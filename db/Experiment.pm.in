@@ -2042,7 +2042,7 @@ sub PostSwap($$$$)
 		$query_result->fetchrow_array;
 	    # Might happen if swapin stats got losts.
 	    $duration = 0
-		if (! defined($duration));
+		if (! defined($duration) || $duration < 0);
 
 	    $prev_swapper = User->Lookup($prev_uid_idx);
 	    $prev_swapper = $swapper
