@@ -126,6 +126,7 @@ sub setjailoptions();
 sub startproxy($);
 sub mysystem($);
 sub cleanup();
+sub startproxy($);
 
 #
 # Parse command arguments. Once we return from getopts, all that should be

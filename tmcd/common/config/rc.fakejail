@@ -109,6 +109,7 @@ sub BootFatal($)
 	     ("datafile" => $BOOTLOG, "timeout" => 5));
     }
 
+    # XXX "--" ensures that -1 is not interpreted as a tmcc cmdline arg
     if (tmcc(TMCCCMD_BOOTERRNO, "-- -1") < 0) {
 	print "Error sending boot errno to Emulab Control!\n";
     }

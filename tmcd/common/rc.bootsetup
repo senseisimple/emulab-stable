@@ -179,7 +179,8 @@ sub BootFatal($$)
 	print "Error sending TBFAILED to Emulab Control!\n";
     }
     
-    if (tmcc(TMCCCMD_BOOTERRNO, $code, undef, %TMCCTIMEOUT) < 0) {
+    # XXX "--" ensures that code < 0 is not interpreted as a tmcc cmdline arg
+    if (tmcc(TMCCCMD_BOOTERRNO, "-- $code", undef, %TMCCTIMEOUT) < 0) {
 	print "Error sending boot errno to Emulab Control!\n";
     }
     
