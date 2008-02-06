@@ -3971,10 +3971,16 @@ COMMAND_PROTOTYPE(dotunnels)
 	char		buf[MYBUFSIZE];
 	int		nrows;
 
-	res = mydb_query("select vname,isserver,peer_ip,port,password, "
-			 " encrypt,compress,assigned_ip,proto,mask "
-			 "from tunnels where node_id='%s'",
-			 10, reqp->nodeid);
+	res = mydb_query("select lma.lanid,lma.memberid,"
+			 "   lma.attrkey,lma.attrvalue from lans as l "
+			 "left join lan_members as lm on lm.lanid=l.lanid "
+			 "left join lan_member_attributes as lma on "
+			 "     lma.lanid=lm.lanid and "
+			 "     lma.memberid=lm.memberid "
+			 "where l.exptidx='%d' and l.type='tunnel' and "
+			 "      lm.node_id='%s' and "
+			 "      lma.attrkey like 'tunnel_%%'",
+			 4, reqp->exptidx, reqp->nodeid);
 
 	if (!res) {
 		error("TUNNELS: %s: DB Error getting tunnels\n", reqp->nodeid);
@@ -3989,19 +3995,14 @@ COMMAND_PROTOTYPE(dotunnels)
 		row = mysql_fetch_row(res);
 
 		OUTPUT(buf, sizeof(buf),
-		        "TUNNEL=%s ISSERVER=%s PEERIP=%s PEERPORT=%s "
-			"PASSWORD=%s ENCRYPT=%s COMPRESS=%s "
-			"INET=%s MASK=%s PROTO=%s\n",
-			row[0], row[1], row[2], row[3], row[4],
-			row[5], row[6], row[7], CHECKMASK(row[9]), row[8]);
-		       
+		       "TUNNEL=%s MEMBER=%s KEY='%s' VALUE='%s'\n",
+		       row[0], row[1], row[2], row[3]);
 		client_writeback(sock, buf, strlen(buf), tcp);
 		
 		nrows--;
 		if (verbose)
-			info("TUNNELS: %s ISSERVER=%s PEERIP=%s "
-			     "PEERPORT=%s INET=%s\n",
-			     row[0], row[1], row[2], row[3], row[7]);
+			info("TUNNEL=%s MEMBER=%s KEY='%s' VALUE='%s'\n",
+			     row[0], row[1], row[2], row[3]);
 	}
 	mysql_free_result(res);
 	return 0;
