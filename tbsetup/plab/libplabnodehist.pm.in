@@ -46,8 +46,8 @@ my $debug = 0;
 #  members is the number of consecutive 'success's or 'failure's in 
 #    the sequence.
 #
-sub getNodeHistSequences(;$$) {
-    
+sub getNodeHistSequences($;$$) {
+    my $plcname = shift;
     my $fpnode = shift;
     my $fstime = shift;
 
@@ -74,12 +74,15 @@ sub getNodeHistSequences(;$$) {
 		     localtime(time() - $fstime)) . "'";
     }
 
-    my $q = "select phys_node_id,unix_timestamp(timestamp)," . 
-	    "    status" . 
-	    "  from plab_nodehist" . 
-	    "  where component='node' and operation='create'" . 
-	    "  $filter" . 
-	    "  order by phys_node_id,timestamp";
+    my $q = "select pnh.phys_node_id,unix_timestamp(pnh.timestamp)," . 
+	    "  pnh.status" . 
+	    " from plab_nodehist as pnh" . 
+	    " left join plab_mapping as pm on pnh.phys_node_id=pm.node_id" . 
+	    " left join plab_plc_info as ppi on pm.plc_idx=ppi.plc_idx" . 
+	    " where component='node' and operation='create'" . 
+	    "   and ppi.plc_name='$plcname'" . 
+	    " $filter" . 
+	    " order by phys_node_id,timestamp";
 
     if ($debug) {
 	print "query = \"$q\"\n";
