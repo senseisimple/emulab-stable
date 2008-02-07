@@ -1,7 +1,7 @@
 # -*- python -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -11,10 +11,6 @@ Plab central, slices, and nodes.  All data (except static things like
 certificates) is kept in the Emulab DB.  Unlike the regular dslice
 svm, this one supports dynamically changing which nodes are in a
 slice.
-
-This requires an already obtained dslice certficate and key.  By
-default it expects to find these in the @prefix@/etc/plab/
-subdirectory.
 """
 
 import sys
@@ -70,13 +66,6 @@ debug = 0
 # Constants
 #
 DEF_AGENT = "PLC4";
-#
-# Add a compatibility agent --- libplab will make all PLC calls on this agent
-# in addition to the default agent.
-#
-COMPAT_AGENT = "PLCNM";
-# if this is set, do all PLC calls on COMPAT_AGENT as well as DEF_AGENT
-compat_mode = 0
 
 RENEW_TIME = 2*24*60*60  # Renew two days before lease expires
 
@@ -89,6 +78,8 @@ TBOPS = "@TBOPSEMAIL_NOSLASH@"
 MAILTAG = "@THISHOMEBASE@"
 SLICE_ALIAS_DIR = "/etc/mail/plab-slice-addrs"
 
+DEFAULT_DATA_PATH = "@prefix@/etc/plab"
+
 RESERVED_PID = "emulab-ops"
 RESERVED_EID = "hwdown"       # start life in hwdown
 MONITOR_PID  = "emulab-ops"
@@ -100,7 +91,7 @@ MAGIC_INET_GATEWAYS =  ("205.124.244.150", "205.124.239.185",
                         "205.124.244.154", "205.124.244.138",
                         "205.124.244.130", )
 LOCAL_PLAB_DOMAIN = ".flux.utah.edu"
-LOCAL_PLAB_LINKTYPE = "pcplabinet2"
+LOCAL_PLAB_LINKTYPE = "inet2"
 
 # allowed nil/unknown values (sentinels).
 ATTR_NIL_VALUES = ('None',)
@@ -120,55 +111,25 @@ PELAB_PUSH  = "@prefix@/sbin/pelab_opspush"
 
 ROOTBALL_URL = "http://localhost:1492/" # ensure this ends in a slash
 
-DEF_PLAB_URL = "www.planet-lab.org"
 DEF_SITE_XML = "/xml/sites.xml"
 IGNORED_NODES_FILE = "@prefix@/etc/plab/IGNOREDNODES"
 ALLOWED_NODES_FILE = "@prefix@/etc/plab/ALLOWEDNODES"
 
-DEF_ROOTBALL_NAME = "@PLAB_ROOTBALL@"
-SLICEPREFIX = "@PLAB_SLICEPREFIX@"
-NODEPREFIX  = "plab"
-
 BADSITECHARS = re.compile(r"\W+")
 PLABBASEPRIO = 20000
 PLAB_SVC_SLICENAME = "utah_svc_slice"
-PLAB_SVC_SLICEDESC = "Emulab management service slice. Performs periodic " \
-                     "checkins with Emulab central, and routes events for " \
-                     "other Emulab slices. Slivers in this slice should " \
-                     "only interact with other PlanetLab machines, and Emulab."
+PLAB_SVC_SLICEDESC = "@THISHOMEBASE@ management service slice. Performs " \
+                     "periodic checkins with @THISHOMEBASE@ central, and " \
+                     "routes events for other @THISHOMEBASE@ slices. " \
+                     "Slivers in this slice should only interact with " \
+                     "other PLC-based nodes, and @THISHOMEBASE@."
 PLABMON_PID = "emulab-ops"
 PLABMON_EID = "plab-monitor"
-DEF_SLICE_DESC = "Slice created by Emulab"
-DEF_EMULAB_URL = "http://www.emulab.net"
+DEF_SLICE_DESC = "Slice created by @THISHOMEBASE@"
+DEF_EMULAB_URL = "http://@WWWHOST@"
 
 PLABEXPIREWARN = 1*WEEK        # one week advance warning for slice expiration.
 NODEEXPIREWARN = 2*WEEK+2*DAY  # about two weeks advance warning for slivers.
-
-#
-# This is a trigger table for dist'ing out multiple rootballs depending on
-# which NM is running on the node.  Since we don't know which version is
-# running on a node until we call into (DEF|COMPAT)_AGENT and actually connect
-# to the node, it's based off classnames.
-#
-# The table specifies a prefix to the default rootball name; this rootball
-# should be placed in the normal location.
-#
-# If the plcagent class and nodeagent class are both not in the trigger table,
-# we simply push the default rootball.
-#
-# Note that we could store version info in the database, but that doesn't
-# really have long-term value.  Plus, we have to be checking sites.xml all the
-# time to catch version changes during rollout.  This way, plabmonitord and
-# the web interface know exactly what is the version whenever a node is
-# contacted for setup.
-#
-# For now, only NM4agent has a custom tarball, since v4 nodes are in the
-# distinct minority right now.
-#
-from mod_PLC4 import NM4agent
-
-#rootball_triggers = { mod_PLC4 : { NM4agent : 'NM4-' } }
-rootball_triggers = dict({})
 
 #
 # var to track failed renewals
@@ -185,7 +146,6 @@ sys.stdout = os.fdopen(sys.stdout.fileno(), sys.stdout.mode, 0)
 #
 signal.signal(signal.SIGPIPE, signal.SIG_IGN)
 
-
 #
 # Plab abstraction
 #
@@ -200,13 +160,13 @@ class MultiChangeError(Exception):
         pass
     pass
 
-
 #
 # Class responsible for parsing planetlab sites file
 #
 class siteParser:
 
-    def __init__(self):
+    def __init__(self,plc):
+        self.plc = plc
         self.parser = xml.parsers.expat.ParserCreate()
         self.parser.StartElementHandler = self.__site_start_elt
         self.parser.EndElementHandler = self.__site_end_elt
@@ -216,8 +176,7 @@ class siteParser:
         self.__longitude = 0
         
     def getPlabNodeInfo(self):
-                
-        conn = httplib.HTTPSConnection(DEF_PLAB_URL)
+        conn = httplib.HTTPSConnection(self.plc.url)
         conn.request("GET", DEF_SITE_XML)
         res = conn.getresponse()
         if res.status != 200:
@@ -235,7 +194,8 @@ class siteParser:
         return self.__hosts
 
     def __site_start_elt(self, name, attrs):
-        
+
+        # XXX: how will this look for multiple plcs?
         if name == "PLANETLAB_SITES":
             pass
         
@@ -262,17 +222,20 @@ class siteParser:
                 print "node %s did not have IP!" % attrs['NAME']
                 pass
             else:
-                self.__hosts.append({
-                    'HNAME'     : attrs['NAME'],
-                    'IP'        : attrs['IP'],
-                    'PLABID'    : attrs['NODE_ID'],
-                    'MAC'       : attrs['MAC'],
-                    'BWLIMIT'   : attrs['BWLIMIT'],
-                    'SITE'      : self.__sitename,
-                    'LATITUDE'  : self.__latitude,
-                    'LONGITUDE' : self.__longitude,
-                    'STATUS'    : attrs['STATUS']
-                    })
+                adi = { 'HNAME'     : attrs['NAME'],
+                        'IP'        : attrs['IP'],
+                        'PLABID'    : attrs['NODE_ID'],
+                        'MAC'       : attrs['MAC'],
+                        'BWLIMIT'   : attrs['BWLIMIT'],
+                        'SITE'      : self.__sitename,
+                        'LATITUDE'  : self.__latitude,
+                        'LONGITUDE' : self.__longitude
+                        }
+                if attrs.has_key('STATUS'):
+                    adi['STATUS'] = attrs['STATUS']
+                    pass
+
+                self.__hosts.append(adi)
                 pass
             pass
         
@@ -291,61 +254,379 @@ class siteParser:
             pass
         return
 
+    pass
 
-class Plab:
-    def __init__(self, agent=None):
-        if not agent:
-            self.agent = agents[DEF_AGENT]()
+#
+# Class to pull node, nodenetwork, and site info from PLC via xmlrpc.  Its
+# getPlabNodeInfo method returns in the same format as the original
+# SiteParser.getPlabNodeInfo .
+#
+class XmlrpcNodeInfoFetcher:
+    def __init__(self,plc):
+        self.plc = plc
+        # store the info
+        self.__hosts = []
+
+        which_agent = plc.getAttrVal("nmagent")
+        if which_agent == None:
+            which_agent = DEF_AGENT
             pass
-        if compat_mode:
-            self.compat_agent = agents[COMPAT_AGENT]()
-        if debug:
-            print "Using module: %s" % self.agent.modname
-            if compat_mode:
-                print "COMPAT: Using module: %s" % self.compat_agent.modname
-            pass
+
+        # grab a mod_PLC4 agent
+        self.agent = agents[which_agent](plc)
+
         pass
 
-    def createSlice(self, pid, eid):
+    def getPlabNodeInfo(self):
+        nif = ['nodenetwork_ids','boot_status','hostname','site_id','node_id']
+        ni = self.agent.getNodes(outfilter=nif)
+
+        # XXX: eventually will want to handle multiple interfaces
+        nni_inf = dict({'is_primary' : True})
+        nni_outf = ['ip','nodenetwork_id','mac','bwlimit']
+        nni = self.agent.getNodeNetworks(infilter=nni_inf,outfilter=nni_outf)
+        # index by nnid to make lookups easier
+        nni_map = dict({})
+        for n in nni:
+            nni_map[n['nodenetwork_id']] = dict({ 'IP'      : n['ip'],
+                                                  'MAC'     : n['mac'],
+                                                  'BWLIMIT' : n['bwlimit'] })
+            pass
+
+        sif = ['site_id','longitude','latitude','abbreviated_name']
+        si = self.agent.getSites(outfilter=sif)
+        # index by sid
+        si_map = dict({})
+        for s in si:
+            si_map[s['site_id']] = dict({ 'SITE' : s['abbreviated_name'],
+                                          'LATITUDE' : s['latitude'],
+                                          'LONGITUDE' : s['longitude'] })
+            pass
+
+        # now, munge into one list:
+        for n in ni:
+            # check if we have site info for this node:
+            if not si_map.has_key(n['site_id']):
+                errstr = "could not find site for node %s" % n['hostname']
+                if not ignoreErrors:
+                    raise RuntimeError, "Error: %s" % errstr
+                else:
+                    print "Warning: %s" % errstr
+                    pass
+                continue
+
+            # check if we have the primary nodenetwork for this node:
+            nnid = -1
+            for i in n['nodenetwork_ids']:
+                if nni_map.has_key(i):
+                    nnid = i
+                    break
+                pass
+            if nnid < 0:
+                errstr = "could not find network for node %s" % n['hostname']
+                if not ignoreErrors:
+                    raise RuntimeError, "Error: %s" % errstr
+                else:
+                    print "Warning: %s" % errstr
+                    pass
+                continue
+
+            # now add the node:
+            adi = { 'HNAME'     : n['hostname'],
+                    'PLABID'    : n['node_id'],
+                    'IP'        : nni_map[nnid]['IP'],
+                    'MAC'       : nni_map[nnid]['MAC'],
+                    'BWLIMIT'   : nni_map[nnid]['BWLIMIT'],
+                    'SITE'      : si_map[n['site_id']]['SITE'],
+                    'LATITUDE'  : si_map[n['site_id']]['LATITUDE'],
+                    'LONGITUDE' : si_map[n['site_id']]['LONGITUDE'] }
+            if n.has_key('boot_status'):
+                adi['STATUS'] = n['boot_status']
+                pass
+            
+            self.__hosts.append(adi)
+            pass
+
+        return self.__hosts
+    
+    pass
+
+
+class Plab:
+    def __init__(self):
+        pass
+
+    def getPLCs(self):
         """
-        Slice factory function
+        Returns a list of PLC (name,idx) tuples currently in the Emulab db.
         """
-        slice = Slice(self, pid, eid)
-        slice._create()
+        plcs = []
+        res = DBQueryFatal("select plc_idx,plc_name from plab_plc_info")
+        for (idx,name) in res:
+            plcs.append((name,idx))
+            pass
+        return plcs
+
+    def createSlices(self,pid,eid,stopOnFail=False):
+        """
+        Slice factory function that creates all slices necessary for an
+        Emulab experiment.  If you want to be immediately notified if one of
+        the slices cannot be created successfully, set the stopOnFail param.
+
+        Note: if there are errors while creating and configuring some slices,
+        those are returned via an exception.
+        Any successfully-created slices are NOT torn down!  If you get an
+        exception from this call, you should immediately call Plab.loadSlices,
+        and call the destroySlice method on each slice returned by loadSlices.
+        """
+
+        # Since each experiment could have multiple slices, we figure out
+        # which slices we're going to need, and we allow for the possibility
+        # that there may already be an existing slice for this experiment
+        # that can host some of its nodes.
+        #
+        # (XXX: for now, we're assuming that each experiment can have only one
+        # slice per PLC (figuring out which nodes go to which slice at the
+        # same PLC may not be needed ever, and is going to require lots more
+        # config info.))
+
+        slicelist = []
+        failedslices = []
+
+        # grab any existing slices and which plcs host them
+        res = DBQueryFatal("select plc_idx,slicename"
+                           "  from plab_slices"
+                           " where pid=%s and eid=%s",
+                           (pid,eid))
+        existing = dict({})
+        for (plcidx,slicename) in res:
+            existing[plcidx] = slicename
+            pass
+
+        # grab which plcs we need a slice at, and the necessary info to create
+        # a slicename
+        res = DBQueryFatal("select ppi.plc_idx,ppi.def_slice_prefix"
+                           " from reserved as r"
+                           " left join nodes as n on r.node_id=n.node_id"
+                           " left join node_types as nt on n.type=nt.type"
+                           " left join plab_plc_info as ppi"
+                           "   on nt.type=ppi.node_type"
+                           " where r.pid=%s and r.eid=%s"
+                           "   and ppi.plc_idx is not NULL"
+                           " group by n.type",(pid,eid))
+        for (plcidx,prefix) in res:
+            plc,slicename = None,None
+            if existing.has_key(plcidx):
+                slicename = existing[plcidx]
+                pass
+            else:
+                res = DBQueryFatal("select idx from experiments"
+                                   " where pid=%s and eid=%s",
+                                   (pid,eid))
+                if not len(res):
+                    raise RuntimeError, \
+                          "Didn't get any results while looking up info on " \
+                          "experiment %s/%s" % (self.pid, self.eid)
+                (exptidx,) = res[0]
+                slicename = "%s_elab_%d" % (prefix,exptidx)
+                pass
+            
+            try:
+                plc = PLC(plcidx,slicename)
+            except:
+                raise
+            
+            slice = EmulabSlice(plc,slicename,pid=pid,eid=eid)
+            try:
+                slice.create()
+            except:
+                print "Create of slice %s at %s failed!" % (slice.slicename,
+                                                            plc.name)
+                if stopOnFail:
+                    raise
+                failedslices.append(slice.slicename)
+                if debug:
+                    traceback.print_exc()
+                    pass
+                continue
+            slicelist.append(slice)
+            pass
+
+        if not failedslices == []:
+            raise RuntimeError, "Could not create some slices: %s" \
+                  % ','.join(failedslices)
+
+        return slicelist
+
+    def createSlice(self,pid,eid,plcidx,slicename):
+        """
+        Create only a single slice within an experiment.
+        """
+        plc = None
+        try:
+            plc = PLC(plcidx,slicename)
+        except:
+            raise
+
+        slice = EmulabSlice(plc,slicename,pid=pid,eid=eid)
+
+        try:
+            slice.create()
+        except:
+            print "Creation of slice %s failed!" % slicename
+            if debug:
+                traceback.print_exc()
+                pass
+            raise
+
         return slice
 
-    def createSliceNoDB(self,name,description,userlist=[],nodelist=[],
-                        instmethod=None):
+    def createSliceDirect(self,plcidx,slicename,description,sliceurl=None,
+                          userlist=[],nodelist=[],instmethod=None):
         """
         Slice factory function that doesn't use the Emulab db.
         """
-        slice = Slice(self,usedb=False,slicename=name,slicedescr=description,
+        plc = None
+        try:
+            plc = PLC(plcidx,slicename)
+        except:
+            raise
+        slice = Slice(plc,slicename,slicedescr=description,sliceurl=sliceurl,
                       userlist=userlist,nodelist=nodelist,
                       instmethod=instmethod)
         slice._create()
         return slice
 
-    def loadSlice(self, pid, eid):
+    def loadSliceByNode(self, pid, eid, nodeid):
         """
-        Slice factory function
+        Slice factory function that loads the slice which contains the given
+        nodeid and corresponds to the given pid/eid.
         """
-        slice = Slice(self, pid, eid)
-        slice._load()
+        slice = None
+
+        #
+        # We want to have only one of each of monitoring and testing
+        # experiments, but we want to have a slice from each PLC be "in"
+        # that experiment.  Thus, we have to find out which plc the node
+        # "belongs" to, and figure out which slice we care about based the
+        # hosting plc.
+        #
+        res = DBQueryFatal("select ps.plc_idx,ps.slicename"
+                           " from reserved as r"
+                           " left join nodes as n on r.node_id=n.node_id"
+                           " left join plab_mapping as pm"
+                           "   on n.phys_nodeid=pm.node_id"
+                           " left join plab_slices as ps"
+                           "   on pm.plc_idx=ps.plc_idx"
+                           " where r.node_id=%s and r.pid=%s and r.eid=%s"
+                           "   and ps.pid=%s and ps.eid=%s",
+                           (nodeid,pid,eid,pid,eid))
+        if not res or len(res) <= 0:
+            raise RuntimeError, "Could not find a slice for %s/%s/%s!" % \
+                  (pid,eid,nodeid)
+        if len(res) > 1:
+            raise RuntimeError, "Found multiple slices for %s/%s/%s!" % \
+                  (pid,eid,nodeid)
+        (plcidx,slicename) = res[0]
+
+        plc = None
+        try:
+            plc = PLC(plcidx,slicename)
+        except:
+            raise
+
+        slice = EmulabSlice(plc,slicename,pid,eid)
+        try:
+            slice.load()
+        except:
+            print "Load of existing slice %s (%s) failed!" % (slice.slicename,
+                                                              plc.name)
+            if debug:
+                traceback.print_exc()
+                pass
+            raise
+
         return slice
 
-    def loadSliceNoDB(self,slicename,slicedescr=None,sliceurl=None,
-                      userlist=[],nodelist=[],instmethod=None):
+    def loadSlices(self, pid, eid, stopOnFail=False):
+        """
+        Slice factory function that loads all slices necessary for an Emulab
+        experiment.
+        """
+        slicelist = []
+
+        # grab any existing slices and which plcs host them
+        res = DBQueryFatal("select plc_idx,slicename"
+                           "  from plab_slices"
+                           " where pid=%s and eid=%s",
+                           (pid,eid))
+
+        for (plcidx,slicename) in res:
+            plc = None
+            try:
+                plc = PLC(plcidx,slicename)
+            except:
+                raise
+            
+            # need to try to load and (re)configure an existing slice:
+            slice = EmulabSlice(plc,slicename,pid,eid)
+            try:
+                slice.load()
+            except:
+                print "Load of existing slice %s failed!" % slice.slicename
+                if debug:
+                    traceback.print_exc()
+                    pass
+                if stopOnFail:
+                    raise
+                #failedslices.append(slice.slicename)
+                continue
+            slicelist.append(slice)
+            pass
+        
+        return slicelist
+
+    def loadSlice(self,pid,eid,plcidx,slicename):
+        """
+        Slice factory function that loads all slices necessary for an Emulab
+        experiment.
+        """
+        slice = None
+        plc = None
+        try:
+            plc = PLC(plcidx,slicename)
+        except:
+            raise
+        
+        slice = EmulabSlice(plc,slicename,pid,eid)
+        try:
+            slice.load()
+        except:
+            print "Load of existing slice %s failed!" % slice.slicename
+            if debug:
+                traceback.print_exc()
+                pass
+            raise
+        
+        return slice
+
+    def loadSliceDirect(self,plcidx,slicename,slicedescr=None,sliceurl=None,
+                        userlist=[],nodelist=[],instmethod=None):
         """
         Slice factory function that doesn't use the Emulab db.
         """
-        slice = Slice(self,usedb=False,slicename=slicename,
-                      slicedescr=slicedescr,sliceurl=sliceurl,
+        plc = None
+        try:
+            plc = PLC(plcidx,slicename)
+        except:
+            raise
+        slice = Slice(plc,slicename,slicedescr=slicedescr,sliceurl=sliceurl,
                       userlist=userlist,nodelist=nodelist,
                       instmethod=instmethod)
-        slice._load()
+        slice.load()
         return slice
 
-    def updateNodeEntries(self, ignorenew = False):
+    def updateNodeEntries(self, plcid, ignorenew = False):
         """
         Finds out which Plab nodes are available, and
         update the DB accordingly.  If ignorenew is True, this will only
@@ -363,10 +644,26 @@ class Plab:
         
         print "Getting available Plab nodes ..."
 
+        # grab our plc:
+        plc = PLC(plcid)
+
+        method = plc.getAttrVal("syncmethod")
+        if method == None:
+            method = "xmlrpc"
+            pass
+
         avail = []
         try:
-            parser = siteParser()
+            if method == "sitesxml":
+                parser = siteParser(plc)
+            elif method == "xmlrpc":
+                parser = XmlrpcNodeInfoFetcher(plc)
+            else:
+                raise RuntimeError, "Unsupported update node method %s!" % \
+                      method
+
             avail = parser.getPlabNodeInfo()
+                
             pass
         # XXX: rewrite to use more elegant exception info gathering.
         except:
@@ -385,8 +682,12 @@ class Plab:
             print avail
             pass
 
-        ignored_nodes = self.__readNodeFile(IGNORED_NODES_FILE)
-        allowed_nodes = self.__readNodeFile(ALLOWED_NODES_FILE)
+        # We use nodetype because the plc name might have icky chars, or might
+        # change -- but the nodetype will not.
+        ignored_nodes = self.__readNodeFile("%s.%s" % (IGNORED_NODES_FILE,
+                                                       plc.nodetype))
+        allowed_nodes = self.__readNodeFile("%s.%s" % (ALLOWED_NODES_FILE,
+                                                       plc.nodetype))
 
         # Enforce node limitations, if any.
         # XXX: This is ugly - maybe move to a separate function
@@ -417,16 +718,16 @@ class Plab:
         # Check for duplicate node attributes (sanity check)
         availdups = self.__findDuplicateAttrs(avail)
         if len(availdups):
-            SENDMAIL(TBOPS, "Duplicates in plab advertised node list",
+            SENDMAIL(TBOPS, "Duplicates in %s advertised node list",
                      "Duplicate attributes:\n"
                      "%s\n\n"
-                     "Let plab support know!" % availdups,
+                     "Let plab support know!" % (plc.name,availdups),
                      TBOPS)
             raise RuntimeError, \
                   "Duplicate attributes in plab node listing:\n%s" % availdups
 
         # Get node info we already have.
-        known = self.__getKnownPnodes()
+        known = self.__getKnownPnodes(plc)
         if debug:
             print "Got known pnodes:"
             print known
@@ -469,7 +770,7 @@ class Plab:
                               (nodeent['LINKTYPE'], nodeent['IP'])
                         pass
                     # Add the node.
-                    self.__addNode(nodeent)
+                    self.__addNode(plc,nodeent)
                     # Add a line for the add/update message.
                     nodestr = "%s\t\t%s\t\t%s\t\t%s\t\t%s\n" % \
                               (nodeent['PLABID'],
@@ -500,7 +801,7 @@ class Plab:
                         pass
                     chgerrstr += "\n"
                     continue
-                self.__updateNode(nodeid, nodeent)
+                self.__updateNode(plc, nodeid, nodeent)
                 # Add a line for the add/update message.
                 nodestr = nodeid + "\n"
                 for (attr,(old,new)) in diffattrs.items():
@@ -613,7 +914,7 @@ class Plab:
             pass
         return ()
 
-    def __getKnownPnodes(self):
+    def __getKnownPnodes(self,plc):
         """
         getFree helper function.  Returns a dict of IP:node_id pairs
         for the Plab nodes that currently exist in the DB.
@@ -623,7 +924,8 @@ class Plab:
                            "wni.longitude,wni.bwlimit"
                            " from plab_mapping as pm"
                            " left join widearea_nodeinfo as wni on"
-                           "    pm.node_id = wni.node_id")
+                           "    pm.node_id = wni.node_id"
+                           " where pm.plc_idx=%s",(plc.idx,))
         
         ret = {}
         for (nodeid, plabid, hostname, ip, mac, site,
@@ -640,10 +942,10 @@ class Plab:
         # Check for duplicate node attributes: report any that are found.
         dups = self.__findDuplicateAttrs(ret.values())
         if len(dups):
-            SENDMAIL(TBOPS, "Duplicate plab node attributes in the DB!",
+            SENDMAIL(TBOPS, "Duplicate %s node attributes in the DB!",
                      "Duplicate node attrs:\n"
                      "%s\n\n"
-                     "Fix up please!" % dups,
+                     "Fix up please!" % (plc.name,dups),
                      TBOPS)
             raise RuntimeError, \
                   "Duplicate node attributes in DB:\n%s" % dups            
@@ -699,7 +1001,7 @@ class Plab:
         
         tld = nodeent['HNAME'].split(".")[-1].lower()
         if not tld in ("edu", "org", "net", "com", "gov", "us", "ca"):
-            nodeent['LINKTYPE'] = "pcplabintl"
+            nodeent['LINKTYPE'] = "intl"
             return
         
         # Is it us?
@@ -714,12 +1016,12 @@ class Plab:
 
         for gw in MAGIC_INET2_GATEWAYS:
             if trace.find(gw) != -1:
-                nodeent['LINKTYPE'] = "pcplabinet2"
+                nodeent['LINKTYPE'] = "inet2"
                 return
 
         for gw in MAGIC_INET_GATEWAYS:
             if trace.find(gw) != -1:
-                nodeent['LINKTYPE'] = "pcplabinet"
+                nodeent['LINKTYPE'] = "inet"
                 return
         else:
             print "Warning: Unknown gateway for host %s" % nodeent['IP']
@@ -728,25 +1030,25 @@ class Plab:
         nodeent['LINKTYPE'] = "*Unknown*"
         return
 
-    def __addNode(self, nodeent):
+    def __addNode(self, plc, nodeent):
         """
         updateNodeEntries() helper function.  Adds a new Plab pnode and
         associated vnode to the DB.  The argument is a dictionary containing
         the new node's attributes.
         """
         # Generate/grab variables to be used when creating the node.
-        defosid, controliface = self.__getNodetypeInfo()
+        defosid, controliface = self.__getNodetypeInfo(plc)
         hostonly = nodeent['HNAME'].replace(".", "-")
-        nidnum, priority = self.__nextFreeNodeid()
-        nodeid = "%s%d" % (NODEPREFIX, nidnum)
-        vnodeprefix = "%svm%d" % (NODEPREFIX, nidnum)
+        nidnum, priority = self.__nextFreeNodeid(plc)
+        nodeid = "%s%d" % (plc.nodename_prefix, nidnum)
+        vnodeprefix = "%svm%d" % (plc.nodename_prefix, nidnum)
         print "Creating pnode %s as %s, priority %d." % \
               (nodeent['IP'], nodeid, priority)
 
         # Do the stuff common to both node addition and update first
         # Note that if this fails, we want the exception generated to
         # percolate up to the caller immediately, so don't catch it.
-        self.__updateNode(nodeid, nodeent)
+        self.__updateNode(plc, nodeid, nodeent)
 
         # Now perform stuff specific to node addition
         try:
@@ -760,7 +1062,7 @@ class Plab:
                          "  eventstate, state_timestamp, inception)"
                          " values (%s, %s, %s, %s, %s,"
                          "  %s, %s, %s, now(), %s, now(), now())",
-                         (nodeid, 'pcplabphys', nodeid,
+                         (nodeid, "%s%s" % (plc.nodetype,'phys'), nodeid,
                           'testnode', priority*100,
                           'ALWAYSUP', defosid,
                           'FREE_CLEAN',
@@ -787,12 +1089,13 @@ class Plab:
             DBQueryFatal("replace into node_auxtypes"
                          " (node_id, type, count)"
                          " values (%s, %s, %s)",
-                         (nodeid, nodeent['LINKTYPE'], 1))
+                         (nodeid,"%s%s" % (plc.nodetype,nodeent['LINKTYPE']),
+                          1))
             
             DBQueryFatal("replace into node_auxtypes"
                          " (node_id, type, count)"
                          " values (%s, %s, %s)",
-                         (nodeid, 'pcplab', 1))
+                         (nodeid, plc.nodetype, 1))
             
             DBQueryFatal("replace into node_status"
                          " (node_id, status, status_timestamp)"
@@ -800,10 +1103,11 @@ class Plab:
                          (nodeid, 'down'))
 
             DBQueryFatal("insert into plab_mapping"
-                         " (node_id, plab_id, hostname, IP, mac, create_time)"
-                         " values (%s, %s, %s, %s, %s, now())",
+                         " (node_id, plab_id, hostname, IP, mac, create_time,"
+                         "  plc_idx)"
+                         " values (%s, %s, %s, %s, %s, now(), %s)",
                          (nodeid, nodeent['PLABID'], nodeent['HNAME'],
-                          nodeent['IP'], nodeent['MAC']))
+                          nodeent['IP'], nodeent['MAC'], plc.idx))
 
             #
             # NowAdd the site_mapping entry for this node.
@@ -812,9 +1116,10 @@ class Plab:
             # See if we know about the associated site - grab idx if so
             siteidx = 0
             nodeidx = 1
-            siteres = DBQueryFatal("select site_idx, node_idx from "
-                                   " plab_site_mapping where site_name=%s",
-                                   nodeent['SITE']);
+            siteres = DBQueryFatal("select site_idx, node_idx"
+                                   " from plab_site_mapping"
+                                   " where site_name=%s and plc_idx=%s",
+                                   (nodeent['SITE'],plc.idx));
             if len(siteres):
                 # There are already nodes listed for this site, so get
                 # the next node id.
@@ -831,7 +1136,11 @@ class Plab:
                 maxres = DBQueryFatal("select MAX(site_idx) from "
                                       " plab_site_mapping")
                 try:
-                    siteidx = int(maxres[0][0]) + 1
+                    if not maxres[0][0]:
+                        siteidx = 1
+                    else:
+                        siteidx = int(maxres[0][0]) + 1
+                        pass
                     pass
                 except ValueError:
                     siteidx = 1
@@ -840,15 +1149,15 @@ class Plab:
             # Create site_mapping entry, optionally creating new site idx
             # via not specifying the site_idx field (field is auto_increment)
             DBQueryFatal("insert into plab_site_mapping "
-                         " values (%s, %s, %s, %s)",
-                         (nodeent['SITE'], siteidx, nodeid, nodeidx))
+                         " values (%s, %s, %s, %s, %s)",
+                         (nodeent['SITE'], siteidx, nodeid, nodeidx, plc.idx))
 
             # Create a single reserved plab vnode for the managment sliver.
             n = 1
             vprio = (priority * 100) + n
             sshdport = 38000 + n
             vnodeid = "%s-%d" % (vnodeprefix, n)
-            vnodetype = "pcplab"
+            vnodetype = plc.nodetype
             if verbose:
                 print "Creating vnode %s, priority %d" % (vnodeid, vprio)
                 pass
@@ -884,10 +1193,12 @@ class Plab:
             pass
         
         except:
-            print "Error adding PLAB node to DB: someone needs to clean up!"
+            print "Error adding %s (%s) to DB: someone needs to clean up!" % \
+                  (nodeid,plc.name)
             tbmsg = "".join(traceback.format_exception(*sys.exc_info()))
-            SENDMAIL(TBOPS, "Error adding new plab node to DB: %s\n" %
-                     nodeid, "Some operation failed while trying to add a"
+            SENDMAIL(TBOPS, "Error adding new %s node to DB: %s\n" % \
+                     (plc.name,nodeid),
+                     "Some operation failed while trying to add a"
                      " newly discovered plab node to the DB:\n %s"
                      "\n Please clean up!\n" % tbmsg, TBOPS)
             raise
@@ -931,13 +1242,13 @@ class Plab:
         
         return None
     
-    def __updateNode(self, nodeid, nodeent):
+    def __updateNode(self, plc, nodeid, nodeent):
         """
         updateNodeEntries() helper function.  Updates attributes for plab
         nodes passed in via the nodeent argument.
         """
         # Get the name of the control interface for plab nodes.
-        defosid, controliface = self.__getNodetypeInfo()
+        defosid, controliface = self.__getNodetypeInfo(plc)
 
         haslatlong = (('LATITUDE' in nodeent and 'LONGITUDE' in nodeent) and
             (nodeent['LATITUDE'] != 0 or nodeent['LONGITUDE'] != 0))
@@ -1017,7 +1328,7 @@ class Plab:
         #         "Plab node %s attributes updated." % nodeid, updmsg, TBOPS)
         return
 
-    def __getNodetypeInfo(self):
+    def __getNodetypeInfo(self,plc):
         """
         addNode helper function.  Returns a (defosid, controliface) 
         tuple for the Plab pnode type.  Caches the result since
@@ -1030,10 +1341,10 @@ class Plab:
 
             dbres = DBQueryFatal("select attrkey,attrvalue "
                                  " from node_type_attributes as a "
-                                 " where type = 'pcplabphys' and "
+                                 " where type = '%s%s' and "
                                  "       (a.attrkey='default_osid' or "
                                  "        a.attrkey='control_interface') "
-                                 " order by attrkey")
+                                 " order by attrkey" % (plc.nodetype,'phys'))
             
             assert (len(dbres) == 2), "Failed to get node type info"
             attrdict = {}
@@ -1047,7 +1358,7 @@ class Plab:
         
         return self.__getNodetypeInfoCache
 
-    def __nextFreeNodeid(self):
+    def __nextFreeNodeid(self,plc):
         """
         addNode helper function.  Returns a (nodeid, priority) tuple of
         the next free nodeid and priority for Plab nodes.
@@ -1057,11 +1368,11 @@ class Plab:
         DBQueryFatal("lock tables nextfreenode write")
         try:
             res = DBQueryFatal("select nextid, nextpri from nextfreenode"
-                               " where nodetype = 'pcplab'")
+                               " where nodetype = '%s'" % plc.nodetype)
             assert (len(res) == 1), "Unable to find next free nodeid"
             DBQueryFatal("update nextfreenode"
                          " set nextid = nextid + 1, nextpri = nextpri + 1"
-                         " where nodetype = 'pcplab'")
+                         " where nodetype = '%s'" % plc.nodetype)
             ((nodeid, priority), ) = res
             pass
         finally:
@@ -1083,7 +1394,8 @@ class Plab:
             pass
         return nodelist
 
-    def renew(self, inpid = None, ineid = None, force = False):
+    def renew(self,rpid=None,reid=None,rplcidx=None,rslicename=None,
+              force=False):
         """
         Renews all of the Plab leases regardless of when they expire.  Note
         that all times are handled in the UTC time zone.  We don't trust
@@ -1093,15 +1405,31 @@ class Plab:
         global failedrenew # XXX
         
         now = int(time.time())
-        
-        if not inpid:
-            res = DBQueryFatal("select pid, eid from plab_slices");
+
+        plc = None
+        if rplcidx:
+            plc = PLC(rplcidx)
             pass
-        else:
-            if not ineid:
-                raise RuntimeError, "renew: Must provide eid with pid."
-            res = ((inpid, ineid),)
-            pass
+
+        fclause = []
+        fargs = []
+        if rpid:
+            fclause.append("pid=%s")
+            fargs.append(rpid)
+        if reid:
+            fclause.append("eid=%s")
+            fargs.append(reid)
+        if plc:
+            fclause.append("plc_idx=%s")
+            fargs.append(plc.idx)
+        if rslicename:
+            fclause.append("slicename=%s")
+            fargs.append(rslicename)
+
+        res = DBQueryFatal("select pid,eid,slicename,plc_idx"
+                           " from plab_slices"
+                           " where " + " and ".join(fclause),
+                           tuple(fargs))
         
         loadedSlices = {}
         newfail = []
@@ -1110,19 +1438,19 @@ class Plab:
 
         print "Renewing Plab leases at %s ..." % time.ctime()
 
-        for (pid, eid) in res:
+        for (pid,eid,slicename,plcidx) in res:
 
             try:
-                slice = loadedSlices[(pid, eid)]
+                slice = loadedSlices[(pid,eid,plcidx,slicename)]
                 pass
             except KeyError:
-                slice = self.loadSlice(pid, eid)
-                loadedSlices[(pid, eid)] = slice
+                slice = self.loadSlice(pid,eid,plcidx,slicename)
+                loadedSlices[(pid,eid,plcidx,slicename)] = slice
                 pass
-            
+
             res = slice.renew(force)
-            entry = (pid, eid, slice.leaseend)
-            
+            entry = (pid,eid,slice.slicename,slice.plc.name,slice.leaseend)
+
             if not res:
                 print "Failed to renew lease for %s/%s" % \
                       entry[:2]
@@ -1137,13 +1465,15 @@ class Plab:
                 if entry in failedrenew:
                     failedrenew.remove(entry)
                     pass
-                    
+                pass
+            pass
+
         if newfail:
             failedrenew += newfail
             failstr = ""
             for n in newfail:
-                failstr += "%s/%s (expires: %s UTC)\n" % \
-                           (n[:2] + (time.asctime(time.gmtime(n[2])),))
+                failstr += "Slice %s (%s) in %s/%s (expires: %s UTC)\n" % \
+                           (n[:4] + (time.asctime(time.gmtime(n[4])),))
                 pass
             
             SENDMAIL(TBOPS, "Lease renewal(s) failed",
@@ -1154,8 +1484,8 @@ class Plab:
         if failsoon:
             failstr = ""
             for n in failsoon:
-                failstr += "%s/%s: (expires: %s UTC)\n" % \
-                           (n[:2] + (time.asctime(time.gmtime(n[2])),))
+                failstr += "Slice %s (%s) in %s/%s: (expires: %s UTC)\n" % \
+                           (n[:4] + (time.asctime(time.gmtime(n[4])),))
                 pass
             SENDMAIL(TBOPS, "Warning: PLAB leases have expired, or will soon",
                      "The following plab leases have expired, or will soon:\n"
@@ -1166,280 +1496,303 @@ class Plab:
     
     pass # end class Plab
 # AOP wrappers for class Plab
-wrap_around(Plab.createSlice, timeAdvice)
+wrap_around(Plab.createSlices, timeAdvice)
+
 
 #
-# Slice abstraction
+# PLC object: holds basic info and any attributes about a plc, plus
+# an agent to talk to it.
 #
+class PLC:
+    def __init__(self,plcid,slicename=None):
+        self.id = plcid
+        self.slicename = slicename
+
+        (self.idx,self.name,self.url,self.slice_prefix,self.nodename_prefix,
+         self.nodetype,self.svcslice) = (None,None,None,None,None,None,None)
+
+        self.agent = None
+        self.extra_agents = []
+
+        # initialize ourself
+        self.load()
+        
+        return
+
+    def load(self):
+        """
+        Load PLC config info from Emulab db.  If a slice was specified,
+        load any special slice attributes that may override this PLC's
+        default attributes.
+        """
+        # Figure out if we were given a plc idx or name; either is fine.
+        wcstr = ""
+        if type(self.id) == types.IntType or type(self.id) == types.LongType:
+            wcstr = "plc_idx=%s"
+            pass
+        else:
+            wcstr = "plc_name=%s"
+            pass
+        # Grab the default, necessary set of plc attributes.
+        res = DBQueryFatal("select plc_idx,plc_name,api_url,def_slice_prefix,"
+                           "  nodename_prefix,node_type,svc_slice_name"
+                           " from plab_plc_info"
+                           " where %s" % wcstr,(self.id,))
+
+        if not len(res):
+            raise RuntimeError, "Could not find PLC %s!" % str(self.id,)
+        
+        (self.idx,self.name,self.url,self.slice_prefix,self.nodename_prefix,
+         self.nodetype,self.svcslice) = res[0]
+
+        # Grab any plc-wide attributes.
+        res = DBQueryFatal("select attrkey,attrvalue"
+                           " from plab_plc_attributes"
+                           " where plc_idx=%s",(self.idx,))
+        self.plcattrs = dict({})
+        for (k,v) in res:
+            self.plcattrs[k] = v
+            pass
+
+        # Grab any slice-specific attributes if necessary.
+        self.sliceattrs = dict({})
+        if not self.slicename == None:
+            res = DBQueryFatal("select attrkey,attrvalue"
+                               " from plab_slice_attributes"
+                               " where slicename=%s",(self.slicename,))
+            for (k,v) in res:
+                self.sliceattrs[k] = v
+                pass
+            pass
+
+        # setup our agent(s):
+        primary_agent = self.getAttrVal("primary_agent")
+        if primary_agent == None:
+            primary_agent = DEF_AGENT
+            pass
+        self.agent = agents[primary_agent](self)
+
+        return
+
+    def getAttrVal(self,attrName,required=False):
+        for d in [self.sliceattrs,self.plcattrs]:
+            if d.has_key(attrName):
+                return d[attrName]
+            pass
+        if required:
+            raise RuntimeError, "Could not find attribute '%s'!" % attrName
+        return None
+
+    # XXX: fix this to return different auth structures for different roles
+    # (i.e., for privileged calls, use PI creds; for others, use user creds).
+    def getAuthParameter(self):
+        """
+        Returns an authentication structure for making XMLRPC calls at PLC
+        based on plc and slice attributes.
+        """
+        auth = dict({})
+        errstr = "PLC %s" % self.name
+        if not self.slicename == None:
+            errstr = "%s, slice %s" % (errstr,self.slicename)
+            pass
+
+        # Get the auth method.
+        method = None
+        if self.sliceattrs.has_key("auth_method"):
+            method = self.sliceattrs["auth_method"]
+        elif self.plcattrs.has_key("auth_method"):
+            method = self.plcattrs["auth_method"]
+        else:
+            raise RuntimeError, \
+                  "Could not determine auth_method for %s" % errstr
+        auth["AuthMethod"] = method
+
+        # Grab any necessary additional auth info based on the method.
+        if method == "password":
+            try:
+                auth["Username"] = self.getAttrVal("username",required=True)
+            except:
+                raise RuntimeError, "Could not find username for %s" % errstr
+            try:
+                auth["AuthString"] = self.getAttrVal("password",required=True)
+            except:
+                raise RuntimeError, "Could not find username for %s" % errstr
+            try:
+                auth["Role"] = self.getAttrVal("role",required=True)
+            except:
+                raise RuntimeError, "Could not find role for %s" % errstr
+            pass
+        else:
+            raise RuntimeError, "Unsupported auth_method '%s' for %s!" % \
+                  (method,errstr)
+
+        return auth
+
+    pass
+
+
 class Slice:
-
-    def __init__(self, plab, pid = None, eid = None, exptidx = None,
-                 usedb = True, slicename = None, slicedescr = DEF_SLICE_DESC,
-                 sliceurl = DEF_EMULAB_URL, userlist = [], nodelist = [],
-                 instmethod = None):
-        self.plab = plab
-        self.pid, self.eid = pid, eid
-        self.slicemeta = None
-        self.slicemeta_legacy = None
-        self.exptidx = exptidx
+    """
+    This is a barebones slice class that knows just enough to talk to a PLC
+    and do some basic operations on slices.  There are public member
+    functions for each common operation, as well as private member functions
+    which just call out to PLC via xmlrpc.  If you need to do more than just
+    make the xmlrpc calls, you can extend the class and override the
+    higher-level public functions with extra goop.
+    """
+    
+    def __init__(self,plc,slicename,
+                 slicedescr=DEF_SLICE_DESC,sliceurl=DEF_EMULAB_URL,
+                 userlist=[],nodelist=[],instmethod=None):
+        self.plc = plc
         self.slicename = slicename
         self.description = slicedescr
         self.sliceurl = sliceurl
-        self.usedb = usedb
+        self.instmethod = instmethod
         self.userlist = userlist
         self.nodelist = nodelist
-        self.instmethod = instmethod
 
         # Rules for arguments.
-        if usedb and (pid == None or eid == None):
-            raise RuntimeError, "Must provide pid/eid if using DB!"
-
-        if not usedb and slicename == None:
-            raise RuntimeError, "Must provide slicename if not using DB!"
-
-        # For the case where usedb is false, we have to set eid/pid to
-        # empty strings instead of None, since various other classes assume
-        # they are set.  Same with leaseend -- for that, we just pick the
-        # current time (it's a safe, if impractical, base for "renewing" the
-        # slice).  We do attempt to retrieve leaseend from PLC in _load.
-        if self.pid == None:
-            self.pid = ""
-        if self.eid == None:
-            self.eid = ""
-        self.leaseend = time.gmtime(time.time())
+        if plc == None:
+            raise RuntimeError, "Must provide plc!"
+        if slicename == None:
+            raise RuntimeError, "Must provide slicename!"
         
-        return
-    
+        pass
+
+    def create(self):
+        print "(Directly) Creating slice %s at %s." % (self.slicename,
+                                                       self.plc.name)
+        self._create()
+        return self._configure()
+
     def _create(self):
-        """
-        Creates a new slice that initially contains no nodes.  Don't call
-        this directly, use Plab.createSlice instead.
-        """
-
-        adminbit = 0
-        if self.pid == PLABMON_PID and self.eid == PLABMON_EID:
-            self.slicename   = PLAB_SVC_SLICENAME
-            self.description = PLAB_SVC_SLICEDESC
-            adminbit = 1
-            pass
-
-        if self.usedb:
-            res = DBQueryFatal("select idx, expt_name from experiments "
-                               "where pid=%s "
-                               "and eid=%s",
-                               (self.pid, self.eid))
-            if not len(res):
-                raise RuntimeError, \
-                      "Didn't get any results while looking up info on " \
-                      "experiment %s/%s" % (self.pid, self.eid)
-            (eindex, descr) = res[0]
-            
-            if not self.slicename:
-                self.slicename = "%s_%s" % (SLICEPREFIX, eindex)
-                pass
-            
-            self.description = descr
-            self.exptidx = eindex
-            pass
-        
-        print "Creating Plab slice %s." % self.slicename
-
         try:
-            res, tmpslicemeta, self.leaseend = \
-                 self.plab.agent.createSlice(self)
-            
-            # Do compat calls right after main agent calls.
-            if compat_mode:
+            res, self.slicemeta, self.leaseend = \
+                 self.plc.agent.createSlice(self)
+
+            #
+            # Support for "compat" agents during PLC transition times.
+            # We don't bother saving any of these tickets at this point.
+            # The only point is to duplicate the state at the extra PLCs.
+            #
+            for extra_agent in self.plc.extra_agents:
                 try:
-                    self.plab.compat_agent.createSlice(self)
+                    extra_agent.createSlice(self)
                 except:
-                    print "Warning: compat agent failed in createSlice; " \
+                    print "Warning: extra agent failed in createSlice; " \
                           "\n  watch for inconsistent DB state!"
                     pass
-                pass
-
-            # see if we have two tickets to insert (support the legacy
-            # ticket or not)
-            if type(tmpslicemeta) == tuple:
-                self.slicemeta = tmpslicemeta[0]
-                self.slicemeta_legacy = tmpslicemeta[1]
-                insertFieldsStr = "(exptidx,pid,eid,slicename,slicemeta," \
-                                  "slicemeta_legacy,leaseend,admin)"
-                insertValuesStr = "(%s,%s,%s,%s,%s,%s,%s,%s)"
-                insertValuesTuple = (self.exptidx,self.pid,self.eid,
-                                     self.slicename,
-                                     self.slicemeta,self.slicemeta_legacy,
-                                     time.strftime("%Y-%m-%d %H:%M:%S",
-                                                   time.gmtime(self.leaseend)),
-                                     adminbit)
-                pass
-            else:
-                self.slicemeta = tmpslicemeta
-                insertFieldsStr = "(exptidx,pid,eid,slicename,slicemeta," \
-                                  "leaseend,admin)"
-                insertValuesStr = "(%s, %s, %s, %s, %s, %s, %s)"
-                insertValuesTuple = (self.exptidx,self.pid,self.eid,
-                                     self.slicename,self.slicemeta,
-                                     time.strftime("%Y-%m-%d %H:%M:%S",
-                                                   time.gmtime(self.leaseend)),
-                                     adminbit)
-                pass
-
-            if self.usedb:
-                qstr = "insert into plab_slices " + insertFieldsStr + \
-                       " values " + insertValuesStr
-                
-                DBQueryFatal(qstr,insertValuesTuple)
                 pass
             pass
         except:
             print "slice create(slice %s): exception\n%s" \
                   % (self.slicename,traceback.format_exc())
             
-            self.plab.agent.deleteSlice(self)
+            self.plc.agent.deleteSlice(self)
             
-            if compat_mode:
+            for extra_agent in self.plc.extra_agents:
                 try:
-                    self.plab.compat_agent.deleteSlice(self)
+                    extra_agent.deleteSlice(self)
                 except:
-                    print "Warning: compat agent failed in deleteSlice; " \
+                    print "Warning: extra agent failed in createSlice; " \
                           "\n  watch for inconsistent DB state!"
                     pass
-                pass
-
-            if self.usedb:
-                DBQueryFatal("delete from plab_slices where slicename=%s",
-                             (self.slicename,))
                 pass
             raise
-
-        if self.usedb:
-            # Setup mailing alias for the slice.  All mail currently filters
-            # in via the 'emulabman' alias.  A procmail filter there will
-            # redirect it to the appropriate user.
-            try:
-                qres = DBQueryFatal("select u.uid, u.usr_email from users as u "
-                                    "left join experiments as e "
-                                    "on u.uid_idx = e.swapper_idx "
-                                    "where e.pid=%s and e.eid=%s",
-                                    (self.pid, self.eid))
-                if not len(qres):
-                    raise RuntimeError, \
-                          "Didn't get any results while looking up user info" \
-                          " for experiment %s/%s" % (self.pid, self.eid)
-                (username, usremail) = qres[0]
-                command = "%s -host %s /bin/echo %s \> %s/%s" % \
-                          (SSH, USERNODE, usremail,
-                           SLICE_ALIAS_DIR, self.slicename)
-                os.system(command)
-            except:
-                print "Could not setup email alias for slice: %s!" \
-                      % self.slicename
-                traceback.print_exc()
-                pass
-            pass
-
-        return res
-
-    def _load(self):
-        """
-        Loads an already allocated slice from the DB.  Don't call this
-        directly, use Plab.loadSlice instead.
-
-        XXX This should probably be made lazy, since not all operations
-        really need it
-        """
-        if not self.usedb:
-            # Just grab NM tickets from PLC for now
-            try:
-                self.slicemeta = self.plab.agent.getSliceMeta(self)
-                self.slicemeta_legacy = self.plab.agent.getSliceMetaLegacy(self)
-                pass
-            except:
-                raise
-
-            # Grab leaseend time
-            try:
-                self.leaseend = self.plab.agent.getSliceExpTime(self)
-                pass
-            except:
-                # do nothing -- we can survive without the leaseend time.
-                pass
-            
-            return
-        
-        if verbose:
-            print "Loading slice for pid/eid %s/%s" % (self.pid, self.eid)
-            pass
-
-        # grab our exptidx
-        res = DBQueryFatal("select idx, expt_name from experiments "
-                           "where pid=%s "
-                           "and eid=%s",
-                           (self.pid, self.eid))
-        if not len(res):
-            raise RuntimeError, \
-                  "Didn't get any results while looking up info on " \
-                  "experiment %s/%s" % (self.pid, self.eid)
-        (eindex, descr) = res[0]
-        
-        if not self.slicename:
-            self.slicename = "%s_%s" % (SLICEPREFIX, eindex)
-            pass
-        
-        self.description = descr
-        self.exptidx = eindex
-            
-        res = DBQueryFatal("select slicename, slicemeta, "
-                           "  slicemeta_legacy, leaseend "
-                           " from plab_slices "
-                           " where pid = %s and eid = %s",
-                           (self.pid, self.eid))
-        assert (len(res) > 0), \
-               "No slice found for %s-%s" % (self.pid, self.eid)
-        assert (len(res) == 1), \
-               "Multiple slices found for %s-%s" % (self.pid, self.eid)
-        ((self.slicename,self.slicemeta,self.slicemeta_legacy,leaseend),) = res
-        self.leaseend = calendar.timegm(time.strptime(str(leaseend),
-                                                      "%Y-%m-%d %H:%M:%S"))
         return
 
-    def renew(self, force = False):
-        """
-        Renews slice lease.  We want this to be the maximum allowed by law...
-        Store the expiration time in UTC.
-        """
-        print "Renewing lease for slice %s" % self.slicename
+    def configure(self):
+        print "(Directly) Configuring slice %s at %s." % (self.slicename,
+                                                          self.plc.name)
+        return self._configure()
 
+    def _configure(self):
         try:
-            ret = self.plab.agent.renewSlice(self, force)
+            res, self.slicemeta, self.leaseend = \
+                 self.plc.agent.configureSlice(self)
 
-            if compat_mode:
+            #
+            # Support for "compat" agents during PLC transition times.
+            # We don't bother saving any of these tickets at this point.
+            # The only point is to duplicate the state at the extra PLCs.
+            #
+            for extra_agent in self.plc.extra_agents:
                 try:
-                    self.plab.compat_agent.renewSlice(self)
+                    extra_agent.configureSlice(self)
                 except:
-                    print "Warning: compat agent failed in renewSlice; " \
+                    print "Warning: extra agent failed in configureSlice; " \
                           "\n  watch for inconsistent DB state!"
                     pass
-                pass
-
-            if self.usedb:
-                DBQueryFatal("update plab_slices "
-                             "set slicemeta=%s,leaseend=%s,slicemeta_legacy=%s"
-                             " where slicename=%s",
-                             (self.slicemeta,
-                              time.strftime("%Y-%m-%d %H:%M:%S",
-                                            time.gmtime(self.leaseend)),
-                              self.slicemeta_legacy,
-                              self.slicename))
                 pass
             pass
         except:
-            print "slice.renew: Slice renewal failed:"
+            print "slice configure(slice %s): exception\n%s" \
+                  % (self.slicename,traceback.format_exc())
+            raise
+        return
+
+    def load(self):
+        print "(Directly) Loading slice info for %s at %s." % (self.slicename,
+                                                               self.plc.name)
+        return self._load()
+
+    def _load(self):
+        """
+        Loads sliceinfo from PLC.
+        """
+        self.plc.agent.loadSliceInfo(self)
+        pass
+
+    def destroy(self):
+        print "(Directly) Destroying slice %s at %s." % (self.slicename,
+                                                         self.plc.name)
+        self._destroy()
+        pass
+
+    def _destroy(self):
+        try:
+            self.plc.agent.deleteSlice(self)
+            pass
+        except:
+            print "Failed to delete slice %s at %s!" % (self.slicename,
+                                                        self.plc.idx)
             traceback.print_exc()
-            ret = 0
             pass
 
+        for extra_agent in self.plc.extra_agents:
+            try:
+                extra_agent.deleteSlice(self)
+            except:
+                print "Warning: extra agent failed in deleteSlice; " \
+                      "\n  watch for inconsistent DB state!"
+                pass
+            pass
+        pass
+
+    def renew(self, force=False):
+        print "(Directly) Renewing lease for slice %s at %s." % \
+              (self.slicename,self.plc.name)
+        self._renew()
+        print "Renewing lease for slice nodes in %s at %s." % (self.slicename,
+                                                               self.plc.name)
+        self._renewNodes()
+        pass
+
+    def _renew(self,force=False):
+        ret = self.plc.agent.renewSlice(self, force)
+        
+        for extra_agent in self.plc.extra_agents:
+            try:
+                extra_agent.renewSlice(self)
+            except:
+                print "Warning: extra agent failed in renewSlice; " \
+                      "\n  watch for inconsistent DB state!"
+                pass
+            pass
+        return ret
+
+    def _renewNodes(self):
         # Renew individual slivers, if necessary.  Any that fail to renew
         # and are close to expiration need to be noted.  They will be
         # reported after renewal has been attempted on all nodes.
@@ -1451,8 +1804,8 @@ class Slice:
                 node = self.loadNode(nodeid)
                 pass
             except AssertionError:
-                print "Node %s doesn't really exist in %s" % \
-                      (nodeid, self.slicename)
+                print "Node %s doesn't really exist in %s (%s)" % \
+                      (nodeid, self.slicename, self.plc.name)
                 continue
             if node.renew():
                 print "Failed to renew node: %s (expires %s UTC)" % \
@@ -1465,8 +1818,295 @@ class Slice:
             del node
             pass
 
+        return reportfailed
+
+    def createNode(self, nodeid, force=False):
+        """
+        Node factory function
+        """
+        node = Node(self, nodeid, usedb=False)
+        node._create(force)
+        return node
+
+    def loadNode(self, nodeid):
+        """
+        Node factory function
+        """
+        node = Node(self, nodeid, usedb=False)
+        node._load()
+        return node
+
+    def _updateSliceMeta(self):
+        """
+        Grab current slice metadata from Planetlab.
+        """
+        self.slicemeta = self.plc.agent.getSliceMeta(self)
+        return self.slicemeta
+
+    def updateSliceMeta(self):
+        return self._updateSliceMeta()
+
+    def getSliceNodes(self):
+        """
+        Return a tuple containing the nodes that belong to this slice
+        """
+        retval = []
+        for n in self.nodelist:
+            nn = Node(self,n,usedb=False)
+            # Grab the IP and hostname
+            retval.append([n,nn.IP,nn.hostname])
+            pass
+        return retval
+
+    def getSliceUsers(self):
+        return self.userlist
+
+    pass
+
+
+#
+# Emulab-specific operations and database use.
+#
+class EmulabSlice(Slice):
+    """
+    Emulab extensions to the basic slice object.  Mostly allows us to use
+    the Emulab db as a cache for slice/sliver information, and to do other
+    other Emulab-y things.
+    """
+
+    def __init__(self,plc,slicename,pid,eid):
+        # holds the agent
+        self.plc = plc
+        self.slicename = slicename
+        # Emulab pid/eid
+        self.pid, self.eid = pid, eid
+        # Emulab exptidx: loaded later.
+        self.exptidx = None
+
+        # Stuff we need to grab from the db:
+        self.description = None
+        self.sliceurl = DEF_EMULAB_URL
+        self.instmethod = None
+        self.userlist = None
+        self.nodelist = None
+        # Ticket for NM
+        self.slicemeta = None
+        # lease timeout
+        self.leaseend = time.gmtime(time.time())
+        
+        # config attributes
+        self.sliceattrs = dict({})
+
+        # Rules for arguments.
+        if plc == None:
+            raise RuntimeError, "Must provide plc!"
+        if slicename == None:
+            raise RuntimeError, "Must provide slicename!"
+
+        (self.is_created,self.is_configured,
+         self.no_cleanup,self.no_destroy) = (0,0,0,0)
+
+        return
+
+    def _loadSliceStatusBits(self):
+        # Don't fail if the slice isn't in the plab_slices table yet
+        res = DBQueryFatal("select is_created,is_configured,"
+                           "  no_cleanup,no_destroy"
+                           " from plab_slices"
+                           " where slicename=%s and plc_idx=%s",
+                           (self.slicename,self.plc.idx))
+        if len(res) == 1:
+            (self.is_created,self.is_configured,
+             self.no_cleanup,self.no_destroy) = res[0]
+            pass
+        pass
+
+    def _saveSliceStatusBits(self):
+        res = DBQueryFatal("update plab_slices set"
+                           "  is_created=%s,is_configured=%s,"
+                           "  no_cleanup=%s,no_destroy=%s"
+                           " where slicename=%s and plc_idx=%s",
+                           (self.is_created,self.is_configured,
+                            self.no_cleanup,self.no_destroy,
+                            self.slicename,self.plc.idx))
+        pass
+            
+    def _preload(self):
+        """
+        Load attributes, various other things, from db.
+        """
+        # Grab any slice attributes:
+        res = DBQueryFatal("select attrkey,attrvalue"
+                           " from plab_slice_attributes"
+                           " where slicename=%s and plc_idx=%s",
+                           (self.slicename,self.plc.idx))
+        for (k,v) in res:
+            self.sliceattrs[k] = v
+            pass
+
+        self.adminbit = 0
+        if self.pid == PLABMON_PID and self.eid == PLABMON_EID:
+            self.description = PLAB_SVC_SLICEDESC
+            self.adminbit = 1
+            pass
+
+        # grab exptidx
+        res = DBQueryFatal("select idx, expt_name from experiments "
+                           " where pid=%s and eid=%s",
+                           (self.pid, self.eid))
+        if not len(res):
+            raise RuntimeError, \
+                  "Didn't get any results while looking up info on " \
+                  "experiment %s/%s" % (self.pid, self.eid)
+        (eindex,descr) = res[0]
+        
+        self.description = descr
+        self.exptidx = eindex
+
+        pass
+
+    def create(self):
+        """
+        Creates a new slice that initially contains no nodes.  Don't call
+        this directly, use a Plab factory function instead.
+        This method uses bits in the plab_slices table to decide if it should
+        really create the slice, or just configure it and its nodes.
+        """
+        print "Creating slice %s at %s." % (self.slicename,self.plc.name)
+        self._preload()
+        # If the slice is already in the plab_slices table, get info
+        # about what we should/shouldn't do when setting it up.
+        self._loadSliceStatusBits()
+
+        # only do the create if the slice hasn't been created
+        if not self.is_created:
+            self._create()
+            
+            try:
+                insertFieldsStr = "(exptidx,pid,eid,slicename,slicemeta," \
+                                  "leaseend,admin,plc_idx)"
+                insertValuesStr = "(%s, %s, %s, %s, %s, %s, %s, %s)"
+                insertValuesTuple = (self.exptidx,self.pid,self.eid,
+                                     self.slicename,self.slicemeta,
+                                     time.strftime("%Y-%m-%d %H:%M:%S",
+                                                   time.gmtime(self.leaseend)),
+                                     self.adminbit,self.plc.idx)
+                qstr = "replace into plab_slices " + insertFieldsStr + \
+                       " values " + insertValuesStr
+                #if debug:
+                #    print "plab_slices insert: %s %s" % (str(qstr),
+                #                                         str(insertValuesTuple))
+                #    pass
+                DBQueryFatal(qstr,insertValuesTuple)
+
+                self.is_created = 1
+                self._saveSliceStatusBits()
+                pass
+            except:
+                self._destroy()
+                DBQueryFatal("delete from plab_slices"
+                             "  where slicename=%s and plc_idx=%s",
+                             (self.slicename,self.plc.idx))
+                raise
+            pass
+        else:
+            print "  Not doing create for slice %s at %s (already exists)." % \
+                  (self.slicename,self.plc.name)
+            pass
+
+        # now do the configure
+        if not self.is_configured:
+            self._configure()
+            self.is_configured = 1
+            self._saveSliceStatusBits()
+            pass
+        else:
+            print "  Not doing configure for slice %s at %s " \
+                  "(already configured)." % (self.slicename,self.plc.name)
+            pass
+
+        # Setup mailing alias for the slice.  All mail currently filters
+        # in via the 'emulabman' alias.  A procmail filter there will
+        # redirect it to the appropriate user.
+        try:
+            qres = DBQueryFatal("select u.uid, u.usr_email from users as u "
+                                "left join experiments as e "
+                                "on u.uid_idx = e.swapper_idx "
+                                "where e.pid=%s and e.eid=%s",
+                                (self.pid, self.eid))
+            if not len(qres):
+                raise RuntimeError, \
+                      "Didn't get any results while looking up user info" \
+                      " for experiment %s/%s" % (self.pid, self.eid)
+            (username, usremail) = qres[0]
+            command = "%s -host %s /bin/echo %s \> %s/%s" % \
+                      (SSH, USERNODE, usremail,
+                       SLICE_ALIAS_DIR, self.slicename)
+            os.system(command)
+        except:
+            print "Could not setup email alias for slice %s at %s!" \
+                  % (self.slicename,self.plc.name)
+            traceback.print_exc()
+            pass
+        
+        return
+
+    def load(self):
+        """
+        Loads an already allocated slice from the DB.  Don't call this
+        directly, use a Plab factory function instead.
+
+        XXX This should probably be made lazy, since not all operations
+        really need it
+        """
+        if verbose:
+            print "Loading slice %s at %s." % (self.slicename,self.plc.name)
+            pass
+        
+        self._preload()
+        self._loadSliceStatusBits()
+
+        res = DBQueryFatal("select slicemeta,leaseend "
+                           " from plab_slices "
+                           " where pid=%s and eid=%s and slicename=%s"
+                           "  and plc_idx=%s",
+                           (self.pid,self.eid,self.slicename,self.plc.idx))
+        
+        assert (len(res) > 0), \
+               "Did not find slice %s (%s) for %s/%s" % (self.slicename,
+                                                         self.plc.name,
+                                                         self.pid,self.eid)
+        assert (len(res) == 1), \
+               "Multiple entries found for slice %s (%s) for %s/%s" % \
+               (self.slicename,self.plc.name,self.pid,self.eid)
+        ((self.slicemeta,leaseend),) = res
+        self.leaseend = calendar.timegm(time.strptime(str(leaseend),
+                                                      "%Y-%m-%d %H:%M:%S"))
+        return
+
+    def renew(self, force = False):
+        """
+        Renews slice lease.  We want this to be the maximum allowed by law...
+        Store the expiration time in UTC.
+        """
+        print "Renewing lease for slice %s at %s" % (self.slicename,
+                                                     self.plc.name)
+        self._renew()
+        
+        DBQueryFatal("update plab_slices "
+                     "set slicemeta=%s,leaseend=%s"
+                     " where slicename=%s and plc_idx=%s",
+                     (self.slicemeta,
+                      time.strftime("%Y-%m-%d %H:%M:%S",
+                                    time.gmtime(self.leaseend)),
+                      self.slicename,self.plc.idx))
+
+        print "Renewing lease for slice nodes in %s at %s" % (self.slicename,
+                                                              self.plc.name)
+        reportfailed = self._renewNodes()
+
         # Report any nodes that are near to expiration
-        if self.usedb and len(reportfailed) > 0:
+        if len(reportfailed) > 0:
             tbstr = ""
             for nodeid, leaseend in reportfailed:
                 tbstr += "Node: %s, Leaseend: %s UTC\n" % \
@@ -1479,7 +2119,7 @@ class Slice:
                      (self.pid, self.eid, tbstr),
                      TBOPS)
         
-        return ret
+        return
 
     def destroy(self):
         """
@@ -1488,47 +2128,38 @@ class Slice:
         in the slice, but those should be removed by Emulab before the
         slice is destroyed.
         """
-        print "Destroying Plab slice %s." % self.slicename
-        nodeidlist = []
-        if self.usedb:
+        print "Destroying slice %s at %s." % (self.slicename,self.plc.name)
+        if not self.no_cleanup:
+            nodeidlist = []
             res = DBQueryFatal("select node_id from plab_slice_nodes"
-                               " where slicename = %s",
-                               (self.slicename))
+                               " where slicename=%s and plc_idx=%s",
+                               (self.slicename,self.plc.idx))
             for (nodeid,) in res:
                 nodeidlist.append(nodeid)
                 pass
+            
+            print "\tRemoving any remaining nodes in slice..."
+            for nid in nodeidlist:
+                node = self.loadNode(nid)
+                node.free()
+                del node  # Encourage the GC'er
+                pass
+
+            # mark as unconfigured...
+            self.is_configured = 0
+            self._saveSliceStatusBits()
             pass
         else:
-            nodeidlist = self.nodelist
+            print "  Not cleaning up nodes in slice %s at %s." % \
+                  (self.slicename,self.plc.name)
             pass
-        
-        print "\tRemoving any remaining nodes in slice.."
-        for nid in nodeidlist:
-            node = self.loadNode(nid)
-            node.free()
-            del node  # Encourage the GC'er
-            pass
+
 
         osigs = disable_sigs(TERMSIGS)
+        
+        if not self.no_destroy:
+            self._destroy()
 
-        try:
-            self.plab.agent.deleteSlice(self)
-            pass
-        except:
-            print "Failed to delete slice!"
-            traceback.print_exc()
-            pass
-
-        if compat_mode:
-            try:
-                self.plab.compat_agent.deleteSlice(self)
-            except:
-                print "Warning: compat agent failed in deleteSlice; " \
-                      "\n  watch for inconsistent DB state!"
-                pass
-            pass
-
-        if self.usedb:
             try:
                 print "\tRemoving slice DB entry."
                 DBQueryFatal("delete from plab_slices where slicename = %s",
@@ -1540,33 +2171,37 @@ class Slice:
                          "Slice deletion error:\n\n%s" % tbstr, TBOPS)
                 enable_sigs(osigs)
                 raise
-            
-            try:
-                command = "%s -host %s /bin/rm -f %s/%s" % \
-                          (SSH, USERNODE, SLICE_ALIAS_DIR, self.slicename)
-                os.system(command)
-            except:
-                print "Could not remove email alias for slice: %s!" % \
-                      self.slicename
-                traceback.print_exc()
-                pass
+            # mark as unconfigured and uncreated
+            # XXX: this means that setting the is_configured bit at swapin
+            # is useless if the slice is destroyed later.
+            self.is_created = 0
+            self.is_configured = 0
+            self._saveSliceStatusBits()
             pass
-        
+        else:
+            print "  Not destroying slice %s at %s." % \
+                  (self.slicename,self.plc.name)
+            pass
+
+        # remove mail aliases
+        try:
+            command = "%s -host %s /bin/rm -f %s/%s" % \
+                      (SSH, USERNODE, SLICE_ALIAS_DIR, self.slicename)
+            os.system(command)
+        except:
+            print "Could not remove email alias for slice: %s!" % \
+                  self.slicename
+            traceback.print_exc()
+            pass
+    
         enable_sigs(osigs)
+        pass
 
     def createNode(self, nodeid, force=False):
         """
         Node factory function
         """
-        # XXX: KRW - The following is a hack to help me with testing.
-        #if not nodeid.startswith("plab"):
-        #    IP = socket.gethostbyname(nodeid)
-        #    qres = DBQueryFatal("select n.node_id from nodes as n left join "
-        #                        "interfaces as i on n.node_id = i.node_id "
-        #                        "where i.IP = %s", (IP,))
-        #    assert (len(qres) > 0), "Node does not exist in DB: %s" % nodeid
-        #    nodeid = qres[0][0] + "-20"
-        node = Node(self, nodeid, usedb = self.usedb)
+        node = Node(self, nodeid)
         node._create(force)
         return node
 
@@ -1574,72 +2209,57 @@ class Slice:
         """
         Node factory function
         """
-        node = Node(self, nodeid, usedb = self.usedb)
+        node = Node(self, nodeid)
         node._load()
         return node
 
     def updateSliceMeta(self):
         """
-        Grab current slice metadata from Planetlab and store in db
+        Grab current slice metadata from Planetlab and store in db.
         """
         try:
-            # Handle legacy tickets for compat purposes.
-            self.slicemeta = self.plab.agent.getSliceMeta(self)
-            self.slicemeta_legacy = self.plab.agent.getSliceMetaLegacy(self)
-            if self.usedb:
-                DBQueryFatal("update plab_slices set"
-                             " slicemeta=%s,slicemeta_legacy=%s"
-                             " where slicename=%s",
-                             (self.slicemeta,self.slicemeta_legacy,
-                              self.slicename))
-                pass
+            self._updateSliceMeta()
+            DBQueryFatal("update plab_slices set slicemeta=%s"
+                         " where slicename=%s and plc_idx=%s",
+                         (self.slicemeta,self.slicename,self.plc.idx))
             pass
         except:
             print "Error updating slice metadata!"
-            tbstr = "".join(traceback.format_exception(*sys.exc_info()))
-            SENDMAIL(TBOPS, "Error updating slice metadata",
-                     "Slice metadata update error:\n\n%s" % tbstr, TBOPS)
+            #traceback.print_exc()
+            #tbstr = "".join(traceback.format_exception(*sys.exc_info()))
+            #SENDMAIL(TBOPS, "Error updating slice metadata",
+            #         "Slice metadata update error:\n\n%s" % tbstr, TBOPS)
             raise
+        return self.slicemeta
 
     def getSliceNodes(self):
-        """
-        Return a tuple containing the nodes that belong to this slice
-        """
-        if self.usedb:
-            # Grab set of plab nodes belonging to expt and their IPs:
-            return DBQueryFatal("select r.node_id, i.IP, w.hostname "
-                                " from reserved as r "
-                                " left join nodes as n1 "
-                                "  on r.node_id = n1.node_id "
-                                " left join nodes as n2 "
-                                "  on n1.phys_nodeid = n2.node_id "
+        # Grab set of plab nodes belonging to expt and their IPs:
+        res = DBQueryFatal("select r.node_id, i.IP, w.hostname "
+                           " from reserved as r "
+                           " left join nodes as n1 "
+                           "  on r.node_id = n1.node_id "
+                           " left join nodes as n2 "
+                           "  on n1.phys_nodeid = n2.node_id "
                                 " left join widearea_nodeinfo as w "
-                                "  on n2.node_id = w.node_id "
-                                " left join interfaces as i "
-                                "  on w.node_id = i.node_id "
-                                " where r.pid=%s and r.eid=%s "
-                                " and n1.type=%s and i.role=%s",
-                                (self.pid, self.eid, "pcplab", "ctrl"))
-        else:
-            retval = []
-            for n in self.nodelist:
-                nn = Node(self,n)
-                # Grab the IP and hostname
-                retval.append([n,nn.IP,nn.hostname])
-                pass
-            return retval
-        pass
+                           "  on n2.node_id = w.node_id "
+                           " left join interfaces as i "
+                           "  on w.node_id = i.node_id "
+                           " where r.pid=%s and r.eid=%s "
+                           " and n1.type=%s and i.role=%s",
+                           (self.pid,self.eid,self.plc.nodetype,"ctrl"))
+        if not res or not len(res):
+            res = []
+            pass
 
-    def getSliceUsers(self):
-        return self.userlist
-    
+        return res
+
     pass  # end of class Slice
 # AOP wrappers for class Slice
 wrap_around(Slice._create, timeAdvice)
 wrap_around(Slice.destroy, timeAdvice)
 
 # Helper regexps used in the Node class
-VNODE_REG = re.compile("^plabvm(\d+)\-(\d+)$")
+VNODE_REG = re.compile("^[\w\d]+vm(\d+)\-(\d+)$")
 PNODE_REG = re.compile("^plab(\d+)$")
 IP_REG = re.compile("^(\d+)\.(\d+)\.(\d+)\.(\d+)$")
 HOSTNAME_REG = re.compile("^([\d\w\-\.]+)$")
@@ -1654,31 +2274,30 @@ class Node:
     # Also, note that passing in a pnode or hostname/IP forces usedb = False,
     # since most Emulab db entries depend on the vnodeid at this level.
     #
-    def __init__(self, slice, nodeid, pollNode = False, usedb = True):
+    def __init__(self, slice, nodeid, usedb = True, pollNode = False):
         self.usedb = usedb
         self.slice = slice
         self.nodeid = nodeid
 
         # Figure out what kind of nodeid we were given (how we do lookups
         # depends on it):
-        if VNODE_REG.match(nodeid) != None:
-            self.nidtype = 'v'
-            pass
-        elif PNODE_REG.match(nodeid) != None:
-            self.nidtype = 'p'
-            self.usedb = False
-            pass
-        elif IP_REG.match(nodeid) != None:
-            self.nidtype = 'i'
-            self.usedb = False
-            pass
-        elif HOSTNAME_REG.match(nodeid) != None:
-            self.nidtype = 'h'
-            self.usedb = False
+        if not self.usedb:
+            if VNODE_REG.match(nodeid) != None:
+                self.nidtype = 'v'
+                pass
+            elif IP_REG.match(nodeid) != None:
+                self.nidtype = 'i'
+                pass
+            elif HOSTNAME_REG.match(nodeid) != None:
+                self.nidtype = 'h'
+                pass
+            else:
+                raise RuntimeError, "nodeid must be an Emulab vnode, " \
+                      " a hostname, or IP address!"
             pass
         else:
-            raise RuntimeError, "nodeid must be an Emulab vnode or pnode, or" \
-                  " a hostname or IP address!"
+            self.nidtype = 'v'
+            pass
         
         (self.IP,self.hostname,self.phys_nodeid) = self.__findHostInfo()
         
@@ -1729,7 +2348,7 @@ class Node:
     def pingNM(self):
         isup = False
         try:
-            isup = self.slice.plab.agent.pingNM(self)
+            isup = self.slice.plc.agent.pingNM(self)
         except:
             if debug:
                 traceback.print_exc()
@@ -1760,6 +2379,8 @@ class Node:
         Slice.createNode instead.
         """
 
+        print "usedb = %s" % str(self.usedb)
+
         if self.usedb:
             # First, make sure there isn't already an entry in the DB
             try:
@@ -1788,7 +2409,7 @@ class Node:
         res = None
         try:
             res, self.nodemeta, self.leaseend = \
-                 self.slice.plab.agent.createNode(self)
+                 self.slice.plc.agent.createNode(self)
             if self.usedb:
                 self.__logNodeHist('node','create','success','')
                 pass
@@ -1801,12 +2422,11 @@ class Node:
 
         if self.usedb:
             DBQueryFatal("replace into plab_slice_nodes"
-                         " (exptidx, pid, eid, slicename, node_id,"
+                         " (slicename, plc_idx, node_id,"
                          " nodemeta, leaseend)"
-                         " values (%s, %s, %s, %s, %s, %s, %s)",
-                         (self.slice.exptidx, self.slice.pid, self.slice.eid,
-                          self.slice.slicename, self.nodeid,
-                          self.nodemeta,
+                         " values (%s, %s, %s, %s, %s)",
+                         (self.slice.slicename, self.slice.plc.idx,
+                          self.nodeid, self.nodemeta,
                           time.strftime("%Y-%m-%d %H:%M:%S",
                                         time.gmtime(self.leaseend))))
             pass
@@ -1897,7 +2517,7 @@ class Node:
 
         deleted = 0
         try:
-            deleted = self.slice.plab.agent.freeNode(self)
+            deleted = self.slice.plc.agent.freeNode(self)
             if self.usedb:
                 # Uncomment to increase logging
                 #self.__logNodeHist('node','free','success','')
@@ -1929,7 +2549,7 @@ class Node:
         res = None
         try:
             res, self.nodemeta, self.leaseend = \
-                 self.slice.plab.agent.renewNode(self)
+                 self.slice.plc.agent.renewNode(self)
             if self.usedb:
                 self.__logNodeHist('node','renew','success','')
                 pass
@@ -1966,7 +2586,7 @@ class Node:
     def _start(self):
         res = None
         try:
-            res = self.slice.plab.agent.startNode(self)
+            res = self.slice.plc.agent.startNode(self)
             if self.usedb:
                 self.__logNodeHist('node','start','success','')
                 pass
@@ -1993,7 +2613,7 @@ class Node:
     def _stop(self):
         res = None
         try:
-            res = self.slice.plab.agent.stopNode(self)
+            res = self.slice.plc.agent.stopNode(self)
             if self.usedb:
                 self.__logNodeHist('node','stop','success','')
                 pass
@@ -2020,7 +2640,7 @@ class Node:
     def _restart(self):
         res = None
         try:
-            res = self.slice.plab.agent.restartNode(self)
+            res = self.slice.plc.agent.restartNode(self)
             if self.usedb:
                 self.__logNodeHist('node','restart','success','')
                 pass
@@ -2034,51 +2654,36 @@ class Node:
         TIMESTAMP("restartnode %s finished." % self.nodeid)
         return 0
 
-    def emulabify(self, rootballpath = DEFAULT_DATA_PATH,
-                  rootballname = DEF_ROOTBALL_NAME):
+    def emulabify(self):
         """
         Performs the necessary steps to turn this node into an
         Emulab/Plab node.  Primarily, this unpacks the magic files on to
         the node.
         """
-        # check to see if we should use a custom rootball
-        rrootballname = rootballname
-        try:
-            if (not self.nmagent == None) \
-                   and (not self.slice.plab.agent == None):
-                tpc = self.slice.plab.agent.__class__
-                tnc = self.nmagent.getAgentClass()
-                if rootball_triggers.has_key(tpc) \
-                       and rootball_triggers[tpc].has_key(tnc):
-                    # found a valid prefix for the rootball; update the name
-                    rrootballname = rootball_triggers[tpc][tnc] + rootballname
-                    if debug:
-                        print "Updated rootball name from %s to %s" \
-                              % (rootballname,rrootballname)
-                        pass
-                    pass
-                else:
-                    if debug:
-                        print "rbtriggers: %s; looking for %s/%s" \
-                              % (str(rootball_triggers),str(tpc),str(tnc))
-                        pass
-                    pass
+
+        # check if we want to skip emulabify:
+        do_emulabify = self.slice.plc.getAttrVal("emulabify")
+        if do_emulabify and (do_emulabify == "no" or do_emulabify == "NO"):
+            return
+
+        # grab rootballs that need to be installed in this slice
+        rootballs = self.slice.plc.getAttrVal("rootballs",required=True)
+        tmp = rootballs.split(',')
+        rootballs = []
+        for r in tmp:
+            (ball,loc) = (r,None)
+            if r.find(":") >= 0:
+                (ball,loc) = r.split(':')
                 pass
-            else:
-                if debug:
-                    print "One of the agents was null!"
-                    pass
-                pass
+            rootballs.append((ball,loc))
             pass
-        except:
-            print "Warning: exception while trying to update rootball name"
-            traceback.print_exc()
-            pass
-        
+
         TIMESTAMP("emulabify started on %s." % self.nodeid)
-        print "Overlaying Emulab files on %s ..." % self.nodeid
+        print "Setting up root access on %s ..." % self.nodeid
+
+        # have to set us up with root before anything else
         try:
-            self.__copy(DEFAULT_DATA_PATH + "fixsudo.sh", "/tmp/fixsudo.sh",
+            self.__copy(DEFAULT_DATA_PATH + "/fixsudo.sh", "/tmp/fixsudo.sh",
                         tries=3,interval=5)
             self.__perform("-tt sh /tmp/fixsudo.sh", quiet = True,
                            tries=3,interval=5)
@@ -2094,19 +2699,48 @@ class Node:
             print "Adding slice user to 'root' group on %s failed; " \
                   "attempting to carry on anyway." % self.nodeid
             pass
-        try:
-            self.unpackRootball(rootballpath, rrootballname)
-            if self.usedb:
-                # Uncomment to increase logging
-                #self.__logNodeHist('node','emulabify','success','')
+
+        # now upload any rootballs
+        print "Uploading rootballs to %s ..." % self.nodeid
+        for (rootball,unpackdir) in rootballs:
+            if not unpackdir:
+                unpackdir = "/"
                 pass
-        except:
-            if self.usedb:
-                self.__logNodeHist('node','emulabify','failure',
-                                   traceback.format_exception(*sys.exc_info()))
+            # handle one special case...
+            if unpackdir == '$HOME':
+                unpackdir = "/home/%s" % self.slice.slicename
                 pass
-            raise
+            
+            try:
+                self.unpackRootball(DEFAULT_DATA_PATH, rootball,
+                                    destpath=unpackdir)
+                if self.usedb:
+                    #self.__logNodeHist('node','emulabify','success','')
+                    pass
+                pass
+            except:
+                if self.usedb:
+                    self.__logNodeHist('node','emulabify','failure',
+                                       traceback.format_exception(*sys.exc_info()))
+                    pass
+                raise
+            pass
+
+        # now run any postsetup commands:
+        print "Running commands on %s" % self.nodeid
+        commands = self.slice.plc.getAttrVal("commands")
+        if commands:
+            commands = commands.split(',')
+            pass
+        else:
+            commands = []
+            pass
+        for command in commands:
+            self.__perform(command)
+            pass
+
         TIMESTAMP("emulabify finished on %s." % self.nodeid)
+        pass
 
     def addToGroup(self, user, group):
         if verbose:
@@ -2125,12 +2759,12 @@ class Node:
         try:
             if debug:
                 print "Trying to grab rootball through loopback service"
-            self.__perform("sudo wget -q -nH -P /tmp " +
+            self.__perform("sudo wget -t 1 -q -nH -P /tmp " +
                            ROOTBALL_URL + rbname)
         except RuntimeError:
             print "Warning: couldn't get rootball via local service on %s: " \
                   "Falling back to remote transfer." % self.nodeid
-            self.__copy(rbpath + rbname, "/tmp/" + rbname)
+            self.__copy(rbpath + "/" + rbname, "/tmp/" + rbname)
             pass
             
         self.__perform("sudo tar -jxf /tmp/" + rbname + " -C %s" % destpath,
@@ -2324,7 +2958,7 @@ class Node:
             hostname = self.nodeid
             pass
         
-        if debug:
+        if verbose:
             print "hostname is %s for node %s" % (hostname,IP)
             pass
         
@@ -2365,7 +2999,7 @@ class Node:
             phys_nodeid = None
             pass
         
-        if debug:
+        if verbose:
             print "hostname is %s for node %s" % (hostname,IP)
             pass
         

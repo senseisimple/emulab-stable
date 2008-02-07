@@ -76,7 +76,29 @@ sub new($$$$$) {
 
     # Clean up anything left behind by a terminated monitor
     # XXX: this is kind of hacky, but it works.
-    my @vnodes = ExpNodes($PLABTESTING_PID, $PLABTESTING_EID);
+    #
+    # NOTE: we grab all the nodes for this plc, OR any vnodes in this 
+    # experiment that don't have entries in the plab_slice_nodes table.
+    # This presents a nice race, but we don't have a great way to solve 
+    # right now.
+    my $plcname = getPLCName();
+    my @vnodes = ();
+    my $qres = DBQueryFatal("select r.node_id" . 
+			    " from reserved as r" . 
+			    " left join plab_slice_nodes as psn" . 
+			    "   on r.node_id=psn.node_id" . 
+			    " left join plab_plc_info as ppi" . 
+			    "   on psn.plc_idx=ppi.plc_idx" . 
+			    " where r.pid='$PLABTESTING_PID'" . 
+			    "   and r.eid='$PLABTESTING_EID'" . 
+			    "   and (ppi.plc_name='$plcname'" . 
+			    "        or ppi.plc_name is NULL)");
+    if ($qres->num_rows()) {
+	while (my @row = $qres->fetchrow_array()) {
+	    my $vnodename = $row[0];
+	    push @vnodes, $vnodename;
+	}
+    }
     if (@vnodes) {
         system("$VNODE_SETUP -f -k -n 100 $PLABTESTING_PID $PLABTESTING_EID");
         Node::DeleteVnodes(@vnodes);

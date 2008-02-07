@@ -709,20 +709,23 @@ sub doSwapout($) {
 			 "where pid='$pid' and eid='$eid'");
 
 	if ($db_result->numrows) {
-	    # Are there any dslice nodes left?
+	    # Are there any nodes left in the slice?
 	    $db_result =
-		DBQueryFatal("select n.node_id from nodes as n ".
-			     "left join node_types as nt on n.type = nt.type ".
-			     "left join reserved as r ".
-			     " on r.node_id = n.node_id ".
-			     "where r.pid='$pid' and r.eid='$eid' ".
-			     " and nt.isplabdslice = 1");
+		DBQueryFatal("select r.node_id ".
+			     " from plab_slices as ps".
+			     " left join plab_slice_nodes as psn ".
+			     "   on (ps.slicename=psn.slicename ".
+			     "       and ps.plc_idx=psn.plc_idx) ".
+			     " left join reserved as r ".
+			     "   on psn.node_id=r.node_id ".
+			     " where ps.pid='$pid' and ps.eid='$eid'".
+			     "   and r.node_id is not NULL");
 
 	    if (!$db_result->numrows) {
-		print "Destroying Planetlab slice.\n";
+		print "Tearing down Slices.\n";
 		TBDebugTimeStamp("plabslice destroy started");
 		if (system("plabslice destroy $pid $eid")) {
-		    tberror "Failed to destroy Plab dslice.";
+		    tberror "Failed to tear down Slices.";
 		    $swapout_errors = 1;
 		}
 		TBDebugTimeStamp("plabslice destroy finished");
@@ -990,37 +993,33 @@ sub doSwapin($) {
     # dslice now
     #
     if ($type > UPDATE_RECOVER) {
-	# Are there any Plab nodes?
+	# Are there any Plab nodes?  First get a list of node types in the exp;
+	# if any are types hosted by any of the PLCs we know about, create
+	# all slices necessary for the experiment in a single plabslice call.
 	$db_result =
-	    DBQueryFatal("select n.node_id from nodes as n ".
-			 "left join node_types as nt on n.type = nt.type ".
-			 "left join reserved as r on r.node_id = n.node_id ".
-			 "where r.pid='$pid' and r.eid='$eid' ".
-			 " and nt.isplabdslice = 1");
+	    DBQueryFatal("select nt.type,ppi.plc_name from nodes as n ".
+			 "  left join node_types as nt on n.type = nt.type ".
+			 "  left join reserved as r on r.node_id = n.node_id ".
+			 "  left join plab_plc_info as ppi ".
+			 "    on nt.type = ppi.node_type".
+			 " where r.pid='$pid' and r.eid='$eid'".
+			 "    and ppi.node_type is not NULL".
+			 " group by nt.type");
 
 	if ($db_result->numrows) {
-	    # Does slice already exist?
-	    $db_result =
-		DBQueryFatal("select slicename from plab_slices ".
-			     "where pid='$pid' and eid='$eid'");
-
-	    if (! $db_result->numrows) {
-		my @plabnodes = ();
-		
-		while (my ($node) = $db_result->fetchrow_array()) {
-		    push(@plabnodes, $node);
-		}
-		
-		print "Creating Planetlab slice.\n";
-		TBDebugTimeStamp("plabslice create started");
-		if (system("plabslice create $pid $eid")) {
-		    tberror({type => 'secondary', severity => SEV_SECONDARY,
-			     error => ['plabslice_create_failed']},
-			    "Failed to create Plab dslice");
-		    return 3;
-		}
-		TBDebugTimeStamp("plabslice alloc finished");
+	    my $info_str = "";
+	    while (my ($nt,$plc) = $db_result->fetchrow_array()) {
+		$info_str .= " $plc($nt)";
 	    }
+	    print "Configuring Slices for $info_str.\n";
+	    TBDebugTimeStamp("plabslice started");
+	    if (system("plabslice create $pid $eid")) {
+		tberror({type => 'secondary', severity => SEV_SECONDARY,
+			 error => ['plabslice_create_failed']},
+			"Failed to configure Slices.");
+		return 3;
+	    }
+	    TBDebugTimeStamp("plabslice finished");
 	}
     }
 

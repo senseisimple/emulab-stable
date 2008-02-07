@@ -2,7 +2,7 @@
 # -*- python -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -11,12 +11,11 @@ sys.path.append("@prefix@/lib")
 import getopt
 from libtestbed import *
 import libplab
+import traceback
 
-usage = "%prog [-vd] {create|destroy} pid eid\n" \
-        "  Without Emulab DB:\n" \
-        "%prog [-vd] [-u <user1,...>] [-n <node1,...>] [-m <instmethod>] \n" \
-        "      -c <slicedesc> {create|destroy} slicename"
-        #            [-w <url>]
+usage = "\t%prog [-vd] {create|destroy|metaup} pid eid [-p plc slicename]\n" \
+        "\t%prog [-vd] [-u <user1,...>] [-n <node1,...>] [-m <instmethod>] \n"\
+        "\t      -c <slicedesc> [-w <url>] {create|destroy} slicename"
 
 def main(args):
     me = args[0]
@@ -31,19 +30,26 @@ def main(args):
                       help="Slice description",default=None)
     parser.add_option("-m","--instmethod",dest="instmethod",action="store",
                       help="Slice instantiation method",default=None)
-#    parser.add_option("-w","--sliceurl",dest="sliceurl",action="store_true",
-#                      help="Slice URL",default=None)
+    parser.add_option("-w","--sliceurl",dest="sliceurl",action="store",
+                      help="Slice URL",default=None)
+    parser.add_option("-p","--plc",dest="plc",action="store",
+                      help="PLC Name",default=None)
+
+    command,slicename = None,None
     userlist,nodelist = None,None
+    pid,eid = None,None
     
     (opts, args) = parser.parse_args()
     
-    usedb = True
     if len(args) == 2:
-        usedb = False
         command,slicename = args
         if args[0] == 'create' and (opts.slicedesc == None \
                                     or opts.slicedesc == ''):
-            parser.error("Must supply a slice description if creating by slicename!")
+            parser.error("Must supply a slice description if creating" \
+                         " by slicename!")
+            pass
+        if opts.plc == None:
+            parser.error("Must supply a plc if creating by slicename!")
             pass
         if opts.nodes != None:
             nodelist = opts.nodes.split(',')
@@ -52,7 +58,7 @@ def main(args):
             nodelist = []
             pass
         if opts.users != None:
-            userlist = opts.nodes.split(',')
+            userlist = opts.users.split(',')
             pass
         else:
             userlist = []
@@ -61,31 +67,93 @@ def main(args):
     elif len(args) == 3:
         command,pid,eid = args
         pass
+    elif len(args) == 4:
+        command,pid,eid,slicename = args
+        if not opts.plc or opts.plc == '':
+            parser.error("When specifying a slicename, you must also specify" \
+                         " a PLC!")
+            pass
+        pass
     else:
         parser.error("Incorrect number of arguments")
         pass
 
     plab = libplab.Plab()
+    slicelist = []
     if command == "create":
-        if usedb:
-            slice = plab.createSlice(pid, eid)
+        if pid and eid and slicename:
+            slice = plab.createSlice(pid,eid,opts.plc,slicename)
+            slicelist.append(slice)
             pass
+        elif pid and eid:
+            slicelist = plab.createSlices(pid,eid)
         else:
-            slice = plab.createSliceNoDB(slicename,opts.slicedesc,
-                                         userlist=userlist,nodelist=nodelist,
-                                         instmethod=opts.instmethod)
+            slice = plab.createSliceDirect(opts.plc,slicename,
+                                           opts.slicedesc,opts.sliceurl,
+                                           userlist=userlist,nodelist=nodelist,
+                                           instmethod=opts.instmethod)
+            slicelist.append(slice)
             pass
         pass
     elif command == "destroy":
-        if usedb:
-            slice = plab.loadSlice(pid, eid)
+        if pid and eid and slicename:
+            slice = plab.loadSlice(pid,eid,opts.plc,slicename)
+            slice.destroy()
+            pass
+        elif pid and eid:
+            failedslices = []
+            slicelist = plab.loadSlices(pid,eid)
+            for slice in slicelist:
+                try:
+                    slice.destroy()
+                except:
+                    print "Failed to destroy %s:" % str(slice.slicename)
+                    failedslices.append(slice.slicename)
+                    traceback.print_exc()
+                    pass
+                pass
+
+            if not failedslices == []:
+                raise RuntimeError("Could not destroy some slices: %s" % \
+                                   ','.join(failedslices))
             pass
         else:
-            slice = plab.loadSliceNoDB(slicename,slicedescr=opts.slicedesc,
-                                       userlist=userlist,nodelist=nodelist,
-                                       instmethod=opts.instmethod)
+            slice = plab.loadSliceDirect(opts.plc,slicename,
+                                         slicedescr=opts.slicedesc,
+                                         userlist=userlist,nodelist=nodelist,
+                                         instmethod=opts.instmethod)
+            slice.destroy()
             pass
-        slice.destroy()
+        pass
+    elif command == "metaup":
+        if pid and eid and slicename:
+            slice = plab.loadSlice(pid,eid,opts.plc,slicename)
+            slice.updateSliceMeta()
+            pass
+        elif pid and eid:
+            failedslices = []
+            slicelist = plab.loadSlices(pid, eid)
+            for slice in slicelist:
+                try:
+                    slice.updateSliceMeta()
+                except:
+                    print "Failed to update ticket for %s:" % \
+                          str(slice.slicename)
+                    failedslices.append(slice.slicename)
+                    traceback.print_exc()
+                    pass
+                pass
+
+            if not failedslices == []:
+                raise RuntimeError("Could not update tickets for some slices:"
+                                   " %s" % '.'.join(failedslices))
+            pass
+        else:
+            slice = plab.loadSliceDirect(slicename,slicedescr=opts.slicedesc,
+                                         userlist=userlist,nodelist=nodelist,
+                                         instmethod=opts.instmethod)
+            slice.updateSliceMeta()
+            pass
         pass
     else:
         usage(me)

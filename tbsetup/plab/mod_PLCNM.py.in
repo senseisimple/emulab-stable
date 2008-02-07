@@ -126,6 +126,22 @@ class NMagent:
             pass
         return self.__vers
 
+    def ping(self):
+        try:
+            res = self.__server.version()
+            if type(res) == list and len(res) == 2 and res[0] == 0:
+                return True
+            pass
+        except:
+            if debug:
+                traceback.print_exc()
+                pass
+            pass
+        return False
+    
+    def getAgentClass(self):
+        return self.__class__
+
     pass
 #wrap_around(NMagent.create_sliver, timeAdvice)
 #wrap_around(NMagent.delete_sliver, timeAdvice)

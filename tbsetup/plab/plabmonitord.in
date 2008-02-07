@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -17,7 +17,7 @@ use POSIX ":sys_wait_h";
 # 
 sub usage()
 {
-    print STDERR "Usage: plabmonitord [-dS]\n";
+    print STDERR "Usage: plabmonitord [-dS] <plcname>\n";
     print STDERR "  -d   Debug mode.\n";
     print STDERR "  -S   Run WITHOUT reading monitor state from database;\n";
     print STDERR "         new state will still be written (default is to" .
@@ -27,6 +27,8 @@ sub usage()
 my $optlist = "dS";
 my $debug   = 0;
 my $stateful = 1;
+my $plcname = '';
+my $plctype = '';
 
 #
 # Only real root can call this.
@@ -82,14 +84,41 @@ my %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
 }
-if (@ARGV) {
-    usage();
-}
 if (defined($options{"d"})) {
     $debug = 1;
 }
 if (defined($options{'S'})) {
     $stateful = 0;
+}
+
+#
+# Grab the supplied plcname and ensure we know about it.
+#
+if (scalar(@ARGV) == 1) {
+    $plcname = shift(@ARGV);
+
+    # XXX need to escape this better
+    if ($plcname =~ /\'/) {
+	print STDERR "plcname has illegal characters: $plcname\n";
+	usage();
+    }
+
+    my $qres = DBQueryFatal("select plc_name,node_type" . 
+			    " from plab_plc_info" . 
+			    " where plc_name='$plcname'");
+    if (!$qres->numrows()) {
+	print STDERR "Unknown plc $plcname!\n";
+	exit(-62);
+    }
+
+    ($plcname,$plctype) = $qres->fetchrow_array();
+
+    # tell other libplabmon users, sigh
+    setPLCName($plcname);
+}
+else {
+    print STDERR "Must supply plcname argument!\n";
+    usage();
 }
 
 #
@@ -101,8 +130,8 @@ sub fatal($);
 #
 # Global vars
 #
-my $LOGFILE      = "$TB/log/plabmonitord";
-my $PIDFILE      = "/var/run/plabmonitord.pid";
+my $LOGFILE      = "$TB/log/plabmonitord-$plcname";
+my $PIDFILE      = "/var/run/plabmonitord-$plcname.pid";
 my $MINSLEEP     = 2;    # Sleep for no less than 2 seconds.
 my $MAXWINSIZE   = 40;   # Degree of parallelization.
 my $MAXSLEEPTIME = 600;  # Don't ever sleep for longer than this - we need
@@ -133,16 +162,17 @@ system("echo '$PID' > $PIDFILE") == 0 or
     die("*** $0:\n".
 	"    Could not create $PIDFILE!");
 
-# pid -> pool mapping; passed in as param to pool setup funtion.
+# pid -> pool mapping; passed in as param to pool setup function.
 my %chpid2pool = ();
 
-print "Plab Monitor Daemon starting... pid $$, at ".`date`;
+print "Plab Monitor Daemon ($plcname) starting... pid $$, at ".`date`;
 
 #
 # Open the status log.  This will be used by the pools to log
 # node success/fail results, and other status info.
 #
-OpenLog(STATUSLOG, STATUSLOGPATH) or die "Can't open status log!";
+OpenLog(STATUSLOG($plcname), STATUSLOGPATH($plcname)) 
+    or die "Can't open status log!";
 
 #
 # Create the node pools.
@@ -259,14 +289,6 @@ while (1) {
         }
     }
 
-    # This is the best place to get an idea of running plabnode procs.
-    my @procs = `ps axwww | grep 'emulab-ops plab-' | wc -l`;
-    my $pcount = 0;
-    if (scalar(@procs) > 0) {
-	$procs[0] =~ /(\d+)/;
-	$pcount = $procs[0];
-    }
-
     # Look for expired processes.  Calling checkexpiration on a pool
     # has the side effect of checking for ISUP (or ISUP expiration) for
     # any nodes pending thusly in the pool.  The return value is the
@@ -276,9 +298,6 @@ while (1) {
         my $numfinished = $pool->checkexpiration();
         $windowsize -= $numfinished;
     }
-
-    # Log diff between believed window size, and "actual"
-    print "winsize = $windowsize / runprocs = $pcount\n";
 
     # We may have just fired off a bunch of kills, so chill for a bit to
     # let things quiesce.
@@ -301,14 +320,21 @@ sub updatenodepool($) {
 
     print "Updating node membership in pool: $pool->{'NAME'}\n";
 
+    # XXX: checking node type like this is mighty expensive!  Can't we just 
+    # check the base type for this plc?
     # XXX: need to change everything to deal with vnodes rather than pnodes.
+    #
+    # NOTE: in the query below, we filter by plctype, but append phys to the 
+    # type string!  In libplab, when nodes are added to the db, we also 
+    # auto-append "phys" to create the phys category of the plab type.
     my $qres = 
         DBQueryFatal("select r.node_id from reserved as r ".
                      "left join nodes as n on n.node_id=r.node_id ".
                      "left join node_types as nt on n.type = nt.type ".
                      "where r.pid='$poolpid' and ".
                      "      r.eid='$pooleid' and ".
-                     "      nt.isplabphysnode = 1 ".
+                     "      nt.isplabphysnode = 1 and ".
+		     "      nt.type='${plctype}phys'".
                      "order by rand()");
 
     if ($qres and $qres->num_rows()) {
@@ -346,7 +372,7 @@ sub updatenodepool($) {
 		    print "calcnextcheck($pnodename) = ".($nct-time())."\n";
 		}
 
-                Log(STATUSLOG, "plabmonitord, $pnodename, addtopool, ".
+                Log(STATUSLOG($plcname), "plabmonitord, $pnodename, addtopool, ".
                     "nostat, node added to pool $pool->{'NAME'}");
             }
             # Mark this node as still in the pool as of this check.
@@ -361,7 +387,7 @@ sub updatenodepool($) {
         if ($poolpnodes->{$pnodename}->{'updtime'} != $now) {
             print "Removing $pnodename from pool: $pool->{'NAME'}\n";
             delete $poolpnodes->{$pnodename};
-            Log(STATUSLOG, "plabmonitord, $pnodename, removefrompool, ".
+            Log(STATUSLOG($plcname), "plabmonitord, $pnodename, removefrompool, ".
                 "nostat, node removed from pool $pool->{'NAME'}");
         }
     }

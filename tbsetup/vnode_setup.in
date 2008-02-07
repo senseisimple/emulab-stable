@@ -310,9 +310,13 @@ foreach my $node (@nodes) {
 		    # if there is a mistaken sliver entry in the DB.
 
 		    $res = DBQueryFatal(
-			"select slicename,node_id from plab_slice_nodes" . 
-			" where pid='$pid' and eid='$eid' " . 
-                        "   and node_id='$node'");
+			"select ps.slicename,psn.node_id".
+			" from plab_slices as ps" . 
+			" left join plab_slice_nodes as psn" . 
+			"   on (ps.slicename=psn.slicename" . 
+			"       and ps.plc_idx=psn.plc_idx)" . 
+			" where ps.pid='$pid' and ps.eid='$eid'" . 
+                        "   and psn.node_id='$node'");
 		    if ($res->numrows == 1) {
 			# node exists; change mode to resetup
 			$mode = "resetup";

@@ -72,10 +72,10 @@ def main(args):
     
     plab = libplab.Plab()
     if slicename != None:
-        slice = plab.loadSliceNoDB(slicename)
+        slice = plab.loadSliceDirect(slicename)
         pass
     else:
-        slice = plab.loadSlice(pid, eid)
+        slice = plab.loadSliceByNode(pid, eid, nodeid)
         pass
 
     if command == "alloc":
@@ -91,6 +91,7 @@ def main(args):
             # Note that vnode_setup boots the node
             pass
         except Exception, e:
+            traceback.print_exc()
             print "Node setup failed on %s" % nodeid
             processException(command, nodeid, e)
             try: node.free()

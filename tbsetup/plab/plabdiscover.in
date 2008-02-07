@@ -2,7 +2,7 @@
 # -*- python -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -12,21 +12,28 @@ import libplab
 from libtestbed import *
 
 def usage(me):
-    print "Usage: %s [ -vd ]" % me
-    print "  Passing -o to getfree will cause it to only run once."
-    print "  Passing -i to getfree will cause if to only update using"
-    print "   existing node info (no new nodes will be added)."
+    print "Usage: %s [ -vd ] [<plc>]" % me
+    print "    (where <plc> is the name or id of a plc in the db)"
     sys.exit(1)
 
 
 def main(args):
     me = args[0]
     parser = TBParser()
-    parser.parse_args()
+    (options,cargs) = parser.parse_args()
 
     plab = libplab.Plab()
-    plab.updateNodeEntries()
-    
+    if len(cargs) > 0:
+        print "Updating node entries at %s." % cargs[0]
+        plab.updateNodeEntries(cargs[0])
+    else:
+        # Grab all the PLCs we know about and do for all...
+        plcs = plab.getPLCs()
+        for (name,idx) in plcs:
+            print "Updating node entries at %s." % name
+            plab.updateNodeEntries(name)
+            pass
+        pass
     return
 
 if __name__ == "__main__":

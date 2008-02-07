@@ -136,23 +136,12 @@ sub checknextnode($) {
 	# However, wastes resources on boss by not exec'ing this; we have a
 	# whole extra process hanging around just so we can do the rootball 
 	# and httpd stuff after.  XXX!
+
 	my $vres = TBForkCmd("$SSH -host $vnode $CLIENT_BIN/vnodesetup" . 
 			     " -p $vnode");
 	if ($vres) {
 	    print "*** Vnodesetup failed: $vnode\n";
 	    exit($vres);
-	}
-
-	# Try to dist out the rootball and other files, but don't make
-	# setup conditional on success/failure.
-	if (TBForkCmd("$PLABDIST $vnode")) {
-	    print "*** Could not dist out rootball on $vnode, ignoring.\n";
-	}
-
-	# Try to start the thttpd server in the service sliver, but don't make 
-	# setup conditional on success/failure
-	if (TBForkCmd("$PLABHTTPD $vnode")) {
-	    print "*** Could not start thttpd on $vnode, ignoring.\n";
 	}
 
 	exit($vres);
@@ -260,10 +249,10 @@ sub processchild($$$) {
         delete $self->{'PENDING'}->{$pnode->{'name'}};
         if (!$exstat) {
             print "Teardown of $pnode->{'vnode'} complete\n";
-            Log(STATUSLOG, $logmsg . "teardown, success, teardown succeeded.");
+            Log(STATUSLOG(getPLCName()), $logmsg . "teardown, success, teardown succeeded.");
         } else {
             print "Teardown of $pnode->{'vnode'} failed: $exstat\n";
-            Log(STATUSLOG, $logmsg . "teardown, fail, teardown failed.");
+            Log(STATUSLOG(getPLCName()), $logmsg . "teardown, fail, teardown failed.");
         }
 
         return 1;
@@ -311,7 +300,7 @@ sub processchild($$$) {
         $self->teardownnode($pnode);
         $self->calcnextcheck($pnode);
         $pnode->{'consecfails'}++;
-        Log(STATUSLOG, $logmsg);
+        Log(STATUSLOG(getPLCName()), $logmsg);
     } else {
         # Instantiation was successful.
         # Setup a timeout to wait for ISUP.
@@ -339,7 +328,7 @@ sub checkexpiration($) {
                     # Yes!  Node is up.
                     print "Setup of $pnode->{'vnode'} on $pnode->{'name'} ".
                         " succeeded\n";
-                    Log(STATUSLOG, "$self->{'NAME'}, $pnode->{'name'}, ".
+                    Log(STATUSLOG(getPLCName()), "$self->{'NAME'}, $pnode->{'name'}, ".
                         "setup, success, node came up successfully.");
                     $self->nodesetupcomplete($pnode);
                     $numfinished++;

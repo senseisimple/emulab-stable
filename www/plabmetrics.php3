@@ -328,8 +328,9 @@ if ($isadmin) {
 select e.pid,e.eid from experiments as e 
 left join reserved as r on e.pid=r.pid and e.eid=r.eid 
 left join nodes as n on r.node_id=n.node_id 
-left join node_types as nt on n.type=nt.type 
-where nt.type='pcplab' group by e.pid,e.eid";
+left join nodes as n2 on n.phys_nodeid=n2.node_id 
+left join node_types as nt on n2.type=nt.type 
+where nt.isplabphysnode=1 group by e.pid,e.eid";
 }
 else {
     $pequery = "
@@ -337,9 +338,10 @@ select e.pid,e.eid from group_membership as g
 left join experiments as e on g.pid=e.pid and g.pid=g.gid 
 left join reserved as r on e.pid=r.pid and e.eid=r.eid 
 left join nodes as n on r.node_id=n.node_id 
-left join node_types as nt on n.type=nt.type 
-where g.uid='$uid' and e.pid is not null and e.eid is not null 
-  and nt.type='pcplab' group by e.pid,e.eid";
+left join nodes as n2 on n.phys_nodeid=n2.node_id 
+left join node_types as nt on n2.type=nt.type 
+where g.uid='johnsond' and e.pid is not null and e.eid is not null 
+  and nt.isplabphysnode=1 group by e.pid,e.eid";
 }
 $qres = DBQueryFatal($pequery);
 
@@ -387,6 +389,7 @@ if (mysql_num_rows($qres) > 0) {
 $colmap = array( 'node_id' => 'pm.node_id',
 		 'hostname' => 'pm.hostname',
 		 'plab_id' => 'pm.plab_id',
+                 'plc_name' => 'ppi.plc_name',
 		 'site' => 'psm.site_name',
                  # emulab columns
 		 'nodestatus' => 'ns.status',
@@ -396,8 +399,6 @@ $colmap = array( 'node_id' => 'pm.node_id',
 		 'jitdeduction' => 'pnhs.jitdeduct',
 		 'successes' => 'pnhs.succnum',
 		 'failures' => 'pnhs.failnum',
-                 # what about what kind of link the node contains 
-		 # (i.e., inet,inet2,dsl,...) ?
                  # comon columns
 		 'resptime' => 'pcd.resptime','uptime' => 'pcd.uptime',
 		 'lastcotop' => 'pcd.lastcotop',
@@ -433,6 +434,7 @@ $colsrc = array( 'resptime' => 'CoMon','uptime' => 'CoMon',
                  'bwlimit' => 'CoMon','txrate' => 'CoMon','rxrate' => 'CoMon',
 		 
 		 'node_id' => 'Emulab','hostname' => 'Emulab',
+                 'plc_name' => 'Emulab',
 		 'plab_id' => 'Emulab','unavail' => 'Emulab',
 		 'site' => 'Emulab','nettype' => 'Emulab',
 		 'jitdeduction' => 'Emulab','successes' => 'Emulab',
@@ -444,6 +446,7 @@ $colsrc = array( 'resptime' => 'CoMon','uptime' => 'CoMon',
 $coldoc = array( 'node_id' => 'Emulab physical node id.',
 		 'hostname' => 'Node hostname.',
 		 'plab_id' => 'PLC node id number.',
+		 'plc_name' => 'PLC name.',
 		 'site' => 'Site with which the node is affiliated.',
 		 'nodestatus' => 'Emulab node status; up or down.',
 		 'nodestatustime' => 'Most recent heartbeat time from the ' . 
@@ -592,8 +595,9 @@ foreach ($colmap as $k => $v) {
 }
 
 # Default columns displayed, in this order.
-$defcols = array( 'node_id','hostname','nodestatus','nodestatustime','unavail',
-		  '5minload','freemem','txrate','rxrate','date', );
+$defcols = array( 'node_id','hostname','plc_name','nodestatus',
+                  'nodestatustime','unavail','5minload','freemem',
+                  'txrate','rxrate','date', );
 
 # Default sort and included columns
 $defsortcols = array( 'unavail','5minload' );
@@ -695,6 +699,15 @@ elseif ((isset($newpgsel) && count($newpgsel) > 0)
     }
     $da = array_diff($selectionlist,$ra);
     $selectionlist = $da;
+}
+
+#
+# Grab the base types for all plc nodetypes.  Used in pm_buildqueryinfo below.
+#
+$basenodetypes = array();
+$qres = DBQueryFatal("select type from node_types where isplabdslice=1");
+while ($row = mysql_fetch_array($qres)) {
+    array_push($basenodetypes,$row['type']);
 }
 
 #
@@ -844,7 +857,7 @@ function pm_filterdata($data) {
     #
     if (isset($experiment) 
 	&& (isset($upnodefilter) && $upnodefilter == 'emulab')) {
-	echo "FOO: rns = " . count($remaining_nodes) . "<br>\n";
+        #echo "FOO: rns = " . count($remaining_nodes) . "<br>\n";
 	$upnodes = array();
 	$pnq = "select n.node_id from nodes as n" . 
 	    " left join reserved as r on n.node_id=r.node_id" . 
@@ -863,7 +876,7 @@ function pm_filterdata($data) {
 	    }
 	}
 	$remaining_nodes = $rnatmp;
-	echo "FOO: rns = " . count($remaining_nodes) . "<br>\n";
+        #echo "FOO: rns = " . count($remaining_nodes) . "<br>\n";
     }
 
     #
@@ -1617,6 +1630,7 @@ function pm_buildqueryinfo() {
     global $hostfilter,$hf_regexp;
     global $userquery;
     global $opterrs;
+    global $basenodetypes;
 
     $q_colstr = '';
     foreach ($cols as $c) {
@@ -1632,17 +1646,25 @@ function pm_buildqueryinfo() {
     if (isset($experiment)) {
         $q_joinstr = " reserved as r" . 
             " left join nodes as n on r.node_id=n.node_id" .
-            " left join plab_mapping as pm on n.phys_nodeid=pm.node_id";
+	    " left join nodes as n2 on n.phys_nodeid=n2.phys_nodeid" . 
+	    " left join node_types as nt2 on n2.type=nt2.type" . 
+            " left join plab_mapping as pm on n.phys_nodeid=pm.node_id" . 
+	    " left join plab_plc_info as ppi on pm.plc_idx=ppi.plc_idx";
     }
     elseif (isset($upnodefilter) && $upnodefilter == 'emulab') {
         # Note, the other half of this case (if $experiment isset AND this 
         # case) is covered later because it has to be postfiltered!
 	$q_joinstr = " reserved as r" . 
             " left join nodes as n on r.node_id=n.node_id" .
-            " left join plab_mapping as pm on n.phys_nodeid=pm.node_id";
+	    " left join nodes as n2 on n.phys_nodeid=n2.phys_nodeid" . 
+	    " left join node_types as nt2 on n2.type=nt2.type" . 
+            " left join plab_mapping as pm on n.phys_nodeid=pm.node_id" . 
+	    " left join plab_plc_info as ppi on pm.plc_idx=ppi.plc_idx";
     }
     else {
         $q_joinstr = " plab_mapping as pm";
+        $q_joinstr .= " left join plab_plc_info as ppi" . 
+	              " on pm.plc_idx=ppi.plc_idx";
     }
     # for now, just join all possible tables, even if we are not selecting data
     $q_joinstr .= " left join plab_site_mapping as psm on pm.node_id=psm.node_id";
@@ -1654,13 +1676,20 @@ function pm_buildqueryinfo() {
 
     # setup the quick filter string (note that all of these get anded)
     
-    # note that all plab nodes get a non-"pcplab" node auxtype.
-    $q_quickfs = "nat.type != 'pcplab'";
+    # note that all plab nodes get a non-"<nodetype_prefix>" node auxtype,
+    # and this denotes to which network the node is connected.
+    $rbtypes = array();
+    foreach ($basenodetypes as $btype) {
+        array_push($rbtypes,"'$btype'");
+    }
+    $q_quickfs = "!(nat.type in (".implode(',',$rbtypes)."))";
     if (isset($experiment)) {
         if (strlen($q_quickfs) > 0) {
 	    $q_quickfs .= " and ";
         }
         $q_quickfs .= " r.pid='$pid' and r.eid='$eid'";
+        $q_quickfs .= " and ";
+        $q_quickfs .= " nt2.isplabphysnode=1";
     }
     if (isset($upnodefilter)) {
         if ($upnodefilter == "emulab") {
@@ -1669,7 +1698,7 @@ function pm_buildqueryinfo() {
             }
             $q_quickfs .= " ns.status='up'";
 	    if (!isset($experiment)) {
-		$q_quickfs .= " and n.type='pcplabphys' and !(r.pid='emulab-ops' and r.eid='hwdown')";
+		$q_quickfs .= " and nt2.isplabphysnode=1 and !(r.pid='emulab-ops' and r.eid='hwdown')";
 	    }
         }
         elseif ($upnodefilter == "comon") {
