@@ -4961,6 +4961,7 @@ COMMAND_PROTOTYPE(dojailconfig)
 		if ((int)mysql_num_rows(res) != 0) {
 			row = mysql_fetch_row(res);
 			if (row[0]) {
+				bufp = buf;
 				bufp += OUTPUT(bufp, ebufp - bufp,
 					       "VDSIZE=%d\n", atoi(row[0]));
 			}
