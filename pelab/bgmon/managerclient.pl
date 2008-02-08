@@ -56,7 +56,7 @@ else { $settings{managerID} = "default"; }
 if ($opt{s}) { $server = $opt{s}; } else { $server = "localhost"; }
 if ($opt{p}) { $port = $opt{p}; }
 if ($opt{h}) { exit &usage; }
-if ($opt{e}) { $settings{"bgmonexpt"} = $opt{e}; }
+if ($opt{e}) { $settings{"bgmonexpt"} = $opt{e}; setevexpid($opt{e});}
 if ($opt{d}) { $settings{"testduration"} = $opt{d}; }
 if ($opt{a}) { $settings{"allpairs"} = 1; }
 if ($opt{L}) { $settings{"noLatency"} = 1; }

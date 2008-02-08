@@ -144,7 +144,7 @@ sub updateTestEvent($);
 sub addCmd($$);
 sub updateOutageState($);
 sub updateOutageState_lossCheck($);
-sub initTestEv($$);
+sub initTestEv($$$$$$$);
 sub getstats;
 sub diffstats($$);
 sub printstats($$);
@@ -216,6 +216,21 @@ my $subtimer_reset = 10;  # subtimer reaches 0 this many times thru poll loop
 my $subtimer = $subtimer_reset;  #decrement every poll-loop.
 
 
+#
+# XXX / TODO: This is a hack to keep the "outage detection"
+# stuff working.  Outage detection should probably be its own tool.
+#
+sub hacky_evalLatencyResult($){
+    my ($result) = @_;
+    my %eval_result = (split(/[=,]/, $result));
+    if( $eval_result{error} != 0 ){
+        return -1;
+    }else{
+        return $eval_result{latency};
+    }
+}
+
+
 sub handleincomingmsgs()
 {
     my $inmsg;
@@ -271,7 +286,18 @@ sub handleincomingmsgs()
             my $newtestper = $sockIn{testper};
             my $duration =$sockIn{duration};
             my $managerID=$sockIn{managerID};
-            initTestEv($linkdest,$testtype);
+
+            #XXX / TODO: How to handle tool parameterization if an
+            #EDIT comes in with a different toolname, etc..!
+            # -- what are the issues?
+            initTestEv(
+                $linkdest,$testtype,
+                $sockIn{toolname},
+                $sockIn{toolwrapperpath},
+                $sockIn{tooltype},
+                $sockIn{req_params},
+                $sockIn{opt_params}
+                );
             my $testev = \%{ $testevents{$linkdest}{$testtype} };
 
 #            print time()." EDIT:\n";
@@ -302,7 +328,15 @@ sub handleincomingmsgs()
             }
             my $offset = 0;
             foreach my $linkdest (@destnodes){
-                initTestEv($linkdest,$testtype);
+#                initTestEv($linkdest,$testtype);
+                initTestEv(
+                    $linkdest,$testtype,
+                    $sockIn{toolname},
+                    $sockIn{toolwrapperpath},
+                    $sockIn{tooltype},
+                    $sockIn{req_params},
+                    $sockIn{opt_params}
+                    );
                 my $testev = \%{ $testevents{$linkdest}{$testtype} };
                 #add new cmd to queue
                 addCmd( $testev, 
@@ -450,7 +484,7 @@ while (1) {
             unlink($filename) or warn "can't delete temp file";
 	    undef $testev->{"new_results"};
 	    undef $testev->{"lastsize"};
-
+            
             my %results = 
                 ("sourceaddr" => $thismonaddr,
                  "destaddr" => $destaddr,
@@ -480,7 +514,10 @@ while (1) {
 		 defined($testev->{"new_results"})) ){
 		my @raw_lines;
 
-                #read raw results from temp file
+        #read raw results from temp file
+        #  NOTE: parsing is now done in the wrapper, and we return the
+        #  entire wrapper output
+        # this stuff left in for the "continuous hack" (for now)
 		my $filename = $testev->{"outfile"};
 		if (!$testev->{"flag_finished"} ||
 		    !$testev->{"continuous"}) {
@@ -515,14 +552,16 @@ while (1) {
 		if (@raw_lines) {
 		    my $raw;
 		    foreach my $line (@raw_lines){
-			$raw = $raw.$line;
+                $raw = $raw.$line;
 		    }
 
 		    #parse raw data
+#            print "RAW data = $raw\n";
 		    my $parsedData = parsedata($testtype,
-					       $testev->{"continuous"},
-					       $raw);
+                                       $testev->{"continuous"},
+                                       $raw);
 		    $testev->{"results_parsed"} = $parsedData;
+            print "PARSED data = $parsedData\n";
 
 		    my %results = 
 			("sourceaddr" => $thismonaddr,
@@ -755,25 +794,43 @@ sub spawnTest($$)
           #save child pid in test event
           $testevents{$linkdest}{$testtype}{"pid"} = $pid;
           $testevents{$linkdest}{$testtype}{"tstamp"} = time_all();
-	  $testevents{$linkdest}{$testtype}{"outfile"} = $filename;
-	  $testevents{$linkdest}{$testtype}{"lastsize"} = 0;
+          $testevents{$linkdest}{$testtype}{"outfile"} = $filename;
+          $testevents{$linkdest}{$testtype}{"lastsize"} = 0;
           $runningtestPIDs{$pid} = [$linkdest, $testtype];
           
       }elsif( defined $pid ){
-          #child
+          #child          
 
+          if( $testtype eq "latency" || 
+              $testtype eq "bw")
+          {
+              my $toolwrapperpath 
+                  = "$testevents{$linkdest}{$testtype}{toolwrapperpath}";
+              print "toolwrapperpath=$toolwrapperpath\n";
+              my $toolparams =
+                  $testevents{$linkdest}{$testtype}{req_params} ." ".
+#                  $testevents{$linkdest}{$testtype}{opt_params} .
+                  " target $linkdest";
+              
+              print "Running test: $toolwrapperpath $toolparams\n";
+              exec "sudo $toolwrapperpath $toolparams >$filename 2>&1"
+                  or die "can't exec: $!\n";
+          }
+=pod
           #############################
           ###ADD MORE TEST TYPES HERE###
           #############################
+
           if( $testtype eq "latency" ){
               #command line for "LATENCY TEST"
 #             print "##########latTest\n";
 	      my $duration = 0;
 	      my $period = $testevents{$linkdest}{$testtype}{"testper"};
 	      if ($contin) {
-		  $duration = int($testevents{$linkdest}{$testtype}{"limitTime"}) - time() + 1;
+		  $duration = int($testevents{$linkdest}{$testtype}{"limitTime"})
+              - time() + 1;
 		  if ($duration < 0 || $duration > (24*60*60)) {
-		      $contin = 0;
+          $contin = 0;
 		  }
 	      }
 	      if ($contin) {
@@ -784,7 +841,7 @@ sub spawnTest($$)
 			  or die "can't exec: $!\n";
 	      } else {
 		  #one ping, using fping
-		  # (2 total attempts, 10 sec timeout between)
+          # (2 total attempts, 10 sec timeout between)
 		  exec "sudo $workingdir".
 		      "fping -t$fpingTimeout -s -r1 $linkdest >& $filename"
 			  or die "can't exec: $!\n";
@@ -793,22 +850,23 @@ sub spawnTest($$)
               #command line for "BANDWIDTH TEST"
 #             print "###########bwtest\n";
               exec "$workingdir".
-                  "iperf -c $linkdest -t $iperfduration -p $iperfport >$filename"
-                      or die "can't exec: $!";
-          }elsif( $testtype eq "outage" ){
+    "iperf -c $linkdest -t $iperfduration -p $iperfport >$filename"
+    or die "can't exec: $!";
+      }
+=cut
+          elsif( $testtype eq "outage" ){
               exec "$workingdir".
                   "fping -c16 -p250 $linkdest >& $filename"
-                      or die "can't exec: $!\n";
+                  or die "can't exec: $!\n";
           }else{
               warn "bad testtype: $testtype";
           }
-
       }elsif( $! == EAGAIN ){
           #recoverable fork error, redo;
           sleep 1;
           redo FORK;
       }else{ die "can't fork: $!\n";}
-  }
+    }
     return 0;
 }
 
@@ -844,43 +902,34 @@ sub parsedata($$$)
     #############################
     #latency test
     if( $type eq "latency" ){
-        # for fping results parsing, using -s option.
-        # Note, these must be in this order!
-
-
-        # TODO: get these regex's to work as OR logic...
+        
+        if ($iscontin) {
+            # "traditional" ping output
+            if( /icmp_seq=\d+ ttl=\d+ time=([\d\.]+) ms/ ) {
+                $parsed = "$1" if ( $1 ne "0.000" );
+            }elsif( /unknown host/ ){
+                $parsed = $ERRID{unknownhost};
+            }elsif( /100% packet loss/ ){
+                $parsed = $ERRID{timeout};
+            }
+        } else {
+            $parsed = $raw;
+            # fping output
 =pod
-        if(
-            /ICMP Network Unreachable/ ||
-            /ICMP Host Unreachable from/ ||
-            /ICMP Protocol Unreachable/ ||
-            /ICMP Port Unreachable/ ||
-            /ICMP Unreachable/
+            if( /^ICMP / )
+            {
+                $parsed = $ERRID{ICMPunreachable};
+            }elsif( /address not found/ ){
+                $parsed = $ERRID{unknownhost};
+            }elsif( /2 timeouts/ ){
+                $parsed = $ERRID{timeout};
+            }elsif( /[\s]+([\S]*) ms \(avg round trip time\)/ ){
+                $parsed = "$1" if( $1 ne "0.00" );
+            }else{
+                $parsed = $ERRID{unknown};
+            }
 =cut
-	if ($iscontin) {
-	    # "traditional" ping output
-	    if( /icmp_seq=\d+ ttl=\d+ time=([\d\.]+) ms/ ) {
-		$parsed = "$1" if ( $1 ne "0.000" );
-	    }elsif( /unknown host/ ){
-		$parsed = $ERRID{unknownhost};
-	    }elsif( /100% packet loss/ ){
-		$parsed = $ERRID{timeout};
-	    }
-	} else {
-	    # fping output
-	    if( /^ICMP / )
-	    {
-		$parsed = $ERRID{ICMPunreachable};
-	    }elsif( /address not found/ ){
-		$parsed = $ERRID{unknownhost};
-	    }elsif( /2 timeouts/ ){
-		$parsed = $ERRID{timeout};
-	    }elsif( /[\s]+([\S]*) ms \(avg round trip time\)/ ){
-		$parsed = "$1" if( $1 ne "0.00" );
-	    }else{
-		$parsed = $ERRID{unknown};
-	    }
-	}
+        }
 =pod
         #this section of parsing is for linux ping hosts.
         if(     /100\% packet loss/ ){
@@ -906,6 +955,8 @@ sub parsedata($$$)
         }
 =cut
     }elsif( $type eq "bw" ){
+        $parsed = $raw;
+=pod
         if(    /connect failed: Connection timed out/ ){
             # this one shouldn't happen, if the timeout check done by
             # bgmon is set low enough.
@@ -923,6 +974,7 @@ sub parsedata($$$)
             $parsed = $ERRID{unknown};
         }
 #       print "parsed=$parsed\n";
+=cut
     }elsif( $type eq "outage" ){
         #print "parsing Outage data\n";
         if( /loss = \d+\/\d+\/([\d.]+)%/ ){
@@ -939,7 +991,7 @@ sub parsedata($$$)
         }
         #print "parsed data = $parsed\n";
     }
-           
+    
     return $parsed;
 }
 
@@ -1153,7 +1205,9 @@ sub updateOutageState($)
     my $testev = \%{ $testevents{$destaddr}{latency} };
     my $curstate = $testev->{outagestate};
     my $nextstate = $curstate;
-    if( $testev->{results_parsed} > 0 ){
+
+#    if( $testev->{results_parsed} > 0 ){
+    if( hacky_evalLatencyResult($testev->{results_parsed}) > 0 ){
         #valid result, so note the time that this was seen
         $testev->{lastValidLatTime} = time();
     }
@@ -1258,7 +1312,8 @@ sub isWorkingPathDown($)
 {
     my ($testev) = @_;
     my $secSinceUp = time() - $testev->{lastValidLatTime};
-    if( $testev->{results_parsed} < 0 && 
+#    if( $testev->{results_parsed} < 0 && 
+    if( hacky_evalLatencyResult($testev->{results_parsed}) < 0 && 
         $secSinceUp < $outDet_maxPastSuc*60*60 )
     {
         #path is down and was up recently
@@ -1331,9 +1386,10 @@ sub addCmd($$)
     updateTestEvent( $testev );
 }
 
-sub initTestEv($$)
+sub initTestEv($$$$$$$)
 {
-    my ($dest,$type) = @_;
+    my ($dest, $type, $toolname, $toolwrapperpath, $tooltype,
+        $req_params, $opt_params) = @_;
 
     if( !defined $testevents{$dest}{$type} ){
         $testevents{$dest}{$type} = {
@@ -1350,6 +1406,11 @@ sub initTestEv($$)
                                      fpingTimeout   => $fpingTimeoutDef
                                      };
     }
+    $testevents{$dest}{$type}{toolname} = $toolname;
+    $testevents{$dest}{$type}{toolwrapperpath} = $toolwrapperpath;
+    $testevents{$dest}{$type}{tooltype} = $tooltype;
+    $testevents{$dest}{$type}{req_params} = $req_params;
+    $testevents{$dest}{$type}{opt_params} = $opt_params;
 }
 
 sub getstats()

@@ -27,12 +27,29 @@ sub usage {
 
 my $debug    = 0;
 my $impotent = 0;
+my $nocap    = 0;
+my $bwperiod = 5;
+
+#
+# $evexpt is the experiment ("pid/eid") in which the entire bgmon framework
+# (probes, manager, clients) is running.  This is used for confining Emulab
+# events (client/manager communication) to just that experiment.  The
+# '-e pid/eid' option to the manager sets the context for that instance.
+#
+# $bgmonexpt is an incompletely implemented feature that allows multiple
+# probe experiments to share the manager.  Here the client specifies the
+# experiment of the probes (passed in the message) and one common manager
+# muxes/demuxes messages to the different probe experiments.  There are
+# still seperate opsrecv processes.  It isn't yet clear how useful this
+# might be.
+# 
+
 my $evexpt   = "__none";
-my $bgmonexpt;
 my $default_bgmonexpt = "tbres/pelabbgmon";
+my $bgmonexpt;
 my ($server,$port,$cmdport);
 my %opt = ();
-if (!getopts("s:p:c:dih", \%opt)) {
+if (!getopts("s:p:c:dNihe:", \%opt)) {
     exit &usage;
 }
 
@@ -58,9 +75,10 @@ if ($opt{s}) { $server = $opt{s}; } else { $server = "localhost"; }
 if ($opt{p}) { $port = $opt{p}; }
 if ($opt{c}) { $cmdport = $opt{c};} else { $cmdport = 5052; }
 if ($opt{h}) { exit &usage; }
-#if ($opt{e}) { $evexpt = $opt{e}; }
+if ($opt{e}) { $evexpt = $opt{e}; setevexpid($evexpt); $bgmonexpt=$evexpt;}
 if ($opt{d}) { $debug = 1; }
 if ($opt{i}) { $impotent = 1; } 
+if ($opt{N}) { $nocap = 1; print "*** No bandwidth cap enforced\n"; }
 
 if (@ARGV !=0) { exit &usage; }
 
@@ -87,6 +105,7 @@ if ($port) { $URL .= ":$port"; }
 
 # Register for normal "manager client" notifications
 my $handle_mc = event_register($URL,0);
+
 if (!$handle_mc) { die "Unable to register with event system\n"; }
 my $tuple = address_tuple_alloc();
 if (!$tuple) { die "Could not allocate an address tuple\n"; }
@@ -116,7 +135,7 @@ $sel->add($socket_cmd);
 
 print "setting cmdport $cmdport and cmdexpt $bgmonexpt\n";
 setcmdport($cmdport);
-setexpid($default_bgmonexpt);
+setexpid($bgmonexpt);
 
 
 #main()
@@ -181,8 +200,16 @@ sub callbackFunc($$$) {
 	print "EVENT: $time $objtype $eventtype\n"
 	    if ($debug);
 
+	# XXX just to make sure we get the event
+	if( $eventtype eq "TEST" ){
+	    my $managerID = event_notification_get_string($handle,
+							  $notification,
+							  "managerID");
+	    print "got TEST event: managerID=$managerID\n";
+	}
+
 	# TODO: Does this have to be listed in lib/libtb/tbdefs.h ??
-	if( $eventtype eq "EDIT" ){
+	elsif( $eventtype eq "EDIT" ){
 	    #
 	    # Got a request to modify a path's test freq
 	    #
@@ -208,17 +235,46 @@ sub callbackFunc($$$) {
 	    my $newexpid = event_notification_get_string($handle,
 							  $notification,
 							  "expid");
+
+        #
+        #XXX / TODO: stuff for tool generalization
+        #  hacked in here for now, but source should be from the 
+        # managerclient' message (?)
+        #
+        my $toolname;
+        my $toolwrapperpath;
+        my $tooltype; #one-shot or continuous
+        my $req_params; #params required, but universal for each tool instance
+        my $opt_params = "";
+
+        if( $testtype eq "bw" ){
+            $toolname = "iperf";
+            $toolwrapperpath = "/tmp/iperfwrapper";
+            $tooltype = "one-shot";
+            $req_params = "port 5002 duration 5";
+        }elsif( $testtype eq "latency"){
+            $toolname = "fping";
+            $toolwrapperpath = "/tmp/fpingwrapper";
+            $tooltype = "one-shot";
+            $req_params = "timeout 10000 printstats 1 retries 1";
+        }
+
 	    if( !defined $newexpid || $newexpid eq "" ){
 		$newexpid = $bgmonexpt;
 	    }
 
 	    my %cmd = ( expid     => $newexpid,
-			cmdtype   => $eventtype,
-			dstnode   => $dstnode,
-			testtype  => $testtype,
-			testper   => "$period",
-			duration  => "$duration",
-			managerID => $managerID
+                    cmdtype   => $eventtype,
+                    dstnode   => $dstnode,
+                    testtype  => $testtype,
+                    testper   => "$period",
+                    duration  => "$duration",
+                    managerID => $managerID
+                    ,toolname => $toolname
+                    ,toolwrapperpath=>$toolwrapperpath
+                    ,tooltype => $tooltype
+                    ,req_params=> $req_params
+                    ,opt_params=> $opt_params
 			);
 
 
@@ -254,18 +310,46 @@ sub callbackFunc($$$) {
 	    my $newexpid = event_notification_get_string($handle,
 							 $notification,
 							 "expid");
+        #
+        #XXX / TODO: stuff for tool generalization
+        #  hacked in here for now, but source should be from the 
+        # managerclient' message (?)
+        #
+        my $toolname;
+        my $toolwrapperpath;
+        my $tooltype; #one-shot or continuous
+        my $req_params; #params required, but universal for each tool instance
+        my $opt_params = "";
+
+        if( $testtype eq "bw" ){
+            $toolname = "iperf";
+            $toolwrapperpath = "/tmp/iperfwrapper.pl";
+            $tooltype = "one-shot";
+            $req_params = "port 5002 duration 5";
+        }elsif( $testtype eq "latency"){
+            $toolname = "fping";
+            $toolwrapperpath = "/tmp/fpingwrapper.pl";
+            $tooltype = "one-shot";
+            $req_params = "timeout 10000 retries 1";
+        }
+
 	    if( !defined $newexpid || $newexpid eq "" ){
 		$newexpid = $bgmonexpt;
 	    }
 
 	    my %cmd = ( expid     => $newexpid,
-			cmdtype   => $eventtype,
-			destnodes  => $destnodes,
-                        srcnode   => $srcnode,
-			testtype  => $testtype,
-			testper   => "$testper",
-			duration  => "$duration"
-			,managerID => $managerID
+                    cmdtype   => $eventtype,
+                    destnodes  => $destnodes,
+                    srcnode   => $srcnode,
+                    testtype  => $testtype,
+                    testper   => "$testper",
+                    duration  => "$duration"
+                    ,managerID => $managerID
+                    ,toolname => $toolname
+                    ,toolwrapperpath=>$toolwrapperpath
+                    ,tooltype => $tooltype
+                    ,req_params=> $req_params
+                    ,opt_params=> $opt_params
 			);
 
 	    print "got $eventtype:$srcnode,$destnodes,$testtype,".
@@ -277,8 +361,11 @@ sub callbackFunc($$$) {
 #		sendcmd( $srcnode, \%cmd );
 #	    }
 	    if( isCmdValid(\%cmd) ){
-		print "sending cmd from $srcnode\n";
-                sendcmd( $srcnode, \%cmd );
+#		print "sending cmd from $srcnode\n";
+            print "sending cmd to $srcnode on behalf of $managerID\n";
+            sendcmd( $srcnode, \%cmd );
+	    }else{
+		print "rejecting $testtype cmd for $srcnode\n";
 	    }
 	}
 	elsif( $eventtype eq "STOPALL" ){
@@ -315,11 +402,21 @@ sub isCmdValid($)
     #list of invalid conditions
     if( $cmdref->{managerID} ne "automanagerclient" ){
 	#managerclient is not the AMC
-	if( $cmdref->{duration} eq "0" ){
+	if( $cmdref->{duration} == 0 ){
 	    #only AMC can send "forever" commands
-	    $valid = 0;
-	}elsif( $cmdref->{testtype} eq "bw" )
-	{
+	    return(0);
+	}
+	if( $cmdref->{testtype} eq "bw" ){
+	    # Cannot specify period less than test length
+	    if ( $cmdref->{testper} < $bwperiod ){
+		return(0);
+	    }
+
+	    # No caps enforced
+	    if ($nocap) {
+		return(1);
+	    }
+
 	    my @destnodes;
 	    if( $cmdref->{cmdtype} eq "INIT" ){
 		@destnodes = split(" ",$cmdref->{destnodes});
