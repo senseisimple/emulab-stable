@@ -1238,9 +1238,9 @@ CREATE TABLE `group_stats` (
   `last_activity` datetime default NULL,
   `allexpt_duration` int(11) unsigned default '0',
   `allexpt_vnodes` int(11) unsigned default '0',
-  `allexpt_vnode_duration` int(11) unsigned default '0',
+  `allexpt_vnode_duration` double(14,0) unsigned default '0',
   `allexpt_pnodes` int(11) unsigned default '0',
-  `allexpt_pnode_duration` int(11) unsigned default '0',
+  `allexpt_pnode_duration` double(14,0) unsigned default '0',
   PRIMARY KEY  (`gid_idx`),
   UNIQUE KEY `pidgid` (`pid`,`gid`),
   KEY `gid_uuid` (`gid_uuid`)
@@ -2611,9 +2611,9 @@ CREATE TABLE `project_stats` (
   `last_activity` datetime default NULL,
   `allexpt_duration` int(11) unsigned default '0',
   `allexpt_vnodes` int(11) unsigned default '0',
-  `allexpt_vnode_duration` int(11) unsigned default '0',
+  `allexpt_vnode_duration` double(14,0) unsigned default '0',
   `allexpt_pnodes` int(11) unsigned default '0',
-  `allexpt_pnode_duration` int(11) unsigned default '0',
+  `allexpt_pnode_duration` double(14,0) unsigned default '0',
   PRIMARY KEY  (`pid_idx`),
   UNIQUE KEY `pid` (`pid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
@@ -3133,9 +3133,9 @@ CREATE TABLE `user_stats` (
   `last_activity` datetime default NULL,
   `allexpt_duration` int(11) unsigned default '0',
   `allexpt_vnodes` int(11) unsigned default '0',
-  `allexpt_vnode_duration` int(11) unsigned default '0',
+  `allexpt_vnode_duration` double(14,0) unsigned default '0',
   `allexpt_pnodes` int(11) unsigned default '0',
-  `allexpt_pnode_duration` int(11) unsigned default '0',
+  `allexpt_pnode_duration` double(14,0) unsigned default '0',
   PRIMARY KEY  (`uid_idx`),
   KEY `uid_uuid` (`uid_uuid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;

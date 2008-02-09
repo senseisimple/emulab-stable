@@ -4291,3 +4291,21 @@ last_net_act,last_cpu_act,last_ext_act);
 
 		./newlans.pl
 
+4.141: Bump pnode/vnode duration counters to floats since several
+       users/projects have overflowed an unsigned int.
+
+       alter table group_stats change `allexpt_vnode_duration`
+         `allexpt_vnode_duration` double(14,0) unsigned default '0';
+       alter table group_stats change `allexpt_pnode_duration`
+         `allexpt_pnode_duration` double(14,0) unsigned default '0';
+
+       alter table project_stats change `allexpt_vnode_duration`
+         `allexpt_vnode_duration` double(14,0) unsigned default '0';
+       alter table project_stats change `allexpt_pnode_duration`
+         `allexpt_pnode_duration` double(14,0) unsigned default '0';
+
+       alter table user_stats change `allexpt_vnode_duration`
+         `allexpt_vnode_duration` double(14,0) unsigned default '0';
+       alter table user_stats change `allexpt_pnode_duration`
+         `allexpt_pnode_duration` double(14,0) unsigned default '0';
+
