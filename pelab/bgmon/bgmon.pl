@@ -444,35 +444,35 @@ while (1) {
         my $destaddr = $runningtestPIDs{$pid}[0];
         my $testtype = $runningtestPIDs{$pid}[1];
         my $testev = \%{ $testevents{$destaddr}{$testtype} };
-	my $killit = 0;
+        my $killit = 0;
 
-	if ($testev->{"continuous"}) {
-	    my $filename = $testev->{"outfile"};
-	    my $fsize = $testev->{"lastsize"};
-	    my $cursize = (stat($filename))[7];
-	    print time_all().": c$testtype test: fn=$filename, fs=$cursize, lastfs=$fsize\n" if ($debug > 1);
-	    if (defined($cursize)) {
-		if ($cursize > $fsize) {
-		    $testev->{"new_results"} = $fsize;
-		    $testev->{"tstamp"} = time_all();
-		} else {
-		    undef $testev->{"new_results"};
-		}
-	    } else {
-		# something is horribly wrong, kill the process
-		$killit = "no output file";
-	    }
-	}
+        if ($testev->{"continuous"}) {
+            my $filename = $testev->{"outfile"};
+            my $fsize = $testev->{"lastsize"};
+            my $cursize = (stat($filename))[7];
+            print time_all().": c$testtype test: fn=$filename, fs=$cursize, lastfs=$fsize\n" if ($debug > 1);
+            if (defined($cursize)) {
+                if ($cursize > $fsize) {
+                    $testev->{"new_results"} = $fsize;
+                    $testev->{"tstamp"} = time_all();
+                } else {
+                    undef $testev->{"new_results"};
+                }
+            } else {
+                # something is horribly wrong, kill the process
+                $killit = "no output file";
+            }
+        }
         if( $testtype eq "bw" &&
             time_all() >
             $testev->{"tstamp"} + 
             $iperftimeout )    
         {
             # bw test is running too long, so kill it
-	    $killit = "timeout";
-	}
+            $killit = "timeout";
+        }
 
-	if ($killit) {
+        if ($killit) {
             kill 'TERM', $pid;
             print time_all()." $testtype $killit: killed $destaddr, ".
                 "pid=$pid\n";
@@ -480,11 +480,14 @@ while (1) {
             $testev->{"timedout"} = 1;
 
             #delete tmp filename
-	    my $filename = $testev->{"outfile"};
+            my $filename = $testev->{"outfile"};
             unlink($filename) or warn "can't delete temp file";
-	    undef $testev->{"new_results"};
-	    undef $testev->{"lastsize"};
-            
+            undef $testev->{"new_results"};
+            undef $testev->{"lastsize"};
+#
+# The special iperf timeout hack is to be handled by the iperf wrapper.
+#
+=pod            
             my %results = 
                 ("sourceaddr" => $thismonaddr,
                  "destaddr" => $destaddr,
@@ -493,11 +496,12 @@ while (1) {
                  "tstamp" => $testev->{tstamp},
                  "magic"  => "$magic",
                  "ts_finished" => time()
-                 );
+                );
             #save result to local DB
             my $index = saveTestToLocalDB(\%results);
             #send result to remote DB
             sendResults(\%results, $index);
+=cut
         }
 
     }
@@ -505,41 +509,41 @@ while (1) {
     #iterate through all event structures
     for my $destaddr ( keys %testevents ) {
         for my $testtype ( keys %{ $testevents{$destaddr} } ){
-
+            
             my $testev = \%{ $testevents{$destaddr}{$testtype} };
-
+            
             #check for finished events
             if( $testev->{"flag_finished"} == 1 ||
-		($testev->{"continuous"} &&
-		 defined($testev->{"new_results"})) ){
-		my @raw_lines;
-
-        #read raw results from temp file
-        #  NOTE: parsing is now done in the wrapper, and we return the
-        #  entire wrapper output
-        # this stuff left in for the "continuous hack" (for now)
-		my $filename = $testev->{"outfile"};
-		if (!$testev->{"flag_finished"} ||
-		    !$testev->{"continuous"}) {
-		    open FILE, "< $filename"
-			or warn "can't open file $filename";
-		    if ($testev->{"new_results"}) {
-			seek(FILE, $testev->{"new_results"}, 0);
-		    }
-		    @raw_lines = <FILE>;
-		    if (!$testev->{"flag_finished"}) {
-			$testev->{"lastsize"} = tell(FILE);
-		    }
-		    close FILE;
-		}
-
-		if ($testev->{"flag_finished"}) {
-		    unlink($filename) or warn "can't delete temp file";
-		    undef $testev->{"new_results"};
-		    undef $testev->{"lastsize"};
-		} else {
-		    print "c$testtype test: read ", scalar(@raw_lines),
-		    " lines, size=", $testev->{"lastsize"}, "\n" if ($debug > 1);
+                ($testev->{"continuous"} &&
+                 defined($testev->{"new_results"})) ){
+                my @raw_lines;
+                
+                #read raw results from temp file
+                #  NOTE: parsing is now done in the wrapper, and we return the
+                #  entire wrapper output
+                # this stuff left in for the "continuous hack" (for now)
+                my $filename = $testev->{"outfile"};
+                if (!$testev->{"flag_finished"} ||
+                    !$testev->{"continuous"}) {
+                    open FILE, "< $filename"
+                        or warn "can't open file $filename";
+                    if ($testev->{"new_results"}) {
+                        seek(FILE, $testev->{"new_results"}, 0);
+                    }
+                    @raw_lines = <FILE>;
+                    if (!$testev->{"flag_finished"}) {
+                        $testev->{"lastsize"} = tell(FILE);
+                    }
+                    close FILE;
+                }
+                
+                if ($testev->{"flag_finished"}) {
+                    unlink($filename) or warn "can't delete temp file";
+                    undef $testev->{"new_results"};
+                    undef $testev->{"lastsize"};
+                } else {
+                    print "c$testtype test: read ", scalar(@raw_lines),
+                    " lines, size=", $testev->{"lastsize"}, "\n" if ($debug > 1);
 		}
 
 		#
@@ -561,7 +565,6 @@ while (1) {
                                        $testev->{"continuous"},
                                        $raw);
 		    $testev->{"results_parsed"} = $parsedData;
-            print "PARSED data = $parsedData\n";
 
 		    my %results = 
 			("sourceaddr" => $thismonaddr,
@@ -571,6 +574,11 @@ while (1) {
 			 "tstamp" => $testev->{tstamp},
 			 "magic"  => "$magic",
 			 "ts_finished" => time()
+             ,"toolname" => $testev->{toolname}
+             ,"toolwrapperpath" => $testev->{toolwrapperpath}
+             ,"tooltype" => $testev->{tooltype}
+             ,"req_params" => $testev->{req_params}
+             ,"opt_params" => $testev->{opt_params}
 			 );
 
 		    #MARK_RELIABLE
@@ -607,16 +615,16 @@ while (1) {
                     time() >= $testev->{limitTime} )
                 {
                     my $oldper = $testev->{testper};
-		    print time().": Ending test $testtype for $destaddr\n";
-		    $testev->{"end_stats"} = getstats();
-		    printstats("End", $testev->{"end_stats"});
-		    my $diff = diffstats($testev->{"start_stats"},
-					 $testev->{"end_stats"});
-		    printstats("Total", $diff);
+                    print time().": Ending test $testtype for $destaddr\n";
+                    $testev->{"end_stats"} = getstats();
+                    printstats("End", $testev->{"end_stats"});
+                    my $diff = diffstats($testev->{"start_stats"},
+                                         $testev->{"end_stats"});
+                    printstats("Total", $diff);
                     # Rate increase expired. Get new value from Q
                     $testev->{cmdq}->cleanQueue();  #rid expired values
                     $testev->{testper} = 0;  #reset existing period
-		    undef $testev->{continuous};
+                    undef $testev->{continuous};
                     updateTestEvent($testev);
                     print "resetting period from $oldper";
                     print " to ".$testev->{testper}."\n";
@@ -628,18 +636,18 @@ while (1) {
                     #if time of next run is in the future, set it to that
                     $testev->{"timeOfNextRun"} += $testev->{"testper"};
                 }else{
-		    if ( ($testev->{"timeOfNextRun"}  == 0) &&
-			 ( $testev->{"managerID"} eq "automanagerclient" ) &&
-			 ($testtype eq "bw" ) ) {
-			# init the test based on random initial time
-			my $range = $testev->{"testper"} - 2 * $iperfduration;
-			my $random_init = int(rand($range));
-			$testev->{"timeOfNextRun"} =  time_all() + $random_init;
-		    } else {
-			#if time of next run is in the past, set to current time
-			$testev->{"timeOfNextRun"}
-			= time_all();
-		    }
+                    if ( ($testev->{"timeOfNextRun"}  == 0) &&
+                         ( $testev->{"managerID"} eq "automanagerclient" ) &&
+                         ($testtype eq "bw" ) ) {
+                        # init the test based on random initial time
+                        my $range = $testev->{"testper"} - 2 * $iperfduration;
+                        my $random_init = int(rand($range));
+                        $testev->{"timeOfNextRun"} =  time_all() + $random_init;
+                    } else {
+                        #if time of next run is in the past, set to current time
+                        $testev->{"timeOfNextRun"}
+                        = time_all();
+                    }
                 }
 
                 $testev->{"flag_scheduled"} = 1;
@@ -651,9 +659,10 @@ while (1) {
                 $testev->{"pid"} == 0 )
             {
                 #run test
-		print time().": Starting test $testtype for $destaddr\n";
-		$testev->{"start_stats"} = getstats();
-		printstats("Start", $testev->{"start_stats"});
+                print time().": Starting test $testtype for $destaddr\n"
+                    if( $debug > 1 );
+                $testev->{"start_stats"} = getstats();
+                printstats("Start", $testev->{"start_stats"});
                 spawnTest( $destaddr, $testtype );
             }
 
@@ -806,13 +815,13 @@ sub spawnTest($$)
           {
               my $toolwrapperpath 
                   = "$testevents{$linkdest}{$testtype}{toolwrapperpath}";
-              print "toolwrapperpath=$toolwrapperpath\n";
               my $toolparams =
                   $testevents{$linkdest}{$testtype}{req_params} ." ".
 #                  $testevents{$linkdest}{$testtype}{opt_params} .
                   " target $linkdest";
               
-              print "Running test: $toolwrapperpath $toolparams\n";
+              print "Running test: $toolwrapperpath $toolparams\n"
+                  if( $debug > 2 );
               exec "sudo $toolwrapperpath $toolparams >$filename 2>&1"
                   or die "can't exec: $!\n";
           }
@@ -1077,7 +1086,13 @@ sub sendResults($$){
                    testtype => $results->{testtype},
                    result   => $results->{result},
                    tstamp   => $results->{tstamp},
-                   index    => $index );
+                   index    => $index
+                   ,"toolname" => $results->{toolname}
+                   ,"toolwrapperpath" => $results->{toolwrapperpath}
+                   ,"tooltype" => $results->{tooltype}
+                   ,"req_params" => $results->{req_params}
+                   ,"opt_params" => $results->{opt_params}
+        );
     my $result_serial = serialize_hash( \%result );
     $socket_snd->send($result_serial);
 }
@@ -1437,7 +1452,7 @@ sub diffstats($$)
     my %after = %{$re};
     my %diff;
     foreach my $key (keys(%before)) {
-	$diff{$key} = $after{$key} - $before{$key};
+        $diff{$key} = $after{$key} - $before{$key};
     }
     return \%diff;
 }
@@ -1447,7 +1462,8 @@ sub printstats($$)
     my ($hdr,$stats) = @_;
 
     print("$hdr: utime=", $stats->{utime},
-	  ", stime=", $stats->{stime},
-	  ", cutime=", $stats->{cutime},
-	  ", cstime=", $stats->{cstime}, "\n");
+          ", stime=", $stats->{stime},
+          ", cutime=", $stats->{cutime},
+          ", cstime=", $stats->{cstime}, "\n")
+        if( $debug > 0 );
 }

@@ -89,8 +89,9 @@ sub serialize_hash($)
     my $out = "";
 
     for my $key (keys %hash){
-	$out .= $separator if( $out ne "" );
-	$out .= $key.$separator.$hash{$key};
+        $out .= $separator if( $out ne "" );
+        $out .= $key.$separator;
+        $out .= $hash{$key} if( defined $hash{$key} );
     }
     return $out;
 }

@@ -6,6 +6,10 @@
 #
 
 
+#
+# TODO: Watch iperf, and kill if a timeout (30 sec) is exceeded.
+#
+
 use strict;
 
 my %params = (@ARGV);

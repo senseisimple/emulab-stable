@@ -168,6 +168,51 @@ while (1) {
     }
 }
 
+#
+#XXX / TODO: stuff for tool generalization
+#  hacked in here for now, but source should be from the 
+# managerclient' message (?)
+#
+sub addToolSpecificFields
+{
+    my ($cmdRef) = @_;
+    my $testtype = $cmdRef->{testtype};
+    my $toolname;
+    my ($req_params_actual, $opt_params_actual);
+
+    if( $testtype eq "bw" ){
+        $toolname = "iperf";
+#        $toolwrapperpath = "/tmp/iperfwrapper";
+#        $tooltype = "one-shot";
+        $req_params_actual = "port 5002 duration 5";
+    }elsif( $testtype eq "latency"){
+        $toolname = "fping";
+#        $toolwrapperpath = "/tmp/fpingwrapper";
+#        $tooltype = "one-shot";
+        $req_params_actual = "timeout 10000 retries 1";
+    }
+
+    my $sth = DBQuery("select * from tool_spec where toolname='$toolname'");
+    my ( $toolname, $metric, $type, $toolwrapperpath, 
+         $req_params_formal, $opt_params_formal)
+        = ( $sth->fetchrow_array() );
+
+    #XXX / TODO Check that all given actual parameters match the formal params
+    #
+    $cmdRef->{toolname} = $toolname;
+    $cmdRef->{toolwrapperpath} = $toolwrapperpath;
+    $cmdRef->{tooltype} = $type;
+    $cmdRef->{req_params} = $req_params_actual;
+    $cmdRef->{opt_params} = $opt_params_actual;
+
+    print "CMD: \n";
+    foreach my $key (keys %{$cmdRef}){
+        my $value = ${$cmdRef}{$key};
+        print "  $key=$value  \n";
+    }
+}
+
+
 
 #
 # callback for managerclient requests
@@ -236,28 +281,6 @@ sub callbackFunc($$$) {
 							  $notification,
 							  "expid");
 
-        #
-        #XXX / TODO: stuff for tool generalization
-        #  hacked in here for now, but source should be from the 
-        # managerclient' message (?)
-        #
-        my $toolname;
-        my $toolwrapperpath;
-        my $tooltype; #one-shot or continuous
-        my $req_params; #params required, but universal for each tool instance
-        my $opt_params = "";
-
-        if( $testtype eq "bw" ){
-            $toolname = "iperf";
-            $toolwrapperpath = "/tmp/iperfwrapper";
-            $tooltype = "one-shot";
-            $req_params = "port 5002 duration 5";
-        }elsif( $testtype eq "latency"){
-            $toolname = "fping";
-            $toolwrapperpath = "/tmp/fpingwrapper";
-            $tooltype = "one-shot";
-            $req_params = "timeout 10000 printstats 1 retries 1";
-        }
 
 	    if( !defined $newexpid || $newexpid eq "" ){
 		$newexpid = $bgmonexpt;
@@ -270,13 +293,9 @@ sub callbackFunc($$$) {
                     testper   => "$period",
                     duration  => "$duration",
                     managerID => $managerID
-                    ,toolname => $toolname
-                    ,toolwrapperpath=>$toolwrapperpath
-                    ,tooltype => $tooltype
-                    ,req_params=> $req_params
-                    ,opt_params=> $opt_params
 			);
-
+        
+        addToolSpecificFields(\%cmd);
 
 	    print "got EDIT: $srcnode, $dstnode: $newexpid\n";
 
@@ -310,28 +329,6 @@ sub callbackFunc($$$) {
 	    my $newexpid = event_notification_get_string($handle,
 							 $notification,
 							 "expid");
-        #
-        #XXX / TODO: stuff for tool generalization
-        #  hacked in here for now, but source should be from the 
-        # managerclient' message (?)
-        #
-        my $toolname;
-        my $toolwrapperpath;
-        my $tooltype; #one-shot or continuous
-        my $req_params; #params required, but universal for each tool instance
-        my $opt_params = "";
-
-        if( $testtype eq "bw" ){
-            $toolname = "iperf";
-            $toolwrapperpath = "/tmp/iperfwrapper.pl";
-            $tooltype = "one-shot";
-            $req_params = "port 5002 duration 5";
-        }elsif( $testtype eq "latency"){
-            $toolname = "fping";
-            $toolwrapperpath = "/tmp/fpingwrapper.pl";
-            $tooltype = "one-shot";
-            $req_params = "timeout 10000 retries 1";
-        }
 
 	    if( !defined $newexpid || $newexpid eq "" ){
 		$newexpid = $bgmonexpt;
@@ -345,27 +342,18 @@ sub callbackFunc($$$) {
                     testper   => "$testper",
                     duration  => "$duration"
                     ,managerID => $managerID
-                    ,toolname => $toolname
-                    ,toolwrapperpath=>$toolwrapperpath
-                    ,tooltype => $tooltype
-                    ,req_params=> $req_params
-                    ,opt_params=> $opt_params
 			);
+
+        addToolSpecificFields(\%cmd);
 
 	    print "got $eventtype:$srcnode,$destnodes,$testtype,".
 		"$testper,$duration,$managerID,$newexpid\n";
 
-	    # only automanager can send "forever" edits (duration=0)
-#	    if( $duration > 0 ){ #|| $managerID eq "automanagerclient" ){
-#		print "sending cmd from $srcnode\n";
-#		sendcmd( $srcnode, \%cmd );
-#	    }
 	    if( isCmdValid(\%cmd) ){
-#		print "sending cmd from $srcnode\n";
             print "sending cmd to $srcnode on behalf of $managerID\n";
             sendcmd( $srcnode, \%cmd );
 	    }else{
-		print "rejecting $testtype cmd for $srcnode\n";
+            print "rejecting $testtype cmd for $srcnode\n";
 	    }
 	}
 	elsif( $eventtype eq "STOPALL" ){
@@ -610,6 +598,7 @@ sub getBandwidth() {
         return $avgbw;
     }
 }
+
 
 =pod
 sub event_poll_amc($){
