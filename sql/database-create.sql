@@ -2427,6 +2427,8 @@ CREATE TABLE `plab_mapping` (
   `IP` varchar(15) NOT NULL default '',
   `mac` varchar(17) NOT NULL default '',
   `create_time` datetime default NULL,
+  `deleted` tinyint(1) NOT NULL default '0',
+  `plc_idx` int(10) unsigned NOT NULL default '0',
   PRIMARY KEY  (`node_id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
@@ -2466,6 +2468,35 @@ CREATE TABLE `plab_nodehiststats` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `plab_plc_attributes`
+--
+
+DROP TABLE IF EXISTS `plab_plc_attributes`;
+CREATE TABLE `plab_plc_attributes` (
+  `plc_idx` int(10) unsigned NOT NULL default '0',
+  `attrkey` varchar(64) NOT NULL default '',
+  `attrvalue` tinytext NOT NULL,
+  PRIMARY KEY  (`plc_idx`,`attrkey`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `plab_plc_info`
+--
+
+DROP TABLE IF EXISTS `plab_plc_info`;
+CREATE TABLE `plab_plc_info` (
+  `plc_idx` int(10) unsigned NOT NULL auto_increment,
+  `plc_name` varchar(64) NOT NULL default '',
+  `api_url` varchar(255) NOT NULL default '',
+  `def_slice_prefix` varchar(32) NOT NULL default '',
+  `nodename_prefix` varchar(30) NOT NULL default '',
+  `node_type` varchar(30) NOT NULL default '',
+  `svc_slice_name` varchar(64) NOT NULL default '',
+  PRIMARY KEY  (`plc_idx`),
+  KEY `plc_name` (`plc_name`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `plab_site_mapping`
 --
 
@@ -2475,7 +2506,21 @@ CREATE TABLE `plab_site_mapping` (
   `site_idx` smallint(5) unsigned NOT NULL auto_increment,
   `node_id` varchar(32) NOT NULL default '',
   `node_idx` tinyint(3) unsigned NOT NULL default '0',
-  PRIMARY KEY  (`site_name`,`site_idx`,`node_idx`)
+  `plc_idx` int(10) unsigned NOT NULL default '0',
+  PRIMARY KEY  (`site_name`,`site_idx`,`node_idx`,`plc_idx`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `plab_slice_attributes`
+--
+
+DROP TABLE IF EXISTS `plab_slice_attributes`;
+CREATE TABLE `plab_slice_attributes` (
+  `plc_idx` int(10) unsigned NOT NULL default '0',
+  `slicename` varchar(64) NOT NULL default '',
+  `attrkey` varchar(64) NOT NULL default '',
+  `attrvalue` tinytext NOT NULL,
+  PRIMARY KEY  (`plc_idx`,`slicename`,`attrkey`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
@@ -2484,15 +2529,12 @@ CREATE TABLE `plab_site_mapping` (
 
 DROP TABLE IF EXISTS `plab_slice_nodes`;
 CREATE TABLE `plab_slice_nodes` (
-  `pid` varchar(12) NOT NULL default '',
-  `eid` varchar(32) NOT NULL default '',
-  `exptidx` int(11) NOT NULL default '0',
   `slicename` varchar(64) NOT NULL default '',
   `node_id` varchar(32) NOT NULL default '',
   `leaseend` datetime default NULL,
   `nodemeta` text,
-  PRIMARY KEY  (`node_id`),
-  KEY `exptidx` (`exptidx`)
+  `plc_idx` int(10) unsigned NOT NULL default '0',
+  PRIMARY KEY  (`slicename`,`plc_idx`,`node_id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
@@ -2509,8 +2551,12 @@ CREATE TABLE `plab_slices` (
   `slicemeta_legacy` text,
   `leaseend` datetime default NULL,
   `admin` tinyint(1) default '0',
-  PRIMARY KEY  (`exptidx`),
-  UNIQUE KEY `pideid` (`pid`,`eid`)
+  `plc_idx` int(10) unsigned NOT NULL default '0',
+  `is_created` tinyint(1) default '0',
+  `is_configured` tinyint(1) default '0',
+  `no_cleanup` tinyint(1) default '0',
+  `no_destroy` tinyint(1) default '0',
+  PRIMARY KEY  (`exptidx`,`slicename`,`plc_idx`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --

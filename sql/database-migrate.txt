@@ -4334,3 +4334,64 @@ last_net_act,last_cpu_act,last_ext_act);
        on lma.lanid=lm.lanid and lma.memberid=lm.memberid and
        attrkey='node_id' set node_id=attrvalue;
 
+4.143: Support management of and operations on multiple PLCs, including
+       support for slices from multiple PLCs in one experiment.
+
+       If you have data in these tables (extremely unlikely!), ask Utah for
+       instructions on how to change over to multiple PLC support.
+
+       	alter table plab_mapping 
+	  add column `deleted` tinyint(1) NOT NULL default '0', 
+          add column `plc_idx` int(10) unsigned NOT NULL default '0';
+
+	CREATE TABLE `plab_plc_attributes` (
+	  `plc_idx` int(10) unsigned NOT NULL default '0',
+	  `attrkey` varchar(64) NOT NULL default '',
+	  `attrvalue` tinytext NOT NULL,
+	  PRIMARY KEY  (`plc_idx`,`attrkey`)
+	) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+	CREATE TABLE `plab_plc_info` (
+	  `plc_idx` int(10) unsigned NOT NULL auto_increment,
+	  `plc_name` varchar(64) NOT NULL default '',
+	  `api_url` varchar(255) NOT NULL default '',
+	  `def_slice_prefix` varchar(32) NOT NULL default '',
+	  `nodename_prefix` varchar(30) NOT NULL default '',
+	  `node_type` varchar(30) NOT NULL default '',
+	  `svc_slice_name` varchar(64) NOT NULL default '',
+	  PRIMARY KEY  (`plc_idx`),
+	  KEY `plc_name` (`plc_name`)
+	) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+	alter table plab_site_mapping
+	  add column `plc_idx` int(10) unsigned NOT NULL default '0',
+	  drop primary key,
+	  add primary key (`site_name`,`site_idx`,`node_idx`,`plc_idx`);
+
+	CREATE TABLE `plab_slice_attributes` (
+	  `plc_idx` int(10) unsigned NOT NULL default '0',
+	  `slicename` varchar(64) NOT NULL default '',
+	  `attrkey` varchar(64) NOT NULL default '',
+	  `attrvalue` tinytext NOT NULL,
+	  PRIMARY KEY  (`plc_idx`,`slicename`,`attrkey`)
+	) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+	alter table plab_slice_nodes
+	  drop key `exptidx`,
+	  drop column `pid`,
+	  drop column `eid`,
+	  drop column `exptidx`,
+	  add column `plc_idx` int(10) unsigned NOT NULL default '0',
+	  drop primary key,
+	  add primary key (`slicename`,`plc_idx`,`node_id`);
+
+	alter table plab_slices
+	  add column `plc_idx` int(10) unsigned NOT NULL default '0',
+	  add column `is_created` tinyint(1) default '0',
+	  add column `is_configured` tinyint(1) default '0',
+	  add column `no_cleanup` tinyint(1) default '0',
+	  add column `no_destroy` tinyint(1) default '0',
+	  drop key `pideid`,
+	  drop primary key,
+	  add primary key (`exptidx`,`slicename`,`plc_idx`);
+
