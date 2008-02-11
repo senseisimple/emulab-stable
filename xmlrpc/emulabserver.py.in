@@ -1406,7 +1406,7 @@ class experiment:
             pass
 
         argstr += " " + escapeshellarg(argdict["proj"])
-        argstr += " " + escapeshellarg(argdict["exp"])
+        argstr += "/" + escapeshellarg(argdict["exp"])
 
         (exitval, output) = runcommand(TBDIR + "/bin/endexp " + argstr)
         if exitval:
