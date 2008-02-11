@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -1322,7 +1322,8 @@ sub cleanup()
 	# that fails, but results in the experiment being restored the
 	# way it was. 
 	#
-	$experiment->SwapFail($this_user, TBDB_STATS_SWAPMODIFY, $errorstat);
+	$experiment->SwapFail($this_user, TBDB_STATS_SWAPMODIFY, $errorstat,
+			      ($modifyHosed ? TBDB_STATS_FLAGS_MODHOSED() :0));
 	if ($modifySwapped) {
 	    $experiment->PostSwap($this_user, TBDB_STATS_SWAPOUT);
 	}

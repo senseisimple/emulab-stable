@@ -1879,9 +1879,9 @@ sub PreSwap($$$$)
 #
 # Rollback after a failed swap operation; cleans up the stats and resources.
 #
-sub SwapFail($$$$)
+sub SwapFail($$$$;$)
 {
-    my ($self, $swapper, $which, $ecode) = @_;
+    my ($self, $swapper, $which, $ecode, $flags) = @_;
 
     # Must be a real reference. 
     return -1
@@ -1890,6 +1890,9 @@ sub SwapFail($$$$)
     # Do not proceed if we got here via a hosed resources record.
     return 0
 	if ($EXPT_RESOURCESHOSED);
+
+    $flags = 0
+	if (!defined($flags));
 
     # Old swap gathering stuff.
     $self->GatherSwapStats($swapper, $which, $ecode);
@@ -1926,7 +1929,8 @@ sub SwapFail($$$$)
     # experiment, but do not want to tackle that at this time
     #
     if (! $lastrsrc && ($which eq $EXPT_START || $which eq $EXPT_SWAPIN)) {
-	DBQueryWarn("update experiment_resources set swapin_time=0 ".
+	DBQueryWarn("update experiment_resources set swapin_time=0, ".
+		    " vnodes=0,jailnodes=0,plabnodes=0,delaynodes=0 ".
 		    "where idx='$rsrcidx'")
 	or return -1;
     }
@@ -1948,7 +1952,10 @@ sub SwapFail($$$$)
 
     if ($which eq $EXPT_SWAPMOD &&
 	$self->state() eq libdb::EXPTSTATE_ACTIVE()) {
-	DBQueryWarn("update experiment_resources set swapmod_time=0 ".
+	DBQueryWarn("update experiment_resources set ".
+		    ($flags & libdb::TBDB_STATS_FLAGS_MODHOSED() ?
+		     "swapout_time=swapmod_time, " : " ") .
+		    "swapmod_time=0 ".
 		    "where idx='$lastrsrc'")
 	    or return -1;
     }
