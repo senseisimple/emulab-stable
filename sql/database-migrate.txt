@@ -4258,7 +4258,7 @@ last_net_act,last_cpu_act,last_ext_act);
 	CREATE TABLE `lan_members` (
 	  `lanid` int(11) NOT NULL default '0',
 	  `memberid` int(11) NOT NULL auto_increment,
-	  PRIMARY KEY  (`lanid`,`memberid`)
+  	  PRIMARY KEY  (`lanid`,`memberid`)
 	) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 	
 	CREATE TABLE `lan_member_attributes` (
@@ -4291,6 +4291,12 @@ last_net_act,last_cpu_act,last_ext_act);
 
 		./newlans.pl
 
+        Run this query to fix a previous problem (after doing an install).
+	
+	update experiment_resources as r left join testbed_stats as s
+	on s.rsrcidx=r.idx set swapin_time=UNIX_TIMESTAMP(tstamp)
+	where action='start' and exitcode=0 and swapin_time=0;
+
 4.141: Bump pnode/vnode duration counters to floats since several
        users/projects have overflowed an unsigned int.
 
@@ -4308,4 +4314,23 @@ last_net_act,last_cpu_act,last_ext_act);
          `allexpt_vnode_duration` double(14,0) unsigned default '0';
        alter table user_stats change `allexpt_pnode_duration`
          `allexpt_pnode_duration` double(14,0) unsigned default '0';
+
+4.142: GRE and EGRE tunnels.
+
+       ALTER TABLE virt_lans MODIFY encap_style
+        enum('alias','veth','veth-ne','vlan','vtun','egre','gre','default')
+        NOT NULL default 'default'; 
+
+       ALTER TABLE experiments MODIFY encap_style
+        enum('alias','veth','veth-ne','vlan','vtun','egre','gre','default')
+        NOT NULL default 'default'; 
+
+       DROP TABLE IF EXISTS `tunnels`;
+
+       alter table lan_members add `node_id` varchar(32) NOT NULL default '';
+       alter table lan_members add  KEY `node_id` (`node_id`);
+       
+       update lan_members as lm left join lan_member_attributes as lma
+       on lma.lanid=lm.lanid and lma.memberid=lm.memberid and
+       attrkey='node_id' set node_id=attrvalue;
 

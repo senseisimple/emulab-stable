@@ -1007,7 +1007,7 @@ CREATE TABLE `experiments` (
   `idx` int(10) unsigned NOT NULL auto_increment,
   `sim_reswap_count` smallint(5) unsigned NOT NULL default '0',
   `veth_encapsulate` tinyint(4) NOT NULL default '1',
-  `encap_style` enum('alias','veth','veth-ne','vlan','default') NOT NULL default 'default',
+  `encap_style` enum('alias','veth','veth-ne','vlan','vtun','egre','gre','default') NOT NULL default 'default',
   `allowfixnode` tinyint(4) NOT NULL default '1',
   `jail_osname` varchar(20) default NULL,
   `delay_osname` varchar(20) default NULL,
@@ -1515,7 +1515,9 @@ DROP TABLE IF EXISTS `lan_members`;
 CREATE TABLE `lan_members` (
   `lanid` int(11) NOT NULL default '0',
   `memberid` int(11) NOT NULL auto_increment,
-  PRIMARY KEY  (`lanid`,`memberid`)
+  `node_id` varchar(32) NOT NULL default '',
+  PRIMARY KEY  (`lanid`,`memberid`),
+  KEY `node_id` (`node_id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
@@ -3001,31 +3003,6 @@ CREATE TABLE `traces` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
--- Table structure for table `tunnels`
---
-
-DROP TABLE IF EXISTS `tunnels`;
-CREATE TABLE `tunnels` (
-  `pid` varchar(12) NOT NULL default '',
-  `eid` varchar(32) NOT NULL default '',
-  `exptidx` int(11) NOT NULL default '0',
-  `node_id` varchar(32) NOT NULL default '',
-  `vname` varchar(32) NOT NULL default '',
-  `isserver` tinyint(3) unsigned NOT NULL default '0',
-  `port` int(11) NOT NULL default '0',
-  `peer_ip` varchar(32) NOT NULL default '',
-  `mask` varchar(15) default NULL,
-  `password` varchar(32) NOT NULL default '',
-  `proto` varchar(12) NOT NULL default 'udp',
-  `encrypt` tinyint(3) unsigned NOT NULL default '0',
-  `compress` tinyint(3) unsigned NOT NULL default '0',
-  `assigned_ip` varchar(32) NOT NULL default '',
-  PRIMARY KEY  (`exptidx`,`node_id`,`vname`),
-  UNIQUE KEY `pideid` (`pid`,`eid`,`node_id`,`vname`),
-  KEY `node_id` (`node_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1;
-
---
 -- Table structure for table `uidnodelastlogin`
 --
 
@@ -3413,7 +3390,7 @@ CREATE TABLE `virt_lans` (
   `nobwshaping` tinyint(4) default '0',
   `mustdelay` tinyint(1) default '0',
   `usevethiface` tinyint(4) default '0',
-  `encap_style` enum('alias','veth','veth-ne','vlan','tunnel','default') NOT NULL default 'default',
+  `encap_style` enum('alias','veth','veth-ne','vlan','vtun','egre','gre','default') NOT NULL default 'default',
   `trivial_ok` tinyint(4) default '1',
   `protocol` varchar(30) NOT NULL default 'ethernet',
   `is_accesspoint` tinyint(4) default '0',
