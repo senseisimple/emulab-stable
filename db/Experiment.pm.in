@@ -732,7 +732,7 @@ sub AddInputFile($$;$)
 	if ($isnsfile &&
 	    $self->TableUpdate("experiment_resources",
 			       "input_data_idx='$input_data_idx'",
-			       "rsrcidx='$rsrcidx'")) != 0) {
+			       "idx='$rsrcidx'")) != 0) {
 	    DBQueryWarn("unlock tables");
 	    return -1;
 	}
