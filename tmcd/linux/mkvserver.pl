@@ -24,6 +24,16 @@ use libtmcc;
 #
 # Questions:
 #
+# How to setup the virtual networks?
+#
+# * vservers provides localhost virtualization
+# * use etun devices to give vif inside and outside of vserver
+# * bridge outside etuns together as appropriate, possibly including
+#   phys interfaces
+#
+# Optimizations:
+# * if link is p2p and all "on node", just use etun pair w/no bridge
+#
 
 #
 # Create a jailed environment. There are some stub files stored in
@@ -76,6 +86,12 @@ STDERR->autoflush(1);
 my $JAILCNET	   = "172.16.0.0";
 my $JAILCNETMASK   = "255.240.0.0";
 
+my $USEPROXY	   = 1;
+my $USECHPID	   = 0;
+if ($USECHPID) {
+    $USEPROXY = 0;
+}
+
 #
 # Locals
 #
@@ -87,7 +103,7 @@ my $VSERVERDIR     = "/vservers";
 my $JAILCONFIG     = "jailconfig";
 my @ROOTCPDIRS     = ("etc", "root");
 my @ROOTMKDIRS     = ("dev", "tmp", "var", "usr", "proc", "users", "lib",
-		      "bin", "sbin", "home");
+		      "bin", "sbin", "home", "local");
 my @ROOTMNTDIRS    = ("bin", "sbin", "usr", "lib");
 my @EMUVARDIRS	   = ("logs", "db", "jails", "boot", "lock");
 my $IP;
@@ -262,7 +278,9 @@ else {
     mkvserver("$vnodeid");
 }
 TBDebugTimeStamp("mkjail done with root fs");
-startproxy("$vnodeid");
+if ($USEPROXY) {
+    startproxy("$vnodeid");
+}
 
 #
 # Start the vserver. If all goes well, this will exit cleanly, with the
@@ -313,7 +331,7 @@ if ($jailpid) {
 	    undef($jailpid);
 	    last;
 	}
-	if ($kidpid == $tmccpid) {
+	if ($USEPROXY && $kidpid == $tmccpid) {
 	    print("TMCC proxy exited with status $?. Restarting ...\n");
 	    startproxy("$vnodeid");
 	    next;
@@ -349,10 +367,34 @@ sub mkvserver($)
 	$interface = "nodev:0.0.0.0/0";
     }
 
+    my $enetifs = "";
+
+    #
+    # XXX still need code to create etun devices outside the vserver.
+    # To create a pair you do:
+    #    echo etun0,etun1 > /sys/module/etun/parameters/newif
+    # To destroy do:
+    #    echo etun0 > /sys/module/etun/parameters/delif
+    # (just need to specify one end).  Apparently you can call these things
+    # whatever you want (e.g., "veth").
+    #
+    # Then configure the IFs with appropriate IPs.
+    #
+if (0) {
+    foreach my $ip (@jailips) {
+	my $iface = `$BINDIR/findif -i $ip`;
+	chomp($iface);
+	if (!$iface) {
+	    fatal("Could not find interface for jailIP $ip");
+	}
+	$enetifs .= " --interface ${iface}:${ip}/24";
+    }
+}
+
     # Create the skeleton vserver. It will be mostly empty.
     mysystem("$VSERVER $vnodeid build --force -m skeleton ".
 	     "--hostname $jailhostname --interface $interface ".
-	     "--flags persistent");
+	     "$enetifs --flags persistent");
 
     # The filesystem for the vserver lands here.
     my $vdir = $VDIR;
@@ -368,10 +410,19 @@ sub mkvserver($)
     TBDebugTimeStamp("mkvserver: Copying root cp dirs done!");
 
     #
-    # Set vserver "capabilities".
+    # Set vserver capabilities and flags
     #
-    # Allows binding to TCP/UDP sockets below 1024
-    mysystem("echo 'NET_BIND_SERVICE' > $cdir/bcapabilities");
+    # NET_BIND_SERVICE: Allows binding to TCP/UDP sockets below 1024
+    # LBACK_REMAP:      Virtualize the loopback device
+    # HIDE_LBACK:       Hide real address used for loopback
+    # HIDE_NETIF:       Hide "foreign" network interfaces
+    mysystem("echo 'NET_BIND_SERVICE' >> $cdir/bcapabilities");
+    mysystem("echo 'LBACK_REMAP' >> $cdir/nflags");
+    mysystem("echo 'HIDE_LBACK' >> $cdir/nflags");
+    mysystem("echo 'HIDE_NETIF' >> $cdir/nflags");
+
+    # XXX needed to do clone with CLONE_NEWNET
+    mysystem("echo 'SYS_ADMIN' >> $cdir/bcapabilities");
 
     #
     # Clean out some stuff from /etc.
@@ -433,9 +484,11 @@ sub mkvserver($)
 
     #
     # Some security stuff; remove files that would enable it to talk to
-    # tmcd directly (only imortant on remote nodes). Must go through proxy.
+    # tmcd directly (only important on remote nodes). Must go through proxy.
     #
-    mysystem("rm -f $vdir/$ETCDIR/*.pem");
+    if ($USEPROXY) {
+	mysystem("rm -f $vdir/$ETCDIR/*.pem");
+    }
     
     #
     # Now a bunch of stuff to set up a nice environment in the jail.
@@ -446,6 +499,15 @@ sub mkvserver($)
     mysystem("ln -s ../../init.d/sshd $vdir/etc/rc6.d/K80sshd");
     mysystem("cp -p $ETCVSERVER/rc.invserver $vdir/etc/rc3.d/S99invserver");
     mysystem("cp -p $ETCVSERVER/rc.invserver $vdir/etc/rc6.d/K99invserver");
+    if ($USECHPID) {
+	#
+	# this script comes from tmcd/linux/vserver0.sh
+	# assumes chpid and vserver1.sh have been installed in $BINDIR
+	# (not part of makefile yet)
+	#
+        mysystem("ln -s ../../init.d/chpid $vdir/etc/rc3.d/S00chpid");
+	mysystem("ln -s ../../init.d/chpid $vdir/etc/rc6.d/K00chpid");
+    }
 
     # Kill anything that uses /dev/console in syslog; will not work.
     mysystem("sed -i.bak ".
@@ -810,4 +872,3 @@ sub mysystem($)
 	fatal("Command failed: $? - $command");
     }
 }
-

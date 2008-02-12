@@ -106,7 +106,7 @@ sub DoBoot()
     # setup to proceed in parallel (okay, at most two are going to partially
     # overlap, but that is better then nothing at all!
     # 
-    TBDebugTimeStamp("rc.injail starting watchdog");
+    TBDebugTimeStamp("rc.invserver starting watchdog");
     if (-x "$BINDIR/watchdog") {
         print("Starting testbed watchdog daemon\n");
 	system("$BINDIR/watchdog start");
@@ -119,13 +119,13 @@ sub DoBoot()
     # This is where we run all of the config scripts. These talk to the
     # DB and setup the node the way it is supposed to be. 
     # 
-    TBDebugTimeStamp("rc.injail running config scripts");
+    TBDebugTimeStamp("rc.invserver running config scripts");
     print("Running config scripts\n");
     system("$RCDIR/rc.config boot");
     if ($?) {
 	BootFatal("Error running $RCDIR/rc.config");
     }
-    TBDebugTimeStamp("rc.injail done running config scripts");
+    TBDebugTimeStamp("rc.invserver done running config scripts");
 
     # Linktest daemon now runs inside jails.
     if (-x "$RCDIR/rc.linktest") {
