@@ -731,7 +731,8 @@ sub AddInputFile($$;$)
 	}
 	if ($isnsfile &&
 	    $self->TableUpdate("experiment_resources",
-			       "input_data_idx='$input_data_idx'") != 0) {
+			       "input_data_idx='$input_data_idx'",
+			       "rsrcidx='$rsrcidx'")) != 0) {
 	    DBQueryWarn("unlock tables");
 	    return -1;
 	}
@@ -2154,6 +2155,7 @@ sub PostSwap($$$$)
 	else {
 	    $swapper->UpdateStats($which, 0, 0, 0);
 	}
+	
 
 	#
 	# Update the per-experiment record.
@@ -3265,7 +3267,6 @@ sub VnameToPmap($$)
     my ($node_id) = $query_result->fetchrow_array();    
     return Node->Lookup($node_id);
 }
-
 
 # _Always_ make sure that this 1 is at the end of the file...
 1;
