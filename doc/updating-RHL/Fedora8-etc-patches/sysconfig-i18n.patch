@@ -1,0 +1,6 @@
+--- /etc/sysconfig/i18n.orig	2008-01-30 09:24:26.000000000 -0700
++++ /etc/sysconfig/i18n	2008-02-05 17:14:29.000000000 -0700
+@@ -1,2 +1,2 @@
+-LANG="en_US.UTF-8"
++LANG="C"
+ SYSFONT="latarcyrheb-sun16"

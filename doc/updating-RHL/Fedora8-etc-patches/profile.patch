@@ -1,0 +1,17 @@
+--- profile~	2008-02-05 17:15:44.000000000 -0700
++++ profile	2008-02-05 17:17:05.000000000 -0700
+@@ -20,11 +20,9 @@
+ fi
+ 
+ # Path manipulation
+-if [ "$EUID" = "0" ]; then
+-	pathmunge /sbin
+-	pathmunge /usr/sbin
+-	pathmunge /usr/local/sbin
+-fi
++pathmunge /sbin
++pathmunge /usr/sbin
++pathmunge /usr/local/sbin
+ 
+ # No core files by default
+ ulimit -S -c 0 > /dev/null 2>&1

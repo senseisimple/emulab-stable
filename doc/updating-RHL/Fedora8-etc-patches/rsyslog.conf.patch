@@ -1,0 +1,13 @@
+--- rsyslog.conf.orig	2007-06-25 03:42:50.000000000 -0600
++++ rsyslog.conf	2008-02-05 17:11:32.000000000 -0700
+@@ -2,6 +2,10 @@
+ # Logging much else clutters up the screen.
+ #kern.*                                                 /dev/console
+ 
++# For the testbed. Log ssh logins to ops.
++local5.err						/dev/console
++auth.info						@users
++
+ # Log anything (except mail) of level info or higher.
+ # Don't log private authentication messages!
+ *.info;mail.none;authpriv.none;cron.none                /var/log/messages

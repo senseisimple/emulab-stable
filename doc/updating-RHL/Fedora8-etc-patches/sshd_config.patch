@@ -1,0 +1,11 @@
+--- /etc/ssh/sshd_config~	2007-09-17 17:24:50.000000000 -0600
++++ /etc/ssh/sshd_config	2008-02-05 17:07:09.000000000 -0700
+@@ -18,7 +18,7 @@
+ # Disable legacy (protocol version 1) support in the server for new
+ # installations. In future the default will change to require explicit
+ # activation of protocol 1
+-Protocol 2
++Protocol 2,1
+ 
+ # HostKey for protocol version 1
+ #HostKey /etc/ssh/ssh_host_key

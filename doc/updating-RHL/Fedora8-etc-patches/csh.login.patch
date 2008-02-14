@@ -1,0 +1,15 @@
+--- csh.login~	2007-05-23 09:55:03.000000000 -0600
++++ csh.login	2008-02-05 17:18:16.000000000 -0700
+@@ -7,11 +7,7 @@
+ 		setenv PATH "${PATH}:/usr/X11R6/bin"
+         endif
+ else
+-	if ( $uid == 0 ) then
+-		setenv PATH "/sbin:/usr/sbin:/usr/local/sbin:/bin:/usr/bin:/usr/local/bin:/usr/X11R6/bin"
+-	else
+-		setenv PATH "/bin:/usr/bin:/usr/local/bin:/usr/X11R6/bin"
+-	endif
++	setenv PATH "/sbin:/usr/sbin:/usr/local/sbin:/bin:/usr/bin:/usr/local/bin:/usr/X11R6/bin"
+ endif
+ 
+ setenv HOSTNAME `/bin/hostname`
