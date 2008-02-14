@@ -114,7 +114,7 @@ if (scalar(@ARGV) == 1) {
     ($plcname,$plctype) = $qres->fetchrow_array();
 
     # tell other libplabmon users, sigh
-    setPLCName($plcname);
+    libplabmon::setPLCName($plcname);
 }
 else {
     print STDERR "Must supply plcname argument!\n";
@@ -218,7 +218,7 @@ $SIG{INT}  = \&termsig;
 #
 my $seqref = {};
 if ($stateful) {
-    $seqref = getNodeHistSequences();
+    $seqref = getNodeHistSequences($plcname);
 }
 
 #

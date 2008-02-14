@@ -193,6 +193,7 @@ my $JITTER_DEDUCTION_FACTOR = 0.015;
 # increasing order of unavailability (so that the most avail are first).
 #
 # Arguments:
+#   $0 = name of plc.
 #   $1 = a ref to a hash returned by getNodeHistSequences; if undef, this 
 #        function will call getNodeHistSequences.
 #   $2 = boolean; if !0, will increase unavailability rank for a node if it is 
@@ -201,8 +202,13 @@ my $JITTER_DEDUCTION_FACTOR = 0.015;
 #        of the data; each successively prior day's unavailability gets a 
 #        decreasing weight.  Could be useful; easy to do.
 #
-sub rankNodesByUnavail(;$$$) {
+sub rankNodesByUnavail($;$$$) {
+    my $plcname = shift;
     my ($sref,$dojitter,$doewma) = @_;
+
+    if (!defined($plcname)) {
+	return undef;
+    }
 
     if (!defined($sref)) {
 	$sref = getNodeHistSequences();
