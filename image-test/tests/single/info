@@ -1,6 +1,7 @@
 Simple single node experment to test basic things about the node currently:
   tar
   startcmd
+  program-agent and event system
 
 Expands to 4 tests one for each pc:
   single-pc600
