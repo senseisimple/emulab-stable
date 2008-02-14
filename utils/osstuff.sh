@@ -34,7 +34,7 @@ Linux)
 	if [ -n "$rel" ]; then
             dist="Redhat"
 	else
-            rel=`grep 'Fedora Core' /etc/redhat-release | sed -e 's/Fedora Core release \([0-9]\).*/\1/'`
+            rel=`grep 'Fedora' /etc/redhat-release | sed -e 's/Fedora .*release \([0-9]\).*/\1/'`
 	    if [ -n "$rel" ]; then
 	        dist="Fedora"
 	    fi
