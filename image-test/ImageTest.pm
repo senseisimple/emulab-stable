@@ -205,9 +205,9 @@ sub test_rcmd ($$$$;&) {
 #
 sub test_traceroute ($$@) {
   my ($src,$dest,@path) = @_;
-  test_rcmd "traceroute-${src}_$dest", [], $src, "/usr/sbin/traceroute $dest",
+  test_rcmd "traceroute-${src}_$dest", [], $src, "traceroute $dest",
     sub {
-      local @_ = split /\n/;
+      local @_ = grep {!/^traceroute/} split /\n/;
       if (@_+0 != @path+0) {
 	printf "*** traceroute $src->$dest: expected %d hops but got %d.\n",
 	  @path+0, @_+0;
