@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2005, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2005, 2007, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -101,11 +101,6 @@ if ($ELABINELAB) {
 # guess which switch they're using
 #
 my @test_switches = map {[$_,"experimental"]} getTestSwitches();
-
-if (!@test_switches) {
-    die "No experimental switches found - make sure they're in the nodes ".
-	"table!\n";
-}
 
 #
 # Get trunk ports so that we can skip MACs learned on them
