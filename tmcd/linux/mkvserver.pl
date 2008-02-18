@@ -98,6 +98,7 @@ if ($USECHPID) {
 my $JAILPATH	   = "/var/emulab/jails";
 my $ETCVSERVER     = "/usr/local/etc/emulab/vserver";
 my $VSERVER	   = "/usr/sbin/vserver";
+my $VSERVERUTILS   = "/usr/lib/util-vserver";
 my $TMCC	   = "$BINDIR/tmcc";
 my $VSERVERDIR     = "/vservers";
 my $JAILCONFIG     = "jailconfig";
@@ -118,6 +119,7 @@ my $tmccpid;
 my $debug	   = 1;
 my @mntpoints      = ();
 my $USEVCNETROUTES = 0;
+my $USEHASHIFIED   = 0;
 my @controlroutes  = ();
 my $interactive    = 0;
 my $cleaning	   = 0;
@@ -136,6 +138,7 @@ sub mkvserver($);
 sub upvserver($);
 sub LoopMount($$);
 sub PreparePhysNode();
+sub PrepareFilesystems();
 sub fatal($);
 sub getjailconfig($);
 sub setjailoptions();
@@ -253,9 +256,11 @@ setjailoptions();
 
 # Do some prep stuff on the physical node if this is the first vserver.
 PreparePhysNode();
+PrepareFilesystems()
+    if ($USEHASHIFIED);
 
 print("Setting up jail for $vnodeid using $IP\n")
-    if ($debug);
+    if ($debug && defined($IP));
 
 $VDIR = "$VSERVERDIR/$vnodeid";
 $CDIR = "/etc/vservers/$vnodeid";
@@ -358,8 +363,13 @@ sub mkvserver($)
     my ($vnodeid) = @_;
     my $interface;
 
+    # The filesystem for the vserver lands here.
+    my $vdir = $VDIR;
+    # The configuration directory is here.
+    my $cdir = $CDIR;
+
     if (defined($IP)) {
-	system("/usr/lib/util-vserver/mask2prefix $JAILCNETMASK");
+	system("$VSERVERUTILS/mask2prefix $JAILCNETMASK");
 	my $prefix = $? >> 8;
 	$interface = "${vnodeid}=${phys_cnet_if}:${IP}/${prefix}";
     }
@@ -392,14 +402,11 @@ if (0) {
 }
 
     # Create the skeleton vserver. It will be mostly empty.
-    mysystem("$VSERVER $vnodeid build --force -m skeleton ".
+    mysystem("$VSERVER $vnodeid build --force ".
+	     "-m " . ($USEHASHIFIED ? "clone " : "skeleton ") .
 	     "--hostname $jailhostname --interface $interface ".
-	     "$enetifs --flags persistent");
-
-    # The filesystem for the vserver lands here.
-    my $vdir = $VDIR;
-    # The configuration directory is here.
-    my $cdir = $CDIR;
+	     "$enetifs --flags persistent ".
+	     ($USEHASHIFIED ? "-- --source /vservers/root" : ""));
 
     #
     # Copy in the top level directories. 
@@ -424,60 +431,68 @@ if (0) {
     # XXX needed to do clone with CLONE_NEWNET
     mysystem("echo 'SYS_ADMIN' >> $cdir/bcapabilities");
 
+    if (!$USEHASHIFIED) {
+	#
+	# Copy in the top level directories. 
+	#
+	foreach my $dir (@ROOTCPDIRS) {
+	    mysystem("rsync -a /$dir $vdir");
+	}
+	TBDebugTimeStamp("mkvserver: Copying root cp dirs done!");
+
+	#
+	# Make some other directories that are need in /root.
+	#
+	foreach my $dir (@ROOTMKDIRS) {
+	    if (! -e "$vdir/$dir") {
+		mkdir("$vdir/$dir", 0755) or
+		    fatal("Could not mkdir '$dir' in $vdir: $!");
+	    }
+	}
+
+	#
+	# Mount (read-only) these other directories to save space.
+	#
+	foreach my $dir (@ROOTMNTDIRS) {
+	    LoopMount("/$dir", "$vdir/$dir");
+	}
+
+	#
+	# Duplicate the /var hierarchy without the contents.
+	#
+	open(VARDIRS, "find /var -type d -print |")
+	    or fatal("Could not start find on /var");
+	while (<VARDIRS>) {
+	    my $dir = $_;
+	    chomp($dir);
+
+	    mysystem("rsync -dlptgoD $dir $vdir$dir");
+	}
+	close(VARDIRS);
+
+	#
+	# Get a list of all the plain files and create zero length versions
+	# in the new var.
+	#
+	opendir(DIR, "/var/log") or
+	    fatal("Cannot opendir /var/log: $!");
+	my @logs = grep { -f "/var/log/$_" } readdir(DIR);
+	closedir(DIR);
+
+	foreach my $log (@logs) {
+	    mysystem("touch $vdir/var/log/$log");
+	}
+	TBDebugTimeStamp("mkvserver: creating root filesystem done.");
+    }
+
     #
     # Clean out some stuff from /etc.
     #
     mysystem("/bin/rm -rf $vdir/etc/rc.d/rc*.d/*");
 
-    #
-    # Make some other directories that are need in /root.
-    #
-    foreach my $dir (@ROOTMKDIRS) {
-	if (! -e "$vdir/$dir") {
-	    mkdir("$vdir/$dir", 0755) or
-		fatal("Could not mkdir '$dir' in $vdir: $!");
-	}
-    }
-    TBDebugTimeStamp("mkvserver: Creating root mkdir dirs done!");
-
-    #
-    # Mount (read-only) these other directories to save space.
-    #
-    foreach my $dir (@ROOTMNTDIRS) {
-	LoopMount("/$dir", "$vdir/$dir");
-    }
-    TBDebugTimeStamp("mkvserver: Mounting root dirs done!");
-
     # /tmp is special.
     mysystem("chmod 1777 $vdir/tmp");
 
-    #
-    # Duplicate the /var hierarchy without the contents.
-    #
-    open(VARDIRS, "find /var -type d -print |")
-	or fatal("Could not start find on /var");
-    while (<VARDIRS>) {
-	my $dir = $_;
-	chomp($dir);
-
-	mysystem("rsync -dlptgoD $dir $vdir$dir");
-    }
-    close(VARDIRS);
-
-    #
-    # Get a list of all the plain files and create zero length versions
-    # in the new var.
-    #
-    opendir(DIR, "/var/log") or
-	fatal("Cannot opendir /var/log: $!");
-    my @logs = grep { -f "/var/log/$_" } readdir(DIR);
-    closedir(DIR);
-
-    foreach my $log (@logs) {
-	mysystem("touch $vdir/var/log/$log");
-    }
-    TBDebugTimeStamp("mkvserver: finished setting up /var");
-    
     # Create a local logs directory. 
     mysystem("mkdir -p $vdir/local/logs")
 	if (! -e "$vdir/local/logs");
@@ -524,7 +539,7 @@ if (0) {
 	     "$vdir/etc/ssh/sshd_config");
     
     # Port/Address for sshd.
-    if ($IP ne $hostip) {
+    if (defined($IP) && $IP ne $hostip) {
 	# XXX This can come out (sshd bind to port 22) once we have
 	# the network stack stuff in the kernel.
 	mysystem("echo 'Port $sshdport' >> $vdir/etc/ssh/sshd_config");
@@ -871,4 +886,86 @@ sub mysystem($)
     if ($?) {
 	fatal("Command failed: $? - $command");
     }
+}
+
+#
+# Create the hashified filesystems that will be used in the vservers.
+# This is done just once when the system boots and the hashified copy
+# does not yet exist.
+#
+sub PrepareFilesystems()
+{
+    return 0
+	if (-e "$VSERVERDIR/hashed");
+
+    #
+    # First create the copy of the root filesystems.
+    #
+    if (! -e "$VSERVERDIR/root") {
+	mysystem("mkdir $VSERVERDIR/root") == 0
+	    or return -1;
+
+	foreach my $dir (@ROOTMKDIRS) {
+	    if (! -e "$VSERVERDIR/root/$dir") {
+		mkdir("$VSERVERDIR/root/$dir", 0755) or
+		    fatal("Could not mkdir '$dir' in $VSERVERDIR/root: $!");
+	    }
+	}
+
+	print "Making a copy of root directories to $VSERVERDIR/root\n";
+	foreach my $dir (@ROOTMNTDIRS) {
+	    mysystem("rsync -a /$dir $VSERVERDIR/root") == 0
+		or return -1;
+	}
+    }
+
+    #
+    # Create the hashified copy of it.
+    #
+    mysystem("mkdir -p $VSERVERDIR/hashed/root") == 0
+	or return -1;
+
+    print "Making a hashied copy of $VSERVERDIR/root $VSERVERDIR/hashed\n";
+    mysystem("$VSERVERUTILS/vhashify --manually ".
+	     "--destination /vservers/hashed /vservers/root ''")
+	== 0 or return -1;
+
+    #
+    # Now copy in the stuff that we do not want unified; each vserver
+    # gets a copy.
+    #
+    # Copy in the top level directories. 
+    #
+    print "Copying the rest of the root directories to $VSERVERUTILS/root\n";
+    foreach my $dir (@ROOTCPDIRS) {
+	mysystem("rsync -a /$dir $VSERVERDIR/root") == 0
+	    or return -1;
+    }
+
+    #
+    # Duplicate the /var hierarchy without the contents.
+    #
+    open(VARDIRS, "find /var -type d -print |")
+	or fatal("Could not start find on /var");
+    while (<VARDIRS>) {
+	my $dir = $_;
+	chomp($dir);
+
+	mysystem("rsync -dlptgoD $dir $VSERVERDIR/root${dir}");
+    }
+    close(VARDIRS);
+
+    #
+    # Get a list of all the plain files and create zero length versions
+    # in the new var.
+    #
+    opendir(DIR, "/var/log") or
+	fatal("Cannot opendir /var/log: $!");
+    my @logs = grep { -f "/var/log/$_" } readdir(DIR);
+    closedir(DIR);
+    
+    foreach my $log (@logs) {
+	mysystem("touch $VSERVERDIR/root/var/log/$log");
+    }
+    return 0;
 }
