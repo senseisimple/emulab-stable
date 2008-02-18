@@ -409,14 +409,6 @@ if (0) {
 	     ($USEHASHIFIED ? "-- --source /vservers/root" : ""));
 
     #
-    # Copy in the top level directories. 
-    #
-    foreach my $dir (@ROOTCPDIRS) {
-	mysystem("rsync -a /$dir $vdir");
-    }
-    TBDebugTimeStamp("mkvserver: Copying root cp dirs done!");
-
-    #
     # Set vserver capabilities and flags
     #
     # NET_BIND_SERVICE: Allows binding to TCP/UDP sockets below 1024
