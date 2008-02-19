@@ -18,6 +18,21 @@ Note that some instructions may have steps that need to occur at a few
 different points in the install process - these are marked with the
 earliest time one of the steps needs to occur.
 
+20080219: After install:
+
+          The newnode MFS ssh keys have been updated from protocol 1
+          to protocol 2 (rsa key). The new keys were installed in
+          /usr/testbed/etc by the top level install target. If you
+          plan to add new nodes to your testbed you will want to put the
+          new key into the newnode MFS. Do the following as root:
+
+	  mdconfig -a -t vnode -u 1 -f /tftpboot/freebsd.newnode/boot/mfsroot
+  	  mount /dev/md1 /mnt
+          cat install/newnode_sshkeys/identity >>/mnt/root/.ssh/authorized_keys
+ 	  umount /dev/mnt
+	  mdconfig -d -u 1
+	  cd /tftpboot/freebsd.newnode/boot; ./prepare
+
 20070511: Before build.
 
 	  Install the new publish/subscribe system which is replacing Elvin.
