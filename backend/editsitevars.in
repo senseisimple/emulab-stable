@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -280,8 +280,8 @@ exit(0)
 # Now safe to set the site variable value.
 #
 my $name = $editsitevars_args{"name"};
-my $value = exists($editsitevars_args{"reset"}) ? "NULL" :
-    "'" . escapeshellarg($editsitevars_args{"value"}) . "'";
+my $value = (exists($editsitevars_args{"reset"}) ?
+	     "NULL" : DBQuoteSpecial($editsitevars_args{"value"}));
 
 DBQueryFatal("UPDATE sitevariables ".
 	     "SET value=$value ".
