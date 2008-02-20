@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -29,6 +29,13 @@ if (! $isadmin) {
 # Verify page arguments.
 #
 $reqargs = RequiredPageArguments("project", PAGEARG_PROJECT);
+$optargs = OptionalPageArguments("head_uid", PAGEARG_STRING,
+				 "user_interface", PAGEARG_STRING,
+				 "message", PAGEARG_ANYTHING,
+				 "silent", PAGEARG_BOOLEAN,
+				 "pcplab_okay", PAGEARG_BOOLEAN,
+				 "ron_okay", PAGEARG_BOOLEAN,
+				 "back", PAGEARG_STRING);
 
 #
 # Check to make sure thats this is a valid PID.
@@ -129,8 +136,9 @@ echo "
 
 echo "<tr>
          <td align=center>
-	    <input type=checkbox value=Yep
-                     name=silent>Silent (no email sent for deny,destroy)
+	    <input type=checkbox value=Yep ".
+               ((isset($silent) && $silent == "Yep") ? "checked " : " ") .
+                     "name=silent>Silent (no email sent for deny,destroy)
 	 </td>
        </tr>\n";
 
@@ -149,8 +157,9 @@ $allmembers = $this_project->MemberList();
 foreach ($allmembers as $other_user) {
     $this_uid   = $other_user->uid();
     $this_webid = $other_user->webid();
+    $sel = ((isset($head_uid) && $head_uid == $this_webid) ? "selected" : "");
     
-    echo "                   <option value='$this_webid'>$this_uid</option>\n";
+    echo "             <option $sel value='$this_webid'>$this_uid</option>\n";
 }
 echo "        </select>
           </td>
@@ -165,7 +174,10 @@ echo "<tr>
               <select name=user_interface>\n";
 
 foreach ($TBDB_USER_INTERFACE_LIST as $interface) {
-    echo "            <option value='$interface'>$interface</option>\n";
+    $sel = ((isset($user_interface) &&
+	     $user_interface == $interface) ? "selected" : "");
+    
+    echo "            <option $sel value='$interface'>$interface</option>\n";
 }
 echo "        </select>
           </td>
@@ -181,16 +193,26 @@ $num_pcplab = $this_project->num_pcplab();
 $num_ron    = $this_project->num_ron();
 
 if ($num_ron || $num_pcplab) {
+        # Default these on.
+        if (!isset($back)) {
+	    $pcplab_okay = "Yep";
+	    $ron_okay = "Yep";
+	}
+    
 	echo "<tr>
                  <td align=center>\n";
 	if ($num_pcplab) {
-		echo "<input type=checkbox value=Yep checked
-                                 name=pcplab_okay>
+		echo "<input type=checkbox value=Yep ".
+		     ((isset($pcplab_okay) && $pcplab_okay == "Yep")
+		      ? "checked " : " ") . 
+		    " name=pcplab_okay>
                                  Allow Plab &nbsp\n";
 	}
 	if ($num_ron) {
-		echo "<input type=checkbox value=Yep checked
-                                 name=ron_okay>
+		echo "<input type=checkbox value=Yep ".
+		     ((isset($ron_okay) && $ron_okay == "Yep")
+		      ? "checked " : " ") . 
+                               " name=ron_okay>
                                  Allow RON (PCWA) &nbsp\n";
 	}
 	echo "   </td>
@@ -204,7 +226,11 @@ echo "<tr>
 
 echo "<tr>
          <td align=center class=left>
-             <textarea name=message rows=15 cols=70></textarea>
+             <textarea name=message rows=15 cols=70>";
+if (isset($message)) {
+    echo ereg_replace("\r", "", $message);
+}
+echo "</textarea>
          </td>
       </tr>\n";
 
