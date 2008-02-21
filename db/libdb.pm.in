@@ -828,7 +828,6 @@ sub TBDB_PHYSICAL_NODE_TABLES() {
 	'switch_stacks'		=> [ 'node_id' ],
 	'tiplines'		=> [ 'node_id' ],
 	'tmcd_redirect'		=> [ 'node_id' ],
-	'tunnels'		=> [ 'node_id' ],
 	'uidnodelastlogin'	=> [ 'node_id' ],
 	'v2pmap'		=> [ 'node_id' ],
 	'vinterfaces'		=> [ 'node_id' ],
@@ -2452,7 +2451,6 @@ sub TBExptContainsNodeCT($$$)
 		   "ipsubnets");
 
 @physicalTables = ("delays",
-		   "tunnels",
 		   "ipport_ranges",
 		   "v2pmap",
 		   "linkdelays",
