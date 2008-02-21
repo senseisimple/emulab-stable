@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -424,7 +424,7 @@ if (-e $cvsdir) {
 	   "  grep -q '${template_tag}:'");
     if (! $?) {
 	System("$CVSBIN -d $cvsdir rtag -n -r ".
-	       "  $template_tag $instance_tag $guid/setup") == 0
+	       "  $template_tag $instance_tag setup") == 0
 	       or fatal(-1, "Could not rtag with instance tag in $cvsdir");
     }
 }
