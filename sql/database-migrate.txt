@@ -4395,3 +4395,28 @@ last_net_act,last_cpu_act,last_ext_act);
 	  drop primary key,
 	  add primary key (`exptidx`,`slicename`,`plc_idx`);
 
+4.144: Add daily stats for generating reports and graphs?
+
+	CREATE TABLE `daily_stats` (
+	  `theday` date default NULL,
+	  `exptstart_count` int(11) unsigned default '0',
+	  `exptpreload_count` int(11) unsigned default '0',
+	  `exptswapin_count` int(11) unsigned default '0',
+	  `exptswapout_count` int(11) unsigned default '0',
+	  `exptswapmod_count` int(11) unsigned default '0',
+	  `allexpt_duration` int(11) unsigned default '0',
+	  `allexpt_vnodes` int(11) unsigned default '0',
+	  `allexpt_vnode_duration` int(11) unsigned default '0',
+	  `allexpt_pnodes` int(11) unsigned default '0',
+	  `allexpt_pnode_duration` int(11) unsigned default '0',
+	  PRIMARY KEY  (`theday`)
+	) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+	alter table experiment_stats add
+	      `last_activity` datetime default NULL after destroyed;
+
+	# this is fine for an initial value.
+	update experiment_stats set last_activity=created
+	      where last_activity is NULL;
+
+

@@ -525,11 +525,13 @@ sub Create($$$$)
     #
     if (! DBQueryWarn("insert into experiment_stats ".
 		      "(eid, pid, creator, creator_idx, gid, created, ".
-		      " batch, exptidx, rsrcidx, pid_idx, gid_idx, eid_uuid) ".
+		      " batch, exptidx, rsrcidx, pid_idx, gid_idx, eid_uuid, ".
+		      " last_activity) ".
 		      "values('$eid', '$pid', '$creator_uid', '$creator_idx',".
 		      "       '$gid', FROM_UNIXTIME('$now'), ".
 		      "        $batchmode, $exptidx, $rsrcidx, ".
-		      "        $pid_idx, $gid_idx, '$uuid')")) {
+		      "        $pid_idx, $gid_idx, '$uuid', ".
+		      "        FROM_UNIXTIME('$now'))")) {
 	DBQueryWarn("delete from experiments where pid='$pid' and eid='$eid'");
 	DBQueryWarn("delete from experiment_resources where idx=$rsrcidx");
 	DBQueryWarn("unlock tables");
@@ -2172,6 +2174,7 @@ sub PostSwap($$$$)
 	    DBQueryWarn("update experiment_stats ".
 			"set ${tmp}_count=${tmp}_count+1, ".
 			"    ${tmp}_last=now(), ".
+			"    last_activity=${tmp}_last, ".
 			"    swapin_duration=swapin_duration+${duration}, ".
 			"    swap_exitcode=0, ".
 			"    last_error=NULL ".

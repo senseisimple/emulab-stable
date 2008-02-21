@@ -234,6 +234,26 @@ CREATE TABLE `current_reloads` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `daily_stats`
+--
+
+DROP TABLE IF EXISTS `daily_stats`;
+CREATE TABLE `daily_stats` (
+  `theday` date default NULL,
+  `exptstart_count` int(11) unsigned default '0',
+  `exptpreload_count` int(11) unsigned default '0',
+  `exptswapin_count` int(11) unsigned default '0',
+  `exptswapout_count` int(11) unsigned default '0',
+  `exptswapmod_count` int(11) unsigned default '0',
+  `allexpt_duration` int(11) unsigned default '0',
+  `allexpt_vnodes` int(11) unsigned default '0',
+  `allexpt_vnode_duration` int(11) unsigned default '0',
+  `allexpt_pnodes` int(11) unsigned default '0',
+  `allexpt_pnode_duration` int(11) unsigned default '0',
+  PRIMARY KEY  (`theday`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `datapository_databases`
 --
 
@@ -643,6 +663,7 @@ CREATE TABLE `experiment_stats` (
   `gid_idx` mediumint(8) unsigned NOT NULL default '0',
   `created` datetime default NULL,
   `destroyed` datetime default NULL,
+  `last_activity` datetime default NULL,
   `swapin_count` smallint(5) unsigned default '0',
   `swapin_last` datetime default NULL,
   `swapout_count` smallint(5) unsigned default '0',
