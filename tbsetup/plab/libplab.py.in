@@ -2017,8 +2017,29 @@ class EmulabSlice(Slice):
         # now do the configure
         if not self.is_configured:
             self._configure()
+
+            try:
+                insertFieldsStr = "(exptidx,pid,eid,slicename,slicemeta," \
+                                  "leaseend,plc_idx)"
+                insertValuesStr = "(%s, %s, %s, %s, %s, %s, %s)"
+                insertValuesTuple = (self.exptidx,self.pid,self.eid,
+                                     self.slicename,self.slicemeta,
+                                     time.strftime("%Y-%m-%d %H:%M:%S",
+                                                   time.gmtime(self.leaseend)),
+                                     self.plc.idx)
+                qstr = "replace into plab_slices " + insertFieldsStr + \
+                       " values " + insertValuesStr
+                DBQueryFatal(qstr,insertValuesTuple)
+                pass
+            except:
+                print "warning: failure while updating ticket for %s at %s" \
+                      % (self.slicename,self.plc.name)
+                pass
+
+            # save bits regardless of possible db failure
             self.is_configured = 1
             self._saveSliceStatusBits()
+            
             pass
         else:
             print "  Not doing configure for slice %s at %s " \
