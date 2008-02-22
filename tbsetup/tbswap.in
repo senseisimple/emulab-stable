@@ -606,7 +606,7 @@ sub doSwapout($) {
 	#
 	print STDERR "Freeing nodes.\n";
 	TBDebugTimeStamp("nfree started");
-	if (system("nfree $pid $eid")) {
+	if (system("nfree -a $pid $eid")) {
 	    tberror({type => 'secondary', severity => SEV_SECONDARY,
 		     error => ['nfree_failed']},
 		    "Could not free nodes.");

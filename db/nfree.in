@@ -17,16 +17,17 @@ use Getopt::Std;
 #
 sub usage ()
 {
-    die("Usage: nfree [-x] [-o] <pid> <eid> [<node> <node> <...>]\n".
-	"Releases all nodes in the specified experiment.\n".
+    die("Usage: nfree [-x] [-o] <pid> <eid> (-a | <node> <node> <...>)\n".
+	"Releases all nodes in the specified experiment if -a is given.\n".
 	"If nodes are listed, nfree releases only those nodes.\n".
 	" '-x' frees all virtual nodes on any physical node that is freed.\n".
 	" '-o' Moves nodes into a oldreserved holding experiment.\n"
 	);
 }
-my $optlist = "xo";
+my $optlist = "xoa";
 my $freeDependantVirtuals = 0;
 my $moveToOldReserved     = 0;
+my $freeAllNodes          = 0;
 
 # Configure variables
 my $TB       = "@prefix@";
@@ -81,11 +82,22 @@ if (defined($options{"x"})) {
 if (defined($options{"o"})) {
     $moveToOldReserved = 1;
 }
-if (@ARGV < 2) {
+if (defined($options{"a"})) {
+    $freeAllNodes = 1;
+}
+if (@ARGV < 2 || @ARGV == 2 && !$freeAllNodes) {
     usage();
 }
 my $pid = shift;
 my $eid = shift;
+
+if (@ARGV > 0 && $ARGV[0] eq '-a') {
+    $freeAllNodes = 1;
+    shift;
+}
+if ($freeAllNodes && @ARGV > 0) {
+    usage();
+}
 
 # Make sure that the experiment actually exists
 my $experiment = Experiment->Lookup($pid, $eid);
