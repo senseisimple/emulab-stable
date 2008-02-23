@@ -991,7 +991,7 @@ int main (int argc, char **argv) {
 		int fd;
 		struct feedclient_args *args;
 		struct sockaddr client_addr;
-		size_t client_addrlen;
+		size_t client_addrlen = sizeof(&client_addr);
 
 		fd = accept(sock,&client_addr,&client_addrlen);
 
