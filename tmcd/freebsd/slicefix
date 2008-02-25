@@ -417,11 +417,17 @@ dolinux() {
 	#
 	# If there's a GRUB config file, update all root=X kernel params.
 	#
-	gconf=/mnt/boot/grub/grub.conf
+	fgconf=/boot/grub/grub.conf
+	gconf=/mnt$fgconf
+        if [ ! -r $gconf ]; then
+	    echo "Could not find $fgconf; trying /boot/grub/menu.lst"
+	    fgconf=/boot/grub/menu.lst
+	    gconf=/mnt$fgconf
+	fi
 	if [ -r $gconf ]; then
-	    echo "  updating /boot/grub/grub.conf"
+	    echo "  updating $fgconf"
 	    sed -i .orig -e "s;\([br]oot=/dev\)/[hs]d.[0-7];\1/${ldisk}${part};" $gconf || {
-		echo "Failed to update /boot/grub/grub.conf"
+		echo "Failed to update $fgconf"
 	    }
 
 	    #
@@ -439,7 +445,7 @@ dolinux() {
 	        gdisk=`expr $gdisk + 1`
 	    fi
 	    sed -i '' -e "s;root (hd[0-9],[0-9]);root (hd${gdisk},${gpart});" $gconf || {
-		echo "Failed to update root in /boot/grub/grub.conf"
+		echo "Failed to update root in $fgconf"
 	    }
 	fi
 
