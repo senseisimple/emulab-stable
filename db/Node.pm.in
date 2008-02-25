@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005-2007 University of Utah and the Flux Group.
+# Copyright (c) 2005-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package Node;
@@ -89,6 +89,7 @@ sub Lookup($$)
     $self->{"DBROW"}    = $query_result->fetchrow_hashref();
     $self->{"RSRV"}     = undef;
     $self->{"TYPEINFO"} = undef;
+    $self->{"ATTRS"}    = undef;
     bless($self, $class);
 
     # Add to cache.
@@ -254,6 +255,7 @@ sub Refresh($)
     # Force reload
     $self->{"RSRV"}     = undef;
     $self->{"TYPEINFO"} = undef;
+    $self->{"ATTRS"}    = undef;
     return 0;
 }
 
@@ -704,6 +706,47 @@ sub vname($)
 	if (! $self->IsReserved());
 
     return $self->{"RSRV"}->{'vname'};
+}
+
+#
+# Lookup a specific attribute in the node_attributes table, 
+#
+sub NodeAttribute($$$;$)
+{
+    my ($self, $attrkey, $pattrvalue, $pattrtype) = @_;
+    
+    return -1
+	if (!ref($self));
+
+    my $node_id = $self->node_id();
+
+    if (!defined($self->{"ATTRS"})) {
+	my $query_result =
+	    DBQueryWarn("select * from node_attributes ".
+			"where node_id='$node_id'");
+
+	return -1
+	    if (!defined($query_result));
+
+       	$self->{"ATTRS"} = {};
+	while (my $row = $query_result->fetchrow_hashref()) {
+	    my $key = $row->{'attrkey'};
+
+	    $self->{"ATTRS"}->{$key} = $row;
+	}
+    }
+    
+    if (!exists($self->{"ATTRS"}->{$attrkey})) {
+	$$pattrvalue = undef;
+	return 0;
+    }
+    my $ref = $self->{"ATTRS"}->{$attrkey};
+
+    $$pattrvalue = $ref->{'attrvalue'};
+    $$pattrtype  = $ref->{'attrtype'}
+        if (defined($pattrtype));
+
+    return 0;
 }
 
 #
