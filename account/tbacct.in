@@ -48,6 +48,7 @@ my $BUGDBSUPPORT= @BUGDBSUPPORT@;
 my $OPSDBSUPPORT= @OPSDBSUPPORT@;
 my $CHATSUPPORT = @CHATSUPPORT@;
 my $MAILMANSUPPORT= @MAILMANSUPPORT@;
+my $THISHOMEBASE= "@THISHOMEBASE@";
 my $PROTOUSER   = 'elabman';
 
 my $SAMBANODE	= "fs";  # DNS makes this do the right thing in E-in-E.
@@ -77,6 +78,7 @@ my $MMMODIFYUSER= "$TB/sbin/mmmodifymember";
 my $ADDMMUSER   = "$TB/sbin/addmmuser";
 my $DELMMUSER   = "$TB/sbin/delmmuser";
 my $OPSDBCONTROL= "$TB/sbin/opsdb_control";
+my $ADDHOOK     = "$TB/sbin/adduserhook";
 my $NOLOGIN	= "/sbin/nologin";
 my $SSH		= "$TB/bin/sshtb";
 my $SAVEUID	= $UID;
@@ -401,6 +403,16 @@ sub AddUser()
 	    
 	if (system("$SSH -host $CONTROL $CHPASS -p '$pswd' $user")) {
 	    fatal("Could not initialize password for user $user on $CONTROL!");
+	}
+
+	#
+	# Extra hook added for CMU. Generalize later.
+	#
+	if ($THISHOMEBASE =~ /^cmuemulab$/i) {
+	    print "Running post create hook for user $user on $CONTROL.\n";
+
+	    # Do not worry about failure. 
+	    system("$SSH -host $CONTROL $ADDHOOK $user");
 	}
     }
     $UID = $SAVEUID;

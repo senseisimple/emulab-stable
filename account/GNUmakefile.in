@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -16,6 +16,7 @@ SBIN_STUFF	= tbacct addsfskey addpubkey mkusercert quotamail genpubkeys \
 		  newuser newproj
 LIBEXEC_STUFF	= webtbacct webaddsfskey webaddpubkey webmkusercert \
 		  webnewuser webnewproj
+CTRLSBIN_STUFF  = adduserhook
 
 # These scripts installed setuid, with sudo. 
 SETUID_BIN_SCRIPTS   = 
@@ -26,7 +27,7 @@ SETUID_LIBX_SCRIPTS  =
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
-all:	$(SBIN_STUFF) $(LIBEXEC_STUFF)
+all:	$(SBIN_STUFF) $(LIBEXEC_STUFF) $(CTRLSBIN_STUFF)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -50,6 +51,8 @@ post-install:
 
 control-install:
 
+hook-install: $(addprefix $(INSTALL_DIR)/opsdir/sbin/, $(CTRLSBIN_STUFF))
+
 # This rule says what web* script depends on which installed binary directory.
 $(LIBEXEC_STUFF): $(INSTALL_SBINDIR)
 
@@ -64,3 +67,7 @@ $(LIBEXEC_STUFF): $(TESTBED_SRCDIR)/WEBtemplate.in
 clean:
 	rm -f *.o core
 
+$(INSTALL_DIR)/opsdir/sbin/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
+	$(INSTALL) $< $@
