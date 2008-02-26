@@ -78,6 +78,7 @@ void dolog(int level, char *format, ...);
 
 int val2speed(int val);
 void rawmode(char *devname, int speed);
+void netmode(char *devname);
 void writepid(void);
 void createkey(void);
 int handshake(void);
@@ -129,12 +130,14 @@ int	 powermon = 0;
 #ifndef  USESOCKETS
 #define relay_snd 0
 #define relay_rcv 0
+#define remotemode 0
 #else
 char		  *Bossnode = BOSSNODE;
 struct sockaddr_in Bossaddr;
 char		  *Aclname;
 int		   serverport = SERVERPORT;
 int		   sockfd, tipactive, portnum, relay_snd, relay_rcv;
+int		   remotemode;
 int		   upportnum = -1, upfd = -1, upfilefd = -1;
 char		   uptmpnam[64];
 size_t		   upfilesize = 0;
@@ -322,7 +325,7 @@ main(int argc, char **argv)
 	else
 		Progname = *argv;
 
-	while ((op = getopt(argc, argv, "rds:Hb:ip:c:T:aou:v:P")) != EOF)
+	while ((op = getopt(argc, argv, "rds:Hb:ip:c:T:aou:v:Pm")) != EOF)
 		switch (op) {
 #ifdef	USESOCKETS
 #ifdef  WITHSSL
@@ -340,6 +343,10 @@ main(int argc, char **argv)
 
 		case 'i':
 			standalone = 1;
+			break;
+
+		case 'm':
+			remotemode = 1;
 			break;
 #endif /* USESOCKETS */
 		case 'H':
@@ -583,6 +590,11 @@ main(int argc, char **argv)
 	}
 	
 	if (!relay_rcv) {
+#ifdef  USESOCKETS
+	    if (remotemode)
+		netmode(argv[1]);
+	    else
+#endif
 		rawmode(Devname, speed);
 	}
 	
@@ -1384,6 +1396,39 @@ rawmode(char *devname, int speed)
 		die("%s: powermonmode: %s", Devname, geterr(errno));
 	
 }
+
+/*
+ * The console line is really a socket on some node:port.
+ */
+#ifdef  USESOCKETS
+void
+netmode(char *hostport)
+{
+	struct sockaddr_in	sin;
+	struct hostent		*he;
+	char			*bp;
+	int			port;
+
+	if ((bp = strchr(hostport, ':')) == NULL)
+		die("%s: bad format, expecting 'host:port'", hostport);
+	*bp++ = '\0';
+	if (sscanf(bp, "%d", &port) != 1)
+		die("%s: bad port number", bp);
+	he = gethostbyname(hostport);
+	if (he == 0) {
+		die("gethostbyname(%s): %s", hostport, hstrerror(h_errno));
+	}
+	bzero(&sin, sizeof(sin));
+	memcpy ((char *)&sin.sin_addr, he->h_addr, he->h_length);
+	sin.sin_family = AF_INET;
+	sin.sin_port = htons(port);
+
+	if ((devfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+		die("socket(): %s", geterr(errno));
+	if (connect(devfd, (struct sockaddr *)&sin, sizeof(sin)) < 0)
+		die("connect(): %s", geterr(errno));
+}
+#endif
 
 /*
  * From kgdbtunnel
