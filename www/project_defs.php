@@ -135,7 +135,7 @@ class Project
     function approved()      { return $this->field("approved"); }
     function inactive()      { return $this->field("inactive"); }
     function date_inactive() { return $this->field("date_inactive"); }
-    function public()        { return $this->field("public"); }
+    function ispublic()      { return $this->field("public"); }
     function public_whynot() { return $this->field("public_whynot"); }
     function expt_count()    { return $this->field("expt_count"); }
     function expt_last()     { return $this->field("expt_last"); }
@@ -594,7 +594,7 @@ class Project
 	$proj_created		= $this->created();
 	$proj_name		= $this->name();
 	$proj_URL		= $this->URL();
-	$proj_public		= YesNo($this->public());
+	$proj_public		= YesNo($this->ispublic());
 	$proj_funders		= $this->funders();
 	$proj_head_idx		= $this->head_idx();
 	$proj_members		= $this->num_members();
