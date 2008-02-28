@@ -28,14 +28,6 @@ freebsd.newnode*/
 	which are not yet part of Emulab.  Has a generic kernel and specialized
 	scripts for figuring out the network connections, etc.
 
-mfs-entries.sql
-	At some point in the Emulab setup directions you will be told that
-	you need to ask Utah about DB entries for the MFSes.  This file
-	contains commands for setting up those entries.  As the database
-	schema changes occasionally, you should check the table layout
-	at the beginning of the file to make sure it matches your DB before
-	performing the INSERT commands.
-
 pxeboot*/pxeboot.emu-{sio,vga,null}
 	This is a specialized version of the FreeBSD boot loader.
 	There is a version for use with the 4.7 based system (pxeboot47)
