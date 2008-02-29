@@ -5,49 +5,49 @@
 
 using namespace std;
 
-EventPipe::reset()
+EventPipe::reset(void)
 {
-	string command;
+  string command;
 
-	command = "/usr/testbed/bin/tevc -e " +
-			projectName + '/' + experimentName +
-			" now " + agentName +" MODIFY " +
-			"BANDWIDTH=1000 " +
-			"DELAY=0 " +
-			"PLR=0";
+  command = "/usr/testbed/bin/tevc -e "
+    + g::projectName + '/' + g::experimentName
+    + " now " + agentName +" MODIFY " +
+    + "BANDWIDTH=100000 "
+    + "DELAY=0 "
+    + "PLR=0";
 
-	system(command);
+  system(command);
 }
 
 EventPipe::resetParameter(Parameter const & newParameter)
 {
-	string parameterName;
-	int parameterValue;
-	stringstream ss;
-	string valueString;
-	string command;
+        string parameterName;
+        int parameterValue;
+        stringstream ss;
+        string valueString;
+        string command;
 
-	parameterValue = parameter.getValue();
-	switch(newParameter.getType()) {
-		case BANDWIDTH:
-				parameterString = "BANDWITH";
-				ss << parameterValue;
-				break;
-		case DELAY:	
-				parameterString = "DELAY";
-				ss << parameterValue;
-				break;
-		case LOSS:	
-				parameterString = "LOSS";
-				ss << parameterValue;
-				break;
-	}
-	ss >> valueString;
+        parameterValue = parameter.getValue();
+        switch(newParameter.getType()) {
+                case BANDWIDTH:
+                                parameterString = "BANDWIDTH";
+                                ss << parameterValue;
+                                break;
+                case DELAY:
+                                parameterString = "DELAY";
+                                ss << parameterValue;
+                                break;
+                case LOSS:
+                                parameterString = "LOSS";
+                                ss << parameterValue;
+                                break;
+        }
+        valueString = ss.str();
 
-	command = "/usr/testbed/bin/tevc -e " +
-			projectName + '/' + experimentName +
-			" now " + agentName + " MODIFY " +
-			parameterString + '=' + valueString;
+        command = "/usr/testbed/bin/tevc -e " +
+                        projectName + '/' + experimentName +
+                        " now " + agentName + " MODIFY " +
+                        parameterString + '=' + valueString;
 
-	system(command);
+        system(command);
 }
