@@ -20,6 +20,7 @@ public:
   virtual void reset(void);
   virtual void resetParameter(Parameter const & newParameter);
 private:
+  string agentName;
 };
 
 #endif

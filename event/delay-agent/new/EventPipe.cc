@@ -5,12 +5,21 @@
 
 using namespace std;
 
+EventPipe::EventPipe(std::string const & name)
+{
+	agentName = name;
+}
+
+EventPipe::~EventPipe()
+{
+}
+
 EventPipe::reset(void)
 {
   string command;
 
   command = "/usr/testbed/bin/tevc -e "
-    + g::projectName + '/' + g::experimentName
+    + g::experimentName
     + " now " + agentName +" MODIFY " +
     + "BANDWIDTH=100000 "
     + "DELAY=0 "
