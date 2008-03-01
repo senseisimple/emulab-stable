@@ -609,8 +609,28 @@ int main (int argc, char **argv) {
 		 * other than IPv4
 		 */
 #ifdef __linux__
-		ptr = ptr + sizeof(ifr->ifr_name) +
-			MAX(sizeof(struct sockaddr),sizeof(ifr->ifr_addr));
+		/* 
+		 * ptr = ptr + sizeof(ifr->ifr_name) +
+		 *       MAX(sizeof(struct sockaddr),sizeof(ifr->ifr_addr));
+                 * Doesn't work on 64 bit linux, linux defines ifreq as:
+		 * struct ifreq {
+		 *     char ifr_name[IFNAMSIZ];
+		 *     union {
+		 *         struct sockaddr ifr_addr;
+                 *         ...
+                 *     }
+                 * }
+                 * (see netdevice(7))
+                 * And one of the other components of the union is larger 
+		 * than sockaddr as:
+		 *   sizeof(struct ifreq)                            is 40 
+		 *   sizeof(ifr->ifr_name) + sizeof(struct sockaddr) is 32
+                 * So for now I am ignoring the Stevens book and using what 
+                 * will work on linux (according to the netdevice(7) man page,
+		 * and also tested on 32 and 64 bits versions of Fedora 8).
+		 * -- kevina
+		 */
+ 	        ptr = ptr + sizeof(struct ifreq);
 #else
 		ptr = ptr + sizeof(ifr->ifr_name) +
 			MAX(sizeof(struct sockaddr),ifr->ifr_addr.sa_len);
