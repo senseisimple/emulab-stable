@@ -78,7 +78,7 @@ void dolog(int level, char *format, ...);
 
 int val2speed(int val);
 void rawmode(char *devname, int speed);
-void netmode(char *devname);
+void netmode();
 void writepid(void);
 void createkey(void);
 int handshake(void);
@@ -414,7 +414,11 @@ main(int argc, char **argv)
 	Ttyname = newstr(strbuf);
 	(void) snprintf(strbuf, sizeof(strbuf), PTYNAME, TIPPATH, argv[0]);
 	Ptyname = newstr(strbuf);
-	(void) snprintf(strbuf, sizeof(strbuf), DEVNAME, DEVPATH, argv[1]);
+	if (remotemode)
+		strcpy(strbuf, argv[1]);
+	else
+		(void) snprintf(strbuf, sizeof(strbuf),
+				DEVNAME, DEVPATH, argv[1]);
 	Devname = newstr(strbuf);
 
 	openlog(Progname, LOG_PID, LOG_TESTBED);
@@ -592,7 +596,7 @@ main(int argc, char **argv)
 	if (!relay_rcv) {
 #ifdef  USESOCKETS
 	    if (remotemode)
-		netmode(argv[1]);
+		netmode();
 	    else
 #endif
 		rawmode(Devname, speed);
@@ -821,10 +825,25 @@ capture(void)
 			else
 #endif
 			  cc = read(devfd, buf, sizeof(buf));
-			if (cc < 0)
-				die("%s: read: %s", Devname, geterr(errno));
-			if (cc == 0)
-				die("%s: read: EOF", Devname);
+			if (cc <= 0) {
+#ifdef  USESOCKETS
+				if (remotemode) {
+					FD_CLR(devfd, &sfds);
+					close(devfd);
+					warning("remote socket closed");
+					usleep(5000000);
+					/* will not return on error */
+					netmode();
+					FD_SET(devfd, &sfds);
+					continue;
+				}
+#endif
+				if (cc < 0)
+					die("%s: read: %s",
+					    Devname, geterr(errno));
+				if (cc == 0)
+					die("%s: read: EOF", Devname);
+			}
 			errno = 0;
 
 			sigprocmask(SIG_BLOCK, &actionsigmask, &omask);
@@ -1402,13 +1421,15 @@ rawmode(char *devname, int speed)
  */
 #ifdef  USESOCKETS
 void
-netmode(char *hostport)
+netmode()
 {
 	struct sockaddr_in	sin;
 	struct hostent		*he;
 	char			*bp;
 	int			port;
-
+	char			hostport[BUFSIZ];
+	
+	strcpy(hostport, Devname);
 	if ((bp = strchr(hostport, ':')) == NULL)
 		die("%s: bad format, expecting 'host:port'", hostport);
 	*bp++ = '\0';
@@ -1427,6 +1448,9 @@ netmode(char *hostport)
 		die("socket(): %s", geterr(errno));
 	if (connect(devfd, (struct sockaddr *)&sin, sizeof(sin)) < 0)
 		die("connect(): %s", geterr(errno));
+	
+	if (fcntl(devfd, F_SETFL, O_NONBLOCK) < 0)
+		die("%s: fcntl(O_NONBLOCK): %s", Devname, geterr(errno));
 }
 #endif
 
