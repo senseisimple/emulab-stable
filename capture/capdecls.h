@@ -1,10 +1,11 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2002, 2008 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
 #define SERVERPORT	855
+#define LOGGERPORT	858
 #define DEVPATH		"/dev"
 #define TIPPATH		"/dev/tip"
 #ifdef HPBSD
@@ -23,6 +24,15 @@ typedef struct {
 	char		key[256];	/* and the string itself. */
 } secretkey_t;
 #define DEFAULTKEYLEN	32
+
+/*
+ * This is for the cap logger handshake, which passes additional stuff.
+ */
+typedef struct {
+    secretkey_t		secretkey;
+    char		node_id[128];
+    int			offset;
+} logger_t;
 
 /*
  * The capserver then returns this structure as part of the handshake.
@@ -51,4 +61,5 @@ typedef struct {
 #define CAPOK		0
 #define CAPBUSY		1
 #define CAPNOPERM	2
+#define CAPERROR        3
 typedef int		capret_t;
