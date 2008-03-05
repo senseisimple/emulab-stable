@@ -1,132 +1,63 @@
 <!--
    EMULAB-COPYRIGHT
-   Copyright (c) 2000-2002, 2005 University of Utah and the Flux Group.
+   Copyright (c) 2000-2008 University of Utah and the Flux Group.
    All rights reserved.
   -->
 <center>
 <h1>
-    Overview of Installed Software
+    Software Overview
 </h1>
 </center>
 
 <ul>
-<li><b>Wide-area nodes</b>: FreeBSD 4.6 with additions for robustness
-    and for participation in the wide area Netbed.
-
-<p>
 <li><b>boss.emulab.net</b>: Master server, database, web server, name server, trusted disk-image server
     <p>
-    Also known as <b>www.netbed.org</b>.
-    Runs FreeBSD.  This is the master machine for the testbed
+    Runs FreeBSD 6.2.  This is the master machine for the testbed
     software.  Runs all the critical software components and thus is not
     directly accessible by testbed users.  Mediates (via the database)
     access to node power cycling and disk-image loading as well as providing
     DNS and web services.
 
 <p>
-<li><b>users.emulab.net</b>:  NFS and SFS file server, login/control/console access point,
-    serial line server.
+<li><b>users.emulab.net</b>:  NFS and SFS file server,
+    login/control/console access point, serial line server.
 
     <p>
     Also known as <b>ops.emulab.net</b> and <b>fs.emulab.net</b>.
-    Currently runs FreeBSD 4.5-RELEASE.  This is the main server machine for users
+    Currently runs FreeBSD 6.2.  This is the main server machine for users
     of the testbed and is where shared home directories and all project files
     live.  While most of the testbed configuration process is done via
     the Web interface, a few things must be done while logged into
     users.emulab.net.  These testbed specific commands and programs are
     contained in <code>/usr/testbed/bin</code>. Your skeleton login
     files already have this directory in your path.
-    
-    <p>
-    This is also one of Emulab's "serial-line console" servers.  Experimenters can access
-    the console of any testbed node (using the <code>console</code> program) from here.
-    Console output of all nodes is also logged here.
+
+<p>
+<li><b>pc[001-XXX]</b>: Each Emulab has a variety of testnodes that
+       are available to users. Please see the 
+       <a href="hardware.html">hardware page</a> for a
+       complete description of available hardware types. In general,
+       all testbed nodes run a variety of operating systems including
+       FreeBSD, Redhat Linux, Fedora Core, and even
+       <a href="doc/docwrapper.php3?docname=windows.html">
+       Windows&nbsp;XP</a>. Registered users can find out exactly what
+       operating systems are supported on each node type by clicking
+       on <a href="https://www.emulab.net/showosid_list.php3">List
+       OSIDs</a> in the Emulab web interface "Experimentation" drop
+       down menu.
+       
+       <p>
+       You can also run whatever OS you like by loading 
+       <a href="tutorial/tutorial.php3#CustomOS">your own OS
+       image</a>.
+
+       <p>
+       Please see the <a href="kb-show.php3?xref_tag=tb-set-node-os">FAQ</a>
+       and <a href = "tutorial/tutorial.php3#OsChoices">Tutorial</a>
+       for more information.
+<p>
+<li><b>Wide-area nodes</b>: <em>Utah Emulab Only</em>
+    FreeBSD 4.6 with additions for robustness and for participation in
+    the wide area Netbed.
 </ul>
 
-<h3>Machines used only for ``Emulab Classic'':</h3>
-
-<ul>
-<p>
-<li><b>tipserv1.emulab.net</b>: additional test node serial line server
-    <p>
-    Runs FreeBSD 4.5-RELEASE.
-    Provides physical serial line ports for additional testbed nodes.
-    Not directly accessible by testbed users, hosted serial lines are
-    accessed by users via a proxy agent on users.emulab.net.
-
-<p>
-<li><b>pc[1-40].emulab.net</b>: <a href="hardware.html#tbpc600">pc600</a> testbed PC nodes
-    <p>
-    The testbed nodes can boot any operating system image that has been
-    captured into an Emulab imagezip file.  FreeBSD,
-    RedHat Linux, and 
-    <a href="doc/docwrapper.php3?docname=windows.html"> Windows&nbsp;XP</a>
-    are fully supported.
-    Click <a href="https://www.emulab.net/showosid_list.php3">List ImageIDs and
-    OSIDs</a> in the Emulab web interface "Interaction" pane to see the
-    current list of Emulab-supplied OSs, 
-    and see the <a href="kb-show.php3?xref_tag=tb-set-node-os">FAQ</a> and 
-    <a href = "tutorial/tutorial.php3#OsChoices">Tutorial</a>
-    for more information.
-
-    <p>
-    You may also boot your own OSKit kernels on them. You
-    can run whatever OS you like by loading 
-    <a href="tutorial/tutorial.php3#CustomOS">your own OS image</a> onto the
-    the 4th DOS slice using the Testbed configuration software.
-
-    <p>
-    Each node has 5 100/MBbps ethernet cards. The first four
-    interfaces are connected to the "experimental network," and are
-    used to "wire up" your specific network topology. The last
-    interface is connected to the "control network," and is used
-    for configuration and for login access from users.emulab.net.
-    In FreeBSD this card is named <code>fxp4</code>,
-    and in Linux and OSKit kernels it is <code>eth4</code>
-
-    <p>
-    All of these nodes have their COM1 serial interface (console
-    port) connected to users.emulab.net. The port is configured to run
-    at 115K baud, and are accessible from users.emulab.net via
-    <code>console</code> using the appropriate "pc" names; e.g., "pc6."
-
-<p>
-<li><b>pc[41-168].emulab.net</b>: <a href="hardware.html#tbpc850">pc850</a> testbed PC nodes
-    <p>
-    Same as "pc600" nodes from a software perspective:
-    booting FreeBSD, RedHat Linux, 
-    <a href="doc/docwrapper.php3?docname=windows.html"> Windows&nbsp;XP</a>,
-    OSKit or custom kernels.
-    However, due to differences in the hardware configuration,
-    the "control" interface is <code>fxp0</code> under FreeBSD,
-    <code>eth2</code> under Linux, and <code>eth0</code> under OSKit kernels.
-
-    <p>
-    As these testbed nodes support true console redirection,
-    BIOS interaction, as well as OS kernel interaction, is possible via
-    the console serial lines.  However, the BIOS is password-protected
-    and only read-only access is allowed without the password.
-
-<p>
-<li><em>(Currently unavailable)</em><br>
-<b>sh[1-20]-[1-8].emulab.net</b>: testbed <a href="hardware.html#tbshark">Shark</a> nodes
-    <p>
-    The Sharks run NetBSD by default, with the filesystems provided via
-    NFS. You may also boot your own OSKit kernels. At this time, no support
-    is provided for running your own operating system on the Sharks.
-
-    <p>
-    Each Shark has a single 10Mbps ethernet which serves as both the control
-    and experimental interface. This is done with IP "aliasing", and
-    causes experimental traffic to be routed to the experimental
-    network instead of the control network.
-
-    <p>
-    All nodes use the serial port as their console, but due to the
-    limited number of serial ports on the control node, only the last
-    Shark on each shelf is connected to the control node.  These
-    designated Shark console lines are accessible from
-    users.emulab.net (via the <code>console</code> command) using the appropriate
-    "tbsh" shelf names; e.g., "sh16."
-
-</ul>
