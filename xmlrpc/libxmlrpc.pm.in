@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -54,8 +54,8 @@ $ENV{'PATH'} = $ENV{'PATH'} . ":/usr/local/bin";
 my %config =
     ( "debug"		=> 0,
       "verbose",	=> 0,
-      "server"		=> undef,
-      "portnum"		=> undef,
+      "server"		=> $BOSSNODE,
+      "portnum"		=> @OUTERBOSS_XMLRPCPORT@,
       "version"		=> undef,
       "cert"		=> undef,
     );
