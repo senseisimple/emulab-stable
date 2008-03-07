@@ -49,6 +49,8 @@ char		*Aclname;
 char		*nodeid;
 char		*server;
 int		debug = 0;
+int		tailmode = 0;
+int		offset;
 int		sockfd, portnum = LOGGERPORT;
 logger_t	logreq;
 
@@ -99,13 +101,28 @@ main(int argc, char **argv)
 	else
 		Progname = *argv;
 
-	while ((op = getopt(argc, argv, "da:p:")) != EOF) {
+	/*
+	 * The first argument has to be the +/- line option. Leave it
+	 * someone else to generalize.
+	 */
+	if (argc > 1) {
+	    if ((argv[1][0] == '+' || argv[1][0] == '-') &&
+		isdigit(argv[1][1])) {
+		offset = atoi(argv[1]);
+		optind++;
+	    }
+	}
+
+	while ((op = getopt(argc, argv, "da:p:f")) != EOF) {
 		switch (op) {
 		case 'd':
 			debug++;
 			break;
 		case 'a':
 			Aclname = optarg;
+			break;
+		case 'f':
+			tailmode++;
 			break;
 		case 'p':
 			portnum = atoi(optarg);
@@ -121,8 +138,10 @@ main(int argc, char **argv)
 	if (!Aclname) {
 	    (void) snprintf(strbuf, sizeof(strbuf), ACLNAME, ACLPATH, argv[0]);
 	    Aclname = strdup(strbuf);
-	    nodeid  = argv[0];
 	}
+	if (argc)
+	    nodeid = argv[0];
+	
 	loadAcl(Aclname);
 	ConnectToServer();
 	wfd = fileno(stdout);
@@ -132,11 +151,11 @@ main(int argc, char **argv)
 	 */
 	while (1) {
 	    if ((cc = Read(strbuf, sizeof(strbuf))) <= 0) {
-		if (cc < 0)
+		if (cc < 0) {
 		    perror("reading data from server");
-		else
-		    fprintf(stderr, "Error reading date from server!\n");
-		exit(-1);
+		    exit(-1);
+		}
+		exit(0);
 	    }
 	    if (write(wfd, strbuf, cc) != cc) {
 		exit(-1);
@@ -165,6 +184,12 @@ ConnectToServer(void)
 		server, hstrerror(h_errno));
 	exit(-1);
     }
+
+    /* Additonal options to pass to the server */
+    if (tailmode)
+	logreq.flags |= CAPLOGFLAG_TAIL;
+    if (offset)
+	logreq.offset = offset;
 
 #ifdef WITHSSL
     if (usingSSL)
@@ -301,7 +326,8 @@ Read(void * data, int size)
 void
 usage(void)
 {
-	fprintf(stderr, "usage: %s [-d] [-p port] [-a aclfile] machine\n",
+	fprintf(stderr, "usage: %s "
+		"[-/+line] [-f] [-p port] [-a aclfile] machine\n",
 		Progname);
 	exit(1);
 }

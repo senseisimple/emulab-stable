@@ -26,15 +26,6 @@ typedef struct {
 #define DEFAULTKEYLEN	32
 
 /*
- * This is for the cap logger handshake, which passes additional stuff.
- */
-typedef struct {
-    secretkey_t		secretkey;
-    char		node_id[128];
-    int			offset;
-} logger_t;
-
-/*
  * The capserver then returns this structure as part of the handshake.
  */
 typedef struct {
@@ -50,6 +41,18 @@ typedef struct {
 	int		portnum;
 	secretkey_t	key;
 } whoami_t;
+
+/*
+ * This is for the cap logger handshake, which passes additional stuff.
+ */
+typedef struct {
+    secretkey_t		secretkey;
+    char		node_id[128];
+    int			offset;
+    unsigned int	flags;
+} logger_t;
+#define CAPLOGFLAG_NOFLAGS	0x0
+#define CAPLOGFLAG_TAIL		0x1
 
 /*
  * Return Status. Define a constant size return to ensure that the

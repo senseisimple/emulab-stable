@@ -52,6 +52,7 @@ void		dolog(int level, char *format, ...);
 int		clientconnect(void);
 int		Write(void *thing, void *data, int size);
 int		Read(void *thing, void *data, int size);
+int		checkAcl(const char * filename, logger_t *logreq);
 
 #ifndef LOG_TESTBED
 #define LOG_TESTBED	LOG_USER
@@ -334,14 +335,15 @@ clientconnect(void)
 {
 	struct sockaddr_in	client;
 	struct timeval		timeout;
-	int			i, cc, length = sizeof(client);
+	int			i, cc, lines, count, length = sizeof(client);
 	int			clientfd = -1, logfd = -1, pid;
 	logger_t		logreq;
 	capret_t		capret = CAPOK;
-	char			strbuf[BUFSIZ];
+	char			*bp, strbuf[BUFSIZ];
 	static fd_set		sfds;
 	static int		fdcount;
 	fd_set			fds;
+	FILE			*fp;
 #ifdef WITHSSL
 	int			ret;
 	SSL			*ssl = NULL;
@@ -354,8 +356,11 @@ clientconnect(void)
 		return 1;
 	}
 	pid = fork();
-	if (pid)
+	if (pid) {
+	    close(clientfd);
 	    return pid;
+	}
+	close(sockfd);
 
 	signal(SIGTERM, SIG_DFL);
 	signal(SIGINT,  SIG_DFL);
@@ -426,6 +431,10 @@ clientconnect(void)
 	    Aclname = strdup(strbuf);
 	    (void) snprintf(strbuf, sizeof(strbuf), RUNNAME, LOGPATH, Machine);
 	    Runname = strdup(strbuf);
+
+	    if (! checkAcl(Aclname, &logreq)) {
+		capret = CAPNOPERM;
+	    }
 	}
 	else {
 	    capret = CAPERROR;
@@ -451,6 +460,61 @@ clientconnect(void)
 	    goto done;
 
 	/*
+	 * Handle the offset. This is in lines, so its not as simple as
+	 * seeking. 
+	 */
+	lines  = logreq.offset;
+	fp     = fdopen(logfd, "r");
+	count  = 0;
+
+	/*
+	 * If a negative line count, have to read to the end first
+	 * to get total line count, and then start over from the
+	 * beginning. I am sure there are clever ways to avoid this
+	 * but why bother.
+	 */
+	if (lines < 0) {
+	    while ((bp = fgets(strbuf, sizeof(strbuf), fp)) != NULL) {
+		int cc = strlen(strbuf);
+		if (strbuf[cc-1] == '\n' || strbuf[cc-1] == '\r') {
+		    count++;
+		}
+	    }
+	    lines = count - lines;
+	    if (lines < 0)
+		lines = 0;
+	    count = 0;
+	    rewind(fp);
+	}
+
+	/*
+	 * Now spit out whatever we have, starting at the offset.
+	 */
+	while ((bp = fgets(strbuf, sizeof(strbuf), fp)) != NULL) {
+	    int cc = strlen(strbuf);
+	    if (strbuf[cc-1] == '\r')
+		strbuf[cc-1] = '\n';
+	    
+	    if (strbuf[cc-1] == '\n')
+		count++;
+
+	    if (count >= lines) {
+		while (cc) {
+		    int wc = Write(output, bp, cc);
+
+		    if (wc < 0) {
+			warning("%s: write: ", geterr(errno));
+			goto done;
+		    }
+		    cc -= wc;
+		    bp += wc;
+		}
+	    }
+	}
+	if (!(logreq.flags & CAPLOGFLAG_TAIL))
+	    goto done;
+
+	/*
 	 * Now just loop reading from file and sending it back.
 	 * Need to use select since we are waiting for stuff to
 	 * get added to the end of the file.
@@ -459,6 +523,8 @@ clientconnect(void)
 	FD_SET(logfd, &sfds);
 	FD_SET(clientfd, &sfds);
 	fdcount = logfd + 1;
+	if (clientfd > logfd)
+	    fdcount = clientfd + 1;
 	
 	for (;;) {
 		fds = sfds;
@@ -506,9 +572,45 @@ clientconnect(void)
 		    }			
 		}
 	}
+	dolog(LOG_NOTICE, "%s disconnected", inet_ntoa(client.sin_addr));
 	exit(0);
  done:
+	dolog(LOG_NOTICE, "%s disconnected", inet_ntoa(client.sin_addr));
 	exit(1);
+}
+
+/*
+ * Check aclfile against provided key.
+ */
+int
+checkAcl(const char * filename, logger_t *logreq)
+{
+    FILE	*aclFile = fopen(filename, "r");
+    char	b1[256];
+    char	b2[256];
+    int		valid = 0;
+
+    if (!aclFile) {
+	warning("Error opening ACL file '%s' - %s\n",
+		filename, strerror(errno));
+	return 0;
+    }
+
+    while (fscanf(aclFile, "%256s %256s\n", b1, b2) != EOF) {
+	if (strncmp(b1, "key:", 4) == 0 || strncmp(b1, "keydata:", 8) == 0) {
+	    if (strncmp(logreq->secretkey.key, b2,
+			sizeof(logreq->secretkey.key))) {
+		warning("Key mismatch in ACL file '%s'\n", filename);
+		valid = 0;
+	    }
+	    else
+		valid = 1;
+	    break;
+	}
+    }
+    fclose(aclFile);
+
+    return valid;
 }
 
 /*

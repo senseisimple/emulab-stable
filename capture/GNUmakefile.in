@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -15,8 +15,8 @@ include $(OBJDIR)/Makeconf
 
 all:		boss-all tipserv-all
 boss-all:	capserver
-tipserv-all:	capture capture-tty capquery
-client: capture capquery
+tipserv-all:	capture capture-tty capquery caplogserver caplog caplog.bin
+client: capture capquery caplog caplog.bin
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -46,6 +46,12 @@ capture: capture.c capdecls.h
 capquery: capquery.c capdecls.h
 	$(CC) $(CFLAGS) -DPREFIX=\"$(TBROOT)\" -o $@ $< $(LDFLAGS) $(LIBS)
 
+caplog.bin: caplog.c capdecls.h
+	$(CC) $(CFLAGS) -DPREFIX=\"$(TBROOT)\" -o $@ $< $(LDFLAGS) $(LIBS)
+
+caplogserver: caplogserver.c capdecls.h
+	$(CC) $(CFLAGS) -DPREFIX=\"$(TBROOT)\" -o $@ $< $(LDFLAGS) $(LIBS)
+
 capture-nossl: capture.c capdecls.h
 	$(CC) $(CFLAGS) -DUSESOCKETS -DPREFIX=\"$(TBROOT)\" -o capture-nossl $<
 
@@ -69,7 +75,10 @@ client-install: client
 
 real-install:	all $(INSTALL_SBINDIR)/capserver $(INSTALL_SBINDIR)/capture
 
-tipserv-install:	tipserv-all $(INSTALL_SBINDIR)/capture
+tipserv-install:	tipserv-all $(INSTALL_SBINDIR)/capture \
+			$(INSTALL_SBINDIR)/caplogserver
 
 clean:
 	rm -f *.o capture capture-tty capserver capquery core errs Errs
+	rm -f caplog caplog.bin caplogserver
+
