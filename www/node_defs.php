@@ -497,9 +497,13 @@ class Node
 		isset($row["floor"]) && isset($row["building"])) {
 		$floor    = $row["floor"];
 		$building = $row["building"];
+		$room     = $row["room"];
 		$loc_x    = $row["loc_x"];
 		$loc_y    = $row["loc_y"];
 		$orient   = $row["orientation"];
+		$contact  = $row["contact"];
+		$email    = $row["email"];
+		$phone    = $row["phone"];
 	
 		$query_result =
 		    DBQueryFatal("select * from floorimages ".
@@ -628,14 +632,44 @@ class Node
             #
             # Location info.
             # 
+	    if (isset($building)) {
+		echo "<tr>
+                      <td>Location (bldg/floor/room):</td>
+                      <td class=left>$building";
+		if (isset($floor)) {
+		    echo "/$floor";
+		}
+		if (isset($room)) {
+		    echo "/$room";
+		}
+		echo "</td>
+                      </tr>\n";
+	    }
 	    if (isset($meters_x) && isset($meters_y)) {
 		echo "<tr>
-                      <td>Location:</td>
+                      <td>Location Coordinates:</td>
                       <td class=left>x=$meters_x, y=$meters_y meters";
 		if (isset($orientation)) {
 		    echo " (o=$orientation degrees)";
 		}
 		echo      "</td>
+                  </tr>\n";
+	    }
+	    if (OPSGUY() && (isset($contact) || isset($email))) {
+		$lcstr = "";
+		if (isset($contact)) {
+		    $lcstr .= "$contact:";
+		}
+		if (isset($email)) {
+		    $lcstr .= " <a href='mailto:$email'>$email</a>";
+		}
+		if (isset($phone)) {
+		    $lcstr .= " $phone";
+		}
+		echo "<tr>
+                      <td>Location Contact:</td>
+                      <td class=left>$lcstr
+                      </td>
                   </tr>\n";
 	    }
 	}
