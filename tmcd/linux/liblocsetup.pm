@@ -399,6 +399,7 @@ sub os_ifconfig_line($$$$$$$$;$$$)
 	$uplines = 
 	    "if $ethtool $iface >/dev/null 2>&1; then\n    " .
 	    "  $ethtool -s $iface autoneg off speed $speed duplex $duplex\n    " .
+	    "  sleep 2 # needed due to likely bug in e100 driver on pc850s\n".
 	    "else\n    " .
 	    "  /sbin/mii-tool --force=$media $iface\n    " .
 	    "fi\n    ";
