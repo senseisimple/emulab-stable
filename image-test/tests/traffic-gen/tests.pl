@@ -7,13 +7,14 @@
 use IO::Socket;
 use POSIX ":sys_wait_h";
 
+use Carp;
 use Data::Dumper;
 
 local $^W = 1;
 
 sub parse ($) {
   local ($_) = @_;
-  @d = /(\d+)\.\d+ \(icmp:\d+,\d+ tcp:(\d+),\d+ udp:(\d+),\d+ other:\d+,\d+\)/ or die;
+  @d = /(\d+)\.\d+ \(icmp:\d+,\d+ tcp:(\d+),\d+ udp:(\d+),\d+ other:\d+,\d+\)/ or confess "?$_";
   return @d;
 }
 
@@ -76,6 +77,7 @@ sub find_interval (\$\%$$$$$)
 
 test 'event', [], sub {
 
+  # connect to emulab pcapper daemon on port 4443
   my $n0s = IO::Socket::INET->new(Proto => 'tcp',
 				  PeerAddr => "node0.$eid.$pid",
 				  PeerPort => 4443)

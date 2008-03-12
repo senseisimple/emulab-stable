@@ -13,6 +13,12 @@ set node2 [$ns node]
 set node3 [$ns node]
 set node4 [$ns node]
 
+tb-set-node-os $node0 @OS@
+tb-set-node-os $node1 @OS@
+tb-set-node-os $node2 @OS@
+tb-set-node-os $node3 @OS@
+tb-set-node-os $node4 @OS@
+
 tb-set-sync-server $node0
 
 tb-set-node-startcmd $node0 "@DATADIR@/startcmd0.sh /proj/@PID@/exp/@EID@/tmp/"

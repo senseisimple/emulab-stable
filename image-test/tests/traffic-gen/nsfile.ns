@@ -10,6 +10,9 @@ source tb_compat.tcl
 set node0 [$ns node]
 set node1 [$ns node]
 
+tb-set-node-os $node0 @OS@
+tb-set-node-os $node1 @OS@
+
 set link1 [$ns duplex-link $node0 $node1 100Mb 0ms DropTail]
 
 set udp0 [new Agent/UDP]
