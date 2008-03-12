@@ -1,0 +1,87 @@
+
+It is possible to install Fedora over the serial line and without
+physically using any CD or DVDs.
+
+Download the files in "os/isolinux/" to a directory in /tftpboot.  Now
+fixup "serial.cfg".  At the end of the file is my serial.cfg for
+reference.
+
+Figure out the mac address of the ethernet interface for the control
+net and then add a symbolic link in /tftpboot/pxelinux.cfg to
+serial.cfg.  For example my link looks like this:
+  01-00-11-43-e4-96-40 -> ../fedora8-installer/serial.cfg
+
+If you have not already, make sure there is no way your experient can
+get swapped out accidentally or by emulab.
+
+Now modify the nodes table so that the pxe_boot_path is
+"/tftpboot/pxelinux.0", for example:
+
+  mysql> select node_id,pxe_boot_path from nodes where node_id='pc392';
+  +---------+----------------------+
+  | node_id | pxe_boot_path        |
+  +---------+----------------------+
+  | pc392   | /tftpboot/pxelinux.0 |
+  +---------+----------------------+
+  1 row in set (0.00 sec)
+
+Once modified run:
+
+  /usr/testbed/sbin/dhcpd_makeconf -ir
+
+Now reboot the node, and you should be able to install Fedora via the
+serial console.
+
+Before rebooting you need to set "pxe_boot_path" to NULL and rerun
+dhcpd_makeconf.
+
+---
+
+SERIAL 0 115200 0
+
+#default vesamenu.c32
+#prompt 1
+timeout 600
+
+display fedora8-installer/boot.msg
+#F1 fedora8-installer/boot.msg
+#F2 fedora8-installer/options.msg
+#F3 fedora8-installer/general.msg
+#F4 fedora8-installer/param.msg
+#F5 fedora8-installer/rescue.msg
+
+DEFAULT text
+
+#menu background splash.jpg
+#menu title Welcome to Fedora 8!
+#menu color border 0 #ffffffff #00000000
+#menu color sel 7 #ffffffff #ff000000
+#menu color title 0 #ffffffff #00000000
+#menu color tabmsg 0 #ffffffff #00000000
+#menu color unsel 0 #ffffffff #00000000
+#menu color hotsel 0 #ff000000 #ffffffff
+#menu color hotkey 7 #ffffffff #ff000000
+
+#label linux
+#  kernel fedora8-installer/vmlinuz
+#  append initrd=fedora8-installer/initrd.img console=tty0 console=ttyS0,115200 --
+label text
+#  menu label Install or upgrade an existing system (^text mode)
+  kernel fedora8-installer/vmlinuz
+  append initrd=fedora8-installer/initrd.img text console=tty0 console=ttyS0,115200 --
+label rescue
+#  menu label ^Rescue installed system
+  kernel fedora8-installer/vmlinuz
+  append initrd=fedora8-installer/initrd.img rescue console=tty0 console=ttyS0,115200 --
+#label local
+#  menu label Boot from ^local drive
+#  localboot 0xffff
+#label memtest86
+#  menu label ^Memory test
+#  kernel memtest
+#  append -
+
+
+
+
+

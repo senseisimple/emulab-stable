@@ -1,7 +1,6 @@
 #
 # Stuff to do in order to make a fresh Fedora 8 testbed ready
-#
-# (updated from FC4-build.txt)
+#   for both the 32 bit and 64 bit (x86_64) versions
 #
 
 #
@@ -18,6 +17,8 @@
 # final image
 
 mount /dev/hda4 /z
+
+# Copy the testbed source to /z/testbed somehow.
 
 export testbed_src=/z/testbed
 export etc_patches=${testbed_src}/doc/updating-RHL/Fedora8-etc-patches
@@ -95,7 +96,42 @@ rpm -e ccache
 ##
 ## This will cause problems with some of emulab client software
 ##
-chkconfig --list iptables
+chkconfig iptables off
+
+## Fix up device drivers
+##
+# disable udev-post, as it adds persistent udev rules, and as a result
+#  eth devices will get high-numbered names like eth8+
+chkconfig udev-post
+# now go though /etc/udev/70-persistent-cd.rules and
+#   /etc/udev/70-persistent-net.rules and remove any devices settings
+# also fix up /etc/modprobe.conf, must remove eth* aliases, also need to add
+#   scci_hostadapter aliases, best to just use the one in $etc_patches:
+cp etc_patches/modprobe.conf /etc
+
+## Add wireless cards to /etc/modprobe.d/blacklist
+##
+patch /etc/modprobe.d/blacklist < $etc_patches/blacklist.patch
+
+## For the 64 bit image enable listing the arch when using "rpm -qa"
+##
+echo '%_query_all_fmt  %%{name}-%%{version}-%%{release}.%%{arch}' > /etc/rpm/macros
+
+## Reinstall grub
+##
+## For some reason the f8 installer may hardcoded the bios boot drive
+## address, which may cause problems with the wireless nodes that
+## boot off a USB memory stick.
+sudo grub
+grub> find /boot/grub/grub.conf
+grub> root (hd0,1)
+grub> setup (hd0,1)
+grub> quit
+
+## Fix up grub.conf
+##
+# Change the terminal line to
+#   terminal --dumb --timeout=0 serial console
 
 ## Install tcsh
 ##
@@ -103,26 +139,13 @@ chkconfig --list iptables
 ## the program agent.
 yum install tcsh
 
+
 ###############################################################################
 
 ## Install Keys 
 ## emulab-keys.tar.gz created by running 
 ##   sh ${testbed_src}/doc/updating-RHL/tar-keys
 ## on an exiting node
-
-# From other node make a tarball with
-#      root/.ssh/authorized_keys
-#      root/.ssh/authorized_keys2
-#      root/.cvsup/auth
-#      etc/ssh/ssh_host_dsa_key
-#      etc/ssh/ssh_host_dsa_key.pub
-#      etc/ssh/ssh_host_key
-#      etc/ssh/ssh_host_key.pub
-#      etc/ssh/ssh_host_rsa_key
-#      etc/ssh/ssh_host_rsa_key.pub
-#      etc/emulab/client.pem
-#      etc/emulab/emulab.pem
-
 
 # Note: root password will get installed by prepare
 
@@ -138,7 +161,6 @@ yum install tcsh
 ## Install the Emulab client stuff. 
 ##
 #
-# ...
 mkdir testbed-obj
 ../testbed/configure  --with-TBDEFS=../testbed/defs-default
 make client
@@ -152,12 +174,75 @@ make client-install
 
 # Done manually, compare your RPM list to Fedora8-rpm-list.txt using something 
 # like:
-#   cut -f1 < Fedora8-rpm-list.txt > Fedora8-rpm-names.txt
-#   rpm -qa --queryformat '%{NAME}\n' > mine.txt
+#   cut -f1 < Fedora8-rpm-list.txt | uniq > Fedora8-rpm-names.txt
+#   rpm -qa --queryformat '%{NAME}\n' | sort -u > mine.txt
 #   comm Fedora8-rpm-names.txt mine.txt
+#
+# For the 64 bit image, also remove most of the 32 bit libraries
+# The file Fedora8-rpm-list.txt contains the arch as the third column
+# grep for "i.86" to figure out which 32 bit libraries where kept.
 # 
 # You may also find Fedora8-rpm-list-install.txt usefull.  It is the rpm list
-# after the initial install
+# after the initial install for the 32 bit Fedora image.
+#
+# NOTE: used 'rpm -qa --queryformat '%{NAME}\t%{VERSION}\t%{ARCH}\n' | sort'
+#   to create Fedora8-rpm-list.txt
+# ALSO NOTE: The set of packages on the 32 bit and 64 bit Fedora are the same
+#   except for a few extra 32 bit libraries on the 64 bit image, thus the package
+#   list Fedora8-rpm-list.txt is good to compare against for both versions.
+
+###############################################################################
+
+##
+## Fine tune services
+##
+
+Enable the following and only the following services using "sudo ntsysv"
+
+  [*] acpid        
+  [*] anacron      
+  [ ] atd          
+  [ ] autofs       
+  [ ] avahi-daemon 
+  [ ] bgpd         
+  [ ] cpuspeed     
+  [*] crond        
+  [ ] cups         
+  [ ] gated        
+  [ ] gpm          
+  [ ] ip6tables    
+  [ ] iptables     
+  [*] irqbalance   
+  [ ] lm_sensors   
+  [ ] mdmonitor    
+  [*] messagebus   
+  [ ] netconsole   
+  [*] netfs        
+  [ ] netplugd     
+  [*] network      
+  [ ] nfs          
+  [*] nfslock      
+  [*] ntpd         
+  [ ] ospf6d       
+  [ ] ospfd        
+  [ ] psacct       
+  [ ] racoon       
+  [ ] rdisc        
+  [ ] restorecond  
+  [ ] ripd         
+  [ ] ripngd       
+  [*] rpcbind      
+  [ ] rpcgssd      
+  [*] rpcidmapd    
+  [ ] rpcsvcgssd   
+  [*] rsyslog      
+  [ ] saslauthd    
+  [*] sendmail     
+  [ ] smartd       
+  [*] sshd         
+  [ ] udev-post    
+  [ ] xfs          
+  [ ] zebra        
 
 ###############################################################################
 
@@ -213,7 +298,7 @@ rpm -i /share/redhat/7.3/RPMS/gated-3.6-14.i386.rpm
 
 ## Install kernel
 
-## ...
+## /share/fedora/F8/src on ops.emulab.net
 
 ###############################################################################
 
@@ -228,5 +313,5 @@ find /var/cache/man -type f | xargs rm
 
 # Create an image via the web interface. 
 
-
+######
 
