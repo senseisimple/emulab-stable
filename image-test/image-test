@@ -66,6 +66,7 @@ sub help() {
      "  -e FILE    exceptions file to use\n".
      "  -u         don't swap an experment out with unexpected failed tests\n".
      "  -h         halt on failed swapouts\n".
+     "  --eid-prefix STR  (default \"it-\")\n".
      "  --skip-std-tests  skip standard tests expect for ssh-*\n");
 }
 
@@ -113,6 +114,7 @@ GetOptions
     "u" => \$dont_swapout_unexpected,
     "h" => \$halt_failed_swapouts,
     "l|list" => \$just_list,
+    "eid-prefix=s" => \$eid_prefix,
     "skip-std-tests" => \$skip_std_tests
   or usage();
 
