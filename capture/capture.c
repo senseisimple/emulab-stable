@@ -78,7 +78,7 @@ void dolog(int level, char *format, ...);
 
 int val2speed(int val);
 void rawmode(char *devname, int speed);
-void netmode();
+int netmode();
 void writepid(void);
 void createkey(void);
 int handshake(void);
@@ -595,17 +595,16 @@ main(int argc, char **argv)
 	
 	if (!relay_rcv) {
 #ifdef  USESOCKETS
-	    if (remotemode)
-		netmode();
+	    if (remotemode) {
+		if (netmode() != 0)
+		    die("Could not establish connection to %s\n", Devname);
+	    }
 	    else
 #endif
-		rawmode(Devname, speed);
+		    rawmode(Devname, speed);
 	}
-	
 	writepid();
-
 	capture();
-
 	cleanup();
 	exit(0);
 }
@@ -830,10 +829,11 @@ capture(void)
 				if (remotemode) {
 					FD_CLR(devfd, &sfds);
 					close(devfd);
-					warning("remote socket closed");
-					usleep(5000000);
-					/* will not return on error */
-					netmode();
+					warning("remote socket closed;"
+						"attempting to reconnect");
+					while (netmode() != 0) {
+					    usleep(5000000);
+					}
 					FD_SET(devfd, &sfds);
 					continue;
 				}
@@ -1420,7 +1420,7 @@ rawmode(char *devname, int speed)
  * The console line is really a socket on some node:port.
  */
 #ifdef  USESOCKETS
-void
+int
 netmode()
 {
 	struct sockaddr_in	sin;
@@ -1437,20 +1437,29 @@ netmode()
 		die("%s: bad port number", bp);
 	he = gethostbyname(hostport);
 	if (he == 0) {
-		die("gethostbyname(%s): %s", hostport, hstrerror(h_errno));
+		warning("gethostbyname(%s): %s", hostport, hstrerror(h_errno));
+		return -1;
 	}
 	bzero(&sin, sizeof(sin));
 	memcpy ((char *)&sin.sin_addr, he->h_addr, he->h_length);
 	sin.sin_family = AF_INET;
 	sin.sin_port = htons(port);
 
-	if ((devfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
-		die("socket(): %s", geterr(errno));
-	if (connect(devfd, (struct sockaddr *)&sin, sizeof(sin)) < 0)
-		die("connect(): %s", geterr(errno));
-	
-	if (fcntl(devfd, F_SETFL, O_NONBLOCK) < 0)
-		die("%s: fcntl(O_NONBLOCK): %s", Devname, geterr(errno));
+	if ((devfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+		warning("socket(): %s", geterr(errno));
+		return -1;
+	}
+	if (connect(devfd, (struct sockaddr *)&sin, sizeof(sin)) < 0) {
+		warning("connect(): %s", geterr(errno));
+		close(devfd);
+		return -1;
+	}
+	if (fcntl(devfd, F_SETFL, O_NONBLOCK) < 0) {
+		warning("%s: fcntl(O_NONBLOCK): %s", Devname, geterr(errno));
+		close(devfd);
+		return -1;
+	}
+	return 0;
 }
 #endif
 
