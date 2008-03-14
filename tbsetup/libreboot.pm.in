@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # node reboot library. Basically the backend to the node_reboot script, but
@@ -80,6 +80,7 @@ sub nodereboot($$)
 {
     my ($args, $result) = @_;
     my @nodes       = @{ $args->{'nodelist'}};
+    my %nodeobjects = ();	# Not in the mood to rewrite this function.
 
     #
     # Start a new logging sub-process
@@ -170,7 +171,8 @@ sub nodereboot($$)
     foreach my $node (@nodes) {
 	my $nodeobject = Node->Lookup($node);
 	my $rebootable = $nodeobject->rebootable();
-
+	
+	$nodeobjects{$node} = $nodeobject;
 	push(@temp,$node) if $rebootable;
     }
     @nodes = @temp;
@@ -334,7 +336,7 @@ sub nodereboot($$)
 	    # We need the pid so we can wait for them all before preceeding.
 	    #
 	    foreach my $node ( @batch ) {
-		$pids{$node} = RebootNode($node, $reconfig,
+		$pids{$node} = RebootNode($nodeobjects{$node}, $reconfig,
 					  $killmode, $rebootmode, $prepare);
 	    }
 	}
@@ -476,8 +478,9 @@ sub nodereboot($$)
 # that it can wait on all the children later.
 #
 sub RebootNode {
-    my ($pc, $reconfig, $killmode, $rebootmode, $prepare) = @_;
+    my ($nodeobject, $reconfig, $killmode, $rebootmode, $prepare) = @_;
     my ($status, $syspid, $mypid, $didipod, $nodestate);
+    my $pc = $nodeobject->node_id();
 
     #
     # Start a new logging sub-process
@@ -530,6 +533,13 @@ sub RebootNode {
 	    return -2;
 	}
 
+	my $whol = 0;
+	if ($nodeobject->NodeAttribute("wakeonlan_afterpower", \$whol) == 0) {
+	    if ($whol) {
+		$nodeobject->SimpleWOL();
+	    }
+	}
+	
 	#
 	# The aux program sends the event to stated ...
 	#

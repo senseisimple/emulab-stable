@@ -17,6 +17,7 @@ use vars qw(@ISA @EXPORT);
 my $TB		= "@prefix@";
 my $BOSSNODE    = "@BOSSNODE@";
 my $EVENTSYS    = @EVENTSYS@;
+my $WOL         = "$TB/sbin/whol";
 # XXX stinky hack detection
 my $ISUTAH	= @TBMAINSITE@;
 
@@ -1430,6 +1431,58 @@ sub SetSchedReload($$;$)
 			  "(node_id, image_id, reload_type) values ".
 			  "('$node_id', '$imageid', '$type')"));
 
+    return 0;
+}
+
+#
+# Do a normal wakeonlan after power cycle. This is for laptops that like
+# to go to sleep (especially while in PXEWAIT).
+#
+sub SimpleWOL($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $node_id = $self->node_id();
+
+    # XXX Must know the outgoing interface. Using the whol flag. Ick.
+    my $query_result =
+	DBQueryFatal("select iface from interfaces ".
+		     "where node_id='boss' and whol=1");
+    if ($query_result->numrows != 1) {
+	warn "SimpleWOL: Could not get outgoing interface for boss node.\n";
+	return -1;
+    }
+    my ($iface) = $query_result->fetchrow_array();
+
+    #
+    # Grab the control interface MAC for the node.
+    #
+    $query_result =
+	DBQueryFatal("select mac from interfaces  ".
+		     "where node_id='$node_id' and ".
+		     "      role='" . TBDB_IFACEROLE_CONTROL() . "'");
+
+    if ($query_result->numrows != 1) {
+	warn "SimpleWOL: Could not get control interface MAC for $node_id.\n";
+	return -1;
+    }
+    my ($mac) = $query_result->fetchrow_array();
+
+    print "Doing a plain WOL to $node_id ($mac) via interface $iface\n";
+
+    #
+    # Do this a few times since the packet could get lost and
+    # it seems to take a couple of packets to kick it.
+    #
+    for (my $i = 0; $i < 5; $i++) {
+	system("$WOL $iface $mac");
+	select(undef, undef, undef, 0.1);
+    }
+    select(undef, undef, undef, 5.0);
     return 0;
 }
 
