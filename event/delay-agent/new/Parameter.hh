@@ -10,13 +10,16 @@ class Parameter
 public:
   enum ParameterType
   {
+    NOTHING,
     BANDWIDTH,
     DELAY,
     // This is the loss rate in thousandths. 1000 is 100% loss. 1 is 0.1% loss. Etc.
-    LOSS
+    LOSS,
+    // 1 means reset to link up. 0 means reset to link down.
+    LINK_UP
   };
 public:
-  Parameter(ParameterType newType=DELAY, int newValue=0);
+  Parameter(ParameterType newType=NOTHING, int newValue=0);
 
   ParameterType getType(void) const;
   int getValue(void) const;

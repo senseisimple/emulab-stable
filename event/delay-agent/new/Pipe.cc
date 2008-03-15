@@ -13,7 +13,7 @@ Pipe::Pipe(RootPipe * newSecret)
 
 Pipe::~Pipe()
 {
-  release(secret);
+  secret->release();
 }
 
 Pipe::Pipe(Pipe const & right)
@@ -25,7 +25,7 @@ Pipe::Pipe(Pipe const & right)
 Pipe & Pipe::operator=(Pipe const & right)
 {
   right.secret->acquire();
-  secret.release();
+  secret->release();
   secret = right.secret;
   return *this;
 }

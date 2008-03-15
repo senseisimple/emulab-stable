@@ -7,56 +7,78 @@ using namespace std;
 
 EventPipe::EventPipe(std::string const & name)
 {
-	agentName = name;
+  agentName = name;
 }
 
 EventPipe::~EventPipe()
 {
 }
 
-EventPipe::reset(void)
+void EventPipe::reset(void)
 {
   string command;
 
   command = "/usr/testbed/bin/tevc -e "
-    + g::experimentName
-    + " now " + agentName +" MODIFY " +
+    + g::experimentName + " now " + agentName +" UP ";
+  system(command.c_str());
+
+  command = "/usr/testbed/bin/tevc -e "
+    + g::experimentName + " now " + agentName +" MODIFY "
     + "BANDWIDTH=100000 "
     + "DELAY=0 "
     + "PLR=0";
-
-  system(command);
+  system(command.c_str());
 }
 
-EventPipe::resetParameter(Parameter const & newParameter)
+void EventPipe::resetParameter(Parameter const & newParameter)
 {
-        string parameterName;
-        int parameterValue;
-        stringstream ss;
-        string valueString;
-        string command;
+  string parameterString;
+  stringstream ss;
+  string valueString;
+  string command;
 
-        parameterValue = parameter.getValue();
-        switch(newParameter.getType()) {
-                case BANDWIDTH:
-                                parameterString = "BANDWIDTH";
-                                ss << parameterValue;
-                                break;
-                case DELAY:
-                                parameterString = "DELAY";
-                                ss << parameterValue;
-                                break;
-                case LOSS:
-                                parameterString = "LOSS";
-                                ss << parameterValue;
-                                break;
-        }
-        valueString = ss.str();
+  int parameterValue = newParameter.getValue();
+  if (newParameter.getType() == Parameter::LINK_UP)
+  {
+    string action;
+    if (parameterValue == 1)
+    {
+      action = "UP";
+    }
+    else
+    {
+      action = "DOWN";
+    }
+    command = "/usr/testbed/bin/tevc -e "
+      + g::experimentName + " now " + agentName + " " + action;
+    system(command.c_str());
+  }
+  else
+  {
+    switch(newParameter.getType())
+    {
+    case Parameter::BANDWIDTH:
+      parameterString = "BANDWIDTH";
+      ss << parameterValue;
+      break;
+    case Parameter::DELAY:
+      parameterString = "DELAY";
+      ss << parameterValue;
+      break;
+    case Parameter::LOSS:
+      parameterString = "LOSS";
+      ss << parameterValue;
+      break;
+    default:
+      break;
+    }
+    valueString = ss.str();
 
-        command = "/usr/testbed/bin/tevc -e " +
-                        projectName + '/' + experimentName +
-                        " now " + agentName + " MODIFY " +
-                        parameterString + '=' + valueString;
+    command = "/usr/testbed/bin/tevc -e "
+      + g::experimentName + " now "
+      + agentName + " MODIFY "
+      + parameterString + '=' + valueString;
 
-        system(command);
+    system(command.c_str());
+  }
 }

@@ -11,7 +11,7 @@ Parameter::Parameter(ParameterType newType, int newValue)
 {
 }
 
-ParameterType Parameter::getType(void) const
+Parameter::ParameterType Parameter::getType(void) const
 {
   return type;
 }

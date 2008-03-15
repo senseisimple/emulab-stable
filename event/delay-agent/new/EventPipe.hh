@@ -10,6 +10,8 @@
 #ifndef EVENT_PIPE_HH_DELAY_AGENT_1
 #define EVENT_PIPE_HH_DELAY_AGENT_1
 
+#include "RootPipe.hh"
+
 class EventPipe : public RootPipe
 {
 public:
@@ -20,7 +22,7 @@ public:
   virtual void reset(void);
   virtual void resetParameter(Parameter const & newParameter);
 private:
-  string agentName;
+  std::string agentName;
 };
 
 #endif

@@ -6,6 +6,27 @@ using namespace std;
 
 namespace g
 {
-  string projectName;
   string experimentName;
+  bool debug = false;
+
+  map<Parameter::ParameterType, Parameter> defaultParameters;
+
+  multimap<std::string, std::list<PipeInfo>::iterator> pipes;
+  list<PipeInfo> pipeVault;
 }
+
+int stringToInt(std::string const & val)
+{
+  int result = 0;
+  istringstream stream(val);
+  stream >> result;
+  return result;
+}
+
+string intToString(int val)
+{
+  ostringstream stream;
+  stream << val;
+  return stream.str();
+}
+
