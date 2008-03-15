@@ -24,6 +24,7 @@ void subscribeReset(event_handle_t handle, address_tuple_t eventTuple, string co
 
 int main(int argc, char * argv[])
 {
+  cerr << "Beginning program" << endl;
   //TODO: Daemonize
   setupDefaultParameters();
   readArgs(argc, argv);
@@ -32,6 +33,7 @@ int main(int argc, char * argv[])
 
 void setupDefaultParameters(void)
 {
+  cerr << "Setting up default parameters" << endl;
   g::defaultParameters[Parameter::BANDWIDTH] = Parameter(Parameter::BANDWIDTH, 100000);
   g::defaultParameters[Parameter::DELAY] = Parameter(Parameter::DELAY, 0);
   g::defaultParameters[Parameter::LOSS] = Parameter(Parameter::LOSS, 0);
@@ -40,6 +42,7 @@ void setupDefaultParameters(void)
 
 void readArgs(int argc, char * argv[])
 {
+  cerr << "Processing arguments" << endl;
   string server;
   string port;
   string keyFile;
@@ -92,6 +95,7 @@ void readArgs(int argc, char * argv[])
       usage(argv[0]);
       break;
     }
+    option = getopt(argc, argv, "s:p:f:dE:l:i:k:j");
   }
 
   /*Check if all params are specified, otherwise, print usage and exit*/
@@ -117,6 +121,7 @@ void initLogging(string const & /*logFile*/)
 
 void readMapFile(string const & mapFile, string & linkSubscribe, string & resetSubscribe)
 {
+  cerr << "Reading map file" << endl;
   ifstream in(mapFile.c_str(), ios::in);
   string lineString;
   getline(in, lineString);
@@ -143,7 +148,7 @@ void readMapFile(string const & mapFile, string & linkSubscribe, string & resetS
       g::pipeVault.push_front(first);
       g::pipes.insert(make_pair("new-" + first.name, g::pipeVault.begin()));
       g::pipes.insert(make_pair("new-" + first.linkName, g::pipeVault.begin()));
-      addEntry(linkSubscribe, "new-" + first.endName);
+      addEntry(linkSubscribe, "new-" + first.linkName);
       addEntry(linkSubscribe, "new-" + first.name);
 
       PipeInfo second(name, secondEnd, end == secondEnd, secondInterface,
@@ -153,7 +158,7 @@ void readMapFile(string const & mapFile, string & linkSubscribe, string & resetS
       g::pipes.insert(make_pair("new-" + second.linkName, g::pipeVault.begin()));
       if (!second.isLan)
       {
-        addEntry(linkSubscribe, "new-" + second.endName);
+        addEntry(linkSubscribe, "new-" + second.linkName);
       }
 
       addEntry(resetSubscribe, "new-" + first.name);
@@ -190,6 +195,7 @@ void addEntry(string & commaList, string const & newName)
 
 void writePidFile(string const & pidFile)
 {
+  cerr << "Writing pid file" << endl;
   string filename = pidFile;
   if (pidFile == "")
   {
@@ -207,20 +213,22 @@ void writePidFile(string const & pidFile)
 void initEvents(string const & server, string const & port, string const & keyFile,
                 string const & linkSubscription, string const & resetSubscription)
 {
+  cerr << "Initializing event system" << endl;
   string serverString = "elvin://" + server;
   event_handle_t handle;
   if (port != "")
   {
     serverString += ":" + port;
   }
+  cerr << "Server string: " << serverString << endl;
   if (keyFile != "")
   {
-    handle = event_register_withkeyfile(const_cast<char *>(server.c_str()), 0,
+    handle = event_register_withkeyfile(const_cast<char *>(serverString.c_str()), 0,
                                         const_cast<char *>(keyFile.c_str()));
   }
   else
   {
-    handle = event_register_withkeyfile(const_cast<char *>(server.c_str()), 0, NULL);
+    handle = event_register_withkeyfile(const_cast<char *>(serverString.c_str()), 0, NULL);
   }
   if (handle == NULL)
   {
@@ -240,6 +248,7 @@ void initEvents(string const & server, string const & port, string const & keyFi
 
 void subscribeLink(event_handle_t handle, address_tuple_t eventTuple, string const & linkSubscription)
 {
+  cerr << "Link subscription names: " << linkSubscription << endl;
   eventTuple->objname = const_cast<char *>(linkSubscription.c_str());
   eventTuple->objtype = TBDB_OBJECTTYPE_LINK;
   eventTuple->eventtype = TBDB_EVENTTYPE_UP "," TBDB_EVENTTYPE_DOWN "," TBDB_EVENTTYPE_MODIFY;
@@ -257,6 +266,7 @@ void subscribeLink(event_handle_t handle, address_tuple_t eventTuple, string con
 
 void subscribeReset(event_handle_t handle, address_tuple_t eventTuple, string const & resetSubscription)
 {
+  cerr << "Reset subscription names: " << resetSubscription << endl;
   eventTuple->objname = const_cast<char *>((resetSubscription + "," + ADDRESSTUPLE_ALL).c_str());
   eventTuple->objtype = TBDB_OBJECTTYPE_LINK;
   eventTuple->eventtype = TBDB_EVENTTYPE_RESET;

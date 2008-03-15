@@ -20,6 +20,7 @@ void linkCallback(event_handle_t handle,
                   event_notification_t notification,
                   void *data)
 {
+  cerr << "EVENT: Received new event" << endl;
   char name[EVENT_BUFFER_SIZE];
   char type[EVENT_BUFFER_SIZE];
 
