@@ -9,8 +9,8 @@ EVENT_OBJS	+= EventPipe.o
 
 OBJS	+= $(COMMON_OBJS)
 LIBS	+= $(COMMON_LIBS) -lcrypto -lpubsub
-CXXFLAGS = -DELVIN_COMPAT -Wall -I../../lib/ -I/usr/local/include
-LDFLAGS = -L/usr/local/lib
+CXXFLAGS = -DELVIN_COMPAT -Wall -I../../lib/ -I../../../../
+LDFLAGS = -L../../../../pubsub
 
 OS =? `uname -s`
 ifeq ($(OS), "FreeBSD")
