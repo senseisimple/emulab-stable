@@ -342,12 +342,20 @@ sub virtlantunnel($)	{ return $virt_lans{$_[0]}->{"TUNNEL"}; }
 sub virtlandelayinfo($$){ return @{$virt_lans{$_[0]}->{"DELAYINFO"}->{$_[1]}};}
 sub virtlanqueueinfo($$){ return @{$virt_lans{$_[0]}->{"QUEUEINFO"}->{$_[1]}};}
 sub virtlantraceinfo($$){ return @{$virt_lans{$_[0]}->{"TRACEINFO"}->{$_[1]}};}
-sub virtlanshaped($$)	{ return $virt_lans{$_[0]}->{"SHAPED"}->{$_[1]};}
-sub virtlansetshaped($$){ $virt_lans{$_[0]}->{"SHAPED"}->{$_[1]} = 1; }
 sub virtlannetmask($)	{ return $virt_lans{$_[0]}->{"MASK"}; }
 sub virtlanwidearea($)  { return $virt_lans{$_[0]}->{"WIDEAREA"}; }
 sub virtlanallsim($)    { return $virt_lans{$_[0]}->{"ALLSIM"}; }
 sub virtlanprotocol($)  { return $virt_lans{$_[0]}->{"PROTOCOL"}; }
+sub virtlandelayed($)   { return $virt_lans{$_[0]}->{"DELAYED"}; }
+sub virtlansetdelayed($){ $virt_lans{$_[0]}->{"DELAYED"} = 1; }
+
+sub virtlanmembershaped($$) {
+    return $virt_lans{$_[0]}->{"SHAPEDMEMBERS"}->{$_[1]};
+}
+sub virtlansetmembershaped($$) {
+    $virt_lans{$_[0]}->{"SHAPEDMEMBERS"}->{$_[1]} = 1;
+    # Mark the lan as having shaped members.
+}
 sub virtlanAP($)        {
     return $virt_lans{$_[0]}->{"ACCESSPOINT"}
         if (defined($virt_lans{$_[0]}->{"ACCESSPOINT"}));
@@ -2115,11 +2123,31 @@ foreach $plink (keys(%plinks)) {
 	    }
 	    else {
 		$protolan = ProtoLan->Lookup($experiment, $lan);
-		$protolan = ProtoLan->Create($experiment, $lan)
-		    if (!defined($protolan));
-		$protolan->SetType("vlan");
-		$protolan->SetRole("link/lan");
+		if (!defined($protolan)) {
+		    #
+		    # XXX Watch for a lan that mixes delayed and non-delayed
+		    # members. We should create the protolans earlier.
+		    #
+		    $protolan = ProtoLan->Create($experiment, $lan);
+		    
+		    if (virtlandelayed($lan)) {
+			my $protolanlan = ProtoLan->Create($experiment,
+							   $lan . "-delaylan",
+							   $protolan);
+			$protolanlan->SetType("vlan");
+			$protolanlan->SetRole("delay");
+		    }
+		    else {
+			$protolan->SetType("vlan");
+		    }
+		    $protolan->SetRole("link/lan");
+		}
 		$protolan->AddInterface($nodeA, $vnodeA, $vportA, $portA);
+		if (virtlandelayed($lan)) {
+		    my $protolanlan = ProtoLan->Lookup($experiment,
+						       $lan . "-delaylan");
+		    $protolanlan->AddMember($nodeA, $portA);
+		}
 	    }
 	}
 	else {
@@ -2336,8 +2364,8 @@ foreach $delayid (keys(%nodedelays)) {
 	#
 	# See if this delaynode was inserted strictly for tracing/monitoring.
 	#
-	my $noshaping = ((virtlanshaped($vname, $member0) ||
-			  virtlanshaped($vname, $member1)) ? 0 : 1);
+	my $noshaping = ((virtlanmembershaped($vname, $member0) ||
+			  virtlanmembershaped($vname, $member1)) ? 0 : 1);
     
 	DBQueryFatal("insert into delays " .
 	     " (pid,eid,exptidx,node_id,vname,noshaping,iface0,iface1" .
@@ -2369,7 +2397,7 @@ foreach $delayid (keys(%nodedelays)) {
 	#
 	# See if this delaynode was inserted strictly for tracing/monitoring.
 	#
-	my $noshaping = (virtlanshaped($vname, $member0) ? 0 : 1);
+	my $noshaping = (virtlanmembershaped($vname, $member0) ? 0 : 1);
     
 	#
 	# Obviously, its implied that the q0 params are towards the lan,
@@ -4357,7 +4385,8 @@ sub LoadVirtLans()
 	# that the link is getting a delaynode cause its really being
 	# shaped, or because it is being traced or monitored.
 	#  
-	$virt_lans{$vname}->{"SHAPED"}->{$member} = 0;
+	$virt_lans{$vname}->{"SHAPEDMEMBERS"}->{$member} = 0;
+	$virt_lans{$vname}->{"DELAYED"} = 0;
 
 	#
 	# XXX - Whenever a delay node is inserted, port speeds are set to
@@ -4412,7 +4441,7 @@ sub virtlantopbw($$) {
         # shaping we put in only the bandwidth from the virtual topology -
 	# otherwise, we put in the bandwidth of the type of physical interface
 	# it is likely to get mapped to
-        my $shaped = virtlanshaped($virtlan,$member);
+        my $shaped = virtlanmembershaped($virtlan,$member);
 	if (virtlanemulated($virtlan) || virtlan_use_linkdelay($virtlan,$shaped)) {
 	    $return_bw = $bw;
 	} else {
@@ -5009,8 +5038,8 @@ sub CreateTopFile()
 		# Need a delay node and its really a shaped link.
 		$shaped = 1;
 		# Mark the links as shaped for later.
-		virtlansetshaped($lan, $nodeport0);
-		virtlansetshaped($lan, $nodeport1);
+		virtlansetmembershaped($lan, $nodeport0);
+		virtlansetmembershaped($lan, $nodeport1);
 	    }
 
 	    #
@@ -5220,7 +5249,7 @@ sub CreateTopFile()
 		     # Global force, or per-lan force. 
 		     $forcelinkdelays || $uselinkdelay)) {
 		    $shaped = 1;
-		    virtlansetshaped($lan, $member);
+		    virtlansetmembershaped($lan, $member);
 		}
 
 		#
@@ -5328,6 +5357,10 @@ sub CreateTopFile()
 
 			printdb "Delay node $plink ($delayname) = " .
 			    join(" ", @{$delaylinks{$plink}}) . "\n";
+
+			# XXX Mark the lan as having delayed members so that
+			# we create a delayed protolan. Bogus.
+			virtlansetdelayed($lan);
 		    }
 		    #
 		    # Port is set to the next-fastes speed when the link gets a
