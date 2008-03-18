@@ -9,9 +9,11 @@ source tb_compat.tcl
 
 set node0 [$ns node]
 tb-set-node-os $node0 @OS@
+tb-set-hardware $node0 pc850
 
 set node1 [$ns node]
 tb-set-node-os $node1 @OS@
+tb-set-hardware $node1 pc850
 
 set link0 [$ns duplex-link $node0 $node1 100Mb 0ms DropTail]
 

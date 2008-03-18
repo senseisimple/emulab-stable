@@ -19,6 +19,12 @@ tb-set-node-os $node2 @OS@
 tb-set-node-os $node3 @OS@
 tb-set-node-os $node4 @OS@
 
+tb-set-hardware $node0 pc850
+tb-set-hardware $node1 pc850
+tb-set-hardware $node2 pc850
+tb-set-hardware $node3 pc850
+tb-set-hardware $node4 pc850
+
 set link0 [$ns duplex-link $node0 $node2 100Mb 0ms DropTail]
 set link1 [$ns duplex-link $node1 $node2 100Mb 0ms DropTail]
 set link2 [$ns duplex-link $node2 $node3 100Mb 0ms DropTail]

@@ -728,13 +728,13 @@ sub results_summary($$) {
   return "requires cleanup and had failed tests: ".failed_tests($exp)
     if $res == (ERR_FAILED | STATUS_CLEANUP);
 
-  return "had one of more fatal errors"
+  return "had one or more fatal errors"
     if $res == (ERR_FATAL | STATUS_NONE);
-  return "had one of more fatal errors and is still swapped in"
+  return "had one or more fatal errors and is still swapped in"
     if $res == (ERR_FATAL | STATUS_SWAPPEDIN);
-  return "had one of more fatal errors and still exists"
+  return "had one or more fatal errors and still exists"
     if $res == (ERR_FATAL | STATUS_EXISTS);
-  return "had one of more fatal errors and requires cleanup"
+  return "had one or more fatal errors and requires cleanup"
     if $res == (ERR_FATAL | STATUS_CLEANUP);
 
   return "was interrupted"
