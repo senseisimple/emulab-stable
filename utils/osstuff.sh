@@ -30,7 +30,7 @@ Linux)
         rel=`grep DISTRIB_RELEASE /etc/lsb-release | awk -F = '{ print $2; }'`
     fi
     if [ -z "$dist" -a -r /etc/redhat-release ]; then
-        rel=`grep 'Red Hat' /etc/redhat-release | sed -e 's/Red Hat Linux release \([0-9]\.[0-9]\).*/\1/'`
+        rel=`grep 'Red Hat' /etc/redhat-release | sed -e 's/Red Hat Linux release \([0-9]\(\.[0-9]\)\?\).*/\1/'`
 	if [ -n "$rel" ]; then
             dist="Redhat"
 	else
