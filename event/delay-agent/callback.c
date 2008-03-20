@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003, 2006, 2007 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2008 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -579,6 +579,7 @@ int get_new_link_params(int l_index, event_handle_t handle,
   int gotpipe = 0;
   int islan = link_map[l_index].islan;
   char *temp = NULL;
+  int gotqib = 0;
 
   /* Allow upper level to init the pipe */
   if (*pipe_which >= 0) {
@@ -630,7 +631,8 @@ int get_new_link_params(int l_index, event_handle_t handle,
 	    since we assume that limit is in slots/packets by default
 	 */
 	 link_map[l_index].params[p_num].q_size = atoi(argvalue);
-	 link_map[l_index].params[p_num].flags_p &= ~PIPE_QSIZE_IN_BYTES;
+	 if (!gotqib)
+	   link_map[l_index].params[p_num].flags_p &= ~PIPE_QSIZE_IN_BYTES;
 	 if (!gotpipe && !islan) {
 	   link_map[l_index].params[1].q_size =
 		   link_map[l_index].params[0].q_size;
@@ -649,6 +651,7 @@ int get_new_link_params(int l_index, event_handle_t handle,
 	   info("QSize in bytes\n");
 	   link_map[l_index].params[p_num].flags_p |= PIPE_QSIZE_IN_BYTES;
 	 }
+	 gotqib = 1;
 	 if (!gotpipe && !islan) {
 	   link_map[l_index].params[1].flags_p =
 		   link_map[l_index].params[0].flags_p;
