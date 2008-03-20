@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2007 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2008 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -585,7 +585,7 @@ main(int argc, char **argv)
 			"cannot set real-time priority\n");
 	    }
 	    else if (rtprio(RTP_SET, 0, &rtp) < 0) {
-		pwarning("main: cannot set real-time priority\n");
+		pwarning("main: cannot set real-time priority");
 	    }
 	}
 #elif defined(linux)
