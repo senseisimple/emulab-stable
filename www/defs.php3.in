@@ -247,7 +247,8 @@ function FORMERROR($field) {
 # A page argument error. 
 # 
 function PAGEARGERROR($msg = 0) {
-    $default = "Invalid page arguments: " . $_SERVER['REQUEST_URI'];
+    $default = "Invalid page arguments: " .
+          	htmlspecialchars($_SERVER['REQUEST_URI']);
 
     if ($msg) {
 	$default = "$default<br><br>$msg";
