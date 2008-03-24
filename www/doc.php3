@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -77,7 +77,7 @@ echo "<li><b><a href=\"$TBBASE/kb-search.php3\">\n
           Emulab Internals</a></b>
 <li><b><a href = "doc/docwrapper.php3?docname=hw-recommend.html">
           Want to build your own Testbed?</a></b>
-<li><b><a href = "docwrapper.php3?docname=hardware.html">
+<li><b><a href = "hardware.php">
           Current Hardware Overview</a></b>
 <li><b><a href = "docwrapper.php3?docname=software.html">
           Current Software Overview</a></b>

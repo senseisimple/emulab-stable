@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -174,7 +174,7 @@ network experimentation.
           Authorization Scheme, Policy, and "How To Get Started"</a></b>
 <li><b><a href = "docwrapper.php3?docname=software.html">
           Overview of Installed Software</a></b>
-<li><b><a href = "docwrapper.php3?docname=hardware.html">
+<li><b><a href = "hardware.php">
           Hardware Overview, "Emulab Classic"</a></b>
 <li><b><a href = "docwrapper.php3?docname=security.html">
           Security Issues</a></b>

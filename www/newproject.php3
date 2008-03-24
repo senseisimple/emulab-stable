@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -483,7 +483,7 @@ function SPITFORM($formfields, $returning, $errors)
 
     echo "<tr>
               <td colspan=2>*Estimated #of
-        <a href=\"$TBDOCBASE/docwrapper.php3?docname=hardware.html#tbpcs\" target='_blank'>
+        <a href=\"$TBDOCBASE/hardware.php#tbpcs\" target='_blank'>
                              PCs</a>:</td>
               <td class=left>
                   <input type=text
