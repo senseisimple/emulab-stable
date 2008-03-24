@@ -4398,7 +4398,7 @@ last_net_act,last_cpu_act,last_ext_act);
 4.144: Add daily stats for generating reports and graphs?
 
 	CREATE TABLE `daily_stats` (
-	  `theday` date default NULL,
+          `theday` date NOT NULL default '0000-00-00',
 	  `exptstart_count` int(11) unsigned default '0',
 	  `exptpreload_count` int(11) unsigned default '0',
 	  `exptswapin_count` int(11) unsigned default '0',
@@ -4419,4 +4419,4 @@ last_net_act,last_cpu_act,last_ext_act);
 	update experiment_stats set last_activity=created
 	      where last_activity is NULL;
 
-
+4.145: Fix error in previous revision; skip to next entry;

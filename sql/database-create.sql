@@ -239,7 +239,7 @@ CREATE TABLE `current_reloads` (
 
 DROP TABLE IF EXISTS `daily_stats`;
 CREATE TABLE `daily_stats` (
-  `theday` date default NULL,
+  `theday` date NOT NULL default '0000-00-00',
   `exptstart_count` int(11) unsigned default '0',
   `exptpreload_count` int(11) unsigned default '0',
   `exptswapin_count` int(11) unsigned default '0',
