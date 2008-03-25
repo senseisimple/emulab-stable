@@ -534,6 +534,11 @@ function WRITESIDEBAR() {
 	echo "<a id='webdisabled' href='$TBDOCBASE/nologins.php3'>".
 	    "Web Interface Temporarily Unavailable</a>";
 	WRITESIDEBARNOTICE("Please Try Again Later");
+	
+        $message = TBGetSiteVar("web/message");
+        if ($message != "") {
+	    WRITESIDEBARNOTICE($message);
+	}
     }
 
     # Start Interaction section if going to spit out interaction options.
