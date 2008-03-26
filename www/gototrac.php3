@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -16,7 +16,14 @@ $this_user = CheckLoginOrDie(CHECKLOGIN_USERSTATUS|
 			     CHECKLOGIN_WEBONLY|CHECKLOGIN_WIKIONLY);
 $uid       = $this_user->uid();
 
-$TRACURL        = "https://${USERNODE}/trac";
+$geniproject = Project::Lookup("geni");
+$approved    = 0;
+if (! ($geniproject &&
+       $geniproject->IsMember($this_user, $approved) && $approved)) {
+    USERERROR("You do not have permission to access the Trac wiki!", 1);
+}
+
+$TRACURL        = "https://${USERNODE}/trac/protogeni";
 $TRACCOOKIENAME = "trac_auth";
 
 #

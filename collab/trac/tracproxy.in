@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2007 University of Utah and the Flux Group.
+# Copyright (c) 2007, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -27,7 +27,7 @@ my $debug   = 0;
 my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $OURDOMAIN   = "@OURDOMAIN@";
-my $TRACDIR     = "/usr/local/www/data/trac";
+my $TRACDIR     = "/usr/local/www/data/trac/protogeni";
 my $TRACPASSWD  = "$TRACDIR/.htpasswd";
 my $TRACADMIN   = "/usr/local/bin/trac-admin";
 my $TRACUSER    = "nobody";
@@ -94,7 +94,7 @@ my $uri = `grep mysql: $TRACDIR/conf/trac.ini`;
 if ($?) {
     fatal("Could not get mysql data from $TRACDIR/conf/trac.ini");
 }
-if ($uri =~ /mysql:\/\/(\w*):(\w*)\@localhost\/(\w*)$/) {
+if ($uri =~ /mysql:\/\/(\w*):(\w*)\@localhost\/([\+\w]*)$/) {
     $dbname = $3;
     $dbuser = $1;
     $dbpass = $2;

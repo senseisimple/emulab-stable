@@ -294,7 +294,7 @@ function WRITESIDEBAR() {
     global $login_status, $login_user, $pid, $gid;
     global $TBBASE, $TBDOCBASE, $BASEPATH, $WIKISUPPORT, $MAILMANSUPPORT;
     global $BUGDBSUPPORT, $BUGDBURL, $CVSSUPPORT, $CHATSUPPORT, $TRACSUPPORT;
-    global $CHECKLOGIN_WIKINAME;
+    global $CHECKLOGIN_WIKINAME, $TBMAINSITE;
     global $THISHOMEBASE;
     global $EXPOSETEMPLATES;
     global $currentusage, $FANCYBANNER, $ELABINELAB, $PLABSUPPORT;
@@ -682,9 +682,15 @@ function WRITESIDEBAR() {
 	    NavMenuButton("My Chat Buddies",
 			  "$TBBASE/" . CreateURL("mychat", $login_user));
 	}
-	if ($TRACSUPPORT && STUDLY()) {
-	    NavMenuButton("Trac Management",
-			  "$TBBASE/" . CreateURL("gototrac", $login_user));
+	if ($TBMAINSITE && $TRACSUPPORT) {
+	    $geniproject = Project::Lookup("geni");
+	    $approved    = 0;
+	    
+	    if ($geniproject &&
+		$geniproject->IsMember($login_user, $approved) && $approved) {
+		NavMenuButton("Trac Management",
+			      "$TBBASE/" . CreateURL("gototrac", $login_user));
+	    }
 	}
     }
 
