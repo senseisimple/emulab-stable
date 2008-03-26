@@ -277,7 +277,7 @@ class XmlrpcNodeInfoFetcher:
 
         pass
 
-    def getPlabNodeInfo(self):
+    def getPlabNodeInfo(self,ignoreErrors=True):
         nif = ['nodenetwork_ids','boot_status','hostname','site_id','node_id']
         ni = self.agent.getNodes(outfilter=nif)
 
@@ -718,10 +718,10 @@ class Plab:
         # Check for duplicate node attributes (sanity check)
         availdups = self.__findDuplicateAttrs(avail)
         if len(availdups):
-            SENDMAIL(TBOPS, "Duplicates in %s advertised node list",
+            SENDMAIL(TBOPS, "Duplicates in %s advertised node list" % plc.name,
                      "Duplicate attributes:\n"
                      "%s\n\n"
-                     "Let plab support know!" % (plc.name,availdups),
+                     "Let plab support know!" % availdups,
                      TBOPS)
             raise RuntimeError, \
                   "Duplicate attributes in plab node listing:\n%s" % availdups
