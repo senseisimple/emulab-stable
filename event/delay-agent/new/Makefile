@@ -10,6 +10,7 @@ EVENT_OBJS	+= EventPipe.o
 OBJS	+= $(COMMON_OBJS)
 LIBS	+= $(COMMON_LIBS) -lcrypto -lpubsub
 CXXFLAGS = -DELVIN_COMPAT -Wall -I../../lib/ -I../../../../
+CFLAGS = $(CXXFLAGS)
 LDFLAGS = -L../../../../pubsub
 
 OS =? `uname -s`
@@ -44,8 +45,7 @@ libevent.a: event.o util.o
 	ranlib libevent.a
 
 event.o: ../../lib/event.c
-	gcc $(CXXFLAGS) -c -o event.o $<
+
 
 util.o: ../../lib/util.c
-	gcc $(CXXFLAGS) -c -o util.o $<
 
