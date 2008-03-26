@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2007 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2008 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -204,6 +204,12 @@ int event_notification_get_int32(event_handle_t handle,
 int event_notification_get_int64(event_handle_t handle,
                                  event_notification_t notification,
                                  char *name, int64_t *value);
+int event_notification_get_opaque_length(event_handle_t handle,
+					 event_notification_t notification,
+					 char *name);
+int event_notification_get_string_length(event_handle_t handle,
+					 event_notification_t notification,
+					 char *name);
 int event_notification_get_opaque(event_handle_t handle,
                                   event_notification_t notification,
                                   char *name, void *buffer, int length);

@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2007 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2008 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -760,6 +760,60 @@ event_notification_get_int64(event_handle_t handle,
     return 1;
 }
 
+
+/*
+ * Return the length of a attribute with name NAME.
+ * Used to dynamically size buffers for the event_notification_get_* calls.
+ * Returns the length or -1 on error.
+ *
+ * Note that we only do this for opaques and strings as the other types
+ * all have a "standard" size.
+ */
+
+int
+event_notification_get_opaque_length(event_handle_t handle,
+				     event_notification_t notification,
+				     char *name)
+{
+    char *v;
+    int len;
+
+    if (!handle || !notification || !name) {
+        ERROR("invalid parameter\n");
+        return -1;
+    }
+
+    if (pubsub_notification_get_opaque(notification->pubsub_notification,
+				       name, &v, &len, &handle->status) != 0) {
+        ERROR("could not get opaque attribute \"%s\" from notification %p\n",
+              name, notification);
+        return -1;
+    }
+
+    return len;
+}
+
+int
+event_notification_get_string_length(event_handle_t handle,
+				     event_notification_t notification,
+				     char *name)
+{
+    char *v;
+
+    if (!handle || !notification || !name) {
+        ERROR("invalid parameter\n");
+        return -1;
+    }
+
+    if (pubsub_notification_get_string(notification->pubsub_notification,
+				       name, &v, &handle->status) != 0) {
+        ERROR("could not get string attribute \"%s\" from notification %p\n",
+              name, notification);
+        return -1;
+    }
+
+    return strlen(v);
+}
 
 /*
  * Get the opaque attribute with name NAME from the event
