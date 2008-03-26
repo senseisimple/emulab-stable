@@ -688,7 +688,7 @@ function WRITESIDEBAR() {
 	    
 	    if ($geniproject &&
 		$geniproject->IsMember($login_user, $approved) && $approved) {
-		NavMenuButton("Trac Management",
+		NavMenuButton("ProtoGENI Trac Wiki",
 			      "$TBBASE/" . CreateURL("gototrac", $login_user));
 	    }
 	}
