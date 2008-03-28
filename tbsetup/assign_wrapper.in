@@ -2006,12 +2006,13 @@ foreach $plink (keys(%plinks)) {
 	    # don't want a veth interface
 	    if (! virtlanallsim($lan) ) {
 		# No phys mapping. We create a veth, but there is no
-		# phys mapping for the port.
+		# phys mapping for the port and no underlying (linked) vlan.
 		$nodeA = $v2pmap{(split(":", $virtA))[0]};
 		$nodeB = $v2pmap{(split(":", $virtB))[0]};
 		$portA = NewVirtIface($lan, $virtA, $nodeA);
 		$portB = NewVirtIface($lan, $virtB, $nodeB);
 		$protolink = ProtoLan->Create($experiment, $lan);
+		$protolink->SetType("trivial");
 		$protolink->SetRole("link/lan");
 		$protolink->AddInterface($nodeA, $vnodeA, $vportA, $portA);
 		$protolink->AddInterface($nodeB, $vnodeB, $vportB, $portB);
@@ -2103,8 +2104,21 @@ foreach $plink (keys(%plinks)) {
 		$portA = NewVirtIface($lan, $virtA, $nodeA, $portA);
 
 		$protolan = ProtoLan->Lookup($experiment, $lan);
-		$protolan = ProtoLan->Create($experiment, $lan, $protovlan)
-		    if (!defined($protolan));
+		if (defined($protolan)) {
+		    #
+		    # Watch for a lan that mixes trivial links and actual
+		    # vlan encapsulated links. We might have processed a
+		    # trivial member first, in which case we have to set its
+		    # link pointer to the protovlan.
+		    #
+		    if ($protolan->type() eq "trivial") {
+			$protolan->SetLink($protovlan);
+		    }
+		}
+		else {
+		    $protolan = ProtoLan->Create($experiment,
+						 $lan, $protovlan);
+		}
 		$protolan->SetType("emulated");
 		$protolan->SetRole("link/lan");
 		$protolan->AddInterface($nodeA, $vnodeA, $vportA, $portA);
@@ -2159,9 +2173,11 @@ foreach $plink (keys(%plinks)) {
 		$portA = NewVirtIface($lan, $virtA, $nodeA);
 
 		$protolan = ProtoLan->Lookup($experiment, $lan);
-		$protolan = ProtoLan->Create($experiment, $lan)
-		    if (!defined($protolan));
-		$protolan->SetRole("link/lan");
+		if (!defined($protolan)) {
+		    $protolan = ProtoLan->Create($experiment, $lan);
+		    $protolan->SetType("trivial");
+		    $protolan->SetRole("link/lan");
+		}
 		$protolan->AddInterface($nodeA, $vnodeA, $vportA, $portA);
 	    }
 	    else {
@@ -3337,7 +3353,7 @@ sub UploadVlans()
     ProtoLan->DumpAll()
 	if ($verbose);
     
-    printdb "Merging vlans.\n";
+    printdb "Merging vlans ...\n";
   again:
     foreach my $protolanA (ProtoLan->ProtoLanList()) {
 	my @membersA = $protolanA->MemberList();
@@ -3387,7 +3403,6 @@ sub UploadVlans()
 	printdb "Uploading vlans table.\n";
 	ProtoLan->DumpAll()
 	    if ($verbose);
-
 	ProtoLan->InstantiateAll() == 0
 	    or fatal("Could not instantiate protolans!");
 
