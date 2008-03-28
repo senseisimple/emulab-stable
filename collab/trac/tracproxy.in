@@ -279,6 +279,9 @@ sub xLogin(@)
     DBQueryFatal("replace into session set ".
 		 "   sid='$user', authenticated=1, ".
 		 "   last_visit=UNIX_TIMESTAMP(now())");
+    DBQueryFatal("replace into session_attribute set ".
+		 "  sid='$user', authenticated=1, name='name', ".
+		 "  value='$user'");
 
     print "$hash\n";
     return 0;
