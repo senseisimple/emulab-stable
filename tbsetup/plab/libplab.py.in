@@ -266,6 +266,7 @@ class XmlrpcNodeInfoFetcher:
         self.plc = plc
         # store the info
         self.__hosts = []
+        self.__groups = dict({})
 
         which_agent = plc.getAttrVal("nmagent")
         if which_agent == None:
@@ -276,6 +277,40 @@ class XmlrpcNodeInfoFetcher:
         self.agent = agents[which_agent](plc)
 
         pass
+
+    def getPlabNodeGroupInfo(self,ignoreErrors=True):
+        ngf = ['nodegroup_id','name','description','node_ids']
+        ng = self.agent.getNodeGroups(outfilter=ngf)
+
+        # build up our translation table
+        pemap = dict({})
+        qres = DBQueryFatal("select node_id,plab_id from plab_mapping")
+        for (node_id,plab_id) in qres:
+            pemap[plab_id] = node_id
+            pass
+
+        self.__groups = dict({})
+
+        for n in ng:
+            elab_nodes = []
+            for plab_id in n['node_ids']:
+                # we have to turn plab_id from planetlab's int into our 
+                # varchars; sigh, legacy.
+                elab_plab_id = str(plab_id)
+                if pemap.has_key(elab_plab_id):
+                    elab_nodes.append(pemap[elab_plab_id])
+                    pass
+                else:
+                    print "%s not in pemap!" % elab_plab_id
+                pass
+
+            od = dict({ 'name':n['name'],'nodegroup_id':n['nodegroup_id'],
+                        'description':n['description'],'node_ids':elab_nodes })
+
+            self.__groups[n['nodegroup_id']] = od
+            pass
+
+        return self.__groups
 
     def getPlabNodeInfo(self,ignoreErrors=True):
         nif = ['nodenetwork_ids','boot_status','hostname','site_id','node_id']
@@ -626,6 +661,115 @@ class Plab:
         slice.load()
         return slice
 
+    def updateNodeGroupEntries(self,plcid,ignorenew = False):
+        # grab our plc:
+        plc = PLC(plcid)
+
+        print "Synching %s node groups..." % plc.name
+        print "Starting at %s." % time.strftime("%Y-%m-%d %H:%M:%S",
+                                                time.localtime())
+
+        method = plc.getAttrVal("syncmethod")
+        if method == None:
+            method = "xmlrpc"
+            pass
+
+        groups = None
+        parser = None
+        try:
+            if method == "sitesxml":
+                parser = siteParser(plc)
+            elif method == "xmlrpc":
+                parser = XmlrpcNodeInfoFetcher(plc)
+            else:
+                raise RuntimeError, "Unsupported update node method %s!" % \
+                      method
+
+            if callable(getattr(parser,'getPlabNodeGroupInfo')):
+                groups = parser.getPlabNodeGroupInfo()
+                pass
+            if not groups == None:
+                print "\nGot nodegroup list:"
+                print str(groups)
+                pass
+            else:
+                print "No way to get nodegroups; done."
+                pass
+
+            pass
+        except:
+            extype, exval, extrace = sys.exc_info()
+            print "Error talking to agent: %s: %s" % (extype, exval)
+            if debug:
+                traceback.print_exc()
+                pass
+            
+            print "Going back to sleep until next scheduled poll"
+            return
+
+        qres = DBQueryFatal("select nodegroup_idx from plab_nodegroups"
+                            " where plc_idx=%s",(plc.idx,))
+        existing = []
+        for (idx,) in qres:
+            existing.append(idx)
+            pass
+
+        new = groups.keys()
+
+        # We take the easy way out for synch'ing: synch the groups, but
+        # just wipe and rebuild the members table.  So, make that set of
+        # operations appear atomic to any readers.
+        DBQueryFatal("lock tables plab_nodegroups write,"
+                     " plab_nodegroup_members write")
+
+        try:
+            # figure out groups that no longer exist and delete them
+            delete = []
+            for gid in existing:
+                if not gid in new:
+                    delete.append(gid)
+                    pass
+                pass
+            for gid in delete:
+                print "Removing nodegroup %d." % gid
+                DBQueryFatal("delete from plab_nodegroup_members" \
+                             " where plc_idx=%s and nodegroup_idx=%s",
+                             (plc.idx,gid))
+                DBQueryFatal("delete from plab_nodegroups" \
+                             " where plc_idx=%s and nodegroup_idx=%s",
+                             (plc.idx,gid))
+                existing.remove(gid)
+                pass
+            
+            # update existing/new groups
+            for gid in new:
+                # just delete all the member entries, then replace--it's easier
+                DBQueryFatal("delete from plab_nodegroup_members" \
+                             " where plc_idx=%s and nodegroup_idx=%s",
+                             (plc.idx,gid))
+                DBQueryFatal("replace into plab_nodegroups" \
+                             " (plc_idx,nodegroup_idx,name,description)" \
+                             " values (%s,%s,%s,%s)",
+                             (plc.idx,gid,groups[gid]['name'],
+                              groups[gid]['description']))
+                for node_id in groups[gid]['node_ids']:
+                    DBQueryFatal("replace into plab_nodegroup_members" \
+                                 " (plc_idx,nodegroup_idx,node_id)" \
+                                 " values (%s,%s,%s)",
+                                 (plc.idx,gid,node_id))
+                    pass
+                pass
+            pass
+        except:
+            print "Exception while talking to DB; there may be\n" \
+                  "  unsynch'd state to cleanup!"
+            traceback.print_exc()
+            pass
+
+        DBQueryFatal("unlock tables")
+
+        return
+
     def updateNodeEntries(self, plcid, ignorenew = False):
         """
         Finds out which Plab nodes are available, and
@@ -641,11 +785,13 @@ class Plab:
         nodes DB, and this list is updated dynamically.  It also gathers
         static data about new nodes.
         """
-        
-        print "Getting available Plab nodes ..."
 
         # grab our plc:
         plc = PLC(plcid)
+
+        print "Synching %s nodes..." % plc.name
+        print "Starting at %s." % time.strftime("%Y-%m-%d %H:%M:%S",
+                                                time.localtime())
 
         method = plc.getAttrVal("syncmethod")
         if method == None:
@@ -653,6 +799,7 @@ class Plab:
             pass
 
         avail = []
+        parser = None
         try:
             if method == "sitesxml":
                 parser = siteParser(plc)
@@ -663,7 +810,7 @@ class Plab:
                       method
 
             avail = parser.getPlabNodeInfo()
-                
+
             pass
         # XXX: rewrite to use more elegant exception info gathering.
         except:
@@ -679,7 +826,7 @@ class Plab:
 
         if debug:
             print "Got advertisement list:"
-            print avail
+            print str(avail)
             pass
 
         # We use nodetype because the plc name might have icky chars, or might
@@ -718,13 +865,14 @@ class Plab:
         # Check for duplicate node attributes (sanity check)
         availdups = self.__findDuplicateAttrs(avail)
         if len(availdups):
-            SENDMAIL(TBOPS, "Duplicates in %s advertised node list" % plc.name,
-                     "Duplicate attributes:\n"
-                     "%s\n\n"
-                     "Let plab support know!" % availdups,
-                     TBOPS)
-            raise RuntimeError, \
-                  "Duplicate attributes in plab node listing:\n%s" % availdups
+            #SENDMAIL(TBOPS, "Duplicates in %s advertised node list" % plc.name,
+            #         "Duplicate attributes:\n"
+            #         "%s\n\n"
+            #         "Let plab support know!" % availdups,
+            #         TBOPS)
+            #raise RuntimeError, \
+            print "Warning: duplicate attributes in plab node listing:\n%s" \
+                  % availdups
 
         # Get node info we already have.
         known = self.__getKnownPnodes(plc)
@@ -832,11 +980,14 @@ class Plab:
             pass
         
         if chgerrstr:
-            SENDMAIL(TBOPS,
-                     "Two or more changes detected for some plab nodes",
-                     "Two or more distinguishing attributes have changed "
-                     "on the following planetlab nodes:\n\n%s\n" % chgerrstr,
-                     TBOPS)
+            #SENDMAIL(TBOPS,
+            #         "Two or more changes detected for some plab nodes",
+            #         "Two or more distinguishing attributes have changed "
+            #         "on the following planetlab nodes:\n\n%s\n" % chgerrstr,
+            #         TBOPS)
+            print "Warning: two or more distinguishing attributes have" \
+                  " changed on the following planetlab nodes:\n\n%s\n" \
+                  % chgerrstr,
             pass
 
         if len(toadd) or len(toupdate):
@@ -846,17 +997,23 @@ class Plab:
             print "Pushing out site_mapping ..."
             os.spawnl(os.P_WAIT, PELAB_PUSH, PELAB_PUSH)
             # Now announce that we've added/updated nodes.
-            SENDMAIL(TBOPS,
-                     "Plab nodes have been added/updated in the DB.",
-                     "The following plab nodes have been added to the DB:\n"
-                     "PlabID\t\tIP\t\tHostname\t\tSite\t\tLinktype\n\n"
-                     "%s\n\n"
-                     "The following plab nodes have been updated in the DB:\n"
-                     "\n%s\n\n" % \
-                     (addstr, updstr),
-                     TBOPS)
+            #SENDMAIL(TBOPS,
+            #         "Plab nodes have been added/updated in the DB.",
+            #         "The following plab nodes have been added to the DB:\n"
+            #         "PlabID\t\tIP\t\tHostname\t\tSite\t\tLinktype\n\n"
+            #         "%s\n\n"
+            #         "The following plab nodes have been updated in the DB:\n"
+            #         "\n%s\n\n" % \
+            #         (addstr, updstr),
+            #         TBOPS)
+            print "The following plab nodes have been added to the DB:\n" \
+                  "PlabID\t\tIP\t\tHostname\t\tSite\t\tLinktype\n" \
+                  "\n%s\n\n" \
+                  "The following plab nodes have been updated in the DB:\n" \
+                  "\n%s\n\n" % (addstr, updstr),
             print "Done adding new Plab nodes."
             pass
+
         return
 
     def __matchPlabNode(self, plabent, knownents):
@@ -942,13 +1099,14 @@ class Plab:
         # Check for duplicate node attributes: report any that are found.
         dups = self.__findDuplicateAttrs(ret.values())
         if len(dups):
-            SENDMAIL(TBOPS, "Duplicate %s node attributes in the DB!",
-                     "Duplicate node attrs:\n"
-                     "%s\n\n"
-                     "Fix up please!" % (plc.name,dups),
-                     TBOPS)
-            raise RuntimeError, \
-                  "Duplicate node attributes in DB:\n%s" % dups            
+            #SENDMAIL(TBOPS,
+            #         "Duplicate %s node attributes in the DB!" % plc.name,
+            #         "Duplicate node attrs:\n"
+            #         "%s\n\n"
+            #         "Fix up please!" % str(dups),
+            #         TBOPS)
+            #raise RuntimeError, \
+            print "Warning: duplicate node attributes in DB:\n%s" % str(dups)
         return ret
 
     def __findDuplicateAttrs(self, nodelist):
@@ -1044,6 +1202,11 @@ class Plab:
         vnodeprefix = "%svm%d" % (plc.nodename_prefix, nidnum)
         print "Creating pnode %s as %s, priority %d." % \
               (nodeent['IP'], nodeid, priority)
+
+        # fixup MAC so it's not null, even if plab did not give us a MAC:
+        if nodeent['MAC'] == None:
+            nodeent['MAC'] = ''
+            pass
 
         # Do the stuff common to both node addition and update first
         # Note that if this fails, we want the exception generated to
@@ -1515,11 +1678,11 @@ class PLC:
         self.extra_agents = []
 
         # initialize ourself
-        self.load()
+        self.__load()
         
         return
 
-    def load(self):
+    def __load(self):
         """
         Load PLC config info from Emulab db.  If a slice was specified,
         load any special slice attributes that may override this PLC's
@@ -1545,24 +1708,29 @@ class PLC:
         (self.idx,self.name,self.url,self.slice_prefix,self.nodename_prefix,
          self.nodetype,self.svcslice) = res[0]
 
-        # Grab any plc-wide attributes.
-        res = DBQueryFatal("select attrkey,attrvalue"
-                           " from plab_plc_attributes"
-                           " where plc_idx=%s",(self.idx,))
+        # Grab any attributes.
+        res = DBQueryFatal("select slicename,nodegroup_idx,node_id,"
+                           "  attrkey,attrvalue"
+                           " from plab_attributes"
+                           " where plc_idx=%s"
+                           " order by slicename,nodegroup_idx,node_id",
+                           (self.idx,))
         self.plcattrs = dict({})
-        for (k,v) in res:
-            self.plcattrs[k] = v
-            pass
+        for (slicename,nodegroup_idx,node_id,k,v) in res:
+            condlist = []
+            if self.plcattrs.has_key(k):
+                condlist = self.plcattrs[k]
+            else:
+                self.plcattrs[k] = condlist
 
-        # Grab any slice-specific attributes if necessary.
-        self.sliceattrs = dict({})
-        if not self.slicename == None:
-            res = DBQueryFatal("select attrkey,attrvalue"
-                               " from plab_slice_attributes"
-                               " where slicename=%s",(self.slicename,))
-            for (k,v) in res:
-                self.sliceattrs[k] = v
-                pass
+            if slicename == "":
+                slicename = None
+            if node_id == "":
+                node_id = None
+            valdict = { 'slicename':slicename,'nodegroup_idx':nodegroup_idx,
+                        'node_id':node_id,'value':v }
+
+            condlist.append(valdict)
             pass
 
         # setup our agent(s):
@@ -1574,14 +1742,80 @@ class PLC:
 
         return
 
-    def getAttrVal(self,attrName,required=False):
-        for d in [self.sliceattrs,self.plcattrs]:
-            if d.has_key(attrName):
-                return d[attrName]
+    def getAttrVal(self,attrName,slice=None,node=None,required=False):
+        """
+        Attributes can be set for a PLC across a conditional slice, nodegroup,
+        and node tuple.  The first attribute stored in the DB that matches at
+        least the attrName, and matches the most slice,nodegroup,node
+        conditions, is returned.
+        Conditional values of 'None' can only match attribute conditions of
+        None (NULL or '' in the db).  Conditional values that are not None
+        can match attribute conditions of either None, or the value itself;
+        however, direct value matches are preferred.
+        """
+        retval = None
+        if self.plcattrs.has_key(attrName):
+            condlist = self.plcattrs[attrName]
+
+            # find the matching attribute:
+            retval = None
+            bestDirectMatch = 0
+            bestAnyMatch = 0
+            for c in condlist:
+                dM,aM = 0,0
+
+                # setup the real values we're going to test against.
+                test_slicename = slice
+                if slice:
+                    test_slicename = slice.slicename
+                test_nodegroups = []
+                test_node = None
+                if node:
+                    test_nodegroups = node.nodegroups
+                    test_node = node.phys_nodeid
+
+                if c['slicename'] == test_slicename:
+                    dM += 100
+                    aM += 100
+                elif not c['slicename']:
+                    aM += 100
+                elif c['slicename'] and test_slicename:
+                    # skip this condvalue because neither element
+                    # is None but they are unequal; thus, it cannot match.
+                    continue
+
+                if c['nodegroup_idx'] in test_nodegroups:
+                    dM += 90
+                    aM += 90
+                elif not c['nodegroup_idx']:
+                    aM += 90
+                elif c['nodegroup_idx'] and len(test_nodegroups) > 0:
+                    # same skip reasoning
+                    continue
+
+                if c['node_id'] == test_node:
+                    dM += 80
+                    aM += 80
+                elif not c['node_id']:
+                    aM += 80
+                elif c['node_id'] and test_node:
+                    # same skip reasoning
+                    continue
+
+                if (dM > bestDirectMatch) \
+                       or (dM == bestDirectMatch and aM > bestAnyMatch):
+                    retval = c['value']
+                    bestDirectMatch = dM
+                    bestAnyMatch = aM
+
+                    #print "Declaring %s best match with %d/%d" \
+                    #      % (str(retval),dM,aM)
+                pass
             pass
-        if required:
+        if not retval and required:
             raise RuntimeError, "Could not find attribute '%s'!" % attrName
-        return None
+
+        return retval
 
     # XXX: fix this to return different auth structures for different roles
     # (i.e., for privileged calls, use PI creds; for others, use user creds).
@@ -1597,18 +1831,10 @@ class PLC:
             pass
 
         # Get the auth method.
-        method = None
-        if self.sliceattrs.has_key("auth_method"):
-            method = self.sliceattrs["auth_method"]
-        elif self.plcattrs.has_key("auth_method"):
-            method = self.plcattrs["auth_method"]
-        else:
-            raise RuntimeError, \
-                  "Could not determine auth_method for %s" % errstr
-        auth["AuthMethod"] = method
+        auth["AuthMethod"] = self.getAttrVal("auth_method",required=True)
 
         # Grab any necessary additional auth info based on the method.
-        if method == "password":
+        if auth["AuthMethod"] == "password":
             try:
                 auth["Username"] = self.getAttrVal("username",required=True)
             except:
@@ -1624,7 +1850,7 @@ class PLC:
             pass
         else:
             raise RuntimeError, "Unsupported auth_method '%s' for %s!" % \
-                  (method,errstr)
+                  (auth["AuthMethod"],errstr)
 
         return auth
 
@@ -1893,9 +2119,6 @@ class EmulabSlice(Slice):
         self.slicemeta = None
         # lease timeout
         self.leaseend = time.gmtime(time.time())
-        
-        # config attributes
-        self.sliceattrs = dict({})
 
         # Rules for arguments.
         if plc == None:
@@ -1933,17 +2156,8 @@ class EmulabSlice(Slice):
             
     def _preload(self):
         """
-        Load attributes, various other things, from db.
+        Load bits, various other things, from db.
         """
-        # Grab any slice attributes:
-        res = DBQueryFatal("select attrkey,attrvalue"
-                           " from plab_slice_attributes"
-                           " where slicename=%s and plc_idx=%s",
-                           (self.slicename,self.plc.idx))
-        for (k,v) in res:
-            self.sliceattrs[k] = v
-            pass
-
         self.adminbit = 0
         if self.pid == PLABMON_PID and self.eid == PLABMON_EID:
             self.description = PLAB_SVC_SLICEDESC
@@ -2328,6 +2542,9 @@ class Node:
         # must be set in mod_<PLCAGENT>.createNode if you want to use
         # multiple rootball and triggering support
         self.nmagent = None
+
+        self.nodegroups = []
+
         return
 
     def __logNodeHist(self,component,operation,status,msg):
@@ -2399,8 +2616,6 @@ class Node:
         node setup is performed.  Don't call this directly, use
         Slice.createNode instead.
         """
-
-        print "usedb = %s" % str(self.usedb)
 
         if self.usedb:
             # First, make sure there isn't already an entry in the DB
@@ -2497,6 +2712,14 @@ class Node:
         else:
             self.leaseend = calendar.timegm(time.strptime(str(leaseend),
                                                           "%Y-%m-%d %H:%M:%S"))
+            pass
+
+        # finally, grab which nodegroups we're in:
+        qres = DBQueryFatal("select nodegroup_idx"
+                            " from plab_nodegroup_members"
+                            " where node_id=%s",(self.phys_nodeid,))
+        for (ngid,) in qres:
+            self.nodegroups.append(ngid)
             pass
         
         return
@@ -2683,12 +2906,14 @@ class Node:
         """
 
         # check if we want to skip emulabify:
-        do_emulabify = self.slice.plc.getAttrVal("emulabify")
+        do_emulabify = self.slice.plc.getAttrVal("emulabify",
+                                                 slice=self.slice,node=self)
         if do_emulabify and (do_emulabify == "no" or do_emulabify == "NO"):
             return
 
         # grab rootballs that need to be installed in this slice
-        rootballs = self.slice.plc.getAttrVal("rootballs",required=True)
+        rootballs = self.slice.plc.getAttrVal("rootballs",slice=self.slice,
+                                              node=self,required=True)
         tmp = rootballs.split(',')
         rootballs = []
         for r in tmp:
@@ -2749,7 +2974,8 @@ class Node:
 
         # now run any postsetup commands:
         print "Running commands on %s" % self.nodeid
-        commands = self.slice.plc.getAttrVal("commands")
+        commands = self.slice.plc.getAttrVal("commands",slice=self.slice,
+                                             node=self)
         if commands:
             commands = commands.split(',')
             pass

@@ -12,7 +12,7 @@ import libplab
 from libtestbed import *
 
 def usage(me):
-    print "Usage: %s [ -vd ] [<plc>]" % me
+    print "Usage: %s [ -vd ] [ -n ] [ -g ] [<plc>] ... [<plc>]" % me
     print "    (where <plc> is the name or id of a plc in the db)"
     sys.exit(1)
 
@@ -20,19 +20,41 @@ def usage(me):
 def main(args):
     me = args[0]
     parser = TBParser()
+
+    parser.add_option("-n", "--nodes",dest="nodes",default=False,
+                      action="store_true",help="Only synch node entries.")
+    parser.add_option("-g", "--nodegroups",dest="nodegroups",default=False,
+                      action="store_true",help="Only synch node group entries.")
+    
     (options,cargs) = parser.parse_args()
 
+    both = True
+    if options.nodes and options.nodegroups:
+        both = True
+    elif options.nodes or options.nodegroups:
+        both = False
+
     plab = libplab.Plab()
+
+    plcids = []    
     if len(cargs) > 0:
-        print "Updating node entries at %s." % cargs[0]
-        plab.updateNodeEntries(cargs[0])
+        # Only do the args...
+        plcids = cargs
     else:
         # Grab all the PLCs we know about and do for all...
         plcs = plab.getPLCs()
         for (name,idx) in plcs:
-            print "Updating node entries at %s." % name
-            plab.updateNodeEntries(name)
+            plcids.append(name)
             pass
+        pass
+
+    for plc in plcids:
+        if options.nodes or both:
+            print "Updating node entries at %s." % plc
+            plab.updateNodeEntries(plc)
+        if options.nodegroups or both:
+            print "Updating node group entries at %s." % plc
+            plab.updateNodeGroupEntries(plc)
         pass
     return
 
