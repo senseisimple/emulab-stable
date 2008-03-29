@@ -81,7 +81,7 @@ sub new($$$$$) {
     # experiment that don't have entries in the plab_slice_nodes table.
     # This presents a nice race, but we don't have a great way to solve 
     # right now.
-    my $plcname = getPLCName();
+    my $plcname = libplabmon::getPLCName();
     my @vnodes = ();
     my $qres = DBQueryFatal("select r.node_id" . 
 			    " from reserved as r" . 

@@ -249,10 +249,12 @@ sub processchild($$$) {
         delete $self->{'PENDING'}->{$pnode->{'name'}};
         if (!$exstat) {
             print "Teardown of $pnode->{'vnode'} complete\n";
-            Log(STATUSLOG(getPLCName()), $logmsg . "teardown, success, teardown succeeded.");
+            Log(STATUSLOG(libplabmon::getPLCName()),
+		$logmsg . "teardown, success, teardown succeeded.");
         } else {
             print "Teardown of $pnode->{'vnode'} failed: $exstat\n";
-            Log(STATUSLOG(getPLCName()), $logmsg . "teardown, fail, teardown failed.");
+            Log(STATUSLOG(libplabmon::getPLCName()),
+		$logmsg . "teardown, fail, teardown failed.");
         }
 
         return 1;
@@ -300,7 +302,7 @@ sub processchild($$$) {
         $self->teardownnode($pnode);
         $self->calcnextcheck($pnode);
         $pnode->{'consecfails'}++;
-        Log(STATUSLOG(getPLCName()), $logmsg);
+        Log(STATUSLOG(libplabmon::getPLCName()), $logmsg);
     } else {
         # Instantiation was successful.
         # Setup a timeout to wait for ISUP.
@@ -328,7 +330,8 @@ sub checkexpiration($) {
                     # Yes!  Node is up.
                     print "Setup of $pnode->{'vnode'} on $pnode->{'name'} ".
                         " succeeded\n";
-                    Log(STATUSLOG(getPLCName()), "$self->{'NAME'}, $pnode->{'name'}, ".
+                    Log(STATUSLOG(libplabmon::getPLCName()),
+			"$self->{'NAME'}, $pnode->{'name'}, ".
                         "setup, success, node came up successfully.");
                     $self->nodesetupcomplete($pnode);
                     $numfinished++;
