@@ -2,31 +2,24 @@
 
 all: delay-agent
 
-COMMON_OBJS	+= main.o Pipe.o Parameter.o lib.o RootPipe.o linkCallback.o resetCallback.o
-LINUX_OBJS	+= LinuxPipe.o
-FREEBSD_OBJS	+= FreeBSDPipe.o
-EVENT_OBJS	+= EventPipe.o
+OBJS	= main.o Pipe.o Parameter.o lib.o RootPipe.o linkCallback.o resetCallback.o \
+	EventPipe.o DummynetPipe.o
 
-OBJS	+= $(COMMON_OBJS)
-LIBS	+= $(COMMON_LIBS) -lcrypto -lpubsub
+LIBS	= -lcrypto -lpubsub
 CXXFLAGS = -DELVIN_COMPAT -Wall -I../../lib/ -I../../../../
-CFLAGS = $(CXXFLAGS)
 LDFLAGS = -L../../../../pubsub
 
-OS =? `uname -s`
-ifeq ($(OS), "FreeBSD")
-	LIBS += $(FREEBSD_LIBS)
-	LDFLAGS += $(FREEBSD_LDFLAGS)
-	CXXFLAGS += $(FREEBSD_CXXFLAGS)
-	OBJS += $(FREEBSD_OBJS)
+OS = $(shell uname -s)
+
+ifeq ($(OS), FreeBSD)
+CXXFLAGS += -DFREEBSD
 endif
 
-ifeq ($(OS), "Linux")
-	LIBS += $(LINUX_LIBS)
-	LDFLAGS += $(LINUX_LDFLAGS)
-	CXXFLAGS += $(LINUX_CXXFLAGS)
-	OBJS += $(LINUX_OBJS)
+ifeq ($(OS), Linux)
+CXXFLAGS += -DLINUX
 endif
+
+CFLAGS = $(CXXFLAGS)
 
 %.o: %.cc
 	$(CXX) $(CXXFLAGS) -c $< -o $@
@@ -34,18 +27,16 @@ endif
 delay-agent: $(OBJS) $(COMMON_OBJS) $(EVENT_OBJS) libevent.a
 	$(CXX) $(LDFLAGS) -o $@ $^ $(LIBS)
 
-event-delay-agent: $(COMMON_OBJS) $(EVENT_OBJS) libevent.a
-	$(CXX) $(LDFLAGS) -o $@ $^ $(LIBS)
-
 clean:
-	rm -f *.o *.a delay-agent event-delay-agent
+	rm -f *.o *.a delay-agent
 
 libevent.a: event.o util.o
 	$(AR) crv libevent.a event.o util.o
 	ranlib libevent.a
 
 event.o: ../../lib/event.c
-
+	$(CC) $(CFLAGS) -c $< -o $@
 
 util.o: ../../lib/util.c
+	$(CC) $(CFLAGS) -c $< -o $@
 

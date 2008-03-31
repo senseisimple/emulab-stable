@@ -1,5 +1,7 @@
 // DummynetPipe.cc
 
+#ifdef FREEBSD
+
 #include "lib.hh"
 #include "DummynetPipe.hh"
 
@@ -10,74 +12,74 @@ using namespace std;
 
 DummynetPipe::DummynetPipe(std::string const & pipeno)
 {
-	dummynetPipeNumber = stringToInt(pipeno);
+        dummynetPipeNumber = stringToInt(pipeno);
 
-	dummynetSocket = socket(AF_INET, SOCK_RAW, IPPROTO_RAW);
-	if (dummynetSocket < 0) {
-		cerr << "Can't create raw socket" << endl;
-	}
+        dummynetSocket = socket(AF_INET, SOCK_RAW, IPPROTO_RAW);
+        if (dummynetSocket < 0) {
+                cerr << "Can't create raw socket" << endl;
+        }
 }
 
 DummynetPipe::~DummynetPipe()
 {
-	close(dummynetSocket);
+        close(dummynetSocket);
 }
 
 DummynetPipe::reset(void)
 {
-	struct dn_pipe *pipe;
+        struct dn_pipe *pipe;
 
-	pipe = getPipe();
-	if (pipe == NULL) {
-		cerr << "Couldn't find pipe for " << dummynetPipeNumber << endl;
-		return;
-	}
+        pipe = getPipe();
+        if (pipe == NULL) {
+                cerr << "Couldn't find pipe for " << dummynetPipeNumber << endl;
+                return;
+        }
 
-	map<Parameter::ParameterType, Parameter>::iterator pos = g::defaultParameters.begin();
-	map<Parameter::ParameterType, Parameter>::iterator limit = g::defaultParameters.end();
+        map<Parameter::ParameterType, Parameter>::iterator pos = g::defaultParameters.begin();
+        map<Parameter::ParameterType, Parameter>::iterator limit = g::defaultParameters.end();
 
-	for (; pos != limit; ++pos)
-	{
-		updateParameter(pipe, pos->second);
-	}
+        for (; pos != limit; ++pos)
+        {
+                updateParameter(pipe, pos->second);
+        }
 
-	setPipe(pipe);
+        setPipe(pipe);
 
-	free(pipe);
+        free(pipe);
 }
 
 DummynetPipe::updateParameter(struct dn_pipe* pipe, Parameter const & parameter)
 {
-	switch (parameter.getType())
-	{
+        switch (parameter.getType())
+        {
                 case BANDWIDTH:
-				pipe->bandwidth = newParameter.getValue();
+                                pipe->bandwidth = newParameter.getValue();
                                 break;
                 case DELAY:
-				pipe->delay = newParameter.getValue();
+                                pipe->delay = newParameter.getValue();
                                 break;
 #if 0
                 case LOSS:
                                 parameterString = "LOSS";
                                 break;
 #endif
-	}
+        }
 }
 
 DummynetPipe::resetParameter(Parameter const & newParameter)
 {
-	struct dn_pipe *pipe;
+        struct dn_pipe *pipe;
 
-	pipe = getPipe();
-	if (pipe == NULL) {
-		return;
-	}
+        pipe = getPipe();
+        if (pipe == NULL) {
+                return;
+        }
 
-	updateParameter(pipe, newParameter);
+        updateParameter(pipe, newParameter);
 
-	setPipe(pipe);
+        setPipe(pipe);
 
-	free(pipe);
+        free(pipe);
 }
 
 void *DummynetPipe::getPipe(void)
@@ -102,7 +104,7 @@ void *DummynetPipe::getPipe(void)
       cerr << "malloc: cant allocate memory" << endl;
       return 0;
     }
-    
+
     while (num_bytes >= num_alloc) {
       num_alloc = num_alloc * 2 + 200;
       num_bytes = num_alloc ;
@@ -110,7 +112,7 @@ void *DummynetPipe::getPipe(void)
         cerr << "cant alloc memory" << endl;
         return 0;
       }
-    
+
       if (getsockopt(dummynetSocket, IPPROTO_IP, IP_DUMMYNET_GET,
              data, &num_bytes) < 0){
         cerr << "error in getsockopt" << endl;
@@ -124,16 +126,16 @@ void *DummynetPipe::getPipe(void)
     pipe = NULL;
 
     for ( ; num_bytes >= sizeof(*p) ; p = (struct dn_pipe *)next ) {
-       
-     
+
+
        if ( DN_PIPE_NEXT(p) != (struct dn_pipe *)DN_IS_PIPE )
-	     break ;
+             break ;
 
        l = sizeof(*p) + p->fs.rq_elements * sizeof(*q) ;
        next = (void *)p  + l ;
        num_bytes -= l ;
        if (pipe_num != p->pipe_nr)
-	     continue;
+             continue;
 
        q = (struct dn_flow_queue *)(p+1) ;
 
@@ -152,7 +154,7 @@ void *DummynetPipe::getPipe(void)
     }
 
     if ((num_bytes < sizeof(*p) || (DN_PIPE_NEXT(p) != (struct dn_pipe *)DN_IS_PIPE))) {
-	    return NULL;
+            return NULL;
     }
 
     pipe = malloc(l);
@@ -163,7 +165,7 @@ void *DummynetPipe::getPipe(void)
 
     memcpy(pipe, p, l);
     free(data);
-    
+
     return pipe;
 }
 
@@ -171,7 +173,9 @@ void *DummynetPipe::getPipe(void)
 
 void DummynetPipe::setPipe(struct dn_pipe *pipe)
 {
-	    if (setsockopt(dummynetSocket,IPPROTO_IP, IP_DUMMYNET_CONFIGURE, pipe,sizeof (*pipe))
-		< 0)
-	      cerr << "IP_DUMMYNET_CONFIGURE setsockopt failed" << endl;
+            if (setsockopt(dummynetSocket,IPPROTO_IP, IP_DUMMYNET_CONFIGURE, pipe,sizeof (*pipe))
+                < 0)
+              cerr << "IP_DUMMYNET_CONFIGURE setsockopt failed" << endl;
 }
+
+#endif
