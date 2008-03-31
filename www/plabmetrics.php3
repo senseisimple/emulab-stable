@@ -391,6 +391,7 @@ $colmap = array( 'node_id' => 'pm.node_id',
 		 'plab_id' => 'pm.plab_id',
                  'plc_name' => 'ppi.plc_name',
 		 'site' => 'psm.site_name',
+		 'plab_nodegroup' => 'png.nodegrouplist',
                  # emulab columns
 		 'nodestatus' => 'ns.status',
 		 'nodestatustime' => 'ns.status_timestamp',
@@ -439,7 +440,7 @@ $colsrc = array( 'resptime' => 'CoMon','uptime' => 'CoMon',
 		 'site' => 'Emulab','nettype' => 'Emulab',
 		 'jitdeduction' => 'Emulab','successes' => 'Emulab',
                  'failures' => 'Emulab','nodestatus' => 'Emulab',
-                 'nodestatustime' => 'Emulab' );
+                 'nodestatustime' => 'Emulab','plab_nodegroup' => 'Emulab' );
 
 # The legend for fields.  The comon data is quoted from
 # http://summer.cs.princeton.edu/status/legend.html .
@@ -569,7 +570,7 @@ $colmap_mysqlnames_where = array();
 
 foreach ($colmap as $k => $v) {
     $had_as = false;
-    if (strstr($v,' as ')) {
+    if (strpos($v," as ") != false) {
 	$sa = explode(' as ',$v);
 	$nv = $sa[1];
 	$had_as = true;
@@ -595,7 +596,7 @@ foreach ($colmap as $k => $v) {
 }
 
 # Default columns displayed, in this order.
-$defcols = array( 'node_id','hostname','plc_name','nodestatus',
+$defcols = array( 'node_id','hostname','plab_nodegroup','nodestatus',
                   'nodestatustime','unavail','5minload','freemem',
                   'txrate','rxrate','date', );
 
@@ -717,19 +718,19 @@ while ($row = mysql_fetch_array($qres)) {
 # Grab query parts
 $qbits = pm_buildqueryinfo();
 $select_s = $qbits[0]; $src_s = $qbits[1]; $filter_s = $qbits[2]; 
-$sort_s = $qbits[3]; $pag_s = $qbits[4];
+$sort_s = $qbits[3]; $group_s = $qbits[4]; $pag_s = $qbits[5];
 
 # query that counts num data rows
 $qcount = "select count(" . $colmap['node_id'] . ") as num" . 
-    " from $src_s $filter_s";
+    " from $src_s $filter_s $group_s";
 
 # query that gets data (note that if we need to do postfiltering, we
 # manually paginate the data!)
 if ($mustpostfilter) {
-    $q = "select $select_s from $src_s $filter_s $sort_s";
+    $q = "select $select_s from $src_s $filter_s $group_s $sort_s";
 }
 else {
-    $q = "select $select_s from $src_s $filter_s $sort_s $pag_s";
+    $q = "select $select_s from $src_s $filter_s $group_s $sort_s $pag_s";
 }
 
 #echo "qcount = $qcount<br><br>\n";
@@ -1673,6 +1674,16 @@ function pm_buildqueryinfo() {
     $q_joinstr .= " left join plab_comondata as pcd on pm.node_id=pcd.node_id";
     $q_joinstr .= " left join plab_nodehiststats as pnhs" . 
 	" on pm.node_id=pnhs.node_id";
+    #
+    # Note that we have to use a subquery to get this crap.  It's either that
+    # or use a view
+    #
+    $q_joinstr .= " left join (select pngm.node_id as node_id," . 
+        " group_concat(png.name order by png.name) as nodegrouplist" . 
+        " from plab_nodegroup_members as pngm" . 
+        " left join plab_nodegroups as png" . 
+        " on pngm.nodegroup_idx=png.nodegroup_idx" . 
+        " group by pngm.node_id) as png on pm.node_id=png.node_id";
 
     # setup the quick filter string (note that all of these get anded)
     
@@ -1770,6 +1781,8 @@ function pm_buildqueryinfo() {
     }
     $q_sortstr .= " $sortdir";
 
+    $q_groupstr = " ";
+
     # setup pagination
     $q_pagstr = '';
     if (!isset($limit)) {
@@ -1785,7 +1798,8 @@ function pm_buildqueryinfo() {
 	$q_pagstr .= " limit $limit offset $offset";
     }
 
-    return array($q_colstr,$q_joinstr,$q_finalfs,$q_sortstr,$q_pagstr);
+    return array($q_colstr,$q_joinstr,$q_finalfs,$q_sortstr,
+		 $q_groupstr,$q_pagstr);
 }
 
 function pm_showtable($totalrows,$data) {
@@ -1934,7 +1948,7 @@ function pm_showtable($totalrows,$data) {
 # containers may be implicit (that is, <name> <comp> <const> is a container).
 #
 function pm_parseuserquery($q,$debug = false) {
-    global $colmap,$colmap_mysqlnames;
+    global $colmap,$colmap_mysqlnames,$colmap_mysqlnames_where;
 
     # first tokenize
     $toka = array();
@@ -2065,7 +2079,7 @@ function pm_parseuserquery($q,$debug = false) {
 	return false;
     }
     function iscop($tok) {
-	$cops = array('<','>','<=','>=','==','!=');
+	$cops = array('<','>','<=','>=','==','!=','like');
 	foreach ($cops as $cop) {
 	    if ($cop == $tok)
 		return true;
@@ -2111,6 +2125,7 @@ function pm_parseuserquery($q,$debug = false) {
 	elseif ($need == 'ccont' && $tok == ')') {
 	    return true;
 	}
+	return false;
     }
     function whichsat($tok,$lneeds) {
 	foreach ($lneeds as $n) {
@@ -2146,20 +2161,23 @@ function pm_parseuserquery($q,$debug = false) {
     # needs are valid.
     $sawcop = false;
 
+    $prev_toka_like = false;
     foreach ($toka as $i) {
-        # echo "needs = " . implode(',',$needs) . "; ";
+        #echo "needs = " . implode(',',$needs) . "; <br>\n";
 	$sneed = whichsat($i,$needs);
 	if ($sneed == '') {
 	    $errstr = "Parser error at token '$i'!";
 	    break;
 	}
-	
+
+	$just_set_like = false;
+
 	$needs = $trans[$sneed];
 	if (!isset($needs)) {
 	    $needs = array();
 	}
 
-        # echo "sneed = $sneed; newneeds = " . implode(',',$needs) . "<br>\n";
+        #echo "sneed = $sneed; newneeds = " . implode(',',$needs) . "<br>\n";
 
 	if ($sneed == 'ocont') {
 	    ++$oc;
@@ -2171,7 +2189,7 @@ function pm_parseuserquery($q,$debug = false) {
 	}
         # XXX: handle the problem caused by use of ' as ' in colmap
 	elseif ($sneed == 'name') {
-	    $retq .= " " . $colmap[$i] . " ";
+	    $retq .= " " . $colmap_mysqlnames_where[$i] . " ";
 	    if ($sawcop) {
 		$sawcop = false;
 		$trans['name'] = $pre_cop_name_const_trans;
@@ -2184,7 +2202,12 @@ function pm_parseuserquery($q,$debug = false) {
 		$cstr = $i;
 	    }
 	    else {
-		$cstr = "'" . $i . "'";
+                # add the wildcards on user behalf
+		$ss = '';
+		if ($prev_toka_like) {
+		    $ss = '%';
+		}
+		$cstr = "'$ss" . $i . "$ss'";
 	    }
 	    $retq .= " $cstr ";
 	    if ($sawcop) {
@@ -2203,9 +2226,19 @@ function pm_parseuserquery($q,$debug = false) {
 	    $sawcop = true;
 	    $trans['name'] = $post_cop_name_const_trans;
 	    $trans['const'] = $post_cop_name_const_trans;
+
+	    if ($i == "like") {
+		$prev_toka_like = true;
+		$just_set_like = true;
+	    }
 	}
 	elseif ($sneed == 'bop') {
 	    $retq .= " $i ";
+	}
+
+        # clear special case for like cop
+	if (!$just_set_like) {
+	    $prev_toka_like = false;
 	}
     }
     if (strlen($errstr) > 0) {
