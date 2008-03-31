@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2007 University of Utah and the Flux Group.
+# Copyright (c) 2007, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -13,11 +13,12 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print STDOUT "Usage: tracxlogin <uid> <ipaddr>\n";
+    print STDOUT "Usage: tracxlogin [-w wiki] <uid> <ipaddr>\n";
     exit(-1);
 }
-my $optlist = "d";
+my $optlist = "dw:";
 my $debug   = 0;
+my $wiki    = "emulab";
 
 #
 # Configure variables
@@ -88,7 +89,16 @@ if (! getopts($optlist, \%options)) {
 if (defined($options{"d"})) {
     $debug = 1;
 }
+if (defined($options{"w"})) {
+    $wiki = $options{"w"};
 
+    if ($wiki =~ /^([-\w]+)$/) {
+	$wiki = $1;
+    }
+    else {
+	die("Bad data in wiki: $wiki");
+    }
+}
 usage()
     if (@ARGV != 2);
     
@@ -122,8 +132,8 @@ if (! defined($target_user)) {
 #
 $UID = $EUID;
 
-open(COOKIE, "$SSH -host $CONTROL $TRACPROXY xlogin $user $ipaddr |") or
-    fatal("$TRACPROXY failed on $CONTROL!");
+open(COOKIE, "$SSH -host $CONTROL $TRACPROXY -w $wiki xlogin $user $ipaddr |")
+    or fatal("$TRACPROXY failed on $CONTROL!");
 my $cookie = <COOKIE>;
 close(COOKIE) or
     fatal("$TRACPROXY failed on $CONTROL!");

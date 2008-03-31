@@ -689,7 +689,13 @@ function WRITESIDEBAR() {
 	    if ($geniproject &&
 		$geniproject->IsMember($login_user, $approved) && $approved) {
 		NavMenuButton("ProtoGENI Trac Wiki",
-			      "$TBBASE/" . CreateURL("gototrac", $login_user));
+			      "$TBBASE/" . CreateURL("gototrac", $login_user,
+						     "wiki", "geni"));
+	    }
+	    if (STUDLY()) {
+		NavMenuButton("Emulab Trac Wiki",
+			      "$TBBASE/" . CreateURL("gototrac", $login_user,
+						     "wiki", "emulab"));
 	    }
 	}
     }

@@ -18,7 +18,7 @@ sub usage()
     print "       tracproxy xlogin  <uid> or\n";
     exit(-1);
 }
-my $optlist = "d";
+my $optlist = "dw:";
 my $debug   = 0;
 
 #
@@ -27,8 +27,9 @@ my $debug   = 0;
 my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $OURDOMAIN   = "@OURDOMAIN@";
-my $TRACDIR     = "/usr/local/www/data/trac/protogeni";
-my $TRACPASSWD  = "$TRACDIR/.htpasswd";
+my $TRACTOPDIR  = "/usr/local/www/data/trac";
+my $TRACDIR;
+my $TRACPASSWD;
 my $TRACADMIN   = "/usr/local/bin/trac-admin";
 my $TRACUSER    = "nobody";
 my $TRACGROUP   = "nobody";
@@ -82,6 +83,15 @@ if (! getopts($optlist, \%options)) {
 if (defined($options{"d"})) {
     $debug = 1;
 }
+if (defined($options{"w"})) {
+    $TRACDIR  = "$TRACTOPDIR/" . $options{"w"};
+}
+else {
+    $TRACDIR  = "$TRACTOPDIR/emulab";
+}
+# This lives in the trac project dir.
+$TRACPASSWD  = "$TRACDIR/.htpasswd";
+
 if (! @ARGV) {
     usage();
 }

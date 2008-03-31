@@ -16,21 +16,33 @@ $this_user = CheckLoginOrDie(CHECKLOGIN_USERSTATUS|
 			     CHECKLOGIN_WEBONLY|CHECKLOGIN_WIKIONLY);
 $uid       = $this_user->uid();
 
-$geniproject = Project::Lookup("geni");
-$approved    = 0;
-if (! ($geniproject &&
-       $geniproject->IsMember($this_user, $approved) && $approved)) {
-    USERERROR("You do not have permission to access the Trac wiki!", 1);
+#
+# Verify page arguments. project_title is the project to zap to.
+#
+$optargs = OptionalPageArguments("wiki",  PAGEARG_STRING,
+				 "force", PAGEARG_BOOLEAN);
+if (!isset($wiki)) {
+    $wiki = "emulab";
 }
-
-$TRACURL        = "https://${USERNODE}/trac/protogeni";
-$TRACCOOKIENAME = "trac_auth";
+elseif ($wiki == "geni") {
+    $geniproject = Project::Lookup("geni");
+    $approved    = 0;
+    if (! ($geniproject &&
+	   $geniproject->IsMember($this_user, $approved) && $approved)) {
+	USERERROR("You do not have permission to access the Trac wiki!", 1);
+    }
+}
+else {
+    USERERROR("Unknown Trac wiki $wiki!", 1);
+}
+$TRACURL        = "https://${USERNODE}/trac/$wiki";
+$TRACCOOKIENAME = "trac_auth_${wiki}";
 
 #
 # Look for our cookie. If the browser has it, then there is nothing
 # more to do; just redirect the user over to the wiki.
 #
-if (isset($_COOKIE[$TRACCOOKIENAME])) {
+if (!isset($force) && isset($_COOKIE[$TRACCOOKIENAME])) {
     header("Location: ${TRACURL}");
     return;
 }
@@ -38,8 +50,8 @@ if (isset($_COOKIE[$TRACCOOKIENAME])) {
 #
 # Do the xlogin, which gives us back a hash to stick in the cookie.
 #
-SUEXEC($uid, "nobody", "tracxlogin $uid " . $_SERVER['REMOTE_ADDR'],
-       SUEXEC_ACTION_DIE);
+SUEXEC($uid, "nobody", "tracxlogin -w " . escapeshellarg($wiki) .
+       " $uid " . $_SERVER['REMOTE_ADDR'], SUEXEC_ACTION_DIE);
 
 if (!preg_match("/^(\w*)$/", $suexec_output, $matches)) {
     TBERROR($suexec_output, 1);
