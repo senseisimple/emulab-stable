@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -901,7 +901,7 @@ function DOLOGIN_MAGIC($uid, $uid_idx, $email = null, $adminon = 0)
     global $TBNAMECOOKIE, $TBLOGINCOOKIE, $TBSECURECOOKIES, $TBEMAILCOOKIE;
     global $TBMAIL_OPS, $TBMAIL_AUDIT, $TBMAIL_WWW;
     global $WIKISUPPORT, $WIKICOOKIENAME;
-    global $BUGDBSUPPORT, $BUGDBCOOKIENAME;
+    global $BUGDBSUPPORT, $BUGDBCOOKIENAME, $TRACSUPPORT;
     
     # Caller makes these checks too.
     if (!TBvalid_uid($uid)) {
@@ -982,6 +982,15 @@ function DOLOGIN_MAGIC($uid, $uid_idx, $email = null, $adminon = 0)
 	$flushtime = time() - 1000000;
 	    
 	setcookie($BUGDBCOOKIENAME, "", $flushtime, "/",
+		  $TBAUTHDOMAIN, $TBSECURECOOKIES);
+    }
+    # These cookie names are still in flux. 
+    if ($TRACSUPPORT) {
+	$flushtime = time() - 1000000;
+	    
+	setcookie("trac_auth_emulab", "", $flushtime, "/",
+		  $TBAUTHDOMAIN, $TBSECURECOOKIES);
+	setcookie("trac_auth_protogeni", "", $flushtime, "/",
 		  $TBAUTHDOMAIN, $TBSECURECOOKIES);
     }
 	
