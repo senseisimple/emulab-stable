@@ -228,6 +228,7 @@ cout << "Physical Graph: " << parse_ptop(PG,SG,ptopfile) << endl;
 
 // Calculate the minimum spanning tree for the switches - we only consider one
 // potential path between each pair of switches.
+// XXX: Should soon be replaced by calculate_shortest_routes()
 void calculate_switch_MST() {
   cout << "Calculating shortest paths on switch fabric." << endl;
 
@@ -744,6 +745,20 @@ nosuchtype:
 #endif
 }
 
+// Perfrom a pre-cehck to make sure that polices that are checkable at precheck
+// time are not violated. Returns 1 if everything is A-OK, 0 otherwise
+// TODO - move away from using global variables
+int policy_precheck() {
+  cout << "Policy precheck:" << endl;
+  if (tb_featuredesire::check_desire_policies()) {
+    cout << "Policy precheck succeeded" << endl;
+    return 1;
+  } else {
+    cout << "*** Policy precheck failed!" << endl;
+    return 0;
+  }
+}  
+
 // Signal handler - add a convneint way to kill assign and make it return an
 // unretryable error
 void exit_unretryable(int signal) {
@@ -948,7 +963,13 @@ int main(int argc,char **argv) {
       }
   }
 #endif
-
+    
+  // Run the policy precheck - the idea behind running this last is that some
+  // policy violations might become more clear after doing pruning
+    if (!policy_precheck()) {
+	exit(EXIT_UNRETRYABLE);
+    }
+    
   // Bomb out early if we're only doing the prechecks
   if (prechecks_only) {
       exit(EXIT_SUCCESS);

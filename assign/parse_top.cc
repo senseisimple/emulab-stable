@@ -152,8 +152,9 @@ int parse_top(tb_vgraph &VG, istream& i)
 		      top_error("Bad desire, bad weight.");
 		      gweight = 0;
 		  }
-		  v->desires.push_front(
-			  tb_node_featuredesire(desirename,gweight));
+		  tb_node_featuredesire node_fd(desirename, gweight);
+		  node_fd.add_desire_user(gweight);
+		  v->desires.push_front(node_fd);
 	      }
 	  }
 	}

@@ -16,8 +16,44 @@
 using namespace std;
 
 /*
- * Base class for features and desires - not intended to be used directly, only
- * to be subclassed by tb_feature and tb_desire
+ * This small class is used to describe policies in force regarding features
+ * and desires. The idea behind putting this it its own class is that you want
+ * to be able to apply baiscally the same policies to features and desires, but
+ * treat them seperateley.
+ */
+class tb_featuredesire_policy {
+public:
+    tb_featuredesire_policy(): allowable(true), limited_use(false),
+    min_use(0.0f), max_use(0.0f) { ; };
+    /*
+     * Functions for maintaining FD policy state. Inline, since they're
+     * so simple.
+     */
+    void allow()                   { allowable = true; };
+    void disallow()                { allowable = false; }
+    bool is_allowable()            { return this->allowable; };
+    void limit_use(double howmuch) { limited_use = true; max_use = howmuch; };
+    void unlimit_use()             { limited_use = false; max_use = 0.0f; }
+    bool is_limited()              { return limited_use; }
+    double get_limit()             { return max_use; }
+    
+    friend ostream &operator<<(ostream &o, const tb_featuredesire_policy &fdp);
+    
+private:
+    // Indicates whether or not we are allowed to use this feature or
+    // desire, and if so, how much of it we are allowed to use. Note that
+    // while these limits are global, this is different from using a global
+    // FD - it is a policy knob that can be applied in the ptop file
+    bool allowable;
+    bool limited_use;
+    double max_use;
+    // Note: min_use not implemented, as it's not clear what the point
+    // would be
+    double min_use;
+};
+
+/*
+ * Base class for features and desires.
  */
 class tb_featuredesire {
     public:
@@ -43,7 +79,7 @@ class tb_featuredesire {
 	inline bool  is_g_one()		const { return g_one_is_okay;	}
 	inline bool  is_g_more()	const { return g_more_than_one; }
 	inline int   global_use_count() const { return in_use_globally; }
-	inline fstring name()             const { return my_name;         }
+	inline fstring name()           const { return my_name;         }
 
 	/*
 	 * Operators, primarily for use with the STL
@@ -63,7 +99,34 @@ class tb_featuredesire {
 	 */
 	void add_global_user(int howmany = 1);
 	void remove_global_user(int howmany = 1);
-
+    
+	/*
+	 * Simple bookkeeping
+	 */
+	void add_desire_user(double weight);
+	int get_desire_users();
+	double get_desire_total_weight();
+    
+	/*
+	 * Functions for manipulating the policies for features or desires with
+	 * this name.
+	 * NOTE: Only desire policies implement for now
+	 */
+	void disallow_desire();
+	void allow_desire();
+	void limit_desire(double limit);
+	void unlimit_desire();
+    
+	/*
+	 * Check to see if any desires violate policies - this is checkable at
+	 * any time (after all desires and policies have been set up), because
+	 * it is not dependant on the current mapping. Returns true if
+	 * everything is okay, false if not.
+	 * Feature policy violations, which are not yet implemented, will be
+	 * much harder because of thise.
+	 */
+	static bool check_desire_policies();
+    
     private:
 	/*
 	 * This is private, so that we can force callers to go through the
@@ -87,11 +150,25 @@ class tb_featuredesire {
 	bool l_additive;      // If a local FD, is additive
 
 	// Counts how many instances of this feature are in use across all
-	// nodes - for use with global nodes
+	// nodes - for use with global features
 	int in_use_globally;
 
 	typedef map<fstring,tb_featuredesire*> name_featuredesire_map;
 	static name_featuredesire_map featuredesires_by_name;
+    
+	/*
+	 * Policies for using features and desires with the name. NOTE: Only
+	 * feature policies implemented yet, as they are easier to check for.
+	 */
+	tb_featuredesire_policy feature_policy;
+	tb_featuredesire_policy desire_policy;
+    
+	/*
+	 * Some simple bookkeeping stuff, currently only used to enforce
+	 * policies.
+	 */
+	int desire_users;
+	double desire_total_weight;
 };
 
 /*
@@ -140,6 +217,9 @@ class tb_node_featuredesire {
 	const bool  is_global() const { return featuredesire_obj->is_global(); }
 	const bool  is_l_additive() const {
 	    return featuredesire_obj->is_l_additive();
+	}
+	void add_desire_user(double weight) const { 
+	    featuredesire_obj->add_desire_user(weight); 
 	}
 
 	score_and_violations add_global_user() const;

@@ -25,7 +25,9 @@ tb_featuredesire::tb_featuredesire(fstring _my_name) : my_name(_my_name),
 				    global(false), local(false),
 				    l_additive(false), g_one_is_okay(false),
 				    g_more_than_one(false),
-				    in_use_globally(0) { 
+				    in_use_globally(0), desire_policy(),
+				    feature_policy(), desire_users(0),
+				    desire_total_weight(0.0f) { 
     static int highest_id = 0;
 		
     // Pick a unique numeric identifier for this feature/desire
@@ -111,6 +113,72 @@ void tb_featuredesire::remove_global_user(int howmany) {
     in_use_globally -= howmany;
     assert(in_use_globally >= 0);
 }
+
+/*
+ * Functions for manipulating policies
+ */
+void tb_featuredesire::disallow_desire() {
+    desire_policy.disallow();
+}
+void tb_featuredesire::allow_desire() {
+    desire_policy.allow();
+}
+void tb_featuredesire::limit_desire(double limit) {
+    desire_policy.limit_use(limit);
+}
+void tb_featuredesire::unlimit_desire() {
+    desire_policy.unlimit_use();
+}
+
+/*
+ * Bookkeeping functions
+ */
+void tb_featuredesire::add_desire_user(double weight) {
+    desire_users++;
+    desire_total_weight += weight;
+}
+int tb_featuredesire::get_desire_users() {
+    return desire_users;
+}
+double tb_featuredesire::get_desire_total_weight() {
+    return desire_total_weight;
+}
+
+/*
+ * Check desire violations - true means everything was okay, false otherwise
+ */
+bool tb_featuredesire::check_desire_policies() {
+    int errors = 0;
+    name_featuredesire_map::const_iterator it = featuredesires_by_name.begin();
+    while (it != featuredesires_by_name.end()) {
+	tb_featuredesire *fd = it->second;
+	if (!fd->desire_policy.is_allowable() && fd->desire_users) {
+	    cout << "  *** Policy violation: " << endl
+		<< "      Feature " << it->first
+		<< " requested, but prohibited by policy" << endl;
+	    errors++;
+	} else {
+	    if (fd->desire_policy.is_limited() &&
+		(fd->desire_total_weight > fd->desire_policy.get_limit())) {
+		cout << "  *** Policy violation: " << endl
+		    << "    Feature " << it->first
+		    << " requested with weight " << fd->desire_total_weight
+		    << " but limted to " << fd->desire_policy.get_limit()
+		    << " by policy" << endl;
+		errors++;
+	    }
+	}
+	it++;
+    }
+    
+    if (errors) {
+	return false;
+    } else {
+	return true;
+    }
+}
+
+
 
 /*********************************************************************
  * tb_node_featuredesire

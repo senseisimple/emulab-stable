@@ -16,7 +16,7 @@ by Ricci, Alfeld, and Lepreau about assign.
 ##### ptop (physical topology) file
 
 ptop file: <line>*
-<line> ::= <node_line> | <link_line> | <type_limit_line>
+<line> ::= <node_line> | <link_line> | <type_limit_line> | <policy_line>
 
 <node_line> ::= node <node_name> <node_type>+ [- <feature>* [- <flag>*  ]]
 <node_type> ::= "*"?<type_name>:<type_count>
@@ -29,6 +29,9 @@ ptop file: <line>*
 <interface> := <node_name>:<mac>/<iface>
 
 <type_limit_line> ::= set-type-limit <node_type> <int>
+
+<policy_line> ::= policy <desire_policy>
+<desire_policy> ::= desire <feature_name> ( disallow | limit <float> )
 
 Interpretation:
 
@@ -79,6 +82,10 @@ Interpretation:
     file. The other two portions are mostly ignored.
 <type_limit_line> - used to enforce Emulab policies: ie. this experiment is
     not allowed to use more than 10 pc3000 nodes
+<policy_line> - used to indicate policies for mapping the experiment. The only
+    policies currently supported are 'desire' policies, which can be used to
+    disallow the top file from requesting a particular desire, or limit the
+    total weight that can be given to a desire
 
 ##### top (virtual topology) file
 
