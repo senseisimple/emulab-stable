@@ -148,10 +148,10 @@ void changeParameter(list<PipeInfo>::iterator pipe, Parameter const & newParamet
   }
   else if (oldParameter.getValue() != newParameter.getValue())
   {
-    oldParameter = newParameter;
     if (pipe->parameters[Parameter::LINK_UP].getValue() == 1)
     {
       pipe->rawPipe.resetParameter(newParameter);
     }
+    oldParameter = newParameter;
   }
 }

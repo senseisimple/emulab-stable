@@ -20,6 +20,7 @@ void EventPipe::reset(void)
 
   command = "/usr/testbed/bin/tevc -e "
     + g::experimentName + " now " + agentName +" UP ";
+  cerr << "Sending event: " << command << endl;
   system(command.c_str());
 
   command = "/usr/testbed/bin/tevc -e "
@@ -27,6 +28,7 @@ void EventPipe::reset(void)
     + "BANDWIDTH=100000 "
     + "DELAY=0 "
     + "PLR=0";
+  cerr << "Sending event: " << command << endl;
   system(command.c_str());
 }
 
@@ -51,6 +53,7 @@ void EventPipe::resetParameter(Parameter const & newParameter)
     }
     command = "/usr/testbed/bin/tevc -e "
       + g::experimentName + " now " + agentName + " " + action;
+    cerr << "Sending event: " << command << endl;
     system(command.c_str());
   }
   else
@@ -66,7 +69,7 @@ void EventPipe::resetParameter(Parameter const & newParameter)
       ss << parameterValue;
       break;
     case Parameter::LOSS:
-      parameterString = "LOSS";
+      parameterString = "PLR";
       ss << parameterValue;
       break;
     default:
@@ -79,6 +82,7 @@ void EventPipe::resetParameter(Parameter const & newParameter)
       + agentName + " MODIFY "
       + parameterString + '=' + valueString;
 
+    cerr << "Sending event: " << command << endl;
     system(command.c_str());
   }
 }

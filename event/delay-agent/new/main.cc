@@ -146,34 +146,34 @@ void readMapFile(string const & mapFile, string & linkSubscribe, string & resetS
 
       PipeInfo first(name, end, end == secondEnd, interface, pipeData);
       g::pipeVault.push_front(first);
-      g::pipes.insert(make_pair("new" + first.name, g::pipeVault.begin()));
-      g::pipes.insert(make_pair("new" + first.linkName, g::pipeVault.begin()));
-      addEntry(linkSubscribe, "new" + first.linkName);
-      addEntry(linkSubscribe, "new" + first.name);
+      g::pipes.insert(make_pair(/*"new" + */first.name, g::pipeVault.begin()));
+      g::pipes.insert(make_pair(/*"new" + */first.linkName, g::pipeVault.begin()));
+      addEntry(linkSubscribe, /*"new" + */first.linkName);
+      addEntry(linkSubscribe, /*"new" + */first.name);
 
       PipeInfo second(name, secondEnd, end == secondEnd, secondInterface,
                       secondPipeData);
       g::pipeVault.push_front(second);
-      g::pipes.insert(make_pair("new" + second.name, g::pipeVault.begin()));
-      g::pipes.insert(make_pair("new" + second.linkName, g::pipeVault.begin()));
+      g::pipes.insert(make_pair(/*"new" + */second.name, g::pipeVault.begin()));
+      g::pipes.insert(make_pair(/*"new" + */second.linkName, g::pipeVault.begin()));
       if (!second.isLan)
       {
-        addEntry(linkSubscribe, "new" + second.linkName);
+        addEntry(linkSubscribe, /*"new" + */second.linkName);
       }
 
-      addEntry(resetSubscribe, "new" + first.name);
+      addEntry(resetSubscribe, /*"new" + */first.name);
     }
     else
     {
       line >> end >> interface >> pipeData;
       PipeInfo first(name, end, false, interface, pipeData);
       g::pipeVault.push_front(first);
-      g::pipes.insert(make_pair("new" + first.name, g::pipeVault.begin()));
-      g::pipes.insert(make_pair("new" + first.linkName, g::pipeVault.begin()));
-      addEntry(linkSubscribe, "new" + first.endName);
-      addEntry(linkSubscribe, "new" + first.name);
+      g::pipes.insert(make_pair(/*"new" + */first.name, g::pipeVault.begin()));
+      g::pipes.insert(make_pair(/*"new" + */first.linkName, g::pipeVault.begin()));
+      addEntry(linkSubscribe, /*"new" + */first.endName);
+      addEntry(linkSubscribe, /*"new" + */first.name);
 
-      addEntry(resetSubscribe, "new" + first.name);
+      addEntry(resetSubscribe, /*"new" + */first.name);
     }
 
     getline(in, lineString);
