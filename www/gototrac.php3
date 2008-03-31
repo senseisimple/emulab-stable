@@ -32,7 +32,7 @@ elseif ($wiki == "geni") {
 	USERERROR("You do not have permission to access the Trac wiki!", 1);
     }
 }
-else {
+elseif ($wiki != "emulab") {
     USERERROR("Unknown Trac wiki $wiki!", 1);
 }
 $TRACURL        = "https://${USERNODE}/trac/$wiki";
