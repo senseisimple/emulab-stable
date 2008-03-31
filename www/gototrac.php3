@@ -31,6 +31,7 @@ elseif ($wiki == "geni") {
 	   $geniproject->IsMember($this_user, $approved) && $approved)) {
 	USERERROR("You do not have permission to access the Trac wiki!", 1);
     }
+    $wiki = "protogeni";
 }
 elseif ($wiki != "emulab") {
     USERERROR("Unknown Trac wiki $wiki!", 1);
