@@ -20,6 +20,7 @@ sub usage()
 }
 my $optlist = "dw:";
 my $debug   = 0;
+my $wiki;
 
 #
 # Configure variables
@@ -84,9 +85,11 @@ if (defined($options{"d"})) {
     $debug = 1;
 }
 if (defined($options{"w"})) {
+    $wiki     = $options{"w"};
     $TRACDIR  = "$TRACTOPDIR/" . $options{"w"};
 }
 else {
+    $wiki     = "emulab";
     $TRACDIR  = "$TRACTOPDIR/emulab";
 }
 # This lives in the trac project dir.
@@ -278,11 +281,13 @@ sub xLogin(@)
 	if (@_ != 2);
 
     my ($user, $IP) = @_;
+    my $hash = TBGenSecretKey();
 
+  again:
     if (TBDBConnect($dbname, $dbuser, $dbpass) < 0) {
 	fatal("Could not connect to trac database!");
     }
-    my $hash = TBGenSecretKey();
+    
     DBQueryFatal("replace into auth_cookie set ".
 		 "   cookie='$hash', name='$user', ipnr='$IP', ".
 		 "   time=UNIX_TIMESTAMP(now())");
@@ -293,6 +298,13 @@ sub xLogin(@)
 		 "  sid='$user', authenticated=1, name='name', ".
 		 "  value='$user'");
 
+    # Wow, what a HACK!
+    if ($wiki eq "protogeni") {
+	TBDBDisconnect();
+	$wiki = "protogeni-priv";
+	$dbname = $dbname . "+priv";
+	goto again;
+    }
     print "$hash\n";
     return 0;
 }
