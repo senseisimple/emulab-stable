@@ -30,14 +30,20 @@ Linux)
         rel=`grep DISTRIB_RELEASE /etc/lsb-release | awk -F = '{ print $2; }'`
     fi
     if [ -z "$dist" -a -r /etc/redhat-release ]; then
-        rel=`grep 'Red Hat' /etc/redhat-release | sed -e 's/Red Hat Linux release \([0-9]\(\.[0-9]\)\?\).*/\1/'`
-	if [ -n "$rel" ]; then
+        trel=`grep 'Red Hat' /etc/redhat-release | sed -e 's/Red Hat Linux release \([0-9]\(\.[0-9]\)\?\).*/\1/'`
+	if [ -n "$trel" ]; then
             dist="Redhat"
-	else
-            rel=`grep 'Fedora' /etc/redhat-release | sed -e 's/Fedora .*release \([0-9]\).*/\1/'`
-	    if [ -n "$rel" ]; then
-	        dist="Fedora"
-	    fi
+	    rel=$trel
+	fi
+	trel=`grep 'Fedora' /etc/redhat-release | sed -e 's/Fedora .*release \([0-9.]\+\).*/\1/'`
+	if [ -n "$trel" ]; then
+	    dist="Fedora"
+	    rel=$trel
+	fi
+	trel=`grep 'CentOS' /etc/redhat-release | sed -e 's/CentOS .*release \([0-9.]\+\).*/\1/'`
+	if [ -n "$trel" ]; then
+	    dist="CentOS"
+	    rel=$trel
 	fi
     fi
     # XXX hack check for stargate

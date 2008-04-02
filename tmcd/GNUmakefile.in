@@ -72,6 +72,9 @@ endif
 ifeq ($(findstring fedora,$(MDSUBDIR)),fedora)
 MDSUBDIR  = fedora
 endif
+ifeq ($(findstring centos,$(MDSUBDIR)),centos)
+MDSUBDIR  = fedora
+endif
 ifeq ($(MDSUBDIR),stargate1)
 MDSUBDIR  = linux-sg
 endif
