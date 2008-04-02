@@ -2,6 +2,9 @@
 
 #include "lib.hh"
 
+#include <netlink/netlink.h>
+#include <netlink/route/link.h>
+
 using namespace std;
 
 namespace g

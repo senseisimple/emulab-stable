@@ -2,8 +2,7 @@
 
 all: delay-agent
 
-OBJS	= main.o Pipe.o Parameter.o lib.o RootPipe.o linkCallback.o resetCallback.o \
-	EventPipe.o DummynetPipe.o
+OBJS	:=  $(wildcard *.o)
 
 LIBS	= -lcrypto -lpubsub
 CXXFLAGS = -DELVIN_COMPAT -Wall -I../../lib/ -I../../../../
