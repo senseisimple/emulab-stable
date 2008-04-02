@@ -59,6 +59,11 @@ if (!preg_match("/^(\w*)$/", $suexec_output, $matches)) {
 }
 setcookie($TRACCOOKIENAME,
 	  $matches[1], 0, "/", $TBAUTHDOMAIN, $TBSECURECOOKIES);
+if ($wiki == "protogeni") {
+    $TRACCOOKIENAME = "trac_auth_${wiki}_priv";
+    setcookie($TRACCOOKIENAME,
+	      $matches[1], 0, "/", $TBAUTHDOMAIN, $TBSECURECOOKIES);
+}
 header("Location: ${TRACURL}");
 
 ?>
