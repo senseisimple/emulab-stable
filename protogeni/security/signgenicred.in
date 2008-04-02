@@ -1,0 +1,291 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+use XML::LibXML;
+use Data::Dumper;
+
+#
+# Sign a GENI credential
+# 
+sub usage()
+{
+    print("Usage: signgenicred [-d] [-o file] <capfile> [<user>]\n");
+    exit(-1);
+}
+my $optlist = "do:";
+my $debug   = 1;
+my $outfile;
+my $capfile;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS	= "@TBOPSEMAIL@";
+my $TBLOGS	= "@TBLOGSEMAIL@";
+my $OURDOMAIN   = "@OURDOMAIN@";
+my $CONTROL	= "@USERNODE@";
+my $BOSSNODE	= "@BOSSNODE@";
+
+#
+# Load the Testbed support stuff.
+#
+use lib "@prefix@/lib";
+use libaudit;
+use libdb;
+use libtestbed;
+use User;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+# Locals
+my $USERDIR	= USERROOT();
+my $SSLDIR      = "$TB/lib/ssl";
+my $EMULAB_CERT = "$TB/etc/emulab.pem";
+my $EMULAB_KEY  = "$TB/etc/emulab.key";
+my $SCHEMA      = "$TB/lib/protogeni/security/credential.xsd";
+my $OPENSSL     = "/usr/bin/openssl";
+my $XMLLINT     = "/usr/local/bin/xmllint";
+my $XMLSEC1     = "/usr/local/bin/xmlsec1";
+my $SAVEUID	= $UID;
+my $tmpfile     = "/tmp/signcred$$";
+my $certfile;
+my $keyfile;
+my $sigid;
+my $deletefiles = 0;
+
+#
+# This is a template for the xmlsec library.
+#
+my $sigtmpl =
+    "<Signature xml:id=\"%s\" >\n".
+    " <SignedInfo>\n".
+    "  <CanonicalizationMethod ".
+    "     Algorithm=\"http://www.w3.org/TR/2001/REC-xml-c14n-20010315\"/>\n".
+    "  <SignatureMethod ".
+    "     Algorithm=\"http://www.w3.org/2000/09/xmldsig#rsa-sha1\"/>\n".
+    "  <Reference URI=\"%s\">\n".
+    "    <Transforms>\n".
+    "      <Transform ".
+    "        Algorithm=\"http://www.w3.org/2000/09/xmldsig#".
+    "enveloped-signature\" />\n".
+    "    </Transforms>\n".
+    "    <DigestMethod ".
+    "       Algorithm=\"http://www.w3.org/2000/09/xmldsig#sha1\"/>\n".
+    "    <DigestValue></DigestValue>\n".
+    "    </Reference>\n".
+    " </SignedInfo>\n".
+    " <SignatureValue />\n".
+    " <KeyInfo>\n".
+    "  <X509Data >\n".
+    "   <X509SubjectName/>\n".
+    "   <X509IssuerSerial/>\n".
+    "   <X509Certificate/>\n".
+    "  </X509Data>\n".
+    "  <KeyValue />\n".
+    " </KeyInfo>\n".
+    "</Signature>\n";
+
+#
+# We don't want to run this script unless its the real version.
+#
+#if ($EUID != 0) {
+#    die("*** $0:\n".
+#	"    Must be setuid! Maybe its a development version?\n");
+#}
+
+#
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+#
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root!\n");
+}
+
+#
+# Untaint the path
+#
+$ENV{'PATH'} = "$TB/bin:$TB/sbin:/bin:/usr/bin:/usr/bin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Function prototypes
+#
+sub fatal($);
+sub cleanup();
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"o"})) {
+    $outfile = $options{"o"};
+    
+    if ($outfile =~ /^([-\w\.\/]+)$/) {
+	$outfile = $1;
+    }
+    else {
+	fatal("Tainted filename: $outfile");
+    }
+}
+usage()
+    if (!@ARGV);
+$capfile = shift(@ARGV);
+if ($capfile =~ /^([-\w\.\/]+)$/) {
+    $capfile = $1;
+}
+else {
+    fatal("Tainted filename: $capfile");
+}
+
+# Map target user to object.
+my $target_user;
+if (@ARGV) {
+    $target_user = User->Lookup($ARGV[0]);
+    if (! defined($target_user)) {
+	fatal($ARGV[0] . " does not exist!");
+    }
+}
+
+# Map invoking user to object.
+my $this_user = User->LookupByUnixId($UID);
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
+}
+
+#
+# This script is always audited. Mail is sent automatically upon exit.
+#
+if (0 && AuditStart(0)) {
+    #
+    # Parent exits normally
+    #
+    exit(0);
+}
+
+#
+# Verify that the credential conforms to the schema. The wrinkle is that it
+# might already be a signed credential and we just need to add another
+# signature to it, but either way it should still pass the schema check.
+#
+if (system("$XMLLINT -noout -schema $SCHEMA $capfile")) {
+    fatal("$capfile does not conform to schema $SCHEMA");
+}
+
+#
+# Bring in the credential file so we can mess with it.
+#
+my $parser = XML::LibXML->new;
+my $doc    = $parser->parse_file($capfile);
+my $root   = $doc->documentElement();
+
+#
+# The certficate used to sign the credential is either the Emulab certificate
+# or that of the user delegating the credential. For now lets just use the
+# Emulab certificate. I will add user signing later.
+#
+$keyfile  = $EMULAB_KEY;
+$certfile = $EMULAB_CERT;
+
+#
+# Check the root.
+#
+if ($root->nodeName eq "credential") {
+    #
+    # If its a credential then this is the first signing. We have to
+    # create a new document that wraps the credential up and adds the
+    # signing template (see above). When done, it will look like;
+    #
+    # <signed-credential>
+    #  <original capfile>
+    #  <signatures>
+    #   <signature></signature>
+    #  </signatures>
+    # </signed-credential>
+    #
+    my $newroot          = XML::LibXML::Element->new('signed-credential');
+    my $signatures_node  = XML::LibXML::Element->new('signatures');
+    $newroot->addChild($root);
+    $newroot->addChild($signatures_node);
+
+    #
+    # We need the id of the toplevel credential so that we can stick
+    # it into the sig template above, in the References section. We
+    # also need to generate an id for the signature node so that we
+    # can find it and tell xmlsec about it.
+    #
+    my ($xmlid_attribute) = $root->attributes();
+    my $xmlid = $xmlid_attribute->getValue();
+    $sigid = "Sig_${xmlid}";
+    my $template = sprintf($sigtmpl, $sigid, $xmlid);
+
+    #
+    # Convert the template above into a document tree and add it to the
+    # signatures list.
+    #
+    my $tmpparser = XML::LibXML->new;
+    my $newdoc    = $tmpparser->parse_string($template);
+    my $sigroot   = $newdoc->documentElement();
+    $sigroot->setNamespace("http://www.w3.org/2000/09/xmldsig#");
+    $signatures_node->addChild($sigroot);
+    
+    $root = $newroot;
+    $doc->setDocumentElement($root);
+    print $root->toString(1) . "\n";
+}
+else {
+    ;
+}
+
+#
+# So now we have a valid document that needs to be signed at the $sigid
+# reference point. Must write this to a tmp file for xmlsec, and then
+# use xmlsec to add the signature. 
+#
+open(TMP, ">$tmpfile") or
+    fatal("Could not open $tmpfile");
+print TMP $doc->toString(1) . "\n";
+close(TMP);
+
+# Fire up xmlsec and read back the results.
+open(SEC, "$XMLSEC1 --sign --node-id $sigid ".
+     "       --privkey-pem $keyfile,$certfile $tmpfile |")
+    or fatal("Could not start $XMLSEC1 on $tmpfile");
+while (<SEC>) {
+    print $_;
+}
+close(SEC);
+
+cleanup();
+exit(0);
+
+sub cleanup()
+{
+    unlink($tmpfile)
+	if (-e $tmpfile && !$debug);
+}
+
+sub fatal($)
+{
+    my($mesg) = $_[0];
+    cleanup();
+    die("*** $0:\n".
+	"    $mesg\n");
+}

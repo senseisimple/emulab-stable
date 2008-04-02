@@ -1,0 +1,64 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= protogeni/security
+
+include $(OBJDIR)/Makeconf
+
+SBIN_STUFF	= signgenicred verifygenicred
+LIBEXEC_STUFF	= 
+CTRLSBIN_STUFF  =
+LIBFILES        = credential.xsd sig.xsd xml.xsd
+
+# These scripts installed setuid, with sudo. 
+SETUID_BIN_SCRIPTS   = 
+SETUID_SBIN_SCRIPTS  = 
+SETUID_LIBX_SCRIPTS  =
+
+#
+# Force dependencies on the scripts so that they will be rerun through
+# configure if the .in file is changed.
+# 
+all:	$(SBIN_STUFF) $(LIBEXEC_STUFF) $(CTRLSBIN_STUFF) $(LIBFILES)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+install: all script-install
+	@echo "Don't forget to do a post-install as root"
+
+script-install:	$(addprefix $(INSTALL_SBINDIR)/, $(SBIN_STUFF)) \
+	 $(addprefix $(INSTALL_LIBEXECDIR)/, $(LIBEXEC_STUFF)) \
+         $(addprefix $(INSTALL_LIBDIR)/protogeni/security/, $(LIBFILES))
+
+post-install: 
+	chmod 775 $(INSTALL_BINDIR)
+	chmod 775 $(INSTALL_SBINDIR)
+	chmod 775 $(INSTALL_LIBDIR)
+	chmod 775 $(INSTALL_LIBEXECDIR)
+
+control-install:
+
+# This rule says what web* script depends on which installed binary directory.
+$(LIBEXEC_STUFF): $(INSTALL_SBINDIR)
+
+# Just in case the dirs are not yet created,
+$(INSTALL_SBINDIR):
+
+clean:
+	rm -f *.o core
+
+$(INSTALL_DIR)/opsdir/sbin/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
+	$(INSTALL) $< $@
+
+$(INSTALL_LIBDIR)/protogeni/security/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_LIBDIR)/protogeni/security
+	$(INSTALL) $< $@

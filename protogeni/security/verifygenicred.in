@@ -1,0 +1,161 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+use XML::LibXML;
+use Data::Dumper;
+
+#
+# Verify a GENI capability.
+# 
+sub usage()
+{
+    print("Usage: verifygenicap [-d] [-o file] <capfile>\n");
+    exit(-1);
+}
+my $optlist = "do:";
+my $debug   = 0;
+my $outfile;
+my $xmlfile;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS	= "@TBOPSEMAIL@";
+my $TBLOGS	= "@TBLOGSEMAIL@";
+my $OURDOMAIN   = "@OURDOMAIN@";
+my $CONTROL	= "@USERNODE@";
+my $BOSSNODE	= "@BOSSNODE@";
+
+#
+# Load the Testbed support stuff.
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use User;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+# Locals
+my $USERDIR	= USERROOT();
+my $SSLDIR      = "$TB/lib/ssl";
+my $EMULAB_CERT = "$TB/etc/emulab.pem";
+my $EMULAB_KEY  = "$TB/etc/emulab.key";
+my $OPENSSL     = "/usr/bin/openssl";
+my $SAVEUID	= $UID;
+my $certfile;
+my $keyfile;
+my $deletefiles = 0;
+my $certificate;
+my $privkey;
+my $signature   = "";
+
+#
+# We don't want to run this script unless its the real version.
+#
+#if ($EUID != 0) {
+#    die("*** $0:\n".
+#	"    Must be setuid! Maybe its a development version?\n");
+#}
+
+#
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+#
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root!\n");
+}
+
+#
+# Untaint the path
+#
+$ENV{'PATH'} = "$TB/bin:$TB/sbin:/bin:/usr/bin:/usr/bin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Function prototypes
+#
+sub fatal($);
+sub cleanup();
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"o"})) {
+    $outfile = $options{"o"};
+    
+    if ($outfile =~ /^([-\w\.\/]+)$/) {
+	$outfile = $1;
+    }
+    else {
+	fatal("Tainted filename: $outfile");
+    }
+}
+usage()
+    if (!@ARGV);
+$xmlfile = shift(@ARGV);
+if ($xmlfile =~ /^([-\w\.\/]+)$/) {
+    $xmlfile = $1;
+}
+else {
+    fatal("Tainted filename: $xmlfile");
+}
+# Use realpath to resolve any symlinks.
+my $translated = `realpath $xmlfile`;
+if ($translated =~ /^(\/tmp\/[-\w\.\/]+)$/) {
+    $xmlfile = $1;
+}
+else {
+    fatal("Bad data in translated pathname: $xmlfile");
+}
+
+# Map invoking user to object.
+my $this_user = User->LookupByUnixId($UID);
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
+}
+
+#
+# Must wrap the parser in eval since it exits on error.
+#
+my $parser = XML::LibXML->new;
+$parser->validation(1);
+my $doc    = $parser->parse_file($xmlfile);
+
+print Dumper($doc);
+
+# openssl x509 -inform pem -in emulab.pem -pubkey -noout > publickey.pem
+
+
+exit(0);
+
+sub cleanup()
+{
+}
+
+sub fatal($)
+{
+    my($mesg) = $_[0];
+    cleanup();
+    die("*** $0:\n".
+	"    $mesg\n");
+}

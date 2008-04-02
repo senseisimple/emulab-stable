@@ -1,0 +1,38 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ..
+SUBDIR		= protogeni
+
+include $(OBJDIR)/Makeconf
+
+SUBDIRS	= security
+
+all:	all-subdirs
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+install: 
+	@$(MAKE) -C security install
+
+control-install: 
+
+clean:		clean-subdirs
+distclean:	subdir-distclean
+
+subdir-distclean:
+	@$(MAKE) -C imagezip distclean
+
+# How to recursively descend into subdirectories to make general
+# targets such as `all'.
+%.MAKE:
+	@$(MAKE) -C $(dir $@) $(basename $(notdir $@))
+%-subdirs: $(addsuffix /%.MAKE,$(SUBDIRS)) ;
+
+.PHONY:	$(SUBDIRS)
+
