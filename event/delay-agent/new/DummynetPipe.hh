@@ -15,6 +15,7 @@ public:
   virtual void reset(void);
   virtual void resetParameter(Parameter const & newParameter);
 private:
+  char * callGetsockopt(char * data, size_t * count);
   void updateParameter(struct dn_pipe *pipe, Parameter const & parameter);
   void setPipe(struct dn_pipe *pipe);
   char * getAllPipes(void);

@@ -2,13 +2,13 @@
 
 #ifdef FREEBSD
 
-#include "lib.hh"
-#include "DummynetPipe.hh"
-
 extern "C"
 {
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/param.h>
+#include <sys/mbuf.h>
+#include <unistd.h>
 /*
 #include <netinet/ip_compat.h>
 #include <netinet/in.h>
@@ -30,6 +30,10 @@ extern "C"
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
 }
+
+#include "lib.hh"
+#include "DummynetPipe.hh"
+
 
 #if __FreeBSD_version >= 601000
 #define DN_PIPE_NEXT(p) ((p)->next.sle_next)
@@ -57,7 +61,7 @@ DummynetPipe::~DummynetPipe()
 
 void DummynetPipe::reset(void)
 {
-  cahr *data;
+  char *data;
   struct dn_pipe *pipe;
 
   data = getAllPipes();
@@ -121,7 +125,7 @@ void DummynetPipe::resetParameter(Parameter const & newParameter)
   setPipe(pipe);
 }
 
-char * callGetsockopt(char * data, size_t * count)
+char * DummynetPipe::callGetsockopt(char * data, size_t * count)
 {
   if (getsockopt(dummynetSocket, IPPROTO_IP, IP_DUMMYNET_GET,
                  data, count) < 0)
@@ -157,7 +161,7 @@ struct dn_pipe * DummynetPipe::findPipe(char *data)
   pipe = NULL;
   p = (struct dn_pipe *) data;
 
-  while ( DN_PIPE_NEXT(p) == (struct dn_pipe *)DN_IS_PIPE ) {
+  while ( DN_PIPE_NEXT(p) == (struct dn_pipe *)DN_IS_PIPE )
   {
     if (dummynetPipeNumber == p->pipe_nr) {
       pipe = p;

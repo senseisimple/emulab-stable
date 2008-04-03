@@ -2,7 +2,8 @@
 
 all: delay-agent
 
-OBJS	:=  $(wildcard *.o)
+SRCS	:= $(wildcard *.cc)
+OBJS	:= $(SRCS:%.cc=%.o)
 
 LIBS	= -lcrypto -lpubsub
 CXXFLAGS = -DELVIN_COMPAT -Wall -I../../lib/ -I../../../../
