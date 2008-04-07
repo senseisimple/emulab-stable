@@ -1658,8 +1658,8 @@ function pm_buildqueryinfo() {
 	$q_joinstr = " reserved as r" . 
             " left join nodes as n on r.node_id=n.node_id" .
 	    " left join nodes as n2 on n.phys_nodeid=n2.phys_nodeid" . 
-	    " left join node_types as nt2 on n2.type=nt2.type" . 
-            " left join plab_mapping as pm on n.phys_nodeid=pm.node_id" . 
+	    " left join node_types as nt2 on n.type=nt2.type" . 
+            " left join plab_mapping as pm on n2.node_id=pm.node_id" . 
 	    " left join plab_plc_info as ppi on pm.plc_idx=ppi.plc_idx";
     }
     else {
@@ -1675,7 +1675,7 @@ function pm_buildqueryinfo() {
     $q_joinstr .= " left join plab_nodehiststats as pnhs" . 
 	" on pm.node_id=pnhs.node_id";
     #
-    # Note that we have to use a subquery to get this crap.  It's either that
+    # Note that we have to use a subquery to get this crap.  It\'s either that
     # or use a view
     #
     $q_joinstr .= " left join (select pngm.node_id as node_id," . 
