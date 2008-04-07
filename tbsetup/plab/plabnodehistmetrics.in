@@ -10,7 +10,7 @@ use Getopt::Std;
 sub usage()
 {
     print STDOUT
-	"Usage: plabnodehistmetrics [-n]\n";
+	"Usage: plabnodehistmetrics [-n] <plcname>\n";
     exit(-1);
 }
 
@@ -57,7 +57,7 @@ $libdb::DBQUERY_MAXTRIES = 30;
 if (! getopts($optlist, \%options)) {
     usage();
 }
-if (@ARGV) {
+if (scalar(@ARGV) < 1) {
     usage();
 }
 if (defined($options{"n"})) {
@@ -66,8 +66,8 @@ if (defined($options{"n"})) {
 
 # Grab the plab_nodehist sequence stats.
 #
-my $seqref = getNodeHistSequences();
-my $rankref = rankNodesByUnavail($seqref,1,1);
+my $seqref = getNodeHistSequences($ARGV[0]);
+my $rankref = rankNodesByUnavail($ARGV[0],$seqref,1,1);
 my @ranklist = @$rankref;
 
 #
