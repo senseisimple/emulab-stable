@@ -1713,15 +1713,17 @@ sub resetVlanIfOnTrunk($$$) {
     # TODO: Perhaps this should be general - ie. $self{IFINDEX} should have
     # the channel ifIndex the the port is in a channel. Not sure that
     # this is _always_ beneficial, though
+    # NOTE: This 'conversion' is no longer needed, since we call
+    # getChannelIfIndex on the port before passing it into this function
     #
-    my $channel = snmpitGetFatal($self->{SESS},["pagpGroupIfIndex",$ifIndex]);
-    if (!($channel =~ /^\d+$/) || ($channel == 0)) {
-	print "WARNING: resetVlanIfOnTrunk got bad channel ($channel) for $self->{NAME}.$modport\n";
-	return 0;
-    }
-    if (($channel =~ /^\d+$/) && ($channel != 0)) {
-	$ifIndex = $channel;
-    }
+    #my $channel = snmpitGetFatal($self->{SESS},["pagpGroupIfIndex",$ifIndex]);
+    #if (!($channel =~ /^\d+$/) || ($channel == 0)) {
+    #	print "WARNING: resetVlanIfOnTrunk got bad channel ($channel) for $self->{NAME}.$modport\n";
+    #	return 0;
+    #}
+    #if (($channel =~ /^\d+$/) && ($channel != 0)) {
+    #	$ifIndex = $channel;
+    #}
 
     #
     # Get the existing bitfield for allowed VLANs on the trunk
