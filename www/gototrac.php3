@@ -31,13 +31,17 @@ elseif ($wiki == "geni") {
 	   $geniproject->IsMember($this_user, $approved) && $approved)) {
 	USERERROR("You do not have permission to access the Trac wiki!", 1);
     }
-    $wiki = "protogeni";
+    $wiki    = "protogeni";
+    $TRACURL = "https://www.protogeni.net/trac/$wiki";
+    $TRACCOOKIENAME = "trac_auth_protogeni_priv";
 }
 elseif ($wiki != "emulab") {
     USERERROR("Unknown Trac wiki $wiki!", 1);
 }
-$TRACURL        = "https://${USERNODE}/trac/$wiki";
-$TRACCOOKIENAME = "trac_auth_${wiki}";
+else {
+    $TRACURL = "https://${USERNODE}/trac/$wiki";
+    $TRACCOOKIENAME = "trac_auth_${wiki}";
+}
 
 #
 # Look for our cookie. If the browser has it, then there is nothing
@@ -57,13 +61,12 @@ SUEXEC($uid, "nobody", "tracxlogin -w " . escapeshellarg($wiki) .
 if (!preg_match("/^(\w*)$/", $suexec_output, $matches)) {
     TBERROR($suexec_output, 1);
 }
-setcookie($TRACCOOKIENAME,
-	  $matches[1], 0, "/", $TBAUTHDOMAIN, $TBSECURECOOKIES);
+$hash = $matches[1];
+
 if ($wiki == "protogeni") {
-    $TRACCOOKIENAME = "trac_auth_${wiki}_priv";
-    setcookie($TRACCOOKIENAME,
-	      $matches[1], 0, "/", $TBAUTHDOMAIN, $TBSECURECOOKIES);
+    # We do this for the private wiki. Temporary.
+    setcookie($TRACCOOKIENAME, $hash, 0, "/", $TBAUTHDOMAIN, $TBSECURECOOKIES);
 }
-header("Location: ${TRACURL}");
+header("Location: ${TRACURL}/xlogin?user=$uid&hash=$hash");
 
 ?>

@@ -992,6 +992,8 @@ function DOLOGIN_MAGIC($uid, $uid_idx, $email = null, $adminon = 0)
 		  $TBAUTHDOMAIN, $TBSECURECOOKIES);
 	setcookie("trac_auth_protogeni", "", $flushtime, "/",
 		  $TBAUTHDOMAIN, $TBSECURECOOKIES);
+	setcookie("trac_auth_protogeni_priv", "", $flushtime, "/",
+		  $TBAUTHDOMAIN, $TBSECURECOOKIES);
     }
 	
     DBQueryFatal("update users set ".
