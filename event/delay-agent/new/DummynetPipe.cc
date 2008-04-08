@@ -193,7 +193,7 @@ void DummynetPipe::setPipe(struct dn_pipe *pipe)
 // NetlinkPipe.cc
 
 #include "lib.hh"
-#include "NetlinkPipe.hh"
+#include "DummynetPipe.hh"
 
 extern "C"
 {
@@ -202,6 +202,10 @@ extern "C"
 
 #include <netlink/list.h>
 #include <netlink/object.h>
+#include <netlink/route/rtnl.h>
+#include <netlink/route/route.h>
+#include <netlink/route/link.h>
+#include <netlink/route/class.h>
 #include <netlink/route/qdisc.h>
 #include <netlink/route/sch/plr.h>
 #include <netlink/route/sch/delay.h>
@@ -212,16 +216,15 @@ using namespace std;
 
 struct rtnl_class * rtnl_class_get(struct nl_cache *, uint32_t);
 
+/* extern int rtnl_delay_set_delay(struct rtnl_qdisc *, unsigned long); */
+
 NetlinkPipe::NetlinkPipe(std::string const & iface, std::string const & pipeno)
 {
-	int ifindex;
-
 	interfaceName = iface;
 	pipeNumber = pipeno;
 	nl_handle = NULL;
 	class_cache = NULL;
 	qdisc_cache = NULL;
-	link_cache = NULL;
 	
 	init();
 }
@@ -231,6 +234,8 @@ int NetlinkPipe::init(void)
 	struct nl_cache *link_cache;
 	int handle;
 	string str;
+
+	link_cache = NULL;
 
 	nl_handle = nl_handle_alloc();
 	if (nl_handle == NULL) {
@@ -248,7 +253,7 @@ int NetlinkPipe::init(void)
 		return -1;
 	}
 
-	ifindex = rtnl_link_name2i(link_cache, interfaceName);
+	ifindex = rtnl_link_name2i(link_cache, interfaceName.c_str());
 	if (ifindex == RTNL_LINK_NOT_FOUND) {
 		cerr << "Unable to translate link name to ifindex" << endl;
 		return -1;
@@ -266,11 +271,13 @@ int NetlinkPipe::init(void)
 		return -1;
 	}
 
-	handle = g::stringToInt(pipeNumber);
+	handle = stringToInt(pipeNumber);
 	plrHandle = handle << 16;
 	delayHandle = (handle + 10) << 16;
 	htbHandle = (handle + 20) << 16;
 	htbClassHandle = htbHandle + 1;
+
+	return 0;
 }
 
 NetlinkPipe::~NetlinkPipe()
@@ -285,72 +292,61 @@ NetlinkPipe::~NetlinkPipe()
 		nl_close(nl_handle);
 }
 
-NetlinkPipe::reset(void)
+void NetlinkPipe::reset(void)
 {
 	map<Parameter::ParameterType, Parameter>::iterator pos = g::defaultParameters.begin();
 	map<Parameter::ParameterType, Parameter>::iterator limit = g::defaultParameters.end();
 
 	for (; pos != limit; ++pos)
 	{
-		updateParameter(pipe, pos->second);
+		updateParameter(pos->second);
 	}
 }
 
-NetlinkPipe::resetParameter(Parameter const & newParameter)
+void NetlinkPipe::resetParameter(Parameter const & newParameter)
+{
+	updateParameter(newParameter);
+}
+
+void NetlinkPipe::updateParameter(Parameter const & newParameter)
 {
 	struct rtnl_qdisc *qdisc;
 	struct rtnl_class *htbClass;
-	uint32_t = handle;
 
 	qdisc = NULL;
 
 	switch(newParameter.getType()) {
-                case BANDWIDTH:
+		case Parameter::BANDWIDTH:
 				htbClass = rtnl_class_get(class_cache, htbClassHandle);
 				if (htbClass == NULL) {
-					cerr "Couldn't find htb class " << htbClassHandle << endl;
+					cerr << "Couldn't find htb class " << htbClassHandle << endl;
 					return;
 				}
 				rtnl_htb_set_rate(htbClass, newParameter.getValue());
 				rtnl_htb_set_ceil(htbClass, newParameter.getValue());
-				nl_object_put(htbClass);
+				nl_object_put((nl_object *)htbClass);
                                 break;
-                case DELAY:
+		case Parameter::DELAY:
 				qdisc = rtnl_qdisc_get(qdisc_cache, ifindex, delayHandle);
 				if (qdisc == NULL) {
-					cerr "Couldn't find htb class " << delayHandle << endl;
+					cerr << "Couldn't find htb class " << delayHandle << endl;
 					return;
 				}
 				rtnl_delay_set_delay(qdisc, newParameter.getValue());
 				rtnl_qdisc_put(qdisc);
                                 break;
-                case LOSS:
+		case Parameter::LOSS:
 				qdisc = rtnl_qdisc_get(qdisc_cache, ifindex, plrHandle);
-				if (delay == NULL) {
-					cerr "Couldn't find htb class " << delayHandle << endl;
+				if (qdisc == NULL) {
+					cerr << "Couldn't find htb class " << delayHandle << endl;
 					return;
 				}
 				rtnl_plr_set_plr(qdisc, newParameter.getValue());
 				rtnl_qdisc_put(qdisc);
                                 break;
+		default:
+				break;
 	}
-}
-
-struct rtnl_class * rtnl_class_get(struct nl_cache *cache, uint32_t handle)
-{
-	struct rtnl_class *c;
-
-	if (cache->c_ops != &rtnl_class_ops)
-		return NULL;
-
-	nl_list_for_each_entry(c, &cache->c_items, ce_list) {
-		if (c->c_handle == handle) {
-			nl_object_get((struct nl_object *) c);
-			return c;
-		}
-	}
-
-	return NULL;
 }
 
 #endif

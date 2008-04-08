@@ -46,19 +46,21 @@ class NetlinkPipe : public RootPipe
 public:
   // 'name' will be prefixed with "new-" plus the original agent's
   // name. To call the old agent, simply remove the prefix.
-  NetlinkPipe(std::string const & name);
+  NetlinkPipe(std::string const & iface, std::string const & pipeno);
   virtual ~NetlinkPipe();
   virtual void reset(void);
   virtual void resetParameter(Parameter const & newParameter);
 private:
-  virtual updateParameter(struct dn_pipe *pipe, Parameter const & parameter);
+  virtual void updateParameter(Parameter const & newParameter);
+  virtual int init(void);
 
-  string interfaceName;
-  string pipeNumber;
+  std::string interfaceName;
+  std::string pipeNumber;
   int ifindex;
   struct nl_handle *nl_handle;
   struct nl_cache *qdisc_cache, *class_cache;
   uint32_t plrHandle, delayHandle, htbHandle;
+  uint32_t htbClassHandle;
 };
 
 #endif
