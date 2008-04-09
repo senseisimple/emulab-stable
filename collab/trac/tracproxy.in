@@ -297,6 +297,9 @@ sub xLogin(@)
     DBQueryFatal("replace into session_attribute set ".
 		 "  sid='$user', authenticated=1, name='name', ".
 		 "  value='$user'");
+    DBQueryFatal("replace into session_attribute set ".
+		 "  sid='$user', authenticated=1, name='email', ".
+		 "  value='$user'");
 
     # Wow, what a HACK!
     if ($wiki eq "protogeni") {
