@@ -24,7 +24,7 @@ $run = $ARGV[3];
 #$nodeCount = scalar(@nodes);
 $serverPort = 1690;
 # seconds per run
-$duration = 60;
+$duration = 30;
 
 # First argument is the destination node (or 
 # Second argument is the command to change to (if "", no change).
@@ -58,9 +58,9 @@ sub runTest
     my $source = $_[0];
     my $dest = $_[1];
     my $num = $_[2];
-    startProgram($dest, "sh /bw-bottleneck/multiplex-server.sh $serverPort /bw-bottleneck", 0);
+    startProgram($dest, "sh /local/bw-bottleneck-wavelet/multiplex-server.sh $serverPort /local/bw-bottleneck-wavelet", 0);
     sleep(2);
-    startProgram($source, "sh /bw-bottleneck/multiplex-client.sh $serverPort /bw-bottleneck node-$dest.$exp.$proj.emulab.net $duration $source-to-$dest-run-$run-$num", 0);
+    startProgram($source, "sh /local/bw-bottleneck-wavelet/multiplex-client.sh $serverPort /local/bw-bottleneck-wavelet node-$dest.$exp.$proj.emulab.net $duration $source-to-$dest-run-$run-$num", 0);
     sleep($duration * 11);
 
     stopProgram($dest);
@@ -73,15 +73,33 @@ $count = 0;
 
 srand($run);
 
+my %PairHash = ();
+my $iterLimit = $nodeCount*($nodeCount-1);
+
 while (1)
 {
-    $i = int(rand($nodeCount));
-    $j = int(rand($nodeCount));
+    $i = int(rand($nodeCount)) + 1;
+    $j = int(rand($nodeCount)) + 1;
+
+    if( keys(%PairHash) >= $iterLimit )
+    {
+        last;
+    }
+
     if ($i != $j)
     {
-	runTest($i, $j, $count);
-	++$count;
-#	runTest($nodes[$i], $nodes[$j]);
+        my $nodeString = $i . ":" . $j;
+        if( not ( $PairHash{$nodeString} ) )
+        {
+            $PairHash{$nodeString} = 1;
+            runTest($i, $j, $count);
+            ++$count;
+
+            sleep(30);
+        }
+        else
+        {
+            next;
+        }
     }
-    sleep(600);
 }

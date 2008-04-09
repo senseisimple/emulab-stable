@@ -72,7 +72,7 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
         tmpStrStream << origTimestamp;
         actualTimeMaps[hostIndex][tmpStrStream.str()] = (unsigned long long)(secVal*1000 + usecVal/1000);
         sendTimesArray[hostIndex][packetTimeMaps[hostIndex][origTimestamp]] = (unsigned long long)(secVal*1000 + usecVal/1000);
-        printf("Recording Timestamp = %s for Host = %d, value = %llu\n", tmpStrStream.str().c_str(), hostIndex, actualTimeMaps[hostIndex][tmpStrStream.str()]);
+        //printf("Recording Timestamp = %s for Host = %d, value = %llu\n", tmpStrStream.str().c_str(), hostIndex, actualTimeMaps[hostIndex][tmpStrStream.str()]);
     }
     else if(packetType == '1')
     {
@@ -94,8 +94,8 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
             delaySequenceArray[hostIndex][packetTimeMaps[hostIndex][origTimestamp]] = oneWayDelay - ( actualTimeMaps[hostIndex][tmpStrStream.str()] - origTimestamp);
         }
 
-        cout << " Onewaydelay for the ACK = " << oneWayDelay << " recorded = "<< delaySequenceArray[hostIndex][packetTimeMaps[hostIndex][origTimestamp]] <<", host Index = "<< hostIndex << "\n";
-        cout <<" Orig timestamp was "<< tmpStrStream.str() << " , actual time = "<< actualTimeMaps[hostIndex][tmpStrStream.str()]<<"\n";
+        //cout << " Onewaydelay for the ACK = " << oneWayDelay << " recorded = "<< delaySequenceArray[hostIndex][packetTimeMaps[hostIndex][origTimestamp]] <<", host Index = "<< hostIndex << "\n";
+        //cout <<" Orig timestamp was "<< tmpStrStream.str() << " , actual time = "<< actualTimeMaps[hostIndex][tmpStrStream.str()]<<"\n";
 
         if(oneWayDelay < 50000 && oneWayDelay > -50000 && (delaySequenceArray[hostIndex][packetTimeMaps[hostIndex][origTimestamp]] > 100000 || delaySequenceArray[hostIndex][packetTimeMaps[hostIndex][origTimestamp]] < -100000 ) )
         {
@@ -103,7 +103,7 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
 
 
         }
-        cout <<"Packet time map Index = "<< packetTimeMaps[hostIndex][origTimestamp] << ", host index = " << hostIndex << " \n\n\n";
+        //cout <<"Packet time map Index = "<< packetTimeMaps[hostIndex][origTimestamp] << ", host index = " << hostIndex << " \n\n\n";
     }
     else
     {
@@ -349,6 +349,8 @@ int main(int argc, char **argv)
                 if (!(getTimeMilli() - lastSentTime > targetSleepTime))
                 {
                      timeoutValue = ( targetSleepTime - (getTimeMilli() - lastSentTime) )*1000 ;
+                     if(timeoutValue < 0 || timeoutValue > targetSleepTime*1000)
+                         timeoutValue = 0;
                      if(!firstWriteFlag)
                          disableWritesFlag = true;
                 }
