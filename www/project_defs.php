@@ -674,7 +674,7 @@ class Project
 	}
 	if ($CVSSUPPORT) {
 	    $cvsdir = "$TBCVSREPO_DIR/$pid";
-	    $cvsurl = "cvsweb/cvsweb.php3?pid=$pid";
+	    $cvsurl = "cvsweb/cvswebwrap.php3?pid=$pid";
 	
 	    echo "<tr>
                       <td>Project CVS Repository:</td>
