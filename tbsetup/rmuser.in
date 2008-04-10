@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -226,8 +226,17 @@ if (defined($project)) {
     #
     $EUID = $UID;
     system("$MODGROUPS -r $pid:$pid $target_uid");
+    my $estatus = ($? >> 8);
 
-    exit($? >> 8)
+    #
+    # Update all nodes in the project so that account will be removed
+    # and homedir unmounted.
+    #
+    if (!$estatus) {
+	TBNodeUpdateAccountsByPid($pid)
+    }
+
+    exit($estatus)
 	if (!$nuke);
     
     $EUID = 0;
@@ -270,7 +279,7 @@ $target_user->Purge() == 0
     or fatal("Could not purge $target_user from the DB!");
 
 #
-# Remove user acount from both local and control node. No need to do this in
+# Remove user account from both local and control node. No need to do this in
 # nukemode (not allowed anyway) since the account never existed.
 #
 if (! $nuke) {
