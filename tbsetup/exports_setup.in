@@ -150,8 +150,8 @@ if ($WINSUPPORT) {
 
 #
 # First gather up all the nodes that are reserved and the required info.
-# Order by pid,gid first so that they're all grouped together and we avoid
-# extra db queries.
+# Order by pid,gid,admin first so that they're all grouped together and we
+# avoid extra db queries (see lastpid/lastgid/lastadmin).
 #
 # VIRTNODE HACK: Virtual nodes are special, so do not export. (isvirtnode).
 #
@@ -168,7 +168,7 @@ $nodes_result =
 		 "       and nodes.role='testnode' ".
 		 "       and node_types.isvirtnode=0 ".
 		 "       and node_types.isremotenode=0 ".
-		 "order by r.pid,e.gid,r.eid,nodes.priority");
+		 "order by r.pid,e.gid,r.eid,u.admin,nodes.priority");
 
 my %ipgroups    = ();
 my %globalsmbshares   = ();
