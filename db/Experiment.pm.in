@@ -248,6 +248,20 @@ sub LookupByIndex($$)
 }
 
 #
+# Equality test. Not strictly necessary in perl, but good form.
+#
+sub SameExperiment($$)
+{
+    my ($self, $other) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! (ref($self) && ref($other)));
+
+    return $self->idx() == $other->idx();
+}
+
+#
 # All active experiments.
 #
 sub AllActive($)
@@ -280,7 +294,9 @@ sub UserExperimentList($$$)
     
     my $query_result =
 	DBQueryWarn("select idx from experiments ".
-		    "where creator_idx='$uid_idx' or swapper_idx='$uid_idx'");
+		    "where creator_idx='$uid_idx' or ".
+		    "      (swapper_idx='$uid_idx' and ".
+		    "       state!='" . EXPTSTATE_SWAPPED() . "'");
     return -1
 	if (! $query_result);
 
