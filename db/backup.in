@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -33,6 +33,7 @@ my $BACKUPDIR	= "$TB/backup";
 my $LOGDIR	= "$TB/log/mysql";
 my $HOTCOPY     = "/usr/local/bin/mysqlhotcopy";
 my $MYSQLDUMP   = "/usr/local/bin/mysqldump";
+my $SETSITEVAR  = "$TB/sbin/setsitevar";
 my $TAR         = "/usr/bin/tar";
 my $BASE	= "base";
 my $UPD		= "update";
@@ -91,6 +92,12 @@ open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
 if (! chdir($BACKUPDIR)) {
     fatal("Could not chdir to $BACKUPDIR: $!");
 }
+
+#
+# Let people know the system will be sluggish.
+#
+system("$SETSITEVAR web/message '<font color=red>".
+       "Nightly backup in progress; system might be sluggish</font>'");
 
 #
 # Open up the index file to see what the current update file extension is.
@@ -219,6 +226,7 @@ if ($dohotcopy && -e "$BACKUPDIR/tbdb") {
 #SENDMAIL("stoller@flux.utah.edu",
 #	 "DB Backup Finished", "", undef, undef, ($logname));
 
+system("$SETSITEVAR web/message -");
 unlink("$logname");
 exit 0;
 
@@ -228,6 +236,7 @@ sub fatal($) {
     print STDERR "$msg\n";
 
     SENDMAIL($TBOPS, "DB Backup Failed", $msg, undef, undef, ($logname));
+    system("$SETSITEVAR web/message -");
     unlink("$logname");
     exit(1);
 }
