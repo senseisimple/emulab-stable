@@ -214,10 +214,6 @@ extern "C"
 
 using namespace std;
 
-struct rtnl_class * rtnl_class_get(struct nl_cache *, uint32_t);
-
-/* extern int rtnl_delay_set_delay(struct rtnl_qdisc *, unsigned long); */
-
 NetlinkPipe::NetlinkPipe(std::string const & iface, std::string const & pipeno)
 {
 	interfaceName = iface;
@@ -227,6 +223,14 @@ NetlinkPipe::NetlinkPipe(std::string const & iface, std::string const & pipeno)
 	qdisc_cache = NULL;
 	
 	init();
+	/* test(); */
+}
+
+void NetlinkPipe::test(void)
+{
+	Parameter testParam(Parameter::LOSS, 50000);
+
+	updateParameter(testParam);
 }
 
 int NetlinkPipe::init(void)
@@ -236,6 +240,10 @@ int NetlinkPipe::init(void)
 	string str;
 
 	link_cache = NULL;
+
+	cerr << "Got pipe number " << pipeNumber << endl;
+	handle = hexStringToInt(pipeNumber);
+	cerr << "handle: " << handle << endl;
 
 	nl_handle = nl_handle_alloc();
 	if (nl_handle == NULL) {
@@ -265,17 +273,19 @@ int NetlinkPipe::init(void)
 		cerr << "Unable to allocate qdisc cache" << endl;
 		return -1;
 	}
+
+	plrHandle = handle << 16;
+	delayHandle = (handle + 0x10) << 16;
+	htbHandle = (handle + 0x20) << 16;
+
 	class_cache = rtnl_class_alloc_cache(nl_handle, ifindex);
 	if (class_cache == NULL) {
 		cerr << "Unable to allocate class cache" << endl;
 		return -1;
 	}
 
-	handle = stringToInt(pipeNumber);
-	plrHandle = handle << 16;
-	delayHandle = (handle + 10) << 16;
-	htbHandle = (handle + 20) << 16;
 	htbClassHandle = htbHandle + 1;
+
 
 	return 0;
 }
@@ -324,24 +334,27 @@ void NetlinkPipe::updateParameter(Parameter const & newParameter)
 				}
 				rtnl_htb_set_rate(htbClass, newParameter.getValue());
 				rtnl_htb_set_ceil(htbClass, newParameter.getValue());
-				nl_object_put((nl_object *)htbClass);
+				rtnl_class_change(nl_handle, htbClass, NULL);
+				rtnl_class_put(htbClass);
                                 break;
 		case Parameter::DELAY:
 				qdisc = rtnl_qdisc_get(qdisc_cache, ifindex, delayHandle);
 				if (qdisc == NULL) {
-					cerr << "Couldn't find htb class " << delayHandle << endl;
+					cerr << "Couldn't find delay qdisc " << delayHandle << endl;
 					return;
 				}
 				rtnl_delay_set_delay(qdisc, newParameter.getValue());
+				rtnl_qdisc_change(nl_handle, qdisc, NULL);
 				rtnl_qdisc_put(qdisc);
                                 break;
 		case Parameter::LOSS:
 				qdisc = rtnl_qdisc_get(qdisc_cache, ifindex, plrHandle);
 				if (qdisc == NULL) {
-					cerr << "Couldn't find htb class " << delayHandle << endl;
+					cerr << "Couldn't find plr qdisc " << plrHandle << endl;
 					return;
 				}
 				rtnl_plr_set_plr(qdisc, newParameter.getValue());
+				rtnl_qdisc_change(nl_handle, qdisc, NULL);
 				rtnl_qdisc_put(qdisc);
                                 break;
 		default:

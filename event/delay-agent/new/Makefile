@@ -16,8 +16,8 @@ CXXFLAGS += -DFREEBSD
 endif
 
 ifeq ($(OS), Linux)
-CXXFLAGS += -DLINUX -I../../../../libnl-1.1/include
-LDFLAGS += -L../../../../libnl-1.1/lib -lnl
+CXXFLAGS += -DLINUX -I../../../../libnl/include
+LDFLAGS += -L../../../../libnl/lib -lnl
 endif
 
 CFLAGS = $(CXXFLAGS)

@@ -25,6 +25,7 @@
 enum { EVENT_BUFFER_SIZE = 50 };
 
 int stringToInt(std::string const & val);
+int hexStringToInt(std::string const & val);
 std::string intToString(int val);
 
 void resetCallback(event_handle_t handle,

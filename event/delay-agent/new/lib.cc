@@ -26,6 +26,14 @@ int stringToInt(std::string const & val)
   return result;
 }
 
+int hexStringToInt(std::string const & val)
+{
+  int result = 0;
+  istringstream stream(val);
+  stream >> std::hex >> result;
+  return result;
+}
+
 string intToString(int val)
 {
   ostringstream stream;

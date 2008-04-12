@@ -5,6 +5,7 @@
 
 #include "Pipe.hh"
 #include "EventPipe.hh"
+#include "DummynetPipe.hh"
 
 // Each pipe here is uni-directional. Multiple directions are
 // accounted for with multiple pipes.
@@ -22,7 +23,11 @@ struct PipeInfo
     , parameters(g::defaultParameters)
     , interface(newInterface)
     , pipeData(newPipeData)
+#if 0
     , rawPipe(new EventPipe(linkName))
+#else
+    , rawPipe(new NetlinkPipe(newInterface, newPipeData))
+#endif
   {
   }
 

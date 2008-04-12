@@ -41,6 +41,8 @@ private:
 #ifndef NETLINK_PIPE_HH_DELAY_AGENT_1
 #define NETLINK_PIPE_HH_DELAY_AGENT_1
 
+#include <stdint.h>
+
 class NetlinkPipe : public RootPipe
 {
 public:
@@ -53,6 +55,7 @@ public:
 private:
   virtual void updateParameter(Parameter const & newParameter);
   virtual int init(void);
+  virtual void test(void);
 
   std::string interfaceName;
   std::string pipeNumber;
