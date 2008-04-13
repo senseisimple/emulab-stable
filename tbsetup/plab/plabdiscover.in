@@ -28,6 +28,9 @@ def main(args):
     
     (options,cargs) = parser.parse_args()
 
+    libplab.debug = options.debug
+    libplab.verbose = options.verbose
+
     both = True
     if options.nodes and options.nodegroups:
         both = True

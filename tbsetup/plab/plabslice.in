@@ -40,6 +40,9 @@ def main(args):
     pid,eid = None,None
     
     (opts, args) = parser.parse_args()
+
+    libplab.debug = opts.debug
+    libplab.verbose = opts.verbose
     
     if len(args) == 2:
         command,slicename = args

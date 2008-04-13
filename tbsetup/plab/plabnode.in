@@ -58,6 +58,9 @@ def main(args):
     # parse command line options
     opts, args = parser.parse_args(args[1:])
 
+    libplab.debug = opts.debug
+    libplab.verbose = opts.verbose
+
     slicename = None
     # make sure we were told what to do on the command line.
     if len(args) == 3:
