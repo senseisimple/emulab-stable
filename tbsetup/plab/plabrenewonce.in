@@ -2,7 +2,7 @@
 # -*- python -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -11,23 +11,48 @@ sys.path.append("@prefix@/lib")
 import libplab
 from libtestbed import *
 
-def usage(me):
-    print "Usage: %s [ -vd ] [pid eid]" % me
-    sys.exit(1)
-
+usage = "\t%prog [-vd] [-p plcname] pid eid [slicename]"
 
 def main(args):
     me = args[0]
-    parser = TBParser()
-    opts, args = parser.parse_args()
-    pid = eid = None
+    parser = TBParser(usage)
+    parser.add_option("-p","--plc",dest="plc",action="store",
+                      help="PLC Name",default=None)
 
-    plab = libplab.Plab()
+    slicename = None
+    pid,eid = None,None
+
+    (opts,args) = parser.parse_args()
+
+    libplab.debug = opts.debug
+    libplab.verbose = opts.verbose
+
     if len(args) == 2:
-        pid, eid = args
+        pid,eid = args
+        if not pid or not eid:
+            print "Must supply both pid and eid!"
+            sys.exit(1)
+            pass
+        pass
+    elif len(args) == 3:
+        pid,eid,slicename = args
+        if not pid or not eid or not slicename:
+            print "Must supply both pid and eid!"
+            sys.exit(1)
+            pass
+        pass
+    else:
+        parser.error("Incorrect number of arguments")
         pass
 
-    plab.renew(pid, eid, 1)
+    if not slicename and opts.plc:
+        print "Ignoring '-p' PLC option, since you did not specify" \
+              "a slicename!"
+        opts.plc = None
+        pass
+
+    plab = libplab.Plab()
+    plab.renew(pid,eid,opts.plc,slicename)
     
     return
 
