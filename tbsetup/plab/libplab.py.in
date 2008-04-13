@@ -85,6 +85,12 @@ RESERVED_EID = "hwdown"       # start life in hwdown
 MONITOR_PID  = "emulab-ops"
 MONITOR_EID  = "plab-monitor"
 
+BOSSNODE_IP = "@BOSSNODE_IP@"
+# obviously this isn't really true, but we put plab/pgeni nodes on the .35
+CONTROL_NETWORK = "155.98.35.0"
+CONTROL_NETMASK = "255.255.255.0"
+CONTROL_ROUTER = "@CONTROL_ROUTER_IP@"
+
 MAGIC_INET2_GATEWAYS = ("205.124.237.10",  "205.124.244.18",
                         "205.124.244.178", )
 MAGIC_INET_GATEWAYS =  ("205.124.244.150", "205.124.239.185",
@@ -451,26 +457,73 @@ class Plab:
                            " group by n.type",(pid,eid))
         for (plcidx,prefix) in res:
             plc,slicename = None,None
+
+            # grab our plc so we can get config attrs
+            try:
+                plc = PLC(plcidx)
+            except:
+                raise
+
+            # figure out how we're supposed to create this slice
+            slice_create_method = plc.getAttr('slice_create_method')
+            if not slice_create_method or slice_create_method == '':
+                slice_create_method = 'singlesite'
+                pass
+
             if existing.has_key(plcidx):
                 slicename = existing[plcidx]
                 pass
             else:
+                # grab the exptidx; may need it
                 res = DBQueryFatal("select idx from experiments"
                                    " where pid=%s and eid=%s",
                                    (pid,eid))
                 if not len(res):
                     raise RuntimeError, \
-                          "Didn't get any results while looking up info on " \
-                          "experiment %s/%s" % (self.pid, self.eid)
+                          "Didn't get any results while looking up info" \
+                          " on experiment %s/%s" % (self.pid, self.eid)
                 (exptidx,) = res[0]
-                slicename = "%s_elab_%d" % (prefix,exptidx)
+                
+                if slice_create_method == 'singlesite':
+                    # name the slice using the prefix of our single site
+                    slicename = "%s_elab_%d" % (prefix,exptidx)
+                    pass
+                elif slice_create_method == 'federate':
+                    # use the prefix of the site for the pid containing
+                    # this eid.
+                    translator = EmulabPlcObjTranslator(plc)
+
+                    # ensure that project (site) is created and up to date
+                    translator.syncObject('project',pid)
+
+                    # ensure that all users in this project are members of the
+                    # site, and that their info is up to date
+                    res = DBQueryFatal("select uid from group_membership" \
+                                       " where pid=%s",(pid,))
+                    for row in res:
+                        (p_uid,) = row
+                        translator.syncObject('user',p_uid)
+                        pass
+
+                    # now grab whatever site name we need:
+                    site = translator.getPlabName('project',pid)
+
+                    # have to get rid of dashes and make things lowercase.
+                    slicename = "%s_%s" % (site,eid.lower().replace("-",""))
+
+                    # NOTE: since we're mapping from the Emulab eid superset
+                    # of slice names, check to ensure we're not duplicating
+                    # a slicename already in use.  If we are, no problem;
+                    # we just append "_%s" % eid_idx.
+                    res = DBQueryFatal("select slicename from plab_slices" \
+                                       " where pid=%s and slicename=%s",
+                                       (pid,slicename))
+                    if res and len(res) > 0:
+                        slicename = "%s_%s" % (slicename,str(exptidx))
+                        pass
+                    pass
                 pass
-            
-            try:
-                plc = PLC(plcidx,slicename)
-            except:
-                raise
-            
+
             slice = EmulabSlice(plc,slicename,pid=pid,eid=eid)
             try:
                 slice.create()
@@ -499,7 +552,7 @@ class Plab:
         """
         plc = None
         try:
-            plc = PLC(plcidx,slicename)
+            plc = PLC(plcidx)
         except:
             raise
 
@@ -523,7 +576,7 @@ class Plab:
         """
         plc = None
         try:
-            plc = PLC(plcidx,slicename)
+            plc = PLC(plcidx)
         except:
             raise
         slice = Slice(plc,slicename,slicedescr=description,sliceurl=sliceurl,
@@ -566,7 +619,7 @@ class Plab:
 
         plc = None
         try:
-            plc = PLC(plcidx,slicename)
+            plc = PLC(plcidx)
         except:
             raise
 
@@ -599,7 +652,7 @@ class Plab:
         for (plcidx,slicename) in res:
             plc = None
             try:
-                plc = PLC(plcidx,slicename)
+                plc = PLC(plcidx)
             except:
                 raise
             
@@ -629,7 +682,7 @@ class Plab:
         slice = None
         plc = None
         try:
-            plc = PLC(plcidx,slicename)
+            plc = PLC(plcidx)
         except:
             raise
         
@@ -652,7 +705,7 @@ class Plab:
         """
         plc = None
         try:
-            plc = PLC(plcidx,slicename)
+            plc = PLC(plcidx)
         except:
             raise
         slice = Slice(plc,slicename,slicedescr=slicedescr,sliceurl=sliceurl,
@@ -1667,9 +1720,8 @@ wrap_around(Plab.createSlices, timeAdvice)
 # an agent to talk to it.
 #
 class PLC:
-    def __init__(self,plcid,slicename=None):
+    def __init__(self,plcid):
         self.id = plcid
-        self.slicename = slicename
 
         (self.idx,self.name,self.url,self.slice_prefix,self.nodename_prefix,
          self.nodetype,self.svcslice) = (None,None,None,None,None,None,None)
@@ -1826,9 +1878,6 @@ class PLC:
         """
         auth = dict({})
         errstr = "PLC %s" % self.name
-        if not self.slicename == None:
-            errstr = "%s, slice %s" % (errstr,self.slicename)
-            pass
 
         # Get the auth method.
         auth["AuthMethod"] = self.getAttrVal("auth_method",required=True)
@@ -1856,6 +1905,299 @@ class PLC:
 
     pass
 
+class EmulabPlcObjTranslator:
+    """
+    This class provides a translation between Emulab objects and PLC objects.
+    """
+    def __init__(self,plc):
+        self.plc = plc
+        self.__allowed_objects = [ 'project','node','user' ]
+        pass
+
+    def __checkMapByElabId(self,objtype,objid):
+        qres = DBQueryFatal("select plab_id,plab_name from plab_objmap" \
+                            " where objtype=%s and elab_id=%s",
+                            (objtype,str(objid)))
+        if len(qres) != 1:
+            return (None,None)
+
+        (id,name) = qres[0]
+        # plab ids should be ints, but we left the db field type as a string
+        # to support things more generally, if we ever need...
+        try:
+            id = int(id)
+        except:
+            pass
+
+        return (id,name)
+
+    def __checkMapByPlabName(self,objtype,objid):
+        qres = DBQueryFatal("select elab_id from plab_objmap" \
+                            " where objtype=%s and plab_name=%s",
+                            (objtype,str(objid)))
+        if len(qres) != 1:
+            return (None,)
+
+        return qres[0]
+
+    def getPlabName(self,objtype,id):
+        (id,name) = self.__checkMapByPlabName(objtype,id)
+        return name
+
+
+    def getPlabId(self,objtype,id):
+        (id,name) = self.__checkMapByPlabName(objtype,id)
+        return id
+
+    def syncObject(self,objtype,objid):
+        if not objtype in self.__allowed_objects:
+            raise RuntimeError("unknown object type '%s'" % objtype)
+
+        ss = self.plc.agent.syncSupport()
+        if not ss or not objtype in ss:
+            raise RuntimeError("plc agent '%s' does not support object '%s'" \
+                               " sync!" % (self.plc.agent.__class__.__name__,
+                                           objtype))
+
+        if objtype == 'project':
+            pd = self.__translateProject(objid)
+            if debug:
+                print "Translated pid '%s' to '%s'" % (objid,str(pd))
+            retval = self.plc.agent.syncObject(objtype,pd)
+            plab_name = pd['name']
+        elif objtype == 'user':
+            pd = self.__translateUser(objid)
+            if debug:
+                print "Translated user '%s' to '%s'" % (objid,str(pd))
+            # note, we have to sync up sites (to ensure they're added!)
+            for pid in pd['__emulab_pids']:
+                self.syncObject('project',pid)
+                pass
+            del pd['__emulab_pids']
+            retval = self.plc.agent.syncObject(objtype,pd)
+            plab_name = pd['email']
+        elif objtype == 'node':
+            pd = self.__translateNode(objid)
+            if debug:
+                print "Translated node '%s' to '%s'" % (objid,str(pd))
+            # note, we have to sync up sites (to ensure they're added!)
+            for pid in pd['__emulab_pids']:
+                self.syncObject('project',pid)
+                pass
+            del pd['__emulab_pids']
+            retval = self.plc.agent.syncObject(objtype,pd)
+            plab_name = pd['hostname']
+            pass
+
+        # update the objmap, just in case this is a new addition at plc
+        try:
+            DBQueryFatal("replace into plab_objmap" \
+                         " (plc_idx,objtype,elab_id,plab_id,plab_name)" \
+                         " values (%s,%s,%s,%s,%s)",
+                         (self.plc.idx,objtype,objid,str(retval),plab_name))
+        except Exception, ex:
+            msg = "cleanup: object %s/%s synch at plc %s succeeded," \
+                  " but objmap update failed: %s" \
+                  % (objtype,str(objid),self.plc.name,str(ex))
+            raise RuntimeError(msg)
+
+        return
+
+    def deleteObject(self,objtype,objid):
+        if not objtype in self.__allowed_objects:
+            raise RuntimeError("unknown object type '%s'" % objtype)
+
+        ss = self.plc.agent.syncSupport()
+        if not ss or not objtype in ss:
+            raise RuntimeError("plc agent '%s' does not support object '%s'" \
+                               " delete!" % (self.plc.agent.__class__.__name__,
+                                             objtype))
+
+        plab_id,plab_name = self.__checkMapByElabId(objtype,objid)
+
+        if not plab_id:
+            raise RuntimeError("could not find Emulab '%s' object '%s'" \
+                               % (objtype,str(objid)))
+
+        self.plc.agent.deleteObject(objtype,plab_id)
+
+        # update the map:
+        try:
+            DBQueryFatal("delete from plab_objmap" \
+                         " where plc_idx=%s and objtype=%s and elab_id=%s",
+                         (self.plc.idx,objtype,objid))
+        except Exception, ex:
+            msg = "cleanup: object %s/%s delete at plc %s succeeded," \
+                  " but objmap delete failed: %s" \
+                  % (objtype,str(objid),self.plc.name,str(ex))
+            raise RuntimeError(msg)
+
+        return
+
+    # XXX This translation stuff ought to be split, with libplab getting the
+    # data from the Emulab db, then passing it to the PLCagent to translate...
+    # but unnecessary for now!
+    def __translateProject(self,pid):
+        """
+        Returns a planetlab site object.
+        """
+        qres = DBQueryFatal("select pid_idx,name,URL from projects" \
+                            " where pid=%s",(pid,))
+        if len(qres) != 1:
+            raise RuntimeError("could not find Emulab project '%s'" % pid)
+        (pid_idx,pid_name,url) = qres[0]
+        
+        retval = dict({})
+
+        plab_id,plab_name = self.__checkMapByElabId('project',pid)
+        
+        if plab_id and plab_name:
+            retval['id'] = plab_id
+            retval['name'] = plab_name
+            pass
+        else:
+            retval['name'] = pid.lower().replace("-","")
+            (tid,) = self.__checkMapByPlabName('project',retval['name'])
+            tname = retval['name']
+
+            append_digit = 0
+            while tid != None:
+                tname = "%s%d" % (retval['name'],append_digit)
+                (tid) = self.__checkMapByPlabName('project',tname)
+                append_digit += 1
+                pass
+
+            # ok, we have a unique name either way
+            retval['name'] = tname
+            pass
+
+        retval['longitude'] = 0.1
+        retval['latitude'] = 0.1
+        retval['url'] = url
+
+        return retval
+
+    def __translateNode(self,nodeid):
+        """
+        Returns a planetlab node object (expressed as a dict of node
+        properties).
+        """
+        retval = dict({})
+        plab_id,plab_name = self.__checkMapByElabId('node',nodeid)
+        if plab_id:
+            retval['id'] = plab_id
+            pass
+
+        # XXX will eventually need more than just one public interface, but
+        # this will do the trick for now...
+        qres = DBQueryFatal("select wa.hostname,wa.bwlimit,wa.IP" \
+                            " from widearea_nodeinfo as wa" \
+                            " left join interfaces as i on wa.IP=i.IP" \
+                            " where wa.node_id=%s and i.node_id=%s",
+                            (nodeid,nodeid))
+        if len(qres) != 1:
+            raise RuntimeError("could not find Emulab node '%s'" % nodeid)
+        
+        (hostname,bwlimit,IP) = qres[0]
+        
+        retval['hostname'] = hostname
+        networks = [ { 'ip':IP,'bwlimit':bwlimit,'dns1':BOSSNODE_IP,
+                       'network':CONTROL_NETWORK,'netmask':CONTROL_NETMASK,
+                       'gateway':CONTROL_ROUTER,
+                       'method':'dhcp','type':'ipv4','is_primary':True } ]
+        retval['networks'] = networks
+        # put all nodes in the emulabops site
+        retval['__emulab_pids'] = ['emulab-ops']
+        retval['site'] = self.__translateProject('emulab-ops')['name']
+
+        return retval
+
+    def __translateUser(self,uid):
+        """
+        Returns a planetlab user object (expressed as a dict of user
+        properties).
+        """
+        retval = dict({})
+        plab_id,plab_name = self.__checkMapByElabId('user',uid)
+        if plab_id:
+            retval['id'] = plab_id
+            pass
+        
+        # grab basic user details
+        if uid.find("@") > -1:
+            wherestr = "where u.usr_email=%s"
+        else:
+            wherestr = "where u.uid=%s"
+            pass
+        qres = DBQueryFatal("select u.uid,u.usr_name,u.usr_email,u.usr_URL," \
+                            "  u.usr_phone,u.usr_pswd,admin" \
+                            " from users as u %s" % (wherestr,),(uid,))
+        if len(qres) != 1:
+            raise RuntimeError("could not find user '%s'%" % uid)
+
+        (uid,retval['name'],retval['email'],retval['url'],retval['phone'],
+         retval['passwd'],admin) = qres[0]
+        # for whatever reason, elabman isn't marked as admin, so special-case
+        if uid == 'elabman':
+            admin = 1
+            pass
+
+        # now find keys
+        qres = DBQueryFatal("select pubkey from user_pubkeys where uid=%s",
+                            (uid,))
+        keys = []
+        for row in qres:
+            keys.append(row[0])
+            pass
+        retval['keys'] = keys
+
+        # now determine permissions
+        # NOTE: we map project_root,group_root->PI,local_root,user->user
+        #   (and if the admin bit was set above, we set that role too)
+        # This sucks since plab permissions are not per-site!
+        qres = DBQueryFatal("select gm.pid,gm.trust"
+                            " from users as u"
+                            " left join group_membership as gm"
+                            "   on u.uid_idx=gm.uid_idx"
+                            " left join projects as p on gm.pid=p.pid"
+                            " where u.uid=%s and gm.gid=gm.pid",(uid,))
+        roles = []
+        pids = []
+        max_trust = None
+        for (pid,trust) in qres:
+            if trust == "project_root" or trust == "group_root":
+                max_trust = "pi"
+            elif not max_trust == "pi" and (trust == "local_root"
+                                            or trust == "user"):
+                ptrust = "user"
+            elif trust == "none":
+                continue
+            pids.append(pid)
+            pass
+        if max_trust == "pi":
+            roles = ['pi','user']
+        elif max_trust == "user":
+            roles = ['user']
+            pass
+        if admin:
+            roles.append('admin')
+            roles.append('tech')
+            pass
+        retval['roles'] = roles
+
+        # now site membership:
+        # (we keep the emulab pids around so that if we synch on this object,
+        #  we can synch the pids too so that they get created if they're not
+        #  already)
+        retval['__emulab_pids'] = pids
+        retval['sites'] = []
+        for pid in pids:
+            retval['sites'].append(self.__translateProject(pid)['name'])
+            pass
+
+        return retval
+
+    pass
 
 class Slice:
     """

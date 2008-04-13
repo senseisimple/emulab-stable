@@ -17,11 +17,13 @@ import cPickle
 import os
 import socket
 
+import libdb
 from libtestbed import *
 from aspects import wrap_around
 from timer_advisories import timeAdvice
 
 import popen2
+import random
 
 #
 # output control vars
@@ -344,8 +346,6 @@ class PLCagent:
     def SliceGetTicket(self):
         return self.__server.GetSliceTicket(self.auth,self.slicename)
 
-    # XXX: this returns a lot more crap than we use, but we'll keep it intact
-    # for the future...
     def SliceInfo(self,infilter=None,outfilter=None):
         return self.__server.GetSlices(self.auth,infilter,outfilter)
 
@@ -357,6 +357,9 @@ class PLCagent:
 
     def PersonInfo(self,infilter=None,outfilter=None):
         return self.__server.GetPersons(self.auth,infilter,outfilter)
+    
+    def KeyInfo(self,infilter=None,outfilter=None):
+        return self.__server.GetKeys(self.auth,infilter,outfilter)
 
     def NodeNetworkInfo(self,infilter=None,outfilter=None):
         return self.__server.GetNodeNetworks(self.auth,infilter,outfilter)
@@ -374,8 +377,199 @@ class PLCagent:
         return self.__server.AddSliceAttribute(self.auth,self.slicename,
                                                attrname,attrvalue)
 
-    pass # end of PLCagent class
+    def SiteAdd(self,name,url,longitude,latitude):
+        return self.__server.AddSite(self.auth,
+                                     { 'name':name,'login_base':name,
+                                       'abbreviated_name':name,'url':url,
+                                       'longitude':longitude,
+                                       'latitude':latitude,
+                                       'enabled':True,'is_public':False,
+                                       'max_slices':20,'max_slivers':1000 })
 
+    def SiteUpdate(self,id,url,longitude,latitude):
+        return self.__server.UpdateSite(self.auth,id,
+                                        { 'url':url,
+                                          'longitude':longitude,
+                                          'latitude':latitude })
+
+    def SiteDelete(self,id):
+        return self.__server.DeleteSite(self.auth,id)
+
+    def __keygen(self):
+        astr = "abcdefghijklmnopqrstuvwxyz"
+        astr = astr + astr.upper() + '0123456789'
+        tpasslist = random.sample(astr,32)
+        tkey = ''
+        for char in tpasslist:
+            tkey += char
+            pass
+        return tkey
+
+    def NodeAdd(self,site,hostname):
+        nid = self.__server.AddNode(self.auth,site,{ 'hostname':hostname })
+        self.__server.UpdateNode(self.auth,nid,{ 'key':self.__keygen() })
+        return nid
+
+    def NodeUpdate(self,id,hostname,networks):
+        nni = self.NodeNetworkInfo(infilter={ 'node_id':id })
+        # we just ensure that any network in networks is bound to this node;
+        # we leave any other bound ones alone.
+        _all_check_keys = [ 'broadcast','is_primary','network','ip','dns1',
+                            'dns2','hostname','netmask','gateway','mac',
+                            'bwlimit','type','method' ]
+        _most_check_keys = [ 'hostname','ip','mac','netmask' ]
+        # find the primary node network -- if we have a primary net that
+        # doesn't match, must remove this one first.
+        primary_nn = None
+        for ni in nni:
+            if ni['is_primary']:
+                primary_nn = ni
+                break
+            pass
+        # check the existing networks for _most_check_keys; if at least two
+        # of these match, we have a match and may need to update that nnid.
+        for ni in networks:
+            found = None
+            for exni in nni:
+                if exni.has_key('__done'):
+                    continue
+                match_count = 0
+                for k in _most_check_keys:
+                    if ni.has_key(k) and ni[k] == exni[k]:
+                        match_count += 1
+                        pass
+                    pass
+                if match_count > 1:
+                    found = exni
+                    exni['__done'] = True
+                    break
+                pass
+
+            if not found:
+                ad = {}
+                for k in _all_check_keys:
+                    if ni.has_key(k):
+                        ad[k] = ni[k]
+                        pass
+                    pass
+                # if we are adding the primary network, delete the old primary
+                if ad.has_key('is_primary') and ad['is_primary'] \
+                       and primary_nn:
+                    self.__server.DeleteNodeNetwork(self.auth,
+                                                    primary_nn['nodenetwork_id'])
+                    pass
+
+                self.__server.AddNodeNetwork(self.auth,id,ad)
+                pass
+            else:
+                # see if we need to do an update:
+                update = False
+                ad = {}
+                for k in _all_check_keys:
+                    if ni.has_key(k) and ni[k] != exni[k]:
+                        ad[k] = ni[k]
+                        pass
+                    pass
+                if len(ad.keys()) > 0:
+                    self.__server.UpdateNodeNetwork(exni['nodenetwork_id'],ad)
+                    pass
+                pass
+            pass
+
+        if hostname:
+            self.__server.UpdateNode(self.auth,id,{ 'hostname':hostname })
+            pass
+
+        return
+
+    def NodeDelete(self,id):
+        return self.__server.DeleteNode(self.auth,id)
+
+    def PersonAdd(self,name,email,url,phone,passwd,roles):
+        sr = name.rsplit(" ",1)
+        if len(sr) == 1:
+            fname = lname = name
+        else:
+            fname = sr[0]
+            lname = sr[1]
+            pass
+        pid =  self.__server.AddPerson(self.auth,
+                                       { 'first_name':fname,'last_name':lname,
+                                         'url':url,'phone':phone,'email':email,
+                                         'password':passwd,'enabled':True })
+        for role in roles:
+            self.__server.AddRoleToPerson(self.auth,role,pid)
+            pass
+        return pid
+
+    def PersonUpdate(self,id,name,email,url,phone,passwd,roles,keys,sites):
+        # first figure out if we need to update the person
+        upd = {}
+        if name:
+            sr = name.rsplit(" ",1)
+            if len(sr) == 1:
+                upd['first_name'] = upd['last_name'] = name
+            else:
+                upd['first_name'] = sr[0]
+                upd['last_name'] = sr[1]
+                pass
+            pass
+        if email:
+            upd['email'] = email
+        if url:
+            upd['url'] = url
+        if phone:
+            upd['phone'] = phone
+        if passwd:
+            upd['passwd'] = passwd
+
+        # add doesn't enable, so we always force this.
+        upd['enabled'] = True
+
+        if len(upd.keys()) > 0:
+            self.__server.UpdatePerson(self.auth,id,upd)
+            pass
+
+        # now the role:
+        if roles:
+            for role in roles:
+                self.__server.AddRoleToPerson(self.auth,role,id)
+                pass
+            pass
+
+        # now the keys:
+        kil = self.KeyInfo(infilter={'person_id':id},outfilter=['key'])
+        for k in keys:
+            found = False
+            for ki in kil:
+                if ki['key'] == k:
+                    found = True
+                    break
+                pass
+            if not found:
+                try:
+                    self.__server.AddPersonKey(self.auth,id,{ 'key_type':'ssh',
+                                                              'key':k })
+                except xmlrpclib.Fault,ex:
+                    if ex.faultString.find("Invalid SSH version 2 public key") \
+                       > -1:
+                        pass
+                    else:
+                        raise
+                pass
+            pass
+
+        # and last the sites
+        for site in sites:
+            self.__server.AddPersonToSite(self.auth,id,site)
+            pass
+
+        return
+
+    def PersonDelete(self,id):
+        return self.__server.DeletePerson(self.auth,id)
+
+    pass # end of PLCagent class
 
 class mod_PLC4:
     
@@ -389,7 +583,78 @@ class mod_PLC4:
 
         self.nmuid = plc.getAttrVal("nm_username",required=True)
         self.nmkey = plc.getAttrVal("nm_key",required=True)
-        
+
+        # setup translation attributes
+        self.sync_tr = dict()
+        self.sync_tr['node'] = { 'add':'NodeAdd',
+                                 'add_accepts':['site','hostname'],
+                                 'upd':'NodeUpdate',
+                                 'upd_accepts':['id','hostname','networks'],
+                                 'del':'NodeDelete' }
+        self.sync_tr['user'] = { 'add':'PersonAdd',
+                                 'add_accepts':['name','email','url','phone',
+                                                'passwd','roles'],
+                                 'upd':'PersonUpdate',
+                                 'upd_accepts':['id','name','email','url',
+                                                'phone','passwd','roles',
+                                                'keys','sites'],
+                                 'del':'PersonDelete' }
+        self.sync_tr['project'] = { 'add':'SiteAdd',
+                                    'add_accepts':['name','url',
+                                                   'longitude','latitude'],
+                                    'upd':'SiteUpdate',
+                                    'upd_accepts':['id','url',
+                                                   'longitude','latitude'],
+                                    'del':'SiteDelete' }
+
+        return
+
+    def __filterdict(self,d,key_list):
+        retval = dict()
+        for k in key_list:
+            if d.has_key(k):
+                retval[k] = d[k]
+                pass
+            pass
+        return retval
+
+    def syncSupport(self):
+        return self.sync_tr.keys()
+
+    def syncObject(self,objtype,properties):
+        agent = self.__getAgent(None)
+        if not properties.has_key("id"):
+            method = getattr(agent,self.sync_tr[objtype]['add'])
+            args = self.sync_tr[objtype]['add_accepts']
+            fargs = self.__filterdict(properties,args)
+            if debug:
+                print "adding object of type '%s' with args '%s'" \
+                      % (objtype,fargs)
+            retval = tryXmlrpcCmd(method,fargs)
+            # NOTE: we also have to add the `id' field to properties so that
+            # the subsequent update call works.
+            properties['id'] = retval
+        else:
+            # cheat :-)
+            retval = properties['id']
+            pass
+
+        method = getattr(agent,self.sync_tr[objtype]['upd'])
+        args = self.sync_tr[objtype]['upd_accepts']
+        fargs = self.__filterdict(properties,args)
+        if debug:
+            print "updating object of type '%s' with args '%s'" \
+                  % (objtype,fargs)
+        tryXmlrpcCmd(method,self.__filterdict(properties,args))
+
+        return retval
+
+    def deleteObject(self,objtype,id):
+        agent = self.__getAgent(None)
+
+        method = getattr(agent,self.sync_tr[objtype]['del'])
+        tryXmlrpcCmd(method,(id,))
+
         return
 
     def createSlice(self,slice):
