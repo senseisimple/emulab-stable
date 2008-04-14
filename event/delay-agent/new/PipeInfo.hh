@@ -23,10 +23,12 @@ struct PipeInfo
     , parameters(g::defaultParameters)
     , interface(newInterface)
     , pipeData(newPipeData)
-#if 0
-    , rawPipe(new EventPipe(linkName))
-#else
+#if defined LINUX
     , rawPipe(new NetlinkPipe(newInterface, newPipeData))
+#elif defined FREEBSD
+    , rawPipe(new DummynetPipe(newPipeData))
+#else
+    , rawPipe(new EventPipe(linkName))
 #endif
   {
   }

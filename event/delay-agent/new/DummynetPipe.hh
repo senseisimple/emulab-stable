@@ -10,7 +10,7 @@ struct dn_pipe;
 class DummynetPipe : public RootPipe
 {
 public:
-  DummynetPipe(std::string const & name);
+  DummynetPipe(std::string const & newPipeNumber);
   virtual ~DummynetPipe();
   virtual void reset(void);
   virtual void resetParameter(Parameter const & newParameter);
@@ -46,8 +46,6 @@ private:
 class NetlinkPipe : public RootPipe
 {
 public:
-  // 'name' will be prefixed with "new-" plus the original agent's
-  // name. To call the old agent, simply remove the prefix.
   NetlinkPipe(std::string const & iface, std::string const & pipeno);
   virtual ~NetlinkPipe();
   virtual void reset(void);

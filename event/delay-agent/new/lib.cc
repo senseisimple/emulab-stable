@@ -2,8 +2,10 @@
 
 #include "lib.hh"
 
+#ifdef LINUX
 #include <netlink/netlink.h>
 #include <netlink/route/link.h>
+#endif
 
 using namespace std;
 

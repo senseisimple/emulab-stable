@@ -45,6 +45,7 @@ using namespace std;
 
 DummynetPipe::DummynetPipe(std::string const & pipeno)
 {
+  cerr << "Creating Dummynet Pipe" << endl;
   dummynetPipeNumber = stringToInt(pipeno);
 
   dummynetSocket = socket(AF_INET, SOCK_RAW, IPPROTO_RAW);
@@ -91,14 +92,28 @@ void DummynetPipe::updateParameter(struct dn_pipe* pipe, Parameter const & newPa
 {
   switch (newParameter.getType())
   {
+  case Parameter::LINK_UP:
+    if (newParameter.getValue() == 0)
+    {
+      // Link down
+      pipe->fs.plr = 0x7fffffff;
+    }
+    else
+    {
+      // Link up
+      pipe->fs.plr = 0;
+    }
+    break;
   case Parameter::BANDWIDTH:
-    pipe->bandwidth = newParameter.getValue();
+    pipe->bandwidth = newParameter.getValue() * 1000;
     break;
   case Parameter::DELAY:
     pipe->delay = newParameter.getValue();
     break;
-  default:
-    // TODO: Handle UP and DOWN events
+  case Parameter::LOSS:
+    // TODO: Loss
+    break;
+  case Parameter::NOTHING:
     break;
   }
 }
@@ -141,13 +156,14 @@ char * DummynetPipe::callGetsockopt(char * data, size_t * count)
 
 char * DummynetPipe::getAllPipes(void)
 {
-  static vector<char> data(sizeof(struct dn_pipe));
+  static vector<char> data(sizeof(struct dn_pipe), '\0');
   char * result = & data[0];
-  size_t num_bytes = 0;
+  size_t num_bytes = data.size();
   result = callGetsockopt(& data[0], &num_bytes);
   while (num_bytes >= data.size() && result != NULL)
   {
     data.resize(data.size()*2 + 200);
+    num_bytes = data.size();
     result = callGetsockopt(& data[0], &num_bytes);
   }
   return result;
@@ -157,7 +173,7 @@ struct dn_pipe * DummynetPipe::findPipe(char *data)
 {
   struct dn_pipe *p, *pipe;
   int l;
-  
+
   pipe = NULL;
   p = (struct dn_pipe *) data;
 
@@ -216,168 +232,169 @@ using namespace std;
 
 NetlinkPipe::NetlinkPipe(std::string const & iface, std::string const & pipeno)
 {
-	interfaceName = iface;
-	pipeNumber = pipeno;
-	nl_handle = NULL;
-	class_cache = NULL;
-	qdisc_cache = NULL;
-	
-	init();
-	/* test(); */
+  cerr << "Creating Netlink Pipe" << endl;
+        interfaceName = iface;
+        pipeNumber = pipeno;
+        nl_handle = NULL;
+        class_cache = NULL;
+        qdisc_cache = NULL;
+
+        init();
+        /* test(); */
 }
 
 void NetlinkPipe::test(void)
 {
-	Parameter testParam(Parameter::LOSS, 50000);
+        Parameter testParam(Parameter::LOSS, 50000);
 
-	updateParameter(testParam);
+        updateParameter(testParam);
 }
 
 int NetlinkPipe::init(void)
 {
-	struct nl_cache *link_cache;
-	int handle;
-	string str;
+        struct nl_cache *link_cache;
+        int handle;
+        string str;
 
-	link_cache = NULL;
+        link_cache = NULL;
 
-	cerr << "Got pipe number " << pipeNumber << endl;
-	handle = hexStringToInt(pipeNumber);
-	cerr << "handle: " << handle << endl;
+        cerr << "Got pipe number " << pipeNumber << endl;
+        handle = hexStringToInt(pipeNumber);
+        cerr << "handle: " << handle << endl;
 
-	nl_handle = nl_handle_alloc();
-	if (nl_handle == NULL) {
-		cerr << "Unable to allocate nl_handle" << endl;
-		return -1;
-	}
+        nl_handle = nl_handle_alloc();
+        if (nl_handle == NULL) {
+                cerr << "Unable to allocate nl_handle" << endl;
+                return -1;
+        }
 
-	if (nl_connect(nl_handle, NETLINK_ROUTE) < 0) {
-		cerr << "Unable to allocate Netlink socket" << endl;
-		return -1;
-	}
-	link_cache = rtnl_link_alloc_cache(nl_handle);
-	if (link_cache == NULL) {
-		cerr << "Unable to allocate link cache" << endl;
-		return -1;
-	}
+        if (nl_connect(nl_handle, NETLINK_ROUTE) < 0) {
+                cerr << "Unable to allocate Netlink socket" << endl;
+                return -1;
+        }
+        link_cache = rtnl_link_alloc_cache(nl_handle);
+        if (link_cache == NULL) {
+                cerr << "Unable to allocate link cache" << endl;
+                return -1;
+        }
 
-	ifindex = rtnl_link_name2i(link_cache, interfaceName.c_str());
-	if (ifindex == RTNL_LINK_NOT_FOUND) {
-		cerr << "Unable to translate link name to ifindex" << endl;
-		return -1;
-	}
-	nl_cache_free(link_cache);
+        ifindex = rtnl_link_name2i(link_cache, interfaceName.c_str());
+        if (ifindex == RTNL_LINK_NOT_FOUND) {
+                cerr << "Unable to translate link name to ifindex" << endl;
+                return -1;
+        }
+        nl_cache_free(link_cache);
 
-	qdisc_cache = rtnl_qdisc_alloc_cache(nl_handle);
-	if (qdisc_cache == NULL) {
-		cerr << "Unable to allocate qdisc cache" << endl;
-		return -1;
-	}
+        qdisc_cache = rtnl_qdisc_alloc_cache(nl_handle);
+        if (qdisc_cache == NULL) {
+                cerr << "Unable to allocate qdisc cache" << endl;
+                return -1;
+        }
 
-	plrHandle = handle << 16;
-	delayHandle = (handle + 0x10) << 16;
-	htbHandle = (handle + 0x20) << 16;
+        plrHandle = handle << 16;
+        delayHandle = (handle + 0x10) << 16;
+        htbHandle = (handle + 0x20) << 16;
 
-	class_cache = rtnl_class_alloc_cache(nl_handle, ifindex);
-	if (class_cache == NULL) {
-		cerr << "Unable to allocate class cache" << endl;
-		return -1;
-	}
+        class_cache = rtnl_class_alloc_cache(nl_handle, ifindex);
+        if (class_cache == NULL) {
+                cerr << "Unable to allocate class cache" << endl;
+                return -1;
+        }
 
-	htbClassHandle = htbHandle + 1;
+        htbClassHandle = htbHandle + 1;
 
 
-	return 0;
+        return 0;
 }
 
 NetlinkPipe::~NetlinkPipe()
 {
-	if (qdisc_cache)
-		nl_cache_free(qdisc_cache);
+        if (qdisc_cache)
+                nl_cache_free(qdisc_cache);
 
-	if (class_cache)
-		nl_cache_free(class_cache);
+        if (class_cache)
+                nl_cache_free(class_cache);
 
-	if (nl_handle)
-		nl_close(nl_handle);
+        if (nl_handle)
+                nl_close(nl_handle);
 }
 
 void NetlinkPipe::reset(void)
 {
-	map<Parameter::ParameterType, Parameter>::iterator pos = g::defaultParameters.begin();
-	map<Parameter::ParameterType, Parameter>::iterator limit = g::defaultParameters.end();
+        map<Parameter::ParameterType, Parameter>::iterator pos = g::defaultParameters.begin();
+        map<Parameter::ParameterType, Parameter>::iterator limit = g::defaultParameters.end();
 
-	for (; pos != limit; ++pos)
-	{
-		updateParameter(pos->second);
-	}
+        for (; pos != limit; ++pos)
+        {
+                updateParameter(pos->second);
+        }
 }
 
 void NetlinkPipe::resetParameter(Parameter const & newParameter)
 {
-	updateParameter(newParameter);
+        updateParameter(newParameter);
 }
 
 void NetlinkPipe::updateParameter(Parameter const & newParameter)
 {
-	struct rtnl_qdisc *qdisc;
-	struct rtnl_class *htbClass;
+        struct rtnl_qdisc *qdisc;
+        struct rtnl_class *htbClass;
 
-	qdisc = NULL;
+        qdisc = NULL;
 
-	switch(newParameter.getType()) {
-		case Parameter::BANDWIDTH:
-				htbClass = rtnl_class_get(class_cache, htbClassHandle);
-				if (htbClass == NULL) {
-					cerr << "Couldn't find htb class " << htbClassHandle << endl;
-					return;
-				}
-				rtnl_htb_set_rate(htbClass, newParameter.getValue());
-				rtnl_htb_set_ceil(htbClass, newParameter.getValue());
-				rtnl_class_change(nl_handle, htbClass, NULL);
-				rtnl_class_put(htbClass);
+        switch(newParameter.getType()) {
+                case Parameter::BANDWIDTH:
+                                htbClass = rtnl_class_get(class_cache, htbClassHandle);
+                                if (htbClass == NULL) {
+                                        cerr << "Couldn't find htb class " << htbClassHandle << endl;
+                                        return;
+                                }
+                                rtnl_htb_set_rate(htbClass, newParameter.getValue());
+                                rtnl_htb_set_ceil(htbClass, newParameter.getValue());
+                                rtnl_class_change(nl_handle, htbClass, NULL);
+                                rtnl_class_put(htbClass);
                                 break;
-		case Parameter::DELAY:
-				qdisc = rtnl_qdisc_get(qdisc_cache, ifindex, delayHandle);
-				if (qdisc == NULL) {
-					cerr << "Couldn't find delay qdisc " << delayHandle << endl;
-					return;
-				}
-				rtnl_delay_set_delay(qdisc, newParameter.getValue());
-				rtnl_qdisc_change(nl_handle, qdisc, NULL);
-				rtnl_qdisc_put(qdisc);
+                case Parameter::DELAY:
+                                qdisc = rtnl_qdisc_get(qdisc_cache, ifindex, delayHandle);
+                                if (qdisc == NULL) {
+                                        cerr << "Couldn't find delay qdisc " << delayHandle << endl;
+                                        return;
+                                }
+                                rtnl_delay_set_delay(qdisc, newParameter.getValue());
+                                rtnl_qdisc_change(nl_handle, qdisc, NULL);
+                                rtnl_qdisc_put(qdisc);
                                 break;
-		case Parameter::LOSS:
-				qdisc = rtnl_qdisc_get(qdisc_cache, ifindex, plrHandle);
-				if (qdisc == NULL) {
-					cerr << "Couldn't find plr qdisc " << plrHandle << endl;
-					return;
-				}
-				rtnl_plr_set_plr(qdisc, newParameter.getValue());
-				rtnl_qdisc_change(nl_handle, qdisc, NULL);
-				rtnl_qdisc_put(qdisc);
+                case Parameter::LOSS:
+                                qdisc = rtnl_qdisc_get(qdisc_cache, ifindex, plrHandle);
+                                if (qdisc == NULL) {
+                                        cerr << "Couldn't find plr qdisc " << plrHandle << endl;
+                                        return;
+                                }
+                                rtnl_plr_set_plr(qdisc, newParameter.getValue());
+                                rtnl_qdisc_change(nl_handle, qdisc, NULL);
+                                rtnl_qdisc_put(qdisc);
                                 break;
-		case Parameter::LINK_UP:
-				uint32_t value;
+                case Parameter::LINK_UP:
+                                uint32_t value;
 
-				if (newParameter.getValue()) {
-					value = 1;
-				}
-				else {
-					value = 0x7ffffffff;
-				}
-				qdisc = rtnl_qdisc_get(qdisc_cache, ifindex, plrHandle);
-				if (qdisc == NULL) {
-					cerr << "Couldn't find plr qdisc " << plrHandle << endl;
-					return;
-				}
-				rtnl_plr_set_plr(qdisc, value);
-				rtnl_qdisc_change(nl_handle, qdisc, NULL);
-				rtnl_qdisc_put(qdisc);
+                                if (newParameter.getValue()) {
+                                        value = 1;
+                                }
+                                else {
+                                        value = 0x7ffffffff;
+                                }
+                                qdisc = rtnl_qdisc_get(qdisc_cache, ifindex, plrHandle);
+                                if (qdisc == NULL) {
+                                        cerr << "Couldn't find plr qdisc " << plrHandle << endl;
+                                        return;
+                                }
+                                rtnl_plr_set_plr(qdisc, value);
+                                rtnl_qdisc_change(nl_handle, qdisc, NULL);
+                                rtnl_qdisc_put(qdisc);
                                 break;
-		default:
-				break;
-	}
+                default:
+                                break;
+        }
 }
 
 #endif

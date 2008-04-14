@@ -7,6 +7,7 @@ using namespace std;
 
 EventPipe::EventPipe(std::string const & name)
 {
+  cerr << "Creating Event pipe" << endl;
   agentName = name;
 }
 
