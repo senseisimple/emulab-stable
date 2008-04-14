@@ -170,7 +170,7 @@ void readMapFile(string const & mapFile, string & linkSubscribe, string & resetS
       g::pipeVault.push_front(first);
       g::pipes.insert(make_pair(/*"new" + */first.name, g::pipeVault.begin()));
       g::pipes.insert(make_pair(/*"new" + */first.linkName, g::pipeVault.begin()));
-      addEntry(linkSubscribe, /*"new" + */first.endName);
+      addEntry(linkSubscribe, /*"new" + */first.linkName);
       addEntry(linkSubscribe, /*"new" + */first.name);
 
       addEntry(resetSubscribe, /*"new" + */first.name);

@@ -357,6 +357,24 @@ void NetlinkPipe::updateParameter(Parameter const & newParameter)
 				rtnl_qdisc_change(nl_handle, qdisc, NULL);
 				rtnl_qdisc_put(qdisc);
                                 break;
+		case Parameter::LINK_UP:
+				uint32_t value;
+
+				if (newParameter.getValue()) {
+					value = 1;
+				}
+				else {
+					value = 0x7ffffffff;
+				}
+				qdisc = rtnl_qdisc_get(qdisc_cache, ifindex, plrHandle);
+				if (qdisc == NULL) {
+					cerr << "Couldn't find plr qdisc " << plrHandle << endl;
+					return;
+				}
+				rtnl_plr_set_plr(qdisc, value);
+				rtnl_qdisc_change(nl_handle, qdisc, NULL);
+				rtnl_qdisc_put(qdisc);
+                                break;
 		default:
 				break;
 	}
