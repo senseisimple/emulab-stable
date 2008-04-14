@@ -47,13 +47,16 @@ my $PLABMOND_EID    = PLABMOND_EID();
 my $PLABHOLDING_PID = PLABHOLDING_PID();
 my $PLABHOLDING_EID = PLABHOLDING_EID();
 
+my $plcname = '';
+
 sub new($$$$$) {
 
     # The next two lines are some voodoo taken from perltoot(1)
     my $proto = shift;
     my $class = ref($proto) || $proto;
 
-    my ($poolname, $poolpid, $pooleid, $chpid2pool) = @_;
+    my ($plcid, $poolname, $poolpid, $pooleid, $chpid2pool) = @_;
+    $plcname = $plcid;
 
     #
     # Create the actual object
@@ -249,11 +252,11 @@ sub processchild($$$) {
         delete $self->{'PENDING'}->{$pnode->{'name'}};
         if (!$exstat) {
             print "Teardown of $pnode->{'vnode'} complete\n";
-            Log(STATUSLOG(libplabmon::getPLCName()),
+            Log(STATUSLOG($plcname),
 		$logmsg . "teardown, success, teardown succeeded.");
         } else {
             print "Teardown of $pnode->{'vnode'} failed: $exstat\n";
-            Log(STATUSLOG(libplabmon::getPLCName()),
+            Log(STATUSLOG($plcname),
 		$logmsg . "teardown, fail, teardown failed.");
         }
 
@@ -302,7 +305,7 @@ sub processchild($$$) {
         $self->teardownnode($pnode);
         $self->calcnextcheck($pnode);
         $pnode->{'consecfails'}++;
-        Log(STATUSLOG(libplabmon::getPLCName()), $logmsg);
+        Log(STATUSLOG($plcname), $logmsg);
     } else {
         # Instantiation was successful.
         # Setup a timeout to wait for ISUP.
@@ -330,7 +333,7 @@ sub checkexpiration($) {
                     # Yes!  Node is up.
                     print "Setup of $pnode->{'vnode'} on $pnode->{'name'} ".
                         " succeeded\n";
-                    Log(STATUSLOG(libplabmon::getPLCName()),
+                    Log(STATUSLOG($plcname),
 			"$self->{'NAME'}, $pnode->{'name'}, ".
                         "setup, success, node came up successfully.");
                     $self->nodesetupcomplete($pnode);

@@ -54,13 +54,16 @@ my $PLABDOWN_EID    = PLABDOWN_EID();
 my $PLABTESTING_PID = PLABTESTING_PID();
 my $PLABTESTING_EID = PLABTESTING_EID();
 
+my $plcname = '';
+
 sub new($$$$$) {
 
     # The next two lines are some voodoo taken from perltoot(1)
     my $proto = shift;
     my $class = ref($proto) || $proto;
 
-    my ($poolname, $poolpid, $pooleid, $chpid2pool) = @_;
+    my ($plcid, $poolname, $poolpid, $pooleid, $chpid2pool) = @_;
+    $plcname = $plcid;
 
     #
     # Create the actual object
@@ -77,11 +80,9 @@ sub new($$$$$) {
     # Clean up anything left behind by a terminated monitor
     # XXX: this is kind of hacky, but it works.
     #
-    # NOTE: we grab all the nodes for this plc, OR any vnodes in this 
-    # experiment that don't have entries in the plab_slice_nodes table.
-    # This presents a nice race, but we don't have a great way to solve 
-    # right now.
-    my $plcname = libplabmon::getPLCName();
+
+    # figure out 
+
     my @vnodes = ();
     my $qres = DBQueryFatal("select r.node_id" . 
 			    " from reserved as r" . 
@@ -89,10 +90,12 @@ sub new($$$$$) {
 			    "   on r.node_id=psn.node_id" . 
 			    " left join plab_plc_info as ppi" . 
 			    "   on psn.plc_idx=ppi.plc_idx" . 
+			    " left join nodes as n" . 
+			    "   on r.node_id=n.node_id" . 
 			    " where r.pid='$PLABTESTING_PID'" . 
 			    "   and r.eid='$PLABTESTING_EID'" . 
-			    "   and (ppi.plc_name='$plcname'" . 
-			    "        or ppi.plc_name is NULL)");
+			    "   and ppi.plc_name='$plcname'" . 
+			    "   and n.type=ppi.node_type");
     if ($qres->num_rows()) {
 	while (my @row = $qres->fetchrow_array()) {
 	    my $vnodename = $row[0];
@@ -100,7 +103,9 @@ sub new($$$$$) {
 	}
     }
     if (@vnodes) {
-        system("$VNODE_SETUP -f -k -n 100 $PLABTESTING_PID $PLABTESTING_EID");
+	my $nodelist = join(" ",@vnodes);
+        system("$VNODE_SETUP -f -k -n 100" . 
+	       " $PLABTESTING_PID $PLABTESTING_EID $nodelist");
         Node::DeleteVnodes(@vnodes);
     }
 

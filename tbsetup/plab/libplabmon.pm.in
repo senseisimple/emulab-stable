@@ -11,8 +11,7 @@ use Exporter;
 use vars qw(@ISA @EXPORT);
 
 @ISA    = "Exporter";
-@EXPORT = qw (MIN TimeStamp getLA OpenLog Log STATUSLOG STATUSLOGPATH
-	      getPLCName setPLCName);
+@EXPORT = qw (MIN TimeStamp getLA OpenLog Log STATUSLOG STATUSLOGPATH);
 
 # Must come after package declaration!
 use lib '@prefix@/lib';
@@ -30,18 +29,6 @@ my $UPTIME       = "/usr/bin/uptime";
 
 # package vars
 my %logs = ();
-my $plcname;
-
-sub setPLCName {
-    my $tplcname = shift;
-    if (defined($tplcname)) {
-	$plcname = $tplcname;
-    }
-}
-
-sub getPLCName {
-    return $plcname;
-}
 
 sub STATUSLOG { 
     my $log = shift || '';

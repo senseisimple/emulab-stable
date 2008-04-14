@@ -98,7 +98,7 @@ if (scalar(@ARGV) == 1) {
     $plcname = shift(@ARGV);
 
     # XXX need to escape this better
-    if ($plcname =~ /\'/) {
+    if (!($plcname =~ /^[\w\d\-]+$/)) {
 	print STDERR "plcname has illegal characters: $plcname\n";
 	usage();
     }
@@ -112,9 +112,6 @@ if (scalar(@ARGV) == 1) {
     }
 
     ($plcname,$plctype) = $qres->fetchrow_array();
-
-    # tell other libplabmon users, sigh
-    libplabmon::setPLCName($plcname);
 }
 else {
     print STDERR "Must supply plcname argument!\n";
@@ -177,11 +174,13 @@ OpenLog(STATUSLOG($plcname), STATUSLOGPATH($plcname))
 #
 # Create the node pools.
 #
-my $badpool  = plabmon_badpool->new("bad", 
+my $badpool  = plabmon_badpool->new($plcname,
+				    "bad", 
                                     $PLABDOWN_PID, 
                                     $PLABDOWN_EID, 
                                     \%chpid2pool);
-my $goodpool = plabmon_goodpool->new("good", 
+my $goodpool = plabmon_goodpool->new($plcname,
+				     "good", 
                                      $PLABHOLDING_PID, 
                                      $PLABHOLDING_EID, 
                                      \%chpid2pool);
