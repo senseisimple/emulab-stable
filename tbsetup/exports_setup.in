@@ -40,7 +40,7 @@ my $DISABLED	= "@DISABLE_EXPORTS_SETUP@";
 my $WINSUPPORT  = @WINSUPPORT@;
 
 # XXX should be config variable
-my $ISOLATEADMIN= 0;
+my $ISOLATEADMIN= 1;
 
 # XXX for TESTMODE: output to stdout
 my $TOSTDOUT	= 0;
