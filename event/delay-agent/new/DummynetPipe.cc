@@ -337,18 +337,20 @@ void NetlinkPipe::updateParameter(Parameter const & newParameter)
 {
         struct rtnl_qdisc *qdisc;
         struct rtnl_class *htbClass;
+	int rate;
 
         qdisc = NULL;
 
 	switch(newParameter.getType()) {
 		case Parameter::BANDWIDTH:
+				rate = newParameter.getValue() * 1000 / 8;
 				htbClass = rtnl_class_get(class_cache, htbClassHandle);
 				if (htbClass == NULL) {
 					cerr << "Couldn't find htb class " << htbClassHandle << endl;
 					return;
 				}
-				rtnl_htb_set_rate(htbClass, newParameter.getValue() * 1000);
-				rtnl_htb_set_ceil(htbClass, newParameter.getValue() * 1000);
+				rtnl_htb_set_rate(htbClass, rate);
+				rtnl_htb_set_ceil(htbClass, rate);
 				rtnl_class_change(nl_handle, htbClass, NULL);
 				rtnl_class_put(htbClass);
                                 break;

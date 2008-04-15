@@ -29,6 +29,7 @@ sub check
     system($command);
 }
 
+sendEvent("$link", "UP");
 sendEvent($link, "MODIFY DELAY=30");
 sendEvent($link, "MODIFY BANDWIDTH=1000");
 sendEvent("$link-$node1", "MODIFY DELAY=10");
