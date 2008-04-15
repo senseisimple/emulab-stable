@@ -98,7 +98,7 @@ diff -urN linux-2.6.20-1.2944.fc6.emulab-1/net/sched/Makefile linux-2.6.20-1.294
 diff -urN linux-2.6.20-1.2944.fc6.emulab-1/net/sched/sch_delay.c linux-2.6.20-1.2944.fc6.emulab-1-linkdelay/net/sched/sch_delay.c
 --- linux-2.6.20-1.2944.fc6.emulab-1/net/sched/sch_delay.c	1969-12-31 17:00:00.000000000 -0700
 +++ linux-2.6.20-1.2944.fc6.emulab-1-linkdelay/net/sched/sch_delay.c	2007-09-27 23:36:59.000000000 -0600
-@@ -0,0 +1,732 @@
+@@ -0,0 +1,731 @@
 +/*
 + * net/sched/sch_delay.c       Add a delay to anything going out...
 + *
@@ -769,7 +769,6 @@ diff -urN linux-2.6.20-1.2944.fc6.emulab-1/net/sched/sch_delay.c linux-2.6.20-1.
 +  DPRINTK(DQDISC, "{ delay_dump\n");
 +
 +  rta = (struct rtattr *)b;
-+  RTA_PUT(skb, TCA_OPTIONS, 0, NULL);
 +
 +  /* XXX: fix locking */
 +  //sch_tree_lock(sch);
@@ -777,7 +776,7 @@ diff -urN linux-2.6.20-1.2944.fc6.emulab-1/net/sched/sch_delay.c linux-2.6.20-1.
 +  opt.reset_time = p->reset_time;
 +  //sch_tree_unlock(sch);
 +
-+  RTA_PUT(skb, TCA_DELAY_PARMS, sizeof(opt), &opt);
++  RTA_PUT(skb, TCA_OPTIONS, sizeof(opt), &opt);
 +
 +  DPRINTK(DQDISC, "} delay_dump\n");
 +  rta->rta_len = skb->tail - b;
@@ -834,7 +833,7 @@ diff -urN linux-2.6.20-1.2944.fc6.emulab-1/net/sched/sch_delay.c linux-2.6.20-1.
 diff -urN linux-2.6.20-1.2944.fc6.emulab-1/net/sched/sch_plr.c linux-2.6.20-1.2944.fc6.emulab-1-linkdelay/net/sched/sch_plr.c
 --- linux-2.6.20-1.2944.fc6.emulab-1/net/sched/sch_plr.c	1969-12-31 17:00:00.000000000 -0700
 +++ linux-2.6.20-1.2944.fc6.emulab-1-linkdelay/net/sched/sch_plr.c	2007-09-27 22:58:45.000000000 -0600
-@@ -0,0 +1,417 @@
+@@ -0,0 +1,416 @@
 +/*
 + * net/sched/sch_plr.c probibalistically drop packets
 + *
@@ -1189,7 +1188,6 @@ diff -urN linux-2.6.20-1.2944.fc6.emulab-1/net/sched/sch_plr.c linux-2.6.20-1.29
 +  DPRINTK(DQDISC, "{ plr_dump\n");
 +
 +  rta = (struct rtattr *)b;
-+  RTA_PUT(skb, TCA_OPTIONS, 0, NULL);
 +
 +  DPRINTK(DQDISC, "  plr_dump a\n");
 +
@@ -1200,7 +1198,7 @@ diff -urN linux-2.6.20-1.2944.fc6.emulab-1/net/sched/sch_plr.c linux-2.6.20-1.29
 +
 +  DPRINTK(DQDISC, "  plr_dump b\n");
 +
-+  RTA_PUT(skb, TCA_PLR_PARMS, sizeof(opt), &opt);
++  RTA_PUT(skb, TCA_OPTIONS, sizeof(opt), &opt);
 +
 +  DPRINTK(DQDISC, "} plr_dump\n");
 +  rta->rta_len = skb->tail - b;
