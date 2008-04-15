@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 , 2008University of Utah and the Flux Group.
 # All rights reserved.
 #
 SRCDIR		= @srcdir@
@@ -83,6 +83,9 @@ endif
 ifeq ($(SYSTEM),FreeBSD)
 ifeq ($(MDSUBDIR),freebsd4)
 MDSUBDIR  = freebsd
+endif
+ifeq ($(MDSUBDIR),freebsd8)
+MDSUBDIR  = freebsd7
 endif
 endif
 
