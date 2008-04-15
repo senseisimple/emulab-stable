@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -16,12 +16,13 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print "Usage: delaysetup [-i | -u]\n";
+    print "Usage: delaysetup [-i | -u] [-j <vnodeid>]\n";
     exit(1);
 }
-my $optlist   = "iu";
+my $optlist   = "iuj:";
 my $install   = 0;
 my $uninstall = 0;
+my $vnodeid;
 
 # Drag in path stuff so we can find emulab stuff.
 BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
@@ -33,8 +34,8 @@ $| = 1;
 
 #
 # Load the OS independent support library. It will load the OS dependent
-# library and initialize itself. 
-# 
+# library and initialize itself.
+#
 use libsetup;
 use libtmcc;
 
@@ -55,8 +56,19 @@ if (defined($options{"i"})) {
 if (defined($options{"u"})) {
     $uninstall = 1;
 }
+if (defined($options{"j"})) {
+    $vnodeid = $options{"j"};
+    libsetup_setvnodeid($vnodeid);
+    # Tell tmcc library, although thats already been done with previous call.
+    configtmcc("subnode", $vnodeid);
+}
 if (@ARGV) {
     usage();
+}
+
+# XXX not yet
+if (defined($vnodeid)) {
+    exit(0);
 }
 
 #

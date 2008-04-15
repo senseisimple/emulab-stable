@@ -8,6 +8,8 @@ use strict;
 use English;
 use Getopt::Std;
 
+my $DOSETUP = 1;
+
 sub usage()
 {
     print "Usage: [-d] start|stop\n";
@@ -60,7 +62,7 @@ if ($action eq "stop") {
     $SIG{TERM} = 'IGNORE';
     system("kill -TERM -1");
     sleep(1);
-    system("kill -KILL -1");
+    #system("kill -KILL -1");
     exit(0);
 }
 # So that rc will know to invoke us to stop.
@@ -87,8 +89,14 @@ exit(0);
 #
 sub DoBoot()
 {
+    if (!$DOSETUP) {
+	TBDebugTimeStamp("rc.invserver WARNING not starting up");
+	system("touch $BOOTDIR/vrunning");
+	return;
+    }
+
     TBDebugTimeStamp("rc.invserver starting up");
-    
+
     print("Checking Testbed reservation status\n");
     my ($pid, $eid, $vname) = jailsetup();
 
@@ -127,9 +135,8 @@ sub DoBoot()
     }
     TBDebugTimeStamp("rc.invserver done running config scripts");
 
-    # Linktest daemon now runs inside jails.
-    if (-x "$RCDIR/rc.linktest") {
-	print("Starting linktest daemon\n");
+    # Linktest daemon now runs inside (local) jails.
+    if (-x "$RCDIR/rc.linktest" && !REMOTE()) {
 	system("$RCDIR/rc.linktest start");
 	if ($?) {
 	    BootFatal("Error running $RCDIR/rc.linktest");

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -82,6 +82,7 @@ my ($pid, $eid, $vname) = check_nickname();
 #
 print("Starting linktest daemon\n");
 
+my $server = getlocalevserver();
 system("linktest -e $pid/$eid ".
-       "-s localhost -l $logfile -i $pidfile -k $keyfile -u $swapper");
+       "-s $server -l $logfile -i $pidfile -k $keyfile -u $swapper");
 exit($? >> 0);

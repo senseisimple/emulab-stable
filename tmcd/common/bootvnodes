@@ -46,6 +46,11 @@ my $daemon  = 1;
 my $reconfig= 0;
 my $action;
 
+# Prototypes
+sub prebootvnodes($$);
+sub postbootvnodes($$);
+sub bootvnode($$$);
+
 #
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
@@ -101,38 +106,6 @@ if ($daemon && TBBackGround($logname)) {
     # Parent exits normally
     #
     exit(0);
-}
-
-#
-# Helper function to boot/kill/halt/reboot a specific vnode.
-#
-sub bootvnode($$$)
-{
-    my ($vnode, $action, $jailed) = @_;
-    my $opt;
-    my $act;
-
-    if ($action eq "halt") {
-	$opt = "-h";
-	$act = "Halting";
-    }
-    elsif ($action eq "reboot") {
-	$opt = "-r";
-	$act = "Rebooting";
-    }
-    elsif ($action eq "kill") {
-	$opt = "-k";
-	$act = "Killing";
-    }
-    else {
-	$opt = "-b";
-	$act = "Booting";
-    }
-    $opt .= ($jailed ? " -jVt" : " -i");
-    
-    print "$act vnode $vnode ...\n";
-    system("vnodesetup $opt $vnode");
-    return($?);
 }
 
 #
@@ -221,40 +194,54 @@ exit(0)
 exit(0)
     if (! scalar(keys(%newvnodelist)));
 
+prebootvnodes(\%curvnodelist, \%newvnodelist)
+    if (!$fakejails);
+
+foreach my $vnode (sort(keys(%newvnodelist))) {
+    # Blocks until mostly setup. 
+    bootvnode($vnode, "boot", $newvnodelist{$vnode});
+}
+
+postbootvnodes(\%curvnodelist, \%newvnodelist)
+    if (!$fakejails);
+
+exit(0);
+
 #
-# XXX for fake jails, we don't do most of the following,
-# we just start em up.
+# Prepare the vnode host prior to individual vnode setup
+# Takes references to the current and new vnode hashes.
 #
-if ($fakejails) {
-    foreach my $vnode (sort(keys(%newvnodelist))) {
-	# Blocks until mostly setup. 
-	bootvnode($vnode, "boot", $newvnodelist{$vnode});
+sub prebootvnodes($$)
+{
+    my ($cvn, $nvn) = @_;
+
+    #
+    # For local vnodes, create the extra FS for filesystems and other state.
+    # This will fail if it already exists, so just keep going.
+    #
+    if (!REMOTE()) {
+	my $mntdir = $islinux ? "/vservers" : $vndir;
+	system("mkextrafs.pl $mntdir");
     }
-    exit(0);
-}
 
-#
-# If booting with vnodes, then see about creating the extra FS.
-# This will fail if it already exists. Keep going on any failure though.
-#
-if (!REMOTE()) {
-    system("mkextrafs.pl " . ($islinux ? "/vservers" : $vndir));
-}
+    #
+    # Symlink /local into it.
+    #
+    if (! -e "/local") {
+	system("ln -s " . LOCALROOTFS() . " /local");
+    }
 
-#
-# Symlink /local into it.
-#
-if (! -e "/local") {
-    system("ln -s " . LOCALROOTFS() . " /local");
-}
+    #
+    # XXX OS dependent stuff.  Should move elsewhere
+    #
+    if ($islinux) {
+	return;
+    }
 
-if (!$islinux) {
     #
     # Make sure enough vn devices exist
     #
-    for (my $i = 0;
-	 $i < scalar(keys(%newvnodelist)) + scalar(keys(%curvnodelist));
-	 $i++) {
+    for (my $i = 0; $i < scalar(keys(%$nvn)) + scalar(keys(%$cvn)); $i++) {
 	my $dev = "vn${i}";
 	if (! -e "/dev/${dev}c") {
 	    system("(cd /dev; ./MAKEDEV $dev)");
@@ -268,32 +255,71 @@ if (!$islinux) {
     #
     system("sysctl net.inet.ip.intr_queue_maxlen=128 >/dev/null 2>&1");
     system("sysctl vfs.nfs.eacces_retry_enable=1 >/dev/null 2>&1");
+
+    #
+    # XXX grossed out yet?  Try this one: the mount command will HUP mountd
+    # after every successful mount.  Thus if mounts in one jail overlap NFS
+    # activity in another, the latter may be randomly killed off.
+    #
+    # Elegant solution: rename the mountd.pid file so mount cannot find it!
+    # XXX hmm...mountd_sux hack above should take care of this, and we need
+    # to hup mountd when we modify the exports file.
+    #
+    rename("/var/run/mountd.pid", "/var/run/mountd.thisreallysux")
+	if (-e "/var/run/mountd.pid");
 }
 
 #
-# XXX grossed out yet?  Try this one: the mount command will HUP mountd
-# after every successful mount.  Thus if mounts in one jail overlap NFS
-# activity in another, the latter may be randomly killed off.
+# Final setup of vnode host after individual vnode setup
+# Takes references to the current and new vnode hashes.
 #
-# Elegant solution: rename the mountd.pid file so mount cannot find it!
-# XXX hmm...mountd_sux hack above should take care of this, and we need
-# to hup mountd when we modify the exports file.
-#
-rename("/var/run/mountd.pid", "/var/run/mountd.thisreallysux")
-    if (-e "/var/run/mountd.pid");
+sub postbootvnodes($$)
+{
+    my ($cvn, $nvn) = @_;
 
-foreach my $vnode (sort(keys(%newvnodelist))) {
-    # Blocks until mostly setup. 
-    bootvnode($vnode, "boot", $newvnodelist{$vnode});
-}
+    #
+    # XXX OS dependent stuff.  Should move elsewhere
+    #
+    if ($islinux) {
+	return;
+    }
 
-if (!$islinux) {
     my $PIDFILE = "/var/run/progagent.pid";
 
-    foreach my $vnode (keys(%newvnodelist)) {
+    foreach my $vnode (keys(%$nvn)) {
 	system("rtprio 15 -`cat $vndir/$vnode/root/$PIDFILE`")
 	    if (-e "$vndir/$vnode/root/$PIDFILE");
     }
 }
 
-exit(0);
+#
+# Helper function to boot/kill/halt/reboot a specific vnode.
+#
+sub bootvnode($$$)
+{
+    my ($vnode, $action, $jailed) = @_;
+    my $opt;
+    my $act;
+
+    if ($action eq "halt") {
+	$opt = "-h";
+	$act = "Halting";
+    }
+    elsif ($action eq "reboot") {
+	$opt = "-r";
+	$act = "Rebooting";
+    }
+    elsif ($action eq "kill") {
+	$opt = "-k";
+	$act = "Killing";
+    }
+    else {
+	$opt = "-b";
+	$act = "Booting";
+    }
+    $opt .= ($jailed ? " -jVt" : " -i");
+    
+    print "$act vnode $vnode ...\n";
+    system("vnodesetup $opt $vnode");
+    return($?);
+}

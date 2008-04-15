@@ -21,12 +21,13 @@ use Exporter;
 	 jailsetup dojailconfig findiface libsetup_getvnodeid 
 	 ixpsetup libsetup_refresh gettopomap getfwconfig gettiptunnelconfig
 	 gettraceconfig genhostsfile getmotelogconfig calcroutes fakejailsetup
+	 getlocalevserver
 
 	 TBDebugTimeStamp TBDebugTimeStampsOn
 
 	 MFS REMOTE CONTROL WINDOWS JAILED PLAB LOCALROOTFS IXP USESFS 
 	 SIMTRAFGEN SIMHOST ISDELAYNODEPATH JAILHOST DELAYHOST STARGATE
-	 ISFW FAKEJAILED
+	 ISFW FAKEJAILED LINUXJAILED
 
 	 CONFDIR LOGDIR TMDELAY TMJAILNAME TMSIMRC TMCC
 	 TMNICKNAME TMSTARTUPCMD FINDIF
@@ -87,6 +88,12 @@ sub libsetup_getvnodeid()
 my $injail;
 
 #
+# True if $injail == TRUE and running on Linux.
+# Right now this means vserves on RHL.
+#
+my $inlinuxjail;
+
+#
 # True if running as a fake jail (no jail, just processes).
 # 
 my $nojail;
@@ -135,6 +142,9 @@ BEGIN
 
 	libsetup_setvnodeid($vid);
 	$injail = 1;
+	if ($^O eq "linux") {
+	    $inlinuxjail = 1;
+	}
     }
     elsif (exists($ENV{'FAKEJAIL'})) {
 	# Fake jail.
@@ -292,6 +302,7 @@ sub STARGATE()  { if (-e "$ETCDIR/isstargate") { return 1; } else { return 0; } 
 #
 sub JAILED()	{ if ($injail) { return $vnodeid; } else { return 0; } }
 sub FAKEJAILED(){ if ($nojail) { return $vnodeid; } else { return 0; } }
+sub LINUXJAILED(){ if ($injail && $inlinuxjail) { return $vnodeid; } else { return 0; } }
 
 #
 # Are we on plab?
@@ -1826,6 +1837,23 @@ sub whatsmynickname()
     }
 
     return "$vname.$eid.$pid";
+}
+
+#
+# Return the hostname or IP to use for a local event server.
+# Normally this is "localhost", but for virtual nodes which share an
+# event server via the physical host, it may be the IP of the physical host.
+#
+sub getlocalevserver()
+{
+    my $evserver = "localhost";
+
+    if (-e "$BOOTDIR/localevserver") {
+	$evserver = `cat $BOOTDIR/localevserver`;
+	chomp($evserver);
+    }
+
+    return $evserver;
 }
 
 #

@@ -13,6 +13,7 @@ use Fcntl;
 use IO::Handle;
 use Socket;
 use Fcntl ':flock';
+use POSIX ':sys_wait_h';
 
 # Drag in path stuff so we can find emulab stuff. Also untaints path.
 BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
@@ -85,10 +86,12 @@ STDERR->autoflush(1);
 # XXX
 my $JAILCNET	   = "172.16.0.0";
 my $JAILCNETMASK   = "255.240.0.0";
+my $JAILROUTER	   = "172.16.0.1";
 
+my $MOUNTELABFS	   = 1;
 my $USEPROXY	   = 1;
-my $USECHPID	   = 0;
-if ($USECHPID) {
+my $USENEWNET	   = 1;
+if ($USENEWNET) {
     $USEPROXY = 0;
 }
 
@@ -112,6 +115,7 @@ my $IPMASK;
 my $PID;
 my $VDIR;
 my $CDIR;
+my $JDIR;
 my $idnumber;
 my $jailhostname;
 my $jailpid;
@@ -123,6 +127,8 @@ my $USEHASHIFIED   = 0;
 my @controlroutes  = ();
 my $interactive    = 0;
 my $cleaning	   = 0;
+
+my $cnet_bridge_dev = "cbr0";
 
 # This stuff is passed from tmcd, which we parse into a config string
 # and an option set.
@@ -139,6 +145,10 @@ sub upvserver($);
 sub LoopMount($$);
 sub PreparePhysNode();
 sub PrepareFilesystems();
+sub SetupCnetBridge();
+sub CreateCnet($);
+sub DestroyCnet($);
+sub InjectIFs($);
 sub fatal($);
 sub getjailconfig($);
 sub setjailoptions();
@@ -175,7 +185,7 @@ if (defined($options{'s'})) {
     $interactive = 1;
 }
 
-TBDebugTimeStamp("mkjail starting to do real work");
+TBDebugTimeStamp("mkvserver starting to do real work");
 
 #
 # Get the parent IP.
@@ -241,18 +251,41 @@ if (! -e $vnodeid) {
 	fatal("Could not mkdir $vnodeid in $JAILPATH: $!");
 }
 else {
-    TBDebugTimeStamp("mkjail getting jail config");
+    TBDebugTimeStamp("mkvserver getting jail config");
     getjailconfig("$JAILPATH/$vnodeid");
 }
 
 my $phys_cnet_if = `control_interface`;
 chomp($phys_cnet_if);
 
+if (! -r "$BOOTDIR/myip" ||
+    ! -r "$BOOTDIR/mynetmask" ||
+    ! -r "$BOOTDIR/routerip") {
+    fatal("Need control net IP/mask/router for setting up vnode cnet");
+}
+my $cnet_ip = `cat $BOOTDIR/myip`;
+chomp($cnet_ip);
+my $cnet_mask = `cat $BOOTDIR/mynetmask`;
+chomp($cnet_mask);
+my $cnet_router = `cat $BOOTDIR/routerip`;
+chomp($cnet_router);
+
 #
 # See if special options supported, and if so setup args as directed.
 #
-TBDebugTimeStamp("mkjail setting jail options");
+TBDebugTimeStamp("mkvserver setting jail options");
 setjailoptions();
+
+#
+# Physical host's address on virtual control net.
+# Must be called after setjailoptions.
+#
+my $cnet_alias = inet_aton($IP);
+if ((inet_ntoa($cnet_alias & inet_aton($JAILCNETMASK)) eq $JAILCNET)) {
+    $cnet_alias = inet_ntoa($cnet_alias & inet_aton("255.255.255.0"));
+} else {
+    undef $cnet_alias;
+}
 
 # Do some prep stuff on the physical node if this is the first vserver.
 PreparePhysNode();
@@ -265,6 +298,25 @@ print("Setting up jail for $vnodeid using $IP\n")
 $VDIR = "$VSERVERDIR/$vnodeid";
 $CDIR = "/etc/vservers/$vnodeid";
 
+# XXX should really be the same as $VDIR
+$JDIR = "$JAILPATH/$vnodeid";
+
+#
+# Create and configure a control net interface
+#
+# XXX right now this is done before configuring the vserver since
+# it appears that the interface needs to be passed in.  Perhaps the
+# device doesn't actually need to exist during config and can be added
+# directly to the /etc/vservers config hierarchy.
+#
+my $cnetdev = CreateCnet($vnodeid);
+
+#
+# Set up experimental interfaces.
+#
+TBDebugTimeStamp("mkvserver doing ifsetup for vserver");
+mysystem("ifsetup -j $vnodeid boot");
+
 #
 # Create the vserver.
 #
@@ -272,7 +324,7 @@ if (-e $VDIR) {
     #
     # Try to pick up where we left off.
     #
-    TBDebugTimeStamp("mkjail restoring root fs");
+    TBDebugTimeStamp("mkvserver restoring root fs");
     upvserver("$vnodeid");
 }
 else {
@@ -282,7 +334,10 @@ else {
     TBDebugTimeStamp("Creating vserver");
     mkvserver("$vnodeid");
 }
-TBDebugTimeStamp("mkjail done with root fs");
+TBDebugTimeStamp("mkvserver done with root fs");
+
+# Create and configure experimental interfaces
+
 if ($USEPROXY) {
     startproxy("$vnodeid");
 }
@@ -294,10 +349,10 @@ if ($USEPROXY) {
 #
 my $childpid = fork();
 if ($childpid) {
-    #local $SIG{ALRM} = sub { kill("TERM", $childpid); };
-    #alarm 30;
+    local $SIG{ALRM} = sub { kill("TERM", $childpid); };
+    alarm 10;
     waitpid($childpid, 0);
-    #alarm 0;
+    alarm 0;
 
     #
     # If failure then cleanup.
@@ -311,47 +366,100 @@ else {
 
     TBDebugTimeStamp("mkvserver: starting the vserver");
 
-    exec("$VSERVER $vnodeid start");
+    unlink("$VDIR/$BOOTDIR/vserver.pid");
+    exec("$VSERVER $vnodeid start --rescue --rescue-init $BINDIR/vserver-init start");
     die("*** $0:\n".
 	"    exec failed to start the vserver!\n");
 }
 
 #
-# If this file does not exist, the inner setup failed somehow. Stop now.
+# XXX right now vservers are not that cleanly intergrated with network
+# namespaces.  To make an interface visible to a vserver, we have to
+# associate it with the name space.  This is done by writing the pid of
+# some process in the new namespace to a special file for the device in
+# the /sys pseudo-filesystem.  To do this, we of course need to know the
+# pid of some process in the namespace and we cannot know that until the
+# vserver has been started.  However, just blindly starting the vserver
+# will cause it to (among other things) start configuring and using
+# interfaces that it does not yet have.  So we have to do a little dance
+# with the vserver:
 #
+#  * wait for vserver to create $BOOTDIR/vserver.pid
+#  * inject network interfaces into vserver using that pid
+#  * tell vserver to continue by creating $BOOTDIR/ready
+#  * wait for vserver to create $BOOTDIR/vrunning
+#
+# If vrunning gets created we pronounce the vnode "set up".
+#
+TBDebugTimeStamp("mkvserver: waiting for vserver to start...");
+while (! -e "$VDIR/$BOOTDIR/vserver.pid") {
+    sleep(2);
+}
+my $vspid = `cat $VDIR/$BOOTDIR/vserver.pid`;
+chomp($vspid);
+TBDebugTimeStamp("mkvserver: vserver started, pid $vspid...");
+
+if (!InjectIFs($vspid)) {
+    # XXX force vserver to exit
+    unlink("$VDIR/$BOOTDIR/vserver.pid");
+}
+
+system("cp /dev/null $VDIR/$BOOTDIR/ready");
+TBDebugTimeStamp("mkvserver: interfaces ready, vserver released...");
+
+#
+# Give the vserver time to finish booting.
+# If the magic file does not get created, the inner setup failed somehow.
+# Stop now.
+#
+for (my $i = 0; $i < 10; $i++) {
+    last if (-e "$VDIR/$BOOTDIR/vrunning");
+    print "  waiting for vserver to setup...\n";
+    sleep(3);
+}
 fatal("vserver did not appear to set up properly. Exiting ...")
     if (! -e "$VDIR/$BOOTDIR/vrunning");
 
-print "vserver for $vnodeid started. Waiting ...\n";
-$jailpid = fork();
-if ($jailpid) {
-    #
-    # We do not really care about the exit status of the jail, we just want
-    # to know when it dies inside.
-    #
-    while (1) {
-	my $kidpid = waitpid(-1, 0);
+TBDebugTimeStamp("mkvserver: $vnodeid setup, waiting for termination...\n");
+RUNNING: while (1) {
+    $jailpid = fork();
+    if ($jailpid) {
+	#
+	# We do not really care about the exit status of the jail, we just want
+	# to know when it dies inside.
+	#
+	while (1) {
+	    my $kidpid = waitpid(-1, 0);
 
-	if ($kidpid == $jailpid) {
-	    undef($jailpid);
-	    last;
+	    #
+	    # Vserver exec command returned.  See if vserver exited
+	    # or if the sleep just ended.
+	    #
+	    if ($kidpid == $jailpid) {
+		if (system("$VSERVER $vnodeid running")) {
+		    # vserver is dead, cleanup
+		    undef($jailpid);
+		    last RUNNING;
+		}
+		# vserver sleep command returned, just restart it
+		print "vserver watchdog died, restarting\n";
+		last;
+	    } elsif ($USEPROXY && $kidpid == $tmccpid) {
+		print("TMCC proxy exited with status $?. Restarting ...\n");
+		startproxy("$vnodeid");
+	    } else {
+		print("Unknown child $kidpid exited with status $?!\n");
+	    }
 	}
-	if ($USEPROXY && $kidpid == $tmccpid) {
-	    print("TMCC proxy exited with status $?. Restarting ...\n");
-	    startproxy("$vnodeid");
-	    next;
-	}
-	print("Unknown child $kidpid exited with status $?!\n");
+    } else {
+	$SIG{TERM} = 'DEFAULT';
+
+	exec("$VSERVER $vnodeid exec sleep 1000000");
+	die("*** $0:\n".
+	    "    failed to start vserver watchdog!\n");
     }
 }
-else {
-    $SIG{TERM} = 'DEFAULT';
-
-    exec("$VSERVER $vnodeid exec sleep 1000000");
-    die("*** $0:\n".
-	"    exec failed to start the jail!\n");
-}
-print "vserver for $vnodeid has died. Cleaning up ...\n";
+TBDebugTimeStamp("mkvserver: $vnodeid has died, cleaning up ...\n");
 cleanup();
 exit(0);
 
@@ -368,28 +476,23 @@ sub mkvserver($)
     # The configuration directory is here.
     my $cdir = $CDIR;
 
-    if (defined($IP)) {
-	system("$VSERVERUTILS/mask2prefix $JAILCNETMASK");
-	my $prefix = $? >> 8;
-	$interface = "${vnodeid}=${phys_cnet_if}:${IP}/${prefix}";
-    }
-    else {
-	$interface = "nodev:0.0.0.0/0";
-    }
-
     my $enetifs = "";
 
     #
-    # XXX still need code to create etun devices outside the vserver.
-    # To create a pair you do:
-    #    echo etun0,etun1 > /sys/module/etun/parameters/newif
-    # To destroy do:
-    #    echo etun0 > /sys/module/etun/parameters/delif
-    # (just need to specify one end).  Apparently you can call these things
-    # whatever you want (e.g., "veth").
+    # Add all the interfaces that the vserver will have access to
     #
-    # Then configure the IFs with appropriate IPs.
+    # XXX setting the IP here may or may not be needed.  It gets cleared
+    # when we move the device into the vserver namespace later, but may
+    # still be needed here for establishing access control.
     #
+    if (defined($IP)) {
+	system("$VSERVERUTILS/mask2prefix $JAILCNETMASK");
+	my $prefix = $? >> 8;
+	$interface = "${vnodeid}=${cnetdev}:${IP}/${prefix}";
+    } else {
+	$interface = "nodev:0.0.0.0/0";
+    }
+
 if (0) {
     foreach my $ip (@jailips) {
 	my $iface = `$BINDIR/findif -i $ip`;
@@ -414,14 +517,31 @@ if (0) {
     # NET_BIND_SERVICE: Allows binding to TCP/UDP sockets below 1024
     # LBACK_REMAP:      Virtualize the loopback device
     # HIDE_LBACK:       Hide real address used for loopback
-    # HIDE_NETIF:       Hide "foreign" network interfaces
+    # HIDE_NETIF:       Hide "foreign" network interfaces, this appears
+    #			in both cflags and nflags, need both?
+    #
     mysystem("echo 'NET_BIND_SERVICE' >> $cdir/bcapabilities");
+    #mysystem("echo 'LBACK_ALLOW' >> $cdir/nflags");
     mysystem("echo 'LBACK_REMAP' >> $cdir/nflags");
     mysystem("echo 'HIDE_LBACK' >> $cdir/nflags");
-    mysystem("echo 'HIDE_NETIF' >> $cdir/nflags");
 
-    # XXX needed to do clone with CLONE_NEWNET
-    mysystem("echo 'SYS_ADMIN' >> $cdir/bcapabilities");
+    # XXX which is correct?
+    mysystem("echo 'HIDE_NETIF' >> $cdir/nflags");
+    mysystem("echo 'HIDE_NETIF' >> $cdir/cflags");
+
+    mysystem("echo '~HIDE_CINFO' >> $cdir/cflags");
+    mysystem("echo '~HIDE_MOUNT' >> $cdir/cflags");
+
+    if ($USENEWNET) {
+	# XXX create a network namespace, hack version
+	mysystem("mkdir $cdir/spaces");
+	mysystem("echo '' >> $cdir/spaces/net");	
+
+	# XXX needed to do clone with CLONE_NEWNET
+	mysystem("echo 'SYS_ADMIN' >> $cdir/bcapabilities");
+	mysystem("echo 'NET_ADMIN' >> $cdir/bcapabilities");
+	mysystem("echo 'NET_RAW' >> $cdir/bcapabilities");
+    }
 
     if (!$USEHASHIFIED) {
 	#
@@ -501,19 +621,22 @@ if (0) {
     # Now a bunch of stuff to set up a nice environment in the jail.
     #
     mysystem("ln -s ../../init.d/syslog $vdir/etc/rc3.d/S80syslog");
-    mysystem("ln -s ../../init.d/sshd $vdir/etc/rc3.d/S85sshd");
     mysystem("ln -s ../../init.d/syslog $vdir/etc/rc6.d/K85syslog");
+    mysystem("ln -s ../../init.d/sshd $vdir/etc/rc3.d/S85sshd");
     mysystem("ln -s ../../init.d/sshd $vdir/etc/rc6.d/K80sshd");
-    mysystem("cp -p $ETCVSERVER/rc.invserver $vdir/etc/rc3.d/S99invserver");
-    mysystem("cp -p $ETCVSERVER/rc.invserver $vdir/etc/rc6.d/K99invserver");
-    if ($USECHPID) {
-	#
-	# this script comes from tmcd/linux/vserver0.sh
-	# assumes chpid and vserver1.sh have been installed in $BINDIR
-	# (not part of makefile yet)
-	#
-        mysystem("ln -s ../../init.d/chpid $vdir/etc/rc3.d/S00chpid");
-	mysystem("ln -s ../../init.d/chpid $vdir/etc/rc6.d/K00chpid");
+    # XXX may be needed in the REMOTE case
+    if (0) {
+	mysystem("ln -s ../../init.d/pubsubd $vdir/etc/rc3.d/S95pubsubd");
+	mysystem("ln -s ../../init.d/pubsubd $vdir/etc/rc6.d/K05pubsubd");
+    }
+    mysystem("cp -p $ETCVSERVER/rc.invserver $vdir/etc/rc3.d/S98invserver");
+    mysystem("cp -p $ETCVSERVER/rc.invserver $vdir/etc/rc6.d/K98invserver");
+    if ($USENEWNET) {
+	mysystem("cp -p $ETCVSERVER/vserver-init.sh $vdir/$BINDIR/vserver-init");
+	mysystem("cp -p $ETCVSERVER/vserver-rc.sh $vdir/$BINDIR/vserver-rc");
+	# XXX this should be integrated with regular network startup
+	mysystem("cp -p $ETCVSERVER/vserver-cnet.sh $vdir/etc/rc3.d/S00cnet");
+	mysystem("cp -p $ETCVSERVER/vserver-cnet.sh $vdir/etc/rc6.d/K99cnet");
     }
 
     # Kill anything that uses /dev/console in syslog; will not work.
@@ -532,10 +655,6 @@ if (0) {
     
     # Port/Address for sshd.
     if (defined($IP) && $IP ne $hostip) {
-	# XXX This can come out (sshd bind to port 22) once we have
-	# the network stack stuff in the kernel.
-	mysystem("echo 'Port $sshdport' >> $vdir/etc/ssh/sshd_config");
-
 	mysystem("echo 'ListenAddress $IP' >> ".
 		 "$vdir/etc/ssh/sshd_config");
 	foreach my $ip (@jailips) {
@@ -559,10 +678,17 @@ if (0) {
     }
 
     #
-    # Stash the control net IP if not the same as the host IP
+    # Stash the control net info for use by vserver startup script
+    # to bring up control net.
     #
     if ($IP ne $hostip) {
+	mysystem("echo $cnetdev > $vdir/var/emulab/boot/controlif");
 	mysystem("echo $IP > $vdir/var/emulab/boot/myip");
+	mysystem("echo $JAILCNETMASK > $vdir/var/emulab/boot/mynetmask");
+	mysystem("echo $JAILROUTER > $vdir/var/emulab/boot/routerip");
+
+	# XXX tell vnodes to attach to physhost event server
+	mysystem("echo $cnet_alias > $vdir/var/emulab/boot/localevserver");
     }
 
     #
@@ -589,7 +715,7 @@ if (0) {
     # Mount the usual directories inside the jail. Use linux loopback
     # mounts which will remount an NFS filesystem.
     #
-    if (! REMOTE()) {
+    if ($MOUNTELABFS && ! REMOTE()) {
 	mysystem("$BINDIR/rc/rc.mounts -j $vnodeid $vdir 0 boot");
     }
     TBDebugTimeStamp("mkvserver: mounting NFS filesystems done");
@@ -638,9 +764,14 @@ sub upvserver($)
     # Mount the usual directories inside the jail. Use linux loopback
     # mounts which will remount an NFS filesystem.
     #
-    if (! REMOTE()) {
+    if ($MOUNTELABFS && ! REMOTE()) {
 	mysystem("$BINDIR/rc/rc.mounts -j $vnodeid $vdir 0 boot");
     }
+
+    #
+    # Unlink all the subsystem lock files
+    #
+    mysystem("rm -f $vdir/var/lock/subsys/*");
 
     # Remove this file; rc.invserver will create it at the very end.
     # which indicates the inner environment is running reasonably well.
@@ -662,7 +793,7 @@ sub startproxy($)
     #
     my $insidepath  = "/var/emulab/tmcc";
     my $outsidepath = "${VDIR}${insidepath}";
-    my $log         = "$JAILPATH/$vnodeid/tmcc.log";
+    my $log         = "$JDIR/tmcc.log";
 
     $tmccpid = fork();
     if ($tmccpid) {
@@ -763,11 +894,238 @@ sub setjailoptions() {
 
 #
 # Setup the physical node.
+# * run some scripts to allow vserver setup,
+# * make sure the etun device is loaded
+# * create a control net bridge that virtnodes can be added to.
 #
 sub PreparePhysNode()
 {
     mysystem("/etc/init.d/util-vserver start");
     mysystem("/etc/init.d/vprocunhide start");
+
+    mysystem("modprobe etun >/dev/null 2>&1");
+    SetupCnetBridge();
+}
+
+#
+# Prepare cnet bridge:
+#  * create bridge device
+#  * take down real cnet interface
+#  * assign cnet IP info to bridge
+#  * bring real cnet IF up with no address
+#  * add real cnet IF to bridge
+#  * add an alias on the JAILNET for this host so we can talk to vnodes
+#
+sub SetupCnetBridge()
+{
+    # XXX hack check to see if bridge device is configured
+    if (!system("ifconfig $cnet_bridge_dev >/dev/null 2>&1")) {
+	return;
+    }
+
+    print "Configuring control net bridge $cnet_bridge_dev for phys host\n"
+	if ($debug);
+
+    mysystem("brctl addbr $cnet_bridge_dev");
+    if (system("ifconfig $phys_cnet_if down")) {
+	mysystem("brctl delbr $cnet_bridge_dev");
+	die("*** $0:\n".
+	    "    could not bring down cnet IF\n");
+    }
+    if (system("ifconfig $cnet_bridge_dev $cnet_ip netmask $cnet_mask")) {
+	system("ifconfig $phys_cnet_if up");
+	system("brctl delbr $cnet_bridge_dev");
+	die("*** $0:\n".
+	    "    could not ifconfig $cnet_bridge_dev\n");
+    }
+    if (system("ifconfig $phys_cnet_if 0.0.0.0") ||
+	system("ifconfig $phys_cnet_if up")) {
+	system("ifconfig $cnet_bridge_dev down");
+	system("ifconfig $phys_cnet_if $cnet_ip netmask $cnet_mask");
+	system("route add default gw $cnet_router");
+	system("brctl delbr $cnet_bridge_dev");
+	die("*** $0:\n".
+	    "    could not re-ifconfig $phys_cnet_if\n");
+    }
+    if (system("brctl addif $cnet_bridge_dev $phys_cnet_if")) {
+	system("ifconfig $phys_cnet_if down");
+	system("ifconfig $cnet_bridge_dev down");
+	system("ifconfig $phys_cnet_if $cnet_ip netmask $cnet_mask");
+	system("route add default gw $cnet_router");
+	system("brctl delbr $cnet_bridge_dev");
+	die("*** $0:\n".
+	    "    could not add $phys_cnet_if to $cnet_bridge_dev\n");
+    }
+    if (system("route add default gw $cnet_router")) {
+	system("brctl delif $cnet_bridge_dev $phys_cnet_if");
+	system("ifconfig $phys_cnet_if down");
+	system("ifconfig $cnet_bridge_dev down");
+	system("ifconfig $phys_cnet_if $cnet_ip netmask $cnet_mask");
+	system("route add default gw $cnet_router");
+	system("brctl delbr $cnet_bridge_dev");
+	die("*** $0:\n".
+	    "    could not add $phys_cnet_if to $cnet_bridge_dev\n");
+    }
+    if (defined($cnet_alias)) {
+	mysystem("ifconfig $cnet_bridge_dev:1 $cnet_alias netmask $JAILCNETMASK");
+    }
+}
+
+sub TeardownCnetBridge()
+{
+    system("brctl delif $cnet_bridge_dev $phys_cnet_if");
+    system("ifconfig $phys_cnet_if down");
+    system("ifconfig $cnet_bridge_dev down");
+    system("ifconfig $phys_cnet_if $cnet_ip netmask $cnet_mask");
+    system("route add default gw $cnet_router");
+    system("brctl delbr $cnet_bridge_dev");
+}
+
+#
+# Create an etun pair for the control net and insert the "parent" end
+# into the control net bridge.  We do not bother to configure the child
+# end and any config will get reset when the device is moved into the
+# vnode namespace.
+#
+sub CreateCnet($)
+{
+    my ($vnodeid) = @_;
+    my $vno;
+
+    if ($vnodeid =~ /-(\d+)$/) {
+	$vno = $1;
+    } else {
+	die("*** $0:\n".
+	    "    $vnodeid: not in form name-#\n");
+    }
+    if (! -e "/sys/module/etun/parameters/newif") {
+	die("*** $0:\n".
+	    "    etun device not loader?!\n");
+    }
+
+    my $pend = "pnet$vno";
+    my $vend = "cnet$vno";
+    if (system("echo $pend,$vend > /sys/module/etun/parameters/newif")) {
+	die("*** $0:\n".
+	    "    cannot create etun device(s) for $vnodeid!?\n");
+    }
+    if (system("ifconfig $pend up") ||
+	system("brctl addif $cnet_bridge_dev $pend")) {
+	system("ifconfig $pend down");
+	system("echo $vend > /sys/module/etun/parameters/delif");
+	die("*** $0:\n".
+	    "    cannot put vnode etun device $pend in cnet bridge\n");
+    }
+
+    return $vend;
+}
+
+sub DestroyCnet($)
+{
+    my ($vnodeid) = @_;
+    my $vno;
+
+    if ($vnodeid =~ /-(\d+)$/) {
+	$vno = $1;
+    } else {
+	die("*** $0:\n".
+	    "    $vnodeid: not in form name-#\n");
+    }
+    my $pend = "pnet$vno";
+    my $vend = "cnet$vno";
+
+    # Remove the outside end from the bridge
+    system("ifconfig $pend down");
+    system("brctl delif $cnet_bridge_dev $pend");
+
+    # Take down the inside end and delete the tunnel
+    system("ifconfig $vend down >/dev/null 2>&1");
+    system("echo $pend > /sys/module/etun/parameters/delif");
+}
+
+sub InjectIFs($)
+{
+    my ($vspid) = @_;
+    my $devdir = "/sys/class/net";
+    my @eifs = ();
+
+    #
+    # Figure out all the experimental interfaces
+    #
+    my $TMIFMAP = "$JDIR/ifmap";
+    if ( -e "$TMIFMAP") {
+	if (open(IFMAP, "<$TMIFMAP")) {
+	    while (<IFMAP>) {
+		if (/^(veth\d+).*/) {
+		    push(@eifs, $1);
+		}
+	    }
+	    close(IFMAP);
+	}
+    }
+
+    #
+    # Insert the control net
+    #
+    my $cmd = "echo $vspid > $devdir/$cnetdev/new_ns_pid";
+    print "system('$cmd')\n"
+	if ($debug);
+    if (system($cmd)) {
+	print "Could not inject $cnetdev into vserver namespace\n";
+	return 0;
+    }
+
+    #
+    # Insert the experimental IFs
+    #
+    foreach my $eif (@eifs) {
+	$cmd = "echo $vspid > $devdir/$eif/new_ns_pid";
+	print "system('$cmd')\n"
+	    if ($debug);
+	if (system($cmd)) {
+	    print "Could not inject $eif into vserver namespace\n";
+	    return 0;
+	}
+    }
+
+    return 1;
+}
+
+sub DestroyIFs()
+{
+    my @eifs = ();
+
+    #
+    # Figure out all the experimental interfaces
+    #
+    my $TMIFMAP = "$JDIR/ifmap";
+    if ( -e "$TMIFMAP") {
+	if (open(IFMAP, "<$TMIFMAP")) {
+	    while (<IFMAP>) {
+		if (/^(veth\d+).*/) {
+		    push(@eifs, $1);
+		}
+	    }
+	    close(IFMAP);
+	}
+    }
+
+    #
+    # Destroy the experimental IFs.
+    # We key on the "veth" side of each tunnel rather than the "peth".
+    # This way if the interface is still "injected" in the vserver, we
+    # won't see it and won't mess with it.
+    #
+    foreach my $eif (@eifs) {
+	my $pif = $eif;
+	$pif =~ s/veth/peth/;
+
+	# XXX should remove the phys end from the bridge first
+	system("ifconfig $pif down");
+
+	system("ifconfig $eif down");
+	system("echo $eif > /sys/module/etun/parameters/delif");
+    }
 }
 
 #
@@ -814,14 +1172,21 @@ sub cleanup()
     #
     # A vserver is not killed by sending it a signal.
     # Must use the stop button, which enters the vserver and takes it down.
+    # If $jailpid is defined, we got here as the result of a signal to us.
+    # If it is not defined, then in theory the vserver has exited, but it
+    # may also be the case that just our inside watchdog process died.
+    # To deal with the latter, we perform a check to see if the vserver
+    # is running and kill it if it is.
     #
     if (defined($jailpid)) {
-	system("$VSERVER $vnodeid stop");
+	system("$VSERVER $vnodeid exec $BINDIR/vserver-init stop");
+	system("$VSERVER $vnodeid stop --rescue-init");
 	waitpid($jailpid, 0);
 	undef($jailpid);
     }
     elsif (system("$VSERVER $vnodeid running") == 0) {
-	system("$VSERVER $vnodeid stop");
+	system("$VSERVER $vnodeid exec $BINDIR/vserver-init stop");
+	system("$VSERVER $vnodeid stop --rescue-init");
     }
     # Wait for the status to actually change. Otherwise umounts will fail.
     for ($i = 0; $i < 30; $i++) {
@@ -862,6 +1227,18 @@ sub cleanup()
         #
 	system("/bin/rm -rf $VSERVERDIR/$vnodeid");
     }
+
+    # Teardown experimental tunnel devices
+    DestroyIFs();
+
+    # Teardown the control net tunnel device we created
+    DestroyCnet($vnodeid);
+
+    #
+    # XXX somehow we need to detect when nothing is left in the bridge so
+    # we can teardown the cnet bridge device
+    #
+    #TeardownCnetBridge();
 }
 
 #

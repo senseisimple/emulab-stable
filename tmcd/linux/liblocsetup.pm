@@ -45,6 +45,7 @@ BEGIN
 # Convenience.
 sub REMOTE()	{ return libsetup::REMOTE(); }
 sub PLAB()	{ return libsetup::PLAB(); }
+sub LINUXJAILED(){ return libsetup::LINUXJAILED(); }
 
 #
 # Various programs and things specific to Linux and that we want to export.
@@ -86,11 +87,12 @@ my $GATED	= "/usr/sbin/gated";
 my $ROUTE	= "/sbin/route";
 my $SHELLS	= "/etc/shells";
 my $DEFSHELL	= "/bin/tcsh";
-my $IWCONFIG = '/usr/local/sbin/iwconfig';
-my $WLANCONFIG = '/usr/local/bin/wlanconfig';
-my $RMMOD = '/sbin/rmmod';
-my $MODPROBE = '/sbin/modprobe';
-my $IWPRIV = '/usr/local/sbin/iwpriv';
+my $IWCONFIG    = '/usr/local/sbin/iwconfig';
+my $WLANCONFIG  = '/usr/local/bin/wlanconfig';
+my $RMMOD       = '/sbin/rmmod';
+my $MODPROBE    = '/sbin/modprobe';
+my $IWPRIV      = '/usr/local/sbin/iwpriv';
+my $BRCTL       = "/usr/sbin/brctl";
 
 #
 # OS dependent part of cleanup node state.
@@ -421,7 +423,7 @@ sub os_ifconfig_line($$$$$$$$;$$$)
 #
 # Specialized function for configing virtual ethernet devices:
 #
-#	'veth'	locally hacked veth devices (not on Linux)
+#	'veth'	one end of an etun device embedded in a vserver
 #	'vlan'	802.1q tagged vlan devices
 #	'alias'	IP aliases on physical interfaces
 #
@@ -431,13 +433,96 @@ sub os_ifconfig_veth($$$$$;$$$$%)
 	$rtabid, $encap, $vtag, $itype, $cookie) = @_;
     my ($uplines, $downlines);
 
-    if ($itype !~ /^(alias|vlan)$/) {
-	if ($itype eq "veth") {
-	    warn("veth${id}: 'veth' not supported on Linux\n");
-	} else {
-	    warn("Unknown virtual interface type $itype\n");
-	}
+    if ($itype !~ /^(alias|vlan|veth)$/) {
+	warn("Unknown virtual interface type $itype\n");
 	return "";
+    }
+
+    #
+    # Veth.
+    #
+    # Veths for Linux vservers mean vtun devices.  One end is outside
+    # the vserver and is bridged with other veths and peths as appropriate
+    # to form the topology.  The other end goes in the vserver and is
+    # configured with an IP address.  This final step is not done here
+    # as the vserver must be running first.
+    #
+    # In the current configuration, there is configuration that takes
+    # place both inside and outside the vserver.
+    #
+    # Inside:
+    # The inside case (LINUXJAILED() == 1) just configures the IP info on
+    # the interface.
+    #
+    # Outside:
+    # The outside actions are much more involved as described above.
+    # The VTAG identifies a bridge device "ebrN" to be used.
+    # The RTABID identifies the namespace, but we don't care here.
+    #
+    # To create a etun pair you do:
+    #    echo etun0,etun1 > /sys/module/etun/parameters/newif
+    # To destroy do:
+    #    echo etun0 > /sys/module/etun/parameters/delif
+    #
+    if ($itype eq "veth") {
+	#
+	# We are inside a Linux jail.
+	# We configure the interface pretty much like normal.
+	#
+	if (LINUXJAILED()) {
+	    if ($inet eq "") {
+		$uplines .= "$IFCONFIGBIN $iface up";
+	    }
+	    else {
+		$uplines  .= sprintf($IFCONFIG, $iface, $inet, $mask);
+		$downlines = "$IFCONFIGBIN $iface down";
+	    }
+	    
+	    return ($uplines, $downlines);
+	}
+
+	#
+	# Outside jail.
+	# Create tunnels and bridge and plumb them all together.
+	#
+	my $brdev = "ebr$vtag";
+	my $iniface = "veth$id";
+	my $outiface = "peth$id";
+	my $devdir = "/sys/module/etun/parameters";
+
+	# UP
+	$uplines = "";
+
+	# modprobe (should be done already for cnet setup, but who cares)
+	$uplines .= "modprobe etun\n";
+
+	# make sure bridge device exists and is up
+	$uplines .= "    $IFCONFIGBIN $brdev >/dev/null 2>&1 || {";
+	$uplines .= "        $BRCTL addbr $brdev\n";
+	$uplines .= "        $IFCONFIGBIN $brdev up\n";
+	$uplines .= "    }\n";
+
+	# create the tunnel device
+	$uplines .= "    echo $outiface,$iniface > $devdir/newif || exit 1\n";
+
+	# bring up outside IF, insert into bridge device
+	$uplines .= "    $IFCONFIGBIN $outiface up || exit 2\n";
+	$uplines .= "    $BRCTL addif $brdev $outiface || exit 3\n";
+
+	# configure the MAC address for the inside device
+	$uplines .= "    $IFCONFIGBIN $iniface hw ether $vmac || exit 4\n";
+
+	# DOWN
+	$downlines = "";
+
+	# remove IF from bridge device, down it (remove bridge if empty?)
+	$downlines .= "$BRCTL delif $brdev $outiface || exit 13\n";
+	$downlines .= "    $IFCONFIGBIN $outiface down || exit 12\n";
+
+	# destroy tunnel devices (this will fail if inside IF in vserver still)
+	$downlines .= "    echo $iniface > $devdir/delif || exit 11\n";
+
+	return ($uplines, $downlines);
     }
 
     #
@@ -510,12 +595,15 @@ sub os_viface_name($)
     # alias: There is an alias device, but not sure what it is good for
     #        so for now we just return the phys device.
     # vlan:  vlan<VTAG>
+    # veth:  veth<ID>
     #
     my $itype = $ifconfig->{"ITYPE"};
     if ($itype eq "alias") {
 	return $piface;
     } elsif ($itype eq "vlan") {
 	return $itype . $ifconfig->{"VTAG"};
+    } elsif ($itype eq "veth") {
+	return $itype . $ifconfig->{"ID"};
     }
 
     warn("Linux does not support virtual interface type '$itype'\n");
@@ -1429,7 +1517,7 @@ sub os_config_gre($$$$$$$)
     if (system("ip tunnel add $dev mode gre remote $dsthost local $srchost") ||
 	system("ip link set $dev up") ||
 	system("ip addr add $inetip dev $dev") ||
-	system("ifconfig $dev netmask $mask")) {
+	system("$IFCONFIGBIN $dev netmask $mask")) {
 	warn("Could not start tunnel!\n");
 	return -1;
     }

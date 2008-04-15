@@ -46,7 +46,7 @@ use librc;
 # Not all clients support this.
 #
 exit(0)
-    if (MFS() || JAILED() || REMOTE() || PLAB());
+    if (MFS() || (JAILED() && !LINUXJAILED()) || REMOTE() || PLAB());
 
 # Protos.
 sub doboot();
@@ -189,6 +189,7 @@ sub doboot()
 	    my $vmac     = $ifconfig->{VMAC};
 	    my $pmac     = $ifconfig->{PMAC};
 	    my $iface    = $ifconfig->{IFACE};
+	    my $viface   = $ifconfig->{VIFACE};
 	    my $ifrtabid = undef;
 	    my $encap    = $ifconfig->{ENCAP};
 	    my $vtag	 = $ifconfig->{VTAG};
@@ -226,6 +227,10 @@ sub doboot()
 		$downcmds .= TMROUTECONFIG . " $inet down\n    ";
 		$downcmds .= "$downline\n    ";
 	    }
+
+	    # Trivially parsable map for users, which associate an IP
+	    # with a local interface. 
+	    push(@ifacemap, "$viface $inet $vmac");
 	}
     }
 
