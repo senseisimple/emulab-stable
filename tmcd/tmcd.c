@@ -953,8 +953,10 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 		if (sscanf(bp, "VERSION=%d", &i) == 1) {
 			version = i;
 			if (version > CURRENT_VERSION) {
-				error("version skew: server=%d, request=%d, "
+				error("version skew on request from %s: "
+				      "server=%d, request=%d, "
 				      "old TMCD installed?\n",
+				      inet_ntoa(client->sin_addr),
 				      CURRENT_VERSION, version);
 			}
 			continue;
@@ -1182,7 +1184,8 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 		client_writeback_done(sock,
 				      redirect ? &redirect_client : client);
 
-	if (byteswritten && (command_array[i].flags & F_MINLOG) == 0)
+	if (byteswritten &&
+	    (verbose || (command_array[i].flags & F_MINLOG) == 0))
 		info("%s: %s wrote %d bytes\n",
 		     reqp->nodeid, command_array[i].cmdname,
 		     byteswritten);
@@ -3910,7 +3913,6 @@ COMMAND_PROTOTYPE(dostate)
 		error("DOSTATE: %s: Bad arguments\n", reqp->nodeid);
 		return 1;
 	}
-
 #ifdef EVENTSYS
 	/*
 	 * Send the state out via an event
