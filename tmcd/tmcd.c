@@ -3340,27 +3340,15 @@ COMMAND_PROTOTYPE(domounts)
 	 * experiments projects, plus all the members of all of the projects
 	 * that have been granted access to share the nodes in that expt.
 	 */
-#ifdef  NOSHAREDEXPTS
 	res = mydb_query("select u.uid from users as u "
 			 "left join group_membership as p on "
 			 "     p.uid_idx=u.uid_idx "
 			 "where p.pid='%s' and p.gid='%s' and "
 			 "      u.status='active' and "
 			 "      u.webonly=0 and "
+			 "      u.admin=%d and "
 			 "      p.trust!='none'",
-			 1, reqp->pid, reqp->gid);
-#else
-	res = mydb_query("select distinct u.uid from users as u "
-			 "left join exppid_access as a "
-			 " on a.exp_pid='%s' and a.exp_eid='%s' "
-			 "left join group_membership as p on "
-			 "     p.uid_idx=u.uid_idx "
-			 "where ((p.pid='%s' and p.gid='%s') or p.pid=a.pid) "
-			 "       and u.status='active' and "
-			 "       u.webonly=0 and "
-			 "       p.trust!='none'",
-			 1, reqp->pid, reqp->eid, reqp->pid, reqp->gid);
-#endif
+			 1, reqp->pid, reqp->gid, reqp->swapper_isadmin);
 	if (!res) {
 		error("MOUNTS: %s: DB Error getting users!\n", reqp->pid);
 		return 1;
