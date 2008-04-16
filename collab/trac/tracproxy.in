@@ -287,7 +287,10 @@ sub xLogin(@)
     if (TBDBConnect($dbname, $dbuser, $dbpass) < 0) {
 	fatal("Could not connect to trac database!");
     }
-    
+    # Remove old/stale auth cookies to avoid buildup.
+    DBQueryFatal("delete from auth_cookie ".
+		 "where name='$user' and ipnr='$IP' and ".
+		 "      time < (UNIX_TIMESTAMP(now()) - (60 * 60 * 24))");
     DBQueryFatal("replace into auth_cookie set ".
 		 "   cookie='$hash', name='$user', ipnr='$IP', ".
 		 "   time=UNIX_TIMESTAMP(now())");
