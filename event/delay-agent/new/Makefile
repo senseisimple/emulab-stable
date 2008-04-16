@@ -3,7 +3,6 @@
 all: delay-agent
 
 SRCS	:= $(wildcard *.cc)
-OBJS	:= $(SRCS:%.cc=%.o)
 
 LIBS	= -lcrypto -lpubsub
 CXXFLAGS = -DELVIN_COMPAT -Wall -I../../lib/ -I../../../../
@@ -20,16 +19,18 @@ CXXFLAGS += -DLINUX -I../../../../libnl/include
 LDFLAGS += -L../../../../libnl/lib -lnl
 endif
 
+OBJS	:= $(SRCS:%.cc=%.o)
+
 CFLAGS = $(CXXFLAGS)
 
 %.o: %.cc
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-delay-agent: $(OBJS) $(COMMON_OBJS) $(EVENT_OBJS) libevent.a
+delay-agent: $(OBJS) libevent.a
 	$(CXX) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 clean:
-	rm -f *.o *.a delay-agent
+	rm -f *.a delay-agent $(OBJS)
 
 libevent.a: event.o util.o
 	$(AR) crv libevent.a event.o util.o

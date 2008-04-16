@@ -5,7 +5,13 @@
 
 #include "Pipe.hh"
 #include "EventPipe.hh"
+#ifdef FREEBSD
 #include "DummynetPipe.hh"
+#else
+#ifdef LINUX
+#include "NetlinkPipe.hh"
+#endif
+#endif
 
 // Each pipe here is uni-directional. Multiple directions are
 // accounted for with multiple pipes.
