@@ -5691,7 +5691,9 @@ COMMAND_PROTOTYPE(dodoginfo)
 		     iv_interval, iv_isalive, iv_ntpdrift, iv_cvsup,
 		     iv_rusage, iv_hkeys);
 	if (vers >= 29)
-		OUTPUT(bp, sizeof(buf) - (bp - buf), " SETROOTPSWD=3600");
+		OUTPUT(bp, sizeof(buf) - (bp - buf), " SETROOTPSWD=3600\n");
+	else
+		OUTPUT(bp, sizeof(buf) - (bp - buf), "\n");
 	
 	client_writeback(sock, buf, strlen(buf), tcp);
 
