@@ -87,7 +87,7 @@ my %iv = (
     rusage  => 0,
     hkeys   => 0,
     batt    => (STARGATE() ? 60 : 0),
-    rootpswd=> 3600,
+    rootpswd=> 0,
 );
 
 my %funcs = (

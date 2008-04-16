@@ -1890,7 +1890,7 @@ COMMAND_PROTOTYPE(doaccounts)
 				 "      and u.webonly=0 "
                                  "      and g.unix_gid is not NULL "
 				 "      and u.status='active' "
-				 "      and u.admin=%d and "
+				 "      and u.admin=0 and "
 				 "  (FIND_IN_SET(g.gid_idx, "
 				 "   (select na.attrvalue from nodes as n "
 				 "    left join node_type_attributes as na on "
@@ -1898,7 +1898,7 @@ COMMAND_PROTOTYPE(doaccounts)
 				 "    where n.node_id='%s' and "
 				 "    na.attrkey='project_accounts')) > 0) "
 				 "order by u.uid",
-				 17, reqp->swapper_isadmin, reqp->nodeid);
+				 17, reqp->nodeid);
 	}
 	else if (reqp->islocal || reqp->isvnode) {
 		/*
@@ -1909,6 +1909,11 @@ COMMAND_PROTOTYPE(doaccounts)
 		 * user to return. Well, a primary group and a list of aux
 		 * groups for that user.
 		 */
+	  	char adminclause[MYBUFSIZE];
+		strcpy(adminclause, "");
+#ifdef ISOLATEADMINS
+		sprintf(adminclause, "and u.admin=%d", reqp->swapper_isadmin);
+#endif
 		res = mydb_query("select distinct "
 				 "  u.uid,u.usr_pswd,u.unix_uid,u.usr_name, "
 				 "  p.trust,g.pid,g.gid,g.unix_gid,u.admin, "
@@ -1924,10 +1929,10 @@ COMMAND_PROTOTYPE(doaccounts)
 				 "where ((p.pid='%s')) and p.trust!='none' "
 				 "      and u.status='active' "
 				 "      and u.webonly=0 "
-				 "      and u.admin=%d "
+				 "      %s "
                                  "      and g.unix_gid is not NULL "
 				 "order by u.uid",
-				 17, reqp->pid, reqp->swapper_isadmin);
+				 17, reqp->pid, adminclause);
 	}
 	else if (reqp->jailflag) {
 		/*
@@ -3095,8 +3100,10 @@ COMMAND_PROTOTYPE(domounts)
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
 	char		buf[MYBUFSIZE];
-	int		nrows;
-	int		usesfs;
+	int		nrows, usesfs;
+#ifdef  ISOLATEADMINS
+	int		isadmin;
+#endif
 
 	/*
 	 * Should SFS mounts be served?
@@ -3340,15 +3347,14 @@ COMMAND_PROTOTYPE(domounts)
 	 * experiments projects, plus all the members of all of the projects
 	 * that have been granted access to share the nodes in that expt.
 	 */
-	res = mydb_query("select u.uid from users as u "
+	res = mydb_query("select u.uid,u.admin from users as u "
 			 "left join group_membership as p on "
 			 "     p.uid_idx=u.uid_idx "
 			 "where p.pid='%s' and p.gid='%s' and "
 			 "      u.status='active' and "
 			 "      u.webonly=0 and "
-			 "      u.admin=%d and "
 			 "      p.trust!='none'",
-			 1, reqp->pid, reqp->gid, reqp->swapper_isadmin);
+			 2, reqp->pid, reqp->gid);
 	if (!res) {
 		error("MOUNTS: %s: DB Error getting users!\n", reqp->pid);
 		return 1;
@@ -3360,14 +3366,18 @@ COMMAND_PROTOTYPE(domounts)
 		return 0;
 	}
 
-	while (nrows) {
+	while (nrows--) {
 		row = mysql_fetch_row(res);
-				
+#ifdef ISOLATEADMINS
+		isadmin = atoi(row[1]);
+		if (isadmin != reqp->swapper_isadmin) {
+			continue;
+		}
+#endif
 		OUTPUT(buf, sizeof(buf), "REMOTE=%s/%s LOCAL=%s/%s\n",
 			FSUSERDIR, row[0], USERDIR, row[0]);
 		client_writeback(sock, buf, strlen(buf), tcp);
 		
-		nrows--;
 		if (verbose)
 		    info("MOUNTS: %s", buf);
 	}
@@ -5690,8 +5700,14 @@ COMMAND_PROTOTYPE(dodoginfo)
 		     "RUSAGE=%d HOSTKEYS=%d",
 		     iv_interval, iv_isalive, iv_ntpdrift, iv_cvsup,
 		     iv_rusage, iv_hkeys);
-	if (vers >= 29)
-		OUTPUT(bp, sizeof(buf) - (bp - buf), " SETROOTPSWD=3600\n");
+	if (vers >= 29) {
+	        int rootpswdinterval = 0;
+#ifdef DYNAMICROOTPASSWORDS
+	        rootpswdinterval = 3600;
+#endif
+		OUTPUT(bp, sizeof(buf) - (bp - buf), " SETROOTPSWD=%d\n",
+		       rootpswdinterval);
+	}
 	else
 		OUTPUT(bp, sizeof(buf) - (bp - buf), "\n");
 	
