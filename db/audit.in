@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -25,6 +25,7 @@ my $debug   = 0;
 #
 my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
+my $ISOLATEADMINS = @ISOLATEADMINS@;
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
@@ -39,6 +40,7 @@ $| = 1;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use Project;
 
 #
 # Only real root can call this.
@@ -325,6 +327,55 @@ if ($query_result->numrows) {
 
 	printf("%-12s %-12s %-8s %-12s %-22s %s\n",
 	       $pid, $eid, $exptidx, $creator, $swapin_time, $idx);
+    }
+}
+
+#
+# Looks for admin/nonadmin mix users in projects.
+#
+if ($ISOLATEADMINS) {
+    $query_result =
+	DBQueryWarn("select pid_idx from projects where approved=1");
+
+    fatal("Error accessing the database.")
+	if (! $query_result);
+
+    my @badlist = ();
+
+    while (my ($pid_idx) = $query_result->fetchrow()) {
+	my $project = Project->Lookup($pid_idx);
+	fatal("Could not look up project $pid_idx in DB")
+	    if (!defined($project));
+	my @members;
+
+	if ($project->GetProjectGroup()->MemberList(\@members,
+				    $Group::MEMBERLIST_FLAGS_ALLUSERS)) {
+	    fatal("Could not look up members for project $pid_idx")
+	}
+	next
+	    if (@members == 0);
+	
+	$adminflag = $members[0]->admin();
+	foreach my $user (@members) {
+	    if ($user->admin() != $adminflag) {
+		#
+		# This gets special email.
+		#
+		if ($debug) {
+		    print "Bad mix of admin AND non-admin users in $project\n";
+		}
+		else  {
+		    push(@badlist, $project);
+		}
+		last;
+	    }
+	}
+    }
+    if (@badlist && !$debug) {
+	my $msg = "The following projects have an unsafe mix of admin and ".
+	    "non-admin users:\n\n@badlist\n";
+
+	SENDMAIL($TBOPS, "Testbed Admin Users Check", $msg, $TBOPS);
     }
 }
 

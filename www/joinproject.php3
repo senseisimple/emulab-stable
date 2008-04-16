@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -777,6 +777,42 @@ if (! $returning) {
 if ($forwikionly) {
     header("Location: wikiregister.php3?finished=1");
     exit();
+}
+
+#
+# If this sitevar is set, check to see if this addition will create a
+# mix of admin and non-admin people in the group. 
+#
+if ($ISOLATEADMINS &&
+    !$project->IsMember($user, $ignore)) {
+    $members = $project->MemberList();
+
+    foreach ($members as $other_user) {
+	if ($user->admin() != $other_user->admin()) {
+	    if ($returning) {
+		$errors["Joining Project"] =
+		    "Improper mix of admin and non-admin users";
+		SPITFORM($formfields, $returning, $errors);
+		PAGEFOOTER();
+		return;
+	    }
+	    else {
+		#
+		# The user creation still succeeds, which is good. Do not
+		# want the effort to be wasted. But need to indicate that
+		# something went wrong. Lets send email to tbops since this
+		# should be an uncommon problem.
+		#
+		TBERROR("New user '$joining_uid' attempted to join project ".
+			"'$pid'\n".
+			"which would create a mix of admin and non-admin ".
+			"users\n", 0);
+		
+		header("Location: joinproject.php3?finished=1");
+		return;
+	    }
+	}
+    }
 }
 
 #
