@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 AC_PREREQ(2.13)
@@ -202,6 +202,8 @@ AC_SUBST(MIN_UNIX_GID)
 AC_SUBST(DELAYTHRESH)
 AC_SUBST(PELABSUPPORT)
 AC_SUBST(ELVIN_COMPAT)
+AC_SUBST(ISOLATEADMINS)
+AC_SUBST(DYNAMICROOTPASSWORDS)
 
 #
 # Offer both versions of the email addresses that have the @ escaped
@@ -275,6 +277,8 @@ MIN_UNIX_GID=6000
 DELAYTHRESH=2
 PELABSUPPORT=0
 ELVIN_COMPAT=0
+ISOLATEADMINS=1
+DYNAMICROOTPASSWORDS=1
 
 #
 # XXX You really don't want to change these!
