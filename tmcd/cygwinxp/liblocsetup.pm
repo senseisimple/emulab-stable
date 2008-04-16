@@ -485,6 +485,22 @@ sub os_userdel($)
 }
 
 #
+# Modify user password.
+# 
+sub os_modpasswd($$)
+{
+    my($login, $pswd) = @_;
+
+    my $cmd = "echo -e '$pswd\\n$pswd' | passwd $login >& /dev/null";
+    ##print "    $cmd\n";
+    if (system($cmd) != 0) {
+	warning("os_modpasswd error ($cmd)\n");
+	return -1;
+    }
+    return 0;
+}
+
+#
 # Modify user group membership and password.
 # Changing the login shell is unimplemented.
 # 

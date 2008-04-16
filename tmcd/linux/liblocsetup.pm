@@ -16,7 +16,7 @@ use Exporter;
 	 $HOSTSFILE $LOOPBACKMOUNT
 	 os_account_cleanup os_ifconfig_line os_etchosts_line
 	 os_setup os_groupadd os_useradd os_userdel os_usermod os_mkdir
-	 os_ifconfig_veth os_viface_name
+	 os_ifconfig_veth os_viface_name os_modpasswd
 	 os_routing_enable_forward os_routing_enable_gated
 	 os_routing_add_manual os_routing_del_manual os_homedirdel
 	 os_groupdel os_getnfsmounts os_islocaldir
@@ -668,6 +668,25 @@ sub os_usermod($$$$$$)
     $shell = MapShell($shell);
 
     return system("$USERMOD -s $shell -g $gid $glist -p '$pswd' $login");
+}
+
+#
+# Modify user password.
+# 
+sub os_modpasswd($$)
+{
+    my($login, $pswd) = @_;
+
+    if (system("$USERMOD -p '$pswd' $login") != 0) {
+	warn "*** WARNING: resetting password for $login.\n";
+	return -1;
+    }
+    if ($login eq "root" &&
+	system("$USERMOD -p '$pswd' toor") != 0) {
+	warn "*** WARNING: resetting password for toor.\n";
+	return -1;
+    }
+    return 0;
 }
 
 #

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2006-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include_once("osinfo_defs.php");
@@ -997,7 +997,9 @@ class Node
         #
 	$query_result =
 	    DBQueryFatal("select attrkey,attrvalue from node_attributes ".
-			 "where node_id='$node_id'");
+			 "where node_id='$node_id' ".
+			 ($noperm ? "" : "and attrkey!='root_password'"));
+			 
 	if (!$short && mysql_num_rows($query_result)) {
 	    echo "<tr>
                     <td align=center colspan=2>Node Attributes</td>

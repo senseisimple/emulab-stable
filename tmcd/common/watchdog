@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use Getopt::Std;
@@ -87,6 +87,7 @@ my %iv = (
     rusage  => 0,
     hkeys   => 0,
     batt    => (STARGATE() ? 60 : 0),
+    rootpswd=> 3600,
 );
 
 my %funcs = (
@@ -97,6 +98,7 @@ my %funcs = (
     rusage  => \&sendrusage,
     hkeys   => \&sendhkeys,
     batt    => \&sendbatt,
+    rootpswd=> \&setrootpswd,
 );
 
 my %immediate = (
@@ -107,6 +109,7 @@ my %immediate = (
     rusage  => 1,
     hkeys   => 1,
     batt    => 1,
+    rootpswd=> 1,
 );
 
 #
@@ -119,6 +122,7 @@ sub runcvsup($);
 sub sendrusage($);
 sub sendhkeys($);
 sub sendbatt($);
+sub setrootpswd($);
 sub logmsg($;$);
 sub saysomething($);
 
@@ -390,6 +394,7 @@ sub setintervals($)
 	$iv{cvsup} = 21;
 	$iv{rusage} = 15;
 	$iv{batt} = 25;
+	$iv{rootpswd} = 10;
 
 	my $delta = $curtime - $faketimes{check};
 	$faketimes{check} = $curtime;
@@ -447,8 +452,10 @@ sub setintervals($)
 	    $oiv{$key} = $iv{$key};
 	}
 
+	print $tmccresults[0] . "\n";
+
 	if ($tmccresults[0] =~
-	    /INTERVAL=(-?\d+) ISALIVE=(-?\d+) NTPDRIFT=(-?\d+) CVSUP=(-?\d+) RUSAGE=(-?\d+) HOSTKEYS=(-?\d+)/) {
+	    /INTERVAL=(-?\d+) ISALIVE=(-?\d+) NTPDRIFT=(-?\d+) CVSUP=(-?\d+) RUSAGE=(-?\d+) HOSTKEYS=(-?\d+) SETROOTPSWD=(-?\d+)/) {
 	    $iv{check} = $1
 		if ($1 >= 0);
 	    $iv{isalive} = $2
@@ -462,6 +469,8 @@ sub setintervals($)
                               #      to enable finer granularity on plab.
 	    $iv{hkeys} = $6
 		if ($6 >= 0);
+	    $iv{rootpswd} = $7
+		if ($7 >= 0);
 	}
 
 	#
@@ -473,6 +482,7 @@ sub setintervals($)
 	    $iv{rusage} = 0;
 	    $iv{hkeys} = 0;
 	    $iv{batt} = 0;
+	    $iv{rootpswd} = 0;
 	}
 
 	foreach my $key (keys %iv) {
@@ -536,7 +546,8 @@ sub setintervals($)
     if ($report) {
 	logmsg("setintervals: check=$iv{check}, isalive=$iv{isalive}, ".
 	       "drift=$iv{drift}, cvsup=$iv{cvsup}, rusage=$iv{rusage}, ".
-	       "hostkeys=$iv{hkeys}, battery=$iv{batt}\n");
+	       "hostkeys=$iv{hkeys}, battery=$iv{batt}, ".
+	       "rootpswd=$iv{rootpswd}\n");
     }
 
     #
@@ -853,6 +864,39 @@ resched:
     $curtime = time();
     qinsert($curtime + $iv{batt}, \&sendbatt)
 	if ($iv{batt});
+}
+
+sub setrootpswd($)
+{
+    my ($curtime) = @_;
+    
+    if ($fakeit) {
+	my $delta = $curtime - $faketimes{rootpswd};
+	$faketimes{rootpswd} = $curtime;
+	logmsg("setrootpswd at +$delta\n");
+	qinsert($curtime + $iv{rootpswd}, \&setrootpswd) if ($iv{rootpswd});
+	return;
+    }
+
+    #
+    # Reset the root password.
+    #
+    if (tmcc(TMCCCMD_ROOTPSWD, undef, \@tmccresults) == 0
+	&& scalar(@tmccresults) &&
+	$tmccresults[0] =~ /^HASH=(.*)$/) {
+	my $hash = $1;
+	logmsg("Resetting root password\n");
+	liblocsetup::os_modpasswd("root", $hash);
+    }
+
+resched:
+    #
+    # Set up for another interval.
+    # Since the tmcc call and update can take awhile, we update curtime
+    #
+    $curtime = time();
+    qinsert($curtime + $iv{rootpswd}, \&setrootpswd)
+	if ($iv{rootpswd});
 }
 
 sub saysomething($)

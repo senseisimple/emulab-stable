@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -32,7 +32,7 @@ use Exporter;
 	     TMCCCMD_BOOTERRNO TMCCCMD_BOOTLOG TMCCCMD_BATTERY TMCCCMD_USERENV
 	     TMCCCMD_TIPTUNNELS TMCCCMD_TRACEINFO TMCCCMD_ELVINDPORT
              TMCCCMD_PLABEVENTKEYS TMCCCMD_PORTREGISTER
-	     TMCCCMD_MOTELOG TMCCCMD_BOOTWHAT
+	     TMCCCMD_MOTELOG TMCCCMD_BOOTWHAT TMCCCMD_ROOTPSWD
 	     );
 
 # Must come after package declaration!
@@ -177,6 +177,7 @@ my %commandset =
       "motelog"         => {TAG => "motelog"},
       "portregister"    => {TAG => "portregister"},
       "bootwhat"        => {TAG => "bootwhat"},
+      "rootpswd"        => {TAG => "rootpswd"},
     );
 
 #
@@ -236,6 +237,7 @@ sub TMCCCMD_PLABEVENTKEYS(){ $commandset{"plabeventkeys"}->{TAG}; }
 sub TMCCCMD_MOTELOG()   { $commandset{"motelog"}->{TAG}; }
 sub TMCCCMD_PORTREGISTER(){ $commandset{"portregister"}->{TAG}; }
 sub TMCCCMD_BOOTWHAT()  { $commandset{"bootwhat"}->{TAG}; }
+sub TMCCCMD_ROOTPSWD()  { $commandset{"rootpswd"}->{TAG}; }
 
 #
 # Caller uses this routine to set configuration of this library
