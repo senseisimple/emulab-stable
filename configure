@@ -1734,6 +1734,20 @@ EOF
 
 fi
 
+if test $ISOLATEADMINS -eq 1; then
+    cat >> confdefs.h <<EOF
+#define ISOLATEADMINS 1
+EOF
+
+fi
+
+if test $DYNAMICROOTPASSWORDS -eq 1; then
+    cat >> confdefs.h <<EOF
+#define DYNAMICROOTPASSWORDS 1
+EOF
+
+fi
+
 LOG_TESTBED=`echo "LOG_$TBLOGFACIL" | tr a-z A-Z`
 cat >> confdefs.h <<EOF
 #define LOG_TESTBED $LOG_TESTBED
