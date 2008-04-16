@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package Project;
@@ -261,6 +261,20 @@ sub Create($$$$)
 	return undef;
     }
     return $newproject;
+}
+
+#
+# Equality test for two projects. Not necessary in perl, but good form.
+#
+sub SameProject($$)
+{
+    my ($self, $other) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! (ref($self) && ref($other)));
+
+    return $self->pid_idx() == $other->pid_idx();
 }
 
 #
