@@ -171,10 +171,10 @@ void NetlinkPipe::updateParameter(Parameter const & newParameter)
 				uint32_t value;
 
 				if (newParameter.getValue()) {
-					value = 1;
+					value = 0;
 				}
 				else {
-					value = 0x7ffffffff;
+					value = 0xffffffff;
 				}
 				qdisc = rtnl_qdisc_get(qdisc_cache, ifindex, plrHandle);
 				if (qdisc == NULL) {
