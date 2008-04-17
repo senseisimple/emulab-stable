@@ -471,7 +471,8 @@ class PLCagent:
                         pass
                     pass
                 if len(ad.keys()) > 0:
-                    self.__server.UpdateNodeNetwork(exni['nodenetwork_id'],ad)
+                    self.__server.UpdateNodeNetwork(self.auth,
+                                                    exni['nodenetwork_id'],ad)
                     pass
                 pass
             pass

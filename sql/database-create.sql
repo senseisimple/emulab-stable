@@ -3850,6 +3850,9 @@ CREATE TABLE `widearea_nodeinfo` (
   `bwlimit` varchar(32) default NULL,
   `privkey` varchar(128) default NULL,
   `IP` varchar(15) default NULL,
+  `gateway` varchar(15) NOT NULL default '',
+  `dns` tinytext NOT NULL,
+  `boot_method` enum('static','dhcp','') NOT NULL default '',
   PRIMARY KEY  (`node_id`),
   KEY `IP` (`IP`),
   KEY `privkey` (`privkey`)

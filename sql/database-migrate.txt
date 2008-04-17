@@ -4420,3 +4420,16 @@ last_net_act,last_cpu_act,last_ext_act);
 	      where last_activity is NULL;
 
 4.145: Fix error in previous revision; skip to next entry;
+
+4.146: Add columns in widearea_nodeinfo to specify a boot method (i.e., static
+       IP or DHCP), a default gateway, and dns servers, for widearea nodes:
+
+       alter table widearea_nodeinfo 
+         add column `gateway` varchar(15) NOT NULL default '' after `IP`;
+
+       alter table widearea_nodeinfo 
+         add column `dns` tinytext NOT NULL default '' after `gateway`;
+
+       alter table widearea_nodeinfo 
+         add column `boot_method` enum('static','dhcp','') NOT NULL 
+           default '' after `dns`;

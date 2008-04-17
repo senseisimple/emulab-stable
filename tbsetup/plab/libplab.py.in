@@ -2090,22 +2090,96 @@ class EmulabPlcObjTranslator:
 
         # XXX will eventually need more than just one public interface, but
         # this will do the trick for now...
-        qres = DBQueryFatal("select wa.hostname,wa.bwlimit,wa.IP" \
+        qres = DBQueryFatal("select wa.hostname,wa.bwlimit,wa.IP," \
+                            "  i.mask,i.mac,wa.boot_method,wa.gateway,wa.dns" \
                             " from widearea_nodeinfo as wa" \
                             " left join interfaces as i on wa.IP=i.IP" \
                             " where wa.node_id=%s and i.node_id=%s",
                             (nodeid,nodeid))
         if len(qres) != 1:
             raise RuntimeError("could not find Emulab node '%s'" % nodeid)
-        
-        (hostname,bwlimit,IP) = qres[0]
-        
+
+        #
+        # XXX: assume ipv4 for now
+        #
+        (hostname,bwlimit,IP,netmask,mac,boot_method,gateway,dns) = qres[0]
+
+        # ensure boot_method is something sane.
+        if not boot_method or boot_method == '':
+            boot_method = 'dhcp'
+            pass
+
+        if not dns or dns == '':
+            raise RuntimeError("translateNode: must set WA DNS!")
+
+        # netmask must be set!
+        if not netmask or netmask == '':
+            raise RuntimeError("translateNode: ctrl netmask must be set!")
+        elif dns.find(','):
+            # allow multiple dns servers
+            dns = dns.split(',')
+            pass
+
+        if mac == '':
+            mac = None
+            pass
+        else:
+            # translate from string sans colons
+            mac = mac[0:2] + ":" + mac[2:4] + ":" + mac[4:6] + ":" + \
+                  mac[6:8] + ":" + mac[8:10] + ":" + mac[10:12]
+            pass
+
+        sip = IP.split('.')
+        smask = netmask.split('.')
+
+        if not len(sip) == 4:
+            raise RuntimeError("translateNode: improper WA IP!")
+        else:
+            sip = map(lambda(x): int(x),sip)
+            pass
+        if not len(smask) == 4:
+            raise RuntimeError("translateNode: improper WA netmask!")
+        else:
+            smask = map(lambda(x): int(x),smask)
+            pass
+
+        n_network = "%s.%s.%s.%s" % (sip[0] & smask[0],sip[1] & smask[1],
+                                     sip[2] & smask[2],sip[3] & smask[3])
+        # keep the network bits but set host bits to 1s
+        n_bcast = "%s.%s.%s.%s" % ((sip[0] & smask[0]) | (~smask[0] & 0xff),
+                                   (sip[1] & smask[1]) | (~smask[1] & 0xff),
+                                   (sip[2] & smask[2]) | (~smask[2] & 0xff),
+                                   (sip[3] & smask[3]) | (~smask[3] & 0xff),)
+
         retval['hostname'] = hostname
-        networks = [ { 'ip':IP,'bwlimit':bwlimit,'dns1':BOSSNODE_IP,
-                       'network':CONTROL_NETWORK,'netmask':CONTROL_NETMASK,
-                       'gateway':CONTROL_ROUTER,
-                       'method':'dhcp','type':'ipv4','is_primary':True } ]
-        retval['networks'] = networks
+        ctrl_network = { 'ip':IP,'bwlimit':bwlimit,'method':boot_method,
+                         'network':n_network,'netmask':netmask,
+                         'type':'ipv4','is_primary':True }
+        # set the gateway and bcast addr if we're static:
+        if boot_method == 'static':
+            if not gateway or gateway == "":
+                raise RuntimeError("translateNode: must set gateway when" \
+                                   " boot_method=static!")
+            else:
+                ctrl_network['gateway'] = gateway
+                ctrl_network['broadcast'] = n_bcast
+                pass
+            pass
+        # setup dns
+        if type(dns) == list:
+            ctrl_network['dns1'] = dns[0]
+            if len(dns) > 1:
+                ctrl_network['dns2'] = dns[1]
+                pass
+            pass
+        else:
+            ctrl_network['dns1'] = dns
+            pass
+        # add mac if we have it (which we always do!)
+        if mac:
+            ctrl_network['mac'] = mac
+            pass
+        retval['networks'] = [ ctrl_network ]
         # put all nodes in the emulabops site
         retval['__emulab_pids'] = ['emulab-ops']
         retval['site'] = self.__translateProject('emulab-ops')['name']

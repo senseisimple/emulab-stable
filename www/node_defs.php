@@ -1043,6 +1043,9 @@ class Node
 	$country	= $row["country"];
 	$hostname	= $row["hostname"];
 	$site		= $row["site"];
+	$boot_method    = $row["boot_method"];
+	$gateway        = $row["gateway"];
+	$dns            = $row["dns"];
 
 	if (! ($user = User::Lookup($contact_uid))) {
             # This is not an error since the field is set to "nobody" when
@@ -1104,6 +1107,21 @@ class Node
         echo "<tr>
                   <td>Hostname:</td>
                   <td class=left>$hostname</td>
+              </tr>\n";
+
+        echo "<tr>
+                  <td>Boot Method:</td>
+                  <td class=left>$boot_method</td>
+              </tr>\n";
+
+        echo "<tr>
+                  <td>Gateway:</td>
+                  <td class=left>$gateway</td>
+              </tr>\n";
+
+        echo "<tr>
+                  <td>DNS:</td>
+                  <td class=left>$dns</td>
               </tr>\n";
 
 	echo "<tr>
