@@ -2398,6 +2398,23 @@ CREATE TABLE `partitions` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `plab_attributes`
+--
+
+DROP TABLE IF EXISTS `plab_attributes`;
+CREATE TABLE `plab_attributes` (
+  `attr_idx` int(11) unsigned NOT NULL auto_increment,
+  `plc_idx` int(10) unsigned default NULL,
+  `slicename` varchar(64) default NULL,
+  `nodegroup_idx` int(10) unsigned default NULL,
+  `node_id` varchar(32) default NULL,
+  `attrkey` varchar(64) NOT NULL default '',
+  `attrvalue` tinytext NOT NULL,
+  PRIMARY KEY  (`attr_idx`),
+  UNIQUE KEY `realattrkey` (`plc_idx`,`slicename`,`nodegroup_idx`,`node_id`,`attrkey`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `plab_comondata`
 --
 
@@ -2451,6 +2468,31 @@ CREATE TABLE `plab_mapping` (
   `deleted` tinyint(1) NOT NULL default '0',
   `plc_idx` int(10) unsigned NOT NULL default '0',
   PRIMARY KEY  (`node_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `plab_nodegroup_members`
+--
+
+DROP TABLE IF EXISTS `plab_nodegroup_members`;
+CREATE TABLE `plab_nodegroup_members` (
+  `plc_idx` int(10) unsigned NOT NULL default '0',
+  `nodegroup_idx` int(10) unsigned NOT NULL default '0',
+  `node_id` varchar(32) NOT NULL default '',
+  PRIMARY KEY  (`plc_idx`,`nodegroup_idx`,`node_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `plab_nodegroups`
+--
+
+DROP TABLE IF EXISTS `plab_nodegroups`;
+CREATE TABLE `plab_nodegroups` (
+  `plc_idx` int(10) unsigned NOT NULL default '0',
+  `nodegroup_idx` int(10) unsigned NOT NULL default '0',
+  `name` varchar(64) NOT NULL default '',
+  `description` text NOT NULL,
+  PRIMARY KEY  (`plc_idx`,`nodegroup_idx`,`name`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --

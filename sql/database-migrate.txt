@@ -4433,3 +4433,34 @@ last_net_act,last_cpu_act,last_ext_act);
        alter table widearea_nodeinfo 
          add column `boot_method` enum('static','dhcp','') NOT NULL 
            default '' after `dns`;
+
+4.147: Add a more general notion of plab attributes (attributes are now keyed
+       off plc,slice,nodegroup,node_id tuples, as appropriate).  Also add
+       support for sucking down plab nodegroups.
+
+       CREATE TABLE `plab_attributes` (
+         `attr_idx` int(11) unsigned NOT NULL auto_increment,
+	 `plc_idx` int(10) unsigned default NULL,
+	 `slicename` varchar(64) default NULL,
+	 `nodegroup_idx` int(10) unsigned default NULL,
+	 `node_id` varchar(32) default NULL,
+	 `attrkey` varchar(64) NOT NULL default '',
+	 `attrvalue` tinytext NOT NULL,
+	 PRIMARY KEY  (`attr_idx`),
+	 UNIQUE KEY `realattrkey` (`plc_idx`,`slicename`,`nodegroup_idx`,`node_id`,`attrkey`)
+       ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+       CREATE TABLE `plab_nodegroup_members` (
+         `plc_idx` int(10) unsigned NOT NULL default '0',
+	 `nodegroup_idx` int(10) unsigned NOT NULL default '0',
+	 `node_id` varchar(32) NOT NULL default '',
+	 PRIMARY KEY  (`plc_idx`,`nodegroup_idx`,`node_id`)
+       ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+       CREATE TABLE `plab_nodegroups` (
+         `plc_idx` int(10) unsigned NOT NULL default '0',
+	 `nodegroup_idx` int(10) unsigned NOT NULL default '0',
+	 `name` varchar(64) NOT NULL default '',
+	 `description` text NOT NULL,
+	 PRIMARY KEY  (`plc_idx`,`nodegroup_idx`,`name`)
+       ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
