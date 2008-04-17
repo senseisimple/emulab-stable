@@ -2531,6 +2531,20 @@ CREATE TABLE `plab_nodehiststats` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `plab_objmap`
+--
+
+DROP TABLE IF EXISTS `plab_objmap`;
+CREATE TABLE `plab_objmap` (
+  `plc_idx` int(10) unsigned NOT NULL,
+  `objtype` varchar(32) NOT NULL,
+  `elab_id` varchar(64) NOT NULL,
+  `plab_id` varchar(255) NOT NULL,
+  `plab_name` tinytext NOT NULL,
+  PRIMARY KEY  (`plc_idx`,`objtype`,`elab_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `plab_plc_attributes`
 --
 

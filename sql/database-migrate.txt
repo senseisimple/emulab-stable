@@ -4464,3 +4464,15 @@ last_net_act,last_cpu_act,last_ext_act);
 	 `description` text NOT NULL,
 	 PRIMARY KEY  (`plc_idx`,`nodegroup_idx`,`name`)
        ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+4.148: Add a table to map Emulab objects that have been synchronized at a PLC
+       to the corresponding object at that PLC.
+
+       CREATE TABLE `plab_objmap` (
+         `plc_idx` int(10) unsigned NOT NULL,
+	 `objtype` varchar(32) NOT NULL,
+	 `elab_id` varchar(64) NOT NULL,
+	 `plab_id` varchar(255) NOT NULL,
+	 `plab_name` tinytext NOT NULL,
+	 PRIMARY KEY  (`plc_idx`,`objtype`,`elab_id`)
+       ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
