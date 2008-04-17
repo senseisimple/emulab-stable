@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2006, 2007, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -113,7 +113,6 @@ if (! defined($this_user)) {
     fatal("You ($UID) do not exist!");
 }
 $target_dbid  = $target_user->dbid();
-$target_uid   = $target_user->uid();
 
 #
 # Only operate on unapproved users (must be verified). Any other state
