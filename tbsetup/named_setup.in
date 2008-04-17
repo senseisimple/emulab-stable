@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -98,8 +98,10 @@ if ((my $locked = TBScriptLock("named", 1)) != TBSCRIPTLOCK_OKAY()) {
 # Grab the list of all nodes, including virtual and widearea nodes
 #
 my $db_result =
-    DBQueryFatal("select n.node_id, n.role, n.jailip, i.IP, i.role ".
-		 "    from nodes as n join interfaces as i ".
+    DBQueryFatal("select n.node_id, n.role, n.jailip, i.IP, i.role, ".
+                 "    r.inner_elab_role ".
+		 "  from nodes as n join interfaces as i ".
+		 "left join reserved as r on r.node_id=n.node_id ".
 		 "where (n.node_id=i.node_id and n.role='testnode' or ".
 		 "       n.phys_nodeid=i.node_id and n.role='virtnode') ".
 		 "    and (i.IP is not null or n.jailip is not null) ".
@@ -116,8 +118,8 @@ process_nodes($db_result);
 # For IXPs we also need their gateway addresses as well
 #
 $db_result =
-    DBQueryFatal("select n.node_id, n.role, n.jailip, i.IP, i.role ".
-		 "    from nodes as n ".
+    DBQueryFatal("select n.node_id, n.role, n.jailip, i.IP, i.role, null ".
+		 "  from nodes as n ".
 		 "left join interfaces as i ".
 		 "on n.phys_nodeid=i.node_id and n.node_id!=i.node_id ". 
 		 "where n.role='testnode' ".
@@ -218,6 +220,7 @@ sub process_nodes($) {
 	my $jailIP  = $row[2];
 	my $IP      = $row[3];
 	my $irole   = $row[4];
+	my $inner_elab_role = $row[5];
 
 	#
 	# For most nodes, we get the IP address from the interfaces table;
@@ -245,7 +248,8 @@ sub process_nodes($) {
 	#
 	my $node_rec = {
 	    IP   => $IP,
-	    role => $nrole
+	    role => $nrole,
+	    inner_elab_role => $inner_elab_role
 	};
 
 	#
@@ -386,7 +390,14 @@ sub make_forward_zonefile($$$) {
 	}
 
 	print MAP "$node_id\tIN\tA\t$node_rec->{IP}\n";
-	print MAP "\tIN\tMX 10\t$USERS.\n";
+	if (defined($node_rec->{inner_elab_role}) &&
+	    ($node_rec->{inner_elab_role} eq "ops" ||
+	     $node_rec->{inner_elab_role} eq "ops+fs")) {
+	    print MAP "\tIN\tMX 10\t$node_id\n";
+	}
+	else {
+	    print MAP "\tIN\tMX 10\t$USERS.\n";
+	}
     }
 
     #
