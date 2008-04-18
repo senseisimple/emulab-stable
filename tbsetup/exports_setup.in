@@ -38,9 +38,7 @@ my $groupdir    = "@FSDIR_GROUPS@";
 my $scratchdir  = "@FSDIR_SCRATCH@";
 my $DISABLED	= "@DISABLE_EXPORTS_SETUP@";
 my $WINSUPPORT  = @WINSUPPORT@;
-
-# XXX should be config variable
-my $ISOLATEADMIN= 1;
+my $ISOLATEADMIN= @ISOLATEADMINS@;
 
 # XXX for TESTMODE: output to stdout
 my $TOSTDOUT	= 0;
