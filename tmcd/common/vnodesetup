@@ -94,8 +94,9 @@ if ($UID) {
 	die("*** $0:\n".
 	    "    $UID is not in the password file!\n");
 
-    if ($pwname ne "emulabman" && !($pwname =~ /emulab_[-\@\w]*/) &&
-        !($pwname =~ /utah_[-\@\w]*/)) {
+    $slicename = `cat /etc/slicename`;
+    chomp($slicename);
+    if ($pwname ne "emulabman" && $pwname ne $slicename) {
 	die("*** $0:\n".
 	    "    You do not have permission to run this script!\n");
     }
