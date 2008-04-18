@@ -469,7 +469,7 @@ class Plab:
                 raise
 
             # figure out how we're supposed to create this slice
-            slice_create_method = plc.getAttr('slice_create_method')
+            slice_create_method = plc.getAttrVal('slice_create_method')
             if not slice_create_method or slice_create_method == '':
                 slice_create_method = 'singlesite'
                 pass
@@ -1949,12 +1949,12 @@ class EmulabPlcObjTranslator:
         return qres[0]
 
     def getPlabName(self,objtype,id):
-        (id,name) = self.__checkMapByPlabName(objtype,id)
+        (id,name) = self.__checkMapByElabId(objtype,id)
         return name
 
 
     def getPlabId(self,objtype,id):
-        (id,name) = self.__checkMapByPlabName(objtype,id)
+        (id,name) = self.__checkMapByElabId(objtype,id)
         return id
 
     def syncObject(self,objtype,objid):
@@ -3354,7 +3354,7 @@ class Node:
         # have to set us up with root before anything else
         try:
             self.__copy(DEFAULT_DATA_PATH + "/fixsudo.sh", "/tmp/fixsudo.sh",
-                        tries=3,interval=5)
+                        tries=6,interval=15)
             self.__perform("-tt sh /tmp/fixsudo.sh", quiet = True,
                            tries=3,interval=5)
             pass
