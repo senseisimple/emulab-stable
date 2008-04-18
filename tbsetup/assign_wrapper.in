@@ -158,7 +158,7 @@ if (@ARGV != 2) {
     usage();
 }
 if (defined($options{"v"})) {
-    $verbose = 1;
+    $verbose++;
 }
 if (defined($options{"u"})) {
     $updating = 1;
@@ -1952,7 +1952,6 @@ foreach $plink (keys(%plinks)) {
 	# nodeportA and nodeportB are the only two nodes in the LAN.
 	# If the link is delayed, its with endpoint delays, not a delay node.
 	#
-	printdb "  Link:";
 
 	#
 	# trivial links do not have physical links, but could be using
@@ -2028,7 +2027,7 @@ foreach $plink (keys(%plinks)) {
 	#
 	$portmap{$virtA} = $portA;
 	$portmap{$virtB} = $portB;
-	printdb "  Portmap:\n";
+	printdb "Link - Portmap:\n";
 	printdb "    $virtA = $portA\n";
 	printdb "    $virtB = $portB\n";
 	
@@ -2066,8 +2065,6 @@ foreach $plink (keys(%plinks)) {
 	# nodeportA is the node.
 	# nodeportB is the LAN
 	# No delays
-	printdb "  LAN:";
-
 	my ($vnodeA,$vportA) = split(":",$virtA);
 	my $protolan;
 
@@ -2186,7 +2183,7 @@ foreach $plink (keys(%plinks)) {
 	    }
 	}
 	$portmap{$virtA} = $portA;
-	printdb "  Portmap:\n";
+	printdb "Lan - Portmap:\n";
 	printdb "    $virtA = $portA\n";
 	
 	if ($delaylinks{$plink}) {
@@ -2216,8 +2213,6 @@ foreach $plink (keys(%plinks)) {
 	# node is attached to a fake switch (LAN).
 	# nodeportA is the node.
 	# nodeportB is the fake LAN.
-	printdb " FAKELAN:";
-
 	my ($vnodeA,$vportA) = split(":",$virtA);
 
 	#
@@ -2232,7 +2227,7 @@ foreach $plink (keys(%plinks)) {
 	$protolan->AddInterface($nodeA, $vnodeA, $vportA, $portA);
 	
 	$portmap{$virtA} = $portA;
-	printdb "  Portmap:\n";
+	printdb "FakeLan - Portmap:\n";
 	printdb "    $virtA = $portA\n";
 
  	#
@@ -2256,14 +2251,17 @@ TBDebugTimeStamp("interpreting finished");
 printdb "Uploading to DB\n";
 TBDebugTimeStamp("uploading started");
 
+if ($verbose > 1) {
+    $libdb::DBQUERY_DEBUG = 1;
+}
+
 # Write the vlans to the DB.
 UploadVlans();
+PatchVirts();
 
 # Stop here ...
 exit(0)
     if ($impotent);
-
-PatchVirts();
 
 #
 # Seed the virt_agents table. This should probably be done elsewhere.
@@ -3509,6 +3507,7 @@ sub NewVirtIface($$$;$)
     my $isvdev;
     my $type;
     my $mac;
+    my $newid;
 
     my $isveth = ($encap eq "veth" || $encap eq "veth-ne");
 
@@ -3549,11 +3548,23 @@ sub NewVirtIface($$$;$)
 
 	$vvnode  = "NULL";
     }
+    if ($verbose) {
+	my $speed = 0;
+
+	if (defined($pport) && $isvdev) {
+	    $speed = interfacespeedmbps(physinterfacetype($pnode, $pport),
+					"ethernet");
+	}
+	printdb "VirtIface: $lan, $vnodeport, $pnode, isvdev:$isvdev, ".
+	    "isveth:$isveth" . (defined($pport) ? ", $pport" : "") .
+	    ", $speed\n";
+    }
 
     if ($impotent) {
 	# Make up an id; its never used anyplace.
-	$newvif = $type . $veth_id++;
-	return $newvif;
+	$newid  = $veth_id++;
+	$newvif = $type . $newid;
+	goto vethstuff;
     }
 
     #
@@ -3578,7 +3589,7 @@ sub NewVirtIface($$$;$)
 		     (defined($pport) ? "'$pport'" : "NULL") . ", ".
 		     "'$rtabid', $vvnode, $experiment_idx, '$vllidx')");
     
-    my $newid = $query_result->insertid;
+    $newid  = $query_result->insertid;
     $newvif = $type . $newid;
     
     #
@@ -3600,6 +3611,7 @@ sub NewVirtIface($$$;$)
     # not have the correct physical LAN info coming out of assign
     # and may need to be patched up later.
     #
+  vethstuff:
     if (!defined($pport) && $isvnode) {
 	if (!defined($veth_interfaces{$lan})) {
 	    $veth_interfaces{$lan} = {};
@@ -3683,10 +3695,25 @@ sub PatchVirts()
 	    my $pport = $veth_patches{$lan}->{$pnode};
 
 	    foreach my $vethid (@{$veth_interfaces{$lan}->{$pnode}}) {
-		printdb "Virt Patch: $lan $pnode $vethid $pport\n";
-
 		DBQueryFatal("update vinterfaces set iface='$pport' ".
-			     "where node_id='$pnode' and unit='$vethid'");
+			     "where node_id='$pnode' and unit='$vethid'")
+		    if (! $impotent);
+
+		#
+		# For veth and vlan interfaces, we need to set the
+		# characteristics of the underlying physical
+		# interface.
+		#
+		my $speed =
+		    interfacespeedmbps(physinterfacetype($pnode, $pport),
+				       "ethernet");
+	
+		DBQueryFatal("update interfaces set " .
+			     "   current_speed='$speed' " .
+			     "where node_id='$pnode' and iface='$pport'")
+		    if (!$impotent);
+
+		printdb "Virt Patch: $lan $pnode $vethid $pport $speed\n";
 	    }
 	}
     }
