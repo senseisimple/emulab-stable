@@ -3354,7 +3354,7 @@ class Node:
         # have to set us up with root before anything else
         try:
             self.__copy(DEFAULT_DATA_PATH + "/fixsudo.sh", "/tmp/fixsudo.sh",
-                        tries=6,interval=15)
+                        tries=12,interval=15)
             self.__perform("-tt sh /tmp/fixsudo.sh", quiet = True,
                            tries=3,interval=5)
             pass
