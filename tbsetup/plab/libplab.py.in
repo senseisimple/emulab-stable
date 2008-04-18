@@ -281,6 +281,10 @@ class XmlrpcNodeInfoFetcher:
 
         # grab a mod_PLC4 agent
         self.agent = agents[which_agent](plc)
+        try:
+            self.agent.setdebug(debug,verbose)
+        except:
+            pass
 
         pass
 
@@ -1791,6 +1795,10 @@ class PLC:
             primary_agent = DEF_AGENT
             pass
         self.agent = agents[primary_agent](self)
+        try:
+            self.agent.setdebug(debug,verbose)
+        except:
+            pass
 
         return
 

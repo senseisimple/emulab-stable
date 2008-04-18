@@ -610,6 +610,12 @@ class mod_PLC4:
 
         return
 
+    def setdebug(self,sdebug,sverbose):
+        global debug, verbose
+        debug = sdebug
+        verbose = sverbose
+        pass
+
     def __filterdict(self,d,key_list):
         retval = dict()
         for k in key_list:
