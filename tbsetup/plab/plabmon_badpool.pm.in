@@ -48,6 +48,7 @@ my $PLABHOLDING_PID = PLABHOLDING_PID();
 my $PLABHOLDING_EID = PLABHOLDING_EID();
 
 my $plcname = '';
+my $plcvtype = '';
 
 sub new($$$$$) {
 
@@ -69,6 +70,18 @@ sub new($$$$$) {
     $self->{'CHPID2POOL'} = $chpid2pool;
     $self->{'PNODES'}  = {};
     $self->{'PENDING'} = {};
+
+    # grab the vtype for this plc:
+    my $qr = DBQueryFatal("select node_type from plab_plc_info" .
+                          " where plc_name='$plcname'");
+    if ($qr->num_rows() < 1) {
+        die "could not find vtype for plc $plcname!";
+    }
+    elsif ($qr->num_rows() > 1) {
+        die "too many possible vtypes for plc $plcname!";
+    }
+    my @qrow = $qr->fetchrow_array();
+    $plcvtype = $qrow[0];
 
     bless($self,$class);
     return $self;
@@ -457,7 +470,7 @@ sub nodesetupcomplete($$) {
     
     TBSetNodeLogEntry($pnode->{'name'}, "root", TB_DEFAULT_NODELOGTYPE(),
                       "'Moved to $PLABHOLDING_EID; ".
-                      "plab node $pnode->{'vnode'} setup okay by monitor.'");
+                      "$plcvtype node $pnode->{'vnode'} setup okay by monitor.'");
 
     # XXX: move to goodpool.
 

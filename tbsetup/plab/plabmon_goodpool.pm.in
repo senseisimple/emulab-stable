@@ -55,6 +55,7 @@ my $PLABTESTING_PID = PLABTESTING_PID();
 my $PLABTESTING_EID = PLABTESTING_EID();
 
 my $plcname = '';
+my $plcvtype = '';
 
 sub new($$$$$) {
 
@@ -77,12 +78,21 @@ sub new($$$$$) {
     $self->{'PNODES'}  = {};
     $self->{'PENDING'} = {};
 
+    # grab the vtype for this plc:
+    my $qr = DBQueryFatal("select node_type from plab_plc_info" . 
+			  " where plc_name='$plcname'");
+    if ($qr->num_rows() < 1) {
+	die "could not find vtype for plc $plcname!";
+    }
+    elsif ($qr->num_rows() > 1) {
+	die "too many possible vtypes for plc $plcname!";
+    }
+    my @qrow = $qr->fetchrow_array();
+    $plcvtype = $qrow[0];
+
     # Clean up anything left behind by a terminated monitor
     # XXX: this is kind of hacky, but it works.
     #
-
-    # figure out 
-
     my @vnodes = ();
     my $qres = DBQueryFatal("select r.node_id" . 
 			    " from reserved as r" . 
@@ -136,7 +146,7 @@ sub checknextnode($) {
     my %options = ( 'pid'    => $PLABTESTING_PID,
                     'eid'    => $PLABTESTING_EID,
                     'count'  => 1,
-                    'vtype'  => 'pcplab',
+                    'vtype'  => "$plcvtype",
                     'nodeid' => $pnode->{'name'});
     if (Node::CreateVnodes(\@vnodes, \%options)) {
         print "Failed to allocate vnode for $pnode->{'name'}!\n";
@@ -512,7 +522,7 @@ sub movetodownpool($$) {
     
     TBSetNodeLogEntry($pnode->{'name'}, "root", TB_DEFAULT_NODELOGTYPE(),
                       "'Moved to $PLABDOWN_EID; ".
-                      "plab node $pnode->{'vnode'} setup failed by monitor.'");
+                      "$plcvtype node $pnode->{'vnode'} setup failed by monitor.'");
 }
 
 # Make perl happy...
