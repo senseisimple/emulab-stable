@@ -1,0 +1,31 @@
+#! /usr/bin/env python
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+import sys
+from xmlrpc import XmlRpcServer
+
+class myexampleclass:
+    def method1 (self, meta, oneargument, anotherone):
+        print (meta, oneargument, anotherone)
+        return 0
+
+    def method2 (self, meta, *args):
+        sys.exit(0)
+        pass
+    pass
+
+server = XmlRpcServer()
+myinstance = myexampleclass()
+server.register_class('myclass', myinstance)
+
+sys.stdout.write("Content-type: text/xml\n\n")
+server.execute()
+
+
+
+
+
+

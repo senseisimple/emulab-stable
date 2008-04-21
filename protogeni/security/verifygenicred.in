@@ -52,13 +52,15 @@ my $SSLDIR      = "$TB/lib/ssl";
 my $EMULAB_CERT = "$TB/etc/emulab.pem";
 my $EMULAB_KEY  = "$TB/etc/emulab.key";
 my $OPENSSL     = "/usr/bin/openssl";
-my $SAVEUID	= $UID;
+my $XMLLINT     = "/usr/local/bin/xmllint";
+my $XMLSEC1     = "/usr/local/bin/xmlsec1";
+my $SCHEMA      = "$TB/lib/protogeni/security/credential.xsd";
 my $certfile;
 my $keyfile;
 my $deletefiles = 0;
 my $certificate;
 my $privkey;
-my $signature   = "";
+my %credentials = ();
 
 #
 # We don't want to run this script unless its the real version.
@@ -135,17 +137,96 @@ if (! defined($this_user)) {
 }
 
 #
-# Must wrap the parser in eval since it exits on error.
+# Verify that the credential conforms to the schema. The wrinkle is that it
+# might already be a signed credential and we just need to add another
+# signature to it, but either way it should still pass the schema check.
+#
+if (system("$XMLLINT -noout -schema $SCHEMA $xmlfile > /dev/null 2>&1")) {
+    fatal("$xmlfile does not conform to schema $SCHEMA");
+}
+
+#
+# Bring in the credential file so we can mess with it.
 #
 my $parser = XML::LibXML->new;
-$parser->validation(1);
 my $doc    = $parser->parse_file($xmlfile);
+my $root   = $doc->documentElement();
 
-print Dumper($doc);
+#
+# Find the credential node, and then break up the hierarchy so that we
+# can look at each part and then verify the chain of delegations.
+#
+my ($credentials_node) = $root->getElementsByTagName("credential");
+my ($signatures_node)  = $root->getElementsByTagName("signatures");
 
-# openssl x509 -inform pem -in emulab.pem -pubkey -noout > publickey.pem
+if (! (defined($credentials_node) && defined($signatures_node))) {
+    fatal("Malformed signed credentials input");
+}
+# Record the outermost credential in the array, indexed by name.
+my ($xmlid_attribute) = $credentials_node->attributes();
+my $xmlid = $xmlid_attribute->getValue();
+$credentials{$xmlid} = { "node" => $credentials_node };
 
+# Remember the leaf node, and the root which might change below.
+my $leaf_xmlid = $xmlid;
+my $leaf_cred  = $credentials_node;
+my $root_xmlid = $leaf_xmlid;
+my $root_cred  = $leaf_cred;
 
+#
+# The last child of the credentials node will be a parent credential,
+# if there is a parent. Loop through finding each parent and place it
+# in the credentials array. This is basically a doubly linked list of
+# structures, each one pointing to its parent and child credentials. 
+#
+my $temp = $credentials_node;
+while (defined($temp)) {
+    my @childnodes  = $temp->childNodes();
+    undef($temp);
+
+    foreach my $child (@childnodes) {
+	if (defined($child->localname) && $child->localname eq "parent") {
+	    my ($parent_cred) = $child->getElementsByTagName("credential");
+	    #print $parent_cred->toString() . "\n";
+
+	    my ($xmlid_attribute) = $parent_cred->attributes();
+	    my $parent_xmlid = $xmlid_attribute->getValue();
+	    $credentials{$parent_xmlid} = { "node"        => $parent_cred,
+					    "child_xmlid" => $xmlid,
+					    "child_cred"  => $temp };
+
+	    # Add this to the last credential info
+	    $credentials{$xmlid}->{"parent_xmlid"} = $parent_xmlid;
+	    $credentials{$xmlid}->{"parent_cred"}  = $parent_cred;
+	    $xmlid = $parent_xmlid;
+	    $temp  = $parent_cred;
+
+	    # Remember this, might be root.
+	    $root_xmlid = $xmlid;
+	    $root_cred  = $temp;
+	    last;
+	}
+    }
+}
+
+#
+# The certficate used to sign the credential is either the Emulab certificate
+# or that of the user delegating the credential. For now lets just use the
+# Emulab certificate. I will add user signing later.
+#
+$keyfile  = $EMULAB_KEY;
+$certfile = $EMULAB_CERT;
+
+#
+# Lets first make sure that the data has not been messed with; for each
+# credential in the hierarchy check the signature. Remember, the signature
+# covers the credential and all the parents up to the top.
+#
+foreach my $sigid (keys(%credentials)) {
+    system("$XMLSEC1 --verify --node-id Sig_$sigid ".
+	   "       --trusted-pem $certfile $xmlfile > /dev/null 2>&1")
+	== 0 or fatal("Credential $sigid does not verify");
+}
 exit(0);
 
 sub cleanup()

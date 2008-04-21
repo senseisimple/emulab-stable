@@ -73,7 +73,7 @@ my $sigtmpl =
     "     Algorithm=\"http://www.w3.org/TR/2001/REC-xml-c14n-20010315\"/>\n".
     "  <SignatureMethod ".
     "     Algorithm=\"http://www.w3.org/2000/09/xmldsig#rsa-sha1\"/>\n".
-    "  <Reference URI=\"%s\">\n".
+    "  <Reference URI=\"#%s\">\n".
     "    <Transforms>\n".
     "      <Transform ".
     "        Algorithm=\"http://www.w3.org/2000/09/xmldsig#".
@@ -205,6 +205,12 @@ $keyfile  = $EMULAB_KEY;
 $certfile = $EMULAB_CERT;
 
 #
+# Find or create these two nodes.
+#
+my $credentials_node;
+my $signatures_node;
+
+#
 # Check the root.
 #
 if ($root->nodeName eq "credential") {
@@ -220,40 +226,46 @@ if ($root->nodeName eq "credential") {
     #  </signatures>
     # </signed-credential>
     #
-    my $newroot          = XML::LibXML::Element->new('signed-credential');
-    my $signatures_node  = XML::LibXML::Element->new('signatures');
+    my $newroot       = XML::LibXML::Element->new('signed-credential');
+    $signatures_node  = XML::LibXML::Element->new('signatures');
+    $credentials_node = $root;
     $newroot->addChild($root);
     $newroot->addChild($signatures_node);
 
-    #
-    # We need the id of the toplevel credential so that we can stick
-    # it into the sig template above, in the References section. We
-    # also need to generate an id for the signature node so that we
-    # can find it and tell xmlsec about it.
-    #
-    my ($xmlid_attribute) = $root->attributes();
-    my $xmlid = $xmlid_attribute->getValue();
-    $sigid = "Sig_${xmlid}";
-    my $template = sprintf($sigtmpl, $sigid, $xmlid);
-
-    #
-    # Convert the template above into a document tree and add it to the
-    # signatures list.
-    #
-    my $tmpparser = XML::LibXML->new;
-    my $newdoc    = $tmpparser->parse_string($template);
-    my $sigroot   = $newdoc->documentElement();
-    $sigroot->setNamespace("http://www.w3.org/2000/09/xmldsig#");
-    $signatures_node->addChild($sigroot);
-    
     $root = $newroot;
     $doc->setDocumentElement($root);
-    print $root->toString(1) . "\n";
+    #print $root->toString(1) . "\n";
 }
 else {
-    ;
+    ($credentials_node) = $root->getElementsByTagName("credential");
+    ($signatures_node)  = $root->getElementsByTagName("signatures");
+
+    if (! (defined($credentials_node) && defined($signatures_node))) {
+	fatal("Malformed signed credentials input");
+    }
 }
 
+#
+# We need the id of the toplevel credential so that we can stick
+# it into the sig template above, in the References section. We
+# also need to generate an id for the signature node so that we
+# can find it and tell xmlsec about it.
+#
+my ($xmlid_attribute) = $credentials_node->attributes();
+my $xmlid = $xmlid_attribute->getValue();
+$sigid = "Sig_${xmlid}";
+my $template = sprintf($sigtmpl, $sigid, $xmlid);
+
+#
+# Convert the template above into a document tree and add it to the
+# signatures list.
+#
+my $tmpparser = XML::LibXML->new;
+my $newdoc    = $tmpparser->parse_string($template);
+my $sigroot   = $newdoc->documentElement();
+$sigroot->setNamespace("http://www.w3.org/2000/09/xmldsig#");
+$signatures_node->addChild($sigroot);
+   
 #
 # So now we have a valid document that needs to be signed at the $sigid
 # reference point. Must write this to a tmp file for xmlsec, and then
@@ -265,14 +277,25 @@ print TMP $doc->toString(1) . "\n";
 close(TMP);
 
 # Fire up xmlsec and read back the results.
+my $signedcred = "";
+
 open(SEC, "$XMLSEC1 --sign --node-id $sigid ".
      "       --privkey-pem $keyfile,$certfile $tmpfile |")
     or fatal("Could not start $XMLSEC1 on $tmpfile");
 while (<SEC>) {
-    print $_;
+    $signedcred .= $_;
 }
 close(SEC);
 
+if (!defined($outfile)) {
+    print $signedcred;
+}
+else {
+    open(TMP, ">$outfile") or
+	fatal("Could not open $outfile");
+    print TMP $signedcred;
+    close(TMP);
+}
 cleanup();
 exit(0);
 

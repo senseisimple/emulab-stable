@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<credential xml:id="Ref1">
+  <type>capability</type>
+  <owner_uuid>foo bar</owner_uuid>
+  <this_uuid>foo bar</this_uuid>
+  <capabilities>
+    <capability>
+      <capability_name>frazzle</capability_name>
+      <can_delegate>1</can_delegate>
+    </capability>
+  </capabilities>
+</credential>
+
