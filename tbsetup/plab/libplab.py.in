@@ -377,14 +377,19 @@ class XmlrpcNodeInfoFetcher:
                 continue
 
             # now add the node:
+            # note that we force some ints to strings because the xml file
+            # siteParser didn't force them to ints.
             adi = { 'HNAME'     : n['hostname'],
-                    'PLABID'    : n['node_id'],
+                    'PLABID'    : str(n['node_id']),
                     'IP'        : nni_map[nnid]['IP'],
                     'MAC'       : nni_map[nnid]['MAC'],
                     'BWLIMIT'   : nni_map[nnid]['BWLIMIT'],
                     'SITE'      : si_map[n['site_id']]['SITE'],
                     'LATITUDE'  : si_map[n['site_id']]['LATITUDE'],
                     'LONGITUDE' : si_map[n['site_id']]['LONGITUDE'] }
+            if adi['BWLIMIT']:
+                adi['BWLIMIT'] = str(adi['BWLIMIT'])
+                pass
             if n.has_key('boot_status'):
                 adi['STATUS'] = n['boot_status']
                 pass
@@ -493,10 +498,16 @@ class Plab:
                     slicename = "%s_elab_%d" % (prefix,exptidx)
                     pass
                 elif slice_create_method == 'federate':
+                    if debug:
+                        print "Using 'federate' slice create method!"
+                        pass
                     # use the prefix of the site for the pid containing
                     # this eid.
                     translator = EmulabPlcObjTranslator(plc)
 
+                    if debug:
+                        print "Synch'ing project %s" % str(pid)
+                        pass
                     # ensure that project (site) is created and up to date
                     translator.syncObject('project',pid)
 
@@ -506,6 +517,9 @@ class Plab:
                                        " where pid=%s",(pid,))
                     for row in res:
                         (p_uid,) = row
+                        if debug:
+                            print "Synch'ing user %s" % str(p_uid)
+                            pass
                         translator.syncObject('user',p_uid)
                         pass
 
@@ -994,6 +1008,9 @@ class Plab:
         if len(toupdate):
             print "There are %d plab node updates." % len(toupdate)
             for (nodeent,(nodeid,diffattrs)) in toupdate:
+                if debug:
+                    print "About to update %s; new info %s; diff %s" \
+                          % (str(nodeid),str(nodeent),str(diffattrs))
                 try:
                     self.__updateNodeMapping(nodeid, diffattrs)
                     pass
@@ -1128,7 +1145,7 @@ class Plab:
             pass
         return ()
 
-    def __getKnownPnodes(self,plc):
+    def __getKnownPnodes(self,plc,deleted=0):
         """
         getFree helper function.  Returns a dict of IP:node_id pairs
         for the Plab nodes that currently exist in the DB.
@@ -1139,7 +1156,8 @@ class Plab:
                            " from plab_mapping as pm"
                            " left join widearea_nodeinfo as wni on"
                            "    pm.node_id = wni.node_id"
-                           " where pm.plc_idx=%s",(plc.idx,))
+                           " where pm.plc_idx=%s and deleted=%s",
+                           (plc.idx,int(deleted)))
         
         ret = {}
         for (nodeid, plabid, hostname, ip, mac, site,
@@ -3090,6 +3108,16 @@ class Node:
                           time.strftime("%Y-%m-%d %H:%M:%S",
                                         time.gmtime(self.leaseend))))
             pass
+
+        # grab which nodegroups we're in:
+        qres = DBQueryFatal("select nodegroup_idx"
+                            " from plab_nodegroup_members"
+                            " where node_id=%s",(self.phys_nodeid,))
+        for (ngid,) in qres:
+            if not ngid in self.nodegroups:
+                self.nodegroups.append(ngid)
+                pass
+            pass
         
         if self.pollNode:
             TIMESTAMP("Waiting for %s to respond" % self.nodeid)
@@ -3143,7 +3171,9 @@ class Node:
                             " from plab_nodegroup_members"
                             " where node_id=%s",(self.phys_nodeid,))
         for (ngid,) in qres:
-            self.nodegroups.append(ngid)
+            if not ngid in self.nodegroups:
+                self.nodegroups.append(ngid)
+                pass
             pass
         
         return

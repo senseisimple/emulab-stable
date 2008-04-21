@@ -41,8 +41,10 @@ def main(args):
     
     (opts, args) = parser.parse_args()
 
-    libplab.debug = opts.debug
-    libplab.verbose = opts.verbose
+    if not libplab.debug:
+        libplab.debug = opts.debug
+    if not libplab.verbose:
+        libplab.verbose = opts.verbose
     
     if len(args) == 2:
         command,slicename = args
