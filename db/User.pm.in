@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2005-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package User;
@@ -287,6 +287,28 @@ sub LookupByEmail($$)
     my $query_result =
 	DBQueryFatal("select uid_idx from users ".
 		     "where LCASE(usr_email)=LCASE('$email') and ".
+		     "      status!='$status_archived'");
+
+    return undef
+	if (! $query_result || !$query_result->numrows);
+
+    my ($uid_idx) = $query_result->fetchrow_array();
+
+    return User->Lookup($uid_idx);
+}
+
+#
+# Lookup user given a UUID.  
+#
+sub LookupByUUID($$)
+{
+    my ($class, $uuid) = @_;
+    my $status_archived = $USERSTATUS_ARCHIVED;
+    my $safe_uuid = DBQuoteSpecial($uuid);
+
+    my $query_result =
+	DBQueryFatal("select uid_idx from users ".
+		     "where uid_uuid=$safe_uuid and ".
 		     "      status!='$status_archived'");
 
     return undef
