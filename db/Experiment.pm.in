@@ -296,7 +296,7 @@ sub UserExperimentList($$$)
 	DBQueryWarn("select idx from experiments ".
 		    "where creator_idx='$uid_idx' or ".
 		    "      (swapper_idx='$uid_idx' and ".
-		    "       state!='" . EXPTSTATE_SWAPPED() . "'");
+		    "       state!='" . EXPTSTATE_SWAPPED() . "')");
     return -1
 	if (! $query_result);
 
