@@ -1,0 +1,430 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package emdbi;
+use strict;
+use File::Basename;
+use Mysql;
+use English;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+# Configure variables
+my $TB		= "@prefix@";
+my $SCRIPTNAME  = "Unknown";
+my $TBOPS       = "@TBOPSEMAIL@";
+
+# Locals
+my $DBErrorString = "";		# Record last DB error string.
+
+# Remember the DBname for subsequent reconnects.
+my @DBNAMES       = ();
+
+# Untainted scriptname for below.
+if ($PROGRAM_NAME =~ /^([-\w\.\/]+)$/) {
+    $SCRIPTNAME = basename($1);
+}
+else {
+    $SCRIPTNAME = "Tainted";
+}
+
+{
+    #
+    # Create a special class for keeping track of the process the
+    # database handle was created.  This is needed so that the child
+    # process after a fork() 1) set's InactiveDestroy to avoid sending
+    # a disconnect message since it will also close the parent's
+    # database handle 2) reconnects since two separate processes
+    # shouldn't share the same handle.  (1) is handled via overridding
+    # the database handle DESTROY method, (2) is handled in the
+    # DBQueryN function.
+    #
+    package TestbedDBHandle;
+    use vars '@ISA';
+    @ISA = ('Mysql');
+    @TestbedDBHandle::Statement::ISA = ('Mysql::Statement');
+    my %DB_PID; # hash based on db handle
+    sub obj_hash( $ ) {
+	# Return a hex string of the location of the object in memory.
+	# This is slightly better than just converting it to a scalar
+	# as two objects as the scalar also included the class name
+	# the object is "blessed" into which might change over time
+	sprintf("0x%x", $_[0]); 
+    }
+    sub MakeA ( $ ) {
+	my ($obj) = @_;
+	return unless defined $obj;
+	bless ($obj);
+	$DB_PID{obj_hash($obj)} = $$;
+    }
+    sub db_pid () {
+	my ($self) = @_;
+	return $DB_PID{obj_hash($self)};
+    }
+    sub DESTROY {
+	my ($self) = @_;
+	if ($self->db_pid() != $$) {
+	    $self->setInactiveDestroy(1);
+	}
+	delete $DB_PID{obj_hash($self)};
+	$self->SUPER::DESTROY() if $self->can("SUPER::DESTROY");
+    }
+}
+
+#
+# Set up for querying the database. Note that fork causes a reconnect
+# to the DB in the child.
+#
+my @DB;
+
+use vars qw($DBQUERY_MAXTRIES $DBCONN_MAXTRIES
+	    $DBCONN_EXITONERR $DBQUERY_RECONNECT $DBQUERY_DEBUG
+	    @EXPORT_OK);
+
+$DBQUERY_MAXTRIES  = 1;
+$DBQUERY_RECONNECT = 1;
+$DBCONN_MAXTRIES   = 5;
+$DBCONN_EXITONERR  = 1;
+$DBQUERY_DEBUG     = 0;
+@EXPORT_OK         = qw($DBQUERY_MAXTRIES $DBQUERY_RECONNECT
+			$DBCONN_EXITONERR $DBCONN_MAXTRIES $DBQUERY_DEBUG);
+
+sub TBDBConnect($$)
+{
+    my ($dbnum, $dbname) = @_;
+    my $maxtries = $DBCONN_MAXTRIES;
+
+    if (!defined($dbname)) {
+	    print STDERR "What DBNAME should I use?\n";
+	    return -1
+		if (! $DBCONN_EXITONERR);
+	    exit(-1);
+    }
+    
+    #
+    # Do nothing if this DB handle is already connected to DB.
+    #
+    if (defined($DB[$dbnum])) {
+	return 0
+	    if ($DBNAMES[$dbnum] eq $dbname);
+	
+	print STDERR "DBnum $dbnum already connected to another DB: ".
+	    $DBNAMES[$dbnum] . "!\n";
+	return -1
+	    if (! $DBCONN_EXITONERR);
+	exit(-1);
+    }
+    $DBNAMES[$dbnum] = $dbname;
+
+    #
+    # Construct a 'username' from the name of this script and the user who
+    # ran it. This is for accounting purposes.
+    #
+    my $name = getpwuid($UID);
+    if (!$name) {
+	$name = "uid$UID";
+    }
+    my $dbuser = "$SCRIPTNAME:$name:$PID";
+
+    while ($maxtries) {
+	if ($DBQUERY_DEBUG) {
+	    print STDERR "DBConnect:$dbnum $dbname\n";
+	}
+	
+	$DB[$dbnum] = Mysql->connect("localhost", $dbname, $dbuser, "none");
+        TestbedDBHandle::MakeA($DB[$dbnum]);
+	if (defined($DB[$dbnum])) {
+	    last;
+	}
+	$maxtries--;
+	if ($maxtries) {
+	    print STDERR "Cannot connect to DB; trying again in 5 seconds!\n";
+	    sleep(5);
+	}
+    }
+    if (!defined($DB[$dbnum])) {
+	print STDERR
+	    "Cannot connect to DB after $DBQUERY_MAXTRIES attempts!\n";
+	return -1
+	    if (! $DBCONN_EXITONERR);
+	exit(-1);
+    }
+    $DB[$dbnum]->{'dbh'}->{'PrintError'} = 0;
+    $Mysql::QUIET = 1;
+    return 0;
+}
+
+# New version.
+sub TBDBReconnect($)
+{
+    my ($retry) = @_;
+    my ($exitonerr,$maxtries);
+    
+    if ($retry) {
+	$exitonerr = $DBCONN_EXITONERR;
+	$DBCONN_EXITONERR = 0;
+	
+	# And we want to keep trying for a long time!
+	$maxtries = $DBCONN_MAXTRIES;
+	$DBCONN_MAXTRIES  = 10000;
+    }
+
+    for (my $i = 0; $i < @DB; $i++) {
+	next
+	    if (!defined($DB[$i]));
+	
+	undef($DB[$i]);
+	return -1
+	    if (TBDBConnect($i, $DBNAMES[$i]) != 0);
+    }
+
+    if ($retry) {
+	$DBCONN_EXITONERR = $exitonerr;
+	$DBCONN_MAXTRIES  = $maxtries;
+    }
+    #print "Reconnected to DB in process $PID\n";
+   
+    return 0;
+}
+
+# To avoid keeping a mysql connection around.
+sub TBDBDisconnect()
+{
+    for (my $i = 0; $i < @DB; $i++) {
+	undef($DB[$i]);
+    }
+    select(undef, undef, undef, 0.2);
+}
+
+# Create a new DB handle and return the handle number
+sub NewTBDBHandle($)
+{
+    my ($dbname) = @_;
+    
+    my $dbnum = @DB;
+    # Avoid using the initial one here.
+    $dbnum++
+	if (!$dbnum);
+    
+    TBDBConnect($dbnum, $dbname);
+    return $dbnum;
+}
+
+#
+# Issue a DB query. Argument is a string. Returns the actual query object, so
+# it is up to the caller to test it. I would not for one moment view this
+# as encapsulation of the DB interface. I'm just tired of typing the same
+# silly stuff over and over.
+#
+# usage: DBQuery(char *str)
+#        returns the query object result.
+#
+# Sets $DBErrorString is case of error; saving the original query string and
+# the error string from the DB module. Use DBFatal (below) to print/email
+# that string, and then exit.
+#
+sub DBQueryN($$)
+{
+    my($dbnum, $query)   = @_;
+    my $maxtries = $DBQUERY_MAXTRIES;
+    my $result;
+
+    # Not really forever :-)
+    if (!$maxtries) {
+	$maxtries = 100000;
+    }
+
+    # Reconnect to mysqld in child of fork.
+    if ($DB[$dbnum]->db_pid() != $PID) {
+	if (TBDBReconnect(1) != 0) {
+	    $DBErrorString =
+		"  Query: $query\n".
+		"  Error: Could not reconnect to mysqld";
+	    return undef;
+	}
+    }
+
+    if ($DBQUERY_DEBUG) {
+	print STDERR "Query: '$query'\n";
+    }
+
+    while ($maxtries) {
+	# Get this each time through the loop since we try reconnect below.
+	my $db = $DB[$dbnum];
+
+	$result = $db->query($query);
+
+	if (! defined($result)) {
+	    my $err = $db->err;
+
+	    $DBErrorString =
+		"  Query: $query\n".
+		"  Error: " . $db->errstr . " ($err)";
+	}
+	if (defined($result) ||
+	    ($db->err != 2006) && ($db->err != 1053) && ($db->err != 2013) &&
+	    ($db->err != 1046)) {
+	    last;
+	}
+
+	#
+	# If we lose the connection to mysqld; lets try to reconnect. 
+	#
+	if ($db->err == 2006 || $db->err == 2013) {
+	    # This is just for the mysqld watchdog daemon.
+	    return undef
+		if (! $DBQUERY_RECONNECT);
+
+	    if (TBDBReconnect(1) != 0) {
+		$DBErrorString =
+		    "  Query: $query\n".
+		    "  Error: Could not reconnect to mysqld";
+
+		return undef;
+	    }
+	    next;
+	}
+
+	$maxtries--;
+	DBWarn("mysqld went away in process $PID. $maxtries tries left", 0);
+	sleep(1);
+    }
+    return $result;
+}
+sub DBQuery($) {return DBQueryN(0,$_[0]);}
+
+#
+# Same as above, but die on error.
+#
+sub DBQueryFatalN($$)
+{
+    my($dbnum, $query) = @_;
+    my($result);
+
+    $result = DBQueryN($dbnum, $query);
+
+    if (! $result) {
+	DBFatal("DB Query failed");
+    }
+    return $result;
+}
+sub DBQueryFatal($) {return DBQueryFatalN(0,$_[0]);}
+
+#
+# Same as above, but just send email on error. This info is useful
+# to the TB system, but the caller has to retain control.
+#
+sub DBQueryWarnN($$)
+{
+    my($dbnum, $query) = @_;
+    my($result);
+
+    $result = DBQueryN($dbnum, $query);
+
+    if (! $result) {
+	DBWarn("DB Query failed");
+    }
+    return $result;
+}
+sub DBQueryWarn($) {return DBQueryWarnN(0,$_[0]);}
+
+#
+# Warn and send email after a failed DB query. First argument is the error
+# message to display. The contents of $DBErrorString is also printed.
+#
+# usage: DBWarn(char *message)
+#
+sub DBWarn($;$)
+{
+    my($message, $nomail) = @_;
+    
+    DBError(\&warn, $message, $nomail);
+}
+
+#
+# Same as above, but die after the warning.
+#
+# usage: DBFatal(char *message);
+#
+sub DBFatal($;$)
+{
+    my ($message,$nomail) = $_[0];
+    
+    DBError(\&die, $message, $nomail);
+}
+
+#
+# DBError, common parts of DBWarn and DBFatal
+#
+# usage: DBError(log function, message, nomail)
+#
+sub DBError($$;$) 
+{
+    my($f, $message, $nomail) = @_;
+    
+    if (! defined($nomail)) {
+	libtestbed::SENDMAIL($TBOPS, "DBError - $message",
+			     "$message - In $SCRIPTNAME\n".
+			     "$DBErrorString\n");
+    }
+
+    $f->("$message:\n$DBErrorString\n");
+}
+
+#
+# Quote a string for DB insertion.
+#
+# usage: char *DBQuoteSpecial(char *string);
+#
+sub DBQuoteSpecial($)
+{
+    my ($string) = $_[0];
+
+    return $DB[0]->quote($string);
+}
+
+sub DBQuoteSpecialN($$)
+{
+    my ($dbnum, $string) = $_[0];
+
+    return $DB[$dbnum]->quote($string);
+}
+
+#
+# Get the Error From the Last Database query
+#
+sub DBErrN($)
+{
+    return $DB[$_[0]]->err;
+}
+sub DBErr()
+{
+    return $DB[0]->err;
+}
+
+END {
+    # Call it here otherwise may get:
+    #   (in cleanup) Can't call method "FETCH" on an undefined value at 
+    #   /usr/local/lib/perl5/site_perl/5.8.8/mach/Mysql.pm line 91 during 
+    #   global destruction.
+    # where line 91 is:
+    #  	my $oldvalue = $self->{'dbh'}->{'InactiveDestroy'};
+    # which is in setInactiveDestroy() which get called in libdb.pm in:
+    #   if ($self->db_pid() != $$) {
+    #       $self->setInactiveDestroy(1);
+    #   }
+    # which is in TestbedDBHandle::DESTROY (still in libdb.pm even
+    # though it is a diffrent package)
+    #
+    # This error is probably due to some object being destroyed too
+    # soon somewhere in the DBI/DBD modules.
+    TBDBDisconnect();
+}
+
+# _Always_ make sure that this 1 is at the end of the file...
+
+1;
+
