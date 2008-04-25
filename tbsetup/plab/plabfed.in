@@ -1,0 +1,46 @@
+#!/usr/local/bin/python
+# -*- python -*-
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+import sys
+sys.path.append("@prefix@/lib")
+import getopt
+from libtestbed import *
+import libplab
+import traceback
+
+usage = "\t%prog [-d] <plcid_or_name> <sync|delete> <objtype> <objid>"
+
+def main(args):
+    me = args[0]
+    parser = TBParser(usage)
+
+    plcid,op,objtype,objid = None,None,None,None
+    
+    (opts, args) = parser.parse_args()
+
+    libplab.debug = opts.debug
+    libplab.verbose = opts.verbose
+    
+    if len(args) == 4:
+        plcid,op,objtype,objid = args
+
+        # load up the plc:
+        plc = libplab.PLC(plcid)
+        translator = libplab.EmulabPlcObjTranslator(plc)
+
+        if op == 'sync':
+            translator.syncObject(objtype,objid)
+        elif op == 'delete':
+            translator.deleteObject(objtype,objid)
+            pass
+    else:
+        parser.error("Incorrect number of arguments")
+        pass
+
+if __name__ == "__main__":
+    main(sys.argv)
