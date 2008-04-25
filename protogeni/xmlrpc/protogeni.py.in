@@ -5,25 +5,21 @@
 # All rights reserved.
 #
 import sys
-from xmlrpc import XmlRpcServer
+from SimpleXMLRPCServer import CGIXMLRPCRequestHandler
 
 class myexampleclass:
     def method1 (self, meta, oneargument, anotherone):
-        print (meta, oneargument, anotherone)
-        return 0
+        return str(meta) + "," + str(oneargument)
 
     def method2 (self, meta, *args):
         sys.exit(0)
         pass
     pass
 
-server = XmlRpcServer()
 myinstance = myexampleclass()
-server.register_class('myclass', myinstance)
-
-sys.stdout.write("Content-type: text/xml\n\n")
-server.execute()
-
+server = CGIXMLRPCRequestHandler()
+server.register_instance(myinstance)
+server.handle_request()
 
 
 

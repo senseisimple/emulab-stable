@@ -1,0 +1,40 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Simple CGI interfce to the GENI xmlrpc interface. This script is invoked
+# from the web server. The certificate information is in the environment
+# set up by apache.
+#
+use strict;
+use Frontier::Responder;
+
+# Testbed libraries.
+use lib '@prefix@/lib';
+use Protogeni;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+#
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# The UUID of the client certificate is in the env var SSL_CLIENT_S_DN_CN.
+#
+my $responder = Frontier::Responder->new( "methods" => {
+    "User::Lookup" => \&Protogeni::User::Lookup,
+    "add"          => \&Protogeni::add,
+   },
+);
+
+print $responder->answer();

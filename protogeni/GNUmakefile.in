@@ -11,7 +11,7 @@ SUBDIR		= protogeni
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS	= security xmlrpc
+SUBDIRS	= security xmlrpc lib
 
 all:	all-subdirs
 
@@ -20,6 +20,7 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 install: 
 	@$(MAKE) -C security install
 	@$(MAKE) -C xmlrpc install
+	@$(MAKE) -C lib install
 
 control-install: 
 

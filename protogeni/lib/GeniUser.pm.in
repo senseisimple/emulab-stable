@@ -1,0 +1,192 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package GeniUser;
+
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA    = "Exporter";
+@EXPORT = qw ( );
+
+# Must come after package declaration!
+use lib '@prefix@/lib';
+use GeniDB;
+use libtestbed;
+# Hate to import all this crap; need a utility library.
+use libdb qw(TBGetUniqueIndex);
+use English;
+use overload ('""' => 'Stringify');
+use vars qw();
+
+# Configure variables
+my $TB		   = "@prefix@";
+my $TBOPS          = "@TBOPSEMAIL@";
+my $TBAPPROVAL     = "@TBAPPROVALEMAIL@";
+my $TBAUDIT   	   = "@TBAUDITEMAIL@";
+my $BOSSNODE       = "@BOSSNODE@";
+my $CONTROL	   = "@USERNODE@";
+my $OURDOMAIN      = "@OURDOMAIN@";
+
+# Cache of instances to avoid regenerating them.
+my %users      = ();
+my $debug      = 0;
+
+# Little helper and debug function.
+sub mysystem($)
+{
+    my ($command) = @_;
+
+    print STDERR "Running '$command'\n"
+	if ($debug);
+    return system($command);
+}
+
+#
+# Lookup by idx.
+#
+sub Lookup($$)
+{
+    my ($class, $token) = @_;
+    my $query_result;
+
+    # Look in cache first
+    return $users{"$token"}
+        if (exists($users{"$token"}));
+
+    if ($token =~ /^\d+$/) {
+	$query_result =
+	    DBQueryWarn("select * from geni_users ".
+			"where uid_idx='$token' and status='active'");
+    }
+    else {
+	return undef;
+    }
+    
+    return undef
+	if (!$query_result || !$query_result->numrows);
+
+    my $self         = {};
+    $self->{'USER'}  = $query_result->fetchrow_hashref();
+
+    bless($self, $class);
+    
+    # Add to cache. 
+    $users{$self->{'USER'}->{'uid_idx'}} = $self;
+    
+    return $self;
+}
+# accessors
+sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'USER'}->{$_[1]}); }
+sub uid_idx($)		{ return field($_[0], "uid_idx"); }
+sub uid($)		{ return field($_[0], "uid"); }
+sub uuid($)		{ return field($_[0], "uuid"); }
+sub status($)		{ return field($_[0], "status"); }
+sub created($)		{ return field($_[0], "created"); }
+sub archived($)		{ return field($_[0], "archived"); }
+sub name($)		{ return field($_[0], "name"); }
+sub email($)		{ return field($_[0], "email"); }
+sub sa_idx($)		{ return field($_[0], "sa_idx"); }
+
+#
+# Lookup user given a UUID.  
+#
+sub LookupByUUID($$)
+{
+    my ($class, $uuid) = @_;
+    my $safe_uuid = DBQuoteSpecial($uuid);
+
+    my $query_result =
+	DBQueryFatal("select uid_idx from geni_users ".
+		     "where uuid=$safe_uuid");
+    
+    return undef
+	if (! $query_result || !$query_result->numrows);
+
+    my ($uid_idx) = $query_result->fetchrow_array();
+
+    return GeniUser->Lookup($uid_idx);
+}
+
+#
+# Class function to create new Geni user and return object.
+#
+sub Create($$$)
+{
+    my ($class, $uid, $uuid, $name, $email, $sa_idx) = @_;
+    my @insert_data = ();
+
+    # Every user gets a new unique index.
+    my $uid_idx = TBGetUniqueIndex('next_uid', 1);
+
+    # And a UUID (universally unique identifier).
+    $uuid = NewUUID();
+    if (!defined($uuid)) {
+	print "*** WARNING: Could not generate a UUID!\n";
+	return undef;
+    }
+    push(@insert_data, "uid_uuid='$uuid'");
+    push(@insert_data, "status='active'");
+
+    # Now tack on other stuff we need.
+    push(@insert_data, "created=now()");
+    push(@insert_data, "uid_idx='$uid_idx'");
+    push(@insert_data, "sa_idx=$sa_idx");
+
+    my $safe_uid   = DBQuoteSpecial($uid);
+    my $safe_name  = DBQuoteSpecial($name);
+    my $safe_email = DBQuoteSpecial($email);
+    push(@insert_data, "uid=$safe_uid");
+    push(@insert_data, "name=$safe_name");
+    push(@insert_data, "email=$safe_email");
+
+    # Insert into DB.
+    DBQueryWarn("insert into geni_users set " . join(",", @insert_data))
+	or return undef;
+
+    return GeniUser->Lookup($uid_idx);
+}
+
+#
+# Delete the user, as for registration errors.
+#
+sub Delete($)
+{
+    my ($self) = @_;
+
+    return 0
+	if (! ref($self));
+
+    my $uid_idx = $self->uid_idx();
+
+    DBQueryWarn("delete from geni_users where uid_idx='$uid_idx'")
+	or return -1;
+    
+    return 0;
+}
+
+#
+# Archive user. 
+#
+sub Archive($)
+{
+    my ($self) = @_;
+
+    return 0
+	if (! ref($self));
+
+    my $uid_idx = $self->uid_idx();
+
+    DBQueryWarn("update geni_users set status='archived' ".
+		"where uid_idx='$uid_idx'")
+	or return -1;
+    
+    return 0;
+}
+
+# _Always_ make sure that this 1 is at the end of the file...
+1;

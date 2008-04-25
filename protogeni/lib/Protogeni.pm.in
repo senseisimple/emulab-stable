@@ -1,0 +1,118 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005, 2006, 2007, 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package Protogeni;
+
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT @EXPORT_OK
+	    $RESPONSE_SUCCESS $RESPONSE_BADARGS $RESPONSE_ERROR
+	    $RESPONSE_FORBIDDEN $RESPONSE_BADVERSION $RESPONSE_SERVERERROR
+	    $RESPONSE_TOOBIG $RESPONSE_REFUSED $RESPONSE_TIMEDOUT);
+
+@ISA       = "Exporter";
+@EXPORT    = qw ( );
+
+# Must come after package declaration!
+use lib '@prefix@/lib';
+use libdb;
+
+$RESPONSE_SUCCESS        = 0;
+$RESPONSE_BADARGS        = 1;
+$RESPONSE_ERROR          = 2;
+$RESPONSE_FORBIDDEN      = 3;
+$RESPONSE_BADVERSION     = 4;
+$RESPONSE_SERVERERROR    = 5;
+$RESPONSE_TOOBIG         = 6;
+$RESPONSE_REFUSED        = 7;  # Emulab is down, try again later.
+$RESPONSE_TIMEDOUT       = 8;
+
+@EXPORT_OK = qw($RESPONSE_SUCCESS $RESPONSE_BADARGS $RESPONSE_ERROR
+		$RESPONSE_FORBIDDEN $RESPONSE_BADVERSION $RESPONSE_SERVERERROR
+		$RESPONSE_TOOBIG $RESPONSE_REFUSED $RESPONSE_TIMEDOUT);
+
+#
+# This is the "structure" we want to return.
+#
+# class Response:
+#    def __init__(self, code, value=0, output=""):
+#        self.code     = code            # A RESPONSE code
+#        self.value    = value           # A return value; any valid XML type.
+#        self.output   = output          # Pithy output to print
+#        return
+#
+sub MakeResponse($$;$)
+{
+    my ($code, $value, $output) = @_;
+
+    $output = ""
+	if (!defined($output));
+    
+    return {"code"   => $code,
+	    "value"  => $value,
+	    "output" => $output};
+}
+
+sub MalformedAargsResponse()
+{
+    return MakeResponse($RESPONSE_BADARGS, 0, "Malformed arguments to method");
+}
+
+sub BadArgsResponse(;$)
+{
+    my ($msg) = @_;
+
+    $msg = "Bad arguments to method"
+	if (!defined($msg));
+    
+    return MakeResponse($RESPONSE_BADARGS, 0, $msg);
+}
+
+sub add ($$)
+{
+    return MakeResponse(0, $_[0] + $_[1], "foo");
+}
+
+#############################################################################
+package Protogeni::User;
+use emdbi;
+use English;
+use User;
+use GeniUser;
+
+##
+# Lookup a GID (UUID) and return the public key for that user.
+# A GID is just a UUID that has been bound to some data, such as a public
+# key.
+#
+# @param GID the GID of the user to lookup.
+# @return the public key bound to the user GID, or error if no user.
+# 
+sub LookupKey($)
+{
+    my ($uuid) = @_;
+
+    if (! ($uuid =~ /^[-\w]*$/)) {
+	return Protogeni::MalformedArgsResponse();
+    }
+    my $user = User->LookupByUUID($uuid);
+    if (defined($user)) {
+	#
+	# A local Emulab user. Return that key.
+	#	
+	return Protogeni::MakeResponse(0, 2);
+    }
+    return Protogeni::BadArgsResponse("No such user for GID")
+	if (!defined($user));
+
+    #
+    # We want to return the encrypted GENI certificate.
+    #
+    return Protogeni::MakeResponse(0, 1);
+}
+
+# _Always_ make sure that this 1 is at the end of the file...
+1;

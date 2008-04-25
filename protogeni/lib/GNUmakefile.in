@@ -7,31 +7,25 @@
 SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ../..
-SUBDIR		= protogeni/xmlrpc
+SUBDIR		= protogeni/lib
 
 include $(OBJDIR)/Makeconf
 
-# These scripts installed setuid, with sudo. 
-SETUID_BIN_SCRIPTS   = 
-SETUID_SBIN_SCRIPTS  = 
-SETUID_LIBX_SCRIPTS  =
+LIB_SCRIPTS     = Protogeni.pm GeniDB.pm GeniUser.pm test.pl
 
 #
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
-all:	protogeni.py protogeni-client.py protogeni.pl
+all:	$(LIB_SCRIPTS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-install: $(INSTALL_DIR)/protogeni/xmlrpc/protogeni.pl
+install: $(addprefix $(INSTALL_LIBDIR)/, $(LIB_SCRIPTS))
 
 control-install:
 
 clean:
-	rm -f *.o core
+	rm -f *.o core $(LIB_SCRIPTS)
 
-$(INSTALL_DIR)/protogeni/xmlrpc/%: %
-	@echo "Installing $<"
-	-mkdir -p $(INSTALL_DIR)/protogeni/xmlrpc
-	$(INSTALL) $< $@
+
