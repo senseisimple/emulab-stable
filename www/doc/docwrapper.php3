@@ -14,6 +14,23 @@ chdir("doc");
 $reqargs = RequiredPageArguments("docname",    PAGEARG_STRING);
 $optargs = OptionalPageArguments("printable",  PAGEARG_BOOLEAN);
 
+#
+# Need to sanity check the path! Allow only [word].{html,txt} files
+#
+if (!preg_match("/^[-\w]+\.(html|txt)$/", $docname)) {
+    header(' ', true, 400);
+    USERERROR("Illegal document name: $docname!", 1);
+}
+
+#
+# Make sure the file exists
+#
+$fh = @fopen("$docname", "r");
+if (!$fh) {
+    header(' ', true, 404);
+    USERERROR("Can't read document file: $docname!", 1);
+}
+
 if (!isset($printable))
     $printable = 0;
 
@@ -22,13 +39,6 @@ if (!isset($printable))
 #
 if (!$printable) {
     PAGEHEADER("Emulab Documentation");
-}
-
-#
-# Need to sanity check the path! Allow only [word].{html,txt} files
-#
-if (!preg_match("/^[-\w]+\.(html|txt)$/", $docname)) {
-    USERERROR("Illegal document name: $docname!", 1);
 }
 
 #
@@ -59,7 +69,8 @@ if ($textfile) {
     echo "<XMP>\n";
 }
 
-readfile("$docname");
+fpassthru($fh);
+fclose($fh);
 
 if ($textfile) {
     echo "</XMP>\n";
