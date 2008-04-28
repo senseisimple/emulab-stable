@@ -93,6 +93,19 @@ sub email($)		{ return field($_[0], "email"); }
 sub sa_idx($)		{ return field($_[0], "sa_idx"); }
 
 #
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+    
+    my $uid     = $self->uid();
+    my $uid_idx = $self->uid_idx();
+
+    return "[GeniUser: $uid, IDX: $uid_idx]";
+}
+
+#
 # Lookup user given a UUID.  
 #
 sub LookupByUUID($$)
@@ -113,11 +126,32 @@ sub LookupByUUID($$)
 }
 
 #
+# Class method to check for an existing user that has the same
+# uid/email. Lets not allow this for now. Return the number of
+# users that match or -1 if an error. 
+#
+sub CheckExisting($$$)
+{
+    my ($class, $uid, $email) = @_;
+
+    my $safe_uid   = DBQuoteSpecial($uid);
+    my $safe_email = DBQuoteSpecial($email);
+
+    my $query_result =
+	DBQueryFatal("select uid_idx from geni_users ".
+		     "where uid=$safe_uid and email=$safe_email");
+    return -1
+	if (!defined($query_result));
+
+    return $query_result->numrows;
+}
+
+#
 # Class function to create new Geni user and return object.
 #
-sub Create($$$)
+sub Create($$$$$)
 {
-    my ($class, $uid, $uuid, $name, $email, $sa_idx) = @_;
+    my ($class, $uid, $name, $email, $sa_idx) = @_;
     my @insert_data = ();
 
     # Every user gets a new unique index.

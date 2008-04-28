@@ -1,0 +1,44 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package GeniSAClient;
+
+#
+# The client side of the SA interface, used by Slice Authorities to
+# invoke operations on Geni Central and on Slices (Components).
+#
+
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA    = "Exporter";
+@EXPORT = qw ( );
+
+# Must come after package declaration!
+use lib '@prefix@/lib';
+use GeniDB;
+use libtestbed;
+use English;
+use vars qw();
+
+# Configure variables
+my $TB		   = "@prefix@";
+my $TBOPS          = "@TBOPSEMAIL@";
+my $TBAPPROVAL     = "@TBAPPROVALEMAIL@";
+my $TBAUDIT   	   = "@TBAUDITEMAIL@";
+my $BOSSNODE       = "@BOSSNODE@";
+my $CONTROL	   = "@USERNODE@";
+my $OURDOMAIN      = "@OURDOMAIN@";
+
+#
+# Register a user at the Geni ClearingHouse (which in the prototype is
+# is Utah Emulab).
+#
+sub RegisterUser()
+{
+
+}

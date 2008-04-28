@@ -6,6 +6,12 @@
 #
 package Protogeni;
 
+#
+# XXX: Permissions need to be worked on. Some of these interfaces are
+# only valid for SAs and others are available to mere users (geni
+# users of course).
+#
+
 use strict;
 use Exporter;
 use vars qw(@ISA @EXPORT @EXPORT_OK
@@ -77,8 +83,10 @@ sub add ($$)
 }
 
 #############################################################################
-package Protogeni::User;
-use emdbi;
+# The Slice Authority interface for the Geni Clearinghouse.
+#
+package Protogeni::SA;
+use GeniDB;
 use English;
 use User;
 use GeniUser;
@@ -91,7 +99,7 @@ use GeniUser;
 # @param GID the GID of the user to lookup.
 # @return the public key bound to the user GID, or error if no user.
 # 
-sub LookupKey($)
+sub Lookup($)
 {
     my ($uuid) = @_;
 
@@ -101,9 +109,13 @@ sub LookupKey($)
     my $user = User->LookupByUUID($uuid);
     if (defined($user)) {
 	#
-	# A local Emulab user. Return that key.
-	#	
-	return Protogeni::MakeResponse(0, 2);
+	# A local Emulab user. Return the pubkey for the user.
+	#
+	my $cert;
+	if ($user->SSLCert(1, \$cert) != 0) {
+	    return Protogeni::MakeResponse($Protogeni::RESPONSE_ERROR, "");
+	}
+	return Protogeni::MakeResponse(0, $cert);
     }
     return Protogeni::BadArgsResponse("No such user for GID")
 	if (!defined($user));
@@ -113,6 +125,38 @@ sub LookupKey($)
     #
     return Protogeni::MakeResponse(0, 1);
 }
+
+#
+# Register a new Geni user in the DB. Returns the UUID (GUD).
+#
+sub Register($$$)
+{
+    my ($uid, $name, $email) = @_;
+
+    if (! (defined($uid) && defined($name) && defined($email) &&
+	   $uid =~ /^
+
+    #
+    # XXX TODO!
+    #
+    # Who is the SA? We get this from the SSL environment (certificate).
+    #
+    my $sa_idx = 1;
+
+    #
+    # XXX
+    #
+    # What kind of uniquess requirements do we need? No one else with this
+    # email address? Of course, we have to allow uid reuse, but should we
+    # require that for a given SA, that uid is unique, at least to avoid
+    # lots of confusion?
+    #
+    if (GeniUser->CheckExisting($uid, $name)) {
+	return Protogeni::MakeResponse($Protogeni::RESPONSE_ERROR,
+				       "$uid/$email already registered");
+    }
+}
+
 
 # _Always_ make sure that this 1 is at the end of the file...
 1;
