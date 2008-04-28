@@ -387,14 +387,14 @@ sub DBError($$;$)
 #
 sub DBQuoteSpecial($)
 {
-    my ($string) = $_[0];
+    my ($string) = @_;
 
     return $DB[0]->quote($string);
 }
 
 sub DBQuoteSpecialN($$)
 {
-    my ($dbnum, $string) = $_[0];
+    my ($dbnum, $string) = @_;
 
     return $DB[$dbnum]->quote($string);
 }
