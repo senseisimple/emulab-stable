@@ -9,7 +9,7 @@ granted provided that the following conditions are met.
 
 By accepting this software, you agree:
 -not to redistribute it, even within your organization;
--that within a month of the official Utah Emulab release you will upgrade
+-that within two months of the official Utah Emulab release you will upgrade
  to that release and its license[*] and destroy all reasonably accessible
  copies of this software snapshot; after that month all rights you have to
  use, copy, or modify this software snapshot will terminate;
@@ -34,7 +34,7 @@ THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
 CONDITION. THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
 FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 
-June 12, 2007
+April 28, 2008
 
     Flux Research Group
     School of Computing
@@ -43,14 +43,11 @@ June 12, 2007
     Salt Lake City, UT  84112
 
 
-[*] Within a month after the GNU Affero General Public License
-version 3 (AGPLv3) is finalized, Utah expects to release the
-Emulab software under that open source license.
+[*] Utah plans to release the Emulab software under this open source
+license: the GNU Affero General Public License version 3 (AGPLv3),
+found at http://www.fsf.org/licensing/licenses/agpl-3.0.html .
 
-A draft of AGPLv3 is available at http://gplv3.fsf.org/agplv3-dd1.txt.
-It consists of the GNU General Public License version 3 (GPLv3) with a
-single short added Section 13, which requires that the source be
-freely available to users who interact with the software through a
-network.  GPLv3's last call draft is available at
-http://gplv3.fsf.org/gpl-draft-2007-05-31.txt and is planned be
-finalized by June 29, 2007.
+The AGPLv3 consists of the GNU General Public License version 3 (GPLv3)
+with a single short added Section 13, which requires that the source
+be freely available to users who interact with the software through a
+network.
