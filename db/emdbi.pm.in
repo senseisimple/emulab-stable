@@ -332,6 +332,12 @@ sub DBQueryWarnN($$)
 sub DBQueryWarn($) {return DBQueryWarnN(0,$_[0]);}
 
 #
+# Helper functions.
+#
+sub emdbi_die($)	{ die($_[0]); }
+sub emdbi_warn($)	{ warn($_[0]); }
+
+#
 # Warn and send email after a failed DB query. First argument is the error
 # message to display. The contents of $DBErrorString is also printed.
 #
@@ -341,7 +347,7 @@ sub DBWarn($;$)
 {
     my($message, $nomail) = @_;
     
-    DBError(\&warn, $message, $nomail);
+    DBError(\&emdbi_warn, $message, $nomail);
 }
 
 #
@@ -353,7 +359,7 @@ sub DBFatal($;$)
 {
     my ($message,$nomail) = $_[0];
     
-    DBError(\&die, $message, $nomail);
+    DBError(\&emdbi_die, $message, $nomail);
 }
 
 #
