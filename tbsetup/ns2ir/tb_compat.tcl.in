@@ -147,7 +147,9 @@ namespace eval TBCOMPAT {
 
     # The experiment directory, this is where the feedback related files will
     # be read from and dumped to.  XXX Hacky
-    set expdir "${FSDIR_PROJ}/${::GLOBALS::pid}/exp/${::GLOBALS::eid}/"
+    # XXX Hacky II: we must use PROJROOT and not FSDIR_PROJ since these
+    # sourced file paths get recorded and used on boss.
+    set expdir "${PROJROOT}/${::GLOBALS::pid}/exp/${::GLOBALS::eid}/"
 
     # XXX Just for now...
     variable tbxlogfile
