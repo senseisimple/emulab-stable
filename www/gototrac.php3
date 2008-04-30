@@ -24,7 +24,8 @@ $optargs = OptionalPageArguments("wiki",  PAGEARG_STRING,
 if (!isset($wiki)) {
     $wiki = "emulab";
 }
-elseif ($wiki == "geni") {
+
+if ($wiki == "geni") {
     $geniproject = Project::Lookup("geni");
     $approved    = 0;
     if (! ($geniproject &&
