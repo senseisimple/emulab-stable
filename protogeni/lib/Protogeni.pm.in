@@ -5,81 +5,22 @@
 # All rights reserved.
 #
 package Protogeni;
+use Exporter;
+@ISA       = "Exporter";
+@EXPORT    = qw( );
 
 #
 # XXX: Permissions need to be worked on. Some of these interfaces are
 # only valid for SAs and others are available to mere users (geni
 # users of course).
 #
-
-use strict;
-use Exporter;
-use vars qw(@ISA @EXPORT @EXPORT_OK
-	    $RESPONSE_SUCCESS $RESPONSE_BADARGS $RESPONSE_ERROR
-	    $RESPONSE_FORBIDDEN $RESPONSE_BADVERSION $RESPONSE_SERVERERROR
-	    $RESPONSE_TOOBIG $RESPONSE_REFUSED $RESPONSE_TIMEDOUT);
-
-@ISA       = "Exporter";
-@EXPORT    = qw ( );
-
 # Must come after package declaration!
 use lib '@prefix@/lib';
-use libdb;
-
-$RESPONSE_SUCCESS        = 0;
-$RESPONSE_BADARGS        = 1;
-$RESPONSE_ERROR          = 2;
-$RESPONSE_FORBIDDEN      = 3;
-$RESPONSE_BADVERSION     = 4;
-$RESPONSE_SERVERERROR    = 5;
-$RESPONSE_TOOBIG         = 6;
-$RESPONSE_REFUSED        = 7;  # Emulab is down, try again later.
-$RESPONSE_TIMEDOUT       = 8;
-
-@EXPORT_OK = qw($RESPONSE_SUCCESS $RESPONSE_BADARGS $RESPONSE_ERROR
-		$RESPONSE_FORBIDDEN $RESPONSE_BADVERSION $RESPONSE_SERVERERROR
-		$RESPONSE_TOOBIG $RESPONSE_REFUSED $RESPONSE_TIMEDOUT);
-
-#
-# This is the "structure" we want to return.
-#
-# class Response:
-#    def __init__(self, code, value=0, output=""):
-#        self.code     = code            # A RESPONSE code
-#        self.value    = value           # A return value; any valid XML type.
-#        self.output   = output          # Pithy output to print
-#        return
-#
-sub MakeResponse($$;$)
-{
-    my ($code, $value, $output) = @_;
-
-    $output = ""
-	if (!defined($output));
-    
-    return {"code"   => $code,
-	    "value"  => $value,
-	    "output" => $output};
-}
-
-sub MalformedAargsResponse()
-{
-    return MakeResponse($RESPONSE_BADARGS, 0, "Malformed arguments to method");
-}
-
-sub BadArgsResponse(;$)
-{
-    my ($msg) = @_;
-
-    $msg = "Bad arguments to method"
-	if (!defined($msg));
-    
-    return MakeResponse($RESPONSE_BADARGS, 0, $msg);
-}
+use GeniResponse;
 
 sub add ($$)
 {
-    return MakeResponse(0, $_[0] + $_[1], "foo");
+    return GeniResponse->Create(0, $_[0] + $_[1], "foo");
 }
 
 #############################################################################
@@ -87,8 +28,10 @@ sub add ($$)
 #
 package Protogeni::SA;
 use GeniDB;
+use GeniResponse;
 use English;
 use User;
+use emutil;
 use GeniUser;
 
 ##
@@ -101,10 +44,11 @@ use GeniUser;
 # 
 sub Lookup($)
 {
-    my ($uuid) = @_;
+    my ($argref) = @_;
+    my $uuid = $argref->{'uuid'};
 
-    if (! ($uuid =~ /^[-\w]*$/)) {
-	return Protogeni::MalformedArgsResponse();
+    if (! (defined($uuid) && ($uuid =~ /^[-\w]*$/))) {
+	return GeniResponse->MalformedArgsResponse();
     }
     my $user = User->LookupByUUID($uuid);
     if (defined($user)) {
@@ -113,28 +57,65 @@ sub Lookup($)
 	#
 	my $cert;
 	if ($user->SSLCert(1, \$cert) != 0) {
-	    return Protogeni::MakeResponse($Protogeni::RESPONSE_ERROR, "");
+	    return GeniResponse->Create(GENIRESPONSE_ERROR);
 	}
-	return Protogeni::MakeResponse(0, $cert);
+	return GeniResponse->Create(0, $cert);
     }
-    return Protogeni::BadArgsResponse("No such user for GID")
+    return GeniResponse->BadArgsResponse("No such user for GID")
 	if (!defined($user));
 
     #
-    # We want to return the encrypted GENI certificate.
+    # We want to return the certificate.
     #
-    return Protogeni::MakeResponse(0, 1);
+    return GeniResponse->Create(0, 1);
 }
 
 #
-# Register a new Geni user in the DB. Returns the UUID (GUD).
+# Register a new Geni user in the DB. Returns success/failure.
 #
-sub Register($$$)
+sub RegisterUser($)
 {
-    my ($uid, $name, $email) = @_;
+    my ($argref) = @_;
+    my $hrn   = $argref->{'hrn'};
+    my $uid   = $argref->{'uid'};
+    my $uuid  = $argref->{'uuid'};
+    my $name  = $argref->{'name'};
+    my $email = $argref->{'email'};
+    my $cert  = $argref->{'cert'};
 
-    if (! (defined($uid) && defined($name) && defined($email) &&
-	   $uid =~ /^
+    if (! (defined($hrn) && defined($uid) && defined($name) &&
+	   defined($email) &&
+	   defined($cert) && defined($uuid))) {
+	return GeniResponse->MalformedArgsResponse();
+    }
+
+    #
+    # Use the Emulab checkslot routines.
+    #
+    if (! ($hrn =~ /^[-\w\.]*$/)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "hrn: Invalid characters");
+    }
+    if (! ($uuid =~ /^[-\w]*$/)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "uuid: Invalid characters");
+    }
+    if (! TBcheck_dbslot($name, "users", "usr_name", TBDB_CHECKDBSLOT_ERROR)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "name: ". TBFieldErrorString());
+    }
+    if (! TBcheck_dbslot($name, "users", "uid", TBDB_CHECKDBSLOT_ERROR)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "uid: ". TBFieldErrorString());
+    }
+    if (! TBcheck_dbslot($email, "users", "usr_email",TBDB_CHECKDBSLOT_ERROR)){
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "email: ". TBFieldErrorString());
+    }
+    if (! TBcheck_dbslot($cert, "default", "text", TBDB_CHECKDBSLOT_ERROR)){
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "cert: ". TBFieldErrorString());
+    }
 
     #
     # XXX TODO!
@@ -144,19 +125,142 @@ sub Register($$$)
     my $sa_idx = 1;
 
     #
+    # XXX TODO!
+    #
+    # Need to verify the UUID is permitted for the SA making the request.
+    #
+
+    #
     # XXX
     #
     # What kind of uniquess requirements do we need? No one else with this
-    # email address? Of course, we have to allow uid reuse, but should we
-    # require that for a given SA, that uid is unique, at least to avoid
+    # email address? Of course, we have to allow hrn reuse, but should we
+    # require that for a given SA, that hrn is unique, at least to avoid
     # lots of confusion?
     #
-    if (GeniUser->CheckExisting($uid, $name)) {
-	return Protogeni::MakeResponse($Protogeni::RESPONSE_ERROR,
-				       "$uid/$email already registered");
+    if (GeniUser->CheckExisting($hrn, $email)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "$hrn/$email already registered");
     }
+
+    my $newuser = GeniUser->Create($hrn, $uid, $uuid,
+				   $name, $email, $cert, $sa_idx);
+    if (!defined($newuser)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "$hrn/$email could not be registered");
+    }
+
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS, undef,
+				"$hrn/$email has been registered");
 }
 
+#
+# Register a new Geni slice in the DB. Returns the UUID (GID).
+#
+sub RegisterSlice($)
+{
+    my ($argref) = @_;
+    my $hrn   = $argref->{'hrn'};
+    my $uuid  = $argref->{'uuid'};
+    my $creator_uuid  = $argref->{'creator_uuid'};
+
+    if (! (defined($hrn) && defined($uuid) && defined($creator_uuid))) {
+	return Protogeni::MalformedArgsResponse();
+    }
+
+    #
+    # Use the Emulab checkslot routines.
+    #
+    if (! ($hrn =~ /^[-\w\.]*$/)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "hrn: Invalid characters");
+    }
+    if (! ($uuid =~ /^[-\w]*$/)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "uuid: Invalid characters");
+    }
+
+    if (! ($creator_uuid =~ /^[-\w]*$/)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "creator_uuid: Invalid characters");
+    }
+
+    #
+    # XXX TODO!
+    #
+    # Who is the SA? We get this from the SSL environment (certificate).
+    #
+    my $sa_idx = 1;
+
+    #
+    # XXX TODO!
+    #
+    # Need to verify the UUID is permitted for the SA making the request.
+    #
+
+    #
+    # Make sure the geni user exists. It might be a local user though,
+    # which is not duplicated in the geni_users table, to avoid consistency
+    # problems. Probably change this later though.
+    #
+    my $user = GeniUser->Lookup($creator_uuid);
+    if (!defined($user)) {
+	$user = User->LookupByUUID($creator_uuid);
+
+	if (!defined($user)) {
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					"creator_uuid: No such User");
+	}
+    }
+
+    #
+    # Make sure slice hrn and uuid are unique.
+    #
+    if (GeniSlice->CheckExisting($hrn, $uuid)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "$hrn or $uuid already registered");
+    }
+
+    my $newslice = GeniSlice->Create($hrn, $uuid, $creator_uuid, $sa_idx);
+    if (!defined($newslice)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "$hrn/$uuid could not be registered");
+    }
+
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS, undef,
+				"$hrn/$uuid has been registered");
+}
+
+#
+# Brain dead discover resources.
+#
+sub DiscoverResources($)
+{
+    my ($argref) = @_;
+    my $uuid  = $argref->{'uuid'};
+
+    if (!defined($uuid)) {
+	return Protogeni::MalformedArgsResponse();
+    }
+
+    if (! ($uuid =~ /^[-\w]*$/)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "uuid: Invalid characters");
+    }
+
+    #
+    # Return simple list of URLs. 
+    #
+    my @results = ();
+    my $query_result = DBQueryWarn("select url from geni_components");
+    return GeniResponse->Create(GENIRESPONSE_DBERROR)
+	if (!defined($query_result));
+
+    while (my ($url) = $query_result->fetchrow_array()) {
+	push(@results, $url);
+    }
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS, @results);
+}
 
 # _Always_ make sure that this 1 is at the end of the file...
 1;

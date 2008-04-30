@@ -28,7 +28,7 @@ sub DBWarn($;$)		{ emdbi::DBError($_[0], $_[1]); }
 sub DBFatal($;$)	{ emdbi::DBFatal($_[0], $_[1]); }
 sub DBErr()		{ return emdbi::DBErrN($dbnum); }
 
-$emdbi::DBQUERY_DEBUG = 1;
+$emdbi::DBQUERY_DEBUG = 0;
 
 # Default connection.
 $dbnum = emdbi::NewTBDBHandle("geni")

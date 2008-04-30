@@ -4,7 +4,7 @@
 # Copyright (c) 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
-package GeniUser;
+package GeniSlice;
 
 use strict;
 use Exporter;
@@ -33,7 +33,7 @@ my $CONTROL	   = "@USERNODE@";
 my $OURDOMAIN      = "@OURDOMAIN@";
 
 # Cache of instances to avoid regenerating them.
-my %users      = ();
+my %slices     = ();
 my $debug      = 0;
 
 # Little helper and debug function.
@@ -47,7 +47,7 @@ sub mysystem($)
 }
 
 #
-# Lookup by idx, or uuid.
+# Lookup by idx or uuid.
 #
 sub Lookup($$)
 {
@@ -55,18 +55,18 @@ sub Lookup($$)
     my $query_result;
 
     # Look in cache first
-    return $users{"$token"}
-        if (exists($users{"$token"}));
+    return $slices{"$token"}
+        if (exists($slices{"$token"}));
 
     if ($token =~ /^\d+$/) {
 	$query_result =
-	    DBQueryWarn("select * from geni_users ".
+	    DBQueryWarn("select * from geni_slices ".
 			"where idx='$token' and status='active'");
     }
     elsif ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
 	$query_result =
-	    DBQueryWarn("select * from geni_users ".
-			"where uuid='$token' and status='active'");
+	    DBQueryWarn("select * from geni_slices ".
+			"where uuid='$token'");
     }
     else {
 	return undef;
@@ -76,27 +76,22 @@ sub Lookup($$)
 	if (!$query_result || !$query_result->numrows);
 
     my $self         = {};
-    $self->{'USER'}  = $query_result->fetchrow_hashref();
+    $self->{'SLICE'} = $query_result->fetchrow_hashref();
 
     bless($self, $class);
     
     # Add to cache. 
-    $users{$self->{'USER'}->{'idx'}} = $self;
+    $slices{$self->{'SLICE'}->{'idx'}} = $self;
     
     return $self;
 }
 # accessors
 sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'USER'}->{$_[1]}); }
 sub idx($)		{ return field($_[0], "idx"); }
-sub uid($)		{ return field($_[0], "uid"); }
 sub hrn($)		{ return field($_[0], "hrn"); }
 sub uuid($)		{ return field($_[0], "uuid"); }
-sub status($)		{ return field($_[0], "status"); }
+sub creator_uuid($)	{ return field($_[0], "creator_uuid"); }
 sub created($)		{ return field($_[0], "created"); }
-sub archived($)		{ return field($_[0], "archived"); }
-sub name($)		{ return field($_[0], "name"); }
-sub email($)		{ return field($_[0], "email"); }
-sub cert($)		{ return field($_[0], "cert"); }
 sub sa_idx($)		{ return field($_[0], "sa_idx"); }
 
 #
@@ -109,7 +104,7 @@ sub Stringify($)
     my $hrn = $self->hrn();
     my $idx = $self->idx();
 
-    return "[GeniUser: $hrn, IDX: $idx]";
+    return "[GeniSlice: $hrn, IDX: $idx]";
 }
 
 #
@@ -119,14 +114,14 @@ sub Stringify($)
 #
 sub CheckExisting($$$)
 {
-    my ($class, $hrn, $email) = @_;
+    my ($class, $hrn, $uuid) = @_;
 
-    my $safe_hrn   = DBQuoteSpecial($hrn);
-    my $safe_email = DBQuoteSpecial($email);
+    my $safe_hrn  = DBQuoteSpecial($hrn);
+    my $safe_uuid = DBQuoteSpecial($uuid);
 
     my $query_result =
-	DBQueryFatal("select idx from geni_users ".
-		     "where hrn=$safe_hrn and email=$safe_email");
+	DBQueryFatal("select idx from geni_slices ".
+		     "where hrn=$safe_hrn or uuid=$safe_uuid");
     return -1
 	if (!defined($query_result));
 
@@ -134,47 +129,37 @@ sub CheckExisting($$$)
 }
 
 #
-# Class function to create new Geni user and return object.
+# Class function to create new Geni slice and return object.
 #
-sub Create($$$$$$$$)
+sub Create($$$$)
 {
-    my ($class, $hrn, $uid, $uuid, $name, $email, $cert, $sa_idx) = @_;
+    my ($class, $hrn, $uuid, $creator_uuid, $sa_idx) = @_;
     my @insert_data = ();
 
 
-    # Every user gets a new unique index.
-    my $idx = TBGetUniqueIndex('next_uid', 1);
-
-    push(@insert_data, "status='active'");
+    # Every slice gets a new unique index.
+    my $idx = TBGetUniqueIndex('next_exptidx', 1);
 
     # Now tack on other stuff we need.
     push(@insert_data, "created=now()");
     push(@insert_data, "idx='$idx'");
 
     my $safe_hrn   = DBQuoteSpecial($hrn);
-    my $safe_uid   = DBQuoteSpecial($uid);
-    my $safe_name  = DBQuoteSpecial($name);
-    my $safe_email = DBQuoteSpecial($email);
-    my $safe_cert  = DBQuoteSpecial($cert);
     my $safe_uuid  = DBQuoteSpecial($uuid);
-    my $safe_sa    = DBQuoteSpecial($sa_idx);
+    my $safe_cuuid = DBQuoteSpecial($creator_uuid);
     push(@insert_data, "hrn=$safe_hrn");
-    push(@insert_data, "uid=$safe_uid");
-    push(@insert_data, "name=$safe_name");
-    push(@insert_data, "email=$safe_email");
-    push(@insert_data, "cert=$safe_cert");
     push(@insert_data, "uuid=$safe_uuid");
-    push(@insert_data, "sa_idx=$safe_sa");
+    push(@insert_data, "creator_uuid=$safe_cuuid");
 
     # Insert into DB.
-    DBQueryWarn("insert into geni_users set " . join(",", @insert_data))
+    DBQueryWarn("insert into geni_slices set " . join(",", @insert_data))
 	or return undef;
 
-    return GeniUser->Lookup($idx);
+    return GeniSlice->Lookup($idx);
 }
 
 #
-# Delete the user, as for registration errors.
+# Delete the slice, as for registration errors.
 #
 sub Delete($)
 {
@@ -185,30 +170,9 @@ sub Delete($)
 
     my $idx = $self->idx();
 
-    DBQueryWarn("delete from geni_users where idx='$idx'")
+    DBQueryWarn("delete from geni_slices where idx='$idx'")
 	or return -1;
     
     return 0;
 }
 
-#
-# Archive user. 
-#
-sub Archive($)
-{
-    my ($self) = @_;
-
-    return 0
-	if (! ref($self));
-
-    my $idx = $self->idx();
-
-    DBQueryWarn("update geni_users set status='archived' ".
-		"where idx='$idx'")
-	or return -1;
-    
-    return 0;
-}
-
-# _Always_ make sure that this 1 is at the end of the file...
-1;

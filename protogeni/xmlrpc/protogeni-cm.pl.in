@@ -32,9 +32,11 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 # The UUID of the client certificate is in the env var SSL_CLIENT_S_DN_CN.
 #
 my $responder = Frontier::Responder->new( "methods" => {
-    "SA::Lookup"   => \&Protogeni::SA::Lookup,
-    "SA::Register" => \&Protogeni::SA::Register,
-    "add"          => \&Protogeni::add,
+    "SA::Lookup"            => \&Protogeni::SA::Lookup,
+    "SA::RegisterUser"      => \&Protogeni::SA::RegisterUser,
+    "SA::RegisterSlice"     => \&Protogeni::SA::RegisterSlice,
+    "SA::DiscoverResources" => \&Protogeni::SA::DiscoverResources,
+    "add"                   => \&Protogeni::add,
    },
 );
 

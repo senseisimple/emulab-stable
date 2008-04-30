@@ -13,14 +13,12 @@ use strict;
 use Exporter;
 use vars qw(@ISA @EXPORT);
 @ISA    = "Exporter";
-@EXPORT = qw (RESPONSE_SUCCESS RESPONSE_BADARGS RESPONSE_ERROR
-	      RESPONSE_FORBIDDEN RESPONSE_BADVERSION RESPONSE_SERVERERROR
-	      RESPONSE_TOOBIG RESPONSE_REFUSED RESPONSE_TIMEDOUT
-);
+@EXPORT = qw();
 
 # Must come after package declaration!
 use lib '@prefix@/lib';
 use English;
+use GeniResponse;
 use RPC::XML;
 use RPC::XML::Parser;
 use LWP::UserAgent;
@@ -40,19 +38,6 @@ my $debug = 1;
 #
 $ENV{'HTTPS_CERT_FILE'} = "@prefix@/etc/server.pem";
 $ENV{'HTTPS_KEY_FILE'}  = "@prefix@/etc/server.pem";
-
-#
-# GENI XMLRPC defs. Also see ../lib/Protogeni.pm.in if you change this.
-#
-sub RESPONSE_SUCCESS()        { 0; }
-sub RESPONSE_BADARGS()        { 1; }
-sub RESPONSE_ERROR()          { 2; }
-sub RESPONSE_FORBIDDEN()      { 3; }
-sub RESPONSE_BADVERSION()     { 4; }
-sub RESPONSE_SERVERERROR()    { 5; }
-sub RESPONSE_TOOBIG()         { 6; }
-sub RESPONSE_REFUSED()        { 7; }
-sub RESPONSE_TIMEDOUT()       { 8; }
 
 ##
 # The package version number
@@ -103,8 +88,8 @@ sub CallMethodHTTP($$@)
     }
     
     if (!$hresp->is_success()) {
-	return { 'httpcode' => $hresp->code(),
-		 'httpmsg'  => $hresp->message() };
+	return GeniResponse->Create(GENIRESPONSE_RPCERROR,
+				    $hresp->code(), $hresp->message());
     }
 
     #
@@ -145,9 +130,7 @@ sub CallMethodHTTP($$@)
 	}
 	$output = $value;
     }
-    return {"code"   => $code,
-	    "value"  => $value,
-	    "output" => $output};
+    return GeniResponse->new($code, $value, $output);
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

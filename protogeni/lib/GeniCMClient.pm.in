@@ -1,0 +1,54 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package GeniCMClient;
+
+#
+# The client side of the CM interface.
+#
+
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA    = "Exporter";
+@EXPORT = qw ( );
+
+# Must come after package declaration!
+use lib '@prefix@/lib';
+use GeniDB;
+use Genixmlrpc;
+use libtestbed;
+use English;
+use Data::Dumper;
+
+# Configure variables
+my $TB		   = "@prefix@";
+my $TBOPS          = "@TBOPSEMAIL@";
+my $TBAPPROVAL     = "@TBAPPROVALEMAIL@";
+my $TBAUDIT   	   = "@TBAUDITEMAIL@";
+my $BOSSNODE       = "@BOSSNODE@";
+my $OURDOMAIN      = "@OURDOMAIN@";
+my $GENICENTRAL    = "https://boss/protogeni/xmlrpc";
+
+#
+# Discover resources for a slice (local experiment). This contacts Geni
+# Central to get a list of components. I think the interface is supposed
+# to be that we send an rspec and it sends back a list of components. But
+# lets not worry about that; just get a list of all components we can ask
+# for resources from.
+#
+sub DiscoverResources($)
+{
+    my ($experiment) = @_;
+
+    my $response =
+	Genixmlrpc::CallMethodHTTP($GENICENTRAL, "SA::DiscoverResources",
+				   { "uuid"  => $experiment->uuid() });
+
+    print Dumper($response);
+    return $response->code();
+}
