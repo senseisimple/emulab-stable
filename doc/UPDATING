@@ -18,12 +18,25 @@ Note that some instructions may have steps that need to occur at a few
 different points in the install process - these are marked with the
 earliest time one of the steps needs to occur.
 
-20080401: Before install.
+20080501: Before install.
 
-	  Create per project admin mailing lists if you enabled
+	  Create the per project admin mailing lists if you enabled
 	  mailman support (MAILMANSUPPORT set to 1 in defs file).
 
-            sql/create-projadminlists.pl
+          This should be done before the final boss-install.
+          Unfortunately, it also depends on some modification
+          associated with this commit.  Thus do the following
+
+            1) Go to build tree
+            2) Reconfigure and build but don't install
+            3) Do a "gmake install" in "collab/mailman/".
+            4) Go to source tree and run the script
+                 sql/create-projadminlists.pl
+            5) Go back to build tree and do a "gmake boss-install"
+
+          The script will take a while to run so be patent (It took
+          around an hour for Utah's emulab).  It will also create a
+          lot of output so you might want to redirect stdout.
 
 20080219: After install:
 
