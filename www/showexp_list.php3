@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -378,6 +378,7 @@ if ($thumb && !$idle) {
 	$name = stripslashes($row["expt_name"]);
 	$date = $row["dshort"];
         $rsrcidx = $row["rsrcidx"];
+	$state= $row["state"];
 
 	if (! ($head_user = User::Lookup($huid))) {
 	    TBERROR("Could not lookup object for user $huid", 1);
