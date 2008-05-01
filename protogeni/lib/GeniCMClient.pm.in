@@ -21,6 +21,8 @@ use vars qw(@ISA @EXPORT);
 use lib '@prefix@/lib';
 use GeniDB;
 use Genixmlrpc;
+use GeniResponse;
+use GeniTicket;
 use libtestbed;
 use English;
 use Data::Dumper;
@@ -41,14 +43,61 @@ my $GENICENTRAL    = "https://boss/protogeni/xmlrpc";
 # lets not worry about that; just get a list of all components we can ask
 # for resources from.
 #
-sub DiscoverResources($)
+sub DiscoverResources($$)
 {
-    my ($experiment) = @_;
+    my ($experiment, $pref) = @_;
 
     my $response =
 	Genixmlrpc::CallMethodHTTP($GENICENTRAL, "SA::DiscoverResources",
 				   { "uuid"  => $experiment->uuid() });
 
+    return -1
+	if (!defined($response));
+
+    #print Dumper($response);
+
+    return -1
+	if ($response->code() != GENIRESPONSE_SUCCESS);
+    $$pref = $response->value();
+
+    return 0;
+}
+
+#
+# Ask for a ticket. We provide an rspec. Neither of these are defined yet
+# so lets be simpleminded; send a count of nodes we want and get back a
+# count of nodes that can be allocated. I realize there is a problem of
+# those nodes getting allocated before the tickets are redeemed, but not
+# going to worry about that either.
+#
+# $component is just a url for now.
+#
+sub GetTicket($$$$)
+{
+    my ($experiment, $component, $requested, $pref) = @_;
+
+    my $rspec = { "requested" => $requested,
+		  "granted"   => 0};
+    
+    my $response =
+	Genixmlrpc::CallMethodHTTP($component, "CM::GetTicket",
+				   { "uuid"  => $experiment->uuid(),
+				     "rspec" => $rspec });
+    
+    return -1
+	if (!defined($response));
+
     print Dumper($response);
-    return $response->code();
+
+    return -1
+	if ($response->code() != GENIRESPONSE_SUCCESS);
+
+    #
+    # Convert this into a (signed) ticket object.
+    #
+    my $ticket = GeniTicket->Create($experiment->uuid(), $rspec,
+				    $response->value());
+    
+    $$pref = $ticket;
+    return 0;
 }

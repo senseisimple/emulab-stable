@@ -24,6 +24,7 @@ use RPC::XML::Parser;
 use LWP::UserAgent;
 use HTTP::Request::Common qw(POST);
 use HTTP::Headers;
+use Data::Dumper;
 
 # Configure variables
 my $TB		= "@prefix@";
@@ -88,8 +89,8 @@ sub CallMethodHTTP($$@)
     }
     
     if (!$hresp->is_success()) {
-	return GeniResponse->Create(GENIRESPONSE_RPCERROR,
-				    $hresp->code(), $hresp->message());
+	return GeniResponse->new(GENIRESPONSE_RPCERROR,
+				 $hresp->code(), $hresp->message());
     }
 
     #
@@ -108,6 +109,8 @@ sub CallMethodHTTP($$@)
     my $parser   = RPC::XML::Parser->new();
     my $goo      = $parser->parse($xmlgoo);
     my ($value,$output,$code);
+
+    #print Dumper($goo);
     
     # Python servers seem to return faults in structs, not as <fault> elements.
     # Sigh.
@@ -123,12 +126,9 @@ sub CallMethodHTTP($$@)
 	$output = $goo->value()->{"faultString"}->value;
     }
     else {
-	$code   = 0;
-	$value  = $goo->value;
-	if (ref($value)) {
-	    $value = $value->value;
-	}
-	$output = $value;
+	$code   = $goo->value()->{'code'}->value;
+	$value  = $goo->value()->{'value'}->value;
+	$output = $goo->value()->{'output'}->value;
     }
     return GeniResponse->new($code, $value, $output);
 }

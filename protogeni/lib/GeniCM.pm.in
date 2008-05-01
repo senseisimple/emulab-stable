@@ -21,6 +21,8 @@ use vars qw(@ISA @EXPORT);
 use lib '@prefix@/lib';
 use GeniDB;
 use Genixmlrpc;
+use GeniResponse;
+use GeniTicket;
 use libtestbed;
 use English;
 use Data::Dumper;
@@ -34,3 +36,41 @@ my $BOSSNODE       = "@BOSSNODE@";
 my $OURDOMAIN      = "@OURDOMAIN@";
 my $GENICENTRAL    = "https://boss/protogeni/xmlrpc";
 
+#
+# Respond to a GetTicket request. No worries about credentials yet; we
+# trust the caller cause it got past the SSL client verify checks in the
+# web server.
+#
+sub GetTicket($)
+{
+    my ($argref) = @_;
+    my $slice_uuid = $argref->{'uuid'};
+    my $rspec      = $argref->{'rspec'};
+
+    if (! (defined($slice_uuid) && ($slice_uuid =~ /^[-\w]+$/))) {
+	return GeniResponse->MalformedArgsResponse();
+    }
+    if (! defined($rspec)) {
+	return GeniResponse->MalformedArgsResponse();
+    }
+    #
+    # An rspec is a structure with a node count. :-)
+    #
+    # Find out how many nodes are available and grant that many. Silly, eh?
+    #
+    $rspec->{'granted'} = $rspec->{'requested'};
+
+    #
+    # Return a signed ticket.
+    #
+    my $ticket = GeniTicket->Create($slice_uuid, $rspec);
+    if (!defined($ticket)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not create GeniTicket object");
+    }
+    if ($ticket->Sign() != 0) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not sign Ticket");
+    }
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS, $ticket->ticket());
+}

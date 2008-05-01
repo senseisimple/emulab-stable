@@ -86,3 +86,17 @@ sub RegisterSlice($)
     print Dumper($response);
     return $response->code();
 }
+
+#
+# Delete a slice registration.
+#
+sub DeleteSlice($)
+{
+    my ($experiment) = @_;
+
+    my $response =
+	Genixmlrpc::CallMethodHTTP($GENICENTRAL, "SA::DeleteSlice",
+				   { "uuid"  => $experiment->uuid()});
+
+    return $response->code();
+}

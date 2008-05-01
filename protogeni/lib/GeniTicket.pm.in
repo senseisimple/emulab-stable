@@ -1,0 +1,132 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package GeniTicket;
+
+#
+# Some simple ticket stuff.
+#
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA    = "Exporter";
+@EXPORT = qw ( );
+
+# Must come after package declaration!
+use lib '@prefix@/lib';
+use GeniDB;
+use libtestbed;
+use English;
+use Data::Dumper;
+use File::Temp qw(tempfile);
+
+# Configure variables
+my $TB		   = "@prefix@";
+my $TBOPS          = "@TBOPSEMAIL@";
+my $TBAPPROVAL     = "@TBAPPROVALEMAIL@";
+my $TBAUDIT   	   = "@TBAUDITEMAIL@";
+my $BOSSNODE       = "@BOSSNODE@";
+my $OURDOMAIN      = "@OURDOMAIN@";
+my $GENICENTRAL    = "https://boss/protogeni/xmlrpc";
+my $SIGNCRED	   = "$TB/sbin/signgenicred";
+
+#
+# Create a ticket. Not much to it yet.
+#
+# Should we keep track of tickets locally in the DB?
+#
+sub Create($$$;$)
+{
+    my ($class, $uuid, $rspec, $ticket) = @_;
+
+    my $self = {};
+    $self->{'rspec'}   = $rspec;
+    $self->{'uuid'}    = $uuid;		# The slice UUID.
+    $self->{'ticket'}  = $ticket;
+    bless($self, $class);
+
+    return $self;
+}
+# accessors
+sub field($$)           { return ($_[0]->{$_[1]}); }
+sub rspec($)		{ return field($_[0], "rspec"); }
+sub uuid($)		{ return field($_[0], "uuid"); }
+sub ticket($)		{ return field($_[0], "ticket"); }
+
+#
+# Populate the ticket with some stuff, which right now is just the
+# number of node we are willing to grant.
+#
+sub Grant($$)
+{
+    my ($self, $count) = @_;
+
+    return 0
+	if (! ref($self));
+
+    $self->{'count'} = $count;
+    return 0;
+}
+
+#
+# Sign the ticket before returning it. We capture the output, which is
+# in XML.
+#
+sub Sign($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (!ref($self));
+    
+    my $uuid = $self->uuid();
+    my $requested = $self->rspec()->{'requested'};
+    my $granted   = $self->rspec()->{'granted'};
+
+    #
+    # Create a template xml file to sign.
+    #
+    my $template =
+	"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n".
+	"<credential xml:id=\"Ref1\">\n".
+	" <type>ticket</type>\n".
+	" <owner_uuid>$uuid</owner_uuid>\n".
+	" <this_uuid>$uuid</this_uuid>\n".
+	" <ticket>\n".
+	"  <can_delegate>1</can_delegate>\n".
+	"  <rspec>\n".
+	"    <requested>$requested</requested>\n".
+	"    <granted>$granted</granted>\n".
+	"  </rspec>\n".
+	" </ticket>\n".	
+        "</credential>\n";
+
+    my ($fh, $filename) = tempfile(UNLINK => 0);
+    return -1
+	if (!defined($fh));
+
+    print $fh $template;
+    close($fh);
+
+    #
+    # Fire up the signer and capture the output. This is the signed ticket
+    # that is returned. 
+    #
+    if (! open(SIGNER, "$SIGNCRED $filename |")) {
+	print STDERR "Could not sign $filename\n";
+	return -1;
+    }
+    my $ticket = "";
+    while (<SIGNER>) {
+	$ticket .= $_;
+    }
+    close(SIGNER);
+    $self->{'ticket'} = $ticket;
+
+    return 0;
+}
+

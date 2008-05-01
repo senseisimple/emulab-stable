@@ -259,7 +259,7 @@ sub DiscoverResources($)
     while (my ($url) = $query_result->fetchrow_array()) {
 	push(@results, $url);
     }
-    return GeniResponse->Create(GENIRESPONSE_SUCCESS, @results);
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS, \@results);
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

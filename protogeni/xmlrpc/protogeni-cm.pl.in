@@ -16,6 +16,8 @@ use Frontier::Responder;
 # Testbed libraries.
 use lib '@prefix@/lib';
 use Protogeni;
+use GeniCM;
+use libaudit;
 
 #
 # Turn off line buffering on output
@@ -29,6 +31,12 @@ $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 #
+# Use libaudit to capture any output from libraries and programs.
+# Send that to tbops so they can be fixed.
+#
+LogStart(0);
+
+#
 # The UUID of the client certificate is in the env var SSL_CLIENT_S_DN_CN.
 #
 my $responder = Frontier::Responder->new( "methods" => {
@@ -36,8 +44,18 @@ my $responder = Frontier::Responder->new( "methods" => {
     "SA::RegisterUser"      => \&Protogeni::SA::RegisterUser,
     "SA::RegisterSlice"     => \&Protogeni::SA::RegisterSlice,
     "SA::DiscoverResources" => \&Protogeni::SA::DiscoverResources,
+    "CM::GetTicket"         => \&GeniCM::GetTicket,
     "add"                   => \&Protogeni::add,
    },
 );
 
-print $responder->answer();
+my $response = $responder->answer();
+
+#
+# Terminate the log capture so that we can print the response to STDOUT
+# for the web server.
+#
+LogEnd();
+
+print $response;
+

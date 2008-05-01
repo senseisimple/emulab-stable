@@ -167,7 +167,13 @@ if (@ARGV) {
 # Map invoking user to object.
 my $this_user = User->LookupByUnixId($UID);
 if (! defined($this_user)) {
-    fatal("You ($UID) do not exist!");
+    #
+    # We allow this script to run from the web interface as nobody,
+    # as when invoked via an xmlrpc request.
+    #
+    if (getpwuid($UID) ne "nobody") {
+	fatal("You ($UID) do not exist!");
+    }
 }
 
 #
@@ -185,7 +191,15 @@ if (0 && AuditStart(0)) {
 # might already be a signed credential and we just need to add another
 # signature to it, but either way it should still pass the schema check.
 #
-if (system("$XMLLINT -noout -schema $SCHEMA $capfile")) {
+my $xmlint_output = "";
+
+open(TMP, "$XMLLINT -noout -schema $SCHEMA $capfile 2>&1 |")
+    or fatal("Could not start $XMLLINT on $capfile");
+while(<TMP>) {
+    $xmlint_output .= $_;
+}
+if (!close(TMP)) {
+    print $xmlint_output;
     fatal("$capfile does not conform to schema $SCHEMA");
 }
 
