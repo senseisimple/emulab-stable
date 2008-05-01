@@ -28,7 +28,6 @@ my $resend;
 #
 my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
-my $TBAPPROVAL  = "@TBAPPROVALEMAIL@";
 my $TBAUDIT	= "@TBAUDITEMAIL@";
 my $TBBASE      = "@TBBASE@";
 my $TBWWW       = "@TBWWW@";

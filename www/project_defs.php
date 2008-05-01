@@ -720,6 +720,19 @@ class Project
 	    }
 	    echo "    </td>
                   </tr>\n";
+
+	    if (ISADMIN()) {
+		$mmurl   = "gotommlist.php3?listname=${pid}-admin&asadmin=1";
+
+		echo "<tr>
+                         <td>Project Admin Mailing List:</td>
+                         <td class=\"left\">
+                             <a href='$mmurl'>${pid}-admin</a> ";
+		$mmurl   = "gotommlist.php3?listname=${pid}-admin&wantadmin=1";
+		echo "<a href='$mmurl'>(admin access)</a>";
+		echo "    </td>
+                     </tr>\n";
+	    }
 	}
 
 	echo "<tr>

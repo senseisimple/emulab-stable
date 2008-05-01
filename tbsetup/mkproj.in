@@ -39,7 +39,6 @@ sub fatal($);
 #
 my $TB            = "@prefix@";
 my $TBOPS         = "@TBOPSEMAIL@";
-my $TBAPPROVAL	  = "@TBAPPROVALEMAIL@";
 my $TBAUDIT	  = "@TBAUDITEMAIL@";
 my $TBBASE        = "@TBBASE@";
 my $TBWWW         = "@TBWWW@";
@@ -473,21 +472,20 @@ if (!$silent) {
     my $leader_name  = $leader->name();
     my $leader_email = $leader->email();
     
-    SENDMAIL("$leader_name <$leader_email>",
-     "Project '$pid' Approval",
-     "\n".
-     "This message is to notify you that your project '$pid'\n".
-     "has been approved.  We recommend that you save this link so that\n".
-     "you can send it to people you wish to have join your project.\n".
-     "Otherwise, tell them to go to ${TBBASE} and join it.\n".
-     "\n".
-     "    ${TBBASE}/joinproject.php3?target_pid=$pid\n".
-     (defined($message) ? "\n${message}\n" : "") .
-     "\n".
-     "Thanks,\n".
-     "Testbed Operations\n",
-     "$TBAPPROVAL",
-     "Bcc: $TBAPPROVAL");
+    SendProjAdminMail
+	($pid, "ADMIN", "$leader_name <$leader_email>",
+	 "Project '$pid' Approval",
+	 "\n".
+	 "This message is to notify you that your project '$pid'\n".
+	 "has been approved.  We recommend that you save this link so that\n".
+	 "you can send it to people you wish to have join your project.\n".
+	 "Otherwise, tell them to go to ${TBBASE} and join it.\n".
+	 "\n".
+	 "    ${TBBASE}/joinproject.php3?target_pid=$pid\n".
+	 (defined($message) ? "\n${message}\n" : "") .
+	 "\n".
+	 "Thanks,\n".
+	 "Testbed Operations\n");
 
     #
     # If the leader was switched, then generate a second message to the
@@ -497,18 +495,17 @@ if (!$silent) {
 	my $oldleader_uid  = $oldleader->uid();
 	my $oldleader_name = $oldleader->name();
 	
-	SENDMAIL("$leader_name <$leader_email>",
-		 "$oldleader_uid $pid Project Join Request",
-		 "$oldleader_name wants to join project $pid.\n".
-		 "\n".
-		 "Please return to $TBWWW,\n".
-		 "log in, select the 'New User Approval' page, and enter\n".
-		 "your decision regarding ${oldleader_name}'s membership.\n".
-		 "\n".
-		 "Thanks,\n".
-		 "Testbed Operations\n",
-		 "$TBAPPROVAL",
-		 "Bcc: $TBAUDIT");
+	SendProjAdminMail
+	    ($pid, "ADMIN", "$leader_name <$leader_email>",
+	     "$oldleader_uid $pid Project Join Request",
+	     "$oldleader_name wants to join project $pid.\n".
+	     "\n".
+	     "Please return to $TBWWW,\n".
+	     "log in, select the 'New User Approval' page, and enter\n".
+	     "your decision regarding ${oldleader_name}'s membership.\n".
+	     "\n".
+	     "Thanks,\n".
+	     "Testbed Operations\n");
     }
 }
 

@@ -314,6 +314,20 @@ sub DBQueryFatalN($$)
 sub DBQueryFatal($) {return DBQueryFatalN(0,$_[0]);}
 
 #
+# Like DBQueryFatal but also fail if the query didn't return any results
+#
+sub DBQuerySingleFatalN($$)
+{
+    my ($dbnum, $query) = @_;
+    my $query_result = DBQueryFatalN($dbnum, $query);
+    DBFatal("DB Query \"$query\" didn't return any results") 
+	unless $query_result->numrows > 0;
+    my @row = $query_result->fetchrow_array();
+    return $row[0];
+}
+sub DBQuerySingleFatal($) {return DBQuerySingleFatalN(0,$_[0]);}
+
+#
 # Same as above, but just send email on error. This info is useful
 # to the TB system, but the caller has to retain control.
 #

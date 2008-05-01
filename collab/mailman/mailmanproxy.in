@@ -11,8 +11,7 @@ use Errno qw(EEXIST);
 #
 # A wrapper for messing with Mailman from boss.
 #
-sub usage()
-{
+sub usage() {
     print "Usage: mailmanproxy addlist <listname> <listtype> or\n";
     print "       mailmanproxy setlistmembers <listname> or\n";
     print "       mailmanproxy modifymember <uid> <email> or\n";
@@ -375,7 +374,7 @@ sub AddList(@)
     # a carriage return!
     #
     if (! -d "$MMLISTDIR/" . lc($name)) {
-	my $optarg = ($listtype eq "admin" ? "-q" : "");
+	my $optarg = ($listtype =~ /admin$/ ? "-q" : "");
 
 	if ($reconfig) {
 	    print "List '$name' does not exist; exiting ...\n";
@@ -409,7 +408,7 @@ sub AddList(@)
     print CONFIG "send_reminders = False\n";
     print CONFIG "send_welcome_msg = False\n";
     print CONFIG "send_goodbye_msg = False\n";
-    if ($listtype eq "admin") {
+    if ($listtype =~ /admin$/) {
 	# No need for tbops to see any of this.
 	print CONFIG "admin_notify_mchanges = 0\n";
 	# Users may not unsubscribe from our lists. Only their own.
@@ -427,10 +426,17 @@ sub AddList(@)
     print CONFIG "archive = True\n";
     print CONFIG "archive_private = 1\n";
     print CONFIG "digestable = 0\n";
-    # Be default, lists are closed unless the mail originates in the domain.
-    # The point is to allow admin people to post to the lists, but this will
-    # do for now, since we do not expect spammers from within ...
-    print CONFIG "generic_nonmember_action = 2\n";
+    if ($listtype eq "projadmin") {
+	# projadmin lists are open by default ...
+	print CONFIG "generic_nonmember_action = 0\n";
+	print CONFIG "require_explicit_destination = 0\n";
+	print CONFIG "subject_prefix = ''\n";
+    } else {
+	# Be default, lists are closed unless the mail originates in the domain.
+	# The point is to allow admin people to post to the lists, but this will
+	# do for now, since we do not expect spammers from within ...
+	print CONFIG "generic_nonmember_action = 2\n";
+    }
     print CONFIG "accept_these_nonmembers = ['^.*\@.*${OURDOMAIN}\$', ".
 	"'^.*\@.*utah.edu\$']\n";
     close(CONFIG);

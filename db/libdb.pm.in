@@ -162,6 +162,7 @@ use vars qw(@ISA @EXPORT);
 	 SetNodeBootStatus OSFeatureSupported NodeidToExp 
 	 DBQuery DBQueryFatal DBQueryWarn DBWarn DBFatal DBErr
 	 NewTBDBHandle DBQueryN DBQueryFatalN DBQueryWarnN DBErrN
+	 DBQuerySingleFatal DBQuerySingleFatalN
 	 DBQuoteSpecial ExpState
 	 ExpNodes ExpNodeVnames ExpNodesOldReserved
 	 DBDateTime DefaultImageID 
@@ -298,6 +299,8 @@ sub DBQueryN($$)	{ return emdbi::DBQueryN($_[0], $_[1]); }
 sub DBQuery($)		{ return emdbi::DBQuery($_[0]); }
 sub DBQueryFatalN($$)   { return emdbi::DBQueryFatalN($_[0], $_[1]); }
 sub DBQueryFatal($)     { return emdbi::DBQueryFatal($_[0]);}
+sub DBQuerySingleFatalN($$) { return emdbi::DBQuerySingleFatalN($_[0], $_[1]);}
+sub DBQuerySingleFatal($)   { return emdbi::DBQuerySingleFatal($_[0]);}
 sub DBQueryWarnN($$)	{ return emdbi::DBQueryWarnN($_[0], $_[1]); }
 sub DBQueryWarn($)      { return emdbi::DBQueryWarn($_[0]);}
 sub DBQuoteSpecial($)	{ return emdbi::DBQuoteSpecial($_[0]); }

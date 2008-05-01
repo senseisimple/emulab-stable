@@ -107,7 +107,10 @@ $headuid       = $leader->uid();
 $headuid_email = $leader->email();
 $headname      = $leader->name();
 
-TBMAIL("$headname '$headuid' <$headuid_email>",
+SendProjAdminMail(
+       $pid,
+       "ADMIN",
+       "$headname '$headuid' <$headuid_email>",
        "Project '$pid' Approval",
        "\n".
        "This message is to notify you that your project '$pid'\n".
@@ -119,10 +122,7 @@ TBMAIL("$headname '$headuid' <$headuid_email>",
        "\n".
        ($message != "" ? "${message}\n\n" : "") .
        "Thanks,\n".
-       "Testbed Operations\n",
-       "From: $TBMAIL_APPROVAL\n".
-       "Bcc: $TBMAIL_APPROVAL\n".
-       "Errors-To: $TBMAIL_WWW");
+       "Testbed Operations\n");
 
 echo "<center>
       <h2>Done!</h2>

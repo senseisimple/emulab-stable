@@ -21,9 +21,11 @@ use strict;
 my $TB       = "@prefix@";
 my $TBOPS    = "@TBOPSEMAIL@";
 my $CONTROL  = "@USERNODE@";
+my $MAILMANSUPPORT= @MAILMANSUPPORT@;
 
 my $RMGROUP  = "$TB/sbin/rmgroup";
 my $MODGROUPS= "$TB/sbin/modgroups";
+my $DELMMLIST= "$TB/sbin/delmmlist";
 my @grouplist= ();
 
 #
@@ -210,6 +212,19 @@ foreach my $group (@grouplist) {
 print "Removing main project group ...\n";
 if (system("$RMGROUP $pid_idx")) {
     fatal("Could not remove main project group $pid!");
+}
+
+#
+# Now remote the proj admin list, but only if the proj was never
+# approved
+#
+if ($MAILMANSUPPORT) {
+    my $approved = DBQuerySingleFatal("select approved from projects where pid='$pid'");
+    if (!$approved) {
+	my $listname = "$pid-admin";
+	system("$DELMMLIST -a $listname") == 0 or
+	    fatal("$DELMMLIST -a $listname failed!");
+    }
 }
 
 $EUID = 0;

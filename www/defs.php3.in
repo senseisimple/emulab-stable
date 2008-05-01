@@ -168,6 +168,41 @@ function TBMAIL($to, $subject, $message, $headers = 0)
 }
 
 #
+#
+# Identical to perl function of the same name
+#
+#
+function SendProjAdminMail($proj, $from, $to, $subject, $message, $headers = "")
+{
+    global $MAILMANSUPPORT, $TBMAIL_APPROVAL, $TBMAIL_AUDIT, $OURDOMAIN, $TBMAIL_WWW;
+    $projadminmail = $MAILMANSUPPORT ? "$proj-admin@$OURDOMAIN" : $TBMAIL_APPROVAL;
+    if ($headers) {
+        $headers .= "\n";
+    }
+    if ($from == 'ADMIN') {
+	$from = $projadminmail;
+	$headers .= "Bcc: $projadminmail\n";
+    } elseif ($to == 'ADMIN') {
+	$to = $projadminmail;
+	$headers .= "Reply-To: $projadminmail\n";
+    } else {
+	$headers .= "Bcc: $projadminmail\n";
+    }
+    $headers .= "From: $from\n";
+    if ($from == 'AUDIT') {
+	$from = $TBMAIL_AUDIT;
+	$headers .= "Bcc: $TBMAIL_AUDIT\n";
+    } elseif ($to == "AUDIT") {
+	$to = $TBMAIL_AUDIT;
+    } else {
+	$headers .= "Bcc: $TBMAIL_AUDIT\n";
+    }
+    $headers .= "Errors-To: $TBMAIL_WWW\n"; # FIXME: Why?
+    $headers = substr($headers, 0, -1);
+    TBMAIL($to, $subject, $message, $headers);
+}
+
+#
 # Internal errors should be reported back to the user simply. The actual 
 # error information should be emailed to the list for action. The script
 # should then terminate if required to do so.

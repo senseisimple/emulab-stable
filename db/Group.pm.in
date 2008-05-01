@@ -30,7 +30,6 @@ my $TB		  = "@prefix@";
 my $BOSSNODE      = "@BOSSNODE@";
 my $CONTROL	  = "@USERNODE@";
 my $TBOPS         = "@TBOPSEMAIL@";
-my $TBAPPROVAL    = "@TBAPPROVALEMAIL@";
 my $TBAUDIT       = "@TBAUDITEMAIL@";
 my $TBBASE        = "@TBBASE@";
 my $TBWWW         = "@TBWWW@";
@@ -893,35 +892,34 @@ sub SendJoinEmail($$)
     $usr_URL = ""
 	if (!defined($usr_URL));
 
-    SENDMAIL("$leader_name '$leader_uid' <$leader_email>",
-	     "$uid $pid Project Join Request",
-	     "$usr_name is trying to join your group $gid in project $pid.".
-	     "\n".
-	     "\n".
-	     "Contact Info:\n".
-	     "Name:            $usr_name\n".
-	     "Emulab ID:       $uid\n".
-	     "Email:           $usr_email\n".
-	     "User URL:        $usr_URL\n".
-	     "Job Title:       $usr_title\n".
-	     "Affiliation:     $usr_affil\n".
-	     "Address 1:       $usr_addr\n".
-	     "Address 2:       $usr_addr2\n".
-	     "City:            $usr_city\n".
-	     "State:           $usr_state\n".
-	     "ZIP/Postal Code: $usr_zip\n".
-	     "Country:         $usr_country\n".
-	     "Phone:           $usr_phone\n".
-	     "\n".
-	     "Please return to $TBWWW,\n".
-	     "log in, select the 'New User Approval' page, and enter your\n".
+    SendProjAdminMail
+	($pid, "ADMIN", "$leader_name '$leader_uid' <$leader_email>",
+	 "$uid $pid Project Join Request",
+	 "$usr_name is trying to join your group $gid in project $pid.".
+	 "\n".
+	 "\n".
+	 "Contact Info:\n".
+	 "Name:            $usr_name\n".
+	 "Emulab ID:       $uid\n".
+	 "Email:           $usr_email\n".
+	 "User URL:        $usr_URL\n".
+	 "Job Title:       $usr_title\n".
+	 "Affiliation:     $usr_affil\n".
+	 "Address 1:       $usr_addr\n".
+	 "Address 2:       $usr_addr2\n".
+	 "City:            $usr_city\n".
+	 "State:           $usr_state\n".
+	 "ZIP/Postal Code: $usr_zip\n".
+	 "Country:         $usr_country\n".
+	 "Phone:           $usr_phone\n".
+	 "\n".
+	 "Please return to $TBWWW,\n".
+	 "log in, select the 'New User Approval' page, and enter your\n".
 	     "decision regarding $usr_name's membership in your project.\n".
-	     "\n".
-	     "Thanks,\n".
-	     "Testbed Operations\n",
-	     "$TBAPPROVAL",
-	     "CC: $allleaders\n".
-	     "Bcc: $TBAUDIT");
+	 "\n".
+	 "Thanks,\n".
+	 "Testbed Operations\n",
+	 "CC: $allleaders");
 
     return 0;
 }
@@ -952,7 +950,9 @@ sub SendApprovalEmail($$$)
 
     my $trust = $membership->trust();
 
-    SENDMAIL("$usr_name '$usr_uid' <$usr_email>",
+    SendProjAdminMail($pid,
+             "$this_name <$this_email>",
+	     "$usr_name '$usr_uid' <$usr_email>",
              "Membership Approved in '$pid/$gid' ",
 	     "\n".
 	     "This message is to notify you that you have been approved as\n".
@@ -960,9 +960,7 @@ sub SendApprovalEmail($$$)
              "\n\n".
              "Thanks,\n".
              "Testbed Operations\n",
-             "$this_name <$this_email>",
-	     "CC: $allleaders\n".
-	     "Bcc: $TBAUDIT");
+             "CC: $allleaders");
 
     return 0;
 }

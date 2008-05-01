@@ -366,7 +366,9 @@ while (list ($header, $value) = each ($POST_VARS_COPY)) {
         #
 	$target_group->DeleteMember($target_user);
 
-        TBMAIL("$user_name '$user_uid' <$user_email>",
+        SendProjAdminMail($project,
+             "$uid_name <$uid_email>",
+	     "$user_name '$user_uid' <$user_email>",
              "Membership Denied in '$project/$group'",
 	     "\n".
              "This message is to notify you that you have been denied\n".
@@ -374,10 +376,7 @@ while (list ($header, $value) = each ($POST_VARS_COPY)) {
              "\n\n".
              "Thanks,\n".
              "Testbed Operations\n",
-             "From: $uid_name <$uid_email>\n".
-             "Cc:  $leaders\n".
-             "Bcc: $TBMAIL_AUDIT\n".
-             "Errors-To: $TBMAIL_WWW");
+             "Cc:  $leaders");
 
 	echo "<p>
                 User $user_uid was <b>denied</b> membership in $project/$group.

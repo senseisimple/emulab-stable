@@ -665,7 +665,9 @@ class Group
 	$usr_phone	= $user->phone();
 	$usr_URL	= $user->URL();
 	
-	TBMAIL("$leader_name '$leader_uid' <$leader_email>",
+	SendProjAdminMail($pid,
+           "ADMIN", 
+           "$leader_name '$leader_uid' <$leader_email>",
 	   "$joining_uid $pid Project Join Request",
 	   "$usr_name is trying to join your group $gid in project $pid.\n".
 	   "\n".
@@ -689,10 +691,7 @@ class Group
 	   "decision regarding $usr_name's membership in your project.\n\n".
 	   "Thanks,\n".
 	   "Testbed Operations\n",
-	   "From: $TBMAIL_APPROVAL\n".
-	   "Cc: $allleaders\n".
-	   "Bcc: $TBMAIL_AUDIT\n".
-	   "Errors-To: $TBMAIL_WWW");
+	   "Cc: $allleaders");
 
 	return 0;
     }

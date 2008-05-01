@@ -145,7 +145,8 @@ if ($approval == "postpone") {
           </h3>\n";
 }
 elseif (strcmp($approval, "moreinfo") == 0) {
-    TBMAIL("$headname '$headuid' <$headuid_email>",
+    SendProjAdminMail
+        ($pid, "ADMIN", "$headname '$headuid' <$headuid_email>",
          "Project '$pid' Approval Postponed",
          "\n".
          "This message is to notify you that your project application\n".
@@ -155,10 +156,7 @@ elseif (strcmp($approval, "moreinfo") == 0) {
          "\n$message".
          "\n\n".
          "Thanks,\n".
-         "Testbed Operations\n",
-         "From: $TBMAIL_APPROVAL\n".
-         "Bcc: $TBMAIL_APPROVAL\n".
-         "Errors-To: $TBMAIL_WWW");
+         "Testbed Operations\n");
 
     echo "<p><h3>
              Project approval for project $pid (User: $headuid) was

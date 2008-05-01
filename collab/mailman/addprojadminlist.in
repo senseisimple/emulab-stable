@@ -1,0 +1,182 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use Errno qw(EEXIST);
+
+#
+# Add a mailman list, say for a project or other reason. If for a project
+# the admin password comes from the groups table. Otherwise it comes from
+# the sitevars table cause its assumed to be an admins list of some kind.
+#
+sub usage()
+{
+    print STDOUT "Usage: addprojadminlist <proj>\n";
+    exit(-1);
+}
+my $optlist   = "";
+my $debug     = 0;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $TBAUDIT	= "@TBAUDITEMAIL@";
+my $TBAPPROVAL  = "@TBAPPROVALEMAIL@";
+my $CONTROL     = "@USERNODE@";
+my $BOSSNODE	= "@BOSSNODE@";
+my $OURDOMAIN   = "@OURDOMAIN@";
+my $MAILMANSUPPORT= @MAILMANSUPPORT@;
+my $SSH         = "$TB/bin/sshtb";
+my $MMPROXY     = "$TB/sbin/mailmanproxy";
+my $ADDMMLIST   = "$TB/sbin/addmmlist";
+
+my $MAILMANDIR = "/usr/local/mailman";
+my $MMBINDIR   = "$MAILMANDIR/bin";
+my $MMLISTDIR  = "$MAILMANDIR/lists";
+
+
+# Protos
+sub fatal($);
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the Testbed support stuff. 
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use User;
+
+#
+# We don't want to run this script unless its the real version.
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be setuid! Maybe its a development version?\n");
+}
+
+#
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+# 
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root! Its already setuid!\n");
+}
+
+#
+# If no mailman support, just exit. 
+#
+if (! $MAILMANSUPPORT) {
+    print "MailMan support is not enabled. Exit ...\n";
+    exit(0);
+}
+
+#
+# Verify user and get his DB uid and other info for later.
+#
+#my $this_user = User->ThisUser();
+#if (! defined($this_user)) {
+#    die("You ($UID) do not exist!");
+#}
+#my $user_uid   = $this_user->uid();
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+usage()
+    if (@ARGV == 0);
+
+my $proj = $ARGV[0];
+#
+# Untaint args.
+#
+if ($proj =~ /^([\w-]+)$/) {
+    $proj = $1;
+}
+else {
+    die("Bad data in proj: $proj");
+}
+
+my $listname = "$proj-admin";
+my $listtype = "projadmin";
+
+# An admins list of some kind.
+$listowner_email  = $TBOPS;
+
+if (! TBGetSiteVar("general/mailman/password", \$listpasswd)) {
+    fatal("Could not get mailman admin password from sitevars!");
+}
+if (!defined($listpasswd) || $listpasswd eq "") {
+    fatal("mailman admin password sitevar is not set!");
+}
+
+#
+# Note that since we are sending cleartext passwords over, pipe the info
+# into its STDIN so that the passwords are not visible in a ps listing.
+#
+# For ssh.
+#
+$UID = $EUID;
+if ($CONTROL ne $BOSSNODE) {
+
+    # Must serialize some of the mailman stuff. Be sure to use the same token!
+    TBScriptLock("mailman_update") == 0 or
+        fatal("Could not get the lock!");
+
+#   my $optarg = ($debug ? "-d" : "");
+    my $optarg = "";
+    my $verb   = "Adding";
+    my $cmd    = "addlist";
+
+    print "$verb mailman list $listname ($listtype) on $CONTROL.\n";
+    
+    system("echo '$listowner_email $listpasswd' | ".
+	   "$SSH -host $CONTROL $MMPROXY $cmd $listname $listtype");
+    if ($?) {
+	if ($? >> 8 == EEXIST()) {
+	    # Not an error.
+	    exit(0);
+	}
+	fatal("$MMPROXY failed on $CONTROL!");
+    }
+    
+    system("echo $TBAPPROVAL | ".
+	   "$SSH -host $CONTROL $MMBINDIR/add_members -r - $proj-admin");
+
+    my $status = $?;
+    TBScriptUnlock();
+    $? = $status;
+
+}
+
+exit(0);
+
+sub fatal($)
+{
+    my($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}

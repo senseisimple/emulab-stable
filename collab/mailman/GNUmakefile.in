@@ -13,7 +13,7 @@ include $(OBJDIR)/Makeconf
 
 SBIN_SCRIPTS		= addmmlist delmmlist setmmlistmembers mmsetup \
 			  setmmpasswd mmlistmembership mmmodifymember \
-			  addmmuser delmmuser
+			  addmmuser delmmuser addprojadminlist
 LIBEXEC_SCRIPTS		= webaddmmlist webdelmmlist websetmmpasswd mmxlogin \
 			  webmmlistmembership
 CTRL_LIBEXEC_SCRIPTS	= genaliases
@@ -24,7 +24,7 @@ CTRL_SBIN_SCRIPTS	= mailmanproxy
 SETUID_BIN_SCRIPTS   = 
 SETUID_SBIN_SCRIPTS  = addmmuser delmmuser addmmlist delmmlist \
 			setmmlistmembers setmmpasswd mmlistmembership \
-			mmmodifymember
+			mmmodifymember addprojadminlist
 SETUID_LIBX_SCRIPTS  = mmxlogin
 
 #
@@ -63,6 +63,8 @@ post-install:
 	chmod u+s $(INSTALL_LIBEXECDIR)/mmxlogin
 	chown root $(INSTALL_SBINDIR)/mmmodifymember
 	chmod u+s $(INSTALL_SBINDIR)/mmmodifymember
+	chown root $(INSTALL_SBINDIR)/mmmodifymember
+	chmod u+s $(INSTALL_SBINDIR)/addprojadminlist
 
 #
 # Control node installation (okay, plastic)

@@ -34,6 +34,8 @@ my $TBAUDIT	= "@TBAUDITEMAIL@";
 my $TBBASE      = "@TBBASE@";
 my $TBWWW       = "@TBWWW@";
 my $WIKISUPPORT = @WIKISUPPORT@;
+my $MAILMANSUPPORT = @MAILMANSUPPORT@;
+my $ADDPROJADMINLIST = "$TB/sbin/addprojadminlist";
 
 # Cache of instances to avoid regenerating them.
 my %projects   = ();
@@ -260,6 +262,15 @@ sub Create($$$$)
 	DBQueryWarn("delete from projects where pid_idx=$pid_idx");
 	return undef;
     }
+
+    #
+    # Now create the per-project Admin List
+    #
+    if ($MAILMANSUPPORT) {
+	system("$ADDPROJADMINLIST $pid") == 0 or
+	    die("$ADDPROJADMINLIST $pid failed!");
+    }
+
     return $newproject;
 }
 
@@ -373,60 +384,56 @@ sub SendNewProjectEmail($;$)
 	if (!defined($proj_whynotpublic));
 
     if ($returning || $firstproject) {
-	SENDMAIL($TBAPPROVAL,
-		 "New Project '$pid' ($usr_uid)",
-		 "'$usr_name' wants to start project '$pid'.\n".
-		 "\n".
-		 "Name:            $usr_name ($usr_uid/$usr_idx)\n".
-		 "Project IDX:     $pid_idx\n".
-		 "Returning User?: $usr_returning\n".
-		 "Email:           $usr_email\n".
-		 "User URL:        $usr_URL\n".
-		 "Description:     $proj_desc\n".
-		 "Project URL:     $proj_URL\n".
-		 "Public URL:      $proj_public\n".
-		 "Why Not Public:  $proj_whynotpublic\n".
-		 "Link to Us?:     $proj_linked\n".
-		 "Funders:         $proj_funders\n".
-		 "Job Title:       $usr_title\n".
-		 "Affiliation:     $usr_affil\n".
-		 "Address 1:       $usr_addr\n".
-		 "Address 2:       $usr_addr2\n".
-		 "City:            $usr_city\n".
-		 "State:           $usr_state\n".
-		 "ZIP/Postal Code: $usr_zip\n".
-		 "Country:         $usr_country\n".
-		 "Phone:           $usr_phone\n".
-		 "Members:         $proj_members\n".
-		 "PCs:             $proj_pcs\n".
-		 "Planetlab PCs:   $proj_plabpcs\n".
-		 "RON PCs:         $proj_ronpcs\n".
-		 "Unix GID:        $unix_name ($unix_gid)\n".
-		 "Reasons:\n$proj_why\n\n".
-		 "Please review the application and when you have made a \n".
-		 "decision, go to $TBWWW and\n".
-		 "select the 'Project Approval' page.",
-		 "$usr_name '$usr_uid' <$usr_email>",
-		 "Reply-To: $TBAPPROVAL\n".
-		 "Bcc: $TBAUDIT");
+	SendProjAdminMail
+	    ($pid, "$usr_name '$usr_uid' <$usr_email>", "ADMIN",
+	     "New Project '$pid' ($usr_uid)",
+	     "'$usr_name' wants to start project '$pid'.\n".
+	     "\n".
+	     "Name:            $usr_name ($usr_uid/$usr_idx)\n".
+	     "Project IDX:     $pid_idx\n".
+	     "Returning User?: $usr_returning\n".
+	     "Email:           $usr_email\n".
+	     "User URL:        $usr_URL\n".
+	     "Description:     $proj_desc\n".
+	     "Project URL:     $proj_URL\n".
+	     "Public URL:      $proj_public\n".
+	     "Why Not Public:  $proj_whynotpublic\n".
+	     "Link to Us?:     $proj_linked\n".
+	     "Funders:         $proj_funders\n".
+	     "Job Title:       $usr_title\n".
+	     "Affiliation:     $usr_affil\n".
+	     "Address 1:       $usr_addr\n".
+	     "Address 2:       $usr_addr2\n".
+	     "City:            $usr_city\n".
+	     "State:           $usr_state\n".
+	     "ZIP/Postal Code: $usr_zip\n".
+	     "Country:         $usr_country\n".
+	     "Phone:           $usr_phone\n".
+	     "Members:         $proj_members\n".
+	     "PCs:             $proj_pcs\n".
+	     "Planetlab PCs:   $proj_plabpcs\n".
+	     "RON PCs:         $proj_ronpcs\n".
+	     "Unix GID:        $unix_name ($unix_gid)\n".
+	     "Reasons:\n$proj_why\n\n".
+	     "Please review the application and when you have made a \n".
+	     "decision, go to $TBWWW and\n".
+	     "select the 'Project Approval' page.");
     }
     else {
-	SENDMAIL($TBAPPROVAL,
-		 "New Project '$pid' ($usr_uid)",
-		 "'$usr_name' wants to start project '$pid'.\n".
-		 "\n".
-		 "Name:            $usr_name ($usr_uid/$usr_idx)\n".
-		 "Project IDX:     $pid_idx\n".
-		 "Email:           $usr_email\n".
-		 "Returning User?: No\n".
-		 "\n".
-		 "No action is necessary until the user has verified the ".
-		 "account.\n",
-		 "$usr_name '$usr_uid' <$usr_email>",
-		 "Reply-To: $TBAPPROVAL\n".
-		 "Bcc: $TBAUDIT");
+	SendProjAdminMail
+	    ($pid, "$usr_name '$usr_uid' <$usr_email>", "ADMIN",
+	     "New Project '$pid' ($usr_uid)",
+	     "'$usr_name' wants to start project '$pid'.\n".
+	     "\n".
+	     "Name:            $usr_name ($usr_uid/$usr_idx)\n".
+	     "Project IDX:     $pid_idx\n".
+	     "Email:           $usr_email\n".
+	     "Returning User?: No\n".
+	     "\n".
+	     "No action is necessary until the user has verified the ".
+	     "account.\n");
     }
-
+    
     return 0;
 }
 
