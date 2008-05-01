@@ -44,6 +44,13 @@ typedef struct tbboot_header
 	short			version;
 
 	/*
+	 * BIOS device number to boot from, with two magic values:
+	 * - 0xfe means the boot device (CD or USB dongle)
+	 * - 0xff means the disk on which this sector is found
+	 */
+	unsigned char			bootdisk;
+
+	/*
 	 * Set bootfromdisk to 1 to force loader to boot from disk.
 	 */
 	char			bootfromdisk;
@@ -99,7 +106,7 @@ typedef struct tbboot_header
 #define TBBOOT_MAGIC2		0x69ceafd8
 
 /* Current Version */
-#define TBBOOT_VERSION		100
+#define TBBOOT_VERSION		101
 
 /*
  * Offset from start of the disk. Hardwired to sector 60 which should be
