@@ -580,7 +580,8 @@ if ($firewalled) {
 		 "  $node\n".
 		 "in pid/eid $pid/$eid appears to be dead.\n\n".
 		 "The node has been taken out of the pool until this matter ".
-		 "is resolved.\n");
+		 "is resolved.\n",
+		 $user_email_to);
 
 	$failed++;
 	add_failed_node_fatal($node);
@@ -622,7 +623,8 @@ if ($plabinelab) {
 		 "Node:\n".
 		 "  $node\n".
 		 "in pid/eid $pid/$eid failed to boot after loading OS.\n\n".
-		 "The nodes have been freed.\n");
+		 "The nodes have been freed.\n",
+		 $user_email_to);
 	$failed++;
 	add_failed_node_fatal($node);
 	goto tballdone;
@@ -974,7 +976,8 @@ if ($count > 0) {
 	     "  " . join(" ", @informtbopsfatal) . "\n".
 	     "in pid/eid $pid/$eid appear to be dead.\n\n".
 	     "The nodes have been taken out of the pool until this matter ".
-	     "is resolved.\n");
+	     "is resolved.\n",
+	     $user_email_to);
 }
 $count = scalar(@informtbopswarn);
 if ($count > 0) {
@@ -982,7 +985,8 @@ if ($count > 0) {
 	     "Nodes:\n".
 	     "  " . join(" ", @informtbopswarn) . "\n".
 	     "in pid/eid $pid/$eid failed to boot after loading OS.\n\n".
-	     "The nodes have been freed.\n");
+	     "The nodes have been freed.\n",
+	     $user_email_to);
 }
 
 TBDebugTimeStamp("Local node waiting finished");
