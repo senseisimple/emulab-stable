@@ -45,6 +45,7 @@ my $responder = Frontier::Responder->new( "methods" => {
     "SA::RegisterSlice"     => \&Protogeni::SA::RegisterSlice,
     "SA::DiscoverResources" => \&Protogeni::SA::DiscoverResources,
     "CM::GetTicket"         => \&GeniCM::GetTicket,
+    "CM::CreateSliver"      => \&GeniCM::CreateSliver,
     "add"                   => \&Protogeni::add,
    },
 );

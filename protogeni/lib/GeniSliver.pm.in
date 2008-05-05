@@ -1,0 +1,136 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package GeniSliver;
+
+#
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA    = "Exporter";
+@EXPORT = qw ( );
+
+# Must come after package declaration
+use lib '@prefix@/lib';
+use GeniDB;
+# Hate to import all this crap; need a utility library.
+use libdb qw(TBGetUniqueIndex);
+use libtestbed;
+use English;
+use Data::Dumper;
+use File::Temp qw(tempfile);
+
+# Configure variables
+my $TB		   = "@prefix@";
+my $TBOPS          = "@TBOPSEMAIL@";
+my $TBAPPROVAL     = "@TBAPPROVALEMAIL@";
+my $TBAUDIT   	   = "@TBAUDITEMAIL@";
+my $BOSSNODE       = "@BOSSNODE@";
+my $OURDOMAIN      = "@OURDOMAIN@";
+my $GENICENTRAL    = "https://boss/protogeni/xmlrpc";
+my $SIGNCRED	   = "$TB/sbin/signgenicred";
+
+# Cache of instances to avoid regenerating them.
+my %slivers      = ();
+
+#
+# Lookup by idx, or uuid.
+#
+sub Lookup($$)
+{
+    my ($class, $token) = @_;
+    my $query_result;
+
+    # Look in cache first
+    return $slivers{"$token"}
+        if (exists($slivers{"$token"}));
+
+    if ($token =~ /^\d+$/) {
+	$query_result =
+	    DBQueryWarn("select * from geni_slivers ".
+			"where idx='$token'");
+    }
+    elsif ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
+	$query_result =
+	    DBQueryWarn("select * from geni_slivers ".
+			"where uuid='$token'");
+    }
+    else {
+	return undef;
+    }
+    
+    return undef
+	if (!$query_result || !$query_result->numrows);
+
+    my $self          = {};
+    $self->{'SLIVER'} = $query_result->fetchrow_hashref();
+
+    bless($self, $class);
+    
+    # Add to cache. 
+    $slivers{$self->{'SLIVER'}->{'idx'}} = $self;
+    
+    return $self;
+}
+
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+    
+    my $uuid = $self->uuid();
+    my $idx  = $self->idx();
+
+    return "[GeniSliver: $uuid, IDX: $idx]";
+}
+
+#
+# Create a sliver. Not much to it yet.
+#
+sub Create($$)
+{
+    my ($class, $ticket) = @_;
+    my @insert_data = ();
+
+    # Every sliver gets a new unique index.
+    my $idx = TBGetUniqueIndex('next_sliver', 1);
+    # And a new uuid. 
+    my $uuid = NewUUID();
+    if (!defined($uuid)) {
+	print "*** WARNING: Could not generate a UUID!\n";
+	return undef;
+    }
+    my $slice_uuid = $ticket->slice_uuid();
+    my $owner_uuid = $ticket->owner_uuid();
+
+    # Now tack on other stuff we need.
+    push(@insert_data, "created=now()");
+    push(@insert_data, "idx='$idx'");
+    push(@insert_data, "uuid='$uuid'");
+
+    push(@insert_data, "creator_uuid='$owner_uuid'");
+    push(@insert_data, "slice_uuid='$slice_uuid'");
+
+    # Insert into DB.
+    DBQueryWarn("insert into geni_slivers set " . join(",", @insert_data))
+	or return undef;
+
+    return GeniSlice->Lookup($idx);
+}
+# accessors
+sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'SLIVER'}->{$_[1]}); }
+sub idx($)		{ return field($_[0], "idx"); }
+sub uuid($)		{ return field($_[0], "uuid"); }
+sub slice_uuid($)	{ return field($_[0], "slice_uuid"); }
+sub creator_uuid($)	{ return field($_[0], "creator_uuid"); }
+sub created($)		{ return field($_[0], "created"); }
+sub cm_idx($)		{ return field($_[0], "cm_idx"); }
+
+# _Always_ make sure that this 1 is at the end of the file...
+1;

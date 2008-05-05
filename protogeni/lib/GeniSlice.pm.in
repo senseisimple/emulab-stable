@@ -136,7 +136,6 @@ sub Create($$$$)
     my ($class, $hrn, $uuid, $creator_uuid, $sa_idx) = @_;
     my @insert_data = ();
 
-
     # Every slice gets a new unique index.
     my $idx = TBGetUniqueIndex('next_exptidx', 1);
 
@@ -176,3 +175,5 @@ sub Delete($)
     return 0;
 }
 
+# _Always_ make sure that this 1 is at the end of the file...
+1;

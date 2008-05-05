@@ -21,6 +21,8 @@ use lib '@prefix@/lib';
 use GeniDB;
 use libtestbed;
 use English;
+use XML::Simple;
+use XML::LibXML;
 use Data::Dumper;
 use File::Temp qw(tempfile);
 
@@ -35,18 +37,22 @@ my $GENICENTRAL    = "https://boss/protogeni/xmlrpc";
 my $SIGNCRED	   = "$TB/sbin/signgenicred";
 
 #
-# Create a ticket. Not much to it yet.
+# Create an unsigned ticket object from the raw rspec. 
 #
 # Should we keep track of tickets locally in the DB?
 #
-sub Create($$$;$)
+sub Create($$$$;$$)
 {
-    my ($class, $uuid, $rspec, $ticket) = @_;
+    my ($class, $slice_uuid, $owner_uuid,
+	$rspec, $ticket_string, $component) = @_;
 
     my $self = {};
-    $self->{'rspec'}   = $rspec;
-    $self->{'uuid'}    = $uuid;		# The slice UUID.
-    $self->{'ticket'}  = $ticket;
+    $self->{'rspec'}         = $rspec;
+    $self->{'slice_uuid'}    = $slice_uuid;
+    $self->{'owner_uuid'}    = $owner_uuid;
+    $self->{'ticket_string'} = $ticket_string;
+    $self->{'ticket'}        = undef;
+    $self->{'component'}     = $component;
     bless($self, $class);
 
     return $self;
@@ -54,8 +60,67 @@ sub Create($$$;$)
 # accessors
 sub field($$)           { return ($_[0]->{$_[1]}); }
 sub rspec($)		{ return field($_[0], "rspec"); }
-sub uuid($)		{ return field($_[0], "uuid"); }
+sub uuid($)		{ return field($_[0], "slice_uuid"); }
+sub slice_uuid($)	{ return field($_[0], "slice_uuid"); }
+sub owner_uuid($)	{ return field($_[0], "owner_uuid"); }
 sub ticket($)		{ return field($_[0], "ticket"); }
+sub asString($)		{ return field($_[0], "ticket_string"); }
+sub component($)	{ return field($_[0], "component"); }
+
+#
+# Create a ticket object from a signed ticket string.
+#
+sub CreateFromSignedTicket($$)
+{
+    my ($class, $ticket_string) = @_;
+
+    # Use XML::Simple to convert to something we can mess with.
+    my $parser = XML::LibXML->new;
+    my $doc    = $parser->parse_string($ticket_string);
+
+    # Dig out the rspec.
+    my ($rspec_node) = $doc->getElementsByTagName("rspec");
+    return undef
+	if (!defined($rspec_node));
+    my $rspec = XMLin($rspec_node->toString(), ForceArray => 0);
+
+    # Dig out the slice uuid. Locally, I am not sure if we bother to
+    # keep slices in the DB (they are in the DB at geni central).
+    my ($uuid_node) = $doc->getElementsByTagName("this_uuid");
+    return undef
+	if (!defined($uuid_node));
+    my $slice_uuid = $uuid_node->to_literal();
+
+    if (! ($slice_uuid =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/)) {
+	print STDERR "Invalid slice_uuid in ticket\n";
+	return undef;
+    }
+
+    # Dig out the owner uuid. Locally, I am not sure if we bother to
+    # keep users in the DB (they are in the DB at geni central).
+    ($uuid_node) = $doc->getElementsByTagName("owner_uuid");
+    return undef
+	if (!defined($uuid_node));
+    my $owner_uuid = $uuid_node->to_literal();
+
+    if (! ($owner_uuid =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/)) {
+	print STDERR "Invalid owner_uuid in ticket\n";
+	return undef;
+    }
+
+    my $self = {};
+    $self->{'rspec'}         = $rspec;
+    $self->{'slice_uuid'}    = $slice_uuid;
+    $self->{'owner_uuid'}    = $owner_uuid;
+    $self->{'ticket_string'} = $ticket_string;
+    $self->{'xmlref'}        = $doc;
+    $self->{'component'}     = undef;
+    bless($self, $class);
+
+    print Dumper($self);
+
+    return $self;
+}
 
 #
 # Populate the ticket with some stuff, which right now is just the
@@ -83,9 +148,10 @@ sub Sign($)
     return -1
 	if (!ref($self));
     
-    my $uuid = $self->uuid();
-    my $requested = $self->rspec()->{'requested'};
-    my $granted   = $self->rspec()->{'granted'};
+    my $slice_uuid = $self->slice_uuid();
+    my $owner_uuid = $self->owner_uuid();
+    my $requested  = $self->rspec()->{'requested'};
+    my $granted    = $self->rspec()->{'granted'};
 
     #
     # Create a template xml file to sign.
@@ -94,8 +160,8 @@ sub Sign($)
 	"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n".
 	"<credential xml:id=\"Ref1\">\n".
 	" <type>ticket</type>\n".
-	" <owner_uuid>$uuid</owner_uuid>\n".
-	" <this_uuid>$uuid</this_uuid>\n".
+	" <owner_uuid>$owner_uuid</owner_uuid>\n".
+	" <this_uuid>$slice_uuid</this_uuid>\n".
 	" <ticket>\n".
 	"  <can_delegate>1</can_delegate>\n".
 	"  <rspec>\n".
@@ -125,8 +191,10 @@ sub Sign($)
 	$ticket .= $_;
     }
     close(SIGNER);
-    $self->{'ticket'} = $ticket;
+    $self->{'ticket_string'} = $ticket;
 
     return 0;
 }
 
+# _Always_ make sure that this 1 is at the end of the file...
+1;

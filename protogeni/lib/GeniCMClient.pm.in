@@ -23,6 +23,8 @@ use GeniDB;
 use Genixmlrpc;
 use GeniResponse;
 use GeniTicket;
+use GeniSliver;
+use User;
 use libtestbed;
 use English;
 use Data::Dumper;
@@ -76,12 +78,22 @@ sub GetTicket($$$$)
 {
     my ($experiment, $component, $requested, $pref) = @_;
 
+    #
+    # XXX 
+    #
+    my $this_user = User->LookupByUnixId($UID);
+    if (! defined($this_user)) {
+    	print STDERR "You ($UID) do not exist!\n";
+	return -1;
+    }
+
     my $rspec = { "requested" => $requested,
 		  "granted"   => 0};
     
     my $response =
 	Genixmlrpc::CallMethodHTTP($component, "CM::GetTicket",
-				   { "uuid"  => $experiment->uuid(),
+				   { "slice_uuid"  => $experiment->uuid(),
+				     "owner_uuid"  => $this_user->uuid(),
 				     "rspec" => $rspec });
     
     return -1
@@ -95,9 +107,33 @@ sub GetTicket($$$$)
     #
     # Convert this into a (signed) ticket object.
     #
-    my $ticket = GeniTicket->Create($experiment->uuid(), $rspec,
-				    $response->value());
+    my $ticket = GeniTicket->Create($experiment->uuid(), $this_user->uuid(),
+				    $rspec, $response->value(), $component);
     
     $$pref = $ticket;
     return 0;
 }
+
+sub CreateSliver($$$)
+{
+    my ($experiment, $ticket, $pref) = @_;
+
+    my $response =
+	Genixmlrpc::CallMethodHTTP($ticket->component(), "CM::CreateSliver",
+				   { "ticket"  => $ticket->asString() });
+    
+    return -1
+	if (!defined($response));
+
+    print Dumper($response);
+
+    return -1
+	if ($response->code() != GENIRESPONSE_SUCCESS);
+
+    my $sliver = undef;
+
+    $$pref = $sliver;
+    return 0;
+
+}
+		 

@@ -9,6 +9,10 @@
       <capability_name>frazzle</capability_name>
       <can_delegate>1</can_delegate>
     </capability>
+    <capability>
+      <capability_name>drazzle</capability_name>
+      <can_delegate>1</can_delegate>
+    </capability>
   </capabilities>
   <parent>
   <credential xml:id="Ref1">
