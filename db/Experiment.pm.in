@@ -191,6 +191,8 @@ sub pid_idx($)		{ return field($_[0], 'pid_idx'); }
 sub gid_idx($)		{ return field($_[0], 'gid_idx'); }
 sub eid($)		{ return field($_[0], 'eid'); }
 sub idx($)		{ return field($_[0], 'idx'); }
+sub uuid($)		{ return field($_[0], 'eid_uuid'); }
+sub eid_uuid($)		{ return field($_[0], 'eid_uuid'); }
 sub description($)	{ return field($_[0], 'expt_name'); }
 sub path($)		{ return field($_[0], 'path'); }
 sub state($)		{ return field($_[0], 'state'); }

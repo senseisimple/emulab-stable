@@ -996,6 +996,31 @@ sub SetStatus($$)
 }
 
 #
+# Get user ssl certificate (pubkey). 
+#
+sub SSLCert($$$)
+{
+    my ($self, $encrypted, $pref) = @_;
+    $encrypted = ($encrypted ? 1 : 0);
+    
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $uid_idx = $self->uid_idx();
+
+    my $query_result =
+	DBQueryWarn("select cert from user_sslcerts ".
+		    "where uid_idx='$uid_idx' and encrypted=$encrypted");
+    return -1
+	if (!defined($query_result) || !$query_result->numrows);
+
+    my ($cert) = $query_result->fetchrow_array();
+    $$pref = $cert;
+    return 0;
+}
+
+#
 # Set password for user.
 #
 sub SetPassword($$$)
