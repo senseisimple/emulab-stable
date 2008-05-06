@@ -18,6 +18,22 @@ Note that some instructions may have steps that need to occur at a few
 different points in the install process - these are marked with the
 earliest time one of the steps needs to occur.
 
+20080506: After install.
+
+	  A bug introduced on 2007/10/19 caused the "ezid" flag to not
+          be properly set when creating an image using the "easy" form.
+          The net effect of this is that OSID where not being properly
+          deleted when the image id was.  The following two queries
+          will clean up the mess the bug introduced.
+
+             update images set ezid = 1 where not ezid and 
+               exists (select 1 from os_info where osid=imageid and ezid);
+             delete from os_info where ezid and osid 
+               not in (select osid from osidtoimageid);
+           
+          Both queries are safe to run, even if you where not affected
+          by the bug.
+
 20080501: Before install.
 
 	  Create the per project admin mailing lists if you enabled
