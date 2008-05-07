@@ -496,7 +496,7 @@ foreach my $node (@freed_nodes) {
 	}
 	next;
     }
-    elsif (!$TESTMODE &&
+    elsif (!$TESTMODE && !exists($ENV{'NORELOAD'}) &&
 	   ((!$isvirt && $imageable) || # XXX force reload hack!
 	    $inreloads || $mustzero{$node_id})) { # XXX Garcia hack
 	print "Moving $node to $reloading_experiment\n";
