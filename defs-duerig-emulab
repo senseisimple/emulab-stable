@@ -1,12 +1,15 @@
 #
-# This is the definitions file for Kirk on Emulab.Net.
+# This is the definitions file for Jon on Emulab.Net.
 #
 . defs-default
+
 
 TBOPSEMAIL=duerig@flux.utah.edu
 TBLOGSEMAIL=duerig@flux.utah.edu
 TBWWWEMAIL=duerig@flux.utah.edu
+TBAPPROVALEMAIL=duerig@flux.utah.edu
 TBAUDITEMAIL=duerig@flux.utah.edu
 TBSTATEDEMAIL=duerig@flux.utah.edu
 TBTESTSUITEEMAIL=duerig@flux.utah.edu
-WWW=www.emulab.net/~duerig/www
+WWW=www.emulab.net/dev/duerig
+THISHOMEBASE=Duerig.Emulab.Net
