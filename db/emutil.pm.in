@@ -1,0 +1,204 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+# Utility routines for Emulab.
+#
+package emutil;
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+@ISA = "Exporter";
+@EXPORT = qw (TBDB_CHECKDBSLOT_NOFLAGS TBDB_CHECKDBSLOT_WARN
+	      TBDB_CHECKDBSLOT_ERROR TBcheck_dbslot TBFieldErrorString);
+
+# Must come after package declaration!
+use lib '@prefix@/lib';
+use libdb;
+use English;
+
+# Configure variables
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $BOSSNODE    = "@BOSSNODE@";
+
+# Constants for checkslot code.
+sub TBDB_CHECKDBSLOT_NOFLAGS()	{ 0x0; }
+sub TBDB_CHECKDBSLOT_WARN()	{ 0x1; }
+sub TBDB_CHECKDBSLOT_ERROR()	{ 0x2; }
+
+#
+# Support for checking field values against what is specified.
+#
+my %DBFieldData;
+my $DBFieldErrstr = "";
+
+sub TBFieldErrorString() { return $DBFieldErrstr; }
+
+#
+# Download all data from the DB and store in hash for latter access.
+#
+sub TBGrabFieldData()
+{
+    %DBFieldData = ();
+
+    my $query_result =
+	libdb::DBQueryFatal("select * from table_regex");
+
+    while (my %row = $query_result->fetchhash()) {
+	my $table_name  = $row{"table_name"};
+	my $column_name = $row{"column_name"};
+
+	$DBFieldData{$table_name . ":" . $column_name} =
+	    { "check"       => $row{"check"},
+	      "check_type"  => $row{"check_type"},
+	      "column_type" => $row{"column_type"},
+	      "min"         => $row{"min"},
+	      "max"         => $row{"max"}
+	    };
+    }
+}
+
+#
+# Return the field data for a specific table/slot. If none, return the default
+# entry.
+#
+# The top level entry defines some stuff that is not to be overidden by the
+# redirected entries. For example, the top level entry is the only place we
+# can specify a field is optional when inserting a record. We could do this
+# with default entries in the DB table defintion, but I do not like that idea.
+# The min/max lengths also override, unless they are both zero in which case
+# let the first non-zero defs set them.
+#
+sub TBFieldData($$;$)
+{
+    my ($table, $column, $flag) = @_;
+    my $toplevel;
+    my $fielddata;
+
+    if (! %DBFieldData) {
+	TBGrabFieldData();
+    }
+    my $key = $table . ":" . $column;
+
+    while (exists($DBFieldData{$key})) {
+	$fielddata = $DBFieldData{$key};
+
+	#
+	# See if a redirect to another entry.
+	#
+	if ($fielddata->{"check_type"} eq "redirect") {
+	    if (!defined($toplevel)) {
+		$toplevel = $fielddata;
+	    }
+
+	    $key = $fielddata->{"check"};
+#	    print STDERR "Redirecting to $key for $table/$column!\n";
+	    next;
+	}
+	last;
+    }
+    # Resort to a default entry.
+    if (!defined($fielddata)) {
+	$DBFieldErrstr = "Error-checking pattern missing from the database";
+	
+	if (defined($flag)) {
+	    if ($flag & TBDB_CHECKDBSLOT_WARN()) {
+		print STDERR "*** $0:\n" .
+		             "    WARNING: No slot data for $table/$column!\n";
+	    }
+	    return undef
+		if ($flag & TBDB_CHECKDBSLOT_ERROR());
+	}
+	$fielddata = $DBFieldData{"default:default"};
+    }
+    # Return both entries.
+    if (defined($toplevel) &&
+	($toplevel->{"min"} || $toplevel->{"max"})) {
+	return ($fielddata, $toplevel);
+    }
+    return ($fielddata);
+}
+
+#
+# Generic wrapper to check a slot.
+#
+sub TBcheck_dbslot($$$;$)
+{
+    my ($token, $table, $column, $flag) = @_;
+    
+    $DBFieldErrstr = "Unknown Error";
+
+    my ($fielddata,$toplevel) = TBFieldData($table, $column, $flag);
+
+    return 0
+	if (!defined($fielddata));
+
+    my $check       = $fielddata->{"check"};
+    my $check_type  = $fielddata->{"check_type"};
+    my $column_type = $fielddata->{"column_type"};
+    my $min         = (defined($toplevel) ?
+		       $toplevel->{"min"} : $fielddata->{"min"});
+    my $max         = (defined($toplevel) ?
+		       $toplevel->{"max"} : $fielddata->{"max"});
+
+#    print STDERR "Using $check/$check_type/$column_type/$min/$max for ".
+#	"$table/$column\n";
+
+    #
+    # Functional checks not implemented yet.
+    #
+    if ($check_type eq "function") {
+	die("*** $0:\n" .
+	    "    Functional DB checks not implemented: $table/$column!\n");
+    }
+
+    # Make sure the regex is anchored. Its a mistake not to be!
+    $check = "^" . $check
+	if (! ($check =~ /^\^/));
+
+    $check = $check . "\$"
+	if (! ($check =~ /\Q$/));
+
+    # Check regex.
+    if (! ("$token" =~ /$check/)) {
+	$DBFieldErrstr = "Illegal Characters";
+	return 0;
+    }
+
+    # Check min/max.
+    if ($column_type eq "text") {
+	my $len = length($token);
+
+	# Any length is okay if no min or max. 
+	return 1
+	    if ((!($min || $max)) ||
+		($len >= $min && $len <= $max));
+	$DBFieldErrstr = "Too Short"
+	    if ($min && $len < $min);
+	$DBFieldErrstr = "Too Long"
+	    if ($max && $len > $max);
+    }
+    elsif ($column_type eq "int" ||
+	   $column_type eq "float") {
+	# If both min/max are zero, then skip check; allow anything.
+	return 1
+	    if ((!($min || $max)) || ($token >= $min && $token <= $max));
+	$DBFieldErrstr = "Too Small"
+	    if ($min && $token < $min);
+	$DBFieldErrstr = "Too Big"
+	    if ($max && $token > $max);
+    }
+    else {
+	die("*** $0:\n" .
+	    "    Unrecognized column_type $column_type\n");
+    }
+    return 0;
+}
+
+# _Always_ make sure that this 1 is at the end of the file...
+
+1;
+
