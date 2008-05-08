@@ -1,0 +1,132 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+
+#
+# Load the Testbed support stuff.
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use User;
+use Group;
+
+#
+# Backend script to add an existing user to a project/group
+# 
+sub usage()
+{
+    print("Usage: joinproject [-d] [-f] <user> <pid,gid>\n");
+    exit(-1);
+}
+my $optlist  = "df";
+my $force    = 0;
+my $debug    = 0;
+
+#
+# Configure variables
+#
+my $TB		  = "@prefix@";
+my $TBOPS	  = "@TBOPSEMAIL@";
+my $ISOLATEADMINS = @ISOLATEADMINS@;
+
+#
+# Untaint the path
+#
+$ENV{'PATH'} = "$TB/bin:$TB/sbin:/bin:/usr/bin:/usr/bin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Function prototypes
+#
+sub fatal($);
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"f"})) {
+    $force = 1;
+}
+if (@ARGV != 2) {
+    usage();
+}
+my $user   = $ARGV[0];
+my $pidgid = $ARGV[1];
+
+# Map target user to object.
+my $target_user = User->Lookup($user);
+if (! defined($target_user)) {
+    fatal("$user does not exist!");
+}
+
+# Map invoking user to object.
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
+}
+
+# And the Group.
+my $target_group = Group->Lookup($pidgid);
+if (! defined($target_group)) {
+    fatal("$pidgid does not exist!");
+}
+my $project_group = $target_group->GetProject()->GetProjectGroup();
+
+#
+# Check for a mix of users.
+#
+if ($ISOLATEADMINS && !$force && 
+    !defined($project_group->LookupUser($target_user))) {
+    my @members = ();
+    
+    $project_group->MemberList(\@members) == 0
+	or fatal("Error getting members for $project_group");
+
+    foreach my $member (@members) {
+	if ($member->admin() != $target_user->admin()) {
+	    fatal("Improper mix of admin and non-admin users");
+	}
+    }
+}
+
+$target_group->AddMemberShip($target_user) == 0
+    or fatal("Could not add $user to $target_group");
+if (! $target_group->IsProjectGroup()) {
+    $project_group->AddMemberShip($target_user) == 0
+	or fatal("Could not add $user to $project_group");
+}
+
+#
+# Send email for verified users.
+#
+if ($target_user->status() ne $User::USERSTATUS_NEWUSER) {
+    $target_group->SendJoinEmail($target_user);
+}
+exit(0);
+
+sub fatal($)
+{
+    my ($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}

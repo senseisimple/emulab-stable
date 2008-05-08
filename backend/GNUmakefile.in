@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -14,10 +14,10 @@ include $(OBJDIR)/Makeconf
 
 BIN_SCRIPTS     = newosid moduserinfo newgroup newmmlist editexp editimageid \
 		  editnodetype editsitevars newimageid editgroup \
-		  newimageid_ez
-WEB_BIN_SCRIPTS = webnewosid webmoduserinfo webnewgroup webnewmmlist webeditexp \
-		  webeditimageid webeditnodetype webeditsitevars webnewimageid \
-		  webeditgroup webnewimageid_ez
+		  newimageid_ez joinproject
+WEB_BIN_SCRIPTS = webnewosid webmoduserinfo webnewgroup webnewmmlist \
+		  webeditexp webeditimageid webeditnodetype webeditsitevars \
+		  webnewimageid webeditgroup webnewimageid_ez 
 WEB_SBIN_SCRIPTS= 
 LIBEXEC_SCRIPTS	= $(WEB_BIN_SCRIPTS) $(WEB_SBIN_SCRIPTS)
 
