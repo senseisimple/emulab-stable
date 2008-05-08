@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -58,7 +58,7 @@ sub CheckCopyArgs();
 sub CopyInArchive();
 sub fatal($;$);
 
-my $optlist = "iE:g:e:p:S:L:a:l:sfwqt:nzc:bx:y:";	# Enough options?
+my $optlist = "iE:g:e:p:S:L:a:l:sfwqt:nzc:bx:y:h:j";	# Enough options?
 my $batchmode= 1;
 my $frontend = 0;
 my $waitmode = 0;
@@ -66,7 +66,9 @@ my $quiet    = 0;
 my $linktest = 0;	# non-zero means level to run at.
 my $zeemode  = 0;	# Hey, out of options.
 my $zeeopt   = "";	# To pass along.
+my $genimode;           # Allow creation with no NS file, uuid given.
 my $savestate= 0;
+my $nonsfile = 0;	# Admin only option to activate experiment anyway.
 my $template;		# New stuff; experiment templates.
 my $branch_template;    # New stuff; experiment templates.
 my $instance;		# New stuff; experiment templates.
@@ -209,7 +211,8 @@ if (! $swappable && (!defined($noswap_reason) || $noswap_reason eq "")) {
 if (! $idleswap && (!defined($noidleswap_reason) || $noidleswap_reason eq "")){
     tbdie("Must provide a reason with -L option (no idleswap reason)!");
 }
-if (!defined($tempnsfile) && !defined($copyarg) && !TBAdmin()) {
+if (!defined($tempnsfile) && !defined($copyarg)
+    && !TBAdmin() && !defined($genimode)) {
     tbdie("Only admins can create experiments with no NS file");
 }
 my $nsfile  = "$eid.ns";
@@ -306,6 +309,8 @@ $args{'instance_idx'}	   = (defined($instance) ? $instance->idx() : 0);
 $args{'expt_name'}	   = $description;
 $args{'noswap_reason'}	   = $noswap_reason;
 $args{'noidleswap_reason'} = $noidleswap_reason;
+$args{'eid_uuid'}          = $genimode
+    if (defined($genimode));
 
 # Now create the experiment; we get back a perl class instance.
 if (! ($experiment = Experiment->Create($group, $eid, \%args))) {
@@ -427,27 +432,36 @@ close(KEY);
 # the user is forced to do a modify first (to give it a topology). 
 #
 if (!defined($tempnsfile)) {
-    $experiment->Unlock(EXPTSTATE_NEW());
-    exit(0);
+    #
+    # In GeniMode, we skip past the nsfile stuff.
+    #
+    if (defined($genimode)) {
+	$nonsfile = 1;
+    }
+    if (!$nonsfile) {
+	$experiment->Unlock(EXPTSTATE_NEW());
+	exit(0);
+    }
 }
 
-#
-# Now we can get the NS file!
-#
-if (system("/bin/cp", "$tempnsfile", "$nsfile")) {
-    fatal({type => 'primary', severity => SEV_ERROR,
-	   error => ['copy_ns_file_failed', $tempnsfile, $nsfile]},
-	  "Could not copy $tempnsfile to $workdir/$nsfile");
-}
-chmod(0664, "$nsfile");
+if (!$nonsfile) {
+    #
+    # Now we can get the NS file!
+    #
+    if (system("/bin/cp", "$tempnsfile", "$nsfile")) {
+	fatal({type => 'primary', severity => SEV_ERROR,
+	       error => ['copy_ns_file_failed', $tempnsfile, $nsfile]},
+	      "Could not copy $tempnsfile to $workdir/$nsfile");
+    }
+    chmod(0664, "$nsfile");
 
-# Future; do not name the ns as above, but use generic name.
-if (system("/bin/cp", "$tempnsfile", "nsfile.ns")) {
-    fatal({type => 'primary', severity => SEV_ERROR,
-	   error => ['copy_ns_file_failed', $tempnsfile, "nsfile.ns"]},
-	  "Could not copy $tempnsfile to $workdir/$nsfile");
+    # Future; do not name the ns as above, but use generic name.
+    if (system("/bin/cp", "$tempnsfile", "nsfile.ns")) {
+	fatal({type => 'primary', severity => SEV_ERROR,
+	       error => ['copy_ns_file_failed', $tempnsfile, "nsfile.ns"]},
+	      "Could not copy $tempnsfile to $workdir/$nsfile");
+    }
 }
-
 # We created this file below so kill it.
 if ($copyarg) {
     # This is tainted for reasons I do not understand.
@@ -461,7 +475,8 @@ if ($copyarg) {
 # Run parse in impotent mode on the NS file.  This has no effect but
 # will display any errors.
 #
-if (system("$parser -n $zeeopt $pid $gid $eid $nsfile") != 0) {
+if (!$nonsfile &&
+    system("$parser -n $zeeopt $pid $gid $eid $nsfile") != 0) {
     # Obey exit status protocol for web page.
     $errorstat = 1;
     fatal({type => 'secondary', severity => SEV_SECONDARY,
@@ -552,10 +567,6 @@ if (my $childpid = TBBackGround($logname)) {
     exit $exit_code;
 }
 TBdbfork();
-skiplog:
-
-# We are committed now. Affects how fatal() operates.
-$committed = 1;
 
 #
 # When in waitmode, must put ourselves in another process group so that
@@ -564,6 +575,10 @@ $committed = 1;
 if ($waitmode) {
     POSIX::setsid();
 }
+skiplog:
+
+# We are committed now. Affects how fatal() operates.
+$committed = 1;
 
 #
 # We need to catch TERM cause sometimes shit happens and we have to kill
@@ -599,7 +614,8 @@ $SIG{QUIT} = 'DEFAULT';
 $experiment->SetState(EXPTSTATE_PRERUN) == 0
     or fatal("Failed to set experiment state to " . EXPTSTATE_PRERUN());
 
-if ($experiment->PreRun($nsfile, ($zeeopt ? "-z" : ""))) {
+if (!$nonsfile &&
+    $experiment->PreRun($nsfile, ($zeeopt ? "-z" : ""))) {
     $errorstat = $? >> 8;
     fatal({type => 'secondary', severity => SEV_SECONDARY,
 	   error => ['tbprerun_failed']},
@@ -616,7 +632,8 @@ if (! ($frontend || $batchmode)) {
     $experiment->SetState(EXPTSTATE_ACTIVATING) == 0
 	or fatal("Failed to set experiment state to ". EXPTSTATE_ACTIVATING());
 
-    if ($experiment->Swap($Experiment::EXPT_SWAPIN) != 0) {
+    if (!$nonsfile &&
+	$experiment->Swap($Experiment::EXPT_SWAPIN) != 0) {
 	$errorstat = $? >> 8;
 	fatal({type => 'secondary', severity => SEV_SECONDARY,
 	       error => ['tbswap_in_failed']},
@@ -666,6 +683,7 @@ if (defined($logname)) {
 #
 # Save a copy of the files for testbed information gathering (long term).
 #
+
 $experiment->SaveLogFiles();
 
 #
@@ -970,6 +988,17 @@ sub ParseArgs()
 
     if (defined($options{"s"})) {
 	$savestate = 1;
+    }
+    if (defined($options{"h"})) {
+	$genimode = $options{"h"};
+	if (! ($genimode =~ /^[-\w]+$/)) {
+	    tbdie({type => 'primary', severity => SEV_ERROR,
+		   error => ['bad_data', 'argument', $genimode]},
+		  "Bad data in argument: $genimode.");
+	}
+    }
+    if (defined($options{"j"})) {
+	$nonsfile = 1;
     }
 
     #
