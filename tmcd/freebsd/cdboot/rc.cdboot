@@ -353,6 +353,31 @@ sub doboot()
 	elsif ($mfs =~ /^freebsd.*$/) {
 	    goto mfs;
 	}
+	elsif ($bootwhat =~ /^mfs:localhost:partition:(\d+)$/ ||
+	       $bootwhat =~ /^mfs:127\.0\.0\.1:partition:(\d+)$/) {
+	    #
+	    # In this case, we boot from an "alternate" mfs on the Nth 
+	    # partition of the default boot media.  One mfs per partition.
+	    #
+	    my $part = $1 + 0;
+	    if ($part < 1 || $part > 4) {
+		print("Invalid local mfs partition $part;" . 
+		      " falling back to default MFS boot\n");
+		goto mfs;
+	    }
+	    # Boot from the bootloader device, and the specified partition
+	    system("tbbootconfig -d -b 0xfe -k $part -c 0 -m 1 $bootdev");
+	    if ($?) {
+		print("Error running tbbootconfig;" . 
+		      "falling back to default MFS boot\n");
+		goto mfs;
+	    }
+	    system("sync");
+	    BootNotify(0,"Bootinfo said to boot local partition" . 
+		       " $part on default boot device; rebooting.");
+	    system("reboot");
+	    sleep(10000);
+	}
 	else {
 	    # Default to FreeBSD MFS.
 	    goto mfs;
