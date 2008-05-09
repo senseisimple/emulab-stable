@@ -1,0 +1,84 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Description of a virtual topology
+#
+default namespace = "http://emulab.net/resources/vtop/0.2"
+
+#
+# We include the common topology specification schema, but override a few
+# elements
+#
+include "top.rnc" {
+    ## In the vtop file, a node is only allowed to have a single type
+    NodeSpec.NodeType = NodeTypeSpec
+    ## In the vtop file, a link is only allowed to have a single type (which
+    ## is optional)
+    LinkSpec.LinkType = LinkTypeSpec?
+}
+
+## Add an atribute to the 'node' tag that allows you to fix it to a specific
+## physical node
+NodeSpec &= attribute assigned_to { text }?
+
+## Add an atribute to the 'node' tag that allows you to hint that it might
+## be a good idea to assign it to a specific physical node
+NodeSpec &= attribute hint_to { text }?
+
+## Specify a virtual class - assign allows you to define classes for virtual
+## nodes, and specify that all nodes using that class should, or must, be
+## assigned to physical nodes of the same type
+VclassSpec = element vclass {
+    ## Name of the virtual class
+    attribute name { text },
+    ## Specify whether the vclass is hard (ie. all nodes *must* be of the same
+    ## type) or soft (ie. violating it is allowed, but penalize)
+    (element hard { empty } |
+     (element soft { empty },
+      element weight { xsd:float { minInclusive = "0.0" } } ))
+}
+
+## "Legacy" link flags used by assign. Will be replaced by properties
+LinkFlagSpec = 
+    ## Indicates that it is not okay to use a delay node to artificially
+    ## shape/delay traffic for this link. Replace by using type system.
+    element nodelay { empty }?,
+    ## Indicates whether it is okay to multiplex this link with other virtual
+    ## links onto the same physical link (old name: emulated) Probably replace
+    ## by using the type system (ie. have an 'Ethernet' type that can only
+    ## hold one slot,  and an 'Ethernet-tagged' type that can hold more).
+    element multiplex_ok { empty }?,
+    ## Indicates whether it is okay to satisfy this link with a trivial
+    ## (loopback) link. Replace using type system.
+    element trivial_ok { empty }?,
+    ## Gives the name of the interface that must be used to satisfy the source
+    ## of this link - note that the interface name is given, not the node name
+    element fixsrciface { string }?,
+    ## Same as fixsrciface, for destination of the link
+    element fixdstiface { string }?
+
+## Add LinkFlagSpec to the base link specification, since it is only legal
+## in the vtop file
+LinkSpec &= LinkTypeSpec
+
+## Virtual topology
+start = element vtop {
+    ## Project ID
+    attribute pid { text },
+    ## Experiment ID
+    attribute eid { text },
+    ## Group ID (optional)
+    attribute gid { text }?,
+    ## User ID owning the experiment (optional)
+    attribute uid { text }?,
+    ## Nodes in the topology - zero or more
+    NodeSpec*,
+    ## Links in the topology - zero or more
+    LinkSpec*,
+    ## Vclasses
+    VclassSpec*
+}

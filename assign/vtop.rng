@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  
+  EMULAB-COPYRIGHT
+  Copyright (c) 2007 University of Utah and the Flux Group.
+  All rights reserved.
+  
+-->
+<!--
+  
+  Description of a virtual topology
+  
+-->
+<grammar xmlns:a="http://relaxng.org/ns/compatibility/annotations/1.0" ns="http://emulab.net/resources/vtop/0.2" xmlns="http://relaxng.org/ns/structure/1.0" datatypeLibrary="http://www.w3.org/2001/XMLSchema-datatypes">
+  <!--
+    
+    We include the common topology specification schema, but override a few
+    elements
+    
+  -->
+  <include href="top.rng">
+    <define name="NodeSpec.NodeType">
+      <a:documentation>In the vtop file, a node is only allowed to have a single type</a:documentation>
+      <ref name="NodeTypeSpec"/>
+    </define>
+    <define name="LinkSpec.LinkType">
+      <a:documentation>In the vtop file, a link is only allowed to have a single type (which
+is optional)</a:documentation>
+      <optional>
+        <ref name="LinkTypeSpec"/>
+      </optional>
+    </define>
+  </include>
+  <define name="NodeSpec" combine="interleave">
+    <a:documentation>Add an atribute to the 'node' tag that allows you to fix it to a specific
+physical node</a:documentation>
+    <optional>
+      <attribute name="assigned_to"/>
+    </optional>
+  </define>
+  <define name="NodeSpec" combine="interleave">
+    <a:documentation>Add an atribute to the 'node' tag that allows you to hint that it might
+be a good idea to assign it to a specific physical node</a:documentation>
+    <optional>
+      <attribute name="hint_to"/>
+    </optional>
+  </define>
+  <define name="VclassSpec">
+    <a:documentation>Specify a virtual class - assign allows you to define classes for virtual
+nodes, and specify that all nodes using that class should, or must, be
+assigned to physical nodes of the same type</a:documentation>
+    <element name="vclass">
+      <attribute name="name">
+        <a:documentation>Name of the virtual class</a:documentation>
+      </attribute>
+      <choice>
+        <a:documentation>Specify whether the vclass is hard (ie. all nodes *must* be of the same
+type) or soft (ie. violating it is allowed, but penalize)</a:documentation>
+        <element name="hard">
+          <empty/>
+        </element>
+        <group>
+          <element name="soft">
+            <empty/>
+          </element>
+          <element name="weight">
+            <data type="float">
+              <param name="minInclusive">0.0</param>
+            </data>
+          </element>
+        </group>
+      </choice>
+    </element>
+  </define>
+  <define name="LinkFlagSpec">
+    <a:documentation>"Legacy" link flags used by assign. Will be replaced by properties</a:documentation>
+    <optional>
+      <element name="nodelay">
+        <a:documentation>Indicates that it is not okay to use a delay node to artificially
+shape/delay traffic for this link. Replace by using type system.</a:documentation>
+        <empty/>
+      </element>
+    </optional>
+    <optional>
+      <element name="multiplex_ok">
+        <a:documentation>Indicates whether it is okay to multiplex this link with other virtual
+links onto the same physical link (old name: emulated) Probably replace
+by using the type system (ie. have an 'Ethernet' type that can only
+hold one slot,  and an 'Ethernet-tagged' type that can hold more).</a:documentation>
+        <empty/>
+      </element>
+    </optional>
+    <optional>
+      <element name="trivial_ok">
+        <a:documentation>Indicates whether it is okay to satisfy this link with a trivial
+(loopback) link. Replace using type system.</a:documentation>
+        <empty/>
+      </element>
+    </optional>
+    <optional>
+      <element name="fixsrciface">
+        <a:documentation>Gives the name of the interface that must be used to satisfy the source
+of this link - note that the interface name is given, not the node name</a:documentation>
+        <data type="string" datatypeLibrary=""/>
+      </element>
+    </optional>
+    <optional>
+      <element name="fixdstiface">
+        <a:documentation>Same as fixsrciface, for destination of the link</a:documentation>
+        <data type="string" datatypeLibrary=""/>
+      </element>
+    </optional>
+  </define>
+  <define name="LinkSpec" combine="interleave">
+    <a:documentation>Add LinkFlagSpec to the base link specification, since it is only legal
+in the vtop file</a:documentation>
+    <ref name="LinkTypeSpec"/>
+  </define>
+  <start>
+    <a:documentation>Virtual topology</a:documentation>
+    <element name="vtop">
+      <attribute name="pid">
+        <a:documentation>Project ID</a:documentation>
+      </attribute>
+      <attribute name="eid">
+        <a:documentation>Experiment ID</a:documentation>
+      </attribute>
+      <optional>
+        <attribute name="gid">
+          <a:documentation>Group ID (optional)</a:documentation>
+        </attribute>
+      </optional>
+      <optional>
+        <attribute name="uid">
+          <a:documentation>User ID owning the experiment (optional)</a:documentation>
+        </attribute>
+      </optional>
+      <zeroOrMore>
+        <ref name="NodeSpec">
+          <a:documentation>Nodes in the topology - zero or more</a:documentation>
+        </ref>
+      </zeroOrMore>
+      <zeroOrMore>
+        <ref name="LinkSpec">
+          <a:documentation>Links in the topology - zero or more</a:documentation>
+        </ref>
+      </zeroOrMore>
+      <zeroOrMore>
+        <ref name="VclassSpec">
+          <a:documentation>Vclasses</a:documentation>
+        </ref>
+      </zeroOrMore>
+    </element>
+  </start>
+</grammar>

@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  
+  EMULAB-COPYRIGHT
+  Copyright (c) 2007 University of Utah and the Flux Group.
+  All rights reserved.
+  
+-->
+<!--
+  
+  Description of a virtual topology
+  
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" targetNamespace="http://emulab.net/resources/vtop/0.2" xmlns:top="http://emulab.net/resources/top/0.2" xmlns:vtop="http://emulab.net/resources/vtop/0.2">
+  <xs:import namespace="http://emulab.net/resources/top/0.2" schemaLocation="top.xsd"/>
+  <!--
+    
+    We include the common topology specification schema, but override a few
+    elements
+    
+  -->
+  <xs:element name="NodeSpec.NodeType" abstract="true">
+    <xs:annotation>
+      <xs:documentation>In the vtop file, a node is only allowed to have a single type</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:sequence>
+        <xs:group ref="top:type_name"/>
+        <xs:choice>
+          <xs:element ref="top:type_slots"/>
+          <xs:element ref="top:unlimited"/>
+        </xs:choice>
+        <xs:element minOccurs="0" ref="top:static"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:group name="LinkSpec.LinkType">
+    <xs:sequence>
+      <xs:element minOccurs="0" ref="top:link_type"/>
+    </xs:sequence>
+  </xs:group>
+  <xs:element name="vclass">
+    <xs:complexType>
+      <xs:choice>
+        <xs:element ref="vtop:hard"/>
+        <xs:sequence>
+          <xs:element ref="vtop:soft"/>
+          <xs:element ref="vtop:weight"/>
+        </xs:sequence>
+      </xs:choice>
+      <xs:attribute name="name" use="required">
+        <xs:annotation>
+          <xs:documentation>Name of the virtual class</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="hard">
+    <xs:complexType/>
+  </xs:element>
+  <xs:element name="soft">
+    <xs:complexType/>
+  </xs:element>
+  <xs:element name="weight">
+    <xs:simpleType>
+      <xs:restriction base="xs:float">
+        <xs:minInclusive value="0.0"/>
+      </xs:restriction>
+    </xs:simpleType>
+  </xs:element>
+  <xs:group name="LinkFlagSpec">
+    <xs:annotation>
+      <xs:documentation>"Legacy" link flags used by assign. Will be replaced by properties</xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element minOccurs="0" ref="vtop:nodelay"/>
+      <xs:element minOccurs="0" ref="vtop:multiplex_ok"/>
+      <xs:element minOccurs="0" ref="vtop:trivial_ok"/>
+      <xs:element minOccurs="0" ref="vtop:fixsrciface"/>
+      <xs:element minOccurs="0" ref="vtop:fixdstiface"/>
+    </xs:sequence>
+  </xs:group>
+  <xs:element name="nodelay">
+    <xs:complexType/>
+  </xs:element>
+  <xs:element name="multiplex_ok">
+    <xs:complexType/>
+  </xs:element>
+  <xs:element name="trivial_ok">
+    <xs:complexType/>
+  </xs:element>
+  <xs:element name="fixsrciface" type="xs:string"/>
+  <xs:element name="fixdstiface" type="xs:string">
+    <xs:annotation>
+      <xs:documentation>Same as fixsrciface, for destination of the link</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+  <xs:element name="vtop">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element minOccurs="0" maxOccurs="unbounded" ref="top:node">
+          <xs:annotation>
+            <xs:documentation>Nodes in the topology - zero or more</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:group minOccurs="0" maxOccurs="unbounded" ref="top:LinkSpec">
+          <xs:annotation>
+            <xs:documentation>Links in the topology - zero or more</xs:documentation>
+          </xs:annotation>
+        </xs:group>
+        <xs:element minOccurs="0" maxOccurs="unbounded" ref="vtop:vclass">
+          <xs:annotation>
+            <xs:documentation>Vclasses</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+      </xs:sequence>
+      <xs:attribute name="pid" use="required">
+        <xs:annotation>
+          <xs:documentation>Project ID</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+      <xs:attribute name="eid" use="required">
+        <xs:annotation>
+          <xs:documentation>Experiment ID</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+      <xs:attribute name="gid">
+        <xs:annotation>
+          <xs:documentation>Group ID (optional)</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+      <xs:attribute name="uid">
+        <xs:annotation>
+          <xs:documentation>User ID owning the experiment (optional)</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+      <xs:attributeGroup ref="top:NodeSpec"/>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

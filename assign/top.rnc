@@ -1,40 +1,154 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005-2006 University of Utah and the Flux Group.
+# Copyright (c) 2005-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
-default namespace = "http://emulab.net/resources/vtop/1.0"
+#
+# Definition of common data structures used for representing topologies -
+# shared between vtop (virtual topology) and ptop (physical topology)
+# formats.
+#
 
-element top {
-    ## Project ID
-    attribute pid {text},
-    ## Experiment ID
-    attribute eid{text},
-    ## Group ID (optional)
-    attribute gid{text}?,
-    ## User ID owning the experiment (optional)
-    attribute uid{text}?,
-    ## Nodes in the topology - zero or more
-    element node {
-        attribute name {text},
-        element node_type {
-            element type_name { text },
-            ## TODO - Change type
-            element type_slots { text }?
-        },
-        element desire {
-            element desire_name { text },
-            element desire_weight { text },
-            element violatable { empty }?
-        }*,
-        element node_option{
-            element option_name { text },
-            element option_value { text }
-        }*
-    }*,
-    ## Links in the topology - zero or more
-    element link {
-        text
-    }*
+default namespace = "http://emulab.net/resources/top/0.2"
+
+## Representation of a single node type
+NodeTypeSpec = element node_type {
+        ## Name of the type - will almost certainly not be unique
+        element type_name { text },
+        ## How many virtual nodes of this type this physical node can
+        ## handle.
+        (element type_slots { xsd:integer { minInclusive = "1" } } |
+         element unlimited { empty }),
+        ## A flag that indicates that this physical node *always*
+        ## has this type - a node is only allowed to have one dynamic
+        ## (ie. not flagged as static) type at a time, but any number
+        ## of static types at a time
+        element static { empty }?
+}
+
+## A node in the topology
+NodeSpec = element node {
+    ## Name of the node - each node name must be unique within the 
+    ## top element
+    attribute name { text },
+    ## Type specification - we use a named pattern here (defined below), so
+    ## that it can be overriden in the virtual topology schema, where you are
+    ## only allowed to have one
+    NodeSpec.NodeType,
+    ## Legacy flags
+    NodeFlagSpec,
+    ## Legacy features and desires
+    FeatureDesireSpec*,
+    ## Types of virtual nodes that this physical node can satisfy
+    ## Desires of this node, which should (or must) be matched by the
+    ## physical node we are assigned to
+    PropertySpec*
+}
+
+## A node can (by default) have one or more types
+NodeSpec.NodeType = NodeTypeSpec+
+
+## Link types are currently just a siple string. They will almost certainly 
+## have to get more complicated, for two reasons:
+##     First, I want to allow virtual links to specify more than one type, so
+##       that we can ask for links that are, say, 'ethernet or loopback'
+##     Second, I want to have a lot more control over links that get mapped to
+##       multi-hop paths
+## TODO: MAYBE this should be combined with NodeTypeSpec
+LinkTypeSpec = element link_type {
+    element type_name { text }
+}
+
+## Links in the topology - zero or more
+LinkSpec = element link {
+    ## Name of the link - must be unique in the top
+    attribute name { text },
+    ## First interface for this link - links are assumed to be
+    ## symmetric, so the order of the interfaces does not currently
+    ## matter
+    element source_interface { InterfaceSpec },
+    ## Second interface for this link
+    element destination_interface { InterfaceSpec },
+    ## TODO: In the future, the bandwidth, latency, and packet loss will be
+    ## moved to features and/or properties
+    ## Bandwidth of the link in kbps
+    element bandwidth { xsd:float { minExclusive = "0.0" } },
+    ## Latency of the link in ms
+    element latency { xsd:float { minInclusive = "0.0" } },
+    ## Static packet loss probability of the link as a fraction
+    ## (ie. 0.01 == 1%)
+    element packet_loss { xsd:float { minInclusive = "0.0" } },
+    ## Type of this link - we use a named pattern here (defined below), so
+    ## that it can be overriden in the virtual topology schema, where you are
+    ## only allowed to have one
+    LinkSpec.LinkType,
+    ## Properties of this link
+    PropertySpec*
+}
+
+## A link can (by default) have zero or more types
+LinkSpec.LinkType = LinkTypeSpec*
+
+## "Legacy" assign features and desires - will be phased out in favor of
+## properties
+FeatureDesireSpec = element fd {
+    ## Name of this feature or desire
+    element fd_name { text },
+    ## Weight assocated with the feature or desire
+    element fd_weight { xsd:float },
+    ## A flag indicating whether or not a failure to match the desire with a
+    ## a feature is a constraint violation
+    element violatable { empty }?,
+    ## Type information expressed in features and desires
+    ((element global { empty }, element operator { "OnceOnly", "FirstFree" }) |
+     (element local { empty }, element operator { "+" }))?
+}
+
+## "Legacy" assign node flags - will be replaced with properties, and in some
+## cases, explicit links
+NodeFlagSpec =
+    ## Gives the amount of bandwidth this node can forward through its loopback
+    ## interface. In the future, we will make the loopback interface/link
+    ## explicit in the topology
+    ## Valid only for physical nodes
+    element trivial_bandwidth { xsd:integer },
+    ## Specify that this node is a subnode of another node. We MIGHT
+    ## try to do this with properties in the future
+    ## Valid for both virtual and physical nodes
+    element subnode_of { text }?,
+    ## Indicates that this node should never be considered identical to any
+    ## other node. Could be done with a property
+    ## Valid only for physical nodes
+    element unique { empty }?,
+    ## Indicates that virtual links must either all be trivial (loopback), or
+    ## none of them must be. Possibly expressible with properties?
+    element disallow_trivial_mix { empty }?
+
+## Interfaces
+InterfaceSpec = element interface {
+    ## Name of the node, which must match one of the nodes in this topology
+    element node_name { text },
+    ## Name of the interface itself
+    element interface { text },
+    ## Properties of the interface
+    PropertySpec*
+}
+    
+## Properties - new: replacements for features and desires. Not yet implemented
+## in assign, and not yet fully fleshed out in this schema.
+PropertySpec = element property {
+    ## Name of this property
+    element property_name { text },
+    ## Value associated with this property
+    ## TODO: Add ranges and other types from rspec
+    element property_value { text | xsd:float },
+    ## The penalty associated with this property
+    element property_penalty { xsd:float { minInclusive = "0.0" } },
+    ## If this flag is present, not having the property is considered a violation
+    element violatable { empty }?,
+    ## TODO: Add more operators - equality, range test, etc
+    ## Flags for special types of operators
+    ((element global { empty }, element operator { "OnceOnly", "FirstFree" }) |
+     (element local { empty }, element operator { "=", "+" }))?
 }

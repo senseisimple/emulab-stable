@@ -1,0 +1,35 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Description of a physical topology
+#
+
+default namespace = "http://emulab.net/resources/ptop/0.1"
+
+include "top.rnc"
+
+## A simple policy specification - it may end up that policy does not belong in
+## the ptop file directly
+TypeLimitSpec = element type_limit {
+    ## Name of the type we are limiting
+    element type_name { text },
+    ## Limit as to the number of nodes of this type the experiment can use
+    element type_limit { xsd:integer { minInclusive = "0" } }
+}
+  
+start = element ptop {
+    ## The testbed that this physical topology came from - will be used for
+    ## federation
+    attribute testbed { text },
+    ## Nodes in the topology - zero or more
+    NodeSpec*,
+    ## Links in the topology - zero or more
+    LinkSpec*,
+    ## Any limits on how many nodes of a particular type this experiment can
+    ## use.
+    TypeLimitSpec*
+}
