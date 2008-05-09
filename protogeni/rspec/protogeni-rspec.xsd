@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  
+  EMULAB-COPYRIGHT
+  Copyright (c) 2008 University of Utah and the Flux Group.
+  All rights reserved.
+  
+-->
+<!--
+  
+  Simple prototype of an RSpec, to be used by ProtoGENI
+  Some decisions to make:
+      Right now, requests, etc. all are part of the same schema - is
+        this right?
+  
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" targetNamespace="http://www.protogeni.net/resources/rspec/0.1" xmlns:rspec="http://www.protogeni.net/resources/rspec/0.1" xmlns:top="http://emulab.net/resources/top/0.2">
+  <xs:import namespace="http://emulab.net/resources/top/0.2" schemaLocation="top.xsd"/>
+  <!-- Add some more stuff to nodes -->
+  <xs:group name="NodeSpec">
+    <xs:sequence>
+      <xs:element minOccurs="0" ref="rspec:avaiable"/>
+    </xs:sequence>
+  </xs:group>
+  <xs:element name="avaiable">
+    <xs:simpleType>
+      <xs:restriction base="xs:token">
+        <xs:enumeration value="true"/>
+        <xs:enumeration value="false"/>
+      </xs:restriction>
+    </xs:simpleType>
+  </xs:element>
+  <xs:attributeGroup name="NodeSpec">
+    <xs:attribute name="virtualization_type">
+      <xs:simpleType>
+        <xs:restriction base="xs:token">
+          <xs:enumeration value="raw"/>
+          <xs:enumeration value="trellis-vserver"/>
+          <xs:enumeration value="planetlab-vserver"/>
+          <xs:enumeration value="emulab-vnode"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+  </xs:attributeGroup>
+  <xs:element name="rspec">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:group minOccurs="0" maxOccurs="unbounded" ref="rspec:NodeSpec"/>
+        <xs:element minOccurs="0" maxOccurs="unbounded" ref="top:link"/>
+      </xs:sequence>
+      <xs:attribute name="generated" use="required" type="xs:dateTime"/>
+      <xs:attributeGroup ref="rspec:NodeSpec"/>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

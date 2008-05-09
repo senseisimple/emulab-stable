@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- What might be returned by a query asking for which resources are
+    currently available -->
+<rspec xmlns:"http://protogeni.net/resources/rspec/0.1">
+    <node uuid="00000000-0000-0000-0000-000000000002">
+        <available>true</available>
+    </node>
+    <node uuid="00000000-0000-0000-0000-000000000003">
+        <available>false</available>
+    </node>
+    <node uuid="00000000-0000-0000-0000-000000000004">
+        <available>true</available>
+    </node>
+</rspec>

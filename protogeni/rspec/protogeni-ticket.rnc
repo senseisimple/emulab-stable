@@ -1,0 +1,29 @@
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Simple prototype of an ticket, to be used by ProtoGENI
+#
+default namespace = "http://www.protogeni.net/resources/ticket/0.1"
+
+# 
+# Include the whole rspec, in its own namespace
+#
+namespace rs = "http://www.protogeni.net/resources/rspec/0.1"
+
+start = element ticket {
+    # If this ticket is not "cashed in" by this time (UTC), it is invalid
+    attribute redeem_before { xsd:dateTime },
+    # How long the holder may keep the specified resources
+    attribute valid_until { xsd:dateTime},
+    # The slice this ticket has been issued to (UUID)
+    attribute issued_to { text },
+    # The set of resources being promised by this ticket
+    element rs:rspec
+    # Question: Do we need a unqiue identifer for the ticket itself?
+    # Question: Do we need to include information about who issued this ticket?
+    # TODO: Need to include an XML signature, don't know quite what that looks
+    # like
+}

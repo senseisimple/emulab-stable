@@ -1,0 +1,43 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Simple prototype of an RSpec, to be used by ProtoGENI
+# Some decisions to make:
+#     Right now, requests, etc. all are part of the same schema - is
+#       this right?
+#
+
+default namespace = "http://www.protogeni.net/resources/rspec/0.1"
+
+include "top.rnc" {
+    # Add some more stuff to nodes
+    NodeSpec &=
+        # Major semantic change - the 'name' of a (physical) node is now its
+        # UUID. Not sure if we want to include another field that is the testbed's
+        # own human-readable name for the node
+        
+        # Each node has exactly one virtualization technology, which we simply
+        # enumerate here
+        attribute virtualization_type { "raw" | "trellis-vserver" |
+            "planetlab-vserver" | "emulab-vnode" }?,
+        # Inidicate whether or not this node is available - the idea is that a full
+        # dump of the static physical topology will not include this, but that
+        # we can later get updates that include only this attribute (and a UUID)
+        # Just binary for now - probably will include more things, such as a
+        # number of "free slots", later
+        element avaiable { "true" | "false" }?
+}
+
+start = element rspec {
+    # TODO: Include something about who generated this rspec?
+    # When this RSpec was generated - optional, can be used for determining staleness
+    attribute generated { xsd:dateTime },
+    # One or more nodes
+    NodeSpec*,
+    # One or more links
+    LinkSpec*
+}
