@@ -30,6 +30,7 @@ my $TB		  = "@prefix@";
 my $BOSSNODE      = "@BOSSNODE@";
 my $CONTROL	  = "@USERNODE@";
 my $TBOPS         = "@TBOPSEMAIL@";
+my $TBAPPROVAL    = "@TBAPPROVALEMAIL@";
 my $TBAUDIT       = "@TBAUDITEMAIL@";
 my $TBBASE        = "@TBBASE@";
 my $TBWWW         = "@TBWWW@";
@@ -892,8 +893,8 @@ sub SendJoinEmail($$)
     $usr_URL = ""
 	if (!defined($usr_URL));
 
-    SendProjAdminMail
-	($pid, "ADMIN", "$leader_name '$leader_uid' <$leader_email>",
+    SENDMAIL
+	("$leader_name '$leader_uid' <$leader_email>",
 	 "$uid $pid Project Join Request",
 	 "$usr_name is trying to join your group $gid in project $pid.".
 	 "\n".
@@ -919,6 +920,7 @@ sub SendJoinEmail($$)
 	 "\n".
 	 "Thanks,\n".
 	 "Testbed Operations\n",
+	 "$usr_name '$uid' <$usr_email>",
 	 "CC: $allleaders");
 
     return 0;
@@ -950,8 +952,7 @@ sub SendApprovalEmail($$$)
 
     my $trust = $membership->trust();
 
-    SendProjAdminMail($pid,
-             "$this_name <$this_email>",
+    AnonSENDMAIL(
 	     "$usr_name '$usr_uid' <$usr_email>",
              "Membership Approved in '$pid/$gid' ",
 	     "\n".
@@ -960,7 +961,9 @@ sub SendApprovalEmail($$$)
              "\n\n".
              "Thanks,\n".
              "Testbed Operations\n",
-             "CC: $allleaders");
+             undef,
+	     "CC: $allleaders\n".
+	     "Bcc: $TBAUDIT");
 
     return 0;
 }

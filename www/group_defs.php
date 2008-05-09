@@ -638,7 +638,8 @@ class Group
     # Notify leaders of new (and verified) group member.
     #
     function NewMemberNotify($user) {
-	global $TBWWW, $TBMAIL_APPROVAL, $TBMAIL_AUDIT, $TBMAIL_WWW;
+	global $TBWWW, 
+	       $TBMAIL_APPROVAL, $TBMAIL_AUDIT, $TBMAIL_WWW, $TBMAIL_NOREPLY;
 	
 	if (! $this->project) {
 	    $this->LoadProject();
@@ -664,10 +665,9 @@ class Group
 	$usr_country	= $user->country();
 	$usr_phone	= $user->phone();
 	$usr_URL	= $user->URL();
-	
-	SendProjAdminMail($pid,
-           "ADMIN", 
-           "$leader_name '$leader_uid' <$leader_email>",
+
+	TBMAIL	
+          ("$leader_name '$leader_uid' <$leader_email>",
 	   "$joining_uid $pid Project Join Request",
 	   "$usr_name is trying to join your group $gid in project $pid.\n".
 	   "\n".
@@ -691,7 +691,10 @@ class Group
 	   "decision regarding $usr_name's membership in your project.\n\n".
 	   "Thanks,\n".
 	   "Testbed Operations\n",
-	   "Cc: $allleaders");
+	   "From: $usr_name '$joining_uid' <$usr_email>\n".
+	   "Cc: $allleaders\n".
+	   "Bcc: $TBMAIL_AUDIT\n".
+	   "Errors-To: $TBMAIL_WWW");
 
 	return 0;
     }

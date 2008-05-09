@@ -13,7 +13,8 @@ include $(OBJDIR)/Makeconf
 
 SBIN_SCRIPTS		= addmmlist delmmlist setmmlistmembers mmsetup \
 			  setmmpasswd mmlistmembership mmmodifymember \
-			  addmmuser delmmuser addprojadminlist
+			  addmmuser delmmuser \
+			  addprojadminlist closeprojadminlist
 LIBEXEC_SCRIPTS		= webaddmmlist webdelmmlist websetmmpasswd mmxlogin \
 			  webmmlistmembership
 CTRL_LIBEXEC_SCRIPTS	= genaliases
@@ -24,7 +25,7 @@ CTRL_SBIN_SCRIPTS	= mailmanproxy
 SETUID_BIN_SCRIPTS   = 
 SETUID_SBIN_SCRIPTS  = addmmuser delmmuser addmmlist delmmlist \
 			setmmlistmembers setmmpasswd mmlistmembership \
-			mmmodifymember addprojadminlist
+			mmmodifymember addprojadminlist closeprojadminlist
 SETUID_LIBX_SCRIPTS  = mmxlogin
 
 #

@@ -23,7 +23,8 @@ SBIN_SCRIPTS	= vlandiff vlansync withadminprivs export_tables cvsupd.pl \
 		  opsreboot deletenode node_statewait grabwebcams \
 		  grabswitchconfig backupswitches cvsinit checkquota \
 		  spewconlog opsdb_control newnode suchown archive_list \
-                  wanodecheckin wanodecreate spewimage
+                  wanodecheckin wanodecreate spewimage \
+                  anonsendmail
 
 WEB_SBIN_SCRIPTS= webnewnode webdeletenode webspewconlog webarchive_list \
                   webwanodecheckin webspewimage
@@ -36,7 +37,8 @@ CTRLSBIN_SCRIPTS= opsdb_control.proxy daemon_wrapper
 
 # These scripts installed setuid, with sudo. 
 SETUID_BIN_SCRIPTS   = 
-SETUID_SBIN_SCRIPTS  = grabwebcams checkquota spewconlog opsdb_control suchown
+SETUID_SBIN_SCRIPTS  = grabwebcams checkquota spewconlog opsdb_control suchown \
+                       anonsendmail
 SETUID_LIBX_SCRIPTS  = xlogin
 
 #

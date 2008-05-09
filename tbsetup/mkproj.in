@@ -39,6 +39,7 @@ sub fatal($);
 #
 my $TB            = "@prefix@";
 my $TBOPS         = "@TBOPSEMAIL@";
+my $TBAPPROVAL    = "@TBAPPROVALEMAIL@";
 my $TBAUDIT	  = "@TBAUDITEMAIL@";
 my $TBBASE        = "@TBBASE@";
 my $TBWWW         = "@TBWWW@";
@@ -57,6 +58,7 @@ my $ADDWIKIPROJ   = "$TB/sbin/addwikiproj";
 my $ADDBUGDBPROJ  = "$TB/sbin/addbugdbproj";
 my $ADDMMLIST     = "$TB/sbin/addmmlist";
 my $OPSDBCONTROL  = "$TB/sbin/opsdb_control";
+my $CLOSEPROJADMINLIST = "$TB/sbin/closeprojadminlist";
 	  
 my @DIRLIST  = ("exp", "images", "logs", "deltas", "tarfiles", "rpms",
 		"groups", "tiplogs", "images/sigs", "templates");
@@ -467,6 +469,19 @@ if ($query_result->num_rows) {
     }
 }
 
+#
+# Close proj admin list and remove testbed-approval as a member
+#
+#
+# XXX: DISABLED FOR NOW.
+#
+#if ($MAILMANSUPPORT) {
+#    $EUID = $UID;
+#    system("$CLOSEPROJADMINLIST $pid") == 0 or
+#        fatal("$CLOSEPROJADMINLIST failed");
+#    $EUID = 0;
+#}
+
 # Send email, unless silent option given.
 if (!$silent) {
     my $leader_name  = $leader->name();
@@ -485,18 +500,20 @@ if (!$silent) {
 	 (defined($message) ? "\n${message}\n" : "") .
 	 "\n".
 	 "Thanks,\n".
-	 "Testbed Operations\n");
+	 "Testbed Operations\n",
+	 "Bcc: $TBAPPROVAL");
 
     #
     # If the leader was switched, then generate a second message to the
     # new leader telling him to approve the original leader to the project.
     #
     if (defined($oldleader)) {
-	my $oldleader_uid  = $oldleader->uid();
-	my $oldleader_name = $oldleader->name();
+	my $oldleader_uid   = $oldleader->uid();
+	my $oldleader_name  = $oldleader->name();
+	my $oldleader_email = $oldleader->email();
 	
-	SendProjAdminMail
-	    ($pid, "ADMIN", "$leader_name <$leader_email>",
+	SENDMAIL
+	    ("$leader_name <$leader_email>",
 	     "$oldleader_uid $pid Project Join Request",
 	     "$oldleader_name wants to join project $pid.\n".
 	     "\n".
@@ -505,7 +522,8 @@ if (!$silent) {
 	     "your decision regarding ${oldleader_name}'s membership.\n".
 	     "\n".
 	     "Thanks,\n".
-	     "Testbed Operations\n");
+	     "Testbed Operations\n",
+	     "$oldleader_name <$oldleader_email>");
     }
 }
 

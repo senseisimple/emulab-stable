@@ -1,0 +1,155 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use Errno qw(EEXIST);
+
+use strict;
+
+#
+# "Close" a project admin mailing list
+#    does two things:
+#      remove testbed-approval as a list memeber
+#      close the list to nonmebers, but keep the sender filter to
+#      allow mail from utah.edu or emulab.net
+#
+sub usage()
+{
+    print STDOUT "Usage: closeprojadminlist <proj>\n";
+    exit(-1);
+}
+my $optlist   = "";
+my $debug     = 0;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $TBAUDIT	= "@TBAUDITEMAIL@";
+my $TBAPPROVAL  = "@TBAPPROVALEMAIL@";
+my $CONTROL     = "@USERNODE@";
+my $BOSSNODE	= "@BOSSNODE@";
+my $OURDOMAIN   = "@OURDOMAIN@";
+my $MAILMANSUPPORT= @MAILMANSUPPORT@;
+my $SSH         = "$TB/bin/sshtb";
+my $MMPROXY     = "$TB/sbin/mailmanproxy";
+my $ADDMMLIST   = "$TB/sbin/addmmlist";
+
+my $MAILMANDIR = "/usr/local/mailman";
+my $MMBINDIR   = "$MAILMANDIR/bin";
+my $MMLISTDIR  = "$MAILMANDIR/lists";
+
+
+# Protos
+sub fatal($);
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the Testbed support stuff. 
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use User;
+
+#
+# We don't want to run this script unless its the real version.
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be setuid! Maybe its a development version?\n");
+}
+
+#
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+# 
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root! Its already setuid!\n");
+}
+
+#
+# If no mailman support, just exit. 
+#
+if (! $MAILMANSUPPORT) {
+    print "MailMan support is not enabled. Exit ...\n";
+    exit(0);
+}
+
+#
+# Verify user and get his DB uid and other info for later.
+#
+#my $this_user = User->ThisUser();
+#if (! defined($this_user)) {
+#    die("You ($UID) do not exist!");
+#}
+#my $user_uid   = $this_user->uid();
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+usage()
+    if (@ARGV == 0);
+
+my $proj = $ARGV[0];
+#
+# Untaint args.
+#
+if ($proj =~ /^([\w-]+)$/) {
+    $proj = $1;
+}
+else {
+    die("Bad data in proj: $proj");
+}
+
+# For ssh
+$UID = $EUID;
+if ($CONTROL ne $BOSSNODE) {
+
+    # Must serialize some of the mailman stuff. Be sure to use the same token!
+    TBScriptLock("mailman_update") == 0 or
+        fatal("Could not get the lock!");
+
+    system("echo $TBAPPROVAL | ".
+	   "$SSH -host $CONTROL $MMBINDIR/remove_members -f - $proj-admin");
+
+    open(CONFIG, " | $SSH -host $CONTROL $MMBINDIR/config_list -i /dev/stdin $proj-admin");
+    print CONFIG "generic_nonmember_action = 2\n";
+    close(CONFIG);
+
+    my $status = $?;
+    TBScriptUnlock();
+    $? = $status;
+
+}
+
+exit(0);
+
+sub fatal($)
+{
+    my($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}

@@ -105,6 +105,7 @@ $TBMAIL_WWW		= "Testbed WWW <$TBMAILADDR_WWW>";
 $TBMAIL_APPROVAL	= "Testbed Approval <$TBMAILADDR_APPROVAL>";
 $TBMAIL_LOGS		= "Testbed Logs <$TBMAILADDR_LOGS>";
 $TBMAIL_AUDIT		= "Testbed Audit <$TBMAILADDR_AUDIT>";
+$TBMAIL_NOREPLY		= "no-reply@$OURDOMAIN";
 
 #
 # This just spits out an email address in a page, so it does not need
