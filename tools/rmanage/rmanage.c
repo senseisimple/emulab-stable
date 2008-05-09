@@ -11,8 +11,10 @@
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
+#ifndef NO_EMULAB
 #include <mysql/mysql.h>
 #include "tbdb.h"
+#endif
 
 extern char *optarg;
 extern int optopt;
@@ -54,9 +56,10 @@ void usage(char *prog) {
 	    "  -d         Turn on debugging (more d's mean more debug info)\n"
 	    "  -s         Use secure RMCP\n"
 	    "  -H         Interpret keys as hex strings instead of char strings\n"
+#ifndef NO_EMULAB
 	    "  -E         Resolve client and keys using the Emulab database\n"
+#endif
 	    "               (this option implies -H)\n"
-	    "  -c host    The hostname of the managed client\n"
 	    "  -t timeout Timeout (in seconds) for individual RMCP messages\n"
 	    "               (default: %d)\n"
 	    "  -m retries Retry N times for unacknowledged RMCP sends\n"
@@ -67,7 +70,10 @@ void usage(char *prog) {
 	    "  -g key     Use this generation key\n"
 	    "  -u uid     Send the specified username\n"
 	    "\n"
-	    "  clientname IP or hostname (or Emulab node_id if -E specified)\n"
+	    "  clientname IP or hostname\n"
+#ifndef NO_EMULAB
+	    "    (or Emulab node_id if -E specified)\n"
+#endif
 	    "  command    This argument performs an operation on the managed\n"
 	    "             client.  The available commands are:\n",
 	    prog,DEFAULT_TIMEOUT,DEFAULT_RETRIES);
@@ -105,9 +111,11 @@ int main(int argc,char **argv) {
     char *command = NULL;
     int emulab = 0;
     char emip[16];
+#ifndef NO_EMULAB
     MYSQL_RES *res;
     MYSQL_ROW row;
     int nrows;
+#endif
     char *src;
     int clen;
 
@@ -193,6 +201,7 @@ int main(int argc,char **argv) {
 
     ctx = rmcp_ctx_init(timeout,retries);
 
+#ifndef NO_EMULAB
     if (emulab) {
 	dbinit();
 	/* Attempt lookup in Emulab db */
@@ -275,6 +284,7 @@ int main(int argc,char **argv) {
 
 	client = emip;
     }
+#endif
 
     if (secure) {
 	if (strcmp(role,"administrator") == 0) {
