@@ -36,7 +36,7 @@ my $TBAPPROVAL     = "@TBAPPROVALEMAIL@";
 my $TBAUDIT   	   = "@TBAUDITEMAIL@";
 my $BOSSNODE       = "@BOSSNODE@";
 my $OURDOMAIN      = "@OURDOMAIN@";
-my $GENICENTRAL    = "https://boss/protogeni/xmlrpc";
+my $GENICENTRAL    = "https://myboss.little-emulab-bsd61.testbed.emulab.net/protogeni/xmlrpc";
 
 #
 # Discover resources for a slice (local experiment). This contacts Geni
@@ -76,7 +76,7 @@ sub DiscoverResources($$)
 #
 sub GetTicket($$$$)
 {
-    my ($experiment, $component, $requested, $pref) = @_;
+    my ($experiment, $component, $rspec, $pref) = @_;
 
     #
     # XXX 
@@ -87,9 +87,6 @@ sub GetTicket($$$$)
 	return -1;
     }
 
-    my $rspec = { "requested" => $requested,
-		  "granted"   => 0};
-    
     my $response =
 	Genixmlrpc::CallMethodHTTP($component, "CM::GetTicket",
 				   { "slice_uuid"  => $experiment->uuid(),
@@ -98,8 +95,6 @@ sub GetTicket($$$$)
     
     return -1
 	if (!defined($response));
-
-    print Dumper($response);
 
     return -1
 	if ($response->code() != GENIRESPONSE_SUCCESS);

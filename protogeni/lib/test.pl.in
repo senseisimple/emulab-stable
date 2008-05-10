@@ -16,13 +16,22 @@ use English;
 #GeniSAClient::RegisterUser(User->ThisUser());
 
 my $experiment = Experiment->Lookup("testbed", "one-node");
+my $slice;
 my $resources;
 my $ticket;
 my $sliver;
+my $rspec = { "node_id"   => "pc159",
+	      "granted"   => 0};
 
 GeniCMClient::DiscoverResources($experiment, \$resources);
+print $resources->[0] . "\n";
 
-GeniCMClient::GetTicket($experiment, $resources->[0], 1, \$ticket);
+GeniCMClient::GetTicket($experiment, $resources->[0], $rspec, \$ticket);
+open(T, "> /tmp/T");
+print T $ticket->asString();
+close(T);
+     
+exit(0);
 if ($ticket) {
     GeniCMClient::CreateSliver($experiment, $ticket, \$sliver);
 }

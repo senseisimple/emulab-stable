@@ -164,7 +164,7 @@ sub Delete($)
 {
     my ($self) = @_;
 
-    return 0
+    return -1
 	if (! ref($self));
 
     my $idx = $self->idx();

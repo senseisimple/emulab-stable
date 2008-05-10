@@ -115,7 +115,8 @@ CREATE TABLE `geni_slices` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 #
-# Geni Slivers. Created on components (by CMs of course).
+# Geni Slivers. Created on components (by CMs of course). Locally, a sliver
+# corresponds to an allocated node. 
 #
 DROP TABLE IF EXISTS `geni_slivers`;
 CREATE TABLE `geni_slivers` (
@@ -123,6 +124,7 @@ CREATE TABLE `geni_slivers` (
   `uuid` varchar(40) NOT NULL default '',
   `slice_uuid` varchar(40) NOT NULL default '',
   `creator_uuid` varchar(40) NOT NULL default '',
+  `node_id` varchar(32) default NULL,
   `created` datetime default NULL,
   `cm_idx` int(10) unsigned NOT NULL default '0',
   PRIMARY KEY  (`idx`),
@@ -130,3 +132,20 @@ CREATE TABLE `geni_slivers` (
   INDEX `slice_uuid` (`slice_uuid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
+#
+# Table to remember the tickets that a component manager hands out. 
+#
+DROP TABLE IF EXISTS `geni_tickets`;
+CREATE TABLE `geni_tickets` (
+  `idx` mediumint(8) unsigned NOT NULL default '0',
+  `owner_uuid` varchar(40) NOT NULL default '',
+  `slice_uuid` varchar(40) NOT NULL default '',
+  `created` datetime default NULL,
+  `redeem_before` datetime default NULL,
+  `valid_until` datetime default NULL,
+  `cm_idx` int(10) unsigned NOT NULL default '0',
+  `ticket_string` text,
+  PRIMARY KEY  (`idx`),
+  INDEX `owner_uuid` (`owner_uuid`),
+  INDEX `slice_uuid` (`slice_uuid`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;

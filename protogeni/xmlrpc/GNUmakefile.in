@@ -28,6 +28,8 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 install: $(INSTALL_DIR)/protogeni/xmlrpc/protogeni.pl \
          $(INSTALL_LIBDIR)/Genixmlrpc.pm \
          $(INSTALL_LIBDIR)/GeniResponse.pm
+	$(SUDO) chown root $(INSTALL_DIR)/protogeni/xmlrpc/protogeni.pl
+	$(SUDO) chmod u+s  $(INSTALL_DIR)/protogeni/xmlrpc/protogeni.pl
 
 control-install:
 

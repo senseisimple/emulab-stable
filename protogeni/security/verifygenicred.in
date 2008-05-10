@@ -130,12 +130,6 @@ else {
     fatal("Bad data in translated pathname: $xmlfile");
 }
 
-# Map invoking user to object.
-my $this_user = User->LookupByUnixId($UID);
-if (! defined($this_user)) {
-    fatal("You ($UID) do not exist!");
-}
-
 #
 # Verify that the credential conforms to the schema. The wrinkle is that it
 # might already be a signed credential and we just need to add another

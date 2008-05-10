@@ -20,6 +20,8 @@ use GeniDB;
 # Hate to import all this crap; need a utility library.
 use libdb qw(TBGetUniqueIndex);
 use libtestbed;
+use Experiment;
+use Node;
 use English;
 use Data::Dumper;
 use File::Temp qw(tempfile);
@@ -33,6 +35,9 @@ my $BOSSNODE       = "@BOSSNODE@";
 my $OURDOMAIN      = "@OURDOMAIN@";
 my $GENICENTRAL    = "https://boss/protogeni/xmlrpc";
 my $SIGNCRED	   = "$TB/sbin/signgenicred";
+my $AVAIL	   = "$TB/sbin/avail";
+my $NALLOC	   = "$TB/bin/nalloc";
+my $NFREE	   = "$TB/bin/nfree";
 
 # Cache of instances to avoid regenerating them.
 my %slivers      = ();
@@ -108,12 +113,13 @@ sub Create($$)
     }
     my $slice_uuid = $ticket->slice_uuid();
     my $owner_uuid = $ticket->owner_uuid();
+    my $node_id    = $ticket->rspec()->{'node_id'};
 
     # Now tack on other stuff we need.
     push(@insert_data, "created=now()");
     push(@insert_data, "idx='$idx'");
     push(@insert_data, "uuid='$uuid'");
-
+    push(@insert_data, "node_id='$node_id'");
     push(@insert_data, "creator_uuid='$owner_uuid'");
     push(@insert_data, "slice_uuid='$slice_uuid'");
 
@@ -131,6 +137,72 @@ sub slice_uuid($)	{ return field($_[0], "slice_uuid"); }
 sub creator_uuid($)	{ return field($_[0], "creator_uuid"); }
 sub created($)		{ return field($_[0], "created"); }
 sub cm_idx($)		{ return field($_[0], "cm_idx"); }
+sub node_id($)		{ return field($_[0], "node_id"); }
+
+#
+# Delete the sliver. The sliver should not be provisioned when this done.
+#
+sub Delete($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $idx = $self->idx();
+
+    DBQueryWarn("delete from geni_slivers where idx='$idx'")
+	or return -1;
+    
+    return 0;
+}
+
+#
+# Get the experiment for the slice this sliver belongs to.
+#
+sub GetExperiment($)
+{
+    my ($self) = @_;
+
+    return undef
+	if (! ref($self));
+
+    return Experiment->Lookup($self->slice_uuid());
+}
+
+#
+# Provision a slice. We actually did this when the ticket was requested.
+#
+sub Provision($)
+{
+    return 0;
+}
+
+#
+# Unprovision a sliver. 
+#
+sub UnProvision($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $experiment = Experiment->Lookup($self->slice_uuid());
+    my $node_id    = $self->node_id();
+    my $node       = Node->Lookup($node_id);
+    return -1
+	if (!defined($node));
+    my $reservation = Node->Reservation();
+    
+    if (defined($reservation) && $reservation->SameExperiment($experiment)) {
+	my $pid = $experiment->pid();
+	my $eid = $experiment->eid();
+	
+	system("$NFREE $pid $eid $node_id");
+    }
+    return 0;
+}
 
 # _Always_ make sure that this 1 is at the end of the file...
 1;

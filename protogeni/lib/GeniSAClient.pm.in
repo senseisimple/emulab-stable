@@ -80,9 +80,7 @@ sub RegisterSlice($)
 				   { "hrn"   => $hrn,
 				     "uuid"  => $experiment->uuid(),
 				     "creator_uuid" => $user->uuid()});
-
     
-
     print Dumper($response);
     return $response->code();
 }

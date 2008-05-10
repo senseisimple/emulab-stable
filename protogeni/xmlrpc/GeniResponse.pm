@@ -18,7 +18,7 @@ use vars qw(@ISA @EXPORT);
 	      GENIRESPONSE_SERVERERROR
 	      GENIRESPONSE_TOOBIG GENIRESPONSE_REFUSED
 	      GENIRESPONSE_TIMEDOUT GENIRESPONSE_DBERROR
-	      GENIRESPONSE_RPCERROR);
+	      GENIRESPONSE_RPCERROR GENIRESPONSE_UNAVAILABLE);
 
 use overload ('""' => 'Stringify');
 
@@ -36,6 +36,7 @@ sub GENIRESPONSE_REFUSED()        { 7; }
 sub GENIRESPONSE_TIMEDOUT()       { 8; }
 sub GENIRESPONSE_DBERROR()        { 9; }
 sub GENIRESPONSE_RPCERROR()       {10; }
+sub GENIRESPONSE_UNAVAILABLE()    {11; }
 
 #
 # This is the (python-style) "structure" we want to return.

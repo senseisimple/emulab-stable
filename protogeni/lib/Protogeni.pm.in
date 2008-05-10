@@ -155,7 +155,7 @@ sub RegisterUser($)
 }
 
 #
-# Register a new Geni slice in the DB. Returns the UUID (GID).
+# Register a new Geni slice in the DB. 
 #
 sub RegisterSlice($)
 {

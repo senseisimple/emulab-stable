@@ -24,8 +24,11 @@ use Genixmlrpc;
 use GeniResponse;
 use GeniTicket;
 use GeniSliver;
+use GeniUser;
 use libtestbed;
-use emutil;
+# Hate to import all this crap; need a utility library.
+use libdb qw(TBGetUniqueIndex TBcheck_dbslot TBDB_CHECKDBSLOT_ERROR);
+use User;
 use English;
 use Data::Dumper;
 use Experiment;
@@ -38,6 +41,8 @@ my $TBAUDIT   	   = "@TBAUDITEMAIL@";
 my $BOSSNODE       = "@BOSSNODE@";
 my $OURDOMAIN      = "@OURDOMAIN@";
 my $GENICENTRAL    = "https://boss/protogeni/xmlrpc";
+my $CREATEEXPT     = "$TB/bin/batchexp";
+my $NALLOC	   = "$TB/bin/nalloc";
 
 #
 # Respond to a GetTicket request. No worries about credentials yet; we
@@ -63,26 +68,75 @@ sub GetTicket($)
     }
 
     #
+    # XXX Should we create a local geni_slices record in the DB?
+    #
+if (0) {
+    #
     # If the underlying experiment does not exist, need to create
-    # a holding experiment.
+    # a holding experiment. All these are going to go into the same
+    # project for now. Generally, users for non-local slices do not
+    # have local accounts or directories.
     #
-    
-    #
-    # An rspec is a structure with a node count. :-)
-    #
-    # Find out how many nodes are available and grant that many. Silly, eh?
-    #
-    $rspec->{'granted'} = $rspec->{'requested'};
+    my $experiment = Experiment->Lookup($slice_uuid);
+    if (!defined($experiment)) {
+	#
+	# Form an eid for the experiment. 
+	#
+	my $eid = "slice" . TBGetUniqueIndex('next_sliceid', 1);
+
+	# Note the -h option; allows experiment with no NS file.
+	system("$CREATEEXPT -q -i -w -E 'Geni Slice Experiment' ".
+	       "-h '$slice_uuid' -p genislices -e $eid");
+	if ($?) {
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					"Internal Error");
+	}
+	$experiment = Experiment->Lookup($slice_uuid);
+    }
 
     #
-    # Return a signed ticket.
+    # An rspec is a structure that requests a specific node. If that node
+    # is available, then reserve it. Otherwise the ticket cannot be
+    # granted.
+    #
+    my $node_id = $rspec->{'node_id'};
+    my $pid     = $experiment->pid();
+    my $eid     = $experiment->eid();
+
+    if (defined($node_id) && $node_id =~ /^(\w*)$/) {
+	$node_id = $1;
+    }
+    else {
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "Improper node id");
+    }
+}
+
+    #
+    # Create the ticket first, before allocating the node.
     #
     my $ticket = GeniTicket->Create($slice_uuid, $owner_uuid, $rspec);
     if (!defined($ticket)) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not create GeniTicket object");
     }
+if (0) {
+    # Nalloc might fail if the node gets picked up by someone else.
+#    system("$NALLOC $pid $eid $node_id");
+    if (($? >> 8) < 0) {
+	$ticket->Delete();
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Allocation failure");
+    }
+    elsif (($? >> 8) > 0) {
+	$ticket->Delete();
+	return GeniResponse->Create(GENIRESPONSE_UNAVAILABLE, undef,
+				    "Could not allocate node\n");
+    }
+}
     if ($ticket->Sign() != 0) {
+	# Release will free the node.
+	$ticket->Release();
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not sign Ticket");
     }
@@ -110,6 +164,12 @@ sub CreateSliver($)
 				    "Could not create GeniTicket object");
     }
 
+    my $experiment = Experiment->Lookup($ticket->slice_uuid());
+    if (!defined($experiment)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "No local experiment for slice");
+    }
+
     #
     # XXX TODO: Need to verify the invoking user is the one in the ticket.
     #
@@ -118,5 +178,17 @@ sub CreateSliver($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not create GeniSliver object");
     }
+
+    #
+    # Provision the slice. Okay, we already allocated the node above,
+    # so this should just work, unless the node has been released cause
+    # it has been too long.
+    #
+    if ($sliver->Provision() != 0) {
+	$sliver->Delete();
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not provision sliver");
+    }
+    
     return GeniResponse->Create(GENIRESPONSE_SUCCESS, 0, "Wow!");
 }

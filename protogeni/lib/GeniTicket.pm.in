@@ -20,6 +20,8 @@ use vars qw(@ISA @EXPORT);
 use lib '@prefix@/lib';
 use GeniDB;
 use libtestbed;
+use Experiment;
+use libdb qw(TBGetUniqueIndex);
 use English;
 use XML::Simple;
 use XML::LibXML;
@@ -35,11 +37,10 @@ my $BOSSNODE       = "@BOSSNODE@";
 my $OURDOMAIN      = "@OURDOMAIN@";
 my $GENICENTRAL    = "https://boss/protogeni/xmlrpc";
 my $SIGNCRED	   = "$TB/sbin/signgenicred";
+my $NFREE	   = "$TB/bin/nfree";
 
 #
 # Create an unsigned ticket object from the raw rspec. 
-#
-# Should we keep track of tickets locally in the DB?
 #
 sub Create($$$$;$$)
 {
@@ -52,6 +53,7 @@ sub Create($$$$;$$)
     $self->{'owner_uuid'}    = $owner_uuid;
     $self->{'ticket_string'} = $ticket_string;
     $self->{'ticket'}        = undef;
+    $self->{'idx'}           = undef;	# Only set when in DB.
     $self->{'component'}     = $component;
     bless($self, $class);
 
@@ -59,12 +61,14 @@ sub Create($$$$;$$)
 }
 # accessors
 sub field($$)           { return ($_[0]->{$_[1]}); }
+sub idx($)		{ return field($_[0], "idx"); }
 sub rspec($)		{ return field($_[0], "rspec"); }
 sub uuid($)		{ return field($_[0], "slice_uuid"); }
 sub slice_uuid($)	{ return field($_[0], "slice_uuid"); }
 sub owner_uuid($)	{ return field($_[0], "owner_uuid"); }
 sub ticket($)		{ return field($_[0], "ticket"); }
 sub asString($)		{ return field($_[0], "ticket_string"); }
+sub ticket_string($)	{ return field($_[0], "ticket_string"); }
 sub component($)	{ return field($_[0], "component"); }
 
 #
@@ -108,6 +112,26 @@ sub CreateFromSignedTicket($$)
 	return undef;
     }
 
+    #
+    # We save copies of the tickets we hand out; lets find that record
+    # in the DB, just to verify.
+    #
+    my ($serial_node) = $doc->getElementsByTagName("serial");
+    return undef
+	if (!defined($serial_node));
+    my $serial = $serial_node->to_literal();
+
+    if (! ($serial =~ /^\w+$/)) {
+	print STDERR "Invalid serial in ticket\n";
+	return undef;
+    }
+    my $query_result =
+	DBQueryWarn("select * from geni_tickets where idx='$serial'");
+    if (!$query_result || !$query_result->numrows) {
+	print STDERR "Could not find the ticket in te DB\n";
+	return undef;
+    }
+
     my $self = {};
     $self->{'rspec'}         = $rspec;
     $self->{'slice_uuid'}    = $slice_uuid;
@@ -115,11 +139,31 @@ sub CreateFromSignedTicket($$)
     $self->{'ticket_string'} = $ticket_string;
     $self->{'xmlref'}        = $doc;
     $self->{'component'}     = undef;
+    $self->{'idx'}           = $serial;
     bless($self, $class);
 
     print Dumper($self);
 
     return $self;
+}
+
+#
+# Might have to delete this fron the DB, as with an error handing out a ticket.
+#
+sub Delete($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    if (defined($self->idx())) {
+	my $idx = $self->idx();
+	
+	DBQueryWarn("delete from geni_tickets where idx='$idx'")
+	    or return -1;
+    }
+    return 0;
 }
 
 #
@@ -130,10 +174,41 @@ sub Grant($$)
 {
     my ($self, $count) = @_;
 
-    return 0
+    return -1
 	if (! ref($self));
 
     $self->{'count'} = $count;
+    return 0;
+}
+
+#
+# Store the given ticket in the DB. We only do this for signed tickets
+# which we hand out, so we have a record of them. 
+#
+sub Store($$)
+{
+    my ($self, $idx) = @_;
+    my @insert_data  = ();
+
+    my $slice_uuid = $self->slice_uuid();
+    my $owner_uuid = $self->owner_uuid();
+
+    # Now tack on other stuff we need.
+    push(@insert_data, "created=now()");
+    push(@insert_data, "idx='$idx'");
+    push(@insert_data, "slice_uuid='$slice_uuid'");
+    push(@insert_data, "owner_uuid='$owner_uuid'");
+    
+    my $safe_ticket = DBQuoteSpecial($self->ticket_string());
+    push(@insert_data, "ticket_string=$safe_ticket");
+
+    # Insert into DB.
+    DBQueryWarn("insert into geni_tickets set " . join(",", @insert_data))
+	or return -1;
+
+    # If sucessfully stored, set the idx field so we know.
+    $self->{'idx'} = $idx;
+
     return 0;
 }
 
@@ -147,27 +222,29 @@ sub Sign($)
 
     return -1
 	if (!ref($self));
+
+    # Every Ticket gets a new unique index, which is used in the xml:id below.
+    # Also used for the DB insertion below.
+    my $idx = TBGetUniqueIndex('next_ticket', 1);
     
     my $slice_uuid = $self->slice_uuid();
     my $owner_uuid = $self->owner_uuid();
-    my $requested  = $self->rspec()->{'requested'};
-    my $granted    = $self->rspec()->{'granted'};
+    my $rspec_xml  = XMLout($self->rspec(), "NoAttr" => 1);
+    $rspec_xml =~ s/opt\>/rspec\>/g;
 
     #
     # Create a template xml file to sign.
     #
     my $template =
 	"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n".
-	"<credential xml:id=\"Ref1\">\n".
+	"<credential xml:id=\"ref1\">\n".
 	" <type>ticket</type>\n".
+	" <serial>$idx</serial>\n".
 	" <owner_uuid>$owner_uuid</owner_uuid>\n".
 	" <this_uuid>$slice_uuid</this_uuid>\n".
 	" <ticket>\n".
 	"  <can_delegate>1</can_delegate>\n".
-	"  <rspec>\n".
-	"    <requested>$requested</requested>\n".
-	"    <granted>$granted</granted>\n".
-	"  </rspec>\n".
+	"  $rspec_xml\n".
 	" </ticket>\n".	
         "</credential>\n";
 
@@ -193,6 +270,49 @@ sub Sign($)
     close(SIGNER);
     $self->{'ticket_string'} = $ticket;
 
+    $self->Store($idx) == 0
+	or return -1;
+
+    return 0;
+}
+
+#
+# Get the experiment for the slice this sliver belongs to.
+#
+sub GetExperiment($)
+{
+    my ($self) = @_;
+
+    return undef
+	if (! ref($self));
+
+    return Experiment->Lookup($self->slice_uuid());
+}
+
+#
+# Release a ticket. Need to release the nodes ...
+#
+sub Release($)
+{
+    my ($self) = @_;
+
+    return undef
+	if (! ref($self));
+
+    my $experiment = Experiment->Lookup($self->slice_uuid());
+    my $node_id    = $self->rspec()->{'node_id'};
+    my $node       = Node->Lookup($node_id);
+    return -1
+	if (!defined($node));
+    my $reservation = Node->Reservation();
+    
+    if (defined($reservation) && $reservation->SameExperiment($experiment)) {
+	my $pid = $experiment->pid();
+	my $eid = $experiment->eid();
+	
+	system("$NFREE $pid $eid $node_id");
+    }
+    $self->Delete();
     return 0;
 }
 
