@@ -455,8 +455,10 @@ tmcd_sslverify_client(char *nodeid, char *class, char *type, int islocal)
 #if 1
 	if (!islocal &&
 	    strcmp(unitname, "pcwa") && strcmp(unitname, "pcron") &&
-	    strcmp(unitname, "pcplab")) {
-		error("sslverify: unitname mismatch: %s!=pcwa|pcron|pcplab\n",
+	    strcmp(unitname, "pcplab") && 
+	    strcmp(unitname, "pcpg") && strcmp(unitname, "pcpgeni")) {
+		error("sslverify: unitname mismatch: %s!=pcwa|pcron|pcplab"
+		      "|pcpg|pcpgeni\n",
 		      unitname, type);
 		return -1;
 	}
