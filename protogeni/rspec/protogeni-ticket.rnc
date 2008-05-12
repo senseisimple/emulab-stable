@@ -1,3 +1,4 @@
+#
 # EMULAB-COPYRIGHT
 # Copyright (c) 2008 University of Utah and the Flux Group.
 # All rights reserved.
@@ -5,6 +6,7 @@
 
 #
 # Simple prototype of an ticket, to be used by ProtoGENI
+# NOTE: This is deprecated: See credential.rnc instead
 #
 default namespace = "http://www.protogeni.net/resources/ticket/0.1"
 
