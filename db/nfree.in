@@ -24,10 +24,11 @@ sub usage ()
 	" '-o' Moves nodes into a oldreserved holding experiment.\n"
 	);
 }
-my $optlist = "xoa";
+my $optlist = "xoaq";
 my $freeDependantVirtuals = 0;
 my $moveToOldReserved     = 0;
 my $freeAllNodes          = 0;
+my $quiet                 = 0;
 
 # Configure variables
 my $TB       = "@prefix@";
@@ -78,6 +79,9 @@ if (! getopts($optlist, \%options)) {
 }
 if (defined($options{"x"})) {
     $freeDependantVirtuals = 1;
+}
+if (defined($options{"q"})) {
+    $quiet = 1;
 }
 if (defined($options{"o"})) {
     $moveToOldReserved = 1;
@@ -170,7 +174,8 @@ if (@ARGV) {
     }
 }
 else {
-    print "Releasing all nodes from experiment $experiment.\n";
+    print "Releasing all nodes from experiment $experiment.\n"
+	if (!$quiet);
     @nodes = $experiment->NodeList(0, 1);
     if (! $moveToOldReserved) {
 	my @oldnodes = ();
@@ -428,7 +433,8 @@ foreach my $node (@freed_nodes) {
     # If the node has a next_reserve entry, change the reservation.
     my $next_reservation = $node->NextReservation();
     if (defined($next_reservation)) {
-	print "Moving $node to $next_reservation\n";
+	print "Moving $node to $next_reservation\n"
+	    if (!$quiet);
 
 	if ($node->MoveReservation($next_reservation) == 0) {
 	    $node->SetNodeHistory(TB_NODEHISTORY_OP_MOVE, $this_user,
@@ -475,7 +481,8 @@ foreach my $node (@freed_nodes) {
 		next;
 	    }
 	}
-	print "Moving $node to $repositioning_experiment\n";
+	print "Moving $node to $repositioning_experiment\n"
+	    if (!$quiet);
 
 	if ($node->MoveReservation($repositioning_experiment) == 0) {
 	    $node->SetNodeHistory(TB_NODEHISTORY_OP_MOVE, $this_user,
@@ -499,7 +506,8 @@ foreach my $node (@freed_nodes) {
     elsif (!$TESTMODE && !exists($ENV{'NORELOAD'}) &&
 	   ((!$isvirt && $imageable) || # XXX force reload hack!
 	    $inreloads || $mustzero{$node_id})) { # XXX Garcia hack
-	print "Moving $node to $reloading_experiment\n";
+	print "Moving $node to $reloading_experiment\n"
+	    if (!$quiet);
 
 	if ($node->MoveReservation($reloading_experiment) == 0) {
 	    $node->SetNodeHistory(TB_NODEHISTORY_OP_MOVE, $this_user,
@@ -525,15 +533,14 @@ foreach my $node (@freed_nodes) {
 		    "values ($pid_idx, '$node_id', '$pid')");
     }
 
-    print "Releasing node '$node_id' ... ";
+    print "Releasing node '$node_id' ...\n"
+	if (!$quiet);
     if (DBQueryWarn("delete from reserved where node_id='$node_id'")) {
-	print "Succeeded.\n";
-
 	$node->SetNodeHistory(TB_NODEHISTORY_OP_FREE, $this_user,
 			      $experiment);
     }
     else {
-	print "Failed!\n";
+	print STDERR "*** Failed to release node '$node_id'!\n";
 	$error++;
     }
 }
