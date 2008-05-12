@@ -110,7 +110,7 @@ NodeFlagSpec =
     ## interface. In the future, we will make the loopback interface/link
     ## explicit in the topology
     ## Valid only for physical nodes
-    element trivial_bandwidth { xsd:integer },
+    (element trivial_bandwidth { xsd:integer })?,
     ## Specify that this node is a subnode of another node. We MIGHT
     ## try to do this with properties in the future
     ## Valid for both virtual and physical nodes

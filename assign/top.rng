@@ -196,13 +196,17 @@ a feature is a constraint violation</a:documentation>
   <define name="NodeFlagSpec">
     <a:documentation>"Legacy" assign node flags - will be replaced with properties, and in some
 cases, explicit links</a:documentation>
-    <element name="trivial_bandwidth">
-      <a:documentation>Gives the amount of bandwidth this node can forward through its loopback
+    <optional>
+      <group>
+        <a:documentation>Gives the amount of bandwidth this node can forward through its loopback
 interface. In the future, we will make the loopback interface/link
 explicit in the topology
 Valid only for physical nodes</a:documentation>
-      <data type="integer"/>
-    </element>
+        <element name="trivial_bandwidth">
+          <data type="integer"/>
+        </element>
+      </group>
+    </optional>
     <optional>
       <element name="subnode_of">
         <a:documentation>Specify that this node is a subnode of another node. We MIGHT

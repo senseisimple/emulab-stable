@@ -192,7 +192,7 @@
   </xs:element>
   <xs:group name="NodeFlagSpec">
     <xs:sequence>
-      <xs:element ref="trivial_bandwidth"/>
+      <xs:element minOccurs="0" ref="trivial_bandwidth"/>
       <xs:element minOccurs="0" ref="subnode_of"/>
       <xs:element minOccurs="0" ref="unique"/>
       <xs:element minOccurs="0" ref="disallow_trivial_mix"/>
