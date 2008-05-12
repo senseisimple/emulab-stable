@@ -1,0 +1,287 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  
+  EMULAB-COPYRIGHT
+  Copyright (c) 2005-2007 University of Utah and the Flux Group.
+  All rights reserved.
+  
+-->
+<!--
+  
+  Definition of common data structures used for representing topologies -
+  shared between vtop (virtual topology) and ptop (physical topology)
+  formats.
+  
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" targetNamespace="http://emulab.net/resources/top/0.2" xmlns:sig="http://www.w3.org/2000/09/xmldsig#" xmlns:credential="http://www.protogeni.net/resources/credential/0.1" xmlns:top="http://emulab.net/resources/top/0.2">
+  <xs:import namespace="http://www.protogeni.net/resources/credential/0.1" schemaLocation="credential.xsd"/>
+  <xs:import namespace="http://www.w3.org/2000/09/xmldsig#" schemaLocation="sig.xsd"/>
+  <xs:import namespace="http://www.w3.org/XML/1998/namespace" schemaLocation="xml.xsd"/>
+  <xs:element name="node_type">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="type_name" type="xs:string">
+          <xs:annotation>
+            <xs:documentation>Name of the type - will almost certainly not be unique</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:choice>
+          <xs:element ref="top:type_slots"/>
+          <xs:element ref="top:unlimited"/>
+        </xs:choice>
+        <xs:element minOccurs="0" ref="top:static"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="type_slots">
+    <xs:simpleType>
+      <xs:restriction base="xs:integer">
+        <xs:minInclusive value="1"/>
+      </xs:restriction>
+    </xs:simpleType>
+  </xs:element>
+  <xs:element name="unlimited">
+    <xs:complexType/>
+  </xs:element>
+  <xs:element name="static">
+    <xs:complexType/>
+  </xs:element>
+  <xs:group name="NodeSpec.NodeType">
+    <xs:annotation>
+      <xs:documentation>A node can (by default) have one or more types</xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element maxOccurs="unbounded" ref="top:node_type"/>
+    </xs:sequence>
+  </xs:group>
+  <xs:element name="link_type">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="type_name" type="xs:string"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="link">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="top:source_interface"/>
+        <xs:element ref="top:destination_interface"/>
+        <xs:element ref="top:bandwidth"/>
+        <xs:element ref="top:latency"/>
+        <xs:element ref="top:packet_loss"/>
+        <xs:group ref="top:LinkSpec.LinkType"/>
+        <xs:element minOccurs="0" maxOccurs="unbounded" ref="top:property">
+          <xs:annotation>
+            <xs:documentation>Properties of this link</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+      </xs:sequence>
+      <xs:attribute name="name" use="required">
+        <xs:annotation>
+          <xs:documentation>Name of the link - must be unique in the top</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="source_interface" type="top:InterfaceSpec"/>
+  <xs:element name="destination_interface" type="top:InterfaceSpec">
+    <xs:annotation>
+      <xs:documentation>Second interface for this link</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+  <xs:element name="bandwidth">
+    <xs:simpleType>
+      <xs:restriction base="xs:float">
+        <xs:minExclusive value="0.0"/>
+      </xs:restriction>
+    </xs:simpleType>
+  </xs:element>
+  <xs:element name="latency">
+    <xs:annotation>
+      <xs:documentation>Latency of the link in ms</xs:documentation>
+    </xs:annotation>
+    <xs:simpleType>
+      <xs:restriction base="xs:float">
+        <xs:minInclusive value="0.0"/>
+      </xs:restriction>
+    </xs:simpleType>
+  </xs:element>
+  <xs:element name="packet_loss">
+    <xs:simpleType>
+      <xs:restriction base="xs:float">
+        <xs:minInclusive value="0.0"/>
+      </xs:restriction>
+    </xs:simpleType>
+  </xs:element>
+  <xs:attributeGroup name="LinkSpec">
+    <xs:annotation>
+      <xs:documentation>Links in the topology - zero or more</xs:documentation>
+    </xs:annotation>
+    <xs:attribute name="uuid" use="required"/>
+    <xs:attribute name="name"/>
+  </xs:attributeGroup>
+  <xs:group name="LinkSpec.LinkType">
+    <xs:annotation>
+      <xs:documentation>A link can (by default) have zero or more types</xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element minOccurs="0" maxOccurs="unbounded" ref="top:link_type"/>
+    </xs:sequence>
+  </xs:group>
+  <xs:element name="fd">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="top:fd_name"/>
+        <xs:element ref="top:fd_weight"/>
+        <xs:element minOccurs="0" name="violatable">
+          <xs:complexType/>
+        </xs:element>
+        <xs:choice minOccurs="0">
+          <xs:annotation>
+            <xs:documentation>Type information expressed in features and desires</xs:documentation>
+          </xs:annotation>
+          <xs:sequence>
+            <xs:element ref="top:global"/>
+            <xs:element name="operator">
+              <xs:simpleType>
+                <xs:restriction base="xs:token">
+                  <xs:enumeration value="OnceOnly"/>
+                  <xs:enumeration value="FirstFree"/>
+                </xs:restriction>
+              </xs:simpleType>
+            </xs:element>
+          </xs:sequence>
+          <xs:sequence>
+            <xs:element ref="top:local"/>
+            <xs:element name="operator">
+              <xs:simpleType>
+                <xs:restriction base="xs:token">
+                  <xs:enumeration value="+"/>
+                </xs:restriction>
+              </xs:simpleType>
+            </xs:element>
+          </xs:sequence>
+        </xs:choice>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="fd_name" type="xs:string">
+    <xs:annotation>
+      <xs:documentation>Name of this feature or desire</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+  <xs:element name="fd_weight" type="xs:float">
+    <xs:annotation>
+      <xs:documentation>Weight assocated with the feature or desire</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+  <xs:element name="global">
+    <xs:complexType/>
+  </xs:element>
+  <xs:element name="local">
+    <xs:complexType/>
+  </xs:element>
+  <xs:group name="NodeFlagSpec">
+    <xs:sequence>
+      <xs:element ref="top:trivial_bandwidth"/>
+      <xs:element minOccurs="0" ref="top:subnode_of"/>
+      <xs:element minOccurs="0" ref="top:unique"/>
+      <xs:element minOccurs="0" ref="top:disallow_trivial_mix"/>
+    </xs:sequence>
+  </xs:group>
+  <xs:element name="trivial_bandwidth" type="xs:integer"/>
+  <xs:element name="subnode_of" type="xs:string"/>
+  <xs:element name="unique">
+    <xs:complexType/>
+  </xs:element>
+  <xs:element name="disallow_trivial_mix">
+    <xs:complexType/>
+  </xs:element>
+  <xs:complexType name="InterfaceSpec">
+    <xs:annotation>
+      <xs:documentation>Interfaces</xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element ref="top:interface"/>
+    </xs:sequence>
+    <xs:attribute name="node_uuid" use="required"/>
+    <xs:attribute name="node_name"/>
+  </xs:complexType>
+  <xs:element name="interface">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="top:node_name"/>
+        <xs:element name="interface" type="xs:string">
+          <xs:annotation>
+            <xs:documentation>Name of the interface itself</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element minOccurs="0" maxOccurs="unbounded" ref="top:property">
+          <xs:annotation>
+            <xs:documentation>Properties of the interface</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="node_name" type="xs:string">
+    <xs:annotation>
+      <xs:documentation>Name of the node, which must match one of the nodes in this topology</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+  <xs:element name="property">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="top:property_name"/>
+        <xs:element ref="top:property_value"/>
+        <xs:element ref="top:property_penalty"/>
+        <xs:element minOccurs="0" name="violatable">
+          <xs:annotation>
+            <xs:documentation>If this flag is present, not having the property is considered a violation</xs:documentation>
+          </xs:annotation>
+          <xs:complexType/>
+        </xs:element>
+        <xs:choice minOccurs="0">
+          <xs:sequence>
+            <xs:element ref="top:global"/>
+            <xs:element name="operator">
+              <xs:simpleType>
+                <xs:restriction base="xs:token">
+                  <xs:enumeration value="OnceOnly"/>
+                  <xs:enumeration value="FirstFree"/>
+                </xs:restriction>
+              </xs:simpleType>
+            </xs:element>
+          </xs:sequence>
+          <xs:sequence>
+            <xs:element ref="top:local"/>
+            <xs:element name="operator">
+              <xs:simpleType>
+                <xs:restriction base="xs:token">
+                  <xs:enumeration value="="/>
+                  <xs:enumeration value="+"/>
+                </xs:restriction>
+              </xs:simpleType>
+            </xs:element>
+          </xs:sequence>
+        </xs:choice>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="property_name" type="xs:string">
+    <xs:annotation>
+      <xs:documentation>Name of this property</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+  <xs:element name="property_value" type="xs:string"/>
+  <xs:element name="property_penalty">
+    <xs:annotation>
+      <xs:documentation>The penalty associated with this property</xs:documentation>
+    </xs:annotation>
+    <xs:simpleType>
+      <xs:restriction base="xs:float">
+        <xs:minInclusive value="0.0"/>
+      </xs:restriction>
+    </xs:simpleType>
+  </xs:element>
+</xs:schema>
