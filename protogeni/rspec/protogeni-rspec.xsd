@@ -9,56 +9,12 @@
 <!--
   
   Simple prototype of an RSpec, to be used by ProtoGENI
-  Some decisions to make:
-      Right now, requests, etc. all are part of the same schema - is
-        this right?
+  Just a wrapper around the 'common' rpsec patterns, so that we don't have
+  to define a start symbol in that file (so that it can easily be referenced
+  by others.)
   
 -->
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" targetNamespace="http://www.protogeni.net/resources/rspec/0.1" xmlns:rspec="http://www.protogeni.net/resources/rspec/0.1" xmlns:top="http://emulab.net/resources/top/0.2">
+  <xs:include schemaLocation="protogeni-rspec-common.xsd"/>
   <xs:import namespace="http://emulab.net/resources/top/0.2" schemaLocation="top.xsd"/>
-  <!-- Add some more stuff to nodes -->
-  <xs:group name="NodeSpec">
-    <xs:sequence>
-      <xs:element minOccurs="0" ref="rspec:avaiable"/>
-    </xs:sequence>
-  </xs:group>
-  <xs:element name="avaiable" type="xs:boolean"/>
-  <xs:attributeGroup name="NodeSpec">
-    <xs:attribute name="uuid" use="required"/>
-    <xs:attribute name="name"/>
-    <xs:attribute name="virtualization_type">
-      <xs:simpleType>
-        <xs:restriction base="xs:token">
-          <xs:enumeration value="raw"/>
-          <xs:enumeration value="trellis-vserver"/>
-          <xs:enumeration value="planetlab-vserver"/>
-          <xs:enumeration value="emulab-vnode"/>
-        </xs:restriction>
-      </xs:simpleType>
-    </xs:attribute>
-  </xs:attributeGroup>
-  <xs:element name="rspec">
-    <xs:complexType>
-      <xs:sequence>
-        <xs:group minOccurs="0" maxOccurs="unbounded" ref="rspec:NodeSpec"/>
-        <xs:element minOccurs="0" maxOccurs="unbounded" ref="top:link"/>
-      </xs:sequence>
-      <xs:attribute name="generated" use="required" type="xs:dateTime"/>
-      <xs:attribute name="valid_until" use="required" type="xs:dateTime"/>
-      <xs:attribute name="uuid"/>
-      <xs:attribute name="name"/>
-      <xs:attribute name="virtualization_type">
-        <xs:simpleType>
-          <xs:restriction base="xs:token">
-            <xs:enumeration value="raw"/>
-            <xs:enumeration value="trellis-vserver"/>
-            <xs:enumeration value="planetlab-vserver"/>
-            <xs:enumeration value="emulab-vnode"/>
-          </xs:restriction>
-        </xs:simpleType>
-      </xs:attribute>
-      <xs:attribute name="uuid"/>
-      <xs:attribute name="name"/>
-    </xs:complexType>
-  </xs:element>
 </xs:schema>
