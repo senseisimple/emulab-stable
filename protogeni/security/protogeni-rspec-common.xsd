@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" targetNamespace="http://www.protogeni.net/resources/credential/0.1" xmlns:sig="http://www.w3.org/2000/09/xmldsig#" xmlns:credential="http://www.protogeni.net/resources/credential/0.1" xmlns:top="http://emulab.net/resources/top/0.2">
-  <xs:import namespace="http://emulab.net/resources/top/0.2" schemaLocation="top.xsd"/>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" targetNamespace="http://www.protogeni.net/resources/credential/0.1" xmlns:sig="http://www.w3.org/2000/09/xmldsig#" xmlns:credential="http://www.protogeni.net/resources/credential/0.1">
+  <xs:include schemaLocation="top.xsd"/>
   <xs:import namespace="http://www.w3.org/2000/09/xmldsig#" schemaLocation="sig.xsd"/>
   <xs:import namespace="http://www.w3.org/XML/1998/namespace" schemaLocation="xml.xsd"/>
   <!--
@@ -19,6 +19,7 @@
   <xs:group name="NodeSpec">
     <xs:sequence>
       <xs:element minOccurs="0" ref="credential:avaiable"/>
+      <xs:element minOccurs="0" ref="credential:component_manager_URL"/>
     </xs:sequence>
   </xs:group>
   <xs:element name="avaiable" type="xs:boolean"/>
@@ -36,12 +37,19 @@
       </xs:simpleType>
     </xs:attribute>
   </xs:attributeGroup>
+  <xs:attributeGroup name="LinkSpec">
+    <xs:attribute name="uuid" use="required"/>
+    <xs:attribute name="name"/>
+  </xs:attributeGroup>
+  <!-- TODO: Might add a URL for the CM for a link in the future -->
+  <xs:attributeGroup name="InterfaceSpec">
+    <xs:attribute name="node_uuid" use="required"/>
+    <xs:attribute name="node_name"/>
+  </xs:attributeGroup>
+  <xs:element name="component_manager_URL" type="xs:anyURI"/>
   <xs:element name="rspec">
     <xs:complexType>
-      <xs:sequence>
-        <xs:group minOccurs="0" maxOccurs="unbounded" ref="credential:NodeSpec"/>
-        <xs:element minOccurs="0" maxOccurs="unbounded" ref="top:link"/>
-      </xs:sequence>
+      <xs:group minOccurs="0" maxOccurs="unbounded" ref="credential:NodeSpec"/>
       <xs:attribute name="generated" use="required" type="xs:dateTime"/>
       <xs:attribute name="valid_until" use="required" type="xs:dateTime"/>
       <xs:attribute name="uuid"/>

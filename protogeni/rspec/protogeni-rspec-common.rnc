@@ -26,19 +26,27 @@ include "../../assign/top.rnc" {
         # that we can later get updates that include only this attribute (and a
         # UUID) Just binary for now - probably will include more things, such
         # as a number of "free slots", later
-        element avaiable { xsd:boolean }?  }
+        element avaiable { xsd:boolean }?,
+        # Optionally, include the URL for this component's CM
+        CMURLSpec?
     LinkSpec &=
         # Semantic change - the 'name' of a (physical) link is now
         # solely for human-readability. It's the UUID, which we add here,
         # that is the "true" identifier.
         attribute uuid { text },
         attribute name { text }?
+        # TODO: Might add a URL for the CM for a link in the future
     InterfaceSpec &= 
         # Semantic change - the 'name' in an interface is solely for human
         # readability. It's the UUID that is used to uniquely identify a
         # node.
         attribute node_uuid { text },
         attribute node_name { text }?
+}
+
+## How to contact a component manager. In the future, could include information
+## about the version of the interface it supports, or something like that...
+CMURLSpec = element component_manager_URL { xsd:anyURI }
 
 RSpec = element rspec {
     # TODO: Include something about who generated this rspec?
