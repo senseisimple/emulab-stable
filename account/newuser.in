@@ -276,7 +276,7 @@ UserError("Email address already in use; please pick another!")
 my $pswd = $xmlparse->{'attribute'}->{'password'}->{'value'};
 
 # Admins can "star" the password entry.
-if ($this_user->IsAdmin() && $pswd eq "*") {
+if (defined($this_user) && $this_user->IsAdmin() && $pswd eq "*") {
     $newuser_args{'usr_pswd'} = "*";
 }
 else {
