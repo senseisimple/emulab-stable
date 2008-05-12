@@ -13,29 +13,48 @@
 
 default namespace = "http://www.protogeni.net/resources/rspec/0.1"
 
-include "top.rnc" {
+include "../../assign/top.rnc" {
     # Add some more stuff to nodes
     NodeSpec &=
-        # Major semantic change - the 'name' of a (physical) node is now its
-        # UUID. Not sure if we want to include another field that is the testbed's
-        # own human-readable name for the node
-        
+        # Semantic change - the 'name' of a (physical) node is now
+        # solely for human-readability. It's the UUID, which we add here,
+        # that is the "true" identifier (ie. used in identifying link
+        # endpoints.)
+        attribute uuid { text },
+        attribute name { text }?,
         # Each node has exactly one virtualization technology, which we simply
         # enumerate here
         attribute virtualization_type { "raw" | "trellis-vserver" |
-            "planetlab-vserver" | "emulab-vnode" }?,
-        # Inidicate whether or not this node is available - the idea is that a full
-        # dump of the static physical topology will not include this, but that
-        # we can later get updates that include only this attribute (and a UUID)
-        # Just binary for now - probably will include more things, such as a
-        # number of "free slots", later
-        element avaiable { "true" | "false" }?
-}
+        "planetlab-vserver" | "emulab-vnode" }?,
+        # Inidicate whether or not this node is available - the idea is that a
+        # full dump of the static physical topology will not include this, but
+        # that we can later get updates that include only this attribute (and a
+        # UUID) Just binary for now - probably will include more things, such
+        # as a number of "free slots", later
+        element avaiable { xsd:boolean }?  }
+    LinkSpec &=
+        # Semantic change - the 'name' of a (physical) link is now
+        # solely for human-readability. It's the UUID, which we add here,
+        # that is the "true" identifier.
+        attribute uuid { text },
+        attribute name { text }?
+    InterfaceSpec &= 
+        # Semantic change - the 'name' in an interface is solely for human
+        # readability. It's the UUID that is used to uniquely identify a
+        # node.
+        attribute node_uuid { text },
+        attribute node_name { text }?
 
 start = element rspec {
     # TODO: Include something about who generated this rspec?
-    # When this RSpec was generated - optional, can be used for determining staleness
+    # When this RSpec was generated - optional, can be used for determining
+    # staleness
     attribute generated { xsd:dateTime },
+    # How long this rspec is valid - in the case of a ticket, this indicates
+    # how long the holder may use the resources. For a resource request, it's
+    # how long we want the resources. For an advertisement, it might be a hint
+    # as to how long it's okay to cache this rspec.
+    attribute valid_until { xsd:dateTime },
     # One or more nodes
     NodeSpec*,
     # One or more links

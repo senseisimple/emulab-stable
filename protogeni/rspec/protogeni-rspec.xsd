@@ -22,15 +22,10 @@
       <xs:element minOccurs="0" ref="rspec:avaiable"/>
     </xs:sequence>
   </xs:group>
-  <xs:element name="avaiable">
-    <xs:simpleType>
-      <xs:restriction base="xs:token">
-        <xs:enumeration value="true"/>
-        <xs:enumeration value="false"/>
-      </xs:restriction>
-    </xs:simpleType>
-  </xs:element>
+  <xs:element name="avaiable" type="xs:boolean"/>
   <xs:attributeGroup name="NodeSpec">
+    <xs:attribute name="uuid" use="required"/>
+    <xs:attribute name="name"/>
     <xs:attribute name="virtualization_type">
       <xs:simpleType>
         <xs:restriction base="xs:token">
@@ -49,7 +44,21 @@
         <xs:element minOccurs="0" maxOccurs="unbounded" ref="top:link"/>
       </xs:sequence>
       <xs:attribute name="generated" use="required" type="xs:dateTime"/>
-      <xs:attributeGroup ref="rspec:NodeSpec"/>
+      <xs:attribute name="valid_until" use="required" type="xs:dateTime"/>
+      <xs:attribute name="uuid"/>
+      <xs:attribute name="name"/>
+      <xs:attribute name="virtualization_type">
+        <xs:simpleType>
+          <xs:restriction base="xs:token">
+            <xs:enumeration value="raw"/>
+            <xs:enumeration value="trellis-vserver"/>
+            <xs:enumeration value="planetlab-vserver"/>
+            <xs:enumeration value="emulab-vnode"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="uuid"/>
+      <xs:attribute name="name"/>
     </xs:complexType>
   </xs:element>
 </xs:schema>
