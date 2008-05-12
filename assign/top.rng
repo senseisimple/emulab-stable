@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-  
-  EMULAB-COPYRIGHT
-  Copyright (c) 2005-2007 University of Utah and the Flux Group.
-  All rights reserved.
-  
--->
-<!--
-  
-  Definition of common data structures used for representing topologies -
-  shared between vtop (virtual topology) and ptop (physical topology)
-  formats.
-  
--->
-<grammar xmlns:a="http://relaxng.org/ns/compatibility/annotations/1.0" ns="http://emulab.net/resources/top/0.2" xmlns="http://relaxng.org/ns/structure/1.0" datatypeLibrary="http://www.w3.org/2001/XMLSchema-datatypes">
+<grammar xmlns:a="http://relaxng.org/ns/compatibility/annotations/1.0" xmlns="http://relaxng.org/ns/structure/1.0" datatypeLibrary="http://www.w3.org/2001/XMLSchema-datatypes">
+  <!--
+    
+    EMULAB-COPYRIGHT
+    Copyright (c) 2005-2007 University of Utah and the Flux Group.
+    All rights reserved.
+    
+  -->
+  <!--
+    
+    Definition of common data structures used for representing topologies -
+    shared between vtop (virtual topology) and ptop (physical topology)
+    formats.
+    
+  -->
   <define name="NodeTypeSpec">
     <a:documentation>Representation of a single node type</a:documentation>
     <element name="node_type">
@@ -175,8 +175,10 @@ a feature is a constraint violation</a:documentation>
               <empty/>
             </element>
             <element name="operator">
-              <value>OnceOnly</value>
-              <value>FirstFree</value>
+              <choice>
+                <value>OnceOnly</value>
+                <value>FirstFree</value>
+              </choice>
             </element>
           </group>
           <group>
@@ -280,8 +282,10 @@ Flags for special types of operators</a:documentation>
               <empty/>
             </element>
             <element name="operator">
-              <value>OnceOnly</value>
-              <value>FirstFree</value>
+              <choice>
+                <value>OnceOnly</value>
+                <value>FirstFree</value>
+              </choice>
             </element>
           </group>
           <group>
@@ -289,8 +293,10 @@ Flags for special types of operators</a:documentation>
               <empty/>
             </element>
             <element name="operator">
-              <value>=</value>
-              <value>+</value>
+              <choice>
+                <value>=</value>
+                <value>+</value>
+              </choice>
             </element>
           </group>
         </choice>

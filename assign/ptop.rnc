@@ -26,9 +26,9 @@ start = element ptop {
     ## federation
     attribute testbed { text },
     ## Nodes in the topology - zero or more
-    NodeSpec*,
     ## Links in the topology - zero or more
-    LinkSpec*,
+    (NodeSpec | LinkSpec)*,
+#    LinkSpec*,
     ## Any limits on how many nodes of a particular type this experiment can
     ## use.
     TypeLimitSpec*

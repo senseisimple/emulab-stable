@@ -10,8 +10,6 @@
 # formats.
 #
 
-default namespace = "http://emulab.net/resources/top/0.2"
-
 ## Representation of a single node type
 NodeTypeSpec = element node_type {
         ## Name of the type - will almost certainly not be unique
@@ -101,7 +99,7 @@ FeatureDesireSpec = element fd {
     ## a feature is a constraint violation
     element violatable { empty }?,
     ## Type information expressed in features and desires
-    ((element global { empty }, element operator { "OnceOnly", "FirstFree" }) |
+    ((element global { empty }, element operator { "OnceOnly" | "FirstFree" }) |
      (element local { empty }, element operator { "+" }))?
 }
 
@@ -149,6 +147,6 @@ PropertySpec = element property {
     element violatable { empty }?,
     ## TODO: Add more operators - equality, range test, etc
     ## Flags for special types of operators
-    ((element global { empty }, element operator { "OnceOnly", "FirstFree" }) |
-     (element local { empty }, element operator { "=", "+" }))?
+    ((element global { empty }, element operator { "OnceOnly" | "FirstFree" }) |
+     (element local { empty }, element operator { "=" | "+" }))?
 }

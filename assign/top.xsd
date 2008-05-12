@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-  
-  EMULAB-COPYRIGHT
-  Copyright (c) 2005-2007 University of Utah and the Flux Group.
-  All rights reserved.
-  
--->
-<!--
-  
-  Definition of common data structures used for representing topologies -
-  shared between vtop (virtual topology) and ptop (physical topology)
-  formats.
-  
--->
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" targetNamespace="http://emulab.net/resources/top/0.2" xmlns:top="http://emulab.net/resources/top/0.2">
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
+  <!--
+    
+    EMULAB-COPYRIGHT
+    Copyright (c) 2005-2007 University of Utah and the Flux Group.
+    All rights reserved.
+    
+  -->
+  <!--
+    
+    Definition of common data structures used for representing topologies -
+    shared between vtop (virtual topology) and ptop (physical topology)
+    formats.
+    
+  -->
   <xs:element name="node_type">
     <xs:complexType>
       <xs:sequence>
@@ -23,10 +23,10 @@
           </xs:annotation>
         </xs:element>
         <xs:choice>
-          <xs:element ref="top:type_slots"/>
-          <xs:element ref="top:unlimited"/>
+          <xs:element ref="type_slots"/>
+          <xs:element ref="unlimited"/>
         </xs:choice>
-        <xs:element minOccurs="0" ref="top:static"/>
+        <xs:element minOccurs="0" ref="static"/>
       </xs:sequence>
     </xs:complexType>
   </xs:element>
@@ -46,18 +46,18 @@
   <xs:element name="node">
     <xs:complexType>
       <xs:sequence>
-        <xs:group ref="top:NodeSpec.NodeType"/>
-        <xs:group ref="top:NodeFlagSpec">
+        <xs:group ref="NodeSpec.NodeType"/>
+        <xs:group ref="NodeFlagSpec">
           <xs:annotation>
             <xs:documentation>Legacy flags</xs:documentation>
           </xs:annotation>
         </xs:group>
-        <xs:element minOccurs="0" maxOccurs="unbounded" ref="top:fd">
+        <xs:element minOccurs="0" maxOccurs="unbounded" ref="fd">
           <xs:annotation>
             <xs:documentation>Legacy features and desires</xs:documentation>
           </xs:annotation>
         </xs:element>
-        <xs:element minOccurs="0" maxOccurs="unbounded" ref="top:property"/>
+        <xs:element minOccurs="0" maxOccurs="unbounded" ref="property"/>
       </xs:sequence>
       <xs:attribute name="name" use="required"/>
     </xs:complexType>
@@ -67,7 +67,7 @@
       <xs:documentation>A node can (by default) have one or more types</xs:documentation>
     </xs:annotation>
     <xs:sequence>
-      <xs:element maxOccurs="unbounded" ref="top:node_type"/>
+      <xs:element maxOccurs="unbounded" ref="node_type"/>
     </xs:sequence>
   </xs:group>
   <xs:element name="link_type">
@@ -80,13 +80,13 @@
   <xs:element name="link">
     <xs:complexType>
       <xs:sequence>
-        <xs:element ref="top:source_interface"/>
-        <xs:element ref="top:destination_interface"/>
-        <xs:element ref="top:bandwidth"/>
-        <xs:element ref="top:latency"/>
-        <xs:element ref="top:packet_loss"/>
-        <xs:group ref="top:LinkSpec.LinkType"/>
-        <xs:element minOccurs="0" maxOccurs="unbounded" ref="top:property">
+        <xs:element ref="source_interface"/>
+        <xs:element ref="destination_interface"/>
+        <xs:element ref="bandwidth"/>
+        <xs:element ref="latency"/>
+        <xs:element ref="packet_loss"/>
+        <xs:group ref="LinkSpec.LinkType"/>
+        <xs:element minOccurs="0" maxOccurs="unbounded" ref="property">
           <xs:annotation>
             <xs:documentation>Properties of this link</xs:documentation>
           </xs:annotation>
@@ -99,8 +99,8 @@
       </xs:attribute>
     </xs:complexType>
   </xs:element>
-  <xs:element name="source_interface" type="top:InterfaceSpec"/>
-  <xs:element name="destination_interface" type="top:InterfaceSpec">
+  <xs:element name="source_interface" type="InterfaceSpec"/>
+  <xs:element name="destination_interface" type="InterfaceSpec">
     <xs:annotation>
       <xs:documentation>Second interface for this link</xs:documentation>
     </xs:annotation>
@@ -134,14 +134,14 @@
       <xs:documentation>A link can (by default) have zero or more types</xs:documentation>
     </xs:annotation>
     <xs:sequence>
-      <xs:element minOccurs="0" maxOccurs="unbounded" ref="top:link_type"/>
+      <xs:element minOccurs="0" maxOccurs="unbounded" ref="link_type"/>
     </xs:sequence>
   </xs:group>
   <xs:element name="fd">
     <xs:complexType>
       <xs:sequence>
-        <xs:element ref="top:fd_name"/>
-        <xs:element ref="top:fd_weight"/>
+        <xs:element ref="fd_name"/>
+        <xs:element ref="fd_weight"/>
         <xs:element minOccurs="0" name="violatable">
           <xs:complexType/>
         </xs:element>
@@ -150,7 +150,7 @@
             <xs:documentation>Type information expressed in features and desires</xs:documentation>
           </xs:annotation>
           <xs:sequence>
-            <xs:element ref="top:global"/>
+            <xs:element ref="global"/>
             <xs:element name="operator">
               <xs:simpleType>
                 <xs:restriction base="xs:token">
@@ -161,7 +161,7 @@
             </xs:element>
           </xs:sequence>
           <xs:sequence>
-            <xs:element ref="top:local"/>
+            <xs:element ref="local"/>
             <xs:element name="operator">
               <xs:simpleType>
                 <xs:restriction base="xs:token">
@@ -192,10 +192,10 @@
   </xs:element>
   <xs:group name="NodeFlagSpec">
     <xs:sequence>
-      <xs:element ref="top:trivial_bandwidth"/>
-      <xs:element minOccurs="0" ref="top:subnode_of"/>
-      <xs:element minOccurs="0" ref="top:unique"/>
-      <xs:element minOccurs="0" ref="top:disallow_trivial_mix"/>
+      <xs:element ref="trivial_bandwidth"/>
+      <xs:element minOccurs="0" ref="subnode_of"/>
+      <xs:element minOccurs="0" ref="unique"/>
+      <xs:element minOccurs="0" ref="disallow_trivial_mix"/>
     </xs:sequence>
   </xs:group>
   <xs:element name="trivial_bandwidth" type="xs:integer"/>
@@ -211,19 +211,19 @@
       <xs:documentation>Interfaces</xs:documentation>
     </xs:annotation>
     <xs:sequence>
-      <xs:element ref="top:interface"/>
+      <xs:element ref="interface"/>
     </xs:sequence>
   </xs:complexType>
   <xs:element name="interface">
     <xs:complexType>
       <xs:sequence>
-        <xs:element ref="top:node_name"/>
+        <xs:element ref="node_name"/>
         <xs:element name="interface" type="xs:string">
           <xs:annotation>
             <xs:documentation>Name of the interface itself</xs:documentation>
           </xs:annotation>
         </xs:element>
-        <xs:element minOccurs="0" maxOccurs="unbounded" ref="top:property">
+        <xs:element minOccurs="0" maxOccurs="unbounded" ref="property">
           <xs:annotation>
             <xs:documentation>Properties of the interface</xs:documentation>
           </xs:annotation>
@@ -239,9 +239,9 @@
   <xs:element name="property">
     <xs:complexType>
       <xs:sequence>
-        <xs:element ref="top:property_name"/>
-        <xs:element ref="top:property_value"/>
-        <xs:element ref="top:property_penalty"/>
+        <xs:element ref="property_name"/>
+        <xs:element ref="property_value"/>
+        <xs:element ref="property_penalty"/>
         <xs:element minOccurs="0" name="violatable">
           <xs:annotation>
             <xs:documentation>If this flag is present, not having the property is considered a violation</xs:documentation>
@@ -250,7 +250,7 @@
         </xs:element>
         <xs:choice minOccurs="0">
           <xs:sequence>
-            <xs:element ref="top:global"/>
+            <xs:element ref="global"/>
             <xs:element name="operator">
               <xs:simpleType>
                 <xs:restriction base="xs:token">
@@ -261,7 +261,7 @@
             </xs:element>
           </xs:sequence>
           <xs:sequence>
-            <xs:element ref="top:local"/>
+            <xs:element ref="local"/>
             <xs:element name="operator">
               <xs:simpleType>
                 <xs:restriction base="xs:token">

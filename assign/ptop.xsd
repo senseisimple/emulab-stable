@@ -11,12 +11,16 @@
   Description of a physical topology
   
 -->
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" targetNamespace="http://emulab.net/resources/ptop/0.1" xmlns:top="http://emulab.net/resources/top/0.2" xmlns:ptop="http://emulab.net/resources/ptop/0.1">
-  <xs:import namespace="http://emulab.net/resources/top/0.2" schemaLocation="top.xsd"/>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" targetNamespace="http://emulab.net/resources/ptop/0.1" xmlns:ptop="http://emulab.net/resources/ptop/0.1">
+  <xs:include schemaLocation="top.xsd"/>
   <xs:element name="type_limit">
     <xs:complexType>
       <xs:sequence>
-        <xs:element ref="ptop:type_name"/>
+        <xs:element name="type_name" type="xs:string">
+          <xs:annotation>
+            <xs:documentation>Name of the type we are limiting</xs:documentation>
+          </xs:annotation>
+        </xs:element>
         <xs:element name="type_limit">
           <xs:annotation>
             <xs:documentation>Limit as to the number of nodes of this type the experiment can use</xs:documentation>
@@ -30,24 +34,13 @@
       </xs:sequence>
     </xs:complexType>
   </xs:element>
-  <xs:element name="type_name" type="xs:string">
-    <xs:annotation>
-      <xs:documentation>Name of the type we are limiting</xs:documentation>
-    </xs:annotation>
-  </xs:element>
   <xs:element name="ptop">
     <xs:complexType>
       <xs:sequence>
-        <xs:element minOccurs="0" maxOccurs="unbounded" ref="top:node">
-          <xs:annotation>
-            <xs:documentation>Nodes in the topology - zero or more</xs:documentation>
-          </xs:annotation>
-        </xs:element>
-        <xs:element minOccurs="0" maxOccurs="unbounded" ref="top:link">
-          <xs:annotation>
-            <xs:documentation>Links in the topology - zero or more</xs:documentation>
-          </xs:annotation>
-        </xs:element>
+        <xs:choice minOccurs="0" maxOccurs="unbounded">
+          <xs:element ref="ptop:node"/>
+          <xs:element ref="ptop:link"/>
+        </xs:choice>
         <xs:element minOccurs="0" maxOccurs="unbounded" ref="ptop:type_limit"/>
       </xs:sequence>
       <xs:attribute name="testbed" use="required"/>

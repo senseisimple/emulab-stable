@@ -11,7 +11,7 @@
   Description of a physical topology
   
 -->
-<grammar xmlns:a="http://relaxng.org/ns/compatibility/annotations/1.0" ns="http://emulab.net/resources/ptop/0.1" xmlns="http://relaxng.org/ns/structure/1.0" datatypeLibrary="http://www.w3.org/2001/XMLSchema-datatypes">
+<grammar ns="http://emulab.net/resources/ptop/0.1" xmlns:a="http://relaxng.org/ns/compatibility/annotations/1.0" xmlns="http://relaxng.org/ns/structure/1.0" datatypeLibrary="http://www.w3.org/2001/XMLSchema-datatypes">
   <include href="top.rng"/>
   <define name="TypeLimitSpec">
     <a:documentation>A simple policy specification - it may end up that policy does not belong in
@@ -36,16 +36,15 @@ the ptop file directly</a:documentation>
 federation</a:documentation>
       </attribute>
       <zeroOrMore>
-        <ref name="NodeSpec">
-          <a:documentation>Nodes in the topology - zero or more</a:documentation>
-        </ref>
+        <choice>
+          <a:documentation>Nodes in the topology - zero or more
+Links in the topology - zero or more</a:documentation>
+          <ref name="NodeSpec"/>
+          <ref name="LinkSpec"/>
+        </choice>
       </zeroOrMore>
       <zeroOrMore>
-        <ref name="LinkSpec">
-          <a:documentation>Links in the topology - zero or more</a:documentation>
-        </ref>
-      </zeroOrMore>
-      <zeroOrMore>
+        <!--    LinkSpec*, -->
         <ref name="TypeLimitSpec">
           <a:documentation>Any limits on how many nodes of a particular type this experiment can
 use.</a:documentation>
