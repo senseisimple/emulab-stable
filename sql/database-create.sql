@@ -3207,7 +3207,13 @@ CREATE TABLE `user_sslcerts` (
   `privkey` text,
   `created` datetime default NULL,
   `encrypted` tinyint(1) NOT NULL default '0',
-  PRIMARY KEY  (`idx`)
+  `status` enum('valid','revoked','expired') default 'valid',
+  `orgunit` tinytext,
+  `revoked` datetime default NULL,
+  `password` tinytext,
+  PRIMARY KEY  (`idx`),
+  KEY `uid` (`uid`),
+  KEY `uid_idx` (`uid_idx`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --

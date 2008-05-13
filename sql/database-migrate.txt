@@ -4481,3 +4481,20 @@ last_net_act,last_cpu_act,last_ext_act);
 
        alter table users add usr_affil_abbrev varchar(16) after usr_affil;
        alter table deleted_users add usr_affil_abbrev varchar(16) after usr_affil;
+
+4.150: Improvements to the sslcerts table for GENI support.
+       Generally, its nice to support real revocation, but
+       specifically, we want to remember expired and revoked
+       certificates so we can generate crls, and we also want to store
+       the passwords associated with the (encrypted) keys so that
+       users do not have to remember them; they can get them from us
+       if they know their Emulab password.
+
+       alter table user_sslcerts
+       	 add `status` enum('valid','revoked','expired') default 'valid',
+	 add `orgunit` tinytext,
+         add `revoked` datetime default NULL,
+	 add `password` tinytext,
+	 add KEY `uid` (`uid`),
+	 add KEY `uid_idx` (`uid_idx`);
+
