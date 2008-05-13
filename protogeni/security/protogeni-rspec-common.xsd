@@ -16,14 +16,11 @@
     
   -->
   <!-- Add some more stuff to nodes -->
-  <xs:group name="NodeSpec">
+  <xs:complexType name="NodeContents">
     <xs:sequence>
       <xs:element minOccurs="0" ref="credential:avaiable"/>
       <xs:element minOccurs="0" ref="credential:component_manager_URL"/>
     </xs:sequence>
-  </xs:group>
-  <xs:element name="avaiable" type="xs:boolean"/>
-  <xs:attributeGroup name="NodeSpec">
     <xs:attribute name="uuid" use="required"/>
     <xs:attribute name="name"/>
     <xs:attribute name="virtualization_type">
@@ -36,36 +33,26 @@
         </xs:restriction>
       </xs:simpleType>
     </xs:attribute>
-  </xs:attributeGroup>
-  <xs:attributeGroup name="LinkSpec">
+  </xs:complexType>
+  <xs:element name="avaiable" type="xs:boolean"/>
+  <xs:attributeGroup name="LinkContents">
     <xs:attribute name="uuid" use="required"/>
     <xs:attribute name="name"/>
   </xs:attributeGroup>
   <!-- TODO: Might add a URL for the CM for a link in the future -->
-  <xs:attributeGroup name="InterfaceSpec">
+  <xs:attributeGroup name="InterfaceContents">
     <xs:attribute name="node_uuid" use="required"/>
     <xs:attribute name="node_name"/>
   </xs:attributeGroup>
   <xs:element name="component_manager_URL" type="xs:anyURI"/>
   <xs:element name="rspec">
     <xs:complexType>
-      <xs:group minOccurs="0" maxOccurs="unbounded" ref="credential:NodeSpec"/>
+      <xs:sequence>
+        <xs:element minOccurs="0" maxOccurs="unbounded" ref="credential:node"/>
+        <xs:element minOccurs="0" maxOccurs="unbounded" ref="credential:link"/>
+      </xs:sequence>
       <xs:attribute name="generated" use="required" type="xs:dateTime"/>
       <xs:attribute name="valid_until" use="required" type="xs:dateTime"/>
-      <xs:attribute name="uuid"/>
-      <xs:attribute name="name"/>
-      <xs:attribute name="virtualization_type">
-        <xs:simpleType>
-          <xs:restriction base="xs:token">
-            <xs:enumeration value="raw"/>
-            <xs:enumeration value="trellis-vserver"/>
-            <xs:enumeration value="planetlab-vserver"/>
-            <xs:enumeration value="emulab-vnode"/>
-          </xs:restriction>
-        </xs:simpleType>
-      </xs:attribute>
-      <xs:attribute name="uuid"/>
-      <xs:attribute name="name"/>
     </xs:complexType>
   </xs:element>
 </xs:schema>

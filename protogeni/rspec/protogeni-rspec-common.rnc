@@ -10,7 +10,7 @@
 
 include "../../assign/top.rnc" {
     # Add some more stuff to nodes
-    NodeSpec &=
+    NodeContents &=
         # Semantic change - the 'name' of a (physical) node is now
         # solely for human-readability. It's the UUID, which we add here,
         # that is the "true" identifier (ie. used in identifying link
@@ -29,14 +29,14 @@ include "../../assign/top.rnc" {
         element avaiable { xsd:boolean }?,
         # Optionally, include the URL for this component's CM
         CMURLSpec?
-    LinkSpec &=
+    LinkContents &=
         # Semantic change - the 'name' of a (physical) link is now
         # solely for human-readability. It's the UUID, which we add here,
         # that is the "true" identifier.
         attribute uuid { text },
         attribute name { text }?
         # TODO: Might add a URL for the CM for a link in the future
-    InterfaceSpec &= 
+    InterfaceContents &= 
         # Semantic change - the 'name' in an interface is solely for human
         # readability. It's the UUID that is used to uniquely identify a
         # node.
