@@ -58,8 +58,6 @@ RSpec = element rspec {
     # how long we want the resources. For an advertisement, it might be a hint
     # as to how long it's okay to cache this rspec.
     attribute valid_until { xsd:dateTime },
-    # One or more nodes
-    NodeSpec*,
-    # One or more links
-    LinkSpec*
+    # One or more nodes/links
+    (NodeSpec | LinkSpec)*
 }

@@ -47,10 +47,10 @@
   <xs:element name="component_manager_URL" type="xs:anyURI"/>
   <xs:element name="rspec">
     <xs:complexType>
-      <xs:sequence>
-        <xs:element minOccurs="0" maxOccurs="unbounded" ref="credential:node"/>
-        <xs:element minOccurs="0" maxOccurs="unbounded" ref="credential:link"/>
-      </xs:sequence>
+      <xs:choice minOccurs="0" maxOccurs="unbounded">
+        <xs:element ref="credential:node"/>
+        <xs:element ref="credential:link"/>
+      </xs:choice>
       <xs:attribute name="generated" use="required" type="xs:dateTime"/>
       <xs:attribute name="valid_until" use="required" type="xs:dateTime"/>
     </xs:complexType>
