@@ -1,27 +1,29 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<signed-credential>
+<signed-credential xmlns="http://www.protogeni.net/resources/credential/0.1" xmlns:sig="http://www.w3.org/2000/09/xmldsig#">
   <credential xml:id="Ref2">
   <type>capability</type>
+  <serial>2</serial>
   <owner_uuid>foo bar</owner_uuid>
   <this_uuid>foo bar</this_uuid>
   <capabilities>
     <capability>
-      <capability_name>frazzle</capability_name>
+      <name>frazzle</name>
       <can_delegate>1</can_delegate>
     </capability>
     <capability>
-      <capability_name>drazzle</capability_name>
+      <name>drazzle</name>
       <can_delegate>1</can_delegate>
     </capability>
   </capabilities>
   <parent>
   <credential xml:id="Ref1">
   <type>capability</type>
+  <serial>3</serial>
   <owner_uuid>foo bar</owner_uuid>
   <this_uuid>foo bar</this_uuid>
   <capabilities>
     <capability>
-      <capability_name>frazzle</capability_name>
+      <name>frazzle</name>
       <can_delegate>1</can_delegate>
     </capability>
   </capabilities>
@@ -46,9 +48,9 @@ kDDvwDHIkP8WlWF+Pk1NJNZRpmUFLtPdRG2DTWG/ySwp8UBJRLgkSno7N5ULmbxm
 pA74Pi0YLOq2yLJpdm+HdDa1uqpI7YSgMSPoEUqTVX0=</SignatureValue>
  <KeyInfo>
   <X509Data>
-   
-   
-   
+
+
+
   <X509Certificate>MIIEAzCCA2ygAwIBAgIBADANBgkqhkiG9w0BAQQFADCBuDELMAkGA1UEBhMCVVMx
 DTALBgNVBAgTBFV0YWgxFzAVBgNVBAcTDlNhbHQgTGFrZSBDaXR5MR0wGwYDVQQK
 ExRVdGFoIE5ldHdvcmsgVGVzdGJlZDEeMBwGA1UECxMVQ2VydGlmaWNhdGUgQXV0
