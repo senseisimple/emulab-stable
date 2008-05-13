@@ -26,7 +26,7 @@
 handle.</a:documentation>
         <element name="type_slots">
           <data type="integer">
-            <param name="minInclusive">1</param>
+            <param name="minInclusive">0</param>
           </data>
         </element>
         <element name="unlimited">

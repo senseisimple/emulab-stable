@@ -16,7 +16,7 @@ NodeTypeSpec = element node_type {
         element type_name { text },
         ## How many virtual nodes of this type this physical node can
         ## handle.
-        (element type_slots { xsd:integer { minInclusive = "1" } } |
+        (element type_slots { xsd:integer { minInclusive = "0" } } |
          element unlimited { empty }),
         ## A flag that indicates that this physical node *always*
         ## has this type - a node is only allowed to have one dynamic
