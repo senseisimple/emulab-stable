@@ -47,31 +47,34 @@ of static types at a time</a:documentation>
   <define name="NodeSpec">
     <a:documentation>A node in the topology</a:documentation>
     <element name="node">
-      <attribute name="name">
-        <a:documentation>Name of the node - each node name must be unique within the 
+      <ref name="NodeContents"/>
+    </element>
+  </define>
+  <define name="NodeContents">
+    <attribute name="name">
+      <a:documentation>Name of the node - each node name must be unique within the 
 top element</a:documentation>
-      </attribute>
-      <ref name="NodeSpec.NodeType">
-        <a:documentation>Type specification - we use a named pattern here (defined below), so
+    </attribute>
+    <ref name="NodeSpec.NodeType">
+      <a:documentation>Type specification - we use a named pattern here (defined below), so
 that it can be overriden in the virtual topology schema, where you are
 only allowed to have one</a:documentation>
+    </ref>
+    <ref name="NodeFlagSpec">
+      <a:documentation>Legacy flags</a:documentation>
+    </ref>
+    <zeroOrMore>
+      <ref name="FeatureDesireSpec">
+        <a:documentation>Legacy features and desires</a:documentation>
       </ref>
-      <ref name="NodeFlagSpec">
-        <a:documentation>Legacy flags</a:documentation>
-      </ref>
-      <zeroOrMore>
-        <ref name="FeatureDesireSpec">
-          <a:documentation>Legacy features and desires</a:documentation>
-        </ref>
-      </zeroOrMore>
-      <zeroOrMore>
-        <ref name="PropertySpec">
-          <a:documentation>Types of virtual nodes that this physical node can satisfy
+    </zeroOrMore>
+    <zeroOrMore>
+      <ref name="PropertySpec">
+        <a:documentation>Types of virtual nodes that this physical node can satisfy
 Desires of this node, which should (or must) be matched by the
 physical node we are assigned to</a:documentation>
-        </ref>
-      </zeroOrMore>
-    </element>
+      </ref>
+    </zeroOrMore>
   </define>
   <define name="NodeSpec.NodeType">
     <a:documentation>A node can (by default) have one or more types</a:documentation>
@@ -96,51 +99,54 @@ TODO: MAYBE this should be combined with NodeTypeSpec</a:documentation>
   <define name="LinkSpec">
     <a:documentation>Links in the topology - zero or more</a:documentation>
     <element name="link">
-      <attribute name="name">
-        <a:documentation>Name of the link - must be unique in the top</a:documentation>
-      </attribute>
-      <element name="source_interface">
-        <a:documentation>First interface for this link - links are assumed to be
+      <ref name="LinkContents"/>
+    </element>
+  </define>
+  <define name="LinkContents">
+    <attribute name="name">
+      <a:documentation>Name of the link - must be unique in the top</a:documentation>
+    </attribute>
+    <element name="source_interface">
+      <a:documentation>First interface for this link - links are assumed to be
 symmetric, so the order of the interfaces does not currently
 matter</a:documentation>
-        <ref name="InterfaceSpec"/>
-      </element>
-      <element name="destination_interface">
-        <a:documentation>Second interface for this link</a:documentation>
-        <ref name="InterfaceSpec"/>
-      </element>
-      <element name="bandwidth">
-        <a:documentation>TODO: In the future, the bandwidth, latency, and packet loss will be
+      <ref name="InterfaceSpec"/>
+    </element>
+    <element name="destination_interface">
+      <a:documentation>Second interface for this link</a:documentation>
+      <ref name="InterfaceSpec"/>
+    </element>
+    <element name="bandwidth">
+      <a:documentation>TODO: In the future, the bandwidth, latency, and packet loss will be
 moved to features and/or properties
 Bandwidth of the link in kbps</a:documentation>
-        <data type="float">
-          <param name="minExclusive">0.0</param>
-        </data>
-      </element>
-      <element name="latency">
-        <a:documentation>Latency of the link in ms</a:documentation>
-        <data type="float">
-          <param name="minInclusive">0.0</param>
-        </data>
-      </element>
-      <element name="packet_loss">
-        <a:documentation>Static packet loss probability of the link as a fraction
+      <data type="float">
+        <param name="minExclusive">0.0</param>
+      </data>
+    </element>
+    <element name="latency">
+      <a:documentation>Latency of the link in ms</a:documentation>
+      <data type="float">
+        <param name="minInclusive">0.0</param>
+      </data>
+    </element>
+    <element name="packet_loss">
+      <a:documentation>Static packet loss probability of the link as a fraction
 (ie. 0.01 == 1%)</a:documentation>
-        <data type="float">
-          <param name="minInclusive">0.0</param>
-        </data>
-      </element>
-      <ref name="LinkSpec.LinkType">
-        <a:documentation>Type of this link - we use a named pattern here (defined below), so
+      <data type="float">
+        <param name="minInclusive">0.0</param>
+      </data>
+    </element>
+    <ref name="LinkSpec.LinkType">
+      <a:documentation>Type of this link - we use a named pattern here (defined below), so
 that it can be overriden in the virtual topology schema, where you are
 only allowed to have one</a:documentation>
+    </ref>
+    <zeroOrMore>
+      <ref name="PropertySpec">
+        <a:documentation>Properties of this link</a:documentation>
       </ref>
-      <zeroOrMore>
-        <ref name="PropertySpec">
-          <a:documentation>Properties of this link</a:documentation>
-        </ref>
-      </zeroOrMore>
-    </element>
+    </zeroOrMore>
   </define>
   <define name="LinkSpec.LinkType">
     <a:documentation>A link can (by default) have zero or more types</a:documentation>
@@ -234,20 +240,23 @@ none of them must be. Possibly expressible with properties?</a:documentation>
   <define name="InterfaceSpec">
     <a:documentation>Interfaces</a:documentation>
     <element name="interface">
-      <element name="node_name">
-        <a:documentation>Name of the node, which must match one of the nodes in this topology</a:documentation>
-        <text/>
-      </element>
-      <element name="interface">
-        <a:documentation>Name of the interface itself</a:documentation>
-        <text/>
-      </element>
-      <zeroOrMore>
-        <ref name="PropertySpec">
-          <a:documentation>Properties of the interface</a:documentation>
-        </ref>
-      </zeroOrMore>
+      <ref name="InterfaceContents"/>
     </element>
+  </define>
+  <define name="InterfaceContents">
+    <element name="node_name">
+      <a:documentation>Name of the node, which must match one of the nodes in this topology</a:documentation>
+      <text/>
+    </element>
+    <element name="interface">
+      <a:documentation>Name of the interface itself</a:documentation>
+      <text/>
+    </element>
+    <zeroOrMore>
+      <ref name="PropertySpec">
+        <a:documentation>Properties of the interface</a:documentation>
+      </ref>
+    </zeroOrMore>
   </define>
   <define name="PropertySpec">
     <a:documentation>Properties - new: replacements for features and desires. Not yet implemented

@@ -43,25 +43,24 @@
   <xs:element name="static">
     <xs:complexType/>
   </xs:element>
-  <xs:element name="node">
-    <xs:complexType>
-      <xs:sequence>
-        <xs:group ref="NodeSpec.NodeType"/>
-        <xs:group ref="NodeFlagSpec">
-          <xs:annotation>
-            <xs:documentation>Legacy flags</xs:documentation>
-          </xs:annotation>
-        </xs:group>
-        <xs:element minOccurs="0" maxOccurs="unbounded" ref="fd">
-          <xs:annotation>
-            <xs:documentation>Legacy features and desires</xs:documentation>
-          </xs:annotation>
-        </xs:element>
-        <xs:element minOccurs="0" maxOccurs="unbounded" ref="property"/>
-      </xs:sequence>
-      <xs:attribute name="name" use="required"/>
-    </xs:complexType>
-  </xs:element>
+  <xs:element name="node" type="NodeContents"/>
+  <xs:complexType name="NodeContents">
+    <xs:sequence>
+      <xs:group ref="NodeSpec.NodeType"/>
+      <xs:group ref="NodeFlagSpec">
+        <xs:annotation>
+          <xs:documentation>Legacy flags</xs:documentation>
+        </xs:annotation>
+      </xs:group>
+      <xs:element minOccurs="0" maxOccurs="unbounded" ref="fd">
+        <xs:annotation>
+          <xs:documentation>Legacy features and desires</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element minOccurs="0" maxOccurs="unbounded" ref="property"/>
+    </xs:sequence>
+    <xs:attribute name="name" use="required"/>
+  </xs:complexType>
   <xs:group name="NodeSpec.NodeType">
     <xs:annotation>
       <xs:documentation>A node can (by default) have one or more types</xs:documentation>
@@ -77,28 +76,27 @@
       </xs:sequence>
     </xs:complexType>
   </xs:element>
-  <xs:element name="link">
-    <xs:complexType>
-      <xs:sequence>
-        <xs:element ref="source_interface"/>
-        <xs:element ref="destination_interface"/>
-        <xs:element ref="bandwidth"/>
-        <xs:element ref="latency"/>
-        <xs:element ref="packet_loss"/>
-        <xs:group ref="LinkSpec.LinkType"/>
-        <xs:element minOccurs="0" maxOccurs="unbounded" ref="property">
-          <xs:annotation>
-            <xs:documentation>Properties of this link</xs:documentation>
-          </xs:annotation>
-        </xs:element>
-      </xs:sequence>
-      <xs:attribute name="name" use="required">
+  <xs:element name="link" type="LinkContents"/>
+  <xs:complexType name="LinkContents">
+    <xs:sequence>
+      <xs:element ref="source_interface"/>
+      <xs:element ref="destination_interface"/>
+      <xs:element ref="bandwidth"/>
+      <xs:element ref="latency"/>
+      <xs:element ref="packet_loss"/>
+      <xs:group ref="LinkSpec.LinkType"/>
+      <xs:element minOccurs="0" maxOccurs="unbounded" ref="property">
         <xs:annotation>
-          <xs:documentation>Name of the link - must be unique in the top</xs:documentation>
+          <xs:documentation>Properties of this link</xs:documentation>
         </xs:annotation>
-      </xs:attribute>
-    </xs:complexType>
-  </xs:element>
+      </xs:element>
+    </xs:sequence>
+    <xs:attribute name="name" use="required">
+      <xs:annotation>
+        <xs:documentation>Name of the link - must be unique in the top</xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+  </xs:complexType>
   <xs:element name="source_interface" type="InterfaceSpec"/>
   <xs:element name="destination_interface" type="InterfaceSpec">
     <xs:annotation>
@@ -211,26 +209,24 @@
       <xs:documentation>Interfaces</xs:documentation>
     </xs:annotation>
     <xs:sequence>
-      <xs:element ref="interface"/>
+      <xs:element name="interface" type="InterfaceContents"/>
     </xs:sequence>
   </xs:complexType>
-  <xs:element name="interface">
-    <xs:complexType>
-      <xs:sequence>
-        <xs:element ref="node_name"/>
-        <xs:element name="interface" type="xs:string">
-          <xs:annotation>
-            <xs:documentation>Name of the interface itself</xs:documentation>
-          </xs:annotation>
-        </xs:element>
-        <xs:element minOccurs="0" maxOccurs="unbounded" ref="property">
-          <xs:annotation>
-            <xs:documentation>Properties of the interface</xs:documentation>
-          </xs:annotation>
-        </xs:element>
-      </xs:sequence>
-    </xs:complexType>
-  </xs:element>
+  <xs:complexType name="InterfaceContents">
+    <xs:sequence>
+      <xs:element ref="node_name"/>
+      <xs:element name="interface" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Name of the interface itself</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element minOccurs="0" maxOccurs="unbounded" ref="property">
+        <xs:annotation>
+          <xs:documentation>Properties of the interface</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
   <xs:element name="node_name" type="xs:string">
     <xs:annotation>
       <xs:documentation>Name of the node, which must match one of the nodes in this topology</xs:documentation>

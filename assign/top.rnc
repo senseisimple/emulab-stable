@@ -26,7 +26,9 @@ NodeTypeSpec = element node_type {
 }
 
 ## A node in the topology
-NodeSpec = element node {
+NodeSpec = element node { NodeContents }
+
+NodeContents =
     ## Name of the node - each node name must be unique within the 
     ## top element
     attribute name { text },
@@ -42,7 +44,6 @@ NodeSpec = element node {
     ## Desires of this node, which should (or must) be matched by the
     ## physical node we are assigned to
     PropertySpec*
-}
 
 ## A node can (by default) have one or more types
 NodeSpec.NodeType = NodeTypeSpec+
@@ -59,7 +60,9 @@ LinkTypeSpec = element link_type {
 }
 
 ## Links in the topology - zero or more
-LinkSpec = element link {
+LinkSpec = element link { LinkContents }
+
+LinkContents =
     ## Name of the link - must be unique in the top
     attribute name { text },
     ## First interface for this link - links are assumed to be
@@ -83,7 +86,6 @@ LinkSpec = element link {
     LinkSpec.LinkType,
     ## Properties of this link
     PropertySpec*
-}
 
 ## A link can (by default) have zero or more types
 LinkSpec.LinkType = LinkTypeSpec*
@@ -124,14 +126,15 @@ NodeFlagSpec =
     element disallow_trivial_mix { empty }?
 
 ## Interfaces
-InterfaceSpec = element interface {
+InterfaceSpec = element interface { InterfaceContents }
+
+InterfaceContents =
     ## Name of the node, which must match one of the nodes in this topology
     element node_name { text },
     ## Name of the interface itself
     element interface { text },
     ## Properties of the interface
     PropertySpec*
-}
     
 ## Properties - new: replacements for features and desires. Not yet implemented
 ## in assign, and not yet fully fleshed out in this schema.
