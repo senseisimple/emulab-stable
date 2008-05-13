@@ -252,6 +252,7 @@ class User
     function name()		{ return $this->field("usr_name"); }
     function title()		{ return $this->field("usr_title"); }
     function affil()		{ return $this->field("usr_affil"); }
+    function affil_abbrev()	{ return $this->field("usr_affil_abbrev"); }
     function email()		{ return $this->field("usr_email"); }
     function URL()		{ return $this->field("usr_URL"); }
     function addr()		{ return $this->field("usr_addr"); }
@@ -647,6 +648,7 @@ class User
 	$usr_shell   = $user->shell();
 	$usr_title   = $user->title();
 	$usr_affil   = $user->affil();
+	$usr_affil_abbrev = $user->affil_abbrev();
 	$status      = $user->status();
 	$admin       = $user->admin();
 	$notes       = $user->notes();
@@ -775,6 +777,11 @@ class User
 	echo "<tr>
                   <td>Institutional Affiliation:</td>
                   <td>$usr_affil</td>
+              </tr>\n";
+    
+	echo "<tr>
+                  <td>Institutional Abbreviation:</td>
+                  <td>$usr_affil_abbrev</td>
               </tr>\n";
     
         echo "<tr>

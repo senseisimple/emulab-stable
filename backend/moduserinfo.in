@@ -136,6 +136,7 @@ my %xmlfields =
      "usr_name"		=> ["usr_name",		$SLOT_OPTIONAL],
      "usr_title"	=> ["usr_title",	$SLOT_OPTIONAL],
      "usr_affil"	=> ["usr_affil",	$SLOT_OPTIONAL],
+     "usr_affil_abbrev"	=> ["usr_affil_abbrev",	$SLOT_OPTIONAL],
      "usr_shell"	=> ["usr_shell",	$SLOT_OPTIONAL],
      "usr_URL"		=> ["usr_URL",		$SLOT_OPTIONAL],
      "usr_email"	=> ["usr_email",	$SLOT_OPTIONAL],

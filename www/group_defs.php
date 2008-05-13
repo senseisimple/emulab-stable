@@ -1131,6 +1131,7 @@ class Group
 	echo "<thead class='sort'>";
 	echo "<tr>
                   <th>Name</th>\n";
+	echo "<th>Affiliation</th>\n";
 	if (! $projgrp) {
 	    echo "<th>Email</th>\n";
 	}
@@ -1149,6 +1150,7 @@ class Group
 		TBERROR("Could not lookup object for user $uid_idx", 1);
 	    }
 	    $usr_name     = $target_user->name();
+	    $usr_affil    = $target_user->affil_abbrev();
 	    $usr_email    = $target_user->email();
 	    $usr_uid      = $target_user->uid();
 	    $showuser_url = CreateURL("showuser", $target_user);
@@ -1156,6 +1158,8 @@ class Group
 
 	    echo "<tr>
                       <td>$usr_name</td>\n";
+
+	    echo "<td>$usr_affil</td>\n";
 
 	    if (! $projgrp) {
 		echo "<td>$usr_email</td>\n";

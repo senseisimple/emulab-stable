@@ -238,6 +238,10 @@ function TBvalid_title($token) {
 function TBvalid_affiliation($token) {
     return TBvalid_userdata($token);
 }
+function TBvalid_affiliation_abbreviation($token) {
+    return TBcheck_dbslot($token, "users", "usr_affil_abbrev",
+			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
+}
 function TBvalid_addr($token) {
     return TBvalid_userdata($token);
 }

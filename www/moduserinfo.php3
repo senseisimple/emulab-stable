@@ -125,13 +125,24 @@ function SPITFORM($formfields, $errors)
    	# Affiliation:
 	# 
 	echo "<tr>
-                  <td colspan=2>${optfield}Institutional<br>Affiliation:</td>
-                  <td class=left>
-                      <input type=text
-                             name=\"formfields[usr_affil]\"
-                             value=\"" . $formfields["usr_affil"] . "\"
-	                     size=40>
-                  </td>
+                      <td colspan=2>*Institutional Affiliation:</td>
+                      <td class=left>
+			<table>
+                          <tr>
+                          <td>Name</td>
+                          <td><input type=text
+                                 name=\"formfields[usr_affil]\"
+                                 value=\"" . $formfields["usr_affil"] . "\"
+	                         size=40></td></tr>
+			  <tr>
+                          <td>Abbreviation:</td>
+                          <td><input type=text
+                                 name=\"formfields[usr_affil_abbrev]\"
+                                 value=\"" . $formfields["usr_affil_abbrev"] . "\"
+	                         size=16 maxlength=16> (e.g. MIT)</td>
+			  </tr>
+        		</table>
+                      </td>
               </tr>\n";
 
 	#
@@ -414,6 +425,7 @@ if (!isset($submit)) {
     $defaults["usr_phone"]   = $target_user->phone();
     $defaults["usr_title"]   = $target_user->title();
     $defaults["usr_affil"]   = $target_user->affil();
+    $defaults["usr_affil_abbrev"] = $target_user->affil_abbrev();
     $defaults["usr_shell"]   = $target_user->shell();
     $defaults["notes"]       = $target_user->notes();
     $defaults["password1"]   = "";
@@ -494,6 +506,10 @@ if (isset($formfields["usr_title"]) && $formfields["usr_title"] != "" &&
 if (isset($formfields["usr_affil"]) && $formfields["usr_affil"] != "" &&
     $formfields["usr_affil"] != $target_user->affil()) {
     $args["usr_affil"]	= $formfields["usr_affil"];
+}
+if (isset($formfields["usr_affil_abbrev"]) && $formfields["usr_affil_abbrev"] != "" &&
+    $formfields["usr_affil"] != $target_user->affil_abbrev()) {
+    $args["usr_affil_abbrev"]	= $formfields["usr_affil_abbrev"];
 }
 if (isset($formfields["usr_shell"]) && $formfields["usr_shell"] != "" &&
     $formfields["usr_shell"] != $target_user->shell()) {

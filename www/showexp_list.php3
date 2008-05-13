@@ -384,6 +384,8 @@ if ($thumb && !$idle) {
 	    TBERROR("Could not lookup object for user $huid", 1);
 	}
 	$showuser_url = CreateURL("showuser", $head_user);
+	$head_affil   = $head_user->affil_abbrev();
+	$head_affil_text = $head_affil ? "&nbsp;($head_affil)" : "";
 	
 	if ($idle && ($str=="&nbsp;" || !$pcs)) { continue; }
 
@@ -446,7 +448,7 @@ if ($thumb && !$idle) {
 	    }	
 
 	    echo "<font size=-2><b>Created by:</b> ".
-		 "<a href='$showuser_url'>$huid</a>".
+		 "<a href='$showuser_url'>$huid</a>$head_affil_text".
 		 "</font><br />\n";
 
 	    $special = 0;
@@ -544,6 +546,9 @@ if ($thumb && !$idle) {
 	    TBERROR("Could not lookup object for user $huid", 1);
 	}
 	$showuser_url = CreateURL("showuser", $head_user);
+	$head_affil = $head_user->affil_abbrev();
+	$head_affil_text = $head_affil ? "&nbsp;($head_affil)" : "";
+
 	
 	if ($swapreqs && !$isidle) {
 	    $swapreqs = "";
@@ -695,7 +700,7 @@ if ($thumb && !$idle) {
 	    echo "<td>$name</td>\n";
 	}
 	
-        echo "<td><A href='$showuser_url'>$huid</A></td>\n";
+        echo "<td><A href='$showuser_url'>$huid</A>$head_affil_text</td>\n";
 	echo "</tr>\n";
     }
     echo "</table>\n";

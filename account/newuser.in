@@ -154,7 +154,8 @@ my %usually_required = ("address"	=> "usr_addr",
 		        "country"	=> "usr_country",
 		        "phone"	        => "usr_phone",
 		        "title"	        => "usr_title",
-		        "affiliation"	=> "usr_affil");
+		        "affiliation"	=> "usr_affil",
+		        "affiliation_abbreviation" => "usr_affil_abbrev");
 if ($type eq "wikionly") {
     %optional = (%optional, %usually_required);
 } else {

@@ -156,6 +156,7 @@ function GENPLIST ($query_result)
     echo "<th>PID</th>\n";
     echo "<th>(Approved?) Description</th>\n";
     echo "<th>Leader</th>\n";
+    echo "<th>Affil</th>\n";
     echo "<th>Days<br>Idle</th>\n";
     echo "<th>Expts<br>Created</th>\n";
     echo "<th>Expts<br>Run</th>\n";
@@ -188,6 +189,7 @@ function GENPLIST ($query_result)
 	}
 	$showuser_url = CreateURL("showuser", $head_user);
 	$headuid      = $head_user->uid();
+	$affil        = $head_user->affil_abbrev();
 	
 	echo "<tr>
                   <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
@@ -200,6 +202,7 @@ function GENPLIST ($query_result)
 	}
 	echo "             $Pname</td>
                   <td><A href='$showuser_url'>$headuid</A></td>\n";
+	echo "<td>$affil</td>\n";
 
 	echo "<td>$idle</td>\n";
 	echo "<td>$expt_count</td>\n";

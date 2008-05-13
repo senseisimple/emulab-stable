@@ -604,6 +604,7 @@ REPLACE INTO table_regex VALUES ('users','usr_email','text','regex','^([-\\w\\+\
 REPLACE INTO table_regex VALUES ('users','usr_shell','text','regex','^(csh|sh|bash|tcsh|zsh)$',0,0,NULL);
 REPLACE INTO table_regex VALUES ('users','usr_title','text','redirect','default:tinytext',0,0,NULL);
 REPLACE INTO table_regex VALUES ('users','usr_affil','text','redirect','default:tinytext',0,0,NULL);
+REPLACE INTO `table_regex` VALUES ('users','usr_affil_abbrev','text','regex','^[\\040-\\176]*$',0,16,NULL);
 REPLACE INTO table_regex VALUES ('users','usr_addr','text','redirect','default:tinytext',0,0,NULL);
 REPLACE INTO table_regex VALUES ('users','usr_addr2','text','redirect','default:tinytext',0,0,NULL);
 REPLACE INTO table_regex VALUES ('users','usr_state','text','redirect','default:tinytext',0,0,NULL);

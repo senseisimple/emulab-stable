@@ -145,6 +145,7 @@ sub modified($)		{ return field($_[0], "usr_modified"); }
 sub name($)		{ return field($_[0], "usr_name"); }
 sub title($)		{ return field($_[0], "usr_title"); }
 sub affil($)		{ return field($_[0], "usr_affil"); }
+sub affil_abbrev($)	{ return field($_[0], "usr_affil_abbrev"); }
 sub email($)		{ return field($_[0], "usr_email"); }
 sub URL($)		{ return field($_[0], "usr_URL"); }
 sub addr($)		{ return field($_[0], "usr_addr"); }
@@ -807,7 +808,8 @@ sub ModUserInfo($$$$)
     # (Others above already did their own updates.)
     #
     my %updates;
-    foreach my $col ("usr_name", "usr_title", "usr_affil", "usr_URL",
+    foreach my $col ("usr_name", "usr_title", "usr_affil", "usr_affil_abbrev", 
+		     "usr_URL",
 		     "usr_addr", "usr_addr2", "usr_city", "usr_state",
 		     "usr_zip", "usr_country", "usr_phone", "usr_shell") {
 	# Copy args we want so that others can't get through.
@@ -831,7 +833,8 @@ sub ModUserInfo($$$$)
     else {
 	# Send an audit e-mail reporting what is being changed.
 	my @report = ("Name:usr_name", "Email:usr_email",
-		      "Job Title:usr_title", "Affiliation:usr_affil", 
+		      "Job Title:usr_title", "Affiliation:usr_affil",
+		      "Affiliation Abbreviation:usr_affil_abbrev",
 		      "URL:usr_URL", "Address1:usr_addr",
 		      "Address2:usr_addr2", "City:usr_city",
 		      "State:usr_state", "ZIP/Postal Code:usr_zip",

@@ -238,12 +238,23 @@ function SPITFORM($formfields, $returning, $errors)
             # Affiliation:
             # 
 	    echo "<tr>
-                      <td colspan=2>*Institutional<br>Affiliation:</td>
+                      <td colspan=2>*Institutional Affiliation:</td>
                       <td class=left>
-                          <input type=text
+			<table>
+                          <tr>
+                          <td>Name</td>
+                          <td><input type=text
                                  name=\"formfields[usr_affil]\"
                                  value=\"" . $formfields["usr_affil"] . "\"
-	                         size=40>
+	                         size=40></td></tr>
+			  <tr>
+                          <td>Abbreviation:</td>
+                          <td><input type=text
+                                 name=\"formfields[usr_affil_abbrev]\"
+                                 value=\"" . $formfields["usr_affil_abbrev"] . "\"
+	                         size=16 maxlength=16> (e.g. MIT)</td>
+			  </tr>
+        		</table>
                       </td>
                   </tr>\n";
 
@@ -491,6 +502,7 @@ if (! isset($submit)) {
     $defaults["usr_phone"]   = "";
     $defaults["usr_title"]   = "";
     $defaults["usr_affil"]   = "";
+    $defaults["usr_affil_abbrev"] = "";
     $defaults["password1"]   = "";
     $defaults["password2"]   = "";
     $defaults["wikiname"]    = "";
@@ -573,10 +585,17 @@ if (! $returning) {
 	}
 	if (!isset($formfields["usr_affil"]) ||
 	    strcmp($formfields["usr_affil"], "") == 0) {
-	    $errors["Affiliation"] = "Missing Field";
+	    $errors["Affiliation Name"] = "Missing Field";
 	}
 	elseif (! TBvalid_affiliation($formfields["usr_affil"])) {
-	    $errors["Affiliation"] = TBFieldErrorString();
+	    $errors["Affiliation Name"] = TBFieldErrorString();
+	}
+	if (!isset($formfields["usr_affil_abbrev"]) ||
+	    strcmp($formfields["usr_affil_abbrev"], "") == 0) {
+	    $errors["Affiliation Abbreviation"] = "Missing Field";
+	}
+	elseif (! TBvalid_affiliation_abbreviation($formfields["usr_affil"])) {
+	    $errors["Affiliation Name"] = TBFieldErrorString();
 	}
     }	
     if (!isset($formfields["usr_email"]) ||
@@ -738,6 +757,7 @@ if (! $returning) {
     $args["shell"]         = 'tcsh';
     $args["title"]         = $formfields["usr_title"];
     $args["affiliation"]   = $formfields["usr_affil"];
+    $args["affiliation_abbreviation"] = $formfields["usr_affil_abbrev"];
     $args["password"]      = $formfields["password1"];
     $args["wikiname"]      = ($WIKISUPPORT ? $formfields["wikiname"] : "");
 

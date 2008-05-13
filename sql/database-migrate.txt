@@ -4478,9 +4478,12 @@ last_net_act,last_cpu_act,last_ext_act);
        ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 4.149: Add usr_affil_abbrev column to users and deleted users tables
+       and add 'slot' to table_regex
 
        alter table users add usr_affil_abbrev varchar(16) after usr_affil;
        alter table deleted_users add usr_affil_abbrev varchar(16) after usr_affil;
+
+       REPLACE INTO `table_regex` VALUES ('users','usr_affil_abbrev','text','regex','^[\\040-\\176]*$',0,16,NULL);
 
 4.150: Improvements to the sslcerts table for GENI support.
        Generally, its nice to support real revocation, but
@@ -4497,4 +4500,3 @@ last_net_act,last_cpu_act,last_ext_act);
 	 add `password` tinytext,
 	 add KEY `uid` (`uid`),
 	 add KEY `uid_idx` (`uid_idx`);
-

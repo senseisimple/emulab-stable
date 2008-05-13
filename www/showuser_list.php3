@@ -167,6 +167,7 @@ echo "<tr>
           <th>&nbsp</th>
           <th>UID</th>
           <th>Name</th>
+          <th>Affiliation</th>
           <th>Projects</th>\n";
 
 if (! strcmp($showtype, "inactive")) {
@@ -183,6 +184,7 @@ while ($row = mysql_fetch_array($query_result)) {
     $thisuid  = $row["uid"];
     $webid    = $row["uid_idx"];
     $name     = $row["usr_name"];
+    $affil    = $row["usr_affil_abbrev"];
     $status   = $row["status"];
     $unix_uid = $row["unix_uid"];
     $webidle  = $row["webidle"];
@@ -200,7 +202,8 @@ while ($row = mysql_fetch_array($query_result)) {
     }
 
     echo "<td><A href='$showuser_url'>$thisuid</A></td>
-              <td>$name</td>\n";
+              <td>$name</td>
+	      <td>$affil</td>\n";
 
     # List of projects.
     reset($projmemb_array);
