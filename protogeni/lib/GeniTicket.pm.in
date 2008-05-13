@@ -37,6 +37,7 @@ my $BOSSNODE       = "@BOSSNODE@";
 my $OURDOMAIN      = "@OURDOMAIN@";
 my $GENICENTRAL    = "https://boss/protogeni/xmlrpc";
 my $SIGNCRED	   = "$TB/sbin/signgenicred";
+my $VERIFYCRED	   = "$TB/sbin/verifygenicred";
 my $NFREE	   = "$TB/bin/nfree";
 
 #
@@ -77,6 +78,19 @@ sub component($)	{ return field($_[0], "component"); }
 sub CreateFromSignedTicket($$)
 {
     my ($class, $ticket_string) = @_;
+
+    # First verify the ticket.
+    my ($fh, $filename) = tempfile(UNLINK => 0);
+    return undef
+	if (!defined($fh));
+    print $fh $ticket_string;
+    close($fh);
+    system("$VERIFYCRED $filename");
+    if ($?) {
+	print STDERR "Ticket in $filename did not verify\n";
+	return undef;
+    }
+    unlink($filename);
 
     # Use XML::Simple to convert to something we can mess with.
     my $parser = XML::LibXML->new;
@@ -142,8 +156,6 @@ sub CreateFromSignedTicket($$)
     $self->{'idx'}           = $serial;
     bless($self, $class);
 
-    print Dumper($self);
-
     return $self;
 }
 
@@ -182,8 +194,9 @@ sub Grant($$)
 }
 
 #
-# Store the given ticket in the DB. We only do this for signed tickets
-# which we hand out, so we have a record of them. 
+# Store the given ticket in the DB. We only do this for signed tickets,
+# so we have a record of them. We store them on the server and the client
+# side.
 #
 sub Store($$)
 {
@@ -267,12 +280,16 @@ sub Sign($)
     while (<SIGNER>) {
 	$ticket .= $_;
     }
-    close(SIGNER);
+    if (!close(SIGNER)) {
+	print STDERR "Could not sign $filename\n";
+	return -1;
+    }
     $self->{'ticket_string'} = $ticket;
 
     $self->Store($idx) == 0
 	or return -1;
 
+    unlink($filename);
     return 0;
 }
 

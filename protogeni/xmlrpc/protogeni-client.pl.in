@@ -21,7 +21,7 @@ my $server = shift(@ARGV);
 my $method = shift(@ARGV);
 
 my $response = 
-    Genixmlrpc::CallMethodHTTP("https://$server/protogeni/xmlrpc",
+    Genixmlrpc::CallMethodHTTP("https://$server/protogeni/xmlrpc", undef,
 			       $method, @ARGV);
 
 print Dumper($response);

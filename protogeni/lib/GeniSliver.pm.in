@@ -25,6 +25,7 @@ use Node;
 use English;
 use Data::Dumper;
 use File::Temp qw(tempfile);
+use overload ('""' => 'Stringify');
 
 # Configure variables
 my $TB		   = "@prefix@";
@@ -96,20 +97,22 @@ sub Stringify($)
 }
 
 #
-# Create a sliver. Not much to it yet.
+# Create a sliver. 
 #
-sub Create($$)
+sub Create($$;$)
 {
-    my ($class, $ticket) = @_;
+    my ($class, $ticket, $uuid) = @_;
     my @insert_data = ();
 
     # Every sliver gets a new unique index.
     my $idx = TBGetUniqueIndex('next_sliver', 1);
-    # And a new uuid. 
-    my $uuid = NewUUID();
     if (!defined($uuid)) {
-	print "*** WARNING: Could not generate a UUID!\n";
-	return undef;
+	# And a new uuid for a local sliver.
+	$uuid = NewUUID();
+	if (!defined($uuid)) {
+	    print "*** WARNING: Could not generate a UUID!\n";
+	    return undef;
+	}
     }
     my $slice_uuid = $ticket->slice_uuid();
     my $owner_uuid = $ticket->owner_uuid();
@@ -127,7 +130,12 @@ sub Create($$)
     DBQueryWarn("insert into geni_slivers set " . join(",", @insert_data))
 	or return undef;
 
-    return GeniSlice->Lookup($idx);
+    my $sliver = GeniSliver->Lookup($idx);
+    return undef
+	if (!defined($sliver));
+    $sliver->{'TICKET'} = $ticket;
+
+    return $sliver;
 }
 # accessors
 sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'SLIVER'}->{$_[1]}); }
@@ -171,10 +179,66 @@ sub GetExperiment($)
 }
 
 #
+# Get the ticket for the sliver.
+#
+sub GetTicket($)
+{
+    my ($self) = @_;
+
+    return undef
+	if (! ref($self));
+
+    if (!exists($self->{'TICKET'})) {
+	print STDERR "No ticket object associated with $self\n";
+	return undef;
+    }
+    return $self->{'TICKET'};
+}
+
+#
 # Provision a slice. We actually did this when the ticket was requested.
 #
 sub Provision($)
 {
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    #
+    # the node is already allocated to the sliver, but still need to enter
+    # a virt_nodes entry, and possibly more virt table entries, so that the
+    # node will boot properly, and is otherwie controllable.
+    #
+    my $experiment = Experiment->Lookup($self->slice_uuid());
+    if (!defined($experiment)) {
+	print STDERR "Could not map $self to its experiment\n";
+	return -1;
+    }
+    my $node_id    = $self->node_id();
+    return 0
+	if (!defined($node_id));
+    my $node       = Node->Lookup($node_id);
+    if (!defined($node)) {
+	print STDERR "Could not map node $node_id to its object\n";
+	return -1;
+    }
+    my $reservation = $node->Reservation();
+    if (!defined($reservation)) {
+	print STDERR "$node was already released from $self\n";
+	return -1;
+    }
+    if ($reservation->SameExperiment($experiment)) {
+	if ($experiment->InsertVirtNode($node) != 0) {
+	    print STDERR "Could not add virtnode entry for $node to $self\n";
+	    return -1;
+	}
+    }
+    else {
+	print STDERR "$node is reserved to another, not $self\n";
+	# Signal error so we can look at what happened.
+	return -1;
+    }
     return 0;
 }
 
@@ -189,20 +253,83 @@ sub UnProvision($)
 	if (! ref($self));
 
     my $experiment = Experiment->Lookup($self->slice_uuid());
+    if (!defined($experiment)) {
+	print STDERR "Could not map $self to its experiment\n";
+	return -1;
+    }
     my $node_id    = $self->node_id();
+    return 0
+	if (!defined($node_id));
     my $node       = Node->Lookup($node_id);
-    return -1
-	if (!defined($node));
-    my $reservation = Node->Reservation();
-    
-    if (defined($reservation) && $reservation->SameExperiment($experiment)) {
+    if (!defined($node)) {
+	print STDERR "Could not map node $node_id to its object\n";
+	return -1;
+    }
+    my $reservation = $node->Reservation();
+    if (!defined($reservation)) {
+	print STDERR "$node was already released from $self\n";
+	return 0;
+    }
+    if ($reservation->SameExperiment($experiment)) {
 	my $pid = $experiment->pid();
 	my $eid = $experiment->eid();
 	
-	system("$NFREE $pid $eid $node_id");
+	system("export NORELOAD=1; $NFREE -q $pid $eid $node_id");
+	if ($?) {
+	    print STDERR "Could not deallocate $node from $self\n";
+	    return -1;
+	}
+    }
+    else {
+	print STDERR "$node is reserved to another, not $self\n";
+	# Signal error so we can look at what happened.
+	return -1;
     }
     return 0;
 }
+
+#
+# Start a slice, which roughly translates to reboot the node.
+#
+sub Start($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $experiment = Experiment->Lookup($self->slice_uuid());
+    if (!defined($experiment)) {
+	print STDERR "Could not map $self to its experiment\n";
+	return -1;
+    }
+    my $node_id    = $self->node_id();
+    return 0
+	if (!defined($node_id));
+    my $node       = Node->Lookup($node_id);
+    if (!defined($node)) {
+	print STDERR "Could not map node $node_id to its object\n";
+	return -1;
+    }
+    my $reservation = $node->Reservation();
+    if (!defined($reservation)) {
+	print STDERR "$node was already released from $self\n";
+	return -1;
+    }
+    if ($reservation->SameExperiment($experiment)) {
+	#
+	# Reboot and wait?
+	#
+	#system("$NODEREBOOT $node_id");
+    }
+    else {
+	print STDERR "$node is reserved to another, not $self\n";
+	# Signal error so we can look at what happened.
+	return -1;
+    }
+    return 0;
+}
+
 
 # _Always_ make sure that this 1 is at the end of the file...
 1;

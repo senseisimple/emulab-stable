@@ -13,7 +13,7 @@ include $(OBJDIR)/Makeconf
 
 LIB_SCRIPTS     = Protogeni.pm GeniDB.pm GeniUser.pm GeniSAClient.pm \
 		  GeniSlice.pm GeniSA.pm GeniCM.pm GeniCMClient.pm \
-		  test.pl GeniTicket.pm GeniSliver.pm
+		  test.pl GeniTicket.pm GeniSliver.pm GeniCredential.pm
 
 #
 # Force dependencies on the scripts so that they will be rerun through

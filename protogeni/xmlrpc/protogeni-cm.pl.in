@@ -57,6 +57,22 @@ $ENV{'USER'}    = $user;
 $ENV{'LOGNAME'} = $user;
 
 #
+# The UUID of the client certificate is in the env var SSL_CLIENT_S_DN_CN.
+# If it actually looks like a UUID, then this correponds to an actual user,
+# and the supplied credentials/tickets must match. At present, if there is
+# no UUID, it is another emulab making a request directly, with no user
+# context, and we just let that pass for now.
+#
+if (exists($ENV{'SSL_CLIENT_S_DN_CN'}) &&
+    $ENV{'SSL_CLIENT_S_DN_CN'} =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
+    $ENV{'GENIUSER'} = $ENV{'SSL_CLIENT_S_DN_CN'};
+}
+else {
+    delete($ENV{'GENIUSER'})
+	if (exists($ENV{'GENIUSER'}));
+}    
+
+#
 # Use libaudit to capture any output from libraries and programs.
 # Send that to tbops so they can be fixed.
 #
@@ -69,6 +85,7 @@ my $responder = Frontier::Responder->new( "methods" => {
     "SA::DiscoverResources" => \&Protogeni::SA::DiscoverResources,
     "CM::GetTicket"         => \&GeniCM::GetTicket,
     "CM::CreateSliver"      => \&GeniCM::CreateSliver,
+    "CM::DestroySliver"     => \&GeniCM::DestroySliver,
     "add"                   => \&Protogeni::add,
    },
 );

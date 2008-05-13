@@ -23,6 +23,7 @@ use GeniDB;
 use Genixmlrpc;
 use GeniResponse;
 use GeniTicket;
+use GeniCredential;
 use GeniSliver;
 use GeniUser;
 use libtestbed;
@@ -52,25 +53,38 @@ my $NALLOC	   = "$TB/bin/nalloc";
 sub GetTicket($)
 {
     my ($argref) = @_;
-    my $owner_uuid = $argref->{'owner_uuid'};
     my $slice_uuid = $argref->{'slice_uuid'};
     my $rspec      = $argref->{'rspec'};
+    my $impotent   = $argref->{'impotent'};
+    my $credstring = $argref->{'credential_string'};
+    my $owner_uuid = $ENV{'GENIUSER'};
 
     if (! (defined($slice_uuid) && ($slice_uuid =~ /^[-\w]+$/))) {
 	return GeniResponse->MalformedArgsResponse();
     }
-    # XXX This needs to come from the SSL environment.
     if (! (defined($owner_uuid) && ($owner_uuid =~ /^[-\w]+$/))) {
 	return GeniResponse->MalformedArgsResponse();
     }
     if (! defined($rspec)) {
 	return GeniResponse->MalformedArgsResponse();
     }
+    $impotent = 0
+	if (!defined($impotent));
+
+    my $credential = GeniCredential->CreateFromSigned($credstring);
+    if (!defined($credential)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not create GeniCredential object");
+    }
+    # The credential owner/slice has to match what was provided.
+    if (! ($owner_uuid eq $credential->owner_uuid() &&
+	   $slice_uuid eq $credential->this_uuid())) {
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+				    "Invalid credentials for operation");
+    }
 
     #
     # XXX Should we create a local geni_slices record in the DB?
-    #
-if (0) {
     #
     # If the underlying experiment does not exist, need to create
     # a holding experiment. All these are going to go into the same
@@ -110,7 +124,6 @@ if (0) {
 	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 				    "Improper node id");
     }
-}
 
     #
     # Create the ticket first, before allocating the node.
@@ -120,20 +133,20 @@ if (0) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not create GeniTicket object");
     }
-if (0) {
     # Nalloc might fail if the node gets picked up by someone else.
-#    system("$NALLOC $pid $eid $node_id");
-    if (($? >> 8) < 0) {
-	$ticket->Delete();
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "Allocation failure");
+    if (!$impotent) {
+	system("$NALLOC $pid $eid $node_id");
+	if (($? >> 8) < 0) {
+	    $ticket->Delete();
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					"Allocation failure");
+	}
+	elsif (($? >> 8) > 0) {
+	    $ticket->Delete();
+	    return GeniResponse->Create(GENIRESPONSE_UNAVAILABLE, undef,
+					"Could not allocate node\n");
+	}
     }
-    elsif (($? >> 8) > 0) {
-	$ticket->Delete();
-	return GeniResponse->Create(GENIRESPONSE_UNAVAILABLE, undef,
-				    "Could not allocate node\n");
-    }
-}
     if ($ticket->Sign() != 0) {
 	# Release will free the node.
 	$ticket->Release();
@@ -146,6 +159,8 @@ if (0) {
 
 #
 # Create a sliver.
+#
+# XXX Credentials stuff.
 #
 sub CreateSliver($)
 {
@@ -190,5 +205,74 @@ sub CreateSliver($)
 				    "Could not provision sliver");
     }
     
-    return GeniResponse->Create(GENIRESPONSE_SUCCESS, 0, "Wow!");
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS, $sliver->uuid(), "Wow!");
+}
+
+
+#
+# Start a sliver. I take this to mean, reboot the node. Currently, using
+# the ticket as the credential.
+#
+# XXX Credentials stuff.
+#
+sub StartSliver($)
+{
+    my ($argref) = @_;
+    my $ticket      = $argref->{'ticket'};
+    my $sliver_uuid = $argref->{'uuid'};
+
+    if (!defined($sliver_uuid)) {
+	return GeniResponse->Create(GENIRESPONSE_BADARGS);
+    }
+    my $sliver = GeniSliver->Lookup($sliver_uuid);
+    if (!defined($sliver)) {
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "No such sliver $sliver_uuid");
+    }
+
+    if (! (defined($ticket) &&
+	   !TBcheck_dbslot($ticket, "default", "text",
+			   TBDB_CHECKDBSLOT_ERROR))) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "ticket: ". TBFieldErrorString());
+    }
+    $ticket = GeniTicket->CreateFromSignedTicket($ticket);
+    if (!defined($ticket)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not create GeniTicket object");
+    }
+
+    $sliver->Start() == 0 or
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not start $sliver");
+	
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS);
+}
+
+#
+# Destroy a sliver.
+#
+# XXX Credential stuff ...
+#
+sub DestroySliver($)
+{
+    my ($argref) = @_;
+    my $sliver_uuid = $argref->{'uuid'};
+
+    if (!defined($sliver_uuid)) {
+	return GeniResponse->Create(GENIRESPONSE_BADARGS);
+    }
+    my $sliver = GeniSliver->Lookup($sliver_uuid);
+    if (!defined($sliver)) {
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "No such sliver $sliver_uuid");
+    }
+    $sliver->UnProvision() == 0 or
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not unprovision sliver");
+    $sliver->Delete() == 0 or
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not delete sliver");
+    
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS);
 }
