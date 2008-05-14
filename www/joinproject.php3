@@ -594,7 +594,7 @@ if (! $returning) {
 	    strcmp($formfields["usr_affil_abbrev"], "") == 0) {
 	    $errors["Affiliation Abbreviation"] = "Missing Field";
 	}
-	elseif (! TBvalid_affiliation_abbreviation($formfields["usr_affil"])) {
+	elseif (! TBvalid_affiliation_abbreviation($formfields["usr_affil_abbrev"])) {
 	    $errors["Affiliation Name"] = TBFieldErrorString();
 	}
     }	
