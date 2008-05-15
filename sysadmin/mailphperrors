@@ -47,7 +47,8 @@ my $stamp = POSIX::strftime("%d-%b-%G",
 # egrep the file for the above stamp.
 #
 system("$EGREP '^\\[$stamp' $PHPLOG 2>${ERRFILE} | ".
-       "$FGREP -v -i openssl > $TMPFILE 2>&1");
+       "$FGREP -v -i openssl | ".
+       "$FGREP -v 'in /usr/testbed/devel' > $TMPFILE 2>&1");
 
 if (-s $ERRFILE) {
     SENDMAIL($TBOPS, "Failed to parse PHP error log",
