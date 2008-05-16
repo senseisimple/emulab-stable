@@ -131,7 +131,7 @@ if ($approval == "postpone") {
 	echo "<input type=hidden name=pcplab_okay value=$pcplab_okay>\n";
 	echo "<input type=hidden name=ron_okay value=$ron_okay>\n";
 	echo "<input type=hidden name=message value='".
-	    htmlspecialchars($message) . "'>\n";
+	    htmlspecialchars($message, ENT_QUOTES) . "'>\n";
     
 	echo "<b><input type=submit name=back value=Back></b>\n";
 	echo "</form>\n";
