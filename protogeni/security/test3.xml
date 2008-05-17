@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<signed-credential xmlns="http://www.protogeni.net/resources/credential/0.1" xmlns:sig="http://www.w3.org/2000/09/xmldsig#">
+  <credential xml:id="ref1">
+    <type>capability</type>
+    <serial>3</serial>
+    <owner_uuid>0b2eb97e-ed30-11db-96cb-001143e453fe</owner_uuid>
+    <this_uuid>3e1948fe-ed30-11db-96cb-001143e453fe</this_uuid>
+    <ticket>
+    <can_delegate>false</can_delegate>
+    <redeem_before>2008-04-08T01:01:01</redeem_before>
+    <rspec generated="2008-04-08T01:01:01" valid_until="2009-04-08T01:01:01">
+    <node uuid="foo" name="foo-name">
+      <node_type>
+        <type_name>foobar</type_name>
+        <unlimited/>
+      </node_type>
+      <available>0</available>
+      <component_manager_URL>http://www.example.com</component_manager_URL>
+    </node>
+    <node uuid="bar">
+      <node_type>
+        <type_name>barfoo</type_name>
+        <type_slots>3</type_slots>
+      </node_type>
+    </node>
+    <link uuid="foobar">
+      <source_interface><interface>
+        <node_uuid>foo</node_uuid>
+        <node_name>foo-name</node_name>
+        <interface>eth0</interface>
+      </interface></source_interface>
+      <destination_interface><interface>
+        <node_uuid>bar</node_uuid>
+        <interface>fxp2</interface>
+      </interface></destination_interface>
+      <bandwidth>100000</bandwidth>
+      <latency>1.5</latency>
+      <packet_loss>0</packet_loss>
+      <link_type>
+        <type_name>100Mbit</type_name>
+      </link_type>
+      <link_type>
+        <type_name>wired</type_name>
+      </link_type>
+    </link>
+    </rspec>
+    </ticket>
+  </credential>
+  <signatures>
+    <sig:Signature>foobar</sig:Signature>
+  </signatures>
+</signed-credential>

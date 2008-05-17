@@ -18,7 +18,8 @@
   <!-- Add some more stuff to nodes -->
   <xs:complexType name="NodeContents">
     <xs:sequence>
-      <xs:element minOccurs="0" ref="credential:avaiable"/>
+      <xs:group ref="credential:NodeSpec.NodeType"/>
+      <xs:element minOccurs="0" ref="credential:available"/>
       <xs:element minOccurs="0" ref="credential:component_manager_URL"/>
     </xs:sequence>
     <xs:attribute name="uuid" use="required"/>
@@ -34,16 +35,30 @@
       </xs:simpleType>
     </xs:attribute>
   </xs:complexType>
-  <xs:element name="avaiable" type="xs:boolean"/>
-  <xs:attributeGroup name="LinkContents">
+  <xs:element name="available" type="xs:boolean"/>
+  <xs:complexType name="LinkContents">
+    <xs:sequence>
+      <xs:group ref="credential:LinkEndPoints"/>
+      <xs:group ref="credential:LinkCharacteristics">
+        <xs:annotation>
+          <xs:documentation>The characteristics (bandwidth, latency, loss) which affect traffic.</xs:documentation>
+        </xs:annotation>
+      </xs:group>
+      <xs:group ref="credential:LinkSpec.LinkType"/>
+    </xs:sequence>
     <xs:attribute name="uuid" use="required"/>
     <xs:attribute name="name"/>
-  </xs:attributeGroup>
+  </xs:complexType>
   <!-- TODO: Might add a URL for the CM for a link in the future -->
-  <xs:attributeGroup name="InterfaceContents">
-    <xs:attribute name="node_uuid" use="required"/>
-    <xs:attribute name="node_name"/>
-  </xs:attributeGroup>
+  <xs:complexType name="InterfaceContents">
+    <xs:sequence>
+      <xs:element ref="credential:node_uuid"/>
+      <xs:element minOccurs="0" ref="credential:node_name"/>
+      <xs:element name="interface" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:element name="node_uuid" type="xs:string"/>
+  <xs:element name="node_name" type="xs:string"/>
   <xs:element name="component_manager_URL" type="xs:anyURI"/>
   <xs:element name="rspec">
     <xs:complexType>

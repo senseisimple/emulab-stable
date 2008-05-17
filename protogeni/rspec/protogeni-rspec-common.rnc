@@ -10,7 +10,7 @@
 
 include "../../assign/top.rnc" {
     # Add some more stuff to nodes
-    NodeContents &=
+    NodeContents =
         # Semantic change - the 'name' of a (physical) node is now
         # solely for human-readability. It's the UUID, which we add here,
         # that is the "true" identifier (ie. used in identifying link
@@ -21,27 +21,36 @@ include "../../assign/top.rnc" {
         # enumerate here
         attribute virtualization_type { "raw" | "trellis-vserver" |
         "planetlab-vserver" | "emulab-vnode" }?,
+        NodeSpec.NodeType,
         # Inidicate whether or not this node is available - the idea is that a
         # full dump of the static physical topology will not include this, but
         # that we can later get updates that include only this attribute (and a
         # UUID) Just binary for now - probably will include more things, such
         # as a number of "free slots", later
-        element avaiable { xsd:boolean }?,
+        element available { xsd:boolean }?,
         # Optionally, include the URL for this component's CM
         CMURLSpec?
-    LinkContents &=
+    LinkContents =
         # Semantic change - the 'name' of a (physical) link is now
         # solely for human-readability. It's the UUID, which we add here,
         # that is the "true" identifier.
         attribute uuid { text },
-        attribute name { text }?
+        attribute name { text }?,
+        LinkEndPoints,
+        ## The characteristics (bandwidth, latency, loss) which affect traffic.
+        LinkCharacteristics,
+        ## Type of this link - we use a named pattern here (defined below), so
+        ## that it can be overriden in the virtual topology schema, where you are
+        ## only allowed to have one
+        LinkSpec.LinkType
         # TODO: Might add a URL for the CM for a link in the future
-    InterfaceContents &= 
+    InterfaceContents = 
         # Semantic change - the 'name' in an interface is solely for human
         # readability. It's the UUID that is used to uniquely identify a
         # node.
-        attribute node_uuid { text },
-        attribute node_name { text }?
+        element node_uuid { text },
+        element node_name { text }?,
+        element interface { text }
 }
 
 ## How to contact a component manager. In the future, could include information

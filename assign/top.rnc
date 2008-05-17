@@ -65,27 +65,36 @@ LinkSpec = element link { LinkContents }
 LinkContents =
     ## Name of the link - must be unique in the top
     attribute name { text },
-    ## First interface for this link - links are assumed to be
-    ## symmetric, so the order of the interfaces does not currently
-    ## matter
-    element source_interface { InterfaceSpec },
-    ## Second interface for this link
-    element destination_interface { InterfaceSpec },
-    ## TODO: In the future, the bandwidth, latency, and packet loss will be
-    ## moved to features and/or properties
-    ## Bandwidth of the link in kbps
-    element bandwidth { xsd:float { minExclusive = "0.0" } },
-    ## Latency of the link in ms
-    element latency { xsd:float { minInclusive = "0.0" } },
-    ## Static packet loss probability of the link as a fraction
-    ## (ie. 0.01 == 1%)
-    element packet_loss { xsd:float { minInclusive = "0.0" } },
+    ## The two interfaces which form the endpoints of this link.
+    LinkEndPoints,
+    ## The characteristics (bandwidth, latency, loss) which affect traffic.
+    LinkCharacteristics,
     ## Type of this link - we use a named pattern here (defined below), so
     ## that it can be overriden in the virtual topology schema, where you are
     ## only allowed to have one
     LinkSpec.LinkType,
     ## Properties of this link
     PropertySpec*
+
+## A link has two endpoints. Right now, they are order
+## independent. But they might become order-dependant later.
+LinkEndPoints =
+    ## First interface for this link
+    element source_interface { InterfaceSpec },
+    ## Second interface for this link
+    element destination_interface { InterfaceSpec }
+
+## Link characterstics which affect traffic.
+## TODO: In the future, the bandwidth, latency, and packet loss will be
+## moved to features and/or properties
+LinkCharacteristics =
+    ## Bandwidth of the link in kbps
+    element bandwidth { xsd:float { minExclusive = "0.0" } },
+    ## Latency of the link in ms
+    element latency { xsd:float { minInclusive = "0.0" } },
+    ## Static packet loss probability of the link as a fraction
+    ## (ie. 0.01 == 1%)
+    element packet_loss { xsd:float { minInclusive = "0.0" } }
 
 ## A link can (by default) have zero or more types
 LinkSpec.LinkType = LinkTypeSpec*

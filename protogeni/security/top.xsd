@@ -61,10 +61,56 @@
       </xs:sequence>
     </xs:complexType>
   </xs:element>
-  <xs:element name="link">
-    <xs:complexType>
-      <xs:attributeGroup ref="credential:LinkContents"/>
-    </xs:complexType>
+  <xs:element name="link" type="credential:LinkContents"/>
+  <xs:group name="LinkEndPoints">
+    <xs:sequence>
+      <xs:element ref="credential:source_interface"/>
+      <xs:element ref="credential:destination_interface"/>
+    </xs:sequence>
+  </xs:group>
+  <xs:element name="source_interface" type="credential:InterfaceSpec">
+    <xs:annotation>
+      <xs:documentation>First interface for this link</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+  <xs:element name="destination_interface" type="credential:InterfaceSpec">
+    <xs:annotation>
+      <xs:documentation>Second interface for this link</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+  <xs:group name="LinkCharacteristics">
+    <xs:sequence>
+      <xs:element ref="credential:bandwidth"/>
+      <xs:element ref="credential:latency"/>
+      <xs:element ref="credential:packet_loss"/>
+    </xs:sequence>
+  </xs:group>
+  <xs:element name="bandwidth">
+    <xs:annotation>
+      <xs:documentation>Bandwidth of the link in kbps</xs:documentation>
+    </xs:annotation>
+    <xs:simpleType>
+      <xs:restriction base="xs:float">
+        <xs:minExclusive value="0.0"/>
+      </xs:restriction>
+    </xs:simpleType>
+  </xs:element>
+  <xs:element name="latency">
+    <xs:annotation>
+      <xs:documentation>Latency of the link in ms</xs:documentation>
+    </xs:annotation>
+    <xs:simpleType>
+      <xs:restriction base="xs:float">
+        <xs:minInclusive value="0.0"/>
+      </xs:restriction>
+    </xs:simpleType>
+  </xs:element>
+  <xs:element name="packet_loss">
+    <xs:simpleType>
+      <xs:restriction base="xs:float">
+        <xs:minInclusive value="0.0"/>
+      </xs:restriction>
+    </xs:simpleType>
   </xs:element>
   <xs:group name="LinkSpec.LinkType">
     <xs:annotation>
@@ -143,11 +189,14 @@
   <xs:element name="disallow_trivial_mix">
     <xs:complexType/>
   </xs:element>
-  <xs:element name="interface">
-    <xs:complexType>
-      <xs:attributeGroup ref="credential:InterfaceContents"/>
-    </xs:complexType>
-  </xs:element>
+  <xs:complexType name="InterfaceSpec">
+    <xs:annotation>
+      <xs:documentation>Interfaces</xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="interface" type="credential:InterfaceContents"/>
+    </xs:sequence>
+  </xs:complexType>
   <xs:element name="property">
     <xs:complexType>
       <xs:sequence>
