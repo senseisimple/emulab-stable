@@ -11,49 +11,41 @@ sys.path.append("@prefix@/lib")
 import libplab
 from libtestbed import *
 
-usage = "\t%prog [-vd] [-p plcname] pid eid [slicename]"
+usage = "\t%prog [-vd] [-p plcname] [-e pid/eid] [-s slicename]"
 
 def main(args):
     me = args[0]
     parser = TBParser(usage)
     parser.add_option("-p","--plc",dest="plc",action="store",
-                      help="PLC Name",default=None)
+                      help="PLC name",default=None)
+    parser.add_option("-e","--expt",dest="expt",action="store",
+                      help="pid/eid",default=None)
+    parser.add_option("-s","--slicename",dest="slicename",action="store",
+                      help="slice name",default=None)
 
     slicename = None
     pid,eid = None,None
+    expt = None
 
     (opts,args) = parser.parse_args()
 
     libplab.debug = opts.debug
     libplab.verbose = opts.verbose
 
-    if len(args) == 2:
-        pid,eid = args
-        if not pid or not eid:
-            print "Must supply both pid and eid!"
-            sys.exit(1)
-            pass
+    if expt:
+        try:
+            pid,eid = expt.split('/')
+        except:
+            parser.error("Improper pid/eid")
         pass
-    elif len(args) == 3:
-        pid,eid,slicename = args
-        if not pid or not eid or not slicename:
-            print "Must supply both pid and eid!"
-            sys.exit(1)
-            pass
-        pass
-    else:
+
+    if len(args) > 0:
         parser.error("Incorrect number of arguments")
         pass
 
-    if not slicename and opts.plc:
-        print "Ignoring '-p' PLC option, since you did not specify" \
-              "a slicename!"
-        opts.plc = None
-        pass
-
     plab = libplab.Plab()
-    plab.renew(pid,eid,opts.plc,slicename)
-    
+    plab.renew(opts.plc,pid,eid,slicename)
+
     return
 
 if __name__ == "__main__":

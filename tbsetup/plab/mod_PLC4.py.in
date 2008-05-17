@@ -854,6 +854,10 @@ class mod_PLC4:
         pass
 
     def renewSlice(self, slice, force = False):
+        """
+        Returns -1 if did not need to renew; 0 if renew succeeded;
+        1 if renew failed.
+        """
         agent = self.__getAgent(slice.slicename)
         ret = 0
         now = int(time.time()) # seconds since the epoch (UTC)
@@ -897,7 +901,7 @@ class mod_PLC4:
         if leaseend - now > MIN_LEASE_WINDOW and not force:
             print "Slice %s (%s/%s) doesn't need to be renewed" % \
                   (slice.slicename, slice.pid, slice.eid)
-            return 1
+            return -1
 
         # Max out leaseend as far as (politically) possible
         newleaseend = now + MAX_PLC_LEASELEN
@@ -917,7 +921,7 @@ class mod_PLC4:
             slice.slicemeta = self.getSliceMeta(slice)
             slice.slicemeta_legacy = None
 
-            ret = 1
+            ret = 0
             if debug:
                 print "SliceRenew returns: %s" % res
                 pass
@@ -925,7 +929,7 @@ class mod_PLC4:
         except:
             print "Failed to renew lease for slice %s" % slice.slicename
             traceback.print_exc()
-            ret = 0
+            ret = 1
             pass
         else:
             slice.leaseend = newleaseend

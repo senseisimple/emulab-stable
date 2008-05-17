@@ -335,7 +335,7 @@ class XmlrpcNodeInfoFetcher:
         for n in nni:
             nni_map[n['nodenetwork_id']] = dict({ 'IP'      : n['ip'],
                                                   'MAC'     : n['mac'],
-                                                  'BWLIMIT' : n['bwlimit'] })
+                                                  'BWLIMIT' : str(n['bwlimit']) })
             pass
 
         sif = ['site_id','longitude','latitude','abbreviated_name']
@@ -350,6 +350,9 @@ class XmlrpcNodeInfoFetcher:
 
         # now, munge into one list:
         for n in ni:
+            #if n['hostname'].find('cc.gt') < 0:
+            #    continue
+
             # check if we have site info for this node:
             if not si_map.has_key(n['site_id']):
                 errstr = "could not find site for node %s" % n['hostname']
@@ -387,9 +390,6 @@ class XmlrpcNodeInfoFetcher:
                     'SITE'      : si_map[n['site_id']]['SITE'],
                     'LATITUDE'  : si_map[n['site_id']]['LATITUDE'],
                     'LONGITUDE' : si_map[n['site_id']]['LONGITUDE'] }
-            if adi['BWLIMIT']:
-                adi['BWLIMIT'] = str(adi['BWLIMIT'])
-                pass
             if n.has_key('boot_status'):
                 adi['STATUS'] = n['boot_status']
                 pass
@@ -654,6 +654,62 @@ class Plab:
 
         return slice
 
+    def getSliceMapping(self,plcidx=None,pid=None,eid=None,slicename=None):
+        """
+        Returns a multi-level dict of plcidx->(pid,eid)s->slicename(s),
+        possibly filtered by plcidx, pid, or eid.
+        """
+        retval = dict({})
+
+        plc = None
+        if plcidx:
+            plc = PLC(plcidx)
+            pass
+
+        qstr = "select pid,eid,slicename,plc_idx from plab_slices"
+
+        fclause = []
+        fargs = []
+        if pid:
+            fclause.append("pid=%s")
+            fargs.append(pid)
+        if eid:
+            fclause.append("eid=%s")
+            fargs.append(eid)
+        if plc:
+            fclause.append("plc_idx=%s")
+            fargs.append(plc.idx)
+        if slicename:
+            fclause.append("slicename=%s")
+            fargs.append(slicename)
+
+        args = [ qstr ]
+        if len(fclause):
+            qstr = "%s where %s" % (qstr," and ".join(fclause))
+            args = [ qstr,tuple(fargs) ]
+            pass
+
+        res = DBQueryFatal(*args)
+
+        for (pid,eid,slicename,plc_idx) in res:
+            try:
+                plc = PLC(plc_idx)
+            except:
+                raise "could not resolve plc_idx %d" % plc_idx
+            
+            if not retval.has_key(plc.name):
+                retval[plc.name] = dict({})
+                pass
+
+            if not retval[plc.name].has_key((pid,eid)):
+                retval[plc.name][(pid,eid)] = []
+                pass
+
+            retval[plc.name][(pid,eid)].append(slicename)
+            pass
+
+        return retval
+
     def loadSlices(self, pid, eid, stopOnFail=False):
         """
         Slice factory function that loads all slices necessary for an Emulab
@@ -870,6 +926,7 @@ class Plab:
             pass
 
         avail = []
+        avail_plab_ids = []
         parser = None
         try:
             if method == "sitesxml":
@@ -881,6 +938,11 @@ class Plab:
                       method
 
             avail = parser.getPlabNodeInfo()
+
+            # save off the plab ids for quicker searching.
+            for n in avail:
+                avail_plab_ids.append(n['PLABID'])
+                pass
 
             pass
         # XXX: rewrite to use more elegant exception info gathering.
@@ -947,14 +1009,20 @@ class Plab:
 
         # Get node info we already have.
         known = self.__getKnownPnodes(plc)
+        known_plab_ids = []
         if debug:
             print "Got known pnodes:"
             print known
             pass
 
+        for (nodeid,nodeent) in known.iteritems():
+            known_plab_ids.append(nodeent['PLABID'])
+            pass
+
         # Create list of nodes to add or update
         toadd    = []  # List of node entries to add to DB
         toupdate = []  # List of node entries to update in the DB
+        todelete = []  # List of nodes to mark as "deleted"
         for nodeent in avail:
             # Replace sequences of bad chars in the site entity with
             # a single "-".
@@ -966,6 +1034,19 @@ class Plab:
                 pass
             elif len(matchres[1]):
                 toupdate.append((nodeent,matchres))
+                # since we may change a plabid for an existing node, don't
+                # mark this one as deleted.
+                if nodeent['PLABID'] in known_plab_ids:
+                    known_plab_ids.remove(nodeent['PLABID'])
+                    pass
+                pass
+            pass
+
+        # mark nodes as deleted (for now, just means plab doesn't know about
+        # them)
+        for plabid in known_plab_ids:
+            if not plabid in avail_plab_ids:
+                todelete.append(plabid)
                 pass
             pass
 
@@ -1088,6 +1169,15 @@ class Plab:
             print "Done adding new Plab nodes."
             pass
 
+        # mark any nodes as deleted:
+        if len(todelete) > 0:
+            print "Marking %d nodes as deleted: %s" % (len(todelete),
+                                                       str(todelete))
+        for plabid in todelete:
+            DBQueryFatal("update plab_mapping set deleted=1" \
+                         " where plab_id=%s",(plabid,))
+            pass
+
         return
 
     def __matchPlabNode(self, plabent, knownents):
@@ -1145,7 +1235,7 @@ class Plab:
             pass
         return ()
 
-    def __getKnownPnodes(self,plc,deleted=0):
+    def __getKnownPnodes(self,plc):
         """
         getFree helper function.  Returns a dict of IP:node_id pairs
         for the Plab nodes that currently exist in the DB.
@@ -1156,12 +1246,13 @@ class Plab:
                            " from plab_mapping as pm"
                            " left join widearea_nodeinfo as wni on"
                            "    pm.node_id = wni.node_id"
-                           " where pm.plc_idx=%s and deleted=%s",
-                           (plc.idx,int(deleted)))
+                           " where pm.plc_idx=%s",(plc.idx,))
         
         ret = {}
         for (nodeid, plabid, hostname, ip, mac, site,
              latitude, longitude, bwlimit) in res:
+            #if hostname.find('cc.gt') < 0:
+            #    continue
             ret[nodeid] = {'PLABID'    : plabid,
                            'HNAME'     : hostname,
                            'IP'        : ip,
@@ -1509,6 +1600,9 @@ class Plab:
                          (nodeid, 0, 1, nodeent['IP'], 'plab_fake',
                           controliface, 'ctrl'))
 
+            # ensure to mark as undeleted...
+            DBQueryFatal("update plab_mapping set deleted=0" \
+                         " where node_id=%s",(nodeid,))
             pass
         except:
             print "Error updating PLAB node in DB: someone needs to clean up!"
@@ -1632,8 +1726,7 @@ class Plab:
             pass
         return nodelist
 
-    def renew(self,rpid=None,reid=None,rplcidx=None,rslicename=None,
-              force=False):
+    def renew(self,plc=None,pid=None,eid=None,slicename=None,force=False):
         """
         Renews all of the Plab leases regardless of when they expire.  Note
         that all times are handled in the UTC time zone.  We don't trust
@@ -1641,69 +1734,67 @@ class Plab:
         """
 
         global failedrenew # XXX
-        
         now = int(time.time())
-
-        plc = None
-        if rplcidx:
-            plc = PLC(rplcidx)
-            pass
-
-        fclause = []
-        fargs = []
-        if rpid:
-            fclause.append("pid=%s")
-            fargs.append(rpid)
-        if reid:
-            fclause.append("eid=%s")
-            fargs.append(reid)
-        if plc:
-            fclause.append("plc_idx=%s")
-            fargs.append(plc.idx)
-        if rslicename:
-            fclause.append("slicename=%s")
-            fargs.append(rslicename)
-
-        res = DBQueryFatal("select pid,eid,slicename,plc_idx"
-                           " from plab_slices"
-                           " where " + " and ".join(fclause),
-                           tuple(fargs))
         
+        slicedict = self.getSliceMapping(plc,pid,eid,slicename)
+        renewlist = []
+        print "Renewing the following slices at %s:" % time.ctime()
+        for (plcname,exptdict) in slicedict.iteritems():
+            print "  %s:" % plcname
+            for ((pid,eid),slicelist) in exptdict.iteritems():
+                print "    %s/%s: %s" % (pid,eid,','.join(slicelist))
+                for slice in slicelist:
+                    renewlist.append((plcname,pid,eid,slice))
+                pass
+            pass
+        print ""
+
         loadedSlices = {}
         newfail = []
         failsoon = []
         ret = 0
-
-        print "Renewing Plab leases at %s ..." % time.ctime()
-
-        for (pid,eid,slicename,plcidx) in res:
-
+        
+        for (plcname,pid,eid,slicename) in renewlist:
             try:
-                slice = loadedSlices[(pid,eid,plcidx,slicename)]
+                slice = loadedSlices[(pid,eid,plcname,slicename)]
                 pass
             except KeyError:
-                slice = self.loadSlice(pid,eid,plcidx,slicename)
-                loadedSlices[(pid,eid,plcidx,slicename)] = slice
+                slice = self.loadSlice(pid,eid,plcname,slicename)
+                loadedSlices[(pid,eid,plcname,slicename)] = slice
                 pass
 
-            res = slice.renew(force)
+            print "Renewing slice %s/%s in %s/%s at %s:" \
+                  % (plcname,slicename,pid,eid,time.ctime())
+            res = slice.renew(force=force,renewSlice=True,renewNodes=False)
             entry = (pid,eid,slice.slicename,slice.plc.name,slice.leaseend)
 
-            if not res:
-                print "Failed to renew lease for %s/%s" % \
-                      entry[:2]
+            if res > 0:
+                print "Failed to renew slice lease for %s/%s in %s/%s" % \
+                      (slice.plc.name,slice.slicename,pid,eid)
                 if entry not in failedrenew:
                     newfail.append(entry)
                     pass
                 if (slice.leaseend - now) < PLABEXPIREWARN:
                     failsoon.append(entry)
                     pass
-                pass
+                # skip node renewal
+                continue
+            elif res == -1:
+                # slice did not get renewed, so skip
+                continue
             else:
                 if entry in failedrenew:
                     failedrenew.remove(entry)
                     pass
                 pass
+
+            print "Renewing nodes in slice %s/%s in %s/%s at %s:" \
+                  % (plcname,slicename,pid,eid,time.ctime())
+            res = slice.renew(force=force,renewSlice=False,renewNodes=True)
+
+            print "Finished slice %s/%s in %s/%s at %s:" \
+                  % (plcname,slicename,pid,eid,time.ctime())
+
             pass
 
         if newfail:
@@ -2438,14 +2529,22 @@ class Slice:
             pass
         pass
 
-    def renew(self, force=False):
-        print "(Directly) Renewing lease for slice %s at %s." % \
-              (self.slicename,self.plc.name)
-        self._renew()
-        print "Renewing lease for slice nodes in %s at %s." % (self.slicename,
-                                                               self.plc.name)
-        self._renewNodes()
-        pass
+    def renew(self, force=False, renewSlice=True, renewNodes=True):
+        retval = 0
+        if renewSlice:
+            print "(Directly) Renewing lease for slice %s at %s." % \
+                  (self.slicename,self.plc.name)
+            retval = self._renew(force=force)
+            pass
+
+        # only renew if we got a new ticket!
+        if retval == 0 and renewNodes:
+            print "Renewing lease for slice nodes in %s at %s." \
+                  % (self.slicename,self.plc.name)
+            retval = self._renewNodes()
+            pass
+
+        return retval
 
     def _renew(self,force=False):
         ret = self.plc.agent.renewSlice(self, force)
@@ -2761,42 +2860,48 @@ class EmulabSlice(Slice):
                                                       "%Y-%m-%d %H:%M:%S"))
         return
 
-    def renew(self, force = False):
+    def renew(self, force = False, renewSlice=True, renewNodes=True):
         """
         Renews slice lease.  We want this to be the maximum allowed by law...
         Store the expiration time in UTC.
         """
-        print "Renewing lease for slice %s at %s" % (self.slicename,
-                                                     self.plc.name)
-        self._renew()
+        retval = 0
+        if renewSlice:
+            print "Renewing lease for slice %s at %s" % (self.slicename,
+                                                         self.plc.name)
+            retval = self._renew(force=force)
         
-        DBQueryFatal("update plab_slices "
-                     "set slicemeta=%s,leaseend=%s"
-                     " where slicename=%s and plc_idx=%s",
-                     (self.slicemeta,
-                      time.strftime("%Y-%m-%d %H:%M:%S",
-                                    time.gmtime(self.leaseend)),
-                      self.slicename,self.plc.idx))
+            DBQueryFatal("update plab_slices "
+                         "set slicemeta=%s,leaseend=%s"
+                         " where slicename=%s and plc_idx=%s",
+                         (self.slicemeta,
+                          time.strftime("%Y-%m-%d %H:%M:%S",
+                                        time.gmtime(self.leaseend)),
+                          self.slicename,self.plc.idx))
+            pass
 
-        print "Renewing lease for slice nodes in %s at %s" % (self.slicename,
-                                                              self.plc.name)
-        reportfailed = self._renewNodes()
+        # only renew nodes if we got a new ticket
+        if retval == 0 and renewNodes:
+            print "Renewing lease for slice nodes in %s at %s" \
+                  % (self.slicename,self.plc.name)
+            reportfailed = self._renewNodes()
 
-        # Report any nodes that are near to expiration
-        if len(reportfailed) > 0:
-            tbstr = ""
-            for nodeid, leaseend in reportfailed:
-                tbstr += "Node: %s, Leaseend: %s UTC\n" % \
-                         (nodeid, time.asctime(time.gmtime(leaseend)))
-                pass
-            SENDMAIL(TBOPS, "Plab nodes in danger of expiration: %s/%s" % \
-                     (self.pid, self.eid),
-                     "The following slivers in %s/%s will expire "
-                     "soon:\n\n%s" % \
-                     (self.pid, self.eid, tbstr),
-                     TBOPS)
+            # Report any nodes that are near to expiration
+            if len(reportfailed) > 0:
+                tbstr = ""
+                for nodeid, leaseend in reportfailed:
+                    tbstr += "Node: %s, Leaseend: %s UTC\n" % \
+                             (nodeid, time.asctime(time.gmtime(leaseend)))
+                    pass
+                SENDMAIL(TBOPS, "Plab nodes in danger of expiration: %s/%s" % \
+                         (self.pid, self.eid),
+                         "The following slivers in %s/%s will expire "
+                         "soon:\n\n%s" % \
+                         (self.pid, self.eid, tbstr),
+                         TBOPS)
+            pass
         
-        return
+        return retval
 
     def destroy(self):
         """
