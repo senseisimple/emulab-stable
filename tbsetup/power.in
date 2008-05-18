@@ -32,6 +32,7 @@ use power_sgmote;
 use power_mail;
 use power_whol;
 use power_rmcp;
+use power_ilo;
 use snmpit_apc;
 use libtestbed;
 use User;
@@ -289,7 +290,8 @@ foreach my $power_id (keys %outlets) {
     my $class;
 
     if ($power_id eq "mail" || $power_id =~ /^whol-/ 
-	|| $power_id=~ /^rmcp-/) {
+	|| $power_id=~ /^rmcp-/
+	|| $power_id eq 'ilo' || $power_id eq 'ilo2') {
 	$type = $power_id;
 	$IP = "";
 	$class = "";
@@ -352,6 +354,11 @@ foreach my $power_id (keys %outlets) {
 	    print "Control of $nodestr failed.\n"; ++$exitval;
 	    ++$errors;
 	}
+    } elsif ($type eq 'ilo2' || $type eq 'ilo') {
+	if (iloctrl($type,$op,@nodes)) {
+	    print "Control of $nodestr failed.\n"; ++$exitval;
+            ++$errors;
+        }
     } elsif ($type eq "mail") {
 	if (mailctrl($op,@nodes)) {
 	    print "Control of $nodestr failed.\n"; $exitval++;
