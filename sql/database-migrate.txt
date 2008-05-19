@@ -4500,3 +4500,8 @@ last_net_act,last_cpu_act,last_ext_act);
 	 add `password` tinytext,
 	 add KEY `uid` (`uid`),
 	 add KEY `uid_idx` (`uid_idx`);
+
+4.151: Add a uuid slot to the nodes table, for protogeni.
+
+       alter table nodes add `uuid` varchar(40) NOT NULL default '';
+       update nodes set uuid=UUID();

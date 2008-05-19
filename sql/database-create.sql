@@ -2172,6 +2172,7 @@ CREATE TABLE `nodes` (
   `destination_y` float default NULL,
   `destination_orientation` float default NULL,
   `reserved_pid` varchar(12) default NULL,
+  `uuid` varchar(40) NOT NULL default '',
   PRIMARY KEY  (`node_id`),
   KEY `phys_nodeid` (`phys_nodeid`),
   KEY `node_id` (`node_id`,`phys_nodeid`),

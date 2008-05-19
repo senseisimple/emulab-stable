@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003-2007 University of Utah and the Flux Group.
+# Copyright (c) 2003-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -13,6 +13,7 @@
 use lib '@prefix@/lib';
 
 use libdb;
+use libtestbed;
 use libxmlrpc;
 use NodeType;
 use English;
@@ -361,10 +362,15 @@ NODE: foreach my $node_id (@node_ids) {
     #
     # Okay, time to actually add the node!
     #
+    my $uuid = NewUUID();
+    if (!defined($uuid)) {
+	print "Could not generate a UUID!\n";
+	next NODE;
+    }
     
     DBQueryFatal("INSERT INTO nodes SET node_id='$node_id', type='$type', " .
 	"phys_nodeid='$node_id', role='$role', priority=$priority, " .
-    	"eventstate='$state', op_mode='$opmode', " .
+    	"eventstate='$state', op_mode='$opmode', uuid='$uuid', " .
 	"def_boot_osid='$osid', " .
 	"inception=now(), ".
 	"state_timestamp=unix_timestamp(NOW()), " .

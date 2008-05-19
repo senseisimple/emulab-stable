@@ -1153,6 +1153,12 @@ sub CreateVnodes($$)
 	return -1;
     }
 
+    my $uuid = NewUUID();
+    if (!defined($uuid)) {
+	print "Could not generate a UUID!\n";
+	next NODE;
+    }
+    
     #
     # Assign however many we are told to (typically by assign). Locally
     # this is not a problem since nodes are not shared; assign always
@@ -1238,6 +1244,7 @@ sub CreateVnodes($$)
 	my $statement =
 	         "insert into nodes set ".
 		 "       node_id='$vnodeid', " .
+		 "       uuid='$uuid', " .
 		 "       type='$vtype', ".
 		 "       phys_nodeid='$pnode', ".
 		 "       role='virtnode', " .
