@@ -32,9 +32,9 @@ def main(args):
     libplab.debug = opts.debug
     libplab.verbose = opts.verbose
 
-    if expt:
+    if opts.expt:
         try:
-            pid,eid = expt.split('/')
+            pid,eid = opts.expt.split('/')
         except:
             parser.error("Improper pid/eid")
         pass
@@ -44,7 +44,7 @@ def main(args):
         pass
 
     plab = libplab.Plab()
-    plab.renew(opts.plc,pid,eid,slicename)
+    plab.renew(opts.plc,pid,eid,opts.slicename)
 
     return
 
