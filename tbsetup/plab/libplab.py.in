@@ -2856,8 +2856,15 @@ class EmulabSlice(Slice):
                "Multiple entries found for slice %s (%s) for %s/%s" % \
                (self.slicename,self.plc.name,self.pid,self.eid)
         ((self.slicemeta,leaseend),) = res
-        self.leaseend = calendar.timegm(time.strptime(str(leaseend),
-                                                      "%Y-%m-%d %H:%M:%S"))
+        try:
+            self.leaseend = calendar.timegm(time.strptime(str(leaseend),
+                                                          "%Y-%m-%d %H:%M:%S"))
+        except:
+            self.leaseend = 0
+            print "Warning: could not load leaseend time from db for" \
+                  " slice %s (%s) for %s/%s" % (self.slicename,self.plc.name,
+                                                self.pid,self.eid)
+            pass
         return
 
     def renew(self, force = False, renewSlice=True, renewNodes=True):
