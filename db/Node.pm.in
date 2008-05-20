@@ -100,6 +100,7 @@ sub Lookup($$)
 # accessors
 sub field($$)  { return ((! ref($_[0])) ? -1 : $_[0]->{'DBROW'}->{$_[1]}); }
 sub node_id($)       { return field($_[0], 'node_id'); }
+sub uuid($)          { return field($_[0], 'uuid'); }
 sub type($)          { return field($_[0], 'type'); }
 sub eventstate($)    { return field($_[0], 'eventstate'); }
 sub jailflag($)      { return field($_[0], 'jailflag'); }
