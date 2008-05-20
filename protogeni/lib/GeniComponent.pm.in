@@ -1,0 +1,318 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package GeniComponent;
+
+#
+# Some simple ticket stuff.
+#
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA    = "Exporter";
+@EXPORT = qw ( );
+
+# Must come after package declaration!
+use lib '@prefix@/lib';
+use GeniDB;
+use Genixmlrpc;
+use GeniResponse;
+use GeniTicket;
+use GeniCredential;
+use libtestbed;
+use Experiment;
+use libdb qw(TBGetUniqueIndex);
+use English;
+use overload ('""' => 'Stringify');
+
+# Configure variables
+my $TB		   = "@prefix@";
+my $TBOPS          = "@TBOPSEMAIL@";
+my $TBAPPROVAL     = "@TBAPPROVALEMAIL@";
+my $TBAUDIT   	   = "@TBAUDITEMAIL@";
+my $BOSSNODE       = "@BOSSNODE@";
+my $OURDOMAIN      = "@OURDOMAIN@";
+my $SIGNCRED	   = "$TB/sbin/signgenicred";
+my $VERIFYCRED	   = "$TB/sbin/verifygenicred";
+
+# Cache of instances to avoid regenerating them.
+my %components     = ();
+
+#
+# Lookup by idx, or uuid.
+#
+sub Lookup($$)
+{
+    my ($class, $token) = @_;
+    my $query_result;
+    my $idx;
+
+    if ($token =~ /^\d+$/) {
+	$idx = $token;
+    }
+    elsif ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
+	$query_result =
+	    DBQueryWarn("select idx from geni_components ".
+			"where uuid='$token'");
+	    return undef
+		if (! $query_result || !$query_result->numrows);
+
+	    ($idx) = $query_result->fetchrow_array();
+    }
+    else {
+	return undef;
+    }
+    # Look in cache first
+    return $components{"$idx"}
+        if (exists($components{"$idx"}));
+
+    $query_result =
+	DBQueryWarn("select * from geni_components where idx='$idx'");
+    
+    return undef
+	if (!$query_result || !$query_result->numrows);
+
+    my $self              = {};
+    $self->{'COMPONENT'}  = $query_result->fetchrow_hashref();
+    bless($self, $class);
+    
+    # Add to cache. 
+    $components{$self->{'COMPONENT'}->{'idx'}} = $self;
+    
+    return $self;
+}
+
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+    
+    my $uuid = $self->uuid();
+    my $idx  = $self->idx();
+
+    return "[GeniComponent: $uuid, IDX: $idx]";
+}
+
+#
+# Create a Geni component in the DB.
+#
+sub Create($$$$;$$)
+{
+    my ($class, $uuid, $hrn, $url) = @_;
+
+    my @insert_data = ();
+    my $idx = TBGetUniqueIndex('next_component', 1);
+
+    my $safe_hrn  = DBQuoteSpecial($hrn);
+    my $safe_url  = DBQuoteSpecial($url);
+    my $safe_uuid = DBQuoteSpecial($uuid);
+    
+    # Now tack on other stuff we need.
+    push(@insert_data, "created=now()");
+    push(@insert_data, "idx='$idx'");
+    push(@insert_data, "hrn=$safe_hrn");
+    push(@insert_data, "url=$safe_url");
+    push(@insert_data, "uuid=$safe_uuid");
+
+    # Insert into DB.
+    DBQueryWarn("insert into geni_components set " . join(",", @insert_data))
+	or return undef;
+
+    return GeniComponent->Lookup($idx);
+}
+# accessors
+sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'COMPONENT'}->{$_[1]}); }
+sub idx($)		{ return field($_[0], "idx"); }
+sub uuid($)		{ return field($_[0], "uuid"); }
+sub url($)		{ return field($_[0], "url"); }
+sub hrn($)		{ return field($_[0], "hrn"); }
+
+#
+# Refresh a class instance by reloading from the DB.
+#
+sub Refresh($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $idx = $self->idx();
+
+    my $query_result =
+	DBQueryWarn("select * from geni_components where idx=$idx");
+
+    return -1
+	if (!$query_result || !$query_result->numrows);
+
+    $self->{'COMPONENT'}  = $query_result->fetchrow_hashref();
+    return 0;
+}
+
+#
+# Update Fields.
+#
+sub Update($$)
+{
+    my ($self, $argref) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $idx = $self->idx();
+
+    my $query = "update geni_components set ".
+	join(",", map("$_=" . DBQuoteSpecial($argref->{$_}), keys(%{$argref})));
+
+    $query .= " where idx='$idx'";
+
+    return -1
+	if (! DBQueryWarn($query));
+
+    return Refresh($self);
+}
+
+#
+# Discover Resources on the component. Returns a resource availability
+# spec as an XML string (not a structure).
+#
+sub DiscoverResources($$$$$)
+{
+    my ($self, $user, $credential, $slice_uuid, $pref) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $response =
+	Genixmlrpc::CallMethodHTTP($self->url(),
+				   $user,
+				   "CM::DiscoverResources",
+				   { "slice_uuid"   => $slice_uuid,
+				     "credential"   => $credential->asString()
+				     });
+    
+    return undef
+	if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS);
+
+    return 0;
+}
+
+#
+# Get a Ticket from a component;
+#
+sub GetTicket($$$$$)
+{
+    my ($self, $user, $credential, $slice_uuid, $rspec) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $response = 				       
+	Genixmlrpc::CallMethodHTTP($self->url(),
+				   $user,
+				   "CM::GetTicket",
+				   { "slice_uuid"   => $slice_uuid,
+				     "credential"   => $credential->asString(),
+				     "impotent"     => 0,
+				     "rspec"        => $rspec });
+    
+    return undef
+	if (!defined($response));
+
+    return undef
+	if ($response->code() != GENIRESPONSE_SUCCESS);
+
+    #
+    # Convert this into a (signed) ticket object.
+    #
+    return GeniTicket->Create($slice_uuid, $user->uuid(),
+			      $rspec, $response->value(), $self);
+}
+
+#
+# Create a sliver, given a ticket.
+#
+sub CreateSliver($$$$)
+{
+    my ($self, $user, $ticket, $pref) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $response =
+	Genixmlrpc::CallMethodHTTP($self->url(), $user,
+				   "CM::CreateSliver",
+				   { "ticket"  => $ticket->asString() });
+    
+    return -1
+	if (!defined($response));
+
+    return -1
+	if ($response->code() != GENIRESPONSE_SUCCESS);
+
+    #
+    # We get back a signed credential, which has the sliver uuid inside.
+    #
+    my $credential = GeniCredential->CreateFromSigned($response->value());
+    if (!defined($credential)) {
+	print STDERR "Could not create local credential object.\n";
+	return -1;
+    }
+
+    my $sliver = GeniSliver->Create($ticket, $credential);
+    if (!defined($sliver)) {
+	print STDERR "Could not create local sliver object.\n";
+	return -1;
+    }
+    $$pref = $sliver;
+    return 0;
+}
+
+#
+# Destroy a sliver. 
+#
+sub DestroySliver($$$)
+{
+    my ($self, $user, $sliver) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $credential = $sliver->GetCredential();
+    return -1
+	if (!defined($credential));
+    
+    my $response =
+	Genixmlrpc::CallMethodHTTP($self->url(), $user,
+				   "CM::DestroySliver",
+				   { "uuid"        => $sliver->uuid(),
+				     "credential"  =>
+					 $credential->asString() });
+    
+    if ($response->code() != GENIRESPONSE_SUCCESS) {
+	print STDERR "Could not destroy sliver $sliver\n";
+	return -1;
+    }
+    # Delete the local object from the DB.
+    $sliver->Delete() == 0
+	or return -1;
+    # And the credential since we no longer need to maintain it for
+    # this sliver. 
+
+    return 0;
+}
+
+# _Always_ make sure that this 1 is at the end of the file...
+1;
+

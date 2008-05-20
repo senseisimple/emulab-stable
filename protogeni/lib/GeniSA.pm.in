@@ -7,8 +7,10 @@
 package GeniSA;
 
 #
-# The server side of the SA interface on remote sites. Also communicates
-# with the GMC interface at Geni Central as a client.
+# The server side of the SA interface. At present, we are not exporting
+# the SA server API, since the local Emulab is the SA and it has its own
+# authorization protocol. Eventually this will need to be implemented if
+# we want to act as a Geni SA. 
 #
 use strict;
 use Exporter;
@@ -21,6 +23,9 @@ use vars qw(@ISA @EXPORT);
 use lib '@prefix@/lib';
 use GeniDB;
 use Genixmlrpc;
+use GeniResponse;
+use User;
+use GeniUser;
 use libtestbed;
 use English;
 use Data::Dumper;
@@ -32,6 +37,8 @@ my $TBAPPROVAL     = "@TBAPPROVALEMAIL@";
 my $TBAUDIT   	   = "@TBAUDITEMAIL@";
 my $BOSSNODE       = "@BOSSNODE@";
 my $OURDOMAIN      = "@OURDOMAIN@";
-my $GENICENTRAL    = "https://boss/protogeni/xmlrpc";
 
+#
+# Server side stuff.
+#
 

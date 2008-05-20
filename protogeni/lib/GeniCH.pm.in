@@ -1,0 +1,306 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package GeniCH;
+
+#
+# The server side of the Geni ClearingHouse API. 
+#
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA    = "Exporter";
+@EXPORT = qw ( );
+
+# Must come after package declaration!
+use lib '@prefix@/lib';
+use GeniDB;
+use Genixmlrpc;
+use GeniResponse;
+use User;
+use GeniUser;
+use GeniSlice;
+use libtestbed;
+use emutil;
+use English;
+use Data::Dumper;
+
+# Configure variables
+my $TB		   = "@prefix@";
+my $TBOPS          = "@TBOPSEMAIL@";
+my $TBAPPROVAL     = "@TBAPPROVALEMAIL@";
+my $TBAUDIT   	   = "@TBAUDITEMAIL@";
+my $BOSSNODE       = "@BOSSNODE@";
+my $OURDOMAIN      = "@OURDOMAIN@";
+
+##
+# Lookup a UUID and return a blob of stuff. We allow lookups of both
+# users and slices, which is what we allow clients to register.
+#
+# XXX Not looking at credentials yet, although I think that anyone should
+# be able to lookup uuids if they have a valid certificate signed by an SA.
+#
+sub LookupUser($)
+{
+    my ($argref) = @_;
+    my $uuid = $argref->{'uuid'};
+
+    if (! (defined($uuid) && ($uuid =~ /^[-\w]*$/))) {
+	return GeniResponse->MalformedArgsResponse();
+    }
+    my $user = GeniUser->Lookup($uuid);
+    if (!defined($user)) {
+	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
+				    "No such user $uuid");
+    }
+
+    # Return a blob.
+    my $blob = { "uid"    => $user->uid(),
+		 "hrn"    => $user->hrn(),
+		 "uuid"   => $user->uuid(),
+		 "email"  => $user->email(),
+		 "name"   => $user->name() };
+
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
+}
+sub LookupSlice($)
+{
+    my ($argref) = @_;
+    my $uuid = $argref->{'uuid'};
+
+    if (! (defined($uuid) && ($uuid =~ /^[-\w]*$/))) {
+	return GeniResponse->MalformedArgsResponse();
+    }
+    my $slice = GeniSlice->Lookup($uuid);
+    if (!defined($slice)) {
+	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
+				    "No such user $uuid");
+    }
+
+    # Return a blob.
+    my $blob = { "hrn"          => $slice->hrn(),
+		 "uuid"         => $slice->uuid(),
+		 "creator_uuid" => $slice->creator_uuid() };
+
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
+}
+
+#
+# Register a new Geni user.
+#
+sub RegisterUser($)
+{
+    my ($argref) = @_;
+    my $hrn   = $argref->{'hrn'};
+    my $uid   = $argref->{'uid'};
+    my $uuid  = $argref->{'uuid'};
+    my $name  = $argref->{'name'};
+    my $email = $argref->{'email'};
+    my $cert  = $argref->{'cert'};
+
+    if (! (defined($hrn) && defined($uid) && defined($name) &&
+	   defined($email) &&
+	   defined($cert) && defined($uuid))) {
+	return GeniResponse->MalformedArgsResponse();
+    }
+
+    #
+    # Use the Emulab checkslot routines.
+    #
+    if (! ($hrn =~ /^[-\w\.]*$/)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "hrn: Invalid characters");
+    }
+    if (! ($uuid =~ /^[-\w]*$/)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "uuid: Invalid characters");
+    }
+    if (! TBcheck_dbslot($name, "users", "usr_name", TBDB_CHECKDBSLOT_ERROR)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "name: ". TBFieldErrorString());
+    }
+    if (! TBcheck_dbslot($uid, "users", "uid", TBDB_CHECKDBSLOT_ERROR)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "uid: ". TBFieldErrorString());
+    }
+    if (! TBcheck_dbslot($email, "users", "usr_email",TBDB_CHECKDBSLOT_ERROR)){
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "email: ". TBFieldErrorString());
+    }
+    if (! ($cert =~ /^[\012\015\040-\176]*$/)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "cert: Invalid characters");
+    }
+    
+    #
+    # The SA UUID comes from the SSL environment (certificate). Verify it
+    # and the prefix match for the uuid.
+    #
+    # Need to verify the UUID is permitted for the SA making the request.
+    #
+    my $sa_uuid = $ENV{'GENIUUID'};
+    my $query_result =
+	DBQueryWarn("select idx, uuid_prefix from geni_sliceauthorities ".
+		    "where uuid='$sa_uuid'");
+    return GeniResponse->Create(GENIRESPONSE_DBERROR)
+	if (!defined($query_result));
+    
+    return GeniResponse->Create(GENIRESPONSE_REFUSED, undef, "Who are You?")
+	if (!$query_result->numrows);
+
+    my ($sa_idx, $uuid_prefix)= $query_result->fetchrow_array();
+
+    if ($uuid =~ /^\w+\-\w+\-\w+\-\w+\-(\w+)$/) {
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "uuid: Prefix mismatch")
+	    if ("$uuid_prefix" ne "$1");
+    }
+    else {
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "Improper format for uuid");
+    }
+
+    #
+    # XXX
+    #
+    # What kind of uniquess requirements do we need? No one else with this
+    # email address? Of course, we have to allow hrn reuse, but should we
+    # require that for a given SA, that hrn is unique, at least to avoid
+    # lots of confusion?
+    #
+    if (GeniUser->CheckExisting($hrn, $email)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "$hrn/$email already registered");
+    }
+
+    my $newuser = GeniUser->Create($hrn, $uid, $uuid,
+				   $name, $email, $cert, $sa_idx);
+    if (!defined($newuser)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "$hrn/$email could not be registered");
+    }
+
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS, undef,
+				"$hrn/$email has been registered");
+}
+
+#
+# Register a new Geni slice in the DB. 
+#
+sub RegisterSlice($)
+{
+    my ($argref) = @_;
+    my $hrn   = $argref->{'hrn'};
+    my $uuid  = $argref->{'uuid'};
+    my $creator_uuid  = $argref->{'creator_uuid'};
+
+    if (! (defined($hrn) && defined($uuid) && defined($creator_uuid))) {
+	return Protogeni::MalformedArgsResponse();
+    }
+
+    if (! ($hrn =~ /^[-\w\.]*$/)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "hrn: Invalid characters");
+    }
+    if (! ($uuid =~ /^[-\w]*$/)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "uuid: Invalid characters");
+    }
+
+    if (! ($creator_uuid =~ /^[-\w]*$/)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "creator_uuid: Invalid characters");
+    }
+
+    #
+    # Make sure the geni user exists. 	
+    #
+    my $user = GeniUser->Lookup($creator_uuid);
+    if (!defined($user)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "creator_uuid: No such User");
+    }
+
+    #
+    # Make sure slice hrn and uuid are unique.
+    #
+    if (GeniSlice->CheckExisting($hrn, $uuid)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "$hrn or $uuid already registered");
+    }
+
+    #
+    # The SA UUID comes from the SSL environment (certificate). Verify it
+    # and the prefix match for the uuid.
+    #
+    # Need to verify the UUID is permitted for the SA making the request.
+    #
+    my $sa_uuid = $ENV{'GENIUUID'};
+    my $query_result =
+	DBQueryWarn("select idx, uuid_prefix from geni_sliceauthorities ".
+		    "where uuid='$sa_uuid'");
+    return GeniResponse->Create(GENIRESPONSE_DBERROR)
+	if (!defined($query_result));
+    
+    return GeniResponse->Create(GENIRESPONSE_REFUSED, undef, "Who are You?")
+	if (!$query_result->numrows);
+
+    my ($sa_idx, $uuid_prefix)= $query_result->fetchrow_array();
+
+    if ($uuid =~ /^\w+\-\w+\-\w+\-\w+\-(\w+)$/) {
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "uuid: Prefix mismatch")
+	    if ("$uuid_prefix" ne "$1");
+    }
+    else {
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "Improper format for uuid");
+    }
+
+    my $newslice = GeniSlice->Create($hrn, $uuid, $creator_uuid, $sa_idx);
+    if (!defined($newslice)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "$hrn/$uuid could not be registered");
+    }
+
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS, undef,
+				"$hrn/$uuid has been registered");
+}
+
+#
+# This is just a placeholder; return a list of all components. Eventually
+# takes an rspec and we do a resource mapping. 
+#
+sub DiscoverResources($)
+{
+    my ($argref) = @_;
+    my $slice_uuid  = $argref->{'slice_uuid'};
+
+    if (!defined($slice_uuid)) {
+	return Protogeni::MalformedArgsResponse();
+    }
+    if (! ($slice_uuid =~ /^[-\w]*$/)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "uuid: Invalid characters");
+    }
+
+    #
+    # Return simple list of components (hashes).
+    #
+    my @results = ();
+    my $query_result = DBQueryWarn("select uuid,hrn,url from geni_components");
+    return GeniResponse->Create(GENIRESPONSE_DBERROR)
+	if (!defined($query_result));
+
+    while (my ($component_uuid,$hrn,$url) = $query_result->fetchrow_array()) {
+	push(@results, { "uuid" => $component_uuid,
+			 "hrn"  => $hrn,
+			 "url"  => $url});
+    }
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS, \@results);
+}
+

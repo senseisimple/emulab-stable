@@ -25,6 +25,7 @@ use GeniResponse;
 use GeniTicket;
 use GeniCredential;
 use GeniSliver;
+use GeniComponent;
 use User;
 use libtestbed;
 use English;
@@ -37,33 +38,46 @@ my $TBAPPROVAL     = "@TBAPPROVALEMAIL@";
 my $TBAUDIT   	   = "@TBAUDITEMAIL@";
 my $BOSSNODE       = "@BOSSNODE@";
 my $OURDOMAIN      = "@OURDOMAIN@";
-my $GENICENTRAL    = "https://myboss.little-emulab-bsd61.testbed.emulab.net/protogeni/xmlrpc";
+my $GENICENTRAL    = "myboss.little-emulab-bsd61.testbed.emulab.net";
+my $GENICENTRALURL = "https://$GENICENTRAL/protogeni/xmlrpc";
 
 #
-# Discover resources for a slice (local experiment). This contacts Geni
-# Central to get a list of components. I think the interface is supposed
-# to be that we send an rspec and it sends back a list of components. But
-# lets not worry about that; just get a list of all components we can ask
-# for resources from.
+# Discover resources on components, for this experiment.
 #
-sub DiscoverResources($$)
+sub DiscoverResources($@)
 {
-    my ($experiment, $pref) = @_;
+    my ($experiment, @resources) = @_;
+    my $rspec;
 
-    my $response =
-	Genixmlrpc::CallMethodHTTP($GENICENTRAL, User->LookupByUnixId($UID),
-				   "SA::DiscoverResources",
-				   { "uuid"  => $experiment->uuid() });
+    #
+    # XXX 
+    #
+    my $this_user = User->LookupByUnixId($UID);
+    if (! defined($this_user)) {
+    	print STDERR "You ($UID) do not exist!\n";
+	return -1;
+    }
 
-    return -1
-	if (!defined($response));
+    # Need to construct a credential.
+    my $credential = GeniCredential->Create($experiment->uuid(),
+					    $this_user->uuid());
+    if (!defined($credential)) {
+	print STDERR "Could not create a slice credential for $experiment!\n";
+	return -1;
+    }
+    if ($credential->AddCapability("createslice", 0)) {
+	print STDERR "Could not add capability to slice credential!\n";
+	return -1;
+    }
+    if ($credential->Sign()) {
+	print STDERR "Could not sign slice credential!\n";
+	return -1;
+    }
 
-    #print Dumper($response);
-
-    return -1
-	if ($response->code() != GENIRESPONSE_SUCCESS);
-    $$pref = $response->value();
-
+    foreach my $component (@resources) {
+	$component->DiscoverResources($this_user, $credential,
+				      $experiment->uuid(), \$rspec);
+    }
     return 0;
 }
 
@@ -105,25 +119,9 @@ sub GetTicket($$$$)
 	return -1;
     }
 
-    my $response =
-	Genixmlrpc::CallMethodHTTP($component, $this_user, "CM::GetTicket",
-			{ "slice_uuid"        => $experiment->uuid(),
-			  "credential_string" => $credential->asString(),
-			  "impotent"          => 1,
-			  "rspec"             => $rspec });
-    
-    return -1
-	if (!defined($response));
-
-    return -1
-	if ($response->code() != GENIRESPONSE_SUCCESS);
-
-    #
-    # Convert this into a (signed) ticket object.
-    #
-    my $ticket = GeniTicket->Create($experiment->uuid(), $this_user->uuid(),
-				    $rspec, $response->value(), $component);
-    
+    my $ticket = $component->GetTicket($this_user, $credential,
+				       $experiment->uuid(), $rspec);
+				       
     $$pref = $ticket;
     return 0;
 }
@@ -132,42 +130,41 @@ sub CreateSliver($$$)
 {
     my ($experiment, $ticket, $pref) = @_;
 
-    my $response =
-	Genixmlrpc::CallMethodHTTP($ticket->component(), "CM::CreateSliver",
-				   { "ticket"  => $ticket->asString() });
-    
-    return -1
-	if (!defined($response));
-
-    return -1
-	if ($response->code() != GENIRESPONSE_SUCCESS);
-
-    my $sliver = GeniSliver->Create($ticket, $response->value());
-    if (!defined($sliver)) {
-	print STDERR "Could not create local sliver object\n";
-	return undef;
+    #
+    # XXX 
+    #
+    my $this_user = User->LookupByUnixId($UID);
+    if (! defined($this_user)) {
+    	print STDERR "You ($UID) do not exist!\n";
+	return -1;
     }
-    $$pref = $sliver;
-    return 0;
+
+    return $ticket->component()->CreateSliver($this_user, $ticket, $pref);
 }
 		 
 sub DestroySliver($$)
 {
     my ($experiment, $sliver) = @_;
-    my $ticket = $sliver->GetTicket();
 
-    my $response =
-	Genixmlrpc::CallMethodHTTP($ticket->component(),
-				   "CM::DestroySliver",
-				   { "uuid" => $sliver->uuid() });
-    
-    if ($response->code() != GENIRESPONSE_SUCCESS) {
-	print STDERR "Could not destroy sliver $sliver\n";
+    #
+    # XXX 
+    #
+    my $this_user = User->LookupByUnixId($UID);
+    if (! defined($this_user)) {
+    	print STDERR "You ($UID) do not exist!\n";
 	return -1;
     }
-    $sliver->Delete() == 0
-	or return -1;
 
+    my $component = $sliver->GetComponent();
+    return -1
+	if (!defined($component));
+
+    $component->DestroySliver($this_user, $sliver) == 0
+	or return -1;
+    
     return 0;
 }
-		 
+
+# _Always_ make sure that this 1 is at the end of the file...
+1;
+

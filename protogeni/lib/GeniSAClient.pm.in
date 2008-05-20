@@ -8,7 +8,8 @@ package GeniSAClient;
 
 #
 # The client side of the SA interface, used by Slice Authorities to
-# invoke operations on Geni Central and on Slices (Components).
+# invoke operations on other SAs. Emulab does not do much of this
+# right now. 
 #
 
 use strict;
@@ -33,68 +34,6 @@ my $TBAPPROVAL     = "@TBAPPROVALEMAIL@";
 my $TBAUDIT   	   = "@TBAUDITEMAIL@";
 my $BOSSNODE       = "@BOSSNODE@";
 my $OURDOMAIN      = "@OURDOMAIN@";
-my $GENICENTRAL    = "https://boss/protogeni/xmlrpc";
 
-#
-# Register a local Emulab user at the Geni ClearingHouse (which in the
-# prototype is Utah Emulab).
-#
-sub RegisterUser($)
-{
-    my ($user) = @_;
-    my $cert;
 
-    if ($user->SSLCert(1, \$cert)) {
-	print STDERR
-	    "Geni::RegisterUser - No encrypted certificate found for $user\n";
-	return -1;
-    }
 
-    # XXX Form hrn from the uid and domain. This is backwards.
-    my $hrn = $OURDOMAIN . "." . $user->uid();
-
-    my $response =
-	Genixmlrpc::CallMethodHTTP($GENICENTRAL, "SA::RegisterUser",
-				   { "hrn"   => $hrn,
-				     "uuid"  => $user->uuid(),
-				     "name"  => $user->name(),
-				     "email" => $user->email(),
-				     "cert"  => $cert});
-    print Dumper($response);
-    return $response->code();
-}
-
-#
-# Register a local Emulab experiment at the Clearinghouse, as a slice.
-#
-sub RegisterSlice($)
-{
-    my ($experiment) = @_;
-    my $user = $experiment->GetCreator();
-
-    # XXX Form hrn from the uid and domain. This is backwards.
-    my $hrn = $OURDOMAIN . "." . $experiment->pid() . "." . $experiment->eid();
-
-    my $response =
-	Genixmlrpc::CallMethodHTTP($GENICENTRAL, "SA::RegisterSlice",
-				   { "hrn"   => $hrn,
-				     "uuid"  => $experiment->uuid(),
-				     "creator_uuid" => $user->uuid()});
-    
-    print Dumper($response);
-    return $response->code();
-}
-
-#
-# Delete a slice registration.
-#
-sub DeleteSlice($)
-{
-    my ($experiment) = @_;
-
-    my $response =
-	Genixmlrpc::CallMethodHTTP($GENICENTRAL, "SA::DeleteSlice",
-				   { "uuid"  => $experiment->uuid()});
-
-    return $response->code();
-}

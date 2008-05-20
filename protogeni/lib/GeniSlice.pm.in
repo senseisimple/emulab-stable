@@ -53,25 +53,30 @@ sub Lookup($$)
 {
     my ($class, $token) = @_;
     my $query_result;
-
-    # Look in cache first
-    return $slices{"$token"}
-        if (exists($slices{"$token"}));
+    my $idx;
 
     if ($token =~ /^\d+$/) {
-	$query_result =
-	    DBQueryWarn("select * from geni_slices ".
-			"where idx='$token' and status='active'");
+	$idx = $token;
     }
     elsif ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
 	$query_result =
-	    DBQueryWarn("select * from geni_slices ".
+	    DBQueryWarn("select idx from geni_slices ".
 			"where uuid='$token'");
+	    return undef
+		if (! $query_result || !$query_result->numrows);
+
+	    ($idx) = $query_result->fetchrow_array();
     }
     else {
 	return undef;
     }
     
+    # Look in cache first
+    return $slices{"$idx"}
+        if (exists($slices{"$idx"}));
+
+    $query_result =
+	DBQueryWarn("select * from geni_slices where idx='$idx'");
     return undef
 	if (!$query_result || !$query_result->numrows);
 
@@ -86,7 +91,7 @@ sub Lookup($$)
     return $self;
 }
 # accessors
-sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'USER'}->{$_[1]}); }
+sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'SLICE'}->{$_[1]}); }
 sub idx($)		{ return field($_[0], "idx"); }
 sub hrn($)		{ return field($_[0], "hrn"); }
 sub uuid($)		{ return field($_[0], "uuid"); }
@@ -142,6 +147,7 @@ sub Create($$$$)
     # Now tack on other stuff we need.
     push(@insert_data, "created=now()");
     push(@insert_data, "idx='$idx'");
+    push(@insert_data, "sa_idx='$sa_idx'");
 
     my $safe_hrn   = DBQuoteSpecial($hrn);
     my $safe_uuid  = DBQuoteSpecial($uuid);

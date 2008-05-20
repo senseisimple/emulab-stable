@@ -17,6 +17,8 @@ use vars qw(@ISA @EXPORT);
 # Must come after package declaration
 use lib '@prefix@/lib';
 use GeniDB;
+use GeniComponent;
+use GeniCredential;
 # Hate to import all this crap; need a utility library.
 use libdb qw(TBGetUniqueIndex);
 use libtestbed;
@@ -34,7 +36,6 @@ my $TBAPPROVAL     = "@TBAPPROVALEMAIL@";
 my $TBAUDIT   	   = "@TBAUDITEMAIL@";
 my $BOSSNODE       = "@BOSSNODE@";
 my $OURDOMAIN      = "@OURDOMAIN@";
-my $GENICENTRAL    = "https://boss/protogeni/xmlrpc";
 my $SIGNCRED	   = "$TB/sbin/signgenicred";
 my $AVAIL	   = "$TB/sbin/avail";
 my $NALLOC	   = "$TB/bin/nalloc";
@@ -50,31 +51,40 @@ sub Lookup($$)
 {
     my ($class, $token) = @_;
     my $query_result;
-
-    # Look in cache first
-    return $slivers{"$token"}
-        if (exists($slivers{"$token"}));
+    my $idx;
 
     if ($token =~ /^\d+$/) {
-	$query_result =
-	    DBQueryWarn("select * from geni_slivers ".
-			"where idx='$token'");
+	$idx = $token;
     }
     elsif ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
 	$query_result =
-	    DBQueryWarn("select * from geni_slivers ".
+	    DBQueryWarn("select idx from geni_slivers ".
 			"where uuid='$token'");
+	    return undef
+		if (! $query_result || !$query_result->numrows);
+
+	    ($idx) = $query_result->fetchrow_array();
     }
     else {
 	return undef;
     }
-    
+
+    # Look in cache first
+    return $slivers{"$idx"}
+        if (exists($slivers{"$idx"}));
+
+    $query_result = DBQueryWarn("select * from geni_slivers ".
+				"where idx='$idx'");
+
     return undef
 	if (!$query_result || !$query_result->numrows);
 
-    my $self          = {};
-    $self->{'SLIVER'} = $query_result->fetchrow_hashref();
-
+    my $self              = {};
+    $self->{'SLIVER'}     = $query_result->fetchrow_hashref();
+    $self->{'TICKET'}     = undef;	# Server side.
+    $self->{'COMPONENT'}  = undef;	# Client side.
+    $self->{'CREDENTIAL'} = undef;	# Client side.
+    
     bless($self, $class);
     
     # Add to cache. 
@@ -97,16 +107,26 @@ sub Stringify($)
 }
 
 #
-# Create a sliver. 
+# Create a sliver record in the DB. On the client side we save the credential
+# that allows control of it, for later operations. We also save the component
+# pointer, but not sure that is correct.
 #
 sub Create($$;$)
 {
-    my ($class, $ticket, $uuid) = @_;
+    my ($class, $ticket, $credential) = @_;
     my @insert_data = ();
+    my $uuid;
 
     # Every sliver gets a new unique index.
     my $idx = TBGetUniqueIndex('next_sliver', 1);
-    if (!defined($uuid)) {
+    if (defined($credential)) {
+	$uuid = $credential->this_uuid();
+
+	# Store the credential
+	return undef
+	    if ($credential->Store() != 0);
+    }
+    else {
 	# And a new uuid for a local sliver.
 	$uuid = NewUUID();
 	if (!defined($uuid)) {
@@ -114,9 +134,9 @@ sub Create($$;$)
 	    return undef;
 	}
     }
-    my $slice_uuid = $ticket->slice_uuid();
-    my $owner_uuid = $ticket->owner_uuid();
-    my $node_id    = $ticket->rspec()->{'node_id'};
+    my $slice_uuid     = $ticket->slice_uuid();
+    my $owner_uuid     = $ticket->owner_uuid();
+    my $node_id        = $ticket->rspec()->{'node_id'};
 
     # Now tack on other stuff we need.
     push(@insert_data, "created=now()");
@@ -126,6 +146,13 @@ sub Create($$;$)
     push(@insert_data, "creator_uuid='$owner_uuid'");
     push(@insert_data, "slice_uuid='$slice_uuid'");
 
+    # Only on the client side.
+    push(@insert_data, "credential_idx=" . $credential->idx())
+	if (defined($credential));
+    # Only on the client side.
+    push(@insert_data, "component_idx=" . $ticket->component()->idx())
+	if (defined($ticket->component()));
+
     # Insert into DB.
     DBQueryWarn("insert into geni_slivers set " . join(",", @insert_data))
 	or return undef;
@@ -133,7 +160,11 @@ sub Create($$;$)
     my $sliver = GeniSliver->Lookup($idx);
     return undef
 	if (!defined($sliver));
-    $sliver->{'TICKET'} = $ticket;
+    
+    $sliver->{'CREDENTIAL'} = $credential
+	if (defined($credential));
+    $sliver->{'COMPONENT'} = $ticket->component()
+	if (defined($ticket->component()));
 
     return $sliver;
 }
@@ -144,8 +175,10 @@ sub uuid($)		{ return field($_[0], "uuid"); }
 sub slice_uuid($)	{ return field($_[0], "slice_uuid"); }
 sub creator_uuid($)	{ return field($_[0], "creator_uuid"); }
 sub created($)		{ return field($_[0], "created"); }
-sub cm_idx($)		{ return field($_[0], "cm_idx"); }
+sub credential_idx($)	{ return field($_[0], "credential_idx"); }
 sub node_id($)		{ return field($_[0], "node_id"); }
+sub ticket_idx($)	{ return field($_[0], "ticket_idx"); }
+sub component_idx($)	{ return field($_[0], "component_idx"); }
 
 #
 # Delete the sliver. The sliver should not be provisioned when this done.
@@ -179,20 +212,53 @@ sub GetExperiment($)
 }
 
 #
-# Get the ticket for the sliver.
+# Get the credential for the sliver.
 #
-sub GetTicket($)
+sub GetCredential($)
 {
     my ($self) = @_;
 
     return undef
 	if (! ref($self));
 
-    if (!exists($self->{'TICKET'})) {
-	print STDERR "No ticket object associated with $self\n";
+    return $self->{'CREDENTIAL'} if (defined($self->{'CREDENTIAL'}));
+
+    if (!defined($self->credential_idx())) {
+	print STDERR "No credential associated with $self\n";
 	return undef;
     }
-    return $self->{'TICKET'};
+    my $credential = GeniCredential->Lookup($self->credential_idx());
+    if (!defined($credential)) {
+	print STDERR "Could not get credential object associated with $self\n";
+	return undef;
+    }
+    $self->{'CREDENTIAL'} = $credential;
+    return $credential;
+}
+
+#
+# Get the component for the sliver.
+#
+sub GetComponent($)
+{
+    my ($self) = @_;
+
+    return undef
+	if (! ref($self));
+
+    return $self->{'COMPONENT'} if (defined($self->{'COMPONENT'}));
+
+    if (!defined($self->component_idx())) {
+	print STDERR "No component associated with $self\n";
+	return undef;
+    }
+    my $component = GeniComponent->Lookup($self->component_idx());
+    if (!defined($component)) {
+	print STDERR "Could not get component object associated with $self\n";
+	return undef;
+    }
+    $self->{'COMPONENT'} = $component;
+    return $component;
 }
 
 #
@@ -273,6 +339,11 @@ sub UnProvision($)
     if ($reservation->SameExperiment($experiment)) {
 	my $pid = $experiment->pid();
 	my $eid = $experiment->eid();
+
+	if ($experiment->DeleteVirtNode($node) != 0) {
+	    print STDERR "Could remove virtnode entry for $node from $self\n";
+	    return -1;
+	}
 	
 	system("export NORELOAD=1; $NFREE -q $pid $eid $node_id");
 	if ($?) {

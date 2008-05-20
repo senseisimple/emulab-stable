@@ -30,6 +30,7 @@ use libtestbed;
 # Hate to import all this crap; need a utility library.
 use libdb qw(TBGetUniqueIndex TBcheck_dbslot TBDB_CHECKDBSLOT_ERROR);
 use User;
+use Node;
 use English;
 use Data::Dumper;
 use Experiment;
@@ -41,9 +42,66 @@ my $TBAPPROVAL     = "@TBAPPROVALEMAIL@";
 my $TBAUDIT   	   = "@TBAUDITEMAIL@";
 my $BOSSNODE       = "@BOSSNODE@";
 my $OURDOMAIN      = "@OURDOMAIN@";
-my $GENICENTRAL    = "https://boss/protogeni/xmlrpc";
 my $CREATEEXPT     = "$TB/bin/batchexp";
 my $NALLOC	   = "$TB/bin/nalloc";
+my $AVAIL	   = "$TB/sbin/avail";
+
+#
+# Discover resources on this component, returning a resource availablity spec
+#
+sub DiscoverResources($)
+{
+    my ($argref) = @_;
+    my $slice_uuid = $argref->{'slice_uuid'};
+    my $credential = $argref->{'credential'};
+    my $user_uuid  = $ENV{'GENIUSER'};
+
+    if (! (defined($slice_uuid) && ($slice_uuid =~ /^[-\w]+$/))) {
+	return GeniResponse->MalformedArgsResponse();
+    }
+
+    $credential = GeniCredential->CreateFromSigned($credential);
+    if (!defined($credential)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not create GeniCredential object");
+    }
+    # The credential owner/slice has to match what was provided.
+    if (! ($user_uuid eq $credential->owner_uuid() &&
+	   $slice_uuid eq $credential->this_uuid())) {
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+				    "Invalid credentials for operation");
+    }
+
+    #
+    # Eventually we will take an optional rspec, but for now just return
+    # a list of free nodes using avail. 
+    #
+    if (! open(AVAIL, "$AVAIL type=pc aslist |")) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not start avail");
+    }
+    my @nodelist = ();
+    while (<AVAIL>) {
+	my $nodeid = $_;
+	chomp($nodeid);
+	my $node = Node->Lookup($nodeid);
+	push(@nodelist, $node)
+	    if (defined($node));
+    }
+    close(AVAIL);
+
+    my $xml = "<rspec xmlns:\"http://protogeni.net/resources/rspec/0.1\">\n";
+    foreach my $node (@nodelist) {
+	my $uuid = $node->uuid();
+	my $nodeid = $node->node_id();
+	
+	$xml .= "<node uuid=\"$uuid\" name=\"$nodeid\">".
+	    "<available>true</available></node>\n";
+    }
+    $xml .= "</rspec>";
+
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS, $xml);
+}
 
 #
 # Respond to a GetTicket request. No worries about credentials yet; we
@@ -56,13 +114,10 @@ sub GetTicket($)
     my $slice_uuid = $argref->{'slice_uuid'};
     my $rspec      = $argref->{'rspec'};
     my $impotent   = $argref->{'impotent'};
-    my $credstring = $argref->{'credential_string'};
+    my $credential = $argref->{'credential'};
     my $owner_uuid = $ENV{'GENIUSER'};
 
     if (! (defined($slice_uuid) && ($slice_uuid =~ /^[-\w]+$/))) {
-	return GeniResponse->MalformedArgsResponse();
-    }
-    if (! (defined($owner_uuid) && ($owner_uuid =~ /^[-\w]+$/))) {
 	return GeniResponse->MalformedArgsResponse();
     }
     if (! defined($rspec)) {
@@ -71,7 +126,7 @@ sub GetTicket($)
     $impotent = 0
 	if (!defined($impotent));
 
-    my $credential = GeniCredential->CreateFromSigned($credstring);
+    $credential = GeniCredential->CreateFromSigned($credential);
     if (!defined($credential)) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not create GeniCredential object");
@@ -165,7 +220,8 @@ sub GetTicket($)
 sub CreateSliver($)
 {
     my ($argref) = @_;
-    my $ticket   = $argref->{'ticket'};
+    my $owner_uuid = $ENV{'GENIUSER'};
+    my $ticket     = $argref->{'ticket'};
 
     if (! (defined($ticket) &&
 	   !TBcheck_dbslot($ticket, "default", "text",
@@ -178,6 +234,11 @@ sub CreateSliver($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not create GeniTicket object");
     }
+    # The credential owner has to match what is in the ticket.
+    if ($owner_uuid ne $ticket->owner_uuid()) {
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+				    "Invalid credentials for operation");
+    }
 
     my $experiment = Experiment->Lookup($ticket->slice_uuid());
     if (!defined($experiment)) {
@@ -185,9 +246,6 @@ sub CreateSliver($)
 				    "No local experiment for slice");
     }
 
-    #
-    # XXX TODO: Need to verify the invoking user is the one in the ticket.
-    #
     my $sliver = GeniSliver->Create($ticket);
     if (!defined($sliver)) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
@@ -204,60 +262,31 @@ sub CreateSliver($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not provision sliver");
     }
-    
-    return GeniResponse->Create(GENIRESPONSE_SUCCESS, $sliver->uuid(), "Wow!");
-}
-
-
-#
-# Start a sliver. I take this to mean, reboot the node. Currently, using
-# the ticket as the credential.
-#
-# XXX Credentials stuff.
-#
-sub StartSliver($)
-{
-    my ($argref) = @_;
-    my $ticket      = $argref->{'ticket'};
-    my $sliver_uuid = $argref->{'uuid'};
-
-    if (!defined($sliver_uuid)) {
-	return GeniResponse->Create(GENIRESPONSE_BADARGS);
+    #
+    # The API states we return a credential to control the sliver.
+    #
+    my $credential = GeniCredential->Create($sliver->uuid(),
+					    $owner_uuid);
+    if (!defined($credential)) {
+	print STDERR "Could not create a credential for $sliver!\n";
+	return -1;
     }
-    my $sliver = GeniSliver->Lookup($sliver_uuid);
-    if (!defined($sliver)) {
-	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
-				    "No such sliver $sliver_uuid");
+    if ($credential->Sign()) {
+	print STDERR "Could not sign sliver credential!\n";
+	return -1;
     }
-
-    if (! (defined($ticket) &&
-	   !TBcheck_dbslot($ticket, "default", "text",
-			   TBDB_CHECKDBSLOT_ERROR))) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "ticket: ". TBFieldErrorString());
-    }
-    $ticket = GeniTicket->CreateFromSignedTicket($ticket);
-    if (!defined($ticket)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "Could not create GeniTicket object");
-    }
-
-    $sliver->Start() == 0 or
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "Could not start $sliver");
-	
-    return GeniResponse->Create(GENIRESPONSE_SUCCESS);
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS, $credential->asString());
 }
 
 #
 # Destroy a sliver.
 #
-# XXX Credential stuff ...
-#
 sub DestroySliver($)
 {
     my ($argref) = @_;
+    my $owner_uuid  = $ENV{'GENIUSER'};
     my $sliver_uuid = $argref->{'uuid'};
+    my $credential  = $argref->{'credential'};
 
     if (!defined($sliver_uuid)) {
 	return GeniResponse->Create(GENIRESPONSE_BADARGS);
@@ -267,6 +296,25 @@ sub DestroySliver($)
 	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 				    "No such sliver $sliver_uuid");
     }
+
+    if (! (defined($credential) &&
+	   !TBcheck_dbslot($credential, "default", "text",
+			   TBDB_CHECKDBSLOT_ERROR))) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "credential: ". TBFieldErrorString());
+    }
+    $credential = GeniCredential->CreateFromSigned($credential);
+    if (!defined($credential)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not create GeniCredential object");
+    }
+    # The credential owner has to match what is in the ticket.
+    if (! ($owner_uuid eq $credential->owner_uuid() &&
+	   $sliver_uuid eq $credential->this_uuid())) {
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+				    "Invalid credentials for operation");
+    }
+
     $sliver->UnProvision() == 0 or
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not unprovision sliver");

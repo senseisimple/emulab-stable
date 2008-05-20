@@ -9,32 +9,46 @@ use strict;
 use lib '@prefix@/lib';
 use User;
 use Experiment;
-use GeniSAClient;
+use GeniCHClient;
 use GeniCMClient;
 use English;
+use Data::Dumper;
 
-#GeniSAClient::RegisterUser(User->ThisUser());
-
+my $blob;
 my $experiment = Experiment->Lookup("testbed", "one-node");
 my $slice;
-my $resources;
+my @resources;
 my $ticket;
 my $sliver;
 my $rspec = { "node_id"   => "pc159",
 	      "granted"   => 0};
 
-GeniCMClient::DiscoverResources($experiment, \$resources);
-print $resources->[0] . "\n";
+# Register this user at the ClearingHouse, if not already registered.
+if (GeniCHClient::LookupUser(User->ThisUser(), \$blob) != 0) {
+    if (!defined($blob)) {
+	GeniCHClient::RegisterUser(User->ThisUser());
+    }
+}
 
-GeniCMClient::GetTicket($experiment, $resources->[0], $rspec, \$ticket);
-open(T, "> /tmp/T");
-print T $ticket->asString();
-close(T);
+# Register this slice at the ClearingHouse, if not already registered.
+if (GeniCHClient::LookupSlice($experiment, \$blob) != 0) {
+    if (!defined($blob)) {
+	GeniCHClient::RegisterSlice($experiment);
+    }
+}
+
+# This gives me a list of components.
+GeniCHClient::DiscoverResources($experiment, \@resources);
+# And then resource availability rspecs from each component.
+GeniCMClient::DiscoverResources($experiment, @resources);
+
 exit(0);
-     
+GeniCMClient::GetTicket($experiment, $resources[0], $rspec, \$ticket);
 if (defined($ticket)) {
+    print Dumper($ticket);
     GeniCMClient::CreateSliver($experiment, $ticket, \$sliver);
 }
+print Dumper($sliver);
 
 # Wait for input before proceeding.
 $_ = <STDIN>;
