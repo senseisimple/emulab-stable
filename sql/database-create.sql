@@ -2880,6 +2880,7 @@ CREATE TABLE `reserved` (
   `plab_role` enum('plc','node','none') NOT NULL default 'none',
   `plab_boot` tinyint(1) default '0',
   `mustwipe` tinyint(4) NOT NULL default '0',
+  `genisliver_idx` int(10) unsigned default NULL,
   PRIMARY KEY  (`node_id`),
   UNIQUE KEY `vname` (`pid`,`eid`,`vname`),
   UNIQUE KEY `vname2` (`exptidx`,`vname`),

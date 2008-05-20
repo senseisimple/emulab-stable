@@ -4505,3 +4505,10 @@ last_net_act,last_cpu_act,last_ext_act);
 
        alter table nodes add `uuid` varchar(40) NOT NULL default '';
        update nodes set uuid=UUID();
+
+4.152: Add a marker to the reserved table to indicate the node is part of
+       a sliver.
+
+       alter table reserved add `genisliver_idx` int(10) unsigned
+            default NULL;
+       
