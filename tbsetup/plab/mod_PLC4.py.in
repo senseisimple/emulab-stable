@@ -731,7 +731,29 @@ class mod_PLC4:
                       % slice.slicename
                 raise
             pass
-        
+
+        # Allow slice attributes to be set "generically" via the db
+        sas = self.plc.getAttrVal("slice_attributes",required=False)
+        if sas:
+            try:
+                kvpairs = sas.split(',')
+                for kvp in kvpairs:
+                    (k,v) = kvp.split(':',1)
+
+                    res = tryXmlrpcCmd(agent.SliceAddAttribute,(k,v),
+                                       OKstrs = ['Slice attribute already exists'])
+                    if debug:
+                        print "SliceAddAttribute(%s,%s) result: %s" \
+                              % (str(k),str(v),res)
+                        pass
+                    pass
+                pass
+            except:
+                print "Failed to set slice attribute %s=%s on slice %s" \
+                      % (str(k),str(v),slice.slicename)
+                raise
+            pass
+
         try:
             userlist = slice.getSliceUsers()
             # XXX: we might not always want to add emulabman
@@ -1012,6 +1034,11 @@ class mod_PLC4:
 
     def createNode(self, node):
         plcagent = self.__getAgent(node.slice.slicename)
+
+        if debug:
+            print "createNode for node %s (%s/%s) starting" \
+                  % (str(node.nodeid),str(node.hostname),str(node.IP))
+            pass
 
         ticketdata = cPickle.loads(node.slice.slicemeta)
         node.nmagent = NM4agent(node.IP,node.nodeid,self.nmuid,self.nmkey)
