@@ -51,6 +51,7 @@ my $USERDIR	= USERROOT();
 my $SSLDIR      = "$TB/lib/ssl";
 my $EMULAB_CERT = "$TB/etc/emulab.pem";
 my $EMULAB_KEY  = "$TB/etc/emulab.key";
+my $GENICERTS   = "$TB/etc/genicacerts";
 my $OPENSSL     = "/usr/bin/openssl";
 my $XMLLINT     = "/usr/local/bin/xmllint";
 my $XMLSEC1     = "/usr/local/bin/xmlsec1";
@@ -204,12 +205,18 @@ while (defined($temp)) {
 }
 
 #
-# The certficate used to sign the credential is either the Emulab certificate
-# or that of the user delegating the credential. For now lets just use the
-# Emulab certificate. I will add user signing later.
+# The certficate used to sign the credential was either the Emulab certificate
+# or that of the user delegating the credential. For now we just worry about
+# the emulab credentials. We have the trusted roots cached, so generate a list
+# of them.
 #
-$keyfile  = $EMULAB_KEY;
-$certfile = $EMULAB_CERT;
+opendir(DIR, "$GENICERTS") or
+    fatal("Cannot opendir $GENICERTS: $!");
+my @pemfiles = grep {/^.*\.pem$/} readdir(DIR);
+closedir(DIR);
+
+my $certarg = " " . join(" ", map("--trusted-pem $GENICERTS/$_", @pemfiles)) .
+    " --trusted-pem $EMULAB_CERT";
 
 #
 # Lets first make sure that the data has not been messed with; for each
@@ -217,9 +224,34 @@ $certfile = $EMULAB_CERT;
 # covers the credential and all the parents up to the top.
 #
 foreach my $sigid (keys(%credentials)) {
-    system("$XMLSEC1 --verify --node-id Sig_$sigid ".
-	   "       --trusted-pem $certfile $xmlfile > /dev/null 2>&1")
-	== 0 or fatal("Credential $sigid does not verify");
+    my $cmd = "$XMLSEC1 --verify --node-id Sig_$sigid $certarg $xmlfile";
+    print "$cmd\n"
+	if ($debug);
+
+    open(SEC, "$cmd 2>&1 |")
+	or fatal("Could not start xmlsec1 on $xmlfile");
+
+    #
+    # xmlsec1 is really braindead. It returns zero status if the signature
+    # verifies, even if the cert chain fails to verify. So, must get a single
+    # line back, "OK" for us to consider it really okay.
+    #
+    my $bad  = 0;
+    my $line = <SEC>;
+    if (!defined($line) || !($line =~ /^OK$/)) {
+	$bad = 1;
+    }
+    print $line
+	if (defined($line) && $debug);
+    while (<SEC>) {
+	print $_
+	    if ($debug);
+    }
+    close(SEC) or
+	fatal($! ? "Error closing $XMLSEC1 pipe: $!"
+	         : "Exit status $? from $XMLSEC1");
+    fatal("$sigid in $xmlfile did not verify!")
+	if ($bad);
 }
 exit(0);
 

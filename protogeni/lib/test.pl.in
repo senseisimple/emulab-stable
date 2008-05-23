@@ -11,43 +11,97 @@ use User;
 use Experiment;
 use GeniCHClient;
 use GeniCMClient;
+use GeniUser;
+use GeniCredential;
+use GeniSlice;
 use English;
 use Data::Dumper;
 
+my $this_user = User->LookupByUnixId($UID);
+if (! defined($this_user)) {
+    print STDERR "You ($UID) do not exist!\n";
+    exit(-1);
+}
+
 my $blob;
 my $experiment = Experiment->Lookup("testbed", "one-node");
-my $slice;
+my @components;
 my @resources;
 my $ticket;
 my $sliver;
-my $rspec = { "node_id"   => "pc159",
-	      "granted"   => 0};
 
-# Register this user at the ClearingHouse, if not already registered.
-if (GeniCHClient::LookupUser(User->ThisUser(), \$blob) != 0) {
-    if (!defined($blob)) {
-	GeniCHClient::RegisterUser(User->ThisUser());
+#
+# Create a Geni user from local user. This just checks the registry
+# and inserts an entry if none exists.
+#
+my $geniuser = GeniUser->CreateFromLocal($this_user);
+if (!defined($geniuser)) {
+    die("Could not create a geni user from local user $this_user\n");
+}
+$geniuser->Register() == 0
+    or die("Could not register $geniuser at the Geni ClearingHouse.\n");
+
+#
+# See if there is a local slice record. If not, create one, then
+# register the new slice at the ClearingHouse.
+#
+my $slice = GeniSlice->Lookup($experiment->uuid());
+if (!defined($slice)) {
+    $slice = GeniSlice->CreateFromLocal($experiment, User->ThisUser());
+    if (!defined($slice)) {
+	die("Could not create a local slice record for $experiment\n");
+    }
+    if ($slice->Register() != 0) {
+	$slice->Delete();
+	die("Could not register slice at Geni ClearingHouse.\n");
     }
 }
 
-# Register this slice at the ClearingHouse, if not already registered.
-if (GeniCHClient::LookupSlice($experiment, \$blob) != 0) {
-    if (!defined($blob)) {
-	GeniCHClient::RegisterSlice($experiment);
-    }
+#
+# Discover resources appropriate for the slice (experiment). This is
+# due to change when there is a discovery service at the clearing house.
+# For now, we get back a list of components.
+#
+$slice->DiscoverResources(\@components) == 0 or
+    die("Could not discover resources for $slice\n");
+print Dumper(@components);
+
+#
+# Generate a credential for resource discovery on components. The credential
+# is signed by the local SA, but could just as easily be signed by the slice
+# certificate. 
+#
+my $credential = GeniCredential->Create($slice, $geniuser);
+if (!defined($credential)) {
+    print STDERR "Could not create a slice credential for $slice!\n";
+    exit(-1);
+}
+if ($credential->Sign($GeniCredential::LOCALSA_FLAG)) {
+    print STDERR "Could not sign slice credential!\n";
+    exit(-1);
 }
 
-# This gives me a list of components.
-GeniCHClient::DiscoverResources($experiment, \@resources);
-# And then resource availability rspecs from each component.
-GeniCMClient::DiscoverResources($experiment, @resources);
+foreach my $component (@components) {
+    my $rspec;
+    
+    if ($component->DiscoverResources($slice,
+				      $this_user, $credential, \$rspec) != 0) {
+	print STDERR "Could not discover resources on $component\n";
+	exit(-1);
+    }
+    push(@resources, $rspec);
+    print Dumper($rspec);
+}
 
+# Now that we have some resource availability rspecs, generate a request
+# rspec. This is gonna need a lot more work!
+my $rspec = $resources[0];
+print Dumper($rspec);
 exit(0);
-GeniCMClient::GetTicket($experiment, $resources[0], $rspec, \$ticket);
-if (defined($ticket)) {
-    print Dumper($ticket);
-    GeniCMClient::CreateSliver($experiment, $ticket, \$sliver);
-}
+
+GeniCMClient::GetTicket($experiment, $components[0], $rspec, \$ticket);
+
+GeniCMClient::CreateSliver($experiment, $ticket, \$sliver);
 print Dumper($sliver);
 
 # Wait for input before proceeding.

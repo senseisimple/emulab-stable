@@ -28,6 +28,7 @@ use Experiment;
 use libdb qw(TBGetUniqueIndex);
 use English;
 use overload ('""' => 'Stringify');
+use XML::Simple;
 
 # Configure variables
 my $TB		   = "@prefix@";
@@ -79,6 +80,19 @@ sub Lookup($$)
     my $self              = {};
     $self->{'COMPONENT'}  = $query_result->fetchrow_hashref();
     bless($self, $class);
+
+    #
+    # Grab the certificate, since we will probably want it.
+    #
+    my $uuid = $self->{'COMPONENT'}->{'uuid'};
+    $query_result = DBQueryWarn("select cert from geni_certificates ".
+				"where uuid='$uuid'");
+    if (!$query_result || !$query_result->numrows) {
+	print STDERR "Could not find certificate for component $idx\n";
+	return undef;
+    }
+    my ($cert) = $query_result->fetchrow_array();
+    $self->{'COMPONENT'}->{'cert'} = $cert;
     
     # Add to cache. 
     $components{$self->{'COMPONENT'}->{'idx'}} = $self;
@@ -104,7 +118,7 @@ sub Stringify($)
 #
 sub Create($$$$;$$)
 {
-    my ($class, $uuid, $hrn, $url) = @_;
+    my ($class, $uuid, $hrn, $url, $cert) = @_;
 
     my @insert_data = ();
     my $idx = TBGetUniqueIndex('next_component', 1);
@@ -112,6 +126,7 @@ sub Create($$$$;$$)
     my $safe_hrn  = DBQuoteSpecial($hrn);
     my $safe_url  = DBQuoteSpecial($url);
     my $safe_uuid = DBQuoteSpecial($uuid);
+    my $safe_cert = DBQuoteSpecial($cert);
     
     # Now tack on other stuff we need.
     push(@insert_data, "created=now()");
@@ -121,8 +136,15 @@ sub Create($$$$;$$)
     push(@insert_data, "uuid=$safe_uuid");
 
     # Insert into DB.
-    DBQueryWarn("insert into geni_components set " . join(",", @insert_data))
+    DBQueryWarn("replace into geni_components set " . join(",", @insert_data))
 	or return undef;
+
+    # Insert the certificate.
+    if (!DBQueryWarn("replace into geni_certificates set ".
+		     "  uuid=$safe_uuid, cert=$safe_cert")) {
+	DBQueryWarn("delete from geni_components where idx='$idx'");
+	return undef;
+    }
 
     return GeniComponent->Lookup($idx);
 }
@@ -132,6 +154,7 @@ sub idx($)		{ return field($_[0], "idx"); }
 sub uuid($)		{ return field($_[0], "uuid"); }
 sub url($)		{ return field($_[0], "url"); }
 sub hrn($)		{ return field($_[0], "hrn"); }
+sub cert($)		{ return field($_[0], "cert"); }
 
 #
 # Refresh a class instance by reloading from the DB.
@@ -143,7 +166,8 @@ sub Refresh($)
     return -1
 	if (! ref($self));
 
-    my $idx = $self->idx();
+    my $idx  = $self->idx();
+    my $uuid = $self->uuid();
 
     my $query_result =
 	DBQueryWarn("select * from geni_components where idx=$idx");
@@ -152,6 +176,19 @@ sub Refresh($)
 	if (!$query_result || !$query_result->numrows);
 
     $self->{'COMPONENT'}  = $query_result->fetchrow_hashref();
+
+    #
+    # Grab the certificate, since we will probably want it.
+    #
+    $query_result = DBQueryWarn("select cert from geni_certificates ".
+				"where uuid='$uuid'");
+    if (!$query_result || !$query_result->numrows) {
+	print STDERR "Could not find certificate for component $idx\n";
+	return undef;
+    }
+    my ($cert) = $query_result->fetchrow_array();
+    $self->{'COMPONENT'}->{'cert'} = $cert;
+    
     return 0;
 }
 
@@ -185,23 +222,26 @@ sub Update($$)
 #
 sub DiscoverResources($$$$$)
 {
-    my ($self, $user, $credential, $slice_uuid, $pref) = @_;
+    my ($self, $slice, $user, $credential, $pref) = @_;
 
     # Must be a real reference. 
     return -1
-	if (! ref($self));
+	if (! (ref($self) && ref($slice) && ref($user) && ref($credential)));
 
     my $response =
 	Genixmlrpc::CallMethodHTTP($self->url(),
 				   $user,
 				   "CM::DiscoverResources",
-				   { "slice_uuid"   => $slice_uuid,
-				     "credential"   => $credential->asString()
+				   { "slice"       => $slice->cert(),
+				     "credential"  => $credential->asString()
 				     });
     
-    return undef
+    return -1
 	if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS);
 
+    my $rspec = XMLin($response->value(), ForceArray => ["node"]);
+    $$pref = $rspec;
+    
     return 0;
 }
 
@@ -211,10 +251,16 @@ sub DiscoverResources($$$$$)
 sub GetTicket($$$$$)
 {
     my ($self, $user, $credential, $slice_uuid, $rspec) = @_;
+    my $rspec_xml = $rspec;
 
     # Must be a real reference. 
     return -1
 	if (! ref($self));
+
+    # The rspec is passed as XML. If we get a ref, convert it.
+    if (ref($rspec_xml)) {
+	$rspec_xml = XMLout($rspec_xml, RootName => "rspec");
+    }
 
     my $response = 				       
 	Genixmlrpc::CallMethodHTTP($self->url(),
@@ -223,7 +269,7 @@ sub GetTicket($$$$$)
 				   { "slice_uuid"   => $slice_uuid,
 				     "credential"   => $credential->asString(),
 				     "impotent"     => 0,
-				     "rspec"        => $rspec });
+				     "rspec"        => $rspec_xml });
     
     return undef
 	if (!defined($response));

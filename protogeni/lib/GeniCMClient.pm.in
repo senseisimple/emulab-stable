@@ -42,46 +42,6 @@ my $GENICENTRAL    = "myboss.little-emulab-bsd61.testbed.emulab.net";
 my $GENICENTRALURL = "https://$GENICENTRAL/protogeni/xmlrpc";
 
 #
-# Discover resources on components, for this experiment.
-#
-sub DiscoverResources($@)
-{
-    my ($experiment, @resources) = @_;
-    my $rspec;
-
-    #
-    # XXX 
-    #
-    my $this_user = User->LookupByUnixId($UID);
-    if (! defined($this_user)) {
-    	print STDERR "You ($UID) do not exist!\n";
-	return -1;
-    }
-
-    # Need to construct a credential.
-    my $credential = GeniCredential->Create($experiment->uuid(),
-					    $this_user->uuid());
-    if (!defined($credential)) {
-	print STDERR "Could not create a slice credential for $experiment!\n";
-	return -1;
-    }
-    if ($credential->AddCapability("createslice", 0)) {
-	print STDERR "Could not add capability to slice credential!\n";
-	return -1;
-    }
-    if ($credential->Sign()) {
-	print STDERR "Could not sign slice credential!\n";
-	return -1;
-    }
-
-    foreach my $component (@resources) {
-	$component->DiscoverResources($this_user, $credential,
-				      $experiment->uuid(), \$rspec);
-    }
-    return 0;
-}
-
-#
 # Ask for a ticket. We provide an rspec. Neither of these are defined yet
 # so lets be simpleminded; send a count of nodes we want and get back a
 # count of nodes that can be allocated. I realize there is a problem of
@@ -108,10 +68,6 @@ sub GetTicket($$$$)
 					    $this_user->uuid());
     if (!defined($credential)) {
 	print STDERR "Could not create a slice credential for $experiment!\n";
-	return -1;
-    }
-    if ($credential->AddCapability("createslice", 0)) {
-	print STDERR "Could not add capability to slice credential!\n";
 	return -1;
     }
     if ($credential->Sign()) {

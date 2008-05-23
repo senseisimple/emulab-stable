@@ -24,7 +24,6 @@ use GeniDB;
 use Genixmlrpc;
 use GeniResponse;
 use User;
-use GeniUser;
 use libtestbed;
 use English;
 use Data::Dumper;
@@ -37,21 +36,21 @@ my $TBAUDIT   	   = "@TBAUDITEMAIL@";
 my $BOSSNODE       = "@BOSSNODE@";
 my $OURDOMAIN      = "@OURDOMAIN@";
 my $GENICENTRAL    = "myboss.little-emulab-bsd61.testbed.emulab.net";
-my $GENICENTRALURL = "https://$GENICENTRAL/protogeni/xmlrpc";
+my $GENICENTRALURL = "https://$GENICENTRAL/protogeni/xmlrpc/ch";
 
 #
 # Lookup a user at the clearing house.
 #
 sub LookupUser($$)
 {
-    my ($user, $pref) = @_;
+    my ($uuid, $pref) = @_;
 
     $$pref = undef;
     
     my $response =
 	Genixmlrpc::CallMethodHTTP($GENICENTRALURL, undef,
 				   "CH::LookupUser",
-				   { "uuid"  => $user->uuid()});
+				   { "uuid"  => $uuid });
     return -1
 	if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS);
     
@@ -64,14 +63,14 @@ sub LookupUser($$)
 #
 sub LookupSlice($$)
 {
-    my ($experiment, $pref) = @_;
+    my ($uuid, $pref) = @_;
 
     $$pref = undef;
     
     my $response =
 	Genixmlrpc::CallMethodHTTP($GENICENTRALURL, undef,
 				   "CH::LookupSlice",
-				   { "uuid"  => $experiment->uuid()});
+				   { "uuid"  => $uuid });
     return -1
 	if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS);
     
@@ -83,29 +82,17 @@ sub LookupSlice($$)
 # Register a local Emulab user at the Geni ClearingHouse (which in the
 # prototype is Utah Emulab).
 #
-sub RegisterUser($)
+sub RegisterUser($$$$$)
 {
-    my ($user) = @_;
-    my $cert;
-
-    if ($user->SSLCert(1, \$cert)) {
-	print STDERR
-	    "Geni::RegisterUser - No encrypted certificate found for $user\n";
-	return -1;
-    }
-
-    # XXX Form hrn from the uid and domain. This is backwards.
-    my $hrn = $OURDOMAIN . "." . $user->uid();
+    my ($hrn, $uuid, $name, $email, $cert) = @_;
 
     my $response =
 	Genixmlrpc::CallMethodHTTP($GENICENTRALURL, undef,
 				   "CH::RegisterUser",
 				   { "hrn"   => $hrn,
-				     # Optional, prefered local login id.
-					     "uid"   => $user->uid(),
-				     "uuid"  => $user->uuid(),
-				     "name"  => $user->name(),
-				     "email" => $user->email(),
+				     "uuid"  => $uuid,
+				     "name"  => $name,
+				     "email" => $email,
 				     "cert"  => $cert});
 
     return -1
@@ -117,20 +104,17 @@ sub RegisterUser($)
 #
 # Register a local Emulab experiment at the Clearinghouse, as a slice.
 #
-sub RegisterSlice($)
+sub RegisterSlice($$$$)
 {
-    my ($experiment) = @_;
-    my $user = $experiment->GetCreator();
-
-    # XXX Form hrn from the uid and domain. This is backwards.
-    my $hrn = $OURDOMAIN . "." . $experiment->pid() . "." . $experiment->eid();
+    my ($hrn, $uuid, $creator_uuid, $cert) = @_;
 
     my $response =
 	Genixmlrpc::CallMethodHTTP($GENICENTRALURL, undef,
 				   "CH::CreateSliceName",
 				   { "hrn"   => $hrn,
-				     "uuid"  => $experiment->uuid(),
-				     "creator_uuid" => $user->uuid()});
+				     "uuid"  => $uuid,
+				     "creator_uuid" => $creator_uuid,
+				     "cert"  => $cert });
     
     return -1
 	if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS);
@@ -143,12 +127,12 @@ sub RegisterSlice($)
 #
 sub DeleteSlice($)
 {
-    my ($experiment) = @_;
+    my ($uuid) = @_;
 
     my $response =
 	Genixmlrpc::CallMethodHTTP($GENICENTRALURL, undef,
 				   "CH::FreeSliceName",
-				   { "uuid"  => $experiment->uuid()});
+				   { "uuid"  => $uuid });
 
     return -1
 	if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS);
@@ -165,21 +149,12 @@ sub DeleteSlice($)
 #
 sub DiscoverResources($$)
 {
-    my ($experiment, $pref) = @_;
+    my ($slice, $pref) = @_;
 
-    #
-    # XXX 
-    #
-    my $this_user = User->LookupByUnixId($UID);
-    if (! defined($this_user)) {
-    	print STDERR "You ($UID) do not exist!\n";
-	return -1;
-    }
-    
     my $response =
 	Genixmlrpc::CallMethodHTTP($GENICENTRALURL, undef,
 				   "CH::DiscoverResources",
-				   { "slice_uuid"  => $experiment->uuid() });
+				   { "slice"  => $slice->cert() });
 
     return -1
 	if (!defined($response));
@@ -188,7 +163,7 @@ sub DiscoverResources($$)
 	if ($response->code() != GENIRESPONSE_SUCCESS);
 
     #
-    # We get back a list of components right now, whic we cache locally.
+    # We get back a list of components right now, which we cache locally.
     #
     my @result = ();
     
@@ -196,10 +171,11 @@ sub DiscoverResources($$)
 	my $uuid = $ref->{'uuid'};
 	my $url  = $ref->{'url'};
 	my $hrn  = $ref->{'hrn'};
+	my $cert = $ref->{'cert'};
 
 	my $component = GeniComponent->Lookup($uuid);
 	if (!defined($component)) {
-	    $component = GeniComponent->Create($uuid, $hrn, $url);
+	    $component = GeniComponent->Create($uuid, $hrn, $url, $cert);
 	    if (!defined($component)) {
 		return GeniResponse->Create(GENIRESPONSE_DBERROR);
 	    }

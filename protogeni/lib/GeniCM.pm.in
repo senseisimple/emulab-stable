@@ -24,6 +24,7 @@ use Genixmlrpc;
 use GeniResponse;
 use GeniTicket;
 use GeniCredential;
+use GeniSlice;
 use GeniSliver;
 use GeniUser;
 use libtestbed;
@@ -33,6 +34,7 @@ use User;
 use Node;
 use English;
 use Data::Dumper;
+use XML::Simple;
 use Experiment;
 
 # Configure variables
@@ -52,11 +54,12 @@ my $AVAIL	   = "$TB/sbin/avail";
 sub DiscoverResources($)
 {
     my ($argref) = @_;
-    my $slice_uuid = $argref->{'slice_uuid'};
+    my $slice      = $argref->{'slice'};
     my $credential = $argref->{'credential'};
     my $user_uuid  = $ENV{'GENIUSER'};
+    my $slice_uuid;
 
-    if (! (defined($slice_uuid) && ($slice_uuid =~ /^[-\w]+$/))) {
+    if (! defined($slice)) {
 	return GeniResponse->MalformedArgsResponse();
     }
 
@@ -65,6 +68,10 @@ sub DiscoverResources($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not create GeniCredential object");
     }
+    GeniCredential->CertificateInfo($slice, \$slice_uuid) == 0 or
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not get uuid from Certificate");
+	
     # The credential owner/slice has to match what was provided.
     if (! ($user_uuid eq $credential->owner_uuid() &&
 	   $slice_uuid eq $credential->this_uuid())) {
@@ -90,7 +97,7 @@ sub DiscoverResources($)
     }
     close(AVAIL);
 
-    my $xml = "<rspec xmlns:\"http://protogeni.net/resources/rspec/0.1\">\n";
+    my $xml = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\">\n";
     foreach my $node (@nodelist) {
 	my $uuid = $node->uuid();
 	my $nodeid = $node->node_id();
@@ -104,9 +111,7 @@ sub DiscoverResources($)
 }
 
 #
-# Respond to a GetTicket request. No worries about credentials yet; we
-# trust the caller cause it got past the SSL client verify checks in the
-# web server.
+# Respond to a GetTicket request. 
 #
 sub GetTicket($)
 {
@@ -118,11 +123,16 @@ sub GetTicket($)
     my $owner_uuid = $ENV{'GENIUSER'};
 
     if (! (defined($slice_uuid) && ($slice_uuid =~ /^[-\w]+$/))) {
-	return GeniResponse->MalformedArgsResponse();
+	GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+			     "Improper slice uuid");	
     }
-    if (! defined($rspec)) {
-	return GeniResponse->MalformedArgsResponse();
+    if (! (defined($rspec) && ($rspec =~ /^[-\w]+$/))) {
+	GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+			     "Improper rspec");	
     }
+    # Convert the rspec back to a structure.
+    $rspec = XMLin($rspec, ForceArray => ["node"]);
+
     $impotent = 0
 	if (!defined($impotent));
 
@@ -137,6 +147,18 @@ sub GetTicket($)
 	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
 				    "Invalid credentials for operation");
     }
+
+    #
+    # See if we have a record of this slice in the DB. If not, then we have
+    # to go to the ClearingHouse to find its record, so that we can find out
+    # who the SA for it is.
+    #
+    my $slice = GeniSlice->Lookup($slice_uuid);
+    if (!defined($slice)) {
+
+    }
+
+    
 
     #
     # XXX Should we create a local geni_slices record in the DB?
@@ -164,20 +186,23 @@ sub GetTicket($)
     }
 
     #
-    # An rspec is a structure that requests a specific node. If that node
-    # is available, then reserve it. Otherwise the ticket cannot be
-    # granted.
+    # An rspec is a structure that requests specific nodes. If those
+    # nodes are available, then reserve it. Otherwise the ticket
+    # cannot be granted. 
     #
-    my $node_id = $rspec->{'node_id'};
+    my @nodeids = ();
     my $pid     = $experiment->pid();
     my $eid     = $experiment->eid();
 
-    if (defined($node_id) && $node_id =~ /^(\w*)$/) {
-	$node_id = $1;
-    }
-    else {
-	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
-				    "Improper node id");
+    foreach my $node_id (keys(%{$rspec->{'node'}})) {
+	if ($node_id =~ /^(\w*)$/) {
+	    $node_id = $1;
+	}
+	else {
+	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+					"Improper node id: $node_id");
+	}
+	push(@nodeids, $node_id);
     }
 
     #
@@ -190,7 +215,7 @@ sub GetTicket($)
     }
     # Nalloc might fail if the node gets picked up by someone else.
     if (!$impotent) {
-	system("$NALLOC $pid $eid $node_id");
+	system("$NALLOC $pid $eid @nodeids");
 	if (($? >> 8) < 0) {
 	    $ticket->Delete();
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
@@ -203,7 +228,7 @@ sub GetTicket($)
 	}
     }
     if ($ticket->Sign() != 0) {
-	# Release will free the node.
+	# Release will free the nodes.
 	$ticket->Release();
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not sign Ticket");
@@ -214,8 +239,6 @@ sub GetTicket($)
 
 #
 # Create a sliver.
-#
-# XXX Credentials stuff.
 #
 sub CreateSliver($)
 {

@@ -30,8 +30,10 @@ sub DBErr()		{ return emdbi::DBErrN($dbnum); }
 
 $emdbi::DBQUERY_DEBUG = 0;
 
+my $GENI_DBNAME = (defined($main::GENI_DBNAME) ? $main::GENI_DBNAME : "geni");
+
 # Default connection.
-$dbnum = emdbi::NewTBDBHandle("geni")
+$dbnum = emdbi::NewTBDBHandle("$GENI_DBNAME")
     if (!defined($dbnum));
 
 # _Always_ make sure that this 1 is at the end of the file...

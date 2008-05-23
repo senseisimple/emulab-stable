@@ -14,11 +14,15 @@ use strict;
 use English;
 use Frontier::Responder;
 
+# Do this early so that we talk to the right DB.
+use vars qw($GENI_DBNAME);
+BEGIN { $GENI_DBNAME = "geni"; }
+
 # Testbed libraries.
 use lib '@prefix@/lib';
 use User;
 use GeniCM;
-use GeniCH;
+use GeniSA;
 use libaudit;
 
 # Geniuser.
@@ -82,16 +86,10 @@ else {
 LogStart(0);
 
 my $responder = Frontier::Responder->new( "methods" => {
-    "CH::LookupUser"        => \&GeniCH::LookupUser,
-    "CH::RegisterUser"      => \&GeniCH::RegisterUser,
-    "CH::LookupSlice"       => \&GeniCH::LookupSlice,
-    "CH::CreateSliceName"   => \&GeniCH::RegisterSlice,
-    "CH::DiscoverResources" => \&GeniCH::DiscoverResources,
     "CM::DiscoverResources" => \&GeniCM::DiscoverResources,
     "CM::GetTicket"         => \&GeniCM::GetTicket,
     "CM::CreateSliver"      => \&GeniCM::CreateSliver,
     "CM::DestroySliver"     => \&GeniCM::DestroySliver,
-    "add"                   => \&Protogeni::add,
    },
 );
 

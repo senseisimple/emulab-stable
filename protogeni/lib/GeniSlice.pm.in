@@ -16,9 +16,11 @@ use vars qw(@ISA @EXPORT);
 # Must come after package declaration!
 use lib '@prefix@/lib';
 use GeniDB;
+use GeniCHClient;
 use libtestbed;
 # Hate to import all this crap; need a utility library.
 use libdb qw(TBGetUniqueIndex);
+use Experiment;
 use English;
 use overload ('""' => 'Stringify');
 use vars qw();
@@ -31,6 +33,7 @@ my $TBAUDIT   	   = "@TBAUDITEMAIL@";
 my $BOSSNODE       = "@BOSSNODE@";
 my $CONTROL	   = "@USERNODE@";
 my $OURDOMAIN      = "@OURDOMAIN@";
+my $MKCERT         = "$TB/sbin/mksyscert";
 
 # Cache of instances to avoid regenerating them.
 my %slices     = ();
@@ -82,8 +85,20 @@ sub Lookup($$)
 
     my $self         = {};
     $self->{'SLICE'} = $query_result->fetchrow_hashref();
-
     bless($self, $class);
+
+    #
+    # Grab the certificate, since we will probably want it.
+    #
+    my $uuid = $self->{'SLICE'}->{'uuid'};
+    $query_result = DBQueryWarn("select cert from geni_certificates ".
+				"where uuid='$uuid'");
+    if (!$query_result || !$query_result->numrows) {
+	print STDERR "Could not find certificate for slice $idx\n";
+	return undef;
+    }
+    my ($cert) = $query_result->fetchrow_array();
+    $self->{'SLICE'}->{'cert'} = $cert;
     
     # Add to cache. 
     $slices{$self->{'SLICE'}->{'idx'}} = $self;
@@ -98,6 +113,7 @@ sub uuid($)		{ return field($_[0], "uuid"); }
 sub creator_uuid($)	{ return field($_[0], "creator_uuid"); }
 sub created($)		{ return field($_[0], "created"); }
 sub sa_idx($)		{ return field($_[0], "sa_idx"); }
+sub cert($)		{ return field($_[0], "cert"); }
 
 #
 # Stringify for output.
@@ -134,11 +150,11 @@ sub CheckExisting($$$)
 }
 
 #
-# Class function to create new Geni slice and return object.
+# Class function to create new Geni slice and return the object.
 #
-sub Create($$$$)
+sub Create($$$$$$)
 {
-    my ($class, $hrn, $uuid, $creator_uuid, $sa_idx) = @_;
+    my ($class, $hrn, $uuid, $creator_uuid, $cert, $sa_idx) = @_;
     my @insert_data = ();
 
     # Every slice gets a new unique index.
@@ -152,6 +168,7 @@ sub Create($$$$)
     my $safe_hrn   = DBQuoteSpecial($hrn);
     my $safe_uuid  = DBQuoteSpecial($uuid);
     my $safe_cuuid = DBQuoteSpecial($creator_uuid);
+    my $safe_cert  = DBQuoteSpecial($cert);
     push(@insert_data, "hrn=$safe_hrn");
     push(@insert_data, "uuid=$safe_uuid");
     push(@insert_data, "creator_uuid=$safe_cuuid");
@@ -160,7 +177,92 @@ sub Create($$$$)
     DBQueryWarn("insert into geni_slices set " . join(",", @insert_data))
 	or return undef;
 
+    # Insert the certificate.
+    if (!DBQueryWarn("insert into geni_certificates set ".
+		     "  uuid=$safe_uuid, cert=$safe_cert")) {
+	DBQueryWarn("delete from geni_slices where idx='$idx'");
+	return undef;
+    }
+
     return GeniSlice->Lookup($idx);
+}
+
+#
+# Class function to create new Geni slice from a local experiment.
+#
+sub CreateFromLocal($$)
+{
+    my ($class, $experiment, $user) = @_;
+
+    # XXX Form hrn from the uid and domain. This is backwards.
+    my $hrn = $OURDOMAIN . "." . $experiment->pid() . "." . $experiment->eid();
+    my $uuid = $experiment->uuid();
+    my $creator_uuid = $user->uuid();
+
+    # Set the sa_idx to zero to indicate a local slice.
+    my $sa_idx = 0;
+
+    #
+    # Generate a certificate pair, capturing the certificate to store in
+    # the DB so we have ready access to it.
+    #
+    my $certfile = $experiment->WorkDir() . "/genicert.pem";
+    system("$MKCERT -o $certfile slice $uuid");
+    if ($?) {
+	print STDERR "Could not start $MKCERT\n";
+	return undef;
+    }
+    my $cert;
+    open(CERT, $certfile) or
+	return undef;
+    while (<CERT>) {
+	if ($_ =~ /^-----BEGIN CERT/) {
+	    $cert = "";
+	    next;
+	}
+	last
+	    if ($_ =~ /^-----END CERT/);
+	next
+	    if (!defined($cert));
+	$cert .= $_;
+    }
+    close(CERT);
+    return GeniSlice->Create($hrn, $uuid, $creator_uuid, $cert, $sa_idx);
+}
+
+#
+# Register a local slice at the clearinghouse;
+#
+sub Register($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    GeniCHClient::RegisterSlice($self->hrn(), $self->uuid(),
+				$self->creator_uuid(), $self->cert())
+	== 0 or return -1;
+    
+    return 0;
+}
+
+#
+# Discover resources for a local slice. We do not worry about the experiment
+# yet, since we do not have a resource discovery service. We get back a list
+# of components.
+#
+sub DiscoverResources($$)
+{
+    my ($self, $pref) = @_;
+
+    return -1
+	if (! ref($self));
+
+    GeniCHClient::DiscoverResources($self, $pref) == 0
+	or return -1;
+    
+    return 0;
 }
 
 #
@@ -173,8 +275,11 @@ sub Delete($)
     return -1
 	if (! ref($self));
 
-    my $idx = $self->idx();
+    my $idx  = $self->idx();
+    my $uuid = $self->uuid();
 
+    DBQueryWarn("delete from geni_certificates where uuid='$uuid'")
+	or return -1;
     DBQueryWarn("delete from geni_slices where idx='$idx'")
 	or return -1;
     

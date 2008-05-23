@@ -24,6 +24,7 @@ use GeniResponse;
 use User;
 use GeniUser;
 use GeniSlice;
+use GeniComponent;
 use libtestbed;
 use emutil;
 use English;
@@ -84,7 +85,8 @@ sub LookupSlice($)
     # Return a blob.
     my $blob = { "hrn"          => $slice->hrn(),
 		 "uuid"         => $slice->uuid(),
-		 "creator_uuid" => $slice->creator_uuid() };
+		 "creator_uuid" => $slice->creator_uuid(),
+		 "cert"         => $slice->cert() };
 
     return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
 }
@@ -197,6 +199,7 @@ sub RegisterSlice($)
     my $hrn   = $argref->{'hrn'};
     my $uuid  = $argref->{'uuid'};
     my $creator_uuid  = $argref->{'creator_uuid'};
+    my $cert  = $argref->{'cert'};
 
     if (! (defined($hrn) && defined($uuid) && defined($creator_uuid))) {
 	return Protogeni::MalformedArgsResponse();
@@ -210,10 +213,13 @@ sub RegisterSlice($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "uuid: Invalid characters");
     }
-
     if (! ($creator_uuid =~ /^[-\w]*$/)) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "creator_uuid: Invalid characters");
+    }
+    if (! ($cert =~ /^[\012\015\040-\176]*$/)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "cert: Invalid characters");
     }
 
     #
@@ -261,7 +267,8 @@ sub RegisterSlice($)
 				    "Improper format for uuid");
     }
 
-    my $newslice = GeniSlice->Create($hrn, $uuid, $creator_uuid, $sa_idx);
+    my $newslice = GeniSlice->Create($hrn, $uuid, $creator_uuid, $cert,
+				     $sa_idx);
     if (!defined($newslice)) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "$hrn/$uuid could not be registered");
@@ -278,28 +285,30 @@ sub RegisterSlice($)
 sub DiscoverResources($)
 {
     my ($argref) = @_;
-    my $slice_uuid  = $argref->{'slice_uuid'};
+    my $slice  = $argref->{'slice'};
 
-    if (!defined($slice_uuid)) {
+    # This is a certificate. Ignored for now. 
+    if (!defined($slice)) {
 	return Protogeni::MalformedArgsResponse();
-    }
-    if (! ($slice_uuid =~ /^[-\w]*$/)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "uuid: Invalid characters");
     }
 
     #
     # Return simple list of components (hashes).
     #
     my @results = ();
-    my $query_result = DBQueryWarn("select uuid,hrn,url from geni_components");
+    my $query_result = DBQueryWarn("select uuid from geni_components");
     return GeniResponse->Create(GENIRESPONSE_DBERROR)
 	if (!defined($query_result));
 
-    while (my ($component_uuid,$hrn,$url) = $query_result->fetchrow_array()) {
+    while (my ($component_uuid) = $query_result->fetchrow_array()) {
+	my $component = GeniComponent->Lookup($component_uuid);
+	return GeniResponse->Create(GENIRESPONSE_DBERROR)
+	    if (!defined($component));
+	    
 	push(@results, { "uuid" => $component_uuid,
-			 "hrn"  => $hrn,
-			 "url"  => $url});
+			 "hrn"  => $component->hrn(),
+			 "url"  => $component->url(),
+			 "cert" => $component->cert() });
     }
     return GeniResponse->Create(GENIRESPONSE_SUCCESS, \@results);
 }

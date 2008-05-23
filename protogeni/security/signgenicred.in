@@ -15,13 +15,14 @@ use Data::Dumper;
 # 
 sub usage()
 {
-    print("Usage: signgenicred [-d] [-o file] <capfile> [<user>]\n");
+    print("Usage: signgenicred [-d] [-o file] [-c cert] <capfile> [<user>]\n");
     exit(-1);
 }
-my $optlist = "do:";
+my $optlist = "do:c:";
 my $debug   = 1;
 my $outfile;
 my $capfile;
+my $certificate;
 
 #
 # Configure variables
@@ -50,8 +51,8 @@ $| = 1;
 # Locals
 my $USERDIR	= USERROOT();
 my $SSLDIR      = "$TB/lib/ssl";
-my $EMULAB_CERT = "$TB/etc/emulab.pem";
-my $EMULAB_KEY  = "$TB/etc/emulab.key";
+my $EMULAB_CERT = "$TB/etc/genisa.pem";
+my $EMULAB_KEY  = "$TB/etc/genisa.pem";
 my $SCHEMA      = "$TB/lib/protogeni/security/credential.xsd";
 my $OPENSSL     = "/usr/bin/openssl";
 my $XMLLINT     = "/usr/local/bin/xmllint";
@@ -145,6 +146,18 @@ if (defined($options{"o"})) {
 	fatal("Tainted filename: $outfile");
     }
 }
+if (defined($options{"c"})) {
+    $certificate = $options{"c"};
+    
+    if ($certificate =~ /^([-\w\.\/]+)$/) {
+	$certificate = $1;
+    }
+    else {
+	fatal("Tainted filename: $certificate");
+    }
+    fatal("$certificate does not exist or cannot be read.")
+	if (! -r $certificate);
+}
 usage()
     if (!@ARGV);
 $capfile = shift(@ARGV);
@@ -212,11 +225,17 @@ my $root   = $doc->documentElement();
 
 #
 # The certficate used to sign the credential is either the Emulab certificate
-# or that of the user delegating the credential. For now lets just use the
-# Emulab certificate. I will add user signing later.
+# or that of the user delegating the credential, or a certificate specified
+# on the command line.
 #
-$keyfile  = $EMULAB_KEY;
-$certfile = $EMULAB_CERT;
+if (defined($certficate)) {
+    $keyfile  = $certficate;
+    $certfile = $certficate;
+}
+else {
+    $keyfile  = $EMULAB_KEY;
+    $certfile = $EMULAB_CERT;
+}
 
 #
 # Find or create these two nodes.

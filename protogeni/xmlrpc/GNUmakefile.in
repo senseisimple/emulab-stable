@@ -20,16 +20,19 @@ SETUID_LIBX_SCRIPTS  =
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
-all:	protogeni.py protogeni-client.pl protogeni.pl Genixmlrpc.pm \
+all:	protogeni.pl protogeni-ch.pl Genixmlrpc.pm \
 	GeniResponse.pm
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 install: $(INSTALL_DIR)/protogeni/xmlrpc/protogeni.pl \
+         $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-ch.pl \
          $(INSTALL_LIBDIR)/Genixmlrpc.pm \
          $(INSTALL_LIBDIR)/GeniResponse.pm
 	$(SUDO) chown root $(INSTALL_DIR)/protogeni/xmlrpc/protogeni.pl
 	$(SUDO) chmod u+s  $(INSTALL_DIR)/protogeni/xmlrpc/protogeni.pl
+	$(SUDO) chown root $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-ch.pl
+	$(SUDO) chmod u+s  $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-ch.pl
 
 control-install:
 

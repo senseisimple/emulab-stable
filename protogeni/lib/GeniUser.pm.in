@@ -16,6 +16,7 @@ use vars qw(@ISA @EXPORT);
 # Must come after package declaration!
 use lib '@prefix@/lib';
 use GeniDB;
+use GeniCHClient;
 use libtestbed;
 # Hate to import all this crap; need a utility library.
 use libdb qw(TBGetUniqueIndex);
@@ -140,26 +141,21 @@ sub CheckExisting($$$)
 }
 
 #
-# Class function to create new Geni user and return object.
+# Class function to create new Geni user and return object. Note that this
+# is used by the ClearingHouse *and* the CM/SA to record users. 
 #
-sub Create($$$$$$$$)
+sub Create($$$$$$$$$)
 {
     my ($class, $hrn, $uid, $uuid, $name, $email, $cert, $sa_idx) = @_;
     my @insert_data = ();
 
-    # Create a nonlocal user in the Emulab DB.
-    my $nonlocal_user =
-	User::NonLocal->Create($uid, $uuid, $name, $email);
-    return undef
-	if (!defined($nonlocal_user));
-
-    my $idx = $nonlocal_user->idx();
-
-    push(@insert_data, "status='active'");
+    # Every user gets a new unique index.
+    my $idx = User->NextIDX();
 
     # Now tack on other stuff we need.
     push(@insert_data, "created=now()");
     push(@insert_data, "idx='$idx'");
+    push(@insert_data, "status='active'");
 
     my $safe_hrn   = DBQuoteSpecial($hrn);
     my $safe_uid   = DBQuoteSpecial($uid);
@@ -181,6 +177,17 @@ sub Create($$$$$$$$)
 	or return undef;
 
     return GeniUser->Lookup($idx);
+}
+
+#
+# We wrap up local users so that the interface to them is consistent, but
+# do not want to duplicate any data, so use a different class wrapper.
+#
+sub CreateFromLocal($$)
+{
+    my ($class, $user) = @_;
+
+    return GeniUser::LocalUser->Create($user);
 }
 
 #
@@ -218,6 +225,81 @@ sub Archive($)
 	or return -1;
     
     return 0;
+}
+
+############################################################################
+#
+# Wrapper for local users.
+#
+package GeniUser::LocalUser;
+use English;
+use GeniDB;
+use overload ('""' => 'Stringify');
+
+#
+# Create a wrapper, with the same access names.
+#
+sub Create($$)
+{
+    my ($class, $user) = @_;
+
+    my $self         = {};
+    $self->{'USER'}  = $user;
+
+    bless($self, $class);
+    return $self;
+}
+
+sub uid($)		{ return $_[0]->{'USER'}->uid(); }
+sub uuid                { return $_[0]->{'USER'}->uuid(); }
+sub created($)		{ return $_[0]->{'USER'}->created(); }
+sub name($)		{ return $_[0]->{'USER'}->name(); }
+sub email($)		{ return $_[0]->{'USER'}->email(); }
+sub sa_idx($)		{ return 0; }
+
+# Need to construct this since not in User structure.
+sub hrn($)		{ return $OURDOMAIN . "." . $_[0]->uid(); }
+
+# And this is in another table.
+sub cert($)
+{
+    my ($self) = @_;
+    my $user   = $self->{'USER'};
+    my $cert;
+
+    if ($user->SSLCert(1, \$cert)) {
+	print STDERR "No encrypted certificate found for $user\n";
+	return -1;
+    }
+    return $cert;
+}
+
+#
+# Register this local user at the ClearingHouse.
+#
+sub Register($)
+{
+    my ($self) = @_;
+    my $blob;
+
+    # Register this user at the ClearingHouse, if not already registered.
+    if (GeniCHClient::LookupUser($self->uuid(), \$blob) != 0) {
+	return GeniCHClient::RegisterUser($self->hrn(), $self->uuid(),
+					  $self->name(), $self->email(),
+					  $self->cert());
+    }
+    return 0;
+}
+    
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+    my $user = $self->user();
+    
+    return "$user";
 }
 
 # _Always_ make sure that this 1 is at the end of the file...
