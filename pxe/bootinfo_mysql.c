@@ -102,7 +102,14 @@ query_bootinfo_db(struct in_addr ipaddr, int version, boot_what_t *info)
 			 "     n.next_boot_osid=pnext.osid "
 			 "left join os_info as onext on "
 			 "     onext.osid=n.next_boot_osid "
-			 "where i.IP='%s'", 16, inet_ntoa(ipaddr));
+			 "left outer join "
+			 "  (select type,attrvalue from node_type_attributes "
+			 "     where attrkey='nobootinfo' and attrvalue='1' "
+			 "     group by type) as nobootinfo_types "
+			 "  on n.type=nobootinfo_types.type "
+			 "where i.IP='%s' "
+			 "  and nobootinfo_types.attrvalue is NULL",
+			 16, inet_ntoa(ipaddr));
 
 	if (!res) {
 		error("Query failed for host %s\n", ipstr);
