@@ -25,6 +25,7 @@ use User;
 use GeniUser;
 use GeniSlice;
 use GeniComponent;
+use GeniAuthority;
 use libtestbed;
 use emutil;
 use English;
@@ -59,15 +60,28 @@ sub LookupUser($)
 				    "No such user $uuid");
     }
 
-    # Return a blob.
-    my $blob = { "uid"    => $user->uid(),
-		 "hrn"    => $user->hrn(),
-		 "uuid"   => $user->uuid(),
-		 "email"  => $user->email(),
-		 "name"   => $user->name() };
+    my $authority = GeniAuthority->Lookup($user->sa_idx());
+    if (!defined($authority)) {
+	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
+				    "No slice authority found for user");
+    }
 
+    # Return a blob.
+    my $blob = { "uid"      => $user->uid(),
+		 "hrn"      => $user->hrn(),
+		 "uuid"     => $user->uuid(),
+		 "email"    => $user->email(),
+		 "cert"     => $user->cert(),
+		 "name"     => $user->name(),
+		 "sa"       => { "hrn"      => $authority->hrn(),
+				 "uuid"     => $authority->uuid(),
+				 "cert"     => $authority->cert(),
+				 "url"      => $authority->url() }
+	       };
+    
     return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
 }
+
 sub LookupSlice($)
 {
     my ($argref) = @_;
@@ -82,11 +96,22 @@ sub LookupSlice($)
 				    "No such user $uuid");
     }
 
+    my $authority = GeniAuthority->Lookup($slice->sa_idx());
+    if (!defined($authority)) {
+	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
+				    "No slice authority found for slice");
+    }
+
     # Return a blob.
     my $blob = { "hrn"          => $slice->hrn(),
 		 "uuid"         => $slice->uuid(),
 		 "creator_uuid" => $slice->creator_uuid(),
-		 "cert"         => $slice->cert() };
+		 "cert"         => $slice->cert(),
+		 "sa"           => { "hrn"      => $authority->hrn(),
+				     "uuid"     => $authority->uuid(),
+				     "cert"     => $authority->cert(),
+				     "url"      => $authority->url() }
+	       };
 
     return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
 }
@@ -98,15 +123,13 @@ sub RegisterUser($)
 {
     my ($argref) = @_;
     my $hrn   = $argref->{'hrn'};
-    my $uid   = $argref->{'uid'};
     my $uuid  = $argref->{'uuid'};
     my $name  = $argref->{'name'};
     my $email = $argref->{'email'};
     my $cert  = $argref->{'cert'};
 
-    if (! (defined($hrn) && defined($uid) && defined($name) &&
-	   defined($email) &&
-	   defined($cert) && defined($uuid))) {
+    if (! (defined($hrn) && defined($name) &&
+	   defined($email) && defined($cert) && defined($uuid))) {
 	return GeniResponse->MalformedArgsResponse();
     }
 
@@ -124,10 +147,6 @@ sub RegisterUser($)
     if (! TBcheck_dbslot($name, "users", "usr_name", TBDB_CHECKDBSLOT_ERROR)) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "name: ". TBFieldErrorString());
-    }
-    if (! TBcheck_dbslot($uid, "users", "uid", TBDB_CHECKDBSLOT_ERROR)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "uid: ". TBFieldErrorString());
     }
     if (! TBcheck_dbslot($email, "users", "usr_email",TBDB_CHECKDBSLOT_ERROR)){
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
@@ -179,6 +198,16 @@ sub RegisterUser($)
 				    "$hrn/$email already registered");
     }
 
+    # The local uid we will use is the last part of the hrn.
+    my ($uid) = ($hrn =~ /^.*\.(\w*)$/);
+    if (!defined($uid)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "uid: cannot parse hrn to get uid");
+    }
+    elsif (! TBcheck_dbslot($uid, "users", "uid", TBDB_CHECKDBSLOT_ERROR)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "uid: ". TBFieldErrorString());
+    }
     my $newuser = GeniUser->Create($hrn, $uid, $uuid,
 				   $name, $email, $cert, $sa_idx);
     if (!defined($newuser)) {

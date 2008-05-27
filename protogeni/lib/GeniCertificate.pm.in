@@ -1,0 +1,43 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package GeniCertificate;
+
+#
+# Some simple certificate stuff.
+#
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA    = "Exporter";
+@EXPORT = qw ( );
+
+# Must come after package declaration!
+use lib '@prefix@/lib';
+use GeniDB;
+use libtestbed;
+use libdb qw(TBGetUniqueIndex);
+use English;
+use XML::Simple;
+use XML::LibXML;
+use Data::Dumper;
+use File::Temp qw(tempfile);
+
+# Configure variables
+my $TB		   = "@prefix@";
+my $TBOPS          = "@TBOPSEMAIL@";
+my $TBAPPROVAL     = "@TBAPPROVALEMAIL@";
+my $TBAUDIT   	   = "@TBAUDITEMAIL@";
+my $BOSSNODE       = "@BOSSNODE@";
+my $OURDOMAIN      = "@OURDOMAIN@";
+my $SIGNCRED	   = "$TB/sbin/signgenicred";
+my $VERIFYCRED	   = "$TB/sbin/verifygenicred";
+my $NFREE	   = "$TB/bin/nfree";
+my $OPENSSL	   = "/usr/bin/openssl";
+
+# _Always_ make sure that this 1 is at the end of the file...
+1;

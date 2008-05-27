@@ -116,18 +116,24 @@ sub Create($$;$)
     my ($class, $ticket, $credential) = @_;
     my @insert_data = ();
     my $uuid;
+    my $cert;
 
     # Every sliver gets a new unique index.
     my $idx = TBGetUniqueIndex('next_sliver', 1);
     if (defined($credential)) {
 	$uuid = $credential->this_uuid();
+	$cert = $credential->this_cert();
 
 	# Store the credential
 	return undef
 	    if ($credential->Store() != 0);
     }
     else {
-	# And a new uuid for a local sliver.
+	# Create a cert pair, which gives us a uuid. We have to store the
+	# certificate someplace. Grab the experiment and stick it into the
+	# workdir. xs
+	
+	# And a new uuid and cert for a local sliver.
 	$uuid = NewUUID();
 	if (!defined($uuid)) {
 	    print "*** WARNING: Could not generate a UUID!\n";
@@ -156,6 +162,13 @@ sub Create($$;$)
     # Insert into DB.
     DBQueryWarn("insert into geni_slivers set " . join(",", @insert_data))
 	or return undef;
+
+    # Insert the certificate.
+    if (!DBQueryWarn("replace into geni_certificates set ".
+		     "  uuid=$uuid, cert=$cert")) {
+	DBQueryWarn("delete from geni_slivers where idx='$idx'");
+	return undef;
+    }
 
     my $sliver = GeniSliver->Lookup($idx);
     return undef

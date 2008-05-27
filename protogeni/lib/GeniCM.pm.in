@@ -116,15 +116,16 @@ sub DiscoverResources($)
 sub GetTicket($)
 {
     my ($argref) = @_;
-    my $slice_uuid = $argref->{'slice_uuid'};
+    my $slice_cert = $argref->{'slice'};
     my $rspec      = $argref->{'rspec'};
     my $impotent   = $argref->{'impotent'};
     my $credential = $argref->{'credential'};
     my $owner_uuid = $ENV{'GENIUSER'};
+    my $slice_uuid;
 
-    if (! (defined($slice_uuid) && ($slice_uuid =~ /^[-\w]+$/))) {
+    if (! defined($slice_cert)) {
 	GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
-			     "Improper slice uuid");	
+			     "Improper slice");
     }
     if (! (defined($rspec) && ($rspec =~ /^[-\w]+$/))) {
 	GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
@@ -141,6 +142,11 @@ sub GetTicket($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not create GeniCredential object");
     }
+    GeniCredential->CertificateInfo($slice_cert, \$slice_uuid) == 0 or
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not get uuid from Certificate");
+	
+	
     # The credential owner/slice has to match what was provided.
     if (! ($owner_uuid eq $credential->owner_uuid() &&
 	   $slice_uuid eq $credential->this_uuid())) {
@@ -155,13 +161,27 @@ sub GetTicket($)
     #
     my $slice = GeniSlice->Lookup($slice_uuid);
     if (!defined($slice)) {
-
+	$slice = GeniSlice->CreateFromRegistry($slice_uuid);
+	if (!defined($slice)) {
+	    print STDERR "No slice $slice_uuid in the ClearingHouse\n";
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+			    "Could not get slice info from ClearingHouse");
+	}
     }
 
-    
-
     #
-    # XXX Should we create a local geni_slices record in the DB?
+    # Ditto the user.
+    #
+    my $user = GeniUser->Lookup($owner_uuid);
+    if (!defined($user)) {
+	$user = GeniUser->CreateFromRegistry($owner_uuid);
+	if (!defined($user)) {
+	    print STDERR "No user $owner_uuid in the ClearingHouse\n";
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+			    "Could not get user info from ClearingHouse");
+	}
+    }
+
     #
     # If the underlying experiment does not exist, need to create
     # a holding experiment. All these are going to go into the same
@@ -208,7 +228,7 @@ sub GetTicket($)
     #
     # Create the ticket first, before allocating the node.
     #
-    my $ticket = GeniTicket->Create($slice_uuid, $owner_uuid, $rspec);
+    my $ticket = GeniTicket->Create($slice, $user, $rspec);
     if (!defined($ticket)) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not create GeniTicket object");

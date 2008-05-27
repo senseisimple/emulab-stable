@@ -19,6 +19,7 @@ use vars qw(@ISA @EXPORT);
 # Must come after package declaration!
 use lib '@prefix@/lib';
 use GeniDB;
+use GeniCredential;
 use libtestbed;
 use Experiment;
 use libdb qw(TBGetUniqueIndex);
@@ -38,23 +39,24 @@ my $OURDOMAIN      = "@OURDOMAIN@";
 my $SIGNCRED	   = "$TB/sbin/signgenicred";
 my $VERIFYCRED	   = "$TB/sbin/verifygenicred";
 my $NFREE	   = "$TB/bin/nfree";
+my $CMCERT	   = "$TB/etc/genicm.pem";
 
 #
-# Create an unsigned ticket object from the raw rspec. 
+# Create an unsigned ticket object, to be populated and signed and returned.
 #
-sub Create($$$$;$$)
+sub Create($$$$)
 {
-    my ($class, $slice_uuid, $owner_uuid,
-	$rspec, $ticket_string, $component) = @_;
+    my ($class, $slice, $owner, $rspec) = @_;
 
     my $self = {};
     $self->{'rspec'}         = $rspec;
-    $self->{'slice_uuid'}    = $slice_uuid;
-    $self->{'owner_uuid'}    = $owner_uuid;
-    $self->{'ticket_string'} = $ticket_string;
-    $self->{'ticket'}        = undef;
+    $self->{'slice_uuid'}    = $slice->uuid();
+    $self->{'owner_uuid'}    = $owner->uuid();
+    $self->{'slice_cert'}    = $slice->cert();
+    $self->{'owner_cert'}    = $owner->cert();
+    $self->{'ticket_string'} = undef;
     $self->{'idx'}           = undef;	# Only set when in DB.
-    $self->{'component'}     = $component;
+    $self->{'component'}     = undef;
     bless($self, $class);
 
     return $self;
@@ -66,6 +68,8 @@ sub rspec($)		{ return field($_[0], "rspec"); }
 sub uuid($)		{ return field($_[0], "slice_uuid"); }
 sub slice_uuid($)	{ return field($_[0], "slice_uuid"); }
 sub owner_uuid($)	{ return field($_[0], "owner_uuid"); }
+sub slice_cert($)	{ return field($_[0], "slice_cert"); }
+sub owner_cert($)	{ return field($_[0], "owner_cert"); }
 sub ticket($)		{ return field($_[0], "ticket"); }
 sub asString($)		{ return field($_[0], "ticket_string"); }
 sub ticket_string($)	{ return field($_[0], "ticket_string"); }
@@ -74,22 +78,31 @@ sub component($)	{ return field($_[0], "component"); }
 #
 # Create a ticket object from a signed ticket string.
 #
-sub CreateFromSignedTicket($$)
+sub CreateFromSignedTicket($$;$$)
 {
-    my ($class, $ticket_string) = @_;
+    my ($class, $ticket_string, $component, $nosig) = @_;
 
-    # First verify the ticket.
-    my ($fh, $filename) = tempfile(UNLINK => 0);
-    return undef
-	if (!defined($fh));
-    print $fh $ticket_string;
-    close($fh);
-    system("$VERIFYCRED $filename");
-    if ($?) {
-	print STDERR "Ticket in $filename did not verify\n";
-	return undef;
+    #
+    # This flag is used to avoid verifying the signature since I do not
+    # really care if the component gives me a bad ticket; I am not using
+    # it locally, just passing it back to the component at some point.
+    #
+    $nosig = 0
+	if (!defined($nosig));
+
+    if (! $nosig) {
+	my ($fh, $filename) = tempfile(UNLINK => 0);
+	return undef
+	    if (!defined($fh));
+	print $fh $ticket_string;
+	close($fh);
+	system("$VERIFYCRED $filename");
+	if ($?) {
+	    print STDERR "Ticket in $filename did not verify\n";
+	    return undef;
+	}
+	unlink($filename);
     }
-    unlink($filename);
 
     # Use XML::Simple to convert to something we can mess with.
     my $parser = XML::LibXML->new;
@@ -106,7 +119,10 @@ sub CreateFromSignedTicket($$)
     my ($uuid_node) = $doc->getElementsByTagName("this_uuid");
     return undef
 	if (!defined($uuid_node));
-    my $slice_uuid = $uuid_node->to_literal();
+    my $slice_cert = $uuid_node->to_literal();
+    my $slice_uuid;
+    GeniCredential->CertificateInfo($slice_cert, \$slice_uuid) == 0
+	or return undef;
 
     if (! ($slice_uuid =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/)) {
 	print STDERR "Invalid slice_uuid in ticket\n";
@@ -118,7 +134,10 @@ sub CreateFromSignedTicket($$)
     ($uuid_node) = $doc->getElementsByTagName("owner_uuid");
     return undef
 	if (!defined($uuid_node));
-    my $owner_uuid = $uuid_node->to_literal();
+    my $owner_cert = $uuid_node->to_literal();
+    my $owner_uuid;
+    GeniCredential->CertificateInfo($owner_cert, \$owner_uuid) == 0
+	or return undef;
 
     if (! ($owner_uuid =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/)) {
 	print STDERR "Invalid owner_uuid in ticket\n";
@@ -129,29 +148,35 @@ sub CreateFromSignedTicket($$)
     # We save copies of the tickets we hand out; lets find that record
     # in the DB, just to verify.
     #
-    my ($serial_node) = $doc->getElementsByTagName("serial");
-    return undef
-	if (!defined($serial_node));
-    my $serial = $serial_node->to_literal();
+    my $serial;
 
-    if (! ($serial =~ /^\w+$/)) {
-	print STDERR "Invalid serial in ticket\n";
-	return undef;
-    }
-    my $query_result =
-	DBQueryWarn("select * from geni_tickets where idx='$serial'");
-    if (!$query_result || !$query_result->numrows) {
-	print STDERR "Could not find the ticket in te DB\n";
-	return undef;
+    if (!$nosig) {
+	my ($serial_node) = $doc->getElementsByTagName("serial");
+	return undef
+	    if (!defined($serial_node));
+	$serial = $serial_node->to_literal();
+
+	if (! ($serial =~ /^\w+$/)) {
+	    print STDERR "Invalid serial in ticket\n";
+	    return undef;
+	}
+	my $query_result =
+	    DBQueryWarn("select * from geni_tickets where idx='$serial'");
+	if (!$query_result || !$query_result->numrows) {
+	    print STDERR "Could not find the ticket in te DB\n";
+	    return undef;
+	}
     }
 
     my $self = {};
     $self->{'rspec'}         = $rspec;
     $self->{'slice_uuid'}    = $slice_uuid;
     $self->{'owner_uuid'}    = $owner_uuid;
+    $self->{'slice_cert'}    = $slice_cert;
+    $self->{'owner_cert'}    = $owner_cert;
     $self->{'ticket_string'} = $ticket_string;
     $self->{'xmlref'}        = $doc;
-    $self->{'component'}     = undef;
+    $self->{'component'}     = $component;
     $self->{'idx'}           = $serial;
     bless($self, $class);
 
@@ -239,8 +264,8 @@ sub Sign($)
     # Also used for the DB insertion below.
     my $idx = TBGetUniqueIndex('next_ticket', 1);
     
-    my $slice_uuid = $self->slice_uuid();
-    my $owner_uuid = $self->owner_uuid();
+    my $slice_cert = $self->slice_cert();
+    my $owner_cert = $self->owner_cert();
     my $rspec_xml  = XMLout($self->rspec(), "NoAttr" => 1);
     $rspec_xml =~ s/opt\>/rspec\>/g;
 
@@ -252,8 +277,8 @@ sub Sign($)
 	"<credential xml:id=\"ref1\">\n".
 	" <type>ticket</type>\n".
 	" <serial>$idx</serial>\n".
-	" <owner_uuid>$owner_uuid</owner_uuid>\n".
-	" <this_uuid>$slice_uuid</this_uuid>\n".
+	" <owner_uuid>$owner_cert</owner_uuid>\n".
+	" <this_uuid>$slice_cert</this_uuid>\n".
 	" <ticket>\n".
 	"  <can_delegate>1</can_delegate>\n".
 	"  $rspec_xml\n".
@@ -271,7 +296,7 @@ sub Sign($)
     # Fire up the signer and capture the output. This is the signed ticket
     # that is returned. 
     #
-    if (! open(SIGNER, "$SIGNCRED $filename |")) {
+    if (! open(SIGNER, "$SIGNCRED -c $CMCERT $filename |")) {
 	print STDERR "Could not sign $filename\n";
 	return -1;
     }

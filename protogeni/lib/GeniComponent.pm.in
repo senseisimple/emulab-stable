@@ -250,11 +250,11 @@ sub DiscoverResources($$$$$)
 #
 sub GetTicket($$$$$)
 {
-    my ($self, $user, $credential, $slice_uuid, $rspec) = @_;
+    my ($self, $slice, $rspec, $user, $credential) = @_;
     my $rspec_xml = $rspec;
 
     # Must be a real reference. 
-    return -1
+    return undef
 	if (! ref($self));
 
     # The rspec is passed as XML. If we get a ref, convert it.
@@ -266,9 +266,9 @@ sub GetTicket($$$$$)
 	Genixmlrpc::CallMethodHTTP($self->url(),
 				   $user,
 				   "CM::GetTicket",
-				   { "slice_uuid"   => $slice_uuid,
+				   { "slice"        => $slice->cert(),
 				     "credential"   => $credential->asString(),
-				     "impotent"     => 0,
+				     "impotent"     => 1,
 				     "rspec"        => $rspec_xml });
     
     return undef
@@ -280,8 +280,7 @@ sub GetTicket($$$$$)
     #
     # Convert this into a (signed) ticket object.
     #
-    return GeniTicket->Create($slice_uuid, $user->uuid(),
-			      $rspec, $response->value(), $self);
+    return GeniTicket->CreateFromSignedTicket($response->value(), $self, 1);
 }
 
 #
@@ -289,10 +288,10 @@ sub GetTicket($$$$$)
 #
 sub CreateSliver($$$$)
 {
-    my ($self, $user, $ticket, $pref) = @_;
+    my ($self, $slice, $ticket, $user) = @_;
 
     # Must be a real reference. 
-    return -1
+    return undef
 	if (! ref($self));
 
     my $response =
@@ -300,10 +299,10 @@ sub CreateSliver($$$$)
 				   "CM::CreateSliver",
 				   { "ticket"  => $ticket->asString() });
     
-    return -1
+    return undef
 	if (!defined($response));
 
-    return -1
+    return undef
 	if ($response->code() != GENIRESPONSE_SUCCESS);
 
     #
@@ -312,16 +311,15 @@ sub CreateSliver($$$$)
     my $credential = GeniCredential->CreateFromSigned($response->value());
     if (!defined($credential)) {
 	print STDERR "Could not create local credential object.\n";
-	return -1;
+	return undef;
     }
 
     my $sliver = GeniSliver->Create($ticket, $credential);
     if (!defined($sliver)) {
 	print STDERR "Could not create local sliver object.\n";
-	return -1;
+	return undef;
     }
-    $$pref = $sliver;
-    return 0;
+    return $sliver;
 }
 
 #

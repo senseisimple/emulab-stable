@@ -73,12 +73,10 @@ print Dumper(@components);
 #
 my $credential = GeniCredential->Create($slice, $geniuser);
 if (!defined($credential)) {
-    print STDERR "Could not create a slice credential for $slice!\n";
-    exit(-1);
+    die("Could not create a slice credential for $slice!\n");
 }
 if ($credential->Sign($GeniCredential::LOCALSA_FLAG)) {
-    print STDERR "Could not sign slice credential!\n";
-    exit(-1);
+    die("Could not sign slice credential!\n");
 }
 
 foreach my $component (@components) {
@@ -86,22 +84,27 @@ foreach my $component (@components) {
     
     if ($component->DiscoverResources($slice,
 				      $this_user, $credential, \$rspec) != 0) {
-	print STDERR "Could not discover resources on $component\n";
-	exit(-1);
+	die("Could not discover resources on $component\n");
     }
     push(@resources, $rspec);
     print Dumper($rspec);
 }
 
 # Now that we have some resource availability rspecs, generate a request
-# rspec. This is gonna need a lot more work!
+# rspec. This is gonna need a lot more work.
 my $rspec = $resources[0];
 print Dumper($rspec);
+
+$ticket = $components[0]->GetTicket($slice, $rspec, $this_user, $credential);
+if (!defined($ticket)) {
+    die("Could not get ticket for $slice\n");
+}
 exit(0);
 
-GeniCMClient::GetTicket($experiment, $components[0], $rspec, \$ticket);
-
-GeniCMClient::CreateSliver($experiment, $ticket, \$sliver);
+$sliver = $components[0]->CreateSliver($slice, $ticket, $this_user);
+if (!defined($ticket)) {
+    die("Could not create sliver for $slice\n");
+}
 print Dumper($sliver);
 
 # Wait for input before proceeding.

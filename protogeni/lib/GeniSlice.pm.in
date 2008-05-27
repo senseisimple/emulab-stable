@@ -17,6 +17,8 @@ use vars qw(@ISA @EXPORT);
 use lib '@prefix@/lib';
 use GeniDB;
 use GeniCHClient;
+use GeniAuthority;
+use GeniCredential;
 use libtestbed;
 # Hate to import all this crap; need a utility library.
 use libdb qw(TBGetUniqueIndex);
@@ -207,26 +209,11 @@ sub CreateFromLocal($$)
     # the DB so we have ready access to it.
     #
     my $certfile = $experiment->WorkDir() . "/genicert.pem";
-    system("$MKCERT -o $certfile slice $uuid");
-    if ($?) {
-	print STDERR "Could not start $MKCERT\n";
-	return undef;
-    }
     my $cert;
-    open(CERT, $certfile) or
+    if (GeniCredential->CreateCertificate("slice", $certfile, \$cert) != 0) {
+	print STDERR "Could not create certificate for slice.\n";
 	return undef;
-    while (<CERT>) {
-	if ($_ =~ /^-----BEGIN CERT/) {
-	    $cert = "";
-	    next;
-	}
-	last
-	    if ($_ =~ /^-----END CERT/);
-	next
-	    if (!defined($cert));
-	$cert .= $_;
     }
-    close(CERT);
     return GeniSlice->Create($hrn, $uuid, $creator_uuid, $cert, $sa_idx);
 }
 
@@ -245,6 +232,34 @@ sub Register($)
 	== 0 or return -1;
     
     return 0;
+}
+
+#
+# Create a slice from the ClearingHouse, by looking up the info.
+#
+sub CreateFromRegistry($$)
+{
+    my ($class, $slice_uuid) = @_;
+
+    my $blob;
+    return undef
+	if (GeniCHClient::LookupSlice($slice_uuid, \$blob) != 0);
+
+    my $authority = GeniAuthority->Lookup($blob->{'sa'}->{'uuid'});
+    if (!defined($authority)) {
+	$authority = GeniAuthority->Create($blob->{'sa'}->{'uuid'},
+					   $blob->{'sa'}->{'hrn'},
+					   $blob->{'sa'}->{'url'},
+					   $blob->{'sa'}->{'cert'});
+	if (!defined($authority)) {
+	    print STDERR "Could not create new authority record\n";
+	    return undef;
+	}
+    }
+    return GeniSlice->Create($blob->{'hrn'},
+			     $blob->{'uuid'},
+			     $blob->{'creator_uuid'},
+			     $blob->{'cert'}, $authority->idx());
 }
 
 #

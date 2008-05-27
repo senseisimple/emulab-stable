@@ -17,6 +17,7 @@ use vars qw(@ISA @EXPORT);
 use lib '@prefix@/lib';
 use GeniDB;
 use GeniCHClient;
+use GeniAuthority;
 use libtestbed;
 # Hate to import all this crap; need a utility library.
 use libdb qw(TBGetUniqueIndex);
@@ -84,8 +85,20 @@ sub Lookup($$)
 
     my $self         = {};
     $self->{'USER'}  = $query_result->fetchrow_hashref();
-
     bless($self, $class);
+
+    #
+    # Grab the certificate, since we will probably want it.
+    #
+    my $uuid = $self->{'USER'}->{'uuid'};
+    $query_result = DBQueryWarn("select cert from geni_certificates ".
+				"where uuid='$uuid'");
+    if (!$query_result || !$query_result->numrows) {
+	print STDERR "Could not find certificate for user $idx\n";
+	return undef;
+    }
+    my ($cert) = $query_result->fetchrow_array();
+    $self->{'USER'}->{'cert'} = $cert;
     
     # Add to cache. 
     $users{$self->{'USER'}->{'idx'}} = $self;
@@ -168,13 +181,19 @@ sub Create($$$$$$$$$)
     push(@insert_data, "uid=$safe_uid");
     push(@insert_data, "name=$safe_name");
     push(@insert_data, "email=$safe_email");
-    push(@insert_data, "cert=$safe_cert");
     push(@insert_data, "uuid=$safe_uuid");
     push(@insert_data, "sa_idx=$safe_sa");
 
     # Insert into DB.
     DBQueryWarn("insert into geni_users set " . join(",", @insert_data))
 	or return undef;
+
+    # Insert the certificate.
+    if (!DBQueryWarn("replace into geni_certificates set ".
+		     "  uuid=$safe_uuid, cert=$safe_cert")) {
+	DBQueryWarn("delete from geni_users where idx='$idx'");
+	return undef;
+    }
 
     return GeniUser->Lookup($idx);
 }
@@ -188,6 +207,37 @@ sub CreateFromLocal($$)
     my ($class, $user) = @_;
 
     return GeniUser::LocalUser->Create($user);
+}
+
+#
+# Create a user from the ClearingHouse, by looking up the info.
+#
+sub CreateFromRegistry($$)
+{
+    my ($class, $uuid) = @_;
+
+    my $blob;
+    return undef
+	if (GeniCHClient::LookupUser($uuid, \$blob) != 0);
+
+    my $authority = GeniAuthority->Lookup($blob->{'sa'}->{'uuid'});
+    if (!defined($authority)) {
+	$authority = GeniAuthority->Create($blob->{'sa'}->{'uuid'},
+					   $blob->{'sa'}->{'hrn'},
+					   $blob->{'sa'}->{'url'},
+					   $blob->{'sa'}->{'cert'});
+	if (!defined($authority)) {
+	    print STDERR "Could not create new authority record\n";
+	    return undef;
+	}
+    }
+    return GeniUser->Create($blob->{'hrn'},
+			    $blob->{'uid'},
+			    $blob->{'uuid'},
+			    $blob->{'name'},
+			    $blob->{'email'},
+			    $blob->{'cert'},
+			    $authority->idx());
 }
 
 #
@@ -269,7 +319,7 @@ sub cert($)
 
     if ($user->SSLCert(1, \$cert)) {
 	print STDERR "No encrypted certificate found for $user\n";
-	return -1;
+	return undef;
     }
     return $cert;
 }
@@ -297,7 +347,7 @@ sub Register($)
 sub Stringify($)
 {
     my ($self) = @_;
-    my $user = $self->user();
+    my $user = $self->{'USER'};
     
     return "$user";
 }
