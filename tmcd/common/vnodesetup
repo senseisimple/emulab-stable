@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -157,6 +157,40 @@ else {
 
 if (! ($dojail || $doplab || $fakevnode)) {
     die("Must specify one of -i, -j, -p options.");
+}
+
+#
+# Must do before tmcc gets going!  This is only necessary for vini-style
+# plab/pgeni nodes and, at least for the moment, is only needed when
+# setting up.  Don't think we care at shutdown and I don't want to add
+# any additional complications there.
+#
+if ( $doplab && !($killit || $haltit) && -e "/vsys/enter_admin.in" ) {
+    # Need to be real root for this to work, of course.
+    my $old_uid = $UID;
+    my $old_gid = $GID;
+    $UID = 0;
+    $GID = 0;
+    print "Pid $$ entering default network namespace";
+    system("echo $$ > /vsys/enter_admin.in");
+
+    #
+    # Wait for script to do its thing.  vsys is supposed to provide the output
+    # of the script via enter_admin.out, but reads from that hang forever with
+    # no output.  So for now we use an alternative "solution."
+    #
+    my $i;
+    for ($i = 0; $i < 5; $i++) {
+	last
+	    if (!system("ifconfig eth0 >/dev/null 2>&1"));
+	print "Waiting for control interface to appear...\n";
+	sleep 1;
+    }
+    print "WARNING: no control interface available!\n"
+	if ($i == 5);
+
+    $UID = $old_uid;
+    $GID = $old_gid;
 }
 
 # Tell the library what vnode we are messing with.
