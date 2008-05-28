@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -433,7 +433,10 @@ LanLink instproc fill_ips {} {
 	#perror "Not allowed to use a remote node in lan $self!"
 	return
     }
-    set widearea $isremote
+    if {$isremote} {
+	# A boolean ... not a count.
+	set widearea 1
+    }
 
     # See parse-ns if you change this! 
     if {$isremote && ($netmask != "255.255.255.248")} {
