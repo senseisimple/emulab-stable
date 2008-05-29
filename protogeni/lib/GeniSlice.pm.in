@@ -19,6 +19,7 @@ use GeniDB;
 use GeniCHClient;
 use GeniAuthority;
 use GeniCredential;
+use GeniCertificate;
 use libtestbed;
 # Hate to import all this crap; need a utility library.
 use libdb qw(TBGetUniqueIndex);
@@ -35,7 +36,6 @@ my $TBAUDIT   	   = "@TBAUDITEMAIL@";
 my $BOSSNODE       = "@BOSSNODE@";
 my $CONTROL	   = "@USERNODE@";
 my $OURDOMAIN      = "@OURDOMAIN@";
-my $MKCERT         = "$TB/sbin/mksyscert";
 
 # Cache of instances to avoid regenerating them.
 my %slices     = ();
@@ -93,14 +93,12 @@ sub Lookup($$)
     # Grab the certificate, since we will probably want it.
     #
     my $uuid = $self->{'SLICE'}->{'uuid'};
-    $query_result = DBQueryWarn("select cert from geni_certificates ".
-				"where uuid='$uuid'");
-    if (!$query_result || !$query_result->numrows) {
-	print STDERR "Could not find certificate for slice $idx\n";
+    my $certificate = GeniCertificate->Lookup($uuid);
+    if (!defined($certificate)) {
+	print STDERR "Could not find certificate for slice $idx ($uuid)\n";
 	return undef;
     }
-    my ($cert) = $query_result->fetchrow_array();
-    $self->{'SLICE'}->{'cert'} = $cert;
+    $self->{'CERT'} = $certificate;
     
     # Add to cache. 
     $slices{$self->{'SLICE'}->{'idx'}} = $self;
@@ -115,8 +113,8 @@ sub uuid($)		{ return field($_[0], "uuid"); }
 sub creator_uuid($)	{ return field($_[0], "creator_uuid"); }
 sub created($)		{ return field($_[0], "created"); }
 sub sa_idx($)		{ return field($_[0], "sa_idx"); }
-sub cert($)		{ return field($_[0], "cert"); }
-
+sub cert($)		{ return $_[0]->{'CERT'}->cert(); }
+sub GetCertificate($)   { return $_[0]->{'CERT'}; }
 #
 # Stringify for output.
 #
@@ -170,27 +168,29 @@ sub Create($$$$$$)
     my $safe_hrn   = DBQuoteSpecial($hrn);
     my $safe_uuid  = DBQuoteSpecial($uuid);
     my $safe_cuuid = DBQuoteSpecial($creator_uuid);
-    my $safe_cert  = DBQuoteSpecial($cert);
     push(@insert_data, "hrn=$safe_hrn");
     push(@insert_data, "uuid=$safe_uuid");
     push(@insert_data, "creator_uuid=$safe_cuuid");
 
+    # Insert certificate.
+    if (defined($cert)) {
+	my $certificate = GeniCertificate->StorePublic($cert);
+	if (!defined($certificate)) {
+	    print STDERR "Could not store certificate for new user\n";
+	    return undef;
+	}
+    }
+
     # Insert into DB.
     DBQueryWarn("insert into geni_slices set " . join(",", @insert_data))
 	or return undef;
-
-    # Insert the certificate.
-    if (!DBQueryWarn("insert into geni_certificates set ".
-		     "  uuid=$safe_uuid, cert=$safe_cert")) {
-	DBQueryWarn("delete from geni_slices where idx='$idx'");
-	return undef;
-    }
 
     return GeniSlice->Lookup($idx);
 }
 
 #
 # Class function to create new Geni slice from a local experiment.
+# We want to create the key pair so that we can sign credentials.
 #
 sub CreateFromLocal($$)
 {
@@ -208,13 +208,12 @@ sub CreateFromLocal($$)
     # Generate a certificate pair, capturing the certificate to store in
     # the DB so we have ready access to it.
     #
-    my $certfile = $experiment->WorkDir() . "/genicert.pem";
-    my $cert;
-    if (GeniCredential->CreateCertificate("slice", $certfile, \$cert) != 0) {
+    my $certificate = GeniCertificate->Create("slice", $uuid);
+    if (!defined($certificate)) {
 	print STDERR "Could not create certificate for slice.\n";
 	return undef;
     }
-    return GeniSlice->Create($hrn, $uuid, $creator_uuid, $cert, $sa_idx);
+    return GeniSlice->Create($hrn, $uuid, $creator_uuid, undef, $sa_idx);
 }
 
 #

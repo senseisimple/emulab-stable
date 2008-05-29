@@ -26,6 +26,7 @@ use XML::Simple;
 use XML::LibXML;
 use Data::Dumper;
 use File::Temp qw(tempfile);
+use overload ('""' => 'Stringify');
 
 # Configure variables
 my $TB		   = "@prefix@";
@@ -38,6 +39,253 @@ my $SIGNCRED	   = "$TB/sbin/signgenicred";
 my $VERIFYCRED	   = "$TB/sbin/verifygenicred";
 my $NFREE	   = "$TB/bin/nfree";
 my $OPENSSL	   = "/usr/bin/openssl";
+my $MKCERT         = "$TB/sbin/mksyscert";
+
+# Cache of instances to avoid regenerating them.
+my %certificates  = ();
+
+#
+# Lookup by uuid only.
+#
+sub Lookup($$)
+{
+    my ($class, $token) = @_;
+    my $query_result;
+
+    if (! ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/)) {
+	return undef;
+    }
+    # Look in cache first
+    return $certificates{"$token"}
+        if (exists($certificates{"$token"}));
+
+    $query_result =
+	DBQueryWarn("select * from geni_certificates where uuid='$token'");
+    
+    return undef
+	if (!$query_result || !$query_result->numrows);
+
+    my $self         = {};
+    $self->{'CERT'}  = $query_result->fetchrow_hashref();
+    bless($self, $class);
+
+    # Add to cache. 
+    $certificates{$token} = $self;
+    
+    return $self;
+}
+
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+    
+    my $uuid = $self->uuid();
+
+    return "[GeniCertificate: $uuid]";
+}
+
+# accessors
+sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'CERT'}->{$_[1]}); }
+sub uuid($)		{ return field($_[0], "uuid"); }
+sub created($)		{ return field($_[0], "created"); }
+sub cert($)		{ return field($_[0], "cert"); }
+sub privkey($)		{ return field($_[0], "privkey"); }
+sub revoked($)		{ return field($_[0], "revoked"); }
+
+#
+# Create a certificate pair, which gives us a uuid to use for an object.
+#
+sub Create($$;$)
+{
+    my ($class, $what, $uuid) = @_;
+    # Let mkcert generate a new one.
+    $uuid = ""
+	if (!defined($uuid));
+
+    if (! open(CERT, "$MKCERT $what $uuid |")) {
+	print STDERR "Could not start $MKCERT\n";
+	return undef;
+    }
+    my @certlines = ();
+    while (<CERT>) {
+	push(@certlines, $_);
+    }
+    if (!close(CERT)) {
+	print STDERR "Could not generate a new certificate with $MKCERT\n";
+	return undef;
+    }
+    my $cert;
+    my $privkey;
+    my $string;
+    foreach my $line (@certlines) {
+	if ($line =~ /^-----BEGIN CERT/ ||
+	    $line =~ /^-----BEGIN RSA/) {
+	    $string = "";
+	    next;
+	}
+	if ($line =~ /^-----END CERT/) {
+	    $cert = $string;
+	    $string = undef;
+	    next;
+	}
+	if ($line =~ /^-----END RSA/) {
+	    $privkey = $string;
+	    $string = undef;
+	    next;
+	}
+	$string .= $line
+	    if (defined($string));
+    }
+    if (! (defined($privkey) && defined($cert))) {
+	print STDERR "Could not generate a new certificate with $MKCERT\n";
+	return undef;
+    }
+    if (! ($cert =~ /^[\012\015\040-\176]*$/)) {
+	print STDERR "Improper chars in certificate string\n";
+	return undef;
+    }
+    if (GeniCertificate->CertificateInfo($cert, \$uuid) != 0){
+	print STDERR "Could not find uuid in certificate: $cert\n";
+	return undef;
+    }
+    my $safe_cert = DBQuoteSpecial($cert);
+    my $safe_uuid = DBQuoteSpecial($uuid);
+    my $safe_key  = DBQuoteSpecial($privkey);
+    return undef
+	if (!DBQueryWarn("insert into geni_certificates set ".
+			 " created=now(), uuid=$safe_uuid, ".
+			 " cert=$safe_cert, privkey=$safe_key"));
+
+    return GeniCertificate->Lookup($uuid);
+}
+
+#
+# Delete ...
+#
+sub Delete($)
+{
+    my ($self) = @_;
+    my $uuid = $self->uuid();
+
+    return -1
+	if (!DBQueryWarn("delete from geni_certificates where uuid='$uuid'"));
+
+    return 0;
+}
+
+#
+# Store a public key for a uuid. This is for something that is hosted
+# elsewhere and we just want to save the pubkey away in case we need it.
+#
+sub StorePublic($$)
+{
+    my ($class, $cert) = @_;
+
+    if (! ($cert =~ /^[\012\015\040-\176]*$/)) {
+	print STDERR "Improper chars in certificate string\n";
+	return undef;
+    }
+    my $uuid;
+    if (GeniCertificate->CertificateInfo($cert, \$uuid) != 0){
+	print STDERR "Could not find uuid in certificate: $cert\n";
+	return undef;
+    }
+    my $safe_cert = DBQuoteSpecial($cert);
+    my $safe_uuid = DBQuoteSpecial($uuid);
+    return undef
+	if (!DBQueryWarn("insert into geni_certificates set ".
+			 " created=now(), uuid=$safe_uuid, cert=$safe_cert"));
+
+    return GeniCertificate->Lookup($uuid);
+}
+
+#
+# Write a certificate and private key to a tempfile, as for signing with it.
+#
+sub WriteToFile($)
+{
+    my ($self) = @_;
+    
+    # Deleted when object is released
+    my $tempfile = new File::Temp(UNLINK => 1);
+    my $filename = $tempfile->filename;    
+    print $tempfile "-----BEGIN CERTIFICATE-----\n";
+    print $tempfile $self->cert();
+    print $tempfile "-----END CERTIFICATE-----\n";
+    print $tempfile "-----BEGIN RSA PRIVATE KEY-----\n";
+    print $tempfile $self->privkey();
+    print $tempfile "-----END RSA PRIVATE KEY-----\n";
+    return $filename;
+}
+
+#
+# Convert a certificate to its uuid.
+#
+sub CertificateInfo($$$)
+{
+    my ($class, $string, $pref) = @_;
+
+    # Deleted when scope is left.
+    my $tempfile = new File::Temp(UNLINK => 1);
+    my $filename = $tempfile->filename;    
+    print $tempfile "-----BEGIN CERTIFICATE-----\n";
+    print $tempfile "$string";
+    print $tempfile "-----END CERTIFICATE-----\n";
+
+    my $dn = `$OPENSSL x509 -in $filename -noout -subject`;
+    if ($?) {
+	print STDERR "Cailed to convert $filename to uuid!\n";
+	return -1;
+    }
+
+    if ($dn =~ /CN=([-\w]*)$/) {
+	$$pref = $1;
+    }
+    else {
+	return -1;
+    }
+    return 0;
+}
+
+############################################################################
+#
+# Wrapper for local users.
+#
+package GeniCertificate::LocalUser;
+use English;
+use libdb;
+
+#
+# Create a wrapper, with the same access names.
+#
+sub Create($$)
+{
+    my ($class, $user) = @_;
+    my $uid_idx = $user->uid_idx();
+
+    my $query_result =
+	DBQueryWarn("select * from user_sslcerts ".
+		    "where uid_idx='$uid_idx' and encrypted=1 and ".
+		    "      revoked is null");
+		    
+    return undef
+	if (!defined($query_result) || !$query_result->numrows);
+
+    my $self         = {};
+    $self->{'CERT'}  = $query_result->fetchrow_hashref();
+    bless($self, $class);
+    return $self;
+}
+
+sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'CERT'}->{$_[1]}); }
+sub uuid($)		{ return field($_[0], "uuid"); }
+sub created($)		{ return field($_[0], "created"); }
+sub cert($)		{ return field($_[0], "cert"); }
+sub privkey($)		{ return field($_[0], "privkey"); }
+sub revoked($)		{ return field($_[0], "revoked"); }
 
 # _Always_ make sure that this 1 is at the end of the file...
 1;

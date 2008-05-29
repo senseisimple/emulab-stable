@@ -19,6 +19,7 @@ use lib '@prefix@/lib';
 use GeniDB;
 use GeniComponent;
 use GeniCredential;
+use GeniCertificate;
 # Hate to import all this crap; need a utility library.
 use libdb qw(TBGetUniqueIndex);
 use libtestbed;
@@ -84,7 +85,17 @@ sub Lookup($$)
     $self->{'TICKET'}     = undef;	# Server side.
     $self->{'COMPONENT'}  = undef;	# Client side.
     $self->{'CREDENTIAL'} = undef;	# Client side.
-    
+
+    #
+    # Grab the certificate, since we will probably want it.
+    #
+    my $uuid = $self->{'SLIVER'}->{'uuid'};
+    my $certificate = GeniCertificate->Lookup($uuid);
+    if (!defined($certificate)) {
+	print STDERR "Could not find certificate for sliver $idx ($uuid)\n";
+	return undef;
+    }
+    $self->{'CERTIFICATE'} = $certificate;
     bless($self, $class);
     
     # Add to cache. 
@@ -116,29 +127,31 @@ sub Create($$;$)
     my ($class, $ticket, $credential) = @_;
     my @insert_data = ();
     my $uuid;
-    my $cert;
+    my $certificate;
 
     # Every sliver gets a new unique index.
     my $idx = TBGetUniqueIndex('next_sliver', 1);
     if (defined($credential)) {
+	# Store the certificate for later use.
+	$certificate = GeniCertificate->StorePublic($credential->this_cert());
+	if (!defined($certificate)) {
+	    print STDERR "Could not store certificate\n";
+	    return undef;
+	}
 	$uuid = $credential->this_uuid();
-	$cert = $credential->this_cert();
 
 	# Store the credential
 	return undef
 	    if ($credential->Store() != 0);
     }
     else {
-	# Create a cert pair, which gives us a uuid. We have to store the
-	# certificate someplace. Grab the experiment and stick it into the
-	# workdir. xs
-	
-	# And a new uuid and cert for a local sliver.
-	$uuid = NewUUID();
-	if (!defined($uuid)) {
-	    print "*** WARNING: Could not generate a UUID!\n";
+	# Create a cert pair, which gives us a new uuid.
+	$certificate = GeniCertificate->Create("sliver");
+	if (!defined($certificate)) {
+	    print STDERR "Could not generate new certificate and UUID!\n";
 	    return undef;
 	}
+	$uuid = $certificate->uuid();
     }
     my $slice_uuid     = $ticket->slice_uuid();
     my $owner_uuid     = $ticket->owner_uuid();
@@ -160,13 +173,9 @@ sub Create($$;$)
 	if (defined($ticket->component()));
 
     # Insert into DB.
-    DBQueryWarn("insert into geni_slivers set " . join(",", @insert_data))
-	or return undef;
-
-    # Insert the certificate.
-    if (!DBQueryWarn("replace into geni_certificates set ".
-		     "  uuid=$uuid, cert=$cert")) {
-	DBQueryWarn("delete from geni_slivers where idx='$idx'");
+    if (!DBQueryWarn("insert into geni_slivers set " .
+		     join(",", @insert_data))) {
+	$certificate->Delete();
 	return undef;
     }
 
@@ -192,6 +201,8 @@ sub credential_idx($)	{ return field($_[0], "credential_idx"); }
 sub node_id($)		{ return field($_[0], "node_id"); }
 sub ticket_idx($)	{ return field($_[0], "ticket_idx"); }
 sub component_idx($)	{ return field($_[0], "component_idx"); }
+sub cert($)		{ return $_[0]->{'CERTIFICATE'}->cert(); }
+sub GetCertificate($)   { return $_[0]->{'CERTIFICATE'}; }
 
 #
 # Delete the sliver. The sliver should not be provisioned when this done.
@@ -203,8 +214,13 @@ sub Delete($)
     return -1
 	if (! ref($self));
 
-    my $idx = $self->idx();
+    my $idx  = $self->idx();
+    my $uuid = $self->uuid();
 
+    DBQueryWarn("delete from geni_credentials where this_uuid='$uuid'")
+	or return -1;
+    DBQueryWarn("delete from geni_certificates where uuid='$uuid'")
+	or return -1;
     DBQueryWarn("delete from geni_slivers where idx='$idx'")
 	or return -1;
     
@@ -275,6 +291,30 @@ sub GetComponent($)
 }
 
 #
+# Client side method to contact the sliver component and destroy it.
+#
+sub Destroy($$)
+{
+    my ($self, $user) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $component = $self->GetComponent();
+    return -1
+	if (defined($component));
+
+    return -1
+	if ($component->DestroySliver($self, $user) != 0);
+
+    # Delete the local object from the DB.
+    $self->Delete() == 0
+	or return -1;
+
+    return 0;
+}
+
+#
 # Provision a slice. We actually did this when the ticket was requested.
 #
 sub Provision($)
@@ -319,6 +359,31 @@ sub Provision($)
 	return -1;
     }
     return 0;
+}
+
+#
+# Create a signed credential for this sliver, issued to the provided user.
+# The credential will grant all permissions for now.
+#
+# Should we store these credentials in the DB, recording what we hand out?
+#
+sub NewCredential($$)
+{
+    my ($self, $owner) = @_;
+
+    return undef
+	if (! (ref($self) && ref($owner)));
+
+    my $credential = GeniCredential->Create($self, $owner);
+    if (!defined($credential)) {
+	print STDERR "Could not create credential for $self, $owner\n";
+	return undef;
+    }
+    if ($credential->Sign($self->GetCertificate()) != 0) {
+	print STDERR "Could not sign credential for $self, $owner\n";
+	return undef;
+    }
+    return $credential;
 }
 
 #

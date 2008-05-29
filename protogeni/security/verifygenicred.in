@@ -215,8 +215,7 @@ opendir(DIR, "$GENICERTS") or
 my @pemfiles = grep {/^.*\.pem$/} readdir(DIR);
 closedir(DIR);
 
-my $certarg = " " . join(" ", map("--trusted-pem $GENICERTS/$_", @pemfiles)) .
-    " --trusted-pem $EMULAB_CERT";
+my $certarg = " " . join(" ", map("--trusted-pem $GENICERTS/$_", @pemfiles));
 
 #
 # Lets first make sure that the data has not been messed with; for each

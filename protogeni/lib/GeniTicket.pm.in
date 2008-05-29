@@ -20,6 +20,7 @@ use vars qw(@ISA @EXPORT);
 use lib '@prefix@/lib';
 use GeniDB;
 use GeniCredential;
+use GeniCertificate;
 use libtestbed;
 use Experiment;
 use libdb qw(TBGetUniqueIndex);
@@ -121,7 +122,7 @@ sub CreateFromSignedTicket($$;$$)
 	if (!defined($uuid_node));
     my $slice_cert = $uuid_node->to_literal();
     my $slice_uuid;
-    GeniCredential->CertificateInfo($slice_cert, \$slice_uuid) == 0
+    GeniCertificate->CertificateInfo($slice_cert, \$slice_uuid) == 0
 	or return undef;
 
     if (! ($slice_uuid =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/)) {
@@ -136,7 +137,7 @@ sub CreateFromSignedTicket($$;$$)
 	if (!defined($uuid_node));
     my $owner_cert = $uuid_node->to_literal();
     my $owner_uuid;
-    GeniCredential->CertificateInfo($owner_cert, \$owner_uuid) == 0
+    GeniCertificate->CertificateInfo($owner_cert, \$owner_uuid) == 0
 	or return undef;
 
     if (! ($owner_uuid =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/)) {

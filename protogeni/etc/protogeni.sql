@@ -29,7 +29,6 @@ CREATE TABLE `geni_users` (
   `name` tinytext,
   `email` tinytext,
   `sa_idx` int(10) unsigned NOT NULL default '0',
-  `cert` text,
   PRIMARY KEY  (`idx`),
   KEY `hrn` (`hrn`),
   UNIQUE KEY `uuid` (`uuid`)
@@ -50,13 +49,11 @@ CREATE TABLE `geni_users` (
 #
 DROP TABLE IF EXISTS `geni_components`;
 CREATE TABLE `geni_components` (
-  `hrn` varchar(256) NOT NULL default '',
   `idx` mediumint(8) unsigned NOT NULL default '0',
+  `hrn` varchar(256) NOT NULL default '',
   `uuid` varchar(40) NOT NULL default '',
   `created` datetime default NULL,
-  `name` tinytext,
   `url` tinytext,
-  `cert` text,
   PRIMARY KEY  (`idx`),
   UNIQUE KEY `hrn` (`hrn`),
   UNIQUE KEY `uuid` (`uuid`)
@@ -76,16 +73,13 @@ CREATE TABLE `geni_components` (
 #
 DROP TABLE IF EXISTS `geni_sliceauthorities`;
 CREATE TABLE `geni_sliceauthorities` (
-  `id` varchar(8) NOT NULL default '',
-  `id_idx` mediumint(8) unsigned NOT NULL default '0',
+  `hrn` varchar(256) NOT NULL default '',
+  `idx` mediumint(8) unsigned NOT NULL default '0',
   `uuid` varchar(40) NOT NULL default '',
-  `uuid_prefix` varchar(8) NOT NULL default '',
+  `uuid_prefix` varchar(12) NOT NULL default '',
   `created` datetime default NULL,
-  `name` tinytext,
   `url` tinytext,
-  `pubkey` text,
-  PRIMARY KEY  (`id_idx`),
-  UNIQUE KEY `id` (`id`),
+  PRIMARY KEY  (`idx`),
   UNIQUE KEY `uuid` (`uuid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
@@ -126,7 +120,9 @@ CREATE TABLE `geni_slivers` (
   `creator_uuid` varchar(40) NOT NULL default '',
   `node_id` varchar(32) default NULL,
   `created` datetime default NULL,
-  `cm_idx` int(10) unsigned NOT NULL default '0',
+  `credential_idx` int(10) unsigned default NULL,
+  `ticket_idx` int(10) unsigned default NULL,
+  `component_idx` int(10) unsigned NOT NULL default '0',
   PRIMARY KEY  (`idx`),
   UNIQUE KEY `uuid` (`uuid`),
   INDEX `slice_uuid` (`slice_uuid`)
@@ -143,9 +139,41 @@ CREATE TABLE `geni_tickets` (
   `created` datetime default NULL,
   `redeem_before` datetime default NULL,
   `valid_until` datetime default NULL,
-  `cm_idx` int(10) unsigned NOT NULL default '0',
+  `component_idx` int(10) unsigned NOT NULL default '0',
   `ticket_string` text,
   PRIMARY KEY  (`idx`),
   INDEX `owner_uuid` (`owner_uuid`),
   INDEX `slice_uuid` (`slice_uuid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+#
+# Table to remember credentials.
+#
+DROP TABLE IF EXISTS `geni_credentials`;
+CREATE TABLE `geni_credentials` (
+  `idx` mediumint(8) unsigned NOT NULL default '0',
+  `owner_uuid` varchar(40) NOT NULL default '',
+  `this_uuid` varchar(40) NOT NULL default '',
+  `created` datetime default NULL,
+  `valid_until` datetime default NULL,
+  `credential_string` text,
+  PRIMARY KEY  (`idx`),
+  INDEX `owner_uuid` (`owner_uuid`),
+  INDEX `this_uuid` (`this_uuid`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+#
+# Table to hold uuid<->certificate bindings, keeping them out of the other
+# tables above. We use this on both the client and server side (storing the
+# private key), say for a sliver.
+#
+DROP TABLE IF EXISTS `geni_certificates`;
+CREATE TABLE `geni_certificates` (
+  `uuid` varchar(40) NOT NULL default '',
+  `created` datetime default NULL,
+  `cert` text,
+  `privkey` text,
+  `revoked` datetime default NULL,
+  PRIMARY KEY  (`uuid`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+

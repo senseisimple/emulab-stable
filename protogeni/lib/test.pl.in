@@ -89,9 +89,6 @@ foreach my $component (@components) {
     push(@resources, $rspec);
     print Dumper($rspec);
 }
-
-# Now that we have some resource availability rspecs, generate a request
-# rspec. This is gonna need a lot more work.
 my $rspec = $resources[0];
 print Dumper($rspec);
 
@@ -99,20 +96,20 @@ $ticket = $components[0]->GetTicket($slice, $rspec, $this_user, $credential);
 if (!defined($ticket)) {
     die("Could not get ticket for $slice\n");
 }
-exit(0);
 
 $sliver = $components[0]->CreateSliver($slice, $ticket, $this_user);
 if (!defined($ticket)) {
     die("Could not create sliver for $slice\n");
 }
 print Dumper($sliver);
+exit(0);
 
 # Wait for input before proceeding.
 $_ = <STDIN>;
 
 if (defined($sliver)) {
-    print $sliver . "\n";
-    GeniCMClient::DestroySliver($experiment, $sliver);
+    print Dumper($sliver);
+    $sliver->Destroy($this_user);
 }
 
 

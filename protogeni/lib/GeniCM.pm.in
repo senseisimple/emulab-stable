@@ -24,6 +24,7 @@ use Genixmlrpc;
 use GeniResponse;
 use GeniTicket;
 use GeniCredential;
+use GeniCertificate;
 use GeniSlice;
 use GeniSliver;
 use GeniUser;
@@ -68,7 +69,7 @@ sub DiscoverResources($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not create GeniCredential object");
     }
-    GeniCredential->CertificateInfo($slice, \$slice_uuid) == 0 or
+    GeniCertificate->CertificateInfo($slice, \$slice_uuid) == 0 or
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not get uuid from Certificate");
 	
@@ -142,7 +143,7 @@ sub GetTicket($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not create GeniCredential object");
     }
-    GeniCredential->CertificateInfo($slice_cert, \$slice_uuid) == 0 or
+    GeniCertificate->CertificateInfo($slice_cert, \$slice_uuid) == 0 or
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not get uuid from Certificate");
 	
@@ -265,6 +266,10 @@ sub CreateSliver($)
     my ($argref) = @_;
     my $owner_uuid = $ENV{'GENIUSER'};
     my $ticket     = $argref->{'ticket'};
+    my $impotent   = $argref->{'impotent'};
+
+    $impotent = 0
+	if (!defined($impotent));
 
     if (! (defined($ticket) &&
 	   !TBcheck_dbslot($ticket, "default", "text",
@@ -289,6 +294,25 @@ sub CreateSliver($)
 				    "No local experiment for slice");
     }
 
+    #
+    # See if we have a record of this slice in the DB. If not, throw an
+    # error; might change later.
+    #
+    my $slice = GeniSlice->Lookup($ticket->slice_uuid());
+    if (!defined($slice)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "No slice record for slice");
+    }
+
+    #
+    # Ditto the user.
+    #
+    my $owner = GeniUser->Lookup($owner_uuid);
+    if (!defined($owner)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "No user record for $owner_uuid");
+    }
+
     my $sliver = GeniSliver->Create($ticket);
     if (!defined($sliver)) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
@@ -300,7 +324,7 @@ sub CreateSliver($)
     # so this should just work, unless the node has been released cause
     # it has been too long.
     #
-    if ($sliver->Provision() != 0) {
+    if (!$impotent && $sliver->Provision() != 0) {
 	$sliver->Delete();
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not provision sliver");
@@ -308,15 +332,12 @@ sub CreateSliver($)
     #
     # The API states we return a credential to control the sliver.
     #
-    my $credential = GeniCredential->Create($sliver->uuid(),
-					    $owner_uuid);
+    my $credential = $sliver->NewCredential($owner);
     if (!defined($credential)) {
-	print STDERR "Could not create a credential for $sliver!\n";
-	return -1;
-    }
-    if ($credential->Sign()) {
-	print STDERR "Could not sign sliver credential!\n";
-	return -1;
+	$sliver->UnProvision();
+	$sliver->Delete();
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not create credential sliver");
     }
     return GeniResponse->Create(GENIRESPONSE_SUCCESS, $credential->asString());
 }
@@ -328,23 +349,21 @@ sub DestroySliver($)
 {
     my ($argref) = @_;
     my $owner_uuid  = $ENV{'GENIUSER'};
-    my $sliver_uuid = $argref->{'uuid'};
+    my $sliver_cert = $argref->{'sliver'};
     my $credential  = $argref->{'credential'};
+    my $sliver_uuid;
 
-    if (!defined($sliver_uuid)) {
+    if (!defined($sliver_cert) || !defined($credential)) {
 	return GeniResponse->Create(GENIRESPONSE_BADARGS);
     }
+    GeniCertificate->CertificateInfo($sliver_cert, \$sliver_uuid) == 0 or
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not get uuid from Certificate");
+    
     my $sliver = GeniSliver->Lookup($sliver_uuid);
     if (!defined($sliver)) {
 	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 				    "No such sliver $sliver_uuid");
-    }
-
-    if (! (defined($credential) &&
-	   !TBcheck_dbslot($credential, "default", "text",
-			   TBDB_CHECKDBSLOT_ERROR))) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "credential: ". TBFieldErrorString());
     }
     $credential = GeniCredential->CreateFromSigned($credential);
     if (!defined($credential)) {
@@ -357,7 +376,6 @@ sub DestroySliver($)
 	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
 				    "Invalid credentials for operation");
     }
-
     $sliver->UnProvision() == 0 or
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not unprovision sliver");

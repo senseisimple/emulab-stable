@@ -272,32 +272,18 @@ sub RegisterSlice($)
     # The SA UUID comes from the SSL environment (certificate). Verify it
     # and the prefix match for the uuid.
     #
-    # Need to verify the UUID is permitted for the SA making the request.
-    #
     my $sa_uuid = $ENV{'GENIUUID'};
-    my $query_result =
-	DBQueryWarn("select idx, uuid_prefix from geni_sliceauthorities ".
-		    "where uuid='$sa_uuid'");
-    return GeniResponse->Create(GENIRESPONSE_DBERROR)
-	if (!defined($query_result));
-    
-    return GeniResponse->Create(GENIRESPONSE_REFUSED, undef, "Who are You?")
-	if (!$query_result->numrows);
-
-    my ($sa_idx, $uuid_prefix)= $query_result->fetchrow_array();
-
-    if ($uuid =~ /^\w+\-\w+\-\w+\-\w+\-(\w+)$/) {
-	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
-				    "uuid: Prefix mismatch")
-	    if ("$uuid_prefix" ne "$1");
+    my $authority = GeniAuthority->Lookup($sa_uuid);
+    if (!defined($authority)) {
+	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
+				    "No slice authority record for $sa_uuid");
     }
-    else {
+    if (! $authority->PrefixMatch($uuid)) {
 	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
-				    "Improper format for uuid");
+				    "uuid: Prefix mismatch");
     }
-
     my $newslice = GeniSlice->Create($hrn, $uuid, $creator_uuid, $cert,
-				     $sa_idx);
+				     $authority->idx());
     if (!defined($newslice)) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "$hrn/$uuid could not be registered");

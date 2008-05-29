@@ -228,9 +228,9 @@ my $root   = $doc->documentElement();
 # or that of the user delegating the credential, or a certificate specified
 # on the command line.
 #
-if (defined($certficate)) {
-    $keyfile  = $certficate;
-    $certfile = $certficate;
+if (defined($certificate)) {
+    $keyfile  = $certificate;
+    $certfile = $certificate;
 }
 else {
     $keyfile  = $EMULAB_KEY;

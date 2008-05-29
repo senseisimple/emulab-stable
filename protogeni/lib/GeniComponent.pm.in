@@ -40,6 +40,9 @@ my $OURDOMAIN      = "@OURDOMAIN@";
 my $SIGNCRED	   = "$TB/sbin/signgenicred";
 my $VERIFYCRED	   = "$TB/sbin/verifygenicred";
 
+# Do not allocated nodes.
+my $impotent       = 1;
+
 # Cache of instances to avoid regenerating them.
 my %components     = ();
 
@@ -268,7 +271,7 @@ sub GetTicket($$$$$)
 				   "CM::GetTicket",
 				   { "slice"        => $slice->cert(),
 				     "credential"   => $credential->asString(),
-				     "impotent"     => 1,
+				     "impotent"     => $impotent,
 				     "rspec"        => $rspec_xml });
     
     return undef
@@ -297,7 +300,8 @@ sub CreateSliver($$$$)
     my $response =
 	Genixmlrpc::CallMethodHTTP($self->url(), $user,
 				   "CM::CreateSliver",
-				   { "ticket"  => $ticket->asString() });
+				   { "ticket"    => $ticket->asString(),
+				     "impotent"  => $impotent });
     
     return undef
 	if (!defined($response));
@@ -327,7 +331,7 @@ sub CreateSliver($$$$)
 #
 sub DestroySliver($$$)
 {
-    my ($self, $user, $sliver) = @_;
+    my ($self, $sliver, $user) = @_;
 
     # Must be a real reference. 
     return -1
@@ -340,7 +344,7 @@ sub DestroySliver($$$)
     my $response =
 	Genixmlrpc::CallMethodHTTP($self->url(), $user,
 				   "CM::DestroySliver",
-				   { "uuid"        => $sliver->uuid(),
+				   { "sliver"      => $sliver->cert(),
 				     "credential"  =>
 					 $credential->asString() });
     
@@ -348,12 +352,6 @@ sub DestroySliver($$$)
 	print STDERR "Could not destroy sliver $sliver\n";
 	return -1;
     }
-    # Delete the local object from the DB.
-    $sliver->Delete() == 0
-	or return -1;
-    # And the credential since we no longer need to maintain it for
-    # this sliver. 
-
     return 0;
 }
 

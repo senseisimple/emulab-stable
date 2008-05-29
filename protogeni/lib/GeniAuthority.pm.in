@@ -153,6 +153,25 @@ sub url($)		{ return field($_[0], "url"); }
 sub hrn($)		{ return field($_[0], "hrn"); }
 sub cert($)		{ return field($_[0], "cert"); }
 
+#
+# Does the uuid prefix match.
+#
+sub PrefixMatch($$)
+{
+    my ($self, $uuid) = @_;
+
+    return 0
+	if (!ref($self));
+
+    my $uuid_prefix = $self->uuid_prefix();
+
+    if ($uuid =~ /^\w+\-\w+\-\w+\-\w+\-(\w+)$/) {
+	return 1
+	    if ("$uuid_prefix" eq "$1");
+    }
+    return 0;
+}
+
 # _Always_ make sure that this 1 is at the end of the file...
 1;
 

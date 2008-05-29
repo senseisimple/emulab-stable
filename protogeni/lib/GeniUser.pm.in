@@ -18,6 +18,7 @@ use lib '@prefix@/lib';
 use GeniDB;
 use GeniCHClient;
 use GeniAuthority;
+use GeniCertificate;
 use libtestbed;
 # Hate to import all this crap; need a utility library.
 use libdb qw(TBGetUniqueIndex);
@@ -91,14 +92,12 @@ sub Lookup($$)
     # Grab the certificate, since we will probably want it.
     #
     my $uuid = $self->{'USER'}->{'uuid'};
-    $query_result = DBQueryWarn("select cert from geni_certificates ".
-				"where uuid='$uuid'");
-    if (!$query_result || !$query_result->numrows) {
-	print STDERR "Could not find certificate for user $idx\n";
+    my $certificate = GeniCertificate->Lookup($uuid);
+    if (!defined($certificate)) {
+	print STDERR "Could not find certificate for user $idx ($uuid)\n";
 	return undef;
     }
-    my ($cert) = $query_result->fetchrow_array();
-    $self->{'USER'}->{'cert'} = $cert;
+    $self->{'CERT'} = $certificate;
     
     # Add to cache. 
     $users{$self->{'USER'}->{'idx'}} = $self;
@@ -116,8 +115,9 @@ sub created($)		{ return field($_[0], "created"); }
 sub archived($)		{ return field($_[0], "archived"); }
 sub name($)		{ return field($_[0], "name"); }
 sub email($)		{ return field($_[0], "email"); }
-sub cert($)		{ return field($_[0], "cert"); }
+sub cert($)		{ return $_[0]->{'CERT'}->cert(); }
 sub sa_idx($)		{ return field($_[0], "sa_idx"); }
+sub GetCertificate($)   { return $_[0]->{'CERT'}; }
 
 #
 # Stringify for output.
@@ -157,7 +157,7 @@ sub CheckExisting($$$)
 # Class function to create new Geni user and return object. Note that this
 # is used by the ClearingHouse *and* the CM/SA to record users. 
 #
-sub Create($$$$$$$$$)
+sub Create($$$$$$$$)
 {
     my ($class, $hrn, $uid, $uuid, $name, $email, $cert, $sa_idx) = @_;
     my @insert_data = ();
@@ -174,7 +174,6 @@ sub Create($$$$$$$$$)
     my $safe_uid   = DBQuoteSpecial($uid);
     my $safe_name  = DBQuoteSpecial($name);
     my $safe_email = DBQuoteSpecial($email);
-    my $safe_cert  = DBQuoteSpecial($cert);
     my $safe_uuid  = DBQuoteSpecial($uuid);
     my $safe_sa    = DBQuoteSpecial($sa_idx);
     push(@insert_data, "hrn=$safe_hrn");
@@ -184,16 +183,16 @@ sub Create($$$$$$$$$)
     push(@insert_data, "uuid=$safe_uuid");
     push(@insert_data, "sa_idx=$safe_sa");
 
+    # Insert certificate.
+    my $certificate = GeniCertificate->StorePublic($cert);
+    if (!defined($certificate)) {
+	print STDERR "Could not store certificate for new user\n";
+	return undef;
+    }
+
     # Insert into DB.
     DBQueryWarn("insert into geni_users set " . join(",", @insert_data))
 	or return undef;
-
-    # Insert the certificate.
-    if (!DBQueryWarn("replace into geni_certificates set ".
-		     "  uuid=$safe_uuid, cert=$safe_cert")) {
-	DBQueryWarn("delete from geni_users where idx='$idx'");
-	return undef;
-    }
 
     return GeniUser->Lookup($idx);
 }
@@ -284,6 +283,7 @@ sub Archive($)
 package GeniUser::LocalUser;
 use English;
 use GeniDB;
+use GeniCertificate;
 use overload ('""' => 'Stringify');
 
 #
@@ -295,6 +295,12 @@ sub Create($$)
 
     my $self         = {};
     $self->{'USER'}  = $user;
+
+    # And the certificate wrapper.
+    my $certificate = GeniCertificate::LocalUser->Create($user);
+    return undef
+	if (!defined($certificate));
+    $self ->{'CERT'} = $certificate;
 
     bless($self, $class);
     return $self;
@@ -310,19 +316,9 @@ sub sa_idx($)		{ return 0; }
 # Need to construct this since not in User structure.
 sub hrn($)		{ return $OURDOMAIN . "." . $_[0]->uid(); }
 
-# And this is in another table.
-sub cert($)
-{
-    my ($self) = @_;
-    my $user   = $self->{'USER'};
-    my $cert;
-
-    if ($user->SSLCert(1, \$cert)) {
-	print STDERR "No encrypted certificate found for $user\n";
-	return undef;
-    }
-    return $cert;
-}
+# And this is in another structure.
+sub cert($)             { return $_[0]->{'CERT'}->cert(); }
+sub GetCertificate($)   { return $_[0]->{'CERT'}; }
 
 #
 # Register this local user at the ClearingHouse.
