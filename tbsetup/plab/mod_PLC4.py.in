@@ -370,12 +370,17 @@ class PLCagent:
     def AuthCheck(self):
         return self.__server.AuthCheck(self.auth)
 
-    def SliceAddAttribute(self,attrname,attrvalue):
+    def SliceAddAttribute(self,attrname,attrvalue,node=None):
         if attrname == None or attrvalue == None \
            or attrname == '' or attrvalue == '':
             return 0
-        return self.__server.AddSliceAttribute(self.auth,self.slicename,
-                                               attrname,attrvalue)
+        if node:
+            return self.__server.AddSliceAttribute(self.auth,self.slicename,
+                                                   attrname,attrvalue,node)
+        else:
+            return self.__server.AddSliceAttribute(self.auth,self.slicename,
+                                                   attrname,attrvalue)
+        pass
 
     def SiteAdd(self,name,url,longitude,latitude):
         return self.__server.AddSite(self.auth,
@@ -733,6 +738,7 @@ class mod_PLC4:
             pass
 
         # Allow slice attributes to be set "generically" via the db
+        # Also see below where we add slice attributes on a per-node basis
         sas = self.plc.getAttrVal("slice_attributes",required=False)
         if sas:
             try:
@@ -801,6 +807,12 @@ class mod_PLC4:
         except:
             print "Failed to add nodes to slice %s" % slice.slicename
             raise
+
+        # add any per-node or per-nodegroup attributes:
+        #
+        # XXX: will not work as above -- need to fix above and add this
+        # code in a way that works with the plab_attributes table.
+        #
 
         # XXX: this is currently locked out to pi/user roles, although the docs
         # say otherwise, so we can't use it automatically yet.
