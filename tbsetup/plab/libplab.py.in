@@ -1778,9 +1778,13 @@ class Plab:
                     failsoon.append(entry)
                     pass
                 # skip node renewal
+                print "Finished slice %s/%s in %s/%s at %s:" \
+                      % (plcname,slicename,pid,eid,time.ctime())
                 continue
             elif res == -1:
                 # slice did not get renewed, so skip
+                print "Failingly finished slice %s/%s in %s/%s at %s:" \
+                      % (plcname,slicename,pid,eid,time.ctime())
                 continue
             else:
                 if entry in failedrenew:
@@ -2268,6 +2272,10 @@ class EmulabPlcObjTranslator:
                                    (sip[2] & smask[2]) | (~smask[2] & 0xff),
                                    (sip[3] & smask[3]) | (~smask[3] & 0xff),)
 
+        if bwlimit == '':
+            bwlimit = None
+            pass
+
         retval['hostname'] = hostname
         ctrl_network = { 'ip':IP,'bwlimit':bwlimit,'method':boot_method,
                          'network':n_network,'netmask':netmask,
@@ -2622,6 +2630,18 @@ class Slice:
             nn = Node(self,n,usedb=False)
             # Grab the IP and hostname
             retval.append([n,nn.IP,nn.hostname])
+            pass
+        return retval
+
+    def getSliceNodeObjects(self):
+        """
+        Return a tuple containing node objects for nodes in this slice
+        """
+        retval = []
+        for n in self.nodelist:
+            nn = Node(self,n)
+            # Grab the IP and hostname
+            retval.append(nn)
             pass
         return retval
 
