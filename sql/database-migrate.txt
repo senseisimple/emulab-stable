@@ -4512,3 +4512,20 @@ last_net_act,last_cpu_act,last_ext_act);
        alter table reserved add `genisliver_idx` int(10) unsigned
             default NULL;
        
+4.153: Federation (Geni) support; table of non-local users. I thought
+       about putting these into the users table, but that worries me
+       cause of so many queries in the system that join with uid
+       instead of uid_idx.
+
+       CREATE TABLE `nonlocal_users` (
+        `uid` varchar(8) NOT NULL default '',
+        `uid_idx` mediumint(8) unsigned NOT NULL default '0',
+        `uid_uuid` varchar(40) NOT NULL default '',
+        `created` datetime default NULL,
+        `name` tinytext,
+        `email` tinytext,
+        PRIMARY KEY  (`uid_idx`),
+        KEY `uid` (`uid`),
+        UNIQUE KEY `uid_uuid` (`uid_uuid`)
+       ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+

@@ -2217,6 +2217,22 @@ CREATE TABLE `nologins` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `nonlocal_users`
+--
+
+CREATE TABLE `nonlocal_users` (
+  `uid` varchar(8) NOT NULL default '',
+  `uid_idx` mediumint(8) unsigned NOT NULL default '0',
+  `uid_uuid` varchar(40) NOT NULL default '',
+  `created` datetime default NULL,
+  `name` tinytext,
+  `email` tinytext,
+   PRIMARY KEY  (`uid_idx`),
+   KEY `uid` (`uid`),
+   UNIQUE KEY `uid_uuid` (`uid_uuid`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `nseconfigs`
 --
 

@@ -419,7 +419,7 @@ sub Create($$$$)
 			   keys(%{$argref})));
 
     # Every user gets a new unique index.
-    my $uid_idx = TBGetUniqueIndex('next_uid', 1);
+    my $uid_idx = User->NextIDX();
 
     #
     # Get me an unused unix id. 
@@ -547,6 +547,17 @@ sub Delete($)
 	or return -1;
     
     return 0;
+}
+
+#
+# Utility (class) function to get a new uid for a user.
+#
+sub NextIDX($)
+{
+    my ($class) = @_;
+
+    my $idx = TBGetUniqueIndex('next_uid', 1);
+    return $idx;
 }
 
 #
@@ -1014,12 +1025,40 @@ sub SSLCert($$$)
 
     my $query_result =
 	DBQueryWarn("select cert from user_sslcerts ".
-		    "where uid_idx='$uid_idx' and encrypted=$encrypted");
+		    "where uid_idx='$uid_idx' and encrypted=$encrypted and ".
+		    "      revoked is null");
+		    
     return -1
 	if (!defined($query_result) || !$query_result->numrows);
 
     my ($cert) = $query_result->fetchrow_array();
     $$pref = $cert;
+    return 0;
+}
+
+#
+# Get the passphrase for the encrypted key.
+#
+sub SSLPassPhrase($$$)
+{
+    my ($self, $encrypted, $pref) = @_;
+    $encrypted = ($encrypted ? 1 : 0);
+    
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $uid_idx = $self->uid_idx();
+
+    my $query_result =
+	DBQueryWarn("select password from user_sslcerts ".
+		    "where uid_idx='$uid_idx' and encrypted=$encrypted and ".
+		    "      revoked is null");
+    return -1
+	if (!defined($query_result) || !$query_result->numrows);
+
+    my ($password) = $query_result->fetchrow_array();
+    $$pref = $password;
     return 0;
 }
 
@@ -1464,6 +1503,20 @@ sub AccessCheck($$$)
     return SameUser($self, $user);
 }
 
+#
+# Home dir for user.
+#
+sub HomeDir($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return undef
+	if (! ref($self));
+    
+    return USERROOT() . "/" . $self->uid();
+}
+
 sub escapeshellarg($)
 {
     my ($str) = @_;
@@ -1471,6 +1524,135 @@ sub escapeshellarg($)
     $str =~ s/[^[:alnum:]]/\\$&/g;
     $str =~ /^(.+)$/; # untaint the result
     return $1;
+}
+
+#############################################################################
+# Non-local users, as for federation/geni.
+#
+package User::NonLocal;
+use libdb;
+use libtestbed;
+use English;
+use overload ('""' => 'Stringify');
+
+# Cache of instances to avoid regenerating them.
+my %nonlocal_users      = ();
+
+#
+# Lookup by idx.
+#
+sub Lookup($$)
+{
+    my ($class, $token) = @_;
+    my $idx;
+    my $query_result;
+
+    if ($token =~ /^\d+$/) {
+	$idx = $token;
+    }
+    elsif ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
+	$query_result =
+	    DBQueryWarn("select uid_idx from nonlocal_users ".
+			"where uid_uuid='$token'");
+	    return undef
+		if (! $query_result || !$query_result->numrows);
+
+	    ($idx) = $query_result->fetchrow_array();
+    }
+    else {
+	return undef;
+    }
+    
+    # Look in cache first
+    return $nonlocal_users{"$idx"}
+        if (exists($nonlocal_users{"$idx"}));
+
+    $query_result =
+	DBQueryWarn("select * from nonlocal_users where uid_idx='$idx'");
+
+    return undef
+	if (!$query_result || !$query_result->numrows);
+
+    my $self         = {};
+    $self->{'USER'}  = $query_result->fetchrow_hashref();
+
+    bless($self, $class);
+    
+    # Add to cache. 
+    $nonlocal_users{$self->{'USER'}->{'uid_idx'}} = $self;
+    
+    return $self;
+}
+# accessors
+sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'USER'}->{$_[1]}); }
+sub uid_idx($)		{ return field($_[0], "uid_idx"); }
+sub idx($)		{ return field($_[0], "uid_idx"); }
+sub uid($)		{ return field($_[0], "uid"); }
+sub uid_uuid($)		{ return field($_[0], "uid_uuid"); }
+sub created($)		{ return field($_[0], "created"); }
+sub name($)		{ return field($_[0], "name"); }
+sub email($)		{ return field($_[0], "email"); }
+
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+    
+    my $uid = $self->uid();
+    my $idx = $self->idx();
+
+    return "[NonLocalUser: $uid, IDX: $idx]";
+}
+
+#
+# Class function to create a new Geni user and return object.
+#
+sub Create($$$$$)
+{
+    my ($class, $uid, $uuid, $name, $email) = @_;
+    my @insert_data = ();
+
+    # Every user gets a new unique index.
+    my $idx = User->NextIDX();
+
+    # Now tack on other stuff we need.
+    push(@insert_data, "created=now()");
+    push(@insert_data, "uid_idx='$idx'");
+
+    my $safe_uid   = DBQuoteSpecial($uid);
+    my $safe_name  = DBQuoteSpecial($name);
+    my $safe_email = DBQuoteSpecial($email);
+    my $safe_uuid  = DBQuoteSpecial($uuid);
+    push(@insert_data, "uid=$safe_uid");
+    push(@insert_data, "name=$safe_name");
+    push(@insert_data, "email=$safe_email");
+    push(@insert_data, "uid_uuid=$safe_uuid");
+
+    # Insert into DB.
+    DBQueryWarn("insert into nonlocal_users set " . join(",", @insert_data))
+	or return undef;
+
+    return User::NonLocal->Lookup($idx);
+}
+
+#
+# Delete the user, as for registration errors.
+#
+sub Delete($)
+{
+    my ($self) = @_;
+
+    return 0
+	if (! ref($self));
+
+    my $idx = $self->idx();
+
+    DBQueryWarn("delete from nonlocal_users where uid_idx='$idx'")
+	or return -1;
+    
+    return 0;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...
