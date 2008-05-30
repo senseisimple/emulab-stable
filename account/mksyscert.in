@@ -1,0 +1,249 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+
+#
+# Load the Testbed support stuff.
+#
+use lib "@prefix@/lib";
+use libaudit;
+use libdb;
+use libtestbed;
+use User;
+
+#
+# Create system SSL certificates.
+# 
+sub usage()
+{
+    print("Usage: mksyscert [-d] [-o file] [-p password] <orgunit> [uuid]\n");
+    exit(-1);
+}
+my $optlist  = "dp:o:e";
+my $debug    = 0;
+my $printcert= 0;
+my $outfile;
+my $password = "";
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS	= "@TBOPSEMAIL@";
+my $TBLOGS	= "@TBLOGSEMAIL@";
+my $OURDOMAIN   = "@OURDOMAIN@";
+my $CONTROL	= "@USERNODE@";
+my $BOSSNODE	= "@BOSSNODE@";
+
+# Locals
+my $USERDIR	= USERROOT();
+my $SSLDIR      = "$TB/lib/ssl";
+my $TEMPLATE    = "$SSLDIR/usercert.cnf";
+my $CACONFIG    = "$SSLDIR/ca.cnf";
+my $EMULAB_CERT = "$TB/etc/emulab.pem";
+my $EMULAB_KEY  = "$TB/etc/emulab.key";
+my $OPENSSL     = "/usr/bin/openssl";
+my $WORKDIR     = "$TB/ssl";
+my $SAVEUID	= $UID;
+
+# Locals
+my $encrypted   = 0;
+my $sh_password = "";
+
+#
+# We don't want to run this script unless its the real version.
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be setuid! Maybe its a development version?\n");
+}
+
+#
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+#
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root! Its already setuid!\n");
+}
+
+#
+# Untaint the path
+#
+$ENV{'PATH'} = "$TB/bin:$TB/sbin:/bin:/usr/bin:/usr/bin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Function prototypes
+#
+sub fatal($);
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"o"})) {
+    $outfile = $options{"o"};
+    if ($outfile =~ /^([-\w\.\/]+)$/) {
+	$outfile = $1;
+    }
+    else {
+	die("Tainted arguments: $outfile\n");
+    }
+    
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"e"})) {
+    $printcert = 1;
+}
+if (defined($options{"p"})) {
+    $password = $options{"p"};
+
+    #
+    # Make sure its all escaped since any printable char is allowed.
+    #
+    if ($password =~ /^([\040-\176]*)$/) {
+	$password = $1;
+    }
+    else {
+	die("Tainted argument: $password\n");
+    }
+    $sh_password = $password;
+    $sh_password =~ s/\'/\'\\\'\'/g;
+    $sh_password = "$sh_password";
+    $encrypted = 1;
+}
+if (@ARGV < 1) {
+    usage();
+}
+my $orgunit = shift(@ARGV);
+my $uuid    = (@ARGV ? shift(@ARGV) : undef);
+
+# Map invoking user to object.
+my $this_user = User->LookupByUnixId($UID);
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
+}
+
+# Generate/confirm uuid
+if (!defined($uuid)) {
+    $uuid = NewUUID();
+    if (!defined($uuid)) {
+	fatal("Could not generate a new uuid");
+    }
+}
+if (!($uuid =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/)) {
+    fatal("uuid not in proper format");
+}
+
+#
+# CD to the workdir, and then serialize on the lock file since there is
+# some shared goop that the ssl tools muck with (serial number, index, etc.).
+# 
+chdir("$WORKDIR") or
+    fatal("Could not chdir to $WORKDIR: $!");
+
+TBScriptLock("mkusercert") == 0 or
+    fatal("Could not get the lock!");
+
+#
+# Need an index file, which is the openssl version of the DB.
+#
+if (! -e "index.txt") {
+    open(IND, ">index.txt")
+	or fatal("Could not create index.txt");
+    close(IND);
+}
+
+#
+# We have to figure out what the next serial number will be and write
+# that into the file. We could let "ca' keep track, but with devel
+# trees, we might end up with duplicate serial numbers.
+#
+# XXX Shared with mkusercert ...
+#
+my $serial = TBGetUniqueIndex("user_sslcerts");
+
+open(SER, ">serial")
+    or fatal("Could not create new serial file");
+printf SER "%08x\n", $serial;
+close(SER);
+
+#
+# Create a template conf file.
+#
+system("cp -f $TEMPLATE syscert.cnf") == 0
+    or fatal("Could not copy $TEMPLATE to current dir");
+
+open(TEMP, ">>syscert.cnf")
+    or fatal("Could not open $TEMPLATE for append: $!");
+
+print TEMP "OU\t\t= $orgunit\n";
+print TEMP "CN\t\t= $uuid\n";
+close(TEMP)
+    or fatal("Could not close syscert.cnf: $!");
+
+# Redirect output unless in debugging mode.
+my $outline = ($debug ? "" : ">/dev/null 2>&1");
+
+#
+# Create a client side private key and certificate request.
+#
+system("$OPENSSL req -new -config syscert.cnf ".
+       ($encrypted ? " -passout 'pass:${sh_password}' " : " -nodes ") .
+       " -keyout syscert_key.pem -out syscert_req.pem $outline") == 0
+    or fatal("Could not create certificate request");
+
+#
+# Sign the client cert request, creating a client certificate.
+#
+$UID = 0;
+system("$OPENSSL ca -batch -policy policy_sslxmlrpc ".
+       " -name CA_usercerts -config $CACONFIG ".
+       " -out syscert_cert.pem -cert $EMULAB_CERT -keyfile $EMULAB_KEY ".
+       " -infiles syscert_req.pem $outline") == 0
+    or fatal("Could not sign certificate request");
+$UID = $SAVEUID;
+TBScriptUnlock();
+
+#
+# Combine the key and the certificate into one file
+#
+if (defined($outfile)) {
+    system("cat syscert_key.pem syscert_cert.pem > $outfile") == 0
+	or fatal("Could not combine cert and key into one file");
+
+    if ($printcert) {
+	system("cat syscert_cert.pem");
+    }    
+}
+else {
+    system("cat syscert_key.pem syscert_cert.pem") == 0
+	or fatal("Could not combine cert and key");
+}
+exit(0);
+
+sub fatal($) {
+    my($mesg) = $_[0];
+
+    TBScriptUnlock();
+    die("*** $0:\n".
+	"    $mesg\n");
+}
