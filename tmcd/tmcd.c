@@ -4311,7 +4311,16 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 " nk.node_id=n.node_id "
 				 "left join users as u on "
 				 " u.uid_idx=e.swapper_idx "
-				 "where i.IP='%s' and i.role='ctrl'", /*XXX*/
+				 "left outer join "
+				 "  (select type,attrvalue "
+				 "    from node_type_attributes "
+				 "    where attrkey='nobootinfo' "
+				 "      and attrvalue='1' "
+				 "     group by type) as nobootinfo_types "
+				 "  on n.type=nobootinfo_types.type "
+				 "where i.IP='%s' and i.role='ctrl' "
+				 "  and nobootinfo_types.attrvalue is NULL",
+				 /*XXX*/
 				 29, inet_ntoa(ipaddr));
 	}
 
