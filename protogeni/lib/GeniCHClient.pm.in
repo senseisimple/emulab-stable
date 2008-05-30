@@ -82,18 +82,21 @@ sub LookupSlice($$)
 # Register a local Emulab user at the Geni ClearingHouse (which in the
 # prototype is Utah Emulab).
 #
-sub RegisterUser($$$$$)
+sub RegisterUser($$$$$$)
 {
-    my ($hrn, $uuid, $name, $email, $cert) = @_;
+    my ($hrn, $uuid, $name, $email, $cert, $sshkey) = @_;
+
+    my $args = { "hrn"    => $hrn,
+		 "uuid"   => $uuid,
+		 "name"   => $name,
+		 "email"  => $email,
+		 "cert"   => $cert};
+    $args->{"sshkey"} = $sshkey
+	if (defined($sshkey));
 
     my $response =
 	Genixmlrpc::CallMethodHTTP($GENICENTRALURL, undef,
-				   "CH::RegisterUser",
-				   { "hrn"   => $hrn,
-				     "uuid"  => $uuid,
-				     "name"  => $name,
-				     "email" => $email,
-				     "cert"  => $cert});
+				   "CH::RegisterUser", $args);
 
     return -1
 	if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS);

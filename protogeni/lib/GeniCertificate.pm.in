@@ -209,9 +209,8 @@ sub WriteToFile($)
 {
     my ($self) = @_;
     
-    # Deleted when object is released
-    my $tempfile = new File::Temp(UNLINK => 1);
-    my $filename = $tempfile->filename;    
+    # We want this file to be passed back. 
+    my ($tempfile, $filename) = tempfile(UNLINK => 1);
     print $tempfile "-----BEGIN CERTIFICATE-----\n";
     print $tempfile $self->cert();
     print $tempfile "-----END CERTIFICATE-----\n";

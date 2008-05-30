@@ -20,6 +20,7 @@ use GeniDB;
 use GeniComponent;
 use GeniCredential;
 use GeniCertificate;
+use GeniAggregate;
 # Hate to import all this crap; need a utility library.
 use libdb qw(TBGetUniqueIndex);
 use libtestbed;
@@ -41,6 +42,7 @@ my $SIGNCRED	   = "$TB/sbin/signgenicred";
 my $AVAIL	   = "$TB/sbin/avail";
 my $NALLOC	   = "$TB/bin/nalloc";
 my $NFREE	   = "$TB/bin/nfree";
+my $NODEREBOOT	   = "$TB/bin/node_reboot";
 
 # Cache of instances to avoid regenerating them.
 my %slivers      = ();
@@ -82,9 +84,9 @@ sub Lookup($$)
 
     my $self              = {};
     $self->{'SLIVER'}     = $query_result->fetchrow_hashref();
-    $self->{'TICKET'}     = undef;	# Server side.
     $self->{'COMPONENT'}  = undef;	# Client side.
     $self->{'CREDENTIAL'} = undef;	# Client side.
+    $self->{'AGGREGATE'}  = undef;	# server side.
 
     #
     # Grab the certificate, since we will probably want it.
@@ -119,12 +121,11 @@ sub Stringify($)
 
 #
 # Create a sliver record in the DB. On the client side we save the credential
-# that allows control of it, for later operations. We also save the component
-# pointer, but not sure that is correct.
+# that allows control of it, for later operations.
 #
-sub Create($$;$)
+sub Create($$$;$$)
 {
-    my ($class, $ticket, $credential) = @_;
+    my ($class, $slice, $user, $resource_uuid, $credential, $component) = @_;
     my @insert_data = ();
     my $uuid;
     my $certificate;
@@ -153,15 +154,15 @@ sub Create($$;$)
 	}
 	$uuid = $certificate->uuid();
     }
-    my $slice_uuid     = $ticket->slice_uuid();
-    my $owner_uuid     = $ticket->owner_uuid();
-    my $node_id        = $ticket->rspec()->{'node_id'};
+    my $slice_uuid     = $slice->uuid();
+    my $owner_uuid     = $user->uuid();
 
     # Now tack on other stuff we need.
     push(@insert_data, "created=now()");
     push(@insert_data, "idx='$idx'");
     push(@insert_data, "uuid='$uuid'");
-    push(@insert_data, "node_id='$node_id'");
+    push(@insert_data, "resource_uuid='$resource_uuid'")
+	if (defined($resource_uuid));
     push(@insert_data, "creator_uuid='$owner_uuid'");
     push(@insert_data, "slice_uuid='$slice_uuid'");
 
@@ -169,8 +170,8 @@ sub Create($$;$)
     push(@insert_data, "credential_idx=" . $credential->idx())
 	if (defined($credential));
     # Only on the client side.
-    push(@insert_data, "component_idx=" . $ticket->component()->idx())
-	if (defined($ticket->component()));
+    push(@insert_data, "component_idx=" . $component->idx())
+	if (defined($component));
 
     # Insert into DB.
     if (!DBQueryWarn("insert into geni_slivers set " .
@@ -185,8 +186,9 @@ sub Create($$;$)
     
     $sliver->{'CREDENTIAL'} = $credential
 	if (defined($credential));
-    $sliver->{'COMPONENT'} = $ticket->component()
-	if (defined($ticket->component()));
+    $sliver->{'COMPONENT'} = $component
+	if (defined($component));
+    $sliver->{'AGGREGATE'} = undef;
 
     return $sliver;
 }
@@ -198,9 +200,11 @@ sub slice_uuid($)	{ return field($_[0], "slice_uuid"); }
 sub creator_uuid($)	{ return field($_[0], "creator_uuid"); }
 sub created($)		{ return field($_[0], "created"); }
 sub credential_idx($)	{ return field($_[0], "credential_idx"); }
-sub node_id($)		{ return field($_[0], "node_id"); }
+sub resource_uuid($)	{ return field($_[0], "resource_uuid"); }
 sub ticket_idx($)	{ return field($_[0], "ticket_idx"); }
 sub component_idx($)	{ return field($_[0], "component_idx"); }
+sub aggregate_idx($)	{ return field($_[0], "aggregate_idx"); }
+sub status($)		{ return field($_[0], "status"); }
 sub cert($)		{ return $_[0]->{'CERTIFICATE'}->cert(); }
 sub GetCertificate($)   { return $_[0]->{'CERTIFICATE'}; }
 
@@ -225,6 +229,52 @@ sub Delete($)
 	or return -1;
     
     return 0;
+}
+
+#
+# Set the aggregate for a sliver.
+#
+sub SetAggregate($$)
+{
+    my ($self, $aggregate) = @_;
+
+    return -1
+	if (! (ref($self) && ref($aggregate)));
+
+    my $idx     = $self->idx();
+    my $agg_idx = $aggregate->idx();
+
+    return -1
+	if (!DBQueryWarn("update geni_slivers set ".
+			 "  aggregate_idx='$agg_idx' ".
+			 "where idx='$idx'"));
+    
+    $self->{'SLIVER'}->{'aggregate_idx'} = $agg_idx;
+    $self->{'AGGREGATE'} = $aggregate;
+    return 0;
+}
+
+#
+# Get the aggregate for a sliver.
+#
+sub GetAggregate($)
+{
+    my ($self) = @_;
+
+    return undef
+	if (! ref($self));
+
+    return $self->{'AGGREGATE'} if (defined($self->{'AGGREGATE'}));
+    return undef
+	if (!defined($self->aggregate_idx()));
+
+    my $aggregate = GeniAggregate->Lookup($self->aggregate_idx());
+    if (!defined($aggregate)) {
+	print STDERR "Could not get aggregate object associated with $self\n";
+	return undef;
+    }
+    $self->{'AGGREGATE'} = $aggregate;
+    return $aggregate;
 }
 
 #
@@ -302,7 +352,7 @@ sub Destroy($$)
 
     my $component = $self->GetComponent();
     return -1
-	if (defined($component));
+	if (!defined($component));
 
     return -1
 	if ($component->DestroySliver($self, $user) != 0);
@@ -310,6 +360,26 @@ sub Destroy($$)
     # Delete the local object from the DB.
     $self->Delete() == 0
 	or return -1;
+
+    return 0;
+}
+
+#
+# Client side method to contact the sliver component and start it.
+#
+sub Start($$)
+{
+    my ($self, $user) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $component = $self->GetComponent();
+    return -1
+	if (!defined($component));
+
+    return -1
+	if ($component->StartSliver($self, $user) != 0);
 
     return 0;
 }
@@ -334,12 +404,12 @@ sub Provision($)
 	print STDERR "Could not map $self to its experiment\n";
 	return -1;
     }
-    my $node_id    = $self->node_id();
+    my $resource_uuid = $self->resource_uuid();
     return 0
-	if (!defined($node_id));
-    my $node       = Node->Lookup($node_id);
+	if (!defined($resource_uuid));
+    my $node       = Node->Lookup($resource_uuid);
     if (!defined($node)) {
-	print STDERR "Could not map node $node_id to its object\n";
+	print STDERR "Could not map node $resource_uuid to its object\n";
 	return -1;
     }
     my $reservation = $node->Reservation();
@@ -350,6 +420,10 @@ sub Provision($)
     if ($reservation->SameExperiment($experiment)) {
 	if ($experiment->InsertVirtNode($node) != 0) {
 	    print STDERR "Could not add virtnode entry for $node to $self\n";
+	    return -1;
+	}
+	# Set sliver_idx in the reservation so that Emulab knows.
+	if ($node->ModifyReservation({"genisliver_idx" => $self->idx()}) != 0){
 	    return -1;
 	}
     }
@@ -401,12 +475,12 @@ sub UnProvision($)
 	print STDERR "Could not map $self to its experiment\n";
 	return -1;
     }
-    my $node_id    = $self->node_id();
+    my $resource_uuid = $self->resource_uuid();
     return 0
-	if (!defined($node_id));
-    my $node       = Node->Lookup($node_id);
+	if (!defined($resource_uuid));
+    my $node       = Node->Lookup($resource_uuid);
     if (!defined($node)) {
-	print STDERR "Could not map node $node_id to its object\n";
+	print STDERR "Could not map node $resource_uuid to its object\n";
 	return -1;
     }
     my $reservation = $node->Reservation();
@@ -415,6 +489,7 @@ sub UnProvision($)
 	return 0;
     }
     if ($reservation->SameExperiment($experiment)) {
+	my $node_id = $node->node_id();
 	my $pid = $experiment->pid();
 	my $eid = $experiment->eid();
 
@@ -438,9 +513,9 @@ sub UnProvision($)
 }
 
 #
-# Start a slice, which roughly translates to reboot the node.
+# Start a sliver, which roughly translates to reboot the node.
 #
-sub Start($)
+sub StartUp($)
 {
     my ($self) = @_;
 
@@ -452,12 +527,12 @@ sub Start($)
 	print STDERR "Could not map $self to its experiment\n";
 	return -1;
     }
-    my $node_id    = $self->node_id();
+    my $resource_uuid = $self->resource_uuid();
     return 0
-	if (!defined($node_id));
-    my $node       = Node->Lookup($node_id);
+	if (!defined($resource_uuid));
+    my $node       = Node->Lookup($resource_uuid);
     if (!defined($node)) {
-	print STDERR "Could not map node $node_id to its object\n";
+	print STDERR "Could not map node $resource_uuid to its object\n";
 	return -1;
     }
     my $reservation = $node->Reservation();
@@ -466,10 +541,11 @@ sub Start($)
 	return -1;
     }
     if ($reservation->SameExperiment($experiment)) {
+	my $node_id = $node->node_id();
 	#
 	# Reboot and wait?
 	#
-	#system("$NODEREBOOT $node_id");
+	system("$NODEREBOOT $node_id");
     }
     else {
 	print STDERR "$node is reserved to another, not $self\n";

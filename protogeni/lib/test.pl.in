@@ -98,17 +98,16 @@ if (!defined($ticket)) {
 }
 
 $sliver = $components[0]->CreateSliver($slice, $ticket, $this_user);
-if (!defined($ticket)) {
+if (!defined($sliver)) {
     die("Could not create sliver for $slice\n");
 }
-print Dumper($sliver);
-exit(0);
-
-# Wait for input before proceeding.
-$_ = <STDIN>;
 
 if (defined($sliver)) {
     print Dumper($sliver);
+    # Wait for input before proceeding.
+    $_ = <STDIN>;
+    $sliver->Start($this_user);
+    $_ = <STDIN>;
     $sliver->Destroy($this_user);
 }
 

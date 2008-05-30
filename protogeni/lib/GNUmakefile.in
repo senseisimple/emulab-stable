@@ -15,7 +15,7 @@ LIB_SCRIPTS     = GeniDB.pm GeniUser.pm GeniSAClient.pm \
 		  GeniSlice.pm GeniSA.pm GeniCM.pm GeniCMClient.pm \
 		  test.pl GeniTicket.pm GeniSliver.pm GeniCredential.pm \
 		  GeniComponent.pm GeniCH.pm GeniCHClient.pm \
-		  GeniAuthority.pm GeniCertificate.pm
+		  GeniAuthority.pm GeniCertificate.pm GeniAggregate.pm
 
 #
 # Force dependencies on the scripts so that they will be rerun through

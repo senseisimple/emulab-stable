@@ -157,9 +157,10 @@ sub CheckExisting($$$)
 # Class function to create new Geni user and return object. Note that this
 # is used by the ClearingHouse *and* the CM/SA to record users. 
 #
-sub Create($$$$$$$$)
+sub Create($$$$$$$$$;$)
 {
-    my ($class, $hrn, $uid, $uuid, $name, $email, $cert, $sa_idx) = @_;
+    my ($class, $hrn, $uid, $uuid, $name, $email,
+	$cert, $sa_idx, $sshkey) = @_;
     my @insert_data = ();
 
     # Every user gets a new unique index.
@@ -190,9 +191,21 @@ sub Create($$$$$$$$)
 	return undef;
     }
 
+    # Insert the sshkey if we got one.
+    if (defined($sshkey)) {
+	my $safe_sshkey = DBQuoteSpecial($sshkey);
+	
+	DBQueryWarn("insert into geni_sshkeys set ".
+		    "  uuid=$safe_uuid, created=now(), ".
+		    "  sshkey=$safe_sshkey") or return undef;
+    }
+
     # Insert into DB.
-    DBQueryWarn("insert into geni_users set " . join(",", @insert_data))
-	or return undef;
+    if (! DBQueryWarn("insert into geni_users set " .
+		      join(",", @insert_data))) {
+	DBQueryWarn("delete from geni_sshkeys where uuid=$safe_uuid");
+	return undef;
+    }
 
     return GeniUser->Lookup($idx);
 }
@@ -236,7 +249,10 @@ sub CreateFromRegistry($$)
 			    $blob->{'name'},
 			    $blob->{'email'},
 			    $blob->{'cert'},
-			    $authority->idx());
+			    $authority->idx(),
+			    (exists($blob->{'sshkey'}) ?
+			     $blob->{'sshkey'} : undef));
+			    
 }
 
 #
@@ -255,6 +271,79 @@ sub Delete($)
 	or return -1;
     
     return 0;
+}
+
+#
+# Get the sshkey for a user.
+#
+sub GetSSHKey($$)
+{
+    my ($self, $pref) = @_;
+
+    return -1
+	if (! (ref($self) && ref($pref)));
+
+    $$pref = undef;
+
+    my $uuid = $self->uuid();
+    my $query_result =
+	DBQueryWarn("select sshkey from geni_sshkeys where uuid='$uuid'");
+    return -1
+	if (!$query_result);
+    return 0
+	if (!$query_result->numrows);
+
+    my ($sshkey) = $query_result->fetchrow_array();
+    $$pref = $sshkey;
+    return 0;
+}
+
+#
+# Create a nonlocal user.
+#
+sub CreateNonLocal($)
+{
+    my ($self) = @_;
+
+    return undef
+	if (! ref($self));
+
+    my $sshkey;
+    $self->GetSSHKey(\$sshkey);
+
+    return User::NonLocal->Create($self->idx(),
+				  $self->uid(),
+				  $self->uuid(),
+				  $self->name(),
+				  $self->email(),
+				  $sshkey);
+}
+
+#
+# Bind user to slice, which is another way of saying bind the nonlocal
+# user to the experiment (for tmcd).
+#
+sub BindToSlice($$)
+{
+    my ($self, $slice) = @_;
+
+    return -1
+	if (! (ref($self) && ref($slice)));
+
+    my $emulab_user = User::NonLocal->Lookup($self->uuid());
+    if (!defined($emulab_user)) {
+	$emulab_user = $self->CreateNonLocal();
+	if (!defined($emulab_user)) {
+	    print STDERR "Could not create nonlocal user for $self\n";
+	    return -1;
+	}
+    }
+    my $experiment = $slice->GetExperiment();
+    if (!defined($experiment)) {
+	print STDERR "Could not locate experiment object for $slice\n";
+	return -1;
+    }
+    return $emulab_user->BindToExperiment($experiment);
 }
 
 #
@@ -312,6 +401,7 @@ sub created($)		{ return $_[0]->{'USER'}->created(); }
 sub name($)		{ return $_[0]->{'USER'}->name(); }
 sub email($)		{ return $_[0]->{'USER'}->email(); }
 sub sa_idx($)		{ return 0; }
+sub GetSSHKey($$)       { return $_[0]->{'USER'}->GetSSHKey($_[1]); }
 
 # Need to construct this since not in User structure.
 sub hrn($)		{ return $OURDOMAIN . "." . $_[0]->uid(); }
@@ -319,6 +409,7 @@ sub hrn($)		{ return $OURDOMAIN . "." . $_[0]->uid(); }
 # And this is in another structure.
 sub cert($)             { return $_[0]->{'CERT'}->cert(); }
 sub GetCertificate($)   { return $_[0]->{'CERT'}; }
+
 
 #
 # Register this local user at the ClearingHouse.
@@ -330,9 +421,12 @@ sub Register($)
 
     # Register this user at the ClearingHouse, if not already registered.
     if (GeniCHClient::LookupUser($self->uuid(), \$blob) != 0) {
+	my $sshkey;
+	$self->GetSSHKey(\$sshkey);
+	
 	return GeniCHClient::RegisterUser($self->hrn(), $self->uuid(),
 					  $self->name(), $self->email(),
-					  $self->cert());
+					  $self->cert(), $sshkey);
     }
     return 0;
 }

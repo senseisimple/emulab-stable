@@ -32,7 +32,7 @@ my $TBOPS       = "@TBOPSEMAIL@";
 my $BOSSNODE    = "@BOSSNODE@";
 my $EMULAB_PEMFILE = "@prefix@/etc/genisa.pem";
 
-my $debug = 1;
+my $debug = 0;
 
 ##
 # The package version number

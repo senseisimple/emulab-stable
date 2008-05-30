@@ -300,5 +300,36 @@ sub Delete($)
     return 0;
 }
 
+#
+# Bind user to slice.
+#
+sub BindUserToSlice($$)
+{
+    my ($self, $user) = @_;
+
+    return -1
+	if (! (ref($self) && ref($user)));
+
+    my $experiment = Experiment->Lookup($self->uuid());
+    if (!defined($experiment)) {
+	print STDERR "Could not locate experiment object for $self\n";
+	return -1;
+    }
+    return $user
+}
+
+#
+# Return the emulab experiment for this slice.
+#
+sub GetExperiment($)
+{
+    my ($self) = @_;
+
+    return undef
+	if (!ref($self));
+
+    return Experiment->Lookup($self->uuid());
+}
+
 # _Always_ make sure that this 1 is at the end of the file...
 1;

@@ -1,0 +1,340 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package GeniAggregate;
+
+#
+# Some simple ticket stuff.
+#
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA    = "Exporter";
+@EXPORT = qw ( );
+
+# Must come after package declaration!
+use lib '@prefix@/lib';
+use GeniDB;
+use GeniCredential;
+use GeniCertificate;
+use GeniSliver;
+use libdb qw(TBGetUniqueIndex);
+use English;
+use overload ('""' => 'Stringify');
+use XML::Simple;
+
+# Configure variables
+my $TB		   = "@prefix@";
+my $TBOPS          = "@TBOPSEMAIL@";
+my $TBAPPROVAL     = "@TBAPPROVALEMAIL@";
+my $TBAUDIT   	   = "@TBAUDITEMAIL@";
+my $BOSSNODE       = "@BOSSNODE@";
+my $OURDOMAIN      = "@OURDOMAIN@";
+my $SIGNCRED	   = "$TB/sbin/signgenicred";
+my $VERIFYCRED	   = "$TB/sbin/verifygenicred";
+
+# Cache of instances to avoid regenerating them.
+my %aggregates     = ();
+
+#
+# Lookup by idx, or uuid.
+#
+sub Lookup($$)
+{
+    my ($class, $token) = @_;
+    my $query_result;
+    my $idx;
+
+    if ($token =~ /^\d+$/) {
+	$idx = $token;
+    }
+    elsif ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
+	$query_result =
+	    DBQueryWarn("select idx from geni_aggregates ".
+			"where uuid='$token'");
+	    return undef
+		if (! $query_result || !$query_result->numrows);
+
+	    ($idx) = $query_result->fetchrow_array();
+    }
+    else {
+	return undef;
+    }
+    # Look in cache first
+    return $aggregates{"$idx"}
+        if (exists($aggregates{"$idx"}));
+
+    $query_result =
+	DBQueryWarn("select * from geni_aggregates where idx='$idx'");
+    
+    return undef
+	if (!$query_result || !$query_result->numrows);
+
+    my $self              = {};
+    $self->{'AGGREGATE'}  = $query_result->fetchrow_hashref();
+    $self->{'CREDENTIAL'} = undef;
+    bless($self, $class);
+
+    #
+    # Grab the certificate, since we will probably want it.
+    #
+    my $uuid = $self->{'AGGREGATE'}->{'uuid'};
+    my $certificate = GeniCertificate->Lookup($uuid);
+    if (!defined($certificate)) {
+	print STDERR "Could not find certificate for aggregate $idx ($uuid)\n";
+	return undef;
+    }
+    $self->{'CERTIFICATE'} = $certificate;
+    
+    # Add to cache. 
+    $aggregates{$self->{'AGGREGATE'}->{'idx'}} = $self;
+    
+    return $self;
+}
+
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+    
+    my $uuid = $self->uuid();
+    my $idx  = $self->idx();
+
+    return "[GeniAggregate: $uuid, IDX: $idx]";
+}
+
+#
+# Create a Geni aggregate in the DB. This happens on the server side only
+# for now. The client side does not actually know its an aggregate, at
+# least not yet.
+#
+sub Create($$)
+{
+    my ($class, $ticket) = @_;
+    my @insert_data = ();
+
+    # Every aggregate gets a new unique index.
+    my $idx = TBGetUniqueIndex('next_aggregate', 1);
+
+    # Create a cert pair, which gives us a new uuid.
+    my $certificate = GeniCertificate->Create("aggregate");
+    if (!defined($certificate)) {
+	print STDERR "Could not generate new certificate and UUID!\n";
+	return undef;
+    }
+    my $uuid        = $certificate->uuid();
+    my $slice_uuid  = $ticket->slice_uuid();
+    my $owner_uuid  = $ticket->owner_uuid();
+
+    # Now tack on other stuff we need.
+    push(@insert_data, "created=now()");
+    push(@insert_data, "idx='$idx'");
+    push(@insert_data, "uuid='$uuid'");
+    push(@insert_data, "creator_uuid='$owner_uuid'");
+    push(@insert_data, "slice_uuid='$slice_uuid'");
+
+    # Insert into DB.
+    if (!DBQueryWarn("insert into geni_aggregates set " .
+		     join(",", @insert_data))) {
+	$certificate->Delete();
+	return undef;
+    }
+    return GeniAggregate->Lookup($idx);
+}
+# accessors
+sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'AGGREGATE'}->{$_[1]}); }
+sub idx($)		{ return field($_[0], "idx"); }
+sub uuid($)		{ return field($_[0], "uuid"); }
+sub slice_uuid($)	{ return field($_[0], "slice_uuid"); }
+sub creator_uuid($)	{ return field($_[0], "creator_uuid"); }
+sub created($)		{ return field($_[0], "created"); }
+sub credential_idx($)	{ return field($_[0], "credential_idx"); }
+sub ticket_idx($)	{ return field($_[0], "ticket_idx"); }
+sub cert($)		{ return $_[0]->{'CERTIFICATE'}->cert(); }
+sub GetCertificate($)   { return $_[0]->{'CERTIFICATE'}; }
+
+#
+# List of slivers for this aggregate.
+#
+sub SliverList($$)
+{
+    my ($self, $pref) = @_;
+    my @result = ();
+    
+    return -1
+	if (! (ref($self) && ref($pref)));
+
+    my $idx = $self->idx();
+    my $query_result =
+	DBQueryWarn("select idx from geni_slivers where aggregate_idx='$idx'");
+    return -1
+	if (!$query_result);
+
+    while (my ($sliver_idx) = $query_result->fetchrow_array()) {
+	my $sliver = GeniSliver->Lookup($sliver_idx);
+	if (!defined($sliver)) {
+	    print STDERR "Could not find sliver object for $sliver_idx\n";
+	    return -1;
+	}
+	push(@result, $sliver);
+    }
+    @$pref = @result;
+    return 0;
+    
+}
+
+#
+# Get the credential for the aggregate.
+#
+sub GetCredential($)
+{
+    my ($self) = @_;
+
+    return undef
+	if (! ref($self));
+
+    return $self->{'CREDENTIAL'} if (defined($self->{'CREDENTIAL'}));
+
+    if (!defined($self->credential_idx())) {
+	print STDERR "No credential associated with $self\n";
+	return undef;
+    }
+    my $credential = GeniCredential->Lookup($self->credential_idx());
+    if (!defined($credential)) {
+	print STDERR "Could not get credential object associated with $self\n";
+	return undef;
+    }
+    $self->{'CREDENTIAL'} = $credential;
+    return $credential;
+}
+
+#
+# Create a signed credential for this aggregate, issued to the provided user.
+# The credential will grant all permissions for now.
+#
+# Should we store these credentials in the DB, recording what we hand out?
+#
+sub NewCredential($$)
+{
+    my ($self, $owner) = @_;
+
+    return undef
+	if (! (ref($self) && ref($owner)));
+
+    my $credential = GeniCredential->Create($self, $owner);
+    if (!defined($credential)) {
+	print STDERR "Could not create credential for $self, $owner\n";
+	return undef;
+    }
+    if ($credential->Sign($self->GetCertificate()) != 0) {
+	print STDERR "Could not sign credential for $self, $owner\n";
+	return undef;
+    }
+    return $credential;
+}
+
+#
+# Start all the slivers in the aggregate.
+#
+sub StartUp($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my @slivers = ();
+    if ($self->SliverList(\@slivers) != 0) {
+	print STDERR "Could not get sliver list for $self\n";
+	return -1;
+    }
+    foreach my $sliver (@slivers) {
+	if ($sliver->StartUp() != 0) {
+	    print STDERR "Could not start $sliver in $self\n";
+	    next;
+	}
+    }
+    return 0;
+}
+
+#
+# Unprovision all the slivers in the aggregate.
+#
+sub UnProvision($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my @slivers = ();
+    if ($self->SliverList(\@slivers) != 0) {
+	print STDERR "Could not get sliver list for $self\n";
+	return -1;
+    }
+    foreach my $sliver (@slivers) {
+	if ($sliver->UnProvision() != 0) {
+	    print STDERR "Could not unprovision $sliver in $self\n";
+	    DBQueryWarn("update geni_slivers set status='broken' ".
+			"where idx=" . $sliver->idx());
+	    next;
+	}
+    }
+    return 0;
+}
+
+#
+# Destroy all the slivers in the aggregate, and then the aggregate if there
+# is nothing in it. Leave it around if something goes wrong.
+#
+sub Delete($)
+{
+    my ($self) = @_;
+    my $broken = 0;
+
+    return -1
+	if (! ref($self));
+
+    my @slivers = ();
+    if ($self->SliverList(\@slivers) != 0) {
+	print STDERR "Could not get sliver list for $self\n";
+	return -1;
+    }
+    foreach my $sliver (@slivers) {
+	if ($sliver->status() eq "broken") {
+	    $broken++;
+	    next;
+	}
+	if ($sliver->Delete() != 0) {
+	    print STDERR "Could not delete $sliver from $self\n";
+	    DBQueryWarn("update geni_slivers set status='broken' ".
+			"where idx=" . $sliver->idx());
+	    $broken++;
+	    next;
+	}
+    }
+    return -1
+	if ($broken);
+    
+    my $idx  = $self->idx();
+    my $uuid = $self->uuid();
+
+    DBQueryWarn("delete from geni_credentials where this_uuid='$uuid'")
+	or return -1;
+    DBQueryWarn("delete from geni_certificates where uuid='$uuid'")
+	or return -1;
+    DBQueryWarn("delete from geni_aggregates where idx='$idx'")
+	or return -1;
+    
+    return 0;
+}
+
+# _Always_ make sure that this 1 is at the end of the file...
+1;
+

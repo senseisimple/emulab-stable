@@ -65,6 +65,11 @@ sub LookupUser($)
 	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
 				    "No slice authority found for user");
     }
+    # Grab ssh key.
+    my $sshkey;
+    if ($user->GetSSHKey(\$sshkey) != 0) {
+	print STDERR "Could not get ssh key for $user\n";
+    }
 
     # Return a blob.
     my $blob = { "uid"      => $user->uid(),
@@ -78,6 +83,8 @@ sub LookupUser($)
 				 "cert"     => $authority->cert(),
 				 "url"      => $authority->url() }
 	       };
+    $blob->{'sshkey'} = $sshkey
+	if (defined($sshkey));
     
     return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
 }
@@ -127,6 +134,7 @@ sub RegisterUser($)
     my $name  = $argref->{'name'};
     my $email = $argref->{'email'};
     my $cert  = $argref->{'cert'};
+    my $sshkey= $argref->{'sshkey'};
 
     if (! (defined($hrn) && defined($name) &&
 	   defined($email) && defined($cert) && defined($uuid))) {
@@ -155,6 +163,10 @@ sub RegisterUser($)
     if (! ($cert =~ /^[\012\015\040-\176]*$/)) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "cert: Invalid characters");
+    }
+    if (defined($sshkey) && ! ($sshkey =~ /^[\012\015\040-\176]*$/)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "sshkey: Invalid characters");
     }
     
     #
@@ -209,7 +221,7 @@ sub RegisterUser($)
 				    "uid: ". TBFieldErrorString());
     }
     my $newuser = GeniUser->Create($hrn, $uid, $uuid,
-				   $name, $email, $cert, $sa_idx);
+				   $name, $email, $cert, $sa_idx, $sshkey);
     if (!defined($newuser)) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "$hrn/$email could not be registered");
