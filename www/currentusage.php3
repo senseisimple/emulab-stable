@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -18,7 +18,7 @@ $this_user = CheckLogin($check_status);
 #
 # For anonymous users, show experiment stats.
 #
-function SHOWSTATS()
+function SHOWSTATS($mini = 0)
 {
     $query_result =
 	DBQueryFatal("select count(*) from experiments as e " .
@@ -61,7 +61,8 @@ function SHOWSTATS()
     }
     $freepcs = TBFreePCs();
 
-    $output = "<table valign=top align=center width=100% height=100% border=1>
+    $output = "<table valign=top align=center width=100% height=100%
+                    cellpadding=0 cellspacing=1 border=0>
                 <tr><th nowrap colspan=2 class='usagetitle'>
 	            Current Experiments</th></tr>
                 <tr><td class=menuoptusage align=right>$active_expts</td>
@@ -73,13 +74,15 @@ function SHOWSTATS()
                 <tr><td align=right class=menuoptusage>$swapped_expts</td>
                     <td align=left  class=menuoptusage>
                         <a target=_parent href=explist.php3#swapped>Swapped</a>
-                    </td></tr>
-                <tr><td align=right class=menuoptusage>
+                    </td></tr>";
+    if (!$mini) {
+	$output .= "<tr><td align=right class=menuoptusage>
                         <font size=+1>$freepcs</font></td>
                     <td align=left  class=menuoptusage>
                         <font size=+1>Free PCs</font></td>
-                </tr>
-               </table>\n";
+                </tr>";
+    }
+    $output .= "</table>\n";
     return $output;
 }
 
@@ -219,6 +222,9 @@ function FreeNodeHtml($usagemode = null) {
     if ($this_user) {
 	if ($usagemode == null || $usagemode == "status") {
 	    return ShowStatus();
+	}
+	elseif ($usagemode == "stats") {
+	    return SHOWSTATS(1);
 	}
 	else {
 	    return SHOWFREENODES();

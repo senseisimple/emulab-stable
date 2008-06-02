@@ -142,10 +142,24 @@ div#showexpusagefreenodes table td a {
   color: #2222BB;
 }
 
-.usagetitle {
+div#usagefreenodes table tr th.usagetitle,
+div#usage table tr th.usagetitle {
   color: #fff;
   background-color: #222222;
   text-align: center;
+}
+div#usagefreenodes table tr th.usagetitle {
+  font-size: 8pt;
+  border: solid 0px
+  padding-left: 1px;
+  padding-right: 1px;
+  padding-top: 0px; 
+  padding-bottom: 0px;
+  margin: 0px; 
+  border: 0px;
+  line-height: 12px;
+}
+div#usage table tr th.usagetitle {
   font-size: 10pt;
 }
 

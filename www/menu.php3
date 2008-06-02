@@ -1216,8 +1216,15 @@ function PAGEFOOTER($view = NULL) {
 		x_FreeNodeHtml(usagetablemode, FreeNodeHtml_CB);
 	    }
             function ToggleUsageTable() {
-		usagetablemode =
-		    (usagetablemode == "status" ? "freenodes" : "status");
+		if (usagetablemode == "status") {
+		    usagetablemode = "freenodes";
+		}
+		else if (usagetablemode == "freenodes") {
+		    usagetablemode = "stats";
+		}
+		else {
+		    usagetablemode = "status";
+		}
 		document.cookie = "usagetablemode=" + usagetablemode;
 		GetFreeNodeHtml();
             }
