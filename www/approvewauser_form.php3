@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -68,7 +68,7 @@ echo "
 # 
 $query_result =
     DBQueryFatal("select w.* from widearea_accounts as w ".
-		 "left join users as u on u.uid=w.uid ".
+		 "left join users as u on u.uid_idx=w.uid_idx ".
 		 "WHERE u.status!='" . TBDB_USERSTATUS_UNVERIFIED . "' and ".
 		 "u.status!='" . TBDB_USERSTATUS_NEWUSER . "' and ".
 		 "w.trust='" . TBDB_TRUSTSTRING_NONE . "'");
