@@ -411,6 +411,47 @@ sub AllocCheck($$)
 }
 
 #
+# Set alloc state for a node.
+#
+sub SetAllocState($$)
+{
+    my ($self, $state) = @_;
+
+    return -1
+	if (! (ref($self)));
+    
+    my $now = time();
+    my $node_id = $self->node_id();
+    
+    DBQueryWarn("update nodes set allocstate='$state', " .
+		"    allocstate_timestamp=$now where node_id='$node_id'")
+	or return -1;
+
+    return Refresh($self);
+}
+
+#
+# Get alloc state for a node.
+#
+sub GetAllocState($$)
+{
+    my ($self, $pref) = @_;
+
+    return -1
+	if (! (ref($self) && ref($pref)));
+    
+    my $allocstate = $self->allocstate();
+    
+    if (defined($allocstate)) {
+	$$pref = $allocstate;
+    }
+    else {
+	$$pref = TBDB_ALLOCSTATE_UNKNOWN;
+    }
+    return 0;
+}
+
+#
 # Equality test for two experiments.
 # Not strictly necessary in perl, but good form.
 #
