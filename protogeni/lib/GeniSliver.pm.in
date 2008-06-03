@@ -18,11 +18,12 @@ use vars qw(@ISA @EXPORT);
 use lib '@prefix@/lib';
 use GeniDB;
 use GeniComponent;
+use GeniSlice;
 use GeniCredential;
 use GeniCertificate;
 use GeniAggregate;
 # Hate to import all this crap; need a utility library.
-use libdb qw(TBGetUniqueIndex);
+use libdb qw(TBGetUniqueIndex TBDB_ALLOCSTATE_RES_INIT_DIRTY);
 use libtestbed;
 use Experiment;
 use Node;
@@ -85,6 +86,7 @@ sub Lookup($$)
     my $self              = {};
     $self->{'SLIVER'}     = $query_result->fetchrow_hashref();
     $self->{'COMPONENT'}  = undef;	# Client side.
+    $self->{'SLICE'}      = undef;	# Client side.
     $self->{'CREDENTIAL'} = undef;	# Client side.
     $self->{'AGGREGATE'}  = undef;	# server side.
 
@@ -189,6 +191,7 @@ sub Create($$$;$$)
     $sliver->{'COMPONENT'} = $component
 	if (defined($component));
     $sliver->{'AGGREGATE'} = undef;
+    $sliver->{'SLICE'}     = undef;
 
     return $sliver;
 }
@@ -341,6 +344,31 @@ sub GetComponent($)
 }
 
 #
+# Get the slice for the sliver.
+#
+sub GetSlice($)
+{
+    my ($self) = @_;
+
+    return undef
+	if (! ref($self));
+
+    return $self->{'SLICE'} if (defined($self->{'SLICE'}));
+
+    if (!defined($self->slice_uuid())) {
+	print STDERR "No slice associated with $self\n";
+	return undef;
+    }
+    my $slice = GeniSlice->Lookup($self->slice_uuid());
+    if (!defined($slice)) {
+	print STDERR "Could not get slice object associated with $self\n";
+	return undef;
+    }
+    $self->{'SLICE'} = $slice;
+    return $slice;
+}
+
+#
 # Client side method to contact the sliver component and destroy it.
 #
 sub Destroy($$)
@@ -385,7 +413,48 @@ sub Start($$)
 }
 
 #
+# Client side methods to bind and unbind users from slivers.
+#
+# XXX We issue this using the local SA as the authority, but need to allow
+# the slice/sliver owner to do this.
+# 
+sub BindUser($$)
+{
+    my ($self, $target_user) = @_;
+
+    return -1
+	if (! (ref($self) && ref($target_user)));
+
+    my $component = $self->GetComponent();
+    return -1
+	if (!defined($component));
+
+    return -1
+	if ($component->BindUser($self, $target_user) != 0);
+
+    return 0;
+}
+
+sub UnBindUser($$)
+{
+    my ($self, $target_user) = @_;
+
+    return -1
+	if (! (ref($self) && ref($target_user)));
+
+    my $component = $self->GetComponent();
+    return -1
+	if (!defined($component));
+
+    return -1
+	if ($component->UnBindUser($self, $target_user) != 0);
+
+    return 0;
+}
+
+#
 # Provision a slice. We actually did this when the ticket was requested.
+# We fill in some virt table stuff so that tbswap will work.
 #
 sub Provision($)
 {
@@ -426,6 +495,10 @@ sub Provision($)
 	if ($node->ModifyReservation({"genisliver_idx" => $self->idx()}) != 0){
 	    return -1;
 	}
+	#
+	# This is so tbswap and children do the right thing.
+	#
+	$node->SetAllocState(TBDB_ALLOCSTATE_RES_INIT_DIRTY());
     }
     else {
 	print STDERR "$node is reserved to another, not $self\n";
@@ -513,7 +586,7 @@ sub UnProvision($)
 }
 
 #
-# Start a sliver, which roughly translates to reboot the node.
+# Start a sliver, which means what?
 #
 sub StartUp($)
 {
@@ -545,7 +618,7 @@ sub StartUp($)
 	#
 	# Reboot and wait?
 	#
-	system("$NODEREBOOT $node_id");
+	#system("$NODEREBOOT $node_id");
     }
     else {
 	print STDERR "$node is reserved to another, not $self\n";

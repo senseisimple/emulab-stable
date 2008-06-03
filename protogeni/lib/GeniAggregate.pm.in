@@ -22,6 +22,7 @@ use GeniDB;
 use GeniCredential;
 use GeniCertificate;
 use GeniSliver;
+use GeniSlice;
 use libdb qw(TBGetUniqueIndex);
 use English;
 use overload ('""' => 'Stringify');
@@ -77,6 +78,7 @@ sub Lookup($$)
     my $self              = {};
     $self->{'AGGREGATE'}  = $query_result->fetchrow_hashref();
     $self->{'CREDENTIAL'} = undef;
+    $self->{'SLICE'}      = undef;
     bless($self, $class);
 
     #
@@ -212,6 +214,31 @@ sub GetCredential($)
     }
     $self->{'CREDENTIAL'} = $credential;
     return $credential;
+}
+
+#
+# Get the slice for the aggregate.
+#
+sub GetSlice($)
+{
+    my ($self) = @_;
+
+    return undef
+	if (! ref($self));
+
+    return $self->{'SLICE'} if (defined($self->{'SLICE'}));
+
+    if (!defined($self->slice_uuid())) {
+	print STDERR "No slice associated with $self\n";
+	return undef;
+    }
+    my $slice = GeniSlice->Lookup($self->slice_uuid());
+    if (!defined($slice)) {
+	print STDERR "Could not get slice object associated with $self\n";
+	return undef;
+    }
+    $self->{'SLICE'} = $slice;
+    return $slice;
 }
 
 #

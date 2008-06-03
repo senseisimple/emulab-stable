@@ -24,9 +24,11 @@ use lib '@prefix@/lib';
 use GeniDB;
 use Genixmlrpc;
 use GeniResponse;
-use User;
 use GeniUser;
-use libtestbed;
+use GeniSlice;
+use GeniCredential;
+use GeniCertificate;
+use emutil;
 use English;
 use Data::Dumper;
 

@@ -237,7 +237,8 @@ sub CreateFromRegistry($$)
 	$authority = GeniAuthority->Create($blob->{'sa'}->{'uuid'},
 					   $blob->{'sa'}->{'hrn'},
 					   $blob->{'sa'}->{'url'},
-					   $blob->{'sa'}->{'cert'});
+					   $blob->{'sa'}->{'cert'},
+					   $blob->{'sa'}->{'uuid_prefix'});
 	if (!defined($authority)) {
 	    print STDERR "Could not create new authority record\n";
 	    return undef;
@@ -346,6 +347,25 @@ sub BindToSlice($$)
     return $emulab_user->BindToExperiment($experiment);
 }
 
+sub UnBindFromSlice($$)
+{
+    my ($self, $slice) = @_;
+
+    return -1
+	if (! (ref($self) && ref($slice)));
+
+    my $emulab_user = User::NonLocal->Lookup($self->uuid());
+    return 0
+	if (!defined($emulab_user));
+
+    my $experiment = $slice->GetExperiment();
+    if (!defined($experiment)) {
+	print STDERR "Could not locate experiment object for $slice\n";
+	return -1;
+    }
+    return $emulab_user->UnBindFromExperiment($experiment);
+}
+
 #
 # Archive user. 
 #
@@ -387,8 +407,10 @@ sub Create($$)
 
     # And the certificate wrapper.
     my $certificate = GeniCertificate::LocalUser->Create($user);
-    return undef
-	if (!defined($certificate));
+    if (!defined($certificate)) {
+	print STDERR "No certificate found for $user\n";
+	return undef;
+    }
     $self ->{'CERT'} = $certificate;
 
     bless($self, $class);
@@ -409,7 +431,6 @@ sub hrn($)		{ return $OURDOMAIN . "." . $_[0]->uid(); }
 # And this is in another structure.
 sub cert($)             { return $_[0]->{'CERT'}->cert(); }
 sub GetCertificate($)   { return $_[0]->{'CERT'}; }
-
 
 #
 # Register this local user at the ClearingHouse.

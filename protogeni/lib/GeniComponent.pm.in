@@ -249,6 +249,64 @@ sub DiscoverResources($$$$$)
 }
 
 #
+# Bind and UnBind users to/from slivers.
+#
+# We do this with the local SA as the credential, not the sliver credential.
+#
+sub BindUser($$$$)
+{
+    my ($self, $sliver, $target_user) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! (ref($self) && ref($sliver) && ref($target_user)));
+
+    my $sshkey;
+    $target_user->GetSSHKey(\$sshkey);
+
+    my $userinfo = { "hrn"    => $target_user->hrn(),
+		     "uuid"   => $target_user->uuid(),
+		     "name"   => $target_user->name(),
+		     "email"  => $target_user->email(),
+		     "cert"   => $target_user->cert(),
+		     "sshkey" => $sshkey
+		    };
+    
+    my $response =
+	Genixmlrpc::CallMethodHTTP($self->url(), undef,
+				   "CM::BindUser",
+				   { "sliver"      => $sliver->cert(),
+				     "userinfo"    => $userinfo });
+    
+    if ($response->code() != GENIRESPONSE_SUCCESS) {
+	print STDERR "Could not bind $target_user to sliver $sliver\n";
+	return -1;
+    }
+    return 0;
+}
+
+sub UnBindUser($$$$)
+{
+    my ($self, $sliver, $target_user) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! (ref($self) && ref($sliver) && ref($target_user)));
+    
+    my $response =
+	Genixmlrpc::CallMethodHTTP($self->url(), undef,
+				   "CM::UnBindUser",
+				   { "sliver"      => $sliver->cert(),
+				     "user"        => $target_user->cert() });
+    
+    if ($response->code() != GENIRESPONSE_SUCCESS) {
+	print STDERR "Could not unbind $target_user to sliver $sliver\n";
+	return -1;
+    }
+    return 0;
+}
+
+#
 # Get a Ticket from a component;
 #
 sub GetTicket($$$$$)

@@ -249,7 +249,8 @@ sub CreateFromRegistry($$)
 	$authority = GeniAuthority->Create($blob->{'sa'}->{'uuid'},
 					   $blob->{'sa'}->{'hrn'},
 					   $blob->{'sa'}->{'url'},
-					   $blob->{'sa'}->{'cert'});
+					   $blob->{'sa'}->{'cert'},
+					   $blob->{'sa'}->{'uuid_prefix'});
 	if (!defined($authority)) {
 	    print STDERR "Could not create new authority record\n";
 	    return undef;
@@ -291,6 +292,10 @@ sub Delete($)
 
     my $idx  = $self->idx();
     my $uuid = $self->uuid();
+    my $experiment = $self->GetExperiment();
+    return -1
+	if (!defined($experiment));
+    $experiment->UnBindNonLocalUsers();
 
     DBQueryWarn("delete from geni_certificates where uuid='$uuid'")
 	or return -1;
@@ -298,24 +303,6 @@ sub Delete($)
 	or return -1;
     
     return 0;
-}
-
-#
-# Bind user to slice.
-#
-sub BindUserToSlice($$)
-{
-    my ($self, $user) = @_;
-
-    return -1
-	if (! (ref($self) && ref($user)));
-
-    my $experiment = Experiment->Lookup($self->uuid());
-    if (!defined($experiment)) {
-	print STDERR "Could not locate experiment object for $self\n";
-	return -1;
-    }
-    return $user
 }
 
 #
@@ -329,6 +316,22 @@ sub GetExperiment($)
 	if (!ref($self));
 
     return Experiment->Lookup($self->uuid());
+}
+
+#
+# Check if the given SA is the actual SA for the slice.
+#
+sub IsSliceAuthority($$)
+{
+    my ($self, $authority) = @_;
+
+    return 0
+	if (! (ref($self) && ref($authority)));
+
+    return 1
+	if ($self->sa_idx() == $authority->idx());
+    
+    return 0;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

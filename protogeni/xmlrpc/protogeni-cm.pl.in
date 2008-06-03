@@ -91,6 +91,8 @@ my $responder = Frontier::Responder->new( "methods" => {
     "CM::CreateSliver"      => \&GeniCM::CreateSliver,
     "CM::StartSliver"       => \&GeniCM::StartSliver,
     "CM::DestroySliver"     => \&GeniCM::DestroySliver,
+    "CM::BindUser"          => \&GeniCM::BindUser,
+    "CM::UnBindUser"        => \&GeniCM::UnBindUser,
    },
 );
 

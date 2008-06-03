@@ -81,6 +81,7 @@ sub LookupUser($)
 		 "sa"       => { "hrn"      => $authority->hrn(),
 				 "uuid"     => $authority->uuid(),
 				 "cert"     => $authority->cert(),
+				 "uuid_prefix" => $authority->uuid_prefix(),
 				 "url"      => $authority->url() }
 	       };
     $blob->{'sshkey'} = $sshkey
@@ -114,10 +115,11 @@ sub LookupSlice($)
 		 "uuid"         => $slice->uuid(),
 		 "creator_uuid" => $slice->creator_uuid(),
 		 "cert"         => $slice->cert(),
-		 "sa"           => { "hrn"      => $authority->hrn(),
-				     "uuid"     => $authority->uuid(),
-				     "cert"     => $authority->cert(),
-				     "url"      => $authority->url() }
+		 "sa"           => {"hrn"      => $authority->hrn(),
+				    "uuid"     => $authority->uuid(),
+				    "cert"     => $authority->cert(),
+				    "uuid_prefix" => $authority->uuid_prefix(),
+				    "url"      => $authority->url() }
 	       };
 
     return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);

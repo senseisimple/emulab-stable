@@ -118,7 +118,27 @@ CREATE TABLE `geni_slivers` (
   `uuid` varchar(40) NOT NULL default '',
   `slice_uuid` varchar(40) NOT NULL default '',
   `creator_uuid` varchar(40) NOT NULL default '',
-  `node_id` varchar(32) default NULL,
+  `resource_uuid` varchar(40) NOT NULL default '',
+  `created` datetime default NULL,
+  `credential_idx` int(10) unsigned default NULL,
+  `ticket_idx` int(10) unsigned default NULL,
+  `component_idx` int(10) unsigned NOT NULL default '0',
+  `aggregate_idx` int(10) unsigned default NULL,
+  `status` enum('ready','broken') NOT NULL default 'ready',
+  PRIMARY KEY  (`idx`),
+  UNIQUE KEY `uuid` (`uuid`),
+  INDEX `slice_uuid` (`slice_uuid`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+#
+# Geni Aggregates, which are a collection of resources (nodes, links, etc).
+#
+DROP TABLE IF EXISTS `geni_aggregates`;
+CREATE TABLE `geni_aggregates` (
+  `idx` mediumint(8) unsigned NOT NULL default '0',
+  `uuid` varchar(40) NOT NULL default '',
+  `slice_uuid` varchar(40) NOT NULL default '',
+  `creator_uuid` varchar(40) NOT NULL default '',
   `created` datetime default NULL,
   `credential_idx` int(10) unsigned default NULL,
   `ticket_idx` int(10) unsigned default NULL,
@@ -177,3 +197,13 @@ CREATE TABLE `geni_certificates` (
   PRIMARY KEY  (`uuid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
+#
+# A clearinghouse table to hold sshkeys associated with geni users.
+#
+DROP TABLE IF EXISTS `geni_sshkeys`;
+CREATE TABLE `geni_sshkeys` (
+  `uuid` varchar(40) NOT NULL default '',
+  `created` datetime default NULL,
+  `sshkey` text,
+  PRIMARY KEY  (`uuid`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
