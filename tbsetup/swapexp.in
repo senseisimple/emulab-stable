@@ -32,7 +32,7 @@ sub usage()
 	  "<nsfile> - Optional NS file to parse for experiment modify\n");
     exit(-1);
 }
-my  $optlist = "biafres:wqx";
+my  $optlist = "biafres:wqxg";
 
 #
 # Exit codes are important; they tell the web page what has happened so
@@ -102,6 +102,7 @@ my $force    = 0;
 my $reboot   = 0;
 my $waitmode = 0;
 my $quiet    = 0;
+my $genimode = 0;
 my $eventsys_restart   = 0;
 my $errorstat= -1;
 my $modifyHosed   = 0;
@@ -163,6 +164,9 @@ if (defined($options{"a"})) {
 }
 if (defined($options{"f"})) {
     $force = 1;
+}
+if (defined($options{"g"})) {
+    $genimode = 1;
 }
 if (defined($options{"b"})) {
     $batch = 1;
@@ -779,7 +783,7 @@ if ($inout eq "modify" && defined($modnsfile)) {
 #
 # If not in batch mode, go into the background. Parent exits.
 #
-if (! $batch && ! $template_mode) {
+if (! $batch && ! $template_mode && !$genimode) {
     # Cleanup
     $experiment->CleanLogFiles() == 0
 	or fatal("Could not clean up logfiles!");
@@ -1243,7 +1247,7 @@ $experiment->Unlock();
 $experiment->SetCancelFlag(EXPTCANCEL_CLEAR);
 
 exit(0)
-    if ($template_mode);
+    if ($template_mode || $genimode);
 
 print "Swap Success!\n";
 

@@ -635,7 +635,8 @@ sub doSwapout($) {
                          "  from reserved as rv ".
 			 "left join nodes as n on n.node_id = rv.node_id ".
 			 "left join node_types as nt on nt.type=n.type ".
-			 "where rv.pid='$pid' and rv.eid='$eid'");
+			 "where rv.pid='$pid' and rv.eid='$eid' and ".
+			 "      rv.genisliver_idx is null");
 
 	while (my ($node,$allocstate,$isvirt) = $db_result->fetchrow_array) {
 	    if ($allocstate ne TBDB_ALLOCSTATE_RES_READY()) {

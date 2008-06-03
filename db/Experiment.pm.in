@@ -110,6 +110,16 @@ sub Lookup($$;$)
 	    $arg1 = $1;
 	    $arg2 = $2;
 	}
+	elsif ($arg1 =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
+	    my $result =
+		DBQueryWarn("select idx from experiments ".
+			    "where eid_uuid='$arg1'");
+
+	    return undef
+		if (! $result || !$result->numrows);
+
+	    ($idx) = $result->fetchrow_array();
+	}
 	else {
 	    return undef;
 	}
@@ -376,6 +386,7 @@ sub Create($$$$)
 {
     my ($class, $group, $eid, $argref) = @_;
     my $exptidx;
+    my $uuid;
     my $now = time();
 
     return undef
@@ -478,10 +489,23 @@ sub Create($$$$)
     }
 
     # And a UUID (universally unique identifier).
-    my $uuid = NewUUID();
-    if (!defined($uuid)) {
-	print "*** WARNING: Could not generate a UUID!\n";
-	return undef;
+    if (exists($argref->{'eid_uuid'})) {
+	$uuid = $argref->{'eid_uuid'};
+	delete($argref->{'eid_uuid'});
+
+	if (! ($uuid =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/)) {
+	    DBQueryWarn("unlock tables");
+	    print "*** WARNING: Bad format in UUID!\n";
+	    return undef;
+	}
+    }
+    else {
+	$uuid = NewUUID();
+	if (!defined($uuid)) {
+	    DBQueryWarn("unlock tables");
+	    print "*** WARNING: Could not generate a UUID!\n";
+	    return undef;
+	}
     }
 
     #
@@ -590,6 +614,8 @@ sub Delete($;$)
 
     $purge = 0
 	if (!defined($purge));
+
+    $self->UnBindNonLocalUsers();
 
     #
     # Try to remove experiment directory. We allow for it not being there
@@ -3287,6 +3313,74 @@ sub VnameToPmap($$)
 
     my ($node_id) = $query_result->fetchrow_array();    
     return Node->Lookup($node_id);
+}
+
+#
+# Insert a virt_nodes entry, as needed when allocating a node to an
+# experiment outside the NS file parsing path. Currently using this
+# from the Geni sliver provisioning code.
+#
+sub InsertVirtNode($$)
+{
+    my ($self, $node) = @_;
+
+    # Must be a real reference. 
+    if (!ref($node)) {
+	$node = Node->Lookup($node);
+	return -1
+	    if (!defined($node));
+    }
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+    my $idx = $self->idx();
+    my $node_id = $node->node_id();
+
+    DBQueryWarn("replace into virt_nodes set ".
+		"  pid='$pid', eid='$eid', exptidx='$idx', ".
+		"  vname='$node_id', type='pc', ips='', ".
+		"  cmd_line='', startupcmd='', osname=''")
+	or return -1;
+    
+    return 0;
+}
+sub DeleteVirtNode($$)
+{
+    my ($self, $node) = @_;
+
+    # Must be a real reference. 
+    if (!ref($node)) {
+	$node = Node->Lookup($node);
+	return -1
+	    if (!defined($node));
+    }
+    my $idx = $self->idx();
+    my $node_id = $node->node_id();
+
+    DBQueryWarn("delete from virt_nodes  ".
+		"where exptidx='$idx' and vname='$node_id'")
+	or return -1;
+    
+    return 0;
+}
+
+#
+# Unbind nonlocal users from this experiment.
+#
+sub UnBindNonLocalUsers($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference.
+    return -1
+	if (!ref($self));
+
+    my $idx = $self->idx();
+
+    DBQueryWarn("delete from nonlocal_user_bindings  ".
+		"where exptidx='$idx'")
+	or return -1;
+    
+    return 0;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

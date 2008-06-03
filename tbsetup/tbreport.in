@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -216,16 +216,16 @@ if ($shownodes) {
 	}
 
 	printf "%-15s %-12s %-15s %s\n", $vname, $type, $osname, $qualname;
-	if ($cmd_line ne "") {
+	if (defined($cmd_line) && $cmd_line ne "") {
 	    printf "   %-17s %s\n", "Command Line:", $cmd_line;
 	}
-	if ($startupcmd ne "") {
+	if (defined($startupcmd) && $startupcmd ne "") {
 	    printf "   %-17s %s\n", "Startup Command:", $startupcmd;
 	}
-	if ($rpms ne "") {
+	if (defined($rpms) && $rpms ne "") {
 	    printf "   %-17s %s\n", "RPMS:", $rpms;
 	}
-	if ($tarfiles ne "") {
+	if (defined($tarfiles) && $tarfiles ne "") {
 	    printf "   %-17s %s\n", "Tarfiles:", $tarfiles;
 	}
     }
