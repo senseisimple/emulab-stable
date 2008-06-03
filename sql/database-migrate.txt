@@ -4529,3 +4529,14 @@ last_net_act,last_cpu_act,last_ext_act);
         UNIQUE KEY `uid_uuid` (`uid_uuid`)
        ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
+4.154: Addition to previous revision. This table is for tmcd, to find
+       out what nonlocal users need to be created on slivers (nodes).
+
+       CREATE TABLE `nonlocal_user_bindings` (
+        `uid` varchar(8) NOT NULL default '',
+        `uid_idx` mediumint(8) unsigned NOT NULL default '0',
+        `exptidx` int(11) NOT NULL default '0',
+        PRIMARY KEY  (`uid_idx`),
+        KEY `uid` (`uid`)
+       ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
