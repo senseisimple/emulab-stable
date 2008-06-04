@@ -434,7 +434,7 @@ function WRITESIDEBAR() {
 
     if ($rootEmulab) {
 	# Leave New here about 2 weeks
-        NavMenuButton("Papers and Talks (Mar 9)", "$TBDOCBASE/pubs.php3");
+        NavMenuButtonNew("Papers and Talks (Jun 4)", "$TBDOCBASE/pubs.php3");
 	NavMenuButton("Software (Jul 18)", "$TBDOCBASE/software.php3");
 
 	NavMenuButton("List People",
