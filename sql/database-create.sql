@@ -1442,9 +1442,11 @@ CREATE TABLE `interfaces` (
   `rtabid` smallint(5) unsigned NOT NULL default '0',
   `vnode_id` varchar(32) default NULL,
   `whol` tinyint(4) NOT NULL default '0',
+  `uuid` varchar(40) NOT NULL default '',
   PRIMARY KEY  (`node_id`,`card`,`port`),
   KEY `mac` (`mac`),
-  KEY `IP` (`IP`)
+  KEY `IP` (`IP`),
+  KEY `uuid` (`uuid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --

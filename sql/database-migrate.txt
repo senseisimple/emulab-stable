@@ -4540,3 +4540,8 @@ last_net_act,last_cpu_act,last_ext_act);
         KEY `uid` (`uid`)
        ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
+4.155: Add uuids to the interfaces table.
+
+       alter table interfaces add `uuid` varchar(40) NOT NULL default '';
+       alter table interfaces add  KEY `uuid` (`uuid`);
+       update interfaces set uuid=UUID();

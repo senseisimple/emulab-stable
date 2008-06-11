@@ -467,7 +467,7 @@ NODE: foreach my $node_id (@node_ids) {
 
 	DBQueryFatal("INSERT INTO interfaces SET node_id='$node_id', " .
 	    "card=$card, port=1, mac='$MAC', IP='$iface_IP', " .
-	    "interface_type='$iface_type', iface='$iface', " .
+	    "interface_type='$iface_type', iface='$iface', uuid=UUID(), " .
 	    "current_speed='$max_speed', duplex=$duplex, role='$iface_role'");
 
 	if (!$switch_id) {
