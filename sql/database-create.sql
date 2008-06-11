@@ -444,6 +444,59 @@ CREATE TABLE `emulab_indicies` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `emulab_pubs`
+--
+
+DROP TABLE IF EXISTS `emulab_pubs`;
+CREATE TABLE `emulab_pubs` (
+  `idx` int(10) unsigned NOT NULL auto_increment,
+  `uuid` varchar(40) NOT NULL,
+  `created` datetime NOT NULL,
+  `owner` mediumint(8) unsigned NOT NULL,
+  `submitted_by` mediumint(8) unsigned NOT NULL,
+  `last_edit` datetime NOT NULL,
+  `last_edit_by` mediumint(8) unsigned NOT NULL,
+  `type` tinytext NOT NULL,
+  `authors` tinytext NOT NULL,
+  `affil` tinytext NOT NULL,
+  `title` tinytext NOT NULL,
+  `conf` tinytext NOT NULL,
+  `conf_url` tinytext NOT NULL,
+  `where` tinytext NOT NULL,
+  `year` tinytext NOT NULL,
+  `month` float(3,1) NOT NULL,
+  `volume` tinytext NOT NULL,
+  `number` tinytext NOT NULL,
+  `pages` tinytext NOT NULL,
+  `url` tinytext NOT NULL,
+  `evaluated_on_emulab` tinytext NOT NULL,
+  `category` tinytext NOT NULL,
+  `project` tinytext NOT NULL,
+  `cite_osdi02` tinyint(1) default NULL,
+  `no_cite_why` tinytext NOT NULL,
+  `notes` text NOT NULL,
+  `visible` tinyint(1) NOT NULL default '1',
+  `deleted` tinyint(1) NOT NULL default '0',
+  `editable_owner` tinyint(1) NOT NULL default '1',
+  `editable_proj` tinyint(1) NOT NULL default '1',
+  PRIMARY KEY  (`idx`),
+  UNIQUE KEY `uuid` (`uuid`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `emulab_pubs_month_map`
+--
+
+DROP TABLE IF EXISTS `emulab_pubs_month_map`;
+CREATE TABLE `emulab_pubs_month_map` (
+  `display_order` int(10) unsigned NOT NULL auto_increment,
+  `month` float(3,1) NOT NULL,
+  `month_name` char(8) NOT NULL,
+  PRIMARY KEY  (`month`),
+  UNIQUE KEY `display_order` (`display_order`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `errors`
 --
 
