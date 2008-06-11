@@ -1027,6 +1027,7 @@ function PAGEHEADER($title, $view = NULL, $extra_headers = NULL,
 	$login_user   = null;
     }
     
+    header('Content-type: text/html; charset=utf-8');
     header("Last-Modified: " . gmdate("D, d M Y H:i:s") . " GMT");
     
     if (1) {

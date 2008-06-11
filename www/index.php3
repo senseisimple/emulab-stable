@@ -74,7 +74,7 @@ if ($message != "") {
         <a href="http://www.emulab.net/docwrapper.php3?docname=otheremulabs.html">two
         dozen sites</a> around the world, ranging from testbeds with a handful
         of nodes up to testbeds with hundreds of nodes.
-    Emulab is <a href="http://www.emulab.net/doc/docwrapper.php3?docname=expubs.html">widely used</a>
+    Emulab is <a href="http://www.emulab.net/expubs.php">widely used</a>
         by computer science researchers in the fields of networking and
         distributed systems.
     It is also used to <a href="http://www.emulab.net/doc/docwrapper.php3?docname=exclasses.html">teach

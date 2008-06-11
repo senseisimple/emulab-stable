@@ -1451,6 +1451,8 @@ done
 
 
 
+
+
 #
 # Offer both versions of the email addresses that have the @ escaped
 # for perl (the default), and that don't
@@ -1502,13 +1504,14 @@ OUTERBOSS_NODENAME=""
 OUTERBOSS_XMLRPCPORT=3069
 OUTERBOSS_SSLCERTNAME="/etc/outer_emulab.pem"
 PLABSUPPORT=0
+PUBSUPPORT=0
 WIKISUPPORT=0
-TRACSUPPORT=0
 BUGDBSUPPORT=0
 OPSDBSUPPORT=0
 MAILMANSUPPORT=0
 WINSUPPORT=0
 CVSSUPPORT=0
+TRACSUPPORT=0
 CHATSUPPORT=0
 STAMPS=0
 ARCHIVESUPPORT=0
@@ -1740,7 +1743,6 @@ if test $ISOLATEADMINS -eq 1; then
 EOF
 
 fi
-
 if test $DYNAMICROOTPASSWORDS -eq 1; then
     cat >> confdefs.h <<EOF
 #define DYNAMICROOTPASSWORDS 1
@@ -1866,6 +1868,8 @@ fi
 cat >> confdefs.h <<EOF
 #define TBBASE "$TBBASE"
 EOF
+
+
 if test -z "$THISHOMEBASE"; then
     THISHOMEBASE="Emulab.Net"
 fi
@@ -2122,17 +2126,17 @@ for ac_hdr in ulxmlrpcpp/ulxr_config.h
 do
 ac_safe=`echo "$ac_hdr" | sed 'y%./+-%__p_%'`
 echo $ac_n "checking for $ac_hdr""... $ac_c" 1>&6
-echo "configure:2114: checking for $ac_hdr" >&5
+echo "configure:2130: checking for $ac_hdr" >&5
 if eval "test \"`echo '$''{'ac_cv_header_$ac_safe'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
   cat > conftest.$ac_ext <<EOF
-#line 2119 "configure"
+#line 2135 "configure"
 #include "confdefs.h"
 #include <$ac_hdr>
 EOF
 ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
-{ (eval echo configure:2124: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+{ (eval echo configure:2140: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
 ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
 if test -z "$ac_err"; then
   rm -rf conftest*
@@ -2171,17 +2175,17 @@ for ac_hdr in linux/videodev.h
 do
 ac_safe=`echo "$ac_hdr" | sed 'y%./+-%__p_%'`
 echo $ac_n "checking for $ac_hdr""... $ac_c" 1>&6
-echo "configure:2163: checking for $ac_hdr" >&5
+echo "configure:2179: checking for $ac_hdr" >&5
 if eval "test \"`echo '$''{'ac_cv_header_$ac_safe'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
   cat > conftest.$ac_ext <<EOF
-#line 2168 "configure"
+#line 2184 "configure"
 #include "confdefs.h"
 #include <$ac_hdr>
 EOF
 ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
-{ (eval echo configure:2173: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+{ (eval echo configure:2189: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
 ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
 if test -z "$ac_err"; then
   rm -rf conftest*
@@ -2214,7 +2218,7 @@ done
 # Extract the first word of "gtk-config", so it can be a program name with args.
 set dummy gtk-config; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:2206: checking for $ac_word" >&5
+echo "configure:2222: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_GTK_CONFIG'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -2293,7 +2297,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:2285: checking for a BSD compatible install" >&5
+echo "configure:2301: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -2354,7 +2358,7 @@ esac
 # Extract the first word of "rsync", so it can be a program name with args.
 set dummy rsync; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:2346: checking for $ac_word" >&5
+echo "configure:2362: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_path_RSYNC'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -2811,8 +2815,8 @@ s%@OUTERBOSS_NODENAME@%$OUTERBOSS_NODENAME%g
 s%@OUTERBOSS_XMLRPCPORT@%$OUTERBOSS_XMLRPCPORT%g
 s%@OUTERBOSS_SSLCERTNAME@%$OUTERBOSS_SSLCERTNAME%g
 s%@PLABSUPPORT@%$PLABSUPPORT%g
+s%@PUBSUPPORT@%$PUBSUPPORT%g
 s%@WIKISUPPORT@%$WIKISUPPORT%g
-s%@TRACSUPPORT@%$TRACSUPPORT%g
 s%@MAILMANSUPPORT@%$MAILMANSUPPORT%g
 s%@BUGDBSUPPORT@%$BUGDBSUPPORT%g
 s%@OPSDBSUPPORT@%$OPSDBSUPPORT%g
@@ -2850,9 +2854,8 @@ s%@FRISEBEEMCASTADDR@%$FRISEBEEMCASTADDR%g
 s%@FRISEBEEMCASTPORT@%$FRISEBEEMCASTPORT%g
 s%@WINSUPPORT@%$WINSUPPORT%g
 s%@CVSSUPPORT@%$CVSSUPPORT%g
+s%@TRACSUPPORT@%$TRACSUPPORT%g
 s%@CHATSUPPORT@%$CHATSUPPORT%g
-s%@ISOLATEADMINS@%$ISOLATEADMINS%g
-s%@DYNAMICROOTPASSWORDS@%$DYNAMICROOTPASSWORDS%g
 s%@STAMPS@%$STAMPS%g
 s%@ARCHIVESUPPORT@%$ARCHIVESUPPORT%g
 s%@MIN_UNIX_UID@%$MIN_UNIX_UID%g
@@ -2860,6 +2863,8 @@ s%@MIN_UNIX_GID@%$MIN_UNIX_GID%g
 s%@DELAYTHRESH@%$DELAYTHRESH%g
 s%@PELABSUPPORT@%$PELABSUPPORT%g
 s%@ELVIN_COMPAT@%$ELVIN_COMPAT%g
+s%@ISOLATEADMINS@%$ISOLATEADMINS%g
+s%@DYNAMICROOTPASSWORDS@%$DYNAMICROOTPASSWORDS%g
 s%@TBOPSEMAIL@%$TBOPSEMAIL%g
 s%@TBOPSEMAIL_NOSLASH@%$TBOPSEMAIL_NOSLASH%g
 s%@TBROBOCOPSEMAIL@%$TBROBOCOPSEMAIL%g

@@ -8,6 +8,7 @@ include("defs.php3");
 include("showstuff.php3");
 include_once("template_defs.php");
 include_once("table_defs.php");
+include_once("pub_defs.php");
 
 #
 # Only known and logged in users can do this.
@@ -15,6 +16,7 @@ include_once("table_defs.php");
 $this_user = CheckLoginOrDie(CHECKLOGIN_USERSTATUS|
 			     CHECKLOGIN_WEBONLY|CHECKLOGIN_WIKIONLY);
 $uid       = $this_user->uid();
+$uid_idx   = $this_user->uid_idx();
 $isadmin   = ISADMIN();
 
 #
@@ -66,6 +68,7 @@ else {
 $html_groups    = null;
 $html_stats     = null;
 $html_templates = null;
+$html_pubs      = null;
 
 #
 # See if any mailman lists owned by the user. If so we add a menu item.
@@ -291,6 +294,21 @@ if ($isadmin) {
 	"'>Experiment History</a>";
 }
 
+if ($PUBSUPPORT) {
+    #
+    # List pubs owned by user if any
+    #
+    $query_result = GetPubs("`owner` = $uid_idx");
+    if (mysql_num_rows($query_result)) {
+	$html_pubs = MakeBibList($this_user, $isadmin, $query_result);
+	$html_pubs .= '<p><a href="deleted_pubs.php">Show Deleted Publications</a></p>';
+	$html_pubs .= "\n";
+	list ($html_pubs, $button_pubs) =
+	  TableWrapUp($html_pubs, FALSE, FALSE,
+		      "pubs_table", "pubs_button");
+    }
+}
+
 #
 # Special banner message.
 #
@@ -376,6 +394,12 @@ if ($isadmin && $html_stats) {
 	      "id=\"li_stats\" onclick=\"Show('stats');\">".
               "User Stats</a></li>\n";
 }
+if ($html_pubs) {
+    echo "<li>
+          <a href=\"#G\" class=topnavbar onfocus=\"this.hideFocus=true;\" ".
+	      "id=\"li_pubs\" onclick=\"Show('pubs');\">".
+              "Publications</a></li>\n";
+}
 echo "</ul>\n";
 echo "</div>\n";
 echo "<div align=center id=topnavbarbottom>&nbsp</div>\n"; 
@@ -392,6 +416,9 @@ if ($html_groups) {
 echo $html_profile;
 if ($isadmin && $html_stats) {
     echo $html_stats;
+}
+if ($html_pubs) {
+    echo $html_pubs;
 }
 if ($html_experiments) {
     echo $html_experiments;

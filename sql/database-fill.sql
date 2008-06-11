@@ -147,6 +147,8 @@ REPLACE INTO exported_tables VALUES ('state_triggers');
 REPLACE INTO exported_tables VALUES ('table_regex');
 REPLACE INTO exported_tables VALUES ('testsuite_preentables');
 REPLACE INTO exported_tables VALUES ('webdb_table_permissions');
+REPLACE INTO exported_tables VALUES ('emulab_pubs_month_map');
+
 
 --
 -- Dumping data for table `foreign_keys`
@@ -944,6 +946,10 @@ REPLACE INTO table_regex VALUES ('user_pubkeys','verify','text','redirect','defa
 REPLACE INTO table_regex VALUES ('user_pubkeys','user','text','redirect','users:uid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('user_pubkeys','keyfile','text','regex','^[-_\\w\\.\\/:+]*$',1,256,NULL);
 
+REPLACE INTO table_regex VALUES ('default','tinytext_utf8','text','regex','^(?:[\\x20-\\x7E]|[\\xC2-\\xDF][\\x80-\\xBF]|\\xE0[\\xA0-\\xBF][\\x80-\\xBF]|[\\xE1-\\xEC\\xEE\\xEF][\\x80-\\xBF]{2}|\\xED[\\x80-\\x9F][\\x80-\\xBF])*$',0,256,'adopted from http://www.w3.org/International/questions/qa-forms-utf-8.en.php');
+REPLACE INTO table_regex VALUES ('default','text_utf8','text','regex','^(?:[\\x20-\\x7E]|[\\xC2-\\xDF][\\x80-\\xBF]|\\xE0[\\xA0-\\xBF][\\x80-\\xBF]|[\\xE1-\\xEC\\xEE\\xEF][\\x80-\\xBF]{2}|\\xED[\\x80-\\x9F][\\x80-\\xBF])*$',0,65535,'adopted from http://www.w3.org/International/questions/qa-forms-utf-8.en.php');
+REPLACE INTO table_regex VALUES ('default','fulltext_utf8','text','regex','^(?:[\\x09\\x0A\\x0D\\x20-\\x7E]|[\\xC2-\\xDF][\\x80-\\xBF]|\\xE0[\\xA0-\\xBF][\\x80-\\xBF]|[\\xE1-\\xEC\\xEE\\xEF][\\x80-\\xBF]{2}|\\xED[\\x80-\\x9F][\\x80-\\xBF])*$',0,65535,'adopted from http://www.w3.org/International/questions/qa-forms-utf-8.en.php');
+
 --
 -- Dumping data for table `testsuite_preentables`
 --
@@ -1001,4 +1007,35 @@ REPLACE INTO webdb_table_permissions VALUES ('os_info',1,1,1);
 REPLACE INTO webdb_table_permissions VALUES ('projects',1,1,0);
 REPLACE INTO webdb_table_permissions VALUES ('osidtoimageid',1,0,1);
 REPLACE INTO webdb_table_permissions VALUES ('table_regex',1,1,1);
+
+
+--
+-- Dumping data for table `emulab_pubs_month_map`
+--
+
+REPLACE INTO `emulab_pubs_month_map` VALUES (1,0.0,'');
+REPLACE INTO `emulab_pubs_month_map` VALUES (2,1.0,'Jan');
+REPLACE INTO `emulab_pubs_month_map` VALUES (3,2.0,'Feb');
+REPLACE INTO `emulab_pubs_month_map` VALUES (4,3.0,'Mar');
+REPLACE INTO `emulab_pubs_month_map` VALUES (5,4.0,'Apr');
+REPLACE INTO `emulab_pubs_month_map` VALUES (6,5.0,'May');
+REPLACE INTO `emulab_pubs_month_map` VALUES (7,6.0,'Jun');
+REPLACE INTO `emulab_pubs_month_map` VALUES (8,7.0,'Jul');
+REPLACE INTO `emulab_pubs_month_map` VALUES (9,8.0,'Aug');
+REPLACE INTO `emulab_pubs_month_map` VALUES (10,9.0,'Sep');
+REPLACE INTO `emulab_pubs_month_map` VALUES (11,10.0,'Oct');
+REPLACE INTO `emulab_pubs_month_map` VALUES (12,11.0,'Nov');
+REPLACE INTO `emulab_pubs_month_map` VALUES (13,12.0,'Dec');
+REPLACE INTO `emulab_pubs_month_map` VALUES (14,1.5,'Jan-Feb');
+REPLACE INTO `emulab_pubs_month_map` VALUES (15,2.5,'Feb-Mar');
+REPLACE INTO `emulab_pubs_month_map` VALUES (16,3.5,'Mar-Apr');
+REPLACE INTO `emulab_pubs_month_map` VALUES (17,4.5,'Apr-May');
+REPLACE INTO `emulab_pubs_month_map` VALUES (18,5.5,'May-Jun');
+REPLACE INTO `emulab_pubs_month_map` VALUES (19,6.5,'Jun-Jul');
+REPLACE INTO `emulab_pubs_month_map` VALUES (20,7.5,'Jul-Aug');
+REPLACE INTO `emulab_pubs_month_map` VALUES (21,8.5,'Aug-Sep');
+REPLACE INTO `emulab_pubs_month_map` VALUES (22,9.5,'Sep-Oct');
+REPLACE INTO `emulab_pubs_month_map` VALUES (23,10.5,'Oct-Nov');
+REPLACE INTO `emulab_pubs_month_map` VALUES (24,11.5,'Nov-Dec');
+REPLACE INTO `emulab_pubs_month_map` VALUES (25,12.5,'Dec-Jan');
 

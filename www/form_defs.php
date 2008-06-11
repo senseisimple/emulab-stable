@@ -98,12 +98,11 @@ function FormRenderTextField($name, $attrs)
 function FormRenderCheckBox($name, $attrs)
 {
     $html = "<input type=checkbox name=\"formfields[$name]\" ";
-    if (isset($attrs['#return_value'])) {
-	$html .= "value=\"" . $attrs['#return_value'] . "\" ";
-	if (isset($attrs['#value']) &&
-	    $attrs['#value'] == $attrs['#return_value']) {
-	    $html .= "checked ";
-	}
+    $return_value = isset($attrs['#return_value']) ? $attrs['#return_value'] : 1;
+    $html .= "value=\"" . $return_value . "\" ";
+    if (isset($attrs['#value']) &&
+	$attrs['#value'] == $return_value) {
+	$html .= "checked ";
     }
     if (isset($attrs['#class'])) {
 	$html .= "class=\"" . $attrs['#class'] . "\" ";
@@ -174,14 +173,20 @@ function FormRenderSelect($name, $attrs)
     }
     $html .= ">\n";
 
-    if (isset($attrs['#default']))
-	$default = $attrs['#default'];
-    else
-	$default = "Please Select";
-    $html .= "<option value=''>$default &nbsp</option>\n";
+    if (!@$attrs['#no_default']) {
+	if (isset($attrs['#default']))
+	    $default = $attrs['#default'];
+	else
+	    $default = "Please Select";
+	$html .= "<option value=''>$default &nbsp</option>\n";
+    }
 
     if (isset($attrs['#options'])) {
-	while (list ($selectvalue, $selectlabel) = each ($attrs['#options'])) {
+        $options = $attrs['#options'];
+        if (isset($attrs['#value']) && $attrs['#value'] != ''  
+            && !isset($options[$attrs['#value']]))
+  	    $options[$attrs['#value']] = $attrs['#value'];
+	foreach ($options as $selectvalue => $selectlabel) {
 	    $selected = "";	    
 	    if (isset($attrs['#value']) && $attrs['#value'] == $selectvalue) {
 		$selected = "selected";
@@ -214,6 +219,32 @@ function FormRenderFile($name, $attrs)
     }
     $html .= ">";
     
+    return $html;
+}
+
+function FormRenderTextArea($name, $attrs)
+{
+    $html = "<textarea name=\"formfields[$name]\" ";
+    if (isset($attrs['#javascript'])) {
+	$html .= $attrs['#javascript'] . " ";
+    }
+    if (isset($attrs['#class'])) {
+	$html .= "class=\"" . $attrs['#class'] . "\" ";
+    }
+    else {
+	$html .= "class=\"form-text\" ";
+    }
+    if (isset($attrs['#cols'])) {
+	$html .= "cols=" . $attrs['#cols'] . " ";
+    }
+    if (isset($attrs['#rows'])) {
+	$html .= "rows=" . $attrs['#rows'] . " ";
+    }
+    $html .= ">";
+    if (isset($attrs['#value'])) {
+	$html .= htmlspecialchars($attrs['#value']);
+    }
+    $html .= "</textarea>\n";
     return $html;
 }
 
@@ -295,6 +326,23 @@ function FormRenderList($name, $attributes, $submitted)
     return $html;
 }
 
+# Render a list of elements together, vertically
+function FormRenderVList($name, $attributes, $submitted)
+{
+    $html = "";
+    
+    while (list ($subname, $subattrs) = each ($attributes['#elements'])) {
+	if ($submitted && array_key_exists($subname, $submitted)) {
+	    $subattrs['#value'] = $submitted[$subname];
+	}
+	if (isset($subattrs['#label']))
+	    $html .= $subattrs['#label'] . ": ";
+	$html .= FormRenderElement($subname, $subattrs, $submitted);
+	$html .= "<br>";
+    }
+    return $html;
+}
+
 function FormRenderElement($name, $attributes, $submitted)
 {
     $field_html = null;
@@ -352,6 +400,15 @@ function FormRenderElement($name, $attributes, $submitted)
     case "list":
 	$field_html = FormRenderList($name, $attributes, $submitted);
 	break;
+    case "vlist":
+	$field_html = FormRenderVList($name, $attributes, $submitted);
+	break;
+    case "textarea":
+	$field_html = FormRenderTextArea($name, $attributes, $submitted);
+	break;
+    case "display":
+	$field_html = isset($submitted[$name]) ? $submitted[$name] : $attributes['#value'];
+	break;
     }
     return $field_html;
 }
@@ -370,7 +427,7 @@ function FormRenderElements($fields, $submitted)
 		continue;
 	    }
 	    $cols  = "";
-	    if ($attributes['#type'] == "table")
+	    if ($attributes['#type'] == "table" || $attributes['#type'] == "textarea")
 		$cols = "colspan=2";
 
 	    $mouseover = "";
@@ -402,6 +459,7 @@ function FormRenderElements($fields, $submitted)
 		
 	    $html .= "<tr>";
 	    if ($attributes['#type'] != "submit" &&
+                isset($attributes['#label']) &&
 		!isset($attributes['#colspan'])) {
 		$html .= "<td align=left $mouseover $cols>";
 
@@ -420,8 +478,9 @@ function FormRenderElements($fields, $submitted)
 			$attributes['#description'] . ")";
 		if ($attributes['#type'] == "table") {
 		    $html .= "$field_html</td>";
-		}
-		else {
+		} else if ($attributes['#type'] == "textarea") {
+	 	    $html .= "<br>$field_html</td>";
+                } else {
 		    $html .= "</td>";
 		    $html .= "<td align=left>$field_html</td>";
 		}
@@ -513,12 +572,22 @@ function FormRender($attributes, $errors, $fields, $submitted = null)
     echo "$html\n";
 }
 
-function FormValidateElement($name, &$errors, $attributes, &$submitted)
+function CombineLabels($parent, $attributes) {
+    $res = '';
+    $label = @$attributes['#label'];
+    $res .= $parent;
+    if ($parent != '' && $label != '') $res .= ', ';
+    $res .= $label;
+    return $res;
+}
+
+function FormValidateElement($name, &$errors, $attributes, &$submitted, $parent_label)
 {
+    $error_label = CombineLabels($parent_label, $attributes);
     # Check for required fields not filled out
     if (isset($attributes['#required']) && $attributes['#required'] &&
 	!(isset($submitted[$name]) && $submitted[$name] != "")) {
-	$errors[$attributes['#label']] = "Missing required value";
+	$errors[$error_label] = "Missing required value";
     }
     elseif (isset($attributes['#checkslot']) &&
 	    isset($submitted[$name]) && $submitted[$name] != "") {
@@ -538,13 +607,13 @@ function FormValidateElement($name, &$errors, $attributes, &$submitted)
 				$matches[1], $matches[2],
 				TBDB_CHECKDBSLOT_WARN|
 				TBDB_CHECKDBSLOT_ERROR)) {
-		$errors[$attributes['#label']] = TBFieldErrorString();
+		$errors[$error_label] = TBFieldErrorString();
 	    }
 	}
 	elseif (substr($check, 0, 1) == "/") {
 	    # Regular expression.
 	    if (!preg_match($check, $submitted[$name])) {
-		$errors[$attributes['#label']] = "Illegal characters";
+		$errors[$error_label] = "Illegal characters";
 	    }
 	}
 	else {
@@ -555,10 +624,11 @@ function FormValidateElement($name, &$errors, $attributes, &$submitted)
 
 function FormValidateFileUpload($name, &$errors, $attributes)
 {
+    $error_label = CombineLabels($parent_label, $attributes);
     # Check for required fields not filled out
     if (isset($attributes['#required']) && $attributes['#required'] &&
 	!(isset($_FILES[$name]['name']) && $_FILES[$name]['size'] != 0)) {
-	$errors[$attributes['#label']] = "Missing required value";
+	$errors[$error_label] = "Missing required value";
     }
     elseif (isset($attributes['#checkslot'])) {
 	$check = $attributes['#checkslot'];
@@ -572,7 +642,7 @@ function FormValidateFileUpload($name, &$errors, $attributes)
     }
 }
 
-function FormValidate($form, &$errors, $fields, &$submitted)
+function FormValidate($form, &$errors, $fields, &$submitted, $parent_label = '') 
 {
     while (list ($name, $attributes) = each ($fields)) {
 	switch ($attributes['#type']) {
@@ -583,29 +653,104 @@ function FormValidate($form, &$errors, $fields, &$submitted)
 	case "checkbox":
 	case "radio":
 	case "select":
-	    FormValidateElement($name, $errors, $attributes, $submitted);
+        case "textarea":
+	    FormValidateElement($name, $errors, $attributes, $submitted, $parent_label);
 	    break;
 	case "checkboxes":
 	    while (list ($subname, $subattrs) = each ($attributes['#boxes'])) {
-		FormValidateElement($subname, $errors, $subattrs, $submitted);
+		FormValidateElement($subname, $errors, $subattrs, $submitted,
+		                    CombineLabels($parent_label, $attributes));
 	    }
 	    break;
 	case "table":
-	    FormValidate($form, $errors, $attributes['#fields'], $submitted);
+	    FormValidate($form, $errors, $attributes['#fields'], $submitted,
+                         CombineLabels($parent_label, $attributes));
 	    break;
 	case "list":
+        case "vlist":
 	    while (list ($subname, $subattrs) =
 		   each ($attributes['#elements'])) {
-		FormValidateElement($subname, $errors, $subattrs, $submitted);
+		FormValidateElement($subname, $errors, $subattrs, $submitted,
+                                    CombineLabels($parent_label, $attributes));
 	    }
 	    break;
 	case "file":
-	    FormValidateFileUpload($name, $errors, $attributes);
+	    FormValidateFileUpload($name, $errors, $attributes, $parent_label);
 	    break;
+        case "display":
+            break;
 	default:
 	    $errors[$name] = "Invalid slot type: " . $attributes['#type'];
 	    break;
 	}
     }
+}
+
+function FormTextDumpElement($name, $attributes, $values, $label_width, $parent_label)
+{
+    $res = '';
+    if (!isset($values[$name]) || $values[$name] == '' || @$attributes['#nodump'])
+        return $res;
+    $label = CombineLabels($parent_label, $attributes);
+    $type = $attributes['#type'];
+    $value = $values[$name];
+    if ($type == 'checkbox')
+        $value = $values[$name] ? 'true' : 'false';
+    if ($type == 'select' && isset($attributes['#options'][$value]))
+        $value = $attributes['#options'][$value];
+    if ($type == 'textarea') {
+      $res .= "$label: \n";
+      $res .= $value;
+    } else {
+      $res .= sprintf("%-${label_width}s %s\n", "$label:", $value);
+    }
+    return $res;
+}
+
+function FormTextDump($form, $fields, $values, $label_width = 20, $parent_label = '') 
+{
+    $res = '';
+    while (list ($name, $attributes) = each ($fields)) {
+	switch ($attributes['#type']) {
+	case "hidden":
+	case "textfield":
+	case "password":
+	case "submit":
+	case "checkbox":
+	case "radio":
+	case "select":
+	case "textarea":
+        case "display":
+	    $res .= FormTextDumpElement($name, $attributes, $values, 
+                                        $label_width, $parent_label);
+	    break;
+	case "checkboxes":
+	    while (list ($subname, $subattrs) = each ($attributes['#boxes'])) {
+		FormTextDumpElement($subname, $subattrs, $values, $label_width,
+		                    CombineLabels($parent_label, $attributes));
+	    }
+	    break;
+	case "table":
+	    $res .= FormTextDump($form, $attributes['#fields'], $values, $label_width,
+                                 CombineLabels($parent_label, $attributes));
+	    break;
+	case "list":
+	case "vlist":
+	    while (list ($subname, $subattrs) =
+		   each ($attributes['#elements'])) {
+		$res .= FormTextDumpElement($subname, $subattrs, $values, $label_width,
+                                            CombineLabels($parent_label, $attributes));
+	    }
+	    break;
+	case "file":
+	    # Skip for now
+	    break;
+	default:
+	    user_error("Invalid slot type \"". $attributes['#type'] ."\" in FormTextDump",
+                       E_USER_NOTICE);
+	    break;
+	}
+    }
+    return $res;
 }
 ?>

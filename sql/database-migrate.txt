@@ -4545,3 +4545,8 @@ last_net_act,last_cpu_act,last_ext_act);
        alter table interfaces add `uuid` varchar(40) NOT NULL default '';
        alter table interfaces add  KEY `uuid` (`uuid`);
        update interfaces set uuid=UUID();
+
+4.156: Create emulab_pubs and related tables.
+       Add support for UTF-8 fields in table_regex.
+
+       mysql tbdb < emulab_pubs.sql
