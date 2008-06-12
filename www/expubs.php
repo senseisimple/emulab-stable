@@ -10,8 +10,8 @@ $this_user = null;
 $isadmin = null;
 
 if (!$printable && LoginStatus()) {
-    if (!$HTTPS) {
-	# redirect to secure site, otherwise CheckLoginOrDie will die
+    if (!@$HTTPS) {
+	# redirect to secure site, otherwise CheckLoginOrDie will fail
 	$new_url = "https://$WWWHOST$REQUEST_URI";
 	header("Location: $new_url");
 	PAGEHEADER("Bibliography");
@@ -77,4 +77,3 @@ else {
     PAGEFOOTER();
 }
 ?>
-

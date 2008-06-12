@@ -29,6 +29,8 @@ $footnotes = null;
 #		 '#size'       => 30,           # Optional
 #		 '#maxlength'  => 30,           # Optional
 #		 '#required'   => TRUE,         # Optional
+#                '#prep'       => 'trim'        # Optional used by FormValidate
+#                '#checkslot'  => 'default:text'# Optional used by FormValidate
 #                '#mouseover'  => 'Mouse Me',   # Optional string over label
 #		 '#footnote'   => 'See ...',    # Optional footnote section.
 #		 '#javascript' => "...");       # Optional
@@ -572,6 +574,10 @@ function FormRender($attributes, $errors, $fields, $submitted = null)
     echo "$html\n";
 }
 
+#
+# FormValidate and helper functions
+#
+
 function CombineLabels($parent, $attributes) {
     $res = '';
     $label = @$attributes['#label'];
@@ -585,6 +591,10 @@ function FormValidateElement($name, &$errors, $attributes, &$submitted, $parent_
 {
     $error_label = CombineLabels($parent_label, $attributes);
     # Check for required fields not filled out
+    if (isset($attributes['#prep']) && 
+	isset($submitted[$name]) && $submitted[$name] != "") {
+        $submitted[$name] = $attributes['#prep']($submitted[$name]);
+    }
     if (isset($attributes['#required']) && $attributes['#required'] &&
 	!(isset($submitted[$name]) && $submitted[$name] != "")) {
 	$errors[$error_label] = "Missing required value";
@@ -685,6 +695,10 @@ function FormValidate($form, &$errors, $fields, &$submitted, $parent_label = '')
 	}
     }
 }
+
+#
+# FormTextDump and helper functions
+#
 
 function FormTextDumpElement($name, $attributes, $values, $label_width, $parent_label)
 {

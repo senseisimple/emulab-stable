@@ -18,7 +18,14 @@ function MayEditPub($user, $isadmin, $row) {
     return TBMinTrust($proj->UserTrust($user), $TBDB_TRUST_LOCALROOT);
 }
 
+$thesis_map = array(
+	'thesis' => 'Thesis',
+	'phd thesis' => 'PhD Thesis',
+	'masters thesis' => "Master's Thesis",
+	'bachelors thesis' => "Bachelor's Thesis");
+
 function MakeBib($user, $isadmin, $r) {
+    global $thesis_map;
     $res = '';
     if ($r['url'] != '')
         $res .= "<a href=\"" . $r['url'] . "\">";
@@ -48,12 +55,13 @@ function MakeBib($user, $isadmin, $r) {
     } else if ($type == 'techreport') {
         $res .= ' Technical Report '.  $r['number'];
         # Affiliation here, but can't for techreports because of our data
+        if (!preg_match('/,/', $r['affil']))
+            $res .= ', ' . $r['affil'];
     # if Thesis
-    } else if ($type == 'thesis' || $type == 'ms thesis' || 
-               $type = 'phd thesis' || $type = 'bs thesis') {
-        $res .= ' Thesis';
-        if ($r['where'] != '') 
-            $res .= ', ' . $r['where'];
+    } else if (preg_match('/^([a-z]+ |)thesis$/', $type)) {
+        $res .= ' '. $thesis_map[$type];
+        if ($r['affil'] != '')
+            $res .= ', ' . $r['affil'];
     }
     # Not an Article/Tech report/Thesis? Add nothing special (for now)
 

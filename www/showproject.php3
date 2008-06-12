@@ -6,8 +6,7 @@
 #
 include("defs.php3");
 include_once("template_defs.php");
-if ($PAPERSUPPORT)
-  include_once("paper_defs.php");
+include_once("pub_defs.php");
 
 #
 # Note the difference with which this page gets it arguments!
@@ -100,11 +99,11 @@ if ($isadmin) {
 }
 
 $papers_html = null;
-if ($PAPERSUPPORT) {
+if ($PUBSUPPORT) {
     #
     # List papers for this project if any
     #
-    $query_result = GetPapers("`project` = \"$pid\"");
+    $query_result = GetPubs("`project` = \"$pid\"");
     if (mysql_num_rows($query_result)) {
 	$papers_html = MakeBibList($this_user, $isadmin, $query_result);
     }
