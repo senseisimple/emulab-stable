@@ -98,8 +98,9 @@ $newgraph = combine_links($newgraph);
 my $tmp_topfile = $topfile;
 $tmp_topfile =~ s/(\.top)?$/-coarsened$1/;
 
-
+print "Generating new topfile\n";
 my @topfile = generate_topfile($newgraph);
+print "Running assign\n";
 my ($nodes, $edges) = run_assign($assign_bin, join(" ",@assign_args),
     $tmp_topfile, \@topfile, $logfile);
 
@@ -325,6 +326,11 @@ sub parse_ptop($) {
 		    last if ($type eq "-");
 		    my ($typename, $count) = split /:/, $type;
 
+                    # Handle types that are 'static' (we mostly use this
+                    # for lans and switches) by simply removing the static
+                    # qualifier, which will not appear in the top file
+                    $typename =~ s/^\*//;
+
 		    # Handle types with no count or an 'infinite' count
 		    if (!$count) {
 			$count = 1;
@@ -420,6 +426,7 @@ sub run_assign($$$$$) {
 
     open(ASSIGN,"|$assignbin $assignargs $topfile_name > $logfile");
     close ASSIGN;  # This will wait for the child process to die
+    print "assign completed\n";
     if ($?) {
 	# Assign failed, just pass through the exit code and the assign output
 	warn "Assign failed\n";
