@@ -24,6 +24,9 @@ certainly be issues with your configuration files in /etc. Also, if you monitor
 the serial line, know that the new kernel by default will output at 9600 baud
 instead of the Emulab-configured 115200.
 
+If your kernel will not boot, you may need to reenter sysinstall and reinstall
+your master boot record and/or the boot blocks with the bsdlabel utility.
+
 3) Fix a FreeBSD 6.3 bug in /etc/rc.d/named line 79 by changing && to || in the
 function make_symlinks().
 
@@ -38,8 +41,9 @@ http://www.emulab.net/downloads/ports-20060921.tar.gz into /usr/ports.
 6) Using the new ports tree, install the expat and linuxthreads packages.
 
 7) Install the emulab-boss-2.0 package as described in the doc tree of the
-Emulab source and on the Trac wiki. This process should complete successfully
-but with several (10-20) software version complaints.
+Emulab source and on the Trac wiki (https://users.emulab.net/trac/emulab).
+This process should complete successfully but with several (10-20) software
+version complaints.
 
 8) Continue installing the Emulab software from source as described in the
 installation documentation on the wiki and source tarball.
