@@ -1,0 +1,49 @@
+
+13 June 2008
+
+This is the procedure we used to upgrade the standard Emulab image "FBSD410-STD"
+to a boss node running FreeBSD 6.3 with the 2008-06-10 Emulab source code and
+the 2008-01-14 server meta-port.
+
+Note that the 2008-01-14 meta-port is not yet official and is simply the
+2007-05-17 meta-port with an updated pubsub package.
+
+1) Boot the first CD of the FreeBSD 6.3 release. Once in the sysinstall menu,
+select Upgrade. You may be prompted to mount your FreeBSD partitions before
+proceeding. When it asks you for a distribution set, select Developer. Do not
+install the ports collection at this time.
+
+As sysinstall will inform you, it does not touch /usr/src. You will need to
+manually update your source tree later.
+
+After performing the binary upgrade, sysinstall should inform you that the
+operation was successful.
+
+2) Reboot your machine and make sure the kernel can load. There will almost
+certainly be issues with your configuration files in /etc. Also, if you monitor
+the serial line, know that the new kernel by default will output at 9600 baud
+instead of the Emulab-configured 115200.
+
+3) Fix a FreeBSD 6.3 bug in /etc/rc.d/named line 79 by changing && to || in the
+function make_symlinks().
+
+4) Use pkg_info to check if you have a version of p5-Mysql-modules-1.x installed.
+If it is, remove it with pkg_delete. This package conflicts with the current
+Emulab meta-port. Also, force remove the expat and linuxthreads packages.
+
+5) Remove the old ports collection in /usr/ports if it exists. Unpack the
+Emulab-approved ports collection from 
+http://www.emulab.net/downloads/ports-20060921.tar.gz into /usr/ports.
+
+6) Using the new ports tree, install the expat and linuxthreads packages.
+
+7) Install the emulab-boss-2.0 package as described in the doc tree of the
+Emulab source and on the Trac wiki. This process should complete successfully
+but with several (10-20) software version complaints.
+
+8) Continue installing the Emulab software from source as described in the
+installation documentation on the wiki and source tarball.
+
+You should now have a "working" boss node. This procedure should be similar
+for upgrading an ops node. If something doesn't work, remove the offending
+package and install it again from the approved ports tree.
