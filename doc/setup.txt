@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2001-2007 University of Utah and the Flux Group.
+# Copyright (c) 2001-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -145,11 +145,12 @@ and make sure the home directories for them are removed as well!
 
 ##### Step 3 - Installing packages
 
-Again, almost the same as on ops. Use the same tarball, and follow
-the same pkg_add procedure, except this time, you're going to install
-the emulab-boss package instead of emulab-ops:
+Again, almost the same as on ops. Use the same tarball you downloaded before,
+unpack it on this machine (in say /usr/tmp) and follow the same pkg_add
+procedure, except this time, you're going to install the emulab-boss package
+instead of emulab-ops:
 
-	env PKG_PATH=/usr/tmp/FreeBSD-6.1-20060921 pkg_add emulab-boss-2.0
+	env PKG_PATH=/usr/tmp/packages pkg_add emulab-boss-2.0
 
 Also grab a copy of our approved ports tree and install it, the same as
 described in setup-ops.txt.

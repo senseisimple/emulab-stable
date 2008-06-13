@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2002-2007 University of Utah and the Flux Group.
+# Copyright (c) 2002-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -99,15 +99,18 @@ collection that are known to work with our software, and to save you hours
 of compile time, we provide pre-built binary packages of the ports required
 by Emulab. 
 
-[ NOTE: if you are an existing Emulab site doing a reinstall, and want to
-  maintain backward compatibility with your existing OS images, you will have
-  to get a special packages tarball from Utah. ]
+If this is a new Emulab installation, or you do not need to maintain backward
+compatibility with old OS images (i.e., you plan to build new ones) then
+download the packages tarball from:
 
-Download the packages tarball from:
-
-	http://www.emulab.net/downloads/FreeBSD-6.1-20060921.tar.gz
+	http://www.emulab.net/downloads/FreeBSD-6.1-20080610.tar.gz
 
 (You can use the FreeBSD 'fetch' command to download the file.)
+
+If you are upgrading an existing installation, and you want to continue to
+use your current OS images, then you need to download a different tarball:
+
+	http://www.emulab.net/downloads/FreeBSD-6.1-20080610-elvincompat.tar.gz
 
 Now, untar this someplace (you need about 140MB of space, so don't use /tmp).
 Let's say you untarred it into /usr/tmp. You would then run:
