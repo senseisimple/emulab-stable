@@ -20,9 +20,9 @@ After performing the binary upgrade, sysinstall should inform you that the
 operation was successful.
 
 2) Reboot your machine and make sure the kernel can load. There will almost
-certainly be issues with your configuration files in /etc. Also, if you monitor
-the serial line, know that the new kernel by default will output at 9600 baud
-instead of the Emulab-configured 115200.
+certainly be issues with your configuration files in /etc. If you are using
+a serial console on boss at something other than 9600 baud, note that the
+upgrade will reinstall the boot loader to output at 9600 baud.
 
 If your kernel will not boot, you may need to reenter sysinstall and reinstall
 your master boot record and/or the boot blocks with the bsdlabel utility.
