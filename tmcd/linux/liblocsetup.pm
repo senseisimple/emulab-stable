@@ -707,12 +707,19 @@ sub os_useradd($$$$$$$$$)
     if (!REMOTE()) {
 	$args .= "-d $homedir ";
 
-	#
-	# -M is Redhat only option?  Overrides default CREATE_HOME.
-	# So we see if CREATE_HOME is set and if so, use -M.
-	#
-	if (!system("grep -q CREATE_HOME /etc/login.defs")) {
-	    $args .= "-M ";
+	# Locally, if directory exists and is populated, skip -m
+	# and make sure no attempt is made to create.
+	if (! -d $homedir || ! -e "$homedir/.cshrc") {
+	    $args .= "-m ";
+	}
+	else {
+	    #
+	    # -M is Redhat only option?  Overrides default CREATE_HOME.
+	    # So we see if CREATE_HOME is set and if so, use -M.
+	    #
+	    if (!system("grep -q CREATE_HOME /etc/login.defs")) {
+		$args .= "-M ";
+	    }
 	}
     }
     elsif (!PLAB()) {

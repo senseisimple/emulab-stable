@@ -388,6 +388,15 @@ sub doboot()
 	    else {
 		print "Adding: $login/$uid/$gid/$root/$name/$hdir/$glist\n";
 		push(@addedUsers, $login);
+
+		#
+		# Force doupdate below if the home directory does not exist.
+		# Might be a local node that does not mount /user from ops.
+		# Or a remote node.
+		#
+		$doupdate = 1
+		    if (! -e $hdir);
+		
 		if ($doit &&
 		    os_useradd($login, $uid, $gid, $pswd, 
 			       "$glist", $hdir, $name, $root, $shell)) {
@@ -409,22 +418,15 @@ sub doboot()
 	    }
 
 	    #
-	    # Remote nodes and local control nodes get this. 
+	    # Anytime the home dir is on a local FS ...
 	    # 
-	    if ($doit && (REMOTE() || CONTROL()) && $doupdate) {
+	    if ($doit && $doupdate) {
 		#
 		# Must ask for the current home dir since we rely on pw.conf.
 		#
 		my (undef,undef,undef,undef,
 		    undef,undef,undef,$homedir) = getpwuid($uid);
 
-		#
-		# For remote nodes, only do it if the homedir is local
-		#
-		# Remote nodes with remote homedirs are assumed to all be
-		# sharing the same homedir with that homedir either being
-		# on one of the nodes or on the CONTROL node.
-		#
 		if (CONTROL() || os_islocaldir($homedir)) {
 		    my $sshdir  = "$homedir/.ssh";
 		    my $forward = "$homedir/.forward";
