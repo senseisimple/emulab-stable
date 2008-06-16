@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -601,7 +601,7 @@ sub ParseXmlArgs($$$$$$) {
     #  $args_ref   - Parsed argument values (hash reference.)
     #  $errs_ref   - Error messages on failure (hash reference.)
 
-    my $debug = 0;
+    $debug = 0;
 
     #
     # Must wrap the parser in eval since it exits on error.
