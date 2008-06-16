@@ -168,10 +168,26 @@ sub new($$$;$) {
 	    
     if ($self->{OSTYPE} eq "CatOS") {
 	push @mibs, "$mibpath/CISCO-STACK-MIB.txt";
+        # The STACK mib contains some code for copying config via TFTP
+        $self->{TFTPWRITE} = 1;
     } elsif ($self->{OSTYPE} eq "IOS") {
 	push @mibs, "$mibpath/CISCO-STACK-MIB.txt",
-                    "$mibpath/CISCO-VLAN-MEMBERSHIP-MIB.txt",
-                    "$mibpath/CISCO-CONFIG-COPY-MIB.txt";
+                    "$mibpath/CISCO-VLAN-MEMBERSHIP-MIB.txt";
+        # Backwards compatability: for some reason, some older installations
+        # seem to have a different filename for this file. The version of
+        # the filename ending in '-MIB' is the "correct" one, but try
+        # loading the older file if they don't have the newer one. If they
+        # don't have either one, we'll not fail here, only when they try to
+        # acutally use this MIB, and most sites won't actually use it.
+        if (-e "$mibpath/CISCO-CONFIG-COPY-MIB.txt") {
+            push @mibs, "$mibpath/CISCO-CONFIG-COPY-MIB.txt";
+            $self->{TFTPWRITE} = 1;
+        } elsif (-e "$mibpath/CISCO-CONFIG-COPY.txt") {
+            push @mibs, "$mibpath/CISCO-CONFIG-COPY.txt";
+            $self->{TFTPWRITE} = 1;
+        } else {
+            $self->{TFTPWRITE} = 0;
+        }
     } else {
 	warn "ERROR: Unsupported switch OS $self->{OSTYPE}\n";
 	return undef;
@@ -2016,6 +2032,15 @@ sub writeConfigTFTP($$$) {
     #
     # TODO - convert from Fatal() to Warn() calls
     #
+
+    #
+    # Make sure we've loaded in the proper MIBs to do this
+    #
+    if (!$self->{TFTPWRITE}) {
+	warn "No support for copying config via TFTP - possible missing MIB " .
+             "file\n";
+	return 0;
+    }
 
     #
     # Start off by resolving the server's name into an IP address
