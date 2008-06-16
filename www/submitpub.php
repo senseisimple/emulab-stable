@@ -394,7 +394,8 @@ if (!isset($submit)) {
 #
 # Verify Form
 # 
-if (isset($formfields['allow_missing']) && $formfields['allow_missing']) {
+if ((isset($formfields['deleted']) && $formfields['deleted'])
+    || (isset($formfields['allow_missing']) && $formfields['allow_missing'])) {
     # Hack, modify fields to unset required flag
     foreach ($fields as $k => $v) {
 	unset($fields[$k]['#required']);
@@ -402,6 +403,11 @@ if (isset($formfields['allow_missing']) && $formfields['allow_missing']) {
     unset($fields['category']['#elements']['category']['#required']);
     unset($fields['cite_osdi02']['#elements']['cite_osdi02']['#required']);
 }
+
+# hack since '' == 0 will evaluate to true and thus, "No" 
+# will incorrectly be selected
+if (strcmp($formfields['cite_osdi02'], '') == 0)
+    unset($formfields['cite_osdi02']);
 
 FormValidate($form, $errors, $fields, $formfields);
 
