@@ -79,6 +79,7 @@ sub Lookup($$)
     $self->{'AGGREGATE'}  = $query_result->fetchrow_hashref();
     $self->{'CREDENTIAL'} = undef;
     $self->{'SLICE'}      = undef;
+    $self->{'PARENT'}     = undef;
     bless($self, $class);
 
     #
@@ -158,6 +159,7 @@ sub creator_uuid($)	{ return field($_[0], "creator_uuid"); }
 sub created($)		{ return field($_[0], "created"); }
 sub credential_idx($)	{ return field($_[0], "credential_idx"); }
 sub ticket_idx($)	{ return field($_[0], "ticket_idx"); }
+sub aggregate_idx($)	{ return field($_[0], "aggregate_idx"); }
 sub cert($)		{ return $_[0]->{'CERTIFICATE'}->cert(); }
 sub GetCertificate($)   { return $_[0]->{'CERTIFICATE'}; }
 
@@ -186,9 +188,74 @@ sub SliverList($$)
 	}
 	push(@result, $sliver);
     }
+
+    #
+    # And any aggregates that are children.
+    #
+    $query_result =
+	DBQueryWarn("select idx from geni_aggregates ".
+		    "where aggregate_idx='$idx'");
+    return -1
+	if (!$query_result);
+
+    while (my ($aggregate_idx) = $query_result->fetchrow_array()) {
+	my $aggregate = GeniAggregate->Lookup($aggregate_idx);
+	if (!defined($aggregate_idx)) {
+	    print STDERR
+		"Could not find aggregate object for $aggregate_idx\n";
+	    return -1;
+	}
+	push(@result, $aggregate);
+    }
     @$pref = @result;
     return 0;
     
+}
+
+#
+# Set the aggregate for an aggregate.
+#
+sub SetAggregate($$)
+{
+    my ($self, $aggregate) = @_;
+
+    return -1
+	if (! (ref($self) && ref($aggregate)));
+
+    my $idx     = $self->idx();
+    my $agg_idx = $aggregate->idx();
+
+    return -1
+	if (!DBQueryWarn("update geni_aggregates set ".
+			 "  aggregate_idx='$agg_idx' ".
+			 "where idx='$idx'"));
+    
+    $self->{'AGGREGATE'}->{'aggregate_idx'} = $agg_idx;
+    $self->{'PARENT'} = $aggregate;
+    return 0;
+}
+
+#
+# Get the aggregate for a sliver.
+#
+sub GetAggregate($)
+{
+    my ($self) = @_;
+
+    return undef
+	if (! ref($self));
+
+    return $self->{'PARENT'} if (defined($self->{'PARENT'}));
+    return undef
+	if (!defined($self->aggregate_idx()));
+
+    my $aggregate = GeniAggregate->Lookup($self->aggregate_idx());
+    if (!defined($aggregate)) {
+	print STDERR "Could not get aggregate object associated with $self\n";
+	return undef;
+    }
+    $self->{'PARENT'} = $aggregate;
+    return $aggregate;
 }
 
 #

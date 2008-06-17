@@ -34,6 +34,7 @@ use libtestbed;
 use libdb qw(TBGetUniqueIndex TBcheck_dbslot TBDB_CHECKDBSLOT_ERROR);
 use User;
 use Node;
+use Interface;
 use English;
 use Data::Dumper;
 use XML::Simple;
@@ -108,6 +109,18 @@ sub DiscoverResources($)
 	
 	$xml .= "<node uuid=\"$uuid\" name=\"$nodeid\">".
 	    "<available>true</available></node>\n";
+
+	my @interfaces = Interface->LookupAll($node);
+	foreach my $interface (@interfaces) {
+	    my $iface_uuid = $interface->uuid();
+	    my $iface      = $interface->iface();
+
+	    next 
+		if (! $interface->IsExperimental());
+	    
+	    $xml .= "<interface uuid=\"$iface_uuid\" node_name=\"$nodeid\">".
+		"<iface>$iface</iface></interface>\n";
+	}
     }
     $xml .= "</rspec>";
 
@@ -124,6 +137,7 @@ sub GetTicket($)
     my $rspec      = $argref->{'rspec'};
     my $impotent   = $argref->{'impotent'};
     my $credential = $argref->{'credential'};
+    my $vtopo      = $argref->{'virtual_topology'};
     my $owner_uuid = $ENV{'GENIUSER'};
     my $slice_uuid;
 
@@ -251,6 +265,13 @@ sub GetTicket($)
 					"Could not allocate node\n");
 	}
     }
+    if (defined($vtopo) && $experiment->InsertVirtTopo($vtopo) != 0) {
+	# Release will free the nodes.
+	$ticket->Release();
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not insert virt topology");
+    }
+    
     if ($ticket->Sign() != 0) {
 	# Release will free the nodes.
 	$ticket->Release();
@@ -325,45 +346,50 @@ sub CreateSliver($)
     $owner->BindToSlice($slice) == 0
 	or return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				       "Error binding user to slice");
-	
+
     #
     # We are actually an Aggregate, so return an aggregate of slivers,
-    # even if there is just one node (simpler).
+    # unless there is just one node.
     #
-    my $aggregate = GeniAggregate->Create($ticket);
-    if (!defined($aggregate)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+    my $aggregate;
+    if (scalar(keys(%{$ticket->rspec()->{'node'}})) > 1) {
+	$aggregate = GeniAggregate->Create($ticket);
+	if (!defined($aggregate)) {
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not create GeniAggregate object");
+	}
     }
 
     #
     # Now for each resource (okay, node) in the ticket create a sliver and
     # add it to the aggregate.
     #
-    my @slivers = ();
+    my %slivers = ();
     foreach my $resource_uuid (keys(%{$ticket->rspec()->{'node'}})) {
 	if (! ($resource_uuid =~ /^[-\w]*$/)) {
 	    $message = "Improper resource_uuid in ticket: $resource_uuid";
 	    goto bad;
 	}
-	my $sliver = GeniSliver->Create($slice, $owner, $resource_uuid);
+	my $sliver = GeniSliver::Node->Create($slice, $owner, $resource_uuid);
 	if (!defined($sliver)) {
 	    $message = "Could not create GeniSliver object for $resource_uuid";
 	    goto bad;
 	}
-	push(@slivers, $sliver);
+	$slivers{$resource_uuid} = $sliver;
     }
 
     #
     # Now do the provisioning (note that we actually allocated the node
     # above when the ticket was granted). The add the sliver to the aggregate.
     #
-    foreach my $sliver (@slivers) {
+    foreach my $sliver (values(%slivers)) {
 	if (!$impotent && $sliver->Provision() != 0) {
 	    $message = "Could not provision $sliver";
 	    goto bad;
+
 	}
-	if ($sliver->SetAggregate($aggregate) != 0) {
+	if (defined($aggregate) &&
+	    $sliver->SetAggregate($aggregate) != 0) {
 	    $message = "Could not aggregate for $sliver to $aggregate";
 	    goto bad;
 	}
@@ -378,7 +404,7 @@ sub CreateSliver($)
     # tbswap only once, or at least no more then one at a time.
     #
     if (!$impotent) {
-	system("$SWAPEXP -s modify -r -g $pid $eid");
+	system("$SWAPEXP -s modify -g $pid $eid");
 	if ($?) {
 	    $message = "Failed to tbswap $pid,$eid";
 	    goto bad;
@@ -386,17 +412,68 @@ sub CreateSliver($)
     }
 
     #
+    # Grab the links after swapmod since we do not know what interfaces
+    # assign will pick until now.
+    #
+    # XXX Not sure how to deal with users picking interfaces themselves.
+    #
+    foreach my $linkname (keys(%{$ticket->rspec()->{'link'}})) {
+	my @linkslivers  = ();
+	if (! ($linkname =~ /^[-\w]*$/)) {
+	    $message = "Bad name for link: $linkname";
+	    goto bad;
+	}
+	    
+	my $linkaggregate = GeniAggregate->Create($ticket);
+	if (!defined($linkaggregate)) {
+	    $message = "Could not create aggregate for $linkname";
+	    goto bad;
+	}
+	$slivers{$linkaggregate->uuid()} = $linkaggregate;
+
+	#
+	# Grab the endpoints of the links, which are supposed to refer to
+	# nodes we have already seen.
+	#
+	my @interfaces;
+	if ($experiment->LinkInterfaces($linkname, \@interfaces) != 0) {
+	    $message = "Could not find interfaces for $linkname";
+	    goto bad;
+	}
+
+	foreach my $interface (@interfaces) {
+	    my $sliver = GeniSliver::Interface->Create($slice, $owner,
+						       $interface->uuid());
+	    if (!defined($sliver)) {
+		$message = "Could not create GeniSliver ".
+		    "$interface in $linkname";
+		goto bad;
+	    }
+	    if ($sliver->SetAggregate($linkaggregate) != 0) {
+		$message = "Could not add link sliver $sliver to $aggregate";
+		goto bad;
+	    }
+	}
+    }
+
+    #
     # The API states we return a credential to control the sliver/aggregate.
     #
-    my $credential = $aggregate->NewCredential($owner);
+    my $credential;
+    if (defined($aggregate)) {
+	$credential = $aggregate->NewCredential($owner);
+    }
+    else {
+	$credential = ((values(%slivers))[0])->NewCredential($owner);
+    }
     if (!defined($credential)) {
-	$message = "Could not create credential for $aggregate";
+	$message = "Could not create credential";
 	goto bad;
     }
     return GeniResponse->Create(GENIRESPONSE_SUCCESS, $credential->asString());
 
   bad:
-    foreach my $sliver (@slivers) {
+    foreach my $sliver (values(%slivers)) {
 	$sliver->UnProvision()
 	    if (! $impotent);
 	$sliver->Delete();

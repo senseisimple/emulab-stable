@@ -242,7 +242,7 @@ sub DiscoverResources($$$$$)
     return -1
 	if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS);
 
-    my $rspec = XMLin($response->value(), ForceArray => ["node"]);
+    my $rspec = XMLin($response->value(), ForceArray => ["node", "interface"]);
     $$pref = $rspec;
     
     return 0;
@@ -309,9 +309,9 @@ sub UnBindUser($$$$)
 #
 # Get a Ticket from a component;
 #
-sub GetTicket($$$$$)
+sub GetTicket($$$$$;$)
 {
-    my ($self, $slice, $rspec, $user, $credential) = @_;
+    my ($self, $slice, $rspec, $user, $credential, $vtopo) = @_;
     my $rspec_xml = $rspec;
 
     # Must be a real reference. 
@@ -322,15 +322,16 @@ sub GetTicket($$$$$)
     if (ref($rspec_xml)) {
 	$rspec_xml = XMLout($rspec_xml, RootName => "rspec");
     }
+    my $args = { "slice"        => $slice->cert(),
+		 "credential"   => $credential->asString(),
+		 "impotent"     => $impotent,
+		 "rspec"        => $rspec_xml };
+    $args->{'virtual_topology'} = $vtopo
+	if (defined($vtopo));
 
     my $response = 				       
 	Genixmlrpc::CallMethodHTTP($self->url(),
-				   $user,
-				   "CM::GetTicket",
-				   { "slice"        => $slice->cert(),
-				     "credential"   => $credential->asString(),
-				     "impotent"     => $impotent,
-				     "rspec"        => $rspec_xml });
+				   $user, "CM::GetTicket", $args);
     
     return undef
 	if (!defined($response));
@@ -376,7 +377,8 @@ sub CreateSliver($$$$)
 	return undef;
     }
 
-    my $sliver = GeniSliver->Create($slice, $user, undef, $credential, $self);
+    my $sliver = GeniSliver->Create($slice, $user, undef, undef,
+				    $credential, $self);
     if (!defined($sliver)) {
 	print STDERR "Could not create local sliver object.\n";
 	return undef;

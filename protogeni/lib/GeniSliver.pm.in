@@ -23,7 +23,7 @@ use GeniCredential;
 use GeniCertificate;
 use GeniAggregate;
 # Hate to import all this crap; need a utility library.
-use libdb qw(TBGetUniqueIndex TBDB_ALLOCSTATE_RES_INIT_DIRTY);
+use libdb qw(TBGetUniqueIndex);
 use libtestbed;
 use Experiment;
 use Node;
@@ -100,7 +100,15 @@ sub Lookup($$)
 	return undef;
     }
     $self->{'CERTIFICATE'} = $certificate;
-    bless($self, $class);
+
+    # Bless into sub package if called for.
+    my $resource_type = $self->{'SLIVER'}->{'resource_type'};
+    if (defined($resource_type) && $resource_type ne "") {
+	bless($self, $class . "::" . $self->{'SLIVER'}->{'resource_type'});
+    }
+    else {
+	bless($self, $class);
+    }
     
     # Add to cache. 
     $slivers{$self->{'SLIVER'}->{'idx'}} = $self;
@@ -125,9 +133,10 @@ sub Stringify($)
 # Create a sliver record in the DB. On the client side we save the credential
 # that allows control of it, for later operations.
 #
-sub Create($$$;$$)
+sub Create($$$$;$$$)
 {
-    my ($class, $slice, $user, $resource_uuid, $credential, $component) = @_;
+    my ($class, $slice, $user, $resource_uuid, $resource_type,
+	$credential, $component) = @_;
     my @insert_data = ();
     my $uuid;
     my $certificate;
@@ -165,6 +174,8 @@ sub Create($$$;$$)
     push(@insert_data, "uuid='$uuid'");
     push(@insert_data, "resource_uuid='$resource_uuid'")
 	if (defined($resource_uuid));
+    push(@insert_data, "resource_type='$resource_type'")
+	if (defined($resource_type));
     push(@insert_data, "creator_uuid='$owner_uuid'");
     push(@insert_data, "slice_uuid='$slice_uuid'");
 
@@ -204,6 +215,7 @@ sub creator_uuid($)	{ return field($_[0], "creator_uuid"); }
 sub created($)		{ return field($_[0], "created"); }
 sub credential_idx($)	{ return field($_[0], "credential_idx"); }
 sub resource_uuid($)	{ return field($_[0], "resource_uuid"); }
+sub resource_type($)	{ return field($_[0], "resource_type"); }
 sub ticket_idx($)	{ return field($_[0], "ticket_idx"); }
 sub component_idx($)	{ return field($_[0], "component_idx"); }
 sub aggregate_idx($)	{ return field($_[0], "aggregate_idx"); }
@@ -453,6 +465,54 @@ sub UnBindUser($$)
 }
 
 #
+# Create a signed credential for this sliver, issued to the provided user.
+# The credential will grant all permissions for now.
+#
+# Should we store these credentials in the DB, recording what we hand out?
+#
+sub NewCredential($$)
+{
+    my ($self, $owner) = @_;
+
+    return undef
+	if (! (ref($self) && ref($owner)));
+
+    my $credential = GeniCredential->Create($self, $owner);
+    if (!defined($credential)) {
+	print STDERR "Could not create credential for $self, $owner\n";
+	return undef;
+    }
+    if ($credential->Sign($self->GetCertificate()) != 0) {
+	print STDERR "Could not sign credential for $self, $owner\n";
+	return undef;
+    }
+    return $credential;
+}
+
+############################################################################
+#
+# The server side methods are in packages which inherit from above.
+#
+package GeniSliver::Node;
+use vars qw(@ISA);
+@ISA = "GeniSliver";
+
+use GeniDB;
+use GeniComponent;
+use GeniSlice;
+use GeniCredential;
+use GeniCertificate;
+use GeniAggregate;
+use libdb qw(TBDB_ALLOCSTATE_RES_INIT_DIRTY);
+
+sub Create()
+{
+    my ($class, $slice, $user, $resource_uuid) = @_;
+
+    return GeniSliver->Create($slice, $user, $resource_uuid, "Node");
+}
+
+#
 # Provision a slice. We actually did this when the ticket was requested.
 # We fill in some virt table stuff so that tbswap will work.
 #
@@ -487,10 +547,6 @@ sub Provision($)
 	return -1;
     }
     if ($reservation->SameExperiment($experiment)) {
-	if ($experiment->InsertVirtNode($node) != 0) {
-	    print STDERR "Could not add virtnode entry for $node to $self\n";
-	    return -1;
-	}
 	# Set sliver_idx in the reservation so that Emulab knows.
 	if ($node->ModifyReservation({"genisliver_idx" => $self->idx()}) != 0){
 	    return -1;
@@ -506,31 +562,6 @@ sub Provision($)
 	return -1;
     }
     return 0;
-}
-
-#
-# Create a signed credential for this sliver, issued to the provided user.
-# The credential will grant all permissions for now.
-#
-# Should we store these credentials in the DB, recording what we hand out?
-#
-sub NewCredential($$)
-{
-    my ($self, $owner) = @_;
-
-    return undef
-	if (! (ref($self) && ref($owner)));
-
-    my $credential = GeniCredential->Create($self, $owner);
-    if (!defined($credential)) {
-	print STDERR "Could not create credential for $self, $owner\n";
-	return undef;
-    }
-    if ($credential->Sign($self->GetCertificate()) != 0) {
-	print STDERR "Could not sign credential for $self, $owner\n";
-	return undef;
-    }
-    return $credential;
 }
 
 #
@@ -566,11 +597,6 @@ sub UnProvision($)
 	my $pid = $experiment->pid();
 	my $eid = $experiment->eid();
 
-	if ($experiment->DeleteVirtNode($node) != 0) {
-	    print STDERR "Could remove virtnode entry for $node from $self\n";
-	    return -1;
-	}
-	
 	system("export NORELOAD=1; $NFREE -q $pid $eid $node_id");
 	if ($?) {
 	    print STDERR "Could not deallocate $node from $self\n";
@@ -628,6 +654,60 @@ sub StartUp($)
     return 0;
 }
 
+##########################################################################
+package GeniSliver::Interface;
+use vars qw(@ISA);
+@ISA = "GeniSliver";
+
+use GeniDB;
+use GeniComponent;
+use GeniSlice;
+use GeniCredential;
+use GeniCertificate;
+use GeniAggregate;
+
+sub Create()
+{
+    my ($class, $slice, $user, $resource_uuid) = @_;
+
+    return GeniSliver->Create($slice, $user, $resource_uuid, "Interface");
+}
+
+sub Provision($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    return 0;
+}
+
+#
+# Unprovision a sliver. 
+#
+sub UnProvision($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    return 0;
+}
+
+#
+# Start a sliver, which means what?
+#
+sub StartUp($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    return 0;
+}
 
 # _Always_ make sure that this 1 is at the end of the file...
 1;
