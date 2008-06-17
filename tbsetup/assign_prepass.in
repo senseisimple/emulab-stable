@@ -212,7 +212,10 @@ sub parse_top($) {
 		last;
 	    };
 	    (/^make-vclass$/) && do {
-		die "Sorry, vclasses are not yet supported\n";
+                # XXX: Hack, all top files now include pclasses, but almost
+                # nobody uses the pre-defined ones. Bad Things will happen
+                # if they do...
+                #die "Sorry, vclasses are not yet supported\n";
 		last;
 	    };
 	    (/^fix-node$/) && do {
