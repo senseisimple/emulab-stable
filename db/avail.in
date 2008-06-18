@@ -105,23 +105,14 @@ if (defined($args{"ver"})) {
   $cols .= ",d.version";
   $cond .= " and d.version='".$args{"ver"}."'" if $args{"ver"} ne '='; 
 }
-# if (defined($args{"deltas"})) { 
-#   $os = 1;
-#   $delta=1;
-#   $cols .= ",e.delta_id";
-#   $cond .= " and e.delta_id='".$args{"deltas"}."'" if $args{"deltas"} ne '='; 
-# }
-
 if ($os) {
   $join .= " left join partitions as c on a.node_id=c.node_id";
   $join .= " left join os_info as d on c.osid=d.osid";
 }
-
-# if ($delta) {
-#   $join .= " left join delta_inst as e on c.node_id=e.node_id ".
-#     "and c.partition=e.partition";
-# }
-
+if (defined($args{"prereserve"})) {
+    $pid = $args{"prereserve"};
+    $cond .= " and a.reserved_pid='$pid' ";
+}
 
 my $cmd = "select $cols from $join where $cond order by $order $limit";
 
