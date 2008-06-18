@@ -370,7 +370,8 @@ if (isset($idx)) {
 
 } else {
 
-  $defaults['project'] = $projectlist[0];
+  if (!$isadmin)
+    $defaults['project'] = $projectlist[0];
   $defaults['visible'] = true;
   $defaults['editable_owner'] = true;
   $defaults['editable_proj'] = true;
@@ -478,10 +479,12 @@ if (!isset($idx)) {
     $owner = $uid_idx;
     $vals = array($owner, $uid_idx, $uid_idx, '"'.mysql_escape_string(NewUUID()).'"', "now()", "now()");
     foreach ($dbfields as $f) {
-      $dbname = $f;
-      $value  = $formfields[$f];
-      array_push($cols, '`'. $dbname . '`');
-      array_push($vals, '"'. mysql_escape_string($value) . '"');
+      if (isset($formfields[$f])) {
+        $dbname = $f;
+        $value  = $formfields[$f];
+        array_push($cols, '`'. $dbname . '`');
+        array_push($vals, '"'. mysql_escape_string($value) . '"');
+      }
     }
 
     DBQueryFatal("insert into emulab_pubs (".
@@ -513,7 +516,7 @@ if (!isset($idx)) {
 
     # determine what changed
     foreach ($dbfields as $f) {
-      if ($defaults[$f] != $formfields[$f]) {
+      if (isset($formfields[$f]) && $defaults[$f] != $formfields[$f]) {
         $dbname = $f;
         $value  = @$formfields[$f];
         array_push($update_list,
