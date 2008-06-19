@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -17,12 +17,13 @@ Usage: os_select [-h] [-d] [-c] [-1 | -t] [<osid>] <node> [<node> ...]
  -c    Clear the specified boot osid for nodes. Do not provide an osid.
  -1    Apply change to one-time boot field
  -t    Apply change to temporary boot field
+ -b    Reset to default boot osid. Do not provide an osid.
  osid  OS identifier for the selected OS (see web interface for listing)
  node  Node identifiers (ie pcXX)
 EOF
     exit(-1);
 }
-my $optlist = "hdc1t";
+my $optlist = "hdc1tb";
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -39,6 +40,8 @@ my $TBLOG	= "@TBLOGFACIL@";
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use OSinfo;
+use Node;
 use English;
 use Getopt::Std;
 use Sys::Syslog;
@@ -64,6 +67,7 @@ my $debug	= 0; # debug/verbose
 my $oneshot	= 0; # apply change to next_boot_osid.
 my $tempmode	= 0; # apply change to temp_boot_osid.
 my $clear       = 0; # Clear the selected boot (def,temp,next).
+my $default     = 0; # Reset back to default osid.
 my @nodes       = ();
 my $osid	= "";
 my $opmode;
@@ -82,9 +86,10 @@ if (defined($options{"d"})) { $debug++; }
 if (defined($options{"1"})) { $oneshot=1; }
 if (defined($options{"t"})) { $tempmode=1; }
 if (defined($options{"c"})) { $clear=1; }
+if (defined($options{"b"})) { $default=1; }
 
 # In clearmode, there is no OSID. Just a list of nodes.
-if (! $clear) {
+if (! ($clear || $default)) {
     usage()
 	if (@ARGV < 2);
     $osid = shift();
@@ -126,18 +131,27 @@ if ($UID && !TBAdmin($UID) &&
 #
 # Grab the info for the OSID. 
 #
-if (! $clear) {
-    my $query_result =
-	DBQueryFatal("select * from os_info where osid='$osid'");
-    if ($query_result->numrows != 1) {
-	fatal("Improper DB entry for OSID: $osid");
-    }
-    my %dbrow  = $query_result->fetchhash();
-    $opmode = $dbrow{"op_mode"};
+if (! ($clear || $default)) {
+    my $osinfo = OSinfo->Lookup($osid);
+    fatal("Improper DB entry for OSID: $osid")
+	if (!defined($osinfo));
+    $opmode = $osinfo->op_mode();
 }
 
 foreach my $node (@nodes) {
     my $curmode = node_opmode($node);
+
+    if ($default) {
+	my $nodeobject = Node->Lookup($node);
+	fatal("Could not map $node to its object")
+	    if (!defined($nodeobject));
+	$osid = $nodeobject->default_osid();
+	
+	my $osinfo = OSinfo->Lookup($osid);
+	fatal("Improper DB entry for OSID: $osid")
+	    if (!defined($osinfo));
+	$opmode = $osinfo->op_mode();
+    }
 
     # Why? When will this happen?
     next
