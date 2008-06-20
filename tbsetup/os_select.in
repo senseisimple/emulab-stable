@@ -145,8 +145,7 @@ foreach my $node (@nodes) {
 	my $nodeobject = Node->Lookup($node);
 	fatal("Could not map $node to its object")
 	    if (!defined($nodeobject));
-	$osid = $nodeobject->default_osid();
-	
+	$osid = TBResolveNextOSID($nodeobject->default_osid());
 	my $osinfo = OSinfo->Lookup($osid);
 	fatal("Improper DB entry for OSID: $osid")
 	    if (!defined($osinfo));
