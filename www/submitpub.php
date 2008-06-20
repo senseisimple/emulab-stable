@@ -458,7 +458,7 @@ $formdump = FormTextDump($form, $fields, $formfields, 30);
 function ConfirmationCommon($deleted = false) {
     global $form, $fields, $formfields, $formdump, $idx;
 
-    echo "<pre>\n". htmlspecialchars($formdump). "</pre>\n";
+    echo "<pre>\n". htmlspecialchars($formdump). "\n</pre>\n";
 
     if (!$deleted) {
 	echo '<p>It will appear in the public <a href="expubs.php">Bibliography</a> ';

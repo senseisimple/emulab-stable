@@ -38,7 +38,10 @@ function MakeBib($user, $isadmin, $r) {
     $res .= ' ' . $r['authors'];
     $res .= '.';
     $type = $r['type'];
-    if ($type == "article") {
+    if ($type == "talk") {
+	$res .= "Talk. ";
+    }
+    if ($type == "article" || $type == "talk") {
         $res .= ' <em>' . $r['conf'] . '</em>';
         if ($r['volume'] != '')
             $res .= ', Vol. ' . $r['volume'];

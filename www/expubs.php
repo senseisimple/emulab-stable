@@ -45,9 +45,7 @@ if ($printable) {
 
 <p>
 This page summarizes publications about Emulab as well as publications
-that used Emulab to validate research they present.  For additional publications
-see <a href="http://www.isi.edu/deter/publications.php"
->Publications Made Possible By DETERlab</a>.
+that used Emulab to validate research they present.  
 <p>
 
 If you have a publications that used Utah's Emulab to validate your
