@@ -88,11 +88,11 @@ sub DiscoverResources($)
     # Eventually we will take an optional rspec, but for now just return
     # a list of free nodes using avail. 
     #
-    if (! open(AVAIL, "$AVAIL type=pc aslist |")) {
+    my @nodelist = ();
+    if (! open(AVAIL, "$AVAIL type=pc  aslist |")) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not start avail");
     }
-    my @nodelist = ();
     while (<AVAIL>) {
 	my $nodeid = $_;
 	chomp($nodeid);
@@ -149,8 +149,8 @@ sub GetTicket($)
 	GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 			     "Improper rspec");	
     }
-    # Convert the rspec back to a structure.
-    $rspec = XMLin($rspec, ForceArray => ["node"]);
+    $rspec = XMLin($rspec, ForceArray => ["node", "link"]);
+    #print Dumper($rspec);
 
     $impotent = 0
 	if (!defined($impotent));
@@ -232,15 +232,13 @@ sub GetTicket($)
     my $pid     = $experiment->pid();
     my $eid     = $experiment->eid();
 
-    foreach my $node_id (keys(%{$rspec->{'node'}})) {
-	if ($node_id =~ /^(\w*)$/) {
-	    $node_id = $1;
-	}
-	else {
+    foreach my $resource_uuid (keys(%{$rspec->{'node'}})) {
+	my $node = Node->Lookup($resource_uuid);
+	if (!defined($node)) {
 	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
-					"Improper node id: $node_id");
+					"Bad resource_uuid $resource_uuid");
 	}
-	push(@nodeids, $node_id);
+	push(@nodeids, $node->node_id());
     }
 
     #
@@ -359,6 +357,7 @@ sub CreateSliver($)
 				    "Could not create GeniAggregate object");
 	}
     }
+    #print Dumper($ticket);
 
     #
     # Now for each resource (okay, node) in the ticket create a sliver and
@@ -366,8 +365,9 @@ sub CreateSliver($)
     #
     my %slivers = ();
     foreach my $resource_uuid (keys(%{$ticket->rspec()->{'node'}})) {
-	if (! ($resource_uuid =~ /^[-\w]*$/)) {
-	    $message = "Improper resource_uuid in ticket: $resource_uuid";
+	my $node = Node->Lookup($resource_uuid);
+	if (!defined($node)) {
+	    $message = "Unknown resource_uuid in ticket: $resource_uuid";
 	    goto bad;
 	}
 	my $sliver = GeniSliver::Node->Create($slice, $owner, $resource_uuid);
@@ -376,6 +376,64 @@ sub CreateSliver($)
 	    goto bad;
 	}
 	$slivers{$resource_uuid} = $sliver;
+    }
+
+    #
+    # Now do the links. For each link, we have to add a sliver for the
+    # interfaces, and then combine those two interfaces into an aggregate,
+    # and then that aggregate goes into the aggregate for toplevel sliver.
+    #
+    foreach my $linkname (keys(%{$ticket->rspec()->{'link'}})) {
+	my @linkslivers  = ();
+	if (! ($linkname =~ /^[-\w]*$/)) {
+	    $message = "Bad name for link: $linkname";
+	    goto bad;
+	}
+
+	my $linkaggregate = GeniAggregate::Link->Create($ticket);
+	if (!defined($linkaggregate)) {
+	    $message = "Could not create link aggregate for $linkname";
+	    goto bad;
+	}
+	$slivers{$linkaggregate->uuid()} = $linkaggregate;
+
+	my $linkendpoints =
+	    $ticket->rspec()->{'link'}->{$linkname}->{'LinkEndPoints'};
+	
+	my $src_interface_spec = $linkendpoints->{'source_interface'};
+	my $dst_interface_spec = $linkendpoints->{'destination_interface'};
+
+	my @interfaces = ($src_interface_spec, $dst_interface_spec);
+	foreach my $iface (@interfaces) {
+	    my $node_uuid = $iface->{'node_uuid'};
+	    my $iface     = $iface->{'iface_name'};
+	    my $nodesliver= $slivers{$node_uuid};
+	    if (!defined($nodesliver)) {
+		$message = "Link $linkname specifies a non-existent node";
+		goto bad;
+	    }
+	    my $nodeobject= Node->Lookup($node_uuid);
+	    if (!defined($nodeobject)) {
+		$message = "Could not find node object for $node_uuid";
+		goto bad;
+	    }
+	    my $interface = Interface->LookupByIface($nodeobject, $iface);
+	    if (!defined($interface)) {
+		$message = "No such interface $iface on node $nodeobject";
+		goto bad;
+	    }
+	    my $sliver = GeniSliver::Interface->Create($slice, $owner,
+						       $interface->uuid());
+	    if (!defined($sliver)) {
+		$message = "Could not create GeniSliver ".
+		    "$interface in $linkname";
+		goto bad;
+	    }
+	    if ($sliver->SetAggregate($linkaggregate) != 0) {
+		$message = "Could not add link sliver $sliver to $aggregate";
+		goto bad;
+	    }
+	}
     }
 
     #
@@ -396,63 +454,17 @@ sub CreateSliver($)
     }
 
     #
-    # Run swapexp in update mode. The nodes are already allocated, but need
-    # to be configured like a real experiment.
+    # This stuff needs to be moved elsewhere.
     #
     # XXX What if we have multiple slivers for this slice? We are going
     # to need some locking or management at the slice level so that we run
     # tbswap only once, or at least no more then one at a time.
     #
-    if (!$impotent) {
+    if (0 && !$impotent) {
 	system("$SWAPEXP -s modify -g $pid $eid");
 	if ($?) {
 	    $message = "Failed to tbswap $pid,$eid";
 	    goto bad;
-	}
-    }
-
-    #
-    # Grab the links after swapmod since we do not know what interfaces
-    # assign will pick until now.
-    #
-    # XXX Not sure how to deal with users picking interfaces themselves.
-    #
-    foreach my $linkname (keys(%{$ticket->rspec()->{'link'}})) {
-	my @linkslivers  = ();
-	if (! ($linkname =~ /^[-\w]*$/)) {
-	    $message = "Bad name for link: $linkname";
-	    goto bad;
-	}
-	    
-	my $linkaggregate = GeniAggregate->Create($ticket);
-	if (!defined($linkaggregate)) {
-	    $message = "Could not create aggregate for $linkname";
-	    goto bad;
-	}
-	$slivers{$linkaggregate->uuid()} = $linkaggregate;
-
-	#
-	# Grab the endpoints of the links, which are supposed to refer to
-	# nodes we have already seen.
-	#
-	my @interfaces;
-	if ($experiment->LinkInterfaces($linkname, \@interfaces) != 0) {
-	    $message = "Could not find interfaces for $linkname";
-	    goto bad;
-	}
-
-	foreach my $interface (@interfaces) {
-	    my $sliver = GeniSliver::Interface->Create($slice, $owner,
-						       $interface->uuid());
-	    if (!defined($sliver)) {
-		$message = "Could not create GeniSliver ".
-		    "$interface in $linkname";
-		goto bad;
-	    }
-	    if ($sliver->SetAggregate($linkaggregate) != 0) {
-		$message = "Could not add link sliver $sliver to $aggregate";
-		goto bad;
-	    }
 	}
     }
 
@@ -528,7 +540,7 @@ sub StartSliver($)
 				    "Invalid credentials for operation");
     }
     if (!$impotent) {
-	$sliver->StartUp() == 0 or
+	$sliver->Start() == 0 or
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				"Could not start sliver/aggregate");
     }

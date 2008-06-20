@@ -80,7 +80,15 @@ sub Lookup($$)
     $self->{'CREDENTIAL'} = undef;
     $self->{'SLICE'}      = undef;
     $self->{'PARENT'}     = undef;
-    bless($self, $class);
+
+    # Bless into sub package if called for.
+    my $type = $self->{'AGGREGATE'}->{'type'};
+    if (defined($type) && $type ne "") {
+	bless($self, $class . "::" . $type);
+    }
+    else {
+	bless($self, $class);
+    }
 
     #
     # Grab the certificate, since we will probably want it.
@@ -117,9 +125,9 @@ sub Stringify($)
 # for now. The client side does not actually know its an aggregate, at
 # least not yet.
 #
-sub Create($$)
+sub Create($$;$)
 {
-    my ($class, $ticket) = @_;
+    my ($class, $ticket, $aggregate_type) = @_;
     my @insert_data = ();
 
     # Every aggregate gets a new unique index.
@@ -141,6 +149,8 @@ sub Create($$)
     push(@insert_data, "uuid='$uuid'");
     push(@insert_data, "creator_uuid='$owner_uuid'");
     push(@insert_data, "slice_uuid='$slice_uuid'");
+    push(@insert_data, "type='$aggregate_type'")
+	if (defined($aggregate_type));
 
     # Insert into DB.
     if (!DBQueryWarn("insert into geni_aggregates set " .
@@ -154,14 +164,61 @@ sub Create($$)
 sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'AGGREGATE'}->{$_[1]}); }
 sub idx($)		{ return field($_[0], "idx"); }
 sub uuid($)		{ return field($_[0], "uuid"); }
+sub type($)		{ return field($_[0], "type"); }
 sub slice_uuid($)	{ return field($_[0], "slice_uuid"); }
 sub creator_uuid($)	{ return field($_[0], "creator_uuid"); }
 sub created($)		{ return field($_[0], "created"); }
 sub credential_idx($)	{ return field($_[0], "credential_idx"); }
 sub ticket_idx($)	{ return field($_[0], "ticket_idx"); }
 sub aggregate_idx($)	{ return field($_[0], "aggregate_idx"); }
+sub status($)		{ return field($_[0], "status"); }
 sub cert($)		{ return $_[0]->{'CERTIFICATE'}->cert(); }
 sub GetCertificate($)   { return $_[0]->{'CERTIFICATE'}; }
+
+#
+# Destroy all the slivers in the aggregate, and then the aggregate if there
+# is nothing in it. Leave it around if something goes wrong.
+#
+sub Delete($)
+{
+    my ($self) = @_;
+    my $broken = 0;
+
+    return -1
+	if (! ref($self));
+
+    my @slivers = ();
+    if ($self->SliverList(\@slivers) != 0) {
+	print STDERR "Could not get sliver list for $self\n";
+	return -1;
+    }
+    foreach my $sliver (@slivers) {
+	if ($sliver->status() eq "broken") {
+	    $broken++;
+	    next;
+	}
+	if ($sliver->Delete() != 0) {
+	    print STDERR "Could not delete $sliver from $self\n";
+	    $sliver->SetStatus("broken");
+	    $broken++;
+	    next;
+	}
+    }
+    return -1
+	if ($broken);
+    
+    my $idx  = $self->idx();
+    my $uuid = $self->uuid();
+
+    DBQueryWarn("delete from geni_credentials where this_uuid='$uuid'")
+	or return -1;
+    DBQueryWarn("delete from geni_certificates where uuid='$uuid'")
+	or return -1;
+    DBQueryWarn("delete from geni_aggregates where idx='$idx'")
+	or return -1;
+    
+    return 0;
+}
 
 #
 # List of slivers for this aggregate.
@@ -236,7 +293,7 @@ sub SetAggregate($$)
 }
 
 #
-# Get the aggregate for a sliver.
+# Get the aggregate for an aggregate.
 #
 sub GetAggregate($)
 {
@@ -256,6 +313,27 @@ sub GetAggregate($)
     }
     $self->{'PARENT'} = $aggregate;
     return $aggregate;
+}
+
+#
+# Set the status for the aggregate
+#
+sub SetStatus($$)
+{
+    my ($self, $status) = @_;
+
+    return undef
+	if (! ref($self));
+
+    my $idx = $self->idx();
+    
+    return -1
+	if (!DBQueryWarn("update geni_aggregates set ".
+			 "  status='$status' ".
+			 "where idx='$idx'"));
+    
+    $self->{'AGGREGATE'}->{'status'} = $status;
+    return 0;
 }
 
 #
@@ -336,7 +414,7 @@ sub NewCredential($$)
 #
 # Start all the slivers in the aggregate.
 #
-sub StartUp($)
+sub Start($)
 {
     my ($self) = @_;
 
@@ -349,8 +427,32 @@ sub StartUp($)
 	return -1;
     }
     foreach my $sliver (@slivers) {
-	if ($sliver->StartUp() != 0) {
+	if ($sliver->Start() != 0) {
 	    print STDERR "Could not start $sliver in $self\n";
+	    next;
+	}
+    }
+    return 0;
+}
+
+#
+# Provision all the slivers in the aggregate.
+#
+sub Provision($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my @slivers = ();
+    if ($self->SliverList(\@slivers) != 0) {
+	print STDERR "Could not get sliver list for $self\n";
+	return -1;
+    }
+    foreach my $sliver (@slivers) {
+	if ($sliver->Provision() != 0) {
+	    print STDERR "Could not provision $sliver in $self\n";
 	    next;
 	}
     }
@@ -375,22 +477,43 @@ sub UnProvision($)
     foreach my $sliver (@slivers) {
 	if ($sliver->UnProvision() != 0) {
 	    print STDERR "Could not unprovision $sliver in $self\n";
-	    DBQueryWarn("update geni_slivers set status='broken' ".
-			"where idx=" . $sliver->idx());
+	    $sliver->SetStatus("broken");
 	    next;
 	}
     }
     return 0;
 }
 
+############################################################################
 #
-# Destroy all the slivers in the aggregate, and then the aggregate if there
-# is nothing in it. Leave it around if something goes wrong.
+# Link aggregates need special handling.
 #
-sub Delete($)
+package GeniAggregate::Link;
+use vars qw(@ISA);
+@ISA = "GeniAggregate";
+
+use GeniDB;
+use GeniComponent;
+use GeniSlice;
+use GeniCredential;
+use GeniCertificate;
+use GeniAggregate;
+use Experiment;
+use Interface;
+
+sub Create($$)
+{
+    my ($class, $ticket) = @_;
+
+    return GeniAggregate->Create($ticket, "Link");
+}
+
+#
+# Provision all the slivers in the aggregate.
+#
+sub Provision($)
 {
     my ($self) = @_;
-    my $broken = 0;
 
     return -1
 	if (! ref($self));
@@ -400,32 +523,97 @@ sub Delete($)
 	print STDERR "Could not get sliver list for $self\n";
 	return -1;
     }
-    foreach my $sliver (@slivers) {
-	if ($sliver->status() eq "broken") {
-	    $broken++;
-	    next;
-	}
-	if ($sliver->Delete() != 0) {
-	    print STDERR "Could not delete $sliver from $self\n";
-	    DBQueryWarn("update geni_slivers set status='broken' ".
-			"where idx=" . $sliver->idx());
-	    $broken++;
-	    next;
-	}
-    }
-    return -1
-	if ($broken);
-    
-    my $idx  = $self->idx();
-    my $uuid = $self->uuid();
 
-    DBQueryWarn("delete from geni_credentials where this_uuid='$uuid'")
-	or return -1;
-    DBQueryWarn("delete from geni_certificates where uuid='$uuid'")
-	or return -1;
-    DBQueryWarn("delete from geni_aggregates where idx='$idx'")
-	or return -1;
-    
+    my $experiment = Experiment->Lookup($self->slice_uuid());
+    if (!defined($experiment)) {
+	print STDERR "Could not map $self to its experiment\n";
+	return -1;
+    }
+    my $sliver0    = $slivers[0];
+    my $sliver1    = $slivers[1];
+    my $interface0 = Interface->LookupByUUID($sliver0->resource_uuid());
+    my $interface1 = Interface->LookupByUUID($sliver1->resource_uuid());
+    if (! defined($interface0)) {
+	print STDERR "Could not map $sliver0 to its object\n";
+	return -1;
+    }
+    if (! defined($interface1)) {
+	print STDERR "Could not map $sliver1 to its object\n";
+	return -1;
+    }
+
+    my $vlan = VLan->Create($experiment, $self->uuid());
+    if (!defined($vlan)) {
+	print STDERR "Could not create vlan for $self\n";
+	return -1;
+    }
+    if (! $vlan->AddMember($interface0->node_id(), $interface0->iface())) {
+	print STDERR "$self: Could not add $interface0 to $vlan\n";
+	goto bad;
+    }
+    if (! $vlan->AddMember($interface1->node_id(), $interface1->iface())) {
+	print STDERR "$self: Could not add $interface1 to $vlan\n";
+	goto bad;
+    }
+    if ($vlan->Instantiate() != 0) {
+	print STDERR "$self: Could not instantiate $vlan on switches\n";
+	goto bad;
+    }
+    return 0;
+
+  bad:
+    $vlan->UnInstantiate()
+	if (defined($vlan));
+    $vlan->Destroy()
+	if (defined($vlan));
+    return -1
+}
+
+#
+# Unprovision all the slivers in the aggregate.
+#
+sub UnProvision($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my @slivers = ();
+    if ($self->SliverList(\@slivers) != 0) {
+	print STDERR "Could not get sliver list for $self\n";
+	return -1;
+    }
+    my $experiment = Experiment->Lookup($self->slice_uuid());
+    if (!defined($experiment)) {
+	print STDERR "Could not map $self to its experiment\n";
+	return -1;
+    }
+    my $sliver0    = $slivers[0];
+    my $sliver1    = $slivers[1];
+    my $interface0 = Interface->LookupByUUID($sliver0->resource_uuid());
+    my $interface1 = Interface->LookupByUUID($sliver1->resource_uuid());
+    if (! defined($interface0)) {
+	print STDERR "Could not map $sliver0 to its object\n";
+	return -1;
+    }
+    if (! defined($interface1)) {
+	print STDERR "Could not map $sliver1 to its object\n";
+	return -1;
+    }
+    my $vlan = VLan->Lookup($experiment, $self->uuid());
+    if (! defined($vlan)) {
+	print STDERR "Could not map self to its vlan object\n";
+	return -1;
+    }
+    if ($vlan->UnInstantiate() != 0) {
+	print STDERR "Could not uninstantiate $vlan\n";
+	return -1;
+    }
+    if ($vlan->Destroy() != 0) {
+	print STDERR "Could not destroy $vlan\n";
+	return -1;
+    }
     return 0;
 }
 

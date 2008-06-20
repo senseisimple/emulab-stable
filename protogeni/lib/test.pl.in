@@ -24,7 +24,7 @@ if (! defined($this_user)) {
 }
 
 my $blob;
-my $experiment = Experiment->Lookup("testbed", "too");
+my $experiment = Experiment->Lookup("testbed", "two");
 my @components;
 my @resources;
 my $ticket;
@@ -44,9 +44,9 @@ $geniuser->Register() == 0
 #
 # Another user, for testing binding users to slices.
 #
-my $leebee = GeniUser->CreateFromLocal(User->Lookup("leebee"));
-if (!defined($leebee)) {
-    die("Could not create a geni user from local user leebee\n");
+my $rricci = GeniUser->CreateFromLocal(User->Lookup("rricci"));
+if (!defined($rricci)) {
+    die("Could not create a geni user from local user rricci\n");
 }
 
 #
@@ -112,41 +112,43 @@ print Dumper($rspec);
 my @keys  = keys(%{$rspec->{'node'}});
 my $node1 = $rspec->{'node'}->{$keys[0]};
 my $node2 = $rspec->{'node'}->{$keys[1]};
-my $nspec = {'node' => {$keys[0] => { "uuid" => $node1->{'uuid'} },
-			$keys[1] => { "uuid" => $node2->{'uuid'} },
-		        },
-	     'link' => {'link0' => { "link_name" => 'link0',
-				   }
-		       }
-	    };
 
-#
-# Construct virtual topo information to send over with rspec. Private API.
-# This is awful. Also need some code to generate this.
-#
-my $vtopo = {'node' => {$keys[0] => { "node_name" => "node1",
-				      "osname"    => "FBSD-STD",
-				    },
-			$keys[1] => { "node_name" => "node2",
-				      "osname"    => "FBSD-STD",
-				    },
+my $nspec = {'node' => {$node1->{'uuid'} => { "uuid" => $node1->{'uuid'},
+					      "node_name" => $keys[0],
+					    },
+			$node2->{'uuid'} => { "uuid" => $node2->{'uuid'},
+					      "node_name" => $keys[0],
+					    },
 		        },
-	     'link' => {'link0' => { $keys[0] => { "IP" => "10.1.1.1"
-							 },
-				     $keys[1] => { "IP" => "10.1.1.2"
-							 },
-				    }
-		       }
+	     'link' => {
+		 'link0' => {
+		     "link_name"     => 'link0',
+		     "LinkEndPoints" => {
+			 "source_interface" => {
+			     "node_uuid"  => $node1->{'uuid'},
+			     "node_name"  => $keys[0],
+			     "iface_name" => "eth0",
+			 },
+			 "destination_interface" => {
+			     "node_uuid"  => $node2->{'uuid'},
+			     "node_name"  => $keys[1],
+			     "iface_name" => "eth0",
+			 }
+		     }
+		 }
+	     }
 	   };
+
+print Dumper($nspec);
 
 #
 # Get ticket from component.
 #
-$ticket = $components[0]->GetTicket($slice, $nspec, $this_user,
-				    $credential, $vtopo);
+$ticket = $components[0]->GetTicket($slice, $nspec, $this_user, $credential);
 if (!defined($ticket)) {
     die("Could not get ticket for $slice\n");
 }
+print Dumper($ticket);
 
 #
 # Create sliver on component using the ticket.
@@ -158,14 +160,14 @@ if (!defined($sliver)) {
 
 if (defined($sliver)) {
     print Dumper($sliver);
-    $sliver->BindUser($leebee);
+    $sliver->BindUser($rricci);
     
     # Wait for input before proceeding.
     $_ = <STDIN>;
     $sliver->Start($this_user);
     $_ = <STDIN>;
 
-    $sliver->UnBindUser($leebee);
+    $sliver->UnBindUser($rricci);
     $sliver->Destroy($this_user);
 }
 

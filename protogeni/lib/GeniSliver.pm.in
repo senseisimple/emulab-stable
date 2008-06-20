@@ -104,7 +104,7 @@ sub Lookup($$)
     # Bless into sub package if called for.
     my $resource_type = $self->{'SLIVER'}->{'resource_type'};
     if (defined($resource_type) && $resource_type ne "") {
-	bless($self, $class . "::" . $self->{'SLIVER'}->{'resource_type'});
+	bless($self, $class . "::" . $resource_type);
     }
     else {
 	bless($self, $class);
@@ -290,6 +290,27 @@ sub GetAggregate($)
     }
     $self->{'AGGREGATE'} = $aggregate;
     return $aggregate;
+}
+
+#
+# Set the status for the sliver.
+#
+sub SetStatus($$)
+{
+    my ($self, $status) = @_;
+
+    return undef
+	if (! ref($self));
+
+    my $idx = $self->idx();
+    
+    return -1
+	if (!DBQueryWarn("update geni_slivers set ".
+			 "  status='$status' ".
+			 "where idx='$idx'"));
+    
+    $self->{'SLIVER'}->{'status'} = $status;
+    return 0;
 }
 
 #
@@ -547,14 +568,20 @@ sub Provision($)
 	return -1;
     }
     if ($reservation->SameExperiment($experiment)) {
+	if ($experiment->InsertVirtNode($node) != 0) {
+	    print STDERR "Could not add virtnode entry for $node to $self\n";
+	    return -1;
+	}
+	
 	# Set sliver_idx in the reservation so that Emulab knows.
 	if ($node->ModifyReservation({"genisliver_idx" => $self->idx()}) != 0){
 	    return -1;
 	}
-	#
-	# This is so tbswap and children do the right thing.
-	#
-	$node->SetAllocState(TBDB_ALLOCSTATE_RES_INIT_DIRTY());
+
+	# Set it to boot the default OS.
+	if ($node->SelectOS() != 0) {
+	    return -1;
+	}
     }
     else {
 	print STDERR "$node is reserved to another, not $self\n";
@@ -597,6 +624,11 @@ sub UnProvision($)
 	my $pid = $experiment->pid();
 	my $eid = $experiment->eid();
 
+	if ($experiment->DeleteVirtNode($node) != 0) {
+	    print STDERR "Could remove virtnode entry for $node from $self\n";
+	    return -1;
+	}
+	
 	system("export NORELOAD=1; $NFREE -q $pid $eid $node_id");
 	if ($?) {
 	    print STDERR "Could not deallocate $node from $self\n";
@@ -614,7 +646,7 @@ sub UnProvision($)
 #
 # Start a sliver, which means what?
 #
-sub StartUp($)
+sub Start($)
 {
     my ($self) = @_;
 
@@ -644,7 +676,7 @@ sub StartUp($)
 	#
 	# Reboot and wait?
 	#
-	#system("$NODEREBOOT $node_id");
+	system("$NODEREBOOT $node_id");
     }
     else {
 	print STDERR "$node is reserved to another, not $self\n";
@@ -665,6 +697,9 @@ use GeniSlice;
 use GeniCredential;
 use GeniCertificate;
 use GeniAggregate;
+use Interface;
+use Experiment;
+use Node;
 
 sub Create()
 {
@@ -697,9 +732,9 @@ sub UnProvision($)
 }
 
 #
-# Start a sliver, which means what?
+# Start a sliver.
 #
-sub StartUp($)
+sub Start($)
 {
     my ($self) = @_;
 
