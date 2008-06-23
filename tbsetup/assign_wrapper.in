@@ -3421,17 +3421,13 @@ sub UploadVlans()
 		if (!defined($linkedlan));
 	    my $virtlanidx  = virtlanidx($lan->vname());
 	    my $linkedlanid = $linkedlan->lanid();
-	    # XXX Fix when installed.
-	    my $vlanid;
-	    $linkedlan->GetAttribute("vlanid", \$vlanid);	    
+
+	    printdb("Update vinterfaces: $lan: $virtlanidx -> $linkedlanid\n");
 	    
-	    printdb("Update vinterfaces on $lan: $virtlanidx -> $vlanid\n");
-	    
-	    DBQueryFatal("update vinterfaces set vlanid='$vlanid' ".
+	    DBQueryFatal("update vinterfaces set vlanid='$linkedlanid' ".
 			 "where virtlanidx='$virtlanidx' and ".
 			 "      exptidx='$experiment_idx'");
 	}
-	
     }
     else {
 	printdb "Dumping vlans table.\n";
