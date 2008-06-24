@@ -12,10 +12,10 @@ my $DOSETUP = 1;
 
 sub usage()
 {
-    print "Usage: [-d] start|stop\n";
+    print "Usage: [-dN] start|stop\n";
     exit(1);
 }
-my $optlist    = "d";
+my $optlist    = "dN";
 my $debug      = 0;
 my $action     = "start";
 
@@ -46,6 +46,9 @@ if (! getopts($optlist, \%options)) {
 }
 if (defined($options{'d'})) {
     $debug = 1;
+}
+if (defined($options{'N'})) {
+    $DOSETUP = 0;
 }
 # Allow default above.
 if (@ARGV) {

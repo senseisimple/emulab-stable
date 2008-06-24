@@ -158,6 +158,9 @@ ifcfgs:	$(SRCDIR)/mkifcfgs $(SRCDIR)/ifcfg.template
 
 vserver-install:	dir-install
 	$(INSTALL) -m 755 -o root -g root -d $(VSDIR)
-	$(INSTALL) -m 755 $(SRCDIR)/rc.invserver $(VSDIR)/rc.invserver
+	$(INSTALL) -m 755 $(SRCDIR)/vserver/rc.invserver $(VSDIR)/
+	$(INSTALL) -m 755 $(SRCDIR)/vserver/vserver-cnet.sh $(VSDIR)/
+	$(INSTALL) -m 755 $(SRCDIR)/vserver/vserver-init.sh $(VSDIR)/
+	$(INSTALL) -m 755 $(SRCDIR)/vserver/vserver-rc.sh $(VSDIR)/
 	$(INSTALL) -m 755 $(SRCDIR)/mkvserver.pl $(BINDIR)/mkvserver.pl
 	-ln -sf $(BINDIR)/mkvserver.pl $(BINDIR)/mkjail.pl

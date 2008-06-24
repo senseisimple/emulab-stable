@@ -403,7 +403,6 @@ if (!InjectIFs($vspid)) {
     # XXX force vserver to exit
     unlink("$VDIR/$BOOTDIR/vserver.pid");
 }
-
 system("cp /dev/null $VDIR/$BOOTDIR/ready");
 TBDebugTimeStamp("mkvserver: interfaces ready, vserver released...");
 
@@ -532,16 +531,28 @@ if (0) {
     mysystem("echo '~HIDE_CINFO' >> $cdir/cflags");
     mysystem("echo '~HIDE_MOUNT' >> $cdir/cflags");
 
+    # XXX doesn't seem to get created
+    mysystem("mkdir $cdir/spaces")
+	if (!-d "$cdir/spaces");
+
     if ($USENEWNET) {
 	# XXX create a network namespace, hack version
-	mysystem("mkdir $cdir/spaces");
-	mysystem("echo '' >> $cdir/spaces/net");	
+	# in theory, this...
+	#mysystem("echo '0x4c000200' >> $cdir/spaces/mask");
+
+	# ...or this should do something, but it doesn't
+	# the vserver utils do not uniformly respect these
+	# (vcontext at least, always uses a mask of 0)
+	# so it is all about how the kernel is configured
+	#mysystem("echo '' >> $cdir/spaces/net");
 
 	# XXX needed to do clone with CLONE_NEWNET
-	mysystem("echo 'SYS_ADMIN' >> $cdir/bcapabilities");
-	mysystem("echo 'NET_ADMIN' >> $cdir/bcapabilities");
-	mysystem("echo 'NET_RAW' >> $cdir/bcapabilities");
+	#mysystem("echo 'SYS_ADMIN' >> $cdir/bcapabilities");
+    } else {
+	#mysystem("echo '0xc000200' >> $cdir/spaces/mask");
     }
+    mysystem("echo 'NET_ADMIN' >> $cdir/bcapabilities");
+    mysystem("echo 'NET_RAW' >> $cdir/bcapabilities");
 
     if (!$USEHASHIFIED) {
 	#
@@ -631,9 +642,9 @@ if (0) {
     }
     mysystem("cp -p $ETCVSERVER/rc.invserver $vdir/etc/rc3.d/S98invserver");
     mysystem("cp -p $ETCVSERVER/rc.invserver $vdir/etc/rc6.d/K98invserver");
+    mysystem("cp -p $ETCVSERVER/vserver-init.sh $vdir/$BINDIR/vserver-init");
+    mysystem("cp -p $ETCVSERVER/vserver-rc.sh $vdir/$BINDIR/vserver-rc");
     if ($USENEWNET) {
-	mysystem("cp -p $ETCVSERVER/vserver-init.sh $vdir/$BINDIR/vserver-init");
-	mysystem("cp -p $ETCVSERVER/vserver-rc.sh $vdir/$BINDIR/vserver-rc");
 	# XXX this should be integrated with regular network startup
 	mysystem("cp -p $ETCVSERVER/vserver-cnet.sh $vdir/etc/rc3.d/S00cnet");
 	mysystem("cp -p $ETCVSERVER/vserver-cnet.sh $vdir/etc/rc6.d/K99cnet");
@@ -1049,6 +1060,10 @@ sub InjectIFs($)
     my $devdir = "/sys/class/net";
     my @eifs = ();
 
+    if (!$USENEWNET) {
+	return 1;
+    }
+
     #
     # Figure out all the experimental interfaces
     #
@@ -1067,7 +1082,7 @@ sub InjectIFs($)
     #
     # Insert the control net
     #
-    my $cmd = "echo $vspid > $devdir/$cnetdev/new_ns_pid";
+    my $cmd = "chcontext --ctx 1 -- echo $vspid > $devdir/$cnetdev/new_ns_pid";
     print "system('$cmd')\n"
 	if ($debug);
     if (system($cmd)) {
@@ -1079,7 +1094,7 @@ sub InjectIFs($)
     # Insert the experimental IFs
     #
     foreach my $eif (@eifs) {
-	$cmd = "echo $vspid > $devdir/$eif/new_ns_pid";
+	$cmd = "chcontext --ctx 1 -- echo $vspid > $devdir/$eif/new_ns_pid";
 	print "system('$cmd')\n"
 	    if ($debug);
 	if (system($cmd)) {
