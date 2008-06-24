@@ -1663,6 +1663,12 @@ COMMAND_PROTOTYPE(doifconfig)
 			else if (strcmp(row[6], "vlan") == 0)
 				tag = row[9];
 
+			/* sanity check the tag */
+			if (!isdigit(tag[0])) {
+				error("IFCONFIG: bogus encap tag '%s'\n", tag);
+				tag = "0";
+			}
+
 			bufp += OUTPUT(bufp, ebufp - bufp, " VTAG=%s", tag);
 		}
 
