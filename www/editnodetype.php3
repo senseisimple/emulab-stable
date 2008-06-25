@@ -49,6 +49,12 @@ $rhl_std = OSinfo::LookupByName($emulab_ops, "RHL-STD");
 $fbsd_std = OSinfo::LookupByName($emulab_ops,"FBSD-STD");
 $frisbee_mfs = OSinfo::LookupByName($emulab_ops,"FRISBEE-MFS");
 
+if ($freebsd_mfs == null || $fbsd410_rhl90_std == null ||
+    $rhl_std == null || $fbsd_std == null || $frisbee_mfs == null) {
+    PAGEERROR("You must add images from Utah into your database" .
+              " before adding a nodetype. See installation documentation for details!",1);
+}
+
 # This belongs elsewhere!
 $initial_attributes = array(
     array("attrkey" => "adminmfs_osid", "attrvalue" => $freebsd_mfs->osid(),

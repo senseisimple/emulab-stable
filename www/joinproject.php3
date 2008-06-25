@@ -759,7 +759,9 @@ if (! $returning) {
     $args["affiliation"]   = $formfields["usr_affil"];
     $args["affiliation_abbreviation"] = $formfields["usr_affil_abbrev"];
     $args["password"]      = $formfields["password1"];
-    $args["wikiname"]      = ($WIKISUPPORT ? $formfields["wikiname"] : "");
+    if ($WIKISUPPORT) {
+        $args["wikiname"] = $formfields["wikiname"];
+    }
 
     if (isset($formfields["usr_URL"]) &&
 	$formfields["usr_URL"] != $HTTPTAG && $formfields["usr_URL"] != "") {
