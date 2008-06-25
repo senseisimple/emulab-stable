@@ -1,0 +1,386 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2002-2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#####
+##### Setting up tbdb for a new boss node
+#####
+
+Note: we are working on better automating many of the procedures in this
+document - for now, though, a few of them are still manual.
+
+Note: steps labeled "Local Only" are only required when setting up a testbed
+with local nodes - they can be skipped in a widearea-only testbed.
+
+##### Step 1 - Setup users, projects, and experiments
+
+In order to proceed, you should have the following working (from the boss and
+ops setup documentation):
+
+   NFS mounts between boss and ops
+   Root ssh keys (so that root on boss can ssh to ops without a password)
+   The web interface
+
+Make sure you can log into the web interface using the 'elabman' account.
+The password for the elabman account is the same as the root password on
+your boss node (see, we told you to remember it!).
+
+This account is created as a testbed administrator, but there is one thing
+you will need to do in order to use your admin powers. For the same reason
+that you use 'su' and/or 'sudo' on your UNIX boxes instead of logging in as
+root, you must explicitly enable admin privileges after you log in. When
+logged in as a user who is allowed to become an admin, you will see a green
+dot on the left side of the header above the main page content. The green
+dot means that although you are allowed admin powers, they are currently
+turned off, and you see the same web pages that a regular user sees, and
+can use the same actions. If you click on the dot, it will turn red, and you
+will have full administrator privileges; we call this 'going red dot'.
+If you click on the dot again, it will go back to green, thus you can
+easily flip back and forth between normal privs and admin privs. Note
+that most of the procedures in this file require you to be in red dot mode.
+
+Now, we will use the elabman user to bootstrap your first real account and
+project. Note that while you will use the elabman account to do this, the
+elabman account should not be considered a real account; it is intended to
+help bootstrap only and as such, does not have the power to perform many
+actions that are required later (such as adding nodes to the testbed).
+
+Login as user 'elabman' if you have not already done so. Go into 'red dot'
+mode by clicking on the green dot. You should see the "Start a New Testbed
+Project" page, with a "Create First Project" link on the left menu under
+"Experimentation".
+
+Fill in your own information in the 'Project Head Information'
+section.  It is important that you provide a working email address! Select
+your initial Project Name in the 'Project Information' section (we call
+ours 'testbed', but you can call yours whatever you call your project or
+research group).  Also specify a *working* URL (it is required) for the
+project. Submit the form using the Submit button at the bottom of the page.
+
+The web interface will grind along for a minute or so. DO NOT CLICK THE
+STOP BUTTON! When it is done, you will see a message that invites you to
+login as the user you just created. Do this now so that you can continue
+with setting up your testbed. Note that the elabman account has been
+deactivated during this process to avoid problems later on (and potential
+security breaches). 
+
+Before we continue, lets explain a few more important items:
+
+* Project Membership: In addition to the project you just created, you have
+  automatically been added to the "emulab-ops" project with trust value
+  "group_root". This allows you to approve new members to that project as
+  well as your own project.
+
+* Admin Mode: Your new account has been given "administrator" mode, as
+  described above. To change that value for other users after their
+  accounts are created, you can do this on boss:
+
+	echo 'update users set admin=1 where uid="<username>"' | mysql tbdb
+
+* Shell on Boss: Give yourself the special ability to login to boss;
+  in contrast, most (normal) users have a restricted shell on boss,
+  and are not allowed to log in using a password. Login to boss as root,
+  and edit the password file using the 'vipw' command (FreeBSD requires
+  some special processing on the password file after editing, which vipw
+  does.). Give yourself a real shell (say, /bin/csh) and then exit the
+  editor. Then give yourself a password (in general, it is safer to have a
+  different password on boss then on ops!). Use this command:
+
+	passwd <your username>
+
+  NOTE: See doc/shelloboss.txt for important security issues w.r.t. giving
+  real shells on boss. Before you give a real shell to someone, it is a
+  good idea for them to read this file!
+
+* Now logout and back in as yourself. In general, it is safer and better to
+  not do things as root. In fact, many testbed programs will complain if
+  you invoke them as root because it makes accounting and auditing more
+  difficult.
+
+* Unix Group Membership: The Emulab account system manages both the
+  password file and the group file (/etc/group) on both boss and ops. If
+  you edit them directly, those changes will likely be lost. If you want to be
+  a member of any UNIX groups on boss, use our 'unixgroups' command. For
+  example, to add yourself to the "operator" group, do this on boss (as
+  yourself, not root):
+
+	withadminprivs unixgroups -a <username> operator
+
+  NOTE: Your initial account created above was already placed in the wheel
+  and tbadmin groups.
+
+  NOTE: Just as you need to go 'red dot' to use admin privileges on the web
+  interface, you must also explicitly enable them on the command line. To
+  do this, prefix the command you want to run with 'withadminprivs',
+  which can be abbreviated as 'wap'.
+
+* Set your path: withadminprivs and many other admin-type commands live in
+  /usr/testbed/sbin - you'll want to put this and /usr/testbed/bin in your
+  $PATH.
+
+Others at your site can now apply to join your project, or start their own.
+
+##### Step "-1" - Undoing Step 1 if necessary
+
+If something went wrong during Step 1, it can leave things in an inconsistent
+state.  Here's how to undo it without starting over from scratch.  The goal is
+to remove things that boss-install checks on, so it can be run again to put
+the Emulab database and directories into initial conditions.
+
+ * Remove users, groups, and directories set up by boss-install.
+     pw userdel -n elabman -r
+     pw userdel -n elabckup -r
+     ssh -n ops pw userdel -n elabman -r
+     ssh -n ops pw userdel -n elabckup -r
+
+     ls -l /users /proj /groups
+     rm -r /proj/* /groups/*
+     mkdir /proj/cvsrepos
+     pw groupdel -n emulab-ops
+     ls -l /usr/testbed/{expwork,*/proj}
+     rm -r /usr/testbed/expwork/* /usr/testbed/*/proj/*
+     ls -l /usr/testbed/{expwork,*/proj}
+
+ * Remove user and group from the elabman "Create First Project" pages.
+     set me = *your-login*
+     set us = testbed
+     pw userdel -n $me -r
+     pw groupdel -n $us
+     ls -l /users /proj /groups
+
+ * Also remove any other users and groups you've created since then.
+   Otherwise you will get this message until you've cleared them:
+   'Error Creating Project: Transient error; please try again later.'
+     tail /etc/passwd
+     tail /etc/group
+     set him = *user*
+     set them = *group*
+     pw userdel -n $him -r
+     pw groupdel -n $them
+
+ * Kill the database.
+     mysql -e "drop database tbdb"
+
+ * Run boss-install, checking particularly on the success of these tasks:
+   . Setting up database
+   . Setting up initial user (elabman)
+   . Setting up checkup user (elabckup)
+   . Setting up system experiments
+
+Now you can go back to Step 1 with the first login as 'elabman' and try again.
+
+##### Step 2 - Setup web sql editor
+
+Several of the steps below require you to add data to the database by hand. If
+you're comfortable with SQL, you can do this directly with SQL queries, or you
+can use the generic web-based SQL table editor provided with the testbed
+software. If you plan to use the former method, you can skip this step.
+
+********************************** WARNING **********************************
+* Many tables depend on data in other tables, or depend on programs running *
+* to effect a change. Thus, you should not edit tables other than the ones  *
+* described in this document.                                               *
+* You have been warned......                                                *
+********************************** WARNING **********************************
+
+First, you'll want to protect the webdb script from outside browsers. Because
+of its flexibility, it would be quite dangerous if it were broken into. So, we
+add an additional layer of protection by limiting the IP addresses it may be
+used from. Open your httpd.conf file (located in /usr/local/etc/apache)
+and find the 'Directory' directives. Add a section such as this:
+
+	<Directory /usr/testbed/www/webdb>
+		AllowOverride None
+		order deny,allow
+		deny from all
+		allow from 155.99.212.
+	</Directory>
+	
+If you installed the testbed tree somewhere other than /usr/testbed, fix the
+directory. Change the 'allow from' line to match your IP subnet (note the '.'
+on the end of the address, to match the entire subnet). You can have as
+many 'allow' lines as you want. Restart apache:
+
+	sudo /usr/local/etc/rc.d/apache.sh stop
+	sudo /usr/local/etc/rc.d/apache.sh start
+
+Next, you'll need to specify which users have the ability to edit the database.
+This is done with the 'dbedit' column in the users table. You can turn on
+a user's dbedit bit like so:
+
+	echo 'update users set dbedit=1 where uid="<username>"' | mysql tbdb
+
+##### Step 3 - Setup switches
+##### Local Only
+
+1) Create node types for switches
+
+Add entries to the node_types table for each type of switch you'll be
+using. You can do this by talking to mysql directly, but is more easily
+accomplished using the web interface. In 'red dot' mode, go to:
+
+	https://<yourbossnode>/editnodetype.php3?new_type=1
+
+These are the switch types currently supported:
+    cisco{65xx,40xx,45xx,29xx,55xx}
+        For example, if you had a 6509, you'd enter 'cisco6509'
+        If your switch runs IOS (instead of CatOS), append '-ios' to the
+        type.
+    intel
+        The supported type is the 510T (but just put 'intel' in the type field)
+    nortel1100, nortel5510
+    foundry1500, foundry9604
+(Note: Case sensitive!)
+
+Set the "class" to 'switch' and set "processor" to whatever you used for the
+"type" field.
+
+Most of the other columns are not important for switches (so you can set
+them to 0), but putting in "Max Interfaces" (if the switch is expandable)
+can be useful for your own information.
+
+
+2a) Create interface types for switch interconnects (if any)
+
+If you'll be connecting the experimental switches together, you'll add
+interface types for the ports you'll be using to link them together.  These go
+into the interface_types table. Make up something descriptive for the 'type'
+column (no spaces). Make sure to set the max_speed (in Kbps) and full_duplex
+(1 for full duplex, 0 for half duplex) columns correctly. As an example:
+
+	insert into interface_types set
+	    type='cisco_gigE',max_speed=1000000,full_duplex=1,
+	    manufacturuer='Cisco',model='WS-X6316-GE-TX',ports=16,
+	    connector='RJ45';
+
+
+2b) Create interface capabilities entries for switch interconnects (if any)
+    
+If you added any entries to interface_types in the previous step, you also
+need to add entries to the interface_capabilities table. Using the same
+type name you used above, add a capkey for "protocols", usually set to
+"ethernet" and another capkey for "ethernet_defspeed" to the same value you
+used in the interface_types table. Do this for each type you entered in
+step 2a above. For example:
+
+	insert into interface_capabilities set
+	    type='cisco_gigE',capkey='protocols',capval='ethernet';
+	insert into interface_capabilities set
+	    type='cisco_gigE',capkey='ethernet_defspeed',capval='1000000';
+
+3) Create switches in nodes table
+
+Next, add the switches to the nodes table. The only necessary fields here are
+node_id (choose one appropriate to the switch), type (use one of the ones you
+created earlier,) and role. Role, for switches, should be either 'testswitch'
+or 'ctrlswitch', depending on whether you're using it for the experimental
+or control network. If it's used for both, call it a 'testswitch'. Example:
+
+	insert into nodes set
+	    node_id='cisco1',phys_nodeid='cisco1',
+	    type='cisco6509',role='testswitch';
+
+The node_id you select must resolve in DNS and/or boss's /etc/host file - we'll
+use this name to contact the switch for SNMP. Ie., you must be able to ping the
+name you select as the switch's node_id. 
+
+4) Add state for switch interconnects
+
+If you'll be connecting the experimental switches together, add interfaces to
+each of them.  Use the interface types you created above for them, and be sure
+to get the correct card and port numbers. In modular switches, such as the
+Cisco Cat6500 series, use the switch's 'native' module and port numbers.  For
+switches that do not have expansion modules, the card number is assumed to be
+0. Make sure to get the current_speed (this time, in Mbps, and note, this is
+an enumerated type, not an integer, so you need to put quotes around the
+speed) and duplex correct. You'll also need to set 'iface' to some string
+representing the port - I tend to use 'module/port' (ie. '1/1'). Set the 'role'
+of the interfaces to 'other'.
+
+Now, go into the wires table and add wires connecting the switch interfaces you
+just created. Make sure to set the type to 'Trunk'. In this case, it doesn't
+matter which switch you use as node 1 (the node_id1, card1, port1 columns), and
+which you use as node 2. If you have a non-modular switch, all ports are
+considered to be on card 0.
+
+7) Create switch stacks
+
+Into the switch_stack_types table, create entries for each stack in your
+network. A stack is set of switches that share common VLANs. Usually, your
+experimental switches will be one stack, and the control network another. You
+should create a stack even if there is only one switch in it. The control
+stack should be named 'Control', and the experimental stack 'Experiment' (make
+sure to get the capitalization right). The 'leader' field should be set to the
+node_id of the master switch in the stack.  The stack_type column is used by
+snmpit to determine which module to use to talk to the stack. Most sites
+should set the stack type to 'generic', which handles all switch types
+currently supported by Emulab. If you have all Cisco switches, and are having
+problems with the 'generic' stack type, you can try setting the type to
+'cisco'.  Making a stack for the control network is optional, but will enable
+control-net firewalls. There are a few columns in this table that you will need
+to set:
+
+supports_private: (Cisco only) This switch can make private VLANs - probably
+    best to leave it as 0
+single_domain: (Cisco only) Means that all switches in the stack use VTP to
+    maintain a common set of VLANs. This means that we will only create VLANs
+    on the stack leader - if set to 0, we create VLANs on each switch
+    individually
+snmp_community: The SNMP community string we use for read-write access to the
+    switch. Most switches use 'private' by default.
+min_vlan: The smallest VLAN number that the testbed software will use. If left
+    NULL, defaults to 2.
+max_vlan: Ditto, but the biggest number. Defaults to 1000.
+
+Finally, add switches to these stacks by putting entries in the switch_stacks
+table, listing the node_id of each switch and the stack_id of the stack it
+belongs to. You can leave the 'is_primary' column of these rows with its default
+value (1).
+
+After getting this set up, run 'wap snmpit -l', and make sure it doesn't give
+you any error messages. If it tells you that your type of device isn't
+supported, ask Utah - we have a list of supported devices in snmpit, but they
+are just the ones we've tested. Hopefully, yours will work too, we just haven't
+tried it.
+
+Your snmpit output should look something like this:
+
+%wap snmpit -l
+VLAN     Project/Experiment VName     Members
+--------------------------------------------------------------------------------
+Control-                              myswitch:1
+
+Note that 'Control-' is a truncated version of the name 'Control-hardware' that
+you created in setup-network.txt . If you see any other VLANs on this list,
+that's not a problem, but if you want to delete any of them, you can do that
+with 'wap snmpit -o <name>'.
+
+##### Step 4 - Setup control hardware
+##### Local Only
+
+1) Power controllers
+
+Follow the instructions in setup-power.txt.
+
+Setting up the power controllers before you add your nodes makes adding
+the nodes remotely much easier.  The process being: power off all nodes,
+then power on what you want to be the first node.  It should show up in
+the "new node" page on the Emulab web portal.  You can then add it as "pc1".
+Then power on the second node, add it, etc.
+
+
+##### Step 5 - Images and OSids
+
+These will depend on the image(s) and any OSKit kernels you've recieved, or
+built yourself. Since you're probably using disk images from Utah, the best
+thing to do is ask us for the appropriate lines for the os_info and images
+tables. Make sure to get the PXEBOOT, PXEFRISBEE, and PXEFBSD OSIDs, which are
+required to load disk images.  For a widearea-only testbed, no images entries
+in the images table a required, but OSIDs are still useful, to determine what a
+node's capabilities are. 
+
+##### Step 6 - Setup nodes
+
+To add nodes to the testbed, see setup-nodes.txt .

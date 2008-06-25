@@ -1,0 +1,220 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2002-2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#####
+##### Configuration suggestions for Cisco switches
+#####
+
+This file contains some configuration guidelines that we (Utah) have found
+useful to improve the performance of our Cisco switches.
+
+All commands given are to be typed at the (enable) prompt on your cisco
+switches. They are for CatOS - switches that run IOS may not have these
+commands.
+
+<ports> means a list of ports, which on the CatOS command line, can include
+lists and rages, such as "3/1,3/2" or "3/1-48" or "3/1-48,4/1-48,5/1-48"
+
+##### Allowing ports to come up quicker
+
+This one is useful on both the experimental and control nets:
+    set spantree portfast <ports> enable
+Use this on all ports that are directly connected to nodes, servers, power
+controllers - anything that is not another switch. Normally, the switch waits
+a while (several seconds) when a port first comes up before forwarding traffic
+from this port - it does so to prevent loops in the switch topology. The main
+place you will see the benefit of this is on the control net - with portfast
+disabled, the first few DHCP packets sent by booting nodes will get dropped,
+causing the DHCP to take much longer than necessary.
+
+##### Reducing stray traffic
+
+Disable spanning tree (STP.) If on, STP sends out packets approximately every
+two seconds on every port. You can disable it on all VLANs with the command
+    set spantree disable all
+There are two major consequences (for our purposes) of disabling STP:
+    1) You cannot have _any_ loops in your switch topology, or bad things will
+	happen.
+    2) VLAN pruning on trunks won't work, causing broadcast traffic to be
+	forwarded across trunks that it does not need to cross. We've added
+	features to snmpit to manually do STP's job in this case, so this
+	problem is taken care of.
+You must have STP disabled on _all_ switches that are trunked together! If it
+is enabled on even one, STP traffic will be seen on all of them. 
+
+The switch doesn't trust you to use portfast responsibly. So, it has a
+'bpdu-guard' feature that helps guard against loops. Turn off this feature
+with the command:
+    set spantree portfast bpdu-guard disable
+
+Cisco uses a protocol called 'CDP' to discover other Cisco devices. This sends
+out small packets every two minutes. You can disable it with:
+    set cdp disable <ports>
+Ideally, you should only disable CDP on ports that don't have other Cisco 
+devices attached, but in practice, running with CDP disabled on all ports is
+fine.
+
+Switch ports will, by default, try to negotiate trunking and channeling.
+Cisco provides a handy macro:
+    set port host <ports>
+to disable both of these. Also enables portfast on the ports.
+
+##### Setting MAC address aging time
+
+We have found that some experimenters use applications, kernels, etc. that only
+receive traffic, not send it. This presents a problem, because it prevents the
+switch from learning which port the node is on, and thus broadcasting traffic
+for it to every port in the VLAN. This can be solved by 'priming' - ie. having
+the receive-only node send some traffic (like an ARP response) at the beginning
+of the experiment. However, the default aging time of 300 seconds makes this
+impractical. So, we have disabled this aging, making learned MACs permanent
+(until the VLAN is torn down.)
+
+You must do this for each VLAN, with the command:
+    set cam agingtime <vlan> 0
+For convenience, we've supplied a file (in this directory) called
+'no-cam-aging.cfg' that disables aging on VLANs 2-999 (the ones potentially
+used by our software.) Transfer this file to the switch using the:
+    copy tftp config
+command.
+
+We also suggest that you do this on your control network as well - part of the
+booting process leaves the nodes sitting dormant at a boot loader for extended
+periods of time, so the switch will tend to forget their MACs.  Turning off
+aging is not critical, but we suggest it, because it will reduce stray traffic
+while the switch re-learns MAC addresses.
+
+##### Setting up multicast between multiple switches
+
+If you have more than one switch on the experimental or control networks, you
+may need to do a little setup to get multicast between them. The symptom of
+this problem is that multicast doesn't work between two nodes on different
+switches, and if you run 'show multicast groups' on each switch, some will show
+the group as existing, and others will not.
+
+Run the following command for both sides (ie. on both switches) of every trunk
+link:
+set multicast router 1/1
+(assuming that port 1/1 is your trunk link). If you are using EtherChannel to
+bond together multiple links to form a single trunk, you only need to run this
+command for the first port in the channel.
+
+We had some problems running this command on the trunk on one of our switches:
+it failed with the error:
+Failed to add port 2/1 to multicast router port list.
+What I finally did to resolve this was to tear down the trunk link and
+EtherChannel that port was a part of, run the command on it (which succeeded
+this time), and then build the EtherChannel and trunk back up.
+
+##### Setting the clock
+
+Since bos is an NTP server, you should set your switches to sync time with it.
+On CatOS, this is accomplised with:
+set ntp server 10.11.12.1
+set ntp timezone MST -7
+set ntp summertime MDT
+set ntp summertime enable
+set ntp summertime recurring
+set ntp client enable
+show time
+
+Of course, you'll need to replace 10.11.12.1 with the IP address your boss node
+uses to talk to the switches (usually its control-hardware interface), and
+'MST', -7, and 'MDT' with the names of your timezone and its offset from GMT.
+If you don't use daylight-savings time, leave out the 'summertime' steps, and
+instead do:
+set ntp summertime enable
+
+Watch the output of 'show time' for a while to make sure the clock syncs up.
+It may take a few minutes.
+
+On IOS, these commands are:
+configure terminal
+ntp server 10.11.12.1
+clock timezone MST -7
+clock summer-time MDT recurring
+exit
+
+...  and to see the current time, run 'show clock'
+
+##### IOS commands
+
+The above commands are given under the assummption that your switches are
+running CatOS. If you are running IOS, here are a few notes that may help you
+'translate' the above commands.
+
+Interfaces in CatOS are named as module/port, while interfaces in IOS are named
+as TypeModule/Port - For example, if module 1 has gigabit interfaces, what you
+call 1/1 in CatOS is Gi1/1 in IOS. 100Mbit Ethernet is 'Fa'. (Really, these are
+'GigabitEthernet' and 'FastEthernet' respectively, but you can abbreviate them.)
+
+In order to operate on many interfaces at once, you can issue configuration
+commands like this:
+range gi1/1 - 48, gi2/1 - 48, gi3/1 - 48
+... which would configure all 48 Gigabit interfaces on modules 1, 2, and 3.
+
+The equivalent of 'set port host' (which sets portfast, disabled BPDU guard,
+etc.) is:
+switchport host
+... applied to an interface or a range of interfaces. As in:
+interface range gi1/1 - 48, gi2/1 - 48, gi3/1 - 48
+switchport host
+exit
+
+In order to disable spanning tree, you would use:
+no spanning-tree vlan 1-1005
+
+In order to create a VLAN and set its name:
+vlan 10
+name control-hardware
+exit
+
+In order to set the IP address of the interface in VLAN 10:
+interface vlan 10
+ip address 10.11.13.183 255.255.255.0
+exit
+
+In order to enable an interface:
+interface vlan10
+no shutdown
+exit
+
+In order to remove a VLAN:
+no vlan 1000
+
+To put an interface into a VLAN:
+interface gi0/1
+switchport access vlan 10
+exit
+
+In order to turn on trunking for an interface:
+interface gi0/1
+switchport mode trunk
+exit
+
+In order to turn off trunking for an interface:
+interface gi0/1
+switchport mode access
+exit
+
+In order to put interfaces into an EtherChannel:
+interface range gi1/41 - 48
+channel-group 1 mode on
+exit
+
+(Notes: If you want to make more than one channel, give each set of ports
+a different channel number. And, now, you will configure the whole channel
+as 'interface port-channel 1')
+
+To set the native VLAN on a trunk:
+interface gi0/1
+switchport trunk native vlan 1
+
+To set the read-write SNMP community string to 'public':
+snmp-server community public rw
+
+To globally disable the Cisco Router Discovery (cdp) protocol:
+no cdp run

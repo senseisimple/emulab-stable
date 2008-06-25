@@ -1,0 +1,275 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2002-2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#####
+##### Setting up nodes for use in the testbed
+#####
+
+This file explains how to get nodes set up and added to the testbed.
+
+##### BIOS setup on the nodes
+
+First, we need to get some things set up in the nodes' BIOS. For now, just do
+this on one of the nodes, you'll do the rest later.
+
+Booting from PXE -
+The first thing we'll need to do is have the node boot from PXE on its control
+network interface. This is how the testbed exercises control over what the
+node will boot. In most BIOSes, this should be as simple as finding the boot
+order options, and putting PXE on the top. Things can get a bit confusing if
+you have more than one PXE-capable interface, because the BIOS often provides
+no way of distinguishing between them - you'll have to do some trial-and error
+to figure out which is which.
+
+Disable PXE on experimental interfaces -
+Nodes will boot much quicker if you disable PXE booting (through whatever means
+provided by your card) on experimental net interfaces.
+
+Set power-loss behavior -
+Many BIOSes have an option about what to do after a power failure (which is
+what it looks like to the node when it gets power cycled by a power
+controller.)  They're usually 'always off', 'always on', and 'last state'.
+Always on is the best - last state is OK, but if someone does a 'shutdown -h'
+on the node, you can't bring it back up with power cycling - you have to go
+punch the power button.  Just make sure they're not set to always off.          
+
+#### Type information for the nodes
+
+Unless you're adding some more nodes, identical to the ones you already have,
+you'll need to put some type information about them into the database. You can
+do this through the web interface: log in and go into admin mode. Now, click on
+the 'Node Status' link on the menu, and use the 'Create a new type' link. The
+important things on this page to fill out are: (You can leave the defaults for
+the rest)
+
+* Type - We typically name types 'pcXXX', where XXX is a short (a few
+	characters) string describing the nodes (such as processor
+	speed, chipset, etc.) eg. pc600 for 600-MHz nodes
+  
+* Processor -  Class of processor (eg. 'Pentium IV')
+
+* Speed - CPU speed in MHz (eg. 3000)
+
+* RAM - Amount of RAM in MB (eg. 256)
+
+* HD - Hard disk size in GB (eg. 20)
+
+* Max Interfaces - Maximum number of NIC ports (eg. dual port cards
+	count as 2)
+		   
+* Control Network - Interface number (described below) of the control network
+	interface.
+
+* Control Network Iface - Name of the control network interface under Linux -
+	usually, just a concatenation of 'eth' and the Control Network number
+	you entered above. (eg. 'eth0')
+
+* OSIDs - If Utah has already given you disk images (and their
+	associated database state), then select those at this stage. You
+	should have only one choice for the ImageID. For the Default OSID,
+	select either Linux or FreeBSD, depending on what you think your
+	users are likely to want by default.  For the time being, both the
+	delay and jail OSIDs need to be FreeBSD.  If Utah has not given you
+	images yet, come back and set the OSIDs once they have.
+	
+* Delay Capacity - How many delay nodes this node can be. For example,
+	nodes with 2 experimental interfaces can be 1 delay node, nodes
+	with 4 experimental interfaces can be 2 delay nodes, etc. If your
+	nodes are not especially "beefy" then you might not want to set
+	this number to the maximum it could be.
+	
+* Disk Type - FreeBSD-style disk name for the primary hard drive.
+	Choices are 'ad' (IDE), 'sd' (SCSI), or 'ar' (IDE RAID).
+
+You'll also need to add entries to the interface_types table (using the web
+SQL editor, or SQL directly) for each type of network card you are using.
+Notes on the columns:
+
+* type - Name of the FreeBSD driver for the card (common ones are 'fxp' for
+	Intel EtherExpress Pro 100, 'em' for Intel Pro 1000, and 'bge' for
+	Broadcom gigabit).
+	
+* max_speed - The maximum speed of the interface, in Kbps.  Likely to be
+	either 100000 for 100Mb or 1000000 for Gb.
+
+* full_duplex - 1 if the card can operate in full duplex, 0 otherwise.
+
+Note that you should only specify 1000000 (Gb) for the max_speed if the
+card is Gb capable *and* connected to a Gigabit switch.  If a Gb capable
+card is going to run at 100000 (100Mb) instead, then it is best to add
+a seperate type such as 'em100' (for the 'em' type) to describe that
+configuration.  This way, if you use a Gb switch in the future, you can
+change the type fields in the interfaces table to be 'em' instead of 'em100'.
+
+As an example, to insert an entry for an "fxp" interface:
+
+	insert into interface_types set
+	    type='fxp',max_speed=100000,full_duplex=1,
+	    manufacturuer='Intel',model='EtherExpress Pro',ports=1,
+	    connector='RJ45';
+
+Once you have all of the interfaces specified, you need to insert the
+following interface_capabilities table entries, *for each* new interface
+type you entered above:
+
+	insert into interface_capabilities set
+	    type='fxp',capkey='protocols',capval='ethernet';
+	insert into interface_capabilities set
+	    type='fxp',capkey='ethernet_defspeed',capval='100000';
+
+Again, if the interface is Gigabit capable and connected to a Gb switch,
+capval above should be 1000000.  For example:
+
+	insert into interface_capabilities set
+	    type='em',capkey='protocols',capval='ethernet';
+	insert into interface_capabilities set
+	    type='em',capkey='ethernet_defspeed',capval='1000000';
+
+In such a configuration, you will also want to add:
+
+	insert into interface_capabilities set
+	    type='em',capkey='ethernet_auxspeeds',capval='100000';
+
+This allows a Gb 'em' interface to be configured in an experiment as 100Mb
+without the use of a delay node; i.e., by setting the switch and interface
+characteristics to 100Mb directly.  In theory you could use this to
+configure 10Mb links without a delay node as well, but in our experience,
+we have had too many problems getting switch and node to communicate when
+hardwiring at 10Mb.  So we just use delay nodes to handle 10Mb.
+
+
+##### Bringing up the first node
+
+We'll start by bringing up the first node in the testbed, to make sure things
+are working, and so that you can set some initial values. If we haven't already
+given it to you, ask Utah for the 'newnode' MFS.
+
+What's going to happen as we bring nodes up is that they should boot into
+the 'newnode' MFS, which is a stripped down version of FreeBSD that runs
+out of a memory filesystem. This MFS reports in to boss, informing it of
+it's existence and key things such as it's MAC addresses. Do the BIOS setup
+detailed above on this node, and fire it up.  By the time it's got a
+FreeBSD login prompt on the console, it should have reported in. This will
+send mail to the local testbed-ops list.
+
+Now, let's take a look at the web page where nodes that have checked in, and
+are awaiting creation as 'real' nodes, show up. Log into the web interface as
+an admin (make sure to go 'red dot'). Now, go to the 'Add Testbed Nodes' link.
+Clicking on the numeric ID next to a node will bring up a page with more
+information about the node, which you can edit. You can select nodes with the
+checkboxes along the left side - actions taken by the buttons below operate on
+the selected nodes.
+
+WARNING: Nothing on this page asks for confirmation, so be careful where you
+click.
+
+On this page, you should now see the first node you booted up, which should
+have gotten the name 'pc1'. Click on the ID number (which is probably '1') to
+see more detail. Make sure that the number of interfaces reported is correct.
+Note that the 'Temporary IP' shown on this page is the dynamic one assigned to
+the node by DHCP, from the dynamic range you set up in the defs file. If
+you need to SSH into to it to check things out, until it's be really added
+to the testbed, use this IP.
+
+Next, make sure that the 'Type' column is filled in with the one you entered
+into the types table earlier. If it isn't, fix that now using the 'Set Type'
+box.
+
+Next, set the node name to your preferred naming scheme. We strongly suggest
+leaving it as-is (ie. using pcXXX to name the nodes), but if you must change
+it, do so now - nodes you add later will get a name based on this one, with the
+number and the end incremented. The code that does this guessing supports node
+naming schemes that end in numbers, or end with '-a'.
+
+Now, you'll need to set the IP address for this node. Subsequent nodes will
+have their IP addresses computed from this one. (ie. if you set pc1 to an
+address that ends in '.1', pc3 will get address '.3').
+
+The other thing to check here is to see what order the interface got detected
+in. Unfortunately, FreeBSD and Linux sometimes detect them in different orders.
+If you will usually be running Linux on the nodes, you probably want to
+re-order them to the Linux order so that the database state will make more
+sense to you. At this point, figure out the mapping from the FreeBSD order to
+the Linux one, and write that down. (If necessary, you could boot the node up
+from Knoppix, or some distribution's install floppy/CD to determine the Linux
+order - use MAC addresses to map this to the FreeBSD one.)
+
+If you somehow make a mistake and need to delete a node that's been created,
+use the 'deletenode' script on boss. For example, to delete pc1 from the DB:
+
+	withadminprivs /usr/testbed/sbin/deletenode pc1
+
+##### Bringing up the rest of the nodes
+
+Okay, now that you've got the first node up, the rest should be easy. Bring the
+second node (pc2) up, just like you did the first one. Check to make sure that
+it got an appropriate name and IP address, extrapolated from the first one. If
+that works, start bringing the others up in order. It's important to do them in
+order, because identifying which is which if you do them out of order can be
+very painful! If there are some nodes you simply can't bring up, because of bad
+hardware, etc. write these down, and we'll fix things up later.
+
+Important note: Remember the size of the dynamic range you picked for dhcp
+in the defs file? Well, that will limit how many of nodes you can
+bring up at a time.  If you run out of IP addresses, continue on with the
+nodes you have up, and repeat these steps later with the remainder.
+
+Okay, got all the nodes up? Good. At this point, you can fix things up for any
+you had to skip, using the 'Add to Node ID suffix' box. If, for example, you
+couldn't boot pc10 select all the nodes detected as pc10 and higher, and add 1
+to their node numbers. You will then want to use the 'Recalculate IPs' button
+on these nodes to get their IP addresses set appropriately.
+
+The type for each node is supposed to get detected automatically, but this can
+be a bit imprecise (ie. processor speeds are never exactly as advertised - a
+2GHz processor may be 1.99 GHz.) So, if the nodes didn't get their types
+detected correctly, just select them all, and use the 'set type' button.
+
+##### Figuring out interfaces
+
+If you found earlier that the FreeBSD and Linux ordering for interfaces was
+different, we'll fix that up now.  Use the boxes right above the 'Re-number
+interfaces' button to do this. Just leave blank any interface numbers your
+nodes don't have. For example, if you have two interfaces, and what FreeBSD
+detects as eth0 is eth1 under Linux, and vice versa for eth1, you'd enter
+'1' and '0' in the first two boxes. Select all nodes, and hit the
+'re-number' button. Once you've got this sorted out, the 'Control MAC'
+column should be correct.
+
+Now, we're going to figure out where the interfaces are plugged into your
+switches - you should have entered your switches into the database as part of
+setup-db.txt . If they're not already, enable all of the ports on your
+experimental network that have experimental interfaces connected to them. Also,
+in order to work around some strange behavior (possibly a bug?), you'll need
+to place these ports in some VLAN other than VLAN #1. If you just now
+enabled these interfaces, wait a few minutes to give the switches time to learn
+the nodes' MAC addresses. Now, select all the nodes, and click the 'search
+switch ports' button. This will grab the MAC tables from all switches you put
+into the database, which we'll match up with the MACs that the nodes themselves
+reported. This will take a little while, and it will report any interfaces it
+failed to find. Note - if you didn't enter your control network switch into the
+database, this is okay, but this step won't find any control network
+interfaces. That's acceptable. But, make sure it doesn't complain about any
+experimental-network interfaces.
+
+##### Creating the nodes
+
+You're finally ready to take these nodes and actually create them! (By this
+point, you should have a disk image, etc. from Utah.) Select all the nodes, hit
+'Create', and wait a while. This enter all of the nodes into their permanent
+location in the database, and will reboot them into a 'full' FreeBSD MFS. It
+also puts them into the emulab-ops/hwdown experiment, to make sure that no
+experimenters get them in case something went wrong. Inspect a few to make sure
+they booted right. If so, free them from the hwdown experiment with:
+nfree emulab-ops hwdown pc1 pc2 pc3 ...
+
+At this point, they should get a disk image loaded and end up in the free pool.
+
+##### Serial lines and power controllers
+
+This node creation process doesn't handle serial lines and power controllers
+yet, unfortunately. These will need entries added to the tiplines and outlets
+tables, respectively. Contact Utah if you need help with this.

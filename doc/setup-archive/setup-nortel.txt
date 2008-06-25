@@ -1,0 +1,89 @@
+####
+#### Setting up a Nortel 5500-series switch as an experimental switch 
+####
+
+The Emulab snmpit support works for at least the Nortel 5500 series
+switches;  at DETER, we use 5510-48Ts and 5530-24Ts.  Keith Sklower
+of UCB wrote the actual code, and can provide suggestions about
+which other Nortel switches will work with the snmpit code.  
+
+There are at least two different lines of switches with different SNMP
+MIBs, so there are definitely some Nortel switches which will NOT
+work.  The switches that use the RAPID-CITY mib should be okay, including
+the 8000-series switches, although they have not been tested.
+Apparently, *none* of the Nortel switches that are provided as part
+of IBM blade centers will work with the current code;  if you're
+interested in support, definitely contact Keith.
+
+All of these commands are supposed to be typed from the command
+line (use the "Command Line Interface" menu option).  Make sure that
+you go into "config term" mode to make the changes.  We usually
+leave our switches configured to come up with the menu, as there
+are some common functions that are much easier to do from the menu.
+
+#### Access to the switches
+
+At DETER, we've had the switches lock up infrequently.  When they
+lock up, they require a power cycle to come back, and often have
+managed to lose all or part of their configuration.
+
+For this reason, we have permanent connections to the serial ports
+on the switches from serial port servers, so that we can get in and
+reset the configuration by hand.  We also have the switches on power
+controllers, so that we can power off the switches remotely.
+
+#### Configuration
+
+While I've set up Nortels at DETER several times, and they seem
+to work just fine, I may have forgotten some of the details in my
+rush to get things working.  Here are my suggestions -- please
+let me know what details I've forgotten!
+
+You can ask us at DETER for our 300KB+ Nortel configuration files;
+for obvious reasons, we don't include them here.  Oh, yeah, and
+we're running SW v4.2.1.005.
+
+#### ToS bits
+
+By default, the Nortels appear to set the *IP* ToS bits to zero
+for most packets.  To prevent this, turn off QoS on the switch
+altogether.  This make sense if we want the network to appear as
+though the switch is a direct connection:
+
+	no qos if-assign port ALL
+
+#### Spanning tree
+
+I believe that both Keith and I just turned off STP via the menu
+options, but from the command line it should go something like
+this (YMMV):
+
+	interface FastEthernet ALL
+	spanning-tree port ALL learning disable
+	exit
+
+#### Extra packets
+
+As above, we also want to turn off all topology discovery packets, 
+which will otherwise interfere with idle detection:
+
+	no autotopology
+
+#### IGMP packets
+
+Make sure that multicast can be flooded around the switch correctly;
+the Nortel documentation for this command is particularly cryptic,
+but it works for us.  Doing IGMP snooping apparently (as per Keith)
+locked up our switches.  Ugh.
+
+	vlan igmp unknown-mcast-no-flood disable
+
+#### mac address aging
+
+While we don't have this set at DETER right now, Keith recommended
+turning off mac address aging, as per the various Cisco setup 
+suggestions.  The Nortel maximum (as per Keith) is apparently
+a million;  there is no way to turn it off altogether.
+
+	mac-address-table aging-time 1000000
+

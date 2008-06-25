@@ -1,0 +1,77 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+Rough steps for upgrading your existing Emulab.
+
+0. "Shutdown" the testbed.  Disable the web interface and prevent user
+   logins to "users".  [ We really need a way to stop all Emulab daemons,
+   etc. that might be confused by DB changes. ]
+
+1. Look at doc/UPDATING to find out what you have to update in the
+   boss/ops FreeBSD environment before updating Emulab software.
+   Entries are timestamped, so look for things that have changed since
+   the last you installed.
+
+2. Unpack and build the Emulab software.  You should do this in a directory
+   accessible to your tipserv, ops and boss nodes (e.g., /users) to make
+   the various installs easier.
+
+3. BACKUP YOUR DB.  Do:
+	mysqldump tbdb > db.backup
+
+4. Update the DB.  Look at sql/database-migrate.txt which is a list of
+   SQL commands to perform. In some cases, it also includes instructions
+   regarding operations you need to perform on your data to make it work
+   in the new schema.  Diff the version of this file from the last release,
+   with the version from this release to find which ones to apply.
+
+   If all goes well, proceed to the next step.  Be aware that the
+   "boss-install" make target below will do further checks for missing
+   rows in DB tables.  That target will fail, and tell you what to do to
+   fix your DB, in that case.  It does the table check in two pieces,
+   so it is possible you will have to fix the DB, and restart the boss-install
+   twice.
+
+   If anything goes wrong with the DB update step, contact us.  You can
+   still abort the upgrade at this point by putting back the old db:
+       mysql
+       drop database tbdb;
+       create database tbdb;
+       quit
+       mysql < db.backup
+   and bringing the testbed back up.  After this step, you are committed
+   to the upgrade.
+
+5. Login to your tipservers (if you have them), cd to your build directory
+   and do:
+       sudo gmake tipserv-install
+
+6. Login to your ops/users node, cd to your build directory and do:
+       sudo gmake ops-install
+
+7. Back on your boss node, cd to your build directory and do:
+       sudo gmake boss-install
+       sudo gmake post-install
+
+8. Install a "shared" copyright to appear on the web pages.  We have not
+   yet integrated this step, so it is a little awkward:
+
+   Edit www/copyright-contrib.html and fill in values for @SITENAME@,
+   @SITEDATES@, @SITECOPYRIGHT@.  Then copy this file to copyright.html
+   in your installed testbed tree, e.g.:
+       cp copyright-contrib.html /usr/testbed/www/copyright.html
+
+9. Reboot tipservers, ops and boss and make sure things boot up ok.
+   Try creating/swapping/modifying/destroying an experiment, look
+   for errors.
+
+10.Bring up the web interface and inform users that they should reboot
+   their existing experiment nodes if they notice odd behaviors.
+
+Things should be backward compatible so you don't have to update the
+standard disk images immediately.  But you will want to do it.  See
+update-node.txt for more info about that.
+

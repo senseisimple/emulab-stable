@@ -1,0 +1,51 @@
+These are the steps we followed to create a second tip server:
+
+1. Load the new 4.3 image, and then neuter the tmcd/tmcc stuff. Give
+   it a fixed IP address (turn off DHCP).
+
+2. Put in testbed /etc/group file (since we are going to run
+   console_setup.proxy from paper), but a tbadmins only password file
+   since mere users will not be able to log in.
+
+3. Mount fs.emulab.net:/users on /users (in /etc/fstab).
+
+4. Create new filesystem for /usr/testbed and mount it (in /etc/fstab). 
+
+5. Install testbed software using new "gmake tipserv-install" target.
+
+6. Edit /etc/rc.local to start up the /usr/site/etc/capture.rc file.
+
+7. Create /usr/site/etc/capture.rc.
+
+8. Symlink /var/log/tiplogs to /usr/testbed/log/tiplogs.
+
+9. Edit /etc/syslog.conf:
+
+	!capture
+	*.*                             /usr/testbed/log/capture.log
+
+   Must "touch" the log file so it exists.
+
+10. Create /dev entries for cyclades with MAKEDEV.cz.
+
+11. Edit /etc/remote as needed.
+
+12. Edit /usr/site/etc/capture.rc as needed.
+
+13. Make sure DB tiplines table reflects the node names/locations.
+    Should be entries like:
+
+	INSERT INTO tiplines VALUES ('pc109','tipserv1.emulab.net',0,0,'');
+
+14. Create symlinks on plastic to NFS mounted directories on the
+    tipserver. eg:
+
+	plastic:/dev/tip/pc109.acl -->
+			/nfs/tipserv1/dev/tip/pc109.acl
+	plastic:/var/log/tiplogs/pc109.run -->
+			/nfs/tipserv1/var/log/tiplogs/pc109.run
+	plastic:/var/log/tiplogs/pc109.log -->
+			/nfs/tipserv1/var/log/tiplogs/pc109.log
+
+    Use amd on plastic for this since we don't hard mount cross deps.
+

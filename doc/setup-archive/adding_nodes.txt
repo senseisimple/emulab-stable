@@ -1,0 +1,211 @@
+This file documents the process of adding a new node to the testbed.
+
+A. Information about the node
+-----------------------------
+
+1. MAC address. For each port in the new node you need to find out the
+   MAC address, and which port (eth0/fxp0) it is in software.  You need
+   to know both the Linux (eth) and BSD (fxp,xl,dc,etc.) names.
+
+2. Wiring. We need to know which physical port on the back of the
+   machine maps to eth0, eth1, etc., and where each port is connected
+   to the cisco (get module/port, ie 3/21).
+
+3. Power. Plug it into a power controller, and make note of which one
+   it is (name or IP) and which port you plug it into (1-8).
+
+4. Serial line(s). When you plug in the serial lines, make sure which
+   ports on the serial expander they are plugged into.
+
+B. If the node is of a new type
+-------------------------------
+
+1. You'll need specs on the nodes for the node_types and node_type_attributes
+   tables. For node_types, you'll just need a name for the type:
+
+   insert into `node_types` (class,type) values ("pc", "pc2800d");
+
+   For node_type_attributes you will create a row for each of several
+   attributes.  For this, you will need a name for the processor class
+   (e.g. Core Duo), speed (MHz), RAM size (in MB), boot hard disk type and unit
+   ('ad' and '0' for IDE, 'da' and '0' for SCSI, 'ad' and '4' for SATA),
+   boot disk size (in GB), max # of physical cards it holds (including the
+   motherboard as a card if it has built-in ethernet), and the approximate
+   amount of time it takes the machine to "power cycle" (in seconds).
+
+   You'll also need to give it a default OS id (the default OS to boot)
+   and image ID (disk image the default OS comes from), which port is the
+   control net (e.g. 4) and what its Linux name is (e.g. "eth4"), how many
+   links this node can delay (usually: num_experimental_links / 2), and
+   how many virtual nodes ("jails") the machine can support.
+
+   Example:
+
+   insert into `node_type_attributes` values
+     ('pc2800d','processor','Pentium D','string'),
+     ('pc2800d','frequency','2800','integer'),
+     ('pc2800d','memory','2048','integer'),
+     ('pc2800d','disktype','ad','string'),
+     ('pc2800d','bootdisk_unit','4','integer'),
+     ('pc2800d','disksize','160.00','float'),
+     ('pc2800d','max_interfaces','4','integer'),
+     ('pc2800d','power_delay','60','integer'),
+     ('pc2800d','default_imageid','emulab-ops-FBSD54+FC4-STD','string'),
+     ('pc2800d','default_osid','emulab-ops-FBSD54','string'),
+     ('pc2800d','control_network','0','integer'),
+     ('pc2800d','control_interface','eth0','string'),
+     ('pc2800d','delay_capacity','2','integer'),
+     ('pc2800d','virtnode_capacity','50','integer');
+
+   There are also assorted other attributes you need not change, just
+   use these:
+
+   insert into `node_type_attributes` values
+     ('pc2800d','delay_osid','FBSD-STD','string'),
+     ('pc2800d','jail_osid','FBSD-STD','string'),
+     ('pc2800d','adminmfs_osid','FREEBSD-MFS','string'),
+     ('pc2800d','diskloadmfs_osid','FRISBEE-MFS','string'),
+     ('pc2800d','pxe_boot_path','/tftpboot/pxeboot.emu','string'),
+     ('pc2800d','imageable','1','boolean'),
+     ('pc2800d','rebootable','1','boolean'),
+     ('pc2800d','simnode_capacity','0','integer'),
+     ('pc2800d','trivlink_maxspeed','0','integer');
+
+
+2. There are several scripts that limit searches to certain classes.
+   If the new type you have added does not have class "pc", you may need
+   to include this new class as appropriate.
+   Some of the scripts that might need to be updated are:
+   /db/avail.in
+   /db/nfree.in
+   /tbsetup/assign_wrapper.in
+   /tbsetup/batchexp.in
+   /tbsetup/reload_daemon.in
+   /tbsetup/exports_setup.in
+   /tbsetup/snmpit_lib.pm
+   /www/nodecontrol_list.php3
+   /www/reserved.php3
+   /www/showexp_list.php3
+   /www/tutorial/nscommands.html
+   /www/updown.php3
+   /sql/database-create.sql
+
+C. What to do on boss:
+----------------------
+
+1. Insert entries into interfaces table using info from A(1). Try:
+   insert into interfaces (node_id,card,port,MAC,IP,interface_type,iface)
+   values
+   ("pcN",0,1,"00b0d0f01020",NULL,"BSDTYPE","eth0")  
+
+2. Insert entries into wires table using info from A(2). Try:
+   insert into wires (node_id1,card1,port1,node_id2,card2,port2) values
+   ("pcN",0,1,"ciscoX",5,1)
+
+   For the control interface do:
+   insert into wires (type,node_id1,card1,port1,node_id2,card2,port2)
+   values ("Control","pcN",0,1,"ciscoX",5,1)
+
+   Check to make sure your cards and ports match up with what you 
+   entered in the interfaces table.
+
+3. Insert entry into outlets table, using info from A(3). Try:
+   insert into outlets (node_id, power_id, outlet) values
+   ("pcN","powerX",Y)
+
+4. Add entries to the nodes table for each node. Try:
+   insert into nodes (node_id,type,phys_nodeid,role,def_boot_osid,priority,op_mode)
+   values
+   ("pcN","pc1u","pcN","testnode","FBSD45-STD",P,'NORMAL')
+
+   P (priority) is the where it gets printed out. These need to be
+   ascending numbers, and in the right region. See the table.
+
+4a. Add entries into the tiplines table. The "server" field is where
+    the actual capture process runs:
+
+    INSERT INTO tiplines VALUES ('pc1','pc1','users.emulab.net',0,0,'');
+    INSERT INTO tiplines VALUES ('pc111','pc111','tipserv1.emulab.net',0,0,'');
+
+    You need to add the usual lines in /etc/remote on the machine
+    where the capture process runs. In addition, add a line on users
+    to that users can use tip to connect to a console on a remote tip
+    server. So, on users:
+
+	pc111|tbpc111:dv=/dev/tip/pc111:br#115200:nt:pa=none:
+
+    The device field is ignored, but something must be there. 
+
+5. Until you are ready to put it in service, reserve it to an expt,
+   either with nalloc or by adding an entry to the reserved table
+   directly. You'll probably also want to put its ports in a vlan to
+   enable them.
+
+6. Add the node to the system files:
+   - DNS: on boss, cd /etc/namedb
+	  co -l emulab.net.db.head
+	  add these lines with all the others:
+	  pcN    IN      A       155.101.132.N
+                 IN      MX 10   ops
+                 IN      MX 20   fast.cs.utah.edu.
+	  ci -u emulab.net.db.head
+          cd reverse/
+	  co -l 155.101.132.db
+	  in 155.101.132.db, make these changes:
+	  update serial number on line 10
+	  add entry for node, like this:
+	  N      IN      PTR     pcN.emulab.net.
+	  ci -u 155.101.132.db
+	  run /usr/testbed/sbin/named_setup to update.
+   - DHCP: on boss, cd /usr/local/etc/
+	   if you added a new node type, then you need to add a line
+	   of the form:
+	      %%nodetype=<type>
+	   (where <type> is the new type is called) to dhcpd.conf.template.
+	   Then as root run:
+	      dhcpd_makeconf dhcpd.conf.template > Ndhcpd.conf
+	   you can diff dhcpd.conf with the new file to verify nothing
+           catostrophic happened.  Finally:
+	      sudo cp Ndhcpd.conf dhcpd.conf
+	      sudo /usr/local/etc/rc.d/2.dhcpd.sh restart 
+   - tip: on ops or tipserv1, edit /etc/remote
+	  add a line like this:
+	  pcN:dv=/dev/tip/pcN:br#115200:nt:pa=none:
+	  pcN-tty:dv=/dev/cua<port #>:br#115200:nt:pa=none:
+	  then do these:
+	  sudo touch /var/log/tiplogs/pcN.log
+	  sudo touch /var/log/tiplogs/pcN.run
+   - capture: on ops or tipserv1, edit /usr/site/etc/capture.rc:
+	  add a line like this:
+	  /usr/site/bin/capture -r -s 115200 pcN tty<port#> >/dev/null 2>&1 &
+
+
+D. How to get the first image on it:
+------------------------------------
+
+1. If everything is set up right, you can use the magic PXE Flash Floppy 
+   to put the right thing on the PXE card. Edit the BIOS to put the
+   boot order to Floppy, PXE, Hard Drive, then reboot it.
+
+2. If everything goes right, you should see it PXE boot and find its
+   DHCP info, then contact the ProxyDHCP server to get its bootinfo
+   data, then it should decide according to that what to boot.
+
+3. If process 3 went okay to that point, do an os_load to try to
+   install the standard testbed images for the node.
+
+4. If it doesn't seem to be working just like the others, talk to
+   Leigh and Mike.
+
+E. What next
+------------
+
+1. Test it out and see if it works well enough to put into service. If
+   its ready, release it into the wild with nfree or by deleting its
+   entry in the reserved table.
+
+2. Do some more tests to find any obvious problems. Fix them, if any.
+
+3. Sit back and relax for a few minutes until the bug reports start
+   flowing in.
+
