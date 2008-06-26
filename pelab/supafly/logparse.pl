@@ -1,5 +1,12 @@
 #!/usr/bin/perl -w
 
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+
 use English;
 use Getopt::Std;
 #

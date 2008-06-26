@@ -1,10 +1,17 @@
 #!/usr/bin/perl -w
 
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+
 use Mysql;
 
 my $DB = Mysql->connect("localhost", "pelab", "flexlabdata");
 
-my $threshold = 4;
+my $threshold = 3;
 
 if (!$DB) {
     die "Failled to connect to DB\n";
@@ -27,10 +34,13 @@ while (my @row = $result->fetchrow()) {
     $bw{$row[0]}{$row[1]} = $row[2];
 }
 
+$totalPaths = 0;
+
 foreach my $src (keys %bw) {
     foreach my $dst (keys %{$bw{$src}}) {
         if (exists $bw{$dst}{$src}) {
             # We have measurements in both directions
+	    $totalPaths = $totalPaths + 1;
             my $ratio = $bw{$src}{$dst} * 1.0 / $bw{$dst}{$src};
             if ($ratio < 1) { 
                 # We'll catch this in the other order
@@ -42,3 +52,6 @@ foreach my $src (keys %bw) {
         }
     }
 }
+
+print "Total paths = $totalPaths\n";
+
