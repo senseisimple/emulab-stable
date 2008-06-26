@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -15,7 +15,7 @@ SBIN_SCRIPTS		= tracuser tracsetup
 LIBEXEC_SCRIPTS		= tracxlogin 
 CTRL_LIBEXEC_SCRIPTS	= 
 CTRL_LIB_FILES		= 
-CTRL_SBIN_SCRIPTS	= tracproxy
+CTRL_SBIN_SCRIPTS	= tracproxy email2trac
 
 # These scripts installed setuid, with sudo. 
 SETUID_BIN_SCRIPTS   = 

@@ -1,0 +1,266 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+use Errno;
+use Mail::Internet;
+use Mail::Address;
+
+#
+# Gateway email into BUG DB.
+#
+sub usage()
+{
+    exit(-1);
+}
+my $optlist = "d";
+my $debug   = 0;
+
+#
+# Configure variables
+#
+my $TB       = "@prefix@";
+my $TBOPS    = "@TBOPSEMAIL@";
+my $OURDOMAIN= "@OURDOMAIN@";
+my $TRACDIR  = "/usr/local/www/data/trac/emulab";
+my $TRACEMAIL= "stoller\@" . $OURDOMAIN;
+
+# From sysexits.h
+my $EX_DATAERR	= 65;
+my $EX_NOUSER	= 67;
+my $EX_SOFTWARE	= 70;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libtestbed;
+use libtbdb;
+
+# Locals
+my $dbname;
+my $dbuser;
+my $dbpass;
+
+# Protos
+sub fatal($$);
+sub CheckTicketID($);
+sub AddComment($$$);
+sub Notify($$$);
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+
+#
+# The DB user/passwd are stored in the trac config file, which is
+# hopefully not group readable. Open and parse that file, then open a
+# connection to the DB.
+#
+my $uri = `grep mysql: $TRACDIR/conf/trac.ini`;
+if ($?) {
+    fatal(-1, "Could not get mysql data from $TRACDIR/conf/trac.ini");
+}
+if ($uri =~ /mysql:\/\/(\w*):(\w*)\@localhost\/([\+\w]*)$/) {
+    $dbname = $3;
+    $dbuser = $1;
+    $dbpass = $2;
+}
+else {
+    fatal(-1, "Could not parse mysql uri from $TRACDIR/conf/trac.ini");
+}
+
+# Make sure we have everything we need.
+if (!defined($dbname) ||
+    !defined($dbuser) ||
+    !defined($dbpass)) {
+    fatal(-1, "Could not find db parameters in $TRACDIR/conf/trac.ini");
+}
+if (TBDBConnect($dbname, $dbuser, $dbpass) < 0) {
+    fatal(-1, "Could not connect to trac database!");
+}
+
+#
+# Use this library to parse the message from STDIN.
+#
+my $message = new Mail::Internet \*STDIN;
+fatal($EX_DATAERR, "Cannot parse message")
+    if (! $message);
+my $body    = $message->body();
+my $header  = $message->head();
+my $headers = $header->header_hashref();
+
+fatal($EX_DATAERR, "Headers missing")
+    if (!defined($headers->{"From"}) ||
+	!defined($headers->{"Subject"}));
+
+# Convert this to a string.
+my $comment = "";
+foreach my $line (@{ $body }) {
+    $comment .= $line;
+}
+
+#
+# Figure out the user. If we cannot get that then its an error.
+#
+my $user_email;
+my $ticketid;
+my @objects = Mail::Address->parse($headers->{"From"}[0]);
+
+fatal($EX_DATAERR, "Cannot parse From: ". $headers->{"From"}[0])
+    if (! @objects);
+
+if ($objects[0]->user() =~ /^[-\w]*$/ &&
+    $objects[0]->host() =~ /^[-\w\.]*$/) {
+    $user_email = $objects[0]->user() . "\@" . $objects[0]->host();
+}
+else {
+    fatal($EX_DATAERR, "Cannot parse User: " . $objects[0]->address());
+}
+
+if ($headers->{"Subject"}[0] =~ /\[Emulab\] \#(\d*): /s) {
+    $ticketid = $1;
+}
+else {
+    fatal($EX_DATAERR, "Cannot parse Subject: " . $headers->{"Subject"}[0]);
+}
+
+#
+# Now we check things.
+#
+fatal(-1, "No such ticket: $ticketid")
+    if (CheckTicketID($ticketid) != 0);
+
+fatal($EX_SOFTWARE, "Could not add comment to ticket $ticketid")
+    if (AddComment($ticketid, $user_email, $comment) != 0);
+
+# No errors reported since comment as been added.
+Notify($ticketid, $user_email, $comment);
+
+exit(0);
+
+#
+# Lookup a task ID to make sure its a valid task.
+#
+sub CheckTicketID($)
+{
+    my ($id) = @_;
+
+    my $query_result =
+	DBQueryFatal("select id from ticket where id='$id'");
+
+    return -1
+	if (!$query_result->numrows);
+
+    return 0;
+}
+
+#
+# Add comment ...
+#
+sub AddComment($$$)
+{
+    my ($ticketid, $user_email, $comment) = @_;
+
+    my $now = time();
+    $comment = DBQuoteSpecial($comment);
+
+    my $query_result =
+	DBQueryFatal("select MAX(oldvalue) from ticket_change ".
+		     "where ticket=$ticketid and field='comment'");
+    my ($lastvalue) = $query_result->fetchrow_array();
+    $lastvalue = 0
+	if (!defined($lastvalue) || $lastvalue eq "");
+    $lastvalue++;
+    
+    DBQueryFatal("insert into ticket_change set ".
+		 "  ticket=$ticketid, time=$now, ".
+		 "  author='$user_email', field='comment', ".
+		 "  oldvalue='$lastvalue', newvalue=$comment");
+    DBQueryWarn("update ticket set changetime=$now ".
+		"where id='$ticketid'");
+    return 0;
+}
+
+#
+# And send out the notification.
+#
+sub Notify($$$)
+{
+    my ($tickeid, $user_email, $comment) = @_;
+    my @email_addresses = ();
+
+    #
+    # Email of person assigned to task.
+    #
+    my $query_result =
+	DBQueryWarn("select owner,reporter from ticket ".
+		    "where id=$ticketid");
+
+    # no error since comment already added.
+    return
+ 	if (!$query_result);
+
+    if ($query_result->numrows) {
+	my ($owner,$reporter) = $query_result->fetchrow_array();
+
+	push(@email_addresses, $owner)
+	    if (defined($owner) && $owner ne "");
+	push(@email_addresses, $reporter)
+	    if (defined($reporter) && $reporter ne "");
+    }
+
+    #
+    # And anyone who has commented on it.
+    #
+    $query_result =
+	DBQueryWarn("select distinct author from ticket_change ".
+		    "where ticket=$ticketid and field='comment'");
+    if ($query_result && $query_result->numrows) {
+	while (my ($author) = $query_result->fetchrow_array()) {
+	    push(@email_addresses, $author)
+		if (defined($author) && $author ne "" &&
+		    ! grep {$_ eq $author} @email_addresses);
+	}
+    }
+
+    SENDMAIL(undef,
+	     "Re: [Emulab] #${ticketid}: comment added",
+	     "*** #${ticketid} comment added by $user_email\n\n$comment",
+	     $TRACEMAIL,
+	     "Bcc: " . join(",", @email_addresses));
+}
+
+sub fatal($$)
+{
+    my ($code, $mesg) = @_;
+
+    print STDERR
+	"*** $0:\n".
+	"    $mesg\n";
+    exit($code);
+}
