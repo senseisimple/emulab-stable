@@ -1,0 +1,12 @@
+--- /etc/rc.d/named.ops	2008-06-26 11:18:13.000000000 -0600
++++ /etc/rc.d/named	2008-06-26 11:17:35.000000000 -0600
+@@ -77,7 +77,8 @@
+ make_symlinks()
+ {
+ 	checkyesno named_symlink_enable &&
+-	    ln -fs "${named_chrootdir}${pidfile}" ${pidfile}
++	    ln -fs "${named_chrootdir}${pidfile}" ${pidfile} ||
++	    return 0
+ }
+ 
+ named_reload()
