@@ -1178,6 +1178,15 @@ Phase "dhcpd", "Setting up initial dhcpd configuration", sub {
 };
 
 Phase "named", "Setting up initial named configuration", sub {
+    # Newer than 6.3 have a pidfile location problem: named writes its pid to 
+    # /var/run/named.pid, but the rc scripts set the default pidfile location
+    # to /var/run/named/pid.  So, we symlink and hope for the best.
+    Phase "pidfilefix", "Fixing pidfile location mismatch", sub {
+	PhaseSkip("You appear to have a custom pidfile location in" . 
+		  " /etc/rc.conf")
+	    if (`fgrep '^named_pidfile' /etc/rc.conf`);
+	ExecQuietFatal("ln -sf /var/run/named.pid /var/run/named/pid");
+    };
     Phase "building", "Building named files and templates", sub {
 	ExecQuietFatal("cd $TOP_OBJDIR/named; $GMAKE");
     };
