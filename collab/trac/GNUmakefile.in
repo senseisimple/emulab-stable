@@ -56,10 +56,15 @@ control-install:	\
 clean:
 	rm -f *.o core
 
-$(INSTALL_DIR)/opsdir/sbin/%: %
+$(INSTALL_DIR)/opsdir/sbin/tracproxy: tracproxy
 	@echo "Installing $<"
 	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
 	$(INSTALL) $< $@
+
+$(INSTALL_DIR)/opsdir/sbin/email2trac: email2trac
+	@echo "Installing (setuid nobody) $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
+	$(SUDO) $(INSTALL) -o nobody -m 4755 $< $@
 
 $(INSTALL_DIR)/opsdir/lib/trac/%: %
 	@echo "Installing $<"
