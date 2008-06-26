@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 SRCDIR		= @srcdir@
@@ -222,7 +222,7 @@ uninstall:
 
 force-install:	uninstall install
 
-$(INSTALL_WWWDIR)/doc/LICENSE.txt: $(TESTBED_SRCDIR)/LICENSE
+$(INSTALL_WWWDIR)/doc/LICENSE.txt: $(TESTBED_SRCDIR)/AGPL-COPYING
 	@echo "Installing $<"
 	-mkdir -p $(patsubst %/,%,$(dir $@))
 	$(INSTALL_DATA) $(subst $$,\$$,$<) $(subst $$,\$$,$@)
