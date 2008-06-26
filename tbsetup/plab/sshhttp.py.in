@@ -1,4 +1,9 @@
 #
+# EMULAB-COPYRIGHT
+# Copyright (c) 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+#
 # Need ssh transport proxy to chat with the new NM.  Until PLC deploys the
 # "delegate" ssh login to the NM shell, we ssh to the utah svc slice as
 # emulabman and talk to the NM ourselves.  Obviously, this won't work if

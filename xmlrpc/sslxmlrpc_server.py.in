@@ -1,7 +1,7 @@
 #!/usr/local/bin/python
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 200-2007 University of Utah and the Flux Group.
+# Copyright (c) 2005-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 import sys

@@ -1,4 +1,9 @@
 #!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
 
 #
 # Figure out which OS, distro. etc.
