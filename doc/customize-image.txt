@@ -11,15 +11,20 @@ provided by Utah.  The basic procedure is:
   - save customized image
 
 We will provide you with a generic disk image tarball.  This tarball will
-include a multi-OS "full disk" image and one or more auxilliary "single
+include a multi-OS "full disk" image and one or more auxiliary "single
 partition" images.  The combo image is one which has both a FreeBSD partition
 and a Linux partition.  You will need to customize both.  By convention
 FreeBSD is in DOS partition #1 and Linux in DOS partition #2.
 
 First you need to decide which image to use.  The combo image choices are:
 
-  FBSD62+FC6-GENERIC.ndz    # FreeBSD6.2 + Fedora6 - generic-image.tar
-  FBSD410+RHL90-GENERIC.ndz # FreeBSD4.10 + RedHat9 - generic-image-old.tar
+  * FBSD62+FC6-GENERIC.ndz
+    Includes FreeBSD 6.2 and Fedora 6.
+    Download http://www.emulab.net/downloads/generic-image.tar for this.
+
+  * FBSD410+RHL90-GENERIC.ndz
+    Includes FreeBSD 4.10 and RedHat 9.
+    Download http://www.emulab.net/downloads/generic-image-old.tar for this.
 
 Generally, you will want to use the former as your default image that disks
 are loaded with.  The reason the second image is included at all is that it
@@ -27,7 +32,7 @@ must be used for "virtual node" support, which right now is only available
 in our modified FreeBSD 4.10 kernel.  Unfortunately, the 4.10 kernel, being
 more than 5 years old, doesn't run on all modern hardware.  So you may be
 stuck without vnodes for awhile if your hardware is in the unsupported
-catagory.
+category.
 
 You will need to have the Emulab network-booted, memory-filesystem-based,
 FreeBSD systems (hereafter known as the MFSes).  If you have not done this
@@ -418,7 +423,7 @@ I. Dealing with SCSI disks (or RAID) and unrecognized hardware.
 * For FreeBSD, we have five different FreeBSD 4.10 kernels that are used
   for various purposes.  All of them are based on the GENERIC configuration.
   If the default kernel ("/kernel" aka "/kernel.100HZ") does not boot on your
-  machine or your disk or ethernet interfaces are not recognized, you will
+  machine or your disk or Ethernet interfaces are not recognized, you will
   have to move to the FreeBSD 6.2 based solution above.
 
 * For Linux, it is even more of a PITA.  We currently don't even have a

@@ -113,7 +113,7 @@ How to make a generic image from a Utah one:
 3h. Reboot into the admin MFS
 
 4. Minor admin stuff.
-   Once in the admin MFS, I run fsck on the filesystesm just to be safe:
+   Once in the admin MFS, I run fsck on the filesystems just to be safe:
 
 	fsck /dev/ad0s1[aef]
 	e2fsck -f -y /dev/ad0s2

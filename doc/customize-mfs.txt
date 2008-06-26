@@ -2,7 +2,6 @@
 
 These are the files/directories needed for PXE booting.
 
-
 2. CONTENTS:
 
 README
@@ -47,7 +46,12 @@ do that now, I'll wait...
 
 ...ok.  First, you have to choose between using FreeBSD 4.7 or FreeBSD 6.2
 MFSes.  You almost certainly want to use the 6.2 versions since 6.2 supports
-more hardware.  If you have any problems with those, then try the 4.7 versions.
+more hardware.  In fact, the "6.2 version" actually has a 6.3-STABLE kernel
+built on 6/26/2008, so it is the lastest available for the 6.x series.
+
+If you have any problem with the 6.2 versions *and* you have older hardware,
+then try the 4.7 versions.  If the 6.2 version don't work because it appears
+that your hardware is not supported, then contact Utah for more help.
 In summary, I recommend:
 
 	pxeboot62/pxeboot.emu-{sio,vga} (pick one and rename to "pxeboot.emu")
@@ -70,4 +74,4 @@ loader to drop into interactive mode.  Make sure you replace the loader.conf
 file in the three subdirectories with the -null version as well.
 
 [ This file is a copy of doc/customize-mfs.txt in the Emulab source tree. ]
-[ Last updated 03/02/07 ]
+[ Last updated 06/26/08 ]
