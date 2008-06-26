@@ -5,13 +5,6 @@
 # All rights reserved.
 #
 
-#
-# EMULAB-COPYRIGHT
-# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
-# All rights reserved.
-#
-
-
 InputFile1="\"$1\""
 InputFile2="\"$2\""
 OutputFile="\"$3\""
