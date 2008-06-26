@@ -1,4 +1,9 @@
 #!/usr/local/bin/python
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
 
 #
 # A simple little xmlrpc server that provides an interface to flexlab data.
