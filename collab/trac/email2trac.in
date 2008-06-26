@@ -28,7 +28,7 @@ my $TB       = "@prefix@";
 my $TBOPS    = "@TBOPSEMAIL@";
 my $OURDOMAIN= "@OURDOMAIN@";
 my $TRACDIR  = "/usr/local/www/data/trac/emulab";
-my $TRACEMAIL= "stoller\@" . $OURDOMAIN;
+my $TRACEMAIL= "trac_reply\@" . $OURDOMAIN;
 
 # From sysexits.h
 my $EX_DATAERR	= 65;
