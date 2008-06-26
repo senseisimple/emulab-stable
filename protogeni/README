@@ -1,4 +1,5 @@
 This directory contains an experimental implementation of ProtoGENI.
+As of summer 2008, it is evolving rapidly.
 
 From the GENI website:
 
@@ -14,4 +15,4 @@ GENI software and deployed hardware. We are primarily deriving it from
 our Emulab software, and secondarily leveraging the existing Planetlab
 software. Both base systems are production code.
 
-More info can be found as www.protogeni.net ...
+More info can be found at http://www.protogeni.net ...
