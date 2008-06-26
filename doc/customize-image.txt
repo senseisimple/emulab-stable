@@ -1,19 +1,33 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2004-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 Instructions for creating a site-customized image from a "generic" image
-(FBSD410+RHL90-GENERIC.ndz) provided by Utah.  The basic procedure is:
+provided by Utah.  The basic procedure is:
 
   - load the image on a testbed machine
   - customize both FreeBSD and Linux filesystems
   - save customized image
 
-We will provide you with a generic disk image.  This disk image is one
-which has both a FreeBSD partition and a Linux partition.  You will need
-to customize both.  By convention FreeBSD is in DOS partition #1 and Linux
-in DOS partition #2.
+We will provide you with a generic disk image tarball.  This tarball will
+include a multi-OS "full disk" image and one or more auxilliary "single
+partition" images.  The combo image is one which has both a FreeBSD partition
+and a Linux partition.  You will need to customize both.  By convention
+FreeBSD is in DOS partition #1 and Linux in DOS partition #2.
+
+First you need to decide which image to use.  The combo image choices are:
+
+  FBSD62+FC6-GENERIC.ndz    # FreeBSD6.2 + Fedora6 - generic-image.tar
+  FBSD410+RHL90-GENERIC.ndz # FreeBSD4.10 + RedHat9 - generic-image-old.tar
+
+Generally, you will want to use the former as your default image that disks
+are loaded with.  The reason the second image is included at all is that it
+must be used for "virtual node" support, which right now is only available
+in our modified FreeBSD 4.10 kernel.  Unfortunately, the 4.10 kernel, being
+more than 5 years old, doesn't run on all modern hardware.  So you may be
+stuck without vnodes for awhile if your hardware is in the unsupported
+catagory.
 
 You will need to have the Emulab network-booted, memory-filesystem-based,
 FreeBSD systems (hereafter known as the MFSes).  If you have not done this
@@ -78,16 +92,42 @@ We will assume the machine is called "pc1" in the following directions.
   shell variable:
 
       set DSK=<your-disk-here> # e.g. "ad0", "da0", "ad4"
-	or
+
+  for csh, or:
+
       DSK=<your-disk-here>; export DSK
+
+  for sh or bash.
 
 * Use 'imageunzip' to load the disk.
   If all has gone well, the node should be up and accessible via ssh.
-  To copy the generic image onto the test machine disk, do the following
-  from boss:
+  To copy the generic image onto the test machine disk, first set some
+  variables based on what image you are customizing:
+
+  FBSD62+FC6 (csh):
+     set FULL=FBSD62+FC6
+     set BSD=FBSD62
+     set LNX=FC6
+
+  FBSD62+FC6 (sh):
+     FULL=FBSD62+FC6; export FULL
+     BSD=FBSD62; export BSD
+     LNX=FC6; export LNX
+
+  FBSD410+RHL90 (csh):
+     set FULL=FBSD410+RHL90
+     set BSD=FBSD410
+     set LNX=RHL90
+
+  FBSD410+RHL90 (sh):
+     FULL=FBSD410+RHL90; export FULL
+     BSD=FBSD410; export BSD
+     LNX=RHL90; export LNX
+
+  Now do the following on boss:
 
       sudo ssh pc1 imageunzip - /dev/$DSK \
-	< /usr/testbed/images/FBSD410-RHL90-GENERIC.ndz
+	< /usr/testbed/images/$FULL-GENERIC.ndz
 
   Image loading should take anywhere from 45 seconds, to several minutes.
 
@@ -238,9 +278,9 @@ D. Saving the customized image
    From boss do:
 
        cd /proj/emulab-ops/images
-       sudo ssh pc1 imagezip /dev/$DSK - > FBSD410+RHL90-STD.ndz
-       sudo ssh pc1 imagezip -s 1 /dev/$DSK - > FBSD410-STD.ndz
-       sudo ssh pc1 imagezip -s 2 /dev/$DSK - > RHL90-STD.ndz
+       sudo ssh pc1 imagezip /dev/$DSK - > $FULL-STD.ndz
+       sudo ssh pc1 imagezip -s 1 /dev/$DSK - > $BSD-STD.ndz
+       sudo ssh pc1 imagezip -s 2 /dev/$DSK - > $LNX-STD.ndz
 
 
 E. Testing the image
@@ -306,11 +346,23 @@ G. Installing the images
    The boss installation process should have created image (and OS)
    descriptors for these standard images.  You can verify via the web
    page by clicking on "List ImageIDs" on the left menu and ensuring
-   that FBSD-STD, RHL-STD, FBSD410-STD, and RHL90-STD are all shown.
+   that FBSD-STD, RHL-STD, FBSD62-STD, FBSD410-STD, FC6-STD, and RHL90-STD
+   are all shown.
 
-H. Before you free up the node you have been using to customize the
-   standard image, you might also want to customize the firewall image
-   (FBSD410-IPFW2-GENERIC.ndz) if you plan to use control net firewalls.
+H. Additional images
+
+   If you have chosen FBSD62+FC6-GENERIC as your default image, you may
+   also want the FBSD410 image for firewall and vnode support (this is
+   assuming that FreeBSD 4.10 will run on your hardware).  To do this,
+   you need to customize one or both of:
+
+       FBSD410-IPFW2-GENERIC.ndz
+       FBSD410-GENERIC.ndz
+
+   (Note that we do not use the combo image containing FBSD410 here, we use
+   a "single partition" image with just BSD, which is smaller).  Now, before
+   you free up the node you have been using to customize the standard image,
+   is the time to customize these.
 
    To do this, make sure you node is in the admin MFS and then do (from
    your boss node):
@@ -337,13 +389,27 @@ H. Before you free up the node you have been using to customize the
 
    Again, an image descriptor (FW-IPFW2) should already exist in the database.
      
-Dealing with SCSI disks (or RAID) and unrecognized hardware.
+   Repeat for the vnode kernel:
+
+      sudo ssh pc1 imageunzip -s 1 - /dev/$DSK \
+	< /usr/testbed/images/FBSD410-GENERIC.ndz
+
+       cd /proj/emulab/ops/images
+       sudo ssh pc1 imagezip -s 1 /dev/$DSK - > FBSD410-STD.ndz
+
+       mv /proj/emulab-ops/images/*.ndz /usr/testbed/images/
+
+
+I. Dealing with SCSI disks (or RAID) and unrecognized hardware.
 
 * For completeness here are the files that need to be changed if you have
   other than IDE disks:
 
       FreeBSD /etc/fstab: needs "ad0" changed to appropriate type
+          ("ad4" for SATA, "da0" for SCSI, "aac", "twe" or various
+            others for RAID)
       Linux /etc/fstab: needs "hda" changed to appropriate type
+          ("sda" for SATA or SCSI, ?? for RAID)
       Linux /etc/lilo.conf: ditto, plus lilo must be rerun
 
   However, you should not need to mess with these files, the post-disk-loader
@@ -353,16 +419,14 @@ Dealing with SCSI disks (or RAID) and unrecognized hardware.
   for various purposes.  All of them are based on the GENERIC configuration.
   If the default kernel ("/kernel" aka "/kernel.100HZ") does not boot on your
   machine or your disk or ethernet interfaces are not recognized, you will
-  have to move to a FreeBSD 6.2 based solution.  You will need to contact
-  testbed-ops@emulab.net in this case.  In the future FreeBSD 6 world, there
-  should only be ONE kernel for everything.
+  have to move to the FreeBSD 6.2 based solution above.
 
 * For Linux, it is even more of a PITA.  We currently don't even have a
   generic Linux kernel in the image.  So if Linux doesn't boot in the image,
   you will have to configure/build a new kernel on some external machine.
-  Since the default Linux image is RedHat 9 with a 2.4 kernel, it is also
-  possible that it just doesn't support newer hardware.  Again, contact us
-  if this happens.
+  Since the default Linux image is either Fedora 6 with a 2.6 kernel or
+  RedHat 9 with a 2.4 kernel, it is also possible that it just doesn't
+  support newer hardware.  Contact us if this happens.
 
 [ This file is a copy of doc/customize-image.txt in the Emulab source tree. ]
-[ Last updated 03/14/07 ]
+[ Last updated 06/24/08 ]
