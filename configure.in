@@ -851,6 +851,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/mkproj tbsetup/libtestbed.pm \
 	tbsetup/portstats tbsetup/vnode_setup tbsetup/staticroutes \
 	tbsetup/console_setup.proxy tbsetup/exports_setup.proxy \
+	tbsetup/smbpasswd_setup.proxy \
 	tbsetup/checkports tbsetup/libaudit.pm \
 	tbsetup/libreboot.pm tbsetup/libosload.pm tbsetup/libadminmfs.pm \
 	tbsetup/sfskey_update tbsetup/sfskey_update.proxy \

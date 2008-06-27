@@ -2468,6 +2468,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/db2ns \
 	tbsetup/tbprerun tbsetup/tbswap tbsetup/tbend tbsetup/tbrestart \
 	tbsetup/tbreport tbsetup/named_setup tbsetup/exports_setup \
+	tbsetup/smbpasswd_setup.proxy \
 	tbsetup/checkpass/GNUmakefile tbsetup/assign_wrapper tbsetup/ptopgen \
 	tbsetup/assign_wrapper2 \
 	tbsetup/frisbeelauncher tbsetup/node_update \
