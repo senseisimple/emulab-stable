@@ -3,20 +3,27 @@
 # Copyright (c) 2004-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
-Instructions for creating a site-customized image from a "generic" image
-provided by Utah.  The basic procedure is:
+
+I. Introduction
+
+These are instructions for creating a site-customized image from a "generic"
+image provided by Utah.  The basic procedure is:
 
   - load the image on a testbed machine
   - customize both FreeBSD and Linux filesystems
   - save customized image
 
 We will provide you with a generic disk image tarball.  This tarball will
-include a multi-OS "full disk" image and one or more auxiliary "single
+include a multi-OS "full disk" combo image and one or more auxiliary "single
 partition" images.  The combo image is one which has both a FreeBSD partition
 and a Linux partition.  You will need to customize both.  By convention
 FreeBSD is in DOS partition #1 and Linux in DOS partition #2.
 
-First you need to decide which image to use.  The combo image choices are:
+
+II. Which generic image do I need?
+
+It depends largely on the hardware in your testbed and what advanced Emulab
+features you might need.  The choices are:
 
   * FBSD62+FC6-GENERIC.ndz
     Includes FreeBSD 6.2 and Fedora 6.
@@ -30,21 +37,37 @@ Generally, you will want to use the former as your default image that disks
 are loaded with.  The reason the second image is included at all is that it
 must be used for "virtual node" support, which right now is only available
 in our modified FreeBSD 4.10 kernel.  Unfortunately, the 4.10 kernel, being
-more than 5 years old, doesn't run on all modern hardware.  So you may be
-stuck without vnodes for awhile if your hardware is in the unsupported
-category.
+more than 5 years old, doesn't run on all modern hardware, due to lack of
+drivers and/or buggy ACPI support.  So you may be stuck without vnodes for
+awhile if your hardware is in the unsupported category.  There is also a
+lesser dependency on FreeBSD 4.10 for the control net firewall support.
+
+So, if you want/need vnodes or firewalls but your node hardware won't boot
+FreeBSD 4.10, contact us and we'll figure something out.
+
+
+III. Prerequisites
 
 You will need to have the Emulab network-booted, memory-filesystem-based,
 FreeBSD systems (hereafter known as the MFSes).  If you have not done this
-yet, do it now.  If you do not know what I am talking about, contact
-testbed-ops@flux.utah.edu.
+yet, do it now.  For this you will need to download the MFS tarball:
 
-In particular, the customization of the disk partitions is done using a
-node booted into the "admin" MFS.  If you have followed the Emulab setup
-directions and have added nodes to your testbed to the point where they
-are now in the "hwdown" experiment, they should already be in the admin MFS.
-At this point you should be able to pick one and slogin as root from your
-boss machine.
+	http://www.emulab.net/downloads/tftpboot-lastest.tar.gz
+
+extract the README, and follow the directions there.
+
+You will also need to have at least one test node integrated into your
+testbed.  If you haven't done that yet, go back to the setup documentation
+under "Adding Nodes" and add one!
+
+
+IV. The Process
+
+The customization of the disk partitions is done using a testbed node booted
+into the "admin" MFS.  If you have followed the Emulab setup directions and
+have added nodes to your testbed to the point where they are now in the
+"hwdown" experiment, they should already be in the admin MFS.  At this point
+you should be able to pick one and slogin as root from your boss machine.
 
 If the node does not respond to slogin and you have serial consoles hooked
 up, connect to the console, reboot the node and wait for the Emulab pxeboot
@@ -415,7 +438,7 @@ I. Dealing with SCSI disks (or RAID) and unrecognized hardware.
             others for RAID)
       Linux /etc/fstab: needs "hda" changed to appropriate type
           ("sda" for SATA or SCSI, ?? for RAID)
-      Linux /etc/lilo.conf: ditto, plus lilo must be rerun
+      Linux /etc/lilo.conf: ditto, plus /sbin/lilo must be rerun
 
   However, you should not need to mess with these files, the post-disk-loader
   script will do it for you.
