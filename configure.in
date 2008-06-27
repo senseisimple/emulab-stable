@@ -965,6 +965,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	collab/mailman/delmmlist collab/mailman/mmxlogin \
 	collab/mailman/genaliases collab/mailman/setmmlistmembers \
 	collab/mailman/mailmanproxy collab/mailman/setmmpasswd \
+	collab/cvstools/cvs.proxy collab/cvstools/cvs_ctrl \
 	collab/cvstools/cvsrepo_ctrl.proxy collab/cvstools/cvsrepo_ctrl \
 	collab/cvstools/webcvsrepo_ctrl "
 
