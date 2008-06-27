@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2004-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # XXX I hardwire IPs into generated /etc/rc.conf and /etc/rc.resolv.
@@ -318,7 +318,9 @@ sub doboot()
 	$emulabconfig{OPS_PKG}      = "emulab-ops-2.0";
 	$emulabconfig{BOSS_PKG}     = "emulab-boss-2.0";
     }
-    elsif ($FBSD_VERSION == 6.1 || $FBSD_VERSION == 6.2) {
+    elsif ($FBSD_VERSION == 6.1 ||
+	   $FBSD_VERSION == 6.2 ||
+	   $FBSD_VERSION == 6.3) {
 	if ($ELVIN_COMPAT) {
 	    $emulabconfig{FS_PKG_DIR} = "/share/freebsd/6.1/packages.elvincompat";
 	} else {
