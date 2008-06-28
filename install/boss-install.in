@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003-2007 University of Utah and the Flux Group.
+# Copyright (c) 2003-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -150,6 +150,11 @@ my $APACHE_KEYFILE_OPS  = "$APACHE_ETCDIR/ssl.key/${USERNODE}.key";
 # XXX temporary for tftp
 #
 my $TFTPD_PKG	  = "emulab-tftp-hpa-0.48";
+
+#
+# Named pid file.
+#
+my $NAMED_PIDFILE = "/var/run/named.pid";
 
 #
 # Some directories we care about
@@ -816,7 +821,8 @@ Phase "rc.conf", "Adding testbed content to $RCCONF", sub {
 	push(@strings, (qq|named_enable="YES"|,
 			qq|named_chrootdir=""|,
 			qq|named_flags=""|,
-			qq|named_uid="root"|));
+			qq|named_uid="root"|,
+			qq|named_pidfile="$NAMED_PIDFILE"|));
     }
     AppendToFileFatal($RCCONF, @strings);
 };
@@ -1178,15 +1184,6 @@ Phase "dhcpd", "Setting up initial dhcpd configuration", sub {
 };
 
 Phase "named", "Setting up initial named configuration", sub {
-    # Newer than 6.3 have a pidfile location problem: named writes its pid to 
-    # /var/run/named.pid, but the rc scripts set the default pidfile location
-    # to /var/run/named/pid.  So, we symlink and hope for the best.
-    Phase "pidfilefix", "Fixing pidfile location mismatch", sub {
-	PhaseSkip("You appear to have a custom pidfile location in" . 
-		  " /etc/rc.conf")
-	    if (`fgrep '^named_pidfile' /etc/rc.conf`);
-	ExecQuietFatal("ln -sf /var/run/named.pid /var/run/named/pid");
-    };
     Phase "building", "Building named files and templates", sub {
 	ExecQuietFatal("cd $TOP_OBJDIR/named; $GMAKE");
     };
@@ -1208,7 +1205,22 @@ Phase "named", "Setting up initial named configuration", sub {
 	ExecQuietFatal("$named_control stop");
     };
     Phase "starting", "Starting named", sub {
-	ExecQuietFatal("$named_control start");
+	#
+	# XXX starting sometime in FBSD6, the named start/stop script
+	# returns non-zero status whether it works or not.  So we just
+	# check for the existance of the pidfile after running the start
+	# script.
+	#
+	if ($FBSD_VERSION >= 6) {
+	    unlink($NAMED_PIDFILE)
+		if ( -e "$NAMED_PIDFILE");
+	    if (ExecQuiet("$named_control start") &&
+		! -e "$NAMED_PIDFILE") {
+		PhaseFail("Unable to start named: ");
+	    }
+	} else {
+	    ExecQuietFatal("$named_control start");
+	}
     };
 
     # Lets make sure that old file is gone!
