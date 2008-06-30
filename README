@@ -1,42 +1,66 @@
-This is a snapshot of the current source code for the software that runs
-Emulab at the University of Utah, as well as testbeds at other sites:
+Emulab network testbed source release
+Version 4.9.0
+June 30, 2008
+University of Utah, Flux Research Group
+
+This is a preliminary release of the current source code for the
+software that runs the Emulab network testbed at the University of Utah,
+as well as over 20 testbeds at other sites:
 
    http://www.emulab.net/
 
-This is a snapshot of a rapidly-evolving system, rather than an engineered
-release. It contains all Emulab source required to build a running testbed, but
-interaction with Utah will almost certainly be required to get things up and
-running.
+This is a snapshot of a rapidly-evolving system.  It contains all Emulab
+source required to build a running testbed, but interaction with Emulab
+admins at Utah and elsewhere may be required to get things up and running.
 
-Emulab is being actively developed, so there will be features on deployed
-Emulabs (in particular, Utah's) that are not included in this snapshot.
-Contact us (contact info at the bottom of this file) if you are interested
-in receiving an updated version of this source.
+Emulab is being actively developed, so there may be features in deployed
+Emulabs (in particular, Utah's) that are not included in this release.
+It is our intention to make new snapshots frequently, in the future.
 
 
-IMPORTANT NOTE
-See the file LICENSE for restrictions on this snapshot.
-In summary, you can't redistribute it, use it for commercial
-purposes, must give appropriate credit to Utah and Emulab,
-and return improvements to us.  The intention is to release
-the Emulab software under the AGPLv3 open source license
-Real Soon Now.
-
-
-HOW TO SETUP
-See doc/setup.txt.
+HOW TO SETUP AN EMULAB
+XXX See doc/setup.txt.
 
 This source currently only builds on FreeBSD, and requires several packages;
 the dependencies can be found in the Makefile for our 'meta-port's:
 install/ports/emulab-boss and install/ports/emulab-ops.
 
-HOW TO UPDATE
-Start by looking at doc/update-testbed.txt.
+
+HOW TO UPDATE AN EMULAB
+The upcoming 5.0 release (intention to be in July 2008) will have better
+support for people upgrading existing Emulabs.  We recommend you wait
+for that; do not expect us to help much if you use this release.
+
+XXX If you insist, start by looking at doc/update-testbed.txt.
+
+
+MAILING LISTS
+If you are bringing up an Emulab, be sure to join the mailing list:
+    testbed-admins@flux.utah.edu
+    http://www.flux.utah.edu/mailman/listinfo/testbed-admins
+which has open archives.
+
+
+HELP/CONTACT INFORMATION
+For help and to report bugs and problems, mail
+   testbed-admins@flux.utah.edu   (preferable)
+      or
+   testbed-ops@flux.utah.edu      (if you insist on privacy)
+
+Don't be shy!  We may be able to get the phone with you, too,
+for "big picture" issues and problems.
+
+
+LICENSE
+See the file AGPL-COPYING for licensing conditions.  In summary, the
+Emulab software is distributed under a free and open source license, the
+GNU Affero General Public License version 3 (AGPLv3).  The AGPLv3
+consists of the GNU General Public License version 3 (GPLv3) with a
+single short added Section 13, which requires that the source be freely
+available to all users who interact with the software through a network.
+
 
 DOCUMENTATION
-This is a snapshot, not a formal distribution, so don't expect
-great documentation.
-
 doc/* contains documentation for developers.
 www/*.html and www/doc/*.html contain end-user documentation.
 
@@ -60,9 +84,6 @@ Good places to start would include:
   - Mail we have exchanged with others about hardware recommendations
     (doc/hardware-mail.mbox)
 
-Join the testbed-admins@flux.utah.edu mailing list:
-
-http://www.flux.utah.edu/mailman/listinfo/testbed-admins
 
 QUICK TOUR
  - The Database maintains most testbed state.
@@ -110,7 +131,7 @@ dhcpd     -  DHCPD configuration
 doc       -  Documentation (mainly internal)
 event     -  Event System
 firewall  -  Code and notes for per-experiment control net firewalls
-hyperviewer - 3D experiment visualization tool
+hyperviewer - 3D experiment visualization tool (not used)
 image-test - Test framework for auto-testing of new OS images
 install   -  Site installation scripts
 ipod      -  "Ping of Death" software/patches
@@ -119,11 +140,11 @@ mote      -  Initial testbed support for Berkeley/Crossbow motes
 named     -  BIND configuration files
 os        -  Client-side software (disk loading, route calculation, etc.)
 patches   -  Patches needed to compile standard software packages
-pelab     -  Preliminary support for "Flexlab"; an Emulab/PlanetLab hybrid
-             (http://www.cs.utah.edu/flux/flexlab/)
+pelab     -  Preliminary support for "Flexlab", an Emulab/PlanetLab hybrid
+               (see http://www.cs.utah.edu/flux/flexlab/)
 pxe       -  Software related to PXE-booting machines
 rc.d      -  Server-side startup scripts
-robots    -  Initial testbed support for mobile wireless (Garcia robots)
+robots    -  Support for mobile wireless (Garcia robots)
 security  -  Tools for secure boss node access
 sensors   -  Node monitoring daemons
 sql       -  Database schema and initialization
@@ -133,20 +154,14 @@ tbsetup   -  Experiment creation and manipulation
 testsuite -  Automated testing suite
 tip       -  Node serial line client software
 tmcd      -  Testbed master control daemon and client (for node configuration)
-tools     -  Misc. infrastructure tools
+tools     -  Miscellaneous infrastructure tools
 utils     -  Testbed configuration and maintenance tools
 vis       -  Experiment visualization
 wiki      -  Support for per-project WIKIs
 www       -  Web Interface / User Documentation
 xmlrpc    -  Programatic XML-RPC interface to testbed
 
-HELP/CONTACT INFORMATION
-For help and to report bugs and problems, mail
-    testbed-ops@flux.utah.edu
 
-Don't be shy!  
-We are happy to get on the phone with you, too,
-for "big picture" issues and problems.
-
-Jay Lepreau, lepreau@cs.utah.edu, 801-581-4285, and the Utah testbed crew.
-June 12, 2007
+Good luck!
+Jay Lepreau, lepreau@cs.utah.edu, and the Utah testbed crew.
+June 30, 2008
