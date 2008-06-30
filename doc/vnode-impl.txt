@@ -5,13 +5,20 @@
 #
 
 This file describes the implementation of (and a little bit of the rationale
-for) out FreeBSD-based "virtual node" support.
+for) our FreeBSD-based "virtual node" support.
 
 The summary is that we use a highly customized FreeBSD kernel supporting
 beefed-up jails, virtual disks, virtual ethernet interfaces, and multiple
 routing tables to implement reasonably isolated virtual nodes for network-
 centric activity.  We do not yet provide complete resource isolation, in
 particular to limit CPU or memory consumption.
+
+You may also want to look at the paper describing some of this, including
+the larger system of which it's a part:
+  "Large-scale Virtualization in the Emulab Network Testbed"
+  Hibler et al, 2008 Usenix Annual Technical Conference, June 2008.
+  http://www.cs.utah.edu/flux/papers/virt-usenix08-base.html
+
 
 A. Rationale
 
