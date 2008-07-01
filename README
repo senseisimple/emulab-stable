@@ -3,7 +3,7 @@ Version 4.9.0
 June 30, 2008
 University of Utah, Flux Research Group
 
-This is a preliminary release of the current source code for the
+This is a preliminary release of the full current source code for the
 software that runs the Emulab network testbed at the University of Utah,
 as well as over 20 testbeds at other sites:
 
@@ -11,25 +11,21 @@ as well as over 20 testbeds at other sites:
 
 This is a snapshot of a rapidly-evolving system.  It contains all Emulab
 source required to build a running testbed, but interaction with Emulab
-admins at Utah and elsewhere may be required to get things up and running.
+admins at Utah and elsewhere will likely be required to get things up
+and running.
 
 Emulab is being actively developed, so there may be features in deployed
 Emulabs (in particular, Utah's) that are not included in this release.
-It is our intention to make new snapshots frequently, in the future.
+In the future it is our intention to make new snapshots frequently.
 
 
 HOW TO SETUP AN EMULAB
-The Emulab installation documentation is located on the main Emulab Wiki.
-See http://users.emulab.net/trac/emulab/wiki/InstallDocs
-
-
-This source currently only builds on FreeBSD, and requires several packages;
-the dependencies can be found in the Makefile for our 'meta-port's:
-install/ports/emulab-boss and install/ports/emulab-ops.
+The Emulab installation documentation is located on the Utah Emulab Wiki:
+ http://users.emulab.net/trac/emulab/wiki/InstallDocs
 
 
 HOW TO UPDATE AN EMULAB
-The upcoming 5.0 release (intention to be in July 2008) will have better
+The upcoming 5.0 release (intended to be in July 2008) will have better
 support for people upgrading existing Emulabs.  We recommend you wait
 for that; do not expect us to help much if you use this release.
 
@@ -63,22 +59,24 @@ available to all users who interact with the software through a network.
 
 
 DOCUMENTATION
-We are in the process of moving our documentation to the Emulab wiki at
-https://users.emulab.net/trac/emulab/wiki/.
-This should be considered the primary source of information.
+We are in the process of moving all our documentation to the Utah Emulab wiki at
+  http://users.emulab.net/trac/emulab/wiki/ .
+Soon, but not yet, that should be considered the primary source of information.
 
-doc/* contains documentation for developers.
-www/*.html and www/doc/*.html contain end-user documentation.
+Within this source tree,
+- doc/* contains documentation for developers.
+- www/*.html and www/{doc,tutorial}/*.html contain end-user documentation,
+  all linked from www/doc.php3.
 
 Other good places to start would include:
-  - The search box at www.emulab.net for the absolute latest FAQs and info
-  - The doc/papers directory, which contains papers published about Emulab
+  - The search box at www.emulab.net for the absolutely latest FAQs and info
   - The user tutorial (www/tutorial/tutorial.html)
   - The user FAQ (www/faq.html)
   - The user authorization document (www/auth.html)
   - Software architecture preliminary diagram (doc/arch-diagram.ps)
   - Notes on the source tree and architecture (doc/arch.txt)
   - Overview of some major systems (doc/overview.txt)
+  - The doc/papers directory, which contains a few of the papers we've published about Emulab
   - Diagrams and brief explanations of the state machines used in the 
     system (www/doc/states.html and www/doc/*.gif)
   - Mail we have exchanged with others about hardware recommendations
@@ -117,6 +115,7 @@ QUICK TOUR
 
  - dynamic node and experiment control is provided via the Emulab event
    system and its assorted agents (event/*).
+
 
 SOURCE TREE ORGANIZATION
 account   -  Account creation and management
