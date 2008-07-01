@@ -19,7 +19,9 @@ It is our intention to make new snapshots frequently, in the future.
 
 
 HOW TO SETUP AN EMULAB
-XXX See doc/setup.txt.
+The Emulab installation documentation is located on the main Emulab Wiki.
+See http://users.emulab.net/trac/emulab/wiki/InstallDocs
+
 
 This source currently only builds on FreeBSD, and requires several packages;
 the dependencies can be found in the Makefile for our 'meta-port's:
@@ -31,7 +33,7 @@ The upcoming 5.0 release (intention to be in July 2008) will have better
 support for people upgrading existing Emulabs.  We recommend you wait
 for that; do not expect us to help much if you use this release.
 
-XXX If you insist, start by looking at doc/update-testbed.txt.
+If you insist, start by looking at doc/update-testbed.txt.
 
 
 MAILING LISTS
@@ -61,26 +63,24 @@ available to all users who interact with the software through a network.
 
 
 DOCUMENTATION
+We are in the process of moving our documentation to the Emulab wiki at
+https://users.emulab.net/trac/emulab/wiki/.
+This should be considered the primary source of information.
+
 doc/* contains documentation for developers.
 www/*.html and www/doc/*.html contain end-user documentation.
 
-Good places to start would include:
+Other good places to start would include:
   - The search box at www.emulab.net for the absolute latest FAQs and info
   - The doc/papers directory, which contains papers published about Emulab
   - The user tutorial (www/tutorial/tutorial.html)
   - The user FAQ (www/faq.html)
   - The user authorization document (www/auth.html)
-  - Some powerpoint slides on Emulab internals, found at:
-      http://www.cs.utah.edu/flux/testbed-doc/internals/
-    These include two files especially useful for setting up your own
-    testbed: "build-operate.ppt" and the first part of "security-all.ppt".
   - Software architecture preliminary diagram (doc/arch-diagram.ps)
   - Notes on the source tree and architecture (doc/arch.txt)
   - Overview of some major systems (doc/overview.txt)
   - Diagrams and brief explanations of the state machines used in the 
     system (www/doc/states.html and www/doc/*.gif)
-  - The instructions for building a running system from scratch
-    (doc/setup*.txt)
   - Mail we have exchanged with others about hardware recommendations
     (doc/hardware-mail.mbox)
 
