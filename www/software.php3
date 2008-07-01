@@ -27,10 +27,9 @@ PAGEHEADER("Emulab Software Distributions");
     </li><p>
 
 <li> 
- <!-- DAVID: update the version number in some manner.  I think these 0.x.x ones are kinda stupid. -fjl -->
-     Emulab GUI Client v0.1.1
+     Emulab GUI Client v0.2
      <a href="/downloads/netlab-client.jar">(JAR</a>,
-     <a href="/downloads/netlab-client-0.1.1.tar.gz">source tarball</a>
+     <a href="/downloads/netlab-client-0.2.tar.gz">source tarball</a>
      <!-- <img src="/new.gif" alt="&lt;NEW&gt;"> -->).
      This is the fancier of the GUI clients for creating and
      interacting with experiments.  The GUI provides an alternative to using
