@@ -92,10 +92,12 @@ QUICK TOUR
    * sql/database-create.sql contains the DB schema.
    
  - The Web Interface (www/*) is the primary means of managing and
-   interfacing with the system.
+   interfacing with the system.  For the most part it uses an XML RPC
+   interface (xmlrpc/*) for communicating with the "backend" infrastructure.
+   There is also an experimental standalone GUI that uses this interface.
 
- - The tbsetup directory contains the bulk of the server-side experiment
-   setup and management code.
+ - The tbsetup and backend directories contain the bulk of the server-side
+   experiment setup and management code.
    * startexp (tbsetup/startexp.in) is the backend for experiment creation;
      Important scripts it calls include tbprerun (tbsetup/tbprerun.in) 
      and tbswap (tbsetup/tbswap.in).
@@ -107,20 +109,20 @@ QUICK TOUR
  - The frisbee subsystem (os/frisbee.redux, os/imagezip) is used for creation
    and rapid deployment of disk images.
 
- - tmcd (tmcd/*) is contacted by nodes as they boot up, to get configuration.
+ - The client-driven node configuration is handled by scripts on the client
+   which communicate with the server via a custom configuration protocol.
+   The server- and client-side of this mechanism is in the tmcd subdir.
 
  - capture and console (capture/*, tip/*) provide serial line access to nodes.
 
- - The majority of the client-side (i.e., on each experiment node) boot-time
-   setup code is in the tmcd/common and tmcd/<os-name> directories.  These
-   are mostly perl and sh scripts for adding accounts, configuring interfaces,
-   installing software, etc.
-
+ - dynamic node and experiment control is provided via the Emulab event
+   system and its assorted agents (event/*).
 
 SOURCE TREE ORGANIZATION
 account   -  Account creation and management
 apache    -  Apache HTTPD configuration
 assign    -  Resource allocation software
+backend	  -  Server-side of the Emulab XML RPC interface
 bugdb     -  Optional per-project bug database
 capture   -  Node serial line server software
 cdrom     -  Software related to CD-booting local and remote machines
@@ -131,6 +133,7 @@ dhcpd     -  DHCPD configuration
 doc       -  Documentation (mainly internal)
 event     -  Event System
 firewall  -  Code and notes for per-experiment control net firewalls
+flash     -  Software related to flash-dongle-booting local and remote machines
 hyperviewer - 3D experiment visualization tool (not used)
 image-test - Test framework for auto-testing of new OS images
 install   -  Site installation scripts
@@ -142,6 +145,8 @@ os        -  Client-side software (disk loading, route calculation, etc.)
 patches   -  Patches needed to compile standard software packages
 pelab     -  Preliminary support for "Flexlab", an Emulab/PlanetLab hybrid
                (see http://www.cs.utah.edu/flux/flexlab/)
+protogeni -  Evolving software for a prototype GENI system based on Emulab
+               (see http://www.protogeni.net/)
 pxe       -  Software related to PXE-booting machines
 rc.d      -  Server-side startup scripts
 robots    -  Support for mobile wireless (Garcia robots)
