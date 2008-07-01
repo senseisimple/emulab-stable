@@ -73,5 +73,28 @@ input from a non-existent serial line causing the -sio version of the boot
 loader to drop into interactive mode.  Make sure you replace the loader.conf
 file in the three subdirectories with the -null version as well.
 
+4. EMULAB INTEGRATION
+
+For Emulab to know about the MFSes you have just installed, you will need
+to add some database state.  This is done using the "load-descriptors"
+script in your Emulab build tree:
+
+       cd <your-elab-build-dir>/install
+       ./load-descriptors <your-elab-source-dir>/<descriptor-file>
+
+<descriptor-file> is either "descriptors.sql" or "descriptors-new.sql"
+depending on whether you are going to load FreeBSD4+Redhat9 or
+FreeBSD6+Fedora6 as your standard image on disks.  Sorry, but this is a
+bit of a forward reference, since determining which of those you want
+means skipping ahead and looking at:
+
+      http://www.emulab.net/downloads/generic-image-README.txt
+
+which is part of customizing a disk image for your nodes.  Look at part II
+of that file ("Which generic image do I need?").  If you choose FBSD62+FC6,
+then use "descriptors-new.sql", otherwise use "descriptors.sql".
+(In the next release, we will separate the DB state for the MFS images from
+that of the disk images, and get rid of this confusing step...)
+
 [ This file is a copy of doc/customize-mfs.txt in the Emulab source tree. ]
 [ Last updated 06/26/08 ]
