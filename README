@@ -45,7 +45,7 @@ For help and to report bugs and problems, mail
       or
    testbed-ops@flux.utah.edu      (if you insist on privacy)
 
-Don't be shy!  We may be able to get the phone with you, too,
+Don't be shy!  We may be able to get on the phone with you, too,
 for "big picture" issues and problems.
 
 
@@ -59,9 +59,11 @@ available to all users who interact with the software through a network.
 
 
 DOCUMENTATION
-We are in the process of moving all our documentation to the Utah Emulab wiki at
+We are in the process of moving all our documentation to the Utah Emulab
+wiki at
   http://users.emulab.net/trac/emulab/wiki/ .
-Soon, but not yet, that should be considered the primary source of information.
+Soon, but not yet, that should be considered the primary source of
+information.
 
 Within this source tree,
 - doc/* contains documentation for developers.
@@ -76,7 +78,8 @@ Other good places to start would include:
   - Software architecture preliminary diagram (doc/arch-diagram.ps)
   - Notes on the source tree and architecture (doc/arch.txt)
   - Overview of some major systems (doc/overview.txt)
-  - The doc/papers directory, which contains a few of the papers we've published about Emulab
+  - The doc/papers directory, which contains a few of the papers we've
+    published about Emulab  
   - Diagrams and brief explanations of the state machines used in the 
     system (www/doc/states.html and www/doc/*.gif)
   - Mail we have exchanged with others about hardware recommendations
@@ -90,9 +93,8 @@ QUICK TOUR
    * sql/database-create.sql contains the DB schema.
    
  - The Web Interface (www/*) is the primary means of managing and
-   interfacing with the system.  For the most part it uses an XML RPC
-   interface (xmlrpc/*) for communicating with the "backend" infrastructure.
-   There is also an experimental standalone GUI that uses this interface.
+   interfacing with the system. There is also an experimental
+   standalone GUI that uses this interface.
 
  - The tbsetup and backend directories contain the bulk of the server-side
    experiment setup and management code.
