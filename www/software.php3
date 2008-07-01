@@ -16,7 +16,7 @@ PAGEHEADER("Emulab Software Distributions");
 ?>
 
 <ul>
-<li>
+<li> <img src="/new.gif" alt="&lt;NEW&gt;">
     <a href="/downloads/emulab-080630.tar.gz">
     Emulab network testbed software</a>,
     Version 4.9.0, released June 30, 2008.
@@ -24,7 +24,7 @@ PAGEHEADER("Emulab Software Distributions");
     See the <a href = "README">README</a> and the
     <a href = "http://users.emulab.net/trac/emulab/wiki/InstallDocs">
     online installation documentation</a>.
-    </li>
+    </li><p>
 
 <li> 
  <!-- DAVID: update the version number in some manner.  I think these 0.x.x ones are kinda stupid. -fjl -->
@@ -38,7 +38,8 @@ PAGEHEADER("Emulab Software Distributions");
      command line tools.  Take a look at the
      <a href="netlab/client.php3">tutorial</a>
      for more information.
-     </li>
+     </li><p>
+
 <li> Frisbee disk loader.
      The latest frisbee and imagezip sources can be found in the
      <a href="/downloads/emulab-080630.tar.gz">Emulab release</a>.
