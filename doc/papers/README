@@ -1,5 +1,6 @@
-This directory contains various papers that have been written about
-Netbed/Emulab.  Its current contents are:
+This directory contains a few of the papers we written about Emulab.
+Many more papers are available at http://www.emulab.net/pubs.php3 .
+This directory's current contents are:
 
 netbed-osdi02.pdf
      "An Integrated Experimental Environment for Distributed Systems and Networks"
