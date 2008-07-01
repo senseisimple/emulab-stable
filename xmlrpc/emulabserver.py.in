@@ -4035,6 +4035,75 @@ class node:
         del(mc)
         
         return EmulabResponse(RESPONSE_SUCCESS, value=retval, output=retval)
+
+    #
+    # Get widearea node configuration params, returned as a dict.
+    #
+    def waconfig(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        argerror = CheckRequiredArgs(argdict, ("node",))
+        if (argerror):
+            return argerror
+
+        if not re.match("^[-\w]*$", str(argdict["node"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed node value!")
+
+        if not CheckIsAdmin(self.uid):
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No permission to access node: " +
+                                  argdict["node"])
+            pass
+
+        res = DBQueryFatal("select wni.hostname,wni.bwlimit,wni.privkey,"
+                           "  wni.IP,wni.gateway,wni.dns,wni.boot_method,"
+                           "  i.mac,i.mask"
+                           " from widearea_nodeinfo as wni"
+                           " left join interfaces as i"
+                           "   on wni.node_id=i.node_id"
+                           " where wni.node_id=%s and i.role=%s",
+                           (argdict["node"],'ctrl'))
+        
+        if len(res) == 0:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No such widearea node: %s" \
+                                  % (argdict["node"],))
+        elif len(res) > 1:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="Multiple matches for node: %s" \
+                                  % (argdict["node"],))
+
+        row = res[0]
+
+        retval = dict({})
+        retval['WA_BOOTMETHOD'] = row[6]
+        try:
+            retval['WA_HOSTNAME'] = row[0].split('.',1)[0]
+        except:
+            retval['WA_HOSTNAME'] = row[0]
+        try:
+            retval['WA_DOMAIN'] = row[0].split('.',1)[1]
+        except:
+            retval['WA_DOMAIN'] = ""
+
+        if row[6] == 'static':
+            retval['WA_MAC'] = row[7]
+            retval['WA_IP_ADDR'] = row[3]
+            retval['WA_IP_NETMASK'] = row[8]
+            retval['WA_IP_GATEWAY'] = row[4]
+            retval['WA_IP_DNS1'] = row[5]
+            retval['WA_IP_DNS2'] = "@EXTERNAL_BOSSNODE_IP@"
+            pass
+
+        if row[1] and not row[1] == 0:
+            retval['WA_BWLIMIT'] = row[1]
+
+        retval['PRIVKEY'] = row[2]
+        
+        return EmulabResponse(RESPONSE_SUCCESS,value=retval)
     
     pass
 
