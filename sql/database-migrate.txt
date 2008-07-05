@@ -2084,7 +2084,7 @@ last_net_act,last_cpu_act,last_ext_act);
 
        alter table firewalls add vlan int(11) default NULL;
 
-       update table_regex set check='^(ipfw|ipfw2|ipchains|ipfw2-vlan)$' \
+       update table_regex set `check`='^(ipfw|ipfw2|ipchains|ipfw2-vlan)$' \
            where table_name='firewalls' and column_name='type';
 
        INSERT INTO os_info VALUES ('FW-IPFW2','emulab-ops','FW-IPFW2', \
@@ -2183,7 +2183,7 @@ last_net_act,last_cpu_act,last_ext_act);
 	 enum('open','closed','basic','emulab') not NULL default 'basic';
        ALTER table default_firewall_rules MODIFY style \
 	 enum('open','closed','basic','emulab') not NULL default 'basic';
-       UPDATE table_regex SET check='^(open|closed|basic|emulab)$' WHERE \
+       UPDATE table_regex SET `check`='^(open|closed|basic|emulab)$' WHERE \
 	 table_name='firewalls' AND column_name='style';
 
        and update the default rules:
