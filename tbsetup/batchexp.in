@@ -58,11 +58,12 @@ sub CheckCopyArgs();
 sub CopyInArchive();
 sub fatal($;$);
 
-my $optlist = "iE:g:e:p:S:L:a:l:sfwqt:nzc:bx:y:h:j";	# Enough options?
+my $optlist = "iE:g:e:p:S:L:a:l:sfwqt:nzc:bx:y:h:jk";	# Enough options?
 my $batchmode= 1;
 my $frontend = 0;
 my $waitmode = 0;
 my $quiet    = 0;
+my $lockdown = 0;
 my $linktest = 0;	# non-zero means level to run at.
 my $zeemode  = 0;	# Hey, out of options.
 my $zeeopt   = "";	# To pass along.
@@ -299,6 +300,7 @@ $args{'autoswap'}	   = $autoswap;
 $args{'autoswap_timeout'}  = $autoswaptime;
 $args{'idle_ignore'}	   = $idleignore;
 $args{'keyhash'}	   = $webkey;
+$args{'lockdown'}	   = $lockdown;
 $args{'eventkey'}	   = $eventkey;
 $args{'batchmode'}	   = $batchmode;
 $args{'batchstate'}	   = $batchstate;
@@ -999,6 +1001,9 @@ sub ParseArgs()
     }
     if (defined($options{"j"})) {
 	$nonsfile = 1;
+    }
+    if (defined($options{"k"})) {
+	$lockdown = 1;
     }
 
     #
