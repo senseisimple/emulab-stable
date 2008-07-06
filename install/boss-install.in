@@ -1331,7 +1331,7 @@ Phase "experiments", "Setting up system experiments", sub {
 	    PhaseSkip("Experiment Created")
 		if (-d "$PROJROOT/$pid/exp/$eid");
 	    ExecQuietFatal("$SUDO -u $PROTOUSER $WAP $BATCHEXP ".
-			   "  -q -i -w -f -n -S 'System Experiment' ".
+			   "  -q -i -k -w -f -n -S 'System Experiment' ".
 			   "  -L 'System Experiment' ".
 			   "  -E '$desc - DO NOT DELETE' ".
 			   "  -p $pid -e $eid");
