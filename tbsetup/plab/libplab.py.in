@@ -2582,6 +2582,11 @@ class Slice:
                 print "Node %s doesn't really exist in %s (%s)" % \
                       (nodeid, self.slicename, self.plc.name)
                 continue
+            except:
+                print "Unknown error loading node %s from slice %s (%s)" % \
+                      (nodeid, self.slicename, self.plc.name)
+                traceback.print_exc()
+                continue
             if node.renew():
                 print "Failed to renew node: %s (expires %s UTC)" % \
                       (nodeid, time.asctime(time.gmtime(node.leaseend)))
