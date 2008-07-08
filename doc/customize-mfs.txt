@@ -54,7 +54,8 @@ then try the 4.7 versions.  If the 6.2 version don't work because it appears
 that your hardware is not supported, then contact Utah for more help.
 In summary, I recommend:
 
-	pxeboot62/pxeboot.emu-{sio,vga} (pick one and rename to "pxeboot.emu")
+	pxeboot62/pxeboot.emu-{sio,vga} (pick one and rename to "pxeboot.emu",
+                                         then move it to /tftpboot)
 	frisbee62 (rename to "frisbee")
 	freebsd62 (rename to "freebsd")
 	freebsd62.newnode (rename to "freebsd.newnode")
@@ -80,7 +81,7 @@ to add some database state.  This is done using the "load-descriptors"
 script in your Emulab build tree:
 
        cd <your-elab-build-dir>/install
-       ./load-descriptors <your-elab-source-dir>/<descriptor-file>
+       ./load-descriptors <your-elab-source-dir>/install/<descriptor-file>
 
 <descriptor-file> is either "descriptors.sql" or "descriptors-new.sql"
 depending on whether you are going to load FreeBSD4+Redhat9 or
@@ -97,4 +98,4 @@ then use "descriptors-new.sql", otherwise use "descriptors.sql".
 that of the disk images, and get rid of this confusing step...)
 
 [ This file is a copy of doc/customize-mfs.txt in the Emulab source tree. ]
-[ Last updated 06/26/08 ]
+[ Last updated 07/08/08 ]
