@@ -3438,8 +3438,9 @@ last_net_act,last_cpu_act,last_ext_act);
 
 4.70: Add latitude and longitude to the widearea_nodeinfo table.
 
-        alter table widearea_nodeinfo add latitude float(3,5);
-        alter table widearea_nodeinfo add longitude float(3,5);
+      alter table widearea_nodeinfo
+          add latitude latitude float default NULL,
+          add longitude longitude float default NULL;
  
 4.71: Support for 802.1q tagged VLAN based virtual interfaces.
       First, generalize the encapsulation field.  For compatibility,
