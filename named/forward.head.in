@@ -34,6 +34,7 @@ cvsup		IN	CNAME	boss
 ntp1		IN	CNAME	ops
 ntp2		IN	CNAME	ops
 event-server	IN	CNAME	ops
+wiki		IN	CNAME	ops
 
 ; Fs (may just be a CNAME for ops)
 %fsnode_ina%
