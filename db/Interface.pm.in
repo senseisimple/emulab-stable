@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package Interface;
@@ -48,6 +48,9 @@ sub mysystem($)
 sub LookupAll($$)
 {
     my ($class, $nodeid) = @_;
+
+    $nodeid = $nodeid->node_id()
+	if (ref($nodeid));
 
     # Look in cache first
     return @{ $node_interfaces{$nodeid} }
@@ -105,6 +108,14 @@ sub IP($)      { return field($_[0], 'IP'); }
 sub role($)    { return field($_[0], 'role'); }
 sub type($)    { return field($_[0], 'interface_type'); }
 sub mask($)    { return field($_[0], 'mask'); }
+sub uuid($)    { return field($_[0], 'uuid'); }
+
+sub IsExperimental($)
+{
+    my ($self) = @_;
+
+    return $self->role() eq TBDB_IFACEROLE_EXPERIMENT();
+}
 
 #
 # Lookup by card,port
@@ -112,6 +123,9 @@ sub mask($)    { return field($_[0], 'mask'); }
 sub Lookup($$$$)
 {
     my ($class, $nodeid, $card, $port) = @_;
+
+    $nodeid = $nodeid->node_id()
+	if (ref($nodeid));
 
     # Look in cache first
     return $all_interfaces{"$nodeid:$card:$port"}
@@ -148,6 +162,9 @@ sub LookupByIface($$$)
 {
     my ($class, $nodeid, $iface) = @_;
 
+    $nodeid = $nodeid->node_id()
+	if (ref($nodeid));
+
     # Look in cache first
     return $all_interfaces{"$nodeid:$iface"}
         if (exists($all_interfaces{"$nodeid:$iface"}));
@@ -177,11 +194,39 @@ sub LookupByIface($$$)
 }
 
 #
+# Lookup by uuid
+#
+sub LookupByUUID($$)
+{
+    my ($class, $uuid) = @_;
+
+    if (! ($uuid =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/)) {
+	return undef;
+    }
+    
+    my $query_result =
+	DBQueryWarn("select node_id,iface from interfaces ".
+		    "where uuid='$uuid'");
+
+    return undef
+	if (!$query_result);
+    return undef
+	if (!$query_result->numrows);
+    
+    my ($node_id, $iface) = $query_result->fetchrow_array();
+
+    return Interface->LookupByIface($node_id, $iface);
+}
+
+#
 # Lookup the control interface for a node, which is something we do a lot.
 #
 sub LookupControl($)
 {
     my ($class, $nodeid) = @_;
+
+    $nodeid = $nodeid->node_id()
+	if (ref($nodeid));
 
     my $query_result =
 	DBQueryWarn("select * from interfaces ".
