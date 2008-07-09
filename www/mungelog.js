@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+ * Copyright (c) 2006-2008 University of Utah and the Flux Group.
  * All rights reserved.
  */
 var LOG_STATE_LOADING = 1;
@@ -59,7 +59,14 @@ if (is_safari) {
 
 /* Clear the various 'loading' indicators. */
 function ml_loadFinished() {
-    ClearLoadingIndicators("<center><b>Done!</b></center>");
+    /* Clear the various loading indicators. */
+    var busyimg     = getObjbyName('load_busy');
+    var loadingspan = getObjbyName('load_loading');
+
+    busyimg.style.display = "none";
+    busyimg.src           = "1px.gif";
+    loadingspan.innerHTML = "<center><b>Done!</b></center>";
+
     nextState = LOG_STATE_LOADED;
 }
 

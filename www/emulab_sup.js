@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+ * Copyright (c) 2006-2008 University of Utah and the Flux Group.
  * All rights reserved.
  */
 /*
@@ -19,7 +19,7 @@ if (user_agent.indexOf("firefox") != -1) {
 }
 
 /* Clear the various 'loading' indicators. */
-function ClearLoadingIndicators(done_msg)
+function ClearBusyIndicators(done_msg)
 {
     var busyimg = getObjbyName('busy');
     var loadingspan = getObjbyName('loading');
@@ -31,11 +31,6 @@ function ClearLoadingIndicators(done_msg)
     busyimg.style.display = "none";
     busyimg.src = "1px.gif";
     loadingspan.innerHTML = done_msg;
-}
-
-function ClearBusyIndicators(done_msg)
-{
-	ClearLoadingIndicators(done_msg);
 }
 
 function HideBusyIndicators()

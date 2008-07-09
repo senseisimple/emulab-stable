@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -2196,7 +2196,7 @@ class TemplateInstance
 	$html .= " </div>\n";
 	
 	$html .= "  <img border=0 ";
-	$html .= "       onLoad=\"ClearLoadingIndicators('');\" ";
+	$html .= "       onLoad=\"ClearBusyIndicators('');\" ";
 	$html .= "       src='linkgraph_image.php?instance=$exptidx";
 	$html .= "&graphtype=$graphtype${runarg}";
 	$html .= "${srcarg}${dstarg}'>\n";

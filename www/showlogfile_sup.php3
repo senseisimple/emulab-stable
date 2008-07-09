@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2005-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require_once("Sajax.php");
@@ -113,8 +113,8 @@ function STARTLOG($object)
     $url = CreateURL("spewlogfile", $object);
 
     echo "<center>\n";
-    echo "<img id='busy' src='busy.gif'>
-                   <span id='loading'> Working ...</span>";
+    echo "<img id='load_busy' src='busy.gif'>
+                   <span id='load_loading'> Working ...</span>";
     echo "</center>\n";
     echo "<br>\n";
     
