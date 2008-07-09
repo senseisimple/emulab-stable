@@ -132,7 +132,7 @@ use vars qw(@ISA @EXPORT);
 	 TBDB_STATS_SWAPIN TBDB_STATS_SWAPOUT TBDB_STATS_SWAPMODIFY
 	 TBDB_STATS_FLAGS_IDLESWAP TBDB_STATS_FLAGS_PREMODIFY
 	 TBDB_STATS_FLAGS_START TBDB_STATS_FLAGS_PRESWAPIN
-	 TBDB_STATS_FLAGS_MODHOSED
+	 TBDB_STATS_FLAGS_MODHOSED TBDB_STATS_SWAPUPDATE
 
 	 TBDB_JAILIPBASE TBDB_JAILIPMASK
 
@@ -192,12 +192,6 @@ use vars qw(@ISA @EXPORT);
 	 TBNodeAdminOSID TBNodeDiskloadOSID
 	 TBNodeType TBNodeTypeProcInfo TBNodeTypeBiosWaittime
 
-	 TBExptRemoveVirtualState TBExptBackupVirtualState
-	 TBExptRestoreVirtualState
-
-	 TBExptRemovePhysicalState TBExptBackupPhysicalState
-	 TBExptRestorePhysicalState TBExptClearBackupState
-
 	 TBExptPortRange
 
 	 TBDB_WIDEAREA_LOCALNODE
@@ -252,7 +246,7 @@ require NodeType;
 require Lan;
 use vars qw($DBQUERY_MAXTRIES $DBCONN_MAXTRIES
 	    $DBCONN_EXITONERR $DBQUERY_RECONNECT $DBQUERY_DEBUG
-	    @EXPORT_OK @virtualTables @physicalTables);
+	    @EXPORT_OK);
 
 # Configure variables
 my $TB		= "@prefix@";
@@ -641,6 +635,7 @@ sub TBDB_STATS_TERMINATE()	{ "destroy"; }
 sub TBDB_STATS_SWAPIN()		{ "swapin"; }
 sub TBDB_STATS_SWAPOUT()	{ "swapout"; }
 sub TBDB_STATS_SWAPMODIFY()	{ "swapmod"; }
+sub TBDB_STATS_SWAPUPDATE()	{ "swapupdate"; }
 sub TBDB_STATS_FLAGS_IDLESWAP()	{ 0x01; }
 sub TBDB_STATS_FLAGS_PREMODIFY(){ 0x02; }
 sub TBDB_STATS_FLAGS_START()    { 0x04; }
@@ -2324,58 +2319,6 @@ sub TBExptContainsNodeCT($$$)
 }
 
 #
-# List of tables used for experiment removal/backup/restore.
-#
-@virtualTables  = ("virt_nodes",
-		   "virt_lans",
-		   "virt_lan_lans",
-		   "virt_lan_settings",
-		   "virt_lan_member_settings",
-		   "virt_trafgens",
-		   "virt_agents",
-		   "virt_routes",
-		   "virt_vtypes",
-		   "virt_programs",
-		   "virt_node_desires",
-		   "virt_node_startloc",
-		   "virt_simnode_attributes",
-		   "virt_user_environment",
-		   "virt_parameters",
-		   # vis_nodes is locked during update in prerender, so we
-		   # will get a consistent dataset when we backup.
-		   "vis_nodes",
-		   "vis_graphs",
-		   "nseconfigs",
-		   "eventlist",
-		   "event_groups",
-		   "virt_firewalls",
-		   "firewall_rules",
-		   "virt_tiptunnels",
-		   "ipsubnets");
-
-@physicalTables = ("delays",
-		   "ipport_ranges",
-		   "v2pmap",
-		   "linkdelays",
-		   "traces",
-		   "portmap");
-
-#
-# Clear the backup crap we create below.
-#
-sub TBExptClearBackupState($$)
-{
-    my ($pid, $eid) = @_;
-    my $pstateDir = TBExptWorkDir($pid, $eid) . "/pstate";
-    my $vstateDir = TBExptWorkDir($pid, $eid) . "/vstate";
-
-    system("/bin/rm -rf $pstateDir")
-	if (-e $pstateDir);
-    system("/bin/rm -rf $vstateDir")
-	if (-e $vstateDir);
-}
-
-#
 # Return the list of subnodes for the given node.
 #
 sub TBNodeSubNodes($)
@@ -2523,142 +2466,6 @@ sub TBNodeTypeBiosWaittime($)
 	if ($typeinfo->bios_waittime(\$bios_waittime));
 
     return $bios_waittime;
-}
-
-#
-# Remove the virtual state of an experiment from the DB,
-# returning the number of queries which didn't work.
-#
-sub TBExptRemoveVirtualState($$)
-{
-    my ($pid, $eid) = @_;
-    my $errors = 0;
-
-    foreach my $table (@virtualTables) {
-	DBQueryWarn("DELETE FROM $table WHERE pid='$pid' AND eid='$eid'")
-	    or $errors++;
-    }
-    return $errors;
-}
-
-#
-# Remove the physical state of an experiment from the DB,
-# returning the number of queries which didn't work.
-#
-sub TBExptRemovePhysicalState($$)
-{
-    my ($pid, $eid) = @_;
-    my $errors = 0;
-
-    my $experiment = Experiment->Lookup($pid, $eid);
-    return 1
-	if (!defined($experiment));
-
-    return 1
-	if (Lan->DestroyExperimentLans($experiment) != 0);
-    
-    foreach my $table (@physicalTables) {
-	DBQueryWarn("DELETE FROM $table WHERE pid='$pid' AND eid='$eid'")
-	    or $errors++;
-    }
-    return $errors;
-}
-
-#
-# Backs up specified virtual state of pid/eid into directory in tmp.
-#
-sub TBExptBackupVirtualState($$)
-{
-    my ($pid, $eid) = @_;
-    my $errors    = 0;
-    my $vstateDir = TBExptWorkDir($pid, $eid) . "/vstate";
-
-    if (! -e $vstateDir) {
-	mkdir($vstateDir, 0777)
-	    or return 1;
-
-	chmod(0777, $vstateDir)
-	    or return 1;
-    }
-
-    foreach my $table (@virtualTables) {
-	DBQueryWarn("SELECT * FROM $table ".
-		    "WHERE pid='$pid' AND eid='$eid' ".
-		    "INTO OUTFILE '$vstateDir/$table' ")
-	    or $errors++;
-    }
-    return $errors;
-}
-
-#
-# Backs up specified physical state of pid/eid into directory in tmp.
-#
-sub TBExptBackupPhysicalState($$)
-{
-    my ($pid, $eid) = @_;
-    my $errors    = 0;
-    my $pstateDir = TBExptWorkDir($pid, $eid) . "/pstate";
-
-    if (! -e $pstateDir) {
-	mkdir($pstateDir, 0777)
-	    or return 1;
-
-	chmod(0777, $pstateDir)
-	    or return 1;
-    }
-
-    my $experiment = Experiment->Lookup($pid, $eid);
-    return 1
-	if (!defined($experiment));
-
-    return 1
-	if (Lan->BackupExperimentLans($experiment, $pstateDir) != 0);
-    
-    foreach my $table (@physicalTables) {
-	DBQueryWarn("SELECT * FROM $table WHERE pid='$pid' AND eid='$eid' ".
-		    "INTO OUTFILE '$pstateDir/$table' ")
-	    or $errors++;
-    }
-    return $errors;
-}
-
-#
-# Restores backed up virtual state of pid/eid from directory in /tmp.
-#
-sub TBExptRestoreVirtualState($$)
-{
-    my ($pid, $eid) = @_;
-    my $errors    = 0;
-    my $vstateDir = TBExptWorkDir($pid, $eid) . "/vstate";
-
-    foreach my $table (@virtualTables) {
-	DBQueryWarn("LOAD DATA INFILE '$vstateDir/$table' INTO TABLE $table")
-	    or $errors++;
-    }
-    return $errors;
-}
-
-#
-# Restores backed up virtual state of pid/eid from directory in /tmp.
-#
-sub TBExptRestorePhysicalState($$)
-{
-    my ($pid, $eid) = @_;
-    my $errors    = 0;
-    my $pstateDir = TBExptWorkDir($pid, $eid) . "/pstate";
-
-    my $experiment = Experiment->Lookup($pid, $eid);
-    return 1
-	if (!defined($experiment));
-
-    return 1
-	if (Lan->RestoreExperimentLans($experiment, $pstateDir) != 0);
-    
-    foreach my $table (@physicalTables) {
-	DBQueryWarn("LOAD DATA INFILE '$pstateDir/$table' INTO TABLE $table")
-	    or $errors++;
-    }
-    return $errors;
 }
 
 #
