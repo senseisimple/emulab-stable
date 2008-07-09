@@ -2180,7 +2180,7 @@ sub RecordVlanInsertion($$$$)
     my ($class, $experiment, $lanid, $tag) = @_;
 
     my $pid     = $experiment->pid();
-    my $eid     = $experiment->pid();
+    my $eid     = $experiment->eid();
     my $exptidx = $experiment->idx();
     my $vlan    = VLan->Lookup($lanid);
     return -1
