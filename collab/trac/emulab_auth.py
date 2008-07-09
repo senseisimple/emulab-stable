@@ -19,6 +19,7 @@
 
 import string
 import re
+import os
 
 from trac import perm, util
 from trac.core import *
@@ -56,7 +57,11 @@ class EmulabAuthModule(auth.LoginModule):
                 req.redirect(self.env.abs_href())
                 return
             auth.LoginModule._do_login(self, req)
-            req.redirect(self.env.abs_href())
+            if req.args.get('goto'):
+                req.redirect(self.env.abs_href() + req.args.get('goto'))
+            else:
+                req.redirect(self.env.abs_href())
+                pass
             pass
         elif req.path_info.startswith('/logout'):
             auth.LoginModule._do_logout(self, req)
@@ -128,6 +133,10 @@ class EmulabAuthModule(auth.LoginModule):
             yield ('metanav', 'login', 'logged in as %s' % req.authname)
             yield ('metanav', 'logout',
                    html.A('Logout', href=req.href.logout()))
+        else:
+            shortname = os.path.basename(self.env.path)
+            url = 'https://www.emulab.net/gototrac.php3?login=1&wiki=%s' % shortname
+            yield ('metanav', 'login', html.A('Login', href=url))
             pass
         pass
 

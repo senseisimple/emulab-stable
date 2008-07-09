@@ -20,9 +20,14 @@ $uid       = $this_user->uid();
 # Verify page arguments. project_title is the project to zap to.
 #
 $optargs = OptionalPageArguments("wiki",  PAGEARG_STRING,
-				 "force", PAGEARG_BOOLEAN);
+				 "login", PAGEARG_BOOLEAN,
+				 "do",    PAGEARG_STRING);
+				 
 if (!isset($wiki)) {
     $wiki = "emulab";
+}
+if (!isset($login)) {
+    $login = 0;
 }
 
 if ($wiki == "geni") {
@@ -48,8 +53,12 @@ else {
 # Look for our cookie. If the browser has it, then there is nothing
 # more to do; just redirect the user over to the wiki.
 #
-if (!isset($force) && isset($_COOKIE[$TRACCOOKIENAME])) {
-    header("Location: ${TRACURL}");
+if (!$login) {
+    $url = ${TRACURL};
+    if (isset($do)) {
+	$url .= "/" . $do;
+    }
+    header("Location: ${url}");
     return;
 }
 
@@ -68,6 +77,6 @@ if ($wiki == "protogeni") {
     # We do this for the private wiki. Temporary.
     setcookie($TRACCOOKIENAME, $hash, 0, "/", $TBAUTHDOMAIN, $TBSECURECOOKIES);
 }
-header("Location: ${TRACURL}/xlogin?user=$uid&hash=$hash");
+header("Location: ${TRACURL}/xlogin?user=$uid&hash=$hash" .
+       (isset($do) ? "&goto=/${do}" : ""));
 
-?>

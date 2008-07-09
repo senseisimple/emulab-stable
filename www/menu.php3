@@ -1176,8 +1176,7 @@ function PAGEFOOTER($view = NULL) {
     
     if ($login_user) {
 	echo "    <td class=reportbug>";
-	echo "      <a href='$TBBASE/gotobugdb.php3".
-	                    "?do=newtask&project_title=Emulab'>";
+	echo "      <a href='$TBBASE/gototrac.php3?do=newticket&login=1'>";
 	echo "        Report Bug, Gripe, Request Feature</a>";
 	echo "    </td>";
     }
