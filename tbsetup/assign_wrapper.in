@@ -43,6 +43,7 @@ sub getrtabid($$);
 sub array_diff($$);
 sub LoadCurrent();
 sub SetUpTracing($$$$$);
+sub fatal(@);
 
 #
 # This function as the main assign loop.  It converts the virtual
@@ -186,17 +187,6 @@ my $ptopfile = "$pid-$eid-$$.ptop";
 my $topfile  = "$pid-$eid-$$.top";
 
 TBDebugTimeStampsOn();
-
-#
-# All exits happen via this function!
-#
-sub fatal (@)
-{
-    &tberror(@_);
-
-    # We next go to the END block below.
-    exit($WRAPPER_FAILED);
-}
 
 #
 # We want warnings to cause assign_wrapper to exit abnormally.
@@ -518,6 +508,8 @@ my %admission_control = ();
 my %reserved_v2pmap  = ();
 my %reserved_v2vmap  = ();
 my %oldreservednodes = ();
+my %newreservednodes = ();
+my $oldreservedclean = 0;
 # reserved_p2vmap is indexed by physical and contains one or more virtual
 # nodes
 my %reserved_p2vmap  = ();
@@ -802,7 +794,7 @@ LoadExperiment();
 if ($updating) {
     LoadCurrent();
     print STDERR "Resetting DB before updating.\n";
-    TBExptRemovePhysicalState( $pid, $eid );
+    $experiment->RemovePhysicalState();
 }
 
 #
@@ -1309,10 +1301,7 @@ sub RunAssign ()
     # work all the time i.e. in the example discussed above
     my $oldreserved_pid = OLDRESERVED_PID;	
     my $oldreserved_eid = OLDRESERVED_EID;
-    if (scalar(keys %oldreservednodes)) {
-	# We can't recover after this coz we are making changes to
-	# the DB
-	$NoRecover = 1;
+    if (scalar(keys(%oldreservednodes)) && !$oldreservedclean) {
 	TBDebugTimeStamp("Moving Old Reserved nodes to ".
 	    		 "$oldreserved_pid/$oldreserved_eid ".
 			 "and back started");
@@ -1330,11 +1319,12 @@ sub RunAssign ()
 	    return -1;
 	}
 
-	# We need to move this back and forth the holding reservation only
-	# once i.e. in the first call to RunAssign(). If it gets repeatedly
-	# called coz only some pnode resources got nalloc'ed, we don't have
-	# to do the above again.
-	undef %oldreservednodes;
+	#
+	# We need to only once i.e. in the first call to RunAssign().
+	# If it gets repeatedly called coz only some pnode resources
+	# got nalloced, we do not have to do the above again.
+	#
+	$oldreservedclean = 1;
     }
 
     TBDebugTimeStamp("reserving started");
@@ -1374,6 +1364,7 @@ sub RunAssign ()
 	
 	foreach my $node (@reserved) {
 	    if (exists($toreserve{$node})) {
+		$newreservednodes{$node} = $node;
 		TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_INIT_DIRTY());
 	    }
 	}
@@ -1421,6 +1412,8 @@ sub RunAssign ()
     print "Successfully reserved all physical nodes we needed.\n";
 	
     foreach my $node (keys(%toreserve)) {
+	# Remeber all newly allocated nodes for later free if failure.
+	$newreservednodes{$node} = $node;
 	TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_INIT_DIRTY());
     }
 
@@ -1519,7 +1512,7 @@ if ($needwanassign) {
 # Recoverability ends.
 # All fatal() calls from this point do not have the recoverable '64' bit set.
 #
-$NoRecover = 1;
+#$NoRecover = 1;
 
 # VIRTNODES HACK: Local virtnodes have to be mapped now. This is a little
 # hokey in that the virtnodes just need to be allocated from the pool that
@@ -1737,36 +1730,6 @@ TBExptSetPortRange();
 # Load the current physical resources. This avoids lots of repeated
 # queries to the DB.
 LoadPhysResources();
-
-#
-# For update, wipe old interfaces in DB (normally done by nfree.)
-# These will get rebuilt soon. 
-#
-if ($updating && !$impotent) {
-    foreach my $pnode (keys(%phys_nodes)) {
-	#
-	# Do not need to do this for phys nodes that are to be
-	# released, or for virtnodes since they do not have interfaces
-	# associated with them directly. This is probably a bad assumption
-	# though, and perhaps this entire function should be moved to the
-	# library. 
-	#
-	next
-	    if (physnodeisvirtnode($pnode) ||
-		physnodereuse($pnode) eq "unused");
-
-	DBQueryFatal("update interfaces set IP='',IPaliases=NULL,mask=NULL,".
-		     "       rtabid='0',vnode_id=NULL " .
-		     "where node_id='$pnode' and ".
-		     "  role='" . TBDB_IFACEROLE_EXPERIMENT() . "'");
-
-	# Clean the virtual interfaces table for this node too.
-	DBQueryFatal("delete from vinterfaces where node_id='$pnode'");
-	
-	# And interface settings.
-	DBQueryFatal("delete from interface_settings where node_id='$pnode'");
-    }
-}
 
 ######################################################################
 # Step 3 - Convert to vlans, delays, and portmap
@@ -2951,7 +2914,7 @@ if( $simcount > 0 ) {
 }
 
 TBDebugTimeStamp("assign_wrapper finished");
-exit 0;
+exit(0);
 
 ######################################################################
 # Subroutines
@@ -3421,7 +3384,6 @@ sub UploadVlans()
 		if (!defined($linkedlan));
 	    my $virtlanidx  = virtlanidx($lan->vname());
 	    my $linkedlanid = $linkedlan->lanid();
-
 	    printdb("Update vinterfaces: $lan: $virtlanidx -> $linkedlanid\n");
 	    
 	    DBQueryFatal("update vinterfaces set vlanid='$linkedlanid' ".
@@ -5758,4 +5720,31 @@ sub nodejailosid($)
     return $nextosid;
 }
 
+#
+# All exits happen via this function!
+#
+sub fatal (@)
+{
+    #
+    # Free any newly reserved nodes (in update mode) so that tbswap knows
+    # it is safe to recover the experiment. If we bypass this and leave
+    # through the END block then NoRecover will still be set and tbswap
+    # will know to swap the experiment out. 
+    #
+    if ($updating) {
+	if (scalar(keys(%newreservednodes))) {
+	    $NoRecover = 0
+		if (system("nfree -x $pid $eid " .
+			   join(" ", keys(%newreservednodes))) == 0);
+	}
+	else {
+	    # When not updating this is meaningless to tbswap.
+	    $NoRecover = 0;
+	}
+    }
+    
+    &tberror(@_);
 
+    # We next go to the END block above.
+    exit($WRAPPER_FAILED);
+}

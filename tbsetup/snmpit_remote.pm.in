@@ -74,7 +74,7 @@ sub commonTail($$)
 	defined($response->{"output"}) && $response->{"output"} ne "") {
 	print $response->{"output"};
     }
-    return ($response->{"code"}) ? undef : $response->{"output"};
+    return $response;
 }
 
 
@@ -149,7 +149,10 @@ sub RemoteDoVlansFromTables(@)
 	if (! keys(%$vlantable));
 
     my $errors = 0;
-    my $xmlback =  commonTail("setup",$vlantable);
+    my $response = commonTail("setup", $vlantable);
+    return 1
+	if ($response->{"code"});
+    my $xmlback = $response->{"output"};
 
     if (defined($xmlback)) {
 	foreach my $vlres (split ',', $xmlback) {
@@ -165,6 +168,8 @@ sub RemoteDoVlansFromTables(@)
 		print STDERR "could not set vlan tag for $vlan\n";
 		$errors++;
 	    }
+	    VLan->RecordVlanInsertion($vlan->GetExperiment(),
+				      $vlan->lanid(), $tag);
 	}
     }
     else {
@@ -182,8 +187,14 @@ sub RemoteDoReset(@)
     
     return 0
 	if (! @vlans);
-    my $res = commonTail("destroy", join(",", @vlans));
-    return !defined($res);
+    my $response = commonTail("destroy", join(",", @vlans));
+    return 1
+	if ($response->{"code"});
+
+    foreach my $vlan (@vlans) {
+	VLan->RecordVLanDeletion($vlan);
+    }
+    return 0;
 }
 
 #
@@ -207,8 +218,11 @@ sub RemoteDoTrunking($$@)
     }
     $arg->{"port"} = $port;
 
-    my $res = commonTail("trunk", $arg);
-    return !defined($res);
+    my $response = commonTail("trunk", $arg);
+    return 1
+	if ($response->{"code"});
+
+    return 0;
 }
 
 #
@@ -224,7 +238,10 @@ sub RemoteDoList(@)
     my @list = ();
     my $arg = @vlans ? join(",", @vlans) : "";
 
-    my $xmlback = commonTail("list",$arg);
+    my $response = commonTail("list",$arg);
+    return 1
+	if ($response->{"code"});
+    my $xmlback = $response->{"output"};
     if (!defined($xmlback)) { return @list; }
 
     my $prefix = "" ;

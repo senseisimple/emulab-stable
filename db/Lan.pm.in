@@ -174,7 +174,7 @@ sub Create($$$;$$$)
 		    "   vname=$safe_vname, ".
 		    "   type='$type', ".
 		    "   vidx='$vidx', ".
-		    "   link='$linkid', ".
+		    "   link=$linkid, ".
 		    "   ready=0");
     return undef
 	if (!defined($query_result));
@@ -183,19 +183,6 @@ sub Create($$$;$$$)
     my $lanid = $query_result->insertid();
     my $lan   = Lan->Lookup($lanid);
 
-    # Keep the vlans table in sync for now. Will remove later.
-    if ($type eq "vlan" && !$initialize) {
-	$query_result = 
-	    DBQueryWarn("insert into vlans (id,exptidx,pid,eid,virtual) ".
-			"values ".
-			"(0, '$exptidx', '$pid', '$eid', $safe_vname)");
-	if (!$query_result) {
-	    DBQueryWarn("delete from lans where lanid='$lanid'");
-	    return undef;
-	}
-	my $vlanid = $query_result->insertid();
-	$lan->SetAttribute("vlanid", $vlanid);
-    }
     print "Created lan: $lan\n"
 	if ($debug && $lan);
     return $lan;
@@ -239,14 +226,6 @@ sub Destroy($)
 			     "where lanid='$lanid' and memberid='$memberid'"));
     }
 
-    # Keep the vlans table in sync for now. Will remove later.
-    if ($type eq "vlan" && !$initialize) {
-	my $vlanid;
-
-	$self->GetAttribute("vlanid", \$vlanid);
-	DBQueryWarn("delete from vlans where id='$vlanid'");
-    }
-    
     # Must delete attributes after above vlan removal but before lan removal.
     return -1
 	if (!DBQueryWarn("delete from lan_attributes ".
@@ -318,10 +297,6 @@ sub BackupExperimentLans($$$)
 		    "into outfile '$pstatedir/$table'")
 	    or return -1;
     }
-    # Keep the vlans table in sync for now. Will remove later.
-    DBQueryWarn("select * from vlans where exptidx='$exptidx' ".
-		"into outfile '$pstatedir/vlans' ")
-	or return -1;
     
     return 0;
 }
@@ -336,15 +311,94 @@ sub RestoreExperimentLans($$$)
     return -1
 	if (! ref($experiment));
 
-    # Keep the vlans table in sync for now. Will remove later.
     foreach my $table ("lans", "lan_attributes", "lan_members",
-		       "lan_member_attributes", "ifaces", "vlans") {
+		       "lan_member_attributes", "ifaces") {
 	if (-e "$pstatedir/$table") {
 	    DBQueryWarn("load data infile '$pstatedir/$table' ".
 			"into table $table")
 		or return -1;
 	}
     }
+    return 0;
+}
+
+#
+# Compare current vlans with pre-modify vlans to see which ones changed.
+# These are the ones we will delete from the switches. The ones that do not
+# change can be left alone. In the common case, this should save on the
+# amount of vlan churning we do for swapmod.
+#
+# We return two lists of vlan ids; ones that have changed and need to be
+# deleted, and the rest.
+#
+sub CompareVlansWithSwitches($$$)
+{
+    my ($class, $experiment, $pdiff, $psame) = @_;
+
+    my $exptidx = $experiment->idx();
+    my @changed = ();
+    my @same    = ();
+
+    #
+    # Grab the existing vlans from the vlans table (managed by snmpit).
+    #
+    my $query_result =
+	DBQueryWarn("select id,virtual,members,tag from vlans ".
+		    "where exptidx='$exptidx'");
+    return -1
+	if (!$query_result);
+    
+    while (my ($oldid,$vname,$oldmembers,$tag) =
+	   $query_result->fetchrow_array()) {
+
+	my $vlan = VLan->Lookup($experiment, $vname);
+	if (!defined($vlan) || $vlan->type ne "vlan") {
+	    push(@changed, $oldid);
+	    next;
+	}
+	my $newid = $vlan->lanid();
+
+	#
+	# Compare the members list.
+	#
+	my @oldportlist = split(/\s/, $oldmembers);
+	my @newportlist;
+	if ($vlan->PortList(\@newportlist) != 0) {
+	    print STDERR "Could not get portlist for $vlan\n";
+	    return -1;
+	}
+	if (scalar(@oldportlist) != scalar(@newportlist)) {
+	    push(@changed, $oldid);
+	    next;
+	}
+	my $diff = 0;
+	foreach my $port (@oldportlist) {
+	    if (! grep {$_ eq $port} @newportlist) {
+		$diff++;
+	    }
+	}
+	if ($diff) {
+	    push(@changed, $oldid);
+	    next;
+	}
+	push(@same, $oldid);
+
+	#
+	# Change the new lan (and its partner entries) to have the old id
+	# number, so that it matches what is on the switch, as told by
+	# the vlans table. 
+	#
+	# This is bad; if one of these updates fails, we are screwed.
+	#
+	foreach my $table ("lans", "lan_attributes", "lan_members",
+			   "lan_member_attributes", "ifaces") {
+	    DBQueryWarn("update $table set lanid=$oldid ".
+			"where lanid='$newid'")
+		or return -1;
+	}
+    }
+    @$pdiff = @changed;
+    @$psame = @same;
     return 0;
 }
 
@@ -518,12 +572,9 @@ sub AddInterface($$$$;$$)
 	return undef;
     }
 
-    # Keep vlans table in sync for now.
     if ($self->type() eq "vlan" && !$initialize) {
 	my $nodeiface = $node->node_id() . ":" . $iface;
-	my $vlanid;
-
-	$self->GetAttribute("vlanid", \$vlanid);
+	my $vlanid    = $self->lanid();
 
 	DBQueryWarn("update vlans set ".
 		    " members=CONCAT_WS(' ', members, '$nodeiface') ".
@@ -542,40 +593,34 @@ sub AddMember($$;$)
     return undef
 	if (!ref($self));
 
-    my $member = Lan::Member->Create($self);
-
-    if (defined($node)) {
-	if (!ref($node)) {
-	    $node = Node->Lookup($node);
-	    if (!defined($node)) {
-		$member->Destroy();
-		return undef;
-	    }
-	}
-	
-	# And the node.
-	if ($member->SetAttribute("node_id", $node->node_id()) != 0) {
-	    $member->Destroy();
+    if (!ref($node)) {
+	$node = Node->Lookup($node);
+	if (!defined($node)) {
 	    return undef;
 	}
-	# Set the attribute for the physical interface.
-	if (defined($iface) &&
-	    $member->SetAttribute("iface", $iface) != 0) {
-	    $member->Destroy();
-	    return undef;
-	}
+    }
 
-	# Keep vlans table in sync for now.
-	if ($self->type() eq "vlan" && !$initialize) {
-	    my $member = $node->node_id() . ":" . $iface;
-	    my $vlanid;
+    my $member = Lan::Member->Create($self, $node);
 
-	    $self->GetAttribute("vlanid", \$vlanid);
+    # And the node attribute. 
+    if ($member->SetAttribute("node_id", $node->node_id()) != 0) {
+	$member->Destroy();
+	return undef;
+    }
+    # Set the attribute for the physical interface.
+    if (defined($iface) &&
+	$member->SetAttribute("iface", $iface) != 0) {
+	$member->Destroy();
+	return undef;
+    }
+    # Keep vlans table in sync.
+    if ($self->type() eq "vlan" && !$initialize) {
+	my $member = $node->node_id() . ":" . $iface;
+	my $vlanid = $self->lanid();
 
-	    DBQueryWarn("update vlans set ".
-			" members=CONCAT_WS(' ', members, '$member') ".
-			"where id='$vlanid'");
-	}
+	DBQueryWarn("update vlans set ".
+		    " members=CONCAT_WS(' ', members, '$member') ".
+		    "where id='$vlanid'");
     }
     return $member;
 }
@@ -979,14 +1024,21 @@ sub Stringify($)
 #
 # Create a new Lan::Member object (on a specific lan) and return it.
 #
-sub Create($$)
+sub Create($$$)
 {
-    my ($class, $lan) = @_;
-    my $lanid = $lan->lanid();
+    my ($class, $lan, $node) = @_;
+
+    if (!ref($node)) {
+	$node = Node->Lookup($node);
+	return 0
+	    if (!defined($node));
+    }
+    my $nodeid = $node->node_id(); 
+    my $lanid  = $lan->lanid();
 
     my $query_result = 
 	DBQueryWarn("insert into lan_members set ".
-		    "  lanid='$lanid', memberid=NULL");
+		    "  lanid='$lanid', memberid=NULL, node_id='$nodeid'");
     return undef
 	if (!$query_result);
 
@@ -1255,14 +1307,14 @@ sub Create($$$$$;$)
     my $query_result =
 	DBQueryWarn("select idx from virt_lan_lans ".
 		    "where exptidx=$exptidx and vname='$vname'");
-    return -1
+    return undef
 	if (!$query_result || !$query_result->numrows);
     my ($vidx) = $query_result->fetchrow_array();
 
     # Use supplied member (which provides the ifaceid) or generate a
     # new one.
     if (!defined($member)) {
-	$member = $lan->AddMember();
+	$member = Lan::Member->Create($lan, $node);
 	return undef
 	    if (!defined($member));
     }
@@ -1773,6 +1825,8 @@ use English;
 use Lan;
 use overload ('""' => 'Stringify');
 
+my $SNMPIT = "$TB/bin/snmpit";
+
 # Cache of instances to avoid regenerating them.
 my %vlans   = ();
 
@@ -1942,6 +1996,29 @@ sub MemberList($$)
     return $self->GetLan()->MemberList($plist);
 }
 
+sub PortList($$)
+{
+    my ($self, $pref) = @_;
+    my @members;
+    my @ports  = ();
+
+    return -1
+	if ($self->MemberList(\@members) != 0);
+
+    foreach my $member (@members) {
+	my $nodeid;
+	my $iface;
+
+	return -1
+	    if ($member->GetAttribute("node_id", \$nodeid) != 0 ||
+		$member->GetAttribute("iface", \$iface) != 0);
+	
+	push(@ports, "$nodeid:$iface");
+    }
+    @$pref = @ports;
+    return 0;
+}
+
 #
 # Get value of an attribute.
 #
@@ -1971,11 +2048,8 @@ sub SetTag($$)
 {
     my ($self, $tag) = @_;
 
-    # Keep vlans table in sync for now.
     if (!$initialize) {
-	my $vlanid;
-
-	$self->GetAttribute("vlanid", \$vlanid);
+	my $vlanid = $self->lanid();
 
 	DBQueryWarn("update vlans set tag='$tag' ".
 		    "where id='$vlanid'");
@@ -2045,10 +2119,128 @@ sub ExperimentVLans($$$)
     return 0;
 }
 
+#
+# Utility function to add a vlan to the switch infrastructure. 
+#
+sub Instantiate($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $experiment = $self->GetExperiment();
+    return -1
+	if (!defined($experiment));
+
+    my $pid    = $experiment->pid();
+    my $eid    = $experiment->eid();
+    my $vname  = $self->vname();
+    my $lanid  = $self->lanid();
+
+    #print "Setting up VLAN $vname ($lanid) in $pid/$eid\n";
+    system("$SNMPIT -t $pid $eid $lanid");
+    return -1
+	if ($?);
+    return 0;
+}
+
+#
+# Utility function to remove a vlan from the switch infrastructure.
+#
+sub UnInstantiate($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $experiment = $self->GetExperiment();
+    return -1
+	if (!defined($experiment));
+
+    my $pid    = $experiment->pid();
+    my $eid    = $experiment->eid();
+    my $vname  = $self->vname();
+    my $lanid  = $self->lanid();
+
+    #print "Removing VLAN $vname ($lanid) from $pid/$eid\n";
+    system("$SNMPIT -r $pid $eid $lanid");
+    return -1
+	if ($?);
+    return 0;
+}
+
+#
+# Class methods to maintain the backup vlans table, which records what
+# is on the switches. This is used to optimize swapmod, nothing else.
+#
+sub RecordVlanInsertion($$$$)
+{
+    my ($class, $experiment, $lanid, $tag) = @_;
+
+    my $pid     = $experiment->pid();
+    my $eid     = $experiment->pid();
+    my $exptidx = $experiment->idx();
+    my $vlan    = VLan->Lookup($lanid);
+    return -1
+	if (!defined($vlan));
+
+    my $vname   = $vlan->vname();
+    my @portlist;
+    $vlan->PortList(\@portlist) == 0
+	or return -1;
+    my $members = join(" ", @portlist);
+
+    DBQueryWarn("replace into vlans set ".
+		"  id='$lanid', pid='$pid', eid='$eid', exptidx='$exptidx', ".
+		"  virtual='$vname', members='$members', tag='$tag'")
+	or return -1;
+
+    return 0;
+}
+
+sub RecordVLanDeletion($$)
+{
+    my ($class, $id) = @_;
+
+    DBQueryWarn("delete from vlans where id='$id'")
+	or return -1;
+
+    return 0;
+}
+
+#
+# Return a list of stale vlans for an experiment; vlans in the vlans
+# table that need to be removed from the switches. This happens when a
+# swapmod fails badly cause we try to optimize swapmod by not tearing
+# down vlans until the swapin phase, so as not churn vlans that have not
+# changed.
+#
+sub StaleVlanList($$$)
+{
+    my ($class, $experiment, $pref) = @_;
+
+    my $pid     = $experiment->pid();
+    my $eid     = $experiment->pid();
+    my $exptidx = $experiment->idx();
+    my @result  = ();
+
+    my $query_result =
+	DBQueryWarn("select id from vlans where exptidx=$exptidx");
+    return -1
+	if (!$query_result);
+
+    while (my ($id) = $query_result->fetchrow_array()) {
+	push(@result, $id);
+    }
+    @$pref = @result;
+    return 0;
+}
+
 ############################################################################
 #
-# The most common kind of Lan is a Vlan, so lets create a package/object
-# for it.
+# Another convenience package, for tunnels.
 #
 package Tunnel;
 use libdb;
@@ -2101,9 +2293,9 @@ sub GetExperiment($) { return $_[0]->{'EXPT'}; }
 #
 # Create a new Tunnel object and return it. No members yet ... 
 #
-sub Create($$$$;$$)
+sub Create($$$$$;$$)
 {
-    my ($class, $experiment, $vname, $secretkey, $mask, $port) = @_;
+    my ($class, $experiment, $vname, $secretkey, $style, $mask, $port) = @_;
 
     # The new lan has the 'ready' bit set to zero.
     my $lan = Lan->Create($experiment, $vname, "tunnel");
@@ -2112,6 +2304,10 @@ sub Create($$$$;$$)
 
     # Set the secret key for the tunnel.
     if ($lan->SetAttribute("secretkey", $secretkey) != 0) {
+	$lan->Destroy();
+	return undef;
+    }
+    if ($lan->SetAttribute("style", $style) != 0) {
 	$lan->Destroy();
 	return undef;
     }
@@ -2163,14 +2359,14 @@ sub Stringify($)
 #
 sub AddInterface($$$$;$$)
 {
-    my ($self, $node, $vnode, $vport, $ip, $peerip, $isserver) = @_;
+    my ($self, $node, $vnode, $vport) = @_;
 
     if (!ref($node)) {
 	$node = Node->Lookup($node);
 	return undef
 	    if (!defined($node));
     }
-    my $member = $self->AddMember($node, $ip, $peerip, $isserver);
+    my $member = $self->AddMember($node);
     return undef
 	if (!defined($member));
     
@@ -2183,11 +2379,11 @@ sub AddInterface($$$$;$$)
 }
 
 #
-# Add a member to a tunnel.
+# Add a member to a tunnel. The caller needs to a bunch of stuff.
 #
-sub AddMember($$$;$$)
+sub AddMember($$)
 {
-    my ($self, $node, $ip, $peerip, $isserver) = @_;
+    my ($self, $node) = @_;
 
     if (!ref($node)) {
 	$node = Node->Lookup($node);
@@ -2198,48 +2394,6 @@ sub AddMember($$$;$$)
     return undef
 	if (!defined($member));
 
-    if ($member->SetAttribute("ipaddr", $ip) != 0) {
-	$member->Destroy();
-	return undef;
-    }
-    if (defined($peerip) && 
-	$member->SetAttribute("peeripaddr", $peerip) != 0) {
-	$member->Destroy();
-	return undef;
-    }
-    if (defined($isserver) && $isserver &&
-	$member->SetAttribute("isserver", "1") != 0) {
-	$member->Destroy();
-	return undef;
-    }
-    # I think this table is going to go away.
-    my $pid      = $self->pid();
-    my $eid      = $self->eid();
-    my $exptidx  = $self->exptidx();
-    my $node_id  = $node->node_id();
-    my $lan      = $self->vname();
-    my $secretkey;
-    my $ipmask;
-    my $serverport;
-
-    if ($self->GetAttribute("secretkey", \$secretkey) != 0 ||
-	$self->GetAttribute("ipmask", \$ipmask) != 0 ||
-	$self->GetAttribute("serverport", \$serverport) != 0) {
-	$member->Destroy();
-	return undef;
-    }
-    $isserver = (defined($isserver) && $isserver ? 1 : 0);
-    
-    if (!DBQueryWarn("insert into tunnels ".
-		     " (pid, eid, node_id, vname, isserver, port, ".
-		     "  peer_ip, mask, assigned_ip, password) ".
-		     "values ('$pid', '$eid', '$node_id', '$lan', ".
-		     "        $isserver, '$serverport', ".
-		     "        '$peerip', '$ipmask', '$ip','$secretkey')")) {
-	$member->Destroy();
-	return undef;
-    }
-    
     return $member;
 }
 

@@ -20,6 +20,7 @@ my $TB = '@prefix@';
 
 use libdb;
 use User;
+use Experiment;
 use snmpit_lib;
 use snmpit_remote;
 use libtblog;
@@ -35,7 +36,7 @@ sub doListVlans($);
 sub doListPorts($);
 sub doPortStatus($@);
 sub doGetStats($);
-sub doVlansFromTables($@);
+sub doVlansFromTables($$@);
 sub doReset($@);
 sub doMakeVlan($$@);
 sub doDeleteVlan($@);
@@ -157,6 +158,7 @@ if ($opt{q}) {
 #
 my $pid;
 my $eid;
+my $experiment;
 my @ports;
 my @optvlanids = ();
 my $equaltrunking = 0;
@@ -405,10 +407,12 @@ if ($pid && $eid) {
     #
     # First, make sure the experiment exists
     #
-    if (!ExpState($pid,$eid)) {
+    $experiment = Experiment->Lookup($pid,$eid);
+    if (!defined($experiment)) {
 	die "There is no experiment $eid in project $pid\n";
     }
-    if ($UID && !TBExptAccessCheck($UID,$pid,$eid,TB_EXPT_MODIFY)) {
+    if (defined($this_user) &&
+	!$experiment->AccessCheck($this_user, TB_EXPT_MODIFY)) {
 	die "You do not have permission to modify experiment $pid/$eid\n";
     }
 }
@@ -698,7 +702,7 @@ COMMAND: foreach my $command (@commands) {
 	    last;
 	}; # /ports/ && do
 	/tables/ && do {
-	    $exitval += doVlansFromTables(\@stacks,@vlans);
+	    $exitval += doVlansFromTables($experiment,\@stacks,@vlans);
 	    last;
 	}; # /tables/ && do
 	/reset/ && do {
@@ -881,7 +885,7 @@ $vlan_id,$ddep, $pideid,           $vname,   $members
 	    next;
         }
 	$vname         = $vlan->vname();
-	my $experiment = $vlan->GetExperiment();
+        $experiment    = $vlan->GetExperiment();
 
 	#
 	# Permissions check - people only get to see their own VLANs
@@ -1219,7 +1223,8 @@ $port,    $inoctets, $inunicast,$innunicast,$indiscards,$inerr,  $inunk,    $out
 # Creates all VLANs given. Looks up identifiers in the database to determine
 # the membership.
 #
-sub doVlansFromTables($@) {
+sub doVlansFromTables($$@) {
+    my $experiment = shift;
     my $stacks = shift;
     my @vlans = @_;
 
@@ -1288,7 +1293,10 @@ sub doVlansFromTables($@) {
 		# Don't try to put ports in a VLAN if it couldn't be created
 		#
 		$errors++;
-	    } else { setVlanTag($vlan, $vlan_number); }
+	    } else {
+		setVlanTag($vlan, $vlan_number);
+		VLan->RecordVlanInsertion($experiment, $vlan, $vlan_number);
+	    }
 	}
 
 	#
@@ -1354,6 +1362,8 @@ sub doReset($@) {
 	}
 	foreach my $vlan (@existant_vlans) {
 	    setVlanTag($vlan, 0);
+	    VLan->RecordVLanDeletion($vlan);
+	    
 	}
     }
     return $errors;
@@ -1420,6 +1430,13 @@ sub doDeleteVlan($@) {
     my $stacks = shift;
     my @vlan_names = @_;
 
+    #
+    # Hand over to outer boss.
+    # 
+    if ($ELABINELAB) {
+	return RemoteDoReset(@vlan_names);
+    }
+
     my $errors = 0;
 
     my %exists = ();
@@ -1442,6 +1459,9 @@ sub doDeleteVlan($@) {
 	    if (!$ok) {
 		$errors++;
 	    }
+	    foreach my $vlan (@existant_vlans) {
+		VLan->RecordVLanDeletion($vlan);
+	    }	    
 	}
     }
 
@@ -1577,16 +1597,14 @@ sub doRecreateVlans($) {
     #
     # Get a list of all experiments, so that we can re-create their VLANs
     #
-    my @expts = ();
-    my $result = DBQueryFatal("select pid,eid from experiments ".
-    	"where state = '". EXPTSTATE_ACTIVE. "'");
-    while (my ($pid,$eid) = $result->fetchrow()) {
-	my @vlans = getExperimentVlans($pid,$eid);
-	doVlansFromTables($stacks,@vlans);
+    my @experiments = Experiment->AllActive();
+    foreach my $experiment (@experiments) {
+	my @vlans = getExperimentVlans($experiment->pid(), $experiment->eid());
+	
+	doVlansFromTables($experiment, $stacks, @vlans)
+	    if (@vlans);
     }
-
     return 1;
-
 }
 
 #

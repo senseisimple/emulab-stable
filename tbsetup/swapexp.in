@@ -95,6 +95,7 @@ my $signaled = 0;
 my $tbdir    = "$TB/bin";
 my $tbdata   = "tbdata";
 my $checkquota = "$TB/sbin/checkquota";
+my $wrapper    = "$TB/libexec/assign_wrapper";
 my $batch    = 0;
 my $idleswap = 0;
 my $autoswap = 0;
@@ -296,6 +297,11 @@ if (my $instance = Template::Instance->LookupByExptidx($experiment->idx())) {
 	die("*** $0:\n".
 	    "    $pid/$eid is a template instance; use another command\n");
     }
+}
+
+# XXX Hack for geni mode.
+if ($genimode) {
+    $experiment->SetState(EXPTSTATE_ACTIVE);
 }
 
 #
@@ -1026,6 +1032,17 @@ elsif ($inout eq "modify") {
 	    goto FWHOSED;
 	}
     }
+    elsif ($genimode) {
+	#
+	# Need the min/max numbers, usually done during prerun.
+	#
+	print "Doing a pre-assign ...\n";
+	if (system("$wrapper -t $pid $eid")) {
+	    fatal({type => 'secondary', severity => SEV_SECONDARY,
+		   error => ['update_aborted', undef]},
+		  "assign prerun failed!");
+	}
+    }
 
     #
     # Our next state depends on whether the experiment was active or swapped.
@@ -1055,6 +1072,7 @@ elsif ($inout eq "modify") {
 	else {
 	    $optarg  = ($reboot ? "-reboot" : "");
 	    $optarg .= ($eventsys_restart ? " -eventsys_restart" : "");
+	    $optarg .= ($genimode ? "-noswapout" : "");
 	}
 
 	if ($experiment->Swap($Experiment::EXPT_SWAPMOD, $optarg) == 0) {
@@ -1092,8 +1110,14 @@ elsif ($inout eq "modify") {
 		$modifyError = "Update aborted; experiment swapped out.";
 	    }
 	    else {
-		tbreport(SEV_SECONDARY, 'update_aborted', 'state_restored');
-		$modifyError = "Update aborted; old state restored.";
+		if ($genimode) {
+		    tbreport(SEV_SECONDARY, 'update_aborted','still active');
+		    $modifyError = "Update aborted; still swapped in.";
+		}
+		else {
+		    tbreport(SEV_SECONDARY, 'update_aborted','state_restored');
+		    $modifyError = "Update aborted; old state restored.";
+		}
 
 		# Reset the swapper since the experiment is still running.
 		$experiment->SetSwapper($last_swapper);
