@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -12,10 +12,10 @@ SUBDIR		= bugdb
 include $(OBJDIR)/Makeconf
 
 SBIN_SCRIPTS		= addbugdbproj addbugdbuser setbugdbgroups \
-			  bugdbsetup
+			  bugdbsetup 
 LIBEXEC_SCRIPTS		= bugdbxlogin
 
-CTRL_SBIN_SCRIPTS	= bugdbproxy bugdbgateway
+CTRL_SBIN_SCRIPTS	= bugdbproxy bugdbgateway exporttickets
 
 # These scripts installed setuid, with sudo. 
 SETUID_BIN_SCRIPTS   = 
@@ -62,6 +62,11 @@ $(INSTALL_DIR)/opsdir/sbin/bugdbgateway: bugdbgateway
 	$(SUDO) $(INSTALL) -o nobody -m 4755 $< $@
 
 $(INSTALL_DIR)/opsdir/sbin/bugdbproxy: bugdbproxy
+	echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
+	$(INSTALL_PROGRAM) $< $@
+
+$(INSTALL_DIR)/opsdir/sbin/exporttickets: exporttickets
 	echo "Installing $<"
 	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
 	$(INSTALL_PROGRAM) $< $@
