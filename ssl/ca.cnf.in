@@ -26,7 +26,6 @@ serial		= $dir/serial 		# The current serial number
 crl		= $dir/crl.pem 		# The current CRL
 private_key	= $dir/cakey.pem        # The private key
 RANDFILE	= $dir/.rand		# private random number file
-
 x509_extensions	= usr_cert		# The extentions to add to the cert
 
 # Extensions to add to a CRL. Note: Netscape communicator chokes on V2 CRLs
@@ -69,6 +68,7 @@ default_days	= 2000			# how long to certify for
 default_crl_days= 2000			# how long before next CRL
 default_md	= md5			# which md to use.
 preserve	= no			# keep passed DN ordering
+unique_subject  = no
 
 # A few difference way of specifying how similar the request should look
 # For type CA, the listed attributes must be the same, and the optional
