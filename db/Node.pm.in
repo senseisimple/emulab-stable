@@ -18,6 +18,7 @@ my $TB		= "@prefix@";
 my $BOSSNODE    = "@BOSSNODE@";
 my $EVENTSYS    = @EVENTSYS@;
 my $WOL         = "$TB/sbin/whol";
+my $OSSELECT    = "$TB/bin/os_select";
 # XXX stinky hack detection
 my $ISUTAH	= @TBMAINSITE@;
 
@@ -70,14 +71,28 @@ sub mysystem($)
 #
 sub Lookup($$)
 {
-    my ($class, $nodeid) = @_;
+    my ($class, $token) = @_;
+    my $nodeid;
+
+    if ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
+	my $query_result =
+	    DBQueryWarn("select node_id from nodes ".
+			"where uuid='$token'");
+	    return undef
+		if (! $query_result || !$query_result->numrows);
+
+	    ($nodeid) = $query_result->fetchrow_array();
+    }
+    elsif ($token =~ /^[-\w]+$/) {
+	$nodeid = $token;
+    }
+    else {
+	return undef;
+    }
 
     # Look in cache first
     return $nodes{$nodeid}
         if (exists($nodes{$nodeid}));
-
-    return undef
-	if (! ($nodeid =~ /^[-\w]+$/));
 
     my $query_result =
 	DBQueryWarn("select * from nodes as n ".
@@ -1086,10 +1101,9 @@ sub SetEventState($$)
 }
 
 #
-# Create new vnodes. This routine obviously cannot be called on a specific
-# instance since it does not exist! The argument is still a reference; to a
-# a hash of options to be used when creating the new node(s). A list of the
-# node names is returned.
+# Create new vnodes. The argument is a reference; to a a hash of options to
+# be used when creating the new node(s). A list of the node names is
+# returned.
 #
 sub CreateVnodes($$)
 {
@@ -1554,6 +1568,26 @@ sub NewRootPasswd($)
 		"  attrkey='root_password',attrvalue='$hash'")
 	or return -1;
 
+    return 0;
+}
+
+#
+# Invoke OS selection. Currently we use this to reset to default boot,
+# but might change later to take an argument.
+#
+sub SelectOS($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $node_id = $self->node_id();
+
+    system("$OSSELECT -b $node_id");
+    return -1
+	if ($?);
     return 0;
 }
 
