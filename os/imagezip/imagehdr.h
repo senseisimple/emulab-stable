@@ -13,20 +13,20 @@
  * None of this wimpy start at version 1 stuff either, our first version
  * is 1,768,515,945!
  *
- *	V2 introduced the first and last sector fields as well
- *	as basic relocations.
+ *      V2 introduced the first and last sector fields as well
+ *      as basic relocations.
  *
- *	V3 introduced LILO relocations for Linux partition images.
- *	Since an older imageunzip would still work, but potentially
- *	lay down an incorrect images, I bumped the version number.
+ *      V3 introduced LILO relocations for Linux partition images.
+ *      Since an older imageunzip would still work, but potentially
+ *      lay down an incorrect images, I bumped the version number.
  */
-#define COMPRESSED_MAGIC_BASE		0x69696969
-#define COMPRESSED_V1			(COMPRESSED_MAGIC_BASE+0)
-#define COMPRESSED_V2			(COMPRESSED_MAGIC_BASE+1)
-#define COMPRESSED_V3			(COMPRESSED_MAGIC_BASE+2)
-#define COMPRESSED_V4			(COMPRESSED_MAGIC_BASE+3)
+#define COMPRESSED_MAGIC_BASE           0x69696969
+#define COMPRESSED_V1                   (COMPRESSED_MAGIC_BASE+0)
+#define COMPRESSED_V2                   (COMPRESSED_MAGIC_BASE+1)
+#define COMPRESSED_V3                   (COMPRESSED_MAGIC_BASE+2)
+#define COMPRESSED_V4                   (COMPRESSED_MAGIC_BASE+3)
 
-#define COMPRESSED_MAGIC_CURRENT	COMPRESSED_V4
+#define COMPRESSED_MAGIC_CURRENT        COMPRESSED_V4
 
 /*
  * Each compressed block of the file has this little header on it.
@@ -35,12 +35,12 @@
  * have to know exactly how much to give the inflator.
  */
 struct blockhdr_V1 {
-	uint32_t	magic;
-	uint32_t	size;		/* Size of compressed part */
-	int32_t		blockindex;
-	int32_t		blocktotal;
-	int32_t		regionsize;
-	int32_t		regioncount;
+        uint32_t        magic;
+        uint32_t        size;           /* Size of compressed part */
+        int32_t         blockindex;
+        int32_t         blocktotal;
+        int32_t         regionsize;
+        int32_t         regioncount;
 };
 
 /*
@@ -52,21 +52,23 @@ struct blockhdr_V1 {
  * this was not the case in frisbee.
  */
 struct blockhdr_V2 {
-	uint32_t	magic;		/* magic/version */
-	uint32_t	size;		/* Size of compressed part */
-	int32_t		blockindex;	/* netdisk: which block we are */
-	int32_t		blocktotal;	/* netdisk: total number of blocks */
-	int32_t		regionsize;	/* sizeof header + regions */
-	int32_t		regioncount;	/* number of regions */
-	/* V2 follows */
-	uint32_t	firstsect;	/* first sector described by block */
-	uint32_t	lastsect;	/* last sector described by block */
-	int32_t		reloccount;	/* number of reloc entries */
+        uint32_t        magic;          /* magic/version */
+        uint32_t        size;           /* Size of compressed part */
+        int32_t         blockindex;     /* netdisk: which block we are */
+        int32_t         blocktotal;     /* netdisk: total number of blocks */
+        int32_t         regionsize;     /* sizeof header + regions */
+        int32_t         regioncount;    /* number of regions */
+        /* V2 follows */
+        uint32_t        firstsect;      /* first sector described by block */
+        uint32_t        lastsect;       /* last sector described by block */
+        int32_t         reloccount;     /* number of reloc entries */
 };
 
 #define CHECKSUM_LEN_MAX 64
 /* SIGNATURE_KEY_LENGTH must be greater than CHECKSUM_LEN_MAX + 41 */
 #define SIGNATURE_KEY_LENGTH 256
+#define UUID_LENGTH 16
+/*#define AUTHENTICATION_SIGNATURE_LENGTH 256;*/
 
 /*
  * Version 3 of the block descriptor adds support for integrety protection
@@ -77,22 +79,25 @@ struct blockhdr_V2 {
  * are required to support SHA1, support for others are optional.
  */
 struct blockhdr_V4 {
-	uint32_t	magic;		/* magic/version */
-	uint32_t	size;		/* Size of compressed part */
-	int32_t		blockindex;	/* netdisk: which block we are */
-	int32_t		blocktotal;	/* netdisk: total number of blocks */
-	int32_t		regionsize;	/* sizeof header + regions */
-	int32_t		regioncount;	/* number of regions */
-	/* V2 follows */
-	uint32_t	firstsect;	/* first sector described by block */
-	uint32_t	lastsect;	/* last sector described by block */
-	int32_t		reloccount;	/* number of reloc entries */
+        uint32_t        magic;          /* magic/version */
+        uint32_t        size;           /* Size of compressed part */
+        int32_t         blockindex;     /* netdisk: which block we are */
+        int32_t         blocktotal;     /* netdisk: total number of blocks */
+        int32_t         regionsize;     /* sizeof header + regions */
+        int32_t         regioncount;    /* number of regions */
+        /* V2 follows */
+        uint32_t        firstsect;      /* first sector described by block */
+        uint32_t        lastsect;       /* last sector described by block */
+        int32_t         reloccount;     /* number of reloc entries */
         /* V4 follows */
         uint32_t        enc_cipher;     /* Which cipher was used to encrypt */
         //uint32_t        enc_iv    ;     /* Initialization vector */
         int8_t          enc_iv[EVP_MAX_KEY_LENGTH];      /* Initialization vector */
         uint32_t        checksumtype;   /* Which checksum was used */
         unsigned char   checksum[SIGNATURE_KEY_LENGTH]; /* Checksum, leave room for 512 bits */
+/*        uint32_t        authtype;*/ /* Which authentication algorithm was used */
+/*        unsigned char   authsig[AUTHENTICATION_SIGNATURE_LENGTH];*/ /* Auth Signature */
+        unsigned char   imageid[UUID_LENGTH]; /* Unique imageid for the whole image */
 };
 
 /*
@@ -112,6 +117,9 @@ struct blockhdr_V4 {
 #define ENCRYPTION_NULL 0
 #define ENCRYPTION_BLOWFISH_CBC 1
 
+/* Authentication ciphers supported */
+#define AUTHENTICATION_RSA 0
+
 /*
  * Relocation descriptor.
  * Certain data structures like BSD disklabels and LILO boot blocks require
@@ -121,22 +129,22 @@ struct blockhdr_V4 {
  * Relocation descriptors follow the region descriptors in the header block.
  */
 struct blockreloc {
-	uint32_t	type;		/* relocation type (below) */
-	uint32_t	sector;		/* sector it applies to */
-	uint32_t	sectoff;	/* offset within the sector */
-	uint32_t	size;		/* size of data affected */
+        uint32_t        type;           /* relocation type (below) */
+        uint32_t        sector;         /* sector it applies to */
+        uint32_t        sectoff;        /* offset within the sector */
+        uint32_t        size;           /* size of data affected */
 };
-#define RELOC_NONE		0
-#define RELOC_FBSDDISKLABEL	1	/* FreeBSD disklabel */
-#define RELOC_OBSDDISKLABEL	2	/* OpenBSD disklabel */
-#define RELOC_LILOSADDR		3	/* LILO sector address */
-#define RELOC_LILOMAPSECT	4	/* LILO map sector */
-#define RELOC_LILOCKSUM		5	/* LILO descriptor block cksum */
+#define RELOC_NONE              0
+#define RELOC_FBSDDISKLABEL     1       /* FreeBSD disklabel */
+#define RELOC_OBSDDISKLABEL     2       /* OpenBSD disklabel */
+#define RELOC_LILOSADDR         3       /* LILO sector address */
+#define RELOC_LILOMAPSECT       4       /* LILO map sector */
+#define RELOC_LILOCKSUM         5       /* LILO descriptor block cksum */
 
 /* XXX potential future alternatives to hard-wiring BSD disklabel knowledge */
-#define RELOC_ADDPARTOFFSET	100	/* add partition offset to location */
-#define RELOC_XOR16CKSUM	101	/* 16-bit XOR checksum */
-#define RELOC_CKSUMRANGE	102	/* range of previous checksum */
+#define RELOC_ADDPARTOFFSET     100     /* add partition offset to location */
+#define RELOC_XOR16CKSUM        101     /* 16-bit XOR checksum */
+#define RELOC_CKSUMRANGE        102     /* range of previous checksum */
 
 typedef struct blockhdr_V4 blockhdr_t;
 
@@ -148,8 +156,8 @@ typedef struct blockhdr_V4 blockhdr_t;
  * (swap, free FS blocks).
  */
 struct region {
-	uint32_t	start;
-	uint32_t	size;
+        uint32_t        start;
+        uint32_t        size;
 };
 
 /*
@@ -159,18 +167,18 @@ struct region {
  *
  * This number must be a multiple of the NFS read size in netdisk.
  */
-#define DEFAULTREGIONSIZE	(1024 * 4)
+#define DEFAULTREGIONSIZE       (1024 * 4)
 
 /*
  * Ah, the frisbee protocol. The new world order is to break up the
  * file into fixed 1MB chunks, with the region info prepended to each
  * chunk so that it can be layed down on disk independently of all the
- * chunks in the file. 
+ * chunks in the file.
  */
-#define SUBBLOCKSIZE		(1024 * 1024)
-#define SUBBLOCKMAX		(SUBBLOCKSIZE - DEFAULTREGIONSIZE)
+#define SUBBLOCKSIZE            (1024 * 1024)
+#define SUBBLOCKMAX             (SUBBLOCKSIZE - DEFAULTREGIONSIZE)
 
 /*
  * Assumed sector (block) size
  */
-#define SECSIZE			512
+#define SECSIZE                 512
