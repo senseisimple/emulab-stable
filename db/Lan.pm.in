@@ -353,10 +353,13 @@ sub CompareVlansWithSwitches($$$)
 
 	my $vlan = VLan->Lookup($experiment, $vname);
 	if (!defined($vlan) || $vlan->type ne "vlan") {
+	    print STDERR "$vname is not right!\n";
 	    push(@changed, $oldid);
 	    next;
 	}
 	my $newid = $vlan->lanid();
+
+	print STDERR "$newid, $vlan\n";
 
 	#
 	# Compare the members list.
@@ -367,6 +370,8 @@ sub CompareVlansWithSwitches($$$)
 	    print STDERR "Could not get portlist for $vlan\n";
 	    return -1;
 	}
+	print "$oldmembers\n";
+	print join(" ", @newportlist) . "\n";
 	if (scalar(@oldportlist) != scalar(@newportlist)) {
 	    push(@changed, $oldid);
 	    next;
@@ -374,6 +379,7 @@ sub CompareVlansWithSwitches($$$)
 	my $diff = 0;
 	foreach my $port (@oldportlist) {
 	    if (! grep {$_ eq $port} @newportlist) {
+		print STDERR "$port diff\n";
 		$diff++;
 	    }
 	}
@@ -1836,8 +1842,34 @@ my %vlans   = ();
 sub Lookup($$;$)
 {
     my ($class, $arg1, $arg2) = @_;
+    my $lan;
 
-    my $lan = Lan->Lookup($arg1, $arg2);
+    #
+    # Lan->Lookup() does not do exactly what I want in two arg case.
+    #
+    if (!defined($arg2)) {
+	$lan = Lan->Lookup($arg1);
+    }
+    elsif (!ref($arg1)) {
+	# Two args means lookup by $experiment,$vname
+	print STDERR "VLan->Lookup(): Bad first argument: $arg1\n";
+	return undef;
+    }
+    elsif (! ($arg2 =~ /^[-\w]*$/)) {
+	print STDERR "VLan->Lookup(): Bad second argument: $arg2\n";
+	return undef;
+    }
+    else {
+	my $exptidx = $arg1->idx();
+	my $result = 
+	    DBQueryWarn("select lanid from lans ".
+			"where exptidx='$exptidx' and vname='$arg2' and ".
+			"      type='vlan'");
+	return undef
+	    if (!defined($result) || !$result->numrows);
+	my ($lanid) = $result->fetchrow_array();
+	$lan = Lan->Lookup($lanid);
+    }
     return undef
 	if (!defined($lan));
 
