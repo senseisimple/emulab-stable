@@ -359,7 +359,7 @@ sub CompareVlansWithSwitches($$$)
 	}
 	my $newid = $vlan->lanid();
 
-	print STDERR "$newid, $vlan\n";
+	#print STDERR "$newid, $vlan\n";
 
 	#
 	# Compare the members list.
@@ -370,8 +370,8 @@ sub CompareVlansWithSwitches($$$)
 	    print STDERR "Could not get portlist for $vlan\n";
 	    return -1;
 	}
-	print "$oldmembers\n";
-	print join(" ", @newportlist) . "\n";
+	#print "$oldmembers\n";
+	#print join(" ", @newportlist) . "\n";
 	if (scalar(@oldportlist) != scalar(@newportlist)) {
 	    push(@changed, $oldid);
 	    next;
@@ -379,7 +379,6 @@ sub CompareVlansWithSwitches($$$)
 	my $diff = 0;
 	foreach my $port (@oldportlist) {
 	    if (! grep {$_ eq $port} @newportlist) {
-		print STDERR "$port diff\n";
 		$diff++;
 	    }
 	}
