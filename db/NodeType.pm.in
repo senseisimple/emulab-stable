@@ -83,6 +83,7 @@ sub isplabdslice($)   { return field($_[0], 'isplabdslice'); }
 sub isplabphysnode($) { return field($_[0], 'isplabphysnode'); }
 sub issimnode($)      { return field($_[0], 'issimnode'); }
 sub isgeninode($)     { return field($_[0], 'isgeninode'); }
+sub isfednode($)      { return field($_[0], 'isfednode'); }
 
 #
 # Force a reload of the data.

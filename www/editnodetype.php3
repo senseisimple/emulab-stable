@@ -271,6 +271,16 @@ function SPITFORM($node_type, $formfields, $attributes, $deletes, $errors)
              </td>
           </tr>\n";
 
+    echo "<tr>
+             <td colspan=2>isfednode:</td>
+             <td class=left>
+                 <input type=text
+                        name=\"formfields[isfednode]\"
+                        value=\"" . $formfields["isfednode"] . "\"
+	                size=2>
+             </td>
+          </tr>\n";
+
     #
     # Now do attributes.
     #
@@ -371,7 +381,7 @@ if (isset($new_type)) {
     $defaults = array("class" => "pc", "isvirtnode" => 0,
 		      "isremotenode" => 0, "issubnode" => 0,
 		      "isplabdslice" => 0, "isjailed" => 0, "isdynamic" => 0,
-		      "issimnode" => 0, "isgeninode" => 0);
+		      "issimnode" => 0, "isgeninode" => 0, "isfednode" => 0);
 
     $default_attributes = array();
     $attribute_types = array();
@@ -555,6 +565,11 @@ if (isset($formfields["issimnode"]) && $formfields["issimnode"] != "") {
 # isgeninode
 if (isset($formfields["isgeninode"]) && $formfields["isgeninode"] != "") {
     $args["isgeninode"] = $formfields["isgeninode"];
+}
+
+# isfednode
+if (isset($formfields["isfednode"]) && $formfields["isfednode"] != "") {
+    $args["isfednode"] = $formfields["isfednode"];
 }
 
 # Existing attributes.
