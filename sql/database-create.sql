@@ -2114,6 +2114,7 @@ CREATE TABLE `node_types` (
   `isplabdslice` tinyint(4) NOT NULL default '0',
   `isplabphysnode` tinyint(4) NOT NULL default '0',
   `issimnode` tinyint(4) NOT NULL default '0',
+  `isgeninode` tinyint(4) NOT NULL default '0',
   PRIMARY KEY  (`type`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 

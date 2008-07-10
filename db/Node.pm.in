@@ -861,6 +861,7 @@ sub issubnode($)      { return NodeTypeInfo($_[0])->issubnode(); }
 sub isplabdslice($)   { return NodeTypeInfo($_[0])->isplabdslice(); }
 sub isplabphysnode($) { return NodeTypeInfo($_[0])->isplabphysnode(); }
 sub issimnode($)      { return NodeTypeInfo($_[0])->issimnode(); }
+sub isgeninode($)     { return NodeTypeInfo($_[0])->isgeninode(); }
 
 #
 # And these are the less common attributes, but still common enough to

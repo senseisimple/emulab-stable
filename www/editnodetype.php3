@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -261,6 +261,16 @@ function SPITFORM($node_type, $formfields, $attributes, $deletes, $errors)
              </td>
           </tr>\n";
 
+    echo "<tr>
+             <td colspan=2>isgeninode:</td>
+             <td class=left>
+                 <input type=text
+                        name=\"formfields[isgeninode]\"
+                        value=\"" . $formfields["isgeninode"] . "\"
+	                size=2>
+             </td>
+          </tr>\n";
+
     #
     # Now do attributes.
     #
@@ -361,7 +371,7 @@ if (isset($new_type)) {
     $defaults = array("class" => "pc", "isvirtnode" => 0,
 		      "isremotenode" => 0, "issubnode" => 0,
 		      "isplabdslice" => 0, "isjailed" => 0, "isdynamic" => 0,
-		      "issimnode" => 0);
+		      "issimnode" => 0, "isgeninode" => 0);
 
     $default_attributes = array();
     $attribute_types = array();
@@ -540,6 +550,11 @@ if (isset($formfields["isplabdslice"]) && $formfields["isplabdslice"] != "") {
 # issimnode
 if (isset($formfields["issimnode"]) && $formfields["issimnode"] != "") {
     $args["issimnode"] = $formfields["issimnode"];
+}
+
+# isgeninode
+if (isset($formfields["isgeninode"]) && $formfields["isgeninode"] != "") {
+    $args["isgeninode"] = $formfields["isgeninode"];
 }
 
 # Existing attributes.
