@@ -846,6 +846,8 @@ REPLACE INTO table_regex VALUES ('node_types','isremotenode','text','redirect','
 REPLACE INTO table_regex VALUES ('node_types','issubnode','text','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('node_types','isplabdslice','text','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('node_types','issimnode','text','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('node_types','isgeninode','text','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('node_types','isfednode','text','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('node_types','attr_name','text','regex','^[-\\w]+$',1,32,NULL);
 REPLACE INTO table_regex VALUES ('node_types','attr_osid','text','redirect','os_info:osid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('node_types','attr_imageid','text','redirect','images:imageid',0,0,NULL);
