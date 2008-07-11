@@ -1854,7 +1854,7 @@ sub Lookup($$;$)
 	print STDERR "VLan->Lookup(): Bad first argument: $arg1\n";
 	return undef;
     }
-    elsif (! ($arg2 =~ /^[-\w]*$/)) {
+    elsif (! ($arg2 =~ /^[-\w\/]*$/)) {
 	print STDERR "VLan->Lookup(): Bad second argument: $arg2\n";
 	return undef;
     }
