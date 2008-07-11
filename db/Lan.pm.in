@@ -353,7 +353,8 @@ sub CompareVlansWithSwitches($$$)
 
 	my $vlan = VLan->Lookup($experiment, $vname);
 	if (!defined($vlan) || $vlan->type ne "vlan") {
-	    print STDERR "$vname is not right!\n";
+	    print STDERR "$vname is not a vlan!\n"
+		if (defined($vlan));
 	    push(@changed, $oldid);
 	    next;
 	}
