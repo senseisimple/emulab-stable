@@ -49,6 +49,7 @@ my $MKACCT        = "$TB/sbin/tbacct add";
 my $CVSBIN        = "/usr/bin/cvs";
 my $CHOWN         = "/usr/sbin/chown";
 my $GRANTTYPE     = "$TB/sbin/grantnodetype -d";
+my $ELABINELAB    = @ELABINELAB@;
 my $WIKISUPPORT   = @WIKISUPPORT@;
 my $BUGDBSUPPORT  = @BUGDBSUPPORT@;
 my $OPSDBSUPPORT  = @OPSDBSUPPORT@;
@@ -434,37 +435,39 @@ if (! -e $workdir) {
 # Need to add that I guess, but in the meantime we have just 3 remote
 # phys types to worry about. 
 #
-my $query_result =
-    DBQueryFatal("select pcremote_ok from projects where pid='$pid'");
-if ($query_result->num_rows) {
-    my ($pcremote) = $query_result->fetchrow_array();
+if (!$ELABINELAB) {
+    my $query_result =
+	DBQueryFatal("select pcremote_ok from projects where pid='$pid'");
+    if ($query_result->num_rows) {
+	my ($pcremote) = $query_result->fetchrow_array();
 
-    if (defined($pcremote)) {
-	print "$pcremote\n";
+	if (defined($pcremote)) {
+	    print "$pcremote\n";
 	
-	foreach my $type (split(",", $pcremote)) {
-	    print "$type\n";
-	    
-	    if ($type eq "pcplabphys") {
-		$type = "pcplab";
-	    }
-	    elsif ($type eq "pcron") {
-		$type = "pcvwa";
-	    }
-	    elsif ($type eq "pcwa") {
-		$type = "pcvwa";
-	    }
-	    else {
-		fatal("Unknown remote type $type!");
-	    }
-	    print "$type\n";
+	    foreach my $type (split(",", $pcremote)) {
+		print "$type\n";
+		
+		if ($type eq "pcplabphys") {
+		    $type = "pcplab";
+		}
+		elsif ($type eq "pcron") {
+		    $type = "pcvwa";
+		}
+		elsif ($type eq "pcwa") {
+		    $type = "pcvwa";
+		}
+		else {
+		    fatal("Unknown remote type $type!");
+		}
+		print "$type\n";
 
-	    $EUID = $UID;
+		$EUID = $UID;
 
-	    system("$GRANTTYPE -p $pid $type") == 0 or
-		fatal("Could not grant permission to use type $type!");
-
-	    $EUID = 0;
+		system("$GRANTTYPE -p $pid $type") == 0 or
+		    fatal("Could not grant permission to use type $type!");
+		
+		$EUID = 0;
+	    }
 	}
     }
 }
