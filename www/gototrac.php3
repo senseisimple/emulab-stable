@@ -54,11 +54,11 @@ else {
 # more to do; just redirect the user over to the wiki.
 #
 if (!$login) {
-    $url = ${TRACURL};
+    $url = $TRACURL;
     if (isset($do)) {
 	$url .= "/" . $do;
     }
-    header("Location: ${url}");
+    header("Location: $url");
     return;
 }
 
