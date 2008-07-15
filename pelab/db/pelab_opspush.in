@@ -113,6 +113,24 @@ system("$SSHTB -host $USERNODE $PROXY site_mapping") == 0
 unlink("${tempfile}.site_mapping")
     if (! $debug);
 
+unlink("${tempfile}.site_mapping")
+    if (-e "${tempfile}.site_mapping");
+
+#
+# Now do the plab_mapping (for node info)
+#
+DBQueryFatal("select * from plab_mapping ".
+             "into outfile '${tempfile}.node_mapping' ");
+system("$SCP -p ${tempfile}.node_mapping ".
+       "     ${USERNODE}:/var/db/mysql/pelab") == 0
+    or fatal("Could not copy ${tempfile}.node_mapping to $USERNODE!");
+
+system("$SSHTB -host $USERNODE $PROXY node_mapping") == 0
+    or fatal("Could not load site_mapping entries into ops DB!");
+
+unlink("${tempfile}.node_mapping")
+    if (! $debug);
+
 unlink("$logname")
     if (-e $logname);
 TBScriptUnlock();
