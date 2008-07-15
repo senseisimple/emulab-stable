@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003-2007 University of Utah and the Flux Group.
+# Copyright (c) 2003-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -197,6 +197,7 @@ my $SMBCONF_FILE    = "/usr/local/etc/smb.conf";
 my $SMBCONF_HEAD    = "$SMBCONF_FILE.head";
 my $APACHE_ETCDIR   = "/usr/local/etc/apache";
 my $HTTPD_CONF      = "$APACHE_ETCDIR/httpd.conf";
+my $WWWDIR          = "/usr/local/www/data";
 
 # For installing mysqld
 my $MYSQL           = "/usr/local/bin/mysql";
@@ -974,6 +975,16 @@ Phase "apache", "Installing apache config file", sub {
 
     DoneIfEdited("$HTTPD_CONF");
     ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/apache control-install");
+};
+Phase "wikidocs", "Installing wikidocs redirect", sub {
+    DoneIfExists("$WWWDIR/wikidocs/.htaccess");
+
+    if (! -e "$WWWDIR/wikidocs") {
+	mkdir("$WWWDIR/wikidocs", 0755) or
+	    PhaseFail("Unable to make $WWWDIR/wikidocs: $!");
+    }
+    CreateFileFatal("$WWWDIR/wikidocs/.htaccess",
+		    "Redirect /wikidocs http://users.emulab.net/trac/emulab");
 };
 
 Phase "database", "Setting up database", sub {
