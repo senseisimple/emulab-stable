@@ -156,6 +156,12 @@ class FlexlabDataServer:
         self._lastdataidx = mingidx
         print "Updated lastdataidx to %d" % self._lastdataidx
 
+        q = "select node_id,hostname,IP from node_mapping order by hostname"
+        qres = libdb.DBQueryFatal(q,dbnum=self.dbs['opsdb'])
+        for (node_id,hostname,IP) in qres:
+            self.nodeidToHostIPInfo[node_id] = [hostname,IP]
+            pass
+
         q = "select site_name,site_idx,node_id,node_idx" \
             " from site_mapping order by site_idx"
         qres = libdb.DBQueryFatal(q,dbnum=self.dbs['opsdb'])
@@ -164,24 +170,10 @@ class FlexlabDataServer:
             self.nodeidToSiteIdx[node_id] = sidx
             self.siteIdxToSiteName[sidx] = sname
             self.nodeidToNodeIdx[node_id] = nidx
-            self.nodeidToHostIPInfo[node_id] = self._lookupHostIP(node_id)
             pass
 
         self._cacheinit = True
         pass
-
-    def _lookupHostIP(self,node_id):
-        # this sort of sucks, but we don't have the full map from the boss db.
-        # thus, the reverse lookup could potentially give us a "non-official"
-        # planetlab hostname.
-        try:
-            print "Looking up %s" % node_id
-            (hostname,aliases,addrs) = socket.gethostbyaddr(node_id)
-            return [hostname,addrs[0]]
-        except:
-            traceback.print_exc()
-            pass
-        return None
 
     def getNodeInfo(self,node_id):
         retval = [self.nodeidToNodeIdx[node_id],self.nodeidToSiteIdx[node_id],
@@ -249,6 +241,12 @@ class FlexlabDataServer:
         if not self._cacheinit:
             return
 
+        q = "select node_id,hostname,IP from node_mapping order by hostname"
+        qres = libdb.DBQueryFatal(q,dbnum=self.dbs['opsdb'])
+        for (node_id,hostname,IP) in qres:
+            self.nodeidToHostIPInfo[node_id] = [hostname,IP]
+            pass
+
         q = "select site_name,site_idx,node_id,node_idx" \
             " from site_mapping order by site_idx"
         qres = libdb.DBQueryFatal(q,dbnum=self.dbs['opsdb'])
@@ -261,7 +259,6 @@ class FlexlabDataServer:
                 self.nodeidToSiteIdx[node_id] = sidx
                 self.siteIdxToSiteName[sidx] = sname
                 self.nodeidToNodeIdx[node_id] = nidx
-                self.nodeidToHostIPInfo[node_id] = self._lookupHostIP(node_id)
                 pass
             pass
 
