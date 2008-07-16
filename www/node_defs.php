@@ -939,7 +939,7 @@ class Node
 	    while ($row = mysql_fetch_array($query_result)) {
 		$iface     = $row["iface"];
 		$type      = $row["type"];
-		$man       = $row["manufacturuer"];
+		$man       = $row["manufacturer"];
 		$model     = $row["model"];
 		$protocols = $row["capval"];
 		$channel   = $row["channel"];

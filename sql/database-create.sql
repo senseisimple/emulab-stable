@@ -1467,7 +1467,7 @@ CREATE TABLE `interface_types` (
   `type` varchar(30) NOT NULL default '',
   `max_speed` int(11) default NULL,
   `full_duplex` tinyint(1) default NULL,
-  `manufacturuer` varchar(30) default NULL,
+  `manufacturer` varchar(30) default NULL,
   `model` varchar(30) default NULL,
   `ports` tinyint(4) default NULL,
   `connector` varchar(30) default NULL,
