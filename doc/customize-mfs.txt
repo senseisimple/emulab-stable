@@ -55,7 +55,7 @@ that your hardware is not supported, then contact Utah for more help.
 In summary, I recommend:
 
 	pxeboot62/pxeboot.emu-{sio,vga} (pick one and rename to "pxeboot.emu",
-                                         then move it to /tftpboot)
+                                     then copy it to /tftpboot)
 	frisbee62 (rename to "frisbee")
 	freebsd62 (rename to "freebsd")
 	freebsd62.newnode (rename to "freebsd.newnode")
@@ -64,7 +64,8 @@ Anyway, after choosing your MFSes, you should have three generic MFSes
 (frisbee, freebsd, freebsd.newnode).  The three MFSes unloaded are "generic"
 in the sense that they don't have any of your (or our) Emulab keys or
 passwords.  That is ok for the "newnode" MFS, but the other two will need
-to be customized for your site.  See the README file in each boot
+to be customized for your site.  You will also need to run the 'prepare'
+script for *each* of the three MFSes. See the README file in each boot
 subdirectory for MFS-specific customization and installation instructions.
 
 If you don't have VGA or serial lines, and it appears that nodes are not
