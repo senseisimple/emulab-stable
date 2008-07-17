@@ -901,7 +901,7 @@ function DOLOGIN_MAGIC($uid, $uid_idx, $email = null, $adminon = 0)
     global $TBNAMECOOKIE, $TBLOGINCOOKIE, $TBSECURECOOKIES, $TBEMAILCOOKIE;
     global $TBMAIL_OPS, $TBMAIL_AUDIT, $TBMAIL_WWW;
     global $WIKISUPPORT, $WIKICOOKIENAME;
-    global $BUGDBSUPPORT, $BUGDBCOOKIENAME, $TRACSUPPORT;
+    global $BUGDBSUPPORT, $BUGDBCOOKIENAME, $TRACSUPPORT, $TRACCOOKIENAME;
     
     # Caller makes these checks too.
     if (!TBvalid_uid($uid)) {
@@ -994,6 +994,7 @@ function DOLOGIN_MAGIC($uid, $uid_idx, $email = null, $adminon = 0)
 		  $TBAUTHDOMAIN, $TBSECURECOOKIES);
 	setcookie("trac_auth_protogeni_priv", "", $flushtime, "/",
 		  $TBAUTHDOMAIN, $TBSECURECOOKIES);
+	setcookie($TRACCOOKIENAME, "", $flushtime, "/", $TBAUTHDOMAIN, 0);
     }
 	
     DBQueryFatal("update users set ".
@@ -1032,7 +1033,7 @@ function DOLOGOUT($user) {
     global $CHECKLOGIN_STATUS, $CHECKLOGIN_USER;
     global $TBAUTHCOOKIE, $TBLOGINCOOKIE, $TBAUTHDOMAIN;
     global $WIKISUPPORT, $WIKICOOKIENAME, $HTTP_COOKIE_VARS;
-    global $BUGDBSUPPORT, $BUGDBCOOKIENAME;
+    global $BUGDBSUPPORT, $BUGDBCOOKIENAME, $TRACSUPPORT, $TRACCOOKIENAME;
 
     if (! $CHECKLOGIN_USER)
 	return 1;
@@ -1090,6 +1091,10 @@ function DOLOGOUT($user) {
     
     setcookie($TBAUTHCOOKIE, "", $timeout, "/", $TBAUTHDOMAIN, 0);
     setcookie($TBLOGINCOOKIE, "", $timeout, "/", $TBAUTHDOMAIN, 0);
+
+    if ($TRACSUPPORT) {
+	setcookie($TRACCOOKIENAME, "", $timeout, "/", $TBAUTHDOMAIN, 0);
+    }
     if ($WIKISUPPORT) {
 	setcookie($WIKICOOKIENAME, "", $timeout, "/", $TBAUTHDOMAIN, 0);
     }

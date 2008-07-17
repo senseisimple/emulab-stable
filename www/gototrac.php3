@@ -38,22 +38,22 @@ if ($wiki == "geni") {
 	USERERROR("You do not have permission to access the Trac wiki!", 1);
     }
     $wiki    = "protogeni";
-    $TRACURL = "https://www.protogeni.net/trac/$wiki";
-    $TRACCOOKIENAME = "trac_auth_protogeni_priv";
+    $TRACURL    = "https://www.protogeni.net/trac/$wiki";
+    $COOKIENAME = "trac_auth_protogeni_priv";
 }
 elseif ($wiki != "emulab") {
     USERERROR("Unknown Trac wiki $wiki!", 1);
 }
 else {
-    $TRACURL = "https://${USERNODE}/trac/$wiki";
-    $TRACCOOKIENAME = "trac_auth_${wiki}";
+    $TRACURL    = "https://${USERNODE}/trac/$wiki";
+    $COOKIENAME = "trac_auth_${wiki}";
 }
 
 #
 # Look for our cookie. If the browser has it, then there is nothing
 # more to do; just redirect the user over to the wiki.
 #
-if (!$login) {
+if (!$login && isset($_COOKIE[$TRACCOOKIENAME])) {
     $url = $TRACURL;
     if (isset($do)) {
 	$url .= "/" . $do;
@@ -75,8 +75,11 @@ $hash = $matches[1];
 
 if ($wiki == "protogeni") {
     # We do this for the private wiki. Temporary.
-    setcookie($TRACCOOKIENAME, $hash, 0, "/", $TBAUTHDOMAIN, $TBSECURECOOKIES);
+    setcookie($COOKIENAME, $hash, 0, "/", $TBAUTHDOMAIN, $TBSECURECOOKIES);
 }
+# This cookie tells boss that we have logged into Trac, but nothing else.
+setcookie($TRACCOOKIENAME, $hash, 0, "/", $TBAUTHDOMAIN, $TBSECURECOOKIES);
+
 header("Location: ${TRACURL}/xlogin?user=$uid&hash=$hash" .
-       (isset($do) ? "&goto=/${do}" : ""));
+       (isset($do) ? "&goto=${do}" : ""));
 

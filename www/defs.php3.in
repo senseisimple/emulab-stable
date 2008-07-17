@@ -15,7 +15,7 @@ $OURDOMAIN      = "@OURDOMAIN@";
 $BOSSNODE       = "@BOSSNODE@";
 $USERNODE       = "@USERNODE@";
 $CVSNODE	= "cvs.${OURDOMAIN}";
-$WIKINODE	= "wiki.${OURDOMAIN}";
+$WIKINODE	= $USERNODE;
 $TBADMINGROUP   = "@TBADMINGROUP@";
 $WWWHOST	= "@WWWHOST@";
 $WWW		= "@WWW@";
@@ -40,10 +40,10 @@ $WIKIURL        = "${WIKIHOME}/bin/newlogon";
 $WIKICOOKIENAME = "WikiCookie";
 $BUGDBURL       = "https://${USERNODE}/flyspray";
 $BUGDBCOOKIENAME= "FlysprayCookie";
+$TRACCOOKIENAME = "TracCookie";
 $MAILMANURL     = "http://${USERNODE}/mailman";
 $OPSCVSURL      = "http://${USERNODE}/cvsweb/cvsweb.cgi";
 $OPSJETIURL     = "http://${USERNODE}/jabber/jeti.php";
-$WIKIDOCURL     = "http://${WIKINODE}/wikidocs";
 $MIN_UNIX_UID   = @MIN_UNIX_UID@;
 $MIN_UNIX_GID   = @MIN_UNIX_GID@;
 $EXPOSELINKTEST = 1;
@@ -51,6 +51,7 @@ $EXPOSESTATESAVE= 0;
 $EXPOSEARCHIVE  = 0;
 $EXPOSETEMPLATES= 0;
 $USERSELECTUIDS = 1;
+$REMOTEWIKIDOCS = 0;
 
 $TBMAILADDR_OPS		= "@TBOPSEMAIL_NOSLASH@";
 $TBMAILADDR_WWW		= "@TBWWWEMAIL_NOSLASH@";
@@ -80,6 +81,20 @@ $UUIDGEN_PATH   = "/usr/bin/uuidgen";
 #
 if ($WWWHOST != "www.emulab.net") {
     $TBMAINSITE = 0;
+}
+
+#
+# The wiki docs either come from the local node, or in most cases
+# they are redirected back to Utah's emulab.
+#
+if ($TBMAINSITE) {
+    $WIKIDOCURL  = "https://${WIKINODE}/wikidocs/wiki";
+}
+elseif ($REMOTEWIKIDOCS) {
+    $WIKIDOCURL  = "https://wiki.emulab.net/wikidocs/wiki";
+}
+else {
+    $WIKIDOCURL  = "/wikidocs/wiki";
 }
 
 $TBPROJ_DIR     = "@PROJROOT_DIR@";

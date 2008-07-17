@@ -58,7 +58,7 @@ class EmulabAuthModule(auth.LoginModule):
                 return
             auth.LoginModule._do_login(self, req)
             if req.args.get('goto'):
-                req.redirect(self.env.abs_href() + req.args.get('goto'))
+                req.redirect(self.env.abs_href() + "/" + req.args.get('goto'))
             else:
                 req.redirect(self.env.abs_href())
                 pass
@@ -135,7 +135,9 @@ class EmulabAuthModule(auth.LoginModule):
                    html.A('Logout', href=req.href.logout()))
         else:
             shortname = os.path.basename(self.env.path)
-            url = 'https://www.emulab.net/gototrac.php3?login=1&wiki=%s' % shortname
+            page = req.path_info[1:] or 'wiki/WikiStart'
+
+            url = 'https://www.emulab.net/gototrac.php3?login=1&wiki=%s&do=%s' % (shortname, page)
             yield ('metanav', 'login', html.A('Login', href=url))
             pass
         pass
