@@ -67,3 +67,5 @@ INSERT INTO sitevariables VALUES ('swap/swapout_command',NULL,'','Command to run
 INSERT INTO sitevariables VALUES ('swap/swapout_command_failaction',NULL,'warn','What to do if swapout command fails (warn == continue, fail == fail swapout).');
 INSERT INTO sitevariables VALUES ('swap/swapout_command_timeout',NULL,'120','Time (in seconds) to allow for command completion');
 INSERT INTO sitevariables VALUES ('node/gw_mac','00:b0:8e:84:69:34','','MAC address of the control net router');
+INSERT INTO sitevariables VALUES ('general/default_imagename','FBSD410+RHL90-STD','','Name of the default image for new nodes, assumed to be in the emulab-ops project.');
+

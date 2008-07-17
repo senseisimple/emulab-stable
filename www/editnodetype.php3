@@ -44,12 +44,15 @@ if (!isset($deletes)) { $deletes = array(); }
 
 $emulab_ops = Project::LookupByPid("emulab-ops");
 $freebsd_mfs = OSinfo::LookupByName($emulab_ops,"FREEBSD-MFS");
-$fbsd410_rhl90_std = Image::LookupByName($emulab_ops,"FBSD410+RHL90-STD");
 $rhl_std = OSinfo::LookupByName($emulab_ops, "RHL-STD");
 $fbsd_std = OSinfo::LookupByName($emulab_ops,"FBSD-STD");
 $frisbee_mfs = OSinfo::LookupByName($emulab_ops,"FRISBEE-MFS");
 
-if ($freebsd_mfs == null || $fbsd410_rhl90_std == null ||
+# The default image comes from a site variable to avoid hardwiring here.
+$default_imagename = TBGetSiteVar("general/default_imagename");
+$default_image = Image::LookupByName($emulab_ops, $default_imagename);
+
+if ($freebsd_mfs == null || $default_image == null ||
     $rhl_std == null || $fbsd_std == null || $frisbee_mfs == null) {
     PAGEERROR("You must add images from Utah into your database" .
               " before adding a nodetype. See installation documentation for details!",1);
@@ -68,7 +71,7 @@ $initial_attributes = array(
     array("attrkey" => "control_network", "attrvalue" => "X",
 	  "attrtype" => "integer"),
     array("attrkey" => "default_imageid",
-	  "attrvalue" => $fbsd410_rhl90_std->imageid(),
+	  "attrvalue" => $default_image->imageid(),
 	  "attrtype" => "integer"),
     array("attrkey" => "default_osid", "attrvalue" => $rhl_std->osid(),
 	  "attrtype" => "integer"),
