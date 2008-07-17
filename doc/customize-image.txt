@@ -332,9 +332,18 @@ E. Testing the image
 
    which tells pxeboot to boot from partition 1 (aka, the FreeBSD partition).
    The machine should proceed to boot all the way to a login prompt.  Watch
-   for startup problems, like account setup or mount failures.  If all goes
-   well, login to the console with the root password you set and reboot again.
-   When you get the pxeboot prompt again, type space and then:
+   for startup problems, like account setup or mount failures.  If your
+   kernel panics reporting unknown/missing bus errors, you may need to
+   enable ACPI.  You can either do this directly in /boot/loader.conf by
+   setting acpi_load="YES", or by invoking our slicefix script while in
+   the admin-MFS:
+   
+       set SLICEFIX_ACPI=YES
+       /usr/local/etc/emulab/slicefix -0 <disk>  # e.g. ad4, etc.
+       
+   If all goes well, login to the console with the root password you set
+   and reboot again.  When you get the pxeboot prompt again, type space
+   and then:
 
        part:2
 
