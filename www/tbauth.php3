@@ -994,7 +994,6 @@ function DOLOGIN_MAGIC($uid, $uid_idx, $email = null, $adminon = 0)
 		  $TBAUTHDOMAIN, $TBSECURECOOKIES);
 	setcookie("trac_auth_protogeni_priv", "", $flushtime, "/",
 		  $TBAUTHDOMAIN, $TBSECURECOOKIES);
-	setcookie($TRACCOOKIENAME, "", $flushtime, "/", $TBAUTHDOMAIN, 0);
     }
 	
     DBQueryFatal("update users set ".
@@ -1093,7 +1092,12 @@ function DOLOGOUT($user) {
     setcookie($TBLOGINCOOKIE, "", $timeout, "/", $TBAUTHDOMAIN, 0);
 
     if ($TRACSUPPORT) {
-	setcookie($TRACCOOKIENAME, "", $timeout, "/", $TBAUTHDOMAIN, 0);
+	setcookie("trac_auth_emulab", "", $timeout, "/",
+		  $TBAUTHDOMAIN, 0);
+	setcookie("trac_auth_protogeni", "", $timeout, "/",
+		  $TBAUTHDOMAIN, 0);
+	setcookie("trac_auth_protogeni_priv", "", $timeout, "/",
+		  $TBAUTHDOMAIN, 0);
     }
     if ($WIKISUPPORT) {
 	setcookie($WIKICOOKIENAME, "", $timeout, "/", $TBAUTHDOMAIN, 0);

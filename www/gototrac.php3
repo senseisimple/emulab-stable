@@ -30,7 +30,7 @@ if (!isset($login)) {
     $login = 0;
 }
 
-if ($wiki == "geni") {
+if ($wiki == "geni" || $wiki == "protogeni") {
     $geniproject = Project::Lookup("geni");
     $approved    = 0;
     if (! ($geniproject &&
@@ -53,7 +53,7 @@ else {
 # Look for our cookie. If the browser has it, then there is nothing
 # more to do; just redirect the user over to the wiki.
 #
-if (!$login && isset($_COOKIE[$TRACCOOKIENAME])) {
+if (!$login && isset($_COOKIE[$COOKIENAME])) {
     $url = $TRACURL;
     if (isset($do)) {
 	$url .= "/" . $do;
@@ -73,12 +73,7 @@ if (!preg_match("/^(\w*)$/", $suexec_output, $matches)) {
 }
 $hash = $matches[1];
 
-if ($wiki == "protogeni") {
-    # We do this for the private wiki. Temporary.
-    setcookie($COOKIENAME, $hash, 0, "/", $TBAUTHDOMAIN, $TBSECURECOOKIES);
-}
-# This cookie tells boss that we have logged into Trac, but nothing else.
-setcookie($TRACCOOKIENAME, $hash, 0, "/", $TBAUTHDOMAIN, $TBSECURECOOKIES);
+setcookie($COOKIENAME, $hash, 0, "/", $TBAUTHDOMAIN, $TBSECURECOOKIES);
 
 header("Location: ${TRACURL}/xlogin?user=$uid&hash=$hash" .
        (isset($do) ? "&goto=${do}" : ""));

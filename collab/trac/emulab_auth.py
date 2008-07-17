@@ -56,7 +56,6 @@ class EmulabAuthModule(auth.LoginModule):
             if not req.remote_user:
                 req.redirect(self.env.abs_href())
                 return
-            auth.LoginModule._do_login(self, req)
             if req.args.get('goto'):
                 req.redirect(self.env.abs_href() + "/" + req.args.get('goto'))
             else:
@@ -94,17 +93,21 @@ class EmulabAuthModule(auth.LoginModule):
             # tell the user agent to drop it as it is invalid.
             return None
 
-        # Now delete it. Use-once token, and the underlying auth module
-        # will insert new auth info and generate a cookie.
-        if self.check_ip:
-            cursor.execute("DELETE FROM auth_cookie "
-                           "WHERE cookie=%s AND name=%s AND ipnr=%s",
-                           (hash, user, req.remote_addr))
-        else:
-            cursor.execute("DELETE FROM auth_cookie "
-                           "WHERE cookie=%s and name=%s",
-                           (hash, user))
         db.commit()
+        
+        shortname = os.path.basename(self.env.path)        
+        #
+        # This is awful!
+        #
+        if shortname == "protogeni":
+            cookie_key = "trac_auth_" + str(self.cookie_suffix)
+
+            req.outcookie[cookie_key] = hash
+            req.outcookie[cookie_key]['path'] = req.href()
+            req.outcookie[cookie_key]['domain'] = ".protogeni.net";
+            pass
+        
+        req.authname = user
         return user
 
     def _redirect_back(self, req):
