@@ -339,7 +339,7 @@ E. Testing the image
    the admin-MFS:
    
        set SLICEFIX_ACPI=YES
-       /usr/local/etc/emulab/slicefix -0 <disk>  # e.g. ad4, etc.
+       /usr/local/etc/emulab/slicefix 0 <disk>  # e.g. ad4, etc.
        
    If all goes well, login to the console with the root password you set
    and reboot again.  When you get the pxeboot prompt again, type space
