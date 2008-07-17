@@ -1,32 +1,32 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <signed-credential xmlns="http://www.protogeni.net/resources/credential/0.1" xmlns:sig="http://www.w3.org/2000/09/xmldsig#">
   <credential xml:id="Ref2">
-  <type>capability</type>
+  <type>privilege</type>
   <serial>2</serial>
   <owner_uuid>foo bar</owner_uuid>
   <this_uuid>foo bar</this_uuid>
-  <capabilities>
-    <capability>
+  <privileges>
+    <privilege>
       <name>frazzle</name>
       <can_delegate>1</can_delegate>
-    </capability>
-    <capability>
+    </privilege>
+    <privilege>
       <name>drazzle</name>
       <can_delegate>1</can_delegate>
-    </capability>
-  </capabilities>
+    </privilege>
+  </privileges>
   <parent>
   <credential xml:id="Ref1">
-  <type>capability</type>
+  <type>privilege</type>
   <serial>3</serial>
   <owner_uuid>foo bar</owner_uuid>
   <this_uuid>foo bar</this_uuid>
-  <capabilities>
-    <capability>
+  <privileges>
+    <privilege>
       <name>frazzle</name>
       <can_delegate>1</can_delegate>
-    </capability>
-  </capabilities>
+    </privilege>
+  </privileges>
 </credential>
 </parent>
 </credential>

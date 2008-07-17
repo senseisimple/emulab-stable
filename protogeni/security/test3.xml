@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <signed-credential xmlns="http://www.protogeni.net/resources/credential/0.1" xmlns:sig="http://www.w3.org/2000/09/xmldsig#">
   <credential xml:id="ref1">
-    <type>capability</type>
+    <type>ticket</type>
     <serial>3</serial>
     <owner_uuid>0b2eb97e-ed30-11db-96cb-001143e453fe</owner_uuid>
     <this_uuid>3e1948fe-ed30-11db-96cb-001143e453fe</this_uuid>
