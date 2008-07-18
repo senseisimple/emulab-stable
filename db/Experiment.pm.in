@@ -3089,7 +3089,7 @@ sub RestorePhysicalState($)
 	DBQueryWarn("select * from reserved_${idx}");
     return -1
 	if (!$query_result);
-    while (my ($row) = $query_result->fetchrow_hashref()) {
+    while (my $row = $query_result->fetchrow_hashref()) {
 	my $node_id = $row->{"node_id"};
 	
 	delete($row->{"node_id"});
