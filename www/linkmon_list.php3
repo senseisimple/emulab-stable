@@ -158,7 +158,7 @@ for ($i = 0; $i < $num; $i++) {
 }
 echo "</table>\n";
 echo "<center><font size=-1>".
-     "The <a href='tutorial/docwrapper.php3?docname=advanced.html#Tracing'>".
+     "The <a href='$WIKIDOCURL/AdvancedExample#Tracing'>".
      "Advanced Tutorial</a> has more info on link Tracing/Monitoring\n".
      "</font></center>\n";
 

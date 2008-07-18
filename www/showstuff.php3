@@ -15,6 +15,7 @@ include_once("node_defs.php");
 function SHOWNODES($pid, $eid, $sortby, $showclass) {
     global $SCRIPT_NAME;
     global $TBOPSPID;
+    global $WIKIDOCURL;
     
     #
     # If this is an expt in emulab-ops, we also want to see the reserved
@@ -205,14 +206,14 @@ function SHOWNODES($pid, $eid, $sortby, $showclass) {
 		    <th class='sorttable_nosort'>Last Log Message</th>\n";
 	}
 
-        echo "  <th class='sorttable_nosort'><a href=\"docwrapper.php3?docname=ssh-mime.html\">SSH</a></th>
-                <th class='sorttable_nosort'><a href=\"kb-show.php3?xref_tag=tiptunnel\">Console</a></th> .
+        echo "  <th class='sorttable_nosort'><a href=\"$WIKIDOCURL/ssh_mine\">SSH</a></th>
+                <th class='sorttable_nosort'><a href=\"$WIKIDOCURL/kb25\">Console</a></th> .
                 <th class='sorttable_nosort'>Log</th>";
 
 	# Only put out a RDP column header if there are any Windows nodes.
 	if ($anywindows) {
             echo "  <th class='sorttable_nosort'>
-                        <a href=\"docwrapper.php3?docname=rdp-mime.html\">RDP</a>
+                        <a href=\"$WIKIDOCURL/rdp_mine\">RDP</a>
                     </th>\n";
 	}
 	echo "  </tr></thead>\n";

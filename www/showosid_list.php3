@@ -71,7 +71,7 @@ WRITESUBMENUBUTTON("Image Descriptor list",
 SUBMENUEND();
 
 echo "Listed below are the OS Descriptors that you may use in your NS file
-      with the <a href='tutorial/docwrapper.php3?docname=nscommands.html#OS'>
+      with the <a href='$WIKIDOCURL/nscommands#OS'>
       <tt>tb-set-node-os</tt></a> directive. If the OS you have selected for
       a node is not loaded on that node when the experiment is swapped in,
       the Testbed system will automatically reload that node's disk with the
@@ -80,8 +80,8 @@ echo "Listed below are the OS Descriptors that you may use in your NS file
       already resident. Please be patient.
       <br>
       More information on how to create your own Images is in the
-      <a href='tutorial/tutorial.php3#CustomOS'>Custom OS</a> section of
-      the <a href='tutorial/tutorial.php3'>Emulab Tutorial.</a>
+      <a href='$WIKIDOCURL/Tutorial#CustomOS'>Custom OS</a> section of
+      the <a href='$WIKIDOCURL/Tutorial'>Emulab Tutorial.</a>
       <br>\n";
 
 SUBPAGEEND();

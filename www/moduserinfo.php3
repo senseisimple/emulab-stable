@@ -40,6 +40,7 @@ function SPITFORM($formfields, $errors)
     global $TBDB_UIDLEN, $TBDB_PIDLEN, $TBDB_GIDLEN, $isadmin;
     global $target_user, $wikionly;
     global $shelllist, $defaultshell;
+    global $WIKIDOCURL;
 
     $username = $target_user->uid();
     $uid_idx  = $target_user->uid_idx();
@@ -351,7 +352,7 @@ function SPITFORM($formfields, $errors)
     echo "<h4><blockquote><blockquote>
           <ol>
             <li> Please consult our
-                 <a href = 'docwrapper.php3?docname=security.html'>
+                 <a href = '$WIKIDOCURL/Security'>
                  security policies</a> for information
                  regarding passwords and email addresses.\n";
     if (!$wikionly) {

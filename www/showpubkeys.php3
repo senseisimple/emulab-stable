@@ -41,6 +41,7 @@ if (!$isadmin &&
 function SPITFORM($formfields, $errors)
 {
     global $isadmin, $target_user, $BOSSNODE;
+    global $WIKIDOCURL;
 
     $target_uid = $target_user->uid();
     $uid_idx    = $target_user->uid_idx();
@@ -184,7 +185,7 @@ function SPITFORM($formfields, $errors)
     echo "<blockquote><blockquote><blockquote>
           <ol>
             <li> Please consult our
-                 <a href = 'docwrapper.php3?docname=security.html#SSH'>
+                 <a href = '$WIKIDOCURL/SecReqs#SSH'>
                  security policies</a> for information
                  regarding ssh public keys.
             <li> You should not hand edit your your authorized_keys file on

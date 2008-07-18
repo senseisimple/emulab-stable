@@ -335,8 +335,7 @@ echo "<input type=hidden name=eid value=$eid>\n";
 
 echo "<table align=center border=1>\n";
 echo "<tr>
-          <td><a href='$TBDOCBASE/doc/docwrapper.php3?".
-                 "docname=linktest.html'>Linktest</a> Option:</td>
+          <td><a href='$WIKIDOCURL/linktest'>Linktest</a> Option:</td>
           <td><select name=level>
                  <option value=0>Skip Linktest </option>\n";
 

@@ -48,7 +48,7 @@ if (isset($nodetype) && $nodetype == "mote") {
     $title = "Mote Form";
     $help_message = 
           "See the
-          <a href=doc/docwrapper.php3?docname=emotes.html#PROGRAMMING>
+          <a href=\"$WIKIDOCURL/emotes#PROGRAMMING\">
           mote documentation</a> for more info on creating/using custom
           mote images.";
     # Default to 'srec' files for use with uisp
@@ -63,7 +63,7 @@ if (isset($nodetype) && $nodetype == "mote") {
     $title = "EZ Form";
     $help_message = 
           "See the
-          <a href=tutorial/docwrapper.php3?docname=tutorial.html#CustomOS>
+          <a href=$WIKIDOCURL/Tutorial#CustomOS>
           tutorial</a> for more info on creating/using custom Images.";
     # Default to imagezip ndz files
     $filename_extension = "ndz";

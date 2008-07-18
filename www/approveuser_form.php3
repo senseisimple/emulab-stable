@@ -88,9 +88,9 @@ echo "
       </table>
       <br />
       <b>Important group
-       <a href='docwrapper.php3?docname=groups.html#SECURITY'>
+       <a href='$WIKIDOCURL/Groups#SECURITY'>
        security issues</a> are discussed in the
-       <a href='docwrapper.php3?docname=groups.html'>Groups Tutorial</a>.
+       <a href='$WIKIDOCURL/Groups'>Groups Tutorial</a>.
       </b>
       </center><br />
 

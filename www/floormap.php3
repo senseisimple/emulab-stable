@@ -361,9 +361,9 @@ if (! readfile("${prefix}.map")) {
 }
 
 echo "<font size=+1>For more info on using wireless nodes, see the
-     <a href='tutorial/docwrapper.php3?docname=wireless.html'>
+     <a href='$WIKIDOCURL/wireless'>
      wireless tutorial</a> and the 
-     <a href='tutorial/docwrapper.php3?docname=gnuradio.html'>GNU software 
+     <a href='$WIKIDOCURL/gnuradio'>GNU software 
      defined radio tutorial</a>.</font>\n";
 
 echo "<center>\n";

@@ -262,6 +262,7 @@ function WRITEPLABBOTTOMBAR() {
     global $login_status, $login_user;
     global $TBBASE, $TBDOCBASE, $BASEPATH;
     global $THISHOMEBASE;
+    global $WIKIDOCURL;
 
     if ($login_user) {
 	$newsBase = $TBBASE; 
@@ -274,7 +275,7 @@ function WRITEPLABBOTTOMBAR() {
 	   <br>
 	   <font size=-1>
 	   <form method=get action=$TBDOCBASE/search.php3>
-	   [ <a href='$TBDOCBASE/doc.php3'>
+	   [ <a href='$WIKIDOCURL'>
 		Documentation</a> : <input name=query size = 15/>
 		  <input type=submit style='font-size:10px;' value='Search' /> ]
 	   [ <a href='$newsBase/news.php3'>
@@ -298,6 +299,7 @@ function WRITESIDEBAR() {
     global $THISHOMEBASE;
     global $EXPOSETEMPLATES;
     global $currentusage, $FANCYBANNER, $ELABINELAB, $PLABSUPPORT;
+    global $WIKIDOCURL;
     $firstinitstate = TBGetFirstInitState();
 
     #
@@ -419,7 +421,7 @@ function WRITESIDEBAR() {
     }
     if ($rootEmulab) {
 	NavMenuButton("Other Emulabs", 
-		      "$TBDOCBASE/docwrapper.php3?docname=otheremulabs.html");
+		      "$WIKIDOCURL/OtherEmulabs");
     } else {
 	NavMenuButton("Utah Emulab", "http://www.emulab.net/");
     }
@@ -430,7 +432,7 @@ function WRITESIDEBAR() {
 	NavMenuButton("News $newsDate", "$newsBase/news.php3");
     }
 
-    NavMenuButton("Documentation", "$TBDOCBASE/doc.php3");
+    NavMenuButton("Documentation", "$WIKIDOCURL");
 
     if ($rootEmulab) {
 	# Leave New here about 2 weeks

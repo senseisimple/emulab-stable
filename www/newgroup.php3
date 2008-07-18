@@ -54,6 +54,7 @@ function SPITFORM($formfields, $errors)
 {
     global $project, $pid, $projlist;
     global $TBDB_GIDLEN, $TBDB_UIDLEN;
+    global $WIKIDOCURL;
 
     if ($errors) {
 	echo "<table class=nogrid
@@ -151,9 +152,9 @@ function SPITFORM($formfields, $errors)
           </table>\n";
 
     echo "<br><center>
-	     Important <a href=docwrapper.php3?docname=groups.html#SECURITY'>
+	     Important <a href='$WIKIDOCURL/Groups#SECURITY'>
 	     security issues</a> are discussed in the
-	     <a href='docwrapper.php3?docname=groups.html'>Groups Tutorial</a>.
+	     <a href='$WIKIDOCURL/Groups'>Groups Tutorial</a>.
           </center>\n";
 }
 

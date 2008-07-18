@@ -362,7 +362,7 @@ echo "<td align=\"left\" valign=\"top\" class=\"stealth\">
                      name=show_cameras
                      value=Yep
                      $cam_checked>Show <a
- href=\"doc/docwrapper.php3?docname=mobilewireless.html#VISION\">Tracking
+ href=\"$WIKIDOCURL/wireless#VISION\">Tracking
  Camera</a> Bounds</input></td>
       </tr>
       <tr>
@@ -370,7 +370,7 @@ echo "<td align=\"left\" valign=\"top\" class=\"stealth\">
                      name=show_exclusion
                      value=Yep
                      $excl_checked>Show <a
- href=\"doc/docwrapper.php3?docname=mobilewireless.html#VISION\">Exclusion
+ href=\"$WIKIDOCURL/wireless#VISION\">Exclusion
  Zones</a></input></td>
       </tr>
       <tr><td colspan=2 align=center><input type=submit value=Update></td></tr>

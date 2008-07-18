@@ -84,7 +84,7 @@ if ($node->HasSerialConsole()) {
 # 
 if ($experiment) {
     WRITESUBMENUBUTTON("SSH to node</a> ".
-		       "<a href='docwrapper.php3?docname=ssh-mime.html'>".
+		       "<a href='$WIKIDOCURL/ssh_mine'>".
 		       "(howto)", "nodessh.php3?node_id=$node_id");
 }
 

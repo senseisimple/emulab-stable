@@ -55,6 +55,7 @@ function SPITFORM($template, $formfields, $parameters, $errors)
 {
     global $TBDB_EIDLEN, $EXPOSELINKTEST, $EXPOSESTATESAVE, $TBDOCBASE;
     global $TBVALIDDIRS_HTML, $linktest_levels;
+    global $WIKIDOCURL;
 
     PAGEHEADER("Instantiate an Experiment Template");
 
@@ -153,8 +154,7 @@ function SPITFORM($template, $formfields, $parameters, $errors)
     else {
 	echo "<tr>
 		  <td class='pad4'>
-		    <a href='$TBDOCBASE/docwrapper.php3?".
-	                 "docname=swapping.html#swapping'>
+		    <a href='$WIKIDOCURL/Swapping#swapping'>
 		    Swapping:</td>
 		  <td>
 		  <table cellpadding=0 cellspacing=0 border=0><tr>
@@ -165,8 +165,7 @@ function SPITFORM($template, $formfields, $parameters, $errors)
 	    echo " checked='1'";
 	}
 	echo "></td>
-		  <td><a href='$TBDOCBASE/docwrapper.php3?".
-	                    "docname=swapping.html#idleswap'>
+		  <td><a href='$WIKIDOCURL/Swapping#idleswap'>
 		  <b>Idle-Swap:</b></a> Swap out this experiment
 		  after 
 		  <input type='text' name='formfields[exp_idleswap_timeout]'
@@ -188,8 +187,7 @@ function SPITFORM($template, $formfields, $parameters, $errors)
 	    echo " checked='1'";
 	}
 	echo "></td>
-		  <td><a href='$TBDOCBASE/docwrapper.php3?".
-	                    "docname=swapping.html#autoswap'>
+		  <td><a href='$WIKIDOCURL/Swapping#autoswap'>
 		  <b>Max. Duration:</b></a> Swap out after
 		  <input type='text' name='formfields[exp_autoswap_timeout]'
 			 value='";
@@ -208,8 +206,7 @@ function SPITFORM($template, $formfields, $parameters, $errors)
 	    }
 
 	    echo "></td>\n";
-	    echo "<td><a href='$TBDOCBASE/docwrapper.php3?".
-		              "docname=swapping.html#swapstatesave'>
+	    echo "<td><a href='$WIKIDOCURL/Swapping#swapstatesave'>
 		  <b>State Saving:</b></a> Save disk state on swapout</td>
 		  </tr>";
 	
@@ -293,7 +290,7 @@ function SPITFORM($template, $formfields, $parameters, $errors)
     echo ">\n";
     echo "Batch Mode Instantiation &nbsp;
 	  <font size='-1'>(See
-          <a href='$TBDOCBASE/tutorial/tutorial.php3#BatchMode'>Tutorial</a>
+          <a href='$WIKIDOCURL/Tutorial#BatchMode'>Tutorial</a>
           for more information)</font>
 	  </td>
 	  </tr>\n";
@@ -319,8 +316,7 @@ function SPITFORM($template, $formfields, $parameters, $errors)
     #
     if (STUDLY() || $EXPOSELINKTEST) {
 	echo "<tr>
-              <td><a href='$TBDOCBASE/doc/docwrapper.php3?".
-	                  "docname=linktest.html'>Linktest</a> Option:</td>
+              <td><a href='$WIKIDOCURL/linktest'>Linktest</a> Option:</td>
               <td><select name=\"formfields[exp_linktest]\">
                           <option value=0>Skip Linktest </option>\n";
 
@@ -334,8 +330,7 @@ function SPITFORM($template, $formfields, $parameters, $errors)
 		$linktest_levels[$i] . "</option>\n";
 	}
 	echo "       </select>";
-	echo "    (<a href='$TBDOCBASE/doc/docwrapper.php3?".
-	    "docname=linktest.html'><b>What is this?</b></a>)";
+	echo "    (<a href='$WIKIDOCURL/linktest'><b>What is this?</b></a>)";
 	echo "    </td>
               </tr>\n";
     }

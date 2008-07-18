@@ -69,6 +69,7 @@ function SPITFORM($advanced,$formfields, $errors = array()) {
     global $TBBASE;
     global $plab_types, $plab_type_descr;
     global $nodeversions;
+    global $WIKIDOCURL;
 
     #
     # Default autoswap time - very long...
@@ -280,7 +281,7 @@ function SPITFORM($advanced,$formfields, $errors = array()) {
         # Node version
         #
 	echo "<tr>
-                 <td><a href=\"$TBBASE/kb-show.php3?xref_tag=plab-node-versions\">Node version</a>:
+                 <td><a href=\"$WIKIDOCURL/kb272\">Node version</a>:
                  </td>
                  <td>
                     <select name='formfields[nodeversion]'>\n";
@@ -486,13 +487,13 @@ function SPITFORM($advanced,$formfields, $errors = array()) {
     #
     echo "<h4>Need a machine to build binaries for PlanetLab? " .
          "<a href=nsgen.php3?template=plabdevbox>Make a DevBox</a> inside " .
-         " Emulab. (<a href=kb-show.php3?xref_tag=PLAB-DEVBOX>More information</a>)</h4>\n";
+         " Emulab. (<a href=\"$WIKIDOCURL/kb98\">More information</a>)</h4>\n";
 
     #
     # Let them know about the devbox support
     #
     echo "<h4>Want to try your PlanetLab application on Emulab? " .
-         "<a href=kb-show.php3?xref_tag=plab-on-elab>This page</a> will " .
+         "<a href=\"$WIKIDOCURL/kb100\">This page</a> will " .
          "show you how.</h4>\n";
 
     PAGEFOOTER();

@@ -39,6 +39,7 @@ if (!$isadmin &&
 function SPITFORM($formfields, $errors)
 {
     global $isadmin, $target_user, $BOSSNODE, $OURDOMAIN;
+    global $WIKIDOCURL;
 
     $target_uid = $target_user->uid();
     $uid_idx    = $target_user->uid_idx();
@@ -173,7 +174,7 @@ function SPITFORM($formfields, $errors)
     echo "<blockquote><blockquote><blockquote>
           <ol>
             <li> Please consult our
-                 <a href = 'docwrapper.php3?docname=security.html#SSH'>
+                 <a href = '$WIKIDOCURL/SecReqs#SSH'>
                  security policies</a> for information
                  regarding ssh/sfs public keys.
             <li> Note to <a href=http://www.opera.com><b>Opera 5</b></a> users:

@@ -240,7 +240,7 @@ $fields['project'] =
 $fields['cite_osdi02'] = 
     array('#type' => 'vlist',
           '#label' => "Did you cite our OSDI'02 paper?",
-	  '#link' => "docwrapper.php3?docname=policies.html#reporting",
+	  '#link' => "$WIKIDOCURL/AdminPolicies#reporting",
           '#required' => true,
 	  '#elements' => array(
               'cite_osdi02' =>

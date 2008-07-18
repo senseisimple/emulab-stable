@@ -159,6 +159,7 @@ function SPITFORM($formfields, $errors)
     global $EXPOSELINKTEST, $EXPOSEARCHIVE;
     global $EXPOSESTATESAVE;
     global $TBVALIDDIRS_HTML;
+    global $WIKIDOCURL;
 
     PAGEHEADER("Begin a Testbed Experiment");
 
@@ -483,8 +484,7 @@ function SPITFORM($formfields, $errors)
     else {
 	echo "<tr>
 		  <td class='pad4'>
-		    <a href='$TBDOCBASE/docwrapper.php3?".
-	                 "docname=swapping.html#swapping'>
+		    <a href='$WIKIDOCURL/Swapping#swapping'>
 		    Swapping:</td>
 		  <td>
 		  <table cellpadding=0 cellspacing=0 border=0><tr>
@@ -496,8 +496,7 @@ function SPITFORM($formfields, $errors)
 	    echo " checked='1'";
 	}
 	echo "></td>
-		  <td><a href='$TBDOCBASE/docwrapper.php3?".
-	                    "docname=swapping.html#idleswap'>
+		  <td><a href='$WIKIDOCURL/Swapping#idleswap'>
 		  <b>Idle-Swap:</b></a> Swap out this experiment
 		  after 
 		  <input type='text' name='formfields[exp_idleswap_timeout]'
@@ -520,8 +519,7 @@ function SPITFORM($formfields, $errors)
 	    echo " checked='1'";
 	}
 	echo "></td>
-		  <td><a href='$TBDOCBASE/docwrapper.php3?".
-	                    "docname=swapping.html#autoswap'>
+		  <td><a href='$WIKIDOCURL/Swapping#autoswap'>
 		  <b>Max. Duration:</b></a> Swap out after
 		  <input type='text' name='formfields[exp_autoswap_timeout]'
 			 value='";
@@ -540,8 +538,7 @@ function SPITFORM($formfields, $errors)
 	    }
 
 	    echo "></td>\n";
-	    echo "<td><a href='$TBDOCBASE/docwrapper.php3?".
-		              "docname=swapping.html#swapstatesave'>
+	    echo "<td><a href='$WIKIDOCURL/Swapping#swapstatesave'>
 		  <b>State Saving:</b></a> Save disk state on swapout</td>
 		  </tr>";
 	}
@@ -559,8 +556,7 @@ function SPITFORM($formfields, $errors)
         }
       } else {
     echo "<tr>
-              <td><a href='$TBDOCBASE/doc/docwrapper.php3?".
-	                  "docname=linktest.html'>Linktest</a> Option:</td>
+              <td><a href='$WIKIDOCURL/linktest'>Linktest</a> Option:</td>
               <td><select name=\"formfields[exp_linktest]\">
                           <option value=0>Skip Linktest </option>\n";
 
@@ -574,8 +570,7 @@ function SPITFORM($formfields, $errors)
 	    $linktest_levels[$i] . "</option>\n";
     }
     echo "       </select>";
-    echo "    (<a href='$TBDOCBASE/doc/docwrapper.php3?".
-	"docname=linktest.html'><b>What is this?</b></a>)";
+    echo "    (<a href='$WIKIDOCURL/linktest'><b>What is this?</b></a>)";
     echo "    </td>
           </tr>\n";
       }
@@ -603,7 +598,7 @@ function SPITFORM($formfields, $errors)
 	echo ">\n";
 	echo "Batch Mode Experiment &nbsp;
 	      <font size='-1'>(See
-	      <a href='$TBDOCBASE/tutorial/tutorial.php3#BatchMode'>Tutorial</a>
+	      <a href='$WIKIDOCURL/Tutorial'>Tutorial</a>
 	      for more information)</font>
 	      </td>
 	      </tr>\n";

@@ -66,6 +66,7 @@ function SPITFORM($formfields, $returning, $errors)
     global $usr_keyfile, $FirstInitState;
     global $ACCOUNTWARNING, $EMAILWARNING;
     global $WIKISUPPORT, $WIKIHOME, $USERSELECTUIDS;
+    global $WIKIDOCURL;
     
     PAGEHEADER("Start a New Testbed Project");
 
@@ -84,7 +85,7 @@ function SPITFORM($formfields, $returning, $errors)
                  If you are a <font color=red>student
                  (undergrad or graduate)</font>, please
                  do not try to start a project! <br>Your advisor must do it.
-                 <a href=docwrapper.php3?docname=auth.html target='_blank'>
+                 <a href='$WIKIDOCURL/Auth' target='_blank'>
                  Read this for more info.</a>
               </font></center><br>\n";
 
@@ -166,7 +167,7 @@ function SPITFORM($formfields, $returning, $errors)
                       Project Head Information:&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp
                       <font size=-2>
                        (Prospective project leaders please read our
-                       <a href='docwrapper.php3?docname=policies.html' target='_blank'>
+                       <a href='$WIKIDOCURL/AdminPolicies' target='_blank'>
                        Administrative Policies</a>)</font>
                   </th>
               </tr>\n";
@@ -177,7 +178,7 @@ function SPITFORM($formfields, $returning, $errors)
 	if ($USERSELECTUIDS || $FirstInitState == "createproject") {
 	    echo "<tr>
                       <td colspan=2>*<a
-                             href='docwrapper.php3?docname=security.html'
+                             href='$WIKIDOCURL/Security'
                              target=_blank>Username</a>
                                 (alphanumeric, lowercase):</td>
                       <td class=left>
@@ -506,7 +507,7 @@ function SPITFORM($formfields, $returning, $errors)
 
     echo "<tr>
               <td colspan=2>Request Access to 
-                  <a href=\"$TBDOCBASE/docwrapper.php3?docname=widearea.html\"
+                  <a href=\"$WIKIDOCURL/widearea\"
                       target='_blank'>Planetlab PCs</a>:</td>
               <td class=left>
                   <input type=checkbox value=checked
@@ -518,7 +519,7 @@ function SPITFORM($formfields, $returning, $errors)
 
     echo "<tr>
               <td colspan=2>Request Access to 
-                 <a href=\"$TBDOCBASE/docwrapper.php3?docname=widearea.html\"
+                 <a href=\"$WIKIDOCURL/widearea\"
                     target='_blank'>wide-area PCs</a>:</td>
               <td class=left>
                   <input type=checkbox value=checked
@@ -557,7 +558,7 @@ function SPITFORM($formfields, $returning, $errors)
     echo "<h4><blockquote><blockquote>
           <ol>
             <li> Please consult our
-                 <a href = 'docwrapper.php3?docname=security.html' target='_blank'>
+                 <a href = '$WIKIDOCURL/Security' target='_blank'>
                  security policies</a> for information
                  regarding passwords and email addresses.\n";
     if (! $returning) {

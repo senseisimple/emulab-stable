@@ -1,0 +1,45 @@
+# The following documentation files are now available on the WIKI at
+# at http://users.emulab.net/trac/emulab/wiki/<PAGE> and will eventually
+# be removed from CVS.
+
+FILE                                WIKI PAGE
+
+event/linktest/linktest.html        linktest
+www/auth.html                       Auth
+www/doc.php3                        .
+www/doc/emotes.html                 emotes
+www/doc/exclasses.html              Classes
+www/doc/hw-recommend.html           HWRecommend
+www/doc/linkdelays.html             linkdelays
+www/doc/netbuilddoc.html            netbuilddoc
+www/doc/pc2000.html                 pc2000
+www/doc/pc3000.html                 pc3000
+www/doc/plab.html                   plab
+www/doc/windows.html                Windows
+www/groups.html                     Groups
+www/hardware-emulab.net.html        UtahHardware
+www/otheremulabs.html               OtherEmulabs
+www/policies.html                   AdminPolicies
+www/rdp-mime.html                   rdp_mime
+www/security.html                   SecReqs
+www/software.html                   software
+www/ssh-mime.html                   ssh_mine
+www/swapping.html                   Swapping
+www/tutorial/advanced.html          AdvancedExample
+www/tutorial/behindthescenes.html   behindthescenes
+www/tutorial/elabinelab.php3        elabinelab
+www/tutorial/eventsystem.html       eventsystem
+www/tutorial/firewall.html          firewall
+www/tutorial/gnuradio.html          gnuradio
+www/tutorial/ixp.html               ixp
+www/tutorial/netfpga.html           netfpga
+www/tutorial/nscommands.html        nscommands
+www/tutorial/nse.html               nse
+www/tutorial/routing.html           routing
+www/tutorial/secure.html            secure
+www/tutorial/tutorial.html          Tutorial
+www/tutorial/tutorial.php3          Tutorial
+www/tutorial/vnodes.html            vnodes
+www/tutorial/widearea.html          widearea
+www/tutorial/wireless.html          wireless
+www/widearea.html                   widearea

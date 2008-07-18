@@ -71,13 +71,13 @@ if ($message != "") {
         <a href="http://www.cs.utah.edu">School of Computing</a> at the
         <a href="http://www.utah.edu">University of Utah</a>.
     There are also installations of the Emulab software at more than
-        <a href="http://www.emulab.net/docwrapper.php3?docname=otheremulabs.html">two
+        <a href="http://users.emulab.net/trac/emulab/wiki/OtherEmulabs">two
         dozen sites</a> around the world, ranging from testbeds with a handful
         of nodes up to testbeds with hundreds of nodes.
     Emulab is <a href="http://www.emulab.net/expubs.php">widely used</a>
         by computer science researchers in the fields of networking and
         distributed systems.
-    It is also used to <a href="http://www.emulab.net/doc/docwrapper.php3?docname=exclasses.html">teach
+    It is also used to <a href="http://users.emulab.net/trac/emulab/wiki/Classes">teach
         classes</a> in those fields.
 </p>
 

@@ -384,7 +384,7 @@ $num_total = ($num_free + $num_up + $num_down + $num_pd + $num_unk);
 mysql_data_seek($query_result, 0);
 
 if (! strcmp($showtype, "widearea")) {
-    echo "<a href=tutorial/docwrapper.php3?docname=widearea.html>
+    echo "<a href='$WIKIDOCURL/widearea'>
              Widearea Usage Notes</a>\n";
 }
 

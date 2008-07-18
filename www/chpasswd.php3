@@ -37,7 +37,7 @@ if ((isset($keyB) && $keyB != "") && (!isset($keyA) || $keyA == "")) {
 
     USERERROR("Oops, not able to proceed!<br>".
 	      "Please read this ".
-	      "<a href='kb-show.php3?xref_tag=forgotpassword'>".
+	      "<a href='$WIKIDOCURL/kb69'>".
 	      "Knowledge Base Entry</a> to see what the likely cause is.", 1);
 }
 

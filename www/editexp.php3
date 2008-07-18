@@ -42,6 +42,7 @@ if (! $experiment->AccessCheck($this_user, $TB_EXPT_MODIFY)) {
 function SPITFORM($experiment, $formfields, $errors)
 {
     global $isadmin, $TBDOCBASE, $linktest_levels, $EXPOSELINKTEST;
+    global $WIKIDOCURL;
 
     #
     # Standard Testbed Header
@@ -91,7 +92,7 @@ function SPITFORM($experiment, $formfields, $errors)
     #
     # Swapping goo.
     #
-    $swaplink = "$TBDOCBASE/docwrapper.php3?docname=swapping.html";
+    $swaplink = "$WIKIDOCURL/Swapping";
 
     echo "<tr>
 	      <td class='pad4'>
@@ -268,7 +269,7 @@ function SPITFORM($experiment, $formfields, $errors)
     echo ">\n";
     echo "Batch Mode Experiment &nbsp;
           <font size='-1'>(See
-          <a href='$TBDOCBASE/tutorial/tutorial.php3#BatchMode'>Tutorial</a>
+          <a href='$WIKIDOCURL/Tutorial#BatchMode'>Tutorial</a>
           for more information)</font>
           </td>
           </tr>\n";
@@ -278,8 +279,7 @@ function SPITFORM($experiment, $formfields, $errors)
     # 
     if (STUDLY() || $EXPOSELINKTEST) {
     echo "<tr>
-              <td><a href='$TBDOCBASE/doc/docwrapper.php3?".
-	                  "docname=linktest.html'>Linktest</a> Option:</td>
+              <td><a href='$WIKIDOCURL/linktest'>Linktest</a> Option:</td>
               <td><select name=\"formfields[linktest_level]\">
                           <option value=0>Skip Linktest </option>\n";
 
@@ -293,8 +293,7 @@ function SPITFORM($experiment, $formfields, $errors)
 	    $linktest_levels[$i] . "</option>\n";
     }
     echo "       </select>";
-    echo "    (<a href='$TBDOCBASE/doc/docwrapper.php3?".
-	"docname=linktest.html'><b>What is this?</b></a>)";
+    echo "    (<a href='$WIKIDOCURL/linktest'><b>What is this?</b></a>)";
     echo "    </td>
           </tr>\n";
     }

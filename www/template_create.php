@@ -35,6 +35,7 @@ function SPITFORM($formfields, $errors)
     global $TBDB_PIDLEN, $TBDB_GIDLEN, $TBDB_EIDLEN, $TBDOCBASE;
     global $projlist;
     global $TBVALIDDIRS_HTML;
+    global $WIKIDOCURL;
 
     PAGEHEADER("Create an Experiment Template");
 
@@ -225,7 +226,7 @@ function SPITFORM($formfields, $errors)
     echo "<blockquote><blockquote>
           <ol>
             <li> Please read this
-                <a href=kb-show.php3?xref_tag=template_parameters>KB entry</a>
+                <a href='$WIKIDOCURL/kb112'>KB entry</a>
                 to see what NS extensions are available for templates.
           </ol>
           </blockquote></blockquote>\n";

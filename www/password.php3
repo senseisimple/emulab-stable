@@ -55,6 +55,7 @@ if (CheckLogin($check_status)) {
 function SPITFORM($email, $phone, $failed, $simple, $view)
 {
     global	$TBBASE;
+    global	$WIKIDOCURL;
     
     PAGEHEADER("Forgot Your Password?", $view);
 
@@ -112,7 +113,7 @@ function SPITFORM($email, $phone, $failed, $simple, $view)
           your password.
 
           <br><br>
-          <b>Please read this <a href='kb-show.php3?xref_tag=forgotpassword'>
+          <b>Please read this <a href='$WIKIDOCURL/kb69'>
           Knowledge Base Entry</a> if you get an error
           when trying to use the link we email to you!</b>
           </blockquote>\n";

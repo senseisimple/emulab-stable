@@ -80,6 +80,7 @@ function SPITFORM($formfields, $returning, $errors)
     global $TBDB_UIDLEN, $TBDB_PIDLEN, $TBDB_GIDLEN;
     global $ACCOUNTWARNING, $EMAILWARNING;
     global $WIKISUPPORT, $forwikionly, $WIKIHOME, $USERSELECTUIDS;
+    global $WIKIDOCURL;
 
     if ($forwikionly)
 	PAGEHEADER("Wiki Registration");
@@ -176,7 +177,7 @@ function SPITFORM($formfields, $returning, $errors)
             #
 	    echo "<tr>
                       <td colspan=2>*<a
-                             href='docwrapper.php3?docname=security.html'
+                             href='$WIKIDOCURL/Security'
                              target=_blank>Username</a>
                                 (alphanumeric, lowercase):</td>
                       <td class=left>
@@ -421,7 +422,7 @@ function SPITFORM($formfields, $returning, $errors)
     echo "<h4><blockquote><blockquote>
           <ol>
             <li> Please consult our
-                 <a href = 'docwrapper.php3?docname=security.html' target='_blank'>
+                 <a href = '$WIKIDOCURL/Security' target='_blank'>
                  security policies</a> for information
                  regarding passwords and email addresses.\n";
     if (!$returning && !$forwikionly) {

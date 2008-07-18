@@ -618,7 +618,7 @@ class Experiment
     # Show an experiment.
     #
     function Show($short = 0, $sortby = "") {
-	global $TBDBNAME, $TBDOCBASE;
+	global $TBDBNAME, $TBDOCBASE, $WIKIDOCURL;
 	$pid = $this->pid();
 	$eid = $this->eid();
 	$nodecounts  = array();
@@ -840,27 +840,23 @@ class Experiment
 
 	    if (ISADMIN()) {
 		echo "<tr>
-                    <td><a href='$TBDOCBASE/docwrapper.php3?".
-		    "docname=swapping.html#swapping'>Swappable:</a></td>
+                    <td><a href='$WIKIDOCURL/Swapping#swapping'>Swappable:</a></td>
                     <td class=\"left\">$swappable</td>
                   </tr>\n";
 	    }
     
 	    echo "<tr>
-                  <td><a href='$TBDOCBASE/docwrapper.php3?".
-		"docname=swapping.html#idleswap'>Idle-Swap:</a></td>
+                  <td><a href='$WIKIDOCURL/Swapping#idleswap'>Idle-Swap:</a></td>
                   <td class=\"left\">$idleswap</td>
               </tr>\n";
 
 	    echo "<tr>
-                <td><a href='$TBDOCBASE/docwrapper.php3?".
-		"docname=swapping.html#autoswap'>Max. Duration:</a></td>
+                <td><a href='$WIKIDOCURL/Swapping#autoswap'>Max. Duration:</a></td>
                 <td class=\"left\">$autoswap</td>
               </tr>\n";
 
 	    echo "<tr>
-                <td><a href='$TBDOCBASE/docwrapper.php3?".
-		"docname=swapping.html#swapstatesave'>Save State:</a></td>
+                <td><a href='$WIKIDOCURL/Swapping#swapstatesave'>Save State:</a></td>
                 <td class=\"left\">$savedisk</td>
               </tr>\n";
 
@@ -896,7 +892,7 @@ class Experiment
 	    }
 
 	    echo "<tr>
-                <td><a href='doc/docwrapper.php3?docname=linktest.html'>".
+                <td><a href='$WIKIDOCURL/linktest'>".
 		"Linktest Level</a>: </td>
                 <td class=\"left\">$linktest_level $linktest_running</td>
               </tr>\n";

@@ -84,7 +84,7 @@ We'll still be here waiting for you.
 </li>
 </ul>
 <p>
-<a href="../doc/docwrapper.php3?docname=netbuilddoc.html">Netbuild Full Reference</a>
+<a href="<? echo $WIKIDOCURL ?>/netbuilddoc">Netbuild Full Reference</a>
 </p>
 
 <?php
