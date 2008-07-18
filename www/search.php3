@@ -53,7 +53,7 @@ function SPITSEARCHFORM($query)
 
 if ($TBMAINSITE || $REMOTEWIKIDOCS) {
     $query = htmlspecialchars($query);
-    header("Location: $WIKIDOCURL/search?q=$query&noquickjump=1&wiki=on");
+    header("Location: $WIKIDOCURL/../search?q=$query&noquickjump=1&wiki=on");
     return;
 }
 
