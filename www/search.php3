@@ -1,21 +1,24 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
-
-#
-# Standard Testbed Header
-#
-PAGEHEADER("Search Emulab Documentation");
 
 #
 # Verify page arguments.
 #
 $optargs = OptionalPageArguments("submit",      PAGEARG_STRING,
 				 "query",       PAGEARG_STRING);
+#
+# Utah now stores its documentation in a Trac wiki. The Utah web site
+# and web sites that link to Utahs documentation will use the Trac
+# search engine at Utah. Optionally, if you have the docs locally
+# in html format, continue to use the swish search tools on it. Note that
+# the knowledge base in the DB is also deprecated; all of that content
+# was pushed into the wiki.
+#
 
 #
 # We no longer support an advanced search option. We might bring it back
@@ -23,7 +26,6 @@ $optargs = OptionalPageArguments("submit",      PAGEARG_STRING,
 #
 function SPITSEARCHFORM($query)
 {
-
     echo "<table align=center border=1>
           <form action=search.php3 method=get>\n";
 
@@ -48,6 +50,17 @@ function SPITSEARCHFORM($query)
     echo "</form>
           </table><br>\n";
 }
+
+if ($TBMAINSITE || $REMOTEWIKIDOCS) {
+    $query = htmlspecialchars($query);
+    header("Location: $WIKIDOCURL/search?q=$query&noquickjump=1&wiki=on");
+    return;
+}
+
+#
+# Standard Testbed Header after possible redirect above.
+#
+PAGEHEADER("Search Emulab Documentation");
 
 if (!isset($query) || $query == "") {
     SPITSEARCHFORM("");
@@ -87,13 +100,6 @@ register_shutdown_function("CLEANUP");
 SPITSEARCHFORM($query);
 flush();
 
-#
-# First the Knowledge Base
-#
-$embedded    = 1;
-$query_type  = "and";
-$query_which = "both";
-include("kb-search.php3");
 $safe_query  = escapeshellarg($query);
 
 echo "<br>\n";

@@ -1,26 +1,13 @@
 IndexFile @prefix@/www/site.index
-IndexDir @prefix@/www
+IndexDir @prefix@/www/wikidocs/wiki
 ReplaceRules remove @prefix@/www/
 
 DefaultContents TXT
 IndexContents HTML .htm .html
 IndexContents TXT  .txt .text
 
-# Don't index any directories of these directories
-FileRules dirname contains /webglimpse
-FileRules dirname contains /images
-FileRules dirname contains /thumbs
-FileRules dirname contains /dev/
-FileRules dirname contains /downloads
-FileRules dirname contains /distributions
-FileRules dirname contains /bugtrack
-FileRules dirname contains /netlab
-
-# Sigh, special case. Sorry.
-FileMatch filename contains xmlrpcapi.php3 client.php3 mobilewireless.php3 elabinelab.php3 software.php3
-
-# But only index the .html files
-IndexOnly .html
+FileRules dirname contains /attachments
+FileRules dirname contains /chrome
 
 # Show basic info while indexing
 IndexReport 1
