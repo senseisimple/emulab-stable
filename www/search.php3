@@ -51,6 +51,13 @@ function SPITSEARCHFORM($query)
           </table><br>\n";
 }
 
+if (!isset($query) || $query == "") {
+    PAGEHEADER("Search Emulab Documentation");
+    SPITSEARCHFORM("");
+    PAGEFOOTER();
+    return;
+}
+
 if ($TBMAINSITE || $REMOTEWIKIDOCS) {
     $query = htmlspecialchars($query);
     header("Location: $WIKIDOCURL/../search?q=$query&noquickjump=1&wiki=on");
@@ -61,12 +68,6 @@ if ($TBMAINSITE || $REMOTEWIKIDOCS) {
 # Standard Testbed Header after possible redirect above.
 #
 PAGEHEADER("Search Emulab Documentation");
-
-if (!isset($query) || $query == "") {
-    SPITSEARCHFORM("");
-    PAGEFOOTER();
-    return;
-}
 
 # Sanitize for the shell. Be fancy later.
 if (!preg_match("/^[-\w\ \"]+$/", $query)) {
