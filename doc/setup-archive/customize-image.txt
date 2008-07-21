@@ -296,24 +296,9 @@ the time stamp that forces a periodic fsck:
       e2fsck -f -y /dev/${DSK}s2
 
 
-D. Saving the customized image
+D. Testing the image
 
-   The "whole disk" image is the one used most frequently, but we also
-   create single partition images of FreeBSD and Linux as well.  Put the
-   images onto a test area at first, and install them permanently later
-   (in step G.)
-
-   From boss do:
-
-       cd /proj/emulab-ops/images
-       sudo ssh pc1 imagezip /dev/$DSK - > $FULL-STD.ndz
-       sudo ssh pc1 imagezip -s 1 /dev/$DSK - > $BSD-STD.ndz
-       sudo ssh pc1 imagezip -s 2 /dev/$DSK - > $LNX-STD.ndz
-
-
-E. Testing the image
-
-   Now that you have saved a copy of your customization, you can test out
+   Before you save a copy of your customization, you can test out
    the image and make sure it works.
 
    NOTE: you will need console access to the node at this point, either
@@ -348,21 +333,21 @@ E. Testing the image
        part:2
 
    to boot into the Linux partition.  Again watch for problems.  If
-   everything worked, skip the next step and proceed to "Installing the
-   images" below.  If there was a catastrophic failure, you can reboot
-   the node into the admin MFS and reload the disk either with the image
-   snapshot you made or, worst case, the generic image.  If you just
-   need to make some minor changes, make them and proceed with the next
-   step.
+   everything worked, skip the next step and proceed to "Saving the
+   customized image" below.  If there was a catastrophic failure,
+   you can reboot the node into the admin MFS and reload the disk
+   either with the image snapshot you made or, worst case, the generic
+   image.  If you just need to make some minor changes, make them 
+   and proceed with "Saving the customized image" step (F).
 
 
-F. Recreating the image
+E. Recreating the image
 
    If you need to tweak either the FreeBSD or Linux partitions, you will
-   need to save the image again.  Doing this properly involves cleaning up
-   anything that the Emulab node self configuration might have done.
-   While you are running either FreeBSD or Linux you do the following
-   from the console:
+   need to save the image again if you already have.  Doing this 
+   properly involves cleaning up anything that the Emulab node self 
+   configuration might have done. While you are running either FreeBSD 
+   or Linux you do the following from the console:
 
        shutdown now
        <wait for single user root prompt>
@@ -371,12 +356,27 @@ F. Recreating the image
        reboot
 
    As the node reboots, catch the pxeboot prompt and boot into the admin
-   MFS.  Go back to the "Saving the customized image" step (D).
+   MFS.  Go back to the "Testing the image" step (D).
+
+
+F. Saving the customized image
+
+   The "whole disk" image is the one used most frequently, but we also
+   create single partition images of FreeBSD and Linux as well.  Put the
+   images onto a test area at first, and install them permanently later
+   (in step G.) Make sure you're in the admin-MFS on the node.
+
+   From boss do:
+
+       cd /proj/emulab-ops/images
+       sudo ssh pc1 imagezip /dev/$DSK - > $FULL-STD.ndz
+       sudo ssh pc1 imagezip -s 1 /dev/$DSK - > $BSD-STD.ndz
+       sudo ssh pc1 imagezip -s 2 /dev/$DSK - > $LNX-STD.ndz
 
 
 G. Installing the images
 
-   Once you have a working image, go back to your boss and do:
+   Once you have a working image, do the following from boss:
 
        mv /proj/emulab-ops/images/*.ndz /usr/testbed/images/
 
