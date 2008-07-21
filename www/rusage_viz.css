@@ -1,0 +1,102 @@
+
+#rviz {
+	background-color:#222;
+	overflow:hidden;
+	font-size:10px;
+	font-family:Verdana, Geneva, Arial, Helvetica, sans-serif;
+	position:relative;
+	width:900px;
+	height:500px;
+	margin:auto;
+	background-color:#1D1D20;
+}
+
+#rviz td { background-color: transparent }
+#rviz tr { background-color: transparent }
+#rviz table { background-color: transparent }
+
+#rviz div {
+	position:absolute;
+	overflow:hidden;	
+}
+
+#rviz .content {
+	background-color:#333;
+	border:0px solid #111;
+}
+
+#rviz .head {
+	height:18px;
+	color:white;
+	background-color:#444;
+	
+}
+
+#rviz .head.in-path {
+	background-color:#655;
+}
+
+#rviz .body {
+	background-color:black;
+}
+
+#rviz .leaf {
+	color:white;
+	background-color:#111;
+	display:table-cell;
+	vertical-align:middle;
+}
+
+#rviz .over-leaf {
+	border:0px solid #9FD4FF; 
+}
+
+#rviz .over-content {
+	background-color: #9FD4FF;
+}
+
+#rviz .over-head { /* boy i'm funny! */
+	background-color:#A4D9FF;
+	color:white;
+}
+
+/*TOOLTIPS*/
+.tool-tip {
+	color: #fff;
+	width: 139px;
+	z-index: 13000;
+	background-color: black;
+	opacity:0.9;
+	filter:alpha(opacity=90);
+}
+ 
+.tool-title {
+	font-weight: bold;
+	font-size: 11px;
+	margin: 0;
+	color: #9FD4FF;
+	padding: 8px 8px 4px;
+	background-color: black;
+	
+}
+ 
+.tool-text {
+	font-size: 11px;
+	padding: 4px 8px 8px;
+	background-color: black;
+}
+
+.album {
+	width:100px;
+	margin:3px;
+}
+
+.text {
+	margin:5px 0;
+}
+
+input {
+	font-size:10px;
+	font-family:Verdana, Geneva, Arial, Helvetica, sans-serif;
+
+}
