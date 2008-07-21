@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2007 University of Utah and the Flux Group.
+# Copyright (c) 2007, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -169,16 +169,40 @@ $query_result =
 
 while (my ($pid,$eid,$exptidx,$rsrcidx,$uid,$uid_idx,$created) =
 	$query_result->fetchrow_array()) {
-     print "Adding missing testbed_stats record for $pid,$eid,$exptidx\n";
-     DBQueryFatal("insert into testbed_stats_new ".
-		 "(idx, start_time, end_time, exptidx, rsrcidx, action, ".
-		 " exitcode, uid, uid_idx) values ".
-		 "(NULL, '$created', '$created', $exptidx, $rsrcidx, ".
-		 " 'new', 0, '$uid', '$uid_idx')");
+     print "Adding missing testbed _stats records for $pid,$eid,$exptidx\n";
+
+     if (!defined($rsrcidx)) {
+	 if (!$impotent) {
+	     my $resource_result =
+		 DBQueryWarn("insert into experiment_resources_new ".
+			     "(tstamp, exptidx, uid_idx) ".
+			     "values ('$created', $exptidx, $uid_idx)");
+	     $rsrcidx = $resource_result->insertid;
+	 }
+	 else {
+	     $rsrcidx = 1;
+	 }
+	 DBQueryWarn("update experiment_stats_new set ".
+		     " rsrcidx=$rsrcidx ".
+		     "where exptidx=$exptidx")
+	     if (!$impotent);
+     }
+     
+     my $query = "insert into testbed_stats_new ".
+	 "(idx, start_time, end_time, exptidx, rsrcidx, action, ".
+	 " exitcode, uid, uid_idx) values ".
+	 "(NULL, '$created', '$created', $exptidx, $rsrcidx, ".
+	 " 'new', 0, '$uid', '$uid_idx')";
+     if ($impotent) {
+	 print "$query\n";
+     }
+     else {
+	 DBQueryFatal($query);
+     }
 }
 
 $query_result =
-    DBQueryFatal("select s.exptidx,e.state from experiment_stats as s ".
+    DBQueryFatal("select s.exptidx,e.state from experiment_stats_new as s ".
 		 "left join experiments as e on e.idx=s.exptidx ".
 #		 "where s.exptidx=8751 or s.exptidx=30605 or s.exptidx=13307 ".
 #		 "  or s.exptidx=19412 ".
@@ -519,7 +543,8 @@ while (my ($exptidx,$expstate) = $query_result->fetchrow_array()) {
 	if (!$save) {
 	    print "D: $idx\n";
 	    DBQueryFatal("delete from experiment_resources_new ".
-			 "where idx=$idx");
+			 "where idx=$idx")
+		if (!$impotent);
 	    delete($bytimestamp{$unixtime});
 	    delete($resources{$idx});
 	}
@@ -692,7 +717,8 @@ while (my ($exptidx,$expstate) = $query_result->fetchrow_array()) {
 	    my $val = $rowref->{$key};
 		
 	    if ($key eq "thumbnail") {
-		$query .= "thumbnail=" . DBQuoteSpecial($val);
+		$query .= "thumbnail=" . DBQuoteSpecial($val)
+		    if (!$impotent);
 	    }
 	    elsif (!defined($val)) {
 		$query .= "$key=NULL";
@@ -703,8 +729,12 @@ while (my ($exptidx,$expstate) = $query_result->fetchrow_array()) {
 	    $query .= ","
 		if (@keys);
 	}
-	DBQueryFatal($query)
-	    if (!$impotent);
+	if ($impotent) {
+	    print "$query\n";
+	}
+	else {
+	    DBQueryFatal($query);
+	}
     }
 
     foreach my $idx (keys(%testbed_stats)) {
@@ -743,10 +773,11 @@ while (my ($exptidx,$rsrcidx) = $query_result->fetchrow_array()) {
     print "Cleaning up $exptidx,$rsrcidx\n";
     DBQueryFatal("update experiment_resources_new set ".
 		 "  swapout_time=swapout_time+1 ".
-		 "where idx=$rsrcidx");
+		 "where idx=$rsrcidx")
+	if (!$impotent);
 }
 
-if (1) {
+if (!$impotent) {
 #   DBQueryFatal("unlock tables");
     DBQueryFatal("rename table ".
 		 "testbed_stats to testbed_stats_backup, ".
