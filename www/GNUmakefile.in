@@ -199,6 +199,7 @@ INSTALLFILES = $(addprefix $(INSTALL_SBINDIR)/, htmlinstall) \
 	$(addprefix $(INSTALL_ETCDIR)/, swish.conf)
 
 install: $(INSTALLFILES)
+	-mkdir -p $(INSTALL_WWWDIR)/wikidocs/wiki
 	(swish-e -c ./swish.conf)
 	cd $(INSTALL_WWWDIR) && \
 		rm -f tbdb.html; \
