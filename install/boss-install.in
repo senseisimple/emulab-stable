@@ -116,6 +116,7 @@ my $WAP             = "$PREFIX/sbin/withadminprivs";
 my $NAMED_SETUP     = "$PREFIX/sbin/named_setup";
 my $ADDPUBKEY       = "$PREFIX/sbin/addpubkey";
 my $TBACCT          = "$PREFIX/sbin/tbacct";
+my $WWWDIR          = "$PREFIX/www";
 
 my $CRACKLIB_DICT   = "/usr/local/lib/pw_dict.pwd";
 
@@ -1320,6 +1321,17 @@ Phase "chkupuser", "Setting up checkup user (elabckup)", sub {
 		   (defined($password) ? " -p $password" : "").
 		   " -u elabckup -n 'Emulab Checkup User' ".
 		   "-e '@TBTESTSUITEEMAIL@'");
+};
+Phase "wikidocs", "Installing wikidocs redirect", sub {
+    DoneIfExists("$WWWDIR/wikidocs/.htaccess");
+
+    if (! -e "$WWWDIR/wikidocs") {
+	mkdir("$WWWDIR/wikidocs", 0755) or
+	    PhaseFail("Unable to make $WWWDIR/wikidocs: $!");
+    }
+    CreateFileFatal("$WWWDIR/wikidocs/.htaccess",
+		    "RedirectMatch (.*)/wikidocs ".
+		    " http://users.emulab.net/trac/emulab");
 };
 
 Phase "experiments", "Setting up system experiments", sub {
