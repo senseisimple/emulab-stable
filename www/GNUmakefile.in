@@ -195,6 +195,7 @@ INSTALLFILES = $(addprefix $(INSTALL_SBINDIR)/, htmlinstall) \
 	$(addprefix $(INSTALL_SBINDIR)/, htmlinstall) \
 	$(addprefix $(INSTALL_WWWDIR)/cvsweb/, $(ALLCVSWEB)) \
 	$(addprefix $(INSTALL_DIR)/opsdir/www/cvsweb/, $(ALLOPSCVSWEB)) \
+	$(INSTALL_WWWDIR)/wikidocs/wiki/ignore.html \
 	$(INSTALL_WWWDIR)/doc/LICENSE.txt \
 	$(addprefix $(INSTALL_ETCDIR)/, swish.conf)
 
