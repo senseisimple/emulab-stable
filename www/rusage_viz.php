@@ -205,6 +205,8 @@ else {
     echo "var currentColor = \"$defColorField\";\n";
 }
 
+echo "var TBBASE = \"$TBBASE\";";
+
 echo "</script>\n\n";
 
 #
@@ -588,7 +590,7 @@ function refresh(rresource) {
 
     var pargs = "uid=" + tbuid + "&auth=" + tbauth;
     pargs += "&getdata=1&resource=" + rresource;
-    var req = new Request({ url:"https://www.emulab.net/dev/johnsond/rusage_viz.php",method:'get',autoCancel:true,async:true });
+    var req = new Request({ url:TBBASE + "/rusage_viz.php",method:'get',autoCancel:true,async:true });
     req.onSuccess = update;
     req.send(pargs);
 }
