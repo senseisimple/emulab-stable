@@ -12,8 +12,7 @@ if (!$TRACSUPPORT) {
 }
 
 # No Pageheader since we spit out a redirection below.
-$this_user = CheckLoginOrDie(CHECKLOGIN_USERSTATUS|
-			     CHECKLOGIN_WEBONLY|CHECKLOGIN_WIKIONLY);
+$this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
 
 #
