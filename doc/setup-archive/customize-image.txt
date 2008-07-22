@@ -431,7 +431,7 @@ H. Additional images
       sudo ssh pc1 imageunzip -s 1 - /dev/$DSK \
 	< /usr/testbed/images/FBSD410-GENERIC.ndz
 
-       cd /proj/emulab/ops/images
+       cd /proj/emulab-ops/images
        sudo ssh pc1 imagezip -s 1 /dev/$DSK - > FBSD410-STD.ndz
 
        mv /proj/emulab-ops/images/*.ndz /usr/testbed/images/
@@ -466,4 +466,4 @@ I. Dealing with SCSI disks (or RAID) and unrecognized hardware.
   support newer hardware.  Contact us if this happens.
 
 [ This file is a copy of doc/customize-image.txt in the Emulab source tree. ]
-[ Last updated 06/24/08 ]
+[ Last updated 07/22/08 ]
