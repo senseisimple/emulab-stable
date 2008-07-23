@@ -4,10 +4,15 @@
 
 # Need the major version number to figure out to do.
 OSMAJOR!= /usr/bin/uname -r | /usr/bin/sed -e 's/\..*//'
+OSMINOR!= /usr/bin/uname -r | /usr/bin/sed -e 's/[0-9][0-9]*\.\([0-9][0-9]*\).*/\1/'
 
 PORTNAME=	emulab-ops
 .if ${OSMAJOR} >= 6
+.if ${OSMINOR} >= 3
+PORTVERSION=	2.1
+.else
 PORTVERSION=	2.0
+.endif
 .else
 PORTVERSION=	1.4
 .endif
@@ -35,6 +40,11 @@ MAINTAINER=	ricci@cs.utah.edu
 #
 .MAKEFLAGS+=	SWIG_LANGUAGES= 
 .MAKEFLAGS+=    WANT_SWIG_PERL=yes WANT_SWIG_PYTHON=yes WANT_SWIG_TCL=yes
+
+#
+# Have not taken the plunge to PHP5
+#
+.MAKEFLAGS+=	PHP_VER=4
 
 #
 # Various ports need to agree on what version of apache. Make sure this
@@ -87,7 +97,6 @@ RUN_DEPENDS+= \
 	${LOCALBASE}/libexec/apache/libauth_mysql.so:${PORTSDIR}/www/mod_auth_mysql \
 	${LOCALBASE}/libexec/mysqld:${PORTSDIR}/databases/mysql50-server \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/DBI.pm:${PORTSDIR}/databases/p5-DBI \
-	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Mysql.pm:${PORTSDIR}/databases/p5-DBD-mysql50 \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/XML/Parser:${PORTSDIR}/textproc/p5-XML-Parser \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/XML/Simple.pm:${PORTSDIR}/textproc/p5-XML-Simple \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/CGI/Session.pm:${PORTSDIR}/www/p5-CGI-Session \
@@ -101,6 +110,16 @@ RUN_DEPENDS+= \
 	mysqlhotcopy:${PORTSDIR}/databases/mysql50-scripts
 .else
 RUN_DEPENDS+= smbd:${PORTSDIR}/net/samba3
+.endif
+
+.if ${PORTVERSION} == "2.1"
+# not sure why we don't build this for 6.0-6.2...
+RUN_DEPENDS+= smbd:${PORTSDIR}/net/samba3
+RUN_DEPENDS+= \
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/DBD/mysql.pm:${PORTSDIR}/databases/p5-DBD-mysql50
+.else
+RUN_DEPENDS+= \
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Mysql.pm:${PORTSDIR}/databases/p5-DBD-mysql50
 .endif
 
 NO_BUILD=	yes

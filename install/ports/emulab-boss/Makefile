@@ -4,10 +4,15 @@
 
 # Need the major version number to figure out to do.
 OSMAJOR!= /usr/bin/uname -r | /usr/bin/sed -e 's/\..*//'
+OSMINOR!= /usr/bin/uname -r | /usr/bin/sed -e 's/[0-9][0-9]*\.\([0-9][0-9]*\).*/\1/'
 
 PORTNAME=	emulab-boss
 .if ${OSMAJOR} >= 6
+.if ${OSMINOR} >= 3
+PORTVERSION=	2.1
+.else
 PORTVERSION=	2.0
+.endif
 .else
 PORTVERSION=	1.7
 .endif
@@ -35,6 +40,11 @@ MAINTAINER=	ricci@cs.utah.edu
 #
 .MAKEFLAGS+=	SWIG_LANGUAGES= 
 .MAKEFLAGS+=    WANT_SWIG_PERL=yes WANT_SWIG_PYTHON=yes WANT_SWIG_TCL=yes
+
+#
+# Have not taken the plunge to PHP5
+#
+.MAKEFLAGS+=	PHP_VER=4
 
 #
 # Various ports need to agree on what version of apache. Make sure this
@@ -96,11 +106,18 @@ RUN_DEPENDS=	\
 	${PYTHON_SITELIBDIR}/M2Crypto/ASN1.py:${PORTSDIR}/security/py-m2crypto \
 	${LOCALBASE}/include/boost:${PORTSDIR}/devel/boost \
 	gmake:${PORTSDIR}/devel/gmake \
-	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Mysql.pm:${PORTSDIR}/databases/p5-DBD-mysql50 \
 	kmetis:${PORTSDIR}/math/metis \
         curl:${PORTSDIR}/ftp/curl \
 	${PYTHON_SITELIBDIR}/MySQLdb/times.py:${PORTSDIR}/databases/py-MySQLdb \
 	mysqlhotcopy:${PORTSDIR}/databases/mysql50-scripts
+
+.if ${PORTVERSION} == "2.1"
+RUN_DEPENDS+= \
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/DBD/mysql.pm:${PORTSDIR}/databases/p5-DBD-mysql50
+.else
+RUN_DEPENDS+= \
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Mysql.pm:${PORTSDIR}/databases/p5-DBD-mysql50
+.endif
 
 .if ${OSMAJOR} >= 6
 RUN_DEPENDS+= \

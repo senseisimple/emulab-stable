@@ -3,10 +3,15 @@
 
 # Need the major version number to figure out to do.
 OSMAJOR!= /usr/bin/uname -r | /usr/bin/sed -e 's/\..*//'
+OSMINOR!= /usr/bin/uname -r | /usr/bin/sed -e 's/[0-9][0-9]*\.\([0-9][0-9]*\).*/\1/'
 
 PORTNAME=	emulab-fs
 .if ${OSMAJOR} >= 6
+.if ${OSMINOR} >= 3
+PORTVERSION=	2.1
+.else
 PORTVERSION=	2.0
+.endif
 .else
 PORTVERSION=	1.4
 .endif
@@ -40,6 +45,11 @@ RUN_DEPENDS= gmake:${PORTSDIR}/devel/gmake \
 
 .if ${OSMAJOR} >= 6
 .else
+RUN_DEPENDS+= smbd:${PORTSDIR}/net/samba3
+.endif
+
+.if ${PORTVERSION} == "2.1"
+# not sure why we don't build this for 6.0-6.2...
 RUN_DEPENDS+= smbd:${PORTSDIR}/net/samba3
 .endif
 

@@ -38,7 +38,6 @@ include/ulxr_wbxmlparse.h
 include/ulxr_xmlparse.h
 include/ulxr_xmlparse_base.h
 lib/libulsshxmlrpcpp.a
-lib/libulsshxmlrpcpp.la
 lib/libulsshxmlrpcpp.so
 lib/libulsshxmlrpcpp.so.0
 lib/libulxmlrpcpp.so
