@@ -22,7 +22,8 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 
 CFLAGS	+= -O -g -Wall -DUDP \
 		-I${OBJDIR} -I/usr/local/include \
-		-I${TESTBED_SRCDIR}/lib/libtb -I${TESTBED_SRCDIR}/pxe
+		-I${TESTBED_SRCDIR}/lib/libtb -I${TESTBED_SRCDIR}/pxe \
+		-L/usr/local/lib
 TMLIBS	 = ${OBJDIR}/lib/libtb/libtb.a
 BOOTINFO = ${OBJDIR}/pxe/bootinfo.o ${OBJDIR}/pxe/bootinfo_mysql.o
 LDFLAGS += $(LDSTATIC)
@@ -108,6 +109,15 @@ tmcd: tmcd.c ${TMCDLIBS} decls.h version.o $(SSLOBJ) $(BOOTINFO)
 		version.o $(SSLOBJ) $(BOOTINFO) \
 		$(LFLAGS) -L/usr/local/lib/mysql -lmysqlclient \
 		$(ELVINFLAGS) $(TMCDLDFLAGS) $(TMCDLIBS) $(TMLIBS) 
+
+newtmcd: newtmcd.c libtmcd.o ${TMCDLIBS} decls.h version.o $(SSLOBJ) $(BOOTINFO)
+	$(CC) $(CFLAGS) $(SSLFLAGS) $(TMCDCFLAGS) -o tmcd $< \
+		libtmcd.o version.o $(SSLOBJ) $(BOOTINFO) \
+		$(LFLAGS) -L/usr/local/lib/mysql -lmysqlclient  -lxml2 \
+		$(ELVINFLAGS) $(TMCDLDFLAGS) $(TMCDLIBS) $(TMLIBS) 
+
+libtmcd.o: libtmcd.c ${TMCDLIBS} decls.h version.o $(SSLOBJ) $(BOOTINFO)
+	$(CC) $(CFLAGS) -I/usr/local/include/libxml2 $(SSLFLAGS) $(TMCDCFLAGS) -c -o libtmcd.o $<
 
 tmcc: tmcc.c decls.h $(SSLOBJ)
 	$(CC) $(CFLAGS) $(SSLFLAGS) $(LDSTATIC) -g -o tmcc $< $(SSLOBJ) \
