@@ -31,6 +31,7 @@ use snmpit_cisco;
 use snmpit_foundry;
 use snmpit_nortel;
 use SNMP;
+use Getopt::Long;
 
 use strict;
 
@@ -57,14 +58,26 @@ if (!TBAdmin($>)) {
     die "Sorry, only admins can use this script\n";
 }
 
-if (@ARGV) {
-    die "usage: $0\n";
+my %opt = ();
+GetOptions(\%opt, 'v');
+my $debug = 0;
+if ($opt{v}) {
+    $debug = 1;
+}
+
+sub DEBUG {
+    if ($debug) {
+	print STDERR @_;
+    }
 }
 
 #
 # ElabinElab is special; Ask outer boss for the info.
 #
 if ($ELABINELAB) {
+    if ($debug) {
+        DEBUG "ELABINELAB mode\n";
+    }
     libxmlrpc::Config({"server"  => $RPCSERVER,
 		       "verbose" => 0,
 		       "cert"    => $RPCCERT,
@@ -101,6 +114,10 @@ if ($ELABINELAB) {
 # guess which switch they're using
 #
 my @test_switches = map {[$_,"experimental"]} getTestSwitches();
+if (!@test_switches) {
+    die "Error: No experimental net switches found in database - you need\n" .
+        "to add them before running this script\n";
+}
 
 #
 # Get trunk ports so that we can skip MACs learned on them
@@ -115,11 +132,11 @@ if (!@control_switches) {
 
 my @switches = (@test_switches, @control_switches);
 
-my $debug = 0;
-
-sub DEBUG {
-    if ($debug) {
-	print @_;
+if ($debug) {
+    DEBUG "switches in database:\n";
+    foreach my $switch (@switches) {
+        my ($name, $type) = @$switch;
+        DEBUG "  $name ($type)\n";
     }
 }
 
