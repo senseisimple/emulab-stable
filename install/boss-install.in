@@ -231,9 +231,11 @@ if ($USERNODE eq $FSNODE) {
 }
 
 # Version of FreeBSD.
-my $FBSD_VERSION = 4;
-if (`uname -r` =~ /^(\d)/) {
-    $FBSD_VERSION = $1;
+my $FBSD_MAJOR = 4;
+my $FBSD_MINOR = 10;
+if (`uname -r` =~ /^(\d+)\.(\d+)/) {
+    $FBSD_MAJOR = $1;
+    $FBSD_MINOR = $2;
 }
 else {
     die("Could not determine what version of FreeBSD you are running!\n");
@@ -243,7 +245,14 @@ else {
 # The meta-ports (name and version) that drag in all the dependancies for
 # a boss node. These are OS dependent as we upgrade.
 #
-my $BOSS_PORT = (($FBSD_VERSION == 4) ? "emulab-boss-1.8" : "emulab-boss-2.0");
+my $BOSS_PORT = "emulab-boss-1.8";
+if ($FBSD_MAJOR > 4) {
+    if ($FBSD_MAJOR == 6 && $FBSD_MINOR > 2) {
+	$BOSS_PORT = "emulab-boss-2.1";
+    } else {
+	$BOSS_PORT = "emulab-boss-2.0";
+    }
+}
 my $PHP4_PORT = "php4-extensions-1.0";
 
 #
@@ -412,7 +421,7 @@ Phase "ports", "Installing ports", sub {
 	    }
 	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $BOSS_PORT");
 	};
-	if ($FBSD_VERSION > 4) {
+	if ($FBSD_MAJOR > 4) {
 	    Phase "php4", "Installing php4 package", sub {
 		if (!ExecQuiet("$PKG_INFO -e $PHP4_PORT")) {
 		    PhaseSkip("Port already installed");
@@ -454,7 +463,7 @@ Phase "ports", "Installing ports", sub {
 	DoneIfExists("$PORTSMISCDIR/emulab-boss");
 	ExecQuietFatal("$SH $SRCDIR/ports/ports-install");
     };
-    if ($FBSD_VERSION == 4) {
+    if ($FBSD_MAJOR == 4) {
 	# Ick. The php4 port is broken with SSL, so we have to patch
 	# it - hopefully it'll get fixed someday, and we remove this
 	Phase "php4patch", "Patching php4 port", sub {
@@ -479,7 +488,7 @@ Phase "portfixup", "Fixing up packages", sub {
 	my $pname = GetPackage("rsync", $packagedir);
 	ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
     };
-    if ($FBSD_VERSION == 6) {
+    if ($FBSD_MAJOR == 6) {
 	# Temporary for template stuff
 	Phase "Simple", "Looking for Simple XML Parser", sub {
 	    if (!ExecQuiet("$PKG_INFO -x p5-XML-Simple")) {
@@ -500,7 +509,7 @@ Phase "portfixup", "Fixing up packages", sub {
     }
     if ($WINSUPPORT) {
 	Phase "gcc30", "Looking for GCC 3.0 and installing", sub {
-	    if ($FBSD_VERSION > 4 ||
+	    if ($FBSD_MAJOR > 4 ||
 		!ExecQuiet("$PKG_INFO -x gcc30")) {
 		PhaseSkip("GCC 3.0 already installed");
 	    }
@@ -511,7 +520,7 @@ Phase "portfixup", "Fixing up packages", sub {
 };
 
 Phase "patches", "Applying patches", sub {
-    if ($FBSD_VERSION == 4) {
+    if ($FBSD_MAJOR == 4) {
 	Phase "g++patch", "Patching g++'s STL", sub {
 	    if (!ExecQuiet("$PATCH -C -f -R -p0 -i $STL_PATCH")) {
 		PhaseSkip("Patch already applied");
@@ -815,7 +824,7 @@ Phase "rc.conf", "Adding testbed content to $RCCONF", sub {
 		   qq|apache_enable="YES"|);
 
     # Starting at FreeBSD 6 we use the default version of bind, not the port.
-    if ($FBSD_VERSION < 6) {
+    if ($FBSD_MAJOR < 6) {
 	push(@strings, qq|named_enable="NO"|);
     }
     else {
@@ -832,7 +841,7 @@ Phase "rc.conf", "Adding testbed content to $RCCONF", sub {
 # New version perl does not appear to require this anymore. In fact, it
 # seems to break things if it is!
 #
-if ($FBSD_VERSION == 4) {
+if ($FBSD_MAJOR == 4) {
     Phase "suidperl", "Setting the suid bit on $SUIDPERL", sub {
 	PhaseSkip("Already done") if (-u $SUIDPERL);
 	ExecQuietFatal("$CHMOD u+s $SUIDPERL");
@@ -1030,7 +1039,7 @@ Phase "rndc", "Setting up rndc for control of nameserver", sub {
     my $RNDC_CONFGEN = "/usr/sbin/rndc-confgen";
 
     # Bind9 port prior to FreeBSD6
-    if ($FBSD_VERSION < 6) {
+    if ($FBSD_MAJOR < 6) {
 	$RNDC_KEY     = "/usr/local/etc/rndc.key";
 	$RNDC_CONFGEN = "/usr/local/sbin/rndc-confgen";
     }
@@ -1087,7 +1096,7 @@ Phase "sslcerts", "Setting up SSL certificates", sub {
 	Phase "rc.d", "Installing Apache startup file", sub {
 	    DoneIfExists("$RCDIR/apache.sh");
 	    ExecQuietFatal("mv $RCDIR/apache.sh.sample $RCDIR/apache.sh");
-	    if ($FBSD_VERSION == 6) {
+	    if ($FBSD_MAJOR == 6) {
 		ExecQuietFatal("sed -i .orig ".
 			       "-e 's/^apache_enable/#apache_enable/' ".
 			       "$RCDIR/apache.sh");
@@ -1099,7 +1108,7 @@ Phase "sslcerts", "Setting up SSL certificates", sub {
 	    ExecQuietFatal("$RCDIR/apache.sh start");
 	};
     };
-    if ($FBSD_VERSION > 4) {
+    if ($FBSD_MAJOR > 4) {
 	Phase "apache", "Setting up Apache on ops", sub {
 	    Phase "cert", "Installing Apache SSL certificate", sub {
 		ExecQuietFatal("$SCP $TOP_OBJDIR/ssl/$APACHE_CERTPEM_OPS ".
@@ -1196,7 +1205,7 @@ Phase "named", "Setting up initial named configuration", sub {
     };
     
     # Starting at 6.0 we use the default version of bind, not the port.
-    my $named_control = ($FBSD_VERSION < 6 ?
+    my $named_control = ($FBSD_MAJOR < 6 ?
 			 "$RCDIR/1.named.sh" : "/etc/rc.d/named");
     
     Phase "stopping", "Stopping named", sub {
@@ -1212,7 +1221,7 @@ Phase "named", "Setting up initial named configuration", sub {
 	# check for the existance of the pidfile after running the start
 	# script.
 	#
-	if ($FBSD_VERSION >= 6) {
+	if ($FBSD_MAJOR >= 6) {
 	    unlink($NAMED_PIDFILE)
 		if ( -e "$NAMED_PIDFILE");
 	    if (ExecQuiet("$named_control start") &&
@@ -1225,7 +1234,7 @@ Phase "named", "Setting up initial named configuration", sub {
     };
 
     # Lets make sure that old file is gone!
-    if ($FBSD_VERSION >= 6) {
+    if ($FBSD_MAJOR >= 6) {
 	Phase "cleanup", "Cleaning up old files", sub {
 	    DoneIfDoesntExist("$RCDIR/1.named.sh");
 	
@@ -1253,7 +1262,7 @@ if ($BUGDBSUPPORT) {
 
     Phase "flyspray", "Finalizing flyspray installation", sub {
 	PhaseSkip("flyspray not supported")
-	    if ($FBSD_VERSION < 6);
+	    if ($FBSD_MAJOR < 6);
 
  	ExecQuietFatal("$SSH -o 'BatchMode=yes' root\@${USERNODE} ".
 		       "     '$BUGDBPROXY setup' ");

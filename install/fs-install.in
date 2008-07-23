@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2004, 2005, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2003-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -68,9 +68,11 @@ sub usage {
 }
 
 # Version of FreeBSD.
-my $FBSD_VERSION = 4;
-if (`uname -r` =~ /^(\d)/) {
-    $FBSD_VERSION = $1;
+my $FBSD_MAJOR = 4;
+my $FBSD_MINOR = 10;
+if (`uname -r` =~ /^(\d+)\.(\d+)/) {
+    $FBSD_MAJOR = $1;
+    $FBSD_MINOR = $2;
 }
 else {
     die("Could not determine what version of FreeBSD you are running!\n");
@@ -80,7 +82,14 @@ else {
 # The meta-ports (name and version) that drag in all the dependancies for
 # an fs node. These are OS dependent as we upgrade.
 #
-my $FS_PORT   = (($FBSD_VERSION == 4) ? "emulab-fs-1.4" : "emulab-fs-2.0");
+my $FS_PORT = "emulab-fs-1.4";
+if ($FBSD_MAJOR > 4) {
+    if ($FBSD_MAJOR == 6 && $FBSD_MINOR > 2) {
+	$FS_PORT = "emulab-fs-2.1";
+    } else {
+	$FS_PORT = "emulab-fs-2.0";
+    }
+}
 
 my $packagedir = "";
 my $batchmode  = 0;

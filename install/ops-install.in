@@ -90,9 +90,11 @@ sub usage {
 }
 
 # Version of FreeBSD.
-my $FBSD_VERSION = 4;
-if (`uname -r` =~ /^(\d)/) {
-    $FBSD_VERSION = $1;
+my $FBSD_MAJOR = 4;
+my $FBSD_MINOR = 10;
+if (`uname -r` =~ /^(\d+)\.(\d+)/) {
+    $FBSD_MAJOR = $1;
+    $FBSD_MINOR = $2;
 }
 else {
     die("Could not determine what version of FreeBSD you are running!\n");
@@ -102,8 +104,17 @@ else {
 # The meta-ports (name and version) that drag in all the dependancies for
 # an ops/fs node. These are OS dependent as we upgrade.
 #
-my $OPS_PORT  = (($FBSD_VERSION == 4) ? "emulab-ops-1.4" : "emulab-ops-2.0");
-my $FS_PORT   = (($FBSD_VERSION == 4) ? "emulab-fs-1.4" : "emulab-fs-2.0");
+my $OPS_PORT = "emulab-ops-1.4"; 
+my $FS_PORT = "emulab-fs-1.4";
+if ($FBSD_MAJOR > 4) {
+    if ($FBSD_MAJOR == 6 && $FBSD_MINOR > 2) {
+	$OPS_PORT = "emulab-ops-2.1";
+	$FS_PORT = "emulab-fs-2.1";
+    } else {
+	$OPS_PORT = "emulab-ops-2.0";
+	$FS_PORT = "emulab-fs-2.0";
+    }
+}
 my $PHP4_PORT = "php4-extensions-1.0";
 
 my $packagedir = "";
@@ -333,7 +344,7 @@ Phase "ports", "Installing ports", sub {
 	    }
 	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $OPS_PORT");
 	};
-	if ($FBSD_VERSION > 4) {
+	if ($FBSD_MAJOR > 4) {
 	    Phase "php4", "Installing php4 package", sub {
 		if (!ExecQuiet("$PKG_INFO -e $PHP4_PORT")) {
 		    PhaseSkip("Package already installed");
@@ -381,7 +392,7 @@ Phase "ports", "Installing ports", sub {
     if ($CVSSUPPORT) {
 	Phase "cvsd", "Installing cvsd package", sub {
 	    PhaseSkip("cvsd not supported on ops")
-		if ($FBSD_VERSION < 6);
+		if ($FBSD_MAJOR < 6);
 
 	    if (!ExecQuiet("$PKG_INFO -x -E cvsd")) {
 		PhaseSkip("cvsd package already installed");
@@ -396,7 +407,7 @@ Phase "ports", "Installing ports", sub {
     if ($BUGDBSUPPORT) {
 	Phase "flyspray", "Installing flyspray package support", sub {
 	    PhaseSkip("flyspray not supported on ops")
-		if ($FBSD_VERSION < 6);
+		if ($FBSD_MAJOR < 6);
 
 	    if (!ExecQuiet("$PKG_INFO -x -E adodb")) {
 		PhaseSkip("adodb package already installed");
@@ -483,7 +494,7 @@ Phase "portfixup", "Fixing up packages", sub {
 	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
 	};
 	Phase "gcc30", "Looking for GCC 3.0 and installing", sub {
-	    if ($FBSD_VERSION > 4 ||
+	    if ($FBSD_MAJOR > 4 ||
 		!ExecQuiet("$PKG_INFO -x gcc30")) {
 		PhaseSkip("GCC 3.0 already installed");
 	    }
@@ -971,7 +982,7 @@ Phase "rc.d", "Setting up rc.d scripts", sub {
 
 Phase "apache", "Installing apache config file", sub {
     PhaseSkip("apache not supported on ops")
-	if ($FBSD_VERSION == 4);
+	if ($FBSD_MAJOR == 4);
 
     DoneIfEdited("$HTTPD_CONF");
     ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/apache control-install");
@@ -989,7 +1000,7 @@ Phase "wikidocs", "Installing wikidocs redirect", sub {
 
 Phase "database", "Setting up database", sub {
     PhaseSkip("mysqld not supported on ops")
-	if ($FBSD_VERSION == 4);
+	if ($FBSD_MAJOR == 4);
     
     # Get a password for the the DB.
     Phase "password", "Asking for mysqld root password", sub {
@@ -1066,7 +1077,7 @@ if ($MAILMANSUPPORT) {
     
     Phase "Mailman", "Setting up Mailman", sub {
 	PhaseSkip("mailman not supported on ops")
-	    if ($FBSD_VERSION == 4);
+	    if ($FBSD_MAJOR == 4);
 
 	# Patch for broken install
 	ExecQuietFatal("$CHMOD 2770 $MAILMANDIR/archives/private");
@@ -1151,7 +1162,7 @@ if ($CVSSUPPORT) {
     
     Phase "cvsd", "Installing cvsd", sub {
 	PhaseSkip("cvsd not supported on ops")
-	    if ($FBSD_VERSION < 6);
+	    if ($FBSD_MAJOR < 6);
 
 	Phase "files", "Installing cvsd files", sub {
 	    DoneIfExists($CVSDHEAD);
@@ -1205,7 +1216,7 @@ if ($BUGDBSUPPORT) {
 
     Phase "flyspray", "Installing flyspray", sub {
 	PhaseSkip("flyspray not supported on ops")
-	    if ($FBSD_VERSION < 6);
+	    if ($FBSD_MAJOR < 6);
 
 	# Get a password for the installation.
 	Phase "password", "Generating flyspray password", sub {
@@ -1335,7 +1346,7 @@ if ($WIKISUPPORT) {
     
     Phase "TWiki", "Installing TWiki", sub {
 	PhaseSkip("TWiki not supported on ops")
-	    if ($FBSD_VERSION < 6);
+	    if ($FBSD_MAJOR < 6);
 
 	Phase "fetching", "Fetching TWiki distribution", sub {
 	    DoneIfExists($localtarfile);
