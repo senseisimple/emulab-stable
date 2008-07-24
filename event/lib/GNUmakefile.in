@@ -44,9 +44,8 @@ TCFLAGS = $(CFLAGS) $(PUBSUBMTFLAGS)
 # Special CFLAGS w/o warnings, for SWIG-generated code
 CFLAGS_NOWARN += -O2 -g -I. $(PUBSUBFLAGS)
 ifeq ($(SYSTEM),Linux)
-PCORE  = -I/usr/lib/perl5/5.6.1/i386-linux/CORE
-PCORE  += -I/usr/lib/perl5/5.8.3/i386-linux-thread-multi/CORE
-PCORE  += -I/usr/lib/perl5/5.8.6/i386-linux-thread-multi/CORE
+PCORE  = -I$(shell find /usr/lib/perl5/$(PERLVERS) | grep CORE\$$$") \
+	`perl -e 'use Config; print $$Config{ccflags};'`
 PYCORE = -I@PYTHON_INCLUDE@
 else
 
