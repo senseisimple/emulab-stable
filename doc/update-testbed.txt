@@ -7,8 +7,22 @@
 Rough steps for upgrading your existing Emulab.
 
 0. "Shutdown" the testbed.  Disable the web interface and prevent user
-   logins to "users".  [ We really need a way to stop all Emulab daemons,
-   etc. that might be confused by DB changes. ]
+   logins to "users":
+
+	boss> wap webcontrol -l nologin
+
+   We also want to make sure that none of the testbed daemons are
+   running:
+
+	boss> sudo mv -f /usr/local/etc/rc.d/3.testbed.sh \
+                         /usr/local/etc/rc.d/3.testbed.sh.save
+
+   Add add this to /etc/rc.conf to prevent the cron based daemons from
+   running:
+
+	cron_enable="NO"
+
+   Then reboot boss.
 
 1. Look at doc/UPDATING to find out what you have to update in the
    boss/ops FreeBSD environment before updating Emulab software.
@@ -29,12 +43,16 @@ Rough steps for upgrading your existing Emulab.
    in the new schema.  Diff the version of this file from the last release,
    with the version from this release to find which ones to apply.
 
-   If all goes well, proceed to the next step.  Be aware that the
-   "boss-install" make target below will do further checks for missing
-   rows in DB tables.  That target will fail, and tell you what to do to
-   fix your DB, in that case.  It does the table check in two pieces,
-   so it is possible you will have to fix the DB, and restart the boss-install
-   twice.
+   If all goes well, install the newly built emulab software:
+
+	boss> gmake boss-install
+	boss> cd rc.d; gmake install
+	
+   Be aware that the "boss-install" make target will do further checks
+   for missing rows in DB tables.  That target will fail, and tell you
+   what to do to fix your DB, in that case.  It does the table check
+   in two pieces, so it is possible you will have to fix the DB, and
+   restart the boss-install twice.
 
    If anything goes wrong with the DB update step, contact us.  You can
    still abort the upgrade at this point by putting back the old db:
@@ -56,15 +74,12 @@ Rough steps for upgrading your existing Emulab.
        sudo gmake fs-install
    b. login to "ops" ("users"), cd to your build directory and do:
        sudo gmake ops-install
+       cd rc.d; sudo gmake control-install
    Skip to step 8.
 
 7. Login to your "ops" (aka "users") machine, cd to your build directory
    and do:
        sudo gmake opsfs-install
-
-8. Back on your boss node, cd to your build directory and do:
-       sudo gmake boss-install
-       sudo gmake post-install
 
 9. Install a "shared" copyright to appear on the web pages.  We have not
    yet integrated this step, so it is a little awkward:
@@ -74,11 +89,18 @@ Rough steps for upgrading your existing Emulab.
    in your installed testbed tree, e.g.:
        cp copyright-contrib.html /usr/testbed/www/copyright.html
 
-10.Reboot tipservers, ops and boss and make sure things boot up ok.
+10. Undo the changes in Step 1.
+
+	boss> wap webcontrol -l login
+	boss> sudo rm -f /usr/local/etc/rc.d/3.testbed.sh.save
+
+    And remove the cron disable line from /etc/rc.conf
+
+11.Reboot tipservers, ops and boss and make sure things boot up ok.
    Try creating/swapping/modifying/destroying an experiment, look
    for errors.
 
-11.Bring up the web interface and inform users that they should reboot
+12.Bring up the web interface and inform users that they should reboot
    their existing experiment nodes if they notice odd behaviors.
 
 Things should be backward compatible so you don't have to update the
