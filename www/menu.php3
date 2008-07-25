@@ -714,6 +714,9 @@ function WRITESIDEBAR() {
 	NavMenuButton("View Testbed Stats",
 		      "$TBBASE/showstats.php3");
 
+	NavMenuButton("Resource Usage Visualization",
+		      "$TBBASE/rusage_viz.php");
+
 	NavMenuButton("Approve New Projects",
 		      "$TBBASE/approveproject_list.php3");
 
