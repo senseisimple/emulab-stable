@@ -531,7 +531,10 @@ Phase "patches", "Applying patches", sub {
     Phase "m2cryptopatch", "Patching m2crypto", sub {
 	my $patchfile = $M2CRYPTO_PATCH;
 	
-	if (ExecQuiet("$PKG_INFO -I -x m2crypto | fgrep -q -s '0.13'") == 0) {
+	if (ExecQuiet("$PKG_INFO -I -x m2crypto | fgrep -q -s '0.17'") == 0) {
+	    $patchfile = "${patchfile}-0.17";
+	}
+	elsif (ExecQuiet("$PKG_INFO -I -x m2crypto | fgrep -q -s '0.13'") == 0) {
 	    $patchfile = "${patchfile}-0.13";
 	}
 	if (!ExecQuiet("$PATCH -C -f -l -R -p0 -i $patchfile")) {

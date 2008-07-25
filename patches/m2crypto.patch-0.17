@@ -1,0 +1,21 @@
+Index: /usr/local/lib/python2.5/site-packages/M2Crypto/SSL/Context.py
+===================================================================
+--- Context.py	(revision 322)
++++ Context.py	(working copy)
+@@ -14,13 +14,13 @@
+         self.map = {}
+ 
+     def __getitem__(self, key):
+-        return self.map[key] 
++        return self.map[repr(key)] 
+ 
+     def __setitem__(self, key, value):
+-        self.map[key] = value
++        self.map[repr(key)] = value
+ 
+     def __delitem__(self, key):
+-        del self.map[key]
++        del self.map[repr(key)]
+ 
+ def map():
+     if _ctxmap.singleton is None:
