@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -16,14 +16,15 @@ Rough steps for upgrading your existing Emulab.
    the last you installed.
 
 2. Unpack and build the Emulab software.  You should do this in a directory
-   accessible to your tipserv, ops and boss nodes (e.g., /users) to make
-   the various installs easier.
+   accessible to your boss and ops machines (and your fs and tipserv machines
+   if you have them) to make the various installs easier.  Typically this
+   would be a directory in /users or /proj.
 
-3. BACKUP YOUR DB.  Do:
+3. BACKUP YOUR DB on boss.  Do:
 	mysqldump tbdb > db.backup
 
-4. Update the DB.  Look at sql/database-migrate.txt which is a list of
-   SQL commands to perform. In some cases, it also includes instructions
+4. Update the DB on boss.  Look at sql/database-migrate.txt which is a list
+   of SQL commands to perform. In some cases, it also includes instructions
    regarding operations you need to perform on your data to make it work
    in the new schema.  Diff the version of this file from the last release,
    with the version from this release to find which ones to apply.
@@ -45,18 +46,27 @@ Rough steps for upgrading your existing Emulab.
    and bringing the testbed back up.  After this step, you are committed
    to the upgrade.
 
-5. Login to your tipservers (if you have them), cd to your build directory
-   and do:
+5. If you have one or more "tipserv" machines, login to them, cd to your
+   build directory and do:
        sudo gmake tipserv-install
 
-6. Login to your ops/users node, cd to your build directory and do:
+6. If you have a combined ops/fs machine (the common case), skip to step 7.
+   Otherwise:
+   a. login to "fs", cd to your build directory and do:
+       sudo gmake fs-install
+   b. login to "ops" ("users"), cd to your build directory and do:
        sudo gmake ops-install
+   Skip to step 8.
 
-7. Back on your boss node, cd to your build directory and do:
+7. Login to your "ops" (aka "users") machine, cd to your build directory
+   and do:
+       sudo gmake opsfs-install
+
+8. Back on your boss node, cd to your build directory and do:
        sudo gmake boss-install
        sudo gmake post-install
 
-8. Install a "shared" copyright to appear on the web pages.  We have not
+9. Install a "shared" copyright to appear on the web pages.  We have not
    yet integrated this step, so it is a little awkward:
 
    Edit www/copyright-contrib.html and fill in values for @SITENAME@,
@@ -64,11 +74,11 @@ Rough steps for upgrading your existing Emulab.
    in your installed testbed tree, e.g.:
        cp copyright-contrib.html /usr/testbed/www/copyright.html
 
-9. Reboot tipservers, ops and boss and make sure things boot up ok.
+10.Reboot tipservers, ops and boss and make sure things boot up ok.
    Try creating/swapping/modifying/destroying an experiment, look
    for errors.
 
-10.Bring up the web interface and inform users that they should reboot
+11.Bring up the web interface and inform users that they should reboot
    their existing experiment nodes if they notice odd behaviors.
 
 Things should be backward compatible so you don't have to update the
