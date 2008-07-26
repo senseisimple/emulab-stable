@@ -189,8 +189,12 @@ PUBLIC_NETMASK=255.255.255.0
 DHCPD_DYNRANGE="155.98.36.200 155.98.36.249"
 
 #
-# If you have forwarders for your named, specify them here for named.conf
-# generation in the named directory.
+# Fill in the nameservers for your campus network here - the nameserver on boss
+# will forward requests for domains other than your own to these nameservers
+# OR
+# Leave this variable empty to have boss ignore any local nameservers and go
+# straight to the roots itself. This is NOT recommended, as you won't get the
+# benefit of local caches, and may be blocked on some campuses.
 #
 NAMED_FORWARDERS="1.1.1.1 1.1.2.1"
 
