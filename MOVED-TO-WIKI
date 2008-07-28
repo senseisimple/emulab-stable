@@ -4,6 +4,44 @@
 
 FILE                                WIKI PAGE
 
+doc/arch-hier.txt                   ArchHeir
+doc/arch.txt                        Arch
+doc/boot-scaling-issues.txt         BootScalingIssues
+doc/care-and-feeding.txt            CareAndFeeding
+doc/cisco-voodoo.txt                CiscoVoodoo
+doc/client-selfconfig.txt           ClientSelfConfig
+doc/create-generic-image.txt        CreateGenericImage
+doc/cross-compiling.txt             CrossCompiling
+doc/customize-image.txt             CustomizeImage
+doc/customize-mfs.txt               CustomizeMfs
+doc/dbtoir.txt                      dbtoir
+doc/delay-implementation.txt        DelayImplementation
+doc/errorcodes.txt                  ErrorCodes
+doc/hardware-mail.mbox              HardwareMail
+doc/ip-assumptions.txt              IP Assumptions
+doc/kernel-patches.txt              KernelPatches
+doc/linux-kernel.txt                LinuxKernel
+doc/multiplexed-links.txt           MultiplexedLinks
+doc/newimage.txt                    NewImage
+doc/newnode-from-admin.txt          NewnodeFromAdmin
+doc/overview.txt                    Overview
+doc/package-building.txt            PackageBuilding
+doc/port2-serial-console.txt        Port2SerialConsole
+doc/security.txt                    SecurityNotes
+doc/setup-elabinelab.txt            SetupElabinelab
+doc/setup-plc.txt                   SetupPLC
+doc/shellonboss.txt                 ShellOnBoss
+doc/snmpit-internals.txt            SnmpitInternals
+doc/tftpboot-setup.txt              TftpbootSetup
+doc/tim-stack.nits                  TimStackNits
+doc/uk-image.txt                    UK Image
+doc/ulsshxmlrpcpp.txt               ulsshxmlrpcpp
+doc/update-mfs.txt                  UpdateMFS
+doc/update-node.txt                 UpdateNode
+doc/updating-RHL/                   UpdatingRHL
+doc/vnode-impl.txt                  VnodeImpl
+doc/vnode-setup.txt                 VnodeSetup
+doc/webglimpse.txt                  WebGlimpse
 event/linktest/linktest.html        linktest
 www/auth.html                       Auth
 www/doc.php3                        .
