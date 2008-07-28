@@ -15,6 +15,12 @@ if (!$TRACSUPPORT) {
 $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
 
+# The user has to be approved, real account.
+if (!HASREALACCOUNT($uid)) {
+    USERERROR("You may not login to the Emulab Wiki until your account ".
+	      "has been approved and is active.", 1);
+}
+
 #
 # Verify page arguments. project_title is the project to zap to.
 #
