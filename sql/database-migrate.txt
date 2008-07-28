@@ -2805,9 +2805,10 @@ last_net_act,last_cpu_act,last_ext_act);
 4.9: Add a 'global_vtypes' table to allow admins to create vtypes that apply
     to all users:
 
-        create table global_vtypes (vtype varchar(30) primary key, \
-                                    weight float not null default 0.5, \
-                                    types text not null default "");
+        create table global_vtypes \
+	 (vtype varchar(30) not null default '' primary key, \
+          weight float not null default 0.5, \
+          types text not null default "");
 
 4.10: New inner_elab roles to support separate ops and fs nodes.
       While I'm here, add future roles for distinguishing boss and the router.
@@ -3029,7 +3030,7 @@ last_net_act,last_cpu_act,last_ext_act);
 4.25: Modify tables for the logging subsystem
 
   alter table log
-    modify level tinyint(2) not null,
+    modify level tinyint(2) not null default '0',
     add sublevel tinyint(2) NOT NULL default 0 after level,
     modify type 
       enum('normal','entering','exiting','thecause','extra','summary')
@@ -3037,7 +3038,8 @@ last_net_act,last_cpu_act,last_ext_act);
 
   alter table scripts change name script_name varchar(24) NOT NULL default '';
 
-  alter table priorities change name priority_name varchar(8) NOT NULL;
+  alter table priorities change name priority_name varchar(8) \
+      NOT NULL default '';
 
 4.26: Add tables for the checkup_daemon.
 
@@ -3182,12 +3184,12 @@ last_net_act,last_cpu_act,last_ext_act);
      structured fashion:
 
 	CREATE TABLE errors (
-	  session int unsigned NOT NULL,
-	  stamp int unsigned NOT NULL,
-	  exptidx int NOT NULL,
-	  script smallint(3) NOT NULL,
-	  cause varchar(16) NOT NULL,
-	  confidence float NOT NULL,
+	  session int(1) unsigned NOT NULL default '0',
+	  stamp int(10) unsigned NOT NULL default '0',
+	  exptidx int(11) NOT NULL default '0',
+	  script smallint(3) NOT NULL default '0',
+	  cause varchar(16) NOT NULL default '',
+	  confidence float NOT NULL default '0',
 	  mesg text NOT NULL,
 	  primary key (session)
 	);
@@ -3199,14 +3201,14 @@ last_net_act,last_cpu_act,last_ext_act);
 	  add log_session int unsigned;
 
 	CREATE TABLE causes (
-	  cause varchar(16) NOT NULL,
-	  cause_desc varchar(32) NOT NULL,
+	  cause varchar(16) NOT NULL default '',
+	  cause_desc varchar(32) NOT NULL default '',
 	  primary key (cause),
 	  unique key (cause_desc)
 	);
 
         ALTER TABLE log 
-          change cause cause varchar(16) NOT NULL,
+          change cause cause varchar(16) NOT NULL default '',
           change pidx exptidx int NOT NULL default '0';
 
 	INSERT INTO exported_tables values ('causes');
