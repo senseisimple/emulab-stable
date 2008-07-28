@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -37,7 +37,7 @@ db-fill-dist: knowlbase
 	  > database-fill.sql
 
 sitevars:
-	@mysqldump -t tbdb sitevariables > sitevars-create.sql 
+	@mysqldump --skip-opt --skip-quote-names -t tbdb sitevariables > sitevars-create.sql 
 
 knowlbase:
 	@mysqldump -c -t tbdb knowledge_base_entries | sed -e 's,^INSERT,REPLACE,' > knowlbase-create.sql 
