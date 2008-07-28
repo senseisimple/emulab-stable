@@ -96,7 +96,6 @@ $(LTEVENT_OBJS): ../lib/libevent.a ../lib/event.h
 install: weblinktest $(SCRIPT_RUN) $(SCRIPT_PROXY) $(LTEVENT) \
 		$(INSTALL_SBINDIR)/$(SCRIPT_CONTROL) 
 	$(INSTALL_PROGRAM) weblinktest $(INSTALL_LIBEXECDIR)
-	$(INSTALL_DATA) $(SRCDIR)/linktest.html $(INSTALL_WWWDIR)/doc
 	-mkdir -p $(INSTALL_DIR)/opsdir/bin
 	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
 	-mkdir -p $(INSTALL_DIR)/opsdir/libexec
