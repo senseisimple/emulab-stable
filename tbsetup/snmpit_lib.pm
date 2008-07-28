@@ -24,6 +24,7 @@ use Exporter;
 		getDeviceOptions getTrunks getTrunksFromSwitches
                 getTrunkHash 
 		getExperimentPorts snmpitGet snmpitGetWarn snmpitGetFatal
+                getExperimentControlPorts
 		snmpitSet snmpitSetWarn snmpitSetFatal 
                 snmpitBulkwalk snmpitBulkwalkWarn snmpitBulkwalkFatal
 		printVars tbsort );
@@ -289,6 +290,29 @@ sub getExperimentPorts ($$) {
     my ($pid, $eid) = @_;
 
     return getVlanPorts(getExperimentVlans($pid,$eid));
+}
+
+#
+# Returns an array of control net ports used by a given experiment
+#
+sub getExperimentControlPorts ($$) {
+    my ($pid, $eid) = @_;
+
+    # 
+    # Get a list of all *physical* nodes in the experiment
+    #
+    my $exp = Experiment->Lookup($pid,$eid);
+    my @nodes = $exp->NodeList(0,0);
+
+    #
+    # Get control net interfaces
+    #
+    my @ports =  map { $_->node_id() . ":" . $_->control_iface() } @nodes;
+
+    #
+    # Convert from iface to port number when we return
+    #
+    return convertPortsFromIfaces(@ports);
 }
 
 #

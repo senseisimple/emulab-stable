@@ -42,6 +42,7 @@ Usage: $0 [-h] <-p | <pid> <eid> > [vname ...] [vname:port ...]
 -p    The machines given are physical, not virtual, node IDs. No pid and
       eid should be given when using this option.
 -s    Ports are specified in switch.port syntax
+-C    List control net, rather than experimental net, ports
 
 If only pid and eid are given, prints out information about all ports in the
 experiment. Otherwise, output is limited to the nodes and/or ports given.
@@ -61,7 +62,8 @@ END
 # Process command-line arguments
 #
 my %opt = ();
-GetOptions(\%opt,'h','a','e','p','b','z','q','c','s');
+Getopt::Long::Configure("no_ignore_case");
+GetOptions(\%opt,'h','a','e','p','b','z','q','c','s','C');
 
 if ($opt{h}) {
     exit &usage;
@@ -212,7 +214,7 @@ elsif ($opt{p}) {
 	my ($hostname,$portnumber) = ($1,$3);
 	if (defined $portnumber) {
 	    push @ports, $port;
-	} else {
+	} else  {
 	    my $interfaces = DBQueryFatal("select card from interfaces " .
 		"where node_id = '$hostname'");
 	    while (my ($card) = $interfaces->fetchrow()) {
@@ -221,7 +223,17 @@ elsif ($opt{p}) {
 	}
     }
 } else {
-    my @experimentPorts = getExperimentPorts($pid,$eid);
+    my @experimentPorts;
+    #
+    # Get control net or experimental net ports, depending on what they
+    # asked for
+    #
+    if ($opt{C}) {
+        @experimentPorts = getExperimentControlPorts($pid,$eid);
+    } else {
+        @experimentPorts = getExperimentPorts($pid,$eid);
+    }
+    print "ep: " . join(";",@experimentPorts) . "\n";
     if (@passedPorts) {
 	#
 	# Handle a set of passed-in ports
