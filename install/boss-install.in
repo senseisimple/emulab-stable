@@ -797,6 +797,19 @@ Phase "database", "Setting up database", sub {
 	    PhaseSkip("Already done");
 	}
 	ExecQuietFatal("$MYSQL $DBNAME < $TOP_SRCDIR/sql/sitevars-create.sql");
+	#
+	# Make sure admincheck is on for new installs.  We leave it off
+	# for upgrades (and elabinelab) where there are pre-existing user
+	# and projects where admin isolation requires more work.
+	#
+	Phase "admincheck", "Enabling admin isolation sitevar", sub {
+	    if (! $ELABINELAB) {
+		PhaseSkip("Not enabling for elabinelab");
+	    }
+	    ExecQuietFatal("echo \"update sitevariables set value='1' where ".
+			   "      name='general/joinproject/admincheck'\" | ".
+			   "$MYSQL $DBNAME");
+	};
     };
     Phase "knowlbase", "Filling knowledge_base_entries table", sub {
 	my ($exitval, @rows) = ExecQuiet("echo 'select * from " .
