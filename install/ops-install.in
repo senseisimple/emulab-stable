@@ -889,8 +889,16 @@ Phase "samba", "Setting up Samba", sub {
     };
     if ($ELABINELAB) {	
 	Phase "starting", "Starting Samba", sub {
+	    my $sscript;
+	    if (-x "$RCDIR/samba.sh") {
+		$sscript = "samba.sh";
+	    } elsif (-x "$RCDIR/samba") {
+		$sscript = "samba";
+	    } else {
+		PhaseFail("No samba startup script!?");
+	    }
 	    DoneIfExists("$VARRUN/smbd.pid");
-	    ExecQuietFatal("$RCDIR/samba.sh start");
+	    ExecQuietFatal("$RCDIR/$sscript start");
 	};
     }
 };
