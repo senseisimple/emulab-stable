@@ -319,8 +319,7 @@ sub doboot()
 	$emulabconfig{BOSS_PKG}     = "emulab-boss-2.0";
     }
     elsif ($FBSD_VERSION == 6.1 ||
-	   $FBSD_VERSION == 6.2 ||
-	   $FBSD_VERSION == 6.3) {
+	   $FBSD_VERSION == 6.2) {
 	if ($ELVIN_COMPAT) {
 	    $emulabconfig{FS_PKG_DIR} = "/share/freebsd/6.1/packages.elvincompat";
 	} else {
@@ -331,6 +330,18 @@ sub doboot()
 	$emulabconfig{FS_PKG}       = "emulab-fs-2.0";
 	$emulabconfig{OPS_PKG}      = "emulab-ops-2.0";
 	$emulabconfig{BOSS_PKG}     = "emulab-boss-2.0";
+    }
+    elsif ($FBSD_VERSION == 6.3) {
+	if ($ELVIN_COMPAT) {
+	    $emulabconfig{FS_PKG_DIR} = "/share/freebsd/6.3/packages.elvincompat";
+	} else {
+	    $emulabconfig{FS_PKG_DIR} = "/share/freebsd/6.3/packages";
+	}
+	$emulabconfig{OPS_PKG_DIR}  = $emulabconfig{FS_PKG_DIR};
+	$emulabconfig{BOSS_PKG_DIR} = $emulabconfig{FS_PKG_DIR};
+	$emulabconfig{FS_PKG}       = "emulab-fs-2.1";
+	$emulabconfig{OPS_PKG}      = "emulab-ops-2.1";
+	$emulabconfig{BOSS_PKG}     = "emulab-boss-2.1";
     }
 
     # Figure out where /share is coming from (outer fs node). We need
