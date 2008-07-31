@@ -38,8 +38,6 @@ my $TBAPPROVAL     = "@TBAPPROVALEMAIL@";
 my $TBAUDIT   	   = "@TBAUDITEMAIL@";
 my $BOSSNODE       = "@BOSSNODE@";
 my $OURDOMAIN      = "@OURDOMAIN@";
-my $GENICENTRAL    = "myboss.little-emulab-bsd61.testbed.emulab.net";
-my $GENICENTRALURL = "https://$GENICENTRAL/protogeni/xmlrpc";
 
 # _Always_ make sure that this 1 is at the end of the file...
 1;

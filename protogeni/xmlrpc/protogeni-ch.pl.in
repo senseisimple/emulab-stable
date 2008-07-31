@@ -13,6 +13,7 @@
 use strict;
 use English;
 use Frontier::Responder;
+use Data::Dumper;
 
 # Do this early so that we talk to the right DB.
 use vars qw($GENI_DBNAME);
@@ -77,6 +78,14 @@ else {
     print $decoder->encode_fault(-1, "Invalid certificate; no UUID");
     exit(0);
 }
+#
+# Reaching into the Frontier code so I can debug this crap.
+#
+my $request = Frontier::Responder::get_cgi_request();
+if (!defined($request)) {
+    print "Content-Type: text/txt\n\n";
+    exit(0);
+}
 
 #
 # Use libaudit to capture any output from libraries and programs.
@@ -84,8 +93,13 @@ else {
 #
 LogStart(0);
 
+# Add stuff for log message if sent.
+AddAuditInfo("message", $request . "\n\n" . Dumper(%ENV));
+
 my $responder = Frontier::Responder->new( "methods" => {
     "CH::LookupUser"        => \&GeniCH::LookupUser,
+    "CH::BindUser"          => \&GeniCH::BindUser,
+    "CH::UnBindUser"        => \&GeniCH::UnBindUser,
     "CH::RegisterUser"      => \&GeniCH::RegisterUser,
     "CH::LookupSlice"       => \&GeniCH::LookupSlice,
     "CH::CreateSliceName"   => \&GeniCH::RegisterSlice,
@@ -93,13 +107,18 @@ my $responder = Frontier::Responder->new( "methods" => {
    },
 );
 
-my $response = $responder->answer();
+my $response = $responder->{'_decode'}->serve($request,
+					      $responder->{'methods'});
 
 #
 # Terminate the log capture so that we can print the response to STDOUT
 # for the web server.
 #
+print STDERR "\n\n" . $response;
+
 LogEnd();
 
-print $response;
+print "Content-Type: text/xml \n\n" . $response;
+
+
 

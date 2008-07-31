@@ -29,6 +29,7 @@ use XML::Simple;
 use XML::LibXML;
 use Data::Dumper;
 use File::Temp qw(tempfile);
+use overload ('""' => 'Stringify');
 
 # Configure variables
 my $TB		   = "@prefix@";
@@ -42,6 +43,45 @@ my $VERIFYCRED	   = "$TB/sbin/verifygenicred";
 my $NFREE	   = "$TB/bin/nfree";
 my $CMCERT	   = "$TB/etc/genicm.pem";
 
+# Cache of tickets.
+my %tickets = ();
+
+#
+# Lookup by local idx.
+#
+sub Lookup($$)
+{
+    my ($class, $idx) = @_;
+
+    return undef
+	if (! ($idx =~ /^\d*$/));
+    return $tickets{"$idx"}
+        if (exists($tickets{"$idx"}));
+
+    my $query_result =
+	DBQueryWarn("select * from geni_tickets where idx='$idx'");
+
+    return undef
+	if (!defined($query_result) || !$query_result->numrows);
+
+    my $row = $query_result->fetchrow_hashref();
+
+    # Map the component
+    my $component;
+    if ($row->{'component_idx'}) {
+	$component = GeniComponent->Lookup($row->{'component_idx'});
+	return undef
+	    if (!defined($component));
+    }
+    my $ticket = GeniTicket->CreateFromSignedTicket($row->{'ticket_string'},
+						    $component, 1);
+    return undef
+	if (!defined($ticket));
+
+    $tickets{"$idx"} = $ticket;
+    return $ticket;
+}
+
 #
 # Create an unsigned ticket object, to be populated and signed and returned.
 #
@@ -49,15 +89,28 @@ sub Create($$$$)
 {
     my ($class, $slice, $owner, $rspec) = @_;
 
+    # Every Ticket gets a new unique index (sequence number).
+    my $seqno = TBGetUniqueIndex('next_ticket', 1);
+    
     my $self = {};
     $self->{'rspec'}         = $rspec;
     $self->{'slice_uuid'}    = $slice->uuid();
     $self->{'owner_uuid'}    = $owner->uuid();
     $self->{'slice_cert'}    = $slice->cert();
     $self->{'owner_cert'}    = $owner->cert();
+    $self->{'seqno'}         = $seqno;
     $self->{'ticket_string'} = undef;
-    $self->{'idx'}           = undef;	# Only set when in DB.
     $self->{'component'}     = undef;
+    $self->{'stored'}        = 0;	# Stored to the DB.
+
+    #
+    # Locally generated tickets need a local DB index, which can be the
+    # same as the sequence number. A ticket from a remote component will
+    # have it own seqno, and so we will generate a locally valid idx for
+    # those when when(if) we store them in the DB.
+    #
+    $self->{'idx'}           = $seqno;
+    
     bless($self, $class);
 
     return $self;
@@ -65,6 +118,7 @@ sub Create($$$$)
 # accessors
 sub field($$)           { return ($_[0]->{$_[1]}); }
 sub idx($)		{ return field($_[0], "idx"); }
+sub seqno($)		{ return field($_[0], "seqno"); }
 sub rspec($)		{ return field($_[0], "rspec"); }
 sub uuid($)		{ return field($_[0], "slice_uuid"); }
 sub slice_uuid($)	{ return field($_[0], "slice_uuid"); }
@@ -75,6 +129,22 @@ sub ticket($)		{ return field($_[0], "ticket"); }
 sub asString($)		{ return field($_[0], "ticket_string"); }
 sub ticket_string($)	{ return field($_[0], "ticket_string"); }
 sub component($)	{ return field($_[0], "component"); }
+sub stored($)		{ return field($_[0], "stored"); }
+
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+    
+    my $idx = $self->idx();
+    if (!defined($idx)) {
+	my $seqno = $self->seqno();
+	$idx = "S$seqno";
+    }
+    return "[GeniTicket: $idx]";
+}
 
 #
 # Create a ticket object from a signed ticket string.
@@ -146,31 +216,18 @@ sub CreateFromSignedTicket($$;$$)
 	return undef;
     }
 
-    #
-    # We save copies of the tickets we hand out; lets find that record
-    # in the DB, just to verify.
-    #
-    my $serial;
+    my ($seqno_node) = $doc->getElementsByTagName("serial");
+    return undef
+	if (!defined($seqno_node));
+    my $seqno = $seqno_node->to_literal();
 
-    if (!$nosig) {
-	my ($serial_node) = $doc->getElementsByTagName("serial");
-	return undef
-	    if (!defined($serial_node));
-	$serial = $serial_node->to_literal();
-
-	if (! ($serial =~ /^\w+$/)) {
-	    print STDERR "Invalid serial in ticket\n";
-	    return undef;
-	}
-	my $query_result =
-	    DBQueryWarn("select * from geni_tickets where idx='$serial'");
-	if (!$query_result || !$query_result->numrows) {
-	    print STDERR "Could not find the ticket in te DB\n";
-	    return undef;
-	}
+    if (! ($seqno =~ /^\w+$/)) {
+	print STDERR "Invalid sequence number in ticket\n";
+	return undef;
     }
 
     my $self = {};
+    $self->{'idx'}           = undef;
     $self->{'rspec'}         = $rspec;
     $self->{'slice_uuid'}    = $slice_uuid;
     $self->{'owner_uuid'}    = $owner_uuid;
@@ -179,14 +236,31 @@ sub CreateFromSignedTicket($$;$$)
     $self->{'ticket_string'} = $ticket_string;
     $self->{'xmlref'}        = $doc;
     $self->{'component'}     = $component;
-    $self->{'idx'}           = $serial;
+    $self->{'seqno'}         = $seqno;
+    $self->{'stored'}        = 0;
+    
+    #
+    # We save copies of the tickets we hand out; lets find that record
+    # in the DB, just to verify.
+    #
+    if (! $nosig) {
+	my $query_result =
+	    DBQueryWarn("select * from geni_tickets where idx='$seqno'");
+	if (!$query_result || !$query_result->numrows) {
+	    print STDERR "Could not find the ticket $seqno in the DB\n";
+	    return undef;
+	}
+	$self->{'idx'}    = $seqno;
+	$self->{'stored'} = 1;
+    }
     bless($self, $class);
 
     return $self;
 }
 
 #
-# Might have to delete this fron the DB, as with an error handing out a ticket.
+# Might have to delete this from the DB, as with an error handing out
+# a ticket.
 #
 sub Delete($)
 {
@@ -195,11 +269,13 @@ sub Delete($)
     return -1
 	if (! ref($self));
 
-    if (defined($self->idx())) {
+    if ($self->stored()) {
 	my $idx = $self->idx();
 	
 	DBQueryWarn("delete from geni_tickets where idx='$idx'")
 	    or return -1;
+	
+	delete($tickets{"$idx"});
     }
     return 0;
 }
@@ -224,17 +300,31 @@ sub Grant($$)
 # so we have a record of them. We store them on the server and the client
 # side.
 #
-sub Store($$)
+sub Store($)
 {
-    my ($self, $idx) = @_;
+    my ($self) = @_;
     my @insert_data  = ();
 
+    my $idx        = $self->idx();
+    my $seqno      = $self->seqno();
     my $slice_uuid = $self->slice_uuid();
     my $owner_uuid = $self->owner_uuid();
+
+    #
+    # For a locally created/signed ticket, seqno=idx. For a ticket from
+    # another component, we have to generate a locally unique idx for
+    # the DB insertion.
+    #
+    $idx = TBGetUniqueIndex('next_ticket', 1)
+	if (!defined($idx));
+    # A locally generated ticket will not have a component. Might change that.
+    push(@insert_data, "component_idx=" . $self->component()->idx())
+	if (defined($self->component()));
 
     # Now tack on other stuff we need.
     push(@insert_data, "created=now()");
     push(@insert_data, "idx='$idx'");
+    push(@insert_data, "seqno='$seqno'");
     push(@insert_data, "slice_uuid='$slice_uuid'");
     push(@insert_data, "owner_uuid='$owner_uuid'");
     
@@ -245,15 +335,14 @@ sub Store($$)
     DBQueryWarn("insert into geni_tickets set " . join(",", @insert_data))
 	or return -1;
 
-    # If sucessfully stored, set the idx field so we know.
-    $self->{'idx'} = $idx;
-
+    $tickets{"$idx"}  = $self;
+    $self->{'stored'} = 1;
     return 0;
 }
 
 #
 # Sign the ticket before returning it. We capture the output, which is
-# in XML.
+# in XML. 
 #
 sub Sign($)
 {
@@ -262,10 +351,7 @@ sub Sign($)
     return -1
 	if (!ref($self));
 
-    # Every Ticket gets a new unique index, which is used in the xml:id below.
-    # Also used for the DB insertion below.
-    my $idx = TBGetUniqueIndex('next_ticket', 1);
-    
+    my $idx        = $self->seqno();
     my $slice_cert = $self->slice_cert();
     my $owner_cert = $self->owner_cert();
     my $rspec_xml  = XMLout($self->rspec(), "NoAttr" => 1);
@@ -312,7 +398,7 @@ sub Sign($)
     }
     $self->{'ticket_string'} = $ticket;
 
-    $self->Store($idx) == 0
+    $self->Store() == 0
 	or return -1;
 
     unlink($filename);
@@ -343,17 +429,23 @@ sub Release($)
 	if (! ref($self));
 
     my $experiment = Experiment->Lookup($self->slice_uuid());
-    my $node_id    = $self->rspec()->{'node_id'};
-    my $node       = Node->Lookup($node_id);
-    return -1
-	if (!defined($node));
-    my $reservation = Node->Reservation();
-    
-    if (defined($reservation) && $reservation->SameExperiment($experiment)) {
-	my $pid = $experiment->pid();
-	my $eid = $experiment->eid();
-	
-	system("$NFREE $pid $eid $node_id");
+    my $pid     = $experiment->pid();
+    my $eid     = $experiment->eid();
+    my @nodeids = ();
+
+    foreach my $resource_uuid (keys(%{$self->rspec()->{'node'}})) {
+	my $node = Node->Lookup($resource_uuid);
+	next
+	    if (!defined($node));
+
+	my $reservation = $node->Reservation();
+	if (defined($reservation) &&
+	    $reservation->SameExperiment($experiment)) {
+	    push(@nodeids, $node->node_id());
+	}
+    }
+    if (@nodeids) {
+	system("$NFREE $pid $eid @nodeids");
     }
     $self->Delete();
     return 0;

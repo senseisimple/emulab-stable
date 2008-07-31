@@ -26,6 +26,7 @@ use libdb qw(TBGetUniqueIndex);
 use Experiment;
 use English;
 use overload ('""' => 'Stringify');
+use Data::Dumper;
 use vars qw();
 
 # Configure variables
@@ -98,10 +99,11 @@ sub Lookup($$)
 	print STDERR "Could not find certificate for slice $idx ($uuid)\n";
 	return undef;
     }
-    $self->{'CERT'} = $certificate;
+    $self->{'CERT'}  = $certificate;
+    $self->{'USERS'} = undef;
     
     # Add to cache. 
-    $slices{$self->{'SLICE'}->{'idx'}} = $self;
+    $slices{$self->{'SLICE'}->{'idx'}}    = $self;
     
     return $self;
 }
@@ -226,6 +228,10 @@ sub Register($)
     return -1
 	if (! ref($self));
 
+    my $blob;
+    return 0
+	if (GeniCHClient::LookupSlice($self->uuid(), \$blob) == 0);
+
     GeniCHClient::RegisterSlice($self->hrn(), $self->uuid(),
 				$self->creator_uuid(), $self->cert())
 	== 0 or return -1;
@@ -256,10 +262,70 @@ sub CreateFromRegistry($$)
 	    return undef;
 	}
     }
-    return GeniSlice->Create($blob->{'hrn'},
-			     $blob->{'uuid'},
-			     $blob->{'creator_uuid'},
-			     $blob->{'cert'}, $authority->idx());
+    my $slice = GeniSlice->Create($blob->{'hrn'},
+				  $blob->{'uuid'},
+				  $blob->{'creator_uuid'},
+				  $blob->{'cert'}, $authority->idx());
+    return undef
+	if (!defined($slice));
+
+    print STDERR Dumper($blob);
+
+    # Add the user bindings.
+    foreach my $uuid (@{ $blob->{'userbindings'} }) {
+	my $user = GeniUser->Lookup($uuid);
+	if (!defined($user)) {
+	    $user = GeniUser->CreateFromRegistry($uuid);
+	    if (!defined($user)) {
+		print STDERR "No user $uuid in the ClearingHouse\n";
+		next;
+	    }
+	}
+	DBQueryWarn("replace into geni_bindings set ".
+		    " created=now(), slice_uuid='$slice_uuid', ".
+		    " user_uuid='$uuid'")
+	    or print STDERR
+	    "Could not insert user binding for $uuid to slice $slice_uuid\n";
+    }
+    return $slice;
+}
+
+#
+# Update slice from the ClearingHouse, by looking up the info.
+#
+sub UpdateFromRegistry($)
+{
+    my ($self) = @_;
+    my $slice_uuid = $self->uuid();
+
+    my $blob;
+    return -1
+	if (GeniCHClient::LookupSlice($slice_uuid, \$blob) != 0);
+
+    print STDERR Dumper($blob);
+
+    DBQueryWarn("delete from geni_bindings ".
+		"where slice_uuid='$slice_uuid'")
+	or print STDERR
+	"Could not delete user bindings from slice $slice_uuid\n";
+
+    # Add the user bindings.
+    foreach my $uuid (@{ $blob->{'userbindings'} }) {
+	my $user = GeniUser->Lookup($uuid);
+	if (!defined($user)) {
+	    $user = GeniUser->CreateFromRegistry($uuid);
+	    if (!defined($user)) {
+		print STDERR "No user $uuid in the ClearingHouse\n";
+		next;
+	    }
+	}
+	DBQueryWarn("replace into geni_bindings set ".
+		    " created=now(), slice_uuid='$slice_uuid', ".
+		    " user_uuid='$uuid'")
+	    or print STDERR
+	    "Could not insert user binding for $uuid to slice $slice_uuid\n";
+    }
+    return 0;
 }
 
 #
@@ -331,6 +397,73 @@ sub IsSliceAuthority($$)
     return 1
 	if ($self->sa_idx() == $authority->idx());
     
+    return 0;
+}
+
+#
+# Client side methods to bind and unbind users from slices
+#
+# XXX We issue this using the local SA as the authority, but need to allow
+# the slice/owner credentials to do this.
+# 
+sub BindUser($$)
+{
+    my ($self, $target_user) = @_;
+
+    return -1
+	if (! (ref($self) && ref($target_user)));
+
+    GeniCHClient::BindUser($self->uuid(), $target_user->uuid())
+	== 0 or return -1;
+    
+    return 0;
+}
+
+sub UnBindUser($$)
+{
+    my ($self, $target_user) = @_;
+
+    return -1
+	if (! (ref($self) && ref($target_user)));
+
+    GeniCHClient::UnBindUser($self->uuid(), $target_user->uuid())
+	== 0 or return -1;
+
+    return 0;
+}
+
+#
+# Return the user bindings for a slice, as a list. Used on client and server
+# to get the geni_bindings table entries for a slice.
+#
+sub UserBindings($$)
+{
+    my ($self, $pref) = @_;
+    
+    return -1
+	if (! (ref($self) && ref($pref)));
+
+    my $uuid = $self->uuid();
+
+    if (!defined($self->{'USERS'})) {
+	my $query_result =
+	    DBQueryWarn("select user_uuid from geni_bindings ".
+			"where slice_uuid='$uuid'");
+	return -1
+	    if (!$query_result);
+
+	$self->{'USERS'} = {};
+
+	while (my ($user_uuid) = $query_result->fetchrow_array()) {
+	    my $user = GeniUser->Lookup($user_uuid);
+	    if (!defined($user)) {
+		print STDERR "Bindings: No mapping for user $user_uuid\n";
+		next;
+	    }
+	    $self->{'USERS'}->{$user_uuid} = $user;
+	}
+    }
+    @$pref = keys(%{ $self->{'USERS'} });
     return 0;
 }
 

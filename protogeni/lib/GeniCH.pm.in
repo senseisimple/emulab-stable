@@ -110,6 +110,13 @@ sub LookupSlice($)
 				    "No slice authority found for slice");
     }
 
+    # User bindings too.
+    my @userbindings = ();
+    if ($slice->UserBindings(\@userbindings) != 0) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Error getting user bindings for slice");
+    }
+
     # Return a blob.
     my $blob = { "hrn"          => $slice->hrn(),
 		 "uuid"         => $slice->uuid(),
@@ -119,7 +126,8 @@ sub LookupSlice($)
 				    "uuid"     => $authority->uuid(),
 				    "cert"     => $authority->cert(),
 				    "uuid_prefix" => $authority->uuid_prefix(),
-				    "url"      => $authority->url() }
+				    "url"      => $authority->url() },
+		 "userbindings" => \@userbindings,
 	       };
 
     return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
@@ -340,5 +348,128 @@ sub DiscoverResources($)
 			 "cert" => $component->cert() });
     }
     return GeniResponse->Create(GENIRESPONSE_SUCCESS, \@results);
+}
+
+#
+# Bind user to slice
+#
+sub BindUser($)
+{
+    my ($argref) = @_;
+    my $slice_uuid  = $argref->{'slice_uuid'};
+    my $user_uuid   = $argref->{'user_uuid'};
+
+
+    if (! (defined($slice_uuid) && defined($user_uuid))) {
+	return GeniResponse->MalformedArgsResponse();
+    }
+
+    #
+    # Use the Emulab checkslot routines.
+    #
+    if (! ($slice_uuid =~ /^[-\w]*$/)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "uuid: Invalid characters");
+    }
+    if (! ($user_uuid =~ /^[-\w]*$/)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "uuid: Invalid characters");
+    }
+    
+    #
+    # The SA UUID comes from the SSL environment (certificate). Verify it
+    # and the prefix match for the uuid.
+    #
+    # Need to verify the UUID is permitted for the SA making the request.
+    #
+    my $sa_uuid = $ENV{'GENIUUID'};
+    my $query_result =
+	DBQueryWarn("select idx, uuid_prefix from geni_sliceauthorities ".
+		    "where uuid='$sa_uuid'");
+    return GeniResponse->Create(GENIRESPONSE_DBERROR)
+	if (!defined($query_result));
+    
+    return GeniResponse->Create(GENIRESPONSE_REFUSED, undef, "Who are You?")
+	if (!$query_result->numrows);
+
+    my $slice = GeniSlice->Lookup($slice_uuid);
+    if (!defined($slice)) {
+	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
+				    "No such slice $slice_uuid");
+    }
+    my $user = GeniUser->Lookup($user_uuid);
+    if (!defined($slice)) {
+	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
+				    "No such user $user_uuid");
+    }
+    DBQueryWarn("replace into geni_bindings set ".
+		"  slice_uuid='$slice_uuid', user_uuid='$user_uuid', ".
+		"  created=now()")
+	or return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				       "Error binding user to slice");	
+    
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS, undef,
+				"$user_uuid has been bound to slice");
+}
+
+#
+# UnBind user from slice
+#
+sub UnBindUser($)
+{
+    my ($argref) = @_;
+    my $slice_uuid  = $argref->{'slice_uuid'};
+    my $user_uuid   = $argref->{'user_uuid'};
+
+
+    if (! (defined($slice_uuid) && defined($user_uuid))) {
+	return GeniResponse->MalformedArgsResponse();
+    }
+
+    #
+    # Use the Emulab checkslot routines.
+    #
+    if (! ($slice_uuid =~ /^[-\w]*$/)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "uuid: Invalid characters");
+    }
+    if (! ($user_uuid =~ /^[-\w]*$/)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "uuid: Invalid characters");
+    }
+    
+    #
+    # The SA UUID comes from the SSL environment (certificate). Verify it
+    # and the prefix match for the uuid.
+    #
+    # Need to verify the UUID is permitted for the SA making the request.
+    #
+    my $sa_uuid = $ENV{'GENIUUID'};
+    my $query_result =
+	DBQueryWarn("select idx, uuid_prefix from geni_sliceauthorities ".
+		    "where uuid='$sa_uuid'");
+    return GeniResponse->Create(GENIRESPONSE_DBERROR)
+	if (!defined($query_result));
+    
+    return GeniResponse->Create(GENIRESPONSE_REFUSED, undef, "Who are You?")
+	if (!$query_result->numrows);
+
+    my $slice = GeniSlice->Lookup($slice_uuid);
+    if (!defined($slice)) {
+	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
+				    "No such slice $slice_uuid");
+    }
+    my $user = GeniUser->Lookup($user_uuid);
+    if (!defined($slice)) {
+	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
+				    "No such user $user_uuid");
+    }
+    DBQueryWarn("delete from geni_bindings ".
+		"where slice_uuid='$slice_uuid' and user_uuid='$user_uuid'")
+	or return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				       "Error unbinding user from slice");
+    
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS, undef,
+				"$user_uuid has been unbound from slice");
 }
 

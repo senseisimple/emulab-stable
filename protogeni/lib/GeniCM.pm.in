@@ -186,6 +186,11 @@ sub GetTicket($)
 			    "Could not get slice info from ClearingHouse");
 	}
     }
+    else {
+	$slice->UpdateFromRegistry() == 0 or
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+			"Could not update slice info from ClearingHouse");
+    }
 
     #
     # Ditto the user.
@@ -345,6 +350,20 @@ sub CreateSliver($)
 	or return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				       "Error binding user to slice");
 
+    # Bind the other users too.
+    my @userbindings;
+    if ($slice->UserBindings(\@userbindings) != 0) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Error binding users to slice");
+    }
+    foreach my $otheruuid (@userbindings) {
+	my $otheruser = GeniUser->Lookup($otheruuid);
+	
+	if (!$otheruser->BindToSlice($slice) != 0) {
+	    print STDERR "Could not bind $otheruser to $slice\n";
+	}
+    }
+
     #
     # We are actually an Aggregate, so return an aggregate of slivers,
     # unless there is just one node.
@@ -449,21 +468,6 @@ sub CreateSliver($)
 	if (defined($aggregate) &&
 	    $sliver->SetAggregate($aggregate) != 0) {
 	    $message = "Could not aggregate for $sliver to $aggregate";
-	    goto bad;
-	}
-    }
-
-    #
-    # This stuff needs to be moved elsewhere.
-    #
-    # XXX What if we have multiple slivers for this slice? We are going
-    # to need some locking or management at the slice level so that we run
-    # tbswap only once, or at least no more then one at a time.
-    #
-    if (0 && !$impotent) {
-	system("$SWAPEXP -s modify -g $pid $eid");
-	if ($?) {
-	    $message = "Failed to tbswap $pid,$eid";
 	    goto bad;
 	}
     }
@@ -600,215 +604,5 @@ sub DestroySliver($)
 				    "Could not delete sliver/aggregate");
     
     return GeniResponse->Create(GENIRESPONSE_SUCCESS);
-}
-
-#
-# Bind a user to a slice.
-#
-sub BindUser($)
-{
-    my ($argref) = @_;
-    my $sliver     = $argref->{'sliver'};
-    my $hrn        = $argref->{'userinfo'}->{'hrn'};
-    my $uuid       = $argref->{'userinfo'}->{'uuid'};
-    my $name       = $argref->{'userinfo'}->{'name'};
-    my $email      = $argref->{'userinfo'}->{'email'};
-    my $cert       = $argref->{'userinfo'}->{'cert'};
-    my $sshkey     = $argref->{'userinfo'}->{'sshkey'};
-    my $sliver_uuid;
-
-    if (! (defined($hrn) && defined($name) && defined($sliver) &&
-	   defined($email) && defined($cert) && defined($uuid))) {
-	return GeniResponse->MalformedArgsResponse();
-    }
-
-    GeniCertificate->CertificateInfo($sliver, \$sliver_uuid) == 0 or
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "Could not get uuid from Certificate");
-    
-    #
-    # See if we have a record of this sliver in the DB. If not, then we have
-    # to go to the ClearingHouse to find its record, so that we can find out
-    # who the SA for it is.
-    #
-    $sliver = GeniSliver->Lookup($sliver_uuid);
-    if (!defined($sliver)) {
-	# Might be an aggregate instead.
-	$sliver = GeniAggregate->Lookup($sliver_uuid);
-	if (!defined($sliver)) {
-	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					"No such sliver $sliver_uuid");
-	}
-    }
-    my $slice = $sliver->GetSlice();
-
-    #
-    # Use the Emulab checkslot routines.
-    #
-    if (! ($hrn =~ /^[-\w\.]*$/)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "hrn: Invalid characters");
-    }
-    if (! ($uuid =~ /^[-\w]*$/)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "uuid: Invalid characters");
-    }
-    if (! TBcheck_dbslot($name, "users", "usr_name", TBDB_CHECKDBSLOT_ERROR)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "name: ". TBFieldErrorString());
-    }
-    if (! TBcheck_dbslot($email, "users", "usr_email",TBDB_CHECKDBSLOT_ERROR)){
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "email: ". TBFieldErrorString());
-    }
-    if (! ($cert =~ /^[\012\015\040-\176]*$/)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "cert: Invalid characters");
-    }
-    if (defined($sshkey) && ! ($sshkey =~ /^[\012\015\040-\176]*$/)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "sshkey: Invalid characters");
-    }
-
-    #
-    # The SA UUID comes from the SSL environment (certificate). Verify it
-    # and the prefix match for the uuid.
-    #
-    my $sa_uuid = $ENV{'GENIUUID'};
-    my $authority = GeniAuthority->Lookup($sa_uuid);
-    if (!defined($authority)) {
-	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
-				    "No slice authority record for $sa_uuid");
-    }
-    if (! $authority->PrefixMatch($uuid)) {
-	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
-				    "uuid: Prefix mismatch");
-    }
-
-    #
-    # Verify that this is the SA for the slice. 
-    #
-    if (! $slice->IsSliceAuthority($authority)) {
-	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
-				    "Must be the SA for the slice");
-    }
-
-    # Might already exist. Not an error, Just check binding and return.
-    my $user = GeniUser->Lookup($uuid);
-    if (defined($user)) {
-	$user->BindToSlice($slice) == 0
-	    or return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					   "Error binding user to slice");
-
-	return GeniResponse->Create(GENIRESPONSE_SUCCESS, undef,
-			    "$hrn/$email has been bound to slice");
-    }
-
-    #
-    # XXX
-    #
-    # What kind of uniquess requirements do we need? No one else with this
-    # email address? Of course, we have to allow hrn reuse, but should we
-    # require that for a given SA, that hrn is unique, at least to avoid
-    # lots of confusion?
-    #
-    if (GeniUser->CheckExisting($hrn, $email)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "$hrn/$email already registered");
-    }
-
-    # The local uid we will use is the last part of the hrn.
-    my ($uid) = ($hrn =~ /^.*\.(\w*)$/);
-    if (!defined($uid)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "uid: cannot parse hrn to get uid");
-    }
-    elsif (! TBcheck_dbslot($uid, "users", "uid", TBDB_CHECKDBSLOT_ERROR)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "uid: ". TBFieldErrorString());
-    }
-    my $newuser = GeniUser->Create($hrn, $uid, $uuid,
-				   $name, $email, $cert,
-				   $authority->idx(), $sshkey);
-    if (!defined($newuser)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "$hrn/$email could not be registered");
-    }
-    $newuser->BindToSlice($slice) == 0
-	or return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				       "Error binding user to sliver");
-    
-    return GeniResponse->Create(GENIRESPONSE_SUCCESS, undef,
-				"$hrn/$email has been bound to $sliver_uuid");
-}
-
-#
-# Unbind user from sliver.
-#
-sub UnBindUser($)
-{
-    my ($argref) = @_;
-    my $sliver      = $argref->{'sliver'};
-    my $user       = $argref->{'user'};
-    my $sliver_uuid;
-    my $user_uuid;
-
-    if (! (defined($sliver) && defined($user))) {
-	return GeniResponse->MalformedArgsResponse();
-    }
-
-    GeniCertificate->CertificateInfo($sliver, \$sliver_uuid) == 0 or
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "Could not get uuid from Certificate");
-    
-    GeniCertificate->CertificateInfo($user, \$user_uuid) == 0 or
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "Could not get uuid from Certificate");
-    
-    #
-    # See if we have a record of this sliver in the DB. If not, then we have
-    # to go to the ClearingHouse to find its record, so that we can find out
-    # who the SA for it is.
-    #
-    $sliver = GeniSliver->Lookup($sliver_uuid);
-    if (!defined($sliver)) {
-	# Might be an aggregate instead.
-	$sliver = GeniAggregate->Lookup($sliver_uuid);
-	if (!defined($sliver)) {
-	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					"No such sliver $sliver_uuid");
-	}
-    }
-    # Does not exist? Not an error.
-    $user = GeniUser->Lookup($user_uuid);
-    if (! defined($user)) {
-	return GeniResponse->Create(GENIRESPONSE_SUCCESS, undef,
-				    "$user_uuid is not bound to $sliver_uuid");
-    }
-    my $slice = $sliver->GetSlice();
-
-    #
-    # The SA UUID comes from the SSL environment (certificate). 
-    #
-    my $sa_uuid = $ENV{'GENIUUID'};
-    my $authority = GeniAuthority->Lookup($sa_uuid);
-    if (!defined($authority)) {
-	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
-				    "No slice authority record for $sa_uuid");
-    }
-    #
-    # Verify that this is the SA for the slice. 
-    #
-    if (! $slice->IsSliceAuthority($authority)) {
-	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
-				    "Must be the SA for the slice");
-    }
-
-    $user->UnBindFromSlice($slice) == 0
-	or return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				       "Error unbinding user from sliver");
-    
-    return GeniResponse->Create(GENIRESPONSE_SUCCESS, undef,
-				"$user_uuid has been unbound from sliver");
 }
 

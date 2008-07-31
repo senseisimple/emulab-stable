@@ -44,10 +44,13 @@ $geniuser->Register() == 0
 #
 # Another user, for testing binding users to slices.
 #
-my $rricci = GeniUser->CreateFromLocal(User->Lookup("rricci"));
-if (!defined($rricci)) {
-    die("Could not create a geni user from local user rricci\n");
+my $geniuser2 = GeniUser->CreateFromLocal(User->Lookup("leebee"));
+if (!defined($geniuser2)) {
+    die("Could not create a geni user from local user leebee\n");
 }
+# Register at the ClearingHouse.
+$geniuser2->Register() == 0
+    or die("Could not register $geniuser2 at the Geni ClearingHouse.\n");
 
 #
 # See if there is a local slice record. If not, create one, then
@@ -59,20 +62,14 @@ if (!defined($slice)) {
     if (!defined($slice)) {
 	die("Could not create a local slice record for $experiment\n");
     }
-    if ($slice->Register() != 0) {
-	$slice->Delete();
-	die("Could not register slice at Geni ClearingHouse.\n");
-    }
 }
-
-#
-# Discover resources appropriate for the slice (experiment). This is
-# due to change when there is a discovery service at the clearing house.
-# For now, we get back a list of components.
-#
-$slice->DiscoverResources(\@components) == 0 or
-    die("Could not discover resources for $slice\n");
-print Dumper(@components);
+if ($slice->Register() != 0) {
+    $slice->Delete();
+    die("Could not register slice at Geni ClearingHouse.\n");
+}
+if ($slice->BindUser($geniuser2) != 0) {
+    die("Could not bind $geniuser2 to slice at Geni ClearingHouse.\n");
+}
 
 #
 # Generate a credential for resource discovery on components. The credential
@@ -88,6 +85,15 @@ if ($credential->Sign($GeniCredential::LOCALSA_FLAG)) {
 }
 
 #
+# Discover resources appropriate for the slice (experiment). This is
+# due to change when there is a discovery service at the clearing house.
+# For now, we get back a list of components.
+#
+$slice->DiscoverResources(\@components) == 0 or
+    die("Could not discover resources for $slice\n");
+print Dumper(@components);
+
+#
 # Discover resources on each component. This stuff is just a placeholder
 # for something else later. For now, we just pass the rspec right back
 # to get the ticket.
@@ -100,7 +106,6 @@ foreach my $component (@components) {
 	die("Could not discover resources on $component\n");
     }
     push(@resources, $rspec);
-    print Dumper($rspec);
 }
 my $rspec = $resources[0];
 print Dumper($rspec);
@@ -160,14 +165,12 @@ if (!defined($sliver)) {
 
 if (defined($sliver)) {
     print Dumper($sliver);
-    $sliver->BindUser($rricci);
     
     # Wait for input before proceeding.
     $_ = <STDIN>;
     $sliver->Start($this_user);
     $_ = <STDIN>;
 
-    $sliver->UnBindUser($rricci);
     $sliver->Destroy($this_user);
 }
 

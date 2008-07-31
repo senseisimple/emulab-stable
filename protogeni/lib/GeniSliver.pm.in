@@ -446,46 +446,6 @@ sub Start($$)
 }
 
 #
-# Client side methods to bind and unbind users from slivers.
-#
-# XXX We issue this using the local SA as the authority, but need to allow
-# the slice/sliver owner to do this.
-# 
-sub BindUser($$)
-{
-    my ($self, $target_user) = @_;
-
-    return -1
-	if (! (ref($self) && ref($target_user)));
-
-    my $component = $self->GetComponent();
-    return -1
-	if (!defined($component));
-
-    return -1
-	if ($component->BindUser($self, $target_user) != 0);
-
-    return 0;
-}
-
-sub UnBindUser($$)
-{
-    my ($self, $target_user) = @_;
-
-    return -1
-	if (! (ref($self) && ref($target_user)));
-
-    my $component = $self->GetComponent();
-    return -1
-	if (!defined($component));
-
-    return -1
-	if ($component->UnBindUser($self, $target_user) != 0);
-
-    return 0;
-}
-
-#
 # Create a signed credential for this sliver, issued to the provided user.
 # The credential will grant all permissions for now.
 #

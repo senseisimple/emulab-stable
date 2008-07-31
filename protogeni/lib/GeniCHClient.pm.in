@@ -35,7 +35,7 @@ my $TBAPPROVAL     = "@TBAPPROVALEMAIL@";
 my $TBAUDIT   	   = "@TBAUDITEMAIL@";
 my $BOSSNODE       = "@BOSSNODE@";
 my $OURDOMAIN      = "@OURDOMAIN@";
-my $GENICENTRAL    = "myboss.little-emulab-bsd61.testbed.emulab.net";
+my $GENICENTRAL    = "myboss.myelab.testbed.emulab.net";
 my $GENICENTRALURL = "https://$GENICENTRAL/protogeni/xmlrpc/ch";
 
 #
@@ -191,6 +191,42 @@ sub DiscoverResources($$)
 	push(@result, $component);
     }
     @$pref = @result;
+    return 0;
+}
+
+#
+# Bind and unbind users to/from slices
+#
+sub BindUser($$)
+{
+    my ($slice_uuid, $user_uuid) = @_;
+
+    my $args = { "slice_uuid" => $slice_uuid,
+		 "user_uuid"  => $user_uuid };
+
+    my $response =
+	Genixmlrpc::CallMethodHTTP($GENICENTRALURL, undef,
+				   "CH::BindUser", $args);
+
+    return -1
+	if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS);
+    
+    return 0;
+}
+sub UnBindUser($$)
+{
+    my ($slice_uuid, $user_uuid) = @_;
+
+    my $args = { "slice_uuid" => $slice_uuid,
+		 "user_uuid"  => $user_uuid };
+
+    my $response =
+	Genixmlrpc::CallMethodHTTP($GENICENTRALURL, undef,
+				   "CH::UnBindUser", $args);
+
+    return -1
+	if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS);
+    
     return 0;
 }
 

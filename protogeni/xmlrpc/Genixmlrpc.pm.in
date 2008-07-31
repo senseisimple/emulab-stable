@@ -84,7 +84,7 @@ sub CallMethodHTTP($$$@)
 
     my $request = new RPC::XML::request($method, @args);
     if ($debug > 1) {
-	print STDERR "xml request: " . $request->as_string();
+	print STDERR "xml request: $httpURL:" . $request->as_string();
 	print STDERR "\n";
     }
 
