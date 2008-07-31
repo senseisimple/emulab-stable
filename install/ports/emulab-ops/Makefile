@@ -113,6 +113,8 @@ RUN_DEPENDS+= smbd:${PORTSDIR}/net/samba3
 .endif
 
 .if ${PORTVERSION} == "2.1"
+# not sure why this is just needed for 6.3
+RUN_DEPENDS+= ${X11BASE}/libdata/xorg/libraries:${PORTSDIR}/x11/xorg-libraries
 # not sure why we don't build this for 6.0-6.2...
 RUN_DEPENDS+= smbd:${PORTSDIR}/net/samba3
 RUN_DEPENDS+= \

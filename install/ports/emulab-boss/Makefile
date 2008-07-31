@@ -58,6 +58,18 @@ MAINTAINER=	ricci@cs.utah.edu
 #
 .MAKEFLAGS+=	-DBATCH
 
+#
+# XXX not really a build dependency, but needs to get installed before
+# any attempt to install mysql50-* ports
+#
+.if ${PORTVERSION} == "2.1"
+BUILD_DEPENDS=	\
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Mysql.pm:${PORTSDIR}/misc/p5-DBD-mysql50-old
+.else
+BUILD_DEPENDS=	\
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Mysql.pm:${PORTSDIR}/databases/p5-DBD-mysql50
+.endif
+
 LIB_DEPENDS= gd.4:${PORTSDIR}/graphics/gd \
 	lthread.[23]:${PORTSDIR}/devel/linuxthreads \
 	mhash.2:${PORTSDIR}/security/mhash \
@@ -112,11 +124,9 @@ RUN_DEPENDS=	\
 	mysqlhotcopy:${PORTSDIR}/databases/mysql50-scripts
 
 .if ${PORTVERSION} == "2.1"
-RUN_DEPENDS+= \
-	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/DBD/mysql.pm:${PORTSDIR}/databases/p5-DBD-mysql50
-.else
-RUN_DEPENDS+= \
-	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Mysql.pm:${PORTSDIR}/databases/p5-DBD-mysql50
+# not sure why this is just needed for 6.3
+RUN_DEPENDS+=	\
+	${X11BASE}/libdata/xorg/libraries:${PORTSDIR}/x11/xorg-libraries
 .endif
 
 .if ${OSMAJOR} >= 6
