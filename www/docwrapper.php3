@@ -20,13 +20,26 @@ if (!preg_match("/^[-\w]+\.(html|txt)$/", $docname)) {
     USERERROR("Illegal document name: $docname!", 1);
 }
 
+$to_wiki = array(
+  'hardware.html' => 'UtahHardware',
+  'hardware-emulab.net.html' => 'UtahHardware',
+  'auth.html' => 'Auth',
+  'otheremulabs.html' => 'OtherEmulabs',
+);
+
 #
 # Make sure the file exists
 #
 $fh = @fopen("$docname", "r");
 if (!$fh) {
-    header(' ', true, 404);
-    USERERROR("Can't read document file: $docname!", 1);
+    if (isset ($to_wiki{$docname})) {
+      $wikiname = $to_wiki{$docname};
+      header("Location: $WIKIDOCURL/$wikiname", TRUE, 301);
+      return 0;
+    } else {
+      header(' ', true, 404);
+      USERERROR("Can't read document file: $docname!", 1);
+    }
 }
 
 if (!isset($printable))
