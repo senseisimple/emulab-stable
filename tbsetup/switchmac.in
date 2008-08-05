@@ -30,6 +30,7 @@ use snmpit_lib;
 use snmpit_cisco;
 use snmpit_foundry;
 use snmpit_nortel;
+use snmpit_hp;
 use SNMP;
 use Getopt::Long;
 
@@ -164,6 +165,8 @@ SWITCH:
 	    $switchtype = "intel"; last;};
 	(/^nortel/) && do { $snmpversion = "1"; $useindexing = 0;
 	    $switchtype = "nortel"; last;};
+	(/^hp/) && do { $snmpversion = "1"; $useindexing = 0;
+	    $switchtype = "hp"; last;};
 	(/^foundry/) && do { $snmpversion = "1"; $useindexing = 0;
 	    $switchtype = "foundry"; last;};
 
@@ -210,6 +213,9 @@ SWITCH:
 	}
 	if ($switchtype eq "nortel") {
 	    $device = new snmpit_nortel($switch,$debug,$community);
+	}
+	if ($switchtype eq "hp") {
+	    $device = new snmpit_hp($switch,$debug,$community);
 	}
     }
 
@@ -362,7 +368,7 @@ SWITCH:
 		#
 		my $modport;
 		if (($switchtype eq "cisco") || ($switchtype eq "foundry") ||
-		    ($switchtype eq "nortel")) {
+		    ($switchtype eq "hp") || ($switchtype eq "nortel")) {
 		    ($modport) = $device->convertPortFormat(2, $ifIndex);
 		} else {
 		    $modport = "1.$ifIndex";

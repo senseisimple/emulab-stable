@@ -2,8 +2,8 @@
 
 #
 # EMULAB-LGPL
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
-# Copyright (c) 2004-2006 Regents, University of California.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2004-2008 Regents, University of California.
 # All rights reserved.
 #
 
@@ -123,6 +123,12 @@ sub new($$$@) {
 		$device = new snmpit_nortel($devicename,$self->{DEBUG});
 		last;
 		}; # /nortel.*/
+	    (/hp/)
+		    && do {
+		use snmpit_hp;
+		$device = new snmpit_hp($devicename,$self->{DEBUG});
+		last;
+		}; # /hp.*/
 	    die "Device $devicename is not of a known type, skipping\n";
 	}
 
@@ -513,7 +519,6 @@ sub findVlans($@) {
 			{ warn "Incompatible 802.1Q tag assignments for $id\n" .
                                "    Saw $num on $device->{NAME}, but had " .
                                "$oldnum before\n";}
-
 		} else
 		    { $mapping{$id} = $num; }
 	}
