@@ -57,6 +57,9 @@ FILES  += $(SRCDIR)/.htaccess $(SRCDIR)/error.shtml \
 	  $(SRCDIR)/ssh-mime-winxp.exe $(SRCDIR)/rdp-mime-winxp.exe \
 	  $(SRCDIR)/emulab-mime-winxp.zip $(SRCDIR)/emulab-mime-winxp.reg \
 	  $(SRCDIR)/emusearch.xml
+ifeq ($(TBROOT),/usr/testbed)
+FILES  += robots.txt
+endif 
 
 AUTOICONS  = $(wildcard $(SRCDIR)/autostatus-icons/*.gif)
 AUTOICONS += $(wildcard $(SRCDIR)/autostatus-icons/*.png)
