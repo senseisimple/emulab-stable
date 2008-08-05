@@ -7,7 +7,7 @@
 #
 
 #
-# install-boss.sh - Script to do the initial install of a boss node
+# boss-install - Script to do the initial install of a boss node
 #
 # The main things it does not do yet:
 # * Figure out where to put directories such as /usr/testbed - they must
@@ -15,7 +15,6 @@
 # * Set up named - we probably have to do that later, when the interfaces table
 #   is filled in
 # * Set up a sup tree. Not sure what the right thing to do here is!
-# * Doesn't do anything about SSL certificates for the web
 
 #
 # Configure variables

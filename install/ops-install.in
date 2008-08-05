@@ -7,7 +7,7 @@
 #
 
 #
-# install-ops - Script to do the initial install of an ops node
+# ops-install - Script to do the initial install of an ops node
 #
 # The main things it does not do yet:
 # * Figure out where to put directories such as /users /proj - they must
