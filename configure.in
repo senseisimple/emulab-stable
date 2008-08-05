@@ -909,6 +909,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
         utils/backupswitches utils/setbuildinfo utils/checkquota \
 	utils/spewconlog utils/xlogin \
 	utils/opsdb_control utils/opsdb_control.proxy \
+	utils/remove_old_www \
 	www/GNUmakefile www/defs.php3 www/dbdefs.php3 www/xmlrpc.php3 \
 	www/xmlrpcpipe.php3 \
 	www/swish.conf www/websearch \
