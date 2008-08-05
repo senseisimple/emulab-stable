@@ -60,7 +60,7 @@ if (!isset($query) || $query == "") {
 
 if ($TBMAINSITE || $REMOTEWIKIDOCS) {
     $query = htmlspecialchars($query);
-    header("Location: $WIKIDOCURL/../search?q=$query&noquickjump=1&wiki=on");
+    header("Location: search_cse.php?query=$query");
     return;
 }
 
