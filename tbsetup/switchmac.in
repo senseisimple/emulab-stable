@@ -157,10 +157,14 @@ foreach my $switchref (@switches) {
     #
     my $type = getDeviceType($switch);
     my ($snmpversion, $useindexing, $switchtype);
+    my $cisco_29xx = 0;
 SWITCH:
     for ($type) {
-	(/^cisco/ || /^catalyst/) && do { $snmpversion = "2c"; $useindexing = 1;
-	    $switchtype = "cisco"; last;};
+	(/^cisco/ || /^catalyst/) && do {
+            $snmpversion = "2c"; $useindexing = 1; $switchtype = "cisco";
+            if ($type =~ /29\d\d/) { DEBUG "Cisco 29xx\n"; $cisco_29xx = 1; }
+            last;
+        };
 	(/^intel/) && do { $snmpversion = "1"; $useindexing = 0;
 	    $switchtype = "intel"; last;};
 	(/^nortel/) && do { $snmpversion = "1"; $useindexing = 0;
@@ -355,7 +359,17 @@ SWITCH:
 	    #
 	    foreach my $index (keys %bridgeports) {
 		my $bridgeport = $bridgeports{$index};
-		my $ifIndex = $ifIndexMap{$bridgeport};
+                
+                #
+                # Funny special case for cisco 29xx series - it doesn't need
+                # to go throug the map!
+                #
+		my $ifIndex;
+                if ($cisco_29xx) {
+                    $ifIndex = $bridgeport;
+                } else {
+                    $ifIndex = $ifIndexMap{$bridgeport};
+                }
 		if (!$ifIndex) {
 			DEBUG "ifIndex conversion failed for $bridgeport!\n";
 			next;
@@ -395,20 +409,29 @@ SWITCH:
 	    # off-switch (eg. a trunk port)
 	    #
 	    DEBUG "printing for index $index\n";
-	    next unless ($status{$index} && ($status{$index} eq "learned" || 
-		$status{$index} eq "3"));
+	    if (!($status{$index} && ($status{$index} eq "learned" || 
+		$status{$index} eq "3"))) {
+                DEBUG "   Skipping MAC that wasn't learned\n";
+                next;
+            }
 	    #
 	    # As far as I can tell, this is a bug with (at least some versions
 	    # of) CatOS - we sometimes get back MACs that are not even in
 	    # this vlan, and those end up with an empty $realport
 	    #
-	    next if ((!$realports{$index}) ||
-		     ($realports{$index} =~ /ifIndex/));
+	    if ((!$realports{$index}) || ($realports{$index} =~ /ifIndex/)) {
+                DEBUG "   Skipping MAC with bad realport ($realports{$index})\n";
+                next;
+            }
+
             #
             # Skip ports that belong to known trunks - we only want to learn
             # about nodes that are directly connected to each switch
             #
-            next if ($trunks{$realports{$index}});
+            if ($trunks{$realports{$index}}) {
+                DEBUG "   Skipping MAC on a trunk\n";
+                next;
+            }
 
 	    print "$MACs{$index},$realports{$index},$vlan_number,". 
 		"$interfaces{$index},$class_str\n";
