@@ -1,14 +1,10 @@
 User-Agent: *
 # Disallow most php pages except a select few
+Disallow: /*.php*$
 Allow: /index.php3
 Allow: /doc.php3
-Allow: /docwrapper.php3
-Allow: /doc/docwrapper.php3
-# Google was rejecting URL's of the form
-#   http://www.emulab.net/docwrapper.php3?docname=FOO
-# Let's see if this helps.
-Allow: /docwrapper.php3?*$
-Allow: /doc/docwrapper.php3?*$
+Allow: /docwrapper
+Allow: /doc/docwrapper
 Allow: /news.php3
 Allow: /pubs.php3
 Allow: /expubs.php
@@ -17,8 +13,7 @@ Allow: /people.php3
 Allow: /gallery/gallery.php3
 Allow: /explist.php3
 Allow: /tutorial/mobilewireless.php3
-# Last in case the reason google was rejecting docwrapper pages was
-# due to order
-Disallow: /*.php*$
 # Disallow downloads for now
 Disallow: /downloads
+Disallow: /wikidocs
+
