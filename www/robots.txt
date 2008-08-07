@@ -1,6 +1,8 @@
 User-Agent: *
 # Disallow most php pages except a select few
-Disallow: /*.php*$
+Disallow: /*php$
+Disallow: /*php3$
+Disallow: /*php4$
 Allow: /index.php3
 Allow: /doc.php3
 Allow: /docwrapper
