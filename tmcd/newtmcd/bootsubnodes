@@ -1,0 +1,162 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use Getopt::Std;
+use English;
+use Errno;
+use POSIX qw(strftime);
+
+#
+# Startup subnodes, if there are any!
+#
+# NB: This script should not be run in foreground mode on a remote node
+# when booting; if boss is down the boot will hang. On local nodes, its
+# okay to hang.
+#
+sub usage()
+{
+    print "Usage: bootsubnodes [-d] [-f]\n";
+    exit(1);
+}
+my $optlist = "df";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use libtmcc;
+
+# Locals
+my $logname = "$LOGDIR/bootsubnodes.debug";
+my $debug   = 0;
+my $daemon  = 1;
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug  = 1;
+}
+if (defined($options{"f"})) {
+    $daemon = 0;
+}
+if (@ARGV) {
+    usage();
+}
+
+#
+# Must be root.
+# 
+if ($UID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+#
+# Put this into the background and log its output. We *must* do this cause
+# we do not want to halt the boot if the testbed is down!
+# 
+if ($daemon && TBBackGround($logname)) {
+    #
+    # Parent exits normally
+    #
+    exit(0);
+}
+
+my %subnodelist;
+
+#
+# Get the current set of subnodes that are supposed to be running on
+# this node.
+#
+my %tmccresults;
+
+if (tmcc(TMCCCMD_SUBNODELIST, undef, \%tmccresults) < 0) {
+    die("*** WARNING: Could not get subnode list from server!\n");
+}
+if (!$tmccresults{'subnode'}) {
+    print "No subnodes. Exiting gracefully ...\n";
+    exit(0);
+}
+
+foreach my $node (@{$tmccresults{'subnode'}}) {
+    my $nodeid = $$node{'nodeid'};
+    my $type = $$node{'type'};
+
+    if ($node =~ /^([-\w]+)$/ && $type =~ /^([-\w]+)$/) {
+	$subnodelist{$nodeid} = $type;
+    }
+    else {
+	warn("*** WARNING: Skipping bad subnodeid: 'NODEID=$nodeid TYPE=$type'\n");
+    }
+}
+print "subnodelist is @{[keys(%subnodelist)]}\n";
+
+# Pause to give hardware settle time.
+sleep(2);
+
+foreach my $subnode (keys(%subnodelist)) {
+    my $type = $subnodelist{$subnode};
+    
+    print "Setting up subnode $subnode ($type) ...\n";
+    # These should not return until the subnode is fully running.
+    SWITCH: for ($type) {
+	/^IXP$/i && do {
+	    system("ixpboot $subnode");
+	    if ($?) {
+		print STDERR "$subnode boot failed with $?\n";
+	    }
+	    last SWITCH;
+	};
+	/^mote$/i && do {
+	    libsetup_setvnodeid($subnode);
+	    configtmcc("subnode", $subnode);
+	    tmcc(TMCCCMD_STATE, "BOOTING");
+	    tmcc(TMCCCMD_SUBCONFIG, undef, \%tmccresults) == 0
+		or die("*** $0:\n".
+		       "    Could not get subnode config from server!\n");
+	    my $BAUD = 0;
+	    my $CAPSERVER = "";
+	    my $CAPPORT = 0;
+	    if ($tmccresults{'type'} eq 'mica2') {
+	    	$BAUD = 57600;
+	    }
+	    $CAPSERVER = $tmccresults{'capserver'};
+	    $CAPPORT = $tmccresults{'capport'};
+	    if (-x "$BINDIR/capture") {
+		system("$BINDIR/capture -a -s $BAUD -u '/usr/local/bin/uisp ".
+		       "-dprog=sggpio -dpart=ATmega128 --wr_fuse_e=ff ".
+		       "--erase --upload if=%s' $CAPSERVER:$CAPPORT tts/2");
+	    }
+	    tmcc(TMCCCMD_STATE, "ISUP");
+	    last SWITCH;
+	};
+	/^netfpga$/i && do {
+	    system("netfpgactl $subnode boot");
+	    if ($?) {
+                print STDERR "$subnode boot failed with $?\n";
+            }
+            last SWITCH;
+	};
+	print "Invalid subnode type: $type\n";
+    }
+    sleep(1);
+}
+exit(0);

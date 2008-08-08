@@ -1,0 +1,220 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2007, 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# This script is the jail equiv of ../common/rc.bootsetup. It runs
+# inside the jail and does a limited set of bootstrapping tasks.
+#
+sub usage()
+{
+    print "Usage: " . scriptname() . " -j vnodeid\n";
+    exit(1);
+}
+my $optlist = "j:";
+my $vnodeid;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+# Only root.
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself.
+#
+use libsetup;
+use libtmcc;
+use librc;
+
+# Protos.
+sub doboot();
+sub doshutdown();
+sub BootFatal($);
+
+# Parse command line.
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{'j'})) {
+    $vnodeid = $options{'j'};
+    libsetup_setvnodeid($vnodeid);
+}
+else {
+    usage();
+}
+
+# Script specific goo. Needs to go after we set the vnode above.
+my $RCDIR	= "$BINDIR/rc";
+my $EVPIDFILE	= CONFDIR() . "/evproxy.pid";
+my $done	= 0;
+# The caller (vnodesetup) is writing this file. We want to send it back.
+my $BOOTLOG	= "$LOGDIR/tbvnode-${vnodeid}.log";
+
+sub handler ($) {
+    my ($signame) = @_;
+    
+    $SIG{INT}  = 'IGNORE';
+    $SIG{TERM} = 'IGNORE';
+    $SIG{USR1} = 'IGNORE';
+    $SIG{HUP}  = 'IGNORE';
+    $done = 1;
+}
+$SIG{INT}  = \&handler;
+$SIG{HUP}  = \&handler;
+$SIG{USR1} = \&handler;
+# Do not want to be shutdown except by our parent, when machine reboots.
+$SIG{TERM} = 'IGNORE';
+
+# Do the "boot"
+doboot();
+
+# And just spin waiting to be killed off
+print("Waiting to be killed off\n");
+while (!$done) {
+    sleep(1);
+}
+
+# Kill it all off.
+doshutdown();
+
+exit(0);
+
+#
+# This version of fatal sends boot status to tmcd, and then generates
+# a TBFAILED state transition. 
+#
+sub BootFatal($)
+{
+    my ($msg) = @_;
+
+    print "$msg, shutting down\n";
+
+    doshutdown();
+
+    #
+    # Send the console log to the server.
+    #
+    if (-e $BOOTLOG && -s $BOOTLOG) {
+	tmcc(TMCCCMD_BOOTLOG, "", undef,
+	     ("datafile" => $BOOTLOG, "timeout" => 5));
+    }
+
+    # XXX "--" ensures that -1 is not interpreted as a tmcc cmdline arg
+    if (tmcc(TMCCCMD_BOOTERRNO, "-- -1") < 0) {
+	print "Error sending boot errno to Emulab Control!\n";
+    }
+    
+    if (tmcc(TMCCCMD_STATE, "TBFAILED") < 0) {
+	print "Error sending TBFAILED to Emulab Control!\n";
+    }
+    exit(-1);
+}
+
+#
+# Boot Action.
+#
+sub doboot()
+{
+    TBDebugTimeStamp("rc.nojail starting up");
+    
+    my ($pid, $eid, $vname) = fakejailsetup();
+
+    #
+    # At this point, if we are a free node just return. Something went wacky.
+    #
+    if (!defined($pid)) {
+	return;
+    }
+    # Get the boss info for below.
+    my ($bossname, $bossip) = tmccbossinfo();
+    if (!defined($bossname)) {
+	BootFatal("Could not determine the name of the boss server");
+    }
+    my ($domain) = ($bossname =~ /^[^\.]+\.(.*)$/);
+
+    #
+    # Start the event proxy.
+    #
+    if (-x "$BINDIR/evproxy") {
+	print("Starting event proxy daemon\n");
+	system("$BINDIR/evproxy -i $EVPIDFILE ".
+	       "   -s event-server.${domain} -e $pid/$eid");
+	if ($?) {
+	    BootFatal("Error running $BINDIR/evproxy");
+	}
+    }
+
+    #
+    # This is where we run all of the config scripts. These talk to the
+    # DB and setup the node the way it is supposed to be. 
+    # 
+    TBDebugTimeStamp("rc.injail running config scripts");
+    print("Running config scripts\n");
+    
+    system("$RCDIR/rc.config");
+    if ($?) {
+	BootFatal("Could not start program agent for $vnodeid");
+    }
+
+    TBDebugTimeStamp("rc.nojail done running config scripts");
+
+    print("Informing the testbed that we are up and running\n");
+    if (tmcc(TMCCCMD_STATE, "ISUP") < 0) {
+	BootFatal("Error sending ISUP to Emulab Control");
+    }
+
+    #
+    # Send the console log to the server.
+    #
+    if (-e $BOOTLOG && -s $BOOTLOG) {
+	tmcc(TMCCCMD_BOOTLOG, "", undef,
+	     ("datafile" => $BOOTLOG, "timeout" => 5));
+    }
+}
+
+#
+# Shutdown Action.
+#
+sub doshutdown()
+{
+    print("Running termination scripts\n");
+    system("$RCDIR/rc.config -j $vnodeid shutdown");
+
+    if (-e $EVPIDFILE) {
+	my $mpid = `cat $EVPIDFILE`;
+	chomp($mpid);
+	# untaint
+	if ($mpid =~ /^([\d]+)$/) {
+	    $mpid = $1;
+
+	    print("Killing the event proxy\n");
+	    
+	    if (kill('TERM', $mpid) == 0) {
+		print "*** Could not kill(TERM) process $mpid: $!\n";
+		return -1;
+	    }
+	    #
+	    # Wait for the pidfile to be removed. Do not wait too long though. 
+	    # 
+	    my $i = 15;
+	    while (-e $EVPIDFILE && $i > 0) {
+		sleep(1);
+		$i -= 1;
+	    }
+	    if (-e $EVPIDFILE) {
+		print "*** Not able to kill evproxy process $mpid!\n";
+	    }
+	}
+    }
+}
+

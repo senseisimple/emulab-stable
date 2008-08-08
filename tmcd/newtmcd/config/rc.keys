@@ -1,0 +1,201 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+sub usage()
+{
+    print "Usage: " .
+	scriptname() . " [-j vnodeid] boot|shutdown|reconfig|reset\n";
+    exit(1);
+}
+my $optlist = "j:";
+my $action  = "boot";
+
+# Turn off line buffering on output
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+# Only root.
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use libtmcc;
+use librc;
+
+#
+# Not all clients support this.
+#
+exit(0)
+    if (MFS());
+
+# Protos.
+sub doboot();
+sub doshutdown();
+sub doreconfig();
+sub docleanup();
+
+# Parse command line.
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{'j'})) {
+    my $vnodeid = $options{'j'};
+    libsetup_setvnodeid($vnodeid);
+}
+# Allow default above.
+if (@ARGV) {
+    $action = $ARGV[0];
+}
+
+# Execute the action.
+SWITCH: for ($action) {
+    /^boot$/i && do {
+	doboot();
+	last SWITCH;
+    };
+    /^shutdown$/i && do {
+	doshutdown();
+	last SWITCH;
+    };
+    /^reconfig$/i && do {
+	doreconfig();
+	last SWITCH;
+    };
+    /^reset$/i && do {
+	docleanup();
+	last SWITCH;
+    };
+    fatal("Invalid action: $action\n");
+}
+exit(0);
+
+# More protos.
+sub dokeyhash();
+sub doeventkey();
+
+#
+# Boot Action.
+#
+sub doboot()
+{
+    print STDOUT "Checking Testbed keys ...\n";
+    dokeyhash();
+    doeventkey();
+}
+
+#
+# Shutdown Action.
+#
+sub doshutdown()
+{
+    # Nothing to do.
+}
+
+#
+# Node Reconfig Action (without rebooting).
+#
+sub doreconfig()
+{
+    doshutdown();
+    return doboot();
+}
+
+#
+# Node cleanup action (node is reset to completely clean state).
+#
+sub docleanup()
+{
+    unlink TMKEYHASH()
+	if (-e TMKEYHASH());
+    unlink TMEVENTKEY()
+	if (-e TMEVENTKEY());
+}
+
+#
+# Get the hashkey
+# 
+sub dokeyhash()
+{
+    my $keyhash;
+    my %tmccresults;
+
+    if (tmcc(TMCCCMD_KEYHASH, undef, \%tmccresults) < 0) {
+	fatal("Could not get keyhash from server!");
+    }
+    unlink TMKEYHASH();
+    return 0
+	if (! exists($tmccresults{"uc(hash)"}));
+
+    #
+    # There should be just one string. Ignore anything else.
+    #
+    if ($tmccresults{"uc(hash)"} =~ /^([\w]*)$/) {
+	$keyhash = $1;
+    }
+    else {
+	fatal("Bad keyhash: $tmccresults{"uc(hash)"}");
+    }
+
+    #
+    # Write a file so the node knows the key.
+    #
+    my $oldumask = umask(0227);
+    
+    if (system("echo '$keyhash' > ". TMKEYHASH)) {
+	fatal("Could not write " . TMKEYHASH);
+    }
+    umask($oldumask);
+    return 0;
+}
+
+#
+# Get the event key
+# 
+sub doeventkey()
+{
+    my $eventkey;
+    my %tmccresults;
+
+    if (tmcc(TMCCCMD_EVENTKEY, undef, \%tmccresults) < 0) {
+	fatal("Could not get eventkey from server!");
+    }
+    unlink TMEVENTKEY();
+    return 0
+	if (! exists($tmccresults{"uc(key)"}));
+
+    #
+    # There should be just one string. Ignore anything else.
+    #
+    if ($tmccresults{"uc(key)"} =~ /^([\w]*)$/) {
+	$eventkey = $1;
+    }
+    else {
+	fatal("Bad eventkey line: $tmccresults{"uc(hash)"}");
+    }
+
+    #
+    # Write a file so the node knows the key.
+    #
+    my $oldumask = umask(0227);
+    
+    if (system("echo -n '$eventkey' > ". TMEVENTKEY)) {
+	fatal("Could not write " . TMEVENTKEY);
+    }
+    umask($oldumask);
+    return 0;
+}
+

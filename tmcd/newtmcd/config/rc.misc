@@ -1,0 +1,190 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+sub usage()
+{
+    print "Usage: " .
+	scriptname() . " [-j vnodeid] boot|shutdown|reconfig|reset\n";
+    exit(1);
+}
+my $optlist = "j:";
+my $action  = "boot";
+
+# Turn off line buffering on output
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+# Only root.
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use libtmcc;
+use librc;
+
+#
+# Not all clients support this.
+#
+exit(0)
+    if (MFS());
+
+# Protos.
+sub doboot();
+sub doshutdown();
+sub doreconfig();
+sub docleanup();
+
+# Parse command line.
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{'j'})) {
+    my $vnodeid = $options{'j'};
+    libsetup_setvnodeid($vnodeid);
+}
+# Allow default above.
+if (@ARGV) {
+    $action = $ARGV[0];
+}
+
+# Execute the action.
+SWITCH: for ($action) {
+    /^boot$/i && do {
+	doboot();
+	last SWITCH;
+    };
+    /^shutdown$/i && do {
+	doshutdown();
+	last SWITCH;
+    };
+    /^reconfig$/i && do {
+	doreconfig();
+	last SWITCH;
+    };
+    /^reset$/i && do {
+	docleanup();
+	last SWITCH;
+    };
+    fatal("Invalid action: $action\n");
+}
+exit(0);
+
+# More protos
+sub donodeid();
+sub docreator();
+
+#
+# Boot Action.
+#
+sub doboot()
+{
+    # Handled elsewhere for other node types.
+    donodeid()
+	if (!PLAB() && !JAILED() && !IXP());
+    docreator();
+}
+
+#
+# Shutdown Action.
+#
+sub doshutdown()
+{
+    # Nothing to do
+}
+
+#
+# Node Reconfig Action (without rebooting).
+#
+sub doreconfig()
+{
+    doshutdown();
+    return doboot();
+}
+
+#
+# Node cleanup action (node is reset to completely clean state).
+#
+sub docleanup()
+{
+    unlink TMNODEID(), TMCREATOR(), TMSWAPPER();
+}
+
+#
+# Get the nodeid
+# 
+sub donodeid()
+{
+    my $nodeid;
+    my %tmccresults;
+
+    if (tmcc(TMCCCMD_NODEID, undef, \%tmccresults) < 0) {
+	fatal("Could not get nodeid from server!");
+    }
+    return 0 if (! exists($tmccresults{"uc(id)"}));
+    
+    #
+    # There should be just one string. Ignore anything else.
+    #
+    if ($tmccresults{"uc(id)"} =~ /([-\w]*)/) {
+	$nodeid = $1;
+    }
+    else {
+	fatal("Bad nodeid line: $tmccresults{"uc(id)"}");
+    }
+    
+    system("echo '$nodeid' > ". TMNODEID);
+    return 0;
+}
+
+#
+# Get experiment creator
+# 
+sub docreator()
+{
+    my $creator;
+    my %tmccresults;
+
+    if (tmcc(TMCCCMD_CREATOR, undef, \%tmccresults) < 0) {
+	fatal("Could not get creator from server!");
+    }
+    return 0 if (! keys(%tmccresults));
+    
+    #
+    # There should be one string for the creator of the experiment...
+    #
+    if ($tmccresults{"uc(creator)"} =~ /^([-\w]*)$/) {
+	$creator = $1;
+    }
+    else {
+	fatal("Bad creator line: $tmccresults{"uc(creator)"}");
+    }
+    system("echo '$creator' > ". TMCREATOR());
+
+    #
+    # ... and another string for the user who swapped it in.
+    #
+    if ($tmccresults{"uc(swapper)"} =~ /^([-\w]*)$/) {
+	$swapper = $1;
+    }
+    else {
+	fatal("Bad swapper line: $tmccresults{"uc(swapper)"}");
+    }
+    system("echo '$swapper' > ". TMSWAPPER());
+
+    return 0;
+}
+

@@ -1,0 +1,285 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004, 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# XXX hack: workaround for tmcc cmd failure inside TCL storing the output
+#     of a few tmcc commands in $BOOTDIR files for use by NSE. Yuck!
+#     Because of tmcc caching, it is not really a problem to rerun these
+#     commands, and it keeps all this sim stuff here in one place so its
+#     obvious what is going on and who all this stuff is for.
+#
+sub usage()
+{
+    print "Usage: " .
+	scriptname() . " [-j vnodeid] boot|shutdown|reconfig|reset\n";
+    exit(1);
+}
+my $optlist = "j:";
+my $action  = "boot";
+
+# Turn off line buffering on output
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+# Only root.
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+# Script specific goo.
+my $BOSSFILE    = "$BOOTDIR/tmcc.bossinfo";
+my $NSECONFIGS  = "$BOOTDIR/tmcc.nseconfigs";
+my $ROUTELIST   = "$BOOTDIR/tmcc.routelist";
+my $TRAFGENS    = "$BOOTDIR/tmcc.trafgens";
+my $IFCONFIGS   = "$BOOTDIR/tmcc.ifconfig";
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use libtmcc;
+use librc;
+
+#
+# Not all clients support this.
+#
+exit(0)
+    if (MFS() || !(SIMHOST() || SIMTRAFGEN()));
+
+# Protos.
+sub doboot();
+sub doshutdown();
+sub doreconfig();
+sub docleanup();
+
+# Parse command line.
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{'j'})) {
+    my $vnodeid = $options{'j'};
+    libsetup_setvnodeid($vnodeid);
+}
+# Allow default above.
+if (@ARGV) {
+    $action = $ARGV[0];
+}
+
+# libsetup specific goo here. 
+my $SIMRC	= TMSIMRC();
+
+# Execute the action.
+SWITCH: for ($action) {
+    /^boot$/i && do {
+	doboot();
+	last SWITCH;
+    };
+    /^shutdown$/i && do {
+	doshutdown();
+	last SWITCH;
+    };
+    /^reconfig$/i && do {
+	doreconfig();
+	last SWITCH;
+    };
+    /^reset$/i && do {
+	docleanup();
+	last SWITCH;
+    };
+    fatal("Invalid action: $action\n");
+}
+exit(0);
+
+#
+# Boot Action.
+#
+sub doboot()
+{
+    docleanup();
+    
+    my $boss = tmccbossname();
+
+    system("echo '$boss' >$BOSSFILE");
+    if ($?) {
+	fatal("Could not write $BOSSFILE");
+    }
+
+    my %nseconfigs = ();
+
+    if (tmcc(TMCCCMD_NSECONFIGS, undef, \%nseconfigs) < 0) {
+	fatal("Could not get nseconfigs from server!");
+    }
+    if (open(NSECFG, ">$NSECONFIGS")) {
+        my $ptr = $nseconfigs{'config'};
+	$ptr = [ $ptr ] if (ref $ptr ne 'ARRAY');
+	foreach my $nseconfig (@$ptr) {
+	    print NSECFG "$nseconfig\n";
+	}
+	close(NSECFG);
+    }
+    else {
+	fatal("Cannot open file $NSECONFIGS: $!");
+    }
+    
+    my %routelist = ();
+
+    #
+    # XXX this will require more effort if it can even be made to work at all.
+    # The problem is that routelist needs to include all routes for the
+    # experiment, not just those for the "current" node.
+    #
+    # The implication is that we need to use static-old routing when NSE
+    # is involved.  This is not currently enforced.
+    #
+    if (0) {
+	my $type;
+	if (getrouterconfig(\@routelist, \$type)) {
+	    fatal("Could not get router configuration from libsetup!");
+	}
+	if ($type eq "gated" || $type eq "ospf") {
+	    fatal("Cannot do session routing in NSE!\n");
+	}
+
+	#
+	# produce route lines as expected by nseinput.tcl:
+	# ROUTE NODE=%s SRC=%s DEST=%s DESTTYPE=%s DESTMASK=%s NEXTHOP=%s COST=%s
+	#
+	if (open(RLIST, ">$ROUTELIST")) {
+	    foreach my $rconfig (@routelist) {
+		#" NODE=", $rconfig->{"??"},
+		print RLIST "ROUTE",
+		" NODE=", $rconfig->{"NODE"},
+		" SRC=", $rconfig->{"SRCIPADDR"},
+		" DEST=", $rconfig->{"IPADDR"},
+		" DESTTYPE=", $rconfig->{"TYPE"},
+		" DESTMASK=", $rconfig->{"IPMASK"},
+		" NEXTHOP=", $rconfig->{"GATEWAY"},
+		" COST=", $rconfig->{"COST"},
+		"\n";
+	    }
+	    close(RLIST);
+	    undef(@routelist);
+	}
+	else {
+	    fatal("Cannot open file $ROUTELIST: $!");
+	}
+    }
+    else {
+	if (tmcc(TMCCCMD_ROUTELIST, undef, \%routelist) < 0) {
+	    fatal("Could not get routelist from server!");
+	}
+	if (open(RLIST, ">$ROUTELIST")) {
+	    my $ptr = $routelist{'route'};
+	    $ptr = [ $ptr ] if (ref $ptr ne 'ARRAY');
+	    foreach my $rconfig (@$ptr) {
+		#" NODE=", $rconfig->{"??"},
+		print RLIST "ROUTE",
+		" NODE=", $rconfig->{"NODE"},
+		" SRC=", $rconfig->{"SRCIPADDR"},
+		" DEST=", $rconfig->{"IPADDR"},
+		" DESTTYPE=", $rconfig->{"TYPE"},
+		" DESTMASK=", $rconfig->{"IPMASK"},
+		" NEXTHOP=", $rconfig->{"GATEWAY"},
+		" COST=", $rconfig->{"COST"},
+		"\n";
+		print RLIST $route;
+	    }
+	    close(RLIST);
+	    undef(@routelist);
+	}
+	else {
+	    fatal("Cannot open file $ROUTELIST: $!");
+	}
+    }
+
+    my %trafgens = ();
+
+    if (tmcc(TMCCCMD_TRAFFIC, undef, \%trafgens) < 0) {
+	fatal("Could not get trafgens from server!");
+    }
+    if (open(TLIST, ">$TRAFGENS")) {
+        my $ptr = $trafgens{'entry'};
+	$ptr = [ $ptr ] if (ref $ptr ne 'ARRAY');
+
+	foreach my $trafgen (@$ptr) {
+	    print TLIST "TRAFGEN=" . $$trafgen{'trafgen'};
+	    print TLIST " MYNAME=" . $$trafgen{'myname'};
+	    print TLIST " MYPORT=" . $$trafgen{'myport'};
+	    print TLIST " PEERNAME=" . $$trafgen{'peername'};
+	    print TLIST " PEERPORT=" . $$trafgen{'peerport'};
+	    print TLIST " PROTO=" . $$trafgen{'proto'};
+	    print TLIST " ROLE=" . $$trafgen{'rule'};
+	    print TLIST " GENERATOR=" . $$trafgen{'generator'} . "\n";
+	}
+	close(TLIST);
+    }
+    else {
+	fatal("Cannot open file $TRAFGENS: $!");
+    }
+
+    my %ifconfigs = ();
+
+    if (tmcc(TMCCCMD_IFC, undef, \%ifconfigs) < 0) {
+	fatal("Could not get interface config from server!");
+    }
+    if (open(ILIST, ">$IFCONFIGS")) {
+	foreach my $ifc (@ifconfigs) {
+	    print ILIST $ifc;
+	}
+	close(ILIST);
+    }
+    else {
+	fatal("Cannot open file $IFCONFIGS: $!");
+    }
+
+    #
+    # Generate a start file for rc.setup since we need to delay the actual
+    # start of the simulator till later ...
+    #
+    if (open(RC, ">$SIMRC")) {
+	print RC "#!/bin/sh\n"; 
+	print RC "$BINDIR/startnse &\n";
+	print RC "exit 0\n";
+	close RC;
+	chmod(0755, $SIMRC);
+    }
+    else {
+	fatal("Could not open $SIMRC: $!");
+    }
+}
+
+#
+# Shutdown Action.
+#
+sub doshutdown()
+{
+    system("killall nse");
+}
+
+#
+# Node Reconfig Action (without rebooting).
+#
+sub doreconfig()
+{
+    doshutdown();
+    docleanup();
+    return doboot();
+}
+
+#
+# Node cleanup action (node is reset to completely clean state).
+#
+sub docleanup()
+{
+    unlink $ROUTELIST, $BOSSFILE, $NSECONFIGS, $TRAFGENS, $IFCONFIGS, $SIMRC;
+}

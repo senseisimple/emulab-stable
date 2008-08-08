@@ -1,0 +1,173 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+sub usage()
+{
+    print "Usage: " .
+	scriptname() . " [-j vnodeid] boot|shutdown|reconfig|reset\n";
+    exit(1);
+}
+my $optlist = "j:";
+my $action  = "boot";
+
+# Turn off line buffering on output
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+# Only root.
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+# Script specific goo
+my $PIDFILE     = "/var/run/syncd.pid";
+my $LOGFILE     = "$LOGDIR/syncserver.debug";
+my $SYNCD       = "$BINDIR/emulab-syncd";
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use libtmcc;
+use librc;
+
+#
+# Not all clients support this.
+#
+exit(0)
+    if (MFS() || REMOTE() && !PLAB());
+
+# Protos.
+sub doboot();
+sub doshutdown();
+sub doreconfig();
+sub docleanup();
+
+# Parse command line.
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{'j'})) {
+    my $vnodeid = $options{'j'};
+    libsetup_setvnodeid($vnodeid);
+}
+# Allow default above.
+if (@ARGV) {
+    $action = $ARGV[0];
+}
+
+# Execute the action.
+SWITCH: for ($action) {
+    /^boot$/i && do {
+	doboot();
+	last SWITCH;
+    };
+    /^shutdown$/i && do {
+	doshutdown();
+	last SWITCH;
+    };
+    /^reconfig$/i && do {
+	doreconfig();
+	last SWITCH;
+    };
+    /^reset$/i && do {
+	docleanup();
+	last SWITCH;
+    };
+    fatal("Invalid action: $action\n");
+}
+exit(0);
+
+#
+# Boot Action.
+#
+sub doboot()
+{
+    my $syncserver;
+    my $startserver;
+    my %tmccresults;
+
+    if (tmcc(TMCCCMD_SYNCSERVER, undef, \%tmccresults) < 0) {
+	fatal("Could not get syncserver name from server!");
+    }
+    unlink TMSYNCSERVER();
+    
+    return if (! keys(%tmccresults));
+
+    #
+    # There should be just one string. Ignore anything else.
+    #
+    if ($tmccresults{"uc(server)"} =~ /^[-\w\.]*$/  ||
+        $tmccresults{"uc(isserver)"} =~ /\d/) {
+
+	$syncserver  = $tmccresults{"uc(server)"};
+	$startserver = $tmccresults{"uc(isserver)"};
+    }
+    else {
+	fatal("Bad syncserver line: $tmccresults{"uc(server)"} $tmccresults{"uc(isserver)"}");
+    }
+
+    #
+    # Write a file so the client program knows where the server is.
+    #
+    if (system("echo '$syncserver' > ". TMSYNCSERVER)) {
+	fatal("Could not write " . TMSYNCSERVER);
+    }
+
+    #
+    # If we are the sync server, arrange to start it up.
+    #
+    return
+	if (! $startserver);
+
+    system("$SYNCD -v -l $LOGFILE");
+    if ($?) {
+	fatal("Could not start sync server!");
+    }
+    return;
+}
+
+#
+# Shutdown Action.
+#
+sub doshutdown()
+{
+    #
+    # Kill the process.
+    #
+    if (-e $PIDFILE) {
+	system("kill `cat $PIDFILE`");
+	# Does not remove its own pidfile!
+	unlink $PIDFILE;
+    }
+    return;
+}
+
+#
+# Node Reconfig Action (without rebooting).
+#
+sub doreconfig()
+{
+    # Same as booting
+    doshutdown();
+    return doboot();
+}
+
+#
+# Node cleanup action (node is reset to clean state, as if just allocated).
+#
+sub docleanup()
+{
+    # Remove DB file. No attempt is made to uninstall though.
+    unlink TMSYNCSERVER(), $PIDFILE, $LOGFILE;
+}

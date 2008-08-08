@@ -1,0 +1,207 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# This script is run directly from boot. It should NOT be run after
+# that since some stuff is not setup to properly restart yet. For
+# general reconfig or update, use rc.config instead.
+#
+sub usage()
+{
+    print "Usage: " . scriptname() . "[-b] boot|shutdown|reconfig|reset\n";
+    exit(1);
+}
+my $optlist    = "b";
+my $background = 0;
+my $action     = "boot";
+
+# Turn off line buffering on output
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+# Only root.
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+# Script specific goo.
+my $RCDIR   = "$BINDIR/rc";
+my $LOGFILE = "$LOGDIR/bootsetup.debug";
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use libtmcc;
+use librc;
+
+# XXX This is the outer bossname. We use an IP so we are not dependent
+# on the nameserver. The route to boss will have been added by DHCP on
+# the outer control network.
+if (! -e "$ETCDIR/outer_bossnode") {
+    die("*** $0:\n".
+	"    $ETCDIR/outer_bossnode does not exist!\n");
+}
+my $bossname = `cat $ETCDIR/outer_bossnode`;
+chomp($bossname);
+
+$ENV{'BOSSNAME'} = "$bossname";
+# Allow for portnum
+if ($bossname =~ /^([\w\.]+)$/) {
+    libtmcc::configtmcc("server", $1);
+}
+elsif ($bossname =~ /^([\w\.]+):(\d+)$/) {
+    # For debugging using my own tmcd. See rc.mkelab.
+    libtmcc::configtmcc("server", $1);
+    libtmcc::configtmcc("portnum", $2);
+    $bossname = $1;
+}
+
+# Brutal. Inner elab will have its own certs, and so talk to outer elab
+# without SSL, since tmcd does not require SSL on local nodes.
+libtmcc::configtmcc("nossl", 1);
+$ENV{'TMCCNOSSL'} = "1";
+
+# Add a timeout since in the firewall case, we will not be able to
+# reach outer boss.
+libtmcc::configtmcc("timeout", 5);
+
+# Protos.
+sub doboot();
+sub doshutdown();
+sub doreconfig();
+sub docleanup();
+
+# Parse command line.
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{'b'})) {
+    $background = 1;
+}
+# Allow default above.
+if (@ARGV) {
+    $action = $ARGV[0];
+}
+
+# Execute in background and return immediately.
+if ($background && TBBackGround($LOGFILE)) {
+    print "Node reconfiguration started ...\n";
+    exit(0);
+}
+
+# Execute the action.
+SWITCH: for ($action) {
+    /^boot$/i && do {
+	doboot();
+	last SWITCH;
+    };
+    /^shutdown$/i && do {
+	doshutdown();
+	last SWITCH;
+    };
+    /^reconfig$/i && do {
+	doreconfig();
+	last SWITCH;
+    };
+    /^reset$/i && do {
+	docleanup();
+	last SWITCH;
+    };
+    fatal("Invalid action: $action\n");
+}
+exit(0);
+
+#
+# Boot Action.
+#
+sub doboot()
+{
+    #
+    # Check for an os dependent initialization script.
+    #
+    my $os_script = "rc." . lc($OSNAME);
+    
+    if (-x "$RCDIR/$os_script") {
+	system("$RCDIR/$os_script");
+	if ($?) {
+	    fatal("Error running $RCDIR/$os_script");
+	}
+    }
+
+    #
+    # Check for kernel rename first. Probably not required so early.
+    #
+    if (-x "$RCDIR/rc.kname") {
+	system("$RCDIR/rc.kname");
+	if ($?) {
+	    fatal("Error running $RCDIR/rc.kname");
+	}
+    }
+
+    print("Informing Emulab Control that we have rebooted\n");
+    if (tmcc(TMCCCMD_STATE, "TBSETUP") < 0) {
+	fatal("Error sending TBSETUP to Emulab Control!");
+    }
+
+    # We do not do anything.
+    sleep(2);
+
+    # Now send ISUP
+    print("Informing Emulab Control that we are up and running\n");
+    if (tmcc(TMCCCMD_STATE, "ISUP") < 0) {
+	fatal("Error sending ISUP to Emulab Control!");
+    }
+}
+
+#
+# Shutdown Action.
+#
+sub doshutdown()
+{
+    print("Informing Emulab Control that we are are rebooting\n");
+    if (tmcc(TMCCCMD_STATE, "SHUTDOWN") < 0) {
+	fatal("Error sending SHUTDOWN to Emulab Control!");
+    }
+}
+
+#
+# Node Reconfig Action (without rebooting).
+#
+sub doreconfig()
+{
+    print("Informing Emulab Control that we are doing a reconfig\n");
+    if (tmcc(TMCCCMD_STATE, "TBSETUP") < 0) {
+	fatal("Error sending TBSETUP to Emulab Control!");
+    }
+
+    sleep(1);
+
+    #
+    # And (re)boot vnodes. As with boot, doing it after ISUP is better;
+    # os_setup will consider the node ready, and move onto waiting for
+    # vnodes to boot.
+    #
+    print("Informing Emulab Control that we are back up and running\n");
+    if (tmcc(TMCCCMD_STATE, "ISUP") < 0) {
+	fatal("Error sending ISUP to Emulab Control!");
+    }
+    return 0;
+}
+
+#
+# Node cleanup action (node is reset to completely clean state).
+#
+sub docleanup()
+{
+}

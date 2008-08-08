@@ -1,0 +1,725 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004-2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+sub usage()
+{
+    print "Usage: " .
+	scriptname() . " [-j vnodeid] [-n] boot|shutdown|reconfig|reset\n";
+    exit(1);
+}
+my $optlist = "j:n";
+my $action  = "boot";
+my $doit = 1;
+
+# Turn off line buffering on output
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+# Only root.
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+# Script specific goo.
+#
+# These go in /var/emulab. Good for all environments!
+# 
+my $PASSDB   = "$VARDIR/db/passdb";
+my $GROUPDB  = "$VARDIR/db/groupdb";
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use liblocsetup;
+use libtmcc;
+use librc;
+
+# Protos.
+sub doboot();
+sub doshutdown();
+sub doreconfig();
+sub docleanup();
+
+# Parse command line.
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{'j'})) {
+    my $vnodeid = $options{'j'};
+    libsetup_setvnodeid($vnodeid);
+}
+if (defined($options{'n'})) {
+    $doit = 0;
+}
+if (@ARGV) {
+    $action = $ARGV[0];
+}
+
+# Execute the action.
+SWITCH: for ($action) {
+    /^boot$/i && do {
+	doboot();
+	last SWITCH;
+    };
+    /^shutdown$/i && do {
+	doshutdown();
+	last SWITCH;
+    };
+    /^reconfig$/i && do {
+	doreconfig();
+	last SWITCH;
+    };
+    /^reset$/i && do {
+	docleanup();
+	last SWITCH;
+    };
+    fatal("Invalid action: $action\n");
+}
+exit(0);
+
+# More protos.
+sub TBNewsshKeyfile($$$$@);
+
+#
+# Boot Action.
+#
+sub doboot()
+{
+    my %tmccresults;
+    my %newaccounts = ();
+    my %newgroups   = ();
+    my %pubkeys     = ();
+    my @sfskeys     = ();
+    my %deletes     = ();
+    my %lastmod     = ();
+    my %PWDDB;
+    my %GRPDB;
+
+    print STDOUT "Checking Testbed user accounts configuration ... \n";
+    my $arg = WINDOWS() ? "windows" : undef;
+    if (tmcc(TMCCCMD_ACCT, $arg, \%tmccresults) < 0) {
+	fatal("Could not get account info from server!");
+    }
+    # Important; if no results then do nothing. We do not want to remove
+    # accounts cause the server failed to give us anything!
+    return 0
+	if (! (keys %tmccresults));
+
+    #
+    # The strategy is to keep a record of all the groups and accounts
+    # added by the testbed system so that we know what to remove. We
+    # use a vanilla perl dbm for that, one for the groups and one for
+    # accounts. 
+    #
+    # First just get the current set of groups/accounts from tmcd.
+    #
+    my $ptr = $tmccresults{"uc(addgroup)"};
+    if (ref $ptr ne 'ARRAY') {
+    	$ptr = [ $ptr ];
+    }
+    foreach my $group (@$ptr) {
+    	my $gname = $$group{'name'};
+	$gname = lc($gname)
+	    if (PLAB());
+	    
+	if (REMOTE() && !JAILED() && !PLAB()) {
+	    $gname = "emu-${gname}";
+	}
+
+	$newgroups{$gname} = $$group{'gid'};
+    }
+
+    $ptr = $tmccresults{"uc(adduser)"};
+    if (ref $ptr ne 'ARRAY') {
+    	$ptr = [ $ptr ];
+    }
+
+    foreach my $user (@$ptr) {
+    if ($$user{'login'} !~ /^[-\w]+$/ && $$user{'pswd'} !~ /^[^:]+$/ &&
+        $$user{'uid'} !~ /^\d+$/ && $$user{'gid'} !~ /^.*$/ &&
+        $$user{'root'} !~ /^\d$/ && $$user{'name'} !~ /^.*$/ &&
+        $$user{'homedir'} !~ /^.*$/ && $$user{'glist'} !~ /^.*$/ &&
+        $$user{'serial'} !~ /^\d+$/ && $$user{'email'} !~ /^[-\w\@\.\+]+$/ &&
+        $$user{'shell'} !~ /^[-\w]*$/) { 
+
+	warning("bad account data: for user $$user{'login'}");
+    }
+    else {
+    	$newaccounts{$$user{'login'}} = $user;
+    }
+
+    $ptr = $tmccresults{"uc(pubkey)"};
+    if (ref $ptr ne 'ARRAY') {
+    	$ptr = [ $ptr ];
+    }
+
+    foreach my $pubkey (@$ptr) {
+    	my $login = $$pubkey{'login'};
+        if (! defined($pubkeys{$login})) {
+	    $pubkeys{$login} = [];
+	}
+	push(@{$pubkeys{$login}}, $$pubkey{'key'});
+    }
+
+    $ptr = $tmccresults{"uc(sfskey)"};
+    if (ref $ptr ne 'ARRAY') {
+    	$ptr = [ $ptr ];
+    }
+    foreach my $sfskey (@$ptr) {
+	# SFS key goes into the array.
+	#
+	push(@sfskeys, $$sfskey{'key'});
+    }
+
+    # On CygWin, just make a batch of Windows accounts and generate
+    # /etc/passwd and /etc/group from the Windows accounts.
+    # (The process isn't finished until os_accounts_end is called.)
+    goto bad
+	if (WINDOWS() && os_accounts_start());
+
+    if (! MFS()) {
+	#
+	# These will just start out as empty hashes so everything is added.
+	# 
+	dbmopen(%PWDDB, $PASSDB, 0660) or
+	    fatal("Cannot open $PASSDB: $!");
+	
+	dbmopen(%GRPDB, $GROUPDB, 0660) or
+	    fatal("Cannot open $GROUPDB: $!");
+    }
+
+    #
+    # Create any groups that do not currently exist. Add each to the
+    # DB as we create it.
+    #
+    while (($group, $gid) = each %newgroups) {
+	my ($exists,undef,$curgid) = getgrnam($group);
+	
+	if ($exists) {
+	    if (WINDOWS()) {
+		# Windows needs to know all of the groups by name.
+		os_groupgid($group, $gid);
+	    }
+	    else {
+		if ($gid != $curgid) {
+		    warning("$group/$gid mismatch with existing group");
+		}
+	    }
+	    next;
+	}
+
+	print "Adding group: $group/$gid\n";
+	    
+	if ($doit && os_groupadd($group, $gid)) {
+	    warning("Error adding new group $group/$gid");
+	    next;
+	}
+	# Add to DB only if successful. 
+	$GRPDB{$group} = $gid;
+    }
+
+    #
+    # Now remove the ones that we created previously, but are now no longer
+    # in the group set (as told to us by the TMCD). Note, we cannot delete 
+    # them directly from the hash since that would mess up the foreach loop,
+    # so just stick them in temp and postpass it.
+    #
+    while (($group, $gid) = each %GRPDB) {
+	if (defined($newgroups{$group})) {
+	    next;
+	}
+
+	print "Removing group: $group/$gid\n";
+	
+	if ($doit && os_groupdel($group)) {
+	    warning("Error removing group $group/$gid");
+	    next;
+	}
+	# Delete from DB only if successful. 
+	$deletes{$group} = $gid;
+    }
+    while (($group, $gid) = each %deletes) {
+	delete($GRPDB{$group});
+    }
+    %deletes = ();
+
+    # Write the DB back out!
+    if (! MFS()) {
+	dbmclose(%GRPDB);
+    }
+
+    #
+    # Repeat the same sequence for accounts, except we remove old accounts
+    # first. 
+    # 
+
+    # XXX: hack, hack, hack - Jay requested that user "games" be removed from
+    # plab nodes since conflicts with his UID.
+    os_userdel("games")
+	if ($doit && PLAB());
+
+    while (($login, $info) = each %PWDDB) {
+	my $uid = $info;
+	
+	#
+	# Split out the uid from the serial. Note that this was added later
+	# so existing DBs might not have a serial yet. We save the serial
+	# for later. 
+	#
+	if ($info =~ /(\d*):(\d*)/) {
+	    $uid = $1;
+	    $lastmod{$login} = $2;
+	}
+	
+	if (defined($newaccounts{$login})) {
+	    next;
+	}
+
+	my ($exists,undef,$curuid,undef,
+	    undef,undef,undef,$homedir) = getpwnam($login);
+
+	#
+	# If the account is gone, someone removed it by hand. Remove it
+	# from the DB so we do not keep trying.
+	#
+	if (! defined($exists)) {
+	    warning("Account for $login was already removed!");
+	    $deletes{$login} = $login;
+	    next;
+	}
+
+	#
+	# Check for mismatch, just in case. If there is a mismatch remove it
+	# from the DB so we do not keep trying.
+	#
+	if ($uid != $curuid) {
+	    warning("Account uid for $login has changed ($uid/$curuid)!");
+	    $deletes{$login} = $login;
+	    next;
+	}
+	
+	print "Removing user: $login\n";
+	
+	if ($doit && os_userdel($login) != 0) {
+	    warning("Error removing user $login");
+	    next;
+	}
+
+	#
+	# Remove the home dir. 
+	#
+	# Must ask for the current home dir in case it came from pw.conf.
+	#
+	if (defined($homedir) &&
+	    index($homedir, "/${login}")) {
+	    if ($doit && os_homedirdel($login, $homedir) != 0) {
+	        warning("Could not remove homedir $homedir.");
+	    }
+	}
+	
+	# Delete from DB only if successful. 
+	$deletes{$login} = $login;
+    }
+    
+    while (($login, undef) = each %deletes) {
+	delete($PWDDB{$login});
+    }
+
+    my @addedUsers = ();
+    while (($login, $info) = each %newaccounts) {
+	$pswd  = $$info{'pswd'};
+	$uid   = $$info{'uid'};
+	$gid   = $$info{'gid'};
+	$root  = $$info{'root'};
+	$name  = $$info{'name'};
+	$hdir  = $$info{'homedir'};
+	$glist = $$info{'glist'};
+	$serial= $$info{'serial'};
+	$email = $$info{'email'};
+	$shell = $$info{'shell'};
+	if ( $name =~ /^(([^:]+$|^))$/ ) {
+	    $name = $1;
+	}
+
+	#
+	# See if update needed, based on the serial number we get.
+	# If its different, the account info has changed.
+	# 
+	my $doupdate = 0;
+	if (!defined($lastmod{$login}) || $lastmod{$login} != $serial) {
+		$doupdate = 1;
+	}
+	    
+	my ($exists,undef,$curuid) = getpwnam($login);
+
+    if ($exists) {
+    	if (!defined($PWDDB{$login})) {
+    	    warning("Skipping since $login existed before EmulabMan!");
+    	    next;
+    	}
+    	# Windows uses its own UID and GID numbers. 
+    	if ($curuid != $uid  && ! WINDOWS()) {
+    	    warning("$login/$uid uid mismatch with existing login!");
+    	    next;
+    	}
+    	if ($doupdate) {
+    	    print "Updating: ".
+    		"$login/$uid/$gid/$root/$name/$hdir/$glist\n";
+    	    
+    	    os_usermod($login, $gid, "$glist", $pswd, $root, $shell)
+    		if ($doit);
+
+    	    #
+    	    # Note that we changed the info for next time.
+    	    # 
+    	    $PWDDB{$login} = "$uid:$serial";
+    	}
+    }
+    else {
+    	print "Adding: $login/$uid/$gid/$root/$name/$hdir/$glist\n";
+    	push(@addedUsers, $login);
+
+    	#
+    	# Force doupdate below if the home directory does not exist.
+    	# Might be a local node that does not mount /user from ops.
+    	# Or a remote node.
+    	#
+    	$doupdate = 1
+    	    if (! -e $hdir);
+    	
+    	if ($doit &&
+    	    os_useradd($login, $uid, $gid, $pswd, 
+    		       "$glist", $hdir, $name, $root, $shell)) {
+    	    warning("Error adding new user $login");
+    	    next;
+    	}
+
+    	if (PLAB() && ! -e $hdir) {
+    	    if ($doit && !os_mkdir($hdir, "0755")) {
+    		warning("Error creating user homedir");
+    		next;
+    	    }
+    	    chown($uid, $gid, $hdir)
+    		if ($doit);
+    	}
+
+    	# Add to DB only if successful. 
+    	$PWDDB{$login} = "$uid:$serial";
+    }
+
+    #
+    # Anytime the home dir is on a local FS ...
+    # 
+    if ($doit && $doupdate) {
+	#
+	# Must ask for the current home dir since we rely on pw.conf.
+	#
+	my (undef,undef,undef,undef,
+	    undef,undef,undef,$homedir) = getpwuid($uid);
+
+	if (CONTROL() || os_islocaldir($homedir)) {
+	    my $sshdir  = "$homedir/.ssh";
+	    my $forward = "$homedir/.forward";
+
+	    #
+	    # Create .ssh dir and populate it with an authkeys file.
+	    #
+	    TBNewsshKeyfile($sshdir, $uid, $gid, 0,
+			    @{$pubkeys{$login}});
+
+	    #
+	    # Give user a .forward back to emulab.
+	    #
+	    if (! -e $forward) {
+		system("echo '$email' > $forward");
+	
+		chown($uid, $gid, $forward) 
+		    or warning("Could not chown $forward: $!");
+	
+		chmod(0644, $forward) 
+		    or warning("Could not chmod $forward: $!");
+	    }
+	}
+    }
+    }
+    # Write the DB back out!
+    if (! MFS()) {
+	dbmclose(%PWDDB);
+    }
+
+    if (WINDOWS()) {
+	# Make the /etc/group and passwd files.
+	os_accounts_end()
+	    if ($doit);
+
+	# We couldn't do chown'ing before new users were in the /etc/passwd file.
+	if (scalar(@addedUsers) == 0) {
+	    print "No new users needing ssh authorized_keys files.\n";
+	}
+	else {
+	    print "Filling in ssh authorized_keys files for new users.\n";
+	}
+	foreach my $login (@addedUsers) {
+	    $info = $newaccounts{$login};
+		$pswd  = $$info{'pswd'};
+		$uid   = $$info{'uid'};
+		$gid   = $$info{'gid'};
+		$root  = $$info{'root'};
+		$name  = $$info{'name'};
+		$hdir  = $$info{'homedir'};
+
+		# We have to put the authorized_keys files somewhere that they
+		# won't be covered up by the Samba homedir mounts.
+		# 
+		# The SMB protocol (whether served by Samba or Microsoft)
+		# doesn't provide fine-grained control over file and directory
+		# permissions, just coarse control over the whole share mount.
+		# Hence sshd will ignore the keys files if they're remote.
+		# 
+		# This matches a line like this in /etc/sshd_config:
+		# AuthorizedKeysFile /sshkeys/%u/authorized_keys
+		my $sshdir = "/sshkeys/$login";
+		print "    $sshdir\n";
+
+		# Open up an existing key dir to the root user.  Even though root
+		# is in the Administrators group, it's locked out by permissions.
+		$cmd = "$CHMOD 777 $sshdir";
+		if ($doit && -e $sshdir && system($cmd) != 0) {
+		    warning("Failed $cmd: $!");
+		}
+		$cmd = "$CHOWN -R root $sshdir";
+		if ($doit && -e $sshdir && system($cmd) != 0) {
+		    warning("Failed $cmd: $!");
+		}
+
+		# Create .ssh dir and populate it with an authkeys file.
+		if ($doit) {
+		    TBNewsshKeyfile($sshdir, $uid, $gid, 0,
+				    @{$pubkeys{$login}});
+		}
+
+		# Set the ownership of the home directory / mount point / keys.
+		# Use the system chown by name, not UID.  Can't use chown -R, it goes
+		# top-down, chowning the directory away and then trying to read it.
+		my $cmd = "$CHOWN $login $sshdir/*";
+		if ($doit && system($cmd) != 0) {
+		    warning("Failed $cmd: $!");
+		}
+		$cmd = "$CHOWN $login $sshdir";
+		if ($doit && system($cmd) != 0) {
+		    warning("Failed $cmd: $!");
+		}
+		$cmd = "$CHMOD 700 $sshdir";
+		if ($doit && system($cmd) != 0) {
+		    warning("Failed $cmd: $!");
+		}
+	}
+    }
+
+    #
+    # Create sfs_users file and populate it with public SFS keys
+    #
+    if ($doit && USESFS()) {
+	my $sfsusers = "/etc/sfs/sfs_users";
+	
+	if (!open(SFSKEYS, "> ${sfsusers}.new")) {
+	    warning("Could not open ${sfsusers}.new: $!");
+	    goto bad;
+	}
+	    
+	print SFSKEYS "#\n";
+	print SFSKEYS "# DO NOT EDIT! This file auto generated by ".
+	    "Emulab.Net account software.\n";
+	print SFSKEYS "#\n";
+	print SFSKEYS "# Please use the web interface to edit your ".
+	    "SFS public key list.\n";
+	print SFSKEYS "#\n";
+	foreach my $key (@sfskeys) {
+	    print SFSKEYS "$key\n";
+	}
+	close(SFSKEYS);
+
+	if (!chown(0, 0, "${sfsusers}.new")) {
+	    warning("Could not chown ${sfsusers}.new: $!");
+	    goto bad;
+	}
+	if (!chmod(0600, "${sfsusers}.new")) {
+	    warning("Could not chmod ${sfsusers}.new: $!");
+	    goto bad;
+	}
+	    
+	#
+	# If there is an update script, its the new version of SFS.
+	# Run that script to convert the keys over. At some point ops
+	# and the DB will be converted too, and this can go away.
+	#
+	if (-x "/usr/local/lib/sfs/upgradedb.pl") {
+	    system("/usr/local/lib/sfs/upgradedb.pl ${sfsusers}.new");
+	    system("rm -f ${sfsusers}.new.v1-saved-1");
+	}
+
+	# Because sfs_users only contains public keys, sfs_users.pub is
+	# exactly the same
+	if (system("cp -p -f ${sfsusers}.new ${sfsusers}.pub.new")) {
+	    warning("Could not copy ${sfsusers}.new to ".
+		    "${sfsusers}.pub.new: $!");
+	    goto bad;
+	}
+	    
+	if (!chmod(0644, "${sfsusers}.pub.new")) {
+	    warning("Could not chmod ${sfsusers}.pub.new: $!");
+	    goto bad;
+	}
+
+	# Save off old key files and move in new ones
+	foreach my $keyfile ("${sfsusers}", "${sfsusers}.pub") {
+	    if (-e $keyfile) {
+		if (system("cp -p -f $keyfile $keyfile.old")) {
+		    warning("Could not save off $keyfile: $!");
+		    next;
+		}
+		if (!chown(0, 0, "$keyfile.old")) {
+		    warning("Could not chown $keyfile.old: $!");
+		}
+		if (!chmod(0600, "$keyfile.old")) {
+		    warning("Could not chmod $keyfile.old: $!");
+		}
+	    }
+	    if (system("mv -f $keyfile.new $keyfile")) {
+		warning("Could not mv $keyfile.new $keyfile.new!");
+	    }
+	}
+      bad:
+    }
+    return 0;
+}
+
+#
+# Shutdown Action.
+#
+sub doshutdown()
+{
+    # Nothing to do; we leave the accounts as is when we shutdown.
+    # When we update, the boot routine handles adding and deleting
+    # old accounts as needed. 
+
+    # Make the CygWin /etc/passwd and /etc/group files match Windows.
+    os_accounts_sync()
+	if ($doit && WINDOWS());
+}
+
+#
+# Node Reconfig Action (without rebooting).
+#
+sub doreconfig()
+{
+    doshutdown();
+    return doboot();
+}
+
+#
+# Node cleanup action (node is reset to completely clean state).
+#
+sub docleanup()
+{
+    my $pdb = $PASSDB . ".db";
+    my $gdb = $GROUPDB . ".db";
+
+    # RHL9 sillyness; they do not append the .db suffix!
+    unlink $PASSDB
+	if (-e $PASSDB);
+    unlink $GROUPDB
+	if (-e $GROUPDB);
+    
+    unlink $pdb
+	if (-e $pdb);
+    unlink $gdb
+	if (-e $gdb);
+    
+    # Hand this off to liblocsetup to restore default passwd/group files.
+    os_account_cleanup()
+	if ($doit);
+}
+
+#
+# Generate ssh authorized_keys files. Either protocol 1 or 2.
+# Returns 0 on success, -1 on failure.
+#
+sub TBNewsshKeyfile($$$$@)
+{
+    my ($sshdir, $uid, $gid, $protocol, @pkeys) = @_;
+    my $keyfile = "$sshdir/authorized_keys";
+	
+    if (! -e $sshdir) {
+	if (! os_mkdir($sshdir, "0700")) {
+	    warning("TBNewsshKeyfile: Could not os_mkdir $sshdir: $!");
+	    return -1;
+	}
+    }
+
+    if (! WINDOWS()) {
+	# On Windows we'll do the chown'ing at the end.
+	# Right now it would lock out root.
+	if (!chown($uid, $gid, $sshdir)) {
+	    warning("Could not chown $sshdir: $!");
+	    return -1;
+	}
+    }
+
+    if ($protocol == 2) {
+	$keyfile .= "2";
+    }
+
+    if (!open(AUTHKEYS, "> ${keyfile}.new")) {
+	warning("Could not open ${keyfile}.new: $!");
+	return -1;
+    }
+    print AUTHKEYS "#\n";
+    print AUTHKEYS "# DO NOT EDIT! This file auto generated by ".
+	"Emulab.Net account software.\n";
+    print AUTHKEYS "#\n";
+    print AUTHKEYS "# Please use the web interface to edit your ".
+	"public key list.\n";
+    print AUTHKEYS "#\n";
+    
+    foreach my $key (@pkeys) {
+	print AUTHKEYS "$key\n";
+    }
+    close(AUTHKEYS);
+
+    if (! WINDOWS() && !chown($uid, $gid, "${keyfile}.new")) {
+	warning("Could not chown ${keyfile}.new: $!");
+	return -1;
+    }
+    if (!chmod(0600, "${keyfile}.new")) {
+	warning("Could not chmod ${keyfile}.new: $!");
+	return -1;
+    }
+    if (-e "${keyfile}") {
+	if (system("cp -p -f ${keyfile} ${keyfile}.old")) {
+	    warning("Could not save off ${keyfile}: $!");
+	    return -1;
+	}
+	if (! WINDOWS() && !chown($uid, $gid, "${keyfile}.old")) {
+	    warning("Could not chown ${keyfile}.old: $!");
+	}
+	if (!chmod(0600, "${keyfile}.old")) {
+	    warning("Could not chmod ${keyfile}.old: $!");
+	}
+    }
+    if (system("mv -f ${keyfile}.new ${keyfile}")) {
+	warning("Could not mv ${keyfile}.new to ${keyfile}");
+    }
+    return 0;
+}

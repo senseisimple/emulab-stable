@@ -1,0 +1,541 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004, 2005, 2006, 2007, 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# This script is run directly from boot. It should NOT be run after
+# that since some stuff is not setup to properly restart yet. For
+# general reconfig or update, use rc.config instead.
+#
+sub usage()
+{
+    print "Usage: " . scriptname() . "[-b] boot|shutdown|reconfig|reset\n";
+    exit(1);
+}
+my $optlist    = "b";
+my $background = 0;
+my $action     = "boot";
+
+# Turn off line buffering on output
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+# Only root.
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use libtmcc;
+use librc;
+
+# Script specific goo.
+my $RCDIR	= "$BINDIR/rc";
+my $LOGFILE	= "$LOGDIR/bootsetup.debug";
+my $BOOTLOG     = "/var/log/emulab.bootlog";
+my %TMCCTIMEOUT	= (REMOTE() ? ("timeout" => 5) : ());
+
+# Protos.
+sub doboot();
+sub doshutdown();
+sub doreconfig();
+sub docleanup();
+sub BootFatal($$);
+
+#
+# If this is the MFS, hand off to that script.
+#
+if (MFS()) {
+    exec("$RCDIR/rc.mfs", @ARGV);
+    die("*** $0:\n".
+	"    Could not exec $RCDIR/rc.mfs!\n");
+}
+
+# Parse command line.
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{'b'})) {
+    $background = 1;
+}
+# Allow default above.
+if (@ARGV) {
+    $action = $ARGV[0];
+}
+
+#
+# Booting up. If this is a widearea node, we do not want to hang
+# on boss if its down, but instead let the machine boot and do this
+# stuff later.
+#
+if (REMOTE() && $action eq "boot") {
+    require POSIX;
+    import POSIX;
+
+    if (TBBackGround($BOOTLOG)) {
+	sleep(1);
+	exit(0);
+    }
+    # Fully disconnect from bootup. 
+    POSIX::setsid();
+    # Let the boot continue on for a bit.
+    sleep(5);
+}
+
+#
+# We want to save all of the output off, but also dup it to the console.
+#
+if ($action eq "boot" || $action eq "reconfig") {
+    open(LOG, "> $LOGFILE") or
+	BootFatal(-1, "Could not open $LOGFILE!");
+    my $ofh = select(LOG);
+    $| = 1;
+    select($ofh);
+    
+    #
+    # This open implicitly forks a child, which goes on to execute the rest
+    # of the script. The parent is going to sit in this loop and capture the
+    # output of the child, writing it to the logfile and to the console.
+    #
+    my $pid = open(FOO, "-|");
+    BootFatal($? >> 8, "Boot Failure; popen failed!")
+	if (!defined($pid));
+    
+    if ($pid) {
+	while (<FOO>) {
+	    print LOG $_;
+	    if ($action ne "reconfig") {
+		print "$_";
+	    }
+	}
+	close(LOG);
+	close(FOO);
+	if ($?) {
+	    BootFatal($? >> 8, "Boot Failure!");
+	}
+	exit(0);
+    }
+
+    if ($action eq "reconfig") {
+	# Need this or ssh will hang, even though it was called with -n option.
+	open(STDIN, "</dev/null");
+    }
+    if (REMOTE()) {
+	# Maybe just do this all the time. 
+	open(STDERR, ">&STDOUT");
+    }
+}
+
+# Execute the action.
+SWITCH: for ($action) {
+    /^boot$/i && do {
+	doboot();
+	last SWITCH;
+    };
+    /^shutdown$/i && do {
+	doshutdown();
+	last SWITCH;
+    };
+    /^reconfig$/i && do {
+	doreconfig();
+	last SWITCH;
+    };
+    /^reset$/i && do {
+	docleanup();
+	last SWITCH;
+    };
+    fatal("Invalid action: $action\n");
+}
+exit(0);
+
+#
+# This version of fatal sends the console log to tmcd, and then generates
+# a TBFAILED state transition. 
+#
+sub BootFatal($$)
+{
+    my ($code, $msg) = @_;
+    
+    print "$msg\n";
+
+    #
+    # Send the console log to the server.
+    #
+    if (-e $LOGFILE && -s $LOGFILE &&
+	tmcc(TMCCCMD_BOOTLOG, "", undef,
+	     ("datafile" => $LOGFILE, "timeout" => 5)) < 0) {
+	print "Error sending TBFAILED to Emulab Control!\n";
+    }
+    
+    # XXX "--" ensures that code < 0 is not interpreted as a tmcc cmdline arg
+    if (tmcc(TMCCCMD_BOOTERRNO, "-- $code", undef, %TMCCTIMEOUT) < 0) {
+	print "Error sending boot errno to Emulab Control!\n";
+    }
+    
+    if (tmcc(TMCCCMD_STATE, "TBFAILED", undef, %TMCCTIMEOUT) < 0) {
+	print "Error sending TBFAILED to Emulab Control!\n";
+    }
+    exit($code);
+}
+
+#
+# Boot Action.
+#
+sub doboot()
+{
+    #
+    # Sort of a hodgepodge of stuff!
+    #
+    # Get the boss info for below.
+    my ($bossname, $bossip) = tmccbossinfo();
+    if (!defined($bossname)) {
+	fatal("Could not determine the name of the boss server!");
+    }
+
+    #
+    # We need a hostname that resolves to something. If we get here and
+    # there is no hostname, set it.
+    #
+    if (REMOTE()) {
+	my $curname = `hostname -s`;
+	if (! ($curname =~ /.+/)) {
+	    my ($domain) = ($bossname =~ /^[^\.]+\.(.*)$/);
+	    my %tmccresults;
+	    
+	    if (tmcc(TMCCCMD_NODEID, undef, \%tmccresults) < 0) {
+		fatal("Could not get nodeid from tmccd!");
+	    }
+	    my $nodeid = $tmccresults{'id'};
+	
+	    print STDERR
+		"Hostname not set. Setting it to ${nodeid}.${domain}\n";
+	    
+	    if (system("hostname", "${nodeid}.${domain}")) {
+		fatal("sethostname failed!");
+	    }
+	    # Delay a moment to let things settle down.
+	    sleep(5);
+	}
+    }
+
+    #
+    # Check for an os dependent initialization script.
+    #
+    my $os_script = "rc." . lc($OSNAME);
+    if (-x "$RCDIR/$os_script") {
+        print("Running os dependent initialization script $os_script\n");    
+	system("$RCDIR/$os_script");
+	if ($?) {
+	    fatal("Error running $RCDIR/$os_script");
+	}
+    }
+
+    #
+    # Check for kernel rename first. Probably not required so early.
+    #
+    if (-x "$RCDIR/rc.kname") {
+	system("$RCDIR/rc.kname");
+	if ($?) {
+	    fatal("Error running $RCDIR/rc.kname");
+	}
+    }
+
+    if (-x "$BINDIR/tbshutdown" && ! WINDOWS()) {
+        print("Starting up shutdown notification daemon\n");
+        system("$BINDIR/tbshutdown");
+	if ($?) {
+	    fatal("Error running $BINDIR/tbshutdown");
+	}
+    }
+
+    print("Informing Emulab Control that we have rebooted\n");
+    if (tmcc(TMCCCMD_STATE, "TBSETUP") < 0) {
+	fatal("Error sending TBSETUP to Emulab Control!");
+    }
+
+    # Now we get into the real work.
+    print("Checking Testbed reservation status\n");
+    my ($pid, $eid, $vname) = bootsetup();
+
+    #
+    # This stuff is run regardless of reservation status.
+    #
+    if (-x "$RCDIR/rc.ipod" && ! WINDOWS()) {
+	print("Setting up Ping of Death\n");
+	system("$RCDIR/rc.ipod");
+	# This is allowed to fail; ipod might not be supported.
+    }
+
+    if (-x "$RCDIR/rc.healthd" && ! (WINDOWS() || REMOTE())) {
+	print("Starting node health monitoring daemon\n");
+	system("$RCDIR/rc.healthd start");
+	# If it fails, that is okay. Keep going.
+    }
+    
+    if (-x "$RCDIR/rc.slothd" && ! REMOTE()) {
+	print("Starting slothd usage detector\n");
+	system("$RCDIR/rc.slothd start");
+	if ($?) {
+	    fatal("Error running $RCDIR/rc.slothd");
+	}
+    }
+
+    if (-x "$BINDIR/watchdog") {
+        print("Starting testbed update watchdog\n");
+	system("$BINDIR/watchdog start");
+	if ($?) {
+	    fatal("Error running $BINDIR/watchdog");
+	}
+    }
+
+    #
+    # Run the stargate startup if necessary
+    # 
+    if (-x "$RCDIR/rc.stargate" && STARGATE()) {
+        print("Firing off garcia/stargate processes\n");
+        system("$RCDIR/rc.stargate start");
+        if ($?) {
+            fatal("Error running $RCDIR/rc.stargate");
+        }
+    }
+
+    #
+    # At this point, if we are a free node just run the config scripts
+    # to clean things up, although there should not be anything to clean
+    # up. We do it anyway just to be safe.
+    #
+    if (!defined($pid)) {
+	if (-x "$RCDIR/rc.config") {
+	    print("Resetting node to a clean state\n");
+	    system("$RCDIR/rc.config reset");
+	    if ($?) {
+		fatal("Error running $RCDIR/rc.config");
+	    }
+	}
+	# And then we are done. 
+	goto isfree;
+    }
+
+    #
+    # Start the elvin proxy.
+    #
+    if (-x "$BINDIR/evproxy" && !REMOTE()) {
+	print("Starting elvin proxy daemon\n");
+	system("$BINDIR/evproxy -s event-server -e $pid/$eid");
+	if ($?) {
+	    fatal("Error running $BINDIR/evproxy");
+	}
+    }
+
+    #
+    # This is where we run all of the config scripts. These talk to the
+    # DB and setup the node the way it is supposed to be. 
+    # 
+    print("Running config scripts\n");
+    system("$RCDIR/rc.config boot");
+    if ($?) {
+	fatal("Error running $RCDIR/rc.config");
+    }
+
+    if (-x "$RCDIR/rc.canaryd" && -x "$BINDIR/canaryd" && !REMOTE()) {
+	print("Starting canaryd usage tracer\n");
+	system("$RCDIR/rc.canaryd start");
+	if ($?) {
+	    fatal("Error running $RCDIR/rc.canaryd");
+	}
+    }
+
+    #
+    # Start the linktest daemon. This script will exit without running
+    # linktest is the node is hosting SIM or JAILS.
+    #
+    if (-x "$RCDIR/rc.linktest" && !REMOTE()) {
+	system("$RCDIR/rc.linktest start");
+	if ($?) {
+	    fatal("Error running $RCDIR/rc.linktest");
+	}
+    }
+
+    #
+    # The simulator might run here, and that is special. It will send its
+    # own ISUP. Sounds icky. 
+    #
+    if (-x TMSIMRC) {
+	print("Starting Network Simulation; ISUP delayed until later\n");
+	system(TMSIMRC);
+	if ($?) {
+	    fatal("Error running " . TMSIMRC);
+	}
+	# We are done. 
+	return;
+    }
+
+    # Now send ISUP
+    print("Informing Emulab Control that we are up and running\n");
+    if (tmcc(TMCCCMD_STATE, "ISUP") < 0) {
+	fatal("Error sending ISUP to Emulab Control!");
+    }
+
+    #
+    # After everything is setup, run any startup command.
+    #
+    # Note that this mechanism is only used for the admin MFS now,
+    # regular user startup commands are run via the program agent.
+    #
+    if (-x "$RCDIR/rc.startcmd") {
+	TBDebugTimeStamp("running $RCDIR/rc.startcmd");
+	system("$RCDIR/rc.startcmd boot");
+	if ($?) {
+	    fatal("Error running $RCDIR/rc.startcmd");
+	}
+    }
+
+    #
+    # Boot vnodes. Doing it after ISUP is better; os_setup will
+    # consider the node ready, and move onto waiting for vnodes to
+    # boot. Ditto for subnodes below which should be merged with vnodes.
+    #
+    if (-x "$BINDIR/bootvnodes") {
+	print("Booting up vnodes\n");
+	# Foreground mode.
+	system("$BINDIR/bootvnodes -f");
+	if ($?) {
+	    fatal("Error running $BINDIR/bootvnodes");
+	}
+    }
+    if (-x "$BINDIR/bootsubnodes") {
+	print("Booting up subnodes\n");
+	# Foreground mode.
+	system("$BINDIR/bootsubnodes -f");
+	if ($?) {
+	    fatal("Error running $BINDIR/bootsubnodes");
+	}
+    }
+
+    # we are done!
+    return;
+
+  isfree:
+    print("Informing Emulab Control that we are up and running\n");
+    if (tmcc(TMCCCMD_STATE, "ISUP") < 0) {
+	fatal("Error sending ISUP to Emulab Control!");
+    }
+    if (-x "$BINDIR/bootsubnodes") {
+	print("Booting up subnodes\n");
+	# Foreground mode.
+	system("$BINDIR/bootsubnodes -f");
+	if ($?) {
+	    fatal("Error running $BINDIR/bootsubnodes");
+	}
+    }
+}
+
+#
+# Shutdown Action.
+#
+sub doshutdown()
+{
+    #
+    # Halt vnodes. The filesystems are left intact!
+    #
+    if (-x "$BINDIR/bootvnodes") {
+	print("Halting vnodes\n");
+	# Foreground mode.
+	system("$BINDIR/bootvnodes -f -h");
+	if ($?) {
+	    fatal("Error running $BINDIR/bootvnodes");
+	}
+    }
+
+    print("Informing Emulab Control that we are are rebooting\n");
+    if (tmcc(TMCCCMD_STATE, "SHUTDOWN", undef, %TMCCTIMEOUT) < 0) {
+	fatal("Error sending SHUTDOWN to Emulab Control!");
+    }
+}
+
+#
+# Node Reconfig Action (without rebooting).
+#
+sub doreconfig()
+{
+    print("Informing Emulab Control that we are doing a reconfig\n");
+    if (tmcc(TMCCCMD_STATE, "TBSETUP") < 0) {
+	fatal("Error sending TBSETUP to Emulab Control!");
+    }
+
+    #
+    # Very hacky. These options just tell bootvnodes to halt/kill vnodes.
+    # 
+    if (-x "$BINDIR/bootvnodes") {
+	print("Halting vnodes\n");
+	# Foreground mode. -c is "reconfig" mode.
+	system("$BINDIR/bootvnodes -f -c -h");
+	if ($?) {
+	    fatal("Error running $BINDIR/bootvnodes");
+	}
+    }
+
+    #
+    # Now tell the node to reconfig, but first have to make sure we have the
+    # right hostname since that can change to. Silly, stupid, dumb. Will
+    # probably break anyway since DHCP has to run again as well.
+    # 
+    if (-x "$BINDIR/sethostname") {
+	print("Setting hostname\n");
+	# Foreground mode.
+	system("$BINDIR/sethostname");
+	if ($?) {
+	    fatal("Error running $BINDIR/sethostname");
+	}
+
+    }
+
+    print("Running reconfig scripts\n");
+    system("$RCDIR/rc.config reconfig");
+    if ($?) {
+	fatal("Error running $RCDIR/rc.config");
+    }
+
+    #
+    # And (re)boot vnodes. As with boot, doing it after ISUP is better;
+    # os_setup will consider the node ready, and move onto waiting for
+    # vnodes to boot.
+    #
+    print("Informing Emulab Control that we are back up and running\n");
+    if (tmcc(TMCCCMD_STATE, "ISUP") < 0) {
+	fatal("Error sending ISUP to Emulab Control!");
+    }
+
+    #
+    # And (re)boot vnodes.
+    #
+    if (-x "$BINDIR/bootvnodes") {
+	print("Booting vnodes\n");
+	# Foreground mode. -c is "reconfig" mode.
+	system("$BINDIR/bootvnodes -f -c -b");
+	if ($?) {
+	    fatal("Error running $BINDIR/bootvnodes");
+	}
+    }
+    
+    return 0;
+}
+
+#
+# Node cleanup action (node is reset to completely clean state).
+#
+sub docleanup()
+{
+}
