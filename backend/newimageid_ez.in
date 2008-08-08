@@ -485,12 +485,18 @@ if (!$isadmin && defined($node_id)) {
     while (my ($ntype) = $query_result->fetchrow_array()) {
 	$otypes{$ntype} = 1;
     }
+    my @invalid_node_types;
     foreach my $ntype (@mtype_keys) {
         $ntype =~ s/^mtype_//;
 	if (!exists($otypes{$ntype})) {
-	    UserError("Node Types: Current image on $node_id".
-		      " cannot run on node type $ntype");
+	    push @invalid_node_types, $ntype;
 	}
+    }
+    if (@invalid_node_types) {
+	UserError("Node Types: Current image on $node_id".
+		  " cannot run on the following node types: ". 
+		  join(' ', @invalid_node_types));
+		  
     }
 }
 
