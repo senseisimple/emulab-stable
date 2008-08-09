@@ -25,6 +25,8 @@ $to_wiki = array(
   'hardware-emulab.net.html' => 'UtahHardware',
   'auth.html' => 'Auth',
   'otheremulabs.html' => 'OtherEmulabs',
+  'swapping.html' => 'Swapping',
+  'software.html' => 'software'
 );
 
 #
