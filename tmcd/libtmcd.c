@@ -229,9 +229,7 @@ XML_COMMAND_PROTOTYPE(dosyncserver);
 XML_COMMAND_PROTOTYPE(dokeyhash);
 XML_COMMAND_PROTOTYPE(doeventkey);
 XML_COMMAND_PROTOTYPE(dofullconfig);
-#if 0
 XML_COMMAND_PROTOTYPE(doroutelist);
-#endif
 XML_COMMAND_PROTOTYPE(dorole);
 XML_COMMAND_PROTOTYPE(dorusage);
 XML_COMMAND_PROTOTYPE(dodoginfo);
@@ -278,6 +276,7 @@ RAW_COMMAND_PROTOTYPE(dobootlog);
 #define F_MAXLOG	0x04	/* record maximal logging info normally */
 #define F_ALLOCATED	0x08	/* node must be allocated to make call */
 #define F_REMNOSSL	0x10	/* remote nodes can request without SSL */
+#define F_UDP		0x20	/* call may be made via UDP */
 
 struct command {
 	char	*cmdname;
@@ -285,70 +284,68 @@ struct command {
 	int	flags;
 	int    (*func)(xmlNode *, tmcdreq_t *, char *);
 } xml_command_array[] = {
-	{ "reboot",	  FULLCONFIG_NONE, 0, doreboot },
-	{ "nodeid",	  FULLCONFIG_ALL,  0, donodeid },
-	{ "status",	  FULLCONFIG_NONE, 0, dostatus },
-	{ "ifconfig",	  FULLCONFIG_ALL,  F_ALLOCATED, doifconfig },
+	{ "reboot",	  FULLCONFIG_NONE, F_UDP, doreboot },
+	{ "nodeid",	  FULLCONFIG_ALL,  F_UDP, donodeid },
+	{ "status",	  FULLCONFIG_NONE, F_UDP, dostatus },
+	{ "ifconfig",	  FULLCONFIG_ALL,  F_UDP|F_ALLOCATED, doifconfig },
 	{ "accounts",	  FULLCONFIG_ALL,  0, doaccounts },
-	{ "delay",	  FULLCONFIG_ALL,  F_ALLOCATED, dodelay },
-	{ "linkdelay",	  FULLCONFIG_ALL,  F_ALLOCATED, dolinkdelay },
-	{ "hostnames",	  FULLCONFIG_NONE, F_ALLOCATED, dohosts },
-	{ "rpms",	  FULLCONFIG_ALL,  F_ALLOCATED, dorpms },
-	{ "deltas",	  FULLCONFIG_NONE, F_ALLOCATED, dodeltas },
-	{ "tarballs",	  FULLCONFIG_ALL,  F_ALLOCATED, dotarballs },
-	{ "startupcmd",	  FULLCONFIG_ALL,  F_ALLOCATED, dostartcmd },
-	{ "startstatus",  FULLCONFIG_NONE, F_ALLOCATED, dostartstat }, /* Before startstat*/
-	{ "startstat",	  FULLCONFIG_NONE, 0, dostartstat },
-	{ "readycount",   FULLCONFIG_NONE, F_ALLOCATED, doreadycount },
-	{ "ready",	  FULLCONFIG_NONE, F_ALLOCATED, doready },
-	{ "mounts",	  FULLCONFIG_ALL,  F_ALLOCATED, domounts },
-	{ "sfshostid",	  FULLCONFIG_NONE, F_ALLOCATED, dosfshostid },
-	{ "loadinfo",	  FULLCONFIG_NONE, 0, doloadinfo},
-	{ "reset",	  FULLCONFIG_NONE, 0, doreset},
-	{ "routing",	  FULLCONFIG_ALL,  F_ALLOCATED, dorouting},
-	{ "trafgens",	  FULLCONFIG_ALL,  F_ALLOCATED, dotrafgens},
+	{ "delay",	  FULLCONFIG_ALL,  F_UDP|F_ALLOCATED, dodelay },
+	{ "linkdelay",	  FULLCONFIG_ALL,  F_UDP|F_ALLOCATED, dolinkdelay },
+	{ "hostnames",	  FULLCONFIG_NONE, F_UDP|F_ALLOCATED, dohosts },
+	{ "rpms",	  FULLCONFIG_ALL,  F_UDP|F_ALLOCATED, dorpms },
+	{ "deltas",	  FULLCONFIG_NONE, F_UDP|F_ALLOCATED, dodeltas },
+	{ "tarballs",	  FULLCONFIG_ALL,  F_UDP|F_ALLOCATED, dotarballs },
+	{ "startupcmd",	  FULLCONFIG_ALL,  F_UDP|F_ALLOCATED, dostartcmd },
+	{ "startstatus",  FULLCONFIG_NONE, F_UDP|F_ALLOCATED, dostartstat }, /* Before startstat*/
+	{ "startstat",	  FULLCONFIG_NONE, F_UDP, dostartstat },
+	{ "readycount",   FULLCONFIG_NONE, F_UDP|F_ALLOCATED, doreadycount },
+	{ "ready",	  FULLCONFIG_NONE, F_UDP|F_ALLOCATED, doready },
+	{ "mounts",	  FULLCONFIG_ALL,  F_UDP|F_ALLOCATED, domounts },
+	{ "sfshostid",	  FULLCONFIG_NONE, F_UDP|F_ALLOCATED, dosfshostid },
+	{ "loadinfo",	  FULLCONFIG_NONE, F_UDP, doloadinfo},
+	{ "reset",	  FULLCONFIG_NONE, F_UDP, doreset},
+	{ "routing",	  FULLCONFIG_ALL,  F_UDP|F_ALLOCATED, dorouting},
+	{ "trafgens",	  FULLCONFIG_ALL,  F_UDP|F_ALLOCATED, dotrafgens},
 	{ "nseconfigs",	  FULLCONFIG_ALL,  F_ALLOCATED, donseconfigs},
-	{ "creator",	  FULLCONFIG_ALL,  F_ALLOCATED, docreator},
-	{ "state",	  FULLCONFIG_NONE, 0, dostate},
-	{ "tunnels",	  FULLCONFIG_ALL,  F_ALLOCATED, dotunnels},
-	{ "vnodelist",	  FULLCONFIG_PHYS, 0, dovnodelist},
-	{ "subnodelist",  FULLCONFIG_PHYS, 0, dosubnodelist},
-	{ "isalive",	  FULLCONFIG_NONE, F_REMUDP|F_MINLOG, doisalive},
+	{ "creator",	  FULLCONFIG_ALL,  F_UDP|F_ALLOCATED, docreator},
+	{ "state",	  FULLCONFIG_NONE, F_UDP, dostate},
+	{ "tunnels",	  FULLCONFIG_ALL,  F_UDP|F_ALLOCATED, dotunnels},
+	{ "vnodelist",	  FULLCONFIG_PHYS, F_UDP, dovnodelist},
+	{ "subnodelist",  FULLCONFIG_PHYS, F_UDP, dosubnodelist},
+	{ "isalive",	  FULLCONFIG_NONE, F_UDP|F_REMUDP|F_UDP|F_MINLOG, doisalive},
 	{ "ipodinfo",	  FULLCONFIG_PHYS, 0, doipodinfo},
 	{ "ntpinfo",	  FULLCONFIG_PHYS, 0, dontpinfo},
 	{ "ntpdrift",	  FULLCONFIG_NONE, 0, dontpdrift},
-	{ "jailconfig",	  FULLCONFIG_VIRT, F_ALLOCATED, dojailconfig},
-	{ "plabconfig",	  FULLCONFIG_VIRT, F_ALLOCATED, doplabconfig},
-	{ "subconfig",	  FULLCONFIG_NONE, 0, dosubconfig},
-        { "sdparams",     FULLCONFIG_PHYS, 0, doslothdparams},
-        { "programs",     FULLCONFIG_ALL,  F_ALLOCATED, doprogagents},
-        { "syncserver",   FULLCONFIG_ALL,  F_ALLOCATED, dosyncserver},
-        { "keyhash",      FULLCONFIG_ALL,  F_ALLOCATED, dokeyhash},
-        { "eventkey",     FULLCONFIG_ALL,  F_ALLOCATED, doeventkey},
-        { "fullconfig",   FULLCONFIG_NONE, F_ALLOCATED, dofullconfig},
-#if 0
-        { "routelist",	  FULLCONFIG_PHYS, F_ALLOCATED, doroutelist},
-#endif
-        { "role",	  FULLCONFIG_PHYS, F_ALLOCATED, dorole},
-        { "rusage",	  FULLCONFIG_NONE, F_REMUDP|F_MINLOG, dorusage},
-        { "watchdoginfo", FULLCONFIG_ALL,  F_REMUDP|F_MINLOG, dodoginfo},
-        { "hostkeys",     FULLCONFIG_NONE, 0, dohostkeys},
-        { "firewallinfo", FULLCONFIG_ALL,  0, dofwinfo},
-        { "hostinfo",     FULLCONFIG_NONE, 0, dohostinfo},
-	{ "emulabconfig", FULLCONFIG_NONE, F_ALLOCATED, doemulabconfig},
-	{ "eplabconfig",  FULLCONFIG_NONE, F_ALLOCATED, doeplabconfig},
-	{ "localization", FULLCONFIG_PHYS, 0, dolocalize},
-	{ "booterrno",    FULLCONFIG_NONE, 0, dobooterrno},
-	{ "battery",      FULLCONFIG_NONE, F_REMUDP|F_MINLOG, dobattery},
-	{ "userenv",      FULLCONFIG_ALL,  F_ALLOCATED, douserenv},
-	{ "tiptunnels",	  FULLCONFIG_ALL,  F_ALLOCATED, dotiptunnels},
-	{ "traceinfo",	  FULLCONFIG_ALL,  F_ALLOCATED, dotraceconfig },
-	{ "elvindport",   FULLCONFIG_NONE, 0, doelvindport},
-	{ "plabeventkeys",FULLCONFIG_NONE, 0, doplabeventkeys},
-	{ "intfcmap",     FULLCONFIG_NONE, 0, dointfcmap},
-	{ "motelog",      FULLCONFIG_ALL,  F_ALLOCATED, domotelog},
-	{ "portregister", FULLCONFIG_NONE, F_REMNOSSL, doportregister},
-	{ "bootwhat",	  FULLCONFIG_NONE, 0, dobootwhat },
+	{ "jailconfig",	  FULLCONFIG_VIRT, F_UDP|F_ALLOCATED, dojailconfig},
+	{ "plabconfig",	  FULLCONFIG_VIRT, F_UDP|F_ALLOCATED, doplabconfig},
+	{ "subconfig",	  FULLCONFIG_NONE, F_UDP, dosubconfig},
+        { "sdparams",     FULLCONFIG_PHYS, F_UDP, doslothdparams},
+        { "programs",     FULLCONFIG_ALL,  F_UDP|F_ALLOCATED, doprogagents},
+        { "syncserver",   FULLCONFIG_ALL,  F_UDP|F_ALLOCATED, dosyncserver},
+        { "keyhash",      FULLCONFIG_ALL,  F_UDP|F_ALLOCATED, dokeyhash},
+        { "eventkey",     FULLCONFIG_ALL,  F_UDP|F_ALLOCATED, doeventkey},
+        { "fullconfig",   FULLCONFIG_NONE, F_UDP|F_ALLOCATED, dofullconfig},
+        { "routelist",	  FULLCONFIG_PHYS, F_UDP|F_ALLOCATED, doroutelist},
+        { "role",	  FULLCONFIG_PHYS, F_UDP|F_ALLOCATED, dorole},
+        { "rusage",	  FULLCONFIG_NONE, F_UDP|F_REMUDP|F_UDP|F_MINLOG, dorusage},
+        { "watchdoginfo", FULLCONFIG_ALL,  F_UDP|F_REMUDP|F_UDP|F_MINLOG, dodoginfo},
+        { "hostkeys",     FULLCONFIG_NONE, F_UDP, dohostkeys},
+        { "firewallinfo", FULLCONFIG_ALL,  F_UDP, dofwinfo},
+        { "hostinfo",     FULLCONFIG_NONE, F_UDP, dohostinfo},
+	{ "emulabconfig", FULLCONFIG_NONE, F_UDP|F_ALLOCATED, doemulabconfig},
+	{ "eplabconfig",  FULLCONFIG_NONE, F_UDP|F_ALLOCATED, doeplabconfig},
+	{ "localization", FULLCONFIG_PHYS, F_UDP, dolocalize},
+	{ "booterrno",    FULLCONFIG_NONE, F_UDP, dobooterrno},
+	{ "battery",      FULLCONFIG_NONE, F_UDP|F_REMUDP|F_UDP|F_MINLOG, dobattery},
+	{ "userenv",      FULLCONFIG_ALL,  F_UDP|F_ALLOCATED, douserenv},
+	{ "tiptunnels",	  FULLCONFIG_ALL,  F_UDP|F_ALLOCATED, dotiptunnels},
+	{ "traceinfo",	  FULLCONFIG_ALL,  F_UDP|F_ALLOCATED, dotraceconfig },
+	{ "elvindport",   FULLCONFIG_NONE, F_UDP, doelvindport},
+	{ "plabeventkeys",FULLCONFIG_NONE, F_UDP, doplabeventkeys},
+	{ "intfcmap",     FULLCONFIG_NONE, F_UDP, dointfcmap},
+	{ "motelog",      FULLCONFIG_ALL,  F_UDP|F_ALLOCATED, domotelog},
+	{ "portregister", FULLCONFIG_NONE, F_UDP|F_REMNOSSL, doportregister},
+	{ "bootwhat",	  FULLCONFIG_NONE, F_UDP, dobootwhat },
 };
 static int numcommands = sizeof(xml_command_array)/sizeof(struct command);
 
@@ -358,10 +355,10 @@ struct raw_command {
 	int	flags;
 	int    (*func)(char **, int *, int, tmcdreq_t *, char *);
 } raw_xml_command_array[] = {
-	{ "bootlog",      FULLCONFIG_NONE, 0, dobootlog},
-	{ "ltmap",        FULLCONFIG_NONE, F_MINLOG|F_ALLOCATED, doltmap},
-	{ "ltpmap",       FULLCONFIG_NONE, F_MINLOG|F_ALLOCATED, doltpmap},
-	{ "topomap",      FULLCONFIG_NONE, F_MINLOG|F_ALLOCATED, dotopomap},
+	{ "bootlog",      FULLCONFIG_NONE, F_UDP, dobootlog},
+	{ "ltmap",        FULLCONFIG_NONE, F_UDP|F_MINLOG|F_ALLOCATED, doltmap},
+	{ "ltpmap",       FULLCONFIG_NONE, F_UDP|F_MINLOG|F_ALLOCATED, doltpmap},
+	{ "topomap",      FULLCONFIG_NONE, F_UDP|F_MINLOG|F_ALLOCATED, dotopomap},
 };
 static int numrawcommands = sizeof(raw_xml_command_array)/sizeof(struct raw_command);
 
@@ -489,6 +486,13 @@ tmcdresp_t *tmcd_handle_request(int sock, char *command, char *rdata, tmcdreq_t 
 			goto skipit;
 		}
 
+	}
+
+	/* If this is a UDP request, make sure it is allowed */
+	if (!reqp->istcp && (flags & F_UDP) == 0) {
+		error("%s: %s: Invalid UDP request from node\n",
+		      reqp->nodeid, command);
+		goto skipit;
 	}
 
 	/*
@@ -650,7 +654,7 @@ XML_COMMAND_PROTOTYPE(doifconfig)
 	MYSQL_ROW	row;
 	char		clause[BUFSIZ];
 	char		buf[MYBUFSIZE];
-	xmlNode		*node;
+	xmlNode		*node, *ifconfigNode;
 	int		nrows;
 	int		num_interfaces=0;
 
@@ -688,6 +692,8 @@ XML_COMMAND_PROTOTYPE(doifconfig)
 		return 1;
 	}
 
+	ifconfigNode = new_response(root, "ifconfig");
+
 	nrows = (int)mysql_num_rows(res);
 	while (nrows) {
 		row = mysql_fetch_row(res);
@@ -719,7 +725,7 @@ XML_COMMAND_PROTOTYPE(doifconfig)
 			 * We now use the MAC to determine the interface, but
 			 * older images still want that tag at the front.
 			 */
-			node = new_response(root, "interface");
+			node = new_response(ifconfigNode, "interface");
 			add_key(node, "type", type);
 			add_key(node, "inet", row[1]);
 			add_key(node, "mask", mask);
@@ -789,42 +795,32 @@ XML_COMMAND_PROTOTYPE(doifconfig)
 	/*
 	 * Interface settings.
 	 */
-	if (reqp->version>= 16) {
-		res = mydb_query("select i.MAC,s.capkey,s.capval "
-				 "from interface_settings as s "
-				 "left join interfaces as i on "
-				 "     s.node_id=i.node_id and s.iface=i.iface "
-				 "where s.node_id='%s' and %s ",
-				 3,
-				 reqp->issubnode ? reqp->nodeid : reqp->pnodeid,
-				 clause);
+	res = mydb_query("select i.MAC,s.capkey,s.capval "
+			 "from interface_settings as s "
+			 "left join interfaces as i on "
+			 "     s.node_id=i.node_id and s.iface=i.iface "
+			 "where s.node_id='%s' and %s ",
+			 3,
+			 reqp->issubnode ? reqp->nodeid : reqp->pnodeid,
+			 clause);
 
-		if (!res) {
-			error("IFCONFIG: %s: "
-			      "DB Error getting interface_settings!\n",
-			      reqp->nodeid);
-			return 1;
-		}
-		nrows = (int)mysql_num_rows(res);
-		while (nrows) {
-			row = mysql_fetch_row(res);
-			node = new_response(root, "interface-setting");
-			add_key(node, "mac", row[0]);
-			add_key(node, "key", row[1]);
-			add_key(node, "val", row[2]);
-
-			nrows--;
-		}
-		mysql_free_result(res);
+	if (!res) {
+		error("IFCONFIG: %s: "
+		      "DB Error getting interface_settings!\n",
+		      reqp->nodeid);
+		return 1;
 	}
+	nrows = (int)mysql_num_rows(res);
+	while (nrows) {
+		row = mysql_fetch_row(res);
+		node = new_response(ifconfigNode, "interface-settings");
+		add_key(node, "mac", row[0]);
+		add_key(node, "key", row[1]);
+		add_key(node, "val", row[2]);
 
-	/*
-	 * Handle virtual interfaces for both physical nodes (multiplexed
-	 * links) and virtual nodes.  Veths (the first virtual interface type)
-	 * were added in rev 10.
-	 */
-	if (reqp->version< 10)
-		return 0;
+		nrows--;
+	}
+	mysql_free_result(res);
 
 	/*
 	 * First, return config info the physical interfaces underlying
@@ -833,7 +829,7 @@ XML_COMMAND_PROTOTYPE(doifconfig)
 	 * For virtual nodes, we do this just for the physical node;
 	 * no need to send it back for every vnode!
 	 */
-	if (reqp->version>= 18 && !reqp->isvnode) {
+	if (!reqp->isvnode) {
 
 		/*
 		 * First do phys interfaces underlying veth/vlan interfaces
@@ -857,7 +853,7 @@ XML_COMMAND_PROTOTYPE(doifconfig)
 		nrows = (int)mysql_num_rows(res);
 		while (nrows) {
 			row = mysql_fetch_row(res);
-			node = new_response(root, "interface");
+			node = new_response(ifconfigNode, "interface");
 			add_key(node, "type", row[0]);
 			add_key(node, "mac", row[1]);
 			add_key(node, "speed", row[2]); /* in Mbps */
@@ -891,13 +887,13 @@ XML_COMMAND_PROTOTYPE(doifconfig)
 		while (nrows) {
 			row = mysql_fetch_row(res);
 
-			node = new_response(root, "interface");
+			node = new_response(ifconfigNode, "interface");
 			add_key(node, "type", row[0]);
 			add_key(node, "mac", row[1]);
 			add_key(node, "speed", row[2]); /* in Mbps */
 			add_key(node, "duplex", row[3]);
 
-			node = new_response(root, "interface");
+			node = new_response(ifconfigNode, "interface");
 			add_key(node, "type", row[4]);
 			add_key(node, "mac", row[5]);
 			add_key(node, "speed", row[6]); /* in Mbps */
@@ -966,20 +962,12 @@ XML_COMMAND_PROTOTYPE(doifconfig)
 		}
 
 		/*
-		 * Older clients only know how to deal with "veth" here.
-		 * "alias" is handled via IPALIASES= and "vlan" is unknown.
-		 * So skip all but isveth cases.
-		 */
-		if (reqp->version< 27 && !isveth)
-			continue;
-
-		/*
 		 * Note that PMAC might be NULL, which happens if there is
 		 * no underlying phys interface (say, colocated nodes in a
 		 * link).
 		 */
 
-		node = new_response(root, "interface");
+		node = new_response(ifconfigNode, "interface");
 		add_key(node, "type", isveth ? "veth" : row[6]);
 		add_key(node, "inet", row[1]);
 		add_key(node, "mask", CHECKMASK(row[4]));
@@ -1025,12 +1013,6 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 	xmlNode *node, *accounts_node;
 	int		nrows, gidint;
 	int		tbadmin, didwidearea = 0, nodetypeprojects = 0;
-
-	if (! reqp->istcp) {
-		error("ACCOUNTS: %s: Cannot give account info out over UDP!\n",
-		      reqp->nodeid);
-		return 1;
-	}
 
 	/*
 	 * Now check reserved table
@@ -1516,9 +1498,6 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 			     "UID=%s GID=%d ROOT=%d GLIST=%s\n",
 			     row[0], row[2], gidint, is_root, glist);
 
-		if (reqp->version< 5)
-			goto skipkeys;
-
 		/*
 		 * Locally, everything is NFS mounted so no point in
 		 * sending back pubkey stuff; it's never used except on CygWin.
@@ -1556,7 +1535,7 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 				add_key(node, "key", pubkey_row[1]);
 
 				pubkeys_nrows--;
-			}
+			
 		}
 		mysql_free_result(pubkeys_res);
 
@@ -1565,7 +1544,7 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 		 * Do not bother to send back SFS keys if the node is not
 		 * running SFS.
 		 */
-		if (reqp->version< 6 || !strlen(reqp->sfshostid))
+		if (!strlen(reqp->sfshostid))
 			goto skipkeys;
 
 		/*
@@ -2174,7 +2153,7 @@ XML_COMMAND_PROTOTYPE(dotarballs)
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
 	char		*bp, *sp, *tp;
-	xmlNode		*node;
+	xmlNode		*node, *tarballs_node;
 
 	/*
 	 * Get Tarball list for the node.
@@ -2202,6 +2181,8 @@ XML_COMMAND_PROTOTYPE(dotarballs)
 		return 0;
 	}
 	
+	tarballs_node = new_response(root, "tarballs");
+	
 	bp  = row[0];
 	sp  = bp;
 	do {
@@ -2210,7 +2191,7 @@ XML_COMMAND_PROTOTYPE(dotarballs)
 			continue;
 		*tp++ = '\0';
 
-		node = new_response(root, "tarball");
+		node = new_response(tarballs_node, "tarball");
 		add_key(node, "dir", bp);
 		add_key(node, "filename", tp);
 	} while ((bp = sp));
@@ -2404,7 +2385,7 @@ XML_COMMAND_PROTOTYPE(domounts)
 	 * Should SFS mounts be served?
 	 */
 	usesfs = 0;
-	if (reqp->version>= 6 && strlen(fshostid)) {
+	if (strlen(fshostid)) {
 		if (strlen(reqp->sfshostid))
 			usesfs = 1;
 		else {
@@ -2953,12 +2934,12 @@ XML_COMMAND_PROTOTYPE(dorouting)
 			strncpy(dstip, row[0], sizeof(dstip));
 
 		node = new_response(routing_node, "route");
-		add_key(node, "dest", dstip);
-		add_key(node, "desttype", row[1]);
-		add_key(node, "destmask", row[2]);
-		add_key(node, "nexthop", row[3]);
+		add_key(node, "ipaddr", dstip);
+		add_key(node, "type", row[1]);
+		add_key(node, "ipmask", row[2]);
+		add_key(node, "gateway", row[3]);
 		add_key(node, "cost", row[4]);
-		add_key(node, "src", row[5]);
+		add_key(node, "srcipaddr", row[5]);
 
 		n--;
 	}
@@ -3159,7 +3140,7 @@ XML_COMMAND_PROTOTYPE(dotrafgens)
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
 	int		nrows;
-	xmlNode		*node;
+	xmlNode		*node, *trafgensNode;
 
 	res = mydb_query("select vi.vname,role,proto,"
 			 "  vnode,port,ip,target_vnode,target_port,target_ip, "
@@ -3179,11 +3160,13 @@ XML_COMMAND_PROTOTYPE(dotrafgens)
 		return 0;
 	}
 
+	trafgensNode = new_response(root, "trafgens");
+
 	while (nrows) {
 		char myname[TBDB_FLEN_VNAME+2];
 		char peername[TBDB_FLEN_VNAME+2];
 
-		node = new_response(root, "trafgens");
+		node = new_response(trafgensNode, "entry");
 		
 		row = mysql_fetch_row(res);
 
@@ -3223,11 +3206,6 @@ XML_COMMAND_PROTOTYPE(donseconfigs)
 	MYSQL_ROW	row;
 	int		nrows;
 	xmlNode		*node;
-
-	if (!reqp->istcp) {
-		error("NSECONFIGS: %s: Cannot do UDP mode!\n", reqp->nodeid);
-		return 1;
-	}
 
 	res = mydb_query("select nseconfig from nseconfigs as nse "
 			 "where nse.pid='%s' and nse.eid='%s' "
@@ -3331,7 +3309,7 @@ XML_COMMAND_PROTOTYPE(dotunnels)
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
 	int		nrows;
-	xmlNode		*node;
+	xmlNode		*node, *tunnels_node;
 
 	res = mydb_query("select lma.lanid,lma.memberid,"
 			 "   lma.attrkey,lma.attrvalue from lans as l "
@@ -3353,9 +3331,10 @@ XML_COMMAND_PROTOTYPE(dotunnels)
 		return 0;
 	}
 
+	tunnels_node = new_response(root, "tunnels");
 	while (nrows) {
 		row = mysql_fetch_row(res);
-		node = new_response(root, "tunnels");
+		node = new_response(tunnels_node, "tunnel");
 
 		add_key(node, "tunnel", row[0]);
 		add_key(node, "member", row[1]);
@@ -3379,7 +3358,7 @@ XML_COMMAND_PROTOTYPE(dovnodelist)
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
 	int		nrows;
-	xmlNode		*node;
+	xmlNode		*node, *vnodelist_node;
 
 	res = mydb_query("select r.node_id,n.jailflag from reserved as r "
 			 "left join nodes as n on r.node_id=n.node_id "
@@ -3397,9 +3376,10 @@ XML_COMMAND_PROTOTYPE(dovnodelist)
 		return 0;
 	}
 
+	vnodelist_node = new_response(root, "vnodelist");
 	while (nrows) {
 		row = mysql_fetch_row(res);
-		node = new_response(root, "vnodelist");
+		node = new_response(vnodelist_node, "vnode");
 
 		/* XXX Plab? */
 		add_key(node, "vnodeid", row[0]);
@@ -3419,10 +3399,7 @@ XML_COMMAND_PROTOTYPE(dosubnodelist)
 	MYSQL_RES	*res;
 	MYSQL_ROW	row;
 	int		nrows;
-	xmlNode		*node;
-
-	if (reqp->version<= 23)
-		return 0;
+	xmlNode		*subnodelist_node, *node;
 
 	res = mydb_query("select n.node_id,nt.class from nodes as n "
                          "left join node_types as nt on nt.type=n.type "
@@ -3439,10 +3416,10 @@ XML_COMMAND_PROTOTYPE(dosubnodelist)
 		return 0;
 	}
 
+	subnodelist_node = new_response(root, "subnodelist");
 	while (nrows) {
 		row = mysql_fetch_row(res);
-		node = new_response(root, "subnodelist");
-
+		node = new_response(subnodelist_node, "subnode");
 		add_key(node, "nodeid", row[0]);
 		add_key(node, "type", row[1]);
 
@@ -3497,12 +3474,6 @@ XML_COMMAND_PROTOTYPE(doipodinfo)
 	int		fd, cc, i;
 	xmlNode		*node;
 
-	if (!reqp->istcp) {
-		error("IPODINFO: %s: Cannot do this in UDP mode!\n",
-		      reqp->nodeid);
-		return 1;
-	}
-
 	if ((fd = open("/dev/urandom", O_RDONLY)) < 0) {
 		errorc("opening /dev/urandom");
 		return 1;
@@ -3549,12 +3520,6 @@ XML_COMMAND_PROTOTYPE(dontpinfo)
 	MYSQL_ROW	row;
 	int		nrows;
 	xmlNode		*node;
-
-	if (!reqp->istcp) {
-		error("NTPINFO: %s: Cannot do this in UDP mode!\n",
-		      reqp->nodeid);
-		return 1;
-	}
 
 	/*
 	 * First get the servers and peers.
@@ -3625,11 +3590,6 @@ XML_COMMAND_PROTOTYPE(dontpdrift)
 {
 	float		drift;
 
-	if (!reqp->istcp) {
-		error("NTPDRIFT: %s: Cannot do this in UDP mode!\n",
-		      reqp->nodeid);
-		return 1;
-	}
 	if (!reqp->islocal) {
 		error("NTPDRIFT: %s: remote nodes not allowed!\n",
 		      reqp->nodeid);
@@ -3869,9 +3829,6 @@ XML_COMMAND_PROTOTYPE(doplabconfig)
  */
 XML_COMMAND_PROTOTYPE(dosubconfig)
 {
-	if (reqp->version<= 23)
-		return 0;
-
 	if (!reqp->issubnode) {
 		error("SUBCONFIG: %s: Not a subnode\n", reqp->nodeid);
 		return 1;
@@ -4071,7 +4028,6 @@ XML_COMMAND_PROTOTYPE(doeventkey)
 	return 0;
 }
 
-#if 0
 /*
  * Return routing stuff for all vnodes mapped to the requesting physnode
  */
@@ -4081,7 +4037,7 @@ XML_COMMAND_PROTOTYPE(doroutelist)
 	MYSQL_ROW	row;
 	char		buf[MYBUFSIZE];
 	int		n, nrows;
-	xmlNode		*node;
+	xmlNode		*node, *routelist_node;
 
 	/*
 	 * Get the routing type from the nodes table.
@@ -4100,6 +4056,8 @@ XML_COMMAND_PROTOTYPE(doroutelist)
 		return 0;
 	}
 
+	routelist_node = new_response(root, "routelist");
+
 	/*
 	 * Return type. At some point we might have to return a list of
 	 * routes too, if we support static routes specified by the user
@@ -4110,12 +4068,8 @@ XML_COMMAND_PROTOTYPE(doroutelist)
 		mysql_free_result(res);
 		return 0;
 	}
-	sprintf(buf, "ROUTERTYPE=%s\n", row[0]);
+	add_key(routelist_node, "routertype", row[0]);
 	mysql_free_result(res);
-
-	client_writeback(sock, buf, strlen(buf), tcp);
-	if (verbose)
-		info("ROUTES: %s", buf);
 
 	/*
 	 * Get the routing type from the nodes table.
@@ -4162,13 +4116,16 @@ XML_COMMAND_PROTOTYPE(doroutelist)
 			strncpy(dstip, inet_ntoa(tip), sizeof(dstip));
 		} else
 			strncpy(dstip, row[2], sizeof(dstip));
+			node = new_response(routelist_node, "route");
 
-		sprintf(buf, "ROUTE NODE=%s SRC=%s DEST=%s DESTTYPE=%s DESTMASK=%s "
-			"NEXTHOP=%s COST=%s\n",
-			row[0], row[1], dstip, row[3], row[4], row[5], row[6]);
+			add_key(node, "node", row[0]);
+			add_key(node, "srcipaddr", row[1]);
+			add_key(node, "ipaddr", dstip);
+			add_key(node, "type", row[3]);
+			add_key(node, "ipmask", row[4]);
+			add_key(node, "gateway", row[5]);
+			add_key(node, "cost", row[6]);
 
-		client_writeback(sock, buf, strlen(buf), tcp);
-		
 		n--;
 	}
 	mysql_free_result(res);
@@ -4177,7 +4134,6 @@ XML_COMMAND_PROTOTYPE(doroutelist)
 
 	return 0;
 }
-#endif
 
 /*
  * Return routing stuff for all vnodes mapped to the requesting physnode
@@ -4563,7 +4519,7 @@ XML_COMMAND_PROTOTYPE(dofwinfo)
 	char		fwstyle[TBDB_FLEN_VNAME+2];
 	int		n, nrows;
 	char		*vlan;
-	xmlNode		*node, *fwrules_node, *fwvars_node;
+	xmlNode		*node, *fwinfo_node, *fwvars_node;
 	xmlNode		*fwhosts_node, *host_node;
 
 	/*
@@ -4590,14 +4546,14 @@ XML_COMMAND_PROTOTYPE(dofwinfo)
 	}
 
 
-	node = new_response(root, "fwinfo");
+	fwinfo_node = new_response(root, "fwinfo");
 
 	/*
 	 * Common case, no firewall
 	 */
 	if ((int)mysql_num_rows(res) == 0) {
 		mysql_free_result(res);
-		add_key(node, "type", "none");
+		add_key(fwinfo_node, "type", "none");
 		return 0;
 	}
 
@@ -4609,7 +4565,7 @@ XML_COMMAND_PROTOTYPE(dofwinfo)
 		mysql_free_result(res);
 		error("FWINFO: %s: DB Error in firewall info, no firewall!\n",
 		      reqp->nodeid);
-		add_key(node, "type", "none");
+		add_key(fwinfo_node, "type", "none");
 		return 0;
 	}
 
@@ -4630,8 +4586,8 @@ XML_COMMAND_PROTOTYPE(dofwinfo)
 		else
 			fwip = row[5];
 
-		add_key(node, "type", "remote");
-		add_key(node, "fwip", fwip);
+		add_key(fwinfo_node, "type", "remote");
+		add_key(fwinfo_node, "fwip", fwip);
 		mysql_free_result(res);
 
 		return 0;
@@ -4651,18 +4607,18 @@ XML_COMMAND_PROTOTYPE(dofwinfo)
 	 *
 	 * XXX for now we use the control interface for in/out
 	 */
-	add_key(node, "type", row[1]);
-	add_key(node, "style", row[2]);
-	add_key(node, "in_if", row[6]);
-	add_key(node, "out_if", row[6]);
-	add_key(node, "in_vlan", vlan);
-	add_key(node, "out_vlan", vlan);
+	add_key(fwinfo_node, "type", row[1]);
+	add_key(fwinfo_node, "style", row[2]);
+	add_key(fwinfo_node, "in_if", row[6]);
+	add_key(fwinfo_node, "out_if", row[6]);
+	add_key(fwinfo_node, "in_vlan", vlan);
+	add_key(fwinfo_node, "out_vlan", vlan);
 
 	/*
 	 * Put out info about firewall rule logging
 	 */
-	if (reqp->version> 25 && row[3] && row[3][0]) {
-		add_key(node, "log", row[3]);
+	if (row[3] && row[3][0]) {
+		add_key(fwinfo_node, "log", row[3]);
 	}
 
 	strncpy(fwtype, row[1], sizeof(fwtype));
@@ -4674,58 +4630,47 @@ XML_COMMAND_PROTOTYPE(dofwinfo)
 	 * Return firewall variables
 	 */
 	/* XXX Ryan: how to state that these are variables? breaks simple key/value pair idea */
-	if (reqp->version> 21) {
-		/*
-		 * Grab the node gateway MAC which is not currently part
-		 * of the firewall variables table.
-		 */
-		res = mydb_query("select value from sitevariables "
-				 "where name='node/gw_mac'", 1);
-		fwvars_node = new_response(node, "fwvars");
-		if (res && mysql_num_rows(res) > 0) {
-			row = mysql_fetch_row(res);
-			if (row[0]) { /* XXX Ryan */
-				add_format_key(fwvars_node, "EMULAB_GWIP=%s", CONTROL_ROUTER_IP);
-				add_format_key(fwvars_node, "EMULAB_GWMAC=%s", row[0]);
-#if 0
-				OUTPUT(buf, sizeof(buf),
-				       "VAR=EMULAB_GWIP VALUE=\"%s\"\n",
-				       CONTROL_ROUTER_IP);
-				client_writeback(sock, buf, strlen(buf), tcp);
-				OUTPUT(buf, sizeof(buf),
-				       "VAR=EMULAB_GWMAC VALUE=\"%s\"\n",
-				       row[0]);
-				client_writeback(sock, buf, strlen(buf), tcp);
-#endif
-			}
+	/*
+	 * Grab the node gateway MAC which is not currently part
+	 * of the firewall variables table.
+	 */
+	res = mydb_query("select value from sitevariables "
+			 "where name='node/gw_mac'", 1);
+	fwvars_node = new_response(fwinfo_node, "fwvars");
+	if (res && mysql_num_rows(res) > 0) {
+		row = mysql_fetch_row(res);
+		if (row[0]) { /* XXX Ryan */
+			node = new_response(fwinfo_node, "fwvar")
+			add_key(node, "var", "EMULAB_GWIP");
+			add_key(node, "value", CONTROL_ROUTER_IP);
+			node = new_response(fwinfo_node, "fwvar")
+			add_key(node, "var", "EMULAB_GWMAC");
+			add_key(node, "value", row[0]);
 		}
-		if (res)
-			mysql_free_result(res);
-
-		res = mydb_query("select name,value from default_firewall_vars",
-				 2);
-		if (!res) {
-			error("FWINFO: %s: DB Error getting firewall vars!\n",
-			      reqp->nodeid);
-			nrows = 0;
-		} else
-			nrows = (int)mysql_num_rows(res);
-		for (n = nrows; n > 0; n--) {
-			row = mysql_fetch_row(res);
-			if (!row[0] || !row[1])
-				continue;
-			add_key(fwvars_node, row[0], row[1]); /* XXX Ryan */;
-#if 0
-			OUTPUT(buf, sizeof(buf), "VAR=%s VALUE=\"%s\"\n",
-			       row[0], row[1]);
-			client_writeback(sock, buf, strlen(buf), tcp);
-#endif
-		}
-		if (res)
-			mysql_free_result(res);
-		if (verbose)
-			info("FWINFO: %d variables\n", nrows);
 	}
+	if (res)
+		mysql_free_result(res);
+
+	res = mydb_query("select name,value from default_firewall_vars",
+			 2);
+	if (!res) {
+		error("FWINFO: %s: DB Error getting firewall vars!\n",
+		      reqp->nodeid);
+		nrows = 0;
+	} else
+		nrows = (int)mysql_num_rows(res);
+	for (n = nrows; n > 0; n--) {
+		row = mysql_fetch_row(res);
+		if (!row[0] || !row[1])
+			continue;
+		node = new_response(fwinfo_node, "fwvar");
+		add_key(node, "var", row[0]);
+		add_key(node, "value", row[1]);
+	}
+	if (res)
+		mysql_free_result(res);
+	if (verbose)
+		info("FWINFO: %d variables\n", nrows);
 
 	/*
 	 * Get the user firewall rules from the DB and return them.
@@ -4741,10 +4686,11 @@ XML_COMMAND_PROTOTYPE(dofwinfo)
 	}
 	nrows = (int)mysql_num_rows(res);
 
-	fwrules_node = new_response(node, "fwrules");
 	for (n = nrows; n > 0; n--) {
 		row = mysql_fetch_row(res);
-		add_key(fwrules_node, row[0], row[1]);
+		node = new_response(fwinfo_node, "fwrule");
+		add_key(node, "ruleno", row[0]);
+		add_key(node, "rule", row[1]);
 	}
 
 	mysql_free_result(res);
@@ -4767,7 +4713,9 @@ XML_COMMAND_PROTOTYPE(dofwinfo)
 
 	for (n = nrows; n > 0; n--) {
 		row = mysql_fetch_row(res);
-		add_key(fwrules_node, row[0], row[1]);
+		node = new_response(fwrules_node, "fwrule");
+		add_key(node, "ruleno", row[0]);
+		add_key(node, "rule", row[1]);
 	}
 
 	mysql_free_result(res);
@@ -4786,38 +4734,29 @@ XML_COMMAND_PROTOTYPE(dofwinfo)
 	 * that we can provide proxy ARP.
 	 */
 	 /* XXX Ryan fix this */
-	if (reqp->version> 24) {
-		res = mydb_query("select r.vname,i.IP,i.mac "
-			"from reserved as r "
-			"left join interfaces as i on r.node_id=i.node_id "
-			"where r.pid='%s' and r.eid='%s' and i.role='ctrl'",
-			 3, reqp->pid, reqp->eid);
-		if (!res) {
-			error("FWINFO: %s: DB Error getting host info!\n",
-			      reqp->nodeid);
-			return 1;
-		}
-		nrows = (int)mysql_num_rows(res);
-
-		fwhosts_node = new_response(node, "fwhosts");
-
-		for (n = nrows; n > 0; n--) {
-			row = mysql_fetch_row(res);
-			host_node = new_response(node, "host");
-			if (reqp->version> 25) {
-				add_key(host_node, "host", row[0]);
-				add_key(host_node, "cnetip", row[1]);
-				add_key(host_node, "cnetmac", row[2]);
-			} else {
-				add_key(host_node, "host", row[0]);
-				add_key(host_node, "cnetip", row[1]);
-			}
-		}
-
-		mysql_free_result(res);
-		if (verbose)
-			info("FWINFO: %d firewalled hosts\n", nrows);
+	res = mydb_query("select r.vname,i.IP,i.mac "
+		"from reserved as r "
+		"left join interfaces as i on r.node_id=i.node_id "
+		"where r.pid='%s' and r.eid='%s' and i.role='ctrl'",
+		 3, reqp->pid, reqp->eid);
+	if (!res) {
+		error("FWINFO: %s: DB Error getting host info!\n",
+		      reqp->nodeid);
+		return 1;
 	}
+	nrows = (int)mysql_num_rows(res);
+
+	for (n = nrows; n > 0; n--) {
+		row = mysql_fetch_row(res);
+		node = new_response(fwinfo_node, "fwhost");
+		add_key(node, "host", row[0]);
+		add_key(node, "cnetip", row[1]);
+		add_key(node, "cnetmac", row[2]);
+	}
+
+	mysql_free_result(res);
+	if (verbose)
+		info("FWINFO: %d firewalled hosts\n", nrows);
 
 	return 0;
 }
@@ -5186,7 +5125,7 @@ XML_COMMAND_PROTOTYPE(dolocalize)
  */
 RAW_COMMAND_PROTOTYPE(dobootlog)
 {
-	char		*cp = (char *) NULL;
+	char		*cp = (char *) NULL, *bp;
 	int		len;
 
 	/*
@@ -5215,8 +5154,8 @@ RAW_COMMAND_PROTOTYPE(dobootlog)
 		 *
 		 * Note that tmcc version 22 now closes its write side.
 		 */
-		if (reqp->version>= 22 && reqp->istcp && !reqp->isssl) {
-			char *bp = &buf[len];
+		 if (reqp->istcp && !reqp->isssl) {
+			bp = &buf[len];
 			
 			while (len < sizeof(buf)) {
 				int cc = READ(sock, bp, sizeof(buf) - len);
@@ -5556,7 +5495,7 @@ XML_COMMAND_PROTOTYPE(dotraceconfig)
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
 	int		nrows;
-	xmlNode		*node;
+	xmlNode		*node, *traceconfig_node;
 
 	/*
 	 * Get delay parameters for the machine. The point of this silly
@@ -5614,11 +5553,12 @@ XML_COMMAND_PROTOTYPE(dotraceconfig)
 		mysql_free_result(res);
 		return 0;
 	}
+
+	traceconfig_node = new_response(root, "traceconfig");
 	while (nrows) {
 		int     idx;
 		
 		row = mysql_fetch_row(res);
-		node = new_response(root, "traceconfig");
 
 		/*
 		 * XXX plab hack: add the vnode number to the idx to
@@ -5633,6 +5573,7 @@ XML_COMMAND_PROTOTYPE(dotraceconfig)
 			idx += (atoi(cp+1) * 10);
 		}
 
+		node = new_response(traceconfig_node, "entry");
 		add_key(node, "linkname", row[0]);
 		add_format_key(node, "index", "%d", idx);
 		add_key(node, "mac0", (row[1] ? row[1] : ""));
