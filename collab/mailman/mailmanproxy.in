@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -386,7 +386,7 @@ sub AddList(@)
 	    fatal("AddList: Could not create mailing list!");
     }
     elsif (! $reconfig) {
-	print "List '$name' and already exists; exiting ...\n";
+	print "List '$name' already exists; exiting ...\n";
 	return EEXIST();
     }
 
