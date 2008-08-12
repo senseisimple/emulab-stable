@@ -46,7 +46,7 @@ else {
 	strcmp($subnet_c, "134.134.248.0") &&
 	strcmp($subnet_c, "134.134.136.0") &&
         strcmp($subnet_b, "128.112.0.0")) {
-	USERERROR("You do not have permission to view this page ($subnet)!",
+	USERERROR("You do not have permission to view this page ($REMOTE_ADDR)!",
 		  1);
     }
 }
