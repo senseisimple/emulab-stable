@@ -6,12 +6,6 @@
 #
 package GeniSAClient;
 
-#
-# The client side of the SA interface, used by Slice Authorities to
-# invoke operations on other SAs. Emulab does not do much of this
-# right now. 
-#
-
 use strict;
 use Exporter;
 use vars qw(@ISA @EXPORT);
@@ -21,19 +15,12 @@ use vars qw(@ISA @EXPORT);
 
 # Must come after package declaration!
 use lib '@prefix@/lib';
-use GeniDB;
 use Genixmlrpc;
-use libtestbed;
+use GeniResponse;
 use English;
 use Data::Dumper;
 
-# Configure variables
-my $TB		   = "@prefix@";
-my $TBOPS          = "@TBOPSEMAIL@";
-my $TBAPPROVAL     = "@TBAPPROVALEMAIL@";
-my $TBAUDIT   	   = "@TBAUDITEMAIL@";
-my $BOSSNODE       = "@BOSSNODE@";
-my $OURDOMAIN      = "@OURDOMAIN@";
-
+# _Always_ make sure that this 1 is at the end of the file...
+1;
 
 

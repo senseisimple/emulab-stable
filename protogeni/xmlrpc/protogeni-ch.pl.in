@@ -19,10 +19,13 @@ use Data::Dumper;
 use vars qw($GENI_DBNAME);
 BEGIN { $GENI_DBNAME = "geni-ch"; }
 
+# Configure variables
+my $EMULAB_PEMFILE = "@prefix@/etc/genima.pem";
+
 # Testbed libraries.
 use lib '@prefix@/lib';
-use User;
 use GeniCH;
+use GeniCertificate;
 use libaudit;
 
 # Geniuser.
@@ -39,6 +42,17 @@ $| = 1;
 #
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# So we know who/what we are acting as.
+#
+my $myuuid;
+if (GeniCertificate->CertificateInfoFromFile($EMULAB_PEMFILE,
+					     undef, \$myuuid) != 0) {
+    die("*** $0:\n".
+	"    Could not get uuid from $EMULAB_PEMFILE\n");
+}
+$ENV{'MYUUID'} = $myuuid;
 
 #
 # In the prototype, we accept certificate signed by trusted roots
@@ -97,12 +111,12 @@ LogStart(0);
 AddAuditInfo("message", $request . "\n\n" . Dumper(%ENV));
 
 my $responder = Frontier::Responder->new( "methods" => {
-    "CH::LookupUser"        => \&GeniCH::LookupUser,
+    "GetCredential"         => \&GeniCH::GetCredential,
+    "Resolve"               => \&GeniCH::Resolve,
+    "Register"              => \&GeniCH::Register,
+    "Remove"                => \&GeniCH::Remove,
     "CH::BindUser"          => \&GeniCH::BindUser,
     "CH::UnBindUser"        => \&GeniCH::UnBindUser,
-    "CH::RegisterUser"      => \&GeniCH::RegisterUser,
-    "CH::LookupSlice"       => \&GeniCH::LookupSlice,
-    "CH::CreateSliceName"   => \&GeniCH::RegisterSlice,
     "CH::DiscoverResources" => \&GeniCH::DiscoverResources,
    },
 );
@@ -114,11 +128,11 @@ my $response = $responder->{'_decode'}->serve($request,
 # Terminate the log capture so that we can print the response to STDOUT
 # for the web server.
 #
-print STDERR "\n\n" . $response;
+#print STDERR "\n\n" . $response;
 
 LogEnd();
 
-print "Content-Type: text/xml \n\n" . $response;
+print "Content-Type: text/xml\n\n" . $response;
 
 
 

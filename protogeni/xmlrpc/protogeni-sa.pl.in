@@ -20,11 +20,11 @@ use vars qw($GENI_DBNAME);
 BEGIN { $GENI_DBNAME = "geni"; }
 
 # Configure variables
-my $EMULAB_PEMFILE = "@prefix@/etc/genicm.pem";
+my $EMULAB_PEMFILE = "@prefix@/etc/genisa.pem";
 
 # Testbed libraries.
 use lib '@prefix@/lib';
-use GeniCM;
+use GeniSA;
 use Genixmlrpc;
 use libaudit;
 
@@ -116,13 +116,11 @@ Genixmlrpc->SetContext(Genixmlrpc->Context($EMULAB_PEMFILE));
 AddAuditInfo("message", $request . "\n\n" . Dumper(%ENV));
 
 my $responder = Frontier::Responder->new( "methods" => {
-    "CM::DiscoverResources" => \&GeniCM::DiscoverResources,
-    "CM::GetTicket"         => \&GeniCM::GetTicket,
-    "CM::CreateSliver"      => \&GeniCM::CreateSliver,
-    "CM::StartSliver"       => \&GeniCM::StartSliver,
-    "CM::DestroySliver"     => \&GeniCM::DestroySliver,
-    "CM::BindUser"          => \&GeniCM::BindUser,
-    "CM::UnBindUser"        => \&GeniCM::UnBindUser,
+    "GetCredential"     => \&GeniSA::GetCredential,
+    "Resolve"           => \&GeniSA::Resolve,
+    "Register"          => \&GeniSA::Register,
+    "Remove"            => \&GeniSA::Remove,
+    "DiscoverResources" => \&GeniSA::DiscoverResources,
    },
 );
 
@@ -133,6 +131,11 @@ my $response = $responder->{'_decode'}->serve($request,
 # Terminate the log capture so that we can print the response to STDOUT
 # for the web server.
 #
+#print STDERR "\n\n" . $response;
+
 LogEnd();
 
 print "Content-Type: text/xml \n\n" . $response;
+
+
+

@@ -15,22 +15,16 @@ use vars qw(@ISA @EXPORT);
 @ISA    = "Exporter";
 @EXPORT = qw();
 
-# Must come after package declaration!
-use lib '@prefix@/lib';
+# Must come after package declaration.
 use English;
 use GeniResponse;
+#use IO::Socket::SSL;
 use RPC::XML;
 use RPC::XML::Parser;
 use LWP::UserAgent;
 use HTTP::Request::Common qw(POST);
 use HTTP::Headers;
 use Data::Dumper;
-
-# Configure variables
-my $TB		= "@prefix@";
-my $TBOPS       = "@TBOPSEMAIL@";
-my $BOSSNODE    = "@BOSSNODE@";
-my $EMULAB_PEMFILE = "@prefix@/etc/genisa.pem";
 
 my $debug = 1;
 
@@ -53,14 +47,85 @@ my $PACKAGE_VERSION = 0.1;
 #
 
 #
+# This is the context for making rpc calls. Gives the certificate and an
+# optional password. The caller hangs onto this and passes it back in below.
+#
+# class XmlRpcContext:
+#    def __init__(self, certificate, keyfile, password=None):
+#        self.certificate = certificate
+#        self.keyfile     = keyfile
+#        self.password    = password
+#        return
+#
+sub Context($$;$$)
+{
+    my ($class, $certificate, $keyfile, $password) = @_;
+
+    $keyfile = $certificate
+	if (!defined($keyfile));
+
+    my $self = {"certificate"  => $certificate,
+		"keyfile"      => $keyfile,
+		"password"     => $password};
+    bless($self, $class);
+    return $self;
+}
+# accessors
+sub field($$)           { return ($_[0]->{$_[1]}); }
+sub certificate($)	{ return field($_[0], "certificate"); }
+sub keyfile($)		{ return field($_[0], "keyfile"); }
+sub password($)		{ return field($_[0], "password"); }
+
+#
+# This is a context for a user. Used only on Emulab bossnode. Use the
+# Context() routine above on clients.
+#
+sub UserContext($$)
+{
+    my ($class, $user) = @_;
+    my $password;
+
+    my $pkcs12 = $user->HomeDir() . "/.ssl/encrypted.p12";
+    $user->SSLPassPhrase(1, \$password);
+
+    return Genixmlrpc->Context($pkcs12, $pkcs12, $password);
+}
+
+#
+# Context for making calls.
+#
+my $MyContext;
+
+# Set the context for subsequent calls made to the clearing house.
+#
+sub SetContext($$)
+{
+    my ($class, $context) = @_;
+
+    $MyContext = $context;
+    return 0;
+}
+
+#
 # Call to a non-Emulab xmlrpc server.  
 # If there was an HTTP error, the hash also contains the keys
 # httpcode and httpmsg.
 #
-sub CallMethodHTTP($$$@)
+sub CallMethod($$$@)
 {
-    my ($httpURL, $user, $method, @args) = @_;
+    my ($httpURL, $context, $method, @args) = @_;
 
+    # Default context if not set.
+    $context = $MyContext
+	if (!defined($context));
+
+    # But must have a context;
+    if (!defined($context)) {
+	print STDERR "Must provide an rpc context\n";	
+	return GeniResponse->new(GENIRESPONSE_RPCERROR, -1,
+				 "Must provide an rpc context");
+    }
+    
     #
     # This is for the Crypt::SSL library, many levels down. It appears to
     # be the only way to specify this. Even worse, when we want to use
@@ -68,20 +133,35 @@ sub CallMethodHTTP($$$@)
     # of the file, since that is the only format for which we can provide
     # the passphrase.
     #
-    if (!defined($user)) {
-	$ENV{'HTTPS_CERT_FILE'} = $EMULAB_PEMFILE;
-	$ENV{'HTTPS_KEY_FILE'}  = $EMULAB_PEMFILE;
+    if (0) {
+	$IO::Socket::SSL::DEBUG = 4;
+	$Net::SSLeay::slowly = 1;
+	
+	$IO::Socket::SSL::GLOBAL_CONTEXT_ARGS->{'SSL_key_file'} =
+	    $context->keyfile();	    
+	$IO::Socket::SSL::GLOBAL_CONTEXT_ARGS->{'SSL_cert_file'} =
+	    $context->certificate();	    
+	$IO::Socket::SSL::GLOBAL_CONTEXT_ARGS->{'SSL_use_cert'} = 1;
+
+	#
+	# If we have a passphrase in the context, then provide a callback
+	# to hand it back. Otherwise the user gets prompted for it.
+	#
+	if (defined($context->password())) {
+	    $IO::Socket::SSL::GLOBAL_CONTEXT_ARGS->{'SSL_passwd_cb'} =
+		sub { return $context->password(); };
+	}
     }
     else {
-	my $pkcs12 = $user->HomeDir() . "/.ssl/encrypted.p12";
-	my $password;
-	$user->SSLPassPhrase(1,\$password);
-	$ENV{'HTTPS_PKCS12_FILE'}     = $pkcs12;
-	$ENV{'HTTPS_PKCS12_PASSWORD'} = $password;
-	print "$password, $pkcs12\n"
-	    if ($debug > 1);
+	if (!defined($context->password())) {
+	    $ENV{'HTTPS_CERT_FILE'} = $context->certificate();
+	    $ENV{'HTTPS_KEY_FILE'}  = $context->keyfile();
+	}
+	else {
+	    $ENV{'HTTPS_PKCS12_FILE'}     = $context->certificate();
+	    $ENV{'HTTPS_PKCS12_PASSWORD'} = $context->password();
+	}
     }
-
     my $request = new RPC::XML::request($method, @args);
     if ($debug > 1) {
 	print STDERR "xml request: $httpURL:" . $request->as_string();
@@ -158,5 +238,4 @@ sub CallMethodHTTP($$$@)
 }
 
 # _Always_ make sure that this 1 is at the end of the file...
-
 1;

@@ -88,14 +88,12 @@ sub Lookup($$)
     # Grab the certificate, since we will probably want it.
     #
     my $uuid = $self->{'COMPONENT'}->{'uuid'};
-    $query_result = DBQueryWarn("select cert from geni_certificates ".
-				"where uuid='$uuid'");
-    if (!$query_result || !$query_result->numrows) {
-	print STDERR "Could not find certificate for component $idx\n";
+    my $certificate = GeniCertificate->Lookup($uuid);
+    if (!defined($certificate)) {
+	print STDERR "Could not find certificate for component  $idx\n";
 	return undef;
     }
-    my ($cert) = $query_result->fetchrow_array();
-    $self->{'COMPONENT'}->{'cert'} = $cert;
+    $self->{'CERT'} = $certificate;
     
     # Add to cache. 
     $components{$self->{'COMPONENT'}->{'idx'}} = $self;
@@ -119,7 +117,7 @@ sub Stringify($)
 #
 # Create a Geni component in the DB.
 #
-sub Create($$$$;$$)
+sub Create($$$$$)
 {
     my ($class, $uuid, $hrn, $url, $cert) = @_;
 
@@ -157,7 +155,8 @@ sub idx($)		{ return field($_[0], "idx"); }
 sub uuid($)		{ return field($_[0], "uuid"); }
 sub url($)		{ return field($_[0], "url"); }
 sub hrn($)		{ return field($_[0], "hrn"); }
-sub cert($)		{ return field($_[0], "cert"); }
+sub cert($)		{ return $_[0]->{'CERT'}->cert(); }
+sub GetCertificate($)   { return $_[0]->{'CERT'}; }
 
 #
 # Class method to lookup the component for a given resource (uuid) by
@@ -263,6 +262,23 @@ sub Update($$)
 	if (! DBQueryWarn($query));
 
     return Refresh($self);
+}
+
+#
+# Create component from the ClearingHouse, by looking up the info.
+#
+sub CreateFromRegistry($$)
+{
+    my ($class, $uuid) = @_;
+
+    my $blob;
+    return undef
+	if (GeniCHClient::Resolve($uuid, "CM", \$blob) != 0);
+
+    return GeniComponent->Create($uuid,
+				 $blob->{'hrn'},
+				 $blob->{'url'},
+				 $blob->{'cert'});
 }
 
 #

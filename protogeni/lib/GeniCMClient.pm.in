@@ -19,25 +19,13 @@ use vars qw(@ISA @EXPORT);
 
 # Must come after package declaration!
 use lib '@prefix@/lib';
-use GeniDB;
 use Genixmlrpc;
 use GeniResponse;
-use GeniTicket;
-use GeniCredential;
-use GeniSliver;
-use GeniComponent;
-use User;
-use libtestbed;
 use English;
 use Data::Dumper;
 
 # Configure variables
 my $TB		   = "@prefix@";
-my $TBOPS          = "@TBOPSEMAIL@";
-my $TBAPPROVAL     = "@TBAPPROVALEMAIL@";
-my $TBAUDIT   	   = "@TBAUDITEMAIL@";
-my $BOSSNODE       = "@BOSSNODE@";
-my $OURDOMAIN      = "@OURDOMAIN@";
 
 # _Always_ make sure that this 1 is at the end of the file...
 1;

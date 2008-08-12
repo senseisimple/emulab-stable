@@ -116,7 +116,7 @@ sub archived($)		{ return field($_[0], "archived"); }
 sub name($)		{ return field($_[0], "name"); }
 sub email($)		{ return field($_[0], "email"); }
 sub cert($)		{ return $_[0]->{'CERT'}->cert(); }
-sub sa_idx($)		{ return field($_[0], "sa_idx"); }
+sub sa_uuid($)		{ return field($_[0], "sa_uuid"); }
 sub GetCertificate($)   { return $_[0]->{'CERT'}; }
 
 #
@@ -160,11 +160,17 @@ sub CheckExisting($$$)
 sub Create($$$$$$$$$;$)
 {
     my ($class, $hrn, $uid, $uuid, $name, $email,
-	$cert, $sa_idx, $sshkey) = @_;
+	$cert, $authority, $sshkey) = @_;
     my @insert_data = ();
 
     # Every user gets a new unique index.
     my $idx = User->NextIDX();
+
+    if (!defined($authority)) {
+	print STDERR "Need to specify an authority!\n";
+	return undef;
+    }
+    my $sa_uuid = $authority->uuid();
 
     # Now tack on other stuff we need.
     push(@insert_data, "created=now()");
@@ -176,13 +182,12 @@ sub Create($$$$$$$$$;$)
     my $safe_name  = DBQuoteSpecial($name);
     my $safe_email = DBQuoteSpecial($email);
     my $safe_uuid  = DBQuoteSpecial($uuid);
-    my $safe_sa    = DBQuoteSpecial($sa_idx);
     push(@insert_data, "hrn=$safe_hrn");
     push(@insert_data, "uid=$safe_uid");
     push(@insert_data, "name=$safe_name");
     push(@insert_data, "email=$safe_email");
     push(@insert_data, "uuid=$safe_uuid");
-    push(@insert_data, "sa_idx=$safe_sa");
+    push(@insert_data, "sa_uuid='$sa_uuid'");
 
     # Insert certificate.
     my $certificate = GeniCertificate->StorePublic($cert);
@@ -195,7 +200,7 @@ sub Create($$$$$$$$$;$)
     if (defined($sshkey)) {
 	my $safe_sshkey = DBQuoteSpecial($sshkey);
 	
-	DBQueryWarn("insert into geni_sshkeys set ".
+	DBQueryWarn("replace into geni_sshkeys set ".
 		    "  uuid=$safe_uuid, created=now(), ".
 		    "  sshkey=$safe_sshkey") or return undef;
     }
@@ -222,41 +227,6 @@ sub CreateFromLocal($$)
 }
 
 #
-# Create a user from the ClearingHouse, by looking up the info.
-#
-sub CreateFromRegistry($$)
-{
-    my ($class, $uuid) = @_;
-
-    my $blob;
-    return undef
-	if (GeniCHClient::LookupUser($uuid, \$blob) != 0);
-
-    my $authority = GeniAuthority->Lookup($blob->{'sa'}->{'uuid'});
-    if (!defined($authority)) {
-	$authority = GeniAuthority->Create($blob->{'sa'}->{'uuid'},
-					   $blob->{'sa'}->{'hrn'},
-					   $blob->{'sa'}->{'url'},
-					   $blob->{'sa'}->{'cert'},
-					   $blob->{'sa'}->{'uuid_prefix'});
-	if (!defined($authority)) {
-	    print STDERR "Could not create new authority record\n";
-	    return undef;
-	}
-    }
-    return GeniUser->Create($blob->{'hrn'},
-			    $blob->{'uid'},
-			    $blob->{'uuid'},
-			    $blob->{'name'},
-			    $blob->{'email'},
-			    $blob->{'cert'},
-			    $authority->idx(),
-			    (exists($blob->{'sshkey'}) ?
-			     $blob->{'sshkey'} : undef));
-			    
-}
-
-#
 # Delete the user, as for registration errors.
 #
 sub Delete($)
@@ -266,8 +236,13 @@ sub Delete($)
     return 0
 	if (! ref($self));
 
-    my $idx = $self->idx();
+    my $idx  = $self->idx();
+    my $uuid = $self->uuid();
 
+    DBQueryWarn("delete from geni_bindings where user_uuid='$uuid'")
+	or return -1;
+    DBQueryWarn("delete from geni_certificates where uuid='$uuid'")
+	or return -1;
     DBQueryWarn("delete from geni_users where idx='$idx'")
 	or return -1;
     
@@ -422,7 +397,6 @@ sub uuid                { return $_[0]->{'USER'}->uuid(); }
 sub created($)		{ return $_[0]->{'USER'}->created(); }
 sub name($)		{ return $_[0]->{'USER'}->name(); }
 sub email($)		{ return $_[0]->{'USER'}->email(); }
-sub sa_idx($)		{ return 0; }
 sub GetSSHKey($$)       { return $_[0]->{'USER'}->GetSSHKey($_[1]); }
 
 # Need to construct this since not in User structure.
@@ -445,7 +419,7 @@ sub Register($)
 	my $sshkey;
 	$self->GetSSHKey(\$sshkey);
 	
-	return GeniCHClient::RegisterUser($self->hrn(), $self->uuid(),
+	return GeniCHClient::RegisterUser($self->hrn(), 
 					  $self->name(), $self->email(),
 					  $self->cert(), $sshkey);
     }

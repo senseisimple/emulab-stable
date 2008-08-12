@@ -52,8 +52,17 @@ sub Lookup($$)
     }
     elsif ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
 	$query_result =
-	    DBQueryWarn("select idx from geni_sliceauthorities ".
+	    DBQueryWarn("select idx from geni_authorities ".
 			"where uuid='$token'");
+	    return undef
+		if (! $query_result || !$query_result->numrows);
+
+	    ($idx) = $query_result->fetchrow_array();
+    }
+    elsif ($token =~ /^[\w\.]*$/) {
+	$query_result =
+	    DBQueryWarn("select idx from geni_authorities ".
+			"where hrn='$token'");
 	    return undef
 		if (! $query_result || !$query_result->numrows);
 
@@ -67,7 +76,7 @@ sub Lookup($$)
         if (exists($authorities{"$idx"}));
 
     $query_result =
-	DBQueryWarn("select * from geni_sliceauthorities where idx='$idx'");
+	DBQueryWarn("select * from geni_authorities where idx='$idx'");
     
     return undef
 	if (!$query_result || !$query_result->numrows);
@@ -80,14 +89,12 @@ sub Lookup($$)
     # Grab the certificate, since we will probably want it.
     #
     my $uuid = $self->{'AUTHORITY'}->{'uuid'};
-    $query_result = DBQueryWarn("select cert from geni_certificates ".
-				"where uuid='$uuid'");
-    if (!$query_result || !$query_result->numrows) {
+    my $certificate = GeniCertificate->Lookup($uuid);
+    if (!defined($certificate)) {
 	print STDERR "Could not find certificate for authority $idx\n";
 	return undef;
     }
-    my ($cert) = $query_result->fetchrow_array();
-    $self->{'AUTHORITY'}->{'cert'} = $cert;
+    $self->{'CERT'} = $certificate;
     
     # Add to cache. 
     $authorities{$self->{'AUTHORITY'}->{'idx'}} = $self;
@@ -113,7 +120,7 @@ sub Stringify($)
 #
 sub Create($$$$$$)
 {
-    my ($class, $uuid, $hrn, $url, $cert, $prefix) = @_;
+    my ($class, $uuid, $hrn, $url, $cert, $prefix, $type) = @_;
 
     my @insert_data = ();
     my $idx = TBGetUniqueIndex('next_authority', 1);
@@ -123,6 +130,7 @@ sub Create($$$$$$)
     my $safe_uuid   = DBQuoteSpecial($uuid);
     my $safe_cert   = DBQuoteSpecial($cert);
     my $safe_prefix = DBQuoteSpecial($prefix);
+    my $safe_type   = DBQuoteSpecial($type);
     
     # Now tack on other stuff we need.
     push(@insert_data, "created=now()");
@@ -131,16 +139,17 @@ sub Create($$$$$$)
     push(@insert_data, "url=$safe_url");
     push(@insert_data, "uuid=$safe_uuid");
     push(@insert_data, "uuid_prefix=$safe_prefix");
+    push(@insert_data, "type=$safe_type");
 
     # Insert into DB.
-    DBQueryWarn("replace into geni_sliceauthorities set " .
+    DBQueryWarn("replace into geni_authorities set " .
 		join(",", @insert_data))
 	or return undef;
 
     # Insert the certificate.
     if (!DBQueryWarn("replace into geni_certificates set ".
 		     "  uuid=$safe_uuid, cert=$safe_cert")) {
-	DBQueryWarn("delete from geni_sliceauthorities where idx='$idx'");
+	DBQueryWarn("delete from geni_authorities where idx='$idx'");
 	return undef;
     }
 
@@ -153,7 +162,9 @@ sub uuid($)		{ return field($_[0], "uuid"); }
 sub uuid_prefix($)	{ return field($_[0], "uuid_prefix"); }
 sub url($)		{ return field($_[0], "url"); }
 sub hrn($)		{ return field($_[0], "hrn"); }
-sub cert($)		{ return field($_[0], "cert"); }
+sub type($)		{ return field($_[0], "type"); }
+sub cert($)		{ return $_[0]->{'CERT'}->cert(); }
+sub GetCertificate($)   { return $_[0]->{'CERT'}; }
 
 #
 # Does the uuid prefix match.

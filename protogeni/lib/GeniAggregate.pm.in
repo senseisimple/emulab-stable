@@ -493,7 +493,6 @@ use vars qw(@ISA);
 @ISA = "GeniAggregate";
 
 use GeniDB;
-use GeniComponent;
 use GeniSlice;
 use GeniCredential;
 use GeniCertificate;
@@ -616,6 +615,33 @@ sub UnProvision($)
     }
     return 0;
 }
+
+#
+# Nothing to do yet.
+#
+sub Start($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    return 0;
+}
+
+#
+# Nothing to do yet.
+#
+sub Stop($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    return 0;
+}
+
 
 # _Always_ make sure that this 1 is at the end of the file...
 1;

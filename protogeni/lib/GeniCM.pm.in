@@ -27,6 +27,7 @@ use GeniCredential;
 use GeniCertificate;
 use GeniSlice;
 use GeniAggregate;
+use GeniAuthority;
 use GeniSliver;
 use GeniUser;
 use libtestbed;
@@ -179,7 +180,7 @@ sub GetTicket($)
     #
     my $slice = GeniSlice->Lookup($slice_uuid);
     if (!defined($slice)) {
-	$slice = GeniSlice->CreateFromRegistry($slice_uuid);
+	$slice = CreateSliceFromRegistry($slice_uuid);
 	if (!defined($slice)) {
 	    print STDERR "No slice $slice_uuid in the ClearingHouse\n";
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
@@ -187,7 +188,7 @@ sub GetTicket($)
 	}
     }
     else {
-	$slice->UpdateFromRegistry() == 0 or
+	UpdateSliceFromRegistry($slice) == 0 or
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 			"Could not update slice info from ClearingHouse");
     }
@@ -197,7 +198,7 @@ sub GetTicket($)
     #
     my $user = GeniUser->Lookup($owner_uuid);
     if (!defined($user)) {
-	$user = GeniUser->CreateFromRegistry($owner_uuid);
+	$user = CreateUserFromRegistry($owner_uuid);
 	if (!defined($user)) {
 	    print STDERR "No user $owner_uuid in the ClearingHouse\n";
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
@@ -606,3 +607,133 @@ sub DestroySliver($)
     return GeniResponse->Create(GENIRESPONSE_SUCCESS);
 }
 
+#
+# Utility Routines.
+#
+# Create a slice from the ClearingHouse, by looking up the info.
+#
+sub CreateSliceFromRegistry($)
+{
+    my ($slice_uuid) = @_;
+
+    my $blob;
+    return undef
+	if (GeniCHClient::LookupSlice($slice_uuid, \$blob) != 0);
+
+    my $authority = GeniAuthority->Lookup($blob->{'sa_uuid'});
+    if (!defined($authority)) {
+	$authority = CreateAuthorityFromRegistry($blob->{'sa_uuid'});
+	if (!defined($authority)) {
+	    print STDERR "Could not create new authority record\n";
+	    return undef;
+	}
+    }
+    my $slice = GeniSlice->Create($blob->{'hrn'},
+				  $blob->{'uuid'},
+				  $blob->{'creator_uuid'},
+				  $blob->{'cert'}, $authority);
+    return undef
+	if (!defined($slice));
+
+    # Add the user bindings.
+    foreach my $uuid (@{ $blob->{'userbindings'} }) {
+	my $user = GeniUser->Lookup($uuid);
+	if (!defined($user)) {
+	    $user = CreateUserFromRegistry($uuid);
+	    if (!defined($user)) {
+		print STDERR "No user $uuid in the ClearingHouse\n";
+		next;
+	    }
+	}
+	DBQueryWarn("replace into geni_bindings set ".
+		    " created=now(), slice_uuid='$slice_uuid', ".
+		    " user_uuid='$uuid'")
+	    or print STDERR
+	    "Could not insert user binding for $uuid to slice $slice_uuid\n";
+    }
+    return $slice;
+}
+
+#
+# Update slice from the ClearingHouse, by looking up the info.
+#
+sub UpdateSliceFromRegistry($)
+{
+    my ($slice) = @_;
+    my $slice_uuid = $slice->uuid();
+
+    my $blob;
+    return -1
+	if (GeniCHClient::LookupSlice($slice_uuid, \$blob) != 0);
+
+    DBQueryWarn("delete from geni_bindings ".
+		"where slice_uuid='$slice_uuid'")
+	or print STDERR
+	"Could not delete user bindings from slice $slice_uuid\n";
+
+    # Add the user bindings.
+    foreach my $uuid (@{ $blob->{'userbindings'} }) {
+	my $user = GeniUser->Lookup($uuid);
+	if (!defined($user)) {
+	    $user = CreateUserFromRegistry($uuid);
+	    if (!defined($user)) {
+		print STDERR "No user $uuid in the ClearingHouse\n";
+		next;
+	    }
+	}
+	DBQueryWarn("replace into geni_bindings set ".
+		    " created=now(), slice_uuid='$slice_uuid', ".
+		    " user_uuid='$uuid'")
+	    or print STDERR
+	    "Could not insert user binding for $uuid to slice $slice_uuid\n";
+    }
+    return 0;
+}
+
+#
+# Create a user from the ClearingHouse, by looking up the info.
+#
+sub CreateUserFromRegistry($)
+{
+    my ($uuid) = @_;
+
+    my $blob;
+    return undef
+	if (GeniCHClient::LookupUser($uuid, \$blob) != 0);
+
+    my $authority = GeniAuthority->Lookup($blob->{'sa_uuid'});
+    if (!defined($authority)) {
+	$authority = CreateAuthorityFromRegistry($blob->{'sa_uuid'});
+	if (!defined($authority)) {
+	    print STDERR "Could not create new authority record\n";
+	    return undef;
+	}
+    }
+    return GeniUser->Create($blob->{'hrn'},
+			    $blob->{'uid'},
+			    $blob->{'uuid'},
+			    $blob->{'name'},
+			    $blob->{'email'},
+			    $blob->{'cert'},
+			    $authority,
+			    (exists($blob->{'sshkey'}) ?
+			     $blob->{'sshkey'} : undef));
+}
+
+#
+# Create authority from the ClearingHouse, by looking up the info.
+#
+sub CreateAuthorityFromRegistry($)
+{
+    my ($uuid) = @_;
+
+    my $blob;
+    return undef
+	if (GeniCHClient::Resolve($uuid, "SA", \$blob) != 0);
+
+    return GeniAuthority->Create($uuid,
+				 $blob->{'hrn'},
+				 $blob->{'url'},
+				 $blob->{'cert'},
+				 $blob->{'uuid_prefix'}, "sa");
+}

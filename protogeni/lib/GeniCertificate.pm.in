@@ -68,6 +68,7 @@ sub Lookup($$)
     my $self         = {};
     $self->{'CERT'}  = $query_result->fetchrow_hashref();
     bless($self, $class);
+    my $cert = $self->cert();
 
     # Add to cache. 
     $certificates{$token} = $self;
@@ -155,7 +156,7 @@ sub Create($$;$)
     my $safe_uuid = DBQuoteSpecial($uuid);
     my $safe_key  = DBQuoteSpecial($privkey);
     return undef
-	if (!DBQueryWarn("insert into geni_certificates set ".
+	if (!DBQueryWarn("replace into geni_certificates set ".
 			 " created=now(), uuid=$safe_uuid, ".
 			 " cert=$safe_cert, privkey=$safe_key"));
 
@@ -196,7 +197,7 @@ sub StorePublic($$)
     my $safe_cert = DBQuoteSpecial($cert);
     my $safe_uuid = DBQuoteSpecial($uuid);
     return undef
-	if (!DBQueryWarn("insert into geni_certificates set ".
+	if (!DBQueryWarn("replace into geni_certificates set ".
 			 " created=now(), uuid=$safe_uuid, cert=$safe_cert"));
 
     return GeniCertificate->Lookup($uuid);
@@ -236,7 +237,7 @@ sub CertificateInfo($$$)
 
     my $dn = `$OPENSSL x509 -in $filename -noout -subject`;
     if ($?) {
-	print STDERR "Cailed to convert $filename to uuid!\n";
+	print STDERR "Failed to convert $filename to uuid!\n";
 	return -1;
     }
 
@@ -246,6 +247,40 @@ sub CertificateInfo($$$)
     else {
 	return -1;
     }
+    return 0;
+}
+
+#
+# Convert a certificate inside a pem file to its cert and uuid.
+#
+sub CertificateInfoFromFile($$$$)
+{
+    my ($class, $filename, $pcert, $puuid) = @_;
+
+    my $dn = `$OPENSSL x509 -in $filename -noout -subject`;
+    if ($?) {
+	print STDERR "Failed to convert $filename to uuid!\n";
+	return -1;
+    }
+    if ($dn =~ /CN=([-\w]*)$/) {
+	$$puuid = $1;
+    }
+    else {
+	return -1;
+    }
+    return 0
+	if (!defined($pcert));
+    
+    my $cert = `$OPENSSL x509 -in $filename`;
+    if ($?) {
+	print STDERR "Failed to convert $filename to cert!\n";
+	return -1;
+    }
+    $cert =~ s/^----.*----//mg;
+    $cert =~ s/^$//mg;
+    local $/ = "";
+    chomp($cert);
+    $$pcert = "$cert\n";
     return 0;
 }
 

@@ -19,6 +19,7 @@ use GeniDB;
 use GeniCHClient;
 use GeniAuthority;
 use GeniCredential;
+use GeniComponent;
 use GeniCertificate;
 use libtestbed;
 # Hate to import all this crap; need a utility library.
@@ -73,6 +74,15 @@ sub Lookup($$)
 
 	    ($idx) = $query_result->fetchrow_array();
     }
+    elsif ($token =~ /^[\w\.]*$/) {
+	$query_result =
+	    DBQueryWarn("select idx from geni_slices ".
+			"where hrn='$token'");
+	    return undef
+		if (! $query_result || !$query_result->numrows);
+
+	    ($idx) = $query_result->fetchrow_array();
+    }
     else {
 	return undef;
     }
@@ -114,7 +124,7 @@ sub hrn($)		{ return field($_[0], "hrn"); }
 sub uuid($)		{ return field($_[0], "uuid"); }
 sub creator_uuid($)	{ return field($_[0], "creator_uuid"); }
 sub created($)		{ return field($_[0], "created"); }
-sub sa_idx($)		{ return field($_[0], "sa_idx"); }
+sub sa_uuid($)		{ return field($_[0], "sa_uuid"); }
 sub cert($)		{ return $_[0]->{'CERT'}->cert(); }
 sub GetCertificate($)   { return $_[0]->{'CERT'}; }
 #
@@ -156,17 +166,23 @@ sub CheckExisting($$$)
 #
 sub Create($$$$$$)
 {
-    my ($class, $hrn, $uuid, $creator_uuid, $cert, $sa_idx) = @_;
+    my ($class, $hrn, $uuid, $creator_uuid, $certificate, $authority) = @_;
     my @insert_data = ();
 
     # Every slice gets a new unique index.
     my $idx = TBGetUniqueIndex('next_exptidx', 1);
 
+    if (!defined($authority)) {
+	print STDERR "Need to specify an authority!\n";
+	return undef;
+    }
+    my $sa_uuid = $authority->uuid();
+
     # Now tack on other stuff we need.
     push(@insert_data, "created=now()");
     push(@insert_data, "idx='$idx'");
-    push(@insert_data, "sa_idx='$sa_idx'");
-
+    push(@insert_data, "sa_uuid='$sa_uuid'");
+    
     my $safe_hrn   = DBQuoteSpecial($hrn);
     my $safe_uuid  = DBQuoteSpecial($uuid);
     my $safe_cuuid = DBQuoteSpecial($creator_uuid);
@@ -174,11 +190,12 @@ sub Create($$$$$$)
     push(@insert_data, "uuid=$safe_uuid");
     push(@insert_data, "creator_uuid=$safe_cuuid");
 
-    # Insert certificate.
-    if (defined($cert)) {
-	my $certificate = GeniCertificate->StorePublic($cert);
+    # If the certificate it a reference, then it is already stored in
+    # the DB. If its a string, then need to store it locally.
+    if (!ref($certificate)) {
+	$certificate = GeniCertificate->StorePublic($certificate);
 	if (!defined($certificate)) {
-	    print STDERR "Could not store certificate for new user\n";
+	    print STDERR "Could not store certificate for new slice.\n";
 	    return undef;
 	}
     }
@@ -203,8 +220,14 @@ sub CreateFromLocal($$)
     my $uuid = $experiment->uuid();
     my $creator_uuid = $user->uuid();
 
-    # Set the sa_idx to zero to indicate a local slice.
-    my $sa_idx = 0;
+    #
+    # Need our own (this Emulab) slice authority record.
+    #
+    my $authority = GeniAuthority->Lookup("sa." . $OURDOMAIN);
+    if (!defined($authority)) {
+	print STDERR "Could not find the local authority record\n";
+	return undef;
+    }
 
     #
     # Generate a certificate pair, capturing the certificate to store in
@@ -215,7 +238,8 @@ sub CreateFromLocal($$)
 	print STDERR "Could not create certificate for slice.\n";
 	return undef;
     }
-    return GeniSlice->Create($hrn, $uuid, $creator_uuid, undef, $sa_idx);
+    return GeniSlice->Create($hrn, $uuid, $creator_uuid,
+			     $certificate, $authority);
 }
 
 #
@@ -232,7 +256,7 @@ sub Register($)
     return 0
 	if (GeniCHClient::LookupSlice($self->uuid(), \$blob) == 0);
 
-    GeniCHClient::RegisterSlice($self->hrn(), $self->uuid(),
+    GeniCHClient::RegisterSlice($self->hrn(),
 				$self->creator_uuid(), $self->cert())
 	== 0 or return -1;
     
@@ -240,91 +264,22 @@ sub Register($)
 }
 
 #
-# Create a slice from the ClearingHouse, by looking up the info.
+# Remove a local slice at the clearinghouse;
 #
-sub CreateFromRegistry($$)
-{
-    my ($class, $slice_uuid) = @_;
-
-    my $blob;
-    return undef
-	if (GeniCHClient::LookupSlice($slice_uuid, \$blob) != 0);
-
-    my $authority = GeniAuthority->Lookup($blob->{'sa'}->{'uuid'});
-    if (!defined($authority)) {
-	$authority = GeniAuthority->Create($blob->{'sa'}->{'uuid'},
-					   $blob->{'sa'}->{'hrn'},
-					   $blob->{'sa'}->{'url'},
-					   $blob->{'sa'}->{'cert'},
-					   $blob->{'sa'}->{'uuid_prefix'});
-	if (!defined($authority)) {
-	    print STDERR "Could not create new authority record\n";
-	    return undef;
-	}
-    }
-    my $slice = GeniSlice->Create($blob->{'hrn'},
-				  $blob->{'uuid'},
-				  $blob->{'creator_uuid'},
-				  $blob->{'cert'}, $authority->idx());
-    return undef
-	if (!defined($slice));
-
-    print STDERR Dumper($blob);
-
-    # Add the user bindings.
-    foreach my $uuid (@{ $blob->{'userbindings'} }) {
-	my $user = GeniUser->Lookup($uuid);
-	if (!defined($user)) {
-	    $user = GeniUser->CreateFromRegistry($uuid);
-	    if (!defined($user)) {
-		print STDERR "No user $uuid in the ClearingHouse\n";
-		next;
-	    }
-	}
-	DBQueryWarn("replace into geni_bindings set ".
-		    " created=now(), slice_uuid='$slice_uuid', ".
-		    " user_uuid='$uuid'")
-	    or print STDERR
-	    "Could not insert user binding for $uuid to slice $slice_uuid\n";
-    }
-    return $slice;
-}
-
-#
-# Update slice from the ClearingHouse, by looking up the info.
-#
-sub UpdateFromRegistry($)
+sub UnRegister($)
 {
     my ($self) = @_;
-    my $slice_uuid = $self->uuid();
+
+    return -1
+	if (! ref($self));
 
     my $blob;
-    return -1
-	if (GeniCHClient::LookupSlice($slice_uuid, \$blob) != 0);
+    return 0
+	if (GeniCHClient::LookupSlice($self->uuid(), \$blob) != 0);
 
-    print STDERR Dumper($blob);
-
-    DBQueryWarn("delete from geni_bindings ".
-		"where slice_uuid='$slice_uuid'")
-	or print STDERR
-	"Could not delete user bindings from slice $slice_uuid\n";
-
-    # Add the user bindings.
-    foreach my $uuid (@{ $blob->{'userbindings'} }) {
-	my $user = GeniUser->Lookup($uuid);
-	if (!defined($user)) {
-	    $user = GeniUser->CreateFromRegistry($uuid);
-	    if (!defined($user)) {
-		print STDERR "No user $uuid in the ClearingHouse\n";
-		next;
-	    }
-	}
-	DBQueryWarn("replace into geni_bindings set ".
-		    " created=now(), slice_uuid='$slice_uuid', ".
-		    " user_uuid='$uuid'")
-	    or print STDERR
-	    "Could not insert user binding for $uuid to slice $slice_uuid\n";
-    }
+    GeniCHClient::RemoveSlice($self->uuid())
+	== 0 or return -1;
+    
     return 0;
 }
 
@@ -340,9 +295,28 @@ sub DiscoverResources($$)
     return -1
 	if (! ref($self));
 
-    GeniCHClient::DiscoverResources($self, $pref) == 0
+    my $blob;
+    GeniCHClient::DiscoverResources($self, \$blob) == 0
 	or return -1;
+
+    #
+    # We get back a list of components right now, which we cache locally.
+    #
+    my @result = ();
     
+    foreach my $ref (@{ $blob }) {
+	my $uuid = $ref->{'uuid'};
+
+	my $component = GeniComponent->Lookup($uuid);
+	if (!defined($component)) {
+	    $component = GeniComponent->CreateFromRegistry($uuid);
+	    if (!defined($component)) {
+		return -1;
+	    }
+	}
+	push(@result, $component);
+    }
+    @$pref = @result;
     return 0;
 }
 
@@ -359,10 +333,11 @@ sub Delete($)
     my $idx  = $self->idx();
     my $uuid = $self->uuid();
     my $experiment = $self->GetExperiment();
-    return -1
-	if (!defined($experiment));
-    $experiment->UnBindNonLocalUsers();
+    $experiment->UnBindNonLocalUsers()
+	if (defined($experiment));
 
+    DBQueryWarn("delete from geni_bindings where slice_uuid='$uuid'")
+	or return -1;
     DBQueryWarn("delete from geni_certificates where uuid='$uuid'")
 	or return -1;
     DBQueryWarn("delete from geni_slices where idx='$idx'")
@@ -395,7 +370,7 @@ sub IsSliceAuthority($$)
 	if (! (ref($self) && ref($authority)));
 
     return 1
-	if ($self->sa_idx() == $authority->idx());
+	if ($self->sa_uuid() == $authority->uuid());
     
     return 0;
 }
@@ -403,8 +378,7 @@ sub IsSliceAuthority($$)
 #
 # Client side methods to bind and unbind users from slices
 #
-# XXX We issue this using the local SA as the authority, but need to allow
-# the slice/owner credentials to do this.
+# We issue this using the local SA as the authority.
 # 
 sub BindUser($$)
 {

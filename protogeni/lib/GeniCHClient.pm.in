@@ -20,23 +20,94 @@ use vars qw(@ISA @EXPORT);
 
 # Must come after package declaration!
 use lib '@prefix@/lib';
-use GeniDB;
 use Genixmlrpc;
 use GeniResponse;
-use User;
-use libtestbed;
 use English;
 use Data::Dumper;
 
 # Configure variables
-my $TB		   = "@prefix@";
-my $TBOPS          = "@TBOPSEMAIL@";
-my $TBAPPROVAL     = "@TBAPPROVALEMAIL@";
-my $TBAUDIT   	   = "@TBAUDITEMAIL@";
-my $BOSSNODE       = "@BOSSNODE@";
-my $OURDOMAIN      = "@OURDOMAIN@";
 my $GENICENTRAL    = "myboss.myelab.testbed.emulab.net";
 my $GENICENTRALURL = "https://$GENICENTRAL/protogeni/xmlrpc/ch";
+
+#
+# Context for making calls to the clearinghouse. Opaque to this module.
+#
+my $MyContext;
+
+#
+# Set the context for subsequent calls made to the clearing house.
+#
+sub SetContext($$)
+{
+    my ($class, $context) = @_;
+
+    $MyContext = $context;
+    return 0;
+}
+
+#
+# Our credential for talking to the clearinghouse. Should be cached
+# but currently asking for a new one each time.
+#
+my $Credential;
+
+sub SetCredential()
+{
+    return
+	if (defined($Credential));
+
+    GetCredential(undef, undef, undef, \$Credential) == 0
+	or die("Could not get our CH credential from the clearinghouse.\n");
+}
+
+#
+# Ask the clearing house for a credential.
+#
+sub GetCredential($$$$)
+{
+    my ($credential, $uuid, $type, $pref) = @_;
+
+    my %args = ();
+    $args{'credential'} = $credential
+	if (defined($credential));
+    $args{'uuid'} = $uuid
+	if (defined($uuid));
+    $args{'type'} = $type
+	if (defined($type));
+
+    my $response =
+	Genixmlrpc::CallMethod($GENICENTRALURL, $MyContext,
+			       "GetCredential", \%args);
+
+    return -1
+	if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS);
+    
+    $$pref = $response->value();
+    return 0;
+}
+
+#
+# Lookup a record at the clearing house.
+#
+sub Resolve($$$)
+{
+    my ($uuid, $type, $pref) = @_;
+
+    $$pref = undef;
+
+    SetCredential();
+    
+    my $response =
+	Genixmlrpc::CallMethod($GENICENTRALURL, $MyContext, "Resolve",
+			       { "credential" => $Credential,
+				 "type"       => $type,
+				 "uuid"       => $uuid });
+    return -1
+	if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS);
+    
+    $$pref = $response->value();
+    return 0;
+}
 
 #
 # Lookup a user at the clearing house.
@@ -45,17 +116,7 @@ sub LookupUser($$)
 {
     my ($uuid, $pref) = @_;
 
-    $$pref = undef;
-    
-    my $response =
-	Genixmlrpc::CallMethodHTTP($GENICENTRALURL, undef,
-				   "CH::LookupUser",
-				   { "uuid"  => $uuid });
-    return -1
-	if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS);
-    
-    $$pref = $response->value();
-    return 0;
+    return Resolve($uuid, "User", $pref);
 }
 
 #
@@ -65,16 +126,28 @@ sub LookupSlice($$)
 {
     my ($uuid, $pref) = @_;
 
-    $$pref = undef;
+    return Resolve($uuid, "Slice", $pref);
+}
+
+#
+# Register a record at the clearing house.
+#
+sub Register($$$$)
+{
+    my ($hrn, $type, $cert, $info) = @_;
+
+    SetCredential();
     
     my $response =
-	Genixmlrpc::CallMethodHTTP($GENICENTRALURL, undef,
-				   "CH::LookupSlice",
-				   { "uuid"  => $uuid });
+	Genixmlrpc::CallMethod($GENICENTRALURL, $MyContext, "Register",
+			       { "credential" => $Credential,
+				 "type"       => $type,
+				 "hrn"        => $hrn,
+			         "cert"       => $cert,
+			         "info"       => $info });
     return -1
 	if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS);
     
-    $$pref = $response->value();
     return 0;
 }
 
@@ -82,43 +155,44 @@ sub LookupSlice($$)
 # Register a local Emulab user at the Geni ClearingHouse (which in the
 # prototype is Utah Emulab).
 #
-sub RegisterUser($$$$$$)
+sub RegisterUser($$$$$)
 {
-    my ($hrn, $uuid, $name, $email, $cert, $sshkey) = @_;
+    my ($hrn, $name, $email, $cert, $sshkey) = @_;
 
-    my $args = { "hrn"    => $hrn,
-		 "uuid"   => $uuid,
-		 "name"   => $name,
-		 "email"  => $email,
-		 "cert"   => $cert};
-    $args->{"sshkey"} = $sshkey
+    my $info = { "name"   => $name,
+		 "email"  => $email };
+    $info->{"sshkey"} = $sshkey
 	if (defined($sshkey));
 
-    my $response =
-	Genixmlrpc::CallMethodHTTP($GENICENTRALURL, undef,
-				   "CH::RegisterUser", $args);
-
-    return -1
-	if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS);
-    
-    return 0;
+    return Register($hrn, "User", $cert, $info);
 }
 
 #
-# Register a local Emulab experiment at the Clearinghouse, as a slice.
+# Register a slice at the Clearinghouse.
 #
-sub RegisterSlice($$$$)
+sub RegisterSlice($$$)
 {
-    my ($hrn, $uuid, $creator_uuid, $cert) = @_;
+    my ($hrn, $creator_uuid, $cert) = @_;
 
-    my $response =
-	Genixmlrpc::CallMethodHTTP($GENICENTRALURL, undef,
-				   "CH::CreateSliceName",
-				   { "hrn"   => $hrn,
-				     "uuid"  => $uuid,
-				     "creator_uuid" => $creator_uuid,
-				     "cert"  => $cert });
+    my $info = { "creator_uuid"  => $creator_uuid };
+
+    return Register($hrn, "Slice", $cert, $info);
+}
+
+#
+# Remove a record at the clearing house.
+#
+sub Remove($$)
+{
+    my ($type, $uuid) = @_;
+
+    SetCredential();
     
+    my $response =
+	Genixmlrpc::CallMethod($GENICENTRALURL, $MyContext, "Remove",
+			       { "credential" => $Credential,
+				 "type"       => $type,
+			         "uuid"       => $uuid });
     return -1
 	if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS);
     
@@ -128,19 +202,11 @@ sub RegisterSlice($$$$)
 #
 # Delete a slice registration.
 #
-sub DeleteSlice($)
+sub RemoveSlice($)
 {
     my ($uuid) = @_;
 
-    my $response =
-	Genixmlrpc::CallMethodHTTP($GENICENTRALURL, undef,
-				   "CH::FreeSliceName",
-				   { "uuid"  => $uuid });
-
-    return -1
-	if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS);
-    
-    return 0;
+    return Remove("Slice", $uuid);
 }
 
 #
@@ -155,7 +221,7 @@ sub DiscoverResources($$)
     my ($slice, $pref) = @_;
 
     my $response =
-	Genixmlrpc::CallMethodHTTP($GENICENTRALURL, undef,
+	Genixmlrpc::CallMethod($GENICENTRALURL, $MyContext,
 				   "CH::DiscoverResources",
 				   { "slice"  => $slice->cert() });
 
@@ -165,32 +231,7 @@ sub DiscoverResources($$)
     return -1
 	if ($response->code() != GENIRESPONSE_SUCCESS);
 
-    #
-    # We get back a list of components right now, which we cache locally.
-    #
-    my @result = ();
-    
-    foreach my $ref (@{ $response->value() }) {
-	my $uuid = $ref->{'uuid'};
-	my $url  = $ref->{'url'};
-	my $hrn  = $ref->{'hrn'};
-	my $cert = $ref->{'cert'};
-
-	my $component = GeniComponent->Lookup($uuid);
-	if (!defined($component)) {
-	    $component = GeniComponent->Create($uuid, $hrn, $url, $cert);
-	    if (!defined($component)) {
-		return GeniResponse->Create(GENIRESPONSE_DBERROR);
-	    }
-	}
-	elsif ($url ne $component->url() ||
-	       $hrn ne $component->hrn()) {
-	    $component->Update({"url" => $url, "hrn" => $hrn}) == 0 or
-		return GeniResponse->Create(GENIRESPONSE_DBERROR);
-	}
-	push(@result, $component);
-    }
-    @$pref = @result;
+    $$pref = $response->value();
     return 0;
 }
 
@@ -205,7 +246,7 @@ sub BindUser($$)
 		 "user_uuid"  => $user_uuid };
 
     my $response =
-	Genixmlrpc::CallMethodHTTP($GENICENTRALURL, undef,
+	Genixmlrpc::CallMethod($GENICENTRALURL, $MyContext,
 				   "CH::BindUser", $args);
 
     return -1
@@ -221,7 +262,7 @@ sub UnBindUser($$)
 		 "user_uuid"  => $user_uuid };
 
     my $response =
-	Genixmlrpc::CallMethodHTTP($GENICENTRALURL, undef,
+	Genixmlrpc::CallMethod($GENICENTRALURL, $MyContext,
 				   "CH::UnBindUser", $args);
 
     return -1
@@ -230,3 +271,5 @@ sub UnBindUser($$)
     return 0;
 }
 
+# _Always_ make sure that this 1 is at the end of the file...
+1;

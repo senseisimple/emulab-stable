@@ -647,6 +647,7 @@ sub Start($)
 }
 
 ##########################################################################
+#
 package GeniSliver::Interface;
 use vars qw(@ISA);
 @ISA = "GeniSliver";
@@ -672,6 +673,10 @@ sub Provision($)
 {
     my ($self) = @_;
 
+    #
+    # This is actually implemented in GeniAggregate since currently "link"
+    # is the smallest entity; you cannot operate on an individual interface.
+    #
     return -1
 	if (! ref($self));
 
@@ -685,6 +690,10 @@ sub UnProvision($)
 {
     my ($self) = @_;
 
+    #
+    # This is actually implemented in GeniAggregate since currently "link"
+    # is the smallest entity; you cannot operate on an individual interface.
+    #
     return -1
 	if (! ref($self));
 
@@ -698,6 +707,10 @@ sub Start($)
 {
     my ($self) = @_;
 
+    #
+    # This is actually implemented in GeniAggregate since currently "link"
+    # is the smallest entity; you cannot operate on an individual interface.
+    #
     return -1
 	if (! ref($self));
 
