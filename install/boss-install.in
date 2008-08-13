@@ -152,6 +152,10 @@ my $APACHE_KEYFILE_OPS  = "$APACHE_ETCDIR/ssl.key/${USERNODE}.key";
 my $TFTPD_PKG	  = "emulab-tftp-hpa-0.48";
 
 #
+# XXX temporary for perl DBD mysql access
+my $P5DBD_PKG	  = "p5-DBD-mysql50-3.0002";
+
+#
 # Named pid file.
 #
 my $NAMED_PIDFILE = "/var/run/named.pid";
@@ -453,6 +457,22 @@ Phase "ports", "Installing ports", sub {
 		my $pname = GetPackage("pubsub", $packagedir);
 		ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
 	    };
+	    # XXX Ditto
+	    if ($FBSD_MAJOR == 6 && $FBSD_MINOR > 2) {
+		Phase "p5-DBD-mysql50", "Installing old Perl Mysql package", sub {
+		    my $pname = `$PKG_INFO -E 'p5-DBD-mysql50-*' 2>/dev/null`;
+		    chomp($pname);
+		    if ($pname eq $P5DBD_PKG) {
+			PhaseSkip("p5-DBD-mysql50 already up to date");
+		    }
+		    if (!$packagedir) {
+			PhaseSkip("No package directory provided");
+		    }
+		    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_DEL -f $pname")
+			if ($pname);
+		    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $P5DBD_PKG");
+		};
+	    }
 	}
     };
     PhaseSkip("Package directory provided; not installing from sources")
