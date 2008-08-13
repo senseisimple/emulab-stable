@@ -56,12 +56,82 @@ mkmfs() {
 	fi
 }
 
+#
+# This takes a space-separated string of fs mount points and single size,
+# makes a single MFS of that size, mounts it in /tmp/.buf.<i>, creates dirs for
+# the mounts in /tmp/.buf.<i> (i.e., /tmp/.buf.0/etc), then mounts 
+# /tmp/.buf.<i>/<fs> at the real mount point (i.e., /tmp/.buf.0/etc at /etc).
+# This way, we don't have to estimate space necessary for each mount point.
+# Obviously, this depends on a writeable /tmp.
+#
+mkunionfs() {
+	FSLIST=$1
+	FSSIZE=$2
+
+	# better be >= 6.3 
+	# no, I don't know sed or awk
+	major=`uname -r | sed -e 's/\..*$//`
+	minor=`uname -r | sed -e 's/^[0-9]\.//' | sed -e 's/[^0-9]*$//'`
+
+	if [ $major -lt 6 -o $major -eq 6 -a $minor -lt 3 ]; then
+	        echo -n "FreeBSD version ${major}.${minor} did not have a"
+		echo    " stable unionfs!"
+		return 1
+	fi
+
+	kldstat | grep unionfs > /dev/null
+	if [ $? -ne 0 ]; then
+	        kldload unionfs
+		if [ $? -ne 0 ]; then
+		        echo "error: kldload unionfs, aborting"
+			return 1
+		fi
+	fi
+
+	# find a buf directory.
+	i=0
+	while [ -e /tmp/.bufs.$i ]; do
+	        i=`expr $i + 1`
+	done
+
+	bufdir=/tmp/.bufs.${i}
+	mkdir $bufdir
+	mkmfs $bufdir $FSSIZE 0
+
+	for mntpt in $FSLIST; do
+	        mkdir ${bufdir}/${mntpt}
+		echo "Generating ${mntpt} via unionfs"
+		# -o copymode=transparent \
+		mount_unionfs -o copymode=transparent \
+		        ${bufdir}/${mntpt} $mntpt
+		chkerr $? "mount_unionfs ${bufdir}/${mntpt} $mntpt"
+	done
+
+	return 0
+}
+
 cd /
 
-mkmfs /tmp 4 0
-mkmfs /root 1 1
-mkmfs /etc 4 1
-mkmfs /var 4 1
+mkmfs /tmp 8 0
+
+mkunionfs "/root /etc /bin /lib /libexec /sbin /usr" 128
+if [ $? -eq 1 ]; then
+        echo "mkunionfs failed, not mounting /bin /lib /libexec /sbin /usr rw!"
+        echo "Using mkmfs for /root /etc instead!"
+
+	mkmfs /root 4 1
+	mkmfs /etc  8 1
+fi
+
+# /var gets its own mfs so that logfiles don't use up all the space in a
+# "shared" mfs...
+mkunionfs "/var" 32
+if [ $? -eq 1 ]; then
+        echo "mkunionfs failed, not mounting /var rw!"
+        echo "Using mkmfs for /var instead!"
+
+	mkmfs /var 8 1
+fi
 
 mkmfs /proj 1 0
 mkmfs /users 1 0
