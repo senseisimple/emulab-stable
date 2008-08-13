@@ -33,6 +33,7 @@ use Exporter;
 	     TMCCCMD_TIPTUNNELS TMCCCMD_TRACEINFO TMCCCMD_ELVINDPORT
              TMCCCMD_PLABEVENTKEYS TMCCCMD_PORTREGISTER
 	     TMCCCMD_MOTELOG TMCCCMD_BOOTWHAT TMCCCMD_ROOTPSWD
+	     TMCCCMD_LTMAP TMCCCMD_LTPMAP TMCCCMD_TOPOMAP
 	     );
 
 # Must come after package declaration!
@@ -178,6 +179,9 @@ my %commandset =
       "portregister"    => {TAG => "portregister"},
       "bootwhat"        => {TAG => "bootwhat"},
       "rootpswd"        => {TAG => "rootpswd"},
+      "topomap"	        => {TAG => "topomap"},
+      "ltmap"	        => {TAG => "ltmap"},
+      "ltpmap"	        => {TAG => "ltpmap"},
     );
 
 #
@@ -238,6 +242,9 @@ sub TMCCCMD_MOTELOG()   { $commandset{"motelog"}->{TAG}; }
 sub TMCCCMD_PORTREGISTER(){ $commandset{"portregister"}->{TAG}; }
 sub TMCCCMD_BOOTWHAT()  { $commandset{"bootwhat"}->{TAG}; }
 sub TMCCCMD_ROOTPSWD()  { $commandset{"rootpswd"}->{TAG}; }
+sub TMCCCMD_TOPOMAP(){ $commandset{"topomap"}->{TAG}; }
+sub TMCCCMD_LTMAP()  { $commandset{"ltmap"}->{TAG}; }
+sub TMCCCMD_LTPMAP()  { $commandset{"ltpmap"}->{TAG}; }
 
 #
 # Caller uses this routine to set configuration of this library

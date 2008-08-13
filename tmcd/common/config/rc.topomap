@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2004-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -143,6 +143,13 @@ sub dotopomap()
     my $templtp = "/tmp/ltpmap.gz";
 
     #
+    # Make sure we always try to fetch it fresh
+    #
+    unlink("$tempmap");
+    unlink("$templt");
+    unlink("$templtp");
+    
+    #
     # Try a couple of times to get the file cause of NFS sillyness.
     # Should probably have our own version of cp that retries at the block
     # level?
@@ -166,20 +173,12 @@ sub dotopomap()
 	    }
 	}
     }
-    #
-    # Make sure we always try to fetch it fresh
-    #
-    else {
-	unlink("$tempmap");
-	unlink("$templt");
-	unlink("$templtp");
-    }
     
     if (! -e $tempmap) {
 	#
 	# Try using tmcc. It returns compressed data so do it directly.
 	#
-	system(TMCC() . " topomap > $tempmap");
+	system(TMCCBIN() . " topomap > $tempmap");
 	#
 	# tmcc does not really return useful error codes.
 	#
@@ -192,7 +191,7 @@ sub dotopomap()
 	#
 	# Try using tmcc. It returns compressed data so do it directly.
 	#
-	system(TMCC() . " ltmap > $templt");
+	system(TMCCBIN() . " ltmap > $templt");
 	#
 	# tmcc does not really return useful error codes.
 	#
@@ -205,7 +204,7 @@ sub dotopomap()
 	#
 	# Try using tmcc. It returns compressed data so do it directly.
 	#
-	system(TMCC() . " ltpmap > $templtp");
+	system(TMCCBIN() . " ltpmap > $templtp");
 	#
 	# tmcc does not really return useful error codes.
 	#

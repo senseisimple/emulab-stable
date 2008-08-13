@@ -8,6 +8,7 @@ use English;
 use Getopt::Std;
 use POSIX qw(setsid);
 use Data::Dumper;
+use strict;
 
 sub usage()
 {
@@ -70,6 +71,7 @@ my $VTUNDCONFIG    = CONFDIR() . "/vtund.conf";
 my $LOGFILE        = $LOGDIR   . "/vtund.debug";
 
 # Parse command line.
+my %options;
 if (! getopts($optlist, \%options)) {
     usage();
 }
@@ -284,6 +286,7 @@ sub DoVtun($)
 	my $inetip   = $tunnel->{"tunnel_ip"};
 	my $mask     = $tunnel->{"tunnel_ipmask"};
 	my $proto    = $tunnel->{"tunnel_proto"};
+	my $didserver= 0;
 
 	my $log;
 	my $cmd = "$VTUND -n -P $dstport -f $VTUNDCONFIG ";

@@ -29,7 +29,7 @@ use Exporter;
 	 SIMTRAFGEN SIMHOST ISDELAYNODEPATH JAILHOST DELAYHOST STARGATE
 	 ISFW FAKEJAILED LINUXJAILED
 
-	 CONFDIR LOGDIR TMDELAY TMJAILNAME TMSIMRC TMCC
+	 CONFDIR LOGDIR TMDELAY TMJAILNAME TMSIMRC TMCC TMCCBIN
 	 TMNICKNAME TMSTARTUPCMD FINDIF
 	 TMROUTECONFIG TMLINKDELAY TMDELMAP TMTOPOMAP TMLTMAP TMLTPMAP
 	 TMGATEDCONFIG TMSYNCSERVER TMKEYHASH TMNODEID TMEVENTKEY 
@@ -181,6 +181,7 @@ use liblocsetup;
 # setup library.
 #
 sub TMCC()		{ "$BINDIR/tmcc"; }
+sub TMCCBIN()		{ "$BINDIR/tmcc.bin"; }
 sub FINDIF()		{ "$BINDIR/findif"; }
 sub TMUSESFS()		{ "$BOOTDIR/usesfs"; }
 sub ISSIMTRAFGENPATH()	{ "$BOOTDIR/simtrafgen"; }
@@ -1192,6 +1193,7 @@ sub gettraceconfig($)
 sub gettunnelconfig($)
 {
     my ($rptr)   = @_;
+    my @tmccresults = ();
     my $tunnels  = {};
 
     if (tmcc(TMCCCMD_TUNNEL, undef, \@tmccresults) < 0) {
