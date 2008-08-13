@@ -466,23 +466,24 @@ tmcdresp_t *tmcd_handle_request(int sock, char *command, char *rdata, tmcdreq_t 
 	/*
 	 * Figure out what command was given.
 	 */
-	for (i = 0; i < numcommands; i++)
-		if (strncmp(command, xml_command_array[i].cmdname,
-			    strlen(xml_command_array[i].cmdname)) == 0) {
+	for (i = 0; i < numcommands; i++) {
+		if (strcmp(command, xml_command_array[i].cmdname) == 0) {
 			flags = xml_command_array[i].flags;
 			break;
 		}
+	}
 
 	if (i == numcommands) {
-		for (i = 0; i < numrawcommands; i++) 
-			if (strncmp(command, raw_xml_command_array[i].cmdname,
-				    strlen(raw_xml_command_array[i].cmdname)) == 0) {
+		for (i = 0; i < numrawcommands; i++)  {
+			if (strcmp(command, raw_xml_command_array[i].cmdname) == 0) {
 				is_xml_command = 0;
 				flags = raw_xml_command_array[i].flags;
 			    	break;
 			}
+		}
+
 		if (i == numrawcommands) {
-			info("%s: INVALID REQUEST: %.8s\n", reqp->nodeid, command);
+			printf("%s: INVALID REQUEST: %.8s\n", reqp->nodeid, command);
 			goto skipit;
 		}
 
@@ -569,10 +570,7 @@ tmcdresp_t *tmcd_handle_request(int sock, char *command, char *rdata, tmcdreq_t 
 
 		memcpy(response->data, (char *)xmlbuf, response->length);
 		xmlFree(xmlbuf);
-
-		response->data = (char *)xmlbuf;
-	}
-	else {
+	} else {
 		err = raw_xml_command_array[i].func(&response->data, &response->length, sock, reqp, rdata);
 
 		if (err)
@@ -627,7 +625,7 @@ XML_COMMAND_PROTOTYPE(dostatus)
 {
 	xmlNode *node;
 
-	node = new_response(root, "nodestatus");
+	node = new_response(root, "status");
 	/*
 	 * Now check reserved table
 	 */
@@ -1535,6 +1533,7 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 				add_key(node, "key", pubkey_row[1]);
 
 				pubkeys_nrows--;
+			}
 			
 		}
 		mysql_free_result(pubkeys_res);
@@ -4546,7 +4545,7 @@ XML_COMMAND_PROTOTYPE(dofwinfo)
 	}
 
 
-	fwinfo_node = new_response(root, "fwinfo");
+	fwinfo_node = new_response(root, "firewallinfo");
 
 	/*
 	 * Common case, no firewall
@@ -4640,10 +4639,10 @@ XML_COMMAND_PROTOTYPE(dofwinfo)
 	if (res && mysql_num_rows(res) > 0) {
 		row = mysql_fetch_row(res);
 		if (row[0]) { /* XXX Ryan */
-			node = new_response(fwinfo_node, "fwvar")
+			node = new_response(fwinfo_node, "fwvar");
 			add_key(node, "var", "EMULAB_GWIP");
 			add_key(node, "value", CONTROL_ROUTER_IP);
-			node = new_response(fwinfo_node, "fwvar")
+			node = new_response(fwinfo_node, "fwvar");
 			add_key(node, "var", "EMULAB_GWMAC");
 			add_key(node, "value", row[0]);
 		}
@@ -4713,7 +4712,7 @@ XML_COMMAND_PROTOTYPE(dofwinfo)
 
 	for (n = nrows; n > 0; n--) {
 		row = mysql_fetch_row(res);
-		node = new_response(fwrules_node, "fwrule");
+		node = new_response(fwinfo_node, "fwrule");
 		add_key(node, "ruleno", row[0]);
 		add_key(node, "rule", row[1]);
 	}
@@ -5111,7 +5110,7 @@ XML_COMMAND_PROTOTYPE(dolocalize)
 		return 1;
 	}
 
-	node = new_response(root, "localize");
+	node = new_response(root, "localization");
 	row = mysql_fetch_row(res);
 	if (row[1]) {
 		add_key(node, "rootpubkey", row[1]);

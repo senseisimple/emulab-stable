@@ -891,10 +891,12 @@ execute:
 	response = tmcd_handle_request(sock, bp, rdata, reqp);
 
 skipit:
-	client_writeback(sock, response->data, response->length, istcp);
-	if (!istcp) 
-		client_writeback_done(sock,
+	if (response) {
+		client_writeback(sock, response->data, response->length, istcp);
+		if (!istcp) 
+			client_writeback_done(sock,
 				      redirect ? &redirect_client : client);
+   	}
 
 #if 0
 	if (byteswritten && (command_array[i].flags & F_MINLOG) == 0)

@@ -75,6 +75,7 @@ if (@ARGV) {
     $action = $ARGV[0];
 }
 
+
 # Execute the action.
 SWITCH: for ($action) {
     /^boot$/i && do {
@@ -104,11 +105,12 @@ sub doboot()
 {
     my %agents = ();
     my %userenv = ();
+    my %tmccresults;
 
     #
     # Need the pid/eid. 
     # 
-    my ($pid, $eid, $vname) = check_nickname();
+    #my ($pid, $eid, $vname) = check_nickname();
 
     #
     # Daemonize and let the boot continue. We have to disconnect and
@@ -155,15 +157,14 @@ sub doboot()
 	# This is backward compatible and enables us to boot up unallocated
 	# nodes (though I am not sure they would ever reach this script).
 	#
-	if (@agents == 0) {
-	    my %tmccresults;
+	if (!keys(%agents)) {
 	    if (tmcc(TMCCCMD_CREATOR, undef, \%tmccresults) < 0) {
 		fatal("Could not get UID for progagent from server!");
 	    }
 	    if ($tmccresults{"SWAPPER"} =~ /^[-\w]*$/) {
-		$uid = $tmccresults{"SWAPPER"});
+		$uid = $tmccresults{"SWAPPER"};
 	    } elsif ($tmccresults{"CREATOR"} =~ /^[-\w]*$/) {
-		$uid = $tmccresults{"CREATOR"});
+		$uid = $tmccresults{"CREATOR"};
 	    } else {
 		warning("Cannot determine UID for program agent, not running");
 		exit(0);
@@ -178,7 +179,7 @@ sub doboot()
 	if (!open(RUN, ">$CONFIG")) {
 	    fatal("Could not open $CONFIG: $!");
 	}
-	$ptr = $agents{'agent'};
+	$ptr = $agents{'AGENT'};
 	$ptr = [ $ptr ] if (ref $ptr ne 'ARRAY');
 	
 	foreach my $agent (@$ptr) {

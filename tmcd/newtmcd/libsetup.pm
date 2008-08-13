@@ -10,7 +10,7 @@
 #
 # Common routines and constants for the client bootime setup stuff.
 #
-package libsetup;
+package libnewsetup;
 use Exporter;
 @ISA = "Exporter";
 @EXPORT =
@@ -40,7 +40,7 @@ use Exporter;
 use English;
 
 # The tmcc library.
-use libtmcc;
+use libnewtmcc;
 
 #
 # This is the VERSION. We send it through to tmcd so it knows what version
@@ -49,13 +49,13 @@ use libtmcc;
 # BE SURE TO BUMP THIS AS INCOMPATIBILE CHANGES TO TMCD ARE MADE!
 #
 sub TMCD_VERSION()	{ 29; };
-libtmcc::configtmcc("version", TMCD_VERSION());
+libnewtmcc::configtmcc("version", TMCD_VERSION());
 
 # Control tmcc timeout.
-sub libsetup_settimeout($) { libtmcc::configtmcc("timeout", $_[0]); };
+sub libsetup_settimeout($) { libnewtmcc::configtmcc("timeout", $_[0]); };
 
 # Refresh tmcc cache.
-sub libsetup_refresh()	   { libtmcc::tmccgetconfig(); };
+sub libsetup_refresh()	   { libnewtmcc::tmccgetconfig(); };
 
 #
 # For virtual (multiplexed nodes). If defined, tack onto tmcc command.
@@ -75,7 +75,7 @@ sub libsetup_setvnodeid($)
     }
 
     $vnodeid = $vid;
-    libtmcc::configtmcc("subnode", $vnodeid);
+    libnewtmcc::configtmcc("subnode", $vnodeid);
 }
 sub libsetup_getvnodeid()
 {
@@ -289,7 +289,7 @@ sub CONTROL()	{ if (-e "$ETCDIR/isctrl") { return 1; } else { return 0; } }
 #
 # Same for a Windows (CygWinXP) node.
 #
-# XXX  If you change this, look in libtmcc::tmccgetconfig() as well.
+# XXX  If you change this, look in libnewtmcc::tmccgetconfig() as well.
 sub WINDOWS()	{ if (-e "$ETCDIR/iscygwin") { return 1; } else { return 0; } }
 
 #
@@ -485,7 +485,7 @@ sub dorole()
 	return -1;
     }
     return 0
-	if (! keys(%tmccresults);
+	if (! keys(%tmccresults));
     
     #
     # There should be just one string. Ignore anything else.
@@ -495,7 +495,7 @@ sub dorole()
 	$role = $tmccresults{"ROLE"};
     }
     else {
-	warn "*** WARNING: Bad role line: $tmccresults{"ROLE"}";
+	warn "*** WARNING: Bad role line: $tmccresults{ROLE}";
 	return -1;
     }
     system("echo '$role' > " . TMROLE());
@@ -544,11 +544,11 @@ sub getifconfig($;$)
     	$settings_ptr = [ $tmccresults{"INTERFACE-SETTINGS"} ];
     }
 
-    for (my $iface @$rptr) {
+    for my $iface (@$rptr) {
 	my $name;
     	if (!exists $$iface{'VMAC'}) {
 		$$iface{'SETTINGS'} = {};
-		for (my $entry @$settings_ptr) {
+		for my $entry (@$settings_ptr) {
 			if ($$entry{'MAC'} eq $$iface{'MAC'}) {
 				my $capkey = $$entry{'MAC'}->{'KEY'};
 				my $capval = $$entry{'MAC'}->{'VAL'};
@@ -1079,17 +1079,13 @@ sub gettunnelconfig($)
     	$rptr = [ $tmccresults{"TUNNEL"} ];
     }
 
-    foreach my $entry (@$rptr}) {
+    foreach my $entry (@$rptr) {
 	    my $tunnel = $$entry{'TUNNEL'};
 	    my $member = $$entry{'MEMBER'};
 	    my $key    = $$entry{'KEY'};
 	    my $value  = $$entry{'VALUE'};
 
 	    $tunnels->{"$tunnel:$member"}->{$key} = $value;
-	}
-	else {
-	    warn("*** WARNING: Bad tunnels line: $str\n");
-	}
     }
     $$rptr = $tunnels;
     return 0;
@@ -1206,14 +1202,14 @@ sub getfwconfig($$;$)
 	return -1;
     }
 
-    if ($tmccresults{"TYPE)"} {
+    if ($tmccresults{"TYPE"}) {
     	$fwinfo->{'TYPE'} = $tmccresults{"TYPE"};
 	if ($fwinfo->{'TYPE'} eq 'remote') {
 		$fwinfo->{'FWIP'} = $tmccresults{"FWIP"};
 	}
 	else {
 		for my $key qw/STYLE IN_IF OUT_IF IN_VLAN OUT_VLAN/ {
-			$fwinfo->{$key} = $tmccresults{"$KEY"};
+			$fwinfo->{$key} = $tmccresults{$key};
 		}
 	}
     }
@@ -1221,7 +1217,7 @@ sub getfwconfig($$;$)
     	$fwinfo->{'TYPE'} = 'none';
     }
 
-    if (exists $tmccresults{"LOG)"} {
+    if (exists $tmccresults{"LOG"}) {
     	$log = $tmccresults{"LOG"};
 	if ($log =~ /^allow|accept$/) {
 	    $fwinfo->{"LOGACCEPT"} = 1;
@@ -1239,13 +1235,13 @@ sub getfwconfig($$;$)
     	map { $fwrules{$$_{'RULENO'}} = $$_{'RULE'} } @$ptr;
     }
 
-    if (exists $tmccresults{"FWVAR"} {
+    if (exists $tmccresults{"FWVAR"}) {
     	$ptr = $tmccresults{"FWVAR"};
 	$ptr = [ $ptr ] if (ref $ptr ne 'ARRAY');
     	map { $fwvars{$$_{'VAR'}} = $$_{'VALUE'} } @$ptr;
     }
 
-    if (exists $tmccresults{"FWHOST"} {
+    if (exists $tmccresults{"FWHOST"}) {
     	$ptr = $tmccresults{"FWHOST"};
 	$ptr = [ $ptr ] if (ref $ptr ne 'ARRAY');
 	for (@$ptr) {
@@ -1324,7 +1320,7 @@ sub bootsetup()
 {
     my $oldpid;
 
-    # Tell libtmcc to forget anything it knows.
+    # Tell libnewtmcc to forget anything it knows.
     tmccclrconfig();
     
     #
@@ -1375,7 +1371,7 @@ sub bootsetup()
     }
 
     #
-    # Tell libtmcc to get the full config. Note that this must happen
+    # Tell libnewtmcc to get the full config. Note that this must happen
     # AFTER initsfs() right above, since that changes what tmcd
     # is going to tell us.
     #
@@ -1539,7 +1535,7 @@ sub vnodejailsetup($)
     }
 
     #
-    # Tell libtmcc to get the full config for the jail. At the moment
+    # Tell libnewtmcc to get the full config for the jail. At the moment
     # we do not use SFS inside jails, so okay to do this now (usually
     # have to call initsfs() first). The full config will be copied
     # to the proper location inside the jail by mkjail.
@@ -1560,7 +1556,7 @@ sub vnodejailsetup($)
 #
 sub plabsetup()
 {
-    # Tell libtmcc to forget anything it knows.
+    # Tell libnewtmcc to forget anything it knows.
     tmccclrconfig();
     
     #
@@ -1581,7 +1577,7 @@ sub plabsetup()
     initsfs();
 
     #
-    # Tell libtmcc to get the full config. Note that this must happen
+    # Tell libnewtmcc to get the full config. Note that this must happen
     # AFTER initsfs() right above, since that changes what tmcd
     # is going to tell us.
     #

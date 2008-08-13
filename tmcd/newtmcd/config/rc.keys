@@ -138,16 +138,16 @@ sub dokeyhash()
     }
     unlink TMKEYHASH();
     return 0
-	if (! exists($tmccresults{"uc(hash)"}));
+	if (! exists($tmccresults{"HASH"}));
 
     #
     # There should be just one string. Ignore anything else.
     #
-    if ($tmccresults{"uc(hash)"} =~ /^([\w]*)$/) {
+    if ($tmccresults{"HASH"} =~ /^([\w]*)$/) {
 	$keyhash = $1;
     }
     else {
-	fatal("Bad keyhash: $tmccresults{"uc(hash)"}");
+	fatal("Bad keyhash: $tmccresults{HASH}");
     }
 
     #
@@ -175,16 +175,16 @@ sub doeventkey()
     }
     unlink TMEVENTKEY();
     return 0
-	if (! exists($tmccresults{"uc(key)"}));
+	if (! exists($tmccresults{"KEY"}));
 
     #
     # There should be just one string. Ignore anything else.
     #
-    if ($tmccresults{"uc(key)"} =~ /^([\w]*)$/) {
+    if ($tmccresults{"KEY"} =~ /^([\w]*)$/) {
 	$eventkey = $1;
     }
     else {
-	fatal("Bad eventkey line: $tmccresults{"uc(hash)"}");
+	fatal("Bad eventkey line: $tmccresults{HASH}");
     }
 
     #

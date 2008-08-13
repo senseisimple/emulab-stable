@@ -94,6 +94,7 @@ sub doboot()
 {
     my %rpms   = ();
     my $errors = 0;
+    my %tmccresults;
     
     print STDOUT "Checking Testbed RPM configuration ... \n";
 
@@ -114,7 +115,7 @@ sub doboot()
     # 
     my $installoption = ((REMOTE() || WINDOWS()) ? "-t" : "-c");
 
-    my $ptr = $tmccresults{"uc(package)"};
+    my $ptr = $tmccresults{"PACKAGE"};
     $ptr = [ $ptr ] if (ref $ptr ne 'ARRAY');
 
     foreach my $rpm (@$ptr) {

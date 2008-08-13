@@ -124,62 +124,68 @@ sub doboot()
     #
     # First just get the current set of groups/accounts from tmcd.
     #
-    my $ptr = $tmccresults{"uc(addgroup)"};
-    if (ref $ptr ne 'ARRAY') {
-    	$ptr = [ $ptr ];
-    }
-    foreach my $group (@$ptr) {
-    	my $gname = $$group{'name'};
-	$gname = lc($gname)
-	    if (PLAB());
-	    
-	if (REMOTE() && !JAILED() && !PLAB()) {
-	    $gname = "emu-${gname}";
-	}
+    my $ptr;
+    if ($ptr = $tmccresults{"ADDGROUP"}) {
+	    if (ref $ptr ne 'ARRAY') {
+		$ptr = [ $ptr ];
+	    }
+	    foreach my $group (@$ptr) {
+		my $gname = $$group{'NAME'};
+		$gname = lc($gname)
+		    if (PLAB());
+		    
+		if (REMOTE() && !JAILED() && !PLAB()) {
+		    $gname = "emu-${gname}";
+		}
 
-	$newgroups{$gname} = $$group{'gid'};
-    }
-
-    $ptr = $tmccresults{"uc(adduser)"};
-    if (ref $ptr ne 'ARRAY') {
-    	$ptr = [ $ptr ];
+		$newgroups{$gname} = $$group{'GID'};
+	    }
     }
 
-    foreach my $user (@$ptr) {
-    if ($$user{'login'} !~ /^[-\w]+$/ && $$user{'pswd'} !~ /^[^:]+$/ &&
-        $$user{'uid'} !~ /^\d+$/ && $$user{'gid'} !~ /^.*$/ &&
-        $$user{'root'} !~ /^\d$/ && $$user{'name'} !~ /^.*$/ &&
-        $$user{'homedir'} !~ /^.*$/ && $$user{'glist'} !~ /^.*$/ &&
-        $$user{'serial'} !~ /^\d+$/ && $$user{'email'} !~ /^[-\w\@\.\+]+$/ &&
-        $$user{'shell'} !~ /^[-\w]*$/) { 
+    if ($ptr = $tmccresults{"ADDUSER"}) {
+	    if (ref $ptr ne 'ARRAY') {
+		$ptr = [ $ptr ];
+	    }
 
-	warning("bad account data: for user $$user{'login'}");
-    }
-    else {
-    	$newaccounts{$$user{'login'}} = $user;
-    }
+	    foreach my $user (@$ptr) {
+		    if ($$user{'LOGIN'} !~ /^[-\w]+$/ && $$user{'PSWD'} !~ /^[^:]+$/ &&
+			$$user{'UID'} !~ /^\d+$/ && $$user{'GID'} !~ /^.*$/ &&
+			$$user{'ROOT'} !~ /^\d$/ && $$user{'NAME'} !~ /^.*$/ &&
+			$$user{'HOMEDIR'} !~ /^.*$/ && $$user{'GLIST'} !~ /^.*$/ &&
+			$$user{'SERIAL'} !~ /^\d+$/ && $$user{'EMAIL'} !~ /^[-\w\@\.\+]+$/ &&
+			$$user{'SHELL'} !~ /^[-\w]*$/) { 
 
-    $ptr = $tmccresults{"uc(pubkey)"};
-    if (ref $ptr ne 'ARRAY') {
-    	$ptr = [ $ptr ];
-    }
-
-    foreach my $pubkey (@$ptr) {
-    	my $login = $$pubkey{'login'};
-        if (! defined($pubkeys{$login})) {
-	    $pubkeys{$login} = [];
-	}
-	push(@{$pubkeys{$login}}, $$pubkey{'key'});
+			warning("bad account data: for user $$user{'LOGIN'}");
+		    }
+		    else {
+			$newaccounts{$$user{'LOGIN'}} = $user;
+		    }
+	    }
     }
 
-    $ptr = $tmccresults{"uc(sfskey)"};
-    if (ref $ptr ne 'ARRAY') {
-    	$ptr = [ $ptr ];
+    if ($ptr = $tmccresults{"PUBKEY"}) {
+	    if (ref $ptr ne 'ARRAY') {
+		$ptr = [ $ptr ];
+	    }
+
+	    foreach my $pubkey (@$ptr) {
+		my $login = $$pubkey{'LOGIN'};
+		if (! defined($pubkeys{$login})) {
+		    $pubkeys{$login} = [];
+		}
+		push(@{$pubkeys{$login}}, $$pubkey{'KEY'});
+	    }
     }
-    foreach my $sfskey (@$ptr) {
-	# SFS key goes into the array.
-	#
-	push(@sfskeys, $$sfskey{'key'});
+
+    if ($ptr = $tmccresults{"SFSKEY"}) {
+	    if (ref $ptr ne 'ARRAY') {
+		$ptr = [ $ptr ];
+	    }
+	    foreach my $sfskey (@$ptr) {
+		# SFS key goes into the array.
+		#
+		push(@sfskeys, $$sfskey{'KEY'});
+	    }
     }
 
     # On CygWin, just make a batch of Windows accounts and generate
@@ -338,16 +344,16 @@ sub doboot()
 
     my @addedUsers = ();
     while (($login, $info) = each %newaccounts) {
-	$pswd  = $$info{'pswd'};
-	$uid   = $$info{'uid'};
-	$gid   = $$info{'gid'};
-	$root  = $$info{'root'};
-	$name  = $$info{'name'};
-	$hdir  = $$info{'homedir'};
-	$glist = $$info{'glist'};
-	$serial= $$info{'serial'};
-	$email = $$info{'email'};
-	$shell = $$info{'shell'};
+	$pswd  = $$info{'PSWD'};
+	$uid   = $$info{'UID'};
+	$gid   = $$info{'GID'};
+	$root  = $$info{'ROOT'};
+	$name  = $$info{'NAME'};
+	$hdir  = $$info{'HOMEDIR'};
+	$glist = $$info{'GLIST'};
+	$serial= $$info{'SERIAL'};
+	$email = $$info{'EMAIL'};
+	$shell = $$info{'SHELL'};
 	if ( $name =~ /^(([^:]+$|^))$/ ) {
 	    $name = $1;
 	}
@@ -472,12 +478,12 @@ sub doboot()
 	}
 	foreach my $login (@addedUsers) {
 	    $info = $newaccounts{$login};
-		$pswd  = $$info{'pswd'};
-		$uid   = $$info{'uid'};
-		$gid   = $$info{'gid'};
-		$root  = $$info{'root'};
-		$name  = $$info{'name'};
-		$hdir  = $$info{'homedir'};
+		$pswd  = $$info{'PSWD'};
+		$uid   = $$info{'UID'};
+		$gid   = $$info{'GID'};
+		$root  = $$info{'ROOT'};
+		$name  = $$info{'NAME'};
+		$hdir  = $$info{'HOMEDIR'};
 
 		# We have to put the authorized_keys files somewhere that they
 		# won't be covered up by the Samba homedir mounts.

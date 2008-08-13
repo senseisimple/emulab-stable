@@ -132,34 +132,36 @@ sub doboot()
 	fatal("Could not get mount list from server!");
     }
 
-    $ptr = $tmccresults{"uc(mount)"};
-    $ptr = [ $ptr ] if (ref $ptr ne 'ARRAY');
+    if ($ptr = $tmccresults{"MOUNT"}) {
+	    $ptr = [ $ptr ] if (ref $ptr ne 'ARRAY');
 
-    foreach my $mount (@$ptr) {
-        my $remote = $$mount{'remote'};
-        my $local = $$mount{'local'};
+	    foreach my $mount (@$ptr) {
+		my $remote = $$mount{'REMOTE'};
+		my $local = $$mount{'LOCAL'};
 
-	if ($remote =~ /^[-:\@\w\.\/]+$/ && $local =! /^[-\@\w\.\/]+$/) {
-	    $mounts{$remote} = $local;
-	}
-	else {
-	    warning("Malformed mount information: REMOTE=$remote LOCAL=$local");
-	}
+		if (($remote =~ /^[-:\@\w\.\/]+$/) && ($local =~ /^[-\@\w\.\/]+$/)) {
+		    $mounts{$remote} = $local;
+		}
+		else {
+		    warning("Malformed mount information: REMOTE=$remote LOCAL=$local");
+		}
+	    }
     }
 
-    $ptr = $tmccresults{"uc(sfs)"};
-    $ptr = [ $ptr ] if (ref $ptr ne 'ARRAY');
+    if ($ptr = $tmccresults{"SFS"}) {
+	    $ptr = [ $ptr ] if (ref $ptr ne 'ARRAY');
 
-    foreach my $sfs (@$ptr) {
-        my $remote = $$sfs{'remote'};
-        my $local = $$sfs{'local'};
+	    foreach my $sfs (@$ptr) {
+		my $remote = $$sfs{'REMOTE'};
+		my $local = $$sfs{'LOCAL'};
 
-	if ($remote =~ /^[-:\@\w\.\/]+$/ && $local =! /^[-\@\w\.\/]+$/) {
-	    $sfss{$remote} = $local;
-	}
-	else {
-	    warning("Malformed sfs information: REMOTE=$remote LOCAL=$local");
-	}
+		if (($remote =~ /^[-:\@\w\.\/]+$/) && ($local =~ /^[-\@\w\.\/]+$/)) {
+		    $$sfs{$remote} = $local;
+		}
+		else {
+		    warning("Malformed sfs information: REMOTE=$remote LOCAL=$local");
+		}
+	    }
     }
     
     #

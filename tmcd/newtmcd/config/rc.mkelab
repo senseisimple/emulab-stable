@@ -193,6 +193,8 @@ sub doboot()
 	fatal("Could not get Inner Emulab Config info from server!");
     }
     # If no results then do nothing. No inner elab.
+    print "foo " . keys(%tmccresults) . "\n";
+    exit 0;
     return 0 if (! keys(%tmccresults));
 
     #
@@ -264,7 +266,7 @@ sub doboot()
 	if ($line =~ /^(.*)="(.+)"$/ ||
 	    $line =~ /^(.*)=(.+)$/) {
 
-	    $emulabconfig{uc $key} = uc $tmccresults{$key};
+	    $emulabconfig{uc $key} = $tmccresults{uc $key};
 	}
     }
 

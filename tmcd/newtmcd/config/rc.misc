@@ -134,16 +134,16 @@ sub donodeid()
     if (tmcc(TMCCCMD_NODEID, undef, \%tmccresults) < 0) {
 	fatal("Could not get nodeid from server!");
     }
-    return 0 if (! exists($tmccresults{"uc(id)"}));
+    return 0 if (! exists($tmccresults{"ID"}));
     
     #
     # There should be just one string. Ignore anything else.
     #
-    if ($tmccresults{"uc(id)"} =~ /([-\w]*)/) {
+    if ($tmccresults{"ID"} =~ /([-\w]*)/) {
 	$nodeid = $1;
     }
     else {
-	fatal("Bad nodeid line: $tmccresults{"uc(id)"}");
+	fatal("Bad nodeid line: $tmccresults{ID}");
     }
     
     system("echo '$nodeid' > ". TMNODEID);
@@ -166,22 +166,22 @@ sub docreator()
     #
     # There should be one string for the creator of the experiment...
     #
-    if ($tmccresults{"uc(creator)"} =~ /^([-\w]*)$/) {
+    if ($tmccresults{"CREATOR"} =~ /^([-\w]*)$/) {
 	$creator = $1;
     }
     else {
-	fatal("Bad creator line: $tmccresults{"uc(creator)"}");
+	fatal("Bad creator line: $tmccresults{CREATOR}");
     }
     system("echo '$creator' > ". TMCREATOR());
 
     #
     # ... and another string for the user who swapped it in.
     #
-    if ($tmccresults{"uc(swapper)"} =~ /^([-\w]*)$/) {
+    if ($tmccresults{"SWAPPER"} =~ /^([-\w]*)$/) {
 	$swapper = $1;
     }
     else {
-	fatal("Bad swapper line: $tmccresults{"uc(swapper)"}");
+	fatal("Bad swapper line: $tmccresults{SWAPPER}");
     }
     system("echo '$swapper' > ". TMSWAPPER());
 

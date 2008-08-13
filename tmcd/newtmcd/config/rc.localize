@@ -101,13 +101,13 @@ sub doboot()
 	fatal("Could not get localization info from server!");
     }
     # Important; if no results then do nothing. 
-    return 0 if (! exists($tmccresults{"uc(rootpubkey)"}));
+    return 0 if (! exists($tmccresults{"ROOTPUBKEY"}));
 
     #
     # Go through and see what we got. For now, we expect just ssh keys
     # 
-    my $ptr = $tmccresults{"uc(rootpubkey)"};
-    $ptr = [ $ptr ] if (ref $pter ne 'ARRAY');
+    my $ptr = $tmccresults{"ROOTPUBKEY"};
+    $ptr = [ $ptr ] if (ref $ptr ne 'ARRAY');
 
     foreach my $key (@$ptr) {
 	push(@pubkeys, $key);

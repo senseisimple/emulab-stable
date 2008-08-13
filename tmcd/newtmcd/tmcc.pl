@@ -6,6 +6,7 @@
 #
 use English;
 use Getopt::Std;
+use Data::Dumper;
 
 #
 # Perl wrapper to TMCC. Everything is done in the library.
@@ -59,15 +60,16 @@ ParseOptions();
 #
 # And do it. Dump results to stdout.
 #
-my @results = ();
+my %results;
 
-if (my $rval = tmcc($CMD, $ARGS, \@results) != 0) {
+if (my $rval = tmcc($CMD, $ARGS, \%results) != 0) {
     exit($rval);
 }
-if (@results) {
-    foreach my $str (@results) {
-	print STDOUT "$str";
-    }
+if (%results) {
+	print Dumper(\%results);
+    #foreach my $str (@results) {
+#	print STDOUT "$str";
+#    }
 }
 exit(0);
 

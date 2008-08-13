@@ -107,14 +107,14 @@ sub doboot()
     #
     # There should be just one string. Ignore anything else.
     #
-    if ($tmccresults{"uc(server)"} =~ /^[-\w\.]*$/  ||
-        $tmccresults{"uc(isserver)"} =~ /\d/) {
+    if ($tmccresults{"SERVER"} =~ /^[-\w\.]*$/  ||
+        $tmccresults{"ISSERVER"} =~ /\d/) {
 
-	$syncserver  = $tmccresults{"uc(server)"};
-	$startserver = $tmccresults{"uc(isserver)"};
+	$syncserver  = $tmccresults{"SERVER"};
+	$startserver = $tmccresults{"ISSERVER"};
     }
     else {
-	fatal("Bad syncserver line: $tmccresults{"uc(server)"} $tmccresults{"uc(isserver)"}");
+	fatal("Bad syncserver line: $tmccresults{SERVER} $tmccresults{ISSERVER}");
     }
 
     #

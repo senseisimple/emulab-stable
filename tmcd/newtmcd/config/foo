@@ -29,7 +29,7 @@ BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 # library and initialize itself. 
 # 
 use libsetup;
-use libtmcc;
+use libnewtmcc;
 use librc;
 
 # This runs as a separate Local System service on XP.  Change to root.
@@ -249,7 +249,7 @@ sub doboot()
 	#
 	# We want to restart, go around the loop again. Turn the cache off.
 	#
-	libtmcc::configtmcc("nocache", 1);
+	libnewtmcc::configtmcc("nocache", 1);
     }
     return;
 }

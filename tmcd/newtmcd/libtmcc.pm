@@ -11,8 +11,9 @@
 #
 # TODO: Proxy path in a jail. 
 # 
-package libtmcc;
+package libnewtmcc;
 use Exporter;
+use Data::Dumper;
 @ISA    = "Exporter";
 @EXPORT = qw(configtmcc tmcc tmccbossname tmccgetconfig tmccclrconfig
 	     tmcccopycache tmccbossinfo
@@ -63,6 +64,11 @@ my $CACHEFILE	= "tmcc_config.xml";
 my $CACHENAME   = "tmcc";
 my $debug       = 0;
 my $beproxy     = 0;
+
+my @tagstack;
+my @configstack;
+my $current_key;
+my $current_data;
 
 #
 # Configuration. The importer of this library should set these values
@@ -126,19 +132,20 @@ sub handle_start_tag
 	push @tagstack, $element;
 
 	if ($element eq 'key') {
-		my $current_key = $attrs{'name'};
+		$current_key = $attrs{'name'};
 	}
 	elsif ($element ne 'tmcd') {
-		my $ref  = ${$configstack[-1]}{$element};
+		my $fubar = $configstack[-1];
+		$ref = ${$fubar}{uc $element};
 		my $hash = {};
 		if (ref $ref eq 'ARRAY') {
 			push @$ref, $hash;
 		}
 		elsif (defined $ref) {
-			${$configstack[-1]}{uc $element} = [ $ref, $hash ];
+			${$fubar}{uc $element} = [ $ref, $hash ];
 		}
 		else {
-			${$configstack[-1]}{uc $element} = $hash;
+			${$fubar}{uc $element} = $hash;
 		}
 		push @configstack, $hash;
 	}
@@ -150,8 +157,25 @@ sub handle_end_tag
 
 	pop @tagstack;
 
+	if ($current_data) {
+	    $current_data =~ s/^\s+//;
+	    $current_data =~ s/\s+$//;
+	    $current_data =~ s/[\r\n]//g;
+	}
+
 	if ($element eq 'key') {
+		my $config = $configstack[-1];
+		my $value = $$config{uc $current_key};
+
+		if (defined $value) {
+			$$config{uc $current_key} = [ $value, $current_data ];
+		}
+		else {
+			$$config{uc $current_key} = $current_data;
+		}
+
 		$current_key = undef;
+		$current_data = undef;
 	}
 	elsif ($element ne 'tmcd') {
 		pop @configstack;
@@ -162,16 +186,7 @@ sub handle_tag_data
 {
 	my ($parser, $data) = @_;
 
-	if ($current_key) {
-		my $config = $configstack[-1];
-		my $value = $$config{uc $current_key};
-
-		if (not defined $value) {
-			$$config{uc $current_key} = [];
-			$value = $$config{uc $current_key};
-		}
-		push @$value, $data;
-	}
+	$current_data .= $data;
 }
 
 #
@@ -422,10 +437,25 @@ sub runtmcc ($;$$%)
 	return -1;
     }
 
-    $config = parse_config($xml);
+    if ($cmd eq lc('bossinfo')) {
+    	$xml =~ /^(\S+)\s+(\S+).*$/;
+	$config = { BOSSINFO => { BOSSNAME => $1, BOSSIP => $2 } };
+    }
+    else {
+    	$config = parse_config($xml);
+    }
 
-    %$results = %$config
-	if ($config && defined($results));
+    if (defined $results) {
+    	if ($config && $cmd !~ /^fullconfig$/i) {
+	    my $data = $$config{uc $cmd};
+	    if ($data) {
+    	    	%$results = %{$data};
+	    }
+    	}
+	elsif ($config) {
+	    %$results = %$config;
+	}
+    }
     return 0;
 }
 
@@ -433,8 +463,6 @@ sub parse_config
 {
 	my ($xml) = @_;
 
-	my @tagstack;
-	my @configstack;
 	my $parser;
 
 
@@ -445,12 +473,17 @@ sub parse_config
 
 	push @configstack, {};
 
-	{ eval $parser->parse($xml) };
-	if ($@) {
-		print STDERR "Error parsing TMCD data: $@\n";
+	if ($xml) {
+		eval { $parser->parse($xml) };
+		if ($@) {
+			print STDERR "Error parsing TMCD data: $@\n";
+			return -1;
+		}
+	}
+	else {
+		print STDERR "Invalid command\n";
 		return -1;
 	}
-
 
 	return $configstack[0];
 }
@@ -492,6 +525,8 @@ sub tmcc ($;$$%)
     if (!$nocache && (!defined($args) || $args eq "")) {
 	my $tag = $commandset{$cmd}->{TAG};
 	my $xml;
+
+	$tag = "fullconfig" if (not defined $tag);
 	my $filename = CacheDir() . "/$tag.xml";
 
 	if (! -r $filename) {
@@ -562,7 +597,7 @@ sub tmccbossinfo()
 	warn("*** WARNING: Could not get bossinfo from tmcc!\n");
 	return undef;
     }
-    my ($bossname, $bossip) = ($bossinfo{'bossname'}, $bossinfo{'bossip'});
+    my ($bossname, $bossip) = ($bossinfo{'BOSSNAME'}, $bossinfo{'BOSSIP'});
 
     #
     # Taint check. Nice to do for the caller. Also strips any newline.
@@ -644,7 +679,7 @@ sub tmccgetconfig()
     my $ipodinfo;
     # Hack to make sure ipodinfo is not world-readable
     if ($xml =~ /^(.*)(<\s*ipodinfo[^>]*>.*<\s*\/ipodinfo\s*>)(.*)$/im) {
-    	$xml = $1$3;
+    	$xml = $1 . $3;
 	$ipodinfo = $2;
     }
 
@@ -661,7 +696,7 @@ sub tmccgetconfig()
 	my $oldumask = umask;
 	umask 0177;
     	if (open(TD, "> $cdir/ipodinfo.xml")) {
-    		my $data = "<?xml version="1.0"?>\n<tmcd>\n  $ipodinfo\n</tmcd>\n"; 
+    		my $data = "<?xml version=\"1.0\"?>\n<tmcd>\n  $ipodinfo\n</tmcd>\n"; 
 
     		print TD $data;
 		close(TD);

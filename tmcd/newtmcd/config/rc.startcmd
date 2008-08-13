@@ -101,7 +101,7 @@ sub doboot()
     if (!open(RUN, ">" . TMSTARTUPCMD)) {
 	fatal("Could not open " . TMSTARTUPCMD . ": $!");
     }
-    print RUN "$tmccresults{"uc(cmd)"}";
+    print RUN "$tmccresults{CMD}";
     close(RUN);
     chmod(0755, TMSTARTUPCMD);
 
