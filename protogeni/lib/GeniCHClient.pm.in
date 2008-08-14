@@ -157,12 +157,12 @@ sub Register($$$$)
 #
 sub RegisterUser($$$$$)
 {
-    my ($hrn, $name, $email, $cert, $sshkey) = @_;
+    my ($hrn, $name, $email, $cert, $keys) = @_;
 
     my $info = { "name"   => $name,
 		 "email"  => $email };
-    $info->{"sshkey"} = $sshkey
-	if (defined($sshkey));
+    $info->{"sliverkeys"} = $keys
+	if (defined($keys));
 
     return Register($hrn, "User", $cert, $info);
 }

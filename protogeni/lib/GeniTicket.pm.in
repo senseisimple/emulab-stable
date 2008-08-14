@@ -21,7 +21,6 @@ use lib '@prefix@/lib';
 use GeniDB;
 use GeniCredential;
 use GeniCertificate;
-use libtestbed;
 use Experiment;
 use libdb qw(TBGetUniqueIndex);
 use English;
@@ -78,6 +77,11 @@ sub Lookup($$)
     return undef
 	if (!defined($ticket));
 
+    # Mark as coming from the DB.
+    $ticket->{'idx'}    = $idx;
+    $ticket->{'stored'} = 1;
+
+    # Cache.
     $tickets{"$idx"} = $ticket;
     return $ticket;
 }
@@ -143,7 +147,9 @@ sub Stringify($)
 	my $seqno = $self->seqno();
 	$idx = "S$seqno";
     }
-    return "[GeniTicket: $idx]";
+    my $slice_uuid = $self->slice_uuid();
+    
+    return "[GeniTicket: $idx, slice:$slice_uuid]";
 }
 
 #
@@ -419,7 +425,35 @@ sub GetExperiment($)
 }
 
 #
+# Look up a list of tickets for a locally instantiated slice. 
+# Used by the CM.
+#
+sub SliceTickets($$$)
+{
+    my ($class, $slice, $pref) = @_;
+
+    my $slice_uuid = $slice->uuid();
+    my @result = ();
+
+    my $query_result =
+	DBQueryWarn("select idx from geni_tickets ".
+		    "where slice_uuid='$slice_uuid'");
+    return -1
+	if (!$query_result);
+
+    while (my ($idx) = $query_result->fetchrow_array()) {
+	my $ticket = GeniTicket->Lookup($idx);
+	return -1
+	    if (!defined($ticket));
+	push(@result, $ticket);
+    }
+    @$pref = @result;
+    return 0;
+}
+
+#
 # Release a ticket. Need to release the nodes ...
+# Used by the CM.
 #
 sub Release($)
 {
@@ -433,7 +467,8 @@ sub Release($)
     my $eid     = $experiment->eid();
     my @nodeids = ();
 
-    foreach my $resource_uuid (keys(%{$self->rspec()->{'node'}})) {
+    foreach my $ref (@{$self->rspec()->{'node'}}) {
+	my $resource_uuid = $ref->{'uuid'};
 	my $node = Node->Lookup($resource_uuid);
 	next
 	    if (!defined($node));
@@ -445,7 +480,7 @@ sub Release($)
 	}
     }
     if (@nodeids) {
-	system("$NFREE $pid $eid @nodeids");
+	system("export NORELOAD=1; $NFREE $pid $eid @nodeids");
     }
     $self->Delete();
     return 0;

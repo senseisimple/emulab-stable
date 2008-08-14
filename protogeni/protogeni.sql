@@ -28,7 +28,7 @@ CREATE TABLE `geni_users` (
   `status` enum('active','archived','frozen') NOT NULL default 'frozen',
   `name` tinytext,
   `email` tinytext,
-  `sa_idx` int(10) unsigned NOT NULL default '0',
+  `sa_uuid` varchar(40) NOT NULL default '',
   PRIMARY KEY  (`idx`),
   KEY `hrn` (`hrn`),
   UNIQUE KEY `uuid` (`uuid`)
@@ -71,13 +71,14 @@ CREATE TABLE `geni_components` (
 #    UUIDs generated (signed) by and registered must have these top
 #    8 bytes. See wiki discussion.
 #
-DROP TABLE IF EXISTS `geni_sliceauthorities`;
-CREATE TABLE `geni_sliceauthorities` (
+DROP TABLE IF EXISTS `geni_authorities`;
+CREATE TABLE `geni_authorities` (
   `hrn` varchar(256) NOT NULL default '',
   `idx` mediumint(8) unsigned NOT NULL default '0',
   `uuid` varchar(40) NOT NULL default '',
   `uuid_prefix` varchar(12) NOT NULL default '',
   `created` datetime default NULL,
+  `type` enum('sa','ma','ch') NOT NULL default 'sa',
   `url` tinytext,
   PRIMARY KEY  (`idx`),
   UNIQUE KEY `uuid` (`uuid`)
@@ -102,7 +103,7 @@ CREATE TABLE `geni_slices` (
   `created` datetime default NULL,
   `creator_uuid` varchar(40) NOT NULL default '',
   `name` tinytext,
-  `sa_idx` int(10) unsigned NOT NULL default '0',
+  `sa_uuid` varchar(40) NOT NULL default '',
   PRIMARY KEY  (`idx`),
   UNIQUE KEY `hrn` (`hrn`),
   UNIQUE KEY `uuid` (`uuid`)
@@ -119,6 +120,7 @@ CREATE TABLE `geni_slivers` (
   `slice_uuid` varchar(40) NOT NULL default '',
   `creator_uuid` varchar(40) NOT NULL default '',
   `resource_uuid` varchar(40) NOT NULL default '',
+  `resource_type` varchar(40) NOT NULL default '',
   `created` datetime default NULL,
   `credential_idx` int(10) unsigned default NULL,
   `ticket_idx` int(10) unsigned default NULL,
@@ -137,19 +139,22 @@ DROP TABLE IF EXISTS `geni_aggregates`;
 CREATE TABLE `geni_aggregates` (
   `idx` mediumint(8) unsigned NOT NULL default '0',
   `uuid` varchar(40) NOT NULL default '',
+  `type` varchar(40) NOT NULL default '',
   `slice_uuid` varchar(40) NOT NULL default '',
   `creator_uuid` varchar(40) NOT NULL default '',
   `created` datetime default NULL,
   `credential_idx` int(10) unsigned default NULL,
   `ticket_idx` int(10) unsigned default NULL,
   `component_idx` int(10) unsigned NOT NULL default '0',
+  `aggregate_idx` int(10) unsigned default NULL,
+  `status` enum('ready','broken') NOT NULL default 'ready',
   PRIMARY KEY  (`idx`),
   UNIQUE KEY `uuid` (`uuid`),
   INDEX `slice_uuid` (`slice_uuid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 #
-# Table to remember the tickets that a component manager hands out. 
+# Table to remember tickets.
 #
 DROP TABLE IF EXISTS `geni_tickets`;
 CREATE TABLE `geni_tickets` (
@@ -160,10 +165,12 @@ CREATE TABLE `geni_tickets` (
   `redeem_before` datetime default NULL,
   `valid_until` datetime default NULL,
   `component_idx` int(10) unsigned NOT NULL default '0',
+  `seqno` int(10) unsigned NOT NULL default '0',
   `ticket_string` text,
-  PRIMARY KEY  (`idx`),
+  PRIMARY KEY  (`idx`), 
   INDEX `owner_uuid` (`owner_uuid`),
-  INDEX `slice_uuid` (`slice_uuid`)
+  INDEX `slice_uuid` (`slice_uuid`),
+  UNIQUE KEY `compseqno` (`component_idx`, `seqno`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 #
@@ -198,12 +205,39 @@ CREATE TABLE `geni_certificates` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 #
-# A clearinghouse table to hold sshkeys associated with geni users.
+# A clearinghouse table to hold keys associated with geni users.
 #
-DROP TABLE IF EXISTS `geni_sshkeys`;
-CREATE TABLE `geni_sshkeys` (
+DROP TABLE IF EXISTS `geni_userkeys`;
+CREATE TABLE `geni_userkeys` (
+  `type` enum('ssh','password') NOT NULL default 'ssh',
   `uuid` varchar(40) NOT NULL default '',
   `created` datetime default NULL,
-  `sshkey` text,
-  PRIMARY KEY  (`uuid`)
+  `key` text,
+  INDEX `uuid` (`uuid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+#
+# This table maps between resources and their component manager. 
+#
+DROP TABLE IF EXISTS `geni_resources`;
+CREATE TABLE `geni_resources` (
+  `idx` mediumint(8) unsigned NOT NULL default '0',
+  `resource_uuid` varchar(40) NOT NULL default '',
+  `resource_type` varchar(40) NOT NULL default '',
+  `created` datetime default NULL,
+  `component_idx` int(10) unsigned NOT NULL default '0',
+  PRIMARY KEY  (`idx`),
+  UNIQUE KEY `resource_uuid` (`resource_uuid`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+#
+# Hold the users that are bound to slices.
+#
+DROP TABLE IF EXISTS `geni_bindings`;
+CREATE TABLE `geni_bindings` (
+  `slice_uuid` varchar(40) NOT NULL default '',
+  `user_uuid` varchar(40) NOT NULL default '',
+  `created` datetime default NULL,
+  PRIMARY KEY  (`slice_uuid`,`user_uuid`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+

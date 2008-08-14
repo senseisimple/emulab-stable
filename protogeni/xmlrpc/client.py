@@ -29,13 +29,13 @@ SERVER_PATH     = ":443/protogeni/xmlrpc/"
 
 # Path to my certificate
 CERTIFICATE     = "/users/stoller/.ssl/encrypted.pem"
+# Got tired of typing this over and over so I stuck it in a file.
 PASSPHRASEFILE  = "/users/stoller/.ssl/password"
 passphrase      = ""
 
 # Debugging output.
-debug           = 1
+debug           = 0
 impotent        = 0
-
 
 def Fatal(message):
     print message
@@ -43,25 +43,29 @@ def Fatal(message):
     return
 
 def PassPhraseCB(v, prompt1='Enter passphrase:', prompt2='Verify passphrase:'):
+    passphrase = open(PASSPHRASEFILE).readline()
+    passphrase = passphrase.strip()
     return passphrase
 
 #
-# Process a single command line
+# Call the rpc server.
 #
-def do_method(module, method, params):
+def do_method(module, method, params, URI=None):
     if debug:
         print module + " " + method + " " + str(params);
         pass
-    if impotent:
-        return 0;
 
     if not os.path.exists(CERTIFICATE):
         return Fatal("error: missing emulab certificate: %s\n" % CERTIFICATE)
     
     from M2Crypto.m2xmlrpclib import SSL_Transport
     from M2Crypto import SSL
-    
-    URI = "https://" + XMLRPC_SERVER + SERVER_PATH + module
+
+    if URI == None:
+        URI = "https://" + XMLRPC_SERVER + SERVER_PATH + module
+    else:
+        URI = URI + "/" + module
+        pass
     
     ctx = SSL.Context("sslv23")
     ctx.load_cert(CERTIFICATE, CERTIFICATE, PassPhraseCB)
@@ -108,12 +112,6 @@ def do_method(module, method, params):
     return (rval, response)
 
 #
-# Read my passphrase from a file to avoid typing it over and over.
-#
-passphrase = open(PASSPHRASEFILE).readline()
-passphrase = passphrase.strip()
-
-#
 # Get a credential for myself, that allows me to do things at the SA.
 #
 params = {}
@@ -123,6 +121,7 @@ if rval:
     Fatal("Could not get my credential")
     pass
 mycredential = response["value"]
+print "Got my SA credential"
 
 #
 # Look me up just for the hell of it. I can see why the hrn is "useful"
@@ -135,6 +134,8 @@ rval,response = do_method("sa", "Resolve", params)
 if rval:
     Fatal("Could not resolve myself")
     pass
+print "Found my record at the SA"
+#print str(response)
 
 #
 # Lookup slice, delete before proceeding.
@@ -148,6 +149,7 @@ if rval == 0:
     myslice = response["value"]
     myuuid  = myslice["uuid"]
 
+    print "Deleting previous slice called myslice1";
     params = {}
     params["credential"] = mycredential
     params["type"]       = "Slice"
@@ -161,6 +163,7 @@ if rval == 0:
 #
 # Create a slice. 
 #
+print "Creating new slice called myslice1";
 params = {}
 params["credential"] = mycredential
 params["type"]       = "Slice"
@@ -170,6 +173,7 @@ if rval:
     Fatal("Could not get my slice")
     pass
 myslice = response["value"]
+print "New slice created"
 
 #
 # Send a stub rspec over to the SA and let it decide what to do.
@@ -187,6 +191,86 @@ if rval:
     Fatal("Could not do resource discovery")
     pass
 nspec = response["value"]
-print str(nspec)
+print "Bogus DiscoverResources returned"
 
+#
+# Okay, we do not actually have anything like resource discovery yet,
+# so lets fake it.
+#
+rspec = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
+        " <node uuid=\"de9803c2-773e-102b-8eb4-001143e453fe\" " +\
+        "       virtualization_type=\"raw\"> " +\
+        " </node>" +\
+        "</rspec>"
+params = {}
+params["credential"] = myslice
+params["rspec"]      = rspec
+params["impotent"]   = impotent
+rval,response = do_method("cm", "GetTicket", params,
+         URI="https://myboss.myelab.testbed.emulab.net:443/protogeni/xmlrpc")
+if rval:
+    Fatal("Could not get ticket")
+    pass
+ticket = response["value"]
+print "Got a ticket from the CM"
+#print str(ticket)
+
+#
+# Create the sliver.
+#
+params = {}
+params["ticket"]   = ticket
+params["impotent"] = impotent
+rval,response = do_method("cm", "RedeemTicket", params,
+         URI="https://myboss.myelab.testbed.emulab.net:443/protogeni/xmlrpc")
+if rval:
+    Fatal("Could not redeem ticket")
+    pass
+sliver = response["value"]
+print "Created a sliver"
+#print str(sliver)
+
+#
+# Start the sliver.
+#
+params = {}
+params["credential"] = sliver
+params["impotent"]   = impotent
+rval,response = do_method("cm", "StartSliver", params,
+         URI="https://myboss.myelab.testbed.emulab.net:443/protogeni/xmlrpc")
+if rval:
+    Fatal("Could not start sliver")
+    pass
+
+print "Sliver has been started, waiting for input to delete it"
+print "You should be able to log into the sliver after a little bit"
+sys.stdin.readline();
+print "Deleting sliver now"
+
+#
+# Delete the sliver.
+#
+params = {}
+params["credential"] = sliver
+params["impotent"]   = impotent
+rval,response = do_method("cm", "DeleteSliver", params,
+         URI="https://myboss.myelab.testbed.emulab.net:443/protogeni/xmlrpc")
+if rval:
+    Fatal("Could not stop sliver")
+    pass
+print "Sliver has been deleted"
+
+#
+# Delete the slice.
+#
+params = {}
+params["credential"] = mycredential
+params["type"]       = "Slice"
+params["hrn"]        = "myslice1"
+rval,response = do_method("sa", "Remove", params)
+if rval:
+    Fatal("Could not delete slice")
+    pass
+pass
+print "Slice has been deleted"
 

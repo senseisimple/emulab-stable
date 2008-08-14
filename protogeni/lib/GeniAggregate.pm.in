@@ -221,6 +221,33 @@ sub Delete($)
 }
 
 #
+# Look up a list of aggregates for a locally instantiated slice. 
+# Used by the CM.
+#
+sub SliceAggregates($$$)
+{
+    my ($class, $slice, $pref) = @_;
+
+    my $slice_uuid = $slice->uuid();
+    my @result = ();
+
+    my $query_result =
+	DBQueryWarn("select idx from geni_aggregates ".
+		    "where slice_uuid='$slice_uuid'");
+    return -1
+	if (!$query_result);
+
+    while (my ($idx) = $query_result->fetchrow_array()) {
+	my $aggregate = GeniAggregate->Lookup($idx);
+	return -1
+	    if (!defined($aggregate));
+	push(@result, $aggregate);
+    }
+    @$pref = @result;
+    return 0;
+}
+
+#
 # List of slivers for this aggregate.
 #
 sub SliverList($$)

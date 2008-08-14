@@ -6,7 +6,7 @@
 #
 
 #
-# Simple CGI interfce to the GENI xmlrpc interface. This script is invoked
+# Simple CGI interface to the GENI xmlrpc interface. This script is invoked
 # from the web server. The certificate information is in the environment
 # set up by apache.
 #
@@ -17,7 +17,7 @@ use Data::Dumper;
 
 # Do this early so that we talk to the right DB.
 use vars qw($GENI_DBNAME);
-BEGIN { $GENI_DBNAME = "geni"; }
+BEGIN { $GENI_DBNAME = "geni-cm"; }
 
 # Configure variables
 my $EMULAB_PEMFILE = "@prefix@/etc/genicm.pem";
@@ -116,13 +116,13 @@ Genixmlrpc->SetContext(Genixmlrpc->Context($EMULAB_PEMFILE));
 AddAuditInfo("message", $request . "\n\n" . Dumper(%ENV));
 
 my $responder = Frontier::Responder->new( "methods" => {
-    "CM::DiscoverResources" => \&GeniCM::DiscoverResources,
-    "CM::GetTicket"         => \&GeniCM::GetTicket,
-    "CM::CreateSliver"      => \&GeniCM::CreateSliver,
-    "CM::StartSliver"       => \&GeniCM::StartSliver,
-    "CM::DestroySliver"     => \&GeniCM::DestroySliver,
-    "CM::BindUser"          => \&GeniCM::BindUser,
-    "CM::UnBindUser"        => \&GeniCM::UnBindUser,
+    "DiscoverResources" => \&GeniCM::DiscoverResources,
+    "GetTicket"         => \&GeniCM::GetTicket,
+    "RedeemTicket"      => \&GeniCM::RedeemTicket,
+    "StartSliver"       => \&GeniCM::StartSliver,
+    "DeleteSliver"      => \&GeniCM::DeleteSliver,
+    "BindUser"          => \&GeniCM::BindUser,
+    "UnBindUser"        => \&GeniCM::UnBindUser,
    },
 );
 
@@ -133,6 +133,8 @@ my $response = $responder->{'_decode'}->serve($request,
 # Terminate the log capture so that we can print the response to STDOUT
 # for the web server.
 #
+#print STDERR "\n\n" . $response;
+
 LogEnd();
 
 print "Content-Type: text/xml \n\n" . $response;

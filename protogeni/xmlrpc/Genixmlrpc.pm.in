@@ -231,7 +231,7 @@ sub CallMethod($$$@)
 	$value  = $goo->value()->{'value'}->value;
 	$output = $goo->value()->{'output'}->value;
     }
-    if ($debug && $code) {
+    if ($debug > 1 && $code) {
 	print STDERR "$code, $value, $output\n";
     }
     return GeniResponse->new($code, $value, $output);

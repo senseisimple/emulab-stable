@@ -23,8 +23,6 @@ use Genixmlrpc;
 use GeniResponse;
 use GeniTicket;
 use GeniCredential;
-use libtestbed;
-use Experiment;
 use libdb qw(TBGetUniqueIndex);
 use English;
 use overload ('""' => 'Stringify');
@@ -296,10 +294,9 @@ sub DiscoverResources($$$$$)
     my $response =
 	Genixmlrpc::CallMethodHTTP($self->url(),
 				   $user,
-				   "CM::DiscoverResources",
-				   { "slice"       => $slice->cert(),
-				     "credential"  => $credential->asString()
-				     });
+				   "DiscoverResources",
+				   { "credential"  => $credential->asString()
+				   });
     
     return -1
 	if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS);
@@ -326,8 +323,7 @@ sub GetTicket($$$$$;$)
     if (ref($rspec_xml)) {
 	$rspec_xml = XMLout($rspec_xml, RootName => "rspec");
     }
-    my $args = { "slice"        => $slice->cert(),
-		 "credential"   => $credential->asString(),
+    my $args = { "credential"   => $credential->asString(),
 		 "impotent"     => $impotent,
 		 "rspec"        => $rspec_xml };
     $args->{'virtual_topology'} = $vtopo
@@ -335,7 +331,7 @@ sub GetTicket($$$$$;$)
 
     my $response = 				       
 	Genixmlrpc::CallMethodHTTP($self->url(),
-				   $user, "CM::GetTicket", $args);
+				   $user, "GetTicket", $args);
     
     return undef
 	if (!defined($response));
@@ -362,7 +358,7 @@ sub CreateSliver($$$$)
 
     my $response =
 	Genixmlrpc::CallMethodHTTP($self->url(), $user,
-				   "CM::CreateSliver",
+				   "RedeemTicket",
 				   { "ticket"    => $ticket->asString(),
 				     "impotent"  => $impotent });
     
@@ -407,9 +403,8 @@ sub DestroySliver($$$)
     
     my $response =
 	Genixmlrpc::CallMethodHTTP($self->url(), $user,
-				   "CM::DestroySliver",
-				   { "sliver"      => $sliver->cert(),
-				     "impotent"    => $impotent,
+				   "DeleteSliver",
+				   { "impotent"    => $impotent,
 				     "credential"  =>
 					 $credential->asString() });
     
@@ -437,9 +432,8 @@ sub StartSliver($$$)
     
     my $response =
 	Genixmlrpc::CallMethodHTTP($self->url(), $user,
-				   "CM::StartSliver",
-				   { "sliver"      => $sliver->cert(),
-				     "impotent"    => $impotent,
+				   "StartSliver",
+				   { "impotent"    => $impotent,
 				     "credential"  =>
 					 $credential->asString() });
     

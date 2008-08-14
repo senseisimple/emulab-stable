@@ -146,10 +146,10 @@ sub Resolve($)
 	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
 					"No such user $uuid");
 	}
-	# Grab ssh key.
-	my $sshkey;
-	if ($user->GetSSHKey(\$sshkey) != 0) {
-	    print STDERR "Could not get ssh key for $user\n";
+	# Grab keys.
+	my @sliverkeys;
+	if ($user->GetKeys(\@sliverkeys) != 0) {
+	    print STDERR "Could not get sliver keys for $user\n";
 	}
 
 	# Return a blob.
@@ -161,8 +161,8 @@ sub Resolve($)
 		     "name"     => $user->name(),
 		     "sa_uuid"  => $user->sa_uuid(),
 		 };
-	$blob->{'sshkey'} = $sshkey
-	    if (defined($sshkey));
+	$blob->{'sliverkeys'} = \@sliverkeys
+	    if (@sliverkeys);
     
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
     }
@@ -295,7 +295,7 @@ sub Register($)
     if ($type eq "User") {
 	my $name  = $info->{'name'};
 	my $email = $info->{'email'};
-	my $sshkey= $info->{'sshkey'};
+	my $keys  = $info->{'sliverkeys'};
 
 	if (! TBcheck_dbslot($name, "users", "usr_name",
 			     TBDB_CHECKDBSLOT_ERROR)) {
@@ -307,9 +307,20 @@ sub Register($)
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					"email: ". TBFieldErrorString());
 	}
-	if (defined($sshkey) && ! ($sshkey =~ /^[\012\015\040-\176]*$/)) {
-	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					"sshkey: Invalid characters");
+	if (defined($keys)) {
+	    foreach my $keyref (@{ $keys }) {
+		my $type = $keyref->{'type'};
+		my $key  = $keyref->{'key'};
+
+		if ($type ne 'ssh') {
+		    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+						"key: Invalid key type");
+		}
+		if (! ($key =~ /^[\012\015\040-\176]*$/)) {
+		    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+						"key: Invalid characters");
+		}
+	    }
 	}
 	#
 	# Need to verify the UUID is permitted for the SA making the request.
@@ -345,7 +356,7 @@ sub Register($)
 	}
 	my $newuser = GeniUser->Create($hrn, $uid, $uuid,
 				       $name, $email, $cert, $authority,
-				       $sshkey);
+				       $keys);
 	if (!defined($newuser)) {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					"$hrn/$email could not be registered");

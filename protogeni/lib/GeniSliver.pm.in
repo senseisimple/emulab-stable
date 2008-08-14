@@ -44,6 +44,8 @@ my $AVAIL	   = "$TB/sbin/avail";
 my $NALLOC	   = "$TB/bin/nalloc";
 my $NFREE	   = "$TB/bin/nfree";
 my $NODEREBOOT	   = "$TB/bin/node_reboot";
+my $NAMEDSETUP     = "$TB/sbin/named_setup";
+my $GENTOPOFILE    = "$TB/libexec/gentopofile";
 
 # Cache of instances to avoid regenerating them.
 my %slivers      = ();
@@ -402,6 +404,33 @@ sub GetSlice($)
 }
 
 #
+# Look up a list of slivers for a locally instantiated slice. 
+# Used by the CM.
+#
+sub SliceSlivers($$$)
+{
+    my ($class, $slice, $pref) = @_;
+
+    my $slice_uuid = $slice->uuid();
+    my @result = ();
+
+    my $query_result =
+	DBQueryWarn("select idx from geni_slivers ".
+		    "where slice_uuid='$slice_uuid'");
+    return -1
+	if (!$query_result);
+
+    while (my ($idx) = $query_result->fetchrow_array()) {
+	my $sliver = GeniSliver->Lookup($idx);
+	return -1
+	    if (!defined($sliver));
+	push(@result, $sliver);
+    }
+    @$pref = @result;
+    return 0;
+}
+
+#
 # Client side method to contact the sliver component and destroy it.
 #
 sub Destroy($$)
@@ -528,6 +557,9 @@ sub Provision($)
 	return -1;
     }
     if ($reservation->SameExperiment($experiment)) {
+	my $pid = $reservation->pid();
+	my $eid = $reservation->eid();
+	
 	if ($experiment->InsertVirtNode($node) != 0) {
 	    print STDERR "Could not add virtnode entry for $node to $self\n";
 	    return -1;
@@ -540,6 +572,18 @@ sub Provision($)
 
 	# Set it to boot the default OS.
 	if ($node->SelectOS() != 0) {
+	    return -1;
+	}
+
+	# Must have the topofile for node boot. Might need locking on this.
+	if (system("$GENTOPOFILE $pid $eid")) {
+	    print STDERR "$GENTOPOFILE failed\n";
+	    return -1;
+	}
+
+	# The node will not boot locally unless there is a DNS record.
+	if (system("$NAMEDSETUP")) {
+	    print STDERR "$NAMEDSETUP failed\n";
 	    return -1;
 	}
     }

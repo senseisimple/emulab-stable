@@ -201,6 +201,12 @@ sub Resolve($)
 		return GeniResponse->Create(GENIRESPONSE_ERROR);
 	    }
 	}
+	# Grab keys.
+	my @sliverkeys;
+	if ($geniuser->GetKeys(\@sliverkeys) != 0) {
+	    print STDERR "Could not get sliver keys for $geniuser\n";
+	}
+	
 	# Return a blob.
 	my $blob = { "uid"      => $geniuser->uid(),
 		     "hrn"      => $geniuser->hrn(),
@@ -209,6 +215,9 @@ sub Resolve($)
 		     "cert"     => $geniuser->cert(),
 		     "name"     => $geniuser->name(),
 		    };
+	$blob->{'sliverkeys'} = \@sliverkeys
+	    if (@sliverkeys);
+	
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
     }
     if ($type eq "Slice") {
@@ -228,7 +237,7 @@ sub Resolve($)
 	}
 	if (!defined($slice)) {
 	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
-					"No such slice register here");
+					"No such slice registered here");
 	}
 
 	# User bindings too.
@@ -401,10 +410,17 @@ sub Remove($)
 {
     my ($argref) = @_;
     my $uuid = $argref->{'uuid'};
+    my $hrn  = $argref->{'hrn'};
     my $cred = $argref->{'credential'};
     my $type = $argref->{'type'};
 
-    if (! (defined($uuid) && ($uuid =~ /^[-\w]*$/))) {
+    if (! (defined($uuid) || defined($hrn))) {
+	return GeniResponse->MalformedArgsResponse();
+    }
+    if (defined($uuid) && !($uuid =~ /^[-\w]*$/)) {
+	return GeniResponse->MalformedArgsResponse();
+    }
+    if (defined($hrn) && !($hrn =~ /^[-\w\.]*$/)) {
 	return GeniResponse->MalformedArgsResponse();
     }
     if (! (defined($type) && ($type =~ /^(SA|MA|Component|Slice|User)$/))) {
@@ -463,10 +479,23 @@ sub Remove($)
     }
     
     if ($type eq "Slice") {
-	my $slice = GeniSlice->Lookup($uuid);
+	my $slice;
+	
+	if (defined($uuid)) {
+	    $slice = GeniSlice->Lookup($uuid);
+	}
+	else {
+	    #
+	    # XXX Form hrn from the uid and domain. This is backwards.
+	    #
+	    if (! ($hrn =~ /\./)) {
+		$hrn = "${OURDOMAIN}.slices.${hrn}";
+	    }
+	    $slice = GeniSlice->Lookup($hrn);
+	}
 	if (!defined($slice)) {
 	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
-					"No such slice $uuid");
+					"No such slice");
 	}
 
 	#

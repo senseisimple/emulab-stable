@@ -160,7 +160,7 @@ sub CheckExisting($$$)
 sub Create($$$$$$$$$;$)
 {
     my ($class, $hrn, $uid, $uuid, $name, $email,
-	$cert, $authority, $sshkey) = @_;
+	$cert, $authority, $keys) = @_;
     my @insert_data = ();
 
     # Every user gets a new unique index.
@@ -197,18 +197,21 @@ sub Create($$$$$$$$$;$)
     }
 
     # Insert the sshkey if we got one.
-    if (defined($sshkey)) {
-	my $safe_sshkey = DBQuoteSpecial($sshkey);
-	
-	DBQueryWarn("replace into geni_sshkeys set ".
-		    "  uuid=$safe_uuid, created=now(), ".
-		    "  sshkey=$safe_sshkey") or return undef;
+    if (defined($keys)) {
+	foreach my $keyref (@{ $keys }) {
+	    my $safe_key  = DBQuoteSpecial($keyref->{'key'});
+	    my $safe_type = DBQuoteSpecial($keyref->{'type'});
+	    
+	    DBQueryWarn("replace into geni_userkeys set ".
+			"  uuid=$safe_uuid, created=now(), ".
+			"  key=$safe_key, type=$safe_type") or return undef;
+	}
     }
 
     # Insert into DB.
     if (! DBQueryWarn("insert into geni_users set " .
 		      join(",", @insert_data))) {
-	DBQueryWarn("delete from geni_sshkeys where uuid=$safe_uuid");
+	DBQueryWarn("delete from geni_userkeys where uuid=$safe_uuid");
 	return undef;
     }
 
@@ -227,7 +230,7 @@ sub CreateFromLocal($$)
 }
 
 #
-# Delete the user, as for registration errors.
+# Delete the user.
 #
 sub Delete($)
 {
@@ -241,6 +244,8 @@ sub Delete($)
 
     DBQueryWarn("delete from geni_bindings where user_uuid='$uuid'")
 	or return -1;
+    DBQueryWarn("delete from geni_userkeys where user_uuid='$uuid'")
+	or return -1;
     DBQueryWarn("delete from geni_certificates where uuid='$uuid'")
 	or return -1;
     DBQueryWarn("delete from geni_users where idx='$idx'")
@@ -250,27 +255,53 @@ sub Delete($)
 }
 
 #
-# Get the sshkey for a user.
+# Get the sshkeys for a user.
 #
-sub GetSSHKey($$)
+sub GetSSHKeys($$)
 {
     my ($self, $pref) = @_;
+    my @results = ();
 
     return -1
 	if (! (ref($self) && ref($pref)));
 
-    $$pref = undef;
+    my $uuid = $self->uuid();
+    my $query_result =
+	DBQueryWarn("select key from geni_userkeys ".
+		    "where uuid='$uuid' and type='ssh'");
+    return -1
+	if (!$query_result);
+
+    while (my ($sshkey) = $query_result->fetchrow_array()) {
+	push(@results, $sshkey);
+    }
+    @$pref = @results;
+    return 0;
+}
+
+#
+# Get the keys for a user.
+#
+sub GetKeys($$)
+{
+    my ($self, $pref) = @_;
+    my @results = ();
+
+    return -1
+	if (! (ref($self) && ref($pref)));
 
     my $uuid = $self->uuid();
     my $query_result =
-	DBQueryWarn("select sshkey from geni_sshkeys where uuid='$uuid'");
+	DBQueryWarn("select type,key from geni_userkeys ".
+		    "where uuid='$uuid'");
     return -1
 	if (!$query_result);
-    return 0
-	if (!$query_result->numrows);
 
-    my ($sshkey) = $query_result->fetchrow_array();
-    $$pref = $sshkey;
+    while (my ($type,$key) = $query_result->fetchrow_array()) {
+	push(@results, {"type" => $type,
+			"key"  => $key});
+    }
+    @$pref = @results;
     return 0;
 }
 
@@ -284,15 +315,15 @@ sub CreateNonLocal($)
     return undef
 	if (! ref($self));
 
-    my $sshkey;
-    $self->GetSSHKey(\$sshkey);
+    my @sshkeys = ();
+    $self->GetSSHKeys(\@sshkeys);
 
     return User::NonLocal->Create($self->idx(),
 				  $self->uid(),
 				  $self->uuid(),
 				  $self->name(),
 				  $self->email(),
-				  $sshkey);
+				  \@sshkeys);
 }
 
 #
@@ -365,8 +396,12 @@ sub Archive($)
 # Wrapper for local users.
 #
 package GeniUser::LocalUser;
+use vars qw(@ISA);
+@ISA = "GeniUser";
+
 use English;
 use GeniDB;
+use GeniUser;
 use GeniCertificate;
 use overload ('""' => 'Stringify');
 
@@ -392,12 +427,13 @@ sub Create($$)
     return $self;
 }
 
+sub idx($)		{ return $_[0]->{'USER'}->uid_idx(); }
 sub uid($)		{ return $_[0]->{'USER'}->uid(); }
 sub uuid                { return $_[0]->{'USER'}->uuid(); }
 sub created($)		{ return $_[0]->{'USER'}->created(); }
 sub name($)		{ return $_[0]->{'USER'}->name(); }
 sub email($)		{ return $_[0]->{'USER'}->email(); }
-sub GetSSHKey($$)       { return $_[0]->{'USER'}->GetSSHKey($_[1]); }
+sub GetSSHKeys($$)      { return $_[0]->{'USER'}->GetSSHKeys($_[1]); }
 
 # Need to construct this since not in User structure.
 sub hrn($)		{ return $OURDOMAIN . "." . $_[0]->uid(); }
@@ -416,16 +452,58 @@ sub Register($)
 
     # Register this user at the ClearingHouse, if not already registered.
     if (GeniCHClient::LookupUser($self->uuid(), \$blob) != 0) {
-	my $sshkey;
-	$self->GetSSHKey(\$sshkey);
-	
+	my @sliverkeys = ();
+	$self->GetKeys(\@sliverkeys);
 	return GeniCHClient::RegisterUser($self->hrn(), 
 					  $self->name(), $self->email(),
-					  $self->cert(), $sshkey);
+					  $self->cert(), \@sliverkeys);
     }
     return 0;
 }
+
+#
+# Get the keys for a local user, which are just sshkeys
+#
+sub GetKeys($$)
+{
+    my ($self, $pref) = @_;
+    my @results = ();
+
+    return -1
+	if (! (ref($self) && ref($pref)));
+
+    my $uuid = $self->uuid();
+    my @sshkeys    = ();
+    $self->GetSSHKeys(\@sshkeys);
     
+    foreach my $sshkey (@sshkeys) {
+	push(@results, {"type" => 'ssh',
+			"key"  => $sshkey});
+    }
+    @$pref = @results;
+    return 0;
+}
+
+#
+# Override this for local users. For tmcd we need an entry in the
+# nonlocal tables (not in the mood to change tmcd yet) so that local
+# users get accounts in slivers that match their local identity. But
+# no need to duplicate the ssh keys. Needs more thought. 
+#
+sub CreateNonLocal($)
+{
+    my ($self) = @_;
+
+    return undef
+	if (! ref($self));
+
+    return User::NonLocal->Create($self->idx(),
+				  $self->uid(),
+				  $self->uuid(),
+				  $self->name(),
+				  $self->email(), undef);
+}
+
 #
 # Stringify for output.
 #

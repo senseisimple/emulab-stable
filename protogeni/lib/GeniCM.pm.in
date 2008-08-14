@@ -134,43 +134,38 @@ sub DiscoverResources($)
 sub GetTicket($)
 {
     my ($argref) = @_;
-    my $slice_cert = $argref->{'slice'};
     my $rspec      = $argref->{'rspec'};
     my $impotent   = $argref->{'impotent'};
-    my $credential = $argref->{'credential'};
+    my $cred       = $argref->{'credential'};
     my $vtopo      = $argref->{'virtual_topology'};
     my $owner_uuid = $ENV{'GENIUSER'};
-    my $slice_uuid;
 
-    if (! defined($slice_cert)) {
-	GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
-			     "Improper slice");
+    if (! defined($cred)) {
+	return GeniResponse->MalformedArgsResponse();
     }
     if (! (defined($rspec) && ($rspec =~ /^[-\w]+$/))) {
 	GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 			     "Improper rspec");	
     }
     $rspec = XMLin($rspec, ForceArray => ["node", "link"]);
-    #print Dumper($rspec);
 
     $impotent = 0
 	if (!defined($impotent));
 
-    $credential = GeniCredential->CreateFromSigned($credential);
+    my $credential = GeniCredential->CreateFromSigned($cred);
     if (!defined($credential)) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not create GeniCredential object");
     }
-    GeniCertificate->CertificateInfo($slice_cert, \$slice_uuid) == 0 or
+    my $slice_uuid = $credential->this_uuid();
+    my $user_uuid  = $credential->owner_uuid();
+    
+    #
+    # Make sure the credential was issued to the caller.
+    #
+    if ($credential->owner_uuid() ne $ENV{'GENIUUID'}) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "Could not get uuid from Certificate");
-	
-	
-    # The credential owner/slice has to match what was provided.
-    if (! ($owner_uuid eq $credential->owner_uuid() &&
-	   $slice_uuid eq $credential->this_uuid())) {
-	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
-				    "Invalid credentials for operation");
+				    "This is not your credential!");
     }
 
     #
@@ -196,11 +191,11 @@ sub GetTicket($)
     #
     # Ditto the user.
     #
-    my $user = GeniUser->Lookup($owner_uuid);
+    my $user = GeniUser->Lookup($user_uuid);
     if (!defined($user)) {
-	$user = CreateUserFromRegistry($owner_uuid);
+	$user = CreateUserFromRegistry($user_uuid);
 	if (!defined($user)) {
-	    print STDERR "No user $owner_uuid in the ClearingHouse\n";
+	    print STDERR "No user $user_uuid in the ClearingHouse\n";
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 			    "Could not get user info from ClearingHouse");
 	}
@@ -238,7 +233,8 @@ sub GetTicket($)
     my $pid     = $experiment->pid();
     my $eid     = $experiment->eid();
 
-    foreach my $resource_uuid (keys(%{$rspec->{'node'}})) {
+    foreach my $ref (@{$rspec->{'node'}}) {
+	my $resource_uuid = $ref->{'uuid'};
 	my $node = Node->Lookup($resource_uuid);
 	if (!defined($node)) {
 	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
@@ -289,10 +285,9 @@ sub GetTicket($)
 #
 # Create a sliver.
 #
-sub CreateSliver($)
+sub RedeemTicket($)
 {
     my ($argref) = @_;
-    my $owner_uuid = $ENV{'GENIUSER'};
     my $ticket     = $argref->{'ticket'};
     my $impotent   = $argref->{'impotent'};
     my $message    = "Error creating sliver/aggregate";
@@ -311,10 +306,13 @@ sub CreateSliver($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not create GeniTicket object");
     }
-    # The credential owner has to match what is in the ticket.
-    if ($owner_uuid ne $ticket->owner_uuid()) {
-	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
-				    "Invalid credentials for operation");
+    
+    #
+    # Make sure the credential was issued to the caller.
+    #
+    if ($ticket->owner_uuid() ne $ENV{'GENIUUID'}) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "This is not your credential!");
     }
 
     my $experiment = Experiment->Lookup($ticket->slice_uuid());
@@ -338,10 +336,15 @@ sub CreateSliver($)
     #
     # Ditto the user.
     #
+    my $owner_uuid = $ticket->owner_uuid();
     my $owner = GeniUser->Lookup($owner_uuid);
     if (!defined($owner)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "No user record for $owner_uuid");
+	$owner = CreateUserFromRegistry($owner_uuid);
+	if (!defined($owner)) {
+	    print STDERR "No user $owner_uuid in the ClearingHouse\n";
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					"No user record for $owner_uuid");
+	}
     }
 
     #
@@ -359,7 +362,13 @@ sub CreateSliver($)
     }
     foreach my $otheruuid (@userbindings) {
 	my $otheruser = GeniUser->Lookup($otheruuid);
-	
+	if (!defined($otheruser)) {
+	    $otheruser = CreateUserFromRegistry($otheruuid);
+	    if (!defined($otheruser)) {
+		print STDERR "No user $otheruser, cannot bind to slice\n";
+		next;
+	    }
+	}
 	if (!$otheruser->BindToSlice($slice) != 0) {
 	    print STDERR "Could not bind $otheruser to $slice\n";
 	}
@@ -370,21 +379,21 @@ sub CreateSliver($)
     # unless there is just one node.
     #
     my $aggregate;
-    if (scalar(keys(%{$ticket->rspec()->{'node'}})) > 1) {
+    if (scalar(@{$ticket->rspec()->{'node'}}) > 1) {
 	$aggregate = GeniAggregate->Create($ticket);
 	if (!defined($aggregate)) {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not create GeniAggregate object");
 	}
     }
-    #print Dumper($ticket);
 
     #
     # Now for each resource (okay, node) in the ticket create a sliver and
     # add it to the aggregate.
     #
     my %slivers = ();
-    foreach my $resource_uuid (keys(%{$ticket->rspec()->{'node'}})) {
+    foreach my $ref (@{$ticket->rspec()->{'node'}}) {
+	my $resource_uuid = $ref->{'uuid'};
 	my $node = Node->Lookup($resource_uuid);
 	if (!defined($node)) {
 	    $message = "Unknown resource_uuid in ticket: $resource_uuid";
@@ -507,26 +516,29 @@ sub CreateSliver($)
 sub StartSliver($)
 {
     my ($argref) = @_;
-    my $owner_uuid  = $ENV{'GENIUSER'};
-    my $sliver_cert = $argref->{'sliver'};
-    my $credential  = $argref->{'credential'};
-    my $sliver_uuid;
-    my $impotent   = $argref->{'impotent'};
+    my $cred        = $argref->{'credential'};
+    my $impotent    = $argref->{'impotent'};
 
     $impotent = 0
 	if (!defined($impotent));
 
-    if (!defined($sliver_cert) || !defined($credential)) {
+    if (!defined($cred)) {
 	return GeniResponse->Create(GENIRESPONSE_BADARGS);
     }
-    GeniCertificate->CertificateInfo($sliver_cert, \$sliver_uuid) == 0 or
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "Could not get uuid from Certificate");
-    
-    $credential = GeniCredential->CreateFromSigned($credential);
+    my $credential = GeniCredential->CreateFromSigned($cred);
     if (!defined($credential)) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not create GeniCredential object");
+    }
+    my $sliver_uuid = $credential->this_uuid();
+    my $user_uuid   = $credential->owner_uuid();
+    
+    #
+    # Make sure the credential was issued to the caller.
+    #
+    if ($credential->owner_uuid() ne $ENV{'GENIUUID'}) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "This is not your credential!");
     }
     my $sliver = GeniSliver->Lookup($sliver_uuid);
     if (!defined($sliver)) {
@@ -536,13 +548,6 @@ sub StartSliver($)
 	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 				    "No such sliver/aggregate $sliver_uuid");
 	}
-    }
-    
-    # The credential owner has to match what is in the ticket.
-    if (! ($owner_uuid eq $credential->owner_uuid() &&
-	   $sliver_uuid eq $credential->this_uuid())) {
-	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
-				    "Invalid credentials for operation");
     }
     if (!$impotent) {
 	$sliver->Start() == 0 or
@@ -555,29 +560,32 @@ sub StartSliver($)
 #
 # Destroy a sliver/aggregate.
 #
-sub DestroySliver($)
+sub DeleteSliver($)
 {
     my ($argref) = @_;
-    my $owner_uuid  = $ENV{'GENIUSER'};
-    my $sliver_cert = $argref->{'sliver'};
-    my $credential  = $argref->{'credential'};
-    my $sliver_uuid;
-    my $impotent   = $argref->{'impotent'};
+    my $cred        = $argref->{'credential'};
+    my $impotent    = $argref->{'impotent'};
 
     $impotent = 0
 	if (!defined($impotent));
 
-    if (!defined($sliver_cert) || !defined($credential)) {
+    if (!defined($cred)) {
 	return GeniResponse->Create(GENIRESPONSE_BADARGS);
     }
-    GeniCertificate->CertificateInfo($sliver_cert, \$sliver_uuid) == 0 or
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "Could not get uuid from Certificate");
-    
-    $credential = GeniCredential->CreateFromSigned($credential);
+    my $credential = GeniCredential->CreateFromSigned($cred);
     if (!defined($credential)) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not create GeniCredential object");
+    }
+    my $sliver_uuid = $credential->this_uuid();
+    my $user_uuid   = $credential->owner_uuid();
+    
+    #
+    # Make sure the credential was issued to the caller.
+    #
+    if ($credential->owner_uuid() ne $ENV{'GENIUUID'}) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "This is not your credential!");
     }
     my $sliver = GeniSliver->Lookup($sliver_uuid);
     if (!defined($sliver)) {
@@ -587,13 +595,6 @@ sub DestroySliver($)
 	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 				    "No such sliver/aggregate $sliver_uuid");
 	}
-    }
-    
-    # The credential owner has to match what is in the ticket.
-    if (! ($owner_uuid eq $credential->owner_uuid() &&
-	   $sliver_uuid eq $credential->this_uuid())) {
-	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
-				    "Invalid credentials for operation");
     }
     if (!$impotent) {
 	$sliver->UnProvision() == 0 or
@@ -628,10 +629,30 @@ sub CreateSliceFromRegistry($)
 	    return undef;
 	}
     }
-    my $slice = GeniSlice->Create($blob->{'hrn'},
-				  $blob->{'uuid'},
-				  $blob->{'creator_uuid'},
-				  $blob->{'cert'}, $authority);
+
+    #
+    # The problem with HRNs is that people will tend to reuse them!
+    # So check to see if we have a slice with the hrn, and if so
+    # we need to check with the registry to see if its still active.
+    # Destroy it locally if not active.
+    #
+    my $slice = GeniSlice->Lookup($blob->{'hrn'});
+    if (defined($slice)) {
+	return $slice
+	    if ($slice->uuid() eq $slice_uuid);
+	
+	my $blob2;
+	if (GeniCHClient::LookupSlice($slice->uuid(), \$blob2) == 0) {
+	    print STDERR "hrn already in use for $slice!\n";
+	    return undef;
+	}
+	return undef
+	    if (CleanupDeadSlice($slice) != 0);
+    }
+    $slice = GeniSlice->Create($blob->{'hrn'},
+			       $blob->{'uuid'},
+			       $blob->{'creator_uuid'},
+			       $blob->{'cert'}, $authority);
     return undef
 	if (!defined($slice));
 
@@ -641,7 +662,7 @@ sub CreateSliceFromRegistry($)
 	if (!defined($user)) {
 	    $user = CreateUserFromRegistry($uuid);
 	    if (!defined($user)) {
-		print STDERR "No user $uuid in the ClearingHouse\n";
+		print STDERR "No user $uuid locally or in the ClearingHouse\n";
 		next;
 	    }
 	}
@@ -697,6 +718,19 @@ sub CreateUserFromRegistry($)
 {
     my ($uuid) = @_;
 
+    #
+    # Check Emulab users table first.
+    #
+    my $user = User->LookupByUUID($uuid);
+    if (defined($user)) {
+	my $geniuser = GeniUser->CreateFromLocal($user);
+	if (!defined($geniuser)) {
+	    print STDERR "Could not create geniuser from $user\n";
+	    return undef;
+	}
+	return $geniuser;
+    }
+
     my $blob;
     return undef
 	if (GeniCHClient::LookupUser($uuid, \$blob) != 0);
@@ -709,15 +743,15 @@ sub CreateUserFromRegistry($)
 	    return undef;
 	}
     }
+    print STDERR Dumper($blob);
+    
     return GeniUser->Create($blob->{'hrn'},
 			    $blob->{'uid'},
 			    $blob->{'uuid'},
 			    $blob->{'name'},
 			    $blob->{'email'},
 			    $blob->{'cert'},
-			    $authority,
-			    (exists($blob->{'sshkey'}) ?
-			     $blob->{'sshkey'} : undef));
+			    $authority, $blob->{'sliverkeys'});
 }
 
 #
@@ -736,4 +770,74 @@ sub CreateAuthorityFromRegistry($)
 				 $blob->{'url'},
 				 $blob->{'cert'},
 				 $blob->{'uuid_prefix'}, "sa");
+}
+
+#
+# Cleanup a dead slice, releasing all the stuff associated with it.
+#
+sub CleanupDeadSlice($)
+{
+    my ($slice) = @_;
+
+    print STDERR "Cleaning up dead slice $slice\n";
+
+    #
+    # Find any aggregates and tear them down.
+    #
+    my @aggregates;
+    if (GeniAggregate->SliceAggregates($slice, \@aggregates) != 0) {
+	print STDERR "Could not get dead aggregates for $slice.\n";
+	return -1;
+    }
+    foreach my $aggregate (@aggregates) {
+	if ($aggregate->UnProvision() != 0) {
+	    print STDERR "Could not UnProvision $aggregate\n";
+	    return -1;
+	}
+	if ($aggregate->Delete() != 0) {
+	    print STDERR "Could not delete $aggregate\n";
+	    return -1;
+	}
+    }
+
+    #
+    # Are there any slivers left after killing the aggregates? 
+    #
+    my @slivers;
+    if (GeniSliver->SliceSlivers($slice, \@slivers) != 0) {
+	print STDERR "Could not get dead slivers for $slice.\n";
+	return -1;
+    }
+    foreach my $sliver (@slivers) {
+	if ($sliver->UnProvision() != 0) {
+	    print STDERR "Could not UnProvision $sliver\n";
+	    return -1;
+	}
+	if ($sliver->Delete() != 0) {
+	    print STDERR "Could not delete $sliver\n";
+	    return -1;
+	}
+    }
+
+    #
+    # And lastly, any tickets that were not instantiated. 
+    #
+    my @tickets;
+    if (GeniTicket->SliceTickets($slice, \@tickets) != 0) {
+	print STDERR "Could not get dead tickets for $slice.\n";
+	return -1;
+    }
+    foreach my $ticket (@tickets) {
+	print STDERR "Releasing $ticket\n";
+	
+	if ($ticket->Release() != 0) {
+	    print STDERR "Could not delete $ticket\n";
+	    return -1;
+	}
+    }
+    if ($slice->Delete() != 0) {
+	print STDERR "Could not delete $slice\n";
+	return -1;
+    }
+    return 0;
 }
