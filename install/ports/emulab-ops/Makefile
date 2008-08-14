@@ -63,6 +63,18 @@ MAINTAINER=	ricci@cs.utah.edu
 #
 .MAKEFLAGS+=	-DBATCH
 
+#
+# XXX not really a build dependency, but needs to get installed before
+# any attempt to install mysql50-* ports
+#
+.if ${PORTVERSION} == "2.1"
+BUILD_DEPENDS=	\
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Mysql.pm:${PORTSDIR}/misc/p5-DBD-mysql50-old
+.else
+BUILD_DEPENDS=	\
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Mysql.pm:${PORTSDIR}/databases/p5-DBD-mysql50
+.endif
+
 LIB_DEPENDS= lthread.[23]:${PORTSDIR}/devel/linuxthreads \
 	ulsshxmlrpcpp.0:${PORTSDIR}/misc/ulsshxmlrpcpp
 
@@ -117,11 +129,6 @@ RUN_DEPENDS+= smbd:${PORTSDIR}/net/samba3
 RUN_DEPENDS+= ${X11BASE}/libdata/xorg/libraries:${PORTSDIR}/x11/xorg-libraries
 # not sure why we don't build this for 6.0-6.2...
 RUN_DEPENDS+= smbd:${PORTSDIR}/net/samba3
-RUN_DEPENDS+= \
-	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/DBD/mysql.pm:${PORTSDIR}/databases/p5-DBD-mysql50
-.else
-RUN_DEPENDS+= \
-	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Mysql.pm:${PORTSDIR}/databases/p5-DBD-mysql50
 .endif
 
 NO_BUILD=	yes

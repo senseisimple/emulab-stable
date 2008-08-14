@@ -71,6 +71,10 @@ my $CONTROL_NETMASK = "@CONTROL_NETMASK@";
 my $TBADMINGID  = 101;
 
 #
+# XXX temporary for perl DBD mysql access
+my $P5DBD_PKG	  = "p5-DBD-mysql50-3.0002";
+
+#
 # Allow this to work if the library is left in the source directory
 #
 use lib '@srcdir@';
@@ -176,6 +180,7 @@ my $NEWALIASES = "/usr/bin/newaliases";
 my $SH         = "/bin/sh";
 my $PKG_INFO   = "/usr/sbin/pkg_info";
 my $PKG_ADD    = "/usr/sbin/pkg_add";
+my $PKG_DEL    = "/usr/sbin/pkg_delete";
 my $PWD        = "/bin/pwd";
 my $CP         = "/bin/cp";
 my $MV         = "/bin/mv";
@@ -364,6 +369,22 @@ Phase "ports", "Installing ports", sub {
 	    my $pname = GetPackage("pubsub", $packagedir);
 	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
 	};
+	# XXX Ditto
+	if ($FBSD_MAJOR == 6 && $FBSD_MINOR > 2) {
+	    Phase "p5-DBD-mysql50", "Installing old Perl Mysql package", sub {
+		my $pname = `$PKG_INFO -E 'p5-DBD-mysql50-*' 2>/dev/null`;
+		chomp($pname);
+		if ($pname eq $P5DBD_PKG) {
+		    PhaseSkip("p5-DBD-mysql50 already up to date");
+		}
+		if (!$packagedir) {
+		    PhaseSkip("No package directory provided");
+		}
+		ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_DEL -f $pname")
+		    if ($pname);
+		ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $P5DBD_PKG");
+	    };
+	}
     };
     Phase "fs-packages", "Installing FS packages", sub {
 	if (!$ISFS) {
@@ -542,7 +563,8 @@ Phase "rc.conf", "Adding testbed content to rc.conf", sub {
 		      qq|mountd_flags="-r -p 900"|,
 		      (($ISFS && $WINSUPPORT) ? qq|smbd_enable="YES"| : ()),
 		      qq|apache_enable="YES"|,
-		      qq|syslogd_flags=""|);
+		      qq|syslogd_flags=""|,
+		      ($CVSSUPPORT ? qq|cvsd_enable="YES"| : ()));
 };
 
 Phase "hosts", "Adding boss/ops/fs IP addresses to $HOSTS", sub {
@@ -1209,6 +1231,9 @@ if ($CVSSUPPORT) {
 	};
 
 	Phase "cvsd.sh", "Installing cvsd.sh", sub {
+	    # FBSD 6.3 package should install this in place
+	    DoneIfExists("$RCDIR/cvsd")
+		if ($FBSD_MINOR > 2);
 	    DoneIfExists("$RCDIR/cvsd.sh");
 	    ExecQuietFatal("mv $RCDIR/cvsd.sh.sample $RCDIR/cvsd.sh");
 	    ExecQuietFatal("$CHMOD a+x $RCDIR/cvsd.sh");
