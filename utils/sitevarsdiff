@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2006, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -132,7 +132,7 @@ sub read_sitevars($$) {
     while(<FH>) {
 	my ($name, $val, $dval, $desc);
 
-	if (/^INSERT INTO `?sitevariables`?/) {
+	if (/^INSERT( IGNORE)? INTO `?sitevariables`?/) {
 	    #
 	    # Either match NULL, or
 	    #   a quote followed by some number of:
@@ -141,7 +141,7 @@ sub read_sitevars($$) {
 	    #   followed by a closed quote.
 	    #
 	    my $match = "^(('([^\\']|(\\\\.))*')|(NULL))";
-	    s/^INSERT INTO `?sitevariables`? VALUES \(//;
+	    s/^INSERT( IGNORE)? INTO `?sitevariables`? VALUES \(//;
 	    ($name) = /${match},/;
 	    s/${match},// or die "bad parse $_";
 	    ($val) = /${match},/;
