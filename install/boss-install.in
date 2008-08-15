@@ -151,9 +151,10 @@ my $APACHE_KEYFILE_OPS  = "$APACHE_ETCDIR/ssl.key/${USERNODE}.key";
 #
 my $TFTPD_PKG	  = "emulab-tftp-hpa-0.48";
 
-#
 # XXX temporary for perl DBD mysql access
 my $P5DBD_PKG	  = "p5-DBD-mysql50-3.0002";
+# XXX temporary until fix dependencies in emulab-boss package
+my $P5GD_PKG	  = "p5-GD-2.07";
 
 #
 # Named pid file.
@@ -472,6 +473,21 @@ Phase "ports", "Installing ports", sub {
 			if ($pname);
 		    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $P5DBD_PKG");
 		};
+		# XXX cannot seem to get the dependency into emulab-boss pkg
+		Phase "p5-GD", "Installing GD graphics package", sub {
+		    my $pname = `$PKG_INFO -E 'p5-GD-*' 2>/dev/null`;
+		    chomp($pname);
+		    if ($pname eq $P5GD_PKG) {
+			PhaseSkip("p5-GD already up to date");
+		    }
+		    if (!$packagedir) {
+			PhaseSkip("No package directory provided");
+		    }
+		    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_DEL -f $pname")
+			if ($pname);
+		    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $P5GD_PKG");
+		};
+
 	    }
 	}
     };
