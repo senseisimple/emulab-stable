@@ -1,7 +1,7 @@
 #!/usr/local/bin/python
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005-2007 University of Utah and the Flux Group.
+# Copyright (c) 2005-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 import sys
@@ -151,7 +151,11 @@ class MyServer(SSL.ForkingSSLServer, SimpleXMLRPCDispatcher):
 	ctx.set_allow_unknown_ca(0)
 	#ctx.set_info_callback()
         
-        SimpleXMLRPCDispatcher.__init__(self)
+        dargs = (self,)
+        if sys.version_info[0] >= 2 and sys.version_info[1] >= 5:
+            dargs = (self,False,None)
+            pass
+        SimpleXMLRPCDispatcher.__init__(*dargs)
         SSL.SSLServer.__init__(self, (ADDR, PORT),
                                MyXMLRPCRequestHandler, ctx)
 	pass
