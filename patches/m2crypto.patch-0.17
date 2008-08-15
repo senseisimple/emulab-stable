@@ -22,12 +22,15 @@ Index: /usr/local/lib/python2.5/site-packages/M2Crypto/SSL/Context.py
 
 --- /usr/local/lib/python2.5/site-packages/M2Crypto/m2xmlrpclib.py~
 +++ /usr/local/lib/python2.5/site-packages/M2Crypto/m2xmlrpclib.py
-@@ -15,6 +15,7 @@
+@@ -15,6 +15,11 @@
      user_agent = "M2Crypto_XMLRPC/%s - %s" % (__version__, Transport.user_agent)
  
      def __init__(self, ssl_context=None):
-+        Transport.__init__(self)
++        try:
++            getattr(Transport,'__init__')
++            Transport.__init__(self)
++        except:
++            pass
          if ssl_context is None:
              self.ssl_ctx=SSL.Context('sslv23')
          else:
-
