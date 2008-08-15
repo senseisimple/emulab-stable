@@ -109,8 +109,8 @@ sub Lookup($$)
 	print STDERR "Could not find certificate for slice $idx ($uuid)\n";
 	return undef;
     }
-    $self->{'CERT'}  = $certificate;
-    $self->{'USERS'} = undef;
+    $self->{'CERT'}     = $certificate;
+    $self->{'BINDINGS'} = undef;
     
     # Add to cache. 
     $slices{$self->{'SLICE'}->{'idx'}}    = $self;
@@ -256,8 +256,17 @@ sub Register($)
     return 0
 	if (GeniCHClient::LookupSlice($self->uuid(), \$blob) == 0);
 
+    # Bind the other users too.
+    my @userbindings;
+    if ($self->UserBindings(\@userbindings) != 0) {
+	print STDERR "Could not get user bindings for $self\n";
+	return -1;
+    }
+
     GeniCHClient::RegisterSlice($self->hrn(),
-				$self->creator_uuid(), $self->cert())
+				$self->creator_uuid(),
+				$self->cert(),
+				\@userbindings)
 	== 0 or return -1;
     
     return 0;
@@ -376,9 +385,8 @@ sub IsSliceAuthority($$)
 }
 
 #
-# Client side methods to bind and unbind users from slices
-#
-# We issue this using the local SA as the authority.
+# Server side of binding users to slices; insert entries into the bindings
+# table.
 # 
 sub BindUser($$)
 {
@@ -387,8 +395,13 @@ sub BindUser($$)
     return -1
 	if (! (ref($self) && ref($target_user)));
 
-    GeniCHClient::BindUser($self->uuid(), $target_user->uuid())
-	== 0 or return -1;
+    my $slice_uuid = $self->uuid();
+    my $user_uuid  = $target_user->uuid();
+
+    DBQueryWarn("replace into geni_bindings set ".
+		" created=now(), slice_uuid='$slice_uuid', ".
+		" user_uuid='$user_uuid'")
+	or return -1;
     
     return 0;
 }
@@ -400,15 +413,19 @@ sub UnBindUser($$)
     return -1
 	if (! (ref($self) && ref($target_user)));
 
-    GeniCHClient::UnBindUser($self->uuid(), $target_user->uuid())
-	== 0 or return -1;
+    my $slice_uuid = $self->uuid();
+    my $user_uuid  = $target_user->uuid();
 
+    DBQueryWarn("delete from geni_bindings ".
+		"where slice_uuid='$slice_uuid' and user_uuid='$user_uuid'")
+	or return -1;
+    
     return 0;
 }
 
 #
-# Return the user bindings for a slice, as a list. Used on client and server
-# to get the geni_bindings table entries for a slice.
+# Return the user bindings for a slice, as a list of uuids. Do not look
+# them up here since this routine is called from the CH.
 #
 sub UserBindings($$)
 {
@@ -419,25 +436,21 @@ sub UserBindings($$)
 
     my $uuid = $self->uuid();
 
-    if (!defined($self->{'USERS'})) {
+    if (!defined($self->{'BINDINGS'})) {
 	my $query_result =
 	    DBQueryWarn("select user_uuid from geni_bindings ".
 			"where slice_uuid='$uuid'");
 	return -1
 	    if (!$query_result);
 
-	$self->{'USERS'} = {};
+	my @bindings = ();
 
 	while (my ($user_uuid) = $query_result->fetchrow_array()) {
-	    my $user = GeniUser->Lookup($user_uuid);
-	    if (!defined($user)) {
-		print STDERR "Bindings: No mapping for user $user_uuid\n";
-		next;
-	    }
-	    $self->{'USERS'}->{$user_uuid} = $user;
+	    push(@bindings, $user_uuid);
 	}
+	$self->{'BINDINGS'} = \@bindings;
     }
-    @$pref = keys(%{ $self->{'USERS'} });
+    @$pref = @{ $self->{'BINDINGS'} };
     return 0;
 }
 

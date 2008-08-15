@@ -127,7 +127,8 @@ print "Got my SA credential"
 # Look me up just for the hell of it. I can see why the hrn is "useful"
 #
 params = {}
-params["uuid"]       = "7450199a-b6eb-102b-a5ad-001143e43770"
+#params["uuid"]       = "7450199a-b6eb-102b-a5ad-001143e43770"
+params["hrn"]       = "stoller"
 params["credential"] = mycredential
 params["type"]       = "User"
 rval,response = do_method("sa", "Resolve", params)
@@ -136,6 +137,20 @@ if rval:
     pass
 print "Found my record at the SA"
 #print str(response)
+
+#
+# Look up leebee alter ego so I can bind him to the slice.
+#
+params = {}
+params["hrn"]       = "leebee"
+params["credential"] = mycredential
+params["type"]       = "User"
+rval,response = do_method("sa", "Resolve", params)
+if rval:
+    Fatal("Could not resolve leebee")
+    pass
+print "Found leebee's record at the SA"
+leebee = response["value"]
 
 #
 # Lookup slice, delete before proceeding.
@@ -168,6 +183,7 @@ params = {}
 params["credential"] = mycredential
 params["type"]       = "Slice"
 params["hrn"]        = "myslice1"
+params["userbindings"] = (leebee["uuid"],)
 rval,response = do_method("sa", "Register", params)
 if rval:
     Fatal("Could not get my slice")

@@ -53,11 +53,14 @@ sub mysystem($)
 #
 # Lookup by idx, or uuid.
 #
-sub Lookup($$)
+sub Lookup($$;$)
 {
-    my ($class, $token) = @_;
+    my ($class, $token, $includelocal) = @_;
     my $query_result;
     my $idx;
+
+    $includelocal = 0
+	if (!defined($includelocal));
 
     if ($token =~ /^\d+$/) {
 	$idx = $token;
@@ -66,10 +69,47 @@ sub Lookup($$)
 	$query_result =
 	    DBQueryWarn("select idx from geni_users ".
 			"where uuid='$token' and status='active'");
-	    return undef
-		if (! $query_result || !$query_result->numrows);
 
-	    ($idx) = $query_result->fetchrow_array();
+	return undef
+	    if (!$query_result);
+
+	if (!$query_result->numrows) {
+	    return undef
+		if (!$includelocal);
+
+	    #
+	    # Check Emulab users table. 
+	    #
+	    my $user = User->LookupByUUID($token);
+	    return undef
+		if (!defined($user));
+	    return GeniUser->CreateFromLocal($user);
+	}
+	($idx) = $query_result->fetchrow_array();
+    }
+    elsif ($token =~ /^[\w\.]*$/) {
+	$query_result =
+	    DBQueryWarn("select idx from geni_users ".
+			"where hrn='$token' and status='active'");
+
+	return undef
+	    if (!$query_result);
+
+	if (!$query_result->numrows) {
+	    return undef
+		if (!$includelocal);
+
+	    #
+	    # Check Emulab users table for last part of hrn.
+	    #
+	    ($token) = ($token =~ /\.(\w*)$/);
+
+	    my $user = User->Lookup($token);
+	    return undef
+		if (!defined($user));
+	    return GeniUser->CreateFromLocal($user);
+	}
+	($idx) = $query_result->fetchrow_array();
     }
     else {
 	return undef;
@@ -81,6 +121,7 @@ sub Lookup($$)
 
     $query_result =
 	DBQueryWarn("select * from geni_users where idx='$idx'");
+    
     return undef
 	if (!$query_result || !$query_result->numrows);
 
@@ -204,7 +245,8 @@ sub Create($$$$$$$$$;$)
 	    
 	    DBQueryWarn("replace into geni_userkeys set ".
 			"  uuid=$safe_uuid, created=now(), ".
-			"  key=$safe_key, type=$safe_type") or return undef;
+			"  `key`=$safe_key, `type`=$safe_type")
+		or return undef;
 	}
     }
 
@@ -267,7 +309,7 @@ sub GetSSHKeys($$)
 
     my $uuid = $self->uuid();
     my $query_result =
-	DBQueryWarn("select key from geni_userkeys ".
+	DBQueryWarn("select `key` from geni_userkeys ".
 		    "where uuid='$uuid' and type='ssh'");
     return -1
 	if (!$query_result);
@@ -292,7 +334,7 @@ sub GetKeys($$)
 
     my $uuid = $self->uuid();
     my $query_result =
-	DBQueryWarn("select type,key from geni_userkeys ".
+	DBQueryWarn("select `type`,`key` from geni_userkeys ".
 		    "where uuid='$uuid'");
     return -1
 	if (!$query_result);
@@ -436,7 +478,7 @@ sub email($)		{ return $_[0]->{'USER'}->email(); }
 sub GetSSHKeys($$)      { return $_[0]->{'USER'}->GetSSHKeys($_[1]); }
 
 # Need to construct this since not in User structure.
-sub hrn($)		{ return $OURDOMAIN . "." . $_[0]->uid(); }
+sub hrn($)		{ return $OURDOMAIN . ".users." . $_[0]->uid(); }
 
 # And this is in another structure.
 sub cert($)             { return $_[0]->{'CERT'}->cert(); }

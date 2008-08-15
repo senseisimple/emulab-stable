@@ -170,11 +170,12 @@ sub RegisterUser($$$$$)
 #
 # Register a slice at the Clearinghouse.
 #
-sub RegisterSlice($$$)
+sub RegisterSlice($$$$)
 {
-    my ($hrn, $creator_uuid, $cert) = @_;
+    my ($hrn, $creator_uuid, $cert, $bindings) = @_;
 
-    my $info = { "creator_uuid"  => $creator_uuid };
+    my $info = { "creator_uuid"  => $creator_uuid,
+	         "userbindings"  => $bindings };
 
     return Register($hrn, "Slice", $cert, $info);
 }

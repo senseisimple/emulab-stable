@@ -666,9 +666,7 @@ sub CreateSliceFromRegistry($)
 		next;
 	    }
 	}
-	DBQueryWarn("replace into geni_bindings set ".
-		    " created=now(), slice_uuid='$slice_uuid', ".
-		    " user_uuid='$uuid'")
+	$slice->BindUser($user) == 0
 	    or print STDERR
 	    "Could not insert user binding for $uuid to slice $slice_uuid\n";
     }
@@ -702,9 +700,7 @@ sub UpdateSliceFromRegistry($)
 		next;
 	    }
 	}
-	DBQueryWarn("replace into geni_bindings set ".
-		    " created=now(), slice_uuid='$slice_uuid', ".
-		    " user_uuid='$uuid'")
+	$slice->BindUser($user) == 0
 	    or print STDERR
 	    "Could not insert user binding for $uuid to slice $slice_uuid\n";
     }
