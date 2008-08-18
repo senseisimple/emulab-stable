@@ -780,12 +780,15 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 		}
 	}
 
-	tmcd_init(NULL, &myipaddr, verbose, debug);
+	reqp->verbose = verbose;
+	reqp->debug = debug;
+
+	tmcd_init(reqp, &myipaddr, NULL);
 
 	/*
 	 * Map the ip to a nodeid.
 	 */
-	if ((err = iptonodeid(client->sin_addr, reqp))) {
+	if ((err = iptonodeid(reqp, client->sin_addr))) {
 		if (reqp->isvnode) {
 			error("No such vnode %s associated with %s\n",
 			      reqp->vnodeid, inet_ntoa(client->sin_addr));
@@ -826,8 +829,16 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	/*
 	 * If the connection is not SSL, then it must be a local node.
 	 */
-	if (reqp->isssl) {
+	if (isssl) {
+#if 0
 		if (tmcd_sslverify_client(reqp->nodeid, reqp->pclass,
+					  reqp->ptype,  reqp->islocal)) {
+			error("%s: SSL verification failure\n", reqp->nodeid);
+			if (! redirect)
+				goto skipit;
+		}
+#endif
+		if (tmcd_sslverify_client(NULL, NULL,
 					  reqp->ptype,  reqp->islocal)) {
 			error("%s: SSL verification failure\n", reqp->nodeid);
 			if (! redirect)
@@ -881,14 +892,14 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 			goto skipit;
 			 */
 		}
-		else if (checkprivkey(client->sin_addr, privkey)) {
+		else if (checkprivkey(reqp, client->sin_addr, privkey)) {
 			error("%s: privkey mismatch: %s!\n",
 			      reqp->nodeid, privkey);
 			goto skipit;
 		}
 	}
 execute:
-	response = tmcd_handle_request(sock, bp, rdata, reqp);
+	response = tmcd_handle_request(reqp, sock, bp, rdata);
 
 skipit:
 	if (response) {

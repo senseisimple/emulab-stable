@@ -2,14 +2,35 @@
 #define _LIBTMCD_H_
 
 #include <netinet/in.h>
+#include <mysql/mysql.h>
 #include <arpa/inet.h>
 #include "tbdefs.h"
+
+#ifdef EVENTSYS
+#include "event.h"
+#endif
+
+#define DBNAME_SIZE	64
+#define HOSTID_SIZE	(32+64)
 
 /*
  * This structure is passed to each request function. The intent is to
  * reduce the number of DB queries per request to a minimum.
  */
 typedef struct {
+	MYSQL		db;
+	int		db_connected;
+	char		dbname[DBNAME_SIZE];
+	char		prev_dbname[DBNAME_SIZE];
+	struct in_addr	myipaddr;
+#ifdef EVENTSYS
+	event_handle_t	event_handle;
+#endif
+	char		fshostid[HOSTID_SIZE];
+	int		verbose;
+	int		debug;
+	int		isssl;
+	int		istcp;
 	int		version;
 	struct in_addr  client;
 	int		allocated;
@@ -17,8 +38,6 @@ typedef struct {
 	int		isvnode;
 	int		issubnode;
 	int		islocal;
-	int		isssl;
-	int		istcp;
 	int		iscontrol;
 	int		isplabdslice;
 	int		isplabsvc;
@@ -51,12 +70,11 @@ typedef struct {
 	int		length;
 } tmcdresp_t;
 
-int	iptonodeid(struct in_addr, tmcdreq_t *);
-int	nodeidtoexp(char *nodeid, char *pid, char *eid, char *gid);
-int	checkprivkey(struct in_addr, char *);
+int	iptonodeid(tmcdreq_t *, struct in_addr);
+int	checkprivkey(tmcdreq_t *reqp, struct in_addr, char *);
 int	checkdbredirect(tmcdreq_t *);
 void	tmcd_free_response(tmcdresp_t *);
-tmcdresp_t *tmcd_handle_request(int, char *, char *, tmcdreq_t *);
-int tmcd_init(char *, struct in_addr *, int, int);
+tmcdresp_t *tmcd_handle_request(tmcdreq_t *, int, char *, char *);
+int tmcd_init(tmcdreq_t *reqp, struct in_addr *, char *);
 
 #endif /* _LIBTMCD_H_ */

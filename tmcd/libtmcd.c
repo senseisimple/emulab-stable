@@ -67,19 +67,12 @@
 	__count__; \
 })
 
-static int debug = 0;
-static int verbose = 0;
-static char	fshostid[HOSTID_SIZE];
-static char     dbname[DBNAME_SIZE];
-static struct in_addr myipaddr;
-
 #ifdef EVENTSYS
-int			myevent_send(address_tuple_t address);
-static event_handle_t	event_handle = NULL;
+int			myevent_send(tmcdreq_t* reqp, address_tuple_t address);
 #endif
 
-static MYSQL_RES *	mydb_query(char *query, int ncols, ...);
-static int		mydb_update(char *query, ...);
+static MYSQL_RES *	mydb_query(tmcdreq_t* reqp, char *query, int ncols, ...);
+static int		mydb_update(tmcdreq_t* reqp, char *query, ...);
 
 static int	safesymlink(char *name1, char *name2);
 
@@ -368,14 +361,14 @@ static int numrawcommands = sizeof(raw_xml_command_array)/sizeof(struct raw_comm
  * already connected. Returns 1 on failure, 0 on sucess.
  */
 int
-event_connect()
+event_connect(tmcdreq_t *reqp)
 {
-	if (!event_handle) {
-		event_handle =
+	if (!reqp->event_handle) {
+		reqp->event_handle =
 		  event_register("elvin://localhost:" BOSSEVENTPORT, 0);
 	}
 
-	if (event_handle) {
+	if (reqp->event_handle) {
 		return 0;
 	} else {
 		error("event_connect: "
@@ -388,35 +381,35 @@ event_connect()
  * Send an event to the event system. Automatically connects (registers)
  * if not already done. Returns 0 on sucess, 1 on failure.
  */
-int myevent_send(address_tuple_t tuple) {
+int myevent_send(tmcdreq_t *reqp, address_tuple_t tuple) {
 	event_notification_t notification;
 
-	if (event_connect()) {
+	if (event_connect(reqp)) {
 		return 1;
 	}
 
-	notification = event_notification_alloc(event_handle,tuple);
+	notification = event_notification_alloc(reqp->event_handle,tuple);
 	if (notification == (event_notification_t) NULL) {
 		error("myevent_send: Unable to allocate notification!");
 		return 1;
 	}
 
-	if (! event_notify(event_handle, notification)) {
-		event_notification_free(event_handle, notification);
+	if (! event_notify(reqp->event_handle, notification)) {
+		event_notification_free(reqp->event_handle, notification);
 
 		error("myevent_send: Unable to send notification!");
 		/*
 		 * Let's try to disconnect from the event system, so that
 		 * we'll reconnect next time around.
 		 */
-		if (!event_unregister(event_handle)) {
+		if (!event_unregister(reqp->event_handle)) {
 			error("myevent_send: "
 			      "Unable to unregister with event system!");
 		}
-		event_handle = NULL;
+		reqp->event_handle = NULL;
 		return 1;
 	} else {
-		event_notification_free(event_handle,notification);
+		event_notification_free(reqp->event_handle,notification);
 		return 0;
 	}
 }
@@ -444,7 +437,7 @@ bievent_send(struct in_addr ipaddr, void *opaque, char *event)
 	tuple->objname	 = reqp->nodeid;
 	tuple->eventtype = event;
 
-	if (myevent_send(tuple)) {
+	if (myevent_send(reqp, tuple)) {
 		error("bievent_send: Error sending event\n");
 		return -1;
 	}
@@ -452,7 +445,7 @@ bievent_send(struct in_addr ipaddr, void *opaque, char *event)
 }
 #endif /* EVENTSYS */
  
-tmcdresp_t *tmcd_handle_request(int sock, char *command, char *rdata, tmcdreq_t *reqp)
+tmcdresp_t *tmcd_handle_request(tmcdreq_t *reqp, int sock, char *command, char *rdata)
 {
 	xmlDoc *doc = NULL;
 	xmlChar *xmlbuf;
@@ -518,7 +511,7 @@ tmcdresp_t *tmcd_handle_request(int sock, char *command, char *rdata, tmcdreq_t 
 	}
 
 	if (!reqp->allocated && (flags & F_ALLOCATED) != 0) {
-		if (verbose || (flags & F_MINLOG) == 0)
+		if (reqp->verbose || (flags & F_MINLOG) == 0)
 			error("%s: %s: Invalid request from free node\n",
 			      reqp->nodeid, command);
 		goto skipit;
@@ -529,10 +522,10 @@ tmcdresp_t *tmcd_handle_request(int sock, char *command, char *rdata, tmcdreq_t 
 	 */
 	if ((flags & F_MAXLOG) != 0) {
 		/* XXX Ryan? overbose = verbose; */
-		verbose = 1;
+		reqp->verbose = 1;
 	}
 #if 0
-	if (verbose || (xml_command_array[i].flags & F_MINLOG) == 0)
+	if (reqp->verbose || (xml_command_array[i].flags & F_MINLOG) == 0)
 		info("%s: reqp->version%d %s %s\n", reqp->nodeid,
 		     version, cp, xml_command_array[i].cmdname);
 	setproctitle("%s: %s %s", reqp->nodeid, cp, xml_command_array[i].cmdname);
@@ -540,7 +533,7 @@ tmcdresp_t *tmcd_handle_request(int sock, char *command, char *rdata, tmcdreq_t 
 
 #if 0
 	if ((flags & F_MAXLOG) != 0)
-		verbose = overbose;
+		reqp->verbose = overbose;
 #endif
 	response = malloc(sizeof(tmcdresp_t));
 	if (response == NULL) {
@@ -667,7 +660,7 @@ XML_COMMAND_PROTOTYPE(doifconfig)
 	/*
 	 * Find all the interfaces.
 	 */
-	res = mydb_query("select i.card,i.IP,i.MAC,i.current_speed,"
+	res = mydb_query(reqp, "select i.card,i.IP,i.MAC,i.current_speed,"
 			 "       i.duplex,i.IPaliases,i.iface,i.role,i.mask,"
 			 "       i.rtabid,i.interface_type,vl.vname "
 			 "  from interfaces as i "
@@ -743,7 +736,7 @@ XML_COMMAND_PROTOTYPE(doifconfig)
 				MYSQL_ROW row2;
 				int nrows2;
 				
-				res2 = mydb_query("select IP "
+				res2 = mydb_query(reqp, "select IP "
 						  "from vinterfaces "
 						  "where type='alias' "
 						  "and node_id='%s'",
@@ -793,7 +786,7 @@ XML_COMMAND_PROTOTYPE(doifconfig)
 	/*
 	 * Interface settings.
 	 */
-	res = mydb_query("select i.MAC,s.capkey,s.capval "
+	res = mydb_query(reqp, "select i.MAC,s.capkey,s.capval "
 			 "from interface_settings as s "
 			 "left join interfaces as i on "
 			 "     s.node_id=i.node_id and s.iface=i.iface "
@@ -832,7 +825,7 @@ XML_COMMAND_PROTOTYPE(doifconfig)
 		/*
 		 * First do phys interfaces underlying veth/vlan interfaces
 		 */
-		res = mydb_query("select distinct "
+		res = mydb_query(reqp, "select distinct "
 				 "       i.interface_type,i.mac, "
 				 "       i.current_speed,i.duplex "
 				 "  from vinterfaces as v "
@@ -864,7 +857,7 @@ XML_COMMAND_PROTOTYPE(doifconfig)
 		/*
 		 * Now do phys interfaces underlying delay interfaces.
 		 */
-		res = mydb_query("select i.interface_type,i.MAC,"
+		res = mydb_query(reqp, "select i.interface_type,i.MAC,"
 				 "       i.current_speed,i.duplex, "
 				 "       j.interface_type,j.MAC,"
 				 "       j.current_speed,j.duplex "
@@ -917,7 +910,7 @@ XML_COMMAND_PROTOTYPE(doifconfig)
 	/*
 	 * Find all the virtual interfaces.
 	 */
-	res = mydb_query("select v.unit,v.IP,v.mac,i.mac,v.mask,v.rtabid, "
+	res = mydb_query(reqp, "select v.unit,v.IP,v.mac,i.mac,v.mask,v.rtabid, "
 			 "       v.type,vll.vname,v.virtlanidx,la.attrvalue "
 			 "  from vinterfaces as v "
 			 "left join interfaces as i on "
@@ -993,7 +986,7 @@ XML_COMMAND_PROTOTYPE(doifconfig)
 			add_key(node, "vtag", tag);
 		}
 
-		if (verbose)
+		if (reqp->verbose)
 			info("IFCONFIG: %s", buf);
 	}
 	mysql_free_result(res);
@@ -1024,7 +1017,7 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 	/*
 	 * See if a per-node-type set of projects is specified for accounts.
 	 */
-	res = mydb_query("select na.attrvalue from nodes as n "
+	res = mydb_query(reqp, "select na.attrvalue from nodes as n "
 			 "left join node_type_attributes as na on "
 			 "  n.type=na.type "
 			 "where n.node_id='%s' and "
@@ -1043,7 +1036,7 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 		/*
 		 * All groups! 
 		 */
-		res = mydb_query("select unix_name,unix_gid from groups", 2);
+		res = mydb_query(reqp, "select unix_name,unix_gid from groups", 2);
 	}
 	else if (nodetypeprojects) {
 		/*
@@ -1052,7 +1045,7 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 		 * set of groups, plus those in emulab-ops since we want
 		 * to include admin people too.
 		 */
-		res = mydb_query("select g.unix_name,g.unix_gid "
+		res = mydb_query(reqp, "select g.unix_name,g.unix_gid "
 				 " from projects as p "
 				 "left join groups as g on "
 				 "     p.pid_idx=g.pid_idx "
@@ -1067,7 +1060,7 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 				 2, reqp->nodeid, RELOADPID);
 	}
 	else if (reqp->islocal || reqp->isvnode) {
-		res = mydb_query("select unix_name,unix_gid from groups "
+		res = mydb_query(reqp, "select unix_name,unix_gid from groups "
 				 "where pid='%s'",
 				 2, reqp->pid);
 	}
@@ -1078,7 +1071,7 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 		 * the jails. Lets use the same query as above for now,
 		 * but switch over to emulab-ops. 
 		 */
-		res = mydb_query("select unix_name,unix_gid from groups "
+		res = mydb_query(reqp, "select unix_name,unix_gid from groups "
 				 "where pid='%s'",
 				 2, RELOADPID);
 	}
@@ -1088,7 +1081,7 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 		 *
 		 * Added this for Dave. I love subqueries!
 		 */
-		res = mydb_query("select g.unix_name,g.unix_gid "
+		res = mydb_query(reqp, "select g.unix_name,g.unix_gid "
 				 " from projects as p "
 				 "left join groups as g on p.pid=g.pid "
 				 "where p.approved!=0 and "
@@ -1107,7 +1100,7 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 		  * that list, then return all of the project groups, for
 		  * each project that is allowed to get accounts on the type.
 		  */
-		  res = mydb_query("select g.unix_name,g.unix_gid "
+		  res = mydb_query(reqp, "select g.unix_name,g.unix_gid "
 				   "  from projects as p "
 				   "join groups as g on p.pid=g.pid "
 				   "where p.approved!=0 and "
@@ -1150,7 +1143,7 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 	 * update after this point, the node will end up getting to
 	 * do it again in case it missed something.
 	 */
-	if (mydb_update("update nodes set update_accounts=update_accounts-1 "
+	if (mydb_update(reqp, "update nodes set update_accounts=update_accounts-1 "
 			"where node_id='%s' and update_accounts!=0",
 			reqp->nodeid)) {
 		error("ACCOUNTS: %s: DB Error setting exit update_accounts!\n",
@@ -1168,7 +1161,7 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 		 * experimental nodes where the number of accounts is small,
 		 * but is not scalable. 
 		 */
-		res = mydb_query("select distinct "
+		res = mydb_query(reqp, "select distinct "
 				 "  u.uid,u.usr_pswd,u.unix_uid,u.usr_name, "
 				 "  p.trust,g.pid,g.gid,g.unix_gid,u.admin, "
 				 "  u.emulab_pubkey,u.home_pubkey, "
@@ -1190,7 +1183,7 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 		 * set of users, plus those in emulab-ops since we want
 		 * to include emulab-ops people too.
 		 */
-		res = mydb_query("select distinct  "
+		res = mydb_query(reqp, "select distinct  "
 				 "u.uid,'*',u.unix_uid,u.usr_name, "
 				 "m.trust,g.pid,g.gid,g.unix_gid,u.admin, "
 				 "u.emulab_pubkey,u.home_pubkey, "
@@ -1228,7 +1221,7 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 		 * user to return. Well, a primary group and a list of aux
 		 * groups for that user.
 		 */
-		res = mydb_query("select distinct "
+		res = mydb_query(reqp, "select distinct "
 				 "  u.uid,u.usr_pswd,u.unix_uid,u.usr_name, "
 				 "  p.trust,g.pid,g.gid,g.unix_gid,u.admin, "
 				 "  u.emulab_pubkey,u.home_pubkey, "
@@ -1252,7 +1245,7 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 		 * A remote node, doing jails. We still want to return
 		 * accounts for the admin people outside the jails.
 		 */
-		res = mydb_query("select distinct "
+		res = mydb_query(reqp, "select distinct "
 			     "  u.uid,'*',u.unix_uid,u.usr_name, "
 			     "  p.trust,g.pid,g.gid,g.unix_gid,u.admin, "
 			     "  u.emulab_pubkey,u.home_pubkey, "
@@ -1283,7 +1276,7 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 		char subclause[MYBUFSIZE];
 		int  count = 0;
 		
-		res = mydb_query("select attrvalue from node_attributes "
+		res = mydb_query(reqp, "select attrvalue from node_attributes "
 				 " where node_id='%s' and "
 				 "       attrkey='dp_projects'",
 				 1, reqp->pnodeid);
@@ -1312,7 +1305,7 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 			}
 		}
 			
-		res = mydb_query("select distinct  "
+		res = mydb_query(reqp, "select distinct  "
 				 "u.uid,'*',u.unix_uid,u.usr_name, "
 				 "m.trust,g.pid,g.gid,g.unix_gid,u.admin, "
 				 "u.emulab_pubkey,u.home_pubkey, "
@@ -1490,7 +1483,7 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 		add_key(node, "email", row[12]);
 		add_key(node, "shell", row[13]);
 
-		if (verbose)
+		if (reqp->verbose)
 			info("ACCOUNTS: "
 			     "ADDUSER LOGIN=%s "
 			     "UID=%s GID=%d ROOT=%d GLIST=%s\n",
@@ -1509,7 +1502,7 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 		/*
 		 * Need a list of keys for this user.
 		 */
-		pubkeys_res = mydb_query("select idx,pubkey "
+		pubkeys_res = mydb_query(reqp, "select idx,pubkey "
 					 " from user_pubkeys "
 					 "where uid='%s'",
 					 2, row[0]);
@@ -1549,7 +1542,7 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 		/*
 		 * Need a list of SFS keys for this user.
 		 */
-		sfskeys_res = mydb_query("select comment,pubkey "
+		sfskeys_res = mydb_query(reqp, "select comment,pubkey "
 					 " from user_sfskeys "
 					 "where uid='%s'",
 					 2, row[0]);
@@ -1569,7 +1562,7 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 
 				sfskeys_nrows--;
 
-				if (verbose)
+				if (reqp->verbose)
 					info("ACCOUNTS: SFSKEY LOGIN=%s "
 					     "COMMENT=%s\n",
 					     row[0], sfskey_row[0]);
@@ -1590,7 +1583,7 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 		 * we could get some duplicate entries, which won't
 		 * really harm anything on the client.
 		 */
-		res = mydb_query("select distinct "
+		res = mydb_query(reqp, "select distinct "
 				 "u.uid,'*',u.unix_uid,u.usr_name, "
 				 "w.trust,'guest','guest',31,u.admin, "
 				 "u.emulab_pubkey,u.home_pubkey, "
@@ -1630,7 +1623,7 @@ XML_COMMAND_PROTOTYPE(dodelay)
 	 * join is to get the type out so that we can pass it back. Of
 	 * course, this assumes that the type is the BSD name, not linux.
 	 */
-	res = mydb_query("select i.MAC,j.MAC, "
+	res = mydb_query(reqp, "select i.MAC,j.MAC, "
 		 "pipe0,delay0,bandwidth0,lossrate0,q0_red, "
 		 "pipe1,delay1,bandwidth1,lossrate1,q1_red, "
 		 "vname, "
@@ -1753,7 +1746,7 @@ XML_COMMAND_PROTOTYPE(dolinkdelay)
 	else
 		strcpy(buf, "and v.vnode_id is NULL");
 
-	res = mydb_query("select i.MAC,d.type,vlan,vnode,d.ip,netmask, "
+	res = mydb_query(reqp, "select i.MAC,d.type,vlan,vnode,d.ip,netmask, "
 		 "pipe,delay,bandwidth,lossrate, "
 		 "rpipe,rdelay,rbandwidth,rlossrate, "
 		 "q_red,q_limit,q_maxthresh,q_minthresh,q_weight,q_linterm, " 
@@ -1809,7 +1802,7 @@ XML_COMMAND_PROTOTYPE(dolinkdelay)
 		add_key(node, "gentle", row[26]);
 			
 		nrows--;
-		if (verbose)
+		if (reqp->verbose)
 			info("LINKDELAY: %s", buf);
 	}
 	mysql_free_result(res);
@@ -1864,7 +1857,7 @@ XML_COMMAND_PROTOTYPE(dohosts)
 	 * network IP address.  The intent is to give plab nodes some
 	 * convenient aliases for refering to each other.
 	 */
-	res = mydb_query("select v.vname,v.vnode,v.ip,v.vport,v2p.node_id,"
+	res = mydb_query(reqp, "select v.vname,v.vnode,v.ip,v.vport,v2p.node_id,"
 			 "v.protocol,i.IP "
 			 "    from virt_lans as v "
 			 "left join v2pmap as v2p on "
@@ -2064,7 +2057,7 @@ XML_COMMAND_PROTOTYPE(dohosts)
 	 * List of control net addresses for jailed nodes.
 	 * Temporary.
 	 */
-	res = mydb_query("select r.node_id,r.vname,n.jailip "
+	res = mydb_query(reqp, "select r.node_id,r.vname,n.jailip "
 			 " from reserved as r "
 			 "left join nodes as n on n.node_id=r.node_id "
 			 "where r.pid='%s' and r.eid='%s' "
@@ -2109,7 +2102,7 @@ XML_COMMAND_PROTOTYPE(dorpms)
 	/*
 	 * Get RPM list for the node.
 	 */
-	res = mydb_query("select rpms from nodes where node_id='%s' ",
+	res = mydb_query(reqp, "select rpms from nodes where node_id='%s' ",
 			 1, reqp->nodeid);
 
 	if (!res) {
@@ -2157,7 +2150,7 @@ XML_COMMAND_PROTOTYPE(dotarballs)
 	/*
 	 * Get Tarball list for the node.
 	 */
-	res = mydb_query("select tarballs from nodes where node_id='%s' ",
+	res = mydb_query(reqp, "select tarballs from nodes where node_id='%s' ",
 			 1, reqp->nodeid);
 
 	if (!res) {
@@ -2220,7 +2213,7 @@ XML_COMMAND_PROTOTYPE(dostartcmd)
 	/*
 	 * Get run command for the node.
 	 */
-	res = mydb_query("select startupcmd from nodes where node_id='%s'",
+	res = mydb_query(reqp, "select startupcmd from nodes where node_id='%s'",
 			 1, reqp->nodeid);
 
 	if (!res) {
@@ -2268,7 +2261,7 @@ XML_COMMAND_PROTOTYPE(dostartstat)
 		return 1;
 	}
 
-	if (verbose)
+	if (reqp->verbose)
 		info("STARTSTAT: "
 		     "%s is reporting startup command exit status: %d\n",
 		     reqp->nodeid, exitstatus);
@@ -2278,7 +2271,7 @@ XML_COMMAND_PROTOTYPE(dostartstat)
 	 * field to a non-null string value is enough to tell whoever is
 	 * watching it that the node is done.
 	 */
-	if (mydb_update("update nodes set startstatus='%d' "
+	if (mydb_update(reqp, "update nodes set startstatus='%d' "
 			"where node_id='%s'", exitstatus, reqp->nodeid)) {
 		error("STARTSTAT: %s: DB Error setting exit status!\n",
 		      reqp->nodeid);
@@ -2301,14 +2294,14 @@ XML_COMMAND_PROTOTYPE(doready)
 	/*
 	 * Update the ready_bits table.
 	 */
-	if (mydb_update("update nodes set ready=1 "
+	if (mydb_update(reqp, "update nodes set ready=1 "
 			"where node_id='%s'", reqp->nodeid)) {
 		error("READY: %s: DB Error setting ready bit!\n",
 		      reqp->nodeid);
 		return 1;
 	}
 
-	if (verbose)
+	if (reqp->verbose)
 		info("READY: %s: Node is reporting ready\n", reqp->nodeid);
 
 	/*
@@ -2338,7 +2331,7 @@ XML_COMMAND_PROTOTYPE(doreadycount)
 	 * keep asking until N and M are equal. Can only be used once
 	 * of course, after experiment creation.
 	 */
-	res = mydb_query("select ready from reserved "
+	res = mydb_query(reqp, "select ready from reserved "
 			 "left join nodes on nodes.node_id=reserved.node_id "
 			 "where reserved.eid='%s' and reserved.pid='%s'",
 			 1, reqp->eid, reqp->pid);
@@ -2384,7 +2377,7 @@ XML_COMMAND_PROTOTYPE(domounts)
 	 * Should SFS mounts be served?
 	 */
 	usesfs = 0;
-	if (strlen(fshostid)) {
+	if (strlen(reqp->fshostid)) {
 		if (strlen(reqp->sfshostid))
 			usesfs = 1;
 		else {
@@ -2395,7 +2388,7 @@ XML_COMMAND_PROTOTYPE(domounts)
 				usesfs = 1;
 		}
 
-		if (verbose) {
+		if (reqp->verbose) {
 			if (usesfs) {
 				info("Using SFS\n");
 			}
@@ -2494,14 +2487,14 @@ XML_COMMAND_PROTOTYPE(domounts)
 		 */
 		if (reqp->islocal) {
 			node = new_response(mount_node, "sfs");
-			snprintf(buf, sizeof(buf), "%s%s/%s", fshostid,
+			snprintf(buf, sizeof(buf), "%s%s/%s", reqp->fshostid,
 					FSDIR_PROJ, reqp->pid);
 			add_key(node, "remote", buf);
 			add_format_key(node, "local", "%s/%s", PROJDIR,
 					reqp->pid);
 
 #if 0
-			if (verbose)
+			if (reqp->verbose)
 				info("MOUNTS: %s", buf);
 #endif
 
@@ -2510,7 +2503,7 @@ XML_COMMAND_PROTOTYPE(domounts)
 			 */
 			if (strcmp(reqp->pid, reqp->gid)) {
 				node = new_response(mount_node, "sfs");
-				snprintf(buf, sizeof(buf), "%s%s/%s/%s", fshostid,
+				snprintf(buf, sizeof(buf), "%s%s/%s/%s", reqp->fshostid,
 						FSDIR_GROUPS, reqp->pid, reqp->gid);
 				add_key(node, "remote", buf);
 				snprintf(buf, sizeof(buf), "%s/%s/%s", GROUPDIR,
@@ -2527,13 +2520,13 @@ XML_COMMAND_PROTOTYPE(domounts)
 			 */
 
 			node = new_response(mount_node, "sfs");
-			snprintf(buf, sizeof(buf), "%s%s/%s", fshostid,
+			snprintf(buf, sizeof(buf), "%s%s/%s", reqp->fshostid,
 					FSDIR_SCRATCH, reqp->pid);
 			add_key(node, "remote", buf);
 			add_format_key(node, "local", "%s/%s", SCRATCHDIR, reqp->pid);
 
 /*
-			if (verbose)
+			if (reqp->verbose)
 				info("MOUNTS: %s", buf);
 */
 #endif
@@ -2542,13 +2535,13 @@ XML_COMMAND_PROTOTYPE(domounts)
 			 * Pointer to /share.
 			 */
 			node = new_response(mount_node, "sfs");
-			snprintf(buf, sizeof(buf), "%s%s", fshostid,
+			snprintf(buf, sizeof(buf), "%s%s", reqp->fshostid,
 					FSDIR_SHARE);
 			add_key(node, "remote", buf);
 			add_format_key(node, "local", "%s", SHAREDIR);
 
 /*
-			if (verbose)
+			if (reqp->verbose)
 				info("MOUNTS: %s", buf);
 */
 #endif
@@ -2559,7 +2552,7 @@ XML_COMMAND_PROTOTYPE(domounts)
 			 * nodes.
 			 */
 			node = new_response(mount_node, "sfs");
-			snprintf(buf, sizeof(buf), "%s%s/%s", fshostid,
+			snprintf(buf, sizeof(buf), "%s%s/%s", reqp->fshostid,
 					FSDIR_PROJ, DOTSFS);
 			add_key(node, "remote", buf);
 			add_format_key(node, "local", "%s%s", PROJDIR, DOTSFS);
@@ -2572,13 +2565,13 @@ XML_COMMAND_PROTOTYPE(domounts)
 			 * Pointer to /proj.
 			 */
 			node = new_response(mount_node, "sfs");
-			snprintf(buf, sizeof(buf), "%s%s", fshostid,
+			snprintf(buf, sizeof(buf), "%s%s", reqp->fshostid,
 					FSDIR_PROJ);
 			add_key(node, "remote", buf);
 			add_format_key(node, "local", "%s/%s", NETBEDDIR, PROJDIR);
 
 #if 0
-			if (verbose)
+			if (reqp->verbose)
 				info("MOUNTS: %s", buf);
 #endif
 
@@ -2586,13 +2579,13 @@ XML_COMMAND_PROTOTYPE(domounts)
 			 * Pointer to /groups
 			 */
 			node = new_response(mount_node, "sfs");
-			snprintf(buf, sizeof(buf), "%s%s", fshostid,
+			snprintf(buf, sizeof(buf), "%s%s", reqp->fshostid,
 					FSDIR_GROUPS);
 			add_key(node, "remote", buf);
 			add_format_key(node, "local", "%s%s", NETBEDDIR, PROJDIR);
 
 #if 0
-			if (verbose)
+			if (reqp->verbose)
 				info("MOUNTS: %s", buf);
 #endif
 
@@ -2600,13 +2593,13 @@ XML_COMMAND_PROTOTYPE(domounts)
 			 * Pointer to /users
 			 */
 			node = new_response(mount_node, "sfs");
-			snprintf(buf, sizeof(buf), "%s%s", fshostid,
+			snprintf(buf, sizeof(buf), "%s%s", reqp->fshostid,
 					FSDIR_USERS);
 			add_key(node, "remote", buf);
 			add_format_key(node, "local", "%s%s", NETBEDDIR, USERDIR);
 
 #if 0
-			if (verbose)
+			if (reqp->verbose)
 				info("MOUNTS: %s", buf);
 #endif
 #ifdef FSSCRATCHDIR
@@ -2614,13 +2607,13 @@ XML_COMMAND_PROTOTYPE(domounts)
 			 * Pointer to per-project scratch directory.
 			 */
 			node = new_response(mount_node, "sfs");
-			snprintf(buf, sizeof(buf), "%s%s", fshostid,
+			snprintf(buf, sizeof(buf), "%s%s", reqp->fshostid,
 					FSDIR_SCRATCH);
 			add_key(node, "remote", buf);
 			add_format_key(node, "local", "%s/%s", NETBEDDIR, SCRATCHDIR);
 
 #if 0
-			if (verbose)
+			if (reqp->verbose)
 				info("MOUNTS: %s", buf);
 #endif
 #endif
@@ -2629,13 +2622,13 @@ XML_COMMAND_PROTOTYPE(domounts)
 			 * Pointer to /share.
 			 */
 			node = new_response(mount_node, "sfs");
-			snprintf(buf, sizeof(buf), "%s%s", fshostid,
+			snprintf(buf, sizeof(buf), "%s%s", reqp->fshostid,
 					FSDIR_SHARE);
 			add_key(node, "remote", buf);
 			add_format_key(node, "local", "%s%s", NETBEDDIR, SHAREDIR);
 
 #if 0
-			if (verbose)
+			if (reqp->verbose)
 				info("MOUNTS: %s", buf);
 #endif
 #endif
@@ -2652,7 +2645,7 @@ XML_COMMAND_PROTOTYPE(domounts)
 	 * Now check for aux project access. Return a list of mounts for
 	 * those projects.
 	 */
-	res = mydb_query("select pid from exppid_access "
+	res = mydb_query(reqp, "select pid from exppid_access "
 			 "where exp_pid='%s' and exp_eid='%s'",
 			 1, reqp->pid, reqp->eid);
 	if (!res) {
@@ -2680,7 +2673,7 @@ XML_COMMAND_PROTOTYPE(domounts)
 	 * that have been granted access to share the nodes in that expt.
 	 */
 #ifdef  NOSHAREDEXPTS
-	res = mydb_query("select u.uid from users as u "
+	res = mydb_query(reqp, "select u.uid from users as u "
 			 "left join group_membership as p on "
 			 "     p.uid_idx=u.uid_idx "
 			 "where p.pid='%s' and p.gid='%s' and "
@@ -2689,7 +2682,7 @@ XML_COMMAND_PROTOTYPE(domounts)
 			 "      p.trust!='none'",
 			 1, reqp->pid, reqp->gid);
 #else
-	res = mydb_query("select distinct u.uid from users as u "
+	res = mydb_query(reqp, "select distinct u.uid from users as u "
 			 "left join exppid_access as a "
 			 " on a.exp_pid='%s' and a.exp_eid='%s' "
 			 "left join group_membership as p on "
@@ -2720,7 +2713,7 @@ XML_COMMAND_PROTOTYPE(domounts)
 		add_format_key(node, "local", "%s/%s", USERDIR, row[0]);
 				
 		nrows--;
-		if (verbose)
+		if (reqp->verbose)
 		    info("MOUNTS: %s", buf);
 	}
 	mysql_free_result(res);
@@ -2776,7 +2769,7 @@ XML_COMMAND_PROTOTYPE(dosfshostid)
 	char	sfspath[BUFSIZ], dspath[BUFSIZ];
 	xmlNode	*node;
 
-	if (!strlen(fshostid)) {
+	if (!strlen(reqp->fshostid)) {
 		/* SFS not being used */
 		info("dosfshostid: Called while SFS is not in use\n");
 		return 0;
@@ -2824,13 +2817,13 @@ XML_COMMAND_PROTOTYPE(dosfshostid)
 	 */
 	mysql_escape_string(buf, nodehostid, strlen(nodehostid));
 	
-	if (mydb_update("update node_hostkeys set sfshostid='%s' "
+	if (mydb_update(reqp, "update node_hostkeys set sfshostid='%s' "
 			"where node_id='%s'", buf, reqp->nodeid)) {
 		error("SFSHOSTID: %s: DB Error setting sfshostid!\n",
 		      reqp->nodeid);
 		return 1;
 	}
-	if (verbose)
+	if (reqp->verbose)
 		info("SFSHOSTID: %s: %s\n", reqp->nodeid, nodehostid);
 	return 0;
 }
@@ -2848,7 +2841,7 @@ XML_COMMAND_PROTOTYPE(dorouting)
 	/*
 	 * Get the routing type from the nodes table.
 	 */
-	res = mydb_query("select routertype from nodes where node_id='%s'",
+	res = mydb_query(reqp, "select routertype from nodes where node_id='%s'",
 			 1, reqp->nodeid);
 
 	if (!res) {
@@ -2891,7 +2884,7 @@ XML_COMMAND_PROTOTYPE(dorouting)
 	/*
 	 * Get the routing type from the nodes table.
 	 */
-	res = mydb_query("select dst,dst_type,dst_mask,nexthop,cost,src "
+	res = mydb_query(reqp, "select dst,dst_type,dst_mask,nexthop,cost,src "
 			 "from virt_routes as vi "
 			 "where vi.vname='%s' and "
 			 " vi.pid='%s' and vi.eid='%s'",
@@ -2943,7 +2936,7 @@ XML_COMMAND_PROTOTYPE(dorouting)
 		n--;
 	}
 	mysql_free_result(res);
-	if (verbose)
+	if (reqp->verbose)
 	    info("ROUTES: %d routes in list\n", nrows);
 
 	return 0;
@@ -2964,7 +2957,7 @@ XML_COMMAND_PROTOTYPE(doloadinfo)
 	/*
 	 * Get the address the node should contact to load its image
 	 */
-	res = mydb_query("select load_address,loadpart,OS,frisbee_pid,"
+	res = mydb_query(reqp, "select load_address,loadpart,OS,frisbee_pid,"
 			 "   mustwipe,mbr_version,access_key,imageid"
 			 "  from current_reloads as r "
 			 "left join images as i on i.imageid = r.image_id "
@@ -3044,7 +3037,7 @@ XML_COMMAND_PROTOTYPE(doloadinfo)
 	useacpi = "unknown";
 	useasf = "unknown";
 
-	res = mydb_query("select attrkey,attrvalue from nodes as n "
+	res = mydb_query(reqp, "select attrkey,attrvalue from nodes as n "
 			 "left join node_type_attributes as a on "
 			 "     n.type=a.type "
 			 "where (a.attrkey='bootdisk_unit' or "
@@ -3117,7 +3110,7 @@ XML_COMMAND_PROTOTYPE(doreset)
 	tuple->objname	 = reqp->nodeid;
 	tuple->eventtype = TBDB_EVENTTYPE_RESET;
 
-	if (myevent_send(tuple)) {
+	if (myevent_send(reqp, tuple)) {
 		error("doreset: Error sending event\n");
 		return 1;
 	} else {
@@ -3141,7 +3134,7 @@ XML_COMMAND_PROTOTYPE(dotrafgens)
 	int		nrows;
 	xmlNode		*node, *trafgensNode;
 
-	res = mydb_query("select vi.vname,role,proto,"
+	res = mydb_query(reqp, "select vi.vname,role,proto,"
 			 "  vnode,port,ip,target_vnode,target_port,target_ip, "
 			 "  generator "
 			 " from virt_trafgens as vi "
@@ -3206,7 +3199,7 @@ XML_COMMAND_PROTOTYPE(donseconfigs)
 	int		nrows;
 	xmlNode		*node;
 
-	res = mydb_query("select nseconfig from nseconfigs as nse "
+	res = mydb_query(reqp, "select nseconfig from nseconfigs as nse "
 			 "where nse.pid='%s' and nse.eid='%s' "
 			 "and nse.vname='%s'",
 			 1, reqp->pid, reqp->eid, reqp->nickname);
@@ -3272,7 +3265,7 @@ XML_COMMAND_PROTOTYPE(dostate)
 	tuple->objname	 = reqp->nodeid;
 	tuple->eventtype = newstate;
 
-	if (myevent_send(tuple)) {
+	if (myevent_send(reqp, tuple)) {
 		error("dostate: Error sending event\n");
 		return 1;
 	}
@@ -3310,7 +3303,7 @@ XML_COMMAND_PROTOTYPE(dotunnels)
 	int		nrows;
 	xmlNode		*node, *tunnels_node;
 
-	res = mydb_query("select lma.lanid,lma.memberid,"
+	res = mydb_query(reqp, "select lma.lanid,lma.memberid,"
 			 "   lma.attrkey,lma.attrvalue from lans as l "
 			 "left join lan_members as lm on lm.lanid=l.lanid "
 			 "left join lan_member_attributes as lma on "
@@ -3341,7 +3334,7 @@ XML_COMMAND_PROTOTYPE(dotunnels)
 		add_key(node, "value", row[3]);
 
 		nrows--;
-		if (verbose)
+		if (reqp->verbose)
 			info("TUNNEL=%s MEMBER=%s KEY='%s' VALUE='%s'\n",
 			     row[0], row[1], row[2], row[3]);
 	}
@@ -3359,7 +3352,7 @@ XML_COMMAND_PROTOTYPE(dovnodelist)
 	int		nrows;
 	xmlNode		*node, *vnodelist_node;
 
-	res = mydb_query("select r.node_id,n.jailflag from reserved as r "
+	res = mydb_query(reqp, "select r.node_id,n.jailflag from reserved as r "
 			 "left join nodes as n on r.node_id=n.node_id "
                          "left join node_types as nt on nt.type=n.type "
                          "where nt.isvirtnode=1 and n.phys_nodeid='%s'",
@@ -3400,7 +3393,7 @@ XML_COMMAND_PROTOTYPE(dosubnodelist)
 	int		nrows;
 	xmlNode		*subnodelist_node, *node;
 
-	res = mydb_query("select n.node_id,nt.class from nodes as n "
+	res = mydb_query(reqp, "select n.node_id,nt.class from nodes as n "
                          "left join node_types as nt on nt.type=n.type "
                          "where nt.issubnode=1 and n.phys_nodeid='%s'",
                          2, reqp->nodeid);
@@ -3440,7 +3433,7 @@ XML_COMMAND_PROTOTYPE(doisalive)
 	 * See db/node_status script, which uses this info (timestamps)
 	 * to determine when nodes are down.
 	 */
-	mydb_update("replace into node_status "
+	mydb_update(reqp, "replace into node_status "
 		    " (node_id, status, status_timestamp) "
 		    " values ('%s', 'up', now())",
 		    reqp->nodeid);
@@ -3495,7 +3488,7 @@ XML_COMMAND_PROTOTYPE(doipodinfo)
 	}
 	*bp = '\0';
 
-	mydb_update("update nodes set ipodhash='%s' "
+	mydb_update(reqp, "update nodes set ipodhash='%s' "
 		    "where node_id='%s'",
 		    hashbuf, reqp->nodeid);
 	
@@ -3503,7 +3496,7 @@ XML_COMMAND_PROTOTYPE(doipodinfo)
 	 * XXX host/mask hardwired to us
 	 */
 	node = new_response(root, "ipodinfo");
-	add_key(node, "host", inet_ntoa(myipaddr));
+	add_key(node, "host", inet_ntoa(reqp->myipaddr));
 	add_key(node, "mask", "255.255.255.255");
 	add_key(node, "hash", hashbuf);
 
@@ -3523,7 +3516,7 @@ XML_COMMAND_PROTOTYPE(dontpinfo)
 	/*
 	 * First get the servers and peers.
 	 */
-	res = mydb_query("select type,IP from ntpinfo where node_id='%s'",
+	res = mydb_query(reqp, "select type,IP from ntpinfo where node_id='%s'",
 			 2, reqp->nodeid);
 
 	if (!res) {
@@ -3561,7 +3554,7 @@ XML_COMMAND_PROTOTYPE(dontpinfo)
 	/*
 	 * Now get the drift.
 	 */
-	res = mydb_query("select ntpdrift from nodes "
+	res = mydb_query(reqp, "select ntpdrift from nodes "
 			 "where node_id='%s' and ntpdrift is not null",
 			 1, reqp->nodeid);
 
@@ -3603,10 +3596,10 @@ XML_COMMAND_PROTOTYPE(dontpdrift)
 		error("NTPDRIFT: %s: Bad argument\n", reqp->nodeid);
 		return 1;
 	}
-	mydb_update("update nodes set ntpdrift='%f' where node_id='%s'",
+	mydb_update(reqp, "update nodes set ntpdrift='%f' where node_id='%s'",
 		    drift, reqp->nodeid);
 
-	if (verbose)
+	if (reqp->verbose)
 		info("NTPDRIFT: %f", drift);
 	return 0;
 }
@@ -3635,7 +3628,7 @@ XML_COMMAND_PROTOTYPE(dojailconfig)
 	 * Get the portrange for the experiment. Cons up the other params I
 	 * can think of right now. 
 	 */
-	res = mydb_query("select low,high from ipport_ranges "
+	res = mydb_query(reqp, "select low,high from ipport_ranges "
 			 "where pid='%s' and eid='%s'",
 			 2, reqp->pid, reqp->eid);
 	
@@ -3657,7 +3650,7 @@ XML_COMMAND_PROTOTYPE(dojailconfig)
 	/*
 	 * Now need the sshdport and jailip for this node.
 	 */
-	res = mydb_query("select sshdport,jailip from nodes "
+	res = mydb_query(reqp, "select sshdport,jailip from nodes "
 			 "where node_id='%s'",
 			 2, reqp->nodeid);
 	
@@ -3694,7 +3687,7 @@ XML_COMMAND_PROTOTYPE(dojailconfig)
 	/*
 	 * See if a per-node-type vnode disk size is specified
 	 */
-	res = mydb_query("select na.attrvalue from nodes as n "
+	res = mydb_query(reqp, "select na.attrvalue from nodes as n "
 			 "left join node_type_attributes as na on "
 			 "  n.type=na.type "
 			 "where n.node_id='%s' and "
@@ -3716,7 +3709,7 @@ XML_COMMAND_PROTOTYPE(dojailconfig)
 	 * ip addresses for this vnode.
 	 */
 
-	res = mydb_query("select ip from virt_lans "
+	res = mydb_query(reqp, "select ip from virt_lans "
 			 "where vnode='%s' and pid='%s' and eid='%s'",
 			 1, reqp->nickname, reqp->pid, reqp->eid);
 
@@ -3763,7 +3756,7 @@ XML_COMMAND_PROTOTYPE(doplabconfig)
 	/*
 	 * Now need the sshdport for this node.
 	 */
-	res = mydb_query("select n.sshdport, ps.admin, i.IP "
+	res = mydb_query(reqp, "select n.sshdport, ps.admin, i.IP "
                          " from reserved as r "
                          " left join nodes as n " 
                          "  on n.node_id=r.node_id "
@@ -3777,7 +3770,7 @@ XML_COMMAND_PROTOTYPE(doplabconfig)
         /*
          * .. And the elvind port.
          */
-        res2 = mydb_query("select attrvalue from node_attributes "
+        res2 = mydb_query(reqp, "select attrvalue from node_attributes "
                           " where node_id='%s' and attrkey='elvind_port'",
                           1, reqp->pnodeid);
 
@@ -3856,7 +3849,7 @@ XML_COMMAND_PROTOTYPE(doixpconfig)
 	 * Get the "control" net address for the IXP from the interfaces
 	 * table. This is really a virtual pci/eth interface.
 	 */
-	res = mydb_query("select i1.IP,i1.iface,i2.iface,i2.mask,i2.IP "
+	res = mydb_query(reqp, "select i1.IP,i1.iface,i2.iface,i2.mask,i2.IP "
 			 " from nodes as n "
 			 "left join interfaces as i1 on i1.node_id=n.node_id "
 			 "     and i1.role='ctrl' "
@@ -3930,7 +3923,7 @@ XML_COMMAND_PROTOTYPE(doprogagents)
 	int		nrows;
 	xmlNode		*node;
 
-	res = mydb_query("select vname,command,dir,timeout,expected_exit_code "
+	res = mydb_query(reqp, "select vname,command,dir,timeout,expected_exit_code "
 			 "from virt_programs "
 			 "where vnode='%s' and pid='%s' and eid='%s'",
 			 5, reqp->nickname, reqp->pid, reqp->eid);
@@ -4041,7 +4034,7 @@ XML_COMMAND_PROTOTYPE(doroutelist)
 	/*
 	 * Get the routing type from the nodes table.
 	 */
-	res = mydb_query("select routertype from nodes where node_id='%s'",
+	res = mydb_query(reqp, "select routertype from nodes where node_id='%s'",
 			 1, reqp->nodeid);
 
 	if (!res) {
@@ -4073,7 +4066,7 @@ XML_COMMAND_PROTOTYPE(doroutelist)
 	/*
 	 * Get the routing type from the nodes table.
 	 */
-	res = mydb_query("select vr.vname,src,dst,dst_type,dst_mask,nexthop,cost "
+	res = mydb_query(reqp, "select vr.vname,src,dst,dst_type,dst_mask,nexthop,cost "
 			 "from virt_routes as vr "
 			 "left join v2pmap as v2p "
 			 "using (pid,eid,vname) "
@@ -4128,7 +4121,7 @@ XML_COMMAND_PROTOTYPE(doroutelist)
 		n--;
 	}
 	mysql_free_result(res);
-	if (verbose)
+	if (reqp->verbose)
 	    info("ROUTES: %d routes in list\n", nrows);
 
 	return 0;
@@ -4146,7 +4139,7 @@ XML_COMMAND_PROTOTYPE(dorole)
 	/*
 	 * Get the erole from the reserved table
 	 */
-	res = mydb_query("select erole from reserved where node_id='%s'",
+	res = mydb_query(reqp, "select erole from reserved where node_id='%s'",
 			 1, reqp->nodeid);
 
 	if (!res) {
@@ -4225,19 +4218,19 @@ XML_COMMAND_PROTOTYPE(dorusage)
 	 * XXX: Plab physnode status is reported from the management slice.
          *
 	 */
-	mydb_update("replace into node_rusage "
+	mydb_update(reqp, "replace into node_rusage "
 		    " (node_id, status_timestamp, "
 		    "  load_1min, load_5min, load_15min, disk_used) "
 		    " values ('%s', now(), %f, %f, %f, %f)",
 		    reqp->pnodeid, la1, la5, la15, dused);
 
 	if (reqp->isplabdslice) {
-		mydb_update("replace into node_status "
+		mydb_update(reqp, "replace into node_status "
 			    " (node_id, status, status_timestamp) "
 			    " values ('%s', 'up', now())",
 			    reqp->pnodeid);
 
-		mydb_update("replace into node_status "
+		mydb_update(reqp, "replace into node_status "
 			    " (node_id, status, status_timestamp) "
 			    " values ('%s', 'up', now())",
 			    reqp->vnodeid);
@@ -4302,7 +4295,7 @@ XML_COMMAND_PROTOTYPE(dodoginfo)
 	/*
 	 * XXX sitevar fetching should be a library function
 	 */
-	res = mydb_query("select name,value,defaultvalue from "
+	res = mydb_query(reqp, "select name,value,defaultvalue from "
 			 "sitevariables where name like 'watchdog/%%'", 3);
 	if (!res || (nrows = (int)mysql_num_rows(res)) == 0) {
 		error("WATCHDOGINFO: no watchdog sitevars\n");
@@ -4399,9 +4392,9 @@ XML_COMMAND_PROTOTYPE(dohostinfo)
 
 	bp = rdata;
 	if (sscanf(bp, "CDVERSION=%31[a-zA-Z0-9-]", buf) == 1) {
-		if (verbose)
+		if (reqp->verbose)
 			info("HOSTINFO CDVERSION=%s\n", buf);
-		if (mydb_update("update nodes set cd_version='%s' "
+		if (mydb_update(reqp, "update nodes set cd_version='%s' "
 				"where node_id='%s'",
 				buf, reqp->nodeid)) {
 			error("HOSTINFO: %s: DB update failed\n", reqp->nodeid);
@@ -4463,7 +4456,7 @@ XML_COMMAND_PROTOTYPE(dohostkeys)
 			error("HOSTKEYS: %s: "
 			      "Unrecognized key type '%.8s ...'\n",
 			      reqp->nodeid, bp);
-			if (verbose)
+			if (reqp->verbose)
 				error("HOSTKEYS: %s\n", rdata);
 			return 1;
 		}
@@ -4478,7 +4471,7 @@ XML_COMMAND_PROTOTYPE(dohostkeys)
 			      reqp->nodeid,
 			      thiskey == rsav1 ? "RSA v1" :
 			      (thiskey == rsav2 ? "RSA v2" : "DSA v2"));
-			if (verbose)
+			if (reqp->verbose)
 				error("HOSTKEYS: %s\n", rdata);
 			return 1;
 		}
@@ -4490,7 +4483,7 @@ XML_COMMAND_PROTOTYPE(dohostkeys)
 		mysql_escape_string(&thiskey[1], buf, strlen(buf));
 		strcat(thiskey, "'");
 	}
-	if (mydb_update("update node_hostkeys set "
+	if (mydb_update(reqp, "update node_hostkeys set "
 			"       sshrsa_v1=%s,sshrsa_v2=%s,sshdsa_v2=%s "
 			"where node_id='%s'",
 			(rsav1[0] ? rsav1 : "NULL"),
@@ -4500,7 +4493,7 @@ XML_COMMAND_PROTOTYPE(dohostkeys)
 		error("HOSTKEYS: %s: setting hostkeys!\n", reqp->nodeid);
 		return 1;
 	}
-	if (verbose) {
+	if (reqp->verbose) {
 		info("sshrsa_v1=%s,sshrsa_v2=%s,sshdsa_v2=%s\n",
 		     (rsav1[0] ? rsav1 : "NULL"),
 		     (rsav2[0] ? rsav2 : "NULL"),
@@ -4526,7 +4519,7 @@ XML_COMMAND_PROTOTYPE(dofwinfo)
 	 *
 	 * XXX will only work if there is one firewall per experiment.
 	 */
-	res = mydb_query("select r.node_id,v.type,v.style,v.log,f.fwname,"
+	res = mydb_query(reqp, "select r.node_id,v.type,v.style,v.log,f.fwname,"
 			 "  i.IP,i.mac,f.vlan "
 			 "from firewalls as f "
 			 "left join reserved as r on"
@@ -4633,7 +4626,7 @@ XML_COMMAND_PROTOTYPE(dofwinfo)
 	 * Grab the node gateway MAC which is not currently part
 	 * of the firewall variables table.
 	 */
-	res = mydb_query("select value from sitevariables "
+	res = mydb_query(reqp, "select value from sitevariables "
 			 "where name='node/gw_mac'", 1);
 	fwvars_node = new_response(fwinfo_node, "fwvars");
 	if (res && mysql_num_rows(res) > 0) {
@@ -4650,7 +4643,7 @@ XML_COMMAND_PROTOTYPE(dofwinfo)
 	if (res)
 		mysql_free_result(res);
 
-	res = mydb_query("select name,value from default_firewall_vars",
+	res = mydb_query(reqp, "select name,value from default_firewall_vars",
 			 2);
 	if (!res) {
 		error("FWINFO: %s: DB Error getting firewall vars!\n",
@@ -4668,13 +4661,13 @@ XML_COMMAND_PROTOTYPE(dofwinfo)
 	}
 	if (res)
 		mysql_free_result(res);
-	if (verbose)
+	if (reqp->verbose)
 		info("FWINFO: %d variables\n", nrows);
 
 	/*
 	 * Get the user firewall rules from the DB and return them.
 	 */
-	res = mydb_query("select ruleno,rule from firewall_rules "
+	res = mydb_query(reqp, "select ruleno,rule from firewall_rules "
 			 "where pid='%s' and eid='%s' and fwname='%s' "
 			 "order by ruleno",
 			 2, reqp->pid, reqp->eid, fwname);
@@ -4693,13 +4686,13 @@ XML_COMMAND_PROTOTYPE(dofwinfo)
 	}
 
 	mysql_free_result(res);
-	if (verbose)
+	if (reqp->verbose)
 	    info("FWINFO: %d user rules\n", nrows);
 
 	/*
 	 * Get the default firewall rules from the DB and return them.
 	 */
-	res = mydb_query("select ruleno,rule from default_firewall_rules "
+	res = mydb_query(reqp, "select ruleno,rule from default_firewall_rules "
 			 "where type='%s' and style='%s' and enabled!=0 "
 			 "order by ruleno",
 			 2, fwtype, fwstyle);
@@ -4718,7 +4711,7 @@ XML_COMMAND_PROTOTYPE(dofwinfo)
 	}
 
 	mysql_free_result(res);
-	if (verbose)
+	if (reqp->verbose)
 	    info("FWINFO: %d default rules\n", nrows);
 
 	/*
@@ -4733,7 +4726,7 @@ XML_COMMAND_PROTOTYPE(dofwinfo)
 	 * that we can provide proxy ARP.
 	 */
 	 /* XXX Ryan fix this */
-	res = mydb_query("select r.vname,i.IP,i.mac "
+	res = mydb_query(reqp, "select r.vname,i.IP,i.mac "
 		"from reserved as r "
 		"left join interfaces as i on r.node_id=i.node_id "
 		"where r.pid='%s' and r.eid='%s' and i.role='ctrl'",
@@ -4754,7 +4747,7 @@ XML_COMMAND_PROTOTYPE(dofwinfo)
 	}
 
 	mysql_free_result(res);
-	if (verbose)
+	if (reqp->verbose)
 		info("FWINFO: %d firewalled hosts\n", nrows);
 
 	return 0;
@@ -4787,7 +4780,7 @@ XML_COMMAND_PROTOTYPE(doemulabconfig)
 	 * Note the single vs dual control network differences!
 	 */
 	if (reqp->singlenet) {
-		res = mydb_query("select r.node_id,r.inner_elab_role,"
+		res = mydb_query(reqp, "select r.node_id,r.inner_elab_role,"
 				 "   i.IP,r.vname from reserved as r "
 				 "left join interfaces as i on "
 				 "     i.node_id=r.node_id and i.role='ctrl' "
@@ -4796,7 +4789,7 @@ XML_COMMAND_PROTOTYPE(doemulabconfig)
 				 4, reqp->pid, reqp->eid);
 	}
 	else {
-		res = mydb_query("select r.node_id,r.inner_elab_role,"
+		res = mydb_query(reqp, "select r.node_id,r.inner_elab_role,"
 				 "   vl.ip,r.vname from reserved as r "
 				 "left join virt_lans as vl on "
 				 "     vl.vnode=r.vname and "
@@ -4857,7 +4850,7 @@ XML_COMMAND_PROTOTYPE(doemulabconfig)
 	/*
 	 * Some package info and other stuff from sitevars.
 	 */
-	res = mydb_query("select name,value from sitevariables "
+	res = mydb_query(reqp, "select name,value from sitevariables "
 			 "where name like 'elabinelab/%%'", 2);
 	if (!res) {
 		error("EMULABCONFIG: %s: DB Error getting elab_in_elab\n",
@@ -4888,7 +4881,7 @@ XML_COMMAND_PROTOTYPE(doemulabconfig)
 	/*
 	 * Stuff from the experiments table.
 	 */
-	res = mydb_query("select elabinelab_cvstag,elabinelab_nosetup "
+	res = mydb_query(reqp, "select elabinelab_cvstag,elabinelab_nosetup "
 			 "   from experiments "
 			 "where pid='%s' and eid='%s'",
 			 2, reqp->pid, reqp->eid);
@@ -4933,7 +4926,7 @@ XML_COMMAND_PROTOTYPE(doeplabconfig)
 	/*
 	 * We only respond if we are a PLC node
 	 */
-	res = mydb_query("select node_id from reserved "
+	res = mydb_query(reqp, "select node_id from reserved "
 			 "where pid='%s' and eid='%s' and plab_role='plc'",
 			 1, reqp->pid, reqp->eid);
 	if (!res) {
@@ -4955,7 +4948,7 @@ XML_COMMAND_PROTOTYPE(doeplabconfig)
 	/*
 	 * VNAME=<vname> PNAME=<FQpname> ROLE=<role> CNETIP=<IP> CNETMAC=<MAC> 
 	 */
-	res = mydb_query("select r.node_id,r.vname,r.plab_role,i.IP,i.mac "
+	res = mydb_query(reqp, "select r.node_id,r.vname,r.plab_role,i.IP,i.mac "
 			 "  from reserved as r join interfaces as i "
 			 "  where r.node_id=i.node_id and "
 			 "    i.role='ctrl' and r.pid='%s' and r.eid='%s'",
@@ -5015,7 +5008,7 @@ XML_COMMAND_PROTOTYPE(doeplabconfig)
 	 *
 	 * VNAME=<vname> IP=<IP> NETMASK=<mask> MAC=<MAC>
 	 */
-	res = mydb_query("select vl.vnode,i.IP,i.mask,i.mac from reserved as r"
+	res = mydb_query(reqp, "select vl.vnode,i.IP,i.mask,i.mac from reserved as r"
 			 "  left join virt_lans as vl"
 			 "    on r.pid=vl.pid and r.eid=vl.eid"
 			 "  left join interfaces as i"
@@ -5049,7 +5042,7 @@ XML_COMMAND_PROTOTYPE(doeplabconfig)
 	 * For now, just assume that plab_plcnet is a valid lan name and 
 	 * join it with virtlans and ifaces.
 	 */
-	res = mydb_query("select vl.vnode,r.node_id,vn.plab_plcnet,"
+	res = mydb_query(reqp, "select vl.vnode,r.node_id,vn.plab_plcnet,"
 			 "       vn.plab_role,i.IP,i.mask,i.mac"
 			 "  from reserved as r left join virt_lans as vl"
 			 "    on r.pid=vl.pid and r.eid=vl.eid"
@@ -5100,7 +5093,7 @@ XML_COMMAND_PROTOTYPE(dolocalize)
 	 * WARNING: This sitevar (node/ssh_pubkey) is referenced in
 	 *          install/boss-install during initial setup.
 	 */
-	res = mydb_query("select name,value "
+	res = mydb_query(reqp, "select name,value "
 			 "from sitevariables where name='node/ssh_pubkey'",
 			 2);
 	if (!res || (nrows = (int)mysql_num_rows(res)) == 0) {
@@ -5173,7 +5166,7 @@ RAW_COMMAND_PROTOTYPE(dobootlog)
 		}
 		mysql_escape_string(cp, buf, len);
 
-		if (mydb_update("replace into node_bootlogs "
+		if (mydb_update(reqp, "replace into node_bootlogs "
 				" (node_id, bootlog, bootlog_timestamp) values "
 				" ('%s', '%s', now())", 
 				reqp->nodeid, cp)) {
@@ -5183,7 +5176,7 @@ RAW_COMMAND_PROTOTYPE(dobootlog)
 			return 1;
 			
 		}
-		if (verbose)
+		if (reqp->verbose)
 		    printf("DOBOOTLOG: %d '%s'\n", len, cp);
 		
 		free(cp);
@@ -5214,13 +5207,13 @@ XML_COMMAND_PROTOTYPE(dobooterrno)
 	/*
 	 * and update DB.
 	 */
-	if (mydb_update("update nodes set boot_errno='%d' "
+	if (mydb_update(reqp, "update nodes set boot_errno='%d' "
 			"where node_id='%s'",
 			myerrno, reqp->nodeid)) {
 		error("DOBOOTERRNO: %s: setting boot errno!\n", reqp->nodeid);
 		return 1;
 	}
-	if (verbose)
+	if (reqp->verbose)
 		info("DOBOOTERRNO: errno=%d\n", myerrno);
 		
 	return 0;
@@ -5250,7 +5243,7 @@ XML_COMMAND_PROTOTYPE(dobattery)
 	/*
 	 * ... update DB.
 	 */
-	if (mydb_update("UPDATE nodes SET battery_percentage=%f,"
+	if (mydb_update(reqp, "UPDATE nodes SET battery_percentage=%f,"
 			"battery_voltage=%f,"
 			"battery_timestamp=UNIX_TIMESTAMP(now()) "
 			"WHERE node_id='%s'",
@@ -5258,7 +5251,7 @@ XML_COMMAND_PROTOTYPE(dobattery)
 		error("DOBATTERY: %s: setting boot errno!\n", reqp->nodeid);
 		return 1;
 	}
-	if (verbose) {
+	if (reqp->verbose) {
 		info("DOBATTERY: capacity=%.2f voltage=%.2f\n",
 		     capacity,
 		     voltage);
@@ -5374,7 +5367,7 @@ XML_COMMAND_PROTOTYPE(douserenv)
 	int		nrows;
 	xmlNode		*node;
 
-	res = mydb_query("select name,value from virt_user_environment "
+	res = mydb_query(reqp, "select name,value from virt_user_environment "
 			 "where pid='%s' and eid='%s' order by idx",
 			 2, reqp->pid, reqp->eid);
 
@@ -5411,7 +5404,7 @@ XML_COMMAND_PROTOTYPE(dotiptunnels)
 	int		nrows;
 	xmlNode		*node, *tunnel_node;
 
-	res = mydb_query("select vtt.vnode,tl.server,tl.portnum,tl.keylen,"
+	res = mydb_query(reqp, "select vtt.vnode,tl.server,tl.portnum,tl.keylen,"
 			 "tl.keydata "
 			 "from virt_tiptunnels as vtt "
 			 "left join reserved as r on r.vname=vtt.vnode and "
@@ -5458,7 +5451,7 @@ XML_COMMAND_PROTOTYPE(dorelayconfig)
 	int		nrows;
 	xmlNode		*node;
 
-	res = mydb_query("select tl.server,tl.portnum from tiplines as tl "
+	res = mydb_query(reqp, "select tl.server,tl.portnum from tiplines as tl "
 			 "where tl.node_id='%s'",
 			 2, reqp->nodeid);
 
@@ -5502,7 +5495,7 @@ XML_COMMAND_PROTOTYPE(dotraceconfig)
 	 * course, this assumes that the type is the BSD name, not linux.
 	 */
 	if (! reqp->isvnode) {
-	  res = mydb_query("select linkvname,i0.MAC,i1.MAC,t.vnode,i2.MAC, "
+	  res = mydb_query(reqp, "select linkvname,i0.MAC,i1.MAC,t.vnode,i2.MAC, "
 			   "       t.trace_type,t.trace_expr,t.trace_snaplen, "
 			   "       t.idx "
 			   "from traces as t "
@@ -5521,7 +5514,7 @@ XML_COMMAND_PROTOTYPE(dotraceconfig)
 			   9, reqp->pid, reqp->eid, reqp->nodeid);
 	}
 	else {
-	  res = mydb_query("select linkvname,i0.mac,i1.mac,t.vnode,'', "
+	  res = mydb_query(reqp, "select linkvname,i0.mac,i1.mac,t.vnode,'', "
 			   "       t.trace_type,t.trace_expr,t.trace_snaplen, "
 			   "       t.idx "
 			   "from traces as t "
@@ -5615,7 +5608,7 @@ XML_COMMAND_PROTOTYPE(doelvindport)
 	/*
          * Now shove the elvin port # we got into the db.
 	 */
-	mydb_update("replace into node_attributes "
+	mydb_update(reqp, "replace into node_attributes "
                     " values ('%s', '%s', %u)",
 		    reqp->pnodeid, "elvind_port", elvport);
 
@@ -5638,7 +5631,7 @@ XML_COMMAND_PROTOTYPE(doplabeventkeys)
                 return 1;
         }
 
-        res = mydb_query("select e.pid, e.eid, e.eventkey from reserved as r "
+        res = mydb_query(reqp, "select e.pid, e.eid, e.eventkey from reserved as r "
                          " left join nodes as n on r.node_id = n.node_id "
                          " left join experiments as e on r.pid = e.pid "
                          "  and r.eid = e.eid "
@@ -5678,12 +5671,12 @@ XML_COMMAND_PROTOTYPE(dointfcmap)
 	MYSQL_ROW	row;
 	xmlNode		*node = NULL;
 
-        res = mydb_query("select node_id, mac from interfaces "
+        res = mydb_query(reqp, "select node_id, mac from interfaces "
 			 "where node_id like 'pc%%' order by node_id",
                          2);
 
 	nrows = (int)mysql_num_rows(res);
-	if (verbose)
+	if (reqp->verbose)
 		info("intfcmap: nrows %d\n", nrows);
 	if (nrows == 0) {
 		mysql_free_result(res);
@@ -5693,7 +5686,7 @@ XML_COMMAND_PROTOTYPE(dointfcmap)
 	/* XXX Ryan: might this benefit from more structure? */
 	while (nrows) {
 		row = mysql_fetch_row(res);
-		/* if (verbose) info("intfcmap: %s %s\n", row[0], row[1]); */
+		/* if (reqp->verbose) info("intfcmap: %s %s\n", row[0], row[1]); */
 
 		/* Consolidate interfaces on the same pc into a single line. */
 		if (pc[0] == '\0') {
@@ -5716,7 +5709,7 @@ XML_COMMAND_PROTOTYPE(dointfcmap)
 	}
 
 	npcs++;
-	if (verbose)
+	if (reqp->verbose)
 		info("intfcmap: npcs %d\n", npcs);
 
 	mysql_free_result(res);
@@ -5735,7 +5728,7 @@ XML_COMMAND_PROTOTYPE(domotelog)
     int nrows;
     xmlNode *node, *motelog_node;
 
-    res = mydb_query("select vnm.logfileid,ml.classfilepath,ml.specfilepath "
+    res = mydb_query(reqp, "select vnm.logfileid,ml.classfilepath,ml.specfilepath "
 		     "from virt_node_motelog as vnm "
 		     "left join motelogfiles as ml on vnm.pid=ml.pid "
 		     "  and vnm.logfileid=ml.logfileid "
@@ -5813,7 +5806,7 @@ XML_COMMAND_PROTOTYPE(doportregister)
 	 * Single argument, lookup up service.
 	 */
 	if (rc == 1) {
-		res = mydb_query("select port,node_id "
+		res = mydb_query(reqp, "select port,node_id "
 				 "   from port_registration "
 				 "where pid='%s' and eid='%s' and "
 				 "      service='%s'",
@@ -5832,7 +5825,7 @@ XML_COMMAND_PROTOTYPE(doportregister)
 			add_format_key(node, "nodeid", "%s.%s", row[1],
 					OURDOMAIN);
 
-			if (verbose)
+			if (reqp->verbose)
 				info("PORTREG: %s: %s", reqp->nodeid, buf);
 		}
 		mysql_free_result(res);
@@ -5843,7 +5836,7 @@ XML_COMMAND_PROTOTYPE(doportregister)
 	 * If port is zero, clear it from the DB
 	 */
 	if (port == 0) {
-		mydb_update("delete from port_registration  "
+		mydb_update(reqp, "delete from port_registration  "
 			    "where pid='%s' and eid='%s' and "
 			    "      service='%s'",
 			    reqp->pid, reqp->eid, service);
@@ -5852,7 +5845,7 @@ XML_COMMAND_PROTOTYPE(doportregister)
 		/*
 		 * Register port for the service.
 		 */
-		if (mydb_update("replace into port_registration set "
+		if (mydb_update(reqp, "replace into port_registration set "
 				"     pid='%s', eid='%s', exptidx=%d, "
 				"     service='%s', node_id='%s', port='%d'",
 				reqp->pid, reqp->eid, reqp->exptidx,
@@ -5862,7 +5855,7 @@ XML_COMMAND_PROTOTYPE(doportregister)
 			return 1;
 		}
 	}
-	if (verbose)
+	if (reqp->verbose)
 		info("PORTREG: %s: %s=%d\n", reqp->nodeid, service, port);
 	
 	return 0;
@@ -5914,13 +5907,10 @@ XML_COMMAND_PROTOTYPE(dobootwhat)
 /*
  * DB stuff
  */
-static MYSQL	db;
-static int	db_connected;
-static char     db_dbname[DBNAME_SIZE];
-static void	mydb_disconnect();
+static void	mydb_disconnect(tmcdreq_t* reqp);
 
 static int
-mydb_connect()
+mydb_connect(tmcdreq_t* reqp)
 {
 	/*
 	 * Each time we talk to the DB, we check to see if the name
@@ -5928,28 +5918,28 @@ mydb_connect()
 	 * be done. If we switched DBs (checkdbredirect()), then drop
 	 * the current connection and form a new one.
 	 */
-	if (db_connected) {
-		if (strcmp(db_dbname, dbname) == 0)
+	if (reqp->db_connected) {
+		if (strcmp(reqp->prev_dbname, reqp->dbname) == 0)
 			return 1;
-		mydb_disconnect();
+		mydb_disconnect(reqp);
 	}
 	
-	mysql_init(&db);
-	if (mysql_real_connect(&db, 0, "tmcd", 0,
-			       dbname, 0, 0, CLIENT_INTERACTIVE) == 0) {
-		error("%s: connect failed: %s\n", dbname, mysql_error(&db));
+	mysql_init(&reqp->db);
+	if (mysql_real_connect(&reqp->db, 0, "tmcd", 0,
+			       reqp->dbname, 0, 0, CLIENT_INTERACTIVE) == 0) {
+		error("%s: connect failed: %s\n", reqp->dbname, mysql_error(&reqp->db));
 		return 0;
 	}
-	strcpy(db_dbname, dbname);
-	db_connected = 1;
+	strcpy(reqp->prev_dbname, reqp->dbname);
+	reqp->db_connected = 1;
 	return 1;
 }
 
 static void
-mydb_disconnect()
+mydb_disconnect(tmcdreq_t* reqp)
 {
-	mysql_close(&db);
-	db_connected = 0;
+	mysql_close(&reqp->db);
+	reqp->db_connected = 0;
 }
 
 /*
@@ -5961,7 +5951,7 @@ extern void	dbclose(void) {}
 #endif
 
 MYSQL_RES *
-mydb_query(char *query, int ncols, ...)
+mydb_query(tmcdreq_t *reqp, char *query, int ncols, ...)
 {
 	MYSQL_RES	*res;
 	char		querybuf[2*MYBUFSIZE];
@@ -5975,13 +5965,13 @@ mydb_query(char *query, int ncols, ...)
 		return (MYSQL_RES *) 0;
 	}
 
-	if (! mydb_connect())
+	if (! mydb_connect(reqp))
 		return (MYSQL_RES *) 0;
 
-	if (mysql_real_query(&db, querybuf, n) != 0) {
+	if (mysql_real_query(&reqp->db, querybuf, n) != 0) {
 		error("%s: query failed: %s, retrying\n",
-		      dbname, mysql_error(&db));
-		mydb_disconnect();
+		      reqp->dbname, mysql_error(&reqp->db));
+		mydb_disconnect(reqp);
 		/*
 		 * Try once to reconnect.  In theory, the caller (client)
 		 * will retry the tmcc call and we will reconnect and
@@ -5991,26 +5981,26 @@ mydb_query(char *query, int ncols, ...)
 		 * reconnecting.  Hence, the client could wind up failing
 		 * even if it retried.
 		 */
-		if (!mydb_connect() ||
-		    mysql_real_query(&db, querybuf, n) != 0) {
+		if (!mydb_connect(reqp) ||
+		    mysql_real_query(&reqp->db, querybuf, n) != 0) {
 			error("%s: query failed: %s\n",
-			      dbname, mysql_error(&db));
+			      reqp->dbname, mysql_error(&reqp->db));
 			return (MYSQL_RES *) 0;
 		}
 	}
 
-	res = mysql_store_result(&db);
+	res = mysql_store_result(&reqp->db);
 	if (res == 0) {
 		error("%s: store_result failed: %s\n",
-		      dbname, mysql_error(&db));
-		mydb_disconnect();
+		      reqp->dbname, mysql_error(&reqp->db));
+		mydb_disconnect(reqp);
 		return (MYSQL_RES *) 0;
 	}
 
 	if (ncols && ncols != (int)mysql_num_fields(res)) {
 		error("%s: Wrong number of fields returned "
 		      "Wanted %d, Got %d\n",
-		      dbname, ncols, (int)mysql_num_fields(res));
+		      reqp->dbname, ncols, (int)mysql_num_fields(res));
 		mysql_free_result(res);
 		return (MYSQL_RES *) 0;
 	}
@@ -6018,7 +6008,7 @@ mydb_query(char *query, int ncols, ...)
 }
 
 int
-mydb_update(char *query, ...)
+mydb_update(tmcdreq_t *reqp, char *query, ...)
 {
 	char		querybuf[8 * 1024];
 	va_list		ap;
@@ -6031,12 +6021,12 @@ mydb_update(char *query, ...)
 		return 1;
 	}
 
-	if (! mydb_connect())
+	if (! mydb_connect(reqp))
 		return 1;
 
-	if (mysql_real_query(&db, querybuf, n) != 0) {
-		error("%s: query failed: %s\n", dbname, mysql_error(&db));
-		mydb_disconnect();
+	if (mysql_real_query(&reqp->db, querybuf, n) != 0) {
+		error("%s: query failed: %s\n", reqp->dbname, mysql_error(&reqp->db));
+		mydb_disconnect(reqp);
 		return 1;
 	}
 	return 0;
@@ -6046,7 +6036,7 @@ mydb_update(char *query, ...)
  * Map IP to node ID (plus other info).
  */
 int
-iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
+iptonodeid(tmcdreq_t *reqp, struct in_addr ipaddr)
 {
 	MYSQL_RES	*res;
 	MYSQL_ROW	row;
@@ -6063,7 +6053,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 	 * check jailflag also check to see if its a vnode or physnode. 
 	 */
 	if (reqp->isvnode) {
-		res = mydb_query("select vt.class,vt.type,np.node_id,"
+		res = mydb_query(reqp, "select vt.class,vt.type,np.node_id,"
 				 " nv.jailflag,r.pid,r.eid,r.vname, "
 				 " e.gid,e.testdb,nv.update_accounts, "
 				 " np.role,e.expt_head_uid,e.expt_swap_uid, "
@@ -6097,7 +6087,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 inet_ntoa(ipaddr), inet_ntoa(ipaddr));
 	}
 	else {
-		res = mydb_query("select t.class,t.type,n.node_id,n.jailflag,"
+		res = mydb_query(reqp, "select t.class,t.type,n.node_id,n.jailflag,"
 				 " r.pid,r.eid,r.vname,e.gid,e.testdb, "
 				 " n.update_accounts,n.role, "
 				 " e.expt_head_uid,e.expt_swap_uid, "
@@ -6216,19 +6206,19 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 /*
  * Map nodeid to PID/EID pair.
  */
-int
-nodeidtoexp(char *nodeid, char *pid, char *eid, char *gid)
+static int
+nodeidtoexp(tmcdreq_t *reqp)
 {
 	MYSQL_RES	*res;
 	MYSQL_ROW	row;
 
-	res = mydb_query("select r.pid,r.eid,e.gid from reserved as r "
+	res = mydb_query(reqp, "select r.pid,r.eid,e.gid from reserved as r "
 			 "left join experiments as e on "
 			 "     e.pid=r.pid and e.eid=r.eid "
 			 "where node_id='%s'",
-			 3, nodeid);
+			 3, reqp->nodeid);
 	if (!res) {
-		error("nodeidtoexp: %s: DB Error getting reserved!\n", nodeid);
+		error("nodeidtoexp: %s: DB Error getting reserved!\n", reqp->nodeid);
 		return 1;
 	}
 
@@ -6238,20 +6228,20 @@ nodeidtoexp(char *nodeid, char *pid, char *eid, char *gid)
 	}
 	row = mysql_fetch_row(res);
 	mysql_free_result(res);
-	strncpy(pid, row[0], TBDB_FLEN_PID);
-	strncpy(eid, row[1], TBDB_FLEN_EID);
+	strncpy(reqp->pid, row[0], TBDB_FLEN_PID);
+	strncpy(reqp->eid, row[1], TBDB_FLEN_EID);
 
 	/*
 	 * If there is no gid (yes, thats bad and a mistake), then copy
 	 * the pid in. Also warn.
 	 */
 	if (row[2]) {
-		strncpy(gid, row[2], TBDB_FLEN_GID);
+		strncpy(reqp->gid, row[2], TBDB_FLEN_GID);
 	}
 	else {
-		strcpy(gid, pid);
+		strcpy(reqp->gid, reqp->pid);
 		error("nodeidtoexp: %s: No GID for %s/%s (pid/eid)!\n",
-		      nodeid, pid, eid);
+		      reqp->nodeid, reqp->pid, reqp->eid);
 	}
 
 	return 0;
@@ -6261,12 +6251,12 @@ nodeidtoexp(char *nodeid, char *pid, char *eid, char *gid)
  * Check private key. 
  */
 int
-checkprivkey(struct in_addr ipaddr, char *privkey)
+checkprivkey(tmcdreq_t *reqp, struct in_addr ipaddr, char *privkey)
 {
 	MYSQL_RES	*res;
 	MYSQL_ROW	row;
 
-	res = mydb_query("select privkey from widearea_privkeys "
+	res = mydb_query(reqp, "select privkey from widearea_privkeys "
 			 "where IP='%s'",
 			 1, inet_ntoa(ipaddr));
 	
@@ -6298,58 +6288,59 @@ checkdbredirect(tmcdreq_t *reqp)
 		return 0; /* XXX Ryan shouldn't this be 1, not 0? */
 
 	/* This changes the DB we talk to. */
-	strcpy(dbname, reqp->testdb);
+	strcpy(reqp->dbname, reqp->testdb);
 
 	/*
 	 * Okay, lets test to make sure that DB exists. If not, fall back
 	 * on the main DB. 
 	 */
-	if (nodeidtoexp(reqp->nodeid, reqp->pid, reqp->eid, reqp->gid)) {
+	if (nodeidtoexp(reqp)) {
 		error("CHECKDBREDIRECT: %s: %s DB does not exist\n",
-		      reqp->nodeid, dbname);
-		strcpy(dbname, DEFAULT_DBNAME);
+		      reqp->nodeid, reqp->dbname);
+		strcpy(reqp->dbname, DEFAULT_DBNAME);
 	}
 	return 0;
 }
 
 
-int tmcd_init(char *db, struct in_addr *ipaddr, int verbose_level, int debug_level)
+int tmcd_init(tmcdreq_t *reqp, struct in_addr *addr, char *db)
 {
 	FILE *fp;
 
-	debug = debug_level;
-	verbose = verbose_level;
+	memcpy(&reqp->myipaddr, addr, sizeof(&reqp->myipaddr));
 
 	/* Start with default DB */
-	strcpy(dbname, DEFAULT_DBNAME);
+	strcpy(reqp->dbname, DEFAULT_DBNAME);
 
 	if (db) {
-		strncpy(dbname, db, sizeof(dbname));
+		strncpy(reqp->dbname, db, sizeof(reqp->dbname));
 	}
 
-	memcpy(&myipaddr, ipaddr, sizeof(myipaddr));
+#ifdef EVENTSYS
+	reqp->event_handle = NULL;
+#endif
 
 	/*
 	 * Get FS's SFS hostid
 	 * XXX This approach is somewhat kludgy
 	 */
-	strcpy(fshostid, "");
+	strcpy(reqp->fshostid, "");
 	if (access(FSHOSTID,R_OK) == 0) {
 		fp = fopen(FSHOSTID, "r");
 		if (!fp) {
 			error("Failed to get FS's hostid");
 		}
 		else {
-			fgets(fshostid, HOSTID_SIZE, fp);
-			if (rindex(fshostid, '\n')) {
-				*rindex(fshostid, '\n') = 0;
-				if (debug) {
-				    info("fshostid: %s\n", fshostid);
+			fgets(reqp->fshostid, HOSTID_SIZE, fp);
+			if (rindex(reqp->fshostid, '\n')) {
+				*rindex(reqp->fshostid, '\n') = 0;
+				if (reqp->debug) {
+				    info("fshostid: %s\n", reqp->fshostid);
 				}
 			}
 			else {
 				error("fshostid from %s may be corrupt: %s",
-				      FSHOSTID, fshostid);
+				      FSHOSTID, reqp->fshostid);
 			}
 			fclose(fp);
 		}
