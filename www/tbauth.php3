@@ -381,7 +381,8 @@ function LoginStatus() {
     #
     # Now add in the modifiers.
     #
-    if ($expired)
+    # Do not expire passwords for admin users.
+    if ($expired && !$admin)
 	$CHECKLOGIN_STATUS |= CHECKLOGIN_PSWDEXPIRED;
     if ($admin)
 	$CHECKLOGIN_STATUS |= CHECKLOGIN_ISADMIN;
