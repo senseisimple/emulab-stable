@@ -16,10 +16,12 @@ else
     exit 1
 fi
 
+if [ -n "$2" ]; then host=$2; else host=www.emulab.net ; fi
+
 if [ ! -d $1/tg2.0/src ]; then
-    echo "Downloading tg2.0 source from www.emulab.net to $1 ..."
+    echo "Downloading tg2.0 source from $host to $1 ..."
     cd $1
-    $fetch http://www.emulab.net/tg2.0.tar.gz
+    $fetch http://$host/tg2.0.tar.gz
     if [ $? -ne 0 ]; then
          echo "Failed..."
          echo "Downloading tg2.0 source from www.postel.org to $1 ..."

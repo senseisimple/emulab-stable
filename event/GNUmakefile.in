@@ -29,7 +29,7 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 # makefile work if it unpacks the tarball itself
 #
 trafgen-fetch:
-	$(SRCDIR)/trafgen/tg-install $(SRCDIR)/trafgen
+	$(SRCDIR)/trafgen/tg-install $(SRCDIR)/trafgen "@OUTERBOSS_NODENAME@"
 
 etc-subdir:
 	@$(MAKE) -C etc all
