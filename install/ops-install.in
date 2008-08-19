@@ -363,10 +363,11 @@ Phase "ports", "Installing ports", sub {
 	}
 	# XXX Also temporary
 	Phase "pubsub", "Installing pubsub package", sub {
-	    if (!ExecQuiet("$PKG_INFO -x pubsub")) {
-		PhaseSkip("pubsub already installed");
+	    my $pspkg = $ELVIN_COMPAT ? "pubsub-elvincompat" : "pubsub";
+	    if (!ExecQuiet("$PKG_INFO -x $pspkg")) {
+		PhaseSkip("$pspkg already installed");
 	    }
-	    my $pname = GetPackage("pubsub", $packagedir);
+	    my $pname = GetPackage($pspkg, $packagedir);
 	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
 	};
 	# XXX Ditto
@@ -1021,6 +1022,9 @@ Phase "apache", "Installing apache config file", sub {
     ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/apache control-install");
 };
 Phase "wikidocs", "Installing wikidocs redirect", sub {
+    PhaseSkip("wikidocs not supported on ops")
+	if ($FBSD_MAJOR == 4);
+
     DoneIfExists("$WWWDIR/wikidocs/.htaccess");
 
     if (! -e "$WWWDIR/wikidocs") {

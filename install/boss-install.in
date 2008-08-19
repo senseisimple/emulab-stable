@@ -50,6 +50,7 @@ my $GROUPROOT   = "@GROUPSROOT_DIR@";
 my $USERROOT    = "@USERSROOT_DIR@";
 my $SCRATCHROOT	= "@SCRATCHROOT_DIR@";
 my $SHAREROOT	= "@SHAREROOT_DIR@";
+my $ELVIN_COMPAT= @ELVIN_COMPAT@;
 
 #
 # Some programs we use
@@ -452,10 +453,11 @@ Phase "ports", "Installing ports", sub {
 	    };
 	    # XXX Also temporary
 	    Phase "pubsub", "Installing pubsub package", sub {
-		if (!ExecQuiet("$PKG_INFO -x pubsub")) {
-		    PhaseSkip("pubsub already installed");
+		my $pspkg = $ELVIN_COMPAT ? "pubsub-elvincompat" : "pubsub";
+		if (!ExecQuiet("$PKG_INFO -x $pspkg")) {
+		    PhaseSkip("$pspkg already installed");
 		}
-		my $pname = GetPackage("pubsub", $packagedir);
+		my $pname = GetPackage($pspkg, $packagedir);
 		ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
 	    };
 	    # XXX Ditto
