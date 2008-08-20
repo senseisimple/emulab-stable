@@ -14,7 +14,7 @@
 # The easy way: do 'gmake all'
 # You can also run the individual targets too.
 
-all: db-create db-fill sitevars
+all: db-create db-fill sitevars old-db-create
 
 db-create:
 	@rm -f ./.tmp-db-create.sql ./.tmp-create-diff
@@ -27,6 +27,13 @@ db-create:
 		mv ./.tmp-db-create.sql ./database-create.sql; \
 	fi
 	@rm -f ./.tmp-create-diff ./.tmp-db-create.sql
+
+old-db-create:
+	cp ./database-create.sql ./.tmp-db-create.sql
+	sed -i '' -e 's/ENGINE=MyISAM DEFAULT CHARSET=latin1/TYPE=MyISAM/' ./.tmp-db-create.sql
+	sed -i '' -e 's/ default CURRENT_TIMESTAMP on update CURRENT_TIMESTAMP//' ./.tmp-db-create.sql
+	mv ./.tmp-db-create.sql ./database-create-old.sql
+	@rm -f ./.tmp-db-create.sql
 
 db-fill:
 	@/usr/testbed/sbin/wap /usr/testbed/sbin/export_tables \

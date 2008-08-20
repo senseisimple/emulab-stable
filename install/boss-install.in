@@ -261,6 +261,14 @@ if ($FBSD_MAJOR > 4) {
 my $PHP4_PORT = "php4-extensions-1.0";
 
 #
+# XXX keep 4.x ElabInElab install limping along...
+#
+if ($FBSD_MAJOR == 4) {
+    $SCP_INIT = "/usr/bin/scp -oProtocol=1";
+    $SCP =      "/usr/bin/scp -oProtocol=2";
+}
+
+#
 # Figure out which directory we live in, so that some stages can do thing
 # relative to it.
 #
@@ -490,6 +498,17 @@ Phase "ports", "Installing ports", sub {
 		    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $P5GD_PKG");
 		};
 
+	    }
+	}
+	else {
+	    # XXX Also temporary
+	    Phase "pubsub", "Installing pubsub package", sub {
+		my $pspkg = $ELVIN_COMPAT ? "pubsub-elvincompat" : "pubsub";
+		if (!ExecQuiet("$PKG_INFO -x $pspkg")) {
+		    PhaseSkip("$pspkg already installed");
+		}
+		my $pname = GetPackage($pspkg, $packagedir);
+		ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
 	    }
 	}
     };
@@ -799,6 +818,9 @@ Phase "database", "Setting up database", sub {
 	if (!ExecQuiet("$MYSQLDUMP -d $DBNAME users")) {
 	    PhaseSkip("Tables have already been created");
 	}
+	if ($FBSD_MAJOR == 4) {
+	    ExecQuietFatal("cp $TOP_SRCDIR/sql/database-create-old.sql $TOP_SRCDIR/sql/database-create.sql")
+	    }
 	ExecQuietFatal("$MYSQL $DBNAME < $TOP_SRCDIR/sql/database-create.sql");
     };
     Phase "dbdata", "Filling tables with initial data", sub {
