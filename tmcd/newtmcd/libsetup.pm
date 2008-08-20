@@ -10,7 +10,7 @@
 #
 # Common routines and constants for the client bootime setup stuff.
 #
-package libnewsetup;
+package libsetup;
 use Exporter;
 @ISA = "Exporter";
 @EXPORT =
@@ -40,7 +40,7 @@ use Exporter;
 use English;
 
 # The tmcc library.
-use libnewtmcc;
+use libtmcc;
 
 #
 # This is the VERSION. We send it through to tmcd so it knows what version
@@ -49,13 +49,13 @@ use libnewtmcc;
 # BE SURE TO BUMP THIS AS INCOMPATIBILE CHANGES TO TMCD ARE MADE!
 #
 sub TMCD_VERSION()	{ 29; };
-libnewtmcc::configtmcc("version", TMCD_VERSION());
+libtmcc::configtmcc("version", TMCD_VERSION());
 
 # Control tmcc timeout.
-sub libsetup_settimeout($) { libnewtmcc::configtmcc("timeout", $_[0]); };
+sub libsetup_settimeout($) { libtmcc::configtmcc("timeout", $_[0]); };
 
 # Refresh tmcc cache.
-sub libsetup_refresh()	   { libnewtmcc::tmccgetconfig(); };
+sub libsetup_refresh()	   { libtmcc::tmccgetconfig(); };
 
 #
 # For virtual (multiplexed nodes). If defined, tack onto tmcc command.
@@ -75,7 +75,7 @@ sub libsetup_setvnodeid($)
     }
 
     $vnodeid = $vid;
-    libnewtmcc::configtmcc("subnode", $vnodeid);
+    libtmcc::configtmcc("subnode", $vnodeid);
 }
 sub libsetup_getvnodeid()
 {
@@ -289,7 +289,7 @@ sub CONTROL()	{ if (-e "$ETCDIR/isctrl") { return 1; } else { return 0; } }
 #
 # Same for a Windows (CygWinXP) node.
 #
-# XXX  If you change this, look in libnewtmcc::tmccgetconfig() as well.
+# XXX  If you change this, look in libtmcc::tmccgetconfig() as well.
 sub WINDOWS()	{ if (-e "$ETCDIR/iscygwin") { return 1; } else { return 0; } }
 
 #
@@ -1320,7 +1320,7 @@ sub bootsetup()
 {
     my $oldpid;
 
-    # Tell libnewtmcc to forget anything it knows.
+    # Tell libtmcc to forget anything it knows.
     tmccclrconfig();
     
     #
@@ -1371,7 +1371,7 @@ sub bootsetup()
     }
 
     #
-    # Tell libnewtmcc to get the full config. Note that this must happen
+    # Tell libtmcc to get the full config. Note that this must happen
     # AFTER initsfs() right above, since that changes what tmcd
     # is going to tell us.
     #
@@ -1535,7 +1535,7 @@ sub vnodejailsetup($)
     }
 
     #
-    # Tell libnewtmcc to get the full config for the jail. At the moment
+    # Tell libtmcc to get the full config for the jail. At the moment
     # we do not use SFS inside jails, so okay to do this now (usually
     # have to call initsfs() first). The full config will be copied
     # to the proper location inside the jail by mkjail.
@@ -1556,7 +1556,7 @@ sub vnodejailsetup($)
 #
 sub plabsetup()
 {
-    # Tell libnewtmcc to forget anything it knows.
+    # Tell libtmcc to forget anything it knows.
     tmccclrconfig();
     
     #
@@ -1577,7 +1577,7 @@ sub plabsetup()
     initsfs();
 
     #
-    # Tell libnewtmcc to get the full config. Note that this must happen
+    # Tell libtmcc to get the full config. Note that this must happen
     # AFTER initsfs() right above, since that changes what tmcd
     # is going to tell us.
     #

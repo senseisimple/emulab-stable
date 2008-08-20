@@ -11,7 +11,7 @@
 #
 # TODO: Proxy path in a jail. 
 # 
-package libnewtmcc;
+package libtmcc;
 use Exporter;
 use Data::Dumper;
 @ISA    = "Exporter";
@@ -407,10 +407,11 @@ sub runtmcc ($;$$%)
     if (!defined($args)) {
 	$args = "";
     }
-    my $string = "$TMCCBIN $options $cmd $args";
+    my $string = "$TMCCBIN -i $options $cmd $args";
     if ($debug) {
 	print STDERR "$string\n";
     }
+
 
     #
     # Special case. If the proxy option is given, exec and forget.
@@ -439,22 +440,17 @@ sub runtmcc ($;$$%)
 
     if ($cmd eq lc('bossinfo')) {
     	$xml =~ /^(\S+)\s+(\S+).*$/;
-	$config = { BOSSINFO => { BOSSNAME => $1, BOSSIP => $2 } };
-    }
-    else {
-    	$config = parse_config($xml);
+	$xml =  "<?xml version=\"1.0\"?>\n";
+	$xml .= "<tmcd>\n";
+	$xml .= "\t<bossinfo>\n";
+	$xml .= "\t\t<key name=\"bossname\">$1</key>\n";
+	$xml .= "\t\t<key name=\"bossip\">$2</key>\n";
+	$xml .= "\t</bossinfo>\n";
+	$xml .= "</tmcd>\n";
     }
 
     if (defined $results) {
-    	if ($config && $cmd !~ /^fullconfig$/i) {
-	    my $data = $$config{uc $cmd};
-	    if ($data) {
-    	    	%$results = %{$data};
-	    }
-    	}
-	elsif ($config) {
-	    %$results = %$config;
-	}
+	$$results = $xml;
     }
     return 0;
 }
@@ -542,16 +538,15 @@ sub tmcc ($;$$%)
 
 	if ($xml) {
 		my $config = parse_config($xml);
-		    if ($config && exists($$config{$tag})) {
+		    if ($config && exists($$config{uc $tag})) {
 			#
 			# If we can get it, great! Otherwise go to tmcd.
 			#
-			%$results = %$config if (defined($results));
+			%$results = %{$$config{uc $tag}} if (defined($results));
 			return 0;
 		    }
 	}
     }
-
     #
     # If proxypath was not specified, check for a proxypath file,
     # unless they explicilty specified not to use a proxy.
@@ -571,7 +566,22 @@ sub tmcc ($;$$%)
 	    die("Bad data in tmccproxy path: $ppath");
 	}
     }
-    return(runtmcc($cmd, $args, $results, %opthash));
+
+    my $xml;
+    if (runtmcc($cmd, $args, \$xml, %opthash) < 0) {
+    	return -1;
+    }
+
+    my $config_data = parse_config($xml);
+    if ($config_data && $cmd !~ /^fullconfig$/i) {
+    	$config_data = $$config_data{uc $cmd};
+    }
+
+    if (defined $results && ref $config_data eq 'HASH') {
+    	%$results = %$config_data;
+    }
+
+    return 0;
 }
 
 #
@@ -678,7 +688,7 @@ sub tmccgetconfig()
 
     my $ipodinfo;
     # Hack to make sure ipodinfo is not world-readable
-    if ($xml =~ /^(.*)(<\s*ipodinfo[^>]*>.*<\s*\/ipodinfo\s*>)(.*)$/im) {
+    if ($xml =~ /^(.*)(<\s*ipodinfo[^>]*>.*<\s*\/ipodinfo\s*>)(.*)$/sim) {
     	$xml = $1 . $3;
 	$ipodinfo = $2;
     }
