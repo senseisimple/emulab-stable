@@ -494,7 +494,7 @@ elsif ($fakevnode) {
 	}
 	undef($jailpid);
 	$cleanupstate = "TBFAILED";
-	fatal("Jail exited unexpectedly!");
+	fatal("Fake jail exited unexpectedly!");
     }
     else {
 	exec("$BINDIR/rc/rc.fakejail -j $vnodeid");

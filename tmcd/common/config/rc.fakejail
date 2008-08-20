@@ -161,9 +161,9 @@ sub doboot()
     TBDebugTimeStamp("rc.injail running config scripts");
     print("Running config scripts\n");
     
-    system("$RCDIR/rc.config");
+    system("$RCDIR/rc.config -j $vnodeid");
     if ($?) {
-	BootFatal("Could not start program agent for $vnodeid");
+	BootFatal("Could not run rc.config for $vnodeid");
     }
 
     TBDebugTimeStamp("rc.nojail done running config scripts");

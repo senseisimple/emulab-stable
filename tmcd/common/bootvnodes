@@ -319,7 +319,7 @@ sub bootvnode($$$)
     }
     $opt .= ($jailed ? " -jVt" : " -i");
     
-    print "$act vnode $vnode ...\n";
+    print "$act vnode $vnode with options '$opt' ...\n";
     system("vnodesetup $opt $vnode");
     return($?);
 }
