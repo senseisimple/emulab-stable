@@ -1,0 +1,21 @@
+Instructions for patching your 6.3-RELEASE based system to 6.3-RELEASE-p3.
+This assumes that you are running a 6.3-RELEASE kernel and binaries and
+have a /usr/src tree that came straight off of the release CD.
+
+Do the following as root:
+
+	cp FreeBSD-6.3.patch /tmp
+	cd /usr
+	patch -p1 < /tmp/FreeBSD-6.3.patch
+	cd /usr/src/secure/lib/libssh
+	make obj && make depend && make && make install
+	cd /usr/src/secure/usr.sbin/sshd
+	make obj && make depend && make && make install
+	cd /usr/src/lib/bind
+	make obj && make depend && make && make install
+	cd /usr/src/usr.sbin/named
+	make obj && make depend && make && make install
+	cd /usr/src
+	make buildkernel KERNCONF=GENERIC
+	make installkernel KERNCONF=GENERIC
+	shutdown -r now
