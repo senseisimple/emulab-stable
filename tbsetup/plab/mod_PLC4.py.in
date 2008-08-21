@@ -72,8 +72,10 @@ class NM4agent:
 
     def _open(self):
         if not self._isopen:
-            print "connecting to NM over ssh with command '%s'" % \
-                  (DEF_NM_SSHCMD % (self.delacct,self.delkey,self.IP),)
+            if debug:
+                print "connecting to NM over ssh with command '%s'" % \
+                      (DEF_NM_SSHCMD % (self.delacct,self.delkey,self.IP),)
+                pass
             try:
                 self.__agentconn = popen2.Popen3(DEF_NM_SSHCMD % (self.delacct,
                                                                   self.delkey,
@@ -170,6 +172,7 @@ class NM4agent:
             rtries -= 1
             try:
                 retval = self._xcall('Create',(slice_name,))
+                retval = self._xcall('Start',(slice_name,))
                 success = True
             except:
                 if rtries == 0:
