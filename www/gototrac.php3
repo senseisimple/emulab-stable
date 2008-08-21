@@ -61,7 +61,7 @@ elseif ($wiki != "emulab") {
 else {
     $TRACURL    = "https://${USERNODE}/trac/$wiki";
     $COOKIENAME = "trac_auth_${wiki}";
-    if (ISADMINISTRATOR()) {
+    if (ISADMINISTRATOR() || STUDLY()) {
 	$priv = 1;
     }
 }
