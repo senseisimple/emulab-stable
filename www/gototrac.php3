@@ -34,6 +34,14 @@ if (!isset($wiki)) {
 if (!isset($login)) {
     $login = 0;
 }
+$priv = 0;
+
+if ($wiki == "protogeni-priv") {
+    $wiki = "protogeni";
+}
+elseif ($wiki == "emulab-priv") {
+    $wiki = "emulab";
+}
 
 if ($wiki == "geni" || $wiki == "protogeni") {
     $geniproject = Project::Lookup("geni");
@@ -42,9 +50,10 @@ if ($wiki == "geni" || $wiki == "protogeni") {
 	   $geniproject->IsMember($this_user, $approved) && $approved)) {
 	USERERROR("You do not have permission to access the Trac wiki!", 1);
     }
-    $wiki    = "protogeni";
+    $priv       = 1;
+    $wiki       = "protogeni";
     $TRACURL    = "https://www.protogeni.net/trac/$wiki";
-    $COOKIENAME = "trac_auth_protogeni_priv";
+    $COOKIENAME = "trac_auth_protogeni";
 }
 elseif ($wiki != "emulab") {
     USERERROR("Unknown Trac wiki $wiki!", 1);
@@ -52,6 +61,9 @@ elseif ($wiki != "emulab") {
 else {
     $TRACURL    = "https://${USERNODE}/trac/$wiki";
     $COOKIENAME = "trac_auth_${wiki}";
+    if (ISADMINISTRATOR()) {
+	$priv = 1;
+    }
 }
 
 #
@@ -67,10 +79,13 @@ if (!$login && isset($_COOKIE[$COOKIENAME])) {
     return;
 }
 
+# Login to private part of wiki.
+$privopt = ($priv ? "-p" : "");
+
 #
 # Do the xlogin, which gives us back a hash to stick in the cookie.
 #
-SUEXEC($uid, "nobody", "tracxlogin -w " . escapeshellarg($wiki) .
+SUEXEC($uid, "nobody", "tracxlogin $privopt -w " . escapeshellarg($wiki) .
        " $uid " . $_SERVER['REMOTE_ADDR'], SUEXEC_ACTION_DIE);
 
 if (!preg_match("/^(\w*)$/", $suexec_output, $matches)) {
@@ -79,7 +94,10 @@ if (!preg_match("/^(\w*)$/", $suexec_output, $matches)) {
 $hash = $matches[1];
 
 setcookie($COOKIENAME, $hash, 0, "/", $TBAUTHDOMAIN, $TBSECURECOOKIES);
-
+if ($priv) {
+    setcookie($COOKIENAME . "_priv",
+	      $hash, 0, "/", $TBAUTHDOMAIN, $TBSECURECOOKIES);
+}
 header("Location: ${TRACURL}/xlogin?user=$uid&hash=$hash" .
        (isset($do) ? "&goto=${do}" : ""));
 

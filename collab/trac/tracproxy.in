@@ -15,7 +15,7 @@ sub usage()
 {
     print "Usage: tracproxy adduser <uid> or\n";
     print "       tracproxy deluser <uid> or\n";
-    print "       tracproxy xlogin  <uid> or\n";
+    print "       tracproxy xlogin [-p] <uid> or\n";
     exit(-1);
 }
 my $optlist = "dw:";
@@ -277,9 +277,15 @@ sub DelUser(@)
 #
 sub xLogin(@)
 {
+    my $priv = 0;
+    
     usage()
-	if (@_ != 2);
+	if (@_ < 2 || @_ > 3);
 
+    if ($_[0] eq "-p") {
+	$priv = 1;
+	shift(@_);
+    }
     my ($user, $IP) = @_;
     my $hash = TBGenSecretKey();
 
@@ -305,9 +311,10 @@ sub xLogin(@)
 		 "  value='${user}\@${OURDOMAIN}'");
 
     # Wow, what a HACK!
-    if ($wiki eq "protogeni") {
+    if ($priv) {
+	$priv = 0;
 	TBDBDisconnect();
-	$wiki = "protogeni-priv";
+	$wiki = "${wiki}-priv";
 	$dbname = $dbname . "+priv";
 	goto again;
     }
