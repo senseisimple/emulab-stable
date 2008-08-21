@@ -372,7 +372,7 @@ def TBSetNodeLogEntry(node, dbuid, etype, message):
     if not TBValidNodeName(node) or not TBValidNodeLogType(etype):
 	return 0
     idx = TBMapUIDtoIDX(dbuid)
-    print "DEBUG: idx = %s" % str(idx)
+
     if type(idx) == tuple:
         idx = idx[0]
         pass
