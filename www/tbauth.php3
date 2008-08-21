@@ -991,6 +991,8 @@ function DOLOGIN_MAGIC($uid, $uid_idx, $email = null, $adminon = 0)
 	    
 	setcookie("trac_auth_emulab", "", $flushtime, "/",
 		  $TBAUTHDOMAIN, $TBSECURECOOKIES);
+	setcookie("trac_auth_emulab_priv", "", $flushtime, "/",
+		  $TBAUTHDOMAIN, $TBSECURECOOKIES);
 	setcookie("trac_auth_protogeni", "", $flushtime, "/",
 		  $TBAUTHDOMAIN, $TBSECURECOOKIES);
 	setcookie("trac_auth_protogeni_priv", "", $flushtime, "/",
@@ -1094,6 +1096,8 @@ function DOLOGOUT($user) {
 
     if ($TRACSUPPORT) {
 	setcookie("trac_auth_emulab", "", $timeout, "/",
+		  $TBAUTHDOMAIN, 0);
+	setcookie("trac_auth_emulab_priv", "", $timeout, "/",
 		  $TBAUTHDOMAIN, 0);
 	setcookie("trac_auth_protogeni", "", $timeout, "/",
 		  $TBAUTHDOMAIN, 0);
