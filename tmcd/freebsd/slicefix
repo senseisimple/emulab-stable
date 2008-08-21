@@ -226,6 +226,16 @@ dofreebsd() {
 	    esac
 	fi
 
+        # check to see if we need to download any postconfig scripts:
+	doosconfig=0
+	if [ -x $BINDIR/osconfig ]; then
+	    $BINDIR/osconfig -c -m /mnt -D $rootdev -s FreeBSD postload
+	    if [ $? -eq 0 ]; then
+		doosconfig=1
+		fixit=1
+	    fi
+	fi
+
 	if [ $fixit -eq 0 ]; then
 		echo "  no changes necessary"
 		umount $rootdev
@@ -320,6 +330,11 @@ EOF1
 hw.bge.allow_asf=1
 EOF2
 	    fi
+	fi
+
+	# actually run any postconfig scripts if we're supposed to:
+	if [ $doosconfig -eq 1 -a -x $BINDIR/osconfig ]; then
+	    $BINDIR/osconfig -m /mnt -D $rootdev -s FreeBSD postload
 	fi
 
 	umount $rootdev
@@ -475,6 +490,13 @@ dolinux() {
 	if [ -f /mnt/var/lib/random-seed -a -c /dev/urandom ]; then
 	    echo "  updating /var/lib/random-seed"
 	    dd if=/dev/urandom of=/mnt/var/lib/random-seed bs=512 count=1 >/dev/null 2>&1
+	fi
+
+	# run any postconfig scripts:
+	if [ -x $BINDIR/osconfig ]; then
+	    echo "Checking for dynamic client-side updates to slice...";
+	    $BINDIR/osconfig -m /mnt -M '-t ext2fs' -f ext2fs \
+		-D $rootdev -s Linux postload
 	fi
 
 	umount $rootdev

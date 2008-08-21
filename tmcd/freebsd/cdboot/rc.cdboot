@@ -26,6 +26,8 @@ my $optlist    = "";
 my $action     = "boot";
 my $debug      = 1;
 
+my $cmdline    = "$0 " . join(" ",@ARGV);
+
 # Turn off line buffering on output
 $| = 1;
 
@@ -220,6 +222,15 @@ sub doboot()
 	print("Setting up Ping of Death\n");
 	system("$RCDIR/rc.ipod");
 	# This is allowed to fail; ipod might not be supported.
+    }
+
+    if (-x "$BINDIR/osconfig" && 
+	(!defined($ENV{"ELAB_UPD_DONE"}) || !$ENV{"ELAB_UPD_DONE"})) {
+	if (!system("$BINDIR/osconfig premfs")) {
+	    # success -- must set our marker and exec this script
+	    $ENV{"ELAB_UPD_DONE"} = 1;
+	    exec($cmdline);
+	}
     }
 
     # Will not return until it gets something it likes.
