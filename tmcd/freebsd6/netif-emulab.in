@@ -156,11 +156,17 @@ cnet_start()
 		fi
 
 		# set hostname
-		hostname "$WA_HOSTNAME"
+		hosts_str="$WA_HOSTNAME"
+                echo "$WA_HOSTNAME" | grep -q \\.
+                if [ $? = 0 ]; then
+                        hostname "$WA_HOSTNAME"
+                else
+                        hostname "${WA_HOSTNAME}.${WA_DOMAIN}"
+			hosts_str="${WA_HOSTNAME}.${WA_DOMAIN} ${hosts_str}"
+                fi
 
 		# setup hosts file
-		echo "$WA_IP_ADDR ${WA_HOSTNAME}.${WA_DOMAIN} $WA_HOSTNAME" >> \
-		     /etc/hosts
+		echo "$WA_IP_ADDR ${hosts_str}" >> /etc/hosts
 
 		# setup a few necessary emulab files...
 		echo "$cnetif" > $ELAB_BOOTDIR/controlif
