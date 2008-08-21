@@ -221,12 +221,14 @@ sub doplabconfig()
     # XXX: need to actually use the slice name, but we don't really have
     #      it stored anywhere yet.
     print "Fixing up the passwd file.\n";
+    my $slicename = `cat /etc/slicename`;
+    chomp($slicename);
     my $sliceuserent = "";
     open(PWD, "< $PWDFILE") or
         fatal("Can't open password file for reading!");
     while (my $pwln = <PWD>) {
         chomp($pwln);
-        if ($pwln =~ /^utah_/) {
+        if ($pwln =~ /^$slicename/) {
             my @pwdfields = split /:/, $pwln;
             $pwdfields[1] = "*";
             $sliceuserent = join(":", @pwdfields);
