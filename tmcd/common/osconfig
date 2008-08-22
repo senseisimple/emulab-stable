@@ -275,7 +275,7 @@ sub doUpdate($$$) {
     $urlargs{"env"} = "$env";
     # note that we always take this from the / root, not the slice /
     if (REMOTE() && !defined($urlargs{"privkey"})) {
-	$urlargs{"privkey"} = `cat /etc/emulab/privkey`;
+	$urlargs{"privkey"} = `cat /etc/emulab/emulab-privkey`;
 	chomp($urlargs{"privkey"});
     }
     if ($check) {
