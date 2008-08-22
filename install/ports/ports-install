@@ -9,6 +9,7 @@ PORTSUBDIR=misc
 SRCDIR=`dirname $0`
 PORTS="elvind emulab-boss emulab-fs emulab-ops libelvin emulab-tftp-hpa p5-GD-old p5-DBD-mysql50-old ulsshxmlrpcpp emulab-iperf emulab-php4 emulab-mailman emulab-pubsub emulab-pubsub-elvincompat"
 
+echo "Copying ports ..."
 for PORT in $PORTS
 do
     cp -r $SRCDIR/$PORT $PORTSDIR/$PORTSUBDIR
@@ -18,4 +19,14 @@ do
     fi
 done
 
+# "register" the emulab ports
+echo "Patching $PORTSDIR/$PORTSSUBDIR/Makefile ..."
+patch -p0 $PORTSDIR/$PORTSSUBDIR/Makefile ports.patch
+
+## recreate the index
+#echo "Recreating ports INDEX (this will take forever) ..."
+#cd $PORTSDIR
+#make index
+
+echo "Done!"
 exit 0

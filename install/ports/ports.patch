@@ -1,0 +1,28 @@
+Index: Makefile
+===================================================================
+RCS file: /share/freebsd/CVS/ports/misc/Makefile,v
+retrieving revision 1.866
+diff -u -r1.866 Makefile
+--- Makefile	29 Oct 2007 23:47:35 -0000	1.866
++++ Makefile	21 Aug 2008 20:47:38 -0000
+@@ -514,5 +514,20 @@
+     SUBDIR += ytree
+     SUBDIR += zaptel
+     SUBDIR += zoneinfo
++# Emulab ports	
++    SUBDIR += elvind
++    SUBDIR += emulab-boss
++    SUBDIR += emulab-fs
++    SUBDIR += emulab-ops
++    SUBDIR += libelvin
++    SUBDIR += emulab-tftp-hpa
++    SUBDIR += p5-GD-old
++    SUBDIR += p5-DBD-mysql50-old
++    SUBDIR += ulsshxmlrpcpp
++    SUBDIR += emulab-iperf
++    SUBDIR += emulab-php4
++    SUBDIR += emulab-mailman
++    SUBDIR += emulab-pubsub
++    SUBDIR += emulab-pubsub-elvincompat
+ 
+ .include <bsd.port.subdir.mk>
