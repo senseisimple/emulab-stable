@@ -62,6 +62,16 @@ sub AddAuthority($$$$)
 }
 
 if (1) {
+    #
+    # On real boss.
+    #
+    $type     = "sa";
+    $url      = "https://www.emulab.net/protogeni/xmlrpc/sa";
+    $hrn      = "sa.emulab.net";
+    $filename = "@prefix@/etc/genisa.pem";
+    AddAuthority($type, $url, $hrn, $filename);
+}
+else {
     $type     = "sa";
     $url      = "https://myboss.myelab.testbed.emulab.net/protogeni/xmlrpc/sa";
     $hrn      = "sa.myelab.testbed.emulab.net";

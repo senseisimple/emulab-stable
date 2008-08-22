@@ -168,7 +168,7 @@ sub LookupByResource($$)
 	if (! ($uuid =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/));
 
     my $query_result =
-	DBQueryWarn("select component_idx from geni_resources ".
+	DBQueryWarn("select component_uuid from geni_resources ".
 		    "where resource_uuid='$uuid'");
 	
     return undef
@@ -189,15 +189,15 @@ sub NewResource($$)
     return -1
 	if (! ref($self));
 
-    my $idx = TBGetUniqueIndex('next_resource', 1);
-    my $component_idx = $self->idx();
+    my $component_uuid = $self->uuid();
     $uuid = DBQuoteSpecial("$uuid");
 
     return -1
 	if (! DBQueryWarn("replace into geni_resources set ".
-			  "  idx=$idx, resource_uuid=$uuid, ".
+			  "  resource_uuid=$uuid, ".
 			  "  resource_type='node', ".
-			  "  created=now(), component_idx=$component_idx"));
+			  "  created=now(), ".
+			  "  component_uuid='$component_uuid'"));
 
     return 0;
 }
@@ -312,17 +312,12 @@ sub DiscoverResources($$$$$)
 #
 sub GetTicket($$$$$;$)
 {
-    my ($self, $slice, $rspec, $user, $credential, $vtopo) = @_;
-    my $rspec_xml = $rspec;
+    my ($self, $slice, $rspec_xml, $context, $credential, $vtopo) = @_;
 
     # Must be a real reference. 
     return undef
 	if (! ref($self));
 
-    # The rspec is passed as XML. If we get a ref, convert it.
-    if (ref($rspec_xml)) {
-	$rspec_xml = XMLout($rspec_xml, RootName => "rspec");
-    }
     my $args = { "credential"   => $credential->asString(),
 		 "impotent"     => $impotent,
 		 "rspec"        => $rspec_xml };
@@ -330,8 +325,7 @@ sub GetTicket($$$$$;$)
 	if (defined($vtopo));
 
     my $response = 				       
-	Genixmlrpc::CallMethodHTTP($self->url(),
-				   $user, "GetTicket", $args);
+	Genixmlrpc::CallMethod($self->url(), $context, "GetTicket", $args);
     
     return undef
 	if (!defined($response));
@@ -350,17 +344,17 @@ sub GetTicket($$$$$;$)
 #
 sub CreateSliver($$$$)
 {
-    my ($self, $slice, $ticket, $user) = @_;
+    my ($self, $slice, $ticket, $context) = @_;
 
     # Must be a real reference. 
     return undef
 	if (! ref($self));
 
     my $response =
-	Genixmlrpc::CallMethodHTTP($self->url(), $user,
-				   "RedeemTicket",
-				   { "ticket"    => $ticket->asString(),
-				     "impotent"  => $impotent });
+	Genixmlrpc::CallMethod($self->url(), $context,
+			       "RedeemTicket",
+			       { "ticket"    => $ticket->asString(),
+				 "impotent"  => $impotent });
     
     return undef
 	if (!defined($response));
@@ -377,8 +371,10 @@ sub CreateSliver($$$$)
 	return undef;
     }
 
-    my $sliver = GeniSliver->Create($slice, $user, undef, undef,
-				    $credential, $self);
+    my $sliver = GeniSliver::Client->Create($slice, $ticket->owner_uuid(),
+					    $ticket->rspec(),
+					    $credential, $self);
+
     if (!defined($sliver)) {
 	print STDERR "Could not create local sliver object.\n";
 	return undef;
@@ -391,7 +387,7 @@ sub CreateSliver($$$$)
 #
 sub DestroySliver($$$)
 {
-    my ($self, $sliver, $user) = @_;
+    my ($self, $sliver, $context) = @_;
 
     # Must be a real reference. 
     return -1
@@ -402,11 +398,10 @@ sub DestroySliver($$$)
 	if (!defined($credential));
     
     my $response =
-	Genixmlrpc::CallMethodHTTP($self->url(), $user,
-				   "DeleteSliver",
-				   { "impotent"    => $impotent,
-				     "credential"  =>
-					 $credential->asString() });
+	Genixmlrpc::CallMethod($self->url(), $context,
+			       "DeleteSliver",
+			       { "impotent"    => $impotent,
+				 "credential"  => $credential->asString() });
     
     if ($response->code() != GENIRESPONSE_SUCCESS) {
 	print STDERR "Could not destroy sliver $sliver\n";
@@ -420,7 +415,7 @@ sub DestroySliver($$$)
 #
 sub StartSliver($$$)
 {
-    my ($self, $sliver, $user) = @_;
+    my ($self, $sliver, $context) = @_;
 
     # Must be a real reference. 
     return -1
@@ -431,11 +426,10 @@ sub StartSliver($$$)
 	if (!defined($credential));
     
     my $response =
-	Genixmlrpc::CallMethodHTTP($self->url(), $user,
-				   "StartSliver",
-				   { "impotent"    => $impotent,
-				     "credential"  =>
-					 $credential->asString() });
+	Genixmlrpc::CallMethod($self->url(), $context,
+			       "StartSliver",
+			       { "impotent"    => $impotent,
+				 "credential"  => $credential->asString() });
     
     if ($response->code() != GENIRESPONSE_SUCCESS) {
 	print STDERR "Could not start sliver $sliver\n";

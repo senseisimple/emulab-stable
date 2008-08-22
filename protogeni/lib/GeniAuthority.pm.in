@@ -178,6 +178,8 @@ sub PrefixMatch($$)
 
     my $uuid_prefix = $self->uuid_prefix();
 
+    print "$uuid, $uuid_prefix, $self\n";
+
     if ($uuid =~ /^\w+\-\w+\-\w+\-\w+\-(\w+)$/) {
 	return 1
 	    if ("$uuid_prefix" eq "$1");

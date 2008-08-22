@@ -1,0 +1,112 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+
+use lib '@prefix@/lib';
+use Genixmlrpc;
+use GeniResponse;
+use GeniUser;
+use GeniCredential;
+use GeniComponent;
+use English;
+use Node;
+use Interface;
+use Data::Dumper;
+
+my $this_user = User->LookupByUnixId($UID);
+if (! defined($this_user)) {
+    print STDERR "You ($UID) do not exist!\n";
+    exit(-1);
+}
+
+#
+# The RPC context for this test script is mostly as an SA, with some
+# exceptions below.
+#
+Genixmlrpc->SetContext(Genixmlrpc->Context("@prefix@/etc/genisa.pem"));
+
+#
+# Create a Geni user from local user. 
+#
+my $geniuser = GeniUser->CreateFromLocal($this_user);
+if (!defined($geniuser)) {
+    die("Could not create a geni user from local user $this_user\n");
+}
+# Register at the ClearingHouse.
+$geniuser->Register() == 0
+    or die("Could not register $geniuser at the Geni ClearingHouse.\n");
+
+#
+# Need a credential to resolve a node.
+#
+my $credential = GeniCredential->Create($geniuser, $geniuser);
+if (!defined($credential)) {
+    die("Could not create credential from $geniuser\n");
+}
+if ($credential->Sign($GeniCredential::LOCALSA_FLAG)) {
+    die("Could not sign credential for $geniuser\n");
+}
+
+#
+# My RPC context.
+#
+my $context = Genixmlrpc->UserContext($this_user);
+
+#
+# Find the component by uuid.
+#
+my $component = GeniComponent->Lookup("45472678-5840-11dd-8eb3-001143e43770");
+if (!defined($component)) {
+    $component = GeniComponent->CreateFromRegistry("45472678-5840-".
+						   "11dd-8eb3-001143e43770");
+    if (!defined($component)) {
+	die("Could not create new component from registry\n");
+    }
+}
+
+my $response =
+    Genixmlrpc::CallMethod($component->url(),
+			   $context,
+			   "Resolve",
+			   { "credential"  => $credential->asString(),
+			     "hrn"         => "pc41",
+			     "type"        => "Node",
+			   });
+if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS) {
+    die("Could not look up resource\n");
+}
+my $value = $response->value();
+#print Dumper($response->value());
+
+my $nodeargs = { "uuid"  => $value->{'uuid'},
+		 "type"  => "pcfedphys",
+		 "role"  => "testnode",
+		 "vtype" => "pcfed" };
+
+my $node = Node->Create("pcfedphys1", undef, $nodeargs);
+if (!defined($node)) {
+    die("Could not create new node.\n");
+}
+
+# Just add the control network for now.
+foreach my $ref (@{ $value->{'interfaces'} }) {
+    if ($ref->{'role'} eq 'ctrl') {
+	my $ifaceargs = { "uuid"  => $ref->{'uuid'},
+			  "type"  => $ref->{'type'},
+			  "role"  => $ref->{'role'},
+			  "card"  => $ref->{'card'},
+			  "port"  => $ref->{'port'},
+			  "MAC"   => $ref->{'MAC'},
+			  "IP"    => $ref->{'IP'},
+			  "mask"  => $ref->{'mask'},
+		      };
+	print Dumper($ifaceargs);
+	Interface->Create($node, $ifaceargs);
+	last;
+    }
+}
+$component->NewResource($node->uuid());

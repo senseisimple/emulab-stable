@@ -28,6 +28,7 @@ use libtestbed;
 use Experiment;
 use Node;
 use English;
+use XML::Simple;
 use Data::Dumper;
 use File::Temp qw(tempfile);
 use overload ('""' => 'Stringify');
@@ -87,10 +88,17 @@ sub Lookup($$)
 
     my $self              = {};
     $self->{'SLIVER'}     = $query_result->fetchrow_hashref();
-    $self->{'COMPONENT'}  = undef;	# Client side.
-    $self->{'SLICE'}      = undef;	# Client side.
-    $self->{'CREDENTIAL'} = undef;	# Client side.
-    $self->{'AGGREGATE'}  = undef;	# server side.
+    $self->{'COMPONENT'}  = undef;	# client
+    $self->{'SLICE'}      = undef;	# client/server
+    $self->{'CREDENTIAL'} = undef;	# client
+    $self->{'AGGREGATE'}  = undef;	# server
+    $self->{'RSPEC'}      = undef;	# client/server
+
+    my $rspec_string = $self->{'SLIVER'}->{'rspec_string'};
+    if (defined($rspec_string) && $rspec_string ne "") {
+	$self->{'RSPEC'} = XMLin($rspec_string,
+				 ForceArray => ["node", "link"]);
+    }
 
     #
     # Grab the certificate, since we will probably want it.
@@ -135,10 +143,10 @@ sub Stringify($)
 # Create a sliver record in the DB. On the client side we save the credential
 # that allows control of it, for later operations.
 #
-sub Create($$$$;$$$)
+sub Create($$$$$;$$$)
 {
-    my ($class, $slice, $user, $resource_uuid, $resource_type,
-	$credential, $component) = @_;
+    my ($class, $slice, $owner_uuid, $resource_uuid, $resource_type,
+	$rspec, $credential, $component) = @_;
     my @insert_data = ();
     my $uuid;
     my $certificate;
@@ -168,7 +176,6 @@ sub Create($$$$;$$$)
 	$uuid = $certificate->uuid();
     }
     my $slice_uuid     = $slice->uuid();
-    my $owner_uuid     = $user->uuid();
 
     # Now tack on other stuff we need.
     push(@insert_data, "created=now()");
@@ -185,8 +192,15 @@ sub Create($$$$;$$$)
     push(@insert_data, "credential_idx=" . $credential->idx())
 	if (defined($credential));
     # Only on the client side.
-    push(@insert_data, "component_idx=" . $component->idx())
+    push(@insert_data, "component_uuid='" . $component->uuid() . "'")
 	if (defined($component));
+
+    if (defined($rspec)) {
+	my $rspec_string = XMLout($rspec, RootName => "rspec");
+	my $safe_rspec   = DBQuoteSpecial($rspec_string);
+
+	push(@insert_data, "rspec_string=$safe_rspec");
+    }
 
     # Insert into DB.
     if (!DBQueryWarn("insert into geni_slivers set " .
@@ -218,12 +232,13 @@ sub created($)		{ return field($_[0], "created"); }
 sub credential_idx($)	{ return field($_[0], "credential_idx"); }
 sub resource_uuid($)	{ return field($_[0], "resource_uuid"); }
 sub resource_type($)	{ return field($_[0], "resource_type"); }
-sub ticket_idx($)	{ return field($_[0], "ticket_idx"); }
-sub component_idx($)	{ return field($_[0], "component_idx"); }
-sub aggregate_idx($)	{ return field($_[0], "aggregate_idx"); }
+sub component_uuid($)	{ return field($_[0], "component_uuid"); }
+sub aggregate_uuid($)	{ return field($_[0], "aggregate_uuid"); }
+sub rspec_string($)     { return field($_[0], "rspec_string"); }
 sub status($)		{ return field($_[0], "status"); }
 sub cert($)		{ return $_[0]->{'CERTIFICATE'}->cert(); }
 sub GetCertificate($)   { return $_[0]->{'CERTIFICATE'}; }
+sub rspec($)            { return $_[0]->{'RSPEC'}; }
 
 #
 # Delete the sliver. The sliver should not be provisioned when this done.
@@ -258,15 +273,15 @@ sub SetAggregate($$)
     return -1
 	if (! (ref($self) && ref($aggregate)));
 
-    my $idx     = $self->idx();
-    my $agg_idx = $aggregate->idx();
+    my $idx      = $self->idx();
+    my $agg_uuid = $aggregate->uuid();
 
     return -1
 	if (!DBQueryWarn("update geni_slivers set ".
-			 "  aggregate_idx='$agg_idx' ".
+			 "  aggregate_uuid='$agg_uuid' ".
 			 "where idx='$idx'"));
     
-    $self->{'SLIVER'}->{'aggregate_idx'} = $agg_idx;
+    $self->{'SLIVER'}->{'aggregate_uuid'} = $agg_uuid;
     $self->{'AGGREGATE'} = $aggregate;
     return 0;
 }
@@ -283,9 +298,9 @@ sub GetAggregate($)
 
     return $self->{'AGGREGATE'} if (defined($self->{'AGGREGATE'}));
     return undef
-	if (!defined($self->aggregate_idx()));
+	if (!defined($self->aggregate_uuid()));
 
-    my $aggregate = GeniAggregate->Lookup($self->aggregate_idx());
+    my $aggregate = GeniAggregate->Lookup($self->aggregate_uuid());
     if (!defined($aggregate)) {
 	print STDERR "Could not get aggregate object associated with $self\n";
 	return undef;
@@ -365,11 +380,11 @@ sub GetComponent($)
 
     return $self->{'COMPONENT'} if (defined($self->{'COMPONENT'}));
 
-    if (!defined($self->component_idx())) {
+    if (!defined($self->component_uuid())) {
 	print STDERR "No component associated with $self\n";
 	return undef;
     }
-    my $component = GeniComponent->Lookup($self->component_idx());
+    my $component = GeniComponent->Lookup($self->component_uuid());
     if (!defined($component)) {
 	print STDERR "Could not get component object associated with $self\n";
 	return undef;
@@ -431,50 +446,6 @@ sub SliceSlivers($$$)
 }
 
 #
-# Client side method to contact the sliver component and destroy it.
-#
-sub Destroy($$)
-{
-    my ($self, $user) = @_;
-
-    return -1
-	if (! ref($self));
-
-    my $component = $self->GetComponent();
-    return -1
-	if (!defined($component));
-
-    return -1
-	if ($component->DestroySliver($self, $user) != 0);
-
-    # Delete the local object from the DB.
-    $self->Delete() == 0
-	or return -1;
-
-    return 0;
-}
-
-#
-# Client side method to contact the sliver component and start it.
-#
-sub Start($$)
-{
-    my ($self, $user) = @_;
-
-    return -1
-	if (! ref($self));
-
-    my $component = $self->GetComponent();
-    return -1
-	if (!defined($component));
-
-    return -1
-	if ($component->StartSliver($self, $user) != 0);
-
-    return 0;
-}
-
-#
 # Create a signed credential for this sliver, issued to the provided user.
 # The credential will grant all permissions for now.
 #
@@ -501,9 +472,9 @@ sub NewCredential($$)
 
 ############################################################################
 #
-# The server side methods are in packages which inherit from above.
+# The client side methods are in packages which inherit from above.
 #
-package GeniSliver::Node;
+package GeniSliver::Client;
 use vars qw(@ISA);
 @ISA = "GeniSliver";
 
@@ -517,9 +488,80 @@ use libdb qw(TBDB_ALLOCSTATE_RES_INIT_DIRTY);
 
 sub Create()
 {
-    my ($class, $slice, $user, $resource_uuid) = @_;
+    my ($class, $slice, $user_uuid, $rspec, $credential, $component) = @_;
 
-    return GeniSliver->Create($slice, $user, $resource_uuid, "Node");
+    return GeniSliver->Create($slice, $user_uuid,
+			      $credential->target_uuid(), "Client", $rspec,
+			      $credential, $component);
+}
+
+#
+# Client side method to contact the sliver component and start it.
+#
+sub Start($$)
+{
+    my ($self, $user) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $component = $self->GetComponent();
+    return -1
+	if (!defined($component));
+
+    return -1
+	if ($component->StartSliver($self, $user) != 0);
+
+    return 0;
+}
+
+#
+# Client side method to contact the sliver component and destroy it.
+#
+sub Destroy($$)
+{
+    my ($self, $user) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $component = $self->GetComponent();
+    return -1
+	if (!defined($component));
+
+    return -1
+	if ($component->DestroySliver($self, $user) != 0);
+
+    # Delete the local object from the DB.
+    $self->Delete() == 0
+	or return -1;
+
+    return 0;
+}
+
+############################################################################
+#
+# The server side methods are in packages which inherit from above.
+#
+package GeniSliver::Node;
+use vars qw(@ISA);
+@ISA = "GeniSliver";
+
+use GeniDB;
+use GeniComponent;
+use GeniSlice;
+use GeniCredential;
+use GeniCertificate;
+use GeniAggregate;
+use XML::Simple;
+use libdb qw(TBDB_ALLOCSTATE_RES_INIT_DIRTY);
+
+sub Create($$$$$)
+{
+    my ($class, $slice, $user_uuid, $resource_uuid, $rspec) = @_;
+
+    return GeniSliver->Create($slice, $user_uuid, $resource_uuid,
+			      "Node", $rspec);
 }
 
 #
@@ -564,9 +606,34 @@ sub Provision($)
 	    print STDERR "Could not add virtnode entry for $node to $self\n";
 	    return -1;
 	}
+
+	if ($self->rspec()->{'virtualization_type'} eq "emulab-vnode") {
+	    #
+	    # Create a fake jailnode on the physnode. 
+	    #
+	    my @vnodes;
+	    if (Node::CreateVnodes(\@vnodes,
+				   {"pid"      => "$pid",
+				    "eid"      => "$eid",
+				    "count"    => 1,
+				    "vtype"    => "pcfake",
+				    "nodeid"   => $node->node_id(),
+				    "verbose"  => 1 }) < 0) {
+		print STDERR "Could not create fake jail node on $node\n";
+		return -1;
+	    }
+	    my $vnode = Node->Lookup($vnodes[0]);
+	
+	    if ($experiment->InsertVirtNode($vnode) != 0) {
+		print STDERR
+		    "Could not add virtnode entry for $vnode to $self\n";
+		return -1;
+	    }
+	    $vnode->ModifyReservation({"genisliver_idx" => $self->idx()});
+	}
 	
 	# Set sliver_idx in the reservation so that Emulab knows.
-	if ($node->ModifyReservation({"genisliver_idx" => $self->idx()}) != 0){
+	if ($node->ModifyReservation({"genisliver_idx" => $self->idx()})) {
 	    return -1;
 	}
 
@@ -632,8 +699,17 @@ sub UnProvision($)
 	    print STDERR "Could remove virtnode entry for $node from $self\n";
 	    return -1;
 	}
+
+	#
+	# Look for virtual nodes to yank out of the virt tables.
+	#
+	my @vnodes;
+	$node->VirtualNodes(\@vnodes);
+	foreach my $vnode (@vnodes) {
+	    $experiment->DeleteVirtNode($vnode);
+	}
 	
-	system("export NORELOAD=1; $NFREE -q $pid $eid $node_id");
+	system("export NORELOAD=1; $NFREE -x -q $pid $eid $node_id");
 	if ($?) {
 	    print STDERR "Could not deallocate $node from $self\n";
 	    return -1;
@@ -708,9 +784,10 @@ use Node;
 
 sub Create()
 {
-    my ($class, $slice, $user, $resource_uuid) = @_;
+    my ($class, $slice, $user_uuid, $resource_uuid, $rspec) = @_;
 
-    return GeniSliver->Create($slice, $user, $resource_uuid, "Interface");
+    return GeniSliver->Create($slice, $user_uuid, $resource_uuid,
+			      "Interface", $rspec);
 }
 
 sub Provision($)

@@ -325,7 +325,12 @@ sub Register($)
 	#
 	# Need to verify the UUID is permitted for the SA making the request.
 	#
-	if (! $authority->PrefixMatch($uuid)) {
+	my $slice_authority = GeniAuthority->Lookup($ENV{'GENIUUID'});
+	if (!defined($slice_authority)) {
+	    print STDERR "Could not find authority object for caller.\n";
+	    return GeniResponse->Create(GENIRESPONSE_ERROR);
+	}
+	if (! $slice_authority->PrefixMatch($uuid)) {
 	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 					"uuid: Prefix mismatch");
 	}
@@ -355,7 +360,7 @@ sub Register($)
 					"uid: ". TBFieldErrorString());
 	}
 	my $newuser = GeniUser->Create($hrn, $uid, $uuid,
-				       $name, $email, $cert, $authority,
+				       $name, $email, $cert, $slice_authority,
 				       $keys);
 	if (!defined($newuser)) {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
@@ -397,10 +402,16 @@ sub Register($)
 	#
 	# Need to verify the UUID is permitted for the SA making the request.
 	#
-	if (! $authority->PrefixMatch($uuid)) {
+	my $slice_authority = GeniAuthority->Lookup($ENV{'GENIUUID'});
+	if (!defined($slice_authority)) {
+	    print STDERR "Could not find authority object for caller.\n";
+	    return GeniResponse->Create(GENIRESPONSE_ERROR);
+	}
+	if (! $slice_authority->PrefixMatch($uuid)) {
 	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 					"uuid: Prefix mismatch");
 	}
+
 	#
 	# Make sure slice hrn and uuid are unique.
 	#
@@ -410,7 +421,7 @@ sub Register($)
 	}
 
 	my $newslice = GeniSlice->Create($hrn, $uuid, $creator_uuid,
-					 $cert, $authority);
+					 $cert, $slice_authority);
 	if (!defined($newslice)) {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					"$hrn/$uuid could not be registered");

@@ -116,6 +116,7 @@ Genixmlrpc->SetContext(Genixmlrpc->Context($EMULAB_PEMFILE));
 AddAuditInfo("message", $request . "\n\n" . Dumper(%ENV));
 
 my $responder = Frontier::Responder->new( "methods" => {
+    "Resolve"	        => \&GeniCM::Resolve,
     "DiscoverResources" => \&GeniCM::DiscoverResources,
     "GetTicket"         => \&GeniCM::GetTicket,
     "RedeemTicket"      => \&GeniCM::RedeemTicket,

@@ -128,7 +128,7 @@ my $response = $responder->{'_decode'}->serve($request,
 # Terminate the log capture so that we can print the response to STDOUT
 # for the web server.
 #
-#print STDERR "\n\n" . $response;
+print STDERR "\n\n" . $response;
 
 LogEnd();
 

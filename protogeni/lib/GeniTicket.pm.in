@@ -321,8 +321,10 @@ sub Store($)
     # another component, we have to generate a locally unique idx for
     # the DB insertion.
     #
-    $idx = TBGetUniqueIndex('next_ticket', 1)
-	if (!defined($idx));
+    if (!defined($idx)) {
+	$idx = TBGetUniqueIndex('next_ticket', 1);
+	$self->{'idx'} = $idx;
+    }
     # A locally generated ticket will not have a component. Might change that.
     push(@insert_data, "component_idx=" . $self->component()->idx())
 	if (defined($self->component()));
@@ -480,7 +482,7 @@ sub Release($)
 	}
     }
     if (@nodeids) {
-	system("export NORELOAD=1; $NFREE $pid $eid @nodeids");
+	system("export NORELOAD=1; $NFREE -x -q $pid $eid @nodeids");
     }
     $self->Delete();
     return 0;

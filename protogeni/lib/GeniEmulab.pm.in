@@ -55,6 +55,16 @@ sub AllocateSlivers($$$)
     my $thisuser = User->ThisUser();
 
     #
+    # The RPC context for this test script is mostly as an SA.
+    #
+    Genixmlrpc->SetContext(Genixmlrpc->Context("@prefix@/etc/genisa.pem"));
+
+    #
+    # except when it has to be as the user.
+    #
+    my $context = Genixmlrpc->UserContext($thisuser);
+
+    #
     # Create a Geni user from current user doing the operation.
     #
     my $geniuser = GeniUser->CreateFromLocal($thisuser);
@@ -105,7 +115,7 @@ sub AllocateSlivers($$$)
 	    print STDERR "Could not sign slice credential $credential!\n";
 	    return -1;
 	}
-	if ($credential->Store() == 0) {
+	if ($credential->Store() != 0) {
 	    print STDERR "Could not store slice credential $credential!\n";
 	    return -1;
 	}
@@ -120,13 +130,28 @@ sub AllocateSlivers($$$)
     # XXX We are still not using rspecs anywhere.
     #
     foreach my $node (@{ $nodelist }) {
+	my $sliver_idx;
+	return -1
+	    if ($node->GetGeniSliverInfo(\$sliver_idx) != 0);
 	next
-	    if ($node->genisliver_idx());
-	
-	my $node_uuid = $node->uuid();
-	my $rspec = {'node' => {$node_uuid =>
-				{"uuid" => $node_uuid}}};
+	    if ($sliver_idx);
 
+	#
+	# The node is a virtnode, but we want a ticket for the physnode.
+	#
+	my $physnode = Node->Lookup($node->phys_nodeid());
+	return -1
+	    if (!defined($physnode));
+	
+	my $node_uuid = $physnode->uuid();
+
+	my $rspec =
+	    "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " .
+	    " <node uuid=\"$node_uuid\" ".
+	    "       virtualization_type=\"emulab-vnode\"> " .
+	    " </node>" .
+	    "</rspec>";
+	
 	#
 	# XXX The component is stored in the geni_resources table. Not sure
 	# how that will work out.
@@ -141,7 +166,7 @@ sub AllocateSlivers($$$)
         # Get ticket from component.
         #
 	my $ticket = $component->GetTicket($slice, $rspec,
-					   $thisuser, $credential);
+					   $context, $credential);
 	
 	if (!defined($ticket)) {
 	    print STDERR "Could not get ticket from CM for $node\n";
@@ -165,7 +190,7 @@ sub AllocateSlivers($$$)
 	# since an rspec can have multiple resources (nodes, links),
 	# and I have not figured out what to do for that yet. 
 	#
-	if ($node->SetGeniSliverIDX($ticket->idx()) != 0) {
+	if ($node->SetGeniSliverInfo($ticket->idx()) != 0) {
 	    print STDERR "Could not set sliver (ticket) idx for $node\n";
 	    if ($ticket->Delete() != 0) {
 		print STDERR "Could not destroy $ticket\n";
@@ -185,6 +210,16 @@ sub InstantiateSlivers($$$)
     my ($class, $experiment, $nodelist) = @_;
     my $thisuser = User->ThisUser();
 
+    #
+    # The RPC context for this test script is mostly as an SA.
+    #
+    Genixmlrpc->SetContext(Genixmlrpc->Context("@prefix@/etc/genisa.pem"));
+
+    #
+    # except when it has to be as the user.
+    #
+    my $context = Genixmlrpc->UserContext($thisuser);
+
     my $slice = GeniSlice->Lookup($experiment->uuid());
     if (!defined($slice)) {
 	print STDERR "No slice exists for $experiment. \n";
@@ -200,9 +235,13 @@ sub InstantiateSlivers($$$)
     # XXX We are still not using rspecs anywhere.
     #
     foreach my $node (@{ $nodelist }) {
-	$sliver_idx = $node->genisliver_idx();
+	my $sliver_idx;
+	return -1
+	    if ($node->GetGeniSliverInfo(\$sliver_idx) != 0);
+	next
+	    if (! $sliver_idx);
 
-	my $sliver = GeniSliver->Lookup($sliver_idx);
+	my $sliver     = GeniSliver->Lookup($sliver_idx);
 	next
 	    if (defined($sliver));
 
@@ -217,18 +256,18 @@ sub InstantiateSlivers($$$)
         #
         # Create sliver on component using the ticket.
         #
-	my $sliver = $component->CreateSliver($slice, $ticket, $thisuser);
+	$sliver = $component->CreateSliver($slice, $ticket, $context);
 	if (!defined($sliver)) {
 	    print STDERR "Could not create sliver on $component for $node\n";
 	    if ($ticket->Delete() != 0) {
 		print STDERR "Could not delete $ticket\n";
 	    }
-	    if ($node->SetGeniSliverIDX(0) != 0) {
+	    if ($node->SetGeniSliverInfo(0) != 0) {
 		print STDERR "Could not clear sliver idx for $node\n";
 	    }
 	    return -1;
 	}
-	if ($node->SetGeniSliverIDX($sliver->idx()) != 0) {
+	if ($node->SetGeniSliverInfo($sliver->idx()) != 0) {
 	    print STDERR "Could not set sliver idx for $node\n";
 	    if ($ticket->Delete() != 0) {
 		print STDERR "Could not delete $ticket\n";
@@ -247,6 +286,55 @@ sub InstantiateSlivers($$$)
 }
 
 #
+# Start the slivers.
+#
+sub StartSlivers($$$)
+{
+    my ($class, $experiment, $nodelist) = @_;
+    my $thisuser = User->ThisUser();
+
+    #
+    # The RPC context for this test script is mostly as an SA.
+    #
+    Genixmlrpc->SetContext(Genixmlrpc->Context("@prefix@/etc/genisa.pem"));
+
+    #
+    # except when it has to be as the user.
+    #
+    my $context = Genixmlrpc->UserContext($thisuser);
+
+    my $slice = GeniSlice->Lookup($experiment->uuid());
+    if (!defined($slice)) {
+	print STDERR "No slice exists for $experiment. \n";
+	return -1;
+    }
+
+    foreach my $node (@{ $nodelist }) {
+	my $sliver_idx;
+	return -1
+	    if ($node->GetGeniSliverInfo(\$sliver_idx) != 0);
+	next
+	    if (! $sliver_idx);
+
+	my $sliver = GeniSliver->Lookup($sliver_idx);
+	if (!defined($sliver)) {
+	    print STDERR "Could not find sliver for $node in $experiment\n";
+	    return -1;
+	}
+	my $component = $sliver->GetComponent();
+
+        #
+        # Create sliver on component using the ticket.
+        #
+	if ($component->StartSliver($slice, $sliver, $context) != 0) {
+	    print STDERR "Could not start $sliver on $component for $node\n";
+	    return -1;
+	}
+    }
+    return 0;
+}
+
+#
 # XXX Need to deal with links between nodes.
 #
 sub DestroySlivers($$$)
@@ -254,6 +342,16 @@ sub DestroySlivers($$$)
     my ($class, $experiment, $nodelist) = @_;
     my $thisuser = User->ThisUser();
     my $errors   = 0;
+
+    #
+    # The RPC context for this test script is mostly as an SA.
+    #
+    Genixmlrpc->SetContext(Genixmlrpc->Context("@prefix@/etc/genisa.pem"));
+
+    #
+    # except when it has to be as the user.
+    #
+    my $context = Genixmlrpc->UserContext($thisuser);
 
     my $slice = GeniSlice->Lookup($experiment->uuid());
     if (!defined($slice)) {
@@ -267,10 +365,11 @@ sub DestroySlivers($$$)
     # XXX We are still not using rspecs anywhere.
     #
     foreach my $node (@{ $nodelist }) {
+	my $sliver_idx;
+	return -1
+	    if ($node->GetGeniSliverInfo(\$sliver_idx) != 0);
 	next
-	    if (! $node->genisliver_idx());
-
-	$sliver_idx = $node->genisliver_idx();
+	    if (! $sliver_idx);
 
 	my $sliver = GeniSliver->Lookup($sliver_idx);
 	if (!defined($sliver)) {
@@ -287,12 +386,12 @@ sub DestroySlivers($$$)
 	    }
 	    next;
 	}
-	if ($sliver->Destroy != 0) {
+	if ($sliver->Destroy() != 0) {
 	    print STDERR "Could not destroy $sliver for $node\n";
 	    $errors++;
 	    next;
 	}
-	if ($node->SetGeniSliverIDX(0) != 0) {
+	if ($node->SetGeniSliverInfo(0) != 0) {
 	    print STDERR "Could not clear sliver idx for $node\n";
 	    $errors++;
 	    next;

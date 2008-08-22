@@ -54,6 +54,106 @@ my $AVAIL	   = "$TB/sbin/avail";
 my $TBSWAP	   = "$TB/bin/tbswap";
 my $SWAPEXP	   = "$TB/bin/swapexp";
 
+
+#
+# Respond to a GetTicket request. 
+#
+sub Resolve($)
+{
+    my ($argref) = @_;
+    my $uuid       = $argref->{'uuid'};
+    my $hrn        = $argref->{'hrn'};
+    my $cred       = $argref->{'credential'};
+    my $type       = $argref->{'type'};
+
+    if (! defined($cred)) {
+	return GeniResponse->MalformedArgsResponse();
+    }
+    if (! (defined($type) && ($type =~ /^(Node)$/))) {
+	return GeniResponse->MalformedArgsResponse();
+    }
+    # Allow lookup by uuid or hrn.
+    if (! (defined($uuid) || defined($hrn))) {
+	return GeniResponse->MalformedArgsResponse();
+    }
+    if (defined($uuid) && !($uuid =~ /^[-\w]*$/)) {
+	return GeniResponse->MalformedArgsResponse();
+    }
+    if (defined($hrn) && !($hrn =~ /^[-\w\.]*$/)) {
+	return GeniResponse->MalformedArgsResponse();
+    }
+
+    my $credential = GeniCredential->CreateFromSigned($cred);
+    if (!defined($credential)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not create GeniCredential object");
+    }
+    
+    #
+    # Make sure the credential was issued to the caller, but no special
+    # permission required to resolve component resources.
+    #
+    if ($credential->owner_uuid() ne $ENV{'GENIUUID'}) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "This is not your credential!");
+    }
+    if ($type eq "Node") {
+	my $node;
+	
+	if (defined($uuid)) {
+	    $node= Node->Lookup($uuid);
+	}
+	else {
+	    #
+	    # We only want the last token for node lookup.
+	    #
+	    if ($hrn =~ /\./) {
+		($hrn) = ($hrn =~ /\.(\w*)$/);
+	    }
+	    $node= Node->Lookup($hrn);
+	}
+	if (!defined($node)) {
+	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED,
+					undef, "Nothing here by that name");
+	}
+	
+	# Return a blob.
+	my $blob = { "hrn"          => "${OURDOMAIN}." . $node->node_id(),
+		     "uuid"         => $node->uuid(),
+		   };
+
+	#
+	# Get the list of interfaces for the node.
+	#
+	my @interfaces;
+	if ($node->AllInterfaces(\@interfaces) != 0) {
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					"Could not get interfaces for $uuid");
+	}
+
+	my @iblobs = ();
+	foreach my $interface (@interfaces) {
+	    my $iblob = { "uuid"	=> $interface->uuid(),
+			  "iface"	=> $interface->iface(),
+			  "type"	=> $interface->type(),
+			  "card"	=> $interface->card(),
+			  "port"	=> $interface->port(),
+			  "role"	=> $interface->role(),
+			  "IP"		=> $interface->IP(),
+			  "mask"	=> $interface->mask(),
+			  "MAC"		=> $interface->mac(),
+		      };
+
+	    push(@iblobs, $iblob);
+	}
+	$blob->{'interfaces'} = \@iblobs
+	    if (@iblobs);
+	
+	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
+    }
+    return GeniResponse->Create(GENIRESPONSE_UNSUPPORTED);
+}
+
 #
 # Discover resources on this component, returning a resource availablity spec
 #
@@ -111,7 +211,11 @@ sub DiscoverResources($)
 	$xml .= "<node uuid=\"$uuid\" name=\"$nodeid\">".
 	    "<available>true</available></node>\n";
 
-	my @interfaces = Interface->LookupAll($node);
+	my @interfaces;
+	if ($node->AllInterfaces(\@interfaces) != 0) {
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					"Could not get interfaces for $uuid");
+	}
 	foreach my $interface (@interfaces) {
 	    my $iface_uuid = $interface->uuid();
 	    my $iface      = $interface->iface();
@@ -369,7 +473,7 @@ sub RedeemTicket($)
 		next;
 	    }
 	}
-	if (!$otheruser->BindToSlice($slice) != 0) {
+	if ($otheruser->BindToSlice($slice) != 0) {
 	    print STDERR "Could not bind $otheruser to $slice\n";
 	}
     }
@@ -393,13 +497,17 @@ sub RedeemTicket($)
     #
     my %slivers = ();
     foreach my $ref (@{$ticket->rspec()->{'node'}}) {
+	my $virtualization_type = $ref->{'virtualization_type'};
 	my $resource_uuid = $ref->{'uuid'};
 	my $node = Node->Lookup($resource_uuid);
 	if (!defined($node)) {
 	    $message = "Unknown resource_uuid in ticket: $resource_uuid";
 	    goto bad;
 	}
-	my $sliver = GeniSliver::Node->Create($slice, $owner, $resource_uuid);
+	my $sliver = GeniSliver::Node->Create($slice,
+					      $owner->uuid(),
+					      $resource_uuid,
+					      $ref);
 	if (!defined($sliver)) {
 	    $message = "Could not create GeniSliver object for $resource_uuid";
 	    goto bad;
@@ -451,8 +559,10 @@ sub RedeemTicket($)
 		$message = "No such interface $iface on node $nodeobject";
 		goto bad;
 	    }
-	    my $sliver = GeniSliver::Interface->Create($slice, $owner,
-						       $interface->uuid());
+	    my $sliver = GeniSliver::Interface->Create($slice,
+						       $owner->uuid(),
+						       $interface->uuid(),
+			       $ticket->rspec()->{'link'}->{$linkname});
 	    if (!defined($sliver)) {
 		$message = "Could not create GeniSliver ".
 		    "$interface in $linkname";

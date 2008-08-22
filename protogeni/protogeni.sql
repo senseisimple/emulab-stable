@@ -123,10 +123,10 @@ CREATE TABLE `geni_slivers` (
   `resource_type` varchar(40) NOT NULL default '',
   `created` datetime default NULL,
   `credential_idx` int(10) unsigned default NULL,
-  `ticket_idx` int(10) unsigned default NULL,
-  `component_idx` int(10) unsigned NOT NULL default '0',
-  `aggregate_idx` int(10) unsigned default NULL,
+  `component_uuid` varchar(40) default NULL,
+  `aggregate_uuid` varchar(40) default NULL,
   `status` enum('ready','broken') NOT NULL default 'ready',
+  `rspec_string` text,
   PRIMARY KEY  (`idx`),
   UNIQUE KEY `uuid` (`uuid`),
   INDEX `slice_uuid` (`slice_uuid`)
@@ -221,13 +221,11 @@ CREATE TABLE `geni_userkeys` (
 #
 DROP TABLE IF EXISTS `geni_resources`;
 CREATE TABLE `geni_resources` (
-  `idx` mediumint(8) unsigned NOT NULL default '0',
   `resource_uuid` varchar(40) NOT NULL default '',
   `resource_type` varchar(40) NOT NULL default '',
   `created` datetime default NULL,
-  `component_idx` int(10) unsigned NOT NULL default '0',
-  PRIMARY KEY  (`idx`),
-  UNIQUE KEY `resource_uuid` (`resource_uuid`)
+  `component_uuid` varchar(40) NOT NULL default '',
+  PRIMARY KEY  (`resource_uuid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 #

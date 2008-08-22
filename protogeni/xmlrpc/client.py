@@ -153,6 +153,21 @@ print "Found leebee's record at the SA"
 leebee = response["value"]
 
 #
+# Lookup a node at the component. 
+#
+params = {}
+params["credential"] = mycredential;
+params["hrn"]        = "pc41";
+params["type"]       = "Node";
+rval,response = do_method("cm", "Resolve", params,
+         URI="https://myboss.myelab.testbed.emulab.net:443/protogeni/xmlrpc")
+if rval:
+    Fatal("Could not lookup info for pc41")
+    pass
+#print str(response["value"]);
+print "Found pc41's record at the CM"
+
+#
 # Lookup slice, delete before proceeding.
 #
 params = {}
@@ -215,7 +230,7 @@ print "Bogus DiscoverResources returned"
 #
 rspec = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
         " <node uuid=\"de9803c2-773e-102b-8eb4-001143e453fe\" " +\
-        "       virtualization_type=\"raw\"> " +\
+        "       virtualization_type=\"emulab-vnode\"> " +\
         " </node>" +\
         "</rspec>"
 params = {}
