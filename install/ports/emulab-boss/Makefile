@@ -125,6 +125,8 @@ RUN_DEPENDS=	\
 	mysqlhotcopy:${PORTSDIR}/databases/mysql50-scripts
 
 .if ${PORTVERSION} == "2.1"
+RUN_DEPENDS+=	\
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/XML/Parser.pm:${PORTSDIR}/textproc/p5-XML-Parser
 # not sure why this is just needed for 6.3
 RUN_DEPENDS+=	\
 	${X11BASE}/libdata/xorg/libraries:${PORTSDIR}/x11/xorg-libraries
