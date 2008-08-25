@@ -95,11 +95,11 @@ $DO portupgrade -N -PP misc/p5-DBD-mysql50-old || {
 $DO pkg_delete -f -x elvin
 if [ -n "$ecompat" ]; then
     echo "update-ports: Installing Elvin packages ..."
-    $DO pkg_add $PKG_PATH/$PKG_PATH/libelvin-4.0.3_2.tbz || {
+    $DO pkg_add $PKG_PATH/libelvin-4.0.3_2.tbz || {
         echo '*** pkg_add of libelvin failed'
         exit 2
     }
-    $DO pkg_add $PKG_PATH/$PKG_PATH/elvind-4.0.3.tbz || {
+    $DO pkg_add $PKG_PATH/elvind-4.0.3.tbz || {
         echo '*** pkg_add of elvind failed'
         exit 2
     }
