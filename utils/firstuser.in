@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -171,7 +171,7 @@ if (system("/usr/sbin/pw useradd $protouser -u $uid -g $agid ".
 if ($CONTROL ne $BOSSNODE) {
     print "Creating user on ops...\n";
     
-    if (system("ssh $CONTROL ".
+    if (system("ssh -2 $CONTROL ".
 	       "'/usr/sbin/pw useradd $protouser -u $uid -g $agid ".
 	       "-G \"$Ggid\" -h - -d $HOMEDIR/$protouser -s $binshell ".
 	       "-c \"$protouser_name\"'")) {
