@@ -19,6 +19,10 @@ my $debug    = 0;
 my $force    = 0;
 my $tempfile = "/var/tmp/testbed_dumperrorlog_tempfile";
 
+my $keep_important = 7 * 24 * 60 * 60;
+my $keep_any       = 4 * 24 * 60 * 60;
+my $max_rows       = 300000;
+
 #
 # Configure variables
 #
@@ -101,6 +105,11 @@ if (!defined($lastseq)) {
 }
 
 #
+# Limit number of rows to keep from locking the log table too long
+#
+my $maxseq = $lastseq + $max_rows;
+
+#
 # And the last experiment index we sent over.
 #
 $query_result =
@@ -145,6 +154,7 @@ if ($ISMAINSITE) {
     #
     DBQueryFatal("select * from log ".
 		 "where seq > $lastseq " .
+		 "and seq <= $maxseq " .
 		 "into outfile '${tempfile}.log' ");
 
     #
@@ -155,6 +165,7 @@ if ($ISMAINSITE) {
     $query_result =
 	DBQueryFatal("select seq from log ".
 		     "where seq > $lastseq " .
+		     "  and seq <= $maxseq ".
 		     "order by seq desc limit 1");
     # Save for later.
     ($lastseq) = $query_result->fetchrow_array();
@@ -206,13 +217,13 @@ if ($ISMAINSITE) {
 			   "report_assign_violation") {
 	if (($tablename eq "errors" ||
 	     $tablename eq "session_info") && !$force) {
-	    DBQueryFatal("select * from $tablename where session>=$firstseq ".
+	    DBQueryFatal("select * from $tablename where session>=$firstseq and session<=$lastseq ".
 			 "into outfile '${tempfile}.${tablename}' ");
 	}
 	elsif ($tablename eq "report_error" ||
 	       $tablename eq "report_context" ||
 	       $tablename eq "report_assign_violation") {
-	    DBQueryFatal("select * from $tablename where seq>=$firstseq ".
+	    DBQueryFatal("select * from $tablename where seq>=$firstseq and seq<=$lastseq ".
 			 "into outfile '${tempfile}.${tablename}' ");
 	}
 	elsif ($tablename eq "users") {
@@ -260,14 +271,16 @@ DBQueryFatal("update emulab_indicies set idx='$exptidx_max' ".
 # And then age out entries.
 #
 DBQueryFatal("delete from log ".
-	     "where stamp < (UNIX_TIMESTAMP(now()) - (7 * 24 * 60 * 60))");
+	     "where stamp < (UNIX_TIMESTAMP(now()) - $keep_important)".
+	     "  and seq <= $maxseq");
 
 #
 # And age out non critical data.
 #
 DBQueryFatal("delete from log ".
 	     "where priority > $NOTICE and ".
-	     "      stamp < (UNIX_TIMESTAMP(now()) - (4 * 24 * 60 * 60))");
+	     "      stamp < (UNIX_TIMESTAMP(now()) - $keep_any)".
+	     "        and seq <= $maxseq");
 
 unlink("$logname")
     if (-e $logname);
