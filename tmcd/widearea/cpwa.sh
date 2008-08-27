@@ -49,6 +49,8 @@ if [ -e $ETCDIR/isrem ]; then
     cp -p $ETCDIR/bossnode $METCDIR/bossnode
     cp -p $ETCDIR/emulab-privkey $METCDIR/emulab-privkey
     cp -p $ETCDIR/waconfig $METCDIR/waconfig
+    cp -p $ETCDIR/client.pem $METCDIR/client.pem
+    cp -p $ETCDIR/emulab.pem $METCDIR/emulab.pem
 fi
 
 exit 0
