@@ -1,5 +1,5 @@
 # PROVIDE: cdroot
-# BEFORE: disks
+# BEFORE: disks netif
 # KEYWORD: FreeBSD
 
 #
