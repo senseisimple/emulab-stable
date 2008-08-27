@@ -48,15 +48,15 @@ if [ -e /etc/emulab/isrem -a -e /etc/emulab/waconfig ]; then
 	    fi
 	done
 
-	if [ x"$cnetif" = x"" ]; then
+	if [ "$cnetif" = "" ]; then
 	    echo "Could not find iface with MAC $WA_MAC; trying DHCP!"
 	    WA_BOOTMETHOD="dhcp"
-	elif [ x"WA_HOSTNAME" = "x" \
-	       -o x"WA_DOMAIN" = "x" \
-	       -o x"WA_IP_ADRR" = "x" \
-	       -o x"WA_IP_NETMASK" = "x" \
-	       -o x"WA_IP_GATEWAY" = "x" \
-	       -o x"WA_IP_DNS1" = "x"  ]; then
+	elif [ "$WA_HOSTNAME" = "" \
+	       -o "$WA_DOMAIN" = "" \
+	       -o "$WA_IP_ADDR" = "" \
+	       -o "$WA_IP_NETMASK" = "" \
+	       -o "$WA_IP_GATEWAY" = "" \
+	       -o "$WA_IP_DNS1" = ""  ]; then
 	    echo "Missing static IP config vars; trying DHCP!"
 	    WA_BOOTMETHOD="dhcp"
 	fi
@@ -72,7 +72,7 @@ if [ "$WA_BOOTMETHOD" = "static" ]; then
     route add default gateway "$WA_IP_GATEWAY"
 
     # bring up lo too just to make sure it's up
-    ifconfig lo0 inet 127.0.0.1 up
+    ifconfig lo inet 127.0.0.1 up
     route add -net 127.0.0.0/8 dev lo
 
     # setup resolv.conf
@@ -99,7 +99,16 @@ if [ "$WA_BOOTMETHOD" = "static" ]; then
     echo "$cnetif" > $BOOTDIR/controlif
     if [ -e "/etc/emulab/bossnode" ]; then
         bossnode=`cat /etc/emulab/bossnode`
-	echo `host -t A "$bossnode" | sed -e 's/.*has address\s*\(.*\)/\1/'` \
+	bossip=`host -t A "$bossnode"`
+	retval="$?"
+	i=0
+	while [ "$retval" != "0" -a $i -lt 6 ]; do
+	    bossip=`host -t A "$bossnode"`
+	    retval="$?"
+	    i=`expr $i + 1`
+	    sleep 5
+	done
+	echo `echo "$bossip" | sed -n -e 's/.*has address\s*\(.*\)/\1/p'` \
 	    > $BOOTDIR/bossip
     fi
     echo "$WA_HOSTNAME" > $BOOTDIR/realname
