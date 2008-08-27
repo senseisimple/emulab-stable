@@ -7,6 +7,7 @@
 
 #
 # HACK: run dhclient on all interfaces, and do nothing else
+# (well, now also bring up a widearea node control net statically if asked)
 #
 # Note that this file's name (eth99) cannot overlap with an actual
 # existing interface or dhclient will loop.  dhclient-script invokes
@@ -19,12 +20,99 @@
 . /etc/emulab/paths.sh
 
 DEVICE="eth99"
-IFACETYPES="3c59x e100 e1000 tulip"
+IFACETYPES="3c59x e100 e1000 tulip e1000e tg3"
 
 #
 # First, probe for all our supported ethernet types
 #
 modprobe -qa $IFACETYPES
+
+#
+# Check: are we a remote node?  If so, possibly try static config in pref
+# to dhcp.
+#
+if [ -e /etc/emulab/isrem -a -e /etc/emulab/waconfig ]; then
+    . /etc/emulab/waconfig
+    echo "Found Emulab widearea config info..."
+
+    _ifs=`ifconfig -s -a | awk '{ print $1 }' | grep -v 'Iface' | grep -v '^lo$'`
+    if [ "$WA_BOOTMETHOD" = "static" -a "$WA_MAC" != "" ]; then 
+	# try to find an iface matching WA_MAC
+	cnetif=""
+	for _if in $_ifs; do
+	    ifconfig $_if | grep HWaddr | sed -e 's/.*HWaddr\s*\(.*\)/\1/' \
+		| grep -q -i "$WA_MAC"
+	    if [ "$?" = "0" ]; then
+		cnetif="$_if"
+		break
+	    fi
+	done
+
+	if [ x"$cnetif" = x"" ]; then
+	    echo "Could not find iface with MAC $WA_MAC; trying DHCP!"
+	    WA_BOOTMETHOD="dhcp"
+	elif [ x"WA_HOSTNAME" = "x" \
+	       -o x"WA_DOMAIN" = "x" \
+	       -o x"WA_IP_ADRR" = "x" \
+	       -o x"WA_IP_NETMASK" = "x" \
+	       -o x"WA_IP_GATEWAY" = "x" \
+	       -o x"WA_IP_DNS1" = "x"  ]; then
+	    echo "Missing static IP config vars; trying DHCP!"
+	    WA_BOOTMETHOD="dhcp"
+	fi
+    fi
+fi
+
+#
+# Try static config if all its constraints above are met...
+#
+if [ "$WA_BOOTMETHOD" = "static" ]; then
+    echo "Statically configuring control net on $cnetif ..."
+    ifconfig "$cnetif" inet "$WA_IP_ADDR" netmask "$WA_IP_NETMASK" up
+    route add default gateway "$WA_IP_GATEWAY"
+
+    # bring up lo too just to make sure it's up
+    ifconfig lo0 inet 127.0.0.1 up
+    route add -net 127.0.0.0/8 dev lo
+
+    # setup resolv.conf
+    echo "search $WA_DOMAIN" > /etc/resolv.conf
+    echo "nameserver $WA_IP_DNS1" >> /etc/resolv.conf
+    if [ x"$WA_IP_DNS2" != x ]; then
+	echo "nameserver $WA_IP_DNS2" >> /etc/resolv.conf
+    fi
+
+    # set hostname
+    hosts_str="$WA_HOSTNAME"
+    echo "$WA_HOSTNAME" | grep -q \\.
+    if [ $? = 0 ]; then
+	hostname "$WA_HOSTNAME"
+    else
+	hostname "${WA_HOSTNAME}.${WA_DOMAIN}"
+	hosts_str="${WA_HOSTNAME}.${WA_DOMAIN} ${hosts_str}"
+    fi
+
+    # setup hosts file
+    echo "$WA_IP_ADDR ${hosts_str}" >> /etc/hosts
+
+    # setup a few necessary emulab files...
+    echo "$cnetif" > $BOOTDIR/controlif
+    if [ -e "/etc/emulab/bossnode" ]; then
+        bossnode=`cat /etc/emulab/bossnode`
+	echo `host -t A "$bossnode" | sed -e 's/.*has address\s*\(.*\)/\1/'` \
+	    > $BOOTDIR/bossip
+    fi
+    echo "$WA_HOSTNAME" > $BOOTDIR/realname
+    echo "$WA_IP_GATEWAY" > $BOOTDIR/routerip
+    echo "$WA_IP_ADDR" > $BOOTDIR/myip
+    echo "$WA_IP_NETMASK" > $BOOTDIR/mynetmask
+
+    exit 0
+fi
+
+#
+# else default to dhclient...
+#
 
 #
 # If dhclient returns success, then it has configured the first interface
@@ -33,6 +121,7 @@ modprobe -qa $IFACETYPES
 # dhclient will leave "up") and set ONBOOT=no to prevent ifup (our caller)
 # from doing any further configuration on this fake interface.
 #
+echo "Discovering control net via dhcp ..."
 if [ -x /sbin/dhclient ] && /sbin/dhclient -q ; then
     killall dhclient
 
