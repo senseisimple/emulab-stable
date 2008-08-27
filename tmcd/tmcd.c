@@ -158,6 +158,7 @@ typedef struct {
 	int		isvnode;
 	int		issubnode;
 	int		islocal;
+	int		isdedicatedwa;
 	int		iscontrol;
 	int		isplabdslice;
 	int		isplabsvc;
@@ -1769,6 +1770,15 @@ COMMAND_PROTOTYPE(doaccounts)
 				 "where pid='%s'",
 				 2, RELOADPID);
 	}
+	else if (!reqp->islocal && reqp->isdedicatedwa) {
+	        /*
+		 * Catch widearea nodes that are dedicated to a single pid/eid.
+		 * Same as local case.
+		 */
+		res = mydb_query("select unix_name,unix_gid from groups "
+				 "where pid='%s'",
+				 2, reqp->pid);
+	}
 	else {
 		/*
 		 * XXX - Old style node, not doing jails.
@@ -1961,6 +1971,47 @@ COMMAND_PROTOTYPE(doaccounts)
 			     "      and u.status='active' and u.admin=1 "
 			     "      order by u.uid",
 			     18, RELOADPID);
+	}
+	else if (!reqp->islocal && reqp->isdedicatedwa) {
+		/*
+		 * Wonder why this code is a copy of the islocal || vnode
+		 * case above?  It's because I don't want to prevent us from
+		 * from the above case where !islocal && jailflag
+		 * for dedicated widearea nodes.
+		 */
+
+		/*
+		 * This crazy join is going to give us multiple lines for
+		 * each user that is allowed on the node, where each line
+		 * (for each user) differs by the project PID and it unix
+		 * GID. The intent is to build up a list of GIDs for each
+		 * user to return. Well, a primary group and a list of aux
+		 * groups for that user.
+		 */
+	  	char adminclause[MYBUFSIZE];
+		strcpy(adminclause, "");
+#ifdef ISOLATEADMINS
+		sprintf(adminclause, "and u.admin=%d", reqp->swapper_isadmin);
+#endif
+		res = mydb_query("select distinct "
+				 "  u.uid,u.usr_pswd,u.unix_uid,u.usr_name, "
+				 "  p.trust,g.pid,g.gid,g.unix_gid,u.admin, "
+				 "  u.emulab_pubkey,u.home_pubkey, "
+				 "  UNIX_TIMESTAMP(u.usr_modified), "
+				 "  u.usr_email,u.usr_shell, "
+				 "  u.widearearoot,u.wideareajailroot, "
+				 "  u.usr_w_pswd,u.uid_idx "
+				 "from group_membership as p "
+				 "join users as u on p.uid_idx=u.uid_idx "
+				 "join groups as g on "
+				 "     p.pid=g.pid and p.gid=g.gid "
+				 "where ((p.pid='%s')) and p.trust!='none' "
+				 "      and u.status='active' "
+				 "      and u.webonly=0 "
+				 "      %s "
+                                 "      and g.unix_gid is not NULL "
+				 "order by u.uid",
+				 18, reqp->pid, adminclause);
 	}
 	else {
 		/*
@@ -4304,7 +4355,8 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 " nk.sfshostid,e.eventkey,0, "
 				 " 0,e.elab_in_elab,e.elabinelab_singlenet, "
 				 " e.idx,e.creator_idx,e.swapper_idx, "
-				 " u.admin "
+				 " u.admin,dedicated_wa_types.attrvalue "
+				 "   as isdedicated_wa "
 				 "from interfaces as i "
 				 "left join nodes as n on n.node_id=i.node_id "
 				 "left join reserved as r on "
@@ -4324,10 +4376,16 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 "      and attrvalue='1' "
 				 "     group by type) as nobootinfo_types "
 				 "  on n.type=nobootinfo_types.type "
+				 "left outer join "
+				 "  (select type,attrvalue "
+				 "   from node_type_attributes "
+				 "   where attrkey='dedicated_widearea' "
+				 "   group by type) as dedicated_wa_types "
+				 "  on n.type=dedicated_wa_types.type "
 				 "where i.IP='%s' and i.role='ctrl' "
 				 "  and nobootinfo_types.attrvalue is NULL",
 				 /*XXX*/
-				 29, inet_ntoa(ipaddr));
+				 30, inet_ntoa(ipaddr));
 	}
 
 	if (!res) {
@@ -4360,6 +4418,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 	reqp->isplabsvc    = (row[22] && strcasecmp(row[22], "0")) ? 1 : 0;
 	reqp->elab_in_elab = (row[23] && strcasecmp(row[23], "0")) ? 1 : 0;
 	reqp->singlenet    = (row[24] && strcasecmp(row[24], "0")) ? 1 : 0;
+	reqp->isdedicatedwa = (row[29] && !strncmp(row[29], "1", 1)) ? 1 : 0;
 
 	if (row[8])
 		strncpy(reqp->testdb, row[8], sizeof(reqp->testdb));
