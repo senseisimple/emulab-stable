@@ -21,6 +21,11 @@ if [ -z "$ELVIN_COMPAT" ]; then
     exit 1
 fi
 
+if [ -z "$UTMPDIR" ]; then
+    echo '*** Must set UTMPDIR to the directory where you untarred patches'
+    exit 1
+fi
+
 ecompat=
 if [ $ELVIN_COMPAT -eq 1 ]; then
     echo "NOTICE: Building with Elvin Compatibility enabled ..."
@@ -124,12 +129,55 @@ $DO portupgrade -N -PP -f -R $ports || {
     exit 2
 }
 
+echo "update-ports: Install necessary PHP4 extensions ..."
+oMAKEFLAGS=$MAKEFLAGS
+MAKEFLAGS="$MAKEFLAGS WITH_MHASH=yes WITH_XMLRPC=yes WITH_CURL=yes WITH_OPENSSL=yes WITH_BZ2=yes WITH_GD=yes WITH_MCRYPT=yes WITH_MYSQL=yes WITH_XML=yes WITH_APACHE=yes"
+$DO pkg_delete -f -x '^php4-' t1lib
+$DO portupgrade -N -PP -R lang/php4-extensions || {
+    echo '*** portupgrade failed'
+    exit 2
+}
+MAKEFLAGS=$oMAKEFLAGS
+
 echo "update-ports: Reinstall legacy p5-DBD package ..."
 $DO pkg_delete -f -x p5-DBD-mysql
 $DO portupgrade -N -PP misc/p5-DBD-mysql50-old || {
     echo '*** portupgrade of p5-DBD-mysql failed'
     exit 2
 }
+
+echo "update-ports: Apply important Emulab port patches ..."
+patchdir=$UTMPDIR
+perldir=/usr/local/lib/perl5/site_perl/5.8.8/mach
+if [ -f $patchdir/Mysql.pm.patch -a -f $perldir/Mysql.pm ]; then
+    patch -d $perldir -p0 < $patchdir/Mysql.pm.patch
+fi
+pythondir=/usr/local/lib/python2.5/site-packages
+if [ -f $patchdir/m2crypto.patch-0.17 -a -d $pythondir/M2Crypto ]; then
+    patch -p0 < $patchdir/m2crypto.patch-0.17
+fi
+
+echo "update-ports: Cleanup startup scripts ..."
+startdir=/usr/local/etc/rc.d
+if [ -f $startdir/1.mysql-client.sh -a -f $startdir/mysql-client ]; then
+    rm -f $startdir/mysql-client
+fi
+if [ -f $startdir/1.mysql-server.sh -o -f $startdir/2.mysql-server.sh ] &&
+   [ -f $startdir/mysql-server ]; then
+    rm -f $startdir/mysql-server
+fi
+if [ -f $startdir/apache.sh.sample ]; then
+    cp -p $startdir/apache.sh.sample $startdir/apache.sh
+fi
+if [ -f $startdir/2.dhcpd.sh -a -f $startdir/isc-dhcpd ]; then
+    rm -f $startdir/isc-dhcpd
+fi
+
+echo "update-ports: Clean out old binaries ..."
+# XXX remnants of named port
+if [ "$SERVER" = "boss" -a -x /usr/local/sbin/rndc ]; then
+    rm -f $startdir/1.named.sh /usr/local/sbin/rndc*
+fi
 
 echo "update-ports: Installing old FreeBSD compatibility packages ..."
 $DO portupgrade -N -PP misc/compat4x misc/compat5x || {
