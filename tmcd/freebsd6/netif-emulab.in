@@ -106,16 +106,16 @@ cnet_start()
 				fi
 			done
 
-			if [ x"$cnetif" = x"" ]; then
+			if [ "$cnetif" = "" ]; then
 			        echo -n "Could not find iface with "
 				echo "$WA_MAC; trying DHCP!"
 			        WA_BOOTMETHOD="dhcp"
-			elif [ x"WA_HOSTNAME" = "x" \
-			        -o x"WA_DOMAIN" = "x" \
-			        -o x"WA_IP_ADRR" = "x" \
-			        -o x"WA_IP_NETMASK" = "x" \
-			        -o x"WA_IP_GATEWAY" = "x" \
-			        -o x"WA_IP_DNS1" = "x"  ]; then
+			elif [ "$WA_HOSTNAME" = "" \
+			        -o "$WA_DOMAIN" = "" \
+			        -o "$WA_IP_ADDR" = "" \
+			        -o "$WA_IP_NETMASK" = "" \
+			        -o "$WA_IP_GATEWAY" = "" \
+			        -o "$WA_IP_DNS1" = ""  ]; then
 				echo -n "Missing static IP config "
 				echo "vars; trying DHCP!"
 				WA_BOOTMETHOD="dhcp"
@@ -151,7 +151,7 @@ cnet_start()
 		# setup resolv.conf
 		echo "search $WA_DOMAIN" > /etc/resolv.conf
 		echo "nameserver $WA_IP_DNS1" >> /etc/resolv.conf
-		if [ x"$WA_IP_DNS2" != x ]; then
+		if [ "$WA_IP_DNS2" != "" ]; then
 			echo "nameserver $WA_IP_DNS2" >> /etc/resolv.conf
 		fi
 
