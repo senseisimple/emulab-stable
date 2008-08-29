@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -318,6 +318,9 @@ sub SendAuditMail($)
 	if ($exitstatus) {
 	    $body   .= "\nExited with status: $exitstatus";
 	}
+	if (defined($AUDIT_INFO{'message'})) {
+	    $body   .= "\n" . $AUDIT_INFO{'message'};
+	}
 	my $FROM     = "$GCOS <${USERNAME}\@${OURDOMAIN}>";
 
 	if (! $logonly) {
@@ -454,6 +457,7 @@ my %AUDIT_METAINFO =
     ( which => 'string',        # ex "PROJ/EXP"
       success_frag => 'string', # ex "T. Swapped In"
       failure_frag => 'string', # ie "Bla Failure"
+      message      => 'string',
       cc => 'list');            # Cc audit mail to these people
 
 #
