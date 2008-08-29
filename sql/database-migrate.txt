@@ -4574,3 +4574,9 @@ last_net_act,last_cpu_act,last_ext_act);
        alter table interfaces modify current_speed \
            enum('0','10','100','1000','4000','10000','40000','100000') \
            NOT NULL default '0';
+
+4.161: Another protogeni addition to the reserved table.
+
+       alter table reserved add `tmcd_redirect` tinytext;
+
+       
