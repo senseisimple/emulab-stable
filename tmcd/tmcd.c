@@ -169,6 +169,7 @@ typedef struct {
 	int		creator_idx;
 	int		swapper_idx;
 	int		swapper_isadmin;
+        int		genisliver_idx;
 	char		nodeid[TBDB_FLEN_NODEID];
 	char		vnodeid[TBDB_FLEN_NODEID];
 	char		pnodeid[TBDB_FLEN_NODEID]; /* XXX */
@@ -187,6 +188,7 @@ typedef struct {
 	char		eventkey[TBDB_FLEN_PRIVKEY];
 	char		sfshostid[TBDB_FLEN_SFSHOSTID];
 	char		testdb[TBDB_FLEN_TINYTEXT];
+	char		tmcd_redirect[TBDB_FLEN_TINYTEXT];
 } tmcdreq_t;
 static int	iptonodeid(struct in_addr, tmcdreq_t *);
 static int	checkdbredirect(tmcdreq_t *);
@@ -292,6 +294,7 @@ COMMAND_PROTOTYPE(dobootwhat);
 #define F_MAXLOG	0x04	/* record maximal logging info normally */
 #define F_ALLOCATED	0x08	/* node must be allocated to make call */
 #define F_REMNOSSL	0x10	/* remote nodes can request without SSL */
+#define F_REMREQSSL	0x20	/* remote nodes must connect with SSL */
 
 struct command {
 	char	*cmdname;
@@ -303,7 +306,7 @@ struct command {
 	{ "nodeid",	  FULLCONFIG_ALL,  0, donodeid },
 	{ "status",	  FULLCONFIG_NONE, 0, dostatus },
 	{ "ifconfig",	  FULLCONFIG_ALL,  F_ALLOCATED, doifconfig },
-	{ "accounts",	  FULLCONFIG_ALL,  0, doaccounts },
+	{ "accounts",	  FULLCONFIG_ALL,  F_REMREQSSL, doaccounts },
 	{ "delay",	  FULLCONFIG_ALL,  F_ALLOCATED, dodelay },
 	{ "linkdelay",	  FULLCONFIG_ALL,  F_ALLOCATED, dolinkdelay },
 	{ "hostnames",	  FULLCONFIG_NONE, F_ALLOCATED, dohosts },
@@ -337,8 +340,8 @@ struct command {
         { "sdparams",     FULLCONFIG_PHYS, 0, doslothdparams},
         { "programs",     FULLCONFIG_ALL,  F_ALLOCATED, doprogagents},
         { "syncserver",   FULLCONFIG_ALL,  F_ALLOCATED, dosyncserver},
-        { "keyhash",      FULLCONFIG_ALL,  F_ALLOCATED, dokeyhash},
-        { "eventkey",     FULLCONFIG_ALL,  F_ALLOCATED, doeventkey},
+        { "keyhash",      FULLCONFIG_ALL,  F_ALLOCATED|F_REMREQSSL, dokeyhash},
+        { "eventkey",     FULLCONFIG_ALL,  F_ALLOCATED|F_REMREQSSL,doeventkey},
         { "fullconfig",   FULLCONFIG_NONE, F_ALLOCATED, dofullconfig},
         { "routelist",	  FULLCONFIG_PHYS, F_ALLOCATED, doroutelist},
         { "role",	  FULLCONFIG_PHYS, F_ALLOCATED, dorole},
@@ -351,7 +354,7 @@ struct command {
 	{ "emulabconfig", FULLCONFIG_NONE, F_ALLOCATED, doemulabconfig},
 	{ "eplabconfig",  FULLCONFIG_NONE, F_ALLOCATED, doeplabconfig},
 	{ "localization", FULLCONFIG_PHYS, 0, dolocalize},
-	{ "rootpswd",     FULLCONFIG_NONE, 0, dorootpswd},
+	{ "rootpswd",     FULLCONFIG_NONE, F_REMREQSSL, dorootpswd},
 	{ "booterrno",    FULLCONFIG_NONE, 0, dobooterrno},
 	{ "bootlog",      FULLCONFIG_NONE, 0, dobootlog},
 	{ "battery",      FULLCONFIG_NONE, F_REMUDP|F_MINLOG, dobattery},
@@ -362,7 +365,7 @@ struct command {
 	{ "ltmap",        FULLCONFIG_NONE, F_MINLOG|F_ALLOCATED, doltmap},
 	{ "ltpmap",       FULLCONFIG_NONE, F_MINLOG|F_ALLOCATED, doltpmap},
 	{ "elvindport",   FULLCONFIG_NONE, 0, doelvindport},
-	{ "plabeventkeys",FULLCONFIG_NONE, 0, doplabeventkeys},
+	{ "plabeventkeys",FULLCONFIG_NONE, F_REMREQSSL, doplabeventkeys},
 	{ "intfcmap",     FULLCONFIG_NONE, 0, dointfcmap},
 	{ "motelog",      FULLCONFIG_ALL,  F_ALLOCATED, domotelog},
 	{ "portregister", FULLCONFIG_NONE, F_REMNOSSL, doportregister},
@@ -1033,6 +1036,17 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 		}
 		goto skipit;
 	}
+	
+	/*
+	 * Redirect geni sliver nodes to the tmcd of their origin.
+	 */
+	if (reqp->tmcd_redirect[0]) {
+		char	buf[BUFSIZ];
+
+		sprintf(buf, "REDIRECT=%s\n", reqp->tmcd_redirect);
+		client_writeback(sock, buf, strlen(buf), istcp);
+		goto skipit;
+	}
 
 	/*
 	 * Redirect is allowed from the local host only!
@@ -1062,7 +1076,16 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	 * If the connection is not SSL, then it must be a local node.
 	 */
 	if (isssl) {
-		if (tmcd_sslverify_client(reqp->nodeid, reqp->pclass,
+		/*
+		 * LBS: I took this test out. This client verification has
+		 * always been a pain, and offers very little since since
+		 * the private key is not encrypted anyway. Besides, we
+		 * do not return any sensitive data via tmcd, just a lot of
+		 * goo that would not be of interest to anyone. I will
+		 * kill this code at some point.
+		 */
+		if (0 &&
+		    tmcd_sslverify_client(reqp->nodeid, reqp->pclass,
 					  reqp->ptype,  reqp->islocal)) {
 			error("%s: SSL verification failure\n", reqp->nodeid);
 			if (! redirect)
@@ -1105,9 +1128,13 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	/*
 	 * Do private key check. (Non-plab) widearea nodes must report a
 	 * private key. It comes over ssl of course. At present we skip
-	 * this check for ron nodes. 
+	 * this check for ron nodes.
+	 *
+	 * LBS: I took this test out cause its silly. Will kill the code at
+	 * some point.
 	 */
-	if (!reqp->islocal && !(reqp->isplabdslice || reqp->isplabsvc)) {
+	if (0 &&
+	    (!reqp->islocal && !(reqp->isplabdslice || reqp->isplabsvc))) {
 		if (!havekey) {
 			error("%s: No privkey sent!\n", reqp->nodeid);
 			/*
@@ -1152,7 +1179,7 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	 * Ditto for remote node connection without SSL.
 	 */
 	if (istcp && !isssl && !reqp->islocal && 
-	    (command_array[i].flags & F_REMNOSSL) == 0) {
+	    (command_array[i].flags & F_REMREQSSL) != 0) {
 		error("%s: %s: Invalid NO-SSL request from remote node\n",
 		      reqp->nodeid, command_array[i].cmdname);
 		goto skipit;
@@ -1693,6 +1720,7 @@ COMMAND_PROTOTYPE(doaccounts)
 	char		buf[MYBUFSIZE];
 	int		nrows, gidint;
 	int		tbadmin, didwidearea = 0, nodetypeprojects = 0;
+	int		didnonlocal = 0;
 
 	if (! tcp) {
 		error("ACCOUNTS: %s: Cannot give account info out over UDP!\n",
@@ -2275,8 +2303,9 @@ COMMAND_PROTOTYPE(doaccounts)
 		 * Add an argument of "pubkeys" to get the PUBKEY data.
 		 * An "windows" argument also returns a user's Windows Password.
 		 */
-		if (reqp->islocal && ! (strncmp(rdata, "pubkeys", 7) == 0
-					|| strncmp(rdata, "windows", 7) == 0))
+		if (reqp->islocal && !reqp->genisliver_idx &&
+		    ! (strncmp(rdata, "pubkeys", 7) == 0
+		       || strncmp(rdata, "windows", 7) == 0))
 			goto skipsshkeys;
 
 		/*
@@ -2406,6 +2435,32 @@ COMMAND_PROTOTYPE(doaccounts)
 				 "order by u.uid",
 				 16, reqp->nodeid);
 
+		if (res) {
+			if ((nrows = mysql_num_rows(res)))
+				goto again;
+			else
+				mysql_free_result(res);
+		}
+	}
+	if (reqp->genisliver_idx && !didnonlocal) {
+	        didnonlocal = 1;
+
+		res = mydb_query("select distinct "
+				 "  u.uid,'*',u.uid_idx,u.name, "
+				 "  'local_root',g.pid,g.gid,g.unix_gid,0, "
+				 "  NULL,NULL,0, "
+				 "  u.email,'csh', "
+				 "  0,0, "
+				 "  NULL,u.uid_idx "
+				 "from nonlocal_user_bindings as b "
+				 "join nonlocal_users as u on "
+				 "     b.uid_idx=u.uid_idx "
+				 "join groups as g on "
+				 "     g.pid='%s' and g.pid=g.gid "
+				 "where (b.exptidx='%d') "
+				 "order by u.uid",
+				 18, reqp->pid, reqp->exptidx);
+		
 		if (res) {
 			if ((nrows = mysql_num_rows(res)))
 				goto again;
@@ -3201,6 +3256,12 @@ COMMAND_PROTOTYPE(domounts)
 	 */
 	if (reqp->jailflag)
 		return 0;
+
+	/*
+	 * XXX
+	 */
+	if (reqp->genisliver_idx)
+		return 0;
 	
 	/*
 	 * If SFS is in use, the project mount is done via SFS.
@@ -3371,8 +3432,8 @@ COMMAND_PROTOTYPE(domounts)
 	/*
 	 * Remote nodes do not get per-user mounts. See above.
 	 */
-	if (!reqp->islocal)
-		return 0;
+	if (!reqp->islocal || reqp->genisliver_idx)
+	        return 0;
 	
 	/*
 	 * Now check for aux project access. Return a list of mounts for
@@ -4319,7 +4380,8 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 " ps.admin, "
 				 " e.elab_in_elab,e.elabinelab_singlenet, "
 				 " e.idx,e.creator_idx,e.swapper_idx, "
-				 " u.admin "
+				 " u.admin,null, "
+				 " r.genisliver_idx,r.tmcd_redirect "
 				 "from nodes as nv "
 				 "left join nodes as np on "
 				 " np.node_id=nv.phys_nodeid "
@@ -4342,7 +4404,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 "where nv.node_id='%s' and "
 				 " ((i.IP='%s' and i.role='ctrl') or "
 				 "  nv.jailip='%s')",
-				 29, reqp->vnodeid,
+				 32, reqp->vnodeid,
 				 inet_ntoa(ipaddr), inet_ntoa(ipaddr));
 	}
 	else {
@@ -4356,7 +4418,8 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 " 0,e.elab_in_elab,e.elabinelab_singlenet, "
 				 " e.idx,e.creator_idx,e.swapper_idx, "
 				 " u.admin,dedicated_wa_types.attrvalue "
-				 "   as isdedicated_wa "
+				 "   as isdedicated_wa, "
+				 " r.genisliver_idx,r.tmcd_redirect "
 				 "from interfaces as i "
 				 "left join nodes as n on n.node_id=i.node_id "
 				 "left join reserved as r on "
@@ -4384,8 +4447,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 "  on n.type=dedicated_wa_types.type "
 				 "where i.IP='%s' and i.role='ctrl' "
 				 "  and nobootinfo_types.attrvalue is NULL",
-				 /*XXX*/
-				 30, inet_ntoa(ipaddr));
+				 32, inet_ntoa(ipaddr));
 	}
 
 	if (!res) {
@@ -4468,6 +4530,13 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 		/* event key for the experiment */
 		if (row[20]) 
 			strcpy(reqp->eventkey, row[20]);
+		/* geni sliver idx */
+		if (row[30]) 
+			reqp->genisliver_idx = atoi(row[30]);
+		else
+			reqp->genisliver_idx = 0;
+		if (row[31]) 
+			strcpy(reqp->tmcd_redirect, row[31]);
 	}
 	
 	if (row[9])
