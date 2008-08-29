@@ -2022,7 +2022,7 @@ COMMAND_PROTOTYPE(doaccounts)
 		sprintf(adminclause, "and u.admin=%d", reqp->swapper_isadmin);
 #endif
 		res = mydb_query("select distinct "
-				 "  u.uid,u.usr_pswd,u.unix_uid,u.usr_name, "
+				 "  u.uid,'*',u.unix_uid,u.usr_name, "
 				 "  p.trust,g.pid,g.gid,g.unix_gid,u.admin, "
 				 "  u.emulab_pubkey,u.home_pubkey, "
 				 "  UNIX_TIMESTAMP(u.usr_modified), "
