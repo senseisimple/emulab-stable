@@ -1,37 +1,5 @@
-diff -Nurb linux-2.6.25.i686/include/linux/sysctl.h linux-2.6.25.i686.emulab/include/linux/sysctl.h
---- linux-2.6.25.i686/include/linux/sysctl.h	2008-04-16 20:49:44.000000000 -0600
-+++ linux-2.6.25.i686.emulab/include/linux/sysctl.h	2008-06-13 08:09:43.000000000 -0600
-@@ -435,6 +435,12 @@
- 	NET_TCP_ALLOWED_CONG_CONTROL=123,
- 	NET_TCP_MAX_SSTHRESH=124,
- 	NET_TCP_FRTO_RESPONSE=125,
-+	/* CONFIG_ICMP_PINGOFDEATH */
-+	NET_IPV4_ICMP_POD_ENABLED=126,
-+	NET_IPV4_ICMP_POD_HOST=127,
-+	NET_IPV4_ICMP_POD_MASK=128,
-+	NET_IPV4_ICMP_POD_KEY=129,
-+	NET_IPV4_ICMP_POD_VERSION=130,
- };
- 
- enum {
-diff -Nurb linux-2.6.25.i686/kernel/sysctl_check.c linux-2.6.25.i686.emulab/kernel/sysctl_check.c
---- linux-2.6.25.i686/kernel/sysctl_check.c	2008-04-16 20:49:44.000000000 -0600
-+++ linux-2.6.25.i686.emulab/kernel/sysctl_check.c	2008-06-13 08:10:19.000000000 -0600
-@@ -389,6 +389,11 @@
- 	{ NET_TCP_ALLOWED_CONG_CONTROL,		"tcp_allowed_congestion_control" },
- 	{ NET_TCP_MAX_SSTHRESH,			"tcp_max_ssthresh" },
- 	{ NET_TCP_FRTO_RESPONSE,		"tcp_frto_response" },
-+	{ NET_IPV4_ICMP_POD_ENABLED,            "icmp_ipod_enabled" },
-+	{ NET_IPV4_ICMP_POD_HOST,               "icmp_ipod_host" },
-+	{ NET_IPV4_ICMP_POD_MASK,               "icmp_ipod_mask" },
-+	{ NET_IPV4_ICMP_POD_KEY,                "icmp_ipod_key" },
-+	{ NET_IPV4_ICMP_POD_VERSION,            "icmp_ipod_version" },
- 	{ 2088 /* NET_IPQ_QMAX */,		"ip_queue_maxlen" },
- 	{}
- };
-diff -Nurb linux-2.6.25.i686/net/ipv4/Kconfig linux-2.6.25.i686.emulab/net/ipv4/Kconfig
---- linux-2.6.25.i686/net/ipv4/Kconfig	2008-04-16 20:49:44.000000000 -0600
-+++ linux-2.6.25.i686.emulab/net/ipv4/Kconfig	2008-06-13 08:09:43.000000000 -0600
+--- linux-2.6.25/net/ipv4/Kconfig	2008-08-29 09:50:50.000000000 -0600
++++ linux-2.6.25-emulab/net/ipv4/Kconfig	2008-08-29 09:53:39.000000000 -0600
 @@ -632,5 +632,11 @@
  
  	  If unsure, say N.
@@ -40,13 +8,12 @@ diff -Nurb linux-2.6.25.i686/net/ipv4/Kconfig linux-2.6.25.i686.emulab/net/ipv4/
 +# Emulab special
 +#
 +config ICMP_PINGOFDEATH
-+       bool "ICMP: ICMP Ping-of-Death (Emulab)"
++        bool "ICMP: ICMP Ping-of-Death (Emulab)"
 +
  source "net/ipv4/ipvs/Kconfig"
  
-diff -Nurb linux-2.6.25.i686/net/ipv4/icmp.c linux-2.6.25.i686.emulab/net/ipv4/icmp.c
---- linux-2.6.25.i686/net/ipv4/icmp.c	2008-04-16 20:49:44.000000000 -0600
-+++ linux-2.6.25.i686.emulab/net/ipv4/icmp.c	2008-06-13 08:09:43.000000000 -0600
+--- linux-2.6.25/net/ipv4/icmp.c	2008-08-29 09:51:02.000000000 -0600
++++ linux-2.6.25-emulab/net/ipv4/icmp.c	2008-08-29 09:57:02.000000000 -0600
 @@ -973,6 +973,67 @@
  out:;
  }
@@ -71,7 +38,7 @@ diff -Nurb linux-2.6.25.i686/net/ipv4/icmp.c linux-2.6.25.i686.emulab/net/ipv4/i
 +	int doit = 0;
 +
 +#if 0
-+	printk(KERN_INFO "IPOD: got type=6, code=%d, host=%u.%u.%u.%u\n", icmph->code, ntohs(iph->tot_len), NIPQUAD(iph->saddr));
++        printk(KERN_INFO "IPOD: got type=6, code=%d, host=%u.%u.%u.%u\n", icmph->code, ntohs(iph->tot_len), NIPQUAD(iph->saddr));
 +#endif
 +
 +        /*
@@ -91,14 +58,14 @@ diff -Nurb linux-2.6.25.i686/net/ipv4/icmp.c linux-2.6.25.i686.emulab/net/ipv4/i
 +		 * If packet doesn't contain enough data or key
 +		 * is otherwise invalid, ignore.
 +                 */
-+	        if (IPOD_CHECK_KEY) {
-+		        if (pskb_may_pull(skb, sizeof(sysctl_ipod_key)-1) &&
-+			    IPOD_VALID_KEY(skb->data))
-+			        doit = 1;
-+		} else {
-+		        doit = 1;
-+		}
-+        }
++                 if (IPOD_CHECK_KEY) {
++                         if (pskb_may_pull(skb, sizeof(sysctl_ipod_key)-1) &&
++			     IPOD_VALID_KEY(skb->data))
++			         doit = 1;
++		 } else {
++		         doit = 1;
++		 }
++	}
 +
 +	if (doit) {
 +	        sysctl_ipod_enabled = 0;
@@ -106,7 +73,7 @@ diff -Nurb linux-2.6.25.i686/net/ipv4/icmp.c linux-2.6.25.i686.emulab/net/ipv4/i
 +		       NIPQUAD(iph->saddr));
 +		machine_restart(NULL);
 +	} else {
-+                printk(KERN_WARNING "IPOD: from %u.%u.%u.%u rejected\n",
++	        printk(KERN_WARNING "IPOD: from %u.%u.%u.%u rejected\n",
 +		       NIPQUAD(iph->saddr));
 +	}
 +}
@@ -122,8 +89,8 @@ diff -Nurb linux-2.6.25.i686/net/ipv4/icmp.c linux-2.6.25.i686.emulab/net/ipv4/i
 +#ifdef CONFIG_ICMP_PINGOFDEATH
 +	/* PING_OF_DEATH (6) */
 +	[6] = {
-+		.handler = icmp_ping_of_death,
-+		.error = 1,
++	  .handler = icmp_ping_of_death,
++	  .error = 1,
 +	},
 +#else
  	[6] = {
@@ -134,9 +101,8 @@ diff -Nurb linux-2.6.25.i686/net/ipv4/icmp.c linux-2.6.25.i686.emulab/net/ipv4/i
  	[7] = {
  		.handler = icmp_discard,
  		.error = 1,
-diff -Nurb linux-2.6.25.i686/net/ipv4/sysctl_net_ipv4.c linux-2.6.25.i686.emulab/net/ipv4/sysctl_net_ipv4.c
---- linux-2.6.25.i686/net/ipv4/sysctl_net_ipv4.c	2008-04-16 20:49:44.000000000 -0600
-+++ linux-2.6.25.i686.emulab/net/ipv4/sysctl_net_ipv4.c	2008-06-13 08:09:43.000000000 -0600
+--- linux-2.6.25/net/ipv4/sysctl_net_ipv4.c	2008-08-29 09:51:18.000000000 -0600
++++ linux-2.6.25-emulab/net/ipv4/sysctl_net_ipv4.c	2008-08-29 09:58:52.000000000 -0600
 @@ -23,6 +23,14 @@
  #include <net/cipso_ipv4.h>
  #include <net/inet_frag.h>
@@ -158,7 +124,7 @@ diff -Nurb linux-2.6.25.i686/net/ipv4/sysctl_net_ipv4.c linux-2.6.25.i686.emulab
  	},
 +#ifdef CONFIG_ICMP_PINGOFDEATH
 +	{
-+                .ctl_name       = NET_IPV4_ICMP_POD_VERSION,
++	        .ctl_name       = CTL_UNNUMBERED,
 +		.procname       = "icmp_ipod_version",
 +		.data           = &sysctl_ipod_version,
 +		.maxlen         = sizeof(int),
@@ -166,7 +132,7 @@ diff -Nurb linux-2.6.25.i686/net/ipv4/sysctl_net_ipv4.c linux-2.6.25.i686.emulab
 +		.proc_handler   = &proc_dointvec,
 +	},
 +	{
-+	        .ctl_name       = NET_IPV4_ICMP_POD_ENABLED,
++	        .ctl_name       = CTL_UNNUMBERED,
 +		.procname       = "icmp_ipod_enabled",
 +		.data           = &sysctl_ipod_enabled,
 +		.maxlen         = sizeof(int),
@@ -174,7 +140,7 @@ diff -Nurb linux-2.6.25.i686/net/ipv4/sysctl_net_ipv4.c linux-2.6.25.i686.emulab
 +		.proc_handler   = &proc_dointvec,
 +	},
 +	{
-+	        .ctl_name       = NET_IPV4_ICMP_POD_HOST,
++	        .ctl_name       = CTL_UNNUMBERED,
 +		.procname       = "icmp_ipod_host",
 +		.data           = &sysctl_ipod_host,
 +		.maxlen         = sizeof(int),
@@ -182,7 +148,7 @@ diff -Nurb linux-2.6.25.i686/net/ipv4/sysctl_net_ipv4.c linux-2.6.25.i686.emulab
 +		.proc_handler   = &proc_dointvec,
 +	},
 +	{
-+	        .ctl_name       = NET_IPV4_ICMP_POD_MASK,
++	        .ctl_name       = CTL_UNNUMBERED,
 +		.procname       = "icmp_ipod_mask",
 +		.data           = &sysctl_ipod_mask,
 +		.maxlen         = sizeof(int),
@@ -190,7 +156,7 @@ diff -Nurb linux-2.6.25.i686/net/ipv4/sysctl_net_ipv4.c linux-2.6.25.i686.emulab
 +		.proc_handler   = &proc_dointvec,
 +	},
 +	{
-+	        .ctl_name       = NET_IPV4_ICMP_POD_KEY,
++	        .ctl_name       = CTL_UNNUMBERED,
 +		.procname       = "icmp_ipod_key",
 +		.data           = sysctl_ipod_key,
 +		.maxlen         = sizeof(sysctl_ipod_key),
