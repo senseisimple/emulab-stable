@@ -5644,6 +5644,14 @@ COMMAND_PROTOTYPE(dofullconfig)
 
 	for (i = 0; i < numcommands; i++) {
 		if (command_array[i].fullconfig & mask) {
+			if (tcp && !isssl && !reqp->islocal && 
+			    (command_array[i].flags & F_REMREQSSL) != 0) {
+				/*
+				 * Silently drop commands that are not
+				 * allowed for remote non-ssl connections.
+				 */
+				continue;
+			}
 			OUTPUT(buf, sizeof(buf),
 			       "*** %s\n", command_array[i].cmdname);
 			client_writeback(sock, buf, strlen(buf), tcp);
