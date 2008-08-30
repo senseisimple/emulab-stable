@@ -4,6 +4,7 @@
 # Copyright (c) 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
+use strict;
 use English;
 use Getopt::Std;
 
@@ -60,6 +61,14 @@ if ($UID != 0) {
 }
 
 #
+# Only one script can run at a time, for now just
+# abort instead of waiting
+#
+my $lock_res = TBScriptLock("dumperrorlog", 1, 0);
+#exit( 0) if $lock_res == TBSCRIPTLOCK_IGNORE();
+exit(-1) if $lock_res != TBSCRIPTLOCK_OKAY();
+
+#
 # Form a temp name.
 #
 my $logname = TBMakeLogname("dumperrorlog");
@@ -68,7 +77,7 @@ my $logname = TBMakeLogname("dumperrorlog");
 # Parse command arguments. Once we return from getopts, all that should
 # left are the required arguments.
 #
-%options = ();
+my %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
 }
@@ -140,6 +149,9 @@ if (!defined($NOTICE)) {
     fatal("No priority named 'NOTICE' in the priorities table!");
 }
 
+print "Copying log entries ($lastseq,$maxseq]\n";
+print "Exptidx ($exptidx_min, $exptidx_max]\n";
+
 #
 # Only the main site does this archiving stuff.
 #
@@ -148,6 +160,16 @@ if ($ISMAINSITE) {
     # Must lock the table of course
     #
     DBQueryFatal("lock tables log write");
+
+    #
+    # Backup old outfile
+    #
+    if (-e "${tempfile}.log") {
+	unlink("${tempfile}.log.save")
+	    if (-e "${tempfile}.log.save");
+	
+	system("/bin/mv -f ${tempfile}.log ${tempfile}.log.save");
+    }
 
     #
     # Grab all of the new entries and store to the file
@@ -176,15 +198,10 @@ if ($ISMAINSITE) {
     # Might not be any new entries ...
     # 
     if (defined($lastseq)) {
-	system("echo \"load data infile '${tempfile}.log' into table log\" ".
+	system("echo \"load data infile '${tempfile}.log' replace into table log\" ".
 	       "     | mysql errorlog");
 	fatal("Could not load into archive DB!")
 	    if ($?);
-
-	# Okay, now that we have really archived them away, update the
-	# seq number.
-	DBQueryFatal("update emulab_indicies set idx='$lastseq' ".
-		     "where name='lastlog_seqnum'");
 
 	#
 	# XXX This awful hack will go away when Kevin is happy with
@@ -201,12 +218,6 @@ if ($ISMAINSITE) {
 	system("$SSHTB -host $USERNODE $PROXY log") == 0
 	    or fatal("Could not load log entries into ops DB!");
     }
-    if (-e "${tempfile}.log") {
-	unlink("${tempfile}.log.save")
-	    if (-e "${tempfile}.log.save");
-	
-	system("/bin/mv -f ${tempfile}.log ${tempfile}.log.save");
-    }
 
     #
     # Now the other tables Kevin needs
@@ -215,6 +226,9 @@ if ($ISMAINSITE) {
 			   "errors", "users", "experiments",
 			   "report_error", "report_context",
 			   "report_assign_violation") {
+
+ 	unlink("${tempfile}.${tablename}") if -e "${tempfile}.${tablename}";
+
 	if (($tablename eq "errors" ||
 	     $tablename eq "session_info") && !$force) {
 	    DBQueryFatal("select * from $tablename where session>=$firstseq and session<=$lastseq ".
@@ -263,6 +277,11 @@ if ($ISMAINSITE) {
     }
 }
 
+# Okay, now that we have really archived them away, update the
+# seq number.
+DBQueryFatal("update emulab_indicies set idx='$lastseq' ".
+	     "where name='lastlog_seqnum'");
+
 # Okay, now that we have really sent over the experiment_stats stuff.
 DBQueryFatal("update emulab_indicies set idx='$exptidx_max' ".
 		     "where name='lastlog_exptidx'");
@@ -284,6 +303,8 @@ DBQueryFatal("delete from log ".
 
 unlink("$logname")
     if (-e $logname);
+
+TBScriptUnlock();
 
 exit(0);
 
