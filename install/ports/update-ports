@@ -71,7 +71,7 @@ $DO portupgrade -N -PP lang/perl5.8 || {
 $DO ln -s /usr/local/bin/perl5.8.8 /usr/bin/perl
 
 echo "update-ports: Cleaning out old python ..."
-$DO pkg_delete -f -x python-2 py23
+$DO pkg_delete -f -x python-2 py23 py24
 
 echo "update-ports: Cleaning out other old cruft ..."
 $DO pkg_delete -f -x XFree86 tcl-8.3 tk-8.3 libtool-1.3 gcc30
