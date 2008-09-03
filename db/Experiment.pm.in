@@ -2520,7 +2520,7 @@ sub OldReservedNodeList($$)
 
 #
 # Return list of experiment nodes (objects or just names)
-# 
+#
 sub NodeList($;$$)
 {
     my ($self, $namesonly, $includevirtual) = @_;
@@ -2813,9 +2813,9 @@ sub SetPanicBit($$)
 #
 # Is experiment firewalled?
 #
-sub IsFirewalled($)
+sub IsFirewalled($;$)
 {
-    my ($self) = @_;
+    my ($self, $pref) = @_;
 
     # Must be a real reference. 
     return -1
@@ -2824,7 +2824,7 @@ sub IsFirewalled($)
     my $pid = $self->pid();
     my $eid = $self->eid();
 
-    return TBExptFirewall($pid, $eid);
+    return TBExptFirewall($pid, $eid, $pref);
 }
 
 #
@@ -3589,10 +3589,11 @@ sub InsertVirtNode($$)
     my $eid = $self->eid();
     my $idx = $self->idx();
     my $node_id = $node->node_id();
+    my $type    = $node->type();
 
     DBQueryWarn("replace into virt_nodes set ".
 		"  pid='$pid', eid='$eid', exptidx='$idx', ".
-		"  vname='$node_id', type='pc', ips='', ".
+		"  vname='$node_id', type='$type', ips='', ".
 		"  cmd_line='', startupcmd='', osname=''")
 	or return -1;
     
@@ -3669,6 +3670,29 @@ sub LinkInterfaces($$$)
     }
     @$pref = @result;
     return 0;
+}
+
+#
+# Does the experiment have any geni nodes. Faster then checking all the nodes.
+#
+sub HasGeniNodes($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference.
+    return -1
+	if (!ref($self));
+
+    my $idx = $self->idx();
+
+    my $query_result =
+	DBQueryFatal("select n.node_id from reserved as r ".
+		     "left join nodes as n on n.node_id=r.node_id ".
+		     "left join node_types as t on t.type=n.type ".
+		     "where r.exptidx=$idx and t.isfednode=1");
+    return -1
+	if (!$query_result);
+    return $query_result->num_rows;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

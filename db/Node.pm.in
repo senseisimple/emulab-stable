@@ -112,12 +112,92 @@ sub Lookup($$)
     $nodes{$nodeid} = $self;
     return $self;
 }
+
+#
+# Bulk lookup of nodes reserved to an experiment. More efficient.
+#
+sub BulkLookup($$$)
+{
+    my ($class, $experiment, $pref) = @_;
+    my %nodelist = ();
+    my $exptidx  = $experiment->idx();
+
+    my $query_result =
+	DBQueryWarn("select n.* from reserved as r ".
+		    "left join nodes as n on n.node_id=r.node_id ".
+		    "where r.exptidx=$exptidx");
+
+    return -1
+	if (!defined($query_result));
+
+    while (my $row = $query_result->fetchrow_hashref()) {
+	my $nodeid = $row->{'node_id'};
+	my $node;
+
+	if (exists($nodes{$nodeid})) {
+	    $node = $nodes{$nodeid};
+	    $node->{"DBROW"} = $row;
+	}
+	else {
+	    $node               = {};
+	    $node->{"DBROW"}    = $row;
+	    bless($node, $class);
+
+	    # Add to cache.
+	    $nodes{$nodeid} = $node;
+	}
+	$node->{"RSRV"}     = undef;
+	$node->{"TYPEINFO"} = undef;
+	$node->{"ATTRS"}    = undef;
+	
+	$nodelist{$nodeid} = $node;
+    }
+
+    $query_result =
+	DBQueryWarn("select r.* from reserved as r ".
+		    "where r.exptidx=$exptidx");
+    return -1
+	if (!defined($query_result));
+    
+    while (my $row = $query_result->fetchrow_hashref()) {
+	my $nodeid = $row->{'node_id'};
+	my $node   = $nodelist{$nodeid};
+
+	return -1
+	    if (!defined($node));
+
+	$node->{"RSRV"} = $row;
+    }
+
+    $query_result =
+	DBQueryWarn("select a.* from reserved as r ".
+		    "left join node_attributes as a on a.node_id=r.node_id ".
+		    "where r.exptidx=$exptidx and a.node_id is not null");
+    return -1
+	if (!defined($query_result));
+    
+    while (my $row = $query_result->fetchrow_hashref()) {
+	my $nodeid = $row->{'node_id'};
+	my $key    = $row->{'attrkey'};
+	my $node   = $nodelist{$nodeid};
+
+	return -1
+	    if (!defined($node));
+
+	$node->{"ATTRS"}->{$key} = $row;
+    }
+	
+    @$pref = values(%nodelist);
+    return 0;
+}
+
 # accessors
 sub field($$)  { return ((! ref($_[0])) ? -1 : $_[0]->{'DBROW'}->{$_[1]}); }
 sub node_id($)       { return field($_[0], 'node_id'); }
 sub uuid($)          { return field($_[0], 'uuid'); }
 sub type($)          { return field($_[0], 'type'); }
 sub eventstate($)    { return field($_[0], 'eventstate'); }
+sub allocstate($)    { return field($_[0], 'allocstate'); }
 sub jailflag($)      { return field($_[0], 'jailflag'); }
 sub phys_nodeid($)   { return field($_[0], 'phys_nodeid'); }
 sub def_boot_osid($) { return field($_[0], 'def_boot_osid'); }
@@ -134,6 +214,19 @@ sub Create($$$$)
 
     my $type = $argref->{'type'};
     my $role = $argref->{'role'};
+    my $uuid;
+
+    if (exists($argref->{'uuid'})) {
+	$uuid = $argref->{'uuid'};
+    }
+    else {
+	$uuid = NewUUID();
+	if (!defined($uuid)) {
+	    print STDERR "Could not generate a UUID!\n";
+	    return undef;
+	}
+    }
+    $uuid = DBQuoteSpecial($uuid);
 
     my $typeinfo = NodeType->Lookup($type);
     return undef
@@ -184,7 +277,7 @@ sub Create($$$$)
 		"  priority=$priority, " .
 		"  eventstate='$state', op_mode='$opmode', " .
 		"  def_boot_osid='$osid', " .
-		"  inception=now(), ".
+		"  inception=now(), uuid=$uuid, ".
 		"  state_timestamp=unix_timestamp(NOW()), " .
 		"  op_mode_timestamp=unix_timestamp(NOW())")
 	or goto bad;
@@ -226,16 +319,18 @@ sub Create($$$$)
     # Add vnode counts.
     #
     if ($role eq $Node::NODEROLE_TESTNODE && $virtnode_capacity) {
-	my $vtype = $type;
-	if (!($vtype =~ s/pc/pcvm/)) {
-	    $vtype = "$vtype-vm";
+	my $vtype;
+	
+	if (exists($argref->{'vtype'})) {
+	    $vtype = $argref->{'vtype'};
 	}
-	my $pcvmtype = ($isremote ? "pcvwa" : "pcvm");
-
-	DBQueryWarn("insert into node_auxtypes set node_id='$node_id', " .
-		    "type='$pcvmtype', count=$virtnode_capacity")
-	    or goto bad;
-	    
+	else  {
+	    $vtype = $type;
+	    if (!($vtype =~ s/pc/pcvm/)) {
+		$vtype = "$vtype-vm";
+	    }
+	}
+	
 	DBQueryWarn("insert into node_auxtypes set node_id='$node_id', " .
 		    "type='$vtype', count=$virtnode_capacity")
 	    or goto bad;
@@ -600,16 +695,20 @@ sub ModifyReservation($$)
 	if (! $self->IsReserved());
     
     my $node_id = $self->node_id();
+    my @sets    = ();
+    foreach my $key (keys(%{$argref})) {
+	my $val = $argref->{$key};
 
-    my $query = "update reserved set ".
-	join(",", map("$_='" . $argref->{$_} . "'", keys(%{$argref})));
+	push(@sets, "$key=" . ("$val" eq "NULL" ? "NULL" : "'$val'"));
+    }
 
+    my $query = "update reserved set ".	join(",", @sets);
     $query .= " where node_id='$node_id'";
 
     return -1
 	if (! DBQueryWarn($query));
 
-    return 0;
+    return Refresh($self);
 }
 
 #
@@ -722,11 +821,15 @@ sub VirtualNodes($$)
     return -1
 	if (! ref($self));
 
+    @$plist         = ();
+
     my $reservation = $self->Reservation();
+    return 0
+	if (!defined($reservation));
+
     my $node_id     = $self->node_id();
     my $exptidx     = $reservation->idx();
     my @result      = ();
-    @$plist         = ();
 
     my $query_result = 
 	DBQueryWarn("select r.node_id from reserved as r ".
@@ -976,6 +1079,20 @@ sub ClearInterfaces($)
 }
 
 #
+# Look up all interfaces for a node, return list of objects.
+#
+sub AllInterfaces($$)
+{
+    my ($self, $pref) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! (ref($self) && ref($pref)));
+
+    return Interface->LookupAll($self->node_id(), $pref);
+}
+
+#
 # Mark a node for an update.
 #
 sub MarkForUpdate($)
@@ -1143,11 +1260,12 @@ sub CreateVnodes($$)
     my $vtype   = $options->{'vtype'};
     my $pnode   = $options->{'nodeid'};
 
-    my $exptidx;
-    if (!TBExptIDX($pid, $eid, \$exptidx)) {
+    my $experiment = Experiment->Lookup($pid, $eid);
+    if (!defined($experiment)) {
 	print STDERR "*** CreateVnodes: No such experiment $pid/$eid!\n";
 	return -1;
     }
+    my $exptidx = $experiment->idx();
 
     #
     # Need the vtype node_type info. 
@@ -1590,6 +1708,46 @@ sub SelectOS($)
     system("$OSSELECT -b $node_id");
     return -1
 	if ($?);
+    return 0;
+}
+
+#
+# Set geni sliver idx,tmcd for the node. Called out of the geni libraries
+# when the sliver that corresponds to the node has been created.
+#
+sub SetGeniSliverInfo($$;$)
+{
+    my ($self, $idx, $tmcd_redirect) = @_;
+
+    return -1
+	if (! (ref($self)));
+
+    my $args = {"genisliver_idx" => $idx};
+    if (defined($tmcd_redirect)) {
+	$args->{'tmcd_redirect'} =
+	    ($tmcd_redirect eq "" ? "NULL" : $tmcd_redirect);
+    }
+    return $self->ModifyReservation($args);
+}
+
+#
+# Get the geni info for a node.
+#
+sub GetGeniSliverInfo($$;$)
+{
+    my ($self, $idx, $tmcd_redirect) = @_;
+
+    return -1
+	if (! (ref($self)));
+
+    my $reservation = $self->ReservedTableEntry();
+    return -1
+	if (!defined($reservation));
+
+    $$idx = $reservation->{'genisliver_idx'};
+    $$tmcd_redirect = $reservation->{'tmcd_redirect'}
+        if defined($tmcd_redirect);
+
     return 0;
 }
 

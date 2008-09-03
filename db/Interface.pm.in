@@ -45,24 +45,27 @@ sub mysystem($)
 #
 # Lookup interfaces for a node and create a list of class instances to return.
 #
-sub LookupAll($$)
+sub LookupAll($$$)
 {
-    my ($class, $nodeid) = @_;
+    my ($class, $nodeid, $pref) = @_;
 
     $nodeid = $nodeid->node_id()
 	if (ref($nodeid));
 
     # Look in cache first
-    return @{ $node_interfaces{$nodeid} }
-        if (exists($node_interfaces{$nodeid}));
+    if (exists($node_interfaces{$nodeid})) {
+	@$pref = @{ $node_interfaces{$nodeid} };
+	return 0;
+    }
+    @$pref = ();
 
     my $query_result =
 	DBQueryWarn("select * from interfaces ".
 		    "where node_id='$nodeid'");
 
-    return undef
+    return -1
 	if (!$query_result);
-    return ()
+    return 0
 	if (!$query_result->numrows);
 
     my $results = [];
@@ -95,7 +98,8 @@ sub LookupAll($$)
     # Add to cache of node interfaces
     $node_interfaces{$nodeid} = $results;
     
-    return @{ $results };
+    @$pref = @{ $results };
+    return 0;
 }
 # accessors
 sub field($$)  { return ((! ref($_[0])) ? -1 : $_[0]->{'DBROW'}->{$_[1]}); }
@@ -156,6 +160,84 @@ sub Lookup($$$$)
 }
 
 #
+# Create a new interface record. This also handles the wires table entries.
+#
+sub Create($$$)
+{
+    my ($class, $node, $argref) = @_;
+
+    return undef
+	if (! (ref($node) && ref($argref)));
+
+    my $node_id = $node->node_id();
+
+    my $MAC        = $argref->{'MAC'};
+    my $IP         = $argref->{'IP'};
+    my $mask       = $argref->{'mask'};
+    my $card       = $argref->{'card'};
+    my $port       = $argref->{'port'};
+    my $iftype     = $argref->{'type'};
+    my $ifrole     = $argref->{'role'};
+    my $uuid       = $argref->{'uuid'};
+    my $max_speed  = $argref->{'max_speed'};
+    my $duplex     = $argref->{'duplex'};
+    my $switch_id  = $argref->{'switch_id'};
+    my $switch_card= $argref->{'switch_card'};
+    my $switch_port= $argref->{'switch_port'};
+    my $wire_type  = $argref->{'wire_type'};
+    my $cable      = $argref->{'cable'};
+    my $length     = $argref->{'length'};
+    my $iface      = "eth$card";
+
+    $port = 1
+	if (!defined($port));
+    $IP = ""
+	if (!defined($IP));
+    $mask = ""
+	if (!defined($mask));
+    $duplex = "full"
+	if (!defined($duplex));
+    $max_speed = 0
+	if (!defined($max_speed));
+    if (!defined($uuid)) {
+	$uuid = NewUUID();
+	if (!defined($uuid)) {
+	    print STDERR "Could not generate a UUID!\n";
+	    return undef;
+	}
+    }
+    DBQueryWarn("insert into interfaces set ".
+		"  node_id='$node_id', " .
+		"  card=$card, port=$port, role='$ifrole', ".
+		"  mac='$MAC', IP='$IP', mask='$mask', " .
+		"  interface_type='$iftype', iface='$iface', " .
+		"  current_speed='$max_speed', duplex='$duplex', ".
+		"  uuid='$uuid'")
+	or return undef;
+
+    if (defined($switch_id)) {
+	my $cable_len = "";
+	if (defined($cable)) {
+	    $cable_len .= ", cable=$cable";
+	}
+	if (defined($length)) {
+	    $cable_len .= ", len=$length";
+	}
+	if (!DBQueryWarn("insert into wires set".
+			 "  type='$wire_type', " .
+			 "  node_id1='$node_id', card1=$card, port1=$port, " .
+			 "  node_id2='$switch_id', card2='$switch_card', " .
+			 "  port2='$switch_port' $cable_len")) {
+	    DBQueryWarn("delete from interfaces ".
+			"where node_id='$node_id' and card='$card' ".
+			"      and port='$port'");
+	    return undef;
+	}
+    }
+    return Interface->Lookup($node_id, $card, $port);
+}
+
+#
 # Lookup by iface
 #
 sub LookupByIface($$$)
@@ -170,7 +252,7 @@ sub LookupByIface($$$)
         if (exists($all_interfaces{"$nodeid:$iface"}));
 
     my $query_result =
-	DBQueryWarn("select * from interfaces ".
+	DBQueryWarn("select card,port from interfaces ".
 		    "where node_id='$nodeid' and iface='$iface'");
 
     return undef
@@ -178,19 +260,9 @@ sub LookupByIface($$$)
     return undef
 	if (!$query_result->numrows);
 
-    my $interface = {};
-	
-    $interface->{"DBROW"} = $query_result->fetchrow_hashref();
-    bless($interface, $class);
+    my ($card, $port) = $query_result->fetchrow_array();
 
-    # Cache by card,port and by iface
-    my $card = $interface->card();
-    my $port = $interface->port();
-    
-    $all_interfaces{"$nodeid:$card:$port"} = $interface;
-    $all_interfaces{"$nodeid:$iface"}      = $interface;
-    
-    return $interface;
+    return Interface->Lookup($nodeid, $card, $port);
 }
 
 #
@@ -205,7 +277,7 @@ sub LookupByUUID($$)
     }
     
     my $query_result =
-	DBQueryWarn("select node_id,iface from interfaces ".
+	DBQueryWarn("select node_id,card,port from interfaces ".
 		    "where uuid='$uuid'");
 
     return undef
@@ -213,9 +285,9 @@ sub LookupByUUID($$)
     return undef
 	if (!$query_result->numrows);
     
-    my ($node_id, $iface) = $query_result->fetchrow_array();
+    my ($nodeid, $card, $port) = $query_result->fetchrow_array();
 
-    return Interface->LookupByIface($node_id, $iface);
+    return Interface->Lookup($nodeid, $card, $port);
 }
 
 #
@@ -229,7 +301,7 @@ sub LookupControl($)
 	if (ref($nodeid));
 
     my $query_result =
-	DBQueryWarn("select * from interfaces ".
+	DBQueryWarn("select card,port from interfaces ".
 		    "where node_id='$nodeid' and ".
 		    "      role='" . TBDB_IFACEROLE_CONTROL()  . "'");
 
@@ -238,20 +310,9 @@ sub LookupControl($)
     return undef
 	if (!$query_result->numrows);
 
-    my $interface = {};
-	
-    $interface->{"DBROW"} = $query_result->fetchrow_hashref();
-    bless($interface, $class);
+    my ($card, $port) = $query_result->fetchrow_array();
 
-    # Cache by card,port and by iface
-    my $card  = $interface->card();
-    my $port  = $interface->port();
-    my $iface = $interface->iface();
-    
-    $all_interfaces{"$nodeid:$card:$port"} = $interface;
-    $all_interfaces{"$nodeid:$iface"}      = $interface;
-    
-    return $interface;
+    return Interface->Lookup($nodeid, $card, $port);
 }
 
 #
