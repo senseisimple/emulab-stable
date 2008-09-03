@@ -24,6 +24,7 @@ use vars qw(@ISA @EXPORT);
 use lib '@prefix@/lib';
 use libdb;
 use libtblog;
+use GeniEmulab;
 use English;
 
 #
@@ -71,6 +72,7 @@ my $reboot      = "$TB/bin/node_reboot";
 
 # Locals
 my $debug       = 0;
+my $silent      = 0;
 my %children    = ();
 
 #
@@ -90,9 +92,10 @@ sub nodereboot($$)
     copy_hash %ENV, $old_env;
     tblog_sub_process("reboot", @nodes);
 
-
     $debug = $args->{'debug'}
         if (exists($args->{'debug'}));
+    $silent = $args->{'silent'}
+        if (exists($args->{'silent'}));
 
     if ($EUID != 0) {
 	#
@@ -188,19 +191,25 @@ sub nodereboot($$)
     my %virtnodes = ();
 
     foreach my $node (@nodes) {
-	my ($jailed, $plab);
-
+	my $nodeobj = $nodeobjects{$node};
+	if (!defined($nodeobj)) {
+	    tbdie("Could not map $node to its object");
+	}
+	my $jailed     = $nodeobj->jailflag();
+	my $plab       = $nodeobj->isplabdslice();
+	my $pnode      = $nodeobj->phys_nodeid();
+	my $geninode   = $nodeobj->isfednode();
+	my $rebootable = $nodeobj->rebootable();
+	
 	# All nodes start out as being successful; altered later as needed.
 	$result->{$node} = 0;
 
-	if (TBIsNodeVirtual($node, \$jailed, \$plab)) {
-	    if (! $jailed && ! $plab) {
+	if ($nodeobj->isvirtnode()) {
+	    if (!$jailed && !$plab && !$geninode && !$rebootable) {
 		print "reboot ($node): Skipping old style virtual node\n";
 		next;
 	    }
-	    my $pnode;
-
-	    if (! TBPhysNodeID($node, \$pnode)) {
+	    if (!defined($pnode)) {
 	        tberror "$node: No physical node!";
 		return -1;
 	    }
@@ -408,7 +417,7 @@ sub nodereboot($$)
     for my $node ( sort(keys(%virtnodes)) ) {
 	my $pnode = $virtnodes{$node};
 
-	if (RebootVNode($node, $pnode)) {
+	if (RebootVNode($nodeobjects{$node}, $pnode)) {
 	    $failed++;
 	    $result->{$node} = -1;
 	    tberror "$node: Reboot failed (on $pnode)";
@@ -424,7 +433,8 @@ sub nodereboot($$)
     if ($waitmode) {
 	my $waitstart = time;
 
-	print STDOUT "reboot: Waiting for nodes to come up.\n";
+	print STDOUT "reboot: Waiting for nodes to come up.\n"
+	    if (!$silent);
 
 	# Wait for events to filter through stated! If we do not wait, then we
 	# could see nodes still in ISUP.
@@ -455,7 +465,8 @@ sub nodereboot($$)
 	}
     }
  done:    
-    print "reboot: Done. There were $failed failures.\n";
+    print "reboot: Done. There were $failed failures.\n"
+	if (!$silent);
 
     if ($asyncmode || $pipemode) {
 	#
@@ -757,15 +768,21 @@ sub RebootNode {
 # Reboot a vnode in a child process, and wait for it.
 #
 sub RebootVNode($$) {
-    my ($vnode, $pnode) = @_;
+    my ($nodeobj, $pnode) = @_;
     my $syspid;
 
-    print STDOUT "reboot ($vnode): Rebooting (on $pnode).\n";
+    my $vnode      = $nodeobj->node_id();
+    my $jailed     = $nodeobj->jailflag();
+    my $plab       = $nodeobj->isplabdslice();
+    my $geninode   = $nodeobj->isfednode();
 
-    # See if we're a plab node (must send the '-p' switch to vnodesetup
+    print STDOUT "reboot ($vnode): Rebooting (on $pnode).\n"
+	if (!$silent);
+
+    #
+    # If we're a plab node (must send the '-p' switch to vnodesetup
     # so that plab slivers reboot properly if vnodesetup has died.
-    my ($jailed,$plab) = (0,0);
-    TBIsNodeVirtual($vnode, \$jailed, \$plab);
+    #
 
     #
     # Run an ssh command in a child process, protected by an alarm to
@@ -776,7 +793,7 @@ sub RebootVNode($$) {
 
     if ($syspid) {
 	local $SIG{ALRM} = sub { kill("TERM", $syspid); };
-	alarm 20;
+	alarm 30;
 	waitpid($syspid, 0);
 	alarm 0;
 	my $exitstatus = $?;
@@ -803,6 +820,19 @@ sub RebootVNode($$) {
 	return($exitstatus);
     }
 
+    if ($geninode) {
+	#
+	# Do this via the Geni API and return that status to the caller.
+	#
+	my $experiment = $nodeobj->Reservation();
+	if (!defined($experiment)) {
+	    print STDERR "*** reboot ($vnode): geninode not allocated.\n";
+	    exit(1);
+	}
+	$EUID = $UID;
+	exit(GeniEmulab->StartSlivers($experiment, [ $nodeobj ]));
+    }
+
     my $addargs = "";
     if ($plab) {
 	$addargs .= "-p ";
@@ -810,6 +840,9 @@ sub RebootVNode($$) {
     elsif ($jailed) {
 	$addargs .= "-j ";
     }
+    else {
+	$addargs .= "-i ";
+    }	
 
     #
     # Must change our real UID to root so that ssh will work.
