@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -41,6 +41,7 @@ my $TBOPS       = "@TBOPSEMAIL@";
 my $TBLOGS      = "@TBLOGSEMAIL@";
 my $CLIENT_BIN  = "@CLIENT_BINDIR@";
 
+my $SAVEUID     = $UID;
 my $ssh		= "$TB/bin/sshtb -n";
 my $debug       = 0;
 my $force       = 0;
@@ -58,6 +59,10 @@ my $dbuid;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use libtblog;
+use Experiment;
+use Node;
+use GeniEmulab;
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -129,26 +134,36 @@ else {
 }
 
 if ($plabonly && $jailonly) {
-    die("*** '-j' and '-p' are mutually exclusive.");
+    tbdie("*** '-j' and '-p' are mutually exclusive.");
+}
+
+#
+# Verify user and get his DB uid and other info for later.
+#
+my $this_user = User->ThisUser();
+if (!defined($this_user) && $UID) {
+    tbdie("You ($UID) do not exist!");
+}
+my $experiment = Experiment->Lookup($pid, $eid);
+if (!defined($experiment)) {
+    tbdie("Could not locate object for experiment $pid/$eid");
 }
 
 #
 # Verify permission to muck with this experiment. Note that this script
 # is run as root from the plab monitor daemon.
 #
-if ($UID && !TBAdmin($UID) &&
-    !TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_DESTROY)) {
-    die("*** $0:\n".
-	"    You do not have permission to mess with $pid/$eid!\n");
+if (defined($this_user) && !$this_user->IsAdmin() &&
+    !$experiment->AccessCheck($this_user, TB_EXPT_DESTROY)) {
+    tbdie("You do not have permission to mess with $pid/$eid!");
 }
 
 #
 # Get the list of nodes in this experiment.
 #
-my @nodes = ExpNodes($pid, $eid);
+my @nodes = $experiment->NodeList(1);
 if (! @nodes) {
-    warn("*** $0:\n".
-	 "    No allocated nodes in experiment $pid/$eid!\n");
+    tbwarn("No allocated nodes in experiment $pid/$eid.");
     exit(0);
 }
 
@@ -167,41 +182,43 @@ if (@ARGV) {
 	    $node = $1;
 
 	    if (!defined($fulllist{$node})) {
-		die("*** $0:\n".
-		     "   Node $node is not allocated to $pid/$eid!\n");
+		tbdie("Node $node is not allocated to $pid/$eid!");
 	    }
 	}
 	else {
-	    die("Bad node name: $node.");
+	    tbdie("Bad node name: $node.");
 	}
 	push(@nodes, $node);
     }
 }
-my $exptstate = ExpState($pid, $eid);
+my $exptstate = $experiment->state();
 
 # Just the vnodes mam.
 foreach my $node (@nodes) {
-    my $pnode;
-    my $jailed;
-    my $plab;
-    my $allocstate;
     my $mode = ($killmode ? "teardown" : "setup");
-    my $remote = TBIsNodeRemote($node); 
-
-    if (! TBIsNodeVirtual($node, \$jailed, \$plab)) {
-	next;
+    
+    my $nodeobj = Node->Lookup($node);
+    if (!defined($nodeobj)) {
+	tbdie("Could not map $node to its object");
     }
+    my $jailed     = $nodeobj->jailflag();
+    my $plab       = $nodeobj->isplabdslice();
+    my $remote     = $nodeobj->isremotenode();
+    my $pnode      = $nodeobj->phys_nodeid();
+    my $allocstate = $nodeobj->allocstate();
+    my $geninode   = $nodeobj->isfednode();
+
+    next
+	if (!$nodeobj->isvirtnode());
+
     if (($plabonly || $jailonly) and 
         !(($plabonly && $plab) || ($jailonly && (($jailed || $remote) 
 						 && !$plab)))) {
         next;
     }
-    if (! TBPhysNodeID($node, \$pnode)) {
-	die("*** $0:\n".
-	    "    No physical node for $node!\n");
+    if (!defined($pnode)) {
+	tbdie("No physical node for $node!");
     }
-
-    TBGetNodeAllocState($node, \$allocstate);
 
     #
     # On remote nodes, or when forcemode is on, always do the deed.
@@ -335,13 +352,13 @@ foreach my $node (@nodes) {
     # XXX: Don't we always want to set this?
     #
     if ($mode eq "teardown" || $mode eq "reboot") {
-	TBSetNodeEventState($node, TBDB_NODESTATE_SHUTDOWN);
+	$nodeobj->SetEventState(TBDB_NODESTATE_SHUTDOWN);
     }
 
     #
     # Put this into the list of calls we have to make in the next loop
     #
-    push @vnodes, [$node, $pnode, $mode, $jailed, $plab];
+    push @vnodes, [$nodeobj, $mode];
 
 }
 
@@ -371,9 +388,14 @@ while (1) {
 	# Look for a vnode that is not on a pnode we're already working on
 	# 
 	# XXX - do this!
-	
-	my ($vnode, $pnode, $mode, $jailed, $plab) = @{pop @vnodes};
-	my $remote = TBIsNodeRemote($vnode); 
+
+	my ($nodeobj, $mode) = @{pop @vnodes};
+	my $vnode    = $nodeobj->node_id();
+	my $jailed   = $nodeobj->jailflag();
+	my $plab     = $nodeobj->isplabdslice();
+	my $remote   = $nodeobj->isremotenode();
+	my $pnode    = $nodeobj->phys_nodeid();
+	my $geni     = $nodeobj->isfednode();
     
 	print STDOUT "Doing $mode of vnode $vnode on $pnode ...\n";
 
@@ -388,8 +410,7 @@ while (1) {
 	    #
 	    # Just keep track of it, we'll wait for it finish down below
 	    #
-	    $child_vnodes{$syspid} =
-		[$vnode, $pnode, $mode, $jailed, $plab, time()];
+	    $child_vnodes{$syspid} = [$nodeobj, $mode, time()];
 	    $children++;
 	} else {
 	    TBdbfork();	# So we get the event system fork too ...
@@ -398,12 +419,18 @@ while (1) {
 	    # Must change our real UID to root so that ssh will work.
 	    $UID = 0;
 
-	    if ($mode eq "setup" && ($plab || !$jailed)) {
+	    if ($mode eq "setup" && ($plab || !$jailed || $geni)) {
                 # Make sure vnode is in the proper state before trying to
                 # bring it up.
                 # XXX: do this for all vnodes (see above)?
-                TBSetNodeEventState($vnode, TBDB_NODESTATE_SHUTDOWN);
-		if ($plab) {
+                $nodeobj->SetEventState(TBDB_NODESTATE_SHUTDOWN);
+		if ($geni) {
+		    $UID  = $SAVEUID;
+		    $EUID = $UID;
+		    $exval = GeniEmulab->StartSlivers($experiment,
+						      [ $nodeobj ]);
+		}
+		elsif ($plab) {
 		    if (TBForkCmd("$TB/sbin/plabnode ". 
 				  ($force ? "-f" : "").
 				  " alloc $pid $eid $vnode", 1)) {
@@ -420,10 +447,16 @@ while (1) {
 		    }
 		}
                 # Make sure the system knows we now have state on the node!
-                TBSetNodeAllocState($vnode, TBDB_ALLOCSTATE_RES_INIT_DIRTY);
+		$nodeobj->SetAllocState(TBDB_ALLOCSTATE_RES_INIT_DIRTY);
 	    }
 	    
-	    if (!($plab && ($mode eq "cleanup" || $mode eq "teardown"))
+	    if ($geni && ($mode eq "teardown" || $mode eq "cleanup")) {
+		$nodeobj->SetEventState(TBDB_NODESTATE_SHUTDOWN);
+		$UID  = $SAVEUID;
+		$EUID = $UID;
+		$exval = GeniEmulab->DestroySlivers($experiment, [ $nodeobj ]);
+	    }
+	    elsif (!($plab && ($mode eq "cleanup" || $mode eq "teardown"))
 		&& !($mode eq "setup" && $remote && !$plab)) {
 		# Cleanup is used only on plab nodes.
 		# Don't try to teardown plab vnodes; it's just asking for
@@ -445,7 +478,7 @@ while (1) {
 
             # Free the plab node lease if necessary.
             if ($plab && ($mode eq "teardown" || $mode eq "cleanup")) {
-                TBSetNodeEventState($vnode, TBDB_NODESTATE_SHUTDOWN);
+		$nodeobj->SetEventState(TBDB_NODESTATE_SHUTDOWN);
                 exec("$TB/sbin/plabnode free $pid $eid $vnode");
                 die("*** $0:\n".
                     "    exec failed!\n");
@@ -466,7 +499,8 @@ while (1) {
 	my $oldestpid = 0;
         my $oldestvnode = "";
 	while (my ($pid, $aref) = each %child_vnodes) {
-	    my ($vnode, $pnode, $mode, $jailed, $plab, $birthtime) = @$aref;
+	    my ($nodeobj, $mode, $birthtime) = @$aref;
+	    my $vnode = $nodeobj->node_id();
 	    if ((!$oldestpid) || ($birthtime < $oldest)) {
 		$oldest = $birthtime;
 		$oldestpid = $pid;
@@ -527,8 +561,10 @@ while (1) {
 	# don't know about this child, ignore it
 	#
 	my $aref = $child_vnodes{$childpid};
-	next unless @$aref;
-	my ($vnode, $pnode, $mode, $jailed, $plab, $birthtime) = @$aref;
+	next unless @$aref;	
+	my ($nodeobj, $mode, $birthtime) = @$aref;
+	my $vnode = $nodeobj->node_id();
+	my $pnode = $nodeobj->phys_nodeid();	
 	$children--;
 	delete $child_vnodes{$childpid};
 
@@ -555,7 +591,7 @@ while (1) {
 		 "    Virtual node $vnode $mode failure!\n");
 	}
 
-	if ($plab) {
+	if ($nodeobj->isplabdslice()) {
 	    #
 	    # If the node was in the setup process, then mark its allocstate
 	    # as down so os_setup knows not to bother waiting for it. DEAD
@@ -564,7 +600,7 @@ while (1) {
 	    #
 	    if ($exitstatus &&
 		(($mode eq "setup") || ($mode eq "reboot"))) {
-		TBSetNodeAllocState($vnode, TBDB_ALLOCSTATE_DEAD());
+		$nodeobj->SetAllocState(TBDB_ALLOCSTATE_DEAD());
 	    }
 	}
     }
