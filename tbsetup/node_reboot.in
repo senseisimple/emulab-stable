@@ -21,6 +21,7 @@ sub usage()
 	  "Usage: node_reboot [-d] [-f] [-w] [-k] node [node ...]\n" .
 	  "       node_reboot [-d] [-f] [-w] [-k] -e pid,eid\n".
 	  "Use the -d option to turn on debugging\n" .
+	  "Use the -s option to turn on silent mode\n" .
 	  "Use the -e option to reboot all the nodes in an experiment\n" .
 	  "Use the -w option to to wait for nodes is come back up\n" .
 	  "Use the -k option to power cycle nodes in PXEWAIT mode\n" .
@@ -32,8 +33,9 @@ sub usage()
 }
 # The hidden -r option runs this in "realmode", ie don't send an event, but
 # really do the work instead.
-my $optlist     = "dfe:wrkacbp";
+my $optlist     = "dfe:wrkacbps";
 my $debug       = 0;
+my $silent      = 0;
 my $powercycle  = 0;
 my $waitmode    = 0;
 my $realmode    = 1; # XXX Temporary, until we make event sending the default.
@@ -98,6 +100,9 @@ if (! getopts($optlist, \%options)) {
 }
 if (defined($options{"d"})) {
     $debug = 1;
+}
+if (defined($options{"s"})) {
+    $silent = 1;
 }
 if (defined($options{"b"})) {
     $rebootmode = 1;
@@ -235,6 +240,7 @@ my %args   = ();
 my %status = ();
 
 $args{'debug'}       = $debug;
+$args{'silent'}      = $silent;
 $args{'powercycle'}  = $powercycle;
 $args{'rebootmode'}  = $rebootmode;
 $args{'waitmode'}    = $waitmode;
