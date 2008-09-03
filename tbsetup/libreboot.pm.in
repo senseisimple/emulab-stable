@@ -423,7 +423,8 @@ sub nodereboot($$)
 	    tberror "$node: Reboot failed (on $pnode)";
 	}
 	else {
-	    print STDOUT "reboot ($node): rebooting (on $pnode).\n";
+	    print STDOUT "reboot ($node): rebooting (on $pnode).\n"
+		if (!$silent);
 	}
     }
 
