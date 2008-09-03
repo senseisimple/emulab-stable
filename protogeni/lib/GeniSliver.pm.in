@@ -155,7 +155,8 @@ sub Create($$$$$;$$$)
     my $idx = TBGetUniqueIndex('next_sliver', 1);
     if (defined($credential)) {
 	# Store the certificate for later use.
-	$certificate = GeniCertificate->StorePublic($credential->this_cert());
+	$certificate =
+	    GeniCertificate->StorePublic($credential->target_cert());
 	if (!defined($certificate)) {
 	    print STDERR "Could not store certificate\n";
 	    return undef;
@@ -346,20 +347,16 @@ sub GetExperiment($)
 #
 # Get the credential for the sliver.
 #
-sub GetCredential($)
+sub GetCredential($$)
 {
-    my ($self) = @_;
+    my ($self, $user) = @_;
 
     return undef
 	if (! ref($self));
 
     return $self->{'CREDENTIAL'} if (defined($self->{'CREDENTIAL'}));
 
-    if (!defined($self->credential_idx())) {
-	print STDERR "No credential associated with $self\n";
-	return undef;
-    }
-    my $credential = GeniCredential->Lookup($self->credential_idx());
+    my $credential = GeniCredential->Lookup($self, $user);
     if (!defined($credential)) {
 	print STDERR "Could not get credential object associated with $self\n";
 	return undef;
@@ -552,6 +549,7 @@ use GeniComponent;
 use GeniSlice;
 use GeniCredential;
 use GeniCertificate;
+use Experiment;
 use GeniAggregate;
 use XML::Simple;
 use libdb qw(TBDB_ALLOCSTATE_RES_INIT_DIRTY);
@@ -559,7 +557,57 @@ use libdb qw(TBDB_ALLOCSTATE_RES_INIT_DIRTY);
 sub Create($$$$$)
 {
     my ($class, $slice, $user_uuid, $resource_uuid, $rspec) = @_;
+    my $virtualization_type = $rspec->{'virtualization_type'};
 
+    my $experiment = $slice->GetExperiment();
+    if (!defined($experiment)) {
+	print STDERR "Could not map $slice to its experiment\n";
+	return -1;
+    }
+
+    #
+    # the node is already allocated to the sliver, but still need to enter
+    # a virt_nodes entry, and possibly more virt table entries, so that the
+    # node will boot properly, and is otherwise controllable.
+    #
+    my $node = Node->Lookup($resource_uuid);
+    if (!defined($node)) {
+	print STDERR "Could not map node $resource_uuid to its object\n";
+	return -1;
+    }
+    my $reservation = $node->Reservation();
+    if (!defined($reservation)) {
+	print STDERR "$node was already released from $slice\n";
+	return -1;
+    }
+    if (! $reservation->SameExperiment($experiment)) {
+	print STDERR "$node is reserved to another, not $reservation\n";
+	# Signal error so we can look at what happened.
+	return -1;
+    }
+    
+    #
+    # The resource UUID refers to the physical node, but the virtualization
+    # type might require a vnode.
+    # 
+    if ($virtualization_type eq "emulab-vnode") {
+	#
+	# Create a fake jailnode on the physnode. 
+	#
+	my @vnodes;
+	if (Node::CreateVnodes(\@vnodes,
+			       {"pid"      => $reservation->pid(),
+				"eid"      => $reservation->eid(),
+				"count"    => 1,
+				"vtype"    => "pcfake",
+				"nodeid"   => $node->node_id(),
+				"verbose"  => 1 }) < 0) {
+	    print STDERR "Could not create fake jail node on $node\n";
+	    return -1;
+	}
+	my $vnode = Node->Lookup($vnodes[0]);
+	$resource_uuid = $vnode->uuid();
+    }
     return GeniSliver->Create($slice, $user_uuid, $resource_uuid,
 			      "Node", $rspec);
 }
@@ -568,9 +616,9 @@ sub Create($$$$$)
 # Provision a slice. We actually did this when the ticket was requested.
 # We fill in some virt table stuff so that tbswap will work.
 #
-sub Provision($)
+sub Provision($;$)
 {
-    my ($self) = @_;
+    my ($self, $extraargs) = @_;
 
     return -1
 	if (! ref($self));
@@ -578,7 +626,7 @@ sub Provision($)
     #
     # the node is already allocated to the sliver, but still need to enter
     # a virt_nodes entry, and possibly more virt table entries, so that the
-    # node will boot properly, and is otherwie controllable.
+    # node will boot properly, and is otherwise controllable.
     #
     my $experiment = Experiment->Lookup($self->slice_uuid());
     if (!defined($experiment)) {
@@ -607,41 +655,54 @@ sub Provision($)
 	    return -1;
 	}
 
+	if (defined($extraargs)) {
+	    if (exists($extraargs->{'tmcd_server'}) &&
+		exists($extraargs->{'tmcd_nodeid'})) {
+		my $tmcd_redirect = $extraargs->{'tmcd_server'} . ":" .
+		    $extraargs->{'tmcd_nodeid'};
+
+		if ($node->ModifyReservation({"tmcd_redirect" =>
+						  $tmcd_redirect})) {
+		    return -1;
+		}
+	    }
+	}
+
+	#
+	# An emulab node uses a vnode on the physnode, even for a dedicated
+	# physical nodes. We need to tell tmcd about the pnode, but not
+	# the vnode since it is going to redirect to tmcd on the remote Emulab
+	# controlling the experiment. 
+	#
 	if ($self->rspec()->{'virtualization_type'} eq "emulab-vnode") {
-	    #
-	    # Create a fake jailnode on the physnode. 
-	    #
-	    my @vnodes;
-	    if (Node::CreateVnodes(\@vnodes,
-				   {"pid"      => "$pid",
-				    "eid"      => "$eid",
-				    "count"    => 1,
-				    "vtype"    => "pcfake",
-				    "nodeid"   => $node->node_id(),
-				    "verbose"  => 1 }) < 0) {
-		print STDERR "Could not create fake jail node on $node\n";
+	    my $pnode = Node->Lookup($node->phys_nodeid());
+	    if (!defined($pnode)) {
+		print STDERR "Could not get pnode object for $node\n";
 		return -1;
 	    }
-	    my $vnode = Node->Lookup($vnodes[0]);
-	
-	    if ($experiment->InsertVirtNode($vnode) != 0) {
+	    
+	    if ($experiment->InsertVirtNode($pnode) != 0) {
 		print STDERR
-		    "Could not add virtnode entry for $vnode to $self\n";
+		    "Could not add virtnode entry for $pnode to $self\n";
 		return -1;
 	    }
-	    $vnode->ModifyReservation({"genisliver_idx" => $self->idx()});
+	    $pnode->ModifyReservation({"genisliver_idx" => $self->idx()});
+
+	    # Set it to boot the default OS.
+	    if ($pnode->SelectOS() != 0) {
+		return -1;
+	    }
+	}
+	else {
+	    #
+	    # For a "raw" node, there is no vnode, so this is the pnode
+	    # we need to mark for tmcd.
+	    #
+	    if ($node->ModifyReservation({"genisliver_idx" => $self->idx()})) {
+		return -1;
+	    }
 	}
 	
-	# Set sliver_idx in the reservation so that Emulab knows.
-	if ($node->ModifyReservation({"genisliver_idx" => $self->idx()})) {
-	    return -1;
-	}
-
-	# Set it to boot the default OS.
-	if ($node->SelectOS() != 0) {
-	    return -1;
-	}
-
 	# Must have the topofile for node boot. Might need locking on this.
 	if (system("$GENTOPOFILE $pid $eid")) {
 	    print STDERR "$GENTOPOFILE failed\n";
@@ -700,20 +761,29 @@ sub UnProvision($)
 	    return -1;
 	}
 
-	#
-	# Look for virtual nodes to yank out of the virt tables.
-	#
-	my @vnodes;
-	$node->VirtualNodes(\@vnodes);
-	foreach my $vnode (@vnodes) {
-	    $experiment->DeleteVirtNode($vnode);
+	if ($self->rspec()->{'virtualization_type'} eq "emulab-vnode") {
+	    my $pnode_id = $node->phys_nodeid();
+	    my $pnode = Node->Lookup($pnode_id);
+	    if (!defined($pnode)) {
+		print STDERR "Could not get pnode object for $pnode_id\n";
+		return -1;
+	    }
+	    if ($experiment->DeleteVirtNode($pnode) != 0) {
+		print STDERR
+		    "Could remove virtnode entry for $pnode from $self\n";
+		return -1;
+	    }
+	    system("export NORELOAD=1; $NFREE -x -q $pid $eid $pnode_id");
 	}
-	
-	system("export NORELOAD=1; $NFREE -x -q $pid $eid $node_id");
+	else {
+	    system("export NORELOAD=1; $NFREE -q $pid $eid $node_id");
+	}
 	if ($?) {
 	    print STDERR "Could not deallocate $node from $self\n";
+	    $node->Refresh();
 	    return -1;
 	}
+	$node->Refresh();
     }
     else {
 	print STDERR "$node is reserved to another, not $self\n";
@@ -753,10 +823,22 @@ sub Start($)
     }
     if ($reservation->SameExperiment($experiment)) {
 	my $node_id = $node->node_id();
+
+	#
+	# Reboot pnode if not already running. 
+	#
+	if ($self->rspec()->{'virtualization_type'} eq "emulab-vnode" &&
+	    $self->status() eq "created") {
+	    $node_id = $node->phys_nodeid();
+	}
 	#
 	# Reboot and wait?
 	#
-	system("$NODEREBOOT $node_id");
+	system("$NODEREBOOT -s $node_id");
+	$self->SetStatus("ready")
+	    if (!$?);
+	return -1
+	    if ($?);
     }
     else {
 	print STDERR "$node is reserved to another, not $self\n";

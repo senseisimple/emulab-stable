@@ -331,7 +331,10 @@ sub GetTicket($)
     #
     # An rspec is a structure that requests specific nodes. If those
     # nodes are available, then reserve it. Otherwise the ticket
-    # cannot be granted. 
+    # cannot be granted.
+    #
+    # XXX Simpleminded ... assumes only physical nodes for now. Need to deal
+    # with virtual nodes (vservers on shared nodes, planetlab nodes, etc).
     #
     my @nodeids = ();
     my $pid     = $experiment->pid();
@@ -343,6 +346,15 @@ sub GetTicket($)
 	if (!defined($node)) {
 	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 					"Bad resource_uuid $resource_uuid");
+	}
+
+	#
+	# See if the node is already reserved.
+	#
+	my $reservation = $node->Reservation();
+	if (defined($reservation)) {
+	    return GeniResponse->Create(GENIRESPONSE_UNAVAILABLE, undef,
+				"$resource_uuid ($node) is not available");
 	}
 	push(@nodeids, $node->node_id());
     }
@@ -394,6 +406,7 @@ sub RedeemTicket($)
     my ($argref) = @_;
     my $ticket     = $argref->{'ticket'};
     my $impotent   = $argref->{'impotent'};
+    my $extraargs  = $argref->{'extraargs'};
     my $message    = "Error creating sliver/aggregate";
 
     $impotent = 0
@@ -497,7 +510,6 @@ sub RedeemTicket($)
     #
     my %slivers = ();
     foreach my $ref (@{$ticket->rspec()->{'node'}}) {
-	my $virtualization_type = $ref->{'virtualization_type'};
 	my $resource_uuid = $ref->{'uuid'};
 	my $node = Node->Lookup($resource_uuid);
 	if (!defined($node)) {
@@ -580,7 +592,7 @@ sub RedeemTicket($)
     # above when the ticket was granted). The add the sliver to the aggregate.
     #
     foreach my $sliver (values(%slivers)) {
-	if (!$impotent && $sliver->Provision() != 0) {
+	if (!$impotent && $sliver->Provision($extraargs) != 0) {
 	    $message = "Could not provision $sliver";
 	    goto bad;
 
@@ -606,6 +618,14 @@ sub RedeemTicket($)
 	$message = "Could not create credential";
 	goto bad;
     }
+    #
+    # The last step is to delete the ticket, since it is no longer needed.
+    # and will cause less confusion if it is not in the DB.
+    #
+    if ($ticket->Delete() != 0) {
+	print STDERR "Error deleting $ticket for $slice\n";
+    }
+    
     return GeniResponse->Create(GENIRESPONSE_SUCCESS, $credential->asString());
 
   bad:
@@ -618,6 +638,40 @@ sub RedeemTicket($)
 	if (defined($aggregate));
     
     return GeniResponse->Create(GENIRESPONSE_ERROR, undef, $message);
+}
+
+#
+# Release a ticket.
+#
+sub ReleaseTicket($)
+{
+    my ($argref) = @_;
+    my $ticket     = $argref->{'ticket'};
+
+    if (! (defined($ticket) &&
+	   !TBcheck_dbslot($ticket, "default", "text",
+			   TBDB_CHECKDBSLOT_ERROR))) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "ticket: ". TBFieldErrorString());
+    }
+    $ticket = GeniTicket->CreateFromSignedTicket($ticket);
+    if (!defined($ticket)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not create GeniTicket object");
+    }
+    
+    #
+    # Make sure the credential was issued to the caller.
+    #
+    if ($ticket->owner_uuid() ne $ENV{'GENIUUID'}) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "This is not your credential!");
+    }
+    if ($ticket->Release() != 0) {
+	print STDERR "Error releasing $ticket\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
+    }
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS);
 }
 
 #
@@ -739,6 +793,8 @@ sub CreateSliceFromRegistry($)
 	    return undef;
 	}
     }
+
+    print Dumper($blob);
 
     #
     # The problem with HRNs is that people will tend to reuse them!

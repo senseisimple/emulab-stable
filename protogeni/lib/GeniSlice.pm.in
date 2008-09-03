@@ -74,7 +74,7 @@ sub Lookup($$)
 
 	    ($idx) = $query_result->fetchrow_array();
     }
-    elsif ($token =~ /^[\w\.]*$/) {
+    elsif ($token =~ /^[-\w\.]*$/) {
 	$query_result =
 	    DBQueryWarn("select idx from geni_slices ".
 			"where hrn='$token'");
@@ -125,8 +125,10 @@ sub uuid($)		{ return field($_[0], "uuid"); }
 sub creator_uuid($)	{ return field($_[0], "creator_uuid"); }
 sub created($)		{ return field($_[0], "created"); }
 sub sa_uuid($)		{ return field($_[0], "sa_uuid"); }
+sub exptidx($)		{ return field($_[0], "exptidx"); }
 sub cert($)		{ return $_[0]->{'CERT'}->cert(); }
 sub GetCertificate($)   { return $_[0]->{'CERT'}; }
+
 #
 # Stringify for output.
 #
@@ -138,6 +140,24 @@ sub Stringify($)
     my $idx = $self->idx();
 
     return "[GeniSlice: $hrn, IDX: $idx]";
+}
+
+#
+# Lookup slice by the experiment it is related to.
+#
+sub LookupByExperiment($$)
+{
+    my ($class, $experiment) = @_;
+
+    my $exptidx = $experiment->idx();
+    my $query_result =
+	DBQueryWarn("select idx from geni_slices ".
+		    "where exptidx='$exptidx'");
+    return undef
+	if (!defined($query_result) || !$query_result->numrows);
+
+    my ($idx) = $query_result->fetchrow_array();
+    return GeniSlice->Lookup($idx);
 }
 
 #
@@ -164,9 +184,10 @@ sub CheckExisting($$$)
 #
 # Class function to create new Geni slice and return the object.
 #
-sub Create($$$$$$)
+sub Create($$$$$$;$)
 {
-    my ($class, $hrn, $uuid, $creator_uuid, $certificate, $authority) = @_;
+    my ($class, $hrn, $uuid, $creator_uuid, $certificate,
+	$authority, $exptidx) = @_;
     my @insert_data = ();
 
     # Every slice gets a new unique index.
@@ -182,6 +203,8 @@ sub Create($$$$$$)
     push(@insert_data, "created=now()");
     push(@insert_data, "idx='$idx'");
     push(@insert_data, "sa_uuid='$sa_uuid'");
+    push(@insert_data, "exptidx=$exptidx")
+	if (defined($exptidx));
     
     my $safe_hrn   = DBQuoteSpecial($hrn);
     my $safe_uuid  = DBQuoteSpecial($uuid);
@@ -211,13 +234,12 @@ sub Create($$$$$$)
 # Class function to create new Geni slice from a local experiment.
 # We want to create the key pair so that we can sign credentials.
 #
-sub CreateFromLocal($$)
+sub CreateFromLocal($$$)
 {
     my ($class, $experiment, $user) = @_;
 
     # XXX Form hrn from the uid and domain. This is backwards.
     my $hrn = $OURDOMAIN . "." . $experiment->pid() . "." . $experiment->eid();
-    my $uuid = $experiment->uuid();
     my $creator_uuid = $user->uuid();
 
     #
@@ -233,13 +255,13 @@ sub CreateFromLocal($$)
     # Generate a certificate pair, capturing the certificate to store in
     # the DB so we have ready access to it.
     #
-    my $certificate = GeniCertificate->Create("slice", $uuid);
+    my $certificate = GeniCertificate->Create("slice");
     if (!defined($certificate)) {
 	print STDERR "Could not create certificate for slice.\n";
 	return undef;
     }
-    return GeniSlice->Create($hrn, $uuid, $creator_uuid,
-			     $certificate, $authority);
+    return GeniSlice->Create($hrn, $certificate->uuid(), $creator_uuid,
+			     $certificate, $authority, $experiment->idx());
 }
 
 #

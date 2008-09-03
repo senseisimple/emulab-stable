@@ -364,31 +364,6 @@ sub SetStatus($$)
 }
 
 #
-# Get the credential for the aggregate.
-#
-sub GetCredential($)
-{
-    my ($self) = @_;
-
-    return undef
-	if (! ref($self));
-
-    return $self->{'CREDENTIAL'} if (defined($self->{'CREDENTIAL'}));
-
-    if (!defined($self->credential_idx())) {
-	print STDERR "No credential associated with $self\n";
-	return undef;
-    }
-    my $credential = GeniCredential->Lookup($self->credential_idx());
-    if (!defined($credential)) {
-	print STDERR "Could not get credential object associated with $self\n";
-	return undef;
-    }
-    $self->{'CREDENTIAL'} = $credential;
-    return $credential;
-}
-
-#
 # Get the slice for the aggregate.
 #
 sub GetSlice($)
@@ -465,9 +440,9 @@ sub Start($)
 #
 # Provision all the slivers in the aggregate.
 #
-sub Provision($)
+sub Provision($;$)
 {
-    my ($self) = @_;
+    my ($self, $extraargs) = @_;
 
     return -1
 	if (! ref($self));
@@ -478,7 +453,7 @@ sub Provision($)
 	return -1;
     }
     foreach my $sliver (@slivers) {
-	if ($sliver->Provision() != 0) {
+	if ($sliver->Provision($extraargs) != 0) {
 	    print STDERR "Could not provision $sliver in $self\n";
 	    next;
 	}
@@ -537,9 +512,9 @@ sub Create($$)
 #
 # Provision all the slivers in the aggregate.
 #
-sub Provision($)
+sub Provision($;$)
 {
-    my ($self) = @_;
+    my ($self, $extraargs) = @_;
 
     return -1
 	if (! ref($self));
@@ -585,6 +560,7 @@ sub Provision($)
 	print STDERR "$self: Could not instantiate $vlan on switches\n";
 	goto bad;
     }
+    $self->SetStatus("ready");
     return 0;
 
   bad:

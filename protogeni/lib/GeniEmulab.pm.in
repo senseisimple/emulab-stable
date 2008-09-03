@@ -44,6 +44,80 @@ my $BOSSNODE       = "@BOSSNODE@";
 my $OURDOMAIN      = "@OURDOMAIN@";
 
 #
+# Initialize for using geni resources.
+#
+sub Initialize($$$)
+{
+    my ($class, $experiment, $op) = @_;
+    my $thisuser = User->ThisUser();
+
+    #
+    # The RPC context for this test script is mostly as an SA.
+    #
+    Genixmlrpc->SetContext(Genixmlrpc->Context("@prefix@/etc/genisa.pem"));
+
+    #
+    # except when it has to be as the user.
+    #
+    my $context = Genixmlrpc->UserContext($thisuser);
+
+    #
+    # Create a Geni user from current user doing the operation.
+    #
+    my $geniuser = GeniUser->CreateFromLocal($thisuser);
+    if (!defined($geniuser)) {
+	print STDERR
+	    "Could not create a geni user from current user $thisuser\n";
+	return -1;
+    }
+    # Register user at the ClearingHouse.
+    if ($geniuser->Register() != 0) {
+	print STDERR "Could not register $geniuser at the ClearingHouse.\n";
+	return -1;
+    }
+
+    #
+    # Create and register the slice.
+    #
+    my $slice = GeniSlice->LookupByExperiment($experiment);
+    if (defined($slice)) {
+	if ($op eq "swapin") {
+	    #
+	    # Remove from the clearing house.
+	    #
+	    print STDERR "Removing old slice for $experiment\n";
+	    
+	    if ($slice->UnRegister()) {
+		print STDERR "Could not delete $slice from clearinghouse!\n";
+		return -1;
+	    }
+	    if ($slice->Delete()) {
+		print STDERR "Could not delete old $slice for $experiment!\n";
+		return -1;
+	    }
+	    undef($slice);
+	}
+    }
+    if (!defined($slice)) {
+	print STDERR "Creating new slice for $experiment\n";
+	
+	$slice = GeniSlice->CreateFromLocal($experiment, $thisuser);
+	if (!defined($slice)) {
+	    print STDERR
+		"Could not create a local slice record for $experiment\n";
+	    return -1;
+	}
+	if ($slice->Register() != 0) {
+	    $slice->Delete();
+	    print STDERR
+		"Could not register slice for $experiment at ClearingHouse.\n";
+	    return -1;
+	}
+    }
+    return 0;
+}
+
+#
 # Allocate the GENI slivers for an Emulab experiment. The nodes to be created
 # are passed in, otherwise lookup the nodes for the experiment.
 #
@@ -73,30 +147,14 @@ sub AllocateSlivers($$$)
 	    "Could not create a geni user from current user $thisuser\n";
 	return -1;
     }
-    # Register user at the ClearingHouse.
-    if ($geniuser->Register() != 0) {
-	print STDERR "Could not register $geniuser at the ClearingHouse.\n";
-	return -1;
-    }
 
     #
-    # The slice should already be registered by this point, but it does
-    # not hurt anything to make sure.
+    # The slice should already be created and registered by this point.
     #
-    my $slice = GeniSlice->Lookup($experiment->uuid());
+    my $slice = GeniSlice->LookupByExperiment($experiment);
     if (!defined($slice)) {
-	$slice = GeniSlice->CreateFromLocal($experiment, $thisuser);
-	if (!defined($slice)) {
-	    print STDERR
-		"Could not create a local slice record for $experiment\n";
-	    return -1;
-	}
-	if ($slice->Register() != 0) {
-	    $slice->Delete();
-	    print STDERR
-		"Could not register slice for $experiment at ClearingHouse.\n";
-	    return -1;
-	}
+	print STDERR "Could not find a local slice record for $experiment\n";
+	return -1;
     }
 
     #
@@ -165,6 +223,8 @@ sub AllocateSlivers($$$)
         #
         # Get ticket from component.
         #
+	print STDERR "Asking for ticket for $node from $component.\n";
+	
 	my $ticket = $component->GetTicket($slice, $rspec,
 					   $context, $credential);
 	
@@ -220,7 +280,7 @@ sub InstantiateSlivers($$$)
     #
     my $context = Genixmlrpc->UserContext($thisuser);
 
-    my $slice = GeniSlice->Lookup($experiment->uuid());
+    my $slice = GeniSlice->LookupByExperiment($experiment);
     if (!defined($slice)) {
 	print STDERR "No slice exists for $experiment. \n";
 	return -1;
@@ -253,10 +313,18 @@ sub InstantiateSlivers($$$)
 	}
 	my $component = $ticket->component();
 
+	#
+	# We need to pass in some extra stuff for Emulab federation.
+	#
+	my $args = {'tmcd_server'  => $BOSSNODE,
+		    'tmcd_nodeid'  => $node->node_id() };
+
         #
         # Create sliver on component using the ticket.
         #
-	$sliver = $component->CreateSliver($slice, $ticket, $context);
+	print STDERR "Redeeming ticket for $node on $component.\n";
+	
+	$sliver = $component->CreateSliver($slice, $ticket, $context, $args);
 	if (!defined($sliver)) {
 	    print STDERR "Could not create sliver on $component for $node\n";
 	    if ($ticket->Delete() != 0) {
@@ -303,7 +371,7 @@ sub StartSlivers($$$)
     #
     my $context = Genixmlrpc->UserContext($thisuser);
 
-    my $slice = GeniSlice->Lookup($experiment->uuid());
+    my $slice = GeniSlice->LookupByExperiment($experiment);
     if (!defined($slice)) {
 	print STDERR "No slice exists for $experiment. \n";
 	return -1;
@@ -324,9 +392,11 @@ sub StartSlivers($$$)
 	my $component = $sliver->GetComponent();
 
         #
-        # Create sliver on component using the ticket.
+        # Start sliver on component using the ticket.
         #
-	if ($component->StartSliver($slice, $sliver, $context) != 0) {
+	print STDERR "Starting $sliver on $component.\n";
+	
+	if ($component->StartSliver($sliver, $context) != 0) {
 	    print STDERR "Could not start $sliver on $component for $node\n";
 	    return -1;
 	}
@@ -353,7 +423,7 @@ sub DestroySlivers($$$)
     #
     my $context = Genixmlrpc->UserContext($thisuser);
 
-    my $slice = GeniSlice->Lookup($experiment->uuid());
+    my $slice = GeniSlice->LookupByExperiment($experiment);
     if (!defined($slice)) {
 	print STDERR "No local slice record for $experiment\n";
 	return -1;
@@ -380,12 +450,27 @@ sub DestroySlivers($$$)
 		    "Could not find ticket for $node in $experiment\n";
 		$errors++;
 	    }
-	    elsif ($ticket->Delete() != 0) {
-		print STDERR "Could not delete $ticket\n";
-		$errors++;
+	    else {
+		my $component = $ticket->component();
+
+		#
+		# Release the ticket.
+		#
+		print STDERR "Releasing $ticket for $node on $component.\n";
+		
+		if ($component->ReleaseTicket($slice, $context, $ticket) != 0){
+		    print STDERR "Could not release $ticket on $component\n";
+		    $errors++;
+		}
+		if ($ticket->Delete() != 0) {
+		    print STDERR "Could not delete $ticket\n";
+		    $errors++;
+		}
 	    }
 	    next;
 	}
+	print STDERR "Releasing $sliver for $node.\n";
+	
 	if ($sliver->Destroy() != 0) {
 	    print STDERR "Could not destroy $sliver for $node\n";
 	    $errors++;

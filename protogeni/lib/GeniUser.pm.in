@@ -87,7 +87,7 @@ sub Lookup($$;$)
 	}
 	($idx) = $query_result->fetchrow_array();
     }
-    elsif ($token =~ /^[\w\.]*$/) {
+    elsif ($token =~ /^[-\w\.]*$/) {
 	$query_result =
 	    DBQueryWarn("select idx from geni_users ".
 			"where hrn='$token' and status='active'");

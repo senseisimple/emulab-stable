@@ -468,6 +468,7 @@ sub Release($)
     my $pid     = $experiment->pid();
     my $eid     = $experiment->eid();
     my @nodeids = ();
+    my @nodes   = ();
 
     foreach my $ref (@{$self->rspec()->{'node'}}) {
 	my $resource_uuid = $ref->{'uuid'};
@@ -476,13 +477,19 @@ sub Release($)
 	    if (!defined($node));
 
 	my $reservation = $node->Reservation();
-	if (defined($reservation) &&
-	    $reservation->SameExperiment($experiment)) {
+	next
+	    if (!defined($reservation));
+	
+	if ($reservation->SameExperiment($experiment)) {
 	    push(@nodeids, $node->node_id());
+	    push(@nodes, $node);
 	}
     }
     if (@nodeids) {
 	system("export NORELOAD=1; $NFREE -x -q $pid $eid @nodeids");
+    }
+    foreach my $node (@nodes) {
+	$node->Refresh();
     }
     $self->Delete();
     return 0;

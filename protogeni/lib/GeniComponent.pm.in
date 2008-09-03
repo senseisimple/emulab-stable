@@ -340,21 +340,48 @@ sub GetTicket($$$$$;$)
 }
 
 #
-# Create a sliver, given a ticket.
+# Release a Ticket on a component;
 #
-sub CreateSliver($$$$)
+sub ReleaseTicket($$$$)
 {
-    my ($self, $slice, $ticket, $context) = @_;
+    my ($self, $slice, $context, $ticket) = @_;
 
     # Must be a real reference. 
     return undef
 	if (! ref($self));
 
+    my $args = { "ticket"   => $ticket->asString() };
+
+    my $response = 				       
+	Genixmlrpc::CallMethod($self->url(), $context, "ReleaseTicket", $args);
+    
+    return -1
+	if (!defined($response));
+
+    return -1
+	if ($response->code() != GENIRESPONSE_SUCCESS);
+
+    return 0;
+}
+
+#
+# Create a sliver, given a ticket.
+#
+sub CreateSliver($$$$;$)
+{
+    my ($self, $slice, $ticket, $context, $extraargs) = @_;
+
+    # Must be a real reference. 
+    return undef
+	if (! ref($self));
+
+    my $args = { "ticket"    => $ticket->asString(),
+		 "impotent"  => $impotent };
+    $args->{'extraargs'} = $extraargs
+	if (defined($extraargs));
+
     my $response =
-	Genixmlrpc::CallMethod($self->url(), $context,
-			       "RedeemTicket",
-			       { "ticket"    => $ticket->asString(),
-				 "impotent"  => $impotent });
+      Genixmlrpc::CallMethod($self->url(), $context, "RedeemTicket", $args);
     
     return undef
 	if (!defined($response));
@@ -368,6 +395,16 @@ sub CreateSliver($$$$)
     my $credential = GeniCredential->CreateFromSigned($response->value(), 1);
     if (!defined($credential)) {
 	print STDERR "Could not create local credential object.\n";
+	return undef;
+    }
+
+    #
+    # We need to store this credential (not the default) so we can
+    # operate on the sliver later.
+    #
+    if ($credential->Store() != 0) {
+	print STDER "Could not store $credential for new sliver\n";
+	$credential->Delete();
 	return undef;
     }
 
@@ -393,7 +430,7 @@ sub DestroySliver($$$)
     return -1
 	if (! ref($self));
 
-    my $credential = $sliver->GetCredential();
+    my $credential = $sliver->GetCredential($context->user());
     return -1
 	if (!defined($credential));
     
@@ -421,7 +458,7 @@ sub StartSliver($$$)
     return -1
 	if (! ref($self));
 
-    my $credential = $sliver->GetCredential();
+    my $credential = $sliver->GetCredential($context->user());
     return -1
 	if (!defined($credential));
     
