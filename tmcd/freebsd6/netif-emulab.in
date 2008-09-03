@@ -171,8 +171,22 @@ cnet_start()
 		# setup a few necessary emulab files...
 		echo "$cnetif" > $ELAB_BOOTDIR/controlif
 		if [ -e "/etc/emulab/bossnode" ]; then
-		        bossnode=`cat /etc/emulab/bossnode`
-			echo `host "$bossnode"` > $ELAB_BOOTDIR/bossip
+			bossnode=`cat /etc/emulab/bossnode`
+			bossip=`host -t A "$bossnode"`
+			retval="$?"
+			i=0
+			while [ "$retval" != "0" -a $i -lt 180 ]; do
+				echo "Failed to resolve boss ($bossnode)!"
+				sleep 5
+				i=`expr $i + 1`
+				bossip=`host -t A "$bossnode"`
+				retval="$?"
+			done
+			if [ "$retval" = "0" ]; then
+				echo "Resolved boss ($bossnode) to $bossip."
+				echo `echo "$bossip" | sed -n -e 's/.*has address\s*\(.*\)/\1/p'` \
+					> $ELAB_BOOTDIR/bossip
+		        fi
 		fi
 		echo "$WA_HOSTNAME" > $ELAB_BOOTDIR/realname
 		echo "$WA_IP_GATEWAY" > $ELAB_BOOTDIR/routerip
