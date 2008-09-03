@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2003-2007 University of Utah and the Flux Group.
+ * Copyright (c) 2003-2008 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -198,11 +198,11 @@ main(int argc, char **argv)
 	/*
 	 * Stash the pid away.
 	 */
-	if (pidfile)
-		strcpy(buf, pidfile);
-	else
+	if (! pidfile) {
 		sprintf(buf, "%s/evproxy.pid", _PATH_VARRUN);
-	fp = fopen(buf, "w");
+		pidfile = buf;
+	}
+	fp = fopen(pidfile, "w");
 	if (fp != NULL) {
 		fprintf(fp, "%d\n", getpid());
 		(void) fclose(fp);
@@ -214,6 +214,7 @@ main(int argc, char **argv)
 
 		select(0, NULL, NULL, NULL, &tv);
 	}
+	unlink(pidfile);
 
 	/* Unregister with the remote event system: */
 	if (event_unregister(bosshandle) == 0) {
