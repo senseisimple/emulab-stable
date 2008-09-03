@@ -836,9 +836,13 @@ sub hackwaitandexit()
     if (-e "/vservers") {
 	$goofy = "/vservers/$vnodeid/var/run/emulab-watchdog.pid";
     }
+    elsif ($fakevnode) {
+	$goofy = CONFDIR() . "/evproxy.pid";
+    }
     else {
 	$goofy = CONFDIR() . "/root/var/run/emulab-watchdog.pid";
     }
+    #print "hackwaitandexit: waiting for $goofy to appear\n";
 	
     while ($count--) {
 	sleep(1);
