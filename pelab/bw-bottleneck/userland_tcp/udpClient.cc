@@ -28,15 +28,21 @@
 #include <math.h>
 
 #define REMOTE_SERVER_PORT 9831
-#define MAX_MSG 450000
+//#define MAX_MSG 450000
+#define MAX_MSG 1458
 
-pcap_t *pcapDescriptor = NULL;
 
 using namespace std;
+
 struct tcp_block{
 
-    unsigned long lastSentSeq;
-    unsigned long lastAckedSeq;
+    unsigned long HighData;
+    unsigned long HighACK;
+    unsigned long HighRxt;
+
+    long pipe;
+    unsigned long recoveryPoint;
+
     int dup_acks;
 
     double congWindow;
@@ -46,28 +52,265 @@ struct tcp_block{
     double rtt_deviation_est;
     double rto_estimate;
 
-    bool slowStart;
+    bool lossRecovery;
 
+    list< pair<unsigned long, unsigned long> > sackRanges;
+    int congAvoidancePackets;
 };
 
+pcap_t *pcapDescriptor = NULL;
 struct tcp_block conn_info;
 int clientSocket;
 struct sockaddr_in remoteServAddr;
 unsigned long long startTime;
 
-void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr, u_char *const udpPacketStart, struct ip const *ipPacket);
-int xmit_packet(char *message, int messageLen);
-
 map<unsigned long, unsigned long long> packetTimeMap;
-map<unsigned long, unsigned long long> timeoutMap;
 map<unsigned long, bool> rexmitMap;
 long long retransTimer;
 list<unsigned long> unackedPackets;
 list<unsigned long> rexmitPackets;
-long num_outstanding_packets;
-unsigned long seq_num_sent_before_loss;
 unsigned long reportedLost;
 unsigned long highSeq;
+
+void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr, u_char *const udpPacketStart, struct ip const *ipPacket);
+int xmit_packet(char *message, int messageLen);
+unsigned long long getTimeMilli();
+
+bool IsLost(unsigned long seq)
+{
+    // If this sequence number was acked by any of the SACKs, we wouldn't find
+    // it in the unacked list.
+    if(find(unackedPackets.begin(),unackedPackets.end(),seq) == unackedPackets.end())
+    {
+        return false;
+    }
+    else
+    { // If the packet is still unacked, check that it is below the highest seq.
+        // sacked to be considered lost.
+        if( (conn_info.sackRanges.size() > 0) && (seq < conn_info.sackRanges.back().second ) )
+            return true;
+        else
+            return false;
+    }
+}
+
+// Returns the sequence number of the next segment to be transmitted.
+unsigned long NextSeq(bool timeout)
+{
+    list<unsigned long>::iterator listIter = unackedPackets.begin();
+
+    // Return the sequence number of the first unacked packet in case of a timeout.
+    if(timeout)
+        return (*listIter);
+
+    while(listIter != unackedPackets.end())
+    {
+        if( IsLost(*listIter) ) 
+        {
+            if( (*listIter) > conn_info.HighRxt )
+            {
+                if( (*listIter) < conn_info.sackRanges.back().second )
+                {
+                    return (*listIter);
+                }
+            }
+        }
+
+        listIter++;
+    }
+
+    // else - no unacked packets were eligible for retransmission - send a new packet.
+    return (conn_info.HighData+1);
+}
+
+// Estimate of the number of packets outstanding in the network.
+void SetPipe()
+{
+    unsigned long i;
+
+    conn_info.pipe = 0;
+
+    for(i = conn_info.HighACK+1; i <= conn_info.HighData; i++)
+    {
+        if( ! IsLost(i) )
+            conn_info.pipe++;
+
+        if(i <= conn_info.HighRxt)
+            conn_info.pipe++;
+    }
+}
+
+
+bool sackCompare( pair<unsigned long, unsigned long> pair1, pair<unsigned long, unsigned long> pair2)
+{
+    if(pair1.second <= pair2.second)
+        return true;
+    else
+        return false;
+}
+
+
+void UpdateSACKs(int numSACKBlocks, u_char *dataPtr)
+{
+    if(numSACKBlocks > 0)
+    {
+        unsigned long lastSACKBlock = *(dataPtr + ((numSACKBlocks-1)*2 + 1 )*sizeof(unsigned long)); 
+        pair<unsigned long, unsigned long> tmpRange;
+
+        printf("Received a SACK\n");
+        // Erase packets acked by the SACK blocks from the unacked list.
+        for(int i = 0;i < numSACKBlocks; i++)
+        {
+            tmpRange.first = *(dataPtr + i*2*sizeof(unsigned long));
+            tmpRange.second = *(dataPtr + (i*2+1)*sizeof(unsigned long));
+
+            for( unsigned long j = tmpRange.first; j <= tmpRange.second; j++)
+            {
+                if(find(unackedPackets.begin(),unackedPackets.end(),j) != unackedPackets.end())
+                    unackedPackets.erase(find(unackedPackets.begin(),unackedPackets.end(),j));
+
+                rexmitMap.erase(j);
+                packetTimeMap.erase(j);
+            }
+        }
+
+        // Update the SACK ranges.
+        // It is not necessary to merge them - all that we care about is their
+        // right most ( most recent ) edge.
+        {
+            for(int i = 0;i < numSACKBlocks; i++)
+            {
+                tmpRange.first = *(dataPtr + i*2*sizeof(unsigned long));
+                tmpRange.second = *(dataPtr + (i*2+1)*sizeof(unsigned long));
+
+                conn_info.sackRanges.push_back(tmpRange);
+            }
+        }
+
+        conn_info.sackRanges.sort(sackCompare);
+    }
+
+    list<pair<unsigned long, unsigned long> >::iterator sackIter = conn_info.sackRanges.begin();
+
+    // Remove SACK ranges to the left side of packets which have been cumulatively acked.
+    while(sackIter != conn_info.sackRanges.end())
+    {
+        if(conn_info.HighACK >= (*sackIter).second)
+            conn_info.sackRanges.erase(sackIter++);
+        else
+            sackIter++;
+    }
+
+}
+
+// Updates all the state variables.
+//void Update(unsigned long seqNum, int numSACKBlocks, u_char *dataPtr, struct pcap_pkthdr const *pcap_info)
+void Update(unsigned long seqNum, int numSACKBlocks, u_char *dataPtr, unsigned long long recvTime)
+{
+    unsigned long numPacketsAcked = 0;
+
+    //printf("ACK for seq # = %u\n", seqNum);
+    if((seqNum-1) > conn_info.HighACK)
+    {
+        numPacketsAcked = seqNum - conn_info.HighACK - 1;
+
+        // Update the RTT estimates.
+        // Only include non retransmitted packets in our calculations.
+        if(! rexmitMap[seqNum-1] )
+        {
+            // Count only the packets that have been individually acked.
+            // ie. only the single packet at the left most position in the
+            // window. Do not take cumulatively acked packets into account.
+            if((seqNum-1) == conn_info.HighACK+1)
+            {
+                //unsigned long long secVal = pcap_info->ts.tv_sec;
+                //unsigned long long usecVal = pcap_info->ts.tv_usec;
+
+                //long rtt_val = (secVal*1000 + usecVal/1000 - packetTimeMap[seqNum-1]);
+                long rtt_val = (recvTime - packetTimeMap[seqNum-1]);
+
+                // Use an exponential moving avg.
+                conn_info.rtt_est = conn_info.rtt_est*(1-0.125) + rtt_val*0.125;
+                conn_info.rtt_deviation_est = conn_info.rtt_deviation_est*(1-0.25) + fabs(rtt_val - conn_info.rtt_est)*0.25;
+
+                conn_info.rto_estimate = conn_info.rtt_est + 4.0*conn_info.rtt_deviation_est;
+
+                // Never allow the timeout timer to be below 1 second, to avoid
+                // spurious timeouts.(RFC 2988)
+                if(conn_info.rto_estimate < 1000)
+                    conn_info.rto_estimate = 1000;
+            }
+        }
+
+        // Remove all cumulatively acked packets from the unacked list.
+        for(unsigned long i = conn_info.HighACK; i < seqNum; i++)
+        {
+            if(find(unackedPackets.begin(),unackedPackets.end(),i) != unackedPackets.end())
+                unackedPackets.erase(find(unackedPackets.begin(),unackedPackets.end(),i));
+
+            rexmitMap.erase(i);
+            packetTimeMap.erase(i);
+        }
+
+        conn_info.HighACK = seqNum - 1;
+
+        // If all packets upto the loss recovery point have been acked, 
+        // terminate loss recovery.
+        if( ( conn_info.lossRecovery ) && ( seqNum >= conn_info.recoveryPoint ) )
+            conn_info.lossRecovery = false;
+
+        // Reset the timout value - because this ACK is acknowledging new data.
+        unsigned long long currTime = getTimeMilli();
+        retransTimer = currTime + (int)conn_info.rto_estimate;
+    }
+    else
+    {
+        numPacketsAcked = 1;
+
+        if(! conn_info.lossRecovery )
+        {
+            conn_info.dup_acks++;
+
+            // We received three duplicate ACKS - enter the loss recovery stage.
+            if(conn_info.dup_acks == 3)
+            {
+                conn_info.lossRecovery = true;
+
+                // Set the recovery point - multiple losses upto this point
+                // will NOT result in multiple cong. window reductions.
+                conn_info.recoveryPoint = conn_info.HighData;
+
+                // Decrease the congestion window and slow start threshold.
+                conn_info.ssthresh = unackedPackets.size() / 2;
+                conn_info.congWindow = unackedPackets.size() / 2;
+                printf("Setting ssthresh = %d\n", conn_info.ssthresh);
+            }
+        }
+    }
+
+    UpdateSACKs(numSACKBlocks, dataPtr);
+
+    SetPipe();
+
+    // Congestion avoidance.
+    if(conn_info.congWindow >= conn_info.ssthresh)
+    {
+        conn_info.congAvoidancePackets += numPacketsAcked;
+
+        if(conn_info.congAvoidancePackets >= conn_info.congWindow)
+        {
+            conn_info.congWindow += 1.0;
+            conn_info.congAvoidancePackets = 0;
+        }
+    }
+    else // Slow Start
+    {
+//        printf("For seq # = %u,packets = %d, window before = %f ", seqNum,numPacketsAcked, conn_info.congWindow);
+        conn_info.congWindow += numPacketsAcked;
+  //      printf(", window after = %f\n", conn_info.congWindow);
+    }
+}
+
 
 unsigned long long getTimeMilli()
 {
@@ -158,7 +401,7 @@ void pcapCallback(u_char *user, const struct pcap_pkthdr *pcap_info, const u_cha
     handleUDP(pcap_info,udpPacket,udpPacketStart, ipPacket);
 }
 
-void init_pcap( char *ipAddress)
+void init_pcap( char *ipAddress, bool WriteFlag)
 {
     char interface[] = "eth4";
     struct bpf_program bpfProg;
@@ -169,18 +412,19 @@ void init_pcap( char *ipAddress)
     bpf_u_int32 maskp, netp;
     struct in_addr localAddress;
 
-    pcap_lookupnet(interface, &netp, &maskp, errBuf);
-    //pcapDescriptor = pcap_open_live(interface, BUFSIZ, 0, 0, errBuf);
     pcapDescriptor = pcap_open_live(interface, 120, 0, 0, errBuf);
-    localAddress.s_addr = netp;
-    //printf("IP addr = %s\n", ipAddress);
-    sprintf(filter," udp and ( (src host %s and dst port 9831 ) or (dst host %s and src port 9831 )) ", ipAddress, ipAddress);
 
     if(pcapDescriptor == NULL)
     {
         printf("Error opening device %s with libpcap = %s\n", interface, errBuf);
         exit(1);
     }
+
+    pcap_lookupnet(interface, &netp, &maskp, errBuf);
+    localAddress.s_addr = netp;
+    //printf("IP addr = %s\n", ipAddress);
+
+    sprintf(filter," udp and ( (dst host %s and src port 9831 )) ", ipAddress);
 
     pcap_compile(pcapDescriptor, &bpfProg, filter, 1, netp);
     pcap_setfilter(pcapDescriptor, &bpfProg);
@@ -193,11 +437,10 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
     u_char *dataPtr = udpPacketStart + 8;
 
     char packetType = *(char *)(dataPtr);
-    long long milliSec = 0;
-    int ackLength = 0;
 
     if(packetType == '0')
     {
+        /*
         unsigned long seqNum = ( *(unsigned long *)(dataPtr + 1));
         unsigned long long currTime = getTimeMilli();
 
@@ -212,6 +455,7 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
         //cout<<"Sending seqNum "<<seqNum<<endl;
 
         unackedPackets.push_back(seqNum);
+        */
 
     }
     else if(packetType == '1')
@@ -222,250 +466,12 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
         reportedLost = ( *(unsigned long *)(dataPtr + 2 + sizeof(unsigned long)));
         highSeq = ( *(unsigned long *)(dataPtr + 2 + 2*sizeof(unsigned long)));
 
-        // Normal ACK without any SACK ranges.
-        {
-            // Change the congestion window.
-            if(conn_info.slowStart)
-            {
-                //conn_info.congWindow += (seqNum - conn_info.lastAckedSeq);
-                conn_info.congWindow += 1; 
+        int sackStart = 2 + 3*sizeof(unsigned long);
 
-                // If the congestion window is greater than the slow-start threshold
-                // disable slow start.
-                if(conn_info.congWindow >= conn_info.ssthresh)
-                    conn_info.slowStart = false;
-            }
-            else // In congestion avoidance, increase window by one packet every RTT.
-            {
-                double tmp = conn_info.congWindow;
-                conn_info.congWindow += (1.0/conn_info.congWindow);
-            }
-
-            // Update the RTT estimates.
-
-            // Only include non retransmitted packets in our calculations.
-            if(! rexmitMap[seqNum-1] )
-            {
-                // Count only the packets that have been individually acked.
-                // ie. only the single packet at the left most position in the
-                // window. Do not take cumulatively acked packets into account.
-                if(seqNum == conn_info.lastAckedSeq+1)
-                {
-                    unsigned long long secVal = pcap_info->ts.tv_sec;
-                    unsigned long long usecVal = pcap_info->ts.tv_usec;
-
-                    long rtt_val = (secVal*1000 + usecVal/1000 - packetTimeMap[seqNum-1]);
-
-                    // Use an exponential moving avg.
-                    conn_info.rtt_est = conn_info.rtt_est*(1-0.125) + rtt_val*0.125;
-                    conn_info.rtt_deviation_est = conn_info.rtt_deviation_est*(1-0.25) + fabs(rtt_val - conn_info.rtt_est)*0.25;
-
-                    conn_info.rto_estimate = conn_info.rtt_est + 4.0*conn_info.rtt_deviation_est;
-
-                    // Never allow the timeout timer to be below 1 second, to avoid
-                    // spurious timeouts.(RFC 2988)
-                    if(conn_info.rto_estimate < 1000)
-                        conn_info.rto_estimate = 1000;
-                }
-            }
-
-            if(seqNum > conn_info.lastAckedSeq)
-            {
-
-                vector<unsigned long> ackedPackets;
-
-                for(unsigned long i = conn_info.lastAckedSeq; i < seqNum; i++)
-                    ackedPackets.push_back(i);
-
-                long tmp = num_outstanding_packets;
-
-
-                if(num_outstanding_packets < 0)
-                {
-                    //printf("Acked = %d, lastAcked = %d, prev = %d, new = %d\n", seqNum, conn_info.lastAckedSeq, tmp,num_outstanding_packets);
-
-                }
-
-                conn_info.lastAckedSeq = seqNum;
-
-                if(conn_info.dup_acks > 0)
-                    conn_info.dup_acks = 0;
-
-                // Remove the ACKed packets from all the maps.
-                for(int i = 0;i < ackedPackets.size(); i++)
-                {
-                    packetTimeMap.erase(ackedPackets[i]);
-                    rexmitMap.erase(ackedPackets[i]);
-                    timeoutMap.erase(ackedPackets[i]);
-                    if(find(unackedPackets.begin(),unackedPackets.end(),ackedPackets[i]) != unackedPackets.end())
-                    {
-                        unackedPackets.erase(find(unackedPackets.begin(),unackedPackets.end(),ackedPackets[i]));
-                // Decrease the outstanding window size by the ACKed number of packets.
-                        num_outstanding_packets -= 1;
-                    }
-                }
-
-
-                list<unsigned long>::iterator rexmitIter = rexmitPackets.begin();
-
-                while(rexmitIter != rexmitPackets.end())
-                {
-                    if(find(ackedPackets.begin(), ackedPackets.end(),(*rexmitIter)) != ackedPackets.end())
-                    {
-                        rexmitIter = rexmitPackets.erase(rexmitIter);
-                    }
-                    else
-                        rexmitIter++;
-                }
-
-                unsigned long long currTime = getTimeMilli();
-                // Reset the timout value - because this ACK is acknowledging new data.
-                retransTimer = currTime + (int)conn_info.rto_estimate;
-            }
-            else if(seqNum == conn_info.lastAckedSeq)// Count duplicate acks.
-            {
-                conn_info.dup_acks += 1;
-                num_outstanding_packets -= 1;
-
-                if(conn_info.dup_acks == 3)
-                { // Add the packet to the retransmit queue.
-
-                    // Indicate that this packet needs to be retransmitted once, any
-                    // further retransmissions have to be caused strictly by a timeout.
-
-                    // Add this seqNum to the list of packets to be rexmitted - if it isn't
-                    // already in that list.
-                    if(find(rexmitPackets.begin(),rexmitPackets.end(),seqNum) == rexmitPackets.end())
-                    {
-                        rexmitPackets.push_back(seqNum);
-
-                        //This map entry is used in two ways - a packet has been rexmitted
-                        // if its entry is true in this map & it had been in the rexmitPackets
-                        // vector.
-                        rexmitMap[seqNum] = false;
-                    }
-
-                    if(seqNum > seq_num_sent_before_loss)
-                    {
-                        // Halve the slow-start threshold and congestion window size.
-                        conn_info.ssthresh = (conn_info.lastSentSeq - conn_info.lastAckedSeq)/2;
-                        if(conn_info.ssthresh < 2)
-                            conn_info.ssthresh = 2;
-                        conn_info.congWindow = conn_info.ssthresh;
-                        conn_info.slowStart = false;
-
-                        seq_num_sent_before_loss = conn_info.lastSentSeq - 1;
-                    }
-                    else // Ignore multiple losses in a single window.
-                    {
-
-                    }
-                }
-            }
-        }
-
-        // Indicates some missing packets at the receiver - add them to rexmit queue.
-        if(sackBlocks != 0)
-        {
-            unsigned long lastAckedPacket = seqNum - 1;
-            int sackStart = 2 + 3*sizeof(unsigned long);
-            unsigned long long currTime = getTimeMilli();
-
-            //printf("Received a SACK for %d with %d blocks\n", seqNum, sackBlocks);
-
-            for(int i = 0;i < sackBlocks; i++)
-            {
-                unsigned long rangeStart = ( *(unsigned long *)(dataPtr + sackStart + i*2*sizeof(long)));
-                unsigned long rangeEnd = ( *(unsigned long *)(dataPtr + sackStart + i*2*sizeof(long) + sizeof(long) ));
-
-                //printf("%d %d :", rangeStart,rangeEnd);
-
-
-                // This is always true, if the SACKs were correctly generated by the receiver.
-
-                bool packetLossFlag = false;
-                unsigned long lostPacketSeq = 0;
-
-                if(rangeStart > lastAckedPacket)
-                {
-                    // All these packets were lost - add them to rexmit queue.
-                    for(unsigned long j = lastAckedPacket + 1; j < rangeStart; j++)
-                    {
-                        if(find(rexmitPackets.begin(),rexmitPackets.end(),j) == rexmitPackets.end())
-                        {
-                            rexmitPackets.push_back(j);
-                            rexmitMap[j] = false;
-                            timeoutMap[j] = currTime + (long)conn_info.rto_estimate;
-
-                            packetLossFlag = true;
-
-                            if(j > lostPacketSeq)
-                                lostPacketSeq = j;
-
-                        }
-                    }
-                }
-                if(packetLossFlag && (lostPacketSeq > seq_num_sent_before_loss))
-                {
-                    conn_info.ssthresh = unackedPackets.size()/2;
-                    if(conn_info.ssthresh < 2)
-                        conn_info.ssthresh = 2;
-                    conn_info.congWindow = 1;
-
-                    conn_info.slowStart = true;
-
-                    seq_num_sent_before_loss = conn_info.lastSentSeq - 1;
-
-
-                }
-
-                lastAckedPacket = rangeEnd;
-
-                bool newPacketsAckedFlag = false;
-
-                // Remove acked packets by this SACK block from unacked/rexmit list.
-                for(unsigned long j = rangeStart; j <= rangeEnd; j++)
-                {
-                    packetTimeMap.erase(j);
-                    rexmitMap.erase(j);
-                    timeoutMap.erase(j);
-                    if(find(unackedPackets.begin(),unackedPackets.end(),j) != unackedPackets.end())
-                    {
-                        newPacketsAckedFlag = true;
-                        unackedPackets.erase(find(unackedPackets.begin(),unackedPackets.end(),j));
-                    }
-                    if(find(rexmitPackets.begin(), rexmitPackets.end(),j) != rexmitPackets.end())
-                    {
-                        newPacketsAckedFlag = true;
-                        rexmitPackets.erase(find(rexmitPackets.begin(), rexmitPackets.end(),j));
-                    }
-                }
-
-                // If this SACK packet is acknowledging receipt of a new packet,
-                // reset the timeout.
-                if(newPacketsAckedFlag)
-                    retransTimer = currTime + (int)conn_info.rto_estimate;
-            }
-
-            list<unsigned long>::iterator rexmitIter;
-            if(rexmitPackets.size() > 0)
-            {
-            //    printf("Rexmit packets = ");
-            }
-            for(rexmitIter = rexmitPackets.begin();rexmitIter != rexmitPackets.end(); rexmitIter++)
-            {
-             //   printf("%d(%d) ", (*rexmitIter), rexmitMap[(*rexmitIter)]);
-            }
-            if(rexmitPackets.size() > 0)
-            {
-              //  printf("\n");
-            }
-
-        }
-        else
-        {
-            //printf("Received an ACK for %d\n", seqNum);
-        }
+        unsigned long long recvTime = pcap_info->ts.tv_sec*1000 + pcap_info->ts.tv_usec/1000;
+        //cout << "Received an ACK for "<<seqNum<<endl;
+        Update(seqNum, sackBlocks, (dataPtr + sackStart), recvTime);
+    //    Update(seqNum, sackBlocks, (dataPtr + sackStart), pcap_info);
 
     }
     else
@@ -475,7 +481,48 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
     }
 }
 
-int xmit_packet(char *message, int messageLen)
+void handlePacket(u_char *const dataPtr, unsigned long long recvTime)
+{
+    char packetType = *(char *)(dataPtr);
+
+    if(packetType == '0')
+    {
+        unsigned long seqNum = ( *(unsigned long *)(dataPtr + 1));
+       // unsigned long long currTime = getTimeMilli();
+
+     //   unsigned long long secVal = pcap_info->ts.tv_sec;
+      //  unsigned long long usecVal = pcap_info->ts.tv_usec;
+
+       // packetTimeMap[seqNum] = (unsigned long long)(secVal*1000 + usecVal/1000);
+
+        // Set the retransmission timer.
+        //retransTimer = currTime + (unsigned long long)conn_info.rto_estimate;
+
+        //cout<<"Sending seqNum "<<seqNum<<endl;
+
+        unackedPackets.push_back(seqNum);
+
+    }
+    else if(packetType == '1')
+    {
+        // We received an ACK.
+        int sackBlocks = (int)(*(char *)(dataPtr + 1));
+        unsigned long seqNum = ( *(unsigned long *)(dataPtr + 2));
+        reportedLost = ( *(unsigned long *)(dataPtr + 2 + sizeof(unsigned long)));
+        highSeq = ( *(unsigned long *)(dataPtr + 2 + 2*sizeof(unsigned long)));
+
+        int sackStart = 2 + 3*sizeof(unsigned long);
+
+        Update(seqNum, sackBlocks, (dataPtr + sackStart), recvTime);
+
+    }
+    else
+    {
+        printf("ERROR: Unknown UDP packet received from remote agent\n");
+        return;
+    }
+}
+int xmit_packet(u_char *message, int messageLen)
 {
 
     int flags = 0;
@@ -488,10 +535,10 @@ int xmit_packet(char *message, int messageLen)
 int main(int argc, char **argv)
 {
     int rc, i, n, flags = 0;
-    socklen_t echoLen;
+    socklen_t echoLen = 0;
     struct sockaddr_in servAddr, localHostAddr;
     struct hostent *host1, *localhostEnt;
-    char msg[MAX_MSG];
+    u_char msg[2000];
 
     string localHostName = argv[1];
     string hostName = argv[2];
@@ -501,9 +548,14 @@ int main(int argc, char **argv)
     localhostEnt = gethostbyname(argv[1]);
     memcpy((char *) &localHostAddr.sin_addr.s_addr,
             localhostEnt->h_addr_list[0], localhostEnt->h_length);
-    init_pcap(inet_ntoa(localHostAddr.sin_addr));
-    int pcapfd = pcap_get_selectable_fd(pcapDescriptor);
 
+    init_pcap(inet_ntoa(localHostAddr.sin_addr), true);
+    int pcapfd = pcap_get_selectable_fd(pcapDescriptor);
+    /*
+    init_pcap(inet_ntoa(localHostAddr.sin_addr), false);
+    int pcapfd_read = pcap_get_selectable_fd(pcapDescriptor_Read);
+    int pcapfd_write = pcap_get_selectable_fd(pcapDescriptor_Write);
+    */
 
     clientSocket = socket(AF_INET, SOCK_DGRAM, 0);
 
@@ -525,15 +577,16 @@ int main(int argc, char **argv)
     startTime = getTimeMilli();
     unsigned long long lastSentTime = startTime;
     unsigned long long lastPrintTime = startTime;
-    char messageString[1458];
+    u_char messageString[1458];
     fd_set socketReadSet, socketWriteSet;
 
     // Initialize the congestion window and slow start threshold.
     conn_info.congWindow = 2.0;
     conn_info.ssthresh = 65000;
-    conn_info.lastAckedSeq = 1;
-    conn_info.lastSentSeq = 1;
-    conn_info.slowStart = true;
+    conn_info.HighACK = 0;
+    conn_info.HighData = 0;
+    conn_info.pipe = 0;
+    conn_info.dup_acks = 0;
 
     // Initialize the timeout value to be one second.
     conn_info.rto_estimate = 1000;
@@ -547,263 +600,187 @@ int main(int argc, char **argv)
 
     // Used for passing along the timeout information to the retransmission part of the code.
     bool timeoutFlag = false;
-    bool timeoutProcessed = true; // Helps not to decrease the congestion window multiple
-    // times before the last timeout was addressed.
 
     reportedLost = 0;
     highSeq = 0;
 
-    seq_num_sent_before_loss = 0;
+    /*
     struct pcap_stat pcapStatObj;
     {
         int bufferSize = 0;
         socklen_t buflen = sizeof(bufferSize);
-        int retVal = getsockopt( pcapfd, SOL_SOCKET, SO_RCVBUF, 
+        int retVal = getsockopt( pcapfd_read, SOL_SOCKET, SO_RCVBUF, 
                 &bufferSize, &buflen);
         printf("Retval = %d, Recv buffer size = %d bytes\n", retVal, bufferSize);
 
     }
+    */
 
-    // For each combination(pair), send a train of UDP packets.
+    struct timeval timeoutStruct;
+
+    timeoutStruct.tv_sec = 0;
+    timeoutStruct.tv_usec = 50000;
+
     while (( lastSentTime - startTime) < connDuration) 
     {
         FD_ZERO(&socketReadSet);
         FD_SET(clientSocket,&socketReadSet);
         FD_SET(pcapfd,&socketReadSet);
+        //FD_SET(pcapfd_write,&socketReadSet);
         FD_ZERO(&socketWriteSet);
         FD_SET(clientSocket,&socketWriteSet);
 
-        struct timeval timeoutStruct;
+        //select(clientSocket+pcapfd_read+pcapfd_write+1,&socketReadSet,&socketWriteSet,0,&timeoutStruct);
+        select(clientSocket+1,&socketReadSet,&socketWriteSet,0,&timeoutStruct);
+        //select(pcapfd+clientSocket+1,&socketReadSet,&socketWriteSet,0,&timeoutStruct);
 
-        timeoutStruct.tv_sec = 0;
-        timeoutStruct.tv_usec = 10000;
-////////////////////////
-        while(pcap_dispatch(pcapDescriptor, 10000, pcapCallback, NULL) != 0);
-
-        select(clientSocket+pcapfd+1,&socketReadSet,&socketWriteSet,0,&timeoutStruct);
-
+        /*
         if (FD_ISSET(pcapfd,&socketReadSet) )
         {
-                    //while(pcap_dispatch(pcapDescriptor, 10000, pcapCallback, NULL) != 0);
-                    pcap_dispatch(pcapDescriptor, 10000, pcapCallback, NULL);
+          //  while(pcap_dispatch(pcapDescriptor, 100, pcapCallback, NULL) != 0);
+            pcap_dispatch(pcapDescriptor, 10000, pcapCallback, NULL);
         }
+        */
+        /*
+        if (FD_ISSET(pcapfd_write,&socketReadSet) )
+        {
+            //while(pcap_dispatch(pcapDescriptor, 10000, pcapCallback, NULL) != 0);
+            pcap_dispatch(pcapDescriptor_Write, 10000, pcapCallback, NULL);
+        }
+        */
 
         if (FD_ISSET(clientSocket,&socketReadSet) )
         {
-            while (true)
-            {
-                if( recvfrom(clientSocket, msg, MAX_MSG, flags,
-                            (struct sockaddr *) &servAddr, &echoLen) != -1)
+            unsigned long long recvTime = getTimeMilli();
+            //memset(msg, 0x0, 100);
+            int retval = 1;
+
+            //while( (retval = recvfrom(clientSocket, (void *)msg, MAX_MSG, flags,(struct sockaddr *) &servAddr, &echoLen) ) > 0)
+            do{
+                retval = recvfrom(clientSocket, (void *)msg, 75, flags,(struct sockaddr *) &servAddr, &echoLen) ;
+                if(retval > 0)
                 {
-          //          while(pcap_dispatch(pcapDescriptor, 10000, pcapCallback, NULL) != 0);
+                    if(retval > 120)
+                    {
+                        printf("ERROR, packet size = %d\n",retval);
+                        exit(1);
+                    }
+                    handlePacket(msg, recvTime);
+                    //memset(msg, 0x0, 100);
                 }
                 else
-                    break;
+                {
+                 //   printf("Retval = %d\n",retval);
+                  //  printf("ERRNO = %d\n", errno);
+                }
+                //pcap_dispatch(pcapDescriptor, 300, pcapCallback, NULL);
             }
+            while(retval > 0);
+
         }
 
         if (FD_ISSET(clientSocket,&socketWriteSet) != 0)
         {
             unsigned long long currTime;
+            unsigned long nextSeq;
 
-            // Send packets until the congestion window is empty.
-            while( (num_outstanding_packets - reportedLost) < conn_info.congWindow)
+            currTime = getTimeMilli();
+            
+            // Send a packet as long as the oustanding data is less than cong. window
+            while( (conn_info.congWindow - conn_info.pipe >= 1.0) || timeoutFlag ) 
             {
-                bool rexmitFlag = false;
-                unsigned long rexmitSeq = 0;
+                nextSeq = NextSeq(timeoutFlag);
 
-                list<unsigned long>::iterator rexmitIter;
+                memset(messageString, 0x0, 100);
+                // Data packet.
+                messageString[0] = '0';
 
-                //if(rexmitPackets.size() > 0)
-                 //   printf("Rexmit packets = ");
-                for(rexmitIter = rexmitPackets.begin();rexmitIter != rexmitPackets.end(); rexmitIter++)
+                // Copy the sequence number into the packet data.
+                memcpy(&messageString[1], &nextSeq, sizeof(unsigned long));
+
+                rc = xmit_packet(messageString, 1458);
+
+                if(rc < 0)
+                    break;
+                else
                 {
-                    // Check if this packet has been queued for retransmission.
-                    // If the timer has expired, retransmit the first packet in this queue
-                    // even if it was sent before.
-                  //  printf("%d(%d) ", (*rexmitIter), rexmitMap[(*rexmitIter)]);
-                    if(rexmitMap[(*rexmitIter)] == false || timeoutFlag == true)
+                    //Record a timestamp for the packet. This is less accurate than
+                    // the libpcap timestamp, but serves as a backup if we fail to
+                    // catch this packet on the way out due to libpcap buffer overflow.
+
+                    // In the most common case, this is going to be revised when the
+                    // packet is recorded by the libpcap filter function.
+                    packetTimeMap[conn_info.HighData] = currTime;
+
+                    retransTimer = currTime + (long long)conn_info.rto_estimate;
+
+                    // Reduce the congestion window to '1' on a timeout.
+                    if(timeoutFlag)
                     {
-                        // Retransmit this packet.
-                        rexmitFlag = true;
-                        rexmitSeq = (*rexmitIter);
-                        break;
-                    }
-                }
-              //  if(rexmitPackets.size() > 0)
-               //     printf("\n");
-
-                // Retransmit a queued packet if possible.
-                if(rexmitFlag)
-                {
-                    // Data packet.
-                    messageString[0] = '0';
-
-                    // Copy the sequence number into the packet data.
-                    memcpy(&messageString[1], &rexmitSeq, sizeof(unsigned long));
-
-                    rc = xmit_packet(messageString, 1458);
-
-                    if(rc >= 0)
-                    {
-                        currTime = getTimeMilli();
-
-                        rexmitMap[rexmitSeq] = true;
-                        timeoutMap[rexmitSeq] = currTime + (long)conn_info.rto_estimate;
-
-                        if(timeoutFlag == true) // Back off the timeout by a factor of 2 - capped to 32 seconds.
-                        {
-                            conn_info.rto_estimate = 2*conn_info.rto_estimate;
-                            if(conn_info.rto_estimate > 32000)
-                                conn_info.rto_estimate = 32000;
-
-                            retransTimer = currTime + (long long)conn_info.rto_estimate;
-                        }
-                        else
-                            retransTimer = currTime + (long long)conn_info.rto_estimate;
-
-                        timeoutFlag = false;
-                        timeoutProcessed = true;
-                        num_outstanding_packets += 1;
-                    }
-
-                    continue;
-                }
-
-                // If we get here, there are no queued packets to be retransmitted,
-                // send a new packet.
-                {
-                    // Data packet.
-                    messageString[0] = '0';
-
-                    // Copy the sequence number into the packet data.
-                    memcpy(&messageString[1], &conn_info.lastSentSeq, sizeof(unsigned long));
-
-                    rc = xmit_packet(messageString, 1458);
-
-                    if(rc < 0)
-                    {
-                        break;
-                    }
-                    else
-                    {
-                        rexmitMap[conn_info.lastSentSeq] = false;
-                        //Record a timestamp for the packet. This is less accurate than
-                        // the libpcap timestamp, but serves as a backup if we fail to
-                        // catch this packet on the way out due to libpcap buffer overflow.
-
-                        // In the most common case, this is going to be revised when the
-                        // packet is recorded by the libpcap filter function.
-                        currTime = getTimeMilli();
-                        packetTimeMap[conn_info.lastSentSeq] = currTime;
-                        retransTimer = currTime + (long long)conn_info.rto_estimate;
-
-                        // This is a new packet, increment the sequence number.
-                        conn_info.lastSentSeq++;
-
-                        num_outstanding_packets += 1;
-                    }
-
-                }
-
-            }
-
-            //////////////////////////
-            while(pcap_dispatch(pcapDescriptor, 10000, pcapCallback, NULL) != 0);
-        }
-
-        // Check for timeouts and retransmit packet(s) if necessary.
-        if(timeoutProcessed)
-        {
-            unsigned long long currTime = getTimeMilli();
-            unsigned long seqNum;
-
-            // Global timeout - this timer is reset on every packet send event & on
-            // receiving acks that acknowledge new data.
-            if(retransTimer < currTime)
-            {
-                //Retransmit the first unacked packet.
-                if(unackedPackets.size() > 0)
-                {
-                    timeoutProcessed = false;
-                    seqNum = unackedPackets.front();
-                    if(find(rexmitPackets.begin(),rexmitPackets.end(),seqNum) == rexmitPackets.end())
-                    {
-                        rexmitPackets.push_back(seqNum);
-                        rexmitMap[seqNum] = false;
-                    }
-
-                    // Halve the slow-start threshold and set congestion window size to 1.
-                    // The cong. window should be halved only once per window - irrespective
-                    // of the number of losses in that window.
-                    if(seqNum > seq_num_sent_before_loss)
-                    {
-                        //conn_info.ssthresh = (conn_info.lastSentSeq - conn_info.lastAckedSeq)/2;
                         conn_info.ssthresh = unackedPackets.size()/2;
                         if(conn_info.ssthresh < 2)
                             conn_info.ssthresh = 2;
+
                         conn_info.congWindow = 1;
 
-                        conn_info.slowStart = true;
-
-                        seq_num_sent_before_loss = conn_info.lastSentSeq - 1;
+                        timeoutFlag = false;
+                        printf("Timed out\n");
                     }
-                 //   else // Do not change the cong. window & ssthreshold for multiple losses
-                        // in a single window.
+
+                    //cout << "Transmitting # "<<conn_info.HighData<<", Time = "<<currTime - startTime<<endl;
+                    // This is a new packet, increment the sequence number.
+                    if(nextSeq > conn_info.HighData)
+                        conn_info.HighData = nextSeq;
+                    else if( (nextSeq > conn_info.HighRxt) && conn_info.lossRecovery )
                     {
+                        conn_info.HighRxt = nextSeq;
 
+                        // Mark this as a retransmitted packet - doesn't count
+                        // towards RTT/RTO calculation.
+                        rexmitMap[nextSeq] = true;
                     }
+                    handlePacket(messageString, currTime);
+
+                    // Recalculate the number of outstanding packets.
+                    SetPipe();
                 }
             }
 
-            // Check the timers of retransmitted packets.
-            list<unsigned long>::iterator rexmitIter;
-            bool multipleTimeouts = false;
+            //////////////////////////
+            //pcap_dispatch(pcapDescriptor, 10000, pcapCallback, NULL);
+            lastSentTime = getTimeMilli();
 
-            for(rexmitIter = rexmitPackets.begin(); rexmitIter != rexmitPackets.end(); rexmitIter++)
+
+            // Check the retransmission timer.
+            if(retransTimer < lastSentTime)
             {
-                // We rexmitted this packet already, but its timer has expired - send it again.
-                if((rexmitMap[(*rexmitIter)] == true) && timeoutMap[(*rexmitIter)] < currTime)
-                {
-                    timeoutProcessed = false;
-                    rexmitMap[(*rexmitIter)] = false;
-                    multipleTimeouts = true;
-                }
+                timeoutFlag = true;
+
+                // Start retransmitting from the first unacked packet.
+                conn_info.HighRxt = conn_info.HighACK;
             }
 
-            if(multipleTimeouts)
-            {
-                //conn_info.ssthresh = (conn_info.lastSentSeq - conn_info.lastAckedSeq)/2;
-                conn_info.ssthresh = unackedPackets.size()/2;
-                if(conn_info.ssthresh < 2)
-                    conn_info.ssthresh = 2;
-                conn_info.congWindow = 1;
-
-                conn_info.slowStart = true;
-
-                seq_num_sent_before_loss = conn_info.lastSentSeq - 1;
-            }
-
+            //cout << "Last sent at time = "<<lastSentTime - startTime<<endl;
         }
-        lastSentTime = getTimeMilli();
 
-        if( (lastSentTime - lastPrintTime) >= 2000)
+        if( (lastSentTime - lastPrintTime) >= 100)
         {
-            cout << lastSentTime - startTime << " " << conn_info.congWindow<< " "<< conn_info.ssthresh << " , outstanding=" <<num_outstanding_packets <<", reportedLost = "<<reportedLost<<endl;
-            pcap_stats(pcapDescriptor, &pcapStatObj);
-            if(pcapStatObj.ps_drop > 0)
-                printf("pcap: Packets received %d, dropped %d\n", pcapStatObj.ps_recv, pcapStatObj.ps_drop);
+            cout << lastSentTime - startTime << " " << conn_info.congWindow<< " "<< conn_info.ssthresh << " , outstanding=" <<conn_info.pipe <<", reportedLost = "<<reportedLost<<endl;
+            //pcap_stats(pcapDescriptor_Read, &pcapStatObj);
+            //if(pcapStatObj.ps_drop > 0)
+             //   printf("pcap: Packets received %d, dropped %d\n", pcapStatObj.ps_recv, pcapStatObj.ps_drop);
             lastPrintTime = lastSentTime;
         }
+
     }
 
     close(clientSocket);
 
-    //double tput = (double)conn_info.lastAckedSeq/(double)connDuration;
-    double tput = (double)(highSeq - reportedLost)/(double)connDuration;
+    //double tput = (double)conn_info.HighACK/(double)connDuration;
+    double tput = (double)(conn_info.HighACK - reportedLost)/(double)connDuration;
     tput *= (1500*8);
 
-    printf("Packets sent = %u(last Packet = %u, highSeq = %u), time = %lld seconds, throughput = %f Kbits/sec\n",conn_info.lastAckedSeq,conn_info.lastSentSeq,highSeq,connDuration/1000, tput );
+    printf("Packets sent = %u(last Packet = %u, highSeq = %u), time = %lld seconds, throughput = %f Kbits/sec\n",conn_info.HighACK,conn_info.HighData,highSeq,connDuration/1000, tput );
 
 }
 

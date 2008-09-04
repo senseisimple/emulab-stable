@@ -21,10 +21,11 @@
 #include <vector>
 #include <map>
 #include <list>
+#include <fcntl.h>
 
 
 #define LOCAL_SERVER_PORT 9831
-#define MAX_MSG 1500
+#define MAX_MSG 150000
 
 pcap_t *pcapDescriptor = NULL;
 
@@ -153,7 +154,7 @@ void pcapCallback(u_char *user, const struct pcap_pkthdr *pcap_info, const u_cha
 
 void init_pcap( char *ipAddress)
 {
-    char interface[] = "eth4";
+    char interface[] = "eth2";
     struct bpf_program bpfProg;
     char errBuf[PCAP_ERRBUF_SIZE];
     char filter[128] = " udp ";
@@ -177,6 +178,7 @@ void init_pcap( char *ipAddress)
 
     pcap_compile(pcapDescriptor, &bpfProg, filter, 1, netp);
     pcap_setfilter(pcapDescriptor, &bpfProg);
+    pcap_setnonblock(pcapDescriptor, 1, errBuf);
 }
 
 void UpdateSACKs(unsigned long seqNum, bool consecutiveSeq , struct tcp_info *connInfo)
@@ -308,7 +310,7 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
         src_ip_port += ":";
         src_ip_port += ntohs(udpHdr->source);
 
-        //cout << "Received packet #"<<seqNum<<endl;
+//        cout << "Received packet #"<<seqNum<<endl;
 
         if(connectionMap.find(src_ip_port) != connectionMap.end()) // Established connection.
         {
@@ -421,7 +423,7 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
 
         if((int)numSackRanges != 0)
         {
-        //    printf("Creating a SACK for packet = %d ^ ", ackedSeq);
+            printf("Creating a SACK for packet = %d ^ ", ackedSeq);
             packetSize += (2*(int)numSackRanges*sizeof(unsigned long));
 
             unsigned long rangeBegin, rangeEnd;
@@ -429,13 +431,25 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
             list<pair<unsigned long, unsigned long> >::iterator sackIter = connInfo->sackRanges.begin();
             int i = 0;
 
+            // Send the 'n' most recent SACK blocks.
+            if(connInfo->sackRanges.size() != numSackRanges)
+            {
+                int index = connInfo->sackRanges.size() - numSackRanges;
+
+                while(index != 0)
+                {
+                    sackIter++;
+                    index--;
+                }
+            }
+
 
             while(i < (int)numSackRanges && (sackIter != connInfo->sackRanges.end()))
             {
                 rangeBegin = (*sackIter).first;
                 rangeEnd = (*sackIter).second;
 
-         //       printf("%d %d: ", rangeBegin, rangeEnd);
+                printf("%d %d: ", rangeBegin, rangeEnd);
 
                 memcpy(&appAck[2 + 3*sizeof(unsigned long) + 2*i*sizeof(unsigned long)], &rangeBegin, sizeof(unsigned long ));
                 memcpy(&appAck[2 + 3*sizeof(unsigned long) + (2*i+1)*sizeof(unsigned long)], &rangeEnd, sizeof(unsigned long ));
@@ -443,13 +457,13 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
                 i++;
                 sackIter++;
             }
-          //  printf("\n");
+            printf("\n");
 
-            //printf("HighSeq = %u, lostNum = %u\n", connInfo->highSeq, connInfo->missingPacketTotal);
+            printf("HighSeq = %u, lostNum = %u\n", connInfo->highSeq, connInfo->missingPacketTotal);
         }
         else
         {
-        //    printf("Sending ACK for packet = %u, received = %u ", ackedSeq,seqNum);
+            printf("Sending ACK for packet = %u, received = %u\n", ackedSeq,seqNum);
 
         }
 
@@ -524,29 +538,57 @@ int main(int argc, char *argv[]) {
 
 
     init_pcap(inet_ntoa(servAddr.sin_addr));
+    int pcapfd = pcap_get_selectable_fd(pcapDescriptor);
     struct pcap_stat pcapStatObj;
+    fd_set socketReadSet;
+
+    struct timeval timeoutStruct;
+
+    timeoutStruct.tv_sec = 0;
+    timeoutStruct.tv_usec = 50000;
+
+    memset(msg,0x0,MAX_MSG);
+    fcntl(sd, F_SETFL, flags | O_NONBLOCK);
 
     /* server infinite loop */
     while(1) {
+        FD_ZERO(&socketReadSet);
+        FD_SET(sd,&socketReadSet);
+        FD_SET(pcapfd,&socketReadSet);
 
-        memset(msg,0x0,MAX_MSG);
+        select(sd+pcapfd+1,&socketReadSet,0,0,&timeoutStruct);
 
-        /* receive message */
-        cliLen = sizeof(cliAddr);
-        n = recvfrom(sd, msg, MAX_MSG, flags,
-                (struct sockaddr *) &cliAddr, &cliLen);
 
-        pcap_dispatch(pcapDescriptor, 1, pcapCallback, NULL);
+        if (FD_ISSET(sd,&socketReadSet) )
+        {   
+            /* receive message */
+            cliLen = sizeof(cliAddr);
 
-        pcap_stats(pcapDescriptor, &pcapStatObj);
-        if(pcapStatObj.ps_drop > 0)
-            printf("pcap: Packets received %d, dropped %d\n", pcapStatObj.ps_recv, pcapStatObj.ps_drop);
+            while(true)
+            {
+                if(recvfrom(sd, msg, MAX_MSG, flags,(struct sockaddr *) &cliAddr, &cliLen))
+                {
+                    pcap_dispatch(pcapDescriptor, 300, pcapCallback, NULL);
+                }
+                else
+                    break;
+            }
+        }
+
+        if (FD_ISSET(pcapfd,&socketReadSet) )
+        {           
+            while(pcap_dispatch(pcapDescriptor, 10000, pcapCallback, NULL) != 0);
+        }
+
 
         if(n<0) {
             printf("%s: cannot receive data \n",argv[0]);
             continue;
         }
     }
+    pcap_stats(pcapDescriptor, &pcapStatObj);
+    if(pcapStatObj.ps_drop > 0)
+        printf("pcap: Packets received %d, dropped %d\n", pcapStatObj.ps_recv, pcapStatObj.ps_drop);
 
     return 0;
 
