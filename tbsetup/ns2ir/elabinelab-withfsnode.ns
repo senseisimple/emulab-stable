@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004-2006 University of Utah and the Flux Group.
+# Copyright (c) 2004-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -151,7 +151,7 @@ if {[info exists ::TBCOMPAT::elabinelab_nodeos("boss")]} {
         tb-set-node-os $myboss $elabinelab_nodeos("boss")
     }
 } else {
-    tb-set-node-os $myboss FBSD-STD
+    tb-set-node-os $myboss FBSD63-STD
 }
 
 if {[info exists ::TBCOMPAT::elabinelab_nodeos("ops")]} {
@@ -159,7 +159,7 @@ if {[info exists ::TBCOMPAT::elabinelab_nodeos("ops")]} {
         tb-set-node-os $myops $elabinelab_nodeos("ops")
     }
 } else {
-    tb-set-node-os $myops  FBSD-STD
+    tb-set-node-os $myops  FBSD63-STD
 }
 
 if {[info exists ::TBCOMPAT::elabinelab_nodeos("fs")]} {
@@ -167,5 +167,5 @@ if {[info exists ::TBCOMPAT::elabinelab_nodeos("fs")]} {
         tb-set-node-os $myfs $elabinelab_nodeos("fs")
     }
 } else {
-    tb-set-node-os $myfs  FBSD-STD
+    tb-set-node-os $myfs  FBSD63-STD
 }
