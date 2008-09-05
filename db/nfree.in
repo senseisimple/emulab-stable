@@ -322,13 +322,16 @@ foreach my $node (@freed_nodes) {
     #
     my $clean;
     if (defined($def_boot_osid)) {
+	#
+	# OSinfo lookup could fail if the OSID was removed at a bad time,
+	# so treat a failure as non-fatal and force a clean.
+	#
 	my $osinfo = OSinfo->Lookup($def_boot_osid);
-	if (!defined($osinfo)) {
-	    print "*** Unable to lookup OSinfo object for $def_boot_osid\n";
-	    $error++;
-	    next;
+	if (defined($osinfo)) {
+	    $clean = $osinfo->mustclean();
+	} else {
+	    $clean = 1;
 	}
-	$clean = $osinfo->mustclean();
     }
     if ($isvirt || !$imageable) {
 	# VIRTNODE HACK: Virtual nodes are special. Do not clean or reload.
