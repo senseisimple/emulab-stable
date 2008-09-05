@@ -6,6 +6,7 @@
 # If you add a variable, be sure to go and update configure.in.
 #
 TBDBNAME=tbdb
+TBERRORLOGDBNAME=errorlog
 TBADMINGROUP=flux
 TBOPSEMAIL=testbed-ops@flux.utah.edu
 TBLOGSEMAIL=testbed-logs@flux.utah.edu

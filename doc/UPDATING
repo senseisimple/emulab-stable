@@ -18,6 +18,27 @@ Note that some instructions may have steps that need to occur at a few
 different points in the install process - these are marked with the
 earliest time one of the steps needs to occur.
 
+20080905: After install
+
+          In order to reduce the size of the main database data in the
+          "log" table is now moved to the errorlog database and old
+          entries are removed. 
+
+          First off create the errorlog database:
+
+            mysqladmin create errorlog
+            mysql errorlog < sql/database-create-errorlog.sql
+
+          Than install a crontab entry to run dumperrorlog every hour
+          by adding the following line to /etc/crontab, be sure to
+          preserve the embedded tabs:
+
+            12	*	*	*	*	root	/usr/testbed/sbin/dumperrorlog
+
+	  dumperrorlog will only move 300,000 rows at a time in order
+	  to avoid locking the log table for too long.  Thus it will
+          take a while for it to get caught up.
+
 20080805: Optional, After install.
 
           As a result of moving the documentation to the WIKI there

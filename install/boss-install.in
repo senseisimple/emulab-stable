@@ -23,6 +23,7 @@ my $PREFIX     = '@prefix@';
 my $SRCDIR     = '@srcdir@';
 my $TOP_SRCDIR = '@top_srcdir@';
 my $DBNAME     = "@TBDBNAME@";
+my $ERRORLOG_DBNAME = "@TBERRORLOGDBNAME@";
 my $ELABINELAB = @ELABINELAB@;
 my $WINSUPPORT = @WINSUPPORT@;
 my $MAILMANSUPPORT = @MAILMANSUPPORT@;
@@ -882,6 +883,21 @@ Phase "database", "Setting up database", sub {
 	ExecQuietFatal("$MYSQL $DBNAME < ".
 		       "$TOP_SRCDIR/sql/knowlbase-create.sql");
     };
+    Phase "$ERRORLOG_DBNAME", "Creating $ERRORLOG_DBNAME", sub {
+	if (!ExecQuiet("$MYSQLSHOW $ERRORLOG_DBNAME")) {
+	    PhaseSkip("$ERRORLOG_DBNAME already exists");
+	}
+	ExecQuietFatal("$MYSQLADMIN create $ERRORLOG_DBNAME");
+    };
+    Phase "tables", "Creating tables in $ERRORLOG_DBNAME", sub {
+	if (!ExecQuiet("$MYSQLDUMP -d $ERRORLOG_DBNAME users")) {
+	    PhaseSkip("Tables have already been created");
+	}
+	if ($FBSD_MAJOR == 4) {
+	    ExecQuietFatal("cp $TOP_SRCDIR/sql/database-create-old-errorlog.sql $TOP_SRCDIR/sql/database-create-errorlog.sql")
+	}
+	ExecQuietFatal("$MYSQL $ERRORLOG_DBNAME < $TOP_SRCDIR/sql/database-create-errorlog.sql");
+    };
 };
 
 Phase "rc.conf", "Adding testbed content to $RCCONF", sub {
@@ -1014,6 +1030,7 @@ Phase "cron", "Adding cron jobs", sub {
 	DoneIfEdited($CRONTAB);
 	AppendToFileFatal($CRONTAB,
 	    "0  \t6\t*\t*\t*\troot\t$PREFIX/sbin/audit",
+	    "12 \t*\t*\t*\t*\troot\t$PREFIX/sbin/dumperrorlog",
 	    "0  \t1\t*\t*\t*\troot\t$PREFIX/sbin/dbcheck",
 	    "45 \t1\t*\t*\t*\troot\t$PREFIX/sbin/backup",
 	    "*/5\t*\t*\t*\t*\troot\t$PREFIX/sbin/node_status",

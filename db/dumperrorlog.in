@@ -27,13 +27,14 @@ my $max_rows       = 300000;
 #
 # Configure variables
 #
-my $TB		= "@prefix@";
-my $TBOPS       = "@TBOPSEMAIL@";
-my $ISMAINSITE  = @TBMAINSITE@;
-my $USERNODE	= "@USERNODE@";
-my $PROXY       = "$TB/sbin/dumperrorlog.proxy";
-my $SCP         = "/usr/bin/scp";
-my $SSHTB	= "$TB/bin/sshtb";
+my $TB		 = "@prefix@";
+my $TBOPS        = "@TBOPSEMAIL@";
+my $ISUTAHEMULAB = "@OURDOMAIN@" eq 'emulab.net';
+my $USERNODE	 = "@USERNODE@";
+my $PROXY        = "$TB/sbin/dumperrorlog.proxy";
+my $SCP          = "/usr/bin/scp";
+my $SSHTB	 = "$TB/bin/sshtb";
+my $ERRORLOGDB   = "@TBERRORLOGDBNAME@";
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
@@ -106,17 +107,12 @@ if (! $debug) {
 my $query_result =
     DBQueryFatal("select idx from emulab_indicies ".
 		 "where name='lastlog_seqnum'");
-my ($lastseq) = $query_result->fetchrow_array();
-if (!defined($lastseq)) {
+my ($minseq) = $query_result->fetchrow_array();
+if (!defined($minseq)) {
     DBQueryFatal("insert into emulab_indicies (name, idx) ".
 		 "values ('lastlog_seqnum', 0)");
-    $lastseq = 0;
+    $minseq = 0;
 }
-
-#
-# Limit number of rows to keep from locking the log table too long
-#
-my $maxseq = $lastseq + $max_rows;
 
 #
 # And the last experiment index we sent over.
@@ -149,25 +145,30 @@ if (!defined($NOTICE)) {
     fatal("No priority named 'NOTICE' in the priorities table!");
 }
 
-print "Copying log entries ($lastseq,$maxseq]\n";
+#
+# Now get the largest log index to copy
+# 
+$query_result =
+    DBQueryFatal("select MAX(seq) from log ".
+		 "where seq > $minseq " .
+		 "  and seq <= $minseq + $max_rows ");
+my $maxseq = $query_result->fetchrow_array();
+$maxseq = $minseq unless defined $maxseq;
+
+print "Copying log entries ($minseq,$maxseq]\n";
 print "Exptidx ($exptidx_min, $exptidx_max]\n";
 
 #
-# Only the main site does this archiving stuff.
-#
-if ($ISMAINSITE) {
-    #
-    # Must lock the table of course
-    #
-    DBQueryFatal("lock tables log write");
-
+# Might not be any new entries ...
+# 
+if ($minseq != $maxseq) {
     #
     # Backup old outfile
     #
     if (-e "${tempfile}.log") {
 	unlink("${tempfile}.log.save")
 	    if (-e "${tempfile}.log.save");
-	
+
 	system("/bin/mv -f ${tempfile}.log ${tempfile}.log.save");
     }
 
@@ -175,35 +176,16 @@ if ($ISMAINSITE) {
     # Grab all of the new entries and store to the file
     #
     DBQueryFatal("select * from log ".
-		 "where seq > $lastseq " .
+		 "where seq > $minseq " .
 		 "and seq <= $maxseq " .
 		 "into outfile '${tempfile}.log' ");
 
-    #
-    # Now we need to find out what the last index really was. 
-    # 
-    my $firstseq = $lastseq;
-    
-    $query_result =
-	DBQueryFatal("select seq from log ".
-		     "where seq > $lastseq " .
-		     "  and seq <= $maxseq ".
-		     "order by seq desc limit 1");
-    # Save for later.
-    ($lastseq) = $query_result->fetchrow_array();
+    system("echo \"load data infile '${tempfile}.log' replace into table log\" ".
+	   "     | mysql $ERRORLOGDB");
+    fatal("Could not load into archive DB!")
+	if ($?);
 
-    DBQueryFatal("unlock tables");
-
-    #
-    # Might not be any new entries ...
-    # 
-    if (defined($lastseq)) {
-	system("echo \"load data infile '${tempfile}.log' replace into table log\" ".
-	       "     | mysql errorlog");
-	fatal("Could not load into archive DB!")
-	    if ($?);
-
-	#
+    if ($ISUTAHEMULAB) {
 	# XXX This awful hack will go away when Kevin is happy with
 	# the error logging code.
 	#
@@ -212,74 +194,77 @@ if ($ISMAINSITE) {
 	# Copy the file over to ops and load it into the DB over there.
 	#
 	system("$SCP -p ${tempfile}.log ".
-	       "     ${USERNODE}:/var/db/mysql/errorlog") == 0
-	    or fatal("Could not copy $tempfile to $USERNODE!");
+	       "     ${USERNODE}:/var/db/mysql/$ERRORLOGDB") == 0
+		   or fatal("Could not copy $tempfile to $USERNODE!");
 
 	system("$SSHTB -host $USERNODE $PROXY log") == 0
 	    or fatal("Could not load log entries into ops DB!");
     }
+}
 
-    #
-    # Now the other tables Kevin needs
-    #
-    foreach my $tablename ("scripts", "priorities", "causes", "session_info",
-			   "errors", "users", "experiments",
-			   "report_error", "report_context",
-			   "report_assign_violation") {
+#
+# Now the other tables Kevin needs
+#
+foreach my $tablename ("scripts", "priorities", "causes", "session_info",
+		       "errors", "users", "experiments",
+		       "report_error", "report_context",
+		       "report_assign_violation") {
 
- 	unlink("${tempfile}.${tablename}") if -e "${tempfile}.${tablename}";
+    unlink("${tempfile}.${tablename}") if -e "${tempfile}.${tablename}";
 
-	if (($tablename eq "errors" ||
-	     $tablename eq "session_info") && !$force) {
-	    DBQueryFatal("select * from $tablename where session>=$firstseq and session<=$lastseq ".
-			 "into outfile '${tempfile}.${tablename}' ");
-	}
-	elsif ($tablename eq "report_error" ||
-	       $tablename eq "report_context" ||
-	       $tablename eq "report_assign_violation") {
-	    DBQueryFatal("select * from $tablename where seq>=$firstseq and seq<=$lastseq ".
-			 "into outfile '${tempfile}.${tablename}' ");
-	}
-	elsif ($tablename eq "users") {
-	    DBQueryFatal("select uid,unix_uid from $tablename ".
-			 "into outfile '${tempfile}.${tablename}' ");
-	}
-	elsif ($tablename eq "experiments") {
-	    next if
-		($exptidx_max == $exptidx_min);
-		
-	    DBQueryFatal("select exptidx,pid,eid from experiment_stats ".
-			 "where exptidx >  $exptidx_min and ".
-			 "      exptidx <= $exptidx_max ".
-			 "into outfile '${tempfile}.${tablename}' ");
-	}
-	else {
-	    DBQueryFatal("select * from $tablename ".
-			 "into outfile '${tempfile}.${tablename}' ");
-	}
+    if (($tablename eq "errors" ||
+	 $tablename eq "session_info") && !$force) {
+	DBQueryFatal("select * from $tablename where session>=$minseq and session<=$maxseq ".
+		     "into outfile '${tempfile}.${tablename}' ");
+    }
+    elsif ($tablename eq "report_error" ||
+	   $tablename eq "report_context" ||
+	   $tablename eq "report_assign_violation") {
+	DBQueryFatal("select * from $tablename where seq>=$minseq and seq<=$maxseq ".
+		     "into outfile '${tempfile}.${tablename}' ");
+    }
+    elsif ($tablename eq "users") {
+	DBQueryFatal("select uid,unix_uid from $tablename ".
+		     "into outfile '${tempfile}.${tablename}' ");
+    }
+    elsif ($tablename eq "experiments") {
+	next if
+	    ($exptidx_max == $exptidx_min);
 
-	system("echo \"load data infile '${tempfile}.${tablename}' ".
-	       "     replace into table $tablename\" | mysql errorlog");
-	fatal("Could not load $tablename into archive DB!")
-	    if ($?);
+	DBQueryFatal("select exptidx,pid,eid from experiment_stats ".
+		     "where exptidx >  $exptidx_min and ".
+		     "      exptidx <= $exptidx_max ".
+		     "into outfile '${tempfile}.${tablename}' ");
+    }
+    else {
+	DBQueryFatal("select * from $tablename ".
+		     "into outfile '${tempfile}.${tablename}' ");
+    }
 
+    system("echo \"load data infile '${tempfile}.${tablename}' ".
+	   "     replace into table $tablename\" | mysql $ERRORLOGDB");
+    fatal("Could not load $tablename into archive DB!")
+	if ($?);
+
+    if ($ISUTAHEMULAB) {
 	#
 	# Copy the file over to ops and load it into the DB over there.
 	#
 	system("$SCP -p ${tempfile}.${tablename} ".
-	       "     ${USERNODE}:/var/db/mysql/errorlog") == 0
-	    or fatal("Could not copy ${tempfile}.${tablename} to $USERNODE!");
+	       "     ${USERNODE}:/var/db/mysql/$ERRORLOGDB") == 0
+		   or fatal("Could not copy ${tempfile}.${tablename} to $USERNODE!");
 
 	system("$SSHTB -host $USERNODE $PROXY $tablename") == 0
 	    or fatal("Could not load $tablename entries into ops DB!");
-	
+
 	unlink("${tempfile}.${tablename}");
     }
 }
 
+
 # Okay, now that we have really archived them away, update the
 # seq number.
-DBQueryFatal("update emulab_indicies set idx='$lastseq' ".
+DBQueryFatal("update emulab_indicies set idx='$maxseq' ".
 	     "where name='lastlog_seqnum'");
 
 # Okay, now that we have really sent over the experiment_stats stuff.
@@ -320,3 +305,4 @@ sub fatal($)
     die("*** $0:\n".
 	"    $msg\n");
 }
+
