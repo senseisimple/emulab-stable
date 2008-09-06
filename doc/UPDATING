@@ -20,11 +20,11 @@ earliest time one of the steps needs to occur.
 
 20080905: After install
 
-          In order to reduce the size of the main database data in the
-          "log" table is now moved to the errorlog database and old
-          entries are removed. 
+          In order to reduce the size of the main database, data in
+          the "log" table is now moved to the errorlog database and
+          old entries are removed.
 
-          First off create the errorlog database:
+          First off, create the errorlog database:
 
             mysqladmin create errorlog
             mysql errorlog < sql/database-create-errorlog.sql
