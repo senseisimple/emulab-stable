@@ -62,7 +62,6 @@ use libtestbed;
 use libtblog;
 use Experiment;
 use Node;
-use GeniEmulab;
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -147,6 +146,12 @@ if (!defined($this_user) && $UID) {
 my $experiment = Experiment->Lookup($pid, $eid);
 if (!defined($experiment)) {
     tbdie("Could not locate object for experiment $pid/$eid");
+}
+
+# XXX Until ProtoGeni stuff more ready for primetime.
+if ($experiment->HasGeniNodes()) {
+    require GeniEmulab;
+    import GeniEmulab;
 }
 
 #
