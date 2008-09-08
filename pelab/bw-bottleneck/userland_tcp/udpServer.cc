@@ -154,7 +154,7 @@ void pcapCallback(u_char *user, const struct pcap_pkthdr *pcap_info, const u_cha
 
 void init_pcap( char *ipAddress)
 {
-    char interface[] = "eth2";
+    char interface[] = "eth4";
     struct bpf_program bpfProg;
     char errBuf[PCAP_ERRBUF_SIZE];
     char filter[128] = " udp ";
@@ -473,7 +473,7 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
         destAddr.sin_port = udpHdr->source;
 
         int retval = sendto(sd,appAck,packetSize,flags,(struct sockaddr *)&destAddr,sizeof(destAddr));
-        if(retval < 0)
+        if(retval <= 0)
         {
             cout<<"Send failed for ACK "<<ackedSeq<<endl;
             exit(1);
