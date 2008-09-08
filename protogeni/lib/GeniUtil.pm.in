@@ -1,0 +1,52 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package GeniUtil;
+
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA    = "Exporter";
+@EXPORT = qw ( );
+
+# Must come after package declaration!
+use lib '@prefix@/lib';
+use User;
+use English;
+use Data::Dumper;
+use XML::Simple;
+
+# Configure variables
+my $TB		   = "@prefix@";
+my $TBOPS          = "@TBOPSEMAIL@";
+my $user	   = "geniuser";
+my $group          = "GeniSlices";
+
+#
+# In the prototype, we accept certificate signed by trusted roots (CA
+# certs we have locally cached). Scripts runs as "geniuser" so that
+# there is an emulab user context, or many of the scripts we invoke
+# will complain and croak.
+#
+sub FlipToGeniUser()
+{
+    my $unix_uid = getpwnam("$user") or
+	die("*** $0:\n".
+	    "    No such user $user\n");
+    my $unix_gid = getgrnam("$group") or
+	die("*** $0:\n".
+	    "    No such group $group\n");
+
+    $GID            = $unix_gid;
+    $EGID           = "$unix_gid $unix_gid";
+    $EUID = $UID    = $unix_uid;
+    $ENV{'USER'}    = $user;
+    $ENV{'LOGNAME'} = $user;
+    return 0;
+}
+
+

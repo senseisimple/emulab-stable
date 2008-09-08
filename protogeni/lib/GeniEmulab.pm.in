@@ -471,7 +471,7 @@ sub DestroySlivers($$$)
 	}
 	print STDERR "Releasing $sliver for $node.\n";
 	
-	if ($sliver->Destroy() != 0) {
+	if ($sliver->Destroy($context) != 0) {
 	    print STDERR "Could not destroy $sliver for $node\n";
 	    $errors++;
 	    next;

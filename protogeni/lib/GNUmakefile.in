@@ -15,9 +15,10 @@ LIB_SCRIPTS     = GeniDB.pm GeniUser.pm GeniSAClient.pm \
 		  GeniSlice.pm GeniSA.pm GeniCM.pm GeniCMClient.pm \
 		  GeniTicket.pm GeniSliver.pm GeniCredential.pm \
 		  GeniComponent.pm GeniCH.pm GeniCHClient.pm GeniEmulab.pm \
-		  GeniAuthority.pm GeniCertificate.pm GeniAggregate.pm
+		  GeniAuthority.pm GeniCertificate.pm GeniAggregate.pm \
+		  GeniUtil.pm
 		  
-SCRIPTS		= test.pl addnode.pl test2.pl addauthority
+SCRIPTS		= test.pl addnode.pl test.pl addauthority
 OPS_LIBS	= GeniCMClient.pm GeniSAClient.pm GeniCHClient.pm
 
 #

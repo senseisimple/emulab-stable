@@ -49,6 +49,7 @@ my $TBAUDIT   	   = "@TBAUDITEMAIL@";
 my $BOSSNODE       = "@BOSSNODE@";
 my $OURDOMAIN      = "@OURDOMAIN@";
 my $CREATEEXPT     = "$TB/bin/batchexp";
+my $ENDEXPT        = "$TB/bin/endexp";
 my $NALLOC	   = "$TB/bin/nalloc";
 my $AVAIL	   = "$TB/sbin/avail";
 my $TBSWAP	   = "$TB/bin/tbswap";
@@ -997,9 +998,65 @@ sub CleanupDeadSlice($)
 	    return -1;
 	}
     }
+
+    my $experiment = $slice->GetExperiment();
+    if (!defined($experiment)) {
+	print STDERR "Could not get experiment for $slice\n";
+	return -1;
+    }
+    # Note the -h option; allows experiment with no NS file.
+    system("$ENDEXPT -q -w " . $experiment->idx());
+    return -1
+	if ($?);
+    
     if ($slice->Delete() != 0) {
 	print STDERR "Could not delete $slice\n";
 	return -1;
     }
     return 0;
+}
+
+#
+# Remove a record, specifically a slice on this component.
+#
+sub DeleteSlice($)
+{
+    my ($argref) = @_;
+    my $credential = $argref->{'credential'};
+
+    if (! defined($credential)) {
+	return GeniResponse->MalformedArgsResponse();
+    }
+
+    $credential = GeniCredential->CreateFromSigned($credential);
+    if (!defined($credential)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not create GeniCredential object");
+    }
+
+    my $slice_uuid = $credential->this_uuid();
+    
+    #
+    # Make sure the credential was issued to the caller.
+    #
+    if ($credential->owner_uuid() ne $ENV{'GENIUUID'}) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "This is not your credential!");
+    }
+
+    #
+    # See if we have a record of this slice in the DB. If not, then we have
+    # to go to the ClearingHouse to find its record, so that we can find out
+    # who the SA for it is.
+    #
+    my $slice = GeniSlice->Lookup($slice_uuid);
+    if (!defined($slice)) {
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+			    "No such slice on this component: $slice_uuid");
+    }
+    if (CleanupDeadSlice($slice) != 0) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not cleanup slice");
+    }
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS);
 }

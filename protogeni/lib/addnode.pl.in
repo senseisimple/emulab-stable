@@ -15,6 +15,7 @@ use GeniComponent;
 use English;
 use Node;
 use Interface;
+use Experiment;
 use Data::Dumper;
 
 my $this_user = User->LookupByUnixId($UID);
@@ -22,6 +23,7 @@ if (! defined($this_user)) {
     print STDERR "You ($UID) do not exist!\n";
     exit(-1);
 }
+my $experiment = Experiment->Lookup("emulab-ops", "geni-nodes");
 
 #
 # The RPC context for this test script is mostly as an SA, with some
@@ -73,7 +75,7 @@ my $response =
 			   $context,
 			   "Resolve",
 			   { "credential"  => $credential->asString(),
-			     "hrn"         => "pc41",
+			     "hrn"         => "pc167",
 			     "type"        => "Node",
 			   });
 if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS) {
@@ -87,26 +89,23 @@ my $nodeargs = { "uuid"  => $value->{'uuid'},
 		 "role"  => "testnode",
 		 "vtype" => "pcfed" };
 
-my $node = Node->Create("pcfedphys1", undef, $nodeargs);
+my $node = Node->Create("pcfedphys2", $experiment, $nodeargs);
 if (!defined($node)) {
     die("Could not create new node.\n");
 }
+$node->SetStatus('up');
 
-# Just add the control network for now.
 foreach my $ref (@{ $value->{'interfaces'} }) {
-    if ($ref->{'role'} eq 'ctrl') {
-	my $ifaceargs = { "uuid"  => $ref->{'uuid'},
-			  "type"  => $ref->{'type'},
-			  "role"  => $ref->{'role'},
-			  "card"  => $ref->{'card'},
-			  "port"  => $ref->{'port'},
-			  "MAC"   => $ref->{'MAC'},
-			  "IP"    => $ref->{'IP'},
-			  "mask"  => $ref->{'mask'},
-		      };
-	print Dumper($ifaceargs);
-	Interface->Create($node, $ifaceargs);
-	last;
-    }
+    my $ifaceargs = { "uuid"  => $ref->{'uuid'},
+		      "type"  => $ref->{'type'},
+		      "role"  => $ref->{'role'},
+		      "card"  => $ref->{'card'},
+		      "port"  => $ref->{'port'},
+		      "MAC"   => $ref->{'MAC'},
+		      "IP"    => $ref->{'IP'},
+		      "mask"  => $ref->{'mask'},
+		  };
+    print Dumper($ifaceargs);
+    Interface->Create($node, $ifaceargs);
 }
 $component->NewResource($node->uuid());
