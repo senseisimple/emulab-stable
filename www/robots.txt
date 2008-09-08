@@ -3,6 +3,7 @@ User-Agent: *
 Disallow: /*php$
 Disallow: /*php3$
 Disallow: /*php4$
+Disallow: /*kb-show.php3
 Allow: /index.php3
 Allow: /doc.php3
 Allow: /docwrapper
