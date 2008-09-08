@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -123,7 +123,7 @@ my $query_result =
 		 "   ((unix_timestamp()-unix_timestamp(ns.status_timestamp)) > $vnode_timeout)) || ".
 		 # Widearea nodes:
 		 "  (nt.isremotenode=1 && nt.isplabdslice=0 && ".
-		 "   nt.isplabphysnode=0 && ".
+		 "   nt.isplabphysnode=0 && nt.isfednode=0 && ".
 		 "   ((unix_timestamp()-unix_timestamp(ns.status_timestamp)) > $wa_timeout)) || ".
 		 # Plab physical nodes:
 		 "  (nt.isplabphysnode=1 && ".
