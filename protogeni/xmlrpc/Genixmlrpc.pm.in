@@ -70,11 +70,6 @@ sub Context($$;$$)
     bless($self, $class);
     return $self;
 }
-# accessors
-sub field($$)           { return ($_[0]->{$_[1]}); }
-sub certificate($)	{ return field($_[0], "certificate"); }
-sub keyfile($)		{ return field($_[0], "keyfile"); }
-sub password($)		{ return field($_[0], "password"); }
 
 #
 # This is a context for a user. Used only on Emulab bossnode. Use the
@@ -88,8 +83,19 @@ sub UserContext($$)
     my $pkcs12 = $user->HomeDir() . "/.ssl/encrypted.p12";
     $user->SSLPassPhrase(1, \$password);
 
-    return Genixmlrpc->Context($pkcs12, $pkcs12, $password);
+    my $self = {"certificate"  => $pkcs12,
+		"keyfile"      => $pkcs12,
+		"password"     => $password,
+		"user"	       => $user};
+    bless($self, $class);
+    return $self;
 }
+# accessors
+sub field($$)           { return ($_[0]->{$_[1]}); }
+sub certificate($)	{ return field($_[0], "certificate"); }
+sub keyfile($)		{ return field($_[0], "keyfile"); }
+sub password($)		{ return field($_[0], "password"); }
+sub user($)		{ return field($_[0], "user"); }
 
 #
 # Context for making calls.

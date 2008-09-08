@@ -119,11 +119,11 @@ my $responder = Frontier::Responder->new( "methods" => {
     "Resolve"	        => \&GeniCM::Resolve,
     "DiscoverResources" => \&GeniCM::DiscoverResources,
     "GetTicket"         => \&GeniCM::GetTicket,
+    "ReleaseTicket"     => \&GeniCM::ReleaseTicket,
     "RedeemTicket"      => \&GeniCM::RedeemTicket,
     "StartSliver"       => \&GeniCM::StartSliver,
     "DeleteSliver"      => \&GeniCM::DeleteSliver,
-    "BindUser"          => \&GeniCM::BindUser,
-    "UnBindUser"        => \&GeniCM::UnBindUser,
+    "DeleteSlice"       => \&GeniCM::DeleteSlice,
    },
 );
 
@@ -134,7 +134,7 @@ my $response = $responder->{'_decode'}->serve($request,
 # Terminate the log capture so that we can print the response to STDOUT
 # for the web server.
 #
-#print STDERR "\n\n" . $response;
+print STDERR "\n\n" . $response;
 
 LogEnd();
 

@@ -25,19 +25,22 @@ all:	protogeni-cm.pl protogeni-ch.pl protogeni-sa.pl Genixmlrpc.pm \
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-install: $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-sa.pl \
-         $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-cm.pl \
-         $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-ch.pl \
-         $(INSTALL_LIBDIR)/Genixmlrpc.pm \
+install-libs: $(INSTALL_LIBDIR)/Genixmlrpc.pm \
          $(INSTALL_LIBDIR)/GeniResponse.pm \
          $(INSTALL_DIR)/opsdir/lib/Genixmlrpc.pm \
          $(INSTALL_DIR)/opsdir/lib/GeniResponse.pm
+
+install-scripts: $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-sa.pl \
+		$(INSTALL_DIR)/protogeni/xmlrpc/protogeni-cm.pl \
+		$(INSTALL_DIR)/protogeni/xmlrpc/protogeni-ch.pl
 	$(SUDO) chown root $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-sa.pl
 	$(SUDO) chmod u+s  $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-sa.pl
 	$(SUDO) chown root $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-ch.pl
 	$(SUDO) chmod u+s  $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-ch.pl
 	$(SUDO) chown root $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-cm.pl
 	$(SUDO) chmod u+s  $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-cm.pl
+
+install: install-libs install-scripts
 
 control-install:
 
