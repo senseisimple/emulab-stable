@@ -648,11 +648,11 @@ if ($widearea) {
     
     #
     # Note - there is currently an assumption in this query that widearea nodes
-    # have only one interface.
+    # have only one control interface.
     #
     $result =
 	DBQueryFatal("select n.node_id,nt.type,ns.status,r.pid,r.eid,wn.site,".
-                     "i.card,i.port,i.iface,wn.bwlimit ".
+                     "i.iface,wn.bwlimit ".
 		     "from nodes as n ".
 		     "left join node_types as nt on nt.type=n.type ".
 		     "left join reserved as r on r.node_id=n.node_id ".
@@ -660,12 +660,12 @@ if ($widearea) {
 		     "left join widearea_nodeinfo as wn on ".
 		     "     wn.node_id=n.node_id ".
 		     "left join interfaces as i on ".
-		     "     n.node_id=i.node_id ".
+		     "     n.node_id=i.node_id and ".
+		     "     i.role='" . TBDB_IFACEROLE_CONTROL() . "'".
 		     "where  (n.role='testnode' and nt.isremotenode=1 and ".
 		     "        nt.isvirtnode=0)");
     
-    while (($physnode,$ptype,$status,$mpid,$meid,$site,$card,$port,$iface,
-            $bwlimit)
+    while (($physnode,$ptype,$status,$mpid,$meid,$site,$iface,$bwlimit)
 	   = $result->fetchrow_array) {
 	my $class = $typemap{$ptype}->{'CLASS'};
 	my @types;
