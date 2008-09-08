@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Testbed Makefile
@@ -31,7 +31,7 @@ include Makeconf
 SUBDIRS = lib db assign www @optional_subdirs@ ipod security sensors \
 		pxe tbsetup account tmcd utils backend tip capture ipod vis \
 		sensors os xmlrpc install/newnode_sshkeys mote tools/whol \
-		tools/svn wiki bugdb collab tools/rmanage
+		tools/svn wiki bugdb collab tools/rmanage protogeni/lib
 
 all:		all-subdirs 
 
