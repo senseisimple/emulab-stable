@@ -37,7 +37,10 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <err.h>
 #ifdef __FreeBSD__
@@ -375,7 +378,7 @@ showdiskinfo(char *disk)
 int
 setdiskinfo(char *disk)
 {
-	int fd, cc;
+	int fd, cc, i, error;
 
 	if (!tweakdiskinfo(disk)) {
 		if (verbose)
@@ -397,6 +400,32 @@ setdiskinfo(char *disk)
 		warnx("%s: partial write (%d != %d)\n", disk,
 		      cc, sizeof(diskinfo.bootblock));
 	}
+#ifdef __linux__
+	printf("Calling ioctl() to re-read partition table.\n");
+	sync();
+	sleep(2);
+	if ((i = ioctl(fd, BLKRRPART)) != 0) {
+                error = errno;
+        } else {
+                /* some kernel versions (1.2.x) seem to have trouble
+                   rereading the partition table, but if asked to do it
+		   twice, the second time works. - biro@yggdrasil.com */
+                sync();
+                sleep(2);
+                if ((i = ioctl(fd, BLKRRPART)) != 0)
+                        error = errno;
+        }
+
+	if (i) {
+		printf("\nWARNING: Re-reading the partition table "
+			 "failed with error %d: %s.\n"
+			 "The kernel still uses the old table.\n"
+			 "The new table will be used "
+			 "at the next reboot.\n"),
+			error, strerror(error);
+	}
+#endif
+
 	close(fd);
 	if (verbose)
 		printf("%s: partition table modified\n", disk);
