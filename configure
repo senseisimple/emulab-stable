@@ -2520,6 +2520,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tmcd/freebsd/GNUmakefile tmcd/freebsd/init/GNUmakefile \
 	tmcd/freebsd/init/4/GNUmakefile tmcd/freebsd/init/5/GNUmakefile \
 	tmcd/freebsd/init/6/GNUmakefile tmcd/freebsd/init/7/GNUmakefile \
+	tmcd/freebsd/init/8/GNUmakefile \
 	tmcd/freebsd/supfile tmcd/freebsd/sethostname \
 	tmcd/linux/GNUmakefile tmcd/linux/supfile \
 	tmcd/linux/sethostname.dhclient \
