@@ -2852,20 +2852,20 @@ foreach $lan (keys(%virt_lans)) {
 	#
 	# And lastly, these override anything the user says to do.
 	# 
-	DBQueryFatal("insert into interface_settings ".
+	DBQueryFatal("replace into interface_settings ".
 		     "       (node_id, iface, capkey, capval) ".
 		     "values ('$pnode', '$pport', 'protocol', '$protocol')");
 	
 	printdb("interface_setting: $pnode $pport protocol $protocol\n");
 
-	DBQueryFatal("insert into interface_settings ".
+	DBQueryFatal("replace into interface_settings ".
 		     "       (node_id, iface, capkey, capval) ".
 		     "values ('$pnode', '$pport', 'ssid', '$ssid')");
 	
 	printdb("interface_setting: $pnode $pport ssid $ssid\n");
 
 	if (defined($ap)) {
-	    DBQueryFatal("insert into interface_settings ".
+	    DBQueryFatal("replace into interface_settings ".
 			 "       (node_id, iface, capkey, capval) ".
 			 "values ('$pnode', '$pport', 'accesspoint', '$ap')");
 	    printdb("interface_setting: $pnode $pport accesspoint $ap\n");
