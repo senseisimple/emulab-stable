@@ -121,9 +121,6 @@ LocalSpec = element local {
     element operator { "+" }
 }
 
-##    ((element global { empty }, element operator { "OnceOnly" | "FirstFree" }) |
-##     (element local { empty }, element operator { "+" }))?
-
 ## "Legacy" assign node flags - will be replaced with properties, and in some
 ## cases, explicit links
 NodeFlagSpec =
@@ -169,6 +166,5 @@ PropertySpec = element property {
     element violatable { empty }?,
     ## TODO: Add more operators - equality, range test, etc
     ## Flags for special types of operators
-    ((element global { empty }, element operator { "OnceOnly" | "FirstFree" }) |
-     (element local { empty }, element operator { "=" | "+" }))?
+    (GlobalSpec | LocalSpec)?
 }
