@@ -1,9 +1,9 @@
 Emulab network testbed source release
-Version 4.9.0
-June 30, 2008
+Version 5.0
+September 1, 2008
 University of Utah, Flux Research Group
 
-This is a preliminary release of the full current source code for the
+This is the first "official" release of the full current source code for the
 software that runs the Emulab network testbed at the University of Utah,
 as well as over 20 testbeds at other sites:
 
@@ -21,16 +21,16 @@ In the future it is our intention to make new snapshots frequently.
 
 HOW TO SETUP AN EMULAB
 The Emulab installation documentation is located on the Utah Emulab Wiki:
- http://users.emulab.net/trac/emulab/wiki/InstallDocs
-
+ http://users.emulab.net/trac/emulab/wiki/InstallRoot
+under "Installation Documentation".
 
 HOW TO UPDATE AN EMULAB
-The upcoming 5.0 release (intended to be in July 2008) will have better
-support for people upgrading existing Emulabs.  We recommend you wait
-for that; do not expect us to help much if you use this release.
-
-If you insist, start by looking at doc/update-testbed.txt.
-
+Updating your existing Emulab is a bit harder than a fresh install,
+as different sites are running different combinations of FreeBSD,
+FreeBSD ports, and Emulab software.  A process that we hope will work
+for most sites is located on the Utah Emulab Wiki:
+ http://users.emulab.net/trac/emulab/wiki/InstallRoot
+under "Upgrade Documentation".
 
 MAILING LISTS
 If you are bringing up an Emulab, be sure to join the mailing list:
@@ -167,7 +167,26 @@ wiki      -  Support for per-project WIKIs
 www       -  Web Interface / User Documentation
 xmlrpc    -  Programatic XML-RPC interface to testbed
 
+UPGRADING FROM the 4.9.0 RELEASE
+There are a surprising number of differences given that we have only
+advanced 0.1 in version!  In a nutshell:
+
+ * Updated FreeBSD packages from FreeBSD 6.1-era to 6.3-era
+ * Much more of the documentation has moved into the Wiki
+ * Changes to the (unused) "protogeni" code
+ * Improvements to the installation scripts
+ * Integration of code/fixes from Keith Sklower and DETER (Thanks!)
+ * Assorted fixes
+
+If you did install the 4.9 release on FreeBSD 6.3, and want to upgrade
+to 5.0 (you should), it should be straightforward.  You will need to apply
+the sql/database-migrate.txt changes 4.157 to 4.160 (which are all trivial)
+and rebuild and reinstall your Emulab software.
+
+It would be good to also update your ports.  In theory, this is all handled
+by a magic script we provide.  Refer to the "Update ports" section of
+  http://users.emulab.net/trac/emulab/wiki/appendix/upgrade-410-63.html
 
 Good luck!
 Jay Lepreau, lepreau@cs.utah.edu, and the Utah testbed crew.
-June 30, 2008
+September 1, 2008
