@@ -12,7 +12,7 @@
 package libtestbed;
 use Exporter;
 @ISA    = "Exporter";
-@EXPORT = qw( TB_BOSSNODE );
+@EXPORT = qw( TB_BOSSNODE TB_EVENTSERVER );
 
 # Must come after package declaration!
 use English;
@@ -41,6 +41,37 @@ use libtmcc;
 sub TB_BOSSNODE()
 {
     return tmccbossname();
+}
+
+#
+# Return name of the event server.
+#
+sub TB_EVENTSERVER()
+{
+    # duplicate behavior of tmcc bossinfo function
+    my @searchdirs = ( "/etc/testbed","/etc/emulab","/etc/rc.d/testbed",
+		       "/usr/local/etc/testbed","/usr/local/etc/emulab" );
+    my $bossnode = TB_BOSSNODE();
+    my $eventserver = '';
+
+    foreach my $d (@searchdirs) {
+	if (-e "$d/eventserver" && !(-z "$d/eventserver")) {
+	    $eventserver = `cat $d/eventserver`;
+	    last;
+	}
+    }
+    if ($eventserver eq '') {
+	my @ds = split(/\./,$bossnode,2);
+	if (scalar(@ds) == 2) {
+	    # XXX event-server hardcode
+	    $eventserver = "event-server.$ds[1]";
+	}
+    }
+    if ($eventserver eq '') {
+	$eventserver = "event-server";
+    }
+
+    return $eventserver;
 }
 
 1;
