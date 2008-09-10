@@ -44,6 +44,7 @@ BEGIN
 }
 # Convenience.
 sub REMOTE()	{ return libsetup::REMOTE(); }
+sub REMOTEDED()	{ return libsetup::REMOTEDED(); }
 sub MFS()	{ return libsetup::MFS(); }
 sub JAILED()	{ return libsetup::JAILED(); }
 
@@ -481,7 +482,7 @@ sub os_mkdir($$)
 sub os_setup()
 {
     # This should never happen!
-    if (REMOTE() || MFS()) {
+    if ((REMOTE() && !REMOTEDED()) || MFS()) {
 	print "Ignoring os setup on remote/MFS node!\n";
 	return 0;
     }
@@ -495,7 +496,7 @@ sub os_routing_enable_forward()
     my $cmd;
     my $fname = libsetup::ISDELAYNODEPATH();
 
-    if (REMOTE()) {
+    if (REMOTE() && !REMOTEDED()) {
 	$cmd = "echo 'IP forwarding not turned on!'";
     }
     elsif (JAILED()) {
@@ -515,7 +516,7 @@ sub os_routing_enable_gated($)
     my ($conffile) = @_;
     my $cmd;
 
-    if (REMOTE()) {
+    if (REMOTE() && !REMOTEDED()) {
 	$cmd = "echo 'GATED IS NOT ALLOWED!'";
     }
     else {

@@ -45,7 +45,8 @@ if ($EUID != 0) {
 # Not all clients support this.
 #
 exit(0)
-    if (MFS() || (REMOTE() && !(PLAB() || FAKEJAILED() || JAILED())));
+    if (MFS() || (REMOTE() && !(REMOTEDED() || PLAB() || FAKEJAILED() 
+				|| JAILED())));
 
 # Script specific goo. 
 my $LOGFILE = LOGDIR() . "/progagent.debug";

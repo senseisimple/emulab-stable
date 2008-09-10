@@ -86,7 +86,7 @@ my $RMMOD       = "/sbin/rmmod";
 my $BRCTL       = "/usr/sbin/brctl";
 
 # This should never happen!
-if (REMOTE() || MFS()) {
+if ((REMOTE() && !REMOTEDED()) || MFS()) {
     print "Skipping delay configuration on remote/MFS node!\n";
     return 0;
 }

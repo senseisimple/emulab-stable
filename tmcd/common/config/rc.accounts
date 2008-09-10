@@ -135,7 +135,7 @@ sub doboot()
 	    $gname = lc($gname)
 		if (PLAB());
 	    
-	    if (REMOTE() && !JAILED() && !PLAB()) {
+	    if (REMOTE() && !REMOTEDED() && !JAILED() && !PLAB()) {
 		$gname = "emu-${gname}";
 	    }
 	    $newgroups{"$gname"} = $2

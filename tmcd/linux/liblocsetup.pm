@@ -44,6 +44,7 @@ BEGIN
 
 # Convenience.
 sub REMOTE()	{ return libsetup::REMOTE(); }
+sub REMOTEDED()	{ return libsetup::REMOTEDED(); }
 sub PLAB()	{ return libsetup::PLAB(); }
 sub LINUXJAILED(){ return libsetup::LINUXJAILED(); }
 

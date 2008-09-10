@@ -46,7 +46,7 @@ use librc;
 # Not all clients support this.
 #
 exit(0)
-    if (MFS() || REMOTE());
+    if (MFS() || (REMOTE() && !REMOTEDED()));
 
 # Now safe to do this since MFS does not have full perl install.
 require Socket;

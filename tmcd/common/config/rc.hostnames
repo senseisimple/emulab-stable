@@ -50,7 +50,7 @@ my $pathname   = $HOSTSFILE;  # Default path from liblocsetup.
 # Not all clients support this.
 #
 exit(0)
-    if (MFS() || (REMOTE() && !(PLAB() || JAILED())));
+    if (MFS() || (REMOTE() && !(REMOTEDED() || PLAB() || JAILED())));
 
 # Protos.
 sub doboot();

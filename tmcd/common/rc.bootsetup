@@ -40,6 +40,7 @@ if ($EUID != 0) {
 use libsetup;
 use libtmcc;
 use librc;
+use libtestbed;
 
 # Script specific goo.
 my $RCDIR	= "$BINDIR/rc";
@@ -332,9 +333,13 @@ sub doboot()
     #
     # Start the elvin proxy.
     #
-    if (-x "$BINDIR/evproxy" && !REMOTE()) {
+    if (-x "$BINDIR/evproxy" && !(REMOTE() && !REMOTEDED())) {
+	my $eventserver = "event-server";
+        if (REMOTE()) {
+            $eventserver = TB_EVENTSERVER();
+        }
 	print("Starting elvin proxy daemon\n");
-	system("$BINDIR/evproxy -s event-server -e $pid/$eid");
+	system("$BINDIR/evproxy -s $eventserver -e $pid/$eid");
 	if ($?) {
 	    fatal("Error running $BINDIR/evproxy");
 	}

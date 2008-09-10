@@ -46,7 +46,8 @@ use librc;
 # Not all clients support this.
 #
 exit(0)
-    if (MFS() || (JAILED() && !LINUXJAILED()) || REMOTE() || PLAB());
+    if (MFS() || (JAILED() && !LINUXJAILED()) || (REMOTE() && !REMOTEDED()) 
+	|| PLAB());
 
 # Protos.
 sub doboot();

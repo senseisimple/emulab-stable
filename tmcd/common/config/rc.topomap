@@ -41,7 +41,7 @@ if ($EUID != 0 && !WINDOWS()) {
 # Not all clients support this.
 #
 exit(0)
-    if (MFS() || (REMOTE() && !(PLAB() || JAILED())));
+    if (MFS() || (REMOTE() && !(REMOTEDED() || PLAB() || JAILED())));
 
 # Protos.
 sub doboot($);
@@ -154,7 +154,7 @@ sub dotopomap()
     # Should probably have our own version of cp that retries at the block
     # level?
     #
-    if (! (USESFS() || WINDOWS())) {
+    if (! (USESFS() || WINDOWS() || REMOTEDED())) {
 	for (my $i = 0; $i < 5; $i++) {
 	    last
 		if (system("cp -fp $topomap $tempmap") == 0);
