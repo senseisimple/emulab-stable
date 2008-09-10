@@ -500,7 +500,7 @@ sched_callback(event_handle_t handle,
 
 void subscribe_callback(event_handle_t handle,  int result,
 			event_subscription_t es, void *data) {
-  if (result) {
+  if (!result) {
     std::string key((char *)data);
     exptmap[key] = es;
     info("Subscription for %s added successfully.\n", (char *)data);
