@@ -13,10 +13,18 @@ use GeniUser;
 use GeniCredential;
 use GeniComponent;
 use English;
+# Hate to import all this crap; need a utility library.
+use libdb qw(TBGetUniqueIndex);
 use Node;
 use Interface;
 use Experiment;
 use Data::Dumper;
+
+if (@ARGV != 2) {
+    die("Bad arguments\n");
+}
+my $remote_node_id = $ARGV[0];
+my $local_node_id  = $ARGV[1];
 
 my $this_user = User->LookupByUnixId($UID);
 if (! defined($this_user)) {
@@ -75,37 +83,63 @@ my $response =
 			   $context,
 			   "Resolve",
 			   { "credential"  => $credential->asString(),
-			     "hrn"         => "pc167",
+			     "hrn"         => $remote_node_id,
 			     "type"        => "Node",
 			   });
 if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS) {
     die("Could not look up resource\n");
 }
 my $value = $response->value();
-#print Dumper($response->value());
+print Dumper($response->value());
 
-my $nodeargs = { "uuid"  => $value->{'uuid'},
-		 "type"  => "pcfedphys",
-		 "role"  => "testnode",
-		 "vtype" => "pcfed" };
+my $node;
+if ($value->{'role'} eq "testnode") {
+    my $nodeargs = { "uuid"  => $value->{'uuid'},
+		     "type"  => "pcfedphys",
+		     "role"  => "testnode",
+		     "vtype" => "pcfed" };
 
-my $node = Node->Create("pcfedphys2", $experiment, $nodeargs);
-if (!defined($node)) {
-    die("Could not create new node.\n");
+    $node = Node->Create($local_node_id, $experiment, $nodeargs);
+    if (!defined($node)) {
+	die("Could not create new node.\n");
+    }
+    $node->SetStatus('up');
+    $component->NewResource($node->uuid());
 }
-$node->SetStatus('up');
+elsif ($value->{'role'} eq "testswitch") {
+    my $nodeargs = { "uuid"  => $value->{'uuid'},
+		     "type"  => "cisco6509",
+		     "role"  => "testswitch" };
+
+    my $switch_id = Interface->LookUpWideAreaSwitch($value->{'hrn'});
+
+    $node = Node->Create($switch_id, undef, $nodeargs);
+    if (!defined($node)) {
+	die("Could not create new node.\n");
+    }
+}
+else {
+    die("unknown node role\n");
+}
 
 foreach my $ref (@{ $value->{'interfaces'} }) {
-    my $ifaceargs = { "uuid"  => $ref->{'uuid'},
-		      "type"  => $ref->{'type'},
-		      "role"  => $ref->{'role'},
-		      "card"  => $ref->{'card'},
-		      "port"  => $ref->{'port'},
-		      "MAC"   => $ref->{'MAC'},
-		      "IP"    => $ref->{'IP'},
-		      "mask"  => $ref->{'mask'},
+    my $ifaceargs = { "uuid"	  => $ref->{'uuid'},
+		      "type"      => $ref->{'type'},
+		      "role"      => $ref->{'role'},
+		      "card"      => $ref->{'card'},
+		      "port"      => $ref->{'port'},
+		      "MAC"       => $ref->{'MAC'},
+		      "IP"        => $ref->{'IP'},
+		      "mask"      => $ref->{'mask'},
 		  };
+    if (exists($ref->{'switch_id'})) {
+	my $switch_id = Interface->LookUpWideAreaSwitch($ref->{'switch_id'});
+
+	$ifaceargs->{"wire_type"}   = $ref->{'wire_type'};
+	$ifaceargs->{"switch_id"}   = $switch_id;
+	$ifaceargs->{"switch_card"} = $ref->{'switch_card'};
+	$ifaceargs->{"switch_port"} = $ref->{'switch_port'};
+    }
     print Dumper($ifaceargs);
     Interface->Create($node, $ifaceargs);
 }
-$component->NewResource($node->uuid());
