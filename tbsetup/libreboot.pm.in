@@ -346,7 +346,7 @@ sub nodereboot($$)
 	    #
 	    foreach my $node ( @batch ) {
 		$pids{$node} = RebootNode($nodeobjects{$node}, $reconfig,
-					  $killmode, $rebootmode, $prepare);
+					  $killmode, $rebootmode, $prepare, $waittime);
 	    }
 	}
 
@@ -434,7 +434,7 @@ sub nodereboot($$)
     if ($waitmode) {
 	my $waitstart = time;
 
-	print STDOUT "reboot: Waiting for nodes to come up.\n"
+	print STDOUT "reboot: Waiting ($waittime s) for nodes to come up.\n"
 	    if (!$silent);
 
 	# Wait for events to filter through stated! If we do not wait, then we
@@ -996,6 +996,8 @@ sub nodereboot_exec($$)
 	if (exists($args->{'freemode'}) && $args->{'freemode'});
     $cmdline .= " -c"
 	if (exists($args->{'reconfig'}) && $args->{'reconfig'});
+    $cmdline .= " -W$args->{waittime}"
+	if (exists($args->{'waittime'}) && $args->{'waittime'});
     $cmdline .= " @{ $args->{'nodelist'}}";
     
     $asyncmode = $args->{'asyncmode'} if (exists($args->{'asyncmode'}));

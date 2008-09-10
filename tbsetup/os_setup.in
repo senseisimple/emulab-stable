@@ -106,7 +106,7 @@ my $dolastload  = 1;
 # Protos
 sub SetupReload($$$);
 sub FirewallSetup($);
-sub os_setup_one($$$);
+sub os_setup_one($$$;$);
 				  
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -616,7 +616,7 @@ if ($plabinelab) {
     my $node = $plcnode;
 
     TBDebugTimeStamp("rebooting/reloading PLC node");
-    if (!os_setup_one($node, $plcimage, "PLC")) {
+    if (!os_setup_one($node, $plcimage, "PLC", 10*60)) {
 	tbwarn "PLC node $node failed to boot".
 	    "This has been reported to testbed-ops.";
 	SENDMAIL($TBOPS, "1 node is down",
@@ -1577,9 +1577,9 @@ sub FirewallSetup($)
 # Setup a single node, waiting for completion (reload, reboot)
 # before returning.
 #
-sub os_setup_one($$$)
+sub os_setup_one($$$;$)
 {
-    my ($node,$image,$msgstr) = @_;
+    my ($node,$image,$msgstr,$reboot_waittime) = @_;
 
     #
     # XXX this is probably not entirely right.
@@ -1658,8 +1658,9 @@ sub os_setup_one($$$)
 	my %reboot_args     = ();
 	my $reboot_failures = {};
 
-	$reboot_args{'debug'}     = $dbg;
+	$reboot_args{'debug'}	  = $dbg;
 	$reboot_args{'waitmode'}  = 1;
+	$reboot_args{'waittime'}  = $reboot_waittime;
 	$reboot_args{'nodelist'}  = [ @nodelist ];
 
 	if (nodereboot(\%reboot_args, $reboot_failures) != 0) {
