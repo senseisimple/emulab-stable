@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Osload library. Basically the backend to the osload script, but also used
@@ -282,18 +282,68 @@ sub osload ($$) {
 	}
 
 	#
-	# Assign partition table entries for each partition in the image.
-	# This is complicated by the fact that an image that covers only
-	# part of the slices, should only change the partition table entries
-	# for the subset of slices that are written to disk.
+	# XXX assumes a DOS MBR, but this is ingrained in the DB schema
+	# as well (i.e., the images.part[1234]_osid fields).
 	#
-	my $startpart = $loadpart == 0 ? 1 : $loadpart;
+	my $MINPART = 1;
+	my $MAXPART = 4;
+
+	#
+	# Assign partition table entries for each partition in the image
+	# that has an OSID associated with it.
+	#
+	# This is complicated by the fact that an image that covers only
+	# part of the slices should only change the partition table entries
+	# for the subset of slices that are written to disk...
+	#
+	# ...UNLESS, the new image requires a different version of the MBR
+	# in which case we must invalidate all partitions except the ones we
+	# are loading since the partition boundaries may have changed.
+	#
+	my $startpart = $loadpart == 0 ? $MINPART : $loadpart;
 	my $endpart   = $startpart + $loadlen;
 	
-	for (my $i = $startpart; $i < $endpart; $i++) {
+	for (my $i = $MINPART; $i <= $MAXPART; $i++) {
 	    my $partname = "part${i}_osid";
 	    my $dbresult;
 	    
+	    #
+	    # Partition is outside the range affected by this image.
+	    # Normally, we just leave it alone, unless a change of MBR
+	    # is implied by the current image.
+	    #
+	    if ($i < $startpart || $i >= $endpart) {
+		if (defined($rowref->{'mbr_version'})) {
+		    $dbresult =
+			DBQueryWarn("select mbr_version ".
+				    " from partitions as p,images as i ".
+				    " where p.imageid=i.imageid ".
+				    " and node_id='$node' and partition='$i'");
+		    if ($dbresult && $dbresult->numrows) {
+			my ($pmbr) = $dbresult->fetchrow_array();
+			if ($pmbr != $rowref->{'mbr_version'}) {
+			    tbwarn("$node: Existing partition $i inconsistent".
+				   " with new image partitioning,".
+				   " invalidating existing partition");
+			    $dbresult =
+				DBQueryWarn("delete from partitions ".
+					    "where node_id='$node' and ".
+					    "partition='$i'");
+			    if (!$dbresult) {
+				tberror("$node: Could not update ".
+					"partition table");
+				goto failednode;
+			    }
+			}
+		    }
+		}
+		next;
+	    }
+
+	    #
+	    # This image has an OSID in the current partition,
+	    # replace the partition table info.
+	    #
 	    if (defined($rowref->{$partname})) {
 		my $osid = $rowref->{$partname};
 		
@@ -303,6 +353,10 @@ sub osload ($$) {
 				"values ".
 				"('$node','$i','$osid','$imageid','$imagepid')");
 	    }
+	    #
+	    # Otherwise, if there is no OS for a particular image partition,
+	    # clear any current partitions table info.
+	    #
 	    else {
 		$dbresult =
 		    DBQueryWarn("delete from partitions ".

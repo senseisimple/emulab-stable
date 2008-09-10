@@ -150,6 +150,7 @@ my %xmlfields =
      "max_concurrent",	=> ["max_concurrent",	$SLOT_OPTIONAL,    0],
      "shared",		=> ["shared",		$SLOT_OPTIONAL,    0],
      "global",		=> ["global",		$SLOT_ADMINONLY,   0],
+     "mbr_version",	=> ["mbr_version",	$SLOT_OPTIONAL],
      "reboot_waittime",	=> ["reboot_waittime",	$SLOT_ADMINONLY],
 );
 
@@ -433,6 +434,29 @@ if (exists($newimageid_args{"node_id"}) &&
     else {
 	$node_id = $node->node_id();
     }
+}
+
+#
+# If no MBR version was specified, and a snapshot node was given,
+# try to deduce the default MBR version based on what is currently
+# on the node we are snapshotting.
+#
+if (!exists($newimageid_args{"mbr_version"}) && defined($node_id)) {
+    my $mbrvers = 1;
+
+    #
+    # If there is only one MBR version for all images on the disk,
+    # use that.  Otherwise, if there is no or ambiguous info, default
+    # to version 1.
+    #
+    my $query_result =
+	DBQueryFatal("select mbr_version from partitions as p, images as i ".
+		     " where p.imageid=i.imageid and p.node_id='$node_id' ".
+		     " group by mbr_version");
+    if ($query_result && $query_result->numrows == 1) {
+	($mbrvers) = $query_result->fetchrow_array();	
+    }
+    $newimageid_args{"mbr_version"} = $mbrvers;
 }
 
 #

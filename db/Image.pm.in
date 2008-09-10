@@ -191,7 +191,7 @@ sub Create($$$$$$$$)
 	push(@arg_slots, $key);
     }
     # Pass-through optional slots, otherwise the DB default is used.
-    foreach my $key ("path", "shared", "global", "ezid") {
+    foreach my $key ("path", "shared", "global", "ezid", "mbr_version") {
 	if (exists($argref->{$key})) {
 	    push(@arg_slots, $key);
 	}
