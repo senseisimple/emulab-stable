@@ -20,17 +20,15 @@ start_cmd="cnet_start"
 stop_cmd="cnet_stop"
 _cmdifn=
 
+# some emulab paths
+ELAB_LOGDIR=@CLIENT_VARDIR@/logs
+ELAB_BOOTDIR=@CLIENT_VARDIR@/boot
+
 # this is a separate function so we can redirect all the output below
 cnet_dhcp()
 {
 	#
-	# Argh! FreeBSD >= 6 has rewritten dhclient and it no longer takes
-	# the -i option.  So we remove that option here.
-	#
-	dhclient_flags=`echo $dhclient_flags | sed -e 's/-i [0-9][0-9]*//'`
-
-	#
-	# Argh V2! FreeBSD >= 6 dhclient also allows only a single interface
+	# Argh! FreeBSD >= 6 dhclient also allows only a single interface
 	# to be specified.  I tried to make this work by launching multiple,
 	# simultaneous dhclients, but that caused EEPROM read failures on
 	# em devices.  So we will use the "pure" port version if it is
@@ -42,6 +40,13 @@ cnet_dhcp()
 	    ${dhclient_program} ${dhclient_flags} $*
 	else
 	    echo "Using default dhclient..."
+
+	    #
+	    # Argh redux! FreeBSD >= 6 has rewritten dhclient and it no longer
+	    # takes the -i option.  So we remove that option here.
+	    #
+	    dhclient_flags=`echo $dhclient_flags | sed -e 's/-i [0-9][0-9]*//'`
+
 	    for _if in $*; do
 		${dhclient_program} ${dhclient_flags} -b $_if
 	    done
@@ -51,7 +56,7 @@ cnet_dhcp()
 
 cnet_start()
 {
-	rm -f @CLIENT_VARDIR@/boot/controlif
+	rm -f $ELAB_BOOTDIR/controlif
 
 	#
 	# Find all the relevant networks IFs.
@@ -76,18 +81,123 @@ cnet_start()
 	esac
 	done
 
-	echo "Emulab looking for control net among: $_ifs ..."
-	cnet_dhcp $_ifs >@CLIENT_VARDIR@/logs/netif-emulab.log 2>&1
-	if [ -e @CLIENT_VARDIR@/boot/controlif ]; then
-		echo "Emulab control net is `cat @CLIENT_VARDIR@/boot/controlif`"
+	# 
+	# For the widearea case: decide if we want static or dynamic 
+	# network configuration based on a config file.
+	# XXX: should try to look on other media as well, instead of just
+	# the boot dongle.
+	#
+	WACONFIG=/etc/emulab/waconfig
+	if [ -e "$WACONFIG" ]; then
+	        # key=val pairs become shell vars
+		. "$WACONFIG"
+
+		echo "Found Emulab widearea config info..."
+
+		if [ "$WA_BOOTMETHOD" = "static" -a "$WA_MAC" != "" ]; then 
+			# try to find an iface matching WA_MAC
+			cnetif=""
+			for _if in $network_interfaces; do
+			        mac=`ifconfig $_if | grep ether | sed -e 's/[[:space:]]*ether[[:space:]]*//'`
+				echo "$mac" | grep -i "$WA_MAC"
+				if [ "$?" = "0" ]; then
+				        cnetif="$_if"
+				        break
+				fi
+			done
+
+			if [ "$cnetif" = "" ]; then
+			        echo -n "Could not find iface with "
+				echo "$WA_MAC; trying DHCP!"
+			        WA_BOOTMETHOD="dhcp"
+			elif [ "$WA_HOSTNAME" = "" \
+			        -o "$WA_DOMAIN" = "" \
+			        -o "$WA_IP_ADDR" = "" \
+			        -o "$WA_IP_NETMASK" = "" \
+			        -o "$WA_IP_GATEWAY" = "" \
+			        -o "$WA_IP_DNS1" = ""  ]; then
+				echo -n "Missing static IP config "
+				echo "vars; trying DHCP!"
+				WA_BOOTMETHOD="dhcp"
+			fi
+		fi
 	else
-		echo "*** No Emulab control net found!"
+		WA_BOOTMETHOD="dhcp"
+	fi
+
+	if [ "$WA_BOOTMETHOD" = "dhcp" ]; then
+	        #
+	        # use good ol' Emulab dhcp!
+		#
+		echo "Emulab looking for control net among: $_ifs ..."
+		cnet_dhcp $_ifs >$ELAB_LOGDIR/netif-emulab.log 2>&1
+		if [ -e $ELAB_BOOTDIR/controlif ]; then
+			echo "Emulab control net is `cat $ELAB_BOOTDIR/controlif`"
+		else
+			echo "*** No Emulab control net found!"
+		fi
+	else
+		#
+		# configure according to static WA_X vars:
+		#
+		echo "Emulab statically configuring control net on $cnetif ..."
+		ifconfig "$cnetif" inet "$WA_IP_ADDR" netmask "$WA_IP_NETMASK" up
+		route add default "$WA_IP_GATEWAY"
+
+		# bring up lo0 too, since we neuter netif
+		ifconfig lo0 inet 127.0.0.1 up
+		route add 127.0.0.1 -interface lo0
+
+		# setup resolv.conf
+		echo "search $WA_DOMAIN" > /etc/resolv.conf
+		echo "nameserver $WA_IP_DNS1" >> /etc/resolv.conf
+		if [ "$WA_IP_DNS2" != "" ]; then
+			echo "nameserver $WA_IP_DNS2" >> /etc/resolv.conf
+		fi
+
+		# set hostname
+		hosts_str="$WA_HOSTNAME"
+                echo "$WA_HOSTNAME" | grep -q \\.
+                if [ $? = 0 ]; then
+                        hostname "$WA_HOSTNAME"
+                else
+                        hostname "${WA_HOSTNAME}.${WA_DOMAIN}"
+			hosts_str="${WA_HOSTNAME}.${WA_DOMAIN} ${hosts_str}"
+                fi
+
+		# setup hosts file
+		echo "$WA_IP_ADDR ${hosts_str}" >> /etc/hosts
+
+		# setup a few necessary emulab files...
+		echo "$cnetif" > $ELAB_BOOTDIR/controlif
+		if [ -e "/etc/emulab/bossnode" ]; then
+			bossnode=`cat /etc/emulab/bossnode`
+			bossip=`host -t A "$bossnode"`
+			retval="$?"
+			i=0
+			while [ "$retval" != "0" -a $i -lt 180 ]; do
+				echo "Failed to resolve boss ($bossnode)!"
+				sleep 5
+				i=`expr $i + 1`
+				bossip=`host -t A "$bossnode"`
+				retval="$?"
+			done
+			if [ "$retval" = "0" ]; then
+				echo "Resolved boss ($bossnode) to $bossip."
+				echo `echo "$bossip" | sed -n -e 's/.*has address\s*\(.*\)/\1/p'` \
+					> $ELAB_BOOTDIR/bossip
+		        fi
+		fi
+		echo "$WA_HOSTNAME" > $ELAB_BOOTDIR/realname
+		echo "$WA_IP_GATEWAY" > $ELAB_BOOTDIR/routerip
+		echo "$WA_IP_ADDR" > $ELAB_BOOTDIR/myip
+		echo "$WA_IP_NETMASK" > $ELAB_BOOTDIR/mynetmask
 	fi
 }
 
 cnet_stop()
 {
-	rm -f @CLIENT_VARDIR@/boot/controlif
+	rm -f $ELAB_BOOTDIR/controlif
 }
 
 load_rc_config $name
