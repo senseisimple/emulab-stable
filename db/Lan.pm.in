@@ -1430,6 +1430,13 @@ sub SetAttribute($$$;$)
     return $self->GetMember()->SetAttribute($key, $value, $type);
 }
 
+sub memberid($)
+{
+    my ($self) = @_;
+
+    return $self->GetMember()->memberid();
+}
+
 ############################################################################
 #
 # A protolan is for creating a lan without sending it to the DB until
@@ -1770,6 +1777,42 @@ sub MemberList($)
     my ($self) = @_;
 
     return keys(%{ $self->{'MEMBERS'} });
+}
+
+#
+# Return member node.
+#
+sub MemberNode($$)
+{
+    my ($self, $member) = @_;
+    
+    return undef
+	if (! exists($self->{'MEMBERS'}->{$member}));
+
+    return $self->{'MEMBERS'}->{$member}->{'node'};
+}
+
+#
+# Return the ifacelist
+#
+sub IfaceList($)
+{
+    my ($self) = @_;
+
+    return keys(%{ $self->{'IFACES'} });
+}
+
+#
+# Return member node.
+#
+sub IfaceNode($$)
+{
+    my ($self, $member) = @_;
+    
+    return undef
+	if (! exists($self->{'IFACES'}->{$member}));
+
+    return $self->{'IFACES'}->{$member}->{'node'};
 }
 
 #

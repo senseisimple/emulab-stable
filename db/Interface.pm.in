@@ -89,6 +89,17 @@ sub LookupAll($$$)
 	    $interface->{"DBROW"}  = $rowref;
 	    bless($interface, $class);
 
+	    #
+	    # Grab the wires table entry.
+	    #
+	    my $wires_result =
+		DBQueryWarn("select * from wires ".
+			    "where node_id1='$nodeid' and ".
+			    "      card1='$card' and port1='$port'");
+	    if ($wires_result && $wires_result->numrows) {
+		$interface->{'WIRES'} = $wires_result->fetchrow_hashref();
+	    }
+
 	    # Cache by card,port and by iface
 	    $all_interfaces{"$nodeid:$card:$port"} = $interface;
 	    $all_interfaces{"$nodeid:$iface"}      = $interface;
@@ -113,6 +124,11 @@ sub role($)    { return field($_[0], 'role'); }
 sub type($)    { return field($_[0], 'interface_type'); }
 sub mask($)    { return field($_[0], 'mask'); }
 sub uuid($)    { return field($_[0], 'uuid'); }
+# Wires table
+sub wire_type($)   { return $_[0]->{'WIRES'}->{'type'}; }
+sub switch_id($)   { return $_[0]->{'WIRES'}->{'node_id2'}; }
+sub switch_card($) { return $_[0]->{'WIRES'}->{'card2'}; }
+sub switch_port($) { return $_[0]->{'WIRES'}->{'port2'}; }
 
 sub IsExperimental($)
 {
@@ -149,6 +165,17 @@ sub Lookup($$$$)
 	
     $interface->{"DBROW"} = $query_result->fetchrow_hashref();
     bless($interface, $class);
+
+    #
+    # Grab the wires table entry.
+    #
+    $query_result =
+	DBQueryWarn("select * from wires ".
+		    "where node_id1='$nodeid' and ".
+		    "      card1='$card' and port1='$port'");
+    if ($query_result && $query_result->numrows) {
+	$interface->{'WIRES'} = $query_result->fetchrow_hashref();
+    }
 
     # Cache by card,port and by iface
     my $iface = $interface->iface();
@@ -326,6 +353,32 @@ sub Stringify($)
     my $iface  = $self->iface();
 
     return "[Interface: $nodeid:$iface]";
+}
+
+#
+# Temporary cruft for geni widearea switches.
+#
+sub LookUpWideAreaSwitch($$)
+{
+    my ($class, $hrn) = @_;
+    my $safe_hrn = DBQuoteSpecial($hrn);
+
+    my $query_result =
+	DBQueryWarn("select node_id from widearea_switches ".
+		    "where hrn=$safe_hrn");
+    return undef
+	if (!$query_result);
+    if ($query_result->numrows) {
+	my ($switch_id) = $query_result->fetchrow_array();
+	return $switch_id;
+    }
+    my $next_id   = TBGetUniqueIndex('next_switch', 1);
+    my $switch_id = "widearea_switch$next_id";
+
+    return $switch_id
+	if (DBQueryWarn("insert into widearea_switches set ".
+			" hrn=$safe_hrn, node_id='$switch_id'"));
+    return undef;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

@@ -196,6 +196,7 @@ sub field($$)  { return ((! ref($_[0])) ? -1 : $_[0]->{'DBROW'}->{$_[1]}); }
 sub node_id($)       { return field($_[0], 'node_id'); }
 sub uuid($)          { return field($_[0], 'uuid'); }
 sub type($)          { return field($_[0], 'type'); }
+sub role($)          { return field($_[0], 'role'); }
 sub eventstate($)    { return field($_[0], 'eventstate'); }
 sub allocstate($)    { return field($_[0], 'allocstate'); }
 sub jailflag($)      { return field($_[0], 'jailflag'); }
@@ -234,27 +235,33 @@ sub Create($$$$)
 
     my $isremote = $typeinfo->isremotenode();
 
-    if ($typeinfo->virtnode_capacity(\$virtnode_capacity)) {
-	print STDERR "*** No virtnode_capacity for $type! Using zero.\n";
-	$virtnode_capacity = 0;
-    }
-    if ($typeinfo->adminmfs_osid(\$adminmfs_osid)) {
-	print STDERR "*** No adminmfs osid for $type!\n";
-	return undef;
-    }
-    # Find object for the adminfs.
-    if (defined($adminmfs_osid)) {
-	$adminmfs = OSinfo->Lookup($adminmfs_osid);
+    if ($role eq "testnode") {
+	if ($typeinfo->virtnode_capacity(\$virtnode_capacity)) {
+	    print STDERR "*** No virtnode_capacity for $type! Using zero.\n";
+	    $virtnode_capacity = 0;
+	}
+	if ($typeinfo->adminmfs_osid(\$adminmfs_osid)) {
+	    print STDERR "*** No adminmfs osid for $type!\n";
+	    return undef;
+	}
+	# Find object for the adminfs.
+	if (defined($adminmfs_osid)) {
+	    $adminmfs = OSinfo->Lookup($adminmfs_osid);
+	}
+	else {
+	    $adminmfs = OSinfo->Lookup(TBOPSPID(), $MFS_INITIAL);
+	}
+	if (!defined($adminmfs)) {
+	    print STDERR "*** Could not find OSinfo object for adminmfs!\n";
+	    return undef;
+	}
+	$osid   = $adminmfs->osid();
+	$opmode = $adminmfs->op_mode();
     }
     else {
-	$adminmfs = OSinfo->Lookup(TBOPSPID(), $MFS_INITIAL);
+	$osid   = 0;
+	$opmode = "";
     }
-    if (!defined($adminmfs)) {
-	print STDERR "*** Could not find OSinfo object for adminmfs!\n";
-	return undef;
-    }
-    $osid   = $adminmfs->osid();
-    $opmode = $adminmfs->op_mode();
     $state  = $STATE_INITIAL;
     
     #
@@ -282,22 +289,24 @@ sub Create($$$$)
 		"  op_mode_timestamp=unix_timestamp(NOW())")
 	or goto bad;
 
-    DBQueryWarn("insert into node_hostkeys (node_id) ".
-		"values ('$node_id')")
-	or goto bad;
+    if ($role eq "testnode") {
+	DBQueryWarn("insert into node_hostkeys (node_id) ".
+		    "values ('$node_id')")
+	    or goto bad;
 	
-    DBQueryWarn("insert into node_status ".
-		"(node_id, status, status_timestamp) ".
-		"values ('$node_id', 'down', now()) ")
-	or goto bad;
+	DBQueryWarn("insert into node_status ".
+		    "(node_id, status, status_timestamp) ".
+		    "values ('$node_id', 'down', now()) ")
+	    or goto bad;
     
-    DBQueryWarn("insert into node_activity ".
-		"(node_id) values ('$node_id')")
-	or goto bad;
+	DBQueryWarn("insert into node_activity ".
+		    "(node_id) values ('$node_id')")
+	    or goto bad;
 	
-    DBQueryWarn("insert into node_utilization ".
-		"(node_id) values ('$node_id')")
-	or goto bad;
+	DBQueryWarn("insert into node_utilization ".
+		    "(node_id) values ('$node_id')")
+	    or goto bad;
+    }
 
     if (defined($experiment)) {
 	my $exptidx = $experiment->idx();
@@ -1748,6 +1757,26 @@ sub GetGeniSliverInfo($$;$)
     $$tmcd_redirect = $reservation->{'tmcd_redirect'}
         if defined($tmcd_redirect);
 
+    return 0;
+}
+
+#
+# Set the status slot for a node.
+#
+sub SetStatus($$)
+{
+    my ($self, $status) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $node_id = $self->node_id();
+
+    return -1
+	if (! DBQueryWarn("update node_status set status='$status' ".
+			  "where node_id='$node_id'"));
+    $self->{"DBROW"}->{'node_status'} = $status;
     return 0;
 }
 
