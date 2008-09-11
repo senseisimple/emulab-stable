@@ -50,13 +50,17 @@ $FILEROOT = "$TBDIR/etc/osconfig";
 #
 function SPITERROR($msg) {
     header("Content-Type: text/plain");
-    echo "TBERROR: $msg\n";
+    $fmsg = "TBERROR: $msg\n";
+    header("Content-Length: " . strlen($fmsg) . "\n");
+    echo "$fmsg";
     exit(1);
 }
 
 function SPITMSG($msg) {
     header("Content-Type: text/plain");
-    echo "TBMSG: $msg\n";
+    $fmsg = "TBMSG: $msg\n";
+    header("Content-Length: " . strlen($fmsg) . "\n");
+    echo "$fmsg";
     exit(1);
 }
 
@@ -123,28 +127,38 @@ if ($_SERVER["REMOTE_ADDR"] != $ip) {
     SPITERROR("no proxies allowed");
 }
 
-# need this below
-$node = Node::LookupByIP($ip);
-if (!$node) {
-    SPITERROR("no such node");
-}
-$node_id = $node->node_id();
-
+# need node_id below
 #
 # Make sure this is a valid request before we return anything.
 #
+# Note, we don't use Node::LookupByIP in the widearea case since there might
+# be multiple node_ids using this control IP -- we explicitly look for the
+# one in the widearea_nodeinfo table.
+$node_id = "";
 if (isset($privkey)) {
     $qres = DBQueryFatal("select node_id from widearea_nodeinfo" .
-			 " where node_id='" . addslashes($node_id) . "' and" . 
+			 " where IP='" . addslashes($ip) . "' and" . 
 			 "   privkey='" . addslashes($privkey) . "'");
-    if (! mysql_num_rows($qres)) {
+    if (!$qres || mysql_num_rows($qres) < 1) {
 	SPITERROR("noauth");
     }
+    else if (mysql_num_rows($qres) > 1) {
+	SPITERROR("ambiguous id");
+    }
+
+    $row = mysql_fetch_array($qres);
+    $node_id = $row["node_id"];
+    $node = Node::Lookup($node_id);
 }
 else {
     if (!IsControlNetIP($ip)) {
 	SPITERROR("notlocal");
     }
+    $node = Node::Lookup($ip);
+    $node_id = $node->node_id();
+}
+if (!$node) {
+    SPITERROR("no such node");
 }
 
 #
@@ -178,7 +192,9 @@ while ($row = mysql_fetch_array($qres)) {
     if (!in_array($c,$constraints))
 	continue;
 
+#echo "matching $c / " . $row["constraint_value"] . " to " . $data["$c"] . "\n";
     $val = match_constraint($c,$row["constraint_value"],$data);
+#var_dump($val);
     
     if (!isset($conproc[$row["target_file_idx"]]))
 	$conproc[$row["target_file_idx"]] = array();
@@ -195,9 +211,9 @@ while ($row = mysql_fetch_array($qres)) {
 # have been met, then we can call this target matched.
 #
 foreach ($conproc as $target_idx => $target) {
-    $cmatch = FALSE;
+    $cmatch = TRUE;
     foreach ($target as $constraint => $match) 
-	$cmatch = ($cmatch || $match);
+	$cmatch = ($cmatch && $match);
 
     if ($cmatch)
 	array_push($match_targets,$target_idx);
@@ -238,7 +254,7 @@ $manifest_str = "";
 $i = 0;
 while ($row = mysql_fetch_array($qres)) {
     if (in_array($row['file_idx'],$match_targets)
-	&& !in_array($row['file_idx'])) {
+	&& !in_array($row['file_idx'],$done)) {
 	$files[$i++] = $row["path"];
 	$manifest_str .= $row["path"] . "\t" . $row["type"] . "\t" . 
 	    $row["dest"] . "\n";
@@ -265,12 +281,12 @@ chdir($FILEROOT);
 
 $retval = system("tar -cf $archive " . implode(" ",$files));
 if ($retval)
-    SPITERROR("cdata");
+    SPITERROR("cdata1");
 
 chdir("$randdir");
 $retval = system("tar -rf $archive MANIFEST");
 if ($retval)
-    SPITERROR("cdata");
+    SPITERROR("cdata2");
 
 system("gzip $archive");
 $archive .= ".gz";
