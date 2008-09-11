@@ -232,6 +232,17 @@ rspec = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
         " <node uuid=\"de9803c2-773e-102b-8eb4-001143e453fe\" " +\
         "       virtualization_type=\"emulab-vnode\"> " +\
         " </node>" +\
+        " <node uuid=\"de995217-773e-102b-8eb4-001143e453fe\" " +\
+        "       virtualization_type=\"emulab-vnode\"> " +\
+        " </node>" +\
+        " <link name=\"link0\" link_name=\"link0\"> " +\
+        "  <LinkEndPoints name=\"destination_interface\" " +\
+        "            iface_name=\"eth0\" " +\
+        "            node_uuid=\"de9803c2-773e-102b-8eb4-001143e453fe\" /> " +\
+        "  <LinkEndPoints name=\"source_interface\" " +\
+        "            iface_name=\"eth0\" " +\
+        "            node_uuid=\"de995217-773e-102b-8eb4-001143e453fe\" /> " +\
+        " </link> " +\
         "</rspec>"
 params = {}
 params["credential"] = myslice
@@ -260,6 +271,20 @@ if rval:
 sliver = response["value"]
 print "Created a sliver"
 #print str(sliver)
+
+#
+# Split the sliver since its an aggregate of resources
+#
+params = {}
+params["credential"] = sliver
+rval,response = do_method("cm", "SplitSliver", params,
+         URI="https://myboss.myelab.testbed.emulab.net:443/protogeni/xmlrpc")
+if rval:
+    Fatal("Could not split sliver")
+    pass
+slivers = response["value"]
+print "Split a sliver"
+print str(slivers)
 
 #
 # Start the sliver.
