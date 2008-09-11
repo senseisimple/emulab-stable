@@ -401,6 +401,13 @@ sub nodetypeissub($)    { return $node_types{$_[0]}->issubnode(); }
 sub nodetypeisplab($)   { return $node_types{$_[0]}->isplabdslice(); }
 sub nodetypeissim($)    { return $node_types{$_[0]}->issimnode(); }
 sub nodetypesimcap($)   { return $node_types{$_[0]}->simnode_capacity(); }
+sub nodetypeisdedicatedremote($) {
+    my $ded = $node_types{$_[0]}->GetAttribute("dedicated_widearea");
+    if (defined($ded) && "$ded" eq "1") {
+	return 1;
+    }
+    return 0;
+}
 
 #
 # osids: Information from the os_info table from the DB, indexed by osid
@@ -1163,8 +1170,10 @@ sub RunAssign ()
 	    # we do not reserve a widearea physnode when a virtual node
 	    # is mapped to it; they are special.
 	    #
+	    my $node_type = virtnodetype($virtual);
 	    $toreserve{$physical} = 1
-		if (!virtnodeisremote($virtual));
+		if (!(virtnodeisremote($virtual) 
+		      && !nodetypeisdedicatedremote($node_type)));
 	}
 	
 	if (virtnodeisvirt($virtual)) {
@@ -2980,6 +2989,7 @@ sub InitPnode($$)
     my $simhost_violation;
     my $inner_elab_role;
     my $plab_role;
+    my $node_type = virtnodetype($vnode);
 
     # XXX NSE hack: 
     if (virtnodeisvnode($vnode) && virtnodeissim($vnode)) {
@@ -3013,7 +3023,8 @@ sub InitPnode($$)
 	$role  = TBDB_RSRVROLE_SIMHOST;
 	$simhost_violation  = 0;
     }
-    elsif (virtnodeisremote($vnode) && $v2vmap{$vnode} ne $pnode) {
+    elsif (virtnodeisremote($vnode) && !nodetypeisdedicatedremote($node_type) 
+	   && $v2vmap{$vnode} ne $pnode) {
 	#
 	# We never allocate remote pnodes (always allocated), so skip.
 	#
@@ -5607,19 +5618,20 @@ sub LoadCurrent()
     my $query_result = 
 	DBQueryFatal("select r.vname,r.node_id,n.phys_nodeid, ".
 		     "       nt.isvirtnode,nt.isremotenode,nt.isplabdslice,r.erole,".
-		     "r.simhost_violation from reserved as r ".
+		     "r.simhost_violation,nt.type from reserved as r ".
 		     "left join nodes as n on n.node_id=r.node_id ".
 		     "left join node_types as nt on nt.type=n.type ".
 		     "where r.pid='$pid' and r.eid='$eid'");
     
-    while (my ($vname,$reserved,$physnode,$isvirt,$isremote,$isplab,$erole,$simhost_violation) =
+    while (my ($vname,$reserved,$physnode,$isvirt,$isremote,$isplab,$erole,$simhost_violation,$node_type) =
 	   $query_result->fetchrow_array) {
 
 	#
 	# WIDEAREA nodes are going to break. Hmm, so are "sim" nodes.
 	#
 	fatal("Cannot update widearea nodes yet!")
-	    if ($isremote && !$isplab);
+	    if ($isremote && !nodetypeisdedicatedremote($node_type) 
+		&& !$isplab);
 	
 	LoadPhysNode($reserved);
 

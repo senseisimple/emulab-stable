@@ -362,8 +362,15 @@ $result =
 		 "left join reserved as m on a.phys_nodeid=m.node_id ".
 		 "left join nodes as np on a.phys_nodeid=np.node_id ".
 		 "left join node_types as t on t.type=a.type ".
+		 "left outer join ". 
+		 "  (select type,attrvalue ".
+		 "   from node_type_attributes ".
+		 "   where attrkey='dedicated_widearea' ".
+		 "   group by type) as dedicated_wa_types ".
+		 "  on t.type=dedicated_wa_types.type ".
 		 "where $free_condition and ".
-		 "      (a.role='testnode' and t.isremotenode=0)");
+		 "      (a.role='testnode' and (t.isremotenode=0 or ".
+		 "                              dedicated_wa_types.attrvalue=1))");
 
 #
 # Scan the results, checking permissions and adding to the list
@@ -661,9 +668,16 @@ if ($widearea) {
 		     "     wn.node_id=n.node_id ".
 		     "left join interfaces as i on ".
 		     "     n.node_id=i.node_id and ".
-		     "     i.role='" . TBDB_IFACEROLE_CONTROL() . "'".
+		     "     i.role='" . TBDB_IFACEROLE_CONTROL() . "' ".
+		     "left outer join ". 
+		     "  (select type,attrvalue ".
+		     "   from node_type_attributes ".
+		     "   where attrkey='dedicated_widearea' ".
+		     "   group by type) as dedicated_wa_types ".
+		     "  on nt.type=dedicated_wa_types.type ".
 		     "where  (n.role='testnode' and nt.isremotenode=1 and ".
-		     "        nt.isvirtnode=0)");
+		     "        nt.isvirtnode=0 and ".
+		     "        dedicated_wa_types.attrvalue is NULL)");
     
     while (($physnode,$ptype,$status,$mpid,$meid,$site,$iface,$bwlimit)
 	   = $result->fetchrow_array) {
