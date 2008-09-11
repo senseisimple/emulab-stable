@@ -22,6 +22,7 @@
 #include <map>
 #include <list>
 #include <fcntl.h>
+#include <signal.h>
 
 
 #define LOCAL_SERVER_PORT 9831
@@ -154,7 +155,7 @@ void pcapCallback(u_char *user, const struct pcap_pkthdr *pcap_info, const u_cha
 
 void init_pcap( char *ipAddress)
 {
-    char interface[] = "eth4";
+    char interface[] = "eth0";
     struct bpf_program bpfProg;
     char errBuf[PCAP_ERRBUF_SIZE];
     char filter[128] = " udp ";
@@ -423,7 +424,7 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
 
         if((int)numSackRanges != 0)
         {
-            printf("Creating a SACK for packet = %d ^ ", ackedSeq);
+            //printf("Creating a SACK for packet = %d ^ ", ackedSeq);
             packetSize += (2*(int)numSackRanges*sizeof(unsigned long));
 
             unsigned long rangeBegin, rangeEnd;
@@ -449,7 +450,7 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
                 rangeBegin = (*sackIter).first;
                 rangeEnd = (*sackIter).second;
 
-                printf("%d %d: ", rangeBegin, rangeEnd);
+           //     printf("%d %d: ", rangeBegin, rangeEnd);
 
                 memcpy(&appAck[2 + 3*sizeof(unsigned long) + 2*i*sizeof(unsigned long)], &rangeBegin, sizeof(unsigned long ));
                 memcpy(&appAck[2 + 3*sizeof(unsigned long) + (2*i+1)*sizeof(unsigned long)], &rangeEnd, sizeof(unsigned long ));
@@ -457,13 +458,13 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
                 i++;
                 sackIter++;
             }
-            printf("\n");
+          //  printf("\n");
 
-            printf("HighSeq = %u, lostNum = %u\n", connInfo->highSeq, connInfo->missingPacketTotal);
+         //   printf("HighSeq = %u, lostNum = %u\n", connInfo->highSeq, connInfo->missingPacketTotal);
         }
         else
         {
-            printf("Sending ACK for packet = %u, received = %u\n", ackedSeq,seqNum);
+        //    printf("Sending ACK for packet = %u, received = %u\n", ackedSeq,seqNum);
 
         }
 
@@ -475,7 +476,7 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
         int retval = sendto(sd,appAck,packetSize,flags,(struct sockaddr *)&destAddr,sizeof(destAddr));
         if(retval <= 0)
         {
-            cout<<"Send failed for ACK "<<ackedSeq<<endl;
+            cout<<"Send failed for ACK "<<ackedSeq<<", errno = "<<errno<<endl;
             exit(1);
 
         }
@@ -492,9 +493,214 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
     }
 }
 
+void handlePacket(u_char *dataPtr, struct sockaddr_in *ip_src)
+{
+
+    //u_char *dataPtr = udpPacketStart + 8;
+    unsigned char packetType = *(unsigned char *)(dataPtr);
+
+    if(packetType == '0')// This is a udp data packet arriving here. Send an
+        // application level acknowledgement packet for it.
+    {
+        unsigned long seqNum = *(unsigned long *)(dataPtr + 1);
+        unsigned long ackedSeq = 0;
+        struct tcp_info *connInfo;
+        string src_ip_port;
+
+        src_ip_port = inet_ntoa(ip_src->sin_addr) ; 
+        src_ip_port += ":";
+        src_ip_port += ntohs(ip_src->sin_port);
+
+//        cout << "Received packet #"<<seqNum<<endl;
+
+        if(connectionMap.find(src_ip_port) != connectionMap.end()) // Established connection.
+        {
+            // Look up the connection info.
+            connInfo = connectionMap[src_ip_port];
+
+            if(seqNum == connInfo->lastInOrderPacket+1) // Received the next packet in window
+                // and ACK as many packets as possible.
+            {
+
+                if(connInfo->recvdPackets.size() != 0) // There are future seq. numbered packets
+                    // in the buffer.
+                {
+                    unsigned long curSeq = seqNum;
+
+                    // Remove all contiguous packets from the buffer.
+                    while(connInfo->recvdPackets.front() == curSeq+1)
+                    {
+                        curSeq++;
+                        pop_heap(connInfo->recvdPackets.begin(), connInfo->recvdPackets.end(), greater<int>());
+                        connInfo->recvdPackets.pop_back();
+                    }
+
+                    connInfo->lastInOrderPacket = curSeq;
+                }
+                else // This packet advances the right edge of the window by one.
+                    connInfo->lastInOrderPacket++;
+
+                ackedSeq = connInfo->lastInOrderPacket+1;
+                UpdateSACKs(seqNum, true, connInfo);
+            }
+            else if(seqNum <= connInfo->lastInOrderPacket) // Redundant packet.
+                ackedSeq = connInfo->lastInOrderPacket+1;
+            else
+            {
+                vector<unsigned long >::iterator seqNumIter = connInfo->recvdPackets.end();
+
+                seqNumIter = find(connInfo->recvdPackets.begin(), connInfo->recvdPackets.end(), seqNum);
+
+                if(seqNumIter == connInfo->recvdPackets.end()) // We haven't seen this packet
+                    // before, put it in the received packet list.
+                {
+                    connInfo->recvdPackets.push_back(seqNum);
+                    push_heap(connInfo->recvdPackets.begin(), connInfo->recvdPackets.end(), greater<int>());
+                    ackedSeq = connInfo->lastInOrderPacket+1;
+                    //printf("Initializing SACK blocks for packet %d, ack = %d\n", seqNum,ackedSeq);
+                    UpdateSACKs(seqNum, false, connInfo);
+                }
+                else // Redundant packet, doesn't advance the window.
+                    ackedSeq = connInfo->lastInOrderPacket+1;
+            }
+
+        }
+        else // New connection
+        {
+            connInfo = new struct tcp_info;
+
+            connInfo->recvdPackets.resize(0);
+            connInfo->lastInOrderPacket = 0;
+            connInfo->sackRanges.resize(0);
+            connectionMap[src_ip_port] = connInfo;
+
+            connInfo->highSeq = seqNum;
+            connInfo->missingPacketTotal = 0;
+
+            if(seqNum != connInfo->lastInOrderPacket+1) // This isn't the first packet.
+            {
+                connInfo->recvdPackets.push_back(seqNum);
+                push_heap(connInfo->recvdPackets.begin(), connInfo->recvdPackets.end(), greater<int>());
+                connInfo->lastInOrderPacket = 0;
+                ackedSeq = connInfo->lastInOrderPacket + 1;
+
+                UpdateSACKs(seqNum, false, connInfo);
+
+            }
+            else // Received the first packet.
+            {
+                connInfo->lastInOrderPacket = 1;
+                ackedSeq = connInfo->lastInOrderPacket + 1;
+
+            }
+        }
+
+        // Keep track of the highest sequence number received from the sender.
+        if(seqNum > connInfo->highSeq)
+            connInfo->highSeq = seqNum;
+
+        // Send an ACK for the expected sequence number.
+        appAck[0] = '1';
+        char numSackRanges = (char)0;
+        int packetSize = 2 + 3*sizeof(unsigned long);
+
+        // Limit the maximum number of sack blocks to 5.
+        if(connInfo->sackRanges.size() != 0)
+        {
+            if(connInfo->sackRanges.size() >= 5)
+                numSackRanges = (char)5;
+            else
+                numSackRanges = (char)connInfo->sackRanges.size();
+        }
+        memcpy(&appAck[1], &numSackRanges, sizeof(char));
+        memcpy(&appAck[2], &ackedSeq, sizeof(unsigned long));
+        //cout<<"Sending ACK for seqNum = " << ackedSeq<<endl;
+
+        // Send the total of missing packets.
+        memcpy(&appAck[2 + sizeof(unsigned long)], &connInfo->missingPacketTotal, sizeof(unsigned long ));
+
+        // Also the highest sequence number seen.
+        memcpy(&appAck[2 + 2*sizeof(unsigned long)], &connInfo->highSeq, sizeof(unsigned long ));
+
+        if((int)numSackRanges != 0)
+        {
+            //printf("Creating a SACK for packet = %d ^ ", ackedSeq);
+            packetSize += (2*(int)numSackRanges*sizeof(unsigned long));
+
+            unsigned long rangeBegin, rangeEnd;
+
+            list<pair<unsigned long, unsigned long> >::iterator sackIter = connInfo->sackRanges.begin();
+            int i = 0;
+
+            // Send the 'n' most recent SACK blocks.
+            if(connInfo->sackRanges.size() != numSackRanges)
+            {
+                int index = connInfo->sackRanges.size() - numSackRanges;
+
+                while(index != 0)
+                {
+                    sackIter++;
+                    index--;
+                }
+            }
+
+
+            while(i < (int)numSackRanges && (sackIter != connInfo->sackRanges.end()))
+            {
+                rangeBegin = (*sackIter).first;
+                rangeEnd = (*sackIter).second;
+
+           //     printf("%d %d: ", rangeBegin, rangeEnd);
+
+                memcpy(&appAck[2 + 3*sizeof(unsigned long) + 2*i*sizeof(unsigned long)], &rangeBegin, sizeof(unsigned long ));
+                memcpy(&appAck[2 + 3*sizeof(unsigned long) + (2*i+1)*sizeof(unsigned long)], &rangeEnd, sizeof(unsigned long ));
+
+                i++;
+                sackIter++;
+            }
+          //  printf("\n");
+
+         //   printf("HighSeq = %u, lostNum = %u\n", connInfo->highSeq, connInfo->missingPacketTotal);
+        }
+        else
+        {
+        //    printf("Sending ACK for packet = %u, received = %u\n", ackedSeq,seqNum);
+
+        }
+
+        // Fill in the IP address & port number.
+        memcpy((char *) &destAddr.sin_addr.s_addr,
+                (char *) &(ip_src->sin_addr.s_addr), sizeof(ip_src->sin_addr.s_addr));
+        destAddr.sin_port = ip_src->sin_port;
+
+        int retval = sendto(sd,appAck,packetSize,flags,(struct sockaddr *)&destAddr,sizeof(destAddr));
+        if(retval <= 0)
+        {
+            cout<<"Send failed for ACK "<<ackedSeq<<", errno="<<errno<<endl;
+            exit(1);
+
+        }
+    }
+    else if(packetType == '1') // TODO:This is an udp ACK packet. If it is being sent
+        // out from this host, do nothing.
+    {
+
+    }
+    else
+    {
+        printf("ERROR: Unknown UDP packet received from remote agent\n");
+        return;
+    }
+}
+
+void DetectTimeout(int signal)
+{
+    connectionMap.clear();
+}
+
 int main(int argc, char *argv[]) {
 
-    char msg[MAX_MSG];
+    u_char msg[MAX_MSG];
     struct hostent *localHost;
 
     /* socket creation */
@@ -537,9 +743,9 @@ int main(int argc, char *argv[]) {
     flags = 0;
 
 
-    init_pcap(inet_ntoa(servAddr.sin_addr));
-    int pcapfd = pcap_get_selectable_fd(pcapDescriptor);
-    struct pcap_stat pcapStatObj;
+    //init_pcap(inet_ntoa(servAddr.sin_addr));
+    //int pcapfd = pcap_get_selectable_fd(pcapDescriptor);
+    //struct pcap_stat pcapStatObj;
     fd_set socketReadSet;
 
     struct timeval timeoutStruct;
@@ -548,18 +754,34 @@ int main(int argc, char *argv[]) {
     timeoutStruct.tv_usec = 50000;
 
     memset(msg,0x0,MAX_MSG);
-    fcntl(sd, F_SETFL, flags | O_NONBLOCK);
+//    fcntl(sd, F_SETFL, flags | O_NONBLOCK);
+
+    // Define connection timeout to be 5 seconds.
+    struct timeval conn_timeout, empty_timeout;
+    conn_timeout.tv_sec = 5;
+    conn_timeout.tv_usec = 0;
+    empty_timeout.tv_sec = 0;
+    empty_timeout.tv_usec = 0;
+
+    struct itimerval conn_timeout_timer;
+    conn_timeout_timer.it_value = conn_timeout;
+    // Do not renew the timer automatically.
+    conn_timeout_timer.it_interval = empty_timeout;
+
+    signal(SIGALRM, DetectTimeout);
+    setitimer(ITIMER_REAL, &conn_timeout_timer, NULL);
 
     /* server infinite loop */
     while(1) {
-        FD_ZERO(&socketReadSet);
-        FD_SET(sd,&socketReadSet);
-        FD_SET(pcapfd,&socketReadSet);
+ //       FD_ZERO(&socketReadSet);
+  //      FD_SET(sd,&socketReadSet);
+     //   FD_SET(pcapfd,&socketReadSet);
 
-        select(sd+pcapfd+1,&socketReadSet,0,0,&timeoutStruct);
+        //select(sd+pcapfd+1,&socketReadSet,0,0,&timeoutStruct);
+   //     select(sd+1,&socketReadSet,0,0,&timeoutStruct);
 
 
-        if (FD_ISSET(sd,&socketReadSet) )
+    //    if (FD_ISSET(sd,&socketReadSet) )
         {   
             /* receive message */
             cliLen = sizeof(cliAddr);
@@ -568,17 +790,21 @@ int main(int argc, char *argv[]) {
             {
                 if(recvfrom(sd, msg, MAX_MSG, flags,(struct sockaddr *) &cliAddr, &cliLen))
                 {
-                    pcap_dispatch(pcapDescriptor, 300, pcapCallback, NULL);
+                    handlePacket(msg, &cliAddr);
+                    setitimer(ITIMER_REAL, &conn_timeout_timer, NULL);
+                    //pcap_dispatch(pcapDescriptor, 300, pcapCallback, NULL);
                 }
                 else
                     break;
             }
         }
 
+        /*
         if (FD_ISSET(pcapfd,&socketReadSet) )
         {           
             while(pcap_dispatch(pcapDescriptor, 10000, pcapCallback, NULL) != 0);
         }
+        */
 
 
         if(n<0) {
@@ -586,9 +812,11 @@ int main(int argc, char *argv[]) {
             continue;
         }
     }
+    /*
     pcap_stats(pcapDescriptor, &pcapStatObj);
     if(pcapStatObj.ps_drop > 0)
         printf("pcap: Packets received %d, dropped %d\n", pcapStatObj.ps_recv, pcapStatObj.ps_drop);
+        */
 
     return 0;
 

@@ -454,12 +454,19 @@ void Update(unsigned long seqNum, int numSACKBlocks, u_char *dataPtr, unsigned l
         {
             conn_info.congWindow += 1.0;
             conn_info.congAvoidancePackets = 0;
+
+            //FIXME:
+            //if(conn_info.congWindow > 170)
+             //   conn_info.congWindow = 170;
         }
     }
     else // Slow Start
     {
 //        printf("For seq # = %u,packets = %d, window before = %f ", seqNum,numPacketsAcked, conn_info.congWindow);
         conn_info.congWindow += numPacketsAcked;
+            //FIXME:
+         //   if(conn_info.congWindow > 170)
+          //      conn_info.congWindow = 170;
   //      printf(", window after = %f\n", conn_info.congWindow);
     }
 //    cout << "CongWin: " << conn_info.congWindow<< " "<< conn_info.ssthresh << " , outstanding=" <<conn_info.pipe << ", last Range = "<<conn_info.sackRanges.back().second<<endl;
@@ -751,7 +758,7 @@ int main(int argc, char **argv)
 
     // Initialize the congestion window and slow start threshold.
     conn_info.congWindow = 2.0;
-    conn_info.ssthresh = 65000;
+    conn_info.ssthresh = 85;
     conn_info.HighACK = 0;
     conn_info.HighData = 0;
     conn_info.pipe = 0;
@@ -918,7 +925,7 @@ int main(int argc, char **argv)
                             conn_info.congWindow = 1;
 
                             timeoutFlag = false;
-                            printf("Timed out\n");
+                            //printf("Timed out\n");
 
                             conn_info.rto_estimate *= 2;
 
@@ -998,8 +1005,9 @@ int main(int argc, char **argv)
     double tput = (double)(conn_info.HighData - unackedPackets.size())/(double)connDuration;
     tput *= (1500*8);
 
-    printf("Packets sent = %u(last Packet = %u, highSeq = %u), time = %lld seconds, throughput = %f Kbits/sec\n",conn_info.HighACK,conn_info.HighData,highSeq,connDuration/1000, tput );
+    //printf("Packets sent = %u(last Packet = %u, highSeq = %u), time = %lld seconds, throughput = %f Kbits/sec\n",conn_info.HighACK,conn_info.HighData,highSeq,connDuration/1000, tput );
+    printf("%d Kbits/sec\n", (long)tput );
 
-    printf("Ack count = %d\n", ackCount);
+    //printf("Ack count = %d\n", ackCount);
 }
 
