@@ -27,8 +27,11 @@ PAGEHEADER("Emulab Software Distributions");
     See the <a href = "README">README</a> and the
     <a href = "http://users.emulab.net/trac/emulab/wiki/InstallRoot">
     online installation and upgrading documentation</a>.
+    If for some reason you cannot access the online documentation, there is
+    <a href="http://www.emulab.net/downloads/emulab-install-docs-080901.tar.gz">
+    a tarball of the installation documents</a>
+    that you can download and unpack locally.
     </li><p>
-
 <li> <a href="/downloads/emulab-080630.tar.gz">
     Emulab network testbed software</a>,
     Version 4.9.0, released June 30, 2008.
