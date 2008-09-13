@@ -67,8 +67,8 @@ sub Lookup($$)
 
     # Map the component
     my $component;
-    if ($row->{'component_idx'}) {
-	$component = GeniComponent->Lookup($row->{'component_idx'});
+    if ($row->{'component_uuid'}) {
+	$component = GeniComponent->Lookup($row->{'component_uuid'});
 	return undef
 	    if (!defined($component));
     }
@@ -132,6 +132,7 @@ sub owner_cert($)	{ return field($_[0], "owner_cert"); }
 sub ticket($)		{ return field($_[0], "ticket"); }
 sub asString($)		{ return field($_[0], "ticket_string"); }
 sub ticket_string($)	{ return field($_[0], "ticket_string"); }
+sub component_uuid($)	{ return field($_[0], "component_uuid"); }
 sub component($)	{ return field($_[0], "component"); }
 sub stored($)		{ return field($_[0], "stored"); }
 
@@ -183,7 +184,14 @@ sub CreateFromSignedTicket($$;$$)
 
     # Use XML::Simple to convert to something we can mess with.
     my $parser = XML::LibXML->new;
-    my $doc    = $parser->parse_string($ticket_string);
+    my $doc;
+    eval {
+	$doc = $parser->parse_string($ticket_string);
+    };
+    if ($@) {
+	print STDERR "Failed to parse ticket string: $@\n";
+	return undef;
+    }
 
     # Dig out the rspec.
     my ($rspec_node) = $doc->getElementsByTagName("rspec");
@@ -326,7 +334,7 @@ sub Store($)
 	$self->{'idx'} = $idx;
     }
     # A locally generated ticket will not have a component. Might change that.
-    push(@insert_data, "component_idx=" . $self->component()->idx())
+    push(@insert_data, "component_uuid='" . $self->component()->uuid() . "'")
 	if (defined($self->component()));
 
     # Now tack on other stuff we need.
@@ -362,6 +370,7 @@ sub Sign($)
     my $idx        = $self->seqno();
     my $slice_cert = $self->slice_cert();
     my $owner_cert = $self->owner_cert();
+    my $hrn        = "$OURDOMAIN.tickets.$idx";
     my $rspec_xml  = XMLout($self->rspec(), "NoAttr" => 1);
     $rspec_xml =~ s/opt\>/rspec\>/g;
 
@@ -374,7 +383,10 @@ sub Sign($)
 	" <type>ticket</type>\n".
 	" <serial>$idx</serial>\n".
 	" <owner_uuid>$owner_cert</owner_uuid>\n".
+	" <target_uuid>$slice_cert</target_uuid>\n".
 	" <this_uuid>$slice_cert</this_uuid>\n".
+	" <hrn>$hrn</hrn>\n".
+	" <expires>2008-05-10T09:00:00</expires>\n".
 	" <ticket>\n".
 	"  <can_delegate>1</can_delegate>\n".
 	"  $rspec_xml\n".
@@ -493,6 +505,20 @@ sub Release($)
     }
     $self->Delete();
     return 0;
+}
+
+#
+# Equality test for two tickets.
+#
+sub SameTicket($$)
+{
+    my ($self, $other) = @_;
+
+    # Must be a real reference. 
+    return 0
+	if (! (ref($self) && ref($other)));
+
+    return $self->idx() == $other->idx();
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

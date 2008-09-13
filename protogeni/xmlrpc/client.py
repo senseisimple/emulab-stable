@@ -122,6 +122,8 @@ if rval:
     pass
 mycredential = response["value"]
 print "Got my SA credential"
+#print str(mycredential);
+#sys.exit(0);
 
 #
 # Look me up just for the hell of it. I can see why the hrn is "useful"
@@ -230,6 +232,7 @@ print "Bogus DiscoverResources returned"
 #
 rspec = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
         " <node uuid=\"de9803c2-773e-102b-8eb4-001143e453fe\" " +\
+        "       hrn=\"geni1\" "+\
         "       virtualization_type=\"emulab-vnode\"> " +\
         " </node>" +\
         " <node uuid=\"de995217-773e-102b-8eb4-001143e453fe\" " +\
@@ -270,7 +273,7 @@ if rval:
     pass
 sliver = response["value"]
 print "Created a sliver"
-#print str(sliver)
+print str(sliver)
 
 #
 # Split the sliver since its an aggregate of resources

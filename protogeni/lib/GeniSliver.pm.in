@@ -93,6 +93,7 @@ sub Lookup($$)
     $self->{'CREDENTIAL'} = undef;	# client
     $self->{'AGGREGATE'}  = undef;	# server
     $self->{'RSPEC'}      = undef;	# client/server
+    $self->{'HRN'}        = undef;	# Bogus kludge for aggregates.
 
     my $rspec_string = $self->{'SLIVER'}->{'rspec_string'};
     if (defined($rspec_string) && $rspec_string ne "") {
@@ -140,15 +141,45 @@ sub Stringify($)
 }
 
 #
+# Cons up an hrn.
+#
+sub hrn($)
+{
+    my ($self) = @_;
+
+    if (defined($self->{'HRN'})) {
+	# XXX Kludge for Emulab aggregates
+	return $self->{'HRN'};
+    }
+    elsif (defined($self->rspec()->{'tmcd_nodeid'})) {
+	return $self->rspec()->{'tmcd_nodeid'};
+    }
+    elsif (defined($self->rspec()->{'hrn'})) {
+	return $self->rspec()->{'hrn'};
+    }
+    else {
+	return $OURDOMAIN . "." . $self->resource_type() . "." .
+	    $self->idx();
+    }
+}
+# XXX Kludge for Emulab aggregates
+sub Sethrn($$)
+{
+    my ($self, $hrn) = @_;
+    
+    $self->{'HRN'} = $hrn;
+    return 0;
+}    
+
+#
 # Create a sliver record in the DB. On the client side we save the credential
 # that allows control of it, for later operations.
 #
-sub Create($$$$$;$$$)
+sub Create($$$$$$;$$$)
 {
-    my ($class, $slice, $owner_uuid, $resource_uuid, $resource_type,
+    my ($class, $slice, $owner_uuid, $uuid, $resource_uuid, $resource_type,
 	$rspec, $credential, $component) = @_;
     my @insert_data = ();
-    my $uuid;
     my $certificate;
 
     # Every sliver gets a new unique index.
@@ -161,20 +192,19 @@ sub Create($$$$$;$$$)
 	    print STDERR "Could not store certificate\n";
 	    return undef;
 	}
-	$uuid = $credential->this_uuid();
+	$resource_uuid = $uuid = $credential->this_uuid();
 
 	# Store the credential
 	return undef
 	    if ($credential->Store() != 0);
     }
     else {
-	# Create a cert pair, which gives us a new uuid.
-	$certificate = GeniCertificate->Create("sliver");
+	# Create a cert pair, for this resource uuid. 
+	$certificate = GeniCertificate->Create("sliver", $uuid);
 	if (!defined($certificate)) {
 	    print STDERR "Could not generate new certificate and UUID!\n";
 	    return undef;
 	}
-	$uuid = $certificate->uuid();
     }
     my $slice_uuid     = $slice->uuid();
 
@@ -182,10 +212,8 @@ sub Create($$$$$;$$$)
     push(@insert_data, "created=now()");
     push(@insert_data, "idx='$idx'");
     push(@insert_data, "uuid='$uuid'");
-    push(@insert_data, "resource_uuid='$resource_uuid'")
-	if (defined($resource_uuid));
-    push(@insert_data, "resource_type='$resource_type'")
-	if (defined($resource_type));
+    push(@insert_data, "resource_uuid='$resource_uuid'");
+    push(@insert_data, "resource_type='$resource_type'");
     push(@insert_data, "creator_uuid='$owner_uuid'");
     push(@insert_data, "slice_uuid='$slice_uuid'");
 
@@ -487,8 +515,8 @@ sub Create()
 {
     my ($class, $slice, $user_uuid, $rspec, $credential, $component) = @_;
 
-    return GeniSliver->Create($slice, $user_uuid,
-			      $credential->target_uuid(), "Client", $rspec,
+    return GeniSliver->Create($slice, $user_uuid, undef, undef,
+			      "Client", $rspec,
 			      $credential, $component);
 }
 
@@ -536,6 +564,45 @@ sub Destroy($$)
     return 0;
 }
 
+#
+# On the client side, the aggregate points to the parent sliver when it
+# contains multiple resources.
+#
+sub SetAggregate($$)
+{
+    my ($self, $parent) = @_;
+
+    return -1
+	if (! (ref($self) && ref($parent)));
+
+    my $idx         = $self->idx();
+    my $parent_uuid = $parent->uuid();
+
+    return -1
+	if (!DBQueryWarn("update geni_slivers set ".
+			 "  aggregate_uuid='$parent_uuid' ".
+			 "where idx='$idx'"));
+
+    return 0;
+}
+sub GetAggregate($)
+{
+    my ($self) = @_;
+
+    return undef
+	if (! ref($self));
+
+    return undef
+	if (!defined($self->aggregate_uuid()));
+
+    my $parent = GeniSliver->Lookup($self->aggregate_uuid());
+    if (!defined($parent)) {
+	print STDERR "Could not get parent object associated with $self\n";
+	return undef;
+    }
+    return $parent;
+}
+
 ############################################################################
 #
 # The server side methods are in packages which inherit from above.
@@ -558,6 +625,7 @@ sub Create($$$$$)
 {
     my ($class, $slice, $user_uuid, $resource_uuid, $rspec) = @_;
     my $virtualization_type = $rspec->{'virtualization_type'};
+    my $uuid = $resource_uuid;
 
     my $experiment = $slice->GetExperiment();
     if (!defined($experiment)) {
@@ -606,9 +674,9 @@ sub Create($$$$$)
 	    return -1;
 	}
 	my $vnode = Node->Lookup($vnodes[0]);
-	$resource_uuid = $vnode->uuid();
+	$uuid = $vnode->uuid();
     }
-    return GeniSliver->Create($slice, $user_uuid, $resource_uuid,
+    return GeniSliver->Create($slice, $user_uuid, $uuid, $resource_uuid,
 			      "Node", $rspec);
 }
 
@@ -633,12 +701,12 @@ sub Provision($;$)
 	print STDERR "Could not map $self to its experiment\n";
 	return -1;
     }
-    my $resource_uuid = $self->resource_uuid();
+    my $uuid = $self->uuid();
     return 0
-	if (!defined($resource_uuid));
-    my $node       = Node->Lookup($resource_uuid);
+	if (!defined($uuid));
+    my $node       = Node->Lookup($uuid);
     if (!defined($node)) {
-	print STDERR "Could not map node $resource_uuid to its object\n";
+	print STDERR "Could not map node $uuid to its object\n";
 	return -1;
     }
     my $reservation = $node->Reservation();
@@ -655,16 +723,14 @@ sub Provision($;$)
 	    return -1;
 	}
 
-	if (defined($extraargs)) {
-	    if (exists($extraargs->{'tmcd_server'}) &&
-		exists($extraargs->{'tmcd_nodeid'})) {
-		my $tmcd_redirect = $extraargs->{'tmcd_server'} . ":" .
-		    $extraargs->{'tmcd_nodeid'};
+	if (exists($self->rspec()->{'tmcd_server'}) &&
+	    exists($self->rspec()->{'tmcd_nodeid'})) {
+	    my $tmcd_redirect =
+		$self->rspec()->{'tmcd_server'} . ":" .
+		$self->rspec()->{'tmcd_nodeid'};
 
-		if ($node->ModifyReservation({"tmcd_redirect" =>
-						  $tmcd_redirect})) {
-		    return -1;
-		}
+	    if ($node->ModifyReservation({"tmcd_redirect" => $tmcd_redirect})){
+		return -1;
 	    }
 	}
 
@@ -674,7 +740,8 @@ sub Provision($;$)
 	# the vnode since it is going to redirect to tmcd on the remote Emulab
 	# controlling the experiment. 
 	#
-	if ($self->rspec()->{'virtualization_type'} eq "emulab-vnode") {
+	if (exists($self->rspec()->{'virtualization_type'}) &&
+	    $self->rspec()->{'virtualization_type'} eq "emulab-vnode") {
 	    my $pnode = Node->Lookup($node->phys_nodeid());
 	    if (!defined($pnode)) {
 		print STDERR "Could not get pnode object for $node\n";
@@ -738,12 +805,12 @@ sub UnProvision($)
 	print STDERR "Could not map $self to its experiment\n";
 	return -1;
     }
-    my $resource_uuid = $self->resource_uuid();
+    my $uuid = $self->uuid();
     return 0
-	if (!defined($resource_uuid));
-    my $node       = Node->Lookup($resource_uuid);
+	if (!defined($uuid));
+    my $node       = Node->Lookup($uuid);
     if (!defined($node)) {
-	print STDERR "Could not map node $resource_uuid to its object\n";
+	print STDERR "Could not map node $uuid to its object\n";
 	return -1;
     }
     my $reservation = $node->Reservation();
@@ -808,12 +875,12 @@ sub Start($)
 	print STDERR "Could not map $self to its experiment\n";
 	return -1;
     }
-    my $resource_uuid = $self->resource_uuid();
+    my $uuid = $self->uuid();
     return 0
-	if (!defined($resource_uuid));
-    my $node       = Node->Lookup($resource_uuid);
+	if (!defined($uuid));
+    my $node       = Node->Lookup($uuid);
     if (!defined($node)) {
-	print STDERR "Could not map node $resource_uuid to its object\n";
+	print STDERR "Could not map node $uuid to its object\n";
 	return -1;
     }
     my $reservation = $node->Reservation();
@@ -869,7 +936,7 @@ sub Create()
     my ($class, $slice, $user_uuid, $resource_uuid, $rspec) = @_;
 
     return GeniSliver->Create($slice, $user_uuid, $resource_uuid,
-			      "Interface", $rspec);
+			      $resource_uuid, "Interface", $rspec);
 }
 
 sub Provision($)

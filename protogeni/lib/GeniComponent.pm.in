@@ -203,6 +203,19 @@ sub NewResource($$)
 }
 
 #
+# Compare two component refs.
+#
+sub SameComponent($$)
+{
+    my ($self, $other) = @_;
+
+    return 0
+	if (! (ref($self) && ref($other)));
+
+    return $self->idx() == $other->idx();
+}
+
+#
 # Refresh a class instance by reloading from the DB.
 #
 sub Refresh($)
@@ -398,16 +411,6 @@ sub CreateSliver($$$$;$)
 	return undef;
     }
 
-    #
-    # We need to store this credential (not the default) so we can
-    # operate on the sliver later.
-    #
-    if ($credential->Store() != 0) {
-	print STDER "Could not store $credential for new sliver\n";
-	$credential->Delete();
-	return undef;
-    }
-
     my $sliver = GeniSliver::Client->Create($slice, $ticket->owner_uuid(),
 					    $ticket->rspec(),
 					    $credential, $self);
@@ -472,6 +475,65 @@ sub StartSliver($$$)
 	print STDERR "Could not start sliver $sliver\n";
 	return -1;
     }
+    return 0;
+}
+
+#
+# Split a sliver. 
+#
+sub SplitSliver($$$$)
+{
+    my ($self, $sliver, $context, $pref) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $credential = $sliver->GetCredential($context->user());
+    return -1
+	if (!defined($credential));
+
+    my $slice = $sliver->GetSlice();
+    return -1
+	if (!defined($slice));
+    
+    my $response =
+	Genixmlrpc::CallMethod($self->url(), $context,
+			       "SplitSliver",
+			       { "credential"  => $credential->asString() });
+    
+    if ($response->code() != GENIRESPONSE_SUCCESS) {
+	print STDERR "Could not split sliver $sliver\n";
+	return -1;
+    }
+
+    #
+    # We get back signed credentials, which has the sliver uuid inside.
+    #
+    my @slivers = ();
+    
+    foreach my $credential (@{ $response->value() }) {
+	my $credential = GeniCredential->CreateFromSigned($credential, 1);
+	if (!defined($credential)) {
+	    print STDERR "Could not create local credential object.\n";
+	    return -1;
+	}
+
+	my $s = GeniSliver::Client->Create($slice,
+					   $credential->owner_uuid(),
+					   undef,
+					   $credential, $self);
+
+	if (!defined($s)) {
+	    print STDERR "Could not create local sliver object.\n";
+	    return -1;
+	}
+	$s->SetAggregate($sliver);
+	# XXX Kludge for Emulab aggregates
+	$s->Sethrn($credential->hrn());
+	push(@slivers, $s);
+    }
+    @$pref = @slivers;
     return 0;
 }
 

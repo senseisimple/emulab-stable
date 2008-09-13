@@ -221,6 +221,16 @@ sub Delete($)
 }
 
 #
+# Cons up an hrn.
+#
+sub hrn($)
+{
+    my ($self) = @_;
+
+    return $OURDOMAIN . ".aggregates." . $self->idx();
+}
+
+#
 # Look up a list of aggregates for a locally instantiated slice. 
 # Used by the CM.
 #
@@ -258,9 +268,11 @@ sub SliverList($$)
     return -1
 	if (! (ref($self) && ref($pref)));
 
-    my $idx = $self->idx();
+    my $idx  = $self->idx();
+    my $uuid = $self->uuid();
     my $query_result =
-	DBQueryWarn("select idx from geni_slivers where aggregate_idx='$idx'");
+	DBQueryWarn("select idx from geni_slivers ".
+		    "where aggregate_uuid='$uuid'");
     return -1
 	if (!$query_result);
 
@@ -530,31 +542,23 @@ sub Provision($;$)
 	print STDERR "Could not map $self to its experiment\n";
 	return -1;
     }
-    my $sliver0    = $slivers[0];
-    my $sliver1    = $slivers[1];
-    my $interface0 = Interface->LookupByUUID($sliver0->resource_uuid());
-    my $interface1 = Interface->LookupByUUID($sliver1->resource_uuid());
-    if (! defined($interface0)) {
-	print STDERR "Could not map $sliver0 to its object\n";
-	return -1;
-    }
-    if (! defined($interface1)) {
-	print STDERR "Could not map $sliver1 to its object\n";
-	return -1;
-    }
 
     my $vlan = VLan->Create($experiment, $self->uuid());
     if (!defined($vlan)) {
 	print STDERR "Could not create vlan for $self\n";
-	return -1;
-    }
-    if (! $vlan->AddMember($interface0->node_id(), $interface0->iface())) {
-	print STDERR "$self: Could not add $interface0 to $vlan\n";
 	goto bad;
     }
-    if (! $vlan->AddMember($interface1->node_id(), $interface1->iface())) {
-	print STDERR "$self: Could not add $interface1 to $vlan\n";
-	goto bad;
+
+    foreach my $sliver (@slivers) {
+	my $interface = Interface->LookupByUUID($sliver->resource_uuid());
+	if (! defined($interface)) {
+	    print STDERR "Could not map $sliver to its interface object\n";
+	    goto bad;
+	}
+	if (! $vlan->AddMember($interface->node_id(), $interface->iface())) {
+	    print STDERR "$self: Could not add $interface to $vlan\n";
+	    goto bad;
+	}
     }
     if ($vlan->Instantiate() != 0) {
 	print STDERR "$self: Could not instantiate $vlan on switches\n";
@@ -591,18 +595,7 @@ sub UnProvision($)
 	print STDERR "Could not map $self to its experiment\n";
 	return -1;
     }
-    my $sliver0    = $slivers[0];
-    my $sliver1    = $slivers[1];
-    my $interface0 = Interface->LookupByUUID($sliver0->resource_uuid());
-    my $interface1 = Interface->LookupByUUID($sliver1->resource_uuid());
-    if (! defined($interface0)) {
-	print STDERR "Could not map $sliver0 to its object\n";
-	return -1;
-    }
-    if (! defined($interface1)) {
-	print STDERR "Could not map $sliver1 to its object\n";
-	return -1;
-    }
+
     my $vlan = VLan->Lookup($experiment, $self->uuid());
     if (! defined($vlan)) {
 	print STDERR "Could not map self to its vlan object\n";

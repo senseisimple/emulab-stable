@@ -31,6 +31,7 @@ use libtestbed;
 use User;
 use Node;
 use Interface;
+use Lan;
 use English;
 use Data::Dumper;
 use Experiment;
@@ -180,36 +181,25 @@ sub AllocateSlivers($$$)
     }
 
     #
-    # Loop through each node and grab a ticket for it. The nodes table
-    # stores the uuid of the node as told to us in resource discovery.
-    # Use this to create a simple rspec. This will need to get fancier
-    # later.
+    # Loop through nodes, combining nodes at the same component into a
+    # list for that component.
     #
-    # XXX We are still not using rspecs anywhere.
-    #
+    # Bookkeeping for the rest of this function.
+    my %components      = ();
+    my %component_nodes = ();
+    my %node_component  = ();
+    my %pnode_component  = ();
+    
     foreach my $node (@{ $nodelist }) {
-	my $sliver_idx;
-	return -1
-	    if ($node->GetGeniSliverInfo(\$sliver_idx) != 0);
-	next
-	    if ($sliver_idx);
-
 	#
 	# The node is a virtnode, but we want a ticket for the physnode.
 	#
-	my $physnode = Node->Lookup($node->phys_nodeid());
+	my $pnode = Node->Lookup($node->phys_nodeid());
 	return -1
-	    if (!defined($physnode));
+	    if (!defined($pnode));
 	
-	my $node_uuid = $physnode->uuid();
+	my $node_uuid = $pnode->uuid();
 
-	my $rspec =
-	    "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " .
-	    " <node uuid=\"$node_uuid\" ".
-	    "       virtualization_type=\"emulab-vnode\"> " .
-	    " </node>" .
-	    "</rspec>";
-	
 	#
 	# XXX The component is stored in the geni_resources table. Not sure
 	# how that will work out.
@@ -219,17 +209,161 @@ sub AllocateSlivers($$$)
 	    print STDERR "Could not find CM for $node\n";
 	    return -1;
 	}
+	$component_nodes{$component->uuid()} = []
+	    if (!exists($component_nodes{$component->uuid()}));
+	push(@{ $component_nodes{$component->uuid()} }, $node);
+	$node_component{$node->node_id()}   = $component;
+	$pnode_component{$pnode->node_id()} = $component;
+	$components{$component->uuid()}     = $component;
+    }
+
+    #
+    # Now find links and lans between nodes, which of course must be at
+    # the same components since we talking about real vlans, not tunnels. 
+    #
+    my %component_lans = ();
+    my @lans;
+
+    if (Lan->ExperimentLans($experiment, \@lans) != 0) {
+	print STDERR "Could not get lans for $experiment\n";
+	return -1;
+    }
+    foreach my $lan (@lans) {
+	next
+	    if ($lan->type() ne "geni-vlan");
+
+	my @members;
+
+	if ($lan->MemberList(\@members) != 0) {
+	    print STDERR "Could not get members for $lan\n";
+	    return -1;
+	}
+
+	#
+	# Sanity check; all the nodes in the list must reside on the same
+	# component.
+	#
+	my $component;
+	foreach my $member (@members) {
+	    my $node;
+	    my $iface;
+
+	    if ($member->GetNodeIface(\$node, \$iface) != 0) {
+		print STDERR "Could not get node/iface for $member\n";
+		return -1;
+	    }
+	    #
+	    # 
+	    #
+	    my $tmp = $pnode_component{$node->node_id()};
+
+	    $component = $tmp
+		if (!defined($component));
+
+	    if (!$component->SameComponent($tmp)) {
+		print STDERR "Component mismatch in members of $lan\n";
+		return -1;
+	    }
+	}
+	$component_lans{$component->uuid()} = []
+	    if (!exists($component_lans{$component->uuid()}));
+	push(@{ $component_lans{$component->uuid()} }, $lan);
+    }
+
+    #
+    # Now build up rspecs for each component. 
+    #
+    my %component_rspecs = ();
+
+    foreach my $component_uuid (keys(%component_nodes)) {
+	my @nodelist  = @{ $component_nodes{$component_uuid} };
+	my $component = $components{$component_uuid};
+	my $rspec     =
+	    "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> ";
+	
+	foreach my $node (@nodelist) {
+	    #
+	    # The node is a virtnode, but we want a ticket for the physnode.
+	    #
+	    my $physnode = Node->Lookup($node->phys_nodeid());
+	    return -1
+		if (!defined($physnode));
+	    my $node_uuid = $physnode->uuid();
+	    my $node_id   = $node->node_id();
+
+	    #
+	    # We need to pass in some extra stuff for Emulab federation
+	    # (tmcd redirection).
+	    #
+	    $rspec .= " <node uuid=\"$node_uuid\" ".
+		      "       tmcd_server=\"$BOSSNODE\" ".
+		      "       tmcd_nodeid=\"$node_id\" ".
+		      "       hrn=\"$node_id\" ".
+		      "       virtualization_type=\"emulab-vnode\"> " .
+		      " </node>";
+	}
+	if (exists($component_lans{$component_uuid})) {
+	    my @lans = @{ $component_lans{$component_uuid} };
+
+	    foreach my $lan (@lans) {
+		my $name = $lan->vname();
+		my @members;
+
+		if ($lan->MemberList(\@members) != 0) {
+		    print STDERR "Could not get members for $lan\n";
+		    return -1;
+		}
+		$rspec .= "<link name=\"$name\" link_name=\"$name\"> ";
+
+		foreach my $member (@members) {
+		    my $node;
+		    my $iface;
+
+		    if ($member->GetNodeIface(\$node, \$iface) != 0) {
+			print STDERR "Could not get node/iface for $member\n";
+			return -1;
+		    }
+		    #
+		    # The node is a virtnode, but we want the physnode.
+		    #
+		    my $physnode = Node->Lookup($node->phys_nodeid());
+		    return -1
+			if (!defined($physnode));
+		    my $pnode_uuid = $physnode->uuid();
+		    my $name = $node->node_id() . ":" . $iface;
+
+		    $rspec .= "<LinkEndPoints name=\"$name\" " .
+			"            iface_name=\"$iface\" " .
+			"            node_uuid=\"$pnode_uuid\" /> ";
+		}
+		$rspec .= "</link>";
+	    }
+	}
+	$rspec .= "</rspec>";
+	print "$rspec\n";
+	$component_rspecs{$component_uuid} = $rspec;
+    }
+    
+    #
+    # Now submit each rspec to its component.
+    #
+    my %component_tickets = ();
+    
+    foreach my $component_uuid (keys(%component_nodes)) {
+	my @nodelist  = @{ $component_nodes{$component_uuid} };
+	my $component = $components{$component_uuid};
+	my $rspec     = $component_rspecs{$component_uuid};
 
         #
         # Get ticket from component.
         #
-	print STDERR "Asking for ticket for $node from $component.\n";
+	print STDERR "Asking for ticket from $component.\n";
 	
 	my $ticket = $component->GetTicket($slice, $rspec,
 					   $context, $credential);
 	
 	if (!defined($ticket)) {
-	    print STDERR "Could not get ticket from CM for $node\n";
+	    print STDERR "Could not get ticket from $component\n";
 	    return -1;
 	}
 
@@ -239,7 +373,7 @@ sub AllocateSlivers($$$)
 	#
 	if ($ticket->Store() != 0) {
 	    $ticket->Delete();
-	    print STDERR "Could not store $ticket on $component for $node\n";
+	    print STDERR "Could not store $ticket for $component\n";
 	    return -1;
 
 	}
@@ -250,12 +384,14 @@ sub AllocateSlivers($$$)
 	# since an rspec can have multiple resources (nodes, links),
 	# and I have not figured out what to do for that yet. 
 	#
-	if ($node->SetGeniSliverInfo($ticket->idx()) != 0) {
-	    print STDERR "Could not set sliver (ticket) idx for $node\n";
-	    if ($ticket->Delete() != 0) {
-		print STDERR "Could not destroy $ticket\n";
+	foreach my $node (@nodelist) {
+	    if ($node->SetGeniSliverInfo($ticket->idx()) != 0) {
+		print STDERR "Could not set sliver/ticket idx for $node\n";
+		if ($ticket->Delete() != 0) {
+		    print STDERR "Could not destroy $ticket\n";
+		}
+		return -1;
 	    }
-	    return -1;
 	}
     }
 
@@ -287,67 +423,130 @@ sub InstantiateSlivers($$$)
     }
 
     #
-    # Loop through each node and grab a ticket for it. The nodes table
-    # stores the uuid of the node as told to us in resource discovery.
-    # Use this to create a simple rspec. This will need to get fancier
-    # later.
+    # Loop through nodes, combining nodes at the same component into a
+    # list for that component.
     #
-    # XXX We are still not using rspecs anywhere.
-    #
+    # Bookkeeping for the rest of this function.
+    my %components        = ();
+    my %component_nodes   = ();
+    my %component_tickets = ();
+    my %node_component    = ();
+    my %node_slivers      = ();
+    my %pnodes            = ();
+
     foreach my $node (@{ $nodelist }) {
-	my $sliver_idx;
+	my $ticket_idx;
 	return -1
-	    if ($node->GetGeniSliverInfo(\$sliver_idx) != 0);
+	    if ($node->GetGeniSliverInfo(\$ticket_idx) != 0);
 	next
-	    if (! $sliver_idx);
+	    if (! $ticket_idx);
 
-	my $sliver     = GeniSliver->Lookup($sliver_idx);
-	next
-	    if (defined($sliver));
-
-	# See if its still a ticket.
-	my $ticket = GeniTicket->Lookup($sliver_idx);
+	my $physnode = Node->Lookup($node->phys_nodeid());
+	if (!defined($physnode)) {
+	    print STDERR "Could not get pnode object for $node\n";
+	    return -1;
+	}
+	$pnodes{$node->uuid()} = $physnode;
+	
+	my $ticket = GeniTicket->Lookup($ticket_idx);
 	if (!defined($ticket)) {
 	    print STDERR "Could not find ticket for $node in $experiment\n";
 	    return -1;
 	}
 	my $component = $ticket->component();
 
-	#
-	# We need to pass in some extra stuff for Emulab federation.
-	#
-	my $args = {'tmcd_server'  => $BOSSNODE,
-		    'tmcd_nodeid'  => $node->node_id() };
+	$component_nodes{$component->uuid()} = []
+	    if (!exists($component_nodes{$component->uuid()}));
+	push(@{ $component_nodes{$component->uuid()} }, $node);
+	$node_component{$node->node_id()}      = $component;
+	$components{$component->uuid()}        = $component;
+
+	# Sanity check.
+	if (!exists($component_tickets{$component->uuid()})) {
+	    $component_tickets{$component->uuid()} = $ticket;
+	}
+	elsif (!$ticket->SameTicket($component_tickets{$component->uuid()})) {
+	    print STDERR "Ticket mismatch for $component\n";
+	    return -1;
+	}
+    }
+
+    #
+    # For each component, submit the ticket associated with the list of
+    # nodes on that component.
+    #
+    foreach my $component_uuid (keys(%component_tickets)) {
+	my @nodelist  = @{ $component_nodes{$component_uuid} };
+	my $component = $components{$component_uuid};
+	my $ticket    = $component_tickets{$component_uuid};
 
         #
         # Create sliver on component using the ticket.
         #
-	print STDERR "Redeeming ticket for $node on $component.\n";
+	print STDERR "Redeeming ticket on $component.\n";
 	
-	$sliver = $component->CreateSliver($slice, $ticket, $context, $args);
-	if (!defined($sliver)) {
-	    print STDERR "Could not create sliver on $component for $node\n";
-	    if ($ticket->Delete() != 0) {
-		print STDERR "Could not delete $ticket\n";
-	    }
-	    if ($node->SetGeniSliverInfo(0) != 0) {
-		print STDERR "Could not clear sliver idx for $node\n";
-	    }
-	    return -1;
-	}
-	if ($node->SetGeniSliverInfo($sliver->idx()) != 0) {
-	    print STDERR "Could not set sliver idx for $node\n";
-	    if ($ticket->Delete() != 0) {
-		print STDERR "Could not delete $ticket\n";
-	    }
-	    if ($sliver->Destroy() != 0) {
-		print STDERR "Could not destroy $sliver\n";
-	    }
-	    return -1;
-	}
+	my $sliver =
+	    $component->CreateSliver($slice, $ticket, $context);
+
 	# No longer need the ticket.
 	if ($ticket->Delete() != 0) {
 	    print STDERR "Could not delete $ticket\n";
+	}
+	if (!defined($sliver)) {
+	    print STDERR "Could not create sliver on $component\n";
+	    return -1;
+	}
+
+	#
+	# If the sliver corresponds to multiple nodes, then we want to
+	# split it apart so that we have a credential for each node.
+	#
+	if (@nodelist > 1) {
+	    my @slivers;
+
+	    if ($component->SplitSliver($sliver, $context, \@slivers) != 0) {
+		print STDERR "Could not split $sliver on $component\n";
+		if ($sliver->Destroy($context) != 0) {
+		    print STDERR "Could not destroy $sliver\n";
+		}
+		return -1;
+	    }
+	    foreach my $node (@nodelist) {
+		my $physnode = $pnodes{$node->uuid()};
+		my $node_sliver;
+		foreach my $s (@slivers) {
+		    #
+		    # XXX Bogus use of hrn, but I am assuming the only
+		    # time this happens is when speaking to another Emulab
+		    # which will be doing the same thing.
+		    #
+		    if ($s->hrn() eq $node->node_id()) {
+			$node_sliver = $s;
+			last;
+		    }
+		}
+		if (!defined($node_sliver)) {
+		    print STDERR "Could not get sliver for $node in $sliver\n";
+		    if ($sliver->Destroy($context) != 0) {
+			print STDERR "Could not destroy $sliver\n";
+		    }
+		    return -1;
+		}
+		$node_slivers{$node->uuid()} = $node_sliver;
+	    }
+	}
+	else {
+	    # For loop below.
+	    $node_slivers{$nodelist[0]->uuid()} = $sliver;
+	}
+
+	foreach my $node (@nodelist) {
+	    my $s = $node_slivers{$node->uuid()};
+	    
+	    if ($node->SetGeniSliverInfo($s->idx()) != 0) {
+		print STDERR "Could not set sliver idx for $node\n";
+		return -1;
+	    }
 	}
     }
     return 0;
@@ -431,8 +630,6 @@ sub DestroySlivers($$$)
 
     #
     # Loop through each node and do the sliver thing.
-    #
-    # XXX We are still not using rspecs anywhere.
     #
     foreach my $node (@{ $nodelist }) {
 	my $sliver_idx;

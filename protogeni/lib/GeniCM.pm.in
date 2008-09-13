@@ -121,6 +121,7 @@ sub Resolve($)
 	# Return a blob.
 	my $blob = { "hrn"          => "${OURDOMAIN}." . $node->node_id(),
 		     "uuid"         => $node->uuid(),
+		     "role"	    => $node->role(),
 		   };
 
 	#
@@ -134,15 +135,23 @@ sub Resolve($)
 
 	my @iblobs = ();
 	foreach my $interface (@interfaces) {
+	    next
+		if (!defined($interface->switch_id()));
+		
 	    my $iblob = { "uuid"	=> $interface->uuid(),
 			  "iface"	=> $interface->iface(),
 			  "type"	=> $interface->type(),
 			  "card"	=> $interface->card(),
 			  "port"	=> $interface->port(),
 			  "role"	=> $interface->role(),
-			  "IP"		=> $interface->IP(),
-			  "mask"	=> $interface->mask(),
+			  "IP"		=> $interface->IP() || "",
+			  "mask"	=> $interface->mask() || "",
 			  "MAC"		=> $interface->mac(),
+			  "switch_id"   => "${OURDOMAIN}." . 
+			      $interface->switch_id(),
+			  "switch_card"	=> $interface->switch_card(),
+			  "switch_port"	=> $interface->switch_port(),
+			  "wire_type"	=> $interface->wire_type(),
 		      };
 
 	    push(@iblobs, $iblob);
@@ -505,6 +514,8 @@ sub RedeemTicket($)
 	}
     }
 
+    print Dumper($ticket->rspec());
+
     #
     # Now for each resource (okay, node) in the ticket create a sliver and
     # add it to the aggregate.
@@ -550,14 +561,11 @@ sub RedeemTicket($)
 	my $linkendpoints =
 	    $ticket->rspec()->{'link'}->{$linkname}->{'LinkEndPoints'};
 	
-	my $src_interface_spec = $linkendpoints->{'source_interface'};
-	my $dst_interface_spec = $linkendpoints->{'destination_interface'};
-
-	my @interfaces = ($src_interface_spec, $dst_interface_spec);
-	foreach my $iface (@interfaces) {
-	    my $node_uuid = $iface->{'node_uuid'};
-	    my $iface     = $iface->{'iface_name'};
-	    my $nodesliver= $slivers{$node_uuid};
+	foreach my $ifacename (keys(%{ $linkendpoints })) {
+	    my $iface      = $linkendpoints->{$ifacename};
+	    my $node_uuid  = $iface->{'node_uuid'};
+	    my $iface_name = $iface->{'iface_name'};
+	    my $nodesliver = $slivers{$node_uuid};
 	    if (!defined($nodesliver)) {
 		$message = "Link $linkname specifies a non-existent node";
 		goto bad;
@@ -567,9 +575,9 @@ sub RedeemTicket($)
 		$message = "Could not find node object for $node_uuid";
 		goto bad;
 	    }
-	    my $interface = Interface->LookupByIface($nodeobject, $iface);
+	    my $interface = Interface->LookupByIface($nodeobject, $iface_name);
 	    if (!defined($interface)) {
-		$message = "No such interface $iface on node $nodeobject";
+		$message = "No such interface $iface_name on node $nodeobject";
 		goto bad;
 	    }
 	    my $sliver = GeniSliver::Interface->Create($slice,
@@ -589,8 +597,9 @@ sub RedeemTicket($)
     }
 
     #
-    # Now do the provisioning (note that we actually allocated the node
-    # above when the ticket was granted). The add the sliver to the aggregate.
+    # Now do the provisioning (note that we actually allocated the
+    # node above when the ticket was granted). Then add the sliver to
+    # the aggregate.
     #
     foreach my $sliver (values(%slivers)) {
 	if (!$impotent && $sliver->Provision($extraargs) != 0) {
@@ -1059,4 +1068,67 @@ sub DeleteSlice($)
 				    "Could not cleanup slice");
     }
     return GeniResponse->Create(GENIRESPONSE_SUCCESS);
+}
+
+#
+# Split an aggregated sliver into its separate parts and return a list.
+#
+sub SplitSliver($)
+{
+    my ($argref) = @_;
+    my $cred        = $argref->{'credential'};
+    my $impotent    = $argref->{'impotent'};
+
+    $impotent = 0
+	if (!defined($impotent));
+
+    if (!defined($cred)) {
+	return GeniResponse->Create(GENIRESPONSE_BADARGS);
+    }
+    my $credential = GeniCredential->CreateFromSigned($cred);
+    if (!defined($credential)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not create GeniCredential object");
+    }
+    my $sliver_uuid = $credential->this_uuid();
+    my $user_uuid   = $credential->owner_uuid();
+    
+    #
+    # Make sure the credential was issued to the caller.
+    #
+    if ($credential->owner_uuid() ne $ENV{'GENIUUID'}) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "This is not your credential!");
+    }
+    my $user = GeniUser->Lookup($user_uuid);
+    if (!defined($user)) {
+	$user = CreateUserFromRegistry($user_uuid);
+	if (!defined($user)) {
+	    print STDERR "No user $user_uuid in the ClearingHouse\n";
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					"No user record for $user_uuid");
+	}
+    }
+
+    my $aggregate = GeniAggregate->Lookup($sliver_uuid);
+    if (!defined($aggregate)) {
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "No such aggregate $sliver_uuid");
+    }
+    my @sliver_list = ();
+    if ($aggregate->SliverList(\@sliver_list) != 0) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not get slivers for $aggregate");
+    }
+    my @credentials = ();
+
+    foreach my $sliver (@sliver_list) {
+	my $credential = $sliver->NewCredential($user);
+	if (!defined($credential)) {
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				"Could not create credential for $sliver");
+	}
+	push(@credentials, $credential->asString());
+    }
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS, \@credentials);
 }

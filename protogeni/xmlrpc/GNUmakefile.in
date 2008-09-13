@@ -40,7 +40,7 @@ install-scripts: $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-sa.pl \
 	$(SUDO) chown root $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-cm.pl
 	$(SUDO) chmod u+s  $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-cm.pl
 
-install: install-libs
+install: install-libs install-scripts
 
 control-install:
 
