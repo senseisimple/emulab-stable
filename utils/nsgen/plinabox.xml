@@ -10,7 +10,7 @@
     </description>
     <variable name="Count" default="2" descr="Number of nodes (not including PLC)" />
     <variable name="PLCHWType" default="pc3000" descr="Hardware Type for PLC" />
-    <variable name="HWType" default="pc" descr="Hardware Type for nodes" />
+    <variable name="HWType" default="plabpc" descr="Hardware Type for nodes" />
     <!-- This hard-codes the image name, but it seems like we have to do
          that somewhere... -->
     <variable name="ImageName" default="PLAB-PLC" descr = "Disk Image for PLC" />
@@ -29,6 +29,9 @@
 source tb_compat.tcl
 set ns [new Simulator]
 
+# Hack: node types plab pcs are known to work on
+tb-make-soft-vtype plabpc {pc850 pc2400c2}
+
 set num_pcs <Count />
 
 #
@@ -44,14 +47,13 @@ set privatePLC <PLCOnExpLAN />
 # 
 # Create the nodes
 #
-set lan_string ""
+set lan_string "$plc"
 for {set i 1} {$i <= $num_pcs} {incr i} { 
   set node($i) [$ns node]
   tb-set-node-plab-role $node($i) node
   tb-set-hardware $node($i) <HWType />
-  append lan_string "$node($i) "
+  append lan_string " $node($i)"
 }
-append lan_string "$plc "
 
 set lan [$ns make-lan $lan_string 100Mb 0ms]
 
