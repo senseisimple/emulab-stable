@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -328,9 +328,6 @@ else {
 	echo "If you do not receive
               email notification within a reasonable amount of time,
               please contact $TBMAILADDR.\n";
-
-	echo "<br><br>
-              While you are waiting, you can watch the log in realtime:<br>\n";
 	echo "</div>";
 	echo "<br>\n";
 	STARTLOG($experiment);
