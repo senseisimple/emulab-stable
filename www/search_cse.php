@@ -12,6 +12,10 @@ require("defs.php3");
 $optargs = OptionalPageArguments("submit",      PAGEARG_STRING,
 				 "query",       PAGEARG_STRING);
 
+if (!isset($query)) {
+    $query = "";
+}
+
 header("Location: http://www.google.com/cse?cx=007876920815929749329:hb-sxxwdr8y&ie=UTF-8&q=$query&sa=\"Search+Documentation\"");
 
 ?>
