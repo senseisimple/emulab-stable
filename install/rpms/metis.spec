@@ -13,8 +13,8 @@ Version:	%{version}
 Release:	%{release}
 Summary:	METIS is a set of serial programs for partitioning graphs, partitioning finite element meshes, and producing fill reducing orderings for sparse matrices.
 
-Group:		Programming
-License:	MIT
+Group:		Algorithms
+License:	Unknown
 URL:		%{url}
 Source:	      	%{name}-%{src_version}.tar.gz
 BuildRoot:	%{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
@@ -42,7 +42,7 @@ rm -rf $RPM_BUILD_ROOT
 mkdir -p  $RPM_BUILD_ROOT
 mkdir -p  $RPM_BUILD_ROOT/usr/bin
 mkdir -p  $RPM_BUILD_ROOT/usr/lib
-mkdir -p  $RPM_BUILD_ROOT/usr/include
+mkdir -p  $RPM_BUILD_ROOT/usr/include/metis
 
 install graphchk $RPM_BUILD_ROOT/usr/bin
 install kmetis $RPM_BUILD_ROOT/usr/bin
@@ -54,6 +54,12 @@ install partdmesh $RPM_BUILD_ROOT/usr/bin
 install partnmesh $RPM_BUILD_ROOT/usr/bin
 install pmetis $RPM_BUILD_ROOT/usr/bin
 install libmetis.a $RPM_BUILD_ROOT/usr/lib
+install -m 644 Lib/struct.h $RPM_BUILD_ROOT/usr/include/metis
+install -m 644 Lib/metis.h $RPM_BUILD_ROOT/usr/include/metis
+install -m 644 Lib/defs.h $RPM_BUILD_ROOT/usr/include/metis
+install -m 644 Lib/proto.h $RPM_BUILD_ROOT/usr/include/metis
+install -m 644 Lib/macros.h $RPM_BUILD_ROOT/usr/include/metis
+install -m 644 Lib/rename.h $RPM_BUILD_ROOT/usr/include/metis
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -63,8 +69,9 @@ rm -rf $RPM_BUILD_ROOT
 %doc Doc/manual.ps INSTALL CHANGES FILES VERSION
 /usr/bin/*
 /usr/lib/*
+/usr/include/metis/*
 
 %changelog
 
- * Mon Sep 09 2008 David Johnson <johnsond@cs.utah.edu> 
+ * Mon Sep 10 2008 David Johnson <johnsond@cs.utah.edu> 
    - initial version.
