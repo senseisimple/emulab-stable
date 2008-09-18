@@ -583,6 +583,7 @@ sub RedeemTicket($)
 	    my $sliver = GeniSliver::Interface->Create($slice,
 						       $owner->uuid(),
 						       $interface->uuid(),
+						       $node_uuid,
 			       $ticket->rspec()->{'link'}->{$linkname});
 	    if (!defined($sliver)) {
 		$message = "Could not create GeniSliver ".
@@ -753,6 +754,7 @@ sub DeleteSliver($)
     }
     my $sliver_uuid = $credential->this_uuid();
     my $user_uuid   = $credential->owner_uuid();
+    my @slivers     = ();
     
     #
     # Make sure the credential was issued to the caller.
@@ -764,21 +766,35 @@ sub DeleteSliver($)
     my $sliver = GeniSliver->Lookup($sliver_uuid);
     if (!defined($sliver)) {
 	# Might be an aggregate instead.
-	$sliver = GeniAggregate->Lookup($sliver_uuid);
-	if (!defined($sliver)) {
+	my $aggregate = GeniAggregate->Lookup($sliver_uuid);
+	if (!defined($aggregate)) {
 	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 				    "No such sliver/aggregate $sliver_uuid");
 	}
+	push(@slivers, $aggregate);
     }
-    if (!$impotent) {
-	$sliver->UnProvision() == 0 or
+    else {
+	# 
+	# Find dependent slivers first (say, links on a node). These
+	# have to be torn down first to prevent dangling vlans.
+	#
+	if ($sliver->DependentSlivers(\@slivers) != 0) {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				"Could not unprovision sliver/aggregate");
+					"Could not get DependentSlivers");
+	}
+	@slivers = (@slivers, $sliver);
     }
-    $sliver->Delete() == 0 or
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "Could not delete sliver/aggregate");
-    
+
+    foreach $sliver (@slivers) {
+	if (!$impotent) {
+	    $sliver->UnProvision() == 0 or
+		return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					    "Could not unprovision sliver");
+	}
+	$sliver->Delete() == 0 or
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					"Could not delete sliver");
+    }
     return GeniResponse->Create(GENIRESPONSE_SUCCESS);
 }
 
@@ -961,7 +977,26 @@ sub CleanupDeadSlice($)
 	print STDERR "Could not get dead aggregates for $slice.\n";
 	return -1;
     }
+    #
+    # Link aggregates first.
+    #
+    my @nonlinks = ();
+    
     foreach my $aggregate (@aggregates) {
+	if ($aggregate->type() ne "Link") {
+	    push(@nonlinks, $aggregate);
+	    next;
+	}
+	if ($aggregate->UnProvision() != 0) {
+	    print STDERR "Could not UnProvision $aggregate\n";
+	    return -1;
+	}
+	if ($aggregate->Delete() != 0) {
+	    print STDERR "Could not delete $aggregate\n";
+	    return -1;
+	}
+    }
+    foreach my $aggregate (@nonlinks) {
 	if ($aggregate->UnProvision() != 0) {
 	    print STDERR "Could not UnProvision $aggregate\n";
 	    return -1;

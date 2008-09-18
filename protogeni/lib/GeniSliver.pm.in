@@ -471,6 +471,39 @@ sub SliceSlivers($$$)
 }
 
 #
+# Find slivers "dependent" on this sliver, as for interfaces on nodes.
+#
+sub DependentSlivers($$)
+{
+    my ($self, $pref) = @_;
+
+    return -1
+	if (! (ref($self) && ref($pref)));
+    @$pref = ();
+
+    my $idx = $self->idx();
+    my $resource_uuid = $self->resource_uuid();
+
+    my $query_result =
+	DBQueryWarn("select idx from geni_slivers ".
+		    "where idx!='$idx' and resource_uuid='$resource_uuid'");
+    return -1
+	if (!$query_result);
+
+    my @result = ();
+    while (my ($idx) = $query_result->fetchrow_array()) {
+	my $sliver = GeniSliver->Lookup($idx);
+	if (!defined($sliver)) {
+	    print STDERR "Could not get sliver object for $idx\n";
+	    return -1;
+	}
+	push(@result, $sliver);
+    }
+    @$pref = @result;
+    return 0;
+}
+
+#
 # Create a signed credential for this sliver, issued to the provided user.
 # The credential will grant all permissions for now.
 #
@@ -583,6 +616,21 @@ sub SetAggregate($$)
 			 "  aggregate_uuid='$parent_uuid' ".
 			 "where idx='$idx'"));
 
+    return 0;
+}
+sub ClearAggregate($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $idx         = $self->idx();
+
+    return -1
+	if (!DBQueryWarn("update geni_slivers set ".
+			 "  aggregate_uuid=NULL ".
+			 "where idx='$idx'"));
     return 0;
 }
 sub GetAggregate($)
@@ -933,9 +981,10 @@ use Node;
 
 sub Create()
 {
-    my ($class, $slice, $user_uuid, $resource_uuid, $rspec) = @_;
+    my ($class, $slice, $user_uuid,
+	$interface_uuid, $resource_uuid, $rspec) = @_;
 
-    return GeniSliver->Create($slice, $user_uuid, $resource_uuid,
+    return GeniSliver->Create($slice, $user_uuid, $interface_uuid,
 			      $resource_uuid, "Interface", $rspec);
 }
 
@@ -954,19 +1003,34 @@ sub Provision($)
 }
 
 #
-# Unprovision a sliver. 
+# Unprovision a single interface from a link/lan. 
 #
 sub UnProvision($)
 {
     my ($self) = @_;
 
-    #
-    # This is actually implemented in GeniAggregate since currently "link"
-    # is the smallest entity; you cannot operate on an individual interface.
-    #
     return -1
 	if (! ref($self));
 
+    my $aggregate = $self->GetAggregate();
+    if (!defined($aggregate)) {
+	print STDERR "Could not find aggregate for $self\n";
+	return -1;
+    }
+
+    #
+    # This is terrible; we need an interface to remove ports form vlans,
+    # so that we do not have to tear down the entire vlan and recreate.
+    #
+    if ($aggregate->UnProvision() != 0) {
+	print STDERR "Could not unprovision $aggregate\n";
+	return -1;
+    }
+    $self->ClearAggregate();
+    if ($aggregate->Provision() != 0) {
+	print STDERR "Could not provision $aggregate\n";
+	return -1;
+    }
     return 0;
 }
 

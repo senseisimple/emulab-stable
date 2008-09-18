@@ -488,7 +488,25 @@ sub UnProvision($)
 	print STDERR "Could not get sliver list for $self\n";
 	return -1;
     }
+
+    #
+    # Might be an aggregate that includes link aggregates. Lets do those
+    # first to avoid work when tearing down the nodes.
+    #
+    my @nonlinks = ();
+
     foreach my $sliver (@slivers) {
+	if (! (ref($sliver) eq "GeniAggregate" and $sliver->type() eq "Link")){
+	    push(@nonlinks, $sliver);
+	    next;
+	}
+	if ($sliver->UnProvision() != 0) {
+	    print STDERR "Could not unprovision $sliver in $self\n";
+	    $sliver->SetStatus("broken");
+	    next;
+	}
+    }
+    foreach my $sliver (@nonlinks) {
 	if ($sliver->UnProvision() != 0) {
 	    print STDERR "Could not unprovision $sliver in $self\n";
 	    $sliver->SetStatus("broken");
@@ -550,7 +568,7 @@ sub Provision($;$)
     }
 
     foreach my $sliver (@slivers) {
-	my $interface = Interface->LookupByUUID($sliver->resource_uuid());
+	my $interface = Interface->LookupByUUID($sliver->uuid());
 	if (! defined($interface)) {
 	    print STDERR "Could not map $sliver to its interface object\n";
 	    goto bad;
@@ -598,7 +616,7 @@ sub UnProvision($)
 
     my $vlan = VLan->Lookup($experiment, $self->uuid());
     if (! defined($vlan)) {
-	print STDERR "Could not map self to its vlan object\n";
+	print STDERR "Could not map $self to its vlan object\n";
 	return -1;
     }
     if ($vlan->UnInstantiate() != 0) {
