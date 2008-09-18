@@ -8,6 +8,9 @@ require("defs.php3");
 
 $optargs = OptionalPageArguments("stayhome", PAGEARG_BOOLEAN);
 
+# Temp for In Memorium.
+$stayhome = 1;
+
 #
 # The point of this is to redirect logged in users to their My Emulab
 # page. 
@@ -59,6 +62,26 @@ if ($message != "") {
 }
 
 ?>
+<hr>
+<blockquote><p>
+<center><b><font color=red size=+1>In Memoriam</font></b></center>
+We are
+<a href='http://www.legacy.com/saltlaketribune/Obituaries.asp?Page=Lifestory&PersonId=117597321'>sad to report</a>
+that Jay Lepreau, Research Professor and Director 
+of the Flux Research Group, passed away Monday morning Sept 15th due to
+complications of cancer. Jay was an enthusiastic and productive
+researcher, a dedicated mentor of students and staff, and an avid
+participant in recreational activities such as music and outdoor
+sports. His loss will be felt by all who knew him, both  within the
+computer science community and elsewhere. 
+</p>
+<p>
+Please be assured that we plan to carry on the vision for Emulab that 
+we shared with Jay, and that operation and development of the Utah
+Emulab facility and the Emulab software will continue.
+</p>
+</blockquote>
+<hr>
 
 <p>
     <em>Emulab</em> is a network testbed, giving researchers a wide range of
