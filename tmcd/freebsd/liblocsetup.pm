@@ -56,6 +56,7 @@ $DF		= "/bin/df";
 $EGREP		= "/usr/bin/egrep -s -q";
 $NFSMOUNT	= "/sbin/mount -o -b ";
 $LOOPBACKMOUNT	= "/sbin/mount -t null ";
+$MOUNT		= "/sbin/mount";
 $UMOUNT		= "/sbin/umount";
 $TMPASSWD	= "$ETCDIR/master.passwd";
 $SFSSD		= "/usr/local/sbin/sfssd";
@@ -596,9 +597,20 @@ sub os_islocaldir($)
     my ($dir) = @_;
     my $rv = 0; 
 
-    my @dfoutput = `$DF -l $dir 2>/dev/null`;
-    if (grep(!/^filesystem/i, @dfoutput) > 0) {
-	$rv = 1;
+    #
+    # XXX 'df -l' doesn't do the right thing on older FreeBSD
+    # so we compare what df returns to the mount table.  If the current
+    # hack doesn't work, we will now err on the safe side and say the
+    # homedir is remote, since our caller only gets destructive if the
+    # homedir is local.
+    #
+    my $dfoutput = `$DF -l $dir | grep -v -i filesystem 2>/dev/null`;
+    my $mdev = (split('\s+', $dfoutput))[0];
+    if ($mdev) {
+	my $mountout = `$MOUNT | grep $mdev`;
+	if ($mountout && $mountout ne "" && $mountout !~ /\(nfs/) {
+	    $rv = 1;
+	}
     }
     return $rv;
 }
@@ -614,7 +626,7 @@ sub os_getnfsmounts($)
     #
     # Grab the output of the mount command and parse. 
     #
-    if (! open(MOUNT, "/sbin/mount|")) {
+    if (! open(MOUNT, "$MOUNT|")) {
 	print "os_getnfsmounts: Cannot run mount command\n";
 	return -1;
     }
