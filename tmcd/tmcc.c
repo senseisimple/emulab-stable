@@ -31,6 +31,7 @@ typedef int socklen_t;
 #endif /* __CYGWIN__ */
 #include <stdarg.h>
 #include <stdlib.h>
+#include <ctype.h>
 #include <string.h>
 #include <sys/time.h>
 #include <sys/stat.h>
@@ -243,7 +244,6 @@ main(int argc, char **argv)
 	if (getenv("TMCCNOSSL") != NULL)
 		nousessl = 1;
 #endif
-
 	if (!bossnode) {
 		int	port = 0;
 		
@@ -380,6 +380,7 @@ main(int argc, char **argv)
 		n = dotcp(buf, fileno(stdout), serverip);
 	if (waitfor)
 		alarm(0);
+	fflush(stderr);
 	exit(n);
 }
 
@@ -473,6 +474,7 @@ dotcp(char *data, int outfd, struct in_addr serverip)
 	int			n, sock, cc;
 	struct sockaddr_in	name;
 	char			*bp, buf[MYBUFSIZE];
+	int			redirectlimit = 5;
 	
 #ifdef  WITHSSL
 	if (!nousessl && tmcd_client_sslinit()) {
@@ -480,6 +482,7 @@ dotcp(char *data, int outfd, struct in_addr serverip)
 		return -1;
 	}
 #endif
+ again:
 	while (1) {
 		for (n = 0; n < numports; n++) {
 			/* Create socket from which to read. */
@@ -553,6 +556,31 @@ dotcp(char *data, int outfd, struct in_addr serverip)
 				goto bad;
 			}
 			break;
+		}
+		if (strncmp(buf, "REDIRECT=", strlen("REDIRECT=")) == 0) {
+			struct hostent	*he;
+			static int rewritecommand(char *, char *, char **);
+
+			redirectlimit--;
+			if (redirectlimit == 0) {
+				fprintf(stderr, "Redirect limit reached\n");
+				goto bad;
+			}
+			buf[cc] = '\0';
+			if (rewritecommand(buf, data, &bp)) {
+				goto bad;
+			}
+			he = gethostbyname(bp);
+			if (he)
+				memcpy((char *)&serverip,
+				       he->h_addr, he->h_length);
+			else {
+				fprintf(stderr,
+					"gethostbyname(%s) failed\n", buf); 
+				goto bad;
+			}
+			CLOSE(sock);
+			goto again;
 		}
 		progress += cc;
 		if (dooutput(outfd, buf, cc) < 0)
@@ -850,7 +878,6 @@ beproxy(char *localpath, struct in_addr serverip, char *partial)
 			rval = dotcp(command, newsock, serverip);
 		if (waitfor)
 			alarm(0);
-		
 		if (rval < 0 && debug) {
 			fprintf(stderr, "Request failed!\n");
 			fflush(stderr);
@@ -885,4 +912,39 @@ dooutput(int fd, char *buf, int len)
 		count -= cc;
 	}
 	return len;
+}
+
+static int
+rewritecommand(char *redirect, char *command, char **server)
+{
+	char	*bp;
+	char	buf[MAXTMCDPACKET];
+			
+	bp = strchr(redirect, '\n');
+	if (bp)
+		*bp = (char) NULL;
+	bp = strchr(redirect, '=');
+	if (!bp)
+		return -1;
+	bp++;
+	*server = bp;
+
+	bp = strchr(bp, ':');
+	if (!bp)
+		return 0;
+	*bp++ = (char) NULL;
+
+	sprintf(buf, "VNODEID=%s ", bp);
+
+	bp = command;
+	if (strncmp(bp, "VNODEID=", strlen("VNODEID=")) == 0) {
+		bp = strchr(bp, ' ');
+		if (!bp)
+			return -1;
+		bp++;
+	}
+	strncat(buf, bp, sizeof(buf) - strlen(buf));
+	strcpy(command, buf);
+	fprintf(stderr, "%s, %s\n", command, *server);
+	return 0;
 }
