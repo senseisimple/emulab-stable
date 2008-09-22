@@ -39,7 +39,7 @@ earliest time one of the steps needs to occur.
 	  to avoid locking the log table for too long.  Thus it will
           take a while for it to get caught up.
 
-20080905: Anytime
+20080905: After install.
 
 	  For the moment, all testbeds will redirect documentation to
           emulab.net. In the near future we will make a documentation
@@ -49,6 +49,12 @@ earliest time one of the steps needs to occur.
 		ops> cat > /usr/local/www/data/wikidocs/.htaccess
 		     Redirect /wikidocs http://users.emulab.net/trac/emulab
 		     ^D
+
+	  And on your boss node:
+
+		boss> cat > /usr/testbed/www/wikidocs/.htaccess
+		      Redirect /wikidocs https://users.emulab.net/trac/emulab
+		      ^D
 
 20080805: Optional, After install.
 
