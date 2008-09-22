@@ -5052,6 +5052,16 @@ COMMAND_PROTOTYPE(dojailconfig)
 		return 0;
 
 	/*
+	 * geni nodes get something completely different. 
+	 */
+	if (reqp->genisliver_idx) {
+		OUTPUT(bufp, sizeof(buf),
+		       "EVENTSERVER=\"event-server.%s\"\n", OURDOMAIN);
+		client_writeback(sock, buf, strlen(buf), tcp);
+		return 0;
+	}
+
+	/*
 	 * Get the portrange for the experiment. Cons up the other params I
 	 * can think of right now. 
 	 */
@@ -5108,8 +5118,10 @@ COMMAND_PROTOTYPE(dojailconfig)
 		       "IPFW=1\n"
 		       "IPDIVERT=1\n"
 		       "ROUTING=%d\n"
-		       "DEVMEM=%d\n",
-		       low, high, atoi(row[0]), reqp->islocal, reqp->islocal);
+		       "DEVMEM=%d\n"
+		       "EVENTSERVER=\"event-server.%s\"\n",
+		       low, high, atoi(row[0]), reqp->islocal, reqp->islocal,
+		       OURDOMAIN);
 
 	client_writeback(sock, buf, strlen(buf), tcp);
 	mysql_free_result(res);
