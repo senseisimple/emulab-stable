@@ -2189,10 +2189,11 @@ COMMAND_PROTOTYPE(doaccounts)
 
 		/*
 		 * widearearoot and wideareajailroot override trust values
-		 * from the project (above). Of course, tbadmin overrides
-		 * everthing!
+		 * from the project (above) (IF the node is not isdedicatedwa,
+		 * since these must behave like local). Of course, tbadmin
+		 * overrides everthing!
 		 */
-		if (!reqp->islocal && !reqp->isplabdslice) {
+		if (!reqp->islocal && !reqp->isdedicatedwa && !reqp->isplabdslice) {
 			if (!reqp->isvnode)
 				root = atoi(row[14]);
 			else
