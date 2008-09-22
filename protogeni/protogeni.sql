@@ -100,6 +100,7 @@ CREATE TABLE `geni_slices` (
   `hrn` varchar(256) NOT NULL default '',
   `idx` mediumint(8) unsigned NOT NULL default '0',
   `uuid` varchar(40) NOT NULL default '',
+  `exptidx` int(11) default NULL,
   `created` datetime default NULL,
   `creator_uuid` varchar(40) NOT NULL default '',
   `name` tinytext,
@@ -117,6 +118,8 @@ DROP TABLE IF EXISTS `geni_slivers`;
 CREATE TABLE `geni_slivers` (
   `idx` mediumint(8) unsigned NOT NULL default '0',
   `uuid` varchar(40) NOT NULL default '',
+  `hrn` varchar(256) NOT NULL default '',
+  `name` varchar(256) NOT NULL default '',
   `slice_uuid` varchar(40) NOT NULL default '',
   `creator_uuid` varchar(40) NOT NULL default '',
   `resource_uuid` varchar(40) NOT NULL default '',
@@ -125,7 +128,7 @@ CREATE TABLE `geni_slivers` (
   `credential_idx` int(10) unsigned default NULL,
   `component_uuid` varchar(40) default NULL,
   `aggregate_uuid` varchar(40) default NULL,
-  `status` enum('ready','broken') NOT NULL default 'ready',
+  `status` enum('created','ready','broken') NOT NULL default 'created',
   `rspec_string` text,
   PRIMARY KEY  (`idx`),
   UNIQUE KEY `uuid` (`uuid`),
@@ -138,6 +141,8 @@ CREATE TABLE `geni_slivers` (
 DROP TABLE IF EXISTS `geni_aggregates`;
 CREATE TABLE `geni_aggregates` (
   `idx` mediumint(8) unsigned NOT NULL default '0',
+  `hrn` varchar(256) NOT NULL default '',
+  `name` varchar(256) NOT NULL default '',
   `uuid` varchar(40) NOT NULL default '',
   `type` varchar(40) NOT NULL default '',
   `slice_uuid` varchar(40) NOT NULL default '',
@@ -147,7 +152,7 @@ CREATE TABLE `geni_aggregates` (
   `ticket_idx` int(10) unsigned default NULL,
   `component_idx` int(10) unsigned NOT NULL default '0',
   `aggregate_idx` int(10) unsigned default NULL,
-  `status` enum('ready','broken') NOT NULL default 'ready',
+  `status` enum('created','ready','broken') NOT NULL default 'created',
   PRIMARY KEY  (`idx`),
   UNIQUE KEY `uuid` (`uuid`),
   INDEX `slice_uuid` (`slice_uuid`)
@@ -159,12 +164,13 @@ CREATE TABLE `geni_aggregates` (
 DROP TABLE IF EXISTS `geni_tickets`;
 CREATE TABLE `geni_tickets` (
   `idx` mediumint(8) unsigned NOT NULL default '0',
+  `ticket_uuid` varchar(40) NOT NULL default '',
   `owner_uuid` varchar(40) NOT NULL default '',
   `slice_uuid` varchar(40) NOT NULL default '',
   `created` datetime default NULL,
   `redeem_before` datetime default NULL,
   `valid_until` datetime default NULL,
-  `component_idx` int(10) unsigned NOT NULL default '0',
+  `component_uuid` varchar(40) NOT NULL default '',
   `seqno` int(10) unsigned NOT NULL default '0',
   `ticket_string` text,
   PRIMARY KEY  (`idx`), 
@@ -179,6 +185,7 @@ CREATE TABLE `geni_tickets` (
 DROP TABLE IF EXISTS `geni_credentials`;
 CREATE TABLE `geni_credentials` (
   `idx` mediumint(8) unsigned NOT NULL default '0',
+  `uuid` varchar(40) NOT NULL default '',
   `owner_uuid` varchar(40) NOT NULL default '',
   `this_uuid` varchar(40) NOT NULL default '',
   `created` datetime default NULL,

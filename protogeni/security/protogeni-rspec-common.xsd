@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" targetNamespace="http://www.protogeni.net/resources/credential/0.1" xmlns:sig="http://www.w3.org/2000/09/xmldsig#" xmlns:credential="http://www.protogeni.net/resources/credential/0.1">
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" xmlns:sig="http://www.w3.org/2000/09/xmldsig#">
   <xs:include schemaLocation="top.xsd"/>
   <xs:import namespace="http://www.w3.org/2000/09/xmldsig#" schemaLocation="sig.xsd"/>
   <xs:import namespace="http://www.w3.org/XML/1998/namespace" schemaLocation="xml.xsd"/>
@@ -18,9 +18,9 @@
   <!-- Add some more stuff to nodes -->
   <xs:complexType name="NodeContents">
     <xs:sequence>
-      <xs:group ref="credential:NodeSpec.NodeType"/>
-      <xs:element minOccurs="0" ref="credential:available"/>
-      <xs:element minOccurs="0" ref="credential:component_manager_URL"/>
+      <xs:group ref="NodeSpec.NodeType"/>
+      <xs:element minOccurs="0" ref="available"/>
+      <xs:element minOccurs="0" ref="component_manager_URL"/>
     </xs:sequence>
     <xs:attribute name="uuid" use="required"/>
     <xs:attribute name="name"/>
@@ -38,13 +38,13 @@
   <xs:element name="available" type="xs:boolean"/>
   <xs:complexType name="LinkContents">
     <xs:sequence>
-      <xs:group ref="credential:LinkEndPoints"/>
-      <xs:group ref="credential:LinkCharacteristics">
+      <xs:group ref="LinkEndPoints"/>
+      <xs:group ref="LinkCharacteristics">
         <xs:annotation>
           <xs:documentation>The characteristics (bandwidth, latency, loss) which affect traffic.</xs:documentation>
         </xs:annotation>
       </xs:group>
-      <xs:group ref="credential:LinkSpec.LinkType"/>
+      <xs:group ref="LinkSpec.LinkType"/>
     </xs:sequence>
     <xs:attribute name="uuid" use="required"/>
     <xs:attribute name="name"/>
@@ -52,8 +52,8 @@
   <!-- TODO: Might add a URL for the CM for a link in the future -->
   <xs:complexType name="InterfaceContents">
     <xs:sequence>
-      <xs:element ref="credential:node_uuid"/>
-      <xs:element minOccurs="0" ref="credential:node_name"/>
+      <xs:element ref="node_uuid"/>
+      <xs:element minOccurs="0" ref="node_name"/>
       <xs:element name="interface" type="xs:string"/>
     </xs:sequence>
   </xs:complexType>
@@ -63,8 +63,8 @@
   <xs:element name="rspec">
     <xs:complexType>
       <xs:choice minOccurs="0" maxOccurs="unbounded">
-        <xs:element ref="credential:node"/>
-        <xs:element ref="credential:link"/>
+        <xs:element ref="node"/>
+        <xs:element ref="link"/>
       </xs:choice>
       <xs:attribute name="generated" use="required" type="xs:dateTime"/>
       <xs:attribute name="valid_until" use="required" type="xs:dateTime"/>

@@ -678,7 +678,7 @@ sub Create($$$$$)
     my $experiment = $slice->GetExperiment();
     if (!defined($experiment)) {
 	print STDERR "Could not map $slice to its experiment\n";
-	return -1;
+	return undef;
     }
 
     #
@@ -689,17 +689,17 @@ sub Create($$$$$)
     my $node = Node->Lookup($resource_uuid);
     if (!defined($node)) {
 	print STDERR "Could not map node $resource_uuid to its object\n";
-	return -1;
+	return undef;
     }
     my $reservation = $node->Reservation();
     if (!defined($reservation)) {
 	print STDERR "$node was already released from $slice\n";
-	return -1;
+	return undef;
     }
     if (! $reservation->SameExperiment($experiment)) {
 	print STDERR "$node is reserved to another, not $reservation\n";
 	# Signal error so we can look at what happened.
-	return -1;
+	return undef;
     }
     
     #
@@ -719,7 +719,7 @@ sub Create($$$$$)
 				"nodeid"   => $node->node_id(),
 				"verbose"  => 1 }) < 0) {
 	    print STDERR "Could not create fake jail node on $node\n";
-	    return -1;
+	    return undef;
 	}
 	my $vnode = Node->Lookup($vnodes[0]);
 	$uuid = $vnode->uuid();

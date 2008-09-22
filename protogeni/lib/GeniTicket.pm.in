@@ -98,6 +98,8 @@ sub Create($$$$)
     
     my $self = {};
     $self->{'rspec'}         = $rspec;
+    $self->{'ticket_cert'}   = undef;
+    $self->{'ticket_uuid'}   = undef;
     $self->{'slice_uuid'}    = $slice->uuid();
     $self->{'owner_uuid'}    = $owner->uuid();
     $self->{'slice_cert'}    = $slice->cert();
@@ -129,6 +131,8 @@ sub slice_uuid($)	{ return field($_[0], "slice_uuid"); }
 sub owner_uuid($)	{ return field($_[0], "owner_uuid"); }
 sub slice_cert($)	{ return field($_[0], "slice_cert"); }
 sub owner_cert($)	{ return field($_[0], "owner_cert"); }
+sub ticket_cert($)	{ return field($_[0], "ticket_cert"); }
+sub ticket_uuid($)	{ return field($_[0], "ticket_uuid"); }
 sub ticket($)		{ return field($_[0], "ticket"); }
 sub asString($)		{ return field($_[0], "ticket_string"); }
 sub ticket_string($)	{ return field($_[0], "ticket_string"); }
@@ -200,9 +204,23 @@ sub CreateFromSignedTicket($$;$$)
     my $rspec = XMLin($rspec_node->toString(), ForceArray => ["node",
 							      "link"]);
 
+    # Dig out the ticket uuid.
+    my ($uuid_node) = $doc->getElementsByTagName("uuid");
+    return undef
+	if (!defined($uuid_node));
+    my $ticket_cert = $uuid_node->to_literal();
+    my $ticket_uuid;
+    GeniCertificate->CertificateInfo($ticket_cert, \$ticket_uuid) == 0
+	or return undef;
+
+    if (! ($ticket_uuid =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/)) {
+	print STDERR "Invalid uuid in ticket\n";
+	return undef;
+    }
+
     # Dig out the slice uuid. Locally, I am not sure if we bother to
     # keep slices in the DB (they are in the DB at geni central).
-    my ($uuid_node) = $doc->getElementsByTagName("this_uuid");
+    my ($uuid_node) = $doc->getElementsByTagName("target_uuid");
     return undef
 	if (!defined($uuid_node));
     my $slice_cert = $uuid_node->to_literal();
@@ -243,6 +261,8 @@ sub CreateFromSignedTicket($$;$$)
     my $self = {};
     $self->{'idx'}           = undef;
     $self->{'rspec'}         = $rspec;
+    $self->{'ticket_cert'}   = $ticket_cert;
+    $self->{'ticket_uuid'}   = $ticket_uuid;
     $self->{'slice_uuid'}    = $slice_uuid;
     $self->{'owner_uuid'}    = $owner_uuid;
     $self->{'slice_cert'}    = $slice_cert;
@@ -284,8 +304,11 @@ sub Delete($)
 	if (! ref($self));
 
     if ($self->stored()) {
-	my $idx = $self->idx();
+	my $idx  = $self->idx();
+	my $uuid = $self->ticket_uuid();
 	
+	DBQueryWarn("delete from geni_certificates where uuid='$uuid'")
+	    or return -1;
 	DBQueryWarn("delete from geni_tickets where idx='$idx'")
 	    or return -1;
 	
@@ -323,6 +346,7 @@ sub Store($)
     my $seqno      = $self->seqno();
     my $slice_uuid = $self->slice_uuid();
     my $owner_uuid = $self->owner_uuid();
+    my $ticket_uuid= $self->ticket_uuid();
 
     #
     # For a locally created/signed ticket, seqno=idx. For a ticket from
@@ -341,6 +365,7 @@ sub Store($)
     push(@insert_data, "created=now()");
     push(@insert_data, "idx='$idx'");
     push(@insert_data, "seqno='$seqno'");
+    push(@insert_data, "ticket_uuid='$ticket_uuid'");
     push(@insert_data, "slice_uuid='$slice_uuid'");
     push(@insert_data, "owner_uuid='$owner_uuid'");
     
@@ -375,6 +400,18 @@ sub Sign($)
     $rspec_xml =~ s/opt\>/rspec\>/g;
 
     #
+    # Every ticket/credential its own uuid (certificate).
+    #
+    my $certificate = GeniCertificate->Create("ticket");
+    if (!defined($certificate)) {
+	print STDERR "Could not generate new certificate for $self!\n";
+	return -1;
+    }
+    $self->{'ticket_cert'}   = $certificate->cert();
+    $self->{'ticket_uuid'}   = $certificate->uuid();
+    my $ticket_cert = $certificate->cert();
+
+    #
     # Create a template xml file to sign.
     #
     my $template =
@@ -384,11 +421,12 @@ sub Sign($)
 	" <serial>$idx</serial>\n".
 	" <owner_uuid>$owner_cert</owner_uuid>\n".
 	" <target_uuid>$slice_cert</target_uuid>\n".
-	" <this_uuid>$slice_cert</this_uuid>\n".
+	" <uuid>$ticket_cert</uuid>\n".
 	" <hrn>$hrn</hrn>\n".
 	" <expires>2008-05-10T09:00:00</expires>\n".
 	" <ticket>\n".
 	"  <can_delegate>1</can_delegate>\n".
+	"  <redeem_before>2008-05-10T09:00:00</redeem_before>\n".
 	"  $rspec_xml\n".
 	" </ticket>\n".	
         "</credential>\n";

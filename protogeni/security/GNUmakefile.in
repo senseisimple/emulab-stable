@@ -14,7 +14,8 @@ include $(OBJDIR)/Makeconf
 SBIN_STUFF	= signgenicred verifygenicred
 LIBEXEC_STUFF	= 
 CTRLSBIN_STUFF  =
-LIBFILES        = credential.xsd sig.xsd xml.xsd
+LIBFILES        = credential.xsd sig.xsd xml.xsd top.xsd \
+		  protogeni-rspec-common.xsd
 
 # These scripts installed setuid, with sudo. 
 SETUID_BIN_SCRIPTS   = 
