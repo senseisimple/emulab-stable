@@ -5048,9 +5048,6 @@ COMMAND_PROTOTYPE(dojailconfig)
 		/* Silent error is fine */
 		return 0;
 	}
-	if (!reqp->jailflag)
-		return 0;
-
 	/*
 	 * geni nodes get something completely different. 
 	 */
@@ -5060,6 +5057,8 @@ COMMAND_PROTOTYPE(dojailconfig)
 		client_writeback(sock, buf, strlen(buf), tcp);
 		return 0;
 	}
+	if (!reqp->jailflag)
+		return 0;
 
 	/*
 	 * Get the portrange for the experiment. Cons up the other params I
