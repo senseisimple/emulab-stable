@@ -13,7 +13,7 @@ use Math::BigInt;
 sub usage()
 {
     print("Usage: ptopgen [-v] [-s switch] [-p pid [-e eid]] [-m factor] " .
-	  "[-n c/e]\n".
+	  "[-n c/e] [-x]\n".
 	  "       -p include nodes the project has permission to use\n".
 	  "       -e include given experiments resources\n" .
 	  "          in the ptopfile (as if they were free)\n" .
@@ -24,10 +24,12 @@ sub usage()
 	  "       -m Override multiplex_factor\n".
 	  "       -u Prune unused interfaces of allocated nodes (-e)\n".
 	  "       -c Delay capacity override\n".
-	  "       -n Add in modelnet core and edge node features\n");
+	  "       -n Add in modelnet core and edge node features\n".
+	  "       -x Output into the new xml ptop format.\n");
     exit(-1);
 }
-my $optlist = "s:e:m:vp:rSan:c:u";
+
+my $optlist = "s:e:m:vp:rSan:c:ux";
 my $mfactor;
 my $virtstuff = 0;
 my $widearea  = 0;
@@ -89,6 +91,8 @@ my $pid;
 my $exempt_eid;
 my $switchtouse;
 
+my $do_xml = 0;
+
 #
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
@@ -141,6 +145,12 @@ if (defined($options{"e"})) {
     usage()
 	if (!defined($pid));
 }
+if (defined($options{"x"})) {
+    $do_xml = 1;
+    print "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+    print "<ptop testbed=\"@THISHOMEBASE@\" "
+	. "xmlns=\"http://emulab.net/resources/ptop/0.1\">\n";
+}
 usage()
     if ($prune && !defined($exempt_eid));
 
@@ -174,6 +184,10 @@ while (my ($class,$type,$isvirt) = $result->fetchrow_array) {
 # Read node_startloc
 $result = DBQueryFatal("select node_id,building from node_startloc");
 while (($node,$building) = $result->fetchrow_array) {
+    # TODO: This screws up the meaning of the @features list. Now it
+    # is not just a list of feature strings, but a list of strings
+    # which might themselves be space-delimited lists of feature
+    # strings. Fix this.
     $areamap{$node} .= " area-$building:0";
 }
 
@@ -294,7 +308,11 @@ while (my ($osid) = $result->fetchrow()) {
 
 # Print switches
 if (defined($switchtouse)) {
-    print "node $switchtouse switch:1 *lan:*\n";
+    if ($do_xml) {
+	print_switch($switchtouse);
+    } else {
+	print "node $switchtouse switch:1 *lan:*\n";
+    }
     $switches{$switchtouse} = 1;
 }
 else {
@@ -303,7 +321,11 @@ else {
 		     "where role='testswitch' or role='widearea_switch'");
 
     while (($switch) = $result->fetchrow_array) {
-	print "node $switch switch:1 *lan:*\n";
+	if ($do_xml) {
+	    print_switch($switch);
+	} else {
+	    print "node $switch switch:1 *lan:*\n";
+	}
 	$switches{$switch} = 1;
     }
 }
@@ -621,11 +643,17 @@ foreach $node (keys(%nodes)) {
 	push @flags, "subnode_of:$subnode_of{$node}";
     }
 
-    my $text = "node $node " . join(" ",@types) . " - " . join(" ",@features) .
-	" - " . join(" ",@flags);
-
-
-    print "$text\n";
+    if ($do_xml) {
+        print "<node name=\"$node\">\n";
+	print_node_types(@types);
+	print_node_flags(@flags);
+	print_node_features(split(" ", join(" ",@features)));
+	print "</node>\n\n";
+    } else {
+	my $text = "node $node " . join(" ",@types) .
+	    " - " . join(" ",@features) . " - " . join(" ",@flags);
+	print "$text\n";
+    }
 }
 
 #
@@ -652,7 +680,14 @@ if ($widearea) {
     #
     my $fake_inet_switch = "internet";
     my @inet_protos = ("ipv4");
-    print "node $fake_inet_switch ", join(" ",map("*$_:*",@inet_protos)), "\n";
+    if ($do_xml) {
+	print "<node name=\"$fake_inet_switch\">\n";
+	print_node_types(map("*$_:*", @inet_protos));
+	print "</node>\n\n";
+    } else {
+	print("node $fake_inet_switch ",
+	      join(" ",map("*$_:*",@inet_protos)), "\n");
+    }
     
     #
     # Note - there is currently an assumption in this query that widearea nodes
@@ -767,11 +802,18 @@ if ($widearea) {
 	    push @features, "bwlimit:0";
         }
 
-	my $text = "node $physnode " .
-	           join(" ",@types) . " - " . join(" ",@features) .
-		   " - " . join(" ",@flags);
-
-	print "$text\n";
+	if ($do_xml) {
+	    print "<node name=\"$physnode\">\n";
+	    print_node_types(@types);
+	    print_node_flags(@flags);
+	    print_node_features(@features);
+	    print "</node>\n";
+	} else {
+	    my $text = "node $physnode " .
+		join(" ",@types) . " - " . join(" ",@features) .
+		" - " . join(" ",@flags);
+	    print "$text\n";
+	}
 
         #
         # Print out a link to the 'internet'.
@@ -779,10 +821,16 @@ if ($widearea) {
         # could put something real in there.
         #
         if ($iface) {
-            print "link link-$physnode:$iface-$fake_inet_switch:(null) ".
-                "$physnode:$physnode/$iface $fake_inet_switch:(null) " .
-                "100000 0 0 1 ".
-                join(" ",@inet_protos). "\n";
+	    if ($do_xml) {
+		print_simple_link($physnode, $iface,
+				  $fake_inet_switch, "(null)",
+				  100000, 0, 0, @inet_protos);
+	    } else {
+		print "link link-$physnode:$iface-$fake_inet_switch:(null) ".
+		    "$physnode:$physnode/$iface $fake_inet_switch:(null) " .
+		    "100000 0 0 1 ".
+		    join(" ",@inet_protos). "\n";
+	    }
         }
 
 	# Insert into nodes array in case there are wires entries.
@@ -903,8 +951,15 @@ while (($node1,$card1,$port1,$node2,$card2,$port2) =
             }
             push @types, "$basetype-$bw";
 
-	    print "link link-$node1:$iface1-$node2:$iface2 $node1:$node1/$iface1" .
-		" $node2:$iface2 $bw 0 0 1 " . join(" ",@types) . "\n";
+	    if ($do_xml) {
+		print_simple_link($node1, $iface1,
+				  $node2, $iface2,
+				  $bw, 0, 0, @types);
+	    } else {
+		print "link link-$node1:$iface1-$node2:$iface2" .
+		    " $node1:$node1/$iface1" .
+		    " $node2:$iface2 $bw 0 0 1 " . join(" ",@types) . "\n";
+	    }
 	}
     } 
 }
@@ -972,13 +1027,22 @@ if ($TRACK_INTERSWITCH_BANDWIDTH) {
     }
 }
 
+# TODO: Figure out how to actually add interconnect interfaces rather than
+#       just having them be (null).
 foreach $interconnect (keys(%interconnects)) {
     ($src,$dst) = split(":",$interconnect);
     my $speed = $interconnects{$interconnect};
     # This is really dumb - BigInts like to print out with a leading '+',
     # which we don't want. Stript it off.
     $speed =~ s/^\+|-//;
-    print "link link-$interconnect $src $dst $speed 0 0 1 ethernet\n";
+    if ($do_xml) {
+	print_named_link("link-$interconnect",
+			 $src, "(null)",
+			 $dst, "(null)",
+			 $speed, 0, 0, "ethernet");
+    } else {
+	print "link link-$interconnect $src $dst $speed 0 0 1 ethernet\n";
+    }
 }
 
 #
@@ -986,7 +1050,13 @@ foreach $interconnect (keys(%interconnects)) {
 #
 my @wireless_protos = ("80211", "80211a", "80211b", "80211g", "flex900");
 my $fake_switch = "airswitch";
-print "node $fake_switch ", join(" ",map("*$_:*",@wireless_protos)), "\n";
+if ($do_xml) {
+    print "<node name=\"$fake_switch\">\n";
+    print_node_types(map("*$_:*", @wireless_protos));
+    print "</node>\n\n";
+} else {
+    print "node $fake_switch ", join(" ",map("*$_:*",@wireless_protos)), "\n";
+}
 
 foreach my $interface (keys(%interfacetypes)) {
     my ($node,$card,$port) = split(":", $interface);
@@ -1029,9 +1099,19 @@ foreach my $interface (keys(%interfacetypes)) {
 	    $max_bw = $ifacebw;
 	}
     }
-    print "link link-$node:$iface-$fake_switch:(null) ".
-	"$node:$node/$iface $fake_switch:(null) $max_bw 0 0 1 ".
-	join(" ",@intersection). "\n";
+    if ($do_xml) {
+	print_simple_link($node, $iface,
+			$fake_switch, "(null)",
+			$max_bw, 0, 0, @intersection);
+    } else {
+	print "link link-$node:$iface-$fake_switch:(null) ".
+	    "$node:$node/$iface $fake_switch:(null) $max_bw 0 0 1 ".
+	    join(" ",@intersection). "\n";
+    }
+}
+
+if ($do_xml) {
+    print "</ptop>\n";
 }
 
 exit(0);
@@ -1084,4 +1164,133 @@ sub get_ifacecardport {
     } else {
 	return ();
     }
+}
+
+######################################################################
+# Functions for printing XML
+######################################################################
+
+# The order print_node_types(), print_node_features(),
+# print_node_flags() must always be observed lest we break the schema.
+sub print_node_types
+{
+    my $i = 0;
+    for (; $i < scalar(@_); ++$i) {
+	my ($name, $count) = split(/:/, $_[$i], 2);
+	my $is_static = 0;
+	if ($name =~ /^\*/) {
+	    $name = substr($name, 1);
+	    $is_static = 1;
+	}
+	print "  <node_type>\n";
+	print "    <type_name>$name</type_name>\n";
+	if ($count eq "*") {
+	    print "    <unlimited/>\n";
+	} else {
+	    print "    <type_slots>$count</type_slots>\n";
+	}
+	if ($is_static) {
+	    print "    <static/>\n";
+	}
+	print "  </node_type>\n";
+    }
+}
+
+sub print_node_features
+{
+    my $i = 0;
+    for (; $i < scalar(@_); ++$i) {
+	my ($name, $value) = split(/:/, $_[$i], 2);
+	my $flags = "    ";
+	if ($value >= 1.0) {
+	    $flags .= "<violatable/>";
+	}
+	if ($name =~ /^\?\+/) {
+	    $flags .= "<local/><operator>+</operator>";
+	    $name = substr($name, 2);
+	}
+	elsif ($name =~ /^&\*/) {
+	    $flags .= "<global/><operator>FirstFree</operator>";
+	    $name = substr($name, 2);
+	}
+	elsif ($name =~ /^\*!/) {
+	    $flags .= "<global/><operator>OnceOnly</operator>";
+	    $name = substr($name, 2);
+	}
+	print "  <fd>\n";
+	print "    <fd_name>$name</fd_name>\n";
+	print "    <fd_weight>$value</fd_weight>\n";
+	if ($flags ne "    ") {
+	    print $flags."\n";
+	}
+	print "  </fd>\n";
+    }
+}
+
+sub print_node_flags
+{
+    my $i = 0;
+    for (; $i < scalar(@_); ++$i) {
+	my ($name, $value) = split(/:/, $_[$i], 2);
+	if ($name eq "trivial_bandwidth") {
+	    print "  <trivial_bandwidth>$value</trivial_bandwidth\n";
+	}
+	elsif ($name eq "subnode_of") {
+	    print "  <subnode_of>$value</subnode_of>\n";
+	}
+	elsif ($name eq "unique") {
+	    print "  <unique/>\n";
+	}
+	elsif ($name eq "disallow_trivial_mix") {
+	    print "  <disallow_trivial_mix/>\n";
+	}
+    }
+}
+
+# Special print function for switches.
+sub print_switch
+{
+    my $name = shift(@_);
+    print "<node name=\"$name\">\n";
+    print_node_types(("switch:1", "*lan:*"));
+    print "</node>\n\n";
+}
+
+# Print a link with a unique name not necessarily related to source,
+# dest, source_if, and dest_if.
+sub print_named_link
+{
+    my $name = shift(@_);
+    my $source = shift(@_);
+    my $source_if = shift(@_);
+    my $dest = shift(@_);
+    my $dest_if = shift(@_);
+    my $bw = shift(@_);
+    my $delay = shift(@_);
+    my $loss = shift(@_);
+    my $proto_count = scalar(@_);
+    print "<link name=\"$name\">\n";
+    print "  <source_interface><interface>\n";
+    print "    <node_name>$source</node_name>\n";
+    print "    <interface>$source_if</interface>\n";
+    print "  </interface></source_interface>\n";
+    print "  <destination_interface><interface>\n";
+    print "    <node_name>$dest</node_name>\n";
+    print "    <interface>$dest_if</interface>\n";
+    print "  </interface></destination_interface>\n";
+    print "  <bandwidth>$bw</bandwidth>\n";
+    print "  <latency>$delay</latency>\n";
+    print "  <packet_loss>$loss</packet_loss>\n";
+    my $i = 0;
+    for (; $i < $proto_count; ++$i) {
+	print "  <link_type><type_name>" . $_[$i] . "</type_name></link_type>\n";
+    }
+    print "</link>\n\n";
+}
+
+# Print a link where the name is just a recapitulation of the source
+# and destination node and interface names.
+sub print_simple_link
+{
+    print_named_link("link-".$_[0].":".$_[1]."-".$_[2].":".$_[3], @_);
 }
