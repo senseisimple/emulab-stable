@@ -746,12 +746,15 @@ sub os_useradd($$$$$$$$$)
 
     # Map the shell into a full path.
     $shell = MapShell($shell);
+    my $oldmask = umask(0022);
 
     if (system("$USERADD -u $uid -g $gid $args -p '$pswd' ".
 	       "-s $shell -c \"$gcos\" $login") != 0) {
 	warn "*** WARNING: $USERADD $login error.\n";
+	umask($oldmask);
 	return -1;
     }
+    umask($oldmask);
     return 0;
 }
 
