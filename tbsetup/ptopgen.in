@@ -299,7 +299,8 @@ if (defined($switchtouse)) {
 }
 else {
     $result =
-	DBQueryFatal("select node_id from nodes where role = \"testswitch\"");
+	DBQueryFatal("select node_id from nodes ".
+		     "where role='testswitch' or role='widearea_switch'");
 
     while (($switch) = $result->fetchrow_array) {
 	print "node $switch switch:1 *lan:*\n";
@@ -783,6 +784,9 @@ if ($widearea) {
                 "100000 0 0 1 ".
                 join(" ",@inet_protos). "\n";
         }
+
+	# Insert into nodes array in case there are wires entries.
+	$nodes{$physnode} = $ptype;
     }
 }
 
@@ -839,6 +843,7 @@ while (($node1,$card1,$port1,$node2,$card2,$port2) =
        $result->fetchrow_array) {
     if ((defined($nodes{$node1}) || defined($switches{$node1})) && 
 	(defined($nodes{$node2}) || defined($switches{$node2}))) {
+
         
         # Types for this link - for the time being, we assume that all
         # links are Ethernet, though this will certaily change later.
@@ -987,9 +992,13 @@ foreach my $interface (keys(%interfacetypes)) {
     my ($node,$card,$port) = split(":", $interface);
 
     next
-    if (!defined($nodes{$node}));
+	if (!defined($nodes{$node}));;
 	
     my $type    = $interfacetypes{$interface};
+
+    next
+	if (!defined($interfaceprotocols{$type}));
+    
     my @protos  = @{ $interfaceprotocols{$type} };
     my $iface   = get_iface($node,$card,$port);
 
