@@ -19,6 +19,10 @@ $optargs = OptionalPageArguments("printable",  PAGEARG_BOOLEAN);
 $sitefile = "hardware-" . strtolower($THISHOMEBASE) . ".html";
 
 if (!file_exists($sitefile)) {
+    if ($TBMAINSITE) {
+	header("Location: $WIKIDOCURL/UtahHardware");
+	return;
+    }
     PAGEHEADER("Hardware Overview");
     USERERROR("This Emulab has not established a site-specific hardware page.",
 	      1);
