@@ -135,12 +135,30 @@ sub doboot()
     if (!defined($pid)) {
 	return;
     }
+
     # Get the boss info for below.
     my ($bossname, $bossip) = tmccbossinfo();
     if (!defined($bossname)) {
 	BootFatal("Could not determine the name of the boss server");
     }
     my ($domain) = ($bossname =~ /^[^\.]+\.(.*)$/);
+    
+    print("Checking Testbed jail configuration\n");
+    my @tmccresults = ();
+    if (tmcc(TMCCCMD_JAILCONFIG, undef, \@tmccresults) < 0) {
+	fatal("Could not get jailconfig from server!");
+    }
+    return
+	if (! @tmccresults);
+    
+    my $eventserver = "event-server.${domain}";
+
+    # parse the config
+    CONFPARSE: for (@tmccresults) {
+        /^EVENTSERVER="(.*)"$/ && do {
+            $eventserver = $1;
+        };
+    }
 
     #
     # Start the event proxy.
@@ -148,7 +166,7 @@ sub doboot()
     if (-x "$BINDIR/evproxy") {
 	print("Starting event proxy daemon\n");
 	system("$BINDIR/evproxy -i $EVPIDFILE ".
-	       "   -s event-server.${domain} -e $pid/$eid");
+	       "   -s $eventserver -e $pid/$eid");
 	if ($?) {
 	    BootFatal("Error running $BINDIR/evproxy");
 	}
