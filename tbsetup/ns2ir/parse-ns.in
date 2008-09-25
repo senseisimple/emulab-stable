@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -365,6 +365,14 @@ while (my ($vname,$ips) = $query_result->fetchrow_array()) {
     if ($newips ne $ips) {
 	DBQueryFatal("update virt_nodes set ips='$newips' ".
 		     "where vname='$vname' and pid='$pid' and eid='$eid'");
+	
+	foreach my $ipinfo (split(" ", $newips)) {
+	    my ($port,$ip) = split(":", $ipinfo);
+
+	    DBQueryFatal("update virt_lans set ip='$ip' ".
+			 "where vnode='$vname' and vport='$port' ".
+			 "      and pid='$pid' and eid='$eid'");
+	}
     }
 }
 #
