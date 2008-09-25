@@ -389,14 +389,6 @@ sub doboot()
 		print "Adding: $login/$uid/$gid/$root/$name/$hdir/$glist\n";
 		push(@addedUsers, $login);
 
-		#
-		# Force doupdate below if the home directory does not exist.
-		# Might be a local node that does not mount /user from ops.
-		# Or a remote node.
-		#
-		$doupdate = 1
-		    if (! -e $hdir);
-		
 		if ($doit &&
 		    os_useradd($login, $uid, $gid, $pswd, 
 			       "$glist", $hdir, $name, $root, $shell)) {
@@ -412,7 +404,13 @@ sub doboot()
 		    chown($uid, $gid, $hdir)
 			if ($doit);
 		}
-
+		#
+		# Might be a local node that does not mount /user from ops.
+		# Or a remote node.
+		#
+		$doupdate = 1
+		    if (! -e "$hdir/.ssh");
+		
 		# Add to DB only if successful. 
 		$PWDDB{$login} = "$uid:$serial";
 	    }
