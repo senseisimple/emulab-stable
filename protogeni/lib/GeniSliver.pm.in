@@ -316,6 +316,28 @@ sub SetAggregate($$)
 }
 
 #
+# And clear the aggregate.
+#
+sub ClearAggregate($$)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $idx      = $self->idx();
+
+    return -1
+	if (!DBQueryWarn("update geni_slivers set ".
+			 "  aggregate_uuid=NULL ".
+			 "where idx='$idx'"));
+    
+    $self->{'SLIVER'}->{'aggregate_uuid'} = undef;
+    $self->{'AGGREGATE'} = undef;
+    return 0;
+}
+
+#
 # Get the aggregate for a sliver.
 #
 sub GetAggregate($)

@@ -220,7 +220,7 @@ sub CreateFromSignedTicket($$;$$)
 
     # Dig out the slice uuid. Locally, I am not sure if we bother to
     # keep slices in the DB (they are in the DB at geni central).
-    my ($uuid_node) = $doc->getElementsByTagName("target_uuid");
+    ($uuid_node) = $doc->getElementsByTagName("target_uuid");
     return undef
 	if (!defined($uuid_node));
     my $slice_cert = $uuid_node->to_literal();

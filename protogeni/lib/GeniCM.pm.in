@@ -507,7 +507,8 @@ sub RedeemTicket($)
     #
     my $aggregate;
     if (scalar(@{$ticket->rspec()->{'node'}}) > 1) {
-	$aggregate = GeniAggregate->Create($ticket);
+	$aggregate = GeniAggregate->Create($ticket, "Aggregate",
+					   $slice->hrn());
 	if (!defined($aggregate)) {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not create GeniAggregate object");
@@ -551,7 +552,7 @@ sub RedeemTicket($)
 	    goto bad;
 	}
 
-	my $linkaggregate = GeniAggregate::Link->Create($ticket);
+	my $linkaggregate = GeniAggregate::Link->Create($ticket, $linkname);
 	if (!defined($linkaggregate)) {
 	    $message = "Could not create link aggregate for $linkname";
 	    goto bad;
@@ -775,14 +776,20 @@ sub DeleteSliver($)
     }
     else {
 	# 
-	# Find dependent slivers first (say, links on a node). These
-	# have to be torn down first to prevent dangling vlans.
+	# Find dependent slivers first (say, links on a node). For now,
+	# do not allow this sliver to be torn down until the dependent
+	# sliver(s) are torn down first. Eventually we want to tear them
+	# down here in the proper order, hence the code below.
 	#
 	if ($sliver->DependentSlivers(\@slivers) != 0) {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					"Could not get DependentSlivers");
 	}
-	@slivers = (@slivers, $sliver);
+	if (@slivers) {
+	    return GeniResponse->Create(GENIRESPONSE_REFUSED, undef,
+					"Must tear dow dependent slivers");
+	}
+	@slivers = (@slivers, $sliver);	
     }
 
     foreach $sliver (@slivers) {

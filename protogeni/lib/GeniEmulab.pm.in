@@ -252,9 +252,6 @@ sub AllocateSlivers($$$)
 		print STDERR "Could not get node/iface for $member\n";
 		return -1;
 	    }
-	    #
-	    # 
-	    #
 	    my $tmp = $pnode_component{$node->node_id()};
 
 	    $component = $tmp
@@ -268,6 +265,7 @@ sub AllocateSlivers($$$)
 	$component_lans{$component->uuid()} = []
 	    if (!exists($component_lans{$component->uuid()}));
 	push(@{ $component_lans{$component->uuid()} }, $lan);
+	$lan->SetAttribute("geni-component", $component->uuid(), "string");
     }
 
     #
@@ -422,6 +420,12 @@ sub InstantiateSlivers($$$)
 	return -1;
     }
 
+    my @lans;
+    if (Lan->ExperimentLans($experiment, \@lans) != 0) {
+	print STDERR "Could not get lans for $experiment\n";
+	return -1;
+    }
+
     #
     # Loop through nodes, combining nodes at the same component into a
     # list for that component.
@@ -429,9 +433,11 @@ sub InstantiateSlivers($$$)
     # Bookkeeping for the rest of this function.
     my %components        = ();
     my %component_nodes   = ();
+    my %component_lans    = ();
     my %component_tickets = ();
     my %node_component    = ();
     my %node_slivers      = ();
+    my %lan_slivers       = ();
     my %pnodes            = ();
 
     foreach my $node (@{ $nodelist }) {
@@ -470,6 +476,19 @@ sub InstantiateSlivers($$$)
 	    return -1;
 	}
     }
+    foreach my $lan (@lans) {
+	next
+	    if ($lan->type() ne "geni-vlan");
+
+	my $component_uuid;
+	if ($lan->GetAttribute("geni-component", \$component_uuid) != 0) {
+	    print STDERR "Could not find geni-component attribute in $lan\n";
+	    return -1;
+	}
+	$component_lans{$component_uuid} = []
+	    if (!exists($component_lans{$component_uuid}));
+	push(@{ $component_lans{$component_uuid} }, $lan);
+    }
 
     #
     # For each component, submit the ticket associated with the list of
@@ -477,8 +496,10 @@ sub InstantiateSlivers($$$)
     #
     foreach my $component_uuid (keys(%component_tickets)) {
 	my @nodelist  = @{ $component_nodes{$component_uuid} };
+	my @lanlist   = @{ $component_lans{$component_uuid} };
 	my $component = $components{$component_uuid};
 	my $ticket    = $component_tickets{$component_uuid};
+	my @slivers   = ();
 
         #
         # Create sliver on component using the ticket.
@@ -502,14 +523,9 @@ sub InstantiateSlivers($$$)
 	# split it apart so that we have a credential for each node.
 	#
 	if (@nodelist > 1) {
-	    my @slivers;
-
 	    if ($component->SplitSliver($sliver, $context, \@slivers) != 0) {
 		print STDERR "Could not split $sliver on $component\n";
-		if ($sliver->Destroy($context) != 0) {
-		    print STDERR "Could not destroy $sliver\n";
-		}
-		return -1;
+		goto bad;
 	    }
 	    foreach my $node (@nodelist) {
 		my $physnode = $pnodes{$node->uuid()};
@@ -527,12 +543,31 @@ sub InstantiateSlivers($$$)
 		}
 		if (!defined($node_sliver)) {
 		    print STDERR "Could not get sliver for $node in $sliver\n";
-		    if ($sliver->Destroy($context) != 0) {
-			print STDERR "Could not destroy $sliver\n";
-		    }
-		    return -1;
+		    goto bad;
 		}
 		$node_slivers{$node->uuid()} = $node_sliver;
+	    }
+	    foreach my $lan (@lanlist) {
+		next
+		    if ($lan->type() ne "geni-vlan");
+
+		my $lan_sliver;
+		foreach my $s (@slivers) {
+		    #
+		    # XXX Bogus use of hrn, but I am assuming the only
+		    # time this happens is when speaking to another Emulab
+		    # which will be doing the same thing.
+		    #
+		    if ($s->hrn() eq $lan->vname()) {
+			$lan_sliver = $s;
+			last;
+		    }
+		}
+		if (!defined($lan_sliver)) {
+		    print STDERR "Could not get sliver for $lan in $sliver\n";
+		    goto bad;
+		}
+		$lan_slivers{$lan->vname()} = $lan_sliver;
 	    }
 	}
 	else {
@@ -545,9 +580,27 @@ sub InstantiateSlivers($$$)
 	    
 	    if ($node->SetGeniSliverInfo($s->idx()) != 0) {
 		print STDERR "Could not set sliver idx for $node\n";
-		return -1;
+		goto bad;
 	    }
 	}
+	foreach my $lan (@lanlist) {
+	    my $s = $lan_slivers{$lan->vname()};
+	    
+	    if ($lan->SetAttribute("geni-sliver", $s->idx(), "integer") != 0) {
+		print STDERR "Could not set sliver idx for $lan\n";
+		goto bad;
+	    }
+	}
+	next;
+	
+      bad:
+	foreach my $s (@slivers) {
+	    $s->Delete();
+	}
+	if (defined($sliver) && $sliver->Destroy($context) != 0) {
+	    print STDERR "Could not destroy $sliver\n";
+	}
+	return -1;
     }
     return 0;
 }

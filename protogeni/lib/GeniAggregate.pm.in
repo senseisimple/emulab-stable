@@ -83,7 +83,7 @@ sub Lookup($$)
 
     # Bless into sub package if called for.
     my $type = $self->{'AGGREGATE'}->{'type'};
-    if (defined($type) && $type ne "") {
+    if (defined($type) && $type ne "" && $type ne "Aggregate") {
 	bless($self, $class . "::" . $type);
     }
     else {
@@ -125,9 +125,9 @@ sub Stringify($)
 # for now. The client side does not actually know its an aggregate, at
 # least not yet.
 #
-sub Create($$;$)
+sub Create($$$$)
 {
-    my ($class, $ticket, $aggregate_type) = @_;
+    my ($class, $ticket, $aggregate_type, $hrn) = @_;
     my @insert_data = ();
 
     # Every aggregate gets a new unique index.
@@ -146,6 +146,7 @@ sub Create($$;$)
     # Now tack on other stuff we need.
     push(@insert_data, "created=now()");
     push(@insert_data, "idx='$idx'");
+    push(@insert_data, "hrn=" . DBQuoteSpecial($hrn));
     push(@insert_data, "uuid='$uuid'");
     push(@insert_data, "creator_uuid='$owner_uuid'");
     push(@insert_data, "slice_uuid='$slice_uuid'");
@@ -227,6 +228,11 @@ sub hrn($)
 {
     my ($self) = @_;
 
+    my $hrn = field($self, "hrn");
+
+    if (defined($hrn) && $hrn ne "") {
+	return $hrn;
+    }
     return $OURDOMAIN . ".aggregates." . $self->idx();
 }
 
@@ -532,11 +538,11 @@ use GeniAggregate;
 use Experiment;
 use Interface;
 
-sub Create($$)
+sub Create($$$)
 {
-    my ($class, $ticket) = @_;
+    my ($class, $ticket, $hrn) = @_;
 
-    return GeniAggregate->Create($ticket, "Link");
+    return GeniAggregate->Create($ticket, "Link", $hrn);
 }
 
 #
@@ -616,8 +622,8 @@ sub UnProvision($)
 
     my $vlan = VLan->Lookup($experiment, $self->uuid());
     if (! defined($vlan)) {
-	print STDERR "Could not map $self to its vlan object\n";
-	return -1;
+	print STDERR "No vlan associated with $self\n";
+	return 0;
     }
     if ($vlan->UnInstantiate() != 0) {
 	print STDERR "Could not uninstantiate $vlan\n";
