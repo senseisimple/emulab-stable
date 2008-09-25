@@ -51,8 +51,7 @@ exit(0)
 # Script specific goo. 
 my $LOGFILE = LOGDIR() . "/progagent.debug";
 my $WRAPLOG = LOGDIR() . "/progwrap.debug";
-my $PIDFILE = (FAKEJAILED() ?
-	       CONFDIR() . "/progagent.pid" : "/var/run/progagent.pid");
+my $PIDFILE = (FAKEJAILED() ? CONFDIR() : "/var/run") . "/progagent.pid";
 my $CONFIG  = CONFDIR() . "/progagents";
 my $PAGENT  = "$BINDIR/program-agent";
 my $TOKEN   = "/var/tmp/progagent-token";
