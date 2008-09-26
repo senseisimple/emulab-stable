@@ -173,7 +173,7 @@ if ($env eq 'postload') {
 		detectLinux($mnt,%osconfig_args);
 	    }
 	    elsif ($slicetype =~ /freebsd/i) {
-		detectFreeBSD($mnt,%osconfig_args);
+		detectBSD($mnt,%osconfig_args);
 	    }
 	}
 	setupEnv();
@@ -248,6 +248,24 @@ sub checkAndMount() {
     return 0;
 }
 
+#
+# Little subroutine to URL encode data we're sending through the web interface
+#
+sub urlencode {
+    my ($string) = @_;
+    my @chars = split //, $string;
+    my $encoded = "";
+    foreach my $char (@chars) {
+	if ($char =~ /[0-9a-zA-Z]/) {
+	    $encoded .= $char;
+	} else {
+	    $encoded .= sprintf "%%%02X", ord($char);
+	}
+    }
+
+    return $encoded;
+}
+
 sub doUpdate($$$) {
     my ($env,$check,$aref) = @_;
     my %urlargs = ();
@@ -283,7 +301,7 @@ sub doUpdate($$$) {
     }
 
     foreach my $k (keys(%urlargs)) {
-	$uurl .= "&${k}=" . $urlargs{$k};
+	$uurl .= "&${k}=" . urlencode($urlargs{$k});
     }
 
     my $doit = 0;
@@ -504,7 +522,7 @@ sub detectLinuxDistro($) {
 	    $retval[1] = $2;
 	}
     }
-    elsif (-e "/mnt/etc/lsb-release") {
+    elsif (-e "$mnt/etc/lsb-release") {
 	my $d = `cat $mnt/etc/lsb-release | grep DISTRIB_ID`;
 	chomp($d);
 	if ($d =~ /DISTRIB_ID=([\w\d]+)/i) {
