@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -36,7 +36,8 @@ if (!$isadmin && !$target_user->SameUser($this_user)) {
 }
 
 $query_result =& $target_user->TableLookUp("user_sslcerts",
-					   "cert,privkey", "encrypted=1");
+					   "cert,privkey",
+					   "encrypted=1 and status='valid'");
 
 if (!mysql_num_rows($query_result)) {
     PAGEHEADER("Download SSL Certificate for $target_uid");
