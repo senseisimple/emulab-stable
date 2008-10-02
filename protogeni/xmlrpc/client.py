@@ -123,7 +123,6 @@ if rval:
 mycredential = response["value"]
 print "Got my SA credential"
 #print str(mycredential);
-#sys.exit(0);
 
 #
 # Look me up just for the hell of it. I can see why the hrn is "useful"
@@ -153,6 +152,7 @@ if rval:
     pass
 print "Found leebee's record at the SA"
 leebee = response["value"]
+#print str(leebee);
 
 #
 # Lookup a node at the component. 
@@ -228,24 +228,12 @@ print "Bogus DiscoverResources returned"
 
 #
 # Okay, we do not actually have anything like resource discovery yet,
-# so lets fake it.
 #
 rspec = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
         " <node uuid=\"de9803c2-773e-102b-8eb4-001143e453fe\" " +\
         "       hrn=\"geni1\" "+\
         "       virtualization_type=\"emulab-vnode\"> " +\
         " </node>" +\
-        " <node uuid=\"de995217-773e-102b-8eb4-001143e453fe\" " +\
-        "       virtualization_type=\"emulab-vnode\"> " +\
-        " </node>" +\
-        " <link name=\"link0\" link_name=\"link0\"> " +\
-        "  <LinkEndPoints name=\"destination_interface\" " +\
-        "            iface_name=\"eth0\" " +\
-        "            node_uuid=\"de9803c2-773e-102b-8eb4-001143e453fe\" /> " +\
-        "  <LinkEndPoints name=\"source_interface\" " +\
-        "            iface_name=\"eth0\" " +\
-        "            node_uuid=\"de995217-773e-102b-8eb4-001143e453fe\" /> " +\
-        " </link> " +\
         "</rspec>"
 params = {}
 params["credential"] = myslice
@@ -273,7 +261,38 @@ if rval:
     pass
 sliver = response["value"]
 print "Created a sliver"
-print str(sliver)
+#print str(sliver)
+
+#
+# Add resources to the sliver. 
+#
+rspec = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
+        " <node uuid=\"de9803c2-773e-102b-8eb4-001143e453fe\" " +\
+        "       hrn=\"geni1\" "+\
+        "       virtualization_type=\"emulab-vnode\"> " +\
+        " </node>" +\
+        " <node uuid=\"de995217-773e-102b-8eb4-001143e453fe\" " +\
+        "       virtualization_type=\"emulab-vnode\"> " +\
+        " </node>" +\
+        " <link name=\"link0\" link_name=\"link0\"> " +\
+        "  <LinkEndPoints name=\"destination_interface\" " +\
+        "            iface_name=\"eth0\" " +\
+        "            node_uuid=\"de9803c2-773e-102b-8eb4-001143e453fe\" /> " +\
+        "  <LinkEndPoints name=\"source_interface\" " +\
+        "            iface_name=\"eth0\" " +\
+        "            node_uuid=\"de995217-773e-102b-8eb4-001143e453fe\" /> " +\
+        " </link> " +\
+        "</rspec>"
+params = {}
+params["credential"] = sliver
+params["rspec"]      = rspec
+params["impotent"]   = impotent
+rval,response = do_method("cm", "UpdateSliver", params,
+         URI="https://myboss.myelab.testbed.emulab.net:443/protogeni/xmlrpc")
+if rval:
+    Fatal("Could not update sliver with new rspec")
+    pass
+print "Added resources to sliver."
 
 #
 # Split the sliver since its an aggregate of resources
@@ -286,7 +305,7 @@ if rval:
     Fatal("Could not split sliver")
     pass
 slivers = response["value"]
-print "Split a sliver"
+print "Split the sliver"
 print str(slivers)
 
 #

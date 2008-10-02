@@ -112,8 +112,10 @@ LogStart(0);
 #
 Genixmlrpc->SetContext(Genixmlrpc->Context($EMULAB_PEMFILE));
 
+#print STDERR time() . "\n";
+
 # Add stuff for log message if sent.
-AddAuditInfo("message", $request . "\n\n" . Dumper(%ENV));
+AddAuditInfo("message", $request . "\n");
 
 my $responder = Frontier::Responder->new( "methods" => {
     "GetCredential"     => \&GeniSA::GetCredential,
@@ -132,6 +134,7 @@ my $response = $responder->{'_decode'}->serve($request,
 # for the web server.
 #
 #print STDERR "\n\n" . $response;
+#print STDERR time() . "\n";
 
 LogEnd();
 

@@ -128,6 +128,7 @@ sub seqno($)		{ return field($_[0], "seqno"); }
 sub rspec($)		{ return field($_[0], "rspec"); }
 sub uuid($)		{ return field($_[0], "slice_uuid"); }
 sub slice_uuid($)	{ return field($_[0], "slice_uuid"); }
+sub target_uuid($)	{ return field($_[0], "slice_uuid"); }
 sub owner_uuid($)	{ return field($_[0], "owner_uuid"); }
 sub slice_cert($)	{ return field($_[0], "slice_cert"); }
 sub owner_cert($)	{ return field($_[0], "owner_cert"); }

@@ -107,8 +107,10 @@ if (!defined($request)) {
 #
 LogStart(0);
 
+#print STDERR time() . "\n";
+
 # Add stuff for log message if sent.
-AddAuditInfo("message", $request . "\n\n" . Dumper(%ENV));
+AddAuditInfo("message", $request . "\n");
 
 my $responder = Frontier::Responder->new( "methods" => {
     "GetCredential"         => \&GeniCH::GetCredential,
@@ -128,7 +130,8 @@ my $response = $responder->{'_decode'}->serve($request,
 # Terminate the log capture so that we can print the response to STDOUT
 # for the web server.
 #
-print STDERR "\n\n" . $response;
+#print STDERR "\n\n" . $response;
+#print STDERR time() . "\n";
 
 LogEnd();
 

@@ -7,7 +7,7 @@
 package GeniAggregate;
 
 #
-# Some simple ticket stuff.
+# Some simple aggregate stuff.
 #
 use strict;
 use Exporter;
@@ -125,9 +125,9 @@ sub Stringify($)
 # for now. The client side does not actually know its an aggregate, at
 # least not yet.
 #
-sub Create($$$$)
+sub Create($$$$$)
 {
-    my ($class, $ticket, $aggregate_type, $hrn) = @_;
+    my ($class, $slice, $owner, $aggregate_type, $hrn) = @_;
     my @insert_data = ();
 
     # Every aggregate gets a new unique index.
@@ -140,8 +140,8 @@ sub Create($$$$)
 	return undef;
     }
     my $uuid        = $certificate->uuid();
-    my $slice_uuid  = $ticket->slice_uuid();
-    my $owner_uuid  = $ticket->owner_uuid();
+    my $slice_uuid  = $slice->uuid();
+    my $owner_uuid  = $owner->uuid();
 
     # Now tack on other stuff we need.
     push(@insert_data, "created=now()");
@@ -170,7 +170,6 @@ sub slice_uuid($)	{ return field($_[0], "slice_uuid"); }
 sub creator_uuid($)	{ return field($_[0], "creator_uuid"); }
 sub created($)		{ return field($_[0], "created"); }
 sub credential_idx($)	{ return field($_[0], "credential_idx"); }
-sub ticket_idx($)	{ return field($_[0], "ticket_idx"); }
 sub aggregate_idx($)	{ return field($_[0], "aggregate_idx"); }
 sub status($)		{ return field($_[0], "status"); }
 sub cert($)		{ return $_[0]->{'CERTIFICATE'}->cert(); }
@@ -361,6 +360,24 @@ sub GetAggregate($)
 }
 
 #
+# Is object in the aggregate.
+#
+sub IsMember($$)
+{
+    my ($self, $object) = @_;
+
+    return -1
+	if (! (ref($self) && ref($object)));
+
+    my $aggregate = $object->GetAggregate();
+    return 0
+	if (!$aggregate);
+    return -1
+	if ($self->idx() != $aggregate->idx());
+    return 1;
+}
+
+#
 # Set the status for the aggregate
 #
 sub SetStatus($$)
@@ -540,9 +557,9 @@ use Interface;
 
 sub Create($$$)
 {
-    my ($class, $ticket, $hrn) = @_;
+    my ($class, $slice, $owner, $hrn) = @_;
 
-    return GeniAggregate->Create($ticket, "Link", $hrn);
+    return GeniAggregate->Create($slice, $owner, "Link", $hrn);
 }
 
 #
