@@ -1,0 +1,60 @@
+#! /bin/sh
+
+disk=$1
+part=$2
+
+if [ $# -ne 2 ]; then
+	exit 1
+fi
+
+freebsd_slices=`fdisk -l /dev/$disk 2> /dev/null | \
+	sed -n '/a5 *FreeBSD/s#^/dev/'$disk'\([0-9]*\) .*$#\1#p'`
+total_slices=`fdisk -l /dev/$disk | grep "^/dev/$disk[0-9]" | wc -l`
+
+if [ $total_slices -eq 0 ]; then
+	exit 1;
+fi
+
+if [ -z "$freebsd_slices" ]; then
+	# No slices?
+	exit 1
+fi
+
+dmesg_output=`dmesg | grep " *$disk$part: <bsd: $disk[0-9]* "`
+# Valid disklabels should be properly parsed by linux. If it didn't like
+# the label, we can't mount anything.
+if [ -z "$dmesg_output" ]; then
+	# invalid disklabel
+	exit 1
+fi
+
+(
+# Change partition types to empty for all other FreeBSD slices
+# so we can get the disklabel for the correct slice.  These
+# changes don't get written to disk.  They're just here because
+# Linux's fdisk sucks and doesn't let us specify which partition's
+# disklabel to edit.
+for slice in $freebsd_slices; do
+	[ $slice -eq $part ] && continue
+	echo t		# Change slice type
+	if [ $total_slices -gt 1 ]; then
+		echo $slice	# Specify slice
+	fi
+	echo 0		# Set to empty type
+done
+
+echo b		# Change to BSD disklabel mode
+echo p		# Print disklabel
+echo q		# Quit (don't write to disk)
+) | fdisk /dev/$disk 2> /dev/null | grep '^ *a:' > /dev/null
+rc=$?
+
+# Valid disklabel, but no 'a' partition.
+if [ $rc -ne 0 ]; then
+	exit 1
+fi
+
+# We have a valid disklabel with an 'a' partition.
+# Output the Linux device name for it.
+echo $dmesg_output | cut -d' ' -f3
+exit 0

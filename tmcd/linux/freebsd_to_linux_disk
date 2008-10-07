@@ -1,0 +1,44 @@
+#! /bin/sh
+
+disk=$1
+part=$2
+if [ -z "$disk" ] || [ -z "$part" ]; then
+	echo "Usage: ${0##*/} disk partition"
+	exit 1
+fi
+
+# figure out the linux device name
+dunit=`echo $disk | sed -e 's/..\([0-7]\)/\1/'`
+case $disk in
+	# IDE
+	ad[0-3])
+		dtype="hd"
+		d=`echo $dunit | sed -e 'y/0123/048c/'`
+		lrootdev="3${d}${part}"
+		;;
+	# SATA
+	ad[4-7])
+		dtype="sd"
+		dunit=`expr $dunit - 4`
+		lrootdev="8${dunit}${part}"
+		;;
+	# SCSI
+	da[0-7])
+		dtype="sd"
+		lrootdev="8${dunit}${part}"
+		;;
+	# Megaraid
+	amrd[0-7])
+		dunit=`echo $disk | sed -e 's/amrd\([0-7]\)/\1/'`
+		dtype="sd"
+		lrootdev="8${dunit}${part}"
+		;;
+	*)
+		echo "${0##*/}: linux: unknown disk $disk" 1>&2
+		return 1
+		;;
+esac
+dunit=`echo $dunit | sed -e 'y/01234567/abcdefgh/'`;
+ldisk=$dtype$dunit
+
+echo $ldisk $lrootdev
