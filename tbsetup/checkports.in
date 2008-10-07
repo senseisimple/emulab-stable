@@ -82,7 +82,7 @@ my $eid       = $experiment->eid();
 #
 # Make sure they have access to it
 #
-if (!!experiment->AccessCheck($this_user, TB_EXPT_READINFO)) {
+if (!$experiment->AccessCheck($this_user, TB_EXPT_READINFO)) {
     die "You do not have permission to view experiment $pid/$eid\n";
 }
 
