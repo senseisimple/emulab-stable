@@ -233,7 +233,7 @@ elsif ($opt{p}) {
     } else {
         @experimentPorts = getExperimentPorts($pid,$eid);
     }
-    print "ep: " . join(";",@experimentPorts) . "\n";
+    #print "ep: " . join(";",@experimentPorts) . "\n";
     if (@passedPorts) {
 	#
 	# Handle a set of passed-in ports
