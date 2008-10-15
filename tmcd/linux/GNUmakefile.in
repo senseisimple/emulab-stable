@@ -65,24 +65,26 @@ mfs-install:	destdircheck common-install etc-install \
 
 frisbee-mfs-install:	destdircheck
 	$(INSTALL) -m 644 $(SRCDIR)/frisbee/rc.local $(SYSETCDIR)/rc.local
-	$(INSTALL) -m 755 $(SRCDIR)/dhclient-exit-hooks \
-			$(SYSETCDIR)/dhclient-exit-hooks
-	$(INSTALL) -m 755 $(SRCDIR)/dhclient-enter-hooks \
-			$(SYSETCDIR)/dhclient-enter-hooks
-	@if [ -r $(SRCDIR)/master.passwd ]; then \
-	    $(INSTALL) -m 600 $(SRCDIR)/master.passwd $(SYSETCDIR); \
-	    pwd_mkdb -d $(SYSETCDIR) $(SYSETCDIR)/master.passwd; \
-	    if [ ! -e $(DESTDIR)/bin/csh ]; then \
-		ln $(DESTDIR)/bin/sh $(DESTDIR)/bin/csh; \
-	    fi \
-	fi
-	@if [ -r $(SRCDIR)/group ]; then \
-	    $(INSTALL) -m 644 $(SRCDIR)/group $(SYSETCDIR); \
-	fi
+	#$(INSTALL) -m 755 $(SRCDIR)/dhclient-exit-hooks \
+	#		$(SYSETCDIR)/dhclient-exit-hooks
+	#$(INSTALL) -m 755 $(SRCDIR)/dhclient-enter-hooks \
+	#		$(SYSETCDIR)/dhclient-enter-hooks
+	#@if [ -r $(SRCDIR)/master.passwd ]; then \
+	#    $(INSTALL) -m 600 $(SRCDIR)/master.passwd $(SYSETCDIR); \
+	#    pwd_mkdb -d $(SYSETCDIR) $(SYSETCDIR)/master.passwd; \
+	#    if [ ! -e $(DESTDIR)/bin/csh ]; then \
+	#	ln $(DESTDIR)/bin/sh $(DESTDIR)/bin/csh; \
+	#    fi \
+	#fi
+	#@if [ -r $(SRCDIR)/group ]; then \
+	#    $(INSTALL) -m 644 $(SRCDIR)/group $(SYSETCDIR); \
+	#fi
 	$(INSTALL) -m 755 $(SRCDIR)/control_interface $(SYSETCDIR)/testbed
 	$(INSTALL) -m 755 $(SRCDIR)/rc.frisbee $(SYSETCDIR)/testbed
 	$(INSTALL) -m 755 $(SRCDIR)/rc.ipod $(SYSETCDIR)/testbed
 	$(INSTALL) -m 755 $(SRCDIR)/slicefix $(SYSETCDIR)/testbed
+	$(INSTALL) -m 755 $(SRCDIR)/freebsd_to_linux_disk $(SYSETCDIR)/testbed
+	$(INSTALL) -m 755 $(SRCDIR)/check_disklabel $(SYSETCDIR)/testbed
 	$(INSTALL) -m 755 -s ../tmcc-nossl $(SYSETCDIR)/testbed/tmcc
 	$(INSTALL) -m 755 -s ../findif $(SYSETCDIR)/testbed
 	rm -f $(BINDIR)/rc/rc.mkelab
@@ -182,6 +184,12 @@ script-install:	dir-install $(SCRIPTS)
 	$(INSTALL) -m 755 $(SRCDIR)/chipset.awk $(BINDIR)/chipset.awk
 	$(INSTALL) -m 755 $(SRCDIR)/cpuspeed.awk $(BINDIR)/cpuspeed.awk
 	$(INSTALL) -m 755 $(SRCDIR)/rc.mfs $(BINDIR)/rc/rc.mfs
+	$(INSTALL) -m 755 $(SRCDIR)/control_interface $(SYSETCDIR)/testbed
+	$(INSTALL) -m 755 $(SRCDIR)/rc.frisbee $(BINDIR)/rc/rc.frisbee
+	$(INSTALL) -m 755 $(SRCDIR)/slicefix $(BINDIR)/slicefix
+	$(INSTALL) -m 755 $(SRCDIR)/freebsd_to_linux_disk $(BINDIR)/freebsd_to_linux_disk
+	$(INSTALL) -m 755 $(SRCDIR)/check_disklabel $(BINDIR)/check_disklabel
+	$(INSTALL) -m 755 -s ../findif $(BINDIR)/findif
 
 sfs-install:
 	$(INSTALL) -m 755 -o root -g root -d $(DESTDIR)/etc/sfs

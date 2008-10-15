@@ -1,0 +1,647 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use File::Basename;
+use Fcntl;
+use IO::Handle;
+
+sub WhichRawDisk();
+
+#
+# This script is run directly from boot. It should NOT be run after
+# that since some stuff is not setup to properly restart yet. For
+# general reconfig or update, use rc.config instead.
+#
+sub usage()
+{
+    print "Usage: " . scriptname() . "boot|shutdown|reconfig|reset\n";
+    exit(1);
+}
+my $optlist    = "";
+my $action     = "boot";
+my $debug      = 1;
+
+my $cmdline    = "$0 " . join(" ",@ARGV);
+
+# Turn off line buffering on output
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+# Only root.
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+# Script specific goo.
+my $RCDIR   = "$BINDIR/rc";
+my $LOGFILE = "$LOGDIR/cdbootsetup.debug";
+
+#
+# Disk related parameters
+#
+
+# where to find kernel config output
+my $dmesgcmd = "/sbin/dmesg";
+my $dmesgfile = "/var/run/dmesg.boot";
+
+# preferred ordering of disks to use
+my @bsd_preferred = ("ar", "aacd", "amrd", "mlxd", "twed", "ad", "da");
+my @linux_preferred = ("sd", "hd");
+my @bsd_units = (0, 1, 2, 3, 4, 5, 6, 7);
+my @linux_units = qw/a b c d e f g/;
+
+# min disk size we can use (in MB)
+my $MINDISKSIZE = 8000;
+
+my $defrawdisk	= "/dev/ad0";
+my $rawbootdisk;
+
+# Set below.
+my $bossname;
+my $bossip;
+
+# For widearea.
+my $privkey;
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use libtmcc;
+use librc;
+
+# Protos.
+sub doboot();
+sub doshutdown();
+sub doreconfig();
+sub docleanup();
+sub BootNotify($$);
+sub BootWhat();
+
+# Allow default above.
+if (@ARGV) {
+    $action = $ARGV[0];
+}
+
+if ($action eq "boot" || $action eq "reconfig") {
+    #
+    # We want to save all of the output off, but also dup it to the console.
+    #
+    open(LOG, "> $LOGFILE") or
+	BootNotify(-1, "Could not open $LOGFILE!");
+    LOG->autoflush(1);
+
+    #
+    # This open implicitly forks a child, which goes on to execute the rest
+    # of the script. The parent is going to sit in this loop and capture the
+    # output of the child, writing it to the logfile and to the console.
+    # 
+    if (open(FOO, "-|")) {
+	while (<FOO>) {
+	    print LOG $_;
+	    print "$_";
+	}
+	close(LOG);
+	close(FOO);
+	# The CDROM *always* reports back what it can.
+	BootNotify($? >> 8, "CD Boot");
+	exit(0);
+    }
+    open(STDERR, ">&STDOUT");
+}
+
+# Execute the action.
+SWITCH: for ($action) {
+    /^boot$/i && do {
+	doboot();
+	last SWITCH;
+    };
+    /^shutdown$/i && do {
+	doshutdown();
+	last SWITCH;
+    };
+    /^reconfig$/i && do {
+	doreconfig();
+	last SWITCH;
+    };
+    /^reset$/i && do {
+	docleanup();
+	last SWITCH;
+    };
+    /^rawdisk$/i && do {
+	WhichRawDisk();
+	print "$rawbootdisk\n";
+	last SWITCH;
+    };
+    fatal("Invalid action: $action\n");
+}
+exit(0);
+
+#
+# Notify boss of what happened. If the code is non-zero, then also
+# generate a booterrno and a TBFAILED state transition. 
+#
+sub BootNotify($$)
+{
+    my ($code, $msg) = @_;
+
+    print "$msg\n";
+    system("sync");
+    
+    #
+    # Send the console log to the server.
+    #
+    if (-e $LOGFILE && -s $LOGFILE &&
+	tmcc(TMCCCMD_BOOTLOG, "", undef,
+	     ("datafile" => $LOGFILE, "timeout" => 10)) < 0) {
+	print "Error sending TBFAILED to Emulab Control!\n";
+    }
+
+    return
+	if (!$code);
+    
+    if (tmcc(TMCCCMD_STATE, "PXEFAILED") < 0) {
+	print "Error sending PXEFAILED to Emulab Control!\n";
+    }
+    exit($code);
+}
+
+#
+# Boot Action.
+#
+sub doboot()
+{
+    my $bootdev;
+    
+    #
+    # The CD does some different stuff.
+    #
+    print("Doing Testbed Setup on a CD/Dongle\n");
+
+    # Get the boss info for below.
+    ($bossname, $bossip) = tmccbossinfo();
+    if (!defined($bossname)) {
+	fatal("Could not determine the name of the boss server!");
+    }
+
+    #
+    # Widearea nodes need to checkin and tell Emulab in case we are a new
+    # node, or more likely, our IP address has changed. 
+    #
+    if (REMOTE()) {
+	my $hostname = `hostname`;
+	chomp($hostname);
+
+	$privkey = `cat $ETCDIR/emulab-privkey`;
+	chomp($privkey);
+
+	my $IP = `cat $BOOTDIR/myip`;
+	chomp($IP);
+
+	my $URL = "https://$bossname/wanodecheckin.php".
+	    "?IP=$IP&privkey=$privkey" .
+	    (defined($hostname) && $hostname ne ""
+	     ? "&hostname=$hostname" : "");
+
+	system("$WGET -O - '$URL'");
+    }
+
+    # Enable IPoD
+    if (-x "$RCDIR/rc.ipod") {
+	print("Setting up Ping of Death\n");
+	system("$RCDIR/rc.ipod");
+	# This is allowed to fail; ipod might not be supported.
+    }
+
+    if (-x "$BINDIR/osconfig" && 
+	(!defined($ENV{"ELAB_UPD_DONE"}) || !$ENV{"ELAB_UPD_DONE"})) {
+	if (!system("$BINDIR/osconfig premfs")) {
+	    # success -- must set our marker and exec this script
+	    $ENV{"ELAB_UPD_DONE"} = 1;
+	    exec($cmdline);
+	}
+    }
+
+    # Will not return until it gets something it likes.
+    $bootdev = WhichRawDisk();
+    print("Using $bootdev for config sector ...\n");
+
+    #
+    # Report back the CD version
+    # XXX may want to consider not doing then on every boot
+    #
+    if (-e "$ETCDIR/emuboot-volid") {
+	my $cdversion = `cat $ETCDIR/emuboot-volid`;
+	chomp($cdversion);
+	tmcc(TMCCCMD_HOSTINFO, "CDVERSION=$cdversion");
+    }
+
+  bootinfo:
+    #
+    # If this is first install on this disk, or if the disk has just been
+    # loaded, initialize the magic sector so that it boots from the CD.
+    # We might reset that below. 
+    #
+    system("tbbootconfig -v $bootdev");
+    if ($?) {
+	print("No valid boot config on $bootdev; initializing ...\n");
+	system("tbbootconfig -d -f -c 1 -k 0 ".
+	       (defined($privkey) ? "-e '$privkey' " : "") . "-m 1 $bootdev");
+	if ($?) {
+	    print("Error running tbbootconfig; falling back to MFS boot\n");
+	    goto mfs;
+	}
+    }
+
+    #
+    # Use the bootinfo client to find out what we should do. Note that
+    # like the PXE version, this client will block when told to WAIT
+    # by the bootinfo server, returning only when bootinfo says that the node
+    # should boot (has been allocated or needs to be reloaded).
+    #
+    print("Asking bootinfo what to do; warning, this might block ...\n");
+    my $bootwhat = BootWhat();
+    chomp($bootwhat);
+
+    if ($debug) {
+	print("Bootinfo returned '$bootwhat'\n");
+	sleep(10);
+    }
+
+    if ($bootwhat eq "reboot") {
+	print("Bootinfo says to reboot ... so thats what we gonna do!\n");
+	system("sync");
+	BootNotify(0, "Bootinfo said to reboot");
+	system("reboot");
+	sleep(10000);
+    }
+    elsif ($bootwhat =~ /^partition:(\d)\s*(.*)/) {
+	my $bpart = $1;
+	my $cmdline = $2;
+	my $ptype = 0;
+
+	if ($bpart eq "0") {
+	    print("Bootinfo says to boot from MBR ...\n");
+	    $bpart = 255; # XXX
+	} else {
+	    print("Bootinfo says to boot slice $bpart");
+	    if ($cmdline ne "") {
+		print(" with command line '$cmdline'");
+	    }
+	    print(".  Checking MBR first ...\n");
+	    $ptype = VerifyMBR($bootdev, $bpart);
+	    if ($ptype < 0) {
+		print("Partition $bpart on $bootdev not valid; ".
+		      "falling back to MFS\n");
+		goto mfs;
+	    }
+	}
+	system("tbbootconfig -d -c 0 -k $bpart -m 1 $bootdev");
+	if ($?) {
+	    print("Error running tbbootconfig; falling back to MFS boot\n");
+	    goto mfs;
+	}
+	if ($cmdline ne "") {
+	    # XXX Linux only.  We need to generalize here...
+	    if ($ptype == 131) {
+		system("groklilo -c '$cmdline' $bpart $bootdev");
+		if ($?) {
+		    print("Error setting command line; falling back to MFS boot\n");
+		    goto mfs;
+		}
+	    }
+	    else {
+		print("WARNING: command line ignored for ptype $ptype\n");
+	    }
+	}
+	system("sync");
+	BootNotify(0, "Bootinfo said to boot partition $bpart");
+	system("reboot");
+	sleep(10000);
+    }
+    elsif ($bootwhat =~ /^mfs:([-\w\.]*:)?(.*)$/) {
+	print("Bootinfo says to boot MFS $2!\n");
+	my $mfs = basename($2);
+
+	#
+	# We know about a couple of different MFSs, but thats it!
+	#
+	if ($mfs eq "freebsd.newnode") {
+	    system("$BINDIR/newclient");
+	    #
+	    # Not supposed to do anything else after this, so just
+	    # exit to avoid booting into the MFS.
+	    #
+	    return 0;
+	}
+	elsif ($mfs =~ /^frisbee.*$/) {
+	    #
+	    # Run the frisbee script. We do not want rc.frisbee to reboot
+	    # though since once the frisbee is done, we can immediately go
+	    # back through bootinfo to see what to do next, avoiding a full
+	    # reboot cycle!
+	    #
+	    if (system("$RCDIR/rc.frisbee -noreboot") == 0) {
+		print("Waiting a few seconds for events to settle ...\n");
+		sleep(10);
+		goto bootinfo;
+	    }
+	    fatal("Failed to reload the disk. Sending data to Emulab.");
+	    # Drop into the shell to debug.
+	    return 1;
+	}
+	elsif ($mfs =~ /^freebsd.*$/) {
+	    goto mfs;
+	}
+	elsif ($bootwhat =~ /^mfs:localhost:partition:(\d+)$/ ||
+	       $bootwhat =~ /^mfs:127\.0\.0\.1:partition:(\d+)$/) {
+	    #
+	    # In this case, we boot from an "alternate" mfs on the Nth 
+	    # partition of the default boot media.  One mfs per partition.
+	    #
+	    my $part = $1 + 0;
+	    if ($part < 1 || $part > 4) {
+		print("Invalid local mfs partition $part;" . 
+		      " falling back to default MFS boot\n");
+		goto mfs;
+	    }
+	    # Boot from the bootloader device, and the specified partition
+	    system("tbbootconfig -d -b 0xfe -k $part -c 0 -m 1 $bootdev");
+	    if ($?) {
+		print("Error running tbbootconfig;" . 
+		      "falling back to default MFS boot\n");
+		goto mfs;
+	    }
+	    system("sync");
+	    BootNotify(0,"Bootinfo said to boot local partition" . 
+		       " $part on default boot device; rebooting.");
+	    system("reboot");
+	    sleep(10000);
+	}
+	else {
+	    # Default to FreeBSD MFS.
+	    goto mfs;
+	}
+    }
+
+    #
+    # At this point, chain over to the MFS boot, since the CD mirrors
+    # that when doing a standard BSD boot.
+    #
+  mfs:
+    if (-x "$RCDIR/rc.mfs") {
+	print("Switching over to MFS boot setup\n");
+	system("$RCDIR/rc.mfs");
+	# Fall through on failure.
+    }
+}
+
+#
+# Shutdown Action.
+#
+sub doshutdown()
+{
+}
+
+#
+# Node Reconfig Action (without rebooting).
+#
+sub doreconfig()
+{
+}
+
+#
+# Node cleanup action (node is reset to completely clean state).
+#
+sub docleanup()
+{
+}
+
+#
+# Which raw disk. Prompt if we cannot come up with a good guess.
+# Note: raw and block devices are one in the same now.
+#
+sub WhichRawDisk()
+{
+    #
+    # Find the list of configured disks
+    #
+    my @list = DiskList();
+
+    #
+    # Search the drives looking for one with a valid header.
+    # 
+    foreach my $disk (@list) {
+	my $guess = "/dev/${disk}";
+
+	system("tbbootconfig -v $guess");
+	if (! $?) {
+	    $rawbootdisk = $guess;
+	    goto gotone;
+	}
+    }
+
+    #
+    # None with configuration info, just use the first existing disk
+    # which is large enough and is actually accessible.
+    #
+    foreach my $disk (@list) {
+	my $guess = "/dev/${disk}";
+
+	if (DiskSize($disk) >= $MINDISKSIZE && DiskReadable($disk)) {
+	    #
+	    # Allow for overiding the guess, with short timeout.
+	    #
+	    $rawbootdisk = Prompt("Which Disk Device is the boot device?",
+				  "$guess", 10);
+	    goto gotone;
+	}
+    }
+  gotone:
+    
+    #
+    # If still not defined, then loop forever.
+    # 
+    while (!defined($rawbootdisk) || ! -e $rawbootdisk) {
+	$rawbootdisk = Prompt("Which Disk Device is the boot device?",
+			      $defrawdisk);
+    }
+    return $rawbootdisk;
+}
+
+#
+# Create a list of all disks and their sizes.
+#
+sub DiskList()
+{
+	my @disks;
+	my @tmp;
+	my @preferred;
+	my @units;
+
+	if (-x $dmesgcmd) {
+	   @tmp = os_get_disks();
+	}
+
+	if ($OSNAME eq 'linux') {
+		@preferred = @linux_preferred;
+		@units = @linux_units;
+	}
+	elsif ($OSNAME eq 'freebsd') {
+		@preferred = @bsd_preferred;
+		@units = @bsd_units;
+	}
+
+	for my $disk (@preffered) {
+		for my $unit (@units) {
+			for my $dev (@tmp) {
+				if ($dev =~ /^$disk$unit/) {
+					push @disks, $dev;
+				}
+			}
+		}
+	}
+
+    return @disks;
+}
+
+sub DiskSize($)
+{
+    my ($name) = @_;
+
+    my $size = os_get_disk_size($name);
+    if (defined $size) {
+	    return $size;
+    }
+
+    return 0;
+}
+
+sub DiskReadable($)
+{
+    my ($disk) = @_;
+    my $dev = "/dev/$disk";
+
+    if (!system("dd if=$dev of=/dev/null bs=512 count=32 >/dev/null 2>&1")) {
+	return(1);
+    }
+    return(0);
+}
+
+#
+# Spit out a prompt and a default answer. If optional timeout supplied,
+# then wait that long before returning the default. Otherwise, wait forever.
+#
+sub Prompt($$;$)
+{
+    my ($prompt, $default, $timeout) = @_;
+
+    if (!defined($timeout)) {
+	$timeout = 10000000;
+    }
+
+    print "$prompt";
+    if (defined($default)) {
+	print " [$default]";
+    }
+    print ": ";
+
+    eval {
+	local $SIG{ALRM} = sub { die "alarm\n" }; # NB: \n required
+	
+	alarm $timeout;
+	$_ = <STDIN>;
+	alarm 0;
+    };
+    if ($@) {
+	if ($@ ne "alarm\n") {
+	    die("Unexpected interrupt in prompt\n");
+	}
+	#
+	# Timed out.
+	#
+	print "\n";
+	return $default;
+    }
+    return undef
+	if (!defined($_));
+	
+    chomp();
+    if ($_ eq "") {
+	return $default;
+    }
+
+    return $_;
+}
+
+sub VerifyMBR($$)
+{
+    my ($bootdev, $partition) = @_;
+    my ($size, $type) = os_get_partition_info($bootdev, $partition);
+
+    if ($size == 0) {
+	print "Zero length partition $partition\n";
+        return -1;
+    }
+
+    return $type;
+}
+
+#
+# Ask bootwhat what to do. 
+#
+sub BootWhat()
+{
+    if (!REMOTE()) {
+	my $bootwhat = `bootinfoclient -s $bossname`;
+	if ($?) {
+	    print("Error running bootinfoclient; falling back to MFS boot\n");
+	    return "";
+	}
+	return $bootwhat;
+    }
+    my @results;
+
+    if (tmcc(TMCCCMD_BOOTWHAT, "", \@results) < 0 || !@results) {
+	print "Error getting BOOTWHAT from Emulab Control!\n";
+	return "";
+    }
+    my ($status, $type, $rest) =
+	($results[0] =~ /^STATUS=(\w*) TYPE=(\d*)(.*)$/);
+    if (!defined($status) || $status ne "success") {
+	print "BOOTWHAT did not return success from Emulab Control!\n";
+	return "";
+    }
+    return "reboot"
+	if ($type == 5);
+
+    # MFS
+    if ($type == 7) {
+	my ($what) = ($rest =~ /^\s*WHAT=(.*)/);
+	return "mfs:$what";
+    }
+    # Partition.
+    if ($type == 1) {
+	my ($what, $cmdline);
+	
+	if ($rest =~ /^\s*WHAT=(\d*)$/) {
+	    $what = $1;
+	    $cmdline = "";
+	}
+	elsif ($rest =~ /^\s*WHAT=(\d*)\s+CMDLINE='(.*)'$/) {
+	    $what = $1;
+	    $cmdline = $2;
+	}
+	return "partition:$what $cmdline";
+    }
+    return "";
+}

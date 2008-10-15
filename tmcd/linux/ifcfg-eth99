@@ -26,6 +26,8 @@ IFACETYPES="3c59x eepro100 e1000 r8169 tulip"
 #
 modprobe -qa $IFACETYPES
 
+interfaces=`ifconfig -a -s | sed '1d;/^lo /d;s/ .*$//'`
+
 #
 # If dhclient returns success, then it has configured the first interface
 # and gone into background mode.  At that point we don't care about it any
@@ -33,7 +35,7 @@ modprobe -qa $IFACETYPES
 # dhclient will leave "up") and set ONBOOT=no to prevent ifup (our caller)
 # from doing any further configuration on this fake interface.
 #
-if [ -x /sbin/dhclient ] && /sbin/dhclient -q ; then
+if [ -x /sbin/dhclient ] && /sbin/dhclient -q $interfaces; then
     killall dhclient
 
     if [ -e $BOOTDIR/controlif ]; then

@@ -63,6 +63,7 @@ $SFSSD		= "/usr/local/sbin/sfssd";
 $SFSCD		= "/usr/local/sbin/sfscd";
 $RPMCMD		= "/usr/local/bin/rpm";
 $HOSTSFILE	= "/etc/hosts";
+$WGET		= "/usr/local/bin/wget";
 
 #
 # These are not exported
@@ -888,6 +889,82 @@ sub os_config_gre($$$$$$$)
 	return -1;
     }
     return 0;
+}
+
+sub os_get_disks
+{
+    my @disks;
+    my $dmesgpat = "^([a-z]+\\d+):.* (\\d+)MB.*\$";
+
+    for my $cmd ("/sbin/dmesg", "cat /var/run/dmesg.boot") {
+	    my @cmdout = `$cmd`;
+	    foreach my $line (@cmdout) {
+		if ($line =~ /$dmesgpat/) {
+		    my $name = $1;
+
+		    push @disks, $name;
+		}
+	    }
+
+	    last if (@disks);
+    }
+
+    return @disks;
+}
+
+sub os_get_disk_size($)
+{
+    my ($disk) = @_;
+    my $size;
+
+    $disk =~ s#^/dev/##;
+
+    my @cmdout = `$cmd`;
+
+    my $dmesgpat = "^($disk\\d+):.* (\\d+)MB.*\$";
+    foreach my $line (@cmdout) {
+	if ($line =~ /$dmesgpat/) {
+	    my $size = $2;
+	    last;
+	}
+    }
+
+    return $size;
+}
+
+sub os_get_partition_info($$)
+{
+    my ($bootdev, $partition) = @_;
+
+    if (!open(FDISK, "fdisk -s $bootdev |")) {
+	print("Failed to run fdisk on $bootdev!");
+	return -1;
+    }
+
+    # First line looks like "/dev/ad0: 5005 cyl 255 hd 63 sec"
+    my $line = <FDISK>;
+    if (!defined($line)) {
+	print("No fdisk summary info for MBR on $bootdev!\n");
+	goto bad;
+    }
+    if (! ($line =~ /^.*cyl (\d*) hd (\d*) sec/)) {
+	print("Invalid fdisk summary info for MBR on $bootdev!\n");
+	goto bad;
+    }
+    while (<FDISK>) {
+	if ($_ =~ /^\s*(\d):\s*\d*\s*(\d*)\s*(0x[\w]*)\s*0x[\w]*$/) {
+	    if ($1 == $partition) {
+		my $plen = $2;
+		my $ptype = hex($3);
+		close(FDISK);
+		return ($plen, $ptype);
+	    }
+	}
+    }
+    print("No such partition in fdisk summary info for MBR on $bootdev!\n");
+  bad:
+    close(FDISK);
+    return -1;
 }
 
 1;

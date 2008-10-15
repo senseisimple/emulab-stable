@@ -62,6 +62,7 @@ $SFSSD		= "/usr/local/sbin/sfssd";
 $SFSCD		= "/usr/local/sbin/sfscd";
 $RPMCMD		= "/bin/rpm";
 $HOSTSFILE	= "/etc/hosts";
+$WGET		= "/usr/bin/wget";
 
 #
 # These are not exported
@@ -1552,6 +1553,65 @@ sub os_config_gre($$$$$$$)
 	return -1;
     }
     return 0;
+}
+
+sub os_get_disks
+{
+	my @blockdevs;
+
+	@blockdevs = map { s#/sys/block/## } glob('/sys/block/*');
+
+	return @blockdevs;
+}
+
+sub os_get_disk_size($)
+{
+	my $disk = (@_);
+	my $size;
+
+	$disk =~ s#^/dev/##;
+
+	if (!open SIZE, "/sys/block/$disk/size") {
+		warn "Couldn't open /sys/block/$disk/size: $!\n";
+		return undef;
+	}
+	$size = <SIZE>;
+	close SIZE;
+	chomp $size;
+
+	$size = $size * 512 / 1024 / 1024;
+
+	return $size;
+}
+
+sub os_get_partition_info($$)
+{
+    my ($bootdev, $partition) = @_;
+
+    if (!open(FDISK, "fdisk -l /dev/$bootdev |")) {
+	print("Failed to run fdisk on /dev/$bootdev!");
+	return -1;
+    }
+
+    while (<FDISK>) {
+	    next if (!m#^/dev/$bootdev$partition\s+#);
+
+	    s/\*//;
+
+	    my ($length, $ptype) = (split /\s+/)[3,4];
+
+	    $length =~ s/\+$//;
+	    $ptype = hex($ptype);
+
+	    close FDISK;
+
+	    return ($length, $ptype);
+    }
+
+    print "No such partition in fdisk summary info for MBR on /dev/$bootdev!\n";
+    close FDISK;
+
+    return -1;
 }
 
 1;
