@@ -95,6 +95,11 @@ else {
 	if ($node->isvirtnode()) {
 	    if ($node->isplabdslice()) {
 		TBPlabNodeUsername($hostname, \$user);
+                # if the node didn't exist in the db, we don't want to just
+                # try logging in as root!
+                if (!defined($user) || "$user" eq "0") {
+                    exit(1);
+                }
 	    }
 	    $hostname = $node->phys_nodeid();
 	}
