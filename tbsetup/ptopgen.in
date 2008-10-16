@@ -25,11 +25,12 @@ sub usage()
 	  "       -u Prune unused interfaces of allocated nodes (-e)\n".
 	  "       -c Delay capacity override\n".
 	  "       -n Add in modelnet core and edge node features\n".
-	  "       -x Output into the new xml ptop format.\n");
-    exit(-1);
+	  "       -x Output into the new xml ptop format.\n".
+	  "       -g With -x, geni version\n");
+        exit(-1);
 }
 
-my $optlist = "s:e:m:vp:rSan:c:ux";
+my $optlist = "s:e:m:vp:rSan:c:uxg";
 my $mfactor;
 my $virtstuff = 0;
 my $widearea  = 0;
@@ -38,6 +39,9 @@ my $allnodes  = 0;
 my $mnetcores = 0;
 my $mnetedges = 0;
 my $prune     = 0;
+my $do_xml    = 0;
+my $genimode  = 0;
+
 my $delaycap_override;
 
 #
@@ -90,8 +94,6 @@ my $DEADEID = NODEDEAD_EID();
 my $pid;
 my $exempt_eid;
 my $switchtouse;
-
-my $do_xml = 0;
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -146,6 +148,8 @@ if (defined($options{"e"})) {
 	if (!defined($pid));
 }
 if (defined($options{"x"})) {
+    $genimode = 1
+	if (defined($options{"g"}));
     $do_xml = 1;
     print "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
     print "<ptop testbed=\"@THISHOMEBASE@\" "
@@ -317,12 +321,12 @@ if (defined($switchtouse)) {
 }
 else {
     $result =
-	DBQueryFatal("select node_id from nodes ".
+	DBQueryFatal("select node_id,uuid from nodes ".
 		     "where role='testswitch' or role='widearea_switch'");
 
-    while (($switch) = $result->fetchrow_array) {
+    while (($switch, $uuid) = $result->fetchrow_array) {
 	if ($do_xml) {
-	    print_switch($switch);
+	    print_switch($switch, $uuid);
 	} else {
 	    print "node $switch switch:1 *lan:*\n";
 	}
@@ -379,7 +383,7 @@ $result =
     DBQueryFatal("select a.node_id,a.type,a.phys_nodeid,t.class,t.issubnode," .
 		 "a.def_boot_osid, (b.pid is not null and b.eid is not null), " .
 		 "  np.reserved_pid is not null,np.eventstate, ".
-		 "  np.battery_percentage ".
+		 "  np.battery_percentage,np.uuid ".
 		 "from nodes as a ".
 		 "left join reserved as b on a.node_id=b.node_id ".
 		 "left join reserved as m on a.phys_nodeid=m.node_id ".
@@ -402,7 +406,8 @@ $result =
 # the type/class of node.
 #
 while (($node,$type,$physnode,$class,$issubnode,$def_boot_osid,$reserved,
-	$prereserved,$eventstate,$battery_perc) = $result->fetchrow_array) {
+	$prereserved,$eventstate,$battery_perc,$uuid) =
+       $result->fetchrow_array) {
     $nodes{$node} = $type
 	if (!defined($pid) ||
 	    ($permissions{$type} && $permissions{$class}));
@@ -410,6 +415,7 @@ while (($node,$type,$physnode,$class,$issubnode,$def_boot_osid,$reserved,
 	$subnode_of{$node} = $physnode;
     }
     $node_def_boot_osid{$node} = $def_boot_osid;
+    $node_uuids{$node} = $uuid;
 
     if ($reserved) {
 	$is_reserved{$node} = 1;
@@ -456,6 +462,7 @@ foreach $node (keys(%nodes)) {
     my $cpu_speed = $typemap{$type}->{'SPEED'};
     my $ram = $typemap{$type}->{'RAM'};
     my $trivspeed = $typemap{$type}->{'TRIVSPEED'};
+    my $uuid = $node_uuids{$node};
     
     my @types = ("$type:1");
     my @features;
@@ -644,10 +651,12 @@ foreach $node (keys(%nodes)) {
     }
 
     if ($do_xml) {
-        print "<node name=\"$node\">\n";
+        print "<node name=\"$node\" uuid=\"$uuid\">\n";
 	print_node_types(@types);
-	print_node_flags(@flags);
-	print_node_features(split(" ", join(" ",@features)));
+	if (!$genimode) {
+	    print_node_flags(@flags);
+	    print_node_features(split(" ", join(" ",@features)));
+	}
 	print "</node>\n\n";
     } else {
 	my $text = "node $node " . join(" ",@types) .
@@ -1051,10 +1060,13 @@ foreach $interconnect (keys(%interconnects)) {
 my @wireless_protos = ("80211", "80211a", "80211b", "80211g", "flex900");
 my $fake_switch = "airswitch";
 if ($do_xml) {
-    print "<node name=\"$fake_switch\">\n";
-    print_node_types(map("*$_:*", @wireless_protos));
-    print "</node>\n\n";
-} else {
+    if (!$genimode) {
+	print "<node name=\"$fake_switch\">\n";
+	print_node_types(map("*$_:*", @wireless_protos));
+	print "</node>\n\n";
+    }
+}
+else {
     print "node $fake_switch ", join(" ",map("*$_:*",@wireless_protos)), "\n";
 }
 
@@ -1251,7 +1263,9 @@ sub print_node_flags
 sub print_switch
 {
     my $name = shift(@_);
-    print "<node name=\"$name\">\n";
+    my $uuid = shift(@_);
+    print "<node name=\"$name\"" .
+	(defined($uuid) ? " uuid=\"$uuid\"" : "") . ">\n";
     print_node_types(("switch:1", "*lan:*"));
     print "</node>\n\n";
 }
