@@ -1,0 +1,209 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+# Simple script to move nodes between "elab mode" and "plab mode"...
+#
+
+#
+# Configure variables
+#
+my $TB         = "@prefix@";
+# XXX stinky hack detection
+my $ISUTAH	= @TBMAINSITE@;
+
+my $NFREE      = "$TB/bin/nfree";
+my $RESERVE    = "$TB/sbin/sched_reserve";
+my $OSSELECT   = "$TB/bin/os_select";
+my $REBOOT     = "$TB/bin/node_reboot";
+my $PLABFED    = "$TB/sbin/plabfed";
+
+# name of the PLC we're talking to (config metadata in emulab db)
+my $PLC = "ProtoGENI";
+# osid for the plab mfs (on emulab widearea usb dongles, second partition)
+my $PLABMFS_OSID = 1550;
+
+#
+# Yes, nasty hack... but we have no way of specifying modes and "groups" of 
+# node_ids that are really the same node in the db.  Can't do that until we 
+# free ourselves from ID'ing nodes via IP address.
+# So, instead, we restrict to a couple types (to prevent operator mistakes),
+# and we figure out which nodes from each type represent the same phys node
+# based off the hostname field in the widearea_nodeinfo table.  Yes, this sucks,
+# but anything else is meta-physical.  Ha ha!
+#
+my $etype = "pcpg";
+my $ptype = "pcpgeniphys";
+
+use lib '@prefix@/lib';
+use libdb;
+use Node;
+use NodeType;
+
+# Turn off line buffering on output
+$| = 1;
+
+if (!TBAdmin()) {
+    die "Sorry, only testbed administrators can run this script!\n";
+}
+if (!$ISUTAH) {
+    die "Sorry, this only makes sense at Utah Emulab at the moment!\n";
+}
+
+#
+# Handle command-line arguments
+#
+sub usage {
+    die "usage: epmodeset <elab|plab> <node> ... <node>\n";
+}
+
+if (@ARGV < 2) {
+    usage();
+}
+
+my ($mode,@nodes) = @ARGV;
+if (!($mode eq "elab" || $mode eq "plab")) {
+    usage();
+}
+
+#
+# First, only operate on ! virtnodes.
+# If putting the node in elab mode:
+#   * (if node was in elab mode (free or alloc, noop)
+#   * (if node was in plab mode, need to move plab phys node into hwdown)
+#   * move elab phys from hwdown to reloading (nfree is easiest)
+#   * force reboot
+#
+# If putting the node in plab mode:
+#   * (if in plab mode, noop)
+#   * (if in elab mode, make sure in hwdown, reloading, or free, else fail)
+#   * move elab phys node to hwdown first
+#   * os_select on elab phys node to boot plab mfs
+#   * mv plab phys node to hwdown, mv plab vnode -1 to plab-monitor
+#
+
+#
+# Resolve all node names/ids and create elab->plab, plab->elab maps.
+#
+# nid->Node maps (elab->elab and plab->plab)
+my %einfo = ();
+my %pinfo = ();
+# nid->nid maps (elab->plab and plab->elab)
+my %epmap = ();
+my %pemap = ();
+
+foreach my $n (@nodes) {
+    if (!($n =~ /^[a-zA-Z][a-zA-Z0-9\-\.]+$/)) {
+	die "Bad node '$n', exiting!\n";
+    }
+
+    # yes, we are assuming that hostnames will be the same for the elab and plab
+    # node_ids.
+    my $qres = DBQueryFatal("select wa.hostname" . 
+			    " from widearea_nodeinfo as wa " . 
+			    " left join nodes as n on wa.node_id=n.node_id" . 
+			    " where (wa.node_id='$n' or wa.hostname='$n')" . 
+			    "   and (n.type='$etype' or n.type='$ptype')" . 
+			    " group by wa.hostname");
+    if ($qres->num_rows() != 1) {
+	die "Could not find exactly one matching widearea hostname for '$n'!";
+    }
+    my ($hostname) = $qres->fetch_row();
+    $qres = DBQueryFatal("select wa.node_id,n.type,wa.hostname" . 
+			 " from widearea_nodeinfo as wa " . 
+			 " left join nodes as n on wa.node_id=n.node_id" . 
+			 " where wa.hostname='$hostname'" . 
+			 "   and (n.type='$etype' or n.type='$ptype')");
+    if ($qres->num_rows() != 2) {
+	die "Should be exactly two widearea_nodeinfo records for node '$n'!\n";
+    }
+    my $i = 2;
+    my ($enid,$pnid) = (undef,undef);
+    while ($i--) {
+	my ($nid,$ntype,$hostname) = $qres->fetch_row();
+	if ($ntype eq $etype) {
+	    my $node = Node->Lookup($nid);
+	    if (!defined($node)) {
+		die "Could not find node '$n', exiting!\n";
+	    }
+	    $einfo{$nid} = $node;
+	    $enid = $nid;
+	}
+	elsif ($ntype eq $ptype) {
+	    my $node = Node->Lookup($nid);
+	    if (!defined($node)) {
+		die "Could not find node '$n', exiting!\n";
+	    }
+	    $pinfo{$nid} = $node;
+	    $pnid = $nid;
+	}
+    }
+    if (!(defined($enid) && defined($pnid))) {
+	die "Could not find elab and plab widearea_nodeinfo for node '$n'!\n";
+    }
+    $epmap{$enid} = $pnid;
+    $pemap{$pnid} = $enid;
+}
+
+foreach my $n (keys(%einfo)) {
+    print "Working on elab $n (plab $epmap{$n}):\n";
+    if ($mode eq 'elab') {
+	my ($pid,$eid);
+	my $allocated = NodeidToExp($n,\$pid,\$eid);
+	if (!$allocated) {
+	    print STDERR "Node '$n' already free, skipping.\n";
+	    next;
+	}
+	if ($allocated && ($pid ne NODEDEAD_PID || $eid ne NODEDEAD_EID)) {
+	    print STDERR "Node '$n' already allocated to $pid/$eid, skipping!\n";
+	    next;
+	}
+	if ($allocated) {
+	    if (system("$NFREE ".NODEDEAD_PID." ".NODEDEAD_EID." $n")) {
+		print STDERR "nfree failed for '$n', skipping!";
+		next;
+	    }
+	}
+	# so, now the node will be reloading... just need to fix up the plab
+	# node_id stuff.
+	$allocated = NodeidToExp($epmap{$n},\$pid,\$eid);
+	if (system("$RESERVE ".NODEDEAD_PID." ".NODEDEAD_EID." $epmap{$n}")) {
+	    print STDERR "sched_reserve failed for '$epmap{$n}', skipping!\n";
+	    next;
+	}
+	if ($allocated) {
+	    if (system("$NFREE $pid $eid " . $epmap{$n})) {
+		print STDERR "nfree failed for '$epmap{$n}', skipping!";
+		next;
+	    }
+	}
+    }
+    elsif ($mode eq 'plab') {
+	my ($pid,$eid);
+	my $allocated = NodeidToExp($n,\$pid,\$eid);
+	if ($allocated && ($pid ne NODEDEAD_PID || $eid ne NODEDEAD_EID)) {
+	    print STDERR "Node '$n' allocated to $pid/$eid, skipping.\n";
+	    next;
+	}
+	if (!$allocated) {
+	    if (system("$RESERVE ".NODEDEAD_PID." ".NODEDEAD_EID." $n")) {
+		print STDERR "sched_reserve failed for '$n', skipping!\n";
+		next;
+	    }
+	}
+	if (system("$OSSELECT $PLABMFS_OSID $n")) {
+	    print STDERR "os_select failed for '$n', skipping!\n";
+	    next;
+	}
+	# make sure node gets reinstalled from its PLC
+	if (system("$PLABFED $PLC manage node $n setstate rins")) {
+	    print STDERR "plabfed failed to set node '$n' boot state to rins!\n";
+	    next;
+	}
+	system("$REBOOT $n");
+    }
+}
+
+exit(0);

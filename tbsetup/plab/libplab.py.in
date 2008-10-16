@@ -2033,6 +2033,7 @@ class EmulabPlcObjTranslator:
     def __init__(self,plc):
         self.plc = plc
         self.__allowed_objects = [ 'project','node','user' ]
+        self.__mgmtOperations = { 'node': [ 'setstate' ] }
         pass
 
     def __checkMapByElabId(self,objtype,objid):
@@ -2153,6 +2154,26 @@ class EmulabPlcObjTranslator:
                   % (objtype,str(objid),self.plc.name,str(ex))
             raise RuntimeError(msg)
 
+        return
+
+    def manageObject(self,objtype,objid,op,opargs=[]):
+        if not objtype in self.__allowed_objects:
+            raise RuntimeError("unknown object type '%s'" % objtype)
+
+        if not objtype in self.__mgmtOperations \
+           and not op in self.__mgmtOperations[objtype]:
+            raise RuntimeError("unknown management operation %s/%s" \
+                               % (objtype,op))
+
+        ss = self.plc.agent.syncSupport()
+        if not ss or not objtype in ss:
+            raise RuntimeError("plc agent '%s' does not support object '%s'" \
+                               " delete!" % (self.plc.agent.__class__.__name__,
+                                             objtype))
+
+        plab_id,plab_name = self.__checkMapByElabId(objtype,objid)
+
+        self.plc.agent.manageObject(objtype,plab_id,op,opargs)
         return
 
     # XXX This translation stuff ought to be split, with libplab getting the
@@ -3521,7 +3542,7 @@ class Node:
         # have to set us up with root before anything else
         try:
             self.__copy(DEFAULT_DATA_PATH + "/fixsudo.sh", "/tmp/fixsudo.sh",
-                        tries=12,interval=15)
+                        tries=1000,interval=15)
             self.__perform("-tt sh /tmp/fixsudo.sh", quiet = True,
                            tries=3,interval=5)
             pass

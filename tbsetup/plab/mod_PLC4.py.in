@@ -494,6 +494,10 @@ class PLCagent:
     def NodeDelete(self,id):
         return self.__server.DeleteNode(self.auth,id)
 
+    def NodeSetBootState(self,id,boot_state):
+            self.__server.UpdateNode(self.auth,id,{ 'boot_state':boot_state })
+            pass
+
     def PersonAdd(self,name,email,url,phone,passwd,roles):
         sr = name.rsplit(" ",1)
         if len(sr) == 1:
@@ -616,6 +620,9 @@ class mod_PLC4:
                                                    'longitude','latitude'],
                                     'del':'SiteDelete' }
 
+        self.mgmt_tr = dict()
+        self.mgmt_tr['node'] = { 'setstate':'NodeSetBootState' }
+
         return
 
     def setdebug(self,sdebug,sverbose):
@@ -663,6 +670,20 @@ class mod_PLC4:
         tryXmlrpcCmd(method,self.__filterdict(properties,args))
 
         return retval
+
+    def manageObject(self,objtype,objid,op,opargs=[]):
+        agent = self.__getAgent(None)
+
+        method = getattr(agent,self.mgmt_tr[objtype][op])
+        fargs = list(opargs)
+        fargs.insert(0,objid)
+        if debug:
+            print "managing object of type '%s' with args '%s'" \
+                  % (objtype,fargs)
+        fargs = tuple(fargs)
+        tryXmlrpcCmd(method,fargs)
+
+        return objid
 
     def deleteObject(self,objtype,id):
         agent = self.__getAgent(None)

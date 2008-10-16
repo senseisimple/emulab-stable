@@ -13,7 +13,9 @@ from libtestbed import *
 import libplab
 import traceback
 
-usage = "\t%prog [-d] <plcid_or_name> <sync|delete> <objtype> <objid>"
+usage = "\t%prog [-d] <plcid_or_name> <sync|delete> <objtype> <objid>\n" \
+        "\t%prog [-d] <plcid_or_name> <manage> <objtype> <objid> <op> <opargs>\n"
+
 
 def main(args):
     me = args[0]
@@ -38,9 +40,25 @@ def main(args):
         elif op == 'delete':
             translator.deleteObject(objtype,objid)
             pass
+        else:
+            raise RuntimeError("unknown command %s" % op)
+    elif len(args) > 5:
+        plcid,op,objtype,objid,mgmt_op = args[:5]
+        opargs = args[5:]
+
+        # load up the plc:
+        plc = libplab.PLC(plcid)
+        translator = libplab.EmulabPlcObjTranslator(plc)
+
+        if op == 'manage':
+            translator.manageObject(objtype,objid,mgmt_op,opargs)
+        else:
+            raise RuntimeError("unknown command %s" % op)
     else:
         parser.error("Incorrect number of arguments")
         pass
+
+    sys.exit(0)
 
 if __name__ == "__main__":
     main(sys.argv)
