@@ -46,6 +46,7 @@ my $NALLOC	   = "$TB/bin/nalloc";
 my $NFREE	   = "$TB/bin/nfree";
 my $NODEREBOOT	   = "$TB/bin/node_reboot";
 my $NAMEDSETUP     = "$TB/sbin/named_setup";
+my $PLABNODE       = "$TB/sbin/plabnode";
 my $GENTOPOFILE    = "$TB/libexec/gentopofile";
 
 # Cache of instances to avoid regenerating them.
@@ -93,7 +94,6 @@ sub Lookup($$)
     $self->{'CREDENTIAL'} = undef;	# client
     $self->{'AGGREGATE'}  = undef;	# server
     $self->{'RSPEC'}      = undef;	# client/server
-    $self->{'HRN'}        = undef;	# Bogus kludge for aggregates.
 
     my $rspec_string = $self->{'SLIVER'}->{'rspec_string'};
     if (defined($rspec_string) && $rspec_string ne "") {
@@ -141,43 +141,13 @@ sub Stringify($)
 }
 
 #
-# Cons up an hrn.
-#
-sub hrn($)
-{
-    my ($self) = @_;
-
-    if (defined($self->{'HRN'})) {
-	# XXX Kludge for Emulab aggregates
-	return $self->{'HRN'};
-    }
-    elsif (defined($self->rspec()->{'tmcd_nodeid'})) {
-	return $self->rspec()->{'tmcd_nodeid'};
-    }
-    elsif (defined($self->rspec()->{'hrn'})) {
-	return $self->rspec()->{'hrn'};
-    }
-    else {
-	return $OURDOMAIN . "." . $self->resource_type() . "." .
-	    $self->idx();
-    }
-}
-# XXX Kludge for Emulab aggregates
-sub Sethrn($$)
-{
-    my ($self, $hrn) = @_;
-    
-    $self->{'HRN'} = $hrn;
-    return 0;
-}    
-
-#
 # Create a sliver record in the DB. On the client side we save the credential
 # that allows control of it, for later operations.
 #
-sub Create($$$$$$;$$$)
+sub Create($$$$$$$$;$$$)
 {
     my ($class, $slice, $owner_uuid, $uuid, $resource_uuid, $resource_type,
+	$hrn, $nickname,
 	$rspec, $credential, $component) = @_;
     my @insert_data = ();
     my $certificate;
@@ -185,22 +155,25 @@ sub Create($$$$$$;$$$)
     # Every sliver gets a new unique index.
     my $idx = TBGetUniqueIndex('next_sliver', 1);
     if (defined($credential)) {
+	$certificate = $credential->target_cert();
 	# Store the certificate for later use.
-	$certificate =
-	    GeniCertificate->StorePublic($credential->target_cert());
-	if (!defined($certificate)) {
+	if ($certificate->Store() != 0) {
 	    print STDERR "Could not store certificate\n";
 	    return undef;
 	}
 	$resource_uuid = $uuid = $credential->this_uuid();
-
+	$hrn = $credential->hrn();
+	if (defined($credential->extensions()) &&
+	    exists($credential->extensions()->{'nickname'})) {
+	    $nickname = $credential->extensions()->{'nickname'};
+	}
 	# Store the credential
 	return undef
 	    if ($credential->Store() != 0);
     }
     else {
 	# Create a cert pair, for this resource uuid. 
-	$certificate = GeniCertificate->Create("sliver", $uuid);
+	$certificate = GeniCertificate->Create("sliver", $hrn, $TBOPS, $uuid);
 	if (!defined($certificate)) {
 	    print STDERR "Could not generate new certificate and UUID!\n";
 	    return undef;
@@ -211,6 +184,9 @@ sub Create($$$$$$;$$$)
     # Now tack on other stuff we need.
     push(@insert_data, "created=now()");
     push(@insert_data, "idx='$idx'");
+    push(@insert_data, "hrn=" . DBQuoteSpecial($hrn));
+    push(@insert_data, "nickname=" . DBQuoteSpecial($nickname))
+	if (defined($nickname));
     push(@insert_data, "uuid='$uuid'");
     push(@insert_data, "resource_uuid='$resource_uuid'");
     push(@insert_data, "resource_type='$resource_type'");
@@ -255,6 +231,8 @@ sub Create($$$$$$;$$$)
 sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'SLIVER'}->{$_[1]}); }
 sub idx($)		{ return field($_[0], "idx"); }
 sub uuid($)		{ return field($_[0], "uuid"); }
+sub hrn($)		{ return field($_[0], "hrn"); }
+sub nickname($)		{ return field($_[0], "nickname"); }
 sub slice_uuid($)	{ return field($_[0], "slice_uuid"); }
 sub creator_uuid($)	{ return field($_[0], "creator_uuid"); }
 sub created($)		{ return field($_[0], "created"); }
@@ -543,6 +521,9 @@ sub NewCredential($$)
 	print STDERR "Could not create credential for $self, $owner\n";
 	return undef;
     }
+    if (defined($self->nickname())) {
+	$credential->AddExtension("nickname", $self->nickname());
+    }
     if ($credential->Sign($self->GetCertificate()) != 0) {
 	print STDERR "Could not sign credential for $self, $owner\n";
 	return undef;
@@ -571,7 +552,7 @@ sub Create()
     my ($class, $slice, $user_uuid, $rspec, $credential, $component) = @_;
 
     return GeniSliver->Create($slice, $user_uuid, undef, undef,
-			      "Client", $rspec,
+			      "Client", undef, undef, $rspec, 
 			      $credential, $component);
 }
 
@@ -713,41 +694,48 @@ sub Create($$$$$)
 	print STDERR "Could not map node $resource_uuid to its object\n";
 	return undef;
     }
-    my $reservation = $node->Reservation();
-    if (!defined($reservation)) {
-	print STDERR "$node was already released from $slice\n";
-	return undef;
+    if (! $node->isremotenode()) {
+	my $reservation = $node->Reservation();
+	if (!defined($reservation)) {
+	    print STDERR "$node was already released from $slice\n";
+	    return undef;
+	}
+	if (! $reservation->SameExperiment($experiment)) {
+	    print STDERR "$node is reserved to another, not $reservation\n";
+	    # Signal error so we can look at what happened.
+	    return undef;
+	}
     }
-    if (! $reservation->SameExperiment($experiment)) {
-	print STDERR "$node is reserved to another, not $reservation\n";
-	# Signal error so we can look at what happened.
-	return undef;
-    }
+    my $hrn = "emulab." . $node->node_id();
+    my $nickname = $rspec->{'nickname'};
     
     #
     # The resource UUID refers to the physical node, but the virtualization
     # type might require a vnode.
     # 
     if ($virtualization_type eq "emulab-vnode") {
+	my $vtype = ($node->isplabphysnode() ? "pcplab" : "pcfake");
+	
 	#
-	# Create a fake jailnode on the physnode. 
+	# Create a virtual node on the physnode. 
 	#
 	my @vnodes;
 	if (Node::CreateVnodes(\@vnodes,
-			       {"pid"      => $reservation->pid(),
-				"eid"      => $reservation->eid(),
+			       {"pid"      => $experiment->pid(),
+				"eid"      => $experiment->eid(),
 				"count"    => 1,
-				"vtype"    => "pcfake",
+				"vtype"    => "$vtype",
 				"nodeid"   => $node->node_id(),
 				"verbose"  => 1 }) < 0) {
-	    print STDERR "Could not create fake jail node on $node\n";
+	    print STDERR "Could not create new virtual node on $node\n";
 	    return undef;
 	}
 	my $vnode = Node->Lookup($vnodes[0]);
 	$uuid = $vnode->uuid();
+	$hrn = "emulab." . $vnode->node_id()
     }
     return GeniSliver->Create($slice, $user_uuid, $uuid, $resource_uuid,
-			      "Node", $rspec);
+			      "Node", $hrn, $nickname, $rspec);
 }
 
 #
@@ -779,83 +767,89 @@ sub Provision($;$)
 	print STDERR "Could not map node $uuid to its object\n";
 	return -1;
     }
+    my $node_id     = $node->node_id();
     my $reservation = $node->Reservation();
     if (!defined($reservation)) {
-	print STDERR "$node was already released from $self\n";
+	print STDERR "$node was already released from slice\n";
 	return -1;
     }
-    if ($reservation->SameExperiment($experiment)) {
-	my $pid = $reservation->pid();
-	my $eid = $reservation->eid();
+    if (! $reservation->SameExperiment($experiment)) {
+	print STDERR "$node is reserved to another, not $reservation\n";
+	# Signal error so we can look at what happened.
+	return -1;
+    }
+    my $pid = $experiment->pid();
+    my $eid = $experiment->eid();
 	
-	if ($experiment->InsertVirtNode($node) != 0) {
-	    print STDERR "Could not add virtnode entry for $node to $self\n";
+    if ($experiment->InsertVirtNode($node) != 0) {
+	print STDERR "Could not add virtnode entry for $node to $self\n";
+	return -1;
+    }
+
+    if (exists($self->rspec()->{'tmcd_server'}) &&
+	exists($self->rspec()->{'tmcd_nodeid'})) {
+	my $tmcd_redirect =
+	    $self->rspec()->{'tmcd_server'} . ":" .
+	    $self->rspec()->{'tmcd_nodeid'};
+
+	if ($node->ModifyReservation({"tmcd_redirect" => $tmcd_redirect})){
 	    return -1;
 	}
+    }
 
-	if (exists($self->rspec()->{'tmcd_server'}) &&
-	    exists($self->rspec()->{'tmcd_nodeid'})) {
-	    my $tmcd_redirect =
-		$self->rspec()->{'tmcd_server'} . ":" .
-		$self->rspec()->{'tmcd_nodeid'};
-
-	    if ($node->ModifyReservation({"tmcd_redirect" => $tmcd_redirect})){
-		return -1;
-	    }
+    #
+    # An emulab cluster node uses a vnode on the physnode, even for a
+    # dedicated physical nodes. We need to tell tmcd about the pnode,
+    # but not the vnode since it is going to redirect to tmcd on the
+    # remote Emulab controlling the experiment.
+    #
+    if (!$node->isremotenode() &&
+	exists($self->rspec()->{'virtualization_type'}) &&
+	$self->rspec()->{'virtualization_type'} eq "emulab-vnode") {
+	my $pnode = Node->Lookup($node->phys_nodeid());
+	if (!defined($pnode)) {
+	    print STDERR "Could not get pnode object for $node\n";
+	    return -1;
 	}
-
-	#
-	# An emulab node uses a vnode on the physnode, even for a dedicated
-	# physical nodes. We need to tell tmcd about the pnode, but not
-	# the vnode since it is going to redirect to tmcd on the remote Emulab
-	# controlling the experiment. 
-	#
-	if (exists($self->rspec()->{'virtualization_type'}) &&
-	    $self->rspec()->{'virtualization_type'} eq "emulab-vnode") {
-	    my $pnode = Node->Lookup($node->phys_nodeid());
-	    if (!defined($pnode)) {
-		print STDERR "Could not get pnode object for $node\n";
-		return -1;
-	    }
 	    
-	    if ($experiment->InsertVirtNode($pnode) != 0) {
-		print STDERR
-		    "Could not add virtnode entry for $pnode to $self\n";
-		return -1;
-	    }
-	    $pnode->ModifyReservation({"genisliver_idx" => $self->idx()});
-
-	    # Set it to boot the default OS.
-	    if ($pnode->SelectOS() != 0) {
-		return -1;
-	    }
-	}
-	else {
-	    #
-	    # For a "raw" node, there is no vnode, so this is the pnode
-	    # we need to mark for tmcd.
-	    #
-	    if ($node->ModifyReservation({"genisliver_idx" => $self->idx()})) {
-		return -1;
-	    }
-	}
-	
-	# Must have the topofile for node boot. Might need locking on this.
-	if (system("$GENTOPOFILE $pid $eid")) {
-	    print STDERR "$GENTOPOFILE failed\n";
+	if ($experiment->InsertVirtNode($pnode) != 0) {
+	    print STDERR "Could not add virtnode entry for $pnode to $self\n";
 	    return -1;
 	}
+	$pnode->ModifyReservation({"genisliver_idx" => $self->idx()});
 
-	# The node will not boot locally unless there is a DNS record.
-	if (system("$NAMEDSETUP")) {
-	    print STDERR "$NAMEDSETUP failed\n";
+	# Set it to boot the default OS.
+	if ($pnode->SelectOS() != 0) {
 	    return -1;
 	}
     }
     else {
-	print STDERR "$node is reserved to another, not $self\n";
-	# Signal error so we can look at what happened.
+	#
+	# For a "raw" node, there is no vnode, so this is the pnode
+	# we need to mark for tmcd.
+	#
+	if ($node->ModifyReservation({"genisliver_idx" => $self->idx()})) {
+	    return -1;
+	}
+    }
+	
+    # Must have the topofile for node boot. Might need locking on this.
+    if (system("$GENTOPOFILE $pid $eid")) {
+	print STDERR "$GENTOPOFILE failed\n";
 	return -1;
+    }
+
+    # The node will not boot locally unless there is a DNS record.
+    if (system("$NAMEDSETUP")) {
+	print STDERR "$NAMEDSETUP failed\n";
+	return -1;
+    }
+    if ($node->isremotenode()) {
+	system("$PLABNODE alloc $pid $eid $node_id");
+	if ($?) {
+	    print STDERR "$PLABNODE failed\n";
+	    return -1;
+	}
     }
     return 0;
 }
@@ -893,12 +887,21 @@ sub UnProvision($)
 	my $pid = $experiment->pid();
 	my $eid = $experiment->eid();
 
+	if ($node->isremotenode()) {
+	    system("$PLABNODE free $pid $eid $node_id");
+	    if ($?) {
+		print STDERR "$PLABNODE failed\n";
+		return -1;
+	    }
+	}
+
 	if ($experiment->DeleteVirtNode($node) != 0) {
 	    print STDERR "Could remove virtnode entry for $node from $self\n";
 	    return -1;
 	}
 
-	if ($self->rspec()->{'virtualization_type'} eq "emulab-vnode") {
+	if (!$node->isremotenode() &&
+	    $self->rspec()->{'virtualization_type'} eq "emulab-vnode") {
 	    my $pnode_id = $node->phys_nodeid();
 	    my $pnode = Node->Lookup($pnode_id);
 	    if (!defined($pnode)) {
@@ -961,6 +964,12 @@ sub Start($)
     if ($reservation->SameExperiment($experiment)) {
 	my $node_id = $node->node_id();
 
+	# XXX Need to fix up this status stuff.
+	if ($node->isremotenode() && $self->status() eq "created") {
+	    $self->SetStatus("ready");
+	    next;
+	}
+
 	#
 	# Reboot pnode if not already running. 
 	#
@@ -1004,10 +1013,14 @@ use Node;
 sub Create()
 {
     my ($class, $slice, $user_uuid,
-	$interface_uuid, $resource_uuid, $rspec) = @_;
+	$interface_uuid, $node, $rspec) = @_;
+
+    my $nickname = $rspec->{'nickname'};
+    my $hrn = "emulab." . $node->node_id() . "." . $rspec->{'iface_name'};
 
     return GeniSliver->Create($slice, $user_uuid, $interface_uuid,
-			      $resource_uuid, "Interface", $rspec);
+			      $node->uuid(), "Interface",
+			      $hrn, $nickname, $rspec);
 }
 
 sub Provision($)

@@ -23,6 +23,7 @@ use GeniCredential;
 use GeniCertificate;
 use Experiment;
 use libdb qw(TBGetUniqueIndex);
+use libtestbed qw(NewUUID);
 use English;
 use XML::Simple;
 use XML::LibXML;
@@ -98,12 +99,11 @@ sub Create($$$$)
     
     my $self = {};
     $self->{'rspec'}         = $rspec;
-    $self->{'ticket_cert'}   = undef;
     $self->{'ticket_uuid'}   = undef;
     $self->{'slice_uuid'}    = $slice->uuid();
     $self->{'owner_uuid'}    = $owner->uuid();
-    $self->{'slice_cert'}    = $slice->cert();
-    $self->{'owner_cert'}    = $owner->cert();
+    $self->{'slice_cert'}    = $slice->GetCertificate();
+    $self->{'owner_cert'}    = $owner->GetCertificate();
     $self->{'seqno'}         = $seqno;
     $self->{'ticket_string'} = undef;
     $self->{'component'}     = undef;
@@ -126,13 +126,12 @@ sub field($$)           { return ($_[0]->{$_[1]}); }
 sub idx($)		{ return field($_[0], "idx"); }
 sub seqno($)		{ return field($_[0], "seqno"); }
 sub rspec($)		{ return field($_[0], "rspec"); }
-sub uuid($)		{ return field($_[0], "slice_uuid"); }
 sub slice_uuid($)	{ return field($_[0], "slice_uuid"); }
 sub target_uuid($)	{ return field($_[0], "slice_uuid"); }
 sub owner_uuid($)	{ return field($_[0], "owner_uuid"); }
 sub slice_cert($)	{ return field($_[0], "slice_cert"); }
 sub owner_cert($)	{ return field($_[0], "owner_cert"); }
-sub ticket_cert($)	{ return field($_[0], "ticket_cert"); }
+sub uuid($)		{ return field($_[0], "ticket_uuid"); }
 sub ticket_uuid($)	{ return field($_[0], "ticket_uuid"); }
 sub ticket($)		{ return field($_[0], "ticket"); }
 sub asString($)		{ return field($_[0], "ticket_string"); }
@@ -209,46 +208,51 @@ sub CreateFromSignedTicket($$;$$)
     my ($uuid_node) = $doc->getElementsByTagName("uuid");
     return undef
 	if (!defined($uuid_node));
-    my $ticket_cert = $uuid_node->to_literal();
-    my $ticket_uuid;
-    GeniCertificate->CertificateInfo($ticket_cert, \$ticket_uuid) == 0
-	or return undef;
+    my $ticket_uuid = $uuid_node->to_literal();
 
     if (! ($ticket_uuid =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/)) {
 	print STDERR "Invalid uuid in ticket\n";
 	return undef;
     }
 
-    # Dig out the slice uuid. Locally, I am not sure if we bother to
-    # keep slices in the DB (they are in the DB at geni central).
-    ($uuid_node) = $doc->getElementsByTagName("target_uuid");
+    # Dig out the target certificate.
+    my ($cert_node) = $doc->getElementsByTagName("target_gid");
     return undef
-	if (!defined($uuid_node));
-    my $slice_cert = $uuid_node->to_literal();
-    my $slice_uuid;
-    GeniCertificate->CertificateInfo($slice_cert, \$slice_uuid) == 0
-	or return undef;
+	if (!defined($cert_node));
+    my $target_certificate =
+	GeniCertificate->LoadFromString($cert_node->to_literal());
+    return undef
+	if (!defined($target_certificate));
 
-    if (! ($slice_uuid =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/)) {
-	print STDERR "Invalid slice_uuid in ticket\n";
+    if (!($target_certificate->uuid() =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/)) {
+	print STDERR "Invalid target_uuid in credential\n";
+	return undef;
+    }
+    if (!($target_certificate->hrn() =~ /^[\w\.]+$/)) {
+	print STDERR "Invalid hrn in credential\n";
 	return undef;
     }
 
-    # Dig out the owner uuid. Locally, I am not sure if we bother to
-    # keep users in the DB (they are in the DB at geni central).
-    ($uuid_node) = $doc->getElementsByTagName("owner_uuid");
+    # Dig out the owner certificate.
+    ($cert_node) = $doc->getElementsByTagName("owner_gid");
     return undef
-	if (!defined($uuid_node));
-    my $owner_cert = $uuid_node->to_literal();
-    my $owner_uuid;
-    GeniCertificate->CertificateInfo($owner_cert, \$owner_uuid) == 0
-	or return undef;
+	if (!defined($cert_node));
 
-    if (! ($owner_uuid =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/)) {
-	print STDERR "Invalid owner_uuid in ticket\n";
+    my $owner_certificate =
+	GeniCertificate->LoadFromString($cert_node->to_literal());
+    return undef
+	if (!defined($owner_certificate));
+
+    if (!($owner_certificate->uuid() =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/)) {
+	print STDERR "Invalid target_uuid in credential\n";
+	return undef;
+    }
+    if (!($owner_certificate->hrn() =~ /^[\w\.]+$/)) {
+	print STDERR "Invalid hrn in credential\n";
 	return undef;
     }
 
+    # Sequence number
     my ($seqno_node) = $doc->getElementsByTagName("serial");
     return undef
 	if (!defined($seqno_node));
@@ -262,12 +266,11 @@ sub CreateFromSignedTicket($$;$$)
     my $self = {};
     $self->{'idx'}           = undef;
     $self->{'rspec'}         = $rspec;
-    $self->{'ticket_cert'}   = $ticket_cert;
     $self->{'ticket_uuid'}   = $ticket_uuid;
-    $self->{'slice_uuid'}    = $slice_uuid;
-    $self->{'owner_uuid'}    = $owner_uuid;
-    $self->{'slice_cert'}    = $slice_cert;
-    $self->{'owner_cert'}    = $owner_cert;
+    $self->{'slice_uuid'}    = $target_certificate->uuid();
+    $self->{'owner_uuid'}    = $owner_certificate->uuid();
+    $self->{'slice_cert'}    = $target_certificate;
+    $self->{'owner_cert'}    = $owner_certificate;
     $self->{'ticket_string'} = $ticket_string;
     $self->{'xmlref'}        = $doc;
     $self->{'component'}     = $component;
@@ -308,8 +311,6 @@ sub Delete($)
 	my $idx  = $self->idx();
 	my $uuid = $self->ticket_uuid();
 	
-	DBQueryWarn("delete from geni_certificates where uuid='$uuid'")
-	    or return -1;
 	DBQueryWarn("delete from geni_tickets where idx='$idx'")
 	    or return -1;
 	
@@ -394,23 +395,16 @@ sub Sign($)
 	if (!ref($self));
 
     my $idx        = $self->seqno();
-    my $slice_cert = $self->slice_cert();
-    my $owner_cert = $self->owner_cert();
-    my $hrn        = "$OURDOMAIN.tickets.$idx";
+    my $slice_cert = $self->slice_cert()->cert();
+    my $owner_cert = $self->owner_cert()->cert();
     my $rspec_xml  = XMLout($self->rspec(), "NoAttr" => 1);
     $rspec_xml =~ s/opt\>/rspec\>/g;
 
     #
-    # Every ticket/credential its own uuid (certificate).
+    # Every ticket/credential gets its own uuid.
     #
-    my $certificate = GeniCertificate->Create("ticket");
-    if (!defined($certificate)) {
-	print STDERR "Could not generate new certificate for $self!\n";
-	return -1;
-    }
-    $self->{'ticket_cert'}   = $certificate->cert();
-    $self->{'ticket_uuid'}   = $certificate->uuid();
-    my $ticket_cert = $certificate->cert();
+    my $ticket_uuid = NewUUID();
+    $self->{'ticket_uuid'} = $ticket_uuid;
 
     #
     # Create a template xml file to sign.
@@ -420,10 +414,9 @@ sub Sign($)
 	"<credential xml:id=\"ref1\">\n".
 	" <type>ticket</type>\n".
 	" <serial>$idx</serial>\n".
-	" <owner_uuid>$owner_cert</owner_uuid>\n".
-	" <target_uuid>$slice_cert</target_uuid>\n".
-	" <uuid>$ticket_cert</uuid>\n".
-	" <hrn>$hrn</hrn>\n".
+	" <owner_gid>$owner_cert</owner_gid>\n".
+	" <target_gid>$slice_cert</target_gid>\n".
+	" <uuid>$ticket_uuid</uuid>\n".
 	" <expires>2008-05-10T09:00:00</expires>\n".
 	" <ticket>\n".
 	"  <can_delegate>1</can_delegate>\n".

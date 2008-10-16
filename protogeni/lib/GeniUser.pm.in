@@ -195,13 +195,11 @@ sub CheckExisting($$$)
 }
 
 #
-# Class function to create new Geni user and return object. Note that this
-# is used by the ClearingHouse *and* the CM/SA to record users. 
+# Class function to create new Geni user in the DB and return object. 
 #
-sub Create($$$$$$$$$;$)
+sub Create($$$$;$)
 {
-    my ($class, $hrn, $uid, $uuid, $name, $email,
-	$cert, $authority, $keys) = @_;
+    my ($class, $certificate, $authority, $info, $keys) = @_;
     my @insert_data = ();
 
     # Every user gets a new unique index.
@@ -218,22 +216,38 @@ sub Create($$$$$$$$$;$)
     push(@insert_data, "idx='$idx'");
     push(@insert_data, "status='active'");
 
-    my $safe_hrn   = DBQuoteSpecial($hrn);
-    my $safe_uid   = DBQuoteSpecial($uid);
-    my $safe_name  = DBQuoteSpecial($name);
-    my $safe_email = DBQuoteSpecial($email);
-    my $safe_uuid  = DBQuoteSpecial($uuid);
+    my $safe_hrn   = DBQuoteSpecial($certificate->hrn());
+    my $safe_uuid  = DBQuoteSpecial($certificate->uuid());
+    my $safe_email = DBQuoteSpecial($certificate->email());
     push(@insert_data, "hrn=$safe_hrn");
-    push(@insert_data, "uid=$safe_uid");
-    push(@insert_data, "name=$safe_name");
-    push(@insert_data, "email=$safe_email");
     push(@insert_data, "uuid=$safe_uuid");
+    push(@insert_data, "email=$safe_email");
     push(@insert_data, "sa_uuid='$sa_uuid'");
 
-    # Insert certificate.
-    my $certificate = GeniCertificate->StorePublic($cert);
-    if (!defined($certificate)) {
-	print STDERR "Could not store certificate for new user\n";
+    #
+    # uid come from last component of the hrn.
+    #
+    my ($uid) = ($certificate->hrn() =~ /^.*\.(\w*)$/);
+    return undef
+	if (!defined($uid));
+
+    #
+    # This comes from either an info record or the cert.
+    #
+    my $safe_name;
+    if (defined($info) && exists($info->{'name'})) {
+	$safe_name = DBQuoteSpecial($info->{'name'});
+    }
+    else {
+	$safe_name = DBQuoteSpecial($uid);
+    }
+    my $safe_uid = DBQuoteSpecial($uid);
+
+    push(@insert_data, "uid=$safe_uid");
+    push(@insert_data, "name=$safe_name");
+
+    if ($certificate->Store() != 0) {
+	print STDERR "Could not store certificate for new user.\n";
 	return undef;
     }
 
@@ -258,6 +272,41 @@ sub Create($$$$$$$$$;$)
     }
 
     return GeniUser->Lookup($idx);
+}
+
+#
+# Modify a record; only partial.
+#
+sub Modify($$$$)
+{
+    my ($self, $name, $email, $keys) = @_;
+    my @insert_data = ();
+
+    my $idx  = $self->idx();
+    my $uuid = $self->uuid();
+    my $safe_name  = DBQuoteSpecial($name);
+    my $safe_email = DBQuoteSpecial($email);
+
+    return -1
+	if (!DBQueryWarn("update geni_users set ".
+			 " name=$safe_name, email=$safe_email ".
+			 "where idx='$idx'"));
+
+    if (defined($keys)) {
+	return -1
+	    if (!DBQueryWarn("delete from geni_userkeys where uuid='$uuid'"));
+	
+	foreach my $keyref (@{ $keys }) {
+	    my $safe_key  = DBQuoteSpecial($keyref->{'key'});
+	    my $safe_type = DBQuoteSpecial($keyref->{'type'});
+	    
+	    DBQueryWarn("replace into geni_userkeys set ".
+			"  uuid='$uuid', created=now(), ".
+			"  `key`=$safe_key, `type`=$safe_type")
+		or return undef;
+	}
+    }
+    return 0;
 }
 
 #
@@ -463,7 +512,7 @@ sub Create($$)
 	print STDERR "No certificate found for $user\n";
 	return undef;
     }
-    $self ->{'CERT'} = $certificate;
+    $self->{'CERT'} = $certificate;
 
     bless($self, $class);
     return $self;
@@ -478,7 +527,7 @@ sub email($)		{ return $_[0]->{'USER'}->email(); }
 sub GetSSHKeys($$)      { return $_[0]->{'USER'}->GetSSHKeys($_[1]); }
 
 # Need to construct this since not in User structure.
-sub hrn($)		{ return $OURDOMAIN . ".users." . $_[0]->uid(); }
+sub hrn($)		{ return "emulab." . $_[0]->uid(); }
 
 # And this is in another structure.
 sub cert($)             { return $_[0]->{'CERT'}->cert(); }
@@ -492,15 +541,10 @@ sub Register($)
     my ($self) = @_;
     my $blob;
 
-    # Register this user at the ClearingHouse, if not already registered.
-    if (GeniCHClient::LookupUser($self->uuid(), \$blob) != 0) {
-	my @sliverkeys = ();
-	$self->GetKeys(\@sliverkeys);
-	return GeniCHClient::RegisterUser($self->hrn(), 
-					  $self->name(), $self->email(),
-					  $self->cert(), \@sliverkeys);
-    }
-    return 0;
+    my @sliverkeys = ();
+    $self->GetKeys(\@sliverkeys);
+    return GeniCHClient::RegisterUser($self->name(), $self->email(),
+				      $self->cert(), \@sliverkeys);
 }
 
 #

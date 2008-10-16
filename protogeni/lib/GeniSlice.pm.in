@@ -142,6 +142,18 @@ sub Stringify($)
     return "[GeniSlice: $hrn, IDX: $idx]";
 }
 
+# The slicename is the last token in the hrn.
+sub slicename($)
+{
+    my ($self) = @_;
+
+    my ($slicename) = ($self->hrn() =~ /^.*\.(\w*)$/);
+    $slicename = $self->hrn()
+	if (!defined($slicename));
+
+    return $slicename;
+}
+
 #
 # Lookup slice by the experiment it is related to.
 #
@@ -184,10 +196,9 @@ sub CheckExisting($$$)
 #
 # Class function to create new Geni slice and return the object.
 #
-sub Create($$$$$$;$)
+sub Create($$$$;$)
 {
-    my ($class, $hrn, $uuid, $creator_uuid, $certificate,
-	$authority, $exptidx) = @_;
+    my ($class, $certificate, $creator_uuid, $authority, $exptidx) = @_;
     my @insert_data = ();
 
     # Every slice gets a new unique index.
@@ -206,26 +217,22 @@ sub Create($$$$$$;$)
     push(@insert_data, "exptidx=$exptidx")
 	if (defined($exptidx));
     
-    my $safe_hrn   = DBQuoteSpecial($hrn);
-    my $safe_uuid  = DBQuoteSpecial($uuid);
+    my $safe_hrn   = DBQuoteSpecial($certificate->hrn());
+    my $safe_uuid  = DBQuoteSpecial($certificate->uuid());
     my $safe_cuuid = DBQuoteSpecial($creator_uuid);
     push(@insert_data, "hrn=$safe_hrn");
     push(@insert_data, "uuid=$safe_uuid");
     push(@insert_data, "creator_uuid=$safe_cuuid");
 
-    # If the certificate it a reference, then it is already stored in
-    # the DB. If its a string, then need to store it locally.
-    if (!ref($certificate)) {
-	$certificate = GeniCertificate->StorePublic($certificate);
-	if (!defined($certificate)) {
-	    print STDERR "Could not store certificate for new slice.\n";
-	    return undef;
-	}
+    if ($certificate->Store() != 0) {
+	print STDERR "Could not store certificate for new slice.\n";
+	return undef;
     }
 
     # Insert into DB.
-    DBQueryWarn("insert into geni_slices set " . join(",", @insert_data))
-	or return undef;
+    return undef
+	if (! DBQueryWarn("insert into geni_slices set " .
+			  join(",", @insert_data)));
 
     return GeniSlice->Lookup($idx);
 }
@@ -238,30 +245,42 @@ sub CreateFromLocal($$$)
 {
     my ($class, $experiment, $user) = @_;
 
-    # XXX Form hrn from the uid and domain. This is backwards.
-    my $hrn = $OURDOMAIN . "." . $experiment->pid() . "." . $experiment->eid();
-    my $creator_uuid = $user->uuid();
+    #
+    # So we know who/what we are acting as.
+    #
+    my $EMULAB_PEMFILE = "@prefix@/etc/genisa.pem";
+    my $certificate = GeniCertificate->LoadFromFile($EMULAB_PEMFILE);
+    if (!defined($certificate)) {
+	print STDERR "Could not get uuid from $EMULAB_PEMFILE\n";
+	return undef;
+    }
 
     #
-    # Need our own (this Emulab) slice authority record.
+    # Need our own slice authority record.
     #
-    my $authority = GeniAuthority->Lookup("sa." . $OURDOMAIN);
+    my $authority = GeniAuthority->Lookup($certificate->uuid());
     if (!defined($authority)) {
 	print STDERR "Could not find the local authority record\n";
 	return undef;
     }
+    
+    my $hrn = $authority->hrn() . "." . $experiment->idx();
+    my $creator_uuid = $user->uuid();
 
     #
-    # Generate a certificate pair, capturing the certificate to store in
-    # the DB so we have ready access to it.
+    # Generate a certificate.
     #
-    my $certificate = GeniCertificate->Create("slice");
+    $certificate = GeniCertificate->Create("slice", $hrn, $user->email());
     if (!defined($certificate)) {
 	print STDERR "Could not create certificate for slice.\n";
 	return undef;
     }
-    return GeniSlice->Create($hrn, $certificate->uuid(), $creator_uuid,
-			     $certificate, $authority, $experiment->idx());
+    my $slice = GeniSlice->Create($certificate, $creator_uuid,
+				  $authority, $experiment->idx());
+    $certificate->Delete()
+	if (!defined($slice));
+
+    return $slice;
 }
 
 #
@@ -274,10 +293,6 @@ sub Register($)
     return -1
 	if (! ref($self));
 
-    my $blob;
-    return 0
-	if (GeniCHClient::LookupSlice($self->uuid(), \$blob) == 0);
-
     # Bind the other users too.
     my @userbindings;
     if ($self->UserBindings(\@userbindings) != 0) {
@@ -285,8 +300,7 @@ sub Register($)
 	return -1;
     }
 
-    GeniCHClient::RegisterSlice($self->hrn(),
-				$self->creator_uuid(),
+    GeniCHClient::RegisterSlice($self->creator_uuid(),
 				$self->cert(),
 				\@userbindings)
 	== 0 or return -1;
@@ -336,14 +350,16 @@ sub DiscoverResources($$)
     my @result = ();
     
     foreach my $ref (@{ $blob }) {
-	my $uuid = $ref->{'uuid'};
+	my $certificate = GeniCertificate->LoadFromString($ref->{'gid'});
+	return -1
+	    if (!defined($certificate));
+	my $uuid = $certificate->uuid();
 
 	my $component = GeniComponent->Lookup($uuid);
 	if (!defined($component)) {
 	    $component = GeniComponent->CreateFromRegistry($uuid);
-	    if (!defined($component)) {
-		return -1;
-	    }
+	    return -1
+		if (!defined($component));
 	}
 	push(@result, $component);
     }
@@ -440,6 +456,25 @@ sub UnBindUser($$)
 
     DBQueryWarn("delete from geni_bindings ".
 		"where slice_uuid='$slice_uuid' and user_uuid='$user_uuid'")
+	or return -1;
+    
+    return 0;
+}
+
+#
+# Unbind all users.
+#
+sub UnBindUsers($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $slice_uuid = $self->uuid();
+
+    DBQueryWarn("delete from geni_bindings ".
+		"where slice_uuid='$slice_uuid'")
 	or return -1;
     
     return 0;

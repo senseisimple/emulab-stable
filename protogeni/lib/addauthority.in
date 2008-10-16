@@ -31,63 +31,81 @@ if ($asch) {
 # Now we can load the libraries after setting the proper DB.
 use lib '@prefix@/lib';
 require GeniDB;
-require GeniCredential;
+require GeniCertificate;
 require GeniAuthority;
+require GeniComponent;
 
 my $type     = $ARGV[0];
 my $url      = $ARGV[1];
 my $hrn      = $ARGV[2];
 my $filename = $ARGV[3];
 
-sub AddAuthority($$$$)
+sub AddAuthority($$$)
 {
-    my ($type, $url, $hrn, $filename) = @_;
-
+    my ($type, $url, $filename) = @_;
     my $prefix;
-    my $cert;
-    my $uuid;
-    if (GeniCertificate->CertificateInfoFromFile($filename,
-						 \$cert, \$uuid) != 0) {
-	die("Could not get uuid from $filename\n");
+    
+    my $certificate = GeniCertificate->LoadFromFile($filename);
+    if (!defined($certificate)) {
+	die("Could not get certificate from $filename\n");
     }
-    if ($uuid =~ /\w*-(\w*)$/) {
+    if ($certificate->uuid() =~ /\w*-(\w*)$/) {
 	$prefix = $1;
     }
     else {
-	die("Could not get prefix from $uuid\n");
+	die("Could not get prefix from uuid\n");
     }
-    GeniAuthority->Create($uuid, $hrn, $url, $cert, $prefix, $type)
+    GeniAuthority->Create($certificate, $url, $prefix, $type)
 	or die("Could not add new authority\n");
     return 0;
 }
 
-if (1) {
+sub AddComponent($$)
+{
+    my ($url, $filename) = @_;
+    
+    my $certificate = GeniCertificate->LoadFromFile($filename);
+    if (!defined($certificate)) {
+	die("Could not get certificate from $filename\n");
+    }
+    GeniComponent->Create($certificate, $url)
+	or die("Could not add new component\n");
+    return 0;
+}
+
+if (0) {
     #
     # On real boss.
     #
     $type     = "sa";
     $url      = "https://www.emulab.net/protogeni/xmlrpc/sa";
-    $hrn      = "sa.emulab.net";
+    $hrn      = "emulab.sa";
     $filename = "@prefix@/etc/genisa.pem";
-    AddAuthority($type, $url, $hrn, $filename);
+    AddAuthority($type, $url, $filename);
 }
 else {
     $type     = "sa";
     $url      = "https://myboss.myelab.testbed.emulab.net/protogeni/xmlrpc/sa";
-    $hrn      = "sa.myelab.testbed.emulab.net";
+    $hrn      = "myelab.sa";
     $filename = "@prefix@/etc/genisa.pem";
-    AddAuthority($type, $url, $hrn, $filename);
+    AddAuthority($type, $url, $filename);
 
-    $type     = "sa";
-    $url      = "https://www.emulab.net/protogeni/xmlrpc/sa";
-    $hrn      = "sa.emulab.net";
-    $filename = "@prefix@/etc/emulabsa.pem";
-    AddAuthority($type, $url, $hrn, $filename);
+    if ($asch) {
+	$type     = "sa";
+	$url      = "https://www.emulab.net/protogeni/xmlrpc/sa";
+	$hrn      = "emulab.sa";
+	$filename = "@prefix@/etc/emulabsa.pem";
+	AddAuthority($type, $url, $filename);
 
-    $type     = "ma";
-    $url      = "https://myboss.myelab.testbed.emulab.net/protogeni/xmlrpc/ch";
-    $hrn      = "ch.myelab.testbed.emulab.net";
-    $filename = "@prefix@/etc/genima.pem";
-    AddAuthority($type, $url, $hrn, $filename);
+	$type     = "ma";
+	$url      = "https://myboss.myelab.testbed.emulab.net/protogeni/xmlrpc/ch";
+	$hrn      = "myelab.ch";
+	$filename = "@prefix@/etc/genima.pem";
+	AddAuthority($type, $url, $filename);
+
+	$url      = "https://myboss.myelab.testbed.emulab.net/protogeni/xmlrpc/cm";
+	$filename = "@prefix@/etc/genicm.pem";
+	AddComponent($url, $filename);
+    }
 }
 

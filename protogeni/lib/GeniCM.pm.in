@@ -56,6 +56,7 @@ my $AVAIL	   = "$TB/sbin/avail";
 my $PTOPGEN	   = "$TB/libexec/ptopgen";
 my $TBSWAP	   = "$TB/bin/tbswap";
 my $SWAPEXP	   = "$TB/bin/swapexp";
+my $PLABSLICE	   = "$TB/sbin/plabslice";
 
 
 #
@@ -189,7 +190,7 @@ sub DiscoverResources($)
     #
     # Use ptopgen in xml mode to spit back an xml file. 
     #
-    if (! open(AVAIL, "$PTOPGEN -x -g -p GeniSlices |")) {
+    if (! open(AVAIL, "$PTOPGEN -x -g -r -p GeniSlices |")) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not start avail");
     }
@@ -221,7 +222,7 @@ sub GetTicket($)
 	GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 			     "Improper rspec");	
     }
-    $rspec = XMLin($rspec, ForceArray => ["node", "link"]);
+    $rspec = XMLin($rspec, ForceArray => ["node", "link", "linkendpoints"]);
 
     $impotent = 0
 	if (!defined($impotent));
@@ -231,9 +232,10 @@ sub GetTicket($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not create GeniCredential object");
     }
-    my $slice_uuid = $credential->this_uuid();
+    my $slice_uuid = $credential->target_uuid();
     my $user_uuid  = $credential->owner_uuid();
     
+
     #
     # Make sure the credential was issued to the caller.
     #
@@ -249,17 +251,12 @@ sub GetTicket($)
     #
     my $slice = GeniSlice->Lookup($slice_uuid);
     if (!defined($slice)) {
-	$slice = CreateSliceFromRegistry($slice_uuid);
+	$slice = CreateSliceFromCertificate($credential);
 	if (!defined($slice)) {
-	    print STDERR "No slice $slice_uuid in the ClearingHouse\n";
+	    print STDERR "Could not create $slice_uuid\n";
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-			    "Could not get slice info from ClearingHouse");
+					"Could not create slice");
 	}
-    }
-    else {
-	UpdateSliceFromRegistry($slice) == 0 or
-	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-			"Could not update slice info from ClearingHouse");
     }
 
     #
@@ -267,7 +264,7 @@ sub GetTicket($)
     #
     my $user = GeniUser->Lookup($user_uuid);
     if (!defined($user)) {
-	$user = CreateUserFromRegistry($user_uuid);
+	$user = CreateUserFromCertificate($credential->owner_cert());
 	if (!defined($user)) {
 	    print STDERR "No user $user_uuid in the ClearingHouse\n";
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
@@ -300,6 +297,17 @@ sub GetTicket($)
 	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 					"Bad resource_uuid $resource_uuid");
 	}
+	#
+	# Widearea nodes do not need to be allocated, but for now all
+	# I allow is a plabdslice node.
+	#
+	if ($node->isremotenode()) {
+	    if (! $node->isplabphysnode()) {
+		return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+					    "Only plab widearea nodes");
+	    }
+	    next;
+	}
 
 	#
 	# See if the node is already reserved.
@@ -321,7 +329,7 @@ sub GetTicket($)
 				    "Could not create GeniTicket object");
     }
     # Nalloc might fail if the node gets picked up by someone else.
-    if (!$impotent) {
+    if (@nodeids && !$impotent) {
 	system("$NALLOC $pid $eid @nodeids");
 	if (($? >> 8) < 0) {
 	    $ticket->Delete();
@@ -331,7 +339,7 @@ sub GetTicket($)
 	elsif (($? >> 8) > 0) {
 	    $ticket->Delete();
 	    return GeniResponse->Create(GENIRESPONSE_UNAVAILABLE, undef,
-					"Could not allocate node\n");
+					"Could not allocate node");
 	}
     }
     if (defined($vtopo) && $experiment->InsertVirtTopo($vtopo) != 0) {
@@ -405,14 +413,14 @@ sub UpdateSliver($)
     if (! (defined($rspec) && ($rspec =~ /^[-\w]+$/))) {
 	GeniResponse->Create(GENIRESPONSE_BADARGS, undef, "Improper rspec");
     }
-    $rspec = XMLin($rspec, ForceArray => ["node", "link"]);
+    $rspec = XMLin($rspec, ForceArray => ["node", "link", "linkendpoints"]);
 
     my $credential = GeniCredential->CreateFromSigned($cred);
     if (!defined($credential)) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not create GeniCredential object");
     }
-    my $sliver_uuid = $credential->this_uuid();
+    my $sliver_uuid = $credential->target_uuid();
     my $user_uuid   = $credential->owner_uuid();
     
     #
@@ -469,7 +477,7 @@ sub ModifySliver($$$$)
     #
     my $owner = GeniUser->Lookup($owner_uuid);
     if (!defined($owner)) {
-	$owner = CreateUserFromRegistry($owner_uuid);
+	$owner = CreateUserFromCertificate($credential->owner_cert());
 	if (!defined($owner)) {
 	    print STDERR "No user $owner_uuid in the ClearingHouse\n";
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
@@ -482,7 +490,7 @@ sub ModifySliver($$$$)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "No local experiment for slice");
     }
-    print Dumper($rspec);
+    print STDERR Dumper($rspec);
 
     #
     # Figure out what nodes to allocate or free. 
@@ -493,6 +501,7 @@ sub ModifySliver($$$$)
     my @tofree   = ();
     my $pid      = $experiment->pid();
     my $eid      = $experiment->eid();
+    my $needplabslice = 0;
 
     #
     # Find current nodes and record their uuids. 
@@ -529,6 +538,19 @@ sub ModifySliver($$$$)
 	if (!defined($node)) {
 	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 					"Bad resource_uuid $resource_uuid");
+	}
+
+	#
+	# Widearea nodes do not need to be allocated, but for now all
+	# I allow is a plabdslice node.
+	#
+	if ($node->isremotenode()) {
+	    if (! $node->isplabphysnode()) {
+		return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+					    "Only plab widearea nodes");
+	    }
+	    $needplabslice = 1;
+	    next;
 	}
 
 	#
@@ -582,7 +604,7 @@ sub ModifySliver($$$$)
 	    }
 	    if (@dlist) {
 		return GeniResponse->Create(GENIRESPONSE_REFUSED, undef,
-					    "Must tear dow dependent slivers");
+				    "Must tear down dependent slivers first");
 	    }
 	    push(@tofree, $s);
 	}
@@ -595,6 +617,7 @@ sub ModifySliver($$$$)
 	or return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				       "Error binding user to slice");
 
+
     # Bind the other users too.
     my @userbindings;
     if ($slice->UserBindings(\@userbindings) != 0) {
@@ -604,7 +627,7 @@ sub ModifySliver($$$$)
     foreach my $otheruuid (@userbindings) {
 	my $otheruser = GeniUser->Lookup($otheruuid);
 	if (!defined($otheruser)) {
-	    $otheruser = CreateUserFromRegistry($otheruuid);
+	    $otheruser = CreateUserFromCertificate($otheruuid);
 	    if (!defined($otheruser)) {
 		print STDERR "No user $otheruser, cannot bind to slice\n";
 		next;
@@ -623,8 +646,13 @@ sub ModifySliver($$$$)
 	$aggregate = $object;
     }
     else {
-	$aggregate = GeniAggregate->Create($slice, $owner,
-					   "Aggregate", $slice->hrn());
+	#
+	# Form the hrn from the slicename.
+	#
+	my $hrn = "${OURDOMAIN}." . $slice->slicename();
+	
+	$aggregate = GeniAggregate->Create($slice, $owner, "Aggregate",
+					   $hrn, $slice->hrn());
 	if (!defined($aggregate)) {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				"Could not create GeniAggregate object");
@@ -725,13 +753,9 @@ sub ModifySliver($$$$)
 	}
 	$slivers{$linkaggregate->uuid()} = $linkaggregate;
 
-	my $linkendpoints =
-	    $rspec->{'link'}->{$linkname}->{'LinkEndPoints'};
-	
-	foreach my $ifacename (keys(%{ $linkendpoints })) {
-	    my $iface      = $linkendpoints->{$ifacename};
-	    my $node_uuid  = $iface->{'node_uuid'};
-	    my $iface_name = $iface->{'iface_name'};
+	foreach my $ref (@{$rspec->{'link'}->{$linkname}->{'LinkEndPoints'}}) {
+	    my $node_uuid  = $ref->{'node_uuid'};
+	    my $iface_name = $ref->{'iface_name'};
 	    my $nodesliver = $slivers{$node_uuid} || $nodelist{$node_uuid};
 	    if (!defined($nodesliver)) {
 		$message = "Link $linkname specifies a non-existent node";
@@ -750,8 +774,8 @@ sub ModifySliver($$$$)
 	    my $sliver = GeniSliver::Interface->Create($slice,
 						       $owner->uuid(),
 						       $interface->uuid(),
-						       $node_uuid,
-						       $iface);
+						       $nodeobject,
+						       $ref);
 	    if (!defined($sliver)) {
 		$message = "Could not create GeniSliver ".
 		    "$interface in $linkname";
@@ -761,6 +785,17 @@ sub ModifySliver($$$$)
 		$message = "Could not add link sliver $sliver to $aggregate";
 		goto bad;
 	    }
+	}
+    }
+
+    #
+    # Create a planetlab slice before provisioning (which creates nodes).
+    #
+    if ($needplabslice && !$impotent) {
+	system("$PLABSLICE create $pid $eid");
+	if ($?) {
+	    $message = "Plab Slice creation failure";
+	    goto bad;
 	}
     }
 
@@ -881,7 +916,7 @@ sub StartSliver($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not create GeniCredential object");
     }
-    my $sliver_uuid = $credential->this_uuid();
+    my $sliver_uuid = $credential->target_uuid();
     my $user_uuid   = $credential->owner_uuid();
     
     #
@@ -928,7 +963,7 @@ sub DeleteSliver($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not create GeniCredential object");
     }
-    my $sliver_uuid = $credential->this_uuid();
+    my $sliver_uuid = $credential->target_uuid();
     my $user_uuid   = $credential->owner_uuid();
     my @slivers     = ();
     
@@ -983,115 +1018,56 @@ sub DeleteSliver($)
 #
 # Utility Routines.
 #
-# Create a slice from the ClearingHouse, by looking up the info.
+# Create a slice from the a certificate (GID).
 #
-sub CreateSliceFromRegistry($)
+sub CreateSliceFromCertificate($)
 {
-    my ($slice_uuid) = @_;
+    my ($credential) = @_;
 
-    my $blob;
-    return undef
-	if (GeniCHClient::LookupSlice($slice_uuid, \$blob) != 0);
+    my $certificate = $credential->target_cert();
+    my $owner_uuid  = $credential->owner_uuid();
 
-    my $authority = GeniAuthority->Lookup($blob->{'sa_uuid'});
+    my $authority = GeniAuthority->LookupByPrefix($certificate->uuid());
     if (!defined($authority)) {
-	$authority = CreateAuthorityFromRegistry($blob->{'sa_uuid'});
+	$authority = CreateAuthorityFromRegistry($certificate->uuid());
 	if (!defined($authority)) {
 	    print STDERR "Could not create new authority record\n";
 	    return undef;
 	}
     }
 
-    print Dumper($blob);
-
     #
-    # The problem with HRNs is that people will tend to reuse them!
+    # The problem with HRNs is that people will tend to reuse them.
     # So check to see if we have a slice with the hrn, and if so
     # we need to check with the registry to see if its still active.
     # Destroy it locally if not active.
     #
-    my $slice = GeniSlice->Lookup($blob->{'hrn'});
+    my $slice = GeniSlice->Lookup($certificate->hrn());
     if (defined($slice)) {
 	return $slice
-	    if ($slice->uuid() eq $slice_uuid);
+	    if ($slice->uuid() eq $certificate->uuid());
 	
-	my $blob2;
-	if (GeniCHClient::LookupSlice($slice->uuid(), \$blob2) == 0) {
-	    print STDERR "hrn already in use for $slice!\n";
-	    return undef;
-	}
 	return undef
 	    if (CleanupDeadSlice($slice) != 0);
     }
-    $slice = GeniSlice->Create($blob->{'hrn'},
-			       $blob->{'uuid'},
-			       $blob->{'creator_uuid'},
-			       $blob->{'cert'}, $authority);
+    $slice = GeniSlice->Create($certificate, $owner_uuid, $authority);
     return undef
 	if (!defined($slice));
 
-    # Add the user bindings.
-    foreach my $uuid (@{ $blob->{'userbindings'} }) {
-	my $user = GeniUser->Lookup($uuid);
-	if (!defined($user)) {
-	    $user = CreateUserFromRegistry($uuid);
-	    if (!defined($user)) {
-		print STDERR "No user $uuid locally or in the ClearingHouse\n";
-		next;
-	    }
-	}
-	$slice->BindUser($user) == 0
-	    or print STDERR
-	    "Could not insert user binding for $uuid to slice $slice_uuid\n";
-    }
     return $slice;
 }
 
 #
-# Update slice from the ClearingHouse, by looking up the info.
+# Create a user from a certificate.
 #
-sub UpdateSliceFromRegistry($)
+sub CreateUserFromCertificate($)
 {
-    my ($slice) = @_;
-    my $slice_uuid = $slice->uuid();
-
-    my $blob;
-    return -1
-	if (GeniCHClient::LookupSlice($slice_uuid, \$blob) != 0);
-
-    DBQueryWarn("delete from geni_bindings ".
-		"where slice_uuid='$slice_uuid'")
-	or print STDERR
-	"Could not delete user bindings from slice $slice_uuid\n";
-
-    # Add the user bindings.
-    foreach my $uuid (@{ $blob->{'userbindings'} }) {
-	my $user = GeniUser->Lookup($uuid);
-	if (!defined($user)) {
-	    $user = CreateUserFromRegistry($uuid);
-	    if (!defined($user)) {
-		print STDERR "No user $uuid in the ClearingHouse\n";
-		next;
-	    }
-	}
-	$slice->BindUser($user) == 0
-	    or print STDERR
-	    "Could not insert user binding for $uuid to slice $slice_uuid\n";
-    }
-    return 0;
-}
-
-#
-# Create a user from the ClearingHouse, by looking up the info.
-#
-sub CreateUserFromRegistry($)
-{
-    my ($uuid) = @_;
+    my ($certificate) = @_;
 
     #
     # Check Emulab users table first.
     #
-    my $user = User->LookupByUUID($uuid);
+    my $user = User->LookupByUUID($certificate->uuid());
     if (defined($user)) {
 	my $geniuser = GeniUser->CreateFromLocal($user);
 	if (!defined($geniuser)) {
@@ -1101,27 +1077,16 @@ sub CreateUserFromRegistry($)
 	return $geniuser;
     }
 
-    my $blob;
-    return undef
-	if (GeniCHClient::LookupUser($uuid, \$blob) != 0);
-
-    my $authority = GeniAuthority->Lookup($blob->{'sa_uuid'});
+    my $authority = GeniAuthority->LookupByPrefix($certificate->uuid());
     if (!defined($authority)) {
-	$authority = CreateAuthorityFromRegistry($blob->{'sa_uuid'});
+	$authority = CreateAuthorityFromRegistry($certificate->uuid());
 	if (!defined($authority)) {
 	    print STDERR "Could not create new authority record\n";
 	    return undef;
 	}
     }
-    print STDERR Dumper($blob);
-    
-    return GeniUser->Create($blob->{'hrn'},
-			    $blob->{'uid'},
-			    $blob->{'uuid'},
-			    $blob->{'name'},
-			    $blob->{'email'},
-			    $blob->{'cert'},
-			    $authority, $blob->{'sliverkeys'});
+
+    return GeniUser->Create($certificate, $authority);
 }
 
 #
@@ -1131,15 +1096,23 @@ sub CreateAuthorityFromRegistry($)
 {
     my ($uuid) = @_;
 
+    my ($prefix) = ($uuid =~ /^\w+\-\w+\-\w+\-\w+\-(\w+)$/);
+    
     my $blob;
     return undef
-	if (GeniCHClient::Resolve($uuid, "SA", \$blob) != 0);
+	if (GeniCHClient::Resolve("P${prefix}", "SA", \$blob) != 0);
 
-    return GeniAuthority->Create($uuid,
-				 $blob->{'hrn'},
-				 $blob->{'url'},
-				 $blob->{'cert'},
-				 $blob->{'uuid_prefix'}, "sa");
+    my $certificate = GeniCertificate->LoadFromString($blob->{'gid'});
+    return undef
+	if (!defined($certificate));
+
+    my $authority = GeniAuthority->Create($certificate,
+					  $blob->{'url'},
+					  $blob->{'type'});
+    $certificate->Delete()
+	if (!defined($authority));
+
+    return $authority;
 }
 
 #
@@ -1226,14 +1199,15 @@ sub CleanupDeadSlice($)
     }
 
     my $experiment = $slice->GetExperiment();
-    if (!defined($experiment)) {
-	print STDERR "Could not get experiment for $slice\n";
-	return -1;
+    if (defined($experiment)) {
+	my $pid = $experiment->pid();
+	my $eid = $experiment->eid();
+	system("$PLABSLICE destroy $pid $eid");
+    
+	system("$ENDEXPT -q $pid,$eid");
+	return -1
+	    if ($?);
     }
-    # Note the -h option; allows experiment with no NS file.
-    system("$ENDEXPT -q -w " . $experiment->idx());
-    return -1
-	if ($?);
     
     if ($slice->Delete() != 0) {
 	print STDERR "Could not delete $slice\n";
@@ -1260,7 +1234,7 @@ sub DeleteSlice($)
 				    "Could not create GeniCredential object");
     }
 
-    my $slice_uuid = $credential->this_uuid();
+    my $slice_uuid = $credential->target_uuid();
     
     #
     # Make sure the credential was issued to the caller.
@@ -1307,7 +1281,7 @@ sub SplitSliver($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not create GeniCredential object");
     }
-    my $sliver_uuid = $credential->this_uuid();
+    my $sliver_uuid = $credential->target_uuid();
     my $user_uuid   = $credential->owner_uuid();
     
     #
@@ -1319,7 +1293,7 @@ sub SplitSliver($)
     }
     my $user = GeniUser->Lookup($user_uuid);
     if (!defined($user)) {
-	$user = CreateUserFromRegistry($user_uuid);
+	$user = CreateUserFromCertificate($credential->owner_cert());
 	if (!defined($user)) {
 	    print STDERR "No user $user_uuid in the ClearingHouse\n";
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,

@@ -132,9 +132,9 @@ sub LookupSlice($$)
 #
 # Register a record at the clearing house.
 #
-sub Register($$$$)
+sub Register($$$)
 {
-    my ($hrn, $type, $cert, $info) = @_;
+    my ($type, $cert, $info) = @_;
 
     SetCredential();
     
@@ -142,7 +142,6 @@ sub Register($$$$)
 	Genixmlrpc::CallMethod($GENICENTRALURL, $MyContext, "Register",
 			       { "credential" => $Credential,
 				 "type"       => $type,
-				 "hrn"        => $hrn,
 			         "cert"       => $cert,
 			         "info"       => $info });
     return -1
@@ -155,29 +154,29 @@ sub Register($$$$)
 # Register a local Emulab user at the Geni ClearingHouse (which in the
 # prototype is Utah Emulab).
 #
-sub RegisterUser($$$$$)
+sub RegisterUser($$$$)
 {
-    my ($hrn, $name, $email, $cert, $keys) = @_;
+    my ($name, $email, $cert, $keys) = @_;
 
     my $info = { "name"   => $name,
 		 "email"  => $email };
     $info->{"sliverkeys"} = $keys
 	if (defined($keys));
 
-    return Register($hrn, "User", $cert, $info);
+    return Register("User", $cert, $info);
 }
 
 #
 # Register a slice at the Clearinghouse.
 #
-sub RegisterSlice($$$$)
+sub RegisterSlice($$$)
 {
-    my ($hrn, $creator_uuid, $cert, $bindings) = @_;
+    my ($creator_uuid, $cert, $bindings) = @_;
 
     my $info = { "creator_uuid"  => $creator_uuid,
 	         "userbindings"  => $bindings };
 
-    return Register($hrn, "Slice", $cert, $info);
+    return Register("Slice", $cert, $info);
 }
 
 #

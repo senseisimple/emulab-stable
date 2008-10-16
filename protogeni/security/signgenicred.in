@@ -212,7 +212,7 @@ while(<TMP>) {
     $xmlint_output .= $_;
 }
 if (!close(TMP)) {
-    print $xmlint_output;
+    print STDERR $xmlint_output;
     fatal("$capfile does not conform to schema $SCHEMA");
 }
 

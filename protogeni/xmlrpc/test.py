@@ -125,63 +125,18 @@ print "Got my SA credential"
 #print str(mycredential);
 
 #
-# Look me up just for the hell of it. I can see why the hrn is "useful"
-#
-params = {}
-#params["uuid"]       = "7450199a-b6eb-102b-a5ad-001143e43770"
-params["hrn"]       = "stoller"
-params["credential"] = mycredential
-params["type"]       = "User"
-rval,response = do_method("sa", "Resolve", params)
-if rval:
-    Fatal("Could not resolve myself")
-    pass
-print "Found my record at the SA"
-#print str(response)
-
-#
-# Look up leebee alter ego.
-#
-params = {}
-params["hrn"]       = "leebee"
-params["credential"] = mycredential
-params["type"]       = "User"
-rval,response = do_method("sa", "Resolve", params)
-if rval:
-    Fatal("Could not resolve leebee")
-    pass
-print "Found leebee's record at the SA"
-leebee = response["value"]
-#print str(leebee);
-
-#
-# Lookup a node at the component. 
-#
-params = {}
-params["credential"] = mycredential;
-params["hrn"]        = "pc41";
-params["type"]       = "Node";
-rval,response = do_method("cm", "Resolve", params,
-         URI="https://myboss.myelab.testbed.emulab.net:443/protogeni/xmlrpc")
-if rval:
-    Fatal("Could not lookup info for pc41")
-    pass
-#print str(response["value"]);
-print "Found pc41's record at the CM"
-
-#
 # Lookup slice, delete before proceeding.
 #
 params = {}
 params["credential"] = mycredential
 params["type"]       = "Slice"
-params["hrn"]        = "myslice1"
+params["hrn"]        = "myslice2"
 rval,response = do_method("sa", "Resolve", params)
 if rval == 0:
     myslice = response["value"]
     myuuid  = myslice["uuid"]
 
-    print "Deleting previous slice called myslice1";
+    print "Deleting previous slice called myslice2";
     params = {}
     params["credential"] = mycredential
     params["type"]       = "Slice"
@@ -195,11 +150,11 @@ if rval == 0:
 #
 # Create a slice. 
 #
-print "Creating new slice called myslice1";
+print "Creating new slice called myslice2";
 params = {}
 params["credential"] = mycredential
 params["type"]       = "Slice"
-params["hrn"]        = "myslice1"
+params["hrn"]        = "myslice2"
 rval,response = do_method("sa", "Register", params)
 if rval:
     Fatal("Could not get my slice")
@@ -208,25 +163,11 @@ myslice = response["value"]
 print "New slice created"
 #print str(myslice);
 
-params = {}
-params["credential"] = myslice
-rval,response = do_method("cm", "DiscoverResources", params,
-         URI="https://myboss.myelab.testbed.emulab.net:443/protogeni/xmlrpc")
-if rval:
-    Fatal("Could not discover resources at the CM")
-    pass
-rspec = response["value"]
-print "Got a resource discovery rspec from the CM"
-#print str(rspec)
-
-#
-# Do resource discovery at the component. 
-#
 #
 # Okay, we do not actually have anything like resource discovery yet,
 #
 rspec = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
-        " <node uuid=\"de9803c2-773e-102b-8eb4-001143e453fe\" " +\
+        " <node uuid=\"dea1c536-773e-102b-8eb4-001143e453fe\" " +\
         "       nickname=\"geni1\" "+\
         "       virtualization_type=\"emulab-vnode\"> " +\
         " </node>" +\
@@ -236,14 +177,13 @@ params["credential"] = myslice
 params["rspec"]      = rspec
 params["impotent"]   = impotent
 rval,response = do_method("cm", "GetTicket", params,
-         URI="https://myboss.myelab.testbed.emulab.net:443/protogeni/xmlrpc")
+         URI="https://boss.emulab.net:443/protogeni/xmlrpc")
 if rval:
     Fatal("Could not get ticket")
     pass
 ticket = response["value"]
 print "Got a ticket from the CM"
 #print str(ticket)
-sys.exit(0);
 
 #
 # Create the sliver.
@@ -252,72 +192,13 @@ params = {}
 params["ticket"]   = ticket
 params["impotent"] = impotent
 rval,response = do_method("cm", "RedeemTicket", params,
-         URI="https://myboss.myelab.testbed.emulab.net:443/protogeni/xmlrpc")
+         URI="https://boss.emulab.net:443/protogeni/xmlrpc")
 if rval:
     Fatal("Could not redeem ticket")
     pass
 sliver = response["value"]
 print "Created a sliver"
 print str(sliver)
-
-#
-# Add resources to the sliver. 
-#
-rspec = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
-        " <node uuid=\"de9803c2-773e-102b-8eb4-001143e453fe\" " +\
-        "       nickname=\"geni1\" "+\
-        "       virtualization_type=\"emulab-vnode\"> " +\
-        " </node>" +\
-        " <node uuid=\"de995217-773e-102b-8eb4-001143e453fe\" " +\
-        "       nickname=\"geni2\" "+\
-        "       virtualization_type=\"emulab-vnode\"> " +\
-        " </node>" +\
-        " <link name=\"link0\" nickname=\"link0\"> " +\
-        "  <linkendpoints nickname=\"destination_interface\" " +\
-        "            iface_name=\"eth0\" " +\
-        "            node_uuid=\"de9803c2-773e-102b-8eb4-001143e453fe\" /> " +\
-        "  <linkendpoints nickname=\"source_interface\" " +\
-        "            iface_name=\"eth0\" " +\
-        "            node_uuid=\"de995217-773e-102b-8eb4-001143e453fe\" /> " +\
-        " </link> " +\
-        "</rspec>"
-params = {}
-params["credential"] = sliver
-params["rspec"]      = rspec
-params["impotent"]   = impotent
-rval,response = do_method("cm", "UpdateSliver", params,
-         URI="https://myboss.myelab.testbed.emulab.net:443/protogeni/xmlrpc")
-if rval:
-    Fatal("Could not update sliver with new rspec")
-    pass
-print "Added resources to sliver."
-
-#
-# Split the sliver since its an aggregate of resources
-#
-params = {}
-params["credential"] = sliver
-rval,response = do_method("cm", "SplitSliver", params,
-         URI="https://myboss.myelab.testbed.emulab.net:443/protogeni/xmlrpc")
-if rval:
-    Fatal("Could not split sliver")
-    pass
-slivers = response["value"]
-print "Split the sliver"
-print str(slivers)
-sys.exit(0);
-
-#
-# Start the sliver.
-#
-params = {}
-params["credential"] = sliver
-params["impotent"]   = impotent
-rval,response = do_method("cm", "StartSliver", params,
-         URI="https://myboss.myelab.testbed.emulab.net:443/protogeni/xmlrpc")
-if rval:
-    Fatal("Could not start sliver")
-    pass
 
 print "Sliver has been started, waiting for input to delete it"
 print "You should be able to log into the sliver after a little bit"
@@ -331,7 +212,7 @@ params = {}
 params["credential"] = sliver
 params["impotent"]   = impotent
 rval,response = do_method("cm", "DeleteSliver", params,
-         URI="https://myboss.myelab.testbed.emulab.net:443/protogeni/xmlrpc")
+         URI="https://boss.emulab.net:443/protogeni/xmlrpc")
 if rval:
     Fatal("Could not stop sliver")
     pass
@@ -343,11 +224,10 @@ print "Sliver has been deleted"
 params = {}
 params["credential"] = mycredential
 params["type"]       = "Slice"
-params["hrn"]        = "myslice1"
+params["hrn"]        = "myslice2"
 rval,response = do_method("sa", "Remove", params)
 if rval:
     Fatal("Could not delete slice")
     pass
 pass
 print "Slice has been deleted"
-

@@ -296,7 +296,7 @@ sub AllocateSlivers($$$)
 	    $rspec .= " <node uuid=\"$node_uuid\" ".
 		      "       tmcd_server=\"$BOSSNODE\" ".
 		      "       tmcd_nodeid=\"$node_id\" ".
-		      "       hrn=\"$node_id\" ".
+		      "       nickname=\"$node_id\" ".
 		      "       virtualization_type=\"emulab-vnode\"> " .
 		      " </node>";
 	}
@@ -311,7 +311,7 @@ sub AllocateSlivers($$$)
 		    print STDERR "Could not get members for $lan\n";
 		    return -1;
 		}
-		$rspec .= "<link name=\"$name\" link_name=\"$name\"> ";
+		$rspec .= "<link name=\"$name\" nickname=\"$name\"> ";
 
 		foreach my $member (@members) {
 		    my $node;
@@ -328,9 +328,9 @@ sub AllocateSlivers($$$)
 		    return -1
 			if (!defined($physnode));
 		    my $pnode_uuid = $physnode->uuid();
-		    my $name = $node->node_id() . ":" . $iface;
+		    my $nickname = $node->node_id() . ":" . $iface;
 
-		    $rspec .= "<LinkEndPoints name=\"$name\" " .
+		    $rspec .= "<LinkEndPoints nickname=\"$nickname\" " .
 			"            iface_name=\"$iface\" " .
 			"            node_uuid=\"$pnode_uuid\" /> ";
 		}
@@ -532,11 +532,11 @@ sub InstantiateSlivers($$$)
 		my $node_sliver;
 		foreach my $s (@slivers) {
 		    #
-		    # XXX Bogus use of hrn, but I am assuming the only
+		    # XXX Bogus use of nickname, but I am assuming the only
 		    # time this happens is when speaking to another Emulab
 		    # which will be doing the same thing.
 		    #
-		    if ($s->hrn() eq $node->node_id()) {
+		    if ($s->nickname() eq $node->node_id()) {
 			$node_sliver = $s;
 			last;
 		    }
@@ -554,11 +554,11 @@ sub InstantiateSlivers($$$)
 		my $lan_sliver;
 		foreach my $s (@slivers) {
 		    #
-		    # XXX Bogus use of hrn, but I am assuming the only
+		    # XXX Bogus use of nickname, but I am assuming the only
 		    # time this happens is when speaking to another Emulab
 		    # which will be doing the same thing.
 		    #
-		    if ($s->hrn() eq $lan->vname()) {
+		    if ($s->nickname() eq $lan->vname()) {
 			$lan_sliver = $s;
 			last;
 		    }

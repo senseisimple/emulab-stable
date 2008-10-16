@@ -108,7 +108,7 @@ sub Resolve($)
     if (! (defined($uuid) && ($uuid =~ /^[-\w]*$/))) {
 	return GeniResponse->MalformedArgsResponse();
     }
-    if (! (defined($type) && ($type =~ /^(SA|CM|MA|Component|Slice|User)$/))) {
+    if (! (defined($type) && ($type =~ /^(SA|CM|MA|Component|Slice|User)$/i))){
 	return GeniResponse->MalformedArgsResponse();
     }
     if (! defined($cred)) {
@@ -147,10 +147,10 @@ sub Resolve($)
 					"No such user $uuid");
 	}
 	# Grab keys.
-	my @sliverkeys;
-	if ($user->GetKeys(\@sliverkeys) != 0) {
-	    print STDERR "Could not get sliver keys for $user\n";
-	}
+	#my @sliverkeys;
+	#if ($user->GetKeys(\@sliverkeys) != 0) {
+	#    print STDERR "Could not get sliver keys for $user\n";
+	#}
 
 	# Return a blob.
 	my $blob = { "uid"      => $user->uid(),
@@ -161,23 +161,21 @@ sub Resolve($)
 		     "name"     => $user->name(),
 		     "sa_uuid"  => $user->sa_uuid(),
 		 };
-	$blob->{'sliverkeys'} = \@sliverkeys
-	    if (@sliverkeys);
+	#$blob->{'sliverkeys'} = \@sliverkeys
+	#    if (@sliverkeys);
     
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
     }
-    if ($type eq "SA") {
+    if ($type eq "SA" || $type eq "sa") {
 	my $authority = GeniAuthority->Lookup($uuid);
 	if (!defined($authority)) {
 	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
 					"No such authority $uuid");
 	}
 	# Return a blob.
-	my $blob = { "uuid"        => $authority->uuid(),
-		     "cert"        => $authority->cert(),
-		     "hrn"         => $authority->hrn(),
-		     "uuid_prefix" => $authority->uuid_prefix(),
+	my $blob = { "gid"         => $authority->cert(),
 		     "url"         => $authority->url(),
+		     "type"        => $authority->type(),
 		 };
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
     }
@@ -188,9 +186,7 @@ sub Resolve($)
 					"No such component $uuid");
 	}
 	# Return a blob.
-	my $blob = { "uuid"        => $component->uuid(),
-		     "cert"        => $component->cert(),
-		     "hrn"         => $component->hrn(),
+	my $blob = { "gid"         => $component->cert(),
 		     "url"         => $component->url(),
 		 };
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
@@ -203,11 +199,11 @@ sub Resolve($)
 	}
 
 	# User bindings too.
-	my @userbindings = ();
-	if ($slice->UserBindings(\@userbindings) != 0) {
-	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					"Error getting users for slice");
-	}
+	#my @userbindings = ();
+	#if ($slice->UserBindings(\@userbindings) != 0) {
+	#    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+	#				"Error getting users for slice");
+	#}
 
 	# Return a blob.
 	my $blob = { "hrn"          => $slice->hrn(),
@@ -215,7 +211,7 @@ sub Resolve($)
 		     "creator_uuid" => $slice->creator_uuid(),
 		     "cert"         => $slice->cert(),
 		     "sa_uuid"      => $slice->sa_uuid(),
-		     "userbindings" => \@userbindings,
+	#	     "userbindings" => \@userbindings,
 		 };
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
     }
@@ -229,14 +225,10 @@ sub Register($)
 {
     my ($argref) = @_;
     my $cred  = $argref->{'credential'};
-    my $hrn   = $argref->{'hrn'};
     my $cert  = $argref->{'cert'};
     my $info  = $argref->{'info'};
     my $type  = $argref->{'type'};
 
-    if (! (defined($hrn) && ($hrn =~ /^[-\w.]*$/))) {
-	return GeniResponse->MalformedArgsResponse();
-    }
     if (! (defined($type) && ($type =~ /^(SA|MA|Component|Slice|User)$/))) {
 	return GeniResponse->MalformedArgsResponse();
     }
@@ -280,22 +272,26 @@ sub Register($)
     }
 
     #
-    # Grab the uuid out of the certificate.
+    # Grab the uuid and hrn out of the certificate.
     #
-    my $uuid;
-    GeniCertificate->CertificateInfo($cert, \$uuid) == 0
-	or return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				       "cert: Could not get uuid");
+    my $certificate = GeniCertificate->LoadFromString($cert);
+    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				"Could not parse certificate")
+	if (!defined($certificate));
 
-    if (! ($uuid =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/)) {
+    if (! ($certificate->uuid() =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/)) {
 	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 				    "Improper format for uuid");
+    }
+    if (! ($certificate->hrn() =~ /^[\w\.]+$/)) {
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "Improper format for hrn");
     }
     
     if ($type eq "User") {
 	my $name  = $info->{'name'};
 	my $email = $info->{'email'};
-	my $keys  = $info->{'sliverkeys'};
+	my $keys  = undef;
 
 	if (! TBcheck_dbslot($name, "users", "usr_name",
 			     TBDB_CHECKDBSLOT_ERROR)) {
@@ -307,7 +303,7 @@ sub Register($)
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					"email: ". TBFieldErrorString());
 	}
-	if (defined($keys)) {
+	if (0 && defined($keys)) {
 	    foreach my $keyref (@{ $keys }) {
 		my $type = $keyref->{'type'};
 		my $key  = $keyref->{'key'};
@@ -330,11 +326,30 @@ sub Register($)
 	    print STDERR "Could not find authority object for caller.\n";
 	    return GeniResponse->Create(GENIRESPONSE_ERROR);
 	}
-	if (! $slice_authority->PrefixMatch($uuid)) {
+	if (! $slice_authority->PrefixMatch($certificate->uuid())) {
 	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 					"uuid: Prefix mismatch");
 	}
 
+	my $existing = GeniUser->Lookup($certificate->uuid());
+	if (defined($existing)) {
+	    if (! ($existing->hrn() eq $certificate->hrn())) {
+		return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					    "Not allowed to change hrn");
+	    }
+	    if (! ($existing->sa_uuid() eq $slice_authority->uuid())) {
+		return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				"Already registered with another SA");
+	    }
+	    #
+	    # Update operation, but only name, email, and keys for now.
+	    #
+	    if ($existing->Modify($name, $email, $keys) != 0) {
+		return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					    "Could not update user");
+	    }
+	    return GeniResponse->Create(GENIRESPONSE_SUCCESS);
+	}
 	#
 	# XXX
 	#
@@ -343,31 +358,18 @@ sub Register($)
 	# require that for a given SA, that hrn is unique, at least to avoid
 	# lots of confusion?
 	#
-	if (GeniUser->CheckExisting($hrn, $email)) {
+	if (GeniUser->CheckExisting($certificate->hrn(), $email)) {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					"$hrn/$email already registered");
+					"hrn/email already registered");
 	}
-
-	# The local uid we will use is the last part of the hrn.
-	my ($uid) = ($hrn =~ /^.*\.(\w*)$/);
-	if (!defined($uid)) {
-	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					"uid: cannot parse hrn to get uid");
-	}
-	elsif (! TBcheck_dbslot($uid, "users", "uid",
-				TBDB_CHECKDBSLOT_ERROR)) {
-	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					"uid: ". TBFieldErrorString());
-	}
-	my $newuser = GeniUser->Create($hrn, $uid, $uuid,
-				       $name, $email, $cert, $slice_authority,
-				       $keys);
+	my $newuser = GeniUser->Create($certificate, $slice_authority,
+				       $info, $keys);
 	if (!defined($newuser)) {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					"$hrn/$email could not be registered");
+					"Could not be registered");
 	}
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, undef,
-				    "$hrn/$email has been registered");
+				    "User has been registered");
     }
     if ($type eq "Slice") {
 	my $creator_uuid  = $info->{'creator_uuid'};
@@ -389,7 +391,7 @@ sub Register($)
 	#
 	# Ditto any users bound to the slice.
 	#
-	if (defined($userbindings)) {
+	if (0 && defined($userbindings)) {
 	    foreach my $binding_uuid (@{ $userbindings }) {
 		my $binding_user = GeniUser->Lookup($binding_uuid);
 		if (!defined($binding_user)) {
@@ -407,30 +409,56 @@ sub Register($)
 	    print STDERR "Could not find authority object for caller.\n";
 	    return GeniResponse->Create(GENIRESPONSE_ERROR);
 	}
-	if (! $slice_authority->PrefixMatch($uuid)) {
+	if (! $slice_authority->PrefixMatch($certificate->uuid())) {
 	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 					"uuid: Prefix mismatch");
 	}
 
 	#
-	# Make sure slice hrn and uuid are unique.
+	# Reregistration of existing slice is okay.
 	#
-	if (GeniSlice->CheckExisting($hrn, $uuid)) {
-	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					"$hrn or $uuid already registered");
+	my $existing = GeniSlice->Lookup($certificate->uuid());
+	if (defined($existing)) {
+	    if (! ($existing->cert() eq $certificate->cert())) {
+		return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					    "Not allowed to change cert");
+	    }
+	    if (! ($existing->sa_uuid() eq $slice_authority->uuid())) {
+		return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				"Already registered with another SA");
+	    }
+	    if (0 && defined($userbindings)) {
+		$existing->UnBindUsers();
+		
+		foreach my $binding_uuid (@{ $userbindings }) {
+		    my $binding_user = GeniUser->Lookup($binding_uuid);
+		    $existing->BindUser($binding_user);
+		}
+	    }
+	    
+	    return GeniResponse->Create(GENIRESPONSE_SUCCESS);
 	}
 
-	my $newslice = GeniSlice->Create($hrn, $uuid, $creator_uuid,
-					 $cert, $slice_authority);
+	#
+	# Make sure slice hrn and uuid are unique.
+	#
+	if (GeniSlice->CheckExisting($certificate->hrn(),
+				     $certificate->uuid())) {
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					"Slice already registered");
+	}
+
+	my $newslice = GeniSlice->Create($certificate, $creator_uuid,
+					 $slice_authority);
 	if (!defined($newslice)) {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					"$hrn/$uuid could not be registered");
+					"Could not be registered");
 	}
 
 	#
 	# Add the bindings now.
 	# 
-	if (defined($userbindings)) {
+	if (0 && defined($userbindings)) {
 	    foreach my $binding_uuid (@{ $userbindings }) {
 		my $binding_user = GeniUser->Lookup($binding_uuid);
 		$newslice->BindUser($binding_user);
@@ -438,7 +466,7 @@ sub Register($)
 	}
 	
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, undef,
-				    "$hrn/$uuid has been registered");
+				    "Slice has been registered");
     }
     return GeniResponse->Create(GENIRESPONSE_UNSUPPORTED);
 }
@@ -547,7 +575,7 @@ sub DiscoverResources($)
 	return GeniResponse->Create(GENIRESPONSE_DBERROR)
 	    if (!defined($component));
 	    
-	push(@results, { "uuid" => $component_uuid });
+	push(@results, { "gid" => $component->cert() });
     }
     return GeniResponse->Create(GENIRESPONSE_SUCCESS, \@results);
 }

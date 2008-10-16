@@ -1,0 +1,35 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= protogeni/scripts
+
+include $(OBJDIR)/Makeconf
+
+SBIN_STUFF	= newgeninode cleanupslice
+
+# These scripts installed setuid, with sudo. 
+SETUID_BIN_SCRIPTS   = 
+SETUID_SBIN_SCRIPTS  = cleanupslice
+SETUID_LIBX_SCRIPTS  =
+
+#
+# Force dependencies on the scripts so that they will be rerun through
+# configure if the .in file is changed.
+# 
+all:	$(SBIN_STUFF)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+install: $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_STUFF))
+
+control-install:
+
+clean:
+	rm -f *.o core *.pl *.pm *.py
+

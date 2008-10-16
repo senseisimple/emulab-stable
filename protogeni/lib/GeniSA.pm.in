@@ -173,7 +173,7 @@ sub Resolve($)
 	    # XXX Form hrn from the uid and domain. This is backwards.
 	    #
 	    if (! ($hrn =~ /\./)) {
-		$hrn = "${OURDOMAIN}.users.${hrn}";
+		$hrn = "emulab.${hrn}";
 	    }
 	    $geniuser = GeniUser->Lookup($hrn, 1);
 	}
@@ -182,10 +182,10 @@ sub Resolve($)
 					undef, "No one here by that name");
 	}
 	# Grab keys.
-	my @sliverkeys;
-	if ($geniuser->GetKeys(\@sliverkeys) != 0) {
-	    print STDERR "Could not get sliver keys for $geniuser\n";
-	}
+	#my @sliverkeys;
+	#if ($geniuser->GetKeys(\@sliverkeys) != 0) {
+	#    print STDERR "Could not get sliver keys for $geniuser\n";
+	#}
 	
 	# Return a blob.
 	my $blob = { "uid"      => $geniuser->uid(),
@@ -195,8 +195,8 @@ sub Resolve($)
 		     "cert"     => $geniuser->cert(),
 		     "name"     => $geniuser->name(),
 		    };
-	$blob->{'sliverkeys'} = \@sliverkeys
-	    if (@sliverkeys);
+	#$blob->{'sliverkeys'} = \@sliverkeys
+	#    if (@sliverkeys);
 	
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
     }
@@ -211,7 +211,7 @@ sub Resolve($)
 	    # XXX Form hrn from the uid and domain. This is backwards.
 	    #
 	    if (! ($hrn =~ /\./)) {
-		$hrn = "${OURDOMAIN}.slices.${hrn}";
+		$hrn = "emulab.${hrn}";
 	    }
 	    $slice = GeniSlice->Lookup($hrn);
 	}
@@ -221,18 +221,18 @@ sub Resolve($)
 	}
 
 	# User bindings too.
-	my @userbindings = ();
-	if ($slice->UserBindings(\@userbindings) != 0) {
-	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				"Error getting user bindings for slice");
-	}
+	#my @userbindings = ();
+	#if ($slice->UserBindings(\@userbindings) != 0) {
+	#    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+	#			"Error getting user bindings for slice");
+	#}
 
 	# Return a blob.
 	my $blob = { "hrn"          => $slice->hrn(),
 		     "uuid"         => $slice->uuid(),
 		     "creator_uuid" => $slice->creator_uuid(),
 		     "cert"         => $slice->cert(),
-		     "userbindings" => \@userbindings,
+	#	     "userbindings" => \@userbindings,
 		 };
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
     }
@@ -314,7 +314,7 @@ sub Register($)
 	    print STDERR "Could not register $this_user at clearinghouse\n";
 	    return GeniResponse->Create(GENIRESPONSE_ERROR);
 	}
-	if (defined($userbindings)) {
+	if (0 && defined($userbindings)) {
 	    foreach my $binding_uuid (@{ $userbindings }) {
 		my $binding_user = GeniUser->Lookup($binding_uuid, 1);
 		if (!defined($binding_user)) {
@@ -336,12 +336,13 @@ sub Register($)
 	#
 	# XXX Form hrn from the uid and domain. This is backwards.
 	#
-	my $hrn = "${OURDOMAIN}.slices.${hrn}";
+	my $hrn = "emulab.${hrn}";
 
 	#
 	# Generate a certificate (and uuid) for this new slice.
 	#
-	my $certificate = GeniCertificate->Create("slice");
+	my $certificate = GeniCertificate->Create("slice", $hrn,
+						  $this_user->email());
 	if (!defined($certificate)) {
 	    print STDERR "Could not create new certificate for slice\n";
 	    return GeniResponse->Create(GENIRESPONSE_ERROR);
@@ -356,9 +357,9 @@ sub Register($)
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					"$hrn or $uuid already registered");
 	}
-	my $slice = GeniSlice->Create($hrn, $uuid,
+	my $slice = GeniSlice->Create($certificate,
 				      $credential->owner_uuid(),
-				      $certificate, $authority);
+				      $authority);
 	if (!defined($slice)) {
 	    $certificate->Delete();
 	    print STDERR "Could not create new slice object\n";
@@ -384,7 +385,7 @@ sub Register($)
 	#
 	# Add the bindings locally before registration.
 	# 
-	if (defined($userbindings)) {
+	if (0 && defined($userbindings)) {
 	    foreach my $binding_uuid (@{ $userbindings }) {
 		my $binding_user = GeniUser->Lookup($binding_uuid, 1);
 		$slice->BindUser($binding_user);
@@ -398,7 +399,8 @@ sub Register($)
 	    $slice_credential->Delete();
 	    $slice->Delete();
 	    print STDERR "Could not register new slice at the clearinghouse\n";
-	    return GeniResponse->Create(GENIRESPONSE_ERROR);
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+			"Could not register new slice at clearinghouse");
 	}
 
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS,

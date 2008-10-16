@@ -115,17 +115,16 @@ sub Stringify($)
 #
 # Create a Geni component in the DB.
 #
-sub Create($$$$$)
+sub Create($$$)
 {
-    my ($class, $uuid, $hrn, $url, $cert) = @_;
+    my ($class, $certificate, $url) = @_;
 
     my @insert_data = ();
     my $idx = TBGetUniqueIndex('next_component', 1);
 
-    my $safe_hrn  = DBQuoteSpecial($hrn);
+    my $safe_hrn  = DBQuoteSpecial($certificate->hrn());
     my $safe_url  = DBQuoteSpecial($url);
-    my $safe_uuid = DBQuoteSpecial($uuid);
-    my $safe_cert = DBQuoteSpecial($cert);
+    my $safe_uuid = DBQuoteSpecial($certificate->uuid());
     
     # Now tack on other stuff we need.
     push(@insert_data, "created=now()");
@@ -134,16 +133,14 @@ sub Create($$$$$)
     push(@insert_data, "url=$safe_url");
     push(@insert_data, "uuid=$safe_uuid");
 
+    if ($certificate->Store() != 0) {
+	print STDERR "Could not store certificate for new component.\n";
+	return undef;
+    }
+
     # Insert into DB.
     DBQueryWarn("replace into geni_components set " . join(",", @insert_data))
 	or return undef;
-
-    # Insert the certificate.
-    if (!DBQueryWarn("replace into geni_certificates set ".
-		     "  uuid=$safe_uuid, cert=$safe_cert")) {
-	DBQueryWarn("delete from geni_components where idx='$idx'");
-	return undef;
-    }
 
     return GeniComponent->Lookup($idx);
 }
@@ -286,10 +283,15 @@ sub CreateFromRegistry($$)
     return undef
 	if (GeniCHClient::Resolve($uuid, "CM", \$blob) != 0);
 
-    return GeniComponent->Create($uuid,
-				 $blob->{'hrn'},
-				 $blob->{'url'},
-				 $blob->{'cert'});
+    my $certificate = GeniCertificate->LoadFromString($blob->{'gid'});
+    return undef
+	if (!defined($certificate));
+
+    my $component = GeniComponent->Create($certificate, $blob->{'url'});
+    $certificate->Delete()
+	if (!defined($component));
+
+    return $component;
 }
 
 #
@@ -529,8 +531,6 @@ sub SplitSliver($$$$)
 	    return -1;
 	}
 	$s->SetAggregate($sliver);
-	# XXX Kludge for Emulab aggregates
-	$s->Sethrn($credential->hrn());
 	push(@slivers, $s);
     }
     @$pref = @slivers;

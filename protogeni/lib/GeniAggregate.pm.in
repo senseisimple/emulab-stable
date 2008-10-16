@@ -125,16 +125,16 @@ sub Stringify($)
 # for now. The client side does not actually know its an aggregate, at
 # least not yet.
 #
-sub Create($$$$$)
+sub Create($$$$$$)
 {
-    my ($class, $slice, $owner, $aggregate_type, $hrn) = @_;
+    my ($class, $slice, $owner, $aggregate_type, $hrn, $nickname) = @_;
     my @insert_data = ();
 
     # Every aggregate gets a new unique index.
     my $idx = TBGetUniqueIndex('next_aggregate', 1);
 
     # Create a cert pair, which gives us a new uuid.
-    my $certificate = GeniCertificate->Create("aggregate");
+    my $certificate = GeniCertificate->Create("aggregate", $hrn, $TBOPS);
     if (!defined($certificate)) {
 	print STDERR "Could not generate new certificate and UUID!\n";
 	return undef;
@@ -147,6 +147,7 @@ sub Create($$$$$)
     push(@insert_data, "created=now()");
     push(@insert_data, "idx='$idx'");
     push(@insert_data, "hrn=" . DBQuoteSpecial($hrn));
+    push(@insert_data, "nickname=" . DBQuoteSpecial($nickname));
     push(@insert_data, "uuid='$uuid'");
     push(@insert_data, "creator_uuid='$owner_uuid'");
     push(@insert_data, "slice_uuid='$slice_uuid'");
@@ -165,6 +166,7 @@ sub Create($$$$$)
 sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'AGGREGATE'}->{$_[1]}); }
 sub idx($)		{ return field($_[0], "idx"); }
 sub uuid($)		{ return field($_[0], "uuid"); }
+sub nickname($)		{ return field($_[0], "nickname"); }
 sub type($)		{ return field($_[0], "type"); }
 sub slice_uuid($)	{ return field($_[0], "slice_uuid"); }
 sub creator_uuid($)	{ return field($_[0], "creator_uuid"); }
@@ -232,7 +234,7 @@ sub hrn($)
     if (defined($hrn) && $hrn ne "") {
 	return $hrn;
     }
-    return $OURDOMAIN . ".aggregates." . $self->idx();
+    return "emulab.aggregate_" . $self->idx();
 }
 
 #
@@ -441,6 +443,9 @@ sub NewCredential($$)
 	print STDERR "Could not create credential for $self, $owner\n";
 	return undef;
     }
+    if (defined($self->nickname())) {
+	$credential->AddExtension("nickname", $self->nickname());
+    }
     if ($credential->Sign($self->GetCertificate()) != 0) {
 	print STDERR "Could not sign credential for $self, $owner\n";
 	return undef;
@@ -557,9 +562,14 @@ use Interface;
 
 sub Create($$$)
 {
-    my ($class, $slice, $owner, $hrn) = @_;
+    my ($class, $slice, $owner, $linkname) = @_;
 
-    return GeniAggregate->Create($slice, $owner, "Link", $hrn);
+    #
+    # Form an hrn using the slicename and linkname
+    #
+    my $hrn = "emulab." . $slice->slicename() . "." . $linkname;
+
+    return GeniAggregate->Create($slice, $owner, "Link", $hrn, $linkname);
 }
 
 #

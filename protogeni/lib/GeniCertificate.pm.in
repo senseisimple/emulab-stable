@@ -65,8 +65,9 @@ sub Lookup($$)
     return undef
 	if (!$query_result || !$query_result->numrows);
 
-    my $self         = {};
-    $self->{'CERT'}  = $query_result->fetchrow_hashref();
+    my $self          = {};
+    $self->{'CERT'}   = $query_result->fetchrow_hashref();
+    $self->{'stored'} = 1;
     bless($self, $class);
     my $cert = $self->cert();
 
@@ -93,20 +94,47 @@ sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'CERT'}->{$_[1]}); }
 sub uuid($)		{ return field($_[0], "uuid"); }
 sub created($)		{ return field($_[0], "created"); }
 sub cert($)		{ return field($_[0], "cert"); }
+sub DN($)		{ return field($_[0], "DN"); }
 sub privkey($)		{ return field($_[0], "privkey"); }
 sub revoked($)		{ return field($_[0], "revoked"); }
 
 #
+# The fields are buried inside the DN.
+#
+sub hrn($)
+{
+    my ($self) = @_;
+
+    if ($self->DN() =~ /\/OU=([-\w\.]+)\//) {
+	return $1
+	    if ($1 ne "");
+    }
+    print STDERR "Cannot find hrn inside DN: '" . $self->DN() . "'\n";
+    return "unknown";
+}
+sub email($)
+{
+    my ($self) = @_;
+
+    if ($self->DN() =~ /\/emailAddress=(.*)/) {
+	return $1
+	    if ($1 ne "");
+    }
+    print STDERR "Cannot find email inside DN: '" . $self->DN() . "'\n";
+    return "unknown";
+}
+
+#
 # Create a certificate pair, which gives us a uuid to use for an object.
 #
-sub Create($$;$)
+sub Create($$$$;$)
 {
-    my ($class, $what, $uuid) = @_;
+    my ($class, $what, $hrn, $email, $uuid) = @_;
     # Let mkcert generate a new one.
     $uuid = ""
 	if (!defined($uuid));
 
-    if (! open(CERT, "$MKCERT $what $uuid |")) {
+    if (! open(CERT, "$MKCERT -e \"$email\" $hrn $uuid |")) {
 	print STDERR "Could not start $MKCERT\n";
 	return undef;
     }
@@ -148,19 +176,17 @@ sub Create($$;$)
 	print STDERR "Improper chars in certificate string\n";
 	return undef;
     }
-    if (GeniCertificate->CertificateInfo($cert, \$uuid) != 0){
-	print STDERR "Could not find uuid in certificate: $cert\n";
+
+    my $certificate = GeniCertificate->LoadFromString($cert);
+    return undef
+	if (!defined($certificate));
+
+    $certificate->{'CERT'}->{'privkey'} = $privkey;
+    if ($certificate->Store() != 0) {
+	print STDERR "Could not write new certificate to DB\n";
 	return undef;
     }
-    my $safe_cert = DBQuoteSpecial($cert);
-    my $safe_uuid = DBQuoteSpecial($uuid);
-    my $safe_key  = DBQuoteSpecial($privkey);
-    return undef
-	if (!DBQueryWarn("replace into geni_certificates set ".
-			 " created=now(), uuid=$safe_uuid, ".
-			 " cert=$safe_cert, privkey=$safe_key"));
-
-    return GeniCertificate->Lookup($uuid);
+    return $certificate;
 }
 
 #
@@ -172,35 +198,120 @@ sub Delete($)
     my $uuid = $self->uuid();
 
     return -1
-	if (!DBQueryWarn("delete from geni_certificates where uuid='$uuid'"));
+	if ($self->{'stored'} &&
+	    !DBQueryWarn("delete from geni_certificates where uuid='$uuid'"));
 
     return 0;
 }
 
 #
-# Store a public key for a uuid. This is for something that is hosted
-# elsewhere and we just want to save the pubkey away in case we need it.
+# Load a certificate from a string. This creates an object, but does
+# not store it in the DB.
 #
-sub StorePublic($$)
+sub LoadFromString($$)
 {
-    my ($class, $cert) = @_;
+    my ($class, $string) = @_;
 
-    if (! ($cert =~ /^[\012\015\040-\176]*$/)) {
+    if (! ($string =~ /^[\012\015\040-\176]*$/)) {
 	print STDERR "Improper chars in certificate string\n";
 	return undef;
     }
-    my $uuid;
-    if (GeniCertificate->CertificateInfo($cert, \$uuid) != 0){
-	print STDERR "Could not find uuid in certificate: $cert\n";
+    my ($tempfile, $filename) = tempfile(UNLINK => 1);
+    if (!$tempfile) {
+	print STDERR "Could not create tempfile for cert string\n";
 	return undef;
     }
-    my $safe_cert = DBQuoteSpecial($cert);
-    my $safe_uuid = DBQuoteSpecial($uuid);
-    return undef
-	if (!DBQueryWarn("replace into geni_certificates set ".
-			 " created=now(), uuid=$safe_uuid, cert=$safe_cert"));
+    print $tempfile "-----BEGIN CERTIFICATE-----\n";
+    print $tempfile $string;
+    print $tempfile "-----END CERTIFICATE-----\n";
 
-    return GeniCertificate->Lookup($uuid);
+    my $certificate = GeniCertificate->LoadFromFile($filename);
+    unlink($filename);
+    return $certificate;
+}
+
+#
+# Load a certificate from a file. This creates an object, but does
+# not store it in the DB.
+#
+sub LoadFromFile($$)
+{
+    my ($class, $filename) = @_;
+
+    if (! open(X509, "$OPENSSL x509 -in $filename -subject |")) {
+	print STDERR "Could not start $OPENSSL on $filename\n";
+	return undef;
+    }
+    my @certlines = ();
+    while (<X509>) {
+	push(@certlines, $_);
+    }
+    if (!close(X509) || !@certlines) {
+	print STDERR "Could not load certificate from $filename\n";
+	return undef;
+    }
+
+    #
+    # The first line is the DN (subject).
+    #
+    my $DN = shift(@certlines);
+    chomp($DN);
+
+    #
+    # Throw away first and last lines; the cert is rest.
+    #
+    shift(@certlines);
+    pop(@certlines);
+    my $cert = join("", @certlines);
+
+    # Dig out the uuid.
+    my $uuid;
+    if ($DN =~ /\/CN=([-\w]*)/) {
+	$uuid = $1;
+    }
+    else {
+	print STDERR "Could not find uuid in 'DN'\n";
+	return undef;
+    }
+    
+    my $self          = {};
+    $self->{'CERT'}   = {};
+    $self->{'stored'} = 0;
+    bless($self, $class);
+
+    $self->{'CERT'}->{'uuid'}      = $uuid;
+    $self->{'CERT'}->{'cert'}      = $cert;
+    $self->{'CERT'}->{'DN'}        = $DN;
+    $self->{'CERT'}->{'privkey'}   = undef;
+    $self->{'CERT'}->{'revoked'}   = undef;
+    $self->{'CERT'}->{'created'}   = undef;
+    return $self;
+}
+
+#
+# Store a certificate that was loaded from a string/file.
+#
+sub Store($)
+{
+    my ($self) = @_;
+
+    return 0
+	if ($self->{'stored'});
+
+    my @inserts = ();
+    push(@inserts, "created=now()");
+    push(@inserts, "uuid=" . DBQuoteSpecial($self->uuid()));
+    push(@inserts, "cert=" . DBQuoteSpecial($self->cert()));
+    push(@inserts, "DN=" . DBQuoteSpecial($self->DN()));
+    push(@inserts, "privkey=" . DBQuoteSpecial($self->privkey()))
+	if (defined($self->privkey()));
+
+    return -1
+	if (!DBQueryWarn("replace into geni_certificates set ".
+			 join(",", @inserts)));
+    
+    $self->{'stored'} = 1;
+    return 0;
 }
 
 #
@@ -219,69 +330,6 @@ sub WriteToFile($)
     print $tempfile $self->privkey();
     print $tempfile "-----END RSA PRIVATE KEY-----\n";
     return $filename;
-}
-
-#
-# Convert a certificate to its uuid.
-#
-sub CertificateInfo($$$)
-{
-    my ($class, $string, $pref) = @_;
-
-    # Deleted when scope is left.
-    my $tempfile = new File::Temp(UNLINK => 1);
-    my $filename = $tempfile->filename;    
-    print $tempfile "-----BEGIN CERTIFICATE-----\n";
-    print $tempfile "$string";
-    print $tempfile "-----END CERTIFICATE-----\n";
-
-    my $dn = `$OPENSSL x509 -in $filename -noout -subject`;
-    if ($?) {
-	print STDERR "Failed to convert $filename to uuid!\n";
-	return -1;
-    }
-
-    if ($dn =~ /CN=([-\w]*)$/) {
-	$$pref = $1;
-    }
-    else {
-	return -1;
-    }
-    return 0;
-}
-
-#
-# Convert a certificate inside a pem file to its cert and uuid.
-#
-sub CertificateInfoFromFile($$$$)
-{
-    my ($class, $filename, $pcert, $puuid) = @_;
-
-    my $dn = `$OPENSSL x509 -in $filename -noout -subject`;
-    if ($?) {
-	print STDERR "Failed to convert $filename to uuid!\n";
-	return -1;
-    }
-    if ($dn =~ /CN=([-\w]*)$/) {
-	$$puuid = $1;
-    }
-    else {
-	return -1;
-    }
-    return 0
-	if (!defined($pcert));
-    
-    my $cert = `$OPENSSL x509 -in $filename`;
-    if ($?) {
-	print STDERR "Failed to convert $filename to cert!\n";
-	return -1;
-    }
-    $cert =~ s/^----.*----//mg;
-    $cert =~ s/^$//mg;
-    local $/ = "";
-    chomp($cert);
-    $$pcert = "$cert\n";
-    return 0;
 }
 
 ############################################################################
@@ -308,9 +356,11 @@ sub Create($$)
     return undef
 	if (!defined($query_result) || !$query_result->numrows);
 
-    my $self         = {};
-    $self->{'CERT'}  = $query_result->fetchrow_hashref();
+    my $self           = {};
+    $self->{'CERT'}    = $query_result->fetchrow_hashref();
+    $self->{'stored'}  = 1;
     bless($self, $class);
+
     return $self;
 }
 
@@ -320,6 +370,33 @@ sub created($)		{ return field($_[0], "created"); }
 sub cert($)		{ return field($_[0], "cert"); }
 sub privkey($)		{ return field($_[0], "privkey"); }
 sub revoked($)		{ return field($_[0], "revoked"); }
+
+#
+# Need to add DN to the emulab table.
+#
+sub DN($)
+{
+    my ($self) = @_;
+
+    return $self->{'CERT'}->{'DN'}
+        if (exists($self->{'CERT'}->{'DN'}));
+    
+    # Deleted when scope is left.
+    my $tempfile = new File::Temp(UNLINK => 1);
+    my $filename = $tempfile->filename;    
+    print $tempfile "-----BEGIN CERTIFICATE-----\n";
+    print $tempfile "$self->cert()";
+    print $tempfile "-----END CERTIFICATE-----\n";
+
+    my $dn = `$OPENSSL x509 -in $filename -noout -subject`;
+    if ($?) {
+	print STDERR "Failed to convert $filename to uuid!\n";
+	return undef;
+    }
+    chomp($dn);
+    $self->{'CERT'}->{'DN'} = $dn;
+    return $dn;
+}
 
 # _Always_ make sure that this 1 is at the end of the file...
 1;

@@ -227,7 +227,7 @@ foreach my $sigid (keys(%credentials)) {
     $cmd .= "--print-debug "
 	if ($debug);
     $cmd .= "--node-id Sig_$sigid $certarg $xmlfile";
-    print "$cmd\n"
+    print STDERR "$cmd\n"
 	if ($debug);
 
     open(SEC, "$cmd 2>&1 |")
@@ -243,10 +243,10 @@ foreach my $sigid (keys(%credentials)) {
     if (!defined($line) || !($line =~ /^OK$/)) {
 	$bad = 1;
     }
-    print $line
+    print STDERR $line
 	if (defined($line) && $debug);
     while (<SEC>) {
-	print $_
+	print STDERR $_
 	    if ($debug);
     }
     close(SEC) or

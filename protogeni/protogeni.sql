@@ -81,7 +81,8 @@ CREATE TABLE `geni_authorities` (
   `type` enum('sa','ma','ch') NOT NULL default 'sa',
   `url` tinytext,
   PRIMARY KEY  (`idx`),
-  UNIQUE KEY `uuid` (`uuid`)
+  UNIQUE KEY `uuid` (`uuid`),
+  UNIQUE KEY `uuid_prefix` (`uuid_prefix`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 #
@@ -119,7 +120,7 @@ CREATE TABLE `geni_slivers` (
   `idx` mediumint(8) unsigned NOT NULL default '0',
   `uuid` varchar(40) NOT NULL default '',
   `hrn` varchar(256) NOT NULL default '',
-  `name` varchar(256) NOT NULL default '',
+  `nickname` varchar(256) default NULL,
   `slice_uuid` varchar(40) NOT NULL default '',
   `creator_uuid` varchar(40) NOT NULL default '',
   `resource_uuid` varchar(40) NOT NULL default '',
@@ -142,14 +143,13 @@ DROP TABLE IF EXISTS `geni_aggregates`;
 CREATE TABLE `geni_aggregates` (
   `idx` mediumint(8) unsigned NOT NULL default '0',
   `hrn` varchar(256) NOT NULL default '',
-  `name` varchar(256) NOT NULL default '',
+  `nickname` varchar(256) default NULL,
   `uuid` varchar(40) NOT NULL default '',
   `type` varchar(40) NOT NULL default '',
   `slice_uuid` varchar(40) NOT NULL default '',
   `creator_uuid` varchar(40) NOT NULL default '',
   `created` datetime default NULL,
   `credential_idx` int(10) unsigned default NULL,
-  `ticket_idx` int(10) unsigned default NULL,
   `component_idx` int(10) unsigned NOT NULL default '0',
   `aggregate_idx` int(10) unsigned default NULL,
   `status` enum('created','ready','broken') NOT NULL default 'created',
@@ -176,7 +176,7 @@ CREATE TABLE `geni_tickets` (
   PRIMARY KEY  (`idx`), 
   INDEX `owner_uuid` (`owner_uuid`),
   INDEX `slice_uuid` (`slice_uuid`),
-  UNIQUE KEY `compseqno` (`component_idx`, `seqno`)
+  UNIQUE KEY `compseqno` (`component_uuid`, `seqno`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 #
@@ -206,6 +206,7 @@ CREATE TABLE `geni_certificates` (
   `uuid` varchar(40) NOT NULL default '',
   `created` datetime default NULL,
   `cert` text,
+  `DN` text,
   `privkey` text,
   `revoked` datetime default NULL,
   PRIMARY KEY  (`uuid`)

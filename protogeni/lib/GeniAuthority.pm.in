@@ -59,6 +59,12 @@ sub Lookup($$)
 
 	    ($idx) = $query_result->fetchrow_array();
     }
+    elsif ($token =~ /^\d+$/) {
+	$idx = $token;
+    }
+    elsif ($token =~ /^P([\w]+)$/) {
+	return GeniAuthority->LookupByPrefix($1);
+    }
     elsif ($token =~ /^[\w\.]*$/) {
 	$query_result =
 	    DBQueryWarn("select idx from geni_authorities ".
@@ -120,15 +126,15 @@ sub Stringify($)
 #
 sub Create($$$$$$)
 {
-    my ($class, $uuid, $hrn, $url, $cert, $prefix, $type) = @_;
+    my ($class, $certificate, $url, $type) = @_;
 
     my @insert_data = ();
     my $idx = TBGetUniqueIndex('next_authority', 1);
+    my ($prefix) = ($certificate->uuid() =~ /^\w+\-\w+\-\w+\-\w+\-(\w+)$/);
 
-    my $safe_hrn    = DBQuoteSpecial($hrn);
+    my $safe_hrn    = DBQuoteSpecial($certificate->hrn());
     my $safe_url    = DBQuoteSpecial($url);
-    my $safe_uuid   = DBQuoteSpecial($uuid);
-    my $safe_cert   = DBQuoteSpecial($cert);
+    my $safe_uuid   = DBQuoteSpecial($certificate->uuid());
     my $safe_prefix = DBQuoteSpecial($prefix);
     my $safe_type   = DBQuoteSpecial($type);
     
@@ -141,17 +147,15 @@ sub Create($$$$$$)
     push(@insert_data, "uuid_prefix=$safe_prefix");
     push(@insert_data, "type=$safe_type");
 
-    # Insert into DB.
-    DBQueryWarn("replace into geni_authorities set " .
-		join(",", @insert_data))
-	or return undef;
-
-    # Insert the certificate.
-    if (!DBQueryWarn("replace into geni_certificates set ".
-		     "  uuid=$safe_uuid, cert=$safe_cert")) {
-	DBQueryWarn("delete from geni_authorities where idx='$idx'");
+    if ($certificate->Store() != 0) {
+	print STDERR "Could not store certificate for new user.\n";
 	return undef;
     }
+
+    # Insert into DB.
+    return undef
+	if (!DBQueryWarn("replace into geni_authorities set " .
+			 join(",", @insert_data)));
 
     return GeniAuthority->Lookup($idx);
 }
@@ -167,6 +171,30 @@ sub cert($)		{ return $_[0]->{'CERT'}->cert(); }
 sub GetCertificate($)   { return $_[0]->{'CERT'}; }
 
 #
+# Create authority from the ClearingHouse, by looking up the info.
+#
+sub CreateFromRegistry($$$)
+{
+    my ($class, $type, $uuid) = @_;
+
+    my $blob;
+    return undef
+	if (GeniCHClient::Resolve($uuid, $type, \$blob) != 0);
+
+    my $certificate = GeniCertificate->LoadFromString($blob->{'gid'});
+    return undef
+	if (!defined($certificate));
+
+    my $authority = GeniAuthority->Create($certificate,
+					  $blob->{'url'},
+					  $blob->{'type'});
+    $certificate->Delete()
+	if (!defined($authority));
+
+    return $authority;
+}
+
+#
 # Does the uuid prefix match.
 #
 sub PrefixMatch($$)
@@ -178,13 +206,43 @@ sub PrefixMatch($$)
 
     my $uuid_prefix = $self->uuid_prefix();
 
-    print "$uuid, $uuid_prefix, $self\n";
-
     if ($uuid =~ /^\w+\-\w+\-\w+\-\w+\-(\w+)$/) {
 	return 1
 	    if ("$uuid_prefix" eq "$1");
     }
     return 0;
+}
+
+#
+# Find an authority by looking for the prefix. This will eventually go
+# away when we switch top chains.
+#
+sub LookupByPrefix($$)
+{
+    my ($class, $uuid) = @_;
+    my $prefix;
+    
+    if ($uuid =~ /^\w+\-\w+\-\w+\-\w+\-(\w+)$/) {
+	$prefix = $1;
+    }
+    elsif ($uuid =~ /^(\w+)$/) {
+	$prefix = $1;
+    }
+    else {
+	print STDERR "Could no parse uuid for prefix\n";
+	return undef;
+    }
+    
+    my $query_result =
+	DBQueryWarn("select idx from geni_authorities ".
+		    "where uuid_prefix='$prefix'");
+
+    return undef
+	if (! $query_result || !$query_result->numrows);
+
+    my ($idx) = $query_result->fetchrow_array();
+
+    return GeniAuthority->Lookup($idx);
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

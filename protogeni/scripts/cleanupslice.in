@@ -1,0 +1,97 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+
+#
+# Cleanup a dead slice on the machine running a CM.
+# 
+sub usage()
+{
+    print "Usage: cleanupslice <uuid>\n";
+    exit(1);
+}
+sub fatal($);
+my  $optlist = "";
+
+#
+# Configure variables
+#
+my $TB		  = "@prefix@";
+my $TBOPS         = "@TBOPSEMAIL@";
+my $TBLOGS        = "@TBLOGSEMAIL@";
+
+# Do this early so that we talk to the right DB.
+use vars qw($GENI_DBNAME);
+BEGIN { $GENI_DBNAME = "geni-cm"; }
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use GeniSlice;
+use GeniUtil;
+use GeniCM;
+
+# Map invoking user to object.
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
+}
+if (!$this_user->IsAdmin()) {
+    die("*** $0:\n".
+	"    You do not have permission to run this script!\n");
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+usage()
+    if (@ARGV != 1);
+my $uuid = $ARGV[0];
+
+#
+# Taint check.
+#
+if ($uuid =~ /^([\w\-]+)$/) {
+    $uuid = $1;
+}
+else {
+    die("*** Bad data in $uuid\n");
+}
+my $slice = GeniSlice->Lookup($uuid);
+if (!defined($slice)) {
+    fatal("No such slice for $uuid");
+}
+GeniUtil::FlipToGeniUser();
+
+if (GeniCM::CleanupDeadSlice($slice) != 0) {
+    fatal("Could not clean up slice $slice");
+}
+exit(0);
+
+sub fatal($) {
+    my ($msg) = @_;
+
+    print STDERR "$msg\n";
+    exit(1);
+}

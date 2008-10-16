@@ -132,14 +132,11 @@ sub CallMethod($$$@)
 				 "Must provide an rpc context");
     }
     
-    #
-    # This is for the Crypt::SSL library, many levels down. It appears to
-    # be the only way to specify this. Even worse, when we want to use
-    # an encrypted key belonging to a user, have to use the pkcs12 format
-    # of the file, since that is the only format for which we can provide
-    # the passphrase.
-    #
     if (0) {
+	#
+	# This does not work. Not sure why, but need to figure it out
+	# cause it does cert chains while Crypt::SSL (below) does not. 
+	#
 	$IO::Socket::SSL::DEBUG = 4;
 	$Net::SSLeay::slowly = 1;
 	
@@ -159,6 +156,13 @@ sub CallMethod($$$@)
 	}
     }
     else {
+	#
+	# This is for the Crypt::SSL library, many levels down. It
+	# appears to be the only way to specify this. Even worse, when
+	# we want to use an encrypted key belonging to a user, have to
+	# use the pkcs12 format of the file, since that is the only
+	# format for which we can provide the passphrase.
+	#
 	if (!defined($context->password())) {
 	    $ENV{'HTTPS_CERT_FILE'} = $context->certificate();
 	    $ENV{'HTTPS_KEY_FILE'}  = $context->keyfile();

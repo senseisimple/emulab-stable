@@ -46,13 +46,12 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 #
 # So we know who/what we are acting as.
 #
-my $myuuid;
-if (GeniCertificate->CertificateInfoFromFile($EMULAB_PEMFILE,
-					     undef, \$myuuid) != 0) {
+my $certificate = GeniCertificate->LoadFromFile($EMULAB_PEMFILE);
+if (!defined($certificate)) {
     die("*** $0:\n".
 	"    Could not get uuid from $EMULAB_PEMFILE\n");
 }
-$ENV{'MYUUID'} = $myuuid;
+$ENV{'MYUUID'} = $certificate->uuid();
 
 #
 # In the prototype, we accept certificate signed by trusted roots
@@ -136,8 +135,9 @@ my $response = $responder->{'_decode'}->serve($request,
 # Terminate the log capture so that we can print the response to STDOUT
 # for the web server.
 #
-#print STDERR "\n\n" . $response;
+print STDERR "\n\n" . $response;
 
 LogEnd();
 
 print "Content-Type: text/xml \n\n" . $response;
+exit(0);
