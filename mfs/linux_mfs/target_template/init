@@ -1,0 +1,7 @@
+#! /bin/sh
+
+mkdir -p /newroot
+mount -t tmpfs none /newroot
+tar cf - `ls / | grep -v newroot` | (cd newroot; tar xf-)
+cd /newroot
+exec switch_root -c /dev/console . /sbin/init $@

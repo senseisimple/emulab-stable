@@ -1,0 +1,37 @@
+This is the build tree for the Linux-based frisbee MFS.
+
+In order to actually build anything, you'll need a whole bunch of source
+tarballs.  They can be found in ops:/share/linux/mfs/source.  Just rsync
+or scp that whole tree on top of the 'source' subdirectory in this tree.
+
+This can probably only be compiled on a Linux machine.
+
+To build, run "make build-env" to build the cross-compiling uClibc
+toolchain.  Then run "make target" to compile all of the source for the
+initramfs.
+
+Finally, run "make target-initramfs" to create a compressed cpio archive
+suitable to use as an initramfs.
+
+The kernel is compiled but not installed anywhere.  You'll have to pull
+it out of the build tree for now.
+
+TODO
+----
+Lots of small things.  I've tested the tmcc and frisbee functionality of
+the image, but it's not really automated yet.  The necessary scripts are
+all there, but not yet tested.
+
+BUGS
+----
+- There are no docs (except this, and it sucks).
+- The build system needs some work:
+  - The kernel image isn't installed anywhere
+  - There are occasional problems building the toolchain.  These are due
+    to weird bugs in the gcc build process that I haven't figured out a
+    good fix for.
+  - There are some minor dependency issues in building some of the
+    targets that cause other targets to be rebuilt unnecessarily.
+- Documentation sucks.
+- The hotplug scripts that work with mdev (busybox's stripped-down udev)
+  need to be cleaned up a bit.

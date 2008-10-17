@@ -1,0 +1,294 @@
+#! /bin/sh
+
+if [ -r /etc/emulab/paths.sh ]; then
+	. /etc/emulab/paths.sh
+else
+	BOOTDIR=/etc/testbed
+	ETCDIR=/etc/testbed
+fi
+
+MBR_PATH=/etc/emulab
+EXTRA_FS_MOUNTPOINT=/images
+
+TMCC=tmcc
+FRISBEE=frisbee
+
+get_value()
+{
+	local data="$1"
+	local key="$2"
+
+	echo $data | tr ' ' '\n' | sed -n "s/^$key=//p"
+}
+
+install_mbr()
+{
+	local disk=$1
+	local new_mbr_ver=$2
+	local cur_mbr_ver=''
+	loal os=`uname -s`
+
+	if ! dd if=$disk of=/dev/null bs=512 count=1 2>/dev/null; then
+			echo "WARNING: could not read from $disk, MBR not changed"
+			return -1
+	fi
+
+	if [ "$os" = Linux ]; then
+		size=`echo -e 'u\np\nq' | fdisk $disk | \
+			sed -n "s#^${disk}1 *. *[0-9]* *\([0-9]*\).*\$#\1#p"`
+	elif [ "$os" = FreeBSD ]; then
+		size=`fdisk -s ${disk##*/} 2>/dev/null | \
+			sed -n -e 's/^ *1: *[0-9][0-9]* *\([0-9][0-9]*\).*$/\1/p'`
+	fi
+
+	case ${size}s in
+		6281352s)
+			cur_mbr_ver=1
+			;;
+		12305790s)
+			cur_mbr_ver=2
+			;;
+		s)
+			echo "Found no MBR on $disk, installing version $new_mbr_ver"
+			;;
+		*)
+			echo "WARNING: custom MBR on $disk, not changed"
+			return 0
+			;;
+	esac
+
+	if [ "$cur_mbr_ver" = $new_mbr_ver ]; then
+		return 0
+	fi
+
+	if ! [ -r $MBR_PATH/mbr{$new_mbr_ver}.dd ]; then
+		echo "WARNING: cannot find MBR version $new_mbr_ver, not installed"
+		return -1
+	fi
+	
+	echo "Installing MBR version $new_mbr_ver ..."
+	dd if=$MBR_PATH/mbr{$new_mbr_ver}.dd of=$disk bs=512 count=1
+
+	# Linux won't re-read the partition table unless told to do so.
+	# hdparm could be used for this, but it may not be installed.
+	# fdisk tells the kernel to re-read the table after writing it
+	# to disk, so we'll just use that.
+	if [ $os = Linux ]; then
+		echo "Re-reading partition table ..."
+		echo w | fdisk $disk > /dev/null
+	fi
+}
+
+#
+# Function to zero all potential superblocks in the DOS partitions that
+# could interfere with the OSes on the image being loaded.
+#
+# FreeBSD 4 or 5 goes out of its way to make this hard.  In FBSD4, we
+# cannot overwrite the beginning of partitions that have a legit superblock.
+# In FBSD5, DOS partitions that have a zero type cannot even be accessed.
+# So we have to use the whole-disk special file using offsets extracted
+# via fdisk.  This is unnecessary with Linux, but it's easier just to do it
+# the same way on both OSs rather than have special-case code.
+#
+zap_superblocks()
+{
+	local disk=$1
+	local offsets=''
+	local os=`uname -s`
+
+	if [ $os = Linux ]; then
+		offsets=`echo -e 'u\np\nq' | fdisk $disk | \
+			sed -n "s#^${disk}[0-9]* *. *[0-9]* *\([0-9]*\).*\$#\1#p"`
+	elif [ $os = FreeBSD ]; then
+		offsets=`fdisk -s ${disk##*/} 2>/dev/null | \
+			sed -n -e 's/^[ 0-9]*: *\([0-9]*\).*$/\1/p'`
+	fi
+
+	if [ x"$offs" = x ]; then
+		return 0
+	fi
+
+	echo -n "Invalidating old potential superblocks: "
+	for off in $offsets; do
+		echo -n "$off "
+		dd if=/dev/zero of=$disk seek=$off bs=512 count=16 > /dev/null 2>&1
+		if [ $? -ne 0 ]; then
+			echo "WARNING: failed to invalidate $off"
+		fi
+	done
+	echo ""
+
+	return 0
+}
+
+download_image()
+{
+	local address=$1
+	local device=$2
+	local port=""
+	local imagefile=""
+
+	local protocol=${address%%://*}
+	if [ $protocol = $address ]; then
+		case $address in
+			/*) protocol=file ;;
+			*) protocol=frisbee ;;
+		esac
+	fi
+
+	case $protocol in
+		frisbee)
+			port=${address##*:}
+			if [ $port = $address ]; then
+				echo "*** WARNING: no port specified for frisbee"
+				return -1
+			fi
+			address=${address%%:*}
+			;;
+		http|https)
+			server=${address%%/*}
+			filename=${address#*/}
+
+			if ! make_extra_fs $EXTRA_FS_MOUNTPOINT; then
+				return -1
+			fi
+
+			wget -nv -N -P $EXTRA_FS_MOUNTPOINT \
+				$protocol://$server/$filename
+			rc=$?
+			if [ $rc -eq 0 ]; then
+				echo "wget succeeded getting the image"
+			else
+				echo "wget failed, status $rc"
+				return -1
+			fi
+			imagefile=$EXTRA_FS_MOUNTPOINT/${filename##*/}
+			;;
+		file)
+			imagefile=/$address
+			;;
+		*)
+			echo "*** WARNING: Unsupported protocol $protocol!"
+			return -1
+			;;
+	esac
+
+	$TMCC state RELOADING
+
+	if [ $protocol = frisbee ]; then
+		$FRISBEE $FRISBEE_OPTS $device
+		rc=$?
+
+		if [ $rc -ne 0 ]; then
+			echo "Frisbee run failed, status $rc"
+			return $rc
+		fi
+
+		echo "Frisbee run finished"
+		rc=0
+	else
+		$IMAGEUNZIP $IMAGEUNZIP_OPTS $imagefile $device
+		rc=$?
+	fi
+
+	return $rc
+}
+
+$TMCC state RELOADSETUP
+#XXX wait until we have loadinfo
+
+BOSSINFO=`$BINDIR/tmcc bossinfo`
+LOADINFO=`$BINDIR/tmcc loadinfo`
+BOSSIP=${BOSSINFO##* }
+
+ADDRESS=`get_value "$LOADINFO" ADDR`
+PARTOS=`get_value "$LOADINFO" PARTOS`
+PARTITION=`get_value "$LOADINFO" PART`
+PARTITION=${PARTITION:-'0'}
+DISK=`get_value "$LOADINFO" DISK`
+DISK=${DISK:-'ad0'}
+ZFILL=`get_value "$LOADINFO" ZFILL`
+ZFILL=${ZFILL:-'0'}
+ACPI=`get_value "$LOADINFO" ACPI`
+ASF=`get_value "$LOADINFO" ASF`
+MBR=`get_value "$LOADINFO" MBR`
+
+FRISBEE_OPTS=""
+
+if [ $PARTITION -ne 0 ]; then
+	FRISBEE_OPTS="$FRISBEE_OPTS -s $PARTITION"
+	case $PARTOS in
+		FreeBSD) PTYPE=165 ;;
+		OpenBSD) PTYPE=166 ;;
+		Fedora|Linux)   PTYPE=131 ;;
+	esac
+
+	[ -n "$PTYPE" ] && FRISBEE_OPTS="$FRISBEE_OPTS -D $PTYPE"
+fi
+
+# XXX enable IPoD
+# XXX set memory options
+
+#if [ $HOSTNEM -ge 26624 ]; then
+#	# XXX set ulimit
+#	FRISBEE_OPTS="$FRISBEE_OPTS -M $HOSTMEM"
+#fi
+
+if [ -z "$ADDRESS" ]; then
+	echo "Unable to get address for loading image"
+	return -1
+fi
+
+if [ -e $BOOTDIR/myip ]; then
+	FRISBEE_OPTS="$FRISBEE_OPTS -i `cat $BOOTDIR/myip`"
+fi
+FRISBEE_OPTS="$FRISBEE_OPTS -m $MCAST -p $PORT"
+
+IMAGEUNZIP_OPTS="-o -O -W 32"
+
+# ZFILL==1: use frisbee
+# ZFILL==2: separate disk-wipe pass (not yet implemented)
+if [ "$ZFILL" != "0" ]; then
+	FRISBEE_OPTS="$FRISBEE_OPTS -z"
+	IMAGEUNZIP_OPTS="$IMAGEUNZIP_OPTS -z"
+fi
+
+os=`uname -s`
+device=/dev/$DISK
+if [ $PARTITION -ne 0 ]; then
+	if [ $os = Linux ]; then
+		device=$device$PARTITION
+	elif [ $os = FreeBSD ]; then
+		device=${device}s$PARTITION
+	fi
+fi
+
+is_remote=0
+[ -e $ETCDIR/isrem ] && is_remote=1
+
+# For slice images, ensure that the MBR is the correct version
+# and replace if not.
+if [ "$PARTITION" != "0" ]; then
+    tweakmbr $DISK $MBR
+fi
+
+# If not zeroing the disk and we are loading a full disk image
+# we need to ensure that we at least invalidate any old superblocks
+# that might leak through (most likely in partition 4 which isn't
+# touched by our current image).  We do this before running frisbee
+# so that any legit filesystems loaded from the image work.
+
+# Since we do it before frisbee, we are counting on the current
+# MBR being the same as the MBR being layed down.  While not
+# a reasonable assumption in general, it mostly works in our
+# environment and at least won't hurt anything if not true.
+if [ $is_remote -eq 0 -a $PARTITION -eq 0 -a $ZFILL -eq 0 ]; then
+	zap_superblocks /dev/$DISK
+fi
+
+install_mbr /dev/$DISK $MBR
+
+echo "Resizing final disk partition"
+growdisk -vW /dev/$DISK
+download_image $ADDRESS $device
+
