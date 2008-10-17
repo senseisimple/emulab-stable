@@ -179,6 +179,12 @@ foreach my $n (keys(%einfo)) {
 		next;
 	    }
 	}
+	# make sure that node doesn't get touched by PLC if it mistakenly boots
+	# from there, somehow
+	if (system("$PLABFED $PLC manage node $n setstate dbg")) {
+	    print STDERR "plabfed failed to set node '$n' boot state to dbg!\n";
+	    next;
+	}
     }
     elsif ($mode eq 'plab') {
 	my ($pid,$eid);
