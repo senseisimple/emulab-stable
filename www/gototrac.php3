@@ -14,6 +14,7 @@ if (!$TRACSUPPORT) {
 # No Pageheader since we spit out a redirection below.
 $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 # The user has to be approved, real account.
 if (!HASREALACCOUNT($uid)) {
@@ -45,9 +46,12 @@ elseif ($wiki == "emulab-priv") {
 
 if ($wiki == "geni" || $wiki == "protogeni") {
     $geniproject = Project::Lookup("geni");
+    if (!$geniproject) {
+	USERERROR("There is no such Trac wiki!", 1);
+    }
     $approved    = 0;
-    if (! ($geniproject &&
-	   $geniproject->IsMember($this_user, $approved) && $approved)) {
+    if (! ($isadmin ||
+	   ($geniproject->IsMember($this_user, $approved) && $approved))) {
 	USERERROR("You do not have permission to access the Trac wiki!", 1);
     }
     $priv       = 1;
