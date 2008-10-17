@@ -29,6 +29,7 @@
 #endif
 #else
 #include <sys/types.h>
+#include <stdint.h>
 #include <stdio.h>
 
 static int debug;
