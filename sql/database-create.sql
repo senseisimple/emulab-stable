@@ -2178,7 +2178,7 @@ CREATE TABLE `nodes` (
   `node_id` varchar(32) NOT NULL default '',
   `type` varchar(30) NOT NULL default '',
   `phys_nodeid` varchar(32) default NULL,
-  `role` enum('testnode','virtnode','ctrlnode','testswitch','ctrlswitch','powerctrl','unused') NOT NULL default 'unused',
+  `role` enum('testnode','virtnode','ctrlnode','testswitch','ctrlswitch','powerctrl','widearea_switch','unused') NOT NULL default 'unused',
   `inception` datetime default NULL,
   `def_boot_osid` int(8) unsigned default NULL,
   `def_boot_path` text,
@@ -4049,6 +4049,17 @@ CREATE TABLE `widearea_recent` (
   `start_time` int(10) unsigned default NULL,
   `end_time` int(10) unsigned default NULL,
   PRIMARY KEY  (`node_id1`,`iface1`,`node_id2`,`iface2`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `widearea_switches`
+--
+
+DROP TABLE IF EXISTS `widearea_switches`;
+CREATE TABLE `widearea_switches` (
+  `hrn` varchar(255) default NULL,
+  `node_id` varchar(32) NOT NULL default '',
+  PRIMARY KEY  (`hrn`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --

@@ -4579,4 +4579,17 @@ last_net_act,last_cpu_act,last_ext_act);
 
        alter table reserved add `tmcd_redirect` tinytext;
 
-       
+4.162: Some stuff for prototyping widearea assignment of federated Emulabs.
+
+       alter table nodes change `role` `role`
+           enum('testnode','virtnode','ctrlnode','testswitch',
+                'ctrlswitch','powerctrl','widearea_switch','unused')
+                NOT NULL default 'unused';
+
+	CREATE TABLE `widearea_switches` (
+	  `hrn` varchar(255) default NULL,
+	  `node_id` varchar(32) NOT NULL default '',
+	  PRIMARY KEY  (`hrn`)
+	) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+
