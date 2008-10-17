@@ -37,6 +37,7 @@ RCDIR		?= $(SYSETCDIR)/rc.d
 INSTALL		?= /usr/bin/install -c 
 COMMON		?= $(SRCDIR)/../common
 DEFRUNLVLDIR	?= $(RCDIR)/rc3.d
+ISMFS		= $(ETCDIR)/ismfs
 
 # without DESTDIR, used for the value of symlinks
 RRCDIR		?= /etc/rc.d
@@ -65,10 +66,10 @@ mfs-install:	destdircheck common-install etc-install \
 
 frisbee-mfs-install:	destdircheck
 	$(INSTALL) -m 644 $(SRCDIR)/frisbee/rc.local $(SYSETCDIR)/rc.local
-	#$(INSTALL) -m 755 $(SRCDIR)/dhclient-exit-hooks \
-	#		$(SYSETCDIR)/dhclient-exit-hooks
-	#$(INSTALL) -m 755 $(SRCDIR)/dhclient-enter-hooks \
-	#		$(SYSETCDIR)/dhclient-enter-hooks
+	$(INSTALL) -m 755 $(SRCDIR)/dhclient-exit-hooks \
+			$(SYSETCDIR)/dhclient-exit-hooks
+	$(INSTALL) -m 755 $(SRCDIR)/dhclient-enter-hooks \
+			$(SYSETCDIR)/dhclient-enter-hooks
 	#@if [ -r $(SRCDIR)/master.passwd ]; then \
 	#    $(INSTALL) -m 600 $(SRCDIR)/master.passwd $(SYSETCDIR); \
 	#    pwd_mkdb -d $(SYSETCDIR) $(SYSETCDIR)/master.passwd; \
@@ -89,6 +90,29 @@ frisbee-mfs-install:	destdircheck
 	$(INSTALL) -m 755 -s ../findif $(SYSETCDIR)/testbed
 	rm -f $(BINDIR)/rc/rc.mkelab
 	rm -f $(RCDIR)/elvind.sh
+
+cdboot-install:	destdircheck common-install etc-install \
+			script-install bin-install
+	$(INSTALL) -m 755 $(SRCDIR)/cdboot/rc.cdboot $(BINDIR)/rc/rc.cdboot
+	$(INSTALL) -m 755 $(SRCDIR)/rc.frisbee $(BINDIR)/rc/rc.frisbee
+	$(INSTALL) -m 755 $(SRCDIR)/slicefix $(BINDIR)/slicefix
+	#cp $(SRCDIR)/cdboot/fstab $(SYSETCDIR)/fstab
+	#cp $(SRCDIR)/cdboot/fstab.lbs $(SYSETCDIR)/fstab.lbs
+	#$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/boot
+	#cp $(SRCDIR)/cdboot/loader.conf $(DESTDIR)/boot/loader.conf
+	#cp $(SRCDIR)/cdboot/loader.rc.lbs $(DESTDIR)/boot/loader.rc.lbs
+	#cp $(SRCDIR)/cdboot/.profile $(DESTDIR)/.profile
+	echo >$(ISMFS) "This file indicates its the MFS. DO NOT DELETE!"
+	(cd ../../sensors/slothd; $(MAKE) DESTDIR=$(DESTDIR) client-install)
+	(cd ../../pxe; $(MAKE) DESTDIR=$(DESTDIR) client-install)
+	(cd ../../os; $(MAKE) DESTDIR=$(DESTDIR) cdboot-install)
+	(cd ../../cdrom;$(MAKE) DESTDIR=$(DESTDIR) client-install)
+	(cd ../../tools/teachswitch; $(MAKE) DESTDIR=$(DESTDIR) client-install)
+	$(INSTALL) -m 755 $(SRCDIR)/../../install/newclient $(BINDIR)/newclient
+	$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/users
+	$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/proj
+	$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/groups
+	$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/share
 
 simple-install:	common-install script-install bin-install
 
@@ -184,7 +208,7 @@ script-install:	dir-install $(SCRIPTS)
 	$(INSTALL) -m 755 $(SRCDIR)/chipset.awk $(BINDIR)/chipset.awk
 	$(INSTALL) -m 755 $(SRCDIR)/cpuspeed.awk $(BINDIR)/cpuspeed.awk
 	$(INSTALL) -m 755 $(SRCDIR)/rc.mfs $(BINDIR)/rc/rc.mfs
-	$(INSTALL) -m 755 $(SRCDIR)/control_interface $(SYSETCDIR)/testbed
+	$(INSTALL) -m 755 $(SRCDIR)/control_interface $(BINDIR)/testbed
 	$(INSTALL) -m 755 $(SRCDIR)/rc.frisbee $(BINDIR)/rc/rc.frisbee
 	$(INSTALL) -m 755 $(SRCDIR)/slicefix $(BINDIR)/slicefix
 	$(INSTALL) -m 755 $(SRCDIR)/freebsd_to_linux_disk $(BINDIR)/freebsd_to_linux_disk

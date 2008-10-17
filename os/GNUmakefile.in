@@ -75,8 +75,13 @@ frisbee-mfs:
 	$(MAKE) -C growdisk client
 
 frisbee-mfs-install: frisbee-mfs
+ifeq ($(SYSTEM),FreeBSD)
 	CLIENT_BINDIR=/etc/testbed $(MAKE) -e -C frisbee.redux client-install
 	CLIENT_BINDIR=/etc/testbed $(MAKE) -e -C growdisk client-install
+else
+	CLIENT_BINDIR=/usr/local/bin $(MAKE) -e -C frisbee.redux client-install
+	CLIENT_BINDIR=/usr/local/bin $(MAKE) -e -C growdisk client-install
+endif
 
 cdboot-install: mfs-install frisbee-mfs
 	$(MAKE) -e -C frisbee.redux client-install
