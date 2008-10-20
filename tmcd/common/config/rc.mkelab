@@ -509,8 +509,18 @@ sub SetupFsNode()
     # Clean up a few things on the image and create symlinks into ${TBDIR} for
     # /proj, /users, /groups and /scratch. Also allows /share to be created/
     #
-    mysystem("umount -A -t nfs");
-    # In case umount fails!
+    print "Command: 'umount -A -t nfs'\n";
+    print "Started at:  " . libsetup::TBTimeStamp() . "\n";
+    system("umount -A -t nfs");
+    if ($?) {
+	print STDERR "*** umount of NFS filesystems failed\n";
+    }
+    #
+    # Uber-paranoid: even if the umount says it works, don't trust it.
+    # Move the old mount points out of the way no matter what.
+    # It is not super critical that these be unmounted at this time as
+    # we will be rebooting shortly anyway; we just need them out of the way.
+    #
     mysystem("cd /; mv -f users users.old");
     mysystem("cd /; mv -f proj proj.old");
     mysystem("cd /; mv -f share share.old");
@@ -870,8 +880,18 @@ sub SetupOpsNode($)
     # Clean up a few things on the image and create symlinks into ${TBDIR} for
     # /proj, /users, /groups and /scratch. Also allows /share to be created/
     #
-    mysystem("umount -A -t nfs");
-    # In case umount fails!
+    print "Command: 'umount -A -t nfs'\n";
+    print "Started at:  " . libsetup::TBTimeStamp() . "\n";
+    system("umount -A -t nfs");
+    if ($?) {
+	print STDERR "*** umount of NFS filesystems failed\n";
+    }
+    #
+    # Uber-paranoid: even if the umount says it works, don't trust it.
+    # Move the old mount points out of the way no matter what.
+    # It is not super critical that these be unmounted at this time as
+    # we will be rebooting shortly anyway; we just need them out of the way.
+    #
     mysystem("cd /; mv -f users users.old");
     mysystem("cd /; mv -f proj proj.old");
     mysystem("cd /; mv -f share share.old");
@@ -1245,7 +1265,28 @@ sub SetupBossNode()
     # We no longer need anything from NFS, and we need to unmount everything
     # so we can mount new NFS filesystems in their proper places. 
     # 
-    mysystem("umount -A -t nfs");
+    print "Command: 'umount -A -t nfs'\n";
+    print "Started at:  " . libsetup::TBTimeStamp() . "\n";
+    system("umount -A -t nfs");
+    if ($?) {
+	print STDERR "*** umount of NFS filesystems failed\n";
+    }
+    #
+    # Uber-paranoid: even if the umount says it works, don't trust it.
+    # Move the old mount points out of the way no matter what.
+    # It is not super critical that these be unmounted at this time as
+    # we will be rebooting shortly anyway; we just need them out of the way.
+    #
+    mysystem("cd /; mv -f users users.old; mkdir users");
+    mysystem("cd /; mv -f proj proj.old; mkdir proj");
+    mysystem("cd /; mv -f share share.old; mkdir share");
+    # This might not exist
+    mysystem("cd /; mv -f groups groups.old; mkdir groups")
+	if (-d "/groups");
+    if ($SCRATCHFS) {
+	mysystem("cd /; mv -f scratch scratch.old; mkdir scratch")
+	    if (-d "/scratch");
+    }
 
     #
     # Lets mount the package dir so that we can pass off some stuff to
@@ -1872,7 +1913,7 @@ sub mysystem($;$)
 	if (!defined($retrycount));
 
     while ($retrycount--) {
-	print "Command: '$command\'\n";
+	print "Command: '$command'\n";
 	print "Started at:  " . libsetup::TBTimeStamp() . "\n";
 	
 	system($command);
