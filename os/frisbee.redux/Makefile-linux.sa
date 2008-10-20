@@ -23,7 +23,7 @@ LINUXOPTS	= -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE \
 
 CLIENTFLAGS	= $(CFLAGS)
 CLIENTLIBS	= -lz $(PTHREADLIBS)
-CLIENTOBJS	= client.o frisbee.o $(SHAREDOBJS)
+CLIENTOBJS	= client.o frisbee.o $(IMAGEZIPDIR)/disksize.o $(SHAREDOBJS)
 
 SERVERFLAGS	= $(CFLAGS)
 SERVERLIBS	= $(PTHREADLIBS)
@@ -72,6 +72,8 @@ event.o:	$(SRCDIR)/event.c decls.h log.h event.h
 	$(CC) $(EVENTFLAGS) -c event.c
 
 $(IMAGEZIPDIR)/imageunzip.c: $(IMAGEZIPDIR)/imagehdr.h $(IMAGEZIPDIR)/queue.h
+
+$(IMAGEZIPDIR)/disksize.c: $(IMAGEZIPDIR)/imagehdr.h $(IMAGEZIPDIR)/queue.h
 
 frisbee.o:	$(IMAGEZIPDIR)/imageunzip.c
 	$(CC) -c $(CFLAGS) -DFRISBEE -I$(IMAGEZIPDIR) -o frisbee.o \

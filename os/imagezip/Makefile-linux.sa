@@ -54,16 +54,16 @@ endif
 all:	imagezip imageunzip imagedump
 
 imagezip: imagezip.o version.o $(FSOBJS) $(FSLIBS)
-	$(CC) $(CFLAGS) imagezip.o version.o $(FSOBJS) $(FSLIBS) $(LIBS) -o imagezip
+	$(CC) $(CFLAGS) $^ $(LIBS) -o imagezip
 
-imageunzip: imageunzip.o crc.o version.o
-	$(CC) $(CFLAGS) imageunzip.o crc.o version.o $(UNZIPLIBS) -o imageunzip
+imageunzip: imageunzip.o crc.o version.o disksize.o
+	$(CC) $(CFLAGS) $^ $(UNZIPLIBS) -o imageunzip
 
-imageunzip.o:	imageunzip.c
-	$(CC) -c $(UNZIPCFLAGS) -o imageunzip.o $<
+imageunzip.o: imageunzip.c
+	$(CC) $(UNZIPCFLAGS) -o $@ -c $<
 
 imagedump: imagedump.o version.o
-	$(CC) $(CFLAGS) imagedump.o version.o $(LIBS) -o imagedump
+	$(CC) $(CFLAGS) $^ $(LIBS) -o imagedump
 
 version.c: imagezip.c imageunzip.c imagedump.c
 	echo >$@ "char build_info[] = \"Built `date +%d-%b-%Y` by `id -nu`@`hostname | sed 's/\..*//'`:`pwd`\";"
