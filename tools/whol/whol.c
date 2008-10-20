@@ -7,14 +7,21 @@
 
 #include <stdio.h>
 #include <fcntl.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/ioctl.h>
-#include <net/bpf.h>
-
 #include <sys/socket.h>
+#if defined(__FreeBSD__)
 #include <net/if.h>
+#include <net/bpf.h>
+#elif defined(__linux__)
+#include <linux/if_ether.h>
+#include <linux/if_arp.h>
+#endif
+
 #include <net/ethernet.h>
 #include <netinet/in_systm.h>
 #include <netinet/in.h>
@@ -26,6 +33,8 @@ u_short in_cksum(u_short *addr, int len);
 const int MAX_BPFNUM = 16;
 
 const int packet_len = 666;
+
+int whackanode(char *, char *);
 
 int
 main(int argc, char **argv)
@@ -57,17 +66,25 @@ main(int argc, char **argv)
 int
 whackanode(char *iface, char *victim)
 {
+#if defined(__FreeBSD__)
     int bpfnum;
     int bpffd;
+#elif defined(__linux__)
+    int sock;
+#endif
     struct ifreq req;
     void *buf;
-    ssize_t written;
+    ssize_t send_result;
     int i,j,length;
     struct ether_header *eheader;
     struct ip *ip;
     struct udphdr *udp;
     char *pbody;
     u_char dst_mac[6];
+#if defined(__linux__)
+    u_char src_mac[6];
+    struct sockaddr_ll socket_address;
+#endif
 
     /*
      * Convert the victim MAC address from ASCII into bytes
@@ -88,6 +105,7 @@ whackanode(char *iface, char *victim)
         dst_mac[i] = tmp;
     }
 
+#if defined(__FreeBSD__)
     /*
      * Find and open a BPF device to send the packet on
      */
@@ -114,6 +132,34 @@ whackanode(char *iface, char *victim)
         perror("BIOSETIF failed");
 	return 1;
     }
+#elif defined(__linux__)
+    if ((sock = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL))) < 0) {
+	perror("socket");
+	return (1);
+    }
+
+    strcpy(req.ifr_name,iface);
+    if (ioctl(sock,SIOCGIFHWADDR,&req) < 0) {
+        perror("SIOGCIFHWADDR failed");
+	return 1;
+    }
+
+    memcpy(src_mac, req.ifr_hwaddr.sa_data, sizeof(src_mac));
+
+    strcpy(req.ifr_name,iface);
+    if (ioctl(sock,SIOCGIFINDEX,&req) < 0) {
+        perror("SIOGCIFINDEX failed");
+	return 1;
+    }
+
+    memset(&socket_address, 0, sizeof(socket_address));
+    socket_address.sll_family = PF_PACKET;
+    socket_address.sll_protocol = htons(ETH_P_IP); /* XXX correct? */
+    socket_address.sll_hatype = ARPHRD_ETHER; /* XXX is this needed? */
+    socket_address.sll_pkttype = PACKET_OTHERHOST;
+    socket_address.sll_halen = ETH_ALEN;
+    socket_address.sll_ifindex = req.ifr_ifindex;
+#endif
 
     /*
      * Build up a packet ourselves
@@ -130,12 +176,14 @@ whackanode(char *iface, char *victim)
      * Fill in the destination MAC, and make it look like an IP packet so that
      * the switch will deliver it.
      */
-    for (i = 0; i < ETHER_ADDR_LEN; i++) {
-	eheader->ether_dhost[i] = dst_mac[i];
-    }
+    memcpy(eheader->ether_dhost, dst_mac, sizeof(eheader->ether_dhost));
     eheader->ether_type = htons(ETHERTYPE_IP);
 
-    /* Note: The NIC will fill in the src MAC automagically */
+#if defined(__FreeBSD__)
+    /* Note: The NIC will fill in the src MAC automagically on FreeBSD */
+#elif defined(__linux__)
+    memcpy(eheader->ether_shost, src_mac, sizeof(eheader->ether_shost));
+#endif
 
     /*
      * Make an IP header
@@ -155,10 +203,17 @@ whackanode(char *iface, char *victim)
     /*
      * Make a UDP header; plain IP will work too
      */
+#if defined(__FreeBSD__)
     udp->uh_sport = 0;
     udp->uh_dport = 0;
     udp->uh_ulen = htons(packet_len - ETHER_HDR_LEN - sizeof(*ip) - sizeof(*udp));
     udp->uh_sum = 0;
+#else
+    udp->source = 0;
+    udp->dest = 0;
+    udp->len = htons(packet_len - ETHER_HDR_LEN - sizeof(*ip) - sizeof(*udp));
+    udp->check = 0;
+#endif
 
     /*
      * Put in the magic juice that makes the victim reboot - 6 bytes of 1s,
@@ -180,9 +235,15 @@ whackanode(char *iface, char *victim)
     /*
      * Whack away!
      */
-    written = write(bpffd,buf,packet_len);
-    if (written < 0) {
-        perror("whol: write failed");
+#if defined(__FreeBSD__)
+    send_result = write(bpffd,buf,packet_len);
+#elif defined(__linux__)
+    send_result = sendto(sock, buf, packet_len, 0,
+                         (struct sockaddr *)&socket_address,
+                         sizeof(socket_address));
+#endif
+    if (send_result < 0) {
+        perror("whol: failed to send packet");
     }
 
     return 0;
