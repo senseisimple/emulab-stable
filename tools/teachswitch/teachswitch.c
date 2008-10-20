@@ -8,19 +8,30 @@
 
 #include <stdio.h>
 #include <fcntl.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/ioctl.h>
-#include <net/bpf.h>
-
 #include <sys/socket.h>
-#include <net/if.h>
-#include <net/ethernet.h>
+#include <arpa/inet.h>
 
-const int MAX_BPFNUM = 16;
+#include <net/ethernet.h>
+#if defined(__FreeBSD__)
+#include <net/if.h>
+#include <net/bpf.h>
+#elif defined(__linux__)
+#include <linux/if_ether.h>
+#include <linux/if_arp.h>
+#endif
+
 const int MAX_INTERFACES = 8;
 const int SLEEP_TIME = 30;
+#if defined(__FreeBSD__)
+const int MAX_BPFNUM = 16;
+#endif
 
 /*
  * Destination Ethernet address - the 'Ethernet Loopback Test' one
@@ -33,11 +44,15 @@ const int packet_len = ETHER_MIN_LEN;
 int MAX(int a, int b) { if ((a) > (b)) return (a); else return (b); }
 
 int main(int argc, char **argv) {
+    int interfaces[MAX_INTERFACES];
+#if defined(__FreeBSD__)
     int bpfnum;
-    int bpffd[MAX_INTERFACES];
+#elif defined(__linux__)
+    struct sockaddr hwaddrs[MAX_INTERFACES];
+    struct sockaddr_ll socket_address;
+#endif
     struct ifreq req;
-    void *buf;
-    ssize_t written;
+    void *buffer;
     int i;
     struct ether_header *eheader;
     char *pbody;
@@ -51,7 +66,11 @@ int main(int argc, char **argv) {
      * Get a list of all interfaces, so that we can sent packets on
      * each one.
      */
+#if defined(__FreeBSD__)
     if ((sock = socket(PF_INET, SOCK_DGRAM, 0)) < 0) {
+#elif defined(__linux__)
+    if ((sock = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL))) < 0) {
+#endif
 	perror("socket");
 	return (1);
     }
@@ -63,18 +82,25 @@ int main(int argc, char **argv) {
 	exit(1);
     }
 
+#if defined(__FreeBSD__)
     bpfnum = 0;
+#endif
     num_interfaces = 0;
     strcpy(lastname,"");
     for (ptr = ifc.ifc_buf; ptr < (void*)(ifc.ifc_buf + ifc.ifc_len); ) {
         char *iface;
-	struct ifreq *ifr, flag_ifr;
+	struct ifreq *ifr;
 
 	ifr = (struct ifreq *)ptr;
 
 	iface = ifr->ifr_name;
+
+#if defined(__FreeBSD__)
 	ptr = ptr + sizeof(ifr->ifr_name) +
 	    MAX(sizeof(struct sockaddr),ifr->ifr_addr.sa_len);
+#elif defined(__linux__)
+	ptr += sizeof(*ifr);
+#endif
 
 
 	if (!strcmp(iface,lastname)) {
@@ -86,9 +112,9 @@ int main(int argc, char **argv) {
 	/*
 	 * Get interface flags
 	 */
-	bzero(&flag_ifr,sizeof(flag_ifr));
-	strcpy(flag_ifr.ifr_name, iface);
-	if (ioctl(sock,SIOCGIFFLAGS, (caddr_t)&flag_ifr) < 0) {
+	memset(&req, 0, sizeof(req));
+	strcpy(req.ifr_name, iface);
+	if (ioctl(sock,SIOCGIFFLAGS, (caddr_t)&req) < 0) {
 	    perror("Getting interface flags");
 	    exit(1);
 	}
@@ -96,21 +122,21 @@ int main(int argc, char **argv) {
 	/*
 	 *
 	 */
-	if (flag_ifr.ifr_flags & IFF_LOOPBACK) {
+	if (req.ifr_flags & IFF_LOOPBACK) {
 	    continue;
 	}
 
 	/*
 	 * If the interface is down, bring it up
 	 */
-	if (!(flag_ifr.ifr_flags & IFF_UP)) {
-	    flag_ifr.ifr_flags |= IFF_UP;
-	    if (ioctl(sock,SIOCSIFFLAGS, (caddr_t)&flag_ifr) < 0) {
+	if (!(req.ifr_flags & IFF_UP)) {
+	    req.ifr_flags |= IFF_UP;
+	    if (ioctl(sock,SIOCSIFFLAGS, (caddr_t)&req) < 0) {
 		perror("Setting interface flags");
 		exit(1);
 	    }
 	}
-
+#if defined(__FreeBSD__)
 	printf("Looking for a BPF device for %s\n",iface);
 
 	/*
@@ -119,15 +145,15 @@ int main(int argc, char **argv) {
 	for (; bpfnum < MAX_BPFNUM; bpfnum++) {
 	    char bpfpath[1024];
 	    sprintf(bpfpath,"/dev/bpf%i",bpfnum);
-	    bpffd[num_interfaces] = open(bpfpath,O_WRONLY);
-	    if (bpffd[num_interfaces] < 0) {
+	    interfaces[num_interfaces] = open(bpfpath,O_WRONLY);
+	    if (interfaces[num_interfaces] < 0) {
 	    } else {
 		printf("Opened %s\n",bpfpath);
 		break;
 	    }
 	}
 
-	if (bpffd[num_interfaces] < 0) {
+	if (interfaces[num_interfaces] < 0) {
 	    printf("Failed to find an open-able BPF device\n");
 	    continue;
 	}
@@ -137,10 +163,37 @@ int main(int argc, char **argv) {
 	 */
 	strcpy(req.ifr_name,iface);
 
-	if (ioctl(bpffd[num_interfaces],BIOCSETIF,&req) < 0) {
+	if (ioctl(interfaces[num_interfaces],BIOCSETIF,&req) < 0) {
 	    perror("BIOSETIF failed");
 	    continue;
 	}
+#elif defined(__linux__)
+	/*
+	 * Get interface index
+	 */
+	memset(&req, 0, sizeof(req));
+	strcpy(req.ifr_name, iface);
+	if (ioctl(sock,SIOCGIFINDEX, (caddr_t)&req) < 0) {
+	    perror("Getting interface index");
+	    exit(1);
+	}
+
+
+	interfaces[num_interfaces] = req.ifr_ifindex;
+
+	/*
+	 * Get interface MAC address
+	 */
+	memset(&req, 0, sizeof(req));
+	strcpy(req.ifr_name, iface);
+	if (ioctl(sock,SIOCGIFHWADDR, (caddr_t)&req) < 0) {
+	    perror("Getting interface hwaddr");
+	    exit(1);
+	}
+
+	memcpy(&hwaddrs[num_interfaces], &req.ifr_hwaddr,
+	       sizeof (struct sockaddr));
+#endif
 
 	num_interfaces++;
     }
@@ -148,33 +201,51 @@ int main(int argc, char **argv) {
     /*
      * Build up a packet ourselves
      */
-    buf = (void*)malloc(packet_len);
-    bzero(buf,packet_len);
+    buffer = (void*)malloc(packet_len);
+    memset(buffer, 0, packet_len);
 
-    eheader = buf;
-    pbody = buf + ETHER_HDR_LEN;
+    eheader = buffer;
+    pbody = buffer + ETHER_HDR_LEN;
 
     /*
      * Fill in the MAC, and make the packet type 'Loopback Test', so that it
      * hopefully won't go anywhere.
      */
-    for (i = 0; i < ETHER_ADDR_LEN; i++) {
-	eheader->ether_dhost[i] = dst_mac[i];
-    }
-    eheader->ether_type = htons(ETHERTYPE_LOOPBACK);
+
+    /* Set up the frame header */
+    memcpy(eheader->ether_dhost, dst_mac, sizeof(dst_mac));
+    eheader->ether_type = ETHERTYPE_LOOPBACK;
+
     strncpy(pbody,"Testbed MAC discovery",packet_len - ETHER_HDR_LEN);
 
+#if defined(__linux__)
+    memset(&socket_address, 0, sizeof(socket_address));
+    socket_address.sll_family = PF_PACKET;
+    socket_address.sll_protocol = htons(ETH_P_LOOP); /* XXX correct? */
+    socket_address.sll_hatype = ARPHRD_ETHER; /* XXX is this needed? */
+    socket_address.sll_pkttype = PACKET_LOOPBACK;
+    socket_address.sll_halen = ETH_ALEN;
+    memcpy(socket_address.sll_addr, dst_mac, sizeof(dst_mac));
+#endif
 
     /*
-     * Loop forever, periodically sending out packets on all the BPF
-     * descriptors.
+     * Loop forever, periodically sending out packets on all interfaces.
      */
     while (1) {
 	printf("Sending out packets\n");
 	for (i = 0; i < num_interfaces; i++) {
-	    written = write(bpffd[i],buf,packet_len);
-	    if (written < 0) {
-		perror("Write failed");
+	    int send_result = 0;
+#if defined(__FreeBSD__)
+	    send_result = write(interfaces[i],buffer,packet_len);
+#elif defined(__linux__)
+	    socket_address.sll_ifindex = interfaces[i];
+    	    memcpy(eheader->ether_shost, hwaddrs[i].sa_data, ETH_ALEN);
+	    send_result = sendto(sock, buffer, ETHER_MIN_LEN, 0,
+	                         (struct sockaddr *)&socket_address,
+				 sizeof(socket_address));
+#endif
+	    if (send_result < 0) {
+		perror("Failed to send packet");
 	    }
 	}
 
