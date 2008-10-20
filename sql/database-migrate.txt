@@ -4587,9 +4587,9 @@ last_net_act,last_cpu_act,last_ext_act);
                 NOT NULL default 'unused';
 
 	CREATE TABLE `widearea_switches` (
-	  `hrn` varchar(255) default NULL,
+          `hrn` varchar(255) NOT NULL default '',
 	  `node_id` varchar(32) NOT NULL default '',
 	  PRIMARY KEY  (`hrn`)
 	) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
-
+4.163: Fix to previous revision; skip to next entry.

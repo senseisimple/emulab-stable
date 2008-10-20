@@ -4057,7 +4057,7 @@ CREATE TABLE `widearea_recent` (
 
 DROP TABLE IF EXISTS `widearea_switches`;
 CREATE TABLE `widearea_switches` (
-  `hrn` varchar(255) default NULL,
+  `hrn` varchar(255) NOT NULL default '',
   `node_id` varchar(32) NOT NULL default '',
   PRIMARY KEY  (`hrn`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
