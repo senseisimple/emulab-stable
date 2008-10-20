@@ -80,6 +80,7 @@ $(LIBSRCDIR)/patched:
 	    fi \
 	fi
 	$(UNPACK) $(NTFSVER).tar.gz
+	$(PATCH) < $(SRCDIR)/ntfs_lvalue.patch
 ifdef LINUX
 	$(PATCH) < $(SRCDIR)/ntfs.linuxpatch
 else

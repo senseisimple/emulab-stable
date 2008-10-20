@@ -1,0 +1,67 @@
+--- ntfsprogs-1.7.1/libntfs/attrib.c	2003-02-13 05:25:30.000000000 -0500
++++ ntfsprogs-1.7.1/libntfs/attrib.c	2008-10-01 16:25:17.000000000 -0400
+@@ -688,7 +688,7 @@
+ 			/* Update progress counters. */
+ 			total += to_read;
+ 			count -= to_read;
+-			(u8*)b += to_read;
++			b = (u8*)b + to_read;
+ 			continue;
+ 		}
+ 		/* It is a real lcn, read it into @dst. */
+@@ -704,7 +704,7 @@
+ 		if (br > 0) {
+ 			total += br;
+ 			count -= br;
+-			(u8*)b += br;
++			b = (u8*)b + br;
+ 			continue;
+ 		}
+ 		/* If the syscall was interrupted, try again. */
+@@ -950,7 +950,7 @@
+ 			 */
+ 			total += to_write;
+ 			count -= to_write;
+-			(u8*)b += to_write;
++			b = (u8*)b + to_write;
+ 			continue;
+ 		}
+ 		/* It is a real lcn, write it to the volume. */
+@@ -970,7 +970,7 @@
+ 		if (written > 0) {
+ 			total += written;
+ 			count -= written;
+-			(u8*)b += written;
++			b = (u8*)b + written;
+ 			continue;
+ 		}
+ 		/* If the syscall was interrupted, try again. */
+@@ -1084,7 +1084,7 @@
+ 	if (br <= 0)
+ 		return br;
+ 	br /= bk_size;
+-	for (end = (u8*)b + br * bk_size; (u8*)b < end; (u8*)b += bk_size)
++	for (end = (u8*)b + br * bk_size; (u8*)b < end; b = (u8*)b + bk_size)
+ 		ntfs_mst_post_read_fixup((NTFS_RECORD*)b, bk_size);
+ 	/* Finally, return the number of blocks read. */
+ 	return br;
+--- ntfsprogs-1.7.1/libntfs/runlist.c	2003-02-06 10:24:56.000000000 -0500
++++ ntfsprogs-1.7.1/libntfs/runlist.c	2008-10-01 16:25:17.000000000 -0400
+@@ -1067,7 +1067,7 @@
+ 			 */
+ 			total += to_write;
+ 			count -= to_write;
+-			(u8*)b += to_write;
++			b = (u8*)b + to_write;
+ 			continue;
+ 		}
+ 		/* It is a real lcn, write it to the volume. */
+@@ -1084,7 +1084,7 @@
+ 		if (written > 0) {
+ 			total += written;
+ 			count -= written;
+-			(u8*)b += written;
++			b = (u8*)b + written;
+ 			continue;
+ 		}
+ 		/* If the syscall was interrupted, try again. */
