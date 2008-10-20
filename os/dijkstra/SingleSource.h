@@ -12,6 +12,7 @@
 #ifndef SINGLE_SOURCE_H_DISTRIBUTED_DIJKSTRA_1
 #define SINGLE_SOURCE_H_DISTRIBUTED_DIJKSTRA_1
 
+#include <climits>
 #include <boost/config.hpp>
 #include <boost/graph/graph_traits.hpp>
 #include <boost/graph/adjacency_list.hpp>

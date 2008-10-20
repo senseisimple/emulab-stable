@@ -8,6 +8,7 @@
 #define __COMON_H
 
 #include "port.h"
+#include <cstring>
 
 /*
  * We have to do these includes differently depending on which version of gcc

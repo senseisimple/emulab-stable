@@ -26,6 +26,7 @@
 #include <map>
 #include <string>
 #include <iostream>
+#include <cstring>
 
 #define IPADDRFILE "/var/emulab/boot/myip"
 

@@ -16,6 +16,7 @@
 #include "TreeCompressor.h"
 #include "VoteIpTree.h"
 #include "OptimalIpTree.h"
+#include <cstring>
 
 using namespace std;
 

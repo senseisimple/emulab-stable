@@ -35,6 +35,7 @@ using namespace __gnu_cxx;
 #endif
 
 #include <string>
+#include <cstring>
 using namespace std;
 
 class fstring {

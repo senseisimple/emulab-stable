@@ -112,6 +112,8 @@ char *usagestr =
  " -i              Do not use SSL protocol\n"
  "\n";
 
+static int rewritecommand(char *, char *, char **);
+
 void
 usage()
 {
@@ -559,7 +561,6 @@ dotcp(char *data, int outfd, struct in_addr serverip)
 		}
 		if (strncmp(buf, "REDIRECT=", strlen("REDIRECT=")) == 0) {
 			struct hostent	*he;
-			static int rewritecommand(char *, char *, char **);
 
 			redirectlimit--;
 			if (redirectlimit == 0) {

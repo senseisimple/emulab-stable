@@ -9,6 +9,8 @@
 #ifndef SET_ITERATOR_H_DISTRIBUTED_DIJKSTRA_1
 #define SET_ITERATOR_H_DISTRIBUTED_DIJKSTRA_1
 
+#include <cstring>
+
 template<class T>
 class DefaultCompare
 {

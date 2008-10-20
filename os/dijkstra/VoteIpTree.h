@@ -21,6 +21,7 @@
 #ifndef VOTE_IP_TREE_H_DISTRIBUTED_DIJKSTRA_1
 #define VOTE_IP_TREE_H_DISTRIBUTED_DIJKSTRA_1
 
+#include <climits>
 #include "bitmath.h"
 #include "IpTree.h"
 

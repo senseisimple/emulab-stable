@@ -98,6 +98,8 @@
 #include <grp.h>
 #include <errno.h>
 #include <stdarg.h>
+#include <stdlib.h>
+#include <time.h>
 #include "suexec.h"
 
 /*
