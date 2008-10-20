@@ -403,7 +403,7 @@ class Node
 			 "last_ext_act) as last_act, ".
 			 "  t.isvirtnode,t.isremotenode,t.isplabdslice, ".
 			 "  r.erole as rsrvrole, pi.IP as phys_IP, loc.*, ".
-			 "  util.* ".
+			 "  util.*,n.uuid as node_uuid ".
 			 " from nodes as n ".
 			 "left join reserved as r on n.node_id=r.node_id ".
 			 "left join node_activity as na on ".
@@ -471,6 +471,7 @@ class Node
 	$inception          = $row["inception"];
 	$alloctime          = $row["allocated"];
 	$downtime           = $row["down"];
+	$uuid               = $row["node_uuid"];
 
 	if (!$def_boot_cmd_line)
 	    $def_boot_cmd_line = "&nbsp;";
@@ -841,6 +842,12 @@ class Node
                       <td class=left>
                           <a href='showproject.php3?pid=$reserved_pid'>
                                $reserved_pid</a></td>
+                  </tr>\n";
+	    }
+	    if ($uuid) {
+		echo "<tr>
+                      <td>UUID:</td>
+                      <td class=left>$uuid</td>
                   </tr>\n";
 	    }
 	
