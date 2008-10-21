@@ -577,15 +577,6 @@ sub AddInterface($$$$;$$)
 	$interface->Destroy();
 	return undef;
     }
-
-    if ($self->type() eq "vlan" && !$initialize) {
-	my $nodeiface = $node->node_id() . ":" . $iface;
-	my $vlanid    = $self->lanid();
-
-	DBQueryWarn("update vlans set ".
-		    " members=CONCAT_WS(' ', members, '$nodeiface') ".
-		    "where id='$vlanid'");
-    }
     return $interface;
 }
 
@@ -618,15 +609,6 @@ sub AddMember($$;$)
 	$member->SetAttribute("iface", $iface) != 0) {
 	$member->Destroy();
 	return undef;
-    }
-    # Keep vlans table in sync.
-    if ($self->type() eq "vlan" && !$initialize) {
-	my $member = $node->node_id() . ":" . $iface;
-	my $vlanid = $self->lanid();
-
-	DBQueryWarn("update vlans set ".
-		    " members=CONCAT_WS(' ', members, '$member') ".
-		    "where id='$vlanid'");
     }
     return $member;
 }
