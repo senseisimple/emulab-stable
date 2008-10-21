@@ -7,11 +7,6 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Terminating Project and Remove all Trace");
-
-#
 # Only known and logged in users can end experiments.
 #
 $this_user = CheckLoginOrDie();
@@ -35,6 +30,12 @@ $optargs = OptionalPageArguments("canceled",  PAGEARG_BOOLEAN,
 
 # Need these below.
 $pid = $project->pid();
+
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Terminating Project and Remove all Trace");
 
 #
 # Check to see if there are any active experiments. Abort if there are.

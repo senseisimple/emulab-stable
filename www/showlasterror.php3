@@ -7,11 +7,6 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Last Error");
-
-#
 # Only known and logged in users.
 #
 $this_user = CheckLoginOrDie();
@@ -23,6 +18,11 @@ $isadmin   = ISADMIN();
 #
 $reqargs = RequiredPageArguments("experiment", PAGEARG_EXPERIMENT);
 $exptidx = $experiment->idx();
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Last Error");
 
 #
 # Must have permission to view experiment details.

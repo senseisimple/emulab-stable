@@ -7,11 +7,6 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("New Users Approved");
-
-#
 # Only known and logged in users.
 #
 $this_user = CheckLoginOrDie();
@@ -21,6 +16,11 @@ $uid       = $this_user->uid();
 # The reason for this call is to make sure that globals are set properly.
 #
 $reqargs = RequiredPageArguments();
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("New Users Approved");
 
 # Local used below.
 $projectchecks = array();

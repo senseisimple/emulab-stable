@@ -7,11 +7,6 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Link Monitoring");
-
-#
 # Only known and logged in users.
 #
 $this_user = CheckLoginOrDie();
@@ -51,6 +46,11 @@ $query_result =
 if (mysql_num_rows($query_result) == 0) {
     USERERROR("No links are being traced/monitored in $eid/$pid!", 1);
 }
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Link Monitoring");
 
 echo $experiment->PageHeader();
 echo "<br /><br />\n";

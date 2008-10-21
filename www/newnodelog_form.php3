@@ -8,11 +8,6 @@ include("defs.php3");
 include_once("node_defs.php");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Enter Node Log Entry");
-
-#
 # Only known and logged in users can do this.
 #
 $this_user = CheckLoginOrDie();
@@ -31,6 +26,11 @@ $optargs = OptionalPageArguments("node", PAGEARG_NODE);
 if (! ($isadmin || OPSGUY())) {
     USERERROR("You do not have permission to enter log entries!", 1);
 }
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Enter Node Log Entry");
 
 echo "<table align=center border=1> 
       <tr>

@@ -7,11 +7,6 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Commit and Tag");
-
-#
 # Only known and logged in users can look at experiments.
 #
 $this_user = CheckLoginOrDie();
@@ -36,6 +31,11 @@ if (!$isadmin &&
     USERERROR("You do not have permission to view tags for ".
 	      "archive in $pid/$eid!", 1);
 }
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Commit and Tag");
 
 function SPITFORM($formfields, $errors)
 {

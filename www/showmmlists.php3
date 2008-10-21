@@ -7,12 +7,6 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Mailman Lists");
-
-#
-#
 # Only known and logged in users allowed.
 #
 $this_user = CheckLoginOrDie();
@@ -26,6 +20,11 @@ $user_email = $this_user->email();
 $optargs = OptionalPageArguments("sortby",      PAGEARG_STRING,
 				 "showallmm",   PAGEARG_BOOLEAN,
 				 "target_user", PAGEARG_USER);
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Mailman Lists");
 
 if (! isset($sortby)) {
     $sortby = "listname";

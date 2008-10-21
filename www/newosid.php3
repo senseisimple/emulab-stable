@@ -10,11 +10,6 @@ include("osiddefs.php3");
 include("form_defs.php");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Create a new OS Descriptor");
-
-#
 # Only known and logged in users.
 #
 $this_user = CheckLoginOrDie();
@@ -41,6 +36,11 @@ $projselection = array();
 while (list($project) = each($projlist)) {
     $projselection[$project] = $project;
 }
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Create a new OS Descriptor");
 
 #
 # Define the form.

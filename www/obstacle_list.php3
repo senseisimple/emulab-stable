@@ -7,17 +7,17 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Obstacle List");
-
-#
 #
 # Only known and logged in users allowed.
 #
 $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Obstacle List");
 
 #
 # Spit out all the obstacles. At some point this page should take

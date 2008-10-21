@@ -7,11 +7,6 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Testbed Summary Stats");
-
-#
 # Only known and logged in users can end experiments.
 #
 $this_user = CheckLoginOrDie();
@@ -33,6 +28,11 @@ if (!$isadmin && !STUDLY()) {
 $optargs = OptionalPageArguments("showby",     PAGEARG_STRING,
 				 "range",      PAGEARG_STRING,
 				 "experiment", PAGEARG_EXPERIMENT);
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Testbed Summary Stats");
 
 # Page args,
 if (! isset($showby)) {

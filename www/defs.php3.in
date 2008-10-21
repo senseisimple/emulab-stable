@@ -258,9 +258,14 @@ function TBERROR ($message, $death, $xmp = 0) {
 }
 
 #
-# General user errors should print something warm and fuzzy
+# General user errors should print something warm and fuzzy.  If a
+# header is not already printed and the dealth paramater is true, then
+# assume the error is a precheck error and send an appropriate HTTP
+# response to prevent robots from indexing the page.  This currently
+# defaults to a "400 Bad Request", but that may change in the future.
 #
-function USERERROR($message, $death = 1) {
+function USERERROR($message, $death = 1, 
+	           $status_code = HTTP_400_BAD_REQUEST) {
     global $TBMAILADDR;
     global $session_interactive, $session_errorhandler;
 
@@ -286,7 +291,7 @@ function USERERROR($message, $death = 1) {
             </font>\n";
 
     if ($death) {
-	PAGEERROR($msg);
+	PAGEERROR($msg, $status_code);
     }
     else
         echo "$msg\n";
@@ -310,7 +315,7 @@ function PAGEARGERROR($msg = 0) {
     if ($msg) {
 	$default = "$default<br><br>$msg";
     }
-    USERERROR($default, 1);
+    USERERROR($default, 1, HTTP_400_BAD_REQUEST);
 }
 
 #

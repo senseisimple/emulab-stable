@@ -13,11 +13,6 @@ require("newnode-defs.php3");
 #
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("New Testbed Nodes");
-
-#
 # Only admins can see this page
 #
 $this_user = CheckLoginOrDie();
@@ -43,6 +38,11 @@ $optargs = OptionalPageArguments("selected",     PAGEARG_ARRAY,
 				 "newprefix",    PAGEARG_STRING,
 				 "addnumber",    PAGEARG_STRING,
 				 "renumber",     PAGEARG_STRING);
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("New Testbed Nodes");
 
 #
 # XXX - a hack

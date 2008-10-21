@@ -8,11 +8,6 @@ include("defs.php3");
 include_once("node_defs.php");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Modify Node Attributes Form");
-
-#
 # Only known and logged in users can do this.
 #
 $this_user = CheckLoginOrDie();
@@ -42,6 +37,11 @@ $url     = CreateURL("modnodeattributes", $node);
 if (isset($refer)) {
     $url .= "&refer=$refer";
 }
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Modify Node Attributes Form");
 
 #
 # Get any node attributes that might exist

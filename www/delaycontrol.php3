@@ -7,11 +7,6 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Delay Control");
-
-#
 # Only known and logged in users can do this.
 #
 $this_user = CheckLoginOrDie();
@@ -31,6 +26,11 @@ $eid	  = $experiment->eid();
 $gid	  = $experiment->gid();
 $state	  = $experiment->state();
 $unix_gid = $experiment->UnixGID();
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Delay Control");
 
 #
 # Look for transition and exit with error.

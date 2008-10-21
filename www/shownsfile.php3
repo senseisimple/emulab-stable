@@ -7,17 +7,6 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-if (!isset($justns)) {
-    $justns = 0;
-}
-
-if (!$justns) {
-    PAGEHEADER("Visualization, NS File, and Details");
-}
-
-#
 # Only known and logged in users.
 #
 $this_user = CheckLoginOrDie();
@@ -32,6 +21,17 @@ $optargs = OptionalPageArguments("zoom",         PAGEARG_NUMERIC,
 				 "detail",       PAGEARG_BOOLEAN,
 				 "showevents",   PAGEARG_BOOLEAN,
 				 "justns",       PAGEARG_BOOLEAN);
+
+#
+# Standard Testbed Header
+#
+if (!isset($justns)) {
+    $justns = 0;
+}
+
+if (!$justns) {
+    PAGEHEADER("Visualization, NS File, and Details");
+}
 
 #
 # Need these below

@@ -12,11 +12,6 @@ include("defs.php3");
 # 
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Show Experiment Information");
-
-#
 # Only known and logged in users.
 #
 $this_user = CheckLoginOrDie();
@@ -27,6 +22,11 @@ $isadmin   = ISADMIN();
 # Verify page arguments
 #
 $optargs = OptionalPageArguments("record", PAGEARG_INTEGER);
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Show Experiment Information");
 
 #
 # Right now we show just the last N records entered, unless the user

@@ -7,11 +7,6 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Robot Web Cams");
-
-#
 # Only known and logged in users.
 #
 $this_user = CheckLoginOrDie();
@@ -28,7 +23,14 @@ $optargs = OptionalPageArguments("camheight",   PAGEARG_INTEGER,
 				 "camera",      PAGEARG_INTEGER,
 				 "applet",      PAGEARG_BOOLEAN);
 
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Robot Web Cams");
+
+#
 # Helper function.
+#
 function MyError($msg)
 {
     # No Data. Spit back a stub image.

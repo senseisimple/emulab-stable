@@ -8,11 +8,6 @@ include("defs.php3");
 include_once("node_defs.php");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Node History");
-
-#
 # Only known and logged in users can do this.
 #
 $this_user = CheckLoginOrDie();
@@ -30,6 +25,11 @@ $optargs = OptionalPageArguments("showall",   PAGEARG_BOOLEAN,
 				 "reverse",   PAGEARG_BOOLEAN,
 				 "count",     PAGEARG_INTEGER,
 				 "node",      PAGEARG_NODE);
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Node History");
 
 if (!isset($showall)) {
     $showall = 0;

@@ -7,11 +7,6 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Request info about possibly Idle experiment");
-
-#
 # Only known and logged in users.
 #
 $this_user = CheckLoginOrDie();
@@ -32,6 +27,11 @@ $reqargs = RequiredPageArguments("experiment", PAGEARG_EXPERIMENT);
 $optargs = OptionalPageArguments("message",    PAGEARG_STRING,
 				 "canceled",   PAGEARG_STRING,
 				 "confirmed",  PAGEARG_STRING);
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Request info about possibly Idle experiment");
 
 #
 # Need these below

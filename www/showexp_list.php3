@@ -7,11 +7,6 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Experiment Information Listing");
-
-#
 # Only known and logged in users.
 #
 $this_user = CheckLoginOrDie();
@@ -25,6 +20,11 @@ $optarg = OptionalPageArguments("showtype",   PAGEARG_STRING,
 				"sortby",     PAGEARG_STRING,
 				"thumb",      PAGEARG_INTEGER,
 				"noignore",   PAGEARG_BOOLEAN);
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Experiment Information Listing");
 
 $clause      = 0;
 $having      = "";

@@ -7,8 +7,6 @@
 chdir("..");
 include("defs.php3");
 
-PAGEHEADER("Real Time Robot Tracking Applet");
-
 $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
@@ -118,6 +116,11 @@ if (isset($withwebcams) && $withwebcams) {
 	$webcams[] = $camurl;
     }
 }
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Real Time Robot Tracking Applet");
 
 #
 # Draw the legend and some explanatory text.

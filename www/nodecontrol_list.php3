@@ -14,11 +14,6 @@ include_once("node_defs.php");
 # 
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Node Control Center");
-
-#
 # Only known and logged in users can do this.
 #
 $this_user = CheckLoginOrDie();
@@ -44,6 +39,11 @@ else {
     $target_idx  = $this_user->uid_idx();
     $target_user = $this_user;
 }
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Node Control Center");
 
 echo "<b>Show: <a href='nodecontrol_list.php3?showtype=summary'>summary</a>,
                <a href='nodecontrol_list.php3?showtype=pcs'>pcs</a>,

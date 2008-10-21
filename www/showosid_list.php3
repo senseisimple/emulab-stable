@@ -7,11 +7,6 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("OS Descriptor List");
-
-#
 #
 # Only known and logged in users allowed.
 #
@@ -24,6 +19,11 @@ $isadmin   = ISADMIN();
 # ones in their projects or ones that are globally available.
 #
 $optargs = OptionalPageArguments("creator",  PAGEARG_USER);
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("OS Descriptor List");
 
 #
 # Allow for creator restriction

@@ -7,11 +7,6 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("New Project Approved");
-
-#
 # Only known and logged in users can do this.
 #
 $this_user = CheckLoginOrDie();
@@ -26,10 +21,16 @@ $optargs = OptionalPageArguments("head_uid", PAGEARG_STRING,
 				 "silent", PAGEARG_BOOLEAN,
 				 "pcplab_okay", PAGEARG_BOOLEAN,
 				 "ron_okay", PAGEARG_BOOLEAN);
+
 $sendemail = 1;
 if (isset($silent) && $silent) {
     $sendemail = 0;
 }
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("New Project Approved");
 
 #
 # Of course verify that this uid has admin privs!

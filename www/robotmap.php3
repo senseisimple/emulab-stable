@@ -7,11 +7,6 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Robot Map");
-
-#
 # Only logged in people at the moment; might open up at some point.
 #
 $this_user = CheckLoginOrDie();
@@ -86,6 +81,11 @@ if (isset($map_y) && $map_y != "") {
 else {
     unset($map_y);
 }
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Robot Map");
 
 #
 # Assume a single image for the robot map. When user clicks, pixel

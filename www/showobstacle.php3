@@ -7,11 +7,6 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Obstacle Information");
-
-#
 #
 # Only known and logged in users allowed.
 #
@@ -23,6 +18,11 @@ $isadmin   = ISADMIN();
 # Verify page arguments.
 #
 $reqargs = RequiredPageArguments("id",  PAGEARG_INTEGER);
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Obstacle Information");
 
 $query_result =
     DBQueryFatal("select o.*,f.pixels_per_meter from obstacles as o ".

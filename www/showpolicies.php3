@@ -7,17 +7,17 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Experiment Admission Control Policies");
-
-#
 #
 # Only known and logged in users allowed.
 #
 $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Experiment Admission Control Policies");
 
 #
 # Only admin people can see this page.

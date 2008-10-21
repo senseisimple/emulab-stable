@@ -7,11 +7,6 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("New Project Approval List");
-
-#
 # Only known and logged in users can do this. uid came in with the URI.
 #
 $this_user = CheckLoginOrDie();
@@ -29,6 +24,11 @@ if (! $isadmin) {
 # The reason for this call is to make sure that globals are set properly.
 #
 $reqargs = RequiredPageArguments();
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("New Project Approval List");
 
 #
 # Look in the projects table to see which projects have not been approved.

@@ -450,6 +450,17 @@ function LoginStatus() {
 function LOGGEDINORDIE($uid, $modifier = 0, $login_url = NULL) {
     global $TBBASE, $BASEPATH;
     global $TBAUTHTIMEOUT, $CHECKLOGIN_HASHKEY, $CHECKLOGIN_IDX;
+    global $drewheader;
+
+    if ($drewheader) {
+	trigger_error(
+	    "PAGEHEADER called before LOGGEDINORDIE ".
+	    "(called by CheckLoginOrDie). ".
+	    "Won't be able to redirect to the login page or ".
+            "return proper HTTP status code on Error ".
+	    "in ". $_SERVER['SCRIPT_FILENAME'] . ",",
+	    E_USER_WARNING);
+    }
 
     #
     # We now ignore the $uid argument and let LoginStatus figure it out.
@@ -458,8 +469,15 @@ function LOGGEDINORDIE($uid, $modifier = 0, $login_url = NULL) {
     #
     # Allow the caller to specify a different URL to direct the user to
     #
+    $redirect_url = null;
     if (!$login_url) {
 	$login_url = "$TBBASE/login.php3?refer=1";
+        if ($uid || REMEMBERED_ID()) {
+	    # HTTP_REFERER will not work reliably when redirecting so
+	    # pass in the URI for this page as an argument
+	    $redirect_url = "$TBBASE/login.php3?referrer=".
+                            urlencode($_SERVER['REQUEST_URI']);
+	}
     }
 
     $link = "\n<a href=\"$login_url\">Please ".
@@ -469,15 +487,27 @@ function LOGGEDINORDIE($uid, $modifier = 0, $login_url = NULL) {
 
     switch ($status & CHECKLOGIN_STATUSMASK) {
     case CHECKLOGIN_NOTLOGGEDIN:
-        USERERROR("You do not appear to be logged in! $link", 1);
+	if ($redirect_url) {
+	    header("Location: $redirect_url&error=notloggedin");
+	    exit;
+        } else {
+            USERERROR("You do not appear to be logged in! $link",
+		      1, HTTP_403_FORBIDDEN);
+        }
         break;
     case CHECKLOGIN_TIMEDOUT:
-        USERERROR("Your login has timed out! $link", 1);
+	if ($redirect_url) {
+	    header("Location: $redirect_url&error=timedout");
+	    exit;
+        } else {
+            USERERROR("Your login has timed out! $link",
+		      1, HTTP_403_FORBIDDEN);
+        }
         break;
     case CHECKLOGIN_MAYBEVALID:
         USERERROR("Your login cannot be verified. Are cookies turned on? ".
 		  "Are you using https? Are you logged in using another ".
-		  "browser or another machine? $link", 1);
+		  "browser or another machine? $link", 1, HTTP_403_FORBIDDEN);
         break;
     case CHECKLOGIN_LOGGEDIN:
         #
@@ -505,17 +535,23 @@ function LOGGEDINORDIE($uid, $modifier = 0, $login_url = NULL) {
     #
     if ($status & CHECKLOGIN_PSWDEXPIRED)
         USERERROR("Your password has expired. ".
-		  "<a href=moduserinfo.php3>Please change it now!</a>", 1);
+		  "<a href=moduserinfo.php3>Please change it now!</a>",
+		  1, HTTP_403_FORBIDDEN);
     if ($status & CHECKLOGIN_FROZEN)
-        USERERROR("Your account has been frozen!", 1);
+        USERERROR("Your account has been frozen!",
+		  1, HTTP_403_FORBIDDEN);
     if ($status & (CHECKLOGIN_UNVERIFIED|CHECKLOGIN_NEWUSER))
-        USERERROR("You have not verified your account yet!", 1);
+        USERERROR("You have not verified your account yet!",
+		  1, HTTP_403_FORBIDDEN);
     if ($status & CHECKLOGIN_UNAPPROVED)
-        USERERROR("Your account has not been approved yet!", 1);
+        USERERROR("Your account has not been approved yet!",
+		  1, HTTP_403_FORBIDDEN);
     if (($status & CHECKLOGIN_WEBONLY) && ! ISADMIN())
-        USERERROR("Your account does not permit you to access this page!", 1);
+        USERERROR("Your account does not permit you to access this page!",
+		  1, HTTP_403_FORBIDDEN);
     if (($status & CHECKLOGIN_WIKIONLY) && ! ISADMIN())
-        USERERROR("Your account does not permit you to access this page!", 1);
+        USERERROR("Your account does not permit you to access this page!",
+		  1, HTTP_403_FORBIDDEN);
 
     #
     # Lastly, check for nologins here. This heads off a bunch of other

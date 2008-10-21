@@ -10,11 +10,6 @@ include_once("imageid_defs.php");
 include_once("osinfo_defs.php");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Edit Image Descriptor");
-
-#
 # Only known and logged in users.
 #
 $this_user = CheckLoginOrDie();
@@ -37,6 +32,11 @@ $imageid = $image->imageid();
 if (!$image->AccessCheck($this_user, $TB_IMAGEID_MODIFYINFO)) {
     USERERROR("You do not have permission to access ImageID $imageid!", 1);
 }
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Edit Image Descriptor");
 
 #
 # Need a list of node types. We join this over the nodes table so that

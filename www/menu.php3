@@ -1261,8 +1261,15 @@ function PAGEFOOTER($view = NULL) {
     echo "</body></html>\n";
 }
 
-function PAGEERROR($msg) {
+define("HTTP_400_BAD_REQUEST", 400);
+define("HTTP_403_FORBIDDEN", 403);
+define("HTTP_404_NOT_FOUND", 404);
+
+function PAGEERROR($msg, $status_code = 0) {
     global $drewheader, $noheaders;
+
+    if (! $drewheader && $status_code != 0)
+        header(' ', true, $status_code);
 
     if (! $drewheader && ! $noheaders) {
 	PAGEHEADER("Page Error");

@@ -7,11 +7,6 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Watch Event Log");
-
-#
 # Only known and logged in users.
 #
 $this_user = CheckLoginOrDie();
@@ -34,6 +29,11 @@ $url = CreateURL("spewevents", $experiment);
 if (!$experiment->AccessCheck($this_user, $TB_EXPT_READINFO)) {
     USERERROR("You do not have permission to view events for $pid/$eid!", 1);
 }
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Watch Event Log");
 
 echo $experiment->PageHeader();
 echo "<br>\n";

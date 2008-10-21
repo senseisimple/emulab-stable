@@ -7,11 +7,6 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Image List");
-
-#
 #
 # Only known and logged in users allowed.
 #
@@ -25,6 +20,11 @@ $isadmin   = ISADMIN();
 #
 $optargs = OptionalPageArguments("creator",  PAGEARG_USER);
 $extraclause = "";
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Image List");
 
 #
 # Allow for creator restriction

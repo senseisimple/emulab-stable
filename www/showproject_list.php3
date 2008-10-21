@@ -7,11 +7,6 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Project Information List");
-
-#
 # Only known and logged in users can do this.
 #
 $this_user = CheckLoginOrDie();
@@ -22,6 +17,11 @@ $isadmin   = ISADMIN();
 # Verify page arguments
 #
 $optargs = OptionalPageArguments("splitview",   PAGEARG_BOOLEAN);
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Project Information List");
 
 #
 # Admin users can see all projects, while normal users can only see

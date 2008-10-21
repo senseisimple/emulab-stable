@@ -8,11 +8,6 @@ include("defs.php3");
 include_once("node_defs.php");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Delete a Node Log Entry");
-
-#
 # Only known and logged in users can end experiments.
 #
 $this_user = CheckLoginOrDie();
@@ -36,6 +31,11 @@ if (! ($isadmin || OPSGUY())) {
 
 # Need these below
 $node_id = $node->node_id();
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Delete a Node Log Entry");
 
 #
 # We run this twice. The first time we are checking for a confirmation

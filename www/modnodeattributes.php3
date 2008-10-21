@@ -8,11 +8,6 @@ include("defs.php3");
 include_once("node_defs.php");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Modify Node Attributes Form");
-
-#
 # Only known and logged in users can do this.
 #
 $this_user = CheckLoginOrDie();
@@ -40,6 +35,11 @@ $optargs = OptionalPageArguments("refer",      PAGEARG_STRING,
 # Need these below ...
 $node_id = $node->node_id();
 $type    = $node->type();
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Modify Node Attributes Form");
 
 #
 # Get current set of attributes for node - used in comparison below

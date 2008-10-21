@@ -8,11 +8,6 @@ include("defs.php3");
 include("imageid_defs.php");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Image Descriptor");
-
-#
 # Only known and logged in users.
 #
 $this_user = CheckLoginOrDie();
@@ -23,6 +18,11 @@ $isadmin   = ISADMIN();
 # Verify page arguments.
 #
 $reqargs = RequiredPageArguments("image", PAGEARG_IMAGE);
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Image Descriptor");
 
 # Need these below.
 $imageid = $image->imageid();

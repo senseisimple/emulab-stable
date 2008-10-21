@@ -7,11 +7,6 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Create a Project Group");
-
-#
 # Only known and logged in users.
 #
 $this_user = CheckLoginOrDie();
@@ -46,6 +41,11 @@ else {
 		  "project $pid!", 1);
     }
 }
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Create a Project Group");
 
 #
 # Spit the form out using the array of data. 

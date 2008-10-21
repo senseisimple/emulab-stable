@@ -7,16 +7,16 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Syntax Check your NS file");
-
-#
 # Only known and logged in users can begin experiments.
 #
 $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Syntax Check your NS file");
 
 ?>
 <table align="center" border="1"> 

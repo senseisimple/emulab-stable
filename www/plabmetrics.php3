@@ -15,6 +15,151 @@ $FLEXLAB_XMLRPC_SRV = 'ops.emulab.net';
 $FLEXLAB_XMLRPC_SRV_PORT = 3993;
 
 #
+# Collect errors.
+#
+$opterrs = array();
+
+#
+# Only known and logged in users can get plab data.
+#
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
+
+#
+# Hacks -- unset $pid and $eid vars if they are '' before we check args!
+# (needed so we can let users drop a previous pid/eid filter).
+#
+if (isset($_REQUEST['pid']) && $_REQUEST['pid'] == '') {
+    unset($_REQUEST['pid']);
+}
+if (isset($_REQUEST['eid']) && $_REQUEST['eid'] == '') {
+    unset($_REQUEST['eid']);
+}
+
+# Do similar for other arguments.
+if (isset($_REQUEST['upnodefilter']) && $_REQUEST['upnodefilter'] == '') {
+    unset($_REQUEST['upnodefilter']);
+}
+if (isset($_REQUEST['userquery']) && $_REQUEST['userquery'] == '') {
+    unset($_REQUEST['userquery']);
+}
+
+# Make sure to add any new args here to pm_buildurl() as well.
+$optargs = OptionalPageArguments( "experiment", PAGEARG_EXPERIMENT,
+				  "cols",   PAGEARG_ALPHALIST,
+				  "offset", PAGEARG_INTEGER,
+				  "limit",  PAGEARG_INTEGER,
+				  "upnodefilter", PAGEARG_STRING,
+				  "pagelayout", PAGEARG_BOOLEAN,
+				  "sortcols", PAGEARG_ALPHALIST,
+				  "sortdir", PAGEARG_STRING,
+
+                                  # Never fear.  We check this ourself since
+                                  # it could contain either an alphanumeric
+                                  # string, or a perl5 regex. NOTE:
+                                  # only alphanum strings go in db queries;
+                                  # regexes are handled within this page.
+				  "hostfilter", PAGEARG_ANYTHING,
+
+				  "selectable", PAGEARG_BOOLEAN,
+				  "selectionlist", PAGEARG_ALPHALIST,
+				  "newpgsel", PAGEARG_ARRAY,
+				  "pgsel", PAGEARG_ARRAY,
+
+                                  # We check this *extremely* copiously.
+                                  # It actually gets tokenized and parsed and
+                                  # we verify every last token against known 
+                                  # or numeric values.
+				  "userquery", PAGEARG_ANYTHING,
+
+				  "flexlabfilter", PAGEARG_BOOLEAN,
+				  "flexlabfcsize", PAGEARG_INTEGER,
+				  "flexlabsave", PAGEARG_BOOLEAN,
+				  "flexlabrecompute", PAGEARG_BOOLEAN,
+				  "flexlabfcnodes", PAGEARG_ALPHALIST );
+
+                                  # Unimplemented.
+                                  # Verified, but never leaves php
+                                  #"colrank", PAGEARG_ANYTHING);
+
+# Yet to be implemented:
+# * basic options
+#     add and pcvm links; other?
+# * advanced options
+#     build-your-own rank (based off column weights, normalization to max or 
+#       user-chosen ceil; each col should be able to be minimized/maximized in 
+#       its contribution to the rank)
+
+#
+# Argument checks.
+#
+
+# first of all, only post-filter the data if absolutely necessary.
+$mustpostfilter = 0;
+
+# access control -- everybody can see stats for all nodes, but only members
+# of a pid can see which nodes an eid in that pid has.
+if (isset($experiment)) {
+    if (!$experiment->AccessCheck($this_user, $TB_EXPT_READINFO)) {
+	USERERROR("You do not have permission to view this experiment!",1);
+    }
+
+    # need these later
+    $eid = $experiment->eid();
+    $pid = $experiment->pid();
+}
+
+# check hostfilter -- if it is an alphanum string, we can send to db; else,
+# it is a perl5 regexp and we have to filter in php.  Note that we also
+# allow common hostname chars -,.,_ since the db can accept these...
+if (!isset($hostfilter)) {
+    $hf_regexp = 0;
+}
+elseif ($hostfilter == '' || preg_match("/^(\s+)$/",$hostfilter) > 0) {
+    $hf_regexp = 0;
+    unset($hostfilter);
+}
+elseif (preg_match("/^([0-9a-zA-Z\-_\.]+)$/",$hostfilter) == 1) {
+    $hf_regexp = 0;
+}
+else {
+    $hf_regexp = 1;
+    # setup post-filtering so that we can match using regexps.
+    $mustpostfilter = 1;
+    #echo "needed regexp and postfilter<br>\n";
+}
+
+#
+# Flexlab filter options:
+#
+if (isset($flexlabfilter) && $flexlabfilter) {
+    if (isset($flexlabsave) && $flexlabsave 
+	&& isset($flexlabrecompute) && $flexlabrecompute) {
+        # unset recompute; save is the winner...
+	unset($flexlabrecompute);
+    }
+
+    $mustpostfilter = 1;
+}
+else {
+    if (isset($flexlabfcnodes)) {
+	unset($flexlabfcnodes);
+    }
+}
+
+#
+# If filtering on pid/eid AND upnodefilter == emulab, we must postfilter the
+# data (initial query will get the list of pid/eid nodes, then we filter out
+# upnodes).  This is because a plab node isup according to Emulab if its 
+# node status is up and if it is in the emulab-ops/plabnodes experiment.
+#
+if (isset($experiment) 
+    && (isset($upnodefilter) && $upnodefilter == 'emulab')) {
+    $mustpostfilter = 1;
+}
+
+#
 # Standard Testbed Header
 #
 # Cheat and use the page args to influence the view.
@@ -151,152 +296,6 @@ function getFormElementValue(form,id) {
 
 </script>
 <?php
-
-#
-# Collect errors.
-#
-$opterrs = array();
-
-#
-# Only known and logged in users can get plab data.
-#
-$this_user = CheckLoginOrDie();
-$uid       = $this_user->uid();
-$isadmin   = ISADMIN();
-
-#
-# Hacks -- unset $pid and $eid vars if they are '' before we check args!
-# (needed so we can let users drop a previous pid/eid filter).
-#
-if (isset($_REQUEST['pid']) && $_REQUEST['pid'] == '') {
-    unset($_REQUEST['pid']);
-}
-if (isset($_REQUEST['eid']) && $_REQUEST['eid'] == '') {
-    unset($_REQUEST['eid']);
-}
-
-# Do similar for other arguments.
-if (isset($_REQUEST['upnodefilter']) && $_REQUEST['upnodefilter'] == '') {
-    unset($_REQUEST['upnodefilter']);
-}
-if (isset($_REQUEST['userquery']) && $_REQUEST['userquery'] == '') {
-    unset($_REQUEST['userquery']);
-}
-
-# Make sure to add any new args here to pm_buildurl() as well.
-$optargs = OptionalPageArguments( "experiment", PAGEARG_EXPERIMENT,
-				  "cols",   PAGEARG_ALPHALIST,
-				  "offset", PAGEARG_INTEGER,
-				  "limit",  PAGEARG_INTEGER,
-				  "upnodefilter", PAGEARG_STRING,
-				  "pagelayout", PAGEARG_BOOLEAN,
-				  "sortcols", PAGEARG_ALPHALIST,
-				  "sortdir", PAGEARG_STRING,
-
-                                  # Never fear.  We check this ourself since
-                                  # it could contain either an alphanumeric
-                                  # string, or a perl5 regex. NOTE:
-                                  # only alphanum strings go in db queries;
-                                  # regexes are handled within this page.
-				  "hostfilter", PAGEARG_ANYTHING,
-
-				  "selectable", PAGEARG_BOOLEAN,
-				  "selectionlist", PAGEARG_ALPHALIST,
-				  "newpgsel", PAGEARG_ARRAY,
-				  "pgsel", PAGEARG_ARRAY,
-
-                                  # We check this *extremely* copiously.
-                                  # It actually gets tokenized and parsed and
-                                  # we verify every last token against known 
-                                  # or numeric values.
-				  "userquery", PAGEARG_ANYTHING,
-
-				  "flexlabfilter", PAGEARG_BOOLEAN,
-				  "flexlabfcsize", PAGEARG_INTEGER,
-				  "flexlabsave", PAGEARG_BOOLEAN,
-				  "flexlabrecompute", PAGEARG_BOOLEAN,
-				  "flexlabfcnodes", PAGEARG_ALPHALIST );
-
-                                  # Unimplemented.
-                                  # Verified, but never leaves php
-                                  #"colrank", PAGEARG_ANYTHING);
-
-# Yet to be implemented:
-# * basic options
-#     add and pcvm links; other?
-# * advanced options
-#     build-your-own rank (based off column weights, normalization to max or 
-#       user-chosen ceil; each col should be able to be minimized/maximized in 
-#       its contribution to the rank)
-
-
-#
-# Argument checks.
-#
-
-# first of all, only post-filter the data if absolutely necessary.
-$mustpostfilter = 0;
-
-# access control -- everybody can see stats for all nodes, but only members
-# of a pid can see which nodes an eid in that pid has.
-if (isset($experiment)) {
-    if (!$experiment->AccessCheck($this_user, $TB_EXPT_READINFO)) {
-	USERERROR("You do not have permission to view this experiment!",1);
-    }
-
-    # need these later
-    $eid = $experiment->eid();
-    $pid = $experiment->pid();
-}
-
-# check hostfilter -- if it is an alphanum string, we can send to db; else,
-# it is a perl5 regexp and we have to filter in php.  Note that we also
-# allow common hostname chars -,.,_ since the db can accept these...
-if (!isset($hostfilter)) {
-    $hf_regexp = 0;
-}
-elseif ($hostfilter == '' || preg_match("/^(\s+)$/",$hostfilter) > 0) {
-    $hf_regexp = 0;
-    unset($hostfilter);
-}
-elseif (preg_match("/^([0-9a-zA-Z\-_\.]+)$/",$hostfilter) == 1) {
-    $hf_regexp = 0;
-}
-else {
-    $hf_regexp = 1;
-    # setup post-filtering so that we can match using regexps.
-    $mustpostfilter = 1;
-    #echo "needed regexp and postfilter<br>\n";
-}
-
-#
-# Flexlab filter options:
-#
-if (isset($flexlabfilter) && $flexlabfilter) {
-    if (isset($flexlabsave) && $flexlabsave 
-	&& isset($flexlabrecompute) && $flexlabrecompute) {
-        # unset recompute; save is the winner...
-	unset($flexlabrecompute);
-    }
-
-    $mustpostfilter = 1;
-}
-else {
-    if (isset($flexlabfcnodes)) {
-	unset($flexlabfcnodes);
-    }
-}
-
-#
-# If filtering on pid/eid AND upnodefilter == emulab, we must postfilter the
-# data (initial query will get the list of pid/eid nodes, then we filter out
-# upnodes).  This is because a plab node isup according to Emulab if its 
-# node status is up and if it is in the emulab-ops/plabnodes experiment.
-#
-if (isset($experiment) 
-    && (isset($upnodefilter) && $upnodefilter == 'emulab')) {
-    $mustpostfilter = 1;
-}
 
 #
 # Setup the viewable exp/pid mappings:

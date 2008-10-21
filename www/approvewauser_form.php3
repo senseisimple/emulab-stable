@@ -7,11 +7,6 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Widearea Accounts Approval Form");
-
-#
 # Only admin types can use this page.
 #
 $this_user = CheckLoginOrDie();
@@ -21,6 +16,11 @@ $isadmin   = ISADMIN();
 if (! $isadmin) {
     USERERROR("Only testbed administrators people can access this page!", 1);
 }
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Widearea Accounts Approval Form");
 
 echo "
       <h2>Approve local accounts on specific widearea nodes</h2>

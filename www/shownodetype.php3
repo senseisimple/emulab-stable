@@ -8,11 +8,6 @@ include("defs.php3");
 include("imageid_defs.php");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Node Type Information");
-
-#
 # Anyone can access this info, its a PUBLIC PAGE!
 #
 $reqargs = RequiredPageArguments("node_type", PAGEARG_STRING);
@@ -21,6 +16,11 @@ $reqargs = RequiredPageArguments("node_type", PAGEARG_STRING);
 if (!preg_match("/^[-\w]+$/", $node_type)) {
     PAGEARGERROR("Invalid characters in arguments.");
 }
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Node Type Information");
 
 $query_result =
     DBQueryFatal("select * from node_types ".

@@ -7,11 +7,6 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("New Project Approval");
-
-#
 # Only known and logged in users can do this.
 #
 $this_user = CheckLoginOrDie();
@@ -45,6 +40,11 @@ if (! ($this_project = $reqargs["project"])) {
 }
 $pid = $this_project->pid();
 $projleader = $this_project->GetLeader();
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("New Project Approval");
 
 echo "<center><h3>You have the following choices:</h3></center>
       <table class=stealth align=center border=0>

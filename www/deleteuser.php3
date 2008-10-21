@@ -7,11 +7,6 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Remove User");
-
-#
 # Only known and logged in users allowed.
 #
 $this_user = CheckLoginOrDie();
@@ -31,6 +26,11 @@ $optargs = OptionalPageArguments("target_project",  PAGEARG_PROJECT,
 # Need these below.
 $target_dbuid = $target_user->uid();
 $target_uid   = $target_user->uid();
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Remove User");
 
 #
 # Requesting? Fire off email and we are done. 

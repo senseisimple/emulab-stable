@@ -11,11 +11,6 @@ include_once("node_defs.php");
 include("osiddefs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Create a new Image Descriptor (long form)");
-
-#
 # Only known and logged in users.
 #
 $this_user = CheckLoginOrDie();
@@ -38,6 +33,11 @@ if (! count($projlist)) {
     USERERROR("You do not appear to be a member of any Projects in which ".
 	      "you have permission to create new Image descriptors.", 1);
 }
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Create a new Image Descriptor (long form)");
 
 #
 # Need a list of node types. We join this over the nodes table so that

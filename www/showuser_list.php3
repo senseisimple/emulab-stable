@@ -7,11 +7,6 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("User List");
-
-#
 #
 # Only known and logged in users allowed.
 #
@@ -38,6 +33,12 @@ if (!isset($showtype)) {
 if (!isset($searchfor)) {
     $searchfor = "";
 }
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("User List");
+
 
 echo "<b>Show: <a href='showuser_list.php3?showtype=loggedin'>loggedin</a>,
                <a href='showuser_list.php3?showtype=recent'>recent</a>,

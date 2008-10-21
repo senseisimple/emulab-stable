@@ -17,7 +17,8 @@ $optargs = OptionalPageArguments("login",    PAGEARG_STRING,
 				 "simple",   PAGEARG_BOOLEAN,
 				 "adminmode",PAGEARG_BOOLEAN,
 				 "refer",    PAGEARG_BOOLEAN,
-				 "referrer", PAGEARG_STRING);
+				 "referrer", PAGEARG_STRING,
+				 "error",    PAGEARG_STRING);
 				 
 # Allow adminmode to be passed along to new login. Handy for letting admins
 # log in when NOLOGINS() is on.
@@ -31,8 +32,8 @@ if (! isset($simple)) {
 if (! isset($key)) {
     $key = null;
 }
-if (! isset($referrer)) {
-    $referrer = null;
+if (! isset($error)) {
+    $error = null;
 }
 
 # See if referrer page requested that it be passed along so that it can be
@@ -45,6 +46,10 @@ if (isset($refer) &&
     # the user may have visited the last page with http. If they did, send them
     # back through https
     $referrer = preg_replace("/^http:/i","https:",$referrer);
+} else if (isset($referrer)) {
+    $refer = true;
+} else {
+    $referrer = null;
 }
 
 #
@@ -90,23 +95,39 @@ if (($this_user = CheckLogin($status))) {
 #
 # The uid can be an email address, and in fact defaults to that now. 
 # 
-function SPITFORM($uid, $key, $referrer, $failed, $adminmode, $simple, $view)
+function SPITFORM($uid, $key, $referrer, $error, $adminmode, $simple, $view)
 {
     global $TBDB_UIDLEN, $TBBASE;
     
     PAGEHEADER("Login",$view);
+ 
+    $premessage = "Please login to our secure server.";
 
-    if ($failed) {
-	echo "<center>
-              <font size=+1 color=red>
-	      Login attempt failed! Please try again.
-              </font>
-              </center><br>\n";
+    if ($error) {
+	echo "<center>";
+        echo "<font size=+1 color=red>";
+    	switch ($error) {
+        case "failed": 
+            echo "Login attempt failed! Please try again.";
+            break;
+        case "notloggedin":
+	    echo "You do not appear to be logged in!";
+	    $premessage = "Please log in again.";
+            break;
+        case "timedout":
+	    echo "Your login has timed out!";
+	    $premessage = "Please log in again.";
+	    break;
+	default:
+	    echo "Unknown Error ($error)!";
+        }
+        echo "</font>";
+        echo "</center><br>\n";
     }
 
     echo "<center>
           <font size=+1>
-          Please login to our secure server.<br>
+          $premessage<br>
           (You must have cookies enabled)
           </font>
           </center>\n";
@@ -164,8 +185,8 @@ if (! isset($login)) {
     else {
 	$login_id = REMEMBERED_ID();
     }
-    
-    SPITFORM($login_id, $key, $referrer, 0, $adminmode, $simple, $view);
+
+    SPITFORM($login_id, $key, $referrer, $error, $adminmode, $simple, $view);
     PAGEFOOTER($view);
     return;
 }
@@ -196,7 +217,7 @@ else {
 # Failed, then try again with an error message.
 # 
 if ($login_status == $STATUS_LOGINFAIL) {
-    SPITFORM($uid, $key, $referrer, 1, $adminmode, $simple, $view);
+    SPITFORM($uid, $key, $referrer, "failed", $adminmode, $simple, $view);
     PAGEFOOTER($view);
     return;
 }

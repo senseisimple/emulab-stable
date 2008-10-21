@@ -15,8 +15,6 @@ $view = array(
     'hide_copyright' => 1
 );
 
-PAGEHEADER("Experiment Creation GUI", $view);
-
 #
 # Only known and logged in users can do this.
 #
@@ -30,6 +28,8 @@ $isadmin   = ISADMIN();
 $optargs = OptionalPageArguments("experiment", PAGEARG_EXPERIMENT,
 				 "fallback",   PAGEARG_BOOLEAN);
 
+
+PAGEHEADER("Experiment Creation GUI", $view);
 ?>
 
 <h3>Note: See the Help menu for quickstart and tips</h3>

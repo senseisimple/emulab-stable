@@ -345,6 +345,17 @@ function OptionalPageArguments()
 
 function VerifyPageArguments($argspec, $required)
 {
+    global $drewheader;
+
+    if ($drewheader) {
+	trigger_error(
+	    "PAGEHEADER called before VerifyPageArguments ".
+	    "(called by RequiredPageArguments or OptionalPageArguments). ".
+	    "Won't be able to return proper HTTP status code on Error ".
+	    "in ". $_SERVER['SCRIPT_FILENAME'] . ",",
+            E_USER_WARNING);
+    }
+
     $result   = array();
 
     while ($argspec and count($argspec) > 1) {

@@ -7,11 +7,6 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Request a Swap/Terminate");
-
-#
 # Only known and logged in users.
 #
 $this_user = CheckLoginOrDie();
@@ -32,6 +27,11 @@ $reqargs = RequiredPageArguments("experiment", PAGEARG_EXPERIMENT);
 $optargs = OptionalPageArguments("canceled",   PAGEARG_STRING,
 				 "confirmed",  PAGEARG_STRING,
 				 "force",      PAGEARG_BOOLEAN);
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Request a Swap/Terminate");
 
 #
 # Need these below

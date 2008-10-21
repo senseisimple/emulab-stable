@@ -7,11 +7,6 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Widearea Accounts Approval Form");
-
-#
 # Only known and logged in users can be verified.
 #
 $this_user = CheckLoginOrDie();
@@ -108,6 +103,11 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
 	TBERROR("Invalid approval value $approval in approvewauser.php3.", 1);
     }
 }
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Widearea Accounts Approval Form");
 
 reset($HTTP_POST_VARS);
 

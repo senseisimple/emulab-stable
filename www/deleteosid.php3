@@ -8,11 +8,6 @@ include("defs.php3");
 include_once("osinfo_defs.php");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Delete an OS Descriptor");
-
-#
 # Only known and logged in users can end experiments.
 #
 $this_user = CheckLoginOrDie();
@@ -37,6 +32,11 @@ $osname = $osinfo->osname();
 if (!$osinfo->AccessCheck($this_user, $TB_OSID_DESTROY)) {
     USERERROR("You do not have permission to delete OS Descriptor $osid!", 1);
 }
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Delete an OS Descriptor");
 
 $conflicts = 0;
 

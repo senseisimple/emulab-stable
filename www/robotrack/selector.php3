@@ -7,8 +7,6 @@
 chdir("..");
 include("defs.php3");
 
-PAGEHEADER("Node Selector Applet");
-
 $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
@@ -61,6 +59,11 @@ else {
 if (! mysql_num_rows($query_result)) {
     USERERROR("No such building/floor", 1);
 }
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Node Selector Applet");
 
 #
 # Draw the legend and some explanatory text.

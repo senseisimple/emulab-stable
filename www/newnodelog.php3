@@ -8,11 +8,6 @@ include("defs.php3");
 include_once("node_defs.php");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Enter Node Log Entry");
-
-#
 # Only known and logged in users.
 #
 $this_user = CheckLoginOrDie();
@@ -48,6 +43,11 @@ if (! TBvalid_description($log_entry)) {
 $log_type  = escapeshellarg($log_type);
 $log_entry = escapeshellarg($log_entry);
 $node_id   = $node->node_id();
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Enter Node Log Entry");
 
 #
 # Run the external script. 

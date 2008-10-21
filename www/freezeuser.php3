@@ -7,11 +7,6 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Freeze User Account");
-
-#
 # Only known and logged in users allowed.
 #
 $this_user = CheckLoginOrDie();
@@ -65,6 +60,11 @@ if (!strcmp($action, "freeze")) {
 	USERERROR("You cannot freeze someone who is not active!", 1);
     }
 }
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Freeze User Account");
 
 #
 # Requesting? Fire off email and we are done. 

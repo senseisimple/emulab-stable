@@ -8,8 +8,6 @@ chdir("..");
 require("defs.php3");
 chdir("buildui");
 
-PAGEHEADER("NetBuild");
-
 #
 # Only known and logged in users can do this.
 #
@@ -31,6 +29,11 @@ if (isset($action) && $action == "modify") {
     $eid = $experiment->eid();
     echo "<h3>Modifying $pid/$eid:</h3>";
 }
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("NetBuild");
 
 ?>
 

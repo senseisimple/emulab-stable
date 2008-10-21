@@ -7,11 +7,6 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Confirm Verification");
-
-#
 # Only known and logged in users can be verified. 
 #
 $this_user = CheckLoginOrDie(CHECKLOGIN_UNVERIFIED|CHECKLOGIN_NEWUSER|
@@ -27,6 +22,11 @@ if (!isset($key) || strcmp($key, "") == 0) {
     USERERROR("Missing field; ".
               "Please go back and fill out the \"key\" field!", 1);
 }
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Confirm Verification");
 
 #
 # Grab the status and do the modification.

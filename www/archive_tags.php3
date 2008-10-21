@@ -7,11 +7,6 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Archive Tags");
-
-#
 # Only known and logged in users can end experiments.
 #
 $this_user = CheckLoginOrDie();
@@ -91,6 +86,11 @@ elseif (isset($index)) {
 else {
     PAGEARGERROR("Must provide a current or former experiment index");
 }
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Archive Tags");
 
 # Show just the last N records unless request is different.
 if (!isset($records)) {

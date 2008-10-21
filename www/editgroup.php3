@@ -7,11 +7,6 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Edit Group Membership");
-
-#
 # Only known and logged in users.
 #
 $this_user = CheckLoginOrDie();
@@ -41,6 +36,11 @@ if (! $group->AccessCheck($this_user, $TB_PROJECT_EDITGROUP)) {
     USERERROR("You do not have permission to edit group $gid in ".
 	      "project $pid!", 1);
 }
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Edit Group Membership");
 
 #
 # See if user is allowed to add non-members to group.

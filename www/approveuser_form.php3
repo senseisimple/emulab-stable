@@ -7,11 +7,6 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("New User Approval");
-
-#
 # Only known and logged in users can be verified.
 #
 $this_user   = CheckLoginOrDie();
@@ -33,6 +28,11 @@ $approvelist = $this_user->ApprovalList(1);
 if (count($approvelist) == 0) {
     USERERROR("You have no new project members who need approval.", 1);
 }
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("New User Approval");
 
 echo "
       <h2>Approve new users in your Project or Group</h2>

@@ -7,8 +7,6 @@
 include("defs.php3");
 include_once("node_defs.php");
 
-PAGEHEADER("Free Node");
-
 #
 # Only known and logged in users can do this.
 #
@@ -43,6 +41,11 @@ $eid     = $experiment->eid();
 if (! ($isadmin || (OPSGUY()) && $pid == $TBOPSPID)) {
     USERERROR("Not enough permission to free nodes!", 1);
 }
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Free Node");
 
 #
 # We run this twice. The first time we are checking for a confirmation

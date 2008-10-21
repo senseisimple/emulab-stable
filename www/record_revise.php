@@ -7,11 +7,6 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Revise Run Record");
-
-#
 # Only known and logged in users can look at experiments.
 #
 $this_user = CheckLoginOrDie();
@@ -39,6 +34,11 @@ if (!$isadmin &&
     !$instance->AccessCheck($this_user, $TB_EXPT_MODIFY)) {
     USERERROR("You do not have permission to change this record!", 1);
 }
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Revise Run Record");
 
 function SPITFORM($formfields, $errors)
 {

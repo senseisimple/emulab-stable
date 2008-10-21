@@ -7,11 +7,6 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Delete a Group");
-
-#
 # Only known and logged in users.
 #
 $this_user = CheckLoginOrDie();
@@ -46,6 +41,11 @@ if (! $project->AccessCheck($this_user, $TB_PROJECT_DELGROUP)) {
     USERERROR("You do not have permission to delete groups in project $pid!",
 	      1);
 }
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Delete a Group");
 
 #
 # Check to see if there are any active experiments. Abort if there are.

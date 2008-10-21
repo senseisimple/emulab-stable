@@ -7,11 +7,6 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Testbed Wide Stats");
-
-#
 # Only known and logged in users can end experiments.
 #
 $this_user = CheckLoginOrDie();
@@ -26,6 +21,12 @@ $optargs = OptionalPageArguments("showby",	      PAGEARG_STRING,
 				 "target_project",    PAGEARG_PROJECT,
 				 "exptidx",           PAGEARG_INTEGER,
 				 "records",           PAGEARG_INTEGER);
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Testbed Wide Stats");
+
 if (! isset($verbose)) {
      $verbose = 0;
 }

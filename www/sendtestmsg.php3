@@ -6,8 +6,6 @@
 #
 include("defs.php3");
 
-PAGEHEADER("Send a Test Message");
-
 #
 # Only known and logged in users can do this.
 #
@@ -28,6 +26,8 @@ $reqargs = RequiredPageArguments("target_user",  PAGEARG_USER);
 $target_uid = $target_user->uid();
 $usr_name   = $target_user->name();
 $usr_email  = $target_user->email();
+
+PAGEHEADER("Send a Test Message");
 
 # Send the email.
 TBMAIL("$usr_name '$target_uid' <$usr_email>",

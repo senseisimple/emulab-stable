@@ -8,11 +8,6 @@ include("defs.php3");
 include_once("node_defs.php");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Node Control Center");
-
-#
 # Only known and logged in users can do this.
 #
 $this_user = CheckLoginOrDie();
@@ -27,6 +22,11 @@ if (!$isadmin && !STUDLY()) {
 # Verify page arguments.
 #
 $optargs = OptionalPageArguments("type",        PAGEARG_STRING);
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Node Control Center");
 
 $query_result =
     DBQueryFatal("select n.inception,util.*, ".

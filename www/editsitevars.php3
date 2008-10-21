@@ -7,11 +7,6 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Edit Site Variables");
-
-#
 # Only known and logged in users can do this.
 #
 $this_user = CheckLoginOrDie();
@@ -32,6 +27,11 @@ $optargs = OptionalPageArguments(# Edit greenballs pull up an Edit subform.
 				 "defaulted",  PAGEARG_STRING,
 				 "edited",     PAGEARG_STRING,
 				 "canceled",   PAGEARG_STRING);
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Edit Site Variables");
 
 function SPIT_MSGS($message, $errors)
 {

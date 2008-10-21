@@ -8,11 +8,6 @@ include("defs.php3");
 include_once("node_defs.php");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Node Control Form");
-
-#
 # Only known and logged in users can do this.
 #
 $this_user = CheckLoginOrDie();
@@ -43,6 +38,11 @@ if (!$isadmin &&
     !$node->AccessCheck($this_user, $TB_NODEACCESS_MODIFYINFO)) {
     USERERROR("You do not have permission to modify node parameters!", 1);
 }
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Node Control Form");
 
 #
 # Check each parameter. Also note that when setting/clearing values,

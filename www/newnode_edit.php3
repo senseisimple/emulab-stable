@@ -12,11 +12,6 @@ require("defs.php3");
 #
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("New Testbed Node");
-
-#
 # Only admins can see this page
 #
 $this_user = CheckLoginOrDie();
@@ -32,6 +27,11 @@ $optargs = OptionalPageArguments("node_id",    PAGEARG_STRING,
 				 "type",       PAGEARG_STRING,
 				 "IP",         PAGEARG_STRING,
 				 "identifier", PAGEARG_STRING);
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("New Testbed Node");
 
 #
 # If we had any update information passed to us, do the update now

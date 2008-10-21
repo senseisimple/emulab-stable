@@ -8,11 +8,6 @@ include("defs.php3");
 include("node_defs.php");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Node Log");
-
-#
 # Only known and logged in users can do this.
 #
 $this_user = CheckLoginOrDie();
@@ -23,6 +18,11 @@ $isadmin   = ISADMIN();
 # Verify page arguments.
 #
 $reqargs = RequiredPageArguments("node", PAGEARG_NODE);
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Node Log");
 
 #
 # Perm check.

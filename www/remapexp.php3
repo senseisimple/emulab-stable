@@ -6,8 +6,6 @@
 #
 include("defs.php3");
 
-PAGEHEADER("Remap Virtual Nodes");
-
 #
 # Only known and logged in users can do this.
 #
@@ -49,6 +47,8 @@ else {
 	$reboot = 0;
 	$eventrestart = 0;
 }
+
+PAGEHEADER("Remap Virtual Nodes");
 
 if (isset($canceled) && $canceled) {
     echo "<center><h3><br>

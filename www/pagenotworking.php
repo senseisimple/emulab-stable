@@ -6,17 +6,16 @@
 #
 include("defs.php3");
 
+$optargs = OptionalPageArguments("confirmed",   PAGEARG_BOOLEAN,
+				 "description", PAGEARG_STRING, 
+				 "referrer",    PAGEARG_STRING);
+$this_user = CheckLogin($check_status);
+$referrer  = (isset($referrer) ? $referrer : $_SERVER['HTTP_REFERER']);
+
 #
 # Standard Testbed Header
 #
 PAGEHEADER("Page Not Working Properly!");
-
-$optargs = OptionalPageArguments("confirmed",   PAGEARG_BOOLEAN,
-				 "description", PAGEARG_STRING, 
-				 "referrer",    PAGEARG_STRING);
-
-$this_user = CheckLogin($check_status);
-$referrer  = (isset($referrer) ? $referrer : $_SERVER['HTTP_REFERER']);
 
 if ($this_user) {
     if (!isset($confirmed)) {

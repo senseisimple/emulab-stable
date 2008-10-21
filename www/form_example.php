@@ -7,8 +7,6 @@
 include("defs.php3");
 include("form_defs.php");
 
-PAGEHEADER("Silly Forms example");
-
 #
 # Only known and logged in users.
 #
@@ -17,6 +15,8 @@ $uid       = $this_user->uid();
 
 $optargs = OptionalPageArguments("submit",      PAGEARG_STRING,
 				 "formfields",  PAGEARG_ARRAY);
+
+PAGEHEADER("Silly Forms example");
 
 # The form attributes:
 $form = array('#id'	  => 'form1',
