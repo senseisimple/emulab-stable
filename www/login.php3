@@ -46,9 +46,7 @@ if (isset($refer) &&
     # the user may have visited the last page with http. If they did, send them
     # back through https
     $referrer = preg_replace("/^http:/i","https:",$referrer);
-} else if (isset($referrer)) {
-    $refer = true;
-} else {
+} else if (! isset($referrer)) {
     $referrer = null;
 }
 

@@ -202,13 +202,13 @@ if (isset($_REQUEST["start"]) && isset($_REQUEST["level"])) {
     return;
 }
 
+# Must do this!
+CHECKPAGEARGS();
+
 #
 # Okay, this is the initial page.
 # 
 PAGEHEADER("Run Linktest");
-
-# Must do this!
-CHECKPAGEARGS();
 
 echo "<script>\n";
 sajax_show_javascript();

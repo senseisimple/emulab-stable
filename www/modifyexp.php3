@@ -18,11 +18,6 @@ $isadmin   = ISADMIN();
 # This will not return if its a sajax request.
 include("showlogfile_sup.php3");
 
-#
-# Standard Testbed Header
-#
-PAGEHEADER("Modify Experiment");
-
 $reqargs = RequiredPageArguments("experiment",      PAGEARG_EXPERIMENT);
 $optargs = OptionalPageArguments("go",              PAGEARG_STRING,
 				 "syntax",          PAGEARG_STRING,
@@ -31,6 +26,11 @@ $optargs = OptionalPageArguments("go",              PAGEARG_STRING,
 				 "nsdata",          PAGEARG_ANYTHING,
 				 "exp_localnsfile", PAGEARG_STRING,
 				 "formfields",      PAGEARG_ARRAY);
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Modify Experiment");
 
 # Need these below.
 $pid = $experiment->pid();
