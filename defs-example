@@ -231,6 +231,25 @@ JAILIPBASE=$VIRTNODE_NETWORK
 JAILIPMASK=$VIRTNODE_NETMASK
 
 #
+# Selective disable of a couple of features.
+#
+# DISABLE_NAMED_SETUP	If you are not running a name server on your boss.
+#			This will prevent you from using the virtual node
+#			names (e.g., node1.eid.pid.<your-domain>).
+#
+# DISABLE_EXPORTS_SETUP	Prevent dynamic configuration of the exports file
+#			on your "fs" node.  You will need to use this if
+#			your fs node is not running FreeBSD or is otherwise
+#			not under your control.  If you set this option, you
+#			will need to ensure that ALL your Emulab filesystems
+#			(e.g., /proj, /users) are exported to ALL your nodes.
+#			This has obvious security implications and YOU REALLY
+#			SHOULD NOT DO THIS. 
+#
+DISABLE_NAMED_SETUP=0
+DISABLE_EXPORTS_SETUP=0
+
+#
 # Only supported on the Mother Ship (emulab.net) right now.
 #
 WIKISUPPORT=0
