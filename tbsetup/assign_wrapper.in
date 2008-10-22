@@ -1170,10 +1170,10 @@ sub RunAssign ()
 	    # we do not reserve a widearea physnode when a virtual node
 	    # is mapped to it; they are special.
 	    #
-	    my $node_type = virtnodetype($virtual);
 	    $toreserve{$physical} = 1
-		if (!(virtnodeisremote($virtual) 
-		      && !nodetypeisdedicatedremote($node_type)));
+		if (!virtnodeisvnode($virtual) ||
+		    !(virtnodeisremote($virtual)
+		      && !nodetypeisdedicatedremote(virtnodetype($virtual))));
 	}
 	
 	if (virtnodeisvirt($virtual)) {
@@ -2989,7 +2989,6 @@ sub InitPnode($$)
     my $simhost_violation;
     my $inner_elab_role;
     my $plab_role;
-    my $node_type = virtnodetype($vnode);
 
     # XXX NSE hack: 
     if (virtnodeisvnode($vnode) && virtnodeissim($vnode)) {
@@ -3023,7 +3022,8 @@ sub InitPnode($$)
 	$role  = TBDB_RSRVROLE_SIMHOST;
 	$simhost_violation  = 0;
     }
-    elsif (virtnodeisremote($vnode) && !nodetypeisdedicatedremote($node_type) 
+    elsif (virtnodeisremote($vnode) &&
+	   !nodetypeisdedicatedremote(virtnodetype($vnode))
 	   && $v2vmap{$vnode} ne $pnode) {
 	#
 	# We never allocate remote pnodes (always allocated), so skip.
