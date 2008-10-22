@@ -17,11 +17,6 @@ $uid_idx   = $this_user->uid_idx();
 $isadmin   = ISADMIN();
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Submit Publication");
-
-#
 # Verify feature is enabled
 #
 if (!$PUBSUPPORT)
@@ -33,6 +28,11 @@ if (!$PUBSUPPORT)
 $optargs = OptionalPageArguments("submit",      PAGEARG_STRING,
 			  	 "idx", 	PAGEARG_INTEGER,
                                  "formfields",  PAGEARG_ARRAY);
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Submit Publication");
 
 $also_required = array();
 $also_required['article'] = array('conf', 'month');

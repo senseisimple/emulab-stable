@@ -13,8 +13,6 @@ $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
-PAGEHEADER("Resend Project Approval Message");
-
 if (!$isadmin) {
     USERERROR("You do not have permission to access this page!", 1);
 }
@@ -26,6 +24,8 @@ $reqargs = RequiredPageArguments("project", PAGEARG_PROJECT);
 $optargs = OptionalPageArguments("submit",  PAGEARG_STRING,
 				 "message", PAGEARG_ANYTHING);
 $pid = $project->pid();
+
+PAGEHEADER("Resend Project Approval Message");
 
 #
 # Form to allow text input.

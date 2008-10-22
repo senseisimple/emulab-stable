@@ -13,8 +13,6 @@ $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
-PAGEHEADER("Resend Verification Key");
-
 if (!$isadmin) {
     USERERROR("You do not have permission to view this page!", 1);
 }
@@ -33,6 +31,8 @@ $key        = $target_user->verify_key();
 if (!$key || !strcmp($key, "")) {
     USERERROR("$target_uid does not have a valid verification key!", 1);
 }
+
+PAGEHEADER("Resend Verification Key");
 
 # Send the email.
 TBMAIL("$usr_name '$target_uid' <$usr_email>",

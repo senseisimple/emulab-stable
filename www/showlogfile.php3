@@ -16,11 +16,6 @@ $isadmin   = ISADMIN();
 # This will not return if its a sajax request.
 include("showlogfile_sup.php3");
 
-#
-# Standard Testbed Header
-#
-PAGEHEADER("Experiment Activity Log");
-
 $reqargs = RequiredPageArguments("experiment", PAGEARG_EXPERIMENT);
 
 # Need these below.
@@ -39,6 +34,11 @@ $logfile = $experiment->GetLogfile();
 if (! $logfile) {
     USERERROR("Experiment $pid/$eid is no longer in transition!", 1);
 }
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Experiment Activity Log");
 
 echo $experiment->PageHeader();
 echo "<br /><br />\n";

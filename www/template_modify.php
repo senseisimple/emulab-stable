@@ -18,11 +18,6 @@ $isadmin   = ISADMIN();
 include("showlogfile_sup.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Modify Experiment Template");
-
-#
 # Verify page arguments
 #
 $reqargs = RequiredPageArguments("template",   PAGEARG_TEMPLATE);
@@ -39,6 +34,11 @@ if (! $template->AccessCheck($this_user, $TB_EXPT_MODIFY)) {
     USERERROR("You do not have permission to export in template ".
 	      "$guid/$vers!", 1);
 }
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Modify Experiment Template");
 
 #
 # Spit the form out using the array of data.
