@@ -28,6 +28,7 @@ else {
 }
 
 my $FETCH = "/usr/bin/fetch";
+my $WGET = '/usr/bin/wget';
 
 my $FORMURL = "newnodecheckin.php";
 
@@ -261,7 +262,12 @@ sub buildURL {
 #
 sub checkin {
     my ($URL) = @_;
-    open(CHECKIN,"$FETCH -o '-' '$URL'|")
+    my $checkin_command = $FETCH;
+    
+    if (! -x $FETCH) {
+        $checkin_command = $WGET
+    }
+    open(CHECKIN,"$checkin_command -o '-' '$URL'|")
 	or error_fatal($ERROR_CHECKIN,"Unable to check in with boss!\n");
     my $id = undef;
     while (<CHECKIN>) {
@@ -281,7 +287,17 @@ sub checkin {
 # Grab a list of all interfaces on this node - returns a list of [$iface, $mac,
 # $status] for each one
 #
-sub find_interfaces {
+sub find_interfaces
+{
+    if ($^O eq 'freebsd') {
+        freebsd_find_interfaces(@_);
+    }
+    elsif ($^O eq 'linux') {
+        linux_find_interfaces(@_);
+    }
+}
+
+sub freebsd_find_interfaces {
     #
     # Grab this node's MAC addresses - we'll just parse them from the output of
     # ifconfig for now.
@@ -356,12 +372,94 @@ sub find_interfaces {
 
     return @ifaces;
 }
+sub linux_find_interfaces {
+    my @ifconfig_lines = `$IFCONFIG -a`;
+    my @ifaces;
+    my $status;
+
+    for (@ifconfig_lines) {
+        chomp;
+        next if /^\s+/ || /^$/;
+        next unless /^(\S+)\s+Link encap:Ethernet\s+HWaddr\s+([0-9a-fA-F:]+).*$/;
+        my ($iface, $mac) = ($1, $2);
+        my $status;
+        $mac =~ s/://g;
+        if (length($mac) != 12) {
+            error($ERROR_HWPROB,"Malformed MAC $mac\n");
+        }
+        if ( -f "/sys/class/net/$iface/carrier" ) {
+            $status = 0;
+            if (open CARRIER, "/sys/class/net/$iface/carrier") {
+                $status = <CARRIER>;
+                if (defined $status) {
+                    chomp $status;
+                }
+                else {
+                    $status = 0;
+                }
+                close CARRIER;
+            }
+        }
+
+        push @ifaces, [$iface, $mac, $status];
+    }
+    #
+    # Warn about any that don't have carrier
+    #
+    foreach my $aref (@ifaces) {
+        my ($iface, $mac, $status) = @$aref;
+        if ($status ne "1") {
+            message("WARNING: $iface has no carrier!\n");
+        }
+    }
+
+    return @ifaces;
+}
+
 
 #
 # Figure out the disk drive size - returns a pair containing the disk device
 # (ie. ad0 or da1) and the size in megabytes
 #
-sub get_disksize {
+sub get_disksize
+{
+    if ($^O eq 'freebsd') {
+        freebsd_get_disksize(@_);
+    }
+    elsif ($^O eq 'linux') {
+        linux_get_disksize(@_);
+    }
+}
+
+sub linux_get_disksize {
+    my @disks;
+    my $size;
+
+    @disks = sort(glob "/sys/block/sd*");
+    push @disks, sort(glob "/sys/block/hd*");
+    @disks = map { s#/sys/block/##; $_ } @disks;
+
+    if (@disks == 0) {
+        message("WARNING: Unable to find disk drive\n");
+        return ("unknown", 0);
+    }
+
+    if (open SIZE, "/sys/block/$disks[0]/size") {
+        $size = <SIZE>;
+        chomp $size;
+        close SIZE;
+    }
+    else {
+        message("WARNING: Unable to get size of disk drive\n");
+        return ("unknown", 0);
+    }
+
+    $size = int($size * 512 / 1024 / 1024);
+
+    return ($disks[0], $size);
+}
+
+sub freebsd_get_disksize {
     if (!open(DMESG,"<$DMESG")) {
 	error($ERROR_HWPROB,"Unable to open $DMESG\n");
 	return ("",0);
@@ -391,7 +489,17 @@ sub get_disksize {
 #
 # Find this node's CPU speed - returns the speed in MHz
 #
-sub get_cpuspeed {
+sub get_cpuspeed
+{
+    if ($^O eq 'freebsd') {
+        freebsd_get_cpuspeed(@_);
+    }
+    elsif ($^O eq 'linux') {
+        linux_get_cpuspeed(@_);
+    }
+}
+
+sub freebsd_get_cpuspeed {
     if (!open(DMESG,"<$DMESG")) {
 	error($ERROR_HWPROB,"Unable to open $DMESG\n");
 	return (0);
@@ -405,6 +513,22 @@ sub get_cpuspeed {
     }
     return $speed;
 }
+
+sub linux_get_cpuspeed {
+    if (!open(CPUINFO,"/proc/cpuinfo")) {
+        error($ERROR_HWPROB,"Unable to open /proc/cpuinfo\n");
+        return (0);
+    }
+    my $speed = 0;
+    while (<CPUINFO>) {
+        if (/^cpu MHz\s*:\s*(\d+)(:?\.\d+)?.*$/) {
+            $speed = $1;
+            last;
+        }
+    }
+    return $speed;
+}
+
 
 #
 # Teach the switch where we are
