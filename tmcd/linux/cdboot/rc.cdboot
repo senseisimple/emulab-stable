@@ -10,6 +10,11 @@ use File::Basename;
 use Fcntl;
 use IO::Handle;
 
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+use liblocsetup;
+
 sub WhichRawDisk();
 
 #
@@ -488,9 +493,7 @@ sub DiskList()
 	my @preferred;
 	my @units;
 
-	if (-x $dmesgcmd) {
-	   @tmp = os_get_disks();
-	}
+	@tmp = os_get_disks();
 
 	if ($OSNAME eq 'linux') {
 		@preferred = @linux_preferred;
@@ -501,7 +504,7 @@ sub DiskList()
 		@units = @bsd_units;
 	}
 
-	for my $disk (@preffered) {
+	for my $disk (@preferred) {
 		for my $unit (@units) {
 			for my $dev (@tmp) {
 				if ($dev =~ /^$disk$unit/) {

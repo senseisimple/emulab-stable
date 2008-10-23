@@ -21,6 +21,7 @@ use Exporter;
 	 os_routing_add_manual os_routing_del_manual os_homedirdel
 	 os_groupdel os_getnfsmounts os_islocaldir
 	 os_fwconfig_line os_fwrouteconfig_line os_config_gre
+	 os_get_disks os_get_disk_size os_get_partition_info
        );
 
 # Must come after package declaration!
@@ -1559,14 +1560,14 @@ sub os_get_disks
 {
 	my @blockdevs;
 
-	@blockdevs = map { s#/sys/block/## } glob('/sys/block/*');
+	@blockdevs = map { s#/sys/block/##; $_ } glob('/sys/block/*');
 
 	return @blockdevs;
 }
 
 sub os_get_disk_size($)
 {
-	my $disk = (@_);
+	my ($disk) = @_;
 	my $size;
 
 	$disk =~ s#^/dev/##;
