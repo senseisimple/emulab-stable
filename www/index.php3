@@ -17,6 +17,10 @@ $stayhome = 1;
 #
 if (($this_user = CheckLogin($check_status))) {
     $check_status = $check_status & CHECKLOGIN_STATUSMASK;
+    if ($check_status == CHECKLOGIN_MAYBEVALID) {
+	# Maybe the reason was because they where not using HTTPS ...
+	RedirectHTTPS();
+    }
     
     if (($firstinitstate = TBGetFirstInitState())) {
 	unset($stayhome);
@@ -33,14 +37,6 @@ if (($this_user = CheckLogin($check_status))) {
 		       CreateURL("showuser", $this_user));
 	    }
 	    return;
-	}
-	elseif (isset($SSL_PROTOCOL)) {
-            # Fall through; display the page.
-	    ;
-	}
-	elseif ($check_status == CHECKLOGIN_MAYBEVALID) {
-            # Not in SSL mode, so reload using https to see if logged in.
-	    header("Location: $TBBASE/index.php3");
 	}
     }
     # Fall through; display the page.

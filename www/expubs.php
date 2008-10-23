@@ -16,18 +16,9 @@ $this_user = null;
 $isadmin = null;
 
 if (!$printable && LoginStatus()) {
-    if (!@$HTTPS) {
-	# redirect to secure site, otherwise CheckLoginOrDie will fail
-	$new_url = "https://$WWWHOST$REQUEST_URI";
-	header("Location: $new_url");
-	PAGEHEADER("Bibliography");
-	echo "<p>Please use $new_url when logged in.</p>";
-	PAGEFOOTER();
-	return;
-    } else {
-	$this_user = CheckLoginOrDie();
-	$isadmin   = ISADMIN();
-    }
+    RedirectHTTPS();
+    $this_user = CheckLoginOrDie();
+    $isadmin   = ISADMIN();
 }
 
 #

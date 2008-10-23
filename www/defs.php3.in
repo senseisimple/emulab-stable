@@ -547,6 +547,24 @@ function YesNo($bool) {
 }
 
 #
+# If the page was accessed via http redirect to https and exit
+# otherwise do nothing
+#
+function RedirectHTTPS() {
+    global $WWWHOST,$drewheader;
+    if ($drewheader) {
+	trigger_error(
+	    "PAGEHEADER called before RedirectHTTPS ".
+	    "Won't be able to redirect to HTTPS if necessary ".
+	    "in ". $_SERVER['SCRIPT_FILENAME'] . ",",
+	    E_USER_WARNING);
+    } else if (!@$_SERVER['HTTPS'] && $_SERVER['REQUEST_METHOD'] == 'GET') {
+	header("Location: https://$WWWHOST". $_SERVER['REQUEST_URI']);
+	exit;
+    }
+}
+
+#
 # Beware empty spaces (cookies)!
 # 
 require("tbauth.php3");

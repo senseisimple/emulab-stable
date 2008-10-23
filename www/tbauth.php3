@@ -505,7 +505,10 @@ function LOGGEDINORDIE($uid, $modifier = 0, $login_url = NULL) {
         }
         break;
     case CHECKLOGIN_MAYBEVALID:
-        USERERROR("Your login cannot be verified. Are cookies turned on? ".
+	# This error can happen if a user tries to access a page with
+	# via http instead of https, so try to redirect to https first
+	RedirectHTTPS(); # will not return if accesses via http
+	USERERROR("Your login cannot be verified. Are cookies turned on? ".
 		  "Are you using https? Are you logged in using another ".
 		  "browser or another machine? $link", 1, HTTP_403_FORBIDDEN);
         break;
