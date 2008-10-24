@@ -371,6 +371,8 @@ if ($isadmin &&
     exists($newimageid_args{"global"}) &&
     $newimageid_args{"global"} eq "1") {
     $global = 1;
+} else {
+    delete $newimageid_args{"global"};
 }
 
 my $shared = 0;
@@ -561,9 +563,14 @@ delete($newimageid_args{"path"});
 # Cross-connect: Make the os descriptor first with the imagename, then take
 # the osid index and use it as the imageid index as well.
 $newimageid_args{"ezid"} = 1;
+# OSInfo->Create args not quite the same as Image->Create ones so copy 
+# newimageid_args into a new hash and fix up values.
+my %newosid_args = %newimageid_args;
+$newosid_args{"shared"} = $newimageid_args{"global"} 
+    if exists $newimageid_args{"global"};
 my $usrerr;
 my $new_osinfo = OSinfo->Create($project, $this_user, $imagename,
-				\%newimageid_args, \$usrerr);
+				\%newosid_args, \$usrerr);
 UserError($usrerr)
     if (defined($usrerr));
 fatal("Could not create new OSID!")
