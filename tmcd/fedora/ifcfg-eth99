@@ -122,7 +122,7 @@ fi
 #
 # else default to dhclient...
 #
-interfaces=`ifconfig -a -s | sed '1d;/^lo /d;s/ .*$//'`
+interfaces=`ifconfig -a -s | sed '1d;/^lo /d;/^wmaster/d;s/ .*$//'`
 
 #
 # If dhclient returns success, then it has configured the first interface

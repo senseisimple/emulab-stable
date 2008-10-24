@@ -26,7 +26,7 @@ IFACETYPES="3c59x eepro100 e1000 r8169 tulip"
 #
 modprobe -qa $IFACETYPES
 
-interfaces=`ifconfig -a -s | sed '1d;/^lo /d;s/ .*$//'`
+interfaces=`ifconfig -a -s | sed '1d;/^lo /d;/^wmaster/d;s/ .*$//'`
 
 #
 # If dhclient returns success, then it has configured the first interface
