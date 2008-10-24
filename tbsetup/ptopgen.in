@@ -704,7 +704,7 @@ if ($widearea) {
     #
     $result =
 	DBQueryFatal("select n.node_id,nt.type,ns.status,r.pid,r.eid,wn.site,".
-                     "i.iface,wn.bwlimit ".
+                     "i.iface,wn.bwlimit,n.uuid ".
 		     "from nodes as n ".
 		     "left join node_types as nt on nt.type=n.type ".
 		     "left join reserved as r on r.node_id=n.node_id ".
@@ -724,7 +724,7 @@ if ($widearea) {
 		     "        nt.isvirtnode=0 and ".
 		     "        dedicated_wa_types.attrvalue is NULL)");
     
-    while (($physnode,$ptype,$status,$mpid,$meid,$site,$iface,$bwlimit)
+    while (($physnode,$ptype,$status,$mpid,$meid,$site,$iface,$bwlimit,$uuid)
 	   = $result->fetchrow_array) {
 	my $class = $typemap{$ptype}->{'CLASS'};
 	my @types;
@@ -812,7 +812,7 @@ if ($widearea) {
         }
 
 	if ($do_xml) {
-	    print "<node name=\"$physnode\">\n";
+	    print "<node name=\"$physnode\" uuid=\"$uuid\">\n";
 	    print_node_types(@types);
 	    print_node_flags(@flags);
 	    print_node_features(@features);
