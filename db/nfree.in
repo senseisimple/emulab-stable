@@ -216,7 +216,7 @@ foreach my $node (@nodes) {
     # Check to make sure they have actually reserved the nodes, now that
     # the reserved table is locked.
     my $rowref = $node->ReservedTableEntry();
-    if (!defined($rowref)) {
+    unless (defined($rowref) && $rowref->{'pid'} eq $pid && $rowref->{'eid'} eq $eid) {
 	print STDERR "$node is not reserved by your experiment.\n";
 	$error++;
 	next;
