@@ -97,6 +97,8 @@ sub cert($)		{ return field($_[0], "cert"); }
 sub DN($)		{ return field($_[0], "DN"); }
 sub privkey($)		{ return field($_[0], "privkey"); }
 sub revoked($)		{ return field($_[0], "revoked"); }
+sub certfile($)		{ return field($_[0], "certfile"); }
+sub GetCertificate($)   { return $_[0]; }
 
 #
 # The fields are buried inside the DN.
@@ -285,6 +287,7 @@ sub LoadFromFile($$)
     $self->{'CERT'}->{'privkey'}   = undef;
     $self->{'CERT'}->{'revoked'}   = undef;
     $self->{'CERT'}->{'created'}   = undef;
+    $self->{'CERT'}->{'certfile'}  = $filename;
     return $self;
 }
 

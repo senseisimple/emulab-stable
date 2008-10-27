@@ -23,6 +23,7 @@ use GeniCredential;
 use GeniCertificate;
 use GeniSliver;
 use GeniSlice;
+use GeniRegistry;
 use libdb qw(TBGetUniqueIndex);
 use English;
 use overload ('""' => 'Stringify');
@@ -143,6 +144,9 @@ sub Create($$$$$$)
     my $slice_uuid  = $slice->uuid();
     my $owner_uuid  = $owner->uuid();
 
+    $aggregate_type = "Aggregate"
+    	if (! defined($aggregate_type));
+
     # Now tack on other stuff we need.
     push(@insert_data, "created=now()");
     push(@insert_data, "idx='$idx'");
@@ -151,8 +155,7 @@ sub Create($$$$$$)
     push(@insert_data, "uuid='$uuid'");
     push(@insert_data, "creator_uuid='$owner_uuid'");
     push(@insert_data, "slice_uuid='$slice_uuid'");
-    push(@insert_data, "type='$aggregate_type'")
-	if (defined($aggregate_type));
+    push(@insert_data, "type='$aggregate_type'");
 
     # Insert into DB.
     if (!DBQueryWarn("insert into geni_aggregates set " .
@@ -235,6 +238,32 @@ sub hrn($)
 	return $hrn;
     }
     return "emulab.aggregate_" . $self->idx();
+}
+
+#
+# Look up toplevel aggregate for a locally instantiated slice. 
+#
+sub SliceAggregate($$)
+{
+    my ($class, $slice) = @_;
+
+    my $slice_uuid = $slice->uuid();
+    my @result = ();
+
+    my $query_result =
+	DBQueryWarn("select idx from geni_aggregates ".
+		    "where slice_uuid='$slice_uuid' and type='Aggregate'");
+    return undef
+	if (!$query_result);
+    return undef
+	if ($query_result->numrows != 1);
+
+    my ($idx) = $query_result->fetchrow_array();
+    my $aggregate = GeniAggregate->Lookup($idx);
+    return undef
+	if (!defined($aggregate));
+
+    return $aggregate;
 }
 
 #
@@ -658,6 +687,285 @@ sub UnProvision($)
     }
     if ($vlan->Destroy() != 0) {
 	print STDERR "Could not destroy $vlan\n";
+	return -1;
+    }
+    return 0;
+}
+
+#
+# Nothing to do yet.
+#
+sub Start($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    return 0;
+}
+
+#
+# Nothing to do yet.
+#
+sub Stop($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    return 0;
+}
+
+
+############################################################################
+#
+# Tunnel aggregates need special handling too
+#
+package GeniAggregate::Tunnel;
+use vars qw(@ISA);
+@ISA = "GeniAggregate";
+
+use GeniDB;
+use GeniSlice;
+use GeniCredential;
+use GeniCertificate;
+use GeniRegistry;
+use GeniAggregate;
+use Experiment;
+use Interface;
+use Data::Dumper;
+
+sub Create($$$$$$)
+{
+    my ($class, $slice, $owner, $node1sliver, $node2sliver, $rspec) = @_;
+    my $clearinghouse;
+
+    my $linkname = $rspec->{'nickname'};
+    return undef
+	if (!defined($linkname));
+
+    my $experiment = Experiment->Lookup($slice->uuid());
+    if (!defined($experiment)) {
+	print STDERR "Could not map $slice to its experiment\n";
+	return -1;
+    }
+
+    #
+    # Form an hrn using the slicename and linkname
+    #
+    my $hrn = "emulab." . $slice->slicename() . "." . $linkname;
+
+    my $aggregate = GeniAggregate->Create($slice, $owner, "Tunnel",
+					  $hrn, $linkname);
+    goto bad
+	if (!defined($aggregate));
+
+    #
+    # Create a tunnel entry in the lans table.
+    #
+    my $tunnel = Tunnel->Create($experiment, $aggregate->uuid(), "", "gre");
+    if (!defined($tunnel)) {
+	print STDERR "Could not create tunnel entry in lans table\n";
+	return undef;
+    }
+
+    my $node1ref = (@{$rspec->{'linkendpoints'}})[0];
+    my $node2ref = (@{$rspec->{'linkendpoints'}})[1];
+
+    # These are the ips of the tunnel.
+    my $ip1      = $node1ref->{'tunnel_ip'};
+    my $ip2      = $node2ref->{'tunnel_ip'};
+    my $ctrlip1;
+    my $ctrlip2;
+    my $iface1;
+    my $iface2;
+
+    # We need the control network addresses, but it is possible that
+    # one of the nodes is not on this testbed.
+    if (defined($node1sliver)) {
+	my $node1 = Node->Lookup($node1ref->{'node_uuid'});
+	my $interface = Interface->LookupControl($node1);
+	goto bad
+	    if (!defined($interface));
+	$ctrlip1 = $interface->IP();
+	$iface1  = $tunnel->AddMember($node1);
+	if (!defined($iface1)) {
+	    print STDERR "Could not add $node1 to $tunnel\n";
+	    goto bad;
+	}
+    }
+    else {
+	#
+	# Need to ask the clearinghouse where this node comes from.
+	#
+	$clearinghouse = GeniRegistry::ClearingHouse->Create();
+	
+	my $blob;
+	if ($clearinghouse->Resolve($node1ref->{'node_uuid'},
+				    "Component", \$blob) != 0) {
+	    print STDERR "Could not lookup node at clearinghouse\n";
+	    goto bad;
+	}
+	my $certificate = GeniCertificate->LoadFromString($blob->{'cm'});
+	goto bad
+	    if (!defined($certificate));
+	
+	my $component = GeniComponent->Lookup($certificate->uuid());
+	if (!defined($component)) {
+	    $component = GeniComponent->CreateFromCertificate($certificate,
+							      $blob->{'url'});
+	    if (!defined($component)) {
+		print STDERR "Could not create component from $certificate\n";
+		goto bad;
+	    }
+	}
+	my $credential = GeniRegistry::Client->CreateCredential($component);
+	if (!defined($credential)) {
+	    print STDERR "Could not create a credential for $component\n";
+	    goto bad;
+
+	}
+	my $registry = GeniRegistry::Client->Create($component, undef,
+						    $credential);
+	if (!defined($registry)) {
+	    print STDERR "Could not create a registry client for $component\n";
+	    goto bad;
+	}
+	$registry->Resolve($node1ref->{'node_uuid'}, "Node", \$blob);
+
+	foreach my $ref (@{ $blob->{'interfaces'} }) {
+	    $ctrlip1 = $ref->{'IP'}
+	        if ($ref->{'role'} eq "ctrl");
+	}
+    }
+    if (defined($node2sliver)) {
+	my $node2 = Node->Lookup($node2ref->{'node_uuid'});
+	my $interface = Interface->LookupControl($node2);
+	goto bad
+	    if (!defined($interface));
+	$ctrlip2 = $interface->IP();
+	$iface2  = $tunnel->AddMember($node2);
+	if (!defined($iface2)) {
+	    print STDERR "Could not add $node2 to $tunnel\n";
+	    goto bad;
+	}
+    }
+    else {
+	#
+	# Need to ask the clearinghouse where this node comes from.
+	#
+	$clearinghouse = GeniRegistry::ClearingHouse->Create()
+	    if (!defined($clearinghouse));
+	
+	my $blob;
+	if ($clearinghouse->Resolve($node2ref->{'node_uuid'},
+				    "Component", \$blob) != 0) {
+	    print STDERR "Could not lookup node at clearinghouse\n";
+	    goto bad;
+	}
+	my $certificate = GeniCertificate->LoadFromString($blob->{'cm'});
+	goto bad
+	    if (!defined($certificate));
+	
+	my $component = GeniComponent->Lookup($certificate->uuid());
+	if (!defined($component)) {
+	    $component = GeniComponent->CreateFromCertificate($certificate,
+							      $blob->{'url'});
+	    if (!defined($component)) {
+		print STDERR "Could not create component from $certificate\n";
+		goto bad;
+	    }
+	}
+	my $credential = GeniRegistry::Client->CreateCredential($component);
+	if (!defined($credential)) {
+	    print STDERR "Could not create a credential for $component\n";
+	    goto bad;
+
+	}
+	my $registry = GeniRegistry::Client->Create($component, undef,
+						    $credential);
+	if (!defined($registry)) {
+	    print STDERR "Could not create a registry client for $component\n";
+	    goto bad;
+	}
+	$registry->Resolve($node2ref->{'node_uuid'}, "Node", \$blob);
+
+	foreach my $ref (@{ $blob->{'interfaces'} }) {
+	    $ctrlip2 = $ref->{'IP'}
+	        if ($ref->{'role'} eq "ctrl");
+	}
+    }
+    print STDERR "$ip1, $ip2, $ctrlip1, $ctrlip2\n";
+
+    if (defined($iface1)) {
+	$iface1->SetAttribute("tunnel_ip", $ip1);
+	$iface1->SetAttribute("tunnel_peerip", $ip2);
+	$iface1->SetAttribute("tunnel_srcip", $ctrlip1);
+	$iface1->SetAttribute("tunnel_dstip", $ctrlip2);
+	$iface1->SetAttribute("tunnel_ipmask", "255.255.255.0");
+	$iface1->SetAttribute("tunnel_lan", $linkname);
+	$iface1->SetAttribute("tunnel_unit", $iface1->memberid());
+	$iface1->SetAttribute("tunnel_style", "gre");
+    }
+    if (defined($iface2)) {
+	$iface2->SetAttribute("tunnel_ip", $ip2);
+	$iface2->SetAttribute("tunnel_peerip", $ip1);
+	$iface2->SetAttribute("tunnel_srcip", $ctrlip2);
+	$iface2->SetAttribute("tunnel_dstip", $ctrlip1);
+	$iface2->SetAttribute("tunnel_ipmask", "255.255.255.0");
+	$iface2->SetAttribute("tunnel_lan", $linkname);
+	$iface2->SetAttribute("tunnel_unit", $iface2->memberid());
+	$iface2->SetAttribute("tunnel_style", "gre");
+    }
+    return $aggregate;
+
+  bad:
+    $tunnel->Destroy()
+	if (defined($tunnel));
+    $aggregate->Delete()
+	if (defined($aggregate));
+    return undef;
+}
+
+#
+# All the work done above.
+#
+sub Provision($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    $self->SetStatus("ready");
+    return 0;
+}
+
+#
+# Destroy the underlying tunnel in the lans table.
+#
+sub UnProvision($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $experiment = Experiment->Lookup($self->slice_uuid());
+    if (!defined($experiment)) {
+	print STDERR "Could not map $self to its experiment\n";
+	return -1;
+    }
+
+    my $tunnel = Tunnel->Lookup($experiment, $self->uuid());
+    if (! defined($tunnel)) {
+	print STDERR "No tunnel associated with $self\n";
+	return 0;
+    }
+    if ($tunnel->Destroy() != 0) {
+	print STDERR "Could not destroy $tunnel\n";
 	return -1;
     }
     return 0;

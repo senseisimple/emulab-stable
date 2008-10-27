@@ -93,18 +93,25 @@ else {
     if ($asch) {
 	$type     = "sa";
 	$url      = "https://www.emulab.net/protogeni/xmlrpc/sa";
-	$hrn      = "emulab.sa";
 	$filename = "@prefix@/etc/emulabsa.pem";
 	AddAuthority($type, $url, $filename);
 
 	$type     = "ma";
-	$url      = "https://myboss.myelab.testbed.emulab.net/protogeni/xmlrpc/ch";
-	$hrn      = "myelab.ch";
+	$url  = "https://myboss.myelab.testbed.emulab.net/protogeni/xmlrpc/ch";
 	$filename = "@prefix@/etc/genima.pem";
 	AddAuthority($type, $url, $filename);
 
-	$url      = "https://myboss.myelab.testbed.emulab.net/protogeni/xmlrpc/cm";
+	$type     = "ma";
+	$url      = "https://boss.emulab.net/protogeni/xmlrpc/cm";
+	$filename = "@prefix@/etc/emulabcm.pem";
+	AddAuthority($type, $url, $filename);
+
+	$url  = "https://myboss.myelab.testbed.emulab.net/protogeni/xmlrpc/cm";
 	$filename = "@prefix@/etc/genicm.pem";
+	AddComponent($url, $filename);
+
+	$url      = "https://boss.emulab.net/protogeni/xmlrpc/cm";
+	$filename = "@prefix@/etc/emulabcm.pem";
 	AddComponent($url, $filename);
     }
 }

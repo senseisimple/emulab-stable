@@ -61,10 +61,11 @@ sub Context($$;$$)
 {
     my ($class, $certificate, $keyfile, $password) = @_;
 
-    $keyfile = $certificate
+    $keyfile = $certificate->certfile()
 	if (!defined($keyfile));
 
     my $self = {"certificate"  => $certificate,
+		"certfile"     => $certificate->certfile(),
 		"keyfile"      => $keyfile,
 		"password"     => $password};
     bless($self, $class);
@@ -83,7 +84,8 @@ sub UserContext($$)
     my $pkcs12 = $user->HomeDir() . "/.ssl/encrypted.p12";
     $user->SSLPassPhrase(1, \$password);
 
-    my $self = {"certificate"  => $pkcs12,
+    my $self = {"certificate"  => undef,
+		"certfile"     => $pkcs12,
 		"keyfile"      => $pkcs12,
 		"password"     => $password,
 		"user"	       => $user};
@@ -93,6 +95,7 @@ sub UserContext($$)
 # accessors
 sub field($$)           { return ($_[0]->{$_[1]}); }
 sub certificate($)	{ return field($_[0], "certificate"); }
+sub certfile($)		{ return field($_[0], "certfile"); }
 sub keyfile($)		{ return field($_[0], "keyfile"); }
 sub password($)		{ return field($_[0], "password"); }
 sub user($)		{ return field($_[0], "user"); }
@@ -110,6 +113,12 @@ sub SetContext($$)
 
     $MyContext = $context;
     return 0;
+}
+sub GetContext($)
+{
+    my ($class) = @_;
+
+    return $MyContext;
 }
 
 #
@@ -143,7 +152,7 @@ sub CallMethod($$$@)
 	$IO::Socket::SSL::GLOBAL_CONTEXT_ARGS->{'SSL_key_file'} =
 	    $context->keyfile();	    
 	$IO::Socket::SSL::GLOBAL_CONTEXT_ARGS->{'SSL_cert_file'} =
-	    $context->certificate();	    
+	    $context->certfile();	    
 	$IO::Socket::SSL::GLOBAL_CONTEXT_ARGS->{'SSL_use_cert'} = 1;
 
 	#
@@ -164,11 +173,11 @@ sub CallMethod($$$@)
 	# format for which we can provide the passphrase.
 	#
 	if (!defined($context->password())) {
-	    $ENV{'HTTPS_CERT_FILE'} = $context->certificate();
+	    $ENV{'HTTPS_CERT_FILE'} = $context->certfile();
 	    $ENV{'HTTPS_KEY_FILE'}  = $context->keyfile();
 	}
 	else {
-	    $ENV{'HTTPS_PKCS12_FILE'}     = $context->certificate();
+	    $ENV{'HTTPS_PKCS12_FILE'}     = $context->certfile();
 	    $ENV{'HTTPS_PKCS12_PASSWORD'} = $context->password();
 	}
     }

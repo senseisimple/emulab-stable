@@ -1,0 +1,302 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package GeniRegistry;
+
+#
+# Server side of a Registry.
+#
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA    = "Exporter";
+@EXPORT = qw ( );
+
+# Must come after package declaration!
+use lib '@prefix@/lib';
+use Genixmlrpc;
+use GeniResponse;
+use English;
+use Data::Dumper;
+
+##########################################################################
+#
+package GeniRegistry::Client;
+
+use Genixmlrpc;
+use GeniResponse;
+use English;
+use Data::Dumper;
+
+#
+# Create an object that represents a client connection to a registry.
+#
+sub Create($$;$$)
+{
+    my ($class, $authority, $context, $credential) = @_;
+
+    # Cause of the clearinghouse is currently represented by a URL.
+    $authority = $authority->url()
+	if (ref($authority));
+
+    if (!defined($credential)) {
+	my $response =
+	    Genixmlrpc::CallMethod($authority, $context, "GetCredential", {});
+	
+	return undef
+	    if (!defined($response) ||
+		$response->code() != GENIRESPONSE_SUCCESS);
+	$credential = $response->value();
+    }
+    elsif (ref($credential) eq "GeniCredential") {
+	$credential = $credential->asString();
+    }
+
+    my $self              = {};
+    $self->{'authority'}  = $authority;
+    $self->{'context'}    = $context;
+    $self->{'credential'} = $credential;
+    bless($self, $class);
+
+    return $self;
+}
+sub authority($)	{ return $_[0]->{"authority"}; }
+sub context($)		{ return $_[0]->{"context"}; }
+sub credential($)	{ return $_[0]->{"credential"}; }
+
+sub CreateCredential($$;$)
+{
+    my ($class, $authority, $context) = @_;
+    
+    #
+    # We are creating a self signed credential here, which is fine
+    # since we all have the trusted root certs in our caches. This
+    # will change later.
+    #
+    $context = Genixmlrpc->GetContext()
+	if (!defined($context));
+
+    if (!defined($context)) {
+	print STDERR "Need a context to create a registry credential\n";
+	return undef;
+    }
+    my $credential = GeniCredential->Create($authority->GetCertificate(),
+					    $context->certificate());
+    if (!defined($credential)) {
+	print STDERR "Could not create clearinghouse credential\n";
+	return undef;
+    }
+    if ($credential->Sign($context->certificate()) != 0) {
+	$credential->Delete();
+	print STDERR "Could not sign clearinghouse credential\n";
+	return undef;
+    }
+    return $credential;
+}
+
+#
+# Lookup a record.
+#
+sub Resolve($$$$)
+{
+    my ($self, $uuid, $type, $pref) = @_;
+
+    $$pref = undef;
+    
+    my $response =
+	Genixmlrpc::CallMethod($self->authority(),
+			       $self->context(), 
+			       "Resolve",
+			       { "credential" => $self->credential(),
+				 "type"       => $type,
+				 "uuid"       => $uuid });
+    return -1
+	if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS);
+    
+    $$pref = $response->value();
+    return 0;
+}
+
+#
+# Lookup a user.
+#
+sub LookupUser($$$)
+{
+    my ($self, $uuid, $pref) = @_;
+
+    return $self->Resolve($uuid, "User", $pref);
+}
+
+#
+# Lookup a slice.
+#
+sub LookupSlice($$$)
+{
+    my ($self, $uuid, $pref) = @_;
+
+    return $self->Resolve($uuid, "Slice", $pref);
+}
+
+#
+# Register a record.
+#
+sub Register($$$$)
+{
+    my ($self, $type, $cert, $info) = @_;
+
+    my $response =
+	Genixmlrpc::CallMethod($self->authority(),
+			       $self->context(),
+			       "Register",
+			       { "credential" => $self->credential(),
+				 "type"       => $type,
+			         "cert"       => $cert,
+			         "info"       => $info });
+    return -1
+	if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS);
+    
+    return 0;
+}
+
+#
+# Register a user.
+#
+sub RegisterUser($$$$$)
+{
+    my ($self, $name, $email, $cert, $keys) = @_;
+
+    my $info = { "name"   => $name,
+		 "email"  => $email };
+
+    return $self->Register("User", $cert, $info);
+}
+
+#
+# Register a slice.
+#
+sub RegisterSlice($$$$)
+{
+    my ($self, $creator_uuid, $cert, $bindings) = @_;
+
+    my $info = { "creator_uuid"  => $creator_uuid,
+	         "userbindings"  => $bindings };
+
+    return $self->Register("Slice", $cert, $info);
+}
+
+#
+# Remove a record.
+#
+sub Remove($$$)
+{
+    my ($self, $type, $uuid) = @_;
+
+    my $response =
+	Genixmlrpc::CallMethod($self->authority(),
+			       $self->context(),
+			       "Remove",
+			       { "credential" => $self->credential(),
+				 "type"       => $type,
+			         "uuid"       => $uuid });
+    return -1
+	if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS);
+    
+    return 0;
+}
+
+#
+# Delete a slice registration.
+#
+sub RemoveSlice($$)
+{
+    my ($self, $uuid) = @_;
+
+    return $self->Remove("Slice", $uuid);
+}
+
+#
+# List components.
+#
+sub ListComponents($$$)
+{
+    my ($self, $slice, $pref) = @_;
+
+    my $response =
+	Genixmlrpc::CallMethod($self->authority(),
+			       $self->context(),
+			       "CH::DiscoverResources",
+			       { "credential" => $self->credential() });
+
+    return -1
+	if (!defined($response));
+
+    return -1
+	if ($response->code() != GENIRESPONSE_SUCCESS);
+
+    $$pref = $response->value();
+    return 0;
+}
+
+##########################################################################
+#
+package GeniRegistry::ClearingHouse;
+
+use Genixmlrpc;
+use GeniCertificate;
+use GeniCredential;
+
+# Configure variables
+my $GENICENTRAL    = "myboss.myelab.testbed.emulab.net";
+my $GENICENTRALURL = "https://$GENICENTRAL/protogeni/xmlrpc/ch";
+
+#
+# The clearinghouse is a registry.
+#
+sub Create($;$$)
+{
+    my ($class, $context, $credential) = @_;
+    
+    my $EMULAB_PEMFILE1 = "@prefix@/etc/genima.pem";
+    my $EMULAB_PEMFILE2 = "@prefix@/etc/genich.pem";
+    my $pemfile = (-e $EMULAB_PEMFILE1 ? $EMULAB_PEMFILE1 : $EMULAB_PEMFILE2);
+
+    if (!defined($credential)) {
+	#
+	# We are creating a self signed credential here, which is fine
+	# since the Clearinghouse has the certs of all trusted roots.
+	#
+	my $certificate = GeniCertificate->LoadFromFile($pemfile);
+	if (!defined($certificate)) {
+	    print STDERR "Could not load certificate from $pemfile\n";
+	    return undef;
+	}
+	$context = Genixmlrpc->GetContext()
+	    if (!defined($context));
+
+	if (!defined($context)) {
+	    print STDERR "Need a context to create clearinghouse credential\n";
+	    return undef;
+	}
+	$credential = GeniCredential->Create($certificate,
+					     $context->certificate());
+	if (!defined($credential)) {
+	    print STDERR "Could not create clearinghouse credential\n";
+	    return undef;
+	}
+	if ($credential->Sign($context->certificate()) != 0) {
+	    $credential->Delete();
+	    print STDERR "Could not sign clearinghouse credential\n";
+	    return undef;
+	}
+    }
+    
+    return GeniRegistry::Client->Create($GENICENTRALURL,
+					$context, $credential->asString());
+}
+
+# _Always_ make sure that this 1 is at the end of the file...
+1;

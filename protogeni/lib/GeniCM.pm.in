@@ -56,19 +56,21 @@ my $AVAIL	   = "$TB/sbin/avail";
 my $PTOPGEN	   = "$TB/libexec/ptopgen";
 my $TBSWAP	   = "$TB/bin/tbswap";
 my $SWAPEXP	   = "$TB/bin/swapexp";
-my $PLABSLICE	   = "$TB/sbin/plabslice";
-
+my $PLABSLICE	   = "$TB/sbin/plabslicewrapper";
+my $NAMEDSETUP     = "$TB/sbin/named_setup";
+my $VNODESETUP     = "$TB/sbin/vnode_setup";
+my $GENTOPOFILE    = "$TB/libexec/gentopofile";
 
 #
-# Respond to a GetTicket request. 
+# Respond to a Resolve request. 
 #
 sub Resolve($)
 {
     my ($argref) = @_;
     my $uuid       = $argref->{'uuid'};
-    my $hrn        = $argref->{'hrn'};
     my $cred       = $argref->{'credential'};
     my $type       = $argref->{'type'};
+    my $hrn;
 
     if (! defined($cred)) {
 	return GeniResponse->MalformedArgsResponse();
@@ -77,13 +79,10 @@ sub Resolve($)
 	return GeniResponse->MalformedArgsResponse();
     }
     # Allow lookup by uuid or hrn.
-    if (! (defined($uuid) || defined($hrn))) {
+    if (! defined($uuid)) {
 	return GeniResponse->MalformedArgsResponse();
     }
     if (defined($uuid) && !($uuid =~ /^[-\w]*$/)) {
-	return GeniResponse->MalformedArgsResponse();
-    }
-    if (defined($hrn) && !($hrn =~ /^[-\w\.]*$/)) {
 	return GeniResponse->MalformedArgsResponse();
     }
 
@@ -507,7 +506,7 @@ sub ModifySliver($$$$)
     # Find current nodes and record their uuids. 
     #
     if (defined($object)) {
-	if ($object->type() eq "Link") {
+	if ($object->type() ne "Aggregate") {
 	    return GeniResponse->Create(GENIRESPONSE_UNSUPPORTED, undef,
 					"Only node aggregates allowed");
 	}
@@ -619,11 +618,9 @@ sub ModifySliver($$$$)
 
 
     # Bind the other users too.
-    my @userbindings;
-    if ($slice->UserBindings(\@userbindings) != 0) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "Error binding users to slice");
-    }
+    # XXX Need to figure out where these come from.
+    my @userbindings = ();
+
     foreach my $otheruuid (@userbindings) {
 	my $otheruser = GeniUser->Lookup($otheruuid);
 	if (!defined($otheruser)) {
@@ -695,7 +692,7 @@ sub ModifySliver($$$$)
 	    my $iface_name  = $i->rspec()->{'iface_name'};
 
 	    my $linkendpoints =
-		$rspec->{'link'}->{$s->hrn()}->{'LinkEndPoints'};
+		$rspec->{'link'}->{$s->hrn()}->{'linkendpoints'};
 	}
     }
     
@@ -703,7 +700,8 @@ sub ModifySliver($$$$)
     # Now for each resource (okay, node) in the ticket create a sliver and
     # add it to the aggregate.
     #
-    my %slivers = ();
+    my %slivers   = ();
+    my @plabnodes = ();
     foreach my $ref (@{$rspec->{'node'}}) {
 	my $resource_uuid = $ref->{'uuid'};
 	# Already in the aggregate?
@@ -731,6 +729,16 @@ sub ModifySliver($$$$)
 	# have not turned into slivers yet. Ick.
 	#
 	delete($toalloc{$resource_uuid});
+
+	# See below; setup all pnodes at once.
+	if ($node->isremotenode()) {
+	    my $vnode = Node->Lookup($sliver->uuid());
+	    if (!defined($vnode)) {
+		print STDERR "Could not locate vnode $sliver\n";
+		goto bad;
+	    }
+	    push(@plabnodes, $vnode);
+	}
     }
 
     #
@@ -744,6 +752,35 @@ sub ModifySliver($$$$)
 	    $message = "Bad name for link: $linkname";
 	    goto bad;
 	}
+	my $linkref = $rspec->{'link'}->{$linkname};
+
+	#
+	# XXX Tunnels are a total kludge right now ...
+	#
+	if (exists($linkref->{'link_type'}) &&
+	    $linkref->{'link_type'} eq "tunnel") {
+
+	    my $node1ref = (@{$linkref->{'linkendpoints'}})[0];
+	    my $node2ref = (@{$linkref->{'linkendpoints'}})[1];
+
+	    my $node1sliver = $slivers{$node1ref->{'node_uuid'}} ||
+		$nodelist{$node1ref->{'node_uuid'}};
+	    my $node2sliver = $slivers{$node2ref->{'node_uuid'}} ||
+		$nodelist{$node2ref->{'node_uuid'}};
+	    
+	    my $tunnel = GeniAggregate::Tunnel->Create($slice,
+						       $owner,
+						       $node1sliver,
+						       $node2sliver,
+						       $linkref);
+
+	    if (!defined($tunnel)) {
+		$message = "Could not create tunnel aggregate for $linkname";
+		goto bad;
+	    }
+	    $slivers{$tunnel->uuid()} = $tunnel;
+	    next;
+	}
 
 	my $linkaggregate = GeniAggregate::Link->Create($slice, $owner,
 							$linkname);
@@ -753,7 +790,7 @@ sub ModifySliver($$$$)
 	}
 	$slivers{$linkaggregate->uuid()} = $linkaggregate;
 
-	foreach my $ref (@{$rspec->{'link'}->{$linkname}->{'LinkEndPoints'}}) {
+	foreach my $ref (@{$rspec->{'link'}->{$linkname}->{'linkendpoints'}}) {
 	    my $node_uuid  = $ref->{'node_uuid'};
 	    my $iface_name = $ref->{'iface_name'};
 	    my $nodesliver = $slivers{$node_uuid} || $nodelist{$node_uuid};
@@ -812,6 +849,30 @@ sub ModifySliver($$$$)
 	}
 	if ($sliver->SetAggregate($aggregate) != 0) {
 	    $message = "Could not set aggregate for $sliver to $aggregate";
+	    goto bad;
+	}
+    }
+
+    #
+    # We want to do this stuff only once, not for each node. 
+    #
+    # Must have the topofile for node boot. Might need locking on this.
+    if (system("$GENTOPOFILE $pid $eid")) {
+	print STDERR "$GENTOPOFILE failed\n";
+	goto bad;
+    }
+    # The nodes will not boot locally unless there is a DNS record.
+    if (system("$NAMEDSETUP")) {
+	print STDERR "$NAMEDSETUP failed\n";
+	goto bad;
+    }
+    # Set up plab nodes all at once. 
+    if ($needplabslice && @plabnodes && !$impotent) {
+	my @node_ids = map { $_->node_id() } @plabnodes;
+
+	system("$VNODESETUP -p -q -m $pid $eid @node_ids");
+	if ($?) {
+	    print STDERR "$VNODESETUP failed\n";
 	    goto bad;
 	}
     }
@@ -1138,7 +1199,8 @@ sub CleanupDeadSlice($)
     my @nonlinks = ();
     
     foreach my $aggregate (@aggregates) {
-	if ($aggregate->type() ne "Link") {
+	if (! ($aggregate->type() eq "Link" ||
+	       $aggregate->type() eq "Tunnel")) {
 	    push(@nonlinks, $aggregate);
 	    next;
 	}
@@ -1352,4 +1414,60 @@ sub GeniExperiment($)
     return $experiment;
 }
 
+#
+# Return a list of slivers for the specified slice.
+#
+sub GetSliver($)
+{
+    my ($argref) = @_;
+    my $cred     = $argref->{'credential'};
 
+    if (!defined($cred)) {
+	return GeniResponse->Create(GENIRESPONSE_BADARGS);
+    }
+    my $credential = GeniCredential->CreateFromSigned($cred);
+    if (!defined($credential)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not create GeniCredential object");
+    }
+
+    my $slice_uuid = $credential->target_uuid();
+    my $user_uuid  = $credential->owner_uuid();
+
+    #
+    # Make sure the credential was issued to the caller.
+    #
+    if ($credential->owner_uuid() ne $ENV{'GENIUUID'}) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "This is not your credential!");
+    }
+    my $user = GeniUser->Lookup($user_uuid);
+    if (!defined($user)) {
+	$user = CreateUserFromCertificate($credential->owner_cert());
+	if (!defined($user)) {
+	    print STDERR "Could not create user from certificate\n";
+	    return GeniResponse->Create(GENIRESPONSE_ERROR);
+	}
+    }
+
+    my $slice = GeniSlice->Lookup($slice_uuid);
+    if (!defined($slice)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "No slice record for slice");
+    }
+
+    my $aggregate = GeniAggregate->SliceAggregate($slice);
+    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
+				"No slivers here for slice")
+	if (!defined($aggregate));
+    
+    my $new_credential = $aggregate->NewCredential($user);
+    if (!defined($new_credential)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
+    }
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS,
+				$new_credential->asString());
+}
+
+# _Always_ make sure that this 1 is at the end of the file...
+1;

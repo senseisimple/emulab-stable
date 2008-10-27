@@ -220,6 +220,21 @@ print "Got a resource discovery rspec from the CM"
 #print str(rspec)
 
 #
+# Ask the clearing house for a list of components.
+#
+params = {}
+params["credential"] = mycredential
+rval,response = do_method("ch", "ListComponents", params,
+         URI="https://myboss.myelab.testbed.emulab.net:443/protogeni/xmlrpc")
+if rval:
+    Fatal("Could not List components.")
+    pass
+components = response["value"]
+print "Got a component list from ClearingHouse"
+print str(components)
+sys.exit(0);
+
+#
 # Do resource discovery at the component. 
 #
 #
@@ -281,6 +296,7 @@ rspec = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
         "            node_uuid=\"de995217-773e-102b-8eb4-001143e453fe\" /> " +\
         " </link> " +\
         "</rspec>"
+
 params = {}
 params["credential"] = sliver
 params["rspec"]      = rspec

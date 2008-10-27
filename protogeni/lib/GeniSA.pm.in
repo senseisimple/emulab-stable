@@ -90,10 +90,68 @@ sub GetCredential($)
 				    $credential->asString());
     }
 
+    my $credential = GeniCredential->CreateFromSigned($cred);
+    if (!defined($credential)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not create GeniCredential object");
+    }
+
+    #
+    # Make sure the credential was issued to the caller.
+    #
+    if ($credential->owner_uuid() ne $ENV{'GENIUUID'}) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "This is not your credential!");
+    }
+    #
+    # And that the target of the credential is this registry.
+    #
+    my $authority = GeniAuthority->Lookup($ENV{'MYUUID'});
+    if (!defined($authority)) {
+	print STDERR "Could not find local authority object\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
+    }
+    if ($credential->target_uuid() ne $authority->uuid()) {
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN,
+				    undef, "This is not your registry!");
+    }
+
+    my $this_user = GeniUser->Lookup($credential->owner_uuid(), 1);
+    if (!defined($this_user)) {
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN,
+				    undef, "Who are you?");
+    }
+    
     #
     # User provided a credential, and wants a new credential to access
     # the object referenced by the uuid.
     #
+    if ($type eq "Slice") {
+	my $slice = GeniSlice->Lookup($uuid);
+	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
+				    "No such Slice")
+	    if (!defined($slice));
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+				    "Not your slice!")
+	    if ($slice->creator_uuid() ne $this_user->uuid());
+	
+	#
+	# Return a credential for the slice.
+	#
+	my $slice_credential = GeniCredential->Create($slice, $this_user);
+	if (!defined($slice_credential)) {
+	    print STDERR "Could not create new credential for $slice\n";
+	    return GeniResponse->Create(GENIRESPONSE_ERROR);
+	}
+	if ($slice_credential->Sign($GeniCredential::LOCALSA_FLAG)) {
+	    $slice_credential->Delete();
+	    print STDERR "Could not sign credential for $slice\n";
+	    return GeniResponse->Create(GENIRESPONSE_ERROR);
+	}
+	return GeniResponse->Create(GENIRESPONSE_SUCCESS,
+				    $slice_credential->asString());
+    }
+    
     return GeniResponse->Create(GENIRESPONSE_UNSUPPORTED);
 }
 
@@ -485,7 +543,7 @@ sub Remove($)
 	    # XXX Form hrn from the uid and domain. This is backwards.
 	    #
 	    if (! ($hrn =~ /\./)) {
-		$hrn = "${OURDOMAIN}.slices.${hrn}";
+		$hrn = "emulab.${hrn}";
 	    }
 	    $slice = GeniSlice->Lookup($hrn);
 	}

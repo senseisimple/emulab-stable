@@ -1,0 +1,64 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+
+# Configure variables
+my $TB		   = "@prefix@";
+my $TBOPS          = "@TBOPSEMAIL@";
+my $OURDOMAIN	   = "@OURDOMAIN@";
+
+use vars qw($GENI_DBNAME);
+$GENI_DBNAME = "geni-cm";
+
+use lib '@prefix@/lib';
+use GeniCertificate;
+use GeniComponent;
+use GeniCHClient;
+use Node;
+
+# XXX Need to deal with this.
+my $HRN = (($OURDOMAIN eq "emulab.net") ? "emulab" : "myelab");
+
+if (!@ARGV) {
+    die("*** $0:\n".
+	"    Must supply a node id\n");
+}
+
+my $this_user = User->LookupByUnixId($UID);
+if (! defined($this_user)) {
+    print STDERR "You ($UID) do not exist!\n";
+    exit(-1);
+}
+
+#
+# The RPC context for this script is as the CM.
+#
+Genixmlrpc->SetContext(Genixmlrpc->Context("@prefix@/etc/genicm.pem"));
+
+my $node_id = $ARGV[0];
+my $node    = Node->Lookup($node_id);
+if (!defined($node)) {
+    die("*** $0:\n".
+	"    Could not map $node_id to object\n");
+}
+
+# See if we already have a certificate.
+my $certificate = GeniCertificate->Lookup($node->uuid());
+if (!defined($certificate)) {
+    $certificate = GeniCertificate->Create("Node", "${HRN}.${node_id}",
+					   $TBOPS, $node->uuid());
+    if (!defined($certificate)) {
+	die("*** $0:\n".
+	    "    Could not generate certificate for $node\n");
+    }
+}
+
+GeniCHClient::Register("Component", $certificate->cert(),
+		       { "resource_uuid" => $node->uuid(),
+			 "resource_type" => "Node"});
+

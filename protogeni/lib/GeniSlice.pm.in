@@ -16,7 +16,7 @@ use vars qw(@ISA @EXPORT);
 # Must come after package declaration!
 use lib '@prefix@/lib';
 use GeniDB;
-use GeniCHClient;
+use GeniRegistry;
 use GeniAuthority;
 use GeniCredential;
 use GeniComponent;
@@ -293,19 +293,12 @@ sub Register($)
     return -1
 	if (! ref($self));
 
-    # Bind the other users too.
-    my @userbindings;
-    if ($self->UserBindings(\@userbindings) != 0) {
-	print STDERR "Could not get user bindings for $self\n";
-	return -1;
-    }
+    my $clearinghouse = GeniRegistry::ClearingHouse->Create();
+    return -1
+	if (!defined($clearinghouse));
 
-    GeniCHClient::RegisterSlice($self->creator_uuid(),
-				$self->cert(),
-				\@userbindings)
-	== 0 or return -1;
-    
-    return 0;
+    return $clearinghouse->RegisterSlice($self->creator_uuid(),
+					 $self->cert(), {});
 }
 
 #
@@ -318,14 +311,11 @@ sub UnRegister($)
     return -1
 	if (! ref($self));
 
-    my $blob;
-    return 0
-	if (GeniCHClient::LookupSlice($self->uuid(), \$blob) != 0);
+    my $clearinghouse = GeniRegistry::ClearingHouse->Create();
+    return -1
+	if (!defined($clearinghouse));
 
-    GeniCHClient::RemoveSlice($self->uuid())
-	== 0 or return -1;
-    
-    return 0;
+    return $clearinghouse->RemoveSlice($self->uuid());
 }
 
 #
@@ -340,8 +330,12 @@ sub DiscoverResources($$)
     return -1
 	if (! ref($self));
 
+    my $clearinghouse = GeniRegistry::ClearingHouse->Create();
+    return -1
+	if (!defined($clearinghouse));
+
     my $blob;
-    GeniCHClient::DiscoverResources($self, \$blob) == 0
+    $clearinghouse->DiscoverResources($self, \$blob) == 0
 	or return -1;
 
     #

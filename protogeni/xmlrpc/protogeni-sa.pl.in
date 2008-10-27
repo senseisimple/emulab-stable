@@ -109,7 +109,7 @@ LogStart(0);
 #
 # Create and set our RPC context for any calls we end up making.
 #
-Genixmlrpc->SetContext(Genixmlrpc->Context($EMULAB_PEMFILE));
+Genixmlrpc->SetContext(Genixmlrpc->Context($certificate));
 
 #print STDERR time() . "\n";
 
@@ -132,7 +132,7 @@ my $response = $responder->{'_decode'}->serve($request,
 # Terminate the log capture so that we can print the response to STDOUT
 # for the web server.
 #
-print STDERR "\n\n" . $response;
+#print STDERR "\n\n" . $response;
 #print STDERR time() . "\n";
 
 LogEnd();

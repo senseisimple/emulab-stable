@@ -136,6 +136,28 @@ if rval == 0:
     myslice = response["value"]
     myuuid  = myslice["uuid"]
 
+    print "Getting slice credential for myslice3";
+    params = {}
+    params["credential"] = mycredential
+    params["type"]       = "Slice"
+    params["uuid"]       = myuuid
+    rval,response = do_method("sa", "GetCredential", params)
+    if rval:
+        Fatal("Could not get slice credential")
+        pass
+    slicecred = response["value"]
+
+#    print "Getting sliver for myslice3 from CM";
+#    params = {}
+#    params["credential"] = slicecred;
+#    rval,response = do_method("cm", "GetSliver", params)
+#    if rval:
+#        Fatal("Could not get slivers for slice from cm")
+#        pass
+#    slivercred = response["value"]
+#    print str(slivercred);
+#    sys.exit(0);
+    
     print "Deleting previous slice called myslice3";
     params = {}
     params["credential"] = mycredential
@@ -177,7 +199,7 @@ rspec1 = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
         "            node_uuid=\"de9a0b2e-773e-102b-8eb4-001143e453fe\" /> " +\
         "  <linkendpoints nickname=\"source_interface\" " +\
         "            tunnel_ip=\"192.168.1.2\" " +\
-        "            node_uuid=\"de995217-773e-102b-8eb4-001143e453fe\" /> " +\
+        "            node_uuid=\"de9803c2-773e-102b-8eb4-001143e453fe\" /> " +\
         " </link> " +\
         "</rspec>"
 
@@ -192,7 +214,7 @@ if rval:
     pass
 ticket1 = response["value"]
 print "Got a ticket from the CM on Emulab"
-print str(ticket)
+#print str(ticket)
 
 #
 # Get a ticket for a node on Inner Emulab.
@@ -223,7 +245,7 @@ if rval:
     pass
 ticket2 = response["value"]
 print "Got a ticket from the CM on Inner Emulab"
-#print str(ticket2)
+print str(ticket2)
 
 #
 # Create the slivers.
@@ -238,7 +260,6 @@ if rval:
     pass
 sliver2 = response["value"]
 print "Created a sliver on Inner Emulab"
-sys.exit(0);
 
 params = {}
 params["ticket"]   = ticket1
@@ -250,12 +271,56 @@ if rval:
     pass
 sliver1 = response["value"]
 print "Created a sliver on Emulab"
-print str(sliver1)
+#print str(sliver1)
+
+#
+# Start the slivers.
+#
+params = {}
+params["credential"] = sliver2
+params["impotent"]   = impotent
+rval,response = do_method("cm", "StartSliver", params,
+         URI="https://myboss.myelab.testbed.emulab.net:443/protogeni/xmlrpc")
+if rval:
+    Fatal("Could not start sliver on Inner Emulab")
+    pass
+
+params = {}
+params["credential"] = sliver1
+params["impotent"]   = impotent
+rval,response = do_method("cm", "StartSliver", params,
+         URI="https://boss.emulab.net:443/protogeni/xmlrpc")
+if rval:
+    Fatal("Could not start sliver on Emulab")
+    pass
 
 print "Sliver has been started, waiting for input to delete it"
 print "You should be able to log into the sliver after a little bit"
 sys.stdin.readline();
 print "Deleting sliver now"
+
+#
+# Delete the slivers.
+#
+params = {}
+params["credential"] = sliver2
+params["impotent"]   = impotent
+rval,response = do_method("cm", "DeleteSliver", params,
+         URI="https://myboss.myelab.testbed.emulab.net:443/protogeni/xmlrpc")
+if rval:
+    Fatal("Could not stop sliver on inner emulab")
+    pass
+print "Sliver has been deleted"
+
+params = {}
+params["credential"] = sliver1
+params["impotent"]   = impotent
+rval,response = do_method("cm", "DeleteSliver", params,
+         URI="https://boss.emulab.net:443/protogeni/xmlrpc")
+if rval:
+    Fatal("Could not stop sliver on Emulab")
+    pass
+print "Sliver has been deleted"
 
 #
 # Delete the slice.

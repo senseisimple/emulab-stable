@@ -109,7 +109,7 @@ LogStart(0);
 #
 # Create and set our RPC context for any calls we end up making.
 #
-Genixmlrpc->SetContext(Genixmlrpc->Context($EMULAB_PEMFILE));
+Genixmlrpc->SetContext(Genixmlrpc->Context($certificate));
 
 # Add stuff for log message if sent.
 AddAuditInfo("message", $request . "\n");
@@ -125,6 +125,7 @@ my $responder = Frontier::Responder->new( "methods" => {
     "DeleteSlice"       => \&GeniCM::DeleteSlice,
     "SplitSliver"       => \&GeniCM::SplitSliver,
     "UpdateSliver"      => \&GeniCM::UpdateSliver,
+    "GetSliver"         => \&GeniCM::GetSliver,
    },
 );
 

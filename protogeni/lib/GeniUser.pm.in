@@ -16,7 +16,7 @@ use vars qw(@ISA @EXPORT);
 # Must come after package declaration!
 use lib '@prefix@/lib';
 use GeniDB;
-use GeniCHClient;
+use GeniRegistry;
 use GeniAuthority;
 use GeniCertificate;
 use libtestbed;
@@ -539,12 +539,13 @@ sub GetCertificate($)   { return $_[0]->{'CERT'}; }
 sub Register($)
 {
     my ($self) = @_;
-    my $blob;
 
-    my @sliverkeys = ();
-    $self->GetKeys(\@sliverkeys);
-    return GeniCHClient::RegisterUser($self->name(), $self->email(),
-				      $self->cert(), \@sliverkeys);
+    my $clearinghouse = GeniRegistry::ClearingHouse->Create();
+    return -1
+	if (!defined($clearinghouse));
+
+    return $clearinghouse->RegisterUser($self->name(), $self->email(),
+					$self->cert());
 }
 
 #

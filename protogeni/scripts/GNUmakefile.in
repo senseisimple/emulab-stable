@@ -11,7 +11,7 @@ SUBDIR		= protogeni/scripts
 
 include $(OBJDIR)/Makeconf
 
-SBIN_STUFF	= newgeninode cleanupslice
+SBIN_STUFF	= newgeninode cleanupslice register_resources
 
 # These scripts installed setuid, with sudo. 
 SETUID_BIN_SCRIPTS   = 

@@ -166,6 +166,27 @@ sub Resolve($)
     
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
     }
+    if ($type eq "Component") {
+	my $component = GeniComponent->LookupByResource($uuid);
+	
+	if (!defined($component)) {
+	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
+					"No such resource $uuid");
+	}
+	my $certificate = GeniCertificate->Lookup($uuid);
+	if (!defined($certificate)) {
+	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
+					"No certificate for $uuid");
+	}
+
+	# Return a blob.
+	my $blob = { "gid"      => $certificate->cert(),
+		     "cm"	=> $component->cert(),
+		     "url"      => $component->url(),
+		 };
+    
+	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
+    }
     if ($type eq "SA" || $type eq "sa") {
 	my $authority = GeniAuthority->Lookup($uuid);
 	if (!defined($authority)) {
@@ -468,6 +489,34 @@ sub Register($)
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, undef,
 				    "Slice has been registered");
     }
+    if ($type eq "Component") {
+	my $resource_type  = $info->{'resource_type'};
+	my $resource_uuid  = $info->{'resource_uuid'};
+
+	my $component = GeniComponent->Lookup($ENV{'GENIUUID'});
+	if (!defined($component)) {
+	    print STDERR "Could not find component object for caller.\n";
+	    return GeniResponse->Create(GENIRESPONSE_ERROR);
+	}
+
+	if (! ($resource_uuid =~ /^[-\w]+$/)) {
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					"resource_uuid: Invalid characters");
+	}
+	if (! ($resource_type =~ /^[-\w]+$/)) {
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					"resource_type: Invalid characters");
+	}
+	if ($certificate->Store() != 0) {
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					"Could not store certificate");
+	}
+	if ($component->NewResource($resource_uuid) != 0) {
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					"Could not register new resource");
+	}
+    }
+
     return GeniResponse->Create(GENIRESPONSE_UNSUPPORTED);
 }
 
@@ -534,7 +583,7 @@ sub Remove($)
     if ($type eq "Slice") {
 	my $slice = GeniSlice->Lookup($uuid);
 	if (!defined($slice)) {
-	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
+	    return GeniResponse->Create(GENIRESPONSE_SUCCESS, undef,
 					"No such slice $uuid");
 	}
 	if ($slice->Delete()) {
@@ -552,14 +601,26 @@ sub Remove($)
 # This is just a placeholder; return a list of all components. Eventually
 # takes an rspec and we do a resource mapping. 
 #
-sub DiscoverResources($)
+sub ListComponents($)
 {
     my ($argref) = @_;
-    my $slice  = $argref->{'slice'};
+    my $cred  = $argref->{'credential'};
 
-    # This is a certificate. Ignored for now. 
-    if (!defined($slice)) {
-	return Protogeni::MalformedArgsResponse();
+    if (! defined($cred)) {
+	return GeniResponse->MalformedArgsResponse();
+    }
+    my $credential = GeniCredential->CreateFromSigned($cred);
+    if (!defined($credential)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not create GeniCredential object");
+    }
+
+    #
+    # Make sure the credential was issued to the caller.
+    #
+    if ($credential->owner_uuid() ne $ENV{'GENIUUID'}) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "This is not your credential!");
     }
 
     #
@@ -575,7 +636,9 @@ sub DiscoverResources($)
 	return GeniResponse->Create(GENIRESPONSE_DBERROR)
 	    if (!defined($component));
 	    
-	push(@results, { "gid" => $component->cert() });
+	push(@results, { "gid" => $component->cert(),
+			 "hrn" => $component->hrn(),
+		         "url" => $component->url() });
     }
     return GeniResponse->Create(GENIRESPONSE_SUCCESS, \@results);
 }

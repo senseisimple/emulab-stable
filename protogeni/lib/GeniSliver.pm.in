@@ -46,7 +46,8 @@ my $NALLOC	   = "$TB/bin/nalloc";
 my $NFREE	   = "$TB/bin/nfree";
 my $NODEREBOOT	   = "$TB/bin/node_reboot";
 my $NAMEDSETUP     = "$TB/sbin/named_setup";
-my $PLABNODE       = "$TB/sbin/plabnode";
+my $PLABNODE       = "$TB/sbin/plabnodewrapper";
+my $VNODESETUP     = "$TB/sbin/vnode_setup";
 my $GENTOPOFILE    = "$TB/libexec/gentopofile";
 
 # Cache of instances to avoid regenerating them.
@@ -714,7 +715,17 @@ sub Create($$$$$)
     # type might require a vnode.
     # 
     if ($virtualization_type eq "emulab-vnode") {
-	my $vtype = ($node->isplabphysnode() ? "pcplab" : "pcfake");
+	my $vtype = "pcfake";
+
+	if ($node->isplabphysnode()) {
+	    if ($node->type() =~ /^(\w*)phys$/) {
+		$vtype = $1;
+	    }
+	    else {
+		print STDERR "Could not determine vtype for $node\n";
+		return undef;
+	    }
+	}
 	
 	#
 	# Create a virtual node on the physnode. 
@@ -832,25 +843,6 @@ sub Provision($;$)
 	    return -1;
 	}
     }
-	
-    # Must have the topofile for node boot. Might need locking on this.
-    if (system("$GENTOPOFILE $pid $eid")) {
-	print STDERR "$GENTOPOFILE failed\n";
-	return -1;
-    }
-
-    # The node will not boot locally unless there is a DNS record.
-    if (system("$NAMEDSETUP")) {
-	print STDERR "$NAMEDSETUP failed\n";
-	return -1;
-    }
-    if ($node->isremotenode()) {
-	system("$PLABNODE alloc $pid $eid $node_id");
-	if ($?) {
-	    print STDERR "$PLABNODE failed\n";
-	    return -1;
-	}
-    }
     return 0;
 }
 
@@ -888,9 +880,9 @@ sub UnProvision($)
 	my $eid = $experiment->eid();
 
 	if ($node->isremotenode()) {
-	    system("$PLABNODE free $pid $eid $node_id");
+	    system("$VNODESETUP -p -q -m -k $pid $eid $node_id");
 	    if ($?) {
-		print STDERR "$PLABNODE failed\n";
+		print STDERR "$VNODESETUP failed\n";
 		return -1;
 	    }
 	}

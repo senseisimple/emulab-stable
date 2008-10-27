@@ -1,0 +1,45 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# We don't want to run this script unless its the real version.
+# That is, it must be setuid root. 
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root! Maybe its a development version?\n");
+}
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $PLABSLICE   = "$TB/sbin/plabslice";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Turn off line buffering on output
+$| = 1; 
+
+# Invoke as real root.
+$UID=0;
+
+my @args = ();
+foreach my $arg (@ARGV) {
+    if ($arg =~ /^([-\w]*)$/) {
+	push(@cmdargs, $1);
+    }
+    else {
+	die("*** $0:\n".
+	    "    Bad argument $arg\n");
+    }
+}
+exec($PLABSLICE, @cmdargs);

@@ -295,6 +295,20 @@ sub CreateFromRegistry($$)
 }
 
 #
+# Create component from a certificate.
+#
+sub CreateFromCertificate($$$)
+{
+    my ($class, $certificate, $url) = @_;
+
+    my $component = GeniComponent->Create($certificate, $url);
+    $certificate->Delete()
+	if (!defined($component));
+
+    return $component;
+}
+
+#
 # Discover Resources on the component. Returns a resource availability
 # spec as an XML string (not a structure).
 #
