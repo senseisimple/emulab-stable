@@ -22,14 +22,17 @@ use User;
 # 
 sub usage()
 {
-    print("Usage: mksyscert [-d] [-o file] [-p password] <orgunit> [uuid]\n");
+    print("Usage: mksyscert [-d] [-o file] [-p password] [-e email] ".
+	  "[-u url] [-a authority] <orgunit> [uuid]\n");
     exit(-1);
 }
-my $optlist  = "dp:o:e";
+my $optlist  = "dp:o:ve:u:a:";
 my $debug    = 0;
 my $printcert= 0;
 my $outfile;
 my $password = "";
+my $email;
+my $url;
 
 #
 # Configure variables
@@ -38,19 +41,23 @@ my $TB		= "@prefix@";
 my $TBOPS	= "@TBOPSEMAIL@";
 my $TBLOGS	= "@TBLOGSEMAIL@";
 my $OURDOMAIN   = "@OURDOMAIN@";
+my $PGENIDOMAIN = "@PROTOGENI_DOMAIN@";
+my $PGENISUPPORT= @PROTOGENI_SUPPORT@;
 my $CONTROL	= "@USERNODE@";
 my $BOSSNODE	= "@BOSSNODE@";
 
 # Locals
 my $USERDIR	= USERROOT();
 my $SSLDIR      = "$TB/lib/ssl";
-my $TEMPLATE    = "$SSLDIR/usercert.cnf";
+my $TEMPLATE    = "$SSLDIR/syscert.cnf";
 my $CACONFIG    = "$SSLDIR/ca.cnf";
 my $EMULAB_CERT = "$TB/etc/emulab.pem";
 my $EMULAB_KEY  = "$TB/etc/emulab.key";
 my $OPENSSL     = "/usr/bin/openssl";
 my $WORKDIR     = "$TB/ssl";
 my $SAVEUID	= $UID;
+my $certfile    = $EMULAB_CERT;
+my $keyfile     = $EMULAB_KEY;
 
 # Locals
 my $encrypted   = 0;
@@ -105,12 +112,29 @@ if (defined($options{"o"})) {
     else {
 	die("Tainted arguments: $outfile\n");
     }
-    
+   
 }
 if (defined($options{"d"})) {
     $debug = 1;
 }
 if (defined($options{"e"})) {
+    $email = $options{"e"};
+}
+if (defined($options{"a"})) {
+    my $authority = $options{"a"};
+    if ($authority =~ /^([-\w\.\/]+)$/) {
+	$authority = $1;
+    }
+    else {
+	die("Tainted arguments: $authority\n");
+    }
+    $certfile = $authority;
+    $keyfile  = $authority;
+}
+if (defined($options{"u"})) {
+    $url = $options{"u"};
+}
+if (defined($options{"v"})) {
     $printcert = 1;
 }
 if (defined($options{"p"})) {
@@ -151,6 +175,9 @@ if (!defined($uuid)) {
 }
 if (!($uuid =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/)) {
     fatal("uuid not in proper format");
+}
+if (!defined($email)) {
+    $email = $TBOPS;
 }
 
 #
@@ -197,6 +224,13 @@ open(TEMP, ">>syscert.cnf")
 
 print TEMP "OU\t\t= $orgunit\n";
 print TEMP "CN\t\t= $uuid\n";
+print TEMP "emailAddress\t= $email\n";
+
+print TEMP "\n";
+print TEMP "[ req_altname ]\n";
+if (defined($url)) {
+    print TEMP "URI=$url\n\n";
+}
 close(TEMP)
     or fatal("Could not close syscert.cnf: $!");
 
@@ -206,7 +240,7 @@ my $outline = ($debug ? "" : ">/dev/null 2>&1");
 #
 # Create a client side private key and certificate request.
 #
-system("$OPENSSL req -new -config syscert.cnf ".
+system("$OPENSSL req -text -new -config syscert.cnf ".
        ($encrypted ? " -passout 'pass:${sh_password}' " : " -nodes ") .
        " -keyout syscert_key.pem -out syscert_req.pem $outline") == 0
     or fatal("Could not create certificate request");
@@ -216,8 +250,8 @@ system("$OPENSSL req -new -config syscert.cnf ".
 #
 $UID = 0;
 system("$OPENSSL ca -batch -policy policy_sslxmlrpc ".
-       " -name CA_usercerts -config $CACONFIG ".
-       " -out syscert_cert.pem -cert $EMULAB_CERT -keyfile $EMULAB_KEY ".
+       " -name CA_syscerts -config $CACONFIG ".
+       " -out syscert_cert.pem -cert $certfile -keyfile $keyfile ".
        " -infiles syscert_req.pem $outline") == 0
     or fatal("Could not sign certificate request");
 $UID = $SAVEUID;

@@ -38,6 +38,8 @@ my $TB		= "@prefix@";
 my $TBOPS	= "@TBOPSEMAIL@";
 my $TBLOGS	= "@TBLOGSEMAIL@";
 my $OURDOMAIN   = "@OURDOMAIN@";
+my $PGENIDOMAIN = "@PROTOGENI_DOMAIN@";
+my $PGENISUPPORT= @PROTOGENI_SUPPORT@;
 my $CONTROL	= "@USERNODE@";
 my $BOSSNODE	= "@BOSSNODE@";
 my $OU          = "sslxmlrpc";	# orgunit
@@ -245,8 +247,14 @@ system("cp -f $TEMPLATE usercert.cnf") == 0
 open(TEMP, ">>usercert.cnf")
     or fatal("Could not open $TEMPLATE for append: $!");
 
-print TEMP "OU\t\t= $OU\n";
+if ($PGENISUPPORT) {
+    print TEMP "OU\t\t= $PGENIDOMAIN.$user_uid\n";
+}
+else {
+    print TEMP "OU\t\t= $user_uid\n";
+}
 print TEMP "CN\t\t= $user_uuid\n";
+print TEMP "emailAddress\t= $user_uid" . "\@" . "$OURDOMAIN\n";
 close(TEMP)
     or fatal("Could not close usercert.cnf: $!");
 
