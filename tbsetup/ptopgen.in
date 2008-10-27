@@ -753,6 +753,10 @@ if ($widearea) {
 	#
 	if (($status && ($status ne 'up')) ||
 	    ($mpid eq $DEADPID && $meid eq $DEADEID)) {
+	    # But not in genimode.
+	    next
+		if ($genimode);
+	    
 	    push @features, "down:1";
 	}
 
