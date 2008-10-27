@@ -207,6 +207,8 @@ AC_SUBST(ELVIN_COMPAT)
 AC_SUBST(ISOLATEADMINS)
 AC_SUBST(DYNAMICROOTPASSWORDS)
 AC_SUBST(REMOTEWIKIDOCS)
+AC_SUBST(PROTOGENI_SUPPORT)
+AC_SUBST(PROTOGENI_DOMAIN)
 
 #
 # Offer both versions of the email addresses that have the @ escaped
@@ -285,6 +287,7 @@ ELVIN_COMPAT=0
 ISOLATEADMINS=1
 DYNAMICROOTPASSWORDS=1
 REMOTEWIKIDOCS=1
+PROTOGENI_SUPPORT=0
 
 #
 # XXX You really don't want to change these!
@@ -966,6 +969,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
         bugdb/GNUmakefile bugdb/bugdbproxy \
         protogeni/GNUmakefile protogeni/security/GNUmakefile \
         protogeni/xmlrpc/GNUmakefile protogeni/lib/GNUmakefile \
+        protogeni/scripts/GNUmakefile \
         collab/GNUmakefile \
         collab/trac/GNUmakefile \
         collab/jabber/GNUmakefile \
