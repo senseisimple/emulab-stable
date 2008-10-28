@@ -1,5 +1,5 @@
---- grub-0.97/stage2/builtins.c.orig	2005-02-15 14:58:23.000000000 -0700
-+++ grub-0.97/stage2/builtins.c	2008-10-17 13:31:46.000000000 -0600
+--- grub-0.97/stage2/builtins.c.orig	2005-02-15 16:58:23.000000000 -0500
++++ grub-0.97/stage2/builtins.c	2008-10-28 15:07:43.000000000 -0400
 @@ -49,6 +49,15 @@
  # include <md5.h>
  #endif
@@ -40,9 +40,9 @@
  /* Check a password for correctness.  Returns 0 if password was
     correct, and a value != 0 for error, similarly to strcmp. */
  int
-@@ -3612,6 +3638,188 @@
-   {"delete",		0,		0x7f,	0,	0x53}
- };
+@@ -3171,6 +3197,188 @@
+   return 0;
+ }
  
 +#ifdef SUPPORT_EMULAB
 +static int
@@ -93,7 +93,7 @@
 +static int
 +tbboot_func(char *arg, int flags)
 +{
-+	int biosdev, slice;
++	int biosdev, slice = 0;
 +	char buffer[512];
 +	tbboot_t *tbhdr = (tbboot_t *)buffer;
 +	int config_biosdev;
@@ -130,7 +130,7 @@
 +
 +		if (biosdev == MAX_BIOS_DRIVE) {
 +			errnum = ERR_BOOT_FAILURE;
-+			grub_printf("no biosdev found for testbed boot");
++			grub_printf("no biosdev found for testbed boot\n");
 +		}
 +	}
 +
@@ -172,7 +172,7 @@
 +			slice = 0;
 +			sprintf(diskdev, "(hd%d)", biosdev - 0x80);
 +		} else {
-+			sprintf(diskdev, "(hd%d,%d)", biosdev - 0x80, slice);
++			sprintf(diskdev, "(hd%d,%d)", biosdev - 0x80, slice - 1);
 +		}
 +	}
 +
@@ -227,9 +227,9 @@
 +#endif /* SUPPORT_EMULAB */
 +
  static int
- setkey_func (char *arg, int flags)
+ root_func (char *arg, int flags)
  {
-@@ -3757,6 +3965,17 @@
+@@ -4359,6 +4567,19 @@
    return 0;
  }
  
@@ -239,21 +239,147 @@
 +  "testbed_boot",
 +  tbboot_func,
 +  BUILTIN_CMDLINE | BUILTIN_MENU | BUILTIN_HELP_LIST,
-+  "testbed_boot",
-+  "testbed booting magic",
++  "testbed_boot [BOOT_DEVICE]",
++  "Use the Emulab magic disk sector to determine whether a certain disk"
++  " and partition should be booted, or if the Linux MFS should be booted."
++  " BOOT_DEVICE must be a hard disk device (i.e. hd0)."
 +};
 +#endif /* SUPPORT_EMULAB */
 +
- static struct builtin builtin_setkey =
+ static struct builtin builtin_terminfo =
  {
-   "setkey",
-@@ -4864,6 +5083,9 @@
+   "terminfo",
+@@ -4870,6 +5091,9 @@
+ #ifdef SUPPORT_SERIAL
+   &builtin_terminfo,
  #endif /* SUPPORT_SERIAL */
-   &builtin_setkey,
-   &builtin_setup,
-+#if defined(SUPPORT_EMULAB)
++#ifdef SUPPORT_EMULAB
 +  &builtin_tbboot,
 +#endif /* SUPPORT_EMULAB */
- #if defined(SUPPORT_SERIAL) || defined(SUPPORT_HERCULES)
-   &builtin_terminal,
- #endif /* SUPPORT_SERIAL || SUPPORT_HERCULES */
+   &builtin_testload,
+   &builtin_testvbe,
+ #ifdef SUPPORT_NETBOOT
+--- /dev/null	2008-09-15 14:59:17.502817549 -0400
++++ grub-0.97/stage2/testbed_boot.h	2008-10-24 18:18:47.447983762 -0400
+@@ -0,0 +1,121 @@
++/*
++ * EMULAB-COPYRIGHT
++ * Copyright (c) 2000-2002 University of Utah and the Flux Group.
++ * All rights reserved.
++ */
++
++/*
++ * This structure is placed in the boot block. The loader reads the
++ * structure to determine whether it should boot from CDROM or switch
++ * to the disk.
++ *
++ * The basic idea is this:
++ *
++ * 1. The node always boots from the CD-ROM (first in boot chain).
++ * 2. The loader looks for this magic structure:
++ *     2a: If not present continues to load from the CD-ROM (step 4).
++ *     2b: If present check the contents of the structure. If directed to
++ *         boot from the disk goto step 3. If not, continues to load from
++ *         the CDROM (step 4).
++ * 3. Boot from the disk. Switch the boot device to the disk so that the
++ *    kernel is loaded from the disk. Also reset the flag (written to disk)
++ *    to indicate that next reboot should happen from the CDROM. Also set
++ *    another flag, cleared by the kernel, that indicates the kernel booted
++ *    okay. This avoids reboot loops in the case of a scrogged disk.
++ * 4. Boot from the CD-ROM. The user level code on the CD-ROM will take care
++ *    of the rest, writing the proper flags to the structure on the disk.
++ *    Normally, this means checking in with Emulab, and then setting the flag
++ *    to cause it to boot from the disk.
++ *
++ * This entire structure has to be less than a sector.
++ */
++#define SECSIZE			512
++#define TBBOOT_MAXIFACELEN	12
++#define TBBOOT_MAXHOSTLEN	32
++#define TBBOOT_MAXDOMAINLEN	64
++#define TBBOOT_MAXKEYLEN	64
++#define TBBOOT_MAXDISKDEVLEN	32
++
++struct in_addr
++{
++	unsigned long s_addr;
++};
++
++typedef struct tbboot_header
++{
++	unsigned long		magic1;
++	short			version;
++
++	/*
++	 * BIOS device number to boot from, with two magic values:
++	 * - 0xfe means the boot device (CD or USB dongle)
++	 * - 0xff means the disk on which this sector is found
++	 */
++	unsigned char			bootdisk;
++
++	/*
++	 * Set bootfromdisk to 1 to force loader to boot from disk.
++	 */
++	char			bootfromdisk;
++
++	/*
++	 * Set bootfromcdrom to 0 when booting from the disk. The kernel
++	 * will set this to 1. If the cdrom boots with bootfromdisk 0
++	 * and bootfromcdrom 0, something went wrong and the kernel did not
++	 * boot properly. Avoids a loop.
++	 */
++	char			bootfromcdrom;
++
++	/*
++	 * Flag to indicate the image is valid. Clear this when writing
++	 * a new image, and set it when done.
++	 */
++	char			validimage;
++
++	/*
++	 * Flag to indicate the system config block is valid (has info).
++	 */
++	char			validconfig;
++
++	/*
++	 * crc32 from the zlib library.
++	 */ 
++	unsigned long		checksum;
++
++	/* Paranoia */
++	unsigned long		magic2;
++
++	/*
++	 * The emulab key. 
++	 */
++	char			emulabkey[TBBOOT_MAXKEYLEN];
++
++	/*
++	 * System configuration.
++	 */
++	struct {
++		char		interface[TBBOOT_MAXIFACELEN];
++		char		hostname[TBBOOT_MAXHOSTLEN];
++		char		domain[TBBOOT_MAXDOMAINLEN];
++		struct in_addr	IP;
++		struct in_addr	netmask;
++		struct in_addr	nameserver;
++		struct in_addr	gateway;
++	} sysconfig;
++} tbboot_t;
++
++/* Magic value identifying the header.  */
++#define TBBOOT_MAGIC1		0x9badbeef
++#define TBBOOT_MAGIC2		0x69ceafd8
++
++/* Current Version */
++#define TBBOOT_VERSION		101
++
++/*
++ * Offset from start of the disk. Hardwired to sector 60 which should be
++ * clear on our images.
++ */
++#define TBBOOT_SECTOR		60
++#define TBBOOT_OFFSET		(TBBOOT_SECTOR * SECSIZE)
++
++
