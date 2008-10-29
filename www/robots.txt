@@ -1,22 +1,4 @@
 User-Agent: *
-# Disallow most php pages except a select few
-Disallow: /*php$
-Disallow: /*php3$
-Disallow: /*php4$
-Disallow: /*kb-show.php3
-Allow: /index.php3
-Allow: /doc.php3
-Allow: /docwrapper
-Allow: /doc/docwrapper
-Allow: /tutorial/docwrapper
-Allow: /news.php3
-Allow: /pubs.php3
-Allow: /expubs.php
-Allow: /software.php3
-Allow: /people.php3
-Allow: /gallery/gallery.php3
-Allow: /explist.php3
-Allow: /tutorial/mobilewireless.php3
 # Disallow downloads for now
 Disallow: /downloads
 Disallow: /wikidocs
