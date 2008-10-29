@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -47,7 +47,7 @@ SUBMENUSTART("Project Options");
 WRITESUBMENUBUTTON("Create Subgroup",
 		   "newgroup.php3?pid=$pid");
 WRITESUBMENUBUTTON("Edit User Privs",
-		   "editgroup_form.php3?pid=$pid&gid=$pid");
+		   "editgroup.php3?pid=$pid&gid=$pid");
 WRITESUBMENUBUTTON("Remove Users",
 		   "showgroup.php3?pid=$pid&gid=$pid");
 WRITESUBMENUBUTTON("Show Project History",
