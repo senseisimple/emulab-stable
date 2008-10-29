@@ -294,12 +294,12 @@ function parseDatum(datum,type) {
 function parseAndBuild(data) {
     var retval = {};
     var lines = data.split("\n");
-    if (lines.length < 2) {
+    if (lines.length < 3) {
 	// there was an error
 	if (lines.length == 0) {
 	    error("no data in response from server");
 	}
-	else if (lines.length == 1) {
+	else if (lines.length > 0) {
 	    error(lines[0]);
 	}
 	return null;
