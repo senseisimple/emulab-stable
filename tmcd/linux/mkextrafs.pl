@@ -137,8 +137,16 @@ if ($stype != 131) {
     mysystem("$DOSTYPE -f /dev/$disk $slice 131");
 }
 
-mysystem("mkfs $fsdevice");
-mysystem("echo \"$fsdevice $mountpoint ext2 defaults 0 0\" >> /etc/fstab");
+# eh, quick try for ext3 -- no way we can consistently check the kernel for 
+# support, off the top of my head
+if ( -e "/sbin/mkfs.ext3") {
+    mysystem("mke2fs -j $fsdevice");
+    mysystem("echo \"$fsdevice $mountpoint ext3 defaults 0 0\" >> /etc/fstab");
+}
+else {
+    mysystem("mkfs $fsdevice");
+    mysystem("echo \"$fsdevice $mountpoint ext2 defaults 0 0\" >> /etc/fstab");
+}
 
 mysystem("mount $mountpoint");
 mysystem("mkdir $mountpoint/local");
