@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2006-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2006-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -75,7 +75,8 @@ sub power {
     my $oids = $CtlOIDS{"default"};
     my $type = SNMP::translateObj($self->{SESS}->get("sysObjectID.0"));
 
-    if ($type eq "masterSwitchrPDU") { $oids = $CtlOIDS{"rPDU"}; }
+    if (defined($type) &&
+	$type eq "masterSwitchrPDU") { $oids = $CtlOIDS{"rPDU"}; }
 
 #   "sPDUOutletCtl" is ".1.3.6.1.4.1.318.1.1.4.4.2.1.3";
     if    ($op eq "on")  { $op = @$oids[1]; }
