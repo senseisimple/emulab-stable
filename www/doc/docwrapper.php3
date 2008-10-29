@@ -18,8 +18,7 @@ $optargs = OptionalPageArguments("printable",  PAGEARG_BOOLEAN);
 # Need to sanity check the path! Allow only [word].{html,txt} files
 #
 if (!preg_match("/^[-\w]+\.(html|txt)$/", $docname)) {
-    header(' ', true, 400);
-    USERERROR("Illegal document name: $docname!", 1);
+    USERERROR("Illegal document name: $docname!", 1, HTTP_400_BAD_REQUEST);
 }
 
 #
@@ -27,8 +26,7 @@ if (!preg_match("/^[-\w]+\.(html|txt)$/", $docname)) {
 #
 $fh = @fopen("$docname", "r");
 if (!$fh) {
-    header(' ', true, 404);
-    USERERROR("Can't read document file: $docname!", 1);
+    USERERROR("Can't read document file: $docname!", 1, HTTP_404_NOT_FOUND);
 }
 
 if (!isset($printable))

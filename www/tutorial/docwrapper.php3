@@ -18,8 +18,7 @@ $optargs = OptionalPageArguments("printable",  PAGEARG_BOOLEAN);
 # Need to sanity check the path! Allow only [word].html files
 #
 if (!preg_match("/^[-\w\.]+\.(html|txt)$/", $docname)) {
-    header(' ', true, 400);
-    USERERROR("Illegal document name: $docname!", 1);
+    USERERROR("Illegal document name: $docname!", 1, HTTP_400_BAD_REQUEST);
 }
 
 $to_wiki = array(
@@ -37,8 +36,7 @@ if (!$fh) {
       header("Location: $WIKIDOCURL/$wikiname", TRUE, 301);
       return 0;
     } else {
-      header(' ', true, 404);
-      USERERROR("Can't read document file: $docname!", 1);
+      USERERROR("Can't read document file: $docname!", 1, HTTP_404_NOT_FOUND);
     }
 }
 
