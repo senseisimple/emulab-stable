@@ -20,7 +20,7 @@ LIB_SCRIPTS     = GeniDB.pm GeniUser.pm GeniSAClient.pm \
 SBIN_SCRIPTS	= plabnodewrapper plabslicewrapper
 		  
 SCRIPTS		= test.pl addnode.pl test.pl addauthority
-OPS_LIBS	= GeniCMClient.pm GeniSAClient.pm GeniCHClient.pm
+OPS_LIBS	= GeniCMClient.pm GeniSAClient.pm
 
 # These scripts installed setuid, with sudo. 
 SETUID_SBIN_SCRIPTS  = plabnodewrapper plabslicewrapper
