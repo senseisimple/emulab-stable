@@ -167,7 +167,7 @@ print "New slice created"
 # Okay, we do not actually have anything like resource discovery yet,
 #
 rspec = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
-        " <node uuid=\"dea1c536-773e-102b-8eb4-001143e453fe\" " +\
+        " <node uuid=\"1c0f012f-a176-11dd-9fcd-001143e43770\" " +\
         "       nickname=\"geni1\" "+\
         "       virtualization_type=\"emulab-vnode\"> " +\
         " </node>" +\
@@ -177,7 +177,7 @@ params["credential"] = myslice
 params["rspec"]      = rspec
 params["impotent"]   = impotent
 rval,response = do_method("cm", "GetTicket", params,
-         URI="https://boss.emulab.net:443/protogeni/xmlrpc")
+         URI="https://myboss.myelab.testbed.emulab.net:443/protogeni/xmlrpc")
 if rval:
     Fatal("Could not get ticket")
     pass
@@ -192,13 +192,13 @@ params = {}
 params["ticket"]   = ticket
 params["impotent"] = impotent
 rval,response = do_method("cm", "RedeemTicket", params,
-         URI="https://boss.emulab.net:443/protogeni/xmlrpc")
+         URI="https://myboss.myelab.testbed.emulab.net:443/protogeni/xmlrpc")
 if rval:
     Fatal("Could not redeem ticket")
     pass
 sliver = response["value"]
 print "Created a sliver"
-print str(sliver)
+#print str(sliver)
 
 print "Sliver has been started, waiting for input to delete it"
 print "You should be able to log into the sliver after a little bit"
@@ -212,7 +212,7 @@ params = {}
 params["credential"] = sliver
 params["impotent"]   = impotent
 rval,response = do_method("cm", "DeleteSliver", params,
-         URI="https://boss.emulab.net:443/protogeni/xmlrpc")
+         URI="https://myboss.myelab.testbed.emulab.net:443/protogeni/xmlrpc")
 if rval:
     Fatal("Could not stop sliver")
     pass

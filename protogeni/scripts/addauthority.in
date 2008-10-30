@@ -1,0 +1,69 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Data::Dumper;
+use Getopt::Std;
+
+#
+# Add an authority to the DB. Mostly for bootstrapping.
+# 
+sub usage()
+{
+    print "Usage: addauthority [-c]\n";
+    exit(1);
+}
+my $optlist    = "c";
+my $asch       = 0;
+
+use vars qw($GENI_DBNAME);
+if ($asch) {
+    $GENI_DBNAME = "geni-ch";
+}
+
+# Now we can load the libraries after setting the proper DB.
+use lib '@prefix@/lib';
+require GeniDB;
+use GeniCertificate;
+use GeniAuthority;
+
+#
+# Check args.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"c"})) {
+    $asch = 1;
+}
+usage()
+    if (@ARGV != 3);
+
+my $certfile = $ARGV[0];
+my $type     = $ARGV[1];
+my $url      = $ARGV[2];
+
+my $certificate = GeniCertificate->LoadFromFile($certfile);
+if (!defined($certificate)) {
+    die("Could not get certificate from $certfile\n");
+}
+if ($certificate->uuid() =~ /\w*-(\w*)$/) {
+    $prefix = $1;
+}
+else {
+    die("Could not get prefix from uuid\n");
+}
+
+if (GeniAuthority->CheckExisting($type, $certificate->uuid(),
+				 $certificate->hrn())) {
+    die("$certfile is already registered in the DB\n");
+}
+GeniAuthority->Create($certificate, $url, $prefix, $type)
+    or die("Could not add new authority\n");
+
+exit(0);

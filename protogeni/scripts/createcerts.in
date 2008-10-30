@@ -1,0 +1,89 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+
+#
+# Create the certs for a new protogeni emulab. Add optional -c option if
+# this is a clearinghouse.
+# 
+sub usage()
+{
+    print "Usage: createpgenicerts [-c]\n";
+    exit(1);
+}
+my $optlist = "c";
+my $asch    = 0;
+
+#
+# Configure variables
+#
+my $TB		  = "@prefix@";
+my $TBOPS         = "@TBOPSEMAIL@";
+my $TBLOGS        = "@TBLOGSEMAIL@";
+my $PGENIDOMAIN   = "@PROTOGENI_DOMAIN@";
+my $PGENISUPPORT  = @PROTOGENI_SUPPORT@;
+my $TBBASE        = "@TBBASE@";
+my $mksyscert	  = "$TB/sbin/mksyscert";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Protos
+sub fatal($);
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+if ($UID != 0) {
+    fatal("Must be root to run this script\n");
+}
+
+#
+# Check args.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"c"})) {
+    $asch = 1;
+}
+
+#
+# Generate the certs we need.
+#
+system("$mksyscert -o /tmp/genicm.pem ".
+       "  -u $TBBASE/protogeni/xmlrpc/cm $PGENIDOMAIN.cm") == 0
+    or fatal("Could not generate CM certificate");
+system("$mksyscert -o /tmp/genisa.pem ".
+       "  -u $TBBASE/protogeni/xmlrpc/sa $PGENIDOMAIN.sa") == 0
+    or fatal("Could not generate SA certificate");
+if ($asch) {
+    system("$mksyscert -o /tmp/genich.pem ".
+	   "  -u $TBBASE/protogeni/xmlrpc/ch $PGENIDOMAIN.ch") == 0
+	   or fatal("Could not generate CH certificate");
+}
+
+exit(0);
+
+sub fatal($)
+{
+    my ($msg) = @_;
+
+    die("*** $0:\n".
+	"    $msg\n");
+}

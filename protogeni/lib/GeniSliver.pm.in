@@ -959,7 +959,7 @@ sub Start($)
 	# XXX Need to fix up this status stuff.
 	if ($node->isremotenode() && $self->status() eq "created") {
 	    $self->SetStatus("ready");
-	    next;
+	    goto done;
 	}
 
 	#
@@ -983,6 +983,7 @@ sub Start($)
 	# Signal error so we can look at what happened.
 	return -1;
     }
+  done:
     return 0;
 }
 

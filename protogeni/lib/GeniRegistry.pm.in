@@ -262,9 +262,21 @@ sub Create($;$$)
     
     my $EMULAB_PEMFILE1 = "@prefix@/etc/genima.pem";
     my $EMULAB_PEMFILE2 = "@prefix@/etc/genich.pem";
-    my $pemfile = (-e $EMULAB_PEMFILE1 ? $EMULAB_PEMFILE1 : $EMULAB_PEMFILE2);
 
     if (!defined($credential)) {
+	my $pemfile;
+
+	if (-e $EMULAB_PEMFILE1) {
+	    $pemfile = $EMULAB_PEMFILE1
+	}
+	elsif (-e $EMULAB_PEMFILE2) {
+	    $pemfile = $EMULAB_PEMFILE2;
+	}
+	else {
+	    print STDERR "Cannot find the pem file for the clearinghouse!\n";
+	    retrn undef;
+	}
+
 	#
 	# We are creating a self signed credential here, which is fine
 	# since the Clearinghouse has the certs of all trusted roots.
@@ -296,6 +308,23 @@ sub Create($;$$)
     
     return GeniRegistry::Client->Create($GENICENTRALURL,
 					$context, $credential->asString());
+}
+
+#
+# Get a credential from the clearinghouse, as for bootstrapping.
+#
+sub GetCredential($;$)
+{
+    my ($class, $context) = @_;
+
+    my $response =
+	Genixmlrpc::CallMethod($GENICENTRALURL, $context, "GetCredential", {});
+	
+    return undef
+	if (!defined($response) ||
+	    $response->code() != GENIRESPONSE_SUCCESS);
+
+    return GeniCredential->CreateFromSigned($response->value(), 1);
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

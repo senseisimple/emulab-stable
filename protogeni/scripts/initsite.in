@@ -1,0 +1,195 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+
+#
+# Initialize an emulab to act as a protogeni emulab. Add optional -c
+# option if this is a clearinghouse.
+# 
+sub usage()
+{
+    print "Usage: initpgenisite [-c]\n";
+    exit(1);
+}
+my $optlist = "c";
+my $asch    = 0;
+my $cflag   = "";
+
+#
+# Configure variables
+#
+my $TB		  = "@prefix@";
+my $TBOPS         = "@TBOPSEMAIL@";
+my $TBLOGS        = "@TBLOGSEMAIL@";
+my $PGENIDOMAIN   = "@PROTOGENI_DOMAIN@";
+my $PGENISUPPORT  = @PROTOGENI_SUPPORT@;
+my $TBBASE        = "@TBBASE@";
+my $newuser	  = "$TB/sbin/newuser";
+my $newproj	  = "$TB/sbin/newproj";
+my $tbacct	  = "$TB/sbin/tbacct";
+my $mkcerts	  = "$TB/sbin/protogeni/createcerts";
+my $addauthority  = "$TB/sbin/protogeni/addauthority";
+my $SACERT	  = "$TB/etc/genisa.pem";
+my $CMCERT	  = "$TB/etc/genicm.pem";
+my $CHCERT	  = "$TB/etc/genich.pem";
+my $SUDO	  = "/usr/local/bin/sudo";
+my $MYSQL         = "/usr/local/bin/mysql";
+my $MYSQLADMIN    = "/usr/local/bin/mysqladmin";
+my $MYSQLSHOW     = "/usr/local/bin/mysqlshow";
+my $MYSQLDUMP     = "/usr/local/bin/mysqldump";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Protos
+sub fatal($);
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
+use Genixmlrpc;
+use GeniRegistry;
+
+if ($UID != 0) {
+    fatal("Must be root to run this script\n");
+}
+
+#
+# Check args.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"c"})) {
+    $asch  = 1;
+    $cflag = "-c";
+}
+
+#
+# The web server needs to do client authentication, for the geni xmlrpc
+# interface. A bundle of CA certs from the trusted roots (emulabs) will
+# be used. This bundle will periodically update as sites come online.
+# To start with, its just the local CA cert. Please make sure that
+# /etc/rc.conf has this line in it:
+#
+#   apache_flags="-DSSL -DPGENI"
+#
+if (! -e "$TB/etc/genica.bundle") {
+    system("/bin/cp $TB/etc/emulab.pem $TB/etc/genica.bundle") == 0
+	or fatal("Could not initialize $TB/etc/genica.bundle");
+}
+if (system("egrep -q -s 'DPGENI' /etc/rc.conf")) {
+    print "Please add 'apache_flags=\"-DSSL -DPGENI\"' to /etc/rc.conf\n";
+    print "Then restart apache. Then rerun this script\n";
+    exit(1);
+}
+
+#
+# user/project that slices (experiments) belong to.
+#
+
+
+#
+# Databases.
+#
+
+#
+# Generate the certs we need.
+#
+system("$mkcerts $cflag") == 0 
+    or fatal("Could not generate certificates");
+
+#
+# Load the SA cert to act as caller context.
+#
+my $certificate = GeniCertificate->LoadFromFile($SACERT);
+if (!defined($certificate)) {
+    fatal("Could not load certificate from $SACERT\n");
+}
+my $context = Genixmlrpc->Context($certificate);
+if (!defined($context)) {
+    fatal("Could not create context to talk to clearinghouse");
+}
+
+#
+# Note that we had to send the clearinghouse $TB/etc/emulab.pem so they
+# know about this new site. That is sent out of band (email).
+#
+# So now ask the clearinghouse for a credential to talk to it.
+#
+my $credential = GeniRegistry::ClearingHouse->GetCredential($context);
+if (!defined($credential)) {
+    fatal("Could not get credential to talk to clearinghouse");
+}
+my $clearinghouse = GeniRegistry::ClearingHouse->Create($context,
+							$credential);
+if (!defined($clearinghouse)) {
+    fatal("Could not create a clearinghouse client");
+}
+
+#
+# Register our certs.
+#
+print "Registering SA cert at the clearinghouse.\n";
+if ($clearinghouse->Register("SA", $certificate->cert(),
+			     { "url" => "$TBBASE/protogeni/xmlrpc/sa" })) {
+    fatal("Could not register SA cert at the clearinghouse");
+}
+my $cmcert = GeniCertificate->LoadFromFile($CMCERT);
+if (!defined($cm)) {
+    fatal("Could not load certificate from $CMCERT\n");
+}
+print "Registering CM cert at the clearinghouse.\n";
+if ($clearinghouse->Register("CM", $cmcert->cert(),
+			     { "url" => "$TBBASE/protogeni/xmlrpc/cm" })) {
+    fatal("Could not register CM cert at the clearinghouse");
+}
+if (!$asch) {
+    #
+    # We want a copy of the clearinghouse certificate in the local FS.
+    #
+    my $blob;
+    $clearinghouse->Resolve("0-0-0-0-0-0", "MA", \$blob) == 0
+	or fatal("Could not resolve the clearinghouse certificate");
+
+    my $chcert = GeniCertificate->LoadFromString($blob->{'gid'});
+    fatal("Could not load CH certificate from blob")
+	if (!defined($chcert));
+
+    my $certfile = $chcert->WriteToFile();
+    if (system("$SUDO /bin/mv $certfile $CHCERT")) {
+	$chcert->Delete();
+	unlink($certfile);
+	fatal("Could not mv $certfile to $CHCERT");
+    }
+    unlink($certfile);
+	
+}
+else {
+    #
+    # Add the cert to the DB directly.
+    #
+    system("$addauthority -c $CHCERT MA $TBBASE/protogeni/xmlrpc/ch") == 0
+	or fatal("Could not add MA certificate");
+}
+exit(0);
+
+sub fatal($)
+{
+    my ($msg) = @_;
+
+    die("*** $0:\n".
+	"    $msg\n");
+}

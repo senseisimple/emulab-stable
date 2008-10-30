@@ -11,7 +11,7 @@ SUBDIR		= protogeni
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS	= security xmlrpc lib scripts
+SUBDIRS	= security xmlrpc lib scripts etc
 
 all:	all-subdirs
 
@@ -22,6 +22,7 @@ install:
 	@$(MAKE) -C xmlrpc install
 	@$(MAKE) -C lib install
 	@$(MAKE) -C scripts install
+	@$(MAKE) -C etc install
 
 control-install: 
 

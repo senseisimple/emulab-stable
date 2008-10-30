@@ -970,7 +970,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
         bugdb/GNUmakefile bugdb/bugdbproxy \
         protogeni/GNUmakefile protogeni/security/GNUmakefile \
         protogeni/xmlrpc/GNUmakefile protogeni/lib/GNUmakefile \
-        protogeni/scripts/GNUmakefile \
+        protogeni/scripts/GNUmakefile protogeni/etc/GNUmakefile \
         collab/GNUmakefile \
         collab/trac/GNUmakefile \
         collab/jabber/GNUmakefile \

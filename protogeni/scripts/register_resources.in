@@ -11,6 +11,7 @@ use English;
 my $TB		   = "@prefix@";
 my $TBOPS          = "@TBOPSEMAIL@";
 my $OURDOMAIN	   = "@OURDOMAIN@";
+my $EMULAB_PEMFILE = "@prefix@/etc/genicm.pem";
 
 use vars qw($GENI_DBNAME);
 $GENI_DBNAME = "geni-cm";
@@ -18,11 +19,11 @@ $GENI_DBNAME = "geni-cm";
 use lib '@prefix@/lib';
 use GeniCertificate;
 use GeniComponent;
-use GeniCHClient;
+use GeniRegistry;
 use Node;
 
 # XXX Need to deal with this.
-my $HRN = (($OURDOMAIN eq "emulab.net") ? "emulab" : "myelab");
+my $HRN = (($OURDOMAIN eq "emulab.net") ? "utahemulab" : "myelab");
 
 if (!@ARGV) {
     die("*** $0:\n".
@@ -38,27 +39,46 @@ if (! defined($this_user)) {
 #
 # The RPC context for this script is as the CM.
 #
-Genixmlrpc->SetContext(Genixmlrpc->Context("@prefix@/etc/genicm.pem"));
-
-my $node_id = $ARGV[0];
-my $node    = Node->Lookup($node_id);
-if (!defined($node)) {
+my $cmcertificate = GeniCertificate->LoadFromFile($EMULAB_PEMFILE);
+if (!defined($cmcertificate)) {
     die("*** $0:\n".
-	"    Could not map $node_id to object\n");
+	"    Could not get uuid from $EMULAB_PEMFILE\n");
 }
 
-# See if we already have a certificate.
-my $certificate = GeniCertificate->Lookup($node->uuid());
-if (!defined($certificate)) {
-    $certificate = GeniCertificate->Create("Node", "${HRN}.${node_id}",
-					   $TBOPS, $node->uuid());
-    if (!defined($certificate)) {
+Genixmlrpc->SetContext(Genixmlrpc->Context($cmcertificate));
+
+my $clearinghouse = GeniRegistry::ClearingHouse->Create();
+if (!defined($clearinghouse)) {
+    die("*** $0:\n".
+	"    Could not create client for clearinghouse\n");
+}
+
+my @nodes = @ARGV;
+
+foreach my $node_id (@nodes) {
+    my $node    = Node->Lookup($node_id);
+    if (!defined($node)) {
 	die("*** $0:\n".
-	    "    Could not generate certificate for $node\n");
+	    "    Could not map $node_id to object\n");
+    }
+    print "Registering $node_id\n";
+
+    # See if we already have a certificate.
+    my $certificate = GeniCertificate->Lookup($node->uuid());
+    if (!defined($certificate)) {
+	$certificate = GeniCertificate->Create("Node", "${HRN}.${node_id}",
+					       $TBOPS, $node->uuid());
+	if (!defined($certificate)) {
+	    die("*** $0:\n".
+		"    Could not generate certificate for $node\n");
+	}
+    }
+    if ($clearinghouse->Register("Component", $certificate->cert(),
+				 { "resource_uuid" => $node->uuid(),
+				   "resource_type" => "Node"}) != 0) {
+	die("*** $0:\n".
+	    "    Could not register $node_id at the clearinghouse\n");
+
     }
 }
-
-GeniCHClient::Register("Component", $certificate->cert(),
-		       { "resource_uuid" => $node->uuid(),
-			 "resource_type" => "Node"});
 

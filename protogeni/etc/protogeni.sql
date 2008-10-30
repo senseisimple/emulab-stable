@@ -78,7 +78,7 @@ CREATE TABLE `geni_authorities` (
   `uuid` varchar(40) NOT NULL default '',
   `uuid_prefix` varchar(12) NOT NULL default '',
   `created` datetime default NULL,
-  `type` enum('sa','ma','ch') NOT NULL default 'sa',
+  `type` enum('sa','cm','ma','ch') NOT NULL default 'sa',
   `url` tinytext,
   PRIMARY KEY  (`idx`),
   UNIQUE KEY `uuid` (`uuid`),

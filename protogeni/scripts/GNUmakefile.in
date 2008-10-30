@@ -11,7 +11,9 @@ SUBDIR		= protogeni/scripts
 
 include $(OBJDIR)/Makeconf
 
-SBIN_STUFF	= newgeninode cleanupslice register_resources
+SBIN_STUFF	= cleanupslice
+PSBIN_STUFF	= newgeninode register_resources \
+		  createcerts initsite addauthority
 
 # These scripts installed setuid, with sudo. 
 SETUID_BIN_SCRIPTS   = 
@@ -22,14 +24,20 @@ SETUID_LIBX_SCRIPTS  =
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
-all:	$(SBIN_STUFF)
+all:	$(SBIN_STUFF) $(PSBIN_STUFF)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-install: $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_STUFF))
+install: $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_STUFF)) \
+	$(addprefix $(INSTALL_SBINDIR)/protogeni/, $(PSBIN_STUFF))
 
 control-install:
 
 clean:
-	rm -f *.o core *.pl *.pm *.py
+	rm -f *.o core *.pl *.pm *.py $(SBIN_STUFF) $(PSBIN_STUFF)
+
+$(INSTALL_SBINDIR)/protogeni/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_SBINDIR)/protogeni
+	$(INSTALL) $< $@
 

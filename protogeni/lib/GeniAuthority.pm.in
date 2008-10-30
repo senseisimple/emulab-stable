@@ -19,6 +19,7 @@ use vars qw(@ISA @EXPORT);
 # Must come after package declaration!
 use lib '@prefix@/lib';
 use GeniDB;
+use GeniRegistry;
 use libtestbed;
 use libdb qw(TBGetUniqueIndex);
 use English;
@@ -124,7 +125,7 @@ sub Stringify($)
 #
 # Create a Geni authority in the DB.
 #
-sub Create($$$$$$)
+sub Create($$$$)
 {
     my ($class, $certificate, $url, $type) = @_;
 
@@ -171,15 +172,53 @@ sub cert($)		{ return $_[0]->{'CERT'}->cert(); }
 sub GetCertificate($)   { return $_[0]->{'CERT'}; }
 
 #
+# Check to see if there is an existing authority with the same prefix.
+#
+sub CheckExisting($$$$)
+{
+    my ($class, $type, $uuid, $hrn) = @_;
+
+    my ($prefix) = ($certificate->uuid() =~ /^\w+\-\w+\-\w+\-\w+\-(\w+)$/);
+
+    my $query_result =
+	DBQueryWarn("select uuid,type from geni_authorities ".
+		    "where uuid_prefix='$prefix'");
+
+    return -1
+	if (!$query_result);
+    return 0
+	if (!$query_result->numrows);
+
+    while (my ($DBuuid,$DBtype) = $query_result->fetchrow_array()) {
+	# Look for an exact match, which means its just a replacement.
+	next
+	    if ($uuid eq $DBuuid && $type eq $DBtype);
+
+	# Same uuid, different type.
+	return 1
+	    if ($uuid eq $DBuuid && $type ne $DBtype);
+
+	# Different uuid, same type.
+	return 1
+	    if ($uuid ne $DBuuid && $type eq $DBtype);
+    }
+    return 0;
+}
+
+#
 # Create authority from the ClearingHouse, by looking up the info.
 #
 sub CreateFromRegistry($$$)
 {
     my ($class, $type, $uuid) = @_;
 
+    my $clearinghouse = GeniRegistry::ClearingHouse->Create();
+    return undef
+	if (!defined($clearinghouse));
+
     my $blob;
     return undef
-	if (GeniCHClient::Resolve($uuid, $type, \$blob) != 0);
+	if ($clearinghouse->Resolve($uuid, $type, \$blob) != 0);
 
     my $certificate = GeniCertificate->LoadFromString($blob->{'gid'});
     return undef

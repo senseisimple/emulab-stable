@@ -225,11 +225,13 @@ sub Create($$$$;$)
     push(@insert_data, "sa_uuid='$sa_uuid'");
 
     #
-    # uid come from last component of the hrn.
+    # uid comes from last component of the hrn.
     #
     my ($uid) = ($certificate->hrn() =~ /^.*\.(\w*)$/);
-    return undef
-	if (!defined($uid));
+    if (!defined($uid)) {
+	print STDERR "HRN is not dotted: " . $certificate->hrn() . "\n";
+	return undef;
+    }
 
     #
     # This comes from either an info record or the cert.

@@ -30,6 +30,7 @@ use GeniAggregate;
 use GeniAuthority;
 use GeniSliver;
 use GeniUser;
+use GeniRegistry;
 use libtestbed;
 # Hate to import all this crap; need a utility library.
 use libdb qw(TBGetUniqueIndex TBcheck_dbslot TBDB_CHECKDBSLOT_ERROR);
@@ -1158,10 +1159,14 @@ sub CreateAuthorityFromRegistry($)
     my ($uuid) = @_;
 
     my ($prefix) = ($uuid =~ /^\w+\-\w+\-\w+\-\w+\-(\w+)$/);
-    
+
+    my $clearinghouse = GeniRegistry::ClearingHouse->Create();
+    return undef
+	if (!defined($clearinghouse));
+
     my $blob;
     return undef
-	if (GeniCHClient::Resolve("P${prefix}", "SA", \$blob) != 0);
+	if ($clearinghouse->Resolve("P${prefix}", "SA", \$blob) != 0);
 
     my $certificate = GeniCertificate->LoadFromString($blob->{'gid'});
     return undef
@@ -1415,7 +1420,7 @@ sub GeniExperiment($)
 }
 
 #
-# Return a list of slivers for the specified slice.
+# Return the top level aggregate (sliver) for a slice. 
 #
 sub GetSliver($)
 {

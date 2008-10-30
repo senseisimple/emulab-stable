@@ -21,6 +21,7 @@ use lib '@prefix@/lib';
 use GeniDB;
 use Genixmlrpc;
 use GeniResponse;
+use GeniRegistry;
 use GeniTicket;
 use GeniCredential;
 use libdb qw(TBGetUniqueIndex);
@@ -279,9 +280,13 @@ sub CreateFromRegistry($$)
 {
     my ($class, $uuid) = @_;
 
+    my $clearinghouse = GeniRegistry::ClearingHouse->Create();
+    return undef
+	if (!defined($clearinghouse));
+
     my $blob;
     return undef
-	if (GeniCHClient::Resolve($uuid, "CM", \$blob) != 0);
+	if ($clearinghouse->Resolve($uuid, "CM", \$blob) != 0);
 
     my $certificate = GeniCertificate->LoadFromString($blob->{'gid'});
     return undef

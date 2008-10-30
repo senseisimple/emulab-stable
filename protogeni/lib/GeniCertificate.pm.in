@@ -329,9 +329,11 @@ sub WriteToFile($)
     print $tempfile "-----BEGIN CERTIFICATE-----\n";
     print $tempfile $self->cert();
     print $tempfile "-----END CERTIFICATE-----\n";
-    print $tempfile "-----BEGIN RSA PRIVATE KEY-----\n";
-    print $tempfile $self->privkey();
-    print $tempfile "-----END RSA PRIVATE KEY-----\n";
+    if ($self->privkey()) {
+	print $tempfile "-----BEGIN RSA PRIVATE KEY-----\n";
+	print $tempfile $self->privkey();
+	print $tempfile "-----END RSA PRIVATE KEY-----\n";
+    }
     return $filename;
 }
 

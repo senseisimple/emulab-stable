@@ -212,6 +212,16 @@ sub Resolve($)
 		 };
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
     }
+    if ($type eq "MA") {
+	#
+	# I think the MA is the ClearingHouse?
+	#
+	# Return a blob.
+	my $blob = { "gid"         => $authority->cert(),
+		     "url"         => $authority->url(),
+		 };
+	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
+    }
     if ($type eq "Slice") {
 	my $slice = GeniSlice->Lookup($uuid);
 	if (!defined($slice)) {
@@ -250,7 +260,7 @@ sub Register($)
     my $info  = $argref->{'info'};
     my $type  = $argref->{'type'};
 
-    if (! (defined($type) && ($type =~ /^(SA|MA|Component|Slice|User)$/))) {
+    if (! (defined($type) && ($type =~ /^(SA|MA|CM|Component|Slice|User)$/))) {
 	return GeniResponse->MalformedArgsResponse();
     }
     if (! defined($cred)) {
@@ -515,8 +525,27 @@ sub Register($)
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					"Could not register new resource");
 	}
+	return GeniResponse->Create(GENIRESPONSE_SUCCESS);
     }
+    if ($type eq "CM" || $type eq "SA") {
+	my $url = $info->{'url'};
 
+	#
+	# Check for an existing authority. 
+	#
+	if (GeniAuthority->CheckExisting($certificate->uuid(), $type,
+					 $certificate->hrn()) != 0) {
+	    print STDERR "Attempt to register existing authority\n";
+	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+					"Authority already exists");
+	}
+	my $authority = GeniAuthority->Create($certificate, $url, $type);
+	if (!defined($authority)) {
+	    print STDERR "Could not register new authority\n";
+	    return GeniResponse->Create(GENIRESPONSE_ERROR);
+	}
+	return GeniResponse->Create(GENIRESPONSE_SUCCESS);
+    }
     return GeniResponse->Create(GENIRESPONSE_UNSUPPORTED);
 }
 
@@ -530,7 +559,7 @@ sub Remove($)
     my $uuid  = $argref->{'uuid'};
     my $type  = $argref->{'type'};
 
-    if (! (defined($type) && ($type =~ /^(SA|MA|Component|Slice|User)$/))) {
+    if (! (defined($type) && ($type =~ /^(SA|MA|CM|Component|Slice|User)$/))) {
 	return GeniResponse->MalformedArgsResponse();
     }
     if (! defined($cred)) {
