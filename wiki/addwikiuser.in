@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -253,6 +253,7 @@ if ($CONTROL ne $BOSSNODE) {
 
     # shell escape.
     $usr_pswd  =~ s/\$/\\\$/g;
+    $usr_pswd  =~ s/\*/\\\*/g;
 
     if (system("$SSH -host $CONTROL $WIKIPROXY ".
 	       "  $optarg adduser $user $wikiname '$usr_pswd'")) {
