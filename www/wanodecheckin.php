@@ -70,3 +70,5 @@ if ($retval) {
     SUEXECERROR(SUEXEC_ACTION_CONTINUE);
 }
 SPITSTATUS($retval);
+
+?>

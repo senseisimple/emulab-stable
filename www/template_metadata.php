@@ -466,3 +466,5 @@ if (isset($referrer)) {
 else {
     header("Location: ". CreateURL("template_show", $template));
 }
+
+?>

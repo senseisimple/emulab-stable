@@ -313,3 +313,5 @@ function BEGINEXP($nsref)
     $url .= "&nsref=$nsref";
     header("Location: $url");
 }
+
+?>

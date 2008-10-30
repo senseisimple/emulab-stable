@@ -55,3 +55,4 @@ echo "-----BEGIN CERTIFICATE-----\n";
 echo $cert;
 echo "-----END CERTIFICATE-----\n";
 
+?>

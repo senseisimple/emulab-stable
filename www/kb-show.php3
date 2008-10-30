@@ -30,3 +30,5 @@ if (isset($idx)) {
 else {
     header("Location: $WIKIDOCURL/KnowledgeBase", TRUE, 301);
 }    
+
+?>

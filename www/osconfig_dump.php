@@ -306,3 +306,5 @@ unlink($manifest);
 rmdir($randdir);
 
 return;
+
+?>

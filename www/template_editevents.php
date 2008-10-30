@@ -257,3 +257,5 @@ while (list ($index, $dbrow) = each ($eventlist)) {
 
 # Zap back to this page.
 header("Location: ".  CreateURL("template_editevents.php", $template));
+
+?>

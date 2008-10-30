@@ -50,3 +50,5 @@ for ($i = 0; $i < count($output); $i++) {
     echo "$output[$i]\n";
 }
 echo "\n";
+
+?>

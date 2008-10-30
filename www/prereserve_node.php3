@@ -131,3 +131,5 @@ DBQueryFatal("update nodes set reserved_pid='$pid' ".
 	     "where node_id='$node_id'");
 
 header("Location: " . CreateURL("shownode", $node));
+
+?>
