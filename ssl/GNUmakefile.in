@@ -252,9 +252,7 @@ boss-installX:	$(INSTALL_ETCDIR)/emulab.pem \
 		$(INSTALL_ETCDIR)/capture.sha1fingerprint \
 		$(INSTALL_ETCDIR)/emulab_privkey.pem \
 		$(INSTALL_ETCDIR)/emulab_pubkey.pem \
-		usercert.cnf syscert.cnf
-	$(INSTALL_DATA) usercert.cnf $(INSTALL_LIBDIR)/ssl/usercert.cnf
-	$(INSTALL_DATA) ca.cnf $(INSTALL_LIBDIR)/ssl/ca.cnf
+		install-conf
 	$(INSTALL_DATA) localnode.pem $(INSTALL_ETCDIR)/client.pem
 	chmod 640 $(INSTALL_ETCDIR)/emulab.pem
 	chmod 600 $(INSTALL_ETCDIR)/emulab.key
@@ -269,6 +267,11 @@ boss-installX:	$(INSTALL_ETCDIR)/emulab.pem \
 	chmod 644 $(INSTALL_ETCDIR)/capture.fingerprint
 	chmod 644 $(INSTALL_ETCDIR)/capture.sha1fingerprint
 
+install-conf:	usercert.cnf syscert.cnf ca.cnf
+	$(INSTALL_DATA) usercert.cnf $(INSTALL_LIBDIR)/ssl/usercert.cnf
+	$(INSTALL_DATA) syscert.cnf $(INSTALL_LIBDIR)/ssl/syscert.cnf
+	$(INSTALL_DATA) ca.cnf $(INSTALL_LIBDIR)/ssl/ca.cnf
+
 remote-site-boss-install:	install-dirs \
 		$(INSTALL_ETCDIR)/emulab.pem \
 		$(INSTALL_ETCDIR)/emulab.key \
@@ -277,9 +280,7 @@ remote-site-boss-install:	install-dirs \
 		$(INSTALL_ETCDIR)/capture.sha1fingerprint \
 		$(INSTALL_ETCDIR)/ctrlnode.pem \
 		$(INSTALL_ETCDIR)/server.pem \
-		usercert.cnf
-	$(INSTALL_DATA) usercert.cnf $(INSTALL_LIBDIR)/ssl/usercert.cnf
-	$(INSTALL_DATA) ca.cnf $(INSTALL_LIBDIR)/ssl/ca.cnf
+		install-conf
 	$(INSTALL_DATA) localnode.pem $(INSTALL_ETCDIR)/client.pem
 	chmod 640 $(INSTALL_ETCDIR)/emulab.pem
 	chmod 600 $(INSTALL_ETCDIR)/emulab.key

@@ -5,16 +5,12 @@ prompt                  = no
 default_bits		= 1024
 default_keyfile 	= privkey.pem
 distinguished_name	= req_distinguished_name
-attributes		= req_attributes
-x509_extensions	        = v3_ca	# The extentions to add to the self signed cert
+req_extensions	        = request_extensions
 string_mask             = nombstr
 
-[ req_attributes ]
-
-[ v3_ca ]
+[ request_extensions ]
+basicConstraints=critical,CA:TRUE
 subjectKeyIdentifier=hash
-authorityKeyIdentifier=keyid:always,issuer:always
-basicConstraints = CA:true
 
 # This will be appended to by mkusercert.
 [ req_distinguished_name ]
