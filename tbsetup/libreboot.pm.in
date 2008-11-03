@@ -24,7 +24,6 @@ use vars qw(@ISA @EXPORT);
 use lib '@prefix@/lib';
 use libdb;
 use libtblog;
-use GeniEmulab;
 use English;
 
 #
@@ -33,9 +32,14 @@ use English;
 my $TB		= "@prefix@";
 my $CLIENT_BIN  = "@CLIENT_BINDIR@";
 my $BOSSNODE    = "@BOSSNODE@";
+my $PGENISUPPORT= @PROTOGENI_SUPPORT@;
+
+if ($PGENISUPPORT) {
+    require GeniEmulab;
+}
 
 #
-# The number of nodes we reboot at a time and the time to wait between batches. 
+# The number of nodes we reboot at a time and the time to wait between batches.
 # The batch size determines the degree of parallelism.
 #
 my $BATCHCOUNT  = 12;
