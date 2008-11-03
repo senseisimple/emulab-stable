@@ -246,12 +246,9 @@ sub ListComponents($$$)
 package GeniRegistry::ClearingHouse;
 
 use Genixmlrpc;
+use GeniResponse;
 use GeniCertificate;
 use GeniCredential;
-
-# Configure variables
-my $GENICENTRAL    = "myboss.myelab.testbed.emulab.net";
-my $GENICENTRALURL = "https://$GENICENTRAL/protogeni/xmlrpc/ch";
 
 #
 # The clearinghouse is a registry.
@@ -262,6 +259,7 @@ sub Create($;$$)
     
     my $EMULAB_PEMFILE1 = "@prefix@/etc/genima.pem";
     my $EMULAB_PEMFILE2 = "@prefix@/etc/genich.pem";
+    my $url;
 
     if (!defined($credential)) {
 	my $pemfile;
@@ -274,7 +272,7 @@ sub Create($;$$)
 	}
 	else {
 	    print STDERR "Cannot find the pem file for the clearinghouse!\n";
-	    retrn undef;
+	    return undef;
 	}
 
 	#
@@ -306,7 +304,7 @@ sub Create($;$$)
 	}
     }
     
-    return GeniRegistry::Client->Create($GENICENTRALURL,
+    return GeniRegistry::Client->Create($credential->target_cert()->URL(),
 					$context, $credential->asString());
 }
 
@@ -317,12 +315,31 @@ sub GetCredential($;$)
 {
     my ($class, $context) = @_;
 
+    $context = Genixmlrpc->GetContext()
+	if (!defined($context));
+
+    my $EMULAB_PEMFILE = "@prefix@/etc/genich.pem";
+    if (!defined($EMULAB_PEMFILE)) {
+	print STDERR "$EMULAB_PEMFILE needed to talk to the clearinghouse\n";
+	return undef;
+    }
+    my $certificate = GeniCertificate->LoadFromFile($EMULAB_PEMFILE);
+    if (!defined($certificate)) {
+	print STDERR "Could not load CH certificate from $EMULAB_PEMFILE\n";
+	return undef;
+    }
+    my $url = $certificate->URL();
+    if (!defined($url)) {
+	print STDERR "No URI extension in $EMULAB_PEMFILE\n";
+	return undef;
+    }
     my $response =
-	Genixmlrpc::CallMethod($GENICENTRALURL, $context, "GetCredential", {});
+	Genixmlrpc::CallMethod($url, $context, "GetCredential",
+			       {"gid" => $context->certificate()->cert()});
 	
     return undef
 	if (!defined($response) ||
-	    $response->code() != GENIRESPONSE_SUCCESS);
+	    $response->code() != GENIRESPONSE_SUCCESS());
 
     return GeniCredential->CreateFromSigned($response->value(), 1);
 }

@@ -13,7 +13,7 @@ include $(OBJDIR)/Makeconf
 
 SBIN_STUFF	= cleanupslice
 PSBIN_STUFF	= newgeninode register_resources \
-		  createcerts initsite addauthority
+		  createcerts initsite addauthority getcacerts
 
 # These scripts installed setuid, with sudo. 
 SETUID_BIN_SCRIPTS   = 

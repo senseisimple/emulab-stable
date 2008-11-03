@@ -129,14 +129,15 @@ sub email($)
 #
 # Create a certificate pair, which gives us a uuid to use for an object.
 #
-sub Create($$$$;$)
+sub Create($$$$;$$)
 {
-    my ($class, $what, $hrn, $email, $uuid) = @_;
+    my ($class, $what, $hrn, $email, $uuid, $url) = @_;
     # Let mkcert generate a new one.
     $uuid = ""
 	if (!defined($uuid));
+    $url  = (defined($url) ? "-u $url" : "");
 
-    if (! open(CERT, "$MKCERT -e \"$email\" $hrn $uuid |")) {
+    if (! open(CERT, "$MKCERT $url -e \"$email\" $hrn $uuid |")) {
 	print STDERR "Could not start $MKCERT\n";
 	return undef;
     }
@@ -320,21 +321,72 @@ sub Store($)
 #
 # Write a certificate and private key to a tempfile, as for signing with it.
 #
-sub WriteToFile($)
+sub WriteToFile($;$)
 {
-    my ($self) = @_;
+    my ($self, $withkey) = @_;
+
+    $withkey = 0
+	if (!defined($withkey));
     
     # We want this file to be passed back. 
     my ($tempfile, $filename) = tempfile(UNLINK => 1);
     print $tempfile "-----BEGIN CERTIFICATE-----\n";
     print $tempfile $self->cert();
     print $tempfile "-----END CERTIFICATE-----\n";
-    if ($self->privkey()) {
+    if ($withkey && $self->privkey()) {
 	print $tempfile "-----BEGIN RSA PRIVATE KEY-----\n";
 	print $tempfile $self->privkey();
 	print $tempfile "-----END RSA PRIVATE KEY-----\n";
     }
     return $filename;
+}
+
+#
+# The URL is buried in an extension so we have to parse the text output.
+#
+sub URL($)
+{
+    my ($self) = @_;
+    my $url;
+
+    my $filename = $self->WriteToFile();
+    if (! open(X509, "$OPENSSL x509 -in $filename -text -noout |")) {
+	print STDERR "Could not start $OPENSSL on $filename\n";
+	return undef;
+    }
+    while (<X509>) {
+	if ($_ =~ /^\s+URI:([-\w\.\/:]+)$/) {
+	    $url = $1;
+	    chomp($url);
+	}
+    }
+    if (!close(X509) || !defined($url)) {
+	print STDERR "Could not find url in certificate from $filename\n";
+	return undef;
+    }
+    unlink($filename);
+    return $url;
+}
+
+sub asText($)
+{
+    my ($self) = @_;
+    my $text   = "";
+
+    my $filename = $self->WriteToFile();
+    if (! open(X509, "$OPENSSL x509 -in $filename -text |")) {
+	print STDERR "Could not start $OPENSSL on $filename\n";
+	return undef;
+    }
+    while (<X509>) {
+	$text .= $_;
+    }
+    if (!close(X509) || $text eq "") {
+	print STDERR "Could not dump text of certificate from $filename\n";
+	return undef;
+    }
+    unlink($filename);
+    return $text;
 }
 
 ############################################################################

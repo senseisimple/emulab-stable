@@ -20,7 +20,7 @@ use vars qw($GENI_DBNAME);
 BEGIN { $GENI_DBNAME = "geni-ch"; }
 
 # Configure variables
-my $EMULAB_PEMFILE = "@prefix@/etc/genima.pem";
+my $EMULAB_PEMFILE = "@prefix@/etc/genich.pem";
 
 # Testbed libraries.
 use lib '@prefix@/lib';

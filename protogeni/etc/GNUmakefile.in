@@ -22,6 +22,8 @@ all:	$(ETCFILES)
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 install: $(addprefix $(INSTALL_ETCDIR)/protogeni/, $(ETCFILES))
+	$(INSTALL_DATA) $(SRCDIR)/protogeni.sql \
+		$(INSTALL_ETCDIR)/protogeni/protogeni.sql
 
 control-install:
 

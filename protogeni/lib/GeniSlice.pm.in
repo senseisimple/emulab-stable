@@ -319,49 +319,6 @@ sub UnRegister($)
 }
 
 #
-# Discover resources for a local slice. We do not worry about the experiment
-# yet, since we do not have a resource discovery service. We get back a list
-# of components.
-#
-sub DiscoverResources($$)
-{
-    my ($self, $pref) = @_;
-
-    return -1
-	if (! ref($self));
-
-    my $clearinghouse = GeniRegistry::ClearingHouse->Create();
-    return -1
-	if (!defined($clearinghouse));
-
-    my $blob;
-    $clearinghouse->DiscoverResources($self, \$blob) == 0
-	or return -1;
-
-    #
-    # We get back a list of components right now, which we cache locally.
-    #
-    my @result = ();
-    
-    foreach my $ref (@{ $blob }) {
-	my $certificate = GeniCertificate->LoadFromString($ref->{'gid'});
-	return -1
-	    if (!defined($certificate));
-	my $uuid = $certificate->uuid();
-
-	my $component = GeniComponent->Lookup($uuid);
-	if (!defined($component)) {
-	    $component = GeniComponent->CreateFromRegistry($uuid);
-	    return -1
-		if (!defined($component));
-	}
-	push(@result, $component);
-    }
-    @$pref = @result;
-    return 0;
-}
-
-#
 # Delete the slice, as for registration errors.
 #
 sub Delete($)

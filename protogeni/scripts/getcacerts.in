@@ -1,0 +1,138 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+
+#
+# Create the certs for a new protogeni emulab.
+# 
+sub usage()
+{
+    print "Usage: getcacerts\n";
+    exit(1);
+}
+my $optlist = "d";
+
+#
+# Configure variables
+#
+my $TB		  = "@prefix@";
+my $TBOPS         = "@TBOPSEMAIL@";
+my $TBLOGS        = "@TBLOGSEMAIL@";
+my $PGENIDOMAIN   = "@PROTOGENI_DOMAIN@";
+my $PGENISUPPORT  = @PROTOGENI_SUPPORT@;
+my $TBBASE        = "@TBBASE@";
+my $FETCH	  = "/usr/bin/fetch";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Protos
+sub fatal($);
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+if ($UID != 0) {
+    fatal("Must be root to run this script\n");
+}
+
+#
+# Check args.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+
+mkdir("/tmp/genicacerts.$$", 0755) or
+    fatal("Could not mkdircacerts tmp dir");
+
+#
+# Fetch the ca bundle from Utah. These are public keys ...
+#
+system("$FETCH -q -o /tmp/genica.bundle.$$ ".
+       "     http://boss.emulab.net/genica.bundle") == 0
+    or fatal("Could not fetch genica bundle from Utah");
+
+#
+# Split up the certs.
+#
+my @certs = ();
+my $certstr;
+
+open(BUNDLE, "/tmp/genica.bundle.$$")
+    or fatal("Could not open /tmp/genica.bundle.$$ for reading");
+while (<BUNDLE>) {
+    if ($line =~ /^-----BEGIN CERT/) {
+	$certstr = $_;
+	next;
+    }
+    if ($line =~ /^-----END CERT/) {
+	$certstr .= $_;
+	push(@certs, $certstr);
+	$certstr = undef;
+	next;
+    }
+    if ($certstr) {
+	$certstr .= $_;
+	next;
+    }
+}
+push(@certs, $certstr)
+    if ($certstr);
+close(BUNDLE);
+
+my $idx = 0;
+while (@certs) {
+    my $cert = pop(@certs);
+
+    open(CERT, ">/tmp/genicacerts.$$/$idx.pem")
+	or fatal("Could not open pem file in /tmp/genicacerts.$$");
+    print CERT $cert;
+    close(CERT);
+    $idx++;
+}
+
+if (-e "$TB/etc/genica.bundle.old") {
+    unlink("$TB/etc/genica.bundle.old") or
+	fatal("Could not remove old genica bundle");
+}
+system("/bin/cp $TB/etc/genica.bundle $TB/etc/genica.bundle.old") == 0
+    of fatal("Could not save off $TB/etc/genica.bundle");
+
+if (-e "$TB/etc/genicacerts.old") {
+    system("/bin/rm -rf $TB/etc/genicacerts.old") == 0
+	or fatal("Could not remove old genicacerts directory");
+}
+if (-e "$TB/etc/genicacerts") {
+    system("/bin/mv $TB/etc/genicacerts $TB/etc/genicacerts.old") == 0
+	or fatal("Could not save off genicacerts directory");
+}
+system("/bin/mv /tmp/genica.bundle.$$ $TB/etc/genica.bundle") == 0
+    or fatal("Could not mv /tmp/genica.bundle.$$ $TB/etc/genica.bundle");
+system("/bin/mv /tmp/genicacerts.$$ $TB/etc/genicacerts") == 0
+    or fatal("Could not mv /tmp/genicacerts.$$ to $TB/etc/genicacerts");
+
+exit(0);
+
+sub fatal($)
+{
+    my ($msg) = @_;
+
+    die("*** $0:\n".
+	"    $msg\n");
+}

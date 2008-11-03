@@ -51,6 +51,7 @@ sub GetCredential($)
     my $uuid = $argref->{'uuid'};
     my $cred = $argref->{'credential'};
     my $type = $argref->{'type'};
+    my $gid  = $argref->{'gid'};
 
     #
     # The caller has to be known to us, but how are they known to us?
@@ -58,8 +59,58 @@ sub GetCredential($)
     #
     my $caller_uuid = $ENV{'GENIUUID'};
     my $caller_authority = GeniAuthority->Lookup($ENV{'GENIUUID'});
-    return GeniResponse->Create(GENIRESPONSE_REFUSED, undef, "Who are You?")
-	if (!defined($caller_authority));
+    if (!defined($caller_authority)) {
+        if (!defined($gid)) {
+	    return GeniResponse->Create(GENIRESPONSE_REFUSED,
+					undef, "Who are You?");
+	}
+	#
+	# Must be a new site. We could not have gotten this far without
+	# their CA certificate being know to us, so lets just register them
+	# and tell tbops about it.
+	#
+	if (! ($gid =~ /^[\012\015\040-\176]*$/)) {
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					"cert: Invalid characters");
+	}
+	my $certificate = GeniCertificate->LoadFromString($gid);
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not parse certificate")
+	    if (!defined($certificate));
+
+	if (! ($certificate->uuid() =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/)) {
+	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+					"Improper format for uuid");
+	}
+	if (! ($certificate->hrn() =~ /^[\w\.]+$/)) {
+	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+					"Improper format for hrn");
+	}
+	my $url = $certificate->URL();
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not find URL in the certificate")
+	    if (!defined($url));
+
+	#
+	# Check for an existing authority. 
+	#
+	if (GeniAuthority->CheckExisting("sa", $certificate->uuid(), 
+					 $certificate->hrn()) != 0) {
+	    print STDERR "Attempt to register existing slice authority\n";
+	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+					"Slice Authority already exists");
+	}
+
+	SENDMAIL($TBOPS, "New ProtoGeni Authority",
+		 $certificate->asText());
+
+	$caller_authority = GeniAuthority->Create($certificate, $url, "sa");
+	if (!defined($caller_authority)) {
+	    print STDERR "Could not create new geni authority\n";
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					"Could not create new GeniAuthority");
+	}
+    }
     
     #
     # No credential, then return a generic credential giving caller permission
@@ -167,21 +218,15 @@ sub Resolve($)
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
     }
     if ($type eq "Component") {
-	my $component = GeniComponent->LookupByResource($uuid);
+	my $component = GeniComponent->Lookup($uuid);
 	
 	if (!defined($component)) {
 	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
-					"No such resource $uuid");
-	}
-	my $certificate = GeniCertificate->Lookup($uuid);
-	if (!defined($certificate)) {
-	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
-					"No certificate for $uuid");
+					"No such component resource $uuid");
 	}
 
 	# Return a blob.
-	my $blob = { "gid"      => $certificate->cert(),
-		     "cm"	=> $component->cert(),
+	my $blob = { "gid"      => $component->cert(),
 		     "url"      => $component->url(),
 		 };
     
@@ -201,14 +246,14 @@ sub Resolve($)
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
     }
     if ($type eq "CM") {
-	my $component = GeniComponent->Lookup($uuid);
-	if (!defined($component)) {
+	my $manager = GeniAuthority->Lookup($uuid);
+	if (!defined($manager)) {
 	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
-					"No such component $uuid");
+					"No such manager $uuid");
 	}
 	# Return a blob.
-	my $blob = { "gid"         => $component->cert(),
-		     "url"         => $component->url(),
+	my $blob = { "gid"         => $manager->cert(),
+		     "url"         => $manager->url(),
 		 };
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
     }
@@ -500,45 +545,37 @@ sub Register($)
 				    "Slice has been registered");
     }
     if ($type eq "Component") {
-	my $resource_type  = $info->{'resource_type'};
-	my $resource_uuid  = $info->{'resource_uuid'};
-
-	my $component = GeniComponent->Lookup($ENV{'GENIUUID'});
-	if (!defined($component)) {
-	    print STDERR "Could not find component object for caller.\n";
+	my $manager = GeniAuthority->Lookup($ENV{'GENIUUID'});
+	if (!defined($manager)) {
+	    print STDERR "Could not find manager object for caller.\n";
 	    return GeniResponse->Create(GENIRESPONSE_ERROR);
 	}
-
-	if (! ($resource_uuid =~ /^[-\w]+$/)) {
-	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					"resource_uuid: Invalid characters");
-	}
-	if (! ($resource_type =~ /^[-\w]+$/)) {
-	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					"resource_type: Invalid characters");
-	}
-	if ($certificate->Store() != 0) {
-	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					"Could not store certificate");
-	}
-	if ($component->NewResource($resource_uuid) != 0) {
+	my $component = GeniComponent->CreateFromCertificate($certificate,
+							     $manager);
+	if (!defined($component)) {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					"Could not register new resource");
 	}
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS);
     }
     if ($type eq "CM" || $type eq "SA") {
-	my $url = $info->{'url'};
-
 	#
 	# Check for an existing authority. 
 	#
-	if (GeniAuthority->CheckExisting($certificate->uuid(), $type,
+	if (GeniAuthority->CheckExisting($type, $certificate->uuid(), 
 					 $certificate->hrn()) != 0) {
 	    print STDERR "Attempt to register existing authority\n";
 	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 					"Authority already exists");
 	}
+	my $url = $certificate->URL();
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not find URL in the certificate")
+	    if (!defined($url));
+
+	SENDMAIL($TBOPS, "ProtoGeni Authority Registration",
+		 $certificate->asText());
+	
 	my $authority = GeniAuthority->Create($certificate, $url, $type);
 	if (!defined($authority)) {
 	    print STDERR "Could not register new authority\n";
@@ -653,21 +690,22 @@ sub ListComponents($)
     }
 
     #
-    # Return simple list of components (hashes).
+    # Return simple list of components managers (aggregate managers?)
     #
     my @results = ();
-    my $query_result = DBQueryWarn("select uuid from geni_components");
+    my $query_result = DBQueryWarn("select uuid from geni_authorities ".
+				   "where type='cm'");
     return GeniResponse->Create(GENIRESPONSE_DBERROR)
 	if (!defined($query_result));
 
-    while (my ($component_uuid) = $query_result->fetchrow_array()) {
-	my $component = GeniComponent->Lookup($component_uuid);
+    while (my ($manager_uuid) = $query_result->fetchrow_array()) {
+	my $manager = GeniAuthority->Lookup($manager_uuid);
 	return GeniResponse->Create(GENIRESPONSE_DBERROR)
-	    if (!defined($component));
+	    if (!defined($manager));
 	    
-	push(@results, { "gid" => $component->cert(),
-			 "hrn" => $component->hrn(),
-		         "url" => $component->url() });
+	push(@results, { "gid" => $manager->cert(),
+			 "hrn" => $manager->hrn(),
+		         "url" => $manager->url() });
     }
     return GeniResponse->Create(GENIRESPONSE_SUCCESS, \@results);
 }

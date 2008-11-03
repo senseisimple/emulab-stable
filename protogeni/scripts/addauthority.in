@@ -20,17 +20,6 @@ sub usage()
 my $optlist    = "c";
 my $asch       = 0;
 
-use vars qw($GENI_DBNAME);
-if ($asch) {
-    $GENI_DBNAME = "geni-ch";
-}
-
-# Now we can load the libraries after setting the proper DB.
-use lib '@prefix@/lib';
-require GeniDB;
-use GeniCertificate;
-use GeniAuthority;
-
 #
 # Check args.
 #
@@ -42,28 +31,38 @@ if (defined($options{"c"})) {
     $asch = 1;
 }
 usage()
-    if (@ARGV != 3);
+    if (@ARGV != 2);
 
 my $certfile = $ARGV[0];
 my $type     = $ARGV[1];
-my $url      = $ARGV[2];
+
+use vars qw($GENI_DBNAME);
+if ($asch) {
+    $GENI_DBNAME = "geni-ch";
+}
+
+# Now we can load the libraries after setting the proper DB.
+use lib '@prefix@/lib';
+require GeniDB;
+require GeniCertificate;
+require GeniAuthority;
 
 my $certificate = GeniCertificate->LoadFromFile($certfile);
 if (!defined($certificate)) {
     die("Could not get certificate from $certfile\n");
 }
-if ($certificate->uuid() =~ /\w*-(\w*)$/) {
-    $prefix = $1;
-}
-else {
+if (! ($certificate->uuid() =~ /\w*-(\w*)$/)) {
     die("Could not get prefix from uuid\n");
 }
-
+my $url = $certificate->URL();
+if (!defined($url)) {
+    die("Certificate does not have a URI extension");
+}
 if (GeniAuthority->CheckExisting($type, $certificate->uuid(),
 				 $certificate->hrn())) {
     die("$certfile is already registered in the DB\n");
 }
-GeniAuthority->Create($certificate, $url, $prefix, $type)
+GeniAuthority->Create($certificate, $url, lc($type))
     or die("Could not add new authority\n");
 
 exit(0);

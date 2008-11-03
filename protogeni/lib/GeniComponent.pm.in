@@ -24,6 +24,7 @@ use GeniResponse;
 use GeniRegistry;
 use GeniTicket;
 use GeniCredential;
+use GeniAuthority;
 use libdb qw(TBGetUniqueIndex);
 use English;
 use overload ('""' => 'Stringify');
@@ -46,35 +47,26 @@ my $impotent       = 0;
 my %components     = ();
 
 #
-# Lookup by idx, or uuid.
+# Lookup by uuid.
 #
 sub Lookup($$)
 {
     my ($class, $token) = @_;
     my $query_result;
-    my $idx;
+    my $uuid;
 
-    if ($token =~ /^\d+$/) {
-	$idx = $token;
-    }
-    elsif ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
-	$query_result =
-	    DBQueryWarn("select idx from geni_components ".
-			"where uuid='$token'");
-	    return undef
-		if (! $query_result || !$query_result->numrows);
-
-	    ($idx) = $query_result->fetchrow_array();
+    if ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
+	$uuid = $token;
     }
     else {
 	return undef;
     }
     # Look in cache first
-    return $components{"$idx"}
-        if (exists($components{"$idx"}));
+    return $components{"$uuid"}
+        if (exists($components{"$uuid"}));
 
     $query_result =
-	DBQueryWarn("select * from geni_components where idx='$idx'");
+	DBQueryWarn("select * from geni_components where uuid='$uuid'");
     
     return undef
 	if (!$query_result || !$query_result->numrows);
@@ -86,16 +78,28 @@ sub Lookup($$)
     #
     # Grab the certificate, since we will probably want it.
     #
-    my $uuid = $self->{'COMPONENT'}->{'uuid'};
     my $certificate = GeniCertificate->Lookup($uuid);
     if (!defined($certificate)) {
-	print STDERR "Could not find certificate for component  $idx\n";
+	print STDERR "Could not find certificate for component $uuid\n";
 	return undef;
     }
     $self->{'CERT'} = $certificate;
     
+    #
+    # And grab the manager if we know it. 
+    #
+    my $manager_uuid = $self->{'COMPONENT'}->{'manager_uuid'};
+    if (defined($manager_uuid)) {
+	my $manager = GeniAuthority->Lookup($manager_uuid);
+	if (!defined($manager)) {
+	    print STDERR "Could not find manager for component $uuid\n";
+	    return undef;
+	}
+	$self->{'MANAGER'} = $manager;
+    }
+    
     # Add to cache. 
-    $components{$self->{'COMPONENT'}->{'idx'}} = $self;
+    $components{$self->{'COMPONENT'}->{'uuid'}} = $self;
     
     return $self;
 }
@@ -108,31 +112,30 @@ sub Stringify($)
     my ($self) = @_;
     
     my $uuid = $self->uuid();
-    my $idx  = $self->idx();
 
-    return "[GeniComponent: $uuid, IDX: $idx]";
+    return "[GeniComponent: $uuid]";
 }
 
 #
 # Create a Geni component in the DB.
 #
-sub Create($$$)
+sub Create($$;$)
 {
-    my ($class, $certificate, $url) = @_;
+    my ($class, $certificate, $manager) = @_;
 
     my @insert_data = ();
-    my $idx = TBGetUniqueIndex('next_component', 1);
 
     my $safe_hrn  = DBQuoteSpecial($certificate->hrn());
-    my $safe_url  = DBQuoteSpecial($url);
     my $safe_uuid = DBQuoteSpecial($certificate->uuid());
+    my $safe_url  = DBQuoteSpecial($certificate->URL());
     
     # Now tack on other stuff we need.
     push(@insert_data, "created=now()");
-    push(@insert_data, "idx='$idx'");
     push(@insert_data, "hrn=$safe_hrn");
-    push(@insert_data, "url=$safe_url");
     push(@insert_data, "uuid=$safe_uuid");
+    push(@insert_data, "url=$safe_url");
+    push(@insert_data, "manager_uuid='" . $manager->uuid() . "'")
+	if (defined($manager));
 
     if ($certificate->Store() != 0) {
 	print STDERR "Could not store certificate for new component.\n";
@@ -143,62 +146,17 @@ sub Create($$$)
     DBQueryWarn("replace into geni_components set " . join(",", @insert_data))
 	or return undef;
 
-    return GeniComponent->Lookup($idx);
+    return GeniComponent->Lookup($certificate->uuid());
 }
 # accessors
 sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'COMPONENT'}->{$_[1]}); }
-sub idx($)		{ return field($_[0], "idx"); }
 sub uuid($)		{ return field($_[0], "uuid"); }
-sub url($)		{ return field($_[0], "url"); }
+sub manager_uuid($)	{ return field($_[0], "manager_uuid"); }
 sub hrn($)		{ return field($_[0], "hrn"); }
+sub url($)		{ return field($_[0], "url"); }
 sub cert($)		{ return $_[0]->{'CERT'}->cert(); }
 sub GetCertificate($)   { return $_[0]->{'CERT'}; }
-
-#
-# Class method to lookup the component for a given resource (uuid) by
-# looking in the resources table.
-#
-sub LookupByResource($$)
-{
-    my ($class, $uuid) = @_;
-
-    return undef
-	if (! ($uuid =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/));
-
-    my $query_result =
-	DBQueryWarn("select component_uuid from geni_resources ".
-		    "where resource_uuid='$uuid'");
-	
-    return undef
-	if (! $query_result || !$query_result->numrows);
-
-    my ($idx) = $query_result->fetchrow_array();
-
-    return GeniComponent->Lookup($idx);
-}
-
-#
-# Method to insert a new geni_resources record for the component.
-#
-sub NewResource($$)
-{
-    my ($self, $uuid) = @_;
-
-    return -1
-	if (! ref($self));
-
-    my $component_uuid = $self->uuid();
-    $uuid = DBQuoteSpecial("$uuid");
-
-    return -1
-	if (! DBQueryWarn("replace into geni_resources set ".
-			  "  resource_uuid=$uuid, ".
-			  "  resource_type='node', ".
-			  "  created=now(), ".
-			  "  component_uuid='$component_uuid'"));
-
-    return 0;
-}
+sub GetManager($)       { return $_[0]->{'MANAGER'}; }
 
 #
 # Compare two component refs.
@@ -210,7 +168,7 @@ sub SameComponent($$)
     return 0
 	if (! (ref($self) && ref($other)));
 
-    return $self->idx() == $other->idx();
+    return $self->uuid() eq $other->uuid();
 }
 
 #
@@ -223,29 +181,15 @@ sub Refresh($)
     return -1
 	if (! ref($self));
 
-    my $idx  = $self->idx();
     my $uuid = $self->uuid();
 
     my $query_result =
-	DBQueryWarn("select * from geni_components where idx=$idx");
+	DBQueryWarn("select * from geni_components where uuid='$uuid'");
 
     return -1
 	if (!$query_result || !$query_result->numrows);
 
-    $self->{'COMPONENT'}  = $query_result->fetchrow_hashref();
-
-    #
-    # Grab the certificate, since we will probably want it.
-    #
-    $query_result = DBQueryWarn("select cert from geni_certificates ".
-				"where uuid='$uuid'");
-    if (!$query_result || !$query_result->numrows) {
-	print STDERR "Could not find certificate for component $idx\n";
-	return undef;
-    }
-    my ($cert) = $query_result->fetchrow_array();
-    $self->{'COMPONENT'}->{'cert'} = $cert;
-    
+    $self->{'COMPONENT'} = $query_result->fetchrow_hashref();
     return 0;
 }
 
@@ -260,12 +204,13 @@ sub Update($$)
     return -1
 	if (! ref($self));
 
-    my $idx = $self->idx();
+    my $uuid = $self->uuid();
 
     my $query = "update geni_components set ".
-	join(",", map("$_=" . DBQuoteSpecial($argref->{$_}), keys(%{$argref})));
+	join(",", map("$_=" . DBQuoteSpecial($argref->{$_}),
+		      keys(%{$argref})));
 
-    $query .= " where idx='$idx'";
+    $query .= " where uuid='$uuid'";
 
     return -1
 	if (! DBQueryWarn($query));
@@ -286,13 +231,13 @@ sub CreateFromRegistry($$)
 
     my $blob;
     return undef
-	if ($clearinghouse->Resolve($uuid, "CM", \$blob) != 0);
+	if ($clearinghouse->Resolve($uuid, "Component", \$blob) != 0);
 
     my $certificate = GeniCertificate->LoadFromString($blob->{'gid'});
     return undef
 	if (!defined($certificate));
 
-    my $component = GeniComponent->Create($certificate, $blob->{'url'});
+    my $component = GeniComponent->Create($certificate);
     $certificate->Delete()
 	if (!defined($component));
 
@@ -302,258 +247,15 @@ sub CreateFromRegistry($$)
 #
 # Create component from a certificate.
 #
-sub CreateFromCertificate($$$)
+sub CreateFromCertificate($$;$)
 {
-    my ($class, $certificate, $url) = @_;
+    my ($class, $certificate, $manager) = @_;
 
-    my $component = GeniComponent->Create($certificate, $url);
+    my $component = GeniComponent->Create($certificate, $manager);
     $certificate->Delete()
 	if (!defined($component));
 
     return $component;
-}
-
-#
-# Discover Resources on the component. Returns a resource availability
-# spec as an XML string (not a structure).
-#
-sub DiscoverResources($$$$$)
-{
-    my ($self, $slice, $user, $credential, $pref) = @_;
-
-    # Must be a real reference. 
-    return -1
-	if (! (ref($self) && ref($slice) && ref($user) && ref($credential)));
-
-    my $response =
-	Genixmlrpc::CallMethodHTTP($self->url(),
-				   $user,
-				   "DiscoverResources",
-				   { "credential"  => $credential->asString()
-				   });
-    
-    return -1
-	if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS);
-
-    my $rspec = XMLin($response->value(), ForceArray => ["node", "interface"]);
-    $$pref = $rspec;
-    
-    return 0;
-}
-
-#
-# Get a Ticket from a component;
-#
-sub GetTicket($$$$$;$)
-{
-    my ($self, $slice, $rspec_xml, $context, $credential, $vtopo) = @_;
-
-    # Must be a real reference. 
-    return undef
-	if (! ref($self));
-
-    my $args = { "credential"   => $credential->asString(),
-		 "impotent"     => $impotent,
-		 "rspec"        => $rspec_xml };
-    $args->{'virtual_topology'} = $vtopo
-	if (defined($vtopo));
-
-    my $response = 				       
-	Genixmlrpc::CallMethod($self->url(), $context, "GetTicket", $args);
-    
-    return undef
-	if (!defined($response));
-
-    return undef
-	if ($response->code() != GENIRESPONSE_SUCCESS);
-
-    #
-    # Convert this into a (signed) ticket object.
-    #
-    return GeniTicket->CreateFromSignedTicket($response->value(), $self, 1);
-}
-
-#
-# Release a Ticket on a component;
-#
-sub ReleaseTicket($$$$)
-{
-    my ($self, $slice, $context, $ticket) = @_;
-
-    # Must be a real reference. 
-    return undef
-	if (! ref($self));
-
-    my $args = { "ticket"   => $ticket->asString() };
-
-    my $response = 				       
-	Genixmlrpc::CallMethod($self->url(), $context, "ReleaseTicket", $args);
-    
-    return -1
-	if (!defined($response));
-
-    return -1
-	if ($response->code() != GENIRESPONSE_SUCCESS);
-
-    return 0;
-}
-
-#
-# Create a sliver, given a ticket.
-#
-sub CreateSliver($$$$;$)
-{
-    my ($self, $slice, $ticket, $context, $extraargs) = @_;
-
-    # Must be a real reference. 
-    return undef
-	if (! ref($self));
-
-    my $args = { "ticket"    => $ticket->asString(),
-		 "impotent"  => $impotent };
-    $args->{'extraargs'} = $extraargs
-	if (defined($extraargs));
-
-    my $response =
-      Genixmlrpc::CallMethod($self->url(), $context, "RedeemTicket", $args);
-    
-    return undef
-	if (!defined($response));
-
-    return undef
-	if ($response->code() != GENIRESPONSE_SUCCESS);
-
-    #
-    # We get back a signed credential, which has the sliver uuid inside.
-    #
-    my $credential = GeniCredential->CreateFromSigned($response->value(), 1);
-    if (!defined($credential)) {
-	print STDERR "Could not create local credential object.\n";
-	return undef;
-    }
-
-    my $sliver = GeniSliver::Client->Create($slice, $ticket->owner_uuid(),
-					    $ticket->rspec(),
-					    $credential, $self);
-
-    if (!defined($sliver)) {
-	print STDERR "Could not create local sliver object.\n";
-	return undef;
-    }
-    return $sliver;
-}
-
-#
-# Destroy a sliver. 
-#
-sub DestroySliver($$$)
-{
-    my ($self, $sliver, $context) = @_;
-
-    # Must be a real reference. 
-    return -1
-	if (! ref($self));
-
-    my $credential = $sliver->GetCredential($context->user());
-    return -1
-	if (!defined($credential));
-    
-    my $response =
-	Genixmlrpc::CallMethod($self->url(), $context,
-			       "DeleteSliver",
-			       { "impotent"    => $impotent,
-				 "credential"  => $credential->asString() });
-    
-    if ($response->code() != GENIRESPONSE_SUCCESS) {
-	print STDERR "Could not destroy sliver $sliver\n";
-	return -1;
-    }
-    return 0;
-}
-
-#
-# Start a sliver. 
-#
-sub StartSliver($$$)
-{
-    my ($self, $sliver, $context) = @_;
-
-    # Must be a real reference. 
-    return -1
-	if (! ref($self));
-
-    my $credential = $sliver->GetCredential($context->user());
-    return -1
-	if (!defined($credential));
-    
-    my $response =
-	Genixmlrpc::CallMethod($self->url(), $context,
-			       "StartSliver",
-			       { "impotent"    => $impotent,
-				 "credential"  => $credential->asString() });
-    
-    if ($response->code() != GENIRESPONSE_SUCCESS) {
-	print STDERR "Could not start sliver $sliver\n";
-	return -1;
-    }
-    return 0;
-}
-
-#
-# Split a sliver. 
-#
-sub SplitSliver($$$$)
-{
-    my ($self, $sliver, $context, $pref) = @_;
-
-    # Must be a real reference. 
-    return -1
-	if (! ref($self));
-
-    my $credential = $sliver->GetCredential($context->user());
-    return -1
-	if (!defined($credential));
-
-    my $slice = $sliver->GetSlice();
-    return -1
-	if (!defined($slice));
-    
-    my $response =
-	Genixmlrpc::CallMethod($self->url(), $context,
-			       "SplitSliver",
-			       { "credential"  => $credential->asString() });
-    
-    if ($response->code() != GENIRESPONSE_SUCCESS) {
-	print STDERR "Could not split sliver $sliver\n";
-	return -1;
-    }
-
-    #
-    # We get back signed credentials, which has the sliver uuid inside.
-    #
-    my @slivers = ();
-    
-    foreach my $credential (@{ $response->value() }) {
-	my $credential = GeniCredential->CreateFromSigned($credential, 1);
-	if (!defined($credential)) {
-	    print STDERR "Could not create local credential object.\n";
-	    return -1;
-	}
-
-	my $s = GeniSliver::Client->Create($slice,
-					   $credential->owner_uuid(),
-					   undef,
-					   $credential, $self);
-
-	if (!defined($s)) {
-	    print STDERR "Could not create local sliver object.\n";
-	    return -1;
-	}
-	$s->SetAggregate($sliver);
-	push(@slivers, $s);
-    }
-    @$pref = @slivers;
-    return 0;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

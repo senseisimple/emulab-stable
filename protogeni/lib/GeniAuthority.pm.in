@@ -40,50 +40,38 @@ my $VERIFYCRED	   = "$TB/sbin/verifygenicred";
 my %authorities    = ();
 
 #
-# Lookup by idx, or uuid.
+# Lookup by uuid.
 #
 sub Lookup($$)
 {
     my ($class, $token) = @_;
     my $query_result;
-    my $idx;
+    my $uuid;
 
-    if ($token =~ /^\d+$/) {
-	$idx = $token;
-    }
-    elsif ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
-	$query_result =
-	    DBQueryWarn("select idx from geni_authorities ".
-			"where uuid='$token'");
-	    return undef
-		if (! $query_result || !$query_result->numrows);
-
-	    ($idx) = $query_result->fetchrow_array();
-    }
-    elsif ($token =~ /^\d+$/) {
-	$idx = $token;
+    if ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
+	$uuid = $token;
     }
     elsif ($token =~ /^P([\w]+)$/) {
 	return GeniAuthority->LookupByPrefix($1);
     }
     elsif ($token =~ /^[\w\.]*$/) {
 	$query_result =
-	    DBQueryWarn("select idx from geni_authorities ".
+	    DBQueryWarn("select uuid from geni_authorities ".
 			"where hrn='$token'");
-	    return undef
-		if (! $query_result || !$query_result->numrows);
+	return undef
+	    if (! $query_result || !$query_result->numrows);
 
-	    ($idx) = $query_result->fetchrow_array();
+	($uuid) = $query_result->fetchrow_array();
     }
     else {
 	return undef;
     }
     # Look in cache first
-    return $authorities{"$idx"}
-        if (exists($authorities{"$idx"}));
+    return $authorities{"$uuid"}
+        if (exists($authorities{"$uuid"}));
 
     $query_result =
-	DBQueryWarn("select * from geni_authorities where idx='$idx'");
+	DBQueryWarn("select * from geni_authorities where uuid='$uuid'");
     
     return undef
 	if (!$query_result || !$query_result->numrows);
@@ -95,16 +83,15 @@ sub Lookup($$)
     #
     # Grab the certificate, since we will probably want it.
     #
-    my $uuid = $self->{'AUTHORITY'}->{'uuid'};
     my $certificate = GeniCertificate->Lookup($uuid);
     if (!defined($certificate)) {
-	print STDERR "Could not find certificate for authority $idx\n";
+	print STDERR "Could not find certificate for authority $uuid\n";
 	return undef;
     }
     $self->{'CERT'} = $certificate;
     
     # Add to cache. 
-    $authorities{$self->{'AUTHORITY'}->{'idx'}} = $self;
+    $authorities{$self->{'AUTHORITY'}->{'uuid'}} = $self;
     
     return $self;
 }
@@ -117,9 +104,8 @@ sub Stringify($)
     my ($self) = @_;
     
     my $uuid = $self->uuid();
-    my $idx  = $self->idx();
 
-    return "[GeniAuthority: $uuid, IDX: $idx]";
+    return "[GeniAuthority: $uuid]";
 }
 
 #
@@ -130,18 +116,16 @@ sub Create($$$$)
     my ($class, $certificate, $url, $type) = @_;
 
     my @insert_data = ();
-    my $idx = TBGetUniqueIndex('next_authority', 1);
     my ($prefix) = ($certificate->uuid() =~ /^\w+\-\w+\-\w+\-\w+\-(\w+)$/);
 
     my $safe_hrn    = DBQuoteSpecial($certificate->hrn());
     my $safe_url    = DBQuoteSpecial($url);
     my $safe_uuid   = DBQuoteSpecial($certificate->uuid());
     my $safe_prefix = DBQuoteSpecial($prefix);
-    my $safe_type   = DBQuoteSpecial($type);
+    my $safe_type   = DBQuoteSpecial(lc($type));
     
     # Now tack on other stuff we need.
     push(@insert_data, "created=now()");
-    push(@insert_data, "idx='$idx'");
     push(@insert_data, "hrn=$safe_hrn");
     push(@insert_data, "url=$safe_url");
     push(@insert_data, "uuid=$safe_uuid");
@@ -158,11 +142,10 @@ sub Create($$$$)
 	if (!DBQueryWarn("replace into geni_authorities set " .
 			 join(",", @insert_data)));
 
-    return GeniAuthority->Lookup($idx);
+    return GeniAuthority->Lookup($certificate->uuid());
 }
 # accessors
 sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'AUTHORITY'}->{$_[1]}); }
-sub idx($)		{ return field($_[0], "idx"); }
 sub uuid($)		{ return field($_[0], "uuid"); }
 sub uuid_prefix($)	{ return field($_[0], "uuid_prefix"); }
 sub url($)		{ return field($_[0], "url"); }
@@ -178,7 +161,8 @@ sub CheckExisting($$$$)
 {
     my ($class, $type, $uuid, $hrn) = @_;
 
-    my ($prefix) = ($certificate->uuid() =~ /^\w+\-\w+\-\w+\-\w+\-(\w+)$/);
+    my ($prefix) = ($uuid =~ /^\w+\-\w+\-\w+\-\w+\-(\w+)$/);
+    $type = lc($type);
 
     my $query_result =
 	DBQueryWarn("select uuid,type from geni_authorities ".
@@ -273,15 +257,15 @@ sub LookupByPrefix($$)
     }
     
     my $query_result =
-	DBQueryWarn("select idx from geni_authorities ".
+	DBQueryWarn("select uuid from geni_authorities ".
 		    "where uuid_prefix='$prefix'");
 
     return undef
 	if (! $query_result || !$query_result->numrows);
 
-    my ($idx) = $query_result->fetchrow_array();
+    ($uuid) = $query_result->fetchrow_array();
 
-    return GeniAuthority->Lookup($idx);
+    return GeniAuthority->Lookup($uuid);
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

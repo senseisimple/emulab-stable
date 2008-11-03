@@ -49,14 +49,13 @@ CREATE TABLE `geni_users` (
 #
 DROP TABLE IF EXISTS `geni_components`;
 CREATE TABLE `geni_components` (
-  `idx` mediumint(8) unsigned NOT NULL default '0',
   `hrn` varchar(256) NOT NULL default '',
   `uuid` varchar(40) NOT NULL default '',
+  `manager_uuid` varchar(40) default NULL,
   `created` datetime default NULL,
   `url` tinytext,
-  PRIMARY KEY  (`idx`),
-  UNIQUE KEY `hrn` (`hrn`),
-  UNIQUE KEY `uuid` (`uuid`)
+  PRIMARY KEY  (`uuid`),
+  UNIQUE KEY `hrn` (`hrn`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 #
@@ -74,15 +73,13 @@ CREATE TABLE `geni_components` (
 DROP TABLE IF EXISTS `geni_authorities`;
 CREATE TABLE `geni_authorities` (
   `hrn` varchar(256) NOT NULL default '',
-  `idx` mediumint(8) unsigned NOT NULL default '0',
   `uuid` varchar(40) NOT NULL default '',
   `uuid_prefix` varchar(12) NOT NULL default '',
   `created` datetime default NULL,
-  `type` enum('sa','cm','ma','ch') NOT NULL default 'sa',
+  `type` enum('sa','ma','ch','cm') NOT NULL default 'sa',
   `url` tinytext,
-  PRIMARY KEY  (`idx`),
-  UNIQUE KEY `uuid` (`uuid`),
-  UNIQUE KEY `uuid_prefix` (`uuid_prefix`)
+  PRIMARY KEY  (`uuid`),
+  UNIQUE KEY `hrn` (`hrn`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 #

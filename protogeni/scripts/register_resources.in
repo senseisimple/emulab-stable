@@ -6,28 +6,60 @@
 #
 use strict;
 use English;
+use Getopt::Std;
+
+#
+# Register local resources at the clearinghouse.
+#
+# 
+sub usage()
+{
+    print "Usage: register_resources [-c]\n";
+    exit(1);
+}
+my $optlist = "";
 
 # Configure variables
 my $TB		   = "@prefix@";
 my $TBOPS          = "@TBOPSEMAIL@";
 my $OURDOMAIN	   = "@OURDOMAIN@";
 my $EMULAB_PEMFILE = "@prefix@/etc/genicm.pem";
+my $PGENIDOMAIN    = "@PROTOGENI_DOMAIN@";
+my $PGENISUPPORT   = @PROTOGENI_SUPPORT@;
+
+#
+# Check args.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
 
 use vars qw($GENI_DBNAME);
 $GENI_DBNAME = "geni-cm";
 
 use lib '@prefix@/lib';
-use GeniCertificate;
-use GeniComponent;
-use GeniRegistry;
+use libdb qw(DBQueryFatal);
 use Node;
+require GeniDB;
+require GeniCertificate;
+require GeniComponent;
+require GeniRegistry;
 
-# XXX Need to deal with this.
-my $HRN = (($OURDOMAIN eq "emulab.net") ? "utahemulab" : "myelab");
+# List of nodes.
+my @nodes = ();
 
 if (!@ARGV) {
-    die("*** $0:\n".
-	"    Must supply a node id\n");
+    my $query_result =
+	DBQueryFatal("select n.node_id from nodes as n ".
+		     "left join node_types as t on t.type=n.type ".
+		     "where t.class='pc'");
+    while (my ($node_id) = $query_result->fetchrow_array()) {
+	push(@nodes, $node_id);
+    }
+}
+else {
+    @nodes = @ARGV;
 }
 
 my $this_user = User->LookupByUnixId($UID);
@@ -53,32 +85,41 @@ if (!defined($clearinghouse)) {
 	"    Could not create client for clearinghouse\n");
 }
 
-my @nodes = @ARGV;
-
 foreach my $node_id (@nodes) {
     my $node    = Node->Lookup($node_id);
+    my $certificate;
+    
     if (!defined($node)) {
 	die("*** $0:\n".
 	    "    Could not map $node_id to object\n");
     }
     print "Registering $node_id\n";
 
-    # See if we already have a certificate.
-    my $certificate = GeniCertificate->Lookup($node->uuid());
-    if (!defined($certificate)) {
-	$certificate = GeniCertificate->Create("Node", "${HRN}.${node_id}",
-					       $TBOPS, $node->uuid());
+    my $component = GeniComponent->Lookup($node->uuid());
+    if (!defined($component)) {
+	$certificate = GeniCertificate->Lookup($node->uuid());
 	if (!defined($certificate)) {
+	    $certificate = GeniCertificate->Create("Node",
+						   "${PGENIDOMAIN}.${node_id}",
+						   $TBOPS, $node->uuid(),
+						   $cmcertificate->URL());
+	    if (!defined($certificate)) {
+		die("*** $0:\n".
+		    "    Could not generate certificate for $node\n");
+	    }
+	}
+	$component = GeniComponent->Create($certificate);
+	if (!defined($component)) {
 	    die("*** $0:\n".
-		"    Could not generate certificate for $node\n");
+		"    Could not create component object for $node\n");
 	}
     }
-    if ($clearinghouse->Register("Component", $certificate->cert(),
-				 { "resource_uuid" => $node->uuid(),
-				   "resource_type" => "Node"}) != 0) {
+    $certificate = $component->GetCertificate();
+    
+    if ($clearinghouse->Register("Component",
+				 $certificate->cert(), {}) != 0) {
 	die("*** $0:\n".
 	    "    Could not register $node_id at the clearinghouse\n");
-
     }
 }
 
