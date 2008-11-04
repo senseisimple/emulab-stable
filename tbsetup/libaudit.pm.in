@@ -216,17 +216,24 @@ sub LogStart($;$)
     return AuditStart($daemon, $logname, LIBAUDIT_LOGONLY());
 }
 
-sub LogEnd()
+sub LogEnd(;$)
 {
-    return AuditEnd();
+    my ($status) = @_;
+    
+    return AuditEnd($status);
 }
 
 #
 # Finish an Audit. 
 #
-sub AuditEnd()
+sub AuditEnd(;$)
 {
-    SendAuditMail(0);
+    my ($status) = @_;
+
+    $status = 0
+	if (!defined($status));
+    
+    SendAuditMail($status);
     delete @ENV{'TBAUDITLOG', 'TBAUDITON'};
     if (defined($logfile)) {
 	unlink($logfile)
