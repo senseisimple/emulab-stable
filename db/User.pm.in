@@ -933,7 +933,7 @@ sub Update($$)
     my $uid_idx = $self->uid_idx();
 
     my $query = "update users set usr_modified=now(), ".
-	join(",", map("$_='" . $argref->{$_} . "'", keys(%{$argref})));
+	join(",", map("$_=" . DBQuoteSpecial($argref->{$_}), keys(%{$argref})));
 
     $query .= " where uid_idx='$uid_idx'";
 
