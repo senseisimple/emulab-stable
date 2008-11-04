@@ -41,6 +41,7 @@ my $MKCERTS	  = "$TB/sbin/protogeni/createcerts";
 my $ADDAUTHORITY  = "$TB/sbin/protogeni/addauthority";
 my $GETCACERTS    = "$TB/sbin/protogeni/getcacerts";
 my $MKSYSCERT	  = "$TB/sbin/mksyscert";
+my $MKUSERCERT	  = "$TB/sbin/mkusercert";
 my $WAP           = "$TB/sbin/withadminprivs";
 my $SACERT	  = "$TB/etc/genisa.pem";
 my $CMCERT	  = "$TB/etc/genicm.pem";
@@ -67,6 +68,7 @@ $| = 1;
 
 # Load the Testbed support stuff.
 use lib "@prefix@/lib";
+use libtestbed;
 use User;
 use Project;
 
@@ -176,12 +178,19 @@ if (!defined($geniuser)) {
     fatal("Need to do an install")
 	if (! -e "$TB/etc/protogeni/geniuser.xml");
 
+    print "Creating Geni pseudo user ...\n";
     system("$SUDO -u $PROTOUSER $WAP $NEWUSER $TB/etc/protogeni/geniuser.xml");
     fatal("Could not create geni user")
 	if ($?);
 
     system("$SUDO -u $PROTOUSER $WAP $TBACCT verify $geniuserid");
     fatal("Could not verify geni user")
+	if ($?);
+
+    # Create an encrypted certificate for the test scripts.
+    my $passwd = substr(TBGenSecretKey(), 0, 10);
+    system("$SUDO -u $PROTOUSER $WAP $MKUSERCERT -p '$passwd' $geniuserid");
+    fatal("Could not create encrypted certificate for geni user")
 	if ($?);
 
     $geniuser = User->Lookup($geniuserid);    
@@ -193,6 +202,7 @@ if (!defined($geniproj)) {
     fatal("Need to do an install")
 	if (! -e "$TB/etc/protogeni/geniproj.xml");
 
+    print "Creating Geni slices project ...\n";
     system("$SUDO -u $PROTOUSER $WAP $NEWPROJ $TB/etc/protogeni/geniproj.xml");
     fatal("Could not create geni project")
 	if ($?);
@@ -211,6 +221,7 @@ $geniproj->Refresh();
 #
 # Databases.
 #
+print "Creating Databases ...\n";
 foreach my $dbname ("geni", "geni-ch", "geni-cm") {
     if (system("$MYSQLSHOW $dbname >/dev/null 2>/dev/null")) {
 	system("$MYSQLADMIN create $dbname") == 0
@@ -238,17 +249,20 @@ if (! -e "$TB/lib/ssl/syscert.cnf") {
     exit(1);
 }
 if (! -e $CMCERT) {
+    print "Creating CM certificate ...\n";
     system("$SUDO -u $PROTOUSER $MKSYSCERT -o $CMCERT ".
 	   "  -u $TBBASE/protogeni/xmlrpc/cm $PGENIDOMAIN.cm") == 0
 	   or fatal("Could not generate $CMCERT");
 }
 if (! -e $SACERT) {
+    print "Creating SA certificate ...\n";
     system("$SUDO -u $PROTOUSER $MKSYSCERT -o $SACERT ".
 	   "  -u $TBBASE/protogeni/xmlrpc/sa $PGENIDOMAIN.sa") == 0
 	   or fatal("Could not generate $SACERT");
 }
 if ($asch) {
     if (! -e $CHCERT) {
+	print "Creating CH certificate ...\n";
 	system("$SUDO -u $PROTOUSER $MKSYSCERT -o $CHCERT ".
 	       "  -u $TBBASE/protogeni/xmlrpc/ch $PGENIDOMAIN.ch") == 0
 	       or fatal("Could not generate $CHCERT");
@@ -277,6 +291,7 @@ else {
     #
     # Grab the CH certificate from Utah. Only one for now.
     #
+    print "Fetching clearinghouse certificate from Utah ...\n";
     system("$FETCH -q -o $CHCERT http://boss.emulab.net/genich.pem") == 0
 	or fatal("Could not fetch clearinghouse certificate from Utah");
 }
@@ -297,6 +312,7 @@ if (!defined($context)) {
 # Note that we had to send the clearinghouse $TB/etc/emulab.pem so they
 # know about this new site. That is sent out of band (email).
 #
+print "Getting credential to talk to clearinghouse ...\n";
 my $credential = GeniRegistry::ClearingHouse->GetCredential($context);
 if (!defined($credential)) {
     fatal("Could not get credential to talk to clearinghouse");
@@ -308,7 +324,15 @@ if (!defined($clearinghouse)) {
 }
 
 #
-# Register our certs.
+# Add certs to the local SA database.
+#
+system("$ADDAUTHORITY $SACERT sa") == 0
+    or fatal("Could not add SA certificate");
+system("$ADDAUTHORITY $CMCERT cm") == 0
+    or fatal("Could not add CM certificate");
+
+#
+# Register our certs at the clearinghouse.
 #
 print "Registering SA cert at the clearinghouse.\n";
 if ($clearinghouse->Register("SA", $certificate->cert())) {

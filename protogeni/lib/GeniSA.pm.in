@@ -35,6 +35,7 @@ use Data::Dumper;
 # Configure variables
 my $TB		   = "@prefix@";
 my $OURDOMAIN      = "@OURDOMAIN@";
+my $PGENIDOMAIN    = "@PROTOGENI_DOMAIN@";
 
 #
 # Get a credential for an object. Ignoring the type for now. If no credential
@@ -48,10 +49,6 @@ sub GetCredential($)
     my $cred = $argref->{'credential'};
     my $type = $argref->{'type'};
     
-    if (! (defined($uuid) && ($uuid =~ /^[-\w]*$/))) {
-	return GeniResponse->MalformedArgsResponse();
-    }
-
     #
     # No credential, then return a generic credential giving user permission
     # to do other things.
@@ -88,6 +85,9 @@ sub GetCredential($)
 	}
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS,
 				    $credential->asString());
+    }
+    if (! (defined($uuid) && ($uuid =~ /^[-\w]*$/))) {
+	return GeniResponse->MalformedArgsResponse();
     }
 
     my $credential = GeniCredential->CreateFromSigned($cred);
@@ -231,7 +231,7 @@ sub Resolve($)
 	    # XXX Form hrn from the uid and domain. This is backwards.
 	    #
 	    if (! ($hrn =~ /\./)) {
-		$hrn = "emulab.${hrn}";
+		$hrn = "${PGENIDOMAIN}.${hrn}";
 	    }
 	    $geniuser = GeniUser->Lookup($hrn, 1);
 	}
@@ -269,7 +269,7 @@ sub Resolve($)
 	    # XXX Form hrn from the uid and domain. This is backwards.
 	    #
 	    if (! ($hrn =~ /\./)) {
-		$hrn = "emulab.${hrn}";
+		$hrn = "${PGENIDOMAIN}.${hrn}";
 	    }
 	    $slice = GeniSlice->Lookup($hrn);
 	}
@@ -394,7 +394,7 @@ sub Register($)
 	#
 	# XXX Form hrn from the uid and domain. This is backwards.
 	#
-	my $hrn = "emulab.${hrn}";
+	my $hrn = "${PGENIDOMAIN}.${hrn}";
 
 	#
 	# Generate a certificate (and uuid) for this new slice.
@@ -543,7 +543,7 @@ sub Remove($)
 	    # XXX Form hrn from the uid and domain. This is backwards.
 	    #
 	    if (! ($hrn =~ /\./)) {
-		$hrn = "emulab.${hrn}";
+		$hrn = "${PGENIDOMAIN}.${hrn}";
 	    }
 	    $slice = GeniSlice->Lookup($hrn);
 	}

@@ -498,6 +498,8 @@ use GeniUser;
 use GeniCertificate;
 use overload ('""' => 'Stringify');
 
+my $PGENIDOMAIN   = "@PROTOGENI_DOMAIN@";
+
 #
 # Create a wrapper, with the same access names.
 #
@@ -529,7 +531,7 @@ sub email($)		{ return $_[0]->{'USER'}->email(); }
 sub GetSSHKeys($$)      { return $_[0]->{'USER'}->GetSSHKeys($_[1]); }
 
 # Need to construct this since not in User structure.
-sub hrn($)		{ return "emulab." . $_[0]->uid(); }
+sub hrn($)		{ return "${PGENIDOMAIN}." . $_[0]->uid(); }
 
 # And this is in another structure.
 sub cert($)             { return $_[0]->{'CERT'}->cert(); }

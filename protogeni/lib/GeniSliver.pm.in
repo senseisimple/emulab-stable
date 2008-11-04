@@ -40,6 +40,7 @@ my $TBAPPROVAL     = "@TBAPPROVALEMAIL@";
 my $TBAUDIT   	   = "@TBAUDITEMAIL@";
 my $BOSSNODE       = "@BOSSNODE@";
 my $OURDOMAIN      = "@OURDOMAIN@";
+my $PGENIDOMAIN    = "@PROTOGENI_DOMAIN@";
 my $SIGNCRED	   = "$TB/sbin/signgenicred";
 my $AVAIL	   = "$TB/sbin/avail";
 my $NALLOC	   = "$TB/bin/nalloc";
@@ -707,7 +708,7 @@ sub Create($$$$$)
 	    return undef;
 	}
     }
-    my $hrn = "emulab." . $node->node_id();
+    my $hrn = "${PGENIDOMAIN}." . $node->node_id();
     my $nickname = $rspec->{'nickname'};
     
     #
@@ -743,7 +744,7 @@ sub Create($$$$$)
 	}
 	my $vnode = Node->Lookup($vnodes[0]);
 	$uuid = $vnode->uuid();
-	$hrn = "emulab." . $vnode->node_id()
+	$hrn = "${PGENIDOMAIN}." . $vnode->node_id()
     }
     return GeniSliver->Create($slice, $user_uuid, $uuid, $resource_uuid,
 			      "Node", $hrn, $nickname, $rspec);
@@ -1009,7 +1010,8 @@ sub Create()
 	$interface_uuid, $node, $rspec) = @_;
 
     my $nickname = $rspec->{'nickname'};
-    my $hrn = "emulab." . $node->node_id() . "." . $rspec->{'iface_name'};
+    my $hrn = "${PGENIDOMAIN}." .
+	$node->node_id() . "." . $rspec->{'iface_name'};
 
     return GeniSliver->Create($slice, $user_uuid, $interface_uuid,
 			      $node->uuid(), "Interface",

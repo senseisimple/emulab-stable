@@ -36,6 +36,7 @@ my $TBAPPROVAL     = "@TBAPPROVALEMAIL@";
 my $TBAUDIT   	   = "@TBAUDITEMAIL@";
 my $BOSSNODE       = "@BOSSNODE@";
 my $OURDOMAIN      = "@OURDOMAIN@";
+my $PGENIDOMAIN    = "@PROTOGENI_DOMAIN@";
 my $SIGNCRED	   = "$TB/sbin/signgenicred";
 my $VERIFYCRED	   = "$TB/sbin/verifygenicred";
 
@@ -237,7 +238,7 @@ sub hrn($)
     if (defined($hrn) && $hrn ne "") {
 	return $hrn;
     }
-    return "emulab.aggregate_" . $self->idx();
+    return "${PGENIDOMAIN}.aggregate_" . $self->idx();
 }
 
 #
@@ -596,7 +597,7 @@ sub Create($$$)
     #
     # Form an hrn using the slicename and linkname
     #
-    my $hrn = "emulab." . $slice->slicename() . "." . $linkname;
+    my $hrn = "${PGENIDOMAIN}." . $slice->slicename() . "." . $linkname;
 
     return GeniAggregate->Create($slice, $owner, "Link", $hrn, $linkname);
 }
@@ -755,7 +756,7 @@ sub Create($$$$$$)
     #
     # Form an hrn using the slicename and linkname
     #
-    my $hrn = "emulab." . $slice->slicename() . "." . $linkname;
+    my $hrn = "${PGENIDOMAIN}." . $slice->slicename() . "." . $linkname;
 
     my $aggregate = GeniAggregate->Create($slice, $owner, "Tunnel",
 					  $hrn, $linkname);
