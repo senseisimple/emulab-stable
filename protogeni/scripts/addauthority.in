@@ -14,7 +14,7 @@ use Getopt::Std;
 # 
 sub usage()
 {
-    print "Usage: addauthority [-c]\n";
+    print "Usage: addauthority [-c] <certfile> <type>\n";
     exit(1);
 }
 my $optlist    = "c";
