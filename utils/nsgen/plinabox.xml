@@ -13,7 +13,7 @@
     <variable name="HWType" default="plabpc" descr="Hardware Type for nodes" />
     <!-- This hard-codes the image name, but it seems like we have to do
          that somewhere... -->
-    <variable name="ImageName" default="PLAB-PLC" descr = "Disk Image for PLC" />
+    <variable name="ImageName" default="PLAB-PLC-v42" descr = "Disk Image for PLC" />
     <variable name="PLCOnExpLAN" default="0" descr="PLC should run on private Emulab experimental LAN if 1; else on public Emulab control network." />
     <nstext>
         <section><![CDATA[
