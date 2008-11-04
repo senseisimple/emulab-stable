@@ -15,7 +15,7 @@ use Exporter;
 	 AddAuditInfo
 	 LogStart LogEnd
 	 LIBAUDIT_NODAEMON LIBAUDIT_DAEMON LIBAUDIT_LOGONLY
-	 LIBAUDIT_NODELETE LIBAUDIT_FANCY
+	 LIBAUDIT_NODELETE LIBAUDIT_FANCY LIBAUDIT_LOGTBOPS
        );
 
 # After package decl.
@@ -52,6 +52,8 @@ my $logfile;
 
 # Logonly, not to audit list.
 my $logonly     = 0;
+# Log to tbops
+my $logtbops    = 0;
 
 # Save log when logging only.
 my $savelog     = 0;
@@ -86,6 +88,7 @@ sub LIBAUDIT_LOGONLY	{ 0x02; }
 sub LIBAUDIT_NODELETE	{ 0x04; }
 sub LIBAUDIT_FANCY      { 0x08; } # Only use if libdb and libtblog are
                                   # already in use
+sub LIBAUDIT_LOGTBOPS	{ 0x10; }
 
 #
 # Start an audit (or log) of a script. First arg is a flag indicating if
@@ -113,6 +116,9 @@ sub AuditStart($;$$)
 
 	    if ($options & LIBAUDIT_NODELETE()) {
 		$savelog = 1;
+	    }
+	    if ($options & LIBAUDIT_LOGTBOPS()) {
+		$logtbops = 1;
 	    }
 	}
 	if ($options & LIBAUDIT_FANCY()) {
@@ -209,11 +215,13 @@ sub AuditStart($;$$)
 }
 
 # Logging, not auditing.
-sub LogStart($;$)
+sub LogStart($;$$)
 {
-    my($daemon, $logname) = @_;
+    my($daemon, $logname, $options) = @_;
+    $options = 0
+	if (!defined($options));
 
-    return AuditStart($daemon, $logname, LIBAUDIT_LOGONLY());
+    return AuditStart($daemon, $logname, $options|LIBAUDIT_LOGONLY());
 }
 
 sub LogEnd(;$)
@@ -356,8 +364,13 @@ sub SendAuditMail($)
 	    @FILES = ($logfile);
 
 	    if ($logonly) {
-		$TO    = $FROM;
-		$HDRS .= "\nCC: ".  ($exitstatus ? $TBOPS : $TBLOGS);
+		if ($logtbops) {
+		    $TO    = $TBOPS;
+		}
+		else {
+		    $TO    = $FROM;
+		    $HDRS .= "\nCC: ". ($exitstatus ? $TBOPS : $TBLOGS);
+		}
 	    }
 	    else {
 		$TO    = $TBLOGS;
