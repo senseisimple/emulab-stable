@@ -104,9 +104,7 @@ if (!defined($request)) {
 # Use libaudit to capture any output from libraries and programs.
 # Send that to tbops so they can be fixed.
 #
-LogStart(0);
-
-#print STDERR time() . "\n";
+LogStart(0, undef, LIBAUDIT_LOGTBOPS());
 
 # Add stuff for log message if sent.
 AddAuditInfo("message", $request . "\n");
@@ -127,10 +125,8 @@ my $response = $responder->{'_decode'}->serve($request,
 # Terminate the log capture so that we can print the response to STDOUT
 # for the web server.
 #
-print STDERR "\n\n" . $response;
-#print STDERR time() . "\n";
-
-LogEnd();
+#print STDERR "\n\n" . $response;
+LogEnd(0);
 
 print "Content-Type: text/xml\n\n" . $response;
 
