@@ -397,7 +397,8 @@ sub nodereboot($$)
 		tberror "Failed ($?)!";
 	    }
 	    else {
-		print STDOUT "reboot ($node): Successful!\n";
+		print STDOUT "reboot ($node): Successful!\n"
+		    if (!$silent);
 	    }
 	}
     }
@@ -507,10 +508,12 @@ sub RebootNode {
     tblog_sub_process("reboot_node", $pc);
 
     if ($reconfig) {
-	print "reboot ($pc): Attempting to reconfigure ...\n";
+	print "reboot ($pc): Attempting to reconfigure ...\n"
+	    if (!$silent);
     }
     else {
-	print "reboot ($pc): Attempting to reboot ...\n";
+	print "reboot ($pc): Attempting to reboot ...\n"
+	    if (!$silent);
     }
 
     # Report some activity into last_ext_act
