@@ -26,7 +26,7 @@ package
 
       clip.addEventListener(Event.ENTER_FRAME, enterFrame);
 
-      op = new Operation("", "");
+      op = new Operation(null);
       startCredential();
     }
 
@@ -71,6 +71,7 @@ package
       var before : int = clip.xmlText.scrollV;
       clip.xmlText.appendText("\n-----------------------------------------\n");
       clip.xmlText.appendText("SEND: " + opName + "\n");
+      clip.xmlText.appendText("URL: " + op.getUrl() + "\n");
       clip.xmlText.appendText("-----------------------------------------\n\n");
       clip.xmlText.appendText(op.getSendXml());
       clip.xmlText.scrollV = before;
@@ -91,7 +92,7 @@ package
     {
       opName = "Acquiring credential";
       clip.loadText.text = opName;
-      op.reset("sa", "GetCredential");
+      op.reset(Geni.getCredential);
       op.addField("uuid", "0b2eb97e-ed30-11db-96cb-001143e453fe");
       op.call(completeCredential, failure);
       addSend();
@@ -115,7 +116,7 @@ package
     {
       opName = "Lookup User";
       clip.loadText.text = "Looking up user '" + userName + "'";
-      op.reset("sa", "Resolve");
+      op.reset(Geni.resolve);
       op.addField("hrn", userName);
       op.addField("credential", credential.base);
       op.addField("type", "User");
@@ -141,7 +142,7 @@ package
     {
       opName = "Lookup Slice";
       clip.loadText.text = "Looking up slice name '" + sliceName + "'";
-      op.reset("sa", "Resolve");
+      op.reset(Geni.resolve);
       op.addField("hrn", sliceName);
       op.addField("credential", credential.base);
       op.addField("type", "Slice");
@@ -167,7 +168,7 @@ package
     {
       opName = "Delete";
       clip.loadText.text = "Deleting existing slice";
-      op.reset("sa", "Remove");
+      op.reset(Geni.remove);
       op.addField("credential", credential.base);
       op.addField("uuid", sliceId);
       op.addField("type", "Slice");
@@ -192,7 +193,7 @@ package
     {
       opName = "Create";
       clip.loadText.text = "Creating new slice";
-      op.reset("sa", "Register");
+      op.reset(Geni.register);
       op.addField("credential", credential.base);
       op.addField("hrn", sliceName);
       op.addField("type", "Slice");
@@ -227,7 +228,7 @@ package
         "</rspec>";
       opName = "Looking up resources";
       clip.loadText.text = opName;
-      op.reset("cm", "DiscoverResources");
+      op.reset(Geni.discoverResources);
       op.addField("credential", credential.slice);
       op.addField("rspec", rspec);
       op.setUrl("https://myboss.myelab.testbed.emulab.net:443/protogeni/xmlrpc");

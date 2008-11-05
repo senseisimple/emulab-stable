@@ -19,7 +19,7 @@ package
     override public function start(credential : Credential) : Operation
     {
       opName = "Booting Sliver";
-      op.reset("cm", "StartSliver");
+      op.reset(Geni.startSliver);
       op.addField("credential", credential.slivers[cmIndex]);
       op.addField("impotent", Request.IMPOTENT);
       op.setUrl(url);

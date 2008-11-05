@@ -21,7 +21,7 @@ package
     override public function start(credential : Credential) : Operation
     {
       opName = "Updating Sliver";
-      op.reset("cm", "UpdateSliver");
+      op.reset(Geni.updateSliver);
       op.addField("credential", credential.slivers[cmIndex]);
       op.addField("rspec", rspec);
       op.addField("impotent", Request.IMPOTENT);

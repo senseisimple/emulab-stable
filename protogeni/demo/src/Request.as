@@ -4,7 +4,7 @@ package
   {
     public function Request() : void
     {
-      op = new Operation("", "");
+      op = new Operation(null);
       opName = "";
     }
 

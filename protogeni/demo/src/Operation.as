@@ -6,16 +6,19 @@ package
 
   class Operation
   {
-    public function Operation(newModule : String, newMethod : String) : void
+    public function Operation(qualifiedMethod : Array) : void
     {
       server = null;
-      reset(newModule, newMethod);
+      reset(qualifiedMethod);
     }
 
-    public function reset(newModule : String, newMethod : String) : void
+    public function reset(qualifiedMethod : Array) : void
     {
-      module = newModule;
-      method = newMethod;
+      if (qualifiedMethod != null)
+      {
+        module = qualifiedMethod[0];
+        method = qualifiedMethod[1];
+      }
       clearFields();
       resetUrl();
       if (server != null)
@@ -35,6 +38,11 @@ package
     public function setUrl(newUrl : String) : void
     {
       url = newUrl + "/" + module;
+    }
+
+    public function getUrl() : String
+    {
+      return url;
     }
 
     public function addField(key : String, value : Object) : void

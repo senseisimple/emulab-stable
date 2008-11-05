@@ -23,7 +23,7 @@ package
       if (cm.getTicket(cmIndex) == null)
       {
         opName = "Getting Ticket";
-        op.reset("cm", "GetTicket");
+        op.reset(Geni.getTicket);
         op.addField("credential", credential.slice);
         op.addField("rspec", rspec);
         op.addField("impotent", Request.IMPOTENT);
@@ -32,7 +32,7 @@ package
       else
       {
         opName = "Redeeming Ticket";
-        op.reset("cm", "RedeemTicket");
+        op.reset(Geni.redeemTicket);
         op.addField("ticket", cm.getTicket(cmIndex));
         op.addField("impotent", Request.IMPOTENT);
         op.setUrl(cm.getUrl(cmIndex));

@@ -21,7 +21,7 @@ package
       // TODO: Check to make sure that credential.slivers[cmIndex]
       // exists and perform a no-op if it doesn't.
       opName = "Deleting Sliver";
-      op.reset("cm", "DeleteSliver");
+      op.reset(Geni.deleteSliver);
       op.addField("credential", credential.slivers[cmIndex]);
       op.addField("impotent", Request.IMPOTENT);
       op.setUrl(url);

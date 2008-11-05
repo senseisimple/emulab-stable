@@ -17,7 +17,7 @@ package
     override public function start(credential : Credential) : Operation
     {
       opName = "Requesting Resources";
-      op.reset("cm", "DiscoverResources");
+      op.reset(Geni.discoverResources);
       op.addField("credential", credential.slice);
       op.setUrl(cm.getUrl(cmIndex));
       return op;
