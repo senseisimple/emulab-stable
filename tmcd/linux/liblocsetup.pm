@@ -1589,6 +1589,8 @@ sub os_get_partition_info($$)
 {
     my ($bootdev, $partition) = @_;
 
+    $bootdev =~ s#^/dev/##;
+
     if (!open(FDISK, "fdisk -l /dev/$bootdev |")) {
 	print("Failed to run fdisk on /dev/$bootdev!");
 	return -1;

@@ -141,7 +141,7 @@ dofreebsd() {
 		rootdev=/dev/`$BINDIR/check_disklabel $disk $part`
 		[ "$rootdev" = /dev/ ] && exit 1
 		fstype=ufs
-		fsopts="ro,fstype=44bsd"
+		fsopts="ro,ufstype=44bsd"
 	fi
 
 	mount -t $fstype -o $fsopts $rootdev /mnt || {
@@ -290,13 +290,13 @@ dofreebsd() {
 
 	if [ $changedisk -eq 1 ]; then
 	    echo "  updating /etc/fstab"
-	    sed -E -i .orig -e "s;^/dev/[a-zA-Z]+[0-9]+s[0-9]+;/dev/${freebsd_disk}s${part};" /mnt/etc/fstab || {
+	    sed -i.orig -e "s;^/dev/[a-zA-Z][a-zA-Z]*[0-9][0-9]*s[0-9][0-9]*;/dev/${freebsd_disk}s${part};" /mnt/etc/fstab || {
 		echo "Failed to update /etc/fstab"
 		umount $rootdev
 		return 1
 	    }
 	    echo "  updating /etc/dumpdates"
-	    sed -E -i .orig -e "s;^/dev/[a-zA-Z]+[0-9]+s[0-9]+;/dev/${freebsd_disk}s${part};" /mnt/etc/dumpdates || {
+	    sed -i.orig -e "s;^/dev/[a-zA-Z][a-zA-Z]*[0-9][0-9]*s[0-9][0-9]*;/dev/${freebsd_disk}s${part};" /mnt/etc/dumpdates || {
 		echo "Failed to update /etc/dumpdates"
 		umount $rootdev
 		return 1
@@ -315,7 +315,7 @@ dofreebsd() {
 		on="en"
 	    fi
 	    echo "  ${on}abling ACPI"
-	    sed -E -i .orig -e "/[Aa][Cc][Pp][Ii]/d" /mnt/boot/loader.conf || {
+	    sed -i.orig -e "/[Aa][Cc][Pp][Ii]/d" /mnt/boot/loader.conf || {
 		echo "Failed to update /boot/loader.conf"
 		umount $rootdev
 		return 1
@@ -343,7 +343,7 @@ EOF2
 		on="en"
 	    fi
 	    echo "  ${on}abling ASF"
-	    sed -E -i .orig -e "/[Aa][Ss][Ff]/d" /mnt/boot/loader.conf || {
+	    sed -i.orig -e "/[Aa][Ss][Ff]/d" /mnt/boot/loader.conf || {
 		echo "Failed to update /boot/loader.conf"
 		umount $rootdev
 		return 1
@@ -427,7 +427,7 @@ dolinux() {
 	fi
 
 	# change the swap devices in fstab
-	sed -i .orig -e "s;^/dev/[hs]d.\([0-7]\);/dev/${linux_disk}\1;" /mnt/etc/fstab || {
+	sed -i.orig -e "s;^/dev/[hs]d.\([0-7]\);/dev/${linux_disk}\1;" /mnt/etc/fstab || {
 		echo "Failed to update /etc/fstab"
 		umount $rootdev
 		return 1
@@ -445,7 +445,7 @@ dolinux() {
 	fi
 	if [ -r $gconf ]; then
 	    echo "  updating $fgconf"
-	    sed -i .orig -e "s;\([br]oot=/dev\)/[hs]d.[0-7];\1/${linux_disk}${part};" $gconf || {
+	    sed -i.orig -e "s;\([br]oot=/dev\)/[hs]d.[0-7];\1/${linux_disk}${part};" $gconf || {
 		echo "Failed to update $fgconf"
 	    }
 
@@ -453,7 +453,7 @@ dolinux() {
 	    # Tweak grub's notion of root.
 	    # Note that grub's partition numbering is zero-based.
 	    #
-	    gdisk=`echo $linux_disk | sed -e 's/^[^0-9]*//;y/abcdefgh/01234567/'`
+	    gdisk=`echo $linux_disk | sed -e 's/^.*\(.\)$/\1/;y/abcdefgh/01234567/'`
 	    gpart=`expr $part - 1`
 	    #
 	    # If we booted from a flash device we also have to further tweak
@@ -463,7 +463,7 @@ dolinux() {
 	    if [ $FLASHBOOT -eq 1 ]; then
 	        gdisk=`expr $gdisk + 1`
 	    fi
-	    sed -i '' -e "s;root (hd[0-9],[0-9]);root (hd${gdisk},${gpart});" $gconf || {
+	    sed -i'' -e "s;root (hd[0-9],[0-9]);root (hd${gdisk},${gpart});" $gconf || {
 		echo "Failed to update root in $fgconf"
 	    }
 	fi
@@ -476,7 +476,7 @@ dolinux() {
 	lconf=/mnt/etc/lilo.conf
 	if [ -r $lconf ]; then
 	    echo "  updating /etc/lilo.conf"
-	    sed -i .orig -e "s;\([br]oot=/dev\)/[hs]d.[0-7];\1/${linux_disk}${part};" $lconf || {
+	    sed -i.orig -e "s;\([br]oot=/dev\)/[hs]d.[0-7];\1/${linux_disk}${part};" $lconf || {
 		    echo "Failed to update /etc/lilo.conf"
 		    umount $rootdev
 		    return 1

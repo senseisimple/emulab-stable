@@ -109,10 +109,10 @@ cdboot-install:	destdircheck common-install etc-install \
 	(cd ../../cdrom;$(MAKE) DESTDIR=$(DESTDIR) client-install)
 	(cd ../../tools/teachswitch; $(MAKE) DESTDIR=$(DESTDIR) client-install)
 	$(INSTALL) -m 755 $(SRCDIR)/../../install/newclient $(BINDIR)/newclient
-	$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/users
-	$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/proj
-	$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/groups
-	$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/share
+	#$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/users
+	#$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/proj
+	#$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/groups
+	#$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/share
 
 simple-install:	common-install script-install bin-install
 
