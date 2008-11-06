@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -12,6 +12,7 @@
 use lib '@prefix@/lib';
 use libdb;
 use English;
+use Experiment;
 use Getopt::Std;
 
 # Turn off line buffering on output
@@ -25,23 +26,27 @@ $h = 0; # help mode
 $d = 0; # debug mode
 $a = 0; # show all
 $n = 0; # show nodes
+$s = 0; # summary nodes
 $t = $defidlehours; # Threshold idle time
+my $experiment;
+my $whereclause = " pid is not null and eid is not null ";
 
 print "Got ARGV = ",join(" ",@ARGV),"\n" if $d;
 
 sub help {
     die("Usage:
-idletimes [-h] [-d] [-a] [-n] [-t hrs]
+idletimes [-h] [-d] [-a] [-n] [s] [-t hrs] [eid]
  -h	Show this help message
  -d	Enable debugging/verbose output
  -a	Show all expts (or nodes with -n)
  -n	Show nodes instead of experiments
+ -s     Summary mode for experiment; exit with status only.
  -t hrs	Threshold idle time (in hours, default $defidlehours)
 Note: idletimes shows experiments that are set to idle_ignore.
 ");
 }
 
-my $optlist = "hdant:";
+my $optlist = "hdant:s";
 my %opt = ();
 if (! getopts($optlist,\%opt)) { help(); }
 # Copy the options into global vars
@@ -49,8 +54,21 @@ foreach $var (keys %opt) {
     ${$var} = $opt{$var};
     print "\$$var = $opt{$var} (".${$var}.")\n" if $d;
 }
+if (@ARGV) {
+    my $pideid = $ARGV[0];
+    $experiment = Experiment->Lookup($pideid);
+    if (!defined($experiment)) {
+	die("Experiment $pideid does not exist\n");
+    }
+    if ($experiment->state() ne EXPTSTATE_ACTIVE) {
+	die("Experiment $pideid is not active\n");
+    }
+    my $pid = $experiment->pid();
+    my $eid = $experiment->eid();
+    $whereclause = "pid='$pid' and eid='$eid'";
+}
 
-print "Settings: h=$h  d=$d  a=$a  n=$n  t=$t\n" if $d;
+print "Settings: h=$h  d=$d  a=$a  n=$n  s=$s t=$t\n" if $d;
 
 if ($h) { help(); }
 
@@ -71,7 +89,7 @@ max($lastact_query) as last_act, round((unix_timestamp(now()) -
 unix_timestamp(max($lastact_query)))/3600,2) as idle_time,
 count(r.node_id) as nodes
 from node_activity as n left join reserved as r on n.node_id=r.node_id
-where pid is not null and eid is not null
+where ($whereclause)
 group by pid,eid order by pid,eid";
 } else {
     $sql .= "select pid, eid, n.node_id, last_report,
@@ -79,7 +97,7 @@ last_tty_act, last_net_act, last_cpu_act, last_ext_act,
  $lastact_query as last_act, round((unix_timestamp(now()) -
 unix_timestamp($lastact_query))/3600,2) as idle_time
 from node_activity as n left join reserved as r on n.node_id=r.node_id
-where pid is not null and eid is not null
+where ($whereclause)
 order by pid,eid,n.node_id";
 }
 
@@ -87,7 +105,12 @@ my $q = DBQueryFatal($sql);
 
 if ($d) { print $q->as_string; $q->dataseek(0); }
 
-if (!$n) {
+if ($s && $experiment) {
+    # No output; For a single experiment, there should be a single row.
+    my %row = $q->fetchhash();
+    exit($row{'idle_time'} >= $defidlehours);
+}
+elsif (!$n) {
     $FORMAT_NAME = "ByExpt";
     print <<EOT;
 PID          EID          Nodes  HrsIdle     Last Activity     Act. type
