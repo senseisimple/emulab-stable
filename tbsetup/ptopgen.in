@@ -373,6 +373,12 @@ if (defined($exempt_eid)) {
 	"(b.pid='$pid' and b.eid='$exempt_eid'))"; 
 }
 
+# In genimode exclude nodes with exclusion attribute.
+if ($genimode) {
+    $free_condition = "($free_condition and ".
+	"(nat.attrvalue is null or nat.attrvalue=0))";
+}
+
 # If the user wants all nodes, we consider everything to be free (this
 # overrides the other possible free conditions
 if ($allnodes) {
@@ -389,6 +395,9 @@ $result =
 		 "left join reserved as m on a.phys_nodeid=m.node_id ".
 		 "left join nodes as np on a.phys_nodeid=np.node_id ".
 		 "left join node_types as t on t.type=a.type ".
+		 "left join node_attributes as nat on ".
+		 "     nat.node_id=a.node_id and ".
+		 "     nat.attrkey='protogeni_exclude' ".
 		 "left outer join ". 
 		 "  (select type,attrvalue ".
 		 "   from node_type_attributes ".
