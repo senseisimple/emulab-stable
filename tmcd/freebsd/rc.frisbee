@@ -83,6 +83,18 @@ tweakmbr() {
     dd if=/etc/emulab/mbr${_NEW}.dd of=/dev/$_DSK bs=512 count=1
 }
 
+find_disks() {
+	local disks
+
+	for d in `sed -n 's/^\([a-z]*[0-9][0-9]*\): [0-9][0-9]*MB/\1/p' /var/run/dmesg.boot`; do
+		case $d in
+			ad*|da*|ar*|aacd*) disks="$disks $d"
+		esac
+	done
+
+	echo $disks
+}
+
 #
 # Function to zero all potential superblocks in the DOS partitions that
 # could interfere with the OSes on the image being loaded.
@@ -122,6 +134,7 @@ $BINDIR/tmcc state RELOADSETUP
 
 BOSSINFO=`$BINDIR/tmcc bossinfo`
 LOADINFO=`$BINDIR/tmcc loadinfo`
+STATUS=`$BINDIR/tmcc status`
 
 # For testing purposes.
 #BOSSINFO='boss.emulab.net 155.101.128.70'
@@ -325,6 +338,23 @@ if [ x"$ADDRESS" != x ]; then
 	if [ $isrem -eq 0 -a x"$ZFILL" = x -a "$PARTITION" = "0" ]; then
 	    zapsuperblocks $DISK
 	fi
+
+	# HACK ALERT: If we're reloading we need to zap the superblocks and
+	# MBRs of any other disks in the system.  This is to prevent Linux from
+	# finding an old filesystem with the same label or UUID and mounting
+	# that instead of the right one.  We skip the disks that are mounted
+	# and the disk we're going to write to.
+	case $STATUS in
+		*ALLOCATED=emulab-ops/reloading*)
+			disks=`find_disks`
+			for d in $disks; do
+				[ $d = $DISK ] && continue
+				mount | grep "^/dev/$d" > /dev/null && continue
+				zapsuperblocks $d
+				dd if=/dev/zero of=/dev/$disk bs=512 count=1
+			done
+			;;
+	esac
 
         $BINDIR/tmcc state RELOADING
 
