@@ -273,6 +273,22 @@ write_image()
 	return $rc
 }
 
+find_disks() {
+	local disks
+
+	if [ $OS = "FreeBSD" ]; then
+		for d in `dmesg | sed -n 's/^\([a-z]*[0-9][0-9]*\): [0-9][0-9]*MB/\1/p'`; do
+			case $d in
+				ad*|da*|ar*|aacd*) disks="$disks $d"
+			esac
+		done
+	elif [ $OS = "Linux" ]; then
+		disks=`ls /sys/block/[hs]d* | sed 's;.*/\([^/]*\)$;\1;'`
+	fi
+
+	echo $disks
+}
+
 $BINDIR/tmcc state RELOADSETUP
 
 time=30
@@ -290,6 +306,7 @@ fi
 
 BOSSINFO=`$BINDIR/tmcc bossinfo`
 BOSSIP=${BOSSINFO##* }
+STATUS=`$BINDIR/tmcc status`
 
 # For testing purposes.
 #BOSSINFO='boss.emulab.net 155.101.128.70'
@@ -405,6 +422,18 @@ fi
 if [ $is_remote -eq 0 -a $PARTITION -eq 0 -a $ZFILL -eq 0 ]; then
 	zap_superblocks /dev/$DISK
 fi
+
+case $STATUS in
+	*ALLOCATED=emulab-ops/reloading*)
+		disks=`find_disks`
+		for d in $disks; do
+			[ $d = $DISK ] && continue
+			mount | grep "^/dev/$d" > /dev/null && continue
+			zap_superblocks $d
+			dd if=/dev/zero of=/dev/$disk bs=512 count=1
+		done
+		;;
+esac
 
 install_mbr /dev/$DISK $MBR
 
