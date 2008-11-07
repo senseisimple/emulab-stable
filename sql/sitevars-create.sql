@@ -69,3 +69,6 @@ INSERT IGNORE INTO sitevariables VALUES ('swap/swapout_command_timeout',NULL,'12
 INSERT IGNORE INTO sitevariables VALUES ('node/gw_mac','00:b0:8e:84:69:34','','MAC address of the control net router');
 INSERT IGNORE INTO sitevariables VALUES ('general/default_imagename','FBSD410+RHL90-STD','','Name of the default image for new nodes, assumed to be in the emulab-ops project.');
 INSERT IGNORE INTO sitevariables VALUES ('general/joinproject/admincheck','0','0','When set, a project may not have a mix of admin and non-admin users');
+INSERT IGNORE INTO sitevariables VALUES ('protogeni/allow_externalusers','1','1','When set, external users may allocate slivers on your testbed.');
+INSERT IGNORE INTO sitevariables VALUES ('protogeni/max_externalnodes',NULL,'1024','When set, maximum number of nodes that external users may allocate.');
+
