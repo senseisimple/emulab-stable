@@ -72,11 +72,6 @@ print "Settings: h=$h  d=$d  a=$a  n=$n  s=$s t=$t\n" if $d;
 
 if ($h) { help(); }
 
-# Only root or admin types!
-if (($UID != 0) && (!TBAdmin($UID))) {
-    die("Only root or TB administrators can run idletimes.\n");
-}
-
 # Construct the query
 my $lastact_query = "greatest(last_tty_act, last_net_act, ".
   "last_cpu_act, last_ext_act)";
