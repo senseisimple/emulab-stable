@@ -570,7 +570,7 @@ sub DumpDBGoo()
     # node_id to "fs" or "ops" and their type to ops.
     #
     my @NODETABLES = ("node_auxtypes", "node_status", "nodes",
-		      "node_rusage", "node_hostkeys", "node_idlestats");
+		      "node_rusage", "node_hostkeys", "node_activity");
 
     #
     # These tables are dumped by project ID.
