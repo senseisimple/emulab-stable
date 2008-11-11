@@ -1031,11 +1031,8 @@ sub EditExp($$$$$$)
     # the swapped state. If the query fails, we know that the experiment
     # was in transition.
     #
-	
-    if (!exists($argref->{"batchmode"})) {
-	$argref->{"batchmode"} = 0;
-    }
-    if ($experiment->batchmode() != $argref->{"batchmode"}) {
+
+    if (exists($argref->{"batchmode"}) && $experiment->batchmode() != $argref->{"batchmode"}) {
 	my $success  = 0;
 
 	my $batchmode;
