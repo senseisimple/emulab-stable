@@ -133,7 +133,8 @@ sub GetCredential($)
 	    if (!defined($slice));
 	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
 				    "Not your slice!")
-	    if ($slice->creator_uuid() ne $this_user->uuid());
+	    if ($slice->creator_uuid() ne $this_user->uuid() &&
+		!$slice->IsBound($this_user));
 	
 	#
 	# Return a credential for the slice.
@@ -250,7 +251,7 @@ sub Resolve($)
 		     "hrn"      => $geniuser->hrn(),
 		     "uuid"     => $geniuser->uuid(),
 		     "email"    => $geniuser->email(),
-		     "cert"     => $geniuser->cert(),
+		     "gid"      => $geniuser->cert(),
 		     "name"     => $geniuser->name(),
 		    };
 	#$blob->{'sliverkeys'} = \@sliverkeys
@@ -618,6 +619,112 @@ sub DiscoverResources($)
 			    "Could not discover resources at clearinghouse");
     }
     return GeniResponse->Create(GENIRESPONSE_SUCCESS, 0);
+}
+
+#
+# Return ssh keys.
+#
+sub GetKeys($)
+{
+    my ($argref) = @_;
+    my $cred  = $argref->{'credential'};
+
+    if (! defined($cred)) {
+	return GeniResponse->MalformedArgsResponse();
+    }
+    my $credential = GeniCredential->CreateFromSigned($cred);
+    if (!defined($credential)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not create GeniCredential object");
+    }
+
+    #
+    # Make sure the credential was issued to the caller.
+    #
+    if ($credential->owner_uuid() ne $ENV{'GENIUUID'}) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "This is not your credential!");
+    }
+    #
+    # And that the target of the credential is this registry.
+    #
+    my $authority = GeniAuthority->Lookup($ENV{'MYUUID'});
+    if (!defined($authority)) {
+	print STDERR "Could not find local authority object\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
+    }
+    if ($credential->target_uuid() ne $authority->uuid()) {
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN,
+				    undef, "This is not your registry!");
+    }
+
+    my $this_user = GeniUser->Lookup($credential->owner_uuid(), 1);
+    if (!defined($this_user)) {
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN,
+				    undef, "Who are you?");
+    }
+    my @keys;
+    if ($this_user->GetKeys(\@keys) != 0) {
+	print STDERR "Could not get keys for $this_user\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR);	
+    }
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS, @keys);
+}
+
+#
+# Bind a user to a slice. The slice creator does this so that the target
+# user can request his own credential to manipulate the slice. This is in
+# leu of delegation.
+#
+sub BindToSlice($)
+{
+    my ($argref) = @_;
+    my $cred  = $argref->{'credential'};
+    my $uuid  = $argref->{'uuid'};
+
+    if (!defined($uuid) || !defined($cred)) {
+	return GeniResponse->MalformedArgsResponse();
+    }
+    if (!($uuid =~ /^[-\w]*$/)) {
+	return GeniResponse->MalformedArgsResponse();
+    }
+    my $credential = GeniCredential->CreateFromSigned($cred);
+    if (!defined($credential)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not create GeniCredential object");
+    }
+
+    #
+    # Make sure the credential was issued to the caller.
+    #
+    if ($credential->owner_uuid() ne $ENV{'GENIUUID'}) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "This is not your credential!");
+    }
+    my $this_user = GeniUser->Lookup($credential->owner_uuid(), 1);
+    if (!defined($this_user)) {
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN,
+				    undef, "Who are you?");
+    }
+    my $slice = GeniSlice->Lookup($credential->target_uuid());
+    if (!defined($slice)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Unknown slice for this credential");
+    }
+    
+    #
+    # Locate the target user; must exist locally.
+    #
+    my $target_user = GeniUser->Lookup($uuid, 1);
+    if (!defined($target_user)) {
+	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED,
+				    undef, "No such user here");
+    }
+    if ($slice->BindUser($target_user) != 0) {
+	print STDERR "Could not bind $target_user to $slice\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
+    }
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS);
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

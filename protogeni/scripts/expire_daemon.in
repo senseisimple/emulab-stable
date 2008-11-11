@@ -1,0 +1,212 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+
+#
+# Look for things that need to be expired and resources released. This is
+# incredibly primitive at the moment.
+# 
+sub usage()
+{
+    print "Usage: expire_daemon [-d] [-c | -s]\n";
+    exit(1);
+}
+my $optlist = "d";
+my $debug   = 1;
+my $asch    = 0;
+
+#
+# Configure variables
+#
+my $TB		  = "@prefix@";
+my $TBOPS         = "@TBOPSEMAIL@";
+my $TBLOGS        = "@TBLOGSEMAIL@";
+my $PGENIDOMAIN   = "@PROTOGENI_DOMAIN@";
+my $PGENISUPPORT  = @PROTOGENI_SUPPORT@;
+my $LOGFILE       = "$TB/log/geniexpire";
+my $IDLETIMES	  = "$TB/sbin/idletimes";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Protos
+sub fatal($);
+	  
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+if ($UID != 0) {
+    fatal("Must be root to run this script\n");
+}
+
+#
+# Check args early so we get the right DB.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+
+# Do this early so that we talk to the right DB.
+use vars qw($GENI_DBNAME);
+$GENI_DBNAME = ($asch ? "geni-ch" : "geni-cm");
+$LOGFILE    .= ($asch ? ".ch" : ".cm");
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
+require GeniDB;
+require GeniUtil;
+require GeniTicket;
+require GeniSlice;
+require GeniCM;
+use libtestbed;
+
+GeniUtil::FlipToGeniUser();
+
+# Go to ground.
+if (! $debug) {
+    if (TBBackGround($LOGFILE)) {
+	exit(0);
+    }
+}
+
+#
+# Look for tickets.
+#
+sub ExpireTickets()
+{
+    my $query_result =
+	GeniDB::DBQueryWarn("select idx from geni_tickets ".
+			    "where UNIX_TIMESTAMP(now()) > ".
+			    "      UNIX_TIMESTAMP(redeem_before)");
+
+    while (my ($idx) = $query_result->fetchrow_array()) {
+	my $ticket = GeniTicket->Lookup($idx);
+
+	if (!defined($ticket)) {
+	    # Ticket is gone, lets not worry.
+	   next;
+	}
+	my $slice = GeniSlice->Lookup($ticket->slice_uuid());
+	if (!defined($slice)) {
+	    print STDERR "No slice for $ticket\n";
+	    goto skip;
+	}
+	if ($slice->Lock() != 0) {
+	    print STDERR "Could not lock slice $slice.\n";
+	    goto skip;
+	}
+	print "Expiring ticket $ticket\n";
+
+	if ($ticket->Release() != 0) {
+	    print STDERR "Could not delete $ticket\n";
+	    SENDMAIL($TBOPS, "Could not delete ticket $idx",
+		     "Could not delete ticket $ticket");
+	}
+	else {
+	    print STDERR "$ticket has been deleted\n";
+	}
+	$slice->UnLock();
+      skip:
+	$slice->Flush()
+	    if (defined($slice));
+	$ticket->Flush();
+    }
+}
+
+#
+# Look for slices that need to be expired. 
+#
+sub ExpireSlices()
+{
+    my $query_result =
+	GeniDB::DBQueryWarn("select idx from geni_slices ".
+			    "where UNIX_TIMESTAMP(now()) > ".
+			    "      UNIX_TIMESTAMP(expires)");
+
+    while (my ($idx) = $query_result->fetchrow_array()) {
+	my $slice = GeniSlice->Lookup($idx);
+
+	if (!defined($slice)) {
+	    # Slice is gone, lets not worry.
+	    next;
+	}
+	if ($slice->Lock() != 0) {
+	    print STDERR "Could not lock slice $slice.\n";
+	    goto skip;
+	}
+	my $experiment = $slice->GetExperiment();
+	if (!defined($experiment)) {
+	    print STDERR "Could not get experiment for $slice.\n";
+	    $slice->UnLock();
+	    goto skip;
+	}
+	if ($experiment->Refresh() != 0) {
+	    print STDERR "Could not flush $experiment\n";
+	    $slice->UnLock();
+	    goto skip;
+	}
+	my $pid = $experiment->pid();
+	my $eid = $experiment->eid();
+	my @localnodes = ();
+
+	#
+	# See if we have any local nodes. No point in using the idle
+	# check if there are no nodes. 
+	#
+	$experiment->LocalNodeListNames(\@localnodes);
+	if (@localnodes) {
+	    #
+	    # Use the idletimes program in summary mode to see if the
+	    # the nodes are idle. If they are then it gets swapped.
+	    # This is going to have to get more sophisticated.
+	    #
+	    print STDERR "Checking to see if $slice is idle\n";
+	    system("$IDLETIMES -s $pid,$eid");
+	    if (! $?) {
+		$slice->UnLock();
+		goto skip;
+	    }
+	}
+	print STDERR "$slice is idle; releasing.\n";
+	if (GeniCM::CleanupDeadSlice($slice) != 0) {
+	    print STDERR "Could not release $slice\n";
+	    # Leave it locked. 
+	    goto skip;
+	}
+	$slice->UnLock();
+      skip:
+	$slice->Flush()
+	    if (defined($slice));
+    }
+}
+
+while (1) {
+    ExpireTickets();
+    ExpireSlices();
+
+    print "Pausing for a while ...\n"
+	if ($debug);
+    sleep(30);
+}
+exit(0);
+
+sub fatal($)
+{
+    my ($msg) = @_;
+
+    die("*** $0:\n".
+	"    $msg\n");
+}

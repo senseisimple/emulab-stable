@@ -286,8 +286,8 @@ sub Modify($$$$)
 
     my $idx  = $self->idx();
     my $uuid = $self->uuid();
-    my $safe_name  = DBQuoteSpecial($name);
-    my $safe_email = DBQuoteSpecial($email);
+    my $safe_name  = DBQuoteSpecial($name || $self->name());
+    my $safe_email = DBQuoteSpecial($email || $self->email());
 
     return -1
 	if (!DBQueryWarn("update geni_users set ".
@@ -482,6 +482,16 @@ sub Archive($)
 	or return -1;
     
     return 0;
+}
+
+#
+# Is this a local user. 
+#
+sub IsLocal($)
+{
+    my ($self) = @_;
+
+    return ref($self) eq "GeniUser::LocalUser";
 }
 
 ############################################################################

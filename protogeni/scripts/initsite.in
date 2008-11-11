@@ -89,6 +89,38 @@ if (defined($options{"c"})) {
 }
 
 #
+# Have you sent in your certificate to Utah?
+#
+if (! -e "$TB/etc/.federated") {
+    my $done = 0;
+    my $federated = 0;
+
+    while (!$done) {
+	print "Have you sent in your root certificate to Utah? [y/n]: ";
+
+	$_ = <STDIN>;
+	if ($_ =~ /^(y|yes)$/i) {
+	    $federated = 1;
+	    $done = 1;
+	}
+	elsif ($_ =~ /^(n|no)$/i) {
+	    $federated = 0;
+	    $done = 1;
+	}
+    }
+    if ($federated) {
+	system("/usr/bin/touch $TB/etc/.federated");
+    }
+    else {
+	print "Please email $TB/etc/emulab.pem to testbed-ops\@flux.utah.edu";
+	print "\n";
+	print "This is a public key, so no harm in sending it in email.\n";
+	print "Once you hear back from Utah, please rerun this script.\n";
+	exit(1);
+    }
+}
+
+#
 # Packages.
 #
 my %packlist = ("p5-Frontier-RPC" => "/usr/ports/net/p5-Frontier-RPC",
@@ -126,6 +158,8 @@ if ($asch) {
 	system("/bin/cp $TB/etc/emulab.pem $TB/www/genica.bundle") == 0
 	    or fatal("Could not initialize $TB/www/genica.bundle");
     }
+    chmod(0644, "$TB/www/genica.bundle");
+
     #
     # This is a pain. xmlsec1 cannot deal with a bundle of certs and so we
     # need to split up the bundle into a directory of certs. I hope to deal
@@ -138,15 +172,7 @@ if ($asch) {
     system("/bin/cp $TB/etc/emulab.pem $TB/etc/genicacerts") == 0
 	or fatal("Could not initialize $TB/etc/genicacerts");
 }
-else {
-    #
-    # On the clients, we have to get the bundle from Utah website and
-    # then break it up for xmlsec (see above). We use a script for this
-    # since the clients need to do this everytime a new client is added.
-    #
-    system("$GETCACERTS") == 0
-	or fatal("Could not get CA bundle from Utah");
-}
+
 my $restartapache = 0;
 
 if (system("egrep -q -s 'PGENI' /usr/local/etc/apache/httpd.conf")) {
@@ -163,9 +189,30 @@ if (system("egrep -q -s 'DPGENI' /etc/rc.conf")) {
     print "Please add 'apache_flags=\"-DSSL -DPGENI\"' to /etc/rc.conf\n";
     $restartapache++;
 }
-if ($restartapache) {
+if ($asch && $restartapache) {
     print "Then restart apache:\n";
     print "    sudo /usr/local/etc/rc.d/apache restart\n";
+    print "Then rerun this script\n";
+    exit(1);
+}
+
+#
+# On the clients, we have to get the bundle from Utah website and
+# then break it up for xmlsec (see above). We use a script for this
+# since the clients need to do this everytime a new client is added.
+# This script restarts apache.
+#
+if (!$asch) {
+    system("$GETCACERTS") == 0
+	or fatal("Could not get CA bundle from Utah");
+}
+
+#
+# This cron entry will autoupdate the CA certs.
+#
+if (system("egrep -q -s '$GETCACERTS' /etc/crontab")) {
+    print "Please add this line to /etc/crontab:\n\n";
+    print "13  *  *  *	*  root  $GETCACERTS\n\n";
     print "Then rerun this script\n";
     exit(1);
 }
@@ -281,6 +328,8 @@ if ($asch) {
 	unlink($certfile);
 	fatal("Could not mv $certfile to $TB/www/genich.pem");
     }
+    chmod(0644, "$TB/www/genich.pem");
+
     #
     # Add the cert to the DB directly.
     #

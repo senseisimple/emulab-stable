@@ -120,6 +120,8 @@ my $responder = Frontier::Responder->new( "methods" => {
     "Register"          => \&GeniSA::Register,
     "Remove"            => \&GeniSA::Remove,
     "DiscoverResources" => \&GeniSA::DiscoverResources,
+    "GetKeys"	        => \&GeniSA::GetKeys,
+    "BindToSlice"	=> \&GeniSA::BindToSlice,
    },
 );
 

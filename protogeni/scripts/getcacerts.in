@@ -77,11 +77,11 @@ my $certstr;
 open(BUNDLE, "/tmp/genica.bundle.$$")
     or fatal("Could not open /tmp/genica.bundle.$$ for reading");
 while (<BUNDLE>) {
-    if ($line =~ /^-----BEGIN CERT/) {
+    if ($_ =~ /^-----BEGIN CERT/) {
 	$certstr = $_;
 	next;
     }
-    if ($line =~ /^-----END CERT/) {
+    if ($_ =~ /^-----END CERT/) {
 	$certstr .= $_;
 	push(@certs, $certstr);
 	$certstr = undef;
@@ -92,9 +92,22 @@ while (<BUNDLE>) {
 	next;
     }
 }
-push(@certs, $certstr)
+#
+# If the file is properly terminated, there should be no certificate in
+# progress. Hopefully the file is not trashed at a boundry. We do this
+# before the diff to make sure the file is reasonable.
+#
+fatal("Trashed bundle file")
     if ($certstr);
 close(BUNDLE);
+
+#
+# Go no further if the file is exactly the same as last time.
+#
+system("/usr/bin/diff -q $TB/etc/genica.bundle /tmp/genica.bundle.$$");
+if (!$?) {
+    exit(0);
+}
 
 my $idx = 0;
 while (@certs) {
@@ -111,9 +124,10 @@ if (-e "$TB/etc/genica.bundle.old") {
     unlink("$TB/etc/genica.bundle.old") or
 	fatal("Could not remove old genica bundle");
 }
-system("/bin/cp $TB/etc/genica.bundle $TB/etc/genica.bundle.old") == 0
-    of fatal("Could not save off $TB/etc/genica.bundle");
-
+if (-e "$TB/etc/genica.bundle") {
+    system("/bin/cp $TB/etc/genica.bundle $TB/etc/genica.bundle.old") == 0
+	or fatal("Could not save off $TB/etc/genica.bundle");
+}
 if (-e "$TB/etc/genicacerts.old") {
     system("/bin/rm -rf $TB/etc/genicacerts.old") == 0
 	or fatal("Could not remove old genicacerts directory");
@@ -126,6 +140,10 @@ system("/bin/mv /tmp/genica.bundle.$$ $TB/etc/genica.bundle") == 0
     or fatal("Could not mv /tmp/genica.bundle.$$ $TB/etc/genica.bundle");
 system("/bin/mv /tmp/genicacerts.$$ $TB/etc/genicacerts") == 0
     or fatal("Could not mv /tmp/genicacerts.$$ to $TB/etc/genicacerts");
+
+print "New certificates have been downloaded ... Restarting apache ...\n";
+system("/usr/local/etc/rc.d/apache.sh restart") == 0
+    or fatal("Could not restart apache!");
 
 exit(0);
 

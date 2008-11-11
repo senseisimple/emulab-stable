@@ -19,7 +19,8 @@ use vars qw(@ISA @EXPORT);
 	      GENIRESPONSE_TOOBIG GENIRESPONSE_REFUSED
 	      GENIRESPONSE_TIMEDOUT GENIRESPONSE_DBERROR
 	      GENIRESPONSE_RPCERROR GENIRESPONSE_UNAVAILABLE
-	      GENIRESPONSE_SEARCHFAILED GENIRESPONSE_UNSUPPORTED);
+	      GENIRESPONSE_SEARCHFAILED GENIRESPONSE_UNSUPPORTED
+	      GENIRESPONSE_BUSY GENIRESPONSE_EXPIRED);
 
 use overload ('""' => 'Stringify');
 
@@ -40,7 +41,8 @@ sub GENIRESPONSE_RPCERROR()       {10; }
 sub GENIRESPONSE_UNAVAILABLE()    {11; }
 sub GENIRESPONSE_SEARCHFAILED()   {12; }
 sub GENIRESPONSE_UNSUPPORTED()    {13; }
-
+sub GENIRESPONSE_BUSY()           {14; }
+sub GENIRESPONSE_EXPIRED()        {15; }
 
 #
 # This is the (python-style) "structure" we want to return.
@@ -106,6 +108,12 @@ sub MalformedArgsResponse($)
 {
     return GeniResponse->Create(GENIRESPONSE_BADARGS,
 				undef, "Malformed arguments to method");
+}
+
+sub BusyResponse($)
+{
+    return GeniResponse->Create(GENIRESPONSE_BUSY,
+				undef, "resource is busy; try again later");
 }
 
 sub BadArgsResponse(;$)

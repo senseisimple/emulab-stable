@@ -27,10 +27,11 @@ import xmlrpclib
 XMLRPC_SERVER   = "boss"
 SERVER_PATH     = ":443/protogeni/xmlrpc/"
 
+HOME            = os.environ["HOME"]
 # Path to my certificate
-CERTIFICATE     = "/users/stoller/.ssl/encrypted.pem"
+CERTIFICATE     = HOME + "/.ssl/encrypted.pem"
 # Got tired of typing this over and over so I stuck it in a file.
-PASSPHRASEFILE  = "/users/stoller/.ssl/password"
+PASSPHRASEFILE  = HOME + "/.ssl/password"
 passphrase      = ""
 
 # Debugging output.
@@ -96,6 +97,7 @@ def do_method(module, method, params, URI=None):
     # 
     if len(response["output"]):
         print response["output"],
+        print ": ",
         pass
 
     rval = response["code"]
@@ -121,7 +123,7 @@ if rval:
     Fatal("Could not get my credential")
     pass
 mycredential = response["value"]
-print "Got my SA credential"
+print "Got my SA credential. Looking for slice ..."
 #print str(mycredential);
 
 #
@@ -130,104 +132,50 @@ print "Got my SA credential"
 params = {}
 params["credential"] = mycredential
 params["type"]       = "Slice"
-params["hrn"]        = "myslice2"
+params["hrn"]        = "mytestslice"
 rval,response = do_method("sa", "Resolve", params)
-if rval == 0:
-    myslice = response["value"]
-    myuuid  = myslice["uuid"]
-
-    print "Deleting previous slice called myslice2";
-    params = {}
-    params["credential"] = mycredential
-    params["type"]       = "Slice"
-    params["uuid"]       = myuuid
-    rval,response = do_method("sa", "Remove", params)
-    if rval:
-        Fatal("Could not remove slice record")
-        pass
+if rval:
+    Fatal("Slice does not exist")
     pass
+myslice = response["value"]
+myuuid  = myslice["uuid"]
+print "Found the slice, asking for a credential ..."
 
 #
-# Create a slice. 
+# Get the slice credential.
 #
-print "Creating new slice called myslice2";
 params = {}
 params["credential"] = mycredential
 params["type"]       = "Slice"
-params["hrn"]        = "myslice2"
-rval,response = do_method("sa", "Register", params)
+params["uuid"]       = myuuid
+rval,response = do_method("sa", "GetCredential", params)
 if rval:
-    Fatal("Could not get my slice")
+    Fatal("Could not get Slice credential")
     pass
-myslice = response["value"]
-print "New slice created"
-#print str(myslice);
+slicecred = response["value"]
+print "Got the slice credential, asking for a sliver credential ..."
 
 #
-# Okay, we do not actually have anything like resource discovery yet,
-#
-rspec = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
-        " <node uuid=\"1c0f012f-a176-11dd-9fcd-001143e43770\" " +\
-        "       nickname=\"geni1\" "+\
-        "       virtualization_type=\"emulab-vnode\"> " +\
-        " </node>" +\
-        "</rspec>"
-params = {}
-params["credential"] = myslice
-params["rspec"]      = rspec
-params["impotent"]   = impotent
-rval,response = do_method("cm", "GetTicket", params,
-         URI="https://myboss.myelab.testbed.emulab.net:443/protogeni/xmlrpc")
-if rval:
-    Fatal("Could not get ticket")
-    pass
-ticket = response["value"]
-print "Got a ticket from the CM"
-#print str(ticket)
-
-#
-# Create the sliver.
+# Get the sliver credential.
 #
 params = {}
-params["ticket"]   = ticket
-params["impotent"] = impotent
-rval,response = do_method("cm", "RedeemTicket", params,
-         URI="https://myboss.myelab.testbed.emulab.net:443/protogeni/xmlrpc")
+params["credential"] = slicecred
+rval,response = do_method("cm", "GetSliver", params)
 if rval:
-    Fatal("Could not redeem ticket")
+    Fatal("Could not get Sliver credential")
     pass
-sliver = response["value"]
-print "Created a sliver"
-#print str(sliver)
-
-print "Sliver has been started, waiting for input to delete it"
-print "You should be able to log into the sliver after a little bit"
-sys.stdin.readline();
-print "Deleting sliver now"
+slivercred = response["value"]
+print "Got the sliver credential, deleting the sliver";
 
 #
 # Delete the sliver.
 #
 params = {}
-params["credential"] = sliver
-params["impotent"]   = impotent
-rval,response = do_method("cm", "DeleteSliver", params,
-         URI="https://myboss.myelab.testbed.emulab.net:443/protogeni/xmlrpc")
+params["credential"] = slivercred
+rval,response = do_method("cm", "DeleteSliver", params)
 if rval:
-    Fatal("Could not stop sliver")
+    Fatal("Could not delete sliver")
     pass
-print "Sliver has been deleted"
+print "Sliver has been deleted."
 
-#
-# Delete the slice.
-#
-params = {}
-params["credential"] = mycredential
-params["type"]       = "Slice"
-params["hrn"]        = "myslice2"
-rval,response = do_method("sa", "Remove", params)
-if rval:
-    Fatal("Could not delete slice")
-    pass
-pass
-print "Slice has been deleted"
+

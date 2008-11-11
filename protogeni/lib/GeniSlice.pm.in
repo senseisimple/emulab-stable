@@ -111,6 +111,7 @@ sub Lookup($$)
     }
     $self->{'CERT'}     = $certificate;
     $self->{'BINDINGS'} = undef;
+    $self->{'LOCKED'}   = 0;
     
     # Add to cache. 
     $slices{$self->{'SLICE'}->{'idx'}}    = $self;
@@ -124,10 +125,12 @@ sub hrn($)		{ return field($_[0], "hrn"); }
 sub uuid($)		{ return field($_[0], "uuid"); }
 sub creator_uuid($)	{ return field($_[0], "creator_uuid"); }
 sub created($)		{ return field($_[0], "created"); }
+sub expires($)		{ return field($_[0], "expires"); }
 sub sa_uuid($)		{ return field($_[0], "sa_uuid"); }
 sub exptidx($)		{ return field($_[0], "exptidx"); }
 sub cert($)		{ return $_[0]->{'CERT'}->cert(); }
 sub GetCertificate($)   { return $_[0]->{'CERT'}; }
+sub LOCKED($)           { return $_[0]->{'LOCKED'}; }
 
 #
 # Stringify for output.
@@ -212,6 +215,7 @@ sub Create($$$$;$)
 
     # Now tack on other stuff we need.
     push(@insert_data, "created=now()");
+    push(@insert_data, "expires=DATE_ADD(now(), INTERVAL 1 HOUR)");
     push(@insert_data, "idx='$idx'");
     push(@insert_data, "sa_uuid='$sa_uuid'");
     push(@insert_data, "exptidx=$exptidx")
@@ -235,6 +239,53 @@ sub Create($$$$;$)
 			  join(",", @insert_data)));
 
     return GeniSlice->Lookup($idx);
+}
+
+#
+# We lock at a very coarse grain, mostly in the CM. When a slice is busy
+# we cannot expire things from it.
+#
+sub Lock($)
+{
+    my ($self) = @_;
+    my $idx    = $self->idx();
+
+    # We already have it locked.
+    return 0
+	if ($self->LOCKED());
+
+    DBQueryWarn("lock tables geni_slices write")
+	or return -1;
+
+    my $query_result =
+	DBQueryWarn("select locked from geni_slices ".
+		    "where idx='$idx' and locked is null");
+    if (!$query_result || !$query_result->numrows) {
+	DBQueryWarn("unlock tables");
+	return 1;
+    }
+    $query_result =
+	DBQueryWarn("update geni_slices set locked=now() where idx='$idx'");
+    DBQueryWarn("unlock tables");
+
+    return 1
+	if (!$query_result);
+    $self->{'LOCKED'} = $$;
+    return 0;
+}
+sub UnLock($)
+{
+    my ($self) = @_;
+    my $idx    = $self->idx();
+
+    return 1
+	if (!$self->LOCKED());
+
+    DBQueryWarn("update geni_slices set locked=NULL where idx='$idx'")
+	or return -1;
+    
+    $self->{'LOCKED'} = 0;
+    return 0;
 }
 
 #
@@ -342,6 +393,16 @@ sub Delete($)
 	or return -1;
     
     return 0;
+}
+
+#
+# Flush from our little cache, as for the expire daemon.
+#
+sub Flush($)
+{
+    my ($self) = @_;
+
+    delete($slices{$self->idx()});
 }
 
 #
@@ -459,6 +520,53 @@ sub UserBindings($$)
 	$self->{'BINDINGS'} = \@bindings;
     }
     @$pref = @{ $self->{'BINDINGS'} };
+    return 0;
+}
+
+#
+# Is the user bound to a slice.
+#
+sub IsBound($$)
+{
+    my ($self, $user) = @_;
+    
+    return -1
+	if (! (ref($self) && ref($user)));
+
+    my $slice_uuid = $self->uuid();
+    my $user_uuid  = $user->uuid();
+
+    my $query_result =
+	DBQueryWarn("select user_uuid from geni_bindings ".
+		    "where slice_uuid='$slice_uuid' and ".
+		    "      user_uuid='$user_uuid'");
+    return 0
+	if (!$query_result);
+    return $query_result->numrows();
+}
+
+#
+# Set the expiration time for a slice. 
+#
+sub SetExpiration($$)
+{
+    my ($self, $expires) = @_;
+    my $uuid = $self->uuid();
+
+    if ($expires =~ /^\d+$/) {
+	$expires = "FROM_UNIXTIME($expires)";
+    }
+    else {
+	$expires = "'$expires'";
+    }
+    my $query_result =
+	DBQueryWarn("update geni_slices set expires=$expires " .
+		    "where uuid='$uuid'");
+    
+    return -1
+	if (!$query_result);
+    $self->{'SLICE'}->{'expires'} = $expires;
+
     return 0;
 }
 

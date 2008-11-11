@@ -318,7 +318,9 @@ open(SEC, "$XMLSEC1 --sign --node-id $sigid ".
 while (<SEC>) {
     $signedcred .= $_;
 }
-close(SEC);
+if (!close(SEC)) {
+    fatal("$XMLSEC1 failed on $tmpfile");
+}
 
 if (!defined($outfile)) {
     print $signedcred;
@@ -341,7 +343,7 @@ sub cleanup()
 sub fatal($)
 {
     my($mesg) = $_[0];
-    cleanup();
+#    cleanup();
     die("*** $0:\n".
 	"    $mesg\n");
 }

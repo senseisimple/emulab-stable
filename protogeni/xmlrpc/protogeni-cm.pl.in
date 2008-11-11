@@ -126,6 +126,7 @@ my $responder = Frontier::Responder->new( "methods" => {
     "SplitSliver"       => \&GeniCM::SplitSliver,
     "UpdateSliver"      => \&GeniCM::UpdateSliver,
     "GetSliver"         => \&GeniCM::GetSliver,
+    "BindToSlice"       => \&GeniCM::BindToSlice,
    },
 );
 

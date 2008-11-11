@@ -230,6 +230,7 @@ sub LoadFromString($$)
 
     my $certificate = GeniCertificate->LoadFromFile($filename);
     unlink($filename);
+    $certificate->{'CERT'}->{'certfile'} = undef;
     return $certificate;
 }
 

@@ -28,6 +28,9 @@ use English;
 use XML::Simple;
 use XML::LibXML;
 use Data::Dumper;
+use Date::Parse;
+use POSIX qw(strftime);
+use Time::Local;
 use File::Temp qw(tempfile);
 use overload ('""' => 'Stringify');
 
@@ -78,6 +81,10 @@ sub Lookup($$)
     return undef
 	if (!defined($ticket));
 
+    # We ignore this in the ticket. In fact, we need to change how we bring
+    # tickets back into the system.
+    $ticket->{'redeem_before'} = $row->{'redeem_before'};
+
     # Mark as coming from the DB.
     $ticket->{'idx'}    = $idx;
     $ticket->{'stored'} = 1;
@@ -110,6 +117,12 @@ sub Create($$$$)
     $self->{'stored'}        = 0;	# Stored to the DB.
 
     #
+    # For now, all tickets expire very quickly ...
+    #
+    $self->{'redeem_before'} =
+	POSIX::strftime("20%y-%m-%dT%H:%M:%S", localtime(time() + (2*60)));
+
+    #
     # Locally generated tickets need a local DB index, which can be the
     # same as the sequence number. A ticket from a remote component will
     # have it own seqno, and so we will generate a locally valid idx for
@@ -136,6 +149,7 @@ sub ticket_uuid($)	{ return field($_[0], "ticket_uuid"); }
 sub ticket($)		{ return field($_[0], "ticket"); }
 sub asString($)		{ return field($_[0], "ticket_string"); }
 sub ticket_string($)	{ return field($_[0], "ticket_string"); }
+sub redeem_before($)	{ return field($_[0], "redeem_before"); }
 sub component_uuid($)	{ return field($_[0], "component_uuid"); }
 sub component($)	{ return field($_[0], "component"); }
 sub stored($)		{ return field($_[0], "stored"); }
@@ -155,6 +169,16 @@ sub Stringify($)
     my $slice_uuid = $self->slice_uuid();
     
     return "[GeniTicket: $idx, slice:$slice_uuid]";
+}
+
+#
+# Flush from our little cache, as for the expire daemon.
+#
+sub Flush($)
+{
+    my ($self) = @_;
+
+    delete($tickets{$self->idx()});
 }
 
 #
@@ -288,6 +312,8 @@ sub CreateFromSignedTicket($$;$$)
 	    print STDERR "Could not find the ticket $seqno in the DB\n";
 	    return undef;
 	}
+	my $row = $query_result->fetchrow_hashref();
+	$self->{'redeem_before'} = $row->{'redeem_before'};
 	$self->{'idx'}    = $seqno;
 	$self->{'stored'} = 1;
     }
@@ -349,6 +375,7 @@ sub Store($)
     my $slice_uuid = $self->slice_uuid();
     my $owner_uuid = $self->owner_uuid();
     my $ticket_uuid= $self->ticket_uuid();
+    my $expires    = $self->redeem_before();
 
     #
     # For a locally created/signed ticket, seqno=idx. For a ticket from
@@ -370,6 +397,7 @@ sub Store($)
     push(@insert_data, "ticket_uuid='$ticket_uuid'");
     push(@insert_data, "slice_uuid='$slice_uuid'");
     push(@insert_data, "owner_uuid='$owner_uuid'");
+    push(@insert_data, "redeem_before='$expires'");
     
     my $safe_ticket = DBQuoteSpecial($self->ticket_string());
     push(@insert_data, "ticket_string=$safe_ticket");
@@ -395,6 +423,7 @@ sub Sign($)
 	if (!ref($self));
 
     my $idx        = $self->seqno();
+    my $expires    = $self->redeem_before();
     my $slice_cert = $self->slice_cert()->cert();
     my $owner_cert = $self->owner_cert()->cert();
     my $rspec_xml  = XMLout($self->rspec(), "NoAttr" => 1);
@@ -405,6 +434,10 @@ sub Sign($)
     #
     my $ticket_uuid = NewUUID();
     $self->{'ticket_uuid'} = $ticket_uuid;
+
+    # Convert to GMT.
+    $expires = POSIX::strftime("20%y-%m-%dT%H:%M:%S",
+			       gmtime(str2time($expires)));
 
     #
     # Create a template xml file to sign.
@@ -417,10 +450,10 @@ sub Sign($)
 	" <owner_gid>$owner_cert</owner_gid>\n".
 	" <target_gid>$slice_cert</target_gid>\n".
 	" <uuid>$ticket_uuid</uuid>\n".
-	" <expires>2008-05-10T09:00:00</expires>\n".
+	" <expires>$expires</expires>\n".
 	" <ticket>\n".
 	"  <can_delegate>1</can_delegate>\n".
-	"  <redeem_before>2008-05-10T09:00:00</redeem_before>\n".
+	"  <redeem_before>$expires</redeem_before>\n".
 	"  $rspec_xml\n".
 	" </ticket>\n".	
         "</credential>\n";
@@ -551,6 +584,23 @@ sub SameTicket($$)
 	if (! (ref($self) && ref($other)));
 
     return $self->idx() == $other->idx();
+}
+
+#
+# Check if ticket has expired. Use the DB directly.
+#
+sub Expired($)
+{
+    my ($self) = @_;
+    my $idx    = $self->idx();
+
+    my $query_result =
+	DBQueryWarn("select idx from geni_tickets ".
+		    "where idx='$idx' and ".
+		    "      (UNIX_TIMESTAMP(now()) > ".
+		    "       UNIX_TIMESTAMP(redeem_before))");
+    
+    return $query_result->numrows;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...
