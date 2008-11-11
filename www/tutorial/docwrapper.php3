@@ -23,7 +23,9 @@ if (!preg_match("/^[-\w\.]+\.(html|txt)$/", $docname)) {
 
 $to_wiki = array(
   'tutorial.html' => 'Tutorial',
-  'nse.html' => 'nse'
+  'nse.html' => 'nse',
+  'ixp.html' => 'ixp',
+  'nscommands.html' => 'nscommands'
 );
 
 #
@@ -79,4 +81,3 @@ else {
     PAGEFOOTER();
 }
 ?>
-
