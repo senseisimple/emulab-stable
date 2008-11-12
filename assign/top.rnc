@@ -32,6 +32,8 @@ NodeContents =
     ## Name of the node - each node name must be unique within the 
     ## top element
     attribute name { text },
+    ## Additional attributes if any
+    AdditionalNodeAttributeSpec,
     ## Type specification - we use a named pattern here (defined below), so
     ## that it can be overriden in the virtual topology schema, where you are
     ## only allowed to have one
@@ -47,6 +49,10 @@ NodeContents =
 
 ## A node can (by default) have one or more types
 NodeSpec.NodeType = NodeTypeSpec+
+
+## Default additional flag spec to empty for the moment.
+## It will be overridden in the ptop and vtop files
+AdditionalNodeAttributeSpec = empty
 
 ## Link types are currently just a siple string. They will almost certainly 
 ## have to get more complicated, for two reasons:
@@ -73,6 +79,8 @@ LinkContents =
     ## that it can be overriden in the virtual topology schema, where you are
     ## only allowed to have one
     LinkSpec.LinkType,
+    ## Add additional specs for a link if necessary
+    AdditionalLinkFlagSpec,
     ## Properties of this link
     PropertySpec*
 
@@ -99,6 +107,10 @@ LinkCharacteristics =
 ## A link can (by default) have zero or more types
 LinkSpec.LinkType = LinkTypeSpec*
 
+## Set the additional link flag spec to empty for now.
+## It will be overridden in the ptop and vtop files if required
+AdditionalLinkFlagSpec = empty
+
 ## "Legacy" assign features and desires - will be phased out in favor of
 ## properties
 FeatureDesireSpec = element fd {
@@ -124,11 +136,8 @@ LocalSpec = element local {
 ## "Legacy" assign node flags - will be replaced with properties, and in some
 ## cases, explicit links
 NodeFlagSpec =
-    ## Gives the amount of bandwidth this node can forward through its loopback
-    ## interface. In the future, we will make the loopback interface/link
-    ## explicit in the topology
-    ## Valid only for physical nodes
-    (element trivial_bandwidth { xsd:integer })?,
+    ## Specify additional flags which are only valid in a particular topoplogy
+    AdditionalNodeFlagSpec,
     ## Specify that this node is a subnode of another node. We MIGHT
     ## try to do this with properties in the future
     ## Valid for both virtual and physical nodes
@@ -141,6 +150,10 @@ NodeFlagSpec =
     ## none of them must be. Possibly expressible with properties?
     element disallow_trivial_mix { empty }?
 
+## Set the additional node flag spec to empty for now.
+## It will be overridden if required in the ptop and vtop files
+AdditionalNodeFlagSpec = empty
+
 ## Interfaces
 InterfaceSpec = element interface { InterfaceContents }
 
@@ -148,7 +161,7 @@ InterfaceContents =
     ## Name of the node, which must match one of the nodes in this topology
     element node_name { text },
     ## Name of the interface itself
-    element interface { text },
+    element interface_name { text },
     ## Properties of the interface
     PropertySpec*
     

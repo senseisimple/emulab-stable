@@ -10,15 +10,15 @@
 
 default namespace = "http://emulab.net/resources/ptop/0.1"
 
-include "top.rnc"
-
-## A simple policy specification - it may end up that policy does not belong in
-## the ptop file directly
-TypeLimitSpec = element type_limit {
-    ## Name of the type we are limiting
-    element type_name { text },
-    ## Limit as to the number of nodes of this type the experiment can use
-    element type_limit { xsd:integer { minInclusive = "0" } }
+include "top.rnc" {
+	## There are no node attributes unique to ptop
+	AdditionalNodeAttributeSpec = empty
+	
+	## Adding an additional optional trivial_bandwidth flag only for ptop
+	AdditionalNodeFlagSpec = element trivial_bandwidth { xsd:integer }?
+	
+	## Adding addition flags which are unique to vtop links
+	AdditionalLinkFlagSpec = empty  
 }
   
 start = element ptop {
@@ -27,9 +27,5 @@ start = element ptop {
     attribute testbed { text },
     ## Nodes in the topology - zero or more
     ## Links in the topology - zero or more
-    (NodeSpec | LinkSpec)*,
-#    LinkSpec*,
-    ## Any limits on how many nodes of a particular type this experiment can
-    ## use.
-    TypeLimitSpec*
+    (NodeSpec | LinkSpec)*
 }

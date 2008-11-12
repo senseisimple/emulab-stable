@@ -16,18 +16,27 @@ default namespace = "http://emulab.net/resources/vtop/0.2"
 include "top.rnc" {
     ## In the vtop file, a node is only allowed to have a single type
     NodeSpec.NodeType = NodeTypeSpec
+    
     ## In the vtop file, a link is only allowed to have a single type (which
     ## is optional)
     LinkSpec.LinkType = LinkTypeSpec?
+    
+    ## There are no additional flags specific to vtop
+	AdditionalNodeFlagSpec = empty
+	
+	## The assigned_to and hint_to attributes are unique to vtop
+	AdditionalNodeAttributeSpec = 
+		## Add an atribute to the 'node' tag that allows you to fix it to a specific
+		## physical node
+		attribute assigned_to { text }?,
+		## Add an atribute to the 'node' tag that allows you to hint that it might
+		## be a good idea to assign it to a specific physical node
+		attribute hint_to { text }?
+	
+	## Adding addition flags which are unique to vtop links
+	AdditionalLinkFlagSpec = LinkFlagSpec
 }
 
-## Add an atribute to the 'node' tag that allows you to fix it to a specific
-## physical node
-NodeSpec &= attribute assigned_to { text }?
-
-## Add an atribute to the 'node' tag that allows you to hint that it might
-## be a good idea to assign it to a specific physical node
-NodeSpec &= attribute hint_to { text }?
 
 ## Specify a virtual class - assign allows you to define classes for virtual
 ## nodes, and specify that all nodes using that class should, or must, be
@@ -61,10 +70,6 @@ LinkFlagSpec =
     ## Same as fixsrciface, for destination of the link
     element fixdstiface { string }?
 
-## Add LinkFlagSpec to the base link specification, since it is only legal
-## in the vtop file
-LinkSpec &= LinkTypeSpec
-
 ## Virtual topology
 start = element vtop {
     ## Project ID
@@ -75,10 +80,6 @@ start = element vtop {
     attribute gid { text }?,
     ## User ID owning the experiment (optional)
     attribute uid { text }?,
-    ## Nodes in the topology - zero or more
-    NodeSpec*,
-    ## Links in the topology - zero or more
-    LinkSpec*,
-    ## Vclasses
-    VclassSpec*
+    ## Nodes, links and vclasses in the topology - zero or more
+    (NodeSpec | LinkSpec | VclassSpec)*
 }
