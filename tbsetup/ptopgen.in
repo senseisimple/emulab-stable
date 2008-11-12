@@ -1225,15 +1225,15 @@ sub print_node_features
 	    $flags .= "<violatable/>";
 	}
 	if ($name =~ /^\?\+/) {
-	    $flags .= "<local/><operator>+</operator>";
+	    $flags .= "<local><operator>+</operator></local>";
 	    $name = substr($name, 2);
 	}
-	elsif ($name =~ /^&\*/) {
-	    $flags .= "<global/><operator>FirstFree</operator>";
+	elsif ($name =~ /^\*&/) {
+	    $flags .= "<global><operator>FirstFree</operator></global>";
 	    $name = substr($name, 2);
 	}
 	elsif ($name =~ /^\*!/) {
-	    $flags .= "<global/><operator>OnceOnly</operator>";
+	    $flags .= "<global><operator>OnceOnly</operator></global>";
 	    $name = substr($name, 2);
 	}
 	print "  <fd>\n";
@@ -1251,8 +1251,8 @@ sub print_node_flags
     my $i = 0;
     for (; $i < scalar(@_); ++$i) {
 	my ($name, $value) = split(/:/, $_[$i], 2);
-	if ($name eq "trivial_bandwidth") {
-	    print "  <trivial_bandwidth>$value</trivial_bandwidth\n";
+	if ($name eq "trivial_bw") {
+	    print "  <trivial_bandwidth>$value</trivial_bandwidth>\n";
 	}
 	elsif ($name eq "subnode_of") {
 	    print "  <subnode_of>$value</subnode_of>\n";
@@ -1295,11 +1295,11 @@ sub print_named_link_xml
     print "<link name=\"$name\">\n";
     print "  <source_interface><interface>\n";
     print "    <node_name>$source</node_name>\n";
-    print "    <interface>$source_if</interface>\n";
+    print "    <interface_name>$source_if</interface_name>\n";
     print "  </interface></source_interface>\n";
     print "  <destination_interface><interface>\n";
     print "    <node_name>$dest</node_name>\n";
-    print "    <interface>$dest_if</interface>\n";
+    print "    <interface_name>$dest_if</interface_name>\n";
     print "  </interface></destination_interface>\n";
     print "  <bandwidth>$bw</bandwidth>\n";
     print "  <latency>$delay</latency>\n";
