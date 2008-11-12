@@ -132,7 +132,7 @@ if (!$impotent) {
 
 	DBQueryWarn("replace into node_features ".
 		    " (node_id, feature, weight) ".
-		    " values ('$nodeid', '+unavail', $weight)");
+		    " values ('$nodeid', 'unavail', $weight)");
     }
 }
 

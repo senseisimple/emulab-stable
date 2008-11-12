@@ -385,10 +385,10 @@ sub InsertMetrics($%)
     if (!$impotent) {
 	DBQueryWarn("replace into node_features ".
 		    " (node_id, feature, weight) ".
-		    " values ('$nodeid', '+load', $scaled)");
+		    " values ('$nodeid', 'load', $scaled)");
 	DBQueryWarn("replace into node_features ".
 		    " (node_id, feature, weight) ".
-		    " values ('$nodeid', '+disk', $disk)");
+		    " values ('$nodeid', 'disk', $disk)");
     }
 
     # finally, insert int/float values into the main comon data table
