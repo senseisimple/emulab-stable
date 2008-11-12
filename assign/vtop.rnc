@@ -48,8 +48,8 @@ VclassSpec = element vclass {
     ## type) or soft (ie. violating it is allowed, but penalize)
     (element hard { empty } |
      (element soft { empty },
-      element weight { xsd:float { minInclusive = "0.0" } } ))
-	(element physical_type { text })+
+      element weight { xsd:float { minInclusive = "0.0" } } )),
+	element physical_type { text }+
 }
 
 ## "Legacy" link flags used by assign. Will be replaced by properties
