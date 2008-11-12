@@ -1,0 +1,31 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005-2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Definition of policies
+#
+
+## A type limit policy specification
+TypeLimitSpec = element type_limit {
+	## Name of the type we are limiting
+	element type_name { text },
+	## Limit as to the number of nodes of this type the experiment can use
+	element type_limit { xsd:float { minInclusive = "0.0" } }
+}
+
+## A desire policy specification
+DesireLimitSpec = element desire_policy {
+	## Name of the feature
+	element feature_name { text },
+	## Either disallow it entirely or set a limit on it
+	(element disallow { empty } 
+		| element limit { xsd:float { minInclusive = "0.0" } })
+}
+			
+start = element policy {
+	## 0 or more type limits and desire limits
+	(TypeLimitSpec | DesireLimitSpec) *
+}
