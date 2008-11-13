@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" targetNamespace="http://www.protogeni.net/resources/rspec/0.1" xmlns:rspec="http://www.protogeni.net/resources/rspec/0.1">
   <xs:include schemaLocation="top.xsd"/>
   <!--
     
@@ -16,12 +16,15 @@
   <!-- Add some more stuff to nodes -->
   <xs:complexType name="NodeContents">
     <xs:sequence>
-      <xs:group ref="NodeSpec.NodeType"/>
-      <xs:element minOccurs="0" ref="available"/>
-      <xs:element minOccurs="0" ref="component_manager_URL"/>
+      <xs:group ref="rspec:NodeSpec.NodeType"/>
+      <xs:element minOccurs="0" ref="rspec:available"/>
+      <xs:group minOccurs="0" maxOccurs="unbounded" ref="rspec:InterfaceDecl"/>
+      <xs:element minOccurs="0" ref="rspec:component_manager_URL"/>
     </xs:sequence>
-    <xs:attribute name="uuid" use="required"/>
-    <xs:attribute name="name"/>
+    <xs:attribute name="physical_uuid" use="required"/>
+    <xs:attribute name="physical_name"/>
+    <xs:attribute name="virtual_uuid"/>
+    <xs:attribute name="virtual_name"/>
     <xs:attribute name="virtualization_type">
       <xs:simpleType>
         <xs:restriction base="xs:token">
@@ -36,35 +39,44 @@
   <xs:element name="available" type="xs:boolean"/>
   <xs:complexType name="LinkContents">
     <xs:sequence>
-      <xs:group ref="LinkEndPoints"/>
-      <xs:group ref="LinkCharacteristics">
+      <xs:group ref="rspec:LinkEndPoints"/>
+      <xs:group ref="rspec:LinkCharacteristics">
         <xs:annotation>
           <xs:documentation>The characteristics (bandwidth, latency, loss) which affect traffic.</xs:documentation>
         </xs:annotation>
       </xs:group>
-      <xs:group ref="LinkSpec.LinkType"/>
+      <xs:group ref="rspec:LinkSpec.LinkType"/>
     </xs:sequence>
-    <xs:attribute name="uuid" use="required"/>
-    <xs:attribute name="name"/>
+    <xs:attribute name="physical_uuid" use="required"/>
+    <xs:attribute name="physical_name"/>
+    <xs:attribute name="virtual_uuid"/>
+    <xs:attribute name="virtual_name"/>
   </xs:complexType>
   <!-- TODO: Might add a URL for the CM for a link in the future -->
   <xs:complexType name="InterfaceContents">
     <xs:sequence>
-      <xs:choice minOccurs="0" maxOccurs="unbounded">
-        <xs:element ref="node_uuid"/>
-        <xs:element ref="node_name"/>
-      </xs:choice>
-      <xs:element name="interface" type="xs:string"/>
+      <xs:element ref="rspec:node_uuid"/>
+      <xs:element ref="rspec:interface_name"/>
     </xs:sequence>
   </xs:complexType>
   <xs:element name="node_uuid" type="xs:string"/>
-  <xs:element name="node_name" type="xs:string"/>
+  <xs:element name="interface_name" type="xs:string"/>
+  <!-- InterfaceDecl is for declaration of interfaces inside of a node. -->
+  <xs:group name="InterfaceDecl">
+    <xs:sequence>
+      <xs:element name="interface">
+        <xs:complexType>
+          <xs:attribute name="name" use="required"/>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:group>
   <xs:element name="component_manager_URL" type="xs:anyURI"/>
   <xs:element name="rspec">
     <xs:complexType>
       <xs:choice minOccurs="0" maxOccurs="unbounded">
-        <xs:element ref="node"/>
-        <xs:element ref="link"/>
+        <xs:element ref="rspec:node"/>
+        <xs:element ref="rspec:link"/>
       </xs:choice>
       <xs:attribute name="generated" use="required" type="xs:dateTime"/>
       <xs:attribute name="valid_until" use="required" type="xs:dateTime"/>

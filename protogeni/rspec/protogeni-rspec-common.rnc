@@ -15,8 +15,10 @@ include "../../assign/top.rnc" {
         # solely for human-readability. It's the UUID, which we add here,
         # that is the "true" identifier (ie. used in identifying link
         # endpoints.)
-        attribute uuid { text },
-        attribute name { text }?,
+        attribute physical_uuid { text },
+        attribute physical_name { text }?,
+	attribute virtual_uuid { text }?,
+	attribute virtual_name { text }?,
         # Each node has exactly one virtualization technology, which we simply
         # enumerate here
         attribute virtualization_type { "raw" | "trellis-vserver" |
@@ -28,14 +30,17 @@ include "../../assign/top.rnc" {
         # UUID) Just binary for now - probably will include more things, such
         # as a number of "free slots", later
         element available { xsd:boolean }?,
+	InterfaceDecl*,
         # Optionally, include the URL for this component's CM
         CMURLSpec?
     LinkContents =
         # Semantic change - the 'name' of a (physical) link is now
         # solely for human-readability. It's the UUID, which we add here,
         # that is the "true" identifier.
-        attribute uuid { text },
-        attribute name { text }?,
+        attribute physical_uuid { text },
+        attribute physical_name { text }?,
+        attribute virtual_uuid { text }?,
+        attribute virtual_name { text }?,
         LinkEndPoints,
         ## The characteristics (bandwidth, latency, loss) which affect traffic.
         LinkCharacteristics,
@@ -49,8 +54,12 @@ include "../../assign/top.rnc" {
         # readability. It's the UUID that is used to uniquely identify a
         # node.
         element node_uuid { text },
-        element node_name { text }?,
-        element interface { text }
+        element interface_name { text }
+}
+
+# InterfaceDecl is for declaration of interfaces inside of a node.
+InterfaceDecl = element interface {
+	attribute name { text }
 }
 
 ## How to contact a component manager. In the future, could include information
