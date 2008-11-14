@@ -27,6 +27,20 @@ IFACETYPES="3c59x e100 e1000 tulip e1000e tg3"
 #
 modprobe -qa $IFACETYPES
 
+interfaces=''
+if [ -d /sys/class/net ]; then
+	for d in /sys/class/net/*; do
+		[ -f $d/type ] || continue
+		# Type 1 is Ethernet.  dhclient only supports
+		# type 1.
+		if [ `cat $d/type` = 1 ]; then
+			interfaces="$interfaces ${d##*/}"
+		fi
+	done
+else
+	interfaces=`ifconfig -a -s | sed '1d;/^lo /d;/^wmaster/d;s/ .*$//'`
+fi
+
 #
 # Check: are we a remote node?  If so, possibly try static config in pref
 # to dhcp.
@@ -35,11 +49,10 @@ if [ -e /etc/emulab/isrem -a -e /etc/emulab/waconfig ]; then
     . /etc/emulab/waconfig
     echo "Found Emulab widearea config info..."
 
-    _ifs=`ifconfig -s -a | awk '{ print $1 }' | grep -v 'Iface' | grep -v '^lo$'`
     if [ "$WA_BOOTMETHOD" = "static" -a "$WA_MAC" != "" ]; then 
 	# try to find an iface matching WA_MAC
 	cnetif=""
-	for _if in $_ifs; do
+	for _if in $interfaces; do
 	    ifconfig $_if | grep HWaddr | sed -e 's/.*HWaddr\s*\(.*\)/\1/' \
 		| grep -q -i "$WA_MAC"
 	    if [ "$?" = "0" ]; then
@@ -122,7 +135,6 @@ fi
 #
 # else default to dhclient...
 #
-interfaces=`ifconfig -a -s | sed '1d;/^lo /d;/^wmaster/d;s/ .*$//'`
 
 #
 # If dhclient returns success, then it has configured the first interface

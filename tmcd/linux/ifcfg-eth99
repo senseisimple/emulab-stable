@@ -26,7 +26,19 @@ IFACETYPES="3c59x eepro100 e1000 r8169 tulip"
 #
 modprobe -qa $IFACETYPES
 
-interfaces=`ifconfig -a -s | sed '1d;/^lo /d;/^wmaster/d;s/ .*$//'`
+interfaces=''
+if [ -d /sys/class/net ]; then
+	for d in /sys/class/net/*; do
+		[ -f $d/type ] || continue
+		# Type 1 is Ethernet.  dhclient only supports
+		# type 1.
+		if [ `cat $d/type` = 1 ]; then
+			interfaces="$interfaces ${d##*/}"
+		fi
+	done
+else
+	interfaces=`ifconfig -a -s | sed '1d;/^lo /d;/^wmaster/d;s/ .*$//'`
+fi
 
 #
 # If dhclient returns success, then it has configured the first interface
