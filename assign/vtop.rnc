@@ -19,7 +19,7 @@ include "top.rnc" {
     
     ## In the vtop file, a link is only allowed to have a single type (which
     ## is optional)
-    LinkSpec.LinkType = LinkTypeSpec?
+    LinkSpec.LinkType = LinkTypeSpec
     
     ## There are no additional flags specific to vtop
 	AdditionalNodeFlagSpec = empty
