@@ -105,7 +105,7 @@ LinkCharacteristics =
     element packet_loss { xsd:float { minInclusive = "0.0" } }
 
 ## A link can (by default) have zero or more types
-LinkSpec.LinkType = LinkTypeSpec*
+LinkSpec.LinkType = LinkTypeSpec
 
 ## Set the additional link flag spec to empty for now.
 ## It will be overridden in the ptop and vtop files if required
