@@ -59,6 +59,7 @@ my $SAVEUID	= $UID;
 my $encrypted   = 0;
 my $db_password = "''";
 my $sh_password = "";
+my $days        = 1000;
 
 #
 # We don't want to run this script unless its the real version.
@@ -116,7 +117,6 @@ if (defined($options{"d"})) {
     $debug = 1;
 }
 if (defined($options{"g"})) {
-    $OU = "geni";
     $geniflag = 1;
 }
 if (defined($options{"p"})) {
@@ -136,6 +136,7 @@ if (defined($options{"p"})) {
     $sh_password =~ s/\'/\'\\\'\'/g;
     $sh_password = "$sh_password";
     $encrypted = 1;
+    $days      = 365;
 }
 if (@ARGV != 1) {
     usage();
@@ -247,11 +248,11 @@ system("cp -f $TEMPLATE usercert.cnf") == 0
 open(TEMP, ">>usercert.cnf")
     or fatal("Could not open $TEMPLATE for append: $!");
 
-if ($PGENISUPPORT) {
+if ($PGENISUPPORT && $encrypted) {
     print TEMP "OU\t\t= $PGENIDOMAIN.$user_uid\n";
 }
 else {
-    print TEMP "OU\t\t= $user_uid\n";
+    print TEMP "OU\t\t= $OU\n";
 }
 print TEMP "CN\t\t= $user_uuid\n";
 print TEMP "emailAddress\t= $user_uid" . "\@" . "$OURDOMAIN\n";
@@ -270,7 +271,7 @@ system("$OPENSSL req -new -config usercert.cnf ".
 # Sign the client cert request, creating a client certificate.
 #
 $UID = 0;
-system("$OPENSSL ca -batch -policy policy_sslxmlrpc ".
+system("$OPENSSL ca -batch -policy policy_sslxmlrpc -days $days ".
        " -name CA_usercerts -config $CACONFIG ".
        " -out usercert_cert.pem -cert $EMULAB_CERT -keyfile $EMULAB_KEY ".
        " -infiles usercert_req.pem") == 0
@@ -278,19 +279,17 @@ system("$OPENSSL ca -batch -policy policy_sslxmlrpc ".
 $UID = $SAVEUID;
 
 #
-# We save all of the certs in the DB, but we are not worrying about
-# revocation yet. By saving them, we can eventually do that. But we do
-# have to set the status bit to revoked though or else we will not know
-# later (okay, we can probably figure it out if we had to).
+# We store the DN in the DB too, for creating the crl index file without
+# having to reparse all the certs.
 #
-DBQueryFatal("update user_sslcerts set ".
-	     "  status='revoked',revoked=now() ".
-	     "where uid_idx='$user_dbid' and encrypted=$encrypted");
-
-DBQueryFatal("insert into user_sslcerts ".
-	     "(uid,uid_idx,idx,created,encrypted,orgunit,status,password) ".
-	     "values ('$user_uid', '$user_dbid', $serial, now(), ".
-	     "        $encrypted, '$OU', 'valid', $db_password)");
+my $DN = `$OPENSSL x509 -subject -noout -in usercert_cert.pem`;
+chomp($DN);
+if ($DN =~ /^subject=\s*(\/[-\/\=\w\@\.\s]+)$/) {
+    $DN = $1;
+}
+else {
+    fatal("Could not parse DN from certificate");
+}
 
 #
 # Grab the cert path and strip off the header goo, then insert into
@@ -322,10 +321,38 @@ while (<PKEY>) {
 }
 close(PKEY);
 
-$pkeystring = DBQuoteSpecial($pkeystring);
-$certstring = DBQuoteSpecial($certstring);
-DBQueryFatal("update user_sslcerts set cert=$certstring,privkey=$pkeystring ".
-	     "where uid_idx='$user_dbid' and idx=$serial");
+$pkeystring  = DBQuoteSpecial($pkeystring);
+$certstring  = DBQuoteSpecial($certstring);
+my $dnstring = DBQuoteSpecial($DN);
+# Ensure we keep it past revocation.
+$days++;
+
+#
+# We save all of the encrypted certs in the DB since we are going to issue
+# CRLs for protogeni. We do not bother to save old unencrypted certs since
+# they have a different OU and so protogeni will not accept them, they
+# do not need to be revoked. The sslxmlrpc server checks the table directly
+# so only the most recent is needed.
+#
+DBQueryFatal("insert into user_sslcerts ".
+	     "(uid,uid_idx,idx,created,expires,encrypted,password, ".
+	     " cert,privkey,DN) ".
+	     "values ('$user_uid', '$user_dbid', $serial, now(), ".
+	     "        DATE_ADD(now(), INTERVAL $days DAY), ".
+	     "        $encrypted, $db_password, ".
+	     "        $certstring, $pkeystring, $dnstring)");
+
+if ($encrypted) {
+    DBQueryFatal("update user_sslcerts set ".
+		 "  revoked=now() ".
+		 "where uid_idx='$user_dbid' and idx!=$serial and ".
+		 "      encrypted=1");
+}
+else {
+    DBQueryFatal("delete from user_sslcerts ".
+		 "where uid_idx='$user_dbid' and idx!=$serial and ".
+		 "      encrypted=0");
+}
 
 #
 # Combine the key and the certificate into one file which is

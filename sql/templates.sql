@@ -109,7 +109,7 @@ CREATE TABLE experiment_template_input_data (
   -- Auto generated unique index.
   idx int(10) unsigned NOT NULL auto_increment,
   -- MD5 of the input file.
-  md5 varchar(32) NOT NULL,
+  md5 varchar(32) NOT NULL default '',
   -- The actual text of the input
   input mediumtext,
   PRIMARY KEY  (idx),
@@ -253,13 +253,15 @@ CREATE TABLE experiment_template_parameters (
 #
 # Hmm, the above table is a problem wrt experiment parsing. 
 #
-CREATE TABLE virt_parameters (
-  pid varchar(12) NOT NULL default '',
-  eid varchar(32) NOT NULL default '',
-  name varchar(64) NOT NULL default '',
-  value tinytext,
-  PRIMARY KEY  (pid,eid,name)
-) TYPE=MyISAM;
+CREATE TABLE `virt_parameters` (
+  `pid` varchar(12) NOT NULL default '',
+  `eid` varchar(32) NOT NULL default '',
+  `name` varchar(64) NOT NULL default '',
+  `value` tinytext,
+  `description` text,
+  PRIMARY KEY  (`exptidx`,`name`),
+  UNIQUE KEY `pideid` (`pid`,`eid`,`name`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 #
 # Events that are dynamically created by the user, as for analysis.

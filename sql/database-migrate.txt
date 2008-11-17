@@ -4593,3 +4593,36 @@ last_net_act,last_cpu_act,last_ext_act);
 	) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 4.163: Fix to previous revision; skip to next entry.
+
+4.164: Rework the certs table for protogeni and crls.
+
+       DROP TABLE IF EXISTS `user_sslcerts`;
+       CREATE TABLE `user_sslcerts` (
+         `uid` varchar(8) NOT NULL default '',
+	 `uid_idx` mediumint(8) unsigned NOT NULL default '0',
+	 `idx` int(10) unsigned NOT NULL default '0',
+	 `created` datetime default NULL,
+	 `expires` datetime default NULL,
+	 `revoked` datetime default NULL,
+         `password` tinytext,
+         `encrypted` tinyint(1) NOT NULL default '0',
+         `DN` text,
+         `cert` text,
+         `privkey` text,
+         PRIMARY KEY  (`idx`),
+         KEY `uid` (`uid`),
+         KEY `uid_idx` (`uid_idx`)
+       ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+       See the comments in doc/UPDATING. This must be done after
+       installation.
+
+       	   ./initcerts.pl
+
+       Then restart the ssl xmlrpc server.
+
+           sudo kill `cat /var/run/sslxmlrpc_server.pid`
+	   /usr/testbed/sbin/sslxmlrpc_server.py
+	   
+
+

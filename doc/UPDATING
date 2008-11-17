@@ -18,6 +18,22 @@ Note that some instructions may have steps that need to occur at a few
 different points in the install process - these are marked with the
 earliest time one of the steps needs to occur.
 
+20080915: After install.
+
+	  The user ssl certificate format has changed, so all user
+	  certificates must be removed from the DB and regenerated.
+
+		mysql> delete from user_sslcerts;
+
+	  And then run this script from the source directory:
+
+		sql/initcerts.pl
+
+          Then restart the ssl xmlrpc server.
+
+	        sudo kill `cat /var/run/sslxmlrpc_server.pid`
+		/usr/testbed/sbin/sslxmlrpc_server.py
+
 20080905: After install
 
           In order to reduce the size of the main database, data in
