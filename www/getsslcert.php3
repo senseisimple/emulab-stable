@@ -37,7 +37,7 @@ if (!$isadmin && !$target_user->SameUser($this_user)) {
 
 $query_result =& $target_user->TableLookUp("user_sslcerts",
 					   "cert,privkey",
-					   "encrypted=1 and status='valid'");
+					   "encrypted=1 and revoked is null");
 
 if (!mysql_num_rows($query_result)) {
     PAGEHEADER("Download SSL Certificate for $target_uid");
