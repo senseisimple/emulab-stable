@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -20,7 +20,7 @@ use Exporter;
 	 TBSCRIPTLOCK_IGNORE TBSCRIPTLOCK_FAILED
 	 PROJROOT GROUPROOT USERROOT SCRATCHROOT SHAREROOT
 	 TBValidUserDir TBValidUserDirList TBMakeTempFile NewUUID System
-	 SendProjAdminMail);
+	 SendProjAdminMail ReOpenLog);
 @EXPORT_OK =
     qw ( TBMAIL_PROJADMIN);
 
@@ -332,7 +332,7 @@ sub TBDebugTimeStampsOn()
 # 
 sub TBBackGround($)
 {
-    my($logname) = @_;
+    my ($logname) = @_;
     
     my $mypid = fork();
     if ($mypid) {
@@ -348,10 +348,30 @@ sub TBBackGround($)
     open(STDIN, "< /dev/null") or
 	die("opening /dev/null for STDIN: $!");
 
+    ReOpenLog($logname);
+
+    #
+    # Create a new session to ensure we are clear of any process group
+    #
+    POSIX::setsid() or
+	die("setsid failed: $!");
+
+    return 0;
+}
+
+#
+# As for newsyslog. Call this on signal. newsyslog will have renamed the
+# the original file already.
+#
+sub ReOpenLog($)
+{
+    my ($logname) = @_;
+    
     # Note different taint check (allow /).
     if ($logname =~ /^([-\@\w.\/]+)$/) {
 	$logname = $1;
-    } else {
+    }
+    else {
 	die "Bad data in logfile name: $logname";
     }
 
@@ -363,12 +383,6 @@ sub TBBackGround($)
     #
     STDOUT->autoflush(1);
     STDERR->autoflush(1);
-
-    #
-    # Create a new session to ensure we are clear of any process group
-    #
-    POSIX::setsid() or
-	die("setsid failed: $!");
 
     return 0;
 }
