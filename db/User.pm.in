@@ -583,7 +583,14 @@ sub Purge($)
 	or return -1;
     DBQueryWarn("delete from user_sfskeys  where uid_idx='$uid_idx'")
 	or return -1;
-    DBQueryWarn("delete from user_sslcerts where uid_idx='$uid_idx'")
+
+    #
+    # Do not delete certs; we need them around so we can generte the CRLS.
+    # Just set the revoked flag for them. At some point we need to prune
+    # the table.
+    #
+    DBQueryWarn("update user_sslcerts set revoked=now() ".
+		"where uid_idx='$uid_idx' and revoked is null")
 	or return -1;
 
     #
