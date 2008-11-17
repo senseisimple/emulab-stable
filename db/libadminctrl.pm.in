@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -1255,7 +1255,7 @@ sub LoadCurrent($$$)
 		    "      (expt_swap_uid='$uid' or ".
 		    "       pid='$pid' or gid='$gid')");
 
-    return -1
+    return undef
 	if (!$query_result);
 
     while (my ($c_uid,$c_pid,$c_gid) = $query_result->fetchrow_array()) {
@@ -1291,7 +1291,7 @@ sub LoadCurrent($$$)
 		     "       r.pid='$pid' and e.gid='$gid') and ".
 		     "      r.pid!='" . TBOPSPID() . "' and ".
 		     "      n.role='testnode'");
-    return -1
+    return undef
 	if (!$query_result);
 
     while (my ($c_uid,$c_pid,$c_gid,$c_type,$c_class) =
@@ -1341,7 +1341,7 @@ sub LoadCurrent($$$)
 	}
     }
     
-    return 0;
+    return \%curusage;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...
