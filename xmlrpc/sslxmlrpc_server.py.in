@@ -251,7 +251,7 @@ class MyServer(SSL.ForkingSSLServer, SimpleXMLRPCDispatcher):
     #
     def checkcert(self, uid_idx, serial):
         res = DBQueryFatal("select idx from user_sslcerts "
-                           "where uid_idx=%s and idx=%s and status='valid'",
+                           "where uid_idx=%s and idx=%s and revoked is null ",
                            (str(uid_idx), serial))
 
         return len(res)
