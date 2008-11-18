@@ -96,7 +96,7 @@ Emulab facility and the Emulab software will continue.
     Emulab is <a href="http://www.emulab.net/expubs.php">widely used</a>
         by computer science researchers in the fields of networking and
         distributed systems.
-    It is also used to <a href="http://users.emulab.net/trac/emulab/wiki/Classes">teach
+    It is also designed to support <a href="http://users.emulab.net/trac/emulab/wiki/Education">Education</a>, and has been used to <a href="http://users.emulab.net/trac/emulab/wiki/Classes">teach
         classes</a> in those fields.
 </p>
 
