@@ -103,9 +103,9 @@ sub Stringify($)
 {
     my ($self) = @_;
     
-    my $uuid = $self->uuid();
+    my $hrn = $self->hrn();
 
-    return "[GeniAuthority: $uuid]";
+    return "[GeniAuthority: $hrn]";
 }
 
 #

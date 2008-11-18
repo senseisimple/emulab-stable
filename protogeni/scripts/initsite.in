@@ -40,6 +40,8 @@ my $TBACCT	  = "$TB/sbin/tbacct";
 my $MKCERTS	  = "$TB/sbin/protogeni/createcerts";
 my $ADDAUTHORITY  = "$TB/sbin/protogeni/addauthority";
 my $GETCACERTS    = "$TB/sbin/protogeni/getcacerts";
+my $POSTCRL       = "$TB/sbin/protogeni/postcrl";
+my $GENCRLBUNDLE  = "$TB/sbin/protogeni/gencrlbundle";
 my $MKSYSCERT	  = "$TB/sbin/mksyscert";
 my $MKUSERCERT	  = "$TB/sbin/mkusercert";
 my $WAP           = "$TB/sbin/withadminprivs";
@@ -160,6 +162,13 @@ if ($asch) {
     }
     chmod(0644, "$TB/www/genica.bundle");
 
+    # CRL 
+    if (! -e "$TB/www/genicrl.bundle") {
+	system("/usr/bin/touch $TB/www/genicrl.bundle") == 0
+	    or fatal("Could not initialize $TB/www/genicrl.bundle");
+    }
+    chmod(0644, "$TB/www/genicrl.bundle");
+
     #
     # This is a pain. xmlsec1 cannot deal with a bundle of certs and so we
     # need to split up the bundle into a directory of certs. I hope to deal
@@ -203,18 +212,29 @@ if ($asch && $restartapache) {
 # This script restarts apache.
 #
 if (!$asch) {
-    system("$GETCACERTS") == 0
+    system("$GETCACERTS -l") == 0
 	or fatal("Could not get CA bundle from Utah");
-}
 
-#
-# This cron entry will autoupdate the CA certs.
-#
-if (system("egrep -q -s '$GETCACERTS' /etc/crontab")) {
-    print "Please add this line to /etc/crontab:\n\n";
-    print "13  *  *  *	*  root  $GETCACERTS\n\n";
-    print "Then rerun this script\n";
-    exit(1);
+    #
+    # This cron entry will autoupdate the CA/CRL certs by getting them from Utah.
+    #
+    if (system("egrep -q -s '$GETCACERTS' /etc/crontab")) {
+	print "Please add this line to /etc/crontab:\n\n";
+	print "13  *  *  *	*  root  $GETCACERTS\n\n";
+	print "Then rerun this script\n";
+	exit(1);
+    }
+}
+else {
+    #
+    # But on the clearinghouse, we have to generate the CRL bundle for downloading
+    # by remote sites.
+    #
+    if (system("egrep -q -s '$GENCRLBUNDLE' /etc/crontab")) {
+	print "Please add this line to /etc/crontab:\n\n";
+	print "10  *  *  *  *  root  $GENCRLBUNDLE\n\n";
+	print "Then rerun this script\n";
+	exit(1);
 }
 
 #

@@ -115,6 +115,7 @@ my $responder = Frontier::Responder->new( "methods" => {
     "Register"              => \&GeniCH::Register,
     "Remove"                => \&GeniCH::Remove,
     "ListComponents"        => \&GeniCH::ListComponents,
+    "PostCRL"               => \&GeniCH::PostCRL,
    },
 );
 

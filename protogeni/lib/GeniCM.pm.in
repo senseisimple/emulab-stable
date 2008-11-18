@@ -1796,6 +1796,8 @@ sub CleanupDeadSlice($)
 
     my $experiment = $slice->GetExperiment();
     if (defined($experiment)) {
+	$experiment->LockDown(0);
+	
 	my $pid = $experiment->pid();
 	my $eid = $experiment->eid();
 	system("$PLABSLICE destroy $pid $eid");
@@ -1830,7 +1832,10 @@ sub GeniExperiment($)
 	my $eid = "slice" . TBGetUniqueIndex('next_sliceid', 1);
 
 	# Note the -h option; allows experiment with no NS file.
-	system("$CREATEEXPT -q -i -w -E 'Geni Slice Experiment' ".
+	system("$CREATEEXPT -q -i -k -w ".
+	       "-S 'Geni Slice Experiment -- DO NOT SWAP OR TERMINATE' ".
+	       "-E 'Geni Slice Experiment -- DO NOT SWAP OR TERMINATE' ".
+	       "-L 'Geni Slice Experiment -- DO NOT SWAP OR TERMINATE' ".
 	       "-h '$uuid' -p GeniSlices -e $eid");
 	if ($?) {
 	    return undef;

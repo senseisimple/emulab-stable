@@ -148,6 +148,8 @@ sub Register($$$$)
 {
     my ($self, $type, $cert, $info) = @_;
 
+    $info = {} if (!defined($info));
+
     my $response =
 	Genixmlrpc::CallMethod($self->authority(),
 			       $self->context(),
@@ -238,6 +240,25 @@ sub ListComponents($$$)
 	if ($response->code() != GENIRESPONSE_SUCCESS);
 
     $$pref = $response->value();
+    return 0;
+}
+
+#
+# Post the CRL
+#
+sub PostCRL($$)
+{
+    my ($self, $cert) = @_;
+
+    my $response =
+	Genixmlrpc::CallMethod($self->authority(),
+			       $self->context(),
+			       "PostCRL",
+			       { "credential" => $self->credential(),
+			         "cert"       => $cert });
+    return -1
+	if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS);
+    
     return 0;
 }
 

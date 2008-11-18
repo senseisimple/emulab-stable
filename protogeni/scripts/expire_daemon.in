@@ -72,6 +72,7 @@ require GeniTicket;
 require GeniSlice;
 require GeniCM;
 use libtestbed;
+use POSIX qw(strftime);
 
 GeniUtil::FlipToGeniUser();
 
@@ -183,6 +184,8 @@ sub ExpireSlices()
 	print STDERR "$slice is idle; releasing.\n";
 	if (GeniCM::CleanupDeadSlice($slice) != 0) {
 	    print STDERR "Could not release $slice\n";
+	    SENDMAIL($TBOPS, "Could not release slice $slice",
+		     "Could not release slice $slice");
 	    # Leave it locked. 
 	    goto skip;
 	}
@@ -193,12 +196,23 @@ sub ExpireSlices()
     }
 }
 
+#
+# Setup a signal handler for newsyslog.
+#
+sub handler()
+{
+    ReOpenLog($LOGFILE);
+}
+$SIG{HUP} = \&handler
+    if (!$debug);
+
 while (1) {
+    print "Running at ".
+	POSIX::strftime("20%y-%m-%d %H:%M:%S", localtime()) . "\n";
+    
     ExpireTickets();
     ExpireSlices();
 
-    print "Pausing for a while ...\n"
-	if ($debug);
     sleep(30);
 }
 exit(0);

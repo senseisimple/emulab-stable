@@ -97,23 +97,6 @@ my $sigtmpl =
     "</Signature>\n";
 
 #
-# We don't want to run this script unless its the real version.
-#
-#if ($EUID != 0) {
-#    die("*** $0:\n".
-#	"    Must be setuid! Maybe its a development version?\n");
-#}
-
-#
-# This script is setuid, so please do not run it as root. Hard to track
-# what has happened.
-#
-if ($UID == 0) {
-    die("*** $0:\n".
-	"    Please do not run this as root!\n");
-}
-
-#
 # Untaint the path
 #
 $ENV{'PATH'} = "$TB/bin:$TB/sbin:/bin:/usr/bin:/usr/bin:/usr/sbin";
@@ -166,27 +149,6 @@ if ($capfile =~ /^([-\w\.\/]+)$/) {
 }
 else {
     fatal("Tainted filename: $capfile");
-}
-
-# Map target user to object.
-my $target_user;
-if (@ARGV) {
-    $target_user = User->Lookup($ARGV[0]);
-    if (! defined($target_user)) {
-	fatal($ARGV[0] . " does not exist!");
-    }
-}
-
-# Map invoking user to object.
-my $this_user = User->LookupByUnixId($UID);
-if (! defined($this_user)) {
-    #
-    # We allow this script to run from the web interface as nobody,
-    # as when invoked via an xmlrpc request.
-    #
-    if (getpwuid($UID) ne "nobody") {
-	fatal("You ($UID) do not exist!");
-    }
 }
 
 #

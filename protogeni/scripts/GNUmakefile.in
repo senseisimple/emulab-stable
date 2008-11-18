@@ -12,8 +12,9 @@ SUBDIR		= protogeni/scripts
 include $(OBJDIR)/Makeconf
 
 SBIN_STUFF	= cleanupslice
-PSBIN_STUFF	= register_resources expire_daemon \
-		  createcerts initsite addauthority getcacerts
+PSBIN_STUFF	= register_resources expire_daemon gencrl postcrl \
+		  createcerts initsite addauthority getcacerts \
+		  gencrlbundle
 
 # These scripts installed setuid, with sudo. 
 SETUID_BIN_SCRIPTS   = 

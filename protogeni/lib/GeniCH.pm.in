@@ -710,3 +710,66 @@ sub ListComponents($)
     return GeniResponse->Create(GENIRESPONSE_SUCCESS, \@results);
 }
 
+#
+# Post a new CRL
+#
+sub PostCRL($)
+{
+    my ($argref) = @_;
+    my $cred  = $argref->{'credential'};
+    my $cert  = $argref->{'cert'};
+
+    if (! defined($cred)) {
+	return GeniResponse->MalformedArgsResponse();
+    }
+    if (! defined($cert)) {
+	return GeniResponse->MalformedArgsResponse();
+    }
+    if (! ($cert =~ /^[\012\015\040-\176]*$/)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "cert: Invalid characters");
+    }
+    my $credential = GeniCredential->CreateFromSigned($cred);
+    if (!defined($credential)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not create GeniCredential object");
+    }
+
+    #
+    # Make sure the credential was issued to the caller.
+    #
+    if ($credential->owner_uuid() ne $ENV{'GENIUUID'}) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "This is not your credential!");
+    }
+    #
+    # And that the target of the credential is this registry.
+    #
+    my $authority = GeniAuthority->Lookup($ENV{'MYUUID'});
+    if (!defined($authority)) {
+	print STDERR "Could not find local authority object\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
+    }
+    if ($credential->target_uuid() ne $authority->uuid()) {
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN,
+				    undef, "This is not your registry!");
+    }
+
+    my $caller_authority = GeniAuthority->Lookup($ENV{'GENIUUID'});
+    if (!defined($caller_authority)) {
+	print STDERR "Could not find authority object for caller.\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
+    }
+    if (GeniCertificate->StoreCRL($caller_authority, $cert) != 0) {
+	print STDERR "Could not store CRL for $caller_authority\n";
+
+	SENDMAIL($TBOPS, "Failed to Store CRL",
+		 "Fail to store CRL for $caller_authority\n".
+		 "$cert");
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
+    }
+    SENDMAIL($TBOPS, "Stored a new CRL",
+	     "Storeed a new CRL for $caller_authority\n".
+	     "$cert");
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS);
+}

@@ -9,14 +9,15 @@ use English;
 use Getopt::Std;
 
 #
-# Create the certs for a new protogeni emulab.
+# Get and install the CRL 
 # 
 sub usage()
 {
-    print "Usage: getcacerts\n";
+    print "Usage: getcacerts [-l]\n";
     exit(1);
 }
-my $optlist = "d";
+my $optlist = "l";
+my $nolog   = 0;
 
 #
 # Configure variables
@@ -28,6 +29,8 @@ my $PGENIDOMAIN   = "@PROTOGENI_DOMAIN@";
 my $PGENISUPPORT  = @PROTOGENI_SUPPORT@;
 my $TBBASE        = "@TBBASE@";
 my $FETCH	  = "/usr/bin/fetch";
+my $GENCRL        = "$TB/sbin/protogeni/gencrl";
+my $LOCALCRL      = "$TB/ssl/crl.pem";
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
@@ -45,6 +48,7 @@ $| = 1;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use libaudit;
 
 if ($UID != 0) {
     fatal("Must be root to run this script\n");
@@ -57,9 +61,23 @@ my %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
 }
+if (defined($options{"l"})) {
+    $nolog  = 1;
+}
+my $restartapache = 0;
+
+# Record output in case of error.
+LogStart(0)
+    if (!$nolog);
 
 mkdir("/tmp/genicacerts.$$", 0755) or
     fatal("Could not mkdircacerts tmp dir");
+
+#
+# Create a new local CRL to concate with whatever get from Utah.
+#
+system($GENCRL) >= 0
+    or fatal("Could not generate new CRL!");
 
 #
 # Fetch the ca bundle from Utah. These are public keys ...
@@ -67,6 +85,13 @@ mkdir("/tmp/genicacerts.$$", 0755) or
 system("$FETCH -q -o /tmp/genica.bundle.$$ ".
        "     http://boss.emulab.net/genica.bundle") == 0
     or fatal("Could not fetch genica bundle from Utah");
+
+#
+# Fetch the crl bundle from Utah. These are public keys ...
+#
+system("$FETCH -q -o /tmp/genicrl.bundle.$$ ".
+       "     http://boss.emulab.net/genicrl.bundle") == 0
+    or fatal("Could not fetch genicrl bundle from Utah");
 
 #
 # Split up the certs.
@@ -105,46 +130,76 @@ close(BUNDLE);
 # Go no further if the file is exactly the same as last time.
 #
 system("/usr/bin/diff -q $TB/etc/genica.bundle /tmp/genica.bundle.$$");
-if (!$?) {
-    exit(0);
+if ($?) {
+    my $idx = 0;
+    while (@certs) {
+	my $cert = pop(@certs);
+
+	open(CERT, ">/tmp/genicacerts.$$/$idx.pem")
+	    or fatal("Could not open pem file in /tmp/genicacerts.$$");
+	print CERT $cert;
+	close(CERT);
+	$idx++;
+    }
+
+    if (-e "$TB/etc/genica.bundle.old") {
+	unlink("$TB/etc/genica.bundle.old") or
+	    fatal("Could not remove old genica bundle");
+    }
+    if (-e "$TB/etc/genica.bundle") {
+	system("/bin/cp $TB/etc/genica.bundle $TB/etc/genica.bundle.old") == 0
+	    or fatal("Could not save off $TB/etc/genica.bundle");
+    }
+    if (-e "$TB/etc/genicacerts.old") {
+	system("/bin/rm -rf $TB/etc/genicacerts.old") == 0
+	    or fatal("Could not remove old genicacerts directory");
+    }
+    if (-e "$TB/etc/genicacerts") {
+	system("/bin/mv $TB/etc/genicacerts $TB/etc/genicacerts.old") == 0
+	    or fatal("Could not save off genicacerts directory");
+    }
+    system("/bin/mv /tmp/genica.bundle.$$ $TB/etc/genica.bundle") == 0
+	or fatal("Could not mv /tmp/genica.bundle.$$ $TB/etc/genica.bundle");
+    system("/bin/mv /tmp/genicacerts.$$ $TB/etc/genicacerts") == 0
+	or fatal("Could not mv /tmp/genicacerts.$$ to $TB/etc/genicacerts");
+
+    $restartapache = 1;
 }
 
-my $idx = 0;
-while (@certs) {
-    my $cert = pop(@certs);
+#
+# Prepend the local/latest CRL with what we got from Utah.
+#
+system("/bin/cat $LOCALCRL /tmp/genicrl.bundle.$$ > /tmp/genicrl.combined.$$") == 0
+    or fatal("Could not concate with local CRL");
+system("/bin/mv /tmp/genicrl.combined.$$ /tmp/genicrl.bundle.$$") == 0
+    or fatal("Could not rename the combined CRL file");
 
-    open(CERT, ">/tmp/genicacerts.$$/$idx.pem")
-	or fatal("Could not open pem file in /tmp/genicacerts.$$");
-    print CERT $cert;
-    close(CERT);
-    $idx++;
+# Also do diff for the crl bundle
+system("/usr/bin/diff -q $TB/etc/genicrl.bundle /tmp/genicrl.bundle.$$");
+if ($?) {
+    if (-e "$TB/etc/genicrl.bundle.old") {
+	unlink("$TB/etc/genicrl.bundle.old") or
+	    fatal("Could not remove old genicrl bundle");
+    }
+    if (-e "$TB/etc/genicrl.bundle") {
+	system("/bin/cp $TB/etc/genicrl.bundle $TB/etc/genicrl.bundle.old") == 0
+	    or fatal("Could not save off $TB/etc/genicrl.bundle");
+    }
+    system("/bin/mv /tmp/genicrl.bundle.$$ $TB/etc/genicrl.bundle") == 0
+	or fatal("Could not mv /tmp/genicrl.bundle.$$ $TB/etc/genicrl.bundle");
+
+    $restartapache = 1;
 }
 
-if (-e "$TB/etc/genica.bundle.old") {
-    unlink("$TB/etc/genica.bundle.old") or
-	fatal("Could not remove old genica bundle");
+if ($restartapache) {
+    system("/usr/local/etc/rc.d/apache.sh restart") == 0
+	or fatal("Could not restart apache!");
 }
-if (-e "$TB/etc/genica.bundle") {
-    system("/bin/cp $TB/etc/genica.bundle $TB/etc/genica.bundle.old") == 0
-	or fatal("Could not save off $TB/etc/genica.bundle");
-}
-if (-e "$TB/etc/genicacerts.old") {
-    system("/bin/rm -rf $TB/etc/genicacerts.old") == 0
-	or fatal("Could not remove old genicacerts directory");
-}
-if (-e "$TB/etc/genicacerts") {
-    system("/bin/mv $TB/etc/genicacerts $TB/etc/genicacerts.old") == 0
-	or fatal("Could not save off genicacerts directory");
-}
-system("/bin/mv /tmp/genica.bundle.$$ $TB/etc/genica.bundle") == 0
-    or fatal("Could not mv /tmp/genica.bundle.$$ $TB/etc/genica.bundle");
-system("/bin/mv /tmp/genicacerts.$$ $TB/etc/genicacerts") == 0
-    or fatal("Could not mv /tmp/genicacerts.$$ to $TB/etc/genicacerts");
 
-print "New certificates have been downloaded ... Restarting apache ...\n";
-system("/usr/local/etc/rc.d/apache.sh restart") == 0
-    or fatal("Could not restart apache!");
 
+# Abort the log since apache likes to spit out stuff.
+# No errors at this point, nothing to report.
+AuditAbort();
 exit(0);
 
 sub fatal($)

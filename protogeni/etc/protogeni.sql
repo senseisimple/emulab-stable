@@ -211,10 +211,34 @@ DROP TABLE IF EXISTS `geni_certificates`;
 CREATE TABLE `geni_certificates` (
   `uuid` varchar(40) NOT NULL default '',
   `created` datetime default NULL,
+  `expires` datetime default NULL,
+  `revoked` datetime default NULL,
+  `serial` int(10) unsigned NOT NULL default '0',
+  `cert` text,
+  `DN` text,
+  `privkey` text,
+  PRIMARY KEY  (`uuid`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+CREATE TABLE `geni_certificates` (
+  `uuid` varchar(40) NOT NULL default '',
+  `created` datetime default NULL,
   `cert` text,
   `DN` text,
   `privkey` text,
   `revoked` datetime default NULL,
+  PRIMARY KEY  (`uuid`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+#
+# A clearinghouse table to hold CRLs to be distributed.
+#
+DROP TABLE IF EXISTS `geni_crls`;
+CREATE TABLE `geni_crls` (
+  `uuid` varchar(40) NOT NULL default '',
+  `created` datetime default NULL,
+  `expires` datetime default NULL,
+  `cert` text,
   PRIMARY KEY  (`uuid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
