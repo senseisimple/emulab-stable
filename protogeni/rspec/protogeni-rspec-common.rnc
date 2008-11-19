@@ -11,36 +11,40 @@
 include "../../assign/top.rnc" {
     # Add some more stuff to nodes
     NodeContents =
-        # Semantic change - the 'name' of a (physical) node is now
-        # solely for human-readability. It's the UUID, which we add here,
-        # that is the "true" identifier (ie. used in identifying link
-        # endpoints.)
-        attribute physical_uuid { text },
-        attribute physical_name { text }?,
+        # Semantic change - the 'name' of a node is now
+        # solely for human-readability.
+	# In an advertisement, the component_uuid provides a primary
+	# key which uniquely designates a node.
+	# In a request, the virtual_uuid is the primary key.
+	# The primary key must be globally unique.
+	# The primary key is used when identifying link inputs, for example.
+	attribute name { text }?,
 	attribute virtual_uuid { text }?,
-	attribute virtual_name { text }?,
+	# The mapping to components/slivers. Required for advertisements.
+	Mapping?,
+
         # Each node has exactly one virtualization technology, which we simply
         # enumerate here
         attribute virtualization_type { "raw" | "trellis-vserver" |
         "planetlab-vserver" | "emulab-vnode" }?,
         NodeSpec.NodeType,
-        # Inidicate whether or not this node is available - the idea is that a
+
+        # Indicate whether or not this node is available - the idea is that a
         # full dump of the static physical topology will not include this, but
         # that we can later get updates that include only this attribute (and a
         # UUID) Just binary for now - probably will include more things, such
         # as a number of "free slots", later
         element available { xsd:boolean }?,
-	InterfaceDecl*,
+	InterfaceDecl*
         # Optionally, include the URL for this component's CM
-        CMURLSpec?
+        #CMURLSpec?
+
     LinkContents =
-        # Semantic change - the 'name' of a (physical) link is now
-        # solely for human-readability. It's the UUID, which we add here,
-        # that is the "true" identifier.
-        attribute physical_uuid { text },
-        attribute physical_name { text }?,
+        # Semantic change - the 'name' of a link is now
+        # solely for human-readability.
+        attribute name { text }?,
         attribute virtual_uuid { text }?,
-        attribute virtual_name { text }?,
+	(LinkMapping | PathMapping)?,
         LinkEndPoints,
         ## The characteristics (bandwidth, latency, loss) which affect traffic.
         LinkCharacteristics,
@@ -49,24 +53,52 @@ include "../../assign/top.rnc" {
         ## only allowed to have one
         LinkSpec.LinkType
         # TODO: Might add a URL for the CM for a link in the future
+
     InterfaceContents = 
-        # Semantic change - the 'name' in an interface is solely for human
-        # readability. It's the UUID that is used to uniquely identify a
-        # node.
-        element node_uuid { text },
-        element interface_name { text }
+	# In an advertisement, the component_uuid is mandatory.
+	# In a request, the virtual_uuid is mandatory.
+        element virtual_uuid { text }?,
+	element virtual_interface_name { text }?,
+	element component_uuid { text }?,
+        element component_interface_name { text }?
 }
 
 # InterfaceDecl is for declaration of interfaces inside of a node.
 InterfaceDecl = element interface {
-	attribute name { text }
+    attribute name { text }
+}
+
+Mapping =
+    # This is the uuid of the aggregate that this node or link belongs
+    # to. It is required in an advertisement.
+    attribute aggregate_uuid { text },
+    # The uuid of the physical component.
+    attribute component_uuid { text },
+    # The sliver_uuid is an annotation added when a ticket is
+    # redeemed to notify the client of the association between the
+    # virtual_uuid requests and the actual slivers instantiated.
+    attribute sliver_uuid { text }?
+
+LinkMapping = element component_link { Mapping }
+
+PathMapping = element component_path {
+    (element link { Mapping },
+     element node
+     {
+	Mapping,
+	element in_interface { InterfaceContents },
+	element out_interface { InterfaceContents }
+     }
+    )*,
+    element link { Mapping }
 }
 
 ## How to contact a component manager. In the future, could include information
 ## about the version of the interface it supports, or something like that...
-CMURLSpec = element component_manager_URL { xsd:anyURI }
+#CMURLSpec = element component_manager_URL { xsd:anyURI }
 
 RSpec = element rspec {
+    attribute type { "advertisement" | "request" },
     # TODO: Include something about who generated this rspec?
     # When this RSpec was generated - optional, can be used for determining
     # staleness

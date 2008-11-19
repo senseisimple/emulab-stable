@@ -19,12 +19,12 @@
       <xs:group ref="rspec:NodeSpec.NodeType"/>
       <xs:element minOccurs="0" ref="rspec:available"/>
       <xs:group minOccurs="0" maxOccurs="unbounded" ref="rspec:InterfaceDecl"/>
-      <xs:element minOccurs="0" ref="rspec:component_manager_URL"/>
     </xs:sequence>
-    <xs:attribute name="physical_uuid" use="required"/>
-    <xs:attribute name="physical_name"/>
+    <xs:attribute name="name"/>
     <xs:attribute name="virtual_uuid"/>
-    <xs:attribute name="virtual_name"/>
+    <xs:attribute name="aggregate_uuid"/>
+    <xs:attribute name="component_uuid"/>
+    <xs:attribute name="sliver_uuid"/>
     <xs:attribute name="virtualization_type">
       <xs:simpleType>
         <xs:restriction base="xs:token">
@@ -37,8 +37,16 @@
     </xs:attribute>
   </xs:complexType>
   <xs:element name="available" type="xs:boolean"/>
+  <!--
+    Optionally, include the URL for this component's CM
+    CMURLSpec?
+  -->
   <xs:complexType name="LinkContents">
     <xs:sequence>
+      <xs:choice minOccurs="0">
+        <xs:element ref="rspec:component_link"/>
+        <xs:element ref="rspec:component_path"/>
+      </xs:choice>
       <xs:group ref="rspec:LinkEndPoints"/>
       <xs:group ref="rspec:LinkCharacteristics">
         <xs:annotation>
@@ -47,20 +55,22 @@
       </xs:group>
       <xs:group ref="rspec:LinkSpec.LinkType"/>
     </xs:sequence>
-    <xs:attribute name="physical_uuid" use="required"/>
-    <xs:attribute name="physical_name"/>
+    <xs:attribute name="name"/>
     <xs:attribute name="virtual_uuid"/>
-    <xs:attribute name="virtual_name"/>
   </xs:complexType>
   <!-- TODO: Might add a URL for the CM for a link in the future -->
   <xs:complexType name="InterfaceContents">
     <xs:sequence>
-      <xs:element ref="rspec:node_uuid"/>
-      <xs:element ref="rspec:interface_name"/>
+      <xs:element minOccurs="0" ref="rspec:virtual_uuid"/>
+      <xs:element minOccurs="0" ref="rspec:virtual_interface_name"/>
+      <xs:element minOccurs="0" ref="rspec:component_uuid"/>
+      <xs:element minOccurs="0" ref="rspec:component_interface_name"/>
     </xs:sequence>
   </xs:complexType>
-  <xs:element name="node_uuid" type="xs:string"/>
-  <xs:element name="interface_name" type="xs:string"/>
+  <xs:element name="virtual_uuid" type="xs:string"/>
+  <xs:element name="virtual_interface_name" type="xs:string"/>
+  <xs:element name="component_uuid" type="xs:string"/>
+  <xs:element name="component_interface_name" type="xs:string"/>
   <!-- InterfaceDecl is for declaration of interfaces inside of a node. -->
   <xs:group name="InterfaceDecl">
     <xs:sequence>
@@ -71,13 +81,60 @@
       </xs:element>
     </xs:sequence>
   </xs:group>
-  <xs:element name="component_manager_URL" type="xs:anyURI"/>
+  <xs:attributeGroup name="Mapping">
+    <xs:attribute name="aggregate_uuid" use="required"/>
+    <xs:attribute name="component_uuid" use="required"/>
+    <xs:attribute name="sliver_uuid"/>
+  </xs:attributeGroup>
+  <xs:element name="component_link">
+    <xs:complexType>
+      <xs:attributeGroup ref="rspec:Mapping"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="component_path">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:sequence minOccurs="0" maxOccurs="unbounded">
+          <xs:element name="link">
+            <xs:complexType>
+              <xs:attributeGroup ref="rspec:Mapping"/>
+            </xs:complexType>
+          </xs:element>
+          <xs:element name="node">
+            <xs:complexType>
+              <xs:sequence>
+                <xs:element ref="rspec:in_interface"/>
+                <xs:element ref="rspec:out_interface"/>
+              </xs:sequence>
+              <xs:attributeGroup ref="rspec:Mapping"/>
+            </xs:complexType>
+          </xs:element>
+        </xs:sequence>
+        <xs:element name="link">
+          <xs:complexType>
+            <xs:attributeGroup ref="rspec:Mapping"/>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="in_interface" type="rspec:InterfaceContents"/>
+  <xs:element name="out_interface" type="rspec:InterfaceContents"/>
+  <!-- CMURLSpec = element component_manager_URL { xsd:anyURI } -->
   <xs:element name="rspec">
     <xs:complexType>
       <xs:choice minOccurs="0" maxOccurs="unbounded">
         <xs:element ref="rspec:node"/>
         <xs:element ref="rspec:link"/>
       </xs:choice>
+      <xs:attribute name="type" use="required">
+        <xs:simpleType>
+          <xs:restriction base="xs:token">
+            <xs:enumeration value="advertisement"/>
+            <xs:enumeration value="request"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
       <xs:attribute name="generated" use="required" type="xs:dateTime"/>
       <xs:attribute name="valid_until" use="required" type="xs:dateTime"/>
     </xs:complexType>
