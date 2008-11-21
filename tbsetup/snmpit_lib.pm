@@ -303,6 +303,8 @@ sub getExperimentControlPorts ($$) {
     #
     my $exp = Experiment->Lookup($pid,$eid);
     my @nodes = $exp->NodeList(0,0);
+    # plab and related nodes are still in the list, so filter them out
+    @nodes = grep {$_->control_iface()} @nodes; 
 
     #
     # Get control net interfaces

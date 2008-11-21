@@ -123,6 +123,8 @@ Port Control:
   -U <port>              Turn off trunking for the given <port>
   -b <ports>             Print out port status for a set of ports
   -B <statstring>        Pass in a stat string from -b to restore status
+  -D <pid> <eid>         Disable all control net ports for an experiment
+  -R <pid> <eid>         (Re)enable all control net ports for an experiment
 
 More than one operation can be specified - However, beware that the order in
 which operations will occur is undefined, and some combinations of operations
@@ -137,7 +139,7 @@ my %opt = ();
 Getopt::Long::Configure("no_ignore_case");
 GetOptions(\%opt, 'a','c','d','e','b','B=s@','g','h','i=s@','l','m=s@','M','n',
     'N=s@','o=s@','p=s','q','r','s', 'S=s@','t','E=s','T=s','u=s','U','v=s','w',
-    'y=s','x=s','z=s','F','L=s','O');
+    'y=s','x=s','z=s','F','L=s','O', 'D', 'R');
 # Unused: f,j
 
 if ($opt{h}) {
@@ -179,7 +181,7 @@ if ($UID) {
 # Some operations have mandatory agruments - for others, make sure that
 # the user didn't give any extraneous arguments
 #
-if ($opt{t} || $opt{r}) {
+if ($opt{t} || $opt{r} || $opt{D} || $opt{R}) {
     #
     # Options that take 'pid eid'
     #
@@ -253,6 +255,8 @@ if ($opt{F}) { push @commands, ["synchleader"]; }
 if ($opt{d}) { push @commands, ["portcontrol","disable"]; }
 if ($opt{e}) { push @commands, ["portcontrol","enable"]; }
 if ($opt{a}) { push @commands, ["portcontrol","auto"]; }
+if ($opt{D}) { push @commands, ["expcnetcontrol", "disable"]; }
+if ($opt{R}) { push @commands, ["expcnetcontrol", "enable"]; }
 if ($opt{T}) { push @commands, ["trunkenable", $opt{T}]; }
 
 #
@@ -533,6 +537,10 @@ COMMAND: foreach my $command (@commands) {
 	    		   @supplied_switches : getDeviceNames(@ports);
 	    last;
 	};
+	(/expcnetcontrol/) && do {
+	    @ports = getExperimentControlPorts($pid, $eid);
+	    @devicenames = getDeviceNames(@ports);
+	};
 	(/recreate/) && do {
 	    #
 	    # Safety check - cannot be used with -i . We have to operate on
@@ -720,6 +728,11 @@ COMMAND: foreach my $command (@commands) {
 	    last;
 	};
 	/portcontrol/ && do {
+	    my ($portcommand) = @args;
+	    $exitval += doPortControl(\@stacks,$portcommand,@ports);
+	    last;
+	};
+	/expcnetcontrol/ && do {
 	    my ($portcommand) = @args;
 	    $exitval += doPortControl(\@stacks,$portcommand,@ports);
 	    last;
