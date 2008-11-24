@@ -144,9 +144,15 @@ dofreebsd() {
 		fsopts="ro,ufstype=44bsd"
 	fi
 
+	# Try mounting the filesystem as UFSv1 first,
+	# tnen try UFSv2 if that doesn't work.
+
 	mount -t $fstype -o $fsopts $rootdev /mnt || {
-		echo "RO-mount of $rootdev failed"
-		return 1
+		fsopts=ro,ufstype=ufs2
+		mount -t $fstype -o $fsopts $rootdev /mnt || {
+			echo "RO-mount of $rootdev failed"
+			return 1
+		}
 	}
 
 	#
@@ -427,6 +433,7 @@ dolinux() {
 	fi
 
 	# change the swap devices in fstab
+	echo linux_disk=$linux_disk
 	sed -i.orig -e "s;^/dev/[hs]d.\([0-7]\);/dev/${linux_disk}\1;" /mnt/etc/fstab || {
 		echo "Failed to update /etc/fstab"
 		umount $rootdev
@@ -453,16 +460,39 @@ dolinux() {
 	    # Tweak grub's notion of root.
 	    # Note that grub's partition numbering is zero-based.
 	    #
-	    gdisk=`echo $linux_disk | sed -e 's/^.*\(.\)$/\1/;y/abcdefgh/01234567/'`
+	    gdisk=''
+	    if [ $OS = "Linux" ]; then
+
+	        # Use EDD to figure out the BIOS drive number
+	        #
+	        # HACK: we only look for BIOS drives 0x8[0-9] so we
+	        # don't have to convert to/from hex and do math. The
+	        # The EDD code in the kernel currently only supports
+	        # 0x80-0x85 anyway.
+
+	        gdisk=`sed -n "s/^$linux_disk=\(8[0-9]\)/\1/p" \
+	               $BOOTDIR/edd_map`
+		if [ -n "$gdisk" ]; then
+			echo "  EDD says $linux_disk is BIOS drive 0x$gdisk"
+			gdisk=${gdisk#8}
+		fi
+
+	        # We fall back to our old guessing method if EDD
+	        # doesn't work.
+	    fi
+	    if [ x$gdisk = x ]; then
+	        gdisk=`echo $linux_disk | \
+                       sed -e 's/^.*\(.\)$/\1/;y/abcdefgh/01234567/'`
+	        if [ $FLASHBOOT -eq 1 ]; then
+	            gdisk=`expr $gdisk + 1`
+	        fi
+	    fi
 	    gpart=`expr $part - 1`
 	    #
 	    # If we booted from a flash device we also have to further tweak
 	    # grub's notion of root disk since the flash device will be "hd0".
 	    # It appears that we do NOT have to update Linux's drive mapping.
 	    #
-	    if [ $FLASHBOOT -eq 1 ]; then
-	        gdisk=`expr $gdisk + 1`
-	    fi
 	    sed -i'' -e "s;root (hd[0-9],[0-9]);root (hd${gdisk},${gpart});" $gconf || {
 		echo "Failed to update root in $fgconf"
 	    }
@@ -518,10 +548,11 @@ dolinux() {
 }
 
 fixone() {
-    echo "*** ${disk}s${part}:"
     if [ $OS = FreeBSD ]; then
+    	echo "*** ${disk}s${part}:"
     	ptype=`fdisk -${part} ${disk} | grep sysid | sed 's/^sysid \([0-9][0-9]*\).*/\1/'`
     elif [ $OS = Linux ]; then
+    	echo "*** ${disk}${part}:"
     	ptype=`fdisk -l /dev/$disk | awk /${disk}${part}/'{sub(/\*/,""); print "0x"$5}'`
     fi
     ptype=${ptype:-0}

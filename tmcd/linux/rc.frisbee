@@ -63,8 +63,9 @@ install_mbr()
 	fi
 
 	if [ "$OS" = Linux ]; then
-		size=`echo -e 'u\np\nq' | fdisk $disk | \
-			sed -n "s#^${disk}1 *. *[0-9]* *\([0-9]*\).*\\$#\1#p"`
+		size=`echo -e 'u\np\nq' | fdisk $disk 2> /dev/null| \
+			sed -n "s#^${disk}1 *. *[0-9]* *[0-9]* *\([0-9]*\).*\\$#\1#p"`
+		size=`expr $size '*' 2`
 	elif [ "$OS" = FreeBSD ]; then
 		size=`fdisk -s ${disk##*/} 2>/dev/null | \
 			sed -n -e 's/^ *1: *[0-9][0-9]* *\([0-9][0-9]*\).*$/\1/p'`
@@ -104,7 +105,7 @@ install_mbr()
 	# to disk, so we'll just use that.
 	if [ $OS = Linux ]; then
 		echo "Re-reading partition table ..."
-		echo w | fdisk $disk > /dev/null
+		echo w | fdisk $disk > /dev/null 2>&1
 	fi
 }
 
@@ -125,7 +126,7 @@ zap_superblocks()
 	local offsets=''
 
 	if [ $OS = Linux ]; then
-		offsets=`echo -e 'u\np\nq' | fdisk $disk | \
+		offsets=`echo -e 'u\np\nq' | fdisk $disk 2> /dev/null | \
 			sed -n "s#^${disk}[0-9]* *. *[0-9]* *\([0-9]*\).*\\$#\1#p"`
 	elif [ $OS = FreeBSD ]; then
 		offsets=`fdisk -s ${disk##*/} 2>/dev/null | \
@@ -273,24 +274,9 @@ write_image()
 	return $rc
 }
 
-find_disks() {
-	local disks
-
-	if [ $OS = "FreeBSD" ]; then
-		for d in `dmesg | sed -n 's/^\([a-z]*[0-9][0-9]*\): [0-9][0-9]*MB/\1/p'`; do
-			case $d in
-				ad*|da*|ar*|aacd*) disks="$disks $d"
-			esac
-		done
-	elif [ $OS = "Linux" ]; then
-		disks=`ls /sys/block/[hs]d* | sed 's;.*/\([^/]*\)$;\1;'`
-	fi
-
-	echo $disks
-}
-
 $BINDIR/tmcc state RELOADSETUP
 
+echo "Trying to get loadinfo data... "
 time=30
 while [ $time -gt 0 ]; do
 	sleep 1
@@ -304,9 +290,10 @@ if [ $time -eq 0 ]; then
 	exit 2
 fi
 
+echo "Got loadinfo data"
+
 BOSSINFO=`$BINDIR/tmcc bossinfo`
 BOSSIP=${BOSSINFO##* }
-STATUS=`$BINDIR/tmcc status`
 
 # For testing purposes.
 #BOSSINFO='boss.emulab.net 155.101.128.70'
@@ -324,6 +311,7 @@ ACPI=`get_value "$LOADINFO" ACPI`
 ASF=`get_value "$LOADINFO" ASF`
 MBR=`get_value "$LOADINFO" MBRVERS`
 
+FREEBSD_DISK=$DISK
 # Convert from the FreeBSD device names to Linux device names
 # if necessary.
 if [ $OS = "Linux" ]; then
@@ -331,7 +319,6 @@ if [ $OS = "Linux" ]; then
 		[hs]d[a-z])
 			;;
 		*)
-			OLD_DISK=$DISK
 			DISK=`$BINDIR/freebsd_to_linux_disk $DISK 0` 
 			DISK=${DISK%% *}
 			;;
@@ -423,18 +410,6 @@ if [ $is_remote -eq 0 -a $PARTITION -eq 0 -a $ZFILL -eq 0 ]; then
 	zap_superblocks /dev/$DISK
 fi
 
-case $STATUS in
-	*ALLOCATED=emulab-ops/reloading*)
-		disks=`find_disks`
-		for d in $disks; do
-			[ $d = $DISK ] && continue
-			mount | grep "^/dev/$d" > /dev/null && continue
-			zap_superblocks $d
-			dd if=/dev/zero of=/dev/$disk bs=512 count=1
-		done
-		;;
-esac
-
 install_mbr /dev/$DISK $MBR
 
 echo "Resizing final disk partition"
@@ -475,7 +450,7 @@ fi
 echo "Adjusting slice-related files"
 export SLICEFIX_ACPI=$ACPI
 export SLICEFIX_ASF=$ASF
-$BINDIR/slicefix $PARTITION $DISK
+$BINDIR/slicefix $PARTITION $FREEBSD_DISK
 echo "Image load complete at `date`"
 
 #
