@@ -1,7 +1,20 @@
 #! /bin/sh
 
+# Linux supports BSD disklabels, but it's not trivial to determine which device
+# name Linux assigned to the BSD partitions.  The way I understand it, the MBR
+# partitions (aka 'slices' in BSD parlance) get device names like hda[1-4].
+# Then any logical partitions contained in 'extended' partitions (types 0x5 and
+# 0x85) get handled, followed by the *BSD partitions.  The first 'logical'
+# partition found is given hda5, the second is hda6, and so on.
+
+# In order to figure this out, we need to first determine that the MBR
+# partition in question does in fact have a BSD disklabel, that Linux sees the
+# disklabel as valid, and that it has an 'a' partition.
+
 disk=$1
 part=$2
+
+disklabel_dump=/tmp/disklabel.$disk$part
 
 if [ $# -ne 2 ]; then
 	exit 1
@@ -20,13 +33,22 @@ if [ -z "$freebsd_slices" ]; then
 	exit 1
 fi
 
-dmesg_output=`dmesg | grep " *$disk$part: <bsd: $disk[0-9]* "`
-# Valid disklabels should be properly parsed by linux. If it didn't like
-# the label, we can't mount anything.
-if [ -z "$dmesg_output" ]; then
-	# invalid disklabel
-	exit 1
-fi
+## The only way to determine if a given slice has a BSD disklabel
+## is to look at the dmesg output.  The assumes that the relevant
+## info is still in the kernel's dmesg buffer.  It should be unless
+## we've been running for a long time.  This isn't likely to happen 
+## in a standard tftpboot/dongle boot setup though.
+#
+## XXX find another way to get this info in case the dmesg data
+## isn't available.
+#
+#dmesg_output=`dmesg | grep " *$disk$part: <bsd: $disk[0-9]* "`
+## Valid disklabels should be properly parsed by linux. If it didn't like
+## the label, we can't mount anything.
+#if [ -z "$dmesg_output" ]; then
+#	# invalid disklabel
+#	exit 1
+#fi
 
 (
 # Change partition types to empty for all other FreeBSD slices
@@ -46,15 +68,39 @@ done
 echo b		# Change to BSD disklabel mode
 echo p		# Print disklabel
 echo q		# Quit (don't write to disk)
-) | fdisk /dev/$disk 2> /dev/null | grep '^ *a:' > /dev/null
+) | fdisk -u /dev/$disk 2> /dev/null > $disklabel_dump
 rc=$?
 
+part_offset=`cat /sys/block/$disk/$disk$part/start`
+a_part_offset=`sed -n 's/^ *a: *\([0-9]*\) *.*$/\1/p' $disklabel_dump`
+c_part_offset=`sed -n 's/^ *c: *\([0-9]*\) *.*$/\1/p' $disklabel_dump`
+
+if [ x$a_part_offset = x ] || [ x$c_part_offset = x ]; then
+	#invalid disklabel
+	exit 1
+fi
+
+# Handle relative FreeBSD partitions
+if [ $c_part_offset -eq 0 ]; then
+	a_part_offset=$(( $a_part_offset + $part_offset ))
+fi
+
+a_part_linuxdev=''
+for partdev in /sys/block/$disk/$disk[1-9]*; do
+	[ $partdev = /sys/block/$disk/$disk$part ] && continue
+	start=`cat $partdev/start`
+	[ $start -eq $a_part_offset ] || continue
+
+	a_part_linuxdev=${partdev##*/}
+	break
+done
+
 # Valid disklabel, but no 'a' partition.
-if [ $rc -ne 0 ]; then
+if [ -z "$a_part_linuxdev" ]; then
 	exit 1
 fi
 
 # We have a valid disklabel with an 'a' partition.
 # Output the Linux device name for it.
-echo $dmesg_output | cut -d' ' -f3
+echo $a_part_linuxdev
 exit 0
