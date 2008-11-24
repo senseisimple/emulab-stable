@@ -74,6 +74,7 @@ rc=$?
 part_offset=`cat /sys/block/$disk/$disk$part/start`
 a_part_offset=`sed -n 's/^ *a: *\([0-9]*\) *.*$/\1/p' $disklabel_dump`
 c_part_offset=`sed -n 's/^ *c: *\([0-9]*\) *.*$/\1/p' $disklabel_dump`
+rm -f $disklabel_dump
 
 if [ x$a_part_offset = x ] || [ x$c_part_offset = x ]; then
 	#invalid disklabel
