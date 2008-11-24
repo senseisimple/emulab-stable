@@ -86,6 +86,7 @@ frisbee-mfs-install:	destdircheck
 	$(INSTALL) -m 755 $(SRCDIR)/slicefix $(SYSETCDIR)/testbed
 	$(INSTALL) -m 755 $(SRCDIR)/freebsd_to_linux_disk $(SYSETCDIR)/testbed
 	$(INSTALL) -m 755 $(SRCDIR)/check_disklabel $(SYSETCDIR)/testbed
+	$(INSTALL) -m 755 $(SRCDIR)/get_edd_map $(SYSETCDIR)/testbed
 	$(INSTALL) -m 755 -s ../tmcc-nossl $(SYSETCDIR)/testbed/tmcc
 	$(INSTALL) -m 755 -s ../findif $(SYSETCDIR)/testbed
 	rm -f $(BINDIR)/rc/rc.mkelab
@@ -213,6 +214,7 @@ script-install:	dir-install $(SCRIPTS)
 	$(INSTALL) -m 755 $(SRCDIR)/slicefix $(BINDIR)/slicefix
 	$(INSTALL) -m 755 $(SRCDIR)/freebsd_to_linux_disk $(BINDIR)/freebsd_to_linux_disk
 	$(INSTALL) -m 755 $(SRCDIR)/check_disklabel $(BINDIR)/check_disklabel
+	$(INSTALL) -m 755 $(SRCDIR)/get_edd_map $(BINDIR)/testbed
 	$(INSTALL) -m 755 -s ../findif $(BINDIR)/findif
 
 sfs-install:
