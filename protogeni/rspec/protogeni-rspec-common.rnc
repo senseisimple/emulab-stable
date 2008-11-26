@@ -9,7 +9,6 @@
 #
 
 include "../../assign/top.rnc" {
-    # Add some more stuff to nodes
     NodeContents =
         # Semantic change - the 'name' of a node is now
         # solely for human-readability.
@@ -18,10 +17,10 @@ include "../../assign/top.rnc" {
 	# In a request, the virtual_uuid is the primary key.
 	# The primary key must be globally unique.
 	# The primary key is used when identifying link inputs, for example.
-	attribute name { text }?,
+	attribute virtual_name { text }?,
 	attribute virtual_uuid { text }?,
 	# The mapping to components/slivers. Required for advertisements.
-	Mapping?,
+	ComponentSpec?,
 
         # Each node has exactly one virtualization technology, which we simply
         # enumerate here
@@ -36,15 +35,13 @@ include "../../assign/top.rnc" {
         # as a number of "free slots", later
         element available { xsd:boolean }?,
 	InterfaceDecl*
-        # Optionally, include the URL for this component's CM
-        #CMURLSpec?
 
     LinkContents =
         # Semantic change - the 'name' of a link is now
         # solely for human-readability.
-        attribute name { text }?,
+        attribute virtual_name { text }?,
         attribute virtual_uuid { text }?,
-	(LinkMapping | PathMapping)?,
+	(LinkComponentSpec | PathComponentSpec)?,
         LinkEndPoints,
         ## The characteristics (bandwidth, latency, loss) which affect traffic.
         LinkCharacteristics,
@@ -52,7 +49,6 @@ include "../../assign/top.rnc" {
         ## that it can be overriden in the virtual topology schema, where you are
         ## only allowed to have one
         LinkSpec.LinkType
-        # TODO: Might add a URL for the CM for a link in the future
 
     InterfaceContents = 
 	# In an advertisement, the component_uuid is mandatory.
@@ -63,15 +59,16 @@ include "../../assign/top.rnc" {
         element component_interface_name { text }?
 }
 
-# InterfaceDecl is for declaration of interfaces inside of a node.
 InterfaceDecl = element interface {
-    attribute name { text }
+	attribute name { text }
 }
 
-Mapping =
+ComponentSpec =
     # This is the uuid of the aggregate that this node or link belongs
     # to. It is required in an advertisement.
     attribute aggregate_uuid { text },
+    # User-readable name for the component
+    attribute component_name { text }?,
     # The uuid of the physical component.
     attribute component_uuid { text },
     # The sliver_uuid is an annotation added when a ticket is
@@ -79,27 +76,20 @@ Mapping =
     # virtual_uuid requests and the actual slivers instantiated.
     attribute sliver_uuid { text }?
 
-LinkMapping = element component_link { Mapping }
+LinkComponentSpec = element component_link { ComponentSpec }
 
-PathMapping = element component_path {
-    (element link { Mapping },
+PathComponentSpec = element component_path {
+    (element link { ComponentSpec, LinkEndPoints},
      element node
      {
-	Mapping,
-	element in_interface { InterfaceContents },
-	element out_interface { InterfaceContents }
+	ComponentSpec
      }
     )*,
-    element link { Mapping }
+    element link { ComponentSpec, LinkEndPoints }
 }
-
-## How to contact a component manager. In the future, could include information
-## about the version of the interface it supports, or something like that...
-#CMURLSpec = element component_manager_URL { xsd:anyURI }
 
 RSpec = element rspec {
     attribute type { "advertisement" | "request" },
-    # TODO: Include something about who generated this rspec?
     # When this RSpec was generated - optional, can be used for determining
     # staleness
     attribute generated { xsd:dateTime },

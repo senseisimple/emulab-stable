@@ -13,16 +13,16 @@
     Simple prototype of an RSpec, to be used by ProtoGENI
     
   -->
-  <!-- Add some more stuff to nodes -->
   <xs:complexType name="NodeContents">
     <xs:sequence>
       <xs:group ref="rspec:NodeSpec.NodeType"/>
       <xs:element minOccurs="0" ref="rspec:available"/>
       <xs:group minOccurs="0" maxOccurs="unbounded" ref="rspec:InterfaceDecl"/>
     </xs:sequence>
-    <xs:attribute name="name"/>
+    <xs:attribute name="virtual_name"/>
     <xs:attribute name="virtual_uuid"/>
     <xs:attribute name="aggregate_uuid"/>
+    <xs:attribute name="component_name"/>
     <xs:attribute name="component_uuid"/>
     <xs:attribute name="sliver_uuid"/>
     <xs:attribute name="virtualization_type">
@@ -37,10 +37,6 @@
     </xs:attribute>
   </xs:complexType>
   <xs:element name="available" type="xs:boolean"/>
-  <!--
-    Optionally, include the URL for this component's CM
-    CMURLSpec?
-  -->
   <xs:complexType name="LinkContents">
     <xs:sequence>
       <xs:choice minOccurs="0">
@@ -53,12 +49,11 @@
           <xs:documentation>The characteristics (bandwidth, latency, loss) which affect traffic.</xs:documentation>
         </xs:annotation>
       </xs:group>
-      <xs:group ref="rspec:LinkSpec.LinkType"/>
+      <xs:element ref="rspec:LinkSpec.LinkType"/>
     </xs:sequence>
-    <xs:attribute name="name"/>
+    <xs:attribute name="virtual_name"/>
     <xs:attribute name="virtual_uuid"/>
   </xs:complexType>
-  <!-- TODO: Might add a URL for the CM for a link in the future -->
   <xs:complexType name="InterfaceContents">
     <xs:sequence>
       <xs:element minOccurs="0" ref="rspec:virtual_uuid"/>
@@ -71,7 +66,6 @@
   <xs:element name="virtual_interface_name" type="xs:string"/>
   <xs:element name="component_uuid" type="xs:string"/>
   <xs:element name="component_interface_name" type="xs:string"/>
-  <!-- InterfaceDecl is for declaration of interfaces inside of a node. -->
   <xs:group name="InterfaceDecl">
     <xs:sequence>
       <xs:element name="interface">
@@ -81,14 +75,15 @@
       </xs:element>
     </xs:sequence>
   </xs:group>
-  <xs:attributeGroup name="Mapping">
+  <xs:attributeGroup name="ComponentSpec">
     <xs:attribute name="aggregate_uuid" use="required"/>
+    <xs:attribute name="component_name"/>
     <xs:attribute name="component_uuid" use="required"/>
     <xs:attribute name="sliver_uuid"/>
   </xs:attributeGroup>
   <xs:element name="component_link">
     <xs:complexType>
-      <xs:attributeGroup ref="rspec:Mapping"/>
+      <xs:attributeGroup ref="rspec:ComponentSpec"/>
     </xs:complexType>
   </xs:element>
   <xs:element name="component_path">
@@ -97,30 +92,25 @@
         <xs:sequence minOccurs="0" maxOccurs="unbounded">
           <xs:element name="link">
             <xs:complexType>
-              <xs:attributeGroup ref="rspec:Mapping"/>
+              <xs:group ref="rspec:LinkEndPoints"/>
+              <xs:attributeGroup ref="rspec:ComponentSpec"/>
             </xs:complexType>
           </xs:element>
           <xs:element name="node">
             <xs:complexType>
-              <xs:sequence>
-                <xs:element ref="rspec:in_interface"/>
-                <xs:element ref="rspec:out_interface"/>
-              </xs:sequence>
-              <xs:attributeGroup ref="rspec:Mapping"/>
+              <xs:attributeGroup ref="rspec:ComponentSpec"/>
             </xs:complexType>
           </xs:element>
         </xs:sequence>
         <xs:element name="link">
           <xs:complexType>
-            <xs:attributeGroup ref="rspec:Mapping"/>
+            <xs:group ref="rspec:LinkEndPoints"/>
+            <xs:attributeGroup ref="rspec:ComponentSpec"/>
           </xs:complexType>
         </xs:element>
       </xs:sequence>
     </xs:complexType>
   </xs:element>
-  <xs:element name="in_interface" type="rspec:InterfaceContents"/>
-  <xs:element name="out_interface" type="rspec:InterfaceContents"/>
-  <!-- CMURLSpec = element component_manager_URL { xsd:anyURI } -->
   <xs:element name="rspec">
     <xs:complexType>
       <xs:choice minOccurs="0" maxOccurs="unbounded">
