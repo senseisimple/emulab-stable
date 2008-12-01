@@ -109,7 +109,7 @@ AccessConfig   /dev/null
 #
 # Timeout: The number of seconds before receives and sends time out.
 #
-Timeout 30
+Timeout 300
 
 #
 # KeepAlive: Whether or not to allow persistent connections (more than
@@ -1318,7 +1318,41 @@ SetEnvIf User-Agent ".*MSIE.*" \
 CustomLog @prefix@/log/apache_ssl_request_log \
           "%t %h %{SSL_PROTOCOL}x %{SSL_CIPHER}x \"%r\" %b"
 
-</VirtualHost>                                  
+<IfDefine PGENI>
+# A bundle of trusted protogeni sites.
+SSLCACertificateFile @prefix@/etc/genica.bundle
+# Another bundle of CRLs.
+SSLCARevocationFile @prefix@/etc/genicrl.bundle
+# Default this to none so that regular web server requests pass.
+SSLVerifyClient none
 
+# Reject the unencrypted certs that all users get. 
+<Location />
+SSLRequire ( %{SSL_CLIENT_S_DN_OU} ne "sslxmlrpc" )
+</Location />
+
+ScriptAlias /protogeni/xmlrpc/ch @prefix@/protogeni/xmlrpc/protogeni-ch.pl
+ScriptAlias /protogeni/xmlrpc/cm @prefix@/protogeni/xmlrpc/protogeni-cm.pl
+ScriptAlias /protogeni/xmlrpc/sa @prefix@/protogeni/xmlrpc/protogeni-sa.pl
+<Directory "@prefix@/www/protogeni">
+	SSLRequireSSL
+	Order deny,allow
+	allow from all
+	SSLVerifyClient require
+	SSLVerifyDepth  5
+</Directory>
+<Directory "@prefix@/protogeni/">
+	SSLRequireSSL
+	Order deny,allow
+	allow from all
+	SSLOptions +StdEnvVars
+	Options +ExecCGI +FollowSymLinks
+	SetHandler cgi-script
+	SetEnv USER "nobody"
+	SSLVerifyClient require
+	SSLVerifyDepth  5
+</Directory>
+</IfDefine>
+</VirtualHost>                                  
 </IfDefine>
 
