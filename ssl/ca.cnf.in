@@ -116,3 +116,12 @@ preserve	= no			# keep passed DN ordering
 unique_subject  = no
 copy_extensions = copy
 policy		= policy_sslxmlrpc
+
+[ CA_crl ]
+dir		= .			# Where everything is kept
+database	= $dir/crl.txt		# database index file.
+crl		= $dir/crl.pem 		# The current CRL
+RANDFILE	= $dir/.rand		# private random number file
+default_crl_days= 30			# how long before next CRL
+preserve	= no			# keep passed DN ordering
+unique_subject  = no
