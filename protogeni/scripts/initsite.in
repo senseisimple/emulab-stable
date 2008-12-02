@@ -216,7 +216,8 @@ if (!$asch) {
 	or fatal("Could not get CA bundle from Utah");
 
     #
-    # This cron entry will autoupdate the CA/CRL certs by getting them from Utah.
+    # This cron entry will autoupdate the CA/CRL certs by getting them from
+    # Utah.
     #
     if (system("egrep -q -s '$GETCACERTS' /etc/crontab")) {
 	print "Please add this line to /etc/crontab:\n\n";
@@ -227,8 +228,8 @@ if (!$asch) {
 }
 else {
     #
-    # But on the clearinghouse, we have to generate the CRL bundle for downloading
-    # by remote sites.
+    # But on the clearinghouse, we have to generate the CRL bundle for 
+    # downloading by remote sites.
     #
     if (system("egrep -q -s '$GENCRLBUNDLE' /etc/crontab")) {
 	print "Please add this line to /etc/crontab:\n\n";
