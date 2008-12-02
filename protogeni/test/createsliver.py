@@ -127,6 +127,18 @@ print "Got my SA credential"
 #print str(mycredential);
 
 #
+# Lookup my ssh keys.
+#
+params = {}
+params["credential"] = mycredential
+rval,response = do_method("sa", "GetKeys", params)
+if rval:
+    Fatal("Could not get my keys")
+    pass
+mykeys = response["value"]
+#print str(mykeys);
+
+#
 # Lookup slice.
 #
 params = {}
@@ -197,6 +209,7 @@ print "Got a ticket from the CM. Redeeming the ticket ..."
 #
 params = {}
 params["ticket"]   = ticket
+params["keys"]     = mykeys
 params["impotent"] = impotent
 rval,response = do_method("cm", "RedeemTicket", params)
 if rval:
