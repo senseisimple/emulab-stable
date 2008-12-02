@@ -40,6 +40,7 @@ my $TESTMODE    = @TESTMODE@;
 my $TBOPS       = "@TBOPSEMAIL@";
 my $TBLOGS      = "@TBLOGSEMAIL@";
 my $CLIENT_BIN  = "@CLIENT_BINDIR@";
+my $PGENISUPPORT= @PROTOGENI_SUPPORT@;
 
 my $SAVEUID     = $UID;
 my $ssh		= "$TB/bin/sshtb -n";
@@ -62,7 +63,9 @@ use libtestbed;
 use libtblog;
 use Experiment;
 use Node;
-use GeniEmulab;
+if ($PGENISUPPORT) {
+    require GeniEmulab;
+}
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
