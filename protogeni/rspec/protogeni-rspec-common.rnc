@@ -66,7 +66,7 @@ InterfaceDecl = element interface {
 ComponentSpec =
     # This is the uuid of the aggregate that this node or link belongs
     # to. It is required in an advertisement.
-    attribute aggregate_uuid { text },
+    attribute component_manager_uuid { text },
     # User-readable name for the component
     attribute component_name { text }?,
     # The uuid of the physical component.
