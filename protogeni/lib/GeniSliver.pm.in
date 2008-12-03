@@ -738,7 +738,7 @@ sub Create($$$$$)
 				"count"    => 1,
 				"vtype"    => "$vtype",
 				"nodeid"   => $node->node_id(),
-				"verbose"  => 1 }) < 0) {
+				"verbose"  => 0 }) < 0) {
 	    print STDERR "Could not create new virtual node on $node\n";
 	    return undef;
 	}

@@ -809,14 +809,14 @@ sub Create($$$$$$)
 	    print STDERR "Could not lookup node at clearinghouse\n";
 	    goto bad;
 	}
-	my $certificate = GeniCertificate->LoadFromString($blob->{'cm'});
+	
+	my $certificate = GeniCertificate->LoadFromString($blob->{'gid'});
 	goto bad
 	    if (!defined($certificate));
 	
 	my $component = GeniComponent->Lookup($certificate->uuid());
 	if (!defined($component)) {
-	    $component = GeniComponent->CreateFromCertificate($certificate,
-							      $blob->{'url'});
+	    $component = GeniComponent->CreateFromCertificate($certificate);
 	    if (!defined($component)) {
 		print STDERR "Could not create component from $certificate\n";
 		goto bad;
@@ -866,14 +866,13 @@ sub Create($$$$$$)
 	    print STDERR "Could not lookup node at clearinghouse\n";
 	    goto bad;
 	}
-	my $certificate = GeniCertificate->LoadFromString($blob->{'cm'});
+	my $certificate = GeniCertificate->LoadFromString($blob->{'gid'});
 	goto bad
 	    if (!defined($certificate));
 	
 	my $component = GeniComponent->Lookup($certificate->uuid());
 	if (!defined($component)) {
-	    $component = GeniComponent->CreateFromCertificate($certificate,
-							      $blob->{'url'});
+	    $component = GeniComponent->CreateFromCertificate($certificate);
 	    if (!defined($component)) {
 		print STDERR "Could not create component from $certificate\n";
 		goto bad;
