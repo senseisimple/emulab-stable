@@ -1114,6 +1114,7 @@ CREATE TABLE `experiments` (
   `dpdb` tinyint(1) NOT NULL default '0',
   `dpdbname` varchar(64) default NULL,
   `dpdbpassword` varchar(64) default NULL,
+  `geniflags` int(11) NOT NULL default '0',
   PRIMARY KEY  (`idx`),
   UNIQUE KEY `pideid` (`pid`,`eid`),
   UNIQUE KEY `pididxeid` (`pid_idx`,`eid`),

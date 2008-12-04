@@ -4624,5 +4624,10 @@ last_net_act,last_cpu_act,last_ext_act);
            sudo kill `cat /var/run/sslxmlrpc_server.pid`
 	   /usr/testbed/sbin/sslxmlrpc_server.py
 	   
-
+4.165: Add a geniflags slot to the experiments table so that we can
+       alter the way things behave (like the web interface) when
+       operating on an experiment that is the container for a slice.
+       
+	alter table experiments add
+	     `geniflags` int(11) NOT NULL default '0';
 
