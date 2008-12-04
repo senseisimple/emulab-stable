@@ -346,6 +346,23 @@ sub Delete($)
 }
 
 #
+# Return the rspec in XML for the ticket.
+#
+sub rspecXML($)
+{
+    my ($self) = @_;
+
+    return undef
+	if (! ref($self));
+    return undef
+	if (!defined($self->rspec()));
+
+    my $rspec_xml = XMLout($self->rspec(), "NoAttr" => 1);
+    $rspec_xml =~ s/opt\>/rspec\>/g;
+    return $rspec_xml;
+}
+
+#
 # Populate the ticket with some stuff, which right now is just the
 # number of node we are willing to grant.
 #
