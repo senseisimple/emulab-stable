@@ -14,10 +14,11 @@ use Getopt::Std;
 # 
 sub usage()
 {
-    print "Usage: register_resources [-c]\n";
+    print "Usage: register_resources [-f]\n";
     exit(1);
 }
-my $optlist = "";
+my $optlist = "f";
+my $force   = 0;
 
 # Configure variables
 my $TB		   = "@prefix@";
@@ -34,7 +35,9 @@ my %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
 }
-
+if (defined($options{"f"})) {
+    $force = 1;
+}
 use vars qw($GENI_DBNAME);
 $GENI_DBNAME = "geni-cm";
 
@@ -93,8 +96,6 @@ foreach my $node_id (@nodes) {
 	die("*** $0:\n".
 	    "    Could not map $node_id to object\n");
     }
-    print "Registering $node_id\n";
-
     my $component = GeniComponent->Lookup($node->uuid());
     if (!defined($component)) {
 	$certificate = GeniCertificate->Lookup($node->uuid());
@@ -114,8 +115,12 @@ foreach my $node_id (@nodes) {
 		"    Could not create component object for $node\n");
 	}
     }
+    elsif (!$force) {
+	next;
+    }
     $certificate = $component->GetCertificate();
     
+    print "Registering $node_id\n";
     if ($clearinghouse->Register("Component",
 				 $certificate->cert(), {}) != 0) {
 	die("*** $0:\n".
