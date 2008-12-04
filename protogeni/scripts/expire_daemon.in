@@ -18,7 +18,7 @@ sub usage()
     exit(1);
 }
 my $optlist = "d";
-my $debug   = 1;
+my $debug   = 0;
 my $asch    = 0;
 
 #
