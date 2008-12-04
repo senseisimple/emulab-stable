@@ -370,19 +370,23 @@ sub GetTicket($)
     # XXX Simpleminded ... assumes only physical nodes for now. Need to deal
     # with virtual nodes (vservers on shared nodes, planetlab nodes, etc).
     #
+    my %namemap = ();
+    my %uuidmap = ();
     my @nodeids = ();
+    my @dealloc;
     my $pid     = $experiment->pid();
     my $eid     = $experiment->eid();
 
     foreach my $ref (@{$rspec->{'node'}}) {
 	my $resource_uuid = $ref->{'uuid'};
+	my $node_nickname = $ref->{'nickname'};
 	my $node;
 
 	#
 	# Mostly for debugging right now, allow a wildcard.
 	#
 	if ($resource_uuid eq "*") {
-	    $node = FindFreeNode();
+	    $node = FindFreeNode(@nodeids);
 	    
 	    if (!defined($node)) {
 		$response = GeniResponse->Create(GENIRESPONSE_UNAVAILABLE,
@@ -428,6 +432,10 @@ sub GetTicket($)
 	    goto bad;
 	}
 	push(@nodeids, $node->node_id());
+	$uuidmap{$resource_uuid} = $node;
+	# For wildcarded nodes in links.
+	$namemap{$node_nickname} = $node
+	    if (defined($node_nickname));
     }
 
     #
@@ -463,8 +471,95 @@ sub GetTicket($)
 				    "Too many nodes; limited to $nodesleft");
     }
 
+    # Nalloc might fail if the node gets picked up by someone else.
+    if (@nodeids && !$impotent) {
+	system("$NALLOC $pid $eid @nodeids");
+	if (($? >> 8) < 0) {
+	    $response =
+		GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				     "Allocation failure");
+	    goto bad;
+	}
+	elsif (($? >> 8) > 0) {
+	    $response =
+		GeniResponse->Create(GENIRESPONSE_UNAVAILABLE, undef,
+				     "Could not allocate node");
+	    goto bad;
+	}
+	# In case the code below fails, before ticket is created.
+	@dealloc = @nodeids;
+    }
     #
-    # Create the ticket first, before allocating the node.
+    # Now deal with links for wildcarded nodes. We need to fill in the
+    # node_uuid.
+    #
+    foreach my $linkname (keys(%{$rspec->{'link'}})) {
+	my $linkref = $rspec->{'link'}->{$linkname};
+
+	foreach my $ref (@{$linkref->{'linkendpoints'}}) {
+	    my $node_uuid     = $ref->{'node_uuid'};
+	    my $node_nickname = $ref->{'node_nickname'};
+	    my $iface_name    = $ref->{'iface_name'};
+	    my $node;
+
+	    if ($node_uuid eq "*" && !defined($node_nickname)) {
+		$response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					 "Need nickname for wildcarded link");
+		goto bad;
+	    }
+
+	    # XXX For tunnels that refer to a node on another site.
+	    next
+		if (exists($linkref->{'link_type'}) &&
+		    $linkref->{'link_type'} eq "tunnel" &&
+		    !exists($namemap{$node_nickname}));
+
+	    #
+	    # First map the node if its wildcarded.
+ 	    #
+	    if ($node_uuid eq "*") {
+		if (!exists($namemap{$node_nickname})) {
+		    $response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					     "Could not map wildcarded link");
+		    goto bad;
+		}
+		$node = $namemap{$node_nickname};
+		$ref->{'node_uuid'} = $node->uuid();
+	    }
+	    elsif (!exists($uuidmap{$node_uuid})) {
+		$response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+						 "Could not map link node");
+		goto bad;
+	    }
+	    else {
+		$node = $uuidmap{$node_uuid};
+	    }
+
+	    #
+	    # Now do wildcarded interfaces.
+	    #
+	    if ($iface_name eq "*") {
+		my @interfaces;
+		if ($node->AllInterfaces(\@interfaces) != 0) {
+		    $response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				     "Could not get interfaces for $node");
+		    goto bad;
+		}
+		foreach my $interface (@interfaces) {
+		    next
+			if (!defined($interface->switch_id()));
+		    next
+			if ($interface->role() ne "expt");
+
+		    $ref->{'iface_name'} = $interface->iface();
+		    last;
+		}
+	    }
+	}
+    }
+    
+    #
+    # Create the ticket. 
     #
     my $ticket = GeniTicket->Create($slice, $user, $rspec);
     if (!defined($ticket)) {
@@ -473,35 +568,21 @@ sub GetTicket($)
 				 "Could not create GeniTicket object");
 	goto bad;
     }
-    # Nalloc might fail if the node gets picked up by someone else.
-    if (@nodeids && !$impotent) {
-	system("$NALLOC $pid $eid @nodeids");
-	if (($? >> 8) < 0) {
-	    $ticket->Delete();
-	    $response =
-		GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				     "Allocation failure");
-	    goto bad;
-	}
-	elsif (($? >> 8) > 0) {
-	    $ticket->Delete();
-	    $response =
-		GeniResponse->Create(GENIRESPONSE_UNAVAILABLE, undef,
-				     "Could not allocate node");
-	    goto bad;
-	}
-    }
     if ($ticket->Sign() != 0) {
-	# Release will free the nodes.
-	$ticket->Release();
 	$response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					 "Could not sign Ticket");
 	goto bad;
     }
     $slice->UnLock();
-    return GeniResponse->Create(GENIRESPONSE_SUCCESS,
-				$ticket->asString());
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS, $ticket->asString());
   bad:
+    # Release will free the nodes.
+    if (defined($ticket)) {
+	$ticket->Release();
+    }
+    elsif (@dealloc) {
+	system("export NORELOAD=1; $NFREE -x -q $pid $eid @dealloc");
+    }
     $slice->UnLock()
 	if (defined($slice));
     return $response;
@@ -1848,8 +1929,11 @@ sub GeniExperiment($)
 #
 #
 #
-sub FindFreeNode()
+sub FindFreeNode(@)
 {
+    # Already going to allocate these.
+    my @nodeids = @_;
+    
     my $query_result =
 	DBQueryWarn("select uuid from geni_components");
     return undef
@@ -1860,7 +1944,9 @@ sub FindFreeNode()
 	next
 	    if (!defined($node));
 	next
-	    if ($node->isremotenode()); 
+	    if ($node->isremotenode());
+	next
+	    if (grep {$_ eq $node->node_id()} @nodeids);
 
 	#
 	# See if the node is already reserved.
