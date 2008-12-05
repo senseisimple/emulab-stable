@@ -96,7 +96,7 @@ sub new($$$@) {
 	# Check to see if this is a duplicate
 	#
 	if (defined($self->{DEVICES}{$devicename})) {
-	    warn "WARNING: Device $device was specified twice, skipping\n";
+	    warn "WARNING: Device $devicename was specified twice, skipping\n";
 	    next;
 	}
 
