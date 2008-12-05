@@ -11,7 +11,6 @@
 # snmpit module for HP procurve level 2 switches
 #
 
-use lib '/usr/testbed/lib';
 package snmpit_hp;
 use strict;
 
@@ -359,8 +358,8 @@ sub portControl ($$@) {
 	#
 	# Command not supported
 	#
-	print STDERR "Unsupported port control command '$cmd' ignored.\n";
-	return -1;
+	$self->debug("Unsupported port control command '$cmd' ignored.\n");
+	return 0;
     }
 }
 
@@ -506,6 +505,7 @@ sub findVlans($@) {
     my %mapping = ();
     my $id = $self->{NAME} . "::findVlans";
     my ($count, $name, $vlan_number, $vlan_name) = (scalar(@vlan_ids));
+    $self->debug("$id\n");
 
     if ($count > 0) { @mapping{@vlan_ids} = undef; }
 
@@ -515,7 +515,7 @@ sub findVlans($@) {
     my ($rows) = $self->{SESS}->bulkwalk(0,32, ["dot1qVlanStaticName"]);
     foreach my $rowref (@$rows) {
 	($name,$vlan_number,$vlan_name) = @$rowref;
-	$self->debug("$id: Got $name $vlan_number $vlan_name\n");
+	$self->debug("$id: Got $name $vlan_number $vlan_name\n",2);
 	$vlan_name = convertVlanName($vlan_name);
 	#
 	# We only want the names - we ignore everything else
@@ -829,7 +829,7 @@ sub setPortVlan($$@) {
     my $newInfo = $self->getVlanLists($vlan_number);
     foreach my $vlan (keys %vlansToPorts) {
 	my $oldInfo = $vlan == 1 ? $defaultInfo : $self->getVlanLists($vlan) ;
-	foreach $portIndex (@{$vlansToPorts{$pvid}}) {
+	foreach $portIndex (@{$vlansToPorts{$vlan}}) {
 	    @{@$oldInfo[1]}[$portIndex-1] = 0;
 	    @{@$newInfo[1]}[$portIndex-1] = 1;
 	    @{@$oldInfo[2]}[$portIndex-1] = 0;
@@ -1026,16 +1026,33 @@ sub UpdateField($$$@) {
 	if (!($OID =~ /^ifAdmin/)) {
 	    #
 	    # Procurves use the same mib variable to set both
-	    # speed and duplicity.
+	    # speed and duplex concurrently; only certain
+	    # combinations are permitted.  (We won't support
+	    # auto-10-100MBits. And at least the 5400 series
+	    # doesn't seem to support full-duplex-1000Mbits.)
 	    #
+	    my @state = split "-", $Status;
 	    if (($val eq "half") || ($val eq "full")) {
-		my @state = split "auto-", $Status;
-		if (defined($state[1]) && ($state[1] ne "neg")) {
-		    $oidval = $val . "-duplex-" . $state[1] ;
+		if ($state[0] eq "auto") {
+		    if (($state[1] eq "neg") || ($state[1] eq "10")) {
+			# can't autospeed with specific duplex.
+			$oidval = ($val eq "half") ?
+			   "half-duplex-100Mbits" : "full-duplex-100Mbits";
+		    } elsif ($state[1] eq "1000Mbits") {
+			$oidval = $Status;
+		    } else {
+			$oidval = $val . "-duplex-" . $state[1] ;
+		    }
 		} else {
-		noduplex: print STDERR
-		    "Port $portname could not set duplex without speed first\n";
-		    next;
+			$oidval = $val . "-duplex-" . $state[2] ;
+		}
+	    } else {
+		if (($val eq "auto-neg") || ($val eq "auto-1000Mbits") ||
+			($state[1] ne "duplex")) {
+		    $oidval = $val;
+		} else {
+		    my @valarr = split "-", $val;
+		    $oidval = $state[0] . "-duplex-" . "$valarr[1]";
 		}
 	    }
 	}
@@ -1078,7 +1095,7 @@ sub listVlans($) {
     my %Members = ();
     my ($vlan_name, $oid, $vlan_number, $value, $rowref);
     my ($modport, $node, $ifIndex, @portlist, @memberlist);
-    $self->debug($self->{NAME} . ":listVlans()\n",3);
+    $self->debug($self->{NAME} . "::listVlans()\n",1);
     my $maxport = $self->{MAXPORT};
 
     #
@@ -1087,8 +1104,8 @@ sub listVlans($) {
     my ($rows) = $self->{SESS}->bulkwalk(0,32,"dot1qVlanStaticName");
     foreach $rowref (@$rows) {
 	($oid, $vlan_number, $vlan_name) = @$rowref;
-	if ($vlan_number == 1) { next;}
 	$self->debug("Got $oid $vlan_number $vlan_name\n",3);
+	if ($vlan_number eq "1") { next;}
 	$vlan_name = convertVlanName($vlan_name);
 	if (!$Names{$vlan_number}) {
 	    $Names{$vlan_number} = $vlan_name;
@@ -1549,7 +1566,7 @@ my %blade_sizes = (
 sub readifIndex($) {
     my $self = shift;
     my ($maxport, $maxtrunk, $name, $ifindex, $iidoid, $port, $mod, $j) = (0,0);
-    $self->debug($self->{NAME} . "::readifIndex:\n", 1);
+    $self->debug($self->{NAME} . "::readifIndex:\n", 2);
 
     my $bladesize = $blade_sizes{$self->{HPTYPE}};
 
@@ -1558,7 +1575,7 @@ sub readifIndex($) {
 
     foreach my $rowref (@$rows) {
 	($name,$ifindex,$iidoid) = @$rowref;
-	$self->debug("got $name, $ifindex, iidoid $iidoid\n", 1);
+	$self->debug("got $name, $ifindex, iidoid $iidoid\n", 2);
 	$self->{TRUNKINDEX}{$ifindex} = $iidoid;
 	if ($iidoid) { push @{$self->{TRUNKS}{$iidoid}}, $ifindex; }
 	if ($ifindex > $maxport) { $maxport = $ifindex;}
