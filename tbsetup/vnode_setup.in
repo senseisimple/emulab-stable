@@ -18,10 +18,10 @@ use Getopt::Std;
 # 
 sub usage()
 {
-    print STDOUT "Usage: vnode_setup [-f] [-k] [-j] [-p] [-n <numbatch>] [-w <wait_time>] <pid> <eid> [node ...]\n";
+    print STDOUT "Usage: vnode_setup [-m] [-q] [-f] [-k] [-j] [-p] [-n <numbatch>] [-w <wait_time>] <pid> <eid> [node ...]\n";
     exit(-1);
 }
-my  $optlist = "fdkjpn:w:";
+my  $optlist = "fdkjpn:w:mq";
 
 #
 # We don't want to run this script unless its the real version.
@@ -49,6 +49,8 @@ my $force       = 0;
 my $failed      = 0;
 my $killmode    = 0;
 my $jailonly    = 0;
+my $sendemail   = 0;
+my $quiet       = 0;
 my $plabonly    = 0;
 my $numbatch    = 10;
 my $childwait   = 120;
@@ -87,6 +89,12 @@ if (@ARGV < 2) {
 }
 if (defined($options{"f"})) {
     $force = 1;
+}
+if (defined($options{"m"})) {
+    $sendemail = 1;
+}
+if (defined($options{"q"})) {
+    $quiet = 1;
 }
 if (defined($options{"d"})) {
     $debug = 1;
@@ -368,8 +376,9 @@ foreach my $node (@nodes) {
 
 my $children = 0;
 my %child_vnodes = ();
-print "vnode_setup running at parallelization: $numbatch ". 
-    "wait_time: $childwait\n";
+print STDOUT "vnode_setup running at parallelization: $numbatch ". 
+    "wait_time: $childwait\n"
+    if (!$quiet);
 while (1) {
 
     # Space out the invocation of child processes a little.
@@ -400,7 +409,8 @@ while (1) {
 	my $pnode    = $nodeobj->phys_nodeid();
 	my $geni     = $nodeobj->isfednode();
     
-	print STDOUT "Doing $mode of vnode $vnode on $pnode ...\n";
+	print STDOUT "Doing $mode of vnode $vnode on $pnode ...\n"
+	    if (!$quiet);
 
 	#
 	# Run an ssh command in a child process, protected by an alarm to
@@ -536,7 +546,8 @@ while (1) {
             local $SIG{ALRM} = sub { die "alarm clock" };
 
             if ($waittime <= 0) {
-                print "*** $0: timeout waiting for vnode: $oldestvnode\n";
+                print STDERR
+		    "*** $0: timeout waiting for vnode: $oldestvnode\n";
                 kill("TERM",$oldestpid);
             } else {
                 alarm($waittime);
@@ -613,7 +624,7 @@ while (1) {
 # In force node, do not bother with this other stuff. 
 #
 exit(scalar(@failed_nodes))
-    if ($force);
+    if ($force && !$sendemail);
 
 #
 # Send mail to testbed-ops about failed nodes
@@ -627,9 +638,11 @@ if (@failed_nodes) {
 }
 
 if ($killmode) {
-    print STDOUT "Vnode teardown finished.\n";
+    print STDOUT "Vnode teardown finished.\n"
+	if (!$quiet);
 }
 else {
-    print STDOUT "Vnode setup initiated on all nodes ...\n";
+    print STDOUT "Vnode setup initiated on all nodes ...\n"
+	if (!$quiet);
 }
 exit(0);
