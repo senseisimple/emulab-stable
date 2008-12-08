@@ -103,6 +103,7 @@ CREATE TABLE `geni_slices` (
   `exptidx` int(11) default NULL,
   `created` datetime default NULL,
   `expires` datetime default NULL,
+  `shutdown` datetime default NULL,
   `locked` datetime default NULL,
   `creator_uuid` varchar(40) NOT NULL default '',
   `name` tinytext,

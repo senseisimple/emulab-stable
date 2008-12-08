@@ -221,6 +221,26 @@ sub RemoveSlice($$)
 }
 
 #
+# Emergency shutdown
+#
+sub Shutdown($$$)
+{
+    my ($self, $uuid, $onoff) = @_;
+
+    my $response =
+	Genixmlrpc::CallMethod($self->authority(),
+			       $self->context(),
+			       "Shutdown",
+			       { "credential" => $self->credential(),
+				 "onoff"      => $onoff,
+			         "uuid"       => $uuid });
+    return -1
+	if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS);
+    
+    return 0;
+}
+
+#
 # List components.
 #
 sub ListComponents($$$)

@@ -36,6 +36,7 @@ use Data::Dumper;
 my $TB		   = "@prefix@";
 my $OURDOMAIN      = "@OURDOMAIN@";
 my $PGENIDOMAIN    = "@PROTOGENI_DOMAIN@";
+my $SLICESHUTDOWN  = "$TB/sbin/protogeni/shutdownslice";
 
 #
 # Get a credential for an object. Ignoring the type for now. If no credential
@@ -723,6 +724,46 @@ sub BindToSlice($)
     if ($slice->BindUser($target_user) != 0) {
 	print STDERR "Could not bind $target_user to $slice\n";
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
+    }
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS);
+}
+
+#
+# Emergency shutdown a slice. This cannot be undone via this interface.
+# An Emulab admin will have to do that.
+#
+sub Shutdown($)
+{
+    my ($argref) = @_;
+    my $cred  = $argref->{'credential'};
+
+    if (!defined($cred)) {
+	return GeniResponse->MalformedArgsResponse();
+    }
+    my $credential = GeniCredential->CreateFromSigned($cred);
+    if (!defined($credential)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not create GeniCredential object");
+    }
+
+    #
+    # Make sure the credential was issued to the caller.
+    #
+    if ($credential->owner_uuid() ne $ENV{'GENIUUID'}) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "This is not your credential!");
+    }
+    my $slice_uuid = $credential->target_uuid();
+    my $slice = GeniSlice->Lookup($slice_uuid);
+    if (!defined($slice)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Unknown slice for this credential");
+    }
+    system("$SLICESHUTDOWN $slice_uuid");
+    if ($?) {
+	print STDERR "Could not shutdown $slice!\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Error shutting down slice");
     }
     return GeniResponse->Create(GENIRESPONSE_SUCCESS);
 }

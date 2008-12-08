@@ -125,6 +125,7 @@ sub hrn($)		{ return field($_[0], "hrn"); }
 sub uuid($)		{ return field($_[0], "uuid"); }
 sub creator_uuid($)	{ return field($_[0], "creator_uuid"); }
 sub created($)		{ return field($_[0], "created"); }
+sub shutdown($)		{ return field($_[0], "shutdown"); }
 sub expires($)		{ return field($_[0], "expires"); }
 sub sa_uuid($)		{ return field($_[0], "sa_uuid"); }
 sub exptidx($)		{ return field($_[0], "exptidx"); }
@@ -565,8 +566,35 @@ sub SetExpiration($$)
     
     return -1
 	if (!$query_result);
-    $self->{'SLICE'}->{'expires'} = $expires;
+    # XXX Wrong format, but harmless.
+    $self->{'SLICE'}->{'expires'} = time();
+    return 0;
+}
 
+#
+# Set the shutdown field.
+#
+sub SetShutdown($$)
+{
+    my ($self, $shutdown) = @_;
+    my $uuid = $self->uuid();
+    my $when;
+
+    if ($shutdown) {
+	$when = "now()";
+    }
+    else {
+	$when = "NULL";
+    }
+    my $query_result =
+	DBQueryWarn("update geni_slices set shutdown=$when " .
+		    "where uuid='$uuid'");
+    
+    return -1
+	if (!$query_result);
+
+    # XXX Wrong format, but harmless.
+    $self->{'SLICE'}->{'shutdown'} = ($shutdown ? time() : undef);
     return 0;
 }
 

@@ -38,6 +38,7 @@ my $TBAPPROVAL     = "@TBAPPROVALEMAIL@";
 my $TBAUDIT   	   = "@TBAUDITEMAIL@";
 my $BOSSNODE       = "@BOSSNODE@";
 my $OURDOMAIN      = "@OURDOMAIN@";
+my $SLICESHUTDOWN  = "$TB/sbin/protogeni/shutdownslice";
 
 #
 # Get a credential to use the ClearingHouse. For the moment, the initial
@@ -661,6 +662,72 @@ sub Remove($)
 				    "$uuid has been unregistered");
     }
     return GeniResponse->Create(GENIRESPONSE_UNSUPPORTED);
+}
+
+#
+# Emergency Shutdown of a slice. 
+#
+sub Shutdown($)
+{
+    my ($argref) = @_;
+    my $cred   = $argref->{'credential'};
+    my $uuid   = $argref->{'uuid'};
+    my $clear  = $argref->{'clear'};
+
+    if (! (defined($cred) && defined($uuid))) {
+	return GeniResponse->MalformedArgsResponse();
+    }
+    $clear = (defined($clear) ? $clear : 0);
+    if (! ($uuid =~ /^[-\w]*$/)) {
+	return GeniResponse->MalformedArgsResponse();
+    }
+    my $credential = GeniCredential->CreateFromSigned($cred);
+    if (!defined($credential)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not create GeniCredential object");
+    }
+
+    #
+    # Make sure the credential was issued to the caller.
+    #
+    if ($credential->owner_uuid() ne $ENV{'GENIUUID'}) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "This is not your credential!");
+    }
+
+    #
+    # And that the target of the credential is this registry.
+    #
+    my $authority = GeniAuthority->Lookup($ENV{'MYUUID'});
+    if (!defined($authority)) {
+	print STDERR "Could not find local authority object\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
+    }
+    if ($credential->target_uuid() ne $authority->uuid()) {
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN,
+				    undef, "This is not your registry!");
+    }
+
+    my $slice = GeniSlice->Lookup($uuid);
+    if (!defined($slice)) {
+	print STDERR "No slice record $uuid for shutdown!\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "No such slice registered here");
+    }
+
+    #
+    # Pass the whole thing off to a script that will contact the
+    # CMs.
+    #
+    my $arg = ($clear ? "resume": "");
+    # -c option indicates acting as CH. 
+    system("$SLICESHUTDOWN -c $uuid $arg");
+    if ($?) {
+	print STDERR "Could not shutdown $uuid!\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Error shutting down slice");
+    }
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS);
 }
 
 #

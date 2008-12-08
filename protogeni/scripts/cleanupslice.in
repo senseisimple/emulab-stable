@@ -52,10 +52,6 @@ my $this_user = User->ThisUser();
 if (! defined($this_user)) {
     fatal("You ($UID) do not exist!");
 }
-if (!$this_user->IsAdmin()) {
-    die("*** $0:\n".
-	"    You do not have permission to run this script!\n");
-}
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -82,6 +78,13 @@ my $slice = GeniSlice->Lookup($uuid);
 if (!defined($slice)) {
     fatal("No such slice for $uuid");
 }
+my $experiment = $slice->GetExperiment();
+if (!$this_user->IsAdmin() &&
+    !$experiment->AccessCheck($this_user, TB_EXPT_DESTROY)) {
+    die("*** $0:\n".
+	"    You do not have permission to run this script!\n");
+}
+
 GeniUtil::FlipToGeniUser();
 
 if (GeniCM::CleanupDeadSlice($slice) != 0) {

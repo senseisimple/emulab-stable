@@ -74,14 +74,13 @@ require GeniCM;
 use libtestbed;
 use POSIX qw(strftime);
 
-GeniUtil::FlipToGeniUser();
-
 # Go to ground.
 if (! $debug) {
     if (TBBackGround($LOGFILE)) {
 	exit(0);
     }
 }
+GeniUtil::FlipToGeniUser();
 
 #
 # Look for tickets.
@@ -128,14 +127,16 @@ sub ExpireTickets()
 }
 
 #
-# Look for slices that need to be expired. 
+# Look for slices that need to be expired. Do not expire shutdown slices;
+# Handled below, and we want to keep the record around.
 #
 sub ExpireSlices()
 {
     my $query_result =
 	GeniDB::DBQueryWarn("select idx from geni_slices ".
 			    "where UNIX_TIMESTAMP(now()) > ".
-			    "      UNIX_TIMESTAMP(expires)");
+			    "      UNIX_TIMESTAMP(expires) and ".
+			    "      shutdown is null");
 
     while (my ($idx) = $query_result->fetchrow_array()) {
 	my $slice = GeniSlice->Lookup($idx);
@@ -197,6 +198,43 @@ sub ExpireSlices()
 }
 
 #
+# Look for slices that need to be shutdown
+#
+sub ShutdownSlices()
+{
+    my $query_result =
+	GeniDB::DBQueryWarn("select idx from geni_slices ".
+			    "where shutdown is not null");
+
+    while (my ($idx) = $query_result->fetchrow_array()) {
+	my $slice = GeniSlice->Lookup($idx);
+
+	if (!defined($slice)) {
+	    # Slice is gone, lets not worry.
+	    next;
+	}
+	if ($slice->Lock() != 0) {
+	    print STDERR "Could not lock slice $slice.\n";
+	    goto skip;
+	}
+
+	#
+	# This will get called everytime, but CleanupDeadSlice does
+	# not actually do anything if there are no slivers.
+	#
+	if (GeniCM::CleanupDeadSlice($slice, 0) != 0) {
+	    print STDERR "Could not shutdown $slice\n";
+	    SENDMAIL($TBOPS, "Could not shutdown slice",
+		     "Could not shutdown slice $slice");
+	}
+	$slice->UnLock();
+      skip:
+	$slice->Flush()
+	    if (defined($slice));
+    }
+}
+
+#
 # Setup a signal handler for newsyslog.
 #
 sub handler()
@@ -212,8 +250,9 @@ while (1) {
     
     ExpireTickets();
     ExpireSlices();
+    ShutdownSlices();
 
-    sleep(30);
+    sleep(60);
 }
 exit(0);
 

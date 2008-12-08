@@ -307,7 +307,7 @@ sub GetTicket($)
     }
     
     #
-    # For now all tickets expire ery quickly (minutes), but once the
+    # For now all tickets expire very quickly (minutes), but once the
     # ticket is redeemed, it will expire according to the rspec request.
     #
     if (exists($rspec->{'valid_until'})) {
@@ -345,6 +345,12 @@ sub GetTicket($)
     #
     if ($slice->Lock() != 0) {
 	return GeniResponse->BusyResponse();
+    }
+    # Shutdown slices get nothing.
+    if ($slice->shutdown()) {
+	$slice->UnLock();
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+				    "Slice has been shutdown");
     }
 
     # For now, there can be only a single toplevel aggregate per slice.
@@ -508,11 +514,16 @@ sub GetTicket($)
 		goto bad;
 	    }
 
-	    # XXX For tunnels that refer to a node on another site.
-	    next
-		if (exists($linkref->{'link_type'}) &&
-		    $linkref->{'link_type'} eq "tunnel" &&
-		    !exists($namemap{$node_nickname}));
+	    # XXX No wildcarding for tunnels.
+	    if (exists($linkref->{'link_type'}) &&
+		$linkref->{'link_type'} eq "tunnel") {
+		if ($node_uuid eq "*") {
+		    $response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					 "Tunnels cannot be wildcarded");
+		    goto bad;
+		}
+		next;
+	    }
 
 	    #
 	    # First map the node if its wildcarded.
@@ -630,7 +641,6 @@ sub RedeemTicket($)
     if ($slice->Lock() != 0) {
 	return GeniResponse->BusyResponse();
     }
-
     #
     # Do not redeem an expired ticket, kill it now.
     #
@@ -639,6 +649,12 @@ sub RedeemTicket($)
 	$slice->UnLock();
 	return GeniResponse->Create(GENIRESPONSE_EXPIRED, undef,
 				    "Ticket has expired");
+    }
+    # Shutdown slices get nothing.
+    if ($slice->shutdown()) {
+	$slice->UnLock();
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+				    "Slice has been shutdown");
     }
 
     #
@@ -712,6 +728,12 @@ sub UpdateSliver($)
     }
     if ($slice->Lock() != 0) {
 	return GeniResponse->BusyResponse();
+    }
+    # Shutdown slices get nothing.
+    if ($slice->shutdown()) {
+	$slice->UnLock();
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+				    "Slice has been shutdown");
     }
 
     my $response = ModifySliver($aggregate, $slice,
@@ -1040,6 +1062,9 @@ sub ModifySliver($$$$$$)
     # interfaces, and then combine those two interfaces into an aggregate,
     # and then that aggregate goes into the aggregate for toplevel sliver.
     #
+    goto skiplinks
+	if (!exists($rspec->{'link'}));
+    
     foreach my $linkname (keys(%{$rspec->{'link'}})) {
 	my @linkslivers  = ();
 	if (! ($linkname =~ /^[-\w]*$/)) {
@@ -1118,7 +1143,7 @@ sub ModifySliver($$$$$$)
 	    }
 	}
     }
-
+  skiplinks:
     #
     # Create a planetlab slice before provisioning (which creates nodes).
     #
@@ -1314,6 +1339,12 @@ sub StartSliver($)
     }
     if ($slice->Lock() != 0) {
 	return GeniResponse->BusyResponse();
+    }
+    # Shutdown slices get nothing.
+    if ($slice->shutdown()) {
+	$slice->UnLock();
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+				    "Slice has been shutdown");
     }
     if (!$impotent && $sliver->Start() != 0) {
 	$slice->UnLock();
@@ -1681,6 +1712,83 @@ sub BindToSlice($)
 }
 
 #
+# Shutdown a slice. This is brutal at present; kill it completely.
+#
+sub Shutdown($)
+{
+    my ($argref) = @_;
+    my $cred  = $argref->{'credential'};
+    my $clear = $argref->{'clear'};
+
+    if (! (defined($cred))) {
+	return GeniResponse->MalformedArgsResponse();
+    }
+    $clear = (defined($clear) ? $clear : 0);
+    my $credential = GeniCredential->CreateFromSigned($cred);
+    if (!defined($credential)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not create GeniCredential object");
+    }
+    my $slice_uuid = $credential->target_uuid();
+    my $user_uuid  = $credential->owner_uuid();
+    
+    #
+    # Make sure the credential was issued to the caller.
+    #
+    if ($credential->owner_uuid() ne $ENV{'GENIUUID'}) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "This is not your credential!");
+    }
+
+    #
+    # Create the slice record, since we do not want a request to come
+    # in later.
+    #
+    my $slice = GeniSlice->Lookup($slice_uuid);
+    if (!defined($slice)) {
+	$slice = CreateSliceFromCertificate($credential);
+	if (!defined($slice)) {
+	    print STDERR "Could not create $slice_uuid\n";
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					"Could not create slice");
+	}
+	# No point in doing anything else ...
+	$slice->SetShutdown(1);
+	return GeniResponse->Create(GENIRESPONSE_SUCCESS);
+    }
+    #
+    # Do not worry about locking when setting the shutdown time.
+    # This can lead to race though, if a clear shutdown comes in first.
+    # Seems unlikely though. 
+    #
+    if (!$clear) {
+	# Do not overwrite original shutdown time
+	$slice->SetShutdown(1)
+	    if (!defined($slice->shutdown()) || $slice->shutdown() eq "");
+    }
+    else {
+	$slice->SetShutdown(0);
+    }
+    # Always make sure the slice is shutdown.
+    if ($slice->shutdown()) {
+	# The expire daemon is going to look for this, so it will get
+	# taken care of shortly.
+	if ($slice->Lock() != 0) {
+	    return GeniResponse->BusyResponse();
+	}
+	if (CleanupDeadSlice($slice, 0) != 0) {
+	    SENDMAIL($TBOPS, "Failed to shutdown slice",
+		     "Failed to shutdown slice $slice\n");
+	    print STDERR "Could not shutdown $slice!\n";
+	    # Lets call this a non-error since the local admin person
+	    # is going to have to deal with it anyway. 
+	}
+	$slice->UnLock();
+    }
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS);
+}
+
+#
 # Utility Routines.
 #
 # Create a slice from the a certificate (GID).
@@ -1794,9 +1902,13 @@ sub CreateAuthorityFromRegistry($)
 #
 # Cleanup a dead slice, releasing all the stuff associated with it.
 #
-sub CleanupDeadSlice($)
+sub CleanupDeadSlice($;$)
 {
-    my ($slice) = @_;
+    my ($slice, $purge) = @_;
+
+    # Default to full purge.
+    $purge = 1
+	if (!defined($purge));
 
     # print STDERR "Cleaning up dead slice $slice\n";
 
@@ -1875,6 +1987,9 @@ sub CleanupDeadSlice($)
 	}
     }
 
+    return 0
+	if (!$purge);
+
     my $experiment = $slice->GetExperiment();
     if (defined($experiment)) {
 	$experiment->LockDown(0);
@@ -1922,6 +2037,7 @@ sub GeniExperiment($)
 	    return undef;
 	}
 	$experiment = Experiment->Lookup($uuid);
+	$experiment->Update({"geniflags" => 1});
     }
     return $experiment;
 }

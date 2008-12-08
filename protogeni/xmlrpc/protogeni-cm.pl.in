@@ -127,6 +127,7 @@ my $responder = Frontier::Responder->new( "methods" => {
     "UpdateSliver"      => \&GeniCM::UpdateSliver,
     "GetSliver"         => \&GeniCM::GetSliver,
     "BindToSlice"       => \&GeniCM::BindToSlice,
+    "Shutdown"          => \&GeniCM::Shutdown,
    },
 );
 
@@ -137,7 +138,7 @@ my $response = $responder->{'_decode'}->serve($request,
 # Terminate the log capture so that we can print the response to STDOUT
 # for the web server.
 #
-#print STDERR "\n\n" . $response;
+print STDERR "\n\n" . $response;
 LogEnd(0);
 
 print "Content-Type: text/xml \n\n" . $response;
