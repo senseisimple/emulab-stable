@@ -774,6 +774,8 @@ REPLACE INTO table_regex VALUES ('virt_lan_member_settings','capkey','text','red
 REPLACE INTO table_regex VALUES ('virt_lan_member_settings','capval','text','redirect','virt_lan_settings:capval',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','est_bandwidth','int','redirect','default:int',0,2147483647,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','rest_bandwidth','int','redirect','default:int',0,2147483647,NULL);
+REPLACE INTO table_regex VALUES ('virt_lans','backfill','int','redirect','default:int',0,2147483647,NULL);
+REPLACE INTO table_regex VALUES ('virt_lans','rbackfill','int','redirect','default:int',0,2147483647,NULL);
 REPLACE INTO table_regex VALUES ('location_info','floor','text','regex','^[-\\w]+$',1,32,NULL);
 REPLACE INTO table_regex VALUES ('location_info','building','text','regex','^[-\\w]+$',1,32,NULL);
 REPLACE INTO table_regex VALUES ('location_info','loc_x','int','redirect','default:int',0,2048,NULL);
