@@ -287,6 +287,7 @@ sub elabinelab($)	{ return field($_[0], 'elab_in_elab');}
 sub elabinelab_eid($)   { return field($_[0], 'elabinelab_eid');}
 sub elabinelab_exptidx($){return field($_[0], 'elabinelab_exptidx');}
 sub lockdown($)		{ return field($_[0], 'lockdown'); }
+sub geniflags($)	{ return field($_[0], 'geniflags'); }
 sub created($)		{ return field($_[0], 'expt_created'); }
 sub swapper($)		{ return field($_[0], 'expt_swap_uid');}
 sub swappable($)	{ return field($_[0], 'swappable');}
