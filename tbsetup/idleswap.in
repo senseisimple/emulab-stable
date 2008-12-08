@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -32,6 +32,7 @@ my $TBLOGS	= "@TBLOGSEMAIL@";
 my $TBAUDIT	= "@TBAUDITEMAIL@";
 my $swapexp	= "$TB/bin/swapexp";
 my $template_swapout = "$TB/bin/template_swapout";
+my $cleanupslice = "$TB/sbin/cleanupslice";
 
 # Testbed Support libraries
 use lib "@prefix@/lib";
@@ -114,6 +115,12 @@ if ($experiment->IsInstance()) {
 
     exec "$template_swapout -e $eid $guid/$vers";
     die("Failed to exec $template_swapout!");
+}
+elsif ($experiment->geniflags()) {
+    my $uuid = $experiment->uuid();
+    
+    exec "$cleanupslice $uuid";
+    die("Failed to exec $cleanupslice!");
 }
 else {
     my $arg = "";
