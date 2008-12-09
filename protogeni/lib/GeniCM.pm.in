@@ -386,13 +386,14 @@ sub GetTicket($)
     foreach my $ref (@{$rspec->{'node'}}) {
 	my $resource_uuid = $ref->{'uuid'};
 	my $node_nickname = $ref->{'nickname'};
+	my $virtualization_type = $ref->{'virtualization_type'};
 	my $node;
 
 	#
 	# Mostly for debugging right now, allow a wildcard.
 	#
 	if ($resource_uuid eq "*") {
-	    $node = FindFreeNode(@nodeids);
+	    $node = FindFreeNode($virtualization_type, @nodeids);
 	    
 	    if (!defined($node)) {
 		$response = GeniResponse->Create(GENIRESPONSE_UNAVAILABLE,
@@ -803,7 +804,8 @@ sub ModifySliver($$$$$$)
 	    if (ref($s) eq "GeniSliver::Node") {
 		$nodelist{$s->resource_uuid()} = $s;
 	    }
-	    elsif (ref($s) eq "GeniAggregate::Link") {
+	    elsif (ref($s) eq "GeniAggregate::Link" ||
+		   ref($s) eq "GeniAggregate::Tunnel") {
 		$linklist{$s->uuid()} = $s;
 	    }
 	    else {
@@ -989,8 +991,6 @@ sub ModifySliver($$$$$$)
     # have changed.
     #
     foreach my $s (values(%linklist)) {
-	my $needfree  = 1;
-
 	if (! exists($rspec->{'link'}->{$s->hrn()})) {
 	    $s->UnProvision();
 	    $s->Delete();
@@ -2045,10 +2045,17 @@ sub GeniExperiment($)
 #
 #
 #
-sub FindFreeNode(@)
+sub FindFreeNode($@)
 {
     # Already going to allocate these.
+    my $vtype   = shift(@_);
+    my $type    = "pc";
     my @nodeids = @_;
+
+    if (defined($vtype)) {
+	# XXX Need to implement this.
+	;
+    }
     
     my $query_result =
 	DBQueryWarn("select uuid from geni_components");
