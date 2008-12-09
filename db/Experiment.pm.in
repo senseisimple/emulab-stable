@@ -580,6 +580,23 @@ sub Create($$$$)
     }
 
     #
+    # Lets be real sure that the UUID is really unique.
+    #
+    $query_result =
+	DBQueryWarn("select pid,eid,idx from experiment_stats ".
+		    "where eid_uuid='$uuid'");
+    if (! $query_result) {
+	DBQueryWarn("unlock tables");
+	return undef;
+    }
+    if ($query_result->numrows) {
+	DBQueryWarn("unlock tables");
+	tberror("Experiment uuid $uuid already exists; ".
+		"this is bad!");
+	return undef;
+    }
+
+    #
     # Insert the record. This reserves the pid/eid for us. 
     #
     # Some fields special cause of quoting.
