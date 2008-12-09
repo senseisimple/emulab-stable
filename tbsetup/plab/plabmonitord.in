@@ -118,6 +118,8 @@ else {
     usage();
 }
 
+my $IGNORENODES = "@prefix@/etc/plab/plabmonitord.$plcname.ignore";
+
 #
 # Function prototypes
 #
@@ -319,6 +321,20 @@ sub updatenodepool($) {
 
     print "Updating node membership in pool: $pool->{'NAME'}\n";
 
+    # check our ignore file, and do nothing with these nodes:
+    my %ignore = ();
+    if ( -e "$IGNORENODES" ) {
+	open(IFD,"$IGNORENODES")
+	    or die "could not open $IGNORENODES!";
+	while (my $line = <IFD>) {
+	    chomp($line);
+	    if ($line =~ /^[\d\w\-\.]+$/) {
+		$ignore{$line} = 1;
+	    }
+	}
+	close(IFD);
+    }
+
     # XXX: checking node type like this is mighty expensive!  Can't we just 
     # check the base type for this plc?
     # XXX: need to change everything to deal with vnodes rather than pnodes.
@@ -340,6 +356,11 @@ sub updatenodepool($) {
         # Find any new nodes that need to be added and add them.
         while (my @row = $qres->fetchrow_array()) {
             my $pnodename = $row[0];
+
+	    if (exists($ignore{$pnodename})) {
+		next;
+	    }
+
             if (!exists $poolpnodes->{$pnodename} ) {
                 print "Adding $pnodename to pool: $pool->{'NAME'}\n";
                 $poolpnodes->{$pnodename} = {'name'           => $pnodename,
