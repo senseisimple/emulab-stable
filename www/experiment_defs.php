@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -317,6 +317,7 @@ class Experiment
     function keyhash()          { return $this->field('keyhash'); }
     function paniced()          { return $this->field('paniced'); }
     function panic_date()       { return $this->field('panic_date'); }
+    function geniflags()        { return $this->field('geniflags'); }
 
     #
     # Access Check. Project level check since this might not be a current

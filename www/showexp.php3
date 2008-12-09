@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -267,6 +267,7 @@ $linktest_running = $experiment->linktest_pid();
 $paniced    = $experiment->paniced();
 $panic_date = $experiment->panic_date();
 $lockdown   = $experiment->lockdown();
+$geniflags  = $experiment->geniflags();
 
 if (! ($experiment_stats = $experiment->GetStats())) {
     TBERROR("Could not get experiment stats object for $expindex", 1);
@@ -348,7 +349,7 @@ if ($expstate) {
 	    }
 	}
 	else {
-	    if ($expstate == $TB_EXPTSTATE_SWAPPED) {
+	    if (!$geniflags && $expstate == $TB_EXPTSTATE_SWAPPED) {
 		WRITESUBMENUBUTTON(($instance ?
 				    "Swap Instance In" :
 				    "Swap Experiment In"),
@@ -363,7 +364,7 @@ if ($expstate) {
 				   CreateURL("swapexp", $experiment,
 					     "inout", "out"));
 	    }
-	    elseif ($expstate == $TB_EXPTSTATE_ACTIVATING) {
+	    elseif (!$geniflags && $expstate == $TB_EXPTSTATE_ACTIVATING) {
 		WRITESUBMENUBUTTON(($instance ?
 				   "Cancel Template Instantiation" :
   				   "Cancel Experiment Swapin"),
@@ -372,7 +373,7 @@ if ($expstate) {
 	    }
 	}
     
-	if (!$instance && $expstate != $TB_EXPTSTATE_PANICED) {
+	if (!$instance && !$geniflags && $expstate != $TB_EXPTSTATE_PANICED) {
 	    WRITESUBMENUBUTTON("Terminate Experiment",
 			       CreateURL("endexp", $experiment));
 	}
@@ -382,7 +383,8 @@ if ($expstate) {
 	}
 
         # Batch experiments can be modifed only when paused.
-	if (!$instance && ($expstate == $TB_EXPTSTATE_SWAPPED ||
+	if (!$geniflags &&
+	    !$instance && ($expstate == $TB_EXPTSTATE_SWAPPED ||
 	    (!$isbatch && $expstate == $TB_EXPTSTATE_ACTIVE))) {
 	    WRITESUBMENUBUTTON("Modify Experiment",
 			       CreateURL("modifyexp", $experiment));
@@ -421,7 +423,7 @@ if ($expstate) {
 			   CreateURL("template_commit", $instance));
     }
     
-    if ($expstate == $TB_EXPTSTATE_ACTIVE) {
+    if (!$geniflags && $expstate == $TB_EXPTSTATE_ACTIVE) {
 	WRITESUBMENUBUTTON("Modify Traffic Shaping",
 			   CreateURL("delaycontrol", $experiment));
     }
@@ -433,11 +435,13 @@ WRITESUBMENUBUTTON("Modify Settings",
 WRITESUBMENUDIVIDER();
 
 if ($expstate == $TB_EXPTSTATE_ACTIVE) {
-    WRITESUBMENUBUTTON("Link Tracing/Monitoring",
-		       CreateURL("linkmon_list", $experiment));
+    if (!$geniflags) {
+	WRITESUBMENUBUTTON("Link Tracing/Monitoring",
+			   CreateURL("linkmon_list", $experiment));
     
-    WRITESUBMENUBUTTON("Event Viewer",
-		       CreateURL("showevents", $experiment));
+	WRITESUBMENUBUTTON("Event Viewer",
+			   CreateURL("showevents", $experiment));
+    }
     
     #
     # Admin and project/experiment leaders get this option.
@@ -465,7 +469,7 @@ if (($expstate == $TB_EXPTSTATE_ACTIVE ||
 }
 
 if ($expstate == $TB_EXPTSTATE_ACTIVE) {
-    if (STUDLY() && isset($classes['pcvm'])) {
+    if (!$geniflags && STUDLY() && isset($classes['pcvm'])) {
 	WRITESUBMENUBUTTON("Record Feedback Data",
 			   CreateURL("feedback", $experiment) .
 			   "&mode=record");
@@ -474,7 +478,7 @@ if ($expstate == $TB_EXPTSTATE_ACTIVE) {
 
 if (($expstate == $TB_EXPTSTATE_ACTIVE ||
      $expstate == $TB_EXPTSTATE_SWAPPED) &&
-    STUDLY()) {
+    !$geniflags && STUDLY()) {
     WRITESUBMENUBUTTON("Clear Feedback Data",
 		       CreateURL("feedback", $experiment) . "&mode=clear");
     if (isset($classes['pcvm'])) {
@@ -499,10 +503,12 @@ if (! $instance) {
 		       "showstats.php3?showby=expt&exptidx=$expindex");
 }
 
-WRITESUBMENUBUTTON("Duplicate Experiment",
-		   "beginexp_html.php3?copyid=$expindex");
+if (!$geniflags) {
+    WRITESUBMENUBUTTON("Duplicate Experiment",
+		       "beginexp_html.php3?copyid=$expindex");
+}
 
-if ($EXPOSEARCHIVE && !$instance) {
+if ($EXPOSEARCHIVE && !$instance && !$geniflags) {
     WRITESUBMENUBUTTON("Experiment File Archive",
 		       "archive_view.php3?experiment=$expindex");
 }
@@ -538,21 +544,24 @@ if (isset($classes['mote']) && $expstate == $TB_EXPTSTATE_ACTIVE) {
 
 if ($isadmin) {
     if ($expstate == $TB_EXPTSTATE_ACTIVE) {
-	SUBMENUSECTION("Beta-Test Options");
-	WRITESUBMENUBUTTON("Restart Experiment",
-			   CreateURL("swapexp", $experiment,
-				     "inout", "restart"));
-	WRITESUBMENUBUTTON("Replay Events",
-			   CreateURL("replayexp", $experiment));
+	if (!$geniflags) {
+	    SUBMENUSECTION("Beta-Test Options");
+	    WRITESUBMENUBUTTON("Restart Experiment",
+			       CreateURL("swapexp", $experiment,
+					 "inout", "restart"));
+	    WRITESUBMENUBUTTON("Replay Events",
+			       CreateURL("replayexp", $experiment));
+	}
 
 	SUBMENUSECTION("Admin Options");
+
+	if (!$geniflags) {
+	    WRITESUBMENUBUTTON("Send an Idle Info Request",
+			       CreateURL("request_idleinfo", $experiment));
 	
-	WRITESUBMENUBUTTON("Send an Idle Info Request",
-			   CreateURL("request_idleinfo", $experiment));
-	
-	WRITESUBMENUBUTTON("Send a Swap Request",
-			   CreateURL("request_swapexp", $experiment));
-	
+	    WRITESUBMENUBUTTON("Send a Swap Request",
+			       CreateURL("request_swapexp", $experiment));
+	}
 	WRITESUBMENUBUTTON("Force Swap Out (Idle-Swap)",
 			   CreateURL("swapexp", $experiment,
 				     "inout", "out", "force", 1));

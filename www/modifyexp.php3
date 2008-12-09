@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -37,6 +37,12 @@ $pid = $experiment->pid();
 $eid = $experiment->eid();
 $unix_gid = $experiment->UnixGID();
 $expstate = $experiment->state();
+$geniflags = $experiment->geniflags();
+
+# Must go through the geni interfaces.
+if ($geniflags) {
+    USERERROR("You cannot modify ProtoGeni experiments this way!", 1);
+}
 
 if (!$experiment->AccessCheck($this_user, $TB_EXPT_MODIFY)) {
     USERERROR("You do not have permission to modify this experiment.", 1);

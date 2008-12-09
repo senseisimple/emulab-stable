@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -37,9 +37,16 @@ PAGEHEADER("Terminate Experiment");
 
 # Need these below.
 $lockdown = $experiment->lockdown();
+$geniflags = $experiment->geniflags();
 $exptidx  = $experiment->idx();
 $pid      = $experiment->pid();
 $eid      = $experiment->eid();
+
+# Must go through the geni interfaces.
+if ($geniflags) {
+    USERERROR("You must terminate ProtoGeni experiments via the ".
+	      "the ProtoGeni APIs!", 1);
+}
 
 #
 # Verify permissions.

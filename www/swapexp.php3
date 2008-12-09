@@ -62,9 +62,29 @@ if (isset($force) && $force == 1) {
 	if ($forcetype=="autoswap") { $autoswap=1; }
 }
 else {
-	$force = 0;
-	$idleswap=0;
-	$autoswap=0;
+    # Must go through the geni interfaces.
+    if ($experiment->geniflags()) {
+	USERERROR("You must use forceable swap on ProtoGeni experiments", 1);
+    }
+    
+    #
+    # If the user is not a member of the group, it
+    # must be an admin, and in that case we want him to use the force
+    # swapout path to avoid permission issues.
+    #
+    $group = $experiment->Group();
+    if (!isset($group)) {
+	TBERROR("Could not get group object for $pid/eid", 1);
+    }
+    if (!$group->IsMember($this_user, $ignore) && $isadmin) {
+	USERERROR("Since you are an administrator trying to swap out ".
+		  "an experiment in a project/group you do not belong to, ".
+		  "please go back and use the forcible swap options instead.",
+		  1);
+    }
+    $force = 0;
+    $idleswap=0;
+    $autoswap=0;
 }
 
 # Need these below
