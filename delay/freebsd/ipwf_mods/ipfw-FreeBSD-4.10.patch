@@ -1,0 +1,38 @@
+--- sbin/ipfw.orig/ipfw.c	Fri Sep 17 11:14:50 2004
++++ sbin/ipfw/ipfw.c	Fri Dec  5 16:15:10 2008
+@@ -946,6 +946,7 @@
+ "  pipeconfig:\n"
+ "    {bw|bandwidth} <number>{bit/s|Kbit/s|Mbit/s|Bytes/s|KBytes/s|MBytes/s}\n"
+ "    {bw|bandwidth} interface_name\n"
++"    backfill <number>{bit/s|Kbit/s|Mbit/s|Bytes/s|KBytes/s|MBytes/s}\n"
+ "    delay <milliseconds>\n"
+ "    queue <size>{packets|Bytes|KBytes}\n"
+ "    plr <fraction>\n"
+@@ -1564,6 +1565,27 @@
+ 							pipe.bandwidth *= 8;
+ 					}
+ 					if (pipe.bandwidth < 0)
++						errx(EX_DATAERR,
++						    "bandwidth too large");
++					av += 2;
++					ac -= 2;
++				} else if (!strncmp(*av, "backfill", len)) {
++					pipe.backfill =
++					    strtoul(av[1], &end, 0);
++					if (*end == 'K'
++					    || *end == 'k') {
++						end++;
++						pipe.backfill *=
++						    1000;
++					} else if (*end == 'M') {
++						end++;
++						pipe.backfill *=
++						    1000000;
++					}
++					if (*end == 'B'
++					    || !strncmp(end, "by", 2))
++						pipe.backfill *= 8;
++					if (pipe.backfill < 0)
+ 						errx(EX_DATAERR,
+ 						    "bandwidth too large");
+ 					av += 2;
