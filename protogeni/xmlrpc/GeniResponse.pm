@@ -20,9 +20,10 @@ use vars qw(@ISA @EXPORT);
 	      GENIRESPONSE_TIMEDOUT GENIRESPONSE_DBERROR
 	      GENIRESPONSE_RPCERROR GENIRESPONSE_UNAVAILABLE
 	      GENIRESPONSE_SEARCHFAILED GENIRESPONSE_UNSUPPORTED
-	      GENIRESPONSE_BUSY GENIRESPONSE_EXPIRED);
+	      GENIRESPONSE_BUSY GENIRESPONSE_EXPIRED GENIRESPONSE);
 
 use overload ('""' => 'Stringify');
+my $current_response = undef;
 
 #
 # GENI XMLRPC defs. Also see ../lib/Protogeni.pm.in if you change this.
@@ -43,6 +44,7 @@ sub GENIRESPONSE_SEARCHFAILED()   {12; }
 sub GENIRESPONSE_UNSUPPORTED()    {13; }
 sub GENIRESPONSE_BUSY()           {14; }
 sub GENIRESPONSE_EXPIRED()        {15; }
+sub GENIRESPONSE()		  { return $current_response; }
 
 #
 # This is the (python-style) "structure" we want to return.
@@ -82,6 +84,8 @@ sub Create($$;$$)
     my $self = {"code"   => $code,
 		"value"  => $value,
 		"output" => $output};
+
+    $current_response = $self;
     return $self;
 }
 

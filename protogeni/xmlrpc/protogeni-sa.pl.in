@@ -26,6 +26,7 @@ my $EMULAB_PEMFILE = "@prefix@/etc/genisa.pem";
 use lib '@prefix@/lib';
 use GeniSA;
 use Genixmlrpc;
+use GeniResponse;
 use libaudit;
 
 # Geniuser.
@@ -111,9 +112,6 @@ LogStart(0, undef, LIBAUDIT_LOGTBOPS());
 #
 Genixmlrpc->SetContext(Genixmlrpc->Context($certificate));
 
-# Add stuff for log message if sent.
-AddAuditInfo("message", $request . "\n");
-
 my $responder = Frontier::Responder->new( "methods" => {
     "GetCredential"     => \&GeniSA::GetCredential,
     "Resolve"           => \&GeniSA::Resolve,
@@ -129,13 +127,12 @@ my $responder = Frontier::Responder->new( "methods" => {
 my $response = $responder->{'_decode'}->serve($request,
 					      $responder->{'methods'});
 
+# Add stuff for log message if sent.
+AddAuditInfo("message", $response . "\n\n" . $request);
 #
 # Terminate the log capture so that we can print the response to STDOUT
 # for the web server.
 #
-#print STDERR "\n\n" . $response;
-#print STDERR time() . "\n";
-
 LogEnd();
 
 print "Content-Type: text/xml \n\n" . $response;
