@@ -14,6 +14,16 @@ use strict;
 use English;
 use Frontier::Responder;
 use Data::Dumper;
+use POSIX;
+
+# Yack. apache does not close fds before the exec, and if this dies
+# we are left with a giant mess.
+BEGIN {
+    no warnings;
+    for (my $i = 3; $i < 2048; $i++) {
+      POSIX:close($i);
+    }
+}
 
 # Do this early so that we talk to the right DB.
 use vars qw($GENI_DBNAME);
@@ -136,6 +146,3 @@ AddAuditInfo("message", $response . "\n\n" . $request);
 LogEnd();
 
 print "Content-Type: text/xml \n\n" . $response;
-
-
-

@@ -14,6 +14,16 @@ use strict;
 use English;
 use Frontier::Responder;
 use Data::Dumper;
+use POSIX;
+
+# Yack. apache does not close fds before the exec, and if this dies
+# we are left with a giant mess.
+BEGIN {
+    no warnings;
+    for (my $i = 3; $i < 2048; $i++) {
+      POSIX:close($i);
+    }
+}
 
 # Do this early so that we talk to the right DB.
 use vars qw($GENI_DBNAME);
@@ -110,9 +120,6 @@ LogStart(0, undef, LIBAUDIT_LOGTBOPS());
 # Create and set our RPC context for any calls we end up making.
 #
 Genixmlrpc->SetContext(Genixmlrpc->Context($certificate));
-
-# Add stuff for log message if sent.
-AddAuditInfo("message", $request . "\n");
 
 my $responder = Frontier::Responder->new( "methods" => {
     "Resolve"	        => \&GeniCM::Resolve,
