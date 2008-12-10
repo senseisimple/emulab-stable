@@ -2179,12 +2179,14 @@ sub ExperimentVLans($$$)
 #
 # Utility function to add a vlan to the switch infrastructure. 
 #
-sub Instantiate($)
+sub Instantiate($;$)
 {
-    my ($self) = @_;
+    my ($self, $quiet) = @_;
 
     return -1
 	if (! ref($self));
+    $quiet = 0
+	if (!defined($quiet));
 
     my $experiment = $self->GetExperiment();
     return -1
@@ -2194,9 +2196,10 @@ sub Instantiate($)
     my $eid    = $experiment->eid();
     my $vname  = $self->vname();
     my $lanid  = $self->lanid();
+    my $opt    = ($quiet ? "-q" : "");
 
     #print "Setting up VLAN $vname ($lanid) in $pid/$eid\n";
-    system("$SNMPIT -t $pid $eid $lanid");
+    system("$SNMPIT $opt -t $pid $eid $lanid");
     return -1
 	if ($?);
     return 0;
@@ -2205,12 +2208,14 @@ sub Instantiate($)
 #
 # Utility function to remove a vlan from the switch infrastructure.
 #
-sub UnInstantiate($)
+sub UnInstantiate($;$)
 {
-    my ($self) = @_;
+    my ($self, $quiet) = @_;
 
     return -1
 	if (! ref($self));
+    $quiet = 0
+	if (!defined($quiet));
 
     my $experiment = $self->GetExperiment();
     return -1
@@ -2220,9 +2225,10 @@ sub UnInstantiate($)
     my $eid    = $experiment->eid();
     my $vname  = $self->vname();
     my $lanid  = $self->lanid();
+    my $opt    = ($quiet ? "-q" : "");
 
     #print "Removing VLAN $vname ($lanid) from $pid/$eid\n";
-    system("$SNMPIT -r $pid $eid $lanid");
+    system("$SNMPIT $opt -r $pid $eid $lanid");
     return -1
 	if ($?);
     return 0;
