@@ -16,6 +16,10 @@
 #define INBOOTLOADER
 #endif
 
+#if defined(__linux__)
+#define _FILE_OFFSET_BITS 64
+#endif
+
 #include <string.h>
 
 #ifdef INBOOTLOADER
