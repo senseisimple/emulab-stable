@@ -583,7 +583,7 @@ sub Create($$$$)
     # Lets be real sure that the UUID is really unique.
     #
     $query_result =
-	DBQueryWarn("select pid,eid,idx from experiment_stats ".
+	DBQueryWarn("select pid,eid from experiment_stats ".
 		    "where eid_uuid='$uuid'");
     if (! $query_result) {
 	DBQueryWarn("unlock tables");
