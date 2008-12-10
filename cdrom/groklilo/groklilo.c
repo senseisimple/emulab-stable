@@ -16,6 +16,10 @@
 #define INBOOTLOADER
 #endif
 
+/* Enable Large File Support for Linux.  This wouldn't be necessary
+ * if we didn't need to deal with FreeBSD's bizarre behavior of 
+ * preventing root from writing to partition bootblocks.
+ */
 #if defined(__linux__)
 #define _FILE_OFFSET_BITS 64
 #endif
