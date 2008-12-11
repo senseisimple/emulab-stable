@@ -4634,15 +4634,13 @@ last_net_act,last_cpu_act,last_ext_act);
 4.166: Add backfill values to the database to be used in a future
        commit:
 
-       alter table virt_lans add backfill int(10) unsigned
-           default NULL after bandwidth;
-       alter table virt_lans add rbackfill int(10) unsigned
-           default NULL after rbandwidth;
+       alter table virt_lans 
+           add backfill int(10) unsigned default 0 after bandwidth,
+           add rbackfill int(10) unsigned default 0 after rbandwidth;
 
-       alter table delays add backfill0 int(10) unsigned
-           NOT NULL default '0' after bandwidth0;
-       alter table delays add backfill1 int(10) unsigned
-           NOT NULL default '0' after bandwidth1;
+       alter table delays 
+           add backfill0 int(10) unsigned NOT NULL default 0 after bandwidth0,
+           add backfill1 int(10) unsigned NOT NULL default 0 after bandwidth1;
 
        replace into table_regex VALUES
            ('virt_lans','backfill','int','redirect','default:int',
@@ -4651,3 +4649,5 @@ last_net_act,last_cpu_act,last_ext_act);
            ('virt_lans','rbackfill','int','redirect','default:int',
 	    0,2147483647,NULL);
 
+4.167: Change to backfill default values in virt_lans, skip to next
+       entry

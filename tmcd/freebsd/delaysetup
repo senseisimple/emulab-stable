@@ -364,7 +364,8 @@ sub DelaySetup
 	    $pat .= q(MEANPSIZE1=(\d+) WAIT1=(\d+) SETBIT1=(\d+) );
 	    $pat .= q(DROPTAIL1=(\d+) GENTLE1=(\d+) );
 	    $pat .= q(VNODE0=([-\d\w]+) VNODE1=([-\d\w]+) );
-	    $pat .= q(NOSHAPING=(\d+));
+	    $pat .= q(NOSHAPING=(\d+) );
+	    $pat .= q(BACKFILL0=(\d+) BACKFILL1=(\d+));
 
 	    $delay =~ /$pat/;
 
@@ -416,6 +417,9 @@ sub DelaySetup
 	    my $vnode0     = $38;
 	    my $vnode1     = $39;
 	    my $noshaping  = $40;
+
+	    my $backfill1  = $41;
+	    my $backfill2  = $42;
 
 	    #
 	    # Noshaping. All we wanted was to set up the bridge (above).
@@ -514,9 +518,9 @@ sub DelaySetup
 	    print DEL "ipfw add $p1 pipe $p1 ip from any to any in recv $iface1\n";
 	    print DEL "ipfw add $p2 pipe $p2 ip from any to any in recv $iface2\n";
 	    print DEL "ipfw pipe $p1 config delay ${delay1}ms ";
-	    print DEL "bw ${bandw1}Kbit/s plr $plr1 $queue1 $redparams1\n";
+	    print DEL "bw ${bandw1}Kbit/s backfill ${backfill1}Kbits/s plr $plr1 $queue1 $redparams1\n";
 	    print DEL "ipfw pipe $p2 config delay ${delay2}ms ";
-	    print DEL "bw ${bandw2}Kbit/s plr $plr2 $queue2 $redparams2\n";
+	    print DEL "bw ${bandw2}Kbit/s backfill ${backfill2}Kbits/s plr $plr2 $queue2 $redparams2\n";
 
 	    print STDOUT "  $iface1/$iface2 pipe $p1 config delay ";
 	    print STDOUT "${delay1}ms bw ${bandw1}Kbit/s plr $plr1 ";

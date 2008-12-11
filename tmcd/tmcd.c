@@ -2496,14 +2496,15 @@ COMMAND_PROTOTYPE(dodelay)
 		 "q0_droptail,q0_gentle, "
 		 "q1_limit,q1_maxthresh,q1_minthresh,q1_weight,q1_linterm, "
 		 "q1_qinbytes,q1_bytes,q1_meanpsize,q1_wait,q1_setbit, "
-		 "q1_droptail,q1_gentle,vnode0,vnode1,noshaping "
+		 "q1_droptail,q1_gentle,vnode0,vnode1,noshaping, "
+		 "backfill0,backfill1"
                  " from delays as d "
 		 "left join interfaces as i on "
 		 " i.node_id=d.node_id and i.iface=iface0 "
 		 "left join interfaces as j on "
 		 " j.node_id=d.node_id and j.iface=iface1 "
 		 " where d.node_id='%s'",	 
-		 40, reqp->nodeid);
+		 42, reqp->nodeid);
 	if (!res) {
 		error("DELAY: %s: DB Error getting delays!\n", reqp->nodeid);
 		return 1;
@@ -2544,7 +2545,8 @@ COMMAND_PROTOTYPE(dodelay)
 			"MEANPSIZE1=%s WAIT1=%s SETBIT1=%s " 
 			"DROPTAIL1=%s GENTLE1=%s "
 			"VNODE0=%s VNODE1=%s "
-			"NOSHAPING=%s\n",
+			"NOSHAPING=%s "
+			"BACKFILL0=%s BACKFILL1=%s\n",
 			row[0], row[1],
 			row[2], row[3], row[4], row[5],
 			row[7], row[8], row[9], row[10],
@@ -2560,7 +2562,8 @@ COMMAND_PROTOTYPE(dodelay)
 			row[35], row[36],
 			(row[37] ? row[37] : "foo"),
 			(row[38] ? row[38] : "bar"),
-			row[39]);
+			row[39],
+			row[40], row[41]);
 
 		client_writeback(sock, buf, strlen(buf), tcp);
 		nrows--;
