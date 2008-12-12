@@ -6,8 +6,8 @@ get_mbr_signature()
 {
 	local device=$1
 
-	local sig=`dd if=$device bs=1 count=4 skip=440 2>/dev/null | \
-	              od -t x4 | head -n1 | cut -d' ' -f2`
+	local sig=`dd if=$device bs=1 count=4 skip=440 2>/dev/null | od -x | \
+			sed -n '1s/^[0-9a-f]* *\([0-9a-f]*\) *\([0-9a-f]*\) *$/\1\2/p'`
 
 	while [ ${#sig} -lt 8 ]; do
 		sig="0$sig"
@@ -72,8 +72,13 @@ find_host_adapter()
 
         if [ -L $pcidev_path ]; then
                 channel=`expr $channel + 1`
-                number=`ls $pcidev_path | sed -n -r 's/^(host|ide)([0-9]*)/\2/p' | \
-                           sort -n | sed -n ${channel}p`
+		number=`ls $pcidev_path/ | sed -n 's/^host\([0-9]*\)/\1/p' | \
+			sort -n | sed -n ${channel}p`
+		if [ -z "$number" ]; then
+			number=`ls $pcidev_path/ | sed -n 's/^ide\([0-9]*\)/\1/p' | \
+				sort -n | sed -n ${channel}p`
+		fi            
+
         else
                 return 1
         fi
@@ -81,7 +86,9 @@ find_host_adapter()
         echo $number
 }
 
-modprobe edd
+if ! [ -d $EDD_PATH ]; then
+	modprobe edd
+fi
 
 for bdev in /sys/firmware/edd/int13_dev8*; do
 	[ `cat $bdev/version` = 0x00 ] && continue

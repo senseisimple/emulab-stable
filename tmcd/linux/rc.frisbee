@@ -27,6 +27,12 @@ else
 	ETCDIR=/etc/testbed
 fi
 
+# See if we can map drive names to BIOS numbers via EDD
+if [ -x $BINDIR/get_edd_map ]; then
+	$BINDIR/get_edd_map > $BOOTDIR/edd_map
+fi
+
+
 # Behave a little different on widearea nodes.
 isrem=0
 if [ -e $ETCDIR/isrem ]; then
@@ -324,6 +330,11 @@ if [ $OS = "Linux" ]; then
 			;;
 	esac
 
+	# Try to map disks to BIOS drive numbers via EDD
+	# The map is created now before we touch any disks
+	# since we may need to use the MBR to determine
+	# which disk is which.
+	$BINDIR/get_edd_map > $BOOTDIR/edd_map 2>/dev/null
 fi
 
 FRISBEE_OPTS="-S $BOSSIP"
@@ -350,9 +361,9 @@ if [ $PARTITION -ne 0 ]; then
 fi
 
 # Enable IPoD
-if [ -r $BINDIR/rc.ipod ]; then
-	. $BINDIR/rc.ipod
-fi
+#if [ -r $BINDIR/rc.ipod ]; then
+#	. $BINDIR/rc.ipod
+#fi
 
 FRISBEE_OPTS="$FRISBEE_OPTS `get_buffer_sizes`"
 
@@ -450,7 +461,7 @@ fi
 echo "Adjusting slice-related files"
 export SLICEFIX_ACPI=$ACPI
 export SLICEFIX_ASF=$ASF
-$BINDIR/slicefix $PARTITION $FREEBSD_DISK
+#$BINDIR/slicefix $PARTITION $FREEBSD_DISK
 echo "Image load complete at `date`"
 
 #

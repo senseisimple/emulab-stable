@@ -29,6 +29,118 @@ case $# in
 	exit 1
 esac
 
+get_fstab_root_device()
+{
+	local image_root=$1
+
+	while read device mount rest; do
+		[ x$device = x ] && continue
+		case $device in
+			\#*) continue ;;
+		esac
+
+		if [ $mount = / ]; then
+			echo ${device}
+			break
+		fi
+	done < $image_root/etc/fstab
+}
+
+get_lilo_boot_device()
+{
+	local image_root=$1
+	
+	[ -f $image_root/etc/lilo.conf ] || return 1
+
+	sed -n 's/^boot=//p' $image_root/etc/lilo.conf
+
+	return 0
+}
+
+get_grub_boot_device()
+{
+	local image_root=$1
+	local grub_config=/etc/grub.conf
+	local grub_device_map=/boot/grub/device.map
+	local grub_boot_dev
+
+	if ! [ -f $grub_config ]; then
+		grub_config=/boot/grub/menu.lst
+		if ! [ -f $grub_config ]; then
+			return 1
+		fi
+	fi
+
+	if ! [ -f $grub_device_map ]; then
+		return 1
+	fi
+
+	# Check for Debian-ish grub configs
+	grub_boot_dev=`sed -n 's/^##* *groot=(\(hd[0-9]*\).*$/(\1)/p' \
+	               $grub_config`
+
+	# Check for Fedora-ish grub configs
+	if [ -z "$grub_boot_dev" ]; then
+		grub_boot_dev=`sed -n 's/.*groot=(\(hd[0-9]*\)/(\1)/p' \
+		               $grub_config`
+	fi
+	[ -z "$grub_boot_dev" ] && return 1
+
+	real_grub_boot_dev=`grep "^$grub_boot_dev" $grub_device_map | \
+	                    awk '{ print $2 }'`
+
+	[ -z "$real_grub_boot_dev" ] && return 1
+
+	echo $real_grub_boot_dev
+}
+
+image_wants_ide()
+{
+	local image_root=$1
+	local rc=0;
+
+	# rc == 0 means image wants ide
+	# rc == 1 means image doesn't care
+	# rc == 2 means unknown
+
+	local fstab_root_dev
+	local grub_boot_dev
+	local lilo_boot_dev
+
+	fstab_root_dev=`get_fstab_root_device $image_root`
+	grub_boot_dev=`get_grub_boot_device $image_root`
+	lilo_boot_dev=`get_lilo_boot_device $image_root`
+
+	for dev in "$fstab_root_dev" "$grub_boot_dev" "$lilo_boot_dev"; do
+		case "$fstab_root_dev" in
+			*=*)
+				# Probably LABEL= or UUID=
+				rc=1
+				;;
+			/dev/hd*)
+				rc=0
+				;;
+			*)
+				rc=2
+				;;
+		esac
+
+		[ $rc -lt 2 ] && return $rc
+	done
+
+	# If we get here, we don't know what the image wants
+
+	return $rc
+}
+
+map_disk()
+{
+	local disk=$1
+	local map=$2
+
+	sed -n "s/^$disk=//p" $map
+}
+
 linux_disk=`$BINDIR/freebsd_to_linux_disk $freebsd_disk $part`
 lrootdev=${linux_disk#* }
 linux_disk=${linux_disk%% *}
@@ -417,9 +529,12 @@ dolinux() {
 		echo "fixing Linux root partition ${disk}${part}"
 		fstype=ext3
 	fi
-	mount -t $fstype $rootdev /mnt || {
-		echo "$fstype mount of $rootdev failed"
-		return 1
+	mount -t $fstype $rootdev /mnt 2> /dev/null || {
+		fstype=ext2
+		mount -t $fstype $rootdev /mnt || {
+			echo "$fstype mount of $rootdev failed"
+			return 1
+		}
 	}
 
 	# hardwire the boss node
@@ -432,13 +547,12 @@ dolinux() {
 	    }
 	fi
 
-	# change the swap devices in fstab
-	echo linux_disk=$linux_disk
-	sed -i.orig -e "s;^/dev/[hs]d.\([0-7]\);/dev/${linux_disk}\1;" /mnt/etc/fstab || {
-		echo "Failed to update /etc/fstab"
-		umount $rootdev
-		return 1
-	}
+	$BINDIR/remap_ide_disks > /tmp/disk_map
+	new_disk=`map_disk $linux_disk /tmp/disk_map`
+	translated_rootdev=/dev/$new_disk$part
+
+	$BINDIR/guess_linux_root_device /mnt $rootdev $translated_rootdev
+	lilo_commandline=`cat /mnt/var/emulab/boot/runlilo 2> /dev/null`
 
 	#
 	# If there's a GRUB config file, update all root=X kernel params.
@@ -451,74 +565,40 @@ dolinux() {
 	    gconf=/mnt$fgconf
 	fi
 	if [ -r $gconf ]; then
-	    echo "  updating $fgconf"
-	    sed -i.orig -e "s;\([br]oot=/dev\)/[hs]d.[0-7];\1/${linux_disk}${part};" $gconf || {
-		echo "Failed to update $fgconf"
-	    }
+		gdisk=''
+		# Use EDD to figure out the BIOS drive number
+		#
+		# HACK: we only look for BIOS drives 0x8[0-9] so we
+		# don't have to convert to/from hex and do math. The
+		# The EDD code in the kernel currently only supports
+		# 0x80-0x85 anyway.
 
-	    #
-	    # Tweak grub's notion of root.
-	    # Note that grub's partition numbering is zero-based.
-	    #
-	    gdisk=''
-	    if [ $OS = "Linux" ]; then
-
-	        # Use EDD to figure out the BIOS drive number
-	        #
-	        # HACK: we only look for BIOS drives 0x8[0-9] so we
-	        # don't have to convert to/from hex and do math. The
-	        # The EDD code in the kernel currently only supports
-	        # 0x80-0x85 anyway.
-
-	        gdisk=`sed -n "s/^$linux_disk=\(8[0-9]\)/\1/p" \
-	               $BOOTDIR/edd_map`
+		gdisk=`sed -n "s/^$linux_disk=\(8[0-9]\)/\1/p" \
+		       $BOOTDIR/edd_map`
 		if [ -n "$gdisk" ]; then
-			echo "  EDD says $linux_disk is BIOS drive 0x$gdisk"
-			gdisk=${gdisk#8}
+		    echo "  EDD says $linux_disk is BIOS drive 0x$gdisk"
+		    gdisk=${gdisk#8}
 		fi
 
-	        # We fall back to our old guessing method if EDD
-	        # doesn't work.
-	    fi
-	    if [ x$gdisk = x ]; then
-	        gdisk=`echo $linux_disk | \
-                       sed -e 's/^.*\(.\)$/\1/;y/abcdefgh/01234567/'`
-	        if [ $FLASHBOOT -eq 1 ]; then
-	            gdisk=`expr $gdisk + 1`
-	        fi
-	    fi
-	    gpart=`expr $part - 1`
-	    #
-	    # If we booted from a flash device we also have to further tweak
-	    # grub's notion of root disk since the flash device will be "hd0".
-	    # It appears that we do NOT have to update Linux's drive mapping.
-	    #
-	    sed -i'' -e "s;root (hd[0-9],[0-9]);root (hd${gdisk},${gpart});" $gconf || {
-		echo "Failed to update root in $fgconf"
-	    }
-	fi
+		# We fall back to our old guessing method if EDD
+		# doesn't work.
+		if [ x$gdisk = x ]; then
+		    gdisk=`echo $os_linux_disk | \
+			   sed -e 's/^.*\(.\)$/\1/;y/abcdefgh/01234567/'`
+		    if [ $FLASHBOOT -eq 1 ]; then
+			gdisk=`expr $gdisk + 1`
+		    fi
+		fi
+		gpart=`expr $part - 1`
+		#
+		# If we booted from a flash device we also have to further tweak
+		# grub's notion of root disk since the flash device will be "hd0".
+		# It appears that we do NOT have to update Linux's drive mapping.
+		#
+		sed -i'' -e "s;root (hd[0-9],[0-9]);root (hd${gdisk},${gpart});" $gconf || {
+		    echo "Failed to update root in $fgconf"
+		}
 
-	#
-	# If using lilo, update lilo.conf and set indicator to tell Emulab
-	# to rerun lilo.
-	#
-	linux=
-	lconf=/mnt/etc/lilo.conf
-	if [ -r $lconf ]; then
-	    echo "  updating /etc/lilo.conf"
-	    sed -i.orig -e "s;\([br]oot=/dev\)/[hs]d.[0-7];\1/${linux_disk}${part};" $lconf || {
-		    echo "Failed to update /etc/lilo.conf"
-		    umount $rootdev
-		    return 1
-	    }
-
-	    # XXX note the hardwired path, cannot use BOOTDIR as it is
-	    # different in frisbee MFS.  This also assumes Linux partition
-	    # is one big filesystem.
-	    cp /dev/null /mnt/var/emulab/boot/runlilo
-
-	    # grab the default linux kernel to boot
-	    linux=`lilogetkernel $lconf`
 	fi
 
 	if [ -f /mnt/var/lib/random-seed -a -c /dev/urandom ]; then
@@ -535,10 +615,10 @@ dolinux() {
 
 	umount $rootdev
 
-	if [ "x${linux}" != x ]; then
+	if [ "x${lilo_commandline}" != x ]; then
 	    echo -n "  "
 	    # setup one time lilo command line, must be done after unmount
-	    $BINDIR/groklilo -c "$linux root=$lrootdev" $part /dev/$disk || {
+	    $BINDIR/groklilo -c "$lilo_commandline" $part /dev/$disk || {
 		echo "Failed to set LILO command line"
 		return 1
 	    }
