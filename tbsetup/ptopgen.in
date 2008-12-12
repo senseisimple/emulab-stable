@@ -1277,8 +1277,16 @@ sub print_named_link_ptop
     my $delay = shift(@_);
     my $loss = shift(@_);
     my $proto_count = scalar(@_);
-    print "link $name $source:$source/$source_if "
-	. "$dest:$dest_if $bw $delay $loss 1 " . join(" ", @_) . "\n";
+
+    my $source_full = "$source:$source/$source_if";
+    my $dest_full = "$dest:$dest_if";
+    if ($source =~ /cisco/ && $dest =~ /cisco/)
+    {
+	$source_full = $source;
+	$dest_full = $dest;
+    }
+    print "link $name $source_full "
+	. "$dest_full $bw $delay $loss 1 " . join(" ", @_) . "\n";
 }
 
 sub print_named_link_xml
