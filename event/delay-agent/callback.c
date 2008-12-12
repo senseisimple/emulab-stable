@@ -426,6 +426,9 @@ void set_link_params(int l_index, int blackhole, int p_which)
 	    pipe.bandwidth = p_params->bw;
 	    pipe.delay = p_params->delay;
 
+        /* pramod-CHANGES */
+        pipe.backfill = p_params->backfill;
+
 	    /* set the pipe number*/
 	    pipe.pipe_nr = link_map[l_index].pipes[p_index];
 
@@ -552,6 +555,7 @@ void set_link_params(int l_index, int blackhole, int p_which)
 	    }
 	    /*  else DROPTAIL*/
 
+		   
 	    /* now call setsockopt*/
 	    if (setsockopt(s_dummy,IPPROTO_IP, IP_DUMMYNET_CONFIGURE, &pipe,sizeof pipe)
 		< 0)
@@ -596,7 +600,18 @@ int get_new_link_params(int l_index, event_handle_t handle,
     
     while((argvalue = strsep(&temp," \n"))){
 
-      if(strcmp(argtype,"BANDWIDTH")== 0){
+        /*pramod-CHANGES: */
+      /* Backfill parameters. */ 
+      if(strcmp(argtype,"BACKFILL")== 0){
+
+    link_map[l_index].params[p_num].backfill = atoi(argvalue) * 1000;
+    if (! gotpipe) {
+      link_map[l_index].params[1].backfill =
+          link_map[l_index].params[0].backfill;
+    }
+      }
+      
+      else if(strcmp(argtype,"BANDWIDTH")== 0){
 	info("Bandwidth = %d\n", atoi(argvalue) * 1000);
 	link_map[l_index].params[p_num].bw = atoi(argvalue) * 1000;
 	if (! gotpipe) {

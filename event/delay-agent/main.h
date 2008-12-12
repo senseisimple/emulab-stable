@@ -111,6 +111,7 @@ typedef enum {
 typedef struct {
   int delay;  /* pipe delay*/
   int bw;  /* pipe bw*/
+  int backfill; /*pramod-CHANGES, -add backfill to the pipe*/
   double plr; /* queue loss rate*/
   int q_size; /* queuq size in slots/bytes*/
   structRed_params red_gred_params; /* red/gred params*/
