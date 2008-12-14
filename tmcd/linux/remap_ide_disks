@@ -52,7 +52,11 @@ sd_to_hd_map() {
 	for host in $pata_controllers; do
 		host_num=${host##*host}
 		target=$host/target$host_num:0:0/$host_num:0:0:0
-		if [ -d $target/block ]; then
+		if [ -e $target/block:* ]; then
+			scsi_disk=`ls -d $target/block:*`
+			scsi_disk=${scsi_disk##*:}
+			echo $scsi_disk=hd${ide_disks%% *}
+		elif [ -d $target/block ]; then
 			scsi_disk=`ls -d $target/block/*`
 			scsi_disk=${scsi_disk##*/}
 			echo $scsi_disk=hd${ide_disks%% *}
@@ -60,7 +64,11 @@ sd_to_hd_map() {
 		ide_disks=${ide_disks#* }
 
 		target=$host/target$host_num:0:1/$host_num:0:1:0
-		if [ -d $target/block ]; then
+		if [ -e $target/block:* ]; then
+			scsi_disk=`ls -d $target/block:*`
+			scsi_disk=${scsi_disk##*:}
+			echo $scsi_disk=hd${ide_disks%% *}
+		elif [ -d $target/block ]; then
 			scsi_disk=`ls -d $target/block/*`
 			scsi_disk=${scsi_disk##*/}
 			echo $scsi_disk=hd${ide_disks%% *}

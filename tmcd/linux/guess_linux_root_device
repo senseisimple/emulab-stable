@@ -22,20 +22,34 @@ is_label_or_uuid()
 get_label()
 {
 	local disk="$1"
+	local label=''
 
-	[ -x /lib/udev/vol_id ] || return 1
+	if [ -x /lib/udev/vol_id ]; then
+		label=`/lib/udev/vol_id --label-raw $disk`
+	elif [ -x /sbin/blkid ]; then
+		label=`/sbin/blkid | \
+		       sed -n "s;^$disk"': *.*LABEL="\([^"]*\)".*;\1;p'`
+	else
+		return 1
+	fi
 
-	label=`/lib/udev/vol_id --label-raw $disk`
 	[ -n "$label" ] && echo LABEL=$label
 }
 
 get_uuid()
 {
 	local disk="$1"
+	local uuid=''
 
-	[ -x /lib/udev/vol_id ] || return 1
+	if [ -x /lib/udev/vol_id ]; then
+		uuid=`/lib/udev/vol_id --uuid-raw $disk`
+	elif [ -x /sbin/blkid ]; then
+		uuid=`/sbin/blkid | \
+		       sed -n "s;^$disk"': *.*UUID="\([^"]*\)".*;\1;p'`
+	else
+		return 1
+	fi
 
-	uuid=`/lib/udev/vol_id --uuid $disk`
 	[ -n "$uuid" ] && echo UUID=$uuid
 }
 
