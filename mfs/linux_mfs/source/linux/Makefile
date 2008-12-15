@@ -1,35 +1,43 @@
+include ../../variables.mk
+
+LINUX_VERSION		=	2.6.27.8
+LINUX_PATH		=	$(TARGET_BUILD_PATH)/linux-$(LINUX_VERSION)
+
 KERNEL_CONFIG	=	$(SOURCE_PATH)/linux/linux.config
-LINUX_HEADERS_PATH =	$(TOOLCHAIN_BUILD_PATH)/linux
 TARGET_MODULE_PATH =	$(TARGET_PATH)/lib/modules/$(LINUX_VERSION)
 
 export ARCH=i386
 export INSTALL_MOD_PATH=$(TARGET_PATH)
 
-.PHONY: linux linux-extract linux-patch linux-config linux-bzImage \
-	linux-modules linux-clean linux-menuconfig linux-bzImage-install \
-	linux-modules-install linux-install linux-headers
+.PHONY: extract patch config bzImage \
+	modules clean menuconfig bzImage-install \
+	modules-install all
 
-linux-extract: $(LINUX_PATH)/.extract-stamp
+all: bzImage modules
 
-linux-patch: $(LINUX_PATH)/.patch-stamp
+extract: $(LINUX_PATH)/.extract-stamp
 
-linux-config: $(LINUX_PATH)/.config-stamp
+patch: $(LINUX_PATH)/.patch-stamp
 
-linux-headers: $(LINUX_PATH)/.headers-stamp
+config: $(LINUX_PATH)/.config-stamp
 
-linux-menuconfig:
+headers: $(LINUX_PATH)/.headers-stamp
+
+menuconfig:
 		$(MAKE) -C $(LINUX_PATH) CROSS_COMPILE=$(CROSS_COMPILER_PREFIX) menuconfig
 
-linux-clean:
+clean:
 		$(MAKE) -C $(LINUX_PATH) clean
 
-linux-bzImage-install: linux-bzImage
-		mkdir -p $(TARGET_PATH)/boot
-		cp $(LINUX_PATH)/arch/i386/boot/bzImage $(TARGET_PATH)/boot/vmlinuz-$(LINUX_VERSION)
-		cp $(LINUX_PATH)/System.map $(TARGET_PATH)/boot/System.map-$(LINUX_VERSION)
-		cp $(LINUX_PATH)/.config $(TARGET_PATH)/boot/config-$(LINUX_VERSION)
+install: bzImage-install modules-install
 
-linux-modules-install: linux-modules
+bzImage-install: bzImage
+		mkdir -p $(TOPDIR)/boot
+		cp $(LINUX_PATH)/arch/i386/boot/bzImage $(TOPDIR)/boot/vmlinuz-$(LINUX_VERSION)
+		cp $(LINUX_PATH)/System.map $(TOPDIR)/boot/System.map-$(LINUX_VERSION)
+		cp $(LINUX_PATH)/.config $(TOPDIR)/boot/config-$(LINUX_VERSION)
+
+modules-install: modules
 		mkdir -p $(TARGET_PATH)/lib/modules
 		$(MAKE) -C $(LINUX_PATH) CROSS_COMPILE=$(CROSS_COMPILER_PREFIX) modules_install
 		/sbin/depmod -b $(TARGET_PATH) $(LINUX_VERSION)
@@ -38,20 +46,9 @@ linux-modules-install: linux-modules
 		mv -f $(TARGET_PATH)/lib/modules/$(LINUX_VERSION)/modules.alias.mod \
 			$(TARGET_PATH)/lib/modules/$(LINUX_VERSION)/modules.alias
 
-$(LINUX_PATH)/.headers-stamp: $(LINUX_PATH)/.config-stamp
-		$(MAKE) -C $(LINUX_PATH) \
-			ARCH=i386 \
-			INSTALL_HDR_PATH=$(TOOLCHAIN_BUILD_PATH)/linux \
-			headers_install
-		touch $@
-
-linux-install: linux-bzImage-install linux-modules-install
-
-linux:		linux-bzImage linux-modules
-
 $(LINUX_PATH)/.extract-stamp:
-		mkdir -p $(TOOLCHAIN_BUILD_PATH)
-		cd $(TOOLCHAIN_BUILD_PATH); tar xjf $(SOURCE_PATH)/linux/linux-$(LINUX_VERSION).tar.bz2
+		mkdir -p $(TARGET_BUILD_PATH)
+		cd $(TARGET_BUILD_PATH); tar xjf $(SOURCE_PATH)/linux/linux-$(LINUX_VERSION).tar.bz2
 		touch $@
 
 $(LINUX_PATH)/.patch-stamp: $(LINUX_PATH)/.extract-stamp
@@ -63,9 +60,9 @@ $(LINUX_PATH)/.config-stamp: $(LINUX_PATH)/.patch-stamp
 		$(MAKE) -C $(LINUX_PATH) CROSS_COMPILE=$(CROSS_COMPILER_PREFIX) oldconfig
 		touch $@
 
-linux-bzImage: $(LINUX_PATH)/.config-stamp
+bzImage: $(LINUX_PATH)/.config-stamp
 		PATH=$(STAGING_DIR)/usr/bin:$(PATH) $(MAKE) -C $(LINUX_PATH) CROSS_COMPILE=$(CROSS_COMPILER_PREFIX) bzImage
 
-linux-modules: $(LINUX_PATH)/.config-stamp
+modules: $(LINUX_PATH)/.config-stamp
 		PATH=$(STAGING_DIR)/usr/bin:$(PATH) $(MAKE) -C $(LINUX_PATH) CROSS_COMPILE=$(CROSS_COMPILER_PREFIX) modules
 

@@ -1,23 +1,35 @@
-.PHONY: zlib-extract zlib-patch zlib-config zlib-build \
-	zlib zlib-install zlib-clean zlib-install-target \
-	zlib-install-sysroot
+include ../../variables.mk
+
+.PHONY: extract patch config zlib \
+	install clean install-target \
+	install-sysroot all
+
+ZLIB_VERSION		=	1.2.3
+ZLIB_PATH		=	$(TARGET_BUILD_PATH)/zlib-$(ZLIB_VERSION)
 
 SYSROOT_ZLIB_SHARED = $(STAGING_DIR)/usr/lib/libz.so.$(ZLIB_VERSION)
 TARGET_ZLIB_SHARED = $(TARGET_PATH)/usr/lib/libz.so.$(ZLIB_VERSION)
 
-zlib-extract: $(ZLIB_PATH)/.extract-stamp
+all: zlib
 
-zlib-patch: $(ZLIB_PATH)/.patch-stamp
+zlib: $(ZLIB_PATH)/libz.so.$(ZLIB_VERSION)
 
-zlib-config: $(ZLIB_PATH)/.config-stamp
+extract: $(ZLIB_PATH)/.extract-stamp
 
-zlib-build: $(ZLIB_PATH)/libz.so.$(ZLIB_VERSION)
+patch: $(ZLIB_PATH)/.patch-stamp
 
-zlib-install-sysroot: $(SYSROOT_ZLIB_SHARED)
-zlib-install-target: $(TARGET_ZLIB_SHARED)
+config: $(ZLIB_PATH)/.config-stamp
+
+clean:
+	PATH=$(STAGING_DIR)/usr/bin:$(PATH) $(MAKE) -C $(ZLIB_PATH) clean
+	rm -f $(ZLIB_PATH)/.build-stamp $(ZLIB_PATH)/.config-stamp
+
+install: install-sysroot install-target
+
+install-sysroot: $(SYSROOT_ZLIB_SHARED)
+install-target: $(TARGET_ZLIB_SHARED)
 
 ZLIB_CFLAGS		=	-fPIC -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
-
 
 $(ZLIB_PATH)/.extract-stamp:
 	mkdir -p $(TARGET_BUILD_PATH)
@@ -58,9 +70,3 @@ $(TARGET_PATH)/usr/lib/libz.so.$(ZLIB_VERSION): $(STAGING_DIR)/usr/lib/libz.so.$
 	cp -dpf $(STAGING_DIR)/usr/lib/libz.so* $(TARGET_PATH)/usr/lib
 	$(STRIPCMD) -s $(TARGET_PATH)/usr/lib/libz.so*
 	touch -c $@
-
-zlib-clean:
-	PATH=$(STAGING_DIR)/usr/bin:$(PATH) $(MAKE) -C $(ZLIB_PATH) clean
-	rm -f $(ZLIB_PATH)/.build-stamp $(ZLIB_PATH)/.config-stamp
-
-zlib: zlib-build

@@ -1,0 +1,176 @@
+include ../../variables.mk
+
+BUILDROOT	:=	$(PWD)/$(BUILDROOT)
+
+PROGS	:= imageunzip frisbee growdisk tmcc binoffset groklilo
+BUILD_TARGETS := $(PROGS)
+INSTALL_TARGETS := $(addsuffix -install,$(PROGS))
+
+.PHONY: clean
+.PHONY: $(BUILD_TARGETS) all
+.PHONY: $(INSTALL_TARGETS) script-install install
+
+TESTBED_PATH = /home/rdjackso/testbed
+TESTBED_BUILD_PATH = $(TARGET_BUILD_PATH)/testbed
+TMCD_PATH = $(TESTBED_PATH)/tmcd
+GROKLILO_PATH = $(TESTBED_PATH)/cdrom/groklilo
+GROWDISK_PATH = $(TESTBED_PATH)/os/growdisk
+TESTBEDOBJ_PATH = /home/rdjackso/testbed-obj
+FRISBEE_PATH = $(TESTBED_PATH)/os/frisbee.redux
+BINOFFSET_PATH = $(TESTBED_PATH)/tools/binoffset
+IMAGEZIP_PATH = $(TESTBED_PATH)/os/imagezip
+TMCD_OBJ_PATH = $(TESTBEDOBJ_PATH)/tmcd
+TMCC_OBJ_PATH = $(TARGET_BUILD_PATH)/tmcc
+CFLAGS = -Os
+
+INSTALLED_BINS	:= $(addprefix $(TARGET_PATH)/usr/, \
+			$(addprefix bin/, binoffset imageunzip tmcc frisbee) \
+			$(addprefix sbin/, groklilo growdisk))
+
+all: $(BUILD_TARGETS)
+
+# Use GNU make's second-expansion feature to simplify the installed binary targets.
+# This target needs to be declared here, so do not move it.
+.SECONDEXPANSION:
+
+$(BUILD_TARGETS): $(TESTBED_BUILD_PATH)/$$@
+
+# Install all of the compiled binaries.  Put them in sane locations like
+# /usr/bin and /usr/sbin, but put symlinks for them in $BINDIR for
+# compatibility.
+$(INSTALLED_BINS): $(TESTBED_BUILD_PATH)/$$(notdir $$@)
+	mkdir -p $(dir $@)
+	install -m 755 $< $@
+	mkdir -p $(TARGET_PATH)/etc/testbed
+	ln -sf $(subst $(TARGET_PATH),,$@) $(TARGET_PATH)/etc/testbed
+
+script-install: $(TESTBED_BUILD_PATH)/.script_install_stamp
+
+$(TESTBED_BUILD_PATH)/.script_install_stamp:
+	mkdir -p $(TARGET_PATH)/etc/testbed
+	mkdir -p $(TARGET_PATH)/etc/emulab
+	install -m 755 $(TMCD_PATH)/linux/control_interface $(TARGET_PATH)/etc/testbed
+	install -m 755 $(TMCD_PATH)/linux/rc.frisbee $(TARGET_PATH)/etc/testbed
+	install -m 755 $(TMCD_PATH)/linux/rc.ipod $(TARGET_PATH)/etc/testbed
+	install -m 755 $(TMCD_PATH)/linux/slicefix $(TARGET_PATH)/etc/testbed
+	install -m 755 $(TMCD_PATH)/linux/freebsd_to_linux_disk $(TARGET_PATH)/etc/testbed
+	install -m 755 $(TMCD_PATH)/linux/check_disklabel $(TARGET_PATH)/etc/testbed
+	install -m 755 $(TMCD_PATH)/linux/remap_ide_disks $(TARGET_PATH)/etc/testbed
+	install -m 755 $(TMCD_PATH)/linux/get_edd_map $(TARGET_PATH)/etc/testbed
+	install -m 755 $(TMCD_PATH)/linux/extract_kernel_version $(TARGET_PATH)/etc/testbed
+	install -m 755 $(TMCD_PATH)/linux/guess_linux_root_device $(TARGET_PATH)/etc/testbed
+	install -m 755 $(TMCD_PATH)/common/paths.sh $(TARGET_PATH)/etc/emulab
+	mkdir -p $(TESTBED_BUILD_PATH)
+	touch $(TESTBED_BUILD_PATH)/.script_install_stamp
+
+imageunzip-install: $(TARGET_PATH)/usr/bin/imageunzip
+
+frisbee-install: $(TARGET_PATH)/usr/bin/frisbee
+
+growdisk-install: $(TARGET_PATH)/usr/sbin/growdisk
+
+binoffset-install: $(TARGET_PATH)/usr/bin/binoffset
+
+groklilo-install: $(TARGET_PATH)/usr/sbin/groklilo
+
+tmcc-install: $(TARGET_PATH)/usr/bin/tmcc
+
+clean:
+		rm -rf $(TESTBED_BUILD_PATH)
+
+install: $(INSTALL_TARGETS) script-install
+
+$(TESTBED_BUILD_PATH)/groklilo:
+	mkdir -p $(TESTBED_BUILD_PATH)
+	PATH=$(STAGING_DIR)/usr/bin:$(PATH) \
+	$(CROSS_COMPILER_PREFIX)gcc \
+	-o $@ \
+	$(GROKLILO_PATH)/groklilo.c
+	$(STRIPCMD) --strip-unneeded $@
+
+$(TESTBED_BUILD_PATH)/binoffset:
+	mkdir -p $(TESTBED_BUILD_PATH)
+	PATH=$(STAGING_DIR)/usr/bin:$(PATH) \
+	$(CROSS_COMPILER_PREFIX)gcc \
+	-o $@ \
+	$(BINOFFSET_PATH)/binoffset.c
+	$(STRIPCMD) --strip-unneeded $@
+
+$(TESTBED_BUILD_PATH)/growdisk:
+	mkdir -p $(TESTBED_BUILD_PATH)
+	PATH=$(STAGING_DIR)/usr/bin:$(PATH) \
+	$(CROSS_COMPILER_PREFIX)gcc \
+		-o $@ \
+		-I $(TESTBED_PATH)/os/imagezip \
+		-Os \
+		$(GROWDISK_PATH)/growdisk.c
+	$(STRIPCMD) --strip-unneeded $@
+
+# ARGH! tmcc wants to link against libtb just for the errorc function in libtb/log.c.
+# libtb in turn wants libmysql.  There's no point building all of libtb and its
+# required libs under uclibc, so I'm going to skip the testbed makefiles and
+# build tmcc here.  Note that you must still configure the object tree with the
+# tbdefs file you want, since we need config.h.
+
+#$(TMCC_OBJ_PATH)/tmcc: $(SYSROOT_OPENSSL_SHARED)
+#	mkdir -p $(TMCC_OBJ_PATH)
+#	PATH=$(STAGING_DIR)/usr/bin:$(PATH) \
+#	$(CROSS_COMPILER_PREFIX)gcc \
+#		-DWITHSSL \
+#		-o $@ \
+#		-I$(TESTBEDOBJ_PATH) \
+#		-I$(TESTBED_PATH)/lib/libtb \
+#		-Os \
+#		-lssl \
+#		$(TESTBED_PATH)/tmcd/tmcc.c \
+#		$(TESTBED_PATH)/tmcd/ssl.c \
+#		$(TESTBED_PATH)/lib/libtb/log.c
+#	$(STRIPCMD) --strip-unneeded $@
+
+$(TESTBED_BUILD_PATH)/tmcc:
+	mkdir -p $(TESTBED_BUILD_PATH)
+	PATH=$(STAGING_DIR)/usr/bin:$(PATH) \
+	$(CROSS_COMPILER_PREFIX)gcc \
+		-o $@ \
+		-I$(TESTBEDOBJ_PATH) \
+		-I$(TESTBED_PATH)/lib/libtb \
+		-Os \
+		$(TESTBED_PATH)/tmcd/tmcc.c \
+		$(TESTBED_PATH)/lib/libtb/log.c
+	$(STRIPCMD) --strip-unneeded $@
+
+#	$(MAKE) -C $(TMCD_PATH) \
+#		CC=$(CROSS_COMPILER_PREFIX)gcc \
+#		CFLAGS="$(CFLAGS) -I$(TESTBEDOBJ_PATH)" \
+#		PATH=$(STAGING_DIR)/usr/bin:$(PATH) tmcc
+
+$(TESTBED_BUILD_PATH)/frisbee: $(SYSROOT_ZLIB_SHARED)
+	PATH=$(STAGING_DIR)/usr/bin:$(PATH) \
+	$(MAKE) -C $(FRISBEE_PATH) -f Makefile-linux.sa \
+		CC=$(CROSS_COMPILER_PREFIX)gcc \
+		PATH=$(STAGING_DIR)/usr/bin:$(PATH) frisbee
+	mkdir -p $(dir $@)
+	mv $(FRISBEE_PATH)/frisbee $@
+	$(MAKE) -C $(FRISBEE_PATH) -f Makefile-linux.sa clean
+	$(STRIPCMD) --strip-unneeded $@
+
+$(TESTBED_BUILD_PATH)/imageunzip: $(SYSROOT_ZLIB_SHARED)
+	PATH=$(STAGING_DIR)/usr/bin:$(PATH) \
+	$(MAKE) -C $(IMAGEZIP_PATH) -f Makefile-linux.sa \
+		CC=$(CROSS_COMPILER_PREFIX)gcc \
+		imageunzip
+	mkdir -p $(dir $@)
+	mv $(IMAGEZIP_PATH)/imageunzip $@
+	$(MAKE) -C $(IMAGEZIP_PATH) -f Makefile-linux.sa clean
+	$(STRIPCMD) --strip-unneeded $@
+
+$(TESTBED_BUILD_PATH)/imagezip: $(SYSROOT_ZLIB_SHARED)
+	PATH=$(STAGING_DIR)/usr/bin:$(PATH) \
+	$(MAKE) -C $(IMAGEZIP_PATH) -f Makefile-linux.sa \
+		CC=$(CROSS_COMPILER_PREFIX)gcc \
+		PATH=$(STAGING_DIR)/usr/bin:$(PATH) imagezip
+	$(MAKE) -C $(IMAGEZIP_PATH) -f Makefile-linux.sa clean
+	mkdir -p $(dir $@)
+	mv $(IMAGEZIP_PATH)/imagnzip $@
+	$(STRIPCMD) --strip-unneeded $@
+

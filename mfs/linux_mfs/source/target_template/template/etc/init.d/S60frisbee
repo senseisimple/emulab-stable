@@ -1,0 +1,41 @@
+#!/bin/sh
+#
+# Start frisbee
+#
+
+udhcpc_opts="-q"
+
+LOCKDIR=/var/lock/udhcpc.lock
+SUCCESS_FLAG=/var/state/found_controlnet
+
+start() {
+	
+ 	echo "Starting frisbee..."
+	/etc/testbed/rc.frisbee
+	return $rc
+}
+
+stop() {
+	:
+}
+restart() {
+	:
+}	
+
+case "$1" in
+  start)
+  	start
+	;;
+  stop)
+  	stop
+	;;
+  restart|reload)
+  	restart
+	;;
+  *)
+	echo $"Usage: $0 {start|stop|restart}"
+	exit 1
+esac
+
+exit $?
+
