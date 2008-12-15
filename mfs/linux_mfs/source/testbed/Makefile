@@ -44,9 +44,7 @@ $(INSTALLED_BINS): $(TESTBED_BUILD_PATH)/$$(notdir $$@)
 	mkdir -p $(TARGET_PATH)/etc/testbed
 	ln -sf $(subst $(TARGET_PATH),,$@) $(TARGET_PATH)/etc/testbed
 
-script-install: $(TESTBED_BUILD_PATH)/.script_install_stamp
-
-$(TESTBED_BUILD_PATH)/.script_install_stamp:
+script-install:
 	mkdir -p $(TARGET_PATH)/etc/testbed
 	mkdir -p $(TARGET_PATH)/etc/emulab
 	install -m 755 $(TMCD_PATH)/linux/control_interface $(TARGET_PATH)/etc/testbed
@@ -60,8 +58,6 @@ $(TESTBED_BUILD_PATH)/.script_install_stamp:
 	install -m 755 $(TMCD_PATH)/linux/extract_kernel_version $(TARGET_PATH)/etc/testbed
 	install -m 755 $(TMCD_PATH)/linux/guess_linux_root_device $(TARGET_PATH)/etc/testbed
 	install -m 755 $(TMCD_PATH)/common/paths.sh $(TARGET_PATH)/etc/emulab
-	mkdir -p $(TESTBED_BUILD_PATH)
-	touch $(TESTBED_BUILD_PATH)/.script_install_stamp
 
 imageunzip-install: $(TARGET_PATH)/usr/bin/imageunzip
 
