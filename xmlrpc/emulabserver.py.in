@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004-2007 University of Utah and the Flux Group.
+# Copyright (c) 2004-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 import sys
@@ -4345,6 +4345,42 @@ class elabinelab:
             pass
 
         (exitval, output) = runcommand(TBDIR + "/sbin/snmpit.proxy " + argstr)
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+        
+        return EmulabResponse(RESPONSE_SUCCESS, output=output)
+    
+    def vlansnew(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("xmldoc",))
+        if (argerror):
+            return argerror
+
+        verifyerror = self.verifystuff();
+        if (verifyerror):
+            return verifyerror
+
+        #
+        # We get an xmldoc as the argument, which we give to the proxy
+        # to decode on its own. Easier then trying to decode a bunch
+        # of stuff to pass on the commandline.
+        #
+        (xmlfp, xmlfilename) = writensfile(argdict["xmldoc"]);
+        if not xmlfilename:
+            return EmulabResponse(RESPONSE_SERVERERROR, output="Server Error")
+
+        argstr = "-p " + self.pid + " -e " + self.eid + " " + xmlfilename;
+
+        (exitval, output) = runcommand(TBDIR + "/sbin/snmpit.proxy2 " + argstr)
         if exitval:
             return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
         
