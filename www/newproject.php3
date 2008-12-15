@@ -178,7 +178,7 @@ function SPITFORM($formfields, $returning, $errors)
 	if ($USERSELECTUIDS || $FirstInitState == "createproject") {
 	    echo "<tr>
                       <td colspan=2>*<a
-                             href='$WIKIDOCURL/Security'
+                             href='$WIKIDOCURL/SecReqs'
                              target=_blank>Username</a>
                                 (alphanumeric, lowercase):</td>
                       <td class=left>
