@@ -29,7 +29,7 @@ my $PGENIDOMAIN   = "@PROTOGENI_DOMAIN@";
 my $PGENISUPPORT  = @PROTOGENI_SUPPORT@;
 my $TBBASE        = "@TBBASE@";
 my $FETCH	  = "/usr/bin/fetch";
-my $GENCRL        = "$TB/sbin/protogeni/gencrl";
+my $POSCRL        = "$TB/sbin/protogeni/postcrl";
 my $LOCALCRL      = "$TB/ssl/crl.pem";
 
 # un-taint path
@@ -74,10 +74,13 @@ mkdir("/tmp/genicacerts.$$", 0755) or
     fatal("Could not mkdircacerts tmp dir");
 
 #
-# Create a new local CRL to concate with whatever get from Utah.
+# Post a new CRL. This generates a new local CRL file as well, to
+# concate with whatever get from Utah, which will probably not be
+# uptodate since our post does not cause Utah to regen the bundle.
+# (just making sure we get a new version posted every night).
 #
-system($GENCRL) >= 0
-    or fatal("Could not generate new CRL!");
+system($POSTCRL) >= 0
+    or fatal("Could not post new CRL!");
 
 #
 # Fetch the ca bundle from Utah. These are public keys ...
