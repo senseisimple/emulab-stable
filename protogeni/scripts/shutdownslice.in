@@ -59,6 +59,7 @@ if ($asch) {
 
 # Now we can load the libraries after setting the proper DB.
 use lib '@prefix@/lib';
+use libtestbed;
 require GeniDB;
 require Genixmlrpc;
 use GeniResponse;
@@ -83,6 +84,9 @@ if (!defined($slice)) {
     fatal("No such slice for $uuid");
 }
 
+#
+# 
+#
 if ($asch) {
     #
     # The RPC context for this script is as the CH
@@ -117,12 +121,28 @@ if ($asch) {
     fatal("Could not lookup CM list")
 	if (!defined($query_result));
 
+    #
+    # Go into the background now, so as not to block the caller for
+    # a long time. Mail will be sent if there is an error.
+    # XXX Cannot use libaudit cause there is already an audit running
+    # via the xmlrpc invocation.
+    #
+    my $logname = TBMakeLogname("shutdownslice");
+    if (TBBackGround($logname)) {
+	#
+	# Parent exits normally.
+	#
+	exit(0);
+    }
+    my $errors = 0;
+
     while (my ($manager_uuid) = $query_result->fetchrow_array()) {
 	my $manager = GeniAuthority->Lookup($manager_uuid);
-	fatal("Could not lookup up CM $manager_uuid")
+	print STDERR "Could not lookup up CM $manager_uuid\n"
 	    if (!defined($manager));
 
-	print STDERR "Calling out to $manager to do shutdown\n";
+	print STDERR "Calling out to $manager at " .
+	    TBTimeStamp() . " to do shutdown\n";
 
 	my $response =
 	  Genixmlrpc::CallMethod($manager->url(), undef,
@@ -131,10 +151,25 @@ if ($asch) {
 				   "credential" =>
 				       $slice_credential->asString() });
 	if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS) {
-	    fatal("Could not shutdown $slice on $manager: " .
-		  $response->output());
+	    print STDERR
+		"Could not shutdown $slice on $manager: " .
+		    $response->output();
+	    $errors++;
 	}
     }
+    if ($errors) {
+	SENDMAIL($TBOPS,
+		 "Error doing emergency shutdown",
+		 "Error doing emergency shutdown of slice $uuid",
+		 undef, undef, $logname);
+    }
+    else {
+	SENDMAIL($TBOPS,
+		 "ClearingHouse did an emergency shutdown",
+		 "ClearingHouse did an emergency shutdown of slice $uuid",
+		 undef, undef, $logname);
+    }
+    exit($errors);
 }
 else {
     #
