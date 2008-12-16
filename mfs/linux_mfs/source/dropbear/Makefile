@@ -1,15 +1,22 @@
-.PHONY: dropbear-extract dropbear-patch dropbear-config dropbear-build \
-	dropbear dropbear-install dropbear-clean
+include ../../variables.mk
 
-dropbear-extract: $(DROPBEAR_PATH)/.extract-stamp
+DROPBEAR_VERSION	=	0.52
+DROPBEAR_PATH		=	$(TARGET_BUILD_PATH)/dropbear-$(DROPBEAR_VERSION)
 
-dropbear-patch: $(DROPBEAR_PATH)/.patch-stamp
+.PHONY: extract patch config build \
+	dropbear install clean all
 
-dropbear-config: $(DROPBEAR_PATH)/.config-stamp
+all: dropbear
 
-dropbear-build: $(DROPBEAR_PATH)/dropbearmulti
+extract: $(DROPBEAR_PATH)/.extract-stamp
 
-dropbear-install: $(TARGET_PATH)/usr/sbin/dropbear
+patch: $(DROPBEAR_PATH)/.patch-stamp
+
+config: $(DROPBEAR_PATH)/.config-stamp
+
+dropbear: $(DROPBEAR_PATH)/dropbearmulti
+
+install: $(TARGET_PATH)/usr/sbin/dropbear
 
 $(DROPBEAR_PATH)/.extract-stamp:
 	mkdir -p $(TARGET_BUILD_PATH)
@@ -60,8 +67,6 @@ $(TARGET_PATH)/usr/sbin/dropbear: $(DROPBEAR_PATH)/dropbearmulti
 	mkdir -p $(TARGET_PATH)/usr/lib
 	touch -c $@
 
-dropbear-clean:
+clean:
 	PATH=$(STAGING_DIR)/usr/bin:$(PATH) $(MAKE) -C $(DROPBEAR_PATH) clean
 	rm -f $(DROPBEAR_PATH)/.build-stamp $(DROPBEAR_PATH)/.config-stamp
-
-dropbear: dropbear-build
