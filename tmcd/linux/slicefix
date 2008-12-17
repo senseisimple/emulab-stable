@@ -408,13 +408,15 @@ dofreebsd() {
 
 	if [ $changedisk -eq 1 ]; then
 	    echo "  updating /etc/fstab"
-	    sed -i.orig -e "s;^/dev/[a-zA-Z][a-zA-Z]*[0-9][0-9]*s[0-9][0-9]*;/dev/${freebsd_disk}s${part};" /mnt/etc/fstab || {
+	    cp -fp /mnt/etc/fstab /mnt/etc/fstab.orig
+	    sed -i -e "s;^/dev/[a-zA-Z][a-zA-Z]*[0-9][0-9]*s[0-9][0-9]*;/dev/${freebsd_disk}s${part};" /mnt/etc/fstab || {
 		echo "Failed to update /etc/fstab"
 		umount $rootdev
 		return 1
 	    }
 	    echo "  updating /etc/dumpdates"
-	    sed -i.orig -e "s;^/dev/[a-zA-Z][a-zA-Z]*[0-9][0-9]*s[0-9][0-9]*;/dev/${freebsd_disk}s${part};" /mnt/etc/dumpdates || {
+	    cp -fp /mnt/etc/dumpdates /mnt/etc/dumpdates.orig
+	    sed -i -e "s;^/dev/[a-zA-Z][a-zA-Z]*[0-9][0-9]*s[0-9][0-9]*;/dev/${freebsd_disk}s${part};" /mnt/etc/dumpdates || {
 		echo "Failed to update /etc/dumpdates"
 		umount $rootdev
 		return 1
@@ -433,7 +435,8 @@ dofreebsd() {
 		on="en"
 	    fi
 	    echo "  ${on}abling ACPI"
-	    sed -i.orig -e "/[Aa][Cc][Pp][Ii]/d" /mnt/boot/loader.conf || {
+	    cp -fp /mnt/boot/loader.conf /mnt/boot/loader.conf.orig
+	    sed -i -e "/[Aa][Cc][Pp][Ii]/d" /mnt/boot/loader.conf || {
 		echo "Failed to update /boot/loader.conf"
 		umount $rootdev
 		return 1
@@ -461,7 +464,8 @@ EOF2
 		on="en"
 	    fi
 	    echo "  ${on}abling ASF"
-	    sed -i.orig -e "/[Aa][Ss][Ff]/d" /mnt/boot/loader.conf || {
+	    cp -fp /mnt/boot/loader.conf /mnt/boot/loader.conf.orig
+	    sed -i -e "/[Aa][Ss][Ff]/d" /mnt/boot/loader.conf || {
 		echo "Failed to update /boot/loader.conf"
 		umount $rootdev
 		return 1
@@ -595,7 +599,8 @@ dolinux() {
 		# grub's notion of root disk since the flash device will be "hd0".
 		# It appears that we do NOT have to update Linux's drive mapping.
 		#
-		sed -i'' -e "s;root (hd[0-9],[0-9]);root (hd${gdisk},${gpart});" $gconf || {
+		cp -pf /mnt/$fgconf /mnt/$fgconf.orig
+		sed -i -e "s;root (hd[0-9],[0-9]);root (hd${gdisk},${gpart});" $gconf || {
 		    echo "Failed to update root in $fgconf"
 		}
 
