@@ -1,266 +1,183 @@
-diff -r -C 5 4.10/src/sys/netinet/ip_dummynet.c 4.10_Backfill/src/sys/netinet/ip_dummynet.c
-*** 4.10/src/sys/netinet/ip_dummynet.c	Wed Dec 10 11:06:42 2008
---- 4.10_Backfill/src/sys/netinet/ip_dummynet.c	Wed Dec 10 11:07:31 2008
-***************
-*** 771,780 ****
---- 771,794 ----
-      q->len-- ;
-      q->len_bytes -= len ;
-  
-      pkt->output_time = curr_time + p->delay ;
-  
-+     /*pramod-CHANGES:
-+     // We encountered one of our dummy packets. Simply drop the packet.
-+     // We do not want the dummy packets to be forwarded out of this
-+     // delay node.
-+     // Free the memory that we allocated for the packet. 
+diff -u -r /share/freebsd/4.10-release/src/sys/netinet/ip_dummynet.c /tmp/ip_dummynet.c
+--- /share/freebsd/4.10-release/src/sys/netinet/ip_dummynet.c	Tue Dec 30 05:28:09 2003
++++ /tmp/ip_dummynet.c	Wed Dec 17 16:34:51 2008
+@@ -513,6 +513,18 @@
+ 
+     pkt->output_time = curr_time + p->delay ;
+ 
++#ifdef DN_BACKFILL
++    /*
++     * Backfill dummy packet.  The packet has served its purpose and we
++     * don't want to actually put it out on the wire, so drop it now.
 +     */
-+     if(pkt->isDummy)
-+     {
-+         m_freem(pkt->dn_m);
-+         free(pkt, M_DUMMYNET);
-+         return;
-+     }
++    if (pkt->isDummy) {
++	m_freem(pkt->dn_m);
++        free(pkt, M_DUMMYNET);
++        return;
++    }
++#endif
++
+     if (p->head == NULL)
+ 	p->head = pkt;
+     else
+@@ -746,6 +758,93 @@
+ 		transmit_event(p);
+ 	}
+     }
++
++#ifdef DN_BACKFILL
++    /* sweep pipes and insert dummy packets into BackFill 'enabled' ones */
++    for (pe = all_pipes; pe ; pe = pe->next ) {
++	if (pe->startBackFill) {
++	    int ticksElapsed;
++	    struct dn_flow_queue *pipeQueue = pe->fs.rq[0];
++	    int numPackets = 0;
++
++	    if (pe->lastFillTick != 0)
++		ticksElapsed = curr_time - pe->lastFillTick;
++	    else
++		ticksElapsed = 1;
++
++	    pe->lastFillTick = curr_time;
++	    pe->outStandingBackFillBits += ((pe->backfill*ticksElapsed) / hz);
++
++	    /* Determine the number of full size packets to be sent. */
++	    numPackets = pe->outStandingBackFillBits / 12000;
++	    pe->outStandingBackFillBits %= 12000;
++
++	    while (numPackets > 0) {
++		struct mbuf *backFillBuf = NULL;
++		struct dn_pkt *backFillPkt = NULL;
++		int packetLen = 1500;
++
++		/*
++		 * We filled up the entire queue with dummy packets.
++		 * Assume that the rest of the backfill packets have
++		 * been dropped.
++		 */
++		if (pe->fs.flags_fs & DN_QSIZE_IS_BYTES) {
++		    if (pipeQueue->len_bytes > pipeQueue->fs->qsize)
++			break;
++		} else {
++		    if (pipeQueue->len > pipeQueue->fs->qsize)
++			break;
++		}
++
++		backFillBuf = m_get(M_DONTWAIT, MT_DATA);
++
++		backFillPkt = (struct dn_pkt *)malloc(sizeof(*backFillPkt),
++				M_DUMMYNET, M_NOWAIT|M_ZERO);
++
++		/*if (backFillPkt != NULL && backFillBuf != NULL)*/
++		{
++		    backFillPkt->hdr.mh_type = MT_TAG;
++		    backFillPkt->hdr.mh_flags = PACKET_TAG_DUMMYNET;
++		    DN_NEXT(backFillPkt) = NULL;
++		    backFillPkt->dn_m = backFillBuf;
++		    backFillPkt->isDummy = 1;
++
++		    backFillBuf->m_nextpkt = NULL;
++		    backFillBuf->m_pkthdr.len = packetLen;
++		}
++
++		if (pipeQueue->head == NULL)
++		    pipeQueue->head = backFillPkt;
++		else
++		    DN_NEXT(pipeQueue->tail) = backFillPkt;
++
++		pipeQueue->tail = backFillPkt;
++		pipeQueue->len++;
++		pipeQueue->len_bytes += packetLen;
++
++		/*
++		 * If we reach this point the flow was previously idle,
++		 * so we need to schedule it.
++		 */
++		if (pipeQueue->head == backFillPkt) {
++		    /* Fixed-rate queue: just insert into the ready_heap. */
++		    dn_key t = 0 ;
++		    if (pe->bandwidth)
++			t = SET_TICKS(backFillPkt, pipeQueue, pe);
++		    pipeQueue->sched_time = curr_time ;
++		    if (t == 0) /* must process it now */
++			ready_event(pipeQueue);
++		    else
++			heap_insert(&ready_heap, curr_time + t, pipeQueue);
++		}
++
++		numPackets--;
++	    }
++	}
++    }
++#endif
++
+     /* sweep pipes trying to expire idle flow_queues */
+     for (pe = all_pipes; pe ; pe = pe->next )
+ 	if (pe->idle_heap.elements > 0 &&
+@@ -1132,6 +1231,17 @@
+     q = find_queue(fs, &(fwa->f_id));
+     if ( q == NULL )
+ 	goto dropit ;		/* cannot allocate queue		*/
++
++#ifdef DN_BACKFILL
++    /*
++     * If Backfill has been enabled for this pipe, we now
++     * have a queue to fill up. Start putting dummy packets
++     * into this queue from the next tick.
++     */
++    if (fs->pipe->enableBackFill)
++	fs->pipe->startBackFill = 1;
++#endif
++
+     /*
+      * update statistics, then check reasons to drop pkt
+      */
+@@ -1578,6 +1688,15 @@
+ 	x->delay = p->delay ;
+ 	set_fs_parms(&(x->fs), pfs);
+ 
++#ifdef DN_BACKFILL
++	x->enableBackFill = 0;
++	x->startBackFill = 0;
++	x->backfill = p->backfill;
++	if (x->backfill > 0) {
++	    x->enableBackFill = 1;
++	    /*x->lastFillTick = 0; */
++	}
++#endif
+ 
+ 	if ( x->fs.rq == NULL ) { /* a new pipe */
+ 	    r = alloc_hash(&(x->fs), pfs) ;
+diff -u -r /share/freebsd/4.10-release/src/sys/netinet/ip_dummynet.h /tmp/ip_dummynet.h
+--- /share/freebsd/4.10-release/src/sys/netinet/ip_dummynet.h	Tue May 13 03:31:06 2003
++++ /tmp/ip_dummynet.h	Wed Dec 17 16:35:35 2008
+@@ -141,6 +141,9 @@
+     struct sockaddr_in *dn_dst ;
+     struct route ro;		/* route, for ip_output. MUST COPY	*/
+     int flags ;			/* flags, for ip_output (IPv6 ?)	*/
++    /* #ifdef DN_BACKFILL */
++    int isDummy ;		/* this is a dummy packet               */
++    /* #endif */
+ };
+ 
+ /*
+@@ -350,8 +353,19 @@
+     int ready ; /* set if ifp != NULL and we got a signal from it */
+ 
+     struct dn_flow_set fs ; /* used with fixed-rate flows */
++
++    /* #ifdef DN_BACKFILL */
++    long backfill;
++    int enableBackFill;
++    int startBackFill;
++    int outStandingBackFillBits;
++    dn_key lastFillTick;
++    /* #endif */
+ };
+ 
++/* Argh, why are there internal fields in the user interface struct!? */
++#define DN_HAVE_BACKFILL	1
 + 
-+ 
-      if (p->head == NULL)
-  	p->head = pkt;
-      else
-  	DN_NEXT(p->tail) = pkt;
-      p->tail = pkt;
-***************
-*** 1020,1029 ****
---- 1034,1144 ----
-  		    ready_event_wfq(p) ;
-  	    } else
-  		transmit_event(p);
-  	}
-      }
-+ 
-+     /*pramod-CHANGES: */
-+ 
-+     /* sweep pipes and insert dummy packets into BackFill 'enabled' ones */
-+     for (pe = all_pipes; pe ; pe = pe->next )
-+     {
-+         if(pe->startBackFill)
-+         {
-+ 
-+             int ticksElapsed;
-+             struct dn_flow_queue *pipeQueue = pe->fs.rq[0];
-+             int numPackets = 0;
-+ 
-+             if(pe->lastFillTick != 0)
-+                 ticksElapsed = curr_time - pe->lastFillTick;
-+             else
-+             {
-+                 ticksElapsed = 1;
-+             }
-+ 
-+             pe->lastFillTick = curr_time;
-+             pe->outStandingBackFillBits += ((pe->backfill*ticksElapsed)/hz);
-+ 
-+             /* Determine the number of full size packets required to be sent. */
-+             numPackets = pe->outStandingBackFillBits/12000;
-+             pe->outStandingBackFillBits %= 12000;
-+ 
-+             while(numPackets > 0)
-+             {
-+                 struct mbuf *backFillBuf = NULL;
-+                 struct dn_pkt *backFillPkt = NULL;
-+                 int packetLen = 1500;
-+ 
-+                 /* We filled up the entire queue with dummy packets..
-+                 // Assume that the rest of the backfill packets have
-+                 // been dropped. */
-+                 if ( pe->fs.flags_fs & DN_QSIZE_IS_BYTES)
-+                 {
-+                     if(pipeQueue->len_bytes > pipeQueue->fs->qsize)
-+                         break;
-+                 }
-+                 else
-+                 {
-+                     if(pipeQueue->len > pipeQueue->fs->qsize)
-+                         break;
-+                 }
-+ 
-+                 backFillBuf = m_get(M_DONTWAIT,MT_DATA);
-+ 
-+                 backFillPkt = (struct dn_pkt *)malloc(sizeof (*backFillPkt), M_DUMMYNET, M_NOWAIT|M_ZERO);
-+ 
-+ 
-+                 /*if ( backFillPkt != NULL && backFillBuf != NULL )*/
-+                 {
-+                     backFillPkt->hdr.mh_type = MT_TAG;
-+                     backFillPkt->hdr.mh_flags = PACKET_TAG_DUMMYNET;
-+                     DN_NEXT(backFillPkt) = NULL;
-+                     backFillPkt->dn_m = backFillBuf;
-+                     backFillPkt->isDummy = 1;
-+ 
-+                     backFillBuf->m_nextpkt = NULL;
-+                     backFillBuf->m_pkthdr.len = packetLen;
-+                 }
-+ 
-+                 if (pipeQueue->head == NULL)
-+                     pipeQueue->head = backFillPkt;
-+                 else
-+                     DN_NEXT(pipeQueue->tail) = backFillPkt;
-+ 
-+                 pipeQueue->tail = backFillPkt;
-+                 pipeQueue->len++;
-+                 pipeQueue->len_bytes += packetLen;
-+ 
-+                 /* If we reach this point the flow was previously idle, so we need
-+                  * to schedule it. */
-+                 if ( pipeQueue->head == backFillPkt )       /* flow was idle*/
-+                 {
-+                     /*
-+                      * Fixed-rate queue: just insert into the ready_heap.
-+                      */
-+                     dn_key t = 0 ;
-+                     if (pe->bandwidth)
-+                         t = SET_TICKS(backFillPkt, pipeQueue, pe);
-+                    pipeQueue->sched_time = curr_time ;
-+                     if (t == 0) /* must process it now */
-+                         ready_event( pipeQueue );
-+                     else
-+                         heap_insert(&ready_heap, curr_time + t , pipeQueue );
-+                 }
-+ 
-+                 numPackets--;
-+ 
-+ 
-+             }
-+         }
-+     }
-+ 
-+ 
-+ 
-+ 
-+ 
-      /* sweep pipes trying to expire idle flow_queues */
-      for (pe = all_pipes; pe ; pe = pe->next )
-  	if (pe->idle_heap.elements > 0 &&
-  		DN_KEY_LT(pe->idle_heap.p[0].key, pe->V) ) {
-  	    struct dn_flow_queue *q = pe->idle_heap.p[0].object ;
-***************
-*** 1410,1419 ****
---- 1525,1544 ----
-      if ( q == NULL )
-  	goto dropit ;		/* cannot allocate queue		*/
-      /*
-       * update statistics, then check reasons to drop pkt
-       */
-+ 
-+     /*pramod-CHANGES:
-+     // If Backfill has been enabled for this pipe, we now
-+     // have a queue to fill up. Start putting dummy packets
-+     // into this queue from the next tick. */
-+     if(fs->pipe->enableBackFill)
-+     {
-+         fs->pipe->startBackFill = 1;
-+     }
-+ 
-      q->tot_bytes += len ;
-      q->tot_pkts++ ;
-      if ( fs->plr && random() < fs->plr )
-  	goto dropit ;		/* random pkt drop			*/
-      if ( fs->flags_fs & DN_QSIZE_IS_BYTES) {
-***************
-*** 1857,1866 ****
---- 1982,1992 ----
-  	    x = malloc(sizeof(struct dn_pipe), M_DUMMYNET, M_NOWAIT | M_ZERO);
-  	    if (x == NULL) {
-  		printf("dummynet: no memory for new pipe\n");
-  		return ENOSPC;
-  	    }
-+ 
-  	    x->pipe_nr = p->pipe_nr;
-  	    x->fs.pipe = x ;
-  	    /* idle_heap is the only one from which we extract from the middle.
-  	     */
-  	    x->idle_heap.size = x->idle_heap.elements = 0 ;
-***************
-*** 1875,1892 ****
---- 2001,2029 ----
-  		    q->numbytes = 0;
-  		}
-  	    splx(s);
-  	}
-  
-+ 
-  	s = splimp();
-  	x->bandwidth = p->bandwidth ;
-  	x->numbytes = 0; /* just in case... */
-  	bcopy(p->if_name, x->if_name, sizeof(p->if_name) );
-  	x->ifp = NULL ; /* reset interface ptr */
-  	x->delay = p->delay ;
-  	set_fs_parms(&(x->fs), pfs);
-  
-+     /*pramod-CHANGES:  */
-+     x->enableBackFill = 0;
-+     x->startBackFill = 0;
-+     x->backfill = p->backfill;
-+     /*pramod-CHANGES: */
-+     if(x->backfill > 0)
-+     {
-+         x->enableBackFill = 1;
-+         /*x->lastFillTick = 0; */
-+     }
-  
-  	if ( x->fs.rq == NULL ) { /* a new pipe */
-  	    r = alloc_hash(&(x->fs), pfs) ;
-  	    if (r) {
-  		free(x, M_DUMMYNET);
-***************
-*** 1929,1938 ****
---- 2066,2076 ----
-  	    x = b;
-  	}
-  	s = splimp();
-  	set_fs_parms(x, pfs);
-  
-+ 
-  	if ( x->rq == NULL ) { /* a new flow_set */
-  	    r = alloc_hash(x, pfs) ;
-  	    if (r) {
-  		free(x, M_DUMMYNET);
-  		splx(s);
-diff -r -C 5 4.10/src/sys/netinet/ip_dummynet.h 4.10_Backfill/src/sys/netinet/ip_dummynet.h
-*** 4.10/src/sys/netinet/ip_dummynet.h	Wed Dec 10 11:06:42 2008
---- 4.10_Backfill/src/sys/netinet/ip_dummynet.h	Wed Dec 10 11:07:36 2008
-***************
-*** 139,148 ****
---- 139,150 ----
-      dn_key output_time;		/* when the pkt is due for delivery	*/
-      struct ifnet *ifp;		/* interface, for ip_output		*/
-      struct sockaddr_in *dn_dst ;
-      struct route ro;		/* route, for ip_output. MUST COPY	*/
-      int flags ;			/* flags, for ip_output (IPv6 ?)	*/
-+     /* pramod-CHANGES */
-+     int isDummy;
-  };
-  
-  /*
-   * Overall structure of dummynet (with WF2Q+):
-  
-***************
-*** 348,357 ****
---- 350,367 ----
-      char if_name[IFNAMSIZ];
-      struct ifnet *ifp ;
-      int ready ; /* set if ifp != NULL and we got a signal from it */
-  
-      struct dn_flow_set fs ; /* used with fixed-rate flows */
-+ 
-+ 
-+     /* pramod - CHANGES: */
-+     long backfill;
-+     int enableBackFill;
-+     int startBackFill;
-+     int outStandingBackFillBits;
-+     dn_key lastFillTick;
-  };
-  
-  #ifdef _KERNEL
-  typedef	int ip_dn_ctl_t(struct sockopt *); /* raw_ip.c */
-  typedef	void ip_dn_ruledel_t(void *); /* ip_fw.c */
+ #ifdef _KERNEL
+ typedef	int ip_dn_ctl_t(struct sockopt *); /* raw_ip.c */
+ typedef	void ip_dn_ruledel_t(void *); /* ip_fw.c */
