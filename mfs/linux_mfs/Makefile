@@ -11,6 +11,8 @@ BOOT_PATH	=	$(PWD)/boot
 
 MODULES := busybox zlib linux dropbear testbed hdparm target_template
 INSTALL_MODULES := $(addsuffix -install,$(MODULES))
+EXTRACT_MODULES := $(addsuffix -extract,$(MODULES))
+PATCH_MODULES := $(addsuffix -patch,$(MODULES))
 CLEAN_MODULES := $(addsuffix -clean,$(MODULES))
 
 .PHONY: all clean install root-template-install devices \
@@ -34,6 +36,12 @@ $(MODULES):
 
 $(CLEAN_MODULES):
 	$(MAKE) -C $(SOURCE_PATH)/$(subst -clean,,$@) clean
+
+$(EXTRACT_MODULES):
+	$(MAKE) -C $(SOURCE_PATH)/$(subst -extract,,$@) extract
+
+$(PATCH_MODULES):
+	$(MAKE) -C $(SOURCE_PATH)/$(subst -patch,,$@) patch
 
 $(INSTALL_MODULES):
 	$(MAKE) -C $(SOURCE_PATH)/$(subst -install,,$@) install
