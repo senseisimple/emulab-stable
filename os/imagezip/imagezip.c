@@ -15,7 +15,9 @@
 #include <ctype.h>
 #include <err.h>
 #include <fcntl.h>
+#if !defined(__UCLIBC__)
 #include <fstab.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>

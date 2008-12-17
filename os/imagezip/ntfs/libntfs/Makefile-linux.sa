@@ -37,6 +37,7 @@ configureit:
 	tar zxf ntfsprogs-1.7.1.tar.gz
 	mv ntfsprogs-1.7.1 $(NTFSDIR)
 	patch -sN -d $(NTFSDIR) -p1 < ntfs.linuxpatch
+	patch -sN -d $(NTFSDIR) -p1 < ntfs_lvalue.patch
 	$(NTFSDIR)/configure
 	mv config.h $(NTFSDIR)/include
 	touch configureit
