@@ -641,8 +641,9 @@ function SPITFORM($formfields, $errors)
 	echo "<p>
 	      <h3>Handy Links:</h3>
 	      <ul>
-		 <li> View a <a href='showosid_list.php3'>list of OSIDs</a>
-		      that are available for you to use in your NS file.</li>
+                  <li> View a <a href='showosid_list.php3' target='_blank'>list
+                      of OSIDs</a> that are available for you to use in your NS
+                      file.</li>
 		 <li> Create your own <a href='newimageid_ez.php3'>
 		      custom disk images</a>.</li>
 	      </ul>\n";
