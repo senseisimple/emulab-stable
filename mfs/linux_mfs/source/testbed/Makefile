@@ -2,7 +2,7 @@ include ../../variables.mk
 
 BUILDROOT	:=	$(PWD)/$(BUILDROOT)
 
-PROGS	:= imageunzip frisbee growdisk tmcc binoffset groklilo
+PROGS	:= imageunzip imagezip frisbee growdisk tmcc binoffset groklilo
 BUILD_TARGETS := $(PROGS)
 INSTALL_TARGETS := $(addsuffix -install,$(PROGS))
 
@@ -24,7 +24,7 @@ TMCC_OBJ_PATH = $(TARGET_BUILD_PATH)/tmcc
 CFLAGS = -Os
 
 INSTALLED_BINS	:= $(addprefix $(TARGET_PATH)/usr/, \
-			$(addprefix bin/, binoffset imageunzip tmcc frisbee) \
+			$(addprefix bin/, binoffset imagezip imageunzip tmcc frisbee) \
 			$(addprefix sbin/, groklilo growdisk))
 
 all: $(BUILD_TARGETS)
@@ -60,6 +60,8 @@ script-install:
 	install -m 755 $(TMCD_PATH)/common/paths.sh $(TARGET_PATH)/etc/emulab
 
 imageunzip-install: $(TARGET_PATH)/usr/bin/imageunzip
+
+imagezip-install: $(TARGET_PATH)/usr/bin/imagezip
 
 frisbee-install: $(TARGET_PATH)/usr/bin/frisbee
 
@@ -165,8 +167,8 @@ $(TESTBED_BUILD_PATH)/imagezip: $(SYSROOT_ZLIB_SHARED)
 	$(MAKE) -C $(IMAGEZIP_PATH) -f Makefile-linux.sa \
 		CC=$(CROSS_COMPILER_PREFIX)gcc \
 		PATH=$(STAGING_DIR)/usr/bin:$(PATH) imagezip
-	$(MAKE) -C $(IMAGEZIP_PATH) -f Makefile-linux.sa clean
 	mkdir -p $(dir $@)
-	mv $(IMAGEZIP_PATH)/imagnzip $@
+	mv $(IMAGEZIP_PATH)/imagezip $@
+	$(MAKE) -C $(IMAGEZIP_PATH) -f Makefile-linux.sa clean
 	$(STRIPCMD) --strip-unneeded $@
 

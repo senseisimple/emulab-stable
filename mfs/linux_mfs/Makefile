@@ -9,7 +9,7 @@ STAGING_DIR	=	$(PWD)/buildroot/build_i386/staging_dir
 INITRAMFS	=	$(PWD)/initramfs.gz
 BOOT_PATH	=	$(PWD)/boot
 
-MODULES := busybox zlib linux dropbear testbed hdparm target_template
+MODULES := busybox zlib linux dropbear testbed hdparm target_template sudo e2fsprogs openssl
 INSTALL_MODULES := $(addsuffix -install,$(MODULES))
 EXTRACT_MODULES := $(addsuffix -extract,$(MODULES))
 PATCH_MODULES := $(addsuffix -patch,$(MODULES))
