@@ -236,6 +236,7 @@ else {
 	print "10  *  *  *  *  root  $GENCRLBUNDLE\n\n";
 	print "Then rerun this script\n";
 	exit(1);
+    }
 }
 
 #
