@@ -1,13 +1,13 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2007 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2008 University of Utah and the Flux Group.
  * All rights reserved.
  *
- * boot/bootwhat.h from the OSKit.
+ * Derived from boot/bootwhat.h in the OSKit.
  */
 
-#ifndef _OSKIT_BOOT_BOOTWHAT_H_
-#define _OSKIT_BOOT_BOOTWHAT_H_
+#ifndef _EMULAB_BOOTWHAT_H_
+#define _EMULAB_BOOTWHAT_H_
 
 #define BOOTWHAT_DSTPORT		6969
 #define BOOTWHAT_SRCPORT		9696
@@ -41,7 +41,7 @@ typedef struct boot_info {
 #define BIOPCODE_BOOTWHAT_INFO		5	/* Request for bootinfo */
 
 /* Version */
-#define BIVERSION_CURRENT		1	/* Old version is zero */
+#define BIVERSION_CURRENT		1	/* First version is zero */
 
 /* Status */
 #define BISTAT_SUCCESS			0
@@ -100,6 +100,6 @@ typedef struct boot_what {
 #define BIBOOTWHAT_TYPE_MFS	7	/* Boot an MFS from server:/path */
 
 /* Flags */
-#define BIBOOTWHAT FLAGS_CMDLINE	0x01	/* Kernel to boot */ 
+#define BIBOOTWHAT_FLAGS_CMDLINE	0x01	/* Kernel to boot */ 
 
-#endif /* _OSKIT_BOOT_BOOTWHAT_H_ */
+#endif /* _EMULAB_BOOTWHAT_H_ */

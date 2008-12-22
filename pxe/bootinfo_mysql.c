@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2007 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2008 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -141,11 +141,13 @@ query_bootinfo_db(struct in_addr ipaddr, int version, boot_what_t *info)
 
 	/*
 	 * If we received a query from a node whose PXE boot program is
-	 * not pxeboot, then it must be coming out of PXEWAIT and we need
-	 * to tell it to reboot again to pick up the new PXE boot program.
+	 * not an "Emulab pxeboot", then the node may be coming out of PXEWAIT
+	 * and we need to tell it to reboot again to pick up the new PXE boot
+	 * program.  An "Emulab pxeboot" is one that speaks bootinfo.
 	 *
-	 * XXX if "pxeboot" occurs in the string anywhere we assume it is
-	 * a varient of our pxeboot and we don't do the reboot.
+	 * XXX note that an "Emulab pxeboot" is currently identified by
+	 * its not being the default pxeboot and its path containing the
+	 * string "pxeboot" anywhere.
 	 */
 	if (DEFINED(PXE_BOOT_PATH) &&
 	    strstr(row[PXE_BOOT_PATH], "pxeboot") == NULL) {
@@ -178,6 +180,10 @@ query_bootinfo_db(struct in_addr ipaddr, int version, boot_what_t *info)
 			rval = 1;
 		}
 		if (DEFINED(NEXT_BOOT_CMDLINE)) {
+			/*
+			 * XXX note that this will override any cmdline
+			 * specified in the osid path.  Should append instead?
+			 */
 			strncpy(info->cmdline,
 				row[NEXT_BOOT_CMDLINE], MAX_BOOT_CMDLINE-1);
 		}
@@ -232,6 +238,10 @@ query_bootinfo_db(struct in_addr ipaddr, int version, boot_what_t *info)
 			rval = 1;
 		}
 		if (DEFINED(DEF_BOOT_CMDLINE)) {
+			/*
+			 * XXX note that this will override any cmdline
+			 * specified in the osid path.  Should append instead?
+			 */
 			strncpy(info->cmdline,
 				row[DEF_BOOT_CMDLINE], MAX_BOOT_CMDLINE-1);
 		}
@@ -345,7 +355,14 @@ parse_mfs_path(char *str, boot_what_t *info)
 {
 	struct hostent *he;
 	struct in_addr hip;
-	char *path;
+	char *path, *args;
+
+	/* treat anything after a space as the command line */
+	args = strchr(str, ' ');
+	if (args != NULL) {
+		*args++ = '\0';
+		strncpy(info->cmdline, args, MAX_BOOT_CMDLINE-1);
+	}
 
 	/* no hostname, just copy string as is */
 	path = strchr(str, ':');
