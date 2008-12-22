@@ -1329,7 +1329,7 @@ SSLVerifyClient none
 # Reject the unencrypted certs that all users get. 
 <Location />
 SSLRequire ( %{SSL_CLIENT_S_DN_OU} ne "sslxmlrpc" )
-</Location />
+</Location>
 
 ScriptAlias /protogeni/xmlrpc/ch @prefix@/protogeni/xmlrpc/protogeni-ch.pl
 ScriptAlias /protogeni/xmlrpc/cm @prefix@/protogeni/xmlrpc/protogeni-cm.pl
