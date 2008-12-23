@@ -41,6 +41,7 @@ my $MKCERTS	  = "$TB/sbin/protogeni/createcerts";
 my $ADDAUTHORITY  = "$TB/sbin/protogeni/addauthority";
 my $GETCACERTS    = "$TB/sbin/protogeni/getcacerts";
 my $POSTCRL       = "$TB/sbin/protogeni/postcrl";
+my $GENCRL        = "$TB/sbin/protogeni/gencrl";
 my $GENCRLBUNDLE  = "$TB/sbin/protogeni/gencrlbundle";
 my $MKSYSCERT	  = "$TB/sbin/mksyscert";
 my $MKUSERCERT	  = "$TB/sbin/mkusercert";
@@ -125,16 +126,19 @@ if (! -e "$TB/etc/.federated") {
 #
 # Packages.
 #
-my %packlist = ("p5-Frontier-RPC" => "/usr/ports/net/p5-Frontier-RPC",
+my %packlist = ("libxml2-2.6.26"  => "/usr/ports/textproc/libxml2",
+		"p5-Frontier-RPC" => "/usr/ports/net/p5-Frontier-RPC",
 		"p5-XML-LibXML"   => "/usr/ports/textproc/p5-XML-LibXML",
 		"xmlsec1"         => "/usr/ports/security/xmlsec1",
 		"p5-Crypt-SSLeay" => "/usr/ports/security/p5-Crypt-SSLeay"
 		);
 my $needpkgs = 0;
 
-foreach my $pkgname (keys(%packlist)) {
+foreach my $pkgname (sort(keys(%packlist))) {
     my $pkgdir = $packlist{$pkgname};
     
+    print STDERR "Checking for package $pkgname\n";
+
     next
 	if (system("$PKG_INFO -E '${pkgname}*' >/dev/null") == 0);
 
@@ -151,11 +155,16 @@ if ($needpkgs) {
 # interface. A bundle of CA certs from the trusted roots (emulabs) will
 # be used. This bundle will periodically update as sites come online.
 #
+if (! -e "$TB/etc/genica.bundle") {
+    system("/bin/cp $TB/etc/emulab.pem $TB/etc/genica.bundle") == 0
+	or fatal("Could not initialize $TB/etc/genica.bundle");
+}
+if (! -e "$TB/etc/genicrl.bundle") {
+    system("/usr/bin/touch $TB/etc/genicrl.bundle") == 0
+	or fatal("Could not initialize $TB/etc/genicrl.bundle");
+}
+
 if ($asch) {
-    if (! -e "$TB/etc/genica.bundle") {
-	system("/bin/cp $TB/etc/emulab.pem $TB/etc/genica.bundle") == 0
-	    or fatal("Could not initialize $TB/etc/genica.bundle");
-    }
     if (! -e "$TB/www/genica.bundle") {
 	system("/bin/cp $TB/etc/emulab.pem $TB/www/genica.bundle") == 0
 	    or fatal("Could not initialize $TB/www/genica.bundle");
@@ -198,9 +207,9 @@ if (system("egrep -q -s 'DPGENI' /etc/rc.conf")) {
     print "Please add 'apache_flags=\"-DSSL -DPGENI\"' to /etc/rc.conf\n";
     $restartapache++;
 }
-if ($asch && $restartapache) {
+if ($restartapache) {
     print "Then restart apache:\n";
-    print "    sudo /usr/local/etc/rc.d/apache restart\n";
+    print "    sudo /usr/local/etc/rc.d/apache.sh restart\n";
     print "Then rerun this script\n";
     exit(1);
 }
@@ -212,7 +221,7 @@ if ($asch && $restartapache) {
 # This script restarts apache.
 #
 if (!$asch) {
-    system("$GETCACERTS -l") == 0
+    system("$GETCACERTS -l -p") == 0
 	or fatal("Could not get CA bundle from Utah");
 
     #
@@ -221,7 +230,7 @@ if (!$asch) {
     #
     if (system("egrep -q -s '$GETCACERTS' /etc/crontab")) {
 	print "Please add this line to /etc/crontab:\n\n";
-	print "13  *  *  *	*  root  $GETCACERTS\n\n";
+	print "13  4  *  *	*  root  $GETCACERTS\n\n";
 	print "Then rerun this script\n";
 	exit(1);
     }
@@ -233,7 +242,7 @@ else {
     #
     if (system("egrep -q -s '$GENCRLBUNDLE' /etc/crontab")) {
 	print "Please add this line to /etc/crontab:\n\n";
-	print "10  *  *  *  *  root  $GENCRLBUNDLE\n\n";
+	print "10  4  *  *  *  root  $GENCRLBUNDLE\n\n";
 	print "Then rerun this script\n";
 	exit(1);
     }
@@ -244,7 +253,7 @@ else {
 #
 my $geniuser = User->Lookup($geniuserid);
 if (!defined($geniuser)) {
-    fatal("Need to do an install")
+    fatal("Need to do an install in the protogeni/etc directory.")
 	if (! -e "$TB/etc/protogeni/geniuser.xml");
 
     print "Creating Geni pseudo user ...\n";
@@ -254,12 +263,6 @@ if (!defined($geniuser)) {
 
     system("$SUDO -u $PROTOUSER $WAP $TBACCT verify $geniuserid");
     fatal("Could not verify geni user")
-	if ($?);
-
-    # Create an encrypted certificate for the test scripts.
-    my $passwd = substr(TBGenSecretKey(), 0, 10);
-    system("$SUDO -u $PROTOUSER $WAP $MKUSERCERT -p '$passwd' $geniuserid");
-    fatal("Could not create encrypted certificate for geni user")
 	if ($?);
 
     $geniuser = User->Lookup($geniuserid);    
@@ -283,6 +286,12 @@ if (!defined($geniproj)) {
     $geniproj = Project->Lookup($geniprojid);
     fatal("Could not lookup $geniprojid")
 	if (!defined($geniproj));
+
+    # Create an encrypted certificate for the test scripts.
+    my $passwd = substr(TBGenSecretKey(), 0, 10);
+    system("$SUDO -u $PROTOUSER $WAP $MKUSERCERT -p '$passwd' $geniuserid");
+    fatal("Could not create encrypted certificate for geni user")
+	if ($?);
 }
 $geniuser->Refresh();
 $geniproj->Refresh();

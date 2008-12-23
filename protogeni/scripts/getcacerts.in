@@ -16,8 +16,9 @@ sub usage()
     print "Usage: getcacerts [-l]\n";
     exit(1);
 }
-my $optlist = "l";
+my $optlist = "lp";
 my $nolog   = 0;
+my $nopost  = 0;
 
 #
 # Configure variables
@@ -29,7 +30,8 @@ my $PGENIDOMAIN   = "@PROTOGENI_DOMAIN@";
 my $PGENISUPPORT  = @PROTOGENI_SUPPORT@;
 my $TBBASE        = "@TBBASE@";
 my $FETCH	  = "/usr/bin/fetch";
-my $POSCRL        = "$TB/sbin/protogeni/postcrl";
+my $POSTCRL       = "$TB/sbin/protogeni/postcrl";
+my $GENCRL        = "$TB/sbin/protogeni/gencrl";
 my $LOCALCRL      = "$TB/ssl/crl.pem";
 
 # un-taint path
@@ -64,6 +66,9 @@ if (! getopts($optlist, \%options)) {
 if (defined($options{"l"})) {
     $nolog  = 1;
 }
+if (defined($options{"p"})) {
+    $nopost  = 1;
+}
 my $restartapache = 0;
 
 # Record output in case of error.
@@ -79,8 +84,14 @@ mkdir("/tmp/genicacerts.$$", 0755) or
 # uptodate since our post does not cause Utah to regen the bundle.
 # (just making sure we get a new version posted every night).
 #
-system($POSTCRL) >= 0
-    or fatal("Could not post new CRL!");
+if ($nopost) {
+    system($GENCRL) >= 0
+	or fatal("Could not generate new CRL!");
+}
+else {
+    system($POSTCRL) >= 0
+	or fatal("Could not post new CRL!");
+}
 
 #
 # Fetch the ca bundle from Utah. These are public keys ...

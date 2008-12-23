@@ -133,6 +133,9 @@ if (-e $CRLPEM) {
     print "$crlcreated, $expires, $diff, $force\n"
 	if ($debug);
 }
+else {
+    $force = 1;
+}
 
 #
 # Find all revoked certificates. We want to create an index.txt file. 
