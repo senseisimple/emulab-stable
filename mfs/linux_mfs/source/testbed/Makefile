@@ -46,7 +46,7 @@ $(INSTALLED_BINS): $(TESTBED_BUILD_PATH)/$$(notdir $$@)
 
 script-install:
 	mkdir -p $(TARGET_PATH)/etc/testbed
-	mkdir -p $(TARGET_PATH)/etc/emulab
+	ln -sf $(TARGET_PATH)/etc/testbed $(TARGET_PATH)/etc/emulab
 	install -m 755 $(TMCD_PATH)/linux/control_interface $(TARGET_PATH)/etc/testbed
 	install -m 755 $(TMCD_PATH)/linux/rc.frisbee $(TARGET_PATH)/etc/testbed
 	install -m 755 $(TMCD_PATH)/linux/rc.ipod $(TARGET_PATH)/etc/testbed
@@ -57,6 +57,7 @@ script-install:
 	install -m 755 $(TMCD_PATH)/linux/get_edd_map $(TARGET_PATH)/etc/testbed
 	install -m 755 $(TMCD_PATH)/linux/extract_kernel_version $(TARGET_PATH)/etc/testbed
 	install -m 755 $(TMCD_PATH)/linux/guess_linux_root_device $(TARGET_PATH)/etc/testbed
+	install -m 755 $(TESTBED_PATH)/install/newclient $(TARGET_PATH)/etc/testbed
 	install -m 755 $(TMCD_PATH)/common/paths.sh $(TARGET_PATH)/etc/emulab
 
 imageunzip-install: $(TARGET_PATH)/usr/bin/imageunzip
@@ -110,7 +111,7 @@ $(TESTBED_BUILD_PATH)/growdisk:
 # build tmcc here.  Note that you must still configure the object tree with the
 # tbdefs file you want, since we need config.h.
 
-#$(TMCC_OBJ_PATH)/tmcc: $(SYSROOT_OPENSSL_SHARED)
+#$(TESTBED_BUILD_PATH)/tmcc:
 #	mkdir -p $(TMCC_OBJ_PATH)
 #	PATH=$(STAGING_DIR)/usr/bin:$(PATH) \
 #	$(CROSS_COMPILER_PREFIX)gcc \
@@ -137,10 +138,10 @@ $(TESTBED_BUILD_PATH)/tmcc:
 		$(TESTBED_PATH)/lib/libtb/log.c
 	$(STRIPCMD) --strip-unneeded $@
 
-#	$(MAKE) -C $(TMCD_PATH) \
-#		CC=$(CROSS_COMPILER_PREFIX)gcc \
-#		CFLAGS="$(CFLAGS) -I$(TESTBEDOBJ_PATH)" \
-#		PATH=$(STAGING_DIR)/usr/bin:$(PATH) tmcc
+	$(MAKE) -C $(TMCD_PATH) \
+		CC=$(CROSS_COMPILER_PREFIX)gcc \
+		CFLAGS="$(CFLAGS) -I$(TESTBEDOBJ_PATH)" \
+		PATH=$(STAGING_DIR)/usr/bin:$(PATH) tmcc
 
 $(TESTBED_BUILD_PATH)/frisbee: $(SYSROOT_ZLIB_SHARED)
 	PATH=$(STAGING_DIR)/usr/bin:$(PATH) \
