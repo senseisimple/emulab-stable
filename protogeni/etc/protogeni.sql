@@ -221,16 +221,6 @@ CREATE TABLE `geni_certificates` (
   PRIMARY KEY  (`uuid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
-CREATE TABLE `geni_certificates` (
-  `uuid` varchar(40) NOT NULL default '',
-  `created` datetime default NULL,
-  `cert` text,
-  `DN` text,
-  `privkey` text,
-  `revoked` datetime default NULL,
-  PRIMARY KEY  (`uuid`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1;
-
 #
 # A clearinghouse table to hold CRLs to be distributed.
 #
