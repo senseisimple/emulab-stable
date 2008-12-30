@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2003-2007 University of Utah and the Flux Group.
@@ -23,11 +23,13 @@ use Data::Dumper;
 #
 sub usage()
 {
-    print(STDERR "Usage: wanodecreate <node_id> <xmlfile>\n");
+    print(STDERR "Usage: wanodecreate [-cdi] <node_id> <xmlfile>\n");
     exit(-1);
 }
-my $optlist = "d";
+my $optlist = "cdi";
 my $debug   = 0;
+my $docreate = 0;
+my $impotent = 0;
 
 # Default values for the table entry. Gotta have the undef entries.
 my %defaults = ('node_id'	=> undef,
@@ -45,7 +47,11 @@ my %defaults = ('node_id'	=> undef,
 		'latitude'	=> "NULL",
 		'longitude'     => "NULL",
 		'bwlimit'       => "NULL",
-		'privkey'	=> undef);
+		'privkey'	=> undef,
+		'IP'            => 'NULL',
+		'gateway'       => '',
+		'dns'           => '',
+		'boot_method'   => '');
 
 #
 # Configure variables
@@ -53,6 +59,9 @@ my %defaults = ('node_id'	=> undef,
 my $TB       = "@prefix@";
 my $TBOPS    = "@TBOPSEMAIL@";
 my $TBLOGS   = "@TBLOGSEMAIL@";
+my $TBBASE   = "@TBBASE@";
+my $NAMED    = "$TB/sbin/named_setup";
+my $NALLOC   = "$TB/bin/nalloc";
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -70,9 +79,14 @@ use libtestbed;
 use User;
 use Node;
 use NodeType;
+use Experiment;
 
 # Protos
 sub fatal($);
+
+# Default initial experiment unless overridden.
+my $PID_HWDOWN = NODEDEAD_PID();
+my $EID_HWDOWN = NODEDEAD_EID();
 
 # Parse options.
 my %options = ();
@@ -81,6 +95,12 @@ if (! getopts($optlist, \%options)) {
 }
 if (defined($options{"d"})) {
     $debug = 1;
+}
+if (defined($options{"c"})) {
+    $docreate = 1;
+}
+if (defined($options{"i"})) {
+    $impotent = 1;
 }
 usage
     if (@ARGV != 2);
@@ -113,14 +133,19 @@ if ($query_result->numrows) {
 }
 
 my $parse = XMLin($xmlfile, ValueAttr => [ 'value' ],
-		  SuppressEmpty => undef);
+		  SuppressEmpty => undef,ForceArray => 1);
+
+#print Dumper($parse);
+#exit(0);
 
 # Pick up values from XML file.
 foreach my $key (keys(%defaults)) {
     my $default = $defaults{$key};
 
     if (exists($parse->{$key}) && defined($parse->{$key})) {
-	$defaults{$key} = $parse->{$key};
+	# We forced element values to come in as arrays, for later... but for
+	# the default root-level elements we need, we assume there is only one.
+	$defaults{$key} = $parse->{$key}->[0];
     }
 }
 # Node_id from command line
@@ -145,22 +170,192 @@ if (!defined($defaults{'machine_type'}) || $defaults{'machine_type'} eq "") {
 }
 my $nodetype = NodeType->Lookup($defaults{'machine_type'});
 if (!defined($nodetype)) {
-    fatal("Invalid node type given!");
+    fatal("Invalid node type " . $defaults{'machine_type'} . " given!");
+}
+
+#
+# Look for interfaces, outlet, and tipline in the parse
+#
+# maps of the xml fields to the appropriate field in the db -- mostly the same.
+my %interfaces_fields = ( 'card' => 'card','port' => 'port','mac' => 'mac',
+			  'IP' => 'IP','mask' => 'mask',
+			  'interface_type' => 'interface_type',
+			  'iface' => 'iface','role' => 'role',
+			  'uuid' => 'uuid' );
+my %outlets_fields = ( 'power_id' => 'power_id','outlet_no' => 'outlet' );
+my %outlets_remoteauth_fields = ( 'type' => 'key_type','role' => 'key_role',
+				  'uid' => 'key_uid','key' => 'mykey' );
+my %tiplines_fields = ( 'server' => 'server','portnum' => 'portnum',
+			'tipname' => 'tipname' );
+
+my @interfaces = ();
+# yes, only one of each...
+my %outlet = ();
+my %outlet_remoteauth = ();
+my %tipline = ();
+
+sub fieldCheckAndFill {
+    my ($parse,$fillhash,$fields) = @_;
+
+    foreach my $pk (keys(%$fields)) {
+	my $dbpk = $fields->{$pk};
+	if (exists($parse->{$pk})) {
+	    # assume that we're taking elements who have a single value
+	    my $pval = $parse->{$pk}->[0];
+	    # quick sanitize for insert into the db
+	    # note that this is not secure; we're just trying to prevent
+	    # mistakes from doing any bad stuff to the db.
+	    if ($pval =~ /\';/) {
+		fatal("bad field value $pval for attribute $pk\n");
+	    }
+	    if ($pval !~ /^\-?[0-9]+\.[0-9]*$/ 
+		&& $pval !~ /^\-?[0-9]+$/) {
+		# need to add quotes on the outside for the insert
+		$pval = "'" . $pval . "'";
+	    }
+	    $fillhash->{$dbpk} = $pval;
+	}
+    }
+
+    print "fieldCheckAndFill:\n";
+    print Dumper($fillhash);
+    print "\n";
+
+    return 0;
+}
+
+my $node_id_istr = "'$node_id'";
+if (exists($parse->{'interface'})) {
+    foreach my $ia (@{$parse->{'interface'}}) {
+	my %iface = ();
+	# ugh, need a default...
+	$iface{'uuid'} = "'" . NewUUID() . "'";
+	fieldCheckAndFill($ia,\%iface,\%interfaces_fields);
+	# the field names have been changed, so be careful when testing vs 
+	# outputing an error msg
+	if (!exists($iface{$interfaces_fields{'interface_type'}}) ||
+	    !exists($iface{$interfaces_fields{'iface'}}) ||
+	    !exists($iface{$interfaces_fields{'role'}})) {
+	    fatal("you specified an interface, but must have interface_type," .
+		  " iface, and role attributes!");
+	}
+	$iface{'node_id'} = $node_id_istr;
+	$interfaces[scalar(@interfaces)] = \%iface;
+    }
+}
+
+if (exists($parse->{'outlet'})) {
+    # only look for one -- two does not make sense.
+    my $ia = $parse->{'outlet'}->[0];
+    print Dumper($ia);
+    fieldCheckAndFill($ia,\%outlet,\%outlets_fields);
+    # the field names have been changed, so be careful when testing vs 
+    # outputing an error msg
+    if (!exists($outlet{$outlets_fields{'power_id'}}) ||
+	!exists($outlet{$outlets_fields{'outlet_no'}})) {
+	fatal("you specified an outlet, but must have both power_id and" . 
+	      " outlet_no attributes!");
+    }
+    $outlet{'node_id'} = $node_id_istr;
+
+    # again, only look for one
+    if (exists($parse->{'outlet'}->[0]->{'authinfo'})) {
+	my $ora = $parse->{'outlet'}->[0]->{'authinfo'}->[0];
+	fieldCheckAndFill($ora,\%outlet_remoteauth,
+			  \%outlets_remoteauth_fields);
+	# the field names have been changed, so be careful when testing vs 
+	# outputing an error msg
+	if (!exists($outlet_remoteauth{$outlets_remoteauth_fields{'type'}}) ||
+	    !exists($outlet_remoteauth{$outlets_remoteauth_fields{'key'}})) {
+	    fatal("you specified authinfo for an outlet, but must have both" . 
+		  " type and key attributes!");
+	}
+	$outlet_remoteauth{'node_id'} = $node_id_istr;
+    }
+}
+
+if (exists($parse->{'tipline'})) {
+    # only look for one -- two does not make sense.
+    # user could override this, but it's a sensible default.
+    $tipline{'tipname'} = $node_id_istr;
+    my $ia = $parse->{'tipline'}->[0];
+    fieldCheckAndFill($ia,\%tipline,\%tiplines_fields);
+    # the field names have been changed, so be careful when testing vs 
+    # outputing an error msg
+    if (!exists($tipline{$tiplines_fields{'server'}})) {
+	fatal("you specified a tipline, but must have a server attribute!");
+    }
+    $tipline{'node_id'} = $node_id_istr;
 }
 
 # Make everything is defined.
 foreach my $key (keys(%defaults)) {
     my $default = $defaults{$key};
     if (!defined($default)) {
-	fatal("Must provided a defintion for $key!");
+	fatal("Must provided a definition for $key!");
     }
 }
-DBQueryFatal("insert into widearea_nodeinfo set ".
-	     join(",", map("$_='" . $defaults{$_} . "'", keys(%defaults))));
-print "Inserted new node $node_id with key: ".
-    $defaults{'privkey'} . "\n";
-exit(0);
 
+# insert the widearea_nodeinfo
+DBQueryFatal("insert into widearea_nodeinfo set ".
+	     join(",", map("$_='" . $defaults{$_} . "'", keys(%defaults)))) 
+    if (!$impotent);
+print "Inserted widearea_nodeinfo for new node $node_id with key: ".
+    $defaults{'privkey'} . "\n";
+
+exit(0) 
+    if (!$docreate);
+
+my $experiment = Experiment->Lookup($PID_HWDOWN, $EID_HWDOWN);
+
+if (!$impotent) {
+    $node = Node->Create($node_id,$experiment,
+			 { 'type' => $defaults{'machine_type'},
+			   'role' => $Node::NODEROLE_TESTNODE });
+    if (!defined($node)) {
+	fatal("Create for new node $node_id failed -- cleanup!");
+    }
+}
+print "Created new node $node_id.\n";
+
+#
+# Ok, do the full create, including any interfaces, outlets, and tiplines.
+#
+foreach my $iref (@interfaces) {
+    my $istr = join(",",map("$_=" . $iref->{$_},keys(%$iref)));
+    DBQueryFatal("insert into interfaces set $istr") 
+	if (!$impotent);
+    print "Added interface ".$iref->{'iface'}.".\n";
+}
+if (exists($outlet{'node_id'})) {
+    my $istr = join(",",map("$_=" . $outlet{$_},keys(%outlet)));
+    DBQueryFatal("insert into outlets set $istr") 
+	if (!$impotent);
+    print "Added outlet with id ".$outlet{'power_id'}.".\n";
+
+    if (exists($outlet_remoteauth{'node_id'})) {
+	$istr = join(",",map("$_=" . $outlet_remoteauth{$_},
+			     keys(%outlet_remoteauth)));
+	DBQueryFatal("insert into outlets_remoteauth set $istr") 
+	    if (!$impotent);
+	print "Added outlet remoteauth info with key type ".$outlet_remoteauth{'key_type'}.".\n";
+    }
+}
+if (exists($tipline{'node_id'})) {
+    my $istr = join(",",map("$_=" . $tipline{$_},keys(%tipline)));
+    DBQueryFatal("insert into tiplines set $istr") 
+	if (!$impotent);
+    print "Added tipline on server ".$tipline{'server'}.".\n";
+}
+
+# Now regen nameserver.
+if (!$impotent) {
+    if (system($NAMED) != 0) {
+	fatal("Failed to regenerate named files and restart!");
+    }
+}
+
+exit(0);
 
 sub fatal($)
 {
