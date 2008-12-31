@@ -9,3 +9,8 @@ fi
 
 chmod 1777 "$target_dir/tmp"
 chmod 1777 "$target_dir/var/tmp"
+chmod 0700 "$target_dir/root/.ssh"
+chmod 0600 "$target_dir/etc/shadow"
+chmod u+s "$target_dir/bin/busybox"
+chmod u+s "$target_dir/usr/bin/sudo"
+chmod 0440 "$target_dir/etc/sudoers"

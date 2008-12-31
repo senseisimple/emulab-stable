@@ -1,0 +1,231 @@
+diff -u -r busybox-1.13.1.orig/include/usage.h busybox-1.13.1/include/usage.h
+--- busybox-1.13.1.orig/include/usage.h	2008-11-09 10:28:17.000000000 -0700
++++ busybox-1.13.1/include/usage.h	2008-12-30 17:30:33.000000000 -0700
+@@ -29,8 +29,12 @@
+ #define adduser_full_usage "\n\n" \
+        "Add an user\n" \
+      "\nOptions:" \
+-     "\n	-h DIR		Home directory" \
+-     "\n	-g GECOS	GECOS field" \
++     "\n	-d DIR		Home directory" \
++     "\n	-c GECOS	GECOS field" \
++     "\n	-g GID		primary GID for user" \
++     "\n	-u UID		UID for user" \
++     "\n	-p PASSWD	encrypted user passwd"  \
++     "\n	-c GECOS	GECOS field" \
+      "\n	-s SHELL	Login shell" \
+      "\n	-G GROUP	Add user to existing group" \
+      "\n	-S		Create a system user" \
+diff -u -r busybox-1.13.1.orig/loginutils/addgroup.c busybox-1.13.1/loginutils/addgroup.c
+--- busybox-1.13.1.orig/loginutils/addgroup.c	2008-11-09 10:28:17.000000000 -0700
++++ busybox-1.13.1/loginutils/addgroup.c	2008-12-30 17:30:53.000000000 -0700
+@@ -158,9 +158,18 @@
+ 
+ 		/* check if group and user exist */
+ 		xuname2uid(argv[0]); /* unknown user: exit */
+-		xgroup2gid(argv[1]); /* unknown group: exit */
+-		/* check if user is already in this group */
+ 		gr = getgrnam(argv[1]);
++		if (!gr) {
++			gid = xatoul_range(argv[1], 0,
++					((unsigned long)(gid_t)ULONG_MAX) >> 1);
++			gr = getgrgid(gid);
++			if (!gr)
++				xgroup2gid(argv[1]); /* unknown group: exit */
++			else
++				argv[1] = gr->gr_name;
++		}
++
++		/* check if user is already in this group */
+ 		for (; *(gr->gr_mem) != NULL; (gr->gr_mem)++) {
+ 			if (!strcmp(argv[0], *(gr->gr_mem))) {
+ 				/* user is already in group: do nothing */
+diff -u -r busybox-1.13.1.orig/loginutils/adduser.c busybox-1.13.1/loginutils/adduser.c
+--- busybox-1.13.1.orig/loginutils/adduser.c	2008-11-09 10:28:17.000000000 -0700
++++ busybox-1.13.1/loginutils/adduser.c	2008-12-30 17:30:44.000000000 -0700
+@@ -10,10 +10,12 @@
+ 
+ #include "libbb.h"
+ 
+-#define OPT_DONT_SET_PASS  (1 << 4)
+-#define OPT_SYSTEM_ACCOUNT (1 << 5)
+-#define OPT_DONT_MAKE_HOME (1 << 6)
+-
++#define OPT_DONT_SET_PASS  (1 << 7)
++#define OPT_SYSTEM_ACCOUNT (1 << 8)
++#define OPT_DONT_MAKE_HOME (1 << 9)
++#define OPT_GID (1 << 2)
++#define OPT_UID (1 << 3)
++#define OPT_PASSWORD (1 << 4)
+ 
+ /* remix */
+ /* recoded such that the uid may be passed in *p */
+@@ -24,36 +26,50 @@
+ 	if (getpwnam(p->pw_name))
+ 		bb_error_msg_and_die("login '%s' is in use", p->pw_name);
+ 
+-	if (option_mask32 & OPT_SYSTEM_ACCOUNT) {
+-		p->pw_uid = 0;
+-		max = 999;
++	if (option_mask32 & OPT_UID) {
++		if(getpwuid(p->pw_uid))
++			bb_error_msg_and_die("uid '%d' is in use", p->pw_uid);
++
+ 	} else {
+-		p->pw_uid = 1000;
+-		max = 64999;
+-	}
++		if (option_mask32 & OPT_SYSTEM_ACCOUNT) {
++			p->pw_uid = 0;
++			max = 999;
++		} else {
++			p->pw_uid = 1000;
++			max = 64999;
++		}
+ 
+-	/* check for a free uid (and maybe gid) */
+-	while (getpwuid(p->pw_uid) || (!p->pw_gid && getgrgid(p->pw_uid)))
+-		p->pw_uid++;
++		/* check for a free uid (and maybe gid) */
++		while (getpwuid(p->pw_uid) || (!p->pw_gid && getgrgid(p->pw_uid)))
++			p->pw_uid++;
+ 
+-	if (!p->pw_gid) {
++		if (p->pw_uid > max)
++			bb_error_msg_and_die("no free uids left");
++
++	}
++
++	if (!(option_mask32 & OPT_GID)) {
+ 		/* new gid = uid */
+ 		p->pw_gid = p->pw_uid;
+ 		if (getgrnam(p->pw_name))
+ 			bb_error_msg_and_die("group name '%s' is in use", p->pw_name);
+ 	}
+ 
+-	if (p->pw_uid > max)
+-		bb_error_msg_and_die("no free uids left");
+ }
+ 
+-static void addgroup_wrapper(struct passwd *p)
++static void addgroup_wrapper(struct passwd *p, const char *usegroup)
+ {
+ 	char *cmd;
++	char *group;
++
++	group = strtok((char *)usegroup, ",");
+ 
+-	cmd = xasprintf("addgroup -g %u '%s'", (unsigned)p->pw_gid, p->pw_name);
+-	system(cmd);
+-	free(cmd);
++	while (group) {
++		cmd = xasprintf("addgroup '%s' '%s'", p->pw_name, group);
++		system(cmd);
++		free(cmd);
++		group = strtok(NULL, ",");
++	}
+ }
+ 
+ static void passwd_wrapper(const char *login) NORETURN;
+@@ -68,8 +84,11 @@
+ 
+ #if ENABLE_FEATURE_ADDUSER_LONG_OPTIONS
+ static const char adduser_longopts[] ALIGN1 =
+-		"home\0"                Required_argument "h"
+-		"gecos\0"               Required_argument "g"
++		"home\0"                Required_argument "d"
++		"comment\0"             Required_argument "c"
++		"gid\0"                 Required_argument "g"
++		"uid\0"                 Required_argument "u"
++		"password\0"            Required_argument "p"
+ 		"shell\0"               Required_argument "s"
+ 		"ingroup\0"             Required_argument "G"
+ 		"disabled-password\0"   No_argument       "D"
+@@ -89,8 +108,13 @@
+ {
+ 	struct passwd pw;
+ 	const char *usegroup = NULL;
++	const char *uid_string = NULL;
++	const char *gid_string = NULL;
++	const char *password = NULL;
+ 	FILE *file;
+ 
++	memset(&pw, 0, sizeof(pw));
++
+ #if ENABLE_FEATURE_ADDUSER_LONG_OPTIONS
+ 	applet_long_options = adduser_longopts;
+ #endif
+@@ -106,9 +130,26 @@
+ 
+ 	/* exactly one non-option arg */
+ 	opt_complementary = "=1";
+-	getopt32(argv, "h:g:s:G:DSH", &pw.pw_dir, &pw.pw_gecos, &pw.pw_shell, &usegroup);
++	getopt32(argv, "d:c:g:u:p:s:G:DSH", &pw.pw_dir, &pw.pw_gecos, &gid_string,
++			&uid_string, &password, &pw.pw_shell, &usegroup);
+ 	argv += optind;
+ 
++	if (uid_string)
++		pw.pw_uid = xatoul_range(uid_string, 0,
++				((unsigned long)(uid_t)ULONG_MAX) >> 1);
++
++	if (gid_string)
++		pw.pw_gid = xatoul_range(gid_string, 0,
++				((unsigned long)(gid_t)ULONG_MAX) >> 1);
++
++	if (password) {
++#if ENABLE_FEATURE_SHADOWPASSWDS
++		pw.pw_passwd = "x";
++#else
++		pw.pw_passwd = password;
++#endif
++	}
++
+ 	/* fill in the passwd struct */
+ 	pw.pw_name = argv[0];
+ 	die_if_bad_username(pw.pw_name);
+@@ -116,9 +157,6 @@
+ 		/* create string for $HOME if not specified already */
+ 		pw.pw_dir = xasprintf("/home/%s", argv[0]);
+ 	}
+-	pw.pw_passwd = (char *)"x";
+-	pw.pw_gid = usegroup ? xgroup2gid(usegroup) : 0; /* exits on failure */
+-
+ 	/* make sure everything is kosher and setup uid && maybe gid */
+ 	passwd_study(&pw);
+ 
+@@ -137,8 +175,9 @@
+ 	file = fopen_or_warn(bb_path_shadow_file, "a");
+ 	if (file) {
+ 		//fseek(file, 0, SEEK_END);
+-		fprintf(file, "%s:!:%u:0:99999:7:::\n",
++		fprintf(file, "%s:%s:%u:0:99999:7:::\n",
+ 				pw.pw_name,             /* username */
++				password ? password : "!",
+ 				(unsigned)(time(NULL) / 86400) /* sp->sp_lstchg */
+ 				/*0,*/                  /* sp->sp_min */
+ 				/*99999,*/              /* sp->sp_max */
+@@ -148,11 +187,9 @@
+ 	}
+ #endif
+ 
+-	/* add to group */
+-	/* addgroup should be responsible for dealing w/ gshadow */
+-	/* if using a pre-existing group, don't create one */
+-	if (!usegroup)
+-		addgroup_wrapper(&pw);
++	/* add to existing group */
++	if (usegroup)
++		addgroup_wrapper(&pw, usegroup);
+ 
+ 	/* Clear the umask for this process so it doesn't
+ 	 * screw up the permissions on the mkdir and chown. */
+@@ -169,7 +206,8 @@
+ 		}
+ 	}
+ 
+-	if (!(option_mask32 & OPT_DONT_SET_PASS)) {
++	if (!(option_mask32 & OPT_PASSWORD) &&
++	    !(option_mask32 & OPT_DONT_SET_PASS)) {
+ 		/* interactively set passwd */
+ 		passwd_wrapper(pw.pw_name);
+ 	}

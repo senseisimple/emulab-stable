@@ -4,9 +4,15 @@
 
 [ -z "$1" ] && echo "Error: should be called from udhcpc" && exit 1
 
+if [ -f /etc/emulab/paths.sh ]; then
+	. /etc/emulab/paths.sh
+else
+	BOOTDIR=/etc/testbed
+fi
+
 
 LOCKDIR=/var/lock/udhcpc.lock
-SUCCESS_FLAG=/etc/testbed/myip
+SUCCESS_FLAG=$BOOTDIR/myip
 
 RESOLV_CONF="/etc/resolv.conf"
 [ -n "$broadcast" ] && BROADCAST="broadcast $broadcast"

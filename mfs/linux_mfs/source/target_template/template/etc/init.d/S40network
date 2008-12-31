@@ -5,8 +5,14 @@
 
 udhcpc_opts="-q"
 
+if [ -f /etc/emulab/paths.sh ]; then
+	. /etc/emulab/paths.sh
+else
+	BOOTDIR=/etc/testbed
+fi
+
 LOCKDIR=/var/lock/udhcpc.lock
-SUCCESS_FLAG=/etc/testbed/myip
+SUCCESS_FLAG=$BOOTDIR/myip
 
 start() {
 	interfaces=""

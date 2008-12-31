@@ -2,7 +2,7 @@ include ../../variables.mk
 
 BUILDROOT	:=	$(PWD)/$(BUILDROOT)
 
-PROGS	:= imageunzip imagezip frisbee growdisk tmcc binoffset groklilo
+PROGS	:= imageunzip imagezip frisbee growdisk tmcc.bin binoffset groklilo
 BUILD_TARGETS := $(PROGS)
 INSTALL_TARGETS := $(addsuffix -install,$(PROGS))
 
@@ -24,7 +24,7 @@ TMCC_OBJ_PATH = $(TARGET_BUILD_PATH)/tmcc
 CFLAGS = -Os
 
 INSTALLED_BINS	:= $(addprefix $(TARGET_PATH)/usr/, \
-			$(addprefix bin/, binoffset imagezip imageunzip tmcc frisbee) \
+			$(addprefix bin/, binoffset imagezip imageunzip tmcc.bin frisbee) \
 			$(addprefix sbin/, groklilo growdisk))
 
 all: $(BUILD_TARGETS)
@@ -46,7 +46,15 @@ $(INSTALLED_BINS): $(TESTBED_BUILD_PATH)/$$(notdir $$@)
 
 script-install:
 	mkdir -p $(TARGET_PATH)/etc/testbed
-	ln -sf $(TARGET_PATH)/etc/testbed $(TARGET_PATH)/etc/emulab
+	mkdir -p $(TARGET_PATH)/etc/testbed/rc
+	mkdir -p $(TARGET_PATH)/etc/emulab
+	mkdir -p $(TARGET_PATH)/usr/bin
+	mkdir -p $(TARGET_PATH)/usr/local/etc
+	mkdir -p $(TARGET_PATH)/var/emulab/logs
+	mkdir -p $(TARGET_PATH)/var/emulab/lock
+	mkdir -p $(TARGET_PATH)/var/emulab/boot
+	mkdir -p $(TARGET_PATH)/var/emulab/db
+	ln -sf /etc/testbed $(TARGET_PATH)/usr/local/etc/emulab
 	install -m 755 $(TMCD_PATH)/linux/control_interface $(TARGET_PATH)/etc/testbed
 	install -m 755 $(TMCD_PATH)/linux/rc.frisbee $(TARGET_PATH)/etc/testbed
 	install -m 755 $(TMCD_PATH)/linux/rc.ipod $(TARGET_PATH)/etc/testbed
@@ -59,6 +67,25 @@ script-install:
 	install -m 755 $(TMCD_PATH)/linux/guess_linux_root_device $(TARGET_PATH)/etc/testbed
 	install -m 755 $(TESTBED_PATH)/install/newclient $(TARGET_PATH)/etc/testbed
 	install -m 755 $(TMCD_PATH)/common/paths.sh $(TARGET_PATH)/etc/emulab
+	install -m 755 $(TMCD_PATH)/common/paths.pm $(TARGET_PATH)/etc/emulab
+	install -m 644 $(TMCD_PATH)/common/libsetup.pm $(TARGET_PATH)/etc/testbed
+	install -m 644 $(TMCD_PATH)/common/libtestbed.pm $(TARGET_PATH)/etc/testbed
+	install -m 644 $(TMCD_PATH)/common/libtmcc.pm $(TARGET_PATH)/etc/testbed
+	install -m 644 $(TMCD_PATH)/linux/liblocsetup.pm $(TARGET_PATH)/etc/testbed
+	install -m 755 $(TMCD_PATH)/common/watchdog $(TARGET_PATH)/etc/testbed
+	install -m 755 $(TMCD_PATH)/common/update $(TARGET_PATH)/etc/testbed
+	install -m 755 $(TMCD_PATH)/common/tmcc.pl $(TARGET_PATH)/usr/bin/tmcc
+	ln -sf /usr/bin/tmcc $(TARGET_PATH)/etc/testbed/tmcc
+	install -m 755 $(TMCD_PATH)/common/config/librc.pm $(TARGET_PATH)/etc/testbed
+	install -m 755 $(TMCD_PATH)/common/config/rc.config $(TARGET_PATH)/etc/testbed/rc
+	install -m 755 $(TMCD_PATH)/linux/rc.mfs $(TARGET_PATH)/etc/testbed
+	install -m 755 $(TMCD_PATH)/common/config/rc.misc $(TARGET_PATH)/etc/testbed/rc
+	install -m 755 $(TMCD_PATH)/common/config/rc.localize $(TARGET_PATH)/etc/testbed/rc
+	install -m 755 $(TMCD_PATH)/common/config/rc.mounts $(TARGET_PATH)/etc/testbed/rc
+	install -m 755 $(TMCD_PATH)/common/config/rc.accounts $(TARGET_PATH)/etc/testbed/rc
+	install -m 755 $(TMCD_PATH)/common/config/rc.hostnames $(TARGET_PATH)/etc/testbed/rc
+	install -m 755 $(TMCD_PATH)/common/config/rc.keys $(TARGET_PATH)/etc/testbed/rc
+	touch $(TARGET_PATH)/etc/emulab/ismfs
 
 imageunzip-install: $(TARGET_PATH)/usr/bin/imageunzip
 
@@ -72,7 +99,7 @@ binoffset-install: $(TARGET_PATH)/usr/bin/binoffset
 
 groklilo-install: $(TARGET_PATH)/usr/sbin/groklilo
 
-tmcc-install: $(TARGET_PATH)/usr/bin/tmcc
+tmcc.bin-install: $(TARGET_PATH)/usr/bin/tmcc.bin
 
 clean:
 		rm -rf $(TESTBED_BUILD_PATH)
@@ -126,7 +153,7 @@ $(TESTBED_BUILD_PATH)/growdisk:
 #		$(TESTBED_PATH)/lib/libtb/log.c
 #	$(STRIPCMD) --strip-unneeded $@
 
-$(TESTBED_BUILD_PATH)/tmcc:
+$(TESTBED_BUILD_PATH)/tmcc.bin:
 	mkdir -p $(TESTBED_BUILD_PATH)
 	PATH=$(STAGING_DIR)/usr/bin:$(PATH) \
 	$(CROSS_COMPILER_PREFIX)gcc \
@@ -138,10 +165,10 @@ $(TESTBED_BUILD_PATH)/tmcc:
 		$(TESTBED_PATH)/lib/libtb/log.c
 	$(STRIPCMD) --strip-unneeded $@
 
-	$(MAKE) -C $(TMCD_PATH) \
-		CC=$(CROSS_COMPILER_PREFIX)gcc \
-		CFLAGS="$(CFLAGS) -I$(TESTBEDOBJ_PATH)" \
-		PATH=$(STAGING_DIR)/usr/bin:$(PATH) tmcc
+#	$(MAKE) -C $(TMCD_PATH) \
+#		CC=$(CROSS_COMPILER_PREFIX)gcc \
+#		CFLAGS="$(CFLAGS) -I$(TESTBEDOBJ_PATH)" \
+#		PATH=$(STAGING_DIR)/usr/bin:$(PATH) tmcc
 
 $(TESTBED_BUILD_PATH)/frisbee: $(SYSROOT_ZLIB_SHARED)
 	PATH=$(STAGING_DIR)/usr/bin:$(PATH) \
