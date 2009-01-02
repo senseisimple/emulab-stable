@@ -136,6 +136,12 @@ sub IsExperimental($)
 
     return $self->role() eq TBDB_IFACEROLE_EXPERIMENT();
 }
+sub IsControl($)
+{
+    my ($self) = @_;
+
+    return $self->role() eq TBDB_IFACEROLE_CONTROL();
+}
 
 #
 # Lookup by card,port
