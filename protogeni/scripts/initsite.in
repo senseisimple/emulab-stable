@@ -126,11 +126,11 @@ if (! -e "$TB/etc/.federated") {
 #
 # Packages.
 #
-my %packlist = ("libxml2-2.6.26"  => "/usr/ports/textproc/libxml2",
-		"p5-Frontier-RPC" => "/usr/ports/net/p5-Frontier-RPC",
-		"p5-XML-LibXML"   => "/usr/ports/textproc/p5-XML-LibXML",
-		"xmlsec1"         => "/usr/ports/security/xmlsec1",
-		"p5-Crypt-SSLeay" => "/usr/ports/security/p5-Crypt-SSLeay"
+my %packlist = ("libxml2>=2.6.26"       => "/usr/ports/textproc/libxml2",
+		"p5-Frontier-RPC"       => "/usr/ports/net/p5-Frontier-RPC",
+		"p5-XML-LibXML"         => "/usr/ports/textproc/p5-XML-LibXML",
+		"xmlsec1"               => "/usr/ports/security/xmlsec1",
+		"p5-Crypt-SSLeay>=0.57" => "/usr/ports/security/p5-Crypt-SSLeay"
 		);
 my $needpkgs = 0;
 
