@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2008 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2009 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -1608,7 +1608,12 @@ COMMAND_PROTOTYPE(doifconfig)
 			 "  vll.idx=v.virtlanidx and vll.exptidx='%d' "
 			 "left join lan_attributes as la on "
 			 "  la.lanid=v.vlanid and la.attrkey='vlantag' "
-			 "where v.node_id='%s' and %s",
+			 "left join lan_attributes as la2 on "
+			 "  la2.lanid=v.vlanid and la2.attrkey='stack' "
+			 "where v.node_id='%s' and "
+			 "      (la2.attrvalue='Experimental' or "
+			 "       la2.attrvalue is null) "
+			 "      and %s",
 			 10, reqp->exptidx, reqp->pnodeid, buf);
 	if (!res) {
 		error("IFCONFIG: %s: DB Error getting veth interfaces!\n",
