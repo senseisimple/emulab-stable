@@ -170,18 +170,56 @@ package
       {
         var rspec : XML = XML(str);
         var nodeName : QName = new QName(rspec.namespace(), "node");
+        var xmlNodes : Array = new Array();
         for each (var element in rspec.elements(nodeName))
         {
           if (element.attribute("uuid") != null
               && element.attribute("uuid") != "")
           {
-            names[index].push(element.attribute("name"));
-            uuids[index].push(element.attribute("uuid"));
+            xmlNodes.push(element);
           }
+        }
+        xmlNodes.sort(xmlSort);
+        var i : int = 0;
+        for (; i < xmlNodes.length; ++i)
+        {
+          names[index].push(xmlNodes[i].attribute("name"));
+          uuids[index].push(xmlNodes[i].attribute("uuid"));
         }
       }
       states[index] = NORMAL;
       updateList();
+    }
+
+    function xmlSort(left : XML, right : XML) : int
+    {
+      // TODO: Make this an actual natural sort
+      var leftAttribute = left.attribute("name");
+      var rightAttribute = right.attribute("name");
+      if (leftAttribute.substr(0, 2) == "pc"
+          && rightAttribute.substr(0, 2) == "pc"
+          && int(leftAttribute.substr(2)) > 0
+          && int(rightAttribute.substr(2)) > 0)
+      {
+        var leftNum = int(leftAttribute.substr(2));
+        var rightNum = int(rightAttribute.substr(2));
+        if (leftNum < rightNum)
+        {
+          return -1;
+        }
+        else if (leftNum > rightNum)
+        {
+          return 1;
+        }
+        else
+        {
+          return 0;
+        }
+      }
+      else
+      {
+        return leftAttribute.localeCompare(rightAttribute);
+      }
     }
 
     public function failResources(index : int)

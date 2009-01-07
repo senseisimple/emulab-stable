@@ -20,6 +20,7 @@ package
     static var cm : String = "cm";
 
     public static var getCredential = new Array(ch, "GetCredential");
+    public static var getKeys = new Array(ch, "GetKeys");
     public static var resolve = new Array(ch, "Resolve");
     public static var remove = new Array(ch, "Remove");
     public static var register = new Array(ch, "Register");

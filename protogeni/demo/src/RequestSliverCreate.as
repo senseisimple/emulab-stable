@@ -49,6 +49,7 @@ package
         op.reset(Geni.redeemTicket);
         op.addField("ticket", cm.getTicket(cmIndex));
         op.addField("impotent", Request.IMPOTENT);
+//        op.addField("keys", credential.ssh);
         op.setUrl(cm.getUrl(cmIndex));
       }
       return op;

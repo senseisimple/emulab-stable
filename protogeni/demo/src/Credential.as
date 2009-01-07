@@ -21,6 +21,7 @@ package
       base = null;
       slice = null;
       slivers = null;
+      ssh = null;
     }
 
     public function setupSlivers(count : int)
@@ -36,5 +37,6 @@ package
     public var base : String;
     public var slice : String;
     public var slivers : Array;
+    public var ssh : Object;
   }
 }

@@ -118,6 +118,30 @@ package
       if (code == 0)
       {
         credential.base = String(response.value);
+        startSshLookup();
+      }
+      else
+      {
+        codeFailure();
+      }
+    }
+
+    function startSshLookup() : void
+    {
+      opName = "Acquiring SSH Keys";
+      clip.loadText.text = opName;
+      op.reset(Geni.getKeys);
+      op.addField("credential", credential.base);
+      op.call(completeSshLookup, failure);
+      addSend();
+    }
+
+    function completeSshLookup(code : Number, response : Object) : void
+    {
+      addResponse();
+      if (code == 0)
+      {
+        credential.ssh = response.value;
         startUserLookup();
       }
       else
@@ -125,6 +149,7 @@ package
         codeFailure();
       }
     }
+
 
     function startUserLookup() : void
     {
