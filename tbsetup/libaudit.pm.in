@@ -13,7 +13,7 @@ use Exporter;
 @EXPORT =
     qw ( AuditStart AuditEnd AuditAbort AuditFork AuditSetARGV AuditGetARGV
 	 AddAuditInfo
-	 LogStart LogEnd
+	 LogStart LogEnd LogAbort
 	 LIBAUDIT_NODAEMON LIBAUDIT_DAEMON LIBAUDIT_LOGONLY
 	 LIBAUDIT_NODELETE LIBAUDIT_FANCY LIBAUDIT_LOGTBOPS
        );
@@ -231,6 +231,11 @@ sub LogEnd(;$)
     return AuditEnd($status);
 }
 
+sub LogAbort()
+{
+    return AuditAbort();
+}
+
 #
 # Finish an Audit. 
 #
@@ -270,6 +275,11 @@ sub AuditAbort()
 {
     if ($auditing) {
 	$auditing = 0;
+
+	if (!$daemon && $PERL_VERSION >= 5.008) {
+	    eval("open(STDOUT, \">&\", \$libaudit::SAVE_STDOUT); ".
+		 "open(STDERR, \">&\", \$libaudit::SAVE_STDERR);");
+	}
 
 	if (defined($logfile)) {
 	    #
