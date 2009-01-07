@@ -2,7 +2,7 @@
 
 #
 # EMULAB-LGPL
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -417,29 +417,27 @@ sub createVlan($$$;$$$) {
     # What we do here depends on whether this stack uses VTP to synchronize
     # VLANs or not
     #
-    my $okay = 1;
+    my $vlan_number;
     if ($self->{VTP} || $self->{PRUNE_VLANS}) {
 	#
 	# We just need to create the VLAN on the stack leader
 	#
 	#
-	my $vlan_number = $self->{LEADER}->createVlan($vlan_id,undef,@otherargs);
-	$okay = ($vlan_number != 0);
+	$vlan_number = $self->{LEADER}->createVlan($vlan_id,undef,@otherargs);
     } else {
 	#
 	# We need to create the VLAN on all devices
 	# XXX - should we do the leader first?
 	#
-	my $vlan_number = undef;
-	foreach my $devicename (sort {tbsort($a,$b)} keys %{$self->{DEVICES}}) {
-	    print "Creating VLAN on switch $devicename ... \n" if $self->{DEBUG};
+	foreach my $devicename (sort {tbsort($a,$b)} keys %{$self->{DEVICES}}){
+	    print "Creating VLAN on switch $devicename ... \n"
+		if $self->{DEBUG};
 	    my $device = $self->{DEVICES}{$devicename};
 	    my $res = $device->createVlan($vlan_id,$vlan_number,@otherargs);
 	    if (!$res) {
 		#
 		# Ooops, failed. Don't try any more
 		#
-		$okay = 0;
 		last;
 	    } else {
 		#
@@ -454,13 +452,12 @@ sub createVlan($$$;$$$) {
     # We need to add the ports to VLANs at the stack level, since they are
     # not necessarily on the leader
     #
-    if ($okay && @ports) {
+    if ($vlan_number && @ports) {
 	if ($self->setPortVlan($vlan_id,@ports)) {
-	    $okay = 0;
+	    print STDERR "*** Failed to add ports to vlan\n";
 	}
     }
-
-    return $okay;
+    return return $vlan_number;
 }
 
 #
