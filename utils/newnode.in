@@ -470,6 +470,9 @@ NODE: foreach my $node_id (@node_ids) {
 	    "interface_type='$iface_type', iface='$iface', uuid=UUID(), " .
 	    "current_speed='$max_speed', duplex=$duplex, role='$iface_role'");
 
+	DBQueryFatal("INSERT INTO interface_state SET node_id='$node_id', " .
+	    "card=$card, port=1, iface='$iface'");
+
 	if (!$switch_id) {
 	    print "No switch found for ${node_id}:$iface - skipping\n";
 	    next;

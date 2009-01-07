@@ -1600,6 +1600,11 @@ class Plab:
                          (nodeid, 0, 1, nodeent['IP'], 'plab_fake',
                           controliface, 'ctrl'))
 
+            DBQueryFatal("replace into interface_state"
+                         " (node_id, card, port, iface)"
+                         " values (%s, %s, %s, %s)",
+                         (nodeid, 0, 1, controliface))
+
             # ensure to mark as undeleted...
             DBQueryFatal("update plab_mapping set deleted=0" \
                          " where node_id=%s",(nodeid,))

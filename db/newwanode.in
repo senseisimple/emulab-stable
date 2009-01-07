@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -273,6 +273,10 @@ else {
 		 "(node_id, card, port, IP, interface_type, iface, role) ".
 		 "values ('$nodename', 0, 1, '$nodeip', ".
 		 "        'fxp', '$control_iface', '$ifacerole')");
+
+    DBQueryFatal("insert into interface_state ".
+		 "(node_id, card, port, iface) ".
+		 "values ('$nodename', 0, 1, 'fxp')");
 
     DBQueryFatal("insert into reserved ".
 		 "(node_id, exptidx, pid, eid, rsrv_time, vname) ".
