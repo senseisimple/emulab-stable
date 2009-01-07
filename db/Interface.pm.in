@@ -100,6 +100,20 @@ sub LookupAll($$$)
 		$interface->{'WIRES'} = $wires_result->fetchrow_hashref();
 	    }
 
+	    #
+	    # And the interface_state table.
+	    #
+	    my $state_result =
+		DBQueryWarn("select * from interface_state ".
+			    "where node_id='$nodeid' and ".
+			    "      card='$card' and port='$port'");
+
+	    return -1
+		if (!$state_result);
+	    return -1
+		if (!$state_result->numrows);
+	    $interface->{'STATE'} = $state_result->fetchrow_hashref();
+
 	    # Cache by card,port and by iface
 	    $all_interfaces{"$nodeid:$card:$port"} = $interface;
 	    $all_interfaces{"$nodeid:$iface"}      = $interface;
@@ -129,6 +143,9 @@ sub wire_type($)   { return $_[0]->{'WIRES'}->{'type'}; }
 sub switch_id($)   { return $_[0]->{'WIRES'}->{'node_id2'}; }
 sub switch_card($) { return $_[0]->{'WIRES'}->{'card2'}; }
 sub switch_port($) { return $_[0]->{'WIRES'}->{'port2'}; }
+# Interface State table
+sub enabled($)     { return $_[0]->{'STATE'}->{'enabled'}; }
+sub tagged($)      { return $_[0]->{'STATE'}->{'tagged'}; }
 
 sub IsExperimental($)
 {
@@ -183,6 +200,20 @@ sub Lookup($$$$)
 	$interface->{'WIRES'} = $query_result->fetchrow_hashref();
     }
 
+    #
+    # And the interface_state table.
+    #
+    $query_result =
+	DBQueryWarn("select * from interface_state ".
+		    "where node_id='$nodeid' and ".
+		    "      card='$card' and port='$port'");
+
+    return undef
+	if (!$query_result);
+    return undef
+	if (!$query_result->numrows);
+    $interface->{'STATE'} = $query_result->fetchrow_hashref();
+    
     # Cache by card,port and by iface
     my $iface = $interface->iface();
     
@@ -248,6 +279,15 @@ sub Create($$$)
 		"  uuid='$uuid'")
 	or return undef;
 
+    if (!DBQueryWarn("insert into interface_state set ".
+		     "  node_id='$node_id', " .
+		     "  card=$card, port=$port, iface='$iface'")) {
+	DBQueryWarn("delete from interfaces ".
+		    "where node_id='$node_id' and card='$card' ".
+		    "      and port='$port'");
+	return undef;
+    }
+
     if (defined($switch_id)) {
 	my $cable_len = "";
 	if (defined($cable)) {
@@ -261,6 +301,9 @@ sub Create($$$)
 			 "  node_id1='$node_id', card1=$card, port1=$port, " .
 			 "  node_id2='$switch_id', card2='$switch_card', " .
 			 "  port2='$switch_port' $cable_len")) {
+	    DBQueryWarn("delete from interface_state ".
+			"where node_id='$node_id' and card='$card' ".
+			"      and port='$port'");
 	    DBQueryWarn("delete from interfaces ".
 			"where node_id='$node_id' and card='$card' ".
 			"      and port='$port'");
