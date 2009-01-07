@@ -27,6 +27,7 @@ use Exporter;
                 getExperimentControlPorts
 		snmpitSet snmpitSetWarn snmpitSetFatal 
                 snmpitBulkwalk snmpitBulkwalkWarn snmpitBulkwalkFatal
+	        setPortEnabled setPortTagged
 		printVars tbsort );
 
 use English;
@@ -177,7 +178,8 @@ sub getVlanPorts (@) {
 }
 
 #
-# Returns an an array of trunked ports (in node:card form) used by an experiment
+# Returns an an array of trunked ports (in node:card form) used by an
+# experiment
 #
 sub getExperimentTrunks($$) {
     my ($pid, $eid) = @_;
@@ -216,6 +218,33 @@ sub setVlanTag ($$) {
 	if ($vlan->SetTag($tag) != 0);
 
     return 0;
+}
+
+#
+# Update database to mark port as enabled or disabled.
+#
+sub setPortEnabled($$) {
+    my ($port, $enabled) = @_;
+
+    $port =~ /^(.+):(\d+)$/;
+    my ($node, $card) = ($1, $2);
+    $enabled = ($enabled ? 1 : 0);
+
+    DBQueryFatal("update interface_state set enabled=$enabled ".
+		 "where node_id='$node' and card='$card'");
+    
+    return 0;
+}
+# Ditto for trunked.
+sub setPortTagged($$) {
+    my ($port, $tagged) = @_;
+
+    $port =~ /^(.+):(\d+)$/;
+    my ($node, $card) = ($1, $2);
+    $tagged = ($tagged ? 1 : 0);
+
+    DBQueryFatal("update interface_state set tagged=$tagged ".
+		 "where node_id='$node' and card='$card'");
 }
 
 #
