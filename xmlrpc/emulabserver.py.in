@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004-2008 University of Utah and the Flux Group.
+# Copyright (c) 2004-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 import sys
@@ -4349,7 +4349,10 @@ class elabinelab:
             return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
         
         return EmulabResponse(RESPONSE_SUCCESS, output=output)
-    
+
+    #
+    # Leave the previous one in place or else existing elabinelabs will break.
+    #
     def vlansnew(self, version, argdict):
         if version != self.VERSION:
             return EmulabResponse(RESPONSE_BADVERSION,
@@ -4380,7 +4383,7 @@ class elabinelab:
 
         argstr = "-p " + self.pid + " -e " + self.eid + " " + xmlfilename;
 
-        (exitval, output) = runcommand(TBDIR + "/sbin/snmpit.proxy2 " + argstr)
+        (exitval, output) = runcommand(TBDIR + "/sbin/snmpit.proxynew " + argstr)
         if exitval:
             return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
         
