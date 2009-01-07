@@ -1,25 +1,28 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
+use strict;
 use English;
 use Getopt::Std;
+use RPC::XML::Parser;
+use Data::Dumper;
 
 #
 # Snmpit proxy for ElabInElab.
 #
 sub usage()
 {
-    print STDOUT "Usage: snmpit.proxy [-d] -p <pid> -e <eid> ".
-	"setup|destroy|trunk|list arg [arg ...]\n";
- 
+    print STDOUT "Usage: snmpit.proxy [-d] -p <pid> -e <eid> <xmldoc>\n";
     exit(-1);
 }
 my $optlist  = "dnp:e:";
-my $debug    = 0;
+my $debug    = 1;
 my $impotent = 0;
+my $exitval  = 0;
+my $output;
 my $pid;
 my $eid;
 my @inner_ids   = ();
@@ -45,25 +48,32 @@ $| = 1;
 # Load the Testbed support stuff.
 use lib "@prefix@/lib";
 use libdb;
+use libaudit;
 use libtestbed;
+use User;
 use Experiment;
 use Lan;
+use Interface;
+use Node;
 
 # Locals
 my $exptidx;
 
 # Protos
-sub SetupVlans();
-sub DestroyVlans();
-sub Trunk();
-sub List();
-sub Map();
+sub SetupVlans($);
+sub MakeVlan($);
+sub DestroyVlans($);
+sub PortControl($);
+sub Trunk($);
+sub List($);
+sub MapVlans(@);
+sub fatal($);
 
 #
 # Parse command arguments. Once we return from getopts, all that should
 # left are the required arguments.
 #
-%options = ();
+my %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
 }
@@ -97,9 +107,32 @@ if (defined($options{"e"})) {
     }
 }
 usage()
-    if (!@ARGV || !defined($pid) || !defined($eid));
+    if (@ARGV != 1 || !defined($pid) || !defined($eid));
 
-my $op = shift(@ARGV);
+#
+# Log audit since it is hard to debug this one.
+#
+LogStart(0, undef, LIBAUDIT_LOGTBOPS()|LIBAUDIT_NODELETE);
+
+my $xmldoc = $ARGV[0];
+# Note different taint check (allow /).
+if ($xmldoc =~ /^([-\w\.\/]+)$/) {
+    $xmldoc = $1;
+}
+else {
+    fatal("Tainted argument $xmldoc");
+}
+# Cause we are invoked from the xmlrpc server with this name format.
+if (! ($xmldoc =~ /^\/var\/tmp\/php\w+/)) {
+    fatal("$xmldoc does not resolve to an appropriate directory!");
+}
+if (! -e $xmldoc) {
+    fatal("$xmldoc does not exist!");
+}
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
+}
 
 #
 # Sanity check. Must be an ElabInElab experiment and user must have
@@ -107,14 +140,33 @@ my $op = shift(@ARGV);
 #
 my $experiment = Experiment->Lookup($pid, $eid);
 if (!defined($experiment)) {
-    die("*** $0:\n",
-	"    Experiment $pid/$eid is not active!\n");
+    fatal("Experiment $pid/$eid is not active!");
 }
 $exptidx = $experiment->idx();
-if (!TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_MODIFY)) {
-    die("*** $0:\n".
-	"    You do not have permission to swap or modify this experiment!\n");
+if (!$experiment->AccessCheck($this_user, TB_EXPT_MODIFY)) {
+    fatal("You do not have permission to swap or modify this experiment!");
 }
+
+#
+# Open the file and pass the stream to the parser. 
+#
+open(XMLDOC, $xmldoc) or
+    fatal("$xmldoc could not be opened for reading!");
+
+my $parser   = RPC::XML::Parser->new();
+my $goo      = $parser->parse(*XMLDOC);
+if (! ref($goo)) {
+    fatal("$xmldoc could not be parsed!");
+}
+my $opargs  = $goo->value();
+if (! (exists($opargs->{'op'}) && exists($opargs->{'args'}))) {
+    fatal("missing arguments in xmlgoo");
+}
+my $op    = $opargs->{'op'};
+my $args  = $opargs->{'args'};
+
+# Add stuff for log message if sent.
+AddAuditInfo("message", $op . "\n\n" . Dumper($args));
 
 #
 # I'm going to serialize this for now. When the script exits, the lock
@@ -122,52 +174,111 @@ if (!TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_MODIFY)) {
 #
 DBQueryFatal("select get_lock('snmpit.proxy', 999999)");
 
-if ($op eq "setup") {
-    exit(SetupVlans());
-}
-elsif ($op eq "destroy") {
-    exit(DestroyVlans());
-}
-elsif ($op eq "trunk") {
-    exit(Trunk());
-}
-elsif ($op eq "list") {
-    exit(List());
+SWITCH: for ($op) {
+    /setup/ && do {
+	($exitval, $output) = SetupVlans($args);
+	last;
+    };
+    /makevlan/ && do {
+	($exitval, $output) = MakeVlan($args);
+	last;
+    };
+    /destroy/ && do {
+	($exitval, $output) = DestroyVlans($args);
+	last;
+    };
+    /trunk/ && do {
+	($exitval, $output) = Trunk($args);
+	last;
+    };
+    /list/ && do {
+	($exitval, $output) = List($args);
+	last;
+    };
+    /portcontrol/ && do {
+	($exitval, $output) = PortControl($args);
+	last;
+    };
+    # default case
+    fatal("Unknown operation $op");
 }
 
+# Update with output for log message if sent.
+AddAuditInfo("message", "$op\n\n" . Dumper($args) . "\n\n$output\n");
+
 #
-# Setup vlans for an inner emulab. ARGV holds a set of strings that look
-# like:
-#	id,node:iface,speed,duplex,vtag
-# which came in from the XMLRPC server. For each vlan id, gather up all
-# if its member ports (node:iface), along with the speed and duplex for
-# each port, which goes into the interfaces table so that the real snmpit
-# can find the right values. 
+# Terminate the log capture so that we can print the response to STDOUT
+# for the RPC server. 
+#
+if ($exitval) {
+    LogEnd($exitval);
+}
+else {
+    LogAbort();
+}
+print $output
+    if (defined($output));
+exit($exitval);
+
+#
+# Setup vlans for an inner emulab. For each vlan id, gather up all if
+# its member ports (node:iface), along with the speed and duplex for
+# each port, which goes into the interfaces table so that the real
+# snmpit can find the right values.
+#
+# Note that this function assumes the experiment stack. See MakeVlan()
+# below for the more basic function to create a single vlan on a stack.
 # 
-sub SetupVlans()
+sub SetupVlans($)
 {
+    my ($argtable) = @_;
+    
     my $vlantable = {};
     my %vmaptable = ();
     my %vtagtable = ();
+    my %stacktable= ();
     my %nodes     = ();
     my @outer_ids = ();
     my $errors    = 0;
-	
-    while (@ARGV) {
-	my $str = shift(@ARGV);
 
-	if ($str =~ /^(\d+),([\w:]+),(\d*),(full|half),([-\w]+)$/) {
-	    my $id     = $1;
-	    my $port   = $2;
-	    my $speed  = $3;
-	    my $duplex = $4;
-	    my $vtag   = $5;
+    foreach my $id (keys(%{ $argtable })) {
+	my $vtag    = $argtable->{$id}->{'virtual'};
+	my $stack   = $argtable->{$id}->{'stack'};
+	my $members = $argtable->{$id}->{'members'};
+
+	if (! ($id =~ /^[\d]+$/)) {
+	    fatal("SetupVlans: Illegal id '$id'");
+	}
+	if (! ($vtag =~ /^[\-\w]+$/)) {
+	    fatal("SetupVlans: Illegal vname '$vtag'");
+	}
+	if (!defined($stack)) {
+	    $stack = "Experimental";
+	}
+	elsif ($stack ne "Control" && $stack ne "Experimental") {
+	    fatal("SetupVlans: Illegal stack '$stack'");
+	}
+
+	foreach my $port (keys(%{ $members })) {
+	    my $speed  = $members->{$port}->{'speed'};
+	    my $duplex = $members->{$port}->{'duplex'};
 	    my $node;
 	    my $iface;
+
+	    if (! ($port =~ /^[\-\w]+\:[\-\w]+$/)) {
+		fatal("SetupVlans: Illegal port '$port'");
+	    }
+	    if (! ($speed =~ /^[\d]+$/)) {
+		fatal("SetupVlans: Illegal speed '$speed'");
+	    }
+	    if (! ($duplex eq "full" || $duplex eq "half")) {
+		fatal("SetupVlans: Illegal duplex '$duplex'");
+	    }
 
 	    if (! exists($vlantable->{$id})) {
 		$vlantable->{$id} = {};
 		$vtagtable{$id}   = $vtag;
+		$stacktable{$id}  = $stack;
 	    }
 	    $vlantable->{$id}->{$port} = [$speed, $duplex];
 
@@ -178,10 +289,6 @@ sub SetupVlans()
 	    $nodes{$node} = []
 		if (!exists($nodes{$node}));
 	    push(@{ $nodes{$node} }, $iface);
-	}
-	else {
-	    die("*** $0:\n",
-		"    SetupVlans: Cannot parse '$str'!\n");
 	}
     }
 
@@ -289,10 +396,14 @@ sub SetupVlans()
     # 
     foreach my $id (keys(%$vlantable)) {
 	my $vtag    = $vtagtable{$id};
+	my $stack   = $stacktable{$id};
 	my @members = keys(%{ $vlantable->{$id} });
 	my $mstring = "@members";
 	my $outer_id;
 	my $vlan;
+
+	# Not doing stacks yet.
+	$stack = "Experimental";
 
 	if ($debug) {
 	    print STDERR "$pid $eid $id $mstring\n";
@@ -322,12 +433,15 @@ sub SetupVlans()
 		$errors++;
 		next;
 	    }
+	    $vlan->SetStack($stack);
 	    $outer_id = $vlan->lanid();
 
 	    # Insert mapping between inner and outer vlan entries.
-	    $query_result = DBQueryWarn("insert into elabinelab_vlans ".
-			 "       (exptidx,pid,eid,inner_id,outer_id) ".
-			 "values ($exptidx, '$pid', '$eid', $id, $outer_id)");
+	    $query_result =
+		DBQueryWarn("insert into elabinelab_vlans ".
+			    "      (exptidx,pid,eid,inner_id,outer_id,stack) ".
+			    "values ($exptidx, '$pid', '$eid', '$id', ".
+			    "        '$outer_id', '$stack')");
 	    if (!$query_result || !$query_result->numrows) {
 		#
 		# Failed, must remove vlans entry too. We keep going though
@@ -360,14 +474,17 @@ sub SetupVlans()
 	# And save vlan object for getting the tag.
 	$outer_vlans{$outer_id} = $vlan;
     }
+    # Not doing stacks yet.
+    my $stackopt = "";
+    
     # Now call snmpit to create the actual vlans.
     if ($debug) {
-	print STDERR "Running 'snmpit -t $pid $eid @outer_ids'\n";
+	print STDERR "Running 'snmpit $stackopt -t $pid $eid @outer_ids'\n";
     }
     return $errors
 	if ($impotent);
     
-    system("$TB/bin/snmpit -t $pid $eid @outer_ids > /dev/null");
+    system("$TB/bin/snmpit $stackopt -t $pid $eid @outer_ids");
     if ($?) {
 	#
 	# Yuck failed. We leave things as is, and wait for experiment
@@ -381,7 +498,7 @@ sub SetupVlans()
 	$errors = $? >> 8;
     }
     my @results = ();
-    foreach $id (keys %vmaptable) {
+    foreach my $id (keys %vmaptable) {
 	my $outer_vlan = $outer_vlans{$vmaptable{$id}};
 
 	if ($outer_vlan->Refresh() != 0) {
@@ -389,22 +506,25 @@ sub SetupVlans()
 	    $errors++;
 	    next;
 	}
-	my $tagnum;
-	if ($outer_vlan->GetTag(\$tagnum) != 0) {
+	my $tagnum = $outer_vlan->GetTag();
+	if ($tagnum <= 0) {
 	    print STDERR "*** Could not get vlan tag for $outer_vlan\n";
 	    $errors++;
 	    next;
 	}
 	push (@results, "$id#$tagnum");
     }
-    print join(",", @results);
-    return $errors;
+    return $errors, join(",", @results);
+
 }
+
 #
 # This is common to list and destroy and trunk.
 #
-sub Map()
+sub MapVlans(@)
 {
+    my @vlanids = @_;
+    
     my $query_result =
 	DBQueryFatal("select inner_id,outer_id from elabinelab_vlans ".
 		     "where pid='$pid' and eid='$eid'");
@@ -413,13 +533,13 @@ sub Map()
 	$mapping{$inner_id} = $outer_id;
     }
     #
-    # Sanity check; make sure the set of vlans we got on the command line
-    # (from the inner elab via the RPC server) are really vlans we have
-    # already setup. Anything that does not match, skip with a warning, but
-    # go ahead and tear down ones that match.
+    # Sanity check; make sure the set of vlans we got (from the inner
+    # elab via the RPC server) are really vlans we have already setup.
+    # Anything that does not match, skip with a warning, but go ahead
+    # and tear down ones that match.
     #
-    while (@ARGV) {
-	my $id = shift(@ARGV);
+    while (@vlanids) {
+	my $id = shift(@vlanids);
 
 	if ($id eq "") { next ; }
 	if (! ($id =~ /^\d+$/)) {
@@ -448,14 +568,32 @@ sub Map()
 }
 
 #
+# Add ports to a vlan, creating it if needed. This is mostly to support
+# inner firewalls.
+# 
+sub MakeVlan($)
+{
+    fatal("Unsupported for ElabinElab");
+}
+
+#
 # Destroy a set of vlans. We get a list of inner vlan ID numbers for the
 # inner elab vlans table. We have to map those to outer vlan table id
 # numbers, and then remove those from the DB and from the switches.
 # 
-sub DestroyVlans()
+sub DestroyVlans($)
 {
+    my ($args) = @_;
 
-    Map();
+    if (! exists($args->{'vlans'})) {
+	fatal("DestroyVlans: Missing arguments");
+    }
+    my @vlanids  = @{ $args->{'vlans'} };
+    my @done     = ();
+    my $errors   = 0;
+    my $stack;
+    
+    MapVlans(@vlanids);
     # If no vlans, do nothing! snmpit will end up removing all the vlans!
     return 0
 	if (! @outer_ids);
@@ -465,59 +603,77 @@ sub DestroyVlans()
     #
     # Okay, ask snmpit to tear down these vlans. 
     #
-    if ($debug) {
-	print STDERR "Running 'snmpit -r $pid $eid @outer_ids'\n";
-    }
-    system("$TB/bin/snmpit -r $pid $eid @outer_ids");
-    if ($?) {
-	#
-	# Yuck failed. We leave things as is, and wait for the inner elab
-	# to request experiment teardown again. This mirrors what happens
-	# on a normal swapout; snmpit -r can be retried until all of the
-	# vlans are finally gone; At that point the DB state can be removed.
-	#
-	print STDERR "*** $0:\n".
-	             "    snmpit -r failed!\n";
-	return $? >> 8;
-    }
+    foreach my $vlanid (@vlanids) {
+	my $outer_id = $mapping{$vlanid};
+	my $vlan     = $outer_vlans{$outer_id};
+	my $stack    = $vlan->GetStack();
+	# Not doing stacks yet;
+	my $stackopt = "";
 
-    #
-    # Okay, remove the outer vlan table entries first. 
-    #
-    if ($debug) {
-	print STDERR "Removing @outer_ids from vlans table\n";
-    }
-    foreach my $vlan (values(%outer_vlans)) {
+	if ($debug) {
+	    print STDERR "Running 'snmpit $stackopt -r $pid $eid $outer_id'\n";
+	}
+	system("$TB/bin/snmpit $stackopt -r $pid $eid $outer_id");
+	if ($?) {
+	    #
+	    # Yuck failed. We leave things as is, and wait for the
+	    # inner elab to request experiment teardown again. This
+	    # mirrors what happens on a normal swapout; snmpit -r can
+	    # be retried until all of the vlans are finally gone; At
+	    # that point the DB state can be removed.
+	    #
+	    print STDERR "*** $0:\n".
+		         "    snmpit $stackopt -r $outer_id failed!\n";
+	    $errors = $? >> 8;
+	    goto bad;
+	}
+
+	#
+	# Remove the outer vlan table entries first. 
+	#
+	if ($debug) {
+	    print STDERR "Removing $outer_id from vlans table\n";
+	}
 	if ($vlan->Destroy() != 0) {
 	    print STDERR "*** $0:\n".
 		         "    Could not Destroy() $vlan\n";
-	    return -1;
+	    $errors++;
+	    goto bad;
+	    
 	}
+	#
+	# Since the above worked, we can remove the mappings too.
+	# 
+	if ($debug) {
+	    print STDERR "Removing $outer_id from elabinelab_vlans table\n";
+	}
+	if (!DBQueryWarn("delete from elabinelab_vlans ".
+			 "where pid='$pid' and eid='$eid' and ".
+			 "      inner_id='$vlanid'")) {
+	    $errors++;
+	    goto bad;
+	}
+	push(@done, $vlanid);
     }
-
-    #
-    # Since the above worked, we can remove the mappings too.
-    # 
-    if ($debug) {
-	print STDERR "Removing @inner_ids from elabinelab_vlans table\n";
-    }
-    DBQueryFatal("delete from elabinelab_vlans ".
-		 "where pid='$pid' and eid='$eid' and ".
-		 # Join "id='foo'" with ORs
-		 "(" . join(' OR ', map("inner_id='$_'", @inner_ids)) . ")");
-
-    return 0;
+  bad:
+    return $errors, join(",", @done);
 }
 #
 # List a set of vlans. We get a list of inner vlan ID numbers for the
 # inner elab vlans table. We have to map those to outer vlan table id
 # numbers, and then list.
 # 
-sub List()
+sub List($)
 {
+    my ($args)  = @_;
+
+    if (! exists($args->{'vlans'})) {
+	fatal("List: Missing arguments");
+    }
+    my @vlanids = @{ $args->{'vlans'} };
     my @pairs;
 
-    Map();
+    MapVlans(@vlanids);
     if (!@inner_ids) { @inner_ids = keys %mapping; }
     if (!@inner_ids) { return 0; }
 
@@ -526,32 +682,56 @@ sub List()
 	push @pairs, "$out#$in";
     }
     my $command = "$TB/bin/snmpit -L " . join(",", @pairs);
-    system($command);
+    my $output = `$command`;
     if ($?) {
 	# Yuck failed.
 	print STDERR "*** $0:\n".  "    snmpit -L failed!\n";
 	return $? >> 8;
     }
-    return 0;
+    return 0, $output;
 }
 
 #
 # Either put a(n experimental) port into standard, or dual-mode trunking
 # or reset to its normal state (snmpit -E , -T or - U).
 #
-sub Trunk()
+sub Trunk($)
 {
-    my $mode = shift(@ARGV);
-    my $port = shift(@ARGV);
+    my ($args)  = @_;
+
+    if (! (exists($args->{'mode'}) && exists($args->{'vlans'}) &&
+	   exists($args->{'port'}))) {
+	fatal("Trunk: Missing arguments");
+    }
+    my $mode    = $args->{'mode'};
+    my $port    = $args->{'port'};
+    my @vlanids = @{ $args->{'vlans'} };
+
+    # Taint check these args.
+    if (! ($mode eq "-T" || $mode eq "-E" || $mode eq "-U")) {
+	fatal("Trunk: Improper mode '$mode'");
+    }
+    if (! ($port =~ /^[\-\w]+\:[\-\w]+$/)) {
+	fatal("Trunk: Illegal port '$port'");
+    }
+    # Not doing stacks yet.
+    my $stack    = "Experimental";
+    my $stackopt = "";
+    if (0 && exists($args->{'stack'})) {
+	$stack = $args->{'stack'};
+	if ($stack ne "Control" && $stack ne "Experimental") {
+	    fatal("Trunk: Improper stack argument: $stack");
+	}
+    }
 
     $port =~ /^(.+):(.+)/;
     my ($node, $card) = ($1,$2);
-    my $query =
-	"select iface from interfaces where node_id='$node' and card='$card'";
-    my $query_result = DBQueryFatal($query);
+
+    my $query_result =
+	DBQueryFatal("select iface from interfaces ".
+		     "where node_id='$node' and card='$card'");
     if ($query_result->numrows != 1) {
-	print STDERR "can't determine iface from $port in $pid/$eid\n";
-	return 1;
+	fatal("Cannot determine iface from $port in $pid/$eid");
     }
     my ($iface) = ($query_result->fetchrow())[0];
 
@@ -559,34 +739,39 @@ sub Trunk()
 	DBQueryFatal("select node_id from reserved where node_id='$node' ".
 		     "and pid='$pid' and eid='$eid'");
     if ($query_result->numrows != 1) {
-	print STDERR "$node not allocated to $pid / $eid\n";
-	return 1;
+	fatal("Trunk: $node not allocated to $pid/$eid");
     }
-    Map();
+    MapVlans(@vlanids);
     if ($mode eq "-U") {
-	$query_result = DBQueryFatal("select iface from vinterfaces where " .
-			 "node_id='$node' and type='vlan' and iface='$iface'");
-	if ($query_result->numrows == 0) {
-	    print STDERR "$port not trunked in database\n";
-	    return 1;
+	if ($stack eq "Experimental") {
+	    $query_result =
+		DBQueryFatal("select iface from vinterfaces " .
+			     "where node_id='$node' and type='vlan' and ".
+			     "      iface='$iface'");
+	    if ($query_result->numrows == 0) {
+		fatal("Trunk: $port not trunked in database");
+	    }
 	}
 	#
 	# Okay, ask snmpit to Untrunk
 	#
 	if ($debug) {
-	    print STDERR "Running 'snmpit -U $port'\n";
+	    print STDERR "Running 'snmpit $stackopt -U $port'\n";
 	}
-	system("$TB/bin/snmpit -U $port > /dev/null");
+	system("$TB/bin/snmpit $stackopt -U $port");
 	if ($?) {
 	    # Yuck failed.
-	    print STDERR "*** $0:\n".  "    snmpit -U failed!\n";
-	    return $? >> 8;
+	    fatal("snmpit $stackopt -U failed!");
 	}
 	#
 	# and clean up the database
 	#
-	$query_result = DBQueryFatal("delete from vinterfaces where " .
-			 "node_id='$node' and type='vlan' and iface='$iface'");
+	if ($stack eq "Experimental") {
+	    $query_result =
+		DBQueryFatal("delete from vinterfaces " .
+			     "where node_id='$node' and type='vlan' and ".
+			     "      iface='$iface'");
+	}
 	return 0;
     }
     if (($mode eq "-E") || ($mode eq "-T")) {
@@ -600,29 +785,132 @@ sub Trunk()
 	# appropriate to stuff.  It seems likely that the structure
 	# of the database will be revised, in this area, but
 	# for now, we'll just play Joe Isuzu.
-	$query_result = DBQueryFatal("select iface from vinterfaces where " .
-			  "node_id='$node' and iface='$iface'");
-	if ($query_result->numrows != 0) {
-	    DBQueryFatal("update vinterfaces set type='vlan' where " .
-	      "node_id='$node' and iface='$iface'");
-	} else {
-	    DBQueryFatal(
-	    "replace into vinterfaces (node_id,iface,type) " .
-	    "values ('$node','$iface','vlan')");
+	if ($stack eq "Experimental") {
+	    $query_result =
+		DBQueryFatal("select iface from vinterfaces where " .
+			     "node_id='$node' and iface='$iface'");
+	    if ($query_result->numrows != 0) {
+		DBQueryFatal("update vinterfaces set type='vlan' where " .
+			     "node_id='$node' and iface='$iface'");
+	    }
+	    else {
+		DBQueryFatal("replace into vinterfaces (node_id,iface,type) " .
+			     "values ('$node','$iface','vlan')");
+	    }
 	}
 	#
 	# Okay, ask snmpit to trunk these vlans. 
 	#
-	my $command = "$TB/bin/snmpit -S Experiment $mode $port @outer_ids > /dev/null";
+	my $command =
+	    "$TB/bin/snmpit $stackopt $mode $port @outer_ids";
 	if ($debug) { print STDERR "Running $command\n"; }
 	system($command);
 	if ($?) {
 	    # Yuck failed.
-	    print STDERR "*** $0:\n".  "    snmpit $mode failed!\n";
-	    return $? >> 8;
+	    fatal("Trunk: snmpit $stackopt $mode $mode @outer_ids failed!");
 	}
 	return 0;
     }
     print STDERR "*** unknown mode for trunk request: $mode \n";
     return 1;
+}
+
+#
+# Port control function.
+#
+sub PortControl($)
+{
+    my ($args)  = @_;
+
+    if (! (exists($args->{'command'}) && exists($args->{'ports'}))) {
+	fatal("PortControl: Missing arguments");
+    }
+    my $command = $args->{'command'};
+    my @ports   = @{ $args->{'ports'} };
+
+    # Not doing stacks yet;
+    my $stack   = "Experimental";
+
+    #
+    # Check the ports. Must be valid format and belong to node reserved
+    # to the elabinelab.
+    #
+    foreach my $port (@ports) {
+	if (! ($port =~ /^[\-\w]+\:[\-\w]+$/)) {
+	    fatal("PortControl: Illegal port '$port'");
+	}
+
+	$port =~ /^(.+):(.+)/;
+	my ($nodeid, $card) = ($1,$2);
+
+	my $node = Node->Lookup($nodeid);
+	if (!defined($node)) {
+	    fatal("PortControl: No such node $nodeid");
+	}
+	my $interface = Interface->Lookup($nodeid, $card, 1);
+	if (!defined($interface)) {
+	    fatal("PortControl: No such interface $card on $nodeid");
+	}
+	my $reservation = $node->Reservation();
+	if (!defined($reservation) ||
+	    !$experiment->SameExperiment($reservation)) {
+	    fatal("PortControl: $nodeid is not reserved to $experiment");
+	}
+    }
+    SWITCH: for ($command) {
+	/enable/ && do {
+	    $command = "-e";
+	    last;
+	};
+	/disable/ && do {
+	    $command = "-d";
+	    last;
+	};
+	/auto/ && do {
+	    $command = "-a";
+	    last;
+	};
+	/10mbit/ && do {
+	    $command = "-p 10";
+	    last;
+	};
+	/100mbit/ && do {
+	    $command = "-p 100";
+	    last;
+	};
+	/1000mbit/ && do {
+	    $command = "-p 1000";
+	    last;
+	};
+	/full/ && do {
+	    $command = "-u full";
+	    last;
+	};
+	/half/ && do {
+	    $command = "-u half";
+	    last;
+	};
+	# 'default' case
+	Fatal("PortControl: Unknown command $command");
+    }
+    #
+    # Okay, ask snmpit to do the deed.
+    #
+    if ($debug) {
+	print STDERR "Running 'snmpit $command @ports\n";
+    }
+    system("$TB/bin/snmpit $command @ports");
+    if ($?) {
+	# Yuck failed.
+	fatal("snmpit $command @ports");
+    }
+    return 0;
+}
+
+sub fatal($)
+{
+    my ($msg) = @_;
+
+    die("*** $0:\n",
+	"    $msg\n");
 }

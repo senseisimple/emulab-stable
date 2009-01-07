@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -38,7 +38,7 @@ SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 		  newnode_reboot savelogs.proxy eventsys.proxy \
 		  elabinelab snmpit.proxy panic node_attributes \
 		  nfstrace plabinelab smbpasswd_setup smbpasswd_setup.proxy \
-		  rmproj
+		  rmproj snmpit.proxynew
 ifeq ($(ISMAINSITE),1)
 SBIN_STUFF     += repos_daemon
 endif
