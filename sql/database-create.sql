@@ -428,8 +428,9 @@ CREATE TABLE `elabinelab_vlans` (
   `pid` varchar(12) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
-  `inner_id` int(11) unsigned NOT NULL default '0',
-  `outer_id` int(11) unsigned NOT NULL default '0',
+  `inner_id` varchar(32) NOT NULL default '',
+  `outer_id` varchar(32) NOT NULL default '',
+  `stack` enum('Control','Experimental') NOT NULL default 'Experimental',
   PRIMARY KEY  (`exptidx`,`inner_id`),
   UNIQUE KEY `pideid` (`pid`,`eid`,`inner_id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
@@ -1462,6 +1463,22 @@ CREATE TABLE `interface_settings` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `interface_state`
+--
+
+DROP TABLE IF EXISTS `interface_state`;
+CREATE TABLE `interface_state` (
+  `node_id` varchar(32) NOT NULL default '',
+  `card` tinyint(3) unsigned NOT NULL default '0',
+  `port` tinyint(3) unsigned NOT NULL default '0',
+  `iface` varchar(32) NOT NULL,
+  `enabled` tinyint(1) default '1',
+  `tagged` tinyint(1) default '0',
+  PRIMARY KEY  (`node_id`,`card`,`port`),
+  KEY `nodeiface` (`node_id`,`iface`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `interface_types`
 --
 
@@ -2163,7 +2180,7 @@ CREATE TABLE `nodeipportnum` (
 DROP TABLE IF EXISTS `nodelog`;
 CREATE TABLE `nodelog` (
   `node_id` varchar(32) NOT NULL default '',
-  `log_id` smallint(5) unsigned NOT NULL auto_increment,
+  `log_id` int(10) unsigned NOT NULL auto_increment,
   `type` enum('misc') NOT NULL default 'misc',
   `reporting_uid` varchar(8) NOT NULL default '',
   `reporting_idx` mediumint(8) unsigned NOT NULL default '0',
@@ -3903,6 +3920,7 @@ CREATE TABLE `vlans` (
   `members` text NOT NULL,
   `id` int(11) NOT NULL auto_increment,
   `tag` smallint(5) NOT NULL default '0',
+  `stack` enum('Control','Experimental') NOT NULL default 'Experimental',
   PRIMARY KEY  (`id`),
   KEY `pid` (`pid`,`eid`,`virtual`),
   KEY `exptidx` (`exptidx`,`virtual`)

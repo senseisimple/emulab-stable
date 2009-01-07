@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003-2008 University of Utah and the Flux Group.
+# Copyright (c) 2003-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Anytime you change database-create.sql, but sure to put any special
@@ -4651,3 +4651,48 @@ last_net_act,last_cpu_act,last_ext_act);
 
 4.167: Change to backfill default values in virt_lans, skip to next
        entry
+
+4.168: Various changes to support storing control network vlans in
+       the DB, and eventually elabinelab firewalls.
+
+       # Allow arbitrary the names for the ids. Forgot who wanted this.
+       alter table elabinelab_vlans change `inner_id`
+                `inner_id` varchar(32) NOT NULL default '';
+       alter table elabinelab_vlans change `outer_id`
+                `outer_id` varchar(32) NOT NULL default '';
+
+       # Tag elabinelab created vlans with the stack module.		
+       alter table elabinelab_vlans add `stack`
+           enum('Control','Experimental') NOT NULL default 'Experimental';
+
+       # Tag vlans softstate table with the stack module.
+       alter table vlans add `stack`
+           enum('Control','Experimental') NOT NULL default 'Experimental';
+
+       # A new table, to store softstate on interfaces. snmpit will
+       # modify this table whenever a port is enabled/trunked(tagged)
+       # on the command line. Eventually speed/duplex should go here.
+       CREATE TABLE `interface_state` (
+	  `node_id` varchar(32) NOT NULL default '',
+	  `card` tinyint(3) unsigned NOT NULL default '0',
+	  `port` tinyint(3) unsigned NOT NULL default '0',
+	  `iface` varchar(32) NOT NULL,
+	  `enabled` tinyint(1) default '1',
+	  `tagged` tinyint(1) default '0',
+	  PRIMARY KEY  (`node_id`,`card`,`port`),
+	  KEY `nodeiface` (`node_id`,`iface`)
+	) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+	# Initialize the above table.
+	insert into interface_state (node_id,card,port,iface)
+	   select node_id,card,port,iface from interfaces;
+
+	# Cleanup the vlans table which was filling with cruft
+	# cause of a bug in the swapout code. Finally figured
+	# out how to combine delete and join!
+	delete v FROM vlans v LEFT JOIN lans l on l.lanid=v.id
+	       WHERE l.lanid IS NULL;
+	       
+        # Fix an unrelated bug; slot overflow.
+        alter table nodelog change `log_id`
+                `log_id` int(10) unsigned NOT NULL auto_increment;
