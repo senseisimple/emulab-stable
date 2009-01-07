@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -49,6 +49,7 @@ use User;
 use Experiment;
 use Node;
 use OSinfo;
+use Lan;
 
 # Local stuff
 my $consetup	    = "$TB/libexec/console_setup";
@@ -182,9 +183,47 @@ else {
 	if ($experiment->OldReservedNodeList(\@oldnodes) != 0) {
 	    die("*** $0:\n".
 		"    Could not get oldreserved node list for $experiment\n");
-
 	}
 	push(@nodes, @oldnodes);
+    }
+}
+
+#
+# Sanity check. Do not want to release nodes if they have ports that
+# are trunked or disabled. Means something went wrong elsewhere and
+# we should clean up the mess first. 
+#
+if (! $moveToOldReserved) {
+    foreach my $node (@nodes) {
+	my @interfaces;
+
+	next
+	    if ($node->isvirtnode() || $node->isremotenode());
+
+	if (VLan->IsNodeInAVlan($node)) {
+	    print STDERR "$node is still in a vlan!\n";
+	    $error++;
+	}
+
+	if ($node->AllInterfaces(\@interfaces) != 0) {
+	    die("*** $0:\n".
+		"    Could not get get interfaces for $node\n");
+	}
+	foreach my $interface (@interfaces) {
+	    if ($interface->tagged()) {
+		print STDERR "$interface is still tagged!\n";
+
+		$error++;
+	    }
+	    if (!$interface->enabled()) {
+		print STDERR "$interface is not enabled!\n";
+		$error++;
+	    }
+	}
+    }
+    if ($error) {
+	die("*** $0:\n".
+	    "    Please cleanup the previous errors.\n");
     }
 }
 
