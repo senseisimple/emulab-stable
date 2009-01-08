@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -562,7 +562,7 @@ sub doSwapout($) {
 	    }
 	    if (@stale) {
 		print "Removing stale vlans @stale\n";
-		system("snmpit ". join(" ", map("-o $_", @stale)));
+		system("snmpit -f ". join(" ", map("-o $_", @stale)));
 		if ($?) {
 		    tberror({type => 'summary', severity => SEV_SECONDARY,
 			     error => ['vlan_reset_failed']},
@@ -1241,7 +1241,7 @@ sub doSwapin($) {
 	}
 	if (@diff) {
 	    print "Removing obsolete vlans @diff\n";
-	    system("snmpit ". join(" ", map("-o $_", @diff)));
+	    system("snmpit -f ". join(" ", map("-o $_", @diff)));
 	    if ($?) {
 		tberror({type => 'summary', severity => SEV_SECONDARY,
 			 error => ['vlan_setup_failed']},
@@ -1478,9 +1478,21 @@ sub doFW($$$$) {
 
     # See below.
     if (defined($nodelist)) {
-	foreach my $node (@$nodelist) {
-	    $nodenames{$node} = $node;
+	foreach my $nodeid (@$nodelist) {
+	    my $node = Node->Lookup($nodeid);
+	    if (!defined($node)) {
+		tberror("Could not map $nodeid to its object");
+		return 1;
+	    }
+	    $nodenames{$nodeid} = $node;
 	}
+    }
+
+    # Get current list of reserved nodes. 
+    my @allnodes;
+    if (Node->BulkLookup($experiment, \@allnodes) < 0) {
+	tberror("Failed to load reserved nodes");
+	return 1;
     }
 
     # XXX vlanid in the DB is currently an int, we need a more unique name
@@ -1489,32 +1501,28 @@ sub doFW($$$$) {
     #
     # Find all the experiment nodes and their control interface switch ports
     #
-    # XXX this may be replaced by a call to SNMPIT that just specifies
-    # the pid/eid.  In that case someone else will first have to poplulate
-    # the vlans table with this same info. 
-    #
-    my $db_result =
-	DBQueryWarn("SELECT r.node_id,w.card1 ".
-		    "  FROM wires AS w, reserved AS r ".
-		    "WHERE r.node_id=w.node_id1 AND r.pid='$pid' ".
-		    "  AND r.eid='$eid' AND w.type='Control'");
-    return 1
-	if (!$db_result);
-
-    my $portlist = "";
-    while (my ($node,$cif) = $db_result->fetchrow_array()) {
-	print "$node $cif\n";
-	if ($node eq $fwnode) {
-	    $fwport = "$node:$cif";
+    my $portlist  = "";
+    foreach my $node (@allnodes) {
+	my $control_iface = Interface->LookupControl($node);
+	if (!defined($control_iface)) {
+	    tberror("Could not find control iface object for $node");
+	    return 1;
+	}
+	my $node_id = $node->node_id();
+	my $cif = $control_iface->iface();
+	    
+	print "$node_id $cif\n";
+	if ($node_id eq $fwnode) {
+	    $fwport = "$node_id:$cif";
 	}
 	elsif (defined($nodelist)) {
  	    print "foo @$nodelist\n";
 	    # Only nodes we are moving in/out of the experiment.
-	    $portlist .= " $node:$cif"
-		if (exists($nodenames{$node}));
+	    $portlist .= " $node_id:$cif"
+		if (exists($nodenames{$node_id}));
 	}
 	else {
-	    $portlist .= " $node:$cif";
+	    $portlist .= " $node_id:$cif";
 	}
     }
     if (!defined($fwport)) {
@@ -1533,15 +1541,14 @@ sub doFW($$$$) {
     #
     # XXX hack commands til we nail down the API
     #
-    my $fwsetupstr1 = "snmpit $cnetstack -m $fwvlanname $portlist";
-    my $fwsetupstr2 = "snmpit $cnetstack -N $fwvlanname";
-    my $fwsetupstr3 = "snmpit $cnetstack -T $fwport $cnetvlanname $fwvlanname";
+    my $fwsetupstr1 = "snmpit $cnetstack -m $fwvlanname $pid $eid $portlist";
+    my $fwsetupstr3 = "snmpit $cnetstack -T $fwport $cnetvlanname ";
     my $fwtakedownstr0 = "snmpit $cnetstack -e $fwport";
     my $fwtakedownstr1 = ($portlist eq "" ? "true" :
-			  "snmpit $cnetstack -m $cnetvlanname $portlist");
-    my $fwtakedownstr2 = "snmpit $cnetstack -o $fwvlanname";
+		  "snmpit $cnetstack -m $cnetvlanname $pid $eid $portlist");
+    my $fwtakedownstr2 = "snmpit $cnetstack -o $fwvlanname $pid $eid";
     my $fwtakedownstr3 = "snmpit $cnetstack -U $fwport";
-    my $fwtakedownstr4 = "snmpit $cnetstack -m $cnetvlanname $fwport";
+    my $fwtakedownstr4 = "snmpit $cnetstack -f -m $cnetvlanname $fwport";
 
     if ($action == FWSETUP) {
 	TBDebugTimeStamp("snmpit firewall setup: VLAN");
@@ -1552,27 +1559,42 @@ sub doFW($$$$) {
 		    "Failed to setup Firewall control net VLAN.");
 	    return 1;
 	}
-	#
-	# XXX we don't need to rely on the format of the output of
-	# the snmpit 
-	#
-	my @snmpit_out = split(' ', `$fwsetupstr2`);
-	if ($? || @snmpit_out != 3 || $snmpit_out[2] !~ /^\d+$/) {
-	    tberror "Could not get VLAN number for firewall VLAN, ".
-		    "is your snmpit out of date?\n";
+	my $vlan = VLan->Lookup($experiment, $fwvlanname);
+	if (!defined($vlan)) {
+	    tberror({type => 'secondary', severity => SEV_SECONDARY,
+		     error => ['fwcnvlan_setup_failed']},
+		    "Failed to locate vlan object for $fwvlanname");
 	    return 1;
 	}
-	my $fwvlan = $snmpit_out[2];
+	if ($vlan->GetTag(\$fwvlan) != 0) {
+	    tberror("No vlan tag associated with $vlan");
+	    goto badsetup;
+	}
+	$fwsetupstr3 = "$fwsetupstr3 " . $vlan->id();
 
 	TBDebugTimeStamp("snmpit firewall setup: trunk");
 	print "doFW: '$fwsetupstr3'\n";
 	if (system($fwsetupstr3)) {
 	    tberror "Failed to setup Firewall trunk on port $fwport.";
+	  badsetup:
+	    print "doFW: '$fwtakedownstr1'\n";
 	    if (system($fwtakedownstr1)) {
 		tberror "Could not return $portlist to Control VLAN!";
+		return 1;
 	    }
+	    print "doFW: '$fwtakedownstr2'\n";
 	    if (system($fwtakedownstr2)) {
 		tberror "Could not destroy VLAN $fwvlanname ($fwvlan)!";
+		return 1;
+	    }
+	    print "doFW: '$fwtakedownstr3'\n";
+	    if (system($fwtakedownstr3)) {
+		tberror "Could not untrunk $fwport!";
+		return 1;
+	    }
+	    print "doFW: '$fwtakedownstr4'\n";
+	    if (system($fwtakedownstr4)) {
+		tberror "Could not move $fwport back to Control lan!";
 	    }
 	    return 1;
 	}
@@ -1580,6 +1602,7 @@ sub doFW($$$$) {
 
 	# Record VLAN info now that everything is done
 	TBSetExptFirewallVlan($pid, $eid, $fwvid, $fwvlan);
+	return 0;
     }
     elsif ($action == FWADDNODES) {
 	TBDebugTimeStamp("snmpit firewall port addition");
@@ -1607,16 +1630,22 @@ sub doFW($$$$) {
 	    tberror "Could not re-enable firewall control port $fwport!";
 	    $failed = 1;
 	}
-	TBDebugTimeStamp("snmpit firewall teardown: VLAN");
-	print "doFW: '$fwtakedownstr1'\n";
-	if (system($fwtakedownstr1)) {
-	    tberror "Could not return $portlist to Control VLAN!";
-	    $failed = 1;
-	}
-	print "doFW: '$fwtakedownstr2'\n";
-	if (system($fwtakedownstr2)) {
-	    tberror "Could not destroy VLAN $fwvlanname ($fwvlan)!";
-	    $failed = 1;
+	#
+	# Do not try to do this if the vlan is already gone.
+	#
+	my $vlan = VLan->Lookup($experiment, $fwvlanname);
+	if (defined($vlan)) {
+	    TBDebugTimeStamp("snmpit firewall teardown: VLAN");
+	    print "doFW: '$fwtakedownstr1'\n";
+	    if (system($fwtakedownstr1)) {
+		tberror "Could not return $portlist to Control VLAN!";
+		return 1;
+	    }
+	    print "doFW: '$fwtakedownstr2'\n";
+	    if (system($fwtakedownstr2)) {
+		tberror "Could not destroy VLAN $fwvlanname ($fwvlan)!";
+		return 1;
+	    }
 	}
 	TBDebugTimeStamp("snmpit firewall teardown: trunk");
 	print "doFW: '$fwtakedownstr3'\n";
