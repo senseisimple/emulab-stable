@@ -389,7 +389,7 @@ sub AddUser()
 	if (system("$SSH -host $CONTROL ".
 		   "'$USERADD $user -u $user_number -c \"$fullname\" ".
 		   "-k /usr/share/skel -h - -m -d $HOMEDIR/$user ".
-		   "-g $default_groupname -s /bin/tcsh'")) {
+		   "-g $default_groupname -s $shellpaths{$usr_shell}'")) {
 	    if (($? >> 8) != $USEREXISTS) {
 		fatal("Could not add user $user ($user_number) to $CONTROL.");
 	    }

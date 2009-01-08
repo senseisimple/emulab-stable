@@ -719,14 +719,8 @@ sub SetupFsNode()
     return
 	if ($NOSETUP);
 
-    #
-    # Remove source code from fs so that mere users do not get access to it.
-    # Something to do with licensing ...
-    #
     mysystem("cp -p ${TBDIR}/testbed/src/testbed/defs-elabinelab ".
 	     "      ${TBDIR}/testbed/src");
-    mysystem("rm -rf ${TBDIR}/testbed/src/testbed");
-    mysystem("rm -rf ${TBDIR}/testbed/obj/testbed");
 
     #
     # Copy the mirror tree into place. Do not use rsync.
