@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -450,6 +450,10 @@ function WRITESIDEBAR() {
     }
     else {
 	NavMenuButton("Projects on Emulab", "$TBDOCBASE/projectlist.php3");
+    }
+    if ($TBMAINSITE) {
+	NavMenuButton("<font color=red>In Memoriam</font>",
+		      "$TBDOCBASE/jay.php");
     }
 
     # The search box.  Placed in a table so the text input fills available

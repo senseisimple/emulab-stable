@@ -1,15 +1,12 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
 
 $optargs = OptionalPageArguments("stayhome", PAGEARG_BOOLEAN);
-
-# Temp for In Memorium.
-$stayhome = 1;
 
 #
 # The point of this is to redirect logged in users to their My Emulab
@@ -57,28 +54,15 @@ if ($message != "") {
     echo "</font></center><br>\n";
 }
 
-?>
-<hr>
-<blockquote><p>
-<center><b><font color=red size=+1>In Memoriam</font></b></center>
-We are
-<a href='http://www.legacy.com/saltlaketribune/Obituaries.asp?Page=Lifestory&PersonId=117597321'>sad to report</a>
-that Jay Lepreau, Research Professor and Director 
-of the Flux Research Group, passed away Monday morning Sept 15th due to
-complications of cancer. Jay was an enthusiastic and productive
-researcher, a dedicated mentor of students and staff, and an avid
-participant in recreational activities such as music and outdoor
-sports. His loss will be felt by all who knew him, both  within the
-computer science community and elsewhere. 
-</p>
-<p>
-Please be assured that we plan to carry on the vision for Emulab that 
-we shared with Jay, and that operation and development of the Utah
-Emulab facility and the Emulab software will continue.
-</p>
-</blockquote>
-<hr>
+if ($TBMAINSITE) {
+    echo "<span class='picture'>
+            <center><font size=-1>In Memoriam</font></center><a href=jay.php>
+            <img width=80 height=85 src=jay.jpg></a><br clear=left>
+            <center><font size=-1>Jay Lepreau<br>03/52--09/08
+            </font></center></span><br>\n";
+}
 
+?>
 <p>
     <em>Emulab</em> is a network testbed, giving researchers a wide range of
         environments in which to develop, debug, and evaluate their systems.
