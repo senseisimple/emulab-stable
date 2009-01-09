@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2008 University of Utah and the Flux Group.
+# Copyright (c) 2008-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniCertificate;
@@ -413,9 +413,11 @@ sub StoreCRL($$$)
     $expires =~ s/^nextupdate=//i;
     my $safe_cert    = DBQuoteSpecial($string);
     my $safe_expires = DBQuoteSpecial($expires);
+    my $dateconvert  = "DATE_SUB(STR_TO_DATE($safe_expires, ".
+	"'%b %e %T %Y'), INTERVAL 1 DAY)";
 
     DBQueryWarn("replace into geni_crls set ".
-		"  uuid='$uuid', created=now(), expires=$safe_expires, ".
+		"  uuid='$uuid', created=now(), expires=$dateconvert, ".
 		"  cert=$safe_cert")
 	or return -1;
 
