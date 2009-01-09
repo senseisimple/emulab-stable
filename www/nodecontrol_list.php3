@@ -220,15 +220,19 @@ if (! strcmp($showtype, "summary")) {
 	$unknowncounts[$type] = 0;
     }
 
-    # Get free totals by type.
+    # Get free totals by type.  Note we also check that the physical node
+    # is free, see note on non-summary query for why.
     $query_result =
 	DBQueryFatal("select n.eventstate,n.type,count(*) from nodes as n ".
+		     "left join nodes as np on np.node_id=n.phys_nodeid ".
 		     "left join node_types as nt on n.type=nt.type ".
 		     "left join reserved as r on r.node_id=n.node_id ".
-		     "where (role='testnode') and ".
+		     "left join reserved as rp on rp.node_id=n.phys_nodeid ".
+		     "where (n.role='testnode') and ".
 		     "      (nt.class!='shark' and nt.class!='pcRemote' ".
 		     "      and nt.class!='pcplabphys') ".
-		     "      and r.pid is null and n.reserved_pid is null ".
+		     "      and r.pid is null and rp.pid is null ".
+		     "      and n.reserved_pid is null and np.reserved_pid is null ".
 		     "group BY n.eventstate,n.type");
 
     while ($row = mysql_fetch_array($query_result)) {
@@ -322,15 +326,26 @@ if (! strcmp($showtype, "summary")) {
 
 #
 # Suck out info for all the nodes.
+#
+# If a node is free we check to make sure that that the physical node
+# is also.  This is based on the assumption that if a physical node is
+# not available, neither is the node, such as the case with netpga2.
+# This may not be true for virtual nodes, such as PlanetLab slices,
+# but virtual nodes are allocated on demand, and thus are never free.
 # 
 $query_result =
     DBQueryFatal("select distinct n.node_id,n.phys_nodeid,n.type,ns.status, ".
-		 "   n.def_boot_osid,r.pid,r.eid,nt.class,r.vname ".
+		 "   n.def_boot_osid, ".
+		 "   if(r.pid is not null,r.pid,rp.pid) as pid, ".
+	         "   if(r.pid is not null,r.eid,rp.eid) as eid, ".
+		 "   nt.class, ".
+	 	 "   if(r.pid is not null,r.vname,rp.vname) as vname ".
 		 "$additionalVariables ".
 		 "from nodes as n ".
 		 "left join node_types as nt on n.type=nt.type ".
 		 "left join node_status as ns on n.node_id=ns.node_id ".
 		 "left join reserved as r on n.node_id=r.node_id ".
+		 "left join reserved as rp on n.phys_nodeid=rp.node_id ".
 		 "$additionalLeftJoin ".
 		 "where $role $clause ".
 		 "ORDER BY priority");

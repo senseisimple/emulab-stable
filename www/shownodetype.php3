@@ -101,13 +101,15 @@ echo "</table>\n";
 
 #
 # Suck out info for all the nodes of this type. We are going to show
-# just a list of dots, in two color mode.
-# 
+# just a list of dots, in two color mode.  Note, we also check that the
+# physical node is free, see note in nodecontrol_list.php3 for why.
+#
 $query_result =
-    DBQueryFatal("select n.node_id,n.eventstate,r.pid ".
+    DBQueryFatal("select n.node_id,n.eventstate,ifnull(r.pid,rp.pid) as pid ".
 		 "from nodes as n ".
 		 "left join node_types as nt on n.type=nt.type ".
 		 "left join reserved as r on n.node_id=r.node_id ".
+		 "left join reserved as rp on n.phys_nodeid=rp.node_id ".
 		 "where nt.type='$node_type' and ".
 		 "      (role='testnode' or role='virtnode') ".
 		 "ORDER BY priority");
