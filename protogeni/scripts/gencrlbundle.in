@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2008 University of Utah and the Flux Group.
+# Copyright (c) 2008-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -60,6 +60,9 @@ require GeniCertificate;
 require GeniComponent;
 require GeniRegistry;
 
+# For error log.
+my $errors = 0;
+
 #
 # Check args.
 #
@@ -78,11 +81,19 @@ system("$POSTCRL") >= 0
     or fatal("Could not post our own CRL");
 
 my $query_result =
-    DBQueryWarn("select cert from geni_crls order by uuid");
+    DBQueryWarn("select cert,uuid, ".
+		" UNIX_TIMESTAMP(expires) < UNIX_TIMESTAMP(now()) as expired ".
+		"from geni_crls ".
+		"order by uuid");
 
 open(BUNDLE, ">/tmp/crlbundle.$$")
     or fatal("Could not create new CRL bundle file");
-while (my ($cert) = $query_result->fetchrow_array()) {
+while (my ($cert,$uuid,$expired) = $query_result->fetchrow_array()) {
+    if ($expired) {
+	print STDERR "*** CRL for $uuid has expired. Skipping ...\n";
+	$errors++;
+	next;
+    }
     print BUNDLE $cert;
 }
 close(BUNDLE);
@@ -98,9 +109,13 @@ if ($?) {
     
     system("/bin/cp $BUNDLE $WWWBUNDLE") == 0
 	or fatal("Could not copy to $WWWBUNDLE!");
+
+    system("/usr/local/etc/rc.d/apache.sh restart") == 0
+	or fatal("Could not restart apache!");
 }
 # Apache spits out stuff. No errors at this point, nothing to report.
-AuditEnd();
+AuditEnd()
+    if (!$errors);
 exit(0);
 
 sub fatal($)
