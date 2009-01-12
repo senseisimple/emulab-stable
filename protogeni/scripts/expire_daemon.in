@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2008 University of Utah and the Flux Group.
+# Copyright (c) 2008-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -11,10 +11,13 @@ use Getopt::Std;
 #
 # Look for things that need to be expired and resources released. This is
 # incredibly primitive at the moment.
+#
+# Also TODO. On the clearinghouse we also want to expire things in the
+# the geni-ch DB.
 # 
 sub usage()
 {
-    print "Usage: expire_daemon [-d] [-c | -s]\n";
+    print "Usage: expire_daemon [-d]\n";
     exit(1);
 }
 my $optlist = "d";
@@ -29,6 +32,7 @@ my $TBOPS         = "@TBOPSEMAIL@";
 my $TBLOGS        = "@TBLOGSEMAIL@";
 my $PGENIDOMAIN   = "@PROTOGENI_DOMAIN@";
 my $PGENISUPPORT  = @PROTOGENI_SUPPORT@;
+my $PGENICLRHOUSE = @PROTOGENI_CLEARINGHOUSE@;
 my $LOGFILE       = "$TB/log/geniexpire";
 my $IDLETIMES	  = "$TB/sbin/idletimes";
 
@@ -46,6 +50,13 @@ $| = 1;
 
 if ($UID != 0) {
     fatal("Must be root to run this script\n");
+}
+
+#
+# Exit if not a protogeni site.
+#
+if (! $PGENISUPPORT) {
+    exit(0);
 }
 
 #
