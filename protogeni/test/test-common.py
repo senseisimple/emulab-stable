@@ -11,6 +11,9 @@
 # CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
 # FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 
+from urlparse import urlsplit, urlunsplit
+from urllib import splitport
+
 HOME            = os.environ["HOME"]
 # Path to my certificate
 CERTIFICATE     = HOME + "/.ssl/encrypted.pem"
@@ -75,8 +78,17 @@ def do_method(module, method, params, URI=None):
             path = SERVER_PATH[ "default" ]
 
         URI = "https://" + addr + path + module
-    else:
+    elif module:
         URI = URI + "/" + module
+        pass
+
+    scheme, netloc, path, query, fragment = urlsplit(URI)
+    if scheme == "https":
+        host,port = splitport(netloc)
+        if not port:
+            netloc = netloc + ":443"
+            URI = urlunsplit((scheme, netloc, path, query, fragment));
+            pass
         pass
     
     ctx = SSL.Context("sslv23")
