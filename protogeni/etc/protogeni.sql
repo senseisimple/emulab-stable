@@ -55,6 +55,7 @@ CREATE TABLE `geni_components` (
   `uuid` varchar(40) NOT NULL default '',
   `manager_uuid` varchar(40) default NULL,
   `created` datetime default NULL,
+  `expires` datetime default NULL,
   `url` tinytext,
   PRIMARY KEY  (`uuid`),
   UNIQUE KEY `hrn` (`hrn`)
@@ -78,6 +79,7 @@ CREATE TABLE `geni_authorities` (
   `uuid` varchar(40) NOT NULL default '',
   `uuid_prefix` varchar(12) NOT NULL default '',
   `created` datetime default NULL,
+  `expires` datetime default NULL,
   `type` enum('sa','ma','ch','cm') NOT NULL default 'sa',
   `url` tinytext,
   PRIMARY KEY  (`uuid`),
