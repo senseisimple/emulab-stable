@@ -2,10 +2,11 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007, 2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
+use Getopt::Std;
 
 #
 # dbfillcheck - Make sure that the initial fill contents on the
@@ -14,6 +15,7 @@ use strict;
 # the mysql server is not running, or the database does not exist)
 # prevents us from telling if they differ or not.
 #
+my $optlist = "d";
 
 #
 # Configure variables
@@ -28,6 +30,16 @@ my $tempdifffile  = "/tmp/dbdiff.$$";
 my $tempnewfile   = "/tmp/dbdiff.new.$$";
 my $tempoldfile   = "/tmp/dbdiff.old.$$";
 my $exitcode      = 0;
+my $debug         = 0;
+
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    die("*** $0:\n".
+	"    Usage: dbfillcheck [-d]\n");
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
 
 #
 # Diff exits with 2 if a problem. We tell diff to ignore whitespace
@@ -73,8 +85,11 @@ if (!$?) {
 # status
 #
 print "*** Your installed database is out of date with $dbfill\n";
+print "    Differences are listed in $tempdifffile\n"
+    if ($debug);
 print "    To bring it up to date, run: \n";
 print "    mysqldump tbdb > tbdb.backup\n";
 print "    (cd db; mysql tbdb < $master_fill)\n";
-unlink($tempdifffile);
+unlink($tempdifffile)
+    if (!$debug);
 exit(1);

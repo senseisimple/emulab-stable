@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 SRCDIR		= @srcdir@
@@ -43,7 +43,7 @@ SETUID_LIBX_SCRIPTS  =
 # configure if the .in file is changed.
 # 
 all:	$(BIN_SCRIPTS) $(SBIN_SCRIPTS) $(LIBEXEC_SCRIPTS) $(LIB_SCRIPTS) \
-	$(USERSBINS) $(USERLIBS) schemacheck
+	$(USERSBINS) $(USERLIBS) schemacheck dbfillcheck
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
