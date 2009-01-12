@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2008 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2008, 2009 University of Utah and the Flux Group.
 # All rights reserved.
 # 
 # Permission to use, copy, modify and distribute this software is hereby
@@ -48,6 +48,24 @@ rval,response = do_method("ch", "ListComponents", params)
 if rval:
     Fatal("Could not get a list of components from the ClearingHouse")
     pass
-print str(response["value"])
+#print str(response["value"])
+
+#
+# Ask each manager for its list.
+#
+for manager in response["value"]:
+    print manager["url"]
+
+    #
+    # manager for resource list.
+    #
+    params = {}
+    params["credential"] = mycredential
+    rval,response = do_method(None,
+                              "DiscoverResources", params, manager["url"])
+    if rval:
+        print "Could not get a list of resources"
+        pass
+    pass
 
 
