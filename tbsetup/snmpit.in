@@ -184,7 +184,9 @@ if ($UID) {
 # the user didn't give any extraneous arguments
 #
 if ($opt{m} || $opt{o}) {
-    if (@ARGV < 2 || $ARGV[0] =~ /:/ || $ARGV[1] =~ /:/) {
+    if (@ARGV < 2 ||
+	($opt{m} && ($ARGV[0] =~ /:/ || $ARGV[1] =~ /:/)) ||
+	($opt{o} && ($ARGV[0] =~ /^\d+$/ || $ARGV[1] =~ /^\d+$/))) {
 	if (! $opt{f}) {
 	    tberror "pid/eid reqired!";
 	    exit(usage());
@@ -1536,7 +1538,7 @@ sub doMakeVlan($$@) {
     }
     if (!$errors) {
 	if (defined($source_vlan)) {
-	    VLan->RecordVLanDeletion($experiment, $source_vlan->id());
+	    VLan->RecordVLanDeletion($source_vlan->id());
 	}
 	if (defined($target_vlan)) {
 	    VLan->RecordVlanInsertion($experiment, $target_vlan->id());
@@ -1625,15 +1627,21 @@ sub doDeleteVlan($@) {
 	}
     }
     foreach my $vlan_name (@vlan_names) {
-	next
-	    if (!exists($vlans{$vlan_name}));
+	my $vlan_id = $vlan_ids{$vlan_name};
 	
-	my $vlan = $vlans{$vlan_name};
+	#
+	# Skip if this was not deleted
+	#	
+	next
+	    if ($errors && exists($notdeleted{$vlan_name}));
+
+	# Always delete from the vlans table.
+	VLan->RecordVLanDeletion($vlan_id);
 
 	next
-	    if ($errors && $notdeleted{$vlan_name});
-	
-	VLan->RecordVLanDeletion($vlan->id());
+	    if (!exists($vlans{$vlan_name}));
+	my $vlan = $vlans{$vlan_name};
+
 	$vlan->Destroy()
 	    if ($vlan->IsManual());
     }
