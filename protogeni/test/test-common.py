@@ -21,6 +21,8 @@ CERTIFICATE     = HOME + "/.ssl/encrypted.pem"
 PASSPHRASEFILE  = HOME + "/.ssl/password"
 passphrase      = ""
 
+SLICENAME       = "mytestslice"
+
 cert = X509.load_cert( CERTIFICATE )
 
 # XMLRPC server: use www.emulab.net for the clearinghouse, and

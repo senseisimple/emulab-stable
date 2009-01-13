@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2008 University of Utah and the Flux Group.
+# Copyright (c) 2008-2009 University of Utah and the Flux Group.
 # All rights reserved.
 # 
 # Permission to use, copy, modify and distribute this software is hereby
@@ -44,10 +44,10 @@ print "Got my SA credential"
 params = {}
 params["credential"] = mycredential
 params["type"]       = "Slice"
-params["hrn"]        = "mytestslice"
+params["hrn"]        = SLICENAME
 rval,response = do_method("sa", "Resolve", params)
 if rval == 0:
-    print "Asking for slice credential for mytestslice";
+    print "Asking for slice credential for " + SLICENAME
     myslice = response["value"]
     myuuid  = myslice["uuid"]
     params = {}
