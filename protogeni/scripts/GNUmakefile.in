@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -14,7 +14,7 @@ include $(OBJDIR)/Makeconf
 SBIN_STUFF	= cleanupslice
 PSBIN_STUFF	= register_resources expire_daemon gencrl postcrl \
 		  createcerts initsite addauthority getcacerts \
-		  gencrlbundle shutdownslice
+		  gencrlbundle shutdownslice remauthority
 
 # These scripts installed setuid, with sudo. 
 SETUID_BIN_SCRIPTS   = 

@@ -1,0 +1,85 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Data::Dumper;
+use Getopt::Std;
+
+#
+# Remove an authority from the DB.
+# 
+sub usage()
+{
+    print "Usage: addauthority [-c] <uuid>\n";
+    exit(1);
+}
+my $optlist    = "c";
+my $asch       = 0;
+
+sub fatal($);
+
+#
+# Check args.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"c"})) {
+    $asch = 1;
+}
+usage()
+    if (@ARGV != 1);
+
+my $uuid     = $ARGV[0];
+
+use vars qw($GENI_DBNAME);
+if ($asch) {
+    $GENI_DBNAME = "geni-ch";
+}
+
+# Now we can load the libraries after setting the proper DB.
+use lib '@prefix@/lib';
+require GeniDB;
+require GeniCertificate;
+require GeniAuthority;
+require GeniSlice;
+require GeniUser;
+
+my $authority = GeniAuthority->Lookup($uuid);
+if (!defined($authority)) {
+    fatal("No such authority in DB");
+}
+if ($authority->type() eq "cm") {
+    if (GeniComponent->DeleteAll($authority) != 0) {
+	fatal("Could not delete components for $authority");
+    }
+}
+elsif ($authority->type() eq "sa") {
+    if (GeniSlice->DeleteAll($authority) != 0) {
+	fatal("Could not delete slices for $authority");
+    }
+    if (GeniUser->DeleteAll($authority) != 0) {
+	fatal("Could not delete users for $authority");
+    }
+}
+else {
+    fatal("Do not know how to delete $authority");
+}
+if ($authority->Delete() != 0) {
+    fatal("Could not delete components for $authority");
+}
+
+exit(0);
+
+sub fatal($)
+{
+    my ($msg) = @_;
+
+    die("*** $0:\n".
+	"    $msg\n");
+}
