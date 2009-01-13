@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2008 University of Utah and the Flux Group.
+# Copyright (c) 2008-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniTicket;
@@ -555,10 +555,16 @@ sub Release($)
 {
     my ($self) = @_;
 
-    return undef
+    return -1
 	if (! ref($self));
 
     my $experiment = Experiment->Lookup($self->slice_uuid());
+    if (!defined($experiment)) {
+	#
+	# Cannot be any nodes if no experiment.
+	#
+	return $self->Delete();
+    }
     my $pid     = $experiment->pid();
     my $eid     = $experiment->eid();
     my @nodeids = ();
