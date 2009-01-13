@@ -535,7 +535,7 @@ sub doSwapout($) {
 	# Clean up any VLANs in experiment.
 	#
 	# When modifying an elabinelab experiment, leave the vlans intact
-	# so that the inner networks are not suddenly disconnected!
+	# so that the inner networks are not suddenly disconnected.
 	#
 	if ($type != MODIFY) {
 	    TBDebugTimeStamp("snmpit started");
@@ -572,7 +572,7 @@ sub doSwapout($) {
 	    }
 	}
     }
-
+	
     if ($type >= CLEANUP) {
 	#
 	# Undo plab in elab specialness.
@@ -923,6 +923,37 @@ sub doSwapin($) {
     }
 
     #
+    # When doing a modify, we have to compare vlans to determine which
+    # vlans actually changed and need to be deleted, before processing
+    # the new vlans for the experiment. Note that vlans that already
+    # exist on the switches will be left as is by snmpit.
+    #
+    # We must do this before the nfree of deleted nodes in the next section
+    # because the new test in nfree the prevents nodes from accidentally
+    # getting released when they are in a vlan.
+    #
+    if ($type == MODIFY) {
+	my @diff = ();
+	my @same = ();
+	if (Lan->CompareVlansWithSwitches($experiment, \@diff, \@same) != 0) {
+	    tberror({type => 'summary', severity => SEV_SECONDARY,
+		     error => ['vlan_setup_failed']},
+		    "Failed to compare old vlans");
+	    return 1;
+	}
+	if (@diff) {
+	    print "Removing obsolete vlans @diff\n";
+	    system("snmpit -f ". join(" ", map("-o $_", @diff)));
+	    if ($?) {
+		tberror({type => 'summary', severity => SEV_SECONDARY,
+			 error => ['vlan_setup_failed']},
+			"Failed to remove old vlans");
+		return 1;
+	    }
+	}
+    }
+
+    #
     # Look for any nodes in RES_TEARDOWN. These need to be released,
     # and if a virtnode, they need to be torn down. We cannot wait for
     # the virtnodes to go down with the physnode they are hosted on,
@@ -1223,33 +1254,6 @@ sub doSwapin($) {
     # the step has completed and 2) It's OK for the command to run in
     # parallel with os_setup (no DB dependencies, etc.)
     #
-
-    #
-    # When doing a modify, we have to compare vlans to determine which
-    # vlans actually changed and need to be deleted, before processing
-    # the new vlans for the experiment. Note that vlans that already
-    # exist on the switches will be left as is by snmpit. 
-    #
-    if ($type == MODIFY) {
-	my @diff = ();
-	my @same = ();
-	if (Lan->CompareVlansWithSwitches($experiment, \@diff, \@same) != 0) {
-	    tberror({type => 'summary', severity => SEV_SECONDARY,
-		     error => ['vlan_setup_failed']},
-		    "Failed to compare old vlans");
-	    return 1;
-	}
-	if (@diff) {
-	    print "Removing obsolete vlans @diff\n";
-	    system("snmpit -f ". join(" ", map("-o $_", @diff)));
-	    if ($?) {
-		tberror({type => 'summary', severity => SEV_SECONDARY,
-			 error => ['vlan_setup_failed']},
-			"Failed to remove old vlans");
-		return 1;
-	    }
-	}
-    }
 
     print "Setting up VLANs.\n";
     TBDebugTimeStamp("snmpit started");
