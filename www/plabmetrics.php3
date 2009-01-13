@@ -26,6 +26,14 @@ $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
 
+if (!$PLABSUPPORT) {
+    PAGEHEADER("PlanetLab Metrics");
+    echo "<p>This site does not have PlanetLab support configured.</p>";
+    echo "<p>Email $TBMAILADDR_OPS if this confuses you!</p>";
+    PAGEFOOTER();
+    exit(0);
+}
+
 #
 # Hacks -- unset $pid and $eid vars if they are '' before we check args!
 # (needed so we can let users drop a previous pid/eid filter).
@@ -708,6 +716,13 @@ $basenodetypes = array();
 $qres = DBQueryFatal("select type from node_types where isplabdslice=1");
 while ($row = mysql_fetch_array($qres)) {
     array_push($basenodetypes,$row['type']);
+}
+
+if (empty($basenodetypes)) {
+    echo "<p>This site has not added any PlanetLab-style node types.</p>";
+    echo "<p>Email $TBMAILADDR_OPS if this confuses you!</p>";
+    PAGEFOOTER();
+    exit(0);
 }
 
 #
