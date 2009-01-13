@@ -110,6 +110,7 @@ CREATE TABLE `geni_slices` (
   `creator_uuid` varchar(40) NOT NULL default '',
   `name` tinytext,
   `sa_uuid` varchar(40) NOT NULL default '',
+  `needsfirewall` tinyint(1) NOT NULL default '0',
   PRIMARY KEY  (`idx`),
   UNIQUE KEY `hrn` (`hrn`),
   UNIQUE KEY `uuid` (`uuid`)
