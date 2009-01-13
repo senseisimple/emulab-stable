@@ -162,9 +162,9 @@ sub ExpireSlices()
 	}
 	my $experiment = $slice->GetExperiment();
 	if (!defined($experiment)) {
-	    print STDERR "Could not get experiment for $slice.\n";
+	    print STDERR "Could not get experiment for $slice. Expiring ...\n";
 	    $slice->UnLock();
-	    goto skip;
+	    goto cleanup;
 	}
 	if ($experiment->Refresh() != 0) {
 	    print STDERR "Could not flush $experiment\n";
@@ -194,6 +194,7 @@ sub ExpireSlices()
 	    }
 	}
 	print STDERR "$slice is idle; releasing.\n";
+      cleanup:
 	if (GeniCM::CleanupDeadSlice($slice) != 0) {
 	    print STDERR "Could not release $slice\n";
 	    SENDMAIL($TBOPS, "Could not release slice $slice",
@@ -270,6 +271,14 @@ exit(0);
 sub fatal($)
 {
     my ($msg) = @_;
+
+    #
+    # Send a message to the testbed list. 
+    #
+    SENDMAIL($TBOPS,
+	     "ProtoGENI expire daemon died",
+	     $msg,
+	     $TBOPS);
 
     die("*** $0:\n".
 	"    $msg\n");
