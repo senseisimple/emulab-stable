@@ -1628,6 +1628,11 @@ sub doDeleteVlan($@) {
     }
     foreach my $vlan_name (@vlan_names) {
 	my $vlan_id = $vlan_ids{$vlan_name};
+
+	# Do not throw an error on this. No point, confuses callers.
+	if (!$exists{$vlan_name}) {
+	    print "VLAN $vlan_name does not exist on any switch\n";
+	}	
 	
 	#
 	# Skip if this was not deleted
@@ -1636,21 +1641,17 @@ sub doDeleteVlan($@) {
 	    if ($errors && exists($notdeleted{$vlan_name}));
 
 	# Always delete from the vlans table.
-	VLan->RecordVLanDeletion($vlan_id);
+	VLan->RecordVLanDeletion($vlan_id) == 0
+	    or $errors++;
 
 	next
 	    if (!exists($vlans{$vlan_name}));
 	my $vlan = $vlans{$vlan_name};
 
-	$vlan->Destroy()
-	    if ($vlan->IsManual());
-    }
-    # Do this after the above loop cause of $errors usage
-    foreach my $vlan_name (@vlan_names) {
-	if (!$exists{$vlan_name}) {
-	    print "VLAN $vlan_name does not exist on any switch\n";
-	    $errors++;
-	}	
+	if ($vlan->IsManual()) {
+	    $vlan->Destroy() == 0
+		or $errors++;
+	}
     }
     return $errors;
 }
