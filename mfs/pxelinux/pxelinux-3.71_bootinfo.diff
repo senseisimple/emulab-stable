@@ -1,7 +1,7 @@
 diff -Nru syslinux-3.71+dfsg.orig/com32/modules/bootinfo.c syslinux-3.71+dfsg/com32/modules/bootinfo.c
---- syslinux-3.71+dfsg.orig/com32/modules/bootinfo.c	1969-12-31 17:00:00.000000000 -0700
-+++ syslinux-3.71+dfsg/com32/modules/bootinfo.c	2008-09-24 15:51:47.000000000 -0600
-@@ -0,0 +1,835 @@
+--- syslinux-3.71+dfsg.orig/com32/modules/bootinfo.c	2008-12-18 16:00:21.502810222 -0700
++++ syslinux-3.71+dfsg/com32/modules/bootinfo.c	2008-12-19 16:59:48.000000000 -0700
+@@ -0,0 +1,861 @@
 +/*
 + * EMULAB-COPYRIGHT
 + * Copyright (c) 2008 University of Utah and the Flux Group.
@@ -422,6 +422,18 @@ diff -Nru syslinux-3.71+dfsg.orig/com32/modules/bootinfo.c syslinux-3.71+dfsg/co
 +	return rc;
 +}
 +
++void print_packet(char *buffer, int length)
++{
++	int i;
++
++	for (i = 0; i < length; i++) {
++		if (i % 8 == 0) {
++			printf("\n");
++		}
++		printf("%02x ", buffer[i]);
++	}
++}
++
 +/* Try to get a bootinfo response
 + *
 + * my_ip: destination ip to accept packets for
@@ -453,8 +465,10 @@ diff -Nru syslinux-3.71+dfsg.orig/com32/modules/bootinfo.c syslinux-3.71+dfsg/co
 +		}
 +		rc = udp_read(my_ip, htons(BOOTWHAT_SRCPORT),
 +			      buffer, (uint16_t *)length);
-+		if (rc == PXENV_STATUS_SUCCESS)
++		if (rc == PXENV_STATUS_SUCCESS) {
++			/* print_packet(buffer, *length); */
 +			break;
++		}
 +		else if (rc == -1) {
 +			rc = PXENV_STATUS_FAILURE;
 +		}
@@ -581,34 +595,41 @@ diff -Nru syslinux-3.71+dfsg.orig/com32/modules/bootinfo.c syslinux-3.71+dfsg/co
 +	used = strlen(new_initrd);
 +
 +	p = new_initrd + used;
-+	file = strtok(p, ",");
-+	while(file) {
-+		new_file = mangle_name(boss_name, file);
-+		if ((used + strlen(new_file)) >= length) {
-+			/* plus 1 for comma */
-+			length = used + strlen(new_file) + 1;
-+			/* plus 1 for null */
-+			t = realloc(new_initrd, length + 1);
-+			if (t == NULL) {
-+				if (new_initrd)
-+					free(new_initrd);
-+				return NULL;
++	file = strtok(initrd + used, ",");
++	if (!file) {
++		new_initrd = mangle_name(boss_name, initrd + used);
++	} else {
++		while(file) {
++			new_file = mangle_name(boss_name, file);
++			if ((used + strlen(new_file)) >= length) {
++				/* plus 1 for comma */
++				length = used + strlen(new_file) + 1;
++				/* plus 1 for null */
++				t = realloc(new_initrd, length + 1);
++				if (t == NULL) {
++					if (new_initrd)
++						free(new_initrd);
++					return NULL;
++				}
++				new_initrd = t;
++				p = new_initrd + used;
 +			}
-+			new_initrd = t;
-+			p = new_initrd + used;
++
++			/*start after the "initrd=" */
++			if (new_initrd[7]) {
++				sprintf(p, ",%s", new_file);
++				p += 1;
++			} else {
++				sprintf(p, "%s", new_file);
++			}
++
++			p += strlen(new_file);
++			free(new_file);
++
++			used = p - new_initrd;
++
++			file = strtok(NULL, ",");
 +		}
-+
-+		/*start after the "initrd=" */
-+		sprintf(p, "%s%s", 
-+		        new_initrd[7] ? "," : "",
-+		        new_file);
-+
-+		p += strlen(new_file);
-+		free(new_file);
-+
-+		used = p - new_initrd;
-+
-+		file = strtok(NULL, ",");
 +	}
 +
 +	return new_initrd;
@@ -681,9 +702,9 @@ diff -Nru syslinux-3.71+dfsg.orig/com32/modules/bootinfo.c syslinux-3.71+dfsg/co
 +
 +int main(int argc, char *argv[])
 +{
-+	boot_info_t boot_info;
-+	boot_what_t *boot_what_p;
-+	uint8_t buffer[sizeof(boot_what_t) + MAX_BOOT_CMDLINE];
++	boot_info_t *boot_info;
++	boot_what_t *boot_what;
++	uint8_t buffer[sizeof(boot_info_t) + MAX_BOOT_CMDLINE];
 +	size_t length;
 +	in_addr_t my_ip;
 +	in_addr_t boss_ip;
@@ -723,7 +744,7 @@ diff -Nru syslinux-3.71+dfsg.orig/com32/modules/bootinfo.c syslinux-3.71+dfsg/co
 +		       ntop(&boss_ip, foobar, sizeof(foobar)) : "failed!");
 +	}
 +
-+	boot_what_p = (boot_what_t *)buffer;
++	boot_info = (boot_info_t *)buffer;
 +
 +	/* Extract our IP address from the cached DHCP data */
 +	if (pxe_get_cached_info(PXENV_PACKET_TYPE_DHCP_ACK, &dhcpdata,
@@ -747,9 +768,9 @@ diff -Nru syslinux-3.71+dfsg.orig/com32/modules/bootinfo.c syslinux-3.71+dfsg/co
 +
 +	free(dhcpdata);
 +
-+	memset(&boot_info, 0, sizeof(boot_info_t));
-+	boot_info.version = BIVERSION_CURRENT;
-+	boot_info.opcode  = BIOPCODE_BOOTWHAT_REQUEST;
++	memset(buffer, 0, sizeof(buffer));
++	boot_info->version = BIVERSION_CURRENT;
++	boot_info->opcode  = BIOPCODE_BOOTWHAT_REQUEST;
 +
 +	udp_close();
 +	rc = udp_open(my_ip);
@@ -760,7 +781,7 @@ diff -Nru syslinux-3.71+dfsg.orig/com32/modules/bootinfo.c syslinux-3.71+dfsg/co
 +	
 +	printf("Requesting bootinfo data from %s...", boss_name);
 +	while(1) {
-+		rc = send_request(boss_ip, &boot_info);
++		rc = send_request(boss_ip, boot_info);
 +		if (rc != PXENV_STATUS_SUCCESS && rc != PXENV_STATUS_FAILURE) {
 +			printf("\n");
 +			return rc;
@@ -768,12 +789,13 @@ diff -Nru syslinux-3.71+dfsg.orig/com32/modules/bootinfo.c syslinux-3.71+dfsg/co
 +		
 +		printf(".");
 +
-+		boot_what_p->type = 0;
++		boot_what = (boot_what_t *)boot_info->data;
++		boot_what->type = 0;
 +
 +		length = sizeof(buffer);
 +
 +		/* Wait up to 10 seconds(-ish) for a response */
-+		rc = get_response(my_ip, buffer, &length, 10 * CLK_TCK);
++		rc = get_response(my_ip, boot_info, &length, 10 * CLK_TCK);
 +		if (rc != PXENV_STATUS_SUCCESS && rc != PXENV_STATUS_FAILURE) {
 +			printf("\n");
 +			return rc;
@@ -782,7 +804,7 @@ diff -Nru syslinux-3.71+dfsg.orig/com32/modules/bootinfo.c syslinux-3.71+dfsg/co
 +		if (rc == PXENV_STATUS_SUCCESS)
 +			printf(" ok\n");
 +
-+		while (boot_what_p->type == BIBOOTWHAT_TYPE_WAIT) {
++		while (boot_what->type == BIBOOTWHAT_TYPE_WAIT) {
 +			printf("Polling for bootinfo response... ");
 +			length = sizeof(buffer);
 +			rc = get_response(my_ip, buffer, &length, 0);
@@ -793,20 +815,24 @@ diff -Nru syslinux-3.71+dfsg.orig/com32/modules/bootinfo.c syslinux-3.71+dfsg/co
 +			printf(" ok\n");
 +		}
 +
-+		switch (boot_what_p->type) {
++		switch (boot_what->type) {
 +			case BIBOOTWHAT_TYPE_REBOOT:
 +				printf("Rebooting...\n");
 +				syslinux_reboot(0);
 +				break;
 +			case BIBOOTWHAT_TYPE_PART:
-+				return chain_boot("hd0", boot_what_p->what.partition);
++				return chain_boot("hd0", boot_what->what.partition);
 +				break;
 +			case BIBOOTWHAT_TYPE_MFS:
-+				return kernel_boot(boss_name, boot_what_p->what.mfs,
-+				            boot_what_p->cmdline);
++				return kernel_boot(boss_name, boot_what->what.mfs,
++				            boot_what->cmdline);
 +				break;
 +			case BIBOOTWHAT_TYPE_AUTO:
 +				printf("query: will query again\n");
++				break;
++			case BIBOOTWHAT_TYPE_SYSID:
++				printf("request to boot partition type 0x%02x not supported\n",
++						boot_what->what.sysid);
 +				break;
 +		}
 +
