@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -306,20 +306,13 @@ function SPITFORM($formfields, $errors)
 	    # Planetlab bit. This should really be a drop down menu of the
 	    #                choices.
             #
-	    if (isset($formfields["user_interface"]) &&
-		$formfields["user_interface"] == TBDB_USER_INTERFACE_PLAB) {
-		$checked = "checked";
-	    } else {
-		$checked = "";
-	    }
-
+	    $checked = $formfields["user_interface"];
 	    echo "<tr>
 		      <td colspan=2>Use simplified PlanetLab view:</td>
 		      <td class=left>
 		         <input type='checkbox'
                                 name=\"formfields[user_interface]\"
-                                value=\"" . TBDB_USER_INTERFACE_PLAB . "\"
-			        $checked>
+                                value=checked $checked>
 		      </td>
 	          </tr>\n";
 	}
@@ -431,7 +424,9 @@ if (!isset($submit)) {
     $defaults["notes"]       = $target_user->notes();
     $defaults["password1"]   = "";
     $defaults["password2"]   = "";
-    $defaults["user_interface"] = $target_user->user_interface();
+    $defaults["user_interface"] =
+	($target_user->user_interface() == TBDB_USER_INTERFACE_PLAB ?
+	 "checked" : "");
 
     $wikionly                = $target_user->wikionly();
 
@@ -548,10 +543,17 @@ if (isset($formfields["usr_phone"]) && $formfields["usr_phone"] != "" &&
     $formfields["usr_phone"] != $target_user->phone()) {
     $args["usr_phone"]	= $formfields["usr_phone"];
 }
-if (isset($formfields["user_interface"]) && $formfields["user_interface"] != "" &&
-    $formfields["user_interface"] != $target_user->user_interface()) {
-    $args["user_interface"]	= $formfields["user_interface"];
+if (isset($formfields["user_interface"]) &&
+    $formfields["user_interface"] == "checked") {
+    $desired_interface = TBDB_USER_INTERFACE_PLAB;
 }
+else {
+    $desired_interface = TBDB_USER_INTERFACE_EMULAB;
+}
+if ($desired_interface != $target_user->user_interface()) {
+    $args["user_interface"] = $desired_interface;
+}
+
 if (isset($formfields["notes"]) &&
     $formfields["notes"] != $target_user->notes()) {
     $args["notes"]	= $formfields["notes"];
