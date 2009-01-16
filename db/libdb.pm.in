@@ -703,6 +703,7 @@ sub TBDB_PHYSICAL_NODE_TABLES() {
 	'iface_counters'	=> [ 'node_id' ],
 	'interfaces'		=> [ 'node_id' ],
 	'interface_settings'	=> [ 'node_id' ],
+	'interface_state'	=> [ 'node_id' ],
 	'last_reservation'	=> [ 'node_id' ],
 	'linkdelays'		=> [ 'node_id' ],
 	'location_info'		=> [ 'node_id' ],
