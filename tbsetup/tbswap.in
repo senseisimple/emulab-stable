@@ -1359,8 +1359,8 @@ sub doSwapin($) {
 	    }
 	}
 	
-	if ( $update_Eventsys_restart || 
-	    ($type != MODIFY && $type != MODIFY_RECOVER) ) {
+	if (($update_Eventsys_restart || 
+	    ($type != MODIFY && $type != MODIFY_RECOVER))) {
 	    print "Starting the event system.\n";
 	    TBDebugTimeStamp("eventsys_control started");
 	    if (system("eventsys_control start $pid,$eid")) {
@@ -1507,6 +1507,9 @@ sub doFW($$$$) {
     #
     my $portlist  = "";
     foreach my $node (@allnodes) {
+	next
+	    if ($node->isremotenode() || $node->isvirtnode());
+		
 	my $control_iface = Interface->LookupControl($node);
 	if (!defined($control_iface)) {
 	    tberror("Could not find control iface object for $node");
@@ -1539,7 +1542,7 @@ sub doFW($$$$) {
 	# but mere users must have at least one firewalled node. Just print
 	# the warning though. 
 	# 
-	tberror "No firewalled nodes in $pid/${eid}!";
+	tbwarn "No firewalled nodes in $pid/${eid}!";
     }
 
     #
@@ -1574,33 +1577,34 @@ sub doFW($$$$) {
 	    tberror("No vlan tag associated with $vlan");
 	    goto badsetup;
 	}
-	$fwsetupstr3 = "$fwsetupstr3 " . $vlan->id();
-
-	TBDebugTimeStamp("snmpit firewall setup: trunk");
-	print "doFW: '$fwsetupstr3'\n";
-	if (system($fwsetupstr3)) {
-	    tberror "Failed to setup Firewall trunk on port $fwport.";
-	  badsetup:
-	    print "doFW: '$fwtakedownstr1'\n";
-	    if (system($fwtakedownstr1)) {
-		tberror "Could not return $portlist to Control VLAN!";
+	if ($portlist ne "") {
+	    $fwsetupstr3 = "$fwsetupstr3 " . $vlan->id();
+	    TBDebugTimeStamp("snmpit firewall setup: trunk");
+	    print "doFW: '$fwsetupstr3'\n";
+	    if (system($fwsetupstr3)) {
+		tberror "Failed to setup Firewall trunk on port $fwport.";
+	      badsetup:
+		print "doFW: '$fwtakedownstr1'\n";
+		if (system($fwtakedownstr1)) {
+		    tberror "Could not return $portlist to Control VLAN!";
+		    return 1;
+		}
+		print "doFW: '$fwtakedownstr2'\n";
+		if (system($fwtakedownstr2)) {
+		    tberror "Could not destroy VLAN $fwvlanname ($fwvlan)!";
+		    return 1;
+		}
+		print "doFW: '$fwtakedownstr3'\n";
+		if (system($fwtakedownstr3)) {
+		    tberror "Could not untrunk $fwport!";
+		    return 1;
+		}
+		print "doFW: '$fwtakedownstr4'\n";
+		if (system($fwtakedownstr4)) {
+		    tberror "Could not move $fwport back to Control lan!";
+		}
 		return 1;
 	    }
-	    print "doFW: '$fwtakedownstr2'\n";
-	    if (system($fwtakedownstr2)) {
-		tberror "Could not destroy VLAN $fwvlanname ($fwvlan)!";
-		return 1;
-	    }
-	    print "doFW: '$fwtakedownstr3'\n";
-	    if (system($fwtakedownstr3)) {
-		tberror "Could not untrunk $fwport!";
-		return 1;
-	    }
-	    print "doFW: '$fwtakedownstr4'\n";
-	    if (system($fwtakedownstr4)) {
-		tberror "Could not move $fwport back to Control lan!";
-	    }
-	    return 1;
 	}
 	TBDebugTimeStamp("snmpit firewall setup done");
 
@@ -1609,10 +1613,26 @@ sub doFW($$$$) {
 	return 0;
     }
     elsif ($action == FWADDNODES) {
+	my $vlan = VLan->Lookup($experiment, $fwvlanname);
+	if (!defined($vlan)) {
+	    tberror "Cannot find vlan object for $fwvlanname";
+	    return 1;
+	}
 	TBDebugTimeStamp("snmpit firewall port addition");
 	print "doFW: '$fwsetupstr1'\n";
 	if (system($fwsetupstr1)) {
 	    tberror "Failed to add nodes to Firewall control net VLAN.";
+	    return 1;
+	}
+	#
+	# Redo the trunk operation since there might not have been
+	# any ports last time, and the vlan would not have existed,
+	# so the trunk would not be setup.
+	#
+	$fwsetupstr3 = "$fwsetupstr3 " . $vlan->id();
+	print "doFW: '$fwsetupstr3'\n";
+	if (system($fwsetupstr3)) {
+	    tberror "Failed to setup Firewall trunk on port $fwport.";
 	    return 1;
 	}
 	TBDebugTimeStamp("snmpit firewall setup done");
