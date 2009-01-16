@@ -1,22 +1,3 @@
-#
-# These are new tables to add to the Emulab DB. 
-#
-
-#
-# Remote SAs register users at Emulab (we export GENI ClearingHouse
-# APIs, whatever they are). Local users do not need to be in this table,
-# we can get their data via the Emulab libraries. 
-#
-#  * This is a GENI ClearingHouse table; remote emulabs have just a
-#    local users table. 
-#  * Users in this table are users at other emulabs.
-#  * uid_idx is for indexing into other tables, like user_sslcerts and
-#    user_pubkeys. No need to have geni versions of those tables, as
-#    long as we maintain uid_idx uniqueness. 
-#  * sa_idx is an index into another table. SAs in in the prototype are
-#    other Emulabs.
-#  * The uid does not have to be unique, except for a given SA. 
-#
 DROP TABLE IF EXISTS `geni_users`;
 CREATE TABLE `geni_users` (
   `hrn` varchar(256) NOT NULL default '',
@@ -36,19 +17,6 @@ CREATE TABLE `geni_users` (
   UNIQUE KEY `uuid` (`uuid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
-#
-# All geni components have a GID (UUID->Key) and this
-# table stores them all. In protogeni there are not that many components,
-# and they mostly refer to other Emulabs.
-#
-#  * This is a GENI Clearinghouse table; Components are remote emulabs.
-#  * The ID is a GENI dotted name.
-#  * We store the pubkey for the component here. Remember that
-#    components self generate their keys.
-#  * Not worrying about Management Authorities at this point. I think
-#    the prototype has a single MA, and its operated by hand with
-#    direct mysql statements.
-#
 DROP TABLE IF EXISTS `geni_components`;
 CREATE TABLE `geni_components` (
   `hrn` varchar(256) NOT NULL default '',
@@ -61,18 +29,6 @@ CREATE TABLE `geni_components` (
   UNIQUE KEY `hrn` (`hrn`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
-#
-# Geni Slice Authorities also have a GID. As with components, SAs are
-# mostly other emulabs. GENI users are registered by SAs, as are slices.
-#
-#  * This is a GENI Clearinghouse table; SAs are remote emulabs.
-#  * The ID is a GENI dotted name.
-#  * We store the pubkey for the SA here. Remember that SAs self
-#    generate their keys.
-#  * The uuid_prefix is the topmost 8 bytes assigned to the SA; all
-#    UUIDs generated (signed) by and registered must have these top
-#    8 bytes. See wiki discussion.
-#
 DROP TABLE IF EXISTS `geni_authorities`;
 CREATE TABLE `geni_authorities` (
   `hrn` varchar(256) NOT NULL default '',
@@ -86,17 +42,6 @@ CREATE TABLE `geni_authorities` (
   UNIQUE KEY `hrn` (`hrn`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
-#
-# Geni Slices. Not to be confused with plab_slices ... a geni slice
-# is an emulab experiment that spans the entire set of emulabs. SAs
-# register geni slices at the Clearinghouse, in this table.
-# 
-# * Slices have UUIDs.
-# * The sa_idx refers to the slice authority that created the slice.
-# * The creator UUID should already be in the geni_users table, or in
-#   the local users table.
-# * The pubkey bound to the slice is that of the user creating the slice.
-# 
 DROP TABLE IF EXISTS `geni_slices`;
 CREATE TABLE `geni_slices` (
   `hrn` varchar(256) NOT NULL default '',
@@ -116,10 +61,6 @@ CREATE TABLE `geni_slices` (
   UNIQUE KEY `uuid` (`uuid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
-#
-# Geni Slivers. Created on components (by CMs of course). Locally, a sliver
-# corresponds to an allocated node. 
-#
 DROP TABLE IF EXISTS `geni_slivers`;
 CREATE TABLE `geni_slivers` (
   `idx` mediumint(8) unsigned NOT NULL default '0',
@@ -143,9 +84,6 @@ CREATE TABLE `geni_slivers` (
   INDEX `slice_uuid` (`slice_uuid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
-#
-# Geni Aggregates, which are a collection of resources (nodes, links, etc).
-#
 DROP TABLE IF EXISTS `geni_aggregates`;
 CREATE TABLE `geni_aggregates` (
   `idx` mediumint(8) unsigned NOT NULL default '0',
@@ -167,9 +105,6 @@ CREATE TABLE `geni_aggregates` (
   INDEX `slice_uuid` (`slice_uuid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
-#
-# Table to remember tickets.
-#
 DROP TABLE IF EXISTS `geni_tickets`;
 CREATE TABLE `geni_tickets` (
   `idx` mediumint(8) unsigned NOT NULL default '0',
@@ -189,9 +124,6 @@ CREATE TABLE `geni_tickets` (
   UNIQUE KEY `compseqno` (`component_uuid`, `seqno`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
-#
-# Table to remember credentials.
-#
 DROP TABLE IF EXISTS `geni_credentials`;
 CREATE TABLE `geni_credentials` (
   `idx` mediumint(8) unsigned NOT NULL default '0',
@@ -206,11 +138,6 @@ CREATE TABLE `geni_credentials` (
   INDEX `this_uuid` (`this_uuid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
-#
-# Table to hold uuid<->certificate bindings, keeping them out of the other
-# tables above. We use this on both the client and server side (storing the
-# private key), say for a sliver.
-#
 DROP TABLE IF EXISTS `geni_certificates`;
 CREATE TABLE `geni_certificates` (
   `uuid` varchar(40) NOT NULL default '',
@@ -224,9 +151,6 @@ CREATE TABLE `geni_certificates` (
   PRIMARY KEY  (`uuid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
-#
-# A clearinghouse table to hold CRLs to be distributed.
-#
 DROP TABLE IF EXISTS `geni_crls`;
 CREATE TABLE `geni_crls` (
   `uuid` varchar(40) NOT NULL default '',
@@ -236,9 +160,6 @@ CREATE TABLE `geni_crls` (
   PRIMARY KEY  (`uuid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
-#
-# A clearinghouse table to hold keys associated with geni users.
-#
 DROP TABLE IF EXISTS `geni_userkeys`;
 CREATE TABLE `geni_userkeys` (
   `type` enum('ssh','password') NOT NULL default 'ssh',
@@ -248,9 +169,6 @@ CREATE TABLE `geni_userkeys` (
   INDEX `uuid` (`uuid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
-#
-# This table maps between resources and their component manager. 
-#
 DROP TABLE IF EXISTS `geni_resources`;
 CREATE TABLE `geni_resources` (
   `resource_uuid` varchar(40) NOT NULL default '',
@@ -260,9 +178,6 @@ CREATE TABLE `geni_resources` (
   PRIMARY KEY  (`resource_uuid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
-#
-# Hold the users that are bound to slices.
-#
 DROP TABLE IF EXISTS `geni_bindings`;
 CREATE TABLE `geni_bindings` (
   `slice_uuid` varchar(40) NOT NULL default '',
@@ -271,3 +186,10 @@ CREATE TABLE `geni_bindings` (
   PRIMARY KEY  (`slice_uuid`,`user_uuid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
+DROP TABLE IF EXISTS `version_info`;
+CREATE TABLE `version_info` (
+  `name` varchar(32) NOT NULL default '',
+  `value` tinytext NOT NULL,
+  PRIMARY KEY  (`name`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+REPLACE INTO `version_info` VALUES ('dbrev', '0');
