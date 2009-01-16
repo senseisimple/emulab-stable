@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -163,6 +163,7 @@ use vars qw(@ISA @EXPORT);
 	 DBQuery DBQueryFatal DBQueryWarn DBWarn DBFatal DBErr
 	 NewTBDBHandle DBQueryN DBQueryFatalN DBQueryWarnN DBErrN
 	 DBQuerySingleFatal DBQuerySingleFatalN
+	 DBTableExists DBSlotExists
 	 DBQuoteSpecial ExpState
 	 ExpNodes ExpNodeVnames ExpNodesOldReserved
 	 DBDateTime DefaultImageID 
@@ -301,6 +302,8 @@ sub DBQueryWarn($)      { return emdbi::DBQueryWarn($_[0]);}
 sub DBQuoteSpecial($)	{ return emdbi::DBQuoteSpecial($_[0]); }
 sub DBErrN($)		{ return emdbi::DBErrN($_[0]); }
 sub DBErr()		{ return emdbi::DBErr(); }
+sub DBTableExists($)	{ return emdbi::DBTableExists($_[0]); }
+sub DBSlotExists($$)	{ return emdbi::DBSlotExists($_[0], $_[1]); }
 # These are handled differently cause of tblog stuff.
 sub DBWarn($;$)		{ DBError(\&tbwarn, $_[0], $_[1]); }
 sub DBFatal($;$)	{ DBError(\&tbdie, $_[0], $_[1]); }
@@ -3099,7 +3102,7 @@ sub TBSetExptFirewallVlan($$$$) {
     my $exptidx;
     if (!TBExptIDX($pid, $eid, \$exptidx)) {
 	print "*** WARNING: No such experiment $pid/$eid!\n";
-	return -1;
+	return 0;
     }
 
     #
@@ -3110,7 +3113,7 @@ sub TBSetExptFirewallVlan($$$$) {
 	DBQueryWarn("select fwname from virt_firewalls ".
 		    "WHERE pid='$pid' AND eid='$eid'");
 
-    return -1
+    return 0
 	if (!$query_result || $query_result->num_rows == 0);
 
     my ($fwname) = $query_result->fetchrow_array();
@@ -3120,13 +3123,17 @@ sub TBSetExptFirewallVlan($$$$) {
     #
     DBQueryWarn("replace into firewalls (exptidx,pid,eid,fwname,vlan,vlanid) ".
 		"values ('$exptidx', '$pid', '$eid', ".
-		"        '$fwname', $fwvlan, $fwvlanid)");
+		"        '$fwname', $fwvlan, $fwvlanid)")
+	or return 0;
 
     #
     # Change the reserved table entries for all firewalled nodes to reflect it.
     #
     DBQueryWarn("UPDATE reserved set cnet_vlan=$fwvlan ".
-		"WHERE pid='$pid' AND eid='$eid' AND node_id!='$fwnode'");
+		"WHERE pid='$pid' AND eid='$eid' AND node_id!='$fwnode'")
+	or return 0;
+
+    return 1;
 }
 
 #

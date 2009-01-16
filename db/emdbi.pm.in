@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2008 University of Utah and the Flux Group.
+# Copyright (c) 2008, 2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package emdbi;
@@ -424,6 +424,37 @@ sub DBErr()
 {
     return $DB[0]->err;
 }
+
+#
+# Some utility routines for doing migration (DB upgrades).
+#
+sub DBTableExistsN($$)
+{
+    my($dbnum, $table) = @_;
+
+    my $result =
+	DBQueryN($dbnum, "show tables like '$table'");
+
+    if (! $result) {
+	DBWarn("DB Query failed");
+    }
+    return $result->numrows;
+}
+sub DBTableExists($) { return DBTableExistsN(0,$_[0]); }
+
+sub DBSlotExistsN($$$)
+{
+    my($dbnum, $table, $slot) = @_;
+
+    my $result =
+	DBQueryN($dbnum, "show columns from `$table` like '$slot'");
+
+    if (! $result) {
+	DBWarn("DB Query failed");
+    }
+    return $result->numrows;
+}
+sub DBSlotExists($$) { return DBSlotExistsN(0,$_[0],$_[1]); }
 
 END {
     # Call it here otherwise may get:
