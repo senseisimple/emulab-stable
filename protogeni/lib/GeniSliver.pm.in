@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2008 University of Utah and the Flux Group.
+# Copyright (c) 2008-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniSliver;
@@ -907,10 +907,10 @@ sub UnProvision($)
 		    "Could remove virtnode entry for $pnode from $self\n";
 		return -1;
 	    }
-	    system("export NORELOAD=1; $NFREE -x -q $pid $eid $pnode_id");
+	    system("$NFREE -x -q $pid $eid $pnode_id");
 	}
 	else {
-	    system("export NORELOAD=1; $NFREE -q $pid $eid $node_id");
+	    system("$NFREE -q $pid $eid $node_id");
 	}
 	if ($?) {
 	    print STDERR "Could not deallocate $node from $self\n";
