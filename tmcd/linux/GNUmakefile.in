@@ -219,6 +219,7 @@ script-install:	dir-install $(SCRIPTS)
 	$(INSTALL) -m 755 $(SRCDIR)/extract_kernel_version $(BINDIR)/extract-kernel-version
 	$(INSTALL) -m 755 $(SRCDIR)/get_edd_map $(BINDIR)/testbed
 	$(INSTALL) -m 755 -s ../findif $(BINDIR)/findif
+	$(INSTALL) -m 755 $(SRCDIR)/rc.linux $(BINDIR)/rc
 
 sfs-install:
 	$(INSTALL) -m 755 -o root -g root -d $(DESTDIR)/etc/sfs

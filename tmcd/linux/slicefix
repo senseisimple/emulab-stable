@@ -29,110 +29,6 @@ case $# in
 	exit 1
 esac
 
-get_fstab_root_device()
-{
-	local image_root=$1
-
-	while read device mount rest; do
-		[ x$device = x ] && continue
-		case $device in
-			\#*) continue ;;
-		esac
-
-		if [ $mount = / ]; then
-			echo ${device}
-			break
-		fi
-	done < $image_root/etc/fstab
-}
-
-get_lilo_boot_device()
-{
-	local image_root=$1
-	
-	[ -f $image_root/etc/lilo.conf ] || return 1
-
-	sed -n 's/^boot=//p' $image_root/etc/lilo.conf
-
-	return 0
-}
-
-get_grub_boot_device()
-{
-	local image_root=$1
-	local grub_config=/etc/grub.conf
-	local grub_device_map=/boot/grub/device.map
-	local grub_boot_dev
-
-	if ! [ -f $grub_config ]; then
-		grub_config=/boot/grub/menu.lst
-		if ! [ -f $grub_config ]; then
-			return 1
-		fi
-	fi
-
-	if ! [ -f $grub_device_map ]; then
-		return 1
-	fi
-
-	# Check for Debian-ish grub configs
-	grub_boot_dev=`sed -n 's/^##* *groot=(\(hd[0-9]*\).*$/(\1)/p' \
-	               $grub_config`
-
-	# Check for Fedora-ish grub configs
-	if [ -z "$grub_boot_dev" ]; then
-		grub_boot_dev=`sed -n 's/.*groot=(\(hd[0-9]*\)/(\1)/p' \
-		               $grub_config`
-	fi
-	[ -z "$grub_boot_dev" ] && return 1
-
-	real_grub_boot_dev=`grep "^$grub_boot_dev" $grub_device_map | \
-	                    awk '{ print $2 }'`
-
-	[ -z "$real_grub_boot_dev" ] && return 1
-
-	echo $real_grub_boot_dev
-}
-
-image_wants_ide()
-{
-	local image_root=$1
-	local rc=0;
-
-	# rc == 0 means image wants ide
-	# rc == 1 means image doesn't care
-	# rc == 2 means unknown
-
-	local fstab_root_dev
-	local grub_boot_dev
-	local lilo_boot_dev
-
-	fstab_root_dev=`get_fstab_root_device $image_root`
-	grub_boot_dev=`get_grub_boot_device $image_root`
-	lilo_boot_dev=`get_lilo_boot_device $image_root`
-
-	for dev in "$fstab_root_dev" "$grub_boot_dev" "$lilo_boot_dev"; do
-		case "$fstab_root_dev" in
-			*=*)
-				# Probably LABEL= or UUID=
-				rc=1
-				;;
-			/dev/hd*)
-				rc=0
-				;;
-			*)
-				rc=2
-				;;
-		esac
-
-		[ $rc -lt 2 ] && return $rc
-	done
-
-	# If we get here, we don't know what the image wants
-
-	return $rc
-}
-
 map_disk()
 {
 	local disk=$1
@@ -557,6 +453,11 @@ dolinux() {
 
 	$BINDIR/guess_linux_root_device /mnt $rootdev $translated_rootdev
 	lilo_commandline=`cat /mnt/var/emulab/boot/runlilo 2> /dev/null`
+
+	# Remove swap partitions from fstab; they will be added again
+	# by rc.linux after boot.
+	awk '{ if ($3 != "swap") print; }' /mnt/etc/fstab > /mnt/etc/fstab.new
+	mv -f /mnt/etc/fstab.new /mnt/etc/fstab
 
 	#
 	# If there's a GRUB config file, update all root=X kernel params.

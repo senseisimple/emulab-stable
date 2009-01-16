@@ -38,16 +38,20 @@ RCDIR		= $(SYSETCDIR)/rc.d
 INSTALL		= /usr/bin/install -c 
 COMMON		= $(SRCDIR)/../common
 
-install client-install:	baselinux-install common-install etc-install \
+install client-install:	baselinux-client-install common-install etc-install \
 			sup-install script-install bin-install
 	@echo "Remember to install the PEM files if necessary"
+
+mfs-install: client-install baselinux-mfs-install
+
+frisbee-mfs-install: baselinux-frisbee-mfs-install
 
 simple-install:	common-install script-install bin-install
 
 dir-install:
 
-baselinux-install: dir-install
-	(cd ../linux; $(MAKE) DESTDIR=$(DESTDIR) client-install)
+baselinux-%: dir-install
+	(cd ../linux; $(MAKE) DESTDIR=$(DESTDIR) $(subst baselinux-,,$@))
 
 common-install:	dir-install
 	@echo "no fedora-specific common files"
@@ -81,8 +85,7 @@ sysetc-onceonly-install:
 	@$(MYINSTALL) -m 440 $(SRCDIR)/sudoers $(SYSETCDIR)/sudoers
 	@$(MYINSTALL) $(SRCDIR)/syslog.conf $(SYSETCDIR)/syslog.conf
 
-script-install:	dir-install $(SCRIPTS)
-	$(INSTALL) -m 755 $(SRCDIR)/rc.linux $(BINDIR)/rc
+#script-install:	dir-install $(SCRIPTS)
 
 sfs-install:
 	@echo "no fedora-specific sfs files"
