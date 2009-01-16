@@ -1,0 +1,173 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+
+#
+# Update DB.
+#
+sub usage()
+{
+    print STDERR "Usage: dbupdate <dbname> [<version>]\n";
+    exit(-1);
+}
+my $optlist = "d";
+my $debug   = 0;
+my $dbname;
+my $version;
+my $dbnumber = 0;	# XXX Core emulab code is very rigid.
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $DEFDBNAME	= "@TBDBNAME@";
+
+# Protos
+sub Fatal($);
+
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
+use emdbi;
+use libtestbed;
+
+#
+# Parse command arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (@ARGV < 1 || @ARGV > 2) {
+    usage();
+}
+$dbname  = shift();
+$version = shift()
+    if (@ARGV);
+
+# Sanity check the args.
+if (! ($dbname =~ /^[-\w]+$/)) {
+    Fatal("'$dbname' does not look like a reasonable database name.");
+}
+
+#
+# Open up a connection to the DB. The core emulab code is all written
+# assuming that the first DB connection is used, so go with that. Be
+# nice to change someday. For the Protogeni code, I can be less rigid.
+#
+if ($dbname eq $DEFDBNAME) {
+    # This will exit on error by default.
+    emdbi::TBDBConnect(0, $dbname);
+}
+else {
+    # This will exit on error by default.
+    $dbnumber = emdbi::NewTBDBHandle($dbname);
+}
+
+#
+# If no version number provided, then grab it from the DB.
+#
+if (!defined($version)) {
+    my $query_result =
+	emdbi::DBQueryFatalN($dbnumber,
+			     "select value from version_info ".
+			     "where name='dbrev'");
+    Fatal("No version info in the DB")
+	if (!$query_result->numrows);
+    ($version) = $query_result->fetchrow_array();
+}
+if (! ($version =~ /^[\d\.]+$/)) {
+    Fatal("'$version' does not look like a reasonable starting version.");
+}
+
+#
+# Split apart the version number. Assumed to be in dotted notation.
+#
+my @dots  = split(/\./, "$version");
+my $start = pop(@dots);
+
+#
+# If no dots, then assume the current directory. Otherwise, cd down into
+# lowest directory and start. This could get fancier, but I leave that to
+# someone else.
+#
+if (@dots) {
+    my $dir = join("/", @dots);
+    if (!chdir($dir)) {
+	Fatal("Cannot chdir to $dir");
+    }
+}
+
+#
+# Open up the current directory. We want all numbered files.
+#
+opendir(DIR, ".") or
+    Fatal("Could not opendir the current directory");
+my @files  = grep { /^\d*$/ } readdir(DIR);
+closedir(DIR);
+
+#
+# Sort them since we we want to start at the right file, and proceed
+# in order.
+#
+@files = sort {$a <=> $b} @files;
+
+#
+# Now process each file starting at the start version.
+#
+foreach my $file (@files) {
+    next
+	if ($file <= $start);
+
+    my $fullpath = join("/", @dots) . "/$file";
+    my $revision = join(".", @dots) . ".$file";
+
+    print "Processing update $fullpath\n";
+
+    # Undefine this to make sure we get a new version each file.
+    undef &DoUpdate;
+
+    # This just loads the file.
+    my $return = do $file;
+    if (!defined($return)) {
+	Fatal("  could not parse $file: $@") if $@;
+	Fatal("  could not do $file: $!")    if $!;
+    }
+    # Then we run it.
+    if (DoUpdate($dbnumber, $dbname, $revision) != 0) {
+	Fatal("  returned non-zero; aborting.\n");
+    }
+    # Mark that we have done it. 
+    emdbi::DBQueryFatalN($dbnumber,
+			 "update version_info set value='$revision' ".
+			 "where name='dbrev'");
+}
+
+exit(0);
+
+sub Fatal($)
+{
+    my ($msg) = @_;
+
+    die("*** $0:\n".
+	"    $msg\n");
+}
