@@ -200,7 +200,7 @@ if (! $moveToOldReserved) {
 	next
 	    if ($node->isvirtnode() || $node->isremotenode());
 
-	if (VLan->IsNodeInAVlan($node)) {
+	if (0 && VLan->IsNodeInAVlan($node)) {
 	    print STDERR "$node is still in a vlan!\n";
 	    $error++;
 	}
