@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2005-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -24,7 +24,7 @@ if (!$isadmin) {
 # Verify page arguments.
 #
 $reqargs = RequiredPageArguments("experiment", PAGEARG_EXPERIMENT);
-$optargs = OptionalPageArguments("message",    PAGEARG_STRING,
+$optargs = OptionalPageArguments("message",    PAGEARG_ANYTHING,
 				 "canceled",   PAGEARG_STRING,
 				 "confirmed",  PAGEARG_STRING);
 
