@@ -53,14 +53,15 @@ include "../../assign/top.rnc" {
     InterfaceContents = 
 	# In an advertisement, the component_uuid is mandatory.
 	# In a request, the virtual_uuid is mandatory.
-        element virtual_uuid { text }?,
+        element virtual_node_uuid { text }?,
 	element virtual_interface_name { text }?,
-	element component_uuid { text }?,
+	element component_node_uuid { text }?,
         element component_interface_name { text }?
 }
 
 InterfaceDecl = element interface {
-	attribute name { text }
+	attribute virtual_name { text },
+	attribute component_name { text }
 }
 
 ComponentSpec =
