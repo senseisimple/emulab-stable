@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2005-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Admin MFS library.  Routines related to getting into and out of the
@@ -296,7 +296,7 @@ sub TBAdminMfsSelect($$@)
     #
     if ($on) {
 	# clear one-shot boots
-	if ($only && system("os_select -c -1 @nodes")) {
+	if ($only && system("$osselect -c -1 @nodes")) {
 	    print STDERR "*** $me:\n".
 		"    Failed to clear one-shot boot for @nodes!\n";
 	    @{$failedref} = @nodes
@@ -324,7 +324,7 @@ sub TBAdminMfsSelect($$@)
 	}
 
 	# clear partition boots for successful nodes
-	if ($only && system("os_select -c @good")) {
+	if ($only && system("$osselect -c @good")) {
 	    print STDERR "*** $me:\n".
 		"    Failed to clear partition boot for @good!\n";
 	    @{$failedref} = @nodes
