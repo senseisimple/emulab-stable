@@ -288,15 +288,19 @@ if (!defined($geniproj)) {
     $geniproj = Project->Lookup($geniprojid);
     fatal("Could not lookup $geniprojid")
 	if (!defined($geniproj));
+}
+$geniuser->Refresh();
+$geniproj->Refresh();
 
-    # Create an encrypted certificate for the test scripts.
+# Create an encrypted certificate for the test scripts.
+my $sslcert;
+$geniuser->SSLCert(1, \$sslcert);
+if (!defined($sslcert)) {
     my $passwd = substr(TBGenSecretKey(), 0, 10);
     system("$SUDO -u $PROTOUSER $WAP $MKUSERCERT -p '$passwd' $geniuserid");
     fatal("Could not create encrypted certificate for geni user")
 	if ($?);
 }
-$geniuser->Refresh();
-$geniproj->Refresh();
 
 #
 # Databases.
