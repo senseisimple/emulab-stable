@@ -39,30 +39,6 @@ my $extraopts = ($isvers5 ? "--skip-quote-names" : "");
 my $mysqldump = "mysqldump -d $extraopts $DBNAME";
 
 #
-# We use Mysql module instead of the tesbed libraries, so that we can get
-# a more precise feel for what the error is.
-#
-use Mysql;
-
-#
-# Check to see if the mysqld is running by trying to connect to it.
-#
-my $dbh = Mysql->connect(undef,undef,undef,undef);
-if (!$dbh) {
-    fatal("Unable to connect to mysqld - Either it's not running or \n" .
-    	  "permission was denied.\n");
-}
-
-#
-# Check to see if the database exists
-#
-my @dbs = $dbh->listdbs();
-if (! grep (/^$DBNAME$/,@dbs)) {
-    fatal("Database $DBNAME does not exist in the running database\n");
-}
-undef $dbh;
-
-#
 # Make sure we can write the temporary file
 #
 my $db_schema = "/tmp/schemacheck.$$";
