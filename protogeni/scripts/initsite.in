@@ -190,6 +190,12 @@ if ($asch) {
     system("/bin/cp $TB/etc/emulab.pem $TB/etc/genicacerts") == 0
 	or fatal("Could not initialize $TB/etc/genicacerts");
 }
+if (! -e "$TB/lib/ssl/syscert.cnf") {
+    print "Please go to the ssl subdir of your build tree and do:\n";
+    print "    sudo gmake install-conf\n";
+    print "Then rerun this script\n";
+    exit(1);
+}
 
 my $restartapache = 0;
 
@@ -316,12 +322,6 @@ require GeniRegistry;
 #
 # Generate the certs we need.
 #
-if (! -e "$TB/lib/ssl/syscert.cnf") {
-    print "Please go to the ssl subdir of your build tree and do:\n";
-    print "    sudo gmake install-conf\n";
-    print "Then rerun this script\n";
-    exit(1);
-}
 if (! -e $CMCERT) {
     print "Creating CM certificate ...\n";
     system("$SUDO -u $PROTOUSER $MKSYSCERT -o $CMCERT ".
