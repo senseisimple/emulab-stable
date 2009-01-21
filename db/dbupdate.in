@@ -13,11 +13,13 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print STDERR "Usage: dbupdate <dbname> [<version>]\n";
+    print STDERR "Usage: dbupdate [-s | -f] <dbname> [<version>]\n";
     exit(-1);
 }
-my $optlist = "d";
+my $optlist = "dsf";
 my $debug   = 0;
+my $force   = 0;
+my $single  = 0;
 my $dbname;
 my $version;
 my $dbnumber = 0;	# XXX Core emulab code is very rigid.
@@ -57,6 +59,15 @@ if (! getopts($optlist, \%options)) {
 if (defined($options{"d"})) {
     $debug = 1;
 }
+if (defined($options{"f"})) {
+    $force = 1;
+}
+if (defined($options{"s"})) {
+    $single = 1;
+    if (@ARGV != 2) {
+	Fatal("Must provide a version argument when using -s option");
+    }
+}
 if (@ARGV < 1 || @ARGV > 2) {
     usage();
 }
@@ -88,12 +99,23 @@ else {
 #
 if (!defined($version)) {
     my $query_result =
-	emdbi::DBQueryFatalN($dbnumber,
-			     "select value from version_info ".
-			     "where name='dbrev'");
-    Fatal("No version info in the DB")
-	if (!$query_result->numrows);
-    ($version) = $query_result->fetchrow_array();
+	emdbi::DBQueryN($dbnumber,
+			"select value from version_info ".
+			"where name='dbrev'");
+    if (!$query_result) {
+	if ($dbname eq $DEFDBNAME) {
+	    $version = "4.0";
+	}
+	else {
+	    $version = "1.0";
+	}
+    }
+    elsif (!$query_result->numrows) {
+	Fatal("No version info in the DB");
+    }
+    else {
+	($version) = $query_result->fetchrow_array();
+    }
 }
 if (! ($version =~ /^[\d\.]+$/)) {
     Fatal("'$version' does not look like a reasonable starting version.");
@@ -116,14 +138,23 @@ if (@dots) {
 	Fatal("Cannot chdir to $dir");
     }
 }
+my @files;
 
-#
-# Open up the current directory. We want all numbered files.
-#
-opendir(DIR, ".") or
-    Fatal("Could not opendir the current directory");
-my @files  = grep { /^\d*$/ } readdir(DIR);
-closedir(DIR);
+if ($single) {
+    Fatal("Update file $start does not exist")
+	if (! -e $start);
+    # Just the one file.
+    @files = ($start);
+}
+else {
+    #
+    # Open up the current directory. We want all numbered files.
+    #
+    opendir(DIR, ".") or
+	Fatal("Could not opendir the current directory");
+    @files  = grep { /^\d*$/ } readdir(DIR);
+    closedir(DIR);
+}
 
 #
 # Sort them since we we want to start at the right file, and proceed
@@ -136,7 +167,9 @@ closedir(DIR);
 #
 foreach my $file (@files) {
     next
-	if ($file <= $start);
+	if (!$force && !$single && $file <= $start);
+    next
+	if ($single && $file != $start);
 
     my $fullpath = join("/", @dots) . "/$file";
     my $revision = join(".", @dots) . ".$file";
@@ -159,7 +192,8 @@ foreach my $file (@files) {
     # Mark that we have done it. 
     emdbi::DBQueryFatalN($dbnumber,
 			 "update version_info set value='$revision' ".
-			 "where name='dbrev'");
+			 "where name='dbrev'")
+	if (!$single && !$force);
 }
 
 exit(0);

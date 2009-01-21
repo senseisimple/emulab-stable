@@ -433,11 +433,8 @@ sub DBTableExistsN($$)
     my($dbnum, $table) = @_;
 
     my $result =
-	DBQueryN($dbnum, "show tables like '$table'");
+	DBQueryFatalN($dbnum, "show tables like '$table'");
 
-    if (! $result) {
-	DBWarn("DB Query failed");
-    }
     return $result->numrows;
 }
 sub DBTableExists($) { return DBTableExistsN(0,$_[0]); }
@@ -447,14 +444,25 @@ sub DBSlotExistsN($$$)
     my($dbnum, $table, $slot) = @_;
 
     my $result =
-	DBQueryN($dbnum, "show columns from `$table` like '$slot'");
+	DBQueryFatalN($dbnum, "show columns from `$table` like '$slot'");
 
-    if (! $result) {
-	DBWarn("DB Query failed");
-    }
     return $result->numrows;
 }
 sub DBSlotExists($$) { return DBSlotExistsN(0,$_[0],$_[1]); }
+
+sub DBSlotTypeN($$$)
+{
+    my($dbnum, $table, $slot) = @_;
+
+    my $result =
+	DBQueryFatalN($dbnum, "show columns from `$table` like '$slot'");
+
+    return undef
+	if (! $result->numrows);
+    my $row = $result->fetchrow_hashref();
+    return $row->{'Type'};
+}
+sub DBSlotType($$) { return DBSlotTypeN(0,$_[0],$_[1]); }
 
 END {
     # Call it here otherwise may get:

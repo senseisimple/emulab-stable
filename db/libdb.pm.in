@@ -163,7 +163,7 @@ use vars qw(@ISA @EXPORT);
 	 DBQuery DBQueryFatal DBQueryWarn DBWarn DBFatal DBErr
 	 NewTBDBHandle DBQueryN DBQueryFatalN DBQueryWarnN DBErrN
 	 DBQuerySingleFatal DBQuerySingleFatalN
-	 DBTableExists DBSlotExists
+	 DBTableExists DBSlotExists DBSlotType
 	 DBQuoteSpecial ExpState
 	 ExpNodes ExpNodeVnames ExpNodesOldReserved
 	 DBDateTime DefaultImageID 
@@ -304,6 +304,7 @@ sub DBErrN($)		{ return emdbi::DBErrN($_[0]); }
 sub DBErr()		{ return emdbi::DBErr(); }
 sub DBTableExists($)	{ return emdbi::DBTableExists($_[0]); }
 sub DBSlotExists($$)	{ return emdbi::DBSlotExists($_[0], $_[1]); }
+sub DBSlotType($$)	{ return emdbi::DBSlotType($_[0], $_[1]); }
 # These are handled differently cause of tblog stuff.
 sub DBWarn($;$)		{ DBError(\&tbwarn, $_[0], $_[1]); }
 sub DBFatal($;$)	{ DBError(\&tbdie, $_[0], $_[1]); }

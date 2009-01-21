@@ -17,7 +17,8 @@ SBIN_SCRIPTS	= avail inuse showgraph if2port backup webcontrol node_status \
 		  dbcheck interswitch dbboot grabron stategraph newwanode \
 		  idletimes idlemail setsitevar audit changeuid changepid \
 		  elabinelab_bossinit update_permissions mysqld_watchdog \
-		  dumperrorlog changeleader checkstats changecreator
+		  dumperrorlog changeleader checkstats changecreator \
+		  dbupdate
 
 WEB_SBIN_SCRIPTS= webnodelog webnewwanode webidlemail webchangeuid \
 		  webchangeleader
