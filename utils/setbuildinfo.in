@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Set the version and build info into the DB, at a toplevel install.
@@ -49,36 +49,4 @@ if (!$query_result) {
 	"    Unable to set sitevar 'general/version/build' to $buildinfo\n");
 }
 
-#
-# Now dig out the version info from the database-migrate file.
-#
-my $major = "96";
-my $minor = "96";
-
-open(MIG, $DBMIGRATE) or
-    die("*** $0:\n".
-	"    Unable to open $DBMIGRATE\n");
-while (<MIG>) {
-    if ($_ =~ /^(\d*)\.(\d*)/) {
-	$major = $1;
-	$minor = $2;
-    }
-}
-#
-# The last entry is the build info. 
-#
-$query_result =
-    $dbh->query("update sitevariables set value='$major' ".
-		"where name='general/version/major'");
-if (!$query_result) {
-    die("*** $0:\n".
-	"    Unable to set sitevar 'general/version/major' to '$major'\n");
-}
-$query_result =
-    $dbh->query("update sitevariables set value='$minor' ".
-		"where name='general/version/minor'");
-if (!$query_result) {
-    die("*** $0:\n".
-	"    Unable to set sitevar 'general/version/minor' to '$minor'\n");
-}
 exit(0);

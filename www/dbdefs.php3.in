@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Database Constants
@@ -563,21 +563,30 @@ function TBSetFirstInitPid($pid)
 function TBGetVersionInfo(&$major, &$minor, &$build)
 {
     $query_result = 
-	DBQueryFatal("select name,value from sitevariables ".
-		     "where name='general/version/major' or ".
-		     "      name='general/version/minor' or ".
-		     "      name='general/version/build'");
+	DBQueryFatal("select value from sitevariables ".
+		     "where name='general/version/build'");
 
-    while (($row = mysql_fetch_row($query_result))) {
-	$name  = $row[0];
-	$value = $row[1];
+    if (mysql_num_rows($query_result)) {
+	$row = mysql_fetch_row($query_result);
+	$build = $row[0];
+    }
+    else {
+	$build = "Unknown";
+    }
 
-	if ($name == "general/version/major")
-	    $major = $value;
-	elseif ($name == "general/version/minor")
-	    $minor = $value;
-	elseif ($name == "general/version/build")
-	    $build = $value;
+    $query_result =
+	DBQuery("select value from version_info where name='dbrev'");
+    if ($query_result && mysql_num_rows($query_result)) {
+	$row = mysql_fetch_row($query_result);
+	list($a,$b) = split('\.', $row[0]);
+	$a = (isset($a) && $a != "" ? $a : "x");
+	$b = (isset($b) && $b != "" ? $b : "y");
+	$major = $a;
+	$minor = $b;
+    }
+    else {
+	$major = "X";
+	$minor = "Y";
     }
     return 1;
 }

@@ -1,0 +1,35 @@
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (!DBSlotExists("virt_lans", "backfill")) {
+	DBQueryFatal("alter table virt_lans add ".
+		     "backfill int(10) unsigned default 0 after bandwidth");
+    }
+    if (!DBSlotExists("virt_lans", "backfill")) {
+	DBQueryFatal("alter table virt_lans add ".
+		     "rbackfill int(10) unsigned default 0 after rbandwidth");
+    }
+    if (!DBSlotExists("delays", "backfill0")) {
+	DBQueryFatal("alter table delays add ".
+		     "backfill0 int(10) unsigned NOT NULL ".
+		     "default 0 after bandwidth0");
+    }
+    if (!DBSlotExists("delays", "backfill1")) {
+	DBQueryFatal("alter table delays add ".
+		     "backfill1 int(10) unsigned NOT NULL ".
+		     "default 0 after bandwidth1");
+    }
+    DBQueryFatal("replace into table_regex VALUES ".
+		 " ('virt_lans','backfill','int','redirect','default:int', ".
+		 "  0,2147483647,NULL)");
+    DBQueryFatal("replace into table_regex VALUES ".
+		 " ('virt_lans','rbackfill','int','redirect','default:int', ".
+		 "  0,2147483647,NULL)");
+
+    return 0;
+}
+1;

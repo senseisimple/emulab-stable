@@ -3466,6 +3466,17 @@ CREATE TABLE `v2pmap` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `version_info`
+--
+
+DROP TABLE IF EXISTS `version_info`;
+CREATE TABLE `version_info` (
+  `name` varchar(32) NOT NULL default '',
+  `value` tinytext NOT NULL,
+  PRIMARY KEY  (`name`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `veth_interfaces`
 --
 

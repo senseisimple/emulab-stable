@@ -1,0 +1,62 @@
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    # Allow arbitrary the names for the ids. Forgot who wanted this.
+    DBQueryFatal("alter table elabinelab_vlans change ".
+		 " `inner_id` `inner_id` varchar(32) NOT NULL default ''");
+    DBQueryFatal("alter table elabinelab_vlans change ".
+		 " `outer_id` `outer_id` varchar(32) NOT NULL default ''");
+
+    # Tag elabinelab created vlans with the stack module.
+    if (! DBSlotExists("elabinelab_vlans", "stack")) {
+	DBQueryFatal("alter table elabinelab_vlans add `stack` ".
+		     "  enum('Control','Experimental') ".
+		     "NOT NULL default 'Experimental'");
+    }
+
+    # Tag vlans softstate table with the stack module.
+    if (! DBSlotExists("vlans", "stack")) {
+	DBQueryFatal("alter table vlans add `stack` ".
+		     "  enum('Control','Experimental') ".
+		     "NOT NULL default 'Experimental'");
+    }
+
+    # A new table, to store softstate on interfaces. snmpit will
+    # modify this table whenever a port is enabled/trunked(tagged)
+    # on the command line. Eventually speed/duplex should go here.
+    if (!DBTableExists("interface_state")) {
+	DBQueryFatal("CREATE TABLE `interface_state` ( ".
+		     " `node_id` varchar(32) NOT NULL default '', ".
+		     " `card` tinyint(3) unsigned NOT NULL default '0', ".
+		     " `port` tinyint(3) unsigned NOT NULL default '0', ".
+		     " `iface` varchar(32) NOT NULL, ".
+		     " `enabled` tinyint(1) default '1', ".
+		     " `tagged` tinyint(1) default '0', ".
+		     " PRIMARY KEY  (`node_id`,`card`,`port`), ".
+		     " KEY `nodeiface` (`node_id`,`iface`) ".
+		     " ) ENGINE=MyISAM DEFAULT CHARSET=latin1");
+
+	# Initialize the above table.
+	DBQueryFatal("insert into interface_state (node_id,card,port,iface) ".
+		     "select node_id,card,port,iface from interfaces");
+    }
+
+    #
+    # Cleanup the vlans table which was filling with cruft cause of a
+    # bug in the swapout code. Finally figured out how to combine
+    # delete and join!
+    #
+    DBQueryFatal("delete v FROM vlans v LEFT JOIN lans l on l.lanid=v.id ".
+		 "WHERE l.lanid IS NULL ");
+
+    # Fix an unrelated bug; slot overflow.
+    DBQueryFatal("alter table nodelog change `log_id` ".
+		 "  `log_id` int(10) unsigned NOT NULL auto_increment");
+
+    return 0;
+}
+1;

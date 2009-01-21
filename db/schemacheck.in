@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -82,19 +82,22 @@ my $diff = (system("$schemadiff $db_schema $master_schema") >> 8);
 unlink($db_schema);
 
 if ($diff) {
-
+    my $objdir = `/bin/pwd`;
+    chomp($objdir);
+    
     print << "EOSTR";
-
 The schema from $master_schema differs from
-the running database. As a safety measure, you will not be able to install
-until this is resolved.
+the running database. As a safety measure, you will not be able to
+install until this is resolved.
 
-If you are a user of the emulab software outside of Utah, this is probably
-because your database was created for an older version of the emulab software.
-Contact testbed-ops\@eMulab.net for help in updating your database.
+If you are a user of the emulab software outside of Utah, this is
+probably because your database was created for an older version of the
+emulab software. You can update your database by:
 
-If you're a developer at Utah, this is probably because you (or someone else)
-forgot to update sql/database-create.sql .
+	boss> cd /your/srcdir/sql/updates
+	boss> perl $objdir/dbupdate $DBNAME
+
+Be sure look in /your/srcdir/doc/UPDATING for any other instructions.
 
 EOSTR
 

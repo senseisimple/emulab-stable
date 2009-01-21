@@ -1,0 +1,14 @@
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (!DBSlotExists("experiments", "geniflags")) {
+	DBQueryFatal("alter table experiments add ".
+		     "  `geniflags` int(11) NOT NULL default '0'");
+    }
+    return 0;
+}
+1;
