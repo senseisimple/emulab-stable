@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004-2008 University of Utah and the Flux Group.
+# Copyright (c) 2004-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # TODO: ntpinfo table.
@@ -569,8 +569,9 @@ sub DumpDBGoo()
     # as is, unless its the fs or ops node. For those we want to change the
     # node_id to "fs" or "ops" and their type to ops.
     #
-    my @NODETABLES = ("node_auxtypes", "node_status", "nodes",
-		      "node_rusage", "node_hostkeys", "node_activity");
+    my @NODETABLES = ("node_auxtypes", "node_status", "nodes", 
+		      "node_rusage", "node_hostkeys", "node_activity",
+		      "interface_state");
 
     #
     # These tables are dumped by project ID.
