@@ -14,7 +14,7 @@ use Getopt::Std;
 # 
 sub usage()
 {
-    print "Usage: addauthority [-c] <uuid>\n";
+    print "Usage: remauthority [-c] <uuid>\n";
     exit(1);
 }
 my $optlist    = "c";
