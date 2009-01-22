@@ -196,6 +196,14 @@ if (! -e "$TB/lib/ssl/syscert.cnf") {
     print "Then rerun this script\n";
     exit(1);
 }
+#
+# I do not understand where this file comes from.
+#
+if (! -e "$TB/ssl/index.txt.attr" ||
+    system("egrep -q -s 'no' $TB/ssl/index.txt.attr")) {
+    system("echo 'unique_subject = no' > $TB/ssl/index.txt.attr") == 0
+	or fatal("Could not update $TB/ssl/index.txt.attr");
+}
 
 my $restartapache = 0;
 
