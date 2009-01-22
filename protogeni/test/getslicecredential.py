@@ -32,32 +32,13 @@ execfile( "test-common.py" )
 mycredential = get_self_credential()
 
 #
-# Ask the clearinghouse for a list of component managers. 
+# Lookup slice.
 #
-params = {}
-params["credential"] = mycredential
-rval,response = do_method("ch", "ListComponents", params)
-if rval:
-    Fatal("Could not get a list of components from the ClearingHouse")
-    pass
-#print str(response["value"])
+myslice = resolve_slice( SLICENAME, mycredential )
 
 #
-# Ask each manager for its list.
+# Get the slice credential.
 #
-for manager in response["value"]:
-    print manager["url"]
+slicecredential = get_slice_credential( myslice, mycredential )
 
-    #
-    # manager for resource list.
-    #
-    params = {}
-    params["credential"] = mycredential
-    rval,response = do_method(None,
-                              "DiscoverResources", params, manager["url"])
-    if rval:
-        print "Could not get a list of resources"
-        pass
-    pass
-
-
+print slicecredential

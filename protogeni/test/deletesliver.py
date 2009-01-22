@@ -29,43 +29,20 @@ execfile( "test-common.py" )
 #
 # Get a credential for myself, that allows me to do things at the SA.
 #
-params = {}
-params["uuid"] = "0b2eb97e-ed30-11db-96cb-001143e453fe"
-rval,response = do_method("sa", "GetCredential", params)
-if rval:
-    Fatal("Could not get my credential")
-    pass
-mycredential = response["value"]
+mycredential = get_self_credential()
 print "Got my SA credential. Looking for slice ..."
-#print str(mycredential);
 
 #
 # Lookup slice, delete before proceeding.
 #
-params = {}
-params["credential"] = mycredential
-params["type"]       = "Slice"
-params["hrn"]        = SLICENAME
-rval,response = do_method("sa", "Resolve", params)
-if rval:
-    Fatal("Slice does not exist")
-    pass
-myslice = response["value"]
+myslice = resolve_slice( SLICENAME, mycredential )
 myuuid  = myslice["uuid"]
 print "Found the slice, asking for a credential ..."
 
 #
 # Get the slice credential.
 #
-params = {}
-params["credential"] = mycredential
-params["type"]       = "Slice"
-params["uuid"]       = myuuid
-rval,response = do_method("sa", "GetCredential", params)
-if rval:
-    Fatal("Could not get Slice credential")
-    pass
-slicecred = response["value"]
+slicecred = get_slice_credential( myslice, mycredential )
 print "Got the slice credential, asking for a sliver credential ..."
 
 #

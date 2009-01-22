@@ -30,53 +30,26 @@ execfile( "test-common.py" )
 #
 # Get a credential for myself, that allows me to do things at the SA.
 #
-params = {}
-rval,response = do_method("sa", "GetCredential", params)
-if rval:
-    Fatal("Could not get my credential")
-    pass
-mycredential = response["value"]
-print "Got my SA credential, looking up " + SLICENAME
-#print str(mycredential);
+mycredential = get_self_credential()
+print "Got self credential"
 
 #
 # Lookup slice.
 #
-params = {}
-params["credential"] = mycredential
-params["type"]       = "Slice"
-params["hrn"]        = SLICENAME
-rval,response = do_method("sa", "Resolve", params)
-if rval:
-    #
-    # Create a slice. 
-    #
-    Fatal("Slice does not exist");
-    pass
-else:
-    #
-    # Get the slice credential.
-    #
-    print "Asking for slice credential for " + SLICENAME
-    myslice = response["value"]
-    myuuid  = myslice["uuid"]
-    params = {}
-    params["credential"] = mycredential
-    params["type"]       = "Slice"
-    params["uuid"]       = myuuid
-    rval,response = do_method("sa", "GetCredential", params)
-    if rval:
-        Fatal("Could not get Slice credential")
-        pass
-    myslice = response["value"]
-    print "Got the slice credential, binding myself to it"
-    pass
+myslice = resolve_slice( SLICENAME, mycredential )
+print "Resolved slice " + SLICENAME
+
+#
+# Get the slice credential.
+#
+slicecredential = get_slice_credential( myslice, mycredential )
+print "Got slice credential"
 
 #
 # Bind to slice at the CM.
 #
 params = {}
-params["credential"] = myslice
+params["credential"] = slicecredential
 rval,response = do_method("cm", "BindToSlice", params)
 if rval:
     Fatal("Could not bind myself to slice")

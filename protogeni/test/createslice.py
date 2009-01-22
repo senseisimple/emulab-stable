@@ -29,15 +29,8 @@ execfile( "test-common.py" )
 #
 # Get a credential for myself, that allows me to do things at the SA.
 #
-params = {}
-params["uuid"] = "0b2eb97e-ed30-11db-96cb-001143e453fe"
-rval,response = do_method("sa", "GetCredential", params)
-if rval:
-    Fatal("Could not get my credential")
-    pass
-mycredential = response["value"]
+mycredential = get_self_credential()
 print "Got my SA credential"
-#print str(mycredential);
 
 #
 # Lookup slice, delete before proceeding.
@@ -73,6 +66,8 @@ params["hrn"]        = SLICENAME
 rval,response = do_method("sa", "Register", params)
 if rval:
     Fatal("Could not get my slice")
+    print str(rval)
+    print str(response)
     pass
 myslice = response["value"]
 print "New slice created"

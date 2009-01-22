@@ -14,6 +14,10 @@
 from urlparse import urlsplit, urlunsplit
 from urllib import splitport
 
+# Debugging output.
+debug           = 0
+impotent        = 0
+
 HOME            = os.environ["HOME"]
 # Path to my certificate
 CERTIFICATE     = HOME + "/.ssl/encrypted.pem"
@@ -21,7 +25,52 @@ CERTIFICATE     = HOME + "/.ssl/encrypted.pem"
 PASSPHRASEFILE  = HOME + "/.ssl/password"
 passphrase      = ""
 
+CONFIGFILE      = ".protogeni-config.py"
+GLOBALCONF      = HOME + "/" + CONFIGFILE
+LOCALCONF       = CONFIGFILE
+
 SLICENAME       = "mytestslice"
+
+selfcredentialfile = None
+slicecredentialfile = None
+
+def Usage():
+    print "usage: " + sys.argv[ 0 ] + " [option...]"
+    print """Options:
+    -c file, --credentials=file         read self-credentials from file
+                                            [default: query from SA]
+    -d, --debug                         be verbose about XML methods invoked
+    -f file, --certificate=file         read SSL certificate from file
+                                            [default: ~/.ssl/encrypted.pem]
+    -h, --help                          show options and usage
+    -p file, --passphrase=file          read passphrase from file
+                                            [default: ~/.ssl/password]
+    -s file, --slicecredentials=file    read slice credentials from file
+                                            [default: query from SA]"""
+
+try:
+    opts, args = getopt.getopt( sys.argv[ 1: ], "c:df:hp:s:",
+                                [ "credentials=", "debug", "certificate=",
+                                  "help", "passphrase=", "slicecredentials=" ] )
+except getopt.GetoptError, err:
+    print str( err )
+    Usage()
+    sys.exit( 1 )
+
+for opt, arg in opts:
+    if opt in ( "-c", "--credentials" ):
+        selfcredentialfile = arg
+    elif opt in ( "-d", "--debug" ):
+        debug = 1
+    elif opt in ( "-f", "--certificate" ):
+        CERTIFICATE = arg
+    elif opt in ( "-h", "--help" ):
+        Usage()
+        sys.exit( 0 )
+    elif opt in ( "-p", "--passphrase" ):
+        PASSPHRASEFILE = arg
+    elif opt in ( "-s", "--slicecredentials" ):
+        slicecredentialfile = arg
 
 cert = X509.load_cert( CERTIFICATE )
 
@@ -30,14 +79,6 @@ cert = X509.load_cert( CERTIFICATE )
 XMLRPC_SERVER   = { "ch" : "www.emulab.net",
                     "default" : cert.get_issuer().CN }
 SERVER_PATH     = { "default" : ":443/protogeni/xmlrpc/" }
-
-# Debugging output.
-debug           = 0
-impotent        = 0
-
-CONFIGFILE      = ".protogeni-config.py"
-GLOBALCONF      = HOME + "/" + CONFIGFILE
-LOCALCONF       = CONFIGFILE
 
 if os.path.exists( GLOBALCONF ):
     execfile( GLOBALCONF )
@@ -137,3 +178,46 @@ def do_method(module, method, params, URI=None):
             pass
         pass
     return (rval, response)
+
+def get_self_credential():
+    if selfcredentialfile:
+        f = open( selfcredentialfile )
+        c = f.read()
+        f.close()
+        return c
+    params = {}
+    params["uuid"] = "0b2eb97e-ed30-11db-96cb-001143e453fe"
+    rval,response = do_method("sa", "GetCredential", params)
+    if rval:
+        Fatal("Could not get my credential")
+        pass
+    return response["value"]
+
+def resolve_slice( name, selfcredential ):
+    params = {}
+    params["credential"] = mycredential
+    params["type"]       = "Slice"
+    params["hrn"]        = SLICENAME
+    rval,response = do_method("sa", "Resolve", params)
+    if rval:
+        Fatal("Slice does not exist");
+        pass
+    else:
+        return response["value"]
+
+def get_slice_credential( slice, selfcredential ):
+    if slicecredentialfile:
+        f = open( slicecredentialfile )
+        c = f.read()
+        f.close()
+        return c
+
+    params = {}
+    params["credential"] = selfcredential
+    params["type"]       = "Slice"
+    params["uuid"]       = slice["uuid"]
+    rval,response = do_method("sa", "GetCredential", params)
+    if rval:
+        Fatal("Could not get Slice credential")
+        pass
+    return response["value"]
