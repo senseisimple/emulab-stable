@@ -129,6 +129,7 @@ sub shutdown($)		{ return field($_[0], "shutdown"); }
 sub expires($)		{ return field($_[0], "expires"); }
 sub sa_uuid($)		{ return field($_[0], "sa_uuid"); }
 sub exptidx($)		{ return field($_[0], "exptidx"); }
+sub needsfirewall($)	{ return field($_[0], "needsfirewall"); }
 sub cert($)		{ return $_[0]->{'CERT'}->cert(); }
 sub GetCertificate($)   { return $_[0]->{'CERT'}; }
 sub LOCKED($)           { return $_[0]->{'LOCKED'}; }
@@ -595,6 +596,27 @@ sub SetShutdown($$)
 
     # XXX Wrong format, but harmless.
     $self->{'SLICE'}->{'shutdown'} = ($shutdown ? time() : undef);
+    return 0;
+}
+
+#
+# Set the needsfirewall field.
+#
+sub SetFirewallFlag($$)
+{
+    my ($self, $needsfirewall) = @_;
+    my $uuid = $self->uuid();
+
+    $needsfirewall = ($needsfirewall ? 1 : 0);
+
+    my $query_result =
+	DBQueryWarn("update geni_slices set needsfirewall='$needsfirewall' " .
+		    "where uuid='$uuid'");
+    
+    return -1
+	if (!$query_result);
+
+    $self->{'SLICE'}->{'needsfirewall'} = $needsfirewall;
     return 0;
 }
 
