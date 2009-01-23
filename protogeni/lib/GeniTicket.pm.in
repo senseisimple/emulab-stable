@@ -364,7 +364,7 @@ sub Delete($)
 	
 	DBQueryWarn("delete from geni_tickets where idx='$idx'")
 	    or return -1;
-	
+
 	delete($tickets{"$idx"});
     }
     return 0;

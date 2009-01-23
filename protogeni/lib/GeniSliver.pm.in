@@ -269,6 +269,9 @@ sub Delete($)
     DBQueryWarn("delete from geni_slivers where idx='$idx'")
 	or return -1;
     
+    # Delete from cache. 
+    delete($slivers{$idx});
+    
     return 0;
 }
 

@@ -204,6 +204,9 @@ sub Delete($)
 	if ($self->{'stored'} &&
 	    !DBQueryWarn("delete from geni_certificates where uuid='$uuid'"));
 
+    # Delete from cache. 
+    delete($certificates{$uuid});
+
     return 0;
 }
 

@@ -394,6 +394,9 @@ sub Delete($)
     DBQueryWarn("delete from geni_slices where idx='$idx'")
 	or return -1;
     
+    # Delete from cache. 
+    delete($slices{$idx});
+
     return 0;
 }
 

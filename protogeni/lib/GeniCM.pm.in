@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2008 University of Utah and the Flux Group.
+# Copyright (c) 2008-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniCM;
@@ -46,6 +46,7 @@ use Date::Parse;
 use POSIX qw(strftime);
 use Time::Local;
 use Experiment;
+use Firewall;
 
 # Configure variables
 my $TB		   = "@prefix@";
@@ -353,7 +354,9 @@ sub GetTicket($)
 				    "Slice has been shutdown");
     }
 
+    #
     # For now, there can be only a single toplevel aggregate per slice.
+    # The existence of an aggregate means the slice is active here. 
     #
     my $aggregate = GeniAggregate->SliceAggregate($slice);
     if (defined($aggregate)) {
@@ -361,7 +364,36 @@ sub GetTicket($)
 	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 				    "Already have an aggregate for slice");
     }
-    my $experiment = GeniExperiment($slice_uuid);
+
+    #
+    # Say a ticket already exists in the DB? Lets throw that ticket
+    # away and generate a new one. This is partly a debugging
+    # mechanism.  To really do this correctly, would want to merge in
+    # the existing resources with the new rspec request. Do not
+    # want to go there yet.
+    #
+    my $existing_ticket = GeniTicket->LookupForSlice($slice);
+    if (defined($existing_ticket)) {
+	print STDERR "Releasing existing ticket $existing_ticket\n";
+	if ($existing_ticket->Release() != 0) {
+	    print STDERR "Error releasing existing ticket $existing_ticket\n";
+	    $slice->UnLock();
+	    return GeniResponse->Create(GENIRESPONSE_ERROR);
+	}
+    }
+
+    #
+    # Firewall hack; just a flag in the rspec for now.
+    #
+    if (exists($rspec->{'needsfirewall'}) && $rspec->{'needsfirewall'}) {
+	print STDERR "firewall: " . $rspec->{'needsfirewall'} . "\n";
+	if ($slice->SetFirewallFlag($rspec->{'needsfirewall'}) != 0) {
+	    $slice->UnLock();
+	    return GeniResponse->Create(GENIRESPONSE_ERROR);
+	}
+    }
+    
+    my $experiment = GeniExperiment($slice);
     if (!defined($experiment)) {
 	$slice->UnLock();
 	return GeniResponse->Create(GENIRESPONSE_ERROR,
@@ -373,8 +405,7 @@ sub GetTicket($)
     # nodes are available, then reserve it. Otherwise the ticket
     # cannot be granted.
     #
-    # XXX Simpleminded ... assumes only physical nodes for now. Need to deal
-    # with virtual nodes (vservers on shared nodes, planetlab nodes, etc).
+    # XXX Simpleminded.
     #
     my %namemap = ();
     my %uuidmap = ();
@@ -770,7 +801,7 @@ sub ModifySliver($$$$$$)
 	$owner->Modify(undef, undef, $keys);
     }
 
-    my $experiment = GeniExperiment($slice->uuid());
+    my $experiment = GeniExperiment($slice);
     if (!defined($experiment)) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "No local experiment for slice");
@@ -783,10 +814,12 @@ sub ModifySliver($$$$$$)
     my %nodelist = ();
     my %linklist = ();
     my %toalloc  = ();
+    my @allocated= ();
     my @tofree   = ();
     my $pid      = $experiment->pid();
     my $eid      = $experiment->eid();
     my $needplabslice = 0;
+    my $didfwsetup = 0;
 
     #
     # Find current nodes and record their uuids. 
@@ -1046,6 +1079,9 @@ sub ModifySliver($$$$$$)
 	#
 	delete($toalloc{$resource_uuid});
 
+	# Used below.
+	push(@allocated, $node);
+
 	# See below; setup all pnodes at once.
 	if ($node->isremotenode()) {
 	    my $vnode = Node->Lookup($sliver->uuid());
@@ -1185,6 +1221,17 @@ sub ModifySliver($$$$$$)
 	print STDERR "$NAMEDSETUP failed\n";
 	goto bad;
     }
+    # Do firewall stuff.
+    if ($slice->needsfirewall()) {
+	my $experiment = $slice->GetExperiment();
+	my @node_ids = map { $_->node_id() } @allocated;
+	
+	if (@node_ids && doFWlans($experiment, FWADDNODES, \@node_ids) != 0) {
+	    print STDERR "FireWall setup failed\n";
+	    goto bad;
+	}
+	$didfwsetup = 1;
+    }
     # Set up plab nodes all at once. 
     if ($needplabslice && @plabnodes && !$impotent) {
 	my @node_ids = map { $_->node_id() } @plabnodes;
@@ -1226,6 +1273,15 @@ sub ModifySliver($$$$$$)
     return GeniResponse->Create(GENIRESPONSE_SUCCESS);
 
   bad:
+    # Do firewall stuff.
+    if ($slice->needsfirewall() && $didfwsetup) {
+	my $experiment = $slice->GetExperiment();
+	my @node_ids = map { $_->node_id() } @allocated;
+	
+	if (@node_ids && doFWlans($experiment, FWDELNODES, \@node_ids) != 0) {
+	    print STDERR "FireWall cleanup failed\n";
+	}
+    }
     foreach my $sliver (values(%slivers)) {
 	$sliver->UnProvision()
 	    if (! $impotent);
@@ -1363,7 +1419,6 @@ sub DeleteSliver($)
     my ($argref) = @_;
     my $cred        = $argref->{'credential'};
     my $impotent    = $argref->{'impotent'};
-    my $slice_uuid;
     my $response;
 
     $impotent = 0
@@ -1379,7 +1434,6 @@ sub DeleteSliver($)
     }
     my $sliver_uuid = $credential->target_uuid();
     my $user_uuid   = $credential->owner_uuid();
-    my @slivers     = ();
     
     #
     # Make sure the credential was issued to the caller.
@@ -1388,20 +1442,27 @@ sub DeleteSliver($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "This is not your credential!");
     }
-    my $sliver = GeniSliver->Lookup($sliver_uuid);
-    if (!defined($sliver)) {
-	# Might be an aggregate instead.
-	my $aggregate = GeniAggregate->Lookup($sliver_uuid);
-	if (!defined($aggregate)) {
+
+    #
+    # For now, only allow top level aggregate to be deleted.
+    #
+    my $aggregate = GeniAggregate->Lookup($sliver_uuid);
+    if (!defined($aggregate)) {
+	my $sliver = GeniSliver->Lookup($sliver_uuid);
+	if (defined($sliver)) {
 	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
-				    "No such sliver/aggregate $sliver_uuid");
+					"Must supply toplevel sliver");
 	}
-	$slice_uuid = $aggregate->slice_uuid();
-    	push(@slivers, $aggregate);
+	else {
+	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+					"No such sliver");
+	}
     }
-    else {
-	$slice_uuid = $sliver->slice_uuid();
+    elsif ($aggregate->type() ne "Aggregate") {
+	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+					"Must supply toplevel sliver");
     }
+    my $slice_uuid = $aggregate->slice_uuid();
     my $slice = GeniSlice->Lookup($slice_uuid);
     if (!defined($slice)) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
@@ -1411,36 +1472,28 @@ sub DeleteSliver($)
 	return GeniResponse->BusyResponse();
     }
 
-    if (defined($sliver)) {
-	# 
-	# Find dependent slivers first (say, links on a node). For now,
-	# do not allow this sliver to be torn down until the dependent
-	# sliver(s) are torn down first. Eventually we want to tear them
-	# down here in the proper order, hence the code below.
+    if (!$impotent) {
 	#
-	if ($sliver->DependentSlivers(\@slivers) != 0) {
-	    $response = 
-		GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				     "Could not get DependentSlivers");
-	    goto bad;
+	# A firewalled slice gets special treatment.
+	#
+	if ($slice->needsfirewall()) {
+	    my $experiment = $slice->GetExperiment();
+	
+	    if (undoFWNodes($experiment, 1) != 0) {
+		print STDERR "FireWall cleanup failed\n";
+		$response =
+		    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					 "Could not tear down firewall");
+		goto bad;
+	    }
 	}
-	if (@slivers) {
-	    $response =
-		GeniResponse->Create(GENIRESPONSE_REFUSED, undef,
-				     "Must tear dow dependent slivers");
-	    goto bad;
-	}
-	@slivers = (@slivers, $sliver);	
-    }
-
-    foreach $sliver (@slivers) {
-	if (!$impotent && $sliver->UnProvision() != 0) {
+	if ($aggregate->UnProvision() != 0) {
 	    $response = 
 		GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				     "Could not unprovision sliver");
 	    goto bad;
 	}
-	if ($sliver->Delete() != 0) {
+	if ($aggregate->Delete() != 0) {
 	    $response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					     "Could not delete sliver");
 	    goto bad;
@@ -1450,7 +1503,6 @@ sub DeleteSliver($)
     return GeniResponse->Create(GENIRESPONSE_SUCCESS);
 
   bad:
-    $slice->UnLock();
     return $response;
 }
 
@@ -1910,7 +1962,21 @@ sub CleanupDeadSlice($;$)
     $purge = 1
 	if (!defined($purge));
 
-    # print STDERR "Cleaning up dead slice $slice\n";
+    # print "Cleaning up dead slice $slice\n";
+
+    #
+    # A firewalled slice gets special treatment.
+    #
+    if ($slice->needsfirewall()) {
+	my $experiment = $slice->GetExperiment();
+
+	print "Calling undoFWNodes ...\n";
+	
+	if (undoFWNodes($experiment) != 0) {
+	    print STDERR "FireWall cleanup failed\n";
+	    return -1;
+	}
+    }
 
     #
     # Find any aggregates and tear them down.
@@ -2018,21 +2084,39 @@ sub CleanupDeadSlice($;$)
 #
 sub GeniExperiment($)
 {
-    my ($uuid) = @_;
+    my ($slice) = @_;
+
+    my $uuid = $slice->uuid();
+    my $needsfirewall = $slice->needsfirewall();
 
     my $experiment = Experiment->Lookup($uuid);
     if (!defined($experiment)) {
 	#
 	# Form an eid for the experiment. 
 	#
-	my $eid = "slice" . TBGetUniqueIndex('next_sliceid', 1);
+	my $eid    = "slice" . TBGetUniqueIndex('next_sliceid', 1);
+	my $nsfile = "";
+
+	#
+	# Need a way to can experiments.
+	#
+	if ($needsfirewall) {
+	    $nsfile = "/tmp/$$.ns";
+	    open(NS, "> $nsfile")
+ 		or return undef;
+	    print NS "source tb_compat.tcl\n";
+	    print NS "set ns [new Simulator]\n";
+	    print NS "tb-set-security-level Yellow\n";
+	    print NS "\$ns run\n";
+	    close(NS);
+	}
 
 	# Note the -h option; allows experiment with no NS file.
 	system("$CREATEEXPT -q -i -k -w ".
 	       "-S 'Geni Slice Experiment -- DO NOT SWAP OR TERMINATE' ".
 	       "-E 'Geni Slice Experiment -- DO NOT SWAP OR TERMINATE' ".
 	       "-L 'Geni Slice Experiment -- DO NOT SWAP OR TERMINATE' ".
-	       "-h '$uuid' -p GeniSlices -e $eid");
+	       "-h '$uuid' -p GeniSlices -e $eid $nsfile");
 	if ($?) {
 	    return undef;
 	}

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2008 University of Utah and the Flux Group.
+# Copyright (c) 2008-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniAggregate;
@@ -200,14 +200,15 @@ sub Delete($)
     }
     foreach my $sliver (@slivers) {
 	if ($sliver->status() eq "broken") {
+	    print STDERR "Could not delete 'broken' $sliver from $self\n";
 	    $broken++;
-	    next;
+	    last;
 	}
 	if ($sliver->Delete() != 0) {
 	    print STDERR "Could not delete $sliver from $self\n";
 	    $sliver->SetStatus("broken");
 	    $broken++;
-	    next;
+	    last;
 	}
     }
     return -1
@@ -223,6 +224,9 @@ sub Delete($)
     DBQueryWarn("delete from geni_aggregates where idx='$idx'")
 	or return -1;
     
+    # Delete from cache. 
+    delete($aggregates{$idx});
+
     return 0;
 }
 
@@ -551,20 +555,30 @@ sub UnProvision($)
     # Might be an aggregate that includes link aggregates. Lets do those
     # first to avoid work when tearing down the nodes.
     #
-    my @nonlinks = ();
+    my @links = ();
+    my @nodes = ();
 
     foreach my $sliver (@slivers) {
-	if (! (ref($sliver) eq "GeniAggregate" and $sliver->type() eq "Link")){
-	    push(@nonlinks, $sliver);
-	    next;
+	if (ref($sliver) eq "GeniAggregate::Link" ||
+	    ref($sliver) eq "GeniAggregate::Tunnel") {
+	    push(@links, $sliver);
 	}
+	elsif (ref($sliver) eq "GeniAggregate") {
+	    # Not really a node, but a sub aggregate. 
+	    unshift(@nodes, $sliver);
+	}
+	elsif (ref($sliver) eq "GeniSliver::Node") {
+	    push(@nodes, $sliver);
+	}
+    }
+    foreach my $sliver (@links) {
 	if ($sliver->UnProvision() != 0) {
 	    print STDERR "Could not unprovision $sliver in $self\n";
 	    $sliver->SetStatus("broken");
 	    next;
 	}
     }
-    foreach my $sliver (@nonlinks) {
+    foreach my $sliver (@nodes) {
 	if ($sliver->UnProvision() != 0) {
 	    print STDERR "Could not unprovision $sliver in $self\n";
 	    $sliver->SetStatus("broken");
@@ -641,7 +655,7 @@ sub Provision($;$)
 	    goto bad;
 	}
     }
-    if ($vlan->Instantiate() != 0) {
+    if ($vlan->Instantiate(1) != 0) {
 	print STDERR "$self: Could not instantiate $vlan on switches\n";
 	goto bad;
     }
@@ -649,7 +663,7 @@ sub Provision($;$)
     return 0;
 
   bad:
-    $vlan->UnInstantiate()
+    $vlan->UnInstantiate(1)
 	if (defined($vlan));
     $vlan->Destroy()
 	if (defined($vlan));
@@ -682,7 +696,7 @@ sub UnProvision($)
 	print STDERR "No vlan associated with $self\n";
 	return 0;
     }
-    if ($vlan->UnInstantiate() != 0) {
+    if ($vlan->UnInstantiate(1) != 0) {
 	print STDERR "Could not uninstantiate $vlan\n";
 	return -1;
     }
@@ -897,7 +911,7 @@ sub Create($$$$$$)
 	        if ($ref->{'role'} eq "ctrl");
 	}
     }
-    print STDERR "$ip1, $ip2, $ctrlip1, $ctrlip2\n";
+    # print STDERR "$ip1, $ip2, $ctrlip1, $ctrlip2\n";
 
     if (defined($iface1)) {
 	$iface1->SetAttribute("tunnel_ip", $ip1);
