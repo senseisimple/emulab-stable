@@ -95,6 +95,31 @@ sub Lookup($$)
 }
 
 #
+# Lookup a ticket for a slice. This assumes only a single slice ticket.
+#
+sub LookupForSlice($$)
+{
+    my ($class, $slice) = @_;
+
+    return undef
+	if (! ref($slice));
+
+    my $slice_uuid = $slice->uuid();
+    my $query_result =
+	DBQueryWarn("select idx from geni_tickets ".
+		    "where slice_uuid='$slice_uuid'");
+    return undef
+	if (!$query_result || !$query_result->numrows);
+
+    if ($query_result->numrows != 1) {
+	print STDERR "Too many tickets stored for $slice\n";
+	return undef;
+    }
+    my ($idx) = $query_result->fetchrow_array();
+    return GeniTicket->Lookup($idx);
+}
+
+#
 # Create an unsigned ticket object, to be populated and signed and returned.
 #
 sub Create($$$$)
@@ -120,7 +145,7 @@ sub Create($$$$)
     # For now, all tickets expire very quickly ...
     #
     $self->{'redeem_before'} =
-	POSIX::strftime("20%y-%m-%dT%H:%M:%S", localtime(time() + (2*60)));
+	POSIX::strftime("20%y-%m-%dT%H:%M:%S", localtime(time() + (5*60)));
 
     #
     # Locally generated tickets need a local DB index, which can be the
