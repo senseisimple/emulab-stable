@@ -13,11 +13,15 @@ use Getopt::Std;
 # 
 sub usage()
 {
-    print "Usage: cleanupslice <uuid>\n";
+    print "Usage: cleanupslice [-f] -c | -m | -s <uuid>\n";
     exit(1);
 }
 sub fatal($);
-my  $optlist = "";
+my $optlist = "cmsf";
+my $doch    = 0;
+my $docm    = 0;
+my $dosa    = 0;
+my $force   = 0;
 
 #
 # Configure variables
@@ -25,10 +29,6 @@ my  $optlist = "";
 my $TB		  = "@prefix@";
 my $TBOPS         = "@TBOPSEMAIL@";
 my $TBLOGS        = "@TBLOGSEMAIL@";
-
-# Do this early so that we talk to the right DB.
-use vars qw($GENI_DBNAME);
-BEGIN { $GENI_DBNAME = "geni-cm"; }
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
@@ -41,17 +41,12 @@ $| = 1;
 
 # Load the Testbed support stuff.
 use lib "@prefix@/lib";
-use libdb;
-use libtestbed;
+use GeniDB;
 use GeniSlice;
 use GeniUtil;
 use GeniCM;
-
-# Map invoking user to object.
-my $this_user = User->ThisUser();
-if (! defined($this_user)) {
-    fatal("You ($UID) do not exist!");
-}
+use Genixmlrpc;
+use GeniCertificate;
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -61,37 +56,89 @@ my %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
 }
+if (defined($options{"f"})) {
+    $force = 1;
+}
+if (defined($options{"c"})) {
+    $doch = 1;
+}
+if (defined($options{"m"})) {
+    $docm = 1;
+}
+if (defined($options{"s"})) {
+    $dosa = 1;
+}
 usage()
-    if (@ARGV != 1);
+    if (@ARGV != 1 ||
+	($dosa + $doch + $docm) == 0 || ($dosa + $doch + $docm) > 1);
 my $uuid = $ARGV[0];
 
-#
-# Taint check.
-#
-if ($uuid =~ /^([\w\-]+)$/) {
-    $uuid = $1;
+# Map invoking user to object.
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
 }
-else {
-    die("*** Bad data in $uuid\n");
+if (!$this_user->IsAdmin()) {
+    fatal("You must be a testbed administrator to do this");
 }
+
+# Connect to the proper DB.
+DBConnect(($doch ? GENICH_DBNAME() :
+	   ($docm ? GENICM_DBNAME() : GENISA_DBNAME())));
+
 my $slice = GeniSlice->Lookup($uuid);
 if (!defined($slice)) {
     fatal("No such slice for $uuid");
 }
-my $experiment = $slice->GetExperiment();
-if (!$this_user->IsAdmin() &&
-    !$experiment->AccessCheck($this_user, TB_EXPT_DESTROY)) {
-    die("*** $0:\n".
-	"    You do not have permission to run this script!\n");
-}
-
-GeniUtil::FlipToGeniUser();
-
 if ($slice->Lock() != 0) {
     fatal("Could not lock slice $slice");
 }
-if (GeniCM::CleanupDeadSlice($slice) != 0) {
-    fatal("Could not clean up slice $slice");
+GeniUtil::FlipToGeniUser();
+
+sub DoCM()
+{
+    if (GeniCM::CleanupDeadSlice($slice) != 0) {
+	fatal("Could not clean up slice $slice");
+    }
+}
+
+sub DoCH()
+{
+    if ($slice->Delete()) {
+	fatal("Could not delete $slice from clearinghouse DB!");
+    }
+}
+
+sub DoSA()
+{
+    #
+    # Need an RPC context for this to work.
+    #
+    my $certificate = GeniCertificate->LoadFromFile("$TB/etc/genisa.pem");
+    fatal("Could not load SA certificate")
+	if (!defined($certificate));
+    Genixmlrpc->SetContext(Genixmlrpc->Context($certificate));
+    
+    if ($slice->UnRegister()) {
+	print STDERR "Could not unregister $slice from clearinghouse!\n";
+	exit(1)
+	    if (!$force);
+	
+	print STDERR "Deleting locally anyway ...\n";
+    }
+    if ($slice->Delete()) {
+	fatal("Could not delete $slice from slice authority DB!");
+    }
+}
+
+if ($doch) {
+    DoCH();
+}
+elsif ($docm) {
+    DoCM();
+}
+else {
+    DoSA();
 }
 exit(0);
 
