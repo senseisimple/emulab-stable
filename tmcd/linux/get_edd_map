@@ -6,7 +6,7 @@ get_mbr_signature()
 {
 	local device=$1
 
-	local sig=`dd if=$device bs=1 count=4 skip=440 2>/dev/null | od -x | \
+	local sig=`dd if=$device bs=1 count=4 skip=440 2>/dev/null | od -X | \
 			sed -n '1s/^[0-9a-f]* *\([0-9a-f]*\) *\([0-9a-f]*\) *$/\1\2/p'`
 
 	while [ ${#sig} -lt 8 ]; do
@@ -92,41 +92,45 @@ fi
 
 for bdev in /sys/firmware/edd/int13_dev8*; do
 	[ `cat $bdev/version` = 0x00 ] && continue
-	bdev=${bdev##*_dev}
-	bus_info=`get_host_bus $bdev`
-	bus=`echo $bus_info | cut -d' ' -f 1`
-	busid=`echo $bus_info | cut -d' ' -f 2`
-	channel=`echo $bus_info | cut -d' ' -f 3`
+	if [ -e $bdev/pci_dev ]; then
+		bdev=${bdev##*_dev}
+		bus_info=`get_host_bus $bdev`
+		bus=`echo $bus_info | cut -d' ' -f 1`
+		busid=`echo $bus_info | cut -d' ' -f 2`
+		channel=`echo $bus_info | cut -d' ' -f 3`
 
-	interface_info=`get_interface $bdev`
-	interface=`echo $interface_info | cut -d' ' -f 1`
-	device=`echo $interface_info | cut -d' ' -f 2`
-	lun=`echo $interface_info | cut -d' ' -f 3`
+		interface_info=`get_interface $bdev`
+		interface=`echo $interface_info | cut -d' ' -f 1`
+		device=`echo $interface_info | cut -d' ' -f 2`
+		lun=`echo $interface_info | cut -d' ' -f 3`
 
-	host_adapter=`find_host_adapter $bdev $channel`
+		host_adapter=`find_host_adapter $bdev $channel`
 
-	path=$EDD_PATH/int13_dev$bdev/pci_dev/host$host_adapter
-	if [ -e $path ]; then
-		device_path=$path/target${host_adapter}:0:$device
-		lun_path=$device_path/${host_adapter}:0:$device:$lun
+		path=$EDD_PATH/int13_dev$bdev/pci_dev/host$host_adapter
+		if [ -e $path ]; then
+			device_path=$path/target${host_adapter}:0:$device
+			lun_path=$device_path/${host_adapter}:0:$device:$lun
+		else
+			path=$EDD_PATH/int13_dev$bdev/pci_dev/ide$host_adapter
+			device_path=$path/$host_adapter.$device
+			lun_path=$device_path
+		fi
+		if [ ! -e $lun_path ]; then
+			# Some versions of the kernel read the wrong offset
+			# in the EDD structure to find the LUN.  Assume LUN 0
+			# if that is the case here.
+			path=$device_path/${host_adapter}:0:$device:0
+		else
+			path=$lun_path
+		fi
+
+		if [ -e $path/block ]; then
+			kdev=`ls $path/block`
+		elif [ -e $path/block:* ]; then
+			kdev=`ls -d $path/block:*`
+		fi
 	else
-		path=$EDD_PATH/int13_dev$bdev/pci_dev/ide$host_adapter
-		device_path=$path/$host_adapter.$device
-		lun_path=$device_path
-	fi
-	if [ ! -e $lun_path ]; then
-		# Some versions of the kernel read the wrong offset
-		# in the EDD structure to find the LUN.  Assume LUN 0
-		# if that is the case here.
-		path=$device_path/${host_adapter}:0:$device:0
-	else
-		path=$lun_path
-	fi
-
-	if [ -e $path/block ]; then
-		kdev=`ls $path/block`
-	elif [ -e $path/block:* ]; then
-		kdev=`ls -d $path/block:*`
+		bdev=${bdev##*_dev}
 	fi
 	
 	### FIXME should also try IDE layer

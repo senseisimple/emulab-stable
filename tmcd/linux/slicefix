@@ -488,7 +488,7 @@ dolinux() {
 		# We fall back to our old guessing method if EDD
 		# doesn't work.
 		if [ x$gdisk = x ]; then
-		    gdisk=`echo $os_linux_disk | \
+		    gdisk=`echo $translated_rootdev | \
 			   sed -e 's/^.*\(.\)$/\1/;y/abcdefgh/01234567/'`
 		    if [ $FLASHBOOT -eq 1 ]; then
 			gdisk=`expr $gdisk + 1`
