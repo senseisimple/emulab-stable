@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006, 2007, 2008 University of Utah and the Flux Group.
+# Copyright (c) 2005-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package Experiment;
@@ -310,6 +310,7 @@ sub security_level($)   { return field($_[0], 'security_level');}
 sub linktest_pid($)     { return field($_[0], 'linktest_pid');}
 sub linktest_level($)   { return field($_[0], 'linktest_level');}
 sub logfile($)          { return field($_[0], 'logfile');}
+sub paniced($)          { return field($_[0], 'paniced');}
 sub archive_idx($)	{ return stats($_[0], 'archive_idx'); }
 sub swapin_count($)	{ return stats($_[0], 'swapin_count'); }
 sub destroyed($)	{ return stats($_[0], 'destroyed'); }
@@ -2479,18 +2480,21 @@ sub Report($;$$)
 #
 # Return list of local nodes.
 # 
-sub LocalNodeListNames($$)
+sub LocalNodeListNames($$;$)
 {
-    my ($self, $lref) = @_;
+    my ($self, $lref, $physonly) = @_;
 
     # Must be a real reference. 
     return -1
 	if (! ref($self));
 
+    $physonly = 0
+	if (!defined($physonly));
+
     my $pid = $self->pid();
     my $eid = $self->eid();
 
-    @$lref = ExpNodes($pid, $eid, 1, 0);
+    @$lref = ExpNodes($pid, $eid, 1, $physonly);
     return 0;
 }
 
@@ -2813,10 +2817,8 @@ sub SetPanicBit($$)
     return -1
 	if (! ref($self));
 
-    my $idx = $self->idx();
-
-    $onoff = ($onoff ? 1 : 0);
-    my $when  = ($onoff ? "now()" : "NULL");
+    my $idx  = $self->idx();
+    my $when = ($onoff ? "now()" : "NULL");
     
     return -1
 	if (!DBQueryWarn("update experiments set ".
@@ -2828,9 +2830,9 @@ sub SetPanicBit($$)
 #
 # Is experiment firewalled?
 #
-sub IsFirewalled($;$)
+sub IsFirewalled($;$$$)
 {
-    my ($self, $pref) = @_;
+    my ($self, $pref1, $pref2, $pref3) = @_;
 
     # Must be a real reference. 
     return -1
@@ -2839,7 +2841,7 @@ sub IsFirewalled($;$)
     my $pid = $self->pid();
     my $eid = $self->eid();
 
-    return TBExptFirewall($pid, $eid, $pref);
+    return TBExptFirewall($pid, $eid, $pref1, $pref2, $pref3);
 }
 
 #
@@ -2857,6 +2859,37 @@ sub FirewallAndPort($$$)
 
     TBExptFirewallAndPort($self->pid(), $self->eid(), $fwnodep, $fwportp)
 	or return -1;
+    return 0;
+}
+
+#
+# Set the firewall info.
+#
+sub SetFirewallVlan($$$)
+{
+    my ($self, $fwvlanid, $fwvlan) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    TBSetExptFirewallVlan($self->pid(), $self->eid(), $fwvlanid, $fwvlan)
+	or return -1;
+    return 0;
+}
+
+#
+# Clear the firewall info.
+#
+sub ClearFirewallVlan($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    TBClearExptFirewallVlan($self->pid(), $self->eid());
     return 0;
 }
 
