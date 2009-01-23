@@ -27,7 +27,7 @@ LIBEXEC_SCRIPTS = $(WEB_BIN_SCRIPTS) $(WEB_SBIN_SCRIPTS) xmlconvert
 LIB_SCRIPTS     = libdb.pm Node.pm libdb.py libadminctrl.pm Experiment.pm \
 		  NodeType.pm Interface.pm User.pm Group.pm Project.pm \
 		  Image.pm OSinfo.pm Archive.pm Logfile.pm Lan.pm emdbi.pm \
-		  emutil.pm
+		  emutil.pm Firewall.pm
 
 # Stuff installed on plastic.
 USERSBINS	= genelists.proxy dumperrorlog.proxy
