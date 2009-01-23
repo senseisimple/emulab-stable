@@ -12,7 +12,8 @@ dunit=`echo $disk | sed -e 's/..\([0-7]\)/\1/'`
 case $disk in
 	# IDE
 	ad[0-3])
-		dtype="hd"
+		#dtype="hd"
+		dtype="sd"
 		d=`echo $dunit | sed -e 'y/0123/048c/'`
 		lrootdev="3${d}${part}"
 		;;

@@ -65,7 +65,7 @@ install_mbr()
 
 	if ! dd if=$disk of=/dev/null bs=512 count=1 2>/dev/null; then
 			echo "WARNING: could not read from $disk, MBR not changed"
-			return -1
+			return 255
 	fi
 
 	if [ "$OS" = Linux ]; then
@@ -99,7 +99,7 @@ install_mbr()
 
 	if ! [ -r $MBR_PATH/mbr{$new_mbr_ver}.dd ]; then
 		echo "WARNING: cannot find MBR version $new_mbr_ver, not installed"
-		return -1
+		return 255
 	fi
 	
 	echo "Installing MBR version $new_mbr_ver ..."
@@ -217,7 +217,7 @@ write_image()
 			port=${address##*:}
 			if [ $port = $address ]; then
 				echo "*** WARNING: no port specified for frisbee"
-				return -1
+				return 255
 			fi
 			address=${address%%:*}
 			;;
@@ -242,7 +242,7 @@ write_image()
 				echo "wget succeeded getting the image"
 			else
 				echo "wget failed, status $rc"
-				return -1
+				return 255
 			fi
 			imagefile=/images/${filename##*/}
 			;;
@@ -251,7 +251,7 @@ write_image()
 			;;
 		*)
 			echo "*** WARNING: Unsupported protocol $protocol!"
-			return -1
+			return 255
 			;;
 	esac
 

@@ -1,0 +1,107 @@
+#!/usr/bin/perl -wT
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2004, 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use English;
+use Getopt::Std;
+
+#
+# Create a disk image. Caller must have sudo permission!
+#
+sub usage()
+{
+    print STDOUT "Usage: create-image [-s slice] <device file> <filename>\n";
+    exit(-1);
+}
+my  $optlist = "rs:";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/sbin:/usr/bin:";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# No configure vars.
+#
+my $sudo   = "/usr/local/bin/sudo";
+my $zipper = "/usr/local/bin/imagezip";
+my $slice  = "";
+my $device;
+my $filename;
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV != 2) {
+    usage();
+}
+
+if (defined($options{"s"})) {
+    my $num = $options{"s"};
+
+    if ($num =~ /(\d)/) {
+	$num = $1;
+    }
+    else {
+	die("Tainted slice number: $num");
+    }
+    
+    $slice = "-s $num";
+
+    # XXX for now we do not generate relocation info on slices
+    # XXX there are still some issues with LILO/GRUB
+    $slice = "-N $slice";
+}
+$device   = $ARGV[0];
+$filename = $ARGV[1];
+
+#
+# Untaint the arguments.
+#
+# Note different taint check (allow /).
+if ($device =~ /^([-\w.\/]+)$/) {
+    $device = $1;
+}
+else {
+    die("Tainted device name: $device");
+}
+if ($filename =~ /^([-\w.\/\+]+)$/) {
+    $filename = $1;
+}
+else {
+    die("Tainted output filename: $filename");
+}
+
+$device =~ m#/dev/(\D+)(\d+)#;
+($dtype, $dunit) = ($1, $2);
+$dunit -= 4 if ($dtype eq 'ad' && $dunit > 3);
+$dunit =~ y/01234567/abcdefgh/;
+
+$device = "/dev/sd$dunit";
+
+#
+# Run the command using sudo, since by definition only testbed users
+# with proper trust should be able to zip up a disk. sudo will fail
+# if the user is not in the proper group.
+#
+if (system("$sudo $zipper $slice $device $filename")) {
+    print STDERR "*** Failed to create image!\n";
+    exit 1;
+}
+
+exit 0;
