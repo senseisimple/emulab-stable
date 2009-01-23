@@ -85,6 +85,12 @@ script-install:
 	install -m 755 $(TMCD_PATH)/common/config/rc.accounts $(TARGET_PATH)/etc/testbed/rc
 	install -m 755 $(TMCD_PATH)/common/config/rc.hostnames $(TARGET_PATH)/etc/testbed/rc
 	install -m 755 $(TMCD_PATH)/common/config/rc.keys $(TARGET_PATH)/etc/testbed/rc
+	install -m 755 $(TMCD_PATH)/common/config/rc.startcmd $(TARGET_PATH)/etc/testbed/rc
+	install -m 755 $(TMCD_PATH)/common/runstartup $(TARGET_PATH)/etc/testbed
+	install -m 755 $(TMCD_PATH)/linux/create-image $(TARGET_PATH)/etc/testbed
+	mkdir -p $(TARGET_PATH)/usr/local/bin
+	ln -sf /usr/bin/imagezip $(TARGET_PATH)/usr/local/bin
+	ln -sf /etc/testbed/create-image $(TARGET_PATH)/usr/local/bin
 	touch $(TARGET_PATH)/etc/emulab/ismfs
 
 imageunzip-install: $(TARGET_PATH)/usr/bin/imageunzip

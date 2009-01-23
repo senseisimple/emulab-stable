@@ -1,0 +1,65 @@
+#!/bin/sh
+#
+# Do Emulab stuff
+#
+
+if [ -f /etc/emulab/paths.sh ]; then
+	. /etc/emulab/paths.sh
+else
+	BINDIR=/etc/testbed
+fi
+
+mode=admin
+
+start() {
+	for token in `cat /proc/cmdline`; do
+		case $token in
+			elab_mode=*) mode=${token##*=} ;;
+		esac
+	done
+
+	case $mode in
+		admin)
+			script=$BINDIR/rc.mfs
+			;;
+		newnode)
+			script=$BINDIR/newclient
+			;;
+		frisbee)
+			script=$BINDIR/rc.frisbee
+			;;
+		*)
+			echo "Invalid mode \"$mode\"" 1>&2
+			script=$BINDIR/rc.mfs
+			;;
+	esac
+			
+
+ 	echo "Starting ${script##*/}..."
+	exec $script
+}
+
+stop() {
+	:
+}
+restart() {
+	:
+}	
+
+case "$1" in
+  start)
+  	start
+	;;
+  stop)
+  	stop
+	;;
+  restart|reload)
+  	restart
+	;;
+  *)
+	echo $"Usage: $0 {start|stop|restart}"
+	exit 1
+esac
+
+exit $?
+

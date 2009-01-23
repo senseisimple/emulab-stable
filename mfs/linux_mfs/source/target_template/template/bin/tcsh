@@ -1,0 +1,9 @@
+#! /bin/sh
+
+# This is a hack to allow users with tcsh
+# as their shell to log in to the admin mfs.
+
+# Of course, it doesn't work like tcsh.  But
+# including tcsh is overkill and unnecessary.
+
+exec /bin/sh $@
