@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006, 2007, 2008 University of Utah and the Flux Group.
+# Copyright (c) 2005-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package Group;
@@ -916,7 +916,7 @@ sub SendJoinEmail($$)
 	 "\n".
 	 "Please return to $TBWWW,\n".
 	 "log in, select the 'New User Approval' page, and enter your\n".
-	     "decision regarding $usr_name's membership in your project.\n".
+	     "decision regarding ${usr_name}'s membership in your project.\n".
 	 "\n".
 	 "Thanks,\n".
 	 "Testbed Operations\n",
