@@ -807,7 +807,7 @@ diff -Nru syslinux-3.71+dfsg.orig/com32/modules/bootinfo.c syslinux-3.71+dfsg/co
 +		while (boot_what->type == BIBOOTWHAT_TYPE_WAIT) {
 +			printf("Polling for bootinfo response... ");
 +			length = sizeof(buffer);
-+			rc = get_response(my_ip, buffer, &length, 0);
++			rc = get_response(my_ip, boot_info, &length, 0);
 +			if (rc != PXENV_STATUS_SUCCESS) {
 +				printf("\n");
 +				return rc;
