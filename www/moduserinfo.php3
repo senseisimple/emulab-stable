@@ -306,7 +306,10 @@ function SPITFORM($formfields, $errors)
 	    # Planetlab bit. This should really be a drop down menu of the
 	    #                choices.
             #
-	    $checked = $formfields["user_interface"];
+	    if (isset($formfields["user_interface"]))
+		$checked = $formfields["user_interface"];
+	    else
+		$checked = "";
 	    echo "<tr>
 		      <td colspan=2>Use simplified PlanetLab view:</td>
 		      <td class=left>
