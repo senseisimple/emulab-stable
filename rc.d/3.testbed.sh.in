@@ -91,7 +91,7 @@ case "$1" in
 			@prefix@/sbin/mysqld_watchdog
 		fi
 
-		if [-x @prefix@/sbin/protogeni/expire_daemon ]; then
+		if [ -x @prefix@/sbin/protogeni/expire_daemon ]; then
 			echo -n " expire_daemon"
 			@prefix@/sbin/protogeni/expire_daemon
 		fi
