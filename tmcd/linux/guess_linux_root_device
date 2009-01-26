@@ -400,7 +400,7 @@ rewrite_fstab()
 	local old_root="$2"
 	local new_root="$3"
 
-	sed -i.orig "s;$old_root;$new_root;g" $imageroot/etc/fstab
+	sed -i "s;$old_root;$new_root;g" $imageroot/etc/fstab
 }
 
 rewrite_grub_config()
@@ -410,7 +410,7 @@ rewrite_grub_config()
 	local old_root="$3"
 	local new_root="$4"
 
-	sed -i.orig "s;$old_root;$new_root;g" "$imageroot/$grub_config"
+	sed -i "s;$old_root;$new_root;g" "$imageroot/$grub_config"
 }
 
 
@@ -421,9 +421,9 @@ rewrite_lilo_config()
         local old_root="$2"
         local new_root="$3"
 
-        sed -i.orig '/^[ 	]*root=/d' $lilo_conf
-        sed -i.orig '/append=/s;[ 	]*root=[^" 	]*;;g' $lilo_conf
-        sed -i.orig "/append=/s;\"\$; root=$new_root\";g" $lilo_conf
+        sed -i '/^[ 	]*root=/d' $lilo_conf
+        sed -i '/append=/s;[ 	]*root=[^" 	]*;;g' $lilo_conf
+        sed -i "/append=/s;\"\$; root=$new_root\";g" $lilo_conf
 
 	# Set the special flag that says we need to finish fixing LILO after
 	# boot, and dump the one-time default LILO command-line so that
