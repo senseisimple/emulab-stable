@@ -217,6 +217,13 @@ if (system("egrep -q -s 'DPGENI' /etc/rc.conf")) {
     print "Please add 'apache_flags=\"-DSSL -DPGENI\"' to /etc/rc.conf\n";
     $restartapache++;
 }
+if (!system("egrep -q -s 'apache_flags=\"-DSSL' " .
+	    "/usr/local/etc/rc.d/apache.sh")) {
+    system("sed -i .backup 's/apache_flags=\"-DSSL/" .
+	   "apache_flags=\"\${apache_flags--DSSL}/' " .
+	   "/usr/local/etc/rc.d/apache.sh");
+    $restartapache++;
+}
 if ($restartapache) {
     print "Then restart apache:\n";
     print "    sudo /usr/local/etc/rc.d/apache.sh restart\n";
