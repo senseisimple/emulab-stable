@@ -67,6 +67,7 @@ sub Lookup($$)
 
     my $self          = {};
     $self->{'CERT'}   = $query_result->fetchrow_hashref();
+    $self->{'url'}    = undef;
     $self->{'stored'} = 1;
     bless($self, $class);
     my $cert = $self->cert();
@@ -247,8 +248,9 @@ sub LoadFromString($$)
 sub LoadFromFile($$)
 {
     my ($class, $filename) = @_;
+    my $url;
 
-    if (! open(X509, "$OPENSSL x509 -in $filename -subject |")) {
+    if (! open(X509, "$OPENSSL x509 -in $filename -subject -text |")) {
 	print STDERR "Could not start $OPENSSL on $filename\n";
 	return undef;
     }
@@ -268,9 +270,27 @@ sub LoadFromFile($$)
     chomp($DN);
 
     #
-    # Throw away first and last lines; the cert is rest.
+    # The text output is next. Look for the URL in the extensions. Stop
+    # when we get to the certificate line.
     #
-    shift(@certlines);
+    while (@certlines) {
+	my $line = shift(@certlines);
+	last
+	    if ($line =~ /^-----BEGIN CERT/);
+
+	if ($line =~ /^\s+URI:([-\w\.\/:]+)$/) {
+	    $url = $1;
+	    chomp($url);
+	}
+    }
+    if (!@certlines) {
+	print STDERR "Could not parse certificate from $filename\n";
+	return undef;
+    }
+
+    #
+    # Throw away last line; the cert is rest.
+    #
     pop(@certlines);
     my $cert = join("", @certlines);
 
@@ -296,6 +316,7 @@ sub LoadFromFile($$)
     $self->{'CERT'}->{'revoked'}   = undef;
     $self->{'CERT'}->{'created'}   = undef;
     $self->{'CERT'}->{'certfile'}  = $filename;
+    $self->{'url'}                 = $url;
     return $self;
 }
 
@@ -354,7 +375,10 @@ sub WriteToFile($;$)
 sub URL($)
 {
     my ($self) = @_;
-    my $url;
+    my $url    = $self->{'url'};
+
+    return $url
+	if (defined($url));
 
     my $filename = $self->WriteToFile();
     if (! open(X509, "$OPENSSL x509 -in $filename -text -noout |")) {
@@ -372,6 +396,7 @@ sub URL($)
 	return undef;
     }
     unlink($filename);
+    $self->{'url'} = $url;
     return $url;
 }
 
