@@ -1841,6 +1841,100 @@ sub Shutdown($)
 }
 
 #
+# Return a list of resources currently in use.
+# This is used by the clearinghouse to get a global sense of usage.
+# Currently, only the ClearingHouse will be allowed to make this call,
+# but eventually I think it should be opened up to any of federation
+# roots
+#
+sub ListUsage($)
+{
+    my ($argref) = @_;
+    my $cred  = $argref->{'credential'};
+
+    if (! (defined($cred))) {
+	return GeniResponse->MalformedArgsResponse();
+    }
+    my $credential = GeniCredential->CreateFromSigned($cred);
+    if (!defined($credential)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not create GeniCredential object");
+    }
+    #
+    # Make sure the credential was issued to the caller.
+    #
+    if ($credential->owner_uuid() ne $ENV{'GENIUUID'}) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "This is not your credential!");
+    }
+    #
+    # And that the target of the credential is this registry.
+    #
+    if ($credential->target_uuid() ne $ENV{'MYUUID'}) {
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN,
+				    undef, "This is not your authority!");
+    }
+    # Just one of these, at Utah.
+    my $GENICH_PEMFILE = "@prefix@/etc/genich.pem";
+    my $certificate = GeniCertificate->LoadFromFile($GENICH_PEMFILE);
+    if (!defined($certificate)) {
+	print STDERR "Could not load certificate from $GENICH_PEMFILE\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
+    }
+
+    # The caller has to match the clearinghouse.
+    if ($credential->owner_uuid() ne $certificate->uuid()) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Only the clearinghouse can do this!");
+    }
+    my @slices;
+    if (GeniSlice->ListAll(\@slices) != 0) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
+    }
+    my @result = ();
+
+    foreach my $slice (@slices) {
+	#
+	# Grab all the slivers for this slice, and then
+	# look for just the nodes.
+	#
+	my @slivers    = ();
+	my @components = ();
+	if (GeniSliver->SliceSlivers($slice, \@slivers) != 0) {
+	    print STDERR "Could not slice slivers for $slice\n";
+	    return GeniResponse->Create(GENIRESPONSE_ERROR);
+	}
+	foreach my $sliver (@slivers) {
+	    next
+		if ($sliver->resource_type() ne "Node");
+
+	    my $node = {"sliver_gid"    => $sliver->cert(),
+			"sliver_hrn"    => $sliver->hrn() };
+	    
+	    my $component = GeniComponent->Lookup($sliver->resource_uuid());
+	    if (defined($component)) {
+		$node->{"component_gid"} = $component->cert();
+		$node->{"component_hrn"} = $component->hrn();
+	    }
+	    else {
+		print STDERR "No component in DB for resource ".
+		    $sliver->resource_uuid() . "\n";
+	    }
+	    push(@components, $node);
+	}
+	next
+	    if (!@components);
+	
+	my $blob = {"slice_gid"  => $slice->cert(),
+		    "slice_hrn"  => $slice->hrn(),
+		    "slivers"    => \@components };
+
+	push(@result, $blob);
+    }
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS, \@result);
+}
+
+#
 # Utility Routines.
 #
 # Create a slice from the a certificate (GID).
