@@ -672,5 +672,38 @@ sub DeleteAll($$)
     return 0;
 }
 
+#
+# List all slices, optionally for an authority.
+#
+sub ListAll($$$)
+{
+    my ($class, $pref, $authority) = @_;
+    my @result = ();
+    @$pref = ();
+
+    my $query = "select uuid from geni_slices ";
+    if (defined($authority)) {
+	my $sa_uuid = $authority->uuid();
+	$query .= "where sa_uuid='$sa_uuid'";
+    }
+    my $query_result = DBQueryWarn($query);
+
+    return -1
+	if (! $query_result);
+    return 0
+	if (!$query_result->numrows);
+
+    while (my ($uuid) = $query_result->fetchrow_array()) {
+	my $slice = GeniSlice->Lookup($uuid);
+	if (!defined($slice)) {
+	    print STDERR "Could not lookup slice $uuid\n";
+	    return -1;
+	}
+	push(@result, $slice);
+    }
+    @$pref = @result;
+    return 0;
+}
+
 # _Always_ make sure that this 1 is at the end of the file...
 1;
