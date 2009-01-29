@@ -396,7 +396,6 @@ class Node
 	$node_id = $this->node_id();
 	$short   = ($flags & SHOWNODE_SHORT  ? 1 : 0);
 	$noperm  = ($flags & SHOWNODE_NOPERM ? 1 : 0);
-	$rootpw  = ($flags & SHOWNODE_ROOTPW ? 1 : 0);
     
 	$query_result =
 	    DBQueryFatal("select n.*,na.*,r.vname,r.pid,r.eid,i.IP, ".
