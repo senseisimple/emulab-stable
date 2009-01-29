@@ -136,6 +136,8 @@ my $responder = Frontier::Responder->new( "methods" => {
     "BindToSlice"       => \&GeniCM::BindToSlice,
     "Shutdown"          => \&GeniCM::Shutdown,
     "ListUsage"         => \&GeniCM::ListUsage,
+    "SliceStatus"       => \&GeniCM::SliceStatus,
+    "SliverStatus"      => \&GeniCM::SliverStatus,
    },
 );
 

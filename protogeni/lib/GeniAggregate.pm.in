@@ -181,6 +181,9 @@ sub status($)		{ return field($_[0], "status"); }
 sub cert($)		{ return $_[0]->{'CERTIFICATE'}->cert(); }
 sub GetCertificate($)   { return $_[0]->{'CERTIFICATE'}; }
 
+# An alias so that slivers look like aggregates.
+sub resource_type($)	{ return field($_[0], "type"); }
+
 #
 # Destroy all the slivers in the aggregate, and then the aggregate if there
 # is nothing in it. Leave it around if something goes wrong.

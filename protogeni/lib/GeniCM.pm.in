@@ -1935,6 +1935,182 @@ sub ListUsage($)
 }
 
 #
+# Slice Status
+#
+sub SliceStatus($)
+{
+    my ($argref) = @_;
+    my $cred  = $argref->{'credential'};
+    my $mode  = $argref->{'mode'};
+    $mode = "summary"
+	if (!defined($mode));
+
+    if (! (defined($cred))) {
+	return GeniResponse->MalformedArgsResponse();
+    }
+    my $credential = GeniCredential->CreateFromSigned($cred);
+    if (!defined($credential)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not create GeniCredential object");
+    }
+    my $slice_uuid = $credential->target_uuid();
+    my $user_uuid  = $credential->owner_uuid();
+    
+    #
+    # Make sure the credential was issued to the caller.
+    #
+    if ($credential->owner_uuid() ne $ENV{'GENIUUID'}) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "This is not your credential!");
+    }
+
+    my $slice = GeniSlice->Lookup($slice_uuid);
+    if (!defined($slice)) {
+	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
+				    "No such slice here");
+    }
+    if ($slice->Lock() != 0) {
+	return GeniResponse->BusyResponse();
+    }
+    my $aggregate = GeniAggregate->SliceAggregate($slice);
+    if (!defined($aggregate)) {
+	$slice->UnLock();
+	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
+				    "No slivers here for slice");
+    }
+    #
+    # Grab all the slivers for this slice, and then
+    # look for just the nodes.
+    #
+    my $summary    = "ready";
+    my %details    = ();
+    my @slivers    = ();
+    if (GeniSliver->SliceSlivers($slice, \@slivers) != 0) {
+	print STDERR "Could not get slivers for $slice\n";
+	$slice->UnLock();
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
+    }
+    foreach my $sliver (@slivers) {
+	next
+	    if ($sliver->resource_type() ne "Node");
+
+	my $node_uuid = $sliver->resource_uuid();
+	my $node = Node->Lookup($node_uuid);
+	if (!defined($node)) {
+	    $slice->UnLock();
+	    print STDERR "Cannot find node by uuid $node_uuid\n";
+	    return GeniResponse->Create(GENIRESPONSE_ERROR);
+	}
+	if ($node->IsUp()) {
+	    $details{$node_uuid} = "ready";
+	}
+	else {
+	    $details{$node_uuid} = "notready";
+	    $summary = "notready";
+	}
+    }
+    $slice->UnLock();
+    my $blob = {"status"  => $summary,
+		"details" => \%details};
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
+}
+
+#
+# Sliver status.
+#
+sub SliverStatus($)
+{
+    my ($argref) = @_;
+    my $cred        = $argref->{'credential'};
+
+    if (!defined($cred)) {
+	return GeniResponse->Create(GENIRESPONSE_BADARGS);
+    }
+    my $credential = GeniCredential->CreateFromSigned($cred);
+    if (!defined($credential)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not create GeniCredential object");
+    }
+    my $sliver_uuid = $credential->target_uuid();
+    my $user_uuid   = $credential->owner_uuid();
+    
+    #
+    # Make sure the credential was issued to the caller.
+    #
+    if ($credential->owner_uuid() ne $ENV{'GENIUUID'}) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "This is not your credential!");
+    }
+
+    #
+    # For now, only allow top level aggregate to be deleted.
+    #
+    my $aggregate = GeniAggregate->Lookup($sliver_uuid);
+    if (!defined($aggregate)) {
+	my $sliver = GeniSliver->Lookup($sliver_uuid);
+	if (defined($sliver)) {
+	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+					"Must supply toplevel sliver");
+	}
+	else {
+	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+					"No such sliver");
+	}
+    }
+    elsif ($aggregate->type() ne "Aggregate") {
+	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+					"Must supply toplevel sliver");
+    }
+    my $slice_uuid = $aggregate->slice_uuid();
+    my $slice = GeniSlice->Lookup($slice_uuid);
+    if (!defined($slice)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "No slice record for slice");
+    }
+    if ($slice->Lock() != 0) {
+	return GeniResponse->BusyResponse();
+    }
+
+    #
+    # Grab all the slivers for this slice, and then
+    # look for just the nodes.
+    #
+    my $summary    = "ready";
+    my %details    = ();
+    my @slivers    = ();
+    if ($aggregate->SliverList(\@slivers) != 0) {
+	print STDERR "Could not get slivers for $aggregate\n";
+	$slice->UnLock();
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
+    }
+    foreach my $sliver (@slivers) {
+	next
+	    if ($sliver->isa("GeniAggregate"));
+	next
+	    if ($sliver->resource_type() ne "Node");
+
+	my $node_uuid = $sliver->resource_uuid();
+	my $node = Node->Lookup($node_uuid);
+	if (!defined($node)) {
+	    $slice->UnLock();
+	    print STDERR "Cannot find node by uuid $node_uuid\n";
+	    return GeniResponse->Create(GENIRESPONSE_ERROR);
+	}
+	if ($node->IsUp()) {
+	    $details{$node_uuid} = "ready";
+	}
+	else {
+	    $details{$node_uuid} = "notready";
+	    $summary = "notready";
+	}
+    }
+    $slice->UnLock();
+    my $blob = {"status"  => $summary,
+		"details" => \%details};
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
+}
+
+#
 # Utility Routines.
 #
 # Create a slice from the a certificate (GID).
