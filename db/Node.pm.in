@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005-2008 University of Utah and the Flux Group.
+# Copyright (c) 2005-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package Node;
@@ -468,6 +468,19 @@ sub IsReserved($)
 	return 1;
     }
     return 1;
+}
+
+#
+# Is node up.
+#
+sub IsUp($)
+{
+    my ($self) = @_;
+
+    return 0
+	if (! ref($self));
+
+    return $self->eventstate() eq TBDB_NODESTATE_ISUP;
 }
 
 #
