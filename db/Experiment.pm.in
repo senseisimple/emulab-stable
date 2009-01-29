@@ -744,6 +744,9 @@ sub Delete($;$)
     DBQueryWarn("DELETE from experiments ".
 		"WHERE eid='$eid' and pid='$pid'");
 
+    # Delete from cache. 
+    delete($experiments{"$exptidx"});
+
     #
     # Mark experiment destroyed. This is a backup to End() below.
     #
@@ -779,6 +782,16 @@ sub Delete($;$)
 		"WHERE eid='$eid' and pid='$pid' and exptidx=$exptidx");
 
     return 0;
+}
+
+#
+# Flush from our little cache, as for the expire daemon.
+#
+sub Flush($)
+{
+    my ($self) = @_;
+
+    delete($experiments{$self->idx()});
 }
 
 #
