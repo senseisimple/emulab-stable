@@ -71,4 +71,5 @@ INSERT IGNORE INTO sitevariables VALUES ('general/default_imagename','FBSD410+RH
 INSERT IGNORE INTO sitevariables VALUES ('general/joinproject/admincheck','0','0','When set, a project may not have a mix of admin and non-admin users');
 INSERT IGNORE INTO sitevariables VALUES ('protogeni/allow_externalusers','1','1','When set, external users may allocate slivers on your testbed.');
 INSERT IGNORE INTO sitevariables VALUES ('protogeni/max_externalnodes',NULL,'1024','When set, maximum number of nodes that external users may allocate.');
-
+INSERT IGNORE INTO sitevariables VALUES ('protogeni/cm_uuid','','','The UUID of the local Component Manager.');
+INSERT IGNORE INTO sitevariables VALUES ('protogeni/sa_uuid','','','The UUID of the local Slice Authority.');
