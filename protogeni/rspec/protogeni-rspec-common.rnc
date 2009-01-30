@@ -8,7 +8,7 @@
 # Simple prototype of an RSpec, to be used by ProtoGENI
 #
 
-include "../../assign/top.rnc" {
+include "top.rnc" {
     NodeContents =
         # Semantic change - the 'name' of a node is now
         # solely for human-readability.
@@ -80,13 +80,13 @@ ComponentSpec =
 LinkComponentSpec = element component_link { ComponentSpec }
 
 PathComponentSpec = element component_path {
+    element link { ComponentSpec, LinkEndPoints },
     (element link { ComponentSpec, LinkEndPoints},
      element node
      {
 	ComponentSpec
      }
-    )*,
-    element link { ComponentSpec, LinkEndPoints }
+    )*
 }
 
 RSpec = element rspec {
