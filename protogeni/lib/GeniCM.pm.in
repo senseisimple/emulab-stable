@@ -2337,6 +2337,7 @@ sub CleanupDeadSlice($;$)
 	system("$ENDEXPT -q $pid,$eid");
 	return -1
 	    if ($?);
+	$experiment->Flush();
     }
     
     if ($slice->Delete() != 0) {

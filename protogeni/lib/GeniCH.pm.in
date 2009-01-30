@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2008 University of Utah and the Flux Group.
+# Copyright (c) 2008-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniCH;
@@ -209,7 +209,7 @@ sub Resolve($)
 		     "hrn"      => $user->hrn(),
 		     "uuid"     => $user->uuid(),
 		     "email"    => $user->email(),
-		     "cert"     => $user->cert(),
+		     "gid"      => $user->cert(),
 		     "name"     => $user->name(),
 		     "sa_uuid"  => $user->sa_uuid(),
 		 };
@@ -275,20 +275,12 @@ sub Resolve($)
 					"No such slice $uuid");
 	}
 
-	# User bindings too.
-	#my @userbindings = ();
-	#if ($slice->UserBindings(\@userbindings) != 0) {
-	#    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-	#				"Error getting users for slice");
-	#}
-
 	# Return a blob.
 	my $blob = { "hrn"          => $slice->hrn(),
 		     "uuid"         => $slice->uuid(),
 		     "creator_uuid" => $slice->creator_uuid(),
-		     "cert"         => $slice->cert(),
+		     "gid"          => $slice->cert(),
 		     "sa_uuid"      => $slice->sa_uuid(),
-	#	     "userbindings" => \@userbindings,
 		 };
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
     }
@@ -302,7 +294,7 @@ sub Register($)
 {
     my ($argref) = @_;
     my $cred  = $argref->{'credential'};
-    my $cert  = $argref->{'cert'};
+    my $cert  = $argref->{'gid'};
     my $info  = $argref->{'info'};
     my $type  = $argref->{'type'};
 
@@ -380,21 +372,6 @@ sub Register($)
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					"email: ". TBFieldErrorString());
 	}
-	if (0 && defined($keys)) {
-	    foreach my $keyref (@{ $keys }) {
-		my $type = $keyref->{'type'};
-		my $key  = $keyref->{'key'};
-
-		if ($type ne 'ssh') {
-		    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-						"key: Invalid key type");
-		}
-		if (! ($key =~ /^[\012\015\040-\176]*$/)) {
-		    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-						"key: Invalid characters");
-		}
-	    }
-	}
 	#
 	# Need to verify the UUID is permitted for the SA making the request.
 	#
@@ -466,19 +443,6 @@ sub Register($)
 	}
 
 	#
-	# Ditto any users bound to the slice.
-	#
-	if (0 && defined($userbindings)) {
-	    foreach my $binding_uuid (@{ $userbindings }) {
-		my $binding_user = GeniUser->Lookup($binding_uuid);
-		if (!defined($binding_user)) {
-		    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-						"$binding_user: No such User");
-		}
-	    }
-	}
-	
-	#
 	# Need to verify the UUID is permitted for the SA making the request.
 	#
 	my $slice_authority = GeniAuthority->Lookup($ENV{'GENIUUID'});
@@ -504,14 +468,6 @@ sub Register($)
 		return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				"Already registered with another SA");
 	    }
-	    if (0 && defined($userbindings)) {
-		$existing->UnBindUsers();
-		
-		foreach my $binding_uuid (@{ $userbindings }) {
-		    my $binding_user = GeniUser->Lookup($binding_uuid);
-		    $existing->BindUser($binding_user);
-		}
-	    }
 	    
 	    return GeniResponse->Create(GENIRESPONSE_SUCCESS);
 	}
@@ -532,16 +488,6 @@ sub Register($)
 					"Could not be registered");
 	}
 
-	#
-	# Add the bindings now.
-	# 
-	if (0 && defined($userbindings)) {
-	    foreach my $binding_uuid (@{ $userbindings }) {
-		my $binding_user = GeniUser->Lookup($binding_uuid);
-		$newslice->BindUser($binding_user);
-	    }
-	}
-	
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, undef,
 				    "Slice has been registered");
     }
