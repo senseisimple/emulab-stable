@@ -72,6 +72,7 @@ $| = 1;
 # Load the Testbed support stuff.
 use lib "@prefix@/lib";
 use libtestbed;
+use libdb qw(TBSetSiteVar);
 use User;
 use Project;
 
@@ -441,6 +442,13 @@ print "Registering CM cert at the clearinghouse.\n";
 if ($clearinghouse->Register("CM", $cmcert->cert())) {
     fatal("Could not register CM cert at the clearinghouse");
 }
+
+#
+# Local SiteVars to hold the UUIDs.
+#
+TBSetSiteVar('protogeni/sa_uuid', $certificate->uuid());
+TBSetSiteVar('protogeni/cm_uuid', $cmcert->uuid());
+
 exit(0);
 
 sub fatal($)
