@@ -157,8 +157,21 @@ usage()
 
 print_header();
 
+my %nodetointerface;
+
+# Read interfaces
+my $result = DBQueryFatal("SELECT node_id,card,port,iface,interface_type" .
+		     " from interfaces");
+while (($node,$card,$port,$iface,$type) = $result->fetchrow_array) {
+    push @{ $nodetointerface{"$node"} }, $iface;
+    $interfacemap{"$node:$card:$port"} = $iface;
+    if ((defined $type) && ($type ne "")) {
+	$interfacetypes{"$node:$card:$port"} = $type;
+    }
+}
+
 # Read class/type maps
-my $result =
+$result =
     DBQueryFatal("select class,type,isvirtnode from node_types");
 
 while (my ($class,$type,$isvirt) = $result->fetchrow_array) {
@@ -651,7 +664,8 @@ foreach $node (keys(%nodes)) {
     }
 
     my @parse_features = split(" ", join(" ", @features));
-    print_node($node, \@types, \@parse_features, \@flags, $uuid);
+    print_node($node, \@types, \@parse_features, \@flags, $uuid,
+	       $nodetointerface{$node});
 }
 
 #
@@ -679,7 +693,7 @@ if ($widearea) {
     my $fake_inet_switch = "internet";
     my @inet_protos = ("ipv4");
     my @types = map("*$_:*", @inet_protos);
-    print_node($fake_inet_switch, \@types, [], []);
+    print_node($fake_inet_switch, \@types, [], [], undef, []);
     
     #
     # Note - there is currently an assumption in this query that widearea nodes
@@ -798,7 +812,8 @@ if ($widearea) {
 	    push @features, "bwlimit:0";
         }
 
-	print_node($physnode, \@types, \@features, \@flags, $uuid);
+	print_node($physnode, \@types, \@features, \@flags, $uuid,
+		   $nodetointerface{$physnode});
 
         #
         # Print out a link to the 'internet'.
@@ -816,15 +831,7 @@ if ($widearea) {
     }
 }
 
-# Read interfaces
-$result = DBQueryFatal("SELECT node_id,card,port,iface,interface_type" .
-		     " from interfaces");
-while (($node,$card,$port,$iface,$type) = $result->fetchrow_array) {
-    $interfacemap{"$node:$card:$port"} = $iface;
-    if ((defined $type) && ($type ne "")) {
-	$interfacetypes{"$node:$card:$port"} = $type;
-    }
-}
+# TODO: interface reading used to be here.
 
 # Read interface types. First need to find the protocols an interface supports
 # and then then the speed for each of those protocols.
@@ -1020,7 +1027,7 @@ my @wireless_protos = ("80211", "80211a", "80211b", "80211g", "flex900");
 my $fake_switch = "airswitch";
 if (!$genimode) {
     my @fake_switch_types = map("*$_:*", @wireless_protos);
-    print_node($fake_switch, \@fake_switch_types, [], []);
+    print_node($fake_switch, \@fake_switch_types, [], [], undef, []);
 }
 
 foreach my $interface (keys(%interfacetypes)) {
@@ -1135,6 +1142,7 @@ sub print_header {
     } elsif ($do_xml && $genimode) {
 	print "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
 	print "<rspec xmlns=\"http://www.protogeni.net/resources/rspec/0.1\" ";
+	print "type=\"advertisement\" ";
 	my @times = gmtime(time());
 	printf("generated=\"%04d-%02d-%02dT%02d:%02d:%02dZ\" ",
 	       $times[5] + 1900, $times[4] + 1, $times[3],
@@ -1159,7 +1167,7 @@ sub print_switch
 {
     my $name = shift(@_);
     my $uuid = shift(@_);
-    print_node($name, ["switch:1", "*lan:*"], [], [], $uuid);
+    print_node($name, ["switch:1", "*lan:*"], [], [], $uuid, []);
 }
 
 sub print_node
@@ -1169,22 +1177,34 @@ sub print_node
     my $features = shift(@_);
     my $flags = shift(@_);
     my $uuid = shift(@_);
+    my $interfaces = shift(@_);
     if (!$do_xml) {
 	my $text = "node $name " .
 	    join(" ", @$types) . " - " . join(" ", @$features) .
 		" - " . join(" ", @$flags);
 	print "$text\n";
-    } else {
-	print "<node name=\"$name\"";
-	if ($do_xml && $genimode && defined($uuid)) {
-	    print " uuid=\"$uuid\"";
+    } elsif ($genimode) {
+	# rspec format
+	print "<node ";
+	# TODO: component_manager_uuid
+	print "component_manager_uuid=\"00000\" ";
+	print "component_name=\"$name\" ";
+	if (defined($uuid)) {
+	    print " component_uuid=\"$uuid\" ";
 	}
 	print ">\n";
+	# TODO: Virtualization type
 	print_node_types(@$types);
-	if ($do_xml && !$genimode) {
-	    print_node_flags(@$flags);
-	    print_node_features(@$features);
-	}
+	# TODO: Available
+	print_node_interfaces(@$interfaces);
+	print "</node>\n";
+    } else {
+	# ptop format
+	print "<node name=\"$name\"";
+	print ">\n";
+	print_node_types(@$types);
+	print_node_flags(@$flags);
+	print_node_features(@$features);
 	print "</node>\n";
     }
 }
@@ -1266,6 +1286,15 @@ sub print_node_flags
     }
 }
 
+sub print_node_interfaces
+{
+    my $i = 0;
+    for (; $i < scalar(@_); ++$i) {
+	my $name = $_[$i];
+	print "  <interface component_name=\"${name}\"/>\n";
+    }
+}
+
 sub print_named_link_ptop
 {
     my $name = shift(@_);
@@ -1300,23 +1329,47 @@ sub print_named_link_xml
     my $delay = shift(@_);
     my $loss = shift(@_);
     my $proto_count = scalar(@_);
-    print "<link name=\"$name\">\n";
+    if ($genimode) {
+	print "<link>\n";
+	print "  <component_link ";
+	print "component_manager_uuid=\"00000\" ";
+	print "component_name=\"$name\" ";
+# TODO: link uuid
+	print "component_uuid=\"00000\" ";
+	print "/>\n";
+    } else {
+	print "<link name=\"$name\">\n";
+    }
     print "  <source_interface><interface>\n";
-    print "    <node_name>$source</node_name>\n";
-    print "    <interface_name>$source_if</interface_name>\n";
+    print_interface_contents($source, $source_if);
     print "  </interface></source_interface>\n";
     print "  <destination_interface><interface>\n";
-    print "    <node_name>$dest</node_name>\n";
-    print "    <interface_name>$dest_if</interface_name>\n";
+    print_interface_contents($dest, $dest_if);
     print "  </interface></destination_interface>\n";
     print "  <bandwidth>$bw</bandwidth>\n";
     print "  <latency>$delay</latency>\n";
     print "  <packet_loss>$loss</packet_loss>\n";
     my $i = 0;
     for (; $i < $proto_count; ++$i) {
-	print "  <link_type><type_name>" . $_[$i] . "</type_name></link_type>\n";
+	print "  <link_type><type_name>" . $_[$i]
+	    . "</type_name></link_type>\n";
     }
     print "</link>\n\n";
+}
+
+sub print_interface_contents
+{
+    my $node = shift(@_);
+    my $interface = shift(@_);
+    if ($genimode) {
+# TODO: component_node_uuid
+	print "    <component_node_uuid>$node</component_node_uuid>\n";
+	print "    <component_interface_name>$interface</component_interface_name>\n";
+    } else {
+	print "    <node_name>$node</node_name>\n";
+	print "    <interface_name>$interface</interface_name>\n";
+    }
+
 }
 
 # Print a link with a unique name not necessarily related to source,
