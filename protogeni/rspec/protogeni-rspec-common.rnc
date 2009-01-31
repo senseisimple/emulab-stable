@@ -8,7 +8,7 @@
 # Simple prototype of an RSpec, to be used by ProtoGENI
 #
 
-include "top.rnc" {
+include "../../assign/top.rnc" {
     NodeContents =
         # Semantic change - the 'name' of a node is now
         # solely for human-readability.
@@ -48,7 +48,7 @@ include "top.rnc" {
         ## Type of this link - we use a named pattern here (defined below), so
         ## that it can be overriden in the virtual topology schema, where you are
         ## only allowed to have one
-        LinkSpec.LinkType
+        LinkSpec.LinkType+
 
     InterfaceContents = 
 	# In an advertisement, the component_uuid is mandatory.
@@ -60,8 +60,8 @@ include "top.rnc" {
 }
 
 InterfaceDecl = element interface {
-	attribute virtual_name { text },
-	attribute component_name { text }
+	attribute virtual_name { text }?,
+	attribute component_name { text }?
 }
 
 ComponentSpec =

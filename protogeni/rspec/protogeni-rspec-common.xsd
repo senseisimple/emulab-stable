@@ -21,7 +21,7 @@
     </xs:sequence>
     <xs:attribute name="virtual_name"/>
     <xs:attribute name="virtual_uuid"/>
-    <xs:attribute name="aggregate_uuid"/>
+    <xs:attribute name="component_manager_uuid"/>
     <xs:attribute name="component_name"/>
     <xs:attribute name="component_uuid"/>
     <xs:attribute name="sliver_uuid"/>
@@ -49,34 +49,35 @@
           <xs:documentation>The characteristics (bandwidth, latency, loss) which affect traffic.</xs:documentation>
         </xs:annotation>
       </xs:group>
-      <xs:element ref="rspec:LinkSpec.LinkType"/>
+      <xs:element maxOccurs="unbounded" ref="rspec:LinkSpec.LinkType"/>
     </xs:sequence>
     <xs:attribute name="virtual_name"/>
     <xs:attribute name="virtual_uuid"/>
   </xs:complexType>
   <xs:complexType name="InterfaceContents">
     <xs:sequence>
-      <xs:element minOccurs="0" ref="rspec:virtual_uuid"/>
+      <xs:element minOccurs="0" ref="rspec:virtual_node_uuid"/>
       <xs:element minOccurs="0" ref="rspec:virtual_interface_name"/>
-      <xs:element minOccurs="0" ref="rspec:component_uuid"/>
+      <xs:element minOccurs="0" ref="rspec:component_node_uuid"/>
       <xs:element minOccurs="0" ref="rspec:component_interface_name"/>
     </xs:sequence>
   </xs:complexType>
-  <xs:element name="virtual_uuid" type="xs:string"/>
+  <xs:element name="virtual_node_uuid" type="xs:string"/>
   <xs:element name="virtual_interface_name" type="xs:string"/>
-  <xs:element name="component_uuid" type="xs:string"/>
+  <xs:element name="component_node_uuid" type="xs:string"/>
   <xs:element name="component_interface_name" type="xs:string"/>
   <xs:group name="InterfaceDecl">
     <xs:sequence>
       <xs:element name="interface">
         <xs:complexType>
-          <xs:attribute name="name" use="required"/>
+          <xs:attribute name="virtual_name"/>
+          <xs:attribute name="component_name"/>
         </xs:complexType>
       </xs:element>
     </xs:sequence>
   </xs:group>
   <xs:attributeGroup name="ComponentSpec">
-    <xs:attribute name="aggregate_uuid" use="required"/>
+    <xs:attribute name="component_manager_uuid" use="required"/>
     <xs:attribute name="component_name"/>
     <xs:attribute name="component_uuid" use="required"/>
     <xs:attribute name="sliver_uuid"/>
@@ -89,6 +90,12 @@
   <xs:element name="component_path">
     <xs:complexType>
       <xs:sequence>
+        <xs:element name="link">
+          <xs:complexType>
+            <xs:group ref="rspec:LinkEndPoints"/>
+            <xs:attributeGroup ref="rspec:ComponentSpec"/>
+          </xs:complexType>
+        </xs:element>
         <xs:sequence minOccurs="0" maxOccurs="unbounded">
           <xs:element name="link">
             <xs:complexType>
@@ -102,12 +109,6 @@
             </xs:complexType>
           </xs:element>
         </xs:sequence>
-        <xs:element name="link">
-          <xs:complexType>
-            <xs:group ref="rspec:LinkEndPoints"/>
-            <xs:attributeGroup ref="rspec:ComponentSpec"/>
-          </xs:complexType>
-        </xs:element>
       </xs:sequence>
     </xs:complexType>
   </xs:element>
