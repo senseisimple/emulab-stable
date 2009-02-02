@@ -148,7 +148,7 @@ main(int argc, char **argv)
 	else {
 		err = query_bootinfo_db(target.sin_addr,
 					boot_info.version,
-					boot_whatp);
+					boot_whatp, NULL);
 		if (err) {
 			fatal("Could not send bootinfo packet!");
 		}

@@ -1426,7 +1426,7 @@ CREATE TABLE `images` (
   `ezid` tinyint(4) NOT NULL default '0',
   `shared` tinyint(4) NOT NULL default '0',
   `global` tinyint(4) NOT NULL default '0',
-  `mbr_version` tinyint(4) NOT NULL default '1',
+  `mbr_version` varchar(50) NOT NULL default '1',
   `updated` datetime default NULL,
   `access_key` varchar(64) default NULL,
   PRIMARY KEY  (`imageid`),
@@ -4155,4 +4155,19 @@ CREATE TABLE `wires` (
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
+
+---
+--- Table structure for table `openvpn_config`
+---
+
+DROP TABLE IF EXISTS `sw_configfiles`;
+CREATE TABLE `sw_configfiles` (
+  `id` int(11) NOT NULL auto_increment,
+  `node_id` varchar(32) NOT NULL,
+  `connection_id` int(11) NOT NULL default '0',
+  `file` varchar(4) NOT NULL,
+  `data` text,
+  `swid` varchar(20) NOT NULL,
+   PRIMARY KEY(`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 

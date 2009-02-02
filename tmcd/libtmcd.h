@@ -63,6 +63,7 @@ typedef struct {
 	char		eventkey[TBDB_FLEN_PRIVKEY];
 	char		sfshostid[TBDB_FLEN_SFSHOSTID];
 	char		testdb[TBDB_FLEN_TINYTEXT];
+	char		privkey[TBDB_FLEN_PRIVKEY+1];
 } tmcdreq_t;
 
 typedef struct {

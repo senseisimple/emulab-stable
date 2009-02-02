@@ -12,7 +12,7 @@ int		bootinfo_init(void);
 int		bootinfo(struct in_addr ipaddr,
 			 struct boot_info *info, void *opaque);
 int		query_bootinfo_db(struct in_addr ipaddr, int version,
-				  struct boot_what *info);
+				  struct boot_what *info, char *key);
 int		elabinelab_hackcheck(struct sockaddr_in *target);
 
 extern int debug;

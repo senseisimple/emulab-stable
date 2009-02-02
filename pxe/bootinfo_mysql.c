@@ -47,13 +47,20 @@ open_bootinfo_db(void)
 */
 
 int
-query_bootinfo_db(struct in_addr ipaddr, int version, boot_what_t *info)
+query_bootinfo_db(struct in_addr ipaddr, int version, boot_what_t *info, char* key)
 {
 	int		nrows, rval = 0;
 	MYSQL_RES	*res;
 	MYSQL_ROW	row;
 	char		ipstr[32];
+	int		haskey=0;
 
+	char		savedkey[HOSTKEY_LENGTH];
+	if(key != NULL)
+		{
+		strncpy(savedkey, key, HOSTKEY_LENGTH);
+		haskey=1;
+		}
 	info->cmdline[0] = 0;	/* Must zero first byte! */
 	info->flags      = 0;
 	strcpy(ipstr, inet_ntoa(ipaddr));
@@ -77,40 +84,66 @@ query_bootinfo_db(struct in_addr ipaddr, int version, boot_what_t *info)
 #define DEFINED(x)		(row[(x)] != NULL && row[(x)][0] != '\0')
 #define TOINT(x)		(atoi(row[(x)]))
 
-	res = mydb_query("select n.def_boot_osid, n.def_boot_cmd_line, "
-			 "        odef.path, odef.mfs, pdef.partition, "
-			 "       n.temp_boot_osid, "
-			 "        otemp.path, otemp.mfs, ptemp.partition, "
-			 "       n.next_boot_osid, n.next_boot_cmd_line, "
-			 "        onext.path, onext.mfs, pnext.partition, "
-			 "       r.pid,n.pxe_boot_path "
-			 " from interfaces as i "
-			 "left join nodes as n on i.node_id=n.node_id "
-			 "left join reserved as r on i.node_id=r.node_id "
-			 "left join partitions as pdef on "
-			 "     n.node_id=pdef.node_id and "
-			 "     n.def_boot_osid=pdef.osid "
-			 "left join os_info as odef on "
-			 "     odef.osid=n.def_boot_osid "
-			 "left join partitions as ptemp on "
-			 "     n.node_id=ptemp.node_id and "
-			 "     n.temp_boot_osid=ptemp.osid "
-			 "left join os_info as otemp on "
-			 "     otemp.osid=n.temp_boot_osid "
-			 "left join partitions as pnext on "
-			 "     n.node_id=pnext.node_id and "
-			 "     n.next_boot_osid=pnext.osid "
-			 "left join os_info as onext on "
-			 "     onext.osid=n.next_boot_osid "
-			 "left outer join "
-			 "  (select type,attrvalue from node_type_attributes "
-			 "     where attrkey='nobootinfo' and attrvalue='1' "
-			 "     group by type) as nobootinfo_types "
-			 "  on n.type=nobootinfo_types.type "
-			 "where i.IP='%s' "
-			 "  and nobootinfo_types.attrvalue is NULL",
-			 16, inet_ntoa(ipaddr));
-
+	if(! haskey) {
+		res = mydb_query("select n.def_boot_osid, n.def_boot_cmd_line, "
+				 "        odef.path, odef.mfs, pdef.partition, "
+				 "       n.temp_boot_osid, "
+				 "        otemp.path, otemp.mfs, ptemp.partition, "
+				 "       n.next_boot_osid, n.next_boot_cmd_line, "
+				 "        onext.path, onext.mfs, pnext.partition, "
+				 "       r.pid,n.pxe_boot_path "
+				 " from interfaces as i "
+				 "left join nodes as n on i.node_id=n.node_id "
+				 "left join reserved as r on i.node_id=r.node_id "
+				 "left join partitions as pdef on "
+				 "     n.node_id=pdef.node_id and "
+				 "     n.def_boot_osid=pdef.osid "
+				 "left join os_info as odef on "
+				 "     odef.osid=n.def_boot_osid "
+				 "left join partitions as ptemp on "
+				 "     n.node_id=ptemp.node_id and "
+				 "     n.temp_boot_osid=ptemp.osid "
+				 "left join os_info as otemp on "
+				 "     otemp.osid=n.temp_boot_osid "
+				 "left join partitions as pnext on "
+				 "     n.node_id=pnext.node_id and "
+				 "     n.next_boot_osid=pnext.osid "
+				 "left join os_info as onext on "
+				 "     onext.osid=n.next_boot_osid "
+				 "left outer join "
+				 "  (select type,attrvalue from node_type_attributes "
+				 "     where attrkey='nobootinfo' and attrvalue='1' "
+				 "     group by type) as nobootinfo_types "
+				 "  on n.type=nobootinfo_types.type "
+				 "where i.IP='%s' "
+				 "  and nobootinfo_types.attrvalue is NULL",
+				 16, inet_ntoa(ipaddr));
+	}
+	else { /* User provided a widearea hostkey, so they don't have a necessarily-unique IP address. */
+		/* This is meant to be similar to the above, but queries on the wideareanodekey instead. */
+		res = mydb_query("SELECT n.def_boot_osid, n.def_boot_cmd_line, "
+				 "odef.path, odef.mfs, pdef.partition, "
+				 "n.temp_boot_osid, "
+				 "otemp.path, otemp.mfs, ptemp.partition, "
+				 "n.next_boot_osid, n.next_boot_cmd_line, "
+				 "onext.path, onext.mfs, pnext.partition, "
+				 "r.pid,n.pxe_boot_path "
+				 "FROM nodes AS n "
+				 "LEFT JOIN reserved AS r ON n.node_id=r.node_id "
+				 "LEFT JOIN partitions AS pdef ON n.node_id=pdef.node_id AND n.def_boot_osid=pdef.osid "
+				 "LEFT JOIN os_info AS odef ON odef.osid=n.def_boot_osid "
+				 "LEFT JOIN partitions AS ptemp ON n.node_id=ptemp.node_id AND n.temp_boot_osid=ptemp.osid "
+				 "LEFT JOIN os_info AS otemp ON otemp.osid=n.temp_boot_osid "
+				 "LEFT JOIN partitions AS pnext ON n.node_id=pnext.node_id AND n.next_boot_osid=pnext.osid "
+				 "LEFT JOIN os_info AS onext ON onext.osid=n.next_boot_osid "
+				 "LEFT OUTER JOIN "
+					"(SELECT type,attrvalue FROM node_type_attributes WHERE attrkey='nobootinfo' AND attrvalue='1' GROUP BY type) "
+				 	"AS nobootinfo_types ON n.type=nobootinfo_types.type "
+				 "WHERE n.node_id IN "
+					"(SELECT node_id FROM widearea_nodeinfo WHERE privkey='%s') "
+					"AND nobootinfo_types.attrvalue IS NULL;", 16, savedkey);
+	}
+	
 	if (!res) {
 		error("Query failed for host %s\n", ipstr);
 		/* XXX Wrong. Should fail so client can request again later */

@@ -189,8 +189,9 @@ typedef struct {
 	char		sfshostid[TBDB_FLEN_SFSHOSTID];
 	char		testdb[TBDB_FLEN_TINYTEXT];
 	char		tmcd_redirect[TBDB_FLEN_TINYTEXT];
+	char            privkey[TBDB_FLEN_PRIVKEY+1];
 } tmcdreq_t;
-static int	iptonodeid(struct in_addr, tmcdreq_t *);
+static int	iptonodeid(struct in_addr, tmcdreq_t *, char*);
 static int	checkdbredirect(tmcdreq_t *);
 
 #ifdef EVENTSYS
@@ -1025,18 +1026,25 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	/*
 	 * Map the ip to a nodeid.
 	 */
-	if ((err = iptonodeid(client->sin_addr, reqp))) {
-		if (reqp->isvnode) {
-			error("No such vnode %s associated with %s\n",
-			      reqp->vnodeid, inet_ntoa(client->sin_addr));
-		}
-		else {
-			error("No such node: %s\n",
-			      inet_ntoa(client->sin_addr));
-		}
+	if(havekey) {
+		if((err = iptonodeid(client->sin_addr, reqp, privkey))) {
+			error("No such node with wanode_key [%s]\n", privkey);
 		goto skipit;
+		}
 	}
-	
+	else {
+	if ((err = iptonodeid(client->sin_addr, reqp, NULL))) {
+			if (reqp->isvnode) {
+				error("No such vnode %s associated with %s\n",
+				      reqp->vnodeid, inet_ntoa(client->sin_addr));
+			}
+			else {
+				error("No such node: %s\n",
+				      inet_ntoa(client->sin_addr));
+			}
+			goto skipit;
+		}
+	}	
 	/*
 	 * Redirect geni sliver nodes to the tmcd of their origin.
 	 */
@@ -3748,7 +3756,8 @@ COMMAND_PROTOTYPE(doloadinfo)
 	char		buf[MYBUFSIZE];
 	char		*bufp = buf, *ebufp = &buf[sizeof(buf)];
 	char		*disktype, *useacpi, *useasf, address[MYBUFSIZE];
-	int		disknum, zfill, mbrvers;
+	char		mbrvers[51];
+	int		disknum, zfill;
 
 	/*
 	 * Get the address the node should contact to load its image
@@ -3819,9 +3828,9 @@ COMMAND_PROTOTYPE(doloadinfo)
 	zfill = 0;
 	if (row[4] && row[4][0])
 		zfill = atoi(row[4]);
-	mbrvers = 1;
+	strcpy(mbrvers,"1");
 	if (row[5] && row[5][0])
-		mbrvers = atoi(row[5]);
+		strcpy(mbrvers, row[5]);
 
 	/*
 	 * Get disk type and number
@@ -3870,7 +3879,7 @@ COMMAND_PROTOTYPE(doloadinfo)
 		}
 	}
 	bufp += OUTPUT(bufp, ebufp - bufp,
-		       " DISK=%s%d ZFILL=%d ACPI=%s MBRVERS=%d ASF=%s\n",
+		       " DISK=%s%d ZFILL=%d ACPI=%s MBRVERS=%s ASF=%s\n",
 		       disktype, disknum, zfill, useacpi, mbrvers, useasf);
 	mysql_free_result(res);
 
@@ -4362,7 +4371,7 @@ mydb_update(char *query, ...)
  * Map IP to node ID (plus other info).
  */
 static int
-iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
+iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp, char* nodekey)
 {
 	MYSQL_RES	*res;
 	MYSQL_ROW	row;
@@ -4378,7 +4387,51 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 	 * on the virtnodes. This is okay since all the routines that
 	 * check jailflag also check to see if its a vnode or physnode. 
 	 */
-	if (reqp->isvnode) {
+	if((nodekey != NULL) && (strlen(nodekey) > 1) ) { /* Widearea nodes have wanodekeys that should be used to get the nodeid. */
+		res = mydb_query("SELECT t.class,t.type,n.node_id,n.jailflag,"
+				 " r.pid,r.eid,r.vname,e.gid,e.testdb, "
+				 " n.update_accounts,n.role, "
+				 " e.expt_head_uid,e.expt_swap_uid, "
+				 " e.sync_server,t.class,t.type, "
+				 " t.isremotenode,t.issubnode,e.keyhash, "
+				 " nk.sfshostid,e.eventkey,0, "
+				 " 0,e.elab_in_elab,e.elabinelab_singlenet, "
+				 " e.idx,e.creator_idx,e.swapper_idx, "
+				 " u.admin,dedicated_wa_types.attrvalue "
+				 "   AS isdedicated_wa, "
+				 " r.genisliver_idx,r.tmcd_redirect "
+				 "FROM nodes AS n "
+				 "LEFT JOIN reserved AS r ON "
+				 "  r.node_id=n.node_id "
+				 "LEFT JOIN experiments AS e ON "
+				 " e.pid=r.pid and e.eid=r.eid "
+				 "LEFT JOIN node_types AS t ON "
+				 " t.type=n.type "
+				 "LEFT JOIN node_hostkeys AS nk ON "
+				 " nk.node_id=n.node_id "
+				 "LEFT JOIN users AS u ON "
+				 " u.uid_idx=e.swapper_idx "
+				 "LEFT OUTER JOIN "
+				 "  (SELECT type,attrvalue "
+				 "    FROM node_type_attributes "
+				 "    WHERE attrkey='nobootinfo' "
+				 "      AND attrvalue='1' "
+				 "     GROUP BY type) AS nobootinfo_types "
+				 "  ON n.type=nobootinfo_types.type "
+				 "LEFT OUTER JOIN "
+				 "  (SELECT type,attrvalue "
+				 "   FROM node_type_attributes "
+				 "   WHERE attrkey='dedicated_widearea' "
+				 "   GROUP BY type) AS dedicated_wa_types "
+				 "  ON n.type=dedicated_wa_types.type "
+				"WHERE n.node_id IN "
+                                        "(SELECT node_id FROM widearea_nodeinfo WHERE privkey='%s') "
+				 "  AND nobootinfo_types.attrvalue IS NULL",
+				 32, nodekey);
+
+	}
+
+	else if (reqp->isvnode) {
 		res = mydb_query("select vt.class,vt.type,np.node_id,"
 				 " nv.jailflag,r.pid,r.eid,r.vname, "
 				 " e.gid,e.testdb,nv.update_accounts, "
@@ -4482,6 +4535,12 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 	strncpy(reqp->pclass, row[14], sizeof(reqp->pclass));
 	strncpy(reqp->ptype,  row[15], sizeof(reqp->ptype));
 	strncpy(reqp->nodeid, row[2],  sizeof(reqp->nodeid));
+	if(nodekey != NULL) {
+		strncpy(reqp->privkey, nodekey, TBDB_FLEN_PRIVKEY); 
+	}
+	else {
+		strcpy(reqp->privkey, ""); 
+	}
 	reqp->islocal      = (! strcasecmp(row[16], "0") ? 1 : 0);
 	reqp->jailflag     = (! strcasecmp(row[3],  "0") ? 0 : 1);
 	reqp->issubnode    = (! strcasecmp(row[17], "0") ? 0 : 1);
@@ -7567,6 +7626,11 @@ COMMAND_PROTOTYPE(dobootwhat)
 
 	boot_info.opcode  = BIOPCODE_BOOTWHAT_REQUEST;
 	boot_info.version = BIVERSION_CURRENT;
+
+	if(strlen(reqp->privkey) > 1) { /* We have a private key, so prepare bootinfo for it. */
+		boot_info.opcode = BIOPCODE_BOOTWHAT_KEYED_REQUEST;
+		strncpy(boot_info.data, reqp->privkey, TBDB_FLEN_PRIVKEY);
+	}
 
 	if (bootinfo(reqp->client, &boot_info, (void *) reqp)) {
 		OUTPUT(buf, sizeof(buf), "STATUS=failed\n");

@@ -27,9 +27,10 @@ void
 usage()
 {
 	fprintf(stderr,
-		"Usage: %s <options> [-d] [-s bossnode]\n"
+		"Usage: %s <options> [-d] [-k hostkey] [-s bossnode]\n"
 		"options:\n"
 		"-d         - Turn on debugging\n"
+		"-k         - Specify a widearea hostkey to be used instead of IP for identification\n"
 		"-s         - Boss Node\n",
 		progname);
 	exit(-1);
@@ -46,16 +47,20 @@ main(int argc, char **argv)
 	extern char		build_info[];
 	struct hostent	       *he;
 	struct timeval		timeout;
+	char* 			hostkey = NULL;
 
 	progname = argv[0];
 
-	while ((c = getopt(argc, argv, "dhvs:")) != -1) {
+	while ((c = getopt(argc, argv, "dhvk:s:")) != -1) {
 		switch (c) {
 		case 'd':
 			debug++;
 			break;
 		case 's':
 			bossnode = optarg;
+			break;
+		case 'k':
+			hostkey = optarg;
 			break;
 		case 'v':
 		    	fprintf(stderr, "%s\n", build_info);
@@ -75,6 +80,12 @@ main(int argc, char **argv)
 
 	if (debug)
 		printf("%s\n", build_info);
+
+	if((hostkey != NULL) && ((strlen(hostkey) > HOSTKEY_LENGTH) || (strlen(hostkey) == 0))) {
+		warn("provided hostkey [%s] is not valid (too big or small)", hostkey);
+		exit(1);
+	}
+
 
 	/* Make sure we can map target */
 	if ((he = gethostbyname(bossnode)) == NULL) {
@@ -121,6 +132,10 @@ main(int argc, char **argv)
 	bzero(&boot_info, sizeof(boot_info));
 	boot_info.version = BIVERSION_CURRENT;
 	boot_info.opcode  = BIOPCODE_BOOTWHAT_REQUEST;
+	if(hostkey != NULL) {
+		strcpy(boot_info.data, hostkey);
+		boot_info.opcode = BIOPCODE_BOOTWHAT_KEYED_REQUEST;
+	}
 
 	while (1) {
 		struct sockaddr_in	client;

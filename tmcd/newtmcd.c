@@ -788,16 +788,24 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	/*
 	 * Map the ip to a nodeid.
 	 */
-	if ((err = iptonodeid(reqp, client->sin_addr))) {
-		if (reqp->isvnode) {
-			error("No such vnode %s associated with %s\n",
-			      reqp->vnodeid, inet_ntoa(client->sin_addr));
-		}
-		else {
-			error("No such node: %s\n",
-			      inet_ntoa(client->sin_addr));
-		}
+	if(havekey) {
+	if(err = iptonodeid(reqp, client->sin_addr, privkey)) {
+		error("No such node with wanode_key [%s]\n", privkey);
 		goto skipit;
+		}
+	}
+	else {
+	if ((err = iptonodeid(reqp, client->sin_addr, NULL))) {
+			if (reqp->isvnode) {
+				error("No such vnode %s associated with %s\n",
+				      reqp->vnodeid, inet_ntoa(client->sin_addr));
+			}
+			else {
+				error("No such node: %s\n",
+				      inet_ntoa(client->sin_addr));
+			}
+			goto skipit;
+		}
 	}
 
 	/*

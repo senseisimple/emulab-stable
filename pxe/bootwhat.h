@@ -26,6 +26,8 @@
 #define  MAX_BOOT_PATH		256
 #define  MAX_BOOT_CMDLINE	((MAX_BOOT_DATA - MAX_BOOT_PATH) - 32)
 
+#define	 HOSTKEY_LENGTH 	129
+
 typedef struct boot_info {
 	short   version;
 	short	opcode;
@@ -39,6 +41,7 @@ typedef struct boot_info {
 #define BIOPCODE_BOOTWHAT_ACK		3	/* Ack to Reply */
 #define BIOPCODE_BOOTWHAT_ORDER		4	/* Unsolicited command */
 #define BIOPCODE_BOOTWHAT_INFO		5	/* Request for bootinfo */
+#define BIOPCODE_BOOTWHAT_KEYED_REQUEST 6	/* Request for bootinfo, with key data stuffed into the data portion */
 
 /* Version */
 #define BIVERSION_CURRENT		1	/* First version is zero */

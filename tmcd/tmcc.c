@@ -232,6 +232,12 @@ main(int argc, char **argv)
 		usage();
 	}
 
+#ifndef _WIN32
+	if( (! unixpath) && (0==access("/etc/emulab/emulab-privkey", R_OK)) ) {
+		keyfile = strdup("/etc/emulab/emulab-privkey");
+	}
+#endif
+
 #ifdef _WIN32
         /*Windows requires us to start up the version of the network API that we want*/
 	if(WSAStartup( MAKEWORD( 2, 2 ), &wsaData )) {

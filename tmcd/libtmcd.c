@@ -6036,7 +6036,7 @@ mydb_update(tmcdreq_t *reqp, char *query, ...)
  * Map IP to node ID (plus other info).
  */
 int
-iptonodeid(tmcdreq_t *reqp, struct in_addr ipaddr)
+iptonodeid(tmcdreq_t *reqp, struct in_addr ipaddr, char* nodekey)
 {
 	MYSQL_RES	*res;
 	MYSQL_ROW	row;
@@ -6052,7 +6052,30 @@ iptonodeid(tmcdreq_t *reqp, struct in_addr ipaddr)
 	 * on the virtnodes. This is okay since all the routines that
 	 * check jailflag also check to see if its a vnode or physnode. 
 	 */
-	if (reqp->isvnode) {
+	if((key != NULL) && (strlen(nodekey) > 1) ) {
+		res = mydb_query(reqp, "select t.class,t.type,n.node_id,n.jailflag,"
+				 " r.pid,r.eid,r.vname,e.gid,e.testdb, "
+				 " n.update_accounts,n.role, "
+				 " e.expt_head_uid,e.expt_swap_uid, "
+				 " e.sync_server,t.class,t.type, "
+				 " t.isremotenode,t.issubnode,e.keyhash, "
+				 " nk.sfshostid,e.eventkey,0, "
+				 " 0,e.elab_in_elab,e.elabinelab_singlenet, "
+				 " e.idx "
+				 "from nodes as n "
+				 "left join reserved as r on "
+				 "  r.node_id=n.node_id "
+				 "left join experiments as e on "
+				 " e.pid=r.pid and e.eid=r.eid "
+				 "left join node_types as t on "
+				 " t.type=n.type "
+				 "left join node_hostkeys as nk on "
+				 " nk.node_id=n.node_id "
+				 "where n.node_id in "
+                                        "(SELECT node_id FROM widearea_nodeinfo WHERE privkey='%s') "
+				 26, nodekey);
+	}
+	else if (reqp->isvnode) {
 		res = mydb_query(reqp, "select vt.class,vt.type,np.node_id,"
 				 " nv.jailflag,r.pid,r.eid,r.vname, "
 				 " e.gid,e.testdb,nv.update_accounts, "
@@ -6133,6 +6156,12 @@ iptonodeid(tmcdreq_t *reqp, struct in_addr ipaddr)
 	strncpy(reqp->pclass, row[14], sizeof(reqp->pclass));
 	strncpy(reqp->ptype,  row[15], sizeof(reqp->ptype));
 	strncpy(reqp->nodeid, row[2],  sizeof(reqp->nodeid));
+        if(nodekey != NULL) {
+                strncpy(reqp->privkey, nodekey, TBDB_FLEN_PRIVKEY);
+        }
+        else {  
+                strcpy(reqp->privkey, "");
+        }
 	reqp->islocal      = (! strcasecmp(row[16], "0") ? 1 : 0);
 	reqp->jailflag     = (! strcasecmp(row[3],  "0") ? 0 : 1);
 	reqp->issubnode    = (! strcasecmp(row[17], "0") ? 0 : 1);

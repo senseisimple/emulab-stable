@@ -66,6 +66,13 @@ bootinfo(struct in_addr ipaddr, struct boot_info *boot_info, void *opaque)
 	boot_what_t	*boot_whatp = (boot_what_t *) &boot_info->data;
 
 	switch (boot_info->opcode) {
+	case BIOPCODE_BOOTWHAT_KEYED_REQUEST:
+		info("%s: KEYED REQUEST (key=[%s], vers %d)\n",
+			inet_ntoa(ipaddr), boot_info->data, boot_info->version);
+		/* XXX For right now I'm not going to worry about making the event system work in this
+			code path. */
+		err = query_bootinfo_db(ipaddr, boot_info->version, boot_whatp, boot_info->data);
+		break;
 	case BIOPCODE_BOOTWHAT_REQUEST:
 	case BIOPCODE_BOOTWHAT_INFO:
 		info("%s: REQUEST (vers %d)\n",
@@ -77,7 +84,7 @@ bootinfo(struct in_addr ipaddr, struct boot_info *boot_info, void *opaque)
 				     TBDB_NODESTATE_PXEBOOTING);
 #endif
 		err = query_bootinfo_db(ipaddr,
-					boot_info->version, boot_whatp);
+					boot_info->version, boot_whatp, NULL);
 		break;
 
 	default:
