@@ -172,7 +172,8 @@ foreach my $file (@files) {
 	if ($single && $file != $start);
 
     my $fullpath = join("/", @dots) . "/$file";
-    my $revision = join(".", @dots) . ".$file";
+    my $revision = join(".", @dots);
+    $revision .= (@dots ? "." : "") . $file;
 
     print "Processing update $fullpath\n";
 
