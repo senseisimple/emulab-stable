@@ -28,6 +28,9 @@ include "../../assign/top.rnc" {
         "planetlab-vserver" | "emulab-vnode" }?,
         NodeSpec.NodeType,
 
+	# Information about the physical location of the node.
+	LocationSpec?,
+
         # Indicate whether or not this node is available - the idea is that a
         # full dump of the static physical topology will not include this, but
         # that we can later get updates that include only this attribute (and a
@@ -41,7 +44,7 @@ include "../../assign/top.rnc" {
         # solely for human-readability.
         attribute virtual_name { text }?,
         attribute virtual_uuid { text }?,
-	(LinkComponentSpec | PathComponentSpec)?,
+	(LinkComponentSpec, HopComponentSpec*)?
         LinkEndPoints,
         ## The characteristics (bandwidth, latency, loss) which affect traffic.
         LinkCharacteristics,
@@ -57,6 +60,15 @@ include "../../assign/top.rnc" {
 	element virtual_interface_name { text }?,
 	element component_node_uuid { text }?,
         element component_interface_name { text }?
+}
+
+LocationSpec = element location {
+	# The two-letter ISO 3166 code for the country the node is in.
+	attribute country { text },
+	# Longitude and Lattitude coordinates of the node using the
+	# WGS 84 standard.
+	attribute longitude { text }?,
+	attribute lattitude { text }?
 }
 
 InterfaceDecl = element interface {
@@ -79,14 +91,9 @@ ComponentSpec =
 
 LinkComponentSpec = element component_link { ComponentSpec }
 
-PathComponentSpec = element component_path {
-    element link { ComponentSpec, LinkEndPoints },
-    (element link { ComponentSpec, LinkEndPoints},
-     element node
-     {
-	ComponentSpec
-     }
-    )*
+HopComponentSpec = element component_hop {
+    element node { ComponentSpec },
+    element link { ComponentSpec, LinkEndPoints}
 }
 
 RSpec = element rspec {
