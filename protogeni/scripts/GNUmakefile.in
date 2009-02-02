@@ -14,7 +14,8 @@ include $(OBJDIR)/Makeconf
 SBIN_STUFF	= cleanupslice
 PSBIN_STUFF	= register_resources expire_daemon gencrl postcrl \
 		  createcerts initsite addauthority getcacerts \
-		  gencrlbundle shutdownslice remauthority listusage
+		  gencrlbundle shutdownslice remauthority listusage \
+		  update
 
 # These scripts installed setuid, with sudo. 
 SETUID_BIN_SCRIPTS   = 
