@@ -44,7 +44,7 @@ include "../../assign/top.rnc" {
         # solely for human-readability.
         attribute virtual_name { text }?,
         attribute virtual_uuid { text }?,
-	(LinkComponentSpec, HopComponentSpec*)?
+	(LinkComponentSpec, HopComponentSpec*)?,
         LinkEndPoints,
         ## The characteristics (bandwidth, latency, loss) which affect traffic.
         LinkCharacteristics,
