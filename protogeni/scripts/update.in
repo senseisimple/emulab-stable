@@ -9,8 +9,7 @@ use English;
 use Getopt::Std;
 
 #
-# Initialize an emulab to act as a protogeni emulab. Add optional -c
-# option if this is a clearinghouse.
+# Update Protogeni stuff.
 # 
 sub usage()
 {
