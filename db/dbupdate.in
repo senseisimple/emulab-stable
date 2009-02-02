@@ -107,7 +107,7 @@ if (!defined($version)) {
 	    $version = "4.0";
 	}
 	else {
-	    $version = "1.0";
+	    $version = "0";
 	}
     }
     elsif (!$query_result->numrows) {
