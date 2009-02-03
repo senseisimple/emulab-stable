@@ -219,7 +219,10 @@ script-install:	dir-install $(SCRIPTS)
 	$(INSTALL) -m 755 $(SRCDIR)/slicefix $(BINDIR)/slicefix
 	$(INSTALL) -m 755 $(SRCDIR)/freebsd_to_linux_disk $(BINDIR)/freebsd_to_linux_disk
 	$(INSTALL) -m 755 $(SRCDIR)/check_disklabel $(BINDIR)/check_disklabel
-	$(INSTALL) -m 755 $(SRCDIR)/extract_kernel_version $(BINDIR)/extract-kernel-version
+	$(INSTALL) -m 755 $(SRCDIR)/linux_slicefix $(BINDIR)
+	$(INSTALL) -m 755 $(SRCDIR)/extract_kernel_info $(BINDIR)
+	$(INSTALL) -m 755 $(SRCDIR)/extract_initrd_info $(BINDIR)
+	$(INSTALL) -m 755 $(SRCDIR)/extract_image_info $(BINDIR)
 	$(INSTALL) -m 755 $(SRCDIR)/get_edd_map $(BINDIR)/testbed
 	$(INSTALL) -m 755 -s ../findif $(BINDIR)/findif
 	$(INSTALL) -m 755 $(SRCDIR)/rc.linux $(BINDIR)/rc
