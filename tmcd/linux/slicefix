@@ -29,14 +29,6 @@ case $# in
 	exit 1
 esac
 
-map_disk()
-{
-	local disk=$1
-	local map=$2
-
-	sed -n "s/^$disk=//p" $map
-}
-
 linux_disk=`$BINDIR/freebsd_to_linux_disk $freebsd_disk $part`
 lrootdev=${linux_disk#* }
 linux_disk=${linux_disk%% *}
@@ -419,118 +411,9 @@ lilogetkernel() {
 }
 
 dolinux() {
-	# attempt to mount filesystem   
-	if [ $OS = FreeBSD ]; then
-		rootdev=/dev/${disk}s${part}
-		echo "fixing Linux root partition ${disk}s${part}"
-		fstype=ext2fs
-	elif [ $OS = Linux ]; then
-		rootdev=/dev/${disk}${part}
-		echo "fixing Linux root partition ${disk}${part}"
-		fstype=ext3
-	fi
-	mount -t $fstype $rootdev /mnt 2> /dev/null || {
-		fstype=ext2
-		mount -t $fstype $rootdev /mnt || {
-			echo "$fstype mount of $rootdev failed"
-			return 1
-		}
-	}
 
-	# hardwire the boss node
-	if [ $setboss -eq 1 -a -d /mnt/etc/emulab ]; then
-	    echo "  hardwiring boss to $bossnode"
-	    cp $ETCDIR/bossnode /mnt/etc/emulab/bossnode || {
-	        echo "Failed to create /etc/emulab/bossnode"
-		umount $rootdev
-		return 1
-	    }
-	fi
-
-	$BINDIR/remap_ide_disks > /tmp/disk_map
-	new_disk=`map_disk $linux_disk /tmp/disk_map`
-	translated_rootdev=/dev/$new_disk$part
-
-	$BINDIR/guess_linux_root_device /mnt $rootdev $translated_rootdev
-	lilo_commandline=`cat /mnt/var/emulab/boot/runlilo 2> /dev/null`
-
-	# Remove swap partitions from fstab; they will be added again
-	# by rc.linux after boot.
-	awk '{ if ($3 != "swap") print; }' /mnt/etc/fstab > /mnt/etc/fstab.new
-	mv -f /mnt/etc/fstab.new /mnt/etc/fstab
-
-	#
-	# If there's a GRUB config file, update all root=X kernel params.
-	#
-	fgconf=/boot/grub/grub.conf
-	gconf=/mnt$fgconf
-        if [ ! -r $gconf ]; then
-	    echo "Could not find $fgconf; trying /boot/grub/menu.lst"
-	    fgconf=/boot/grub/menu.lst
-	    gconf=/mnt$fgconf
-	fi
-	if [ -r $gconf ]; then
-		gdisk=''
-		# Use EDD to figure out the BIOS drive number
-		#
-		# HACK: we only look for BIOS drives 0x8[0-9] so we
-		# don't have to convert to/from hex and do math. The
-		# The EDD code in the kernel currently only supports
-		# 0x80-0x85 anyway.
-
-		gdisk=`sed -n "s/^$linux_disk=\(8[0-9]\)/\1/p" \
-		       $BOOTDIR/edd_map`
-		if [ -n "$gdisk" ]; then
-		    echo "  EDD says $linux_disk is BIOS drive 0x$gdisk"
-		    gdisk=${gdisk#8}
-		fi
-
-		# We fall back to our old guessing method if EDD
-		# doesn't work.
-		if [ x$gdisk = x ]; then
-		    gdisk=`echo $translated_rootdev | \
-			   sed -e 's/^.*\(.\)$/\1/;y/abcdefgh/01234567/'`
-		    if [ $FLASHBOOT -eq 1 ]; then
-			gdisk=`expr $gdisk + 1`
-		    fi
-		fi
-		gpart=`expr $part - 1`
-		#
-		# If we booted from a flash device we also have to further tweak
-		# grub's notion of root disk since the flash device will be "hd0".
-		# It appears that we do NOT have to update Linux's drive mapping.
-		#
-		cp -pf /mnt/$fgconf /mnt/$fgconf.orig
-		sed -i -e "s;root (hd[0-9],[0-9]);root (hd${gdisk},${gpart});" $gconf || {
-		    echo "Failed to update root in $fgconf"
-		}
-
-	fi
-
-	if [ -f /mnt/var/lib/random-seed -a -c /dev/urandom ]; then
-	    echo "  updating /var/lib/random-seed"
-	    dd if=/dev/urandom of=/mnt/var/lib/random-seed bs=512 count=1 >/dev/null 2>&1
-	fi
-
-	# run any postconfig scripts:
-	if [ -x $BINDIR/osconfig ]; then
-	    echo "Checking for dynamic client-side updates to slice...";
-	    $BINDIR/osconfig -m /mnt -M "-t $fstype" -f $fstype \
-		-D $rootdev -s Linux postload
-	fi
-
-	umount $rootdev
-
-	if [ "x${lilo_commandline}" != x ]; then
-	    echo -n "  "
-	    # setup one time lilo command line, must be done after unmount
-	    $BINDIR/groklilo -c "$lilo_commandline" $part /dev/$disk || {
-		echo "Failed to set LILO command line"
-		return 1
-	    }
-	fi
-
-	return 0
+	$BINDIR/linux_slicefix $part $linux_disk
+	return $?
 }
 
 fixone() {

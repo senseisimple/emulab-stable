@@ -26,9 +26,9 @@ check_ide_disk() {
 	local file="$1"
 	grep 'ide[-_]disk' "$file" > /dev/null
 	if [ $? -eq 0 ]; then
-		echo "ide-disk: yes"
+		echo "kernel_supports_ide=yes"
 	else
-		echo "ide-disk: no"
+		echo "kernel_supports_ide=no"
 	fi
 }
 
@@ -37,7 +37,7 @@ dump_version() {
 	local version=`sed -n -r '/Linux version/p' "$file" | \
 	    tr -d -c ' -~' | cut -d' ' -f3`
 
-	echo "version: $version"
+	echo "kernel_version=$version"
 }
 
 IKCFG_ST="0x49 0x4b 0x43 0x46 0x47 0x5f 0x53 0x54"

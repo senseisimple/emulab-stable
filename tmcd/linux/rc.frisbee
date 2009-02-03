@@ -408,6 +408,8 @@ fi
 # and replace if not.
 if [ "$PARTITION" != "0" ]; then
     install_mbr /dev/$DISK $MBR
+    echo "Resizing final disk partition"
+    growdisk -vW /dev/$DISK
 fi
 
 # If not zeroing the disk and we are loading a full disk image
@@ -423,11 +425,6 @@ fi
 if [ $is_remote -eq 0 -a $PARTITION -eq 0 -a $ZFILL -eq 0 ]; then
 	zap_superblocks /dev/$DISK
 fi
-
-install_mbr /dev/$DISK $MBR
-
-echo "Resizing final disk partition"
-growdisk -vW /dev/$DISK
 
 if [ $OS = FreeBSD ]; then
 	# Make sure the write-cache is enabled on SCSI disks.  It makes a
@@ -459,6 +456,15 @@ if [ $OS = FreeBSD ]; then
 	if [ $turncacheoff -eq 1 ]; then
 	    $BINDIR/camwce off $DISK
 	fi
+fi
+
+# we resize the 4th partition after writing the image
+# if we used a full disk image.  Otherwise, the resize
+# happens before the image write in case we need the
+# extra partition for an image fetched via HTTP.
+if [ $PARTITION -eq 0 ]; then
+    echo "Resizing final disk partition"
+    growdisk -vW /dev/$DISK
 fi
 
 echo "Adjusting slice-related files"

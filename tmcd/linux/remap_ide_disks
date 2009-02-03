@@ -94,5 +94,6 @@ for dev in /sys/block/sd*; do
 	fi
 done
 
-cat /tmp/ide_disks /tmp/scsi_disks
+[ -f /tmp/ide_disks ] && cat /tmp/ide_disks
+[ -f /tmp/scsi_disks ] && cat /tmp/scsi_disks
 rm -f /tmp/ide_disks /tmp/scsi_disks

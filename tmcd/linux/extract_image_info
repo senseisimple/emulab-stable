@@ -1,0 +1,378 @@
+#! /bin/sh
+
+imageroot="$1"
+real_root_dev="$2"
+translated_root_dev="$3"
+
+initrd=''
+kernel=''
+commandline=''
+grub_config=''
+
+default_lilo_entry=''
+
+get_label()
+{
+	local dev="$1"
+	local label=''
+
+	if [ -x /lib/udev/vol_id ]; then
+		label=`/lib/udev/vol_id --label-raw $dev`
+	elif [ -x /sbin/blkid ]; then
+		label=`/sbin/blkid | \
+		       sed -n "s;^$dev"': *.*LABEL="\([^"]*\)".*;\1;p'`
+	else
+		return 1
+	fi
+
+	echo $label
+}
+
+get_uuid()
+{
+	local dev="$1"
+	local uuid=''
+
+	if [ -x /lib/udev/vol_id ]; then
+		uuid=`/lib/udev/vol_id --uuid-raw $dev`
+	elif [ -x /sbin/blkid ]; then
+		uuid=`/sbin/blkid | \
+		       sed -n "s;^$dev"': *.*UUID="\([^"]*\)".*;\1;p'`
+	else
+		return 1
+	fi
+
+	echo $uuid
+}
+
+extract_default_grub_entry()
+{
+	local imageroot="$1"
+	local grub_conf="$imageroot/$2"
+
+	local default=`sed -n 's/^default[ 	]*\([0-9]*\)$/\1/p' $grub_conf`
+	[ -z "$default" ] && default=0
+
+	local current_entry=-1
+	while read directive rest; do
+		[ -z "$directive" ] && continue
+		case $directive in
+			title)  
+				current_entry=$(( $current_entry + 1 ))
+				;;
+		esac            
+		
+		[ $current_entry -lt $default ] && continue
+		[ $current_entry -gt $default ] && break
+		
+		case $directive in
+			kernel)
+				kernel=${rest%% *}
+				commandline=${rest#* }
+				;;
+			initrd)
+				initrd="$rest"
+				;;
+		esac
+	done < $grub_conf
+}
+
+extract_default_lilo_entry()
+{
+	local imageroot=$1
+	local lilo_conf="$imageroot/etc/lilo.conf"
+
+	# Extract global settings in case the default entry doesn't
+	# have them specified.
+	local global_root=`sed -n \
+	                   's/^root[ 	]*=[ 	]*\(.*\)$/\1/p' \
+	                   $lilo_conf`
+	local global_initrd=`sed -n \
+	                     's/^initrd[ 	]*=[ 	]*\(.*\)$/\1/p' \
+	                     $lilo_conf`
+	if [ -z "$global_initrd" ]; then
+		global_initrd=`sed -n \
+		               's/^ramdisk[ 	]*=[ 	]*\(.*\)$/\1/p' \
+			       $lilo_conf`
+	fi
+	local global_append=`sed -n \
+	                     's/^append[ 	]*=[ 	]*"\(.*\)"$/\1/p' \
+	                     $lilo_conf`
+
+	local global_readonly=`sed -n 's/^read-only/ro/p' $lilo_conf`
+	if [ -z "$global_readonly" ]; then
+		global_readonly=`sed -n 's/^read-write/rw/p' $lilo_conf`
+	fi
+
+	# Get the default label.  If there isn't one, use the first
+	# defined label.
+	local default=`sed -n 's/^default[	]*=[ 	]*\(.*\)$/\1/p' \
+	               $lilo_conf`
+	if [ -z "$default" ]; then
+		default=`sed -n \
+		         's/^[ 	]*label[ 	]*=[ 	]*\(.*\)$/\1/p' \
+			 $lilo_conf | head -n1`
+	fi
+
+	default_lilo_entry="$default"
+
+	local current_image=''
+	local current_initrd=''
+	local current_append=''
+	local current_root=''
+	local current_readonly=''
+
+	local found_image=0
+	while read line; do
+		line=`echo "$line" | sed 's/[ 	]*=[ 	]*/=/'`
+		[ -z "$line" ] && continue
+		case "$line" in
+			image=*)
+				[ $found_image -eq 1 ] && break
+				current_image=${line#*=}
+				current_root=''
+				current_readonly=''
+				current_initrd=''
+				current_append=''
+				;;
+			label=*|alias=*)
+				if [ ${line#*=} = $default ]; then
+					found_image=1
+				fi
+				;;
+			append=*)
+				current_append=${line#*=}
+				current_append=${current_append#\"}
+				current_append=${current_append%\"}
+				;;
+			initrd=*|ramdisk=*)
+				current_initrd=${line#*=}
+				;;
+			root=*)
+				current_root=${line#*=}
+				;;
+			read-only)
+				current_readonly=ro
+				;;
+			read-write)
+				current_readonly=rw
+				;;
+		esac
+	done < $lilo_conf
+
+	[ -z "$current_initrd" ] && current_initrd="$global_initrd"
+	[ -z "$current_append" ] && current_append="$global_append"
+	[ -z "$current_root" ] && current_root="$global_root"
+
+	local found_root=0
+	local found_readonly=0
+	for token in $current_append; do
+		case $token in
+			root=*)
+				found_root=1
+				;;
+			ro|rw)
+				found_readonly=1
+				;;
+		esac
+	done
+	if [ $found_readonly -eq 0 ]; then
+		current_append="$current_append $current_readonly"
+	fi
+	if [ $found_root -eq 0 ]; then
+		current_append="$current_append root=$current_root"
+	fi
+
+	kernel="$current_image"
+	commandline="$current_append"
+	initrd="$current_initrd"
+}
+
+get_bootloader_name()
+{
+	local device=$1
+	
+	# Check for GRUB first because it doesn't write to the first part of the MBR.
+	# Anything that was there before will still be there, so if LILO was previously
+	# installed the string 'LILO' will be present as well as 'GRUB'.  LILO uses
+	# the whole MBR, so we don't need to do anything special to detect it properly.
+	local bootloader=unknown
+	if dd if=$real_root_dev bs=512 count=1 2> /dev/null| grep GRUB > /dev/null; then
+		bootloader=GRUB
+	elif dd if=$real_root_dev bs=512 count=1 2> /dev/null| grep LILO > /dev/null; then
+		bootloader=LILO
+	fi
+
+	echo $bootloader
+}
+
+get_swap_partitions()
+{
+	local device="$1"
+	
+	/sbin/fdisk -l "$device" | grep 'Linux swap' | cut -d' ' -f1
+}
+
+swapon_handles_label()
+{
+	local imageroot="$1"
+
+	cd "$imageroot"
+	local supports_label=0
+	if grep libblkid.so bin/swapon > /dev/null 2>&1 \
+		grep LABEL bin/swapon > /dev/null 2>&1; then
+		supports_label=1
+	elif [ -x sbin/udevd ] && [ -x lib/udev/vol_id ] && \
+	     grep '[^#]*vol_id' etc/udev/rules.d/* > /dev/null; then
+		:
+		supports_label=1
+	fi
+
+	if [ $supports_label -eq 1 ]; then
+		swapon_can_use_label=yes
+	fi
+}
+
+mount_handles_uuid()
+{
+	local imageroot="$1"
+
+	cd "$imageroot"
+	local supports_uuid=0
+	if grep libblkid.so sbin/mount > /dev/null 2>&1 && \
+		grep UUID sbin/mount > /dev/null 2>&1; then
+		supports_uuid=1
+	fi
+	
+	if [ $supports_uuid -eq 1 ]; then
+		mount_can_use_uuid=yes
+	fi
+}
+
+swapon_handles_uuid()
+{
+	local imageroot="$1"
+
+	cd "$imageroot"
+	local supports_uuid=0
+	if grep libblkid.so sbin/swapon > /dev/null 2>&1 && \
+		grep UUID sbin/swapon > /dev/null 2>&1; then
+		supports_uuid=1
+	fi
+	
+	if [ $supports_uuid -eq 1 ]; then
+		swapon_can_use_uuid=yes
+	fi
+}
+
+
+mount_handles_label()
+{
+	local imageroot="$1"
+
+	cd "$imageroot"
+	local supports_label=0
+	if grep libblkid.so bin/mount > /dev/null 2>&1 \
+		grep LABEL bin/mount > /dev/null 2>&1; then
+		supports_label=1
+	elif [ -x sbin/udevd ] && [ -x lib/udev/vol_id ] && \
+	     grep '[^#]*vol_id' etc/udev/rules.d/* > /dev/null; then
+		:
+		supports_label=1
+	fi
+
+	if [ $supports_label -eq 1 ]; then
+		mount_can_use_label=yes
+	fi
+}
+
+extract_root_from_commandline()
+{
+	local commandline="$@"
+
+	for token in $commandline; do
+		case $token in
+			root=*)
+				echo ${token#root=}
+				break
+				;;
+		esac
+	done
+}
+
+extract_root_from_fstab()
+{
+	local imageroot="$1"
+
+	while read device dir rest; do
+		[ -z "$device" ] && continue
+		case $device in
+			\#*)
+				continue
+				;;
+		esac
+		if [ $dir = / ]; then
+			echo $device
+			break
+		fi
+	done < $imageroot/etc/fstab
+}
+
+bootloader=`get_bootloader_name $real_root_dev`
+
+case $bootloader in
+	unknown)
+		echo "unknown bootloader on $real_root_dev" 1>&2
+		exit 1
+		;;
+	LILO)
+		if ! [ -f $imageroot/etc/lilo.conf ]; then
+			echo "Can't find LILO config" 1>&2
+			exit 1
+		fi
+		extract_default_lilo_entry $imageroot
+		echo "default_lilo_entry=$default_lilo_entry"
+		;;
+	GRUB)
+		grub_config=''
+		for file in /boot/grub/grub.conf /etc/grub.conf /boot/grub/menu.lst; do
+			if [ -f "$imageroot/$file" ]; then
+				grub_config="$file"
+				break
+			fi
+		done
+		if [ -z "$grub_config" ]; then
+			echo "Can't find GRUB config" 1>&2
+			exit 1
+		fi
+		echo "grub_config=\"$grub_config\""
+		extract_default_grub_entry $imageroot $grub_config
+		;;
+esac
+
+fstab_root=`extract_root_from_fstab $imageroot`
+bootloader_root=`extract_root_from_commandline $commandline`
+
+echo "bootloader=\"$bootloader\""
+echo "kernel=\"$kernel\""
+echo "initrd=\"$initrd\""
+echo "fstab_root=\"$fstab_root\""
+echo "bootloader_root=\"$bootloader_root\""
+echo "root_label=\"`get_label $real_root_dev`\""
+echo "root_uuid=\"`get_uuid $real_root_dev`\""
+
+mount_can_use_label=no
+mount_can_use_uuid=no
+swapon_can_use_label=no
+swapon_can_use_uuid=no
+mount_handles_label $imageroot && mount_can_use_label=yes
+mount_handles_uuid $imageroot && mount_can_use_uuid=yes
+swapon_handles_label $imageroot && swapon_can_use_label=yes
+swapon_handles_uuid $imageroot && swapon_can_use_uuid=yes
+
+echo "mount_handles_label=$mount_can_use_label"
+echo "mount_handles_uuid=$mount_can_use_uuid"
+echo "swapon_handles_label=$swapon_can_use_label"
+echo "swapon_handles_uuid=$swapon_can_use_uuid"
+
+exit 0

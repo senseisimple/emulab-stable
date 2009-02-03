@@ -1,0 +1,394 @@
+#! /bin/sh
+
+if [ -r /etc/emulab/paths.sh ]; then
+	. /etc/emulab/paths.sh
+else
+	BINDIR=/etc/testbed
+	BOOTDIR=/etc/testbed
+	ETCDIR=/etc/testbed
+fi
+
+if [ -r $ETCDIR/isflash ]; then
+    FLASHBOOT=1
+else
+    FLASHBOOT=0
+fi
+
+if [ -r $ETCDIR/bossnode ]; then
+    bossnode=`cat $ETCDIR/bossnode`;
+    setboss=1
+else
+    setboss=0
+fi
+
+
+
+#imageroot="$1"
+#real_root_dev="$2"
+#translated_root_dev="$3"
+
+initrd=''
+
+default_lilo_entry=''
+
+get_uuid()
+{
+	local dev="$1"
+	local uuid=''
+
+	if [ -x /lib/udev/vol_id ]; then
+		uuid=`/lib/udev/vol_id --uuid-raw $dev`
+	elif [ -x /sbin/blkid ]; then
+		uuid=`/sbin/blkid | \
+		       sed -n "s;^$dev"': *.*UUID="\([^"]*\)".*;\1;p'`
+	else
+		return 1
+	fi
+
+	[ -n "$uuid" ] && echo UUID=$uuid
+}
+
+kernel_version_compare()
+{
+        local version1="$1"
+        local version2="$2"
+	local rc=0
+
+        version1=`echo $version1 | sed 's/^\([0-9]*\.[0-9]*\.[0-9]*\).*$/\1/'`
+        local version1_major=${version1%%.*}
+        local version1_minor=${version1#*.}
+        local version1_maintenance=${version1_minor#*.}
+        version1_minor=${version1_minor%.*}
+
+        version2=`echo $version2 | sed 's/^\([0-9]*\.[0-9]*\.[0-9]*\).*$/\1/'`
+        local version2_major=${version2%%.*}
+        local version2_minor=${version2#*.}
+        local version2_maintenance=${version2_minor#*.}
+        version2_minor=${version2_minor%.*}
+
+        if [ $version1_major -lt $version2_major ]; then
+                rc=-1
+        elif [ $version1_major -gt $version2_major ]; then
+                rc=1
+        elif [ $version1_minor -lt $version2_minor ]; then
+                rc=-1
+        elif [ $version1_minor -gt $version2_minor ]; then
+                rc=1
+        elif [ $version1_maintenance -lt $version2_maintenance ]; then
+                rc=-1
+        elif [ $version1_maintenance -gt $version2_maintenance ]; then
+                rc=1
+        fi
+
+	echo $rc
+}
+
+get_swap_partitions()
+{
+	local device="$1"
+	
+	/sbin/fdisk -l "$device" | grep 'Linux swap' | cut -d' ' -f1
+}
+
+rewrite_fstab()
+{
+	local imageroot="$1"
+	local old_root="$2"
+	local new_root="$3"
+
+	sed -i "s;$old_root;$new_root;g" $imageroot/etc/fstab
+}
+
+rewrite_grub_config()
+{
+	local imageroot="$1"
+	local grub_config="$2"
+	local old_root="$3"
+	local new_root="$4"
+
+	sed -i "s;$old_root;$new_root;g" "$imageroot/$grub_config"
+}
+
+rewrite_lilo_config()
+{
+        local imageroot="$1"
+        local lilo_conf="$imageroot/etc/lilo.conf"
+        local old_root="$2"
+        local new_root="$3"
+
+        sed -i '/^[ 	]*root=/d' $lilo_conf
+        sed -i '/append=/s;[ 	]*root=[^" 	]*;;g' $lilo_conf
+        sed -i "/append=/s;\"\$; root=$new_root\";g" $lilo_conf
+
+	# Set the special flag that says we need to finish fixing LILO after
+	# boot, and dump the one-time default LILO command-line so that
+	# slicefix can find out what it is.
+	echo "$default_lilo_entry root=$new_root" > \
+	    $imageroot/var/emulab/boot/runlilo
+}
+
+map_disk()
+{
+	local disk=$1
+	local map=$2
+
+	sed -n "s/^$disk=//p" $map
+}
+
+case $# in
+1)
+	part=$1
+	;;
+2)
+	part=$1
+	disk=$2
+	;;
+*)
+	echo "Usage: $0 partition [disk]"
+	exit 1
+esac
+
+imageroot=/mnt
+real_root_dev=/dev/${disk}${part}
+echo "fixing Linux root partition ${disk}${part}"
+fstype=ext3
+mount -t $fstype $real_root_dev /mnt 2> /dev/null || {
+	fstype=ext2
+	mount -t $fstype $real_root_dev /mnt || {
+		echo "$fstype mount of $real_root_dev failed" 1>&2
+		exit 1
+	}
+}
+
+$BINDIR/remap_ide_disks > /tmp/disk_map
+new_disk=`map_disk $disk /tmp/disk_map`
+translated_root_dev=/dev/$new_disk$part
+
+# XXX Ugly, disgusting compatibility hack follows
+
+# Recent (as of 2009-01-25) Linux distros use the new PATA drivers
+# instead of the IDE ones to control IDE disks.  This makes disks
+# that were formerly named /dev/hd* now /dev/sd*, just like SCSI,
+# SATA, and everything else.  Since this is the Way of the Future(TM),
+# our scripts assume PATA drivers are in use during the loading
+# process.  However, we must support older and custom-built kernels
+# that use the IDE drivers.
+
+# To do this, we try to use the root filesystem UUID instead of an
+# actual block device where possible.  This is what current distro
+# installers do anyway.  If mounting by UUID isn't supported, we
+# use the filesystem label.  If that doesn't work, and the system
+# has IDE disks installed, we attempt to guess what the root device
+# will be called by the installed kernel based on the version and
+# whether it has support for IDE compiled into the kernel itself.
+# Finally, if all else fails, we just use the device name we
+# currently have for it (which will always be /dev/sd*).
+
+# All this is done by grepping for magic strings in various binaries
+# on the installed root partition, in the installed kernel, and
+# in the initrd/initramfs (if present).  This is extremely ugly,
+# and not guaranteed to be correct.  Unfortunately, there isn't
+# a more reasonable way to do this.
+
+# Once we stop supporting kernels that use the IDE drivers, all of this
+# crap can be removed.  The root partition will then be specified by
+# UUID if possible, or the /dev/sd* disk device if not.
+
+echo "Getting image info..."
+$BINDIR/extract_image_info $imageroot $real_root_dev > /tmp/image_info
+. /tmp/image_info
+cat /tmp/image_info
+
+echo ""
+echo "Getting initrd info..."
+$BINDIR/extract_initrd_info "$imageroot/$initrd" > /tmp/initrd_info
+. /tmp/initrd_info
+cat /tmp/initrd_info
+
+kernel_supports_ide=no
+system_has_pata=no
+older_kernel=no
+if ! [ $real_root_dev = $translated_root_dev ]; then
+	system_has_pata=yes
+
+	# We only care about checking the kernel if one or both of the initrd
+	# or mount requires a real device name.  This also only matters if
+	# there are PATA disks in the system.
+	if ( [ $mount_handles_uuid = no ]  && [ $mount_handles_label = no ] ) || \
+	   ( [ $initrd_handles_uuid = no ] && [ $initrd_handles_label = no ] ); then
+		echo ""
+		echo "Getting kernel info..."
+		$BINDIR/extract_kernel_info "$imageroot/$kernel" > \
+			/tmp/kernel_info
+		. /tmp/kernel_info
+		cat /tmp/kernel_info
+		# Old kernel, so assume we need to deal with IDE devices
+		#
+		# 2.6.21 is the first version of Fedora's kernel that supported
+		# PATA instead of IDE.  Obviously it's possible for a kernel
+		# older than 2.6.21 to use PATA, but not very likely.  This is
+		# a Quick-and-Dirty(TM) hack, but it should catch all the older
+		# images that can't use labels or UUIDs and don't have PATA
+		# support.
+		if [ `kernel_version_compare $kernel_version 2.6.21` -lt 0 ]
+	       	then
+			# If the kernel is this old, it almost certainly uses
+			# IDE.  Assume this in case an old kernel has IDE
+			# support provided by modules in the initramfs.
+			older_kernel=yes
+			kernel_supports_ide=yes
+		fi
+	fi
+fi
+
+echo ""
+
+# Older kernels didn't have PATA support, so they had to support IDE
+if [ $older_kernel = yes ]; then
+	kernel_supports_ide=yes
+fi
+
+# Determine the name of the root device to pass on the kernel commandline
+if [ -n "$root_uuid" ] && [ $initrd_handles_uuid = yes ]; then
+	new_bootloader_root="UUID=$root_uuid"
+elif [ $initrd_handles_uuid = no ] && [ $initrd_handles_label = yes ]; then
+	new_bootloader_root="LABEL=$root_label"
+elif [ $initrd_handles_uuid = no ] && [ $initrd_handles_label = no ]; then
+	if [ $system_has_pata = yes ] && [ $kernel_supports_ide = yes ]; then
+		new_bootloader_root=$translated_root_dev
+	else
+		new_bootloader_root=$real_root_dev
+	fi
+fi
+
+# Determine the name of the root device for /etc/fstab
+if [ -n "$root_uuid" ] && [ $mount_handles_uuid = yes ]; then
+	new_fstab_root="UUID=$root_uuid"
+elif [ $mount_handles_uuid = no ] && [ $mount_handles_label = yes ]; then
+	new_fstab_root="LABEL=$root_label"
+elif [ $mount_handles_uuid = no ] && [ $mount_handles_label = no ]; then
+	if [ $system_has_pata = yes ] && [ $kernel_supports_ide = yes ]; then
+		new_fstab_root=$translated_root_dev
+	else
+		new_fstab_root=$real_root_dev
+	fi
+fi
+
+# XXX End ugly, disgusting compatibility hack
+
+echo "Rewriting /etc/fstab to use '$new_fstab_root' as root device"
+rewrite_fstab $imageroot $fstab_root $new_fstab_root
+
+echo "Rewriting $bootloader config to use '$new_bootloader_root' as root device"
+if [ $bootloader = LILO ]; then
+	rewrite_lilo_config $imageroot $bootloader_root \
+	    $new_bootloader_root
+elif [ $bootloader = GRUB ]; then
+	rewrite_grub_config $imageroot $grub_config \
+	    $bootloader_root $new_bootloader_root
+fi
+
+if [ $bootloader = GRUB ] && [ -r $imageroot/$grub_config ]; then
+	gdisk=''
+	#linux_disk=${real_root_dev##*/}
+	#part=`echo $linux_disk | sed 's/.*\([0-9][0-9]*\)$/\1/'`
+	#linux_disk=${linux_disk%$part}
+	# Use EDD to figure out the BIOS drive number
+	#
+	# HACK: we only look for BIOS drives 0x8[0-9] so we
+	# don't have to convert to/from hex and do math. The
+	# The EDD code in the kernel currently only supports
+	# 0x80-0x85 anyway.
+
+	if [ -f $BOOTDIR/edd_map ]; then
+		gdisk=`sed -n "s/^$disk=\(8[0-9]\)/\1/p" \
+		       $BOOTDIR/edd_map`
+		if [ -n "$gdisk" ]; then
+		    echo -n "Using EDD to find BIOS drive number for $disk... "
+		    echo "0x$gdisk"
+		    gdisk=${gdisk#8}
+		fi
+	fi
+
+	# We fall back to our old guessing method if EDD
+	# doesn't work.
+	if [ x$gdisk = x ]; then
+	    echo -n "Guessing BIOS drive number for $disk... "
+	    gdisk=`echo $translated_root_dev | \
+		   sed -e 's/^.*\([a-h]\)[0-9]*$/\1/;y/abcdefgh/01234567/'`
+	    if [ "$FLASHBOOT" -eq 1 ]; then
+		gdisk=`expr $gdisk + 1`
+	    fi
+	    echo "0x8$gdisk"
+	fi
+	gpart=$(( $part - 1 ))
+	#
+	# If we booted from a flash device we also have to further tweak
+	# grub's notion of root disk since the flash device will be "hd0".
+	# It appears that we do NOT have to update Linux's drive mapping.
+	#
+	
+	echo "GRUB root device is (hd$gdisk,$gpart)"
+	cp -pf $imageroot/$grub_config $imageroot/$grub_config.orig
+	sed -i -e "s;root (hd[0-9],[0-9]);root (hd${gdisk},${gpart});" $imageroot/$grub_config || {
+	    echo "Failed to update root in $grub_config" 1>&2
+	}
+
+fi
+
+# Remove swap partitions from fstab
+awk '{ if ($3 != "swap") print; }' $imageroot/etc/fstab > /tmp/fstab.new
+mv -f /tmp/fstab.new $imageroot/etc/fstab
+
+if [ -x /sbin/mkswap ]; then
+	root_disk=`echo $real_root_dev | sed 's/[0-9]*$//'`
+	translated_root_disk=`echo $translated_root_dev | sed 's/[0-9]*$//'`
+	for swap in `get_swap_partitions $root_disk`; do
+		echo "Making swap partition on $swap"
+		/sbin/mkswap $swap > /dev/null || continue
+		uuid=`get_uuid $swap`
+		if [ $swapon_handles_label = yes ] && [ -n "$uuid" ]; then
+			swapdev="UUID=$uuid"
+		elif [ $kernel_supports_ide = yes ]; then
+			swapdev="$translated_root_disk${swap##$root_disk}"
+		else
+			swapdev=$swap
+		fi
+		
+		echo -e "$swapdev\t\tnone\t\t\tswap\tsw\t\t0 0" >> $imageroot/etc/fstab
+	done
+fi
+
+if [ -f $imageroot/var/lib/random-seed -a -c /dev/urandom ]; then
+    echo "Updating /var/lib/random-seed"
+    dd if=/dev/urandom of=$imageroot/var/lib/random-seed bs=512 count=1 >/dev/null 2>&1
+fi
+
+# hardwire the boss node
+if [ $setboss -eq 1 -a -d $imageroot/etc/emulab ]; then
+    echo "Hardwiring boss to $bossnode"
+    cp $ETCDIR/bossnode $imageroot/etc/emulab/bossnode || {
+	echo "Failed to create /etc/emulab/bossnode" 1>&2
+	exit 1
+    }
+fi
+
+lilo_commandline=`cat $imageroot/var/emulab/boot/runlilo 2> /dev/null`
+
+# run any postconfig scripts:
+if [ -x $BINDIR/osconfig ]; then
+    echo "Checking for dynamic client-side updates to slice...";
+    $BINDIR/osconfig -m $imageroot -M "-t $fstype" -f $fstype \
+	-D $real_root_dev -s Linux postload
+fi
+
+umount $real_root_dev
+
+if [ "x${lilo_commandline}" != x ]; then
+    echo -n "  "
+    # setup one time lilo command line, must be done after unmount
+    $BINDIR/groklilo -c "$lilo_commandline" $part /dev/$disk || {
+	echo "Failed to set LILO command line" 1>&2
+	exit 1
+    }
+fi
