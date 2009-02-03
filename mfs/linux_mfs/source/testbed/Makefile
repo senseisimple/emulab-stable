@@ -63,8 +63,10 @@ script-install:
 	install -m 755 $(TMCD_PATH)/linux/check_disklabel $(TARGET_PATH)/etc/testbed
 	install -m 755 $(TMCD_PATH)/linux/remap_ide_disks $(TARGET_PATH)/etc/testbed
 	install -m 755 $(TMCD_PATH)/linux/get_edd_map $(TARGET_PATH)/etc/testbed
-	install -m 755 $(TMCD_PATH)/linux/extract_kernel_version $(TARGET_PATH)/etc/testbed
-	install -m 755 $(TMCD_PATH)/linux/guess_linux_root_device $(TARGET_PATH)/etc/testbed
+	install -m 755 $(TMCD_PATH)/linux/extract_kernel_info $(TARGET_PATH)/etc/testbed
+	install -m 755 $(TMCD_PATH)/linux/extract_image_info $(TARGET_PATH)/etc/testbed
+	install -m 755 $(TMCD_PATH)/linux/extract_initrd_info $(TARGET_PATH)/etc/testbed
+	install -m 755 $(TMCD_PATH)/linux/linux_slicefix $(TARGET_PATH)/etc/testbed
 	install -m 755 $(TESTBED_PATH)/install/newclient $(TARGET_PATH)/etc/testbed
 	install -m 755 $(TMCD_PATH)/common/paths.sh $(TARGET_PATH)/etc/emulab
 	install -m 755 $(TMCD_PATH)/common/paths.pm $(TARGET_PATH)/etc/emulab
