@@ -62,7 +62,7 @@ else:
     # Get the slice credential.
     #
     print "Asking for slice credential for " + SLICENAME
-    myslice = get_slice_credential( SLICENAME, mycredential )
+    myslice = get_slice_credential( response[ "value" ], mycredential )
     print "Got the slice credential"
     pass
 
