@@ -10,6 +10,9 @@ use English;
 use Getopt::Std;
 use Math::BigInt;
 
+use lib "@prefix@/lib";
+use libdb qw(TBGetSiteVar);
+
 sub usage()
 {
     print("Usage: ptopgen [-v] [-s switch] [-p pid [-e eid]] [-m factor] " .
@@ -41,6 +44,8 @@ my $mnetedges = 0;
 my $prune     = 0;
 my $do_xml    = 0;
 my $genimode  = 0;
+
+my $cmuuid = TBGetSiteVar('protogeni/cm_uuid');
 
 my $delaycap_override;
 
@@ -168,6 +173,37 @@ while (($node,$card,$port,$iface,$type) = $result->fetchrow_array) {
     if ((defined $type) && ($type ne "")) {
 	$interfacetypes{"$node:$card:$port"} = $type;
     }
+}
+
+my %nodetouuid;
+my %nodetoavailable;
+
+$result = DBQueryFatal("SELECT n.node_id, n.eventstate, n.role, n.uuid, " .
+		       "b.node_id, nt.isremotenode, " .
+		       "dedicated_wa_types.attrvalue " .
+		       "from nodes as n " .
+		       "left join reserved as b on n.node_id=b.node_id " .
+		       "left join node_types as nt on nt.type=n.type " .
+		       "left outer join " .
+		       "  (select type, attrvalue " .
+		       "   from node_type_attributes " .
+		       "   where attrkey='dedicated_widearea' " .
+		       "   group by type) as dedicated_wa_types " .
+		       "  on nt.type=dedicated_wa_types.type " .
+		       "where nt.isvirtnode = 0 or nt.isvirtnode is null;");
+while (($node,$eventstate, $role, $uuid, $reserved, $isremotenode,
+	$wa_attrvalue) = $result->fetchrow_array) {
+    $nodetouuid{$node} = $uuid;
+    my $islocal = $role eq 'testnode'
+	&& ((! defined($isremotenode) || $isremotenode == 0)
+	    || (defined($wa_attrvalue) && $wa_attrvalue == 1));
+    my $isup = defined($eventstate)
+	&& ($eventstate eq "TBDB_NODESTATE_ISUP"
+	    || $eventstate eq "TBDB_NODESTATE_PXEWAIT"
+	    || $eventstate eq "TBDB_NODESTATE_POWEROFF"
+	    || $eventstate eq "TBDB_NODESTATE_ALWAYSUP");
+    my $isfree = !$islocal || (! defined($reserved) && $isup);
+    $nodetoavailable{$node} = $isfree;
 }
 
 # Read class/type maps
@@ -831,8 +867,6 @@ if ($widearea) {
     }
 }
 
-# TODO: interface reading used to be here.
-
 # Read interface types. First need to find the protocols an interface supports
 # and then then the speed for each of those protocols.
 # Note that we are going to assume anything attached to a switch is ethernet.
@@ -1186,8 +1220,7 @@ sub print_node
     } elsif ($genimode) {
 	# rspec format
 	print "<node ";
-	# TODO: component_manager_uuid
-	print "component_manager_uuid=\"00000\" ";
+	print "component_manager_uuid=\"${cmuuid}\" ";
 	print "component_name=\"$name\" ";
 	if (defined($uuid)) {
 	    print " component_uuid=\"$uuid\" ";
@@ -1195,7 +1228,14 @@ sub print_node
 	print ">\n";
 	# TODO: Virtualization type
 	print_node_types(@$types);
-	# TODO: Available
+	if ($nodetoavailable{$name})
+	{
+	    print "  <available>true</available>";
+	}
+	else
+	{
+	    print "  <available>false</available>";
+	}
 	print_node_interfaces(@$interfaces);
 	print "</node>\n";
     } else {
@@ -1332,7 +1372,7 @@ sub print_named_link_xml
     if ($genimode) {
 	print "<link>\n";
 	print "  <component_link ";
-	print "component_manager_uuid=\"00000\" ";
+	print "component_manager_uuid=\"${cmuuid}\" ";
 	print "component_name=\"$name\" ";
 # TODO: link uuid
 	print "component_uuid=\"00000\" ";
@@ -1362,8 +1402,14 @@ sub print_interface_contents
     my $node = shift(@_);
     my $interface = shift(@_);
     if ($genimode) {
-# TODO: component_node_uuid
-	print "    <component_node_uuid>$node</component_node_uuid>\n";
+	print "    <component_node_uuid>";
+	my $uuid = $nodetouuid{$node};
+	if (defined($uuid)) {
+	    print "$uuid";
+	} else {
+	    print "0000";
+	}
+	print "</component_node_uuid>\n";
 	print "    <component_interface_name>$interface</component_interface_name>\n";
     } else {
 	print "    <node_name>$node</node_name>\n";
