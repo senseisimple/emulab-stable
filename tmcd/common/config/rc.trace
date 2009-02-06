@@ -141,7 +141,7 @@ sub doboot()
     # Create the /local partition to hold the logs, and mkdir the log
     # directory. This works on Linux too!
     #
-    if (! JAILED()) {
+    if (! JAILED() && ! GENVNODE()) {
 	if (! -d "/local") {
 	    system("mkdir /local") == 0
 		or fatal("Could not mkdir /local");
@@ -234,7 +234,7 @@ sub doboot()
 	    $optargs .= " -P " . (4442 + $idx);
 	}
 
-	if (! JAILED() && ! PLAB() ) {
+	if (! JAILED() && ! GENVNODE() && ! PLAB() ) {
 	    #
 	    # Need the ethernet address for the vnode so we can create an ether
 	    # rule for tcpdump. We want to make sure that we get the correct

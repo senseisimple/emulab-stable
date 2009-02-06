@@ -71,13 +71,18 @@ if (@ARGV) {
 # switch to it.
 #
 my $KERNEL100	= "emulab";
-my $KERNELJAIL  = "jail";
+# XXX: this has the same problems calling GENVNODETYPE() does -- need to 
+# make vnode type explicit from tmcd!
+my $KERNELJAIL  = GENVNODETYPE();
 my $KERNELLDELAY= "linkdelay";
 # just use the linkdelay kernel; it's all the same...
 my $KERNELDELAY = $KERNELLDELAY;
 
-my $TMDELMAP	= TMDELMAP;	# Really comes from libloc.
-my $TC          = "/usr/local/sbin/tc";               # This is the working version!
+my $TMDELMAP	= TMDELMAP;	              # Really comes from libloc.
+my $TC          = "/usr/local/sbin/tc";       # This is the working version!
+if (! -e $TC && -e "/sbin/tc") {              # If we hacked iproute rpm
+    $TC = "/sbin/tc";
+}
 my $IPTABLES    = "/usr/local/sbin/iptables"; # This is the working version!
 my $IFCONFIG    = "/sbin/ifconfig";
 my $MODPROBE    = "/sbin/modprobe";

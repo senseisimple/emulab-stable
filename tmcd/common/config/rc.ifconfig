@@ -182,6 +182,46 @@ sub doboot()
 	    # with a local interface. 
 	    push(@ifacemap, "$iface $inet $mac");
 	}
+	elsif ($ifconfig->{ISVIRT} 
+	       && (GENVNODE() && GENVNODETYPE() eq 'openvz')) {
+	    #
+	    # Yes, these are veths, but we config them from the inside just
+	    # like for a phys node!
+	    #
+	    my $inet     = $ifconfig->{IPADDR};
+	    my $type     = $ifconfig->{ITYPE};
+	    my $mask     = $ifconfig->{IPMASK};
+	    my $mac      = $ifconfig->{VMAC};
+	    my $speed    = $ifconfig->{SPEED};
+	    my $duplex   = $ifconfig->{DUPLEX};
+	    my $aliases  = $ifconfig->{ALIASES};
+	    my $iface    = $ifconfig->{IFACE};
+	    my $settings = $ifconfig->{SETTINGS};
+	    my $lan      = $ifconfig->{LAN};
+	    my $ifrtabid = undef;
+
+	    my ($upline, $downline) =
+		os_ifconfig_line($iface, $inet, $mask,
+				 $speed, $duplex, $aliases,
+				 $type, $lan, $settings,
+				 $ifrtabid, \%oscookie);
+		    
+	    if (defined($upline) && $upline) {
+		$upcmds .= "$upline\n    ";
+		$upcmds .= TMROUTECONFIG . " $inet up\n    "
+		    if ($inet ne "");
+	    }
+		
+	    if (defined($downline)) {
+		$downcmds .= TMROUTECONFIG . " $inet down\n    "
+		    if ($inet ne "");
+		$downcmds .= "$downline\n    ";
+	    }
+
+	    # Trivially parsable map for users, which associate an IP
+	    # with a local interface. 
+	    push(@ifacemap, "$iface $inet $mac");
+	}
 	else {
 	    my $itype	 = $ifconfig->{ITYPE};
 	    my $inet     = $ifconfig->{IPADDR};

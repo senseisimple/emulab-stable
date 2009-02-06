@@ -21,19 +21,20 @@ use Exporter;
 	 jailsetup dojailconfig findiface libsetup_getvnodeid 
 	 ixpsetup libsetup_refresh gettopomap getfwconfig gettiptunnelconfig
 	 gettraceconfig genhostsfile getmotelogconfig calcroutes fakejailsetup
-	 getlocalevserver
+	 getlocalevserver genvnodesetup getgenvnodeconfig stashgenvnodeconfig
 
 	 TBDebugTimeStamp TBDebugTimeStampsOn
 
 	 MFS REMOTE REMOTEDED CONTROL WINDOWS JAILED PLAB LOCALROOTFS IXP USESFS 
+
 	 SIMTRAFGEN SIMHOST ISDELAYNODEPATH JAILHOST DELAYHOST STARGATE
-	 ISFW FAKEJAILED LINUXJAILED
+	 ISFW FAKEJAILED LINUXJAILED GENVNODE GENVNODETYPE GENVNODEHOST
 
 	 CONFDIR LOGDIR TMDELAY TMJAILNAME TMSIMRC TMCC TMCCBIN
 	 TMNICKNAME TMSTARTUPCMD FINDIF
 	 TMROUTECONFIG TMLINKDELAY TMDELMAP TMTOPOMAP TMLTMAP TMLTPMAP
 	 TMGATEDCONFIG TMSYNCSERVER TMKEYHASH TMNODEID TMEVENTKEY 
-	 TMCREATOR TMSWAPPER TMFWCONFIG
+	 TMCREATOR TMSWAPPER TMFWCONFIG TMGENVNODECONFIG 
        );
 
 # Must come after package declaration!
@@ -94,6 +95,11 @@ my $injail;
 my $inlinuxjail;
 
 #
+# True if running inside a vm.
+#
+my $ingenvnode;
+
+#
 # True if running as a fake jail (no jail, just processes).
 # 
 my $nojail;
@@ -127,6 +133,7 @@ BEGIN
     # Make sure these exist! They will not exist on a PLAB vserver initially.
     mkdir("$VARDIR", 0775);
     mkdir("$VARDIR/jails", 0775);
+    mkdir("$VARDIR/vms", 0775);
     mkdir("$VARDIR/db", 0755);
     mkdir("$VARDIR/logs", 0775);
     mkdir("$VARDIR/boot", 0775);
@@ -159,6 +166,15 @@ BEGIN
 
 	libsetup_setvnodeid($vid);
 	$inplab = 1;
+    }
+    elsif (-e "$BOOTDIR/vmname") {
+	open(VN, "$BOOTDIR/vmname");
+	my $vid = <VN>;
+	close(VN);
+
+	libsetup_setvnodeid($vid);
+	$ingenvnode = 1;
+
     }
 
     $role = "";
@@ -196,9 +212,36 @@ sub TMLTPMAP()		{ "$BOOTDIR/ltpmap";}
 sub JAILDIR()		{ "$VARDIR/jails/$vnodeid"; }
 
 #
+# This path is valid only *outside* the vm.  Sucks, but this is the best we
+# can do.  Probably the only way to make this vm-specific if necessary is to
+# have them create their dir and symlink.
+# 
+sub GENVNODEDIR()	{ "$VARDIR/vms/$vnodeid"; }
+
+#
+# XXX: eventually this needs to come from tmcd, but that's not ready yet.
+#
+sub GENVNODETYPE() {
+    if (-e "$ETCDIR/genvmtype") {
+	my $vmtype = `cat $ETCDIR/genvmtype`;
+	chomp($vmtype);
+	return $vmtype;
+    }
+
+    return undef;
+}
+
+#
 # Also valid outside the jail, this is where we put local project storage.
 #
-sub LOCALROOTFS()	{ (REMOTE() ? "/users/local" : "$VARDIR/jails/local");}
+sub LOCALROOTFS() {
+    return "/users/local" 
+	if (REMOTE());
+    return "$VARDIR/jails/local" 
+	if (JAILED());
+    return "$VARDIR/vms/local" 
+	if (GENVNODE());
+}
 
 #
 # Okay, here is the path mess. There are three environments.
@@ -211,7 +254,9 @@ sub LOCALROOTFS()	{ (REMOTE() ? "/users/local" : "$VARDIR/jails/local");}
 #
 sub CONFDIR() {
     return $BOOTDIR
-	if ($injail || $inplab);
+	if ($injail || $inplab || $ingenvnode);
+    return GENVNODEDIR() 
+	if ($vnodeid && GENVNODETYPE());
     return JAILDIR()
 	if ($vnodeid);
     return $BOOTDIR;
@@ -219,7 +264,9 @@ sub CONFDIR() {
 # Cause of fakejails, we want log files in the right place.
 sub LOGDIR() {
     return $LOGDIR
-	if ($injail || $inplab);
+	if ($injail || $inplab || $ingenvnode);
+    return GENVNODEDIR() 
+	if ($vnodeid && GENVNODETYPE());
     return JAILDIR() 
 	if ($vnodeid);
     return $LOGDIR;
@@ -232,6 +279,7 @@ sub TMNICKNAME()	{ CONFDIR() . "/nickname";}
 sub TMJAILNAME()	{ CONFDIR() . "/jailname";}
 sub TMFAKEJAILNAME()	{ CONFDIR() . "/fakejail";}
 sub TMJAILCONFIG()	{ CONFDIR() . "/jailconfig";}
+sub TMGENVNODECONFIG()  { CONFDIR() . "/genvnodeconfig";}
 sub TMSTARTUPCMD()	{ CONFDIR() . "/startupcmd";}
 sub TMROUTECONFIG()     { CONFDIR() . "/rc.route";}
 sub TMGATEDCONFIG()     { CONFDIR() . "/gated.conf";}
@@ -311,6 +359,11 @@ sub FAKEJAILED(){ if ($nojail) { return $vnodeid; } else { return 0; } }
 sub LINUXJAILED(){ if ($injail && $inlinuxjail) { return $vnodeid; } else { return 0; } }
 
 #
+# Are we using the generic vm abstraction for this vnode?  See above.
+#
+sub GENVNODE()  { if ($ingenvnode) { return $vnodeid; } else { return 0; } }
+
+#
 # Are we on plab?
 #
 sub PLAB()	{ if ($inplab) { return $vnodeid; } else { return 0; } }
@@ -333,6 +386,7 @@ sub SIMTRAFGEN(){ if (-e ISSIMTRAFGENPATH())  { return 1; } else { return 0; } }
 
 # A jail host?
 sub JAILHOST()  { if ($role eq "virthost") { return 1; } else { return 0; } }
+sub GENVNODEHOST() { if ($role eq "virthost") { return 1; } else { return 0; } }
 
 # A delay host?  Either a delay node or a node using linkdelays
 sub DELAYHOST()	{ if (-e ISDELAYNODEPATH()) { return 1; } else { return 0; } }
@@ -632,7 +686,7 @@ sub getifconfig($;$)
 	    # The pmac refers to the underlying physical interface the veth
 	    # is attached to, which we do not see from inside the jail.
 	    #
-	    if (JAILED()) {
+	    if (JAILED() || GENVNODE()) {
 		if (! ($iface = findiface($vmac))) {
 		    warn("*** WARNING: Could not map $vmac to a veth!\n");
 		    next;
@@ -1711,7 +1765,153 @@ sub vnodejailsetup($)
     dojailconfig();
 
     return ($pid, $eid, $vname);
-}    
+}   
+
+#
+# All we do is store it away in the file. This makes it avail later.
+# 
+sub stashgenvnodeconfig()
+{
+    my @tmccresults;
+
+    # XXX: use GENVNODECONFIG once it's written!
+    if (tmcc(TMCCCMD_JAILCONFIG, undef, \@tmccresults) < 0) {
+	warn("*** WARNING: Could not get genvnodeconfig from server!\n");
+	return -1;
+    }
+    return 0
+	if (! @tmccresults);
+
+    if (!open(RC, ">" . TMGENVNODECONFIG)) {
+	warn "*** WARNING: Could not write " . TMGENVNODECONFIG . "\n";
+	return -1;
+    }
+    foreach my $str (@tmccresults) {
+	print RC $str;
+    }
+    close(RC);
+    chmod(0755, TMGENVNODECONFIG);
+    return 0;
+}
+
+#
+# Return the generic vnode config info in a hash.  XXX: For now uses jailconfig.
+#
+sub getgenvnodeconfig($;$)
+{
+    my ($rptr,$nocache) = @_;
+    my @tmccresults = ();
+    my %vconfig = ();
+
+    my %tmccopts = ();
+    if ($nocache) {
+	$tmccopts{"nocache"} = 1;
+    }
+
+    # XXX uses jailconfig instead of genvmconfig
+    if (tmcc(TMCCCMD_JAILCONFIG, undef, \@tmccresults, %tmccopts) < 0) {
+	warn("*** WARNING: Could not get genvmconfig from server!\n");
+	%$rptr = ();
+	return -1;
+    }
+
+    foreach my $line (@tmccresults) {
+	if ($line =~ /^(.*)="(.*)"$/ ||
+	    $line =~ /^(.*)=(.+)$/) {
+	    if ($1 eq 'JAILIP' 
+		&& $2 =~ /^(\d+\.\d+\.\d+\.\d+),(\d+\.\d+\.\d+\.\d+)$/) {
+		$vconfig{"CTRLIP"} = $1;
+		$vconfig{"CTRLMASK"} = $2;
+	    }
+	}
+    }
+
+    %$rptr = %vconfig;
+    return 0;
+} 
+
+#
+# Virtual node vm setup. This happens outside in the root context.
+#
+sub genvnodesetup($;$$)
+{
+    my ($vid) = @_;
+
+    #
+    # Set global vnodeid for tmcc commands.
+    #
+    libsetup_setvnodeid($vid);
+
+    #
+    # This is the directory where the rc files go.
+    #
+    if (! -e GENVNODEDIR()) {
+	os_mkdir(GENVNODEDIR(),"0755");
+	#die("*** $0:\n".
+	#    "    No such directory: " . GENVNODEDIR() . "\n");
+    }
+
+    #
+    # Always remove the old nickname file.  No need to worry about a project
+    # change at this level (see bootsetup) but we do need to make sure we
+    # pick up on a vnode/jail being reassigned to a different virtual node.
+    #
+    unlink TMNICKNAME;
+
+    # Do not bother if somehow got released.
+    if (! check_status()) {
+	print "Node is free!\n";
+	return undef;
+    }
+
+    #
+    # Create /local directories for users. 
+    #
+    if (! -e LOCALROOTFS()) {
+	os_mkdir(LOCALROOTFS(), "0755");
+    }
+    if (-e LOCALROOTFS()) {
+	my $piddir = LOCALROOTFS() . "/$pid";
+	my $eiddir = LOCALROOTFS() . "/$pid/$eid";
+	my $viddir = LOCALROOTFS() . "/$pid/$vid";
+
+	if (! -e $piddir) {
+	    mkdir($piddir, 0777) or
+		die("*** $0:\n".
+		    "    mkdir filed - $piddir: $!\n");
+	}
+	if (! -e $eiddir) {
+	    mkdir($eiddir, 0777) or
+		die("*** $0:\n".
+		    "    mkdir filed - $eiddir: $!\n");
+	}
+	if (! -e $viddir) {
+	    mkdir($viddir, 0775) or
+		die("*** $0:\n".
+		    "    mkdir filed - $viddir: $!\n");
+	}
+	chmod(0777, $piddir);
+	chmod(0777, $eiddir);
+	chmod(0775, $viddir);
+    }
+
+    #
+    # Tell libtmcc to get the full config for the jail. At the moment
+    # we do not use SFS inside jails, so okay to do this now (usually
+    # have to call initsfs() first). The full config will be copied
+    # to the proper location inside the jail by mkjail.
+    #
+    tmccgetconfig();
+    
+    #
+    # XXX: Get jail config.  For now we just snoop on this, but should do our
+    # own later.
+    #
+    print STDOUT "Checking Testbed generic VM configuration ...\n";
+    stashgenvnodeconfig();
+
+    return ($pid, $eid, $vname);
+}
 
 #
 # This happens inside a Plab vserver.

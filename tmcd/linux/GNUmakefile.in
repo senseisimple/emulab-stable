@@ -252,3 +252,16 @@ vserver-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/vserver/vserver-rc.sh $(VSDIR)/
 	$(INSTALL) -m 755 $(SRCDIR)/mkvserver.pl $(BINDIR)/mkvserver.pl
 	-ln -sf $(BINDIR)/mkvserver.pl $(BINDIR)/mkjail.pl
+
+openvz-install:	dir-install
+	$(INSTALL) -m 755 $(SRCDIR)/libvnode.pm $(BINDIR)/
+	$(INSTALL) -m 755 $(SRCDIR)/openvz/libvnode_openvz.pm $(BINDIR)/
+	$(INSTALL) -m 755 $(SRCDIR)/openvz/vznetinit-elab.sh $(BINDIR)/
+	$(INSTALL) -m 755 $(SRCDIR)/vnodectl $(BINDIR)/
+	echo "openvz" > $(ETCDIR)/genvmtype
+	-ln -sf $(BINDIR)/vnodectl $(BINDIR)/vnodesetup
+	-ln -sf $(BINDIR)/vnodectl $(BINDIR)/bootvnodes
+	$(INSTALL) -m 755 $(SRCDIR)/openvz/vzmount-elab.sh $(BINDIR)/
+	-ln -sf $(BINDIR)/vzmount-elab.sh /etc/vz/conf/vps.mount
+	$(INSTALL) -m 755 $(SRCDIR)/openvz/vzumount-elab.sh $(BINDIR)/
+	-ln -sf $(BINDIR)/vzumount-elab.sh /etc/vz/conf/vps.umount

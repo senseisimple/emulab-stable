@@ -1,0 +1,629 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Supplants bootvnodes and vnodesetup (the remotely invoked vnodesetup APIs
+# still work) and creates, configures, and provides runtime control for vnodes
+# using the libvnode API.
+#
+
+use Getopt::Std;
+use English;
+use Errno;
+use POSIX qw(strftime);
+use Data::Dumper;
+
+sub usage()
+{
+    print "Usage: vnodectl [-h] [-d] [-f] [-khrb] [-c] [vnodeid vnodeid ...]\n" . 
+          "  -h   Show this help.\n" . 
+          "  -d   Debug mode.\n" . 
+          "  -f   Run in foreground.\n" . 
+          "  -c   Reconfigure listed vnodes (or all vnodes if unspecified).\n" . 
+	  "Actions:\n" . 
+          "  -r   Reboot listed vnodes (or all vnodes if unspecified).\n" . 
+          "  -k   Kill listed vnodes (or all vnodes if unspecified).\n" . 
+          "  -h   Halt listed vnodes (or all vnodes if unspecified).\n" . 
+          "  -b   Boot listed vnodes (or all vnodes if unspecified).\n" . 
+          "";
+    exit(1);
+}
+
+my $optlist = "hdfkhrbc";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use libtmcc;
+
+# Pull in libvnode
+use libvnode;
+
+# Helpers
+sub getvmmap($);
+sub putvmmap($);
+sub safeLibOp($$$$;@);
+sub teardownOldVnodes();
+
+# Locals
+my $VMMAP_FILE = "$VARDIR/vnode.map";
+my $CTRLIPFILE = "/var/emulab/boot/myip";
+
+my $logname = "$LOGDIR/vnodectl.debug";
+my $debug = 0;
+my $daemon = 1;
+my $reconfig = 0;
+my $action = 'boot';
+my @vnodes = ();
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+
+# hah, this is funny... emacs perl mode will not properly indent unless
+# I throw this extra block in.  Woo!
+{
+    if (defined($options{"h"})) {
+	usage();
+    }
+    if (defined($options{"d"})) {
+	$debug = 1;
+    }
+    if (defined($options{"f"})) {
+	$daemon = 0;
+    }
+    if (defined($options{"r"})) {
+	$action = "reboot";
+    }
+    if (defined($options{"k"})) {
+	$action = "kill";
+    }
+    if (defined($options{"h"})) {
+	$action = "halt";
+    }
+    if (defined($options{"b"})) {
+	$action = "boot";
+    }
+    if (defined($options{"c"})) {
+	$reconfig = 1;
+    }
+}
+
+@vnodes = @ARGV;
+if (@vnodes && $reconfig) {
+    print STDERR "*** ERROR: can only reconfig if no vnodes supplied!\n\n";
+    exit(33);
+}
+
+#
+# We do not background for simple ops like reboot, kill, halt, for now:
+#
+if ($action eq 'reboot' || $action eq 'kill' || $action eq 'halt') {
+    $daemon = 0;
+}
+elsif ($action ne 'boot') {
+    print STDERR "Must specify an action!\n";
+    usage();
+}
+
+#
+# Must be root.
+# 
+if ($UID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+#
+# Turn on debug timestamps if desired.
+#
+if ($debug) {
+    TBDebugTimeStampsOn();
+}
+
+#
+# Put this into the background and log its output. We *must* do this cause
+# we do not want to halt the boot if the testbed is down!
+# 
+if ($daemon && TBBackGround($logname)) {
+    #
+    # Parent exits normally
+    #
+    exit(0);
+}
+
+#
+# XXX: for now, support only a single vnode type per phys node.  This is bad,
+# but it's the current assumption.  For now, we also assume the nodetype since
+# we only have pcvm.  Later, we need to get this info from tmcd so we know 
+# lib to load.
+#
+my @nodetypes = ("openvz");
+
+#
+# We go through this crap so that we can pull in multiple packages implementing
+# the libvnode API so they (hopefully) won't step on our namespace too much.
+#
+my %libops = ();
+foreach my $type (@nodetypes) {
+    # load lib and initialize it
+    my %ops;
+    eval "use libvnode_$type; %ops = %libvnode_${type}::ops";
+    if ($@) {
+	die "while trying to load 'libvnode_$type': $@";
+    }
+    if ($debug) {
+	print "%ops($type):\n" . Dumper(%ops);
+    }
+    $libops{$type} = \%ops;
+    if ($debug) {
+	$libops{$type}{'setDebug'}->(1);
+    }
+    $libops{$type}{'init'}->()
+}
+
+my %vndb = ();
+getvmmap(\%vndb);
+
+#
+# Save this off to distinguish if this is first time boot:
+#
+my $allnew = 0;
+if (keys(%vndb) == 0) {
+    $allnew = 1;
+}
+
+if ($debug) {
+    print "GENVNODETYPE " . GENVNODETYPE() . "\n";
+    print "libops:\n" . Dumper(%libops);
+    print "vndb:\n" . Dumper(%vndb);
+}
+
+#
+# Make sure we have nodes that we've already created if they were supplied on
+# the command line.  Yes, this restriction is somewhat arbitrary.
+#
+foreach my $vnode (@vnodes) {
+    if (!exists($vndb{$vnode})) {
+	fatal("Unknown vnode $vnode!\n");
+    }
+}
+
+my @tmccvnodes = ();
+
+#
+# Get the current set of vnodes that are supposed to be running on
+# this node.
+#
+my @tmccresults;
+
+if (tmcc(TMCCCMD_VNODELIST, undef, \@tmccresults) < 0) {
+    die("*** ERROR: Could not get vnode list from server!\n");
+}
+
+my %ifconfigs = ();
+my %vmconfigs = ();
+foreach my $str (@tmccresults) {
+    if ($str =~ /^VNODEID=([-\w]+) JAILED=(\d)$/) {
+	my $vid = $1;
+	push @tmccvnodes, $vid;
+
+	#
+	# XXX: this whole thing is a hack so I can reuse the current way tmcd
+	# sends info for bsd vnode configuration.  In the end, the tmcd side
+	# should be abstracted too!
+	#
+	my ($pid,$eid,$vname) = genvnodesetup($vid);
+	stashgenvnodeconfig();
+
+	$vndb{$vid}{'pid'} = $pid;
+	$vndb{$vid}{'eid'} = $eid;
+	$vndb{$vid}{'vname'} = $vname;
+
+	#
+        # Ok, now fetch the ifconfig info for this vnode.
+	#
+	my @ifc = ();
+	die "getifconfig($vid): $!" 
+	    if (getifconfig(\@ifc));
+	$ifconfigs{$vid} = \@ifc;
+
+	#
+	# Now the vmconfig:
+	#
+	my %vmc = ();
+	die "getgenvnodeconfig($vid): $!" 
+	    if (getgenvnodeconfig(\%vmc));
+	$vmconfigs{$vid} = \%vmc;
+    }
+    else {
+	warn("*** WARNING: Skipping bad vnodeid from tmcc: '$str'\n");
+    }
+}
+
+#
+# Need the domain, but no conistent way to do it. Ask tmcc for the
+# boss node and parse out the domain. 
+#
+my $DOMAINNAME = tmccbossname();
+die("Could not get bossname from tmcc!")
+    if (!defined($DOMAINNAME));
+
+if ($DOMAINNAME =~ /^[-\w]+\.(.*)$/) {
+    $DOMAINNAME = $1;
+}
+else {
+    die("Could not parse domain name!");
+}
+
+#
+# Need the bossip, which we get from virthost emulab boot dir:
+#
+my $BOSSIP = `cat $BOOTDIR/bossip`;
+chomp($BOSSIP);
+if ($BOSSIP !~ /^\d+\.\d+\.\d+\.\d+$/) {
+    die "Bad bossip '$BOSSIP' in $BOOTDIR/bossip!";
+}
+
+#
+# Ok, handle various actions!
+#
+my @errors = ();
+if ($action eq 'reboot' || $action eq 'halt' || $action eq 'kill') {
+    my $op;
+    if ($action eq 'reboot') {
+	$op = 'vnodeReboot';
+    }
+    if ($action eq 'halt') {
+	$op = 'vnodeHalt';
+    }
+    if ($action eq 'kill') {
+	$op = 'vnodeKill';
+    }
+
+    if (@vnodes == 0) {
+	@vnodes = keys(%vndb);
+    }
+
+    foreach my $vnode (@vnodes) {
+	# XXX: type MUST, MUST eventually come from tmcd or somewhere.
+	my $type = GENVNODETYPE();
+	eval {
+	    $libops{$type}{$op}->($vnode,$vndb{$vnode});
+	};
+	if ($@) {
+	    push @errors, $@;
+	}
+    }
+
+    #
+    # Teardown nodes that are no longer with us.
+    #
+    if ($reconfig) {
+	teardownOldVnodes();
+    }
+}
+elsif ($action eq 'boot') {
+    my @newvnodes;
+    my @oldvnodes;
+
+    #
+    # Teardown nodes that are no longer with us.  Note that we already tried 
+    # to do this when halting with reconfig, but maybe something went wrong.
+    #
+    if ($reconfig) {
+	teardownOldVnodes();
+    }
+
+    if ($allnew) {
+	# must be a first time boot
+	@newvnodes = @tmccvnodes;
+	@oldvnodes = ();
+    }
+    elsif ($reconfig) {
+	foreach $curvnode (@tmccvnodes) {
+	    my $found = 0;
+	    foreach $oldvnode (keys(%vndb)) {
+		if ($oldvnode eq $curvnode) {
+		    $found = 1;
+		    last;
+		}
+	    }
+	    if ($found) {
+		push @oldvnodes, $curvnode;
+	    }
+	    else {
+		push @newvnodes, $curvnode;
+	    }
+	}
+    }
+    else {
+	# user just wants to boot some nodes!
+	@oldvnodes = @vnodes;
+	if (@oldvnodes == 0) {
+	    @oldvnodes = keys(%vndb);
+	}
+    }
+
+    # Can't assume anything has been configured in root context, ever, on boot
+    # XXX: need to do this for each type encountered!
+    my $vmtype = GENVNODETYPE();
+    TBDebugTimeStamp("starting $vmtype rootPreConfig()")
+	if ($debug);
+    $libops{GENVNODETYPE()}{'rootPreConfig'}->();
+    TBDebugTimeStamp("finished $vmtype rootPreConfig()")
+	if ($debug);
+
+    TBDebugTimeStamp("starting $vmtype rootPreConfigNetwork")
+	if ($debug);
+    $libops{GENVNODETYPE()}{'rootPreConfigNetwork'}->(\%ifconfigs,{});
+    TBDebugTimeStamp("finished $vmtype rootPreConfigNetwork")
+	if ($debug);
+
+    foreach my $vnode (@newvnodes) {
+	my ($ret,$err);
+
+	#
+	# XXX XXX XXX: need to get this from tmcd!
+	# NOTE: we first put the type into vndb so that the create call can go!
+	#
+	$vndb{$vnode}{'type'} = GENVNODETYPE();
+
+	# OP: create
+	($ret,$err) = safeLibOp($vnode,'vnodeCreate',0,0,$vnode);
+	if ($err) {
+	    push @errors, $err;
+	    delete $vndb{$vnode};
+	    next;
+	}
+	my $vmid = $ret;
+	$vndb{$vnode}{'id'} = $vmid;
+	# flush right away!
+	putvmmap(\%vndb);
+
+	# OP: preconfig
+	next if (safeLibOp($vnode,'vnodePreConfig',1,1,$vnode,$vmid));
+
+	# OP: control net preconfig
+	my $cnet_mac = ipToMac($vmconfigs{$vnode}{'CTRLIP'});
+	my $ext_ctrlip = `cat $CTRLIPFILE`;
+	chomp($ext_ctrlip);
+	if ($ext_ctrlip !~ /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/) {
+	    # can't/shouldn't really go on if this happens
+	    $err = "error prior to vnodePreConfigControlNetwork($vnode):" . 
+		" could not find valid ip in $CTRLIPFILE!";
+	    push @errors, $err;
+	    next;
+	}
+	my $longdomain = $vndb{$vnode}{'eid'} . "." . $vndb{$vnode}{'pid'} 
+	    . ".$DOMAINNAME";
+	next if (safeLibOp($vnode,'vnodePreConfigControlNetwork',1,1,
+			   $vnode,$vmid,$vmconfigs{$vnode}{'CTRLIP'},
+			   $vmconfigs{$vnode}{'CTRLMASK'},$cnet_mac,
+			   $ext_ctrlip,$vndb{$vnode}{'vname'},$longdomain,
+			   $DOMAINNAME,$BOSSIP));
+
+	# OP: exp net preconfig
+	next if (safeLibOp($vnode,'vnodePreConfigExpNetwork',1,1,
+			   $vnode,$vmid,$ifconfigs{$vnode}));
+
+	next if (safeLibOp($vnode,'vnodeConfigResources',1,1,$vnode,$vmid));
+	next if (safeLibOp($vnode,'vnodeConfigDevices',1,1,$vnode,$vmid));
+    }
+
+    if ($reconfig) {
+	foreach my $vnode (@oldvnodes) {
+	    my $vmid = $vndb{$vnode}{'id'};
+
+	    # OP: preconfig
+	    next if (safeLibOp($vnode,'vnodePreConfig',1,$vnode,$vmid));
+
+	    # OP: control net preconfig
+	    my $cnet_mac = ipToMac($vmconfigs{$vnode}{'CTRLIP'});
+	    my $ext_ctrlip = `cat $CTRLIPFILE`;
+	    chomp($ext_ctrlip);
+	    if ($ext_ctrlip !~ /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/) {
+		# can't/shouldn't really go on if this happens
+		$err = "error prior to vnodePreConfigControlNetwork($vnode):" . 
+		    " could not find valid ip in $CTRLIPFILE!";
+		push @errors, $err;
+		next;
+	    }
+	    next if (safeLibOp($vnode,'vnodePreConfigControlNetwork',1,1,
+			       $vnode,$vmid,$vmconfigs{$vnode}{'CTRLIP'},
+			       $vmconfigs{$vnode}{'CTRLMASK'},$cnet_mac,
+			       $ext_ctrlip,$DOMAINNAME));
+
+	    # OP: exp net preconfig
+	    next if (safeLibOp($vnode,'vnodePreConfigExpNetwork',1,1,
+			       $vnode,$vmid,$ifconfigs{$vnode}));
+
+	    next if (safeLibOp($vnode,'vnodeConfigResources',1,1,$vnode,$vmid));
+	    next if (safeLibOp($vnode,'vnodeConfigDevices',1,1,$vnode,$vmid));
+	}
+    }
+
+    foreach my $vnode (@newvnodes,@oldvnodes) {
+	my $vmid = $vndb{$vnode}{'id'};
+
+	next if (safeLibOp($vnode,'vnodeBoot',1,1,$vnode,$vmid));
+	next if (safeLibOp($vnode,'vnodePostConfig',1,1,$vnode,$vmid));
+    }
+
+    # XXX: need to do this for each type encountered!
+    TBDebugTimeStamp("starting $vmtype rootPostConfig()")
+	if ($debug);
+    $libops{GENVNODETYPE()}{'rootPostConfig'}->();
+    TBDebugTimeStamp("finished $vmtype rootPostConfig()")
+	if ($debug);
+}
+
+if (@errors) {
+    print "There were errors encountered:\n\n";
+    foreach my $e (@errors) {
+	print "  $e\n";
+    }
+    exit(@errors);
+}
+
+exit(0);
+
+#
+# Helpers:
+#
+
+sub teardownOldVnodes() {
+    foreach my $oldvnode (keys(%vndb)) {
+	#my $type = $vndb{$oldvnode}{'type'};
+	my $found = 0;
+	foreach my $curvnode (@vnodes) {
+	    if ($curvnode eq $oldvnode) {
+		$found = 1;
+		last;
+	    }
+	}
+	if ($found) {
+	    # if not halted, try that first
+	    my ($ret,$err);
+	    ($ret,$err) = safeLibOp($oldvnode,'vnodeState',1,1,
+				    $oldvnode,$vndb{$oldvnode}{'id'});
+	    if ($err) {
+		print STDERR "*** ERROR: failed to teardown $oldvnode: $err\n";
+		next;
+	    }
+	    #if ($libops{$type}{'vnodeState'}->($oldvnode,
+	    #				       $vndb{$oldvnode}{'id'}) 
+	    if ($ret ne VNODE_STATUS_STOPPED()) {
+		warn("teardown: vnode $oldvnode not stopped, trying to halt before destroy!");
+		($ret,$err) = safeLibOp($oldvnode,'vnodeHalt',1,1,
+					$oldvnode,$vndb{$oldvnode}{'id'});
+		#eval {
+		#    $libops{$type}{'vnodeHalt'}->($oldvnode,
+		#				  $vndb{$oldvnode}{'id'});
+		#};
+		#if ($@) {
+		#    warn("could not halt vnode $oldvnode," . 
+		#	 " destroying anyway: $@\n");
+		#}
+	    }
+	    
+	    # now destroy
+	    ($ret,$err) = safeLibOp($oldvnode,'vnodeDestroy',1,1,
+				    $oldvnode,$vndb{$oldvnode}{'id'});
+	    #eval {
+	    #	$libops{$type}{'vnodeDestroy'}->($oldvnode,
+	    #					 $vndb{$oldvnode}{'id'});
+	    #};
+	    #if ($@) {
+	    #	push @errors, $@;
+	    #}
+	    if ($err) {
+		print STDERR "*** ERROR: failed to destroy $oldvnode: $err\n";
+		next;
+	    }
+
+	    # else we're good, so remove the node from the db
+	    delete $vndb{$oldvnode};
+	    # flush now, just in case!
+	    putvmmap(\%vndb);
+	}
+    }
+}
+
+sub safeLibOp($$$$;@) {
+    my ($vnode_id,$op,$autolog,$autoerr,@args) = @_;
+
+    my $vmid = $vndb{$vnode_id}{'id'};
+    my $vmtype = $vndb{$vnode_id}{'type'};
+
+    my $sargs = '';
+    if (@args > 0) {
+	$sargs = join(',',@args);
+    }
+    TBDebugTimeStamp("starting $vmtype $op($sargs)")
+	if ($debug);
+    my $ret = eval {
+	$libops{$vmtype}{$op}->(@args);
+    };
+    my $err;
+    if ($@) {
+	$err = $@;
+	if ($autolog) {
+	    push @errors, $err;
+	}
+	TBDebugTimeStamp("failed $vmtype $op($sargs): $@")
+	    if ($debug);
+	return (-1,$err);
+    }
+    if ($autoerr && $ret) {
+	$err = "$op($vnode_id) failed with exit code $ret!";
+	if ($autolog) {
+	    push @errors, $err;
+	}
+	TBDebugTimeStamp("failed $vmtype $op($sargs): exited with $ret")
+	    if ($debug);
+	return ($ret,$err);
+    }
+
+    TBDebugTimeStamp("finished $vmtype $op($sargs)")
+	if ($debug);
+
+    return $ret;
+}
+
+sub getvmmap($) {
+    my ($ref,) = @_;
+
+    return 0 
+	if (! -e $VMMAP_FILE);
+
+    open(VMMFD,"$VMMAP_FILE") 
+	or die "could not read $VMMAP_FILE";
+
+    while (<VMMFD>) {
+	chomp($_);
+	if ($_ =~ /^([-\w\d]+)\s+([^\s]+)s+([^\s]+)$/) {
+	    $ref->{$1}{'id'} = $2;
+	    $ref->{$1}{'type'} = $3;
+	}
+    }
+
+    close(VMMFD);
+    return 0;
+}
+
+sub putvmmap($) {
+    my ($ref,) = @_;
+
+    open(VMMFD,">$VMMAP_FILE") 
+	or die "could not open $VMMAP_FILE for writing";
+
+    foreach my $k (keys(%$ref)) {
+	if (exists($ref->{$k}{'id'}) && exists($ref->{$k}{'type'})) {
+	    print VMMFD "$k\t" . $ref->{$k}{'id'} . "\t" . $ref->{$k}{'type'} . 
+		"\n";
+	}
+    }
+
+    close(VMMFD);
+    return 0;
+}

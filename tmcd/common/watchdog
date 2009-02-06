@@ -81,7 +81,8 @@ my %faketimes;
 #
 my %iv = (
     check   => 0,
-    isalive => ((REMOTE() == 1) ? (PLAB() ? 600 : 60) : (JAILED() ? 600 : 180)),
+    isalive => ((REMOTE() == 1) ? (PLAB() ? 600 : 60) : ((JAILED() 
+							  || GENVNODE()) ? 600 : 180)),
     drift   => (60 * 60 * 12),
     cvsup   => (60 * 60 * 12),
     rusage  => 0,
@@ -213,7 +214,7 @@ $SIG{INT}  = \&handler;
 #
 # If jailed, get our jailname. 
 #
-if (JAILED() || PLAB()) {
+if (JAILED() || GENVNODE() || PLAB()) {
     my $vnodeid = libsetup_getvnodeid();
 
     # Tell the tmcc library. Note that its actually been done via libsetup

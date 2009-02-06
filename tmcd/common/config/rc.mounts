@@ -50,7 +50,7 @@ use librc;
 # Not all clients support this.
 #
 exit(0)
-    if (REMOTE() || JAILED() || PLAB());
+    if (REMOTE() || JAILED() || GENVNODE() || PLAB());
 
 # Protos.
 sub doboot();

@@ -51,7 +51,7 @@ $LOGGER = "/usr/local/etc/emulab/motelogd";
 # Not all clients support this.
 #
  exit(0)
-    if (MFS() || PLAB() || JAILED() || WINDOWS() || REMOTE());
+    if (MFS() || PLAB() || JAILED() || GENVNODE() || WINDOWS() || REMOTE());
 
 # Protos.
 sub doboot();

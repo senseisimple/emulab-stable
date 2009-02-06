@@ -347,69 +347,76 @@ sub os_ifconfig_line($$$$$$$$;$$$)
     }
 
     #
-    # Need to check units on the speed. Just in case.
+    # Only do this stuff if we have a physical interface, otherwise it doesn't
+    # mean anything.  We need this for virtnodes whose networks must be 
+    # config'd from inside the container, vm, whatever.
     #
-    if ($speed =~ /(\d*)([A-Za-z]*)/) {
-	if ($2 eq "Mbps") {
-	    $speed = $1;
+    if ($iface_type ne 'veth') {
+        #
+        # Need to check units on the speed. Just in case.
+        #
+	if ($speed =~ /(\d*)([A-Za-z]*)/) {
+	    if ($2 eq "Mbps") {
+		$speed = $1;
+	    }
+	    elsif ($2 eq "Kbps") {
+		$speed = $1 / 1000;
+	    }
+	    else {
+		warn("*** Bad speed units $2 in ifconfig, default to 100Mbps\n");
+		$speed = 100;
+	    }
+	    if ($speed == 1000) {
+		$media = $IFC_1000MBS;
+	    }
+	    elsif ($speed == 100) {
+		$media = $IFC_100MBS;
+	    }
+	    elsif ($speed == 10) {
+		$media = $IFC_10MBS;
+	    }
+	    else {
+		warn("*** Bad Speed $speed in ifconfig, default to 100Mbps\n");
+		$speed = 100;
+		$media = $IFC_100MBS;
+	    }
 	}
-	elsif ($2 eq "Kbps") {
-	    $speed = $1 / 1000;
+	if ($duplex eq "full") {
+	    $media = "$media-$IFC_FDUPLEX";
+	}
+	elsif ($duplex eq "half") {
+	    $media = "$media-$IFC_HDUPLEX";
 	}
 	else {
-	    warn("*** Bad speed units $2 in ifconfig, default to 100Mbps\n");
-	    $speed = 100;
+	    warn("*** Bad duplex $duplex in ifconfig, default to full\n");
+	    $duplex = "full";
+	    $media = "$media-$IFC_FDUPLEX";
 	}
-	if ($speed == 1000) {
-	    $media = $IFC_1000MBS;
-	}
-	elsif ($speed == 100) {
-	    $media = $IFC_100MBS;
-	}
-	elsif ($speed == 10) {
-	    $media = $IFC_10MBS;
-	}
-	else {
-	    warn("*** Bad Speed $speed in ifconfig, default to 100Mbps\n");
-	    $speed = 100;
-	    $media = $IFC_100MBS;
-	}
-    }
-    if ($duplex eq "full") {
-	$media = "$media-$IFC_FDUPLEX";
-    }
-    elsif ($duplex eq "half") {
-	$media = "$media-$IFC_HDUPLEX";
-    }
-    else {
-	warn("*** Bad duplex $duplex in ifconfig, default to full\n");
-	$duplex = "full";
-	$media = "$media-$IFC_FDUPLEX";
-    }
 
-    #
-    # Linux is apparently changing from mii-tool to ethtool but some drivers
-    # don't support the new interface (3c59x), some don't support the old
-    # interface (e1000), and some (eepro100) support the new interface just
-    # enough that they can report success but not actually do anything. Sweet!
-    #
-    my $ethtool;
-    if (-e "/sbin/ethtool") {
-	$ethtool = "/sbin/ethtool";
-    } elsif (-e "/usr/sbin/ethtool") {
-	$ethtool = "/usr/sbin/ethtool";
-    }
-    if (defined($ethtool)) {
-	# this seems to work for returning an error on eepro100
-	$uplines = 
-	    "if $ethtool $iface >/dev/null 2>&1; then\n    " .
-	    "  $ethtool -s $iface autoneg off speed $speed duplex $duplex\n    " .
-	    "  sleep 2 # needed due to likely bug in e100 driver on pc850s\n".
-	    "else\n    " .
-	    "  /sbin/mii-tool --force=$media $iface\n    " .
-	    "fi\n    ";
-    } else {
-	$uplines = "/sbin/mii-tool --force=$media $iface\n    ";
+        #
+        # Linux is apparently changing from mii-tool to ethtool but some drivers
+        # don't support the new interface (3c59x), some don't support the old
+        # interface (e1000), and some (eepro100) support the new interface just
+        # enough that they can report success but not actually do anything. Sweet!
+        #
+	my $ethtool;
+	if (-e "/sbin/ethtool") {
+	    $ethtool = "/sbin/ethtool";
+	} elsif (-e "/usr/sbin/ethtool") {
+	    $ethtool = "/usr/sbin/ethtool";
+	}
+	if (defined($ethtool)) {
+	    # this seems to work for returning an error on eepro100
+	    $uplines = 
+		"if $ethtool $iface >/dev/null 2>&1; then\n    " .
+		"  $ethtool -s $iface autoneg off speed $speed duplex $duplex\n    " .
+		"  sleep 2 # needed due to likely bug in e100 driver on pc850s\n".
+		"else\n    " .
+		"  /sbin/mii-tool --force=$media $iface\n    " .
+		"fi\n    ";
+	} else {
+	    $uplines = "/sbin/mii-tool --force=$media $iface\n    ";
+	}
     }
 
     if ($inet eq "") {

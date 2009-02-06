@@ -40,7 +40,7 @@ use librc;
 # Not all clients support this.
 #
 exit(0)
-    if (MFS() || PLAB() || JAILED());
+    if (MFS() || PLAB() || JAILED() || GENVNODE());
 
 # Protos.
 sub doboot();

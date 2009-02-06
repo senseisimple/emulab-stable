@@ -40,7 +40,7 @@ my $logtemplate;
 # Get the config parameters so we can open up a log file in the proper
 # location. See below.
 #
-if (JAILED() || PLAB()) {
+if (JAILED() || GENVNODE() || PLAB()) {
     $logtemplate = "$VARDIR/logs/runlog.XXXXXX";
 }
 else {
