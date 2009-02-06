@@ -1,0 +1,843 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package VirtExperiment;
+use strict;
+use Carp;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA    = "Exporter";
+@EXPORT = qw ( );
+
+# Must come after package declaration!
+use lib '@prefix@/lib';
+use libdb;
+use libtestbed;
+use Data::Dumper;
+use overload ('""' => 'Stringify');
+
+use vars qw($STORE_FLAGS_DEBUG $STORE_FLAGS_IMPOTENT $STORE_FLAGS_SIMPARSE
+	    $LOOKUP_FLAGS_NOLOAD
+	    %virtual_tables %experiment_fields
+	    $AUTOLOAD @EXPORT_OK);
+
+# Store() flags.
+$STORE_FLAGS_DEBUG	= 0x01;
+$STORE_FLAGS_IMPOTENT	= 0x02;
+$STORE_FLAGS_SIMPARSE	= 0x04;
+# Lookup Flags
+$LOOKUP_FLAGS_NOLOAD    = 0x01;
+
+# Why, why, why?
+@EXPORT_OK = qw($STORE_FLAGS_DEBUG $STORE_FLAGS_IMPOTENT
+		$STORE_FLAGS_SIMPARSE $LOOKUP_FLAGS_NOLOAD);
+
+# Configure variables
+my $TB		= "@prefix@";
+my $BOSSNODE    = "@BOSSNODE@";
+my $CONTROL	= "@USERNODE@";
+my $TBOPS       = "@TBOPSEMAIL@";
+
+# Cache of instances to avoid regenerating them.
+my %virtexperiments   = ();
+my $debug	      = 0;
+
+#
+# Describe the virt tables and their primary keys. 
+#
+%virtual_tables = 
+    ("virt_nodes"		=> [ "vname" ],
+     "virt_lans"		=> [ "vname" ],
+     "virt_lan_lans"		=> [ "vname" ],
+     "virt_lan_settings"	=> [ "vname", "capkey" ],
+     "virt_lan_member_settings" => [ "vname", "member", "capkey" ],
+     "virt_trafgens"		=> [ "vname", "vnode" ],
+     "virt_agents"		=> [ "vname", "vnode" ],
+     "virt_node_desires"	=> [ "vname", "desire" ],
+     "virt_node_startloc"	=> [ "vname", "building" ],
+     "virt_routes"		=> [ "vname", "src", "dst" ],
+     "virt_vtypes"		=> [ "name" ],
+     "virt_programs"		=> [ "vname", "vnode" ],
+     "virt_user_environment"	=> [ "name", "value" ],
+     "nseconfigs"		=> [ "vname" ],
+     "eventlist"		=> [ "vname" ],
+     "event_groups"		=> [ "group_name", "agent_name" ],
+     "virt_firewalls"		=> [ "fwname", "type", "style" ],
+     "firewall_rules"		=> [ "fwname", "ruleno", "rule" ],
+     "virt_tiptunnels"		=> [ "host", "vnode" ],
+     "virt_parameters"          => [ "name", "value" ],
+);
+
+# XXX
+# The experiment table is special. Only certain fields are allowed to
+# be updated. Not sure what the right approach for this is.
+# Note that I regex the data before inserting it below.
+#
+%experiment_fields = ("multiplex_factor"	=> 1,
+		      "forcelinkdelays"		=> 1,
+		      "uselinkdelays"		=> 1,
+		      "usewatunnels"		=> 1,
+		      "uselatestwadata"		=> 1,
+		      "wa_delay_solverweight"	=> 1,
+		      "wa_bw_solverweight"	=> 1,
+		      "wa_plr_solverweight"	=> 1,
+		      "cpu_usage"		=> 1,
+		      "mem_usage"		=> 1,
+		      "allowfixnode"		=> 1,
+		      "encap_style"		=> 1,
+		      "jail_osname"		=> 1,
+		      "delay_osname"		=> 1,
+		      "sync_server"		=> 1,
+		      "use_ipassign"		=> 1,
+		      "ipassign_args"		=> 1,
+		      "usemodelnet"		=> 1,
+		      "modelnet_cores"		=> 1,
+		      "modelnet_edges"		=> 1,
+		      "elab_in_elab"		=> 1,
+		      "elabinelab_eid"		=> 1,
+		      "elabinelab_cvstag"	=> 1,
+		      "elabinelab_singlenet"	=> 1,
+		      "security_level"		=> 1,
+		      "delay_capacity"		=> 1,
+		      "dpdb"			=> 1);
+
+#
+# Grab the virtual topo for an experiment.
+#
+sub Lookup($$;$)
+{
+    my ($class, $experiment, $flags) = @_;
+    $flags = 0
+	if (!defined($flags));
+    
+    my $noload = ($flags & $LOOKUP_FLAGS_NOLOAD ? 1 : 0);
+
+    return undef
+	if (!ref($experiment));
+
+    my $idx = $experiment->idx();
+
+    # Look in cache first
+    return $virtexperiments{"$idx"}
+        if (exists($virtexperiments{"$idx"}));
+
+    my $self              = {};
+    $self->{'EXPERIMENT'} = $experiment;
+    bless($self, $class);
+
+    # Load all the virt tables.
+    foreach my $tablename (keys(%virtual_tables)) {
+	if ($noload) {
+	    $self->{'TABLES'}->{$tablename} = [];
+	}
+	else {
+	    my $rows = LoadTable($self, $tablename);
+	    return undef
+		if (!defined($rows));
+	
+	    $self->{'TABLES'}->{$tablename} = $rows;
+	}
+    }
+
+    # Make a copy of the experiment DBrow, and delete all the stuff we
+    # are not allowed to change through this interface.
+    my $dbrow  = $experiment->dbrow();
+    my $newrow = {}; 
+
+    foreach my $key (keys(%{ $dbrow })) {
+	$newrow->{$key} = $dbrow->{$key}
+	    if (exists($experiment_fields{$key}));
+    }
+    $self->{'DBROW'} = $newrow;
+
+    return $self;
+}
+# accessors
+sub experiment($)       { return $_[0]->{'EXPERIMENT'}; }
+sub dbrow($)            { return $_[0]->{'DBROW'}; }
+sub pid($)		{ return $_[0]->experiment()->pid(); }
+sub pid_idx($)		{ return $_[0]->experiment()->pid_idx(); }
+sub eid($)		{ return $_[0]->experiment()->eid(); }
+sub exptidx($)		{ return $_[0]->experiment()->idx(); }
+
+# To avoid wrtting out all the methods.
+sub AUTOLOAD {
+    my $self = shift;
+    my $type = ref($self) or croak "$self is not an object";
+
+    my $name = $AUTOLOAD;
+    $name =~ s/.*://;   # strip fully-qualified portion
+
+    unless (exists($experiment_fields{$name})) {
+	carp("No such slot '$name' field in class $type");
+	return undef;
+    }
+    if (@_) {
+	return $self->{'DBROW'}->{$name} = shift;
+    }
+    else {
+	return $self->{'DBROW'}->{$name};
+    }
+}
+
+# Break circular reference someplace to avoid exit errors.
+sub DESTROY {
+    my $self = shift;
+
+    $self->{'DBROW'}      = undef;
+    $self->{'EXPERIMENT'} = undef;
+}
+
+#
+# Create a new experiment virtual topology. This means loading the
+# experiment, but not any of the virt tables. We never create a new
+# "experiment" via this path, just a new virt topology for an existing
+# experiment.
+#
+sub CreateNew($$)
+{
+    my ($class, $experiment) = @_;
+
+    return VirtExperiment->Lookup($experiment, $LOOKUP_FLAGS_NOLOAD);
+}
+
+#
+# Add a new empty table row. Caller must populate it.
+#
+sub NewTableRow($$)
+{
+    my ($self, $tablename) = @_;
+    
+    return undef
+	if (! ref($self));
+    return undef
+	if (!exists($virtual_tables{$tablename}));
+
+    my $class = "VirtExperiment::VirtTableRow::$tablename";
+    my $obj   = $class->Create($self->experiment());
+
+    # Add to list of rows for this table.
+    push(@{ $self->{'TABLES'}->{$tablename} }, $obj);
+
+    return $obj;
+}
+
+#
+# Lookup the rows for a table.
+#
+sub LoadTable($$)
+{
+    my ($self, $tablename) = @_;
+    
+    return undef
+	if (! ref($self));
+    return undef
+	if (!exists($virtual_tables{$tablename}));
+
+    my @result  = ();
+    my $exptidx = $self->exptidx();
+    my $query_result =
+	DBQueryWarn("select * from $tablename where exptidx=$exptidx");
+
+    return undef
+	if (!defined($query_result));
+    return []
+	if (!$query_result->numrows);
+
+    while (my $row = $query_result->fetchrow_hashref()) {
+	my $class = "VirtExperiment::VirtTableRow::$tablename";
+ 	my $obj = $class->Create($self->experiment(), $row);
+	push(@result, $obj);
+    }
+    return \@result;
+}
+
+#
+# Store the experiment back to the DB. Includes the experiment table itself.
+#
+sub Store($;$)
+{
+    my ($self, $flags) = @_;
+    $flags = 0
+	if (!defined($flags));
+    
+    my $debug    = ($flags & $STORE_FLAGS_DEBUG ? 1 : 0);
+    my $impotent = ($flags & $STORE_FLAGS_IMPOTENT ? 1 : 0);
+    my $simparse = ($flags & $STORE_FLAGS_SIMPARSE ? 1 : 0);
+    my $exptidx  = $self->exptidx();
+    my $pid      = $self->pid();
+    my $eid      = $self->eid();
+
+    # If these are the results of parsing the nse specifications,
+    # we do not expect updates to the experiments table.
+    goto skip
+	if ($simparse);
+
+    #
+    # Delete anything we are not allowed to set via this interface.
+    #
+    my $dbrow = $self->dbrow();
+    
+    foreach my $key (keys(%{ $dbrow })) {
+	delete($dbrow->{$key})
+	    if (! exists($experiment_fields{$key}));
+    }
+
+    #
+    # Get the default values for the required fields.
+    #
+    my $describe_result =
+	DBQueryWarn("describe experiments");
+    return -1
+	if (!defined($describe_result) || !$describe_result->numrows);
+
+    #
+    # Insert the default values for slots that we do not have
+    # so that we can set them properly in the DB query.
+    #
+    while (my $rowref = $describe_result->fetchrow_hashref()) {
+	my $slot  = $rowref->{"Field"};
+	my $value = $rowref->{"Default"};
+
+	if (exists($experiment_fields{$slot}) &&
+	    ! exists($dbrow->{$slot})) {
+	    $dbrow->{$slot} = (defined($value) ? $value : "NULL");
+	}
+    }
+
+    my @setlist  = ();
+    
+    foreach my $key (keys(%{ $dbrow })) {
+	my $val = $dbrow->{$key};
+
+	# Always skip these; they come from the experiment object. Prevents
+	# users from messing up the DB with a bogus XML file.
+	next
+	    if ($key eq "pid" ||$key eq "eid" || $key eq "idx");
+
+	if (!defined($val) ||
+	    $val eq "NULL" || $val eq "__NULL__" || $val eq "") {
+	    push(@setlist, "$key=NULL");
+	}
+	else {
+	    # Sanity check the fields.
+	    if (TBcheck_dbslot($val, "experiments", $key,
+			       TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+		$val = DBQuoteSpecial($val);
+		    
+		push(@setlist, "$key=$val");
+	    }
+	    else {
+		carp("Illegal characters in table data: experiments:".
+		     "$key - $val");
+		return -1;
+	    }
+	}	    
+    }
+    my $query =
+	"update experiments ".
+	"set " . join(",", @setlist) . " where idx='$exptidx'";
+
+    print "$query\n"
+	if ($debug);
+
+    return -1
+	if (!$impotent && !DBQueryWarn($query));
+  skip:
+
+    #
+    # And then the virt table rows. First need to delete them all.
+    #
+    if (!$impotent) {
+	#
+	# Need this below:
+	#
+	my $query_result =
+	    DBQueryWarn("select idx from event_objecttypes where type='NSE'");
+	return -1
+	    if (!defined($query_result) || !$query_result->numrows);
+	my ($nse_objtype) = $query_result->fetchrow_array();
+	
+	foreach my $tablename (keys(%virtual_tables)) {
+	    if ($simparse) {
+		#
+		# The nseconfigs table is special. During a simparse,
+		# we need delete all rows for the experiment except
+		# the one with the vname 'fullsim'. This row is
+		# essentially virtual info and does not change across
+		# swapins where as the other rows depend on the
+		# mapping
+		#
+		if ($tablename eq "nseconfigs") {
+		    DBQueryWarn("delete from $tablename ". 
+				"where eid='$eid' and pid='$pid' and ".
+				"vname!='fullsim'")
+			or return -1;
+		}
+		elsif ($tablename eq "eventlist" ||
+		       $tablename eq "virt_agents") {
+		    #
+		    # Both eventlist and virt_agents need to be
+		    # cleared for NSE event objecttype since entries
+		    # in this table depend on the particular mapping
+		    #
+		    DBQueryWarn("delete from $tablename ". 
+				"where pid='$pid' and eid='$eid' and ".
+				"objecttype='$nse_objtype'")
+			or return -1;
+		} 
+	    }
+	    else {
+		#
+		# In normal mode all rows deleted. During the nse parse,
+		# leave the other tables alone.
+		#
+		DBQueryWarn("delete from $tablename ".
+			    "where eid='$eid' and pid='$pid'")
+		    or return -1;
+	    }
+	}
+    }
+    
+    foreach my $tablename (keys(%virtual_tables)) {
+	if (exists($self->{'TABLES'}->{$tablename}) &&
+	    $self->{'TABLES'}->{$tablename}) {
+	    my @rows = @{ $self->{'TABLES'}->{$tablename} };
+	    next
+		if (!@rows);
+	    
+	    foreach my $rowref (@rows) {
+		if ($rowref->Store($flags) != 0) {
+		    carp("Could not store table row $rowref");
+		    return -1;
+		}
+	    }
+	}
+    }
+    return 0;
+}
+
+#
+# Flush from our little cache, as for the expire daemon.
+#
+sub Flush($)
+{
+    my ($self) = @_;
+
+    delete($virtexperiments{$self->exptidx()});
+}
+
+#
+# Dump the contents of virt tables.
+#
+sub Dump($)
+{
+    my ($self) = @_;
+
+    my $dbrow = $self->dbrow();
+
+    print $self . "\n";
+    foreach my $key (keys(%{ $dbrow })) {
+	my $val = $dbrow->{$key};
+	$val = "NULL"
+	    if (!defined($val));
+	    
+	print "  $key : $val\n";
+    }
+
+    foreach my $tablename (keys(%virtual_tables)) {
+	if (exists($self->{'TABLES'}->{$tablename}) &&
+	    $self->{'TABLES'}->{$tablename}) {
+	    my @rows = @{ $self->{'TABLES'}->{$tablename} };
+	    next
+		if (!@rows);
+	    
+	    foreach my $rowref (@rows) {
+		$rowref->Dump();
+	    }
+	}
+    }
+}
+
+#
+# Refresh a class instance by reloading from the DB.
+#
+sub Refresh($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    return -1;
+}
+
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+    
+    my $pid   = $self->pid();
+    my $eid   = $self->eid();
+    my $idx   = $self->exptidx();
+
+    return "[VirtExperiment: $pid/$eid/$idx]";
+}
+
+############################################################################
+#
+# VirtTable is a superclass to avoid a bunch of typing. It wraps up DB
+# table rows with methods, but without having to type all the stuff out
+# for each virt table.
+#
+package VirtExperiment::VirtTableRow;
+use Carp;
+use English;
+use overload ('""' => 'Stringify');
+use vars qw($AUTOLOAD);
+use libdb;
+use VirtExperiment;
+
+sub AUTOLOAD {
+    my $self = shift;
+    my $type = ref($self) or croak "$self is not an object";
+
+    my $name = $AUTOLOAD;
+    $name =~ s/.*://;   # strip fully-qualified portion
+
+    my $row = $self->tablerow();
+
+    unless (exists($self->{'SLOTNAMES'}->{$name})) {
+	carp("No such slot '$name' field in class $type");
+	return undef;
+    }
+    if (@_) {
+	return $self->{'TABLEROW'}->{$name} = shift;
+    }
+    else {
+	return $self->{'TABLEROW'}->{$name};
+    }
+}
+
+# Break circular reference someplace to avoid exit errors.
+sub DESTROY {
+    my $self = shift;
+
+    $self->{'TABLEROW'}   = undef;
+    $self->{'TABLENAME'}  = undef;
+    $self->{'EXPERIMENT'} = undef;
+    $self->{'SLOTNAMES'}  = undef;
+}
+
+#
+# A table row. 
+#
+sub Create($$$)
+{
+    my ($class, $experiment, $tablerow) = @_;
+
+    $class = ref($class) || $class;
+    my $tablename;
+    my $slotnames;
+
+    # The intent is to allow contruction of a virtual topo from scratch.
+    $tablerow = {} if (!defined($tablerow));
+
+    if ($class =~ /^VirtExperiment::VirtTableRow::(.*)$/) {
+	$tablename = $1;
+    }
+    else {
+	croak("$class is not in correct format");
+    }
+
+    #
+    # See if we have loaded the DB defs for this table.
+    #
+    my $varname = $tablename . "_dbdefs";
+    if (defined(${$varname})) {
+	$slotnames = ${$varname};
+    }
+    else {
+	$slotnames = {};
+
+	my $describe_result =
+	    DBQueryWarn("describe $tablename");
+
+	return -1
+	    if (!defined($describe_result) || !$describe_result->numrows);
+
+	#
+	# Record the default values for slots.
+	#
+	while (my $rowref = $describe_result->fetchrow_hashref()) {
+	    my $slot  = $rowref->{"Field"};
+	    my $value = $rowref->{"Default"};
+
+	    $slotnames->{$slot} = $value;
+	}
+    }
+    
+    my $self = {};
+    $self->{'TABLEROW'}   = $tablerow;
+    $self->{'TABLENAME'}  = $tablename;
+    $self->{'EXPERIMENT'} = $experiment;
+    $self->{'SLOTNAMES'}  = $slotnames;
+    bless($self, $class);
+
+    return $self;
+}
+sub experiment($)       { return $_[0]->{'EXPERIMENT'}; }
+sub tablename($)        { return $_[0]->{'TABLENAME'}; }
+sub tablerow($)         { return $_[0]->{'TABLEROW'}; }
+sub slotnames($)        { return $_[0]->{'SLOTNAMES'}; }
+
+#
+# Store a single table row to the DB.
+#
+sub Store($;$)
+{
+    my ($self, $flags) = @_;
+    $flags = 0
+	if (!defined($flags));
+    
+    my $debug    = ($flags & $VirtExperiment::STORE_FLAGS_DEBUG ? 1 : 0);
+    my $impotent = ($flags & $VirtExperiment::STORE_FLAGS_IMPOTENT ? 1 : 0);
+    my $simparse = ($flags & $VirtExperiment::STORE_FLAGS_SIMPARSE ? 1 : 0);
+    my $exptidx  = $self->exptidx();
+    my $table    = $self->tablename();
+    my $row      = $self->tablerow();
+    my $pid      = $self->experiment()->pid();
+    my $eid      = $self->experiment()->eid();
+    my $idx      = $self->experiment()->idx();
+
+    # These are the required keys, they must be defined.
+    my %pkeys   = map { $_ => $_ } @{$VirtExperiment::virtual_tables{$table}};
+    
+    my @fields  = ("exptidx", "pid", "eid");
+    my @values  = ("'$idx'", "'$pid'", "'$eid'");
+    
+    foreach my $key (keys(%{ $row })) {
+	my $val = $row->{$key};
+
+	# Always skip these; they come from the experiment object. Prevents
+	# users from messing up the DB with a bogus XML file.
+	next
+	    if ($key eq "pid" ||$key eq "eid" || $key eq "exptidx");
+	
+	if ($key eq "idx") {
+	    # XXX 
+	    if ($val =~ /^\d*$/) {
+		push(@values, DBQuoteSpecial($val));
+	    }
+	    else {
+		carp("Illegal characters in table data: $table:$key - $val");
+		return -1;
+	    }
+	}
+	elsif (!defined($val) || $val eq "NULL") {
+	    push(@values, "NULL");
+	}
+	elsif ($val eq "") {
+	    push(@values, "''");
+	}
+	else {
+	    # Sanity check the fields.
+	    if (TBcheck_dbslot($val, $table, $key,
+			       TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+		push(@values, DBQuoteSpecial($val));
+	    }
+	    else {
+		carp("Illegal characters in table data: $table:$key - $val");
+		return -1;
+	    }
+	    # If a key remove from the list; we got it.
+	    delete($pkeys{$key})
+		if (exists($pkeys{$key}));
+	}
+	push(@fields, $key);
+    }
+    if (keys(%pkeys)) {
+	carp("Missing primary keys in $self");
+	return -1;
+    }
+    my $query;
+    if ($simparse) {
+	#
+	# If we are called after an nseparse, we need to use replace
+	# coz some of the tables such as virt_agents and eventlist are
+	# not truly virtual tables. That is coz they contain the vnode
+	# field which is the same as the vname field in the reserved
+	# table. For simulated nodes, the mapping may change across
+	# swapins and the event may have to be delivered to a
+	# different simhost
+	#
+	$query =
+	    "replace into $table (" . join(",", @fields) . ") ".
+	    "values (" . join(",", @values) . ") ";
+    }
+    else {
+	$query =
+	    "insert into $table (" . join(",", @fields) . ") ".
+	    "values (" . join(",", @values) . ") ";
+    }
+  
+    print "$query\n"
+	if ($debug);
+
+    return -1
+	if (!$impotent && !DBQueryWarn($query));
+
+    return 0;
+}
+
+#
+# Dump the contents of virt tables.
+#
+sub Dump($)
+{
+    my ($self) = @_;
+
+    my $dbrow = $self->tablerow();
+
+    print $self . "\n";
+    foreach my $key (keys(%{ $dbrow })) {
+	my $val = $dbrow->{$key};
+	$val = "NULL"
+	    if (!defined($val));
+	    
+	print "  $key : $val\n";
+    }
+}
+
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+
+    my $table = $self->tablename();
+    my $row   = $self->tablerow();
+    my $pid   = ($self->experiment() ? $self->experiment()->pid() : "?");
+    my $eid   = ($self->experiment() ? $self->experiment()->eid() : "?");
+    my $idx   = ($self->experiment() ? $self->experiment()->idx() : "?");
+
+    my @keys   = @{ $VirtExperiment::virtual_tables{$table} };
+    my @values = map { $row->{$_} } @keys;
+    @values    = map { (defined($_) ? $_ : "NULL") } @values;
+    my $keystr = join(",", @values);
+
+    return "[$table: $pid/$eid/$idx $keystr]";
+}
+
+############################################################################
+# And now subclasses for each virtual table.
+#
+package VirtExperiment::VirtTableRow::virt_nodes;
+use vars qw(@ISA);
+@ISA = "VirtExperiment::VirtTableRow";
+use VirtExperiment;
+
+package VirtExperiment::VirtTableRow::virt_lans;
+use vars qw(@ISA);
+@ISA = "VirtExperiment::VirtTableRow";
+use VirtExperiment;
+
+package VirtExperiment::VirtTableRow::virt_lan_lans;
+use vars qw(@ISA);
+@ISA = "VirtExperiment::VirtTableRow";
+use VirtExperiment;
+
+package VirtExperiment::VirtTableRow::virt_lan_settings;
+use vars qw(@ISA);
+@ISA = "VirtExperiment::VirtTableRow";
+use VirtExperiment;
+
+package VirtExperiment::VirtTableRow::virt_lan_member_settings;
+use vars qw(@ISA);
+@ISA = "VirtExperiment::VirtTableRow";
+use VirtExperiment;
+
+package VirtExperiment::VirtTableRow::virt_trafgens;
+use vars qw(@ISA);
+@ISA = "VirtExperiment::VirtTableRow";
+use VirtExperiment;
+
+package VirtExperiment::VirtTableRow::virt_agents;
+use vars qw(@ISA);
+@ISA = "VirtExperiment::VirtTableRow";
+use VirtExperiment;
+
+package VirtExperiment::VirtTableRow::virt_node_desires;
+use vars qw(@ISA);
+@ISA = "VirtExperiment::VirtTableRow";
+use VirtExperiment;
+
+package VirtExperiment::VirtTableRow::virt_node_startloc;
+use vars qw(@ISA);
+@ISA = "VirtExperiment::VirtTableRow";
+use VirtExperiment;
+
+package VirtExperiment::VirtTableRow::virt_routes;
+use vars qw(@ISA);
+@ISA = "VirtExperiment::VirtTableRow";
+use VirtExperiment;
+
+package VirtExperiment::VirtTableRow::virt_vtypes;
+use vars qw(@ISA);
+@ISA = "VirtExperiment::VirtTableRow";
+use VirtExperiment;
+
+package VirtExperiment::VirtTableRow::virt_programs;
+use vars qw(@ISA);
+@ISA = "VirtExperiment::VirtTableRow";
+use VirtExperiment;
+
+package VirtExperiment::VirtTableRow::virt_user_environment;
+use vars qw(@ISA);
+@ISA = "VirtExperiment::VirtTableRow";
+use VirtExperiment;
+
+package VirtExperiment::VirtTableRow::nseconfigs;
+use vars qw(@ISA);
+@ISA = "VirtExperiment::VirtTableRow";
+use VirtExperiment;
+
+package VirtExperiment::VirtTableRow::eventlist;
+use vars qw(@ISA);
+@ISA = "VirtExperiment::VirtTableRow";
+use VirtExperiment;
+
+package VirtExperiment::VirtTableRow::event_groups;
+use vars qw(@ISA);
+@ISA = "VirtExperiment::VirtTableRow";
+use VirtExperiment;
+
+package VirtExperiment::VirtTableRow::virt_firewalls;
+use vars qw(@ISA);
+@ISA = "VirtExperiment::VirtTableRow";
+use VirtExperiment;
+
+package VirtExperiment::VirtTableRow::firewall_rules;
+use vars qw(@ISA);
+@ISA = "VirtExperiment::VirtTableRow";
+use VirtExperiment;
+
+package VirtExperiment::VirtTableRow::virt_tiptunnels;
+use vars qw(@ISA);
+@ISA = "VirtExperiment::VirtTableRow";
+use VirtExperiment;
+
+package VirtExperiment::VirtTableRow::virt_parameters;
+use vars qw(@ISA);
+@ISA = "VirtExperiment::VirtTableRow";
+use VirtExperiment;
+
+# _Always_ make sure that this 1 is at the end of the file...
+1;
