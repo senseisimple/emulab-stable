@@ -264,6 +264,7 @@ sub Lookup($$;$)
 sub field($$)     { return ((! ref($_[0])) ? -1 : $_[0]->{'EXPT'}->{$_[1]}); }
 sub stats($$)     { return ((! ref($_[0])) ? -1 : $_[0]->{'STATS'}->{$_[1]});}
 sub resources($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'RSRC'}->{$_[1]}); }
+sub dbrow($$)     { return $_[0]->{'EXPT'}; }
 
 sub pid($)		{ return field($_[0], 'pid'); }
 sub gid($)		{ return field($_[0], 'gid'); }
