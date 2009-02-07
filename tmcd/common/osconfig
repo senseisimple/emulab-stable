@@ -288,7 +288,7 @@ sub doUpdate($$$) {
 	return 0;
     }
 
-    my $uurl = "https://$bossname/dev/johnsond/osconfig_dump.php?ip=$ip";
+    my $uurl = "https://$bossname/osconfig_dump.php?ip=$ip";
 
     $urlargs{"env"} = "$env";
     # note that we always take this from the / root, not the slice /
