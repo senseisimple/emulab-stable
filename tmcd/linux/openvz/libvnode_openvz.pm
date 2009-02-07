@@ -144,6 +144,12 @@ sub vz_rootPreConfig {
     # this is what we need for veths
     mysystem("$MODPROBE vzethdev");
 
+    # we need this stuff for traffic shaping -- only root context can
+    # modprobe, for now.
+    mysystem("$MODPROBE sch_plr");
+    mysystem("$MODPROBE sch_delay");
+    mysystem("$MODPROBE sch_htb");
+
     # make sure our network hooks are called
     if (system('grep -q -e EXTERNAL_SCRIPT /etc/vz/vznet.conf')) {
 	if (! -e '/etc/vz/vznet.conf') {
