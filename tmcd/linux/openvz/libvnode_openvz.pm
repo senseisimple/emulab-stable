@@ -48,7 +48,7 @@ use Data::Dumper;
 require "/etc/emulab/paths.pm"; import emulabpaths;
 use libvnode;
 
-my $defaultImage = "fedora-8-i386-emulab-stripped";
+my $defaultImage = "emulab-default";
 
 sub VZSTAT_RUNNING() { return "running"; }
 sub VZSTAT_STOPPED() { return "stopped"; }
@@ -791,8 +791,8 @@ sub makeBridgeMaps() {
 	    $curbr = $1;
 	    $bridges{$curbr} = [];
 	}
-	if ($line =~ /^[^\s]+\s+[^\s]+\s+[^\s]+\s+([\w\d\-]+)$/ 
-	    || $line =~ /^\s+([\w\d\-]+)$/) {
+	if ($line =~ /^[^\s]+\s+[^\s]+\s+[^\s]+\s+([\w\d\-\.]+)$/ 
+	    || $line =~ /^\s+([\w\d\-\.]+)$/) {
 	    push @{$bridges{$curbr}}, $1;
 	    $if2br{$1} = $curbr;
 	}

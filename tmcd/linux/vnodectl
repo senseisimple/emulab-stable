@@ -20,7 +20,6 @@ use Data::Dumper;
 sub usage()
 {
     print "Usage: vnodectl [-h] [-d] [-f] [-khrb] [-c] [vnodeid vnodeid ...]\n" . 
-          "  -h   Show this help.\n" . 
           "  -d   Debug mode.\n" . 
           "  -f   Run in foreground.\n" . 
           "  -c   Reconfigure listed vnodes (or all vnodes if unspecified).\n" . 
@@ -33,7 +32,7 @@ sub usage()
     exit(1);
 }
 
-my $optlist = "hdfkhrbc";
+my $optlist = "dfkhrbc";
 
 #
 # Turn off line buffering on output
@@ -82,9 +81,6 @@ if (! getopts($optlist, \%options)) {
 # hah, this is funny... emacs perl mode will not properly indent unless
 # I throw this extra block in.  Woo!
 {
-    if (defined($options{"h"})) {
-	usage();
-    }
     if (defined($options{"d"})) {
 	$debug = 1;
     }
@@ -157,7 +153,7 @@ if ($daemon && TBBackGround($logname)) {
 # we only have pcvm.  Later, we need to get this info from tmcd so we know 
 # lib to load.
 #
-my @nodetypes = ("openvz");
+my @nodetypes = ( GENVNODETYPE() );
 
 #
 # We go through this crap so that we can pull in multiple packages implementing
@@ -165,13 +161,16 @@ my @nodetypes = ("openvz");
 #
 my %libops = ();
 foreach my $type (@nodetypes) {
+    if ($type =~ /^([\w\d\-]+)$/) {
+	$type = $1;
+    }
     # load lib and initialize it
     my %ops;
     eval "use libvnode_$type; %ops = %libvnode_${type}::ops";
     if ($@) {
 	die "while trying to load 'libvnode_$type': $@";
     }
-    if ($debug) {
+    if (0 && $debug) {
 	print "%ops($type):\n" . Dumper(%ops);
     }
     $libops{$type} = \%ops;
@@ -195,7 +194,6 @@ if (keys(%vndb) == 0) {
 if ($debug) {
     print "GENVNODETYPE " . GENVNODETYPE() . "\n";
     print "libops:\n" . Dumper(%libops);
-    print "vndb:\n" . Dumper(%vndb);
 }
 
 #
@@ -260,6 +258,11 @@ foreach my $str (@tmccresults) {
     }
 }
 
+if ($debug) {
+    print "vndb:\n" . Dumper(%vndb);
+    print "tmccvnodes:\n" . Dumper(@tmccvnodes);
+}
+
 #
 # Need the domain, but no conistent way to do it. Ask tmcc for the
 # boss node and parse out the domain. 
@@ -305,14 +308,7 @@ if ($action eq 'reboot' || $action eq 'halt' || $action eq 'kill') {
     }
 
     foreach my $vnode (@vnodes) {
-	# XXX: type MUST, MUST eventually come from tmcd or somewhere.
-	my $type = GENVNODETYPE();
-	eval {
-	    $libops{$type}{$op}->($vnode,$vndb{$vnode});
-	};
-	if ($@) {
-	    push @errors, $@;
-	}
+	safeLibOp($vnode,$op,1,1,$vnode,$vndb{$vnode}{'id'});
     }
 
     #
@@ -323,8 +319,8 @@ if ($action eq 'reboot' || $action eq 'halt' || $action eq 'kill') {
     }
 }
 elsif ($action eq 'boot') {
-    my @newvnodes;
-    my @oldvnodes;
+    my @newvnodes = ();
+    my @oldvnodes = ();
 
     #
     # Teardown nodes that are no longer with us.  Note that we already tried 
@@ -335,20 +331,13 @@ elsif ($action eq 'boot') {
     }
 
     if ($allnew) {
-	# must be a first time boot
+	# must be a first time (or clean) boot... not sure why we care.
 	@newvnodes = @tmccvnodes;
 	@oldvnodes = ();
     }
     elsif ($reconfig) {
 	foreach $curvnode (@tmccvnodes) {
-	    my $found = 0;
-	    foreach $oldvnode (keys(%vndb)) {
-		if ($oldvnode eq $curvnode) {
-		    $found = 1;
-		    last;
-		}
-	    }
-	    if ($found) {
+	    if (exists($vndb{$curvnode}) && exists($vndb{$curvnode}{'id'})) {
 		push @oldvnodes, $curvnode;
 	    }
 	    else {
@@ -434,8 +423,20 @@ elsif ($action eq 'boot') {
 	foreach my $vnode (@oldvnodes) {
 	    my $vmid = $vndb{$vnode}{'id'};
 
+	    my ($ret,$err);
+	    ($ret,$err) = safeLibOp($vnode,'vnodeState',1,0,
+				    $vnode,$vndb{$vnode}{'id'});
+	    if ($err) {
+		print STDERR "*** ERROR: failed to get status for $vnode: $err\n";
+		next;
+	    }
+	    if ($ret ne VNODE_STATUS_STOPPED()) {
+		warn("teardown: vnode $vnode not stopped, skipping reconfig!");
+		next;
+	    }
+
 	    # OP: preconfig
-	    next if (safeLibOp($vnode,'vnodePreConfig',1,$vnode,$vmid));
+	    next if (safeLibOp($vnode,'vnodePreConfig',1,1,$vnode,$vmid));
 
 	    # OP: control net preconfig
 	    my $cnet_mac = ipToMac($vmconfigs{$vnode}{'CTRLIP'});
@@ -448,10 +449,13 @@ elsif ($action eq 'boot') {
 		push @errors, $err;
 		next;
 	    }
+	    my $longdomain = $vndb{$vnode}{'eid'} . "." . $vndb{$vnode}{'pid'} 
+	        . ".$DOMAINNAME";
 	    next if (safeLibOp($vnode,'vnodePreConfigControlNetwork',1,1,
 			       $vnode,$vmid,$vmconfigs{$vnode}{'CTRLIP'},
 			       $vmconfigs{$vnode}{'CTRLMASK'},$cnet_mac,
-			       $ext_ctrlip,$DOMAINNAME));
+			       $ext_ctrlip,$vndb{$vnode}{'vname'},$longdomain,
+			       $DOMAINNAME,$BOSSIP));
 
 	    # OP: exp net preconfig
 	    next if (safeLibOp($vnode,'vnodePreConfigExpNetwork',1,1,
@@ -478,9 +482,9 @@ elsif ($action eq 'boot') {
 }
 
 if (@errors) {
-    print "There were errors encountered:\n\n";
+    print STDERR "There were errors encountered:\n\n";
     foreach my $e (@errors) {
-	print "  $e\n";
+	print STDERR "  $e\n";
     }
     exit(@errors);
 }
@@ -492,50 +496,36 @@ exit(0);
 #
 
 sub teardownOldVnodes() {
+    print "Looking for old vnodes to tear down...\n";
+
     foreach my $oldvnode (keys(%vndb)) {
-	#my $type = $vndb{$oldvnode}{'type'};
 	my $found = 0;
-	foreach my $curvnode (@vnodes) {
+	foreach my $curvnode (@tmccvnodes) {
 	    if ($curvnode eq $oldvnode) {
 		$found = 1;
 		last;
 	    }
 	}
-	if ($found) {
+	if (!$found) {
+	    print "Tearing down old vnode '$oldvnode':\n";
+
 	    # if not halted, try that first
 	    my ($ret,$err);
-	    ($ret,$err) = safeLibOp($oldvnode,'vnodeState',1,1,
+	    ($ret,$err) = safeLibOp($oldvnode,'vnodeState',1,0,
 				    $oldvnode,$vndb{$oldvnode}{'id'});
 	    if ($err) {
 		print STDERR "*** ERROR: failed to teardown $oldvnode: $err\n";
 		next;
 	    }
-	    #if ($libops{$type}{'vnodeState'}->($oldvnode,
-	    #				       $vndb{$oldvnode}{'id'}) 
 	    if ($ret ne VNODE_STATUS_STOPPED()) {
 		warn("teardown: vnode $oldvnode not stopped, trying to halt before destroy!");
 		($ret,$err) = safeLibOp($oldvnode,'vnodeHalt',1,1,
 					$oldvnode,$vndb{$oldvnode}{'id'});
-		#eval {
-		#    $libops{$type}{'vnodeHalt'}->($oldvnode,
-		#				  $vndb{$oldvnode}{'id'});
-		#};
-		#if ($@) {
-		#    warn("could not halt vnode $oldvnode," . 
-		#	 " destroying anyway: $@\n");
-		#}
 	    }
 	    
 	    # now destroy
 	    ($ret,$err) = safeLibOp($oldvnode,'vnodeDestroy',1,1,
 				    $oldvnode,$vndb{$oldvnode}{'id'});
-	    #eval {
-	    #	$libops{$type}{'vnodeDestroy'}->($oldvnode,
-	    #					 $vndb{$oldvnode}{'id'});
-	    #};
-	    #if ($@) {
-	    #	push @errors, $@;
-	    #}
 	    if ($err) {
 		print STDERR "*** ERROR: failed to destroy $oldvnode: $err\n";
 		next;
@@ -601,7 +591,7 @@ sub getvmmap($) {
 
     while (<VMMFD>) {
 	chomp($_);
-	if ($_ =~ /^([-\w\d]+)\s+([^\s]+)s+([^\s]+)$/) {
+	if ($_ =~ /^([-\w\d]+)\s+([^\s]+)\s+([^\s]+)$/) {
 	    $ref->{$1}{'id'} = $2;
 	    $ref->{$1}{'type'} = $3;
 	}
