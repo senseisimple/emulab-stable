@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2005-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -40,6 +40,7 @@ my  $optlist = "dc";
 my $TB       = "@prefix@";
 my $DBNAME   = "@TBDBNAME@";
 my $TBOPS    = "@TBOPSEMAIL@";
+my $MAINSITE = @TBMAINSITE@;
 
 # XXX
 my $BUILDING = "MEB-ROBOTS";
@@ -51,9 +52,6 @@ use libdb;
 use libtestbed;
 use User;
 use Project;
-
-# Be careful not to exit on transient error
-$libdb::DBQUERY_MAXTRIES = 30;
 
 #
 # These come from the library.
@@ -112,6 +110,10 @@ if (defined($options{"d"})) {
 if (defined($options{"c"})) {
     $cleanup = $options{"c"};
 }
+
+# Do not bother outside of Utah.
+exit(0)
+    if (! $MAINSITE);
 
 if ($cleanup) {
     # For testing purposes mostly, cleanup any leftovers...
