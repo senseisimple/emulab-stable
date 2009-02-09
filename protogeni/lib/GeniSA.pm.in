@@ -178,9 +178,10 @@ sub Resolve($)
     if (defined($hrn) && !($hrn =~ /^[-\w\.]*$/)) {
 	return GeniResponse->MalformedArgsResponse();
     }
-    if (! (defined($type) && ($type =~ /^(SA|MA|Component|Slice|User)$/))) {
+    if (! (defined($type) && ($type =~ /^(SA|MA|Component|Slice|User)$/i))) {
 	return GeniResponse->MalformedArgsResponse();
     }
+    $type = lc($type);
     if (! defined($cred)) {
 	return GeniResponse->MalformedArgsResponse();
     }
@@ -222,7 +223,7 @@ sub Resolve($)
 				    undef, "Who are you?");
     }
     
-    if ($type eq "User") {
+    if ($type eq "user") {
 	my $geniuser;
 	
 	if (defined($uuid)) {
@@ -253,7 +254,7 @@ sub Resolve($)
 	
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
     }
-    if ($type eq "Slice") {
+    if ($type eq "slice") {
 	my $slice;
 	
 	if (defined($uuid)) {

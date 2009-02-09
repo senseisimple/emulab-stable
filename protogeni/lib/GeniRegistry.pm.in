@@ -103,17 +103,24 @@ sub CreateCredential($$;$)
 #
 sub Resolve($$$$)
 {
-    my ($self, $uuid, $type, $pref) = @_;
+    my ($self, $token, $type, $pref) = @_;
 
     $$pref = undef;
-    
+    my $which = "uuid";
+
+    if ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
+	$which = "uuid";
+    }
+    else {
+	$which = "hrn";
+    }
     my $response =
 	Genixmlrpc::CallMethod($self->authority(),
 			       $self->context(), 
 			       "Resolve",
 			       { "credential" => $self->credential(),
 				 "type"       => $type,
-				 "uuid"       => $uuid });
+				 $which       => $token });
     return -1
 	if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS);
     

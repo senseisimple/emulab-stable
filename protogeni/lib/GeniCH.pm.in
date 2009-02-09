@@ -155,14 +155,25 @@ sub Resolve($)
     my ($argref) = @_;
     my $cred = $argref->{'credential'};
     my $uuid = $argref->{'uuid'};
+    my $hrn  = $argref->{'hrn'};
     my $type = $argref->{'type'};
 
-    if (! (defined($uuid) && ($uuid =~ /^[-\w]*$/))) {
+    if (! (defined($uuid) || defined($hrn))) {
+	return GeniResponse->MalformedArgsResponse();
+    }
+    if (defined($uuid) && defined($hrn)) {
+	return GeniResponse->MalformedArgsResponse();
+    }
+    if (defined($uuid) && !($uuid =~ /^[-\w]*$/)) {
+	return GeniResponse->MalformedArgsResponse();
+    }
+    if (defined($hrn) && !($hrn =~ /^[-\w\.]*$/)) {
 	return GeniResponse->MalformedArgsResponse();
     }
     if (! (defined($type) && ($type =~ /^(SA|CM|MA|Component|Slice|User)$/i))){
 	return GeniResponse->MalformedArgsResponse();
     }
+    $type = lc($type);
     if (! defined($cred)) {
 	return GeniResponse->MalformedArgsResponse();
     }
@@ -171,6 +182,7 @@ sub Resolve($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not create GeniCredential object");
     }
+    my $lookup_token = ($uuid || $hrn);
 
     #
     # Make sure the credential was issued to the caller.
@@ -192,17 +204,12 @@ sub Resolve($)
 				    undef, "This is not your registry!");
     }
 
-    if ($type eq "User") {
-	my $user = GeniUser->Lookup($uuid);
+    if ($type eq "user") {
+	my $user = GeniUser->Lookup($lookup_token);
 	if (!defined($user)) {
 	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
-					"No such user $uuid");
+					"No such user $lookup_token");
 	}
-	# Grab keys.
-	#my @sliverkeys;
-	#if ($user->GetKeys(\@sliverkeys) != 0) {
-	#    print STDERR "Could not get sliver keys for $user\n";
-	#}
 
 	# Return a blob.
 	my $blob = { "uid"      => $user->uid(),
@@ -213,17 +220,14 @@ sub Resolve($)
 		     "name"     => $user->name(),
 		     "sa_uuid"  => $user->sa_uuid(),
 		 };
-	#$blob->{'sliverkeys'} = \@sliverkeys
-	#    if (@sliverkeys);
-    
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
     }
-    if ($type eq "Component") {
-	my $component = GeniComponent->Lookup($uuid);
+    if ($type eq "component") {
+	my $component = GeniComponent->Lookup($lookup_token);
 	
 	if (!defined($component)) {
 	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
-					"No such component resource $uuid");
+					"No such component $lookup_token");
 	}
 
 	# Return a blob.
@@ -233,11 +237,11 @@ sub Resolve($)
     
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
     }
-    if ($type eq "SA" || $type eq "sa") {
-	my $authority = GeniAuthority->Lookup($uuid);
+    if ($$type eq "sa") {
+	my $authority = GeniAuthority->Lookup($lookup_token);
 	if (!defined($authority)) {
 	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
-					"No such authority $uuid");
+					"No such authority $lookup_token");
 	}
 	# Return a blob.
 	my $blob = { "gid"         => $authority->cert(),
@@ -246,11 +250,11 @@ sub Resolve($)
 		 };
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
     }
-    if ($type eq "CM") {
-	my $manager = GeniAuthority->Lookup($uuid);
+    if ($type eq "cm") {
+	my $manager = GeniAuthority->Lookup($lookup_token);
 	if (!defined($manager)) {
 	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
-					"No such manager $uuid");
+					"No such manager $lookup_token");
 	}
 	# Return a blob.
 	my $blob = { "gid"         => $manager->cert(),
@@ -258,7 +262,7 @@ sub Resolve($)
 		 };
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
     }
-    if ($type eq "MA") {
+    if ($type eq "ma") {
 	#
 	# I think the MA is the ClearingHouse?
 	#
@@ -268,11 +272,11 @@ sub Resolve($)
 		 };
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
     }
-    if ($type eq "Slice") {
-	my $slice = GeniSlice->Lookup($uuid);
+    if ($type eq "slice") {
+	my $slice = GeniSlice->Lookup($lookup_token);
 	if (!defined($slice)) {
 	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
-					"No such slice $uuid");
+					"No such slice $lookup_token");
 	}
 
 	# Return a blob.
