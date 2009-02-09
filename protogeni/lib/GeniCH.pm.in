@@ -237,7 +237,7 @@ sub Resolve($)
     
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
     }
-    if ($$type eq "sa") {
+    if ($type eq "sa") {
 	my $authority = GeniAuthority->Lookup($lookup_token);
 	if (!defined($authority)) {
 	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
