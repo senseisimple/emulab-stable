@@ -1,11 +1,11 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2003, 2004, 2007 University of Utah and the Flux Group.
+ * Copyright (c) 2003-2009 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
 /*
- *
+ * Dave swears we use this on plab nodes. Hand installed into the rootball.
  */
 #include <stdio.h>
 #include <ctype.h>

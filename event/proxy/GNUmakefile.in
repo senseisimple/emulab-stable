@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -80,6 +80,7 @@ endif
 evproxy-debug:	evproxy.o $(LIBTBDIR)/log.o
 	$(CC) $(PLDFLAGS) -o $@ -pthread evproxy.o $(PLIBS)
 
+# Dave swears we use this on plab nodes. Hand installed into the rootball.
 evproxyplab.o: evproxyplab.cc
 	$(CPPC) $(CFLAGS)  -c $<
 
