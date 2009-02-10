@@ -1850,7 +1850,7 @@ sub Shutdown($)
 sub ListUsage($)
 {
     my ($argref) = @_;
-    my $cred  = $argref->{'credential'};
+    my $cred     = $argref->{'credential'};
 
     if (! (defined($cred))) {
 	return GeniResponse->MalformedArgsResponse();

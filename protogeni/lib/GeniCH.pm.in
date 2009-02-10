@@ -83,7 +83,7 @@ sub GetCredential($)
 	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 					"Improper format for uuid");
 	}
-	if (! ($certificate->hrn() =~ /^[\w\.]+$/)) {
+	if (! ($certificate->hrn() =~ /^[-\w\.]+$/)) {
 	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 					"Improper format for hrn");
 	}
@@ -302,9 +302,10 @@ sub Register($)
     my $info  = $argref->{'info'};
     my $type  = $argref->{'type'};
 
-    if (! (defined($type) && ($type =~ /^(SA|MA|CM|Component|Slice|User)$/))) {
+    if (! (defined($type) && ($type =~ /^(SA|MA|CM|Component|Slice|User)$/i))){
 	return GeniResponse->MalformedArgsResponse();
     }
+    $type = lc($type);
     if (! defined($cred)) {
 	return GeniResponse->MalformedArgsResponse();
     }
@@ -356,12 +357,12 @@ sub Register($)
 	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 				    "Improper format for uuid");
     }
-    if (! ($certificate->hrn() =~ /^[\w\.]+$/)) {
+    if (! ($certificate->hrn() =~ /^[-\w\.]+$/)) {
 	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 				    "Improper format for hrn");
     }
     
-    if ($type eq "User") {
+    if ($type eq "user") {
 	my $name  = $info->{'name'};
 	my $email = $info->{'email'};
 	my $keys  = undef;
@@ -429,7 +430,7 @@ sub Register($)
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, undef,
 				    "User has been registered");
     }
-    if ($type eq "Slice") {
+    if ($type eq "slice") {
 	my $creator_uuid  = $info->{'creator_uuid'};
 	my $userbindings  = $info->{'userbindings'};
 
@@ -495,7 +496,7 @@ sub Register($)
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, undef,
 				    "Slice has been registered");
     }
-    if ($type eq "Component") {
+    if ($type eq "component") {
 	my $manager = GeniAuthority->Lookup($ENV{'GENIUUID'});
 	if (!defined($manager)) {
 	    print STDERR "Could not find manager object for caller.\n";
@@ -509,7 +510,7 @@ sub Register($)
 	}
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS);
     }
-    if ($type eq "CM" || $type eq "SA") {
+    if ($type eq "cm" || $type eq "sa") {
 	#
 	# Check for an existing authority. 
 	#
