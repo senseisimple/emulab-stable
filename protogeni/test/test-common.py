@@ -28,7 +28,7 @@ passphrase      = ""
 CONFIGFILE      = ".protogeni-config.py"
 GLOBALCONF      = HOME + "/" + CONFIGFILE
 LOCALCONF       = CONFIGFILE
-
+EXTRACONF       = None
 SLICENAME       = "mytestslice"
 
 selfcredentialfile = None
@@ -45,13 +45,15 @@ def Usage():
     -h, --help                          show options and usage
     -p file, --passphrase=file          read passphrase from file
                                             [default: ~/.ssl/password]
+    -r file, --read-commands=file       specify additional configuration file
     -s file, --slicecredentials=file    read slice credentials from file
                                             [default: query from SA]"""
 
 try:
-    opts, args = getopt.getopt( sys.argv[ 1: ], "c:df:hp:s:",
+    opts, args = getopt.getopt( sys.argv[ 1: ], "c:df:hp:r:s:",
                                 [ "credentials=", "debug", "certificate=",
-                                  "help", "passphrase=", "slicecredentials=" ] )
+                                  "help", "passphrase=", "read-commands=",
+                                  "slicecredentials=" ] )
 except getopt.GetoptError, err:
     print str( err )
     Usage()
@@ -69,6 +71,8 @@ for opt, arg in opts:
         sys.exit( 0 )
     elif opt in ( "-p", "--passphrase" ):
         PASSPHRASEFILE = arg
+    elif opt in ( "-r", "--read-commands" ):
+        EXTRACONF = arg
     elif opt in ( "-s", "--slicecredentials" ):
         slicecredentialfile = arg
 
@@ -84,6 +88,8 @@ if os.path.exists( GLOBALCONF ):
     execfile( GLOBALCONF )
 if os.path.exists( LOCALCONF ):
     execfile( LOCALCONF )
+if EXTRACONF and os.path.exists( EXTRACONF ):
+    execfile( EXTRACONF )
 
 def Fatal(message):
     print message

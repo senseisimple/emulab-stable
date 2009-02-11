@@ -151,6 +151,8 @@ tmpfile.flush()
 ret = os.spawnlp( os.P_WAIT, XMLSEC1, XMLSEC1, "--sign", "--node-id",
                   "Sig_ref" + str( id ), "--privkey-pem",
                   CERTIFICATE + "," + CERTIFICATE, tmpfile.name )
+if ret == 127:
+    print >> sys.stderr, XMLSEC1 + ": invocation error\n"
 
 tmpfile.close()
 
