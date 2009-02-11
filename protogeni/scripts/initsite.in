@@ -72,9 +72,10 @@ $| = 1;
 # Load the Testbed support stuff.
 use lib "@prefix@/lib";
 use libtestbed;
-use libdb qw(TBSetSiteVar);
+use libdb qw(TBSetSiteVar TBOPSPID DBQueryFatal);
 use User;
 use Project;
+use OSinfo;
 
 if ($UID != 0) {
     fatal("Must be root to run this script\n");
@@ -317,6 +318,24 @@ if (!defined($sslcert)) {
     fatal("Could not create encrypted certificate for geni user")
 	if ($?);
 }
+
+#
+# Need this fake type for now.
+#
+my $osinfo = OSinfo->Lookup(TBOPSPID(), "RHL-STD");
+if (!defined($osinfo)) {
+    fatal("No RHL-STD OSID in the ops project!");
+}
+my $osid = $osinfo->osid();
+
+DBQueryFatal("replace into node_types (type,class,isvirtnode,isdynamic) ".
+	     "values ('pcfake','pcvm',1,1)");
+DBQueryFatal("replace into node_type_attributes ".
+	     "(type,attrkey,attrvalue,attrtype) values ".
+	     "('pcfake','rebootable','1','boolean')");
+DBQueryFatal("replace into node_type_attributes ".
+	     "(type,attrkey,attrvalue,attrtype) values ".
+	     "('pcfake','default_osid','$osid','integer')");
 
 #
 # Databases.
