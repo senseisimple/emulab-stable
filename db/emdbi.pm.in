@@ -314,7 +314,9 @@ sub DBQueryFatalN($$)
 sub DBQueryFatal($) {return DBQueryFatalN(0,$_[0]);}
 
 #
-# Like DBQueryFatal but also fail if the query didn't return any results
+# Like DBQueryFatal but also fail if the query didn't return any
+# results and returns the result as an array in list context or the
+# first column of the result is scalar content.
 #
 sub DBQuerySingleFatalN($$)
 {
@@ -323,7 +325,7 @@ sub DBQuerySingleFatalN($$)
     DBFatal("DB Query \"$query\" didn't return any results") 
 	unless $query_result->numrows > 0;
     my @row = $query_result->fetchrow_array();
-    return $row[0];
+    return wantarray ? @row : $row[0];
 }
 sub DBQuerySingleFatal($) {return DBQuerySingleFatalN(0,$_[0]);}
 
