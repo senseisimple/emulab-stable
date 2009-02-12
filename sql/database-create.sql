@@ -1394,6 +1394,31 @@ CREATE TABLE `ifaces` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `image_history`
+--
+
+DROP TABLE IF EXISTS `image_history`;
+CREATE TABLE `image_history` (
+  `history_id` int(10) unsigned NOT NULL auto_increment,
+  `stamp` int(10) unsigned NOT NULL,
+  `node_history_id` int(10) unsigned NOT NULL,
+  `node_id` varchar(32) NOT NULL,
+  `action` varchar(8) NOT NULL,
+  `newly_alloc` int(1) default NULL,
+  `rsrcidx` int(10) unsigned default NULL,
+  `log_session` int(10) unsigned default NULL,
+  `req_type` varchar(30) default NULL,
+  `phys_type` varchar(30) NOT NULL,
+  `req_os` int(1) default NULL,
+  `osid` int(8) default NULL,
+  `imageid` int(8) default NULL,
+  PRIMARY KEY  (`history_id`),
+  KEY `node_id` (`node_id`,`history_id`),
+  KEY `stamp` (`stamp`),
+  KEY `rsrcidx` (`rsrcidx`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `images`
 --
 
@@ -2015,7 +2040,7 @@ CREATE TABLE `node_history` (
   `exptidx` int(10) unsigned default NULL,
   `stamp` int(10) unsigned default NULL,
   PRIMARY KEY  (`history_id`),
-  KEY `node_id` (`node_id`)
+  KEY `node_id` (`node_id`,`history_id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
