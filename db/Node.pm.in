@@ -22,6 +22,9 @@ my $OSSELECT    = "$TB/bin/os_select";
 # XXX stinky hack detection
 my $ISUTAH	= @TBMAINSITE@;
 
+# Need this for jail ip assignment.
+my $CONTROL_NETMASK = "@CONTROL_NETMASK@";
+
 # Must come after package declaration!
 use lib '@prefix@/lib';
 use libdb;
@@ -31,6 +34,7 @@ require Interface;
 require Experiment;
 require OSinfo;
 use English;
+use Socket;
 use Data::Dumper;
 use overload ('""' => 'Stringify');
 if ($EVENTSYS) {
@@ -1282,6 +1286,12 @@ sub CreateVnodes($$)
     my $vtype   = $options->{'vtype'};
     my $pnode   = $options->{'nodeid'};
 
+    my $node = Node->Lookup($pnode);
+    if (!defined($node)) {
+	print STDERR "*** CreateVnodes: No such node $pnode!\n";
+	return -1;
+    }
+
     my $experiment = Experiment->Lookup($pid, $eid);
     if (!defined($experiment)) {
 	print STDERR "*** CreateVnodes: No such experiment $pid/$eid!\n";
@@ -1310,13 +1320,36 @@ sub CreateVnodes($$)
     #
     my $nodeprefix;
     my $nodenum;
+    my $ipbase;
     if ($pnode =~ /^(.*\D)(\d+)$/) {
 	$nodeprefix = $1;
 	$nodenum    = $2;
+	$ipbase     = $nodenum;
     }
     else {
-	print STDERR "*** CreateVnodes: Unexpected nodeid '$pnode'\n";
-	return -1;
+	$nodeprefix = $pnode;
+	$nodenum    = "";
+
+	#
+	# Determine ipbase from the control IP. 
+	#
+	my $interface = Interface->LookupControl($node);
+	if (!defined($interface)) {
+	    print STDERR "*** CreateVnodes: No control interface for $node\n";
+	    return -1;
+	}
+	my $ctrlip = $interface->IP();
+	if (!defined($ctrlip) || $ctrlip eq "") {
+	    print STDERR "*** CreateVnodes: No control IP for $interface\n";
+	    return -1;
+	}
+	my $tmp = ~inet_aton($CONTROL_NETMASK) & inet_aton($ctrlip);
+	$ipbase = unpack("N", $tmp);
+	if ($ipbase == 0 || $ipbase < 0 || $ipbase > 0x3fff) {
+	    print STDERR
+		"*** CreateVnodes: Bad ipbase '$ipbase' for $interface\n";
+	    return -1;
+	}
     }
 
     #
@@ -1408,7 +1441,7 @@ sub CreateVnodes($$)
     # Create a bunch.
     #
     foreach my $i (@tocreate) {
-	my $vpriority = 10000000 + ($nodenum * 1000) + $i;
+	my $vpriority = 10000000 + ($ipbase * 1000) + $i;
 	my $vnodeid   = $nodeprefix . "vm" . $nodenum . "-" . $i;
 
 	#
@@ -1423,7 +1456,7 @@ sub CreateVnodes($$)
 	#
 	my $nodenumlimit = $ISUTAH ? 200 : 254;
 	my $pnet = $IPBASE2;
-	my $pnode2 = int($nodenum);
+	my $pnode2 = int($ipbase);
 	while ($pnode2 > $nodenumlimit) {
 	    $pnet++;
 	    $pnode2 -= $nodenumlimit;
@@ -1431,6 +1464,7 @@ sub CreateVnodes($$)
 	my $jailip = "${IPBASE1}.${pnet}.${pnode2}.${i}";
 
 	if ($verbose) {
+	    print "Jail IP for $vnodeid is $jailip\n";
 	    if ($impotent) {
 		print "Would allocate $vnodeid on $pnode ($vtype, $osid)\n";
 	    }
