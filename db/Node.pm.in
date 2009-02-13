@@ -78,7 +78,7 @@ sub Lookup($$)
     my ($class, $token) = @_;
     my $nodeid;
 
-    if ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
+    if ($token =~ /^\w{8}\-\w{4}\-\w{4}\-\w{4}\-\w{12}$/) {
 	my $query_result =
 	    DBQueryWarn("select node_id from nodes ".
 			"where uuid='$token'");
@@ -410,7 +410,7 @@ sub AccessCheck($$$)
 
     if ($access_type < TB_NODEACCESS_MIN ||
 	$access_type > TB_NODEACCESS_MAX) {
-	print "*** Invalid access type: $access_type!\n";
+	print STDERR "*** Invalid access type: $access_type!\n";
 	return 0;
     }
     # Admins do whatever they want.
@@ -1386,7 +1386,7 @@ sub CreateVnodes($$)
 
     my $uuid = NewUUID();
     if (!defined($uuid)) {
-	print "Could not generate a UUID!\n";
+	print STDERR "Could not generate a UUID!\n";
 	next NODE;
     }
     
@@ -1464,12 +1464,14 @@ sub CreateVnodes($$)
 	my $jailip = "${IPBASE1}.${pnet}.${pnode2}.${i}";
 
 	if ($verbose) {
-	    print "Jail IP for $vnodeid is $jailip\n";
+	    print STDERR "Jail IP for $vnodeid is $jailip\n";
 	    if ($impotent) {
-		print "Would allocate $vnodeid on $pnode ($vtype, $osid)\n";
+		print STDERR
+		    "Would allocate $vnodeid on $pnode ($vtype, $osid)\n";
 	    }
 	    else {
-		print "Allocating $vnodeid on $pnode ($vtype, $osid)\n";
+		print STDERR
+		    "Allocating $vnodeid on $pnode ($vtype, $osid)\n";
 	    }
 	}
 
