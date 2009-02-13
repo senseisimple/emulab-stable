@@ -1509,13 +1509,15 @@ if ($exit_code == 0) {
 	    my ($node_history_id) 
 		= DBQuerySingleFatal("select max(history_id) ".
 				     "  from node_history where node_id = '$node_id'");
-	    my ($osname, $req_type, $phys_type) 
-		= DBQuerySingleFatal("select v.osname, v.type, n.type ".
+	    my ($erole, $osname, $req_type, $phys_type) 
+		= DBQuerySingleFatal("select r.erole, v.osname, v.type, n.type ".
 				     "  from reserved as r ".
 				     "    left join virt_nodes as v using (vname, exptidx) ".
 				     "    left join nodes as n using (node_id) ".
 				     "where r.node_id = '$node_id'");
-	    my $req_os = $osname ? 1 : 0;
+	    my $req_os = defined $osname ? ($osname ? 1 : 0) : 'NULL';
+	    $erole = 'delay' if $erole eq 'delaynode';
+	    $req_type = $erole unless defined $req_type;
 	    
 	    DBQueryFatal("insert into image_history ".
 			 "(stamp, node_history_id, node_id, ".
