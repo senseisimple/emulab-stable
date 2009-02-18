@@ -1,0 +1,50 @@
+#!/usr/bin/perl
+use Modern::Perl;
+use lib 'lib';
+use TestBed::TestSuite::Experiment;
+use Test::More;
+use Data::Dumper;
+
+sub listexps {
+  output(list_full)
+}
+
+my $ns = <<'NSEND';
+source tb_compat.tcl
+
+set ns [new Simulator]
+
+set node1 [$ns node]
+set node2 [$ns node]
+
+set lan1 [$ns make-lan "$node1 $node2" 100Mb 0ms]
+$ns run
+NSEND
+
+#launchpingswapkill('tbres', 'tewkt', $ns);
+
+sub output {
+  my ($h) = @_;
+  while(my ($pk, $v) = each %$h) {
+    while(my ($gk, $v) = each %$v) {
+      for my $e (@$v) {
+        my $eid;
+        given ($e) {
+          when('name') { $eid = sprintf("%s %s", $e->{'name'}, $e->{'state'});}
+          default { $eid = $e; }
+        };
+          
+        say "$pk :: $gk :: $eid";
+      }
+    }
+  }
+}
+
+listexps();
+if (@ARGV && $ARGV[0] eq 'end') {
+  e('tbres', 'tewkt')->end();
+  listexps();
+}
+
+
+# vim: ft=perl:
