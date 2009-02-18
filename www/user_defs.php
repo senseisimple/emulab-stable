@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006, 2007, 2008 University of Utah and the Flux Group.
+# Copyright (c) 2006-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -1052,7 +1052,7 @@ class User
 
 	DBQueryFatal("update users set ".
 		     "       weblogin_failcount=weblogin_failcount+1, ".
-		     "       weblogin_failstamp='now()' ".
+		     "       weblogin_failstamp=UNIX_TIMESTAMP(now()) ".
 		     "where uid_idx='$idx'");
 
 	return $this->Refresh();
