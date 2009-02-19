@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007, 2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -62,7 +62,7 @@ function SPITFORM($email, $phone, $failed, $simple, $view)
     if ($failed) {
 	echo "<center>
               <font size=+1 color=red>
-              The email/phone you provided does not match.
+              $failed
 	      Please try again.
               </font>
               </center><br>\n";
@@ -138,12 +138,16 @@ if (!isset($reset)) {
 #
 if (!isset($phone) || $phone == "" || !TBvalid_phone($phone) ||
     !isset($email) || $email == "" || !TBvalid_email($email)) {
-    SPITFORM($email, $phone, 1, $simple, $view);
+    SPITFORM($email, $phone,
+	     "The email or phone contains invalid characters.",
+	     $simple, $view);
     return;
 }
 
 if (! ($user = User::LookupByEmail($email))) {
-    SPITFORM($email, $phone, 2, $simple, $view);
+    SPITFORM($email, $phone,
+	     "The email or phone does not match an existing user.",
+	     $simple, $view);
     return;
 }
 $uid       = $user->uid();
@@ -156,7 +160,25 @@ $uid_email = $user->email();
 #
 if (preg_replace("/[^0-9]/", "", $phone) !=
     preg_replace("/[^0-9]/", "", $usr_phone)) {
-    SPITFORM($email, $phone, 3, $simple, $view);
+    SPITFORM($email, $phone,
+	     "The email or phone does not match an existing user.",
+	     $simple, $view);
+    return;
+}
+
+#
+# A matched user, but if frozen do not go further. Confuses users.
+#
+if ($user->weblogin_frozen()) {
+    PAGEHEADER("Forgot Your Password?", $view);
+    echo "<center>
+	     The password cannot be changed; please contact $TBMAILADDR.<br>
+             <br>
+          <font size=+1 color=red>
+            Please do not attempt to change your password again;
+                it will not work!
+          </font>
+          </center><br>\n";
     return;
 }
 

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -58,6 +58,13 @@ define("CHECKLOGIN_ISFOREIGN_ADMIN",	0x800000);	# Admin of another Emulab.
 #
 define("DOLOGIN_MAXUSERATTEMPTS",	15);
 define("DOLOGIN_MAXIPATTEMPTS",		25);
+
+# Return codes for DOLOGIN so that the caller can say something helpful.
+#
+define("DOLOGIN_STATUS_OKAY",		0);
+define("DOLOGIN_STATUS_ERROR",		-1);
+define("DOLOGIN_STATUS_IPFREEZE",	-2);
+define("DOLOGIN_STATUS_WEBFREEZE",	-3);
 
 #
 # Generate a hash value suitable for authorization. We use the results of
@@ -227,7 +234,7 @@ function LoginStatus() {
 		     "       status,admin,cvsweb,g.trust,l.adminon,webonly, " .
 		     "       user_interface,n.type,u.stud,u.wikiname, ".
 		     "       u.wikionly,g.pid,u.foreign_admin,u.uid_idx, " .
-		     "       p.allow_workbench ".
+		     "       p.allow_workbench,u.weblogin_frozen ".
 		     " from users as u ".
 		     "left join login as l on l.uid_idx=u.uid_idx ".
 		     "left join group_membership as g on g.uid_idx=u.uid_idx ".
@@ -251,6 +258,7 @@ function LoginStatus() {
     $trusted   = 0;
     $opsguy    = 0;
     $workbench = 0;
+    $frozen    = 0;
     
     while ($row = mysql_fetch_array($query_result)) {
 	$expired = $row[0];
@@ -283,6 +291,7 @@ function LoginStatus() {
 	$foreign_admin   = $row[15];
 	$uid_idx         = $row[16];
 	$workbench      += $row[17];
+	$frozen          = $row[18];
 
 	$CHECKLOGIN_NODETYPES[$type] = 1;
     }
@@ -298,7 +307,8 @@ function LoginStatus() {
     #
     # Check for frozen account. Might do something interesting later.
     #
-    if (! strcmp($status, TBDB_USERSTATUS_FROZEN)) {
+    if ($frozen ||
+	$status == TBDB_USERSTATUS_FROZEN) {
 	DBQueryFatal("DELETE FROM login WHERE uid_idx='$uid_idx'");
 	$CHECKLOGIN_STATUS = CHECKLOGIN_NOTLOGGEDIN;
 	return $CHECKLOGIN_STATUS;
@@ -771,7 +781,7 @@ function DOLOGIN($token, $password, $adminmode = 0) {
     # Caller makes these checks too.
     if ((!TBvalid_uid($token) && !TBvalid_email($token)) ||
 	!isset($password) || $password == "") {
-	return -1;
+	return DOLOGIN_STATUS_ERROR;
     }
     $now = time();
 
@@ -795,7 +805,7 @@ function DOLOGIN($token, $password, $adminmode = 0) {
 			     "       failcount=failcount+1, ".
 			     "       failstamp='$now' ".
 			     "where IP='$IP'");
-		return -1;
+		return DOLOGIN_STATUS_IPFREEZE;
 	    }
 	}
     }
@@ -827,7 +837,7 @@ function DOLOGIN($token, $password, $adminmode = 0) {
 	# an account is frozen.
 	if ($frozen) {
 	    $user->UpdateWebLoginFail();
-	    return -1;
+	    return DOLOGIN_STATUS_WEBFREEZE;
 	}
 	
         $encoding = crypt("$password", $db_encoding);
@@ -872,7 +882,7 @@ function DOLOGIN($token, $password, $adminmode = 0) {
         # Insert a record in the login table for this uid.
 	#
 	if (DOLOGIN_MAGIC($uid, $uid_idx, $usr_email, $adminon) < 0) {
-	    return -1;
+	    return DOLOGIN_STATUS_ERROR;
 	}
 
 	#
@@ -887,14 +897,14 @@ function DOLOGIN($token, $password, $adminmode = 0) {
 	if (isset($IP)) {
 	    DBQueryFatal("delete from login_failures where IP='$IP'");
 	}
-	return 0;
+	return DOLOGIN_STATUS_OKAY;
       }
     } while (0);
     #
     # No such user
     #
     if (!isset($IP)) {
-	return -1;
+	return DOLOGIN_STATUS_ERROR;
     }
 
     $ipfrozen = 0;
@@ -932,7 +942,7 @@ function DOLOGIN($token, $password, $adminmode = 0) {
 		 "       frozen='$ipfrozen', ".
 		 "       failcount='$ipfailcount', ".
 		 "       failstamp='$now'");
-    return -1;
+    return DOLOGIN_STATUS_ERROR;
 }
 
 function DOLOGIN_MAGIC($uid, $uid_idx, $email = null, $adminon = 0)

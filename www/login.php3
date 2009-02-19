@@ -201,13 +201,29 @@ if (!isset($uid) || $uid == "" || !isset($password) || $password == "") {
     $login_status = $STATUS_LOGINFAIL;
 }
 else {
-    if (DOLOGIN($uid, $password, $adminmode)) {
+    $dologin_status = DOLOGIN($uid, $password, $adminmode);
+
+    if ($dologin_status == DOLOGIN_STATUS_WEBFREEZE) {
+	# Short delay.
+	sleep(1);
+
+	PAGEHEADER("Login", $view);
+	echo "<h3>
+              Your account has been frozen due to earlier login attempt
+              failures. You must contact $TBMAILADDR to have your account
+              restored. <br> <br>
+              Please do not attempt to login again; it will not work!
+              </h3>\n";
+	PAGEFOOTER($view);
+	die("");
+    }
+    else if ($dologin_status == DOLOGIN_STATUS_OKAY) {
+	$login_status = $STATUS_LOGGEDIN;
+    }
+    else {
 	# Short delay.
 	sleep(1);
 	$login_status = $STATUS_LOGINFAIL;
-    }
-    else {
-	$login_status = $STATUS_LOGGEDIN;
     }
 }
 
