@@ -34,20 +34,21 @@ SLICENAME       = "mytestslice"
 selfcredentialfile = None
 slicecredentialfile = None
 
-def Usage():
-    print "usage: " + sys.argv[ 0 ] + " [option...]"
-    print """Options:
-    -c file, --credentials=file         read self-credentials from file
-                                            [default: query from SA]
-    -d, --debug                         be verbose about XML methods invoked
-    -f file, --certificate=file         read SSL certificate from file
-                                            [default: ~/.ssl/encrypted.pem]
-    -h, --help                          show options and usage
-    -p file, --passphrase=file          read passphrase from file
-                                            [default: ~/.ssl/password]
-    -r file, --read-commands=file       specify additional configuration file
-    -s file, --slicecredentials=file    read slice credentials from file
-                                            [default: query from SA]"""
+if "Usage" not in dir():
+    def Usage():
+        print "usage: " + sys.argv[ 0 ] + " [option...]"
+        print """Options:
+        -c file, --credentials=file         read self-credentials from file
+                                                [default: query from SA]
+        -d, --debug                         be verbose about XML methods invoked
+        -f file, --certificate=file         read SSL certificate from file
+                                                [default: ~/.ssl/encrypted.pem]
+        -h, --help                          show options and usage
+        -p file, --passphrase=file          read passphrase from file
+                                                [default: ~/.ssl/password]
+        -r file, --read-commands=file       specify additional configuration file
+        -s file, --slicecredentials=file    read slice credentials from file
+                                                [default: query from SA]"""
 
 try:
     opts, args = getopt.getopt( sys.argv[ 1: ], "c:df:hp:r:s:",
@@ -55,7 +56,7 @@ try:
                                   "help", "passphrase=", "read-commands=",
                                   "slicecredentials=" ] )
 except getopt.GetoptError, err:
-    print str( err )
+    print >> sys.stderr, str( err )
     Usage()
     sys.exit( 1 )
 
@@ -92,9 +93,8 @@ if EXTRACONF and os.path.exists( EXTRACONF ):
     execfile( EXTRACONF )
 
 def Fatal(message):
-    print message
+    print >> sys.stderr, message
     sys.exit(1)
-    return
 
 def PassPhraseCB(v, prompt1='Enter passphrase:', prompt2='Verify passphrase:'):
     passphrase = open(PASSPHRASEFILE).readline()
@@ -159,7 +159,7 @@ def do_method(module, method, params, URI=None):
         response = apply(meth, meth_args)
         pass
     except xmlrpclib.Fault, e:
-        print e.faultString
+        print >> sys.stderr, e.faultString
         return (-1, None)
 
     #
@@ -168,8 +168,8 @@ def do_method(module, method, params, URI=None):
     # Dictionary, hence the code below. 
     # 
     if len(response["output"]):
-        print response["output"],
-        print ": ",
+        print >> sys.stderr, response["output"],
+        print >> sys.stderr, ": ",
         pass
 
     rval = response["code"]

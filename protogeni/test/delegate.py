@@ -14,31 +14,50 @@
 # FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 
 import datetime
+import getopt
 import os
 import re
 import sys
 import tempfile
 import uuid
 import xml.dom.minidom
+import xmlrpclib
+from M2Crypto import X509
 
-if len( sys.argv ) != 2:
-    print >> sys.stderr, "usage: " + sys.argv[ 0 ] + " principal"
+XMLSEC1 = "xmlsec1"
+
+def Usage():
+    print "usage: " + sys.argv[ 0 ] + " [option...] object principal"
+    print """
+where "object" specifies the entity for which privileges are to be delegated,
+and "principal" identifies the agent to whom those privileges are granted.
+
+Each of "object" and "principal" may be specified as a UUID, an HRN, or
+a filename.
+
+Options:
+    -c file, --credentials=file         read self-credentials from file
+                                            [default: query from SA]
+    -d, --debug                         be verbose about XML methods invoked
+    -f file, --certificate=file         read SSL certificate from file
+                                            [default: ~/.ssl/encrypted.pem]
+    -h, --help                          show options and usage
+    -p file, --passphrase=file          read passphrase from file
+                                            [default: ~/.ssl/password]
+    -r file, --read-commands=file       specify additional configuration file"""
+
+execfile( "test-common.py" )
+
+if len( args ) != 2:
+    Usage()
     sys.exit( 1 )
 
-HOME            = os.environ["HOME"]
-# Path to my certificate
-CERTIFICATE     = HOME + "/.ssl/encrypted.pem"
-XMLSEC1         = "xmlsec1"
+def is_uuid( u ):
+    return re.match( "\w+\-\w+\-\w+\-\w+\-\w+$", u )
 
-CONFIGFILE      = ".protogeni-config.py"
-GLOBALCONF      = HOME + "/" + CONFIGFILE
-LOCALCONF       = CONFIGFILE
-
-if os.path.exists( GLOBALCONF ):
-    execfile( GLOBALCONF )
-if os.path.exists( LOCALCONF ):
-    execfile( LOCALCONF )
-
+def is_hrn( h ):
+    return re.match( "[^./]", h )
+    
 # Look up an element (which must exist exactly once) within a node.
 def Lookup( node, name ):
     cnodes = filter( lambda x: x.nodeName == name, node.childNodes )
@@ -54,13 +73,60 @@ def SimpleNode( d, elem, body ):
     n.appendChild( d.createTextNode( body ) );
     return n;
 
-principal = open( sys.argv[ 1 ] )
-owner = re.search( r"^-----BEGIN CERTIFICATE-----\s*(.*)" +
-                   "^-----END CERTIFICATE-----$", principal.read(),
-                   re.MULTILINE | re.DOTALL ).group( 1 )
-principal.close()
+mycredential = get_self_credential()
 
-doc = xml.dom.minidom.parse( sys.stdin )
+slice_uuid = None
+
+if is_uuid( args[ 0 ] ): slice_uuid = args[ 0 ]
+elif is_hrn( args[ 0 ] ):
+    rval, response = do_method( "sa", "Resolve", 
+                                dict( credential = mycredential, 
+                                      type = "Slice", 
+                                      hrn = args[ 0 ] ) )
+    if not rval and "value" in response and "uuid" in response[ "value" ]:
+        slice_uuid = response[ "value" ][ "uuid" ]
+
+if slice_uuid:
+    # we were given a UUID, or a slice HRN which resolved to one: use
+    # that UUID to request credentials from the SA
+    rval, response = do_method( "sa", "GetCredential", 
+                                dict( credential = mycredential, 
+                                      type = "Slice", 
+                                      uuid = slice_uuid ) )
+    if rval:
+        Fatal( sys.argv[ 0 ] + ": could not get slice credential" )
+
+    doc = xml.dom.minidom.parseString( response[ "value" ] )
+else:
+    # we got neither a UUID or a valid slice HRN; assume the parameter is
+    # the name of a file containing slice credentials
+    doc = xml.dom.minidom.parse( args[ 0 ] )
+
+delegate = None
+
+if is_uuid( args[ 1 ] ):
+    rval, response = do_method( "sa", "Resolve", 
+                                dict( credential = mycredential, 
+                                      type = "User", 
+                                      uuid = args[ 1 ] ) )
+    if not rval and "value" in response and "gid" in response[ "value" ]:
+        delegate = response[ "value" ][ "gid" ]
+elif is_hrn( args[ 1 ] ):
+    rval, response = do_method( "sa", "Resolve", 
+                                dict( credential = mycredential, 
+                                      type = "User", 
+                                      hrn = args[ 1 ] ) )
+    if not rval and "value" in response and "gid" in response[ "value" ]:
+        delegate = response[ "value" ][ "gid" ]
+
+if not delegate:
+    # we got neither a UUID or a valid user HRN; assume the parameter is
+    # the name of a file containing the delegate's GID
+    principal = open( args[ 1 ] )
+    delegate = re.search( r"^-----BEGIN CERTIFICATE-----\s*(.*)" +
+                          "^-----END CERTIFICATE-----$", principal.read(),
+                          re.MULTILINE | re.DOTALL ).group( 1 )
+    principal.close()
 
 old = Lookup( doc.documentElement, "credential" )
 
@@ -75,7 +141,7 @@ c.appendChild( Lookup( old, "type" ).cloneNode( True ) )
 
 c.appendChild( SimpleNode( doc, "serial", "1" ) )
 
-c.appendChild( SimpleNode( doc, "owner_gid", owner ) )
+c.appendChild( SimpleNode( doc, "owner_gid", delegate ) )
 
 c.appendChild( Lookup( old, "target_gid" ).cloneNode( True ) )
 
