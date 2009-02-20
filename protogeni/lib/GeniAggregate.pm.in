@@ -164,7 +164,15 @@ sub Create($$$$$$)
 	$certificate->Delete();
 	return undef;
     }
-    return GeniAggregate->Lookup($idx);
+    my $aggregate = GeniAggregate->Lookup($idx);
+    return undef
+	if (!defined($aggregate));
+
+    if (GeniUsage->NewAggregate($aggregate, $slice, $owner)) {
+	print STDERR "GeniAggregate::Create: ".
+	    "GeniUsage->NewAggregate($aggregate) failed\n";
+    }
+    return $aggregate;
 }
 # accessors
 sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'AGGREGATE'}->{$_[1]}); }
@@ -188,9 +196,9 @@ sub resource_type($)	{ return field($_[0], "type"); }
 # Destroy all the slivers in the aggregate, and then the aggregate if there
 # is nothing in it. Leave it around if something goes wrong.
 #
-sub Delete($)
+sub Delete($$)
 {
-    my ($self) = @_;
+    my ($self, $purge) = @_;
     my $broken = 0;
 
     return -1
@@ -207,7 +215,7 @@ sub Delete($)
 	    $broken++;
 	    last;
 	}
-	if ($sliver->Delete() != 0) {
+	if ($sliver->Delete($purge) != 0) {
 	    print STDERR "Could not delete $sliver from $self\n";
 	    $sliver->SetStatus("broken");
 	    $broken++;
@@ -217,6 +225,10 @@ sub Delete($)
     return -1
 	if ($broken);
     
+    if (GeniUsage->DestroyAggregate($self, $purge)) {
+	print STDERR "GeniAggregate::Delete: ".
+	    "GeniUsage->DestroyAggregate($self) failed\n";
+    }
     my $idx  = $self->idx();
     my $uuid = $self->uuid();
 
@@ -362,14 +374,22 @@ sub SetAggregate($$)
     return -1
 	if (! (ref($self) && ref($aggregate)));
 
-    my $idx     = $self->idx();
-    my $agg_idx = $aggregate->idx();
+    my $idx      = $self->idx();
+    my $agg_idx  = $aggregate->idx();
+    my $agg_uuid = $aggregate->uuid();
 
     return -1
 	if (!DBQueryWarn("update geni_aggregates set ".
 			 "  aggregate_idx='$agg_idx' ".
 			 "where idx='$idx'"));
     
+    if (!DBQueryWarn("update aggregate_history set ".
+		     "  aggregate_uuid='$agg_uuid' ".
+		     "where idx='$idx'")) {
+	print STDERR "GeniAggregate::SetAggregate: ".
+	    "Failed to update aggregate_history for $self\n";
+    }
+
     $self->{'AGGREGATE'}->{'aggregate_idx'} = $agg_idx;
     $self->{'PARENT'} = $aggregate;
     return 0;
@@ -941,7 +961,7 @@ sub Create($$$$$$)
   bad:
     $tunnel->Destroy()
 	if (defined($tunnel));
-    $aggregate->Delete()
+    $aggregate->Delete(1)
 	if (defined($aggregate));
     return undef;
 }

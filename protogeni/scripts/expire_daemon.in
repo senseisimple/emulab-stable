@@ -82,6 +82,8 @@ require GeniUtil;
 require GeniTicket;
 require GeniSlice;
 require GeniCM;
+use Experiment;
+use Node;
 use libtestbed;
 use POSIX qw(strftime);
 
@@ -121,7 +123,7 @@ sub ExpireTickets()
 	}
 	print "Expiring ticket $ticket\n";
 
-	if ($ticket->Release() != 0) {
+	if ($ticket->Release(GeniTicket::TICKET_EXPIRED()) != 0) {
 	    print STDERR "Could not delete $ticket\n";
 	    SENDMAIL($TBOPS, "Could not delete ticket $idx",
 		     "Could not delete ticket $ticket");
@@ -263,6 +265,10 @@ while (1) {
     ExpireTickets();
     ExpireSlices();
     ShutdownSlices();
+
+    # Be certain stale info is gone.
+    Experiment->FlushAll();
+    Node->FlushAll();
 
     sleep(60);
 }

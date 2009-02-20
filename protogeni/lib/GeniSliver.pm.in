@@ -22,6 +22,7 @@ use GeniSlice;
 use GeniCredential;
 use GeniCertificate;
 use GeniAggregate;
+use GeniUsage;
 # Hate to import all this crap; need a utility library.
 use libdb qw(TBGetUniqueIndex);
 use libtestbed;
@@ -148,7 +149,7 @@ sub Stringify($)
 #
 sub Create($$$$$$$$;$$$)
 {
-    my ($class, $slice, $owner_uuid, $uuid, $resource_uuid, $resource_type,
+    my ($class, $slice, $owner, $uuid, $resource_uuid, $resource_type,
 	$hrn, $nickname,
 	$rspec, $credential, $component) = @_;
     my @insert_data = ();
@@ -182,6 +183,7 @@ sub Create($$$$$$$$;$$$)
 	}
     }
     my $slice_uuid     = $slice->uuid();
+    my $owner_uuid     = $owner->uuid();
 
     # Now tack on other stuff we need.
     push(@insert_data, "created=now()");
@@ -219,6 +221,11 @@ sub Create($$$$$$$$;$$$)
     my $sliver = GeniSliver->Lookup($idx);
     return undef
 	if (!defined($sliver));
+
+    if (GeniUsage->NewSliver($sliver, $slice, $owner)) {
+	print STDERR
+	    "GeniSliver::Create: GeniUsage->NewSliver($sliver) failed\n";
+    }
     
     $sliver->{'CREDENTIAL'} = $credential
 	if (defined($credential));
@@ -252,9 +259,9 @@ sub rspec($)            { return $_[0]->{'RSPEC'}; }
 #
 # Delete the sliver. The sliver should not be provisioned when this done.
 #
-sub Delete($)
+sub Delete($$)
 {
-    my ($self) = @_;
+    my ($self, $purge) = @_;
 
     return -1
 	if (! ref($self));
@@ -262,13 +269,17 @@ sub Delete($)
     my $idx  = $self->idx();
     my $uuid = $self->uuid();
 
+    if (GeniUsage->DestroySliver($self, $purge)) {
+	print STDERR
+	    "GeniSliver::Delete: GeniUsage->DestroySliver($self) failed\n";
+    }
     DBQueryWarn("delete from geni_credentials where this_uuid='$uuid'")
 	or return -1;
     DBQueryWarn("delete from geni_certificates where uuid='$uuid'")
 	or return -1;
     DBQueryWarn("delete from geni_slivers where idx='$idx'")
 	or return -1;
-    
+
     # Delete from cache. 
     delete($slivers{$idx});
     
@@ -293,6 +304,13 @@ sub SetAggregate($$)
 			 "  aggregate_uuid='$agg_uuid' ".
 			 "where idx='$idx'"));
     
+    if (!DBQueryWarn("update sliver_history set ".
+		     "  aggregate_uuid='$agg_uuid' ".
+		     "where idx='$idx'")) {
+	print STDERR "GeniSliver::SetAggregate: ".
+	    "Failed to update sliver_history for $self\n";
+    }
+
     $self->{'SLIVER'}->{'aggregate_uuid'} = $agg_uuid;
     $self->{'AGGREGATE'} = $aggregate;
     return 0;
@@ -554,9 +572,9 @@ use libdb qw(TBDB_ALLOCSTATE_RES_INIT_DIRTY);
 
 sub Create()
 {
-    my ($class, $slice, $user_uuid, $rspec, $credential, $component) = @_;
+    my ($class, $slice, $user, $rspec, $credential, $component) = @_;
 
-    return GeniSliver->Create($slice, $user_uuid, undef, undef,
+    return GeniSliver->Create($slice, $user, undef, undef,
 			      "Client", undef, undef, $rspec, 
 			      $credential, $component);
 }
@@ -599,7 +617,7 @@ sub Destroy($$)
 	if ($component->DestroySliver($self, $user) != 0);
 
     # Delete the local object from the DB.
-    $self->Delete() == 0
+    $self->Delete(1) == 0
 	or return -1;
 
     return 0;
@@ -679,7 +697,7 @@ use libdb qw(TBDB_ALLOCSTATE_RES_INIT_DIRTY);
 
 sub Create($$$$$)
 {
-    my ($class, $slice, $user_uuid, $resource_uuid, $rspec) = @_;
+    my ($class, $slice, $user, $resource_uuid, $rspec) = @_;
     my $virtualization_type = $rspec->{'virtualization_type'};
     my $uuid = $resource_uuid;
 
@@ -749,7 +767,7 @@ sub Create($$$$$)
 	$uuid = $vnode->uuid();
 	$hrn = "${PGENIDOMAIN}." . $vnode->node_id()
     }
-    return GeniSliver->Create($slice, $user_uuid, $uuid, $resource_uuid,
+    return GeniSliver->Create($slice, $user, $uuid, $resource_uuid,
 			      "Node", $hrn, $nickname, $rspec);
 }
 
@@ -801,6 +819,7 @@ sub Provision($;$)
 	return -1;
     }
 
+    my $redirected = 0;
     if (exists($self->rspec()->{'tmcd_server'}) &&
 	exists($self->rspec()->{'tmcd_nodeid'})) {
 	my $tmcd_redirect =
@@ -810,6 +829,7 @@ sub Provision($;$)
 	if ($node->ModifyReservation({"tmcd_redirect" => $tmcd_redirect})){
 	    return -1;
 	}
+	$redirected = 1;
     }
 
     #
@@ -832,6 +852,10 @@ sub Provision($;$)
 	    return -1;
 	}
 	$pnode->ModifyReservation({"genisliver_idx" => $self->idx()});
+
+	# Not redirected. Use local tmcd anyway.
+	$node->ModifyReservation({"genisliver_idx" => $self->idx()})
+	    if (!$redirected);
 
 	# Set it to boot the default OS.
 	if ($pnode->SelectOS() != 0) {
@@ -911,6 +935,7 @@ sub UnProvision($)
 		return -1;
 	    }
 	    system("$NFREE -x -q $pid $eid $pnode_id");
+	    $pnode->Refresh();
 	}
 	else {
 	    system("$NFREE -q $pid $eid $node_id");
@@ -1010,14 +1035,14 @@ use Node;
 
 sub Create()
 {
-    my ($class, $slice, $user_uuid,
+    my ($class, $slice, $user,
 	$interface_uuid, $node, $rspec) = @_;
 
     my $nickname = $rspec->{'nickname'};
     my $hrn = "${PGENIDOMAIN}." .
 	$node->node_id() . "." . $rspec->{'iface_name'};
 
-    return GeniSliver->Create($slice, $user_uuid, $interface_uuid,
+    return GeniSliver->Create($slice, $user, $interface_uuid,
 			      $node->uuid(), "Interface",
 			      $hrn, $nickname, $rspec);
 }

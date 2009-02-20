@@ -375,7 +375,7 @@ sub GetTicket($)
     my $existing_ticket = GeniTicket->LookupForSlice($slice);
     if (defined($existing_ticket)) {
 	print STDERR "Releasing existing ticket $existing_ticket\n";
-	if ($existing_ticket->Release() != 0) {
+	if ($existing_ticket->Release(TICKET_EXPIRED) != 0) {
 	    print STDERR "Error releasing existing ticket $existing_ticket\n";
 	    $slice->UnLock();
 	    return GeniResponse->Create(GENIRESPONSE_ERROR);
@@ -621,7 +621,7 @@ sub GetTicket($)
   bad:
     # Release will free the nodes.
     if (defined($ticket)) {
-	$ticket->Release();
+	$ticket->Release(TICKET_PURGED);
     }
     elsif (@dealloc) {
 	system("export NORELOAD=1; $NFREE -x -q $pid $eid @dealloc");
@@ -677,7 +677,7 @@ sub RedeemTicket($)
     # Do not redeem an expired ticket, kill it now.
     #
     if ($ticket->Expired()) {
-	$ticket->Release();
+	$ticket->Release(TICKET_EXPIRED);
 	$slice->UnLock();
 	return GeniResponse->Create(GENIRESPONSE_EXPIRED, undef,
 				    "Ticket has expired");
@@ -694,7 +694,7 @@ sub RedeemTicket($)
     #
     my $aggregate = GeniAggregate->SliceAggregate($slice);
     if (defined($aggregate)) {
-	$ticket->Release();
+	$ticket->Release(TICKET_EXPIRED);
 	$slice->UnLock();
 	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 				    "Already have an aggregate for slice");
@@ -1026,7 +1026,7 @@ sub ModifySliver($$$$$$)
     foreach my $s (values(%linklist)) {
 	if (! exists($rspec->{'link'}->{$s->hrn()})) {
 	    $s->UnProvision();
-	    $s->Delete();
+	    $s->Delete(0);
 	    next;
 	}
 
@@ -1063,7 +1063,7 @@ sub ModifySliver($$$$$$)
 	    goto bad;
 	}
 	my $sliver = GeniSliver::Node->Create($slice,
-					      $owner->uuid(),
+					      $owner,
 					      $resource_uuid,
 					      $ref);
 	if (!defined($sliver)) {
@@ -1164,7 +1164,7 @@ sub ModifySliver($$$$$$)
 		goto bad;
 	    }
 	    my $sliver = GeniSliver::Interface->Create($slice,
-						       $owner->uuid(),
+						       $owner,
 						       $interface->uuid(),
 						       $nodeobject,
 						       $ref);
@@ -1258,7 +1258,7 @@ sub ModifySliver($$$$$$)
 	# The last step is to delete the ticket, since it is no longer needed.
 	# and will cause less confusion if it is not in the DB.
 	#
-	if ($ticket->Delete() != 0) {
+	if ($ticket->Delete(TICKET_REDEEMED) != 0) {
 	    print STDERR "Error deleting $ticket for $slice\n";
 	}
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS,
@@ -1285,14 +1285,14 @@ sub ModifySliver($$$$$$)
     foreach my $sliver (values(%slivers)) {
 	$sliver->UnProvision()
 	    if (! $impotent);
-	$sliver->Delete();
+	$sliver->Delete(1);
     }
     if (values(%toalloc)) {
 	my @list = values(%toalloc);
 
 	system("export NORELOAD=1; $NFREE -x -q $pid $eid @list");
     }
-    $aggregate->Delete()
+    $aggregate->Delete(1)
 	if (defined($aggregate) && !defined($object));
     
     return GeniResponse->Create(GENIRESPONSE_ERROR, undef, $message);
@@ -1337,7 +1337,7 @@ sub ReleaseTicket($)
     if ($slice->Lock() != 0) {
 	return GeniResponse->BusyResponse();
     }
-    if ($ticket->Release() != 0) {
+    if ($ticket->Release(TICKET_RELEASED) != 0) {
 	print STDERR "Error releasing $ticket\n";
 	$slice->UnLock();
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
@@ -1493,7 +1493,7 @@ sub DeleteSliver($)
 				     "Could not unprovision sliver");
 	    goto bad;
 	}
-	if ($aggregate->Delete() != 0) {
+	if ($aggregate->Delete(0) != 0) {
 	    $response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					     "Could not delete sliver");
 	    goto bad;
@@ -2271,7 +2271,7 @@ sub CleanupDeadSlice($;$)
 	    print STDERR "Could not UnProvision $aggregate\n";
 	    return -1;
 	}
-	if ($aggregate->Delete() != 0) {
+	if ($aggregate->Delete(0) != 0) {
 	    print STDERR "Could not delete $aggregate\n";
 	    return -1;
 	}
@@ -2281,7 +2281,7 @@ sub CleanupDeadSlice($;$)
 	    print STDERR "Could not UnProvision $aggregate\n";
 	    return -1;
 	}
-	if ($aggregate->Delete() != 0) {
+	if ($aggregate->Delete(0) != 0) {
 	    print STDERR "Could not delete $aggregate\n";
 	    return -1;
 	}
@@ -2300,7 +2300,7 @@ sub CleanupDeadSlice($;$)
 	    print STDERR "Could not UnProvision $sliver\n";
 	    return -1;
 	}
-	if ($sliver->Delete() != 0) {
+	if ($sliver->Delete(0) != 0) {
 	    print STDERR "Could not delete $sliver\n";
 	    return -1;
 	}
@@ -2317,7 +2317,7 @@ sub CleanupDeadSlice($;$)
     foreach my $ticket (@tickets) {
 	# print STDERR "Releasing $ticket\n";
 	
-	if ($ticket->Release() != 0) {
+	if ($ticket->Release(TICKET_EXPIRED) != 0) {
 	    print STDERR "Could not delete $ticket\n";
 	    return -1;
 	}

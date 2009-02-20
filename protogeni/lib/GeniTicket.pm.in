@@ -14,7 +14,7 @@ use Exporter;
 use vars qw(@ISA @EXPORT);
 
 @ISA    = "Exporter";
-@EXPORT = qw ( );
+@EXPORT = qw (TICKET_PURGED TICKET_EXPIRED TICKET_REDEEMED TICKET_RELEASED);
 
 # Must come after package declaration!
 use lib '@prefix@/lib';
@@ -45,6 +45,12 @@ my $SIGNCRED	   = "$TB/sbin/signgenicred";
 my $VERIFYCRED	   = "$TB/sbin/verifygenicred";
 my $NFREE	   = "$TB/bin/nfree";
 my $CMCERT	   = "$TB/etc/genicm.pem";
+
+# Ticket release flags
+sub TICKET_PURGED()	{ return 1; }
+sub TICKET_REDEEMED()	{ return 2; }
+sub TICKET_EXPIRED()	{ return 3; }
+sub TICKET_RELEASED()	{ return 4; }
 
 # Cache of tickets.
 my %tickets = ();
@@ -134,6 +140,8 @@ sub Create($$$$)
     $self->{'ticket_uuid'}   = undef;
     $self->{'slice_uuid'}    = $slice->uuid();
     $self->{'owner_uuid'}    = $owner->uuid();
+    $self->{'slice_hrn'}     = $slice->hrn();
+    $self->{'owner_hrn'}     = $owner->hrn();
     $self->{'slice_cert'}    = $slice->GetCertificate();
     $self->{'owner_cert'}    = $owner->GetCertificate();
     $self->{'seqno'}         = $seqno;
@@ -167,6 +175,9 @@ sub rspec($)		{ return field($_[0], "rspec"); }
 sub slice_uuid($)	{ return field($_[0], "slice_uuid"); }
 sub target_uuid($)	{ return field($_[0], "slice_uuid"); }
 sub owner_uuid($)	{ return field($_[0], "owner_uuid"); }
+sub slice_hrn($)	{ return field($_[0], "slice_hrn"); }
+sub target_hrn($)	{ return field($_[0], "slice_hrn"); }
+sub owner_hrn($)	{ return field($_[0], "owner_hrn"); }
 sub slice_cert($)	{ return field($_[0], "slice_cert"); }
 sub owner_cert($)	{ return field($_[0], "owner_cert"); }
 sub uuid($)		{ return field($_[0], "ticket_uuid"); }
@@ -318,6 +329,8 @@ sub CreateFromSignedTicket($$;$$)
     $self->{'ticket_uuid'}   = $ticket_uuid;
     $self->{'slice_uuid'}    = $target_certificate->uuid();
     $self->{'owner_uuid'}    = $owner_certificate->uuid();
+    $self->{'slice_hrn'}     = $target_certificate->hrn();
+    $self->{'owner_hrn'}     = $owner_certificate->hrn();
     $self->{'slice_cert'}    = $target_certificate;
     $self->{'owner_cert'}    = $owner_certificate;
     $self->{'ticket_string'} = $ticket_string;
@@ -351,9 +364,9 @@ sub CreateFromSignedTicket($$;$$)
 # Might have to delete this from the DB, as with an error handing out
 # a ticket.
 #
-sub Delete($)
+sub Delete($$)
 {
-    my ($self) = @_;
+    my ($self, $flag) = @_;
 
     return -1
 	if (! ref($self));
@@ -364,6 +377,27 @@ sub Delete($)
 	
 	DBQueryWarn("delete from geni_tickets where idx='$idx'")
 	    or return -1;
+
+	if ($flag == TICKET_PURGED) {
+	    GeniUsage->DeleteTicket($self) == 0 
+		or print STDERR "GeniTicket::Delete: ".
+		    "GeniUsage->DeleteTicket($self) failed\n";
+	}
+	elsif ($flag == TICKET_REDEEMED) {
+	    GeniUsage->RedeemTicket($self) == 0 
+		or print STDERR "GeniTicket::Delete: ".
+		    "GeniUsage->RedeemTicket($self) failed\n";
+	}
+	elsif ($flag == TICKET_RELEASED) {
+	    GeniUsage->ReleaseTicket($self) == 0 
+		or print STDERR "GeniTicket::Delete: ".
+		    "GeniUsage->ReleaseTicket($self) failed\n";
+	}
+	elsif ($flag == TICKET_EXPIRED) {
+	    GeniUsage->ExpireTicket($self) == 0 
+		or print STDERR "GeniTicket::Delete: ".
+		    "GeniUsage->ExpireTicket($self) failed\n";
+	}
 
 	delete($tickets{"$idx"});
     }
@@ -447,6 +481,11 @@ sub Store($)
     # Insert into DB.
     DBQueryWarn("insert into geni_tickets set " . join(",", @insert_data))
 	or return -1;
+
+    if (GeniUsage->NewTicket($self)) {
+	print STDERR
+	    "GeniTicket::Store: GeniUsage->NewTicket($self) failed\n";
+    }
 
     $tickets{"$idx"}  = $self;
     $self->{'stored'} = 1;
@@ -576,9 +615,9 @@ sub SliceTickets($$$)
 # Release a ticket. Need to release the nodes ...
 # Used by the CM.
 #
-sub Release($)
+sub Release($$)
 {
-    my ($self) = @_;
+    my ($self, $flag) = @_;
 
     return -1
 	if (! ref($self));
@@ -588,7 +627,7 @@ sub Release($)
 	#
 	# Cannot be any nodes if no experiment.
 	#
-	return $self->Delete();
+	return $self->Delete($flag);
     }
     my $pid     = $experiment->pid();
     my $eid     = $experiment->eid();
@@ -616,7 +655,7 @@ sub Release($)
     foreach my $node (@nodes) {
 	$node->Refresh();
     }
-    $self->Delete();
+    $self->Delete($flag);
     return 0;
 }
 
