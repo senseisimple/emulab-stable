@@ -385,6 +385,22 @@ sub Refresh($)
 }
 
 #
+# Flush from our little cache, as for the expire daemon.
+#
+sub Flush($)
+{
+    my ($self) = @_;
+
+    delete($nodes{$self->node_id()});
+}
+sub FlushAll($)
+{
+    my ($class) = @_;
+    
+    %nodes = ();
+}
+
+#
 # Stringify for output.
 #
 sub Stringify($)

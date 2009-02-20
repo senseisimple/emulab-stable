@@ -794,6 +794,12 @@ sub Flush($)
 
     delete($experiments{$self->idx()});
 }
+sub FlushAll($)
+{
+    my ($class) = @_;
+
+    %experiments = ();
+}
 
 #
 # Add an input file to the template. The point of this is to reduce
