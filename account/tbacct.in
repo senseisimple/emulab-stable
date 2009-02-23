@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -87,7 +87,7 @@ my $USEREXISTS  = 65;
 # Nasty. Should do this with /etc/pw.conf shellpath.
 my %shellpaths  = ("csh"  => "/bin/csh", "sh" => "/bin/sh",
 		   "tcsh" => "/bin/tcsh", "bash" => "/usr/local/bin/bash",
-		   "zsh" => "/bin/zsh");
+		   "zsh" => "/usr/local/bin/zsh");
 
 my $errors      = 0;
 my $sfsupdate   = 0;
