@@ -84,6 +84,9 @@ if (! -e $TC && -e "/sbin/tc") {              # If we hacked iproute rpm
     $TC = "/sbin/tc";
 }
 my $IPTABLES    = "/usr/local/sbin/iptables"; # This is the working version!
+if (! -e $IPTABLES && -e "/sbin/iptables") {  # If we hacked iptables rpm
+    $IPTABLES = "/sbin/iptables";
+}
 my $IFCONFIG    = "/sbin/ifconfig";
 my $MODPROBE    = "/sbin/modprobe";
 my $SYSCTL      = "/sbin/sysctl";
@@ -105,6 +108,23 @@ if ($reinstall || $uninstall) {
 	if (-e TMLINKDELAY);
     exit(0)
 	if ($uninstall);
+}
+
+#
+# Find available imq devices if we're inside a non-fully virtualized container.
+# This is necessary because the imq devices will have been bound into our
+# container -- we can't do anything until that happens.
+# If we're not in a container, they might not exist yet, so we use the old icky
+# way -- modprobe'ing 10 and making assumptions :-(.
+#
+my $contained = 0;
+my @imqdevs = ();
+my $imqidx = 0;
+if (GENVNODE() && GENVNODETYPE() eq 'openvz') {
+    $contained = 1;
+    opendir(DIR,'/sys/class/net') or die "could not open /sys/class/net: $!";
+    @imqdevs = grep { /^imq\d+$/ } readdir(DIR);
+    closedir(DIR);
 }
 
 #
@@ -462,10 +482,12 @@ sub LinkDelaySetup()
 # Figure out how we're going to flush iproute2+tc!
 #	print DEL "ipfw -f flush\n";
 
-        print DEL "modprobe imq numdevs=10\n";
-        print DEL "sysctl -w net.core.rmem_max=8388608\n";
-        print DEL "sysctl -w net.core.wmem_max=8388608\n";
-        print DEL "sysctl -w net.core.netdev_max_backlog=2048\n";
+	if (!$contained) {
+	    print DEL "modprobe imq numdevs=10\n";
+	    print DEL "sysctl -w net.core.rmem_max=8388608\n";
+	    print DEL "sysctl -w net.core.wmem_max=8388608\n";
+	    print DEL "sysctl -w net.core.netdev_max_backlog=2048\n";
+	}
 
 	foreach $delay (@delays) {
 	    my $pat = q(LINKDELAY IFACE=([\d\w]+) TYPE=(simplex|duplex) );
@@ -583,7 +605,7 @@ sub LinkDelaySetup()
             # XXX: temporarily select between delay, plr, and [g]red
             # until they become classful queues.
             
-            print DEL "ifconfig $iface txqueuelen $queue\n";
+            print DEL "$IFCONFIG $iface txqueuelen $queue\n";
 
             print DEL "$TC qdisc add dev $iface handle $pipeno root ";
             print DEL "plr $plr\n";
@@ -601,22 +623,29 @@ sub LinkDelaySetup()
 	    }
 
             $iface =~ /\D+(\d+)/;
-            my $imqnum = $1;
+            my $imqdev = "imq$1";
+	    my $imqnum = $1;
+	    if ($contained) {
+		$imqdev = $imqdevs[$imqidx++];
+		if ($imqdev =~ /\D+(\d+)/) {
+		    $imqnum = $1;
+		}
+	    }
 	    if ($type eq "duplex") {
 		
-                print DEL "$TC qdisc add dev imq${imqnum} handle $pipeno ";
+                print DEL "$TC qdisc add dev $imqdev handle $pipeno ";
                 print DEL "root plr $rplr\n";
 
-                print DEL "$TC qdisc add dev imq${imqnum} handle ";
+                print DEL "$TC qdisc add dev $imqdev handle ";
                 print DEL "". ($pipeno+10) ." parent ${pipeno}:1 ";
                 print DEL "delay usecs $rdelay reset_time 1\n";
 
-                print DEL "$TC qdisc add dev imq${imqnum} handle "; 
+                print DEL "$TC qdisc add dev $imqdev handle "; 
                 print DEL "". ($pipeno+20) ." parent ". ($pipeno+10) .":1 ";
                 print DEL "htb default 1\n";
 
 		if ($rbandw != 0) {
-		    print DEL "$TC class add dev imq${imqnum} classid ";
+		    print DEL "$TC class add dev $imqdev classid ";
 		    print DEL "". ($pipeno+20) .":1 parent ". ($pipeno+20) ." ";
 		    print DEL "htb rate ${rbandw} ceil ${rbandw}\n";
 		}
@@ -624,7 +653,7 @@ sub LinkDelaySetup()
                 print DEL "$IPTABLES -t mangle -A PREROUTING -i $iface ";
                 print DEL "-j IMQ --todev $imqnum\n";
                 
-                print DEL "ifconfig imq${imqnum} up\n";
+                print DEL "$IFCONFIG $imqdev up\n";
 
 		#
                 # *** From FreeBSD version:
@@ -646,7 +675,7 @@ sub LinkDelaySetup()
 	    #}
 
 	    if ($type eq "duplex") {
-		print MAP "$linkname duplex $vnode $vnode $iface imq${imqnum} ".
+		print MAP "$linkname duplex $vnode $vnode $iface $imqdev ".
 		    "$pipeno $rpipeno\n";
 	    }
 	    else {
@@ -671,7 +700,10 @@ sub LinkDelaySetup()
 	}
 	$checkreplace = 1;
     }
-    if ($checkreplace) {
+    #
+    # Only replace the kernel if we're not in a VM, doh!
+    #
+    if ($checkreplace && !(GENVNODE() && GENVNODETYPE() eq 'openvz')) {
 	checkkernel($kernel);
     }
     return 0;

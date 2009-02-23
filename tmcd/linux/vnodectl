@@ -219,6 +219,7 @@ if (tmcc(TMCCCMD_VNODELIST, undef, \@tmccresults) < 0) {
 }
 
 my %ifconfigs = ();
+my %ldconfigs = ();
 my %vmconfigs = ();
 foreach my $str (@tmccresults) {
     if ($str =~ /^VNODEID=([-\w]+) JAILED=(\d)$/) {
@@ -244,6 +245,14 @@ foreach my $str (@tmccresults) {
 	die "getifconfig($vid): $!" 
 	    if (getifconfig(\@ifc));
 	$ifconfigs{$vid} = \@ifc;
+
+	#
+        # Now the linkdelay config:
+	#
+	my @ldc = ();
+	die "getlinkdelayconfig($vid): $!" 
+	    if (getlinkdelayconfig(\@ldc));
+	$ldconfigs{$vid} = \@ldc;
 
 	#
 	# Now the vmconfig:
@@ -364,7 +373,8 @@ elsif ($action eq 'boot') {
 
     TBDebugTimeStamp("starting $vmtype rootPreConfigNetwork")
 	if ($debug);
-    $libops{GENVNODETYPE()}{'rootPreConfigNetwork'}->(\%ifconfigs,{});
+    $libops{GENVNODETYPE()}{'rootPreConfigNetwork'}->(\%ifconfigs,{},
+						      \%ldconfigs);
     TBDebugTimeStamp("finished $vmtype rootPreConfigNetwork")
 	if ($debug);
 
@@ -413,7 +423,8 @@ elsif ($action eq 'boot') {
 
 	# OP: exp net preconfig
 	next if (safeLibOp($vnode,'vnodePreConfigExpNetwork',1,1,
-			   $vnode,$vmid,$ifconfigs{$vnode}));
+			   $vnode,$vmid,
+			   $ifconfigs{$vnode},$ldconfigs{$vnode}));
 
 	next if (safeLibOp($vnode,'vnodeConfigResources',1,1,$vnode,$vmid));
 	next if (safeLibOp($vnode,'vnodeConfigDevices',1,1,$vnode,$vmid));
@@ -459,7 +470,8 @@ elsif ($action eq 'boot') {
 
 	    # OP: exp net preconfig
 	    next if (safeLibOp($vnode,'vnodePreConfigExpNetwork',1,1,
-			       $vnode,$vmid,$ifconfigs{$vnode}));
+			       $vnode,$vmid,
+			       $ifconfigs{$vnode},$ldconfigs{$vnode}));
 
 	    next if (safeLibOp($vnode,'vnodeConfigResources',1,1,$vnode,$vmid));
 	    next if (safeLibOp($vnode,'vnodeConfigDevices',1,1,$vnode,$vmid));

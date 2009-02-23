@@ -22,6 +22,7 @@ use Exporter;
 	 ixpsetup libsetup_refresh gettopomap getfwconfig gettiptunnelconfig
 	 gettraceconfig genhostsfile getmotelogconfig calcroutes fakejailsetup
 	 getlocalevserver genvnodesetup getgenvnodeconfig stashgenvnodeconfig
+         getlinkdelayconfig
 
 	 TBDebugTimeStamp TBDebugTimeStampsOn
 
@@ -733,6 +734,81 @@ sub getifconfig($;$)
     }
   
     @$rptr = @ifacelist;
+    return 0;
+}
+
+#
+# Parse the linkdelay config and return a hash. This leaves the ugly pattern
+# matching stuff here, but lets the caller do whatever with it.
+#
+sub getlinkdelayconfig($;$)
+{
+    my ($rptr,$nocache) = @_;	# Return list to caller (reference).
+    my @tmccresults  = ();
+    my @ldlist       = ();	# To be returned to caller.
+
+    my %tmccopts = ();
+    if ($nocache) {
+	$tmccopts{"nocache"} = 1;
+    }
+
+    if (tmcc(TMCCCMD_LINKDELAYS, undef, \@tmccresults, %tmccopts) < 0) {
+	warn("*** WARNING: Could not get linkdelay config from server!\n");
+	@$rptr = ();
+	return -1;
+    }
+    
+    my $pat = q(LINKDELAY IFACE=([\d\w]+) TYPE=(simplex|duplex) );
+    $pat .= q(LINKNAME=([-\d\w]+) VNODE=([-\d\w]+) );
+    $pat .= q(INET=([0-9.]*) MASK=([0-9.]*) );
+    $pat .= q(PIPE=(\d+) DELAY=([\d\.]+) BW=(\d+) PLR=([\d\.]+) );
+    $pat .= q(RPIPE=(\d+) RDELAY=([\d\.]+) RBW=(\d+) RPLR=([\d\.]+) );
+    $pat .= q(RED=(\d) LIMIT=(\d+) );
+    $pat .= q(MAXTHRESH=(\d+) MINTHRESH=(\d+) WEIGHT=([\d\.]+) );
+    $pat .= q(LINTERM=(\d+) QINBYTES=(\d+) BYTES=(\d+) );
+    $pat .= q(MEANPSIZE=(\d+) WAIT=(\d+) SETBIT=(\d+) );
+    $pat .= q(DROPTAIL=(\d+) GENTLE=(\d+));
+
+    foreach my $str (@tmccresults) {
+	my $ldc = {};
+
+	if ($str =~ /^$pat/) {
+	    $ldc->{"IFACE"} = $1;
+	    $ldc->{"TYPE"} = $2;
+	    $ldc->{"LINKNAME"} = $3;
+	    $ldc->{"VNODE"} = $4;
+	    $ldc->{"INET"} = $5;
+	    $ldc->{"MASK"} = $6;
+	    $ldc->{"PIPE"} = $7;
+	    $ldc->{"DELAY"} = $8;
+	    $ldc->{"BW"} = $9;
+	    $ldc->{"PLR"} = $10;
+	    $ldc->{"RPIPE"} = $11;
+	    $ldc->{"RDELAY"} = $12;
+	    $ldc->{"RBW"} = $13;
+	    $ldc->{"RPLR"} = $14;
+	    $ldc->{"RED"} = $15;
+	    $ldc->{"LIMIT"} = $16;
+	    $ldc->{"MAXTHRESH"} = $17;
+	    $ldc->{"MINTHRESH"} = $18;
+	    $ldc->{"WEIGHT"} = $19;
+	    $ldc->{"LINTERM"} = $20;
+	    $ldc->{"QINBYTES"} = $21;
+	    $ldc->{"BYTES"} = $22;
+	    $ldc->{"MEANPSIZE"} = $23;
+	    $ldc->{"WAIT"} = $24;
+	    $ldc->{"SETBIT"} = $25;
+	    $ldc->{"DROPTAIL"} = $26;
+	    $ldc->{"GENTLE"} = $27;
+
+	    push(@ldlist, $ldc);
+	}
+	else {
+	    warn "*** WARNING: Bad linkdelay line: $str\n";
+	}
+    }
+  
+    @$rptr = @ldlist;
     return 0;
 }
 

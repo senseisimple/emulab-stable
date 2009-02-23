@@ -48,6 +48,16 @@ use Data::Dumper;
 require "/etc/emulab/paths.pm"; import emulabpaths;
 use libvnode;
 
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+
 my $defaultImage = "emulab-default";
 
 sub VZSTAT_RUNNING() { return "running"; }
@@ -194,7 +204,7 @@ sub vz_rootPreConfig {
 # and configuring them as necessary.
 #
 sub vz_rootPreConfigNetwork {
-    my ($node_ifs,$node_ifsets) = @_;
+    my ($node_ifs,$node_ifsets,$node_lds) = @_;
 
     # figure out what bridges we need to make:
     # we need a bridge for each physical iface that is a multiplex pipe,
@@ -260,6 +270,77 @@ sub vz_rootPreConfigNetwork {
 		makeBridgeMaps();
 	    }
 	    mysystem("$BRCTL addif $k $brs{$k}{PHYSDEV}");
+	}
+    }
+
+    #
+    # Figure out how many IMQ devices we need.
+    #
+    my $imqnum = 0;
+    foreach my $node (keys(%$node_lds)) {
+        foreach my $ldc (@{$node_lds->{$node}}) {
+	    if ($ldc->{"TYPE"} eq 'duplex') {
+		++$imqnum;
+	    }
+	}
+    }
+
+    my $numchanged = 0;
+    #
+    # Find out how many already devices we configured last time (there is no
+    # way to tell how many there are if some have already been dedicated to
+    # running containers, so we have to check by writing a file...)
+    #
+    my $nidf = "${emulabpaths::VARDIR}/numimqdevs";
+    my $oldimqnum;
+    if (-e $nidf) {
+	open(FD,"$nidf") or die "could not open $nidf for read: $!\n";
+	$oldimqnum = <FD>;
+	chomp($oldimqnum);
+	close(FD);
+
+	if ($oldimqnum eq "$imqnum") {
+	    $numchanged = 1;
+	}
+    }
+
+    if (!defined($oldimqnum) || $numchanged) {
+	open(FD,">$nidf") or die "could not open $nidf for write: $!\n";
+	print FD "$imqnum\n";
+	close(FD);
+    }
+
+    #
+    # XXX: we have to rmmod the imq module to change the number of allocated
+    # devices, ugh!  So, all the VMs had better be stopped before we do this!
+    # 
+    if (!defined($oldimqnum) || $numchanged) {
+	if (!system('lsmod | grep -q imq')) {
+	    system("$MODPROBE -r imq");
+	}
+
+	if ($imqnum) {
+	    mysystem("$MODPROBE imq numdevs=$imqnum");
+	    mysystem("$MODPROBE ipt_IMQ");
+
+	    #
+	    # This is ugly -- we write a map file that tells 
+	    # vz_vnodePreConfigExpNetwork which container gets which imq devs.
+	    #
+	    open(FD,">${emulabpaths::VARDIR}/imqmap") 
+		or die "could not open ${emulabpaths::VARDIR}/imqmap for write: $!\n";
+	    my $ii = 0;
+	    foreach my $node (sort(keys(%$node_lds))) {
+		my @nidevs = ();
+		foreach my $ldc (@{$node_lds->{$node}}) {
+		    if ($ldc->{"TYPE"} eq 'duplex') {
+			push(@nidevs,"imq$ii");
+			++$ii;
+		    }
+		}
+		print FD "$node\t" . join(',',@nidevs) . "\n";
+	    }
+	    close(FD);
 	}
     }
 
@@ -349,6 +430,49 @@ sub vz_vnodeKill {
 }
 
 sub vz_vnodePreConfig {
+    my ($vnode_id,$vmid) = @_;
+
+    #
+    # Look and see if this node already has imq devs mapped into it -- if those
+    # match the ones in the map file (${emulabpaths::VARDIR}/imqmap), do nothing, else fixup.
+    #
+
+    my %devs = ();
+    if (-e "${emulabpaths::VARDIR}/imqmap") {
+	open(FD,"${emulabpaths::VARDIR}/imqmap") or die "could not open ${emulabpaths::VARDIR}/imqmap: $!\n";
+	while (<FD>) {
+	    chomp($_);
+	    if ($_ =~ /^([^\s]+)\s+([^\s]+)$/ && $1 eq $vnode_id) {
+		foreach my $dev (split(/,/,$2)) {
+		    $devs{$dev} = 1;
+		}
+	    }
+	}
+	close(FD);
+    }
+
+    my $existing = `sed -n -r -e 's/NETDEV="(.*)"/\1/p' /etc/vz/conf/$vmid.conf`;
+    chomp($existing);
+    foreach my $dev (split(/,/,$existing)) {
+	if (!exists($devs{$dev})) {
+	    # needs deleting
+	    $devs{$dev} = 0;
+	}
+	else {
+	    # was already mapped, leave alone
+	    $devs{$dev} = undef;
+	}
+    }
+
+    foreach my $dev (keys(%devs)) {
+	if ($devs{$dev} == 1) {
+	    mysystem("$VZCTL set $vnode_id --netdev_add $dev --save");
+	}
+	elsif ($devs{$dev} == 0) {
+	    mysystem("$VZCTL set $vnode_id --netdev_del $dev --save");
+	}
+    }
+
     return 0;
 }
 
@@ -539,7 +663,7 @@ sub vz_vnodePreConfigControlNetwork {
 # Preconfigures experimental interfaces in the vnode before its first boot.
 #
 sub vz_vnodePreConfigExpNetwork {
-    my ($vnode_id,$vmid,$ifs) = @_;
+    my ($vnode_id,$vmid,$ifs,$lds) = @_;
 
     my $elabifs = "";
     my %netif_strs = ();
