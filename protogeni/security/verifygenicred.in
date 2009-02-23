@@ -91,6 +91,7 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 #
 sub fatal($);
 sub cleanup();
+sub lookup($$);
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -204,6 +205,55 @@ while (defined($temp)) {
     }
 }
 
+# Check that credentials have been delegated correctly: at each level,
+# the privileges must be a subset of the parent, and the target GIDs
+# must be equal.  The "can_delegate" flag must be set in the parent on
+# all privileges which are delegated.  We should also check that the
+# owner GID is correctly identified and authenticated by the included
+# X.509 certificate, but this is NOT yet implemented!
+
+foreach my $credential ( keys( %credentials ) ) {
+    my $node = $credentials{$credential}->{"node"};
+
+    if( $node != $root_cred ) {
+	my $parent = $credentials{$credential}->{"parent_cred"};
+
+	my $gid = lookup( $node, "target_gid" )->textContent;
+	my $parent_gid = lookup( $parent, "target_gid" )->textContent;
+
+	$gid =~ s/\s//;
+	$parent_gid =~ s/\s//;
+
+	fatal( "invalid delegation (GID mismatch)" )
+	    if $gid ne $parent_gid;
+
+	my $type = lookup( $node, "type" )->textContent;
+	my $parent_type = lookup( $parent, "type" )->textContent;
+
+	fatal( "invalid delegation (type mismatch)" )
+	    if $type ne $parent_type;
+
+	if( $type eq "privilege" ) {
+	    my @privs = grep( $_->nodeName eq "privilege",
+			      lookup( $node, "privileges" )->childNodes );
+	    my @parent_privs = grep( $_->nodeName eq "privilege",
+				     lookup( $parent, 
+					     "privileges" )->childNodes );
+	    my %allowed = ();
+	    $allowed{ lookup( $_, "name" )->textContent } = 1
+		foreach grep( lookup( $_, "can_delegate" )->textContent == 1,
+			      @parent_privs );
+
+	    foreach my $priv ( @privs ) {
+		my $name = lookup( $priv, "name" )->textContent;
+
+		fatal( "invalid delegation (privilege not available)" )
+		    unless $allowed{ $name } or $allowed{ "*" };
+	    }		
+	}
+    }
+}
+
 #
 # The certficate used to sign the credential was either the Emulab certificate
 # or that of the user delegating the credential. For now we just worry about
@@ -267,4 +317,17 @@ sub fatal($)
     cleanup();
     die("*** $0:\n".
 	"    $mesg\n");
+}
+
+# Look up an element (which must exist exactly once) within a node.
+sub lookup($$)
+{
+    my( $node, $name ) = @_;
+
+    my @cnodes = grep( $_->nodeName eq $name, $node->childNodes );
+
+    fatal( "invalid credential" )
+	if scalar( @cnodes ) != 1;
+
+    return $cnodes[ 0 ];
 }
