@@ -4385,9 +4385,14 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp, char* nodekey)
 	 *
 	 * XXX Locally, the jail flag is not set on the phys node, only
 	 * on the virtnodes. This is okay since all the routines that
-	 * check jailflag also check to see if its a vnode or physnode. 
+	 * check jailflag also check to see if its a vnode or physnode.
 	 */
-	if((nodekey != NULL) && (strlen(nodekey) > 1) ) { /* Widearea nodes have wanodekeys that should be used to get the nodeid. */
+	/*
+	 * Widearea nodes have wanodekeys that should be used to get
+	 * the nodeid.
+	 */ 
+	if ((nodekey != NULL) && (strlen(nodekey) > 1)) {
+	        return 1;
 		res = mydb_query("SELECT t.class,t.type,n.node_id,n.jailflag,"
 				 " r.pid,r.eid,r.vname,e.gid,e.testdb, "
 				 " n.update_accounts,n.role, "
