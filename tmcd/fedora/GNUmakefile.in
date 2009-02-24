@@ -85,7 +85,7 @@ sysetc-onceonly-install:
 	@$(MYINSTALL) -m 440 $(SRCDIR)/sudoers $(SYSETCDIR)/sudoers
 	@$(MYINSTALL) $(SRCDIR)/syslog.conf $(SYSETCDIR)/syslog.conf
 
-#script-install:	dir-install $(SCRIPTS)
+script-install:	dir-install $(SCRIPTS)
 
 sfs-install:
 	@echo "no fedora-specific sfs files"
