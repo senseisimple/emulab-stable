@@ -264,7 +264,7 @@ class Project
 	chmod($xmlname, 0666);
 
 	$retval = SUEXEC("nobody", "nobody", "webnewproj $xmlname",
-			 SUEXEC_ACTION_IGNORE);
+			 SUEXEC_ACTION_IGNORE | SUEXEC_ACTION_MAIL_TBLOGS);
 
 	if ($retval) {
 	    if ($retval < 0) {

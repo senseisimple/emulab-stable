@@ -336,6 +336,8 @@ define("SUEXEC_ACTION_DIE",		1);
 define("SUEXEC_ACTION_USERERROR",	2);
 define("SUEXEC_ACTION_IGNORE",		3);
 define("SUEXEC_ACTION_DUPDIE",		4);
+# SUEXEC_ACTION_MAIL_TBLOGS to be ored with one of the above actions
+define("SUEXEC_ACTION_MAIL_TBLOGS",     64);
 
 #
 # An suexec error.
@@ -378,6 +380,13 @@ function SUEXEC($uid, $gid, $cmdandargs, $action) {
     global $TBSUEXEC_PATH;
     global $suexec_cmdandargs, $suexec_retval;
     global $suexec_output, $suexec_output_array;
+    global $TBMAIL_LOGS;
+
+    $mail_tblog = 0;
+    if ($action & SUEXEC_ACTION_MAIL_TBLOGS) {
+	$action &= ~SUEXEC_ACTION_MAIL_TBLOGS;
+	$mail_tblog = 1;
+    }
 
     ignore_user_abort(1);
 
@@ -398,6 +407,15 @@ function SUEXEC($uid, $gid, $cmdandargs, $action) {
 	for ($i = 0; $i < count($suexec_output_array); $i++) {
 	    $suexec_output .= "$suexec_output_array[$i]\n";
 	}
+    }
+
+    if ($mail_tblog) {
+	$mesg  = "$TBSUEXEC_PATH $suexec_cmdandargs\n";
+	$mesg .= "Return Value: $suexec_retval\n\n";
+	$mesg .= "--------- OUTPUT ---------\n";
+	$mesg .= $suexec_output;
+	
+	TBMAIL($TBMAIL_LOGS, "suexec: $cmdandargs", $mesg);
     }
 
     #
