@@ -945,6 +945,13 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 		 * Look for PRIVKEY. 
 		 */
 		if (sscanf(bp, "PRIVKEY=%64s", buf)) {
+			for (i = 0; i < strlen(buf); i++){
+				if (! isxdigit(buf[i])) {
+					info("tmcd client provided invalid "
+					     "characters in privkey");
+					goto skipit;
+				}
+			}
 			havekey = 1;
 			strncpy(privkey, buf, sizeof(privkey));
 
@@ -997,6 +1004,14 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 		 * cert or a key.
 		 */
 		if (sscanf(bp, "VNODEID=%30s", buf)) {
+			for (i = 0; i < strlen(buf); i++){
+				if (! (isalnum(buf[i]) ||
+				       buf[i] == '_' || buf[i] == '-')) {
+					info("tmcd client provided invalid "
+					     "characters in vnodeid");
+					goto skipit;
+				}
+			}
 			reqp->isvnode = 1;
 			strncpy(reqp->vnodeid, buf, sizeof(reqp->vnodeid));
 
@@ -1026,14 +1041,14 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	/*
 	 * Map the ip to a nodeid.
 	 */
-	if(havekey) {
-		if((err = iptonodeid(client->sin_addr, reqp, privkey))) {
+	if (havekey) {
+		if ((err = iptonodeid(client->sin_addr, reqp, privkey))) {
 			error("No such node with wanode_key [%s]\n", privkey);
-		goto skipit;
+			goto skipit;
 		}
 	}
 	else {
-	if ((err = iptonodeid(client->sin_addr, reqp, NULL))) {
+		if ((err = iptonodeid(client->sin_addr, reqp, NULL))) {
 			if (reqp->isvnode) {
 				error("No such vnode %s associated with %s\n",
 				      reqp->vnodeid, inet_ntoa(client->sin_addr));
@@ -4392,7 +4407,6 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp, char* nodekey)
 	 * the nodeid.
 	 */ 
 	if ((nodekey != NULL) && (strlen(nodekey) > 1)) {
-	        return 1;
 		res = mydb_query("SELECT t.class,t.type,n.node_id,n.jailflag,"
 				 " r.pid,r.eid,r.vname,e.gid,e.testdb, "
 				 " n.update_accounts,n.role, "
