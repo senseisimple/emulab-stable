@@ -27,13 +27,17 @@ from M2Crypto import X509
 XMLSEC1 = "xmlsec1"
 
 def Usage():
-    print "usage: " + sys.argv[ 0 ] + " [option...] object principal"
+    print "usage: " + sys.argv[ 0 ] + " [option...] object principal [privilege...]"
     print """
-where "object" specifies the entity for which privileges are to be delegated,
-and "principal" identifies the agent to whom those privileges are granted.
+where "object" specifies the entity for which privileges are to be delegated;
+"principal" identifies the agent to whom those privileges are granted; and
+"privilege" lists which classes of operations the delegate may invoke.
 
 Each of "object" and "principal" may be specified as a UUID, an HRN, or
-a filename.
+a filename.  Each "privilege" must be of the form <name>[-], where "name"
+is a privilege identifier and the optional "-" symbol indicates that the
+privilege cannot be re-delegated.  If no privileges are specified, then
+all possible privileges held are delegated.
 
 Options:
     -c file, --credentials=file         read self-credentials from file
@@ -48,7 +52,7 @@ Options:
 
 execfile( "test-common.py" )
 
-if len( args ) != 2:
+if len( args ) < 2:
     Usage()
     sys.exit( 1 )
 
@@ -151,11 +155,40 @@ t = datetime.datetime.utcnow() + datetime.timedelta( hours = 6 )
 t = t.replace( microsecond = 0 )
 c.appendChild( SimpleNode( doc, "expires", t.isoformat() ) )
 
-# FIXME allow an option to specify that only a proper subset of privileges
-# are propagated (or even a a different set specified, even though that would
-# presumably cause the credentials to be rejected).
 for n in old.childNodes:
-    if n.nodeName in ( "privileges", "capabilities", "ticket", "extensions" ):
+    if n.nodeName in ( "privileges", "capabilities" ):
+        if len( args ) > 2:
+            # A list of privileges was given: add them each to the credential.
+            if n.nodeName == "capabilities": type = "capability"
+            else: type = "privilege"
+        
+            privs = n.cloneNode( False )
+            for arg in args[ 2 : ]:
+                if arg[ -1 ] == '-':
+                    argname = arg[ : -1 ]
+                    argdel = "0"
+                else:
+                    argname = arg
+                    argdel = "1"
+
+                priv = doc.createElement( type )
+                privname = doc.createElement( "name" )
+                privname.appendChild( doc.createTextNode( argname ) )
+                privdel = doc.createElement( "can_delegate" )
+                privdel.appendChild( doc.createTextNode( argdel ) )
+                priv.appendChild( privname )
+                priv.appendChild( privdel )
+                privs.appendChild( priv )
+            c.appendChild( privs )
+        else:
+            clone = n.cloneNode( True )
+            c.appendChild( clone )
+            for child in clone.childNodes:
+                if Lookup( child, "can_delegate" ).firstChild.nodeValue == "0":
+                    # a privilege which cannot be delegated: delete it
+                    # from the clone
+                    clone.removeChild( child )
+    elif n.nodeName in ( "ticket", "extensions" ):
         c.appendChild( n.cloneNode( True ) )
 
 doc.documentElement.replaceChild( c, old )
