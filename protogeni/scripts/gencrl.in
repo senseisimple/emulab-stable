@@ -127,7 +127,7 @@ if (-e $CRLPEM) {
     my $diff = $expires - $crlcreated;
     if (time() >= $expires ||
 	$diff <= 0 ||
-	$diff < ($CRLDAYS * 3600 * 24) / 2) {
+	time() >= $crlcreated + $diff / 2) {
 	$force = 1;
     }
 
