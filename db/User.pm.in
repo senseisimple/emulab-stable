@@ -1,20 +1,16 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005-2008 University of Utah and the Flux Group.
+# Copyright (c) 2005-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package User;
 
 use strict;
 use Exporter;
-use vars qw(@ISA @EXPORT);
-
+use vars qw(@ISA);
 @ISA    = "Exporter";
-@EXPORT = qw ( );
 
-# Must come after package declaration!
-use lib '@prefix@/lib';
 use libdb;
 use libtestbed;
 use English;
