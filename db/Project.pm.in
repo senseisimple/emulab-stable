@@ -265,8 +265,13 @@ sub Create($$$$)
     # Now create the per-project Admin List
     #
     if ($MAILMANSUPPORT) {
-	system("$ADDPROJADMINLIST $pid") == 0 or
-	    die("$ADDPROJADMINLIST $pid failed!");
+	my $res = system("$ADDPROJADMINLIST $pid");
+	if ($res != 0) {
+	    SENDMAIL($TBOPS, "Addprojadminlist failed!", 
+		     "\"$ADDPROJADMINLIST $pid\" failed.\n".
+		     "Details most likely in testbed-logs mail with \"suexec: webnewproj\"\n".
+		     "in the subject.\n");
+	}
     }
 
     return $newproject;

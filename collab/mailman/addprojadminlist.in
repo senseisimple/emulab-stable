@@ -164,6 +164,9 @@ if ($CONTROL ne $BOSSNODE) {
     
     system("echo $TBAPPROVAL | ".
 	   "$SSH -host $CONTROL $MMBINDIR/add_members -r - $proj-admin");
+    if ($?) {
+	fatal("Unable to add $TBAPPROVAL to $proj-admin");
+    }
 
     my $status = $?;
     TBScriptUnlock();
