@@ -25,7 +25,7 @@ sub usage()
           "  -c   Reconfigure listed vnodes (or all vnodes if unspecified).\n" . 
 	  "Actions:\n" . 
           "  -r   Reboot listed vnodes (or all vnodes if unspecified).\n" . 
-          "  -k   Kill listed vnodes (or all vnodes if unspecified).\n" . 
+          "  -k   Destroy listed vnodes (or all vnodes if unspecified).\n" . 
           "  -h   Halt listed vnodes (or all vnodes if unspecified).\n" . 
           "  -b   Boot listed vnodes (or all vnodes if unspecified).\n" . 
           "";
@@ -200,10 +200,19 @@ if ($debug) {
 # Make sure we have nodes that we've already created if they were supplied on
 # the command line.  Yes, this restriction is somewhat arbitrary.
 #
-foreach my $vnode (@vnodes) {
-    if (!exists($vndb{$vnode})) {
-	fatal("Unknown vnode $vnode!\n");
+for (my $i = 0; $i < @vnodes; ++$i) {
+    if (!exists($vndb{$vnodes[$i]})) {
+	fatal("Unknown vnode $vnodes[$i]!\n");
     }
+    if ($vnodes[$i] =~ /^([-\w\d]+)/) {
+	$vnodes[$i] = $1;
+    }
+    else {
+	fatal("Malformed vnode named '$vnodes[$i]' specified on command line!");
+    }
+
+    # tag that this vnode was specifed on command line
+    $vndb{$vnodes[$i]}{'__CMDLINE'} = 1;
 }
 
 my @tmccvnodes = ();
@@ -300,16 +309,13 @@ if ($BOSSIP !~ /^\d+\.\d+\.\d+\.\d+$/) {
 # Ok, handle various actions!
 #
 my @errors = ();
-if ($action eq 'reboot' || $action eq 'halt' || $action eq 'kill') {
+if ($action eq 'reboot' || $action eq 'halt') {
     my $op;
     if ($action eq 'reboot') {
 	$op = 'vnodeReboot';
     }
-    if ($action eq 'halt') {
+    elsif ($action eq 'halt') {
 	$op = 'vnodeHalt';
-    }
-    if ($action eq 'kill') {
-	$op = 'vnodeKill';
     }
 
     if (@vnodes == 0) {
@@ -317,6 +323,15 @@ if ($action eq 'reboot' || $action eq 'halt' || $action eq 'kill') {
     }
 
     foreach my $vnode (@vnodes) {
+	if (!exists($vndb{$vnode}) || !exists($vndb{$vnode}{'type'})) {
+	    # this is a node that is not fully configured according to the db.
+	    # we only make noise if it is one of the ones the user asked for.
+	    if (exists($vndb{$vnode}{'__CMDLINE'})) {
+		print STDERR "*** ERROR: $vnode has not yet been created!\n";
+	    }
+	    next;
+	}
+
 	safeLibOp($vnode,$op,1,1,$vnode,$vndb{$vnode}{'id'});
     }
 
@@ -325,6 +340,53 @@ if ($action eq 'reboot' || $action eq 'halt' || $action eq 'kill') {
     #
     if ($reconfig) {
 	teardownOldVnodes();
+    }
+}
+elsif ($action eq 'kill') {
+    if (@vnodes == 0) {
+	@vnodes = keys(%vndb);
+    }
+
+    foreach my $vnode (@vnodes) {
+	if (!exists($vndb{$vnode}) || !exists($vndb{$vnode}{'type'})) {
+	    # this is a node that is not fully configured according to the db.
+	    # we only make noise if it is one of the ones the user asked for.
+	    if (exists($vndb{$vnode}{'__CMDLINE'})) {
+		print STDERR "*** ERROR: $vnode has not yet been created!\n";
+	    }
+	    next;
+	}
+
+	# if not halted, try that first
+	my ($ret,$err);
+	($ret,$err) = safeLibOp($vnode,'vnodeState',1,0,
+				$vnode,$vndb{$vnode}{'id'});
+	if ($err) {
+	    print STDERR "*** ERROR: failed to get state for $vnode: $err\n";
+	    next;
+	}
+	if ($ret ne VNODE_STATUS_STOPPED()) {
+	    warn("kill: vnode $vnode not stopped, trying halt before kill!");
+	    ($ret,$err) = safeLibOp($vnode,'vnodeHalt',1,0,
+				    $vnode,$vndb{$vnode}{'id'});
+	    if ($err) {
+		print STDERR "*** ERROR: failed to halt $vnode before kill: $err\n";
+		next;
+	    }
+	}
+
+	# now destroy
+	($ret,$err) = safeLibOp($vnode,'vnodeDestroy',1,1,
+				$vnode,$vndb{$vnode}{'id'});
+	if ($err) {
+	    print STDERR "*** ERROR: failed to kill $vnode: $err\n";
+	    next;
+	}
+
+	# else we're good, so remove the node from the db
+	delete $vndb{$vnode};
+	# flush now, just in case!
+	putvmmap(\%vndb);
     }
 }
 elsif ($action eq 'boot') {

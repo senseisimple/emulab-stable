@@ -12,7 +12,7 @@ use Exporter;
 @EXPORT = qw( vz_init vz_setDebug 
               vz_rootPreConfig vz_rootPreConfigNetwork vz_rootPostConfig 
               vz_vnodeCreate vz_vnodeDestroy vz_vnodeState 
-              vz_vnodeBoot vz_vnodeHalt vz_vnodeReboot vz_vnodeKill
+              vz_vnodeBoot vz_vnodeHalt vz_vnodeReboot 
               vz_vnodePreConfig 
               vz_vnodePreConfigControlNetwork vz_vnodePreConfigExpNetwork 
               vz_vnodeConfigResources vz_vnodeConfigDevices
@@ -30,7 +30,6 @@ use Exporter;
 	 'vnodeBoot' => \&vz_vnodeBoot,
 	 'vnodeHalt' => \&vz_vnodeHalt,
 	 'vnodeReboot' => \&vz_vnodeReboot,
-	 'vnodeKill' => \&vz_vnodeKill,
 	 'vnodePreConfig' => \&vz_vnodePreConfig,
 	 'vnodePreConfigControlNetwork' => \&vz_vnodePreConfigControlNetwork,
 	 'vnodePreConfigExpNetwork' => \&vz_vnodePreConfigExpNetwork,
@@ -422,11 +421,6 @@ sub vz_vnodeReboot {
     mysystem("$VZCTL restart $vnode_id");
 
     return 0;
-}
-
-# XXX ps axwww | grep -v ' init ' | sed -n -r -e 's/^\s*([0-9]+).*$/\1/p' | xargs
-sub vz_vnodeKill {
-    return vz_vnodeHalt(@_);
 }
 
 sub vz_vnodePreConfig {
