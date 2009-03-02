@@ -269,6 +269,7 @@ while (1) {
     # Be certain stale info is gone.
     Experiment->FlushAll();
     Node->FlushAll();
+    GeniUtil::FlushCaches();
 
     sleep(60);
 }

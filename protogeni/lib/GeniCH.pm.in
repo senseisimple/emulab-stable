@@ -1,4 +1,3 @@
-#!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2008-2009 University of Utah and the Flux Group.
@@ -16,18 +15,16 @@ use vars qw(@ISA @EXPORT);
 @ISA    = "Exporter";
 @EXPORT = qw ( );
 
-# Must come after package declaration!
-use lib '@prefix@/lib';
+#use Devel::TraceUse;
 use GeniDB;
 use Genixmlrpc;
+use GeniRegistry;
 use GeniResponse;
-use User;
 use GeniUser;
-use GeniSlice;
 use GeniComponent;
 use GeniAuthority;
-use libtestbed;
 use emutil;
+use libtestbed qw(SENDMAIL);
 use English;
 use Data::Dumper;
 
@@ -278,7 +275,7 @@ sub Resolve($)
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
     }
     if ($type eq "slice") {
-	my $slice = GeniSlice->Lookup($lookup_token);
+	my $slice = GeniRegistry::GeniSlice->Lookup($lookup_token);
 	if (!defined($slice)) {
 	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
 					"No such slice $lookup_token");
@@ -442,7 +439,6 @@ sub Register($)
     }
     if ($type eq "slice") {
 	my $creator_uuid  = $info->{'creator_uuid'};
-	my $userbindings  = $info->{'userbindings'};
 
 	if (! ($creator_uuid =~ /^[-\w]*$/)) {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
@@ -473,7 +469,7 @@ sub Register($)
 	#
 	# Reregistration of existing slice is okay.
 	#
-	my $existing = GeniSlice->Lookup($certificate->uuid());
+	my $existing = GeniRegistry::GeniSlice->Lookup($certificate->uuid());
 	if (defined($existing)) {
 	    if (! ($existing->cert() eq $certificate->cert())) {
 		return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
@@ -490,14 +486,15 @@ sub Register($)
 	#
 	# Make sure slice hrn and uuid are unique.
 	#
-	if (GeniSlice->CheckExisting($certificate->hrn(),
-				     $certificate->uuid())) {
+	if (GeniRegistry::GeniSlice->CheckExisting($certificate->hrn(),
+						   $certificate->uuid())) {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					"Slice already registered");
 	}
 
-	my $newslice = GeniSlice->Create($certificate, $creator_uuid,
-					 $slice_authority);
+	my $newslice = GeniRegistry::GeniSlice->Create($certificate,
+						       $creator_uuid,
+						       $slice_authority);
 	if (!defined($newslice)) {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					"Could not be registered");
@@ -614,7 +611,7 @@ sub Remove($)
 				    "$uuid has been unregistered");
     }
     if ($type eq "Slice") {
-	my $slice = GeniSlice->Lookup($uuid);
+	my $slice = GeniRegistry::GeniSlice->Lookup($uuid);
 	if (!defined($slice)) {
 	    return GeniResponse->Create(GENIRESPONSE_SUCCESS, undef,
 					"No such slice $uuid");
@@ -673,13 +670,12 @@ sub Shutdown($)
 	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN,
 				    undef, "This is not your registry!");
     }
-
     $credential->HasPrivilege( "authority" ) or
 	$credential->HasPrivilege( "operator" ) or
 	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
 				     "Insufficient privilege" );
 
-    my $slice = GeniSlice->Lookup($uuid);
+    my $slice = GeniRegistry::GeniSlice->Lookup($uuid);
     if (!defined($slice)) {
 	print STDERR "No slice record $uuid for shutdown!\n";
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,

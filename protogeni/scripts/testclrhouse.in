@@ -1,0 +1,101 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+use Data::Dumper;
+
+sub usage()
+{
+    print "Usage: testclrhouse\n";
+    exit(1);
+}
+my $optlist    = "";
+sub fatal($);
+
+#
+# Configure variables
+#
+my $TB		  = "@prefix@";
+my $TBOPS         = "@TBOPSEMAIL@";
+my $TBLOGS        = "@TBLOGSEMAIL@";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+#
+# Check args.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+usage()
+    if (@ARGV);
+
+use vars qw($GENI_DBNAME);
+$GENI_DBNAME = "geni-ch";
+
+# Now we can load the libraries after setting the proper DB.
+use lib '@prefix@/lib';
+use libtestbed;
+require GeniDB;
+require Genixmlrpc;
+use GeniResponse;
+require GeniCertificate;
+require GeniCredential; 
+require GeniAuthority;
+require GeniRegistry;
+
+#
+# The RPC context for this script is as the CH
+#
+my $EMULAB_PEMFILE = "@prefix@/etc/genich.pem";
+my $certificate  = GeniCertificate->LoadFromFile($EMULAB_PEMFILE);
+if (!defined($certificate)) {
+    fatal("Could not load certificate from $EMULAB_PEMFILE");
+}
+Genixmlrpc->SetContext(Genixmlrpc->Context($certificate));
+
+my $authority = GeniAuthority->Lookup($certificate->uuid());
+if (!defined($authority)) {
+    fatal("Could not find local authority object");
+}
+
+# Ask the local clearinghouse for a credential via xmlrpc. Good test, eh?
+print "Asking the clearinghouse for a credential ...\n";
+my $credential = GeniRegistry::ClearingHouse->GetCredential();
+if (!defined($credential)) {
+    fatal("Could not get a credential from the local ClearingHouse");
+}
+print "Got the credential back. Resolving ourself ...\n";
+
+my $clearinghouse = GeniRegistry::Client->Create($authority,
+						 undef, $credential);
+if (!defined($clearinghouse)) {
+    fatal("Could not create a clearinghouse client object");
+}
+my $result;
+if ($clearinghouse->Resolve($authority->uuid(), "ma", \$result) != 0) {
+    fatal("Could not resolve ourself\n");
+}
+print Dumper($result);
+
+exit(0);
+
+sub fatal($) {
+    my ($msg) = @_;
+
+    print STDERR "$msg\n";
+    exit(1);
+}

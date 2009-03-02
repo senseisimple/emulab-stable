@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -19,6 +19,8 @@ all:	emulab.pem server.pem localnode.pem ronnode.pem pcwa.pem ctrlnode.pem \
 remote-site:	emulab.pem capture.pem capture.fingerprint server.pem \
 	localnode.pem capture.sha1fingerprint apache.pem apache-ops.pem \
 	ctrlnode.pem jabber.pem
+
+clearinghouse:	emulab.pem apache.pem
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -303,6 +305,13 @@ control-install:	$(INSTALL_ETCDIR)/capture.pem \
 	chmod 640 $(INSTALL_ETCDIR)/capture.pem
 	chmod 640 $(INSTALL_ETCDIR)/client.pem
 	chmod 640 $(INSTALL_ETCDIR)/emulab.pem
+
+clearinghouse-install:	install-dirs \
+		$(INSTALL_ETCDIR)/emulab.pem \
+		$(INSTALL_ETCDIR)/emulab.key \
+		install-conf
+	chmod 640 $(INSTALL_ETCDIR)/emulab.pem
+	chmod 600 $(INSTALL_ETCDIR)/emulab.key
 
 tipserv-install:	$(INSTALL_SBINDIR)/capture.pem
 	chmod 640 $(INSTALL_SBINDIR)/capture.pem

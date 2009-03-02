@@ -100,10 +100,23 @@ endif
 endif
 
 #
+# Targets
+#
+ifeq ($(STANDALONE_CLEARINGHOUSE),0)
+TARGETS	= $(BIN_STUFF) $(SBIN_STUFF) $(LIBEXEC_STUFF) $(LIB_STUFF) $(SUBDIRS)
+else
+SUBDIRS = 
+TARGETS = libaudit.pm libtestbed.pm libtblog_simple.pm
+SETUID_BIN_SCRIPTS  =
+SETUID_SBIN_SCRIPTS =
+SETUID_LIBX_SCRIPTS = 
+endif
+
+#
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
-all:	$(BIN_STUFF) $(SBIN_STUFF) $(LIBEXEC_STUFF) $(LIB_STUFF) $(SUBDIRS)
+all:	$(TARGETS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -140,10 +153,14 @@ checkup:
 template_cvsroot:
 	@$(MAKE) -C template_cvsroot all
 
-install: all script-install subdir-install
-	@echo "Don't forget to do a post-install as root"
+ifeq ($(STANDALONE_CLEARINGHOUSE),0)
+install: boss-install
+else
+install: clrhouse-install
+endif
 
-boss-install: install
+boss-install: all script-install subdir-install
+	@echo "Don't forget to do a post-install as root"
 
 #
 # Only install the planetlab support if enabled in the defs file
@@ -261,6 +278,10 @@ fs-install:	$(addprefix $(INSTALL_SBINDIR)/, $(FSBIN_STUFF)) \
 #
 tipserv-install:	$(addprefix $(INSTALL_SBINDIR)/, console_setup.proxy)
 
+# Clearinghouse install.
+clrhouse-install: $(INSTALL_LIBDIR)/libaudit.pm \
+		$(INSTALL_LIBDIR)/libtestbed.pm \
+		$(INSTALL_LIBDIR)/libtblog_simple.pm
 
 clean:	subdir-clean
 	rm -f *.o core routecalc wanlinksolve

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -13,9 +13,8 @@ use Getopt::Std;
 #
 use lib "@prefix@/lib";
 use libaudit;
-use libdb;
+use emutil;
 use libtestbed;
-use User;
 
 #
 # Create system SSL certificates.
@@ -43,11 +42,8 @@ my $TBLOGS	= "@TBLOGSEMAIL@";
 my $OURDOMAIN   = "@OURDOMAIN@";
 my $PGENIDOMAIN = "@PROTOGENI_DOMAIN@";
 my $PGENISUPPORT= @PROTOGENI_SUPPORT@;
-my $CONTROL	= "@USERNODE@";
-my $BOSSNODE	= "@BOSSNODE@";
 
 # Locals
-my $USERDIR	= USERROOT();
 my $SSLDIR      = "$TB/lib/ssl";
 my $TEMPLATE    = "$SSLDIR/syscert.cnf";
 my $CACONFIG    = "$SSLDIR/ca.cnf";
@@ -159,12 +155,6 @@ if (@ARGV < 1) {
 }
 my $orgunit = shift(@ARGV);
 my $uuid    = (@ARGV ? shift(@ARGV) : undef);
-
-# Map invoking user to object.
-my $this_user = User->LookupByUnixId($UID);
-if (! defined($this_user)) {
-    fatal("You ($UID) do not exist!");
-}
 
 # Generate/confirm uuid
 if (!defined($uuid)) {

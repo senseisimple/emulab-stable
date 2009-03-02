@@ -37,25 +37,39 @@ USERLIBS	= libtbdb.pm libdb.py
 SETUID_BIN_SCRIPTS   = 
 SETUID_SBIN_SCRIPTS  = genelists dhcpd_makeconf elabinelab_bossinit \
                        changecreator
-SETUID_LIBX_SCRIPTS  = 
+SETUID_LIBX_SCRIPTS  =
+
+#
+# Targets
+#
+ifeq ($(STANDALONE_CLEARINGHOUSE),0)
+TARGETS	= $(BIN_SCRIPTS) $(SBIN_SCRIPTS) $(LIBEXEC_SCRIPTS) $(LIB_SCRIPTS) \
+	$(USERSBINS) $(USERLIBS) schemacheck dbfillcheck
+else
+TARGETS = emdb.pm emutil.pm emdbi.pm
+SETUID_SBIN_SCRIPTS =
+endif
 
 #
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
-all:	$(BIN_SCRIPTS) $(SBIN_SCRIPTS) $(LIBEXEC_SCRIPTS) $(LIB_SCRIPTS) \
-	$(USERSBINS) $(USERLIBS) schemacheck dbfillcheck
+all:	$(TARGETS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-install: $(addprefix $(INSTALL_BINDIR)/, $(BIN_SCRIPTS)) \
+ifeq ($(STANDALONE_CLEARINGHOUSE),0)
+install: boss-install
+else
+install: clrhouse-install
+endif
+
+boss-install: $(addprefix $(INSTALL_BINDIR)/, $(BIN_SCRIPTS)) \
 	$(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS)) \
 	$(addprefix $(INSTALL_LIBDIR)/, $(LIB_SCRIPTS)) \
 	$(addprefix $(INSTALL_LIBEXECDIR)/, $(LIBEXEC_SCRIPTS)) \
         $(addprefix $(INSTALL_DIR)/opsdir/sbin/, $(USERSBINS)) \
         $(addprefix $(INSTALL_DIR)/opsdir/lib/, $(USERLIBS))
-
-boss-install: install
 
 post-install: 
 	chown root $(INSTALL_SBINDIR)/genelists
@@ -70,6 +84,9 @@ post-install:
 #
 control-install: $(addprefix $(INSTALL_SBINDIR)/, $(USERSBINS)) \
 	$(addprefix $(INSTALL_LIBDIR)/, $(USERLIBS))
+
+# Clearinghouse install.
+clrhouse-install: $(addprefix $(INSTALL_LIBDIR)/, $(TARGETS))
 
 # This rule says what web* script depends on which installed binary directory.
 $(WEB_SBIN_SCRIPTS): $(INSTALL_SBINDIR)

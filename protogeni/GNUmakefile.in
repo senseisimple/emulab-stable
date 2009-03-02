@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -11,7 +11,7 @@ SUBDIR		= protogeni
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS	= security xmlrpc lib scripts etc
+SUBDIRS	= security xmlrpc lib scripts etc 
 
 all:	all-subdirs
 
@@ -26,6 +26,9 @@ install:
 
 control-install: 
 
+# Clearinghouse install.
+clrhouse-install: install
+
 clean:		clean-subdirs
 distclean:	subdir-distclean
 
@@ -38,5 +41,4 @@ subdir-distclean:
 	@$(MAKE) -C $(dir $@) $(basename $(notdir $@))
 %-subdirs: $(addsuffix /%.MAKE,$(SUBDIRS)) ;
 
-.PHONY:	$(SUBDIRS)
-
+.PHONY:	$(SUBDIRS) install

@@ -16,8 +16,6 @@ use vars qw(@ISA @EXPORT);
 @ISA    = "Exporter";
 @EXPORT = qw ( );
 
-# Must come after package declaration!
-use lib '@prefix@/lib';
 use GeniDB;
 use Genixmlrpc;
 use GeniResponse;
@@ -25,7 +23,7 @@ use GeniRegistry;
 use GeniTicket;
 use GeniCredential;
 use GeniAuthority;
-use libdb qw(TBGetUniqueIndex);
+use emutil qw(TBGetUniqueIndex);
 use English;
 use overload ('""' => 'Stringify');
 use XML::Simple;
@@ -45,6 +43,7 @@ my $impotent       = 0;
 
 # Cache of instances to avoid regenerating them.
 my %components     = ();
+BEGIN { use GeniUtil; GeniUtil::AddCache(\%components); }
 
 #
 # Lookup by uuid.

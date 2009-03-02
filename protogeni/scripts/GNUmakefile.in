@@ -15,7 +15,7 @@ SBIN_STUFF	= cleanupslice
 PSBIN_STUFF	= register_resources expire_daemon gencrl postcrl \
 		  createcerts initsite addauthority getcacerts \
 		  gencrlbundle shutdownslice remauthority listusage \
-		  update
+		  update reregister
 
 # These scripts installed setuid, with sudo. 
 SETUID_BIN_SCRIPTS   = 
@@ -26,7 +26,7 @@ SETUID_LIBX_SCRIPTS  =
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
-all:	$(SBIN_STUFF) $(PSBIN_STUFF) resolve
+all:	$(SBIN_STUFF) $(PSBIN_STUFF) resolve initclrhouse testclrhouse
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 

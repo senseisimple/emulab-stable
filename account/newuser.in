@@ -269,7 +269,8 @@ if ($WIKISUPPORT) {
 # And the email address has to be unique.
 #
 UserError("Email address already in use; please pick another!")
-    if (User->LookupByEmail($newuser_args{'usr_email'}));
+    if ($newuser_args{'usr_email'} ne $TBOPS &&
+	User->LookupByEmail($newuser_args{'usr_email'}));
 
 #
 # Check the password.

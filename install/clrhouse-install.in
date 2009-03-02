@@ -1,0 +1,646 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Set up a ProtoGeni Clearinghouse.
+#
+
+#
+# Configure variables
+#
+my $PREFIX     = '@prefix@';
+my $SRCDIR     = '@srcdir@';
+my $TOP_SRCDIR = '@top_srcdir@';
+my $DBNAME     = "@TBDBNAME@";
+my $ELABINELAB = @ELABINELAB@;
+my $OURDOMAIN  = '@OURDOMAIN@';
+my $LOGFACIL   = '@TBLOGFACIL@';
+
+#
+# Some programs we use
+#
+my $SH         = "/bin/sh";
+my $CHMOD      = "/bin/chmod";
+my $CHGRP      = "/usr/bin/chgrp";
+my $CHOWN      = "/usr/sbin/chown";
+my $PWD        = "/bin/pwd";
+my $PW         = "/usr/sbin/pw";
+my $PATCH      = "/usr/bin/patch";
+my $SSH_KEYGEN = "/usr/bin/ssh-keygen";
+my $PKG_INFO   = "/usr/sbin/pkg_info";
+my $PKG_ADD    = "/usr/sbin/pkg_add";
+my $PKG_DEL    = "/usr/sbin/pkg_delete";
+my $TOUCH      = "/usr/bin/touch";
+my $SSH_INIT   = "/usr/bin/ssh -1";
+my $SCP_INIT   = "/usr/bin/scp -1";
+my $SSH        = "/usr/bin/ssh -2";
+my $SCP        = "/usr/bin/scp -2";
+my $CP         = "/bin/cp";
+my $ENV        = "/usr/bin/env";
+my $MOUNT      = "/sbin/mount";
+my $SUDO       = "/usr/local/bin/sudo";
+my $SUIDPERL   = "/usr/bin/suidperl";
+my $GMAKE      = "/usr/local/bin/gmake";
+
+my $MYSQL      = "/usr/local/bin/mysql";
+my $MYSQLADMIN = "/usr/local/bin/mysqladmin";
+my $MYSQLSHOW  = "/usr/local/bin/mysqlshow";
+my $MYSQLDUMP  = "/usr/local/bin/mysqldump";
+my $MYSQLINSTALL = "/usr/local/bin/mysql_install_db";
+my $MYSQLDBDIR = "/var/db/mysql";
+
+
+#
+# Some files we edit/create
+#
+my $CRONTAB         = "/etc/crontab";
+my $RCCONF          = "/etc/rc.conf";
+my $SYSLOG_CONF     = "/etc/syslog.conf";
+my $NEWSYSLOG_CONF  = "/etc/newsyslog.conf";
+
+my $PROTOUSER       = "elabman";
+my $PROTOUSER_KEY   = "$TOP_SRCDIR/install/elabman_dsa.pub";
+my $ROOT_PRIVKEY    = "/root/.ssh/id_rsa";
+my $ROOT_PUBKEY     = "$ROOT_PRIVKEY.pub";
+my $ROOT_AUTHKEY    = "/root/.ssh/authorized_keys";
+
+my $APACHE_ETCDIR   = "/usr/local/etc/apache";
+my $SUDOERS         = "/usr/local/etc/sudoers";
+my $HTTPD_CONF      = "$APACHE_ETCDIR/httpd.conf";
+my $PHP_INI         = "/usr/local/etc/php.ini";
+my $WAP             = "$PREFIX/sbin/withadminprivs";
+my $GENCRLBUNDLE    = "$PREFIX/sbin/protogeni/gencrlbundle";
+
+my $M2CRYPTO_PATCH  = "$TOP_SRCDIR/patches/m2crypto.patch";
+my $MYSQL_PM_PATCH  = "$TOP_SRCDIR/patches/Mysql.pm.patch";
+
+my $SSH_CONFIG      = "/etc/ssh/ssh_config";
+my $SYSCTL_CONF	    = "/etc/sysctl.conf";
+
+my $EMULAB_PEM	    = "emulab.pem";
+
+# Apache certs on both boss and ops
+my $APACHE_CERTPEM      = "apache_cert.pem";
+my $APACHE_KEYPEM       = "apache_key.pem";
+my $APACHE_CERTFILE     = "$APACHE_ETCDIR/ssl.crt/www.${OURDOMAIN}.crt";
+my $APACHE_KEYFILE      = "$APACHE_ETCDIR/ssl.key/www.${OURDOMAIN}.key";
+
+# XXX temporary for perl DBD mysql access
+my $P5DBD_PKG	  = "p5-DBD-mysql50-3.0002";
+# XXX temporary until fix dependencies in emulab-boss package
+my $P5GD_PKG	  = "p5-GD-2.07";
+
+#
+# Some directories we care about
+#
+my $LOGDIR        = "$PREFIX/log";
+my $MYSQL_LOGDIR  = "$LOGDIR/mysql";
+my $RCDIR         = "/usr/local/etc/rc.d";
+my $PORTSDIR      = "/usr/ports";
+my $PORTSMISCDIR  = "$PORTSDIR/misc";
+my $VARRUN        = "/var/run";
+my $ETCSSH	  = "/etc/ssh";
+
+#
+# And some lists that we use
+#
+my @TESTBED_DIRS = ($PREFIX);
+my @LOGFILES     = ("$LOGDIR/pubsubd.log");
+
+# Version of FreeBSD.
+my $FBSD_MAJOR = 4;
+my $FBSD_MINOR = 10;
+if (`uname -r` =~ /^(\d+)\.(\d+)/) {
+    $FBSD_MAJOR = $1;
+    $FBSD_MINOR = $2;
+}
+else {
+    die("Could not determine what version of FreeBSD you are running!\n");
+}
+
+#
+# The meta-ports (name and version) that drag in all the dependancies for
+# a boss node. These are OS dependent as we upgrade.
+#
+my $PORTNAME = "emulab-clrhouse-1.1";
+
+#
+# Figure out which directory we live in, so that some stages can do thing
+# relative to it.
+#
+my $OBJDIR = `/usr/bin/dirname $0`;
+chomp $OBJDIR;
+my $TOP_OBJDIR = "$OBJDIR/..";
+
+#
+# Allow this to work if the library is left in the source directory
+#
+use lib '@srcdir@';
+   
+use English;
+use libinstall;
+use Getopt::Std;
+
+#
+# Handle command-line options
+#
+sub usage {
+    print "Usage: boss-install [-b] [-p packagedir] [-s] [-P portname]\n";
+    print "  Required: -p (for binary packages) or -s (for source makes.)\n";
+    exit(1);
+}
+
+my $packagedir = "";
+my $batchmode  = 0;
+my $domakes  = 0;
+my $password;
+my %opts;
+
+if (! getopts("P:p:bsw:", \%opts)) {
+    usage();
+}
+if (defined($opts{p})) {
+    $packagedir = $opts{p};
+}
+if (defined($opts{b})) {
+    $batchmode = 1;
+}
+if (defined($opts{s})) {
+    $domakes = 1;
+}
+if (defined($opts{w})) {
+    $password = $opts{w};
+}
+if (defined($opts{P})) {
+    $PORTNAME = $opts{P};
+}
+# Don't just charge into making ports from source by default.
+if ($packagedir eq "" and $domakes eq 0) {
+    print "At least one of -p and -s must be given.\n";
+    usage();
+}
+if ($packagedir ne "" and $domakes eq 1) {
+    print "Only one of -p and -s can be given.\n";
+    usage();
+}
+if (@ARGV) {
+    usage();
+}
+
+#
+# Make sure they know what they're getting into...
+#
+if (! $batchmode) {
+    print STDERR
+	"WARNING: This script is ONLY intended to be run on a machine\n";
+    print STDERR
+	"that is being set up as a dedicated ClearingHouse Continue? [y/N] ";
+    my $response = <>;
+    die "Installation aborted!\n" unless ($response =~ /^y/i);
+}
+
+if ($UID != 0) {
+    die "This script must be run as root.\n";
+}
+
+Phase "usersgroups", "Creating users and groups", sub {
+    Phase "tbadmin", "Creating tbadmin group", sub {
+	if (getgrnam("tbadmin")) {
+	    PhaseSkip("Group already exists");
+	}
+	ExecQuietFatal("$PW groupadd tbadmin -g 101");
+    };
+    Phase "GeniSlices", "Creating geni group", sub {
+	if (getgrnam("GeniSlices")) {
+	    PhaseSkip("Group already exists");
+	}
+	ExecQuietFatal("$PW groupadd GeniSlices -g 102");
+    };
+    Phase "geniuser", "Creating geni user", sub {
+	if (getpwnam("geniuser")) {
+	    PhaseSkip("User already exists");
+	}
+	ExecQuietFatal("$PW useradd geniuser -u 5998 -g guest -h - ".
+		       "-s /sbin/nologin -c 'Geni User'");
+    };
+    Phase "root", "Creating root group", sub {
+	if (getgrnam("root")) {
+	    PhaseSkip("Group already exists");
+	}
+	ExecQuietFatal("$PW groupadd root -g 103");
+    };
+    # Added next two cause the mysql package does not do this (port does).
+    Phase "mysqlgroup", "Creating mysql group", sub {
+	if (getgrnam("mysql")) {
+	    PhaseSkip("Group already exists");
+	}
+	ExecQuietFatal("$PW groupadd mysql -g 88");
+    };
+    Phase "mysqluser", "Creating mysql user", sub {
+	if (getpwnam("mysql")) {
+	    PhaseSkip("User already exists");
+	}
+	ExecQuietFatal("$PW useradd mysql -u 88 -g 88 -h - ".
+		       "-d $MYSQLDBDIR -s /sbin/nologin -c 'MySQL Daemon'");
+    };
+    ExecQuietFatal("$CHOWN mysql:mysql $MYSQLDBDIR")
+	if (-e $MYSQLDBDIR);
+};
+
+Phase "dirs", "Setting directory permissions", sub {
+    foreach my $dir (@TESTBED_DIRS) {
+	Phase $dir, $dir, sub {
+	    if (!-d $dir) {
+		PhaseFail("Directory $dir does not exist");
+	    }
+	    my ($mode,$group) = (stat($dir))[2,5];
+	    # Fix up the mode (strip file type)
+	    $mode = $mode & 0777;
+	    if ($mode == 0775 && $group eq getgrnam("tbadmin")) {
+		PhaseSkip("Already done");
+	    }
+	    ExecQuietFatal("$CHGRP tbadmin $dir");
+	    ExecQuietFatal("$CHMOD 0775 $dir");
+	};
+    }
+};
+
+Phase "ports", "Installing ports", sub {
+    if (!ExecQuiet("$PKG_INFO -e $PORTNAME")) {
+	PhaseSkip("Package already installed");
+    }
+    Phase "pcopy", "Copying ports into place", sub {
+	DoneIfExists("$PORTSMISCDIR/emulab-clrhouse");
+	ExecQuietFatal("$SH $SRCDIR/ports/ports-install");
+    };
+    PhaseFail("Please install ports manually, since some\n of them are " .
+	      "interactive. Run: \n" .
+	      "    cd $PORTSMISCDIR/emulab-clrhouse && make install\n" .
+	      "then re-run this script.");
+};
+
+Phase "portfixup", "Fixing up packages", sub {
+    Phase "rsync", "Looking for rsync", sub {
+	if (!ExecQuiet("$PKG_INFO -x rsync")) {
+	    PhaseSkip("rsync already installed");
+	}
+	my $pname = GetPackage("rsync", $packagedir);
+	ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
+    };
+    if ($FBSD_MAJOR == 6) {
+	# Temporary for template stuff
+	Phase "Simple", "Looking for Simple XML Parser", sub {
+	    if (!ExecQuiet("$PKG_INFO -x p5-XML-Simple")) {
+		PhaseSkip("p5-XML-Simple already installed");
+	    }
+	    my $pname = GetPackage("p5-XML-Simple", $packagedir);
+	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
+	};
+    }
+};
+
+Phase "patches", "Applying patches", sub {
+    Phase "m2cryptopatch", "Patching m2crypto", sub {
+	my $patchfile = $M2CRYPTO_PATCH;
+	
+	if (ExecQuiet("$PKG_INFO -I -x m2crypto | fgrep -q -s '0.17'") == 0) {
+	    $patchfile = "${patchfile}-0.17";
+	}
+	elsif (ExecQuiet("$PKG_INFO -I -x m2crypto | fgrep -q -s '0.13'") == 0) {
+	    $patchfile = "${patchfile}-0.13";
+	}
+	if (!ExecQuiet("$PATCH -C -f -l -R -p0 -i $patchfile")) {
+	    PhaseSkip("Patch already applied");
+	}
+	ExecQuietFatal("$PATCH -f -l -p0 -i $patchfile");
+    };
+    Phase "Mysql.pm.patch", "Patching Mysql.pm", sub {
+	my $patchfile = $MYSQL_PM_PATCH;
+	$patchfile = `realpath $patchfile`;
+	chomp $patchfile;
+
+	my $dir;
+	foreach $prefix (@INC) {
+	    if (-e "$prefix/Mysql.pm") {
+		$dir = $prefix;
+		last;
+	    }
+	}
+	if (!defined($dir)) {
+	    PhaseFail("Unable to find Mysql.pm");
+	}
+
+	if (!ExecQuiet("$PATCH -d $dir -C -f -l -R -i $patchfile")) {
+	    PhaseSkip("Patch already applied");
+	}
+	ExecQuietFatal("$PATCH -d $dir -f -l -i $patchfile");
+    };
+};
+
+Phase "php.ini", "Creating php.ini file", sub {
+    DoneIfExists($PHP_INI);
+    CreateFileFatal($PHP_INI,
+	"[PHP]","",
+	";",
+	"; So that quotes are not escaped. Needed for netbuild application.",
+	";", 
+	"magic_quotes_gpc        =       Off","",
+	";",
+	"register_globals        =       Off");
+};
+
+Phase "apache", "Installing apache config file", sub {
+    DoneIfEdited("$HTTPD_CONF");
+    # ICK!!! If we installed apache AFTER we unpacked the source tarball,
+    # make will not properly install the new apache config file! So, we use
+    # this shameful hack to force it to do so!
+    ExecQuietFatal("$TOUCH -t 01010000 $HTTPD_CONF");
+    ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/apache install");
+};
+
+Phase "rc.d", "Setting up rc.d scripts", sub {
+    Phase "my-client", "Moving $RCDIR/mysql-client.sh", sub {
+	DoneIfDoesntExist("$RCDIR/mysql-client.sh");
+	ExecQuietFatal("mv $RCDIR/mysql-client.sh $RCDIR/1.mysql-client.sh");
+    };
+    Phase "my-server", "Removing $RCDIR/mysql-server.sh", sub {
+	DoneIfDoesntExist("$RCDIR/mysql-server.sh");
+	if (!unlink "$RCDIR/mysql-server.sh") {
+	    PhaseFail("Unable to remove $RCDIR/mysql-server.sh: $!");
+	}
+    };
+    Phase "my-server2", "Removing $RCDIR/mysql-server", sub {
+	DoneIfDoesntExist("$RCDIR/mysql-server");
+	if (!unlink "$RCDIR/mysql-server") {
+	    PhaseFail("Unable to remove $RCDIR/mysql-server: $!");
+	}
+    };
+    Phase "snmpd", "Removing snmpd startup script",  sub {
+	DoneIfDoesntExist("$RCDIR/snmpd.sh");
+	if (!unlink "$RCDIR/snmpd.sh") {
+	    PhaseFail("Unable to remove $RCDIR/snmpd.sh: $!");
+	}
+    };
+    Phase "rsyncd", "Removing rsyncd startup script",  sub {
+	DoneIfDoesntExist("$RCDIR/rsyncd.sh");
+	if (!unlink "$RCDIR/rsyncd.sh") {
+	    PhaseFail("Unable to remove $RCDIR/rsyncd.sh: $!");
+	}
+    };
+    Phase "dhcpd", "Removing isc-dhcpd startup script",  sub {
+	DoneIfDoesntExist("$RCDIR/isc-dhcpd.sh");
+	if (!unlink "$RCDIR/isc-dhcpd.sh") {
+	    PhaseFail("Unable to remove $RCDIR/isc-dhcpd.sh: $!");
+	}
+    };
+    Phase "rc.testbed", "Installing testbed RC scripts", sub {
+	ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/rc.d clrhouse-install");
+    };
+};
+
+Phase "syslog", "Setting up syslog", sub {
+    Phase "sysconf", "Editing $SYSLOG_CONF", sub {
+	DoneIfEdited($SYSLOG_CONF);
+
+	#
+	# Modify the /dev/console and /var/log/messages lines to exclude
+	# testbed stuff
+	#
+	open(SC,"+<$SYSLOG_CONF") or
+	    PhaseFail("Unable to open $SYSLOG_CONF : $!");
+	my @sc = <SC>;
+	if (scalar(grep(/$LOGFACIL/, @sc)) != 0) {
+	    PhaseFail("Testbed chosen facility $LOGFACIL already in use in /etc/syslog.conf!");
+	}
+	seek(SC,0,0);
+	truncate(SC,0);
+	foreach my $line (@sc) {
+	    my $cpat = q(\s+/dev/console);
+	    my $mpat = q(\s+/var/log/messages);
+	    if ($line =~ /^[^#].*$cpat/) {
+		$line =~ s/($cpat)/\;$LOGFACIL.none$1/;
+	    }
+	    elsif ($line =~ /^[^#].*$mpat/) {
+		$line =~ s/($mpat)/\;$LOGFACIL.none$1/;
+	    }
+	    print SC $line;
+	}
+	close(SC);
+
+	AppendToFileFatal($SYSLOG_CONF,
+	  "!pubsubd",    "*.*\t\t\t\t\t\t$LOGDIR/pubsubd.log");
+    };
+
+    Phase "logdir", "Creating log directory", sub {
+	DoneIfExists($LOGDIR);
+	mkdir $LOGDIR, 0775 or PhaseFail("Unable to create $LOGDIR : $!");
+	ExecQuietFatal("$CHGRP tbadmin $LOGDIR");
+	ExecQuietFatal("$CHMOD 775 $LOGDIR");
+    };
+
+    Phase "logdir", "Creating mysql log directory", sub {
+	DoneIfExists($MYSQL_LOGDIR);
+	mkdir $MYSQL_LOGDIR, 0775 or
+	    PhaseFail("Unable to create $MYSQL_LOGDIR : $!");
+	ExecQuietFatal("$CHOWN mysql:mysql $MYSQL_LOGDIR");
+	ExecQuietFatal("$CHMOD 775 $MYSQL_LOGDIR");
+    };
+
+    Phase "logfiles", "Creating log files", sub {
+	foreach my $logfile (@LOGFILES) {
+	    Phase $logfile, $logfile, sub {
+		DoneIfExists($logfile);
+		CreateFileFatal($logfile);
+		ExecQuietFatal("$CHGRP tbadmin $logfile");
+		ExecQuietFatal("$CHMOD 640 $logfile");
+	    };
+	}
+    };
+
+    Phase "newsyslog", "Setting up $NEWSYSLOG_CONF", sub {
+	DoneIfEdited($NEWSYSLOG_CONF);
+	AppendToFileFatal($NEWSYSLOG_CONF,
+	    "$LOGDIR/pubsubd.log            640  5     1000 *     Z");
+    };
+};
+
+Phase "database", "Setting up database", sub {
+    Phase "initialize", "Initializing mysql", sub {
+	PhaseSkip("mysqld already initialzed")
+	    if (-d "$MYSQLDBDIR/mysql");
+
+	ExecQuietFatal("$MYSQLINSTALL --ldata=${MYSQLDBDIR}");
+	ExecQuietFatal("$CHOWN -R mysql:mysql $MYSQLDBDIR");
+    };
+    Phase "mysql", "Starting mysqld", sub {
+	if (!ExecQuiet("$MYSQLADMIN ping")) {
+	    PhaseSkip("mysqld already running");
+	}
+	ExecQuietFatal("$RCDIR/2.mysql-server.sh start");
+	# Give mysqld some time to start, then make sure it did
+	sleep 5;
+	ExecQuietFatal("$MYSQLADMIN ping");
+    };
+    Phase "$DBNAME", "Creating $DBNAME", sub {
+	if (!ExecQuiet("$MYSQLSHOW $DBNAME")) {
+	    PhaseSkip("tbdb already exists");
+	}
+	ExecQuietFatal("$MYSQLADMIN create $DBNAME");
+    };
+    Phase "tables", "Creating tables in $DBNAME", sub {
+	if (!ExecQuiet("$MYSQLDUMP -d $DBNAME users")) {
+	    PhaseSkip("Tables have already been created");
+	}
+	if ($FBSD_MAJOR == 4) {
+	    ExecQuietFatal("cp $TOP_SRCDIR/sql/database-create-old.sql $TOP_SRCDIR/sql/database-create.sql")
+	    }
+	ExecQuietFatal("$MYSQL $DBNAME < $TOP_SRCDIR/sql/database-create.sql");
+    };
+    Phase "dbdata", "Filling tables with initial data", sub {
+	my ($exitval, @rows) = ExecQuiet("echo 'select * from " .
+	    "exported_tables' | $MYSQL -s $DBNAME");
+	if ($exitval) {
+	    PhaseFail("Error running query");
+	}
+	if (scalar @rows) {
+	    PhaseSkip("Already done");
+	}
+	ExecQuietFatal("$MYSQL $DBNAME < $TOP_SRCDIR/sql/database-fill.sql");
+    };
+    Phase "sdbdata", "Filling tables with supplemental data", sub {
+	my ($exitval, @rows) = ExecQuiet("echo 'select * from " .
+	    "os_info' | $MYSQL -s $DBNAME");
+	if ($exitval) {
+	    PhaseFail("Error running query");
+	}
+	if (scalar @rows) {
+	    PhaseSkip("Already done");
+	}
+	ExecQuietFatal("$MYSQL $DBNAME < " .
+	    "$TOP_SRCDIR/sql/database-fill-supplemental.sql");
+    };
+    Phase "sitevars", "Setting sitevars to default values", sub {
+	my ($exitval, @rows) = ExecQuiet("echo 'select * from " .
+	    "sitevariables' | $MYSQL -s $DBNAME");
+	if ($exitval) {
+	    PhaseFail("Error running query");
+	}
+	if (scalar @rows) {
+	    PhaseSkip("Already done");
+	}
+	ExecQuietFatal("$MYSQL $DBNAME < $TOP_SRCDIR/sql/sitevars-create.sql");
+    };
+};
+
+Phase "rc.conf", "Adding testbed content to $RCCONF", sub {
+    DoneIfEdited($RCCONF);
+    my @strings = (qq|syslogd_flags=""|,
+		   qq|apache_flags="-DSSL -DPGENI"|,
+		   qq|apache_enable="YES"|);
+
+    AppendToFileFatal($RCCONF, @strings);
+};
+
+#
+# New version perl does not appear to require this anymore. In fact, it
+# seems to break things if it is!
+#
+if ($FBSD_MAJOR == 4) {
+    Phase "suidperl", "Setting the suid bit on $SUIDPERL", sub {
+	PhaseSkip("Already done") if (-u $SUIDPERL);
+	ExecQuietFatal("$CHMOD u+s $SUIDPERL");
+    };
+}
+else {
+    Phase "suidperl", "UnSetting the suid bit on $SUIDPERL", sub {
+	PhaseSkip("Already done") if (! -u $SUIDPERL);
+	ExecQuietFatal("$CHMOD u-s $SUIDPERL");
+    };
+}
+
+Phase "cron", "Adding cron jobs", sub {
+    Phase "crontab", "Editing $CRONTAB", sub {
+	DoneIfEdited($CRONTAB);
+	AppendToFileFatal($CRONTAB,
+			  "10 \t4\t*\t*\t*\troot\t$GENCRLBUNDLE\n");
+    };
+};
+
+Phase "sudoers", "Editing $SUDOERS", sub {
+    DoneIfEdited($SUDOERS);
+    AppendToFileFatal($SUDOERS,
+		      "%wheel    ALL=(ALL) NOPASSWD: ALL",
+		      "Defaults  logfile=/var/log/sudo.log");
+};
+
+Phase "sslcerts", "Setting up SSL certificates", sub {
+    Phase "sslgen", "Generating SSL certificates", sub {
+	DoneIfExists("$TOP_OBJDIR/ssl/$EMULAB_PEM");
+	ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/ssl clearinghouse");
+    };
+    Phase "sslinstall", "Installing SSL certificates", sub {
+	DoneIfExists("$PREFIX/etc/$EMULAB_PEM");
+	ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/ssl clearinghouse-install");
+    };
+    Phase "apache", "Setting up Apache on boss", sub {
+	Phase "cert", "Installing Apache SSL certificate", sub {
+	    DoneIfExists("$APACHE_CERTFILE");
+	    ExecQuietFatal("$CP $TOP_OBJDIR/ssl/$APACHE_CERTPEM ".
+			   "    $APACHE_CERTFILE");
+	};
+	Phase "key", "Installing Apache SSL key", sub {
+	    DoneIfExists("$APACHE_KEYFILE");
+	    ExecQuietFatal("$CP $TOP_OBJDIR/ssl/$APACHE_KEYPEM ".
+			   "    $APACHE_KEYFILE");
+	};
+	Phase "rc.d", "Installing Apache startup file", sub {
+	    DoneIfExists("$RCDIR/apache.sh");
+	    ExecQuietFatal("mv $RCDIR/apache.sh.sample $RCDIR/apache.sh");
+	    if ($FBSD_MAJOR == 6) {
+		ExecQuietFatal("sed -i .orig ".
+			       "-e 's/^apache_enable/#apache_enable/' ".
+			       "$RCDIR/apache.sh");
+		ExecQuietFatal("/bin/rm -f $RCDIR/apache.sh.orig");
+	    }
+	};
+    };
+};
+
+Phase "pubsub", "Setting up pubsub system", sub {
+    # For elabinelab, be sure to kill off running event system. Harmless.
+    Phase "stopping", "Stopping pubsub system", sub {
+	if (ExecQuiet("killall -s pubsubd")) {
+	    PhaseSkip("pubsubd not running");
+	}
+	ExecQuietFatal("$RCDIR/2.pubsubd.sh stop");
+    };
+    Phase "starting", "Starting pubsub system", sub {
+	ExecQuietFatal("$RCDIR/2.pubsubd.sh start");
+    };
+};
+
+#
+# Build and install software. Note that I am not looking to see if its
+# been done; I suppose we could touch a file to indicate that build has
+# been completed, but maybe that is not such a good idea.
+#
+my $MAKEFILE = "-f protogeni/install/GNUmakefile";
+	
+Phase "Software", "Building and Installing Software", sub {
+    Phase "building", "Building (please be patient)", sub {
+	ExecQuietFatal("cd $TOP_OBJDIR; $GMAKE $MAKEFILE");
+    };
+    Phase "installing", "Installing (please be patient)", sub {
+	ExecQuietFatal("cd $TOP_OBJDIR; $GMAKE $MAKEFILE clrhouse-install");
+    };
+};
+
+print "--------------------------------------------------------------------\n";
+print "Installation completed succesfully!\n";
+print "Please reboot this machine before proceeding\n";
+
+exit 0;

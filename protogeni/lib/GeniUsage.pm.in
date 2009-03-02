@@ -14,12 +14,7 @@ use vars qw(@ISA @EXPORT);
 @ISA    = "Exporter";
 @EXPORT = qw ( );
 
-# Must come after package declaration
-use lib '@prefix@/lib';
 use GeniDB;
-use GeniComponent;
-use GeniSlice;
-use GeniSliver;
 use XML::Simple;
 use Data::Dumper;
 use File::Temp qw(tempfile);

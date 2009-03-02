@@ -15,29 +15,14 @@ ac_default_prefix=/usr/testbed
 ac_help="$ac_help
   --with-TBDEFS=name	Specify definitions file (defs-default default)"
 ac_help="$ac_help
-  --with-LEDA		Specify LEDA path (/usr/testbed default)"
-ac_help="$ac_help
-  --with-assignbinary	Specify assign binary (overrides LEDA, default on)"
-ac_help="$ac_help
   --with-ssh-args	Specify ssh arguments when running from testbed scripts "
 ac_help="$ac_help
   --with-rcdir		Specify path to install rc.d scripts (/usr/local/etc/rc.d default)"
 ac_help="$ac_help
   --with-apache-config	Specify path to install apache config files (/usr/local/etc/apache default)"
 ac_help="$ac_help
-  --with-brainstem=<DIR> Specify the path to the brainstem installation."
-ac_help="$ac_help
   --enable-debug        Build with debug flags (-g -DDEBUG)
   --disable-debug       Build with optimization flags (-O2 -DNDEBUG -UDEBUG)"
-ac_help="$ac_help
-  --disable-events      Disable events (requires Elvin libraries)"
-ac_help="$ac_help
-  --enable-windows      Enable Windows XP support (default)"
-ac_help="$ac_help
-  --enable-mezzanine    Enable mezzanine support"
-ac_help="$ac_help
-  --enable-testmode     Enable test mode
-  --disable-testmode    Disable test mode"
 
 # Initialize some variables set by options.
 # The variables have the same names as the options, with
@@ -632,7 +617,7 @@ do
 # Extract the first word of "$ac_prog", so it can be a program name with args.
 set dummy $ac_prog; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:636: checking for $ac_word" >&5
+echo "configure:621: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_path_PYTHON'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -680,7 +665,7 @@ fi
 PYTHON_INCLUDE="${PYTHON_PATH}/include/python${PYTHON_VERSION}"
 CPPFLAGS="${CPPFLAGS} -I${PYTHON_INCLUDE}"
 echo $ac_n "checking how to run the C preprocessor""... $ac_c" 1>&6
-echo "configure:684: checking how to run the C preprocessor" >&5
+echo "configure:669: checking how to run the C preprocessor" >&5
 # On Suns, sometimes $CPP names a directory.
 if test -n "$CPP" && test -d "$CPP"; then
   CPP=
@@ -695,13 +680,13 @@ else
   # On the NeXT, cc -E runs the code through the compiler's parser,
   # not just through cpp.
   cat > conftest.$ac_ext <<EOF
-#line 699 "configure"
+#line 684 "configure"
 #include "confdefs.h"
 #include <assert.h>
 Syntax Error
 EOF
 ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
-{ (eval echo configure:705: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+{ (eval echo configure:690: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
 ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
 if test -z "$ac_err"; then
   :
@@ -712,13 +697,13 @@ else
   rm -rf conftest*
   CPP="${CC-cc} -E -traditional-cpp"
   cat > conftest.$ac_ext <<EOF
-#line 716 "configure"
+#line 701 "configure"
 #include "confdefs.h"
 #include <assert.h>
 Syntax Error
 EOF
 ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
-{ (eval echo configure:722: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+{ (eval echo configure:707: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
 ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
 if test -z "$ac_err"; then
   :
@@ -729,13 +714,13 @@ else
   rm -rf conftest*
   CPP="${CC-cc} -nologo -E"
   cat > conftest.$ac_ext <<EOF
-#line 733 "configure"
+#line 718 "configure"
 #include "confdefs.h"
 #include <assert.h>
 Syntax Error
 EOF
 ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
-{ (eval echo configure:739: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+{ (eval echo configure:724: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
 ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
 if test -z "$ac_err"; then
   :
@@ -763,17 +748,17 @@ for ac_hdr in Python.h
 do
 ac_safe=`echo "$ac_hdr" | sed 'y%./+-%__p_%'`
 echo $ac_n "checking for $ac_hdr""... $ac_c" 1>&6
-echo "configure:767: checking for $ac_hdr" >&5
+echo "configure:752: checking for $ac_hdr" >&5
 if eval "test \"`echo '$''{'ac_cv_header_$ac_safe'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
   cat > conftest.$ac_ext <<EOF
-#line 772 "configure"
+#line 757 "configure"
 #include "confdefs.h"
 #include <$ac_hdr>
 EOF
 ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
-{ (eval echo configure:777: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+{ (eval echo configure:762: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
 ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
 if test -z "$ac_err"; then
   rm -rf conftest*
@@ -810,7 +795,7 @@ else { echo "configure: error: can not run $ac_config_sub" 1>&2; exit 1; }
 fi
 
 echo $ac_n "checking host system type""... $ac_c" 1>&6
-echo "configure:814: checking host system type" >&5
+echo "configure:799: checking host system type" >&5
 
 host_alias=$host
 case "$host_alias" in
@@ -831,7 +816,7 @@ host_os=`echo $host | sed 's/^\([^-]*\)-\([^-]*\)-\(.*\)$/\3/'`
 echo "$ac_t""$host" 1>&6
 
 echo $ac_n "checking build system type""... $ac_c" 1>&6
-echo "configure:835: checking build system type" >&5
+echo "configure:820: checking build system type" >&5
 
 build_alias=$build
 case "$build_alias" in
@@ -857,7 +842,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}gcc", so it can be a program name with args.
 set dummy ${ac_tool_prefix}gcc; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:861: checking for $ac_word" >&5
+echo "configure:846: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_CC'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -889,7 +874,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}g++", so it can be a program name with args.
 set dummy ${ac_tool_prefix}g++; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:893: checking for $ac_word" >&5
+echo "configure:878: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_CXX'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -921,7 +906,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}ar", so it can be a program name with args.
 set dummy ${ac_tool_prefix}ar; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:925: checking for $ac_word" >&5
+echo "configure:910: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_AR'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -953,7 +938,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}ranlib", so it can be a program name with args.
 set dummy ${ac_tool_prefix}ranlib; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:957: checking for $ac_word" >&5
+echo "configure:942: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_RANLIB'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -985,7 +970,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}strip", so it can be a program name with args.
 set dummy ${ac_tool_prefix}strip; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:989: checking for $ac_word" >&5
+echo "configure:974: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_STRIP'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -1016,12 +1001,12 @@ fi
 
 
 echo $ac_n "checking for Cygwin environment""... $ac_c" 1>&6
-echo "configure:1020: checking for Cygwin environment" >&5
+echo "configure:1005: checking for Cygwin environment" >&5
 if eval "test \"`echo '$''{'ac_cv_cygwin'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
   cat > conftest.$ac_ext <<EOF
-#line 1025 "configure"
+#line 1010 "configure"
 #include "confdefs.h"
 
 int main() {
@@ -1032,7 +1017,7 @@ int main() {
 return __CYGWIN__;
 ; return 0; }
 EOF
-if { (eval echo configure:1036: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
+if { (eval echo configure:1021: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
   rm -rf conftest*
   ac_cv_cygwin=yes
 else
@@ -1049,19 +1034,19 @@ echo "$ac_t""$ac_cv_cygwin" 1>&6
 CYGWIN=
 test "$ac_cv_cygwin" = yes && CYGWIN=yes
 echo $ac_n "checking for mingw32 environment""... $ac_c" 1>&6
-echo "configure:1053: checking for mingw32 environment" >&5
+echo "configure:1038: checking for mingw32 environment" >&5
 if eval "test \"`echo '$''{'ac_cv_mingw32'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
   cat > conftest.$ac_ext <<EOF
-#line 1058 "configure"
+#line 1043 "configure"
 #include "confdefs.h"
 
 int main() {
 return __MINGW32__;
 ; return 0; }
 EOF
-if { (eval echo configure:1065: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
+if { (eval echo configure:1050: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
   rm -rf conftest*
   ac_cv_mingw32=yes
 else
@@ -1080,7 +1065,7 @@ test "$ac_cv_mingw32" = yes && MINGW32=yes
 
 
 echo $ac_n "checking for executable suffix""... $ac_c" 1>&6
-echo "configure:1084: checking for executable suffix" >&5
+echo "configure:1069: checking for executable suffix" >&5
 if eval "test \"`echo '$''{'ac_cv_exeext'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -1090,7 +1075,7 @@ else
   rm -f conftest*
   echo 'int main () { return 0; }' > conftest.$ac_ext
   ac_cv_exeext=
-  if { (eval echo configure:1094: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; }; then
+  if { (eval echo configure:1079: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; }; then
     for file in conftest.*; do
       case $file in
       *.c | *.C | *.o | *.obj | *.ilk | *.pdb) ;;
@@ -1114,7 +1099,7 @@ ac_exeext=$EXEEXT
 # Extract the first word of "elvin-config", so it can be a program name with args.
 set dummy elvin-config; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:1118: checking for $ac_word" >&5
+echo "configure:1103: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_path_ELVIN_CONFIG'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -1149,7 +1134,7 @@ fi
 # Extract the first word of "javac", so it can be a program name with args.
 set dummy javac; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:1153: checking for $ac_word" >&5
+echo "configure:1138: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_path_JAVAC'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -1184,7 +1169,7 @@ fi
 # Extract the first word of "jar", so it can be a program name with args.
 set dummy jar; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:1188: checking for $ac_word" >&5
+echo "configure:1173: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_path_JAR'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -1219,7 +1204,7 @@ fi
 # Extract the first word of "sudo", so it can be a program name with args.
 set dummy sudo; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:1223: checking for $ac_word" >&5
+echo "configure:1208: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_path_SUDO'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -1255,7 +1240,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}ssh", so it can be a program name with args.
 set dummy ${ac_tool_prefix}ssh; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:1259: checking for $ac_word" >&5
+echo "configure:1244: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_SSH'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -1288,12 +1273,12 @@ fi
 for ac_func in srandomdev
 do
 echo $ac_n "checking for $ac_func""... $ac_c" 1>&6
-echo "configure:1292: checking for $ac_func" >&5
+echo "configure:1277: checking for $ac_func" >&5
 if eval "test \"`echo '$''{'ac_cv_func_$ac_func'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
   cat > conftest.$ac_ext <<EOF
-#line 1297 "configure"
+#line 1282 "configure"
 #include "confdefs.h"
 /* System header to define __stub macros and hopefully few prototypes,
     which can conflict with char $ac_func(); below.  */
@@ -1316,7 +1301,7 @@ $ac_func();
 
 ; return 0; }
 EOF
-if { (eval echo configure:1320: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
+if { (eval echo configure:1305: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
   rm -rf conftest*
   eval "ac_cv_func_$ac_func=yes"
 else
@@ -1488,6 +1473,15 @@ done
 
 
 
+
+HAVE_MEZZANINE=0
+
+GTK_CONFIG=""
+
+BRAINSTEM_DIR=""
+
+HAVE_ULXMLRPCPP=0
+
 #
 # Defaults for for above variables.
 # 
@@ -1539,7 +1533,7 @@ REMOTEWIKIDOCS=1
 PROTOGENI_SUPPORT=0
 PROTOGENI_CLEARINGHOUSE=0
 PROTOGENI_DOMAIN="unknown"
-STANDALONE_CLEARINGHOUSE=0
+STANDALONE_CLEARINGHOUSE=1
 
 #
 # XXX You really don't want to change these!
@@ -1563,6 +1557,7 @@ if test "${with_TBDEFS+set}" = set; then
     fi
     TBDEFS="$withval"
     TBPATH=`dirname $withval`
+    TBPATH="$TBPATH:$srcdir"
 
 else
   
@@ -1898,58 +1893,6 @@ EOF
 
 
 #
-# LEDA library path
-#
-# Check whether --with-LEDA or --without-LEDA was given.
-if test "${with_LEDA+set}" = set; then
-  withval="$with_LEDA"
-  
-    if test "$withval" = "yes"; then
-        LEDA="$ac_default_prefix/LEDA/LEDA-4.0"
-    else
-        LEDA="$withval"
-    fi
-
-else
-  
-    if test -d "$ac_default_prefix/LEDA/LEDA-4.0"; then
-        LEDA="$ac_default_prefix/LEDA/LEDA-4.0"
-    else
-        LEDA=""
-    fi
-
-fi
-
-
-
-#
-# Override LEDA with assign binary.
-#
-# Check whether --with-assignbinary or --without-assignbinary was given.
-if test "${with_assignbinary+set}" = set; then
-  withval="$with_assignbinary"
-  
-    if test "$withval" = "yes"; then
-        ASSIGN="assign.bin"
-        LEDA=""
-    else
-        ASSIGN="$withval"
-        LEDA=""
-    fi
-
-else
-  
-    if test "$LEDA" = ""; then
-        ASSIGN="assign.bin"
-    else
-        ASSIGN=""
-    fi
-
-fi
-
-
-
-#
 # Arguments to ssh to disable strict host key checking, etc
 #
 # Check whether --with-ssh-args or --without-ssh-args was given.
@@ -2001,28 +1944,6 @@ fi
 
 
 #
-# Path to garcia installation
-#
-# Check whether --with-brainstem or --without-brainstem was given.
-if test "${with_brainstem+set}" = set; then
-  withval="$with_brainstem"
-  
-    if test x"$withval" != x""; then
-	BRAINSTEM_DIR="$withval"
-    else
-	{ echo "configure: error: You must specify a brainstem directory" 1>&2; exit 1; };
-    fi
-
-else
-  
-    BRAINSTEM_DIR=""
-
-fi
-
-
-
-
-#
 # Optionally build with optimization or aggressive non-optimization
 # (Actually three options: on, off or default.)
 #
@@ -2044,258 +1965,8 @@ else
 fi
 
 
-#
-# Disable event system. Relies on Elvin. On by default.
-# 
-# Check whether --enable-events or --disable-events was given.
-if test "${enable_events+set}" = set; then
-  enableval="$enable_events"
-  :
-fi
-
-
-if test "$enable_events" = "no"; then
-	eventfiles="";
-        EVENTSYS=0;
-else
-	eventfiles="event/GNUmakefile event/lib/GNUmakefile \
-		    event/etc/elvind-boss.conf event/etc/elvind-ops.conf \
-		    event/etc/elvind-inetd.conf event/etc/GNUmakefile\
-		    event/sched/GNUmakefile \
-                    event/tbgen/GNUmakefile \
-                    event/example/GNUmakefile event/example/tbsend.pl \
-		    event/example/tbrecv.pl event/example/tbsend-short.pl \
-                    event/example/tbsend.py event/example/tbrecv.py \
-		    event/example/eventdebug.pl \
-		    event/trafgen/GNUmakefile \
-		    event/proxy/GNUmakefile \
-		    event/nsetrafgen/GNUmakefile \
-		    event/nsetrafgen/nseinput.tcl \
-		    event/nsetrafgen/nse-makepatch \
-                    event/delay-agent/GNUmakefile \
-		    event/program-agent/GNUmakefile \
-		    event/link-agent/GNUmakefile \
-		    event/stated/waitForState \
-		    event/stated/GNUmakefile event/stated/stated \
-		    event/linktest/GNUmakefile \
-		    event/linktest/iperf/GNUmakefile \
-		    event/linktest/rude/GNUmakefile \
-		    event/linktest/linktest.pl \
-		    event/linktest/weblinktest event/linktest/linktest.proxy \
-		    event/linktest/linktest_control \
-		    event/linktest/run_linktest.pl";
-
-	optional_subdirs="$optional_subdirs event";
-        EVENTSYS=1;
-fi
-
-
-#
-# Quickie pelab support.
-#
-if test $PELABSUPPORT -eq 0; then
-	pelabfiles="";
-else
-	pelabfiles="pelab/GNUmakefile pelab/db/GNUmakefile \
-		    pelab/bgmon/GNUmakefile ";
-	optional_subdirs="$optional_subdirs pelab";
-fi
-
-#
-# Enable Windows support.
-# Right now this means NTFS support in imagezip, maybe more things later.
-# Relies on Linux NTFS library.
-# 
-# Check whether --enable-windows or --disable-windows was given.
-if test "${enable_windows+set}" = set; then
-  enableval="$enable_windows"
-  :
-fi
-
-
-if test "$enable_windows" = "no"; then
-	WINSUPPORT=0;
-elif test "$enable_windows" = "yes"; then
-	WINSUPPORT=1;
-fi
-
-if test $WINSUPPORT -eq 0; then
-	winfiles="";
-else
-	winfiles="os/imagezip/ntfs/GNUmakefile \
-		  os/imagezip/ntfs/liblocale/GNUmakefile \
-		  os/imagezip/ntfs/libntfs/GNUmakefile \
-		  os/imagezip/fat/GNUmakefile"
-	optional_subdirs="$optional_subdirs";
-        cat >> confdefs.h <<EOF
-#define WINSUPPORT 1
-EOF
-
-fi
-
-
-#
-# Check for ulsshxmlrpc header
-#
-
-for ac_hdr in ulxmlrpcpp/ulxr_config.h
-do
-ac_safe=`echo "$ac_hdr" | sed 'y%./+-%__p_%'`
-echo $ac_n "checking for $ac_hdr""... $ac_c" 1>&6
-echo "configure:2146: checking for $ac_hdr" >&5
-if eval "test \"`echo '$''{'ac_cv_header_$ac_safe'+set}'`\" = set"; then
-  echo $ac_n "(cached) $ac_c" 1>&6
-else
-  cat > conftest.$ac_ext <<EOF
-#line 2151 "configure"
-#include "confdefs.h"
-#include <$ac_hdr>
-EOF
-ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
-{ (eval echo configure:2156: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
-ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
-if test -z "$ac_err"; then
-  rm -rf conftest*
-  eval "ac_cv_header_$ac_safe=yes"
-else
-  echo "$ac_err" >&5
-  echo "configure: failed program was:" >&5
-  cat conftest.$ac_ext >&5
-  rm -rf conftest*
-  eval "ac_cv_header_$ac_safe=no"
-fi
-rm -f conftest*
-fi
-if eval "test \"`echo '$ac_cv_header_'$ac_safe`\" = yes"; then
-  echo "$ac_t""yes" 1>&6
-    ac_tr_hdr=HAVE_`echo $ac_hdr | sed 'y%abcdefghijklmnopqrstuvwxyz./-%ABCDEFGHIJKLMNOPQRSTUVWXYZ___%'`
-  cat >> confdefs.h <<EOF
-#define $ac_tr_hdr 1
-EOF
- cat >> confdefs.h <<\EOF
-#define HAVE_ULXMLRPCPP 1
-EOF
-
-		  HAVE_ULXMLRPCPP="yes"
-else
-  echo "$ac_t""no" 1>&6
-fi
-done
-
-
-
-#
-# Check for the robot vision system dependencies.
-#
-for ac_hdr in linux/videodev.h
-do
-ac_safe=`echo "$ac_hdr" | sed 'y%./+-%__p_%'`
-echo $ac_n "checking for $ac_hdr""... $ac_c" 1>&6
-echo "configure:2195: checking for $ac_hdr" >&5
-if eval "test \"`echo '$''{'ac_cv_header_$ac_safe'+set}'`\" = set"; then
-  echo $ac_n "(cached) $ac_c" 1>&6
-else
-  cat > conftest.$ac_ext <<EOF
-#line 2200 "configure"
-#include "confdefs.h"
-#include <$ac_hdr>
-EOF
-ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
-{ (eval echo configure:2205: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
-ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
-if test -z "$ac_err"; then
-  rm -rf conftest*
-  eval "ac_cv_header_$ac_safe=yes"
-else
-  echo "$ac_err" >&5
-  echo "configure: failed program was:" >&5
-  cat conftest.$ac_ext >&5
-  rm -rf conftest*
-  eval "ac_cv_header_$ac_safe=no"
-fi
-rm -f conftest*
-fi
-if eval "test \"`echo '$ac_cv_header_'$ac_safe`\" = yes"; then
-  echo "$ac_t""yes" 1>&6
-    ac_tr_hdr=HAVE_`echo $ac_hdr | sed 'y%abcdefghijklmnopqrstuvwxyz./-%ABCDEFGHIJKLMNOPQRSTUVWXYZ___%'`
-  cat >> confdefs.h <<EOF
-#define $ac_tr_hdr 1
-EOF
- cat >> confdefs.h <<\EOF
-#define HAVE_LINUX_VIDEODEV_H 1
-EOF
-
-		  HAVE_LINUX_VIDEODEV_H="yes"
-else
-  echo "$ac_t""no" 1>&6
-fi
-done
-
-# Extract the first word of "gtk-config", so it can be a program name with args.
-set dummy gtk-config; ac_word=$2
-echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:2238: checking for $ac_word" >&5
-if eval "test \"`echo '$''{'ac_cv_prog_GTK_CONFIG'+set}'`\" = set"; then
-  echo $ac_n "(cached) $ac_c" 1>&6
-else
-  if test -n "$GTK_CONFIG"; then
-  ac_cv_prog_GTK_CONFIG="$GTK_CONFIG" # Let the user override the test.
-else
-  IFS="${IFS= 	}"; ac_save_ifs="$IFS"; IFS=":"
-  ac_dummy="$PATH"
-  for ac_dir in $ac_dummy; do
-    test -z "$ac_dir" && ac_dir=.
-    if test -f $ac_dir/$ac_word; then
-      ac_cv_prog_GTK_CONFIG="gtk-config"
-      break
-    fi
-  done
-  IFS="$ac_save_ifs"
-fi
-fi
-GTK_CONFIG="$ac_cv_prog_GTK_CONFIG"
-if test -n "$GTK_CONFIG"; then
-  echo "$ac_t""$GTK_CONFIG" 1>&6
-else
-  echo "$ac_t""no" 1>&6
-fi
-
-
-# Check whether --enable-mezzanine or --disable-mezzanine was given.
-if test "${enable_mezzanine+set}" = set; then
-  enableval="$enable_mezzanine"
-  :
-fi
-
-
-if test x"$HAVE_LINUX_VIDEODEV_H" != x"" && test x"$GTK_CONFIG" != x""; then
-    HAVE_MEZZANINE="$enable_mezzanine"
-    cat >> confdefs.h <<\EOF
-#define HAVE_MEZZANINE 1
-EOF
-
-else
-    HAVE_MEZZANINE="no"
-fi
-
-
-#
-# Testing mode.  In testing mode scripts should not effect hardware state.
-# This is designed to be used with the testsuite software which operates
-# on a test copy of the DB.
-#
-# Check whether --enable-testmode or --disable-testmode was given.
-if test "${enable_testmode+set}" = set; then
-  enableval="$enable_testmode"
-  :
-fi
-
-
-if test "$enable_testmode" = "yes"; then
-	TESTMODE=1
-else
-	TESTMODE=0
-fi
+eventfiles="";
+EVENTSYS=0;
 
 
 # Make sure $INSTALL is valid at any depth in our tree, i.e. make it absoulte.
@@ -2313,7 +1984,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:2317: checking for a BSD compatible install" >&5
+echo "configure:1988: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -2374,7 +2045,7 @@ esac
 # Extract the first word of "rsync", so it can be a program name with args.
 set dummy rsync; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:2378: checking for $ac_word" >&5
+echo "configure:2049: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_path_RSYNC'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -2418,208 +2089,21 @@ if test "$TBMAINSITE" = 1; then
 fi
 
 outfiles="$outfiles Makeconf GNUmakefile \
-	assign/GNUmakefile \
-        named/GNUmakefile firewall/GNUmakefile \
-	ssl/GNUmakefile ssl/mksig ssl/usercert.cnf \
-	capture/GNUmakefile \
+	ssl/GNUmakefile \
 	db/GNUmakefile \
-	db/Experiment.pm db/Group.pm db/Interface.pm db/Node.pm \
-	db/NodeType.pm db/Project.pm db/User.pm db/Image.pm db/OSinfo.pm \
-	db/nalloc db/nfree db/if2port db/backup \
-	db/webcontrol db/node_status db/genelists db/genelists.proxy \
-	db/dumperrorlog.proxy \
-	db/setsitevar db/newwanode db/audit db/changeuid db/changepid \
-	db/libdb.pm db/libtbdb.pm db/inuse db/avail db/nodeip db/showgraph \
-	db/emdb.pm db/emdbi.pm \
-	db/dhcpd_makeconf db/nodelog db/unixgroups \
-	db/dbcheck db/interswitch db/dbboot db/schemacheck \
-	db/sitevarscheck db/dbfillcheck db/libadminctrl.pm \
-	db/update_permissions \
-	db/grabron db/stategraph db/readycount \
-	db/idletimes db/idlemail db/xmlconvert \
-	db/libdb.py db/elabinelab_bossinit \
-	ipod/GNUmakefile \
-	lib/GNUmakefile lib/libtb/GNUmakefile \
-	os/GNUmakefile os/split-image.sh os/imagezip/GNUmakefile \
-	os/imagezip/ffs/GNUmakefile os/imagezip/extfs/GNUmakefile \
-	os/imagezip/shd/GNUmakefile os/imagezip/hashmap/GNUmakefile \
-	os/frisbee.redux/GNUmakefile os/growdisk/GNUmakefile \
-        os/syncd/GNUmakefile os/dijkstra/GNUmakefile \
-	os/genhostsfile/GNUmakefile os/zapdisk/GNUmakefile \
-	pxe/GNUmakefile pxe/bootinfo.restart \
-	security/GNUmakefile security/lastlog_daemon \
-        sensors/GNUmakefile sensors/slothd/GNUmakefile \
-	sensors/slothd/sdisrunning sensors/slothd/sddeploy \
-        sensors/canaryd/GNUmakefile sensors/canaryd/feedbacklogs \
-	sensors/and/GNUmakefile sensors/and/and-emulab.conf \
-	sensors/powermon/GNUmakefile sensors/powermon/powermon \
-	sensors/nfstrace/GNUmakefile sensors/nfstrace/nfstrace.init \
-	account/GNUmakefile account/tbacct \
-	account/addpubkey account/addsfskey account/genpubkeys \
-	account/quotamail account/mkusercert account/newproj account/newuser \
-	backend/GNUmakefile backend/moduserinfo backend/newgroup \
-	backend/newmmlist backend/editexp backend/editimageid \
-	backend/editnodetype backend/editsitevars backend/newimageid \
-	backend/editgroup backend/newimageid_ez \
-	tbsetup/GNUmakefile tbsetup/console_setup tbsetup/spewlogfile \
-	tbsetup/spewrpmtar tbsetup/gentopofile tbsetup/power_sgmote.pm \
-	tbsetup/console_reset tbsetup/bwconfig tbsetup/power_rpc27.pm \
-	tbsetup/power_mail.pm tbsetup/power_whol.pm \
-	tbsetup/os_load tbsetup/os_setup tbsetup/os_select tbsetup/power \
-	tbsetup/node_reboot tbsetup/nscheck \
-	tbsetup/resetvlans tbsetup/rmuser tbsetup/rmproj \
-	tbsetup/sched_reload tbsetup/sched_reserve tbsetup/reload_daemon \
-	tbsetup/batchexp tbsetup/batch_daemon tbsetup/repos_daemon \
-	tbsetup/wanlinkinfo tbsetup/wanassign \
-	tbsetup/swapexp	tbsetup/endexp tbsetup/elabinelab \
-	tbsetup/frisbeelauncher tbsetup/eventsys.proxy tbsetup/frisbeeimage \
-	tbsetup/snmpit.proxy tbsetup/snmpit_remote.pm \
-	tbsetup/snmpit tbsetup/ns2ir/GNUmakefile \
-	tbsetup/ns2ir/parse.tcl tbsetup/ns2ir/tb_compat.tcl \
-	tbsetup/ns2ir/parse-ns tbsetup/ns2ir/parse.proxy \
-	tbsetup/ns2ir/sim.tcl tbsetup/nseswap tbsetup/nseparse/GNUmakefile \
-	tbsetup/nseparse/nse.parse.proxy tbsetup/nseparse/parse-nse \
-	tbsetup/nseparse/nse.parse.tcl \
-	tbsetup/nsverify/GNUmakefile tbsetup/nsverify/nstbparse \
-	tbsetup/nsverify/verify-ns \
-	tbsetup/db2ns \
-	tbsetup/tbprerun tbsetup/tbswap tbsetup/tbend tbsetup/tbrestart \
-	tbsetup/tbreport tbsetup/named_setup tbsetup/exports_setup \
-	tbsetup/checkpass/GNUmakefile tbsetup/assign_wrapper tbsetup/ptopgen \
-	tbsetup/assign_wrapper2 \
-	tbsetup/frisbeelauncher tbsetup/node_update \
-	tbsetup/savelogs tbsetup/setgroups \
-	tbsetup/savelogs.proxy tbsetup/rmgroup tbsetup/mkexpdir \
-	tbsetup/node_control tbsetup/node_attributes \
-        tbsetup/mkgroup tbsetup/eventsys_start \
-	tbsetup/eventsys_control \
-	tbsetup/mkproj tbsetup/libtestbed.pm \
-	tbsetup/portstats tbsetup/vnode_setup tbsetup/staticroutes \
-	tbsetup/console_setup.proxy tbsetup/exports_setup.proxy \
-	tbsetup/smbpasswd_setup.proxy \
-	tbsetup/checkports tbsetup/libaudit.pm \
-	tbsetup/libreboot.pm tbsetup/libosload.pm tbsetup/libadminmfs.pm \
-	tbsetup/sfskey_update tbsetup/sfskey_update.proxy \
-	tbsetup/idleswap tbsetup/switchmac \
-	tbsetup/newnode_reboot \
-        tbsetup/libtestbed.py \
-	tbsetup/libArchive.pm tbsetup/archive_control \
-	tbsetup/tarfiles_setup \
-	tbsetup/fetchtar.proxy tbsetup/webfrisbeekiller \
-	tbsetup/plab/GNUmakefile tbsetup/plab/libplab.py \
-        tbsetup/plab/mod_dslice.py tbsetup/plab/mod_PLC.py \
-        tbsetup/plab/mod_PLCNM.py \
-	tbsetup/plab/plabslice tbsetup/plab/plabnode tbsetup/plab/plabrenewd \
-        tbsetup/plab/plabrenewonce \
-	tbsetup/plab/plabmetrics tbsetup/plab/plabstats \
-	tbsetup/plab/plabmonitord tbsetup/plab/libplabmon.pm \
-        tbsetup/plab/plabmon_badpool.pm tbsetup/plab/plabmon_goodpool.pm \
-        tbsetup/plab/plablinkdata \
-	tbsetup/plab/libdslice/GNUmakefile tbsetup/plab/etc/GNUmakefile \
-	tbsetup/plab/plabdist tbsetup/plab/plabhttpd \
-	tbsetup/plab/plabdiscover tbsetup/plab/etc/netbed_files/GNUmakefile \
-	tbsetup/ipassign/GNUmakefile tbsetup/ipassign/src/GNUmakefile \
-	tbsetup/ipassign/ipassign_wrapper tbsetup/assign_prepass \
-	tbsetup/panic tbsetup/tbrsync tbsetup/nfstrace \
-	tbsetup/checkup/GNUmakefile tbsetup/checkup/checkup_daemon \
-	tbsetup/libtblog.pm tbsetup/template_cvsroot/GNUmakefile \
-	tip/GNUmakefile tip/console \
-	tmcd/GNUmakefile tmcd/tmcd.restart \
-	tmcd/common/GNUmakefile tmcd/common/config/GNUmakefile \
-	tmcd/freebsd/GNUmakefile tmcd/freebsd/init/GNUmakefile \
-	tmcd/freebsd/init/4/GNUmakefile tmcd/freebsd/init/5/GNUmakefile \
-	tmcd/freebsd/init/6/GNUmakefile tmcd/freebsd/init/7/GNUmakefile \
-	tmcd/freebsd/init/8/GNUmakefile \
-	tmcd/freebsd/supfile tmcd/freebsd/sethostname \
-	tmcd/linux/GNUmakefile tmcd/linux/supfile \
-	tmcd/linux/sethostname.dhclient \
-	tmcd/linux9/GNUmakefile tmcd/linux9/supfile \
-	tmcd/fedora/GNUmakefile tmcd/fedora/supfile \
-        tmcd/linux-sg/GNUmakefile tmcd/ubuntu7/GNUmakefile \
-	tmcd/freebsd5/GNUmakefile tmcd/freebsd5/supfile \
-	tmcd/freebsd6/GNUmakefile tmcd/freebsd6/supfile tmcd/freebsd6/netif-emulab \
-	tmcd/freebsd7/GNUmakefile tmcd/freebsd7/supfile tmcd/freebsd7/netif-emulab \
-	tmcd/cygwinxp/GNUmakefile tmcd/dp/GNUmakefile \
-	tmcd/openbsd/GNUmakefile tmcd/ron/GNUmakefile tmcd/plab/GNUmakefile \
-	utils/GNUmakefile utils/vlandiff utils/vlansync utils/delay_config \
-	utils/sshtb utils/create_image utils/node_admin \
-	utils/firstuser utils/export_tables utils/eventping \
-	utils/cvsupd.pl utils/newnode utils/grantnodetype \
-	utils/nsgen/GNUmakefile utils/nsgen/webnsgen \
-	utils/link_config utils/import_commitlog \
-	utils/opsreboot utils/deletenode utils/spewleds \
-	utils/grabwebcams utils/loghole utils/webcopy \
-	utils/setdest utils/grabswitchconfig \
-        utils/backupswitches utils/setbuildinfo utils/checkquota \
-	utils/spewconlog utils/xlogin \
-	utils/opsdb_control utils/opsdb_control.proxy \
-	utils/remove_old_www utils/epmodeset \
-	www/GNUmakefile www/defs.php3 www/dbdefs.php3 www/xmlrpc.php3 \
-	www/xmlrpcpipe.php3 \
-	www/swish.conf www/websearch \
-	www/garcia-telemetry/GNUmakefile www/tutorial/GNUmakefile \
-	www/sec-check/GNUmakefile www/emusearch.xml \
-	vis/GNUmakefile vis/webvistopology vis/dbvistopology \
-	vis/prerender vis/prerender_all vis/render \
-	vis/floormap vis/webfloormap \
-	rc.d/GNUmakefile rc.d/2.mysql-server.sh rc.d/3.testbed.sh \
-	rc.d/2.elvind.sh rc.d/3.plab.sh rc.d/2.dhcpd.sh rc.d/3.and.sh \
-	rc.d/3.elvin_gateway.sh rc.d/pelab.sh \
-	tools/GNUmakefile rc.d/1.mysql-server.sh tools/svn/GNUmakefile \
-	tools/pcapper/GNUmakefile tools/teachswitch/GNUmakefile \
-        tools/webcamapplet/GNUmakefile tools/whol/GNUmakefile \
-        tools/selectapplet/GNUmakefile tools/rmanage/GNUmakefile \
-	$eventfiles \
-	$winfiles \
-	$pelabfiles \
+	db/libdb.pm db/emdbi.pm db/emutil.pm \
+	account/GNUmakefile \
+	account/mkusercert \
+	tbsetup/GNUmakefile tbsetup/libaudit.pm \
+	rc.d/GNUmakefile rc.d/2.mysql-server.sh  \
+	rc.d/1.mysql-server.sh \
 	apache/GNUmakefile apache/httpd.conf \
-        xmlrpc/GNUmakefile xmlrpc/emulabclient.py xmlrpc/emulabserver.py \
-	xmlrpc/sshxmlrpc_client.py xmlrpc/sshxmlrpc_server.py \
-	xmlrpc/webxmlrpc xmlrpc/script_wrapper.py xmlrpc/libxmlrpc.pm \
-	xmlrpc/emulab xmlrpc/node xmlrpc/experiment xmlrpc/fs xmlrpc/user \
-	xmlrpc/imageid xmlrpc/osid xmlrpc/server xmlrpc/xmlrpcbag \
-	cdrom/GNUmakefile cdrom/tbbootconfig/GNUmakefile \
-	cdrom/groklilo/GNUmakefile \
-	flash/GNUmakefile \
-	dhcpd/dhcpd.conf.template dhcpd/GNUmakefile \
 	install/GNUmakefile \
-	install/ops-install install/boss-install install/fs-install \
-	install/load-descriptors install/dump-descriptors \
-	install/newnode_sshkeys/GNUmakefile install/smb.conf.head \
-	mote/GNUmakefile mote/tbuisp mote/tbsgmotepower mote/newmote \
-	mote/sgtools/GNUmakefile \
-	robots/GNUmakefile robots/tbsetdest/GNUmakefile \
-	robots/mtp/GNUmakefile robots/emc/GNUmakefile \
-	robots/emc/test_emcd.sh robots/emc/loclistener \
-	robots/vmcd/GNUmakefile robots/vmcd/test_vmc-client.sh \
-	robots/rmcd/GNUmakefile robots/primotion/GNUmakefile \
-	robots/primotion/test_gorobot.sh robots/primotion/dgrobot/GNUmakefile \
-	robots/mezzanine/GNUmakefile robots/mezzanine/rtk2/GNUmakefile \
-	robots/mezzanine/libfg/GNUmakefile \
-	robots/mezzanine/libmezz/GNUmakefile \
-	robots/mezzanine/mezzanine/GNUmakefile \
-	robots/tracker/GNUmakefile \
-	robots/mezzanine/mezzcal/GNUmakefile robots/robomonitord \
-        wiki/GNUmakefile wiki/addwikiuser wiki/wikiproxy \
-	wiki/usertemplate wiki/webhometemplate wiki/LocalSite.cfg \
-        wiki/delwikiuser wiki/setwikigroups wiki/addwikiproj \
-        bugdb/GNUmakefile bugdb/bugdbproxy \
+	install/clrhouse-install \
         protogeni/GNUmakefile protogeni/security/GNUmakefile \
         protogeni/xmlrpc/GNUmakefile protogeni/lib/GNUmakefile \
         protogeni/scripts/GNUmakefile protogeni/etc/GNUmakefile \
-        protogeni/test/GNUmakefile \
-        collab/GNUmakefile \
-        collab/trac/GNUmakefile \
-        collab/jabber/GNUmakefile \
-        collab/mailman/GNUmakefile collab/cvstools/GNUmakefile \
-	collab/mailman/mmlistmembership \
-	collab/mailman/addmmlist collab/mailman/mmsetup \
-	collab/mailman/delmmlist collab/mailman/mmxlogin \
-	collab/mailman/genaliases collab/mailman/setmmlistmembers \
-	collab/mailman/mailmanproxy collab/mailman/setmmpasswd \
-	collab/cvstools/cvs.proxy collab/cvstools/cvs_ctrl \
-	collab/cvstools/cvsrepo_ctrl.proxy collab/cvstools/cvsrepo_ctrl \
-	collab/cvstools/webcvsrepo_ctrl "
+        protogeni/test/GNUmakefile"
 
 #
 # Do this for easy distclean.
@@ -2920,19 +2404,16 @@ s%@TBUSERSARCHIVE@%$TBUSERSARCHIVE%g
 s%@TBUSERSARCHIVE_NOSLASH@%$TBUSERSARCHIVE_NOSLASH%g
 s%@TBERRORSEMAIL@%$TBERRORSEMAIL%g
 s%@TBERRORSEMAIL_NOSLASH@%$TBERRORSEMAIL_NOSLASH%g
+s%@HAVE_MEZZANINE@%$HAVE_MEZZANINE%g
+s%@GTK_CONFIG@%$GTK_CONFIG%g
+s%@BRAINSTEM_DIR@%$BRAINSTEM_DIR%g
+s%@HAVE_ULXMLRPCPP@%$HAVE_ULXMLRPCPP%g
 s%@LOG_TESTBED@%$LOG_TESTBED%g
-s%@LEDA@%$LEDA%g
-s%@ASSIGN@%$ASSIGN%g
 s%@SSH_ARGS@%$SSH_ARGS%g
 s%@INSTALL_RCDIR@%$INSTALL_RCDIR%g
 s%@INSTALL_APACHE_CONFIG@%$INSTALL_APACHE_CONFIG%g
-s%@BRAINSTEM_DIR@%$BRAINSTEM_DIR%g
 s%@OPT_CFLAGS@%$OPT_CFLAGS%g
 s%@EVENTSYS@%$EVENTSYS%g
-s%@HAVE_ULXMLRPCPP@%$HAVE_ULXMLRPCPP%g
-s%@GTK_CONFIG@%$GTK_CONFIG%g
-s%@HAVE_MEZZANINE@%$HAVE_MEZZANINE%g
-s%@TESTMODE@%$TESTMODE%g
 s%@INSTALL_PROGRAM@%$INSTALL_PROGRAM%g
 s%@INSTALL_SCRIPT@%$INSTALL_SCRIPT%g
 s%@INSTALL_DATA@%$INSTALL_DATA%g

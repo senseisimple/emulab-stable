@@ -16,14 +16,11 @@ use vars qw(@ISA @EXPORT);
 @ISA    = "Exporter";
 @EXPORT = qw (TICKET_PURGED TICKET_EXPIRED TICKET_REDEEMED TICKET_RELEASED);
 
-# Must come after package declaration!
-use lib '@prefix@/lib';
 use GeniDB;
 use GeniCredential;
 use GeniCertificate;
-use Experiment;
-use libdb qw(TBGetUniqueIndex);
-use libtestbed qw(NewUUID);
+use emutil qw(TBGetUniqueIndex);
+use GeniUtil;
 use English;
 use XML::Simple;
 use XML::LibXML;
@@ -54,6 +51,14 @@ sub TICKET_RELEASED()	{ return 4; }
 
 # Cache of tickets.
 my %tickets = ();
+BEGIN { use GeniUtil; GeniUtil::AddCache(\%tickets); }
+
+# Do not load this for the Clearinghouse XML server.
+BEGIN { 
+    if (! defined($main::GENI_ISCLRHOUSE)) {
+	require Experiment;
+    }
+}
 
 #
 # Lookup by local idx.

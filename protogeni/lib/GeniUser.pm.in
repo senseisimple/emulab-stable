@@ -13,19 +13,21 @@ use vars qw(@ISA @EXPORT);
 @ISA    = "Exporter";
 @EXPORT = qw ( );
 
-# Must come after package declaration!
-use lib '@prefix@/lib';
 use GeniDB;
 use GeniRegistry;
 use GeniAuthority;
 use GeniCertificate;
-use libtestbed;
-# Hate to import all this crap; need a utility library.
-use libdb qw(TBGetUniqueIndex);
-use User;
+use emutil qw(TBGetUniqueIndex);
 use English;
 use overload ('""' => 'Stringify');
 use vars qw();
+
+# Do not load this for the Clearinghouse XML server.
+BEGIN { 
+    if (! defined($main::GENI_ISCLRHOUSE)) {
+	require User;
+    }
+}
 
 # Configure variables
 my $TB		   = "@prefix@";
@@ -38,6 +40,7 @@ my $OURDOMAIN      = "@OURDOMAIN@";
 
 # Cache of instances to avoid regenerating them.
 my %users      = ();
+BEGIN { use GeniUtil; GeniUtil::AddCache(\%users); }
 my $debug      = 0;
 
 # Little helper and debug function.
@@ -200,10 +203,16 @@ sub CheckExisting($$$)
 sub Create($$$$;$)
 {
     my ($class, $certificate, $authority, $info, $keys) = @_;
+    my $idx;
     my @insert_data = ();
 
     # Every user gets a new unique index.
-    my $idx = User->NextIDX();
+    if (defined($main::GENI_ISCLRHOUSE) && $main::GENI_ISCLRHOUSE) {
+	$idx = TBGetUniqueIndex('next_geniuser', 1);
+    }
+    else {
+	my $idx = User->NextIDX();
+    }	
 
     if (!defined($authority)) {
 	print STDERR "Need to specify an authority!\n";

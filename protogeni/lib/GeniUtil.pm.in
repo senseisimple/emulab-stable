@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2008 University of Utah and the Flux Group.
+# Copyright (c) 2008-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniUtil;
@@ -11,11 +11,8 @@ use Exporter;
 use vars qw(@ISA @EXPORT);
 
 @ISA    = "Exporter";
-@EXPORT = qw ( );
+@EXPORT = qw(NewUUID);
 
-# Must come after package declaration!
-use lib '@prefix@/lib';
-use User;
 use English;
 use Data::Dumper;
 use XML::Simple;
@@ -49,4 +46,39 @@ sub FlipToGeniUser()
     return 0;
 }
 
+#
+# Store up the list of caches to flush
+#
+my @ourcaches = ();
 
+sub AddCache($)
+{
+    my ($ref) = @_;
+
+    push(@ourcaches, $ref);
+}
+sub FlushCaches()
+{
+    foreach my $ref (@ourcaches) {
+	%$ref = ();
+    }
+}
+
+#
+# Get me a UUID (universally unique identifier). Its really nice that there
+# is a program that does this! They look like this:
+#
+#	047edb7b-d346-11db-96cb-001143e453fe
+#
+sub NewUUID()
+{
+    my $uuid = `/usr/bin/uuidgen`;
+
+    if ($uuid =~ /^(\w{8}\-\w{4}\-\w{4}\-\w{4}\-\w{12})$/) {
+	return $1;
+    }
+    return undef;
+}
+
+# _Always_ make sure that this 1 is at the end of the file...
+1;

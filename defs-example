@@ -127,8 +127,8 @@ SSLCERT_ORGNAME="Utah Network Testbed"
 # For boss this is an address on the private segment of the control net.
 # For users this is an address on the public segment of the control net.
 #
-BOSSNODE_IP=155.98.32.70
-USERNODE_IP=155.98.33.74
+BOSSNODE_IP=10.1.32.70
+USERNODE_IP=10.1.33.74
 FSNODE_IP=$USERNODE_IP
 
 #
@@ -150,8 +150,8 @@ EXTERNAL_FSNODE_IP=$EXTERNAL_USERNODE_IP
 # The overall control network range - this subnet should cover the
 # CONTROL, PRIVATE, and PUBLIC networks below.
 #
-TESTBED_NETWORK=155.98.32.0
-TESTBED_NETMASK=255.255.240.0
+TESTBED_NETWORK=10.1.32.0
+TESTBED_NETMASK=255.255.255.0
 
 #
 # As above, if you have internal and external networks, define the
@@ -163,22 +163,22 @@ EXTERNAL_TESTBED_NETMASK=$TESTBED_NETMASK
 #
 # The node control network segment.
 #
-CONTROL_ROUTER_IP=155.98.36.1
-CONTROL_NETWORK=155.98.36.0
-CONTROL_NETMASK=255.255.252.0
+CONTROL_ROUTER_IP=10.1.36.1
+CONTROL_NETWORK=10.1.36.0
+CONTROL_NETMASK=255.255.255.0
 
 #
 # The private network segment.
 #
-PRIVATE_NETWORK=155.98.32.0
-PRIVATE_ROUTER=155.98.32.1
+PRIVATE_NETWORK=10.1.32.0
+PRIVATE_ROUTER=10.1.32.1
 PRIVATE_NETMASK=255.255.255.0
 
 #
 # The public network segment.
 #
-PUBLIC_NETWORK=155.98.33.0
-PUBLIC_ROUTER=155.98.33.1
+PUBLIC_NETWORK=10.1.33.0
+PUBLIC_ROUTER=10.1.33.1
 PUBLIC_NETMASK=255.255.255.0
 
 #
@@ -186,7 +186,7 @@ PUBLIC_NETMASK=255.255.255.0
 # to use for new nodes being added to the testbed.
 # You need at least one.
 #
-DHCPD_DYNRANGE="155.98.36.200 155.98.36.249"
+DHCPD_DYNRANGE="10.1.36.200 10.1.36.249"
 
 #
 # Fill in the nameservers for your campus network here - the nameserver on boss

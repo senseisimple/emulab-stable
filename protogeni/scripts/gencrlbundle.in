@@ -56,9 +56,6 @@ use lib '@prefix@/lib';
 use libaudit;
 require GeniDB;
 import GeniDB;
-require GeniCertificate;
-require GeniComponent;
-require GeniRegistry;
 
 # For error log.
 my $errors = 0;
@@ -77,8 +74,12 @@ LogStart(0);
 #
 # Post our own CRL.
 #
-system("$POSTCRL") >= 0
-    or fatal("Could not post our own CRL");
+# XXX Hack check to make sure this is a real emulab.
+#
+if (-d "$TB/expwork/emulab-ops") {
+    system("$POSTCRL") >= 0
+	or fatal("Could not post our own CRL");
+}
 
 my $query_result =
     DBQueryWarn("select cert,uuid, ".

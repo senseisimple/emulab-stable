@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # For installation.
@@ -57,3 +57,7 @@ $(INSTALL_RCDIR)/%: %
 install: $(addprefix $(INSTALL_RCDIR)/, $(RC_SCRIPTS))
 
 control-install:	$(addprefix $(INSTALL_RCDIR)/, $(OPS_SCRIPTS))
+
+clrhouse-install:	$(INSTALL_RCDIR)/2.mysql-server.sh \
+			$(INSTALL_RCDIR)/1.mysql-client.sh
+

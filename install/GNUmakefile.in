@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -11,15 +11,21 @@ SUBDIR		= install
 
 include $(OBJDIR)/Makeconf
 
+ifeq ($(STANDALONE_CLEARINGHOUSE),0)
+TARGETS	= boss-install ops-install fs-install dump-descriptors load-descriptors
+else
+TARGETS = clrhouse-install
+endif
+
 #
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
-all: boss-install ops-install fs-install dump-descriptors load-descriptors
+all: $(TARGETS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-install:
+install: $(INSTALL_LIBDIR)/libinstall.pm
 
 clean: 
 	rm -f boss-install ops-install fs-install

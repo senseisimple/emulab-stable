@@ -17,10 +17,8 @@ use vars qw(@ISA @EXPORT);
 @EXPORT = qw ( );
 
 # Must come after package declaration!
-use lib '@prefix@/lib';
 use GeniDB;
-use libtestbed;
-use libdb qw(TBGetUniqueIndex);
+use emutil qw(TBGetUniqueIndex);
 use English;
 use XML::Simple;
 use XML::LibXML;
@@ -43,6 +41,7 @@ my $MKCERT         = "$TB/sbin/mksyscert";
 
 # Cache of instances to avoid regenerating them.
 my %certificates  = ();
+BEGIN { use GeniUtil; GeniUtil::AddCache(\%certificates); }
 
 #
 # Lookup by uuid only.
@@ -458,7 +457,7 @@ sub StoreCRL($$$)
 #
 package GeniCertificate::LocalUser;
 use English;
-use libdb;
+use emdb;
 
 #
 # Create a wrapper, with the same access names.

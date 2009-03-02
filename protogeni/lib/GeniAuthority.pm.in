@@ -17,11 +17,9 @@ use vars qw(@ISA @EXPORT);
 @EXPORT = qw ( );
 
 # Must come after package declaration!
-use lib '@prefix@/lib';
 use GeniDB;
 use GeniRegistry;
-use libtestbed;
-use libdb qw(TBGetUniqueIndex);
+use emutil qw(TBGetUniqueIndex);
 use English;
 use overload ('""' => 'Stringify');
 use XML::Simple;
@@ -38,6 +36,7 @@ my $VERIFYCRED	   = "$TB/sbin/verifygenicred";
 
 # Cache of instances to avoid regenerating them.
 my %authorities    = ();
+BEGIN { use GeniUtil; GeniUtil::AddCache(\%authorities); }
 
 #
 # Lookup by uuid.

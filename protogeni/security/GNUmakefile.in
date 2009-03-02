@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -52,7 +52,7 @@ $(LIBEXEC_STUFF): $(INSTALL_SBINDIR)
 $(INSTALL_SBINDIR):
 
 clean:
-	rm -f *.o core
+	rm -f *.o core $(SBIN_STUFF)
 
 $(INSTALL_DIR)/opsdir/sbin/%: %
 	@echo "Installing $<"

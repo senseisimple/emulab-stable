@@ -32,9 +32,9 @@ use GeniSliver;
 use GeniUser;
 use GeniRegistry;
 use libtestbed;
+use emutil;
 # Hate to import all this crap; need a utility library.
-use libdb qw(TBGetUniqueIndex TBcheck_dbslot TBGetSiteVar
-	     TBDB_CHECKDBSLOT_ERROR);
+use libdb qw(TBGetSiteVar);
 use User;
 use Node;
 use libadminctrl;

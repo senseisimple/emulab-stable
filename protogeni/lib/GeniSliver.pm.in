@@ -14,8 +14,6 @@ use vars qw(@ISA @EXPORT);
 @ISA    = "Exporter";
 @EXPORT = qw ( );
 
-# Must come after package declaration
-use lib '@prefix@/lib';
 use GeniDB;
 use GeniComponent;
 use GeniSlice;
@@ -24,10 +22,8 @@ use GeniCertificate;
 use GeniAggregate;
 use GeniUsage;
 # Hate to import all this crap; need a utility library.
-use libdb qw(TBGetUniqueIndex);
-use libtestbed;
+use emutil qw(TBGetUniqueIndex);
 use Experiment;
-use Node;
 use English;
 use XML::Simple;
 use Data::Dumper;
@@ -54,6 +50,7 @@ my $GENTOPOFILE    = "$TB/libexec/gentopofile";
 
 # Cache of instances to avoid regenerating them.
 my %slivers      = ();
+BEGIN { use GeniUtil; GeniUtil::AddCache(\%slivers); }
 
 #
 # Lookup by idx, or uuid.
@@ -567,7 +564,6 @@ use GeniComponent;
 use GeniSlice;
 use GeniCredential;
 use GeniCertificate;
-use GeniAggregate;
 use libdb qw(TBDB_ALLOCSTATE_RES_INIT_DIRTY);
 
 sub Create()
@@ -691,7 +687,6 @@ use GeniSlice;
 use GeniCredential;
 use GeniCertificate;
 use Experiment;
-use GeniAggregate;
 use XML::Simple;
 use libdb qw(TBDB_ALLOCSTATE_RES_INIT_DIRTY);
 
@@ -1028,10 +1023,6 @@ use GeniComponent;
 use GeniSlice;
 use GeniCredential;
 use GeniCertificate;
-use GeniAggregate;
-use Interface;
-use Experiment;
-use Node;
 
 sub Create()
 {

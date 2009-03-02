@@ -8,27 +8,25 @@ package GeniSlice;
 
 use strict;
 use Exporter;
-use vars qw(@ISA @EXPORT);
-
-@ISA    = "Exporter";
-@EXPORT = qw ( );
+use vars qw(@ISA);
+@ISA = qw(GeniRegistry::GeniSlice);
 
 # Must come after package declaration!
-use lib '@prefix@/lib';
 use GeniDB;
 use GeniRegistry;
 use GeniAuthority;
 use GeniCredential;
-use GeniComponent;
 use GeniCertificate;
-use libtestbed;
-# Hate to import all this crap; need a utility library.
-use libdb qw(TBGetUniqueIndex);
-use Experiment;
 use English;
-use overload ('""' => 'Stringify');
 use Data::Dumper;
 use vars qw();
+
+# Do not load this for the Clearinghouse XML server.
+BEGIN { 
+    if (! defined($main::GENI_ISCLRHOUSE)) {
+	require Experiment;
+    }
+}
 
 # Configure variables
 my $TB		   = "@prefix@";
@@ -41,6 +39,7 @@ my $OURDOMAIN      = "@OURDOMAIN@";
 
 # Cache of instances to avoid regenerating them.
 my %slices     = ();
+BEGIN { use GeniUtil; GeniUtil::AddCache(\%slices); }
 my $debug      = 0;
 
 # Little helper and debug function.
@@ -59,92 +58,65 @@ sub mysystem($)
 sub Lookup($$)
 {
     my ($class, $token) = @_;
-    my $query_result;
-    my $idx;
 
-    if ($token =~ /^\d+$/) {
-	$idx = $token;
-    }
-    elsif ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
-	$query_result =
-	    DBQueryWarn("select idx from geni_slices ".
-			"where uuid='$token'");
-	    return undef
-		if (! $query_result || !$query_result->numrows);
-
-	    ($idx) = $query_result->fetchrow_array();
-    }
-    elsif ($token =~ /^[-\w\.]*$/) {
-	$query_result =
-	    DBQueryWarn("select idx from geni_slices ".
-			"where hrn='$token'");
-	    return undef
-		if (! $query_result || !$query_result->numrows);
-
-	    ($idx) = $query_result->fetchrow_array();
-    }
-    else {
-	return undef;
-    }
-    
     # Look in cache first
-    return $slices{"$idx"}
-        if (exists($slices{"$idx"}));
+    return $slices{"$token"}
+        if (exists($slices{"$token"}));
 
-    $query_result =
-	DBQueryWarn("select * from geni_slices where idx='$idx'");
+    my $slice = GeniRegistry::GeniSlice->Lookup($token);
     return undef
-	if (!$query_result || !$query_result->numrows);
-
-    my $self         = {};
-    $self->{'SLICE'} = $query_result->fetchrow_hashref();
-    bless($self, $class);
-
-    #
-    # Grab the certificate, since we will probably want it.
-    #
-    my $uuid = $self->{'SLICE'}->{'uuid'};
-    my $certificate = GeniCertificate->Lookup($uuid);
-    if (!defined($certificate)) {
-	print STDERR "Could not find certificate for slice $idx ($uuid)\n";
-	return undef;
-    }
-    $self->{'CERT'}     = $certificate;
-    $self->{'BINDINGS'} = undef;
-    $self->{'LOCKED'}   = 0;
+	if (!defined($slice));
     
+    $slice->{'BINDINGS'} = undef;
+    $slice->{'LOCKED'}   = 0;
+    bless($slice, $class);
+
     # Add to cache. 
-    $slices{$self->{'SLICE'}->{'idx'}}    = $self;
+    $slices{$slice->idx()} = $slice;
     
-    return $self;
+    return $slice;
 }
-# accessors
-sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'SLICE'}->{$_[1]}); }
-sub idx($)		{ return field($_[0], "idx"); }
-sub hrn($)		{ return field($_[0], "hrn"); }
-sub uuid($)		{ return field($_[0], "uuid"); }
-sub creator_uuid($)	{ return field($_[0], "creator_uuid"); }
-sub created($)		{ return field($_[0], "created"); }
-sub shutdown($)		{ return field($_[0], "shutdown"); }
-sub expires($)		{ return field($_[0], "expires"); }
-sub sa_uuid($)		{ return field($_[0], "sa_uuid"); }
-sub exptidx($)		{ return field($_[0], "exptidx"); }
-sub needsfirewall($)	{ return field($_[0], "needsfirewall"); }
-sub cert($)		{ return $_[0]->{'CERT'}->cert(); }
-sub GetCertificate($)   { return $_[0]->{'CERT'}; }
-sub LOCKED($)           { return $_[0]->{'LOCKED'}; }
 
 #
-# Stringify for output.
+# Class function to create new Geni slice and return the object.
 #
-sub Stringify($)
+sub Create($$$$;$)
+{
+    my ($class, $certificate, $creator_uuid, $authority, $exptidx) = @_;
+
+    my $slice = GeniRegistry::GeniSlice->Create($certificate, $creator_uuid,
+						$authority, $exptidx);
+
+    return undef
+	if (!defined($slice));
+    
+    return GeniSlice->Lookup($slice->idx());
+}
+
+#
+# Delete the slice, as for registration errors.
+#
+sub Delete($)
 {
     my ($self) = @_;
-    
-    my $hrn = $self->hrn();
-    my $idx = $self->idx();
 
-    return "[GeniSlice: $hrn, IDX: $idx]";
+    return -1
+	if (! ref($self));
+
+    my $uuid = $self->uuid();
+    
+    my $idx  = $self->idx();
+    my $experiment = $self->GetExperiment();
+    $experiment->UnBindNonLocalUsers()
+	if (defined($experiment));
+
+    DBQueryWarn("delete from geni_bindings where slice_uuid='$uuid'")
+	or return -1;
+
+    # Delete from cache. 
+    delete($slices{$idx});
+
+    return $self->SUPER::Delete();
 }
 
 # The slicename is the last token in the hrn.
@@ -174,72 +146,6 @@ sub LookupByExperiment($$)
 	if (!defined($query_result) || !$query_result->numrows);
 
     my ($idx) = $query_result->fetchrow_array();
-    return GeniSlice->Lookup($idx);
-}
-
-#
-# Class method to check for an existing user that has the same
-# uid/email. Lets not allow this for now. Return the number of
-# users that match or -1 if an error. 
-#
-sub CheckExisting($$$)
-{
-    my ($class, $hrn, $uuid) = @_;
-
-    my $safe_hrn  = DBQuoteSpecial($hrn);
-    my $safe_uuid = DBQuoteSpecial($uuid);
-
-    my $query_result =
-	DBQueryFatal("select idx from geni_slices ".
-		     "where hrn=$safe_hrn or uuid=$safe_uuid");
-    return -1
-	if (!defined($query_result));
-
-    return $query_result->numrows;
-}
-
-#
-# Class function to create new Geni slice and return the object.
-#
-sub Create($$$$;$)
-{
-    my ($class, $certificate, $creator_uuid, $authority, $exptidx) = @_;
-    my @insert_data = ();
-
-    # Every slice gets a new unique index.
-    my $idx = TBGetUniqueIndex('next_exptidx', 1);
-
-    if (!defined($authority)) {
-	print STDERR "Need to specify an authority!\n";
-	return undef;
-    }
-    my $sa_uuid = $authority->uuid();
-
-    # Now tack on other stuff we need.
-    push(@insert_data, "created=now()");
-    push(@insert_data, "expires=DATE_ADD(now(), INTERVAL 1 HOUR)");
-    push(@insert_data, "idx='$idx'");
-    push(@insert_data, "sa_uuid='$sa_uuid'");
-    push(@insert_data, "exptidx=$exptidx")
-	if (defined($exptidx));
-    
-    my $safe_hrn   = DBQuoteSpecial($certificate->hrn());
-    my $safe_uuid  = DBQuoteSpecial($certificate->uuid());
-    my $safe_cuuid = DBQuoteSpecial($creator_uuid);
-    push(@insert_data, "hrn=$safe_hrn");
-    push(@insert_data, "uuid=$safe_uuid");
-    push(@insert_data, "creator_uuid=$safe_cuuid");
-
-    if ($certificate->Store() != 0) {
-	print STDERR "Could not store certificate for new slice.\n";
-	return undef;
-    }
-
-    # Insert into DB.
-    return undef
-	if (! DBQueryWarn("insert into geni_slices set " .
-			  join(",", @insert_data)));
-
     return GeniSlice->Lookup($idx);
 }
 
@@ -369,35 +275,6 @@ sub UnRegister($)
 	if (!defined($clearinghouse));
 
     return $clearinghouse->RemoveSlice($self->uuid());
-}
-
-#
-# Delete the slice, as for registration errors.
-#
-sub Delete($)
-{
-    my ($self) = @_;
-
-    return -1
-	if (! ref($self));
-
-    my $idx  = $self->idx();
-    my $uuid = $self->uuid();
-    my $experiment = $self->GetExperiment();
-    $experiment->UnBindNonLocalUsers()
-	if (defined($experiment));
-
-    DBQueryWarn("delete from geni_bindings where slice_uuid='$uuid'")
-	or return -1;
-    DBQueryWarn("delete from geni_certificates where uuid='$uuid'")
-	or return -1;
-    DBQueryWarn("delete from geni_slices where idx='$idx'")
-	or return -1;
-    
-    # Delete from cache. 
-    delete($slices{$idx});
-
-    return 0;
 }
 
 #
