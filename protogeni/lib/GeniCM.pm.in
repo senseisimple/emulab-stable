@@ -268,6 +268,12 @@ sub GetTicket($)
 				    "This is not your credential!");
     }
 
+    $credential->HasPrivilege( "pi" ) or
+	$credential->HasPrivilege( "instantiate" ) or
+	$credential->HasPrivilege( "bind" ) or
+	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
+				     "Insufficient privilege" );
+
     #
     # Create slice form the certificate.
     #
@@ -743,6 +749,12 @@ sub UpdateSliver($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "This is not your credential!");
     }
+    $credential->HasPrivilege( "pi" ) or
+	$credential->HasPrivilege( "instantiate" ) or
+	$credential->HasPrivilege( "control" ) or
+	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
+				     "Insufficient privilege" );
+
     my $sliver = GeniSliver->Lookup($sliver_uuid);
     if (defined($sliver)) {
 	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
@@ -1376,6 +1388,11 @@ sub StartSliver($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "This is not your credential!");
     }
+    $credential->HasPrivilege( "pi" ) or
+	$credential->HasPrivilege( "control" ) or
+	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
+				     "Insufficient privilege" );
+
     my $sliver = GeniSliver->Lookup($sliver_uuid);
     if (!defined($sliver)) {
 	# Might be an aggregate instead.
@@ -1442,6 +1459,12 @@ sub DeleteSliver($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "This is not your credential!");
     }
+
+    $credential->HasPrivilege( "pi" ) or
+	$credential->HasPrivilege( "instantiate" ) or
+	$credential->HasPrivilege( "control" ) or
+	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
+				     "Insufficient privilege" );
 
     #
     # For now, only allow top level aggregate to be deleted.
@@ -1534,6 +1557,12 @@ sub DeleteSlice($)
 				    "This is not your credential!");
     }
 
+    $credential->HasPrivilege( "pi" ) or
+	$credential->HasPrivilege( "instantiate" ) or
+	$credential->HasPrivilege( "control" ) or
+	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
+				     "Insufficient privilege" );
+
     #
     # See if we have a record of this slice in the DB. If not, then we have
     # to go to the ClearingHouse to find its record, so that we can find out
@@ -1585,6 +1614,12 @@ sub SplitSliver($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "This is not your credential!");
     }
+    $credential->HasPrivilege( "pi" ) or
+	$credential->HasPrivilege( "instantiate" ) or
+	$credential->HasPrivilege( "control" ) or
+	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
+				     "Insufficient privilege" );
+
     my $user = GeniUser->Lookup($user_uuid);
     if (!defined($user)) {
 	$user = CreateUserFromCertificate($credential->owner_cert());
@@ -1657,6 +1692,11 @@ sub GetSliver($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "This is not your credential!");
     }
+    $credential->HasPrivilege( "pi" ) or
+	$credential->HasPrivilege( "info" ) or
+	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
+				     "Insufficient privilege" );
+
     my $user = GeniUser->Lookup($user_uuid);
     if (!defined($user)) {
 	$user = CreateUserFromCertificate($credential->owner_cert());
@@ -1722,6 +1762,11 @@ sub BindToSlice($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "This is not your credential!");
     }
+
+    $credential->HasPrivilege( "pi" ) or
+	$credential->HasPrivilege( "bind" ) or
+	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
+				     "Insufficient privilege" );
 
     my $slice = GeniSlice->Lookup($slice_uuid);
     if (!defined($slice)) {
@@ -1791,6 +1836,12 @@ sub Shutdown($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "This is not your credential!");
     }
+
+    $credential->HasPrivilege( "pi" ) or
+	$credential->HasPrivilege( "instantiate" ) or
+	$credential->HasPrivilege( "control" ) or
+	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
+				     "Insufficient privilege" );
 
     #
     # Create the slice record, since we do not want a request to come
@@ -1964,6 +2015,11 @@ sub SliceStatus($)
 				    "This is not your credential!");
     }
 
+    $credential->HasPrivilege( "pi" ) or
+	$credential->HasPrivilege( "info" ) or
+	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
+				     "Insufficient privilege" );
+
     my $slice = GeniSlice->Lookup($slice_uuid);
     if (!defined($slice)) {
 	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
@@ -2041,6 +2097,11 @@ sub SliverStatus($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "This is not your credential!");
     }
+
+    $credential->HasPrivilege( "pi" ) or
+	$credential->HasPrivilege( "info" ) or
+	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
+				     "Insufficient privilege" );
 
     #
     # For now, only allow top level aggregate to be deleted.

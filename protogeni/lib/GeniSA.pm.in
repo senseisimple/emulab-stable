@@ -117,6 +117,11 @@ sub GetCredential($)
 				    undef, "This is not your registry!");
     }
 
+    $credential->HasPrivilege( "authority" ) or
+	$credential->HasPrivilege( "resolve" ) or
+	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
+				     "Insufficient privilege" );
+
     my $this_user = GeniUser->Lookup($credential->owner_uuid(), 1);
     if (!defined($this_user)) {
 	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN,
@@ -211,6 +216,11 @@ sub Resolve($)
 	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN,
 				    undef, "This is not your registry!");
     }
+
+    $credential->HasPrivilege( "authority" ) or
+	$credential->HasPrivilege( "resolve" ) or
+	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
+				     "Insufficient privilege" );
 
     #
     # We need to enforce Emulab permissions here, since the credential
@@ -332,6 +342,11 @@ sub Register($)
 	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN,
 				    undef, "This is not your registry!");
     }
+
+    $credential->HasPrivilege( "authority" ) or
+	$credential->HasPrivilege( "refresh" ) or
+	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
+				     "Insufficient privilege" );
 
     #
     # We need to enforce Emulab permissions here, since the credential
@@ -509,6 +524,11 @@ sub Remove($)
 				    undef, "This is not your registry!");
     }
 
+    $credential->HasPrivilege( "authority" ) or
+	$credential->HasPrivilege( "refresh" ) or
+	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
+				     "Insufficient privilege" );
+
     #
     # We need to enforce Emulab permissions here, since the credential
     # allows anyone with a credential for this registry to lookup anyone
@@ -596,6 +616,11 @@ sub DiscoverResources($)
 				    "Unknown slice for this credential");
     }
 
+    $credential->HasPrivilege( "authority" ) or
+	$credential->HasPrivilege( "resolve" ) or
+	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
+				     "Insufficient privilege" );
+
     #
     # Ask clearing house for a list of components.
     #
@@ -644,6 +669,11 @@ sub GetKeys($)
 	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN,
 				    undef, "This is not your registry!");
     }
+
+    $credential->HasPrivilege( "authority" ) or
+	$credential->HasPrivilege( "resolve" ) or
+	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
+				     "Insufficient privilege" );
 
     my $this_user = GeniUser->Lookup($credential->owner_uuid(), 1);
     if (!defined($this_user)) {
@@ -699,6 +729,11 @@ sub BindToSlice($)
 				    "Unknown slice for this credential");
     }
     
+    $credential->HasPrivilege( "pi" ) or
+	$credential->HasPrivilege( "bind" ) or
+	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
+				     "Insufficient privilege" );
+
     #
     # Locate the target user; must exist locally.
     #
@@ -745,6 +780,10 @@ sub Shutdown($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Unknown slice for this credential");
     }
+    $credential->HasPrivilege( "pi" ) or
+	$credential->HasPrivilege( "control" ) or
+	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
+				     "Insufficient privilege" );
     system("$SLICESHUTDOWN $slice_uuid");
     if ($?) {
 	print STDERR "Could not shutdown $slice!\n";

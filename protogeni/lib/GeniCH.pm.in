@@ -204,6 +204,11 @@ sub Resolve($)
 				    undef, "This is not your registry!");
     }
 
+    $credential->HasPrivilege( "authority" ) or
+	$credential->HasPrivilege( "resolve" ) or
+	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
+				     "Insufficient privilege" );
+
     if ($type eq "user") {
 	my $user = GeniUser->Lookup($lookup_token);
 	if (!defined($user)) {
@@ -344,6 +349,11 @@ sub Register($)
 	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN,
 				    undef, "This is not your registry!");
     }
+
+    $credential->HasPrivilege( "authority" ) or
+	$credential->HasPrivilege( "refresh" ) or
+	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
+				     "Insufficient privilege" );
 
     #
     # Grab the uuid and hrn out of the certificate.
@@ -584,6 +594,11 @@ sub Remove($)
 				    undef, "This is not your registry!");
     }
 
+    $credential->HasPrivilege( "authority" ) or
+	$credential->HasPrivilege( "refresh" ) or
+	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
+				     "Insufficient privilege" );
+
     if ($type eq "User") {
 	my $user = GeniUser->Lookup($uuid);
 	if (!defined($user)) {
@@ -659,6 +674,11 @@ sub Shutdown($)
 				    undef, "This is not your registry!");
     }
 
+    $credential->HasPrivilege( "authority" ) or
+	$credential->HasPrivilege( "operator" ) or
+	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
+				     "Insufficient privilege" );
+
     my $slice = GeniSlice->Lookup($uuid);
     if (!defined($slice)) {
 	print STDERR "No slice record $uuid for shutdown!\n";
@@ -706,6 +726,11 @@ sub ListComponents($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "This is not your credential!");
     }
+
+    $credential->HasPrivilege( "authority" ) or
+	$credential->HasPrivilege( "resolve" ) or
+	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
+				     "Insufficient privilege" );
 
     #
     # Return simple list of components managers (aggregate managers?)
@@ -772,6 +797,11 @@ sub PostCRL($)
 	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN,
 				    undef, "This is not your registry!");
     }
+
+    $credential->HasPrivilege( "authority" ) or
+	$credential->HasPrivilege( "refresh" ) or
+	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
+				     "Insufficient privilege" );
 
     my $caller_authority = GeniAuthority->Lookup($ENV{'GENIUUID'});
     if (!defined($caller_authority)) {
