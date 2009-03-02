@@ -18,6 +18,26 @@ Note that some instructions may have steps that need to occur at a few
 different points in the install process - these are marked with the
 earliest time one of the steps needs to occur.
 
+20090121: Before install but after reconfigure and rebuild.
+
+	  There are some functions that need to be installed on boss
+          before you can run the new dbupdate procedure which must be
+          done before the boss-install make target. In your object
+	  directory:
+
+		boss> cd db
+		boss> gmake
+		boss> sudo gmake install
+
+20090121: After install:
+
+	  If you do not have an 'elabman' user, do this (grep the
+          password file). Note that XYZ is a password, so pick
+          something good. In your object directory:
+
+		boss> cd utils
+		boss> sudo perl firstuser -b -p "XYZ" -u elabman
+
 20080915: After install.
 
 	  The user ssl certificate format has changed, so all user
