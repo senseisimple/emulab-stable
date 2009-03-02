@@ -2427,6 +2427,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	db/dumperrorlog.proxy \
 	db/setsitevar db/newwanode db/audit db/changeuid db/changepid \
 	db/libdb.pm db/libtbdb.pm db/inuse db/avail db/nodeip db/showgraph \
+	db/emdb.pm db/emdbi.pm \
 	db/dhcpd_makeconf db/nodelog db/unixgroups \
 	db/dbcheck db/interswitch db/dbboot db/schemacheck \
 	db/sitevarscheck db/dbfillcheck db/libadminctrl.pm \
