@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005, 2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -13,8 +13,8 @@
 BEGIN {$FAKE_SCRIPTNAME = $ARGV[0];}
 
 use lib "@prefix@/lib";
-use libtblog qw(:DEFAULT dblog *SOUT *SERR);
 use OSinfo;  # To look up OS by idx.
+use libtblog qw(:DEFAULT dblog *SOUT *SERR);
 
 use constant false => 0;
 use constant true  => 1;

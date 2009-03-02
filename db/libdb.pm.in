@@ -22,6 +22,7 @@ use strict;
 use Exporter;
 use vars qw(@ISA @EXPORT);
 @ISA = "Exporter";
+
 @EXPORT =
     qw ( NODERELOADING_PID NODERELOADING_EID NODEDEAD_PID NODEDEAD_EID
 	 OLDRESERVED_PID OLDRESERVED_EID NFREELOCKED_PID NFREELOCKED_EID 
@@ -160,11 +161,7 @@ use vars qw(@ISA @EXPORT);
 	 TBAdmin TBOpsGuy TBProjAccessCheck TBNodeAccessCheck 
 	 TBExptAccessCheck MarkNodeDown
 	 SetNodeBootStatus OSFeatureSupported NodeidToExp 
-	 DBQuery DBQueryFatal DBQueryWarn DBWarn DBFatal DBErr
-	 NewTBDBHandle DBQueryN DBQueryFatalN DBQueryWarnN DBErrN
-	 DBQuerySingleFatal DBQuerySingleFatalN
-	 DBTableExists DBSlotExists DBSlotType
-	 DBQuoteSpecial ExpState
+	 ExpState
 	 ExpNodes ExpNodeVnames ExpNodesOldReserved
 	 DBDateTime DefaultImageID 
 	 TBSetNodeLogEntry
@@ -172,7 +169,7 @@ use vars qw(@ISA @EXPORT);
 	 TBOSID TBOSMaxConcurrent TBOSCountInstances
 	 TBResolveNextOSID TBOsidToPid TBOSIDRebootWaittime
 	 TBOSLoadMaxOkay TBImageLoadMaxOkay TBImageID 
-	 TBdbfork TBDBDisconnect VnameToNodeid 
+	 TBdbfork VnameToNodeid 
 	 TBIsNodeRemote 
 	 TBIsNodeImageable TBIsNodeVirtual TBControlNetIP TBPhysNodeID
 	 TBNodeUpdateAccountsByPid TBNodeUpdateAccountsByType
@@ -213,7 +210,6 @@ use vars qw(@ISA @EXPORT);
 	 TBDB_EVENTKEY TBDB_WEBKEY
          max min 
 	 hash_recurse array_recurse hash_recurse2 array_recurse2
-	 TBGetUniqueIndex
 
 	 TBExptMinMaxNodes TBExptSecurityLevel TBExptIDX
 	 TBDB_SECLEVEL_GREEN TBDB_SECLEVEL_BLUE TBDB_SECLEVEL_YELLOW
@@ -231,23 +227,22 @@ use vars qw(@ISA @EXPORT);
 	 TBExptContainsNodeCT
 	 );
 
-# Must come after package declaration!
-use lib '@prefix@/lib';
-use emdbi;
+use emdb;
 use emutil;
 use libtblog_simple;
 use English;
 use File::Basename;
 use POSIX qw(strftime);
+
+# This line has to come before the requires.
+@EXPORT = (@emutil::EXPORT, @emdb::EXPORT, @EXPORT);
+# These are requires because of cross dependency hell.
 require User;
 require Project;
 require Group;
 require Node;
 require NodeType;
 require Lan;
-use vars qw($DBQUERY_MAXTRIES $DBCONN_MAXTRIES
-	    $DBCONN_EXITONERR $DBQUERY_RECONNECT $DBQUERY_DEBUG
-	    @EXPORT_OK);
 
 # Configure variables
 my $TB		= "@prefix@";
@@ -257,7 +252,6 @@ my $EVENTSYS    = "@EVENTSYS@";
 my $BOSSNODE    = "@BOSSNODE@";
 my $TESTMODE    = @TESTMODE@;
 my $TBOPSPID	= "emulab-ops";
-my $SCRIPTNAME  = "Unknown";
 my $EXPTLOGNAME = "activity.log";
 my $PROJROOT    = "@PROJROOT_DIR@";
 
@@ -265,73 +259,6 @@ if ($EVENTSYS) {
     require event;
     import event;
 }
-
-# Untainted scriptname for email below.
-if ($PROGRAM_NAME =~ /^([-\w\.\/]+)$/) {
-    $SCRIPTNAME = basename($1);
-}
-else {
-    $SCRIPTNAME = "Tainted";
-}
-
-#
-# Set up for querying the database. Note that fork causes a reconnect
-# to the DB in the child.
-#
-$DBQUERY_MAXTRIES  = 1;
-$DBQUERY_RECONNECT = 1;
-$DBCONN_MAXTRIES   = 5;
-$DBCONN_EXITONERR  = 1;
-$DBQUERY_DEBUG     = 0;
-@EXPORT_OK         = qw($DBQUERY_MAXTRIES $DBQUERY_RECONNECT
-			$DBCONN_EXITONERR $DBCONN_MAXTRIES $DBQUERY_DEBUG);
-@EXPORT            = (@emutil::EXPORT, @EXPORT);
-
-sub TBDBConnect($)	{ return emdbi::TBDBConnect($_[0], $DBNAME); }
-sub TBDBReconnect($)    { return emdbi::TBDBReconnect($_[0]); }
-sub TBDBDisconnect()    { return emdbi::TBDBDisconnect(); }
-sub NewTBDBHandle()     { return emdbi::NewTBDBHandle($DBNAME); }
-sub DBQueryN($$)	{ return emdbi::DBQueryN($_[0], $_[1]); }
-sub DBQuery($)		{ return emdbi::DBQuery($_[0]); }
-sub DBQueryFatalN($$)   { return emdbi::DBQueryFatalN($_[0], $_[1]); }
-sub DBQueryFatal($)     { return emdbi::DBQueryFatal($_[0]);}
-sub DBQuerySingleFatalN($$) { return emdbi::DBQuerySingleFatalN($_[0], $_[1]);}
-sub DBQuerySingleFatal($)   { return emdbi::DBQuerySingleFatal($_[0]);}
-sub DBQueryWarnN($$)	{ return emdbi::DBQueryWarnN($_[0], $_[1]); }
-sub DBQueryWarn($)      { return emdbi::DBQueryWarn($_[0]);}
-sub DBQuoteSpecial($)	{ return emdbi::DBQuoteSpecial($_[0]); }
-sub DBErrN($)		{ return emdbi::DBErrN($_[0]); }
-sub DBErr()		{ return emdbi::DBErr(); }
-sub DBTableExists($)	{ return emdbi::DBTableExists($_[0]); }
-sub DBSlotExists($$)	{ return emdbi::DBSlotExists($_[0], $_[1]); }
-sub DBSlotType($$)	{ return emdbi::DBSlotType($_[0], $_[1]); }
-# These are handled differently cause of tblog stuff.
-sub DBWarn($;$)		{ DBError(\&tbwarn, $_[0], $_[1]); }
-sub DBFatal($;$)	{ DBError(\&tbdie, $_[0], $_[1]); }
-sub DBError($$;$) 
-{
-    my($f, $message, $nomail) = @_;
-    
-    if (! defined($nomail)) {
-	libtestbed::SENDMAIL($TBOPS, "DBError - $message",
-			     "$message - In $SCRIPTNAME\n".
-			     "$emdbi::DBErrorString\n");
-    }
-
-    $f->({cause=>'software'}, "$message:\n$emdbi::DBErrorString");
-}
-
-# Be nice to just reexport these from emdbi to caller. How?
-$emdbi::DBQUERY_MAXTRIES  = $DBQUERY_MAXTRIES;
-$emdbi::DBQUERY_RECONNECT = $DBQUERY_RECONNECT;
-$emdbi::DBCONN_MAXTRIES   = $DBCONN_MAXTRIES;
-$emdbi::DBCONN_EXITONERR  = $DBCONN_EXITONERR;
-$emdbi::DBQUERY_DEBUG     = $DBQUERY_DEBUG;
-
-# Default connection.
-TBDBConnect(0);
-
-# Old version. Should be renamed or just eventfork.
 sub TBdbfork()
 {
     if ($EVENTSYS) {
@@ -3519,8 +3446,6 @@ sub GatherAssignStats($$%)
     my ($pid, $eid, %stats) = @_;
     my @updates = ();
 
-    local $DBQUERY_MAXTRIES = 5;
-
     my $query_result =
 	DBQueryWarn("select e.gid,e.idx,s.rsrcidx from experiments as e ".
 		    "left join experiment_stats as s on e.idx=s.exptidx ".
@@ -3617,43 +3542,6 @@ sub array_recurse2($%) {
     return $str;
 }
 
-#
-# Return a unique index from emulab_indicies for the indicated name.
-# Updates the index to be, well, unique.
-# Eats flaming death on error.
-#
-# WARNING: this will unlock all locked tables, be careful where you call it!
-#
-sub TBGetUniqueIndex($;$$)
-{
-    my ($name, $initval, $nolock) = @_;
-
-    #
-    # Lock the table to avoid conflict, but not if the caller already did it.
-    #
-    $nolock = 0
-	if (!defined($nolock));
-    
-    DBQueryFatal("lock tables emulab_indicies write")
-	if (!$nolock);
-
-    my $query_result =
-	DBQueryFatal("select idx from emulab_indicies ".
-		     "where name='$name'");
-    my ($curidx) = $query_result->fetchrow_array();
-    if (!defined($curidx)) {
-	$curidx = (defined($initval) ? $initval : 1);
-    }
-    my $nextidx = $curidx + 1;
-
-    DBQueryFatal("replace into emulab_indicies (name, idx) ".
-		 "values ('$name', $nextidx)");
-    DBQueryFatal("unlock tables")
-	if (!$nolock);
-
-    return $curidx;
-}
-
 sub TBSetNodeHistory($$$$$)
 {
     my ($nodeid, $op, $uid, $pid, $eid) = @_;
@@ -3715,25 +3603,6 @@ sub TBGetOSBootCmd($$$)
     }
     
     return $retval;
-}
-
-END {
-    # Call it here otherwise may get:
-    #   (in cleanup) Can't call method "FETCH" on an undefined value at 
-    #   /usr/local/lib/perl5/site_perl/5.8.8/mach/Mysql.pm line 91 during 
-    #   global destruction.
-    # where line 91 is:
-    #  	my $oldvalue = $self->{'dbh'}->{'InactiveDestroy'};
-    # which is in setInactiveDestroy() which get called in libdb.pm in:
-    #   if ($self->db_pid() != $$) {
-    #       $self->setInactiveDestroy(1);
-    #   }
-    # which is in TestbedDBHandle::DESTROY (still in libdb.pm even
-    # though it is a diffrent package)
-    #
-    # This error is probably due to some object being destroyed too
-    # soon somewhere in the DBI/DBD modules.
-    TBDBDisconnect();
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

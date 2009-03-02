@@ -11,6 +11,7 @@ use Mysql;
 use English;
 use Exporter;
 use vars qw(@ISA @EXPORT);
+@ISA = "Exporter";
 
 # Configure variables
 my $TB		= "@prefix@";
@@ -81,15 +82,13 @@ else {
 my @DB;
 
 use vars qw($DBQUERY_MAXTRIES $DBCONN_MAXTRIES
-	    $DBCONN_EXITONERR $DBQUERY_RECONNECT $DBQUERY_DEBUG
-	    @EXPORT_OK);
-
+	    $DBCONN_EXITONERR $DBQUERY_RECONNECT $DBQUERY_DEBUG);
 $DBQUERY_MAXTRIES  = 1;
 $DBQUERY_RECONNECT = 1;
 $DBCONN_MAXTRIES   = 5;
 $DBCONN_EXITONERR  = 1;
 $DBQUERY_DEBUG     = 0;
-@EXPORT_OK         = qw($DBQUERY_MAXTRIES $DBQUERY_RECONNECT
+@EXPORT            = qw($DBQUERY_MAXTRIES $DBQUERY_RECONNECT
 			$DBCONN_EXITONERR $DBCONN_MAXTRIES $DBQUERY_DEBUG);
 
 sub TBDBConnect($$)
@@ -390,9 +389,12 @@ sub DBError($$;$)
     my($f, $message, $nomail) = @_;
     
     if (! defined($nomail)) {
-	libtestbed::SENDMAIL($TBOPS, "DBError - $message",
-			     "$message - In $SCRIPTNAME\n".
-			     "$DBErrorString\n");
+	if (open(MAIL, "| /usr/bin/mail -s DBError $TBOPS")) {
+	    print MAIL "\n";
+	    print MAIL "$message - In $SCRIPTNAME\n";
+	    print MAIL "$DBErrorString\n\n";
+	    close(MAIL);
+	}
     }
 
     $f->("$message:\n$DBErrorString\n");

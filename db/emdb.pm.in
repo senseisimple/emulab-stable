@@ -1,0 +1,77 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008, 2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package emdb;
+use strict;
+use File::Basename;
+use English;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+@ISA = "Exporter";
+
+use emdbi;
+use libtestbed;
+use libtblog_simple;
+
+# Configure variables
+my $TB		= "@prefix@";
+my $DBNAME	= "@TBDBNAME@";
+my $SCRIPTNAME  = "Unknown";
+my $TBOPS       = "@TBOPSEMAIL@";
+
+# Untainted scriptname for email below.
+if ($PROGRAM_NAME =~ /^([-\w\.\/]+)$/) {
+    $SCRIPTNAME = basename($1);
+}
+else {
+    $SCRIPTNAME = "Tainted";
+}
+
+@EXPORT = qw(DBQuery DBQueryFatal DBQueryWarn DBWarn DBFatal DBErr
+	     NewTBDBHandle DBQueryN DBQueryFatalN DBQueryWarnN DBErrN
+	     DBQuerySingleFatal DBQuerySingleFatalN TBDBDisconnect
+	     DBTableExists DBSlotExists DBSlotType DBQuoteSpecial
+	     TBDBConnect);
+@EXPORT = (@EXPORT, @emdbi::EXPORT);
+
+sub TBDBConnect($)	{ return emdbi::TBDBConnect($_[0], $DBNAME); }
+sub TBDBReconnect($)    { return emdbi::TBDBReconnect($_[0]); }
+sub TBDBDisconnect()    { return emdbi::TBDBDisconnect(); }
+sub NewTBDBHandle()     { return emdbi::NewTBDBHandle($DBNAME); }
+sub DBQueryN($$)	{ return emdbi::DBQueryN($_[0], $_[1]); }
+sub DBQuery($)		{ return emdbi::DBQuery($_[0]); }
+sub DBQueryFatalN($$)   { return emdbi::DBQueryFatalN($_[0], $_[1]); }
+sub DBQueryFatal($)     { return emdbi::DBQueryFatal($_[0]);}
+sub DBQuerySingleFatalN($$) { return emdbi::DBQuerySingleFatalN($_[0], $_[1]);}
+sub DBQuerySingleFatal($)   { return emdbi::DBQuerySingleFatal($_[0]);}
+sub DBQueryWarnN($$)	{ return emdbi::DBQueryWarnN($_[0], $_[1]); }
+sub DBQueryWarn($)      { return emdbi::DBQueryWarn($_[0]);}
+sub DBQuoteSpecial($)	{ return emdbi::DBQuoteSpecial($_[0]); }
+sub DBErrN($)		{ return emdbi::DBErrN($_[0]); }
+sub DBErr()		{ return emdbi::DBErr(); }
+sub DBTableExists($)	{ return emdbi::DBTableExists($_[0]); }
+sub DBSlotExists($$)	{ return emdbi::DBSlotExists($_[0], $_[1]); }
+sub DBSlotType($$)	{ return emdbi::DBSlotType($_[0], $_[1]); }
+# These are handled differently cause of tblog stuff.
+sub DBWarn($;$)		{ DBError(\&tbwarn, $_[0], $_[1]); }
+sub DBFatal($;$)	{ DBError(\&tbdie, $_[0], $_[1]); }
+sub DBError($$;$) 
+{
+    my($f, $message, $nomail) = @_;
+    
+    if (! defined($nomail)) {
+	libtestbed::SENDMAIL($TBOPS, "DBError - $message",
+			     "$message - In $SCRIPTNAME\n".
+			     "$emdbi::DBErrorString\n");
+    }
+
+    $f->({cause=>'software'}, "$message:\n$emdbi::DBErrorString");
+}
+
+# Default connection.
+TBDBConnect(0);
+
+1;

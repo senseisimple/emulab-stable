@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -256,7 +256,7 @@ use strict;
 #
 use lib "@prefix@/lib";
 use libtestbed;
-use libdb qw(NewTBDBHandle DBQueryN DBQueryWarnN DBQueryFatalN
+use emdb qw(NewTBDBHandle DBQueryN DBQueryWarnN DBQueryFatalN
 	     DBQuoteSpecial $DBQUERY_MAXTRIES DBWarn DBFatal);
 use libtblog_simple;
 
@@ -266,7 +266,7 @@ undef $SCRIPTNAME; # signal to use $ENV{TBLOG_SCRIPTNAME}
 my $DB;
 my $TBLOG_PID;
 
-my $REVISION_STR = '$Revision: 2.24 $';
+my $REVISION_STR = '$Revision: 2.25 $';
 
 #
 # Internal Utility Functions

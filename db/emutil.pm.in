@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Utility routines for Emulab.
@@ -12,11 +12,10 @@ use Exporter;
 use vars qw(@ISA @EXPORT);
 @ISA = "Exporter";
 @EXPORT = qw (TBDB_CHECKDBSLOT_NOFLAGS TBDB_CHECKDBSLOT_WARN
-	      TBDB_CHECKDBSLOT_ERROR TBcheck_dbslot TBFieldErrorString);
+	      TBDB_CHECKDBSLOT_ERROR TBcheck_dbslot TBFieldErrorString
+	      TBGetUniqueIndex);
 
-# Must come after package declaration!
-use lib '@prefix@/lib';
-use libdb;
+use emdb;
 use English;
 
 # Configure variables
@@ -45,7 +44,7 @@ sub TBGrabFieldData()
     %DBFieldData = ();
 
     my $query_result =
-	libdb::DBQueryFatal("select * from table_regex");
+	emdb::DBQueryFatal("select * from table_regex");
 
     while (my %row = $query_result->fetchhash()) {
 	my $table_name  = $row{"table_name"};
@@ -196,6 +195,43 @@ sub TBcheck_dbslot($$$;$)
 	    "    Unrecognized column_type $column_type\n");
     }
     return 0;
+}
+
+#
+# Return a unique index from emulab_indicies for the indicated name.
+# Updates the index to be, well, unique.
+# Eats flaming death on error.
+#
+# WARNING: this will unlock all locked tables, be careful where you call it!
+#
+sub TBGetUniqueIndex($;$$)
+{
+    my ($name, $initval, $nolock) = @_;
+
+    #
+    # Lock the table to avoid conflict, but not if the caller already did it.
+    #
+    $nolock = 0
+	if (!defined($nolock));
+    
+    DBQueryFatal("lock tables emulab_indicies write")
+	if (!$nolock);
+
+    my $query_result =
+	DBQueryFatal("select idx from emulab_indicies ".
+		     "where name='$name'");
+    my ($curidx) = $query_result->fetchrow_array();
+    if (!defined($curidx)) {
+	$curidx = (defined($initval) ? $initval : 1);
+    }
+    my $nextidx = $curidx + 1;
+
+    DBQueryFatal("replace into emulab_indicies (name, idx) ".
+		 "values ('$name', $nextidx)");
+    DBQueryFatal("unlock tables")
+	if (!$nolock);
+
+    return $curidx;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...
