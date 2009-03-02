@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -128,8 +128,18 @@ $UID = $EUID;
 if ($CONTROL ne $BOSSNODE) {
     my $optarg = ($debug ? "-d" : "");
 
-    if (system("$SSH -host $CONTROL $MMPROXY $optarg ".
-	       "setlistmembers $listname < $listfile")) {
+    # Must serialize some of the mailman stuff. Be sure to use the same token!
+    TBScriptLock("mailman_update") == 0 or
+	fatal("Could not get the lock!");
+
+    system("$SSH -host $CONTROL $MMPROXY $optarg ".
+	   "setlistmembers $listname < $listfile");
+
+    my $status = $?;
+    TBScriptUnlock();
+    $? = $status;
+
+    if ($?) {
 	fatal("$MMPROXY failed on $CONTROL!");
     }
 }
