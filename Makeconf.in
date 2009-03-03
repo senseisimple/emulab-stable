@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 # 
 # Most of the configure-substitution magic is done here.
@@ -87,3 +87,4 @@ BRAINSTEM_DIR	= @BRAINSTEM_DIR@
 host_cpu	= @host_cpu@
 
 HAVE_ULXMLRPCPP	= @HAVE_ULXMLRPCPP@
+STANDALONE_CLEARINGHOUSE = @STANDALONE_CLEARINGHOUSE@
