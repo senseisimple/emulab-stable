@@ -2719,8 +2719,8 @@ foreach $lan (keys(%virt_lans)) {
     next
 	if ($impotent);
 
-    my $tunnel = Tunnel->Create($experiment, $lan, $secretkey, 
-				$mask, $ipport);
+    my $tunnel = Tunnel->Create($experiment, $lan, $secretkey,
+				virtlanencapstyle($lan), $mask, $ipport);
     fatal("Could not create tunnel for $lan")
 	if (!defined($tunnel));
 
@@ -3314,6 +3314,30 @@ sub nextipportnum($) {
 #
 sub UploadVlans()
 {
+    #
+    # Post process; mark vlans on federated nodes with a different type
+    # so that we do not try to create them locally.
+    #
+    foreach my $protolanA (ProtoLan->ProtoLanList()) {
+	next
+	    if ($protolanA->type() ne "vlan");
+
+	foreach my $member ($protolanA->MemberList()) {
+	    my $node = $protolanA->MemberNode($member);
+	    if ($node->isfednode()) {
+		$protolanA->SetType("geni-vlan");
+		last;
+	    }
+	}
+	foreach my $member ($protolanA->IfaceList()) {
+	    my $node = $protolanA->IfaceNode($member);
+	    if ($node->isfednode()) {
+		$protolanA->SetType("geni-vlan");
+		last;
+	    }
+	}
+    }
+    
     #
     # Emulated vlans will result in node:port pairs being in more than
     # one vlan since that link is shared for several lans. For hardware
@@ -4310,39 +4334,8 @@ sub LoadVirtLans()
 	$virt_lans{$vname}->{"ACCESSPOINT"}  = $member
 	    if ($rowref->{"is_accesspoint"});
 
-	#
-	# REMOTE VIRTNODE HACK: 
-	#
-	# If its a duplex link involving a remotenode, skip it. 
-	# We do not want to have assign deal with these. The nodes are
-	# allocated as unconnected by another program, and we deal with
-	# it later by creating tunnels between the nodes in the links.
-	# 
-	if ($widearea) {
-	    #
-	    # If the user requested that no tunnels be created, do not bother
-	    # with this. wanassign stills does the right thing, but we do not
-	    # set up the tunnels (see below). 
-	    #
-	    if ($usewatunnels) {
-		$virt_lans{$vname}->{"TUNNEL"} = 1;
-		printdb "    Added $member to tunnels of $vname\n";
-	    }
-	    $expt_stats{"walinks"} += 1;
-	    $needwanassign = 1;
-	    #
-	    # Must let wanassign do this, but it only handles the remote
-	    # side. If a link is between a local node and a remote node,
-	    # then the local node is still handled in here, but it is
-	    # allocated as unconnected.
-	    #
-	    virtnodesetusewan($node)
-		if (virtnodeisremote($node));
-	    next;
-	}
-	elsif (defined($encap) &&
-	       ($encap eq "vtun" || $encap eq "gre" || $encap eq "egre")) {
-	    # Just for testing.
+	if (defined($encap) &&
+	    ($encap eq "vtun" || $encap eq "gre" || $encap eq "egre")) {
 	    $virt_lans{$vname}->{"TUNNEL"} = 1;
 	}
 
@@ -4705,9 +4698,9 @@ sub CreateTopFile()
     }
 
     foreach $lan (keys(%virt_lans)) {
-	# XXX Widearea/Tunnels are handled elsewhere.
+	# XXX Widearea Tunnels are handled elsewhere.
 	next
-	    if (virtlanwidearea($lan) || virtlantunnel($lan));
+	    if (virtlantunnel($lan));
 	
 	my @members = virtlanmembers($lan);
 	printdb "$lan - " . join(" ",@members) . "\n";
@@ -4747,7 +4740,7 @@ sub CreateTopFile()
 		    $osdoeslinkdelays{$osid} = 1;
 		}
 	    } else {
-		if (virtnodeisvirt($node)) {
+		if (virtnodeisvirt($node) && virtnodetype($node) ne "pcfed") {
 		    $virtnodes++;
 
 		    # XXX virtnodes are always BSD at the moment
