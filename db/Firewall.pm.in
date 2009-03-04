@@ -164,6 +164,8 @@ sub doFWlans($$$) {
     my $fwtakedownstr0 = "$SNMPIT $cnetstack -e $fwport";
     my $fwtakedownstr1 = ($portlist eq "" ? "true" :
 		  "$SNMPIT $cnetstack -m $cnetvlanname $pid $eid $portlist");
+    my $fwtakedownstr1b = ($portlist eq "" ? "true" :
+		  "$SNMPIT -f $cnetstack -m $cnetvlanname $portlist");
     my $fwtakedownstr2 = "$SNMPIT $cnetstack -o $fwvlanname $pid $eid";
     my $fwtakedownstr3 = "$SNMPIT $cnetstack -U $fwport";
     my $fwtakedownstr4 = "$SNMPIT $cnetstack -f -m $cnetvlanname $fwport";
@@ -256,8 +258,19 @@ sub doFWlans($$$) {
 	TBDebugTimeStamp("snmpit firewall port deletion");
 	print "doFW: '$fwtakedownstr1'\n";
 	if (system($fwtakedownstr1)) {
-	    tberror "Failed to remove nodes from Firewall control net VLAN.\n";
-	    return 1;
+	    #
+	    # If the exit value is "2" then retry with hidden force option
+	    # since the port was probably already moved, but snmpit has no
+	    # way to verify that. We do know it is out of the old vlan though.
+	    #
+	    if ($? >> 8 == 2) {
+		system($fwtakedownstr1b);
+	    }
+	    if ($?) {
+		tberror "Failed to remove nodes from Firewall ".
+			"control net VLAN.\n";
+		return 1;
+	    }
 	}
 	TBDebugTimeStamp("snmpit firewall setup done");
     }
