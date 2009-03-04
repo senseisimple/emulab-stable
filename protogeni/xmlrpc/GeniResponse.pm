@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
-# EMULAB-COPYRIGHT
-# Copyright (c) 2008 University of Utah and the Flux Group.
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2008-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Perl code to access an XMLRPC server using http. Derived from the

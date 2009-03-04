@@ -1,5 +1,5 @@
-/* EMULAB-COPYRIGHT
- * Copyright (c) 2008 University of Utah and the Flux Group.
+/* GENIPUBLIC-COPYRIGHT
+ * Copyright (c) 2008-2009 University of Utah and the Flux Group.
  * All rights reserved.
  *
  * Permission to use, copy, modify and distribute this software is hereby

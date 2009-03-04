@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 #
-# EMULAB-COPYRIGHT
+# GENIPUBLIC-COPYRIGHT
 # Copyright (c) 2008-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
@@ -10,7 +10,7 @@ use Getopt::Std;
 use Data::Dumper;
 
 #
-# Resolve a uuid or hrn at the clearinghouse or an SA.
+# Register our CM/SA certs at the clearinghouse.
 # 
 sub usage()
 {

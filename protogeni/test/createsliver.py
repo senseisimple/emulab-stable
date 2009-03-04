@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 #
-# EMULAB-COPYRIGHT
+# GENIPUBLIC-COPYRIGHT
 # Copyright (c) 2008-2009 University of Utah and the Flux Group.
 # All rights reserved.
 # 
