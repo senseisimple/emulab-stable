@@ -1451,7 +1451,9 @@ sub doMakeVlan($$@) {
 	    foreach my $port (@ports) {
 		my $vlan = VLan->FindVlanByPort($experiment, $port);
 		if (!defined($vlan)) {
-		    die("$port is not in a vlan object\n");
+		    print STDERR "$port is not in a vlan object\n";
+		    # Tell caller. 
+		    exit(2);
 		}
 		if (defined($source_vlan) && !$vlan->SameVlan($source_vlan)) {
 		    die("Ports must be in a single vlan\n");
