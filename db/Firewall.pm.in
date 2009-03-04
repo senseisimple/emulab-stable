@@ -355,7 +355,7 @@ sub undoFWNodes($;$@) {
     if (!@nodes || scalar(@nodes) == 0) {
 	$experiment->LocalNodeListNames(\@nodes, 1);
 	if ($leavefw) {
-	    @nodes = map {$_ ne $fwnode} @nodes;
+	    @nodes = grep {$_ ne $fwnode} @nodes;
 	}
 	else {
 	    $doall = 1;
