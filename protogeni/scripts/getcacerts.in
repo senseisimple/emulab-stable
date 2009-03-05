@@ -30,6 +30,7 @@ my $PGENIDOMAIN   = "@PROTOGENI_DOMAIN@";
 my $PGENISUPPORT  = @PROTOGENI_SUPPORT@;
 my $TBBASE        = "@TBBASE@";
 my $FETCH	  = "/usr/bin/fetch";
+my $OPENSSL       = "/usr/bin/openssl";
 my $POSTCRL       = "$TB/sbin/protogeni/postcrl";
 my $GENCRL        = "$TB/sbin/protogeni/gencrl";
 my $LOCALCRL      = "$TB/ssl/crl.pem";
@@ -210,6 +211,57 @@ if ($restartapache) {
 	or fatal("Could not restart apache!");
 }
 
+#
+# Decode the CRLs.  All these temporary files are ugly, but we don't want
+# to pipe both to and from the child openssl process because of the
+# possibility of deadlock.
+#
+my $crlstr;
+my $incomplete = undef;
+
+open(BUNDLE, "$TB/etc/genicrl.bundle")
+    or fatal("Could not open $TB/etc/genicrl.bundle for reading");
+open(SINGLE, "> /tmp/genicrl.single.$$")
+    or fatal("Could not open /tmp/genicrl.single.$$ for writing");
+open(REVOKED, "> /tmp/genicrl.serials.$$")
+    or fatal("Could not open /tmp/genicrl.serials.$$ for writing");
+
+while (<BUNDLE>) {
+    print SINGLE $_;
+    if ($_ =~ /^-----BEGIN X509 CRL/) {
+	$incomplete++;
+	next;
+    }
+    if ($_ =~ /^-----END X509 CRL/) {
+	my $issuer;
+
+	open( CERT, "$OPENSSL crl -text -noout < /tmp/genicrl.single.$$ |" ) or
+	    fatal( "Could not decode CRL" );
+	while( <CERT> ) {
+	    m{Issuer: .*/CN=([^/]+)/} and $issuer = $1;
+	    /Serial Number: ([0-9A-Fa-f]+)/ and $issuer and print REVOKED "$issuer $1\n";
+	}
+	close CERT;
+	$incomplete = undef;
+	truncate( SINGLE, 0 );
+	seek( SINGLE, 0, 0 );
+	next;
+    }
+}
+#
+# If the file is properly terminated, there should be no CRL in
+# progress. Hopefully the file is not trashed at a boundary. We do this
+# before moving the decoded file into place to make sure the file
+# is reasonable.
+#
+fatal("Trashed CRL bundle file")
+    if ($incomplete);
+close(BUNDLE);
+close(SINGLE);
+close(REVOKED);
+
+system("/bin/mv /tmp/genicrl.serials.$$ $TB/etc/genicrl.serials") == 0
+    or fatal("Could not mv /tmp/genicrl.serials.$$ $TB/etc/genicrl.serials");
 
 # Abort the log since apache likes to spit out stuff.
 # No errors at this point, nothing to report.
