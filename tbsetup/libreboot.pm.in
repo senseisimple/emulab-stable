@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # node reboot library. Basically the backend to the node_reboot script, but
@@ -227,7 +227,8 @@ sub nodereboot($$)
 	my $pnode = $virtnodes{$node};
 
 	if (defined($realnodes{$pnode})) {
-	    print "reboot ($node): Dropping since its host $pnode will reboot\n";
+	    print "reboot: Dropping $node since its host $pnode will reboot\n"
+		if (!$silent);
 	    delete($virtnodes{$node});
 	}
     }
