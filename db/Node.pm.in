@@ -1398,12 +1398,6 @@ sub CreateVnodes($$)
 	return -1;
     }
 
-    my $uuid = NewUUID();
-    if (!defined($uuid)) {
-	print STDERR "Could not generate a UUID!\n";
-	next NODE;
-    }
-    
     #
     # Assign however many we are told to (typically by assign). Locally
     # this is not a problem since nodes are not shared; assign always
@@ -1476,6 +1470,12 @@ sub CreateVnodes($$)
 	    $pnode2 -= $nodenumlimit;
 	}
 	my $jailip = "${IPBASE1}.${pnet}.${pnode2}.${i}";
+
+	my $uuid = NewUUID();
+	if (!defined($uuid)) {
+	    print STDERR "Could not generate a UUID!\n";
+	    goto bad;
+	}
 
 	if ($verbose) {
 	    print STDERR "Jail IP for $vnodeid is $jailip\n";
