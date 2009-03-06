@@ -50,6 +50,7 @@ my $SSLDIR      = "$TB/lib/ssl";
 my $EMULAB_CERT = "$TB/etc/emulab.pem";
 my $EMULAB_KEY  = "$TB/etc/emulab.key";
 my $GENICERTS   = "$TB/etc/genicacerts";
+my $REVOKED     = "$TB/etc/genicrl.serials";
 my $OPENSSL     = "/usr/bin/openssl";
 my $XMLLINT     = "/usr/local/bin/xmllint";
 my $XMLSEC1     = "/usr/local/bin/xmlsec1";
@@ -252,6 +253,17 @@ foreach my $credential ( keys( %credentials ) ) {
     }
 }
 
+# Read in all entries from CRLs.
+my %revoked = ();
+if( -r $REVOKED ) {
+    open( SERIALS, $REVOKED ) or fatal( "Cannot read $REVOKED" );
+    while( <SERIALS> ) {
+	chomp;
+	$revoked{ $_ } = 1;
+    }
+    close( SERIALS );
+}
+
 #
 # The certficate used to sign the credential was either the Emulab certificate
 # or that of the user delegating the credential. For now we just worry about
@@ -271,7 +283,7 @@ my $certarg = " " . join(" ", map("--trusted-pem $GENICERTS/$_", @pemfiles));
 # covers the credential and all the parents up to the top.
 #
 foreach my $sigid (keys(%credentials)) {
-    my $cmd = "$XMLSEC1 --verify ";
+    my $cmd = "$XMLSEC1 --verify --store-signatures ";
     $cmd .= "--print-debug "
 	if ($debug);
     $cmd .= "--node-id Sig_$sigid $certarg $xmlfile";
@@ -293,9 +305,16 @@ foreach my $sigid (keys(%credentials)) {
     }
     print STDERR $line
 	if (defined($line) && $debug);
+    my $issuer = undef;
     while (<SEC>) {
 	print STDERR $_
 	    if ($debug);
+	$issuer = $1 if m{^==== Issuer Name:.+/CN=([^/]+)/};
+	if( m{^==== Issuer Serial: (.+)} ) {
+	    $issuer and $revoked{ "$issuer $1" } and
+		fatal( "Certificate $issuer $1 has been revoked" );		
+	    $issuer = undef;
+	}
     }
     close(SEC) or
 	fatal($! ? "Error closing $XMLSEC1 pipe: $!"
