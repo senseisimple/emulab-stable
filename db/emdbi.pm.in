@@ -389,9 +389,12 @@ sub DBError($$;$)
     my($f, $message, $nomail) = @_;
     
     if (! defined($nomail)) {
-	if (open(MAIL, "| /usr/bin/mail -s DBError $TBOPS")) {
+	if (open(MAIL, "| /usr/sbin/sendmail -t")) {
+	    print MAIL "To: $TBOPS\n";
+	    print MAIL "Subject: DBError\n";
 	    print MAIL "\n";
-	    print MAIL "$message - In $SCRIPTNAME\n";
+	    print MAIL "In $SCRIPTNAME\n\n";
+	    print MAIL "$message\n\n";
 	    print MAIL "$DBErrorString\n\n";
 	    close(MAIL);
 	}
