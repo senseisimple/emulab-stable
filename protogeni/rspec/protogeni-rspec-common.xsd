@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" targetNamespace="http://www.protogeni.net/resources/rspec/0.1" xmlns:rspec="http://www.protogeni.net/resources/rspec/0.1">
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
   <xs:include schemaLocation="top.xsd"/>
   <!--
     
@@ -15,9 +15,10 @@
   -->
   <xs:complexType name="NodeContents">
     <xs:sequence>
-      <xs:group ref="rspec:NodeSpec.NodeType"/>
-      <xs:element minOccurs="0" ref="rspec:available"/>
-      <xs:group minOccurs="0" maxOccurs="unbounded" ref="rspec:InterfaceDecl"/>
+      <xs:group ref="NodeSpec.NodeType"/>
+      <xs:element minOccurs="0" ref="location"/>
+      <xs:element minOccurs="0" ref="available"/>
+      <xs:group minOccurs="0" maxOccurs="unbounded" ref="InterfaceDecl"/>
     </xs:sequence>
     <xs:attribute name="virtual_name"/>
     <xs:attribute name="virtual_uuid"/>
@@ -40,32 +41,55 @@
   <xs:complexType name="LinkContents">
     <xs:sequence>
       <xs:choice minOccurs="0">
-        <xs:element ref="rspec:component_link"/>
-        <xs:element ref="rspec:component_path"/>
+        <xs:element ref="single_hop_link"/>
+        <xs:element ref="multi_hop_link"/>
       </xs:choice>
-      <xs:group ref="rspec:LinkEndPoints"/>
-      <xs:group ref="rspec:LinkCharacteristics">
+      <xs:group ref="LinkEndPoints"/>
+      <xs:group ref="LinkCharacteristics">
         <xs:annotation>
           <xs:documentation>The characteristics (bandwidth, latency, loss) which affect traffic.</xs:documentation>
         </xs:annotation>
       </xs:group>
-      <xs:element maxOccurs="unbounded" ref="rspec:LinkSpec.LinkType"/>
+      <xs:element maxOccurs="unbounded" ref="LinkSpec.LinkType">
+        <xs:annotation>
+          <xs:documentation>Type of this link - we use a named pattern here (defined below), so
+that it can be overriden in the virtual topology schema, where you are
+only allowed to have one</xs:documentation>
+        </xs:annotation>
+      </xs:element>
     </xs:sequence>
     <xs:attribute name="virtual_name"/>
     <xs:attribute name="virtual_uuid"/>
+    <xs:attribute name="virtualization_type">
+      <xs:simpleType>
+        <xs:restriction base="xs:token">
+          <xs:enumeration value="raw"/>
+          <xs:enumeration value="trellis-vserver"/>
+          <xs:enumeration value="planetlab-vserver"/>
+          <xs:enumeration value="emulab-vnode"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
   </xs:complexType>
   <xs:complexType name="InterfaceContents">
     <xs:sequence>
-      <xs:element minOccurs="0" ref="rspec:virtual_node_uuid"/>
-      <xs:element minOccurs="0" ref="rspec:virtual_interface_name"/>
-      <xs:element minOccurs="0" ref="rspec:component_node_uuid"/>
-      <xs:element minOccurs="0" ref="rspec:component_interface_name"/>
+      <xs:element minOccurs="0" ref="virtual_node_uuid"/>
+      <xs:element minOccurs="0" ref="virtual_interface_name"/>
+      <xs:element minOccurs="0" ref="component_node_uuid"/>
+      <xs:element minOccurs="0" ref="component_interface_name"/>
     </xs:sequence>
   </xs:complexType>
   <xs:element name="virtual_node_uuid" type="xs:string"/>
   <xs:element name="virtual_interface_name" type="xs:string"/>
   <xs:element name="component_node_uuid" type="xs:string"/>
   <xs:element name="component_interface_name" type="xs:string"/>
+  <xs:element name="location">
+    <xs:complexType>
+      <xs:attribute name="country" use="required"/>
+      <xs:attribute name="longitude"/>
+      <xs:attribute name="lattitude"/>
+    </xs:complexType>
+  </xs:element>
   <xs:group name="InterfaceDecl">
     <xs:sequence>
       <xs:element name="interface">
@@ -82,30 +106,31 @@
     <xs:attribute name="component_uuid" use="required"/>
     <xs:attribute name="sliver_uuid"/>
   </xs:attributeGroup>
-  <xs:element name="component_link">
+  <xs:element name="single_hop_link">
     <xs:complexType>
-      <xs:attributeGroup ref="rspec:ComponentSpec"/>
+      <xs:group ref="LinkEndPoints"/>
+      <xs:attributeGroup ref="ComponentSpec"/>
     </xs:complexType>
   </xs:element>
-  <xs:element name="component_path">
+  <xs:element name="multi_hop_link">
     <xs:complexType>
       <xs:sequence>
         <xs:element name="link">
           <xs:complexType>
-            <xs:group ref="rspec:LinkEndPoints"/>
-            <xs:attributeGroup ref="rspec:ComponentSpec"/>
+            <xs:group ref="LinkEndPoints"/>
+            <xs:attributeGroup ref="ComponentSpec"/>
           </xs:complexType>
         </xs:element>
-        <xs:sequence minOccurs="0" maxOccurs="unbounded">
-          <xs:element name="link">
-            <xs:complexType>
-              <xs:group ref="rspec:LinkEndPoints"/>
-              <xs:attributeGroup ref="rspec:ComponentSpec"/>
-            </xs:complexType>
-          </xs:element>
+        <xs:sequence maxOccurs="unbounded">
           <xs:element name="node">
             <xs:complexType>
-              <xs:attributeGroup ref="rspec:ComponentSpec"/>
+              <xs:attributeGroup ref="ComponentSpec"/>
+            </xs:complexType>
+          </xs:element>
+          <xs:element name="link">
+            <xs:complexType>
+              <xs:group ref="LinkEndPoints"/>
+              <xs:attributeGroup ref="ComponentSpec"/>
             </xs:complexType>
           </xs:element>
         </xs:sequence>
@@ -115,8 +140,8 @@
   <xs:element name="rspec">
     <xs:complexType>
       <xs:choice minOccurs="0" maxOccurs="unbounded">
-        <xs:element ref="rspec:node"/>
-        <xs:element ref="rspec:link"/>
+        <xs:element ref="node"/>
+        <xs:element ref="link"/>
       </xs:choice>
       <xs:attribute name="type" use="required">
         <xs:simpleType>
