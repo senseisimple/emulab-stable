@@ -145,7 +145,8 @@ my $query_result =
     DBQueryWarn("select idx,DN,UNIX_TIMESTAMP(created), ".
 		"   UNIX_TIMESTAMP(revoked) ".
 		" from user_sslcerts ".
-		"where encrypted=1 and revoked is not null");
+		"where encrypted=1 and revoked is not null ".
+		"and expires > NOW()");
 if (!$query_result) {
     fatal("Could not get the crl list from the DB");
 }
