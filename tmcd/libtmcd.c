@@ -232,6 +232,7 @@ XML_COMMAND_PROTOTYPE(dohostinfo);
 XML_COMMAND_PROTOTYPE(doemulabconfig);
 XML_COMMAND_PROTOTYPE(doeplabconfig);
 XML_COMMAND_PROTOTYPE(dolocalize);
+XML_COMMAND_PROTOTYPE(dorootpswd);
 XML_COMMAND_PROTOTYPE(dobooterrno);
 XML_COMMAND_PROTOTYPE(dobattery);
 XML_COMMAND_PROTOTYPE(douserenv);
@@ -269,7 +270,7 @@ RAW_COMMAND_PROTOTYPE(dobootlog);
 #define F_MAXLOG	0x04	/* record maximal logging info normally */
 #define F_ALLOCATED	0x08	/* node must be allocated to make call */
 #define F_REMNOSSL	0x10	/* remote nodes can request without SSL */
-#define F_UDP		0x20	/* call may be made via UDP */
+#define F_REMREQSSL	0x20	/* remote nodes must connect with SSL */
 
 struct command {
 	char	*cmdname;
@@ -277,68 +278,69 @@ struct command {
 	int	flags;
 	int    (*func)(xmlNode *, tmcdreq_t *, char *);
 } xml_command_array[] = {
-	{ "reboot",	  FULLCONFIG_NONE, F_UDP, doreboot },
-	{ "nodeid",	  FULLCONFIG_ALL,  F_UDP, donodeid },
-	{ "status",	  FULLCONFIG_NONE, F_UDP, dostatus },
-	{ "ifconfig",	  FULLCONFIG_ALL,  F_UDP|F_ALLOCATED, doifconfig },
-	{ "accounts",	  FULLCONFIG_ALL,  0, doaccounts },
-	{ "delay",	  FULLCONFIG_ALL,  F_UDP|F_ALLOCATED, dodelay },
-	{ "linkdelay",	  FULLCONFIG_ALL,  F_UDP|F_ALLOCATED, dolinkdelay },
-	{ "hostnames",	  FULLCONFIG_NONE, F_UDP|F_ALLOCATED, dohosts },
-	{ "rpms",	  FULLCONFIG_ALL,  F_UDP|F_ALLOCATED, dorpms },
-	{ "deltas",	  FULLCONFIG_NONE, F_UDP|F_ALLOCATED, dodeltas },
-	{ "tarballs",	  FULLCONFIG_ALL,  F_UDP|F_ALLOCATED, dotarballs },
-	{ "startupcmd",	  FULLCONFIG_ALL,  F_UDP|F_ALLOCATED, dostartcmd },
-	{ "startstatus",  FULLCONFIG_NONE, F_UDP|F_ALLOCATED, dostartstat }, /* Before startstat*/
-	{ "startstat",	  FULLCONFIG_NONE, F_UDP, dostartstat },
-	{ "readycount",   FULLCONFIG_NONE, F_UDP|F_ALLOCATED, doreadycount },
-	{ "ready",	  FULLCONFIG_NONE, F_UDP|F_ALLOCATED, doready },
-	{ "mounts",	  FULLCONFIG_ALL,  F_UDP|F_ALLOCATED, domounts },
-	{ "sfshostid",	  FULLCONFIG_NONE, F_UDP|F_ALLOCATED, dosfshostid },
-	{ "loadinfo",	  FULLCONFIG_NONE, F_UDP, doloadinfo},
-	{ "reset",	  FULLCONFIG_NONE, F_UDP, doreset},
-	{ "routing",	  FULLCONFIG_ALL,  F_UDP|F_ALLOCATED, dorouting},
-	{ "trafgens",	  FULLCONFIG_ALL,  F_UDP|F_ALLOCATED, dotrafgens},
+	{ "reboot",	  FULLCONFIG_NONE, 0, doreboot },
+	{ "nodeid",	  FULLCONFIG_ALL,  0, donodeid },
+	{ "status",	  FULLCONFIG_NONE, 0, dostatus },
+	{ "ifconfig",	  FULLCONFIG_ALL,  F_ALLOCATED, doifconfig },
+	{ "accounts",	  FULLCONFIG_ALL,  F_REMREQSSL, doaccounts },
+	{ "delay",	  FULLCONFIG_ALL,  F_ALLOCATED, dodelay },
+	{ "linkdelay",	  FULLCONFIG_ALL,  F_ALLOCATED, dolinkdelay },
+	{ "hostnames",	  FULLCONFIG_NONE, F_ALLOCATED, dohosts },
+	{ "rpms",	  FULLCONFIG_ALL,  F_ALLOCATED, dorpms },
+	{ "deltas",	  FULLCONFIG_NONE, F_ALLOCATED, dodeltas },
+	{ "tarballs",	  FULLCONFIG_ALL,  F_ALLOCATED, dotarballs },
+	{ "startupcmd",	  FULLCONFIG_ALL,  F_ALLOCATED, dostartcmd },
+	{ "startstatus",  FULLCONFIG_NONE, F_ALLOCATED, dostartstat }, /* Before startstat*/
+	{ "startstat",	  FULLCONFIG_NONE, 0, dostartstat },
+	{ "readycount",   FULLCONFIG_NONE, F_ALLOCATED, doreadycount },
+	{ "ready",	  FULLCONFIG_NONE, F_ALLOCATED, doready },
+	{ "mounts",	  FULLCONFIG_ALL,  F_ALLOCATED, domounts },
+	{ "sfshostid",	  FULLCONFIG_NONE, F_ALLOCATED, dosfshostid },
+	{ "loadinfo",	  FULLCONFIG_NONE, 0, doloadinfo},
+	{ "reset",	  FULLCONFIG_NONE, 0, doreset},
+	{ "routing",	  FULLCONFIG_ALL,  F_ALLOCATED, dorouting},
+	{ "trafgens",	  FULLCONFIG_ALL,  F_ALLOCATED, dotrafgens},
 	{ "nseconfigs",	  FULLCONFIG_ALL,  F_ALLOCATED, donseconfigs},
-	{ "creator",	  FULLCONFIG_ALL,  F_UDP|F_ALLOCATED, docreator},
-	{ "state",	  FULLCONFIG_NONE, F_UDP, dostate},
-	{ "tunnels",	  FULLCONFIG_ALL,  F_UDP|F_ALLOCATED, dotunnels},
-	{ "vnodelist",	  FULLCONFIG_PHYS, F_UDP, dovnodelist},
-	{ "subnodelist",  FULLCONFIG_PHYS, F_UDP, dosubnodelist},
-	{ "isalive",	  FULLCONFIG_NONE, F_UDP|F_REMUDP|F_UDP|F_MINLOG, doisalive},
+	{ "creator",	  FULLCONFIG_ALL,  F_ALLOCATED, docreator},
+	{ "state",	  FULLCONFIG_NONE, 0, dostate},
+	{ "tunnels",	  FULLCONFIG_ALL,  F_ALLOCATED, dotunnels},
+	{ "vnodelist",	  FULLCONFIG_PHYS, 0, dovnodelist},
+	{ "subnodelist",  FULLCONFIG_PHYS, 0, dosubnodelist},
+	{ "isalive",	  FULLCONFIG_NONE, F_REMUDP|F_MINLOG, doisalive},
 	{ "ipodinfo",	  FULLCONFIG_PHYS, 0, doipodinfo},
 	{ "ntpinfo",	  FULLCONFIG_PHYS, 0, dontpinfo},
 	{ "ntpdrift",	  FULLCONFIG_NONE, 0, dontpdrift},
-	{ "jailconfig",	  FULLCONFIG_VIRT, F_UDP|F_ALLOCATED, dojailconfig},
-	{ "plabconfig",	  FULLCONFIG_VIRT, F_UDP|F_ALLOCATED, doplabconfig},
-	{ "subconfig",	  FULLCONFIG_NONE, F_UDP, dosubconfig},
-        { "sdparams",     FULLCONFIG_PHYS, F_UDP, doslothdparams},
-        { "programs",     FULLCONFIG_ALL,  F_UDP|F_ALLOCATED, doprogagents},
-        { "syncserver",   FULLCONFIG_ALL,  F_UDP|F_ALLOCATED, dosyncserver},
-        { "keyhash",      FULLCONFIG_ALL,  F_UDP|F_ALLOCATED, dokeyhash},
-        { "eventkey",     FULLCONFIG_ALL,  F_UDP|F_ALLOCATED, doeventkey},
-        { "fullconfig",   FULLCONFIG_NONE, F_UDP|F_ALLOCATED, dofullconfig},
-        { "routelist",	  FULLCONFIG_PHYS, F_UDP|F_ALLOCATED, doroutelist},
-        { "role",	  FULLCONFIG_PHYS, F_UDP|F_ALLOCATED, dorole},
-        { "rusage",	  FULLCONFIG_NONE, F_UDP|F_REMUDP|F_UDP|F_MINLOG, dorusage},
-        { "watchdoginfo", FULLCONFIG_ALL,  F_UDP|F_REMUDP|F_UDP|F_MINLOG, dodoginfo},
-        { "hostkeys",     FULLCONFIG_NONE, F_UDP, dohostkeys},
-        { "firewallinfo", FULLCONFIG_ALL,  F_UDP, dofwinfo},
-        { "hostinfo",     FULLCONFIG_NONE, F_UDP, dohostinfo},
-	{ "emulabconfig", FULLCONFIG_NONE, F_UDP|F_ALLOCATED, doemulabconfig},
-	{ "eplabconfig",  FULLCONFIG_NONE, F_UDP|F_ALLOCATED, doeplabconfig},
-	{ "localization", FULLCONFIG_PHYS, F_UDP, dolocalize},
-	{ "booterrno",    FULLCONFIG_NONE, F_UDP, dobooterrno},
-	{ "battery",      FULLCONFIG_NONE, F_UDP|F_REMUDP|F_UDP|F_MINLOG, dobattery},
-	{ "userenv",      FULLCONFIG_ALL,  F_UDP|F_ALLOCATED, douserenv},
-	{ "tiptunnels",	  FULLCONFIG_ALL,  F_UDP|F_ALLOCATED, dotiptunnels},
-	{ "traceinfo",	  FULLCONFIG_ALL,  F_UDP|F_ALLOCATED, dotraceconfig },
-	{ "elvindport",   FULLCONFIG_NONE, F_UDP, doelvindport},
-	{ "plabeventkeys",FULLCONFIG_NONE, F_UDP, doplabeventkeys},
-	{ "intfcmap",     FULLCONFIG_NONE, F_UDP, dointfcmap},
-	{ "motelog",      FULLCONFIG_ALL,  F_UDP|F_ALLOCATED, domotelog},
-	{ "portregister", FULLCONFIG_NONE, F_UDP|F_REMNOSSL, doportregister},
-	{ "bootwhat",	  FULLCONFIG_NONE, F_UDP, dobootwhat },
+	{ "jailconfig",	  FULLCONFIG_VIRT, F_ALLOCATED, dojailconfig},
+	{ "plabconfig",	  FULLCONFIG_VIRT, F_ALLOCATED, doplabconfig},
+	{ "subconfig",	  FULLCONFIG_NONE, 0, dosubconfig},
+        { "sdparams",     FULLCONFIG_PHYS, 0, doslothdparams},
+        { "programs",     FULLCONFIG_ALL,  F_ALLOCATED, doprogagents},
+        { "syncserver",   FULLCONFIG_ALL,  F_ALLOCATED, dosyncserver},
+        { "keyhash",      FULLCONFIG_ALL,  F_ALLOCATED|F_REMREQSSL, dokeyhash},
+        { "eventkey",     FULLCONFIG_ALL,  F_ALLOCATED, doeventkey},
+        { "fullconfig",   FULLCONFIG_NONE, F_ALLOCATED, dofullconfig},
+        { "routelist",	  FULLCONFIG_PHYS, F_ALLOCATED, doroutelist},
+        { "role",	  FULLCONFIG_PHYS, F_ALLOCATED, dorole},
+        { "rusage",	  FULLCONFIG_NONE, F_REMUDP|F_MINLOG, dorusage},
+        { "watchdoginfo", FULLCONFIG_ALL,  F_REMUDP|F_MINLOG, dodoginfo},
+        { "hostkeys",     FULLCONFIG_NONE, 0, dohostkeys},
+        { "firewallinfo", FULLCONFIG_ALL,  0, dofwinfo},
+        { "hostinfo",     FULLCONFIG_NONE, 0, dohostinfo},
+	{ "emulabconfig", FULLCONFIG_NONE, F_ALLOCATED, doemulabconfig},
+	{ "eplabconfig",  FULLCONFIG_NONE, F_ALLOCATED, doeplabconfig},
+	{ "localization", FULLCONFIG_PHYS, 0, dolocalize},
+	{ "rootpswd",     FULLCONFIG_NONE, F_REMREQSSL, dorootpswd},
+	{ "booterrno",    FULLCONFIG_NONE, 0, dobooterrno},
+	{ "battery",      FULLCONFIG_NONE, F_REMUDP|F_MINLOG, dobattery},
+	{ "userenv",      FULLCONFIG_ALL,  F_ALLOCATED, douserenv},
+	{ "tiptunnels",	  FULLCONFIG_ALL,  F_ALLOCATED, dotiptunnels},
+	{ "traceinfo",	  FULLCONFIG_ALL,  F_ALLOCATED, dotraceconfig },
+	{ "elvindport",   FULLCONFIG_NONE, 0, doelvindport},
+	{ "plabeventkeys",FULLCONFIG_NONE, F_REMREQSSL, doplabeventkeys},
+	{ "intfcmap",     FULLCONFIG_NONE, 0, dointfcmap},
+	{ "motelog",      FULLCONFIG_ALL,  F_ALLOCATED, domotelog},
+	{ "portregister", FULLCONFIG_NONE, F_REMNOSSL, doportregister},
+	{ "bootwhat",	  FULLCONFIG_NONE, 0, dobootwhat },
 };
 static int numcommands = sizeof(xml_command_array)/sizeof(struct command);
 
@@ -348,10 +350,10 @@ struct raw_command {
 	int	flags;
 	int    (*func)(char **, int *, int, tmcdreq_t *, char *);
 } raw_xml_command_array[] = {
-	{ "bootlog",      FULLCONFIG_NONE, F_UDP, dobootlog},
-	{ "ltmap",        FULLCONFIG_NONE, F_UDP|F_MINLOG|F_ALLOCATED, doltmap},
-	{ "ltpmap",       FULLCONFIG_NONE, F_UDP|F_MINLOG|F_ALLOCATED, doltpmap},
-	{ "topomap",      FULLCONFIG_NONE, F_UDP|F_MINLOG|F_ALLOCATED, dotopomap},
+	{ "bootlog",      FULLCONFIG_NONE, 0, dobootlog},
+	{ "ltmap",        FULLCONFIG_NONE, F_MINLOG|F_ALLOCATED, doltmap},
+	{ "ltpmap",       FULLCONFIG_NONE, F_MINLOG|F_ALLOCATED, doltpmap},
+	{ "topomap",      FULLCONFIG_NONE, F_MINLOG|F_ALLOCATED, dotopomap},
 };
 static int numrawcommands = sizeof(raw_xml_command_array)/sizeof(struct raw_command);
 
@@ -504,7 +506,7 @@ tmcdresp_t *tmcd_handle_request(tmcdreq_t *reqp, int sock, char *command, char *
 	 * Ditto for remote node connection without SSL.
 	 */
 	if (reqp->istcp && !reqp->isssl && !reqp->islocal && 
-	    (flags & F_REMNOSSL) == 0) {
+	    (flags & F_REMREQSSL) != 0) {
 		error("%s: %s: Invalid NO-SSL request from remote node\n",
 		      reqp->nodeid, command);
 		goto skipit;
@@ -919,7 +921,12 @@ XML_COMMAND_PROTOTYPE(doifconfig)
 			 "  vll.idx=v.virtlanidx and vll.exptidx='%d' "
 			 "left join lan_attributes as la on "
 			 "  la.lanid=v.vlanid and la.attrkey='vlantag' "
-			 "where v.node_id='%s' and %s",
+			 "left join lan_attributes as la2 on "
+			 "  la2.lanid=v.vlanid and la2.attrkey='stack' "
+			 "where v.node_id='%s' and "
+			 "      (la2.attrvalue='Experimental' or "
+			 "       la2.attrvalue is null) "
+			 "      and %s",
 			 10, reqp->exptidx, reqp->pnodeid, buf);
 	if (!res) {
 		error("IFCONFIG: %s: DB Error getting veth interfaces!\n",
@@ -983,6 +990,12 @@ XML_COMMAND_PROTOTYPE(doifconfig)
 			else if (strcmp(row[6], "vlan") == 0)
 				tag = row[9];
 
+			/* sanity check the tag */
+			if (!isdigit(tag[0])) {
+				error("IFCONFIG: bogus encap tag '%s'\n", tag);
+				tag = "0";
+			}
+
 			add_key(node, "vtag", tag);
 		}
 
@@ -1004,6 +1017,7 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 	xmlNode *node, *accounts_node;
 	int		nrows, gidint;
 	int		tbadmin, didwidearea = 0, nodetypeprojects = 0;
+	int		didnonlocal = 0;
 
 	/*
 	 * Now check reserved table
@@ -1166,7 +1180,7 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 				 "  p.trust,g.pid,g.gid,g.unix_gid,u.admin, "
 				 "  u.emulab_pubkey,u.home_pubkey, "
 				 "  UNIX_TIMESTAMP(u.usr_modified), "
-				 "  u.usr_email,u.usr_shell "
+				 "  u.usr_email,u.usr_shell,u.uid_idx "
 				 "from group_membership as p "
 				 "join users as u on p.uid_idx=u.uid_idx "
 				 "join groups as g on p.pid=g.pid "
@@ -1174,14 +1188,13 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 				 "      and u.webonly=0 "
                                  "      and g.unix_id is not NULL "
 				 "      and u.status='active' order by u.uid",
-				 14, reqp->pid, reqp->gid);
+				 15, reqp->pid, reqp->gid);
 	}
 	else if (nodetypeprojects) {
 		/*
 		 * The projects/groups are specified as a comma separated
 		 * list in the node_type_attributes table. Return this
-		 * set of users, plus those in emulab-ops since we want
-		 * to include emulab-ops people too.
+		 * set of users.
 		 */
 		res = mydb_query(reqp, "select distinct  "
 				 "u.uid,'*',u.unix_uid,u.usr_name, "
@@ -1190,7 +1203,7 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 				 "UNIX_TIMESTAMP(u.usr_modified), "
 				 "u.usr_email,u.usr_shell, "
 				 "u.widearearoot,u.wideareajailroot, "
-				 "u.usr_w_pswd "
+				 "u.usr_w_pswd,u.uid_idx "
 				 "from projects as p "
 				 "join group_membership as m on "
 				 "     m.pid_idx=p.pid_idx "
@@ -1201,16 +1214,16 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 				 "      and m.trust!='none' "
 				 "      and u.webonly=0 "
                                  "      and g.unix_gid is not NULL "
-				 "      and u.status='active' and "
+				 "      and u.status='active' "
+				 "      and u.admin=0 and "
 				 "  (FIND_IN_SET(g.gid_idx, "
 				 "   (select na.attrvalue from nodes as n "
 				 "    left join node_type_attributes as na on "
 				 "         n.type=na.type "
 				 "    where n.node_id='%s' and "
-				 "    na.attrkey='project_accounts')) > 0 or "
-				 "   p.pid='%s') "
+				 "    na.attrkey='project_accounts')) > 0) "
 				 "order by u.uid",
-				 17, reqp->nodeid, RELOADPID);
+				 18, reqp->nodeid);
 	}
 	else if (reqp->islocal || reqp->isvnode) {
 		/*
@@ -1221,6 +1234,11 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 		 * user to return. Well, a primary group and a list of aux
 		 * groups for that user.
 		 */
+	  	char adminclause[MYBUFSIZE];
+		strcpy(adminclause, "");
+#ifdef ISOLATEADMINS
+		sprintf(adminclause, "and u.admin=%d", reqp->swapper_isadmin);
+#endif
 		res = mydb_query(reqp, "select distinct "
 				 "  u.uid,u.usr_pswd,u.unix_uid,u.usr_name, "
 				 "  p.trust,g.pid,g.gid,g.unix_gid,u.admin, "
@@ -1228,7 +1246,7 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 				 "  UNIX_TIMESTAMP(u.usr_modified), "
 				 "  u.usr_email,u.usr_shell, "
 				 "  u.widearearoot,u.wideareajailroot, "
-				 "  u.usr_w_pswd "
+				 "  u.usr_w_pswd,u.uid_idx "
 				 "from group_membership as p "
 				 "join users as u on p.uid_idx=u.uid_idx "
 				 "join groups as g on "
@@ -1236,9 +1254,10 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 				 "where ((p.pid='%s')) and p.trust!='none' "
 				 "      and u.status='active' "
 				 "      and u.webonly=0 "
+				 "      %s "
                                  "      and g.unix_gid is not NULL "
 				 "order by u.uid",
-				 17, reqp->pid);
+				 18, reqp->pid, adminclause);
 	}
 	else if (reqp->jailflag) {
 		/*
@@ -1252,7 +1271,7 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 			     "  UNIX_TIMESTAMP(u.usr_modified), "
 			     "  u.usr_email,u.usr_shell, "
 			     "  u.widearearoot,u.wideareajailroot, "
-			     "  u.usr_w_pswd "
+			     "  u.usr_w_pswd,u.uid_idx "
 			     "from group_membership as p "
 			     "join users as u on p.uid_idx=u.uid_idx "
 			     "join groups as g on "
@@ -1260,7 +1279,57 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 			     "where (p.pid='%s') and p.trust!='none' "
 			     "      and u.status='active' and u.admin=1 "
 			     "      order by u.uid",
-			     17, RELOADPID);
+			     18, RELOADPID);
+	}
+	else if (!reqp->islocal && reqp->isdedicatedwa) {
+		/*
+		 * Wonder why this code is a copy of the islocal || vnode
+		 * case above?  It's because I don't want to prevent us from
+		 * from the above case where !islocal && jailflag
+		 * for dedicated widearea nodes.
+		 */
+
+		/*
+		 * This crazy join is going to give us multiple lines for
+		 * each user that is allowed on the node, where each line
+		 * (for each user) differs by the project PID and it unix
+		 * GID. The intent is to build up a list of GIDs for each
+		 * user to return. Well, a primary group and a list of aux
+		 * groups for that user.
+		 */
+	  	char adminclause[MYBUFSIZE];
+		strcpy(adminclause, "");
+#ifdef ISOLATEADMINS
+		sprintf(adminclause, "and u.admin=%d", reqp->swapper_isadmin);
+#endif
+		res = mydb_query("select distinct "
+				 "  u.uid,'*',u.unix_uid,u.usr_name, "
+				 "  p.trust,g.pid,g.gid,g.unix_gid,u.admin, "
+				 "  u.emulab_pubkey,u.home_pubkey, "
+				 "  UNIX_TIMESTAMP(u.usr_modified), "
+				 "  u.usr_email,u.usr_shell, "
+				 "  u.widearearoot,u.wideareajailroot, "
+				 "  u.usr_w_pswd,u.uid_idx "
+				 "from group_membership as p "
+				 "join users as u on p.uid_idx=u.uid_idx "
+				 "join groups as g on "
+				 "     p.pid=g.pid and p.gid=g.gid "
+				 "where ((p.pid='%s')) and p.trust!='none' "
+				 "      and u.status='active' "
+				 "      and u.webonly=0 "
+				 "      %s "
+                                 "      and g.unix_gid is not NULL "
+				 "order by u.uid",
+				 18, reqp->pid, adminclause);
+	}
+	else if (!reqp->islocal && reqp->isdedicatedwa) {
+	        /*
+		 * Catch widearea nodes that are dedicated to a single pid/eid.
+		 * Same as local case.
+		 */
+		res = mydb_query("select unix_name,unix_gid from groups "
+				 "where pid='%s'",
+				 2, reqp->pid);
 	}
 	else {
 		/*
@@ -1312,7 +1381,7 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 				 "UNIX_TIMESTAMP(u.usr_modified), "
 				 "u.usr_email,u.usr_shell, "
 				 "u.widearearoot,u.wideareajailroot, "
-				 "u.usr_w_pswd "
+				 "u.usr_w_pswd,u.uid_idx "
 				 "from projects as p "
 				 "join group_membership as m "
 				 "  on m.pid=p.pid "
@@ -1323,10 +1392,11 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 				 "      and %s "
 				 "      and m.trust!='none' "
 				 "      and u.webonly=0 "
+				 "      and u.admin=0 "
                                  "      and g.unix_gid is not NULL "
 				 "      and u.status='active' "
 				 "order by u.uid",
-				 17, subclause);
+				 18, subclause);
 	}
 
 	if (!res) {
@@ -1410,10 +1480,11 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 
 		/*
 		 * widearearoot and wideareajailroot override trust values
-		 * from the project (above). Of course, tbadmin overrides
-		 * everthing!
+		 * from the project (above) (IF the node is not isdedicatedwa,
+		 * since these must behave like local). Of course, tbadmin
+		 * overrides everthing!
 		 */
-		if (!reqp->islocal && !reqp->isplabdslice) {
+		if (!reqp->islocal && !reqp->isdedicatedwa && !reqp->isplabdslice) {
 			if (!reqp->isvnode)
 				is_root = atoi(row[14]);
 			else
@@ -1495,8 +1566,9 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 		 * Add an argument of "pubkeys" to get the PUBKEY data.
 		 * An "windows" argument also returns a user's Windows Password.
 		 */
-		if (reqp->islocal && ! (strncmp(rdata, "pubkeys", 7) == 0
-					|| strncmp(rdata, "windows", 7) == 0))
+		if (reqp->islocal && !reqp->genisliver_idx &&
+		    ! (strncmp(rdata, "pubkeys", 7) == 0
+		       || strncmp(rdata, "windows", 7) == 0))
 			goto skipsshkeys;
 
 		/*
@@ -1504,8 +1576,8 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 		 */
 		pubkeys_res = mydb_query(reqp, "select idx,pubkey "
 					 " from user_pubkeys "
-					 "where uid='%s'",
-					 2, row[0]);
+					 "where uid_idx='%s'",
+					 2, row[17]);
 	
 		if (!pubkeys_res) {
 			error("ACCOUNTS: %s: DB Error getting keys\n", row[0]);
@@ -1544,8 +1616,8 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 		 */
 		sfskeys_res = mydb_query(reqp, "select comment,pubkey "
 					 " from user_sfskeys "
-					 "where uid='%s'",
-					 2, row[0]);
+					 "where uid_idx='%s'",
+					 2, row[17]);
 
 		if (!sfskeys_res) {
 			error("ACCOUNTS: %s: DB Error getting SFS keys\n", row[0]);
@@ -1605,6 +1677,32 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 				mysql_free_result(res);
 		}
 	}
+	if (reqp->genisliver_idx && !didnonlocal) {
+	        didnonlocal = 1;
+
+		res = mydb_query("select distinct "
+				 "  u.uid,'*',u.uid_idx,u.name, "
+				 "  'local_root',g.pid,g.gid,g.unix_gid,0, "
+				 "  NULL,NULL,0, "
+				 "  u.email,'csh', "
+				 "  0,0, "
+				 "  NULL,u.uid_idx "
+				 "from nonlocal_user_bindings as b "
+				 "join nonlocal_users as u on "
+				 "     b.uid_idx=u.uid_idx "
+				 "join groups as g on "
+				 "     g.pid='%s' and g.pid=g.gid "
+				 "where (b.exptidx='%d') "
+				 "order by u.uid",
+				 18, reqp->pid, reqp->exptidx);
+		
+		if (res) {
+			if ((nrows = mysql_num_rows(res)))
+				goto again;
+			else
+				mysql_free_result(res);
+		}
+	}
 	return 0;
 }
 
@@ -1632,14 +1730,15 @@ XML_COMMAND_PROTOTYPE(dodelay)
 		 "q0_droptail,q0_gentle, "
 		 "q1_limit,q1_maxthresh,q1_minthresh,q1_weight,q1_linterm, "
 		 "q1_qinbytes,q1_bytes,q1_meanpsize,q1_wait,q1_setbit, "
-		 "q1_droptail,q1_gentle,vnode0,vnode1,noshaping "
+		 "q1_droptail,q1_gentle,vnode0,vnode1,noshaping, "
+		 "backfill0,backfill1"
                  " from delays as d "
 		 "left join interfaces as i on "
 		 " i.node_id=d.node_id and i.iface=iface0 "
 		 "left join interfaces as j on "
 		 " j.node_id=d.node_id and j.iface=iface1 "
 		 " where d.node_id='%s'",	 
-		 40, reqp->nodeid);
+		 42, reqp->nodeid);
 	if (!res) {
 		error("DELAY: %s: DB Error getting delays!\n", reqp->nodeid);
 		return 1;
@@ -1705,6 +1804,8 @@ XML_COMMAND_PROTOTYPE(dodelay)
 		add_key(node, "vnode0", (row[37] ? row[37] : "foo"));
 		add_key(node, "vnode1", (row[38] ? row[38] : "bar"));
 		add_key(node, "noshaping", row[39]);
+		add_key(node, "backfill0", row[40]);
+		add_key(node, "backfill1", row[41]);
 
 		nrows--;
 	}
@@ -2369,8 +2470,10 @@ XML_COMMAND_PROTOTYPE(domounts)
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
 	char		buf[MYBUFSIZE];
-	int		nrows;
-	int		usesfs;
+	int		nrows, usesfs;
+#ifdef  ISOLATEADMINS
+	int		isadmin;
+#endif
 	xmlNode		*node, *mount_node;
 
 	/*
@@ -2411,6 +2514,12 @@ XML_COMMAND_PROTOTYPE(domounts)
 	 * belongs to the experiment (people can log into it). 
 	 */
 	if (reqp->jailflag)
+		return 0;
+
+	/*
+	 * XXX
+	 */
+	if (reqp->genisliver_idx)
 		return 0;
 
 	mount_node = new_response(root, "mounts");
@@ -2638,7 +2747,7 @@ XML_COMMAND_PROTOTYPE(domounts)
 	/*
 	 * Remote nodes do not get per-user mounts. See above.
 	 */
-	if (!reqp->islocal)
+	if (!reqp->islocal || reqp->genisliver_idx)
 		return 0;
 	
 	/*
@@ -2672,27 +2781,14 @@ XML_COMMAND_PROTOTYPE(domounts)
 	 * experiments projects, plus all the members of all of the projects
 	 * that have been granted access to share the nodes in that expt.
 	 */
-#ifdef  NOSHAREDEXPTS
-	res = mydb_query(reqp, "select u.uid from users as u "
+	res = mydb_query("select u.uid,u.admin from users as u "
 			 "left join group_membership as p on "
 			 "     p.uid_idx=u.uid_idx "
 			 "where p.pid='%s' and p.gid='%s' and "
 			 "      u.status='active' and "
 			 "      u.webonly=0 and "
 			 "      p.trust!='none'",
-			 1, reqp->pid, reqp->gid);
-#else
-	res = mydb_query(reqp, "select distinct u.uid from users as u "
-			 "left join exppid_access as a "
-			 " on a.exp_pid='%s' and a.exp_eid='%s' "
-			 "left join group_membership as p on "
-			 "     p.uid_idx=u.uid_idx "
-			 "where ((p.pid='%s' and p.gid='%s') or p.pid=a.pid) "
-			 "       and u.status='active' and "
-			 "       u.webonly=0 and "
-			 "       p.trust!='none'",
-			 1, reqp->pid, reqp->eid, reqp->pid, reqp->gid);
-#endif
+			 2, reqp->pid, reqp->gid);
 	if (!res) {
 		error("MOUNTS: %s: DB Error getting users!\n", reqp->pid);
 		return 1;
@@ -2704,15 +2800,21 @@ XML_COMMAND_PROTOTYPE(domounts)
 		return 0;
 	}
 
-	while (nrows) {
+	while (nrows--) {
 		row = mysql_fetch_row(res);
+
+#ifdef ISOLATEADMINS
+		isadmin = atoi(row[1]);
+		if (isadmin != reqp->swapper_isadmin) {
+			continue;
+		}
+#endif
 		node = new_response(mount_node, "mount");
 		snprintf(buf, sizeof(buf), "%s/%s", FSUSERDIR,
 				row[0]);
 		add_key(node, "remote", buf);
 		add_format_key(node, "local", "%s/%s", USERDIR, row[0]);
 				
-		nrows--;
 		if (reqp->verbose)
 		    info("MOUNTS: %s", buf);
 	}
@@ -2951,7 +3053,8 @@ XML_COMMAND_PROTOTYPE(doloadinfo)
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
 	char		*disktype, *useacpi, *useasf, address[MYBUFSIZE];
-	int		disknum, zfill, mbrvers;
+	char		mbrvers[51];
+	int		disknum, zfill;
 	xmlNode		*node;
 
 	/*
@@ -3025,9 +3128,9 @@ XML_COMMAND_PROTOTYPE(doloadinfo)
 	zfill = 0;
 	if (row[4] && row[4][0])
 		zfill = atoi(row[4]);
-	mbrvers = 1;
+	strcpy(mbrvers,"1");
 	if (row[5] && row[5][0])
-		mbrvers = atoi(row[5]);
+		strcpy(mbrvers, row[5]);
 
 	/*
 	 * Get disk type and number
@@ -3079,7 +3182,7 @@ XML_COMMAND_PROTOTYPE(doloadinfo)
 	add_format_key(node, "disk", "%s%d", disktype, disknum);
 	add_format_key(node, "zfill", "%d", zfill);
 	add_key(node, "acpi", useacpi);
-	add_format_key(node, "mbrvers", "%d", mbrvers);
+	add_format_key(node, "mbrvers", "%s", mbrvers);
 	add_key(node, "asf", useasf);
 
 	mysql_free_result(res);
@@ -3621,6 +3724,14 @@ XML_COMMAND_PROTOTYPE(dojailconfig)
 		/* Silent error is fine */
 		return 0;
 	}
+	/*
+	 * geni nodes get something completely different. 
+	 */
+	if (reqp->genisliver_idx) {
+		node = new_response(root, "jailconfig");
+		add_format_key(node, "eventserver", "event-server.%s", OURDOMAIN);
+		return 0;
+	}
 	if (!reqp->jailflag)
 		return 0;
 
@@ -3681,6 +3792,7 @@ XML_COMMAND_PROTOTYPE(dojailconfig)
 	add_key(node, "ipdivert", "1");
 	add_key(node, "routing",  reqp->islocal ? "1" : "0");
 	add_key(node, "devmem",  reqp->islocal ? "1" : "0");
+	add_format_key(node, "eventserver", "event-server.%s", OURDOMAIN);
 
 	mysql_free_result(res);
 
@@ -4181,6 +4293,14 @@ XML_COMMAND_PROTOTYPE(dofullconfig)
 
 	for (i = 0; i < numcommands; i++) {
 		if (xml_command_array[i].fullconfig & mask) {
+			if (tcp && !isssl && !reqp->islocal && 
+			    (xml_command_array[i].flags & F_REMREQSSL) != 0) {
+				/*
+				 * Silently drop commands that are not
+				 * allowed for remote non-ssl connections.
+				 */
+				continue;
+			}
 			xml_command_array[i].func(root, reqp, rdata);
 		}
 	}
@@ -4290,6 +4410,7 @@ XML_COMMAND_PROTOTYPE(dodoginfo)
 	int		nrows, *iv;
 	int		iv_interval, iv_isalive, iv_ntpdrift, iv_cvsup;
 	int		iv_rusage, iv_hkeys;
+	int		rootpswdinterval = 0;
 	xmlNode		*node;
 
 	/*
@@ -4371,6 +4492,10 @@ XML_COMMAND_PROTOTYPE(dodoginfo)
 	else
 		iv_isalive = 0;
 
+#ifdef DYNAMICROOTPASSWORDS
+	        rootpswdinterval = 3600;
+#endif
+
 	node = new_response(root, "doginfo");
 	add_format_key(node, "interval", "%d", iv_interval);
 	add_format_key(node, "isalive", "%d", iv_isalive);
@@ -4378,6 +4503,7 @@ XML_COMMAND_PROTOTYPE(dodoginfo)
 	add_format_key(node, "cvsup", "%d", iv_cvsup);
 	add_format_key(node, "rusage", "%d", iv_rusage);
 	add_format_key(node, "hostkeys", "%d", iv_hkeys);
+	add_format_key(node, "setrootpswd", "%d", rootpswdinterval);
 
 	return 0;
 }
@@ -5045,11 +5171,12 @@ XML_COMMAND_PROTOTYPE(doeplabconfig)
 	res = mydb_query(reqp, "select vl.vnode,r.node_id,vn.plab_plcnet,"
 			 "       vn.plab_role,i.IP,i.mask,i.mac"
 			 "  from reserved as r left join virt_lans as vl"
-			 "    on r.pid=vl.pid and r.eid=vl.eid"
+			 "    on r.exptidx=vl.exptidx"
 			 "  left join interfaces as i"
 			 "    on vl.ip=i.IP and r.node_id=i.node_id"
 			 "  left join virt_nodes as vn"
 			 "    on vl.vname=vn.plab_plcnet and r.vname=vn.vname"
+			 "      and vn.exptidx=r.exptidx"
 			 "  where r.pid='%s' and r.eid='%s' and"
                          "    r.plab_role != 'none' and i.IP != ''"
 			 "      and vn.plab_plcnet != 'none'"
@@ -5109,6 +5236,72 @@ XML_COMMAND_PROTOTYPE(dolocalize)
 		add_key(node, "rootpubkey", row[1]);
 	}
 	mysql_free_result(res);
+	return 0;
+}
+
+/*
+ * Return root password
+ */
+XML_COMMAND_PROTOTYPE(dorootpswd)
+{
+	MYSQL_RES	*res;
+	MYSQL_ROW	row;
+	char		buf[MYBUFSIZE], hashbuf[MYBUFSIZE], *bp;
+	xmlNode		*node;
+
+	res = mydb_query("select attrvalue from node_attributes "
+			 " where node_id='%s' and "
+			 "       attrkey='root_password'",
+			 1, reqp->pnodeid);
+
+	if (!res || (int)mysql_num_rows(res) == 0) {
+		unsigned char	randdata[5];
+		int		fd, cc, i;
+	
+		if ((fd = open("/dev/urandom", O_RDONLY)) < 0) {
+			errorc("opening /dev/urandom");
+			return 1;
+		}
+		if ((cc = read(fd, randdata, sizeof(randdata))) < 0) {
+			errorc("reading /dev/urandom");
+			close(fd);
+			return 1;
+		}
+		if (cc != sizeof(randdata)) {
+			error("Short read from /dev/urandom: %d", cc);
+			close(fd);
+			return 1;
+		}
+		close(fd);
+
+		bp = hashbuf;
+		for (i = 0; i < sizeof(randdata); i++) {
+			bp += sprintf(bp, "%02x", randdata[i]);
+		}
+		*bp = '\0';
+
+		mydb_update("replace into node_attributes set "
+			    "  node_id='%s', "
+			    "  attrkey='root_password',attrvalue='%s'",
+			    reqp->nodeid, hashbuf);
+	}
+	else {
+		row = mysql_fetch_row(res);
+		strcpy(hashbuf, row[0]);
+	}
+	if (res)
+		mysql_free_result(res);
+	
+	/*
+	 * Need to crypt() this for the node since we obviously do not want
+	 * to return the plain text.
+	 */
+	sprintf(buf, "$1$%s", hashbuf);
+	bp = crypt(hashbuf, buf);
+
+	node = new_response(root, "rootpswd");
+	add_key(node, "hash", bp);
+
 	return 0;
 }
 
@@ -5877,6 +6070,11 @@ XML_COMMAND_PROTOTYPE(dobootwhat)
 
 	node = new_response(root, "bootwhat");
 
+	if(strlen(reqp->privkey) > 1) { /* We have a private key, so prepare bootinfo for it. */
+		boot_info.opcode = BIOPCODE_BOOTWHAT_KEYED_REQUEST;
+		strncpy(boot_info.data, reqp->privkey, TBDB_FLEN_PRIVKEY);
+	}
+
 	if (bootinfo(reqp->client, &boot_info, (void *) reqp)) {
 		add_key(node, "status", "failed");
 	}
@@ -6050,10 +6248,14 @@ iptonodeid(tmcdreq_t *reqp, struct in_addr ipaddr, char* nodekey)
 	 *
 	 * XXX Locally, the jail flag is not set on the phys node, only
 	 * on the virtnodes. This is okay since all the routines that
-	 * check jailflag also check to see if its a vnode or physnode. 
+	 * check jailflag also check to see if its a vnode or physnode.
 	 */
-	if((key != NULL) && (strlen(nodekey) > 1) ) {
-		res = mydb_query(reqp, "select t.class,t.type,n.node_id,n.jailflag,"
+	/*
+	 * Widearea nodes have wanodekeys that should be used to get
+	 * the nodeid.
+	 */ 
+	if ((nodekey != NULL) && (strlen(nodekey) > 1)) {
+		res = mydb_query("SELECT t.class,t.type,n.node_id,n.jailflag,"
 				 " r.pid,r.eid,r.vname,e.gid,e.testdb, "
 				 " n.update_accounts,n.role, "
 				 " e.expt_head_uid,e.expt_swap_uid, "
@@ -6061,20 +6263,41 @@ iptonodeid(tmcdreq_t *reqp, struct in_addr ipaddr, char* nodekey)
 				 " t.isremotenode,t.issubnode,e.keyhash, "
 				 " nk.sfshostid,e.eventkey,0, "
 				 " 0,e.elab_in_elab,e.elabinelab_singlenet, "
-				 " e.idx "
-				 "from nodes as n "
-				 "left join reserved as r on "
+				 " e.idx,e.creator_idx,e.swapper_idx, "
+				 " u.admin,dedicated_wa_types.attrvalue "
+				 "   AS isdedicated_wa, "
+				 " r.genisliver_idx,r.tmcd_redirect "
+				 "FROM nodes AS n "
+				 "LEFT JOIN reserved AS r ON "
 				 "  r.node_id=n.node_id "
-				 "left join experiments as e on "
+				 "LEFT JOIN experiments AS e ON "
 				 " e.pid=r.pid and e.eid=r.eid "
-				 "left join node_types as t on "
+				 "LEFT JOIN node_types AS t ON "
 				 " t.type=n.type "
-				 "left join node_hostkeys as nk on "
+				 "LEFT JOIN node_hostkeys AS nk ON "
 				 " nk.node_id=n.node_id "
-				 "where n.node_id in "
+				 "LEFT JOIN users AS u ON "
+				 " u.uid_idx=e.swapper_idx "
+				 "LEFT OUTER JOIN "
+				 "  (SELECT type,attrvalue "
+				 "    FROM node_type_attributes "
+				 "    WHERE attrkey='nobootinfo' "
+				 "      AND attrvalue='1' "
+				 "     GROUP BY type) AS nobootinfo_types "
+				 "  ON n.type=nobootinfo_types.type "
+				 "LEFT OUTER JOIN "
+				 "  (SELECT type,attrvalue "
+				 "   FROM node_type_attributes "
+				 "   WHERE attrkey='dedicated_widearea' "
+				 "   GROUP BY type) AS dedicated_wa_types "
+				 "  ON n.type=dedicated_wa_types.type "
+				"WHERE n.node_id IN "
                                         "(SELECT node_id FROM widearea_nodeinfo WHERE privkey='%s') "
-				 26, nodekey);
+				 "  AND nobootinfo_types.attrvalue IS NULL",
+				 32, nodekey);
+
 	}
+
 	else if (reqp->isvnode) {
 		res = mydb_query(reqp, "select vt.class,vt.type,np.node_id,"
 				 " nv.jailflag,r.pid,r.eid,r.vname, "
@@ -6085,7 +6308,9 @@ iptonodeid(tmcdreq_t *reqp, struct in_addr ipaddr, char* nodekey)
 				 " nk.sfshostid,e.eventkey,vt.isplabdslice, "
 				 " ps.admin, "
 				 " e.elab_in_elab,e.elabinelab_singlenet, "
-				 " e.idx "
+				 " e.idx,e.creator_idx,e.swapper_idx, "
+				 " u.admin,null, "
+				 " r.genisliver_idx,r.tmcd_redirect "
 				 "from nodes as nv "
 				 "left join nodes as np on "
 				 " np.node_id=nv.phys_nodeid "
@@ -6103,10 +6328,12 @@ iptonodeid(tmcdreq_t *reqp, struct in_addr ipaddr, char* nodekey)
 				 " ps.pid=e.pid and ps.eid=e.eid "
 				 "left join node_hostkeys as nk on "
 				 " nk.node_id=nv.node_id "
+				 "left join users as u on "
+				 " u.uid_idx=e.swapper_idx "
 				 "where nv.node_id='%s' and "
 				 " ((i.IP='%s' and i.role='ctrl') or "
 				 "  nv.jailip='%s')",
-				 26, reqp->vnodeid,
+				 32, reqp->vnodeid,
 				 inet_ntoa(ipaddr), inet_ntoa(ipaddr));
 	}
 	else {
@@ -6118,7 +6345,10 @@ iptonodeid(tmcdreq_t *reqp, struct in_addr ipaddr, char* nodekey)
 				 " t.isremotenode,t.issubnode,e.keyhash, "
 				 " nk.sfshostid,e.eventkey,0, "
 				 " 0,e.elab_in_elab,e.elabinelab_singlenet, "
-				 " e.idx "
+				 " e.idx,e.creator_idx,e.swapper_idx, "
+				 " u.admin,dedicated_wa_types.attrvalue "
+				 "   as isdedicated_wa, "
+				 " r.genisliver_idx,r.tmcd_redirect "
 				 "from interfaces as i "
 				 "left join nodes as n on n.node_id=i.node_id "
 				 "left join reserved as r on "
@@ -6129,8 +6359,24 @@ iptonodeid(tmcdreq_t *reqp, struct in_addr ipaddr, char* nodekey)
 				 " t.type=n.type "
 				 "left join node_hostkeys as nk on "
 				 " nk.node_id=n.node_id "
-				 "where i.IP='%s' and i.role='ctrl'", /*XXX*/
-				 26, inet_ntoa(ipaddr));
+				 "left join users as u on "
+				 " u.uid_idx=e.swapper_idx "
+				 "left outer join "
+				 "  (select type,attrvalue "
+				 "    from node_type_attributes "
+				 "    where attrkey='nobootinfo' "
+				 "      and attrvalue='1' "
+				 "     group by type) as nobootinfo_types "
+				 "  on n.type=nobootinfo_types.type "
+				 "left outer join "
+				 "  (select type,attrvalue "
+				 "   from node_type_attributes "
+				 "   where attrkey='dedicated_widearea' "
+				 "   group by type) as dedicated_wa_types "
+				 "  on n.type=dedicated_wa_types.type "
+				 "where i.IP='%s' and i.role='ctrl' "
+				 "  and nobootinfo_types.attrvalue is NULL",
+				 32, inet_ntoa(ipaddr));
 	}
 
 	if (!res) {
@@ -6156,12 +6402,12 @@ iptonodeid(tmcdreq_t *reqp, struct in_addr ipaddr, char* nodekey)
 	strncpy(reqp->pclass, row[14], sizeof(reqp->pclass));
 	strncpy(reqp->ptype,  row[15], sizeof(reqp->ptype));
 	strncpy(reqp->nodeid, row[2],  sizeof(reqp->nodeid));
-        if(nodekey != NULL) {
-                strncpy(reqp->privkey, nodekey, TBDB_FLEN_PRIVKEY);
-        }
-        else {  
-                strcpy(reqp->privkey, "");
-        }
+	if(nodekey != NULL) {
+		strncpy(reqp->privkey, nodekey, TBDB_FLEN_PRIVKEY); 
+	}
+	else {
+		strcpy(reqp->privkey, ""); 
+	}
 	reqp->islocal      = (! strcasecmp(row[16], "0") ? 1 : 0);
 	reqp->jailflag     = (! strcasecmp(row[3],  "0") ? 0 : 1);
 	reqp->issubnode    = (! strcasecmp(row[17], "0") ? 0 : 1);
@@ -6169,6 +6415,7 @@ iptonodeid(tmcdreq_t *reqp, struct in_addr ipaddr, char* nodekey)
 	reqp->isplabsvc    = (row[22] && strcasecmp(row[22], "0")) ? 1 : 0;
 	reqp->elab_in_elab = (row[23] && strcasecmp(row[23], "0")) ? 1 : 0;
 	reqp->singlenet    = (row[24] && strcasecmp(row[24], "0")) ? 1 : 0;
+	reqp->isdedicatedwa = (row[29] && !strncmp(row[29], "1", 1)) ? 1 : 0;
 
 	if (row[8])
 		strncpy(reqp->testdb, row[8], sizeof(reqp->testdb));
@@ -6184,10 +6431,19 @@ iptonodeid(tmcdreq_t *reqp, struct in_addr ipaddr, char* nodekey)
 			strcpy(reqp->nickname, reqp->nodeid);
 
 		strcpy(reqp->creator, row[11]);
-		if (row[12]) 
+		reqp->creator_idx = atoi(row[26]);
+		if (row[12]) {
 			strcpy(reqp->swapper, row[12]);
-		else
+			reqp->swapper_idx = atoi(row[27]);
+		}
+		else {
 			strcpy(reqp->swapper, reqp->creator);
+			reqp->swapper_idx = reqp->creator_idx;
+		}
+		if (row[28])
+			reqp->swapper_isadmin = atoi(row[28]);
+		else
+			reqp->swapper_isadmin = 0;
 
 		/*
 		 * If there is no gid (yes, thats bad and a mistake), then 
@@ -6209,6 +6465,13 @@ iptonodeid(tmcdreq_t *reqp, struct in_addr ipaddr, char* nodekey)
 		/* event key for the experiment */
 		if (row[20]) 
 			strcpy(reqp->eventkey, row[20]);
+		/* geni sliver idx */
+		if (row[30]) 
+			reqp->genisliver_idx = atoi(row[30]);
+		else
+			reqp->genisliver_idx = 0;
+		if (row[31]) 
+			strcpy(reqp->tmcd_redirect, row[31]);
 	}
 	
 	if (row[9])

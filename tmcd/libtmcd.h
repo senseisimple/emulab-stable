@@ -38,6 +38,7 @@ typedef struct {
 	int		isvnode;
 	int		issubnode;
 	int		islocal;
+	int		isdedicatedwa;
 	int		iscontrol;
 	int		isplabdslice;
 	int		isplabsvc;
@@ -45,6 +46,10 @@ typedef struct {
         int		singlenet;	  /* Modifier for elab_in_elab */
 	int		update_accounts;
 	int		exptidx;
+	int		creator_idx;
+	int		swapper_idx;
+	int		swapper_isadmin;
+	int		genisliver_idx;
 	char		nodeid[TBDB_FLEN_NODEID];
 	char		vnodeid[TBDB_FLEN_NODEID];
 	char		pnodeid[TBDB_FLEN_NODEID]; /* XXX */
@@ -63,6 +68,7 @@ typedef struct {
 	char		eventkey[TBDB_FLEN_PRIVKEY];
 	char		sfshostid[TBDB_FLEN_SFSHOSTID];
 	char		testdb[TBDB_FLEN_TINYTEXT];
+	char		tmcd_redirect[TBDB_FLEN_TINYTEXT];
 	char		privkey[TBDB_FLEN_PRIVKEY+1];
 } tmcdreq_t;
 
@@ -71,7 +77,7 @@ typedef struct {
 	int		length;
 } tmcdresp_t;
 
-int	iptonodeid(tmcdreq_t *, struct in_addr);
+int	iptonodeid(tmcdreq_t *reqp, struct in_addr ipaddr, char* nodekey);
 int	checkprivkey(tmcdreq_t *reqp, struct in_addr, char *);
 int	checkdbredirect(tmcdreq_t *);
 void	tmcd_free_response(tmcdresp_t *);

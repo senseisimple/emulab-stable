@@ -704,6 +704,13 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 		 * Look for PRIVKEY. 
 		 */
 		if (sscanf(bp, "PRIVKEY=%64s", buf)) {
+			for (i = 0; i < strlen(buf); i++){
+				if (! isxdigit(buf[i])) {
+					info("tmcd client provided invalid "
+					     "characters in privkey");
+					goto skipit;
+				}
+			}
 			havekey = 1;
 			strncpy(privkey, buf, sizeof(privkey));
 
@@ -757,6 +764,14 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 		 * cert or a key.
 		 */
 		if (sscanf(bp, "VNODEID=%30s", buf)) {
+			for (i = 0; i < strlen(buf); i++){
+				if (! (isalnum(buf[i]) ||
+				       buf[i] == '_' || buf[i] == '-')) {
+					info("tmcd client provided invalid "
+					     "characters in vnodeid");
+					goto skipit;
+				}
+			}
 			reqp->isvnode = 1;
 			strncpy(reqp->vnodeid, buf, sizeof(reqp->vnodeid));
 
@@ -788,14 +803,14 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	/*
 	 * Map the ip to a nodeid.
 	 */
-	if(havekey) {
-	if(err = iptonodeid(reqp, client->sin_addr, privkey)) {
-		error("No such node with wanode_key [%s]\n", privkey);
-		goto skipit;
+	if (havekey) {
+		if ((err = iptonodeid(client->sin_addr, reqp, privkey))) {
+			error("No such node with wanode_key [%s]\n", privkey);
+			goto skipit;
 		}
 	}
 	else {
-	if ((err = iptonodeid(reqp, client->sin_addr, NULL))) {
+		if ((err = iptonodeid(client->sin_addr, reqp, NULL))) {
 			if (reqp->isvnode) {
 				error("No such vnode %s associated with %s\n",
 				      reqp->vnodeid, inet_ntoa(client->sin_addr));
@@ -805,7 +820,17 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 				      inet_ntoa(client->sin_addr));
 			}
 			goto skipit;
-		}
+	}
+	/*
+	 * Redirect geni sliver nodes to the tmcd of their origin.
+	 * FIXME
+	 */
+	if (reqp->tmcd_redirect[0]) {
+		char	buf[BUFSIZ];
+
+		sprintf(buf, "REDIRECT=%s\n", reqp->tmcd_redirect);
+		client_writeback(sock, buf, strlen(buf), istcp);
+		goto skipit;
 	}
 
 	/*
@@ -846,7 +871,15 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 				goto skipit;
 		}
 #endif
-		if (tmcd_sslverify_client(NULL, NULL,
+		/*
+		 * LBS: I took this test out. This client verification has
+		 * always been a pain, and offers very little since since
+		 * the private key is not encrypted anyway. Besides, we
+		 * do not return any sensitive data via tmcd, just a lot of
+		 * goo that would not be of interest to anyone. I will
+		 * kill this code at some point.
+		 */
+		if (0 && tmcd_sslverify_client(NULL, NULL,
 					  reqp->ptype,  reqp->islocal)) {
 			error("%s: SSL verification failure\n", reqp->nodeid);
 			if (! redirect)
@@ -890,8 +923,11 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	 * Do private key check. (Non-plab) widearea nodes must report a
 	 * private key. It comes over ssl of course. At present we skip
 	 * this check for ron nodes. 
+	 *
+	 * LBS: I took this test out cause its silly. Will kill the code at
+	 * some point.
 	 */
-	if (!reqp->islocal && !(reqp->isplabdslice || reqp->isplabsvc)) {
+	if (0 && !reqp->islocal && !(reqp->isplabdslice || reqp->isplabsvc)) {
 		if (!havekey) {
 			error("%s: No privkey sent!\n", reqp->nodeid);
 			/*
