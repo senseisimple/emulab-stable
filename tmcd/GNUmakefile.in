@@ -110,6 +110,11 @@ tmcd: tmcd.c ${TMCDLIBS} decls.h version.o $(SSLOBJ) $(BOOTINFO)
 		$(LFLAGS) -L/usr/local/lib/mysql -lmysqlclient \
 		$(ELVINFLAGS) $(TMCDLDFLAGS) $(TMCDLIBS) $(TMLIBS) 
 
+mod_tmcd.so: libtmcd.o
+	apxs -c mod_tmcd.c -L/usr/local/lib/mysqlclient -lmysqlclient \
+		-L /usr/local/lib -lxml2 $(SSLOBJ) \
+		$(ELVINFLAGS) $(TMCDLDFLAGS) $(TMCDLIBS) $(TMLIBS) $<
+
 newtmcd: newtmcd.c libtmcd.o ${TMCDLIBS} decls.h version.o $(SSLOBJ) $(BOOTINFO)
 	$(CC) $(CFLAGS) $(SSLFLAGS) $(TMCDCFLAGS) -o tmcd $< \
 		libtmcd.o version.o $(SSLOBJ) $(BOOTINFO) \

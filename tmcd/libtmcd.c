@@ -20,6 +20,8 @@
 #include "bootwhat.h"
 #include "bootinfo.h"
 
+#define error printf
+
 #ifdef EVENTSYS
 #include "event.h"
 #endif
@@ -484,12 +486,14 @@ tmcdresp_t *tmcd_handle_request(tmcdreq_t *reqp, int sock, char *command, char *
 
 	}
 
+#if 0
 	/* If this is a UDP request, make sure it is allowed */
 	if (!reqp->istcp && (flags & F_UDP) == 0) {
 		error("%s: %s: Invalid UDP request from node\n",
 		      reqp->nodeid, command);
 		goto skipit;
 	}
+#endif
 
 	/*
 	 * If this is a UDP request from a remote node,
@@ -1302,7 +1306,7 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 #ifdef ISOLATEADMINS
 		sprintf(adminclause, "and u.admin=%d", reqp->swapper_isadmin);
 #endif
-		res = mydb_query("select distinct "
+		res = mydb_query(reqp, "select distinct "
 				 "  u.uid,'*',u.unix_uid,u.usr_name, "
 				 "  p.trust,g.pid,g.gid,g.unix_gid,u.admin, "
 				 "  u.emulab_pubkey,u.home_pubkey, "
@@ -1327,7 +1331,7 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 		 * Catch widearea nodes that are dedicated to a single pid/eid.
 		 * Same as local case.
 		 */
-		res = mydb_query("select unix_name,unix_gid from groups "
+		res = mydb_query(reqp, "select unix_name,unix_gid from groups "
 				 "where pid='%s'",
 				 2, reqp->pid);
 	}
@@ -1680,7 +1684,7 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 	if (reqp->genisliver_idx && !didnonlocal) {
 	        didnonlocal = 1;
 
-		res = mydb_query("select distinct "
+		res = mydb_query(reqp, "select distinct "
 				 "  u.uid,'*',u.uid_idx,u.name, "
 				 "  'local_root',g.pid,g.gid,g.unix_gid,0, "
 				 "  NULL,NULL,0, "
@@ -2781,7 +2785,7 @@ XML_COMMAND_PROTOTYPE(domounts)
 	 * experiments projects, plus all the members of all of the projects
 	 * that have been granted access to share the nodes in that expt.
 	 */
-	res = mydb_query("select u.uid,u.admin from users as u "
+	res = mydb_query(reqp, "select u.uid,u.admin from users as u "
 			 "left join group_membership as p on "
 			 "     p.uid_idx=u.uid_idx "
 			 "where p.pid='%s' and p.gid='%s' and "
@@ -4139,7 +4143,6 @@ XML_COMMAND_PROTOTYPE(doroutelist)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
-	char		buf[MYBUFSIZE];
 	int		n, nrows;
 	xmlNode		*node, *routelist_node;
 
@@ -4293,7 +4296,7 @@ XML_COMMAND_PROTOTYPE(dofullconfig)
 
 	for (i = 0; i < numcommands; i++) {
 		if (xml_command_array[i].fullconfig & mask) {
-			if (tcp && !isssl && !reqp->islocal && 
+			if (1 && !isssl && !reqp->islocal && 
 			    (xml_command_array[i].flags & F_REMREQSSL) != 0) {
 				/*
 				 * Silently drop commands that are not
@@ -4638,7 +4641,6 @@ XML_COMMAND_PROTOTYPE(dofwinfo)
 	int		n, nrows;
 	char		*vlan;
 	xmlNode		*node, *fwinfo_node, *fwvars_node;
-	xmlNode		*fwhosts_node, *host_node;
 
 	/*
 	 * See if this node's experiment has an associated firewall
@@ -5249,7 +5251,7 @@ XML_COMMAND_PROTOTYPE(dorootpswd)
 	char		buf[MYBUFSIZE], hashbuf[MYBUFSIZE], *bp;
 	xmlNode		*node;
 
-	res = mydb_query("select attrvalue from node_attributes "
+	res = mydb_query(reqp, "select attrvalue from node_attributes "
 			 " where node_id='%s' and "
 			 "       attrkey='root_password'",
 			 1, reqp->pnodeid);
@@ -5280,7 +5282,7 @@ XML_COMMAND_PROTOTYPE(dorootpswd)
 		}
 		*bp = '\0';
 
-		mydb_update("replace into node_attributes set "
+		mydb_update(reqp, "replace into node_attributes set "
 			    "  node_id='%s', "
 			    "  attrkey='root_password',attrvalue='%s'",
 			    reqp->nodeid, hashbuf);
@@ -6070,10 +6072,12 @@ XML_COMMAND_PROTOTYPE(dobootwhat)
 
 	node = new_response(root, "bootwhat");
 
+#if 0
 	if(strlen(reqp->privkey) > 1) { /* We have a private key, so prepare bootinfo for it. */
 		boot_info.opcode = BIOPCODE_BOOTWHAT_KEYED_REQUEST;
 		strncpy(boot_info.data, reqp->privkey, TBDB_FLEN_PRIVKEY);
 	}
+#endif
 
 	if (bootinfo(reqp->client, &boot_info, (void *) reqp)) {
 		add_key(node, "status", "failed");
@@ -6255,7 +6259,7 @@ iptonodeid(tmcdreq_t *reqp, struct in_addr ipaddr, char* nodekey)
 	 * the nodeid.
 	 */ 
 	if ((nodekey != NULL) && (strlen(nodekey) > 1)) {
-		res = mydb_query("SELECT t.class,t.type,n.node_id,n.jailflag,"
+		res = mydb_query(reqp, "SELECT t.class,t.type,n.node_id,n.jailflag,"
 				 " r.pid,r.eid,r.vname,e.gid,e.testdb, "
 				 " n.update_accounts,n.role, "
 				 " e.expt_head_uid,e.expt_swap_uid, "
