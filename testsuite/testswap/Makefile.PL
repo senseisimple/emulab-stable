@@ -1,24 +1,32 @@
-# pull in ExtUtils/AutoInstall.pm from 'inc'
-use lib 'inc';
-use ExtUtils::AutoInstall (
-    -core              => [            # mandatory modules
-    'Carp'             => '',
-    'Modern::Perl'     => '',
-    'Mouse'            => '',
-    'RPC::XML::Client' => '',
-    'RPC::XML'         => '',
-    'Sys::Hostname'    => '',
-    'Test::More'       => '',
-    'Time::Local'      => '',
-    'TAP::Harness'     => '',
-    ],
-);
-=pod
-WriteMakefile(
-    AUTHOR          => 'Emula Perl  <perl@emulab.net>',
-    ABSTRACT        => 'Perl Testsuite for Emulab',
-    NAME            => 'Testbed::Testsuite',
-    VERSION_FROM    => 'Testbed::Testsuite::Experiment.pm',
-    DISTNAME        => 'Emulab-Testbed',
-);
-=cut
+#!/usr/bin/perl
+use Modern::Perl;
+use inc::Module::Install;
+
+# Define metadata
+name            'tbts';
+all_from        'lib/TestBed/XMLRPC/Client.pm';
+perl_version    '5.010';
+author          'Kevin Tew <tewk@flux.utah.edu>';
+version         '0.01';
+
+# Specific dependencies
+requires       'File::Spec'          => '0.80';
+requires       'Carp'                => '1.08';
+requires       'Modern::Perl'        => '1.03';
+requires       'Mouse'               => '0.19';
+requires       'RPC::XML::Client'    => '1.24';
+requires       'RPC::XML'            => '1.41';
+requires       'Sys::Hostname'       => '1.11';
+requires       'Test::More'          => '0.86';
+requires       'Time::Local'         => '1.1901';
+requires       'TAP::Harness'        => '3.16';
+requires       'Net::SSH::Perl'      => '1.34';
+requires       'Net::SFTP'           => '0.10';
+requires       'Crypt::X509'         => '0.32';
+requires       'Log::Log4perl'       => '1.20';
+requires       'Log::Dispatch::File' => '1.22';
+
+test_requires  'Test::More'  => '0.42';
+no_index       'directory'   => 'demos';
+
+WriteAll;

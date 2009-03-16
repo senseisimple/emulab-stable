@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 use Modern::Perl;
-use TestBed::TestSuite::Experiment tests => 3;
+use TestBed::TestSuite::Experiment::Macros tests => 3;
 use Test::More;
 use Data::Dumper;
 

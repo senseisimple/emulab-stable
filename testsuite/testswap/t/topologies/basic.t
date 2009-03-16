@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 use Modern::Perl;
-use TestBed::TestSuite::Experiment tests => 1;
-use Test::More;
+use TestBed::TestSuite::Experiment;
+use Test::More tests => 1;
 use Data::Dumper;
 
 my $ns = <<'NSEND';

@@ -2,44 +2,69 @@
 use Modern::Perl;
 
 package TestBed::TestSuite::Experiment;
-use Tools::PingTest;
-
+use Mouse;
 use TestBed::XMLRPC::Client::Experiment;
-use Test::More;
-our @ISA = qw(Test::More);
-our @EXPORT = qw(e ep echo newexp batchexp list list_brief list_full launchpingswapkill);
+use Tools::PingTest;
+use Tools::TBSSH;
+use Data::Dumper;
 
-sub ep { TestBed::XMLRPC::Client::Experiment->new() }
-sub e  { TestBed::XMLRPC::Client::Experiment->new('pid'=> shift, 'eid' => shift) }
+extends 'Exporter', 'TestBed::XMLRPC::Client::Experiment';
+require Exporter;
+our @EXPORT;
 
-sub echo          { ep()->echo(@_); }
-sub _newexp       { my $e = e(shift, shift); $e->batchexp_ns(shift, @_); $e }
-sub _newexp_wait  { _newexp(@_, 'wait' => 1); }
-sub newexp        { _newexp(@_); }
-sub newexp_wait   { _newexp_wait(@_); }
-sub batchexp      { _newexp(@_); }
-sub batchexp_wait { _newexp_wait(@_); }
-sub list          { ep()->getlist; }
-sub list_brief { ep()->getlist_brief; }
-sub list_full  { ep()->getlist_full; }
+push @EXPORT, qw(e ep launchpingkill launchpingswapkill);
 
-sub connectivity_test {
-  ping("node1.tewkt.tbres.emulab.net");
-  ping("node2.tewkt.tbres.emulab.net");
+sub ep { TestBed::TestSuite::Experiment->new }
+sub e  { TestBed::TestSuite::Experiment->new('pid'=> shift, 'eid' => shift) }
+
+sub ping_test {
+  my ($e) = @_;
+  my $nodes = $e->nodeinfo();
+  for (@$nodes) {
+    ping($_);
+  }
+}
+
+sub ssh_hostname_test {
+  my ($e) = @_;
+  my $nodes = $e->nodeinfo();
+  for (@$nodes) {
+    Tools::TBSSH::sshhostname($_, $TBConfig::EMULAB_USER);
+  }
+}
+
+sub trytest(&$) {
+  eval {$_[0]->()};
+  if ($@) {
+    say $@;
+    $_[1]->end;
+    0; 
+  }
+  else {
+    1;
+  }
+}
+
+sub launchpingkill {
+  my ($pid, $eid, $ns) = @_;
+  my $e = e($pid, $eid);
+  trytest {
+    $e->batchexp_ns_wait($ns) && die "batchexp $eid failed";
+    $e->ping_test             && die "connectivity test $eid failed";
+    $e->end                   && die "exp end $eid failed";
+  } $e;
 }
 
 sub launchpingswapkill {
   my ($pid, $eid, $ns) = @_;
   my $e = e($pid, $eid);
-  $e->batchexp_ns($ns) && die "batchexp $eid failed";
-  $e->waitforactive();
-  connectivity_test($e);
-  $e->nodeinfo();
-  $e->swapoutw();
-  $e->waitforswapped();
-  $e->swapinw();
-  $e->waitforactive();
-  connectivity_test($e);
-  $e->end();
+  trytest {
+    $e->batchexp_ns_wait($ns) && die "batchexp $eid failed";
+    $e->ping_test             && die "connectivity test $eid failed";
+    $e->swapout_wait          && die "swap out $eid failed";
+    $e->swapin_wait           && die "swap in $eid failed";
+    $e->ping_test             && die "connectivity test $eid failed";
+    $e->end                   && die "exp end $eid failed";
+  } $e;
 }
 1;

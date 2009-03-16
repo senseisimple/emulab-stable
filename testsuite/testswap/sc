@@ -1,9 +1,9 @@
 #!/usr/bin/perl
 use Modern::Perl;
 use lib 'lib';
-use TestBed::TestSuite::Experiment;
-use Test::More;
+use TestBed::TestSuite::Experiment::Macros;
 use Data::Dumper;
+use Tools::TBSSH;
 
 sub listexps {
   output(list_full)
@@ -21,8 +21,6 @@ set lan1 [$ns make-lan "$node1 $node2" 100Mb 0ms]
 $ns run
 NSEND
 
-#launchpingswapkill('tbres', 'tewkt', $ns);
-
 sub output {
   my ($h) = @_;
   while(my ($pk, $v) = each %$h) {
@@ -39,12 +37,24 @@ sub output {
     }
   }
 }
-
-listexps();
-if (@ARGV && $ARGV[0] eq 'end') {
-  e('tbres', 'tewkt')->end();
+my $pid = 'tbres';
+if (@ARGV) {
+  $_ = $ARGV[0];
+  my $eid = $ARGV[1];
+  my $e = e($pid, $eid);
+  if (/end/) { $e->end(); }
+  elsif ( /ping/ ) {
+    my $nodes = $e->nodeinfo();
+    for (@$nodes) {
+     say; 
+     use Tools::PingTest;
+     ping($_);
+    }
+  }
+  elsif (/start/) { $e->batchexp_ns_wait($ns); }
+}
+else {
   listexps();
 }
-
 
 # vim: ft=perl:

@@ -1,0 +1,20 @@
+#!/usr/bin/perl
+
+my $THARNESS = 'perl t/harness';
+my $usage = <<"USAGE";
+./tbts 
+        test
+        t/SPECIFIC_TEST.t
+USAGE
+
+if (@ARGV) {
+  my $_ = $ARGV[0];
+  if (/critic/) { exec 'perlcritic .'; }
+  elsif (/test/)   { exec $THARNESS; }
+  elsif (/test/)   { exec "$THARNESS t/topologies/*.t"; }
+  elsif (/.*\.t$/) { exec "$THARNESS $cmd"; }
+}
+else {
+  print $usage;
+}
+

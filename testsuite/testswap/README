@@ -1,0 +1,7 @@
+TO INSTALL
+  perl Makefile.PL
+  make
+
+TO FUN
+  make test
+  make t/topologies/basic.t

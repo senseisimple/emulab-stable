@@ -4,6 +4,7 @@ use Modern::Perl;
 package TestBed::XMLRPC::Client::Experiment;
 use Mouse;
 use Data::Dumper;
+use TestBed::XMLRPC::Client::NodeInfo;
 
 extends 'TestBed::XMLRPC::Client';
 
@@ -21,23 +22,51 @@ sub echo           { shift->augment_output( 'str' => shift ); }
 sub getlist_brief  { shift->augment( 'format' => 'brief'); }
 sub getlist_full   { shift->augment( 'format' => 'full' ); }
 sub batchexp_ns    { shift->augment( 'nsfilestr' => shift, @_ ); }
-sub swapin         { shift->augment_func( 'swapexp', 'direction' => 'in' ); }
-sub swapout        { shift->augment_func( 'swapexp', 'direction' => 'out' ); }
-sub swapinw        { shift->augment_func( 'swapexp', 'direction' => 'in',  'wait' => 1 ); }
-sub swapoutw       { shift->augment_func( 'swapexp', 'direction' => 'out', 'wait' => 1 ); }
-sub end            { shift->augment_func( 'endexp' ); }
-sub waitforswapped { shift->augment_func( 'statewait', 'state' => 'swapped' ); }
+sub swapin         { shift->augment_func_code( 'swapexp', 'direction' => 'in' ); }
+sub swapout        { shift->augment_func_code( 'swapexp', 'direction' => 'out' ); }
+sub end            { shift->augment_func_code( 'endexp' ); }
+sub nodeinfo       { parseNodeInfo(shift->augment_func_output('expinfo', 'show' => 'nodeinfo')); }
+sub waitforactive  {
+  my $self = shift;
+  $self->augment_code(@_) && die sprintf("wait for swapin %s failed", $self->eid);
+}
+sub waitforswapped { 
+  my $self = shift;
+  $self->augment_func_code( 'statewait', 'state' => 'swapped' )
+     && die sprintf("wait for swapin %s failed", $self->eid);
+}
+sub batchexp_ns_wait { 
+  my $self = shift;
+  $self->batchexp_ns(@_);
+  $self->waitforactive;
+}
+sub swapin_wait { 
+  my $self = shift;
+  $self->augment_func_code( 'swapexp', 'direction' => 'in',  'wait' => 1 );
+  $self->waitforactive;
+}
+sub swapout_wait { 
+  my $self = shift;
+  $self->augment_func_code( 'swapexp', 'direction' => 'out',  'wait' => 1 );
+  $self->waitforswapped
+}
+
+sub inject_sub {
+  my ($fqname, $sub) = @_;
+  no strict 'refs';
+  *{ $fqname } = $sub;
+}
 
 sub gen_expinfo_funcs {
   my ($package) = caller();
-  for my $funcname (qw( nodeinfo mapping linkinfo shaping) ) {
+  for my $funcname (qw(mapping linkinfo shaping) ) {
     my $sub = sub {
       shift->augment_func('expinfo', 'show' => $funcname );
     };
-    no strict 'refs';
-    *{ $package . '::' . $funcname } = $sub;
+    inject_sub($package . '::' . $funcname, $sub);
   }
 }
+
 gen_expinfo_funcs();
 
 1;
