@@ -58,7 +58,7 @@ use librc;
 # Not all clients support this.
 #
 exit(0)
-    if (REMOTE() || JAILED() || GENVNODE() || DELAYHOST());
+    if (REMOTE() || JAILED() || DELAYHOST());
 
 # Protos.
 sub doboot();
