@@ -23,7 +23,7 @@ if (!$isadmin && !STUDLY()) {
 # list of nodes, while "nodes" is an array passed by the form.
 #
 $optargs = OptionalPageArguments("node_id",   PAGEARG_STRING,
-				 "nodes",     PAGEARG_STRING,
+				 "nodes",     PAGEARG_ARRAY,
 				 "poweron",   PAGEARG_STRING,
 				 "confirmed", PAGEARG_STRING);
 
