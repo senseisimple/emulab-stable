@@ -13,6 +13,14 @@
 #define DBNAME_SIZE	64
 #define HOSTID_SIZE	(32+64)
 
+#define TMCD_STATUS_OK				0
+#define TMCD_STATUS_INVALID_REQUEST		1
+#define TMCD_STATUS_INVALID_UDP_REQUEST		2
+#define TMCD_STATUS_INVALID_REMOTE_UDP_REQUEST	3
+#define TMCD_STATUS_REQUIRES_ENCRYPTION		4
+#define TMCD_STATUS_NODE_NOT_ALLOCATED		5
+#define TMCD_STATUS_MALLOC_FAILED		6
+
 /*
  * This structure is passed to each request function. The intent is to
  * reduce the number of DB queries per request to a minimum.
@@ -74,6 +82,7 @@ typedef struct {
 
 typedef struct {
 	char		*data;
+	char		*type;
 	int		length;
 } tmcdresp_t;
 
@@ -81,7 +90,7 @@ int	iptonodeid(tmcdreq_t *reqp, struct in_addr ipaddr, char* nodekey);
 int	checkprivkey(tmcdreq_t *reqp, struct in_addr, char *);
 int	checkdbredirect(tmcdreq_t *);
 void	tmcd_free_response(tmcdresp_t *);
-tmcdresp_t *tmcd_handle_request(tmcdreq_t *, int, char *, char *);
+int tmcd_handle_request(tmcdreq_t *, tmcdresp_t **, char *, char *);
 int tmcd_init(tmcdreq_t *reqp, struct in_addr *, char *);
 
 #endif /* _LIBTMCD_H_ */

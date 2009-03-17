@@ -14,17 +14,19 @@
 #include <sys/stat.h>
 #include <sys/param.h>
 #include "decls.h"
-#include "ssl.h"
 #include "log.h"
 #include "config.h"
 #include "bootwhat.h"
 #include "bootinfo.h"
 
-#define error printf
-
 #ifdef EVENTSYS
 #include "event.h"
 #endif
+
+#define	XML_MIME_TYPE	"text/xml"
+#define	GZIP_MIME_TYPE	"application/x-gzip"
+
+int debug = 0;
 
 /*
  * XXX This needs to be localized!
@@ -181,7 +183,7 @@ CHECKMASK(char *arg)
 	x(xmlNode *root, tmcdreq_t *reqp, char *rdata)
 #define RAW_COMMAND_PROTOTYPE(x) \
 	static int \
-	x(char **outbuf, int *length, int sock, tmcdreq_t *reqp, char *rdata)
+	x(tmcdresp_t *response, tmcdreq_t *reqp, char *rdata)
 
 XML_COMMAND_PROTOTYPE(doreboot);
 XML_COMMAND_PROTOTYPE(donodeid);
@@ -350,14 +352,16 @@ struct raw_command {
 	char	*cmdname;
 	int	fullconfig;	
 	int	flags;
-	int    (*func)(char **, int *, int, tmcdreq_t *, char *);
-} raw_xml_command_array[] = {
+	int    (*func)(tmcdresp_t *, tmcdreq_t *, char *);
+} raw_command_array[] = {
+#if 0
 	{ "bootlog",      FULLCONFIG_NONE, 0, dobootlog},
+#endif
 	{ "ltmap",        FULLCONFIG_NONE, F_MINLOG|F_ALLOCATED, doltmap},
 	{ "ltpmap",       FULLCONFIG_NONE, F_MINLOG|F_ALLOCATED, doltpmap},
 	{ "topomap",      FULLCONFIG_NONE, F_MINLOG|F_ALLOCATED, dotopomap},
 };
-static int numrawcommands = sizeof(raw_xml_command_array)/sizeof(struct raw_command);
+static int numrawcommands = sizeof(raw_command_array)/sizeof(struct raw_command);
 
 #ifdef EVENTSYS
 /*
@@ -449,16 +453,17 @@ bievent_send(struct in_addr ipaddr, void *opaque, char *event)
 }
 #endif /* EVENTSYS */
  
-tmcdresp_t *tmcd_handle_request(tmcdreq_t *reqp, int sock, char *command, char *rdata)
+int tmcd_handle_request(tmcdreq_t *reqp, tmcdresp_t **resp, char *command, char *rdata)
 {
 	xmlDoc *doc = NULL;
-	xmlChar *xmlbuf;
+	xmlChar *xmlbuf = NULL;
 	xmlNode *root = NULL;
 	tmcdresp_t *response = NULL;
 	int i, err = 0;
 	int buffersize;
 	int is_xml_command = 1;
 	int flags = 0;
+	int rc = TMCD_STATUS_OK;
 
 	/*
 	 * Figure out what command was given.
@@ -472,15 +477,15 @@ tmcdresp_t *tmcd_handle_request(tmcdreq_t *reqp, int sock, char *command, char *
 
 	if (i == numcommands) {
 		for (i = 0; i < numrawcommands; i++)  {
-			if (strcmp(command, raw_xml_command_array[i].cmdname) == 0) {
+			if (strcmp(command, raw_command_array[i].cmdname) == 0) {
 				is_xml_command = 0;
-				flags = raw_xml_command_array[i].flags;
+				flags = raw_command_array[i].flags;
 			    	break;
 			}
 		}
 
 		if (i == numrawcommands) {
-			printf("%s: INVALID REQUEST: %.8s\n", reqp->nodeid, command);
+			rc = TMCD_STATUS_INVALID_REQUEST;
 			goto skipit;
 		}
 
@@ -489,8 +494,7 @@ tmcdresp_t *tmcd_handle_request(tmcdreq_t *reqp, int sock, char *command, char *
 #if 0
 	/* If this is a UDP request, make sure it is allowed */
 	if (!reqp->istcp && (flags & F_UDP) == 0) {
-		error("%s: %s: Invalid UDP request from node\n",
-		      reqp->nodeid, command);
+		rc = TMCD_STATUS_INVALID_UDP_REQUEST;
 		goto skipit;
 	}
 #endif
@@ -501,8 +505,7 @@ tmcdresp_t *tmcd_handle_request(tmcdreq_t *reqp, int sock, char *command, char *
 	 */
 	if (!reqp->istcp && !reqp->islocal &&
 	    (flags & F_REMUDP) == 0) {
-		error("%s: %s: Invalid UDP request from remote node\n",
-		      reqp->nodeid, command);
+		rc = TMCD_STATUS_INVALID_REMOTE_UDP_REQUEST;
 		goto skipit;
 	}
 
@@ -511,15 +514,12 @@ tmcdresp_t *tmcd_handle_request(tmcdreq_t *reqp, int sock, char *command, char *
 	 */
 	if (reqp->istcp && !reqp->isssl && !reqp->islocal && 
 	    (flags & F_REMREQSSL) != 0) {
-		error("%s: %s: Invalid NO-SSL request from remote node\n",
-		      reqp->nodeid, command);
+		rc = TMCD_STATUS_REQUIRES_ENCRYPTION;
 		goto skipit;
 	}
 
 	if (!reqp->allocated && (flags & F_ALLOCATED) != 0) {
-		if (reqp->verbose || (flags & F_MINLOG) == 0)
-			error("%s: %s: Invalid request from free node\n",
-			      reqp->nodeid, command);
+		rc = TMCD_STATUS_NODE_NOT_ALLOCATED;
 		goto skipit;
 	}
 
@@ -543,6 +543,7 @@ tmcdresp_t *tmcd_handle_request(tmcdreq_t *reqp, int sock, char *command, char *
 #endif
 	response = malloc(sizeof(tmcdresp_t));
 	if (response == NULL) {
+		rc = TMCD_STATUS_MALLOC_FAILED;
 		goto skipit;
 	}
 
@@ -553,34 +554,53 @@ tmcdresp_t *tmcd_handle_request(tmcdreq_t *reqp, int sock, char *command, char *
 		xmlDocSetRootElement(doc, root);
 		err = xml_command_array[i].func(root, reqp, rdata);
 
-		if (err)
-			info("%s: %s: returned %d\n",
-			     reqp->nodeid, xml_command_array[i].cmdname, err);
+		if (err) {
+			response->length = strlen(xml_command_array[i].cmdname) +
+				32 + 3; /* FIXME shouldn't use constant here */
+			response->data = malloc(response->length);
+			if (response->data == NULL) {
+				rc = TMCD_STATUS_MALLOC_FAILED;
+				goto skipit;
+			}
 
-		xmlDocDumpFormatMemory(doc, &xmlbuf, &buffersize, 1);
-		xmlFreeDoc(doc);
-		response->length = strlen((char *)xmlbuf);
-		response->data = malloc(response->length);
-		if (response->data == NULL) {
-			error("unable to allocate memory for response\n");
-			xmlFree(xmlbuf);
+			snprintf(response->data, response->length,
+				"%s returned error code %d",
+				xml_command_array[i].cmdname, err);
 			goto skipit;
 		}
 
+		xmlDocDumpFormatMemory(doc, &xmlbuf, &buffersize, 1);
+		response->length = strlen((char *)xmlbuf);
+		response->data = malloc(response->length);
+		if (response->data == NULL) {
+			rc = TMCD_STATUS_MALLOC_FAILED;
+			goto skipit;
+		}
+		response->type = malloc(strlen(XML_MIME_TYPE) + 1);
+		if (response->type == NULL) {
+			rc = TMCD_STATUS_MALLOC_FAILED;
+			goto skipit;
+		}
+		strcpy(response->type, XML_MIME_TYPE);
+
 		memcpy(response->data, (char *)xmlbuf, response->length);
-		xmlFree(xmlbuf);
 	} else {
-		err = raw_xml_command_array[i].func(&response->data, &response->length, sock, reqp, rdata);
+		err = raw_command_array[i].func(response, reqp, rdata);
 
 		if (err)
 			info("%s: %s: returned %d\n",
-			     reqp->nodeid, raw_xml_command_array[i].cmdname, err);
+			     reqp->nodeid, raw_command_array[i].cmdname, err);
 	}
 
 
 skipit:
+	if (doc)
+		xmlFreeDoc(doc);
+	if (xmlbuf)
+		xmlFree(xmlbuf);
 
-	return response;
+	*resp = response;
+	return rc;
 }
 
 void tmcd_free_response(tmcdresp_t *response)
@@ -2860,7 +2880,7 @@ safesymlink(char *name1, char *name2)
 	}
 	alarm(0);
 	if (sfshostiddeadfl) {
-		errorc("symlinking %s to %s", name2, name1);
+		error("symlinking %s to %s", name2, name1);
 		return -1;
 	}
 	return 0;
@@ -3574,11 +3594,11 @@ XML_COMMAND_PROTOTYPE(doipodinfo)
 	xmlNode		*node;
 
 	if ((fd = open("/dev/urandom", O_RDONLY)) < 0) {
-		errorc("opening /dev/urandom");
+		error("opening /dev/urandom");
 		return 1;
 	}
 	if ((cc = read(fd, randdata, sizeof(randdata))) < 0) {
-		errorc("reading /dev/urandom");
+		error("reading /dev/urandom");
 		close(fd);
 		return 1;
 	}
@@ -4296,7 +4316,7 @@ XML_COMMAND_PROTOTYPE(dofullconfig)
 
 	for (i = 0; i < numcommands; i++) {
 		if (xml_command_array[i].fullconfig & mask) {
-			if (1 && !isssl && !reqp->islocal && 
+			if (reqp->istcp && !reqp->isssl && !reqp->islocal && 
 			    (xml_command_array[i].flags & F_REMREQSSL) != 0) {
 				/*
 				 * Silently drop commands that are not
@@ -4384,7 +4404,7 @@ XML_COMMAND_PROTOTYPE(dorusage)
             plfd = open(pllogfname, O_WRONLY|O_APPEND|O_CREAT, 
                         S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
             if (plfd < 0) {
-                errorc("Can't open log: %s", pllogfname);
+                error("Can't open log: %s", pllogfname);
             } else {
                 write(plfd, buf, strlen(buf));
                 close(plfd);
@@ -5261,11 +5281,11 @@ XML_COMMAND_PROTOTYPE(dorootpswd)
 		int		fd, cc, i;
 	
 		if ((fd = open("/dev/urandom", O_RDONLY)) < 0) {
-			errorc("opening /dev/urandom");
+			error("opening /dev/urandom");
 			return 1;
 		}
 		if ((cc = read(fd, randdata, sizeof(randdata))) < 0) {
-			errorc("reading /dev/urandom");
+			error("reading /dev/urandom");
 			close(fd);
 			return 1;
 		}
@@ -5312,6 +5332,7 @@ XML_COMMAND_PROTOTYPE(dorootpswd)
  */
 RAW_COMMAND_PROTOTYPE(dobootlog)
 {
+#if 0
 	char		*cp = (char *) NULL, *bp;
 	int		len;
 
@@ -5345,7 +5366,7 @@ RAW_COMMAND_PROTOTYPE(dobootlog)
 			bp = &buf[len];
 			
 			while (len < sizeof(buf)) {
-				int cc = READ(sock, bp, sizeof(buf) - len);
+				int cc = read(sock, bp, sizeof(buf) - len);
 
 				if (cc <= 0)
 					break;
@@ -5379,6 +5400,7 @@ RAW_COMMAND_PROTOTYPE(dobootlog)
 
 	*length = 0;
 	*outbuf = NULL;
+#endif
 	
 	return 0;
 }
@@ -5474,7 +5496,7 @@ int slurp_file(char *filename, char **outbuf, int *length, char *function)
 	}
 
 	if ((fp = fopen(filename, "r")) == NULL) {
-		errorc("%s: Could not open %s:", function,
+		error("%s: Could not open %s:", function,
 		       filename);
 		return 1;
 	}
@@ -5508,14 +5530,25 @@ int slurp_file(char *filename, char **outbuf, int *length, char *function)
 RAW_COMMAND_PROTOTYPE(dotopomap)
 {
 	char		filename[MAXPATHLEN];
+	int rc;
 	/*
 	 * Open up the file on boss and spit it back.
 	 */
-	sprintf(filename, "%s/expwork/%s/%s/topomap.gz", TBROOT,
+	snprintf(filename, sizeof(filename),
+		"%s/expwork/%s/%s/topomap.gz", TBROOT,
 		reqp->pid, reqp->eid);
 
-	return slurp_file(filename, outbuf, length, "dotopomap");
+	rc = slurp_file(filename, &response->data, &response->length, "dotopomap");
 
+	if (rc == 0) {
+		response->type = malloc(strlen(GZIP_MIME_TYPE) + 1);
+		if (response->type == NULL)
+			rc = 1;
+		else
+			strcpy(response->type, GZIP_MIME_TYPE);
+	}
+
+	return rc;
 }
 
 /*
@@ -5525,14 +5558,26 @@ RAW_COMMAND_PROTOTYPE(dotopomap)
 RAW_COMMAND_PROTOTYPE(doltmap)
 {
 	char		filename[MAXPATHLEN];
+	int rc;
 
 	/*
 	 * Open up the file on boss and spit it back.
 	 */
-	sprintf(filename, "%s/expwork/%s/%s/ltmap.gz", TBROOT,
+	snprintf(filename, sizeof(filename),
+		"%s/expwork/%s/%s/ltmap.gz", TBROOT,
 		reqp->pid, reqp->eid);
 
-	return slurp_file(filename, outbuf, length, "doltmap");
+	rc = slurp_file(filename, &response->data, &response->length, "doltmap");
+
+	if (rc == 0) {
+		response->type = malloc(strlen(GZIP_MIME_TYPE) + 1);
+		if (response->type == NULL)
+			rc = 1;
+		else
+			strcpy(response->type, GZIP_MIME_TYPE);
+	}
+
+	return rc;
 }
 
 /*
@@ -5542,14 +5587,26 @@ RAW_COMMAND_PROTOTYPE(doltmap)
 RAW_COMMAND_PROTOTYPE(doltpmap)
 {
 	char		filename[MAXPATHLEN];
+	int rc;
 
 	/*
 	 * Open up the file on boss and spit it back.
 	 */
-	sprintf(filename, "%s/expwork/%s/%s/ltpmap.gz", TBROOT,
+	snprintf(filename, sizeof(filename),
+		"%s/expwork/%s/%s/ltpmap.gz", TBROOT,
 		reqp->pid, reqp->eid);
 
-	return slurp_file(filename, outbuf, length, "doltpmap");
+	rc = slurp_file(filename, &response->data, &response->length, "doltpmap");
+
+	if (rc == 0) {
+		response->type = malloc(strlen(GZIP_MIME_TYPE) + 1);
+		if (response->type == NULL)
+			rc = 1;
+		else
+			strcpy(response->type, GZIP_MIME_TYPE);
+	}
+
+	return rc;
 }
 
 /*

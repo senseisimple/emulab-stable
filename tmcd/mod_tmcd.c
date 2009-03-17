@@ -11,26 +11,34 @@ module MODULE_VAR_EXPORT tmcd_module;
 
 static int handle_request(request_rec *r)
 {
-#if 1
 	tmcdreq_t tmcdreq, *reqp = &tmcdreq;
 	tmcdresp_t *response = NULL;
 	char *command;
 	struct in_addr myaddr;
 	struct in_addr client_addr;
 	int err;
+	int status;
+	int rc = OK;
 
-	if (strcmp(r->handler, "tmcd"))
-		return DECLINED;
+	reqp->istcp = 1;
+	reqp->isssl = 1; /* FIXME */
+
+	if (strcmp(r->handler, "tmcd")) {
+		rc = DECLINED;
+		goto err;
+	}
 
 #if 0
 	r->allowed |= (AP_METHOD_BIT << M_GET);
-	if (r->method_number != M_GET)
-		return DECLINED;
+	if (r->method_number != M_GET) {
+		rc = DECLINED;
+		goto err;
+	}
 #endif
 
 	memset(reqp, 0, sizeof(*reqp));
 
-	reqp->version = 1;
+	reqp->version = 1; /* FIXME */
 
 	/* FIXME eliminate or fix myaddr */
 
@@ -55,33 +63,33 @@ static int handle_request(request_rec *r)
 			      inet_ntoa(client->sin_addr));
 		}
 #endif
-		return HTTP_BAD_REQUEST;
+		rc = HTTP_BAD_REQUEST;
+		goto err;
 	}
 
 	/* FIXME */
-	response = tmcd_handle_request(reqp, 0, command, NULL);
+	status = tmcd_handle_request(reqp, &response, command, NULL);
 
-	if (response) {
-		r->content_type = "text/xml; charset=UTF=8";
+	if (status == TMCD_STATUS_OK) {
+		r->content_type = response->type;
+		ap_set_content_length(r, response->length);
 		/* FIXME doctype */
-		ap_rprintf(r, "%s", response->data);
-		tmcd_free_response(response);
-	}
-	else {
-		return HTTP_BAD_REQUEST;
-	}
-#else
-
-	if (r->args) {
-		r->content_type = "text/plain; charset=UTF-8";
 		ap_soft_timeout("tmcd response call trace", r);
 		ap_send_http_header(r);
-		ap_rprintf(r, "%s\n", r->args);
+		ap_rprintf(r, "%s", response->data);
 		ap_kill_timeout(r);
+		goto done;
 	}
-#endif
+	else {
+		rc = HTTP_BAD_REQUEST;
+		goto err;
+	}
+err:
+done:
+	if (response)
+		tmcd_free_response(response);
 
-	return OK;
+	return rc;
 }
 
 static const handler_rec tmcd_handlers[] =

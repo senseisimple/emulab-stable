@@ -124,6 +124,11 @@ newtmcd: newtmcd.c libtmcd.o ${TMCDLIBS} decls.h version.o $(SSLOBJ) $(BOOTINFO)
 libtmcd.o: libtmcd.c ${TMCDLIBS} decls.h version.o $(SSLOBJ) $(BOOTINFO)
 	$(CC) $(CFLAGS) -I/usr/local/include/libxml2 $(SSLFLAGS) $(TMCDCFLAGS) -c -o libtmcd.o $<
 
+libtmcd.so: libtmcd.o ${TMCDLIBS} decls.h $(BOOTINFO)
+	$(LD) -shared $^ -L/usr/local/lib/mysql -lxml2 -lmysqlclient \
+		$(TMCDLIBS) $(ELVINFLAGS) ../lib/libtb/libtb.a \
+		-o $@
+
 tmcc: tmcc.c decls.h $(SSLOBJ)
 	$(CC) $(CFLAGS) $(SSLFLAGS) $(LDSTATIC) -g -o tmcc $< $(SSLOBJ) \
 		$(LFLAGS) $(TMLIBS)
