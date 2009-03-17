@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -82,7 +82,7 @@ my %REQCOLUMNS = ('name'      => 1,
                    );
 
 my $COMONDATAFILE = TBMakeLogname("comon-data");
-my $COMONURL = "http://summer.cs.princeton.edu/status/tabulator.cgi".
+my $COMONURL = "http://comon.cs.princeton.edu/status/tabulator.cgi".
     "?table=table_nodeview&format=formatspaces&select='resptime%20%3E%200'";
 my %host2nodeid = ();
 
