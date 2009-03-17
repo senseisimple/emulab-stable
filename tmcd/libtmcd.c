@@ -80,7 +80,7 @@ static int		mydb_update(tmcdreq_t* reqp, char *query, ...);
 
 static int	safesymlink(char *name1, char *name2);
 
-xmlNode *new_response(xmlNode *root, const char *type)
+xmlNode *add_node(xmlNode *root, const char *type)
 {
 	xmlNode *node = NULL;
 	xmlAttr *attr = NULL;
@@ -327,7 +327,9 @@ struct command {
         { "role",	  FULLCONFIG_PHYS, F_ALLOCATED, dorole},
         { "rusage",	  FULLCONFIG_NONE, F_REMUDP|F_MINLOG, dorusage},
         { "watchdoginfo", FULLCONFIG_ALL,  F_REMUDP|F_MINLOG, dodoginfo},
+#if 0
         { "hostkeys",     FULLCONFIG_NONE, 0, dohostkeys},
+#endif
         { "firewallinfo", FULLCONFIG_ALL,  0, dofwinfo},
         { "hostinfo",     FULLCONFIG_NONE, 0, dohostinfo},
 	{ "emulabconfig", FULLCONFIG_NONE, F_ALLOCATED, doemulabconfig},
@@ -631,7 +633,7 @@ XML_COMMAND_PROTOTYPE(donodeid)
 {
 	xmlNode *node;
 
-	node = new_response(root, "nodeid");
+	node = add_node(root, "nodeid");
 	add_key(node, "id", reqp->nodeid);
 
 	return 0;
@@ -644,7 +646,7 @@ XML_COMMAND_PROTOTYPE(dostatus)
 {
 	xmlNode *node;
 
-	node = new_response(root, "status");
+	node = add_node(root, "status");
 	/*
 	 * Now check reserved table
 	 */
@@ -709,7 +711,7 @@ XML_COMMAND_PROTOTYPE(doifconfig)
 		return 1;
 	}
 
-	ifconfigNode = new_response(root, "ifconfig");
+	ifconfigNode = add_node(root, "ifconfig");
 
 	nrows = (int)mysql_num_rows(res);
 	while (nrows) {
@@ -742,7 +744,7 @@ XML_COMMAND_PROTOTYPE(doifconfig)
 			 * We now use the MAC to determine the interface, but
 			 * older images still want that tag at the front.
 			 */
-			node = new_response(ifconfigNode, "interface");
+			node = add_node(ifconfigNode, "interface");
 			add_key(node, "type", type);
 			add_key(node, "inet", row[1]);
 			add_key(node, "mask", mask);
@@ -830,7 +832,7 @@ XML_COMMAND_PROTOTYPE(doifconfig)
 	nrows = (int)mysql_num_rows(res);
 	while (nrows) {
 		row = mysql_fetch_row(res);
-		node = new_response(ifconfigNode, "interface-settings");
+		node = add_node(ifconfigNode, "interface-settings");
 		add_key(node, "mac", row[0]);
 		add_key(node, "key", row[1]);
 		add_key(node, "val", row[2]);
@@ -870,7 +872,7 @@ XML_COMMAND_PROTOTYPE(doifconfig)
 		nrows = (int)mysql_num_rows(res);
 		while (nrows) {
 			row = mysql_fetch_row(res);
-			node = new_response(ifconfigNode, "interface");
+			node = add_node(ifconfigNode, "interface");
 			add_key(node, "type", row[0]);
 			add_key(node, "mac", row[1]);
 			add_key(node, "speed", row[2]); /* in Mbps */
@@ -904,13 +906,13 @@ XML_COMMAND_PROTOTYPE(doifconfig)
 		while (nrows) {
 			row = mysql_fetch_row(res);
 
-			node = new_response(ifconfigNode, "interface");
+			node = add_node(ifconfigNode, "interface");
 			add_key(node, "type", row[0]);
 			add_key(node, "mac", row[1]);
 			add_key(node, "speed", row[2]); /* in Mbps */
 			add_key(node, "duplex", row[3]);
 
-			node = new_response(ifconfigNode, "interface");
+			node = add_node(ifconfigNode, "interface");
 			add_key(node, "type", row[4]);
 			add_key(node, "mac", row[5]);
 			add_key(node, "speed", row[6]); /* in Mbps */
@@ -989,7 +991,7 @@ XML_COMMAND_PROTOTYPE(doifconfig)
 		 * link).
 		 */
 
-		node = new_response(ifconfigNode, "interface");
+		node = add_node(ifconfigNode, "interface");
 		add_key(node, "type", isveth ? "veth" : row[6]);
 		add_key(node, "inet", row[1]);
 		add_key(node, "mask", CHECKMASK(row[4]));
@@ -1157,7 +1159,7 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 		return 1;
 	}
 
-	accounts_node = new_response(root, "accounts");
+	accounts_node = add_node(root, "accounts");
 
 	while (nrows) {
 		row = mysql_fetch_row(res);
@@ -1167,7 +1169,7 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 			return 1;
 		}
 
-		node = new_response(accounts_node, "addgroup");
+		node = add_node(accounts_node, "addgroup");
 		add_key(node, "name", row[0]);
 		add_key(node, "gid", row[1]);
 
@@ -1565,7 +1567,7 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 		strcpy(home_dir, USERDIR);
 		strcat(home_dir, row[0]);
 
-		node = new_response(accounts_node, "adduser");
+		node = add_node(accounts_node, "adduser");
 		add_key(node, "login", row[0]);
 		add_key(node, "pswd", row[1]);
 		add_key(node, "uid", row[2]);
@@ -1617,7 +1619,7 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 				 * Pubkeys can be large, so we may have to
 				 * malloc a special buffer.
 				 */
-				node = new_response(accounts_node, "pubkey");
+				node = add_node(accounts_node, "pubkey");
 				add_key(node, "login", row[0]);
 				add_key(node, "key", pubkey_row[1]);
 
@@ -1653,7 +1655,7 @@ XML_COMMAND_PROTOTYPE(doaccounts)
 
 				sfskey_row = mysql_fetch_row(sfskeys_res);
 
-				node = new_response(accounts_node, "sfskey");
+				node = add_node(accounts_node, "sfskey");
 				add_key(node, "key", sfskey_row[1]);
 
 				sfskeys_nrows--;
@@ -1787,7 +1789,7 @@ XML_COMMAND_PROTOTYPE(dodelay)
 		}
 
 
-		node = new_response(root, "delay");
+		node = add_node(root, "delay");
 		add_key(node, "int0", row[0]);
 		add_key(node, "int1", row[1]);
 		add_key(node, "pipe0", row[2]);
@@ -1896,7 +1898,7 @@ XML_COMMAND_PROTOTYPE(dolinkdelay)
 	}
 	while (nrows) {
 		row = mysql_fetch_row(res);
-		node = new_response(root, "linkdelay");
+		node = add_node(root, "linkdelay");
 
 		add_key(node, "iface", (row[27] ? row[27] : row[0]));
 		add_key(node, "type", row[1]);
@@ -2135,7 +2137,7 @@ XML_COMMAND_PROTOTYPE(dohosts)
 		    host->shared->hasalias = 1;
 		}
 
-		node = new_response(root, "host");
+		node = add_node(root, "host");
 		add_key(node, "name", host->vname);
 		add_key(node, "vlan", host->vlan);
 		add_key(node, "ip", inet_ntoa(host->ipaddr));
@@ -2163,7 +2165,7 @@ XML_COMMAND_PROTOTYPE(dohosts)
 	 * not overwrite the existing hosts file which already has boss/ops.
 	 */
 	if (reqp->isplabdslice && hostcount > 0) {
-		node = new_response(root, "host");
+		node = add_node(root, "host");
 		add_key(node, "name", BOSSNODE);
 		add_key(node, "ip", EXTERNAL_BOSSNODE_IP);
 		add_key(node, "name", USERNODE);
@@ -2254,7 +2256,7 @@ XML_COMMAND_PROTOTYPE(dorpms)
 	do {
 		bp = strsep(&sp, ":");
 
-		node = new_response(root, "rpm");
+		node = add_node(root, "rpm");
 		add_key(node, "package", bp);
 	} while ((bp = sp));
 	
@@ -2298,7 +2300,7 @@ XML_COMMAND_PROTOTYPE(dotarballs)
 		return 0;
 	}
 	
-	tarballs_node = new_response(root, "tarballs");
+	tarballs_node = add_node(root, "tarballs");
 	
 	bp  = row[0];
 	sp  = bp;
@@ -2308,7 +2310,7 @@ XML_COMMAND_PROTOTYPE(dotarballs)
 			continue;
 		*tp++ = '\0';
 
-		node = new_response(tarballs_node, "tarball");
+		node = add_node(tarballs_node, "tarball");
 		add_key(node, "dir", bp);
 		add_key(node, "filename", tp);
 	} while ((bp = sp));
@@ -2361,7 +2363,7 @@ XML_COMMAND_PROTOTYPE(dostartcmd)
 		return 0;
 	}
 
-	node = new_response(root, "startupcmd");
+	node = add_node(root, "startupcmd");
 	add_key(node, "cmd", row[0]);
 	add_key(node, "uid", reqp->swapper);
 
@@ -2479,7 +2481,7 @@ XML_COMMAND_PROTOTYPE(doreadycount)
 	}
 	mysql_free_result(res);
 
-	node = new_response(root, "readycount");
+	node = add_node(root, "readycount");
 	add_format_key(node, "ready", "%d", ready);
 	add_format_key(node, "total", "%d", total);
 
@@ -2546,7 +2548,7 @@ XML_COMMAND_PROTOTYPE(domounts)
 	if (reqp->genisliver_idx)
 		return 0;
 
-	mount_node = new_response(root, "mounts");
+	mount_node = add_node(root, "mounts");
 	
 	/*
 	 * If SFS is in use, the project mount is done via SFS.
@@ -2555,7 +2557,7 @@ XML_COMMAND_PROTOTYPE(domounts)
 		/*
 		 * Return project mount first. 
 		 */
-		node = new_response(mount_node, "mount");
+		node = add_node(mount_node, "mount");
 		add_format_key(node, "remote", "%s/%s", FSPROJDIR, reqp->pid);
 		add_format_key(node, "local", "%s/%s", PROJDIR, reqp->pid);
 
@@ -2569,7 +2571,7 @@ XML_COMMAND_PROTOTYPE(domounts)
 		/*
 		 * Return scratch mount if its defined.
 		 */
-		node = new_response(mount_node, "mount");
+		node = add_node(mount_node, "mount");
 		add_format_key(node, "remote", "%s/%s", FSSCRATCHDIR,
 				reqp->pid);
 		add_format_key(node, "local", "%s/%s", SCRATCHDIR, reqp->pid);
@@ -2583,7 +2585,7 @@ XML_COMMAND_PROTOTYPE(domounts)
 		/*
 		 * Return share mount if its defined.
 		 */
-		node = new_response(mount_node, "mount");
+		node = add_node(mount_node, "mount");
 		add_key(node, "remote", FSSHAREDIR);
 		add_key(node, "local", SHAREDIR);
 
@@ -2597,7 +2599,7 @@ XML_COMMAND_PROTOTYPE(domounts)
 		 * a mount for the group directory too.
 		 */
 		if (strcmp(reqp->pid, reqp->gid)) {
-			node = new_response(mount_node, "mount");
+			node = add_node(mount_node, "mount");
 			snprintf(buf, sizeof(buf), "%s/%s/%s", FSGROUPDIR, reqp->pid,
 					reqp->gid);
 			add_key(node, "remote", buf);
@@ -2619,7 +2621,7 @@ XML_COMMAND_PROTOTYPE(domounts)
 		 * back mounts for the top level directories. 
 		 */
 		if (reqp->islocal) {
-			node = new_response(mount_node, "sfs");
+			node = add_node(mount_node, "sfs");
 			snprintf(buf, sizeof(buf), "%s%s/%s", reqp->fshostid,
 					FSDIR_PROJ, reqp->pid);
 			add_key(node, "remote", buf);
@@ -2635,7 +2637,7 @@ XML_COMMAND_PROTOTYPE(domounts)
 			 * Return SFS-based group mount.
 			 */
 			if (strcmp(reqp->pid, reqp->gid)) {
-				node = new_response(mount_node, "sfs");
+				node = add_node(mount_node, "sfs");
 				snprintf(buf, sizeof(buf), "%s%s/%s/%s", reqp->fshostid,
 						FSDIR_GROUPS, reqp->pid, reqp->gid);
 				add_key(node, "remote", buf);
@@ -2652,7 +2654,7 @@ XML_COMMAND_PROTOTYPE(domounts)
 			 * Pointer to per-project scratch directory.
 			 */
 
-			node = new_response(mount_node, "sfs");
+			node = add_node(mount_node, "sfs");
 			snprintf(buf, sizeof(buf), "%s%s/%s", reqp->fshostid,
 					FSDIR_SCRATCH, reqp->pid);
 			add_key(node, "remote", buf);
@@ -2667,7 +2669,7 @@ XML_COMMAND_PROTOTYPE(domounts)
 			/*
 			 * Pointer to /share.
 			 */
-			node = new_response(mount_node, "sfs");
+			node = add_node(mount_node, "sfs");
 			snprintf(buf, sizeof(buf), "%s%s", reqp->fshostid,
 					FSDIR_SHARE);
 			add_key(node, "remote", buf);
@@ -2684,7 +2686,7 @@ XML_COMMAND_PROTOTYPE(domounts)
 			 * allows the same paths to work on remote
 			 * nodes.
 			 */
-			node = new_response(mount_node, "sfs");
+			node = add_node(mount_node, "sfs");
 			snprintf(buf, sizeof(buf), "%s%s/%s", reqp->fshostid,
 					FSDIR_PROJ, DOTSFS);
 			add_key(node, "remote", buf);
@@ -2697,7 +2699,7 @@ XML_COMMAND_PROTOTYPE(domounts)
 			 *
 			 * Pointer to /proj.
 			 */
-			node = new_response(mount_node, "sfs");
+			node = add_node(mount_node, "sfs");
 			snprintf(buf, sizeof(buf), "%s%s", reqp->fshostid,
 					FSDIR_PROJ);
 			add_key(node, "remote", buf);
@@ -2711,7 +2713,7 @@ XML_COMMAND_PROTOTYPE(domounts)
 			/*
 			 * Pointer to /groups
 			 */
-			node = new_response(mount_node, "sfs");
+			node = add_node(mount_node, "sfs");
 			snprintf(buf, sizeof(buf), "%s%s", reqp->fshostid,
 					FSDIR_GROUPS);
 			add_key(node, "remote", buf);
@@ -2725,7 +2727,7 @@ XML_COMMAND_PROTOTYPE(domounts)
 			/*
 			 * Pointer to /users
 			 */
-			node = new_response(mount_node, "sfs");
+			node = add_node(mount_node, "sfs");
 			snprintf(buf, sizeof(buf), "%s%s", reqp->fshostid,
 					FSDIR_USERS);
 			add_key(node, "remote", buf);
@@ -2739,7 +2741,7 @@ XML_COMMAND_PROTOTYPE(domounts)
 			/*
 			 * Pointer to per-project scratch directory.
 			 */
-			node = new_response(mount_node, "sfs");
+			node = add_node(mount_node, "sfs");
 			snprintf(buf, sizeof(buf), "%s%s", reqp->fshostid,
 					FSDIR_SCRATCH);
 			add_key(node, "remote", buf);
@@ -2754,7 +2756,7 @@ XML_COMMAND_PROTOTYPE(domounts)
 			/*
 			 * Pointer to /share.
 			 */
-			node = new_response(mount_node, "sfs");
+			node = add_node(mount_node, "sfs");
 			snprintf(buf, sizeof(buf), "%s%s", reqp->fshostid,
 					FSDIR_SHARE);
 			add_key(node, "remote", buf);
@@ -2789,7 +2791,7 @@ XML_COMMAND_PROTOTYPE(domounts)
 	if ((nrows = (int)mysql_num_rows(res))) {
 		while (nrows) {
 			row = mysql_fetch_row(res);
-			node = new_response(mount_node, "mount");
+			node = add_node(mount_node, "mount");
 			snprintf(buf, sizeof(buf), "%s/%s", FSPROJDIR,
 					row[0]);
 			add_key(node, "remote", buf);
@@ -2833,7 +2835,7 @@ XML_COMMAND_PROTOTYPE(domounts)
 			continue;
 		}
 #endif
-		node = new_response(mount_node, "mount");
+		node = add_node(mount_node, "mount");
 		snprintf(buf, sizeof(buf), "%s/%s", FSUSERDIR,
 				row[0]);
 		add_key(node, "remote", buf);
@@ -2923,7 +2925,7 @@ XML_COMMAND_PROTOTYPE(dosfshostid)
 	/*
 	 * Create symlink names
 	 */
-	node = new_response(root, "sfshostid");
+	node = add_node(root, "sfshostid");
 	snprintf(sfspath, sizeof(sfspath), "/sfs/%s", nodehostid);
 	snprintf(dspath, sizeof(dspath), "%s/%s/%s.%s.%s", PROJDIR, DOTSFS,
 	       reqp->nickname, reqp->eid, reqp->pid);
@@ -2994,7 +2996,7 @@ XML_COMMAND_PROTOTYPE(dorouting)
 	if (!strcmp(row[0], "static")) {
 		isstatic = 1;
 	}
-	routing_node = new_response(root, "routing");
+	routing_node = add_node(root, "routing");
 	add_key(routing_node, "routertype", row[0]);
 	mysql_free_result(res);
 
@@ -3051,7 +3053,7 @@ XML_COMMAND_PROTOTYPE(dorouting)
 		} else
 			strncpy(dstip, row[0], sizeof(dstip));
 
-		node = new_response(routing_node, "route");
+		node = add_node(routing_node, "route");
 		add_key(node, "ipaddr", dstip);
 		add_key(node, "type", row[1]);
 		add_key(node, "ipmask", row[2]);
@@ -3107,7 +3109,7 @@ XML_COMMAND_PROTOTYPE(doloadinfo)
 	/*
 	 * Remote nodes get a URL for the address. 
 	 */
-	node = new_response(root, "loadinfo");
+	node = add_node(root, "loadinfo");
 	if (!reqp->islocal) {
 		if (!row[6] || !row[6][0]) {
 			error("doloadinfo: %s: "
@@ -3279,13 +3281,13 @@ XML_COMMAND_PROTOTYPE(dotrafgens)
 		return 0;
 	}
 
-	trafgensNode = new_response(root, "trafgens");
+	trafgensNode = add_node(root, "trafgens");
 
 	while (nrows) {
 		char myname[TBDB_FLEN_VNAME+2];
 		char peername[TBDB_FLEN_VNAME+2];
 
-		node = new_response(trafgensNode, "entry");
+		node = add_node(trafgensNode, "entry");
 		
 		row = mysql_fetch_row(res);
 
@@ -3347,7 +3349,7 @@ XML_COMMAND_PROTOTYPE(donseconfigs)
 	 * Just shove the whole thing out.
 	 */
 
-	node = new_response(root, "nseconfigs");
+	node = add_node(root, "nseconfigs");
 	node = add_key(node, "config", row[0]);
 	mysql_free_result(res);
 	return 0;
@@ -3413,7 +3415,7 @@ XML_COMMAND_PROTOTYPE(docreator)
 {
 	xmlNode		*node;
 
-	node = new_response(root, "creator");
+	node = add_node(root, "creator");
 	add_key(node, "creator", reqp->creator);
 	add_key(node, "swapper", reqp->swapper);
 
@@ -3450,10 +3452,10 @@ XML_COMMAND_PROTOTYPE(dotunnels)
 		return 0;
 	}
 
-	tunnels_node = new_response(root, "tunnels");
+	tunnels_node = add_node(root, "tunnels");
 	while (nrows) {
 		row = mysql_fetch_row(res);
-		node = new_response(tunnels_node, "tunnel");
+		node = add_node(tunnels_node, "tunnel");
 
 		add_key(node, "tunnel", row[0]);
 		add_key(node, "member", row[1]);
@@ -3495,10 +3497,10 @@ XML_COMMAND_PROTOTYPE(dovnodelist)
 		return 0;
 	}
 
-	vnodelist_node = new_response(root, "vnodelist");
+	vnodelist_node = add_node(root, "vnodelist");
 	while (nrows) {
 		row = mysql_fetch_row(res);
-		node = new_response(vnodelist_node, "vnode");
+		node = add_node(vnodelist_node, "vnode");
 
 		/* XXX Plab? */
 		add_key(node, "vnodeid", row[0]);
@@ -3535,10 +3537,10 @@ XML_COMMAND_PROTOTYPE(dosubnodelist)
 		return 0;
 	}
 
-	subnodelist_node = new_response(root, "subnodelist");
+	subnodelist_node = add_node(root, "subnodelist");
 	while (nrows) {
 		row = mysql_fetch_row(res);
-		node = new_response(subnodelist_node, "subnode");
+		node = add_node(subnodelist_node, "subnode");
 		add_key(node, "nodeid", row[0]);
 		add_key(node, "type", row[1]);
 
@@ -3577,7 +3579,7 @@ XML_COMMAND_PROTOTYPE(doisalive)
 	 * just return yes/no and let the client assume it knows what
 	 * to do (update accounts).
 	 */
-	node = new_response(root, "isalive");
+	node = add_node(root, "isalive");
 	add_key(node, "update", (doaccounts ? "1" : "0"));
 
 	return 0;
@@ -3622,7 +3624,7 @@ XML_COMMAND_PROTOTYPE(doipodinfo)
 	/*
 	 * XXX host/mask hardwired to us
 	 */
-	node = new_response(root, "ipodinfo");
+	node = add_node(root, "ipodinfo");
 	add_key(node, "host", inet_ntoa(reqp->myipaddr));
 	add_key(node, "mask", "255.255.255.255");
 	add_key(node, "hash", hashbuf);
@@ -3652,7 +3654,7 @@ XML_COMMAND_PROTOTYPE(dontpinfo)
 		return 1;
 	}
 
-	node = new_response(root, "ntpinfo");
+	node = add_node(root, "ntpinfo");
 	
 	if ((nrows = (int)mysql_num_rows(res))) {
 		while (nrows) {
@@ -3752,7 +3754,7 @@ XML_COMMAND_PROTOTYPE(dojailconfig)
 	 * geni nodes get something completely different. 
 	 */
 	if (reqp->genisliver_idx) {
-		node = new_response(root, "jailconfig");
+		node = add_node(root, "jailconfig");
 		add_format_key(node, "eventserver", "event-server.%s", OURDOMAIN);
 		return 0;
 	}
@@ -3800,7 +3802,7 @@ XML_COMMAND_PROTOTYPE(dojailconfig)
 		return 0;
 	}
 	row   = mysql_fetch_row(res);
-	node = new_response(root, "jailconfig");
+	node = add_node(root, "jailconfig");
 
 	if (row[1]) {
 		add_format_key(node, "jailip", "%s,%s", row[1], JAILIPMASK);
@@ -3922,7 +3924,7 @@ XML_COMMAND_PROTOTYPE(doplabconfig)
 		return 1;
 	}
 	
-	node = new_response(root, "plabconfig");
+	node = add_node(root, "plabconfig");
 	
         /* Add the sshd port (if any) to the output */
         if ((int)mysql_num_rows(res) > 0) {
@@ -4023,7 +4025,7 @@ XML_COMMAND_PROTOTYPE(doixpconfig)
 		(~mask_addr.s_addr);
 	strcpy(bcast_ip, inet_ntoa(bcast_addr));
 
-	node = new_response(root, "ixpconfig");
+	node = add_node(root, "ixpconfig");
 	add_key(node, "ip", row[0]);
 	add_key(node, "iface", row[1]);
 	add_key(node, "bcast", bcast_ip);
@@ -4043,7 +4045,7 @@ XML_COMMAND_PROTOTYPE(doslothdparams)
 {
 	xmlNode *node;
 
-	node = new_response(root, "slothdparams");
+	node = add_node(root, "slothdparams");
 	add_key(node, "params", SDPARAMS);
 	
 	return 0;
@@ -4075,7 +4077,7 @@ XML_COMMAND_PROTOTYPE(doprogagents)
 	}
 	
 	while (nrows) {
-		node = new_response(root, "progagent");
+		node = add_node(root, "progagent");
 		row = mysql_fetch_row(res);
 
 		/*
@@ -4114,7 +4116,7 @@ XML_COMMAND_PROTOTYPE(dosyncserver)
 	if (!strlen(reqp->syncserver))
 		return 0;
 
-	node = new_response(root, "syncserver");
+	node = add_node(root, "syncserver");
 	add_format_key(node, "server", "%s.%s.%s.%s",
 	       reqp->syncserver,
 	       reqp->eid, reqp->pid, OURDOMAIN);
@@ -4134,7 +4136,7 @@ XML_COMMAND_PROTOTYPE(dokeyhash)
 	if (!strlen(reqp->keyhash))
 		return 0;
 
-	node = new_response(root, "keyhash");
+	node = add_node(root, "keyhash");
 	add_key(node, "hash", reqp->keyhash);
 
 	return 0;
@@ -4150,7 +4152,7 @@ XML_COMMAND_PROTOTYPE(doeventkey)
 	if (!strlen(reqp->eventkey))
 		return 0;
 
-	node = new_response(root, "eventkey");
+	node = add_node(root, "eventkey");
 	add_key(node, "key", reqp->eventkey);
 
 	return 0;
@@ -4183,7 +4185,7 @@ XML_COMMAND_PROTOTYPE(doroutelist)
 		return 0;
 	}
 
-	routelist_node = new_response(root, "routelist");
+	routelist_node = add_node(root, "routelist");
 
 	/*
 	 * Return type. At some point we might have to return a list of
@@ -4243,7 +4245,7 @@ XML_COMMAND_PROTOTYPE(doroutelist)
 			strncpy(dstip, inet_ntoa(tip), sizeof(dstip));
 		} else
 			strncpy(dstip, row[2], sizeof(dstip));
-			node = new_response(routelist_node, "route");
+			node = add_node(routelist_node, "route");
 
 			add_key(node, "node", row[0]);
 			add_key(node, "srcipaddr", row[1]);
@@ -4294,7 +4296,7 @@ XML_COMMAND_PROTOTYPE(dorole)
 		return 0;
 	}
 
-	node = new_response(root, "role");
+	node = add_node(root, "role");
 	add_key(node, "role", row[0]);
 	mysql_free_result(res);
 
@@ -4385,7 +4387,7 @@ XML_COMMAND_PROTOTYPE(dorusage)
 	 * just return yes/no and let the client assume it knows what
 	 * to do (update accounts).
 	 */
-	node = new_response(root, "rusage");
+	node = add_node(root, "rusage");
 	add_format_key(node, "update", "%d", reqp->update_accounts);
 
         /* We're going to store plab up/down data in a file for a while. */
@@ -4519,7 +4521,7 @@ XML_COMMAND_PROTOTYPE(dodoginfo)
 	        rootpswdinterval = 3600;
 #endif
 
-	node = new_response(root, "doginfo");
+	node = add_node(root, "doginfo");
 	add_format_key(node, "interval", "%d", iv_interval);
 	add_format_key(node, "isalive", "%d", iv_isalive);
 	add_format_key(node, "ntpdrift", "%d", iv_ntpdrift);
@@ -4686,7 +4688,7 @@ XML_COMMAND_PROTOTYPE(dofwinfo)
 	}
 
 
-	fwinfo_node = new_response(root, "firewallinfo");
+	fwinfo_node = add_node(root, "firewallinfo");
 
 	/*
 	 * Common case, no firewall
@@ -4776,14 +4778,14 @@ XML_COMMAND_PROTOTYPE(dofwinfo)
 	 */
 	res = mydb_query(reqp, "select value from sitevariables "
 			 "where name='node/gw_mac'", 1);
-	fwvars_node = new_response(fwinfo_node, "fwvars");
+	fwvars_node = add_node(fwinfo_node, "fwvars");
 	if (res && mysql_num_rows(res) > 0) {
 		row = mysql_fetch_row(res);
 		if (row[0]) { /* XXX Ryan */
-			node = new_response(fwinfo_node, "fwvar");
+			node = add_node(fwinfo_node, "fwvar");
 			add_key(node, "var", "EMULAB_GWIP");
 			add_key(node, "value", CONTROL_ROUTER_IP);
-			node = new_response(fwinfo_node, "fwvar");
+			node = add_node(fwinfo_node, "fwvar");
 			add_key(node, "var", "EMULAB_GWMAC");
 			add_key(node, "value", row[0]);
 		}
@@ -4803,7 +4805,7 @@ XML_COMMAND_PROTOTYPE(dofwinfo)
 		row = mysql_fetch_row(res);
 		if (!row[0] || !row[1])
 			continue;
-		node = new_response(fwinfo_node, "fwvar");
+		node = add_node(fwinfo_node, "fwvar");
 		add_key(node, "var", row[0]);
 		add_key(node, "value", row[1]);
 	}
@@ -4828,7 +4830,7 @@ XML_COMMAND_PROTOTYPE(dofwinfo)
 
 	for (n = nrows; n > 0; n--) {
 		row = mysql_fetch_row(res);
-		node = new_response(fwinfo_node, "fwrule");
+		node = add_node(fwinfo_node, "fwrule");
 		add_key(node, "ruleno", row[0]);
 		add_key(node, "rule", row[1]);
 	}
@@ -4853,7 +4855,7 @@ XML_COMMAND_PROTOTYPE(dofwinfo)
 
 	for (n = nrows; n > 0; n--) {
 		row = mysql_fetch_row(res);
-		node = new_response(fwinfo_node, "fwrule");
+		node = add_node(fwinfo_node, "fwrule");
 		add_key(node, "ruleno", row[0]);
 		add_key(node, "rule", row[1]);
 	}
@@ -4888,7 +4890,7 @@ XML_COMMAND_PROTOTYPE(dofwinfo)
 
 	for (n = nrows; n > 0; n--) {
 		row = mysql_fetch_row(res);
-		node = new_response(fwinfo_node, "fwhost");
+		node = add_node(fwinfo_node, "fwhost");
 		add_key(node, "host", row[0]);
 		add_key(node, "cnetip", row[1]);
 		add_key(node, "cnetmac", row[2]);
@@ -4961,7 +4963,7 @@ XML_COMMAND_PROTOTYPE(doemulabconfig)
 	/*
 	 * Lets find the role for the current node and spit that out first.
 	 */
-	node = new_response(root, "elabconfig");
+	node = add_node(root, "elabconfig");
 	while (nrows--) {
 		row = mysql_fetch_row(res);
 
@@ -5111,7 +5113,7 @@ XML_COMMAND_PROTOTYPE(doeplabconfig)
 	}
 	nrows = (int)mysql_num_rows(res);
 	
-	eplabconfig_node = new_response(root, "epelabconfig");
+	eplabconfig_node = add_node(root, "epelabconfig");
 	/*
 	 * Spit out the PLC node first just cuz
 	 */
@@ -5120,7 +5122,7 @@ XML_COMMAND_PROTOTYPE(doeplabconfig)
 		row = mysql_fetch_row(res);
 
 		if (!strcmp(row[2], "plc")) {
-			node = new_response(eplabconfig_node, "node");
+			node = add_node(eplabconfig_node, "node");
 			add_key(node, "vname", row[1]);
 			add_format_key(node, "pname", "%s.%s", row[0], OURDOMAIN);
 			add_key(node, "role", row[2]);
@@ -5142,7 +5144,7 @@ XML_COMMAND_PROTOTYPE(doeplabconfig)
 		if (!strcmp(row[1], "plc"))
 			continue;
 
-		node = new_response(eplabconfig_node, "node");
+		node = add_node(eplabconfig_node, "node");
 		add_key(node, "vname", row[1]);
 		add_format_key(node, "pname", "%s.%s", row[0], OURDOMAIN);
 		add_key(node, "role", row[2]);
@@ -5175,7 +5177,7 @@ XML_COMMAND_PROTOTYPE(doeplabconfig)
 	while (nrows--) {
 		row = mysql_fetch_row(res);
 		bufp = buf;
-		node = new_response(eplabconfig_node, "interface");
+		node = add_node(eplabconfig_node, "interface");
 		add_key(node, "vname", row[0]);
 		add_key(node, "ip", row[1]);
 		add_key(node, "netmask", row[2]);
@@ -5213,7 +5215,7 @@ XML_COMMAND_PROTOTYPE(doeplabconfig)
 	while (nrows--) {
 	    row = mysql_fetch_row(res);
 	    bufp = buf;
-	    node = new_response(eplabconfig_node, "lanlink");
+	    node = add_node(eplabconfig_node, "lanlink");
 	    add_key(node, "vname", row[0]);
 	    add_format_key(node, "pname", "%s.%s", row[1], OURDOMAIN);
 	    add_key(node, "plcnetwork", row[2]);
@@ -5252,7 +5254,7 @@ XML_COMMAND_PROTOTYPE(dolocalize)
 		return 1;
 	}
 
-	node = new_response(root, "localization");
+	node = add_node(root, "localization");
 	row = mysql_fetch_row(res);
 	if (row[1]) {
 		add_key(node, "rootpubkey", row[1]);
@@ -5321,7 +5323,7 @@ XML_COMMAND_PROTOTYPE(dorootpswd)
 	sprintf(buf, "$1$%s", hashbuf);
 	bp = crypt(hashbuf, buf);
 
-	node = new_response(root, "rootpswd");
+	node = add_node(root, "rootpswd");
 	add_key(node, "hash", bp);
 
 	return 0;
@@ -5474,7 +5476,7 @@ XML_COMMAND_PROTOTYPE(dobattery)
 		     voltage);
 	}
 	
-	node = new_response(root, "battery");
+	node = add_node(root, "battery");
 	add_key(node, "response", "OK");
 	
 	return 0;
@@ -5634,7 +5636,7 @@ XML_COMMAND_PROTOTYPE(douserenv)
 	}
 	
 	/* XXX Ryan: Is there a better way to do this? */
-	node = new_response(root, "userenv");
+	node = add_node(root, "userenv");
 	while (nrows) {
 		row = mysql_fetch_row(res);
 
@@ -5676,10 +5678,10 @@ XML_COMMAND_PROTOTYPE(dotiptunnels)
 		return 0;
 	}
 
-	node = new_response(root, "tiptunnels");
+	node = add_node(root, "tiptunnels");
 	
 	while (nrows) {
-		tunnel_node = new_response(node, "tiptunnel");
+		tunnel_node = add_node(node, "tiptunnel");
 		row = mysql_fetch_row(res);
 
 		if (row[1]) {
@@ -5719,7 +5721,7 @@ XML_COMMAND_PROTOTYPE(dorelayconfig)
 	
 	while (nrows) {
 		row = mysql_fetch_row(res);
-		node = new_response(root, "relayconfig");
+		node = add_node(root, "relayconfig");
 
 		add_key(node, "type", reqp->type);
 		add_key(node, "capserver", row[0]);
@@ -5798,7 +5800,7 @@ XML_COMMAND_PROTOTYPE(dotraceconfig)
 		return 0;
 	}
 
-	traceconfig_node = new_response(root, "traceconfig");
+	traceconfig_node = add_node(root, "traceconfig");
 	while (nrows) {
 		int     idx;
 		
@@ -5817,7 +5819,7 @@ XML_COMMAND_PROTOTYPE(dotraceconfig)
 			idx += (atoi(cp+1) * 10);
 		}
 
-		node = new_response(traceconfig_node, "entry");
+		node = add_node(traceconfig_node, "entry");
 		add_key(node, "linkname", row[0]);
 		add_format_key(node, "index", "%d", idx);
 		add_key(node, "mac0", (row[1] ? row[1] : ""));
@@ -5895,11 +5897,11 @@ XML_COMMAND_PROTOTYPE(doplabeventkeys)
 		return 0;
 	}
 
-	node = new_response(root, "plabeventkeys");
+	node = add_node(root, "plabeventkeys");
 
 	while (nrows) {
 		row = mysql_fetch_row(res);
-		eventkey_node = new_response(node, "plabeventkey");
+		eventkey_node = add_node(node, "plabeventkey");
 
 		add_key(eventkey_node, "pid", row[0]);
 		add_key(eventkey_node, "eid", row[1]);
@@ -5922,6 +5924,7 @@ XML_COMMAND_PROTOTYPE(dointfcmap)
 	MYSQL_RES	*res;
 	MYSQL_ROW	row;
 	xmlNode		*node = NULL;
+	xmlNode		*interface = NULL;
 
         res = mydb_query(reqp, "select node_id, mac from interfaces "
 			 "where node_id like 'pc%%' order by node_id",
@@ -5935,7 +5938,7 @@ XML_COMMAND_PROTOTYPE(dointfcmap)
 		return 0;
 	}
 
-	/* XXX Ryan: might this benefit from more structure? */
+	node = add_node(root, "intfcmap");
 	while (nrows) {
 		row = mysql_fetch_row(res);
 		/* if (reqp->verbose) info("intfcmap: %s %s\n", row[0], row[1]); */
@@ -5943,19 +5946,19 @@ XML_COMMAND_PROTOTYPE(dointfcmap)
 		/* Consolidate interfaces on the same pc into a single line. */
 		if (pc[0] == '\0') {
 			/* First pc. */
-			node = new_response(root, "intfcmap");
-			add_key(node, "nodeid", row[0]);
-			add_key(node, "mac", row[1]);
+			interface = add_node(node, "interface");
+			add_key(interface, "nodeid", row[0]);
+			add_key(interface, "mac", row[1]);
 		} else if (strncmp(pc, row[0], 8) == 0 ) {
 			/* Same pc, append. */
-			add_key(node, "mac", row[1]);
+			add_key(interface, "mac", row[1]);
 		} else {   
 			/* Different pc, dump this one and start the next. */
 			npcs++;
 
-			node = new_response(root, "intfcmap");
-			add_key(node, "nodeid", row[0]);
-			add_key(node, "mac", row[1]);
+			interface = add_node(node, "intfcmap");
+			add_key(interface, "nodeid", row[0]);
+			add_key(interface, "mac", row[1]);
 		}
 		nrows--;
 	}
@@ -6001,13 +6004,13 @@ XML_COMMAND_PROTOTYPE(domotelog)
 	return 0;
     }
 
-    node = new_response(root, "motelogs");
+    node = add_node(root, "motelogs");
 
     while (nrows) {
 	row = mysql_fetch_row(res);
 	
 	/* only specfilepath can possibly be null */
-	motelog_node = new_response(root, "motelog");
+	motelog_node = add_node(root, "motelog");
 	add_key(motelog_node, "motelogid", row[0]);
 	add_key(motelog_node, "classfile", row[1]);
 	add_key(motelog_node, "specfile", row[2]);
@@ -6072,7 +6075,7 @@ XML_COMMAND_PROTOTYPE(doportregister)
 		}
 		if ((int)mysql_num_rows(res) > 0) {
 			row = mysql_fetch_row(res);
-			node = new_response(root, "portregister");
+			node = add_node(root, "portregister");
 			add_key(node, "port", row[0]);
 			add_format_key(node, "nodeid", "%s.%s", row[1],
 					OURDOMAIN);
@@ -6127,7 +6130,7 @@ XML_COMMAND_PROTOTYPE(dobootwhat)
 	boot_info.opcode  = BIOPCODE_BOOTWHAT_REQUEST;
 	boot_info.version = BIVERSION_CURRENT;
 
-	node = new_response(root, "bootwhat");
+	node = add_node(root, "bootwhat");
 
 #if 0
 	if(strlen(reqp->privkey) > 1) { /* We have a private key, so prepare bootinfo for it. */
