@@ -64,6 +64,11 @@ except getopt.GetoptError, err:
     Usage()
     sys.exit( 1 )
 
+if "PROTOGENI_CERTIFICATE" in os.environ:
+    CERTIFICATE = os.environ[ "PROTOGENI_CERTIFICATE" ]
+if "PROTOGENI_PASSPHRASE" in os.environ:
+    PASSPHRASEFILE = os.environ[ "PROTOGENI_PASSPHRASE" ]
+
 for opt, arg in opts:
     if opt in ( "-c", "--credentials" ):
         selfcredentialfile = arg
