@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2007 University of Utah and the Flux Group.
+# Copyright (c) 2007-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package OSinfo;
@@ -259,6 +259,16 @@ sub Create($$$$$$)
 }
 
 #
+# Lookup a "system" osid, meaning one in the emulab-ops project.
+#
+sub LookupByName($$)
+{
+    my ($class, $osname) = @_;
+
+    return OSinfo->Lookup(TBOPSPID(), $osname);
+}
+
+#
 # Refresh a class instance by reloading from the DB.
 #
 sub Refresh($)
@@ -418,6 +428,148 @@ sub ValidOpMode($$)
     my ($self, $opmode) = @_;
 
     return (exists($OPMODES{$opmode}) ? 1 : 0);
+}
+
+#
+# Boot command like. The caller supplies the default in $pref.
+#
+sub OSBootCmd($$$)
+{
+    my ($self, $role, $pref) = @_;
+
+    return -1
+	if (! (ref($self) && ref($pref)));
+
+    my $osid = $self->osid();
+
+    my $query_result =
+	DBQueryWarn("select ob.boot_cmd_line from os_info as oi ".
+		    "left join os_boot_cmd as ob on ob.OS=oi.OS and ".
+		    "  ob.version=oi.version ".
+		    "where oi.osid='$osid' and ob.role='$role'");
+
+    return -1
+	if (!$query_result || $query_result->numrows > 1);
+    
+    if ($query_result->numrows) {
+	my ($cmdline) = $query_result->fetchrow_array();
+	$$pref = $cmdline;
+    }
+    return 0;
+}
+
+#
+# Resolve a 'generic' OSID (ie. FBSD-STD) to a real OSID
+#
+# Note: It's okay to call this function with a 'real' OSID, but it would be
+# waseful to do so.
+#
+# returns: The 'real' OSID that the OSID resolves to, or undef if there is a
+#          problem (ie. unknown OSID)
+#
+sub ResolveNextOSID($;$)
+{
+    my ($self, $experiment) = @_;
+
+    return undef
+	if (! ref($self));
+
+    my $osid       = $self->osid();
+    my $next_osid  = $self->osid();
+    my $input_osid = $self->osid();
+
+    my $count = 0;
+    do {
+	#
+	# Just a guard to make sure we don't end up in a loop
+	#
+	if ($count++ > 10) {
+	    warn "Resolving $input_osid: Circular reference\n";
+	}
+
+	$osid = $next_osid;
+	my $result =
+	    DBQueryWarn("select nextosid from os_info where osid='$osid'");
+
+	if ($result->num_rows() != 1) {
+	    warn "Resolving $input_osid: Unable to fetch os_info for $osid!\n";
+	    return undef;
+	}
+	($next_osid) = $result->fetchrow();
+
+	#
+	# See if we need to resolve using a map.
+	# Maps currently are only indexed by modification time;
+	# i.e., we look at the last modification time of the experiment to
+	# determine what OSID should be used.
+	#
+	# NOTE: mapping used to be done based on experiment *creation* time
+	# but that left no ability to "update" an experiment to use current
+	# images, at least short of creating a new experiment with the same
+	# ns file.
+	#
+	# next_osid used to be MAP:osid_map, but now its an integer field
+	# so just look for a 0 index, which is not a "valid" osid.
+	#
+	if (defined($next_osid) && $next_osid == 0) {
+	    my $map = "osid_map";
+
+	    my $timestr;
+	    if (defined($experiment)) {
+		my $pid = $experiment->pid();
+		my $eid = $experiment->eid();
+		
+		my $m_result =
+		    DBQueryWarn("select e.expt_created, s.swapmod_last ".
+				"    from experiments as e, ".
+				"         experiment_stats as s ".
+				"where e.idx=s.exptidx and ".
+				"e.pid='$pid' and e.eid='$eid'");
+		if (!$m_result || $m_result->num_rows() == 0) {
+		    warn "Resolving $input_osid: no experiment $pid/$eid!\n";
+		    return undef;
+		}
+		my ($ctime,$mtime) = $m_result->fetchrow();
+		if (defined($mtime) && $mtime ne "") {
+		    $timestr = "'$mtime'";
+		} else {
+		    $timestr = "'$ctime'";
+		}
+	    } else {
+		$timestr = "now()";
+	    }
+
+	    $result = DBQueryWarn("select nextosid from $map ".
+				  "where osid='$osid' and ".
+				  "$timestr between btime and etime");
+	    if (!$result) {
+		warn "No such osid map $map!\n";
+		return undef;
+	    }
+
+	    if ($result->num_rows() == 0) {
+		warn "Resolving $input_osid: Unable to map $osid!\n";
+		return undef;
+	    }
+	    ($next_osid) = $result->fetchrow();
+	}
+    } while ($next_osid);
+    
+    return OSinfo->Lookup($osid);
+}
+
+#
+# Check if a particular feature is supported.
+#
+sub FeatureSupported($$)
+{
+    my ($self, $feature) = @_;
+
+    my $osfeatures = $self->osfeatures();
+    return 0
+	if (!defined($osfeatures) || $osfeatures eq "");
+
+    return grep {$_ eq $feature} split(',', $osfeatures);
 }
 
 # _Always_ make sure that this 1 is at the end of the file...
