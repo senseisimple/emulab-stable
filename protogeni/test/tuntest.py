@@ -28,6 +28,8 @@ import xml.sax
 import string
 from M2Crypto import X509
 
+ACCEPTSLICENAME=1
+
 execfile( "test-common.py" )
 
 class findElement(ContentHandler):

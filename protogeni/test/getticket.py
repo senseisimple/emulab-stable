@@ -25,6 +25,8 @@ import re
 import xmlrpclib
 from M2Crypto import X509
 
+ACCEPTSLICENAME=1
+
 execfile( "test-common.py" )
 
 #
@@ -88,7 +90,7 @@ if rval:
     pass
 ticket = response["value"]
 print "Got a ticket from the CM. Delaying a moment ..."
-#print str(ticket)
+if debug: print str(ticket)
 
 time.sleep(5)
 

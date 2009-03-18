@@ -44,7 +44,7 @@ if rval:
     Fatal("Could not resolve geniuser")
     pass
 print "Found geniuser record at the SA"
-#print str(response)
+if debug: print str(response)
 
 #
 # Lookup my ssh keys.

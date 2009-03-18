@@ -25,6 +25,8 @@ import re
 import xmlrpclib
 from M2Crypto import X509
 
+ACCEPTSLICENAME=1
+
 execfile( "test-common.py" )
 
 #
@@ -43,7 +45,7 @@ if rval:
     Fatal("Could not get my keys")
     pass
 mykeys = response["value"]
-#print str(mykeys);
+if debug: print str(mykeys)
 
 #
 # Lookup slice.

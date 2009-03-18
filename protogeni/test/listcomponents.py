@@ -40,7 +40,7 @@ rval,response = do_method("ch", "ListComponents", params)
 if rval:
     Fatal("Could not get a list of components from the ClearingHouse")
     pass
-#print str(response["value"])
+if debug: print str(response["value"])
 
 #
 # Ask each manager for its list.

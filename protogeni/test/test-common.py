@@ -39,23 +39,26 @@ if "Usage" not in dir():
     def Usage():
         print "usage: " + sys.argv[ 0 ] + " [option...]"
         print """Options:
-        -c file, --credentials=file         read self-credentials from file
-                                                [default: query from SA]
-        -d, --debug                         be verbose about XML methods invoked
-        -f file, --certificate=file         read SSL certificate from file
-                                                [default: ~/.ssl/encrypted.pem]
-        -h, --help                          show options and usage
-        -p file, --passphrase=file          read passphrase from file
-                                                [default: ~/.ssl/password]
-        -r file, --read-commands=file       specify additional configuration file
-        -s file, --slicecredentials=file    read slice credentials from file
-                                                [default: query from SA]"""
+    -c file, --credentials=file         read self-credentials from file
+                                            [default: query from SA]
+    -d, --debug                         be verbose about XML methods invoked
+    -f file, --certificate=file         read SSL certificate from file
+                                            [default: ~/.ssl/encrypted.pem]
+    -h, --help                          show options and usage"""
+        if "ACCEPTSLICENAME" in globals():
+            print """    -n name, --slicename=name           specify human-readable name of slice
+                                            [default: mytestslice]"""
+        print """    -p file, --passphrase=file          read passphrase from file
+                                            [default: ~/.ssl/password]
+    -r file, --read-commands=file       specify additional configuration file
+    -s file, --slicecredentials=file    read slice credentials from file
+                                            [default: query from SA]"""
 
 try:
-    opts, args = getopt.getopt( sys.argv[ 1: ], "c:df:hp:r:s:",
+    opts, args = getopt.getopt( sys.argv[ 1: ], "c:df:hn:p:r:s:",
                                 [ "credentials=", "debug", "certificate=",
                                   "help", "passphrase=", "read-commands=",
-                                  "slicecredentials=" ] )
+                                  "slicecredentials=", "slicename=" ] )
 except getopt.GetoptError, err:
     print >> sys.stderr, str( err )
     Usage()
@@ -71,6 +74,8 @@ for opt, arg in opts:
     elif opt in ( "-h", "--help" ):
         Usage()
         sys.exit( 0 )
+    elif opt in ( "-n", "--slicename" ):
+        SLICENAME = arg
     elif opt in ( "-p", "--passphrase" ):
         PASSPHRASEFILE = arg
     elif opt in ( "-r", "--read-commands" ):
@@ -168,9 +173,8 @@ def do_method(module, method, params, URI=None):
     # emulabclient.py module. The XML standard converts classes to a plain
     # Dictionary, hence the code below. 
     # 
-    if len(response["output"]):
-        print >> sys.stderr, response["output"],
-        print >> sys.stderr, ": ",
+    if response[ "code" ] and len(response["output"]):
+        print >> sys.stderr, response["output"] + ":",
         pass
 
     rval = response["code"]
@@ -204,7 +208,7 @@ def resolve_slice( name, selfcredential ):
     params = {}
     params["credential"] = mycredential
     params["type"]       = "Slice"
-    params["hrn"]        = SLICENAME
+    params["hrn"]        = name
     rval,response = do_method("sa", "Resolve", params)
     if rval:
         Fatal("Slice does not exist");

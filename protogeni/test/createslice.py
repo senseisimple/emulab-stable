@@ -24,6 +24,8 @@ import re
 import xmlrpclib
 from M2Crypto import X509
 
+ACCEPTSLICENAME=1
+
 execfile( "test-common.py" )
 
 #
@@ -71,31 +73,31 @@ if rval:
     pass
 myslice = response["value"]
 print "New slice created"
-#print str(myslice);
+if debug: print str(myslice)
 
+##
+## Lookup another user so we can bind them to the slice.
+##
+#params = {}
+#params["hrn"]       = "leebee"
+#params["credential"] = mycredential
+#params["type"]       = "User"
+#rval,response = do_method("sa", "Resolve", params)
+#if rval:
+#    Fatal("Could not resolve leebee")
+#    pass
+#leebee = response["value"]
+#print "Found leebee record at the SA, binding to slice ..."
 #
-# Lookup another user so we can bind them to the slice.
-#
-params = {}
-params["hrn"]       = "leebee"
-params["credential"] = mycredential
-params["type"]       = "User"
-rval,response = do_method("sa", "Resolve", params)
-if rval:
-    Fatal("Could not resolve leebee")
-    pass
-leebee = response["value"]
-print "Found leebee record at the SA, binding to slice ..."
-
-#
-# And bind the user to the slice so that he can get his own cred.
-#
-params = {}
-params["uuid"]       = leebee["uuid"]
-params["credential"] = myslice
-rval,response = do_method("sa", "BindToSlice", params)
-if rval:
-    Fatal("Could not bind leebee to slice")
-    pass
-leebee = response["value"]
-print "Bound leebee to slice at the SA"
+##
+## And bind the user to the slice so that he can get his own cred.
+##
+#params = {}
+#params["uuid"]       = leebee["uuid"]
+#params["credential"] = myslice
+#rval,response = do_method("sa", "BindToSlice", params)
+#if rval:
+#    Fatal("Could not bind leebee to slice")
+#    pass
+#leebee = response["value"]
+#print "Bound leebee to slice at the SA"
