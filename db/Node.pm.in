@@ -1299,6 +1299,8 @@ sub CreateVnodes($$)
     my $count   = $options->{'count'};
     my $vtype   = $options->{'vtype'};
     my $pnode   = $options->{'nodeid'};
+    # Caller can specify uuids, otherwise we make them up.
+    my @uuids   = @$rptr;
 
     my $node = Node->Lookup($pnode);
     if (!defined($node)) {
@@ -1471,7 +1473,7 @@ sub CreateVnodes($$)
 	}
 	my $jailip = "${IPBASE1}.${pnet}.${pnode2}.${i}";
 
-	my $uuid = NewUUID();
+	my $uuid = (@uuids ? shift(@uuids) : NewUUID());
 	if (!defined($uuid)) {
 	    print STDERR "Could not generate a UUID!\n";
 	    goto bad;
@@ -1767,17 +1769,18 @@ sub NewRootPasswd($)
 # Invoke OS selection. Currently we use this to reset to default boot,
 # but might change later to take an argument.
 #
-sub SelectOS($)
+sub SelectOS($;$)
 {
-    my ($self) = @_;
+    my ($self, $osid) = @_;
 
     # Must be a real reference. 
     return -1
 	if (! ref($self));
 
     my $node_id = $self->node_id();
+    my $args    = (defined($osid) ? "$osid" : "-b");
 
-    system("$OSSELECT -b $node_id");
+    system("$OSSELECT $args $node_id");
     return -1
 	if ($?);
     return 0;
