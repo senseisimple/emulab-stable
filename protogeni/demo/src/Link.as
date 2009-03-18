@@ -104,6 +104,7 @@ package
           child.@iface_name = "eth3";
         }
         child.@node_uuid = left.getId();
+        child.@node_nickname = left.getName();
         result.appendChild(child);
         child = <linkendpoints nickname="source_interface" />
         if (justOne)
@@ -115,6 +116,7 @@ package
           child.@iface_name = "eth3";
         }
         child.@node_uuid = right.getId();
+        child.@node_nickname = right.getName();
         result.appendChild(child);
       }
       return result;

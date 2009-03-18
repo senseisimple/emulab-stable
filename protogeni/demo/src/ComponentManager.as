@@ -44,6 +44,7 @@ package
       states = new Array();
 
       select.removeAll();
+      select.selectedIndex = 0;
 
       var i : int = 0;
       for (; i < cmNames.length; ++i)
@@ -54,10 +55,11 @@ package
         used.push(new Array());
         tickets.push(null);
         states.push(LOADING);
-//        populateNodes(i, cmResults[i]);
+//        if (cmResults[i] != null)
+//        {
+//          populateNodes(i, cmResults[i]);
+//        }
       }
-
-      select.selectedIndex = 0;
 
       states[0] = NORMAL;
 
@@ -173,8 +175,8 @@ package
         var xmlNodes : Array = new Array();
         for each (var element in rspec.elements(nodeName))
         {
-          if (element.attribute("uuid") != null
-              && element.attribute("uuid") != "")
+          if (element.attribute("component_uuid") != null
+              && element.attribute("component_uuid") != "")
           {
             xmlNodes.push(element);
           }
@@ -183,8 +185,8 @@ package
         var i : int = 0;
         for (; i < xmlNodes.length; ++i)
         {
-          names[index].push(xmlNodes[i].attribute("name"));
-          uuids[index].push(xmlNodes[i].attribute("uuid"));
+          names[index].push(xmlNodes[i].attribute("component_name"));
+          uuids[index].push(xmlNodes[i].attribute("component_uuid"));
         }
       }
       states[index] = NORMAL;
@@ -194,8 +196,8 @@ package
     function xmlSort(left : XML, right : XML) : int
     {
       // TODO: Make this an actual natural sort
-      var leftAttribute = left.attribute("name");
-      var rightAttribute = right.attribute("name");
+      var leftAttribute = left.attribute("component_name");
+      var rightAttribute = right.attribute("component_name");
       if (leftAttribute.substr(0, 2) == "pc"
           && rightAttribute.substr(0, 2) == "pc"
           && int(leftAttribute.substr(2)) > 0
@@ -243,37 +245,40 @@ package
     var LOADING = 1;
     var FAILED = 2;
 
-    public static var cmNames : Array = new Array("", "ProtoGENI", "Emulab");
+    public static var cmNames : Array = new Array("", "ProtoGENI", "Emulab",
+                                                  "gtwelab");
     static var cmUrls : Array =
       new Array(null,
                 "https://myboss.myelab.testbed.emulab.net:443/protogeni/xmlrpc",
-                "https://boss.emulab.net:443/protogeni/xmlrpc/");
+                "https://boss.emulab.net:443/protogeni/xmlrpc/",
+                "https://myboss.emulab.geni.emulab.net:443/protogeni/xmlrpc");
     static var cmResults : Array =
       new Array(null,
                 "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> "+
                 " <node uuid=\"de9803c2-773e-102b-8eb4-001143e453fe\" " +
-                "       hrn=\"geni1\" " +
+                "       name=\"geni1\" " +
                 "       virtualization_type=\"emulab-vnode\"> " +
                 " </node>" +
                 " <node uuid=\"de995217-773e-102b-8eb4-001143e453fe\" " +
-                "       hrn=\"geni-other\" " +
+                "       name=\"geni-other\" " +
                 "       virtualization_type=\"emulab-vnode\"> " +
                 " </node>" +
                 "</rspec>",
 
                 "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> "+
                 " <node uuid=\"deb23428-773e-102b-8eb4-001143e453fe\" " +
-                "       hrn=\"pgeni4\" " +
+                "       name=\"pgeni4\" " +
                 "       virtualization_type=\"emulab-vnode\"> " +
                 " </node>" +
                 " <node uuid=\"deb06bd8-773e-102b-8eb4-001143e453fe\" " +
-                "       hrn=\"pgeni2\" " +
+                "       name=\"pgeni2\" " +
                 "       virtualization_type=\"plab_node\"> " +
                 " </node>" +
                 " <node uuid=\"deaaad4b-773e-102b-8eb4-001143e453fe\" " +
-                "       hrn=\"pgeni3\" " +
+                "       name=\"pgeni3\" " +
                 "       virtualization_type=\"plab_node\"> " +
                 " </node>" +
-                "</rspec>");
+                "</rspec>",
+                null);
   }
 }

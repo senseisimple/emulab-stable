@@ -130,6 +130,11 @@ package
       return id;
     }
 
+    public function getName() : String
+    {
+      return name;
+    }
+
     public function getCmIndex() : int
     {
       return cmIndex;
