@@ -251,6 +251,9 @@ sub Lookup($$;$)
     
     $self->{'RSRC'} = $query_result->fetchrow_hashref();
 
+    # Virt Experiment; load lazy.
+    $self->{'VIRTEXPT'} = undef;
+
     bless($self, $class);
     
     # Add to cache. 
@@ -983,6 +986,30 @@ sub GetInputFile($$$)
 }
 
 #
+# Get the virt experiment object;
+#
+sub GetVirtExperiment($)
+{
+    my ($self) = @_;
+
+    return undef
+	if (! ref($self));
+
+    return $self->{'VIRTEXPT'}
+        if (defined($self->{'VIRTEXPT'}));
+
+    require VirtExperiment;
+
+    my $virtexperiment = VirtExperiment->Lookup($self);
+    if (!defined($virtexperiment)) {
+	print STDERR "*** Could not get virtual experiment object for $self\n";
+	return undef;
+    }
+    $self->{'VIRTEXPT'} = $virtexperiment;
+    return $virtexperiment;
+}
+
+#
 # Refresh a class instance by reloading from the DB.
 #
 sub Refresh($)
@@ -1001,6 +1028,7 @@ sub Refresh($)
 	if (!$query_result || !$query_result->numrows);
 
     $self->{'EXPT'}       = $query_result->fetchrow_hashref();
+    $self->{'VIRTEXPT'}   = undef;
     $self->{'ISINSTANCE'} = undef;
     $self->{'ISTEMPLATE'} = undef;
 
@@ -3641,48 +3669,81 @@ sub VnameToPmap($$)
 # experiment outside the NS file parsing path. Currently using this
 # from the Geni sliver provisioning code.
 #
-sub InsertVirtNode($$)
+sub InsertVirtNode($$;$)
 {
-    my ($self, $node) = @_;
+    my ($self, $node, $type) = @_;
+    my $node_id;
 
     # Must be a real reference. 
-    if (!ref($node)) {
-	$node = Node->Lookup($node);
-	return -1
-	    if (!defined($node));
+    if (ref($node)) {
+	$node_id = $node->node_id();
+	$type    = $node->type();
     }
-    my $pid = $self->pid();
-    my $eid = $self->eid();
-    my $idx = $self->idx();
-    my $node_id = $node->node_id();
-    my $type    = $node->type();
+    else {
+	$node_id = $node;
+	$type    = ""
+	    if (!defined($type));
+    }
+    my $virtexperiment = $self->GetVirtExperiment();
+    return -1
+	if (!defined($virtexperiment));
 
-    DBQueryWarn("replace into virt_nodes set ".
-		"  pid='$pid', eid='$eid', exptidx='$idx', ".
-		"  vname='$node_id', type='$type', ips='', ".
-		"  cmd_line='', startupcmd='', osname=''")
-	or return -1;
-    
+    my $virtnode = $virtexperiment->NewTableRow("virt_nodes");
+    return -1
+	if (!defined($virtnode));
+
+    $virtnode->vname($node_id);
+    $virtnode->type($type);
+    $virtnode->ips('');
+    $virtnode->cmd_line('');
+    $virtnode->startupcmd('');
+    $virtnode->osname('');
+
+    return -1
+	if ($virtnode->Store() != 0);
+
     return 0;
 }
 sub DeleteVirtNode($$)
 {
     my ($self, $node) = @_;
+    my $node_id;
 
-    # Must be a real reference. 
-    if (!ref($node)) {
-	$node = Node->Lookup($node);
-	return -1
-	    if (!defined($node));
+    if (ref($node)) {
+	$node_id = $node->node_id();
     }
-    my $idx = $self->idx();
-    my $node_id = $node->node_id();
+    else {
+	$node_id = $node;
+    }
+    my $virtexperiment = $self->GetVirtExperiment();
+    return -1
+	if (!defined($virtexperiment));
 
-    DBQueryWarn("delete from virt_nodes  ".
-		"where exptidx='$idx' and vname='$node_id'")
+    my $virtnode = $virtexperiment->Find("virt_nodes", $node_id);
+    return 0
+	if (!defined($virtnode));
+
+    $virtnode->Delete() == 0
 	or return -1;
     
     return 0;
+}
+sub HasVirtNode($$)
+{
+    my ($self, $node) = @_;
+    my $node_id;
+
+    if (ref($node)) {
+	$node_id = $node->node_id();
+    }
+    else {
+	$node_id = $node;
+    }
+    my $virtexperiment = $self->GetVirtExperiment();
+    return undef
+	if (!defined($virtexperiment));
+
+    return $virtexperiment->Find("virt_nodes", $node_id);
 }
 
 #
@@ -3774,6 +3835,74 @@ sub LockDown($$)
     DBQueryWarn("update experiments set lockdown=$lockdown where idx=$idx")
 	or return -1;
     return 0;
+}
+
+#
+# Set/Get the port range for an experiment.
+#
+sub SetPortRange($$)
+{
+    my ($self, $impotent) = @_;
+    $impotent = 0
+	if (!defined($impotent));
+    my $newlow;
+    my $newhigh;
+    my $lastlow;
+    my $lasthigh;
+
+    DBQueryWarn("lock tables ipport_ranges write") or
+	return undef;
+
+    my $range_result =
+	DBQueryWarn("select low,high from ipport_ranges order by low");
+    return undef
+	if (!defined($range_result));
+
+    if (!$range_result->num_rows) {
+	$newlow = TBDB_LOWVPORT;
+    }
+    else {
+	($lastlow, $lasthigh) = $range_result->fetchrow_array();
+
+	# A hole at the bottom of the range ...
+	if ($lastlow >= TBDB_LOWVPORT + TBDB_PORTRANGE) {
+	    $newlow = TBDB_LOWVPORT;
+	}
+	# Else, find a free hole. 
+	else {
+	    while (my ($thislow,$thishigh) = $range_result->fetchrow_array()) {
+		if ($thislow != $lasthigh + 1 &&
+		    $thislow - $lasthigh > TBDB_PORTRANGE) {
+		    $newlow = $lasthigh + 1;
+		    last;
+		}
+		$lasthigh = $thishigh;
+	    }
+	}
+    }
+    if (!defined($newlow)) {
+	# No holes, tack onto the end. 
+	$newlow = $lasthigh + 1;
+    }
+    if ($newlow >= TBDB_MAXVPORT) {
+	DBQueryWarn("unlock tables");
+	return undef;
+    }
+    $newhigh = $newlow + TBDB_PORTRANGE - 1;
+
+    my $idx = $self->idx();
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+
+    if (! $impotent &&
+	! DBQueryWarn("insert into ipport_ranges ".
+		      " (exptidx, pid, eid, low, high) ".
+		      "values ('$idx','$pid', '$eid', $newlow, $newhigh)")) {
+	DBQueryWarn("unlock tables");
+	return undef;
+    }
+    DBQueryWarn("unlock tables");
+    return ($newlow, $newhigh);
 }
 
 # _Always_ make sure that this 1 is at the end of the file...
