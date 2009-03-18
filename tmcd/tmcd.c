@@ -189,6 +189,7 @@ typedef struct {
 	char		sfshostid[TBDB_FLEN_SFSHOSTID];
 	char		testdb[TBDB_FLEN_TINYTEXT];
 	char		tmcd_redirect[TBDB_FLEN_TINYTEXT];
+	char		sharing_mode[TBDB_FLEN_TINYTEXT];
 	char            privkey[TBDB_FLEN_PRIVKEY+1];
 } tmcdreq_t;
 static int	iptonodeid(struct in_addr, tmcdreq_t *, char*);
@@ -1810,12 +1811,12 @@ COMMAND_PROTOTYPE(doaccounts)
 				 "   p.pid='%s')",
 				 2, reqp->nodeid, RELOADPID);
 	}
-	else if (reqp->islocal || reqp->isvnode) {
+	else if (reqp->isvnode || reqp->islocal) {
 		res = mydb_query("select unix_name,unix_gid from groups "
 				 "where pid='%s'",
 				 2, reqp->pid);
 	}
-	else if (reqp->jailflag) {
+	else if (reqp->jailflag && !reqp->islocal) {
 		/*
 		 * A remote node, doing jails. We still want to return
 		 * a group for the admin people who get accounts outside
@@ -1835,7 +1836,7 @@ COMMAND_PROTOTYPE(doaccounts)
 				 "where pid='%s'",
 				 2, reqp->pid);
 	}
-	else {
+	else if (!reqp->islocal) {
 		/*
 		 * XXX - Old style node, not doing jails.
 		 *
@@ -1867,6 +1868,10 @@ COMMAND_PROTOTYPE(doaccounts)
 				   "      FIND_IN_SET('%s',pcremote_ok)>0",
 				   2, reqp->type);
 		}
+	}
+	else {
+		error("ACCOUNTS: %s: GIDs Fell off the bottom!\n", reqp->pid);
+		return 1;
 	}
 	if (!res) {
 		error("ACCOUNTS: %s: DB Error getting gids!\n", reqp->pid);
@@ -1972,7 +1977,7 @@ COMMAND_PROTOTYPE(doaccounts)
 				 "order by u.uid",
 				 18, reqp->nodeid);
 	}
-	else if (reqp->islocal || reqp->isvnode) {
+	else if (reqp->isvnode || reqp->islocal) {
 		/*
 		 * This crazy join is going to give us multiple lines for
 		 * each user that is allowed on the node, where each line
@@ -2006,7 +2011,7 @@ COMMAND_PROTOTYPE(doaccounts)
 				 "order by u.uid",
 				 18, reqp->pid, adminclause);
 	}
-	else if (reqp->jailflag) {
+	else if (reqp->jailflag && !reqp->islocal) {
 		/*
 		 * A remote node, doing jails. We still want to return
 		 * accounts for the admin people outside the jails.
@@ -2069,7 +2074,7 @@ COMMAND_PROTOTYPE(doaccounts)
 				 "order by u.uid",
 				 18, reqp->pid, adminclause);
 	}
-	else {
+	else if (! reqp->islocal) {
 		/*
 		 * XXX - Old style node, not doing jails.
 		 *
@@ -2136,7 +2141,10 @@ COMMAND_PROTOTYPE(doaccounts)
 				 "order by u.uid",
 				 18, subclause);
 	}
-
+	else {
+		error("ACCOUNTS: %s: UIDs Fell off the bottom!\n", reqp->pid);
+		return 1;
+	}
 	if (!res) {
 		error("ACCOUNTS: %s: DB Error getting users!\n", reqp->pid);
 		return 1;
@@ -2471,7 +2479,11 @@ COMMAND_PROTOTYPE(doaccounts)
 				mysql_free_result(res);
 		}
 	}
-	if (reqp->genisliver_idx && !didnonlocal) {
+
+	/*
+	 * When sharing mode is on, do not return these accounts. 
+	 */
+	if (reqp->genisliver_idx && !didnonlocal && !reqp->sharing_mode[0]) {
 	        didnonlocal = 1;
 
 		res = mydb_query("select distinct "
@@ -3286,7 +3298,7 @@ COMMAND_PROTOTYPE(domounts)
 	 * maybe fix that) so that the phys node still looks like it
 	 * belongs to the experiment (people can log into it). 
 	 */
-	if (reqp->jailflag)
+	if (reqp->jailflag || reqp->sharing_mode[0]) 
 		return 0;
 
 	/*
@@ -4418,7 +4430,8 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp, char* nodekey)
 				 " e.idx,e.creator_idx,e.swapper_idx, "
 				 " u.admin,dedicated_wa_types.attrvalue "
 				 "   AS isdedicated_wa, "
-				 " r.genisliver_idx,r.tmcd_redirect "
+				 " r.genisliver_idx,r.tmcd_redirect, "
+				 " r.sharing_mode "
 				 "FROM nodes AS n "
 				 "LEFT JOIN reserved AS r ON "
 				 "  r.node_id=n.node_id "
@@ -4446,7 +4459,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp, char* nodekey)
 				"WHERE n.node_id IN "
                                         "(SELECT node_id FROM widearea_nodeinfo WHERE privkey='%s') "
 				 "  AND nobootinfo_types.attrvalue IS NULL",
-				 32, nodekey);
+				 33, nodekey);
 
 	}
 
@@ -4462,7 +4475,8 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp, char* nodekey)
 				 " e.elab_in_elab,e.elabinelab_singlenet, "
 				 " e.idx,e.creator_idx,e.swapper_idx, "
 				 " u.admin,null, "
-				 " r.genisliver_idx,r.tmcd_redirect "
+				 " r.genisliver_idx,r.tmcd_redirect, "
+				 " r.sharing_mode "
 				 "from nodes as nv "
 				 "left join nodes as np on "
 				 " np.node_id=nv.phys_nodeid "
@@ -4485,7 +4499,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp, char* nodekey)
 				 "where nv.node_id='%s' and "
 				 " ((i.IP='%s' and i.role='ctrl') or "
 				 "  nv.jailip='%s')",
-				 32, reqp->vnodeid,
+				 33, reqp->vnodeid,
 				 inet_ntoa(ipaddr), inet_ntoa(ipaddr));
 	}
 	else {
@@ -4500,7 +4514,8 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp, char* nodekey)
 				 " e.idx,e.creator_idx,e.swapper_idx, "
 				 " u.admin,dedicated_wa_types.attrvalue "
 				 "   as isdedicated_wa, "
-				 " r.genisliver_idx,r.tmcd_redirect "
+				 " r.genisliver_idx,r.tmcd_redirect, "
+				 " r.sharing_mode "
 				 "from interfaces as i "
 				 "left join nodes as n on n.node_id=i.node_id "
 				 "left join reserved as r on "
@@ -4528,7 +4543,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp, char* nodekey)
 				 "  on n.type=dedicated_wa_types.type "
 				 "where i.IP='%s' and i.role='ctrl' "
 				 "  and nobootinfo_types.attrvalue is NULL",
-				 32, inet_ntoa(ipaddr));
+				 33, inet_ntoa(ipaddr));
 	}
 
 	if (!res) {
@@ -4624,6 +4639,8 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp, char* nodekey)
 			reqp->genisliver_idx = 0;
 		if (row[31]) 
 			strcpy(reqp->tmcd_redirect, row[31]);
+		if (row[32]) 
+			strcpy(reqp->sharing_mode, row[32]);
 	}
 	
 	if (row[9])
@@ -5137,7 +5154,7 @@ COMMAND_PROTOTYPE(dojailconfig)
 	/*
 	 * geni nodes get something completely different. 
 	 */
-	if (reqp->genisliver_idx) {
+	if (reqp->genisliver_idx && reqp->jailflag == 0) {
 		OUTPUT(bufp, sizeof(buf),
 		       "EVENTSERVER=\"event-server.%s\"\n", OURDOMAIN);
 		client_writeback(sock, buf, strlen(buf), tcp);
@@ -5161,12 +5178,14 @@ COMMAND_PROTOTYPE(dojailconfig)
 	}
 
 	if ((int)mysql_num_rows(res) == 0) {
-		mysql_free_result(res);
-		return 0;
+		low  = 0;
+		high = 0x0000FFFF;
 	}
-	row  = mysql_fetch_row(res);
-	low  = atoi(row[0]);
-	high = atoi(row[1]);
+	else {
+		row  = mysql_fetch_row(res);
+		low  = atoi(row[0]);
+		high = atoi(row[1]);
+	}
 	mysql_free_result(res);
 
 	/*
