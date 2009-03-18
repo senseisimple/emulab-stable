@@ -392,7 +392,6 @@ sub GetTicket($)
     # Firewall hack; just a flag in the rspec for now.
     #
     if (exists($rspec->{'needsfirewall'}) && $rspec->{'needsfirewall'}) {
-	print STDERR "firewall: " . $rspec->{'needsfirewall'} . "\n";
 	if ($slice->SetFirewallFlag($rspec->{'needsfirewall'}) != 0) {
 	    $slice->UnLock();
 	    return GeniResponse->Create(GENIRESPONSE_ERROR);
@@ -414,7 +413,8 @@ sub GetTicket($)
     # XXX Simpleminded.
     #
     my %namemap = ();
-    my %uuidmap = ();
+    my %physmap = ();
+    my %virtmap = ();
     my @nodeids = ();
     my @dealloc;
     my $pid     = $experiment->pid();
@@ -423,14 +423,21 @@ sub GetTicket($)
     foreach my $ref (@{$rspec->{'node'}}) {
 	my $resource_uuid = $ref->{'uuid'};
 	my $node_nickname = $ref->{'nickname'};
+	my $phys_nickname = $ref->{'phys_nickname'};
 	my $virtualization_type = $ref->{'virtualization_type'};
+	my $sliver_uuid   = NewUUID();
 	my $node;
 
 	#
 	# Mostly for debugging right now, allow a wildcard.
 	#
 	if ($resource_uuid eq "*") {
-	    $node = FindFreeNode($virtualization_type, @nodeids);
+	    if (defined($phys_nickname) && exists($physmap{$phys_nickname})) {
+		$node = $physmap{$phys_nickname};
+	    }
+	    else {
+		$node = FindFreeNode($virtualization_type, @nodeids);
+	    }
 	    
 	    if (!defined($node)) {
 		$response = GeniResponse->Create(GENIRESPONSE_UNAVAILABLE,
@@ -451,6 +458,10 @@ sub GetTicket($)
 		goto bad;
 	    }
 	}
+	# We assign the sliver uuids here so that user can associate
+	# slivers with parts of the rspec later.
+	$ref->{'sliver_uuid'} = $sliver_uuid;
+	
 	#
 	# Widearea nodes do not need to be allocated, but for now all
 	# I allow is a plabdslice node.
@@ -462,11 +473,11 @@ sub GetTicket($)
 					 "Only plab widearea nodes");
 		goto bad;
 	    }
-	    next;
+	    goto skipalloc;
 	}
 
 	#
-	# See if the node is already reserved.
+	# See if the node is already reserved. 
 	#
 	my $reservation = $node->Reservation();
 	if (defined($reservation)) {
@@ -475,11 +486,17 @@ sub GetTicket($)
 				     "$resource_uuid ($node) not available");
 	    goto bad;
 	}
-	push(@nodeids, $node->node_id());
-	$uuidmap{$resource_uuid} = $node;
+	# watch for duplicates, as for multiple vnodes on a pnode.
+	push(@nodeids, $node->node_id())
+	    if (! grep {$_ eq $node->node_id()} @nodeids);
+
+      skipalloc:
+	$virtmap{$sliver_uuid}   = $node;
 	# For wildcarded nodes in links.
-	$namemap{$node_nickname} = $node
+	$namemap{$node_nickname} = $sliver_uuid
 	    if (defined($node_nickname));
+	$physmap{$phys_nickname} = $node
+	    if (defined($phys_nickname));
     }
 
     #
@@ -544,11 +561,10 @@ sub GetTicket($)
 	    my $node_uuid     = $ref->{'node_uuid'};
 	    my $node_nickname = $ref->{'node_nickname'};
 	    my $iface_name    = $ref->{'iface_name'};
-	    my $node;
 
-	    if ($node_uuid eq "*" && !defined($node_nickname)) {
+	    if (!defined($node_nickname)) {
 		$response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					 "Need nickname for wildcarded link");
+						 "Need nickname for links");
 		goto bad;
 	    }
 
@@ -563,27 +579,19 @@ sub GetTicket($)
 		next;
 	    }
 
+	    # Map the nickname to the actual sliver (node) request.
+	    my $sliver_uuid = $namemap{$node_nickname};
+	    my $node = $virtmap{$sliver_uuid};
+
 	    #
-	    # First map the node if its wildcarded.
+	    # Fill in the physnode if its wildcarded.
  	    #
 	    if ($node_uuid eq "*") {
-		if (!exists($namemap{$node_nickname})) {
-		    $response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					     "Could not map wildcarded link");
-		    goto bad;
-		}
-		$node = $namemap{$node_nickname};
 		$ref->{'node_uuid'} = $node->uuid();
 	    }
-	    elsif (!exists($uuidmap{$node_uuid})) {
-		$response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-						 "Could not map link node");
-		goto bad;
-	    }
-	    else {
-		$node = $uuidmap{$node_uuid};
-	    }
-
+	    # and the sliver_uuid we assigned above.
+	    $ref->{'sliver_uuid'} = $sliver_uuid;
+	    
 	    #
 	    # Now do wildcarded interfaces.
 	    #
@@ -823,6 +831,7 @@ sub ModifySliver($$$$$$)
     #
     # Figure out what nodes to allocate or free. 
     #
+    my %namemap  = ();
     my %nodelist = ();
     my %linklist = ();
     my %toalloc  = ();
@@ -847,7 +856,7 @@ sub ModifySliver($$$$$$)
 	}
 	foreach my $s (@slivers) {
 	    if (ref($s) eq "GeniSliver::Node") {
-		$nodelist{$s->resource_uuid()} = $s;
+		$nodelist{$s->uuid()} = $s;
 	    }
 	    elsif (ref($s) eq "GeniAggregate::Link" ||
 		   ref($s) eq "GeniAggregate::Tunnel") {
@@ -1065,9 +1074,11 @@ sub ModifySliver($$$$$$)
     my @plabnodes = ();
     foreach my $ref (@{$rspec->{'node'}}) {
 	my $resource_uuid = $ref->{'uuid'};
+	my $sliver_uuid   = $ref->{'sliver_uuid'};
+	
 	# Already in the aggregate?
 	next
-	    if (grep {$_ eq $resource_uuid} keys(%nodelist));
+	    if (grep {$_ eq $sliver_uuid} keys(%nodelist));
 	
 	my $node = Node->Lookup($resource_uuid);
 	if (!defined($node)) {
@@ -1077,12 +1088,13 @@ sub ModifySliver($$$$$$)
 	my $sliver = GeniSliver::Node->Create($slice,
 					      $owner,
 					      $resource_uuid,
+					      $sliver_uuid,
 					      $ref);
 	if (!defined($sliver)) {
 	    $message = "Could not create GeniSliver object for $resource_uuid";
 	    goto bad;
 	}
-	$slivers{$resource_uuid} = $sliver;
+	$slivers{$sliver_uuid} = $sliver;
 
 	#
 	# Remove this from %toalloc; if there is an error, the slivers are
@@ -1092,7 +1104,14 @@ sub ModifySliver($$$$$$)
 	delete($toalloc{$resource_uuid});
 
 	# Used below.
-	push(@allocated, $node);
+	push(@allocated, $node)
+	    if (! grep {$_->node_id() eq $node->node_id()} @allocated);
+
+	# Add to the aggregate.
+	if ($sliver->SetAggregate($aggregate) != 0) {
+	    $message = "Could not set aggregate for $sliver to $aggregate";
+	    goto bad;
+	}
 
 	# See below; setup all pnodes at once.
 	if ($node->isremotenode()) {
@@ -1130,10 +1149,13 @@ sub ModifySliver($$$$$$)
 	    my $node1ref = (@{$linkref->{'linkendpoints'}})[0];
 	    my $node2ref = (@{$linkref->{'linkendpoints'}})[1];
 
-	    my $node1sliver = $slivers{$node1ref->{'node_uuid'}} ||
-		$nodelist{$node1ref->{'node_uuid'}};
-	    my $node2sliver = $slivers{$node2ref->{'node_uuid'}} ||
-		$nodelist{$node2ref->{'node_uuid'}};
+	    my $node1sliver_uuid = $namemap{$node1ref->{'sliver_uuid'}};
+	    my $node2sliver_uuid = $namemap{$node2ref->{'sliver_uuid'}};
+
+	    my $node1sliver = $slivers{$node1sliver_uuid} ||
+		$nodelist{$node1sliver_uuid};
+	    my $node2sliver = $slivers{$node2sliver_uuid} ||
+		$nodelist{$node2sliver_uuid};
 	    
 	    my $tunnel = GeniAggregate::Tunnel->Create($slice,
 						       $owner,
@@ -1146,6 +1168,12 @@ sub ModifySliver($$$$$$)
 		goto bad;
 	    }
 	    $slivers{$tunnel->uuid()} = $tunnel;
+
+	    # Add to the aggregate.
+	    if ($tunnel->SetAggregate($aggregate) != 0) {
+		$message = "Could not set aggregate for $tunnel to $aggregate";
+		goto bad;
+	    }
 	    next;
 	}
 
@@ -1157,17 +1185,26 @@ sub ModifySliver($$$$$$)
 	}
 	$slivers{$linkaggregate->uuid()} = $linkaggregate;
 
+	# Add to the aggregate.
+	if ($linkaggregate->SetAggregate($aggregate) != 0) {
+	    $message = "Could not set aggregate for $linkaggregate ".
+		"to $aggregate";
+	    goto bad;
+	}
+
 	foreach my $ref (@{$rspec->{'link'}->{$linkname}->{'linkendpoints'}}) {
-	    my $node_uuid  = $ref->{'node_uuid'};
-	    my $iface_name = $ref->{'iface_name'};
-	    my $nodesliver = $slivers{$node_uuid} || $nodelist{$node_uuid};
+	    my $sliver_uuid  = $ref->{'sliver_uuid'};
+	    my $iface_name   = $ref->{'iface_name'};
+	    my $nodesliver   = $slivers{$sliver_uuid} ||
+		$nodelist{$sliver_uuid};
+	    
 	    if (!defined($nodesliver)) {
 		$message = "Link $linkname specifies a non-existent node";
 		goto bad;
 	    }
-	    my $nodeobject= Node->Lookup($node_uuid);
+	    my $nodeobject= Node->Lookup($nodesliver->resource_uuid());
 	    if (!defined($nodeobject)) {
-		$message = "Could not find node object for $node_uuid";
+		$message = "Could not find node object for $nodesliver";
 		goto bad;
 	    }
 	    my $interface = Interface->LookupByIface($nodeobject, $iface_name);
@@ -1211,11 +1248,6 @@ sub ModifySliver($$$$$$)
     foreach my $sliver (values(%slivers)) {
 	if (!$impotent && $sliver->Provision() != 0) {
 	    $message = "Could not provision $sliver";
-	    goto bad;
-
-	}
-	if ($sliver->SetAggregate($aggregate) != 0) {
-	    $message = "Could not set aggregate for $sliver to $aggregate";
 	    goto bad;
 	}
     }
@@ -2050,7 +2082,7 @@ sub SliceStatus($)
 	next
 	    if ($sliver->resource_type() ne "Node");
 
-	my $node_uuid = $sliver->resource_uuid();
+	my $node_uuid = $sliver->uuid();
 	my $node = Node->Lookup($node_uuid);
 	if (!defined($node)) {
 	    $slice->UnLock();
@@ -2150,7 +2182,7 @@ sub SliverStatus($)
 	next
 	    if ($sliver->resource_type() ne "Node");
 
-	my $node_uuid = $sliver->resource_uuid();
+	my $node_uuid = $sliver->uuid();
 	my $node = Node->Lookup($node_uuid);
 	if (!defined($node)) {
 	    $slice->UnLock();
@@ -2303,7 +2335,7 @@ sub CleanupDeadSlice($;$)
 
 	print "Calling undoFWNodes ...\n";
 	
-	if (undoFWNodes($experiment) != 0) {
+	if (undoFWNodes($experiment, 1) != 0) {
 	    print STDERR "FireWall cleanup failed\n";
 	    return -1;
 	}
@@ -2389,6 +2421,15 @@ sub CleanupDeadSlice($;$)
 
     my $experiment = $slice->GetExperiment();
     if (defined($experiment)) {
+	my @pnodes = $experiment->NodeList(1, 1);
+	my $pnodes = scalar(@pnodes);
+	# Ignore the firewall node in this test; released in endexp.
+	$pnodes--
+	    if ($slice->needsfirewall());
+	if ($pnodes != 0) {
+	    print STDERR "There are still nodes allocated to $experiment!\n";
+	    return -1;
+	}
 	$experiment->LockDown(0);
 	
 	my $pid = $experiment->pid();
@@ -2438,7 +2479,7 @@ sub GeniExperiment($)
  		or return undef;
 	    print NS "source tb_compat.tcl\n";
 	    print NS "set ns [new Simulator]\n";
-	    print NS "tb-set-security-level Yellow\n";
+	    print NS "tb-set-security-level Blue\n";
 	    print NS "\$ns run\n";
 	    close(NS);
 	}

@@ -24,6 +24,7 @@ use GeniUsage;
 # Hate to import all this crap; need a utility library.
 use emutil qw(TBGetUniqueIndex);
 use Experiment;
+use OSinfo;
 use English;
 use XML::Simple;
 use Data::Dumper;
@@ -690,11 +691,10 @@ use Experiment;
 use XML::Simple;
 use libdb qw(TBDB_ALLOCSTATE_RES_INIT_DIRTY);
 
-sub Create($$$$$)
+sub Create($$$$$$)
 {
-    my ($class, $slice, $user, $resource_uuid, $rspec) = @_;
+    my ($class, $slice, $user, $resource_uuid, $sliver_uuid, $rspec) = @_;
     my $virtualization_type = $rspec->{'virtualization_type'};
-    my $uuid = $resource_uuid;
 
     my $experiment = $slice->GetExperiment();
     if (!defined($experiment)) {
@@ -743,11 +743,19 @@ sub Create($$$$$)
 		return undef;
 	    }
 	}
+	elsif (exists($rspec->{'virtualization_subtype'})) {
+	    #
+	    # See if a jail node is requested. 
+	    #
+	    if ($rspec->{'virtualization_subtype'} eq "emulab-jail") {
+		$vtype = "pcvm";
+	    }
+	}
 	
 	#
 	# Create a virtual node on the physnode. 
 	#
-	my @vnodes;
+	my @vnodes = ($sliver_uuid);
 	if (Node::CreateVnodes(\@vnodes,
 			       {"pid"      => $experiment->pid(),
 				"eid"      => $experiment->eid(),
@@ -759,10 +767,9 @@ sub Create($$$$$)
 	    return undef;
 	}
 	my $vnode = Node->Lookup($vnodes[0]);
-	$uuid = $vnode->uuid();
 	$hrn = "${PGENIDOMAIN}." . $vnode->node_id()
     }
-    return GeniSliver->Create($slice, $user, $uuid, $resource_uuid,
+    return GeniSliver->Create($slice, $user, $sliver_uuid, $resource_uuid,
 			      "Node", $hrn, $nickname, $rspec);
 }
 
@@ -808,7 +815,7 @@ sub Provision($;$)
     }
     my $pid = $experiment->pid();
     my $eid = $experiment->eid();
-	
+
     if ($experiment->InsertVirtNode($node) != 0) {
 	print STDERR "Could not add virtnode entry for $node to $self\n";
 	return -1;
@@ -841,19 +848,55 @@ sub Provision($;$)
 	    print STDERR "Could not get pnode object for $node\n";
 	    return -1;
 	}
-	    
-	if ($experiment->InsertVirtNode($pnode) != 0) {
-	    print STDERR "Could not add virtnode entry for $pnode to $self\n";
-	    return -1;
+
+	# Do this early.
+	#
+	# XXX This is the wrong place to do this. 
+	my $osid = undef;
+
+	if (exists($self->rspec()->{'virtualization_subtype'}) &&
+	    $self->rspec()->{'virtualization_subtype'} eq "emulab-jail") {
+
+	    my $osinfo = OSinfo->LookupByName("FBSD-STD");
+	    if (!defined($osinfo)) {
+		print STDERR "Could not find osinfo for FBSD-STD\n";
+		return -1;
+	    }
+	    # Need to resolve to the specfic OSID.
+	    my $nextosinfo = $osinfo->ResolveNextOSID();
+	    if (!defined($nextosinfo)) {
+		print STDERR "Could not resolve nextosid for $osinfo\n";
+		return -1;
+	    }
+	    $osid = $nextosinfo->osid();
+
+	    #
+	    # Gack.
+	    #
+	    my $cmdline = "/kernel.jail";
+	    if ($nextosinfo->OSBootCmd("vnodehost", \$cmdline) != 0) {
+		print STDERR "Could not resolve cmdline for $nextosinfo\n";
+		return -1;
+	    }
+	    $pnode->Update({"def_boot_cmd_line" => $cmdline});
+	    $pnode->ModifyReservation({"sharing_mode" => "shared"});
 	}
-	$pnode->ModifyReservation({"genisliver_idx" => $self->idx()});
+
+	# The pnode might have multiple vnodes on it ... only insert once.
+	if (! $experiment->HasVirtNode($pnode)) {
+	    if ($experiment->InsertVirtNode($pnode) != 0) {
+		print STDERR "Could not add virtnode for $pnode to $self\n";
+		return -1;
+	    }
+	    $pnode->ModifyReservation({"genisliver_idx" => $self->idx()});
+	}
 
 	# Not redirected. Use local tmcd anyway.
 	$node->ModifyReservation({"genisliver_idx" => $self->idx()})
 	    if (!$redirected);
 
-	# Set it to boot the default OS.
-	if ($pnode->SelectOS() != 0) {
+	# Set it to boot the proper os.
+	if ($pnode->SelectOS($osid) != 0) {
 	    return -1;
 	}
     }
@@ -866,6 +909,9 @@ sub Provision($;$)
 	    return -1;
 	}
     }
+    # See below; remote nodes are currently assumed to be running.
+    $self->SetStatus("ready")
+	if (!$node->isremotenode());
     return 0;
 }
 
@@ -924,13 +970,29 @@ sub UnProvision($)
 		print STDERR "Could not get pnode object for $pnode_id\n";
 		return -1;
 	    }
-	    if ($experiment->DeleteVirtNode($pnode) != 0) {
-		print STDERR
-		    "Could remove virtnode entry for $pnode from $self\n";
+
+	    #
+	    # If this is the last virtnode on the physnode, release the
+	    # physnode too. 
+	    #
+	    my @vnodes;
+	    if ($pnode->VirtualNodes(\@vnodes) != 0) {
+		print STDERR "Could not get vnode list for $pnode\n";
 		return -1;
 	    }
-	    system("$NFREE -x -q $pid $eid $pnode_id");
-	    $pnode->Refresh();
+
+	    if (scalar(@vnodes) > 1) {
+		system("$NFREE -q $pid $eid $node_id");
+	    }
+	    else {
+		if ($experiment->DeleteVirtNode($pnode) != 0) {
+		    print STDERR
+			"Could remove virtnode entry for $pnode from $self\n";
+		    return -1;
+		}
+		system("$NFREE -x -q $pid $eid $pnode_id");
+		$pnode->Refresh();
+	    }
 	}
 	else {
 	    system("$NFREE -q $pid $eid $node_id");
@@ -988,18 +1050,9 @@ sub Start($)
 	}
 
 	#
-	# Reboot pnode if not already running. 
-	#
-	if ($self->rspec()->{'virtualization_type'} eq "emulab-vnode" &&
-	    $self->status() eq "created") {
-	    $node_id = $node->phys_nodeid();
-	}
-	#
 	# Reboot and wait?
 	#
 	system("$NODEREBOOT -s $node_id");
-	$self->SetStatus("ready")
-	    if (!$?);
 	return -1
 	    if ($?);
     }

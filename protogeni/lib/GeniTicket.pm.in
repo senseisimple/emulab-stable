@@ -648,7 +648,11 @@ sub Release($$)
 	my $reservation = $node->Reservation();
 	next
 	    if (!defined($reservation));
-	
+
+	# Watch for duplicates, as in multiple vnodes on a pnode.
+	next
+	    if (grep {$_ eq $node->node_id()} @nodeids);
+	    
 	if ($reservation->SameExperiment($experiment)) {
 	    push(@nodeids, $node->node_id());
 	    push(@nodes, $node);
