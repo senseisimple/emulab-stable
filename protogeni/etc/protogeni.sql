@@ -212,7 +212,7 @@ CREATE TABLE `sliver_history` (
   `aggregate_uuid` varchar(40) default NULL,
   `rspec_string` text,
   PRIMARY KEY  (`idx`),
-  UNIQUE KEY `uuid` (`uuid`),
+  KEY `uuid` (`uuid`),
   INDEX `slice_uuid` (`slice_uuid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
