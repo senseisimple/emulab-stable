@@ -3014,6 +3014,7 @@ CREATE TABLE `reserved` (
   `mustwipe` tinyint(4) NOT NULL default '0',
   `genisliver_idx` int(10) unsigned default NULL,
   `tmcd_redirect` tinytext,
+  `sharing_mode` tinytext,
   PRIMARY KEY  (`node_id`),
   UNIQUE KEY `vname` (`pid`,`eid`,`vname`),
   UNIQUE KEY `vname2` (`exptidx`,`vname`),

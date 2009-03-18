@@ -1,0 +1,16 @@
+#
+# Add slot to reserved table. 
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (!DBSlotExists("reserved", "sharing_mode")) {
+	DBQueryFatal("alter table reserved add `sharing_mode` tinytext");
+    }
+    return 0;
+}
+1;
