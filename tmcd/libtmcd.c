@@ -487,7 +487,7 @@ int tmcd_handle_request(tmcdreq_t *reqp, tmcdresp_t **resp, char *command, char 
 		}
 
 		if (i == numrawcommands) {
-			rc = TMCD_STATUS_INVALID_REQUEST;
+			rc = TMCD_STATUS_UNKNOWN_COMMAND;
 			goto skipit;
 		}
 
@@ -499,7 +499,6 @@ int tmcd_handle_request(tmcdreq_t *reqp, tmcdresp_t **resp, char *command, char 
 		rc = TMCD_STATUS_INVALID_UDP_REQUEST;
 		goto skipit;
 	}
-#endif
 
 	/*
 	 * If this is a UDP request from a remote node,
@@ -510,6 +509,7 @@ int tmcd_handle_request(tmcdreq_t *reqp, tmcdresp_t **resp, char *command, char 
 		rc = TMCD_STATUS_INVALID_REMOTE_UDP_REQUEST;
 		goto skipit;
 	}
+#endif
 
 	/*
 	 * Ditto for remote node connection without SSL.
@@ -555,45 +555,42 @@ int tmcd_handle_request(tmcdreq_t *reqp, tmcdresp_t **resp, char *command, char 
 		root = xmlNewNode(NULL, BAD_CAST "tmcd");
 		xmlDocSetRootElement(doc, root);
 		err = xml_command_array[i].func(root, reqp, rdata);
-
-		if (err) {
-			response->length = strlen(xml_command_array[i].cmdname) +
-				32 + 3; /* FIXME shouldn't use constant here */
+		if (!err) {
+			xmlDocDumpFormatMemory(doc, &xmlbuf, &buffersize, 1);
+			response->length = strlen((char *)xmlbuf);
 			response->data = malloc(response->length);
 			if (response->data == NULL) {
 				rc = TMCD_STATUS_MALLOC_FAILED;
 				goto skipit;
 			}
+			response->type = malloc(strlen(XML_MIME_TYPE) + 1);
+			if (response->type == NULL) {
+				rc = TMCD_STATUS_MALLOC_FAILED;
+				goto skipit;
+			}
+			strcpy(response->type, XML_MIME_TYPE);
 
-			snprintf(response->data, response->length,
-				"%s returned error code %d",
-				xml_command_array[i].cmdname, err);
-			goto skipit;
+			memcpy(response->data, (char *)xmlbuf, response->length);
 		}
+	} else {
+		err = raw_command_array[i].func(response, reqp, rdata);
+	}
 
-		xmlDocDumpFormatMemory(doc, &xmlbuf, &buffersize, 1);
-		response->length = strlen((char *)xmlbuf);
+	if (err) {
+		rc = TMCD_STATUS_COMMAND_FAILED;
+		response->length = strlen(xml_command_array[i].cmdname) +
+			32 + 3; /* FIXME shouldn't use constant here */
 		response->data = malloc(response->length);
 		if (response->data == NULL) {
 			rc = TMCD_STATUS_MALLOC_FAILED;
 			goto skipit;
 		}
-		response->type = malloc(strlen(XML_MIME_TYPE) + 1);
-		if (response->type == NULL) {
-			rc = TMCD_STATUS_MALLOC_FAILED;
-			goto skipit;
-		}
-		strcpy(response->type, XML_MIME_TYPE);
 
-		memcpy(response->data, (char *)xmlbuf, response->length);
-	} else {
-		err = raw_command_array[i].func(response, reqp, rdata);
-
-		if (err)
-			info("%s: %s: returned %d\n",
-			     reqp->nodeid, raw_command_array[i].cmdname, err);
+		snprintf(response->data, response->length,
+			"%s returned error code %d",
+			xml_command_array[i].cmdname, err);
+		goto skipit;
 	}
-
 
 skipit:
 	if (doc)
