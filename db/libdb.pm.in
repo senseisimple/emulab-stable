@@ -160,7 +160,7 @@ use vars qw(@ISA @EXPORT);
 
 	 TBAdmin TBOpsGuy TBProjAccessCheck TBNodeAccessCheck 
 	 TBExptAccessCheck MarkNodeDown
-	 SetNodeBootStatus OSFeatureSupported NodeidToExp 
+	 SetNodeBootStatus NodeidToExp 
 	 ExpState
 	 ExpNodes ExpNodeVnames ExpNodesOldReserved
 	 DBDateTime DefaultImageID 
@@ -1130,34 +1130,6 @@ sub SetNodeBootStatus($$)
 }
 
 #
-# Check if a particular feature is supported by an OSID.
-#
-# usage: OSFeatureSupported(char *osid, char *feature)
-#        returns 1 if supported, 0 if not.
-#
-sub OSFeatureSupported($$) {
-    my($osid, $feature) = @_;
-
-    my $query_result =
-	DBQueryFatal("select osfeatures from os_info where osid='$osid'");
-
-    # Invalid OSID?
-    if ($query_result->numrows < 1) {
-	return 0;
-    }
-
-    my $osfeatures = $query_result->fetchrow_array();
-    if (defined($osfeatures)) {
-	foreach my $osfeature (split(',', $osfeatures)) {
-	    if ($feature eq $osfeature) {
-		return 1; 
-	    }
-	} 
-    }
-    return 0;
-}
-
-#
 # Find out what osid a node will boot next time it comes up,
 # Usually (but not always) the currently running OS as well.
 #
@@ -1320,19 +1292,15 @@ sub TBImageID ($$) {
 #        returns osid if its valid.
 #        returns 0 if not valid.
 #
-sub TBOSID ($$) {
-    my($pid, $osname) = @_;
+sub TBOSID($$) {
+    my ($pid, $osname) = @_;
 
-    my $query_result =
-	DBQueryFatal("select osid from os_info ".
-		     "where pid='$pid' and osname='$osname'");
+    require OSinfo;
 
-    if (! $query_result->num_rows) {
-	return 0;
-    }
-
-    my @row = $query_result->fetchrow_array();
-    return $row[0];
+    my $osinfo = OSinfo->Lookup($pid, $osname);
+    return 0
+	if (!defined($osinfo));
+    return $osinfo->osid();
 }
 
 #
@@ -1345,14 +1313,12 @@ sub TBOSID ($$) {
 sub TBOsidToPid ($$) {
     my($osid, $ppid) = @_;
 
-    my $query_result =
-	DBQueryFatal("select pid from os_info where osid='$osid'");
+    require OSinfo;
 
-    if (! $query_result->num_rows) {
-	return 0;
-    }
-    my ($pid) = $query_result->fetchrow_array();
-    $$ppid = $pid;
+    my $osinfo = OSinfo->Lookup($osid);
+    return 0
+	if (!defined($osinfo));
+    $$ppid = $osinfo->pid();
     return 1;
 }
 
@@ -1366,17 +1332,14 @@ sub TBOsidToPid ($$) {
 #
 sub TBOSMaxConcurrent ($)
 {
-    my($osid) = @_;
+    my ($osid) = @_;
 
-    my $query_result =
-	DBQueryFatal("select max_concurrent from os_info where osid='$osid'");
+    require OSinfo;
 
-    if (! $query_result->num_rows) {
-	return 0;
-    }
-
-    my @row = $query_result->fetchrow_array();
-    return $row[0];
+    my $osinfo = OSinfo->Lookup($osid);
+    return 0
+	if (!defined($osinfo));
+    return $osinfo->max_concurrent();
 }
 
 #
@@ -1389,17 +1352,14 @@ sub TBOSMaxConcurrent ($)
 #
 sub TBOSIDRebootWaittime ($)
 {
-    my($osid) = @_;
+    my ($osid) = @_;
 
-    my $query_result =
-	DBQueryFatal("select reboot_waittime from os_info where osid='$osid'");
+    require OSinfo;
 
-    if (! $query_result->num_rows) {
-	return 0;
-    }
-
-    my @row = $query_result->fetchrow_array();
-    return $row[0];
+    my $osinfo = OSinfo->Lookup($osid);
+    return 0
+	if (!defined($osinfo));
+    return $osinfo->reboot_waittime();
 }
 
 #
@@ -1439,83 +1399,26 @@ sub TBOSCountInstances ($;@)
 sub TBResolveNextOSID($;$$)
 {
     my ($osid,$pid,$eid) = @_;
-    my $next_osid = $osid;
-    my $input_osid = $osid;
+    my $experiment;
 
-    my $count = 0;
-    do {
-	#
-	# Just a guard to make sure we don't end up in a loop
-	#
-	if ($count++ > 10) {
-	    warn "Resolving $input_osid: Circular reference\n";
-	}
+    require OSinfo;
 
-	$osid = $next_osid;
-	my $result = DBQueryWarn("select nextosid from os_info where
-	    osid='$osid';");
-
-	if ($result->num_rows() != 1) {
-	    warn "Resolving $input_osid: Unable to fetch os_info for $osid!\n";
+    if (defined($pid) && defined($eid)) {
+	$experiment = Experiment->Lookup($pid, $eid);
+	if (! defined($experiment)) {
+	    warn "TBResolveNextOSID: No such experiment $pid/$eid\n";
 	    return undef;
 	}
-	($next_osid) = $result->fetchrow();
-
-	#
-	# See if we need to resolve using a map.
-	# Maps currently are only indexed by modification time;
-	# i.e., we look at the last modification time of the experiment to
-	# determine what OSID should be used.
-	#
-	# NOTE: mapping used to be done based on experiment *creation* time
-	# but that left no ability to "update" an experiment to use current
-	# images, at least short of creating a new experiment with the same
-	# ns file.
-	#
-	# next_osid used to be MAP:osid_map, but now its an integer field
-	# so just look for a 0 index, which is not a "valid" osid.
-	#
-	if (defined($next_osid) && $next_osid == 0) {
-	    my $map = "osid_map";
-
-	    my $timestr;
-	    if (defined($pid) && defined($eid)) {
-		my $m_result =
-		    DBQueryWarn("select e.expt_created, s.swapmod_last ".
-				"from experiments as e, experiment_stats as s ".
-				"where e.idx=s.exptidx and ".
-				"e.pid='$pid' and e.eid='$eid'");
-		if (!$m_result || $m_result->num_rows() == 0) {
-		    warn "Resolving $input_osid: no experiment $pid/$eid!\n";
-		    return undef;
-		}
-		my ($ctime,$mtime) = $m_result->fetchrow();
-		if (defined($mtime) && $mtime ne "") {
-		    $timestr = "'$mtime'";
-		} else {
-		    $timestr = "'$ctime'";
-		}
-	    } else {
-		$timestr = "now()";
-	    }
-
-	    $result = DBQueryWarn("select nextosid from $map ".
-				  "where osid='$osid' and ".
-				  "$timestr between btime and etime");
-	    if (!$result) {
-		warn "No such osid map $map!\n";
-		return undef;
-	    }
-
-	    if ($result->num_rows() == 0) {
-		warn "Resolving $input_osid: Unable to map $osid!\n";
-		return undef;
-	    }
-	    ($next_osid) = $result->fetchrow();
-	}
-    } while ($next_osid);
-    
-    return $osid;
+    }
+    my $osinfo = OSinfo->Lookup($osid);
+    if (! defined($osinfo)) {
+	warn "TBResolveNextOSID: No such osid $osid\n";
+	return undef;
+    }
+    my $nextosinfo = $osinfo->ResolveNextOSID($experiment);
+    return undef
+	if (!defined($nextosinfo));
+    return $nextosinfo->osid();
 }
 
 #
@@ -3585,24 +3488,6 @@ sub TBSetNodeHistory($$$$$)
 	}
     }
     return $node->SetNodeHistory($op, $this_user, $experiment);
-}
-
-sub TBGetOSBootCmd($$$)
-{
-    my ($osid, $role, $default_cmdline) = @_;
-    my $retval = $default_cmdline;
-    
-    my $query_result =
-	DBQueryFatal("SELECT ob.boot_cmd_line FROM os_info as oi ".
-		     "LEFT JOIN os_boot_cmd as ob on ob.OS=oi.OS and ".
-		     "  ob.version=oi.version ".
-		     "WHERE oi.osid='$osid' and ob.role='$role'");
-    
-    if ($query_result->num_rows == 1) {
-	($retval) = $query_result->fetchrow_array();
-    }
-    
-    return $retval;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

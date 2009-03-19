@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -115,6 +115,7 @@ use Experiment;
 use Node;
 use NodeType;
 use Lan;
+use OSinfo;
 use libadminctrl;
 use libtblog;
 use libtblog qw(*SOUT *SERR);
@@ -409,24 +410,6 @@ sub nodetypeisdedicatedremote($) {
     return 0;
 }
 
-#
-# osids: Information from the os_info table from the DB, indexed by osid
-#
-my %osids = ();
-
-sub osidpath($)         { return $osids{$_[0]}->{"path"}; }
-sub osidos($)           { return $osids{$_[0]}->{"OS"}; }
-sub osidhaspath($)      { my $path = osidpath($_[0]);
-                          return (defined $path) && ($path ne "")};
-sub osidnextosid($)     {
-    my $retval = $osids{$_[0]}->{"nextosid"};
-    
-    if (!defined($retval)) {
-	$retval = $_[0];
-    }
-    return $retval;
-}
-
 # 
 # interface_capabilities: We need this to find out the bandwidths of the devices
 # we actually have on the testbed. Index by interface type name.
@@ -538,6 +521,7 @@ my $experiment_idx;
 my $useprepass;
 my $delaycap_override;
 my $elabinelab = 0;
+my $experiment;
 
 #
 # Notes on virtual interfaces.
@@ -724,6 +708,66 @@ my $veth_id      = 0;
 # are inserted. This hash maintains the rtabids per vnode
 my %vnode2rtabid = ();
 
+#
+# OSinfo lookups.
+#
+sub osidlookup($)
+{
+    my $osid   = $_[0];
+    my $osinfo = OSinfo->Lookup($osid);
+    if (!defined($osinfo)) {
+	tbwarn("No such OSID $osid\n");
+	return undef;
+    }
+    return $osinfo;
+}
+sub osidpath($)
+{
+    my $osinfo = osidlookup($_[0]);
+    return (defined($osinfo) ? $osinfo->path() : undef);
+}
+sub osidos($)
+{
+    my $osinfo = osidlookup($_[0]);
+    return (defined($osinfo) ? $osinfo->OS() : undef);
+}
+sub osidfeaturesupported($$)
+{
+    my $osinfo = osidlookup($_[0]);
+    return (defined($osinfo) ? $osinfo->FeatureSupported($_[1]) : 0);
+}
+sub osidhaspath($)
+{
+    my $path = osidpath($_[0]);
+    return (defined($path) && ($path ne ""));
+}
+sub osidnextosinfo($)
+{
+    my $osinfo = osidlookup($_[0]);
+    return undef
+	if (!defined($osinfo));
+    return $osinfo
+	if (!defined($osinfo->nextosid()));
+    my $nextosinfo = $osinfo->ResolveNextOSID($experiment);
+    return undef
+	if (!defined($nextosinfo));
+    return $nextosinfo;
+}
+sub osidnextosid($)
+{
+    my $nextosinfo = osidnextosinfo($_[0]);
+    return (defined($nextosinfo) ? $nextosinfo->osid() : undef);
+}
+sub osidbootcmd($$$)
+{
+    my ($osid, $role, $default) = @_;
+    my $nextosinfo = osidnextosinfo($osid);
+    return undef
+	if (!defined($nextosinfo) ||
+	    $nextosinfo->OSBootCmd($role, \$default) != 0);
+    return $default;
+}
+
 ######################################################################
 # Step 1 - Setup virtual topology
 #
@@ -761,7 +805,7 @@ my %vnode2rtabid = ();
 
 
 # Slowly convert to using Experiment module.
-my $experiment = Experiment->Lookup($pid, $eid);
+$experiment = Experiment->Lookup($pid, $eid);
 if (!defined($experiment)) {
     fatal("Could not lookup experiment object!")
 }
@@ -3001,10 +3045,9 @@ sub InitPnode($$)
 	else {
 	    $osid = nodejailosid($pnode);
 	}
-
-	my $cmdline = TBGetOSBootCmd(osidnextosid($osid),
-				     "vnodehost",
-				     "/kernel.jail");
+	my $cmdline = osidbootcmd($osid, "vnodehost", "/kernel.jail");
+	fatal("Unexpected error determining boot command line for $pnode")
+	    if (!defined($cmdline));
 	
 	DBQueryFatal("UPDATE nodes set def_boot_cmd_line='$cmdline'," .
 		     " startstatus='none'," .
@@ -3082,9 +3125,9 @@ sub InitPnode($$)
 	fatal("No OSID is defined for internal node $vname!")
 	    if (!defined($osid));
 
-	$cmdline = TBGetOSBootCmd(osidnextosid($osid),
-				  $cmdline_role,
-				  $cmdline);
+	$cmdline = osidbootcmd($osid, $cmdline_role, $cmdline);
+	fatal("Unexpected error determining boot command line for $pnode")
+	    if (!defined($cmdline));
 
 	DBQueryFatal("UPDATE nodes set ".
 		     " def_boot_cmd_line='$cmdline'," .
@@ -3117,18 +3160,16 @@ sub InitPnode($$)
 	    # If the user hasn't overridden the command line, try to find a
 	    # default for this OSID.
 	    if (virtnodeneedslinkdelays($vnode)) {
-		$cmdline = TBGetOSBootCmd(osidnextosid($osid),
-					  "linkdelay",
-					  "");
+		$cmdline = osidbootcmd($osid, "linkdelay", "");
 	    }
 	    elsif (defined($inner_elab_role) &&
 		   ($inner_elab_role eq "boss" ||
 		    $inner_elab_role eq "boss+router")) {
-		$cmdline = TBGetOSBootCmd(osidnextosid($osid),
-					  "linkdelay",
-					  "");
+		$cmdline = osidbootcmd($osid, "linkdelay", "");
 	    }
 	}
+	fatal("Unexpected error determining boot command line for $pnode")
+	    if (!defined($cmdline));
 
 	#
 	# NOTE: We no longer include tarballs and RPMs in this update, because
@@ -3194,10 +3235,6 @@ my %porthigh    = ();
 
 sub TBExptSetPortRange {
     my @nodelist = ();
-    my $newlow;
-    my $newhigh;
-    my $lastlow;
-    my $lasthigh;
     
     #
     # See if any virtual nodes. If not, no need to do anything since
@@ -3222,51 +3259,9 @@ sub TBExptSetPortRange {
     #
     # Otherwise find a free slot in the table.
     #
-    DBQueryFatal("lock tables ipport_ranges write");
+    my ($newlow,$newhigh) = $experiment->SetPortRange($impotent);
 
-    my $range_result =
-	DBQueryFatal("select low,high from ipport_ranges order by low");
-
-    if (!$range_result->num_rows) {
-	$newlow = TBDB_LOWVPORT;
-    }
-    else {
-	($lastlow, $lasthigh) = $range_result->fetchrow_array();
-
-	# A hole at the bottom of the range ...
-	if ($lastlow >= TBDB_LOWVPORT + TBDB_PORTRANGE) {
-	    $newlow = TBDB_LOWVPORT;
-	}
-	# Else, find a free hole. 
-	else {
-	    while (my ($thislow,$thishigh) = $range_result->fetchrow_array()) {
-		if ($thislow != $lasthigh + 1 &&
-		    $thislow - $lasthigh > TBDB_PORTRANGE) {
-		    $newlow = $lasthigh + 1;
-		    last;
-		}
-		$lasthigh = $thishigh;
-	    }
-	}
-    }
-    if (!defined($newlow)) {
-	# No holes, tack onto the end. 
-	$newlow = $lasthigh + 1;
-    }
-    if ($newlow >= TBDB_MAXVPORT) {
-	DBQueryFatal("unlock tables");
-	return -1;
-    }
-    $newhigh = $newlow + TBDB_PORTRANGE - 1;
-
-    if (! $impotent) {
-	DBQueryFatal("insert into ipport_ranges ".
-		     " (exptidx, pid, eid, low, high) ".
-		     "values ('$experiment_idx', ".
-		     "        '$pid', '$eid', $newlow, $newhigh)");
-    }
-    DBQueryFatal("unlock tables");
-    printdb "Setting ipport range to $newlow,$newhigh\n";
+    printdb "ipport range was set to $newlow,$newhigh\n";
 
     #
     # Now set the port range for those nodes hosting virtual nodes.
@@ -3937,23 +3932,6 @@ sub LoadPhysInfo()
 		printdb(" $type:$protocol - @list\n");
 	    }
 	}
-    }
-
-    #
-    # Get paths from os_info, so that we can identify OSKit/MFS OSes, basically
-    # those which do not load a disk image
-    #
-    $query_result =
-	DBQueryFatal("select osid,path,nextosid,OS from os_info");
-    while (my ($osid, $path, $nextosid, $OS) = $query_result->fetchrow()) {
-        $osids{$osid} = {};
-        if ($path) {
-            $osids{$osid}->{"path"} = $path;
-        }
-	if (defined($nextosid)) {
-	    $osids{$osid}->{"nextosid"} = TBResolveNextOSID($osid,$pid,$eid);
-	}
-	$osids{$osid}->{"OS"} = $OS;
     }
 }
 sub interfacespeedmbps($$) {
@@ -4761,14 +4739,14 @@ sub CreateTopFile()
 			
 			if (!exists($osdoesmlink{$osid})) {
 			    $osdoesmlink{$osid} =
-				OSFeatureSupported($osid, 'mlinks');
+				osidfeaturesupported($osid, 'mlinks');
 			    $osdoesveth{$osid} =
-				OSFeatureSupported($osid, 'veths');
+				osidfeaturesupported($osid, 'veths');
 			    $osdoesvlan{$osid} =
-				OSFeatureSupported($osid, 'vlans');
+				osidfeaturesupported($osid, 'vlans');
 			    # Need this for phys nodes requesting lindelays.
 			    $osdoeslinkdelays{$osid} =
-				OSFeatureSupported($osid, 'linkdelays');
+				osidfeaturesupported($osid, 'linkdelays');
 			}
 		    } else {
 			# XXX If the user doesn't explicitly set an OS on a PC.
@@ -5721,7 +5699,12 @@ sub nodejailosid($)
     my $vnode    = $vnodelist[0];
     my $osid     = virtnodeosid($vnode);
     my $nextosid = osidnextosid($osid);
-    printdb "Mapping jail osid to $osid ($nextosid) on $pnode\n";
+    if (defined($nextosid)) {
+	printdb "Mapping jail osid to $osid ($nextosid) on $pnode\n";
+    }
+    else {
+	tbwarn("Could not map jail osid to real osid on $pnode\n");
+    }
     return $nextosid;
 }
 
