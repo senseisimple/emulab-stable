@@ -8,7 +8,17 @@ use TBConfig;
 use Data::Dumper;
 use Carp;
 use Tools;
+
+my $loglevel = "INFO";
+$loglevel = "DEBUG" if $TBConfig::DEBUG_XML_CLIENT;
 my $logger = init_tbts_logger("XMLRPCClient", undef, "INFO", "SCREEN");
+
+BEGIN {
+  use TBConfig;
+  $ENV{HTTPS_CERT_FILE} = glob($TBConfig::SSL_CLIENT_CERT);
+  $ENV{HTTPS_KEY_FILE}  = glob($TBConfig::SSL_CLIENT_KEY);
+}
+
 
 has 'client' => ( isa => 'RPC::XML::Client', is => 'rw', default => sub { 
   my $c = RPC::XML::Client->new($TBConfig::XMLRPC_SERVER, 'timeout' => (10*60));

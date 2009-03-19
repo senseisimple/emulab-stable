@@ -1,6 +1,7 @@
 use Modern::Perl;
 
 package TBConfig;
+use Sys::Hostname;
 use Crypt::X509;
 use Tools qw(slurp);
 use Data::Dumper;
@@ -11,6 +12,7 @@ our $XMLRPC_VERSION   = "0.1";
 our $SSL_CLIENT_CERT  = glob("~/.ssl/emulab.cert");
 our $SSL_CLIENT_KEY   = glob("~/.ssl/emulabkeyout.pem");
 our $EMULAB_USER      = get_emulab_user();
+our $DEBUG_XML_CLIENT = (hostname() =~ /tan/);
 
 sub get_emulab_user {
   my $cert = slurp($SSL_CLIENT_CERT);

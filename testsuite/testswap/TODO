@@ -1,6 +1,7 @@
 test groupings
 linkinfo
 event system
+tests
 
 THINKING ABOUT IT
   Test::Class

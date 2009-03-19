@@ -1,4 +1,30 @@
 #!/usr/bin/perl
+use Modern::Perl;
+use Data::Dumper;
+
+{
+  use Getopt::Long;
+  my $pjobs   = 1;
+  my $logging = 0;
+  my $timing;
+  my $verbose;
+  my $result = GetOptions (
+      "jobs=i"     => \$pjobs,
+      "logging=i"  => \$logging,
+      "timing"     => \$timing,
+      "verbose"    => \$verbose);
+
+  if ($pjobs > 1) {
+    $ENV{'HARNESS_OPTIONS'} = "j$pjobs";
+  }
+  if ($timing > 1) {
+    $ENV{'HARNESS_TIMER'} = 1;
+  }
+  if ($verbose) {
+    $ENV{'HARNESS_VERBOSE'} = 1;
+    $ENV{HARNESS_COLOR} = 1;
+  }
+}
 
 my $THARNESS = 'perl t/harness';
 my $usage = <<"USAGE";
@@ -8,7 +34,8 @@ my $usage = <<"USAGE";
 USAGE
 
 if (@ARGV) {
-  my $_ = $ARGV[0];
+  my $cmd = $ARGV[0];
+  my $_   = $cmd;
   if (/critic/) { exec 'perlcritic .'; }
   elsif (/test/)   { exec $THARNESS; }
   elsif (/test/)   { exec "$THARNESS t/topologies/*.t"; }
