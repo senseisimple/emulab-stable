@@ -2465,6 +2465,34 @@ CREATE TABLE `os_info` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `osconfig_files`
+--
+
+DROP TABLE IF EXISTS `osconfig_files`;
+CREATE TABLE `osconfig_files` (
+  `file_idx` int(10) unsigned NOT NULL auto_increment,
+  `type` enum('script','scriptdep','archive','file') NOT NULL default 'file',
+  `path` varchar(255) NOT NULL default '',
+  `dest` varchar(255) NOT NULL default '',
+  `prio` int(5) unsigned NOT NULL default '0',
+  PRIMARY KEY  (`file_idx`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `osconfig_targets`
+--
+
+DROP TABLE IF EXISTS `osconfig_targets`;
+CREATE TABLE `osconfig_targets` (
+  `constraint_idx` int(10) unsigned NOT NULL auto_increment,
+  `target_apply` enum('premfs','postload') NOT NULL default 'postload',
+  `target_file_idx` int(10) unsigned NOT NULL default '0',
+  `constraint_name` varchar(16) NOT NULL default '',
+  `constraint_value` varchar(128) NOT NULL default '',
+  PRIMARY KEY  (`constraint_idx`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `osid_map`
 --
 
