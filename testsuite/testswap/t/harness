@@ -1,5 +1,6 @@
 #/usr/bin/perl
-use Modern::Perl;
+use strict;
+use warnings; 
 use TAP::Harness;
 use Data::Dumper;
 my %args = (

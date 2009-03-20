@@ -1,4 +1,4 @@
-use Modern::Perl;
+use SemiModern::Perl;
 
 package TBConfig;
 use Sys::Hostname;

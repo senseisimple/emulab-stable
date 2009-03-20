@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-use Modern::Perl;
+use SemiModern::Perl;
 
 package TestBed::XMLRPC::Client::NodeInfo;
 require Exporter;

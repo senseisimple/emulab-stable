@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-use Modern::Perl;
+use SemiModern::Perl;
 use Net::SSH::Perl;
 use Net::SFTP;
 use Data::UUID;
@@ -11,7 +11,6 @@ sub uuid {
   my $ug = new Data::UUID;
   my $uuid = $ug->create_hex();
  $uuid =~ s/^0x//;
- say $uuid;
  $uuid;
 }
 

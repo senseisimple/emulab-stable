@@ -1,5 +1,6 @@
 #!/usr/bin/perl
-use Modern::Perl;
+use SemiModern::Perl;
+use Net::Ping;
 
 package Tools::PingTest;
 require Exporter;
@@ -9,8 +10,8 @@ use Data::Dumper;
 
 sub ping {
   my ($host) = @_;
-  system("ping -c 3 -W 1 -w 5 $host");
-  $?;
+  my $p = Net::Ping->new('tcp', 2);
+  $p->ping($host);
 }
 
 1;

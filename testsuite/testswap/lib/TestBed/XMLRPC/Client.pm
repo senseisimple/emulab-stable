@@ -1,7 +1,7 @@
 #!/usr/bin/perl
-use Modern::Perl;
 
 package TestBed::XMLRPC::Client;
+use SemiModern::Perl;
 use Mouse;
 use RPC::XML::Client;
 use TBConfig;

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
-use Modern::Perl;
 use lib 'lib';
+use SemiModern::Perl;
 use TestBed::TestSuite::Experiment::Macros;
 use Data::Dumper;
 use Tools::TBSSH;
@@ -27,11 +27,8 @@ sub output {
     while(my ($gk, $v) = each %$v) {
       for my $e (@$v) {
         my $eid;
-        given ($e) {
-          when('name') { $eid = sprintf("%s %s", $e->{'name'}, $e->{'state'});}
-          default { $eid = $e; }
-        };
-          
+        if ( exists $e->{'name'} )  { $eid = sprintf("%s %s", $e->{'name'}, $e->{'state'});}
+        else { $eid = $e; }
         say "$pk :: $gk :: $eid";
       }
     }

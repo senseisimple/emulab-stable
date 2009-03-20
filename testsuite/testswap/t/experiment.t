@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-use Modern::Perl;
+use SemiModern::Perl;
 use TestBed::TestSuite::Experiment::Macros tests => 3;
 use Test::More;
 use Data::Dumper;

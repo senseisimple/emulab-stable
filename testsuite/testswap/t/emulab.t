@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-use Modern::Perl;
+use SemiModern::Perl;
 
 use TestBed::XMLRPC::Client::Emulab;
 use Test::More tests => 3;

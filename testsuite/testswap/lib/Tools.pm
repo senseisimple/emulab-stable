@@ -1,6 +1,5 @@
-use Modern::Perl;
-
 package Tools;
+use SemiModern::Perl;
 use Log::Log4perl qw(get_logger :levels);
 #use Log::Log4perl::Appender::Screen
 #use Log::Log4perl::Appender::ScreenColoredLevels
@@ -45,7 +44,7 @@ sub sayts {
 }
 
 sub perlit {
-    map {_perlit($_)} @_; 
+  map {_perlit($_)} @_; 
 }
 
 sub toperl {
