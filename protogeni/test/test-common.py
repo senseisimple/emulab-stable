@@ -115,7 +115,7 @@ def PassPhraseCB(v, prompt1='Enter passphrase:', prompt2='Verify passphrase:'):
 #
 # Call the rpc server.
 #
-def do_method(module, method, params, URI=None):
+def do_method(module, method, params, URI=None, quiet=False):
     if debug:
         print module + " " + method + " " + str(params);
         pass
@@ -170,7 +170,10 @@ def do_method(module, method, params, URI=None):
         response = apply(meth, meth_args)
         pass
     except xmlrpclib.Fault, e:
-        print >> sys.stderr, e.faultString
+        if not quiet: print >> sys.stderr, e.faultString
+        return (-1, None)
+    except xmlrpclib.ProtocolError, e:
+        if not quiet: print >> sys.stderr, e.errmsg
         return (-1, None)
 
     #
@@ -179,7 +182,7 @@ def do_method(module, method, params, URI=None):
     # Dictionary, hence the code below. 
     # 
     if response[ "code" ] and len(response["output"]):
-        print >> sys.stderr, response["output"] + ":",
+        if not quiet: print >> sys.stderr, response["output"] + ":",
         pass
 
     rval = response["code"]
