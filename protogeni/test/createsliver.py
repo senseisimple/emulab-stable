@@ -27,7 +27,43 @@ from M2Crypto import X509
 
 ACCEPTSLICENAME=1
 
+def Usage():
+    print "usage: " + sys.argv[ 0 ] + " [option...] [resource-specification]"
+    print """Options:
+    -c file, --credentials=file         read self-credentials from file
+                                            [default: query from SA]
+    -d, --debug                         be verbose about XML methods invoked
+    -f file, --certificate=file         read SSL certificate from file
+                                            [default: ~/.ssl/encrypted.pem]
+    -h, --help                          show options and usage
+    -n name, --slicename=name           specify human-readable name of slice
+                                            [default: mytestslice]
+    -p file, --passphrase=file          read passphrase from file
+                                            [default: ~/.ssl/password]
+    -r file, --read-commands=file       specify additional configuration file
+    -s file, --slicecredentials=file    read slice credentials from file
+                                            [default: query from SA]"""
+
 execfile( "test-common.py" )
+
+if len( args ) > 1:
+    Usage()
+    sys.exit( 1 )
+elif len( args ) == 1:
+    try:
+        rspecfile = open( args[ 0 ] )
+        rspec = rspecfile.read()
+        rspecfile.close()
+    except IOError, e:
+        print >> sys.stderr, args[ 0 ] + ": " + e.strerror
+        sys.exit( 1 )
+else:
+    rspec = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
+            " <node uuid=\"*\" " +\
+            "       nickname=\"geni1\" "+\
+            "       virtualization_type=\"emulab-vnode\"> " +\
+            " </node>" +\
+            "</rspec>"    
 
 #
 # Get a credential for myself, that allows me to do things at the SA.
@@ -88,12 +124,6 @@ else:
 #
 print "Asking for a ticket from the local CM"
 
-rspec = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
-        " <node uuid=\"*\" " +\
-        "       nickname=\"geni1\" "+\
-        "       virtualization_type=\"emulab-vnode\"> " +\
-        " </node>" +\
-        "</rspec>"
 params = {}
 params["credential"] = myslice
 params["rspec"]      = rspec
