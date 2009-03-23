@@ -10,14 +10,12 @@
 
 include "../../assign/top.rnc" {
     NodeContents =
-        # Semantic change - the 'name' of a node is now
-        # solely for human-readability.
+    # The virtual id of an element may be human readable.
 	# In an advertisement, the component_uuid provides a primary
 	# key which uniquely designates a node.
 	# In a request, the virtual_uuid is the primary key.
 	# The primary key must be globally unique.
 	# The primary key is used when identifying link inputs, for example.
-	attribute virtual_name { text }?,
 	attribute virtual_id { text }?,
 	# The mapping to components/slivers. Required for advertisements.
 	ComponentSpec?,
@@ -40,12 +38,11 @@ include "../../assign/top.rnc" {
 	InterfaceDecl*
 
     LinkContents =
-        # Semantic change - the 'name' of a link is now
-        # solely for human-readability.
-        attribute virtual_name { text }?,
+    # The virtual id of an element may be human readable.
         attribute virtual_id { text }?,
 		attribute virtualization_type { "raw" | "trellis-vserver" |
         			"planetlab-vserver" | "emulab-vnode" }?,
+	# These will only be present in annotated rspecs
 	(SingleHopComponentSpec | MultiHopComponentSpec)?,
         LinkEndPoints,
         ## The characteristics (bandwidth, latency, loss) which affect traffic.
