@@ -194,6 +194,35 @@ sub CheckExisting($$$)
 }
 
 #
+# List all slices.
+#
+sub ListAll($$)
+{
+    my ($class, $pref) = @_;
+    my @result = ();
+    @$pref = ();
+
+    my $query = "select uuid from geni_slices ";
+    my $query_result = DBQueryWarn($query);
+
+    return -1
+	if (! $query_result);
+    return 0
+	if (!$query_result->numrows);
+
+    while (my ($uuid) = $query_result->fetchrow_array()) {
+	my $slice = GeniRegistry::GeniSlice->Lookup($uuid);
+	if (!defined($slice)) {
+	    print STDERR "Could not lookup slice $uuid\n";
+	    return -1;
+	}
+	push(@result, $slice);
+    }
+    @$pref = @result;
+    return 0;
+}
+
+#
 # Stringify for output.
 #
 sub Stringify($)

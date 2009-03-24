@@ -291,6 +291,36 @@ sub LookupByPrefix($$)
     return GeniAuthority->Lookup($uuid);
 }
 
+#
+# List all authorities.
+#
+sub ListAll($$)
+{
+    my ($class, $pref) = @_;
+    my @result = ();
+    @$pref = ();
+
+    my $query = "select uuid from geni_authorities";
+    my $query_result = DBQueryWarn($query);
+
+    return -1
+	if (! $query_result);
+    return 0
+	if (!$query_result->numrows);
+
+    while (my ($uuid) = $query_result->fetchrow_array()) {
+	my $authority = GeniAuthority->Lookup($uuid);
+	if (!defined($authority)) {
+	    print STDERR "Could not lookup authority $uuid\n";
+	    return -1;
+	}
+	push(@result, $authority);
+    }
+    @$pref = @result;
+    return 0;
+}
+
+
 # _Always_ make sure that this 1 is at the end of the file...
 1;
 
