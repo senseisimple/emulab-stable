@@ -1,0 +1,291 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005-2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package libvtop;
+
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT @EXPORT_OK
+	    $VTOP_FLAGS_UPDATE $VTOP_FLAGS_VERBOSE $VTOP_FLAGS_FIXED);
+
+@ISA    = "Exporter";
+@EXPORT = qw( );
+
+use libdb;
+use libtblog;
+use libtestbed;
+use Experiment;
+use VirtExperiment;
+use Node;
+use NodeType;
+use Lan;
+use OSinfo;
+use English;
+use Data::Dumper;
+use Carp;
+
+# Configure variables
+my $TB		= "@prefix@";
+my $BOSSNODE    = "@BOSSNODE@";
+
+# Flags.
+$VTOP_FLAGS_VERBOSE	= 0x01;
+$VTOP_FLAGS_UPDATE	= 0x02;
+$VTOP_FLAGS_FIXED	= 0x04;
+
+@EXPORT_OK = qw($VTOP_FLAGS_UPDATE $VTOP_FLAGS_VERBOSE $VTOP_FLAGS_FIXED);
+
+#
+# Create an object representing the stuff we need to create the vtop file.
+#
+sub Create($$$)
+{
+    my ($class, $experiment, $flags) = @_;
+
+    my $virtexperiment = VirtExperiment->Lookup($experiment);
+    if (!defined($virtexperiment)) {
+	tberror("Could not load virtual experiment object for $experiment\n");
+	return undef;
+    }
+
+    my $self              = {};
+    $self->{'EXPERIMENT'} = $experiment;
+    $self->{'VIRTEXPT'}   = $virtexperiment;
+    $self->{'FLAGS'}      = $flags;
+    $self->{'VNODES'}     = {};
+    $self->{'VLANS'}      = {};
+    bless($self, $class);
+
+    return $self;
+}
+# accessors
+sub experiment($)       { return $_[0]->{'EXPERIMENT'}; }
+sub virtexperiment($)   { return $_[0]->{'VIRTEXPT'}; }
+sub flags($)            { return $_[0]->{'FLAGS'}; }
+sub vnodes($)           { return $_[0]->{'VNODES'}; }
+sub vlans($)            { return $_[0]->{'VLANS'}; }
+sub pid($)		{ return $_[0]->experiment()->pid(); }
+sub pid_idx($)		{ return $_[0]->experiment()->pid_idx(); }
+sub eid($)		{ return $_[0]->experiment()->eid(); }
+sub exptidx($)		{ return $_[0]->experiment()->idx(); }
+
+# The virtual tables from the DB.
+sub virt_table($$)      { return $_[0]->virtexperiment()->Table($_[1]); }
+sub virt_vtypes($)	{ return $_[0]->virt_table("virt_vtypes"); }
+sub virt_desires($)	{ return $_[0]->virt_table("virt_desires"); }
+sub virt_nodes($)       { return $_[0]->virt_table("virt_nodes"); }
+
+# Debug output.
+sub verbose($)		{ return $_[0]->flags() & $VTOP_FLAGS_VERBOSE; }
+sub printdb($$)		{ print $_[1] if ($_[0]->verbose()); }
+
+###############################################################################
+# Virtual Types. 
+#
+sub virttypeisvtype($$) { return $_[0]->virt_vtypes()->Find($_[1]); }
+sub VirtTypes($)        { return $_[0]->virt_vtypes()->Rows(); }
+
+#
+# Dump the vtype list.
+#
+sub PrintVirtTypes($)
+{
+    my ($self) = @_;
+    my @types  = $self->VirtTypes();
+    
+    foreach my $vtype (@types) {
+	my $name    = $vtype->name();
+	my $weight  = $vtype->weight();
+	my @members = split(" ", $vtype->members());
+	
+	print "make-vclass $name $weight @members\n";
+    }
+}
+
+###############################################################################
+# Virtual Nodes. A separate package so we can create objects for each one
+# and then add local stuff to them.
+#
+package libvtop::virt_node;
+use Carp;
+use vars qw($AUTOLOAD);
+
+# To avoid wrtting out all the methods.
+sub AUTOLOAD {
+    my $self = shift;
+    my $type = ref($self) or croak "$self is not an object";
+
+    my $name = $AUTOLOAD;
+    $name =~ s/.*://;   # strip fully-qualified portion
+
+    if (@_) {
+	return $self->{'HASH'}->{$name} = shift;
+    }
+    elsif (exists($self->{'HASH'}->{$name})) {
+	return $self->{'HASH'}->{$name};
+    }
+    else {
+	return $self->virt_node()->$name();
+    }
+}
+
+#
+# Wrap up a virt node.
+#
+sub Create($$$)
+{
+    my ($class, $vtop, $virt_node) = @_;
+
+    my $self = {};
+    bless($self, $class);
+
+    $self->{'VIRTNODE'} = $virt_node;
+    $self->{'VTOP'}     = $vtop;
+    $self->{'HASH'}     = {};
+
+    return $self;
+}
+# accessors
+sub virt_node($)	{ return $_[0]->{'VIRTNODE'}; }
+sub vtop($)		{ return $_[0]->{'VTOP'}; }
+sub hash($)		{ return $_[0]->{'HASH'}; }
+
+# Break circular reference someplace to avoid exit errors.
+sub DESTROY {
+    my $self = shift;
+
+    $self->{'VIRTNODE'}   = undef;
+    $self->{'VTOP'}       = undef;
+    $self->{'HASH'}       = undef;
+}
+
+#############################################################################
+# Back to the main package.
+#
+package libvtop;
+
+sub LoadVirtNodes($)
+{
+    my ($self) = @_;
+
+    $self->printdb("Loading virtual nodes\n");
+
+    my $table = $self->virt_nodes();
+    foreach my $virt_node ($table->Rows()) {
+	my $vnode   = libvtop::virt_node->Create($self, $virt_node);
+	my $vname   = $vnode->vname();
+
+	# Other fields we need.
+	my $ips     = $vnode->ips();
+	my $type    = $vnode->type();
+	my $fixed   = $vnode->fixed();
+	my $osname  = $vnode->osname();
+
+	# XXX
+	# If its a vtype, there will not be any node_type data. This
+	# can break things, if one were to mix a virt/remote type with
+	# a nonvirt/local type! Need to actually verify the vtypes
+	# for consistency. 
+	#
+	my $isremote= 0;
+	my $isvirt  = 0;
+	my $issub   = 0;
+	my $isplab  = 0;
+	my $issim   = 0;
+	my $isdyn   = 0;	# Only virtnodes are dynamic.
+
+	# If we have a real type or auxtype ...
+	my $nodetype = NodeType->LookupAny($type);
+	if (!defined($nodetype)) {
+	    my $vtype = $self->virttypeisvtype($type);
+	    if (!defined($vtype)) {
+		carp("Improper type $type for node $vnode!");
+		return -1;
+	    }
+	    #
+	    # For now, just pick the first member type.
+	    #
+	    my @memberlist = split(" ", $vtype->members());
+	    my $vtypename  = $memberlist[0];
+
+	    $nodetype = NodeType->LookupAny($vtypename);
+	    if (!defined($nodetype)) {
+		carp("Improper type $vtypename in vtypes for node $vnode!");
+		return -1;
+	    }
+	}
+	$isremote = $nodetype->isremotenode();
+	$isvirt   = $nodetype->isvirtnode();
+	$issub    = $nodetype->issubnode();
+	$isplab   = $nodetype->isplabdslice();
+	$issim    = $nodetype->issimnode();
+	$isdyn    = $nodetype->isdynamic();
+
+	# All this info is stashed in our local object.
+	$vnode->_nodeweight(undef);
+	$vnode->_isremotenode($isremote);
+	$vnode->_isvirtnode($isvirt);
+	$vnode->_issubnode($issub);
+	$vnode->_isplabnode($isplab);
+	$vnode->_issimnode($issim);
+	$vnode->_isdynamic($isdyn);
+
+	# The mapped osname to actual osid. 
+	$vnode->_osid(undef);
+	# Eventual physical mapping. 
+	$vnode->_physnode(undef);
+	# Handy to combine these.
+	$vnode->_settings([ $vnode->cmd_line(),
+			    $vnode->rpms(),
+			    $vnode->startupcmd(),
+			    $vnode->tarfiles(),
+			    $vnode->failureaction(),
+			    $vnode->routertype() ]);
+
+	#
+	# If a subnode, kill the fixed mapping. That was just to
+	# tell us the connection. We do not want to overload "fixed"
+	# within assign wrapper since its already overloaded.
+	#
+	if ($issub) {
+	    # Must be a parent. Set in the parser, either explicitly, or else
+	    # one is created if the user leaves it out.
+	    if (!defined($fixed) || $fixed eq "") {
+		carp("Subnode $vname must be fixed to its parent!");
+		return -1;
+	    }
+	    $vnode->_parent($fixed);
+	    $vnode->fixed("");
+	    undef($fixed);
+	}
+
+	# Can fixed really get set to ""?
+	if (defined($fixed) && $fixed ne "") {
+	    $self->{'FIXED_NODES'}->{$vname} = $fixed;
+	}
+
+	$self->printdb("  $vname type:$type ips:$ips\n");
+	$self->printdb("         isrem:$isremote isvirt:$isvirt ");
+	$self->printdb("fixed:$fixed")
+	    if (defined($fixed));
+	$self->printdb("\n");
+    }
+    return 0;
+}
+
+#
+# Create a vtop. 
+#
+sub CreateVtop($)
+{
+    my ($self) = @_;
+    $self->LoadVirtNodes();
+
+    $self->PrintVirtTypes();
+}
+
+1;
+

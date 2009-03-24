@@ -1,0 +1,89 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+sub usage ()
+{
+    print STDERR "Usage: $0 [-v] [-u [-f]] pid eid\n";
+    print STDERR " -v   - Enables verbose output\n";
+    print STDERR " -u   - Enables update mode\n";
+    print STDERR " -f   - Fix current resources during update mode\n";
+    exit(1);
+}
+my $optlist  = "vuf";
+my $verbose  = 1;
+my $fixmode  = 0;
+my $updating = 0;
+my $warnings = 0;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+
+#
+# Load the Testbed support stuff. 
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use libtblog;
+use libvtop;
+
+# Protos
+sub fatal($);
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Turn off line buffering on output
+$| = 1; 
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV < 2) {
+    usage();
+}
+if (defined($options{"v"})) {
+    $verbose++;
+}
+if (defined($options{"u"})) {
+    $updating = 1;
+}
+if (defined($options{"f"})) {
+    $fixmode = 1;
+}
+my $pid = $ARGV[0];
+my $eid = $ARGV[1];
+my $experiment = Experiment->Lookup($pid, $eid);
+if (!defined($experiment)) {
+    fatal("Could not lookup experiment object $pid,$eid!")
+}
+my $vtop = libvtop->Create($experiment, $libvtop::VTOP_FLAGS_VERBOSE);
+if (!defined($vtop)) {
+    fatal("Could o create vtop structure for $experiment");
+}
+$vtop->CreateVtop();
+
+exit(0);
+
+sub fatal($)
+{
+    my ($msg) = @_;
+
+    die("*** $0:\n".
+	"    $msg\n");
+}
