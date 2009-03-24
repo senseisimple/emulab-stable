@@ -118,10 +118,10 @@ zapsuperblocks() {
         return
     fi
 
-    echo -n "Invalidating old potential superblocks: "
+    echo -n "Invalidating old potential superblocks on $DSK: "
     for off in $offs; do
         echo -n "$off "
-	dd if=/dev/zero of=/dev/${DISK} oseek=$off count=16 >/dev/null 2>&1 || {
+	dd if=/dev/zero of=/dev/${DSK} oseek=$off count=16 >/dev/null 2>&1 || {
 	    echo "WARNING: failed to invalidate $off"
 	}
     done
@@ -351,7 +351,8 @@ if [ x"$ADDRESS" != x ]; then
 				[ $d = $DISK ] && continue
 				mount | grep "^/dev/$d" > /dev/null && continue
 				zapsuperblocks $d
-				dd if=/dev/zero of=/dev/$disk bs=512 count=1
+				echo "Invalidating MBR on $d"
+				dd if=/dev/zero of=/dev/$d bs=512 count=1
 			done
 			;;
 	esac
