@@ -14,7 +14,7 @@ Before install:
 
 Than:
   
-  make node_usage-install
+  gmake node_usage-install
 
 And install a crontab entry in /etc/crontab:
 
