@@ -117,7 +117,10 @@ def PassPhraseCB(v, prompt1='Enter passphrase:', prompt2='Verify passphrase:'):
 #
 def do_method(module, method, params, URI=None, quiet=False):
     if debug:
-        print module + " " + method + " " + str(params);
+        if module:
+            print module + " " + method + " " + str(params);
+        else:
+            print URI + " " + method + " " + str(params);
         pass
 
     if not os.path.exists(CERTIFICATE):
