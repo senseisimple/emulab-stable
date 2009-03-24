@@ -57,7 +57,5 @@ for manager in response["value"]:
                               "DiscoverResources", params, manager["url"])
     if rval:
         print "Could not get a list of resources"
-        pass
-    pass
-
-
+    elif debug:
+        print response[ "value" ]
