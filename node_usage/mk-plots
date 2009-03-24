@@ -1,0 +1,70 @@
+#!/usr/bin/perl
+
+chdir "/usr/testbed/data/node_usage/data";
+
+sub true {1}
+sub false {0}
+
+#my $TERMINAL = "postscript eps enhanced color";
+#my $EXT = "eps";
+my $TERMINAL = "png";
+my $EXT = "png";
+my $LW = 2;
+
+sub plot ( $@ ) {
+    my ($what, %ops) = @_;
+    open F, ">node_usage-$what.gpl";
+
+    print F "set terminal $TERMINAL\n";
+    print F "set grid\n" unless defined $ops{grid} and !$ops{grid};
+    print F "\n"; 
+
+    if ($ops{timefmt}) {
+        print F "set xdata time\n";
+        print F "set timefmt '$ops{timefmt}'\n";
+    }
+    print F "set format x \"$ops{format_x}\"\n" if defined $ops{format_x};
+    foreach my $o (qw(size xrange xtics)) {
+        print F "set $o $ops{$o}\n" if defined $ops{$o};
+    }
+    print F "set xlabel '$ops{xlabel}'\n" if defined $ops{xlabel};
+    print F "\n";
+
+    my $lw = $ops{lw};
+    $lw = $LW unless defined $lw;
+
+    print F "set output 'node_avail-$what.$EXT'\n";
+    print F "set ylabel 'Available Nodes'\n";
+    print F "plot 'node_usage-$what.dat' using 1:2 title 'pc600 pc850 pc2000 pc3000s' with lines lw $lw,\\\n";
+    print F "     'node_usage-$what.dat' using 1:3 title 'pc3000s' with lines lw $lw\n\n";
+
+    print F "set output 'node_usage-$what.$EXT'\n";
+    print F "set ylabel 'Node Usage'\n";
+    print F "plot 'node_usage-$what.dat' using 1:4 title 'pc600 pc850 pc2000 pc3000s' with lines lw $lw,\\\n";
+    print F "     'node_usage-$what.dat' using 1:5 title 'pc3000s' with lines lw $lw\n\n";
+    close F;
+
+    system("gnuplot node_usage-$what.gpl");
+}
+
+plot("hourly_last2weeks",timefmt=>'%Y-%m-%d_%H:$M', format_x=>'%a\n%m/%d');
+plot("weekly", timefmt=>'%Y-%m-%d');
+plot("daily_last2months", timefmt=>'%Y-%m-%d');
+plot("daily", timefmt=>'%Y-%m-%d', size=>'2,1');
+plot("monthly", timefmt=>'%Y-%m', format_x=>'%m/%y');
+plot("yearly", grid=>false, xlabel => 'Year', xtics=>1);
+plot("by_hour", xrange=>"[0:23]",
+     xtics=>"('Midnight' 0,'4 am' 4, '8 am' 8, 'Noon' 12, '4 pm' 16, '8 pm' 20, '11 pm' 23)");
+#plot("by_hour", xrange=>"[0:23]",
+#     xtics=>("('Midnight' 0,'' 1 1, '' 2 1, '' 3 1, ".
+#             "'4 am' 4, '' 5 1, '' 6 1, ''7 1, ".
+#             "'8 am' 8, '' 9 1, '' 10 1, '' 11 1, ".
+#             "'Noon' 12, '' 13 1, '' 14 1, '' 15 1, ".
+#             "'4 pm' 16, '' 17 1, '' 18 1, '' 19 1, ".
+#             "'8 pm' 20, '' 21 1, '' 22 1, '11 pm' 23)"));
+plot("by_dayofweek", xrange=>"[0:6]",
+     xtics=>"('Mon' 0, 'Tues' 1, 'Wed' 2, 'Thurs' 3, 'Fri' 4, 'Sat' 5, 'Sun' 6)");
+plot("by_hourofweek", xrange=>"[0:7]",
+     xtics=>"('Midnight Mon' 0, 'Tues' 1, 'Wed' 2, 'Thurs' 3, 'Fri' 4, 'Sat' 5, 'Sun' 6)");
+plot("by_month", xrange=>"[0:11]",
+     xtics=>"('Jan' 0, 'Feb' 1, 'Mar' 2, 'Apr' 3, 'May' 4, 'June' 5, 'July' 6, 'Aug' 7, 'Sep' 8, 'Oct' 9, 'Nov' 10, 'Dec' 11)");

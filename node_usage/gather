@@ -1,0 +1,155 @@
+#!/usr/bin/perl 
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use POSIX qw(strftime floor ceil);
+use Data::Dumper;
+use Carp;
+
+$Data::Dumper::Indent = 1;
+
+use strict;
+use warnings;
+
+my $prep    = 1;
+my $results = 1;
+my $fresh = 0;
+
+my $TB		= "/usr/testbed/";
+
+# Turn off line buffering on output
+$| = 1; 
+
+# Load the Testbed support stuff.
+use lib "/usr/testbed/lib";
+use libdb;
+use libtestbed;
+
+chdir "/usr/testbed/data/node_usage/data";
+
+my %node_type;
+my %node_class;
+
+my $qr = DBQueryFatal("select node_id,type from nodes");
+while (my ($node_id, $type) = $qr->fetchrow()) {
+    $node_type{$node_id} = $type;
+}
+
+$qr = DBQueryFatal("select class,type from node_types");
+while (my ($class,$type) = $qr->fetchrow()) {
+    $node_class{$type} = $class;
+}
+$node_class{'?'} = '?';
+
+our %last_trans;
+our %node_state;
+our $prev;
+our $prev_line;
+our $last_history_id = -1;
+
+if ($prep) {
+
+    DBQueryFatal("insert into node_usage.node_history_copy select * from node_history where history_id > (select max(history_id) from node_usage.node_history_copy)");
+
+    if ($fresh) {
+	DBQueryFatal("drop table if exists node_usage.node_trans");
+	DBQueryFatal("create table node_usage.node_trans (".
+		     "  history_id int unsigned not null primary key,".
+		     "  stamp int unsigned not null, ".
+		     "  node_id char(8) not null, ".
+		     "  op enum('alloc','free','invalid') not null".
+		     ")");
+    }
+    
+    local %last_trans;
+    local %node_state;
+
+    if (!$fresh && -e "gather.state.1") {
+	do "gather.state.1";
+    }
+    
+    $qr = DBQueryFatal("select history_id,node_id,op,stamp from node_usage.node_history_copy where history_id > $last_history_id order by history_id");
+
+    local $last_history_id;
+    
+    while (my ($history_id,$node_id,$op,$stamp) = $qr->fetchrow()) {
+	my $type = $node_type{$node_id};
+	$type = '?' unless defined $type;
+	next unless $node_class{$type} eq 'pc';
+	my $prev_state = $node_state{$node_id};
+	$node_state{$node_id} = $op eq 'free' ? 'free' : 'alloc';
+	my $invalid;
+	if (defined $prev_state) {
+	    $invalid = "alloc non-free node" if ($op eq 'alloc' && $prev_state ne 'free');
+	    $invalid = "free already free node" if ($op eq 'free' && $prev_state eq 'free');
+	    $invalid = "move free node" if ($op eq 'move' && $prev_state eq 'free');
+	}
+	if ($invalid) {
+	    #print STDERR "WARNING: $history_id ($stamp) $last_trans{$node_id}: $invalid\n";
+	    DBQueryFatal("update node_usage.node_trans set op = 'invalid' where history_id=$last_trans{$node_id}");
+	} elsif (!defined $prev_state || $prev_state ne $node_state{$node_id}) {
+	    DBQueryFatal("insert into node_usage.node_trans values ($history_id, $stamp, '$node_id', '$node_state{$node_id}')");
+	    $last_trans{$node_id} = $history_id;
+	}
+	$last_history_id = $history_id;
+    }
+
+    open F, ">gather.state.1";
+    print F Data::Dumper->Dump([\%last_trans], ['*last_trans']);
+    print F Data::Dumper->Dump([\%node_state], ['*node_state']);
+    print F Data::Dumper->Dump([$last_history_id], ['*last_history_id']);
+    close F;
+}
+
+if ($results) {
+
+    local %node_state;
+    local $prev = 0;
+    local $prev_line = '';
+    
+    if ($fresh || !-e "gather.state.2") {
+	unlink "node_usage.raw";
+    } else {
+	do "gather.state.2";
+    }
+
+    open F, ">>node_usage.raw";
+
+    $qr = DBQueryFatal("select history_id,stamp,node_id,op from node_usage.node_trans where history_id > $last_history_id order by history_id");
+    
+    while (my ($history_id,$stamp,$node_id,$op) = $qr->fetchrow()) {
+	my $type = $node_type{$node_id};
+	$type = '?' unless defined $type;
+	$node_state{$node_id} = $op;
+	my %tally;
+	while (my ($n, $s) = each %node_state) {
+	    my $t = $node_type{$n};
+	    $t = '?' unless defined $t;
+	    $tally{$t}[0]++;
+	    $tally{$t}[1]++ if $s eq 'free';
+	    $tally{$t}[2]++ if $s eq 'invalid';
+	}
+	my $line = "$history_id $stamp ";
+	foreach my $t (sort keys %tally) {
+	    $tally{$t}[1] = 0 unless defined $tally{$t}[1];
+	    $tally{$t}[2] = 0 unless defined $tally{$t}[2];
+	    $line .= " $t: $tally{$t}[0] $tally{$t}[1] $tally{$t}[2] ";
+	}
+	$line .= "\n";
+	print F $prev_line if $stamp != $prev;
+	$prev = $stamp;
+	$prev_line = $line;
+    }
+
+    open F, ">gather.state.2";
+    print F Data::Dumper->Dump([\%node_state], ['*node_state']);
+    print F Data::Dumper->Dump([$prev, $prev_line], ['*prev', '*prev_line']);
+    close F;
+}
+
+
+

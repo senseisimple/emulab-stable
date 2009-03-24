@@ -1,0 +1,9 @@
+#!/bin/sh
+
+cd /usr/testbed/data/node_usage/scripts
+
+./gather
+./analy
+./analy2
+./mk-plots
+./publish

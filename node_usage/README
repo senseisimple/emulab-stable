@@ -1,0 +1,21 @@
+
+Scripts to gather node usage data.
+
+Only designed to work on Utah's testbed, but could be adopted to other
+sites with some effort.
+
+Before install:
+
+  mkdir /usr/testbed/www/node_usage
+  mkdir /usr/testbed/data/node_usage
+  mkdir /usr/testbed/data/node_usage/data
+  mkdir /usr/testbed/data/node_usage/scripts
+  mysqladmin create node_usage
+
+Than:
+  
+  make node_usage-install
+
+And install a crontab entry in /etc/crontab:
+
+  30	5	*	*	*	root	/usr/testbed/data/node_usage/scripts/refresh

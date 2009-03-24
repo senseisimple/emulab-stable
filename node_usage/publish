@@ -1,0 +1,4 @@
+#!/bin/sh
+
+cp /usr/testbed/data/node_usage/data/*.png \
+   /usr/testbed/devel/kevina/www/node_usage/

@@ -1,0 +1,90 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use POSIX qw(strftime ceil);
+
+chdir "/usr/testbed/data/node_usage/data";
+
+my $TOLERANCE_ALL = 0.05;
+my $TOLERANCE_PC3000 = 0.05;
+my $TOLERANCE_INTERVAL = 1/3;
+my $START = 1125727200;
+
+my $interval = 60*60;
+my $interval_name = "hourly";
+
+my $start = ceil($START / $interval) * $interval;
+
+my $prev_time = 0;
+my @prev_data = (0,0);
+my @total_so_far = (0,0);
+my $next_cutoff = $start;
+
+my $error_frac = 0;
+
+open F, "node_usage.raw";
+open O, ">node_usage-$interval_name.dat";
+
+while (<F>) {
+    chop;
+    s/^(\d+) (\d+) // or die;
+    my $time = $2;
+    my %d;
+    while (s/^ ([\w\d\-\?]+): (\d+) (\d+) (\d+) //) {
+	$d{$1} = [$2, $3, $4];
+    }
+    no warnings 'uninitialized';
+    my @num = ($d{pc850}[0] + $d{pc600}[0] + $d{pc2000}[0] + $d{pc3000}[0],
+	       $d{pc3000}[0]);
+    die unless $time <= $start || $num[0] == 160 + 128 + 40 + 8;
+    die unless $time <= $start || $num[1] == 160;
+    my @data = ($d{pc850}[1] + $d{pc600}[1] + $d{pc2000}[1] + $d{pc3000}[1],
+		$d{pc3000}[1]);
+    my @error = ($d{pc850}[2] + $d{pc600}[2] + $d{pc2000}[2] + $d{pc3000}[2],
+		 $d{pc3000}[2]);
+    $data[0] = $data[0] + $error[0]/2;
+    $data[1] = $data[1] + $error[1]/2;
+    if ($error[0] > $num[0]*$TOLERANCE_ALL || $error[1] > $num[1]*$TOLERANCE_PC3000) {
+	#print STDERR "ERROR $time: $error\n";
+	@data = ('NaN', 'NaN');
+    }
+    use warnings;
+    
+    my $combine = sub {
+	my ($t) = (@_);
+	my $frac = ($t - $prev_time)/$interval;
+	if ($prev_data[0] != $prev_data[0]) { # ie NaN
+	    $error_frac += $frac;
+	} else {
+	    $total_so_far[0] += $prev_data[0] * $frac;
+	    $total_so_far[1] += $prev_data[1] * $frac;
+            }
+    };
+    
+    while ($time >= $next_cutoff) {
+	&$combine($next_cutoff);
+	my @free = @total_so_far;
+	if ($error_frac > $TOLERANCE_INTERVAL) {
+	    $free[0] = 'NaN';
+	    $free[1] = 'Nan';
+	} else {
+	    $free[0] /= (1 - $error_frac);
+	    $free[1] /= (1 - $error_frac);
+	}
+	my @alloc = ($num[0] - $free[0], $num[1] - $free[1]);
+	my $dtime = $next_cutoff - $interval;
+	printf O ("%d %.1f %.1f %.1f %.1f\n", $dtime, @free, @alloc) if $dtime >= $start;
+	$error_frac = 0;
+	@total_so_far = (0,0);
+	$prev_time = $next_cutoff;
+	$next_cutoff += $interval;
+	
+    }
+    &$combine($time);
+    
+    $prev_time = $time;
+    @prev_data = @data;
+}
+
+
