@@ -388,6 +388,10 @@ sub SendAuditMail($)
 	else {
 	    $TO    = $TBOPS;
 	}
+	if (defined($AUDIT_INFO{'cc'})) {
+	    $HDRS .= "\n";
+	    $HDRS .= "CC: " . join(', ', @{ $AUDIT_INFO{'cc'} });
+	}
 
 	# Leave logfile if sendmail fails. 
 	if (SENDMAIL($TO, $subject, $body, $FROM, $HDRS, @FILES)) {
