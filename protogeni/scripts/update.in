@@ -49,6 +49,7 @@ use lib "@prefix@/lib";
 use libtestbed;
 use libdb qw(TBSetSiteVar TBSiteVarExists TBGetSiteVar);
 use GeniDB;
+use GeniCertificate;	  
 
 if ($UID != 0) {
     fatal("Must be root to run this script\n");
