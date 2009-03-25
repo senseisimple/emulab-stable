@@ -163,6 +163,7 @@ sub new($$$;$) {
 	return undef;
 
     }
+    $self->{DESCR} = $test_case;
 
     $self->readifIndex();
 
@@ -500,7 +501,7 @@ sub createVlan($$$) {
     my $self = shift;
     my $vlan_id = shift;
     my $vlan_number = shift;
-    my $id = $self->{NAME} . ":findVlan";
+    my $id = $self->{NAME} . ":createVlan";
 
     if (!defined($vlan_number)) {
 	warn "$id called without supplying vlan_number";
@@ -1407,7 +1408,13 @@ sub readifIndex($) {
     $self->debug($self->{NAME} . "readifIndex:\n",2);
 
     if (getDeviceType($self->{NAME}) =~ /^nortel5/) {
-	($oidbits, $oidshift) = (63, 6);
+	$self->{DESCR} =~ /SW:v(\d+)\./;
+	my $version = $1;
+	if ($version && ($version > 5)) {
+	    ($oidbits, $oidshift) = (127, 7);
+	} else {  
+	    ($oidbits, $oidshift) = (63, 6);
+	}
     }
     my ($rows) = snmpitBulkwalkFatal($self->{SESS}, ["rcPortIndex"]);
     foreach my $rowref (@$rows) {
