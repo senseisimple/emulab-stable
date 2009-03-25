@@ -31,6 +31,8 @@ use libtestbed;
 
 chdir "/usr/testbed/data/node_usage/data";
 
+$fresh = 1 unless -e "gather.state.1" && "gather.state.2";
+
 my %node_type;
 my %node_class;
 
@@ -68,7 +70,7 @@ if ($prep) {
     local %last_trans;
     local %node_state;
 
-    if (!$fresh && -e "gather.state.1") {
+    if (!$fresh) {
 	do "gather.state.1";
     }
     
@@ -111,7 +113,7 @@ if ($results) {
     local $prev = 0;
     local $prev_line = '';
     
-    if ($fresh || !-e "gather.state.2") {
+    if ($fresh) {
 	unlink "node_usage.raw";
     } else {
 	do "gather.state.2";
