@@ -68,6 +68,10 @@ def Lookup( node, name ):
 
     if len( cnodes ) != 1:
         print >> sys.stderr, sys.argv[ 0 ] + ": invalid credential\n"
+        if debug:
+            print >> sys.stderr, "(Element \"" + name + "\" was found",
+            print >> sys.stderr, str( len( cnodes ) ) + " times (expected once)"
+            
         sys.exit( 1 )
     
     return cnodes[ 0 ]
@@ -184,7 +188,8 @@ for n in old.childNodes:
             clone = n.cloneNode( True )
             c.appendChild( clone )
             for child in clone.childNodes:
-                if Lookup( child, "can_delegate" ).firstChild.nodeValue == "0":
+                if child.nodeName in ( "privilege", "capability" ) and \
+                    Lookup( child, "can_delegate" ).firstChild.nodeValue == "0":
                     # a privilege which cannot be delegated: delete it
                     # from the clone
                     clone.removeChild( child )
