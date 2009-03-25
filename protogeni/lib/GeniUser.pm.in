@@ -211,7 +211,7 @@ sub Create($$$$;$)
 	$idx = TBGetUniqueIndex('next_geniuser', 1);
     }
     else {
-	my $idx = User->NextIDX();
+	$idx = User->NextIDX();
     }	
 
     if (!defined($authority)) {
