@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 #
-# EMULAB-COPYRIGHT
+# GENIPUBLIC-COPYRIGHT
 # Copyright (c) 2008-2009 University of Utah and the Flux Group.
 # All rights reserved.
 # 
@@ -117,8 +117,11 @@ if rval:
     Fatal("Could not get a list of components from the ClearingHouse")
     pass
 components = response["value"];
-url1 = components[0]["url"]
-url2 = components[1]["url"]
+#url1 = components[0]["url"]
+#url2 = components[1]["url"]
+
+#url1 = "https://myboss.myelab.testbed.emulab.net/protogeni/xmlrpc/cm"
+#url2 = "https://www.emulab.net/protogeni/stoller/xmlrpc/cm"
 
 #
 # Get a ticket for a node on a CM.
@@ -147,13 +150,15 @@ ticket_element = findElement("ticket", ticket1)
 node_element   = findElement("node", str(ticket_element.string))
 uuid_element   = findElement("uuid", str(node_element.string))
 node1_uuid     = uuid_element.value
+uuid_element   = findElement("sliver_uuid", str(node_element.string))
+node1_sliveruuid = uuid_element.value
 
 #
 # Get a ticket for a node on another CM.
 #
 rspec2 = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
         " <node uuid=\"*\" " +\
-        "       nickname=\"geni1\" "+\
+        "       nickname=\"geni2\" "+\
         "       virtualization_type=\"emulab-vnode\"> " +\
         " </node>" +\
         "</rspec>"
@@ -175,6 +180,8 @@ ticket_element = findElement("ticket", ticket2)
 node_element   = findElement("node", str(ticket_element.string))
 uuid_element   = findElement("uuid", str(node_element.string))
 node2_uuid     = uuid_element.value
+uuid_element   = findElement("sliver_uuid", str(node_element.string))
+node2_sliveruuid = uuid_element.value
 
 #
 # Create the slivers.
@@ -202,6 +209,7 @@ print "Created a sliver on CM2"
 #
 rspec1 = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
         " <node uuid=\"" + node1_uuid + "\" " +\
+        "       sliver_uuid=\"" + node1_sliveruuid + "\" " +\
         "       nickname=\"geni1\" "+\
         "       virtualization_type=\"emulab-vnode\"> " +\
         " </node>" +\
@@ -209,10 +217,12 @@ rspec1 = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
         "  <linkendpoints nickname=\"destination_interface\" " +\
         "            tunnel_ip=\"192.168.1.1\" " +\
         "            node_nickname=\"geni1\" " +\
+        "            sliver_uuid=\"" + node1_sliveruuid + "\" " +\
         "            node_uuid=\"" + node1_uuid + "\" /> " +\
         "  <linkendpoints nickname=\"source_interface\" " +\
         "            tunnel_ip=\"192.168.1.2\" " +\
         "            node_nickname=\"geni2\" " +\
+        "            sliver_uuid=\"" + node2_sliveruuid + "\" " +\
         "            node_uuid=\"" + node2_uuid + "\" /> " +\
         " </link> " +\
         "</rspec>"
@@ -231,6 +241,7 @@ print "Updated sliver on CM1 with tunnel stuff"
 #
 rspec2 = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
         " <node uuid=\"" + node2_uuid + "\" " +\
+        "       sliver_uuid=\"" + node2_sliveruuid + "\" " +\
         "       nickname=\"geni2\" "+\
         "       virtualization_type=\"emulab-vnode\"> " +\
         " </node>" +\
@@ -238,10 +249,12 @@ rspec2 = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
         "  <linkendpoints nickname=\"destination_interface\" " +\
         "            tunnel_ip=\"192.168.1.1\" " +\
         "            node_nickname=\"geni1\" " +\
+        "            sliver_uuid=\"" + node1_sliveruuid + "\" " +\
         "            node_uuid=\"" + node1_uuid + "\" /> " +\
         "  <linkendpoints nickname=\"source_interface\" " +\
         "            tunnel_ip=\"192.168.1.2\" " +\
         "            node_nickname=\"geni2\" " +\
+        "            sliver_uuid=\"" + node2_sliveruuid + "\" " +\
         "            node_uuid=\"" + node2_uuid + "\" /> " +\
         " </link> " +\
         "</rspec>"
