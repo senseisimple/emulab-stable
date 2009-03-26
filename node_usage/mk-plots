@@ -44,7 +44,7 @@ sub plot ( $@ ) {
     print F "     'node_usage-$what.dat' using 1:5 title 'pc3000s' with lines lw $lw\n\n";
     close F;
 
-    system("gnuplot node_usage-$what.gpl");
+    system("/usr/local/bin/gnuplot node_usage-$what.gpl");
 }
 
 plot("hourly_last2weeks",timefmt=>'%Y-%m-%d_%H:$M', format_x=>'%a\n%m/%d');
