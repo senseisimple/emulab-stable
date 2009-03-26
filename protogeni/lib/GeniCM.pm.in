@@ -133,6 +133,8 @@ sub Resolve($)
 		     "uuid"         => $node->uuid(),
 		     "role"	    => $node->role(),
 		     "hostname"     => $node->node_id() . ".${OURDOMAIN}",
+		     "physctrl"     => 
+			 Interface->LookupControl( $node->phys_nodeid() )->IP(),
 		   };
 
 	#

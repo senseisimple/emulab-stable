@@ -137,10 +137,7 @@ for cm in response[ "value" ]:
                     params[ "uuid" ] = node
                     rval, response = do_method( None, "Resolve", params,
                                                 cm[ "url" ] )
-                    for interface in response[ "value" ][ "interfaces" ]:
-                        if interface[ "role" ] == "ctrl":
-                            Say( interface[ "IP" ] )
-                            break
+                    Say( response[ "value" ][ "physctrl" ] )
             else:
                 Say( NOTREADY )
 
