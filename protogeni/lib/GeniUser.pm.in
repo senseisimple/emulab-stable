@@ -26,6 +26,7 @@ use vars qw();
 BEGIN { 
     if (! defined($main::GENI_ISCLRHOUSE)) {
 	require User;
+	require emdb;
     }
 }
 
@@ -445,6 +446,32 @@ sub BindToSlice($$)
 	if (!defined($emulab_user)) {
 	    print STDERR "Could not create nonlocal user for $self\n";
 	    return -1;
+	}
+    }
+    else {
+	my @sshkeys = ();
+	$self->GetSSHKeys(\@sshkeys);
+	if (0) {
+	    $emulab_user->ModifyKeys(\@sshkeys);
+	}
+	elsif (!$emulab_user->shadow()) {
+	    my $idx = $emulab_user->idx();
+	    my $uid = $emulab_user->uid();
+	    
+	    emdb::DBQueryWarn("delete from user_pubkeys where uid_idx='$idx'")
+		or return -1;
+    
+	    if (@sshkeys) {
+		foreach my $sshkey (@sshkeys) {
+		    my $safe_sshkey = DBQuoteSpecial($sshkey);
+
+		    emdb::DBQueryWarn("insert into user_pubkeys set ".
+				      "  uid='$uid', uid_idx='$idx', ".
+				      "  idx=NULL, stamp=now(), ".
+				      "pubkey=$safe_sshkey")
+			or return -1;
+		}
+	    }
 	}
     }
     my $experiment = $slice->GetExperiment();
