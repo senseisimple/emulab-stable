@@ -36,6 +36,7 @@ package
     {
       if (cm.getTicket(cmIndex) == null)
       {
+        nodes.changeState(cmIndex, ActiveNodes.PLANNED, ActiveNodes.CREATED);
         opName = "Getting Ticket";
         op.reset(Geni.getTicket);
         op.addField("credential", credential.slice);
@@ -68,21 +69,26 @@ package
         }
         else
         {
-          nodes.changeState(cmIndex, ActiveNodes.CREATED);
+          nodes.commitState(cmIndex);
           credential.slivers[cmIndex] = response.value;
           cm.setTicket(cmIndex, null);
         }
       }
       else
       {
-        nodes.changeState(cmIndex, ActiveNodes.FAILED);
+        if (cm.getTicket(cmIndex) != null)
+        {
+          // TODO: DeleteTicket
+        }
+        nodes.revertState(cmIndex);
       }
       return result;
     }
 
     override public function fail() : void
     {
-      nodes.changeState(cmIndex, ActiveNodes.FAILED);
+      // TODO: DeleteTicket
+      nodes.revertState(cmIndex);
     }
 
     var cmIndex : int;

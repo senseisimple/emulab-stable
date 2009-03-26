@@ -49,7 +49,9 @@ package
       renumber(newNumber);
 
       links = new Array();
-      changeState(cmIndex, ActiveNodes.PLANNED);
+      oldState = ActiveNodes.PLANNED;
+      newState = ActiveNodes.PLANNED;
+      updateState();
     }
 
     public function cleanup() : void
@@ -140,14 +142,49 @@ package
       return cmIndex;
     }
 
-    public function changeState(index : int, newState : int) : void
+    public function changeState(index : int, state : int) : void
     {
       if (index == cmIndex)
       {
-        clip.node.nameField.backgroundColor = stateColor[newState];
-        state = newState;
+        newState = state;
+        updateState();
       }
     }
+
+    public function commitState(index : int) : void
+    {
+      if (index == cmIndex)
+      {
+        oldState = newState;
+        updateState();
+      }
+    }
+
+    public function revertState(index : int) : void
+    {
+      if (index == cmIndex)
+      {
+        newState = oldState;
+        updateState();
+      }
+    }
+
+    public function calculateState() : int
+    {
+      var state : int = newState;
+      if (newState != oldState)
+      {
+        state = ActiveNodes.PENDING;
+      }
+      return state;
+    }
+
+    public function updateState() : void
+    {
+      var state : int = calculateState();
+      clip.node.nameField.backgroundColor = stateColor[state];
+    }
+
 
     public function getXml(targetIndex : int) : XML
     {
@@ -165,11 +202,13 @@ package
 
     public function isState(index : int, exemplar : int) : Boolean
     {
+      var state : int = calculateState();
       return index == cmIndex && state == exemplar;
     }
 
     public function getStatusText() : String
     {
+      var state : int = calculateState();
       var result : String = "";
       result += "<font color=\"#7777ff\">Name:</font> " + name + "\n";
       result += "<font color=\"#7777ff\">UUID:</font> " + id + "\n";
@@ -179,6 +218,11 @@ package
       {
         result += "<font color=\"#7777ff\">Status:</font> "
           + ActiveNodes.statusText[state];
+        if (state == ActiveNodes.PENDING)
+        {
+          result += ": " + ActiveNodes.statusText[oldState] + " -> "
+            + ActiveNodes.statusText[newState];
+        }
       }
       return result;
     }
@@ -192,7 +236,8 @@ package
     var links : Array;
     var mouseDownNode : Function;
     var mouseDownLink : Function;
-    var state : int;
+    var oldState : int;
+    var newState : int;
 
     static var virtType = "emulab-vnode";
 
@@ -203,9 +248,9 @@ package
     public static var CENTER_Y : int = Math.floor(HEIGHT/2);
 
     static var stateColor = new Array(0xaaaaff,
-                                      0xaaaaaa,
                                       0xaaffaa,
                                       0xaaffff,
-                                      0xffaaaa);
+                                      0xaaaaaa);
+//                                      0xffaaaa);
   }
 }

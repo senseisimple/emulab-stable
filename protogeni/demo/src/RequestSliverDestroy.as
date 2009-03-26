@@ -34,6 +34,8 @@ package
     {
       // TODO: Check to make sure that credential.slivers[cmIndex]
       // exists and perform a no-op if it doesn't.
+      nodes.changeState(cmIndex, ActiveNodes.CREATED, ActiveNodes.PLANNED);
+      nodes.changeState(cmIndex, ActiveNodes.BOOTED, ActiveNodes.PLANNED);
       opName = "Deleting Sliver";
       op.reset(Geni.deleteSliver);
       op.addField("credential", credential.slivers[cmIndex]);
@@ -47,11 +49,11 @@ package
     {
       if (code == 0)
       {
-        nodes.changeState(cmIndex, ActiveNodes.PLANNED);
+        nodes.commitState(cmIndex);
       }
       else
       {
-        nodes.changeState(cmIndex, ActiveNodes.FAILED);
+        nodes.revertState(cmIndex);
       }
       credential.slivers[cmIndex] = null;
       return null;

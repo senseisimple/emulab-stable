@@ -32,6 +32,7 @@ package
 
     override public function start(credential : Credential) : Operation
     {
+      nodes.changeState(cmIndex, ActiveNodes.CREATED, ActiveNodes.BOOTED);
       opName = "Booting Sliver";
       op.reset(Geni.startSliver);
       op.addField("credential", credential.slivers[cmIndex]);
@@ -45,11 +46,11 @@ package
     {
       if (code == 0)
       {
-        nodes.changeState(cmIndex, ActiveNodes.BOOTED);
+        nodes.commitState(cmIndex);
       }
       else
       {
-        nodes.changeState(cmIndex, ActiveNodes.FAILED);
+        nodes.revertState(cmIndex);
       }
       return null;
     }

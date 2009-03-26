@@ -104,7 +104,7 @@ package
           if (newRequest != null)
           {
             queue.push(newRequest);
-            nodes.changeState(i, ActiveNodes.PENDING);
+//            nodes.changeState(i, ActiveNodes.PENDING);
             if (! working)
             {
               start();

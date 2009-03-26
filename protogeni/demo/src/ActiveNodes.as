@@ -316,14 +316,36 @@ package
       return result;
     }
 
-    public function changeState(cmIndex : int, newState : int) : void
+    public function changeState(cmIndex : int, oldState : int,
+                                newState : int) : void
     {
       var i : int = 0;
       for (; i < nodes.length; ++i)
       {
-        nodes[i].changeState(cmIndex, newState);
+        if (nodes[i].calculateState() == oldState)
+        {
+          nodes[i].changeState(cmIndex, newState);
+        }
       }
       updateSelectText();
+    }
+
+    public function revertState(cmIndex : int) : void
+    {
+      var i : int = 0;
+      for (; i < nodes.length; ++i)
+      {
+        nodes[i].revertState(cmIndex);
+      }
+    }
+
+    public function commitState(cmIndex : int) : void
+    {
+      var i : int = 0;
+      for (; i < nodes.length; ++i)
+      {
+        nodes[i].commitState(cmIndex);
+      }
     }
 
     public function existsState(cmIndex : int, newState : int) : Boolean
@@ -354,15 +376,13 @@ package
     static var NO_SELECTION : int = -1;
 
     public static var PLANNED : int = 0;
-    public static var PENDING : int = 1;
-    public static var CREATED : int = 2;
-    public static var BOOTED : int = 3;
-    public static var FAILED : int = 4;
+    public static var CREATED : int = 1;
+    public static var BOOTED : int = 2;
+    public static var PENDING : int = 3;
 
     public static var statusText = new Array("Planned",
-                                             "Pending",
                                              "Created",
                                              "Booted",
-                                             "Failed");
+                                             "Pending");
   }
 }
