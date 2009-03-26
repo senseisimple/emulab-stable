@@ -8,6 +8,7 @@ use Data::Dumper;
 use MIME::Base64;
 
 our $XMLRPC_SERVER    = "https://boss.emulab.net:3069/usr/testbed";
+our $OPS_SERVER       = "users.emulab.net";
 our $XMLRPC_VERSION   = "0.1";
 our $SSL_CLIENT_CERT  = glob("~/.ssl/emulab.cert");
 our $SSL_CLIENT_KEY   = glob("~/.ssl/emulabkeyout.pem");

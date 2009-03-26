@@ -35,6 +35,10 @@ sub waitforswapped {
   $self->augment_func_code( 'statewait', 'state' => 'swapped' )
      && die sprintf("wait for swapin %s failed", $self->eid);
 }
+
+sub startexp_ns { batchexp_ns(@_, 'batch' => 0); }
+sub startexp_ns_wait { batchexp_ns_wait(@_, 'batch' => 0); }
+
 sub batchexp_ns_wait { 
   my $self = shift;
   $self->batchexp_ns(@_);
@@ -61,7 +65,7 @@ sub gen_expinfo_funcs {
   my ($package) = caller();
   for my $funcname (qw(mapping linkinfo shaping) ) {
     my $sub = sub {
-      shift->augment_func('expinfo', 'show' => $funcname );
+      shift->augment_func_output('expinfo', 'show' => $funcname );
     };
     inject_sub($package . '::' . $funcname, $sub);
   }

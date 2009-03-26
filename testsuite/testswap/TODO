@@ -1,7 +1,8 @@
 test groupings
 linkinfo
+linktest
 event system
-tests
+convert more old tests
 
 THINKING ABOUT IT
   Test::Class
@@ -11,4 +12,4 @@ MOSTLY DONE
 
 LATER
   Client.pm duplicate code elimination - Maybe this would make the code too unreadable
-  Work on TestSuite::Experiment::Macros
+  TestSuite::Experiment::Macros should be a monadic language like JQuery

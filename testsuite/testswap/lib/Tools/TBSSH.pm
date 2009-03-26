@@ -25,11 +25,19 @@ sub path_to_last_part {
   }
 }
 
-
+sub sshtty {
+  ssh(@_, use_tty => 1);
+}
+sub ssh {
+  my ($host, $user, @options) = @_;
+  my $ssh = Net::SSH::Perl->new($host, protocol => "2", options => [ "ForwardAgent yes" ], @options);
+  $ssh->login($user);
+  return $ssh
+}
 sub sshhostname {
   my ($host, $user) = @_;
-  my $ssh = Net::SSH::Perl->new($host, protocol => "2", options => [ "ForwardAgent yes" ]);
-  $ssh->login($user);
+  
+  my $ssh = ssh($host, $user);
   print [$ssh->cmd('uname -a')]->[0];
   return $ssh
 }
@@ -51,8 +59,15 @@ sub pulldirastar {
 }
 
 package Net::SSH::Perl::SSH2;
-use strict;
+use SemiModern::Perl;
 use Net::SSH::Perl::Constants qw( :protocol :msg2 CHAN_INPUT_CLOSED CHAN_INPUT_WAIT_DRAIN );
+
+sub cmdcatout {
+  my $ssh = shift;
+  my @results = $ssh->cmd(@_);
+  say $results[1];
+  say "DONE ttycmdcatout";
+}
 
 sub cmd_debug {
     my $ssh = shift;

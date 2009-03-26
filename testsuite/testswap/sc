@@ -4,10 +4,7 @@ use SemiModern::Perl;
 use TestBed::TestSuite::Experiment::Macros;
 use Data::Dumper;
 use Tools::TBSSH;
-
-sub listexps {
-  output(list_full)
-}
+use TestBed::Wrap::tevc;
 
 my $ns = <<'NSEND';
 source tb_compat.tcl
@@ -18,28 +15,29 @@ set node1 [$ns node]
 set node2 [$ns node]
 
 set lan1 [$ns make-lan "$node1 $node2" 100Mb 0ms]
+set link1 [$ns duplex-link $node1 $node2 100Mb 50ms DropTail]
 $ns run
 NSEND
 
-sub output {
-  my ($h) = @_;
-  while(my ($pk, $v) = each %$h) {
-    while(my ($gk, $v) = each %$v) {
-      for my $e (@$v) {
-        my $eid;
-        if ( exists $e->{'name'} )  { $eid = sprintf("%s %s", $e->{'name'}, $e->{'state'});}
-        else { $eid = $e; }
-        say "$pk :: $gk :: $eid";
-      }
-    }
-  }
+sub usage {
+say <<"END"
+./sc
+     start eid
+     end   eid
+     ping  eid
+     ni    eid  // nodeinfo
+     li    eid  // linkinfo
+END
 }
+
 my $pid = 'tbres';
+
 if (@ARGV) {
   $_ = $ARGV[0];
   my $eid = $ARGV[1];
   my $e = e($pid, $eid);
-  if (/end/) { $e->end(); }
+  if (/--help/) { usage; } 
+  elsif (/end/) { $e->end(); }
   elsif ( /ping/ ) {
     my $nodes = $e->nodeinfo();
     for (@$nodes) {
@@ -48,10 +46,14 @@ if (@ARGV) {
      ping($_);
     }
   }
-  elsif (/start/) { $e->batchexp_ns_wait($ns); }
+  elsif (/start/) { $e->startexp_ns_wait($ns); }
+  elsif (/ni/) { say Dumper($e->nodeinfo) ;}
+  elsif (/li/) { say Dumper($e->linkinfo) ;}
+  elsif (/tevc/) { tevc("-e $pid/$eid now link1 down"); }
 }
 else {
-  listexps();
+  usage;
+  plistexps;
 }
 
 # vim: ft=perl:
