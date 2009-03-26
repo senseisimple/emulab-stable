@@ -30,7 +30,33 @@ from M2Crypto import X509
 
 ACCEPTSLICENAME=1
 
+def Usage():
+    print "usage: " + sys.argv[ 0 ] + " [option...] \
+[component-manager-1 component-manager-2]"
+    print """Options:
+    -c file, --credentials=file         read self-credentials from file
+                                            [default: query from SA]
+    -d, --debug                         be verbose about XML methods invoked
+    -f file, --certificate=file         read SSL certificate from file
+                                            [default: ~/.ssl/encrypted.pem]
+    -h, --help                          show options and usage
+    -n name, --slicename=name           specify human-readable name of slice
+                                            [default: mytestslice]
+    -p file, --passphrase=file          read passphrase from file
+                                            [default: ~/.ssl/password]
+    -r file, --read-commands=file       specify additional configuration file
+    -s file, --slicecredentials=file    read slice credentials from file
+                                            [default: query from SA]"""
+
 execfile( "test-common.py" )
+
+if len( args ) == 2:
+    managers = ( args[ 0 ], args[ 1 ] )
+elif len( args ):
+    Usage()
+    sys.exit( 1 )
+else:
+    managers = None
 
 class findElement(ContentHandler):
     name       = None
@@ -117,11 +143,20 @@ if rval:
     Fatal("Could not get a list of components from the ClearingHouse")
     pass
 components = response["value"];
-#url1 = components[0]["url"]
-#url2 = components[1]["url"]
 
-#url1 = "https://myboss.myelab.testbed.emulab.net/protogeni/xmlrpc/cm"
-#url2 = "https://www.emulab.net/protogeni/stoller/xmlrpc/cm"
+if managers:
+    def FindCM( name, cmlist ):
+        for cm in cmlist:
+            hrn = cm[ "hrn" ]
+            if hrn == name or hrn == name + ".cm":
+                return cm[ "url" ]
+        Fatal( "Could not find component manager " + name )
+
+    url1 = FindCM( managers[ 0 ], components )
+    url2 = FindCM( managers[ 1 ], components )
+else:
+    url1 = components[0]["url"]
+    url2 = components[1]["url"]
 
 #
 # Get a ticket for a node on a CM.
