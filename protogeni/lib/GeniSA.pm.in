@@ -685,7 +685,7 @@ sub GetKeys($)
 	print STDERR "Could not get keys for $this_user\n";
 	return GeniResponse->Create(GENIRESPONSE_ERROR);	
     }
-    return GeniResponse->Create(GENIRESPONSE_SUCCESS, @keys);
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS, \@keys);
 }
 
 #
