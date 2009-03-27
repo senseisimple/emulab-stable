@@ -46,7 +46,7 @@ if debug: print str(response["value"])
 # Ask each manager for its list.
 #
 for manager in response["value"]:
-    print manager["url"]
+    print manager["hrn"] + ": " + manager["url"]
 
     #
     # manager for resource list.
