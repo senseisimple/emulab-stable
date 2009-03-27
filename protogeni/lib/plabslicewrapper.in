@@ -27,7 +27,11 @@ $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 # Turn off line buffering on output
-$| = 1; 
+$| = 1;
+
+# Only where the plab stuff is installed.
+exit(0)
+    if (! -e $PLABSLICE);
 
 # Invoke as real root.
 $UID=0;
