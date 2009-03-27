@@ -137,7 +137,21 @@ for cm in response[ "value" ]:
                     params[ "uuid" ] = node
                     rval, response = do_method( None, "Resolve", params,
                                                 cm[ "url" ] )
-                    Say( response[ "value" ][ "physctrl" ] )
+                    if rval:
+                        print >> sys.stderr, "Could not resolve node " + \
+                            node
+                        os._exit( 1 )
+                    if "physctrl" in response[ "value" ]:
+                        Say( response[ "value" ][ "physctrl" ] )
+                    elif "interfaces" in response[ "value" ]:
+                        for interface in response[ "value" ][ "interfaces" ]:
+                            if interface[ "role" ] == "ctrl":
+                                Say( interface[ "IP" ] )
+                                break
+                    else:
+                        print >> sys.stderr, "No address available for " + \
+                            node
+                        os._exit( 1 )
             else:
                 Say( NOTREADY )
 
