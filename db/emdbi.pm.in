@@ -18,9 +18,6 @@ my $TB		= "@prefix@";
 my $SCRIPTNAME  = "Unknown";
 my $TBOPS       = "@TBOPSEMAIL@";
 
-# Locals
-my $DBErrorString = "";		# Record last DB error string.
-
 # Remember the DBname for subsequent reconnects.
 my @DBNAMES       = ();
 
@@ -81,14 +78,15 @@ else {
 #
 my @DB;
 
-use vars qw($DBQUERY_MAXTRIES $DBCONN_MAXTRIES
+use vars qw($DBQUERY_MAXTRIES $DBCONN_MAXTRIES $DBErrorString
 	    $DBCONN_EXITONERR $DBQUERY_RECONNECT $DBQUERY_DEBUG);
 $DBQUERY_MAXTRIES  = 1;
 $DBQUERY_RECONNECT = 1;
 $DBCONN_MAXTRIES   = 5;
 $DBCONN_EXITONERR  = 1;
 $DBQUERY_DEBUG     = 0;
-@EXPORT            = qw($DBQUERY_MAXTRIES $DBQUERY_RECONNECT
+$DBErrorString     = "";
+@EXPORT            = qw($DBQUERY_MAXTRIES $DBQUERY_RECONNECT $DBErrorString
 			$DBCONN_EXITONERR $DBCONN_MAXTRIES $DBQUERY_DEBUG);
 
 sub TBDBConnect($$)
