@@ -880,7 +880,9 @@ sub ModifySliver($$$$$$)
 	    }
 	    elsif (ref($s) eq "GeniAggregate::Link" ||
 		   ref($s) eq "GeniAggregate::Tunnel") {
-		$linklist{$s->uuid()} = $s;
+		# XXX See the constructor in GeniAggregate.
+		my ($linkname) = ($s->hrn() =~ /\.([-\w]*)$/);
+		$linklist{$linkname} = $s;
 	    }
 	    else {
 		return GeniResponse->Create(GENIRESPONSE_UNSUPPORTED, undef,
@@ -1064,14 +1066,13 @@ sub ModifySliver($$$$$$)
     # We need to tear down links that are no longer in the rspec or
     # have changed.
     #
-    foreach my $s (values(%linklist)) {
-	# XXX See the constructor in GeniAggregate.
-	my ($linkname) = ($s->hrn() =~ /\.([-\w]*)$/);
-	
+    foreach my $linkname (keys(%linklist)) {
 	if (!exists($rspec->{'link'}) ||
 	    !exists($rspec->{'link'}->{$linkname})) {
+	    my $s = $linklist{$linkname};
 	    $s->UnProvision();
 	    $s->Delete(0);
+	    delete($linklist{$linkname});
 	    next;
 	}
     }
@@ -1149,6 +1150,10 @@ sub ModifySliver($$$$$$)
 	    goto bad;
 	}
 	my $linkref = $rspec->{'link'}->{$linkname};
+
+	# Do not worry about modifying a link that is setup. Later.
+	next
+	    if (grep {$_ eq $linkname} keys(%linklist));
 
 	#
 	# XXX Tunnels are a total kludge right now ...
