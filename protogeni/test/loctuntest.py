@@ -128,6 +128,7 @@ rspec = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
         "            tunnel_ip=\"192.168.1.2\" " +\
         "            node_nickname=\"geni2\" " +\
         "            node_uuid=\"*\" /> " +\
+        " </link>" +\
         "</rspec>"
 
 params = {}
