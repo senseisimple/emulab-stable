@@ -915,6 +915,11 @@ sub Create($$$$$$)
 	    $ctrlip1 = $ref->{'IP'}
 	        if ($ref->{'role'} eq "ctrl");
 	}
+	if (!defined($ctrlip1)) {
+	    print STDERR "Could get control IP for ".
+		"$node1ref->{'node_uuid'} at $component\n";
+	    goto bad;
+	}
     }
     if (defined($node2sliver)) {
 	my $node2 = Node->Lookup($node2ref->{'node_uuid'});
@@ -970,6 +975,11 @@ sub Create($$$$$$)
 	foreach my $ref (@{ $blob->{'interfaces'} }) {
 	    $ctrlip2 = $ref->{'IP'}
 	        if ($ref->{'role'} eq "ctrl");
+	}
+	if (!defined($ctrlip2)) {
+	    print STDERR "Could get control IP for ".
+		"$node2ref->{'node_uuid'} at $component\n";
+	    goto bad;
 	}
     }
     # print STDERR "$ip1, $ip2, $ctrlip1, $ctrlip2\n";
