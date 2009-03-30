@@ -16,6 +16,7 @@
 
 import getopt
 import os
+import re
 import sys
 import xmlrpclib
 from M2Crypto import X509
@@ -162,8 +163,20 @@ os.close( pw )
 p = os.fdopen( pr, "r" )
 nodes = []
 for line in p:
-    if line.rstrip() == NOTREADY: Fatal( "Slice is not ready" )
-    nodes.append( line.rstrip() )
+    addr = line.rstrip()
+    if addr == NOTREADY: Fatal( "Slice is not ready" )
+    # Check for RFC 1918 private address space
+    m = re.match( r"([0-9]+)\.([0-9]+)\.[0-9]+\.[0-9]+", addr )
+    if not m:
+        print >> sys.stderr, "Warning: malformed address " + addr
+        continue
+    octet0 = m.group( 1 )
+    octet1 = m.group( 2 )
+    if ( octet0 == 10 ) or ( octet0 == 172 and 16 <= octet1 < 32 ) or \
+            ( octet0 == 192 and octet1 == 168 ):
+        # private address for control interface; silently ignore the node
+        continue
+    nodes.append( addr )
 p.close()
 
 #
@@ -212,8 +225,12 @@ for command in commands:
         elif header[ 0:3 ] == "BZh":
             remotecmd = "bzip2 -c -d | " + remotecmd
 
+        child = {}
         for node in nodes:
-            if not os.fork():
+            pid = os.fork()
+            if pid:
+                child[ pid ] = node
+            else:
                 infile = os.open( command[ 1 ], os.O_RDONLY )
                 os.dup2( infile, 0 )
                 devnull = os.open( "/dev/null", os.O_WRONLY )
@@ -226,7 +243,8 @@ for command in commands:
                           remotecmd )
                 os._exit( 1 )
         for node in nodes:
-            os.wait()
+            ( pid, status ) = os.wait()
+            print "  (finished on node " + child[ pid ] + ")"
     elif command[ 0 ] == "list":
         for node in nodes:
             print node
