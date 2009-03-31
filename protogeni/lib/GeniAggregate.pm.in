@@ -910,11 +910,9 @@ sub Create($$$$$$)
 	    goto bad;
 	}
 	$registry->Resolve($node1ref->{'node_uuid'}, "Node", \$blob);
+	$ctrlip1 = $blob->{'physctrl'}
+	    if (defined($blob) && exists($blob->{'physctrl'}));
 
-	foreach my $ref (@{ $blob->{'interfaces'} }) {
-	    $ctrlip1 = $ref->{'IP'}
-	        if ($ref->{'role'} eq "ctrl");
-	}
 	if (!defined($ctrlip1)) {
 	    print STDERR "Could get control IP for ".
 		"$node1ref->{'node_uuid'} at $component\n";
@@ -971,11 +969,9 @@ sub Create($$$$$$)
 	    goto bad;
 	}
 	$registry->Resolve($node2ref->{'node_uuid'}, "Node", \$blob);
+	$ctrlip2 = $blob->{'physctrl'}
+	    if (defined($blob) && exists($blob->{'physctrl'}));
 
-	foreach my $ref (@{ $blob->{'interfaces'} }) {
-	    $ctrlip2 = $ref->{'IP'}
-	        if ($ref->{'role'} eq "ctrl");
-	}
 	if (!defined($ctrlip2)) {
 	    print STDERR "Could get control IP for ".
 		"$node2ref->{'node_uuid'} at $component\n";
