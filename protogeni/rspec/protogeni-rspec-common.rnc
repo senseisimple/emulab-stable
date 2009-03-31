@@ -10,31 +10,36 @@
 
 include "../../assign/top.rnc" {
     NodeContents =
-    # The virtual id of an element may be human readable.
+    
+	# The virtual id of an element may be human readable.
 	# In an advertisement, the component_uuid provides a primary
 	# key which uniquely designates a node.
-	# In a request, the virtual_uuid is the primary key.
+	# In a request, the virtual_id is the primary key.
 	# The primary key must be globally unique.
 	# The primary key is used when identifying link inputs, for example.
-	attribute virtual_id { text }?,
-	# The mapping to components/slivers. Required for advertisements.
-	ComponentSpec?,
 
-        # Each node has exactly one virtualization technology, which we simply
-        # enumerate here
-        attribute virtualization_type { "raw" | "trellis-vserver" |
-        "planetlab-vserver" | "emulab-vnode" }?,
-        NodeSpec.NodeType,
+	attribute virtual_id { text }?,
+	
+	# Each node has exactly one virtualization technology, which we simply
+	# enumerate here
+	attribute virtualization_type { "raw" | "trellis-vserver" |
+	"planetlab-vserver" | "emulab-vnode" }?,
+    
+	# The mapping to components/slivers. Required for advertisements.
+	ComponentSpec?,    
+
+	NodeSpec.NodeType,
 
 	# Information about the physical location of the node.
 	LocationSpec?,
 
-        # Indicate whether or not this node is available - the idea is that a
-        # full dump of the static physical topology will not include this, but
-        # that we can later get updates that include only this attribute (and a
-        # UUID) Just binary for now - probably will include more things, such
-        # as a number of "free slots", later
-        element available { xsd:boolean }?,
+	# Indicate whether or not this node is available - the idea is that a
+	# full dump of the static physical topology will not include this, but
+	# that we can later get updates that include only this attribute (and a
+	# UUID) Just binary for now - probably will include more things, such
+	# as a number of "free slots", later
+	element available { xsd:boolean }?,
+	
 	InterfaceDecl*
 
     LinkContents =
@@ -42,23 +47,24 @@ include "../../assign/top.rnc" {
         attribute virtual_id { text }?,
 		attribute virtualization_type { "raw" | "trellis-vserver" |
         			"planetlab-vserver" | "emulab-vnode" }?,
-	# These will only be present in annotated rspecs
-	(SingleHopComponentSpec | MultiHopComponentSpec)?,
-        LinkEndPoints,
+	ComponentSpec?,
+	    LinkEndPoints,
         ## The characteristics (bandwidth, latency, loss) which affect traffic.
         LinkCharacteristics,
         ## Type of this link - we use a named pattern here (defined below), so
         ## that it can be overriden in the virtual topology schema, where you are
         ## only allowed to have one
-        LinkSpec.LinkType+
+        LinkSpec.LinkType+,
+		# These will only be present in annotated rspecs
+		(SingleHopComponentSpec | MultiHopComponentSpec)?
 
     InterfaceContents = 
 	# In an advertisement, the component_uuid is mandatory.
 	# In a request, the virtual_id is mandatory.
-		element virtual_node_id { text }?,
-		element virtual_interface_name { text }?,
-		element component_node_uuid { text }?,
-		element component_interface_name { text }?
+		attribute virtual_node_id { text }?,
+		attribute virtual_interface_name { text }?,
+		attribute component_node_uuid { text }?,
+		attribute component_interface_name { text }?
 }
 
 LocationSpec = element location {
@@ -89,12 +95,11 @@ ComponentSpec =
     # virtual_id requests and the actual slivers instantiated.
     attribute sliver_uuid { text }?
 
-SingleHopComponentSpec = element single_hop_link { element link {ComponentSpec, LinkEndPoints } }
+SingleHopComponentSpec = element single_hop_link { element link { ComponentSpec, LinkEndPoints } }
 
 MultiHopComponentSpec = element multi_hop_link {
-	element link { ComponentSpec, LinkEndPoints},
-    (element node { ComponentSpec },
-    	element link { ComponentSpec, LinkEndPoints})+
+	(element link { ComponentSpec, LinkEndPoints} 
+    	| element node { ComponentSpec })+
 }
 
 RSpec = element rspec {
