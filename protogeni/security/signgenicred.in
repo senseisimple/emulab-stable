@@ -264,8 +264,10 @@ $signatures_node->addChild($sigroot);
 # reference point. Must write this to a tmp file for xmlsec, and then
 # use xmlsec to add the signature. 
 #
+# Paranoia.
+unlink($tmpfile);
 open(TMP, ">$tmpfile") or
-    fatal("Could not open $tmpfile");
+    fatal("Could not open $tmpfile: $!");
 print TMP $doc->toString(1) . "\n";
 close(TMP);
 
