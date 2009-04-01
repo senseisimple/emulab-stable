@@ -210,6 +210,9 @@ sub _checklossrate($)
 {
     my ($token) = @_;
 
+    return 1
+	if ("$token" eq "0");
+
     # floating point, no exponent. Stole this out of the perl tutorial.
     if (! ($token =~ /^[+-]?(\d+\.\d+|\d+\.|\.\d+)([eE][+-]?\d+)?$/)) {
 	$DBFieldErrstr = "Improper floating number";
