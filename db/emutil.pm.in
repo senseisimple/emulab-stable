@@ -147,11 +147,17 @@ sub TBcheck_dbslot($$$;$)
 #	"$table/$column\n";
 
     #
-    # Functional checks not implemented yet.
+    # Functional checks partly implemented. Needs work.
     #
     if ($check_type eq "function") {
-	die("*** $0:\n" .
-	    "    Functional DB checks not implemented: $table/$column!\n");
+	if (defined(&$check)) {
+	    my $func = \&$check;
+	    return &$func($token);   
+	}
+	else {
+	    die("*** $0:\n" .
+		"    Functional DB checks not implemented: $table/$column!\n");
+	}
     }
 
     # Make sure the regex is anchored. Its a mistake not to be!
@@ -195,6 +201,33 @@ sub TBcheck_dbslot($$$;$)
 	    "    Unrecognized column_type $column_type\n");
     }
     return 0;
+}
+
+#
+# A helper function for checking lossrates. Bad place for this, I know.
+#
+sub _checklossrate($)
+{
+    my ($token) = @_;
+
+    # floating point, no exponent. Stole this out of the perl tutorial.
+    if (! ($token =~ /^[+-]?(\d+\.\d+|\d+\.|\.\d+)([eE][+-]?\d+)?$/)) {
+	$DBFieldErrstr = "Improper floating number";
+	return 0;
+    }
+    if ($token > 1.0) {
+	$DBFieldErrstr = "Too big; must be < 1.0";
+	return 0;
+    }
+    if ($token < 0.0) {
+	$DBFieldErrstr = "Too small; must be > 0.0";
+	return 0;
+    }
+    if ($token > 0.0 && $token < 0.000001) {
+	$DBFieldErrstr = "Too small; must be >= 0.000001";
+	return 0;
+    }
+    return 1;
 }
 
 #
