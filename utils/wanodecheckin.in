@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003-2007 University of Utah and the Flux Group.
+# Copyright (c) 2003-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -138,12 +138,14 @@ if (!$query_result->numrows) {
 }
 my ($node_id, $known_IP, $machine_type) = $query_result->fetchrow_array();
 
-if (!defined($known_IP) || $IP eq "") {
+$query_result = DBQueryWarn("SELECT n.node_id FROM nodes AS n LEFT ".
+			    "JOIN widearea_nodeinfo AS w ON n.node_id=w.node_id ".
+			    "WHERE w.node_id='$node_id'");
+if (! $query_result->numrows) {
     my $experiment = Experiment->Lookup($PID_HWDOWN, $EID_HWDOWN);
 
     #
-    # If the known_IP is not defined, this is the first time we have
-    # heard from the node. Create it.
+    # This is the first time we have heard from a partially-initialised node. Create it.
     #
     my $node = Node->Create($node_id, $experiment,
 			    {'type' => $machine_type,
