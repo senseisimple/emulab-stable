@@ -74,7 +74,7 @@ if (!defined($experiment)) {
 }
 my $vtop = libvtop->Create($experiment, $libvtop::VTOP_FLAGS_VERBOSE);
 if (!defined($vtop)) {
-    fatal("Could o create vtop structure for $experiment");
+    fatal("Could not create vtop structure for $experiment");
 }
 $vtop->CreateVtop();
 
