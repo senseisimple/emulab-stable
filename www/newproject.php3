@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -558,7 +558,7 @@ function SPITFORM($formfields, $returning, $errors)
     echo "<h4><blockquote><blockquote>
           <ol>
             <li> Please consult our
-                 <a href = '$WIKIDOCURL/Security' target='_blank'>
+                 <a href = '$WIKIDOCURL/SecReqs' target='_blank'>
                  security policies</a> for information
                  regarding passwords and email addresses.\n";
     if (! $returning) {
