@@ -957,7 +957,7 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 			strncpy(privkey, buf, sizeof(privkey));
 
 			if (debug) {
-				info("PRIVKEY %s\n", buf);
+				info("%s: PRIVKEY %s\n", reqp->nodeid, buf);
 			}
 			continue;
 		}
@@ -1285,7 +1285,7 @@ COMMAND_PROTOTYPE(dostatus)
 	 * Now check reserved table
 	 */
 	if (! reqp->allocated) {
-		info("STATUS: %s: FREE\n", reqp->nodeid);
+		info("%s: STATUS: FREE\n", reqp->nodeid);
 		strcpy(buf, "FREE\n");
 		client_writeback(sock, buf, strlen(buf), tcp);
 		return 0;
@@ -1296,7 +1296,7 @@ COMMAND_PROTOTYPE(dostatus)
 	client_writeback(sock, buf, strlen(buf), tcp);
 
 	if (verbose)
-		info("STATUS: %s: %s", reqp->nodeid, buf);
+		info("%s: STATUS: %s", reqp->nodeid, buf);
 	return 0;
 }
 
@@ -1341,7 +1341,7 @@ COMMAND_PROTOTYPE(doifconfig)
 	 * it is the same as pnodeid
 	 */
 	if (!res) {
-		error("IFCONFIG: %s: DB Error getting interfaces!\n",
+		error("%s: IFCONFIG: DB Error getting interfaces!\n",
 		      reqp->nodeid);
 		return 1;
 	}
@@ -1456,7 +1456,7 @@ COMMAND_PROTOTYPE(doifconfig)
 			client_writeback(sock, buf, strlen(buf), tcp);
 			num_interfaces++;
 			if (verbose)
-				info("IFCONFIG: %s", buf);
+				info("%s: IFCONFIG: %s", reqp->nodeid, buf);
 		}
 	skipit:
 		nrows--;
@@ -1477,7 +1477,7 @@ COMMAND_PROTOTYPE(doifconfig)
 				 clause);
 
 		if (!res) {
-			error("IFCONFIG: %s: "
+			error("%s: IFCONFIG: "
 			      "DB Error getting interface_settings!\n",
 			      reqp->nodeid);
 			return 1;
@@ -1491,7 +1491,7 @@ COMMAND_PROTOTYPE(doifconfig)
 				row[0], row[1], row[2]);
 			client_writeback(sock, buf, strlen(buf), tcp);
 			if (verbose)
-				info("IFCONFIG: %s", buf);
+				info("%s: IFCONFIG: %s", reqp->nodeid, buf);
 			nrows--;
 		}
 		mysql_free_result(res);
@@ -1528,7 +1528,7 @@ COMMAND_PROTOTYPE(doifconfig)
 				 "      v.type!='alias' and v.node_id='%s'",
 				 4, reqp->pnodeid);
 		if (!res) {
-			error("IFCONFIG: %s: "
+			error("%s: IFCONFIG: "
 			     "DB Error getting interfaces underlying veths!\n",
 			      reqp->nodeid);
 			return 1;
@@ -1554,7 +1554,7 @@ COMMAND_PROTOTYPE(doifconfig)
 
 			client_writeback(sock, buf, strlen(buf), tcp);
 			if (verbose)
-				info("IFCONFIG: %s", buf);
+				info("%s: IFCONFIG: %s", reqp->nodeid, buf);
 			nrows--;
 		}
 		mysql_free_result(res);
@@ -1574,7 +1574,7 @@ COMMAND_PROTOTYPE(doifconfig)
 				 "where d.node_id='%s'",
 				 8, reqp->pnodeid);
 		if (!res) {
-			error("IFCONFIG: %s: "
+			error("%s: IFCONFIG: "
 			    "DB Error getting interfaces underlying delays!\n",
 			      reqp->nodeid);
 			return 1;
@@ -1602,7 +1602,7 @@ COMMAND_PROTOTYPE(doifconfig)
 
 			client_writeback(sock, buf, strlen(buf), tcp);
 			if (verbose)
-				info("IFCONFIG: %s", buf);
+				info("%s: IFCONFIG: %s", reqp->nodeid, buf);
 			nrows--;
 		}
 		mysql_free_result(res);
@@ -1640,7 +1640,7 @@ COMMAND_PROTOTYPE(doifconfig)
 			 "      and %s",
 			 10, reqp->exptidx, reqp->pnodeid, buf);
 	if (!res) {
-		error("IFCONFIG: %s: DB Error getting veth interfaces!\n",
+		error("%s: IFCONFIG: DB Error getting veth interfaces!\n",
 		      reqp->nodeid);
 		return 1;
 	}
@@ -1648,7 +1648,7 @@ COMMAND_PROTOTYPE(doifconfig)
 		mysql_free_result(res);
 		/* XXX not sure why this is ever an error? */
 		if (!reqp->isplabdslice && num_interfaces == 0) {
-			error("IFCONFIG: %s: No interfaces!\n", reqp->nodeid);
+			error("%s: IFCONFIG: No interfaces!\n", reqp->nodeid);
 			return 1;
 		}
 		return 0;
@@ -1732,7 +1732,7 @@ COMMAND_PROTOTYPE(doifconfig)
 		OUTPUT(bufp, ebufp - bufp, "\n");
 		client_writeback(sock, buf, strlen(buf), tcp);
 		if (verbose)
-			info("IFCONFIG: %s", buf);
+			info("%s: IFCONFIG: %s", reqp->nodeid, buf);
 	}
 	mysql_free_result(res);
 
@@ -1897,7 +1897,7 @@ COMMAND_PROTOTYPE(doaccounts)
 		       "ADDGROUP NAME=%s GID=%d\n", row[0], gidint);
 		client_writeback(sock, buf, strlen(buf), tcp);
 		if (verbose)
-			info("ACCOUNTS: %s", buf);
+			info("%s: ACCOUNTS: %s", reqp->nodeid, buf);
 
 		nrows--;
 	}
@@ -3181,13 +3181,13 @@ COMMAND_PROTOTYPE(doready)
 	 */
 	if (mydb_update("update nodes set ready=1 "
 			"where node_id='%s'", reqp->nodeid)) {
-		error("READY: %s: DB Error setting ready bit!\n",
+		error("%s: READY: DB Error setting ready bit!\n",
 		      reqp->nodeid);
 		return 1;
 	}
 
 	if (verbose)
-		info("READY: %s: Node is reporting ready\n", reqp->nodeid);
+		info("%s: READY: Node is reporting ready\n", reqp->nodeid);
 
 	/*
 	 * Nothing is written back
@@ -4105,7 +4105,7 @@ COMMAND_PROTOTYPE(dostate)
 #endif /* EVENTSYS */
 	
 	/* Leave this logging on all the time for now. */
-	info("STATE: %s\n", newstate);
+	info("%s: STATE: %s\n", reqp->nodeid, newstate);
 	return 0;
 
 }
