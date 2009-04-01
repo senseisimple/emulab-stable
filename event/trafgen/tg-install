@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -21,14 +21,16 @@ if [ -n "$2" ]; then host=$2; else host=www.emulab.net ; fi
 if [ ! -d $1/tg2.0/src ]; then
     echo "Downloading tg2.0 source from $host to $1 ..."
     cd $1
-    $fetch http://$host/tg2.0.tar.gz
-    if [ $? -ne 0 ]; then
-         echo "Failed..."
-         echo "Downloading tg2.0 source from www.postel.org to $1 ..."
-         $fetch http://www.postel.org/tg/tg2.0.tar.gz || {
-	     echo "ERROR: tg-install: $fetch failed"
-	     exit 1
-	 }
+    if [ ! -f tg2.0.tar.gz ]; then
+      $fetch http://$host/tg2.0.tar.gz
+      if [ $? -ne 0 ]; then
+           echo "Failed..."
+           echo "Downloading tg2.0 source from www.postel.org to $1 ..."
+           $fetch http://www.postel.org/tg/tg2.0.tar.gz || {
+	       echo "ERROR: tg-install: $fetch failed"
+	       exit 1
+	   }
+      fi
     fi
     echo "Unpacking/patching tg2.0 source ..."
     tar xzof tg2.0.tar.gz || {

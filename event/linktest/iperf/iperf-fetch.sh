@@ -12,10 +12,12 @@ fi
 if [ ! -d iperf-2.0.2/src ]; then
     echo "Downloading iperf source from www.emulab.net to $1 ..."
     cd $1
-    $fetch http://www.emulab.net/downloads/iperf-2.0.2.tar.gz
-    if [ $? -ne 0 ]; then
-         echo "Failed..."
-	 exit 1
+    if [ ! -f iperf-2.0.2.tar.gz ]; then
+      $fetch http://www.emulab.net/downloads/iperf-2.0.2.tar.gz
+      if [ $? -ne 0 ]; then
+           echo "Failed..."
+	   exit 1
+      fi
     fi
     echo "Unpacking/patching iperf-2.0.2 source ..."
     tar xzof iperf-2.0.2.tar.gz || {

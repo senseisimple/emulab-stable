@@ -14,10 +14,12 @@ fi
 if [ ! -d rude-$version/src ]; then
     echo "Downloading rude source from www.emulab.net to $1 ..."
     cd $1
-    $fetch http://www.emulab.net/downloads/rude-$version.tar.gz
-    if [ $? -ne 0 ]; then
-         echo "Failed..."
-	 exit 1
+    if [ ! -f rude-$version.tar.gz ]; then
+      $fetch http://www.emulab.net/downloads/rude-$version.tar.gz
+      if [ $? -ne 0 ]; then
+           echo "Failed..."
+	   exit 1
+      fi
     fi
     echo "Unpacking/patching $rude-version source ..."
     tar xzof rude-$version.tar.gz || {
