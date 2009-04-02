@@ -1,0 +1,49 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Prototype of a request RSpec, to be used by ProtoGENI
+#
+
+include "protogeni-rspec-common.rnc"
+
+NodeContents &=
+  VirtualName &
+  ComponentName &
+  SliverName
+
+LinkContents &=
+  VirtualName &
+  LinkMapping &
+  SliverName
+
+InterfaceDecl &=
+  ComponentInterfaceDeclName &
+  VirtualName
+
+InterfaceRef &=
+  ComponentInterfaceRefName &
+  VirtualName
+
+RSpecContents &=
+  attribute type { "request" }
+
+# A request link is mapped to an arbitrary topology which represents
+# the virtual LAN/link which embodies it. Note that nodes do not
+# provide any additional information and can be derived from the
+# interface mapping.
+LinkMapping =
+  element component_hop { ComponentName, InterfaceMapping* }*
+
+# Each interface represents a particular physical interface. If that
+# interface is one of the link end points, it is also mapped to that
+# virtual interface name.
+InterfaceMapping = element interface {
+  ComponentInterfaceRefName &
+  VirtualName ?
+}
+
+start = RSpec

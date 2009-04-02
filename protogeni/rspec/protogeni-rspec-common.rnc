@@ -5,113 +5,89 @@
 #
 
 #
-# Simple prototype of an RSpec, to be used by ProtoGENI
+# Common definitions for advertisements, requests, and tickets
 #
 
 include "../../assign/top.rnc" {
-    NodeContents =
-    
-	# The virtual id of an element may be human readable.
-	# In an advertisement, the component_uuid provides a primary
-	# key which uniquely designates a node.
-	# In a request, the virtual_id is the primary key.
-	# The primary key must be globally unique.
-	# The primary key is used when identifying link inputs, for example.
+  NodeContents =
+    # Each node has exactly one virtualization technology, which we simply
+    # enumerate here
+    attribute virtualization_type { "raw" | "trellis-vserver" |
+      "planetlab-vserver" | "emulab-vnode" }? &
 
-	attribute virtual_id { text }?,
-	
-	# Each node has exactly one virtualization technology, which we simply
-	# enumerate here
-	attribute virtualization_type { "raw" | "trellis-vserver" |
-	"planetlab-vserver" | "emulab-vnode" }?,
-    
-	# The mapping to components/slivers. Required for advertisements.
-	ComponentSpec?,    
+    # Node type list
+    NodeTypeList &
 
-	NodeSpec.NodeType,
+    # List of interfaces on this node. Interfaces are declared here. So
+    # all information about a particular interface including types
+    # belongs in the declaration. Other references to interfaces
+    # should just uniquely identify them and refer back here.
+    element interface {
+      InterfaceDecl
+    }*
 
-	# Information about the physical location of the node.
-	LocationSpec?,
-
-	# Indicate whether or not this node is available - the idea is that a
-	# full dump of the static physical topology will not include this, but
-	# that we can later get updates that include only this attribute (and a
-	# UUID) Just binary for now - probably will include more things, such
-	# as a number of "free slots", later
-	element available { xsd:boolean }?,
-	
-	InterfaceDecl*
-
-    LinkContents =
-    # The virtual id of an element may be human readable.
-        attribute virtual_id { text }?,
-		attribute virtualization_type { "raw" | "trellis-vserver" |
-        			"planetlab-vserver" | "emulab-vnode" }?,
-	ComponentSpec?,
-	    LinkEndPoints,
-        ## The characteristics (bandwidth, latency, loss) which affect traffic.
-        LinkCharacteristics,
-        ## Type of this link - we use a named pattern here (defined below), so
-        ## that it can be overriden in the virtual topology schema, where you are
-        ## only allowed to have one
-        LinkSpec.LinkType+,
-		# These will only be present in annotated rspecs
-		(SingleHopComponentSpec | MultiHopComponentSpec)?
-
-    InterfaceContents = 
-	# In an advertisement, the component_uuid is mandatory.
-	# In a request, the virtual_id is mandatory.
-		attribute virtual_node_id { text }?,
-		attribute virtual_interface_name { text }?,
-		attribute component_node_uuid { text }?,
-		attribute component_interface_name { text }?
+  LinkContents =
+    # Link types
+    LinkTypeList &
+    # The interfaces which this link spans.
+    element interface {
+      InterfaceRef
+    }*
 }
 
-LocationSpec = element location {
-	# The two-letter ISO 3166 code for the country the node is in.
-	attribute country { text },
-	# Longitude and Lattitude coordinates of the node using the
-	# WGS 84 standard.
-	attribute longitude { text }?,
-	attribute lattitude { text }?
-}
+NodeTypeList = NodeSpec.NodeType
 
-InterfaceDecl = element interface {
-	attribute virtual_name { text }?,
-	attribute component_name { text }?,
-	element monitoring { attribute user_traffic { text }? }?
-}
+LinkTypeList = LinkSpec.LinkType+
 
-ComponentSpec =
-    # This is the uuid of the aggregate that this node or link belongs
-    # to. It is required in an advertisement.
-    attribute component_manager_uuid { text },
-    # User-readable name for the component
-    attribute component_name { text }?,
-    # The uuid of the physical component.
-    attribute component_uuid { text },
-    # The sliver_uuid is an annotation added when a ticket is
-    # redeemed to notify the client of the association between the
-    # virtual_id requests and the actual slivers instantiated.
-    attribute sliver_uuid { text }?
+VirtualName = attribute virtual_id { text }
 
-SingleHopComponentSpec = element single_hop_link { element link { ComponentSpec, LinkEndPoints } }
+ComponentName =
+  # This is the uuid of the aggregate that this node or link belongs
+  # to. It is required in an advertisement.
+  attribute component_manager_uuid { text } &
+  # User-readable name for the component
+  attribute component_name { text }? &
+  # The uuid of the physical component.
+  attribute component_uuid { text }
 
-MultiHopComponentSpec = element multi_hop_link {
-	(element link { ComponentSpec, LinkEndPoints} 
-    	| element node { ComponentSpec })+
+ComponentInterfaceDeclName = attribute component_name { text }
+
+ComponentInterfaceRefName =
+  attribute component_node_uuid { text } &
+  attribute component_interface_name { text }
+
+SliverName =
+  # The sliver_uuid is an annotation added when a ticket is
+  # redeemed to notify the client of the association between the
+  # virtual_id requests and the actual slivers instantiated.
+  attribute sliver_uuid { text }?
+
+InterfaceDecl = empty
+
+InterfaceRef = empty
+
+Location = element location {
+  # The two-letter ISO 3166 code for the country the node is in.
+  attribute country { text } &
+  # Longitude and Lattitude coordinates of the node using the
+  # WGS 84 standard.
+  attribute longitude { text }? &
+  attribute lattitude { text }?
 }
 
 RSpec = element rspec {
-    attribute type { "advertisement" | "request" },
-    # When this RSpec was generated - optional, can be used for determining
-    # staleness
-    attribute generated { xsd:dateTime },
-    # How long this rspec is valid - in the case of a ticket, this indicates
-    # how long the holder may use the resources. For a resource request, it's
-    # how long we want the resources. For an advertisement, it might be a hint
-    # as to how long it's okay to cache this rspec.
-    attribute valid_until { xsd:dateTime },
-    # One or more nodes/links
-    (NodeSpec | LinkSpec)*
+  RSpecContents
 }
+
+RSpecContents =
+  # When this RSpec was generated - optional, can be used for determining
+  # staleness
+  attribute generated { xsd:dateTime } &
+  # How long this rspec is valid - in the case of a ticket, this indicates
+  # how long the holder may use the resources. For a resource request, it's
+  # how long we want the resources. For an advertisement, it might be a hint
+  # as to how long it's okay to cache this rspec.
+  attribute valid_until { xsd:dateTime } &
+  # One or more nodes/links
+  NodeSpec* &
+  LinkSpec*
