@@ -141,7 +141,6 @@ sub PrintVirtTypes($)
     return 0;
 }
 
-
 ###############################################################################
 # Virtual Nodes. A separate package so we can create objects for each one
 # and then add local stuff to them.
@@ -1336,11 +1335,11 @@ sub PrintVirtLans($)
 	    #
 	    print "node fakelan/$vname $protocol\n";
 	    
-	    # XXX If not ethernet, assume wireless. Need more info someplace.
-	    $self->exptstats()->{'wirelesslans'} += 1;
-
 	    # So we ignore it when it comes back from assign.
 	    $self->lannodes()->{"fakelan/$vname"} = 1;
+	    
+	    # XXX If not ethernet, assume wireless. Need more info someplace.
+	    $self->exptstats()->{'wirelesslans'} += 1;
 
 	    foreach my $member (@members) {
 		my $plink = "fakelan/$vname/$member";
@@ -1596,10 +1595,11 @@ sub PrintVirtLans($)
 	}
 	elsif ($#members != 0) {
 	    $self->exptstats()->{"lans"} += 1;
-	    $self->lannodes()->{"lan/$vname"} = 1;
 
 	    # Lan node for assign.
 	    print "node lan/$vname lan\n";
+	    # Se we ignore it when it comes back from assign.
+	    $self->lannodes()->{"lan/$vname"} = 1;
 	    
 	    foreach my $member (@members) {
 		my $virtnode   = $member->virt_node();
@@ -1657,7 +1657,7 @@ sub PrintVirtLans($)
 		    }
 		    else {
 			#
-			# All the OS have to support linkdelays.
+			# All the OSes have to support linkdelays.
 			#
 			my $osinfo = $virtnode->_osinfo();
 
@@ -1666,8 +1666,9 @@ sub PrintVirtLans($)
 				     $virtnode, $vlan);
 			}
 			elsif (! $osdoeslinkdelays{$osinfo->osid()}) {
+			    my $osname = $osinfo->osname();
 			    tbwarn("$virtnode in lan $vlan is running an OSID".
-				 " ($osinfo) that does not support linkdelays".
+				 " ($osname) that does not support linkdelays".
 				 " (endnode traffic shaping)\n");
 			    $errors++;
 			}
