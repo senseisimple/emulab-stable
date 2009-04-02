@@ -2,7 +2,7 @@
 
 #
 # EMULAB-LGPL
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -62,7 +62,7 @@ my $PORT_FORMAT_NODEPORT = 3;
 # usage: new($classname,$devicename,$debuglevel,$community)
 #        returns a new object, blessed into the snmpit_cisco class.
 #
-sub new($$$;$) {
+sub new($$$$;$) {
 
     # The next two lines are some voodoo taken from perltoot(1)
     my $proto = shift;
@@ -70,6 +70,7 @@ sub new($$$;$) {
 
     my $name = shift;
     my $debugLevel = shift;
+    my $quiet = shift;
     my $community = shift;
 
     #
@@ -84,6 +85,11 @@ sub new($$$;$) {
 	$self->{DEBUG} = $debugLevel;
     } else {
 	$self->{DEBUG} = 0;
+    }
+    if (defined($quiet)) {
+	$self->{QUIET} = $quiet;
+    } else {
+	$self->{QUIET} = 0;
     }
     $self->{BLOCK} = 1;
     $self->{BULK} = 1;
@@ -492,7 +498,8 @@ sub vlanUnlock($) {
     my $EditOp = 'vtpVlanEditOperation'; # use index 1
     my $ApplyStatus = 'vtpVlanApplyStatus'; # use index 1
 
-    print "    Applying VLAN changes on $self->{NAME} ...";
+    print "    Applying VLAN changes on $self->{NAME} ..."
+	if (! $self->{QUIET});
 
     #
     # Send the command to apply what's in the edit buffer
@@ -506,7 +513,7 @@ sub vlanUnlock($) {
 
     if (!defined($ApplyRetVal) || $ApplyRetVal != 1) {
         print " FAILED\n";
-	warn("**** ERROR: Failure attempting to apply VLAN changes ($ApplyRetVal)\n");
+	warn("**** ERROR: Failure attempting to apply VLAN changes ($ApplyRetVal) on $self->{NAME}\n");
     } else {
 
         #
@@ -534,10 +541,13 @@ sub vlanUnlock($) {
         # Tell the caller what happened
         #
         if ($ApplyRetVal ne "succeeded") {
-            print " FAILED\n";
-            warn("**** ERROR: Failure applying VLAN changes: $ApplyRetVal\n");
+            print " FAILED\n"
+		if (! $self->{QUIET});
+            warn("**** ERROR: Failure applying VLAN changes on $self->{NAME}:".
+		 " $ApplyRetVal\n");
         } else { 
-            print " Succeeded\n";
+            print " Succeeded\n"
+		if (! $self->{QUIET});
             $self->debug("Apply Succeeded.\n");
         }
     }
@@ -549,7 +559,8 @@ sub vlanUnlock($) {
     my $snmpvar = [$EditOp,1,"release",'INTEGER'];
     my $RetVal = snmpitSetWarn($self->{SESS},$snmpvar);
     if (! $RetVal ) {
-        warn("*** ERROR: Failed to unlock VLAN edit buffer\n");
+        warn("*** ERROR: ".
+	     "Failed to unlock VLAN edit buffer on $self->{NAME}\n");
         return 0;
     }
     $self->debug("Release: '$RetVal'\n");
@@ -729,7 +740,7 @@ sub createVlan($$;$$$) {
 	# Try to wait out transient failures
 	#
 	if ($tries_remaining != $max_tries) {
-	    print STDERR "VLAN creation failed, trying again " .
+	    print STDERR "VLAN $vlan_id creation failed, trying again " .
 		"($tries_remaining tries left)\n";
 	    sleep 5;
 	}
@@ -780,7 +791,7 @@ sub createVlan($$;$$$) {
 	my $SAID = pack("H*",sprintf("%08x",$vlan_number + 100000));
 
 	print "  Creating VLAN $vlan_id as VLAN #$vlan_number on " .
-		"$self->{NAME} ... ";
+		"$self->{NAME} ... " if (! $self->{QUIET});
 
 	#
 	# Perform the actual creation. Yes, this next line MUST happen all in
@@ -791,7 +802,7 @@ sub createVlan($$;$$$) {
 		[$VlanType,"1.$vlan_number","ethernet","INTEGER"],
 		[$VlanName,"1.$vlan_number",$vlan_id,"OCTETSTR"],
 		[$VlanSAID,"1.$vlan_number",$SAID,"OCTETSTR"]]);
-	print "",($RetVal? "Succeeded":"Failed"), ".\n";
+	print "",($RetVal? "Succeeded":"Failed"), ".\n"	if (! $self->{QUIET});
 
 	#
 	# Check for success
@@ -1167,13 +1178,20 @@ sub removeVlan($@) {
 	#
 	my $VlanRowStatus = 'vtpVlanEditRowStatus'; # vlan is index
 
-	print "  Removing VLAN #$vlan_number on $self->{NAME} ... ";
+	print "  Removing VLAN #$vlan_number on $self->{NAME} ... "
+	    if (! $self->{QUIET});
 	my $RetVal = snmpitSetWarn($self->{SESS},
             [$VlanRowStatus,"1.$vlan_number","destroy","INTEGER"]);
 	if ($RetVal) {
-	    print "Succeeded.\n";
+	    print "Succeeded.\n" if (! $self->{QUIET});
 	} else {
-	    print "Failed.\n";
+	    if ($self->{QUIET}) {
+		print "  Removing VLAN #$vlan_number on ".
+		    "$self->{NAME} failed.\n";
+	    }
+	    else {
+		print "Failed.\n";
+	    }
 	    $errors++;
 	}
 

@@ -2,7 +2,7 @@
 
 #
 # EMULAB-LGPL
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # Copyright (c) 2004-2008 Regents, University of California.
 # All rights reserved.
 #
@@ -28,7 +28,7 @@ use libtestbed;
 # returns a new object blessed into the snmpit_stack class
 #
 
-sub new($$$@) {
+sub new($$$$@) {
 
     # The next two lines are some voodoo taken from perltoot(1)
     my $proto = shift;
@@ -36,6 +36,7 @@ sub new($$$@) {
 
     my $stack_id = shift;
     my $debuglevel = shift;
+    my $quiet = shift;
     my @devicenames = @_;
 
     #
@@ -51,6 +52,11 @@ sub new($$$@) {
 	$self->{DEBUG} = $debuglevel;
     } else {
 	$self->{DEBUG} = 0;
+    }
+    if (defined $quiet) {
+	$self->{QUIET} = $quiet;
+    } else {
+	$self->{QUIET} = 0;
     }
 
     $self->{STACKID} = $stack_id;
@@ -108,7 +114,8 @@ sub new($$$@) {
 	SWITCH: for ($type) {
 	    (/cisco/) && do {
 		use snmpit_cisco;
-		$device = new snmpit_cisco($devicename,$self->{DEBUG});
+		$device = new snmpit_cisco($devicename,
+					   $self->{DEBUG},$self->{QUIET});
 		last;
 		}; # /cisco/
 	    (/foundry1500/ || /foundry9604/)
@@ -453,7 +460,7 @@ sub createVlan($$$;$$$) {
 	$vlan_number = $self->newVlanNumber($vlan_id);
 	if ($vlan_number == 0) { last LOCKBLOCK;}
 	print "Creating VLAN $vlan_id as VLAN #$vlan_number on stack " .
-                 "$self->{STACKID} ... \n";
+                 "$self->{STACKID} ... \n" if (! $self->{QUIET});
 	if ($self->{ALLVLANSONLEADER}) {
 		$res = $self->{LEADER}->createVlan($vlan_id, $vlan_number);
 		$self->unlock();
@@ -470,8 +477,14 @@ sub createVlan($$$;$$$) {
 		#
 		# Ooops, failed. Don't try any more
 		#
+		if ($self->{QUIET}) {
+		    print "Creating VLAN $vlan_id as VLAN #$vlan_number on ".
+			"stack $self->{STACKID} failed\n";
+		}
+		else {
+ 		    print "Failed\n";
+		}
 		$vlan_number = 0;
-		print "Failed\n";
 		last LOCKBLOCK;
 	    }
 	}
@@ -485,7 +498,7 @@ sub createVlan($$$;$$$) {
 		goto failed;
 	    }
 	}
-	print "Succeeded\n";
+	print "Succeeded\n" if (! $self->{QUIET});
 
     }
     $self->unlock();

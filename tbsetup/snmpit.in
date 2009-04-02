@@ -645,20 +645,21 @@ COMMAND: foreach my $command (@commands) {
 	SWITCH: for ($stack_type) {
 	    (/cisco/ || /catalyst/) && do {
 		require snmpit_cisco_stack;
-		$stack = new snmpit_cisco_stack($stack_id,$debug,$single_domain,
-		    @{$stacks{$stack_id}});
+		$stack = new snmpit_cisco_stack($stack_id,$debug,$quiet,
+						$single_domain,
+						@{$stacks{$stack_id}});
 		last;
 	    }; # /cisco/
 	    /intel/ && do {
 		require snmpit_intel_stack;
 		$stack = new snmpit_intel_stack($stack_id,$debug,
-		    @{$stacks{$stack_id}});
+						@{$stacks{$stack_id}});
 		last;
 	    };
 	    /generic/ && do {
 		require snmpit_stack;
-		$stack = new snmpit_stack($stack_id,$debug,
-		    @{$stacks{$stack_id}});
+		$stack = new snmpit_stack($stack_id,$debug,$quiet,
+					  @{$stacks{$stack_id}});
 		last;
 	    }; # /generic/
 
