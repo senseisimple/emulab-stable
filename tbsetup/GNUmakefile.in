@@ -27,7 +27,7 @@ BIN_STUFF	= power snmpit tbend tbprerun tbreport \
 		  template_exprun template_delete template_metadata \
 		  template_export template_control template_commit \
 		  template_analyze template_linkgraph template_instantiate \
-		  template_revise template_checkout
+		  template_revise template_checkout vtopgen
 
 SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 		  batch_daemon exports_setup reload_daemon sched_reserve \
@@ -80,7 +80,7 @@ LIB_STUFF       = libtbsetup.pm exitonwarn.pm libtestbed.pm snmpit_intel.pm \
 		  libaudit.pm libreboot.pm libosload.pm libtestbed.py \
 		  libadminmfs.pm libtblog.pm libtblog_simple.pm libArchive.pm \
 		  power_mail.pm power_whol.pm Template.pm power_rmcp.pm \
-		  power_ilo.pm
+		  power_ilo.pm libvtop.pm
 
 # These scripts installed setuid, with sudo. 
 SETUID_BIN_SCRIPTS   = node_reboot eventsys_control tarfiles_setup savelogs \
