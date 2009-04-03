@@ -9,7 +9,7 @@ package libvtop;
 use strict;
 use Exporter;
 use vars qw(@ISA @EXPORT @EXPORT_OK
-	    $VTOP_FLAGS_UPDATE $VTOP_FLAGS_VERBOSE $VTOP_FLAGS_FIXED);
+	    $VTOP_FLAGS_UPDATE $VTOP_FLAGS_VERBOSE $VTOP_FLAGS_FIXNODES);
 
 @ISA    = "Exporter";
 @EXPORT = qw( );
@@ -27,6 +27,7 @@ use English;
 use Data::Dumper;
 use Carp;
 use POSIX;
+use XML::LibXML;
 
 # Configure variables
 my $TB		  = "@prefix@";
@@ -37,9 +38,9 @@ my $DELAYTHRESH   = @DELAYTHRESH@;
 # Flags.
 $VTOP_FLAGS_VERBOSE	= 0x01;
 $VTOP_FLAGS_UPDATE	= 0x02;
-$VTOP_FLAGS_FIXED	= 0x04;
+$VTOP_FLAGS_FIXNODES	= 0x04;
 
-@EXPORT_OK = qw($VTOP_FLAGS_UPDATE $VTOP_FLAGS_VERBOSE $VTOP_FLAGS_FIXED);
+@EXPORT_OK = qw($VTOP_FLAGS_UPDATE $VTOP_FLAGS_VERBOSE $VTOP_FLAGS_FIXNODES);
 
 #
 # Create an object representing the stuff we need to create the vtop file.
@@ -68,7 +69,12 @@ sub Create($$$)
     $self->{'DELAYLINKS'} = {};
     $self->{'OPTIONS'}    = {};
     $self->{'DELAYID'}    = 0;
+    $self->{'IFACEID'}    = 32768;
     $self->{'PORTBW'}     = {};
+    $self->{'RESULTS'}    = { "nodes"  => [],
+			      "links"  => [],
+			      "class"  => [],
+			      "fixed"  => [] };
     bless($self, $class);
 
     return $self;
@@ -83,12 +89,14 @@ sub lannodes($)         { return $_[0]->{'LANNODES'}; }
 sub vlans($)            { return $_[0]->{'VLANS'}; }
 sub memberof($)         { return $_[0]->{'MEMBEROF'}; }
 sub counters($)         { return $_[0]->{'COUNTERS'}; }
+sub counter($$)         { return $_[0]->{'COUNTERS'}->{$_[1]}; }
 sub options($)          { return $_[0]->{'OPTIONS'}; }
 sub option($$)          { return $_[0]->{'OPTIONS'}->{$_[1]}; }
 sub exptstats($)        { return $_[0]->{'EXPTSTATS'}; }
 sub delaylinks($)       { return $_[0]->{'DELAYLINKS'}; }
 sub delaynodecount()    { return scalar(keys(%{ $_[0]->delaynodes() })); }
 sub portbw($)           { return $_[0]->{'PORTBW'}; }
+sub results($)          { return $_[0]->{'RESULTS'}; }
 sub pid($)		{ return $_[0]->experiment()->pid(); }
 sub pid_idx($)		{ return $_[0]->experiment()->pid_idx(); }
 sub eid($)		{ return $_[0]->experiment()->eid(); }
@@ -110,36 +118,29 @@ sub isadelaynode($$)    { return exists($_[0]->delaynodes()->{$_[1]}); }
 # Debug output.
 sub verbose($)		{ return $_[0]->flags() & $VTOP_FLAGS_VERBOSE; }
 sub updating($)		{ return $_[0]->flags() & $VTOP_FLAGS_UPDATE; }
+sub fixcurrent($)	{ return $_[0]->flags() & $VTOP_FLAGS_FIXNODES; }
 sub printdb($$)		{ print $_[1] if ($_[0]->verbose()); }
 
 # We name delay nodes internally as they are needed.
 sub nextdelayname($)    { return "tbsdelay" . $_[0]->{'DELAYID'}++; }
 # For when the user wants a specific delay os. Use a desire.
 sub delay_desire($)	{ return $_[0]->option("delay_desire_string"); }
+# For XML
+sub nextifacenumber($)  { return $_[0]->{'IFACEID'}++; }
 
-###############################################################################
 # Virtual Types. 
-#
 sub virttypeisvtype($$) { return $_[0]->virt_vtypes()->Find($_[1]); }
 sub VirtTypes($)        { return $_[0]->virt_vtypes()->Rows(); }
 
-#
-# Dump the vtype list.
-#
-sub PrintVirtTypes($)
-{
-    my ($self) = @_;
-    my @types  = $self->VirtTypes();
-    
-    foreach my $vtype (@types) {
-	my $name    = $vtype->name();
-	my $weight  = $vtype->weight();
-	my @members = split(" ", $vtype->members());
-	
-	print "make-vclass $name $weight @members\n";
-    }
-    return 0;
-}
+# Results are stored until they are spit out in one of several formats.
+sub addnode($$)		{ push(@{$_[0]->results()->{"nodes"}}, $_[1]); }
+sub addlink($$)		{ push(@{$_[0]->results()->{"links"}}, $_[1]); }
+sub addvclass($$)	{ push(@{$_[0]->results()->{"class"}}, $_[1]); }
+sub addfixed($$)	{ push(@{$_[0]->results()->{"fixed"}}, $_[1]); }
+
+# Caller will want these.
+sub minimum_nodes($)    { return $_[0]->counter("minimum_nodes"); }
+sub maximum_nodes($)    { return $_[0]->counter("maximum_nodes"); }
 
 ###############################################################################
 # Virtual Nodes. A separate package so we can create objects for each one
@@ -481,6 +482,60 @@ sub LoadPhysInfo($)
     $self->{'IFACECAPS'}  = \%interface_capabilities;
     $self->{'TYPELINKBW'} = \%node_type_linkbw;
     
+    return 0;
+}
+
+#
+# When updating with fixednodes turned on, we need the current set
+# of nodes that need to be fixed.
+#
+sub LoadFixedNodes($)
+{
+    my ($self) = @_;
+
+    $self->counters()->{'reserved_simcount'}  = 0;
+    $self->counters()->{'reserved_virtcount'} = 0;
+    $self->counters()->{'reserved_physcount'} = 0;
+
+    return 0
+	if (!$self->fixcurrent());
+
+    $self->printdb("Loading fixed nodes\n");
+
+    my @nodelist = $self->experiment()->NodeList();
+    return 0
+	if (!@nodelist);
+
+    foreach my $pnode (@nodelist) {
+	my $vname = $pnode->vname();
+	my $rsrv  = $pnode->ReservedTableEntry();
+	
+	#
+	# WIDEAREA nodes are going to break.
+	#
+	if ($pnode->isremotenode() &&
+	    !$pnode->isplabdslice() && !$pnode->isdedicatedremote()) {
+	    tberror("Cannot update widearea nodes yet!\n");
+	    return -1;
+	}
+	if ($pnode->isvirtnode()) {
+	    $self->{'FIXED_NODES'}->{$vname} = $pnode->node_id();
+	    $self->counters()->{'reserved_virtcount'}++;
+	}
+	else {
+	    #
+	    # All the sim stuff is bit rotting cause no one understands it.
+	    #
+	    if ($rsrv->{'erole'} eq TBDB_RSRVROLE_SIMHOST) {
+		tberror("Cannot update sim nodes yet!\n");
+		return -1;
+	    }
+	    else {
+		$self->{'FIXED_NODES'}->{$vname} = $pnode->node_id();
+		$self->counters()->{'reserved_physcount'}++;
+	    }
+	}
+    }
     return 0;
 }
 
@@ -850,9 +905,27 @@ sub LoadVirtLans($)
 }
 
 #
+# Dump the vtype list.
+#
+sub GenVirtTypes($)
+{
+    my ($self) = @_;
+    my @types  = $self->VirtTypes();
+    
+    foreach my $vtype (@types) {
+	my $name    = $vtype->name();
+	my $weight  = $vtype->weight();
+	my @members = split(" ", $vtype->members());
+
+	$self->addvclass("$name $weight @members");
+    }
+    return 0;
+}
+
+#
 # Dump the virt nodes.
 #
-sub PrintVirtNodes($)
+sub GenVirtNodes($)
 {
     my ($self) = @_;
     my $experiment = $self->experiment();
@@ -914,7 +987,7 @@ sub PrintVirtNodes($)
 		}
 	    }
 	}
-	print "node $vname $typestr $subnodestr $desirestr\n";
+	$self->addnode("$vname $typestr $subnodestr $desirestr");
     }
 
     #
@@ -938,7 +1011,7 @@ sub PrintVirtNodes($)
 #
 # Print out the fix nodes.
 #
-sub PrintFixNodes($)
+sub GenFixNodes($)
 {
     my ($self) = @_;
 
@@ -951,7 +1024,7 @@ sub PrintFixNodes($)
 	my $fixed = $self->{'FIXED_NODES'}->{$vname};
 	
 	if ($self->isatoponode($vname) || $self->isadelaynode($vname)) {
-	    print "fix-node $vname $fixed\n";
+	    $self->addfixed("$vname $fixed");
 	}
     }
     return 0;
@@ -971,7 +1044,11 @@ sub PrintSummaryStats($)
 	$self->delaynodecount();
     $minimum_nodes = POSIX::ceil($minimum_nodes);
 
-    if (1) {
+    # For the caller.
+    $self->counters()->{'minimum_nodes'}  = $minimum_nodes;
+    $self->counters()->{'maximum_nodes'}  = $maximum_nodes;
+
+    if (0) {
 	$self->experiment()->Update({"maximum_nodes" => $maximum_nodes,
 				     "minimum_nodes" => $minimum_nodes})
 	    == 0 or return -1
@@ -979,14 +1056,22 @@ sub PrintSummaryStats($)
 
     my $virtnode_count = $self->counters()->{'virtcount'};
     my $simnode_count  = $self->counters()->{'simcount'};
+    my $reserved_virtcount = $self->counters()->{'reserved_virtcount'};
+    my $reserved_physcount = $self->counters()->{'reserved_physcount'};
 
     print "Minimum nodes   = $minimum_nodes\n";
     print "Maximum nodes   = $maximum_nodes\n";
     if ($virtnode_count) {
-	print "Virtual nodes   = $virtnode_count\n";
+	print "Virtual nodes     = $virtnode_count\n";
     }
     if ($simnode_count) {
 	print "Simulated nodes   = $simnode_count\n";
+    }
+    if ($reserved_virtcount) {
+	print "Reserved vnodes   = $reserved_virtcount\n";
+    }
+    if ($reserved_physcount) {
+	print "Reserved pnodes   = $reserved_physcount\n";
     }
     return 0;
 }
@@ -994,7 +1079,7 @@ sub PrintSummaryStats($)
 #
 # Dump the virt lans
 #
-sub PrintVirtLans($)
+sub GenVirtLans($)
 {
     my ($self) = @_;
     my $experiment = $self->experiment();
@@ -1054,8 +1139,7 @@ sub PrintVirtLans($)
 		    $osdoeslinkdelays{$osid} = 1;
 		}
 	    } else {
-		if ($self->isatoponode($virtnode->vname()) &&
-		    $virtnode->type() ne "pcfed") {
+		if ($virtnode->_isvirtnode() && $virtnode->type() ne "pcfed") {
 		    $virtnodes++;
 
 		    # XXX virtnodes are always BSD at the moment
@@ -1333,7 +1417,7 @@ sub PrintVirtLans($)
 	    # since these do not get vlans.  Some other special
 	    # treatment applies as well.
 	    #
-	    print "node fakelan/$vname $protocol\n";
+	    $self->addnode("fakelan/$vname $protocol");
 	    
 	    # So we ignore it when it comes back from assign.
 	    $self->lannodes()->{"fakelan/$vname"} = 1;
@@ -1347,8 +1431,8 @@ sub PrintVirtLans($)
 		    
 		my ($top_bw, $top_rbw) = $self->virtlantopbw($vlan, $member);
 	
-		print "link $plink $vnode fakelan/$vname $top_bw " .
-		    "0 0 $protocol\n";
+		$self->addlink("$plink $vnode fakelan/$vname $top_bw " .
+			       "0 0 $protocol");
 	    }
 	}
 	elsif (@members == 2) {
@@ -1501,10 +1585,11 @@ sub PrintVirtLans($)
 		if ($self->virtlan_use_linkdelay($vlan, $shaped)) {
 		    my $plink = "linksimple/$vname/$member0,$member1";
 
-		    print("link $plink $vname0 $vname1 ".
-			  max($top_bw,$top_rbw) . " 0 0 $protocol " .
-			  ($emulated ? " emulated" : "") .
-			  ($trivial_ok ? " trivial_ok" : "") . " $fixall\n");
+		    $self->addlink("$plink $vname0 $vname1 ".
+				   max($top_bw,$top_rbw) . " 0 0 $protocol" .
+				   ($emulated ? " emulated" : "") .
+				   ($trivial_ok ? " trivial_ok" : "") .
+				   " $fixall");
 		    
 		    #
 		    # We allow users to oversubscribe by letting them turn
@@ -1533,11 +1618,14 @@ sub PrintVirtLans($)
 		    my @delayinfo = ($member0,$delay,$bw,$loss,
 				     $member1,$rdelay,$rbw,$rloss,0);
 
-		    print "node $delayname delay $delaydesire\n";
-		    print "link linksdelaysrc/$vlan/$member0,$member1 ".
-			"$vname0 $delayname $top_bw 0 0 $protocol $fixsrc0\n";
-		    print "link linksdelaydst/$vlan/$member1,$member0 ".
-			"$vname1 $delayname $top_bw 0 0 $protocol $fixdst1\n";
+		    $self->addnode("$delayname delay $delaydesire");
+		    
+		    $self->addlink("linksdelaysrc/$vlan/$member0,$member1 ".
+				   "$vname0 $delayname $top_bw 0 0 ".
+				   "$protocol $fixsrc0");
+		    $self->addlink("linksdelaydst/$vlan/$member1,$member0 ".
+				   "$vname1 $delayname $top_bw 0 0 ".
+				   "$protocol $fixdst1");
 
 		    $self->printdb("Delay node $plink ($delayname) = " . 
 				   join(" ", @delayinfo) . "\n");
@@ -1559,18 +1647,18 @@ sub PrintVirtLans($)
 	    }
 	    else {
 		my $plink = "linksimple/$vname/$member0,$member1";
-		
-		print "link $plink $vname0 $vname1";
+
+		my $spec = "$plink $vname0 $vname1";
 
 		if ($emulated) {
-		    print " " . max($top_bw,$top_rbw) .
+		    $spec .= " " . max($top_bw,$top_rbw) .
 			" 0 0 $protocol emulated";
 		}
 		else {
-		    print " $top_bw 0 0 $protocol";
+		    $spec .= " $top_bw 0 0 $protocol";
 		}
 		if ($trivial_ok) {
-		    print " trivial_ok";
+		    $spec .= " trivial_ok";
 		    #
 		    # We store this info in case assign actually does turn it
 		    # into a trivial link. If that happens, we have to insert
@@ -1588,16 +1676,16 @@ sub PrintVirtLans($)
 		    }
 		}
 		if ($fixall ne '') {
-		    print " $fixall";
+		    $spec .= " $fixall";
 		}
-		print "\n";
+		$self->addlink($spec);
 	    }
 	}
 	elsif ($#members != 0) {
 	    $self->exptstats()->{"lans"} += 1;
 
 	    # Lan node for assign.
-	    print "node lan/$vname lan\n";
+	    $self->addnode("lan/$vname lan");
 	    # Se we ignore it when it comes back from assign.
 	    $self->lannodes()->{"lan/$vname"} = 1;
 	    
@@ -1718,11 +1806,12 @@ sub PrintVirtLans($)
 			my @delayinfo = ($member,$delay,$bw,$loss,
 					 $member,$rdelay,$rbw,$rloss,0);
 
-			print("link $plink $vnodevname lan/$vname " .
-			      max($top_bw,$top_rbw) . " 0 0 $protocol" .
-			      ($emulated ? " emulated" : "") .
-			      ($trivial_ok ? " trivial_ok" : "") . 
-			      ($fixsrc0 ? " $fixsrc0" : "") . "\n");
+			$self->addlink("$plink $vnodevname lan/$vname " .
+				       max($top_bw,$top_rbw) .
+				       " 0 0 $protocol" .
+				       ($emulated ? " emulated" : "") .
+				       ($trivial_ok ? " trivial_ok" : "") . 
+				       ($fixsrc0 ? " $fixsrc0" : ""));
 
 			$self->printdb("Delay link $plink = " .
 				       join(" ", @delayinfo) . "\n");
@@ -1737,12 +1826,14 @@ sub PrintVirtLans($)
 			my @delayinfo   = ($member,$delay,$bw,$loss,
 					   $member,$rdelay,$rbw,$rloss,0);
 			
-			print "node $delayname delay $delaydesire\n";
-			print "link linkdelaysrc/$vname/$member " .
-			    "$vnodevname $delayname $top_bw 0 0 ".
-			    "$protocol $fixsrc0\n";
-			print "link linkdelaydst/$vname/$member " .
-			    "lan/$vname $delayname $top_bw 0 0 $protocol\n";
+			$self->addnode("$delayname delay $delaydesire");
+			
+			$self->addlink("linkdelaysrc/$vname/$member " .
+				       "$vnodevname $delayname $top_bw 0 0 ".
+				       "$protocol $fixsrc0");
+			$self->addlink("linkdelaydst/$vname/$member " .
+				       "lan/$vname $delayname $top_bw 0 0 ".
+				       "$protocol");
 
 			$self->printdb("Delay node $plink ($delayname) = " .
 				       join(" ", @delayinfo) . "\n");
@@ -1767,13 +1858,13 @@ sub PrintVirtLans($)
 		else {
 		    my $plink = "linklan/$vname/$member";
 
-		    print "link $plink $vnodevname lan/$vname $top_bw " .
+		    my $spec = "$plink $vnodevname lan/$vname $top_bw " .
 			"0 0 $protocol";
 		    if ($emulated) {
-			print " emulated";
+			$spec .= " emulated";
 		    }
 		    if ($trivial_ok) {
-			print " trivial_ok";
+			$spec .= " trivial_ok";
 
 			#
 			# We store this info in case assign actually does
@@ -1793,9 +1884,9 @@ sub PrintVirtLans($)
 			}
 		    }
 		    if ($fixsrc0) {
-			print " $fixsrc0";
+			$spec .= " $fixsrc0";
 		    }
-		    print "\n";
+		    $self->addlink($spec);
 		}
 	    }
 	}
@@ -1803,6 +1894,65 @@ sub PrintVirtLans($)
     return 0;
 }
 
+#
+# Print the results in plain text top file format.
+#
+sub PrintTop($;$)
+{
+    my ($self, $output) = @_;
+    $output = *STDOUT
+	if (!defined($output));
+
+#    print Dumper($self);
+
+    foreach my $vclass (@{$self->results->{'class'}}) {
+	print $output "make-vclass $vclass\n";
+    }
+    foreach my $node (@{$self->results->{'nodes'}}) {
+	print $output "node $node\n";
+    }
+    foreach my $link (@{$self->results->{'links'}}) {
+	print $output "link $link\n";
+    }
+    foreach my $fixed (@{$self->results->{'fixed'}}) {
+	print $output "fix-node $fixed\n";
+    }
+    return 0;
+}
+
+#
+# Print in XML.
+#
+sub PrintXML($;$)
+{
+    my ($self, $output) = @_;
+    $output = *STDOUT
+	if (!defined($output));
+
+    my $pid = $self->experiment()->pid();
+    my $eid = $self->experiment()->eid();
+
+    my $doc = XML::LibXML::Document->new();
+
+    my $root = $doc->createElement("vtop");
+    $root->setAttribute("pid", "$pid");
+    $root->setAttribute("eid", "$eid");
+    $root->setAttribute("xmlns", "http://emulab.net/resources/vtop/0.2");
+    $doc->setDocumentElement($root);
+
+    foreach my $vclass (@{$self->results->{'class'}}) {
+	$self->processVClass($doc, $root, $vclass);
+    }
+    foreach my $node (@{$self->results->{'nodes'}}) {
+	$self->processNode($doc, $root, $node);
+    }
+    foreach my $link (@{$self->results->{'links'}}) {
+	$self->processLink($doc, $root, $link);
+    }
+    print $output $doc->toString(1) . "\n";
+
+    return 0;
+}
 #
 # Create a vtop. 
 #
@@ -1846,11 +1996,11 @@ sub CreateVtop($)
     #
     # Set this when forcing linkdelays instead of delay nodes. NS file.
     $self->options()->{'uselinkdelays'} =
-	$self->virtexperiment()->uselinkdelays();
+	($self->virtexperiment()->uselinkdelays() ? 1 : 0);
 
     # Force a link delay, even when no delay would otherwise be inserted.
     $self->options()->{'forcelinkdelays'} =
-	$self->virtexperiment()->forcelinkdelays();
+	($self->virtexperiment()->forcelinkdelays() ? 1 : 0);
 
     # Allow override of delay capacity.
     $self->options()->{'delay_capacity'} = ($DELAYCAPACITY || 1);
@@ -1858,6 +2008,9 @@ sub CreateVtop($)
 	$self->options()->{'delay_capacity'} =
 	    $self->virtexperiment()->delay_capacity();
 	$self->options()->{'delaycap_override'} = 1;
+	# Record this in the stats only when overridden.
+	$self->exptstats()->{'delay_capacity'}  =
+	    $self->options()->{'delay_capacity'};
     }
 
     # Allow override of delay osid.
@@ -1883,18 +2036,31 @@ sub CreateVtop($)
     else {
 	$self->options()->{'delay_desire_string'} = "";
     }
+
+    # Option to fix current resources. Command line overrides experiment.
+    # This option does not make sense unless updating is also on.
+    if ($self->updating() && !$self->fixcurrent() &&
+	$self->virtexperiment()->allowfixnode()) {
+	$self->{'FLAGS'} |= $VTOP_FLAGS_FIXNODES;
+    }
     
     return -1
 	if ($self->LoadPhysInfo() ||
 	    $self->LoadVirtNodes() ||
 	    $self->LoadVirtLans() ||
-	    $self->PrintVirtTypes() ||
-	    $self->PrintVirtNodes() ||
-	    $self->PrintVirtLans() ||
-	    $self->PrintFixNodes() ||
+	    $self->LoadFixedNodes() ||
+	    $self->GenVirtTypes() ||
+	    $self->GenVirtNodes() ||
+	    $self->GenVirtLans() ||
+	    $self->GenFixNodes() ||
 	    $self->PrintSummaryStats());
-    
 
+    # Stats for the caller.
+    $self->exptstats()->{"vnodes"}    = $self->counters()->{'virtcount'};
+    $self->exptstats()->{"wanodes"}   = $self->counters()->{'remotecount'};
+    $self->exptstats()->{"plabnodes"} = $self->counters()->{'plabcount'};
+    $self->exptstats()->{"simnodes"}  = $self->counters()->{'simcount'};
+    
     return 0;
 }
 
@@ -2045,7 +2211,9 @@ sub virtlantopbw($$$) {
 #
 sub virtlan_use_linkdelay($$$) {
     my ($self, $virtlan, $shaped) = @_;
-    
+
+    #print Dumper($virtlan);
+
     #
     # Here are the conditions for using linkdelays on each link/lan
     # Note: $forcelinkdelays and $uselinkdelays are global
@@ -2061,6 +2229,7 @@ sub virtlan_use_linkdelay($$$) {
          # The user forced linkdelays for this specific virtlan
          $virtlan->_uselinkdelay()) {
         # Yep, use linkdelays
+	#$self->printdb("Using linkdelay for $virtlan\n");
         return 1;
     } else {
         # No - either won't be delayed at all, or we'll use a delay node
@@ -2078,4 +2247,251 @@ sub protocolbasetype($) {
     }
 }
 
+#
+# XML support that will move elsewhere. Note that this code is entirely
+# derived from the code that Tarun wrote to convert top files in XML.
+# It is currently operating in the same fashion; parsing the text lines
+# that are created above. This is silly extra work, but I do not want to
+# diverge too far from the original code yet.
+#
+
+#
+# Creates a child node with name "nodeName" whose parent is "parent"
+# in the XML document "document"
+#
+sub addNode($$$)
+{
+    my ($document, $parent, $nodeName) = @_;
+    
+    my $newNode = $document->createElement($nodeName);
+    $parent->appendChild($newNode);
+    return $newNode;
+}
+
+#
+# Creates a child node with name "nodeName" whose parent is "parent"
+# in the XML document "document" The child node has a textnode within
+# it with the text "nodeText"
+#
+sub addNodeWithText($$$$)
+{
+    my ($document, $parent, $nodeName, $nodeText) = @_;
+    
+    my $newNode = $document->createElement($nodeName);
+    my $newTextNode = $document->createTextNode($nodeText);
+    $newNode->appendChild($newTextNode);
+    $parent->appendChild($newNode);
+    return $newNode;
+}
+
+#
+# Processes a node
+#
+sub processNode($$$$)
+{
+    my ($self, $xmlDocument, $root, $line) = @_;
+
+    my ($nodename, $nodetype, @tokens) = split(/\s+/, $line);
+    
+    # To keep track of whether or not a features and desires element
+    # has been added to the current node
+    my $addedFeatureDesireSpecNode = 0;
+
+    my $newNode = addNode($xmlDocument, $root, "node");
+    $newNode->setAttribute("name", $nodename);
+
+    my $NodeTypeNode = addNode($xmlDocument, $newNode, "node_type");
+
+    # The number of type_slots is optional. Default to 1. If there is
+    # no ':' in the name, then the number of slots is 1, else it is
+    # whatever number follows the ':'
+    my ($nodeTypeName, $nodeTypeSlots) = split(":", $nodetype);
+    $nodeTypeSlots = 1
+	if (!defined($nodeTypeSlots));
+    
+    # If the name starts with a *, the the node is to be marked static
+    my $isNodeStatic = 0;
+    if ($nodeTypeName =~ /^\*([-\w]*)$/) {
+	$nodeTypeName = $1;
+	$isNodeStatic = 1;
+    }
+    addNodeWithText($xmlDocument, $NodeTypeNode, "type_name", $nodeTypeName);
+    
+    # If the number of slots is *, then the number of slots is unlimited
+    if ($nodeTypeSlots eq "*") {
+	addNode($xmlDocument, $NodeTypeNode, "unlimited");
+    }
+    else {
+	addNodeWithText($xmlDocument, $NodeTypeNode,
+			"type_slots", $nodeTypeSlots);
+    }
+    if ($isNodeStatic) {
+	addNode($xmlDocument, $NodeTypeNode, "static");
+    }
+
+    # Handle fixed node.
+    if (exists($self->{'FIXED_NODES'}->{$nodename}) &&
+	($self->isatoponode($nodename) || $self->isadelaynode($nodename))) {
+	my $fixed = $self->{'FIXED_NODES'}->{$nodename};
+	
+	$newNode->setAttribute("assigned_to", $fixed);
+    }
+
+    # Iterate through all the optional parameters on the line
+    foreach my $token (@tokens) {
+	# If disallow_trivial_mix is present, put it under the NodeFlagSpec
+	if ($token eq "disallow_trivial_mix") {
+	    addNode($xmlDocument, $newNode, $token);
+	}
+	# If subnode_of is present, find the parent node and add the
+	# appropriate node under NodeFlagSpec
+	elsif ($token =~ /^subnode_of/) {
+	    my ($subNodeOf, $parentNode) = split(":", $token);
+	    addNodeWithText($xmlDocument, $newNode, "subnode_of", $parentNode);
+	}
+	# If an optional desire is present, put it under the
+	# features and desires node
+	elsif ($token =~ /:/) {
+	    my $FeatureDesireSpecNode = addNode($xmlDocument, $newNode, "fd");
+								
+	    # The feature name is optionally prepended with a 2
+	    # character prefix.  Detect the prefix and remove it from
+	    # the feature name as appropriate
+	    my ($featureName, $featureWeight) = split(":", $token);
+	    my ($a, $b, $rest) = ($featureName =~ /^(.)(.)(.*)?/);
+
+	    if (! ("$a" eq "*" || "$a" eq "?")) {
+		addNodeWithText($xmlDocument, $FeatureDesireSpecNode,
+				"fd_name", $featureName);
+	    }
+	    else {
+		addNodeWithText($xmlDocument, $FeatureDesireSpecNode,
+				"fd_name", $rest);
+	    }
+	    addNodeWithText($xmlDocument, $FeatureDesireSpecNode,
+			    "fd_weight", $featureWeight);
+	    
+	    if ($featureWeight >= 1.000000) {
+		addNode($xmlDocument, $FeatureDesireSpecNode, "violatable");
+	    }
+
+	    # The desire prefix is "*!"
+	    if ("$b" eq "!") {
+		my $newGlobalNode = addNode($xmlDocument,
+					    $FeatureDesireSpecNode, "global");
+		addNodeWithText($xmlDocument, $newGlobalNode,
+				"operator", "OnceOnly");
+	    }
+	    # The desire prefix is "*&"
+	    elsif ("$b" eq "&") {
+		my $newGlobalNode = addNode($xmlDocument,
+					    $FeatureDesireSpecNode, "global");
+		addNodeWithText($xmlDocument, $newGlobalNode,
+				"operator", "FirstFree");
+	    }
+	    # The desire prefix is "?+"
+	    elsif ("$b" eq "+") {
+		my $newLocalNode = addNode($xmlDocument,
+					   $FeatureDesireSpecNode, "local");
+		addNodeWithText($xmlDocument, $newLocalNode, "operator", "+");
+	    }
+	}
+    }
+    return 0;
+}
+
+#
+# Processes a link
+#
+sub processLink($$$$)
+{
+    my ($self, $xmlDocument, $root, $line) = @_;
+
+    my ($linkname,
+	$srcNameInterface, $destNameInterface, @tokens) = split(/\s+/, $line);
+    
+    my $newLinkNode = addNode($xmlDocument, $root, "link");
+    $newLinkNode->setAttribute("name", $linkname);
+	
+    # Find the source name and the source interface.
+    # If the node has no interface specified, assign it a "safe" interface
+    # number. Increment the interface number.
+    my ($srcName,$srcInterface) = split(":", $srcNameInterface);
+    if (!defined($srcInterface)) {
+	$srcInterface = $self->nextifacenumber();
+    }
+    # Do the same thing for the destination interface
+    my ($destName,$destInterface) = split(":", $destNameInterface);
+    if (!defined($destInterface)) {
+	$destInterface = $self->nextifacenumber();
+    }
+
+    # Add a source interface element
+    my $sourceInterfaceNode =
+	addNode($xmlDocument, $newLinkNode, "source_interface");
+    my $innerSourceInterfaceNode =
+	addNode($xmlDocument, $sourceInterfaceNode, "interface");
+    addNodeWithText($xmlDocument, $innerSourceInterfaceNode,
+		    "node_name", $srcName);
+    addNodeWithText($xmlDocument, $innerSourceInterfaceNode,
+		    "interface_name", $srcInterface);
+	
+    # Add a destination interface element
+    my $destinationInterfaceNode =
+	addNode($xmlDocument, $newLinkNode, "destination_interface");
+    my $innerDestinationInterfaceNode =
+	addNode($xmlDocument, $destinationInterfaceNode, "interface");
+    addNodeWithText($xmlDocument, $innerDestinationInterfaceNode,
+		    "node_name", $destName);
+    addNodeWithText($xmlDocument, $innerDestinationInterfaceNode,
+		    "interface_name", $destInterface);
+	
+    # Add other stuff that appears on the line
+    addNodeWithText($xmlDocument, $newLinkNode, "bandwidth", shift(@tokens));
+    addNodeWithText($xmlDocument, $newLinkNode, "latency", shift(@tokens));
+    addNodeWithText($xmlDocument, $newLinkNode, "packet_loss", shift(@tokens));
+	
+    # Add a link_type element
+    my $newLinkTypeNode = addNode($xmlDocument, $newLinkNode, "link_type");
+    addNodeWithText($xmlDocument, $newLinkTypeNode,"type_name",shift(@tokens));
+	
+    # Run through the optional parameters at the end of the line
+    foreach my $token (@tokens) {
+	# If fixsrciface or fixdstiface are found
+	if ($token =~ /:/) {
+	    my ($fixIface, $ifaceName) = split(":", $token);
+	    addNodeWithText($xmlDocument, $newLinkNode, $fixIface, $ifaceName);
+	}
+	elsif ($token eq "emulated") {
+	    addNode($xmlDocument, $newLinkNode, "multiplex_ok");
+	}
+	elsif ($token ne "") {
+	    addNode($xmlDocument, $newLinkNode, $token);
+	}
+    }
+}
+
+#
+# Process a v-class.
+#
+sub processVClass($$$$)
+{
+    my ($self, $xmlDocument, $root, $line) = @_;
+    
+    my ($classname, $classweight, @tokens) = split(/\s+/, $line);
+
+    my $newVClassNode = addNode($xmlDocument, $root, "vclass");
+    $newVClassNode->setAttribute("name", $classname);
+	
+    # TODO: Need to take care of the hard case later
+    addNode($xmlDocument, $newVClassNode, "soft");
+    addNodeWithText($xmlDocument, $newVClassNode, "weight", $classweight);
+	
+    # The remaining entries on this line will be physical_types.
+    foreach my $token (@tokens) {
+	addNodeWithText($xmlDocument, $newVClassNode,
+			"physical_type", $token);
+    }
+    return 0;
+}
 1;

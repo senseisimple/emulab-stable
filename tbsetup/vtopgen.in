@@ -9,17 +9,23 @@ use Getopt::Std;
 
 sub usage ()
 {
-    print STDERR "Usage: $0 [-v] [-u [-f]] pid eid\n";
+    print STDERR "Usage: $0 [-v] [-u [-f]] [-x] [-o filename] pid eid\n";
     print STDERR " -v   - Enables verbose output\n";
     print STDERR " -u   - Enables update mode\n";
+    print STDERR " -x   - XML output\n";
+    print STDERR " -o   - Send output to file instead of stdout\n";
     print STDERR " -f   - Fix current resources during update mode\n";
     exit(1);
 }
-my $optlist  = "vuf";
+my $optlist  = "vufxo:";
 my $verbose  = 1;
 my $fixmode  = 0;
 my $updating = 0;
 my $warnings = 0;
+my $xml      = 0;
+my $output   = *STDOUT;
+my $retval   = 0;
+my $filename;
 
 #
 # Configure variables
@@ -66,19 +72,50 @@ if (defined($options{"u"})) {
 if (defined($options{"f"})) {
     $fixmode = 1;
 }
+if (defined($options{"x"})) {
+    $xml = 1;
+}
+if (defined($options{"o"})) {
+    $filename = $options{"o"};
+}
 my $pid = $ARGV[0];
 my $eid = $ARGV[1];
 my $experiment = Experiment->Lookup($pid, $eid);
 if (!defined($experiment)) {
     fatal("Could not lookup experiment object $pid,$eid!")
 }
-my $vtop = libvtop->Create($experiment, $libvtop::VTOP_FLAGS_VERBOSE);
+
+my $flags = 0;
+$flags |= $libvtop::VTOP_FLAGS_VERBOSE
+    if ($verbose);
+$flags |= $libvtop::VTOP_FLAGS_UPDATE
+    if ($updating);
+$flags |= $libvtop::VTOP_FLAGS_FIXNODES
+    if ($fixmode);
+
+# Open up output file now.
+if (defined($filename)) {
+    open(OUT, ">$filename")
+	or fatal("Could not open output file: $!");
+    $output = *OUT;
+}
+
+my $vtop = libvtop->Create($experiment, $flags);
 if (!defined($vtop)) {
     fatal("Could not create vtop structure for $experiment");
 }
-$vtop->CreateVtop();
+$vtop->CreateVtop() == 0
+    or fatal("Could not create vtop for $experiment");
 
-exit(0);
+if ($xml) {
+    $retval = $vtop->PrintXML($output);
+}
+else {
+    $retval = $vtop->PrintTop($output);
+}
+close($output)
+    if (defined($filename));
+exit($retval);
 
 sub fatal($)
 {
