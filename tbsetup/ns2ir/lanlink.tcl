@@ -670,6 +670,18 @@ LanLink instproc set_fixed_iface {node iface} {
     }
 }
 
+# Check the IP address against its mask and ensure that the host
+# portion of the IP address is not all '0's (reserved) or all '1's
+# (broadcast).
+LanLink instproc check-ip-mask {ip mask} {
+    set ipint [inet_atohl $ip]
+    set maskint [inet_atohl $mask]
+    set maskinverse [expr (~ $maskint)]
+    set remainder [expr ($ipint & $maskinverse)]
+    if {$remainder == 0 || $remainder == $maskinverse} {
+	perror "\[check-ip-mask] IP address $ip with netmask $mask has either all '0's (reserved) or all '1's (broadcast) in the host portion of the address."
+    }
+}
 
 Link instproc updatedb {DB} {
     $self instvar toqueue
@@ -751,6 +763,8 @@ Link instproc updatedb {DB} {
 	#
 	set port [lindex $nodeport 1]
 	set ip [$node ip $port]
+
+	$self check-ip-mask $ip $netmask
 
 	set nodeportraw [join $nodeport ":"]
 
@@ -906,6 +920,8 @@ Lan instproc updatedb {DB} {
 	#
 	set port [lindex $nodeport 1]
 	set ip [$node ip $port]
+
+	$self check-ip-mask $ip $netmask
 
 	set nodeportraw [join $nodeport ":"]
 
