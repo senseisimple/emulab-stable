@@ -1,0 +1,36 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005-2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package libmapper;
+
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT @EXPORT_OK);
+
+@ISA    = "Exporter";
+@EXPORT = qw( );
+
+use libdb;
+use libtblog;
+use libtestbed;
+use Experiment;
+use VirtExperiment;
+use Node;
+use NodeType;
+use Lan;
+use OSinfo;
+use English;
+use Data::Dumper;
+use Carp;
+use POSIX;
+use XML::LibXML;
+
+# Configure variables
+my $TB		  = "@prefix@";
+my $BOSSNODE      = "@BOSSNODE@";
+
+
+1;

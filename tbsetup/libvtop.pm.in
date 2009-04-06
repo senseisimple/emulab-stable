@@ -141,6 +141,10 @@ sub addfixed($$)	{ push(@{$_[0]->results()->{"fixed"}}, $_[1]); }
 # Caller will want these.
 sub minimum_nodes($)    { return $_[0]->counter("minimum_nodes"); }
 sub maximum_nodes($)    { return $_[0]->counter("maximum_nodes"); }
+sub plabcount($)	{ return $_[0]->counter("plabcount"); }
+sub virtnodecount($)	{ return $_[0]->counter("virtcount"); }
+sub simnodecount($)	{ return $_[0]->counter("simcount"); }
+sub remotenodecount($)	{ return $_[0]->counter("remotecount"); }
 
 ###############################################################################
 # Virtual Nodes. A separate package so we can create objects for each one
@@ -1047,12 +1051,6 @@ sub PrintSummaryStats($)
     # For the caller.
     $self->counters()->{'minimum_nodes'}  = $minimum_nodes;
     $self->counters()->{'maximum_nodes'}  = $maximum_nodes;
-
-    if (0) {
-	$self->experiment()->Update({"maximum_nodes" => $maximum_nodes,
-				     "minimum_nodes" => $minimum_nodes})
-	    == 0 or return -1
-    }
 
     my $virtnode_count = $self->counters()->{'virtcount'};
     my $simnode_count  = $self->counters()->{'simcount'};
@@ -1990,6 +1988,13 @@ sub CreateVtop($)
 	# includes emulated links. Maybe thats wrong.
 	'maxlinks'    => 0,
     };
+
+    # Initialize counters.
+    $self->{'COUNTERS'}->{'simcount'}    = 0;
+    $self->{'COUNTERS'}->{'remotecount'} = 0;
+    $self->{'COUNTERS'}->{'virtcount'}   = 0;
+    $self->{'COUNTERS'}->{'plabcount'}   = 0;
+    $self->{'COUNTERS'}->{'physcount'}   = 0;
 
     #
     # Experiment wide options.

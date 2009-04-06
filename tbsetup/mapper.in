@@ -1,0 +1,435 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+use POSIX qw(setsid ceil);
+use POSIX ":sys_wait_h";
+
+#
+# This function as the main assign loop.  It converts the virtual
+# topology into a top input including LAN and delay translation.  It
+# then snapshots the current testbed physical state and runs assign,
+# looping a couple times if assign fails.  When assign successfully
+# completes it will interpret the results.  Attempt to match any
+# existing portmap entries and then update the delays and vlans table.
+#
+# XXX Internally created nodes (jailhost,delay,sim) are not treated
+#     consistently. Needs more thought.
+#
+# Return codes: We catch all errors with the END block below, and if
+# anyone calls die() (exit value is 255) we add in the CANRECOVER bit.
+# Failures in assign always cause the caller to stop retrying. 
+#
+# The CANRECOVER bit indicates 'recoverability' (no db or physical
+# state was modified by the time the error occurred). This is relavent
+# to only modify operations (update).
+#
+my $WRAPPER_SUCCESS		 = 0x00;
+my $WRAPPER_FAILED		 = 0x01;	# Failed (Add other values)
+my  $WRAPPER_FAILED_CANRECOVER   = 0x40;        # Can recover from update
+my  $WRAPPER_FAILED_FATALLY      = 0x80;	# Do not use this.
+# Set this once we modify DB state; forces no recover in fatal().
+my $NoRecover = 0;
+
+sub usage ()
+{
+    print STDERR "Usage: $0 [-v] [-u [-f] | -n] pid eid\n";
+    print STDERR " -v   - Enables verbose output\n";
+    print STDERR " -u   - Enables update mode\n";
+    print STDERR " -f   - Fix current resources during update mode\n";
+    print STDERR " -n   - Run assign, but do not reserve/modify resources.\n";
+    print STDERR " -p   - Do a precheck for mapability on an empty testbed - ".
+		 "implies -n\n";
+    exit($WRAPPER_FAILED);
+}
+my $optlist  = "vunfp";
+my $verbose  = 0;
+my $fixmode  = 0;
+my $updating = 0;
+my $impotent = 0;
+my $precheck = 0;
+my $quiet    = 0;
+my $warnings = 0;
+my $maxrun   = 3;		# Maximum number of times we run assign.
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $ASSIGN      = "$TB/libexec/assign";
+my $WRAPPER2    = "$TB/libexec/assign_wrapper2";
+my $PTOPGEN     = "$TB/libexec/ptopgen";
+my $VTOPGEN     = "$TB/bin/vtopgen";
+
+#
+# Load the Testbed support stuff. 
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use libtblog;
+use libvtop;
+use libadminctrl;
+
+# Protos
+sub fatal(@);
+sub debug($);
+sub chat($);
+sub RunAssign($$);
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Turn off line buffering on output
+$| = 1; 
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV < 2) {
+    usage();
+}
+if (defined($options{"v"})) {
+    $verbose++;
+}
+if (defined($options{"u"})) {
+    $updating = 1;
+}
+if (defined($options{"n"})) {
+    $impotent = 1;
+}
+if (defined($options{"f"})) {
+    $fixmode = 1;
+}
+if (defined($options{"p"})) {
+    $precheck = 1;
+}
+
+my $pid = $ARGV[0];
+my $eid = $ARGV[1];
+my $experiment = Experiment->Lookup($pid, $eid);
+if (!defined($experiment)) {
+    fatal("Could not lookup experiment object $pid,$eid!")
+}
+
+#
+# These are the flags to the vtop creation code. 
+#
+my $vtopflags = 0;
+$vtopflags |= $libvtop::VTOP_FLAGS_VERBOSE
+    if ($verbose);
+$vtopflags |= $libvtop::VTOP_FLAGS_UPDATE
+    if ($updating);
+$vtopflags |= $libvtop::VTOP_FLAGS_FIXNODES
+    if ($fixmode);
+
+chat("Starting the new and improved mapper wrapper.\n");
+
+my $vtop = libvtop->Create($experiment, $vtopflags);
+if (!defined($vtop)) {
+    fatal("Could not create vtop structure for $experiment");
+}
+
+#
+# The assign loop. 
+#
+my $currentrun     = 1;
+my $canceled       = 0;
+my $tried_precheck = 0;
+# Admission control counts
+my %admission_control = ();
+
+
+# XXX plab hack - only run assign once on plab topologies, since they're easy
+# to map and the physical topology does not change frequently.
+if ($vtop->plabcount() && $vtop->plabcount == $vtop->virtnodecount()) {
+    $maxrun = 2;
+}
+
+TBDebugTimeStamp("mapper loop started");
+while (1) {
+    chat("Assign run $currentrun\n");
+
+    my $prefix = "$pid-$eid-$$";
+
+    #
+    # When precheck is on, we only do one run in impotent mode and exit.
+    #
+    if ($precheck) {
+	$prefix  .= ".empty";
+	$impotent = 1;
+	chat("Trying assign on an empty testbed.\n");
+    }
+
+    #
+    # RunAssign returns  0 if successful.
+    #           returns -1 if failure, but assign says to stop trying.
+    #           returns  1 if failure, but assign says to try again.
+    #           returns  2 if we made some forward progress.
+    #
+    my $retval = RunAssign($precheck, $prefix);
+
+    # Success!
+    last
+	if ($retval == 0);
+
+    if ($retval < 0) {
+	#
+	# Failure in assign.
+	#
+	fatal({type => 'primary', severity => SEV_ERROR,
+	       error => ['unretriable_assign_error']},
+	      "Unretriable error. Giving up.");
+    }
+    
+    #
+    # When precheck is off, we do a precheck run if the first try fails
+    # to find a solution. This avoids looping on an unsolvable topology.
+    #
+    if (!$precheck && !$tried_precheck) {
+	chat("Trying assign on an empty testbed to verify mapability.\n");
+	my $save_impotent = $impotent;
+	$impotent  = 1;
+	my $retval = RunAssign(1, $prefix . ".empty");
+	if ($retval != 0) {
+	    fatal({type=>'extra', cause=>'user', severity=>SEV_ERROR,
+	           error=>['infeasible_resource_assignment']}, 
+		  "This experiment cannot be instantiated on this ".
+                  "testbed. You have most likely asked for hardware ".
+                  "this testbed does not have, such as nodes of a type ".
+                  "it does not contain, or nodes with too many network ".
+                  "interfaces.  You will need to modify this experiment ".
+                  "before it can be swapped in - re-submitting the ".
+                  "experiment as-is will always result in failure.");
+	}
+	chat("Assign succeeded on an empty testbed.\n");
+	$impotent = $save_impotent;
+	$tried_precheck = 1;
+    }
+
+    if ($currentrun >= $maxrun && $retval != 2) {
+	fatal({type => 'primary', severity => SEV_ERROR,
+	       error => ['reached_assign_run_limit']},
+	      "Reached run limit. Giving up.");
+    }
+
+    chat("Waiting 5 seconds and trying again...\n");
+    sleep(5);
+    $currentrun++;
+}
+TBDebugTimeStamp("mapper loop finished");
+
+exit(0);
+
+#
+# The guts of an assign run.
+#
+sub RunAssign($$)
+{
+    my ($precheck, $prefix) = @_;
+
+    my $ptopfile = $prefix . ".ptop";
+    my $vtopfile = $prefix . ".vtop";
+    my $assignexitcode = 0;
+
+    #
+    # Do admission control test, and gather the info.
+    #
+    my %admission_control;
+    fatal("Failed admission control checks!")
+	if (!TBAdmissionControlCheck(undef, $experiment, \%admission_control));
+
+    #
+    # Snapshot physical resources.
+    #
+    # if updating (-u), include any resources that may already be
+    # allocated to experiment in the PTOP results.
+    #
+    my $ptopargs = "-p $pid ";
+    $ptopargs   .= "-e $eid "
+	if ($updating);
+    $ptopargs   .= "-u "
+	if ($updating && $experiment->elabinelab());
+    $ptopargs   .= "-m " . $experiment->multiplex_factor() . " "
+	if (defined($experiment->multiplex_factor()));
+    $ptopargs   .= "-v "
+	if ($vtop->virtnodecount());
+    $ptopargs   .= "-r "
+	if ($vtop->remotenodecount());
+    $ptopargs   .= "-S "
+	if ($vtop->simnodecount());
+    $ptopargs	.= "-a "
+    	if ($precheck);
+    $ptopargs	.= "-c " . $experiment->delay_capacity() . " "
+    	if (defined($experiment->delay_capacity()));
+
+    chat("ptopargs: '$ptopargs'\n");
+    TBDebugTimeStamp("ptopgen started");
+    system("$PTOPGEN $ptopargs > $ptopfile");
+    if ($?) {
+	fatal("Failure in $ptopfile");
+    }
+    TBDebugTimeStamp("ptopgen finished");
+
+    #
+    # Append this admission control results to ptopgen.
+    #
+    if (scalar(keys(%admission_control))) {
+	open(PTOP, ">> $ptopfile") or
+	    return -1;
+
+	foreach my $typeclass (keys(%admission_control)) {
+	    my $count = $admission_control{$typeclass};
+
+	    print PTOP "set-type-limit $typeclass $count\n";
+	}
+	close(PTOP);
+    }
+
+    #
+    # Now generate a vtop file and dump it to a file.
+    #
+    TBDebugTimeStamp("vtopgen started");
+    $vtop->CreateVtop() == 0
+	or fatal("Could not create vtop for $experiment");
+    open(VTOPFILE, "> $vtopfile") or
+	fatal("Could not open $vtopfile: $!");
+    $vtop->PrintTop(*VTOPFILE) == 0 or
+	fatal("Could not print vtop file for $experiment");
+    TBDebugTimeStamp("ptopgen finished");
+    close(VTOPFILE);
+
+    if ($impotent) {
+	$experiment->Update({"maximum_nodes" => $vtop->maximum_nodes(),
+			     "minimum_nodes" => $vtop->minimum_nodes() })
+	    == 0 or fatal("Could not update min/max nodes for $experiment");
+    }
+
+    # Run assign
+    my $cmd  = "$ASSIGN";
+    my $args = "-P $ptopfile $vtopfile";
+    $args = "-uod -c .75 $args"
+	if ($vtop->virtnodecount() || $vtop->simnodecount());
+    $args = "-n $args"
+    	if ($precheck);
+    chat("assign command: '$cmd $args'\n");
+
+    #
+    # Fork a child to run assign. Parent spins watching the cancel flag
+    # and waiting for assign to finish.
+    #
+    if (my $childpid = fork()) {
+	while (1) {
+	    sleep(2);
+
+	    if (waitpid($childpid, &WNOHANG) == $childpid) {
+		$assignexitcode = $? >> 8;
+		last;
+	    }
+
+	    # Check cancel flag.
+	    if ($experiment->canceled()) {
+		if ((my $pgrp = getpgrp($childpid)) > 0) {
+		    kill('TERM', -$pgrp);
+		    waitpid($childpid, 0);
+
+		    fatal({cause => 'canceled', severity => SEV_IMMEDIATE,
+			   error => ['cancel_flag']},
+			  "Cancel flag set; aborting assign run!");
+		    return -1;
+		}
+		# Loop again to reap child above before exit.
+	    }
+	}
+    }
+    else {
+	#
+	# Change our session so the child can get a killpg without killing
+	# the parent. 
+	#
+        POSIX::setsid();
+	exec("nice $WRAPPER2 $cmd $args > assign.log");
+	die("Could not start assign!\n");
+    }
+
+    # Check cancel flag before continuing. 
+    if ($experiment->canceled()) {
+	fatal({cause => 'canceled', severity => SEV_IMMEDIATE,
+	       error => ['cancel_flag']},
+	      "Cancel flag set; aborting assign run!");
+	return -1;
+    }
+
+    # Check for possible full filesystem ...
+    if (-z "assign.log") {
+	tbnotice("assign.log is zero length! Stopping ...\n");
+	return -1;
+    }
+
+    #
+    # Saving up assign.log coz each swapin/modify is different and it
+    # is nice to have every mapping for debugging and archiving
+    # purposes We do not call it .log though, since we do not want it
+    # copied out to the user directory every swapin. See Experiment.pm
+    #
+    system("/bin/cp assign.log ${prefix}.assign");
+
+    #
+    # We no longer care what assign has to say when it fails.
+    # Any relevent info was already sent to stderr so just 
+    # tell the caller whether we want to keep trying or not.
+    #
+    if ($assignexitcode) {
+	return (($assignexitcode == 1) ? 1 : -1);
+    }
+    #
+    # If we were doing the precheck, go ahead and exit now - there is no
+    # useful information to parse out
+    #
+    if ($precheck) {
+	print "Precheck succeeded.\n";
+	return 0;
+    }
+
+    debug("Reading assign results.\n");
+    if (!open(ASSIGNFP, "assign.log")) {
+	print("Could not open assign logfile! $!\n");
+	return -1;
+    }
+
+    
+
+    exit(0);
+}
+
+sub fatal(@)
+{
+    tberror(@_);
+
+    # We next go to the END block above.
+    exit($WRAPPER_FAILED);
+}
+sub debug($)
+{
+    if ($verbose) {
+	print $_[0];
+    }
+}
+sub chat($)
+{
+    if (! $quiet) {
+	print $_[0];
+    }
+}
