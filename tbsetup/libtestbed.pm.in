@@ -92,6 +92,9 @@ sub TBMAIL_AUDIT()  { "Testbed Audit <$TBAUDITEMAIL>" }
 sub TBMAIL_PROJADMIN($) {
     @MAILMANSUPPORT@ ? "$_[0]-admin\@@OURDOMAIN@" : "@TBAPPROVALEMAIL@";
 }
+sub TBMAIL_APPROVAL() {
+    "@TBAPPROVALEMAIL@";
+}
 
 # This is for the swigged event library which includes this file.
 sub TB_BOSSEVENTPORT()  { "@BOSSEVENTPORT@"; }
@@ -257,6 +260,11 @@ sub SendProjAdminMail($$$$$;$)
 	$headers .= "Bcc: $projadminmail\n"; 
    } elsif ($to eq 'ADMIN') {
 	$to = $projadminmail;
+	if ($projadminmail ne TBMAIL_APPROVAL) {
+	    # to make sure the mail is sent, since sometimes the
+	    # initial mail to the PROJ-admin doesn't, for some reason
+	    $headers .= "Bcc: " . TBMAIL_APPROVAL . "\n";
+	}
 	$headers .= "Reply-To: $projadminmail\n";
     } else {
 	$headers .= "Bcc: $projadminmail\n";
