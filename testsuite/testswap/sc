@@ -46,10 +46,11 @@ if (@ARGV) {
   elsif (/swapin/) { $e->swapin_wait; }
   elsif (/swapout/) { $e->swapout_wait; }
   elsif (/start/) { $e->startexp_ns_wait($ns); }
+  elsif (/tevc/) { $e->tevc(@ARGV); }
+  elsif (/linktest/) { $e->linktest; }
+  elsif (/single_node_tests/) { $e->single_node_tests; }
   elsif (/ni/) { say Dumper($e->nodeinfo) ;}
   elsif (/li/) { say Dumper($e->linkinfo) ;}
-  elsif (/tevc/) { $e->tevc(@ARGV); }
-  elsif (/single_node_tests/) { $e->single_node_tests; }
   else { 
   }
 }

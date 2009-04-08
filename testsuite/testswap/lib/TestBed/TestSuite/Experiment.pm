@@ -13,7 +13,6 @@ use TestBed::TestSuite::Node;
 extends 'Exporter', 'TestBed::XMLRPC::Client::Experiment';
 require Exporter;
 our @EXPORT;
-
 push @EXPORT, qw(e ep launchpingkill launchpingswapkill);
 
 sub ep { TestBed::TestSuite::Experiment->new }
@@ -35,28 +34,18 @@ sub ping_test {
 sub single_node_tests {
   my ($e) = @_;
   for (@{$e->nodes}) {
-    say $_->name;
     $_->single_node_tests();
   }
 }
 
-sub link_test {
+sub linktest {
   my ($e) = @_;
-  TestBed::Wrap::linktest::link_test($e->pid, $e->eid);
+  TestBed::Wrap::linktest::linktest($e->pid, $e->eid);
 }
 
 sub tevc {
   my ($e) = shift;
-  my $pid = $e->pid;
-  my $eid = $e->eid;
   TestBed::Wrap::tevc::tevc($e->pid, $e->eid, @_);
-}
-
-sub hostname_test {
-  my ($e) = @_;
-  for (@{$e->nodes}) {
-    $_->sshcmddump("uname -a");
-  }
 }
 
 sub trytest(&$) {

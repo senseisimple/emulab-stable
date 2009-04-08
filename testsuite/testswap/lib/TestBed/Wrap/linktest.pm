@@ -24,7 +24,9 @@ sub linktest {
   sleep 8;
   for my $i (1..4) {
     sleep 2;
-    $ssh->cmdsuccessdump("run_linktest.pl -v -L $i -l $i -e $pid/$eid");
+    my $cmd = 'PATH=/usr/testbed/bin:$PATH '. "run_linktest.pl -v -L $i -l $i -e $pid/$eid";
+    say $cmd;
+    $ssh->cmdsuccessdump($cmd);
   }
 }
 
