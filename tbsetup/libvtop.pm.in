@@ -1,4 +1,4 @@
-#!/usr/bin/perl -wT
+!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2005-2009 University of Utah and the Flux Group.
@@ -9,7 +9,8 @@ package libvtop;
 use strict;
 use Exporter;
 use vars qw(@ISA @EXPORT @EXPORT_OK
-	    $VTOP_FLAGS_UPDATE $VTOP_FLAGS_VERBOSE $VTOP_FLAGS_FIXNODES);
+	    $VTOP_FLAGS_UPDATE $VTOP_FLAGS_VERBOSE
+	    $VTOP_FLAGS_FIXNODES $VTOP_FLAGS_IMPOTENT);
 
 @ISA    = "Exporter";
 @EXPORT = qw( );
@@ -32,6 +33,7 @@ use XML::LibXML;
 # Configure variables
 my $TB		  = "@prefix@";
 my $BOSSNODE      = "@BOSSNODE@";
+my $AVAIL         = "$TB/bin/avail";
 my $DELAYCAPACITY = @DELAYCAPACITY@;	# Can be overridden by user!
 my $DELAYTHRESH   = @DELAYTHRESH@;
 
@@ -39,8 +41,10 @@ my $DELAYTHRESH   = @DELAYTHRESH@;
 $VTOP_FLAGS_VERBOSE	= 0x01;
 $VTOP_FLAGS_UPDATE	= 0x02;
 $VTOP_FLAGS_FIXNODES	= 0x04;
+$VTOP_FLAGS_IMPOTENT	= 0x08;
 
-@EXPORT_OK = qw($VTOP_FLAGS_UPDATE $VTOP_FLAGS_VERBOSE $VTOP_FLAGS_FIXNODES);
+@EXPORT_OK = qw($VTOP_FLAGS_UPDATE $VTOP_FLAGS_VERBOSE $VTOP_FLAGS_FIXNODES
+		$VTOP_FLAGS_IMPOTENT);
 
 #
 # Create an object representing the stuff we need to create the vtop file.
@@ -69,12 +73,25 @@ sub Create($$$)
     $self->{'DELAYLINKS'} = {};
     $self->{'OPTIONS'}    = {};
     $self->{'DELAYID'}    = 0;
+    $self->{'PHOSTID'}    = 0;
     $self->{'IFACEID'}    = 32768;
     $self->{'PORTBW'}     = {};
     $self->{'RESULTS'}    = { "nodes"  => [],
 			      "links"  => [],
 			      "class"  => [],
 			      "fixed"  => [] };
+    
+    $self->{'PNODES'}      = {};
+    $self->{'FIXEDNODES'}  = {};
+    $self->{'CURRENT_V2P'} = {};
+    $self->{'CURRENT_P2V'} = {};
+    $self->{'CURRENT_V2V'} = {};
+
+    # Below is for interpretation of assign results.
+    $self->{'SOLUTION'}    = {};
+    $self->{'OLDRSRVCLEAN'}= 0;
+    $self->{'NEWRESERVED'} = {};	# Newly reserved nodes.
+    
     bless($self, $class);
 
     return $self;
@@ -97,6 +114,12 @@ sub delaylinks($)       { return $_[0]->{'DELAYLINKS'}; }
 sub delaynodecount()    { return scalar(keys(%{ $_[0]->delaynodes() })); }
 sub portbw($)           { return $_[0]->{'PORTBW'}; }
 sub results($)          { return $_[0]->{'RESULTS'}; }
+sub current_v2p($)      { return $_[0]->{'CURRENT_V2P'}; }
+sub current_p2v($)      { return $_[0]->{'CURRENT_P2V'}; }
+sub current_v2v($)      { return $_[0]->{'CURRENT_V2V'}; }
+sub pnodes($)           { return $_[0]->{'PNODES'}; }
+sub fixednodes($)       { return $_[0]->{'FIXEDNODES'}; }
+sub newreserved($)      { return $_[0]->{'newreserved'}; }
 sub pid($)		{ return $_[0]->experiment()->pid(); }
 sub pid_idx($)		{ return $_[0]->experiment()->pid_idx(); }
 sub eid($)		{ return $_[0]->experiment()->eid(); }
@@ -119,6 +142,7 @@ sub isadelaynode($$)    { return exists($_[0]->delaynodes()->{$_[1]}); }
 sub verbose($)		{ return $_[0]->flags() & $VTOP_FLAGS_VERBOSE; }
 sub updating($)		{ return $_[0]->flags() & $VTOP_FLAGS_UPDATE; }
 sub fixcurrent($)	{ return $_[0]->flags() & $VTOP_FLAGS_FIXNODES; }
+sub impotent($)		{ return $_[0]->flags() & $VTOP_FLAGS_IMPOTENT; }
 sub printdb($$)		{ print $_[1] if ($_[0]->verbose()); }
 
 # We name delay nodes internally as they are needed.
@@ -127,6 +151,7 @@ sub nextdelayname($)    { return "tbsdelay" . $_[0]->{'DELAYID'}++; }
 sub delay_desire($)	{ return $_[0]->option("delay_desire_string"); }
 # For XML
 sub nextifacenumber($)  { return $_[0]->{'IFACEID'}++; }
+sub nextphostnumber($)  { return $_[0]->{'PHOSTID'}++; }
 
 # Virtual Types. 
 sub virttypeisvtype($$) { return $_[0]->virt_vtypes()->Find($_[1]); }
@@ -493,7 +518,7 @@ sub LoadPhysInfo($)
 # When updating with fixednodes turned on, we need the current set
 # of nodes that need to be fixed.
 #
-sub LoadFixedNodes($)
+sub LoadCurrentResources($)
 {
     my ($self) = @_;
 
@@ -506,14 +531,20 @@ sub LoadFixedNodes($)
 
     $self->printdb("Loading fixed nodes\n");
 
-    my @nodelist = $self->experiment()->NodeList();
+    my @nodelist = $self->experiment()->NodeList(0, 1);
     return 0
 	if (!@nodelist);
 
     foreach my $pnode (@nodelist) {
-	my $vname = $pnode->vname();
-	my $rsrv  = $pnode->ReservedTableEntry();
-	
+	my $vname   = $pnode->vname();
+	my $node_id = $pnode->node_id();
+	my $rsrv    = $pnode->ReservedTableEntry();
+
+	# A list of vnodes on this pnode.
+	$self->current_p2v()->{$pnode->phys_nodeid()} = []
+	    if (! exists($self->current_p2v()->{$pnode->phys_nodeid()}));
+	$self->pnodes()->{$node_id} = $pnode;
+
 	#
 	# WIDEAREA nodes are going to break.
 	#
@@ -523,8 +554,26 @@ sub LoadFixedNodes($)
 	    return -1;
 	}
 	if ($pnode->isvirtnode()) {
-	    $self->{'FIXED_NODES'}->{$vname} = $pnode->node_id();
+	    $self->fixednodes()->{$vname} = $pnode->node_id();
 	    $self->counters()->{'reserved_virtcount'}++;
+
+	    # Get the underlying physical node.
+	    my $ppnode = Node->Lookup($pnode->phys_nodeid());
+	    if (!defined($ppnode)) {
+		tberror("Cannot map $pnode to its real physnode");
+		return -1;
+	    }
+
+	    #
+	    # Record the mappings. 
+	    #
+	    $self->current_v2v()->{$vname} = $pnode;
+	    $self->current_v2p()->{$vname} = $ppnode;
+	    push(@{ $self->current_p2v()->{$ppnode->node_id()} }, $vname);
+	    
+	    # Mark the node as unused until later.
+	    $pnode->_reuse("unused");
+	    $ppnode->_reuse("unused");
 	}
 	else {
 	    #
@@ -535,8 +584,18 @@ sub LoadFixedNodes($)
 		return -1;
 	    }
 	    else {
-		$self->{'FIXED_NODES'}->{$vname} = $pnode->node_id();
+		$self->fixednodes()->{$vname} = $pnode->node_id();
 		$self->counters()->{'reserved_physcount'}++;
+
+		#
+		# Record the mapping. 
+		#
+		$self->current_v2p()->{$vname} = $pnode;
+		push(@{ $self->current_p2v()->{$node_id} }, $vname);
+		# Mark the node as unused until later.
+		$pnode->_reuse("unused");
+
+		$self->printdb("current v2p: $node_id -> $vname\n");
 	    }
 	}
     }
@@ -578,6 +637,7 @@ sub LoadVirtNodes($)
 	my $issim   = 0;
 	my $isdyn   = 0;	# Only virtnodes are dynamic.
 	my $isvtyped= 0;
+	my $isded   = 0;
 
 	# If we have a real type or auxtype ...
 	my $nodetype = NodeType->LookupAny($type);
@@ -608,6 +668,7 @@ sub LoadVirtNodes($)
 	$isplab   = $nodetype->isplabdslice();
 	$issim    = $nodetype->issimnode();
 	$isdyn    = $nodetype->isdynamic();
+	$isded    = $nodetype->isdedicatedremote();
 
 	# Mark this as being a virtual typed node.
 	$vnode->_isvtyped($isvtyped);
@@ -620,6 +681,7 @@ sub LoadVirtNodes($)
 	$vnode->_isplabnode($isplab);
 	$vnode->_issimnode($issim);
 	$vnode->_isdynamic($isdyn);
+	$vnode->_isdedremote($isded);
 
 	# The mapped osname to actual osinfo structure.
 	$vnode->_osinfo(undef);
@@ -653,7 +715,7 @@ sub LoadVirtNodes($)
 	# Can fixed really get set to ""?
 	if (defined($fixed) && $fixed ne "") {
 	    # Store the name since we use FIXED_NODES for delay nodes too.
-	    $self->{'FIXED_NODES'}->{$vname} = $fixed;
+	    $self->fixednodes()->{$vname} = $fixed;
 	}
 
 	$self->printdb("  $vname type:$type ips:$ips\n");
@@ -1024,8 +1086,8 @@ sub GenFixNodes($)
     #
     # XXX This must be done last since we create internal nodes above.
     #
-    foreach my $vname (keys(%{ $self->{'FIXED_NODES'} })) {
-	my $fixed = $self->{'FIXED_NODES'}->{$vname};
+    foreach my $vname (keys(%{ $self->fixednodes() })) {
+	my $fixed = $self->fixednodes()->{$vname};
 	
 	if ($self->isatoponode($vname) || $self->isadelaynode($vname)) {
 	    $self->addfixed("$vname $fixed");
@@ -1618,10 +1680,10 @@ sub GenVirtLans($)
 
 		    $self->addnode("$delayname delay $delaydesire");
 		    
-		    $self->addlink("linksdelaysrc/$vlan/$member0,$member1 ".
+		    $self->addlink("linksdelaysrc/$vname/$member0,$member1 ".
 				   "$vname0 $delayname $top_bw 0 0 ".
 				   "$protocol $fixsrc0");
-		    $self->addlink("linksdelaydst/$vlan/$member1,$member0 ".
+		    $self->addlink("linksdelaydst/$vname/$member1,$member0 ".
 				   "$vname1 $delayname $top_bw 0 0 ".
 				   "$protocol $fixdst1");
 
@@ -1951,8 +2013,9 @@ sub PrintXML($;$)
 
     return 0;
 }
+
 #
-# Create a vtop. 
+# One time initializaton for a vtop. 
 #
 sub CreateVtop($)
 {
@@ -2048,13 +2111,14 @@ sub CreateVtop($)
 	$self->virtexperiment()->allowfixnode()) {
 	$self->{'FLAGS'} |= $VTOP_FLAGS_FIXNODES;
     }
-    
     return -1
 	if ($self->LoadPhysInfo() ||
 	    $self->LoadVirtNodes() ||
 	    $self->LoadVirtLans() ||
-	    $self->LoadFixedNodes() ||
-	    $self->GenVirtTypes() ||
+	    $self->LoadCurrentResources());
+    
+    return -1
+	if ($self->GenVirtTypes() ||
 	    $self->GenVirtNodes() ||
 	    $self->GenVirtLans() ||
 	    $self->GenFixNodes() ||
@@ -2252,7 +2316,770 @@ sub protocolbasetype($) {
     }
 }
 
+#############################################################################
 #
+# Solution. Now we get into the code to process the solution. 
+#
+# Stuff for the solution and interpretation.
+sub solution($)         { return $_[0]->{'SOLUTION'}; }
+sub solution_p2v($)	{ return $_[0]->{'SOLUTION'}->{'P2V'}; }
+sub solution_v2p($)	{ return $_[0]->{'SOLUTION'}->{'V2P'}; }
+sub solution_v2v($)	{ return $_[0]->{'SOLUTION'}->{'V2V'}; }
+
+sub ReadSolution($$)
+{
+    my ($self, $input) = @_;
+
+    # Start with a new solution vector each time.
+    $self->{'SOLUTION'} = {};
+    $self->{'SOLUTION'}->{'TORESERVE'} = {};
+    $self->{'SOLUTION'}->{'V2P'}       = {};
+    $self->{'SOLUTION'}->{'P2V'}       = {};
+    $self->{'SOLUTION'}->{'V2V'}       = {};
+    $self->{'SOLUTION'}->{'PLINKS'}    = {};
+    $self->{'SOLUTION'}->{'VIRTNODES'} = {};
+
+    #
+    # Still using the old assign format.
+    #
+    my $found_nodes_section = 0;
+    
+    while (<$input>) {
+	# find the 'BEST SCORE' line and print that out for informational
+	# purposes
+	if (/BEST SCORE/) {
+	    chomp($_);
+	    $self->solution()->{"BEST SCORE"} = $_;
+	}
+        if (/^Nodes:/) {
+            $found_nodes_section = 1;
+            last;
+        }
+    }
+    if (!$found_nodes_section) {
+        tbwarn("Unable to find Nodes section in assign output");
+        return -1;
+    }
+    $self->printdb("Nodes:\n");
+    while (<$input>) {
+	chomp;
+	/^End Nodes$/ && last;
+	my @info = split;
+	my ($virtual,$physical) = @info[0,1];
+
+	# Skip LAN/Fake nodes.
+	next
+	    if (exists($self->lannodes()->{$virtual}));
+
+	# All we do in this stage is store the results.
+	$self->solution()->{'V2P'}->{$virtual}  = $physical;
+	$self->solution()->{'P2V'}->{$physical} = []
+	    if (!exists($self->solution()->{'P2V'}->{$physical}));
+
+	push(@{ $self->solution()->{'P2V'}->{$physical} }, $virtual);
+	$self->printdb("  $virtual $physical\n");
+    }
+
+    # read Edges
+    # By convention, in plinks, the delay node is always the second
+    # entry.
+    my $found_edges_section = 0;
+    while (<$input>) {
+        if (/^Edges:/) {
+            $found_edges_section = 1;
+            last;
+        }
+    }
+    if (!$found_edges_section) {
+        tbwarn("Unable to find Edges section in assign output");
+        return -1;
+    }
+    $self->printdb("Edges:\n");
+    EDGEWHILE: while (<$input>) {
+	my ($vlink,$rawA,$rawB) = undef;
+
+	/^End Edges$/ && last EDGEWHILE;
+        my @info = split;
+	my $line = $_;
+	$_ = $info[1]; # type
+        SWITCH1: {
+	    /^intraswitch$/ && do {
+		($vlink,$rawA,$rawB) = @info[0,3,5];
+		last SWITCH1;
+	    };
+	    /^interswitch$/ && do {
+		($vlink,$rawA,$rawB) = @info[0,3,$#info];
+		last SWITCH1;
+	    };
+	    /^direct$/ && do {
+		($vlink,$rawA,$rawB) = @info[0,3,5];
+		last SWITCH1;
+	    };
+	    /^trivial$/ && do {
+		# we don't have plinks for trivial links
+		$vlink = $info[0];
+		$self->solution()->{'PLINKS'}->{$vlink} = [];
+		next EDGEWHILE;
+	    };
+	    tbwarn("Found garbage: $line\n");
+	}
+	my $nodeportA = getnodeport($rawA);
+	my $nodeportB = getnodeport($rawB);
+	$nodeportA =~ s/\//:/;
+	$nodeportB =~ s/\//:/;
+
+	$self->solution()->{'PLINKS'}->{$vlink} = [$nodeportA,$nodeportB];
+	$self->printdb("  $vlink $nodeportA,$nodeportB\n");
+    }
+
+    return 0;
+}
+
+#
+# Interpret the results. This really just the first stage.
+#
+sub InterpNodes($)
+{
+    my ($self) = @_;
+
+    foreach my $virtual (keys(%{ $self->solution()->{'V2P'} })) {
+	my $physical = $self->solution()->{'V2P'}->{$virtual};
+	my $pnode    = $self->pnodes()->{$physical};
+
+	# This might not exist, as for internal nodes.
+	my $virtnode = $self->vnodes()->{$virtual};
+
+	#
+	# A node already allocated to this experiment, and still wanted.
+	#
+	if (defined($pnode)) {
+	    #
+	    # Mark node as being reused.
+	    #
+	    # Look at node being mapped to the pnode;
+	    # if it not in the previous map, mark node for reboot.
+	    #
+	    if ($pnode->_reuse() eq "reboot") {
+		# No changes once it goes into reboot.
+		;
+	    }
+	    elsif (defined($virtnode) && $virtnode->isvirtnode()) {
+		#
+		# A new virtual node on an existing physical node
+		# does not force the physnode to be rebooted; we can
+		# set up a new virtnode on it without a reboot. If its
+		# an existing virtual on the same physnode, then mark
+		# both as reused; no need to reboot either. If the 
+		# virtnode has moved here from someplace else, no
+		# reboot of the physnode either, but obviously the
+		# vnode will be released and a new one allocated.  What
+		# we cannot determine is if its just a renamed node
+		# (which would require a reboot of the the virtual
+		# node). 
+		#
+		$pnode->_reuse("reused");
+
+		if (exists($self->current_v2p()->{$virtual}) &&
+		    $self->current_v2p()->{$virtual} eq $physical) {
+		    # This is the virtual pnode allocated on the real pnode.
+		    my $virtpname = $self->current_v2v()->{$virtual};
+		    my $virtpnode = $self->pnodes()->{$virtpname};
+
+		    $virtpnode->_reuse("reused");
+		}
+	    }
+	    else {
+		#
+		# If a new node mapped to this physnode (maybe
+		# even the luser changed the name of the node), or if an
+		# existing virtual node moved to this physnode, must
+		# reboot the physnode. Else, the physnode is being
+		# reused as is, and no need to mess with it. If the
+		# user requested reboot, that will be handled outside
+		# of this script.
+		#
+		if (!exists($self->current_v2p()->{$virtual}) ||
+		    $self->current_v2p()->{$virtual} ne $physical) {
+		    $pnode->_reuse("reboot");
+		}
+		else {
+		    $pnode->_reuse("reused");
+		}
+	    }
+	}
+	else {
+	    #
+	    # This is a new node; we have to reserve it. Note that
+	    # we do not reserve a widearea physnode when a virtual node
+	    # is mapped to it; they are special.
+	    #
+	    # If there is no virtnode, then its an internal node, like
+	    # a delay.
+	    #
+	    $self->solution()->{'TORESERVE'}->{$physical} = 1
+		if (!defined($virtnode) ||
+		    !$virtnode->_isvirtnode() ||
+		    !($virtnode->_isremotenode() &&
+		      !$virtnode->_isdedremote()));
+	}
+
+	if (!defined($virtnode)) {
+	    # Internally created node. We need to deal with internally
+	    # created nodes in a different way.
+	}
+	elsif ($virtnode->_isvirtnode()) {
+	    #
+	    # If mapping a virtual node, then record that, since we need
+	    # to allocate the virtnodes on that physnode, later.
+	    #
+	    if (!exists($self->solution()->{'VIRTNODES'}->{$physical})) {
+		$self->solution()->{'VIRTNODES'}->{$physical} = [];
+	    }
+	    push(@{$self->solution()->{'VIRTNODES'}->{$physical}}, $virtual);
+	}
+	elsif ($virtnode->_issubnode()) {
+	    #
+	    # Subnodes are currently not dynamically created, and there
+	    # is only one subnode per physical host. That physical host
+	    # needs to be allocated, if we do not already have it.
+	    #
+	    my $subnode_pnode = Node->Lookup($physical);
+	    if (!defined($subnode_pnode)) {
+		tbwarn("Could not lookup subnode host $physical\n");
+		return -1;
+	    }
+	    if (! exists($self->pnodes()->{$subnode_pnode->phys_nodeid()})) {
+		my $parentname = $subnode_pnode->phys_nodeid();
+		
+		# Make up a name and add to the reserve list.
+		my $newvname = $self->newvname($parentname, "phost");
+
+		$self->solution()->{'TORESERVE'}->{$parentname} = 1;
+		$self->solution()->{'V2P'}->{$newvname}   = $parentname;
+		$self->solution()->{'P2V'}->{$parentname} = [ $newvname ];
+
+		$self->printdb("  Adding subnode: $newvname $parentname\n");
+	    }
+	}
+    }
+}
+
+#
+# Allocate nodes.
+#
+sub AllocNodes($)
+{
+    my ($self) = @_;
+    my $experiment = $self->experiment();
+    my $pid = $experiment->pid();
+    my $eid = $experiment->eid();
+
+    goto skip
+	if ($self->impotent());
+
+    #
+    # Move existing nodes into a holding experiment and then back.
+    #
+    # Why? We will avoid any UNIQUE key issues when a virt_node in the
+    # topology moves from one pnode to another, or from previous to new
+    # mapping.
+    #
+    # Another reason to do this just before nalloc of a new toreserve
+    # nodes is that, we can get into name clashes For example, lets
+    # say the user called his node pc2 and it was actually mapped to
+    # pc99 in the initial swapin. If this was a swapmod where the user
+    # asked for another node node0 which got mapped to pc2. nalloc of
+    # pc2 will result in UNIQUE key problems since there exists a
+    # reserved vname pc2 (virtual name). By having this operation of
+    # moving the nodes into a holding experiment and back before a new
+    # nalloc, we avoid this UNIQUE key problem. Also note that simply
+    # updating the vname to be the same as the node_id field also does
+    # not work all the time i.e. in the example discussed above.
+    #
+    #
+    # We need to only once during a mapping.  If it gets repeatedly
+    # called coz only some pnode resources got nalloced, we do not
+    # have to do the above again.
+    #
+    my @nodeids = keys(%{ $self->current_p2v() });
+    if (@nodeids && !$self->{'OLDRSRVCLEAN'}) {
+	system("nfree -o $pid $eid @nodeids");
+	if ($?) {
+	    tberror("Could not move nodes to old reserved holding\n");
+	    return -1;
+	}
+	system("nalloc $pid $eid @nodeids");
+	if ($?) {
+	    tberror("Could not move nodes back from old reserved holding\n");
+	    return -1;
+	}
+	$self->{'OLDRSRVCLEAN'} = 1;
+    }
+
+    #
+    # Now alloc new nodes. This might include nodes already allocated
+    # in a previous iteration. That is okay; nalloc will ignore them.
+    #
+    @nodeids = keys(%{ $self->solution()->{'TORESERVE'} });
+    $self->printdb("Trying to allocate @nodeids\n");
+    system("nalloc -p $pid $eid @nodeids");
+    my $exitval  = $? >> 8;
+
+    #
+    # If nalloc failed with a fatal error, lets give it up. No retry.
+    # 
+    if ($exitval < 0) {
+	tberror("Failed to reserve any nodes.\n");
+	return -1; 
+    }
+
+    #
+    # Okay, if nalloc got anything, we have to set the norecover bit,
+    # since tbswap operates on the principle that once new nodes are
+    # reserved, recovery is no longer possible. However, if we exit
+    # cleanly enough that we can deallocate the new nodes, recovery
+    # is still possible. In the old assign_wrapper that was handled
+    # in the Fatal(). In the new version ... 
+    #
+    $self->{'NORECOVER'} = 1;
+
+    #
+    # Got some, perhaps not all nodes.
+    #
+    my @reserved  = $experiment->NodeList(0, 1);	# objects, virtual.
+
+    #
+    # All newly allocated nodes MUST go to the INIT_DIRTY allocstate
+    # since the user now has control of them. If we eventually fail,
+    # nodes not in RES_READY are deallocated (retry/modify).
+    #
+    foreach my $pnode (@reserved) {
+	my $nodeid = $pnode->node_id();
+	    
+	if (exists($self->solution()->{'TORESERVE'}->{$nodeid})) {
+	    $self->newreserved()->{$nodeid} = $nodeid;
+	    $pnode->SetAllocState(TBDB_ALLOCSTATE_RES_INIT_DIRTY())
+		if (!$self->impotent());
+	}
+    }
+    
+    if ($exitval > 0) {
+	#
+	# We got some but no all the nodes.
+	#
+	my $rcount    = scalar(@reserved);
+	my $tcount    = scalar(@nodeids);
+	my @justnames = map { $_->node_id() } @reserved;
+
+
+	# We got only some. Need to figure out which.
+	tbinfo("Reserved some nodes ($rcount) we needed, ".
+	       "but not all ($exitval).\n");
+	
+	#
+	# We check to see if we were able to reserve all the fixed
+	# nodes we needed. If we could not get the fixed list, then
+	# this experiment is unlikely to map in the "near" future, so
+	# give up now (no retry).
+	#
+	my @fixed = values(%{ $self->fixednodes() });
+	foreach my $fixname (@fixed) {
+	    if (! grep {$_ eq $fixname} @justnames) {
+		tbwarn("  Could not allocate fixed node $fixname!\n");
+		return -1;
+	    }
+	}
+	
+	#
+	# Must extend the fixed list with newly allocated nodes so
+	# that we can recreate the top file, and try again with a new
+	# set.
+	#
+	foreach my $pnode (@reserved) {
+	    my $nodeid = $pnode->node_id();
+	    
+	    if (exists($self->solution()->{'TORESERVE'}->{$nodeid})) {
+		#
+		# Fix all of the nodes assigned to the pnode.
+		#
+		foreach my $vname (@{ $self->solution_p2v()->{$nodeid} }) {
+		    $self->fixednodes()->{$vname} = $nodeid;
+
+		    # And add to the results for the next vtop print.
+		    $self->addfixed("$vname $nodeid");
+		}
+	    }
+	}
+
+	#
+	# Return indicator that we made forward progress (got some nodes).
+	# Caller will decide if appropriate to keep trying. We made progress
+	# if the return value of nalloc (number of nodes not allocated) does
+	# not equal the number of nodes we tried to allocate.
+	#
+	return (($tcount == $exitval) ? 1 : 2);
+    }
+
+    #
+    # Set the node allocstate for unused/dirty nodes.
+    #
+    foreach my $pnode (values(%{ $self->pnodes() })) {
+	if ($pnode->_reuse() eq "unused") {
+	    #
+	    # Node was used in previous incarnation, but not any more.
+	    # Mark it for teardown by the caller (tbswap currently).
+	    #
+	    $pnode->SetAllocState(TBDB_ALLOCSTATE_RES_TEARDOWN())
+		if (!$self->impotent());
+	}
+	elsif ($pnode->_reuse() eq "reboot") {
+	    #
+	    # Node is being reused, but for a different purpose, so
+	    # it should be rebooted.
+	    #
+	    $pnode->SetAllocState(TBDB_ALLOCSTATE_RES_INIT_DIRTY())
+		if (!$self->impotent());
+	}
+    }
+  skip:
+    if ($self->AllocVirtNodes() != 0) {
+	tberror("Could not allocate virtual nodes\n");
+	return -1;
+    }
+    if ($self->impotent()) {
+	tbinfo("Pretending we could allocate all physical nodes we needed.\n");
+    }
+    else {
+	tbinfo("Successfully reserved all physical nodes we needed.\n");
+    }
+
+    #
+    # Update the pnodes() array with the newly allocated nodes.
+    #
+    foreach my $physical (keys(%{ $self->solution_p2v() })) {
+	my @vlist = @{ $self->solution_p2v()->{$physical} };
+
+	my $pnode = Node->Lookup($physical);
+	if (!defined($pnode)) {
+	    tberror("Could not get object for $physical\n");
+	    return -1;
+	}
+	$self->pnodes()->{$physical} = $pnode;	
+
+	#
+	# Typically, its one-to-one, unless its a physnode hosting
+	# virtnodes, in which case the mapping is one-to-many.
+	#
+	foreach my $virtual (@vlist) {
+	    #
+	    # Nodes that we create in assign_wrapper, like delays
+	    # nodes (tbdelayXX) and jail hosts (vhost-XX) do not have
+	    # entries in the virt_nodes table. Should we form one, so
+	    # that we can refer to all nodes consistently?
+	    #
+	    next
+		if (!exists($self->vnodes()->{$virtual}));
+
+	    my $virtnode = $self->vnodes()->{$virtual};
+	    
+	    if ($virtnode->_isvirtnode()) {
+		#
+		# The physical node is the virtual node on the physical.
+		#
+		$pnode = Node->Lookup($self->solution_v2v()->{$virtual});
+		if (!defined($pnode)) {
+		    tberror("Could not get object for $physical\n");
+		    return -1;
+		}
+		$self->pnodes()->{$pnode->node_id()} = $pnode;
+	    }
+	    $pnode->_virtnode($virtnode);
+	    $virtnode->_pnode($pnode);
+	}
+    }
+    
+    return 0;
+}
+
+# Allocate virtnodes. This is a little hokey in that the virtnodes
+# just need to be allocated from the pool that is on the real node. We
+# know they are free, but we should go through nalloc anyway. If
+# anything fails, no point in retry.
+#
+sub AllocVirtNodes($)
+{
+    my ($self) = @_;
+    my $experiment = $self->experiment();
+    my $pid = $experiment->pid();
+    my $eid = $experiment->eid();
+
+    foreach my $physical (keys(%{ $self->solution()->{'VIRTNODES'} })) {
+	my @vlist = @{ $self->solution()->{'VIRTNODES'}->{$physical} };
+	my $numvs = @vlist;
+	my @plist = ();
+	my @oplist = ();
+	my @ovlist = ();
+	my @delvlist = ();
+
+	$self->printdb("On pnode $physical: vnodes @vlist\n");
+
+	#
+	# If updating, need to watch for nodes that are already reserved.
+	# We save that info in oplist/ovlist, and build a new vlist for
+	# avail, of just the nodes we need in this run. 
+	#
+	if ($self->updating()) {
+	    my @oldvlist = ();
+	    if (exists($self->current_p2v()->{$physical})) {
+		@oldvlist = @{ $self->current_p2v()->{$physical} };
+	    } 
+	    $self->printdb("On pnode $physical: oldvlist: @oldvlist\n");
+
+	    # newvlist = elements in vlist but not in oldvlist
+	    #            i.e. newly mapped to this pnode
+	    my @newvlist = array_diff( \@vlist, \@oldvlist );
+	    $self->printdb("On pnode $physical: newvlist: @newvlist\n");
+
+	    # curvlist = elements in both vlist and oldvlist
+	    #            i.e. vnodes mapped the same way from previous
+	    #            to current
+	    # This is the same as @vlist intersection @oldvlist
+	    # since the lists have no duplicates
+	    my @curvlist = array_diff( \@vlist, \@newvlist );
+	    $self->printdb("On pnode $physical: curvlist: @curvlist\n");
+
+	    foreach my $virtual (@curvlist) {
+		if (exists($self->current_v2v()->{$virtual}) ) {
+		    push(@oplist, $self->current_v2v()->{$virtual});
+		    push(@ovlist, $virtual);
+		}
+	    }
+
+	    # delvlist = elements in oldvlist not in vlist
+	    #            i.e. vnodes that moved to another pnode or
+	    #            went away
+	    @delvlist = array_diff( \@oldvlist, \@vlist );
+	    $self->printdb("On pnode $physical: delvlist: @delvlist\n");
+
+	    while (scalar(@newvlist) && scalar(@delvlist)) {
+		my $del_vnode = pop(@delvlist);
+		if (exists($self->current_v2v->{$del_vnode})) {
+		    my $reserved_node = $$self->current_v2v()->{$del_vnode};
+		    push(@oplist, $reserved_node);
+		    my $new_vnode = pop(@newvlist);
+		    push(@ovlist, $new_vnode);
+		}
+	    }
+	
+	    # These are the new nodes we need to allocate
+	    @vlist = @newvlist;
+	    $numvs = scalar(@vlist);
+
+	    if (@oplist) {
+		$self->printdb("Reusing vnodes @oplist\n"); 
+	    }
+	}
+
+	#
+	# Still need to allocate some virtnodes?
+	#
+	if ($numvs) {
+	    #
+	    # All vnodes on pnode are dynamic if the first one is.
+	    # We also assume that we do not mix vnode types on a pnode; bad.
+	    #
+	    my $virtnode = $self->vnodes()->{$vlist[0]};
+	    
+	    if ($virtnode->_isdynamic()) {
+		# Always use the base type ... node type system sucks.
+		my $basetype = $virtnode->_typeinfo->type();
+	    
+		#
+		# Call into library. Be sure to pass impotent mode along.
+		#
+		if (Node::CreateVnodes(\@plist,
+				       {"pid"      => "$pid",
+					"eid"      => "$eid",
+					"count"    => $numvs,
+					"vtype"    => $basetype,
+					"nodeid"   => $physical,
+					"verbose"  => $self->verbose(),
+					"impotent" => $self->impotent()})
+		    < 0) {
+		    tberror("Could not allocate vnodes on $physical\n");
+		    return -1;
+		}
+	    }
+	    else {
+		#
+		# Run avail to get the list of virtnodes on the phys node. We
+		# already know there are enough, since assign knows that.
+		#
+		$self->printdb("Asking avail for $numvs for vnodes: ".
+			       "@vlist on $physical\n");
+		if (! open(AVAIL, "$AVAIL ".
+			   "virtonly=$physical rand limit=$numvs|")) {
+		    tberror("Could not start avail\n");
+		    return -1;
+		}
+		while (<AVAIL>) {
+		    next
+			if (! /^\|/);
+		    next
+			if (/node_id/);
+
+		    if ($_ =~ /^\|([-a-zA-Z0-9]+)\s*\|(\w+)\s*\|(\w+)\s*\|$/) {
+			push(@plist, $1);
+		    }
+		    else {
+			tberror("Bad line from avail: $_\n");
+			return -1;
+		    }
+		}
+		close(AVAIL);
+
+		# Sanity check.
+		if (scalar(@vlist) != scalar(@plist)) {
+		    $self->printdb("avail gave " . scalar(@plist) .
+				   " vnodes: @plist on $physical\n");
+		    tberror("Could not map some virtual nodes on $physical\n");
+		    return -1;
+		}
+
+		#
+		# Try to allocate. Note, if this fails we are done
+		# for. Okay for now since it is never the case that it
+		# should fail!
+		#
+		if ($self->impotent()) {
+		    tbinfo("Selected for $physical: @plist\n");
+		    tbinfo("Skipping physical reservation, as directed.\n");
+		}
+		else {
+		    tbinfo("Reserving on $physical: @plist ...\n");
+		    system("nalloc $pid $eid @plist");
+		    if ($?) {
+			tberror("Failed to reserve @plist (on $physical)\n");
+			return -1;
+		    }
+		}
+	    }
+	}
+
+	if ($self->updating()) {
+	    #
+	    # Append the lists we created above, so that we get all of them
+	    # in the loop below.
+	    #
+	    @plist = (@plist, @oplist);
+	    @vlist = (@vlist, @ovlist);
+	}
+    
+	while (@plist) {
+	    my $virtphys = pop(@plist);
+	    my $virtual  = pop(@vlist);
+	    my $pnode    = Node->Lookup($virtphys);
+	    if (!defined($pnode)) {
+		tberror("Could not get node object for $virtphys\n");
+		return -1;
+	    }
+
+	    $self->solution_v2v()->{$virtual}  = $virtphys;
+	    $self->printdb("  Mapping $virtual to $virtphys on $physical\n");
+
+	    #
+	    # New virtual nodes are always clean. Old ones stay in whatever
+	    # state they were in so that os_setup/vnode_setup know they
+	    # need to reboot them.
+	    #
+	    if (!$self->impotent()) {
+		if (!exists($self->current_v2v()->{$virtual})) {
+		    $pnode->SetAllocState(TBDB_ALLOCSTATE_RES_INIT_CLEAN());
+		}
+		elsif ($self->current_v2v()->{$virtual} ne $virtphys) {
+		    # Node has moved!
+		    $pnode->SetAllocState(TBDB_ALLOCSTATE_RES_INIT_DIRTY());
+		}
+	    }
+	}
+
+	# Since we have some extra physical vnodes reserved on this pnode,
+	# we will let tbswap tear them down.
+	while (@delvlist) {
+	    my $del_vnode = pop(@delvlist);
+
+	    if (exists($self->current_v2v()->{$del_vnode})) {
+		my $pname = $self->current_v2v()->{$del_vnode};
+		my $pnode = $self->pnodes()->{$pname};
+
+		$pnode->SetAllocState(TBDB_ALLOCSTATE_RES_TEARDOWN())
+		    if (!$self->impotent());
+	    }		
+	}
+    }
+    return 0;
+}
+
+# getnodeport(s)
+# Takes a ports result from assign (mac0,mac1) and returns the
+# first non-null one.
+sub getnodeport($)
+{
+    my $macstring=$_[0];
+    my ($A,$B) = ($macstring =~ /^\(([^,]+),([^,]+)\)$/);
+    return (($A ne "(null)") ? $A : $B);
+}
+
+#
+# Give me a new vname for an internally allocated node. We have to
+# watch for names that were made up previously (say, if this is an
+# update).  Not allowed to reuse names of course. We do not mark nodes
+# as hosting, so have to infer this from reserved_pnodes. I'm sure
+# there is a better way to do this.
+#
+sub newvname($$$)
+{
+    my ($self, $pnode, $prefix) = @_;
+
+    #
+    # First check to see if this pnode was already allocated (update)
+    #
+    my @vnames = keys(%{ $self->current_v2p() });
+	
+    foreach my $vname (@vnames) {
+	# Skip the v mappings.
+	next
+	    if (exists($self->current_v2v->{$vname}));
+
+	return $vname
+	    if ($pnode eq $self->current_v2p->{$vname});
+    }
+    
+    while (1) {
+	my $newname = $prefix . "-" . $self->nextphostnumber();
+
+	return $newname
+	    if (!exists($self->current_v2p->{$newname}));
+    }
+}
+
+sub array_diff($$)
+{
+    my ($a, $b) = @_;
+
+    my %seen; # lookup table
+    my @aonly;# answer
+    
+    # build lookup table
+    @seen{@$b} = ();
+
+    foreach my $item (@$a) {
+	push(@aonly, $item) unless exists $seen{$item};
+    }
+    return @aonly;
+}
+
+#############################################################################
 # XML support that will move elsewhere. Note that this code is entirely
 # derived from the code that Tarun wrote to convert top files in XML.
 # It is currently operating in the same fashion; parsing the text lines
@@ -2335,9 +3162,9 @@ sub processNode($$$$)
     }
 
     # Handle fixed node.
-    if (exists($self->{'FIXED_NODES'}->{$nodename}) &&
+    if (exists($self->fixednodes()->{$nodename}) &&
 	($self->isatoponode($nodename) || $self->isadelaynode($nodename))) {
-	my $fixed = $self->{'FIXED_NODES'}->{$nodename};
+	my $fixed = $self->fixednodes()->{$nodename};
 	
 	$newNode->setAttribute("assigned_to", $fixed);
     }
