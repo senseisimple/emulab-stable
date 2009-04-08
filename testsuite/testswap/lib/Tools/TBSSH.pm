@@ -1,11 +1,11 @@
 #!/usr/bin/perl
+package Tools::TBSSH;
 use SemiModern::Perl;
 use Net::SSH::Perl;
 use Net::SFTP;
 use Data::UUID;
-
-package Tools::TBSSH;
 use Data::Dumper;
+use TBConfig;
 
 sub uuid {
   my $ug = new Data::UUID;
@@ -25,21 +25,30 @@ sub path_to_last_part {
   }
 }
 
-sub sshtty {
-  ssh(@_, use_tty => 1);
-}
 sub ssh {
   my ($host, $user, @options) = @_;
-  my $ssh = Net::SSH::Perl->new($host, protocol => "2", options => [ "ForwardAgent yes" ], @options);
+  $user ||= $TBConfig::EMULAB_USER;
+  my $ssh = Net::SSH::Perl->new($host, protocol => "2", options => [ "ForwardAgent yes" ], use_tty => 1, @options);
   $ssh->login($user);
   return $ssh
 }
-sub sshhostname {
-  my ($host, $user) = @_;
-  
-  my $ssh = ssh($host, $user);
-  print [$ssh->cmd('uname -a')]->[0];
-  return $ssh
+
+sub cmdcheckoutput {
+  my ($host, $cmd, $checker) = @_;
+  my $ssh = ssh($host, $TBConfig::EMULAB_USER);
+  $ssh->cmdcheckoutput($cmd, $checker);
+}
+
+sub cmdsuccess {
+  my ($host, $cmd) = @_;
+  my $ssh = ssh($host, $TBConfig::EMULAB_USER);
+  $ssh->cmdsuccess($cmd);
+}
+
+sub cmdsuccessdump {
+  my ($host, $cmd) = @_;
+  my $ssh = ssh($host, $TBConfig::EMULAB_USER);
+  $ssh->cmdsuccessdump($cmd);
 }
 
 sub pulldirastar {
@@ -61,12 +70,33 @@ sub pulldirastar {
 package Net::SSH::Perl::SSH2;
 use SemiModern::Perl;
 use Net::SSH::Perl::Constants qw( :protocol :msg2 CHAN_INPUT_CLOSED CHAN_INPUT_WAIT_DRAIN );
+use Data::Dumper;
 
-sub cmdcatout {
+sub cmdcheckoutput {
+  my ($ssh, $cmd, $checker) = @_;
+  my @results = $ssh->cmd($cmd);
+  if (defined $checker) {
+    &$checker(@results) || die "ssh checker of cmd $cmd failed";
+  }
+  ($results[2], $ssh, @results);
+}
+
+sub cmdsuccess {
+  my ($ssh, $cmd) = @_;
+  $ssh->cmdcheckoutput($cmd, sub { $_[2] == 0; } );
+}
+
+sub cmdsuccessdump {
+  my ($ssh, $cmd) = @_;
+  $ssh->cmdcheckoutput($cmd, sub { print Dumper(\@_); $_[2] == 0; } );
+}
+
+sub cmddump {
   my $ssh = shift;
   my @results = $ssh->cmd(@_);
-  say $results[1];
-  say "DONE ttycmdcatout";
+  say Dumper(\@results);
+  say "DONE cmddump";
+  ($results[2], $ssh, @results);
 }
 
 sub cmd_debug {

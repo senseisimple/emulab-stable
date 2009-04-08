@@ -1,6 +1,7 @@
 #!/usr/bin/perl
 use lib 'lib';
 use SemiModern::Perl;
+use TBConfig;
 use TestBed::TestSuite::Experiment::Macros;
 use Data::Dumper;
 use Tools::TBSSH;
@@ -21,35 +22,36 @@ NSEND
 
 sub usage {
 say <<"END"
-./sc
-     start eid
-     end   eid
-     ping  eid
-     ni    eid  // nodeinfo
-     li    eid  // linkinfo
+./sc CMD EID ARGS
+
+  CMD = start
+        swapin
+        swapout
+        end
+        ping
+        ni    // nodeinfo
+        li    // linkinfo
 END
 }
 
-my $pid = 'tbres';
+my $pid = $TBConfig::DEFAULT_PID;
 
 if (@ARGV) {
-  $_ = $ARGV[0];
-  my $eid = $ARGV[1];
+  $_ = shift;
+  my $eid = shift;
   my $e = e($pid, $eid);
   if (/--help/) { usage; } 
   elsif (/end/) { $e->end(); }
-  elsif ( /ping/ ) {
-    my $nodes = $e->nodeinfo();
-    for (@$nodes) {
-     say; 
-     use Tools::PingTest;
-     ping($_);
-    }
-  }
+  elsif (/ping/ ) { $e->ping_test; }
+  elsif (/swapin/) { $e->swapin_wait; }
+  elsif (/swapout/) { $e->swapout_wait; }
   elsif (/start/) { $e->startexp_ns_wait($ns); }
   elsif (/ni/) { say Dumper($e->nodeinfo) ;}
   elsif (/li/) { say Dumper($e->linkinfo) ;}
-  elsif (/tevc/) { tevc("-e $pid/$eid now link1 down"); }
+  elsif (/tevc/) { $e->tevc(@ARGV); }
+  elsif (/single_node_tests/) { $e->single_node_tests; }
+  else { 
+  }
 }
 else {
   usage;

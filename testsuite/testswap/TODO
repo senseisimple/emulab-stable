@@ -1,8 +1,10 @@
 test groupings
 linkinfo
-linktest
 event system
 convert more old tests
+general result code handling
+better parallel support
+
 
 THINKING ABOUT IT
   Test::Class

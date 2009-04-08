@@ -49,6 +49,7 @@ if (@ARGV) {
   my $cmd = $ARGV[0];
   $_   = $cmd;
   if (/critic/) { exec 'perlcritic .'; }
+  elsif (/lib/)   { exec "$THARNESS t/lib/*.t t/lib/*/*.t"; }
   elsif (/test/)   { exec $THARNESS; }
   elsif (/test/)   { exec "$THARNESS t/topologies/*.t"; }
   elsif (/.*\.t$/) { exec "$THARNESS $cmd"; }

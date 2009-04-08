@@ -6,13 +6,6 @@ use TBConfig;
 use Data::Dumper;
 use Tools;
 use Tools::TBSSH;
-require Exporter;
-our @ISA = qw(Exporter);
-our @EXPORT = qw(tevc);
-
-my $loglevel = "INFO";
-$loglevel = "DEBUG";
-my $logger = init_tbts_logger("Wrap::tevc", undef, "INFO", "SCREEN");
 
 =pod
 tevc -e proj/expt time objname event [args ...]
@@ -33,12 +26,10 @@ tevc -e testbed/myexp +20 cbr0 stop
 =cut
 
 sub tevc {
-  my ($args) = @_;
-  $args ||= '';
-  my $ssh = Tools::TBSSH::sshtty($TBConfig::OPS_SERVER, $TBConfig::EMULAB_USER);
-  my $cmd = 'PATH=/usr/testbed/bin:$PATH tevc ' . $args;
+  my ($pid, $eid, @args) = @_;
+  my $cmd = 'PATH=/usr/testbed/bin:$PATH tevc ' . "-e $pid/$eid " . join(" ", @args);
   say $cmd;
-  $ssh->cmdcatout($cmd);
+  Tools::TBSSH::cmdsuccessdump($TBConfig::OPS_SERVER, $cmd);
 }
 
 1;

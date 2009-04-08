@@ -4,9 +4,11 @@ use SemiModern::Perl;
 package TestBed::TestSuite::Experiment;
 use Mouse;
 use TestBed::XMLRPC::Client::Experiment;
-use Tools::PingTest;
+use TestBed::Wrap::tevc;
+use TestBed::Wrap::linktest;
 use Tools::TBSSH;
 use Data::Dumper;
+use TestBed::TestSuite::Node;
 
 extends 'Exporter', 'TestBed::XMLRPC::Client::Experiment';
 require Exporter;
@@ -17,19 +19,43 @@ push @EXPORT, qw(e ep launchpingkill launchpingswapkill);
 sub ep { TestBed::TestSuite::Experiment->new }
 sub e  { TestBed::TestSuite::Experiment->new('pid'=> shift, 'eid' => shift) }
 
+sub nodes {
+  my ($e) = @_;
+  my @node_instances = map { TestBed::TestSuite::Node->new('experiment' => $e, 'name'=>$_); } @{$e->nodeinfo()};
+  \@node_instances;
+}
+
 sub ping_test {
   my ($e) = @_;
-  my $nodes = $e->nodeinfo();
-  for (@$nodes) {
-    ping($_);
+  for (@{$e->nodes}) {
+    $_->ping();
   }
 }
 
-sub ssh_hostname_test {
+sub single_node_tests {
   my ($e) = @_;
-  my $nodes = $e->nodeinfo();
-  for (@$nodes) {
-    Tools::TBSSH::sshhostname($_, $TBConfig::EMULAB_USER);
+  for (@{$e->nodes}) {
+    say $_->name;
+    $_->single_node_tests();
+  }
+}
+
+sub link_test {
+  my ($e) = @_;
+  TestBed::Wrap::linktest::link_test($e->pid, $e->eid);
+}
+
+sub tevc {
+  my ($e) = shift;
+  my $pid = $e->pid;
+  my $eid = $e->eid;
+  TestBed::Wrap::tevc::tevc($e->pid, $e->eid, @_);
+}
+
+sub hostname_test {
+  my ($e) = @_;
+  for (@{$e->nodes}) {
+    $_->sshcmddump("uname -a");
   }
 }
 
