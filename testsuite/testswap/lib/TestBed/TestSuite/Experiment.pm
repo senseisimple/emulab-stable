@@ -60,11 +60,22 @@ sub trytest(&$) {
   }
 }
 
+sub startrunkill {
+  my ($e, $ns, $worker) = @_;
+  my $eid = $e->eid;
+  trytest {
+    $e->startexp_ns_wait($ns) && die "batchexp $eid failed";
+    $worker->($e)             && die "worker function failed";
+    $e->end                   && die "exp end $eid failed";
+  } $e;
+}
+
+#class methods
 sub launchpingkill {
   my ($pid, $eid, $ns) = @_;
   my $e = e($pid, $eid);
   trytest {
-    $e->batchexp_ns_wait($ns) && die "batchexp $eid failed";
+    $e->startexp_ns_wait($ns) && die "batchexp $eid failed";
     $e->ping_test             && die "connectivity test $eid failed";
     $e->end                   && die "exp end $eid failed";
   } $e;
@@ -74,7 +85,7 @@ sub launchpingswapkill {
   my ($pid, $eid, $ns) = @_;
   my $e = e($pid, $eid);
   trytest {
-    $e->batchexp_ns_wait($ns) && die "batchexp $eid failed";
+    $e->startexp_ns_wait($ns) && die "batchexp $eid failed";
     $e->ping_test             && die "connectivity test $eid failed";
     $e->swapout_wait          && die "swap out $eid failed";
     $e->swapin_wait           && die "swap in $eid failed";
@@ -82,4 +93,5 @@ sub launchpingswapkill {
     $e->end                   && die "exp end $eid failed";
   } $e;
 }
+
 1;

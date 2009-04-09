@@ -1,0 +1,25 @@
+testswap is a object orient / declarative test framework for the emulab testbed.
+
+
+LIBRARY CODE
+./lib/TestBed/TestSuite/
+Core framework modules that the testwriter should use
+
+./lib/TestBed/XMLRPC/Client/
+The XMLRPC client interface that the core modules use to do their work
+shouldn't be directly used by the testwriter
+
+./lib/TestBed/Wrap/
+command line utility wrappers
+
+./lib/Tools/
+utility modules and functions used by the framework
+
+TESTS
+./t/topologies/
+topology swap tests
+./t/*.t
+xmlrpc tests
+./t/lib
+testswap framework tests
+

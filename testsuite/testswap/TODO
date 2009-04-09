@@ -1,13 +1,19 @@
+DOC
+  POD
+
+-default run kill
+buildup, teardown - Test::Class
+
+Add parameterization examples
+Add parse links from xmlserver
+EXAMPLES
+traffic generation`
 test groupings
-linkinfo
 event system
 convert more old tests
 general result code handling
 better parallel support
-
-
-THINKING ABOUT IT
-  Test::Class
+move xmlrpc tests to t/xmlrpc
 
 MOSTLY DONE
   Parse NodeInfo

@@ -1,6 +1,6 @@
-use SemiModern::Perl;
-
 package TBConfig;
+
+use SemiModern::Perl;
 use Sys::Hostname;
 use Crypt::X509;
 use Tools qw(slurp);

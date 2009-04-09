@@ -1,7 +1,26 @@
-TO INSTALL
+REQUIREMENTS
+  ssh-agent running with SSH emulab keys added
+  emulab client certificate and key
+  TBConfig.pm set up correctly
+
+INSTALLATION INSTRUCTIONS
+  cpan HAS to be configured and functional
+  cpan Module::Install
   perl Makefile.PL
   make
 
-TO FUN
+TO RUN Tests
   make test
+  make t/old/old.t
   make t/topologies/basic.t
+
+Module::Install is a perl library for installing perl modules/frameworks like testswap
+
+If you need help getting CPAN to run as non-root:
+http://www.google.com/search?q=cpan+install+to+home+dir
+How to install Perl CPAN modules into my HOME directory?
+https://help.webfaction.com/index.php?_m=knowledgebase&_a=viewarticle&kbarticleid=132
+Using CPAN with a non-root account
+http://sial.org/howto/perl/life-with-cpan/non-root/
+
+Module::Install http://search.cpan.org/~adamk/Module-Install/
