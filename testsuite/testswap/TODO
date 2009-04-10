@@ -1,23 +1,17 @@
 DOC
   POD
 
--default run kill
 buildup, teardown - Test::Class
 
 Add parameterization examples
-Add parse links from xmlserver
 EXAMPLES
 traffic generation`
-test groupings
-event system
 convert more old tests
 general result code handling
 better parallel support
-move xmlrpc tests to t/xmlrpc
-
-MOSTLY DONE
-  Parse NodeInfo
 
 LATER
   Client.pm duplicate code elimination - Maybe this would make the code too unreadable
   TestSuite::Experiment::Macros should be a monadic language like JQuery
+  test groupings
+  event system

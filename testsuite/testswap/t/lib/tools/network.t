@@ -6,4 +6,4 @@ use Tools::TBSSH;
 use Data::Dumper;
 use Test::More tests => 1;
 
-ok(Tools::Network::test_traceroute($TBConfig::OPS_SERVER, 'boss.emulab.net', 'public-router', 'boss'));
+ok(Tools::Network::test_traceroute($TBConfig::OPS_SERVER, 'boss.emulab.net', 'public-router', 'boss'), 'traceroute ops to boss');
