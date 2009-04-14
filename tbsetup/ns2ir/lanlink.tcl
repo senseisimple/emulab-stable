@@ -256,6 +256,8 @@ LanLink instproc init {s nodes bw d type} {
     $self instvar rbandwidth
     $self instvar ebandwidth
     $self instvar rebandwidth
+    $self instvar backfill
+    $self instvar rbackfill
     $self instvar delay
     $self instvar rdelay
     $self instvar loss
@@ -274,6 +276,8 @@ LanLink instproc init {s nodes bw d type} {
 	# Note - we don't set defaults for ebandwidth and rebandwidth - lack
 	# of an entry for a nodepair indicates that they should be left NULL
 	# in the output.
+	set backfill($nodepair) 0
+	set rbackfill($nodepair) 0
 	set delay($nodepair) [expr $d / 2.0]
 	set rdelay($nodepair) [expr $d / 2.0]
 	set loss($nodepair) 0
@@ -695,6 +699,8 @@ Link instproc updatedb {DB} {
     $self instvar rbandwidth
     $self instvar ebandwidth
     $self instvar rebandwidth
+    $self instvar backfill
+    $self instvar rbackfill
     $self instvar delay
     $self instvar rdelay
     $self instvar loss
@@ -768,7 +774,7 @@ Link instproc updatedb {DB} {
 
 	set nodeportraw [join $nodeport ":"]
 
-	set fields [list "vname" "member" "mask" "delay" "rdelay" "bandwidth" "rbandwidth" "lossrate" "rlossrate" "cost" "widearea" "emulated" "uselinkdelay" "nobwshaping" "encap_style" "q_limit" "q_maxthresh" "q_minthresh" "q_weight" "q_linterm" "q_qinbytes" "q_bytes" "q_meanpsize" "q_wait" "q_setbit" "q_droptail" "q_red" "q_gentle" "trivial_ok" "protocol" "vnode" "vport" "ip" "mustdelay"]
+	set fields [list "vname" "member" "mask" "delay" "rdelay" "bandwidth" "rbandwidth" "backfill" "rbackfill" "lossrate" "rlossrate" "cost" "widearea" "emulated" "uselinkdelay" "nobwshaping" "encap_style" "q_limit" "q_maxthresh" "q_minthresh" "q_weight" "q_linterm" "q_qinbytes" "q_bytes" "q_meanpsize" "q_wait" "q_setbit" "q_droptail" "q_red" "q_gentle" "trivial_ok" "protocol" "vnode" "vport" "ip" "mustdelay"]
 
 	# Treat estimated bandwidths differently - leave them out of the lists
 	# unless the user gave a value - this way, they get the defaults if not
@@ -796,7 +802,7 @@ Link instproc updatedb {DB} {
 	    lappend fields "fixed_iface"
 	}
 
-	set values [list $self $nodeportraw $netmask $delay($nodeport) $rdelay($nodeport) $bandwidth($nodeport) $rbandwidth($nodeport) $loss($nodeport) $rloss($nodeport) $cost($nodeport) $widearea $emulated $uselinkdelay $nobwshaping $encap $limit_  $maxthresh_ $thresh_ $q_weight_ $linterm_ ${queue-in-bytes_}  $bytes_ $mean_pktsize_ $wait_ $setbit_ $droptail_ $red_ $gentle_ $trivial_ok $protocol $node $port $ip $mustdelay]
+	set values [list $self $nodeportraw $netmask $delay($nodeport) $rdelay($nodeport) $bandwidth($nodeport) $rbandwidth($nodeport) $backfill($nodeport) $rbackfill($nodeport)  $loss($nodeport) $rloss($nodeport) $cost($nodeport) $widearea $emulated $uselinkdelay $nobwshaping $encap $limit_  $maxthresh_ $thresh_ $q_weight_ $linterm_ ${queue-in-bytes_}  $bytes_ $mean_pktsize_ $wait_ $setbit_ $droptail_ $red_ $gentle_ $trivial_ok $protocol $node $port $ip $mustdelay]
 
 	if { [info exists ebandwidth($nodeport)] } {
 	    lappend values $ebandwidth($nodeport)
@@ -837,6 +843,8 @@ Lan instproc updatedb {DB} {
     $self instvar rbandwidth
     $self instvar ebandwidth
     $self instvar rebandwidth
+    $self instvar backfill
+    $self instvar rbackfill
     $self instvar delay
     $self instvar rdelay
     $self instvar loss
@@ -930,7 +938,7 @@ Lan instproc updatedb {DB} {
 	    set is_accesspoint 1
 	}
 
-	set fields [list "vname" "member" "mask" "delay" "rdelay" "bandwidth" "rbandwidth" "lossrate" "rlossrate" "cost" "widearea" "emulated" "uselinkdelay" "nobwshaping" "encap_style" "q_limit" "q_maxthresh" "q_minthresh" "q_weight" "q_linterm" "q_qinbytes" "q_bytes" "q_meanpsize" "q_wait" "q_setbit" "q_droptail" "q_red" "q_gentle" "trivial_ok" "protocol" "is_accesspoint" "vnode" "vport" "ip" "mustdelay"]
+	set fields [list "vname" "member" "mask" "delay" "rdelay" "bandwidth" "rbandwidth" "backfill" "rbackfill" "lossrate" "rlossrate" "cost" "widearea" "emulated" "uselinkdelay" "nobwshaping" "encap_style" "q_limit" "q_maxthresh" "q_minthresh" "q_weight" "q_linterm" "q_qinbytes" "q_bytes" "q_meanpsize" "q_wait" "q_setbit" "q_droptail" "q_red" "q_gentle" "trivial_ok" "protocol" "is_accesspoint" "vnode" "vport" "ip" "mustdelay"]
 
 	# Treat estimated bandwidths differently - leave them out of the lists
 	# unless the user gave a value - this way, they get the defaults if not
@@ -958,7 +966,7 @@ Lan instproc updatedb {DB} {
             lappend fields "fixed_iface"
         }
 
-	set values [list $self $nodeportraw $netmask $delay($nodeport) $rdelay($nodeport) $bandwidth($nodeport) $rbandwidth($nodeport) $loss($nodeport) $rloss($nodeport) $cost($nodeport) $widearea $emulated $uselinkdelay $nobwshaping $encap $limit_  $maxthresh_ $thresh_ $q_weight_ $linterm_ ${queue-in-bytes_}  $bytes_ $mean_pktsize_ $wait_ $setbit_ $droptail_ $red_ $gentle_ $trivial_ok $protocol $is_accesspoint $node $port $ip $mustdelay]
+	set values [list $self $nodeportraw $netmask $delay($nodeport) $rdelay($nodeport) $bandwidth($nodeport) $rbandwidth($nodeport) $backfill($nodeport) $rbackfill($nodeport) $loss($nodeport) $rloss($nodeport) $cost($nodeport) $widearea $emulated $uselinkdelay $nobwshaping $encap $limit_  $maxthresh_ $thresh_ $q_weight_ $linterm_ ${queue-in-bytes_}  $bytes_ $mean_pktsize_ $wait_ $setbit_ $droptail_ $red_ $gentle_ $trivial_ok $protocol $is_accesspoint $node $port $ip $mustdelay]
 
 	if { [info exists ebandwidth($nodeport)] } {
 	    lappend values $ebandwidth($nodeport)

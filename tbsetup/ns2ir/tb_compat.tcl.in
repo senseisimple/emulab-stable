@@ -570,6 +570,64 @@ proc tb-set-link-est-bandwidth {srclink args} {
     }
 }
 
+# This takes two possible formats:
+# tb-set-link-backfill <link> <bw>
+# tb-set-link-backfill <src> <dst> <bw>
+proc tb-set-link-backfill {srclink args} {
+    if {[llength $args] == 2} {
+	set dst [lindex $args 0]
+	set bw [lindex $args 1]
+	set sim [$srclink set sim]
+	set reallink [$sim find_link $srclink $dst]
+	if {$reallink == {}} {
+	    perror "\[tb-set-link-backfill] No link between $srclink and $dst."
+	    return
+	}
+    } else {
+	if {[$srclink info class] != "Link"} {
+	    perror "\[tb-set-link-backfill] $srclink is not a link."
+	    return
+	}
+	set reallink $srclink
+	set bw [lindex $args 0]
+    }
+    $reallink instvar bandwidth
+    $reallink instvar backfill
+    $reallink instvar rbackfill
+    foreach pair [array names bandwidth] {
+	set backfill($pair) [parse_bw $bw]
+	set rbackfill($pair) [parse_bw $bw]
+    }
+}
+
+# This takes two possible formats:
+# tb-set-link-backfill <link> <src> <bw>
+proc tb-set-link-simplex-backfill {link src bw} {
+    var_import ::TBCOMPAT::FLOAT
+    if {[$link info class] != "Link"} {
+	perror "\[tb-set-link-simplex-backfill] $link is not a link."
+	return
+    }
+    if {[$src info class] != "Node"} {
+	perror "\[tb-set-link-simplex-backfill] $src is not a node."
+	return
+    }
+    set port [$link get_port $src]
+    if {$port == {}} {
+	perror "\[tb-set-link-simplex-params] $src is not in $link."
+	return
+    }
+    set np [list $src $port]
+    foreach nodeport [$link set nodelist] {
+	if {$nodeport != $np} {
+	    set onp $nodeport
+	}
+    }
+    set realbw [parse_bw $bw]
+    $link set backfill($np) $realbw
+    $link set rbackfill($onp) $realbw
+}
+
 proc tb-set-lan-loss {lan lossrate} {
     var_import ::TBCOMPAT::FLOAT
     if {[$lan info class] != "Lan"} {
@@ -601,6 +659,21 @@ proc tb-set-lan-est-bandwidth {lan bw} {
     foreach pair [array names bandwidth] {
 	set ebandwidth($pair) [parse_bw $bw]
 	set rebandwidth($pair) [parse_bw $bw]
+    }
+}
+
+proc tb-set-lan-backfill {lan bw} {
+    if {[$lan info class] != "Lan"} {
+	perror "\[tb-set-lan-backfill] $lan is not a lan."
+	return
+    }
+
+    $lan instvar bandwidth
+    $lan instvar backfill
+    $lan instvar rbackfill
+    foreach pair [array names bandwidth] {
+	set backfill($pair) [parse_bw $bw]
+	set rbackfill($pair) [parse_bw $bw]
     }
 }
 
@@ -658,6 +731,23 @@ proc tb-set-node-lan-est-bandwidth {node lan bw} {
     }
     $lan set ebandwidth([list $node $port]) [parse_bw $bw]
     $lan set rebandwidth([list $node $port]) [parse_bw $bw]
+}
+proc tb-set-node-lan-backfill {node lan bw} {
+    if {[$node info class] != "Node"} {
+	perror "\[tb-set-node-lan-backfill] $node is not a node."
+	return
+    }
+    if {[$lan info class] != "Lan"} {
+	perror "\[tb-set-node-lan-backfill] $lan is not a lan."
+	return
+    }
+    set port [$lan get_port $node]
+    if {$port == {}} {
+	perror "\[tb-set-node-lan-backfill] $node is not in $lan."
+	return
+    }
+    $lan set backfill([list $node $port]) [parse_bw $bw]
+    $lan set rbackfill([list $node $port]) [parse_bw $bw]
 }
 proc tb-set-node-lan-loss {node lan loss} {
     var_import ::TBCOMPAT::FLOAT
@@ -763,7 +853,7 @@ proc tb-set-link-simplex-params {link src delay bw loss} {
 	return
     }
     if {[$src info class] != "Node"} {
-	perror "\[tb-set-link-simplex-params] $src is not a link."
+	perror "\[tb-set-link-simplex-params] $src is not a node."
 	return
     }
     set port [$link get_port $src]
@@ -791,6 +881,28 @@ proc tb-set-link-simplex-params {link src delay bw loss} {
     $link set rbandwidth($onp) $realbw
     $link set loss($np) [expr $adjloss]
     $link set rloss($onp) [expr $adjloss]
+}
+
+proc tb-set-lan-simplex-backfill {lan node tobw frombw} {
+    var_import ::TBCOMPAT::FLOAT
+    if {[$node info class] != "Node"} {
+	perror "\[tb-set-lan-simplex-params] $node is not a node."
+	return
+    }
+    if {[$lan info class] != "Lan"} {
+	perror "\[tb-set-lan-simplex-params] $lan is not a lan."
+	return
+    }
+    set port [$lan get_port $node]
+    if {$port == {}} {
+	perror "\[tb-set-lan-simplex-params] $node is not in $lan."
+	return
+    }
+    set realtobw [parse_backfill $tobw]
+    set realfrombw [parse_backfill $frombw]
+
+    $lan set backfill([list $node $port]) $realtobw
+    $lan set rbackfill([list $node $port]) $realfrombw
 }
 
 proc tb-set-lan-simplex-params {lan node todelay tobw toloss fromdelay frombw fromloss} {

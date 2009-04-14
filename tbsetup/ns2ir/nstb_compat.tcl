@@ -84,6 +84,11 @@ proc tb-set-node-id {vnode myid} {}
 proc tb-set-link-est-bandwidth {srclink args} {}
 proc tb-set-lan-est-bandwidth {lan bw} {}
 proc tb-set-node-lan-est-bandwidth {node lan bw} {}
+proc tb-set-link-backfill {srclink args} {}
+proc tb-set-link-simplex-backfill {link src bw} {}
+proc tb-set-lan-backfill {lan bw} {}
+proc tb-set-node-lan-backfill {node lan bw} {}
+proc tb-set-lan-simplex-backfill {lan node tobw frombw} {}
 proc tb-set-node-plab-role {node role} {}
 proc tb-set-node-plab-plcnet {node lanlink} {}
 proc tb-set-dpdb {onoff} {}

@@ -571,6 +571,10 @@ proc parse_bw {bspec {islink 1}} {
     return $val
 }
 
+proc parse_backfill {bspec} {
+    return [parse_bw $bspec 0]
+}
+
 # parse_delay dspec
 # This takes a delay specifier in the form of <amt><unit> where <unit>
 # is any of s, ms, ns.  If no unit is given then seconds (s) is

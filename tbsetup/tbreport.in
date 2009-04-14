@@ -28,6 +28,8 @@ sub usage {
     return 1;
 }
 
+sub dump_table($$$$);
+
 my $TBROOT = "@prefix@";
 my $DOMAIN = "@OURDOMAIN@";
 
@@ -378,12 +380,7 @@ if ($showlinks) {
     }
 
     if ($vlan_result->numrows) {
-	print  "Virtual Lan/Link Info:\n";
-	printf "%-15s %-15s %-15s %-9s %-9s %-9s\n",
-	       "ID", "Member/Proto", "IP/Mask", "Delay","BW (Kbs)","Loss Rate";
-	print  "--------------- --------------- --------------- --------- ".
-	       "--------- ---------\n";
-
+	my @data;
 	while (my %row = $vlan_result->fetchhash()) {
 	    my $vname       = $row{"vname"};
 	    my $vnode       = $row{"vnode"};
@@ -393,18 +390,26 @@ if ($showlinks) {
 	    my $mask        = $row{"mask"};
 	    my $delay       = $row{"delay"};
 	    my $bandwidth   = $row{"bandwidth"};
+	    my $backfill    = $row{"backfill"};
 	    my $lossrate    = $row{"lossrate"};
 	    my $rdelay      = $row{"rdelay"};
 	    my $rbandwidth  = $row{"rbandwidth"};
+	    my $rbackfill   = $row{"rbackfill"};
 	    my $rlossrate   = $row{"rlossrate"};
 	    my $protocol    = $row{"protocol"};
-	    
-	    printf "%-15s %-15s %-15s %-9s %-9s %-9s\n", $vname,
-	           $member, $ipmap{$member}, $delay, $bandwidth, $lossrate;
-	    printf "%-15s %-15s %-15s %-9s %-9s %-9s\n", "",
-	           $protocol, $mask, $rdelay, $rbandwidth, $rlossrate;
+	    push @data, [$vname, $member, $ipmap{$member}, 
+		        $delay, $bandwidth, $backfill, $lossrate];
+	    push @data, ["", $protocol, $mask, $rdelay, $rbandwidth, $rbackfill, $rlossrate];
 	}
+
+	print  "Virtual Lan/Link Info:\n";
+	dump_table(["ID", "Member/Proto", "IP/Mask", 
+		    "Delay","BW (Kbs)","Backfill", "Loss Rate"],
+		   ["Backfill"],
+		   [15,15,15,9,9,9,9],
+		   \@data);
 	print "\n";
+		   
 	$vlan_result->dataseek(0);
     }
 
@@ -697,14 +702,7 @@ if ($showdelays && $state eq EXPTSTATE_ACTIVE) {
 		     "where pid='$pid' and eid='$eid' ".
 		     "order by vlan,vnode,node_id");
 
-    if ($result_delays->numrows || $result_linkdelays->numrows) {
-	print  "Physical Delay Info:\n";
-	printf "%-15s %-15s %-12s %-8s %-8s %-6s %-9s\n",
-	       "ID", "Member", "Delay Node", "Delay", "BW (Kbs)", "PLR",
-	       "Pipe";
-	print  "--------------- --------------- ------------ -------- ".
-	       "-------- ------ ---------\n";
-    }
+    my @data;
 
     if ($result_delays->numrows) {
 	while (my %row = $result_delays->fetchhash()) {
@@ -712,38 +710,44 @@ if ($showdelays && $state eq EXPTSTATE_ACTIVE) {
 	    next
 		if ($row{'iface'} eq $row{'iface1'});
 	    
-	    printf("%-15s %-15s %-12s %-8s %-8s %-6s %-9s\n",
-		   $row{vname}, $row{vnode0}, $row{delayvname},
-		   $row{delay0}, $row{bandwidth0}, $row{lossrate0},
-		   $row{pipe0});
+	    push @data, [$row{vname}, $row{vnode0}, $row{delayvname},
+			 $row{delay0}, $row{bandwidth0}, $row{backfill0}, $row{lossrate0},
+			 $row{pipe0}];
 
 	    # If vnode0 eq vnode1, its a lan node. Print differently.
-	    printf("%-15s %-15s %-12s %-8s %-8s %-6s %-9s\n",
-		   ($row{vnode0} eq $row{vnode1} ? "" : $row{vname}),
-		   ($row{vnode0} eq $row{vnode1} ? "" : $row{vnode1}),
-		   ($row{vnode0} eq $row{vnode1} ? "" : $row{delayvname}),
-		   $row{delay1}, $row{bandwidth1}, $row{lossrate1},
-		   $row{pipe1});
+	    push @data, [($row{vnode0} eq $row{vnode1} ? "" : $row{vname}),
+			 ($row{vnode0} eq $row{vnode1} ? "" : $row{vnode1}),
+			 ($row{vnode0} eq $row{vnode1} ? "" : $row{delayvname}),
+			 $row{delay1}, $row{bandwidth1}, $row{backfill1}, $row{lossrate1},
+			 $row{pipe1}];
 	}
-	print "\n";
+	push @data, [];
     }
 
     if ($result_linkdelays->numrows) {
 	while (my %row = $result_linkdelays->fetchhash()) {
-	    printf("%-15s %-15s %-12s %-8s %-8s %-6s %-9s\n",
-		   $row{vlan}, $row{vnode}, $row{node_id},
-		   $row{delay}, $row{bandwidth}, $row{lossrate},
-		   $row{pipe});
+	    push @data, [$row{vlan}, $row{vnode}, $row{node_id},
+			 $row{delay}, $row{bandwidth}, $row{lossrate},
+			 $row{pipe}];
 
 
 	    # Lan node, from the switch
 	    if ($row{type} eq "duplex") {
-		printf("%-15s %-15s %-12s %-8s %-8s %-6s %-9s\n", "", "", "",
-		       $row{rdelay}, $row{rbandwidth}, $row{rlossrate},
-		       $row{rpipe});
+		push @data, ["", "", "",
+			     $row{rdelay}, $row{rbandwidth}, $row{rlossrate},
+			     $row{rpipe}];
 	    }
 	}
-	print "\n";
+	push @data, [];
+    }
+
+    if (@data) {
+	print  "Physical Delay Info:\n";
+	dump_table(["ID", "Member", "Delay Node", "Delay", "BW (Kbs)", 
+		    "Backfill", "PLR", "Pipe"],
+		   ["Backfill"],
+		   [15, 15, 12, 8, 8, 8, 6, 9],
+		   \@data);
     }
 
     $result_delays->dataseek(0);
@@ -1000,3 +1004,54 @@ if ($showfwinfo) {
     }
 }
 exit(0);
+
+
+#
+# dump_table: Dumps a formated table, skipping over any column that
+#   don't have a value if they are listed in the optional array;
+#
+sub skip_over ($$);
+sub dump_table($$$$) { # all parameters are expected to be array references
+    my ($names, $optional, $widths, $data) = @_;
+    my %names_map;
+    my $last = @$names - 1;
+    foreach (0 .. $last) {
+	$names_map{$$names[$_]} = $_;
+    }
+    
+    my @optional;
+    foreach (@$optional) {
+	$optional[$names_map{$_}] = 1;
+    }
+    
+    my @keep;
+    foreach (@$data) {
+	my @d = @$_;
+	for (0..$last) {
+	    $keep[$_]++ if ($d[$_]);
+	}
+    }
+    foreach (0 .. $last) {
+	$keep[$_] = 1 unless $optional[$_];
+    }
+
+    my $format = join(' ', map {"%-${_}s"} skip_over($widths,\@keep))."\n";
+
+    printf($format,skip_over($names,\@keep));
+    print join(' ', map {'-'x$_} skip_over($widths,\@keep))."\n";
+    foreach (@$data) {
+	if (@$_ > 0) {
+	    printf($format, skip_over($_,\@keep));
+	} else {
+	    print "\n";
+	}
+    }
+}
+sub skip_over ($$) {
+    my ($data, $keep) = @_;
+    my @res;
+    foreach (0..$#$data) {
+	push @res, $$data[$_] if $$keep[$_];
+    }
+    return @res;
+}

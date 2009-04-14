@@ -186,71 +186,85 @@ foreach my $lan (keys(%virt_lans)) {
 	my $member0 = $virt_lans{$lan}->{"MEMBERS"}->{$members[0]};
 	my $member1 = $virt_lans{$lan}->{"MEMBERS"}->{$members[1]};
 
-	my $node0   = $member0->{"vnode"};
-	my $delay0  = $member0->{"delay"};
-	my $loss0   = $member0->{"lossrate"};
-	my $bw0     = $member0->{"bandwidth"};
-	my $rdelay0 = $member0->{"rdelay"};
-	my $rloss0  = $member0->{"rlossrate"};
-	my $rbw0    = $member0->{"rbandwidth"};
+	my $node0      = $member0->{"vnode"};
+	my $delay0     = $member0->{"delay"};
+	my $loss0      = $member0->{"lossrate"};
+	my $bw0        = $member0->{"bandwidth"};
+	my $backfill0  = $member0->{"backfill"};
+	my $rdelay0    = $member0->{"rdelay"};
+	my $rloss0     = $member0->{"rlossrate"};
+	my $rbw0       = $member0->{"rbandwidth"};
+	my $rbackfill0 = $member0->{"rbackfill"};
 	my $qtype0  = "droptail";
 	if ($member0->{"q_red"}) {
 	    $qtype0 = ($member0->{"q_gentle"} ? "gred" : "red");
 	}
 
-	my $node1   = $member1->{"vnode"};
-	my $delay1  = $member1->{"delay"};
-	my $loss1   = $member1->{"lossrate"};
-	my $bw1     = $member1->{"bandwidth"};
-	my $rdelay1 = $member1->{"rdelay"};
-	my $rloss1  = $member1->{"rlossrate"};
-	my $rbw1    = $member1->{"rbandwidth"};
-	my $qtype1  = "droptail";
+	my $node1      = $member1->{"vnode"};
+	my $delay1     = $member1->{"delay"};
+	my $loss1      = $member1->{"lossrate"};
+	my $bw1        = $member1->{"bandwidth"};
+	my $backfill1  = $member1->{"backfill"};
+	my $rdelay1    = $member1->{"rdelay"};
+	my $rloss1     = $member1->{"rlossrate"};
+	my $rbw1       = $member1->{"rbandwidth"};
+	my $rbackfill1 = $member1->{"rbackfill"};
+	my $qtype1     = "droptail";
 	if ($member1->{"q_red"}) {
 	    $qtype1 = ($member1->{"q_gentle"} ? "gred" : "red");
 	}
 	
+	# ebw stands for effective bandwith, it is bw - backfill
 	my $delay = ($delay0+$rdelay1) / 1000.0 ;
 	my $loss = 1-(1-$loss0)*(1-$rloss1);
 	my $bw = &min($bw0,$rbw1) * 1000;
+	my $backfill = &max($backfill0,$rbackfill1) * 1000;
+	my $ebw = $bw - $backfill;
 	my $rdelay = ($rdelay0+$delay1) / 1000.0;
 	my $rloss = 1-(1-$rloss0)*(1-$loss1);
 	my $rbw = &min($rbw0,$bw1) * 1000;
+	my $rbackfill = &max($rbackfill0,$backfill1) * 1000;
+	my $rebw = $rbw - $rbackfill;
 
 	printf $LTOUT
-	    "l $node0 $node1 $bw %.4f %.6f $lan $qtype0\n", $delay, $loss;
+	    "l $node0 $node1 $ebw %.4f %.6f $lan $qtype0\n", $delay, $loss;
 	printf $LTOUT
-	    "l $node1 $node0 $rbw %.4f %.6f $lan $qtype1\n", $rdelay, $rloss;
+	    "l $node1 $node0 $rebw %.4f %.6f $lan $qtype1\n", $rdelay, $rloss;
     }
     else {
 	foreach my $memb0 (@members) {
 	    my $member0 = $virt_lans{$lan}->{"MEMBERS"}->{$memb0};
 	    
-	    my $node0   = $member0->{"vnode"};
-	    my $delay0  = $member0->{"delay"};
-	    my $loss0   = $member0->{"lossrate"};
-	    my $bw0     = $member0->{"bandwidth"};
+	    my $node0     = $member0->{"vnode"};
+	    my $delay0    = $member0->{"delay"};
+	    my $loss0     = $member0->{"lossrate"};
+	    my $bw0       = $member0->{"bandwidth"};
+	    my $backfill0 = $member0->{"backfill"};
 	    
 	    foreach my $memb1 (@members) {
 		next
 		    if ($memb0 eq $memb1);
 
-		my $member1 = $virt_lans{$lan}->{"MEMBERS"}->{$memb1};
-		my $node1   = $member1->{"vnode"};
-		my $rdelay1 = $member1->{"rdelay"};
-		my $rloss1  = $member1->{"rlossrate"};
-		my $rbw1    = $member1->{"rbandwidth"};
+		my $member1    = $virt_lans{$lan}->{"MEMBERS"}->{$memb1};
+		my $node1      = $member1->{"vnode"};
+		my $rdelay1    = $member1->{"rdelay"};
+		my $rloss1     = $member1->{"rlossrate"};
+		my $rbw1       = $member1->{"rbandwidth"};
+		my $rbackfill1 = $member1->{"rbackfill"};
 		my $qtype1  = "droptail";
 		if ($member1->{"q_red"}) {
 		    $qtype1 = ($member1->{"q_gentle"} ? "gred" : "red");
 		}
 
+		# ebw stands for effective bandwith, it is bw - backfill
 		my $delay = ($delay0+$rdelay1) / 1000.0;
 		my $loss = 1-(1-$loss0)*(1-$rloss1);
 		my $bw = &min($bw0,$rbw1) * 1000;
+		my $backfill = &max($backfill0,$rbackfill1) * 1000;
+		my $ebw = $bw - $backfill;
 
 		printf $LTOUT
-		    "l $node0 $node1 $bw %.4f %.6f $lan $qtype1\n",
+		    "l $node0 $node1 $ebw %.4f %.6f $lan $qtype1\n",
 		    $delay, $loss;
 	    }
 	}

@@ -615,7 +615,7 @@ my %memberof = ();
 
 # delaylinks stores the actual link delay info, converted from the
 # virt delay params above. It is indexed by link name and contains a
-# [delay,bw,loss] array for each direction. The final member of the
+# [delay,bw,backfill,loss] array for each direction. The final member of the
 # array is an indicator of whether the info is there strictly for a 
 # trivial link (linkdelay inserted only when assign makes link trivial).
 my %delaylinks     = ();
@@ -1868,15 +1868,15 @@ foreach $plink (keys(%plinks)) {
 	$protolandst->AddMember($nodeC, $portC);
 	$protolandst->AddMember($nodeD, $portD);
 	
-	my ($member0,$delay,$bandwidth,$lossrate,
-	    $member1,$rdelay,$rbandwidth,$rlossrate) = @{$delaylinks{$plink}};
+	my ($member0,$delay,$bandwidth,$backfill,$lossrate,
+	    $member1,$rdelay,$rbandwidth,$rbackfill,$rlossrate) = @{$delaylinks{$plink}};
 	
 	$nodedelays{$delayid++} = [$nodeB,$portB,$portD,$lan,
-			       $member0,$delay,$bandwidth,$lossrate,
-			       $member1,$rdelay,$rbandwidth,$rlossrate];
+			       $member0,$delay,$bandwidth,$backfill,$lossrate,
+			       $member1,$rdelay,$rbandwidth,$rbackfill,$rlossrate];
 	printdb "  Delay: \[$nodeB,$portB,$portD,$lan," .
-	    "$delay,$bandwidth,$lossrate,$rdelay,$rbandwidth," .
-	    "$rlossrate,$nodeportA,$nodeportC\]\n";
+	    "$delay,$bandwidth,$backfill,$lossrate,$rdelay,$rbandwidth," .
+	    "$rbackfill,$rlossrate,$nodeportA,$nodeportC\]\n";
 
 	#
 	# Setup portmap using virt members in plink name.
@@ -1940,14 +1940,14 @@ foreach $plink (keys(%plinks)) {
 	$protolanlink->AddMember($nodeA, $portA);
 	$protolanlink->AddMember($nodeB, $portB);
 
-	my ($member0,$delay,$bandwidth,$loss,
-	    $member1,$rdelay,$rbandwidth,$rloss) = @{$delaylinks{$plink}};
+	my ($member0,$delay,$bandwidth,$backfill,$loss,
+	    $member1,$rdelay,$rbandwidth,$rbackfill,$rloss) = @{$delaylinks{$plink}};
 	
 	$nodedelays{$delayid++} = [$nodeB,$portB,$portD,$lan,
-				   $member0,$delay,$bandwidth,$loss,
-				   $member1,$rdelay,$rbandwidth,$rloss];
+				   $member0,$delay,$bandwidth,$backfill,$loss,
+				   $member1,$rdelay,$rbandwidth,$rbackfill,$rloss];
 	printdb "  Delays: \[$nodeB,$portB,$portD,$lan," .
-	    "$delay,$bandwidth,$loss,$rdelay,$rbandwidth,$rloss," .
+	    "$delay,$bandwidth,$backfill,$loss,$rdelay,$rbandwidth,$rbackfill,$rloss," .
 	    "$nodeportA,$nodeportC\]\n";
 
 	$portmap{$virtA} = $portA;
@@ -2048,8 +2048,8 @@ foreach $plink (keys(%plinks)) {
 	printdb "    $virtB = $portB\n";
 	
 	if ($delaylinks{$plink}) {
-	    my ($member0,$delay,$bandwidth,$loss,
-		$member1,$rdelay,$rbandwidth,$rloss,$trivonly) =
+	    my ($member0,$delay,$bandwidth,$backfill,$loss,
+		$member1,$rdelay,$rbandwidth,$rbackfill,$rloss,$trivonly) =
 		    @{$delaylinks{$plink}};
 
 	    if (!$trivonly || $trivonly && $trivial) {
@@ -2057,16 +2057,16 @@ foreach $plink (keys(%plinks)) {
 		# Two entries, one for each side of the duplex link.
 		#
 		$linkdelays{$delayid++} = [$nodeA,$portA,$lan,$member0,
-					   $delay,$bandwidth,$loss,
+					   $delay,$bandwidth,$backfill,$loss,
 					   undef,undef,undef,0];
 	    
 		$linkdelays{$delayid++} = [$nodeB,$portB,$lan,$member1,
-					   $rdelay,$rbandwidth,$rloss,
+					   $rdelay,$rbandwidth,$rbackfill,$rloss,
 					   undef,undef,undef,0];
 
 		printdb "  LinkDelay: \[$nodeA,$portA,$nodeB,$portB," .
-		    "$lan,$delay,$bandwidth,$loss,$rdelay,".
-		    "$rbandwidth,$rloss,$trivonly\]\n";
+		    "$lan,$delay,$bandwidth,$backfill,$loss,$rdelay,".
+		    "$rbackfill,$rbandwidth,$rloss,$trivonly\]\n";
 	    }
 	}
  	#
@@ -2203,8 +2203,8 @@ foreach $plink (keys(%plinks)) {
 	printdb "    $virtA = $portA\n";
 	
 	if ($delaylinks{$plink}) {
-	    my ($member0,$delay,$bandwidth,$loss,
-		$member1,$rdelay,$rbandwidth,$rloss,$trivonly) =
+	    my ($member0,$delay,$bandwidth,$backfill,$loss,
+		$member1,$rdelay,$rbandwidth,$rbackfill,$rloss,$trivonly) =
 		    @{$delaylinks{$plink}};
 
 	    if (!$trivonly || $trivonly && $trivial) {
@@ -2212,12 +2212,12 @@ foreach $plink (keys(%plinks)) {
 		# One entry, comprising each side of the link to lan.
 		#
 		$linkdelays{$delayid++} = [$nodeA,$portA,$lan,$member0,
-					   $delay,$bandwidth,$loss,
-					   $rdelay,$rbandwidth,$rloss,1];
+					   $delay,$bandwidth,$backfill,$loss,
+					   $rdelay,$rbandwidth,$rbackfill,$rloss,1];
 	    
 		printdb "  LinkDelay: \[$nodeA,$portA," .
-		    "$lan,$delay,$bandwidth,$loss,$rdelay,".
-		    "$rbandwidth,$rloss,$trivonly\]\n";
+		    "$lan,$delay,$bandwidth,$backfill,$loss,$rdelay,".
+		    "$rbandwidth,$rbackfill,$rloss,$trivonly\]\n";
 	    }
 	}
  	#
@@ -2364,8 +2364,8 @@ foreach my $lan (keys(%virt_lans)) {
 foreach $delayid (keys(%nodedelays)) {
     # So r* indicates int1->int0 and others are int0->int1
     my ($pnode,$int0,$int1,$vname,
-	$member0,$delay,$bandwidth,$lossrate,
-	$member1,$rdelay,$rbandwidth,$rlossrate) = @{$nodedelays{$delayid}};
+	$member0,$delay,$bandwidth,$backfill,$lossrate,
+	$member1,$rdelay,$rbandwidth,$rbackfill,$rlossrate) = @{$nodedelays{$delayid}};
 
     # ipfw pipe number so we can control it remotely.
     my $pipe0 = physnodenextpipe($pnode);
@@ -2399,8 +2399,8 @@ foreach $delayid (keys(%nodedelays)) {
     
 	DBQueryFatal("insert into delays " .
 	     " (pid,eid,exptidx,node_id,vname,noshaping,iface0,iface1" .
-	     ",vnode0,pipe0,delay0,bandwidth0,lossrate0" .
-	     ",vnode1,pipe1,delay1,bandwidth1,lossrate1" .
+	     ",vnode0,pipe0,delay0,bandwidth0,backfill0,lossrate0" .
+	     ",vnode1,pipe1,delay1,bandwidth1,backfill1,lossrate1" .
 	     ",q0_limit,q0_maxthresh,q0_minthresh,q0_weight,q0_linterm" .
 	     ",q0_qinbytes,q0_bytes,q0_meanpsize,q0_wait,q0_setbit" .
 	     ",q0_droptail,q0_red,q0_gentle" .
@@ -2409,8 +2409,8 @@ foreach $delayid (keys(%nodedelays)) {
 	     ",q1_droptail,q1_red,q1_gentle)" .
 	     " values ('$pid','$eid','$experiment_idx','$pnode','$vname' ".
 	     ",$noshaping,'$int0','$int1'".
-	     ",'$vnode0',$pipe0,$delay,$bandwidth,$lossrate".
-	     ",'$vnode1',$pipe1,$rdelay,$rbandwidth,$rlossrate".
+	     ",'$vnode0',$pipe0,$delay,$bandwidth,$backfill,$lossrate".
+	     ",'$vnode1',$pipe1,$rdelay,$rbandwidth,$rbackfill,$rlossrate".
 	     ",$q0_limit,$q0_maxthresh,$q0_minthresh,$q0_weight,$q0_linterm".
 	     ",$q0_qinbytes,$q0_bytes,$q0_meanpsize,$q0_wait,$q0_setbit".
 	     ",$q0_droptail,$q0_red,$q0_gentle".
@@ -2438,15 +2438,15 @@ foreach $delayid (keys(%nodedelays)) {
 	#
 	DBQueryFatal("insert into delays" .
 	     " (pid,eid,exptidx,node_id,vname,noshaping,iface0,iface1," .
-	     "  vnode0,pipe0,delay0,bandwidth0,lossrate0," .
-	     "  vnode1,pipe1,delay1,bandwidth1,lossrate1," .
+	     "  vnode0,pipe0,delay0,bandwidth0,backfill0,lossrate0," .
+	     "  vnode1,pipe1,delay1,bandwidth1,backfill1,lossrate1," .
 	     "  q0_limit,q0_maxthresh,q0_minthresh,q0_weight,q0_linterm," .
 	     "  q0_qinbytes,q0_bytes,q0_meanpsize,q0_wait,q0_setbit," .
 	     "  q0_droptail,q0_red,q0_gentle,q1_limit,q1_qinbytes) " .
 	     " values ('$pid','$eid','$experiment_idx','$pnode','$vname', ".
 	     "  $noshaping,'$int0','$int1',".
-	     "  '$vnode0',$pipe0,$delay,$bandwidth,$lossrate,".
-	     "  '$vnode1',$pipe1,$rdelay,$rbandwidth,$rlossrate,".
+	     "  '$vnode0',$pipe0,$delay,$bandwidth,$backfill,$lossrate,".
+	     "  '$vnode1',$pipe1,$rdelay,$rbandwidth,$rbackfill,$rlossrate,".
 	     "  $q0_limit,$q0_maxthresh,$q0_minthresh,$q0_weight,$q0_linterm,".
 	     "  $q0_qinbytes,$q0_bytes,$q0_meanpsize,$q0_wait,$q0_setbit,".
 	     "  $q0_droptail,$q0_red,$q0_gentle,2,0)");
@@ -2489,9 +2489,10 @@ foreach $delayid (keys(%nodedelays)) {
 # queues associated with output side (to the switch) of a link.
 #
 foreach $delayid (keys(%linkdelays)) {
+    # backfill unsupported for linkdelays so ignore its entry in linkdelays
     my ($pnode,$iface,$lan,$member,
-	$delay,$bandwidth,$lossrate,
-	$rdelay,$rbandwidth,$rlossrate,$islan) = @{$linkdelays{$delayid}};
+	$delay,$bandwidth,undef,$lossrate,
+	$rdelay,$rbandwidth,undef,$rlossrate,$islan) = @{$linkdelays{$delayid}};
 
     # ipfw pipe numbers so we can control it remotely.
     my $pipe  = physnodenextpipe($pnode);
@@ -4270,10 +4271,12 @@ sub LoadVirtLans()
 	my $delay          = $rowref->{"delay"};
 	my $bandwidth      = $rowref->{"bandwidth"};
 	my $est_bandwidth  = $rowref->{"est_bandwidth"};
+	my $backfill       = $rowref->{"backfill"};
 	my $lossrate       = $rowref->{"lossrate"};
 	my $rdelay         = $rowref->{"rdelay"};
 	my $rbandwidth     = $rowref->{"rbandwidth"};
 	my $rest_bandwidth = $rowref->{"rest_bandwidth"};
+	my $rbackfill      = $rowref->{"rbackfill"};
 	my $rlossrate      = $rowref->{"rlossrate"};
 	my $widearea       = $rowref->{"widearea"};
 	my $isemulated     = $rowref->{"emulated"};
@@ -4322,10 +4325,12 @@ sub LoadVirtLans()
 	    [ $delay,
 	      $bandwidth,
 	      $est_bandwidth,
+	      $backfill,
 	      $lossrate,
 	      $rdelay,
 	      $rbandwidth,
 	      $rest_bandwidth,
+	      $rbackfill,
 	      $rlossrate ];
 
 	#
@@ -4410,8 +4415,8 @@ sub virtlantopbw($$) {
     my ($virtlan, $member) = @_;
     my $node = (split(":",$member))[0];
 
-    my ($delay,$bw,$ebw,$loss,
-	$rdelay,$rbw,$rebw,$rloss) = virtlandelayinfo($virtlan,$member);
+    my ($delay,$bw,$ebw,$backfill,$loss,
+	$rdelay,$rbw,$rebw,$rbackfill,$rloss) = virtlandelayinfo($virtlan,$member);
 
     # Return the estimated bw if it was given; otherwise, return the normal
     # bandwidth, 
@@ -4957,8 +4962,8 @@ sub CreateTopFile()
 	    $lannodes{"fakelan/$lan"} = 1;
 	    foreach $member (@members) {
 		my $plink = "fakelan/$lan/$member";
-		my ($delay,$bw,$ebw,$loss,
-		    $rdelay,$rbw,$rebw,$rloss) = virtlandelayinfo($lan,$member);
+		my ($delay,$bw,$ebw,$backfill,$loss,
+		    $rdelay,$rbw,$rebw,$rbackfill,$rloss) = virtlandelayinfo($lan,$member);
 		my ($top_bw, $top_rbw) = virtlantopbw($lan,$member);
 	
 		my ($node) = (split(":",$member))[0];
@@ -4977,20 +4982,22 @@ sub CreateTopFile()
 	    $node0 = (split(":",$nodeport0))[0];
 	    $node1 = (split(":",$nodeport1))[0];
 
-	    my ($delay0,$bw0,$ebw0,$loss0,
-	     $rdelay0,$rbw0,$rebw0,$rloss0)
+	    my ($delay0,$bw0,$ebw0,$backfill0,$loss0,
+	     $rdelay0,$rbw0,$rebw0,$rbackfill0,$rloss0)
 	     = virtlandelayinfo($lan, $nodeport0);
-	    my ($delay1,$bw1,$ebw1,$loss1,
-	     $rdelay1,$rbw1,$rebw1,$rloss1)
+	    my ($delay1,$bw1,$ebw1,$backfill1,$loss1,
+	     $rdelay1,$rbw1,$rebw1,$rbackfill1,$rloss1)
 	     = virtlandelayinfo($lan, $nodeport1);
 
 	    # Here the r's aregoing to be 1->0 and the others 0->1
 	    $delay = $delay0+$rdelay1;
 	    $loss = 1-(1-$loss0)*(1-$rloss1);
 	    $bw = &min($bw0,$rbw1);
+	    $backfill = &max($backfill0,$rbackfill1);
 	    $rdelay = $rdelay0+$delay1;
 	    $rloss = 1-(1-$rloss0)*(1-$loss1);
 	    $rbw = &min($rbw0,$bw1);
+	    $rbackfill = &max($rbackfill0,$backfill1);
 	    $bandwidth = &getbandwidth($node0,$lan,$bw);
 	    $rbandwidth = &getbandwidth($node1,$lan,$rbw);
 
@@ -5127,8 +5134,8 @@ sub CreateTopFile()
 		    if ($nobwshaping) {
 			$bw = $rbw = 0;
 		    }
-		    $delaylinks{$plink} = [$nodeport0,$delay,$bw,$loss,
-					   $nodeport1,$rdelay,$rbw,$rloss, 0];
+		    $delaylinks{$plink} = [$nodeport0,$delay,$bw,$backfill,$loss,
+					   $nodeport1,$rdelay,$rbw,$rbackfill,$rloss, 0];
 		    
 		    printdb "Delay link $plink = " . 
 			join(" ",@{$delaylinks{$plink}}) . "\n";
@@ -5137,8 +5144,8 @@ sub CreateTopFile()
 		    my $delayname = "tbsdelay" . $delayid++;
 		    my $plink     = "linksdelaysrc/$lan/$nodeport0,$nodeport1";
 		    
-		    $delaylinks{$plink} = [$nodeport0,$delay,$bw,$loss,
-					   $nodeport1,$rdelay,$rbw,$rloss,
+		    $delaylinks{$plink} = [$nodeport0,$delay,$bw,$backfill,$loss,
+					   $nodeport1,$rdelay,$rbw,$rbackfill,$rloss,
 					   0];
 
                     my $delayos = "";
@@ -5189,8 +5196,8 @@ sub CreateTopFile()
 		    # trivial link.		    
 		    #
 		    if (!$nobwshaping && !virtlanallsim($lan)) {
-			$delaylinks{$plink} = [$nodeport0,$delay,$bw,$loss,
-					       $nodeport1,$rdelay,$rbw,$rloss,1];
+			$delaylinks{$plink} = [$nodeport0,$delay,$bw,$backfill,$loss,
+					       $nodeport1,$rdelay,$rbw,$rbackfill,$rloss,1];
 		    }
 		}
 		if ($fixall ne '') {
@@ -5203,8 +5210,8 @@ sub CreateTopFile()
 	    $expt_stats{"lans"} += 1;
 	    $lannodes{"lan/$lan"} = 1;
 	    foreach $member (@members) {
-		my ($delay,$bw,$ebw,$loss,
-		 $rdelay,$rbw,$rebw,$rloss) = virtlandelayinfo($lan, $member);
+		my ($delay,$bw,$ebw,$backfill,$loss,
+		 $rdelay,$rbw,$rebw,$rbackfill,$rloss) = virtlandelayinfo($lan, $member);
 		($node) = (split(":",$member))[0];
 
 		# Need to know about tracing on a per queue basis, since the
@@ -5308,8 +5315,8 @@ sub CreateTopFile()
 			    $bw = $rbw = 0;
 			}
 			$delaylinks{$plink} =
-			    [$member,$delay,$bw,$loss,
-			     $member,$rdelay,$rbw,$rloss,0];
+			    [$member,$delay,$bw,$backfill,$loss,
+			     $member,$rdelay,$rbw,$rbackfill,$rloss,0];
 
 			print(TOPFILE "link $plink $node lan/$lan " .
 			      max($top_bw,$top_rbw) . " 0 0 $protocol" .
@@ -5325,8 +5332,8 @@ sub CreateTopFile()
 			my $plink     = "linkdelaysrc/$lan/$member";
 
 			$delaylinks{$plink} =
-			    [$member,$delay,$bw,$loss,
-			     $member,$rdelay,$rbw,$rloss,0];
+			    [$member,$delay,$bw,$backfill,$loss,
+			     $member,$rdelay,$rbw,$rbackfill,$rloss,0];
 			
 			print TOPFILE "node $delayname delay " .
                             "$delay_osid_desire\n";
@@ -5375,8 +5382,8 @@ sub CreateTopFile()
 			# a trivial link.
 			#
 			if (!$nobwshaping) {
-			    $delaylinks{$plink} = [$member,$delay,$bw,$loss,
-					   $member,$rdelay,$rbw,$rloss,1];
+			    $delaylinks{$plink} = [$member,$delay,$bw,$backfill,$loss,
+					   $member,$rdelay,$rbw,$rbackfill,$rloss,1];
 			}
 		    }
 		    if ($fixsrc0) {
