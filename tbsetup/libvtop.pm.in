@@ -119,7 +119,7 @@ sub current_p2v($)      { return $_[0]->{'CURRENT_P2V'}; }
 sub current_v2v($)      { return $_[0]->{'CURRENT_V2V'}; }
 sub pnodes($)           { return $_[0]->{'PNODES'}; }
 sub fixednodes($)       { return $_[0]->{'FIXEDNODES'}; }
-sub newreserved($)      { return $_[0]->{'newreserved'}; }
+sub newreserved($)      { return $_[0]->{'NEWRESERVED'}; }
 sub pid($)		{ return $_[0]->experiment()->pid(); }
 sub pid_idx($)		{ return $_[0]->experiment()->pid_idx(); }
 sub eid($)		{ return $_[0]->experiment()->eid(); }
@@ -133,6 +133,10 @@ sub virt_lans($)        { return $_[0]->virt_table("virt_lans"); }
 sub virt_lan_lans($)    { return $_[0]->virt_table("virt_lan_lans"); }
 sub virt_desires($)	{ return $_[0]->virt_table("virt_node_desires"); }
 sub virt_startloc($)	{ return $_[0]->virt_table("virt_node_startloc"); }
+sub virt_trafgens($)	{ return $_[0]->virt_table("virt_trafgens"); }
+sub virt_lan_settings($){ return $_[0]->virt_table("virt_lan_settings"); }
+sub virt_lan_member_settings($)	{
+    return $_[0]->virt_table("virt_lan_member_settings"); }
 
 # Given a vname, is it a node in the topo (or something else like a delay).
 sub isatoponode($$)     { return exists($_[0]->vnodes()->{$_[1]}); }
@@ -835,6 +839,7 @@ sub LoadVirtLans($)
 	    $virtlan = libvtop::virt_lan->Create($self, $virt_lan_lan);
 	    # Add it to the toplevel list of lans.
 	    $self->vlans()->{$vlanname} = $virtlan;
+	    $virtlan->_accesspoint(undef);
 	}
 
 	# Now the local wrapper for the virt_lan table entry (the "member").
@@ -2327,11 +2332,16 @@ sub protocolbasetype($) {
 # Solution. Now we get into the code to process the solution. 
 #
 # Stuff for the solution and interpretation.
-sub solution($)         { return $_[0]->{'SOLUTION'}; }
-sub solution_p2v($)	{ return $_[0]->{'SOLUTION'}->{'P2V'}; }
-sub solution_v2p($)	{ return $_[0]->{'SOLUTION'}->{'V2P'}; }
-sub solution_v2v($)	{ return $_[0]->{'SOLUTION'}->{'V2V'}; }
-sub solution_plinks($)	{ return $_[0]->{'SOLUTION'}->{'PLINKS'}; }
+sub solution($)           { return $_[0]->{'SOLUTION'}; }
+sub solution_p2v($)       { return $_[0]->{'SOLUTION'}->{'P2V'}; }
+sub solution_v2p($)	  { return $_[0]->{'SOLUTION'}->{'V2P'}; }
+sub solution_v2v($)	  { return $_[0]->{'SOLUTION'}->{'V2V'}; }
+sub solution_plinks($)	  { return $_[0]->{'SOLUTION'}->{'PLINKS'}; }
+sub solution_rtabmap($)	  { return $_[0]->{'SOLUTION'}->{'RTABMAP'}; }
+sub solution_vethmap($)   { return $_[0]->{'SOLUTION'}->{'VETHMAP'}; }
+sub solution_vethpatch($) { return $_[0]->{'SOLUTION'}->{'VETHPATCHES'}; }
+sub solution_portmap($)   { return $_[0]->{'SOLUTION'}->{'PORTMAP'}; }
+sub solution_vifacemap($) { return $_[0]->{'SOLUTION'}->{'VIFACEMAP'}; }
 
 sub ReadSolution($$)
 {
@@ -2339,12 +2349,17 @@ sub ReadSolution($$)
 
     # Start with a new solution vector each time.
     $self->{'SOLUTION'} = {};
-    $self->{'SOLUTION'}->{'TORESERVE'} = {};
-    $self->{'SOLUTION'}->{'V2P'}       = {};
-    $self->{'SOLUTION'}->{'P2V'}       = {};
-    $self->{'SOLUTION'}->{'V2V'}       = {};
-    $self->{'SOLUTION'}->{'PLINKS'}    = {};
-    $self->{'SOLUTION'}->{'VIRTNODES'} = {};
+    $self->{'SOLUTION'}->{'TORESERVE'}   = {};
+    $self->{'SOLUTION'}->{'V2P'}         = {};
+    $self->{'SOLUTION'}->{'P2V'}         = {};
+    $self->{'SOLUTION'}->{'V2V'}         = {};
+    $self->{'SOLUTION'}->{'PLINKS'}      = {};
+    $self->{'SOLUTION'}->{'VIRTNODES'}   = {};
+    $self->{'SOLUTION'}->{'RTABMAP'}     = {};
+    $self->{'SOLUTION'}->{'VETHMAP'}     = {};
+    $self->{'SOLUTION'}->{'VETHPATCHES'} = {};
+    $self->{'SOLUTION'}->{'PORTMAP'}     = undef;
+    $self->{'SOLUTION'}->{'VIFACEMAP'}   = {};
 
     #
     # Still using the old assign format.
@@ -2404,6 +2419,7 @@ sub ReadSolution($$)
     $self->printdb("Edges:\n");
     EDGEWHILE: while (<$input>) {
 	my ($vlink,$rawA,$rawB) = undef;
+	my $trivial = 0;
 
 	/^End Edges$/ && last EDGEWHILE;
         my @info = split;
@@ -2424,20 +2440,13 @@ sub ReadSolution($$)
 	    };
 	    /^trivial$/ && do {
 		# we don't have plinks for trivial links
-		$vlink = $info[0];
-		$self->solution_plinks()->{$vlink} = [];
-		next EDGEWHILE;
+		$vlink   = $info[0];
+		$trivial = 1;
+		last SWITCH1;
 	    };
-	    tbwarn("Found garbage: $line\n");
+	    tberror("Found garbage: $line\n");
+	    return -1;
 	}
-	my $nodeportA = getnodeport($rawA);
-	my $nodeportB = getnodeport($rawB);
-	# Convert them back to node:iface format.
-	$nodeportA =~ s/\//:/;
-	$nodeportB =~ s/\//:/;
-	my ($nodeA,$portA) = split(":", $nodeportA);
-	my ($nodeB,$portB) = split(":", $nodeportB);
-
 	#
 	# Map the solution back to our objects and store the results.
 	#
@@ -2446,6 +2455,18 @@ sub ReadSolution($$)
 	my $member0;
 	my $member1;
 	my ($lan,$virtA,$virtB,$virtC) = undef;
+	my ($nodeportA,$nodeportB) = undef;
+	my ($nodeA,$portA,$nodeB,$portB) = undef;
+
+	if (!$trivial) {
+	    $nodeportA = getnodeport($rawA);
+	    $nodeportB = getnodeport($rawB);
+	    # Convert them back to node:iface format.
+	    $nodeportA =~ s/\//:/;
+	    $nodeportB =~ s/\//:/;
+	    ($nodeA,$portA) = split(":", $nodeportA);
+	    ($nodeB,$portB) = split(":", $nodeportB);
+	}
 
 	if (($lan,$virtA,$virtB) =
 	    ($vlink =~ m|^linksdelaysrc/(.+)/(.+),(.+)$|)) {
@@ -2471,20 +2492,24 @@ sub ReadSolution($$)
 	    $virtlan = $self->vlans()->{$lan};
 	    $member0 = $virtlan->members()->{$virtA};
 	    $member1 = $virtlan->members()->{$virtB};
-	    $member0->_pnode($nodeA);
-	    $member0->_pport($portA);
-	    $member1->_pnode($nodeB);
-	    $member1->_pport($portB);
+	    if (!$trivial) {
+		$member0->_pnode($nodeA);
+		$member0->_pport($portA);
+		$member1->_pnode($nodeB);
+		$member1->_pport($portB);
+	    }
 	}
 	elsif (($lan,$virtA) =
 	       ($vlink =~ m|^linklan/([^/]+)/(.+)$|)) {
 	    $virtlan = $self->vlans()->{$lan};
 	    $member0 = $virtlan->members()->{$virtA};
-	    $member0->_pnode($nodeA);
-	    $member0->_pport($portA);
-	    # For a special case, see below.
-	    $member0->_lannode($nodeB);
-	    $member0->_lanport($portB);
+	    if (!$trivial) {
+		$member0->_pnode($nodeA);
+		$member0->_pport($portA);
+		# For a special case, see below.
+		$member0->_lannode($nodeB);
+		$member0->_lanport($portB);
+	    }
 	}
 	elsif (($lan,$virtA) =
 	       ($vlink =~ m|^fakelan/([^/]+)/(.+)$|)) {
@@ -2515,8 +2540,13 @@ sub ReadSolution($$)
 	}
 	
 	$self->solution_plinks()->{$vlink} =
-	    [$linktag,$virtlan,$member0,$member1];
-	$self->printdb("  $vlink $nodeportA,$nodeportB\n");
+	    [$linktag,$virtlan,$trivial,$member0,$member1];
+	if (!$trivial) {
+	    $self->printdb("  $vlink $nodeportA,$nodeportB\n");
+	}
+	else {
+	    $self->printdb("  $vlink trivial\n");
+	}
     }
 
     return 0;
@@ -2660,7 +2690,8 @@ sub AllocNodes($)
     my $experiment = $self->experiment();
     my $pid = $experiment->pid();
     my $eid = $experiment->eid();
-
+    my $idx = $experiment->idx();
+	
     goto skip
 	if ($self->impotent());
 
@@ -2855,8 +2886,14 @@ sub AllocNodes($)
 
 	# Node might need the link delay kernel.
 	$pnode->_needslinkdelay(0);
-	$pnode->_pipenumber(10);
-
+	# ipfw pipe numbers.
+	$pnode->_pipenumber(100);
+	# Routing table id for each vnode on a pnode
+	$pnode->_rtabid(0);
+	# For assigning dynamic ports.
+	$pnode->_portnext(TBDB_LOWVPORT);
+	$pnode->_porthigh(TBDB_MAXVPORT);
+	
 	#
 	# Typically, its one-to-one, unless its a physnode hosting
 	# virtnodes, in which case the mapping is one-to-many.
@@ -2887,6 +2924,86 @@ sub AllocNodes($)
 	    $pnode->_virtnode($virtnode);
 	    $virtnode->_pnode($pnode);
 	}
+    }
+    $self->SetPortRange() == 0
+	or return -1;
+    
+    #
+    # Set the sshd ports. Its complicated by the fact that a single
+    # experiment could have multiple jailed nodes on the same physical
+    # node, and so a per-experiment wide sshd port is not going to
+    # work unless there happens to be just one jail per node, but
+    # thats not likely in the local area case.
+    #
+    foreach my $vnodename (keys(%{ $self->solution_v2v() })) {
+	my $vpnodename = $self->solution_v2v()->{$vnodename};
+	my $vpnode     = $self->pnodes()->{$vpnodename};
+	
+	if ($vpnode->isjailed() || $vpnode->isplabdslice()) {
+	    my $pnodename = $self->solution_v2p()->{$vnodename};
+	    my $pnode     = $self->pnodes()->{$pnodename};
+	    my $sshdport  = nextipportnum($pnode);
+
+	    return -1
+		if ($sshdport < 0);
+
+	    $self->printdb("sshdport: ".
+			   "$vnodename $vpnodename $pnodename $sshdport\n");
+
+	    DBQueryWarn("update nodes set sshdport=$sshdport ".
+			"where node_id='$vpnodename'")
+		or return -1 if (!$self->impotent());
+	}
+    }
+
+    #
+    # Must post pass the trafgens list to make sure no ip port collisions.
+    #
+    foreach my $virt_trafgen ($self->virt_trafgens()->Rows()) {
+	my $vnodename = $virt_trafgen->vnode();
+	my $pnodename = $self->solution_v2p()->{$vnodename};
+	my $pnode     = $self->pnodes()->{$pnodename};
+	my $ipport    = nextipportnum($pnode);
+
+	my $trafname         = $virt_trafgen->vname();
+	my $target_vnodename = $virt_trafgen->target_vnode();
+	my $target_trafname  = $virt_trafgen->target_vname();
+
+	$self->printdb("Setting $virt_trafgen port to $ipport\n");
+
+	if (!$self->impotent()) {
+	    DBQueryWarn("update virt_trafgens set port=$ipport ".
+			"where exptidx='$idx' and ".
+			"      vnode='$vnodename' and vname='$trafname'")
+		or return -1;
+	
+	    DBQueryWarn("update virt_trafgens set target_port=$ipport ".
+			"where exptidx='$idx' and ".
+			"      vnode='$target_vnodename' and ".
+			"      vname='$target_trafname'")
+		or return -1;
+	}
+    }
+
+    #
+    # Upload the v2pmap table. The only place I know that cares about
+    # this table is dohosts() in tmcd.c
+    #
+    foreach my $vnodename (keys(%{ $self->solution_v2p() })) {
+	#
+	# If a virtual node, the pnode is the virtual node, not the
+	# underlying physical node.
+	#
+	my $pnodename = (exists($self->solution_v2v()->{$vnodename}) ?
+			 $self->solution_v2v()->{$vnodename} :
+			 $self->solution_v2p()->{$vnodename});
+
+	$self->printdb("v2pmap: $vnodename $pnodename\n");
+
+	DBQueryWarn("insert into v2pmap set ".
+		    "  pid='$pid', eid='$eid', exptidx='$idx', ".
+		    "  vname='$vnodename', node_id='$pnodename'")
+	    or return -1 if (!$self->impotent());
     }
     
     return 0;
@@ -2994,6 +3111,7 @@ sub AllocVirtNodes($)
 					"count"    => $numvs,
 					"vtype"    => $basetype,
 					"nodeid"   => $physical,
+					"debug"    => 0,
 					"verbose"  => $self->verbose(),
 					"impotent" => $self->impotent()})
 		    < 0) {
@@ -3108,6 +3226,7 @@ sub AllocVirtNodes($)
 	    }		
 	}
     }
+
     return 0;
 }
 
@@ -3124,12 +3243,6 @@ sub InterpLinks($)
 
     $self->printdb("Interpreting link/lan results from assign\n");
 
-    # nodedelays and linkdelays are the final representation. Indexed
-    # by integer id, they store the physical node info and the delay
-    # info.
-    my %nodedelays = ();
-    my %linkdelays = ();
-    my $id         = 0;
     my $vlanid     = 0;
     my %portmap    = ();
     my %protovlans = ();
@@ -3137,7 +3250,7 @@ sub InterpLinks($)
     my %plinks = %{ $self->solution_plinks() };
 
     foreach my $plink (keys(%plinks)) {
-	my ($linktag,$virtlan,$member0,$member1) = @{$plinks{$plink}};
+	my ($linktag,$virtlan,$trivial,$member0,$member1) = @{$plinks{$plink}};
 	my $lan = $virtlan->vname();
 
 	#
@@ -3146,8 +3259,6 @@ sub InterpLinks($)
 	# and thus there could be link delays (ie: two jailed nodes on
 	# a link/lan assigned to the same phys node).
 	#
-	my $trivial = (defined($linktag) ? 0 : 1);
-
 	if ($trivial) {
 	    $self->printdb("plink $plink - trivial\n");
 	}
@@ -3157,10 +3268,14 @@ sub InterpLinks($)
 
 	# There is always a member0.
 	my $virtA  = $member0;
-	my $nodeA  = $member0->_pnode();
-	my $portA  = $member0->_pport();
 	my $vnodeA = $member0->vnode();
 	my $vportA = $member0->vport();
+	my ($nodeA,$portA) = undef;
+	# But it might be trivial, so no portinfo.
+	if (!$trivial) {
+	    $nodeA  = $member0->_pnode();
+	    $portA  = $member0->_pport();
+	}
 
 	if ($linktag eq "linksdelaysrc") {
 	    # trivial links do not have physical links, so no delay nodes.
@@ -3281,24 +3396,25 @@ sub InterpLinks($)
 	elsif ($linktag eq "linksimple") {
 	    # The other node in the link that correspond to the topology.
 	    my $virtB  = $member1;
-	    my $nodeB  = $member1->_pnode();
-	    my $portB  = $member1->_pport();
 	    my $vnodeB = $member1->vnode();
 	    my $vportB = $member1->vport();
+	    my ($nodeB,$portB) = undef;
 	    my $protolink;
 	
 	    #
 	    # If the link is delayed, its with endpoint delays, not a
 	    # delay node.
 	    #
-	    $self->printdb("LINK simple: $virtA,$virtB - ".
-			   "$nodeA:$portA,$nodeB:$portB\n");
-
-	    #
 	    # trivial links do not have physical links, but could be using
 	    # virtual interfaces on the same node. 
 	    #
 	    if (! $trivial) {
+		$nodeB  = $member1->_pnode();
+		$portB  = $member1->_pport();
+		
+		$self->printdb("LINK simple: $virtA,$virtB - ".
+			       "$nodeA:$portA,$nodeB:$portB\n");
+
 		if ($virtlan->usevirtiface()) {
 		    #
 		    # When using virtual interfaces we need to create a
@@ -3313,7 +3429,7 @@ sub InterpLinks($)
 		    my $protovlan = ProtoLan->Create($experiment, $lanid);
 		    $protovlan->SetRole("encapsulation");
 		    $protovlan->SetType("vlan");
-		    $protovlan->SetEncapStyle(virtlanencapstyle($lan));
+		    $protovlan->SetEncapStyle($virtlan->_encapstyle());
 		    $protovlan->SetAttribute("link/lan", $lan);
 
 		    $protovlan->AddMember($nodeA, $portA)
@@ -3324,8 +3440,10 @@ sub InterpLinks($)
 		    #
 		    # Create some new virtual devices.
 		    #
-		    $portA = $self->NewVirtIface($lan, $virtA, $nodeA, $portA);
-		    $portB = $self->NewVirtIface($lan, $virtB, $nodeB, $portB);
+		    $portA = $self->NewVirtIface($virtlan,
+						 $member0, $nodeA, $portA);
+		    $portB = $self->NewVirtIface($virtlan,
+						 $member1, $nodeB, $portB);
 
 		    $protolink = ProtoLan->Create($experiment,
 						  $lan, $protovlan);
@@ -3351,8 +3469,12 @@ sub InterpLinks($)
 		    # (linked) vlan.
 		    $nodeA = $self->solution_v2p()->{$vnodeA};
 		    $nodeB = $self->solution_v2p()->{$vnodeB};
-		    $portA = $self->NewVirtIface($lan, $virtA, $nodeA);
-		    $portB = $self->NewVirtIface($lan, $virtB, $nodeB);
+		    $portA = $self->NewVirtIface($virtlan, $member0, $nodeA);
+		    $portB = $self->NewVirtIface($virtlan, $member1, $nodeB);
+
+		    $self->printdb("LINK simple (trivial): $virtA,$virtB - ".
+				   "$nodeA:$portA,$nodeB:$portB\n");
+		    
 		    $protolink = ProtoLan->Create($experiment, $lan);
 		    $protolink->SetType("trivial");
 		    $protolink->SetRole("link/lan");
@@ -3396,13 +3518,13 @@ sub InterpLinks($)
 	    # A single node in a lan, no delay node.
 	    my $protolan;
 
-	    $self->printdb("LAN node: $virtA - $nodeA:$portA\n");
-
 	    #
 	    # trivial links do not have physical links, but could be using
 	    # virtual interfaces on the same node. 
 	    #
 	    if (! $trivial) {
+		$self->printdb("LAN node: $virtA - $nodeA:$portA\n");
+		
 		if ($virtlan->usevirtiface()) {
 		    #
 		    # Look for the underlying protovlan for this lan. Create
@@ -3418,7 +3540,7 @@ sub InterpLinks($)
 			$protovlan = ProtoLan->Create($experiment, $lanid);
 			$protovlan->SetRole("encapsulation");
 			$protovlan->SetType("vlan");
-			$protovlan->SetEncapStyle(virtlanencapstyle($lan));
+			$protovlan->SetEncapStyle($virtlan->_encapstyle());
 			$protovlan->SetAttribute("link/lan", $lan);
 			$protovlans{$lan} = $protovlan;
 		    }
@@ -3428,7 +3550,8 @@ sub InterpLinks($)
 		    #
 		    # Create new veth device.
 		    #
-		    $portA = NewVirtIface($lan, $virtA, $nodeA, $portA);
+		    $portA = $self->NewVirtIface($virtlan,
+						 $member0, $nodeA, $portA);
 
 		    $protolan = ProtoLan->Lookup($experiment, $lan);
 		    if (defined($protolan)) {
@@ -3457,8 +3580,8 @@ sub InterpLinks($)
 		    # two in the vlan. Typically, the lannode is placed on a
 		    # switch, and this is not an issue. Rob understands this!
 		    #
-		    if (! (member0->_lannode() eq $nodeA &&
-			   member0->_lanport() eq $portA)) {
+		    if (! ($member0->_lannode() eq $nodeA &&
+			   $member0->_lanport() eq $portA)) {
 			$protovlan->AddMember($member0->_lannode(),
 					      $member0->_lanport())
 			    if (!$protovlan->IsMember($member0->_lannode(),
@@ -3507,7 +3630,10 @@ sub InterpLinks($)
 		    # No phys mapping. We create a veth, but there is
 		    # no phys port.
 		    $nodeA = $self->solution_v2p()->{$vnodeA};
-		    $portA = NewVirtIface($lan, $virtA, $nodeA);
+		    $portA = $self->NewVirtIface($virtlan, $member0, $nodeA);
+
+		    $self->printdb("LAN node (trivial): ".
+				   "$virtA - $nodeA:$portA\n");
 
 		    $protolan = ProtoLan->Lookup($experiment, $lan);
 		    if (!defined($protolan)) {
@@ -3572,8 +3698,196 @@ sub InterpLinks($)
 	    warn("Bad plink: $plink\n");
 	}
     }
+    $self->{'SOLUTION'}->{'PORTMAP'} = \%portmap;
+
+    # Write the vlans to the DB.
+    $self->UploadVlans() == 0
+	or return -1;
+    $self->UpLoadTunnels() == 0
+	or return -1;
+    $self->UpLoadInterfaceSettings() == 0
+	or return -1;
 
     return 0;
+}
+
+#
+# Takes vnode, pnode as arguments
+# and determines the correct routing table id
+#
+sub getrtabid($$$)
+{
+    my ($self, $pnode, $member) = @_;
+    my $rtabid;
+    my $vnodename = $member->vnode();
+    my $numvnodesonpnode =
+	scalar(@{ $self->solution_p2v()->{$pnode->node_id()} });
+
+    if ($numvnodesonpnode > 1) {
+	if (! exists($self->solution_rtabmap()->{$vnodename})) {
+	    $rtabid = $pnode->_rtabid();
+	    $pnode->_rtabid($rtabid + 1);
+	    $self->solution_rtabmap()->{$vnodename} = $rtabid;
+	}
+	else {
+	    $rtabid = $self->solution_rtabmap()->{$vnodename};
+	}
+    }
+    else {
+	$rtabid = $self->solution_rtabmap()->{$vnodename} = 0;
+    }
+    return $rtabid;
+}
+
+
+sub NewVirtIface($$$$;$)
+{
+    my ($self, $virtlan, $member, $pnodename, $pport) = @_;
+
+    my $lan       = $virtlan->vname();
+    my $pnode     = $self->pnodes()->{$pnodename};
+    my $vnodename = $member->vnode();
+    my $ip        = $member->ip();
+    my $mask      = $member->mask();
+    my $encap     = $virtlan->_encapstyle();
+    my $isveth    = ($encap eq "veth" || $encap eq "veth-ne");
+    my $vllidx    = $virtlan->idx();
+    my $rtabid    = $self->getrtabid($pnode, $member);
+    my $exptidx   = $self->experiment()->idx();
+    my $vvnode;
+    my $isvnode;
+    my $isvdev;
+    my $type;
+    my $mac;
+    my $newid;
+
+    #
+    # Special actions for virtnodes (as opposed to just emulated links).
+    #
+    if ($pnode->isvirtnode()) {
+	$isvnode = 1;
+
+	#
+	# XXX type should be either veth or vlan
+	#
+	$type = $encap;
+	if (!$isveth && $type ne "vlan") {
+	    tbwarn("whacked encap type '$type' for vnode, ".
+		   "setting to 'veth' instead\n");
+	    $type = "veth";
+	    $isveth = 1;
+	}
+	$isvdev = 1;
+
+	# to the nodes table entry for the virtnode. 
+	$vvnode = $self->solution_v2p()->{$vnodename};
+    }
+    else {
+	$isvnode = 0;
+
+	#
+	# For multiplexed links, the default is no encapsulation,
+	# aka "alias".
+	#
+	$type = $encap;
+	if ($type eq "default" || $type eq "alias") {
+	    $type = "alias";
+	    $isvdev = 0;
+	}
+	else {
+	    $isvdev = 1;
+	}
+    }
+
+    #
+    # Make up a MAC address.  For now, just derive it from the assigned
+    # IP address.  Note that this is only needed for "veth" type interfaces.
+    #
+    if ($isveth) {
+	$mac = sprintf "0000%.2x%.2x%.2x%.2x", split(/\./, $ip);
+    } else {
+	$mac = "000000000000";
+    }
+
+    if ($self->impotent()) {
+	# Make up an id; its never used anyplace.
+	$self->counters()->{'vethid'} = 0
+	    if (!exists($self->counters()->{'vethid'}));
+	    
+	$newid  = $self->counters()->{'vethid'}++;
+    }
+    else {
+	#
+	# Insert, and then get the id so we can form the name of
+	# the virtual device. A null pport means no phys port.
+	#
+	$vvnode = (defined($vvnode) ? "'$vvnode'" : "NULL");
+	$pport  = (defined($pport)  ? "'$pport'" : "NULL");
+    
+	my $query_result = 
+	    DBQueryWarn("insert into vinterfaces ".
+			"(node_id, unit, mac, IP, mask, type, iface, ".
+			" rtabid, vnode_id, exptidx, virtlanidx) ".
+			"values ('$pnodename', 0, '$mac', ".
+			"        '$ip', '$mask', '$type', $pport, ".
+			"        '$rtabid', $vvnode, $exptidx, '$vllidx')");
+	return -1
+	    if (!defined($query_result));
+    
+	$newid  = $query_result->insertid;
+    }
+    my $newvif = $type . $newid;
+
+    $self->printdb("VirtIface: $virtlan, $member, $pnodename, ".
+		   "vif:$newvif, isvdev:$isvdev, isveth:$isveth ".
+		   (defined($pport) ? ", $pport" : "") . "\n");
+
+    # Record this vinterface mapping.
+    $self->solution_vifacemap()->{$member} = $newvif;
+    
+    #
+    # For veth and vlan interfaces, we need to set the characteristics
+    # of the underlying physical interface.
+    #
+    if (defined($pport) && $isvdev) {
+	my $speed = $self->interfacespeedmbps(physinterfacetype($pnode, $pport),
+					      "ethernet");
+
+	$self->printdb("  Setting port speed for $pnodename: $pport:$speed\n");
+	
+	DBQueryWarn("update interfaces set " .
+		     "   current_speed='$speed' " .
+		     "where node_id='$pnodename' and iface='$pport'")
+	    or return -1 if (!$self->impotent());
+    }
+
+    #
+    # XXX hackery that only Rob and Leigh understand.
+    # A LAN of vnodes split across multiple physical machines may
+    # not have the correct physical LAN info coming out of assign
+    # and may need to be patched up later.
+    #
+    if (!defined($pport) && $isvnode) {
+	$self->solution_vethmap()->{$lan} = {}
+	  if (!exists($self->solution_vethmap()->{$lan}));
+	$self->solution_vethmap()->{$lan}->{$pnodename} = []
+	  if (!exists($self->solution_vethmap()->{$lan}->{$pnodename}));
+	
+	push(@{ $self->solution_vethmap()->{$lan}->{$pnodename} }, $newid);
+    }
+    return $newvif;
+}
+
+sub AddVirtPatch($$$$)
+{
+    my ($self, $lan, $pnodename, $pport) = @_;
+
+    $self->printdb("Adding Virt Patch: $lan, $pnodename, $pport\n");
+
+    $self->solution_vethpatch()->{$lan} = {}
+        if (!exists($self->solution_vethpatch()->{$lan}));
+    
+    $self->solution_vethpatch()->{$lan}->{$pnodename} = $pport;
 }
 
 #
@@ -3858,6 +4172,604 @@ sub SetUpTracing($$$$$)
     return 0;
 }
 
+#
+# Write the vlans table to the DB.
+#
+sub UploadVlans($)
+{
+    my ($self) = @_;
+    my $experiment = $self->experiment();
+    my $exptidx = $experiment->idx();
+    
+    #
+    # Post process; mark vlans on federated nodes with a different type
+    # so that we do not try to create them locally.
+    #
+    foreach my $protolanA (ProtoLan->ProtoLanList()) {
+	next
+	    if ($protolanA->type() ne "vlan");
+
+	foreach my $member ($protolanA->MemberList()) {
+	    my $node = $protolanA->MemberNode($member);
+	    if ($node->isfednode()) {
+		$protolanA->SetType("geni-vlan");
+		last;
+	    }
+	}
+	foreach my $member ($protolanA->IfaceList()) {
+	    my $node = $protolanA->IfaceNode($member);
+	    if ($node->isfednode()) {
+		$protolanA->SetType("geni-vlan");
+		last;
+	    }
+	}
+    }
+    
+    #
+    # Emulated vlans will result in node:port pairs being in more than
+    # one vlan since that link is shared for several lans. For hardware
+    # implemented 802.1q tagged vlans (type "vlan"), this is ok. But for
+    # "veth" implemented vlans, we have to merge the overlapping vlans
+    # into "supervlans". Must be done iteratively of course.
+    #
+    $self->printdb("Dumping vlans before merging.\n");
+    ProtoLan->DumpAll()
+	if ($self->verbose());
+    
+    $self->printdb("Merging vlans ...\n");
+  again:
+    foreach my $protolanA (ProtoLan->ProtoLanList()) {
+	my @membersA = $protolanA->MemberList();
+	my $keyA     = $protolanA->vname();
+
+	next
+	    if (! ($protolanA->type() eq "vlan" &&
+		   $protolanA->role() eq "encapsulation" &&
+		   $protolanA->encapstyle() ne "vlan"));
+
+	foreach my $protolanB (ProtoLan->ProtoLanList()) {
+	    my @membersB = $protolanB->MemberList();
+	    my $keyB     = $protolanB->vname();
+
+	    next
+		if (! ($protolanB->type() eq "vlan" &&
+		       $protolanB->role() eq "encapsulation" &&
+		       $protolanB->encapstyle() ne "vlan"));
+	    
+	    if ($keyA ne $keyB) {
+		foreach my $memberA (@membersA) {
+		    if (grep {$_ eq $memberA} $protolanB->MemberList()) {
+			foreach my $memberB (@membersB) {
+			    if (! grep {$_ eq $memberB}
+				$protolanA->MemberList()) {
+				$protolanA->AddMember(split(":", $memberB));
+			    }
+			}
+			# Must reset the links before killing the old one.
+			foreach my $protolan (ProtoLan->ProtoLanList()) {
+			    if (defined($protolan->link()) &&
+				$protolan->link()->vname()
+				   eq $protolanB->vname()) {
+				$protolan->SetLink($protolanA);
+			    }
+			}
+			$self->printdb("Merged $protolanB into $protolanA\n");
+			$protolanB->Destroy();
+			goto again;
+		    }
+		}
+	    }
+	}
+    }
+    
+    if (!$self->impotent()) {
+	$self->printdb("Uploading vlans table.\n");
+	ProtoLan->DumpAll()
+	    if ($self->verbose());
+	if (ProtoLan->InstantiateAll() != 0) {
+	    tberror("Could not instantiate protolans!\n");
+	    return -1;
+	}
+
+	# Once the lans are instantiated we have to go back and update the
+	# vinterfaces table. Eventually I want to roll vinterface creation
+	# into lan instantiation.
+	#
+	my @lans;
+	if (Lan->ExperimentLans($experiment, \@lans) != 0) {
+	    tberror("Could not get list of all lans for $experiment\n");
+	    return -1;
+	}
+	foreach my $lan (@lans) {
+	    # Only care about encapsulated links.
+	    next
+		if ($lan->type() ne "emulated");
+
+	    my $linkedlan = $lan->GetLinkedLan();
+	    if (!defined($linkedlan)) {
+		tberror("Emulated lan $lan does not have a linked vlan!\n");
+		return -1;
+	    }
+	    my $virtlan     = $self->vlans()->{$lan->vname()};
+	    if (!defined($virtlan)) {
+		tberror("Could not find lan $lan in local lan list!\n");
+		return -1;
+	    }
+	    my $virtlanidx  = $virtlan->idx();
+	    my $linkedlanid = $linkedlan->lanid();
+	    
+	    $self->printdb("Update vinterfaces: $virtlan: ".
+			   "$virtlanidx -> $linkedlanid\n");
+	    
+	    DBQueryWarn("update vinterfaces set vlanid='$linkedlanid' ".
+			"where virtlanidx='$virtlanidx' and ".
+			"      exptidx='$exptidx'")
+		or return -1;
+	}
+    }
+    else {
+	$self->printdb("Dumping final vlans table.\n");
+	ProtoLan->DumpAll()
+	    if ($self->verbose());
+    }
+
+    #
+    # Upload the port bw to the interfaces table for each iface.
+    #
+    foreach my $virtlan (values(%{ $self->vlans() })) {
+	my $vlanname = $virtlan->vname();
+
+	foreach my $member ($virtlan->memberlist()) {
+	    # Will this happen?
+	    next
+		if (!exists($self->solution_portmap()->{$member}));
+
+	    # XXX NSE checks I do not understand.
+	    next
+		if (! (exists($self->portbw()->{$member}) &&
+		       exists($self->solution_v2p()->{$member->vnode()})));
+
+	    # Skip anything that was turned into a vinterface; the
+	    # port speed will get set elsewhere.
+	    next
+		if (exists($self->solution_vifacemap()->{$member}));
+
+	    my $iface     = $self->solution_portmap()->{$member};
+	    my $pnodename = $self->solution_v2p()->{$member->vnode()};
+	    my $speed     = $self->portbw()->{$member};
+	    
+	    # XXX - the following converts from bps to Mbps
+	    $speed = $speed / 1000;
+
+	    $self->printdb("Interface speed: $pnodename:$iface $speed\n");
+	    
+	    DBQueryWarn("update interfaces set current_speed='$speed' ".
+			"where node_id='$pnodename' and iface='$iface'")
+		or return -1 if (!$self->impotent());
+	}
+    }
+
+    #
+    # Patch up virts.
+    #
+    foreach my $vname (keys(%{ $self->vlans() })) {
+	next
+	    if (!exists($self->solution_vethpatch()->{$vname}));
+
+	foreach my $pname (keys(%{ $self->solution_vethmap()->{$vname} })) {
+	    next
+		if (!exists($self->solution_vethpatch()->{$vname}->{$pname}));
+
+	    my $pport = $self->solution_vethpatch()->{$vname}->{$pname};
+	    my $pnode = $self->pnodes()->{$pname};
+
+	    foreach my $vid (@{$self->solution_vethmap()->{$vname}->{$pname}}) {
+		#
+		# For veth and vlan interfaces, we need to set the
+		# characteristics of the underlying physical
+		# interface.
+		#
+		my $speed =
+		    $self->interfacespeedmbps(physinterfacetype($pnode, $pport),
+					      "ethernet");
+		$self->printdb("Virt Patch: ".
+			       "$vname $pname $vid $pport $speed\n");
+	
+		if (!$self->impotent()) {
+		    DBQueryWarn("update vinterfaces set iface='$pport' ".
+				"where node_id='$pname' and unit='$vid'")
+			or return -1;
+
+		    DBQueryWarn("update interfaces set " .
+				"   current_speed='$speed' " .
+				"where node_id='$pname' and iface='$pport'")
+			or return -1;
+		}
+	    }
+	}
+    }
+    $self->UpLoadIPAddresses() == 0
+	or return -1;
+    return 0;
+}
+
+#
+# Upload the IP addresses to the interfaces table.
+#
+sub UpLoadIPAddresses($)
+{
+    my ($self) = @_;
+
+    # For recording IPs we have seen already.
+    my %IPs = ();
+
+    foreach my $virtlan (values(%{ $self->vlans() })) {
+	my $vlanname = $virtlan->vname();
+	my $mask     = $virtlan->_mask();
+
+	foreach my $member ($virtlan->memberlist()) {
+	    # Will this happen?
+	    next
+		if (!exists($self->solution_portmap()->{$member}));
+
+	    my $iface = $self->solution_portmap()->{$member};
+	    my $vnodename = $member->vnode();
+
+	    if ($virtlan->usevirtiface()) {
+		#
+		# Emulated links on local virtual nodes use the new
+		# veth device.
+		#
+		# See NewVirtIface() calls. Everything was set up then.
+		#
+		my $pnodename = $self->solution_v2p()->{$vnodename};
+		my $ip        = $member->ip();
+
+		$self->printdb("IP: $member - $pnodename:$iface $ip\n");
+	    }
+	    else {
+		#
+		# Use IPs above to catch if we have inserted an entry
+		# for this pnode/iface yet. If not, insert a normal
+		# entry. If so, we want to add a new ipalias for the
+		# interface. That is cause assign can cause an interface
+		# to be shared between multiple links, and so we need
+		# ipaliases on the client side.
+		#
+		my $pnodename  = $self->solution_v2p()->{$vnodename};
+		my $pnode      = $self->pnodes()->{$pnodename};
+		my $ip         = $member->ip();
+		my $rtabid     = $self->getrtabid($pnode, $member);
+		my $pvnodename = undef;
+
+		# Mark as being a jail interface by establishing a connection
+		# to the nodes table entry for the virtnode.
+		if (exists($self->solution_v2v()->{$vnodename})) {
+		    my $pvnode =
+			$self->pnodes()->{$self->solution_v2v()->{$vnodename}};
+
+		    if ($pvnode->isjailed()) {
+			$pvnodename = $self->solution_v2v()->{$vnodename};
+		    }
+		}
+
+		if (! exists($IPs{"$pnodename:$iface"})) {
+		    $self->printdb("IP: $member - ".
+				   (defined($pvnodename) ? "$pvnodename:" : "").
+				   "$pnodename:$iface $ip\n");
+		    
+		    #
+		    # Never update control net interfaces. This is so
+		    # that we can consider them for mapping purposes
+		    # (ie. PlanetLab), but don't have to worry about
+		    # their IPs getting changed, since that's
+		    # important persistent state!
+		    #
+		    if (physinterfacerole($pnode,$iface) eq
+			TBDB_IFACEROLE_CONTROL) {
+			$self->printdb("Not setting IP for control interface: ".
+				       "$pnode:$iface\n");
+		    }
+		    else {
+			my $vnode_id = (defined($pvnodename) ?
+					"'$pvnodename'" : "NULL");
+			
+			DBQueryWarn("update interfaces set ".
+				    "   IP='$ip',IPaliases=NULL,mask='$mask',".
+				    "   vnode_id=$vnode_id,rtabid='$rtabid' ".
+				    "where node_id='$pnodename' and ".
+				    "      iface='$iface'")
+			    or return -1 if (!$self->impotent());
+			    
+			$IPs{"$pnodename:$iface"} = 1;
+		    }
+		}
+		else {
+		    #
+		    # Rather then an IP aliases like we used to do,
+		    # tie a virtual interface to it.
+		    #
+		    my $viface =
+			$self->NewVirtIface($virtlan, $member,
+					    $pnodename, $iface);
+
+		    $self->printdb("IP: $member - ".
+				   "$pnodename:$iface $ip ($viface)\n");
+		}
+	    }
+	}
+    }
+    return 0;
+}
+
+#
+# Upload the tunnels table. These are built for remote node links.
+#
+sub UpLoadTunnels($)
+{
+    my ($self) = @_;
+
+    #
+    # First need to assign ports to the servers. To do that need to
+    # figure out who is a server! We put the server on a real emulab
+    # node if possible, and otherwise one of the virtual nodes. Also,
+    # we want to share the server amongst more than one link, if
+    # possible, since a server can handle more than one tunnel. So,
+    # make sure that only one port is assigned per server node.
+    #
+    my %lantotunnelserver = ();
+    my %rnodetotunnelport = ();
+    my $secretkey;
+
+    foreach my $virtlan (values(%{ $self->vlans() })) {
+	my $server;
+	
+	next
+	    if (! $virtlan->_tunnel());
+
+	my @members = $virtlan->memberlist();
+	if (@members != 2) {
+	    tberror("Too many members for a tunnel!\n");
+	    return -1;
+	}
+
+	#
+	# Pick one of the members to be the server.
+	# 
+	foreach my $member (@members) {
+	    my $virtnode = $member->virt_node();
+
+	    # Start with the first node, but overwrite if better choice.
+	    $server = $virtnode
+		if (!defined($server) ||
+		    (! $virtnode->_isremotenode() &&
+		     ! exists($lantotunnelserver{$virtlan})));
+	}
+	$lantotunnelserver{$virtlan} = $server;
+
+	# Assign a port, but only the first time chosen.
+	if (! $rnodetotunnelport{$server}) {
+	    my $pnodename = $self->solution_v2p()->{$server->vname()};
+	    my $pnode = $self->pnodes()->{$pnodename};
+	
+	    $rnodetotunnelport{$server} = nextipportnum($pnode);
+	}
+    }
+    foreach my $virtlan (values(%{ $self->vlans() })) {
+	next
+	    if (! $virtlan->_tunnel());
+
+	my $server    = $lantotunnelserver{$virtlan};
+	my $ipport    = $rnodetotunnelport{$server};
+	my $mask      = $virtlan->_mask();
+	my $secretkey = TBGenSecretKey();
+
+	my ($member0,$member1) = $virtlan->memberlist();
+	my $virtnode0 = $member0->virt_node();
+	my $virtnode1 = $member1->virt_node();
+	my $ip0       = $member0->ip();
+	my $ip1       = $member1->ip();
+	
+	my $pnodename0 = ($virtnode0->_isremotenode() ?
+			  $self->solution_v2v()->{$virtnode0->vname()} :
+			  $self->solution_v2p()->{$virtnode0->vname()});
+	my $pnodename1 = ($virtnode1->_isremotenode() ?
+			  $self->solution_v2v()->{$virtnode1->vname()} :
+			  $self->solution_v2p()->{$virtnode1->vname()});
+	my $pnode0 = $self->pnodes()->{$pnodename0};
+	my $pnode1 = $self->pnodes()->{$pnodename1};
+	my ($peerip0,$peerip1);
+    
+	#
+	# Need to map the server to the control net interface of the
+	# physical node.
+	#
+	if (! TBControlNetIP($pnodename0, \$peerip0)) {
+	    tberror("No Control Network IP for $pnodename0!\n");
+	    return -1;
+	}
+	if (! TBControlNetIP($pnodename1, \$peerip1)) {
+	    tberror("No Control Network IP for $pnodename1!\n");
+	    return -1;
+	}
+	$self->printdb("Tunnel: $member0 <-> $member1, ".
+		       "$ip0 <-> $ip1, $peerip0 <-> $peerip1\n");
+
+	next
+	    if ($self->impotent());
+
+	my $tunnel = Tunnel->Create($self->experiment(),
+				    $virtlan->vname(), $secretkey,
+				    $virtlan->_encapstyle(), $mask, $ipport);
+	if (!defined($tunnel)) {
+	    tberror("Could not create tunnel for $virtlan\n");
+	    return -1;
+	}
+	my $iface0 = $tunnel->AddInterface($pnodename0,
+					   $member0->vnode(),
+					   $member0->vport0());
+	if (!defined($iface0)) {
+	    tberror("Could not add $member0 to $tunnel\n");
+	    return -1;
+	}
+	my $iface1 = $tunnel->AddInterface($pnodename1,
+					   $member1->vnode(),
+					   $member1->vport0());
+	if (!defined($iface1)) {
+	    tberror("Could not add $member1 to $tunnel\n");
+	    return -1;
+	}
+
+	# Need to set a bunch of attributes later returned by tmcd.
+	if ($iface0->SetAttribute("tunnel_ip", $ip0) ||
+	    $iface0->SetAttribute("tunnel_peerip", $ip1) ||
+	    $iface0->SetAttribute("tunnel_srcip", $peerip0) ||
+	    $iface0->SetAttribute("tunnel_dstip", $peerip1) ||
+	    $iface0->SetAttribute("tunnel_isserver",
+				  ($server eq $virtnode0 ? 1 : 0)) ||
+	    $iface0->SetAttribute("tunnel_secretkey", $secretkey) ||
+	    $iface0->SetAttribute("tunnel_ipmask", $mask) ||
+	    $iface0->SetAttribute("tunnel_serverport", $ipport) ||
+	    $iface0->SetAttribute("tunnel_lan", $virtlan->vname()) ||
+	    $iface0->SetAttribute("tunnel_unit", $iface0->memberid()) ||
+	    $iface0->SetAttribute("tunnel_style", $virtlan->_encapstyle())) {
+	    tberror("Could not set attributes for $iface0 in $tunnel\n");
+	    return -1;
+	}
+	if ($iface1->SetAttribute("tunnel_ip", $ip1) ||
+	    $iface1->SetAttribute("tunnel_peerip", $ip0) ||
+	    $iface1->SetAttribute("tunnel_srcip", $peerip1) ||
+	    $iface1->SetAttribute("tunnel_dstip", $peerip0) ||
+	    $iface1->SetAttribute("tunnel_isserver",
+				  ($server eq $virtnode1 ? 1 : 0)) ||
+	    $iface1->SetAttribute("tunnel_secretkey", $secretkey) ||
+	    $iface1->SetAttribute("tunnel_ipmask", $mask) ||
+	    $iface1->SetAttribute("tunnel_serverport", $ipport) ||
+	    $iface1->SetAttribute("tunnel_lan", $virtlan->vname()) ||
+	    $iface1->SetAttribute("tunnel_unit", $iface1->memberid()) ||
+	    $iface1->SetAttribute("tunnel_style", $virtlan->_encapstyle())) {
+	    tberror("Could not set attributes for $iface1 in $tunnel\n");
+	    return -1;
+	}
+    }
+    return 0;
+}
+
+#
+# Upload interface settings.
+#
+sub UpLoadInterfaceSettings($)
+{
+    my ($self) = @_;
+
+    my $experiment = $self->experiment();
+    my $pid = $experiment->pid();
+    my $eid = $experiment->eid();
+    my $idx = $experiment->idx();
+
+    foreach my $virtlan (values(%{ $self->vlans() })) {
+	my $protocol = $virtlan->_protocol();
+	my $vlanname = $virtlan->vname();
+
+	next
+	    if (! ($protocol =~ /^(80211|flex900)/));
+
+	my @members = $virtlan->memberlist();
+	my $ssid    = "${vlanname}_${idx}";
+	my $apmac;
+
+	if (defined($virtlan->_accesspoint())) {
+	    my $member    = $virtlan->_accesspoint();
+	    my $vnodename = $member->vnode();
+	    my $pnodename = $self->solution_v2p()->{$vnodename};
+	    my $iface     = $self->solution_portmap()->{$member};
+	    my $pnode     = $self->pnodes()->{$pnodename};
+	    my $interface;
+
+	    if ($pnode->GetInterface($iface, \$interface) != 0) {
+		tberror("Could not find interface $pnodename:$iface\n");
+		return -1;
+	    }
+	    $apmac = $interface->mac();
+	}
+
+	foreach my $member (@members) {
+	    my $vnodename = $member->vnode();
+	    my $pnodename = $self->solution_v2p()->{$vnodename};
+	    my $iface     = $self->solution_portmap()->{$member};
+
+	    #
+	    # First copy over the lan settings.
+	    #
+	    foreach my $lan_setting ($self->virt_lan_settings()->Rows()) {
+		my $capkey = DBQuoteSpecial($lan_setting->capkey());
+		my $capval = DBQuoteSpecial($lan_setting->capval());
+
+		$self->printdb("interface_setting: ".
+			       "$pnodename $iface $capkey $capval\n");
+	    
+		DBQueryWarn("insert into interface_settings ".
+			    "       (node_id, iface, capkey, capval) ".
+			    "values ('$pnodename', '$iface', ".
+			    "        $capkey, $capval)")
+		    or return -1 if (!$self->impotent());
+	    }
+
+	    #
+	    # Next do the per-member settings, which override lan settings.
+	    #
+	    foreach my $setting ($self->virt_lan_member_settings()->Rows()) {
+		next
+		    if ($member ne $setting->member());
+
+		my $capkey = DBQuoteSpecial($setting->capkey());
+		my $capval = DBQuoteSpecial($setting->capval());
+
+		$self->printdb("interface_setting: ".
+			       "$pnodename $iface $capkey $capval\n");
+	    
+		DBQueryWarn("replace into interface_settings ".
+			    "       (node_id, iface, capkey, capval) ".
+			    "values ('$pnodename', '$iface', ".
+			    "        $capkey, $capval)")
+		    or return -1 if (!$self->impotent());
+	    }
+
+	    #
+	    # And lastly, these override anything the user says to do.
+	    # 
+	    DBQueryWarn("replace into interface_settings ".
+			 "       (node_id, iface, capkey, capval) ".
+			 "values ('$pnodename', '$iface', ".
+			 "        'protocol', '$protocol')")
+		or return -1 if (!$self->impotent());
+		
+	    $self->printdb("interface_setting: ".
+			   "$pnodename $iface protocol $protocol\n");
+
+	    DBQueryWarn("replace into interface_settings ".
+			"       (node_id, iface, capkey, capval) ".
+			"values ('$pnodename', '$iface', 'ssid', '$ssid')")
+		or return -1 if (!$self->impotent());
+	
+	    $self->printdb("interface_setting: ".
+			   "$pnodename $iface ssid $ssid\n");
+
+	    if (defined($apmac)) {
+		DBQueryWarn("replace into interface_settings ".
+			    "       (node_id, iface, capkey, capval) ".
+			    "values ('$pnodename', '$iface', ".
+			    "        'accesspoint', '$apmac')")
+		    or return -1 if (!$self->impotent());
+		    
+		$self->printdb("interface_setting: ".
+			       "$pnodename $iface accesspoint $apmac\n");
+	    }
+	}
+    }
+    return 0;
+}
+
 # getnodeport(s)
 # Takes a ports result from assign (mac0,mac1) and returns the
 # first non-null one.
@@ -3879,6 +4791,18 @@ sub physinterfacetype($$)
 	return -1;
     }
     return $interface->type();
+}
+# Get the role for an interface.
+sub physinterfacerole($$)
+{
+    my ($pnode, $iface) = @_;
+
+    my $interface;
+    if ($pnode->GetInterface($iface, \$interface) != 0) {
+	tberror("Could not get interface: $pnode:$iface\n");
+	return -1;
+    }
+    return $interface->role();
 }
 
 #
@@ -3928,6 +4852,78 @@ sub array_diff($$)
 	push(@aonly, $item) unless exists $seen{$item};
     }
     return @aonly;
+}
+
+#
+# If there are no virtual nodes, then there is no port sharing, and it
+# makes no difference, as long as there are no collisions on a
+# node. If there are virtual nodes, then assign a port range for the
+# experiment, and all port allocations need to be shared within that
+# range on each phys node. That is, if there are 2 virtual nodes on
+# physical node, then must allocated from the one range.  There is
+# never any overlap between experiements of course.
+# 
+sub SetPortRange($)
+{
+    my ($self) = @_;
+    
+    #
+    # See if any virtual nodes. If not, no need to do anything since
+    # all port allocations will come from the physical node. 
+    #
+    return 0
+	if (! scalar(keys(%{ $self->solution_v2v() })));
+
+    #
+    # Otherwise find a free slot in the table.
+    #
+    my ($newlow,$newhigh) =
+	$self->experiment()->SetPortRange($self->impotent());
+
+    $self->printdb("SetPortRange: $newlow,$newhigh\n");
+
+    #
+    # Now set the port range for those nodes hosting virtual nodes.
+    # This prevents overlap with other vnodes from other experiments
+    # on that nodes. Since you cannot share a node unless you are using
+    # virtual nodes, there is no need to worry about phys nodes that
+    # are dedicated. That might change of course. 
+    #
+    foreach my $vnodename (keys(%{ $self->solution_v2v() })) {
+	my $vpnodename = $self->solution_v2v()->{$vnodename};
+	my $vpnode     = $self->pnodes()->{$vpnodename};
+	my $pnodename  = $self->solution_v2p()->{$vnodename};
+	my $pnode      = $self->pnodes()->{$pnodename};
+
+	$vpnode->_portnext($newlow + 10);
+	$vpnode->_porthigh($newhigh);
+	$pnode->_portnext($newlow + 10);
+	$pnode->_porthigh($newhigh);
+
+	# We only set the vpnodes. tmcd sends that to the client.
+	DBQueryWarn("update nodes set ipport_low=$newlow, ".
+		    " ipport_next=ipport_low+1, ipport_high=$newhigh ".
+		    "where node_id='$vpnodename'")
+	    or return -1 if ($self->impotent());
+    }
+    return 0;
+}
+
+#
+# Bump and return the IP port number for a node. This is
+# required for multiplexing virtual nodes on a physical node. 
+# 
+sub nextipportnum($)
+{
+    my ($pnode)  = @_;
+    my $port     = $pnode->_portnext();
+
+    if ($port >= $pnode->_porthigh()) {
+	tberror("No more dynamic ports available for $pnode!\n");
+	return -1;
+    }
+    $pnode->_portnext($port + 1);
+    return $port;
 }
 
 #############################################################################
