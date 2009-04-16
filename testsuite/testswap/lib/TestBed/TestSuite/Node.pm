@@ -42,7 +42,8 @@ returns a $ssh connection to the node
 =cut
 sub ssh {
   my $self = shift;
-  my $ssh = Tools::TBSSH::instance($self->name);
+  my $fqname = $self->name . "." . $self->experiment->eid . "." . $self->experiment->pid . ".emulab.net";
+  my $ssh = Tools::TBSSH::instance($fqname);
 }
 
 =back 

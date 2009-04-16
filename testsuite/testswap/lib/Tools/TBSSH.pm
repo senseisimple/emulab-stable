@@ -53,6 +53,16 @@ sub cmdsuccessdump {
   return wrapped_ssh($host, $TBConfig::EMULAB_USER, $cmd, sub { print Dumper(\@_); $_[2] == 0; } );
 }
 
+sub cmdfailure {
+  my ($host, $cmd) = @_;
+  return wrapped_ssh($host, $TBConfig::EMULAB_USER, $cmd, sub { $_[2] != 0; } );
+}
+
+sub cmdfailuredump {
+  my ($host, $cmd) = @_;
+  return wrapped_ssh($host, $TBConfig::EMULAB_USER, $cmd, sub { print Dumper(\@_); $_[2] != 0; } );
+}
+
 =head1 NAME
 
 Tools::TBSSH

@@ -1,7 +1,6 @@
 package TBConfig;
 
 use SemiModern::Perl;
-use Sys::Hostname;
 use Crypt::X509;
 use Tools qw(slurp);
 use Data::Dumper;
@@ -14,7 +13,7 @@ our $SSL_CLIENT_CERT  = glob("~/.ssl/emulab.cert");
 our $SSL_CLIENT_KEY   = glob("~/.ssl/emulabkeyout.pem");
 our $EMULAB_USER      = get_emulab_user();
 our $DEFAULT_PID      = 'tbres';
-our $DEBUG_XML_CLIENT = (hostname() =~ /tan/);
+our $DEBUG_XML_CLIENT = $ENV{TBTS_DEBUG} || 0;
 
 sub get_emulab_user {
   my $cert = slurp($SSL_CLIENT_CERT);

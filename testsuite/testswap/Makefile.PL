@@ -7,11 +7,9 @@ perl_version    '5.008';
 author          'Kevin Tew <tewk@flux.utah.edu>';
 version         '0.01';
 
-#requires      'Test::Exception'     => '0.27';
 requires      'Mouse'               => '';
 requires      'RPC::XML::Client'    => '1.24';
 requires      'RPC::XML'            => '1.41';
-requires      'Sys::Hostname'       => '1.11';
 requires      'Test::More'          => '0.86';
 requires      'Time::Local'         => '1.1901';
 requires      'TAP::Harness'        => '3.16';

@@ -28,11 +28,9 @@ sub automate_module_install {
 
 sub install_deps_from_cpan {
   my @deps = qw(
-      Test::Exception
       Mouse
       RPC::XML::Client
       RPC::XML
-      Sys::Hostname
       Test::More
       Time::Local
       TAP::Harness

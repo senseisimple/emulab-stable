@@ -8,6 +8,7 @@ use TestBed::Wrap::linktest;
 use Tools::TBSSH;
 use Data::Dumper;
 use TestBed::TestSuite::Node;
+use TestBed::TestSuite::Link;
 
 extends 'Exporter', 'TestBed::XMLRPC::Client::Experiment';
 require Exporter;
@@ -21,6 +22,24 @@ TestBed::TestSuite::Experiment
 framwork class for starting and testing experiments
 
 =over 4
+
+=item C<< $e->node($nodename) >>
+
+returns a node object representing node $nodename in the experiment
+=cut
+sub node {
+  my ($e, $nodename) = @_;
+  TestBed::TestSuite::Node->new('experiment' => $e, 'name' => $nodename);
+}
+
+=item C<< $e->link($linkname) >>
+
+returns a link object representing link $linkname in the experiment
+=cut
+sub link {
+  my ($e, $linkname) = @_;
+  TestBed::TestSuite::Link->new('experiment' => $e, 'name' => $linkname);
+}
 
 =item C<nodes()>
 
@@ -73,6 +92,24 @@ sub tevc {
   TestBed::Wrap::tevc::tevc($e->pid, $e->eid, @_);
 }
 
+=item C<< $e->linkup($linkname) >>
+
+uses tevc to bring down a link
+=cut
+sub linkup {
+  my ($e, $link) = @_;
+  TestBed::Wrap::tevc::tevc($e->pid, $e->eid, "now $link up");
+}
+
+=item C<< $e->linkdown($linkname) >>
+
+uses tevc to bring up a link
+=cut
+sub linkdown {
+  my ($e, $link) = @_;
+  TestBed::Wrap::tevc::tevc($e->pid, $e->eid, "now $link down");
+}
+
 =item C<trytest { code ... } $e>
 
 catches exceptions while a test is running and cleans up the experiment
@@ -104,6 +141,13 @@ sub startrunkill {
     $worker->($e)             || die "worker function failed";
     $e->end                   && die "exp end $eid failed";
   } $e;
+}
+
+sub startrun {
+  my ($e, $ns, $worker) = @_;
+  my $eid = $e->eid;
+  $e->startexp_ns_wait($ns) && die "batchexp $eid failed";
+  $worker->($e)             || die "worker function failed";
 }
 
 =item C<launchpingkill($pid, $eid, $ns)>

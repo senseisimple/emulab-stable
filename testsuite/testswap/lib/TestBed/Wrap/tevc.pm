@@ -44,7 +44,7 @@ sub tevc {
   my ($pid, $eid, @args) = @_;
   my $cmd = 'PATH=/usr/testbed/bin:$PATH tevc ' . "-e $pid/$eid " . join(" ", @args);
   say $cmd;
-  Tools::TBSSH::cmdsuccessdump($TBConfig::OPS_SERVER, $cmd);
+  Tools::TBSSH::cmdsuccess($TBConfig::OPS_SERVER, $cmd);
 }
 
 1;

@@ -23,11 +23,13 @@ use Data::Dumper;
   my $logging = 0;
   my $timing;
   my $verbose;
+  my $debug;
   my $result = GetOptions (
       "jobs=i"     => \$pjobs,
       "logging=i"  => \$logging,
       "timing"     => \$timing,
-      "verbose"    => \$verbose);
+      "verbose"    => \$verbose,
+      "debug"      => \$debug);
 
   if ($pjobs > 1) {
     $ENV{'HARNESS_OPTIONS'} = "j$pjobs";
@@ -38,6 +40,9 @@ use Data::Dumper;
   if ($verbose) {
     $ENV{'HARNESS_VERBOSE'} = 1;
     $ENV{HARNESS_COLOR} = 1;
+  }
+  if ($debug) {
+    $ENV{TBTS_DEBUG} = 1;
   }
 }
 my $THARNESS = 'perl t/harness';

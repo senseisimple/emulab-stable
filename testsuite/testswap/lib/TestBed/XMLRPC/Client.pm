@@ -61,9 +61,17 @@ sub single_request {
   my ($self, $command, @args) = @_;
   $logger->debug(toperl($command, @args));
   $logger->debug("Sent");
+  if ($TBConfig::DEBUG_XML_CLIENT) {
+    say("Sent");
+    sayperl($command, @args)
+  }
   my $resp = $self->client->send_request($command, $TBConfig::XMLRPC_VERSION, @args); 
   $logger->debug("Received");
   $logger->debug( sub { Dumper($resp); } );
+  if ($TBConfig::DEBUG_XML_CLIENT) {
+    say("Received");
+    say Dumper($resp);
+  }
   $resp;
 }
 

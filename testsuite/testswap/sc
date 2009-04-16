@@ -30,6 +30,9 @@ say <<"END"
         swapout
         end
         ping
+        tevc
+        linktest
+        single_node_tests
         ni    // nodeinfo
         li    // linkinfo
 END
