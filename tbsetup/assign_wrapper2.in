@@ -16,6 +16,8 @@ use lib "@prefix@/lib";
 use OSinfo;  # To look up OS by idx.
 use libtblog qw(:DEFAULT dblog *SOUT *SERR);
 
+$ENV{'PATH'} = "/usr/bin:@prefix@/libexec";
+
 use constant false => 0;
 use constant true  => 1;
 
