@@ -8,12 +8,31 @@ our @ISA = qw(Exporter);
 our @EXPORT = qw(ping test_traceroute);
 use Data::Dumper;
 
+=head1 NAME
+
+Tools::Network
+
+=over 4
+
+=item C<ping($hostname)>
+
+pings $hostname returning 0 or 1
+
+=cut
+
 sub ping {
   my ($host) = @_;
   my $p = Net::Ping->new('tcp', 2);
-  $p->ping($host);
+
+  #Net::Ping returns 0 on success
+  !$p->ping($host);
 }
 
+=item C<test_traceroute($src, $dest, ['hop1_host', 'hop2_host', ...])>
+
+ssh to host $src and executes a traceroute to $dest ensuring it follows the path specified
+returns 0 or 1
+=cut
 sub test_traceroute ($$@) {
   my ($src,$dest,@path) = @_;
   Tools::TBSSH::cmdcheckoutput($src, "traceroute $dest", 
@@ -36,5 +55,9 @@ sub test_traceroute ($$@) {
     return 1;
   });
 }
+
+=back
+
+=cut
 
 1;

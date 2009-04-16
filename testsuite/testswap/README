@@ -4,7 +4,7 @@ REQUIREMENTS
   TBConfig.pm set up correctly
 
 INSTALLATION INSTRUCTIONS
-  cpan HAS to be configured and functional
+  cpan needs to be configured and functional
   cpan Module::Install
   perl Makefile.PL
   make

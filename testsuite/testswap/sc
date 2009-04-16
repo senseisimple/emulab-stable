@@ -2,6 +2,7 @@
 use lib 'lib';
 use SemiModern::Perl;
 use TBConfig;
+use TestBed::TestSuite;
 use TestBed::TestSuite::Experiment::Macros;
 use Data::Dumper;
 use Tools::TBSSH;

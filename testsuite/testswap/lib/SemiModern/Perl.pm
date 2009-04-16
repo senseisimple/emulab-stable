@@ -9,6 +9,20 @@ use IO::Handle;
 use Scalar::Util 'openhandle';
 use Carp;
 
+=head1 NAME
+
+ensures perl version >= 5.008
+
+=over 4
+
+=item say
+
+implements a perl5.10 like say for perl < 5.10
+
+=back
+
+=cut
+
 sub say {
     my $currfh = select();
     my $handle;

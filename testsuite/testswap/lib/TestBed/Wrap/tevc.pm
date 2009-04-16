@@ -1,5 +1,4 @@
 #!/usr/bin/perl
-
 package TestBed::Wrap::tevc;
 use SemiModern::Perl;
 use TBConfig;
@@ -8,6 +7,7 @@ use Tools;
 use Tools::TBSSH;
 
 =pod
+
 tevc -e proj/expt time objname event [args ...]
 
 where the time parameter is one of:
@@ -23,6 +23,21 @@ tevc -e testbed/myexp +10 cbr0 start
 tevc -e testbed/myexp +15 link0 down
 tevc -e testbed/myexp +17 link0 up
 tevc -e testbed/myexp +20 cbr0 stop
+=cut
+
+=head1 NAME
+
+TestBed::Wrap::tevc
+
+=over 4
+
+=item C<tevc($pid, $eid, $arg)>
+
+executes tevc on $pid and $eid with $arg string such as "now link1 down"
+by sshing to ops
+
+=back
+
 =cut
 
 sub tevc {

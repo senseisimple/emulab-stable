@@ -5,7 +5,7 @@ use TAP::Harness;
 use Data::Dumper;
 my %args = (
     verbosity => 1,
-    lib     => [ 'lib', 'blib/lib' ],
+    lib     => [ '.', 'lib', 'blib/lib' ],
     );
 my $harness = TAP::Harness->new( \%args );
 

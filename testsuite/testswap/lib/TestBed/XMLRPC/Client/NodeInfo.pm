@@ -1,5 +1,4 @@
 #!/usr/bin/perl
-
 package TestBed::XMLRPC::Client::NodeInfo;
 use SemiModern::Perl;
 require Exporter;
@@ -117,7 +116,6 @@ sub parse_node_names {
 =item parseNodeInfo
 
 parses nodeInfo text returned form xmlrpc server into a list of node names
-
 =cut
 sub parseNodeInfo {
   my ($text) = @_;
@@ -129,6 +127,7 @@ sub parseNodeInfo {
 split into before and after chunks using delimiters
 
 =cut
+
 sub chunkit {
   my ($array, @patterns) = @_;
 
@@ -147,7 +146,6 @@ sub chunkit {
 =item unique
 
 returns unique items from an array
-
 =cut
 sub unique {
   my %hash;
@@ -168,6 +166,7 @@ sub unique {
 parses linkInfo text returned form xmlrpc server into a list of link names
 
 =cut
+
 sub parseLinkInfo {
   my ($text) = @_;
   my @chunks = chunkit(splitlines($text), 'Virtual Lan/Link Info:',  'Physical Lan/Link Mapping:', 'Virtual Queue Info:');
@@ -191,4 +190,5 @@ sub parseLinkInfo {
 =back
 
 =cut
+
 1;

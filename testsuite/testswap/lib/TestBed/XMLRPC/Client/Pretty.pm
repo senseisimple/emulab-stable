@@ -1,5 +1,4 @@
 #!/usr/bin/perl
-
 package TestBed::XMLRPC::Client::Pretty;
 use SemiModern::Perl;
 require Exporter;
@@ -7,6 +6,16 @@ our @ISA = qw(Exporter);
 our @EXPORT = qw(pretty_listexp);
 use Data::Dumper;
 
+=head1 NAME
+
+TestBed::XMLRPC::Client::Pretty;
+
+=over 4
+
+=item C<pretty_listexp>
+
+pretty prints the XMLRPC response from listexp
+=cut
 sub pretty_listexp {
   my ($h) = @_;
   while(my ($pk, $v) = each %$h) {
@@ -20,5 +29,9 @@ sub pretty_listexp {
     }
   }
 }
+
+=back
+
+=cut
 
 1;

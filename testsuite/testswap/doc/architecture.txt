@@ -1,6 +1,5 @@
 testswap is a object orient / declarative test framework for the emulab testbed.
 
-
 LIBRARY CODE
 ./lib/TestBed/TestSuite/
 Core framework modules that the testwriter should use
@@ -16,10 +15,16 @@ command line utility wrappers
 utility modules and functions used by the framework
 
 TESTS
-./t/topologies/
+./t/topologies/*.t
 topology swap tests
-./t/*.t
+./t/xmlrpc/*.t
 xmlrpc tests
 ./t/lib
 testswap framework tests
 
+
+Exporter is used to export symbols form the defining modules namespace into the module that is using the namespace.
+
+Mouse is a lightweight version of the Moose object system for Perl.
+Moose is the best practice way of doing object orientation in Perl and is modeled after Perl6's OO system.
+Moose is used as the OO basis of testswap

@@ -1,17 +1,27 @@
-DOC
-  POD
+DOCS TODO
 
-buildup, teardown - Test::Class
+TODO
+  VERBOSENESS
+  buildup, teardown using Test::Class
+  create BSD virtual machine for testing
+  Add basic image-test parameterization examples
+  EXAMPLES
+  traffic generation`
+  convert more old tests
+  general result code handling framework
+  possibly collapse TestBed/XMLRPC/Client/* and TestBed/TestSuite
+  possibly collapse tbts and t/harness
 
-Add parameterization examples
-EXAMPLES
-traffic generation`
-convert more old tests
-general result code handling
-better parallel support
+EXPAND CURRENT IMPLEMENTATION
+  event subsystem
+  better parallel support (custom test harness) - functionality like image-test
 
 LATER
   Client.pm duplicate code elimination - Maybe this would make the code too unreadable
   TestSuite::Experiment::Macros should be a monadic language like JQuery
   test groupings
-  event system
+
+DONE
+  POD function documentation
+  better general result code handling (ping_test single_node_test)
+

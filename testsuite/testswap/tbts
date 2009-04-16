@@ -1,6 +1,20 @@
 #!/usr/bin/perl
 use lib 'lib';
 use SemiModern::Perl;
+
+if (-f glob("~/lib/perl5/Net/SSH/Perl.pm")) {
+  my $glob = glob('~/lib/perl5');
+  my $p5l = $ENV{PERL5LIB};
+  unless ( (defined $p5l) && ($p5l =~ /$glob/)) {
+    if (defined $p5l) {
+      $ENV{PERL5LIB} .= ":$glob";
+    }
+    else {
+      $ENV{PERL5LIB} = "$glob";
+    }
+  }
+}
+
 use Data::Dumper;
 
 {
@@ -41,8 +55,12 @@ sub usage {
   print <<"USAGE";
 ./tbts 
         test     - all topology tests
-        lib      - all framework utility libraries
-        xmlrpc   - all xmlrpc client modules
+        sanity   - all framework utility and xmlrpc client modules test
+        lib      - all framework utility tests
+        xmlrpc   - all xmlrpc client modules tests
+        
+        critic   - runs perl critic on framework code
+        coding   - 
 
 USAGE
   print $ts;
@@ -51,11 +69,16 @@ USAGE
 if (@ARGV) {
   my $cmd = $ARGV[0];
   $_   = $cmd;
-  if (/critic/)    { exec 'perlcritic .'; }
+  chomp $_;
+  if (/.*\.t$/) { exec "$THARNESS $cmd"; }
+  elsif ($_ eq 'podc')    { system 'for x in `find lib -iname "*.pm"`; do podchecker $x 2>&1 |grep contain; done; '; }
+  elsif ($_ eq 'pode')    { system 'for x in `find lib -iname "*.pm"`; do podchecker $x 2>&1 |grep ERROR; done;'; }
+  elsif (/critic/)    { exec 'perlcritic lib t'; }
+  elsif (/codingtests/) {  }
+  elsif (/sanity/) { exec "$THARNESS t/lib/*.t t/lib/*/*.t t/xmlrpc/*.t "; }
   elsif (/lib/)    { exec "$THARNESS t/lib/*.t t/lib/*/*.t"; }
   elsif (/xmlrpc/) { exec "$THARNESS t/xmlrpc/*.t"; }
   elsif (/test/)   { exec "$THARNESS t/topologies/*.t"; }
-  elsif (/.*\.t$/) { exec "$THARNESS $cmd"; }
 }
 else {
   print usage();

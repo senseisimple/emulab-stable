@@ -1,7 +1,6 @@
 #!/usr/bin/perl
-use SemiModern::Perl;
-
 package TestBed::XMLRPC::Client::Experiment;
+use SemiModern::Perl;
 use Mouse;
 use Data::Dumper;
 use TestBed::XMLRPC::Client::NodeInfo;
@@ -72,5 +71,129 @@ sub gen_expinfo_funcs {
 }
 
 gen_expinfo_funcs();
+
+=head1 NAME
+
+TestBed::XMLRPC::Client::Experiment
+
+=over 4
+
+=item C<pid>
+
+experiment pid
+
+=item C<eid>
+
+experiment eid
+
+=item C<batchexp>
+
+calls batchexp xmlrpc function
+
+=item C<swapexp>
+
+calls swapexp xmlrpc function
+
+=item C<endexp>
+
+calls endexp xmlrpc function
+
+=item C<waitforactive>
+
+calls waitforactive xmlrpc function
+
+=item C<getlist>
+
+calls getlist xmlrpc function
+
+=item C<expinfo>
+
+calls expinfo xmlrpc cfunction
+
+=item C<args>
+
+B<INTERNAL>: internal method for inserting pid and eid arguments into a xmlrpc call
+
+=item C<< $e->echo($msg) >>
+
+echos $msg through the emulab xmlrpc server
+
+=item C<< $e->getlist_brief() >>
+
+returns the 'format' => 'brief' experiement list
+
+=item C<< $e->getlist_full() >>
+
+returns the 'format' => 'full' experiement list
+
+=item C<< $e->batchexp_ns($nsfile_contents, @args) >>
+
+batches experiment defined in $nsfile_contents
+
+=item C<< $e->swapin >>
+
+swaps the experiment in
+
+=item C<< $e->swapout >>
+
+swaps the experiment out
+
+=item C<< $e->end >>
+
+ends the experiment
+
+=item C<< $e->nodeinfo >>
+
+returns a list of node names in the experiment
+
+=item C<< $e->waitsforactive >>
+
+waits for the experiment to enter the active state
+
+=item C<< $e->waitforswapped >>
+
+waits for the experiment to enter the swapped state
+
+=item C<< $e->startexp_ns($nsfile_contents, @args) >>
+
+start experiment defined in $nsfile_contents
+
+=item C<< $e->startexp_ns_wait($nsfile_contents, @args) >>
+
+start experiment defined in $nsfile_contents
+waits for it to become active
+
+=item C<< $e->batchexp_ns_wait($nsfile_contents, @args) >>
+
+batches experiment defined in $nsfile_contents
+waits for it to become active
+
+=item C<< $e->swapin_wait >>
+
+swaps the experiment in, waits for the experiment to enter the active state
+
+=item C<< $e->swapout_wait >>
+
+swaps the experiment out, waits for the experiment to enter the swapped state
+
+=item C<< inject_sub($fqname, $sub) >>
+
+B<INTERNAL>: injects anonymous sub $sub into $fqname package
+
+=item C<< $e->mapping >>
+
+returns experiment node mapping
+
+=item C<< $e->linkinfo >>
+
+returns experiment linkinfo
+
+=item C<< $e->shaping >>
+
+returns experiment link shaping
+
+=back 
+
+=cut
 
 1;
