@@ -89,7 +89,16 @@ $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 # Turn off line buffering on output
-$| = 1; 
+$| = 1;
+
+#
+# We want warnings to cause assign_wrapper to exit abnormally.
+# 
+# FIXME: Is this still needed.  "warn" is only used once.  Also this
+#  will cause perl internal warnings (such as "Use of uninitialized
+#  value ..."  to cause assign_wrapper to fail. -- kevina
+#
+$SIG{__WARN__} = sub { tbwarn $_[0];$warnings++; };
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -237,7 +246,6 @@ while (1) {
     $currentrun++;
 }
 TBDebugTimeStamp("mapper loop finished");
-
 exit(0);
 
 #
@@ -404,7 +412,7 @@ sub RunAssign($$)
     # useful information to parse out
     #
     if ($precheck) {
-	print "Precheck succeeded.\n";
+	chat("Precheck succeeded.\n");
 	return 0;
     }
 
@@ -437,13 +445,60 @@ sub RunAssign($$)
 	print("Could not setup links\n");
 	return -1;
     }
-
-
+    if ($vtop->InitializePhysNodes() != 0) {
+	print("Could not InitializePhysNodes\n");
+	return -1;
+    }
     exit(0);
+}
+
+# We will come through here no matter how we exit.
+END {
+    # Watch for getting here cause of a die()/exit() statement someplace.
+    my $exitcode = $?;
+
+    if ($exitcode && $exitcode != $WRAPPER_FAILED) {
+	$exitcode = $WRAPPER_FAILED|$WRAPPER_FAILED_FATALLY;
+    }
+    
+    if ($warnings > 0) {
+	tberror("$warnings warnings.\n");
+
+	$exitcode |= $WRAPPER_FAILED;
+    }
+
+    # Set recover bit if we are going to fail.
+    $exitcode = $exitcode|$WRAPPER_FAILED_CANRECOVER
+	if ($exitcode && !$NoRecover);
+
+    # And change the exitcode to be what we want it to be.
+    $? = $exitcode;
 }
 
 sub fatal(@)
 {
+    #
+    # Free any newly reserved nodes (in update mode) so that tbswap knows
+    # it is safe to recover the experiment. If we bypass this and leave
+    # through the END block then NoRecover will still be set and tbswap
+    # will know to swap the experiment out. 
+    #
+    if ($updating) {
+	if (defined($vtop)) {
+	    my @newreservednodes = $vtop->newreservednodes();
+	    my $NoRecover = $vtop->norecover();
+	
+	    if (@newreservednodes) {
+		$NoRecover = 0
+		    if (system("nfree -x $pid $eid @newreservednodes") == 0);
+	    }
+	    else {
+		# When not updating this is meaningless to tbswap.
+		$NoRecover = 0;
+	    }
+	}
+    }
+    
     tberror(@_);
 
     # We next go to the END block above.

@@ -91,6 +91,7 @@ sub Create($$$)
     $self->{'SOLUTION'}    = {};
     $self->{'OLDRSRVCLEAN'}= 0;
     $self->{'NEWRESERVED'} = {};	# Newly reserved nodes.
+    $self->{'NORECOVER'}   = 0;	
     
     bless($self, $class);
 
@@ -108,7 +109,8 @@ sub memberof($)         { return $_[0]->{'MEMBEROF'}; }
 sub counters($)         { return $_[0]->{'COUNTERS'}; }
 sub counter($$)         { return $_[0]->{'COUNTERS'}->{$_[1]}; }
 sub options($)          { return $_[0]->{'OPTIONS'}; }
-sub option($$)          { return $_[0]->{'OPTIONS'}->{$_[1]}; }
+sub option($$)          { return (exists($_[0]->{'OPTIONS'}->{$_[1]}) ?
+				  $_[0]->{'OPTIONS'}->{$_[1]} : undef); }
 sub exptstats($)        { return $_[0]->{'EXPTSTATS'}; }
 sub delaylinks($)       { return $_[0]->{'DELAYLINKS'}; }
 sub delaynodecount()    { return scalar(keys(%{ $_[0]->delaynodes() })); }
@@ -120,6 +122,8 @@ sub current_v2v($)      { return $_[0]->{'CURRENT_V2V'}; }
 sub pnodes($)           { return $_[0]->{'PNODES'}; }
 sub fixednodes($)       { return $_[0]->{'FIXEDNODES'}; }
 sub newreserved($)      { return $_[0]->{'NEWRESERVED'}; }
+sub newreservednodes($) { return @{ $_[0]->{'NEWRESERVED'} }; }
+sub norecover($)        { return $_[0]->{'norecover'}; }
 sub pid($)		{ return $_[0]->experiment()->pid(); }
 sub pid_idx($)		{ return $_[0]->experiment()->pid_idx(); }
 sub eid($)		{ return $_[0]->experiment()->eid(); }
@@ -216,7 +220,7 @@ sub Create($$$)
     $self->{'VIRTNODE'} = $virt_node;
     $self->{'VTOP'}     = $vtop;
     $self->{'HASH'}     = {};
-
+    
     return $self;
 }
 # accessors
@@ -2116,6 +2120,38 @@ sub CreateVtop($)
 	$self->options()->{'delay_desire_string'} = "";
     }
 
+    # Allow override of jail osid.
+    if (defined($self->virtexperiment()->jail_osname())) {
+	my $osname = $self->virtexperiment()->jail_osname();
+	my $osinfo = OSinfo->Lookup($pid, $osname);
+	if (!defined($osinfo)) {
+	    $osinfo = OSinfo->LookupByName($osname);
+	    if (!defined($osinfo)) {
+		tberror({cause => 'user',
+			 type => 'primary', severity => SEV_ERROR,
+			 error => ['invalid_os', 'jail', $osname, $pid]},
+			"Invalid OS $osname in project $pid!");
+		return -1;
+	    }
+	}
+	$self->options()->{'jail_osid'} = $osinfo->osid();
+    }
+
+    # XXX woeful NSE hack
+    my $sim_osname = "FBSD-NSE";
+    if (defined($sim_osname)) {
+	my $osinfo = OSinfo->Lookup($pid, $sim_osname);
+	if (!defined($osinfo)) {
+	    $osinfo = OSinfo->LookupByName($sim_osname);
+	}
+	if (defined($osinfo)) {
+	    $self->options()->{'sim_osid'} = $osinfo->osid();
+	}
+	elsif (exists($self->options()->{'jail_osid'})) {
+	    $self->options()->{'sim_osid'} = $self->options()->{'jail_osid'};
+	}
+    }
+
     # Option to fix current resources. Command line overrides experiment.
     # This option does not make sense unless updating is also on.
     if ($self->updating() && !$self->fixcurrent() &&
@@ -2337,6 +2373,7 @@ sub solution_p2v($)       { return $_[0]->{'SOLUTION'}->{'P2V'}; }
 sub solution_v2p($)	  { return $_[0]->{'SOLUTION'}->{'V2P'}; }
 sub solution_v2v($)	  { return $_[0]->{'SOLUTION'}->{'V2V'}; }
 sub solution_plinks($)	  { return $_[0]->{'SOLUTION'}->{'PLINKS'}; }
+sub solution_virtnodes($) { return $_[0]->{'SOLUTION'}->{'VIRTNODES'}; }
 sub solution_rtabmap($)	  { return $_[0]->{'SOLUTION'}->{'RTABMAP'}; }
 sub solution_vethmap($)   { return $_[0]->{'SOLUTION'}->{'VETHMAP'}; }
 sub solution_vethpatch($) { return $_[0]->{'SOLUTION'}->{'VETHPATCHES'}; }
@@ -2649,10 +2686,10 @@ sub InterpNodes($)
 	    # If mapping a virtual node, then record that, since we need
 	    # to allocate the virtnodes on that physnode, later.
 	    #
-	    if (!exists($self->solution()->{'VIRTNODES'}->{$physical})) {
-		$self->solution()->{'VIRTNODES'}->{$physical} = [];
+	    if (!exists($self->solution_virtnodes()->{$physical})) {
+		$self->solution_virtnodes()->{$physical} = [];
 	    }
-	    push(@{$self->solution()->{'VIRTNODES'}->{$physical}}, $virtual);
+	    push(@{$self->solution_virtnodes()->{$physical}}, $virtual);
 	}
 	elsif ($virtnode->_issubnode()) {
 	    #
@@ -3021,8 +3058,8 @@ sub AllocVirtNodes($)
     my $pid = $experiment->pid();
     my $eid = $experiment->eid();
 
-    foreach my $physical (keys(%{ $self->solution()->{'VIRTNODES'} })) {
-	my @vlist = @{ $self->solution()->{'VIRTNODES'}->{$physical} };
+    foreach my $physical (keys(%{ $self->solution_virtnodes() })) {
+	my @vlist = @{ $self->solution_virtnodes()->{$physical} };
 	my $numvs = @vlist;
 	my @plist = ();
 	my @oplist = ();
@@ -3709,6 +3746,268 @@ sub InterpLinks($)
 	or return -1;
 
     return 0;
+}
+
+#
+# Initialize the nodes.
+#
+sub InitializePhysNodes($)
+{
+    my ($self) = @_;
+    
+    #
+    # Init each pnode.
+    #
+    foreach my $pnodename (keys(%{ $self->solution_p2v() })) {
+    	#
+	# When initializing physical nodes, we can determine
+	# everything we need from the first virtual node (since
+	# there will be multiple vnodes/simnodes on each pnode).
+	#
+    	my $vnodename = $self->solution_p2v()->{$pnodename}[0];
+	    
+	$self->InitializePhysNode($pnodename, $vnodename) == 0
+	    or return -1;
+    }
+    # Now do virtual nodes on each pnode.
+    foreach my $vnodename (keys(%{ $self->solution_v2v() })) {
+	my $vpnodename = $self->solution_v2v()->{$vnodename};
+
+	$self->InitializePhysNode($vpnodename, $vnodename) == 0
+	    or return -1;
+    }
+    return 0;
+}
+
+#
+# Initialize a physical (or virtual physical) node. A lot of magic
+# in this function
+#
+sub InitializePhysNode($$$)
+{
+    my ($self, $pnodename, $vnodename) = @_;
+    my $pnode  = $self->pnodes()->{$pnodename};
+
+    # If this is a node in the topology (in the vnodes() array) then
+    # there must be a virtual physical node.
+    my $virtnode;
+    my $vpnode;
+    if (exists($self->vnodes()->{$vnodename})) {
+	$virtnode = $self->vnodes()->{$vnodename};
+	$vpnode   = $virtnode->_pnode();
+	if (!defined($vpnode)) {
+	    tberror("No virtual physical node for $vnodename on $pnodename\n");
+	    return -1;
+	}
+    }
+    my %nodesets = ();
+    my %rsrvsets = ();
+    my $osid;
+
+    # XXX NSE hack. The pnode is hosting simnodes.
+    if (defined($vpnode) && $vpnode->issimnode()) {
+	my $osid = $self->options()->{'sim_osid'};
+	my $cmdline = $self->osidbootcmd($osid, "vnodehost", "/kernel.jail");
+	if (!defined($cmdline)) {
+	    tberror("Error determining boot command line for $pnode");
+	    return -1;
+	}
+	%nodesets = ("def_boot_cmd_line" => $cmdline,
+		     "startstatus"       => 'none',
+		     "bootstatus"        => 'unknown',
+		     "ready"             => 0,
+		     "rpms"              => '',
+		     "deltas"            => '',
+		     "tarballs"          => '',
+		     "startupcmd"        => '',
+		     "failureaction"     => '',
+		     "routertype"        => TBDB_ROUTERTYPE_STATIC());
+
+	%rsrvsets = ("vname"             => $self->newvname($pnodename,
+							    "simhost"),
+		     "erole"             => TBDB_RSRVROLE_SIMHOST,
+		     "simhost_violation" => 0);
+    }
+    elsif ($pnode->isremotenode() &&
+	   !$pnode->isvirtnode() &&
+	   !$pnode->isdedicatedremote()) {
+	#
+	# We never allocate remote pnodes (always allocated), so skip.
+	#
+	return 0;
+    }
+    elsif (!defined($vpnode) ||
+	   exists($self->solution_virtnodes()->{$pnodename})) {
+	#
+	# One of our internally created nodes. 
+	#
+	my $routertype;
+	my $cmdline_role = "default";
+	my $cmdline      = "";
+	my $vname;
+	my $role;
+
+	if (exists($self->delaynodes()->{$vnodename})) {
+	    #
+	    # A delay node.
+	    #
+	    $osid = ($self->option("delay_osid") || $pnode->delay_osid());
+	    $vname        = $vnodename;
+	    $role         = TBDB_RSRVROLE_DELAYNODE;
+	    $routertype   = TBDB_ROUTERTYPE_NONE;
+	    $cmdline      = "/kernel.delay";
+	    $cmdline_role = "delay";
+
+	    $self->exptstats()->{"delaynodes"} += 1;
+	}
+	else {
+	    #
+	    # A node hosting virtnodes (like jails).
+	    #
+    	    $osid  = ($self->option("jail_osid") ||
+		      $self->nodejailosid($pnode, $virtnode));
+	    return -1
+		if (!defined($osid));
+	    my $osinfo = OSinfo->Lookup($osid);
+	    return -1
+		if (!defined($osinfo));
+	    
+	    $vname        = $self->newvname($pnodename, "vhost");
+	    $role         = TBDB_RSRVROLE_VIRTHOST;
+	    $routertype   = TBDB_ROUTERTYPE_MANUAL;
+	    $cmdline_role = "vnodehost";
+	    $cmdline      = "/kernel.jail" if ($osinfo->OS() eq "FreeBSD");
+
+	    $self->exptstats()->{"jailnodes"} += 1;
+	}
+	if (!defined($osid)) {
+	    tberror("No OSID is defined for internal node $vname!\n");
+	    return -1;
+	}
+	$cmdline = $self->osidbootcmd($osid, $cmdline_role, $cmdline);
+	if (!defined($cmdline)) {
+	    tberror("Error determining boot command line for $pnode\n");
+	    return -1;
+	}
+	%nodesets = ("def_boot_cmd_line" => $cmdline,
+		     "startstatus"       => 0,
+		     "bootstatus"        => 'unknown',
+		     "ready"             => 0,
+		     "routertype"        => TBDB_ROUTERTYPE_STATIC());
+
+	%rsrvsets = ("vname"             => $vname,
+		     "erole"             => $role);
+    }
+    else {
+	#
+	# A normal user node (physical or virtual).
+	#
+	my ($cmdline,$rpms,$startupcmd,$tarfiles,
+	    $failureaction,$routertype) = @{ $virtnode->_settings() };
+
+	$osid = (defined($virtnode->_osinfo()) ?
+		 $virtnode->_osinfo()->osid() : $pnode->default_osid());
+	my $vname           = $vnodename;
+	my $role            = TBDB_RSRVROLE_NODE;
+	my $inner_elab_role = $virtnode->inner_elab_role();
+	my $plab_role       = $virtnode->plab_role();
+
+	if (!defined($cmdline) || $cmdline eq "") {
+	    # If the user has not overridden the command line, try to
+	    # find a default for this OSID. Only test real physical node.
+	    if (!defined($vpnode) && $pnode->_needslinkdelay()) {
+		$cmdline = $self->osidbootcmd($osid, "linkdelay", "");
+	    }
+	    elsif (defined($inner_elab_role) &&
+		   ($inner_elab_role eq "boss" ||
+		    $inner_elab_role eq "boss+router")) {
+		$cmdline = $self->osidbootcmd($osid, "linkdelay", "");
+	    }
+	}
+	if (!defined($cmdline)) {
+	    tberror("Error determining boot command line for $pnode\n");
+	    return -1;
+	}
+	%nodesets = ("def_boot_cmd_line" => $cmdline,
+		     "startstatus"       => 'none',
+		     "bootstatus"        => 'unknown',
+		     "ready"             => 0,
+		     "startupcmd"        => $startupcmd,
+		     "failureaction"     => $failureaction,
+		     "routertype"        => $routertype);
+
+	%rsrvsets = ("vname"             => $vnodename,
+		     "erole"             => $role,
+		     "inner_elab_role"   => $inner_elab_role || "",
+		     "plab_role"         => $plab_role);
+    }
+    $self->printdb("InitPnode: $pnodename $vnodename\n");
+
+    my $setstr = join(",", map("$_='" . $nodesets{$_} . "'", keys(%nodesets)));
+    $self->printdb("  $setstr\n");
+
+    DBQueryWarn("update nodes set $setstr where node_id='$pnodename'")
+	or return -1 if (!$self->impotent());
+
+    $setstr = join(",", map("$_='" . $rsrvsets{$_} . "'", keys(%rsrvsets)));
+    $self->printdb("  $setstr\n");
+
+    DBQueryWarn("update reserved set $setstr where node_id='$pnodename'")
+	or return -1 if (!$self->impotent());
+    
+    #
+    # Now call os_select.
+    #
+    if (defined($osid)) {
+	$self->printdb("  os_select $osid\n");
+	
+	system("os_select $osid $pnodename") == 0
+	    or return -1 if (!$self->impotent());
+    }
+    return 0;
+}
+
+#
+# This is special. Look at the osid of the virtnodes on this pnode and
+# map to a suitable osid using the nextosid field. This overloads nextosid
+# to some extent ...
+#
+sub nodejailosid($$$)
+{
+    my ($self, $pnode, $virtnode) = @_;
+
+    #
+    # We know at this point that all vnodes on this pnode want the same
+    # osid cause of assign (osid features/desires). 
+    #
+    my $osinfo    = $virtnode->_osinfo();
+    my $nextosid  = $osinfo->nextosid();
+    if (defined($nextosid)) {
+	$self->printdb("Mapping jail osid to $nextosid on $pnode\n");
+    }
+    else {
+	tbwarn("Could not map jail osid to real osid on $pnode\n");
+    }
+    return $nextosid;
+}
+
+sub osidbootcmd($$$$)
+{
+    my ($self, $osid, $role, $default) = @_;
+
+    my $osinfo = OSinfo->Lookup($osid);
+    if (!defined($osinfo)) {
+	tbwarn("No such OSID $osid\n");
+	return undef;
+    }
+    if (defined($osinfo->nextosid())) {
+	$osinfo = $osinfo->ResolveNextOSID($self->experiment());
+	return undef
+	    if (!defined($osinfo));
+    }
+    return undef
+	if ($osinfo->OSBootCmd($role, \$default) != 0);
+    return $default;
 }
 
 #
@@ -4814,7 +5113,7 @@ sub physinterfacerole($$)
 #
 sub newvname($$$)
 {
-    my ($self, $pnode, $prefix) = @_;
+    my ($self, $pnodename, $prefix) = @_;
 
     #
     # First check to see if this pnode was already allocated (update)
@@ -4827,7 +5126,7 @@ sub newvname($$$)
 	    if (exists($self->current_v2v->{$vname}));
 
 	return $vname
-	    if ($pnode eq $self->current_v2p->{$vname});
+	    if ($pnodename eq $self->current_v2p->{$vname});
     }
     
     while (1) {
