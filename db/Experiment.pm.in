@@ -20,6 +20,7 @@ use Project;
 use Group;
 use Node;
 use Interface;
+use VirtExperiment;
 use Logfile;
 use English;
 use Data::Dumper;
@@ -313,6 +314,10 @@ sub linktest_pid($)     { return field($_[0], 'linktest_pid');}
 sub linktest_level($)   { return field($_[0], 'linktest_level');}
 sub logfile($)          { return field($_[0], 'logfile');}
 sub paniced($)          { return field($_[0], 'paniced');}
+sub cpu_usage($)        { return field($_[0], 'cpu_usage');}
+sub encap_style($)      { return field($_[0], 'encap_style');}
+sub multiplex_factor($) { return field($_[0], 'multiplex_factor');}
+sub delay_capacity($)   { return field($_[0], 'delay_capacity');}
 sub archive_idx($)	{ return stats($_[0], 'archive_idx'); }
 sub swapin_count($)	{ return stats($_[0], 'swapin_count'); }
 sub destroyed($)	{ return stats($_[0], 'destroyed'); }
@@ -3089,9 +3094,9 @@ sub RemovePhysicalState($)
     }
     return $errors;
 }
-sub BackupPhysicalState($)
+sub BackupPhysicalState($;$)
 {
-    my ($self) = @_;
+    my ($self, $directory) = @_;
 
     # Must be a real reference. 
     return -1
@@ -3099,7 +3104,8 @@ sub BackupPhysicalState($)
 
     my $pid = $self->pid();
     my $eid = $self->eid();
-    my $pstateDir = $self->WorkDir() . "/pstate";
+    my $pstateDir = (defined($directory) ?
+		     $directory : $self->WorkDir() . "/pstate");
     my $errors = 0;
 
     if (! -e $pstateDir) {
@@ -3312,6 +3318,99 @@ sub SetupProgramAgents($)
 		    "         '__all_program-agents', ".
 		    "         '__${vnode}_program-agent')")
 	    or return -1;
+    }
+    return 0;
+}
+
+#
+# Seed the virt_agents table.  Each lan/link needs an agent to handle
+# changes to delays or other link parameters, and that agent (might be
+# several) will be running on more than one node. Delay node agent,
+# wireless agent, etc. They might be running on a node different then
+# where the link is really (delay node). So, just send all link event
+# to all nodes, and let them figure out what they should do (what to
+# ignore, what to act on). So, specify a wildcard; a "*" for the vnode
+# will be treated specially by the event scheduler, and no ipaddr will
+# be inserted into the event. Second, add pseudo agents, one for each
+# member of the link (or just one if a lan). The objname is lan-vnode,
+# and allows us to send an event to just the agent controlling that
+# link (or lan node delay). The agents will subscribe to these
+# additional names when they start up.
+#
+sub SetupNetworkAgents($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+    my $idx = $self->idx();
+    my $virtexp = VirtExperiment->Lookup($self);
+    return -1
+	if (!defined($virtexp));
+
+    my %ethlans = ();  
+    
+    my $lan_members = $virtexp->Table("virt_lans");
+    foreach my $member ($lan_members->Rows()) {
+	my $vnode = $member->vnode();
+	my $vlanname = $member->vname();
+
+	DBQueryFatal("insert into virt_agents ".
+		     " (exptidx, pid, eid, vname, vnode, objecttype) ".
+		     " select '$idx', '$pid', '$eid', ".
+		     "   '${vlanname}-${vnode}', '*', ".
+		     "   idx from event_objecttypes where ".
+		     "   event_objecttypes.type='LINK'");
+
+	DBQueryFatal("insert into virt_agents ".
+		     " (exptidx, pid, eid, vname, vnode, objecttype) ".
+		     " select '$idx', '$pid', '$eid', ".
+		     "   '${vlanname}-${vnode}-tracemon', '*', ".
+		     "   idx from event_objecttypes where ".
+		     "   event_objecttypes.type='LINKTRACE'");
+	
+	DBQueryFatal("insert into event_groups ".
+		     " (exptidx, pid, eid, idx, group_name, agent_name) ".
+		     " values ('$idx', '$pid', '$eid', NULL, ".
+		     "         '__all_tracemon', ".
+		     "         '${vlanname}-${vnode}-tracemon')");
+	
+	DBQueryFatal("insert into event_groups ".
+		     " (exptidx, pid, eid, idx, group_name, agent_name) ".
+		     " values ('$idx', '$pid', '$eid', NULL, ".
+		     "         '${vlanname}-tracemon', ".
+		     "         '${vlanname}-${vnode}-tracemon')");
+
+	# I do not understand this.
+	$ethlans{$vlanname} = $vlanname
+	    if ($member->protocol() ne "ipv4");
+    }
+
+    my $lans = $virtexp->Table("virt_lan_lans");
+    foreach my $lan ($lans->Rows()) {
+	my $vlanname = $lan->vname();
+
+	DBQueryFatal("insert into virt_agents ".
+		     " (exptidx, pid, eid, vname, vnode, objecttype) ".
+		     " select '$idx', '$pid', '$eid', '$vlanname', '*', ".
+		     "   idx from event_objecttypes where ".
+		     "   event_objecttypes.type='LINK'");
+
+	if (exists($ethlans{$vlanname})) {
+	    #
+	    # XXX there is no link (delay) agent running on plab nodes
+	    # (i.e., protocol==ipv4) currently, so we cannot be sending them
+	    # events that they will not acknowledge.
+	    #
+	    DBQueryFatal("insert into event_groups ".
+			 " (exptidx, pid, eid, idx, group_name, agent_name) ".
+			 " values ('$idx', '$pid', '$eid', ".
+			 "         NULL, '__all_lans', '$vlanname')");
+	}
     }
     return 0;
 }
@@ -3688,11 +3787,11 @@ sub InsertVirtNode($$;$)
     return -1
 	if (!defined($virtexperiment));
 
-    my $virtnode = $virtexperiment->NewTableRow("virt_nodes");
+    my $virtnode =
+	$virtexperiment->NewTableRow("virt_nodes", {"vname" => $node_id});
     return -1
 	if (!defined($virtnode));
 
-    $virtnode->vname($node_id);
     $virtnode->type($type);
     $virtnode->ips('');
     $virtnode->cmd_line('');
