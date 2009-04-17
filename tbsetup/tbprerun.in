@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -420,6 +420,10 @@ $experiment->WriteEnvVariables() == 0
 print "Setting up additional program agent support ...\n";
 $experiment->SetupProgramAgents() == 0
     or fatal("Could not setup program agent support");
+
+print "Setting up additional network agent support ...\n";
+$experiment->SetupNetworkAgents() == 0
+    or fatal("Could not setup network agent support");
 
 print "Writing program agent info ...\n";
 $experiment->WriteProgramAgents() == 0
