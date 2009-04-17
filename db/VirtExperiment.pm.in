@@ -52,12 +52,12 @@ my $debug	      = 0;
 #
 %virtual_tables = 
     ("virt_nodes"		=> [ "vname" ],
-     "virt_lans"		=> [ "vname" ],
+     "virt_lans"		=> [ "vname", "vnode", "vport"],
      "virt_lan_lans"		=> [ "vname" ],
      "virt_lan_settings"	=> [ "vname", "capkey" ],
      "virt_lan_member_settings" => [ "vname", "member", "capkey" ],
      "virt_trafgens"		=> [ "vname", "vnode" ],
-     "virt_agents"		=> [ "vname", "vnode" ],
+     "virt_agents"		=> [ "vname", "vname", "vnode" ],
      "virt_node_desires"	=> [ "vname", "desire" ],
      "virt_node_startloc"	=> [ "vname", "building" ],
      "virt_routes"		=> [ "vname", "src", "dst" ],
@@ -65,7 +65,7 @@ my $debug	      = 0;
      "virt_programs"		=> [ "vname", "vnode" ],
      "virt_user_environment"	=> [ "name", "value" ],
      "nseconfigs"		=> [ "vname" ],
-     "eventlist"		=> [ "vname" ],
+     "eventlist"		=> [ "vname", "idx"],
      "event_groups"		=> [ "group_name", "agent_name" ],
      "virt_firewalls"		=> [ "fwname", "type", "style" ],
      "firewall_rules"		=> [ "fwname", "ruleno", "rule" ],
@@ -132,16 +132,18 @@ sub Lookup($$;$)
 
     # Load all the virt tables.
     foreach my $tablename (keys(%virtual_tables)) {
-	if ($noload) {
-	    $self->{'TABLES'}->{$tablename} = [];
+	my $table = VirtExperiment::VirtTable->Create($self, $tablename);
+	if (!defined($table)) {
+	    carp("Could not create table object for $tablename");
+	    return undef;
 	}
-	else {
-	    my $rows = LoadTable($self, $tablename);
-	    return undef
-		if (!defined($rows));
-	
-	    $self->{'TABLES'}->{$tablename} = $rows;
+	if (!$noload) {
+	    if ($table->Load() != 0) {
+		carp("Could not load rows for $table");
+		return undef;
+	    }
 	}
+	$self->{'TABLES'}->{$tablename} = $table;	
     }
 
     # Make a copy of the experiment DBrow, and delete all the stuff we
@@ -163,6 +165,7 @@ sub Lookup($$;$)
 # accessors
 sub experiment($)       { return $_[0]->{'EXPERIMENT'}; }
 sub dbrow($)            { return $_[0]->{'DBROW'}; }
+sub table($$)		{ return $_[0]->{'TABLES'}->{$_[1]}; }
 sub pid($)		{ return $_[0]->experiment()->pid(); }
 sub pid_idx($)		{ return $_[0]->experiment()->pid_idx(); }
 sub eid($)		{ return $_[0]->experiment()->eid(); }
@@ -212,52 +215,22 @@ sub CreateNew($$)
 #
 # Add a new empty table row. Caller must populate it.
 #
-sub NewTableRow($$)
+sub NewTableRow($$$)
 {
-    my ($self, $tablename) = @_;
+    my ($self, $tablename, $argref) = @_;
     
     return undef
 	if (! ref($self));
     return undef
 	if (!exists($virtual_tables{$tablename}));
 
-    my $class = "VirtExperiment::VirtTableRow::$tablename";
-    my $obj   = $class->Create($self);
-
-    # Add to list of rows for this table.
-    push(@{ $self->{'TABLES'}->{$tablename} }, $obj);
-
-    return $obj;
-}
-
-#
-# Lookup the rows for a table.
-#
-sub LoadTable($$)
-{
-    my ($self, $tablename) = @_;
-    
-    return undef
-	if (! ref($self));
-    return undef
-	if (!exists($virtual_tables{$tablename}));
-
-    my @result  = ();
-    my $exptidx = $self->exptidx();
-    my $query_result =
-	DBQueryWarn("select * from $tablename where exptidx=$exptidx");
-
-    return undef
-	if (!defined($query_result));
-    return []
-	if (!$query_result->numrows);
-
-    while (my $row = $query_result->fetchrow_hashref()) {
-	my $class = "VirtExperiment::VirtTableRow::$tablename";
- 	my $obj = $class->Create($self, $row);
-	push(@result, $obj);
+    my $table = $self->{'TABLES'}->{$tablename};
+    my $row   = $table->NewRow($argref);
+    if (!defined($row)) {
+	carp("Could not create new table row in $self");
+	return undef;
     }
-    return \@result;
+    return $row;
 }
 
 #
@@ -406,19 +379,13 @@ sub Store($;$)
 	    }
 	}
     }
-    
+
     foreach my $tablename (keys(%virtual_tables)) {
-	if (exists($self->{'TABLES'}->{$tablename}) &&
-	    $self->{'TABLES'}->{$tablename}) {
-	    my @rows = @{ $self->{'TABLES'}->{$tablename} };
-	    next
-		if (!@rows);
-	    
-	    foreach my $rowref (@rows) {
-		if ($rowref->Store($flags) != 0) {
-		    carp("Could not store table row $rowref");
-		    return -1;
-		}
+	if (exists($self->{'TABLES'}->{$tablename})) {
+	    my $table = $self->{'TABLES'}->{$tablename};
+	    if ($table->Store($flags) != 0) {
+		carp("Could not store table $table");
+		return -1;
 	    }
 	}
     }
@@ -438,57 +405,23 @@ sub Find($$@)
 	warn("Find: unknown table search: $tablename");
 	return undef;
     }
-    # No members.
-    return undef
-	if (! $self->{'TABLES'}->{$tablename});
-
-    # Get the slotnames that determine the lookup from the table above.
-    if (!exists($virtual_tables{$tablename})) {
-	warn("Find: No entry in virtual_tables for $tablename");
-	return undef;
-    }
-    my @names = @{ $virtual_tables{$tablename} };
-    if (scalar(@names) != scalar(@args)) {
-	warn("Find: Wrong number of arguments for lookup in $tablename");
-	return undef;
-    }
-
-    my @rows = @{ $self->{'TABLES'}->{$tablename} };
-    foreach my $rowref (@rows) {
-	my $match = 1;
-	
-	for (my $i = 0; $i < scalar(@names); $i++) {
-	    my $slotname = $names[$i];
-	    my $argvalue = $args[$i];
-
-	    if ($rowref->{'TABLEROW'}->{$slotname} ne $argvalue) {
-		$match = 0;
-		last;
-	    }
-	}
-	return $rowref
-	    if ($match);
-    }
-    return undef;
+    my $table = $self->{'TABLES'}->{$tablename};
+    return $table->Find(@args);
 }
 
 #
-# Delete a row in a table. Do not call this. Utility for below.
+# Return a table.
 #
-sub _deletetablerow($$)
+sub Table($$)
 {
-    my ($self, $row) = @_;
+    my $self = shift();
+    my $tablename = shift();
 
-    my $tablename = $row->tablename();
-    my @newrows   = ();
-
-    my @rows = @{ $self->{'TABLES'}->{$tablename} };
-    foreach my $rowref (@rows) {
-	push(@newrows, $rowref)
-	    if (! ($rowref->SameRow($row)));
+    if (!exists($self->{'TABLES'}->{$tablename})) {
+	warn("Table: unknown table: $tablename");
+	return undef;
     }
-    $self->{'TABLES'}->{$tablename} = \@newrows;
-    return 0;
+    return $self->{'TABLES'}->{$tablename};
 }
 
 #
@@ -520,15 +453,9 @@ sub Dump($)
     }
 
     foreach my $tablename (keys(%virtual_tables)) {
-	if (exists($self->{'TABLES'}->{$tablename}) &&
-	    $self->{'TABLES'}->{$tablename}) {
-	    my @rows = @{ $self->{'TABLES'}->{$tablename} };
-	    next
-		if (!@rows);
-	    
-	    foreach my $rowref (@rows) {
-		$rowref->Dump();
-	    }
+	if (exists($self->{'TABLES'}->{$tablename})) {
+	    my $table = $self->{'TABLES'}->{$tablename};
+	    $table->Dump();
 	}
     }
 }
@@ -562,7 +489,283 @@ sub Stringify($)
 
 ############################################################################
 #
-# VirtTable is a superclass to avoid a bunch of typing. It wraps up DB
+# VirtTable wraps up a bunch of table rows.
+#
+package VirtExperiment::VirtTable;
+use Carp;
+use English;
+use overload ('""' => 'Stringify');
+use libdb;
+use VirtExperiment;
+
+#
+# A table 
+#
+sub Create($$$)
+{
+    my ($class, $virtexperiment, $tablename) = @_;
+
+    $class = ref($class) || $class;
+    my $experiment = $virtexperiment->experiment();
+    my $slotnames;
+
+    #
+    # See if we have loaded the DB defs for this table.
+    #
+    my $varname = $tablename . "_dbdefs";
+    if (defined(${$varname})) {
+	$slotnames = ${$varname};
+    }
+    else {
+	$slotnames = {};
+
+	my $describe_result =
+	    DBQueryWarn("describe $tablename");
+
+	return -1
+	    if (!defined($describe_result) || !$describe_result->numrows);
+
+	#
+	# Record the default values for slots.
+	#
+	while (my $rowref = $describe_result->fetchrow_hashref()) {
+	    my $slot  = $rowref->{"Field"};
+	    my $value = $rowref->{"Default"};
+
+	    $slotnames->{$slot} = $value;
+	}
+    }
+    
+    my $self = {};
+    $self->{'TABLENAME'}  = $tablename;
+    $self->{'EXPERIMENT'} = $experiment;
+    $self->{'VIRTEXPT'}   = $virtexperiment;
+    $self->{'SLOTNAMES'}  = $slotnames;
+    $self->{'TABLEHASH'}  = {};
+    $self->{'TABLELIST'}  = [];
+    bless($self, $class);
+
+    return $self;
+}
+sub experiment($)       { return $_[0]->{'EXPERIMENT'}; }
+sub virtexperiment($)   { return $_[0]->{'VIRTEXPT'}; }
+sub tablename($)        { return $_[0]->{'TABLENAME'}; }
+sub slotnames($)        { return $_[0]->{'SLOTNAMES'}; }
+sub tablelist($)        { return $_[0]->{'TABLELIST'}; }
+sub tablehash($)        { return $_[0]->{'TABLEHASH'}; }
+
+# Break circular reference someplace to avoid exit errors.
+sub DESTROY {
+    my $self = shift;
+
+    $self->{'TABLENAME'}  = undef;
+    $self->{'EXPERIMENT'} = undef;
+    $self->{'VIRTEXPT'}   = undef;
+    $self->{'SLOTNAMES'}  = undef;
+    $self->{'TABLEHASH'}  = undef;
+    $self->{'TABLELIST'}  = undef;
+}
+
+#
+# Lookup the rows for a table from the DB.
+#
+sub Load($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $experiment = $self->experiment();
+    my $exptidx    = $experiment->idx();
+    my $tablename  = $self->tablename();
+    
+    return -1
+	if (!exists($VirtExperiment::virtual_tables{$tablename}));
+
+    my $query_result =
+	DBQueryWarn("select * from $tablename where exptidx=$exptidx");
+
+    return -1
+	if (!defined($query_result));
+    return 0
+	if (!$query_result->numrows);
+
+    while (my $row = $query_result->fetchrow_hashref()) {
+	my $tablerow = $self->NewRow($row);
+	if (!defined($tablerow)) {
+	    return -1;
+	}
+    }
+    return 0;
+}
+
+#
+# Create a new table row.
+#
+sub NewRow($$)
+{
+    my ($self, $argref) = @_;
+    
+    my $tablename  = $self->tablename();
+    my $class = "VirtExperiment::VirtTableRow::$tablename";
+    my $obj   = $class->Create($self);
+
+    #
+    # These are the required keys, they must be defined for the new row
+    # to make any sense. Other slots can be filled in later of course.
+    #
+    my @pkeys = @{$VirtExperiment::virtual_tables{$tablename}};
+    my @pvals = ();
+    foreach my $key (@pkeys) {
+	if (!exists($argref->{$key})) {
+	    carp("Missing table key for new table in $tablename");
+	    return undef;
+	}
+	push(@pvals, $argref->{$key});
+    }
+    # This is the full key. Make sure it does not already exist.
+    my $akey = join(":", @pvals);
+    if (exists($self->{'TABLEHASH'}->{$akey})) {
+	carp("Already have entry for '$akey' in $self");
+	return undef;
+    }
+    foreach my $key (keys(%{$argref})) {
+	$obj->$key($argref->{$key});
+    }
+
+    # Add to list of rows for this table.
+    push(@{ $self->{'TABLELIST'} }, $obj);
+    # And to the hash array using the pkey.
+    $self->{'TABLEHASH'}->{$akey} = $obj;
+
+    return $obj;
+}
+
+#
+# Dump out rows for table.
+#
+sub Dump($)
+{
+    my ($self) = @_;
+
+    my @rows = @{ $self->{'TABLELIST'} };
+
+    return
+	if (!@rows);
+	    
+    foreach my $rowref (@rows) {
+	$rowref->Dump();
+    }
+}
+
+#
+# Store rows for table.
+#
+sub Store($)
+{
+    my ($self) = @_;
+
+    my @rows = @{ $self->{'TABLELIST'} };
+
+    return 0
+	if (!@rows);
+	    
+    foreach my $rowref (@rows) {
+	$rowref->Store() == 0
+	    or return -1;
+    }
+    return 0;
+}
+
+#
+# Return list of rows.
+#
+sub Rows($)
+{
+    my ($self) = @_;
+    my @rows   = @{ $self->{'TABLELIST'} };
+
+    return @rows;
+}
+
+#
+# Find a particular row in a table.
+#
+sub Find($@)
+{
+    my $self = shift();
+    my @args = @_;
+    my $tablename = $self->tablename();
+
+    # No members.
+    return undef
+	if (! @{ $self->{'TABLELIST'} });
+
+    # Get the slotnames that determine the lookup from the table above.
+    if (!exists($VirtExperiment::virtual_tables{$tablename})) {
+	warn("Find: No entry in virtual_tables for $tablename");
+	return undef;
+    }
+    my @pkeys = @{ $VirtExperiment::virtual_tables{$tablename} };
+    if (scalar(@pkeys) != scalar(@args)) {
+	warn("Find: Wrong number of arguments for lookup in $self");
+	return undef;
+    }
+    # This is the full key. 
+    my $akey = join(":", @args);
+
+    return $self->{'TABLEHASH'}->{$akey};
+}
+
+#
+# Delete a row in a table. Do not call this. Utility for below.
+#
+sub _deletetablerow($$)
+{
+    my ($self, $row) = @_;
+
+    my $tablename = $self->tablename();
+    my @newrows   = ();
+
+    my @rows = @{ $self->{'TABLELIST'} };
+    foreach my $rowref (@rows) {
+	push(@newrows, $rowref)
+	    if (! ($rowref->SameRow($row)));
+    }
+    $self->{'TABLES'}->{$tablename} = \@newrows;
+
+    my @keys = keys(%{ $self->{'TABLEHASH'} });
+    foreach my $key (@keys) {
+	my $ref = $self->{'TABLEHASH'}->{$key};
+	
+	if ($ref->SameRow($row)) {
+	    delete($self->{'TABLEHASH'}->{$key});
+	    last;
+	}
+    }
+    return 0;
+}
+
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+
+    my $table = $self->tablename();
+    my $pid   = ($self->experiment() ? $self->experiment()->pid() : "?");
+    my $eid   = ($self->experiment() ? $self->experiment()->eid() : "?");
+    my $idx   = ($self->experiment() ? $self->experiment()->idx() : "?");
+
+    return "[$table: $pid/$eid/$idx]";
+}
+
+
+############################################################################
+#
+# VirtTableRow is a superclass to avoid a bunch of typing. It wraps up DB
 # table rows with methods, but without having to type all the stuff out
 # for each virt table.
 #
@@ -602,7 +805,7 @@ sub DESTROY {
     $self->{'TABLEROW'}   = undef;
     $self->{'TABLENAME'}  = undef;
     $self->{'EXPERIMENT'} = undef;
-    $self->{'VIRTEXPT'}   = undef;
+    $self->{'TABLE'}      = undef;
     $self->{'SLOTNAMES'}  = undef;
 }
 
@@ -618,10 +821,10 @@ sub SameRow($$)
 #
 sub Create($$$)
 {
-    my ($class, $virtexperiment, $tablerow) = @_;
+    my ($class, $table, $tablerow) = @_;
 
     $class = ref($class) || $class;
-    my $experiment = $virtexperiment->experiment();
+    my $experiment = $table->experiment();
     my $tablename;
     my $slotnames;
 
@@ -666,14 +869,14 @@ sub Create($$$)
     $self->{'TABLEROW'}   = $tablerow;
     $self->{'TABLENAME'}  = $tablename;
     $self->{'EXPERIMENT'} = $experiment;
-    $self->{'VIRTEXPT'}   = $virtexperiment;
+    $self->{'TABLE'}      = $table;
     $self->{'SLOTNAMES'}  = $slotnames;
     bless($self, $class);
 
     return $self;
 }
 sub experiment($)       { return $_[0]->{'EXPERIMENT'}; }
-sub virtexperiment($)   { return $_[0]->{'VIRTEXPT'}; }
+sub table($)            { return $_[0]->{'TABLE'}; }
 sub tablename($)        { return $_[0]->{'TABLENAME'}; }
 sub tablerow($)         { return $_[0]->{'TABLEROW'}; }
 sub slotnames($)        { return $_[0]->{'SLOTNAMES'}; }
@@ -690,18 +893,18 @@ sub Store($;$)
     my $debug    = ($flags & $VirtExperiment::STORE_FLAGS_DEBUG ? 1 : 0);
     my $impotent = ($flags & $VirtExperiment::STORE_FLAGS_IMPOTENT ? 1 : 0);
     my $simparse = ($flags & $VirtExperiment::STORE_FLAGS_SIMPARSE ? 1 : 0);
-    my $exptidx  = $self->exptidx();
-    my $table    = $self->tablename();
+    my $tablename= $self->tablename();
     my $row      = $self->tablerow();
     my $pid      = $self->experiment()->pid();
     my $eid      = $self->experiment()->eid();
-    my $idx      = $self->experiment()->idx();
+    my $exptidx  = $self->experiment()->idx();
 
     # These are the required keys, they must be defined.
-    my %pkeys   = map { $_ => $_ } @{$VirtExperiment::virtual_tables{$table}};
+    my %pkeys   =
+	map { $_ => $_ } @{$VirtExperiment::virtual_tables{$tablename}};
     
     my @fields  = ("exptidx", "pid", "eid");
-    my @values  = ("'$idx'", "'$pid'", "'$eid'");
+    my @values  = ("'$exptidx'", "'$pid'", "'$eid'");
     
     foreach my $key (keys(%{ $row })) {
 	my $val = $row->{$key};
@@ -717,7 +920,8 @@ sub Store($;$)
 		push(@values, DBQuoteSpecial($val));
 	    }
 	    else {
-		carp("Illegal characters in table data: $table:$key - $val");
+		carp("Illegal characters in table data: ".
+		     "$tablename:$key - $val\n");
 		return -1;
 	    }
 	}
@@ -729,12 +933,13 @@ sub Store($;$)
 	}
 	else {
 	    # Sanity check the fields.
-	    if (TBcheck_dbslot($val, $table, $key,
+	    if (TBcheck_dbslot($val, $tablename, $key,
 			       TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
 		push(@values, DBQuoteSpecial($val));
 	    }
 	    else {
-		carp("Illegal characters in table data: $table:$key - $val");
+		carp("Illegal characters in table data for $tablename:\n".
+		     "    $key - $val: ". TBFieldErrorString() . "\n");
 		return -1;
 	    }
 	    # If a key remove from the list; we got it.
@@ -759,12 +964,12 @@ sub Store($;$)
 	# different simhost
 	#
 	$query =
-	    "replace into $table (" . join(",", @fields) . ") ".
+	    "replace into $tablename (" . join(",", @fields) . ") ".
 	    "values (" . join(",", @values) . ") ";
     }
     else {
 	$query =
-	    "insert into $table (" . join(",", @fields) . ") ".
+	    "insert into $tablename (" . join(",", @fields) . ") ".
 	    "values (" . join(",", @values) . ") ";
     }
   
@@ -788,20 +993,21 @@ sub Delete($;$)
     
     my $debug    = ($flags & $VirtExperiment::STORE_FLAGS_DEBUG ? 1 : 0);
     my $impotent = ($flags & $VirtExperiment::STORE_FLAGS_IMPOTENT ? 1 : 0);
-    my $virtexp  = $self->virtexperiment();
     my $exptidx  = $self->experiment()->idx();
-    my $table    = $self->tablename();
+    my $table    = $self->table();
+    my $tablename= $self->tablename();
     my $row      = $self->tablerow();
 
     # These are the keys for the table.
-    my %pkeys   = map { $_ => $_ } @{$VirtExperiment::virtual_tables{$table}};
+    my %pkeys   =
+	map { $_ => $_ } @{$VirtExperiment::virtual_tables{$tablename}};
 
     # Gets values for the keys, to use in the query below.
     foreach my $key (keys(%pkeys)) {
 	$pkeys{$key} = $row->{$key};
     }
 
-    my $query = "delete from $table where exptidx=$exptidx and ".
+    my $query = "delete from $tablename where exptidx=$exptidx and ".
 	join(" and ", map("$_='" . $pkeys{$_} . "'", keys(%pkeys)));
     
     print "$query\n"
@@ -811,7 +1017,7 @@ sub Delete($;$)
 	return -1
 	    if (!DBQueryWarn($query));
 
-	$virtexp->_deletetablerow($self);
+	$table->_deletetablerow($self);
     }
     return 0;
 }
