@@ -10,7 +10,8 @@ use strict;
 use Exporter;
 use vars qw(@ISA @EXPORT @EXPORT_OK
 	    $VTOP_FLAGS_UPDATE $VTOP_FLAGS_VERBOSE
-	    $VTOP_FLAGS_FIXNODES $VTOP_FLAGS_IMPOTENT);
+	    $VTOP_FLAGS_FIXNODES $VTOP_FLAGS_IMPOTENT
+	    $VTOP_FLAGS_REGRESSION);
 
 @ISA    = "Exporter";
 @EXPORT = qw( );
@@ -34,6 +35,9 @@ use XML::LibXML;
 my $TB		  = "@prefix@";
 my $BOSSNODE      = "@BOSSNODE@";
 my $AVAIL         = "$TB/bin/avail";
+my $NALLOC        = "$TB/bin/nalloc";
+my $NFREE         = "$TB/bin/nfree";
+my $OS_SELECT     = "$TB/bin/os_select";
 my $DELAYCAPACITY = @DELAYCAPACITY@;	# Can be overridden by user!
 my $DELAYTHRESH   = @DELAYTHRESH@;
 
@@ -42,9 +46,10 @@ $VTOP_FLAGS_VERBOSE	= 0x01;
 $VTOP_FLAGS_UPDATE	= 0x02;
 $VTOP_FLAGS_FIXNODES	= 0x04;
 $VTOP_FLAGS_IMPOTENT	= 0x08;
+$VTOP_FLAGS_REGRESSION  = 0x10;
 
 @EXPORT_OK = qw($VTOP_FLAGS_UPDATE $VTOP_FLAGS_VERBOSE $VTOP_FLAGS_FIXNODES
-		$VTOP_FLAGS_IMPOTENT);
+		$VTOP_FLAGS_IMPOTENT $VTOP_FLAGS_REGRESSION);
 
 #
 # Create an object representing the stuff we need to create the vtop file.
@@ -122,7 +127,7 @@ sub current_v2v($)      { return $_[0]->{'CURRENT_V2V'}; }
 sub pnodes($)           { return $_[0]->{'PNODES'}; }
 sub fixednodes($)       { return $_[0]->{'FIXEDNODES'}; }
 sub newreserved($)      { return $_[0]->{'NEWRESERVED'}; }
-sub newreservednodes($) { return @{ $_[0]->{'NEWRESERVED'} }; }
+sub newreservednodes($) { return keys(%{ $_[0]->{'NEWRESERVED'} }); }
 sub norecover($)        { return $_[0]->{'norecover'}; }
 sub pid($)		{ return $_[0]->experiment()->pid(); }
 sub pid_idx($)		{ return $_[0]->experiment()->pid_idx(); }
@@ -151,6 +156,7 @@ sub verbose($)		{ return $_[0]->flags() & $VTOP_FLAGS_VERBOSE; }
 sub updating($)		{ return $_[0]->flags() & $VTOP_FLAGS_UPDATE; }
 sub fixcurrent($)	{ return $_[0]->flags() & $VTOP_FLAGS_FIXNODES; }
 sub impotent($)		{ return $_[0]->flags() & $VTOP_FLAGS_IMPOTENT; }
+sub regression($)	{ return $_[0]->flags() & $VTOP_FLAGS_REGRESSION; }
 sub printdb($$)		{ print $_[1] if ($_[0]->verbose()); }
 
 # We name delay nodes internally as they are needed.
@@ -285,7 +291,8 @@ sub Create($$$$)
 
     $self->{'VIRTLANLAN'}    = $virt_lanlan;
     $self->{'VTOP'}          = $vtop;
-    $self->{'MEMBERS'}       = {};
+    $self->{'MEMBERHASH'}    = {};
+    $self->{'MEMBERLIST'}    = [];
     $self->{'SHAPEDMEMBERS'} = {};
     $self->{'HASH'}          = {};
 
@@ -293,8 +300,8 @@ sub Create($$$$)
 }
 # accessors
 sub virt_lanlan($)	{ return $_[0]->{'VIRTLANLAN'}; }
-sub members($)		{ return $_[0]->{'MEMBERS'}; }
-sub memberlist($)       { return values(%{ $_[0]->members() }); }
+sub members($)		{ return $_[0]->{'MEMBERHASH'}; }
+sub memberlist($)       { return @{ $_[0]->{'MEMBERLIST'} }; }
 sub shapedmembers($)	{ return $_[0]->{'SHAPEDMEMBERS'}; }
 sub vtop($)		{ return $_[0]->{'VTOP'}; }
 sub hash($)		{ return $_[0]->{'HASH'}; }
@@ -304,7 +311,8 @@ sub DESTROY {
     my $self = shift;
 
     $self->{'VIRTLANLAN'} = undef;
-    $self->{'MEMBERS'}    = undef;
+    $self->{'MEMBERHASH'} = undef;
+    $self->{'MEMBERLIST'} = undef;
     $self->{'VTOP'}       = undef;
     $self->{'HASH'}       = undef;
 }
@@ -315,6 +323,16 @@ sub Stringify($)
     my $vname  = $self->vname();
 
     return "[vlan:$vname]";
+}
+
+sub addmember($$)
+{
+    my ($self, $vlanmember) = @_;
+    
+    $self->members()->{$vlanmember->member()} = $vlanmember;
+    push(@{ $self->{'MEMBERLIST'} }, $vlanmember);
+
+    return 0;
 }
 
 #
@@ -467,7 +485,7 @@ sub LoadPhysInfo($)
     while (my ($iface_type, $node_type) = $query_result->fetchrow()) {
 	my $typeinfo = NodeType->Lookup($node_type);
 	if (!defined($typeinfo)) {
-	    carp("No type info for node type $node_type");
+	    warn("No type info for node type $node_type\n");
 	    return -1;
 	}
 	my $node_class = $typeinfo->class();
@@ -478,7 +496,7 @@ sub LoadPhysInfo($)
 	    if (!defined($node_type_linkbw{$node_class}));
 
 	if (!defined($interface_capabilities{$iface_type}->{"protocols"})) {
-	    carp("No protocols listed in capabilities for $iface_type!");
+	    warn("No protocols listed in capabilities for $iface_type!\n");
 	    return -1;
 	}
 	my @protolist =
@@ -489,7 +507,7 @@ sub LoadPhysInfo($)
 		$interface_capabilities{$iface_type}->{"${proto}_defspeed"};
 
 	    if (!defined($def_speed)) {
-		carp("No default speed in capabilites for $iface_type!");
+		warn("No default speed in capabilites for $iface_type!\n");
 		return -1;
 	    }
 
@@ -658,7 +676,7 @@ sub LoadVirtNodes($)
 	if (!defined($nodetype)) {
 	    my $vtype = $self->virttypeisvtype($type);
 	    if (!defined($vtype)) {
-		carp("Improper type $type for node $vnode!");
+		warn("Improper type $type for node $vnode!\n");
 		return -1;
 	    }
 	    #
@@ -669,7 +687,7 @@ sub LoadVirtNodes($)
 
 	    $nodetype = NodeType->LookupAny($vtypename);
 	    if (!defined($nodetype)) {
-		carp("Improper type $vtypename in vtypes for node $vnode!");
+		warn("Improper type $vtypename in vtypes for node $vnode!\n");
 		return -1;
 	    }
 	    $isvtyped = 1;
@@ -718,7 +736,7 @@ sub LoadVirtNodes($)
 	    # Must be a parent. Set in the parser, either explicitly, or else
 	    # one is created if the user leaves it out.
 	    if (!defined($fixed) || $fixed eq "") {
-		carp("Subnode $vname must be fixed to its parent!");
+		warn("Subnode $vname must be fixed to its parent!\n");
 		return -1;
 	    }
 	    $vnode->_parent($fixed);
@@ -853,7 +871,7 @@ sub LoadVirtLans($)
 
 	# Which we add to the member hash for the lan by vnode:vport
 	# Note that $vlanmember->member() returns vnode:port.
-	$virtlan->members()->{$vlanmember->member()} = $vlanmember;
+	$virtlan->addmember($vlanmember);
 
 	# Global map from vnode:port back to the lan object
 	$self->memberof()->{$vlanmember->member()} = $virtlan;
@@ -862,10 +880,12 @@ sub LoadVirtLans($)
 	my $delay          = $vlanmember->delay();
 	my $bandwidth      = $vlanmember->bandwidth();
 	my $est_bandwidth  = $vlanmember->est_bandwidth();
+	my $backfill       = $vlanmember->backfill();
 	my $lossrate       = $vlanmember->lossrate();
 	my $rdelay         = $vlanmember->rdelay();
 	my $rbandwidth     = $vlanmember->rbandwidth();
 	my $rest_bandwidth = $vlanmember->rest_bandwidth();
+	my $rbackfill      = $vlanmember->rbackfill();
 	my $rlossrate      = $vlanmember->rlossrate();
 	my $widearea       = $vlanmember->widearea();
 	my $isemulated     = $vlanmember->emulated();
@@ -919,10 +939,12 @@ sub LoadVirtLans($)
 	$vlanmember->_delayinfo([ $delay,
 				  $bandwidth,
 				  $est_bandwidth,
+				  $backfill,
 				  $lossrate,
 				  $rdelay,
 				  $rbandwidth,
 				  $rest_bandwidth,
+				  $rbackfill,
 				  $rlossrate ]);
 
 	#
@@ -1522,18 +1544,22 @@ sub GenVirtLans($)
 	    my $vname0    = $virtnode0->vname();
 	    my $vname1    = $virtnode1->vname();
 
-	    my ($delay0,$bw0,$ebw0,$loss0,
-		$rdelay0,$rbw0,$rebw0,$rloss0) = @{$member0->_delayinfo()};
-	    my ($delay1,$bw1,$ebw1,$loss1,
-		$rdelay1,$rbw1,$rebw1,$rloss1) = @{$member1->_delayinfo()};
+	    my ($delay0,$bw0,$ebw0,$backfill0,$loss0,
+		$rdelay0,$rbw0,$rebw0,$rbackfill0,$rloss0) =
+		    @{$member0->_delayinfo()};
+	    my ($delay1,$bw1,$ebw1,$backfill1,$loss1,
+		$rdelay1,$rbw1,$rebw1,$rbackfill1,$rloss1) =
+		    @{$member1->_delayinfo()};
 
 	    # Here the r's are going to be 1->0 and the others 0->1
 	    my $delay      = $delay0+$rdelay1;
 	    my $loss       = 1-(1-$loss0)*(1-$rloss1);
 	    my $bw         = min($bw0,$rbw1);
+ 	    my $backfill   = max($backfill0,$rbackfill1);
 	    my $rdelay     = $rdelay0+$delay1;
 	    my $rloss      = 1-(1-$rloss0)*(1-$loss1);
 	    my $rbw        = min($rbw0,$bw1);
+ 	    my $rbackfill  = max($rbackfill0,$backfill1);
 	    my $bandwidth  = $self->getbandwidth($member0, $vlan, $bw);
 	    my $rbandwidth = $self->getbandwidth($member1, $vlan, $bw);
 
@@ -1676,8 +1702,8 @@ sub GenVirtLans($)
 		    if ($nobwshaping) {
 			$bw = $rbw = 0;
 		    }
-		    my @delayinfo = ($delay,$bw,$loss,
-				     $rdelay,$rbw,$rloss, 0);
+		    my @delayinfo = ($delay,$bw,$backfill,$loss,
+				     $rdelay,$rbw,$rbackfill,$rloss, 0);
 		    
 		    $self->printdb("Delay link $plink = " . 
 				   join(" ", @delayinfo) . "\n");
@@ -1690,8 +1716,8 @@ sub GenVirtLans($)
 		    my $plink       = "linksdelaysrc/$vname/$member0,$member1";
 		    my $delaydesire = $self->delay_desire();
 
-		    my @delayinfo = ($delay,$bw,$loss,
-				     $rdelay,$rbw,$rloss,0);
+		    my @delayinfo = ($delay,$bw,$backfill,$loss,
+				     $rdelay,$rbw,$rbackfill,$rloss,0);
 
 		    $self->addnode("$delayname delay $delaydesire");
 		    
@@ -1746,8 +1772,8 @@ sub GenVirtLans($)
 		    #
 		    if (!$nobwshaping && !$vlan->_allsim()) {
 			$self->delaylinks()->{$plink} = 
-			    [$delay,$bw,$loss,
-			     $rdelay,$rbw,$rloss,1];
+			    [$delay,$bw,$backfill,$loss,
+			     $rdelay,$rbw,$rbackfill,$rloss,1];
 		    }
 		}
 		if ($fixall ne '') {
@@ -1768,8 +1794,9 @@ sub GenVirtLans($)
 		my $virtnode   = $member->virt_node();
 		my $vnodevname = $virtnode->vname();
 		
-		my ($delay,$bw,$ebw,$loss,
-		    $rdelay,$rbw,$rebw,$rloss) = @{$member->_delayinfo()};
+		my ($delay,$bw,$ebw,$backfill,$loss,
+		    $rdelay,$rbw,$rebw,$rbackfill,$rloss) =
+			@{$member->_delayinfo()};
 
 		# Need to know about tracing on a per queue basis, since the
 		# user can specify tracing asymmetrically.
@@ -1878,8 +1905,8 @@ sub GenVirtLans($)
 			if ($nobwshaping) {
 			    $bw = $rbw = 0;
 			}
-			my @delayinfo = ($delay,$bw,$loss,
-					 $rdelay,$rbw,$rloss,0);
+			my @delayinfo = ($delay,$bw,$backfill,$loss,
+					 $rdelay,$rbw,$rbackfill,$rloss,0);
 
 			$self->addlink("$plink $vnodevname lan/$vname " .
 				       max($top_bw,$top_rbw) .
@@ -1898,8 +1925,8 @@ sub GenVirtLans($)
 			my $delayname   = $self->nextdelayname();
 			my $plink       = "linkdelaysrc/$vname/$member";
 			my $delaydesire = $self->delay_desire();
-			my @delayinfo   = ($delay,$bw,$loss,
-					   $rdelay,$rbw,$rloss,0);
+			my @delayinfo   = ($delay,$bw,$backfill,$loss,
+					   $rdelay,$rbw,$rbackfill,$rloss,0);
 			
 			$self->addnode("$delayname delay $delaydesire");
 			
@@ -1954,8 +1981,8 @@ sub GenVirtLans($)
 			#
 			if (!$nobwshaping) {
 			    $self->delaylinks()->{$plink} = 
-				[$delay,$bw,$loss,
-				 $rdelay,$rbw,$rloss,1];
+				[$delay,$bw,$backfill,$loss,
+				 $rdelay,$rbw,$rbackfill,$rloss,1];
 			}
 		    }
 		    if ($fixsrc0) {
@@ -2161,8 +2188,7 @@ sub CreateVtop($)
     return -1
 	if ($self->LoadPhysInfo() ||
 	    $self->LoadVirtNodes() ||
-	    $self->LoadVirtLans() ||
-	    $self->LoadCurrentResources());
+	    $self->LoadVirtLans());
     
     return -1
 	if ($self->GenVirtTypes() ||
@@ -2243,14 +2269,18 @@ sub requires_delay($$$$)
     my $linkbws   = $self->{'TYPELINKBW'};
     my $node_class;
 
-    fatal("requires_delay(): $virtnode - invalid type $node_type!")
-	if (!exists($linkbws->{$node_type}{$protocol}));
+    if (!exists($linkbws->{$node_type}{$protocol})) {    
+	warn("requires_delay(): $virtnode - invalid type $node_type!\n");
+	return 0;
+    }
 
     if (! $virtnode->_isvtyped()) {
 	$node_class = $virtnode->_typeinfo()->class();
 	
-	fatal("requires_delay(): $virtnode - invalid class $node_class!")
-	    if (!exists($linkbws->{$node_class}{$protocol}));
+	if (!exists($linkbws->{$node_class}{$protocol})) {
+	    warn("requires_delay(): $virtnode - invalid class $node_class!\n");
+	    return 0;
+	}
     }
 
     foreach my $bw (keys(%{ $linkbws->{$node_type}{$protocol} })) {
@@ -2275,8 +2305,8 @@ sub virtlantopbw($$$) {
     my ($self, $virtlan, $member) = @_;
     my $node = $member->virt_node()->vname();
 
-    my ($delay,$bw,$ebw,$loss,
-	$rdelay,$rbw,$rebw,$rloss) = @{$member->_delayinfo()};
+    my ($delay,$bw,$ebw,$backfill,$loss,
+	$rdelay,$rbw,$rebw,$rbackfill,$rloss) = @{$member->_delayinfo()};
 
     # Return the estimated bw if it was given; otherwise, return the normal
     # bandwidth, 
@@ -2758,12 +2788,12 @@ sub AllocNodes($)
     #
     my @nodeids = keys(%{ $self->current_p2v() });
     if (@nodeids && !$self->{'OLDRSRVCLEAN'}) {
-	system("nfree -o $pid $eid @nodeids");
+	system("$NFREE -o $pid $eid @nodeids");
 	if ($?) {
 	    tberror("Could not move nodes to old reserved holding\n");
 	    return -1;
 	}
-	system("nalloc $pid $eid @nodeids");
+	system("$NALLOC $pid $eid @nodeids");
 	if ($?) {
 	    tberror("Could not move nodes back from old reserved holding\n");
 	    return -1;
@@ -2777,7 +2807,7 @@ sub AllocNodes($)
     #
     @nodeids = keys(%{ $self->solution()->{'TORESERVE'} });
     $self->printdb("Trying to allocate @nodeids\n");
-    system("nalloc -p $pid $eid @nodeids");
+    system("$NALLOC -p $pid $eid @nodeids");
     my $exitval  = $? >> 8;
 
     #
@@ -3203,7 +3233,7 @@ sub AllocVirtNodes($)
 		}
 		else {
 		    tbinfo("Reserving on $physical: @plist ...\n");
-		    system("nalloc $pid $eid @plist");
+		    system("$NALLOC $pid $eid @plist");
 		    if ($?) {
 			tberror("Failed to reserve @plist (on $physical)\n");
 			return -1;
@@ -3529,8 +3559,8 @@ sub InterpLinks($)
 	    $portmap{$virtB} = $portB;
 	
 	    if (exists($self->delaylinks()->{$plink})) {
-		my ($delay,$bandwidth,$loss,
-		    $rdelay,$rbandwidth,$rloss,$trivonly) =
+		my ($delay,$bandwidth,$backfill,$loss,
+		    $rdelay,$rbandwidth,$rbackfill,$rloss,$trivonly) =
 			@{$self->delaylinks()->{$plink}};
 		
 		if (!$trivonly || $trivonly && $trivial) {
@@ -3538,10 +3568,10 @@ sub InterpLinks($)
 		    # Two entries, one for each side of the duplex link.
 		    #
 		    $self->AddLinkDelay($virtlan,$member0,$nodeA,$portA,0,
-					[$delay,$bandwidth,$loss]);
+					[$delay,$bandwidth,$backfill,$loss]);
 
 		    $self->AddLinkDelay($virtlan,$member1,$nodeB,$portB,0,
-					[$rdelay,$rbandwidth,$rloss]);
+				       [$rdelay,$rbandwidth,$rbackfill,$rloss]);
 		}
 	    }
 	    #
@@ -3689,8 +3719,8 @@ sub InterpLinks($)
 	    $portmap{$virtA} = $portA;
 	
 	    if (exists($self->delaylinks()->{$plink})) {
-		my ($delay,$bandwidth,$loss,
-		    $rdelay,$rbandwidth,$rloss,$trivonly) =
+		my ($delay,$bandwidth,$backfill,$loss,
+		    $rdelay,$rbandwidth,$rbackfill,$rloss,$trivonly) =
 			@{$self->delaylinks()->{$plink}};
 
 		if (!$trivonly || $trivonly && $trivial) {
@@ -3961,7 +3991,7 @@ sub InitializePhysNode($$$)
     if (defined($osid)) {
 	$self->printdb("  os_select $osid\n");
 	
-	system("os_select $osid $pnodename") == 0
+	system("$OS_SELECT $osid $pnodename") == 0
 	    or return -1 if (!$self->impotent());
     }
     return 0;
@@ -4198,8 +4228,8 @@ sub AddDelay($$$$$$$$$)
 	$iface0, $iface1, $islan, $params) = @_;
 
     # Delay Info. 
-    my ($delay,$bandwidth,$lossrate,
-	$rdelay,$rbandwidth,$rlossrate) = @{$params};
+    my ($delay,$bandwidth,$backfill,$lossrate,
+	$rdelay,$rbandwidth,$rbackfill,$rlossrate) = @{$params};
 
     my $pnode =  $self->pnodes()->{$pnodename};
 
@@ -4209,8 +4239,8 @@ sub AddDelay($$$$$$$$$)
     $pnode->_pipenumber($pipe0 + 10);
 
     $self->printdb("  Delay: \[$iface0:$pnodename:$iface1 pipes:$pipe0+$pipe1,".
-		   "$delay,$bandwidth,$lossrate,$rdelay,$rbandwidth," .
-		   "$rlossrate]\n");
+		   "$delay,$bandwidth,$backfill,$lossrate,".
+		   "$rdelay,$rbandwidth,$rbackfill,$rlossrate]\n");
 
     my $vnodename0 = $member0->vnode();
     my $vnodename1 = $member1->vnode();
@@ -4242,8 +4272,8 @@ sub AddDelay($$$$$$$$$)
     
 	DBQueryWarn("insert into delays " .
 	     " (pid,eid,exptidx,node_id,vname,noshaping,iface0,iface1" .
-	     ",vnode0,pipe0,delay0,bandwidth0,lossrate0" .
-	     ",vnode1,pipe1,delay1,bandwidth1,lossrate1" .
+	     ",vnode0,pipe0,delay0,bandwidth0,backfill0,lossrate0" .
+	     ",vnode1,pipe1,delay1,bandwidth1,backfill1,lossrate1" .
 	     ",q0_limit,q0_maxthresh,q0_minthresh,q0_weight,q0_linterm" .
 	     ",q0_qinbytes,q0_bytes,q0_meanpsize,q0_wait,q0_setbit" .
 	     ",q0_droptail,q0_red,q0_gentle" .
@@ -4252,8 +4282,8 @@ sub AddDelay($$$$$$$$$)
 	     ",q1_droptail,q1_red,q1_gentle)" .
 	     " values ('$pid','$eid','$idx','$pnodename','$lan' ".
 	     ",$noshaping,'$iface0','$iface1'".
-	     ",'$vnodename0',$pipe0,$delay,$bandwidth,$lossrate".
-	     ",'$vnodename1',$pipe1,$rdelay,$rbandwidth,$rlossrate".
+	     ",'$vnodename0',$pipe0,$delay,$bandwidth,$backfill,$lossrate".
+	     ",'$vnodename1',$pipe1,$rdelay,$rbandwidth,$rbackfill,$rlossrate".
 	     ",$q0_limit,$q0_maxthresh,$q0_minthresh,$q0_weight,$q0_linterm".
 	     ",$q0_qinbytes,$q0_bytes,$q0_meanpsize,$q0_wait,$q0_setbit".
 	     ",$q0_droptail,$q0_red,$q0_gentle".
@@ -4281,15 +4311,15 @@ sub AddDelay($$$$$$$$$)
 	#
 	DBQueryWarn("insert into delays" .
 	     " (pid,eid,exptidx,node_id,vname,noshaping,iface0,iface1," .
-	     "  vnode0,pipe0,delay0,bandwidth0,lossrate0," .
-	     "  vnode1,pipe1,delay1,bandwidth1,lossrate1," .
+	     "  vnode0,pipe0,delay0,bandwidth0,backfill0,lossrate0," .
+	     "  vnode1,pipe1,delay1,bandwidth1,backfill1,lossrate1," .
 	     "  q0_limit,q0_maxthresh,q0_minthresh,q0_weight,q0_linterm," .
 	     "  q0_qinbytes,q0_bytes,q0_meanpsize,q0_wait,q0_setbit," .
 	     "  q0_droptail,q0_red,q0_gentle,q1_limit,q1_qinbytes) " .
 	     " values ('$pid','$eid','$idx','$pnodename','$lan', ".
 	     "  $noshaping,'$iface0','$iface1',".
-	     "  '$vnodename0',$pipe0,$delay,$bandwidth,$lossrate,".
-	     "  '$vnodename1',$pipe1,$rdelay,$rbandwidth,$rlossrate,".
+	     "  '$vnodename0',$pipe0,$delay,$bandwidth,$backfill,$lossrate,".
+	     "  '$vnodename1',$pipe1,$rdelay,$rbandwidth,$rbackfill,$rlossrate,".
 	     "  $q0_limit,$q0_maxthresh,$q0_minthresh,$q0_weight,$q0_linterm,".
 	     "  $q0_qinbytes,$q0_bytes,$q0_meanpsize,$q0_wait,$q0_setbit,".
 	     "  $q0_droptail,$q0_red,$q0_gentle,2,0)")
@@ -4345,9 +4375,9 @@ sub AddLinkDelay($$$$$$)
 {
     my ($self, $virtlan, $member, $pnodename, $iface, $islan, $params) = @_;
 
-    # Delay Info. 
-    my ($delay,$bandwidth,$lossrate,
-	$rdelay,$rbandwidth,$rlossrate) = @{$params};
+    # backfill unsupported for linkdelays so ignore its entry in params.
+    my ($delay,$bandwidth,$backfill,$lossrate,
+	$rdelay,$rbandwidth,$rbackfill,$rlossrate) = @{$params};
 
     #
     # We need to find the queue info. If its a member of a lan, there
@@ -4371,8 +4401,9 @@ sub AddLinkDelay($$$$$$)
     $pnode->_pipenumber($rpipe + 10);
 
     $self->printdb("  LinkDelay: \[$pipe,$rpipe," .
-		   "$virtlan,$delay,$bandwidth,$lossrate".
-		   ($islan ? "$rdelay,$rbandwidth,$rlossrate" : "") . "\]\n");
+		   "$virtlan,$delay,$bandwidth,$backfill,$lossrate".
+		   ($islan ? "$rdelay,$rbandwidth,$rbackfill,$rlossrate" : "").
+		   "\]\n");
 
     return 0
 	if ($self->impotent());

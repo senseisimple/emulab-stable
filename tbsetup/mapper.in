@@ -26,7 +26,7 @@ use POSIX ":sys_wait_h";
 # Failures in assign always cause the caller to stop retrying. 
 #
 # The CANRECOVER bit indicates 'recoverability' (no db or physical
-# state was modified by the time the error occurred). This is relavent
+# state was modified by the time the error occurred). This is relevant
 # to only modify operations (update).
 #
 my $WRAPPER_SUCCESS		 = 0x00;
@@ -43,30 +43,35 @@ sub usage ()
     print STDERR " -u   - Enables update mode\n";
     print STDERR " -f   - Fix current resources during update mode\n";
     print STDERR " -n   - Run assign, but do not reserve/modify resources.\n";
+    print STDERR " -r   - Regression mode.\n";
     print STDERR " -p   - Do a precheck for mapability on an empty testbed - ".
 		 "implies -n\n";
     exit($WRAPPER_FAILED);
 }
-my $optlist  = "vunfp";
-my $verbose  = 0;
-my $debug    = 1;
-my $fixmode  = 0;
-my $updating = 0;
-my $impotent = 1;
-my $precheck = 0;
-my $quiet    = 0;
-my $warnings = 0;
-my $maxrun   = 3;		# Maximum number of times we run assign.
+my $optlist    = "dvunfprqc";
+my $verbose    = 0;
+my $debug      = 0;
+my $fixmode    = 0;
+my $updating   = 0;
+my $impotent   = 0;
+my $precheck   = 0;
+my $regression = 0;
+my $quiet      = 0;
+my $clear      = 0;
+my $warnings   = 0;
+my $maxrun     = 3;		# Maximum number of times we run assign.
 
 #
 # Configure variables
 #
 my $TB		= "@prefix@";
+my $DBNAME	= "@TBDBNAME@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $ASSIGN      = "$TB/libexec/assign";
 my $WRAPPER2    = "$TB/libexec/assign_wrapper2";
 my $PTOPGEN     = "$TB/libexec/ptopgen";
 my $VTOPGEN     = "$TB/bin/vtopgen";
+my $NFREE       = "$TB/bin/nfree";
 
 #
 # Load the Testbed support stuff. 
@@ -77,12 +82,14 @@ use libtestbed;
 use libtblog;
 use libvtop;
 use libadminctrl;
+use User;
 
 # Protos
 sub fatal(@);
 sub debug($);
 sub chat($);
 sub RunAssign($$);
+sub FinalizeRegression($);
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -114,6 +121,9 @@ if (@ARGV < 2) {
 if (defined($options{"v"})) {
     $verbose++;
 }
+if (defined($options{"d"})) {
+    $debug++;
+}
 if (defined($options{"u"})) {
     $updating = 1;
 }
@@ -126,12 +136,36 @@ if (defined($options{"f"})) {
 if (defined($options{"p"})) {
     $precheck = 1;
 }
+if (defined($options{"r"})) {
+    if ($DBNAME eq "tbdb") {
+	fatal("Cannot use regression mode on main DB");
+    }
+    $regression = 1;
+    $clear = 1;
+}
+if (defined($options{"q"})) {
+    $quiet = 1;
+}
+if (defined($options{"c"})) {
+    $clear = 1;
+}
 
 my $pid = $ARGV[0];
 my $eid = $ARGV[1];
 my $experiment = Experiment->Lookup($pid, $eid);
 if (!defined($experiment)) {
     fatal("Could not lookup experiment object $pid,$eid!")
+}
+#
+# Verify that this person can muck with the experiment.
+#
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
+}
+if (!TBAdmin() &&
+    ! $experiment->AccessCheck($this_user, TB_EXPT_DESTROY)) {
+    fatal("You do not have permission to map this experiment!");
 }
 
 #
@@ -146,12 +180,32 @@ $vtopflags |= $libvtop::VTOP_FLAGS_FIXNODES
     if ($fixmode);
 $vtopflags |= $libvtop::VTOP_FLAGS_IMPOTENT
     if ($impotent);
+$vtopflags |= $libvtop::VTOP_FLAGS_REGRESSION
+    if ($regression);
 
 chat("Starting the new and improved mapper wrapper.\n");
 
 my $vtop = libvtop->Create($experiment, $vtopflags);
 if (!defined($vtop)) {
     fatal("Could not create vtop structure for $experiment");
+}
+
+#
+# If updating, load current experiment resources. We have to be careful
+# of how this is merged in with the (new) desired topology.
+#
+if ($updating) {
+    $vtop->LoadCurrentResources() == 0
+	or fatal("Could not load current resources into mapper");
+}
+if (!$impotent && ($updating || $clear)) {
+    if ($regression) {
+	chat("Freeing reserved nodes in regression mode\n");
+	system("export NORELOAD=1; $NFREE -x -a $pid $eid") == 0
+	    or fatal("Could not release nodes in regression mode");
+    }
+    chat("Clearing physical state before updating.\n");
+    $experiment->RemovePhysicalState();
 }
 TBDebugTimeStamp("vtopgen started");
 $vtop->CreateVtop() == 0
@@ -178,7 +232,7 @@ TBDebugTimeStamp("mapper loop started");
 while (1) {
     chat("Assign run $currentrun\n");
 
-    my $prefix = ($debug ? "$pid-$eid" : "$pid-$eid-$$");
+    my $prefix = ($debug || $regression ? "$pid-$eid" : "$pid-$eid-$$");
 
     #
     # When precheck is on, we only do one run in impotent mode and exit.
@@ -201,10 +255,13 @@ while (1) {
     last
 	if ($retval == 0);
 
-    if ($retval < 0) {
+    if ($retval < 0 || $regression) {
 	#
 	# Failure in assign.
 	#
+	FinalizeRegression(1)
+	    if ($regression);
+
 	fatal({type => 'primary', severity => SEV_ERROR,
 	       error => ['unretriable_assign_error']},
 	      "Unretriable error. Giving up.");
@@ -246,6 +303,8 @@ while (1) {
     $currentrun++;
 }
 TBDebugTimeStamp("mapper loop finished");
+FinalizeRegression(0)
+    if ($regression);
 exit(0);
 
 #
@@ -263,8 +322,12 @@ sub RunAssign($$)
     # Do admission control test, and gather the info.
     #
     my %admission_control;
-    fatal("Failed admission control checks!")
-	if (!TBAdmissionControlCheck(undef, $experiment, \%admission_control));
+    if (!$regression) {
+	if (!TBAdmissionControlCheck(undef, $experiment, \%admission_control)){
+	    tberror("Failed admission control checks!\n");
+	    return -1;
+	}
+    }
 
     #
     # Snapshot physical resources.
@@ -294,7 +357,8 @@ sub RunAssign($$)
     TBDebugTimeStamp("ptopgen started");
     system("$PTOPGEN $ptopargs > $ptopfile");
     if ($?) {
-	fatal("Failure in $ptopfile");
+	tberror("Failure in ptopgen\n");
+	return -1;
     }
     TBDebugTimeStamp("ptopgen finished");
 
@@ -316,16 +380,22 @@ sub RunAssign($$)
     #
     # Now generate a vtop file and dump it to a file.
     #
-    open(VTOPFILE, "> $vtopfile") or
-	fatal("Could not open $vtopfile: $!");
-    $vtop->PrintTop(*VTOPFILE) == 0 or
-	fatal("Could not print vtop file for $experiment");
+    if (! open(VTOPFILE, "> $vtopfile")) {
+	tberror("Could not open $vtopfile: $!\n");
+	return -1;
+    }
+    if ($vtop->PrintTop(*VTOPFILE) != 0) {
+	tberror("Could not print vtop file for $experiment\n");
+	return -1;
+    }
     close(VTOPFILE);
 
-    if ($impotent) {
-	$experiment->Update({"maximum_nodes" => $vtop->maximum_nodes(),
-			     "minimum_nodes" => $vtop->minimum_nodes() })
-	    == 0 or fatal("Could not update min/max nodes for $experiment");
+    if (! ($impotent || $regression)) {
+	if ($experiment->Update({"maximum_nodes" => $vtop->maximum_nodes(),
+				 "minimum_nodes" => $vtop->minimum_nodes() })){
+	    tberror("Could not update min/max nodes for $experiment\n");
+	    return -1;
+	}
     }
 
     # Run assign
@@ -335,6 +405,8 @@ sub RunAssign($$)
 	if ($vtop->virtnodecount() || $vtop->simnodecount());
     $args = "-n $args"
     	if ($precheck);
+    $args = "-s 123456 $args"
+	if ($regression);
     chat("assign command: '$cmd $args'\n");
 
     #
@@ -357,9 +429,9 @@ sub RunAssign($$)
 		    kill('TERM', -$pgrp);
 		    waitpid($childpid, 0);
 
-		    fatal({cause => 'canceled', severity => SEV_IMMEDIATE,
-			   error => ['cancel_flag']},
-			  "Cancel flag set; aborting assign run!");
+		    tberror({cause => 'canceled', severity => SEV_IMMEDIATE,
+			     error => ['cancel_flag']},
+			    "Cancel flag set; aborting assign run!\n");
 		    return -1;
 		}
 		# Loop again to reap child above before exit.
@@ -379,9 +451,9 @@ sub RunAssign($$)
 
     # Check cancel flag before continuing. 
     if ($experiment->canceled()) {
-	fatal({cause => 'canceled', severity => SEV_IMMEDIATE,
-	       error => ['cancel_flag']},
-	      "Cancel flag set; aborting assign run!");
+	tberror({cause => 'canceled', severity => SEV_IMMEDIATE,
+		 error => ['cancel_flag']},
+		"Cancel flag set; aborting assign run!\n");
 	return -1;
     }
 
@@ -416,7 +488,7 @@ sub RunAssign($$)
 	return 0;
     }
 
-    debug("Reading assign results.\n");
+    chat("Reading assign results.\n");
     if (!open(ASSIGNFP, "assign.log")) {
 	print("Could not open assign logfile! $!\n");
 	return -1;
@@ -432,9 +504,9 @@ sub RunAssign($$)
     }
     # Check cancel flag before continuing. 
     if ($experiment->canceled()) {
-	fatal({cause => 'canceled', severity => SEV_IMMEDIATE,
-	       error => ['cancel_flag']},
-	      "Cancel flag set; aborting assign run!");
+	tberror({cause => 'canceled', severity => SEV_IMMEDIATE,
+		 error => ['cancel_flag']},
+		"Cancel flag set; aborting assign run!\n");
 	return -1;
     }
     if ($vtop->AllocNodes() != 0) {
@@ -449,7 +521,40 @@ sub RunAssign($$)
 	print("Could not InitializePhysNodes\n");
 	return -1;
     }
-    exit(0);
+    return 0;
+}
+
+#
+# In regression mode we want to save  the physical state and then clear
+# the physical resources. 
+#
+sub FinalizeRegression($)
+{
+    my ($error) = @_;
+    my $cwd;
+
+    chomp($cwd = `/bin/pwd`);
+    if (!$error) {
+	chat("Saving physical state in regression mode\n");
+	if ($experiment->BackupPhysicalState("$cwd/$pid-$eid.pstate") != 0) {
+	    print STDERR "Could not save physical state!\n";
+	    exit(1);
+	}
+    }
+    chat("Removing physical state in regression mode\n");
+    if ($experiment->RemovePhysicalState() != 0) {
+	print STDERR "Could not remove physical state!\n";
+	exit(1);
+    }
+
+    if ($vtop->newreservednodes()) {
+	my @newreservednodes = $vtop->newreservednodes();
+	system("export NORELOAD=1; $NFREE -x $pid $eid @newreservednodes");
+	if ($?) {
+	    exit(1);
+	}
+    }
+    return 0;
 }
 
 # We will come through here no matter how we exit.

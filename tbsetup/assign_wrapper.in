@@ -44,6 +44,7 @@ sub array_diff($$);
 sub LoadCurrent();
 sub SetUpTracing($$$$$);
 sub fatal(@);
+sub FinalizeRegression($);
 
 #
 # This function as the main assign loop.  It converts the virtual
@@ -84,19 +85,22 @@ sub usage ()
 		 "implies -n\n";
     exit($WRAPPER_FAILED);
 }
-my $optlist  = "vutnfp";
+my $optlist  = "vutnfpr";
 my $verbose  = 0;
 my $fixmode  = 0;
 my $updating = 0;
 my $toponly  = 0;
 my $impotent = 0;
 my $precheck = 0;
+my $regression=0;
 my $warnings = 0;
 
 #
 # Configure variables
 #
 my $TBROOT	  = "@prefix@";
+my $NFREE         = "$TBROOT/bin/nfree";
+my $DBNAME  	  = "@TBDBNAME@";
 my $DELAYCAPACITY = @DELAYCAPACITY@;	# Can be overridden by user!
 $ENV{'PATH'} = "/usr/bin:$TBROOT/libexec:$TBROOT/sbin:$TBROOT/bin";
 
@@ -178,14 +182,20 @@ if (defined($options{"p"})) {
 if (defined($options{"f"})) {
     $fixmode = 1;
 }
+if (defined($options{"r"})) {
+    if ($DBNAME eq "tbdb") {
+	fatal("Cannot use regression mode on main DB");
+    }
+    $regression = 1;
+}
 my $pid = $ARGV[0];
 my $eid = $ARGV[1];
-my $ptopfile = "$pid-$eid-$$.ptop";
+my $ptopfile = ($regression ? "$pid-$eid.ptop" : "$pid-$eid-$$.ptop");
 # Since the topfile could change across
 # swapins and modifies, it makes sense
 # to store all of them. Helps in
 # degugging.
-my $topfile  = "$pid-$eid-$$.top";
+my $topfile  = ($regression ? "$pid-$eid.top" : "$pid-$eid-$$.top");
 
 TBDebugTimeStampsOn();
 
@@ -816,7 +826,7 @@ TBDebugTimeStamp("TOP started");
 #
 # Do admission control test right away.
 #
-if (!$toponly) {
+if (!($toponly || $regression)) {
     fatal("Failed admission control checks!")
 	if (!TBAdmissionControlCheck(undef, $experiment, \%admission_control));
 }
@@ -838,12 +848,19 @@ LoadPhysInfo();
 #
 LoadExperiment();
 
+if ($regression) {
+    print STDERR "Freeing reserved nodes in regression mode\n";
+    system("export NORELOAD=1; $NFREE -x -a $pid $eid") == 0
+	or fatal("Could not release nodes in regression mode");
+}
+
 #
 # If updating, load current experiment resources. We have to be careful
 # of how this is merged in with the (new) desired topology. See below.
 #
-if ($updating) {
-    LoadCurrent();
+if ($updating || $regression) {
+    LoadCurrent()
+	if ($updating);
     print STDERR "Resetting DB before updating.\n";
     $experiment->RemovePhysicalState();
 }
@@ -906,6 +923,11 @@ while (1) {
     # Success!
     last
 	if ($retval == 0);
+
+    if ($regression) {
+	FinalizeRegression(1);
+	fatal("Failed to find solution in regression mode");
+    }
 
     if (!$precheck && !$tried_precheck) {
 	my $ptopfile0 = $ptopfile;
@@ -1017,6 +1039,8 @@ sub RunAssign ()
 	if ($virtcount || $simcount);
     $cmdargs = "-n $cmdargs"
     	if ($precheck);
+    $cmdargs = "-s 123456 $cmdargs"
+    	if ($regression);
 
     my $cmd;
 
@@ -1091,7 +1115,8 @@ sub RunAssign ()
     # for debugging and archiving purposes
     # We do not call it .log though, since we do not want it copied
     # out to the user directory every swapin. See Experiment.pm
-    system("/bin/cp assign.log $pid-$eid-$$.assign");
+    my $assignlog = ($regression ? "$pid-$eid.assign" : "$pid-$eid-$$.assign");
+    system("/bin/cp assign.log $assignlog");
     if (!open(ASSIGNFP, "assign.log")) {
 	print("Could not open assign logfile!\n");
 	return -1;
@@ -2280,85 +2305,6 @@ exit(0)
     if ($impotent);
 
 #
-# Seed the virt_agents table. This should probably be done elsewhere.
-# Anyway, each lan/link needs an agent to handle changes to delays or
-# other link parameters, and that agent (might be several) will be
-# running on more than one node. Delay node agent, wireless agent,
-# etc. They might be running on a node different then where the link
-# is really (delay node). So, just send all link event to all nodes,
-# and let them figure out what they should do (what to ignore, what to
-# act on). So, specify a wildcard; a "*" for the vnode will be treated
-# specially by the event scheduler, and no ipaddr will be inserted
-# into the event. Second, add pseudo agents, one for each member of
-# the link (or just one if a lan). The objname is lan-vnode, and
-# allows us to send an event to just the agent controlling that link
-# (or lan node delay). The agents will subscribe to these additional
-# names when they start up.
-#
-# Must clean these to avoid duplicates.
-DBQueryFatal("delete from event_groups ".
-	     "where pid='$pid' and eid='$eid' and ".
-	     "      (group_name='__all_lans' or group_name='__all_tracemon')");
-
-foreach my $lan (keys(%virt_lans)) {
-    DBQueryFatal("replace into virt_agents ".
-		 " (exptidx, pid, eid, vname, vnode, objecttype) ".
-		 " select '$experiment_idx', '$pid', '$eid', '$lan', '*', ".
-		 "   idx from event_objecttypes where ".
-		 "   event_objecttypes.type='LINK'");
-
-    #
-    # XXX there is no link (delay) agent running on plab nodes
-    # (i.e., protocol==ipv4) currently, so we cannot be sending them
-    # events that they will not acknowledge.
-    #
-    if (virtlanprotocol($lan) ne "ipv4") {
-	DBQueryFatal("insert into event_groups ".
-		     " (exptidx, pid, eid, idx, group_name, agent_name) ".
-		     " values ('$experiment_idx', ".
-		     "         '$pid', '$eid', NULL, '__all_lans', '$lan')");
-    }
-
-    # Must clean these to avoid duplicates created by the loop below.
-    DBQueryFatal("delete from event_groups ".
-		 "where pid='$pid' and eid='$eid' and ".
-		 "      group_name='${lan}-tracemon'");
-
-    # Must clean these cause of how this code used to work; temporary.
-    DBQueryFatal("delete from virt_agents ".
-		 "where pid='$pid' and eid='$eid' and ".
-		 "      vname='${lan}-tracemon'");
-
-    foreach my $member (virtlanmembers($lan)) {
-	my ($vnode) = split(":", $member);
-
-	DBQueryFatal("replace into virt_agents ".
-		     " (exptidx, pid, eid, vname, vnode, objecttype) ".
-		     " select '$experiment_idx', '$pid', '$eid', ".
-		     "   '${lan}-${vnode}', '*', ".
-		     "   idx from event_objecttypes where ".
-		     "   event_objecttypes.type='LINK'");
-
-	DBQueryFatal("replace into virt_agents ".
-		     " (exptidx, pid, eid, vname, vnode, objecttype) ".
-		     " select '$experiment_idx', '$pid', '$eid', ".
-		     "   '${lan}-${vnode}-tracemon', '*', ".
-		     "   idx from event_objecttypes where ".
-		     "   event_objecttypes.type='LINKTRACE'");
-
-	DBQueryFatal("insert into event_groups ".
-		     " (exptidx, pid, eid, idx, group_name, agent_name) ".
-		     " values ('$experiment_idx', '$pid', '$eid', NULL, ".
-		     "         '__all_tracemon', '${lan}-${vnode}-tracemon')");
-
-	DBQueryFatal("insert into event_groups ".
-		     " (exptidx, pid, eid, idx, group_name, agent_name) ".
-		     " values ('$experiment_idx', '$pid', '$eid', NULL, ".
-		     "         '${lan}-tracemon','${lan}-${vnode}-tracemon')");
-    }
-}
-
-#
 # Enter delays.
 # 
 foreach $delayid (keys(%nodedelays)) {
@@ -2968,6 +2914,8 @@ if( $simcount > 0 ) {
 }
 
 TBDebugTimeStamp("assign_wrapper finished");
+FinalizeRegression(0)
+    if ($regression);
 exit(0);
 
 ######################################################################
@@ -5418,7 +5366,7 @@ sub CreateTopFile()
     $maximum_nodes = $physnode_count + keys(%delaynodes);
     $minimum_nodes = POSIX::ceil($minimum_nodes);
 
-    if (! $impotent) {
+    if (! ($impotent || $regression)) {
 	DBQueryFatal("UPDATE experiments set maximum_nodes=$maximum_nodes, " .
 		     "                       minimum_nodes=$minimum_nodes ".
 		     "where pid='$pid' and eid='$eid'");
@@ -5713,6 +5661,39 @@ sub nodejailosid($)
 	tbwarn("Could not map jail osid to real osid on $pnode\n");
     }
     return $nextosid;
+}
+
+#
+# In regression mode we want to save  the physical state and then clear
+# the physical resources. 
+#
+sub FinalizeRegression($)
+{
+    my ($error) = @_;
+    my $cwd;
+
+    chomp($cwd = `/bin/pwd`);
+    if (!$error) {
+	print STDERR "Saving physical state in regression mode\n";
+	if ($experiment->BackupPhysicalState("$cwd/$pid-$eid.pstate") != 0) {
+	    print STDERR "Could not save physical state!\n";
+	    exit(1);
+	}
+    }
+    print STDERR "Removing physical state in regression mode\n";
+    if ($experiment->RemovePhysicalState() != 0) {
+	print STDERR "Could not remove physical state!\n";
+	exit(1);
+    }
+
+    if (scalar(keys(%newreservednodes))) {
+	my @nodeids = keys(%newreservednodes);
+	system("export NORELOAD=1; $NFREE -x $pid $eid @nodeids");
+	if ($?) {
+	    exit(1);
+	}
+    }
+    return 0;
 }
 
 #
