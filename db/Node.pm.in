@@ -8,7 +8,7 @@ package Node;
 
 use strict;
 use Exporter;
-use vars qw(@ISA @EXPORT);
+use vars qw(@ISA @EXPORT $AUTOLOAD);
 
 @ISA    = "Exporter";
 @EXPORT = qw();
@@ -108,6 +108,41 @@ sub Lookup($$)
     $self->{"RSRV"}     = undef;
     $self->{"TYPEINFO"} = undef;
     $self->{"ATTRS"}    = undef;
+    $self->{"IFACES"}   = undef;
+    $self->{"HASH"}     = {};
+    bless($self, $class);
+
+    # Add to cache.
+    $nodes{$nodeid} = $self;
+    return $self;
+}
+
+# Break circular reference someplace to avoid exit errors.
+sub DESTROY {
+    my $self = shift;
+
+    $self->{"DBROW"}    = undef;
+    $self->{"RSRV"}     = undef;
+    $self->{"TYPEINFO"} = undef;
+    $self->{"ATTRS"}    = undef;
+    $self->{"IFACES"}   = undef;
+    $self->{"HASH"}     = undef;
+}
+
+#
+# Create a fake object, as for the mapper (assign_wrapper) during debugging.
+#
+sub MakeFake($$$$)
+{
+    my ($class, $nodeid, $dbrow, $rsrvrow) = @_;
+
+    my $self            = {};
+    $self->{"DBROW"}    = $dbrow;
+    $self->{"RSRV"}     = $rsrvrow;
+    $self->{"TYPEINFO"} = undef;
+    $self->{"ATTRS"}    = undef;
+    $self->{"IFACES"}   = undef;
+    $self->{"HASH"}     = {};
     bless($self, $class);
 
     # Add to cache.
@@ -151,6 +186,8 @@ sub BulkLookup($$$)
 	$node->{"RSRV"}     = undef;
 	$node->{"TYPEINFO"} = undef;
 	$node->{"ATTRS"}    = undef;
+	$node->{"IFACES"}   = undef;
+	$node->{"HASH"}     = {};
 	
 	$nodelist{$nodeid} = $node;
     }
@@ -192,19 +229,26 @@ sub BulkLookup($$$)
     @$pref = values(%nodelist);
     return 0;
 }
+# To avoid writting out all the methods.
+sub AUTOLOAD {
+    my $self = shift;
+    my $type = ref($self) or die("$self is not an object\n");
 
-# accessors
-sub field($$)  { return ((! ref($_[0])) ? -1 : $_[0]->{'DBROW'}->{$_[1]}); }
-sub node_id($)       { return field($_[0], 'node_id'); }
-sub uuid($)          { return field($_[0], 'uuid'); }
-sub type($)          { return field($_[0], 'type'); }
-sub role($)          { return field($_[0], 'role'); }
-sub eventstate($)    { return field($_[0], 'eventstate'); }
-sub allocstate($)    { return field($_[0], 'allocstate'); }
-sub jailflag($)      { return field($_[0], 'jailflag'); }
-sub phys_nodeid($)   { return field($_[0], 'phys_nodeid'); }
-sub def_boot_osid($) { return field($_[0], 'def_boot_osid'); }
-sub pxe_boot_path($) { return field($_[0], 'pxe_boot_path'); }
+    my $name = $AUTOLOAD;
+    $name =~ s/.*://;   # strip fully-qualified portion
+
+    if (@_) {
+	return $self->{'HASH'}->{$name} = shift;
+    }
+    elsif (exists($self->{'DBROW'}->{$name})) {
+	return $self->{'DBROW'}->{$name};
+    }
+    elsif (exists($self->{'HASH'}->{$name})) {
+	return $self->{'HASH'}->{$name};
+    }
+    print STDERR "$self: tried access unknown slot $name\n";
+    return undef;
+}
 
 #
 # Create a new node.
@@ -379,6 +423,7 @@ sub Refresh($)
     $self->{"RSRV"}     = undef;
     $self->{"TYPEINFO"} = undef;
     $self->{"ATTRS"}    = undef;
+    $self->{"IFACES"}   = undef;
     return 0;
 }
 
@@ -748,7 +793,12 @@ sub ModifyReservation($$)
     return -1
 	if (! DBQueryWarn($query));
 
-    return Refresh($self);
+    foreach my $key (keys(%{$argref})) {
+	my $val = $argref->{$key};
+	
+	$self->{'DBROW'}->{$key} = $val;
+    }
+    return 0;
 }
 
 #
@@ -1006,6 +1056,7 @@ sub isplabphysnode($) { return NodeTypeInfo($_[0])->isplabphysnode(); }
 sub issimnode($)      { return NodeTypeInfo($_[0])->issimnode(); }
 sub isgeninode($)     { return NodeTypeInfo($_[0])->isgeninode(); }
 sub isfednode($)      { return NodeTypeInfo($_[0])->isfednode(); }
+sub isdedicatedremote($) { return NodeTypeInfo($_[0])->isdedicatedremote(); }
 
 #
 # And these are the less common attributes, but still common enough to
@@ -1016,6 +1067,12 @@ sub default_osid($;$) {
 }
 sub default_imageid($;$) {
     return NodeTypeInfo($_[0])->default_imageid($_[1]);
+}
+sub delay_osid($;$) {
+    return NodeTypeInfo($_[0])->delay_osid($_[1]);
+}
+sub jail_osid($;$) {
+    return NodeTypeInfo($_[0])->jail_osid($_[1]);
 }
 sub imageable($;$) {
     return NodeTypeInfo($_[0])->imageable($_[1]);
@@ -1130,6 +1187,46 @@ sub AllInterfaces($$)
 	if (! (ref($self) && ref($pref)));
 
     return Interface->LookupAll($self->node_id(), $pref);
+}
+
+#
+# Load the interfaces for a node, which we then access by name.
+#
+sub LoadInterfaces($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    if (!defined($self->{'IFACES'})) {
+	my @interfaces;
+	return -1
+	    if (Interface->LookupAll($self->node_id(), \@interfaces) != 0);
+
+	$self->{'IFACES'} = {};
+
+	foreach my $interface (@interfaces) {
+	    $self->{'IFACES'}->{$interface->iface()} = $interface;
+	}
+    }
+    return 0;
+}
+sub GetInterface($$$)
+{
+    my ($self, $iface, $pref) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! (ref($self) && ref($pref)));
+
+    $self->LoadInterfaces() == 0
+	or return -1;
+    return -1
+	if (!exists($self->{'IFACES'}->{$iface}));
+    $$pref = $self->{'IFACES'}->{$iface};
+    return 0;
 }
 
 #
@@ -1490,22 +1587,23 @@ sub CreateVnodes($$)
 		    "Allocating $vnodeid on $pnode ($vtype, $osid)\n";
 	    }
 	}
+	my %nodesets = ("node_id" => $vnodeid,
+			"uuid" => $uuid,
+			"type" => $vtype,
+			"phys_nodeid" => $pnode,
+			"role" => "virtnode",
+			"priority" => $vpriority,
+		        "op_mode" => $opmode,
+			"eventstate" => $eventstate,
+			"allocstate" => $allocstate,
+			"def_boot_osid" => $osid,
+			"update_accounts" => 1,
+			"jailflag" => $isjailed);
+	$nodesets{"jailip"} = $jailip
+	    if ($isjailed && !$isremote);
 
-	my $statement =
-	         "insert into nodes set ".
-		 "       node_id='$vnodeid', " .
-		 "       uuid='$uuid', " .
-		 "       type='$vtype', ".
-		 "       phys_nodeid='$pnode', ".
-		 "       role='virtnode', " .
-		 "       priority='$vpriority', ".
-		 "       op_mode='$opmode', " .
-		 "       eventstate='$eventstate', " .
-		 "       allocstate='$allocstate', ".
-		 "       def_boot_osid='$osid', " .
-		 "       update_accounts=1, ".
-		 "       jailflag=$isjailed ".
-		 (($isjailed && !$isremote) ? ",jailip='$jailip'" : "");
+	my $statement = "insert into nodes set ".
+	    join(",", map("$_='" . $nodesets{$_} . "'", keys(%nodesets)));
 
 	print STDERR "$statement\n"
 	    if ($debug);
@@ -1517,16 +1615,17 @@ sub CreateVnodes($$)
 
 	#
 	# Also reserve the node!
-	# 
-	$statement =
-	         "insert into reserved set ".
-		 "       node_id='$vnodeid', " .
-		 "       exptidx=$exptidx, ".
-		 "       pid='$pid', ".
-		 "       eid='$eid', ".
-		 "       vname='$vnodeid', ".
-		 "       old_pid='', ".
-		 "       old_eid=''";
+	#
+	my %rsrvsets = ("node_id" => $vnodeid,
+			"exptidx" => $exptidx, 
+			"pid"     => $pid, 
+			"eid"     => $eid,
+			"vname"   => $vnodeid,
+			"old_pid" => "",
+			"old_eid" => "");
+			
+	$statement = "insert into reserved set ".
+	    join(",", map("$_='" . $rsrvsets{$_} . "'", keys(%rsrvsets)));
 
 	print STDERR "$statement\n"
 	    if ($debug);
@@ -1561,7 +1660,10 @@ sub CreateVnodes($$)
 	    print STDERR "*** CreateVnodes: Could not create hostkeys entry\n";
 	    goto bad;
 	}
-	
+
+	Node->MakeFake($vnodeid, \%nodesets, \%rsrvsets)
+	    if ($impotent);
+	    
 	push(@created, $vnodeid);
     }
     DBQueryFatal("unlock tables");
