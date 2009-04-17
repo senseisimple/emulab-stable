@@ -100,6 +100,38 @@ sub LookupSync($$)
 }
 
 #
+# Find me a type, or a class, or by auxtype. Just find me something!
+#
+sub LookupAny($$)
+{
+    my ($class, $type) = @_;
+
+    my $obj = NodeType->Lookup($type);
+    return $obj
+	if (defined($obj));
+
+    my $query_result =
+	DBQueryWarn("select type from node_types where class='$type' limit 1");
+    return undef
+	if (!$query_result);
+    if ($query_result->numrows) {
+	my ($ntype) = $query_result->fetchrow_array();
+	return NodeType->Lookup($ntype);
+    }
+
+    $query_result =
+	DBQueryWarn("select type from node_types_auxtypes ".
+		    "where auxtype='$type' limit 1");
+    return undef
+	if (!$query_result);
+    if ($query_result->numrows) {
+	my ($ntype) = $query_result->fetchrow_array();
+	return NodeType->Lookup($ntype);
+    }
+    return undef;
+}
+
+#
 # Return a list of all types.
 #
 sub AllTypes($)
@@ -264,6 +296,7 @@ sub control_iface($;$) {return GetAttribute($_[0], "control_interface",$_[1]);}
 sub adminmfs_osid($;$) {return GetAttribute($_[0], "adminmfs_osid",$_[1]);}
 sub rebootable($;$)    {return GetAttribute($_[0], "rebootable",$_[1]);}
 sub power_delay($;$)   {return GetAttribute($_[0], "power_delay",$_[1]);}
+sub shared($;$)        {return GetAttribute($_[0], "shared",$_[1]);}
 
 sub initial_experiment($;$) {
     return GetAttribute($_[0], "initial_experiment",$_[1]);
@@ -279,6 +312,9 @@ sub delay_capacity($;$) {
 }
 sub trivlink_maxspeed($;$) {
     return GetAttribute($_[0], "trivlink_maxspeed", $_[1]);
+}
+sub isdedicatedremote($;$) {
+    return GetAttribute($_[0], "dedicated_widearea", $_[1]);
 }
 sub control_interface($;$) { return control_iface($_[0], $_[1]); }
 
