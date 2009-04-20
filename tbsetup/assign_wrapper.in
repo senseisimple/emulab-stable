@@ -1836,7 +1836,7 @@ $delayid = 0;
 
 printdb "Interpreting results.\n";
 TBDebugTimeStamp("interpreting started");
-foreach $plink (keys(%plinks)) {
+foreach $plink (sort(keys(%plinks))) {
     # trivial links do not have physical links, so no delay nodes. But,
     # we *do* use trivial links for intranode links, and thus there could
     # be link delays (ie: two jailed nodes on a link/lan assigned to the
@@ -2307,7 +2307,7 @@ exit(0)
 #
 # Enter delays.
 # 
-foreach $delayid (keys(%nodedelays)) {
+foreach $delayid (sort {$a <=> $b} keys(%nodedelays)) {
     # So r* indicates int1->int0 and others are int0->int1
     my ($pnode,$int0,$int1,$vname,
 	$member0,$delay,$bandwidth,$backfill,$lossrate,
@@ -2434,7 +2434,7 @@ foreach $delayid (keys(%nodedelays)) {
 # switch, and one for traffic from the switch. Like above, there are also
 # queues associated with output side (to the switch) of a link.
 #
-foreach $delayid (keys(%linkdelays)) {
+foreach $delayid (sort {$a <=> $b} keys(%linkdelays)) {
     # backfill unsupported for linkdelays so ignore its entry in linkdelays
     my ($pnode,$iface,$lan,$member,
 	$delay,$bandwidth,undef,$lossrate,
@@ -3152,6 +3152,10 @@ sub InitPnode($$)
 	if (defined($inner_elab_role));
     push(@sets, "plab_role='$plab_role'")
 	if (defined($plab_role));
+    # Do this in regression mode to avoid timestamp diffs
+    if ($regression) {
+	push(@sets, "rsrv_time=0");
+    }
 
     if (@sets) {
 	my $setstr = join(",", @sets);
@@ -3167,6 +3171,13 @@ sub InitPnode($$)
 	system("os_select $osid $pnode") == 0 or
 	    fatal("    os_select $osid $pnode failed!\n");
     }
+    # Clear this after os_select.
+    if ($regression) {
+	DBQueryFatal("update nodes set state_timestamp=0, ".
+		     "    op_mode_timestamp=0,allocstate_timestamp=0 ".
+		     "where node_id='$pnode'");
+    }
+    
     return 0;
 }
 
@@ -3343,7 +3354,7 @@ sub UploadVlans()
 	printdb "Uploading vlans table.\n";
 	ProtoLan->DumpAll()
 	    if ($verbose);
-	ProtoLan->InstantiateAll() == 0
+	ProtoLan->InstantiateAll($regression) == 0
 	    or fatal("Could not instantiate protolans!");
 
 	# Once the lans are instantiated we have to go back and update the
@@ -5089,7 +5100,7 @@ sub CreateTopFile()
 			join(" ",@{$delaylinks{$plink}}) . "\n";
 		}
 		else {
-		    my $delayname = "tbsdelay" . $delayid++;
+		    my $delayname = "tbdelay" . $delayid++;
 		    my $plink     = "linksdelaysrc/$lan/$nodeport0,$nodeport1";
 		    
 		    $delaylinks{$plink} = [$nodeport0,$delay,$bw,$backfill,$loss,

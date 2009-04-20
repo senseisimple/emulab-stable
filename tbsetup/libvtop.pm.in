@@ -160,7 +160,7 @@ sub regression($)	{ return $_[0]->flags() & $VTOP_FLAGS_REGRESSION; }
 sub printdb($$)		{ print $_[1] if ($_[0]->verbose()); }
 
 # We name delay nodes internally as they are needed.
-sub nextdelayname($)    { return "tbsdelay" . $_[0]->{'DELAYID'}++; }
+sub nextdelayname($)    { return "tbdelay" . $_[0]->{'DELAYID'}++; }
 # For when the user wants a specific delay os. Use a desire.
 sub delay_desire($)	{ return $_[0]->option("delay_desire_string"); }
 # For XML
@@ -172,10 +172,14 @@ sub virttypeisvtype($$) { return $_[0]->virt_vtypes()->Find($_[1]); }
 sub VirtTypes($)        { return $_[0]->virt_vtypes()->Rows(); }
 
 # Results are stored until they are spit out in one of several formats.
-sub addnode($$)		{ push(@{$_[0]->results()->{"nodes"}}, $_[1]); }
-sub addlink($$)		{ push(@{$_[0]->results()->{"links"}}, $_[1]); }
 sub addvclass($$)	{ push(@{$_[0]->results()->{"class"}}, $_[1]); }
 sub addfixed($$)	{ push(@{$_[0]->results()->{"fixed"}}, $_[1]); }
+# The reason for this funkyness is so output order is consistent with
+# assign_wrapper when running in regression mode. 
+sub addnode($$)		{ push(@{$_[0]->results()->{"nodeslinks"}},
+			       ["node", $_[1]]); }
+sub addlink($$)		{ push(@{$_[0]->results()->{"nodeslinks"}},
+			       ["link", $_[1]]); }
 
 # Caller will want these.
 sub minimum_nodes($)    { return $_[0]->counter("minimum_nodes"); }
@@ -2010,11 +2014,14 @@ sub PrintTop($;$)
     foreach my $vclass (@{$self->results->{'class'}}) {
 	print $output "make-vclass $vclass\n";
     }
-    foreach my $node (@{$self->results->{'nodes'}}) {
-	print $output "node $node\n";
-    }
-    foreach my $link (@{$self->results->{'links'}}) {
-	print $output "link $link\n";
+    foreach my $ref (@{$self->results->{'nodeslinks'}}) {
+	my ($which, $what) = @{ $ref };
+	if ($which eq "node") {
+	    print $output "node $what\n";
+	}
+	else {
+	    print $output "link $what\n";
+	}
     }
     foreach my $fixed (@{$self->results->{'fixed'}}) {
 	print $output "fix-node $fixed\n";
@@ -2954,7 +2961,7 @@ sub AllocNodes($)
 	# Node might need the link delay kernel.
 	$pnode->_needslinkdelay(0);
 	# ipfw pipe numbers.
-	$pnode->_pipenumber(100);
+	$pnode->_pipenumber(110);
 	# Routing table id for each vnode on a pnode
 	$pnode->_rtabid(0);
 	# For assigning dynamic ports.
@@ -3316,7 +3323,7 @@ sub InterpLinks($)
 
     my %plinks = %{ $self->solution_plinks() };
 
-    foreach my $plink (keys(%plinks)) {
+    foreach my $plink (sort(keys(%plinks))) {
 	my ($linktag,$virtlan,$trivial,$member0,$member1) = @{$plinks{$plink}};
 	my $lan = $virtlan->vname();
 
@@ -3408,7 +3415,7 @@ sub InterpLinks($)
 	    # The delay node port/links
 	    my $nodeB = $member0->_delaynode();
 	    my $portB = $member0->_delayport();
-	    my $nodeD = $member0->_delaynodeB();
+	    my $nodeD = $nodeB;
 	    my $portD = $member0->_delayportB();
 
 	    $self->printdb("LAN delay: $virtA - ".
@@ -3447,7 +3454,7 @@ sub InterpLinks($)
 	    $protolanlink->AddMember($nodeA, $portA);
 	    $protolanlink->AddMember($nodeB, $portB);
 
-	    $self->AddDelay($virtlan, $member0, $member1,
+	    $self->AddDelay($virtlan, $member0, $member0,
 			    $nodeB,$portB,$portD,1,
 			    $self->delaylinks()->{$plink});
 	    
@@ -3923,7 +3930,7 @@ sub InitializePhysNode($$$)
 		     "startstatus"       => 0,
 		     "bootstatus"        => 'unknown',
 		     "ready"             => 0,
-		     "routertype"        => TBDB_ROUTERTYPE_STATIC());
+		     "routertype"        => $routertype);
 
 	%rsrvsets = ("vname"             => $vname,
 		     "erole"             => $role);
@@ -3945,7 +3952,7 @@ sub InitializePhysNode($$$)
 	if (!defined($cmdline) || $cmdline eq "") {
 	    # If the user has not overridden the command line, try to
 	    # find a default for this OSID. Only test real physical node.
-	    if (!defined($vpnode) && $pnode->_needslinkdelay()) {
+	    if ($pnode->_needslinkdelay()) {
 		$cmdline = $self->osidbootcmd($osid, "linkdelay", "");
 	    }
 	    elsif (defined($inner_elab_role) &&
@@ -3968,11 +3975,16 @@ sub InitializePhysNode($$$)
 
 	%rsrvsets = ("vname"             => $vnodename,
 		     "erole"             => $role,
-		     "inner_elab_role"   => $inner_elab_role || "",
 		     "plab_role"         => $plab_role);
+	$rsrvsets{"inner_elab_role"} = $inner_elab_role
+	    if (defined($inner_elab_role));
     }
     $self->printdb("InitPnode: $pnodename $vnodename\n");
 
+    # Do this in regression mode to avoid timestamp diffs
+    if ($self->regression()) {
+	$rsrvsets{"rsrv_time"} = 0;
+    }
     my $setstr = join(",", map("$_='" . $nodesets{$_} . "'", keys(%nodesets)));
     $self->printdb("  $setstr\n");
 
@@ -3980,6 +3992,7 @@ sub InitializePhysNode($$$)
 	or return -1 if (!$self->impotent());
 
     $setstr = join(",", map("$_='" . $rsrvsets{$_} . "'", keys(%rsrvsets)));
+    
     $self->printdb("  $setstr\n");
 
     DBQueryWarn("update reserved set $setstr where node_id='$pnodename'")
@@ -3993,6 +4006,12 @@ sub InitializePhysNode($$$)
 	
 	system("$OS_SELECT $osid $pnodename") == 0
 	    or return -1 if (!$self->impotent());
+    }
+    # Clear this after os_select.
+    if ($self->regression()) {
+	DBQueryFatal("update nodes set state_timestamp=0, ".
+		     "    op_mode_timestamp=0,allocstate_timestamp=0 ".
+		     "where node_id='$pnodename'");
     }
     return 0;
 }
@@ -4236,7 +4255,7 @@ sub AddDelay($$$$$$$$$)
     # ipfw pipe numbers so we can control it remotely.
     my $pipe0 = $pnode->_pipenumber();
     my $pipe1 = $pipe0 + 10;
-    $pnode->_pipenumber($pipe0 + 10);
+    $pnode->_pipenumber($pipe1 + 10);
 
     $self->printdb("  Delay: \[$iface0:$pnodename:$iface1 pipes:$pipe0+$pipe1,".
 		   "$delay,$bandwidth,$backfill,$lossrate,".
@@ -4596,7 +4615,7 @@ sub UploadVlans($)
 	$self->printdb("Uploading vlans table.\n");
 	ProtoLan->DumpAll()
 	    if ($self->verbose());
-	if (ProtoLan->InstantiateAll() != 0) {
+	if (ProtoLan->InstantiateAll($self->regression()) != 0) {
 	    tberror("Could not instantiate protolans!\n");
 	    return -1;
 	}
