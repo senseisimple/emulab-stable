@@ -29,7 +29,7 @@ use overload ('""' => 'Stringify');
 use libtblog_simple;
 
 use vars qw($EXPT_PRELOAD $EXPT_START $EXPT_SWAPIN $EXPT_SWAPUPDATE
-	    $EXPT_SWAPOUT $EXPT_SWAPMOD @physicalTables @virtualTables
+	    $EXPT_SWAPOUT $EXPT_SWAPMOD %physicalTables @virtualTables
 	    @EXPORT_OK);
 
 # Configure variables
@@ -67,7 +67,7 @@ my $EXPT_RESOURCESHOSED = 0;
 # Why, why, why?
 @EXPORT_OK = qw($EXPT_PRELOAD $EXPT_START $EXPT_SWAPUPDATE
 		$EXPT_SWAPIN $EXPT_SWAPOUT $EXPT_SWAPMOD
-		@physicalTables  @virtualTables);
+		%physicalTables  @virtualTables);
 
 #
 # List of tables used for experiment removal/backup/restore.
@@ -99,12 +99,12 @@ my $EXPT_RESOURCESHOSED = 0;
 		   "virt_tiptunnels",
 		   "ipsubnets");
 
-@physicalTables = ("delays",
-		   "ipport_ranges",
-		   "v2pmap",
-		   "linkdelays",
-		   "traces",
-		   "portmap");
+%physicalTables = ("delays"     => ["node_id", "vname", "vnode0", "vnode1"],
+		   "ipport_ranges" => undef,
+		   "v2pmap"        => ["node_id", "vname"],
+		   "linkdelays"    => ["node_id", "vlan", "vnode"],
+		   "traces"        => ["idx"],
+		   "portmap"       => undef); 
 
 # These are slots in the node table that need to be restored. 
 my @nodetable_fields = ("def_boot_osid",
@@ -3088,7 +3088,7 @@ sub RemovePhysicalState($)
 	    or $errors++;
     }
     
-    foreach my $table (@physicalTables) {
+    foreach my $table (keys(%physicalTables)) {
 	DBQueryWarn("DELETE FROM $table WHERE pid='$pid' AND eid='$eid'")
 	    or $errors++;
     }
@@ -3138,8 +3138,14 @@ sub BackupPhysicalState($;$)
 
     # Reserved table is special; we do not want to bring it back in during
     # the restore. We just want the info from it.
-    foreach my $table (@physicalTables, "reserved") {
+    foreach my $table (keys(%physicalTables), "reserved") {
+	my $orderby = "";
+	if (exists($physicalTables{$table}) &&
+	    defined($physicalTables{$table})) {
+	    $orderby = "order by " . join(",", @{$physicalTables{$table}});
+	}
 	DBQueryWarn("SELECT * FROM $table WHERE pid='$pid' AND eid='$eid' ".
+		    "$orderby ".
 		    "INTO OUTFILE '$pstateDir/$table' ")
 	    or $errors++;
     }
@@ -3162,7 +3168,8 @@ sub RestorePhysicalState($)
     return -1
 	if (Lan->RestoreExperimentLans($self, $pstateDir) != 0);
     
-    foreach my $table (@physicalTables, "vinterfaces", "interface_settings") {
+    foreach my $table (keys(%physicalTables),
+		       "vinterfaces", "interface_settings") {
 	DBQueryWarn("LOAD DATA INFILE '$pstateDir/$table' INTO TABLE $table")
 	    or $errors++;
     }

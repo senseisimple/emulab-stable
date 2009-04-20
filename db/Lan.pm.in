@@ -1519,6 +1519,7 @@ sub Create($$$;$)
     $self->{"TYPE"}       = '';
     $self->{"ROLE"}       = '';
     $self->{"ENCAPSTYLE"} = '';
+    $self->{"IDX"}        = undef; # used in regression mode.
     $self->{"INSTANCE"}   = undef;
 
     bless($self, $class);
@@ -1572,6 +1573,7 @@ sub Instantiate($)
     my $experiment = $self->{'EXPT'};
     my $vname      = $self->{'VNAME'};
     my $type       = $self->{'TYPE'};
+    my $idx        = $self->{'IDX'};  # defaults to undef when not regression.
     my $link       = undef;
 
     # Already created.
@@ -1589,7 +1591,7 @@ sub Instantiate($)
     }
 
     # The new lan has the 'ready' bit set to zero.
-    my $lan = Lan->Create($experiment, $vname, $type, undef, $link);
+    my $lan = Lan->Create($experiment, $vname, $type, $idx, $link);
     return -1
 	if (!defined($lan));
 
@@ -1633,9 +1635,21 @@ sub Instantiate($)
 #
 # Instantiate all protolans
 #
-sub InstantiateAll($)
+sub InstantiateAll($$)
 {
-    my ($class) = @_;
+    my ($class, $regression) = @_;
+
+    if ($regression) {
+	#
+	# Need to make sure the id numbers will compare exactly. At some
+	# point a few years from now, this will fail.
+	#
+	my $idx = 999990000;
+	
+	foreach my $protolan (values(%protolans)) {
+	    $protolan->{'IDX'} = $idx++;
+	}
+    }
 
     foreach my $protolan (values(%protolans)) {
 	if ($protolan->Instantiate() != 0) {
