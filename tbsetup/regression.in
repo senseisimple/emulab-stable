@@ -1,0 +1,115 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+use POSIX qw(setsid ceil);
+use POSIX ":sys_wait_h";
+
+sub usage ()
+{
+    print STDERR "Usage: $0 [-v] pid eid\n";
+    print STDERR " -v   - Enables verbose output\n";
+    exit(1);
+}
+my $optlist    = "v";
+my $verbose    = 0;
+my $optarg     = "";
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $MAPPER      = "$TB/bin/mapper";
+my $WRAPPER     = "$TB/libexec/assign_wrapper";
+
+#
+# Load the Testbed support stuff. 
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use User;
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Turn off line buffering on output
+$| = 1;
+
+# Protos
+sub fatal($);
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV < 2) {
+    usage();
+}
+if (defined($options{"v"})) {
+    $verbose++;
+    $optarg = "-v";
+}
+my $pid = $ARGV[0];
+my $eid = $ARGV[1];
+my $experiment = Experiment->Lookup($pid, $eid);
+if (!defined($experiment)) {
+    fatal("Could not lookup experiment object $pid,$eid!")
+}
+#
+# Verify that this person can muck with the experiment.
+#
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
+}
+if (!TBAdmin() &&
+    ! $experiment->AccessCheck($this_user, TB_EXPT_DESTROY)) {
+    fatal("You do not have permission to map this experiment!");
+}
+
+if (! -e "Mapper/$pid/$eid") {
+    system("mkdir -p Mapper/$pid/$eid") == 0
+	or fatal("Could not mkdir Mapper/$pid/$eid");
+}
+if (! -e "Wrapper/$pid/$eid") {
+    system("mkdir -p Wrapper/$pid/$eid") == 0
+	or fatal("Could not mkdir Wrapper/$pid/$eid");
+}
+system("/bin/rm -rf Mapper/$pid/$eid/* Wrapper/$pid/$eid/*") == 0
+    or fatal("Could not clean directories");
+
+print "Running the wrapper ... \n";
+system("cd Wrapper/$pid/$eid; ".
+       "$WRAPPER -r $optarg $pid $eid > wrapper.log 2>&1");
+if ($?) {
+    fatal("Wrapper failed");
+}
+print "Running the mapper ... \n";
+system("cd Mapper/$pid/$eid; ".
+       "$MAPPER -r $optarg $pid $eid > mapper.log 2>&1");
+if ($?) {
+    fatal("Mapper failed");
+}
+print "Diffing the results ...\n";
+system("diff -r -q Mapper/$pid/$eid/$pid-$eid.pstate ".
+       "           Wrapper/$pid/$eid/$pid-$eid.pstate") == 0
+    or fatal("Results differed!");
+
+exit(0);
+
+sub fatal($)
+{
+    die("$_[0]\n");
+}

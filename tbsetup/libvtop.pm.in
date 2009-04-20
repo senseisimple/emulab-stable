@@ -1039,8 +1039,8 @@ sub GenVirtNodes($)
     my $pid    = $experiment->pid();
     my $eid    = $experiment->eid();
 
-    foreach my $vnode (values(%{ $self->{'VNODES'} })) {
-	my $vname = $vnode->vname();
+    foreach my $vname (sort(keys(%{ $self->{'VNODES'} }))) {
+	my $vnode = $self->vnodes()->{$vname};
 	my $type  = $vnode->type();
 
 	my $subnodestr = "";
@@ -1127,7 +1127,7 @@ sub GenFixNodes($)
     #
     # XXX This must be done last since we create internal nodes above.
     #
-    foreach my $vname (keys(%{ $self->fixednodes() })) {
+    foreach my $vname (sort(keys(%{ $self->fixednodes() }))) {
 	my $fixed = $self->fixednodes()->{$vname};
 	
 	if ($self->isatoponode($vname) || $self->isadelaynode($vname)) {
@@ -1193,8 +1193,8 @@ sub GenVirtLans($)
     my %osdoesmlink      = ();
     my %osdoeslinkdelays = ();
 
-    foreach my $vlan (values(%{ $self->{'VLANS'} })) {
-	my $vname = $vlan->vname();
+    foreach my $vname (sort(keys(%{ $self->{'VLANS'} }))) {
+	my $vlan = $self->vlans()->{$vname};
 
 	# Tunnels are handled elsewhere.
 	next
@@ -2962,8 +2962,8 @@ sub AllocNodes($)
 	$pnode->_needslinkdelay(0);
 	# ipfw pipe numbers.
 	$pnode->_pipenumber(110);
-	# Routing table id for each vnode on a pnode
-	$pnode->_rtabid(0);
+	# Routing table id for each vnode on a pnode. Do not use 0.
+	$pnode->_rtabid(1);
 	# For assigning dynamic ports.
 	$pnode->_portnext(TBDB_LOWVPORT);
 	$pnode->_porthigh(TBDB_MAXVPORT);
@@ -3095,8 +3095,8 @@ sub AllocVirtNodes($)
     my $pid = $experiment->pid();
     my $eid = $experiment->eid();
 
-    foreach my $physical (keys(%{ $self->solution_virtnodes() })) {
-	my @vlist = @{ $self->solution_virtnodes()->{$physical} };
+    foreach my $physical (sort(keys(%{ $self->solution_virtnodes() }))) {
+	my @vlist = sort(@{ $self->solution_virtnodes()->{$physical} });
 	my $numvs = @vlist;
 	my @plist = ();
 	my @oplist = ();
@@ -3949,7 +3949,8 @@ sub InitializePhysNode($$$)
 	my $inner_elab_role = $virtnode->inner_elab_role();
 	my $plab_role       = $virtnode->plab_role();
 
-	if (!defined($cmdline) || $cmdline eq "") {
+	if (!$pnode->isvirtnode() &&
+	    (!defined($cmdline) || $cmdline eq "")) {
 	    # If the user has not overridden the command line, try to
 	    # find a default for this OSID. Only test real physical node.
 	    if ($pnode->_needslinkdelay()) {
@@ -4102,19 +4103,19 @@ sub NewVirtIface($$$$;$)
     my $vllidx    = $virtlan->idx();
     my $rtabid    = $self->getrtabid($pnode, $member);
     my $exptidx   = $self->experiment()->idx();
+    my $isvnode   = exists($self->solution_v2v()->{$vnodename});
     my $vvnode;
-    my $isvnode;
     my $isvdev;
     my $type;
     my $mac;
     my $newid;
+    my $pport_db;
+    my $vvnode_db;
 
     #
     # Special actions for virtnodes (as opposed to just emulated links).
     #
-    if ($pnode->isvirtnode()) {
-	$isvnode = 1;
-
+    if ($isvnode) {
 	#
 	# XXX type should be either veth or vlan
 	#
@@ -4128,11 +4129,9 @@ sub NewVirtIface($$$$;$)
 	$isvdev = 1;
 
 	# to the nodes table entry for the virtnode. 
-	$vvnode = $self->solution_v2p()->{$vnodename};
+	$vvnode = $self->solution_v2v()->{$vnodename};
     }
     else {
-	$isvnode = 0;
-
 	#
 	# For multiplexed links, the default is no encapsulation,
 	# aka "alias".
@@ -4169,16 +4168,16 @@ sub NewVirtIface($$$$;$)
 	# Insert, and then get the id so we can form the name of
 	# the virtual device. A null pport means no phys port.
 	#
-	$vvnode = (defined($vvnode) ? "'$vvnode'" : "NULL");
-	$pport  = (defined($pport)  ? "'$pport'" : "NULL");
+	$vvnode_db = (defined($vvnode) ? "'$vvnode'" : "NULL");
+	$pport_db  = (defined($pport)  ? "'$pport'" : "NULL");
     
 	my $query_result = 
 	    DBQueryWarn("insert into vinterfaces ".
 			"(node_id, unit, mac, IP, mask, type, iface, ".
 			" rtabid, vnode_id, exptidx, virtlanidx) ".
 			"values ('$pnodename', 0, '$mac', ".
-			"        '$ip', '$mask', '$type', $pport, ".
-			"        '$rtabid', $vvnode, $exptidx, '$vllidx')");
+			"        '$ip', '$mask', '$type', $pport_db, ".
+			"        '$rtabid', $vvnode_db, $exptidx, '$vllidx')");
 	return -1
 	    if (!defined($query_result));
     
@@ -4205,7 +4204,7 @@ sub NewVirtIface($$$$;$)
 	
 	DBQueryWarn("update interfaces set " .
 		     "   current_speed='$speed' " .
-		     "where node_id='$pnodename' and iface='$pport'")
+		     "where node_id='$pnodename' and iface=$pport_db")
 	    or return -1 if (!$self->impotent());
     }
 
