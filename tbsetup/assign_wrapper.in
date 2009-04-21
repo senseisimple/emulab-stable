@@ -1597,8 +1597,8 @@ if ($needwanassign) {
 # is on the real node. We know they are free, but we should go through
 # nalloc anyway. If anything fails, no point in retry.
 #
-foreach my $pnode (keys(%virtnodes)) {
-    my @vlist = @{$virtnodes{$pnode}};
+foreach my $pnode (sort(keys(%virtnodes))) {
+    my @vlist = sort(@{$virtnodes{$pnode}});
     my $numvs = @vlist;
     my @plist = ();
     my @oplist = ();
@@ -1692,6 +1692,7 @@ foreach my $pnode (keys(%virtnodes)) {
 				    "vtype" => $vtype,
 				    "nodeid" => $pnode,
 				    "verbose"  => $verbose,
+				    "regression" => $regression,
 				    "impotent" => $impotent}) < 0) {
 		fatal("Could not allocate vnodes on $pnode");
 	    }
@@ -2609,7 +2610,7 @@ foreach $vnodeport (keys(%portbw)) {
 # to be just one jail per node, but thats not likely in the local area case.
 # What would be the point.
 #
-foreach my $vnode (keys(%v2pmap)) {
+foreach my $vnode (sort(keys(%v2pmap))) {
     my $pnode  = $v2pmap{$vnode};
     my $vvnode = $v2vmap{$vnode};
 
@@ -4201,8 +4202,7 @@ sub LoadVirtLans()
 	DBQueryFatal("select v.*,vll.idx from virt_lans as v ".
 		     "left join virt_lan_lans as vll on ".
 		     "  vll.exptidx=v.exptidx and vll.vname=v.vname ".
-		     "where v.pid='$pid' and v.eid='$eid' ".
-		     "order by v.vname,v.member");
+		     "where v.pid='$pid' and v.eid='$eid'");
     
     while (my $rowref = $query_result->fetchrow_hashref()) {
 	my $vname  = $rowref->{"vname"};
@@ -4550,7 +4550,7 @@ sub CreateTopFile()
 
     print "opened topfile\n";
     # Print out vtypes
-    foreach my $vtype (keys(%virt_vtypes)) {
+    foreach my $vtype (sort(keys(%virt_vtypes))) {
 	my $name   = virttypename($vtype);
 	my $weight = virttypeweight($vtype);
 	my @members= virttypemembers($vtype);
@@ -4559,7 +4559,7 @@ sub CreateTopFile()
     }
 
     # Dump the node list to the topfile. 
-    foreach my $node (keys(%virt_nodes)) {
+    foreach my $node (sort(keys(%virt_nodes))) {
 	my $vname = virtnodename($node);
 	my $type  = virtnodetype($node);
 
@@ -4639,7 +4639,7 @@ sub CreateTopFile()
 	}
     }
 
-    foreach $lan (keys(%virt_lans)) {
+    foreach $lan (sort(keys(%virt_lans))) {
 	# XXX Widearea Tunnels are handled elsewhere.
 	next
 	    if (virtlantunnel($lan));
@@ -5079,7 +5079,7 @@ sub CreateTopFile()
 		    my $plink = "linksimple/$lan/$nodeport0,$nodeport1";
 
 		    print(TOPFILE "link $plink $node0 $node1 ".
-			  max($top_bw,$top_rbw) . " 0 0 $protocol " .
+			  max($top_bw,$top_rbw) . " 0 0 $protocol" .
 			  ($emulated ? " emulated" : "") .
 			  ($trivial_ok ? " trivial_ok" : "") . " $fixall\n");
 		    
@@ -5360,7 +5360,7 @@ sub CreateTopFile()
     # experiment any more.
     # NB: This must be done last since we create internal nodes above.
     #
-    foreach my $node (keys(%fixed_nodes)) {
+    foreach my $node (sort(keys(%fixed_nodes))) {
 	if ((virtnodeisvnode($node) && !virtnodeusewan($node)) ||
 	    exists($delaynodes{$node})) {
 	    my $pnode = $fixed_nodes{$node};
@@ -5666,7 +5666,7 @@ sub nodejailosid($)
     my $osid     = virtnodeosid($vnode);
     my $nextosid = osidnextosid($osid);
     if (defined($nextosid)) {
-	printdb "Mapping jail osid to $osid ($nextosid) on $pnode\n";
+	printdb "Mapping jail osid $osid to $nextosid on $pnode ($vnode)\n";
     }
     else {
 	tbwarn("Could not map jail osid to real osid on $pnode\n");
@@ -5686,7 +5686,8 @@ sub FinalizeRegression($)
     chomp($cwd = `/bin/pwd`);
     if (!$error) {
 	print STDERR "Saving physical state in regression mode\n";
-	if ($experiment->BackupPhysicalState("$cwd/$pid-$eid.pstate") != 0) {
+	if ($experiment->BackupPhysicalState("$cwd/$pid-$eid.pstate", 1)
+	    != 0) {
 	    print STDERR "Could not save physical state!\n";
 	    exit(1);
 	}

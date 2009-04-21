@@ -3009,7 +3009,7 @@ sub AllocNodes($)
     # work unless there happens to be just one jail per node, but
     # thats not likely in the local area case.
     #
-    foreach my $vnodename (keys(%{ $self->solution_v2v() })) {
+    foreach my $vnodename (sort(keys(%{ $self->solution_v2v() }))) {
 	my $vpnodename = $self->solution_v2v()->{$vnodename};
 	my $vpnode     = $self->pnodes()->{$vpnodename};
 	
@@ -3187,7 +3187,8 @@ sub AllocVirtNodes($)
 					"nodeid"   => $physical,
 					"debug"    => 0,
 					"verbose"  => $self->verbose(),
-					"impotent" => $self->impotent()})
+					"impotent" => $self->impotent(),
+					"regression" => $self->regression()})
 		    < 0) {
 		    tberror("Could not allocate vnodes on $physical\n");
 		    return -1;
@@ -3929,6 +3930,8 @@ sub InitializePhysNode($$$)
 	%nodesets = ("def_boot_cmd_line" => $cmdline,
 		     "startstatus"       => 0,
 		     "bootstatus"        => 'unknown',
+		     # This is no longer used for anything.
+		     "deltas"            => '', 
 		     "ready"             => 0,
 		     "routertype"        => $routertype);
 
@@ -3969,6 +3972,8 @@ sub InitializePhysNode($$$)
 	%nodesets = ("def_boot_cmd_line" => $cmdline,
 		     "startstatus"       => 'none',
 		     "bootstatus"        => 'unknown',
+		     # This is no longer used for anything.
+		     "deltas"            => '', 
 		     "ready"             => 0,
 		     "startupcmd"        => $startupcmd,
 		     "failureaction"     => $failureaction,
@@ -4031,9 +4036,16 @@ sub nodejailosid($$$)
     # osid cause of assign (osid features/desires). 
     #
     my $osinfo    = $virtnode->_osinfo();
-    my $nextosid  = $osinfo->nextosid();
+    return undef
+	if (!defined($osinfo->nextosid()));
+    $osinfo = $osinfo->ResolveNextOSID($self->experiment());
+    return undef
+	if (!defined($osinfo));
+    my $nextosid = $osinfo->osid();
+    
     if (defined($nextosid)) {
-	$self->printdb("Mapping jail osid to $nextosid on $pnode\n");
+	$self->printdb("Mapping jail osinfo $osinfo to ".
+		       "$nextosid on $pnode ($virtnode)\n");
     }
     else {
 	tbwarn("Could not map jail osid to real osid on $pnode\n");
@@ -5252,7 +5264,7 @@ sub SetPortRange($)
 	DBQueryWarn("update nodes set ipport_low=$newlow, ".
 		    " ipport_next=ipport_low+1, ipport_high=$newhigh ".
 		    "where node_id='$vpnodename'")
-	    or return -1 if ($self->impotent());
+	    or return -1 if (!$self->impotent());
     }
     return 0;
 }

@@ -536,7 +536,8 @@ sub FinalizeRegression($)
     chomp($cwd = `/bin/pwd`);
     if (!$error) {
 	chat("Saving physical state in regression mode\n");
-	if ($experiment->BackupPhysicalState("$cwd/$pid-$eid.pstate") != 0) {
+	if ($experiment->BackupPhysicalState("$cwd/$pid-$eid.pstate", 1)
+	    != 0) {
 	    print STDERR "Could not save physical state!\n";
 	    exit(1);
 	}
