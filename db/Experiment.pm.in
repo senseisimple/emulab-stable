@@ -3094,9 +3094,9 @@ sub RemovePhysicalState($)
     }
     return $errors;
 }
-sub BackupPhysicalState($;$)
+sub BackupPhysicalState($;$$)
 {
-    my ($self, $directory) = @_;
+    my ($self, $directory, $regression) = @_;
 
     # Must be a real reference. 
     return -1
@@ -3106,6 +3106,7 @@ sub BackupPhysicalState($;$)
     my $eid = $self->eid();
     my $pstateDir = (defined($directory) ?
 		     $directory : $self->WorkDir() . "/pstate");
+    my $physonly  = (defined($regression) ? undef : 1);
     my $errors = 0;
 
     if (! -e $pstateDir) {
@@ -3119,7 +3120,7 @@ sub BackupPhysicalState($;$)
     return -1
 	if (Lan->BackupExperimentLans($self, $pstateDir) != 0);
 
-    my @pnodenames = ExpNodes($pid, $eid, 0, 1);
+    my @pnodenames = ExpNodes($pid, $eid, 0, $physonly);
     if (@pnodenames) {
 	my $clause = join(" or ", map("node_id='$_'", @pnodenames));
 

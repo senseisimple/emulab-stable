@@ -1391,6 +1391,8 @@ sub CreateVnodes($$)
     my $debug   = defined($options->{'debug'}) && $options->{'debug'};
     my $impotent= defined($options->{'impotent'}) && $options->{'impotent'};
     my $verbose = defined($options->{'verbose'}) && $options->{'verbose'};
+    my $regression = defined($options->{'regression'}) &&
+	$options->{'regression'};
     my $pid     = $options->{'pid'};
     my $eid     = $options->{'eid'};
     my $count   = $options->{'count'};
@@ -1570,7 +1572,14 @@ sub CreateVnodes($$)
 	}
 	my $jailip = "${IPBASE1}.${pnet}.${pnode2}.${i}";
 
-	my $uuid = (@uuids ? shift(@uuids) : NewUUID());
+	# Need to keep the UUIDs consistent across regression mode.
+	my $uuid;
+	if ($regression) {
+	    $uuid = "${pnode2}${i}-1111-2222-3333-44444444";
+	}
+	else {
+	    $uuid = (@uuids ? shift(@uuids) : NewUUID());
+	}
 	if (!defined($uuid)) {
 	    print STDERR "Could not generate a UUID!\n";
 	    goto bad;
