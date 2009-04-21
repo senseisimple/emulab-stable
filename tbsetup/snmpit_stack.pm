@@ -3,7 +3,7 @@
 #
 # EMULAB-LGPL
 # Copyright (c) 2000-2009 University of Utah and the Flux Group.
-# Copyright (c) 2004-2008 Regents, University of California.
+# Copyright (c) 2004-2009 Regents, University of California.
 # All rights reserved.
 #
 
@@ -446,6 +446,7 @@ sub createVlan($$$;$$$) {
     my @otherargs = @_;
     my $vlan_number;
     my %map;
+    my $errortype = "Creating";
 
 
     # We ignore other args for now, since generic stacks don't support
@@ -473,19 +474,7 @@ sub createVlan($$$;$$$) {
 	    $device = $self->{DEVICES}{$devicename};
 	    $res = $device->createVlan($vlan_id, $vlan_number);
 	    if (!$res) {
-	    failed:
-		#
-		# Ooops, failed. Don't try any more
-		#
-		if ($self->{QUIET}) {
-		    print "Creating VLAN $vlan_id as VLAN #$vlan_number on ".
-			"stack $self->{STACKID} failed\n";
-		}
-		else {
- 		    print "Failed\n";
-		}
-		$vlan_number = 0;
-		last LOCKBLOCK;
+		goto failed;
 	    }
 	}
 
@@ -495,7 +484,20 @@ sub createVlan($$$;$$$) {
 	$self->debug( "adding ports @ports to VLAN $vlan_id \n");
 	if (@ports) {
 	    if ($self->setPortVlan($vlan_id,@ports)) {
-		goto failed;
+		$errortype = "Adding Ports to";
+	    failed:
+		#
+		# Ooops, failed. Don't try any more
+		#
+		if (! $self->{QUIET}) {
+		    print "$errortype VLAN $vlan_id as VLAN #$vlan_number on ".
+			"stack $self->{STACKID} failed\n";
+		}
+		else {
+ 		    print "Failed\n";
+		}
+		$vlan_number = 0;
+		last LOCKBLOCK;
 	    }
 	}
 	print "Succeeded\n" if (! $self->{QUIET});
