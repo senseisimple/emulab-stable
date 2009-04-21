@@ -489,13 +489,11 @@ sub createVlan($$$;$$$) {
 		#
 		# Ooops, failed. Don't try any more
 		#
-		if (! $self->{QUIET}) {
+		if ($self->{QUIET}) {
 		    print "$errortype VLAN $vlan_id as VLAN #$vlan_number on ".
-			"stack $self->{STACKID} failed\n";
+			"stack $self->{STACKID} ... \n";
 		}
-		else {
- 		    print "Failed\n";
-		}
+		print "Failed\n";
 		$vlan_number = 0;
 		last LOCKBLOCK;
 	    }
