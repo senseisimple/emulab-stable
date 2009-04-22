@@ -3106,7 +3106,8 @@ sub InitPnode($$)
 	$inner_elab_role = virtnodeelabrole($vnode);
 	$plab_role = virtnodeplabrole($vnode);
 
-	if ((!defined($cmdline) || $cmdline eq "")) {
+	if (!physnodeisvirtnode($pnode) &&
+	    (!defined($cmdline) || $cmdline eq "")) {
 	    # If the user hasn't overridden the command line, try to find a
 	    # default for this OSID.
 	    if (virtnodeneedslinkdelays($vnode)) {
