@@ -3640,7 +3640,7 @@ sub InterpLinks($)
 	    $self->SetUpTracing($lan, $member0, $nodeA, undef, $portA);
 	    $self->SetUpTracing($lan, $member1, $nodeB, undef, $portB);
 	}
-	elsif (my ($lan,$virtA) = ($plink =~ m|^linklan/([^/]+)/(.+)$|)) {
+	elsif ($linktag eq "linklan") {
 	    # A single node in a lan, no delay node.
 	    my $protolan;
 
