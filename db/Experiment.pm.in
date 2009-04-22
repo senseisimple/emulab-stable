@@ -3124,11 +3124,20 @@ sub BackupPhysicalState($;$$)
     if (@pnodenames) {
 	my $clause = join(" or ", map("node_id='$_'", @pnodenames));
 
-	foreach my $table ("vinterfaces", "interface_settings", "nodes") {
-	    DBQueryWarn("select * from $table where $clause ".
-			"into outfile '$pstateDir/$table' ")
-		or $errors++;
-	}
+	DBQueryWarn("select * from nodes where $clause ".
+		    "into outfile '$pstateDir/nodes' ")
+	    or $errors++;
+	# This ordering is for wrapper/mapper regression testing. 
+	DBQueryWarn("select * from vinterfaces where $clause ".
+		    "order by node_id,unit ".
+		    "into outfile '$pstateDir/vinterfaces' ")
+	    or $errors++;
+	# This ordering is for wrapper/mapper regression testing. 
+	DBQueryWarn("select * from interface_settings where $clause ".
+		    "order by node_id,iface,capkey ".
+		    "into outfile '$pstateDir/interface_settings' ")
+	    or $errors++;
+
 	# interfaces table is special, and this is probably wrong to do anyway
 	# since we overwrite columns that are fixed.
 	DBQueryWarn("select * from interfaces where ($clause) and ".
@@ -3140,6 +3149,7 @@ sub BackupPhysicalState($;$$)
     # Reserved table is special; we do not want to bring it back in during
     # the restore. We just want the info from it.
     foreach my $table (keys(%physicalTables), "reserved") {
+	# This ordering is for wrapper/mapper regression testing. 
 	my $orderby = "";
 	if (exists($physicalTables{$table}) &&
 	    defined($physicalTables{$table})) {

@@ -42,6 +42,12 @@ sub debugging() {return $debug; }
 # Set during initial crossover.
 my $initialize = 0;
 
+my %LanTables = ("lans"           => ["lanid"],
+		 "lan_attributes" => ["lanid", "attrkey"],
+		 "lan_members"    => ["lanid", "memberid"],
+		 "lan_member_attributes" => ["lanid", "memberid", "attrkey"],
+		 "ifaces"         => ["lanid", "ifaceid"]);
+
 #
 # Lookup and create a class instance to return.
 #
@@ -292,9 +298,15 @@ sub BackupExperimentLans($$$)
     }
     foreach my $table ("lans", "lan_attributes", "lan_members",
 		       "lan_member_attributes", "ifaces") {
+	# This ordering is for wrapper/mapper regression testing. 
+	my $orderby = "";
+	if (exists($LanTables{$table}) &&
+	    defined($LanTables{$table})) {
+	    $orderby = "order by " . join(",", @{$LanTables{$table}});
+	}
 	DBQueryWarn("select * from $table where ".
 		      join(" or ", map("lanid='$_'", @lanids)) . " " .
-		    "into outfile '$pstatedir/$table'")
+		    "$orderby into outfile '$pstatedir/$table'")
 	    or return -1;
     }
     
@@ -1607,7 +1619,7 @@ sub Instantiate($)
     }
 
     # Members ...
-    foreach my $key (keys(%{ $self->{"MEMBERS"} })) {
+    foreach my $key (sort(keys(%{ $self->{"MEMBERS"} }))) {
 	my $member = $self->{"MEMBERS"}->{$key};
 
 	if (!$lan->AddMember($member->{'node'}, $member->{'iface'})) {
@@ -1617,7 +1629,7 @@ sub Instantiate($)
     }
 
     # Interfaces ...
-    foreach my $key (keys(%{ $self->{"IFACES"} })) {
+    foreach my $key (sort(keys(%{ $self->{"IFACES"} }))) {
 	my $interface = $self->{"IFACES"}->{$key};
 
 	if (!$lan->AddInterface($interface->{'node'},
