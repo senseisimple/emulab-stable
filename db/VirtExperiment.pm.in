@@ -498,6 +498,8 @@ use overload ('""' => 'Stringify');
 use libdb;
 use VirtExperiment;
 
+my %dbslotnames = ();
+
 #
 # A table 
 #
@@ -513,8 +515,8 @@ sub Create($$$)
     # See if we have loaded the DB defs for this table.
     #
     my $varname = $tablename . "_dbdefs";
-    if (defined(${$varname})) {
-	$slotnames = ${$varname};
+    if (defined($dbslotnames{$varname})) {
+	$slotnames = $dbslotnames{$varname};
     }
     else {
 	$slotnames = {};
@@ -534,6 +536,7 @@ sub Create($$$)
 
 	    $slotnames->{$slot} = $value;
 	}
+	$dbslotnames{$varname} = $slotnames;
     }
     
     my $self = {};
@@ -842,8 +845,8 @@ sub Create($$$)
     # See if we have loaded the DB defs for this table.
     #
     my $varname = $tablename . "_dbdefs";
-    if (defined(${$varname})) {
-	$slotnames = ${$varname};
+    if (defined($dbslotnames{$varname})) {
+	$slotnames = $dbslotnames{$varname};
     }
     else {
 	$slotnames = {};
@@ -863,6 +866,7 @@ sub Create($$$)
 
 	    $slotnames->{$slot} = $value;
 	}
+	$dbslotnames{$varname} = $slotnames;
     }
     
     my $self = {};
