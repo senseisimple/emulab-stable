@@ -45,6 +45,7 @@ $| = 1;
 
 # Protos
 sub fatal($);
+sub DoRegression($);
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -54,58 +55,109 @@ my %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
 }
-if (@ARGV < 2) {
+if (@ARGV && @ARGV != 2) {
     usage();
 }
 if (defined($options{"v"})) {
     $verbose++;
     $optarg = "-v";
 }
-my $pid = $ARGV[0];
-my $eid = $ARGV[1];
-my $experiment = Experiment->Lookup($pid, $eid);
-if (!defined($experiment)) {
-    fatal("Could not lookup experiment object $pid,$eid!")
-}
-#
-# Verify that this person can muck with the experiment.
-#
+
 my $this_user = User->ThisUser();
 if (! defined($this_user)) {
     tbdie("You ($UID) do not exist!");
 }
-if (!TBAdmin() &&
-    ! $experiment->AccessCheck($this_user, TB_EXPT_DESTROY)) {
-    fatal("You do not have permission to map this experiment!");
+
+my @builtintests = ( 
+		     ["testbed",    "two-simple"],
+		     ["testbed",    "lan-link-delay"],
+		     ["testbed",    "lan-link-tbdelay"],
+		     ["testbed",    "jail-linklan-delay"],
+		     ["testbed",    "jail-delayed-router"],
+		     ["testbed",    "jail-lan-NN"],
+		     ["testbed",    "myelab"],
+		     ["emulab-ops", "virt-mesh"],
+		     ["SkyNet",     "100nodebig"],
+		     ["tbres",      "lt-meshtest"],
+		     ["tbres",      "vnode-pairs"],
+		     ["testbed",    "bigolesnake"],
+		     ["testbed",    "firewall"],
+		     ["testbed",    "fourswitch"],
+		     ["testbed",    "planetlab2"], 
+		     ["tbres",      "mess"],
+		     ["tbres",      "pelab-bt-fake"],
+		     # Template 11361/46
+		     ["tbres",      "T11361-46"], 
+		     # Template 11953/3
+		     ["tbres",      "T11953-3"],
+		   );
+
+if (@ARGV) {
+    @builtintests = ([$ARGV[0], $ARGV[1]]);
 }
 
-if (! -e "Mapper/$pid/$eid") {
-    system("mkdir -p Mapper/$pid/$eid") == 0
-	or fatal("Could not mkdir Mapper/$pid/$eid");
-}
-if (! -e "Wrapper/$pid/$eid") {
-    system("mkdir -p Wrapper/$pid/$eid") == 0
-	or fatal("Could not mkdir Wrapper/$pid/$eid");
-}
-system("/bin/rm -rf Mapper/$pid/$eid/* Wrapper/$pid/$eid/*") == 0
-    or fatal("Could not clean directories");
+foreach my $ref (@builtintests) {
+    my ($pid, $eid) = @{$ref};
 
-print "Running the wrapper ... \n";
-system("cd Wrapper/$pid/$eid; ".
-       "$WRAPPER -r $optarg $pid $eid > wrapper.log 2>&1");
-if ($?) {
-    fatal("Wrapper failed");
+    my $experiment = Experiment->Lookup($pid, $eid);
+    if (!defined($experiment)) {
+	fatal("Could not lookup experiment object $pid,$eid!");
+    }
+    if (!TBAdmin() &&
+	! $experiment->AccessCheck($this_user, TB_EXPT_DESTROY)) {
+	fatal("You do not have permission to map this experiment!");
+    }
+    DoRegression($experiment);
 }
-print "Running the mapper ... \n";
-system("cd Mapper/$pid/$eid; ".
-       "$MAPPER -r $optarg $pid $eid > mapper.log 2>&1");
-if ($?) {
-    fatal("Mapper failed");
+exit(0);
+
+sub DoRegression($)
+{
+    my ($experiment) = @_;
+
+    my $pid = $experiment->pid();
+    my $eid = $experiment->eid();
+
+    print "Doing a regression test on $pid,$eid\n";
+    
+    if (! -e "Mapper/$pid/$eid") {
+	system("mkdir -p Mapper/$pid/$eid") == 0
+	    or fatal("Could not mkdir Mapper/$pid/$eid");
+    }
+    if (! -e "Wrapper/$pid/$eid") {
+	system("mkdir -p Wrapper/$pid/$eid") == 0
+	    or fatal("Could not mkdir Wrapper/$pid/$eid");
+    }
+    system("/bin/rm -rf Mapper/$pid/$eid/* Wrapper/$pid/$eid/*") == 0
+	or fatal("Could not clean directories");
+
+    my $now = time();
+    print "  Running the wrapper ... \n";
+    system("cd Wrapper/$pid/$eid; ".
+	   "$WRAPPER -r $optarg $pid $eid > wrapper.log 2>&1");
+    if ($?) {
+	fatal("Wrapper failed");
+    }
+    my $howlong = time() - $now;
+    print "    Done in $howlong seconds\n";
+    
+    $now = time();
+    print "  Running the mapper ... \n";
+    system("cd Mapper/$pid/$eid; ".
+	   "$MAPPER -r $optarg $pid $eid > mapper.log 2>&1");
+    if ($?) {
+	fatal("Mapper failed");
+    }
+    $howlong = time() - $now;
+    print "    Done in $howlong seconds\n";
+
+    print "  Diffing the results ...\n";
+    system("diff -r -q Mapper/$pid/$eid/$pid-$eid.pstate ".
+	   "           Wrapper/$pid/$eid/$pid-$eid.pstate") == 0
+	   or fatal("Results differed!");
+
+    return 0;
 }
-print "Diffing the results ...\n";
-system("diff -r -q Mapper/$pid/$eid/$pid-$eid.pstate ".
-       "           Wrapper/$pid/$eid/$pid-$eid.pstate") == 0
-    or fatal("Results differed!");
 
 exit(0);
 
