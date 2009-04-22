@@ -538,6 +538,58 @@ sub LoadPhysInfo($)
 	    }
 	}
     }
+
+    #
+    # Ug, it just gets worse and worse. We also need to map between the
+    # auxtypes that a node (its physical type) can take on. For example,
+    # a link between two pcvm nodes is really a link between a pc600 and
+    # pc850.
+    #
+    $query_result =
+	DBQueryFatal("select distinct n.type,at.type from node_auxtypes as at ".
+		     "left join nodes as n on n.node_id=at.node_id");
+
+    while (my ($phystype, $auxtype) = $query_result->fetchrow()) {
+	next
+	    if (!exists($node_type_linkbw{$phystype}));
+	
+	$node_type_linkbw{$auxtype} = $node_type_linkbw{$phystype};
+    }
+
+    #
+    # Here it goes getting even worse - we have to do a similar thing for
+    # vtypes.
+    #
+    foreach my $vtype ($self->VirtTypes()) {
+	my @members = split(" ", $vtype->members());
+
+	foreach my $phystype (@members) {
+	    next
+		if (!exists($node_type_linkbw{$phystype}));
+
+	    $node_type_linkbw{$vtype} = {}
+	        if (!defined($node_type_linkbw{$vtype}));
+
+	    foreach my $protocol (keys(%{ $node_type_linkbw{$phystype} })) {
+		my @list = keys(%{ $node_type_linkbw{$phystype}{$protocol} });
+		foreach my $speed (@list) {
+		    $node_type_linkbw{$vtype}{$protocol}->{$speed} = 1;
+		}
+	    }
+	}
+    }
+
+    if ($self->verbose()) {
+	$self->printdb("Interface Speeds:\n");
+	foreach my $type (keys(%node_type_linkbw)) {
+	    foreach my $protocol (keys(%{ $node_type_linkbw{$type} })) {
+		my @list = keys(%{ $node_type_linkbw{$type}{$protocol} });
+
+		$self->printdb(" $type:$protocol - @list\n");
+	    }
+	}
+    }
+    
     $self->{'IFACECAPS'}  = \%interface_capabilities;
     $self->{'TYPELINKBW'} = \%node_type_linkbw;
     
@@ -2268,7 +2320,6 @@ sub getbandwidth($$$$)
 sub requires_delay($$$$)
 {
     my ($self, $virtlanmember, $virtlan, $targetbw) = @_;
-    my $best = 10000000000;
 
     my $virtnode  = $virtlanmember->virt_node();
     my $node_type = $virtnode->type();
@@ -3655,7 +3706,9 @@ sub InterpLinks($)
 		    # two in the vlan. Typically, the lannode is placed on a
 		    # switch, and this is not an issue. Rob understands this!
 		    #
-		    if (! ($member0->_lannode() eq $nodeA &&
+		    if (! ($member0->_lannode() ne "null" &&
+			   $member0->_lanport() ne "null" &&
+			   $member0->_lannode() eq $nodeA &&
 			   $member0->_lanport() eq $portA)) {
 			$protovlan->AddMember($member0->_lannode(),
 					      $member0->_lanport())
@@ -5137,7 +5190,8 @@ sub getnodeport($)
 {
     my $macstring=$_[0];
     my ($A,$B) = ($macstring =~ /^\(([^,]+),([^,]+)\)$/);
-    return (($A ne "(null)") ? $A : $B);
+
+    return (($A ne "(null)") ? $A : (($B ne "(null)") ? $B : "null/null"));
 }
 
 # Get the type for an interface.
