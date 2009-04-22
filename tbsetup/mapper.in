@@ -119,6 +119,7 @@ if (@ARGV < 2) {
     usage();
 }
 if (defined($options{"v"})) {
+    TBDebugTimeStampsOn();
     $verbose++;
 }
 if (defined($options{"d"})) {
@@ -142,6 +143,7 @@ if (defined($options{"r"})) {
     }
     $regression = 1;
     $clear = 1;
+    TBDebugTimeStampsOn();
 }
 if (defined($options{"q"})) {
     $quiet = 1;
@@ -185,18 +187,22 @@ $vtopflags |= $libvtop::VTOP_FLAGS_REGRESSION
 
 chat("Starting the new and improved mapper wrapper.\n");
 
+TBDebugTimeStamp("Create libvtop started");
 my $vtop = libvtop->Create($experiment, $vtopflags);
 if (!defined($vtop)) {
     fatal("Could not create vtop structure for $experiment");
 }
+TBDebugTimeStamp("Create libvtop ended");
 
 #
 # If updating, load current experiment resources. We have to be careful
 # of how this is merged in with the (new) desired topology.
 #
 if ($updating) {
+    TBDebugTimeStamp("LoadCurrentResources started");
     $vtop->LoadCurrentResources() == 0
 	or fatal("Could not load current resources into mapper");
+    TBDebugTimeStamp("LoadCurrentResources ended");
 }
 if (!$impotent && ($updating || $clear)) {
     if ($regression) {
@@ -493,15 +499,18 @@ sub RunAssign($$)
 	print("Could not open assign logfile! $!\n");
 	return -1;
     }
+    TBDebugTimeStamp("ReadSolution started");
     if ($vtop->ReadSolution(*ASSIGNFP) != 0) {
 	print("Could not parse assign logfile! $!\n");
 	return -1;
     }
     close(ASSIGNFP);
+    TBDebugTimeStamp("ReadSolution ended, InterpNodes Started");
     if ($vtop->InterpNodes() != 0) {
 	print("Could not interpret nodes.\n");
 	return -1;
     }
+    TBDebugTimeStamp("InterpNodes ended, AllocNodes Started");
     # Check cancel flag before continuing. 
     if ($experiment->canceled()) {
 	tberror({cause => 'canceled', severity => SEV_IMMEDIATE,
@@ -513,14 +522,17 @@ sub RunAssign($$)
 	print("Could not allocate nodes.\n");
 	return -1;
     }
+    TBDebugTimeStamp("AllocNodes ended, InterpLinks Started");
     if ($vtop->InterpLinks() != 0) {
 	print("Could not setup links\n");
 	return -1;
     }
+    TBDebugTimeStamp("InterpLinks ended, InitializePhysNodes Started");
     if ($vtop->InitializePhysNodes() != 0) {
 	print("Could not InitializePhysNodes\n");
 	return -1;
     }
+    TBDebugTimeStamp("InitializePhysNodes ended");
     return 0;
 }
 
