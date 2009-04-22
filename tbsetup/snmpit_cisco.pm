@@ -1953,6 +1953,9 @@ sub readifIndex($) {
                 my $type = $1;
                 my $module = $2;
                 my $port = $3;
+
+		$self->debug("IFINDEX: $descr ($type,$module,$port)\n", 2);
+
                 if ($self->{NON_MODULAR_HACK}) {
                     #
                     # Hack for non-modular switches with both 100Mbps and
@@ -1974,6 +1977,8 @@ sub readifIndex($) {
 
 		$self->{IFINDEX}{$modport} = $ifindex;
 		$self->{IFINDEX}{$ifindex} = $modport;
+
+		$self->debug("IFINDEX: $modport,$ifindex\n", 2);
 	    }
 	}
     }
