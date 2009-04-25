@@ -322,7 +322,7 @@ if ($action eq 'reboot' || $action eq 'halt') {
 	@vnodes = keys(%vndb);
     }
 
-    foreach my $vnode (@vnodes) {
+    foreach my $vnode (sort(@vnodes)) {
 	if (!exists($vndb{$vnode}) || !exists($vndb{$vnode}{'type'})) {
 	    # this is a node that is not fully configured according to the db.
 	    # we only make noise if it is one of the ones the user asked for.
@@ -347,7 +347,7 @@ elsif ($action eq 'kill') {
 	@vnodes = keys(%vndb);
     }
 
-    foreach my $vnode (@vnodes) {
+    foreach my $vnode (sort(@vnodes)) {
 	if (!exists($vndb{$vnode}) || !exists($vndb{$vnode}{'type'})) {
 	    # this is a node that is not fully configured according to the db.
 	    # we only make noise if it is one of the ones the user asked for.
@@ -440,7 +440,7 @@ elsif ($action eq 'boot') {
     TBDebugTimeStamp("finished $vmtype rootPreConfigNetwork")
 	if ($debug);
 
-    foreach my $vnode (@newvnodes) {
+    foreach my $vnode (sort(@newvnodes)) {
 	my ($ret,$err);
 
 	#
@@ -493,7 +493,7 @@ elsif ($action eq 'boot') {
     }
 
     if ($reconfig) {
-	foreach my $vnode (@oldvnodes) {
+	foreach my $vnode (sort(@oldvnodes)) {
 	    my $vmid = $vndb{$vnode}{'id'};
 
 	    my ($ret,$err);
@@ -540,7 +540,7 @@ elsif ($action eq 'boot') {
 	}
     }
 
-    foreach my $vnode (@newvnodes,@oldvnodes) {
+    foreach my $vnode (sort(@newvnodes,@oldvnodes)) {
 	my $vmid = $vndb{$vnode}{'id'};
 
 	next if (safeLibOp($vnode,'vnodeBoot',1,1,$vnode,$vmid));
@@ -572,7 +572,7 @@ exit(0);
 sub teardownOldVnodes() {
     print "Looking for old vnodes to tear down...\n";
 
-    foreach my $oldvnode (keys(%vndb)) {
+    foreach my $oldvnode (sort(keys(%vndb))) {
 	my $found = 0;
 	foreach my $curvnode (@tmccvnodes) {
 	    if ($curvnode eq $oldvnode) {
