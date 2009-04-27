@@ -2,7 +2,7 @@
 use lib 'lib';
 use SemiModern::Perl;
 
-if (-f glob("~/lib/perl5/Net/SSH/Perl.pm")) {
+if (-f glob("~/lib/perl5/Test/Harness.pm")) {
   my $glob = glob('~/lib/perl5');
   my $p5l = $ENV{PERL5LIB};
   unless ( (defined $p5l) && ($p5l =~ /$glob/)) {
@@ -14,6 +14,8 @@ if (-f glob("~/lib/perl5/Net/SSH/Perl.pm")) {
     }
   }
 }
+
+$ENV{PERL5LIB} .= ":tests";
 
 use Data::Dumper;
 
@@ -75,7 +77,9 @@ if (@ARGV) {
   my $cmd = $ARGV[0];
   $_   = $cmd;
   chomp $_;
-  if (/.*\.t$/) { exec "$THARNESS $cmd"; }
+  if (/.*\.t$/ || /.*\.pm/) { 
+    exec "$THARNESS $cmd"; 
+  }
   elsif ($_ eq 'podc')    { system 'for x in `find lib -iname "*.pm"`; do podchecker $x 2>&1 |grep contain; done; '; }
   elsif ($_ eq 'pode')    { system 'for x in `find lib -iname "*.pm"`; do podchecker $x 2>&1 |grep ERROR; done;'; }
   elsif (/critic/)    { exec 'perlcritic lib t'; }

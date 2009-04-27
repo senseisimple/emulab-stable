@@ -41,7 +41,7 @@ sub link {
   TestBed::TestSuite::Link->new('experiment' => $e, 'name' => $linkname);
 }
 
-=item C<nodes()>
+=item C<< $e->nodes() >>
 
 returns a list of node objects representing each node in the experiment
 =cut
@@ -51,7 +51,7 @@ sub nodes {
   \@node_instances;
 }
 
-=item C<ping_test()>
+=item C<< $e->ping_test() >>
 
 runs a ping test across all nodes
 =cut
@@ -62,7 +62,7 @@ sub ping_test {
   }
 }
 
-=item C<single_node_tests()>
+=item C<< $e->single_node_tests() >>
 
 runs a single_node_tests test across all nodes
 =cut
@@ -73,7 +73,7 @@ sub single_node_tests {
   }
 }
 
-=item C<linktest>
+=item C<< $e->linktest >>
 
 runs a linktest on the experiment
 =cut
@@ -82,7 +82,7 @@ sub linktest {
   TestBed::Wrap::linktest::linktest($e->pid, $e->eid);
 }
 
-=item C<tevc>
+=item C<< $e->tevc($arg) >>
 
 runs tevc on ops for this experiment.
 takes an argument string such as "now link1 down"

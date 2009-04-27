@@ -2,17 +2,39 @@ REQUIREMENTS
   ssh-agent running with SSH emulab keys added
   emulab client certificate and key
   TBConfig.pm set up correctly
+  ssh executable in path
 
 INSTALLATION INSTRUCTIONS
-  cpan needs to be configured and functional
-  cpan Module::Install
-  perl Makefile.PL
-  make
-
+  perl ./localcpan.pl
+  add export PERL5LIB=~/lib/perl5 to your environment
+  edit TBConfig.pm to point to your client certificate
+  add your emulab keys to a running ssh-agent
+  
 TO RUN Tests
   make test
   make t/old/old.t
   make t/topologies/basic.t
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+DEPRECATED Module::Install instructions  
+  cpan needs to be configured and functional
+  cpan Module::Install
+  perl Makefile.PL
+  make
 
 Module::Install is a perl library for installing perl modules/frameworks like testswap
 
