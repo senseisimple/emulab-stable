@@ -7,7 +7,7 @@ use Tools;
 
 require Exporter;
 our @ISA = qw(Exporter);
-our @EXPORT = qw(e ep dpe CartProd CartProdRunner concretize defaults);
+our @EXPORT = qw(e ep dpe dpge CartProd CartProdRunner concretize defaults);
 
 =head1 NAME
 
@@ -58,6 +58,14 @@ CartProdRunner(\&VNodeTest::VNodeTest, $config);
 sub ep  { TestBed::TestSuite::Experiment->new }
 sub e   { TestBed::TestSuite::Experiment->new('pid'=> shift, 'eid' => shift) }
 sub dpe { TestBed::TestSuite::Experiment->new('pid'=> $TBConfig::DEFAULT_PID, 'eid' => shift) }
+sub dpge {
+    my $gid = (!defined($TBConfig::DEFAULT_GID) 
+	       || $TBConfig::DEFAULT_GID eq '') 
+	       ? $TBConfig::DEFAULT_PID : $TBConfig::DEFAULT_GID;
+    TestBed::TestSuite::Experiment->new('pid' => $TBConfig::DEFAULT_PID,
+					'gid' => $gid,
+					'eid' => shift)
+}
 
 sub CartProd {
   my ($config, %options) = @_;
