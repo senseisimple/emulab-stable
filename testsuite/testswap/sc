@@ -23,6 +23,7 @@ NSEND
 
 sub usage {
 say <<"END"
+ShortCut
 ./sc CMD EID ARGS
 
   CMD = start

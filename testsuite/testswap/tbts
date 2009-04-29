@@ -51,16 +51,30 @@ my $THARNESS = 'perl t/harness';
 
 sub usage {
   our $ts;
-  sub wanted {
+  our $tpms;
+  sub wanted_t {
     if (-f && /\.t$/) {
       $ts .= "        " . $File::Find::name . "\n";
     }
   }
+  sub wanted_tests {
+    if (-f && /\.pm$/) {
+      $tpms .= "        " . $File::Find::name . "\n";
+    }
+  }
   use File::Find;
-  find(\&wanted, 't');
+  find(\&wanted_t, 't');
+  find(\&wanted_tests, 'tests');
 
   print <<"USAGE";
-./tbts 
+TestBed TestSwap
+./tbts OPTIONS TESTSUITE|TESTFILE
+        -j --jobs=i    parallel jobs
+        -d --debug
+        -t --timing
+        -v --verbose
+
+    TESTSUITES:
         test     - all topology tests
         sanity   - all framework utility and xmlrpc client modules test
         lib      - all framework utility tests
@@ -69,25 +83,25 @@ sub usage {
         critic   - runs perl critic on framework code
         coding   - 
 
+    TESTFILES:
 USAGE
   print $ts;
+  print $tpms;
 }
 
 if (@ARGV) {
   my $cmd = $ARGV[0];
   $_   = $cmd;
   chomp $_;
-  if (/.*\.t$/ || /.*\.pm/) { 
-    exec "$THARNESS $cmd"; 
-  }
-  elsif ($_ eq 'podc')    { system 'for x in `find lib -iname "*.pm"`; do podchecker $x 2>&1 |grep contain; done; '; }
-  elsif ($_ eq 'pode')    { system 'for x in `find lib -iname "*.pm"`; do podchecker $x 2>&1 |grep ERROR; done;'; }
-  elsif (/critic/)    { exec 'perlcritic lib t'; }
-  elsif (/codingtests/) {  }
-  elsif (/sanity/) { exec "$THARNESS t/lib/*.t t/lib/*/*.t t/xmlrpc/*.t "; }
-  elsif (/lib/)    { exec "$THARNESS t/lib/*.t t/lib/*/*.t"; }
-  elsif (/xmlrpc/) { exec "$THARNESS t/xmlrpc/*.t"; }
-  elsif (/test/)   { exec "$THARNESS t/topologies/*.t"; }
+  if (/.*\.t$/ || /.*\.pm/) { exec "$THARNESS $cmd"; }
+  elsif ($_ eq 'podc')      { system 'for x in `find lib -iname "*.pm"`; do podchecker $x 2>&1 |grep contain; done; '; }
+  elsif ($_ eq 'pode')      { system 'for x in `find lib -iname "*.pm"`; do podchecker $x 2>&1 |grep ERROR; done;'; }
+  elsif (/critic/)          { exec 'perlcritic lib t'; }
+  elsif (/codingtests/)     { }
+  elsif (/sanity/)          { exec "$THARNESS t/lib/*.t t/lib/*/*.t t/xmlrpc/*.t "; }
+  elsif (/lib/)             { exec "$THARNESS t/lib/*.t t/lib/*/*.t"; }
+  elsif (/xmlrpc/)          { exec "$THARNESS t/xmlrpc/*.t"; }
+  elsif (/test/)            { exec "$THARNESS t/topologies/*.t"; }
 }
 else {
   print usage();

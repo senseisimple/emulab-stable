@@ -22,7 +22,7 @@ sub pretty_listexp {
     while(my ($gk, $v) = each %$v) {
       for my $e (@$v) {
         my $eid;
-        if ( exists $e->{'name'} )  { $eid = sprintf("%s %s", $e->{'name'}, $e->{'state'});}
+        if ( ref $e && exists $e->{'name'} )  { $eid = sprintf("%s %s", $e->{'name'}, $e->{'state'});}
         else { $eid = $e; }
         say "$pk :: $gk :: $eid";
       }

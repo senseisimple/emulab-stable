@@ -1,9 +1,9 @@
-our $VERSION = '1.00';
-
 use 5.008_000;
-
 use strict;
 use warnings;
+
+our $VERSION = '1.00';
+
 package SemiModern::Perl;
 use IO::Handle;
 use Scalar::Util 'openhandle';

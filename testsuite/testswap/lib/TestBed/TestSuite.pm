@@ -7,68 +7,28 @@ use Tools;
 
 require Exporter;
 our @ISA = qw(Exporter);
-our @EXPORT = qw(e ep dpe dpge CartProd CartProdRunner concretize defaults);
+our @EXPORT = qw(ee e pge dpe dpge CartProd CartProdRunner concretize defaults override);
 
-=head1 NAME
-
-TestBed::TestSuite
-
-=over 4
-
-=item C<ep()>
-
-creates a new empty experiment, for calling experiement "class methods" on
-
-=item C<e($pid, $eid)>
-
-creates a new experiment with pid and eid
-
-=item C<dpe($eid)>
-
-new experiement takes one arg a eid and uses the default pid in TBConfig
-
-=item C<CartProd($hashref)> Cartesian Product Runner
-
-my $config = {
-  'OS'       => [qw( AOS BOS COS )],
-  'HARDWARE' => [qw( AHW BHW CHW )],
-  'LINKTYPE' => [qw( ALT BLT CLT )],
-};
-
-returns [ { OS => 'AOS', HARDWARE => 'AHW', LINKTYPE => 'ALT' },
-          { OS => 'BOS', HARDWARE => 'AHW', LINKTYPE => 'ALT' },
-          ...
-        ]
-
-
-=item C<CartProdRunner($sub, $hashref)> Cartesian Product Runner
-
-my $config = {
-  'OS'       => [qw( AOS BOS COS )],
-  'HARDWARE' => [qw( AHW BHW CHW )],
-  'LINKTYPE' => [qw( ALT BLT CLT )],
-};
-
-CartProdRunner(\&VNodeTest::VNodeTest, $config);
-
-=back
-
-=cut
-
-sub ep  { TestBed::TestSuite::Experiment->new }
-sub e   { TestBed::TestSuite::Experiment->new('pid'=> shift, 'eid' => shift) }
-sub dpe { TestBed::TestSuite::Experiment->new('pid'=> $TBConfig::DEFAULT_PID, 'eid' => shift) }
-sub dpge {
-    my $gid = (!defined($TBConfig::DEFAULT_GID) 
-	       || $TBConfig::DEFAULT_GID eq '') 
-	       ? $TBConfig::DEFAULT_PID : $TBConfig::DEFAULT_GID;
-    TestBed::TestSuite::Experiment->new('pid' => $TBConfig::DEFAULT_PID,
-					'gid' => $gid,
-					'eid' => shift)
+sub ee   { TestBed::TestSuite::Experiment->new }
+sub e    { TestBed::TestSuite::Experiment->new('pid' => shift, 'eid' => shift) }
+sub pge  { TestBed::TestSuite::Experiment->new('pid' => shift, 'gid' => shift, 'eid' => shift) }
+sub dpe  { TestBed::TestSuite::Experiment->new('pid' => $TBConfig::DEFAULT_PID, 'eid' => shift) }
+sub dpge { TestBed::TestSuite::Experiment->new(
+        'pid' => $TBConfig::DEFAULT_PID,
+        'gid' => ($TBConfig::DEFAULT_GID || $TBConfig::DEFAULT_PID),
+        'eid' => shift);
 }
 
 sub CartProd {
-  my ($config, %options) = @_;
+  my $config = shift;
+  my %options;
+  if (@_ == 1) {
+    $options{'filter'} = $_[0];
+  }
+  else {
+    %options = @_;
+  }
+
   #say Dumper($config);
   my @a;
   while (my ($k, $v) = each %$config) {
@@ -91,8 +51,16 @@ sub CartProd {
 
   if (exists $options{'filter'}) {
     my @newa;
-    @a = map { if ($options{'filter'}->($_)) {
-      push @newa, $_;}
+    @a = map { 
+      my $result = $options{'filter'}->($_);
+      if ( defined $result ) {
+        if ( ref $result ) {
+          push @newa, $result;
+        }
+        elsif ( $result ) {
+          push @newa, $_;
+        }
+      }
     } @a;
     @a = @newa;
   }
@@ -104,12 +72,85 @@ sub CartProd {
 }
 
 sub CartProdRunner {
-  my ($proc, $config, %options) = @_;
-  for (CartProd($config, %options)) { $proc->($_); }
+  my $proc = shift;
+  for (CartProd(@_)) { $proc->($_); }
 }
 
 sub defaults {
   my ($params, %defaults) = @_;
-  +{ %defaults, %{($params || {})} };
+  return { %defaults, %{($params || {})} };
 }
+
+sub override {
+  my ($params, %overrides) = @_;
+  return { %{($params || {})}, %overrides };
+}
+
+=head1 NAME
+
+TestBed::TestSuite
+
+=over 4
+
+=item C<ep()>
+
+creates a new empty experiment, for calling experiement "class methods" on
+
+=item C<e($pid, $eid)>
+
+creates a new experiment with pid and eid
+
+=item C<pge($pid, $gid, $eid)>
+
+creates a new experiment with pid, gid, and eid
+
+=item C<dpe($eid)>
+
+new experiement takes one arg a eid and uses the default pid in TBConfig
+
+=item C<dpge($eid)>
+
+new experiement takes one arg a eid and uses the default pid and gid in TBConfig
+
+=item C<CartProd($hashref)> Cartesian Product Runner
+
+=item C<CartProd($hashref, &filter_gen_func)> Cartesian Product Runner
+
+my $config = {
+  'OS'       => [qw( AOS BOS COS )],
+  'HARDWARE' => [qw( AHW BHW CHW )],
+  'LINKTYPE' => [qw( ALT BLT CLT )],
+};
+
+returns [ { OS => 'AOS', HARDWARE => 'AHW', LINKTYPE => 'ALT' },
+          { OS => 'BOS', HARDWARE => 'AHW', LINKTYPE => 'ALT' },
+          ...
+        ]
+
+takes an optional sub ref that acts as a filter
+if &filter_gen_func returns undef or 0 the case is dropped from the result.
+if &filter_gen_func returns a hash ref the has ref becomes the new case resutl.
+
+=item C<CartProdRunner($sub, $hashref)> Cartesian Product Runner
+
+my $config = {
+  'OS'       => [qw( AOS BOS COS )],
+  'HARDWARE' => [qw( AHW BHW CHW )],
+  'LINKTYPE' => [qw( ALT BLT CLT )],
+};
+
+CartProdRunner(\&VNodeTest::VNodeTest, $config);
+
+=item C<defaults($hashref, %defaults)> provides default hash entries for a params hash ref
+
+returns a modified hash ref
+
+=item C<override($hashref, %overrides)> provides hash entry overrides for a params hash ref
+
+returns a modified hash ref
+
+=back
+
+=cut
+
 1;

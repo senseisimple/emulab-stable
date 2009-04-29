@@ -2,7 +2,7 @@
 use SemiModern::Perl;
 use TestBed::TestSuite;
 use Data::Dumper;
-use Test::More tests => 1;
+use Test::More tests => 5;
 
 my $a = { 
   'a' => [qw(a1 a2 a3)],
@@ -10,8 +10,18 @@ my $a = {
   'c' => [qw(c1 c2 c3)],
 };
 
+my $b = { 
+  'a' => [qw(a1 a2)],
+  'b' => [qw(b1 b2)],
+};
+
 our $filter = sub {
-  ($_->{'a'} eq 'a1');
+  return undef if ($_->{'a'} eq 'a1');
+  $_
+};
+
+our $filter2 = sub {
+  !($_->{'a'} eq 'a1');
 };
 
 our $gen = sub {
@@ -22,7 +32,37 @@ our $gen = sub {
     $_;
   }
 };
-for (CartProd($a, 'filter' => $filter, 'generator' => $gen)) {
-  say Dumper($_);
+
+sub hash_equals {
+  my ($a1, $a2) = @_;
+  while (my ($k, $v) = each %$a1) {
+    if ($a2->{$k} ne $v) {
+      say "$k $v " . $a2->{$k};
+      return 0;
+    }
+  }
+  return 1;
 }
-ok(1);
+
+sub array_of_hash_equals {
+  my ($a1, $a2) = @_;
+  return 0 if ((scalar @$a1) != (scalar @$a2));
+  for (0 .. (@$a2 - 1)) {
+    return 0 unless hash_equals($a1->[$_], $a2->[$_]);
+  }
+  return 1;
+}
+
+my $expected1 = [ { 'a' => 'COOL', 'b' => 'b1' }, { 'a' => 'a2', 'b' => 'b2' } ];
+my $expected2 = [ { 'a' => 'a2', 'b' => 'b1' }, { 'a' => 'a2', 'b' => 'b2' } ];
+my @result1 = CartProd($b, 'filter' => $filter, 'generator' => $gen);
+ok(array_of_hash_equals( $expected1, \@result1), 'CartProd($config, filter => $f, generator => $g)');
+#say Dumper($_) for (@result);
+my @result2 = CartProd($b, 'filter' => $filter2);
+ok(array_of_hash_equals( $expected2, \@result2), 'CartProd($config, filter => $f_and_gen)');
+@result2 = CartProd($b, $filter2);
+ok(array_of_hash_equals( $expected2, \@result2), 'CartProd($config, $filter_and_gen)');
+#say Dumper($_) for (@result2);
+
+ok(hash_equals( defaults({ 'a' => 'B' }, 'a' => 'A', b => 'B'), { 'a' => 'B', 'b' => 'B' } ), 'defaults1');
+ok(hash_equals( override({ 'a' => 'B' }, 'a' => 'A', b => 'B'), { 'a' => 'A', 'b' => 'B' } ), 'override1');

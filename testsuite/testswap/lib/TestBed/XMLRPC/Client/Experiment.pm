@@ -15,13 +15,10 @@ has 'eid' => ( isa => 'Str', is => 'rw');
 
 sub args {
   my $self = shift;
-  if (defined($self->gid) && $self->gid ne '') {
-      return { 'pid' => $self->pid, 'gid' => $self->gid, 
-	       'eid' => $self->eid, @_ };
-  }
-  else {
-      return { 'pid' => $self->pid, 'eid' => $self->eid, @_ };
-  }
+  my $args = { 'pid' => $self->pid, 'eid' => $self->eid };
+  my $gid = $self->gid;
+  $args->{'gid'} = $gid if $gid;
+  return { %$args, @_ };
 }
 
 sub echo           { shift->augment_output( 'str' => shift ); }
@@ -88,10 +85,6 @@ TestBed::XMLRPC::Client::Experiment
 =item C<pid>
 
 experiment pid
-
-=item C<gid>
-
-experiment gid
 
 =item C<eid>
 
