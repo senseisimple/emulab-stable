@@ -10,48 +10,55 @@
   -->
   <!--
     
-    Simple prototype of an RSpec, to be used by ProtoGENI
+    Common definitions for advertisements, requests, and tickets
     
   -->
+  <xs:element name="node" type="rspec:NodeContents"/>
+  <xs:element name="link" type="rspec:LinkContents"/>
   <xs:complexType name="NodeContents">
-    <xs:sequence>
-      <xs:group ref="rspec:NodeSpec.NodeType"/>
-      <xs:element minOccurs="0" ref="rspec:location"/>
-      <xs:element minOccurs="0" ref="rspec:available"/>
-      <xs:group minOccurs="0" maxOccurs="unbounded" ref="rspec:InterfaceDecl"/>
-    </xs:sequence>
-    <xs:attribute name="virtual_id"/>
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:group ref="rspec:NodeTypeList"/>
+      <xs:element name="interface">
+        <xs:complexType>
+          <xs:attributeGroup ref="rspec:InterfaceDecl"/>
+        </xs:complexType>
+      </xs:element>
+    </xs:choice>
+    <xs:attribute name="virtualization_type">
+      <xs:simpleType>
+        <xs:restriction base="xs:token">
+          <xs:enumeration value="raw"/>
+          <xs:enumeration value="trellis-vserver"/>
+          <xs:enumeration value="planetlab-vserver"/>
+          <xs:enumeration value="emulab-vnode"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attributeGroup ref="rspec:VirtualName"/>
     <xs:attribute name="component_manager_uuid"/>
     <xs:attribute name="component_name"/>
     <xs:attribute name="component_uuid"/>
-    <xs:attribute name="sliver_uuid"/>
-    <xs:attribute name="virtualization_type">
-      <xs:simpleType>
-        <xs:restriction base="xs:token">
-          <xs:enumeration value="raw"/>
-          <xs:enumeration value="trellis-vserver"/>
-          <xs:enumeration value="planetlab-vserver"/>
-          <xs:enumeration value="emulab-vnode"/>
-        </xs:restriction>
-      </xs:simpleType>
-    </xs:attribute>
+    <xs:attributeGroup ref="rspec:SliverName"/>
   </xs:complexType>
-  <xs:element name="available" type="xs:boolean"/>
   <xs:complexType name="LinkContents">
-    <xs:sequence>
-      <xs:choice minOccurs="0">
-        <xs:element ref="rspec:single_hop_link"/>
-        <xs:element ref="rspec:multi_hop_link"/>
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:choice>
+        <xs:group ref="rspec:LinkTypeList"/>
+        <xs:element name="interface">
+          <xs:complexType>
+            <xs:attributeGroup ref="rspec:InterfaceRef"/>
+          </xs:complexType>
+        </xs:element>
       </xs:choice>
-      <xs:group ref="rspec:LinkEndPoints"/>
-      <xs:group ref="rspec:LinkCharacteristics">
-        <xs:annotation>
-          <xs:documentation>The characteristics (bandwidth, latency, loss) which affect traffic.</xs:documentation>
-        </xs:annotation>
-      </xs:group>
-      <xs:element maxOccurs="unbounded" ref="rspec:LinkSpec.LinkType"/>
-    </xs:sequence>
-    <xs:attribute name="virtual_id"/>
+      <xs:choice>
+        <xs:group ref="rspec:LinkMapping"/>
+        <xs:choice>
+          <xs:element ref="rspec:bandwidth"/>
+          <xs:element ref="rspec:latency"/>
+          <xs:element ref="rspec:packet_loss"/>
+        </xs:choice>
+      </xs:choice>
+    </xs:choice>
     <xs:attribute name="virtualization_type">
       <xs:simpleType>
         <xs:restriction base="xs:token">
@@ -62,19 +69,74 @@
         </xs:restriction>
       </xs:simpleType>
     </xs:attribute>
+    <xs:attributeGroup ref="rspec:VirtualName"/>
+    <xs:attributeGroup ref="rspec:SliverName"/>
   </xs:complexType>
-  <xs:complexType name="InterfaceContents">
+  <xs:element name="bandwidth">
+    <xs:annotation>
+      <xs:documentation>Bandwidth of the link in kbps</xs:documentation>
+    </xs:annotation>
+    <xs:simpleType>
+      <xs:restriction base="xs:float">
+        <xs:minExclusive value="0.0"/>
+      </xs:restriction>
+    </xs:simpleType>
+  </xs:element>
+  <xs:element name="latency">
+    <xs:annotation>
+      <xs:documentation>Latency of the link in ms</xs:documentation>
+    </xs:annotation>
+    <xs:simpleType>
+      <xs:restriction base="xs:float">
+        <xs:minInclusive value="0.0"/>
+      </xs:restriction>
+    </xs:simpleType>
+  </xs:element>
+  <xs:element name="packet_loss">
+    <xs:simpleType>
+      <xs:restriction base="xs:float">
+        <xs:minInclusive value="0.0"/>
+      </xs:restriction>
+    </xs:simpleType>
+  </xs:element>
+  <xs:group name="NodeTypeList">
     <xs:sequence>
-      <xs:element minOccurs="0" ref="rspec:virtual_node_id"/>
-      <xs:element minOccurs="0" ref="rspec:virtual_interface_name"/>
-      <xs:element minOccurs="0" ref="rspec:component_node_uuid"/>
-      <xs:element minOccurs="0" ref="rspec:component_interface_name"/>
+      <xs:element maxOccurs="unbounded" ref="rspec:node_type"/>
     </xs:sequence>
-  </xs:complexType>
-  <xs:element name="virtual_node_id" type="xs:string"/>
-  <xs:element name="virtual_interface_name" type="xs:string"/>
-  <xs:element name="component_node_uuid" type="xs:string"/>
-  <xs:element name="component_interface_name" type="xs:string"/>
+  </xs:group>
+  <xs:group name="LinkTypeList">
+    <xs:sequence>
+      <xs:element maxOccurs="unbounded" ref="rspec:link_type"/>
+    </xs:sequence>
+  </xs:group>
+  <xs:attributeGroup name="VirtualName">
+    <xs:attribute name="virtual_id" use="required"/>
+  </xs:attributeGroup>
+  <xs:attributeGroup name="ComponentName">
+    <xs:attribute name="component_manager_uuid" use="required"/>
+    <xs:attribute name="component_name"/>
+    <xs:attribute name="component_uuid" use="required"/>
+  </xs:attributeGroup>
+  <xs:attributeGroup name="ComponentInterfaceDeclName">
+    <xs:attribute name="component_name" use="required"/>
+  </xs:attributeGroup>
+  <xs:attributeGroup name="ComponentInterfaceRefName">
+    <xs:attribute name="component_node_uuid" use="required"/>
+    <xs:attribute name="component_interface_name" use="required"/>
+  </xs:attributeGroup>
+  <xs:attributeGroup name="SliverName">
+    <xs:attribute name="sliver_uuid"/>
+  </xs:attributeGroup>
+  <xs:attributeGroup name="InterfaceDecl">
+    <xs:attribute name="component_name"/>
+    <xs:attributeGroup ref="rspec:VirtualName"/>
+  </xs:attributeGroup>
+  <xs:attributeGroup name="InterfaceRef">
+    <xs:attribute name="component_node_uuid"/>
+    <xs:attribute name="component_interface_name"/>
+    <xs:attribute name="virtual_node_id" use="required"/>
+    <xs:attribute name="virtual_interface_name" use="required"/>
+  </xs:attributeGroup>
   <xs:element name="location">
     <xs:complexType>
       <xs:attribute name="country" use="required"/>
@@ -82,83 +144,20 @@
       <xs:attribute name="lattitude"/>
     </xs:complexType>
   </xs:element>
-  <xs:group name="InterfaceDecl">
-    <xs:sequence>
-      <xs:element name="interface">
-        <xs:complexType>
-          <xs:sequence>
-            <xs:element minOccurs="0" ref="rspec:monitoring"/>
-          </xs:sequence>
-          <xs:attribute name="virtual_name"/>
-          <xs:attribute name="component_name"/>
-        </xs:complexType>
-      </xs:element>
-    </xs:sequence>
-  </xs:group>
-  <xs:element name="monitoring">
-    <xs:complexType>
-      <xs:attribute name="user_traffic"/>
-    </xs:complexType>
-  </xs:element>
-  <xs:attributeGroup name="ComponentSpec">
-    <xs:attribute name="component_manager_uuid" use="required"/>
-    <xs:attribute name="component_name"/>
-    <xs:attribute name="component_uuid" use="required"/>
-    <xs:attribute name="sliver_uuid"/>
-  </xs:attributeGroup>
-  <xs:element name="single_hop_link">
-    <xs:complexType>
-      <xs:sequence>
-        <xs:element name="link">
-          <xs:complexType>
-            <xs:group ref="rspec:LinkEndPoints"/>
-            <xs:attributeGroup ref="rspec:ComponentSpec"/>
-          </xs:complexType>
-        </xs:element>
-      </xs:sequence>
-    </xs:complexType>
-  </xs:element>
-  <xs:element name="multi_hop_link">
-    <xs:complexType>
-      <xs:sequence>
-        <xs:element name="link">
-          <xs:complexType>
-            <xs:group ref="rspec:LinkEndPoints"/>
-            <xs:attributeGroup ref="rspec:ComponentSpec"/>
-          </xs:complexType>
-        </xs:element>
-        <xs:sequence maxOccurs="unbounded">
-          <xs:element name="node">
-            <xs:complexType>
-              <xs:attributeGroup ref="rspec:ComponentSpec"/>
-            </xs:complexType>
-          </xs:element>
-          <xs:element name="link">
-            <xs:complexType>
-              <xs:group ref="rspec:LinkEndPoints"/>
-              <xs:attributeGroup ref="rspec:ComponentSpec"/>
-            </xs:complexType>
-          </xs:element>
-        </xs:sequence>
-      </xs:sequence>
-    </xs:complexType>
-  </xs:element>
-  <xs:element name="rspec">
-    <xs:complexType>
-      <xs:choice minOccurs="0" maxOccurs="unbounded">
-        <xs:element ref="rspec:node"/>
-        <xs:element ref="rspec:link"/>
-      </xs:choice>
-      <xs:attribute name="type" use="required">
-        <xs:simpleType>
-          <xs:restriction base="xs:token">
-            <xs:enumeration value="advertisement"/>
-            <xs:enumeration value="request"/>
-          </xs:restriction>
-        </xs:simpleType>
-      </xs:attribute>
-      <xs:attribute name="generated" use="required" type="xs:dateTime"/>
-      <xs:attribute name="valid_until" use="required" type="xs:dateTime"/>
-    </xs:complexType>
-  </xs:element>
+  <xs:element name="rspec" type="rspec:RSpecContents"/>
+  <xs:complexType name="RSpecContents">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element ref="rspec:node"/>
+      <xs:element ref="rspec:link"/>
+    </xs:choice>
+    <xs:attribute name="generated" type="xs:dateTime"/>
+    <xs:attribute name="valid_until" type="xs:dateTime"/>
+    <xs:attribute name="type" use="required">
+      <xs:simpleType>
+        <xs:restriction base="xs:token">
+          <xs:enumeration value="request"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+  </xs:complexType>
 </xs:schema>
