@@ -13,28 +13,84 @@ default namespace = "http://emulab.net/resources/vtop/0.2"
 # We include the common topology specification schema, but override a few
 # elements
 #
-include "top.rnc" {
-    ## In the vtop file, a node is only allowed to have a single type
-    NodeSpec.NodeType = NodeTypeSpec
-    
-    ## In the vtop file, a link is only allowed to have a single type (which
-    ## is optional)
-    LinkSpec.LinkType = LinkTypeSpec
-    
-    ## There are no additional flags specific to vtop
-	AdditionalNodeFlagSpec = empty
-	
-	## The assigned_to and hint_to attributes are unique to vtop
-	AdditionalNodeAttributeSpec = 
-		## Add an atribute to the 'node' tag that allows you to fix it to a specific
-		## physical node
+include "top.rnc" 
+
+## "Legacy" assign node flags - will be replaced with properties, and in some
+## cases, explicit links
+NodeFlagSpec =
+    ## Specify that this node is a subnode of another node. We MIGHT
+    ## try to do this with properties in the future
+    ## Valid for both virtual and physical nodes
+    element subnode_of { text }?,
+    ## Indicates that this node should never be considered identical to any
+    ## other node. Could be done with a property
+    ## Valid only for physical nodes
+    element unique { empty }?,
+    ## Indicates that virtual links must either all be trivial (loopback), or
+    ## none of them must be. Possibly expressible with properties?
+    element disallow_trivial_mix { empty }?
+
+## A node in the topology
+NodeSpec = element node { NodeContents }
+  
+NodeContents =
+    ## Name of the node - each node name must be unique within the 
+    ## top element
+        attribute name { text },
 		attribute assigned_to { text }?,
-		## Add an atribute to the 'node' tag that allows you to hint that it might
-		## be a good idea to assign it to a specific physical node
-		attribute hint_to { text }?
-	
-	## Adding addition flags which are unique to vtop links
-	AdditionalLinkFlagSpec = LinkFlagSpec
+		attribute hint_to { text }?,
+    ## Type specification - we use a named pattern here (defined below), so
+    ## that it can be overriden in the virtual topology schema, where you are
+    ## only allowed to have one
+        NodeTypeSpec,
+    ## Legacy flags
+        NodeFlagSpec,
+    ## Legacy features and desires
+        FeatureDesireSpec*,
+    ## Types of virtual nodes that this physical node can satisfy
+    ## Desires of this node, which should (or must) be matched by the
+    ## physical node we are assigned to
+        PropertySpec*
+
+## Links in the topology - zero or more
+LinkSpec = element link { LinkContents }
+
+LinkContents =
+    ## Name of the link - must be unique in the top
+        attribute name { text },
+    ## The two interfaces which form the endpoints of this link.
+        LinkEndPoints,
+    ## The characteristics (bandwidth, latency, loss) which affect traffic.
+        LinkCharacteristics,
+    ## Type of this link - we use a named pattern here (defined below), so
+    ## that it can be overriden in the virtual topology schema, where you are
+    ## only allowed to have one
+        LinkTypeSpec,
+	## "Legacy" link flags used by assign. Will be replaced by properties
+		LinkFlagSpec, 
+	## The annotated link/path
+		LinkMapping?,
+    ## Properties of this link
+        PropertySpec*
+
+## The path to which a link has been mapped
+## For the moment only 2 interface mappings are specified because
+## every link only has 2 interfaces for the moment.
+LinkMapping =
+  element component_hop { 
+		attribute assigned_to { text }, 
+		InterfaceMapping, 
+		InterfaceMapping 
+  }+
+
+# Each interface represents a particular physical interface. If that
+# interface is one of the link end points, it is also mapped to that
+# virtual node and its interface name.
+InterfaceMapping = element interface {
+  attribute physical_node_name { text }, 
+  attribute physical_interface_name { text },
+  attribute virtual_node_name { text }?,
+  attribute virtual_interface_name { text }?
 }
 
 

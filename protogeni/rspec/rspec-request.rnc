@@ -8,25 +8,36 @@
 # Prototype of a request RSpec, to be used by ProtoGENI
 #
 
+default namespace = "http://www.protogeni.net/resources/rspec/0.1"
+
 include "protogeni-rspec-common.rnc"
 
+# The ComponentName will only be available after an assignment
+# The SliverName will be available only after the request has been redeemed.
 NodeContents &=
   VirtualName &
-  ComponentName &
-  SliverName
+  ComponentName? &
+  SliverName?
 
+# The LinkMapping will only be available after an assignment
+# The SliverName will be available only after the request has been redeemed.
 LinkContents &=
   VirtualName &
-  LinkMapping &
-  SliverName
+  LinkMapping? &
+  SliverName? &
+  # Characteristics (bandwidth, latency, loss) which affect traffic.
+  LinkCharacteristics?
 
+# The ComponentInterfaceDeclName will only be available after an assignment
 InterfaceDecl &=
-  ComponentInterfaceDeclName &
+  ComponentInterfaceDeclName? &
   VirtualName
 
+# The ComponentInterfaceRefName will only be available after an assignment
 InterfaceRef &=
-  ComponentInterfaceRefName &
-  VirtualName
+  ComponentInterfaceRefName? &
+  attribute virtual_node_id { text } &
+  attribute virtual_interface_name { text }
 
 RSpecContents &=
   attribute type { "request" }
@@ -36,7 +47,7 @@ RSpecContents &=
 # provide any additional information and can be derived from the
 # interface mapping.
 LinkMapping =
-  element component_hop { ComponentName, InterfaceMapping* }*
+  element component_hop { ComponentName, InterfaceMapping* }+
 
 # Each interface represents a particular physical interface. If that
 # interface is one of the link end points, it is also mapped to that

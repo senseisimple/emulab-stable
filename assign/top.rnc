@@ -12,47 +12,19 @@
 
 ## Representation of a single node type
 NodeTypeSpec = element node_type {
-        ## Name of the type - will almost certainly not be unique
-        element type_name { text },
-        ## How many virtual nodes of this type this physical node can
-        ## handle.
-        (element type_slots { xsd:integer { minInclusive = "0" } } |
-         element unlimited { empty }),
-        ## A flag that indicates that this physical node *always*
-        ## has this type - a node is only allowed to have one dynamic
-        ## (ie. not flagged as static) type at a time, but any number
-        ## of static types at a time
-        element static { empty }?
+	## Name of the type - will almost certainly not be unique
+	attribute type_name { text },
+	## How many virtual nodes of this type this physical node can
+	## handle.
+	attribute type_slots { xsd:integer { minInclusive = "0" } | "unlimited" },
+		##element unlimited { empty }?,
+	## A flag that indicates that this physical node *always*
+	## has this type - a node is only allowed to have one dynamic
+	## (ie. not flagged as static) type at a time, but any number
+	## of static types at a time
+	## element static { empty }?
+	attribute static { "true" }?
 }
-
-## A node in the topology
-NodeSpec = element node { NodeContents }
-
-NodeContents =
-    ## Name of the node - each node name must be unique within the 
-    ## top element
-    attribute name { text },
-    ## Additional attributes if any
-    AdditionalNodeAttributeSpec,
-    ## Type specification - we use a named pattern here (defined below), so
-    ## that it can be overriden in the virtual topology schema, where you are
-    ## only allowed to have one
-    NodeSpec.NodeType,
-    ## Legacy flags
-    NodeFlagSpec,
-    ## Legacy features and desires
-    FeatureDesireSpec*,
-    ## Types of virtual nodes that this physical node can satisfy
-    ## Desires of this node, which should (or must) be matched by the
-    ## physical node we are assigned to
-    PropertySpec*
-
-## A node can (by default) have one or more types
-NodeSpec.NodeType = NodeTypeSpec+
-
-## Default additional flag spec to empty for the moment.
-## It will be overridden in the ptop and vtop files
-AdditionalNodeAttributeSpec = empty
 
 ## Link types are currently just a siple string. They will almost certainly 
 ## have to get more complicated, for two reasons:
@@ -62,27 +34,8 @@ AdditionalNodeAttributeSpec = empty
 ##       multi-hop paths
 ## TODO: MAYBE this should be combined with NodeTypeSpec
 LinkTypeSpec = element link_type {
-    element type_name { text }
+    attribute type_name { text }
 }
-
-## Links in the topology - zero or more
-LinkSpec = element link { LinkContents }
-
-LinkContents =
-    ## Name of the link - must be unique in the top
-    attribute name { text },
-    ## The two interfaces which form the endpoints of this link.
-    LinkEndPoints,
-    ## The characteristics (bandwidth, latency, loss) which affect traffic.
-    LinkCharacteristics,
-    ## Type of this link - we use a named pattern here (defined below), so
-    ## that it can be overriden in the virtual topology schema, where you are
-    ## only allowed to have one
-    LinkSpec.LinkType,
-    ## Add additional specs for a link if necessary
-    AdditionalLinkFlagSpec,
-    ## Properties of this link
-    PropertySpec*
 
 ## A link has two endpoints. Right now, they are order
 ## independent. But they might become order-dependant later.
@@ -104,58 +57,42 @@ LinkCharacteristics =
     ## (ie. 0.01 == 1%)
     element packet_loss { xsd:float { minInclusive = "0.0" } }
 
-## A link can (by default) have zero or more types
-LinkSpec.LinkType = LinkTypeSpec
-
-## Set the additional link flag spec to empty for now.
-## It will be overridden in the ptop and vtop files if required
-AdditionalLinkFlagSpec = empty
-
 ## "Legacy" assign features and desires - will be phased out in favor of
 ## properties
 FeatureDesireSpec = element fd {
     ## Name of this feature or desire
-    element fd_name { text },
+    ## element fd_name { text },
+    attribute fd_name { text },
     ## Weight assocated with the feature or desire
-    element fd_weight { xsd:float },
+    ## element fd_weight { xsd:float },
+    attribute fd_weight { text },
     ## A flag indicating whether or not a failure to match the desire with a
     ## a feature is a constraint violation
-    element violatable { empty }?,
+	##element violatable { empty }?,
+	attribute violatable { "true" }?,
     ## Type information expressed in features and desires
     (GlobalSpec | LocalSpec)?
 }
 
-GlobalSpec = element global {
-    element operator { "OnceOnly" | "FirstFree" }
-}
+## GlobalSpec = element global {
+##	element operator { "OnceOnly" | "FirstFree" }
+##}
+GlobalSpec = attribute global_operator { "OnceOnly" | "FirstFree" }
 
-LocalSpec = element local {
-    element operator { "+" }
-}
-
-## "Legacy" assign node flags - will be replaced with properties, and in some
-## cases, explicit links
-NodeFlagSpec =
-    ## Specify additional flags which are only valid in a particular topoplogy
-    AdditionalNodeFlagSpec,
-    ## Specify that this node is a subnode of another node. We MIGHT
-    ## try to do this with properties in the future
-    ## Valid for both virtual and physical nodes
-    element subnode_of { text }?,
-    ## Indicates that this node should never be considered identical to any
-    ## other node. Could be done with a property
-    ## Valid only for physical nodes
-    element unique { empty }?,
-    ## Indicates that virtual links must either all be trivial (loopback), or
-    ## none of them must be. Possibly expressible with properties?
-    element disallow_trivial_mix { empty }?
-
-## Set the additional node flag spec to empty for now.
-## It will be overridden if required in the ptop and vtop files
-AdditionalNodeFlagSpec = empty
+## LocalSpec = element local {
+##	element operator { "+" }
+##	attribute local_operator { "+" }
+##}
+LocalSpec = attribute local_operator { "+" }
 
 ## Interfaces
-InterfaceSpec = element interface { InterfaceContents }
+## InterfaceSpec = element interface { InterfaceContents }
+InterfaceSpec = 
+	attribute node_name { text },
+	attribute interface_name { text },
+	attribute physical_node_name { text }?,
+	attribute physical_interface_name { text }?,
+	PropertySpec*
 
 InterfaceContents =
     ## Name of the node, which must match one of the nodes in this topology

@@ -8,8 +8,13 @@
 # Common definitions for advertisements, requests, and tickets
 #
 
-include "../../assign/top.rnc" {
-  NodeContents =
+include "../../assign/top.rnc" 
+
+NodeSpec = element node { NodeContents }
+
+LinkSpec = element link { LinkContents }
+
+NodeContents =
     # Each node has exactly one virtualization technology, which we simply
     # enumerate here
     attribute virtualization_type { "raw" | "trellis-vserver" |
@@ -27,17 +32,20 @@ include "../../assign/top.rnc" {
     }*
 
   LinkContents =
+	# Each link has exactly one virtualization technology, which we simply
+    # enumerate here
+    attribute virtualization_type { "raw" | "trellis-vserver" |
+      "planetlab-vserver" | "emulab-vnode" }? &
     # Link types
     LinkTypeList &
     # The interfaces which this link spans.
     element interface {
       InterfaceRef
     }*
-}
 
-NodeTypeList = NodeSpec.NodeType
+NodeTypeList = NodeTypeSpec+
 
-LinkTypeList = LinkSpec.LinkType+
+LinkTypeList = LinkTypeSpec+
 
 VirtualName = attribute virtual_id { text }
 
