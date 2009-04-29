@@ -148,8 +148,13 @@ sub new($$$$;$) {
     #
     # Find the class of switch - look for 4 digits in the switch type
     #
-    if ($self->{SWITCHTYPE} =~ /(\d{2})\d{2}/) {
-       $self->{SWITCHCLASS} = "${1}00";
+	if ($self->{SWITCHTYPE} =~ /(\d{2})(\d{2})/) {
+	   # Special case, that 2960
+	   if ($1 == "29" && $2 == "60") {
+	      $self->{SWITCHCLASS} = "2960";
+	   } else {
+		  $self->{SWITCHCLASS} = "${1}00";
+	   }
     } else {
         warn "snmpit: Unable to determine switch class for $name\n";
         $self->{SWITCHCLASS} = "6500";
@@ -1235,6 +1240,19 @@ sub UpdateField($$$@) {
 	    $self->debug("Port $port was $Status\n");
 	    if ($Status ne $val) {
 		$self->debug("Setting $port to $val...");
+
+		# For 2960, we must ensure that field updates use
+                # module 1 *not* 0
+		# This transforms a request like
+		#	portAdminSpeed.0.8.s100000000
+		# to
+		#	portAdminSpeed.1.8.s100000000
+		#
+		if ($self->{SWITCHCLASS} == "2960" &&
+			$port =~ /^(\d+)\.(\d+)$/ && $1 == 0) {
+			$port = "1.$2";
+		}
+
 		# Don't use async
 		my $result = snmpitSetWarn($self->{SESS},
                     [$OID,$port,$val,"INTEGER"]);
