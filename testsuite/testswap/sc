@@ -39,12 +39,11 @@ ShortCut
 END
 }
 
-my $pid = $TBConfig::DEFAULT_PID;
-
 if (@ARGV) {
   $_ = shift;
-  my $eid = shift;
-  my $e = e($pid, $eid);
+  if (/end/) { e($_)->end() for(@ARGV); }
+
+  my $e = e(shift);
   if (/--help/) { usage; } 
   elsif (/end/) { $e->end(); }
   elsif (/ping/ ) { $e->ping_test; }

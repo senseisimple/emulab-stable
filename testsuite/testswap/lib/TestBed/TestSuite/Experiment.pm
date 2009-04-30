@@ -11,6 +11,9 @@ use TestBed::TestSuite::Node;
 use TestBed::TestSuite::Link;
 
 extends 'Exporter', 'TestBed::XMLRPC::Client::Experiment';
+
+has 'ns' => ( isa => 'Str', is => 'rw');
+
 require Exporter;
 our @EXPORT;
 push @EXPORT, qw(launchpingkill launchpingswapkill);

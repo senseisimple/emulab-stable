@@ -9,7 +9,7 @@ use Data::Dumper;
 use TestBed::Wrap::tevc;
 
 has 'name' => ( isa => 'Str', is => 'rw');
-has 'experiment' => ( is => 'rw');
+has 'experiment' => ( isa => 'TestBed::TestSuite::Experiment', is => 'rw');
 
 =head1 NAME
 TestBed::TestSuite::Link

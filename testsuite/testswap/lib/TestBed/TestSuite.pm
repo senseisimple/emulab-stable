@@ -7,16 +7,16 @@ use Tools;
 
 require Exporter;
 our @ISA = qw(Exporter);
-our @EXPORT = qw(ee e pge dpe dpge CartProd CartProdRunner concretize defaults override);
+our @EXPORT = qw(e dpge CartProd CartProdRunner concretize defaults override);
 
-sub ee   { TestBed::TestSuite::Experiment->new }
-sub e    { TestBed::TestSuite::Experiment->new('pid' => shift, 'eid' => shift) }
-sub pge  { TestBed::TestSuite::Experiment->new('pid' => shift, 'gid' => shift, 'eid' => shift) }
-sub dpe  { TestBed::TestSuite::Experiment->new('pid' => $TBConfig::DEFAULT_PID, 'eid' => shift) }
-sub dpge { TestBed::TestSuite::Experiment->new(
-        'pid' => $TBConfig::DEFAULT_PID,
-        'gid' => ($TBConfig::DEFAULT_GID || $TBConfig::DEFAULT_PID),
-        'eid' => shift);
+sub e { TestBed::TestSuite::Experiment->new(_build_e_from_positionals(@_)); }
+
+sub _build_e_from_positionals {
+  if (@_ == 0) { return {}; }
+  if (@_ == 1) { return { 'eid' => shift }; }
+  if (@_ == 2) { return { 'pid' => shift, 'eid' => shift }; }
+  if (@_ == 3) { return { 'pid' => shift, 'gid' => shift, 'eid' => shift }; }
+  if (@_ >  3) { die 'Too many args to e'; }
 }
 
 sub CartProd {
@@ -92,25 +92,20 @@ TestBed::TestSuite
 
 =over 4
 
-=item C<ep()>
-
+=item C<e()>
 creates a new empty experiment, for calling experiement "class methods" on
+
+=item C<e($eid)>
+
+creates a new experiment with eid and uses the default pid and gid in TBConfig
 
 =item C<e($pid, $eid)>
 
-creates a new experiment with pid and eid
+creates a new experiment with pid and eid and uses the default gid in TBConfig
 
-=item C<pge($pid, $gid, $eid)>
+=item C<e($pid, $gid, $eid)>
 
 creates a new experiment with pid, gid, and eid
-
-=item C<dpe($eid)>
-
-new experiement takes one arg a eid and uses the default pid in TBConfig
-
-=item C<dpge($eid)>
-
-new experiement takes one arg a eid and uses the default pid and gid in TBConfig
 
 =item C<CartProd($hashref)> Cartesian Product Runner
 

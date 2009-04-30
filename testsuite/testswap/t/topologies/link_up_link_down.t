@@ -21,7 +21,7 @@ $ns run
 NSEND
 
 my $eid='linkupdown';
-my $e = dpe($eid);
+my $e = e($eid);
 
 $e->startrunkill($ns,  
   sub { 

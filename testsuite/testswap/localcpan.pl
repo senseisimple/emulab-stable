@@ -39,7 +39,9 @@ sub install_deps_from_cpan {
       Data::UUID
       IPC::Run3
       Crypt::SSLeay
+      Test::Exception
       );
+#      Test::Class
 #Crypt::SSLeay # required for SSL
 #Data::UUID requires user input
 #Net::Ping #tests fail, default installed version 2.31 is good enough

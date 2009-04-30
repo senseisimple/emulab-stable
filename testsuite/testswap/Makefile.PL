@@ -7,7 +7,7 @@ perl_version    '5.008';
 author          'Kevin Tew <tewk@flux.utah.edu>';
 version         '0.01';
 
-requires      'Mouse'               => '';
+requires      'Mouse'               => '0.22';
 requires      'RPC::XML::Client'    => '1.24';
 requires      'RPC::XML'            => '1.41';
 requires      'Test::More'          => '0.86';
@@ -17,7 +17,9 @@ requires      'Crypt::X509'         => '0.32';
 requires      'Log::Log4perl'       => '1.20';
 requires      'Data::UUID'          => '1.149';
 requires      'Net::Ping'           => '2.31';
-requires      'Crypt::SSLeay'       => '';
+requires      'Crypt::SSLeay'       => '0.57';
+requires      'Test::Class'         => '0.31';
+requires      'Test::Exception'     => '';
 
 =pod
 #too much effort to install for now

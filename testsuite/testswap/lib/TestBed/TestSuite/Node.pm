@@ -8,7 +8,7 @@ use Tools::TBSSH;
 use Data::Dumper;
 
 has 'name' => ( isa => 'Str', is => 'rw');
-has 'experiment' => ( is => 'rw');
+has 'experiment' => ( isa => 'TestBed::TestSuite::Experiment', is => 'rw');
 
 =head1 NAME
 TestBed::TestSuite::Node

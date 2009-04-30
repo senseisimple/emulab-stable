@@ -18,7 +18,7 @@ $ns run
 NSEND
 
 my $eid='simple';
-my $e = dpge($eid);
+my $e = e($eid);
 $e->startrunkill($ns,  
   sub { 
     my ($e) = @_; 
