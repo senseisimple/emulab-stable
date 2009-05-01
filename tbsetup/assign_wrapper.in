@@ -85,13 +85,15 @@ sub usage ()
 		 "implies -n\n";
     exit($WRAPPER_FAILED);
 }
-my $optlist  = "vutnfpr";
+my $optlist  = "vutnfprzxm:";
 my $verbose  = 0;
 my $fixmode  = 0;
 my $updating = 0;
 my $toponly  = 0;
 my $impotent = 0;
 my $precheck = 0;
+my $prepass  = 0;
+my $mfactor;
 my $regression=0;
 my $warnings = 0;
 
@@ -179,6 +181,12 @@ if (defined($options{"p"})) {
     $impotent = 1;
     $precheck = 1;
 }
+if (defined($options{"x"})) {
+    $prepass = 1;
+}
+if (defined($options{"m"})) {
+    $mfactor = $options{"m"};
+}
 if (defined($options{"f"})) {
     $fixmode = 1;
 }
@@ -187,6 +195,8 @@ if (defined($options{"r"})) {
 	fatal("Cannot use regression mode on main DB");
     }
     $regression = 1;
+    $regression++
+	if (defined($options{"z"}));
 }
 my $pid = $ARGV[0];
 my $eid = $ARGV[1];
@@ -982,6 +992,8 @@ TBDebugTimeStamp("assign_loop finished");
 # 
 sub RunAssign ()
 {
+    my $assignexitcode = 0;
+    
     # Clear globals for each run.
     undef %v2pmap;
     undef %p2vmap;
@@ -991,6 +1003,16 @@ sub RunAssign ()
 
     my %toreserve = ();
     my %subnodes  = ();
+
+    # Debugging hack for regression mode. Avoid really long assign runs.
+    if ($regression > 1) {
+	if (! -e "assign.log") {
+	    print "No existing assign results file!\n";
+	    return -1;
+	}
+	print "Using existing assign results file\n";
+	goto skiprun;
+    }
     
     TBDebugTimeStamp("ptopgen started");
     # Snapshot physical resources.
@@ -1046,7 +1068,7 @@ sub RunAssign ()
 
     # If doing an experiment with virtnodes, use the prepass wrapper for assign
     # Turned off for now, because it needs some work.
-    if ($useprepass) {
+    if ($useprepass || $prepass) {
     	$cmd = "assign_prepass";
     	$cmdargs = "-m $multiplex_factor $cmdargs"
     	    if ($multiplex_factor);
@@ -1091,7 +1113,7 @@ sub RunAssign ()
 	# the parent. 
 	#
         POSIX::setsid();
-	exec("nice assign_wrapper2 $cmd $cmdargs > assign.log");
+	exec("nice assign_wrapper2 $cmd $cmdargs > assign.log 2>&1");
 	die "Could not start assign!\n";
     }
 
@@ -1103,7 +1125,6 @@ sub RunAssign ()
 	      "Cancel flag set; aborting assign run!");
 	return -1;
     }
-
     # Check for possible full filesystem ...
     if (-z "assign.log") {
 	tbnotice("assign.log is zero length! Stopping ...\n");
@@ -1117,11 +1138,11 @@ sub RunAssign ()
     # out to the user directory every swapin. See Experiment.pm
     my $assignlog = ($regression ? "$pid-$eid.assign" : "$pid-$eid-$$.assign");
     system("/bin/cp assign.log $assignlog");
+  skiprun:
     if (!open(ASSIGNFP, "assign.log")) {
 	print("Could not open assign logfile!\n");
 	return -1;
     }
-
     printdb "Reading assign results.\n";
 
     #
@@ -3042,6 +3063,9 @@ sub InitPnode($$)
 	    else {
 		$osid = nodedelayosid(physnodetype($pnode));
 	    }
+	    fatal("No OSID is defined for internal node on $pnode ($vnode)!")
+		if (!defined($osid));
+
 	    $expt_stats{"delaynodes"} += 1;
 	    $vname = $vnode;
 	    $role  = TBDB_RSRVROLE_DELAYNODE;
@@ -3059,6 +3083,9 @@ sub InitPnode($$)
 	    else {
 		$osid = nodejailosid($pnode);
 	    }
+	    fatal("No OSID is defined for internal node on $pnode ($vnode)!")
+		if (!defined($osid));
+
 	    $expt_stats{"jailnodes"} += 1;
 	    #
 	    # Set the vname to something useful.
@@ -3072,9 +3099,6 @@ sub InitPnode($$)
 	    }
 	    $cmdline_role = "vnodehost";
 	}
-	fatal("No OSID is defined for internal node $vname!")
-	    if (!defined($osid));
-
 	$cmdline = osidbootcmd($osid, $cmdline_role, $cmdline);
 	fatal("Unexpected error determining boot command line for $pnode")
 	    if (!defined($cmdline));
@@ -4203,7 +4227,8 @@ sub LoadVirtLans()
 	DBQueryFatal("select v.*,vll.idx from virt_lans as v ".
 		     "left join virt_lan_lans as vll on ".
 		     "  vll.exptidx=v.exptidx and vll.vname=v.vname ".
-		     "where v.pid='$pid' and v.eid='$eid'");
+		     "where v.pid='$pid' and v.eid='$eid' ".
+		     "order by vname,vnode,vport");
     
     while (my $rowref = $query_result->fetchrow_hashref()) {
 	my $vname  = $rowref->{"vname"};
@@ -4462,7 +4487,7 @@ sub LoadExperiment()
 	if (!defined($uselinkdelays));
     $forcelinkdelays = $o2
 	if (!defined($forcelinkdelays));
-    $multiplex_factor = $o3
+    $multiplex_factor = $mfactor || $o3
 	if (!defined($multiplex_factor));
     $usewatunnels = $o4
 	if (!defined($usewatunnels));
