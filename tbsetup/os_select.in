@@ -69,8 +69,8 @@ my $tempmode	= 0; # apply change to temp_boot_osid.
 my $clear       = 0; # Clear the selected boot (def,temp,next).
 my $default     = 0; # Reset back to default osid.
 my @nodes       = ();
-my $osid;
-my $osinfo;
+my $osid	= "";
+my $opmode;
 
 # Set up syslog
 openlog("osselect", "pid", $TBLOG);
@@ -132,29 +132,125 @@ if ($UID && !TBAdmin($UID) &&
 # Grab the info for the OSID. 
 #
 if (! ($clear || $default)) {
-    $osinfo = OSinfo->Lookup($osid);
+    my $osinfo = OSinfo->Lookup($osid);
     fatal("Improper DB entry for OSID: $osid")
 	if (!defined($osinfo));
-}
-elsif ($default) {
-    $osinfo = "<DEFAULT>";
+    $opmode = $osinfo->op_mode();
 }
 
 foreach my $node (@nodes) {
-    my $nodeobject = Node->Lookup($node);
+    my $curmode = node_opmode($node);
 
-    # The field to change in the DB. 
+    if ($default) {
+	my $nodeobject = Node->Lookup($node);
+	fatal("Could not map $node to its object")
+	    if (!defined($nodeobject));
+	my $osinfo = OSinfo->Lookup($nodeobject->default_osid());
+	fatal("Could not map default_osid to its object for $node")
+	    if (!defined($osinfo));
+	my $nextosinfo = $osinfo->ResolveNextOSID();
+	fatal("Could not resolve nextosid for $osinfo")
+	    if (!defined($nextosinfo));
+	$osid = $nextosinfo->osid();
+	$opmode = $nextosinfo->op_mode();
+    }
+
+    # Why? When will this happen?
+    next
+	if (!$curmode);
+    
+    debug("Current opmode for $node is $curmode.\n");
+
+    # Set/Clear the osid.
+    set_boot_osid($node);
+
+    #
+    # Determine what osid the node will now boot. We need to know this so we
+    # can set the next opmode. This call has to return *something* or we are
+    # screwed since we will not be able to figure out the opmode.
+    #
+    my ($bootosid, $bootopmode) = TBBootWhat($node, $debug);
+
+    fatal("Bootwhat query failed for $node!")
+	if (!$bootosid);
+    debug("Bootwhat says: $node => $bootosid\n");
+
+    #
+    # If its different then what the node is currently booting, then
+    # set up a transition in stated. If no change, be sure to clear
+    # is since stated does not like a transition to be specified when
+    # none is actually going to be made.
+    #
+    if ($curmode ne $bootopmode) {
+	set_nextmode($node, $bootopmode);
+    }
+    else {
+	# Must clear it.
+	set_nextmode($node, "");
+    }
+}
+exit(0);
+
+#
+# Subroutines
+#
+
+# Set the next_op_mode field for a node.
+sub set_nextmode($;$)
+{
+    my ($node, $opmode) = @_;
+
+    if ($opmode eq "") {
+	debug("Clearing next_op_mode for $node.\n");
+    }
+    else {
+	debug("Setting next_op_mode for $node to $opmode.\n");    
+    }
+    
+    DBQueryFatal("update nodes set next_op_mode='$opmode' ".
+		 "where node_id='$node'");
+    return 0;
+}
+
+# Set (or clear) the boot osid.
+sub set_boot_osid($) {
+    my ($node) = @_;
     my $field  = "def_boot_osid";
+    my $value;
+
     $field = "next_boot_osid"
 	if ($oneshot);
     $field = "temp_boot_osid"
 	if ($tempmode);
 
-    if ($nodeobject->OSSelect($osinfo, $field, $debug) != 0) {
-	fatal("OSSelect(): " . ($osinfo ? "$osinfo " : "") ."failed on $node");
+    if ($clear) {
+	debug("Clearing $field for $node.\n");
+	$value = "NULL";
     }
+    else {
+	debug("Setting $field for $node to $osid.\n");
+	$value = "'$osid'";
+    }
+    
+    DBQueryFatal("update nodes set ${field}=${value} where node_id='$node'");
 }
-exit(0);
+
+# Return current opmode that a node is set to.
+sub node_opmode($)
+{
+    my ($node) = @_;
+    my $opmode;
+
+    if (! TBGetNodeOpMode($node, \$opmode)) {
+	fatal("Could not get opmode for node $node!");
+    }
+    if (!defined($opmode) || $opmode eq "" ||
+	$opmode eq TBDB_NODEOPMODE_UNKNOWN) {
+	warning("Invalid opmode $opmode for $node.\n");
+	return 0;
+    }
+    return $opmode;
+}
 
 sub debug($;$)
 {
