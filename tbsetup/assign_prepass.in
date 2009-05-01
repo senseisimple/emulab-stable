@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2008 University of Utah and the Flux Group.
+# Copyright (c) 2004-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -96,7 +96,7 @@ $newgraph = combine_links($newgraph);
 
 # Make a filename for our coarsened topfile
 my $tmp_topfile = $topfile;
-$tmp_topfile =~ s/(\.top)?$/-coarsened$1/;
+$tmp_topfile =~ s/(\.v?top)?$/-coarsened$1/;
 
 print "Generating new topfile\n";
 my @topfile = generate_topfile($newgraph);
@@ -319,6 +319,10 @@ sub parse_ptop($) {
 	my @tokens = split /\s+/,$line;
 	next unless (@tokens); # Skip blank lines
 	SWITCH: for (shift @tokens) {
+	    /^set-type-limit$/ && do {
+		# Skip these.
+		last;
+	    };
 	    /^node$/ && do {
 		my $name = shift @tokens;
 		my @types;
