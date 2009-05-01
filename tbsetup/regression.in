@@ -12,12 +12,15 @@ use POSIX ":sys_wait_h";
 
 sub usage ()
 {
-    print STDERR "Usage: $0 [-v] pid eid\n";
+    print STDERR "Usage: $0 [-v] [-p] pid eid\n";
     print STDERR " -v   - Enables verbose output\n";
+    print STDERR " -p   - Turn on assign prepass\n";
     exit(1);
 }
-my $optlist    = "v";
+my $optlist    = "vpm:";
 my $verbose    = 0;
+my $prepass    = 0;
+my $mfactor;
 my $optarg     = "";
 
 #
@@ -62,6 +65,14 @@ if (defined($options{"v"})) {
     $verbose++;
     $optarg = "-v";
 }
+if (defined($options{"p"})) {
+    $prepass = 1;
+    $optarg  = "$optarg -x";
+}
+if (defined($options{"m"})) {
+    $mfactor = $options{"m"};
+    $optarg  = "$optarg -m $mfactor";
+}
 
 my $this_user = User->ThisUser();
 if (! defined($this_user)) {
@@ -69,27 +80,32 @@ if (! defined($this_user)) {
 }
 
 my @builtintests = ( 
-		     ["testbed",    "two-simple"],
-		     ["testbed",    "lan-link-delay"],
-		     ["testbed",    "lan-link-tbdelay"],
-		     ["testbed",    "jail-linklan-delay"],
-		     ["testbed",    "jail-delayed-router"],
-		     ["testbed",    "jail-lan-NN"],
-		     ["testbed",    "myelab"],
-		     ["emulab-ops", "virt-mesh"],
-		     ["SkyNet",     "100nodebig"],
-		     ["tbres",      "lt-meshtest"],
-		     ["tbres",      "vnode-pairs"],
-		     ["testbed",    "bigolesnake"],
-		     ["testbed",    "firewall"],
-		     ["testbed",    "fourswitch"],
-		     ["testbed",    "planetlab2"], 
-		     ["tbres",      "mess"],
-		     ["tbres",      "pelab-bt-fake"],
+		     ["testbed",      "two-simple"],
+		     ["testbed",      "lan-link-delay"],
+		     ["testbed",      "lan-link-tbdelay"],
+		     ["testbed",      "jail-linklan-delay"],
+		     ["testbed",      "jail-delayed-router"],
+		     ["testbed",      "jail-lan-NN"],
+		     ["testbed",      "myelab"],
+		     ["emulab-ops",   "virt-mesh"],
+		     ["SkyNet",       "100nodebig"],
+		     ["puproj",       "CRAQ-LAN"],
+		     ["DDoS-Defense", "streamPuzzles2"],
+		     ["ShadowCfg",    "pplive-ct-zj"],
+		     ["tbres",        "lt-meshtest"],
+		     ["tbres",        "vnode-pairs"],
+		     ["testbed",      "bigolesnake"],
+		     ["testbed",      "firewall"],
+		     ["testbed",      "fourswitch"],
+		     ["testbed",      "planetlab2"], 
+		     ["tbres",        "mess"],
+		     ["tbres",        "pelab-bt-fake"],
 		     # Template 11361/46
-		     ["tbres",      "T11361-46"], 
+		     ["tbres",        "T11361-46"], 
 		     # Template 11953/3
-		     ["tbres",      "T11953-3"],
+		     ["tbres",        "T11953-3"],
+		     # This takes a long time!
+		     ["SkyNet",       "500nodebig"],
 		   );
 
 if (@ARGV) {
