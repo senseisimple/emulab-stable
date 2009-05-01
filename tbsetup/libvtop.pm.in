@@ -38,7 +38,7 @@ my $AVAIL         = "$TB/bin/avail";
 my $NALLOC        = "$TB/bin/nalloc";
 my $NFREE         = "$TB/bin/nfree";
 my $OS_SELECT     = "$TB/bin/os_select";
-my $DELAYCAPACITY = @DELAYCAPACITY@;	# Can be overridden by user!
+my $DELAYCAPACITY = @DELAYCAPACITY@;	# Can be overridden by user.
 my $DELAYTHRESH   = @DELAYTHRESH@;
 
 # Flags.
@@ -85,14 +85,15 @@ sub Create($$$)
 			      "links"  => [],
 			      "class"  => [],
 			      "fixed"  => [] };
-    
-    $self->{'PNODES'}      = {};
+
+    # Mostly for update mode.
     $self->{'FIXEDNODES'}  = {};
     $self->{'CURRENT_V2P'} = {};
     $self->{'CURRENT_P2V'} = {};
     $self->{'CURRENT_V2V'} = {};
 
     # Below is for interpretation of assign results.
+    $self->{'PNODES'}      = {};
     $self->{'SOLUTION'}    = {};
     $self->{'OLDRSRVCLEAN'}= 0;
     $self->{'NEWRESERVED'} = {};	# Newly reserved nodes.
@@ -188,6 +189,7 @@ sub plabcount($)	{ return $_[0]->counter("plabcount"); }
 sub virtnodecount($)	{ return $_[0]->counter("virtcount"); }
 sub simnodecount($)	{ return $_[0]->counter("simcount"); }
 sub remotenodecount($)	{ return $_[0]->counter("remotecount"); }
+sub sharednodecount($)	{ return $_[0]->counter("sharedcount"); }
 
 ###############################################################################
 # Virtual Nodes. A separate package so we can create objects for each one
@@ -560,8 +562,9 @@ sub LoadPhysInfo($)
     # Here it goes getting even worse - we have to do a similar thing for
     # vtypes.
     #
-    foreach my $vtype ($self->VirtTypes()) {
-	my @members = split(" ", $vtype->members());
+    foreach my $ref ($self->VirtTypes()) {
+	my $vtype   = $ref->name();
+	my @members = split(" ", $ref->members());
 
 	foreach my $phystype (@members) {
 	    next
@@ -771,6 +774,9 @@ sub LoadVirtNodes($)
 	$vnode->_isdynamic($isdyn);
 	$vnode->_isdedremote($isded);
 
+	# User says a shared node is okay.
+	$vnode->_sharedokay(($isvirt && $vnode->sharing_mode() ? 1 : 0));
+
 	# The mapped osname to actual osinfo structure.
 	$vnode->_osinfo(undef);
 	# Eventual physical mapping. 
@@ -807,7 +813,7 @@ sub LoadVirtNodes($)
 	}
 
 	$self->printdb("  $vname type:$type ips:$ips\n");
-	$self->printdb("         isrem:$isremote isvirt:$isvirt ");
+	$self->printdb("         isrem:$isremote isvirt:$isvirt");
 	$self->printdb("fixed:$fixed")
 	    if (defined($fixed));
 	$self->printdb("\n");
@@ -831,6 +837,8 @@ sub LoadVirtNodes($)
 	    if ($isplab);
 	$self->{'COUNTERS'}->{'physcount'}++
 	    if (!$issim && !$isvirt);
+	$self->{'COUNTERS'}->{'sharedcount'}++
+	    if ($isvirt && $vnode->_sharedokay());
 
 	# stats
 	my @iplist  = split(" ", $ips);
@@ -1094,6 +1102,11 @@ sub GenVirtNodes($)
     foreach my $vname (sort(keys(%{ $self->{'VNODES'} }))) {
 	my $vnode = $self->vnodes()->{$vname};
 	my $type  = $vnode->type();
+
+	# XXX prototyping shared mode.
+	if ($type eq "pcvm" && $vnode->_sharedokay()) {
+	    $type = "pcshared";
+	}
 
 	my $subnodestr = "";
 	if ($vnode->_issubnode()) {
@@ -2159,6 +2172,7 @@ sub CreateVtop($)
     $self->{'COUNTERS'}->{'virtcount'}   = 0;
     $self->{'COUNTERS'}->{'plabcount'}   = 0;
     $self->{'COUNTERS'}->{'physcount'}   = 0;
+    $self->{'COUNTERS'}->{'sharedcount'} = 0;
 
     #
     # Experiment wide options.
@@ -2750,6 +2764,8 @@ sub InterpNodes($)
 	    }
 	}
 	else {
+	    my $pnodeobj = Node->Lookup($physical);
+
 	    #
 	    # This is a new node; we have to reserve it. Note that
 	    # we do not reserve a widearea physnode when a virtual node
@@ -2759,10 +2775,13 @@ sub InterpNodes($)
 	    # a delay.
 	    #
 	    $self->solution()->{'TORESERVE'}->{$physical} = 1
-		if (!defined($virtnode) ||
-		    !$virtnode->_isvirtnode() ||
-		    !($virtnode->_isremotenode() &&
-		      !$virtnode->_isdedremote()));
+		if ((!defined($virtnode) ||
+		     !$virtnode->_isvirtnode() ||
+		     !($virtnode->_isremotenode() &&
+		       !$virtnode->_isdedremote())) &&
+		    # Avoid allocating local shared physical node.
+		    !(defined($virtnode) && $virtnode->_isvirtnode() &&
+		      defined($pnodeobj->sharing_mode())));
 	}
 
 	if (!defined($virtnode)) {
@@ -2817,8 +2836,13 @@ sub AllocNodes($)
     my $eid = $experiment->eid();
     my $idx = $experiment->idx();
 	
-    goto skip
-	if ($self->impotent());
+    if ($self->impotent()) {
+	my @nodeids = keys(%{ $self->solution()->{'TORESERVE'} });
+
+	tbinfo("Pretending to allocate @nodeids\n")
+	    if (@nodeids);
+	goto skip;
+    }
 
     #
     # Move existing nodes into a holding experiment and then back.
@@ -2989,10 +3013,7 @@ sub AllocNodes($)
 	tberror("Could not allocate virtual nodes\n");
 	return -1;
     }
-    if ($self->impotent()) {
-	tbinfo("Pretending we could allocate all physical nodes we needed.\n");
-    }
-    else {
+    if (!$self->impotent()) {
 	tbinfo("Successfully reserved all physical nodes we needed.\n");
     }
 
@@ -3456,8 +3477,8 @@ sub InterpLinks($)
 	    #
 	    # Set up tracing across the delay node (both directions).
 	    #
-	    $self->SetUpTracing($lan, $member0, $nodeB, $portB, $portD);
-	    $self->SetUpTracing($lan, $member1, $nodeB, $portD, $portB);
+	    $self->SetUpTracing($virtlan, $member0, $nodeB, $portB, $portD);
+	    $self->SetUpTracing($virtlan, $member1, $nodeB, $portD, $portB);
 	}
 	elsif ($linktag eq "linkdelaysrc") {
 	    # trivial links do not have physical links, so no delay nodes.
@@ -3517,7 +3538,7 @@ sub InterpLinks($)
 	    # Set up tracing across the delay node (one direction
 	    # cause its a lan).
 	    #
-	    $self->SetUpTracing($lan, $member0, $nodeB, $portB, $portD);
+	    $self->SetUpTracing($virtlan, $member0, $nodeB, $portB, $portD);
 	}
 	elsif ($linktag eq "linksimple") {
 	    # The other node in the link that correspond to the topology.
@@ -3637,8 +3658,8 @@ sub InterpLinks($)
 	    # Set up tracing across the link. There is trace on each end node,
 	    # on the output (after the linkdelay above).
 	    #
-	    $self->SetUpTracing($lan, $member0, $nodeA, undef, $portA);
-	    $self->SetUpTracing($lan, $member1, $nodeB, undef, $portB);
+	    $self->SetUpTracing($virtlan, $member0, $nodeA, undef, $portA);
+	    $self->SetUpTracing($virtlan, $member1, $nodeB, undef, $portB);
 	}
 	elsif ($linktag eq "linklan") {
 	    # A single node in a lan, no delay node.
@@ -3795,7 +3816,7 @@ sub InterpLinks($)
 	    #
 	    # Set up tracing on the end node (one direction cause its a lan).
 	    #
-	    $self->SetUpTracing($lan, $member0, $nodeA, undef, $portA);
+	    $self->SetUpTracing($virtlan, $member0, $nodeA, undef, $portA);
 	}
 	elsif ($linktag eq "fakelan") {
 	    #
@@ -3816,7 +3837,7 @@ sub InterpLinks($)
 	    #
 	    # Set up tracing on the end node (one direction cause its a lan).
 	    #
-	    $self->SetUpTracing($lan, $member0, $nodeA, undef, $portA);
+	    $self->SetUpTracing($virtlan, $member0, $nodeA, undef, $portA);
 	}
 	elsif ($plink =~ m|^linkdelaydst/([^/]+)/(.+)$| ||
 	       $plink =~ m|^linksdelaydst/(.+)/(.+),(.+)$|) {
@@ -3924,11 +3945,25 @@ sub InitializePhysNode($$$)
 	   !$pnode->isdedicatedremote()) {
 	#
 	# We never allocate remote pnodes (always allocated), so skip.
+	# Ditto for local pnodes in shared mode. 
 	#
 	return 0;
     }
     elsif (!defined($vpnode) ||
 	   exists($self->solution_virtnodes()->{$pnodename})) {
+
+	#
+	# Watch for a local shared node that is not actually part of
+	# this experiment; just skip it since it was setup when its
+	# holding experiment swapped it in.
+	#
+	if (defined($pnode->sharing_mode()) &&
+	    $pnode->sharing_mode() eq "shared_local" &&
+	    !$pnode->isvirtnode()) {
+	    $self->printdb("InitPnode: Skipping shared_local node $pnode\n");
+	    return 0;
+	}
+    
 	#
 	# One of our internally created nodes. 
 	#
@@ -4022,6 +4057,11 @@ sub InitializePhysNode($$$)
 	    tberror("Error determining boot command line for $pnode\n");
 	    return -1;
 	}
+	if (!$pnode->isvirtnode() &&
+	    defined($virtnode->sharing_mode()) &&
+	    $virtnode->sharing_mode() eq "shared_local") {
+	    $role = "sharedhost";
+	}
 	%nodesets = ("def_boot_cmd_line" => $cmdline,
 		     "startstatus"       => 'none',
 		     "bootstatus"        => 'unknown',
@@ -4037,6 +4077,7 @@ sub InitializePhysNode($$$)
 		     "plab_role"         => $plab_role);
 	$rsrvsets{"inner_elab_role"} = $inner_elab_role
 	    if (defined($inner_elab_role));
+
     }
     $self->printdb("InitPnode: $pnodename $vnodename\n");
 
@@ -4061,10 +4102,24 @@ sub InitializePhysNode($$$)
     # Now call os_select.
     #
     if (defined($osid)) {
-	$self->printdb("  os_select $osid\n");
-	
-	system("$OS_SELECT $osid $pnodename") == 0
-	    or return -1 if (!$self->impotent());
+	if ($self->impotent()) {
+	    $self->printdb("  pretending to os_select $osid\n");
+	}
+	else {
+	    $self->printdb("  os_select $osid\n");
+
+	    # osselect wants an osinfo object.
+	    my $tmposinfo = OSinfo->Lookup($osid);
+	    if (!defined($tmposinfo)) {
+		tberror("Could not map $osid to osinfo object\n");
+		return -1;
+	    }
+	    if ($pnode->OSSelect($tmposinfo, "def_boot_osid",
+				 $self->verbose())) {
+		tberror("OSSelect($pnode,$tmposinfo) failed\n");
+		return -1;
+	    }
+	}
     }
     # Clear this after os_select.
     if ($self->regression()) {
