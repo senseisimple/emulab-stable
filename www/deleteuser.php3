@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2006, 2007, 2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -225,7 +225,12 @@ if (!isset($confirmed_twice)) {
     return;
 }
 
-STARTBUSY("User '$target_uid' is being removed!");
+if (isset($target_project)) {
+    STARTBUSY("User '$target_uid' is being removed from '$target_pid'!");
+}
+else {
+    STARTBUSY("User '$target_uid' is being removed!");
+}
 
 #
 # All the real work is done in the script.
