@@ -958,6 +958,18 @@ sub vname($)
 
     return $self->{"RSRV"}->{'vname'};
 }
+sub sharing_mode($)
+{
+    my ($self) = @_;
+
+    return undef
+	if (! ref($self));
+
+    return undef
+	if (! $self->IsReserved());
+
+    return $self->{"RSRV"}->{'sharing_mode'};
+}
 
 #
 # Lookup a specific attribute in the node_attributes table, 
@@ -1428,6 +1440,7 @@ sub CreateVnodes($$)
     }
     my $isremote = $nodetype->isremotenode();
     my $isjailed = $nodetype->isjailed();
+    my $sharing_mode = $node->sharing_mode();
 
     #
     # Make up a priority (just used for sorting). We need the name prefix
@@ -1623,7 +1636,7 @@ sub CreateVnodes($$)
 	}
 
 	#
-	# Also reserve the node!
+	# Also reserve the node.
 	#
 	my %rsrvsets = ("node_id" => $vnodeid,
 			"exptidx" => $exptidx, 
@@ -1632,6 +1645,11 @@ sub CreateVnodes($$)
 			"vname"   => $vnodeid,
 			"old_pid" => "",
 			"old_eid" => "");
+
+	# This is temporary for prototyping the shared local node support.
+	# Not sure how this will shake out yet.
+	$rsrvsets{"sharing_mode"} = "using_shared_local"
+	    if (defined($sharing_mode));
 			
 	$statement = "insert into reserved set ".
 	    join(",", map("$_='" . $rsrvsets{$_} . "'", keys(%rsrvsets)));
@@ -1956,6 +1974,74 @@ sub SetStatus($$)
     $self->{"DBROW"}->{'node_status'} = $status;
     return 0;
 }
+
+#
+#
+#
+sub OSSelect($$$$)
+{
+    my ($self, $osinfo, $field, $debug) = @_;
+    my $nodeid  = $self->node_id();
+    my $curmode = $self->op_mode();
+
+    # Why? When will this happen?
+    return 0
+	if (!$curmode);
+
+    # Special token, sorry.
+    if (defined($osinfo) && "$osinfo" eq "<DEFAULT>") {
+	$osinfo = OSinfo->Lookup($self->default_osid());
+	if (!defined($osinfo)) {
+	    print STDERR "Could not map default_osid for $nodeid\n";
+	    return -1;
+	}
+	my $nextosinfo = $osinfo->ResolveNextOSID();
+	if (!defined($nextosinfo)) {
+	    print STDERR "Could not resolve nextosid for $osinfo\n";
+	    return -1;
+	}
+	$osinfo = $nextosinfo;
+    }
+    
+    print STDERR "Current opmode for $nodeid is $curmode.\n"
+	if ($debug);
+    print STDERR "Setting $field for $nodeid to $osinfo.\n"
+	if ($debug && defined($osinfo));
+
+    # Set/Clear the osid.
+    DBQueryWarn("update nodes set ${field}=".
+		(defined($osinfo) ? "'" . $osinfo->osid() . "' " : "NULL ") .
+		"where node_id='$nodeid'")
+	or return -1;
+
+    #
+    # Determine what osid the node will now boot. We need to know this so we
+    # can set the next opmode. This call has to return *something* or we are
+    # screwed since we will not be able to figure out the opmode.
+    #
+    my ($bootosid, $bootopmode) = TBBootWhat($nodeid, $debug);
+    if (!$bootosid) {
+	print STDERR "Bootwhat query failed for $nodeid!\n";
+	return -1;
+    }
+    print STDERR "Bootwhat says: $nodeid => $bootosid,$bootopmode\n"
+	if ($debug);
+
+    #
+    # If its different then what the node is currently booting, then
+    # set up a transition in stated. If no change, be sure to clear
+    # is since stated does not like a transition to be specified when
+    # none is actually going to be made.
+    #
+    if ($curmode eq $bootopmode) {
+	$bootopmode = "";
+    }
+    DBQueryWarn("update nodes set next_op_mode='$bootopmode' ".
+		 "where node_id='$nodeid'")
+	or return -1;
+
+    return Refresh($self);
+}    
 
 # _Always_ make sure that this 1 is at the end of the file...
 
