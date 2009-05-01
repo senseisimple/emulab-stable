@@ -1306,7 +1306,7 @@ int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed, bool skip
     }
   }
 
-  SDEBUG(cerr << "  assignment=" << vnode->assignment << endl);
+  SDEBUG(cerr << "  assignment=" << pnode->name << endl);
   SDEBUG(cerr << "  new score=" << score << " new violated=" << violated << endl);
 
   if (!tr->is_static) {

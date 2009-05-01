@@ -96,7 +96,7 @@ public:
 
   friend ostream &operator<<(ostream &o, const tb_pclass& p)
   {
-    o << p.name << "(" << &p << ") size=" << p.size <<
+    o << p.name << " size=" << p.size <<
       " used_members=" << p.used_members << " disabled=" << p.disabled << "\n";
     pclass_members_map::const_iterator dit;
     for (dit=p.members.begin();dit!=p.members.end();++dit) {
