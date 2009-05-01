@@ -44,18 +44,23 @@ sub usage ()
     print STDERR " -f   - Fix current resources during update mode\n";
     print STDERR " -n   - Run assign, but do not reserve/modify resources.\n";
     print STDERR " -r   - Regression mode.\n";
+    print STDERR " -x   - Turn on the prepass\n";
+    print STDERR " -m   - Set the multiplex factor; overrides experiment.\n";
     print STDERR " -p   - Do a precheck for mapability on an empty testbed - ".
 		 "implies -n\n";
     exit($WRAPPER_FAILED);
 }
-my $optlist    = "dvunfprqc";
+my $optlist    = "dvunfprqczxm:";
 my $verbose    = 0;
 my $debug      = 0;
 my $fixmode    = 0;
 my $updating   = 0;
 my $impotent   = 0;
 my $precheck   = 0;
+my $prepass    = 0;
+my $mfactor;
 my $regression = 0;
+my $noassign   = 0;  # Only with regression mode, use previous solution.
 my $quiet      = 0;
 my $clear      = 0;
 my $warnings   = 0;
@@ -137,6 +142,12 @@ if (defined($options{"f"})) {
 if (defined($options{"p"})) {
     $precheck = 1;
 }
+if (defined($options{"x"})) {
+    $prepass = 1;
+}
+if (defined($options{"m"})) {
+    $mfactor = $options{"m"};
+}
 if (defined($options{"r"})) {
     if ($DBNAME eq "tbdb") {
 	fatal("Cannot use regression mode on main DB");
@@ -144,6 +155,8 @@ if (defined($options{"r"})) {
     $regression = 1;
     $clear = 1;
     TBDebugTimeStampsOn();
+    $noassign = 1
+	if (defined($options{"z"}));
 }
 if (defined($options{"q"})) {
     $quiet = 1;
@@ -205,19 +218,25 @@ if ($updating) {
     TBDebugTimeStamp("LoadCurrentResources ended");
 }
 if (!$impotent && ($updating || $clear)) {
-    if ($regression) {
+    if ($regression || $clear) {
 	chat("Freeing reserved nodes in regression mode\n");
 	system("export NORELOAD=1; $NFREE -x -a $pid $eid") == 0
 	    or fatal("Could not release nodes in regression mode");
     }
     chat("Clearing physical state before updating.\n");
     $experiment->RemovePhysicalState();
+    exit(0)
+	if ($clear && !$regression);
 }
 TBDebugTimeStamp("vtopgen started");
 $vtop->CreateVtop() == 0
     or fatal("Could not create vtop for $experiment");
 TBDebugTimeStamp("vtopgen finished");
 
+# multiplex_factor default.
+$mfactor = $experiment->multiplex_factor()
+    if (!defined($mfactor) && defined($experiment->multiplex_factor()));
+    
 #
 # The assign loop. 
 #
@@ -324,6 +343,16 @@ sub RunAssign($$)
     my $vtopfile = $prefix . ".vtop";
     my $assignexitcode = 0;
 
+    # Debugging hack for regression mode. Avoid really long assign runs.
+    if ($regression && $noassign) {
+	if (! -e "assign.log") {
+	    chat("No existing assign results file!\n");
+	    return -1;
+	}
+	chat("Using existing assign results file\n");
+	goto skiprun;
+    }
+    
     #
     # Do admission control test, and gather the info.
     #
@@ -346,14 +375,16 @@ sub RunAssign($$)
 	if ($updating);
     $ptopargs   .= "-u "
 	if ($updating && $experiment->elabinelab());
-    $ptopargs   .= "-m " . $experiment->multiplex_factor() . " "
-	if (defined($experiment->multiplex_factor()));
+    $ptopargs   .= "-m $mfactor "
+	if (defined($mfactor));
     $ptopargs   .= "-v "
 	if ($vtop->virtnodecount());
     $ptopargs   .= "-r "
 	if ($vtop->remotenodecount());
     $ptopargs   .= "-S "
 	if ($vtop->simnodecount());
+    $ptopargs   .= "-h "
+	if ($vtop->sharednodecount());
     $ptopargs	.= "-a "
     	if ($precheck);
     $ptopargs	.= "-c " . $experiment->delay_capacity() . " "
@@ -405,6 +436,8 @@ sub RunAssign($$)
     }
 
     # Run assign
+#    my $cmd  = "assign-dev";
+#    my $args = "-P -x $ptopfile -y $vtopfile";
     my $cmd  = "assign";
     my $args = "-P $ptopfile $vtopfile";
     $args = "-uod -c .75 $args"
@@ -413,6 +446,13 @@ sub RunAssign($$)
     	if ($precheck);
     $args = "-s 123456 $args"
 	if ($regression);
+
+    # The prepass speeds up assign on big tops with virtual nodes.
+    if ($prepass) {
+    	$cmd = "assign_prepass";
+    	$args = "-m $mfactor $args"
+    	    if (defined($mfactor));
+    }
     chat("assign command: '$cmd $args'\n");
 
     #
@@ -450,7 +490,7 @@ sub RunAssign($$)
 	# the parent. 
 	#
         POSIX::setsid();
-	exec("nice $WRAPPER2 $cmd $args > assign.log");
+	exec("nice $WRAPPER2 $cmd $args > assign.log 2>&1");
 	die("Could not start assign!\n");
     }
     TBDebugTimeStamp("assign finished");
@@ -493,7 +533,7 @@ sub RunAssign($$)
 	chat("Precheck succeeded.\n");
 	return 0;
     }
-
+  skiprun:
     chat("Reading assign results.\n");
     if (!open(ASSIGNFP, "assign.log")) {
 	print("Could not open assign logfile! $!\n");
