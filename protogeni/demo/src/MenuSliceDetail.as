@@ -15,6 +15,7 @@
 package
 {
   import flash.display.DisplayObjectContainer;
+  import flash.text.TextField;
 
   class MenuSliceDetail extends MenuState
   {
@@ -37,9 +38,8 @@ package
       nodes = new ActiveNodes(parent, clip.nodeList, clip.description);
       cm = new ComponentManager(clip.cmSelect, clip.nodeList, nodes);
       credential.setupSlivers(cm.getCmCount());
-      console = new Console(parent, nodes, cm, clip.consoleButton,
-                            clip.createSliversButton, clip.bootSliversButton,
-                            clip.deleteSliversButton, credential);
+      console = new Console(parent, nodes, cm, clip,
+                            credential, Main.getText());
       console.discoverResources();
     }
 
@@ -49,6 +49,11 @@ package
       cm.cleanup();
       nodes.cleanup();
       clip.parent.removeChild(clip);
+    }
+
+    override public function getConsole() : TextField
+    {
+      return console.getConsole();
     }
 
     var sliceName : String;

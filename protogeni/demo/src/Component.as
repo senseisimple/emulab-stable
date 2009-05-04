@@ -1,5 +1,5 @@
 /* GENIPUBLIC-COPYRIGHT
- * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
+ * Copyright (c) 2009 University of Utah and the Flux Group.
  * All rights reserved.
  *
  * Permission to use, copy, modify and distribute this software is hereby
@@ -12,28 +12,22 @@
  * FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
  */
 
+// A component has the raw information from the ptop file which is
+// used to create nodes.
+
 package
 {
-  import flash.display.DisplayObjectContainer;
-  import flash.text.TextField;
-
-  class MenuState
+  public class Component
   {
-    public function MenuState() : void
+    public function Component() : void
     {
+      name = "";
+      uuid = "";
+      interfaces = new Array();
     }
 
-    public function init(parent : DisplayObjectContainer) : void
-    {
-    }
-
-    public function cleanup() : void
-    {
-    }
-
-    public function getConsole() : TextField
-    {
-      return null;
-    }
+    public var name : String;
+    public var uuid : String;
+    public var interfaces : Array;
   }
 }

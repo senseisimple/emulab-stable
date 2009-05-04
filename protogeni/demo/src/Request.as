@@ -42,6 +42,11 @@ package
       return opName;
     }
 
+    public function getUrl() : String
+    {
+      return op.getUrl();
+    }
+
     public function start(credential : Credential) : Operation
     {
       return op;
@@ -53,8 +58,9 @@ package
       return null;
     }
 
-    public function fail() : void
+    public function fail() : Request
     {
+      return null;
     }
 
     protected var op : Operation;

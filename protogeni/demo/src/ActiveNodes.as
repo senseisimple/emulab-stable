@@ -77,11 +77,13 @@ package
       linkLayer = null;
     }
 
-    public function addNode(name : String, uuid : String, cmIndex : int,
+    public function addNode(name : String, uuid : String,
+                            interfaces : Array, cmIndex : int,
                             nodeIndex : int, cleanupMethod : Function,
                             x : int, y : int) : void
     {
-      var newNode : Node = new Node(nodeLayer, name, uuid, cmIndex, nodeIndex,
+      var newNode : Node = new Node(nodeLayer, name, uuid, interfaces,
+                                    cmIndex, nodeIndex,
                                     cleanupMethod, nodes.length,
                                     beginDragEvent, beginAddLink);
       dragX = Node.CENTER_X;
@@ -286,14 +288,28 @@ package
       return result;
     }
 
-    public function getXml(cmIndex : int) : XML
+    public function setSliverId(cmIndex : int, name : String,
+                                sliverId : String) : void
+    {
+      var i : int = 0;
+      for (; i < nodes.length; ++i)
+      {
+        if (nodes[i].getCmIndex() == cmIndex
+            && nodes[i].getName() == name)
+        {
+          nodes[i].setSliverId(sliverId);
+        }
+      }
+    }
+
+    public function getXml(cmIndex : int, useTunnels : Boolean) : XML
     {
       var result : XML = null;
       var i : int = 0;
 
       for (i = 0; i < nodes.length; ++i)
       {
-        var currentNode : XML = nodes[i].getXml(cmIndex);
+        var currentNode : XML = nodes[i].getXml(cmIndex, useTunnels);
         if (currentNode != null)
         {
           if (result == null)
@@ -306,7 +322,7 @@ package
 
       for (i = 0; i < links.length; ++i)
       {
-        var currentLink : XML = links[i].getXml(cmIndex);
+        var currentLink : XML = links[i].getXml(cmIndex, useTunnels);
         if (currentLink != null)
         {
           result.appendChild(currentLink);
@@ -355,6 +371,51 @@ package
       for (; i < nodes.length && !result; ++i)
       {
         result = result || nodes[i].isState(cmIndex, newState);
+      }
+      return result;
+    }
+
+    public function hasTunnels(cmIndex : int) : Boolean
+    {
+      var result : Boolean = false;
+      var i : int = 0;
+      for (; i < links.length && !result; ++i)
+      {
+        result = result || links[i].hasTunnelTo(cmIndex);
+      }
+      return result;
+    }
+
+    public function getSpeedUrl() : String
+    {
+      var result : String = null;
+      var names : String = "";
+      var cms : String = "";
+      var hostnames : String = "";
+      var isFirst : Boolean = true;
+      var i : int = 0;
+      for (; i < nodes.length; ++i)
+      {
+        if (nodes[i].isBooted())
+        {
+          if (!isFirst)
+          {
+            names += ",";
+            cms += ",";
+            hostnames += ",";
+          }
+          isFirst = false;
+          names += nodes[i].getName();
+          cms += ComponentManager.cmNames[nodes[i].getCmIndex()];
+          hostnames += nodes[i].getHostName();
+        }
+      }
+      if (names != "")
+      {
+        result = "http://boss.emulab.net/speed-test.php?";
+        result += "names=" + names + "&";
+        result += "cms=" + cms + "&";
+        result += "hostnames=" + hostnames;
       }
       return result;
     }

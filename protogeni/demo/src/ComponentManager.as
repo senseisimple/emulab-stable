@@ -22,6 +22,7 @@ package
   import fl.controls.List;
   import fl.events.ListEvent;
   import flash.events.Event;
+  import flash.utils.Dictionary;
 
   class ComponentManager
   {
@@ -37,21 +38,21 @@ package
       listStatus.alpha = 0.3;
       nodes = newNodes;
 
-      names = new Array();
-      uuids = new Array();
+      components = new Array();
+
       used = new Array();
       tickets = new Array();
       states = new Array();
 
       select.removeAll();
       select.selectedIndex = 0;
+      select.rowCount = 4;
 
       var i : int = 0;
       for (; i < cmNames.length; ++i)
       {
         select.addItem(new ListItem(cmNames[i], null));
-        names.push(new Array());
-        uuids.push(new Array());
+        components.push(new Array());
         used.push(new Array());
         tickets.push(null);
         states.push(LOADING);
@@ -115,8 +116,10 @@ package
     {
       if (used[select.selectedIndex].indexOf(event.index) == -1)
       {
-        nodes.addNode(names[select.selectedIndex][event.index],
-                      uuids[select.selectedIndex][event.index],
+        var com = components[select.selectedIndex][event.index];
+        nodes.addNode(com.name,
+                      com.uuid,
+                      com.interfaces,
                       select.selectedIndex,
                       event.index,
                       removeNode,
@@ -143,9 +146,9 @@ package
       list.removeAll();
       list.clearSelection();
       var i : int = 0;
-      for (; i < names[current].length; ++i)
+      for (; i < components[current].length; ++i)
       {
-        list.addItem(new ListItem(names[current][i], "NodeNone"));
+        list.addItem(new ListItem(components[current][i].name, "NodeNone"));
       }
       list.selectedIndices = used[current].slice();
       if (states[current] == NORMAL)
@@ -168,30 +171,90 @@ package
 
     public function populateNodes(index : int, str : String) : void
     {
-      if (str != null)
+      var console = Main.getConsole();
+      if (console != null)
       {
-        var rspec : XML = XML(str);
-        var nodeName : QName = new QName(rspec.namespace(), "node");
-        var xmlNodes : Array = new Array();
-        for each (var element in rspec.elements(nodeName))
+        console.appendText("\npopulateNodes: " + cmNames[index] + "\n");
+      }
+      try
+      {
+        if (str != null)
         {
-          if (element.attribute("component_uuid") != null
-              && element.attribute("component_uuid") != "")
+          var uuidToNode = new Dictionary();
+          var rspec : XML = XML(str);
+          var nodeName : QName = new QName(rspec.namespace(), "node");
+          var xmlNodes : Array = new Array();
+          for each (var element in rspec.elements(nodeName))
           {
-            xmlNodes.push(element);
+            var uuidAtt : String = element.attribute("component_uuid");
+            if (uuidAtt != "")
+            {
+              xmlNodes.push(element);
+            }
           }
+          xmlNodes.sort(xmlSort);
+          var i : int = 0;
+          for (; i < xmlNodes.length; ++i)
+          {
+            var com : Component = new Component();
+            components[index].push(com);
+            var uuid : String = xmlNodes[i].attribute("component_uuid");
+            uuidToNode[uuid] = com;
+            com.name = xmlNodes[i].attribute("component_name");
+            com.uuid = uuid;
+            var interfaceName = new QName(rspec.namespace(), "interface");
+            var interfaceList = xmlNodes[i].elements(interfaceName);
+            for each (var inter in interfaceList)
+            {
+              var interName = inter.attribute("component_name");
+              com.interfaces.push(new Interface(interName));
+            }
+          }
+
+          parseLinks(rspec, uuidToNode);
         }
-        xmlNodes.sort(xmlSort);
-        var i : int = 0;
-        for (; i < xmlNodes.length; ++i)
+        states[index] = NORMAL;
+        updateList();
+      }
+      catch (e : Error)
+      {
+        var text = Main.getConsole();
+        if (text != null)
         {
-          names[index].push(xmlNodes[i].attribute("component_name"));
-          uuids[index].push(xmlNodes[i].attribute("component_uuid"));
+          text.appendText("\n" + e.toString() + "\n");
         }
       }
-      states[index] = NORMAL;
-      updateList();
     }
+
+    function parseLinks(rspec : XML, uuidToNode : Dictionary) : void
+    {
+      var linkName : QName = new QName(rspec.namespace(), "link");
+      for each (var link in rspec.elements(linkName))
+      {
+        var interElement : QName = new QName(rspec.namespace(), "interface");
+        for each (var inter in link.descendants(interElement))
+        {
+               var uuidList = inter.elements(new QName(rspec.namespace(),
+                                                  "component_node_uuid"));
+          var uuid : String = uuidList.text();
+          var nameList = inter.elements(new QName(rspec.namespace(),
+                                                  "component_interface_name"));
+          var interName : String = nameList.text();
+          var node : Component = uuidToNode[uuid];
+          if (node != null)
+          {
+            for each (var nodeInter in node.interfaces)
+            {
+              if (interName == nodeInter.name)
+              {
+                nodeInter.used = false;
+              }
+            }
+          }
+        }
+      }
+    }
+
 
     function xmlSort(left : XML, right : XML) : int
     {
@@ -234,9 +297,9 @@ package
     var list : List;
     var listStatus : ListStatusClip;
     var nodes : ActiveNodes;
+    // An array of arrays. Outer == CM, inner == Component
+    var components : Array;
 
-    var names : Array;
-    var uuids : Array;
     var used : Array;
     var tickets : Array;
     var states : Array;
@@ -245,13 +308,25 @@ package
     var LOADING = 1;
     var FAILED = 2;
 
+    public static var hostName : Array = new Array("",
+                                                   ".emulab.net",
+                                                   ".emulab.net",
+                                                   ".emulab.net",
+                                                   ".uky.emulab.net",
+                                                   ".schooner.wail.wisc.edu",
+                                                   ".cmcl.cs.cmu.edu");
+
     public static var cmNames : Array = new Array("", "ProtoGENI", "Emulab",
-                                                  "gtwelab");
+                                                  "gtwelab", "Kentucky",
+                                                  "Wisconsin", "CMU");
     static var cmUrls : Array =
       new Array(null,
                 "https://myboss.myelab.testbed.emulab.net:443/protogeni/xmlrpc",
                 "https://boss.emulab.net:443/protogeni/xmlrpc/",
-                "https://myboss.emulab.geni.emulab.net:443/protogeni/xmlrpc");
+                "https://myboss.emulab.geni.emulab.net:443/protogeni/xmlrpc",
+                "https://www.uky.emulab.net/protogeni/xmlrpc",
+                "https://www.schooner.wail.wisc.edu/protogeni/xmlrpc",
+                "https://boss.cmcl.cs.cmu.edu/protogeni/xmlrpc");
     static var cmResults : Array =
       new Array(null,
                 "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> "+
@@ -279,6 +354,9 @@ package
                 "       virtualization_type=\"plab_node\"> " +
                 " </node>" +
                 "</rspec>",
+                null,
+                null,
+                null,
                 null);
   }
 }

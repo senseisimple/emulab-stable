@@ -19,34 +19,41 @@ package
 
   class Util
   {
-    public static function getResponse(name : String, xml : String) : String
+    public static function getResponse(name : String, url : String,
+                                       xml : String) : String
     {
       return "\n-----------------------------------------\n"
         + "RESPONSE: " + name + "\n"
+        + "URL: " + url + "\n"
         + "-----------------------------------------\n\n"
         + xml;
     }
 
-    public static function getSend(name : String, xml : String) : String
+    public static function getSend(name : String, url : String,
+                                   xml : String) : String
     {
       return "\n-----------------------------------------\n"
         + "SEND: " + name + "\n"
+        + "URL: " + url + "\n"
         + "-----------------------------------------\n\n"
         + xml;
     }
 
-    public static function getFailure(opName : String,
+    public static function getFailure(opName : String, url : String,
                                       event : ErrorEvent,
                                       fault : MethodFault) : String
     {
       if (fault != null)
       {
         return "FAILURE fault: " + opName + ": " + fault.getFaultString()
+          + "\nURL: " + url + "\n"
           + "\n";
       }
       else
       {
-        return "FAILURE event: " + opName + ": " + event.toString() + "\n";
+        return "FAILURE event: " + opName + ": " + event.toString()
+          + "\nURL: " + url + "\n"
+          + "\n";
       }
     }
   }

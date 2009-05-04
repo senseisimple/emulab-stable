@@ -15,6 +15,7 @@
 package
 {
   import flash.display.DisplayObjectContainer;
+  import flash.text.TextField;
 
   public class Main
   {
@@ -33,7 +34,24 @@ package
       menu.init(parent);
     }
 
+    public static function getConsole() : TextField
+    {
+      return menu.getConsole();
+    }
+
+    public static function setText(newText : String) : void
+    {
+      text = newText;
+    }
+
+    public static function getText() : String
+    {
+      return text;
+    }
+
     static var parent : DisplayObjectContainer;
     static var menu : MenuState;
+
+    static var text : String;
   }
 }

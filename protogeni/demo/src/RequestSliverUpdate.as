@@ -19,12 +19,14 @@ package
     public function RequestSliverUpdate(newCmIndex : int,
                                         newNodes : ActiveNodes,
                                         newCm : ComponentManager,
-                                        newRspec : String) : void
+                                        newRspec : String,
+                                        newBeginTunnel : Boolean) : void
     {
       cmIndex = newCmIndex;
       nodes = newNodes;
       cm = newCm;
       rspec = newRspec;
+      beginTunnel = newBeginTunnel;
     }
 
     override public function cleanup() : void
@@ -34,11 +36,15 @@ package
 
     override public function start(credential : Credential) : Operation
     {
-      nodes.changeState(cmIndex, ActiveNodes.PLANNED, ActiveNodes.CREATED);
+      if (! beginTunnel)
+      {
+        nodes.changeState(cmIndex, ActiveNodes.PLANNED, ActiveNodes.CREATED);
+      }
       opName = "Updating Sliver";
       op.reset(Geni.updateSliver);
       op.addField("credential", credential.slivers[cmIndex]);
       op.addField("rspec", rspec);
+      op.addField("keys", credential.ssh);
       op.addField("impotent", Request.IMPOTENT);
       op.setUrl(cm.getUrl(cmIndex));
       return op;
@@ -47,20 +53,30 @@ package
     override public function complete(code : Number, response : Object,
                                       credential : Credential) : Request
     {
+      var result = null;
       if (code == 0)
       {
         nodes.commitState(cmIndex);
       }
       else
       {
-        nodes.revertState(cmIndex);
+        if (beginTunnel)
+        {
+          nodes.commitState(cmIndex);
+          nodes.revertState(cmIndex);
+        }
+        else
+        {
+          nodes.revertState(cmIndex);
+        }
       }
-      return null;
+      return result;
     }
 
     var cmIndex : int;
     var nodes : ActiveNodes;
     var cm : ComponentManager;
     var rspec : String;
+    var beginTunnel : Boolean;
   }
 }

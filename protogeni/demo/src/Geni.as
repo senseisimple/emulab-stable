@@ -28,8 +28,10 @@ package
     public static var discoverResources = new Array(cm, "DiscoverResources");
     public static var getTicket = new Array(cm, "GetTicket");
     public static var redeemTicket = new Array(cm, "RedeemTicket");
+    public static var releaseTicket = new Array(cm, "ReleaseTicket");
     public static var deleteSliver = new Array(cm, "DeleteSliver");
     public static var startSliver = new Array(cm, "StartSliver");
     public static var updateSliver = new Array(cm, "UpdateSliver");
+    public static var resolveNode = new Array(cm, "Resolve");
   }
 }

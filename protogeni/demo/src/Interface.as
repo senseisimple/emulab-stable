@@ -1,5 +1,5 @@
 /* GENIPUBLIC-COPYRIGHT
- * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
+ * Copyright (c) 2009 University of Utah and the Flux Group.
  * All rights reserved.
  *
  * Permission to use, copy, modify and distribute this software is hereby
@@ -14,26 +14,22 @@
 
 package
 {
-  import flash.display.DisplayObjectContainer;
-  import flash.text.TextField;
-
-  class MenuState
+  public class Interface
   {
-    public function MenuState() : void
+    public function Interface(newName : String) : void
     {
+      name = newName;
+      used = true;
     }
 
-    public function init(parent : DisplayObjectContainer) : void
+    public function clone() : Interface
     {
+      var result = new Interface(name);
+      result.used = used;
+      return result;
     }
 
-    public function cleanup() : void
-    {
-    }
-
-    public function getConsole() : TextField
-    {
-      return null;
-    }
+    public var name : String;
+    public var used : Boolean;
   }
 }

@@ -50,7 +50,7 @@ package
         op.reset(Geni.redeemTicket);
         op.addField("ticket", cm.getTicket(cmIndex));
         op.addField("impotent", Request.IMPOTENT);
-//        op.addField("keys", credential.ssh);
+        op.addField("keys", credential.ssh);
         op.setUrl(cm.getUrl(cmIndex));
       }
       return op;
@@ -64,31 +64,66 @@ package
       {
         if (cm.getTicket(cmIndex) == null)
         {
-          cm.setTicket(cmIndex, response.value);
+          var ticket : String = response.value;
+          cm.setTicket(cmIndex, ticket);
+          setSliverIds(ticket);
           result = new RequestSliverCreate(cmIndex, nodes, cm, rspec);
         }
         else
         {
-          nodes.commitState(cmIndex);
           credential.slivers[cmIndex] = response.value;
           cm.setTicket(cmIndex, null);
+
+          if (! nodes.hasTunnels(cmIndex))
+          {
+            nodes.commitState(cmIndex);
+          }
+          else
+          {
+            var newRspec = nodes.getXml(cmIndex, true);
+            result = new RequestSliverUpdate(cmIndex, nodes, cm, newRspec,
+                                             true);
+          }
         }
       }
       else
       {
-        if (cm.getTicket(cmIndex) != null)
-        {
-          // TODO: DeleteTicket
-        }
+        result = releaseTicket();
         nodes.revertState(cmIndex);
       }
       return result;
     }
 
-    override public function fail() : void
+    override public function fail() : Request
     {
-      // TODO: DeleteTicket
+      var result : Request = releaseTicket();
       nodes.revertState(cmIndex);
+      return result;
+    }
+
+    function releaseTicket() : Request
+    {
+      var result : Request = null;
+      if (cm.getTicket(cmIndex) != null)
+      {
+        result = new RequestReleaseTicket(cm.getTicket(cmIndex),
+                                          cm.getUrl(cmIndex));
+      }
+      return result;
+    }
+
+    function setSliverIds(signedCredStr : String) : void
+    {
+      var signedCred : XML = XML(signedCredStr);
+      for each (var node in signedCred.descendants("node"))
+      {
+        var name : String = node.elements("nickname");
+        var sliverId : String = node.elements("sliver_uuid");
+        if (name != "" && sliverId != "")
+        {
+          nodes.setSliverId(cmIndex, name, sliverId);
+        }
+      }
     }
 
     var cmIndex : int;

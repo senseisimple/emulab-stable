@@ -15,6 +15,7 @@
 package
 {
   import flash.display.DisplayObjectContainer;
+  import flash.text.TextField;
   import flash.events.ErrorEvent;
   import flash.events.Event;
   import com.mattism.http.xmlrpc.MethodFault;
@@ -50,6 +51,11 @@ package
       clip.parent.removeChild(clip);
     }
 
+    override public function getConsole() : TextField
+    {
+      return clip.xmlText;
+    }
+
     function enterFrame(event : Event) : void
     {
       if (clip.xmlText.scrollV < clip.xmlText.maxScrollV)
@@ -64,14 +70,15 @@ package
       clip.removeEventListener(Event.ENTER_FRAME, enterFrame);
       if (fault != null)
       {
-        clip.xmlText.text = "\nFAILURE fault: " + opName + ": "
-          + fault.getFaultString();
+        clip.xmlText.appendText("\nFAILURE fault: " + opName + ": "
+                                + fault.getFaultString());
       }
       else
       {
-        clip.xmlText.text = "\nFAILURE event: " + opName + ": "
-          + event.toString();
+        clip.xmlText.appendText("\nFAILURE event: " + opName + ": "
+                                + event.toString());
       }
+      clip.xmlText.appendText("\nURL: " + op.getUrl());
     }
 
     function codeFailure() : void
@@ -249,6 +256,7 @@ package
         credential.slice = String(response.value);
 //        startResourceLookup();
         var newMenu = new MenuSliceDetail(sliceName, sliceId, credential);
+        Main.setText(clip.xmlText.text);
         Main.changeState(newMenu);
       }
       else

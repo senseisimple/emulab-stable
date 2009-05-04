@@ -1,5 +1,5 @@
 /* GENIPUBLIC-COPYRIGHT
- * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
+ * Copyright (c) 2009 University of Utah and the Flux Group.
  * All rights reserved.
  *
  * Permission to use, copy, modify and distribute this software is hereby
@@ -14,26 +14,30 @@
 
 package
 {
-  import flash.display.DisplayObjectContainer;
-  import flash.text.TextField;
-
-  class MenuState
+  class RequestReleaseTicket extends Request
   {
-    public function MenuState() : void
+    public function RequestReleaseTicket(newTicket : String,
+                                         newUrl : String) : void
     {
+      ticket = newTicket;
+      url = newUrl;
     }
 
-    public function init(parent : DisplayObjectContainer) : void
+    override public function cleanup() : void
     {
+      super.cleanup();
     }
 
-    public function cleanup() : void
+    override public function start(credential : Credential) : Operation
     {
+      opName = "Release Ticket";
+      op.reset(Geni.releaseTicket);
+      op.addField("ticket", ticket);
+      op.setUrl(url);
+      return op;
     }
 
-    public function getConsole() : TextField
-    {
-      return null;
-    }
+    var ticket : String;
+    var url : String;
   }
 }

@@ -31,6 +31,23 @@ package
       left.addLink(this);
       right = newRight;
       right.addLink(this);
+      leftInterface = "";
+      rightInterface = "";
+      tunnelIp = 0;
+      if (isTunnel())
+      {
+        tunnelIp = getNextTunnel();
+      }
+      else
+      {
+        leftInterface = left.allocateInterface();
+        rightInterface = right.allocateInterface();
+        if (leftInterface == "*" || rightInterface == "*")
+        {
+          Main.getConsole().appendText("\n\nWARNING: Interface not found\n\n");
+        }
+      }
+
       removeClick = newRemoveClick;
       canvas = new Shape();
       parent.addChild(canvas);
@@ -80,54 +97,91 @@ package
         || (left == otherRight && right == otherLeft);
     }
 
-    public function getXml(cmIndex : int) : XML
+    public function getXml(cmIndex : int, useTunnels : Boolean) : XML
     {
       var result : XML = null;
       if (left.getCmIndex() == cmIndex || right.getCmIndex() == cmIndex)
       {
-        var justOne : Boolean= !(left.getCmIndex() == cmIndex
-                                 && right.getCmIndex() == cmIndex);
-        result = <link />;
-        result.@name = "link" + String(number);
-        result.@nickname = "link" + String(number);
-        if (justOne)
+        if (!isTunnel() || useTunnels)
         {
-          result.@link_type= "tunnel";
+          result = <link />;
+          result.@name = "link" + String(number);
+          result.@nickname = "link" + String(number);
+          if (isTunnel())
+          {
+            result.@link_type= "tunnel";
+          }
+
+          var child = <linkendpoints nickname="destination_interface" />;
+          if (isTunnel())
+          {
+            child.@tunnel_ip = ipToString(tunnelIp);
+          }
+          else
+          {
+            child.@iface_name = leftInterface;
+          }
+          child.@node_uuid = left.getId();
+          child.@sliver_uuid = left.getSliverId();
+          child.@node_nickname = left.getName();
+
+          result.appendChild(child);
+
+          child = <linkendpoints nickname="source_interface" />;
+          if (isTunnel())
+          {
+            child.@tunnel_ip = ipToString(tunnelIp + 1);
+          }
+          else
+          {
+            child.@iface_name = rightInterface;
+          }
+          child.@node_uuid = right.getId();
+          child.@sliver_uuid = right.getSliverId();
+          child.@node_nickname = right.getName();
+
+          result.appendChild(child);
         }
-        var child = <linkendpoints nickname="destination_interface" />;
-        if (justOne)
-        {
-          child.@tunnel_ip = "192.168.1.1";
-        }
-        else
-        {
-          child.@iface_name = "eth3";
-        }
-        child.@node_uuid = left.getId();
-        child.@node_nickname = left.getName();
-        result.appendChild(child);
-        child = <linkendpoints nickname="source_interface" />
-        if (justOne)
-        {
-          child.@tunnel_ip="192.168.1.2";
-        }
-        else
-        {
-          child.@iface_name = "eth3";
-        }
-        child.@node_uuid = right.getId();
-        child.@node_nickname = right.getName();
-        result.appendChild(child);
       }
       return result;
     }
 
+    function ipToString(ip : int) : String
+    {
+      var first : int = ((ip >> 8) & 0xff);
+      var second : int = (ip & 0xff);
+      return "192.168." + String(first) + "." + String(second);
+    }
+
+    public function isTunnel() : Boolean
+    {
+      return left.getCmIndex() != right.getCmIndex();
+    }
+
+    public function hasTunnelTo(cmIndex : int) : Boolean
+    {
+      return isTunnel() && (cmIndex == left.getCmIndex()
+                            || cmIndex == right.getCmIndex());
+    }
+
     var number : int;
     var left : Node;
+    var leftInterface : String;
     var right : Node;
+    var rightInterface : String;
+    var tunnelIp : int;
     var canvas : Shape;
     var removeClick : Function;
     var removeClip : RemoveLinkClip;
+
+    static var tunnelNext : int = 1;
+
+    static function getNextTunnel() : int
+    {
+      var result = tunnelNext;
+      tunnelNext += 2;
+      return result;
+    }
 
     public static var WIDTH = 4;
     public static var ESTABLISHED_COLOR = 0x0000ff;

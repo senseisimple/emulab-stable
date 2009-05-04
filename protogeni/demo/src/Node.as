@@ -24,6 +24,7 @@ package
   {
     public function Node(parent : DisplayObjectContainer,
                          newName : String, newId : String,
+                         newInterfaces : Array,
                          newCmIndex : int, newNodeIndex : int,
                          newCleanupMethod : Function, newNumber : int,
                          newMouseDownNode : Function,
@@ -31,6 +32,12 @@ package
     {
       name = newName;
       id = newId;
+      sliverId = "";
+      interfaces = new Array();
+      for each (var inter in newInterfaces)
+      {
+        interfaces.push(inter.clone());
+      }
       cmIndex = newCmIndex;
       nodeIndex = newNodeIndex;
       cleanupMethod = newCleanupMethod;
@@ -42,6 +49,8 @@ package
       clip.width = WIDTH;
       clip.height = HEIGHT;
       clip.node.nameField.text = name;
+      clip.node.cmField.text
+        = ComponentManager.cmNames[cmIndex].substring(0, 1);
       clip.node.mouseChildren = false;
       clip.node.addEventListener(MouseEvent.MOUSE_DOWN, mouseDownNode);
       clip.node.selected.visible = false;
@@ -132,6 +141,16 @@ package
       return id;
     }
 
+    public function setSliverId(newSliverId : String) : void
+    {
+      sliverId = newSliverId;
+    }
+
+    public function getSliverId() : String
+    {
+      return sliverId;
+    }
+
     public function getName() : String
     {
       return name;
@@ -140,6 +159,43 @@ package
     public function getCmIndex() : int
     {
       return cmIndex;
+    }
+
+    public function isBooted() : Boolean
+    {
+      return oldState == ActiveNodes.BOOTED && newState == ActiveNodes.BOOTED;
+    }
+
+    public function getHostName() : String
+    {
+      return name + ComponentManager.hostName[cmIndex];
+    }
+
+    public function allocateInterface() : String
+    {
+      var result = "*";
+      for each (var candidate in interfaces)
+      {
+        if (! candidate.used)
+        {
+          candidate.used = true;
+          result = candidate.name;
+          break;
+        }
+      }
+      return result;
+    }
+
+    public function freeInterface(interName : String) : void
+    {
+      for each (var candidate in interfaces)
+      {
+        if (interName == candidate.name)
+        {
+          candidate.used = false;
+          break;
+        }
+      }
     }
 
     public function changeState(index : int, state : int) : void
@@ -155,6 +211,7 @@ package
     {
       if (index == cmIndex)
       {
+        clip.node.nameField.textColor = 0x000000;
         oldState = newState;
         updateState();
       }
@@ -164,6 +221,7 @@ package
     {
       if (index == cmIndex)
       {
+        clip.node.nameField.textColor = 0xff0000;
         newState = oldState;
         updateState();
       }
@@ -186,7 +244,7 @@ package
     }
 
 
-    public function getXml(targetIndex : int) : XML
+    public function getXml(targetIndex : int, useTunnels : Boolean) : XML
     {
       var result : XML = null;
       if (cmIndex == targetIndex)
@@ -195,7 +253,14 @@ package
 //        result.@uuid = id;
 //        result.@nickname = name;
 //        result.@virtualization_type = virtType;
-        result = XML("<node uuid=\"" + id + "\" nickname=\"" + name + "\" virtualization_type=\"" + virtType + "\"> </node>");
+        var str : String = "<node uuid=\"" + id + "\" nickname=\"" + name
+          + "\" virtualization_type=\"" + virtType + "\" ";
+        if (useTunnels)
+        {
+          str += "sliver_uuid=\"" + sliverId + "\" ";
+        }
+        str += "> </node>";
+        result = XML(str);
       }
       return result;
     }
@@ -212,6 +277,11 @@ package
       var result : String = "";
       result += "<font color=\"#7777ff\">Name:</font> " + name + "\n";
       result += "<font color=\"#7777ff\">UUID:</font> " + id + "\n";
+      if (sliverId != "")
+      {
+        result += "<font color=\"#7777ff\">Sliver UUID:</font> "
+          + sliverId + "\n";
+      }
       result += "<font color=\"#7777ff\">Component Manager:</font> "
         + ComponentManager.cmNames[cmIndex] + "\n";
       if (state != ActiveNodes.PLANNED)
@@ -230,6 +300,7 @@ package
     var clip : NodeClip;
     var name : String;
     var id : String;
+    var sliverId : String;
     var cmIndex : int;
     var nodeIndex : int;
     var cleanupMethod : Function;
@@ -238,6 +309,7 @@ package
     var mouseDownLink : Function;
     var oldState : int;
     var newState : int;
+    var interfaces : Array;
 
     static var virtType = "emulab-vnode";
 
@@ -251,6 +323,5 @@ package
                                       0xaaffaa,
                                       0xaaffff,
                                       0xaaaaaa);
-//                                      0xffaaaa);
   }
 }
