@@ -1670,6 +1670,7 @@ sub InstantiateAll($$)
 	    return -1;
 	}
     }
+    %protolans = ();
     return 0;
 }
 
