@@ -150,7 +150,7 @@ sub DoRegression($)
     my $now = time();
     print "  Running the wrapper ... \n";
     system("cd Wrapper/$pid/$eid; ".
-	   "$WRAPPER -r $optarg $pid $eid > wrapper.log 2>&1");
+	   "$WRAPPER -r -k $optarg $pid $eid > wrapper.log 2>&1");
     if ($?) {
 	fatal("Wrapper failed");
     }
@@ -160,7 +160,7 @@ sub DoRegression($)
     $now = time();
     print "  Running the mapper ... \n";
     system("cd Mapper/$pid/$eid; ".
-	   "$MAPPER -r $optarg $pid $eid > mapper.log 2>&1");
+	   "$MAPPER -r -z $optarg $pid $eid > mapper.log 2>&1");
     if ($?) {
 	fatal("Mapper failed");
     }
@@ -171,6 +171,38 @@ sub DoRegression($)
     system("diff -r -q Mapper/$pid/$eid/$pid-$eid.pstate ".
 	   "           Wrapper/$pid/$eid/$pid-$eid.pstate") == 0
 	   or fatal("Results differed!");
+
+    print " Running in reverse mode ...\n";
+
+    system("/bin/rm -rf Mapper/$pid/$eid/* Wrapper/$pid/$eid/*") == 0
+	or fatal("Could not clean directories");
+
+    $now = time();
+    print "  Running the mapper ... \n";
+    system("cd Mapper/$pid/$eid; ".
+	   "$MAPPER -r -k $optarg $pid $eid > mapper.log 2>&1");
+    if ($?) {
+	fatal("Mapper failed");
+    }
+    $howlong = time() - $now;
+    print "    Done in $howlong seconds\n";
+    
+    $now = time();
+    print "  Running the wrapper ... \n";
+    system("cd Wrapper/$pid/$eid; ".
+	   "$WRAPPER -r -z $optarg $pid $eid > wrapper.log 2>&1");
+    if ($?) {
+	fatal("Wrapper failed");
+    }
+    $howlong = time() - $now;
+    print "    Done in $howlong seconds\n";
+
+    print "  Diffing the results ...\n";
+    system("diff -r -q Mapper/$pid/$eid/$pid-$eid.pstate ".
+	   "           Wrapper/$pid/$eid/$pid-$eid.pstate") == 0
+	   or fatal("Results differed!");
+
+    
 
     return 0;
 }

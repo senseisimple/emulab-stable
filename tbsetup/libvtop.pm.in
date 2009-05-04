@@ -617,14 +617,30 @@ sub LoadCurrentResources($)
     $self->counters()->{'reserved_virtcount'} = 0;
     $self->counters()->{'reserved_physcount'} = 0;
 
-    return 0
-	if (!$self->fixcurrent());
-
-    $self->printdb("Loading fixed nodes\n");
+    $self->printdb("Loading current resources" .
+		   ($self->regression() ? " in regression mode" : "") . "\n");
 
     my @nodelist = $self->experiment()->NodeList(0, 1);
     return 0
 	if (!@nodelist);
+
+    if ($self->regression()) {
+	#
+	# In regression mode, we just store the p2v mapping for fixnode.
+	#
+	foreach my $pnode (@nodelist) {
+	    my $vname   = $pnode->vname();
+	    my $node_id = $pnode->node_id();
+
+	    if ($pnode->isvirtnode()) {
+		$self->fixednodes()->{$vname} = $pnode->phys_nodeid();
+	    }
+	    else {
+		$self->fixednodes()->{$vname} = $node_id;
+	    }
+	}
+	return 0;
+    }
 
     foreach my $pnode (@nodelist) {
 	my $vname   = $pnode->vname();
@@ -645,7 +661,6 @@ sub LoadCurrentResources($)
 	    return -1;
 	}
 	if ($pnode->isvirtnode()) {
-	    $self->fixednodes()->{$vname} = $pnode->node_id();
 	    $self->counters()->{'reserved_virtcount'}++;
 
 	    # Get the underlying physical node.
@@ -654,17 +669,23 @@ sub LoadCurrentResources($)
 		tberror("Cannot map $pnode to its real physnode");
 		return -1;
 	    }
+	    my $ppnode_id = $ppnode->node_id();
 
+	    $self->fixednodes()->{$vname} = $ppnode_id
+		if ($self->fixcurrent());
+	    
 	    #
 	    # Record the mappings. 
 	    #
-	    $self->current_v2v()->{$vname} = $pnode;
-	    $self->current_v2p()->{$vname} = $ppnode;
+	    $self->current_v2v()->{$vname} = $pnode->node_id();
+	    $self->current_v2p()->{$vname} = $ppnode->node_id();
 	    push(@{ $self->current_p2v()->{$ppnode->node_id()} }, $vname);
 	    
 	    # Mark the node as unused until later.
 	    $pnode->_reuse("unused");
 	    $ppnode->_reuse("unused");
+	    
+	    $self->printdb("current v2p: $node_id ($ppnode_id) -> $vname\n");
 	}
 	else {
 	    #
@@ -675,13 +696,15 @@ sub LoadCurrentResources($)
 		return -1;
 	    }
 	    else {
-		$self->fixednodes()->{$vname} = $pnode->node_id();
+		$self->fixednodes()->{$vname} = $pnode->node_id()
+		    if ($self->fixcurrent());
+		
 		$self->counters()->{'reserved_physcount'}++;
 
 		#
 		# Record the mapping. 
 		#
-		$self->current_v2p()->{$vname} = $pnode;
+		$self->current_v2p()->{$vname} = $pnode->node_id();
 		push(@{ $self->current_p2v()->{$node_id} }, $vname);
 		# Mark the node as unused until later.
 		$pnode->_reuse("unused");
@@ -2719,7 +2742,7 @@ sub InterpNodes($)
 		# No changes once it goes into reboot.
 		;
 	    }
-	    elsif (defined($virtnode) && $virtnode->isvirtnode()) {
+	    elsif (defined($virtnode) && $virtnode->_isvirtnode()) {
 		#
 		# A new virtual node on an existing physical node
 		# does not force the physnode to be rebooted; we can
@@ -2927,6 +2950,16 @@ sub AllocNodes($)
 	    $self->newreserved()->{$nodeid} = $nodeid;
 	    $pnode->SetAllocState(TBDB_ALLOCSTATE_RES_INIT_DIRTY())
 		if (!$self->impotent());
+
+	    #
+	    # Fix all of the nodes assigned to the pnode.
+	    #
+	    foreach my $vname (@{ $self->solution_p2v()->{$nodeid} }) {
+		$self->fixednodes()->{$vname} = $nodeid;
+
+		# And add to the results for the next vtop print.
+		$self->addfixed("$vname $nodeid");
+	    }
 	}
     }
     

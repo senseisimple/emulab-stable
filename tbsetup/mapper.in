@@ -50,7 +50,7 @@ sub usage ()
 		 "implies -n\n";
     exit($WRAPPER_FAILED);
 }
-my $optlist    = "dvunfprqczxm:";
+my $optlist    = "dvunfprqczxm:k";
 my $verbose    = 0;
 my $debug      = 0;
 my $fixmode    = 0;
@@ -61,10 +61,13 @@ my $prepass    = 0;
 my $mfactor;
 my $regression = 0;
 my $noassign   = 0;  # Only with regression mode, use previous solution.
+my $noregfree  = 0;  # Only with regression mode, leave physical state at end.
+my $usecurrent = 0;  # Only with regression mode, use current solution.
 my $quiet      = 0;
 my $clear      = 0;
 my $warnings   = 0;
 my $maxrun     = 3;		# Maximum number of times we run assign.
+my $vtop;
 
 #
 # Configure variables
@@ -95,6 +98,8 @@ sub debug($);
 sub chat($);
 sub RunAssign($$);
 sub FinalizeRegression($);
+sub AssignLoop();
+sub MapperWrapper();
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -153,10 +158,13 @@ if (defined($options{"r"})) {
 	fatal("Cannot use regression mode on main DB");
     }
     $regression = 1;
-    $clear = 1;
+    $clear      = 1;
+    $fixmode    = 1;
     TBDebugTimeStampsOn();
-    $noassign = 1
+    $usecurrent = 1
 	if (defined($options{"z"}));
+    $noregfree = 1
+	if (defined($options{"k"}));
 }
 if (defined($options{"q"})) {
     $quiet = 1;
@@ -183,6 +191,10 @@ if (!TBAdmin() &&
     fatal("You do not have permission to map this experiment!");
 }
 
+# multiplex_factor default.
+$mfactor = $experiment->multiplex_factor()
+    if (!defined($mfactor) && defined($experiment->multiplex_factor()));
+    
 #
 # These are the flags to the vtop creation code. 
 #
@@ -198,111 +210,130 @@ $vtopflags |= $libvtop::VTOP_FLAGS_IMPOTENT
 $vtopflags |= $libvtop::VTOP_FLAGS_REGRESSION
     if ($regression);
 
-chat("Starting the new and improved mapper wrapper.\n");
+MapperWrapper();
+if ($regression) {
+    if (0) {
+	$updating   = 1;
+	$fixmode    = 1;
+	$clear      = 0;
+	$vtopflags |=
+	    ($libvtop::VTOP_FLAGS_UPDATE|$libvtop::VTOP_FLAGS_FIXNODES);
 
-TBDebugTimeStamp("Create libvtop started");
-my $vtop = libvtop->Create($experiment, $vtopflags);
-if (!defined($vtop)) {
-    fatal("Could not create vtop structure for $experiment");
-}
-TBDebugTimeStamp("Create libvtop ended");
-
-#
-# If updating, load current experiment resources. We have to be careful
-# of how this is merged in with the (new) desired topology.
-#
-if ($updating) {
-    TBDebugTimeStamp("LoadCurrentResources started");
-    $vtop->LoadCurrentResources() == 0
-	or fatal("Could not load current resources into mapper");
-    TBDebugTimeStamp("LoadCurrentResources ended");
-}
-if (!$impotent && ($updating || $clear)) {
-    if ($regression || $clear) {
-	chat("Freeing reserved nodes in regression mode\n");
-	system("export NORELOAD=1; $NFREE -x -a $pid $eid") == 0
-	    or fatal("Could not release nodes in regression mode");
+	MapperWrapper();
     }
-    chat("Clearing physical state before updating.\n");
-    $experiment->RemovePhysicalState();
-    exit(0)
-	if ($clear && !$regression);
+    FinalizeRegression(0);
 }
-TBDebugTimeStamp("vtopgen started");
-$vtop->CreateVtop() == 0
-    or fatal("Could not create vtop for $experiment");
-TBDebugTimeStamp("vtopgen finished");
+exit(0);
 
-# multiplex_factor default.
-$mfactor = $experiment->multiplex_factor()
-    if (!defined($mfactor) && defined($experiment->multiplex_factor()));
-    
+sub MapperWrapper()
+{
+    chat("Starting the new and improved mapper wrapper.\n");
+
+    TBDebugTimeStamp("Create libvtop started");
+    $vtop = libvtop->Create($experiment, $vtopflags);
+    if (!defined($vtop)) {
+	fatal("Could not create vtop structure for $experiment");
+    }
+    TBDebugTimeStamp("Create libvtop ended");
+
+    #
+    # If updating, load current experiment resources. We have to be
+    # careful of how this is merged in with the (new) desired
+    # topology.
+    #
+    if ($updating || $usecurrent) {
+	TBDebugTimeStamp("LoadCurrentResources started");
+	$vtop->LoadCurrentResources() == 0
+	    or fatal("Could not load current resources into mapper");
+	TBDebugTimeStamp("LoadCurrentResources ended");
+    }
+    if (!$impotent && ($updating || $clear)) {
+	if ($clear) {
+	    chat("Freeing reserved nodes ...\n");
+	    system("export NORELOAD=1; $NFREE -x -a $pid $eid") == 0
+		or fatal("Could not release nodes.");
+	}
+	chat("Clearing physical state before updating.\n");
+	$experiment->RemovePhysicalState();
+	exit(0)
+	    if ($clear && !$regression);
+    }
+    TBDebugTimeStamp("vtopgen started");
+    $vtop->CreateVtop() == 0
+	or fatal("Could not create vtop for $experiment");
+    TBDebugTimeStamp("vtopgen finished");
+    AssignLoop();
+    return 0;
+}
+
 #
 # The assign loop. 
 #
-my $currentrun     = 1;
-my $canceled       = 0;
-my $tried_precheck = 0;
-# Admission control counts
-my %admission_control = ();
+sub AssignLoop()
+{
+    my $currentrun     = 1;
+    my $canceled       = 0;
+    my $tried_precheck = 0;
+    # Admission control counts
+    my %admission_control = ();
 
-
-# XXX plab hack - only run assign once on plab topologies, since they're easy
-# to map and the physical topology does not change frequently.
-if ($vtop->plabcount() && $vtop->plabcount == $vtop->virtnodecount()) {
-    $maxrun = 2;
-}
-
-TBDebugTimeStamp("mapper loop started");
-while (1) {
-    chat("Assign run $currentrun\n");
-
-    my $prefix = ($debug || $regression ? "$pid-$eid" : "$pid-$eid-$$");
-
-    #
-    # When precheck is on, we only do one run in impotent mode and exit.
-    #
-    if ($precheck) {
-	$prefix  .= ".empty";
-	$impotent = 1;
-	chat("Trying assign on an empty testbed.\n");
+    # XXX plab hack - only run assign once on plab topologies, since
+    # they're easy to map and the physical topology does not change
+    # frequently.
+    if ($vtop->plabcount() && $vtop->plabcount == $vtop->virtnodecount()) {
+	$maxrun = 2;
     }
 
-    #
-    # RunAssign returns  0 if successful.
-    #           returns -1 if failure, but assign says to stop trying.
-    #           returns  1 if failure, but assign says to try again.
-    #           returns  2 if we made some forward progress.
-    #
-    my $retval = RunAssign($precheck, $prefix);
+    TBDebugTimeStamp("mapper loop started");
+    while (1) {
+	chat("Assign run $currentrun\n");
 
-    # Success!
-    last
-	if ($retval == 0);
+	my $prefix = ($debug || $regression ? "$pid-$eid" : "$pid-$eid-$$");
 
-    if ($retval < 0 || $regression) {
 	#
-	# Failure in assign.
+	# When precheck is on, we only do one run in impotent mode and exit.
 	#
-	FinalizeRegression(1)
-	    if ($regression);
+	if ($precheck) {
+	    $prefix  .= ".empty";
+	    $impotent = 1;
+	    chat("Trying assign on an empty testbed.\n");
+	}
 
-	fatal({type => 'primary', severity => SEV_ERROR,
-	       error => ['unretriable_assign_error']},
-	      "Unretriable error. Giving up.");
-    }
+	#
+	# RunAssign returns  0 if successful.
+	#           returns -1 if failure, but assign says to stop trying.
+	#           returns  1 if failure, but assign says to try again.
+	#           returns  2 if we made some forward progress.
+	#
+	my $retval = RunAssign($precheck, $prefix);
+
+	# Success!
+	last
+	    if ($retval == 0);
+
+	if ($retval < 0 || $regression) {
+	    #
+	    # Failure in assign.
+	    #
+	    FinalizeRegression(1)
+		if ($regression);
+
+	    fatal({type => 'primary', severity => SEV_ERROR,
+		   error => ['unretriable_assign_error']},
+		  "Unretriable error. Giving up.");
+	}
     
-    #
-    # When precheck is off, we do a precheck run if the first try fails
-    # to find a solution. This avoids looping on an unsolvable topology.
-    #
-    if (!$precheck && !$tried_precheck) {
-	chat("Trying assign on an empty testbed to verify mapability.\n");
-	my $save_impotent = $impotent;
-	$impotent  = 1;
-	my $retval = RunAssign(1, $prefix . ".empty");
-	if ($retval != 0) {
-	    fatal({type=>'extra', cause=>'user', severity=>SEV_ERROR,
+	#
+	# When precheck is off, we do a precheck run if the first try fails
+	# to find a solution. This avoids looping on an unsolvable topology.
+	#
+	if (!$precheck && !$tried_precheck) {
+	    chat("Trying assign on an empty testbed to verify mapability.\n");
+	    my $save_impotent = $impotent;
+	    $impotent  = 1;
+	    my $retval = RunAssign(1, $prefix . ".empty");
+	    if ($retval != 0) {
+		fatal({type=>'extra', cause=>'user', severity=>SEV_ERROR,
 	           error=>['infeasible_resource_assignment']}, 
 		  "This experiment cannot be instantiated on this ".
                   "testbed. You have most likely asked for hardware ".
@@ -311,26 +342,25 @@ while (1) {
                   "interfaces.  You will need to modify this experiment ".
                   "before it can be swapped in - re-submitting the ".
                   "experiment as-is will always result in failure.");
+	    }
+	    chat("Assign succeeded on an empty testbed.\n");
+	    $impotent = $save_impotent;
+	    $tried_precheck = 1;
 	}
-	chat("Assign succeeded on an empty testbed.\n");
-	$impotent = $save_impotent;
-	$tried_precheck = 1;
-    }
 
-    if ($currentrun >= $maxrun && $retval != 2) {
-	fatal({type => 'primary', severity => SEV_ERROR,
-	       error => ['reached_assign_run_limit']},
-	      "Reached run limit. Giving up.");
-    }
+	if ($currentrun >= $maxrun && $retval != 2) {
+	    fatal({type => 'primary', severity => SEV_ERROR,
+		   error => ['reached_assign_run_limit']},
+		  "Reached run limit. Giving up.");
+	}
 
-    chat("Waiting 5 seconds and trying again...\n");
-    sleep(5);
-    $currentrun++;
+	chat("Waiting 5 seconds and trying again...\n");
+	sleep(5);
+	$currentrun++;
+    }
+    TBDebugTimeStamp("mapper loop finished");
+    return 0;
 }
-TBDebugTimeStamp("mapper loop finished");
-FinalizeRegression(0)
-    if ($regression);
-exit(0);
 
 #
 # The guts of an assign run.
@@ -436,10 +466,10 @@ sub RunAssign($$)
     }
 
     # Run assign
-#    my $cmd  = "assign-dev";
-#    my $args = "-P -x $ptopfile -y $vtopfile";
-    my $cmd  = "assign";
-    my $args = "-P $ptopfile $vtopfile";
+    my $cmd  = "assign-dev";
+    my $args = "-P -x $ptopfile -y $vtopfile";
+#    my $cmd  = "assign";
+#    my $args = "-P $ptopfile $vtopfile";
     $args = "-uod -c .75 $args"
 	if ($vtop->virtnodecount() || $vtop->simnodecount());
     $args = "-n $args"
@@ -447,7 +477,7 @@ sub RunAssign($$)
     $args = "-s 123456 $args"
 	if ($regression);
 
-    # The prepass speeds up assign on big tops with virtual nodes.
+    # The prepass speeds up assign on big topos with virtual nodes.
     if ($prepass) {
     	$cmd = "assign_prepass";
     	$args = "-m $mfactor $args"
@@ -588,12 +618,31 @@ sub FinalizeRegression($)
     chomp($cwd = `/bin/pwd`);
     if (!$error) {
 	chat("Saving physical state in regression mode\n");
+	if (system("/bin/rm -rf $pid-$eid.pstate")) {
+	    tberror("Could not clean physical state directory\n");
+	    return -1;
+	}
 	if ($experiment->BackupPhysicalState("$cwd/$pid-$eid.pstate", 1)
 	    != 0) {
 	    print STDERR "Could not save physical state!\n";
 	    exit(1);
 	}
+    
+	# Generate a vtop file with all resources fixed.
+	chat("Generating new vtop file with all resources fixed.\n");
+	if (! open(VTOPFILE, "> $pid-$eid.fixed")) {
+	    tberror("Could not open $pid-$eid.fixed: $!\n");
+	    return -1;
+	}
+	if ($vtop->PrintTop(*VTOPFILE) != 0) {
+	    tberror("Could not print fixed vtop file for $experiment\n");
+	    return -1;
+	}
+	close(VTOPFILE);
     }
+    return 0
+	if ($noregfree);
+    
     chat("Removing physical state in regression mode\n");
     if ($experiment->RemovePhysicalState() != 0) {
 	print STDERR "Could not remove physical state!\n";

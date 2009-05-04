@@ -85,7 +85,7 @@ sub usage ()
 		 "implies -n\n";
     exit($WRAPPER_FAILED);
 }
-my $optlist  = "vutnfprzxm:";
+my $optlist  = "vutnfprzxm:k";
 my $verbose  = 0;
 my $fixmode  = 0;
 my $updating = 0;
@@ -93,9 +93,12 @@ my $toponly  = 0;
 my $impotent = 0;
 my $precheck = 0;
 my $prepass  = 0;
-my $mfactor;
-my $regression=0;
 my $warnings = 0;
+my $mfactor;
+my $regression = 0;
+my $noassign   = 0;  # Only with regression mode, use previous solution.
+my $noregfree  = 0;  # Only with regression mode, leave physical state at end.
+my $usecurrent = 0;  # Only with regression mode, use current solution.
 
 #
 # Configure variables
@@ -195,8 +198,10 @@ if (defined($options{"r"})) {
 	fatal("Cannot use regression mode on main DB");
     }
     $regression = 1;
-    $regression++
+    $usecurrent = 1
 	if (defined($options{"z"}));
+    $noregfree = 1
+	if (defined($options{"k"}));
 }
 my $pid = $ARGV[0];
 my $eid = $ARGV[1];
@@ -858,19 +863,20 @@ LoadPhysInfo();
 #
 LoadExperiment();
 
-if ($regression) {
-    print STDERR "Freeing reserved nodes in regression mode\n";
-    system("export NORELOAD=1; $NFREE -x -a $pid $eid") == 0
-	or fatal("Could not release nodes in regression mode");
-}
-
 #
 # If updating, load current experiment resources. We have to be careful
 # of how this is merged in with the (new) desired topology. See below.
 #
-if ($updating || $regression) {
+if ($updating || $regression || $usecurrent) {
     LoadCurrent()
-	if ($updating);
+	if ($updating || $usecurrent);
+
+    if ($regression) {
+	print STDERR "Freeing reserved nodes in regression mode\n";
+	system("export NORELOAD=1; $NFREE -x -a $pid $eid") == 0
+	    or fatal("Could not release nodes in regression mode");
+    }
+
     print STDERR "Resetting DB before updating.\n";
     $experiment->RemovePhysicalState();
 }
@@ -1005,7 +1011,7 @@ sub RunAssign ()
     my %subnodes  = ();
 
     # Debugging hack for regression mode. Avoid really long assign runs.
-    if ($regression > 1) {
+    if ($noassign) {
 	if (! -e "assign.log") {
 	    print "No existing assign results file!\n";
 	    return -1;
@@ -3193,10 +3199,27 @@ sub InitPnode($$)
     # Now call os_select.
     #
     if (defined($osid)) {
-	printdb("os_select $osid $pnode\n");
-	system("os_select $osid $pnode") == 0 or
-	    fatal("    os_select $osid $pnode failed!\n");
+	if ($impotent) {
+	    printdb("  pretending to os_select $osid\n");
+	}
+	else {
+	    printdb("  os_select $osid\n");
+
+	    # osselect wants an osinfo object.
+	    my $tmposinfo = OSinfo->Lookup($osid);
+	    if (!defined($tmposinfo)) {
+		fatal("Could not map $osid to osinfo object");
+	    }
+	    my $pnodeobject = Node->Lookup($pnode);
+	    if (! defined($pnodeobject)) {
+		fatal("No such pnode $pnode in nodes table!");
+	    }
+	    if ($pnodeobject->OSSelect($tmposinfo, "def_boot_osid", $verbose)) {
+		fatal("OSSelect($pnode,$tmposinfo) failed\n");
+	    }
+	}
     }
+
     # Clear this after os_select.
     if ($regression) {
 	DBQueryFatal("update nodes set state_timestamp=0, ".
@@ -5580,13 +5603,14 @@ sub LoadCurrent()
     
     my $query_result = 
 	DBQueryFatal("select r.vname,r.node_id,n.phys_nodeid, ".
-		     "       nt.isvirtnode,nt.isremotenode,nt.isplabdslice,r.erole,".
+		     "  nt.isvirtnode,nt.isremotenode,nt.isplabdslice,r.erole,".
 		     "r.simhost_violation,nt.type from reserved as r ".
 		     "left join nodes as n on n.node_id=r.node_id ".
 		     "left join node_types as nt on nt.type=n.type ".
 		     "where r.pid='$pid' and r.eid='$eid'");
     
-    while (my ($vname,$reserved,$physnode,$isvirt,$isremote,$isplab,$erole,$simhost_violation,$node_type) =
+    while (my ($vname,$reserved,$physnode,$isvirt,$isremote,
+	       $isplab,$erole,$simhost_violation,$node_type) =
 	   $query_result->fetchrow_array) {
 
 	#
@@ -5595,6 +5619,19 @@ sub LoadCurrent()
 	fatal("Cannot update widearea nodes yet!")
 	    if ($isremote && !nodetypeisdedicatedremote($node_type) 
 		&& !$isplab);
+
+	if ($regression) {
+	    #
+	    # In regression mode, we just store the p2v mapping for fixnode.
+	    #
+	    if ($isvirt) {
+		$fixed_nodes{$vname} = $physnode;
+	    }
+	    else {
+		$fixed_nodes{$vname} = $reserved;
+	    }
+	    next;
+	}
 	
 	LoadPhysNode($reserved);
 
@@ -5659,7 +5696,8 @@ sub LoadCurrent()
 
 		# Allow for the user to "move" a node. Yuck!
 		$fixed_nodes{$vname} = $reserved
-		    if (!defined($fixed_nodes{$vname}) && $fix_current_resources);
+		    if (!defined($fixed_nodes{$vname}) &&
+			$fix_current_resources);
 		$reserved_pcount++;
 	    }
 	}
@@ -5712,12 +5750,27 @@ sub FinalizeRegression($)
     chomp($cwd = `/bin/pwd`);
     if (!$error) {
 	print STDERR "Saving physical state in regression mode\n";
+	if (system("/bin/rm -rf $pid-$eid.pstate")) {
+	    print STDERR "Could not clean physical state directory\n";
+	    exit(1);
+	}
 	if ($experiment->BackupPhysicalState("$cwd/$pid-$eid.pstate", 1)
 	    != 0) {
 	    print STDERR "Could not save physical state!\n";
 	    exit(1);
 	}
+
+	# Load the current resources in so we can generate a new vtop
+	# file with all resources fixed.
+	$fix_current_resources = 1;
+	$updating = 1;
+	LoadCurrent();
+	$topfile = "$pid-$eid.fixed";
+	CreateTopFile();
     }
+    return 0
+	if ($noregfree);
+    
     print STDERR "Removing physical state in regression mode\n";
     if ($experiment->RemovePhysicalState() != 0) {
 	print STDERR "Could not remove physical state!\n";
