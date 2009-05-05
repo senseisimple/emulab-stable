@@ -17,7 +17,8 @@ include "protogeni-rspec-common.rnc"
 NodeContents &=
   VirtualName &
   ComponentName? &
-  SliverName?
+  SliverName? &
+  attribute colocate { text }?
 
 # The LinkMapping will only be available after an assignment
 # The SliverName will be available only after the request has been redeemed.
@@ -35,9 +36,8 @@ InterfaceDecl &=
 
 # The ComponentInterfaceRefName will only be available after an assignment
 InterfaceRef &=
-  ComponentInterfaceRefName? &
   attribute virtual_node_id { text } &
-  attribute virtual_interface_name { text }
+  attribute virtual_interface_id { text }
 
 RSpecContents &=
   attribute type { "request" }
@@ -52,9 +52,11 @@ LinkMapping =
 # Each interface represents a particular physical interface. If that
 # interface is one of the link end points, it is also mapped to that
 # virtual interface name.
-InterfaceMapping = element interface {
-  ComponentInterfaceRefName &
-  VirtualName ?
+InterfaceMapping = element interface_ref {
+  ComponentInterfaceRefName |
+  (attribute virtual_node_id { text } &
+   attribute virtual_interface_id { text })
+#  VirtualName ?
 }
 
 start = RSpec

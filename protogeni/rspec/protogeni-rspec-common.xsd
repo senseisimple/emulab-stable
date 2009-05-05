@@ -18,11 +18,7 @@
   <xs:complexType name="NodeContents">
     <xs:choice minOccurs="0" maxOccurs="unbounded">
       <xs:group ref="rspec:NodeTypeList"/>
-      <xs:element name="interface">
-        <xs:complexType>
-          <xs:attributeGroup ref="rspec:InterfaceDecl"/>
-        </xs:complexType>
-      </xs:element>
+      <xs:element ref="rspec:interface"/>
     </xs:choice>
     <xs:attribute name="virtualization_type">
       <xs:simpleType>
@@ -39,12 +35,18 @@
     <xs:attribute name="component_name"/>
     <xs:attribute name="component_uuid"/>
     <xs:attributeGroup ref="rspec:SliverName"/>
+    <xs:attribute name="colocate"/>
   </xs:complexType>
+  <xs:element name="interface">
+    <xs:complexType>
+      <xs:attributeGroup ref="rspec:InterfaceDecl"/>
+    </xs:complexType>
+  </xs:element>
   <xs:complexType name="LinkContents">
     <xs:choice minOccurs="0" maxOccurs="unbounded">
       <xs:choice>
         <xs:group ref="rspec:LinkTypeList"/>
-        <xs:element name="interface">
+        <xs:element name="interface_ref">
           <xs:complexType>
             <xs:attributeGroup ref="rspec:InterfaceRef"/>
           </xs:complexType>
@@ -118,24 +120,22 @@
     <xs:attribute name="component_uuid" use="required"/>
   </xs:attributeGroup>
   <xs:attributeGroup name="ComponentInterfaceDeclName">
-    <xs:attribute name="component_name" use="required"/>
+    <xs:attribute name="component_id" use="required"/>
   </xs:attributeGroup>
   <xs:attributeGroup name="ComponentInterfaceRefName">
     <xs:attribute name="component_node_uuid" use="required"/>
-    <xs:attribute name="component_interface_name" use="required"/>
+    <xs:attribute name="component_interface_id" use="required"/>
   </xs:attributeGroup>
   <xs:attributeGroup name="SliverName">
     <xs:attribute name="sliver_uuid"/>
   </xs:attributeGroup>
   <xs:attributeGroup name="InterfaceDecl">
-    <xs:attribute name="component_name"/>
+    <xs:attribute name="component_id"/>
     <xs:attributeGroup ref="rspec:VirtualName"/>
   </xs:attributeGroup>
   <xs:attributeGroup name="InterfaceRef">
-    <xs:attribute name="component_node_uuid"/>
-    <xs:attribute name="component_interface_name"/>
     <xs:attribute name="virtual_node_id" use="required"/>
-    <xs:attribute name="virtual_interface_name" use="required"/>
+    <xs:attribute name="virtual_interface_id" use="required"/>
   </xs:attributeGroup>
   <xs:element name="location">
     <xs:complexType>

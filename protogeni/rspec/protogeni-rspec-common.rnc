@@ -39,7 +39,7 @@ NodeContents =
     # Link types
     LinkTypeList &
     # The interfaces which this link spans.
-    element interface {
+    element interface_ref {
       InterfaceRef
     }*
 
@@ -58,11 +58,11 @@ ComponentName =
   # The uuid of the physical component.
   attribute component_uuid { text }
 
-ComponentInterfaceDeclName = attribute component_name { text }
+ComponentInterfaceDeclName = attribute component_id { text }
 
 ComponentInterfaceRefName =
   attribute component_node_uuid { text } &
-  attribute component_interface_name { text }
+  attribute component_interface_id { text }
 
 SliverName =
   # The sliver_uuid is an annotation added when a ticket is
