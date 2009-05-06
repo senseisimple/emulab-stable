@@ -48,13 +48,9 @@ function GetPNodes_cb(data) {
  * event for iframes. 
  */
 if (is_safari) {
-    window.onload = (function() {
-        var nextfn = window.onload || function(){};
-        return function() {
-	    ml_handleReadyState(LOG_STATE_LOADED);
-            nextfn();
-        }
-    })();
+    addLoadFunction(function() {
+        ml_handleReadyState(LOG_STATE_LOADED);
+    });
 }
 
 /* Clear the various 'loading' indicators. */

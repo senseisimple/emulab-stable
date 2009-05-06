@@ -1318,10 +1318,8 @@ function SET_DHTML()
 			dd.n4? d_o.oimg.src = spacer : d_o.oimg.style.visibility = 'hidden';
 	}
 	dd.mkWzDom();
-	if(window.onload) dd.loadFunc = window.onload;
-	if(window.onunload) dd.uloadFunc = window.onunload;
-	window.onload = dd.initz;
-	window.onunload = dd.finlz;
+        addLoadFunction(dd.initz);
+	addUnloadFunction(dd.finlz);
 	dd.setDwnHdl(PICK);
 }
 function ADD_DHTML(d_o) // layers only!

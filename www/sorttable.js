@@ -366,7 +366,7 @@ if (/WebKit/i.test(navigator.userAgent)) { // sniff
 }
 
 /* for other browsers */
-window.onload = sorttable.init;
+addLoadFunction(sorttable.init);
 
 // written by Dean Edwards, 2005
 // with input from Tino Zijdel, Matthias Miller, Diego Perini

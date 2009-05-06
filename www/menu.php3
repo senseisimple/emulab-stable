@@ -829,6 +829,10 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
 	echo "<meta name=\"description\" ".
                    "content=\"emulab - network emulation testbed home\">\n";
     }
+    # This needs to stay first! It defines things that might get used by
+    # later scripts
+    echo "<script type='text/javascript'
+                  src='${BASEPATH}/onload.js'></script>\n";
     if ($extra_headers) {
         echo $extra_headers;
     }

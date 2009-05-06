@@ -700,7 +700,7 @@ function init() {
     refresh(resource);
 }
 
-window.onload = init;
+addLoadFunction(init);
 window.onresize = resizeVizForceRedraw;
 
 </script>

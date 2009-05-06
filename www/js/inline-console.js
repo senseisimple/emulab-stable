@@ -205,11 +205,5 @@ if (window.addEventListener) {
 } else if (window.attachEvent) {
     window.attachEvent('onload', InlineConsole.addConsole);
 } else {
-    window.onload = (function() {
-        var nextfn = window.onload || function(){};
-        return function() {
-            addConsole();
-            nextfn();
-        }
-    })();
+    addLoadFunction(addConsole());
 }

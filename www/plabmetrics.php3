@@ -245,7 +245,7 @@ function init() {
     //divflipvis('selectiondiv');
 }
 
-window.onload = init;
+addLoadFunction(init);
 
 function setElementValue(id,value) {
     if (id == null) {
