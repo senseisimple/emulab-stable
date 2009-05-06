@@ -21,14 +21,19 @@ free pc3000s limits the size of the experiments they can run.
 The second class includes other, older PCs (along with the pc3000s) to give
 a sense for how many nodes are available if one is willing to use some
 slower nodes.
+</p>
 
+<p>
+Emulab currently includes around 350 PC nodes. As you can see, most of those
+are in use even during our periods of &quot;light&quot; usage.
 </p>
 
 <p>
 Hourly graphs show the average number of free nodes in the
 given hour. Daily graphs show the average number of free nodes in the
-given day, etc. Note that because some data in these graphs is averaged
-over a very long time period (up to four years), it may not reflect recent
+given day, etc. All times are given in Mountain Time. Note that because
+some data in these graphs is averaged over a very long time period (up to four
+years), it may not reflect recent
 trends.
 </p>
 
