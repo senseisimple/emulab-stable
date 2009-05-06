@@ -64,12 +64,6 @@ ComponentInterfaceRefName =
   attribute component_node_uuid { text } &
   attribute component_interface_id { text }
 
-SliverName =
-  # The sliver_uuid is an annotation added when a ticket is
-  # redeemed to notify the client of the association between the
-  # virtual_id requests and the actual slivers instantiated.
-  attribute sliver_uuid { text }?
-
 InterfaceDecl = empty
 
 InterfaceRef = empty

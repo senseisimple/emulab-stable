@@ -13,19 +13,18 @@ default namespace = "http://www.protogeni.net/resources/rspec/0.1"
 include "protogeni-rspec-common.rnc"
 
 # The ComponentName will only be available after an assignment
-# The SliverName will be available only after the request has been redeemed.
 NodeContents &=
   VirtualName &
   ComponentName? &
-  SliverName? &
-  attribute colocate { text }?
+  attribute colocate { text }? &
+  # TODO: Remove and replace with something more exensible
+  attribute virtualization_subtype { text }?
 
 # The LinkMapping will only be available after an assignment
-# The SliverName will be available only after the request has been redeemed.
 LinkContents &=
+  attribute link_type { text }? &
   VirtualName &
   LinkMapping? &
-  SliverName? &
   # Characteristics (bandwidth, latency, loss) which affect traffic.
   LinkCharacteristics?
 
@@ -36,6 +35,7 @@ InterfaceDecl &=
 
 # The ComponentInterfaceRefName will only be available after an assignment
 InterfaceRef &=
+  attribute tunnel_ip { text }? &
   attribute virtual_node_id { text } &
   attribute virtual_interface_id { text }
 
