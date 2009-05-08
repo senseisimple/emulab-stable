@@ -420,7 +420,7 @@ function WRITESIDEBAR() {
 	$rootEmulab = 0;
     }
     if ($rootEmulab) {
-	NavMenuButton("Other Emulabs", 
+	NavMenuButtonNew("Other Emulabs", 
 		      "$WIKIDOCURL/OtherEmulabs");
     } else {
 	NavMenuButton("Utah Emulab", "http://www.emulab.net/");
@@ -436,14 +436,14 @@ function WRITESIDEBAR() {
 
     if ($rootEmulab) {
 	# Leave New here about 2 weeks
-        NavMenuButtonNew("Papers and Talks (Apr 4)", "$TBDOCBASE/pubs.php3");
+        NavMenuButton("Papers and Talks (Apr 4)", "$TBDOCBASE/pubs.php3");
 	NavMenuButton("Emulab Software (Sep 1)", "$TBDOCBASE/software.php3");
 
 	NavMenuButton("List People",
 		      "$TBDOCBASE/people.php3");
 	NavMenuButton("Photo Gallery",
 		      "$TBDOCBASE/gallery/gallery.php3");
-	NavMenuButton("Emulab Users",
+	NavMenuButtonNew("Emulab Users",
 		      "$TBDOCBASE/doc/docwrapper.php3?docname=users.html");
 	NavMenuButton("Emulab Sponsors",
 		      "$TBDOCBASE/docwrapper.php3?docname=sponsors.html");
