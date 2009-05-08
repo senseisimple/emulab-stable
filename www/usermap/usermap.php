@@ -94,7 +94,7 @@ function draw_usermap($type) {
         }
     }
 
-    echo "<div id=\"map_canvas\" style=\"<? echo $divstyle ?>\"></div>\n";
+    echo "<div id=\"map_canvas\" style=\"$divstyle\"></div>\n";
 
     if (isset($fullscreen)) {
         echo "</body></html>";
