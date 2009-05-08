@@ -120,6 +120,10 @@ TTFILES  = $(wildcard $(SRCDIR)/timetree/*.png)
 TTFILES += $(wildcard $(SRCDIR)/timetree/*.js)
 TTFILES += $(wildcard $(SRCDIR)/timetree/*.css)
 
+UMFILES  = $(wildcard $(SRCDIR)/usermap/*.php)
+UMFILES += $(wildcard $(SRCDIR)/usermap/*.png)
+UMFILES += $(wildcard $(SRCDIR)/usermap/*.js)
+
 JSFILES += $(wildcard $(SRCDIR)/js/*.js)
 
 # need to make it *.gz; with simply "*", 
@@ -174,6 +178,7 @@ ALLBUI    = $(notdir $(BUIFILES))
 ALLNL     = $(notdir $(NLFILES))
 ALLHY     = $(notdir $(HYFILES))
 ALLTT     = $(notdir $(TTFILES))
+ALLUM     = $(notdir $(UMFILES))
 ALLJS     = $(notdir $(JSFILES))
 ALLROBO   = $(notdir $(ROBOTRACKFILES))
 ALLWISTATS = $(notdir $(WIRELESSSTATSFILES))
@@ -190,6 +195,7 @@ INSTALLFILES = $(addprefix $(INSTALL_SBINDIR)/, htmlinstall) \
 	$(addprefix $(INSTALL_WWWDIR)/netlab/, $(ALLNL)) \
 	$(addprefix $(INSTALL_WWWDIR)/hyperviewer/, $(ALLHY)) \
 	$(addprefix $(INSTALL_WWWDIR)/timetree/, $(ALLTT)) \
+	$(addprefix $(INSTALL_WWWDIR)/usermap/, $(ALLUM)) \
 	$(addprefix $(INSTALL_WWWDIR)/js/, $(ALLJS)) \
 	$(addprefix $(INSTALL_WWWDIR)/robotrack/, $(ALLROBO)) \
 	$(addprefix $(INSTALL_WWWDIR)/wireless-stats/, $(ALLWISTATS)) \
