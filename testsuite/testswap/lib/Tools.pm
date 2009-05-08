@@ -8,7 +8,7 @@ use Log::Log4perl qw(get_logger :levels);
 require Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT = qw(prettytimestamp timestamp sayts sayperl slurp splat toperl
-                 init_tbts_logger concretize);
+                 init_tbts_logger concretize yn_prompt);
 
 =head1 NAME
 
@@ -172,6 +172,36 @@ sub init_tbts_logger {
   }
 
   $logger;
+}
+
+=item C<getyn>
+
+returns 1 if user types Y or y 0 otherwise
+
+=cut
+
+sub getyn {
+  use Term::ReadKey;
+  open(TTY, "</dev/tty");
+  ReadMode "raw";
+  my $key = ReadKey 0, *TTY;
+  ReadMode "normal";
+  print $key;
+  lc($key) eq 'y';
+}
+
+=item C<yn($prompt)>
+
+prints $prompt
+returns 1 if user types Y or y 0 otherwise
+
+=cut
+
+sub yn_prompt {
+  print $_[0] . " ";
+  my $r = getyn;
+  print "\n";
+  return $r;
 }
 
 =back

@@ -1,12 +1,14 @@
 #!/usr/bin/perl
-package T2;
+package RateLimitParallelExample;
 use TestBed::TestExperiment;
 use BasicNSs;
-use Test::More tests => 4;
+use Test::More;
 
-my $sub = sub {
-  ok(1, 'I\'m alive');
+my $test_body = sub {
+  my $e = shift;
+  ok(!($e->ping_test), 'Ping Test');
 };
 
-teste("k$_", "k$_ desc", $BasicNSs::TwoNodeLan, $sub) for (1..4);
+#$eid, $ns, $test_desc, $ns, $desc)
+teste("k$_", $BasicNSs::TwoNodeLan, $test_body, 1, "k$_ desc" ) for (1..2);
 1;

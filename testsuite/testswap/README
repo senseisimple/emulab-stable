@@ -5,15 +5,18 @@ REQUIREMENTS
   ssh executable in path
 
 INSTALLATION INSTRUCTIONS
-  perl ./localcpan.pl
+  perl ./localcpan.pl #this install dependencies in your homdir if you don't have root access to do it yourself
   add export PERL5LIB=~/lib/perl5 to your environment
-  edit TBConfig.pm to point to your client certificate
+  copy TBConfig.pm.in to TBConfig.pm and edit it to point to your client certificate
   add your emulab keys to a running ssh-agent
-  
+
+TO SEE Tests available to run
+  ./tbts 
+ 
 TO RUN Tests
-  make test
-  make t/old/old.t
-  make t/topologies/basic.t
+  ./tbts test
+  ./tbts t/old/old.t
+  ./tbts t/topologies/basic.t
 
 
 
@@ -28,9 +31,14 @@ TO RUN Tests
 
 
 
+Module Install is a comprehensive installer.
+It will:
+  download and install dependencies
+  install tbts in the filesystem to a PREFIX if desired
+  generate MAN pages for all the .pm files
+  etc
 
-
-DEPRECATED Module::Install instructions  
+Module::Install instructions  
   cpan needs to be configured and functional
   cpan Module::Install
   perl Makefile.PL

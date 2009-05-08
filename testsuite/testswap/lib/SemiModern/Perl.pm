@@ -40,6 +40,11 @@ sub say {
     croak $warning;
 }
 
+sub sayd {
+  use Data::Dumper;
+  say Dumper(@_);
+}
+
 if (1 || $] < 5.010) {
   *IO::Handle::say = \&say if ! defined &IO::Handle::say;
 }
@@ -50,6 +55,7 @@ sub import {
   if (1 || $] < 5.010) {
     no strict 'refs';
     *{caller() . '::say'} = \&say;
+    *{caller() . '::sayd'} = \&sayd;
     use strict 'refs';
   }
 }

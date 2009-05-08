@@ -20,6 +20,7 @@ requires      'Net::Ping'           => '2.31';
 requires      'Crypt::SSLeay'       => '0.57';
 requires      'Test::Class'         => '0.31';
 requires      'Test::Exception'     => '';
+requires      'Term::ReadKey'       => '';
 
 =pod
 #too much effort to install for now

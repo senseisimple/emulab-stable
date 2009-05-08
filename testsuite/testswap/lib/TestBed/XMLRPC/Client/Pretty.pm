@@ -3,7 +3,7 @@ package TestBed::XMLRPC::Client::Pretty;
 use SemiModern::Perl;
 require Exporter;
 our @ISA = qw(Exporter);
-our @EXPORT = qw(pretty_listexp);
+our @EXPORT = qw(pretty_listexp experiments_hash_to_list);
 use Data::Dumper;
 
 =head1 NAME
@@ -15,19 +15,35 @@ TestBed::XMLRPC::Client::Pretty;
 =item C<pretty_listexp>
 
 pretty prints the XMLRPC response from listexp
+
 =cut
+
 sub pretty_listexp {
+  for my $ed (experiments_hash_to_list(@_)) {
+    my ($pid, $gid, $eid,) = @{ $ed->[0] };
+    my $status = $ed->[1]->{'state'};
+    say "$pid :: $gid :: $eid $status";
+  }
+}
+
+sub experiments_hash_to_list {
   my ($h) = @_;
+  my @exper_list;
   while(my ($pk, $v) = each %$h) {
     while(my ($gk, $v) = each %$v) {
       for my $e (@$v) {
         my $eid;
-        if ( ref $e && exists $e->{'name'} )  { $eid = sprintf("%s %s", $e->{'name'}, $e->{'state'});}
+        my $status = "";
+        if ( ref $e && exists $e->{'name'} )  { 
+          $eid = $e->{'name'};
+          $status = $e->{'state'};
+        }
         else { $eid = $e; }
-        say "$pk :: $gk :: $eid";
+        push @exper_list, [ [$pk, $gk, $eid], $e];
       }
     }
   }
+  return wantarray ? @exper_list : \@exper_list;
 }
 
 =back

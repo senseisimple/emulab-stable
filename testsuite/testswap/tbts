@@ -26,26 +26,25 @@ use Data::Dumper;
   my $timing;
   my $verbose;
   my $debug;
+  my $project;
+  my $group;
+  my $defines;
   my $result = GetOptions (
-      "jobs=i"     => \$pjobs,
-      "logging=i"  => \$logging,
-      "timing"     => \$timing,
-      "verbose"    => \$verbose,
-      "debug"      => \$debug);
+      "D=s%"        => \$defines,
+      "jobs=i"      => \$pjobs,
+      "logging=i"   => \$logging,
+      "timing"      => \$timing,
+      "verbose"     => \$verbose,
+      "project=s"   => \$project,
+      "group=s"     => \$group,
+      "debug"       => \$debug);
 
-  if ($pjobs > 1) {
-    $ENV{'HARNESS_OPTIONS'} = "j$pjobs";
-  }
-  if ($timing) {
-    $ENV{'HARNESS_TIMER'} = 1;
-  }
-  if ($verbose) {
-    $ENV{'HARNESS_VERBOSE'} = 1;
-    $ENV{HARNESS_COLOR} = 1;
-  }
-  if ($debug) {
-    $ENV{TBTS_DEBUG} = 1;
-  }
+  if ($debug)     { $ENV { 'TBTS_DEBUG'      } = 1; }
+  if ($group)     { $ENV { 'TBTS_GROUP'      } = $group;  }
+  if ($pjobs > 1) { $ENV { 'HARNESS_OPTIONS' } = "j$pjobs"; }
+  if ($project)   { $ENV { 'TBTS_PROJECT'    } = $project; }
+  if ($timing)    { $ENV { 'HARNESS_TIMER'   } = 1; }
+  if ($verbose)   { $ENV { 'HARNESS_VERBOSE' } = 1; $ENV { 'HARNESS_COLOR' } = 1; }
 }
 my $THARNESS = 'perl t/harness';
 
@@ -69,8 +68,10 @@ sub usage {
   print <<"USAGE";
 TestBed TestSwap
 ./tbts OPTIONS TESTSUITE|TESTFILE
-        -j --jobs=i    parallel jobs
         -d --debug
+        -g --group=GROUPNAME
+        -j --jobs=i    parallel jobs
+        -p --project=PROJECTNAME
         -t --timing
         -v --verbose
 

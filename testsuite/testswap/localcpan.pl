@@ -40,6 +40,7 @@ sub install_deps_from_cpan {
       IPC::Run3
       Crypt::SSLeay
       Test::Exception
+      Term::ReadKey
       );
 #      Test::Class
 #Crypt::SSLeay # required for SSL
@@ -75,8 +76,13 @@ sub automate_ssh_install {
 sub main {
   prep_local_cpan;
   $ENV{PERL5LIB} = glob('~/lib/perl5');
-  install_deps_from_cpan;
-#  automate_module_install;  #too complicated on FreeBSD
-#  automate_ssh_install;     #too complicated on FreeBSD
+
+  if ($ARGV[0] && ARGV[0] eq 'MI') {
+    automate_module_install;  #too complicated on FreeBSD
+    automate_ssh_install;     #too complicated on FreeBSD
+  }
+  else {
+    install_deps_from_cpan;
+  }
 }
 #main;

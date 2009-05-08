@@ -3,9 +3,10 @@ use lib 'lib';
 use SemiModern::Perl;
 use TBConfig;
 use TestBed::TestSuite;
+use TestBed::XMLRPC::Client::Pretty;
 use TestBed::TestSuite::Experiment::Macros;
 use Data::Dumper;
-use Tools::TBSSH;
+use Tools;
 use TestBed::Wrap::tevc;
 
 my $ns = <<'NSEND';
@@ -39,23 +40,33 @@ ShortCut
 END
 }
 
+sub end_all_experiments {
+  plistexps;
+  say "";
+  if (yn_prompt("Are you sure you want to terminate all experiments?")) {
+    e(@{$_->[0]})->end for( experiments_hash_to_list(list_full));
+  }
+}
+
 if (@ARGV) {
   $_ = shift;
-  if (/end/) { e($_)->end() for(@ARGV); }
-
-  my $e = e(shift);
-  if (/--help/) { usage; } 
-  elsif (/end/) { $e->end(); }
-  elsif (/ping/ ) { $e->ping_test; }
-  elsif (/swapin/) { $e->swapin_wait; }
-  elsif (/swapout/) { $e->swapout_wait; }
-  elsif (/start/) { $e->startexp_ns_wait($ns); }
-  elsif (/tevc/) { $e->tevc(@ARGV); }
-  elsif (/linktest/) { $e->linktest; }
-  elsif (/single_node_tests/) { $e->single_node_tests; }
-  elsif (/ni/) { say Dumper($e->nodeinfo) ;}
-  elsif (/li/) { say Dumper($e->linkinfo) ;}
-  else { 
+  if (/endall/) { end_all_experiments; }
+  elsif (/end/) { e($_)->end for(@ARGV); }
+  else {
+    my $e = e(shift);
+    if (/--help/) { usage; } 
+    elsif (/end/) { $e->end(); }
+    elsif (/ping/ ) { $e->ping_test; }
+    elsif (/swapin/) { $e->swapin_wait; }
+    elsif (/swapout/) { $e->swapout_wait; }
+    elsif (/start/) { $e->startexp_ns_wait($ns); }
+    elsif (/tevc/) { $e->tevc(@ARGV); }
+    elsif (/linktest/) { $e->linktest; }
+    elsif (/single_node_tests/) { $e->single_node_tests; }
+    elsif (/ni/) { say Dumper($e->nodeinfo) ;}
+    elsif (/li/) { say Dumper($e->linkinfo) ;}
+    else { 
+    }
   }
 }
 else {
