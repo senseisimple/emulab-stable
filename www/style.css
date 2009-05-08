@@ -823,8 +823,29 @@ dl dt {
     font-weight: bold;
 }
 
+div.thumb {
+    width: 115px;
+    text-align: center;
+    font-size: 0.8em;
+    margin-bottom: 20px;
+    border: solid #000000 1px;
+    background-color: #eeeeee;
+    padding: 5px;
+    font-style: italic;
+    float: right;
+    clear: right;
+}
+div.thumb img {
+    border: solid 3px #000000;
+    display: inline;
+    margin: 5px;
+}
+
 dl.envlist {
     border: #ffff00 solid 2px;
     background: #ffffcc;
+    padding: 5px;
+    margin: 0px;
+    /* Awful - needed to make room for the floating thumbnails, above */
+    margin-right: 135px;
 }
-
