@@ -88,12 +88,20 @@ function draw_usermap($type) {
     <?php
 
     } else {
-        $divstyle = "width: 850px; height: 400px;";
+        $divstyle = "width: 850px; height: 400px; margin-right: auto; margin-left: auto";
         if ($type != $USERMAP_TYPE_EMBED) {
             PAGEHEADER("User Map",NULL,$USERMAP_SCRIPTHEADERS);
+            echo("<p>This map shows the cities with registered users of this ");
+            echo("testbed. Numbers on the markers give the numbers of users ");
+            echo("in a region. You can zoom in to see more detail, and ");
+            echo("clicking on a maker will bring up a list of the cities it ");
+            echo("represents.</p>");
         }
     }
 
+    #
+    # The meat - where the map will get displayed
+    #
     echo "<div id=\"map_canvas\" style=\"$divstyle\"></div>\n";
 
     if (isset($fullscreen)) {
