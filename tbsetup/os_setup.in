@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -1103,7 +1103,9 @@ elsif (@vnodelist) {
 	my $osinfo = $osmap{$node};
 	if (defined($osinfo)) {
 	    my $osid = $osinfo->osid();
-	    $reboot_time = $reboot_waittime{$osid};
+	    if (defined($reboot_waittime{$osid})) {
+		$reboot_time = $reboot_waittime{$osid};
+	    }
 	}
 	if ($islocal) {
 	    $maxwait = $reboot_time + (40 * $pnodevcount{$pnode});
