@@ -7,6 +7,7 @@ use TestBed::Wrap::tevc;
 use TestBed::Wrap::linktest;
 use Tools::TBSSH;
 use Data::Dumper;
+use TestBed::TestSuite;
 use TestBed::TestSuite::Node;
 use TestBed::TestSuite::Link;
 
@@ -153,13 +154,13 @@ sub startrun {
   $worker->($e)             || die "worker function failed";
 }
 
-=item C<launchpingkill($pid, $eid, $ns)>
+=item C<launchpingkill($e, $ns)>
 
 class method that starts an experiment, runs a ping_test, and ends the experiment
 =cut
 sub launchpingkill {
-  my ($pid, $eid, $ns) = @_;
-  my $e = e($pid, $eid);
+  my ($e, $ns) = @_;
+  my $eid = $e->eid;
   trytest {
     $e->startexp_ns_wait($ns) && die "batchexp $eid failed";
     $e->ping_test             && die "connectivity test $eid failed";
@@ -167,15 +168,15 @@ sub launchpingkill {
   } $e;
 }
 
-=item C<launchpingkill($pid, $eid, $ns)>
+=item C<launchpingkill($e, $ns)>
 
 class method that starts an experiment, runs a ping_test, 
 swaps the experiment out and then back in, runs a ping test, and finally
 ends the experiment
 =cut
 sub launchpingswapkill {
-  my ($pid, $eid, $ns) = @_;
-  my $e = e($pid, $eid);
+  my ($e, $ns) = @_;
+  my $eid = $e->eid;
 trytest {
     $e->startexp_ns_wait($ns) && die "batchexp $eid failed";
     $e->ping_test             && die "connectivity test $eid failed";

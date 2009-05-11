@@ -1,6 +1,7 @@
 #!/usr/bin/perl
 use SemiModern::Perl;
-use TestBed::TestSuite::Experiment;
+use TestBed::TestSuite;
+use TestBed::TestSuite::Experiment
 use Test::More qw(no_plan);
 use Data::Dumper;
 require 't/old/oldtestsuite.pm';
@@ -20,5 +21,5 @@ for (@who_knows) {
   my $ns = $Testbed::OldTestSuite::data->{$_}->{'nsfile'};
   say "Running " . $_;
   say $ns;
-  ok(launchpingkill('tbres', $_, $ns), $_);
+  ok(launchpingkill(e($_), $ns), $_);
 }

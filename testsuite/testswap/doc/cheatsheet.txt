@@ -1,3 +1,4 @@
-e('PROJECT_ID', 'EXPERIMENT_ID');   #new experiment
-ep();                               #new plain experiment for calling "class methods" on
-dpe('EXPERIMENT_ID')                #default project new experiment
+e('EXPERIMENT_ID');                           # new experiment in default project
+e('PROJECT_ID', 'EXPERIMENT_ID');             # new experiment in default group
+e('PROJECT_ID', 'GROUP_ID', 'EXPERIMENT_ID'); # new experiment
+e();                                          # new plain experiment for calling "class methods" on

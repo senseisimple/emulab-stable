@@ -1,5 +1,6 @@
 #!/usr/bin/perl
 use SemiModern::Perl;
+use TestBed::TestSuite;
 use TestBed::TestSuite::Experiment;
 use Test::More tests => 1;
 use Data::Dumper;
@@ -16,4 +17,4 @@ set lan1 [$ns make-lan "$node1 $node2" 100Mb 0ms]
 $ns run
 NSEND
 
-ok(launchpingswapkill('tbres', 'tewkt', $ns));
+ok(launchpingswapkill(e('tewkt'), $ns));

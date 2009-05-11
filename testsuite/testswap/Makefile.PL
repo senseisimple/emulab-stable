@@ -4,7 +4,7 @@ use inc::Module::Install;
 # Define metadata
 name            'tbts';
 perl_version    '5.008';
-author          'Kevin Tew <tewk@flux.utah.edu>';
+author          'Testbed Developers <testbed-dev@flux.utah.edu>';
 version         '0.01';
 
 requires      'Mouse'               => '0.22';
@@ -23,7 +23,7 @@ requires      'Test::Exception'     => '';
 requires      'Term::ReadKey'       => '';
 
 =pod
-#too much effort to install for now
+#too much effort for BSD users to install for now
 #required for fast SSH and Crypt::DH
 requires      'bignum'              => '0.22';
 requires      'Math::BigRat'        => '0.22';

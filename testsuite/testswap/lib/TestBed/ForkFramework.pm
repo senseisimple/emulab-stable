@@ -106,6 +106,9 @@ sub workloop {
   return wantarray ? @results : \@results;
 }
 
+use constant SELECT_HAS_HANDLES  => 1;
+use constant SELECT_NO_HANDLES  => 0;
+
 sub selectloop {
   my ($self) = @_;
   my $selector = $self->selector;
@@ -139,9 +142,9 @@ sub selectloop {
       waitpid( $_, 0 ) for @{ $self->workers };
       die $error;
     }
-    return 1;
+    return SELECT_HAS_HANDLES;
   }
-  return 0;
+  return SELECT_NO_HANDLES;
 }
 
 sub fffork {

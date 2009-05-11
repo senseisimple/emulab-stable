@@ -18,8 +18,11 @@ TO RUN Tests
   ./tbts t/old/old.t
   ./tbts t/topologies/basic.t
 
-
-
+EXAMPLE Tests to look at to GET STARTED:
+  t/topologies/single_node.t
+  t/topologies/two_node_lan.t
+  t/topologies/simple_two_node_linktest.t
+  t/topologies/link_up_link_down.t
 
 
 

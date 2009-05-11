@@ -75,6 +75,7 @@ sub single_request {
   $resp;
 }
 
+sub xmlrpc_req        { single_request(@_)->value; }
 sub xmlrpc_req_value  { single_request(@_)->value-> {'value'}; }
 sub xmlrpc_req_output { single_request(@_)->value-> {'output'}; }
 sub xmlrpc_req_code   { single_request(@_)->value-> {'code'}; }
@@ -90,6 +91,14 @@ sub augment_code {
   my $self = shift;
   $self->xmlrpc_req_code($self->pkgfunc(), $self->args(@_));
 }
+sub augment_code0 { 
+  my $self = shift;
+  my $result = $self->xmlrpc_req($self->pkgfunc(), $self->args(@_));
+  if ( $result->{'code'} ) {
+    print $result->{'output'};
+  }
+  $result->{'code'};
+}
 sub augment_func { 
   my $self = shift;
   $self->xmlrpc_req_value($self->pkg() . "." . shift, $self->args(@_));
@@ -101,6 +110,15 @@ sub augment_func_output {
 sub augment_func_code { 
   my $self = shift;
   $self->xmlrpc_req_code($self->pkg() . "." . shift, $self->args(@_));
+}
+
+sub augment_func_code0 { 
+  my $self = shift;
+  my $result = $self->xmlrpc_req($self->pkg() . "." . shift, $self->args(@_));
+  if ( $result->{'code'} ) {
+    print $result->{'output'};
+  }
+  $result->{'code'};
 }
 
 =head1 NAME

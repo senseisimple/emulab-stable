@@ -29,13 +29,15 @@ use Data::Dumper;
   my $project;
   my $group;
   my $defines;
+  my $xmlrpcurl;
   my $result = GetOptions (
-      "D=s%"        => \$defines,
+#      "D=s%"        => \$defines,
       "jobs=i"      => \$pjobs,
       "logging=i"   => \$logging,
       "timing"      => \$timing,
       "verbose"     => \$verbose,
       "project=s"   => \$project,
+      "xmlrpcurl=s" => \$xmlrpcurl,
       "group=s"     => \$group,
       "debug"       => \$debug);
 
@@ -45,6 +47,7 @@ use Data::Dumper;
   if ($project)   { $ENV { 'TBTS_PROJECT'    } = $project; }
   if ($timing)    { $ENV { 'HARNESS_TIMER'   } = 1; }
   if ($verbose)   { $ENV { 'HARNESS_VERBOSE' } = 1; $ENV { 'HARNESS_COLOR' } = 1; }
+  if ($xmlrpcurl) { $ENV { 'TBTS_XMLRPC_URL'  } = $xmlrpcurl; }
 }
 my $THARNESS = 'perl t/harness';
 
@@ -74,6 +77,7 @@ TestBed TestSwap
         -p --project=PROJECTNAME
         -t --timing
         -v --verbose
+        -x --xmlrpcurl=XMLRPCURL
 
     TESTSUITES:
         test     - all topology tests
@@ -90,6 +94,15 @@ USAGE
   print $tpms;
 }
 
+my @basic_exper_tests = qw( 
+    t/topologies/single_node.t 
+    t/topologies/two_node_lan.t 
+    t/topologies/simple_two_node_linktest.t 
+    t/topologies/link_up_link_down.t
+);
+#sayd(@basic_exper_tests);
+
+
 if (@ARGV) {
   my $cmd = $ARGV[0];
   $_   = $cmd;
@@ -102,6 +115,7 @@ if (@ARGV) {
   elsif (/sanity/)          { exec "$THARNESS t/lib/*.t t/lib/*/*.t t/xmlrpc/*.t "; }
   elsif (/lib/)             { exec "$THARNESS t/lib/*.t t/lib/*/*.t"; }
   elsif (/xmlrpc/)          { exec "$THARNESS t/xmlrpc/*.t"; }
+  elsif (/test/)            { exec "$THARNESS t/topologies/*.t"; }
   elsif (/test/)            { exec "$THARNESS t/topologies/*.t"; }
 }
 else {

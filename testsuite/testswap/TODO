@@ -1,27 +1,34 @@
 DOCS TODO
+  Overview / howto write a test
 
 TODO
+  cmdline params (-D)
   VERBOSENESS
-  buildup, teardown using Test::Class
-  create BSD virtual machine for testing
   Add basic image-test parameterization examples
-  EXAMPLES
-  traffic generation`
+  EXAMPLES, Get some tests
+  traffic generation
   convert more old tests
   general result code handling framework
-  possibly collapse TestBed/XMLRPC/Client/* and TestBed/TestSuite
-  possibly collapse tbts and t/harness
 
 EXPAND CURRENT IMPLEMENTATION
   event subsystem
-  better parallel support (custom test harness) - functionality like image-test
+  parallel support (custom test harness)
 
 LATER
   Client.pm duplicate code elimination - Maybe this would make the code too unreadable
   TestSuite::Experiment::Macros should be a monadic language like JQuery
   test groupings
+  Large External Tars and Resources for experiements
+  buildup, teardown using Test::Class
+  create BSD virtual machine for testing
+  possibly collapse tbts and t/harness
 
 DONE
   POD function documentation
   better general result code handling (ping_test single_node_test)
+  ForkFramework Constants
 
+Parallel TODOS
+  retry
+  clean up FFF, Roles, constructors
+  CartProd teste - image test example

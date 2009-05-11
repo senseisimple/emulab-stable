@@ -31,11 +31,11 @@ $e->startrunkill($ns,
     ok($e->link("link1")->down, "link down");
     sleep(2);
 
-    my $nlssh = $e->node("node1")->ssh;
-    ok($nlssh->cmdfailuredump("ping -c 5 10.1.2.3"));
+    my $n1ssh = $e->node("node1")->ssh;
+    ok($n1ssh->cmdfailuredump("ping -c 5 10.1.2.3"));
     
     ok($e->link("link1")->up, "link up");
     sleep(2);
-    ok($nlssh->cmdsuccessdump("ping -c 5 10.1.2.3"));
+    ok($n1ssh->cmdsuccessdump("ping -c 5 10.1.2.3"));
   } 
 );
