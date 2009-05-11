@@ -164,7 +164,7 @@ if (!defined($pid)) {
 #
 if (! $pid) {
     # Set the CPU limit for us.
-    setrlimit(RLIMIT_CPU, 900, 900);
+    setrlimit(RLIMIT_CPU, 1200, 1200);
     
     # Give parent a chance to react.
     sleep(1);
