@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -164,7 +164,7 @@ if (!defined($pid)) {
 #
 if (! $pid) {
     # Set the CPU limit for us.
-    setrlimit(RLIMIT_CPU, 600, 600);
+    setrlimit(RLIMIT_CPU, 900, 900);
     
     # Give parent a chance to react.
     sleep(1);
