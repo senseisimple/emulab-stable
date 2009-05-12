@@ -17,6 +17,7 @@ use GeniDB;
 use GeniRegistry;
 use GeniAuthority;
 use GeniCertificate;
+use GeniHRN;
 use emutil qw(TBGetUniqueIndex);
 use English;
 use overload ('""' => 'Stringify');
@@ -66,7 +67,35 @@ sub Lookup($$;$)
     $includelocal = 0
 	if (!defined($includelocal));
 
-    if ($token =~ /^\d+$/) {
+    if( GeniHRN::IsValid( $token ) ) {
+	return undef if !GeniHRN::Authoritative( $token, $OURDOMAIN );
+
+	my ($authority, $type, $id) = GeniHRN::Parse( $token );
+
+	return undef if $type ne "user";
+
+	$query_result =
+	    DBQueryWarn("select idx from geni_users ".
+			"where hrn='$id' and status='active'");
+
+	return undef
+	    if (!$query_result);
+
+	if (!$query_result->numrows) {
+	    return undef
+		if (!$includelocal);
+
+	    #
+	    # Check Emulab users table. 
+	    #
+	    my $user = User->Lookup($id);
+	    return undef
+		if (!defined($user));
+	    return GeniUser->CreateFromLocal($user);
+	}
+	($idx) = $query_result->fetchrow_array();	
+    }
+    elsif ($token =~ /^\d+$/) {
 	$idx = $token;
     }
     elsif ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {

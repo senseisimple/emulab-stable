@@ -36,14 +36,17 @@ print "Got my SA credential"
 # Lookup the geniuser user.
 #
 params = {}
-params["hrn"]       = "geniuser"
+if len( args ) == 1:
+    params["hrn"] = args[ 0 ]
+else:
+    params["hrn"] = "geniuser"
 params["credential"] = mycredential
 params["type"]       = "User"
 rval,response = do_method("sa", "Resolve", params)
 if rval:
-    Fatal("Could not resolve geniuser")
+    Fatal("Could not resolve " + params[ "hrn" ] )
     pass
-print "Found geniuser record at the SA"
+print "Found user record at the SA"
 if debug: print str(response)
 
 #

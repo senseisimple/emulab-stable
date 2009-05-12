@@ -1,0 +1,160 @@
+#!/usr/bin/perl -wT
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package GeniHRN;
+
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA    = "Exporter";
+@EXPORT = qw ( );
+
+# References:
+#
+#   GMOC Proposal: "Use URN as GENI identifiers" version 0.2, Viecco, 2009
+#   RFC 2141, "URN Syntax", Moats, 1997
+#   RFC 3151, "A URN Namespace for Public Identifiers", Walsh, 2001
+#   RFC 3986, "URI Generic Syntax", Berners-Lee, 2005
+#   RFC 3987, "Internationalised Resource Identifiers", Duerst, 2005
+#   RFC 4343, "DNS Case Insensitivity Clarification", Eastlake, 2006
+
+sub Unescape($)
+{
+    my ($uri) = @_;
+
+    my $norm = "";
+    while( $uri =~ /^([^%]*)%([0-9A-Fa-f]{2})(.*)$/ ) {
+	$norm .= $1;
+	my $val = hex( $2 );
+	# Transform %-encoded sequences back to unreserved characters
+	# where possible (see RFC 3986, section 2.3).
+	if( $val == 0x2D || $val == 0x2E ||
+	    ( $val >= 0x30 && $val <= 0x39 ) ||
+	    ( $val >= 0x41 && $val <= 0x5A ) ||
+	    $val == 0x5F ||
+	    ( $val >= 0x61 && $val <= 0x7A ) ||
+	    $val == 0x7E ) {
+	    $norm .= chr( $val );
+	} else {
+	    $norm .= "%" . $2;
+	}
+	$uri = $3;
+    }
+    $norm .= $uri;
+
+    return $norm;
+}
+
+sub IsValid($)
+{
+    my ($hrn) = @_;
+
+    # Reject %00 sequences (see RFC 3986, section 7.3).
+    return undef if $hrn =~ /%00/;
+
+    # We accept ANY other %-encoded octet (following RFC 3987, section 5.3.2.3
+    # in favour of RFC 2141, section 5, which specifies the opposite).
+    $hrn = Unescape( $hrn );
+
+    # The "urn" prefix is case-insensitive (see RFC 2141, section 2).
+    # The "publicid" NID is case-insensitive (see RFC 2141, section 3).
+    # The "IDN" specified by Viecco is believed to be case-sensitive (no
+    #   authoritative reference known).
+    # We regard Viecco's optional resource-type specifier as being
+    #   mandatory: partly to avoid ambiguity between resource type
+    #   namespaces, and partly to avoid ambiguity between a resource-type
+    #   and a resource-name containing (escaped) whitespace.
+    return $hrn =~ m'^[uU][rR][nN]:[pP][uU][bB][lL][iI][cC][iI][dD]:IDN\+[A-Za-z0-9.-]+(?::[A-Za-z0-9.-]+)*\+\w+\+(?:[-!$()*,.0-9=@A-Z_a-z]|(?:%[0-9A-Fa-f][0-9A-Fa-f]))+$';
+}
+
+# Break a URN into (sub-)authority, type, and ID components.  There
+# might be further structure in the authority part, but we'll ignore
+# that for now.
+sub Parse($)
+{
+    my ($hrn) = @_;
+
+    return undef if !IsValid( $hrn );
+
+    $hrn = Unescape( $hrn );
+
+    $hrn =~ /^[^+]*\+([^+]+)\+([^+]+)\+(.+)$/;
+
+    return ($1, $2, $3);
+}
+
+# Generate a ProtoGENI URN.  Note that this is more restrictive than
+# the general GENI naming scheme requires: we rely on the fact that
+# Emulab identifiers are derived from very limited character sets to
+# obtain the guarantee that escaping is never required.  (See the
+# tbdb database regex table.)  This approach should suffice even
+# if and when other GENI implementations decide to distribute URNs
+# containing exotic characters, as long as we are careful to treat
+# foreign URNs as opaque.
+sub Generate($$$)
+{
+    my ($authority, $type, $id) = @_;
+
+    # Assume that any sub-authorities are already encoded (see
+    # RFC 3151, section 2).  We don't currently handle sub-authorities,
+    # so this is irrelevant for now.
+    $authority =~ tr/A-Z/a-z/;
+    return undef if $authority !~ /^[-.0-9A-Za-z:]+$/;
+    return undef if $type !~ /^[-.0-9A-Z_a-z~]+$/;
+    return undef if $id !~ /^[-.0-9A-Z_a-z~]+$/;
+
+    return "urn:publicid:IDN+" . $authority . "+" . $type . "+" . $id;
+}
+
+# Apply scheme-based (and other) normalisations to a URN (see RFC 3987,
+# section 5.3).  This is conformant to RFC 2141, section 5 (we recognise
+# all of those lexical equivalences, and introduce additional ones as
+# is permitted).  We do not perform deep interpretation of the URN, so
+# this procedure can and should be applied to foreign (non-ProtoGENI) URNs.
+sub Normalise($)
+{
+    my ($hrn) = @_;
+
+    return undef if !IsValid( $hrn );
+
+    my ($authority, $type, $id) = Parse( $hrn );
+
+    # Apply case normalisation to the authority; see RFC 3987, section
+    # 5.3.2.1.  According to section 5.3.3, we are supposed to go
+    # further and perform RFC 3490 ToASCII UseSTD3ASCIIRules and
+    # AllowUnassigned and RFC 3491 Nameprep validation to interpret IRIs,
+    # but quite frankly I think I've done more than enough RFC chasing already.
+    $authority =~ tr/A-Z/a-z/;
+
+    return "urn:publicid:IDN+" . $authority . "+" . $type . "+" . $id;
+}
+
+sub Equal($$)
+{
+    my ($hrn0, $hrn1) = @_;
+
+    return undef if !IsValid( $hrn0 ) || !IsValid( $hrn1 );
+
+    my $norm0 = Normalise( $hrn0 );
+    my $norm1 = Normalise( $hrn1 );
+
+    return $norm0 eq $norm1;
+}
+
+sub Authoritative($$)
+{
+    my ($hrn, $authority) = @_;
+
+    $authority =~ tr/A-Z/a-z/;
+    my @hrn = Parse( $hrn );
+    $hrn[ 0 ] =~ tr/A-Z/a-z/;
+
+    return $hrn[ 0 ] eq $authority;
+}
+
+# _Always_ make sure that this 1 is at the end of the file...
+1;

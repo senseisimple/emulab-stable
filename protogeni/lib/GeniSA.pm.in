@@ -28,6 +28,7 @@ use GeniSlice;
 use GeniCredential;
 use GeniCertificate;
 use GeniAuthority;
+use GeniHRN;
 use English;
 use XML::Simple;
 use Data::Dumper;
@@ -163,7 +164,7 @@ sub GetCredential($)
 }
 
 #
-# Resolve a uuid to a record.
+# Resolve a uuid or HRN to a record.
 #
 sub Resolve($)
 {
@@ -180,7 +181,8 @@ sub Resolve($)
     if (defined($uuid) && !($uuid =~ /^[-\w]*$/)) {
 	return GeniResponse->MalformedArgsResponse();
     }
-    if (defined($hrn) && !($hrn =~ /^[-\w\.]*$/)) {
+    if (defined($hrn) && !($hrn =~ /^[-\w\.]*$/) &&
+	!GeniHRN::IsValid( $hrn ) ) {
 	return GeniResponse->MalformedArgsResponse();
     }
     if (! (defined($type) && ($type =~ /^(SA|MA|Component|Slice|User)$/i))) {
@@ -239,8 +241,11 @@ sub Resolve($)
 	if (defined($uuid)) {
 	    $geniuser = GeniUser->Lookup($uuid, 1);
 	}
-	else {
+	elsif( GeniHRN::IsValid( $hrn ) ) {
+	    $geniuser = GeniUser->Lookup($hrn, 1);
+	} else {
 	    #
+	    # Deprecated (pre-URN) HRN.
 	    # XXX Form hrn from the uid and domain. This is backwards.
 	    #
 	    if (! ($hrn =~ /\./)) {
@@ -270,8 +275,11 @@ sub Resolve($)
 	if (defined($uuid)) {
 	    $slice = GeniSlice->Lookup($uuid);
 	}
-	else {
+	elsif( GeniHRN::IsValid( $hrn ) ) {
+	    $slice = GeniSlice->Lookup($hrn);
+	} else {
 	    #
+	    # Deprecated (pre-URN) HRN.
 	    # XXX Form hrn from the uid and domain. This is backwards.
 	    #
 	    if (! ($hrn =~ /\./)) {

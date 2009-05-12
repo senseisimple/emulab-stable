@@ -27,6 +27,7 @@ package GeniRegistry::GeniSlice;
 
 use GeniDB;
 use GeniCertificate;
+use GeniHRN;
 use emutil qw(TBGetUniqueIndex);
 use English;
 use Data::Dumper;
@@ -41,7 +42,26 @@ sub Lookup($$)
     my $query_result;
     my $idx;
 
-    if ($token =~ /^\d+$/) {
+    if( GeniHRN::IsValid( $token ) ) {
+	return undef if !GeniHRN::Authoritative( $token, "@OURDOMAIN@" );
+
+	my ($authority, $type, $id) = GeniHRN::Parse( $token );
+
+	return undef if $type ne "slice";
+	
+	# Prefixing @PROTOGENI_DOMAIN@. is horribly ugly, but necessary
+	# at the moment to maintain database compatibility... this should
+	# probably go away.
+	$query_result =
+	    DBQueryWarn("select idx from geni_slices ".
+			"where hrn='@PROTOGENI_DOMAIN@.$id'");
+
+	return undef
+	    if (! $query_result || !$query_result->numrows);
+
+	($idx) = $query_result->fetchrow_array();
+    }
+    elsif ($token =~ /^\d+$/) {
 	$idx = $token;
     }
     elsif ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
