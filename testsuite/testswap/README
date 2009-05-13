@@ -1,14 +1,17 @@
 REQUIREMENTS
   ssh-agent running with SSH emulab keys added
-  emulab client certificate and key
+  emulab client certificate and decrypted private key
   TBConfig.pm set up correctly
   ssh executable in path
 
 INSTALLATION INSTRUCTIONS
   perl ./localcpan.pl #this install dependencies in your homdir if you don't have root access to do it yourself
   add export PERL5LIB=~/lib/perl5 to your environment
-  copy TBConfig.pm.in to TBConfig.pm and edit it to point to your client certificate
-  add your emulab keys to a running ssh-agent
+  copy TBConfig.pm.in to TBConfig.pm and edit it to point to your emulab SSL client certificate and corresponding decrypted private key.
+
+HOWTO create a cert file and a decrypted private key file from your emulab(cert+key) file.
+  openssl rsa -in emulab -out decrypted_emulab.pem
+  openssl x509 -in emulab -out emulab.cert
 
 TO SEE Tests available to run
   ./tbts 
@@ -23,6 +26,13 @@ EXAMPLE Tests to look at to GET STARTED:
   t/topologies/two_node_lan.t
   t/topologies/simple_two_node_linktest.t
   t/topologies/link_up_link_down.t
+
+Documentation can be found in the doc directory
+running pod2text on any pm file will produce API docs.
+pod2text lib/TestBed/XMLRPC/Client/Experiment.pm
+pod2text lib/TestBed/TestSuite/Experiment.pm
+
+
 
 
 

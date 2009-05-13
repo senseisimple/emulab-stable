@@ -98,41 +98,45 @@ TestBed::XMLRPC::Client::Experiment
 
 =over 4
 
-=item C<pid>
+=item C<< $e->pid >>
 
 experiment pid
 
-=item C<eid>
+=item C<< $e->gid >>
+
+experiment gid
+
+=item C<< $e->eid >>
 
 experiment eid
 
-=item C<batchexp>
+=item C<< $e->batchexp >>
 
 calls batchexp xmlrpc function
 
-=item C<swapexp>
+=item C<< $e->swapexp >>
 
 calls swapexp xmlrpc function
 
-=item C<endexp>
+=item C<< $e->endexp >>
 
 calls endexp xmlrpc function
 
-=item C<waitforactive>
+=item C<< $e->waitforactive >>
 
 calls waitforactive xmlrpc function
 
-=item C<getlist>
+=item C<< $e->getlist >>
 
-calls getlist xmlrpc function
+calls getlist xmlrpc function to get a list of experiments
 
-=item C<expinfo>
+=item C<< $e->expinfo >>
 
 calls expinfo xmlrpc cfunction
 
 =item C<args>
 
-B<INTERNAL>: internal method for inserting pid and eid arguments into a xmlrpc call
+B<INTERNAL>: internal method for inserting pid, gid, and eid arguments into a xmlrpc call
 
 =item C<< $e->echo($msg) >>
 
