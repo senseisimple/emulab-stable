@@ -77,7 +77,7 @@ sub main {
   prep_local_cpan;
   $ENV{PERL5LIB} = glob('~/lib/perl5');
 
-  if ($ARGV[0] && ARGV[0] eq 'MI') {
+  if ($ARGV[0] && $ARGV[0] eq 'MI') {
     automate_module_install;  #too complicated on FreeBSD
     automate_ssh_install;     #too complicated on FreeBSD
   }
