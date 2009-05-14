@@ -21,5 +21,5 @@ for (@who_knows) {
   my $ns = $Testbed::OldTestSuite::data->{$_}->{'nsfile'};
   say "Running " . $_;
   say $ns;
-  ok(launchpingkill(e($_), $ns), $_);
+  ok(e($_)->launchpingkill($ns), $_);
 }

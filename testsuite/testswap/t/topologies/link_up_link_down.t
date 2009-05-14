@@ -1,6 +1,5 @@
 #!/usr/bin/perl
 use SemiModern::Perl;
-use TBConfig;
 use TestBed::TestSuite;
 use Test::More tests => 5;
 use Data::Dumper;

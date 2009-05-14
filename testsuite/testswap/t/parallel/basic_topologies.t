@@ -1,6 +1,6 @@
 #! /usr/bin/perl
 use TestBed::TestSuite;
-use RateLimitParallelExample;
+use BasicTopologies;
 
 # run all the tests in RateLimitParallelExample
 runtests;

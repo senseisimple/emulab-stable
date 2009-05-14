@@ -26,17 +26,13 @@ sub _initialize {
 }
 
 
-package TestBed::TestExperiment;
+package TestBed::ParallelRunner;
 use SemiModern::Perl;
-use TestBed::TestExperiment::Test;
+use TestBed::ParallelRunner::Test;
 use TestBed::ForkFramework;
 use Data::Dumper;
 
 my $ExperimentTests = [];
-
-require Exporter;
-our @ISA = qw(Exporter);
-our @EXPORT = qw(teste runtests);
 
 my $teste_desc = <<'END';
 Not enough arguments to teste
@@ -45,13 +41,7 @@ Not enough arguments to teste
   teste($pid, $gid, $eid, $ns, $sub, $test_count, $desc);
 END
       
-sub teste {
-  if (@_ == 4)    { push @$ExperimentTests, TestBed::TestExperiment::Test::tn('', '', '', @_); }
-  elsif (@_ == 5) { push @$ExperimentTests, TestBed::TestExperiment::Test::tn('', '', @_);     }
-  elsif (@_ == 6) { push @$ExperimentTests, TestBed::TestExperiment::Test::tn(shift, '', @_);  }
-  elsif (@_ == 7) { push @$ExperimentTests, TestBed::TestExperiment::Test::tn(@_);             }
-  else { die $teste_desc; }
-} 
+sub add_experiment { push @$ExperimentTests, TestBed::ParallelRunner::Test::tn(@_); }
 
 sub runtests {
   #prep step
@@ -62,7 +52,7 @@ sub runtests {
   }, $ExperimentTests);
   if ($result->[0]) {
     sayd($result->[2]);
-    die 'TestBed::TestExperiment::runtests died during test prep';
+    die 'TestBed::ParallelRunner::runtests died during test prep';
   }
 
   #create schedule step
@@ -96,6 +86,15 @@ sub reset_test_builder {
   else { $b->no_plan; }
 }
 
+sub setup_test_builder_ouputs {
+  my ($out, $err) = @_;
+  use Test::Builder;
+  my $b = Test::Builder->new;
+  $b->output($out);
+  $b->fail_output($out);
+  $b->todo_output($out);
+}
+
 use Carp;
 $SIG{ __DIE__ } = sub { Carp::confess( @_ ) };
 
@@ -117,6 +116,7 @@ sub tap_wrapper {
     },
     sub {
       reset_test_builder($te->test_count) if $SUBTESTS;
+      setup_test_builder_ouputs(*STDOUT, *STDERR);
       $te->run_ensure_kill;
     });
   }

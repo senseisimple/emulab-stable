@@ -11,13 +11,7 @@ use TestBed::TestSuite;
 use TestBed::TestSuite::Node;
 use TestBed::TestSuite::Link;
 
-extends 'Exporter', 'TestBed::XMLRPC::Client::Experiment';
-
-has 'ns' => ( isa => 'Str', is => 'rw');
-
-require Exporter;
-our @EXPORT;
-push @EXPORT, qw(launchpingkill launchpingswapkill);
+extends 'TestBed::XMLRPC::Client::Experiment';
 
 =head1 NAME
 
@@ -156,7 +150,7 @@ sub startrun {
 
 =item C<launchpingkill($e, $ns)>
 
-class method that starts an experiment, runs a ping_test, and ends the experiment
+method that starts an experiment, runs a ping_test, and ends the experiment
 =cut
 sub launchpingkill {
   my ($e, $ns) = @_;
@@ -170,7 +164,7 @@ sub launchpingkill {
 
 =item C<launchpingkill($e, $ns)>
 
-class method that starts an experiment, runs a ping_test, 
+method that starts an experiment, runs a ping_test, 
 swaps the experiment out and then back in, runs a ping test, and finally
 ends the experiment
 =cut
@@ -179,6 +173,24 @@ sub launchpingswapkill {
   my $eid = $e->eid;
 trytest {
     $e->startexp_ns_wait($ns) && die "batchexp $eid failed";
+    $e->ping_test             && die "connectivity test $eid failed";
+    $e->swapout_wait          && die "swap out $eid failed";
+    $e->swapin_wait           && die "swap in $eid failed";
+    $e->ping_test             && die "connectivity test $eid failed";
+    $e->end                   && die "exp end $eid failed";
+  } $e;
+}
+
+=item C<pingkill($e)>
+
+method that runs a ping_test, 
+swaps the experiment out and then back in, runs a ping test, and finally
+ends the experiment
+=cut
+sub pingswapkill {
+  my ($e) = @_;
+  my $eid = $e->eid;
+trytest {
     $e->ping_test             && die "connectivity test $eid failed";
     $e->swapout_wait          && die "swap out $eid failed";
     $e->swapin_wait           && die "swap in $eid failed";

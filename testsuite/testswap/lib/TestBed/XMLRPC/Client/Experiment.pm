@@ -33,21 +33,14 @@ sub args {
 sub echo           { shift->augment_output( 'str' => shift ); }
 sub getlist_brief  { shift->augment( 'format' => 'brief'); }
 sub getlist_full   { shift->augment( 'format' => 'full' ); }
-sub batchexp_ns    { shift->augment( 'nsfilestr' => shift, @_ ); }
-sub modify_ns      { shift->augment( 'nsfilestr' => shift, @_ ); }
+sub batchexp_ns    { shift->augment_code( 'nsfilestr' => shift, @_ ); }
+sub modify_ns      { shift->augment_code( 'nsfilestr' => shift, @_ ); }
 sub swapin         { shift->augment_func_code( 'swapexp', 'direction' => 'in' ); }
 sub swapout        { shift->augment_func_code( 'swapexp', 'direction' => 'out' ); }
 sub end            { shift->augment_func_code( 'endexp' ); }
 sub nodeinfo       { parseNodeInfo(shift->augment_func_output('expinfo', 'show' => 'nodeinfo')); }
-sub waitforactive  {
-  my $self = shift;
-  $self->augment_code(@_) && die sprintf("wait for swapin %s failed", $self->eid);
-}
-sub waitforswapped { 
-  my $self = shift;
-  $self->augment_func_code( 'statewait', 'state' => 'swapped' )
-     && die sprintf("wait for swapin %s failed", $self->eid);
-}
+sub waitforactive  { shift->augment_code(@_) }
+sub waitforswapped { shift->augment_func_code( 'statewait', 'state' => 'swapped' ) }
 
 sub startexp_ns { batchexp_ns(@_, 'batch' => 0); }
 sub startexp_ns_wait { batchexp_ns_wait(@_, 'batch' => 0); }
@@ -60,14 +53,25 @@ sub create_and_get_metadata {
 
 sub batchexp_ns_wait { 
   my $self = shift;
-  $self->batchexp_ns(@_);
+  my $rc = $self->batchexp_ns(@_);
+  if ($rc) { return $rc }
   $self->waitforactive;
 }
+
+use constant EXPERIMENT_NAME_ALREADY_TAKEN => 2;
+sub ensure_active_ns {
+  my $self = shift;
+  my $rc = $self->batchexp_ns(@_);
+  if ($rc && $rc != EXPERIMENT_NAME_ALREADY_TAKEN) { return $rc }
+  $self->waitforactive;
+}
+
 sub swapin_wait { 
   my $self = shift;
   $self->augment_func_code( 'swapexp', 'direction' => 'in',  'wait' => 1 );
   $self->waitforactive;
 }
+
 sub swapout_wait { 
   my $self = shift;
   $self->augment_func_code( 'swapexp', 'direction' => 'out',  'wait' => 1 );

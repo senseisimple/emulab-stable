@@ -10,6 +10,10 @@ TODO
   convert more old tests
   general result code handling framework
 
+STILL MESSY
+  XMLRPC/Client/Experiment TestSuite/Experiment return codes, exceptions, composability
+  Calling parallel tests 
+
 EXPAND CURRENT IMPLEMENTATION
   event subsystem
   parallel support (custom test harness)
@@ -23,12 +27,13 @@ LATER
   create BSD virtual machine for testing
   possibly collapse tbts and t/harness
 
+Parallel TODOS
+  retry
+  clean up FFF, Roles, constructors
+  CartProd teste - image test example
+
 DONE
   POD function documentation
   better general result code handling (ping_test single_node_test)
   ForkFramework Constants
 
-Parallel TODOS
-  retry
-  clean up FFF, Roles, constructors
-  CartProd teste - image test example

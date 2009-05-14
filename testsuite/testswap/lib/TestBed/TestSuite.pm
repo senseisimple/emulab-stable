@@ -2,14 +2,26 @@
 package TestBed::TestSuite;
 use SemiModern::Perl;
 use TestBed::TestSuite::Experiment;
+use TestBed::ParallelRunner;
 use Data::Dumper;
 use Tools;
 
 require Exporter;
 our @ISA = qw(Exporter);
-our @EXPORT = qw(e dpge CartProd CartProdRunner concretize defaults override);
+our @EXPORT = qw(e CartProd CartProdRunner concretize defaults override rege runtests);
 
 sub e { TestBed::TestSuite::Experiment->new(_build_e_from_positionals(@_)); }
+sub rege {
+  my $e;
+  if (@_ == 4)    { $e = e(); }
+  elsif (@_ == 5) { $e = e(shift); }
+  elsif (@_ == 6) { $e = e(shift, shift); }
+  elsif (@_ == 7) { $e = e(shift, shift, shift); }
+  else { die 'Too many args to rege'; }
+  return TestBed::ParallelRunner::add_experiment($e, @_);
+}
+sub runtests { TestBed::ParallelRunner::runtests; }
+
 
 sub _build_e_from_positionals {
   if (@_ == 0) { return {}; }

@@ -102,6 +102,8 @@ sub workloop {
       redo LOOP;
     }
   }
+  waitpid( $_, 0 ) for @{ $self->workers };
+
   my @results = (scalar @{$self->errors}, $self->results, $self->errors);
   return wantarray ? @results : \@results;
 }

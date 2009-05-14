@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-package TestBed::TestExperiment::Test;
+package TestBed::ParallelRunner::Test;
 use SemiModern::Perl;
 use TestBed::TestSuite::Experiment;
 use Mouse;
@@ -12,12 +12,8 @@ has 'proc' => ( isa => 'CodeRef', is => 'rw');
 has 'test_count'   => ( isa => 'Any', is => 'rw');
 
 sub tn {
-  my ($pid, $gid, $eid, $ns, $sub, $test_count, $desc) = @_;
-  my $e = TestBed::TestSuite::Experiment->new(
-      'pid' => $pid,
-      'gid' => $gid,
-      'eid' => $eid);
-  return TestBed::TestExperiment::Test->new(
+  my ($e, $ns, $sub, $test_count, $desc) = @_;
+  return TestBed::ParallelRunner::Test->new(
     'e' => $e, 
     'ns' => $ns,
     'desc' => $desc,
@@ -27,7 +23,9 @@ sub tn {
 
 sub prep {
   my $self = shift;
-  $self->e->create_and_get_metadata($self->ns);
+  my $r = $self->e->create_and_get_metadata($self->ns);
+  #sayd($r);
+  $r;
 }
 
 sub run {
