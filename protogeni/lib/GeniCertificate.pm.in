@@ -66,7 +66,6 @@ sub Lookup($$)
 
     my $self          = {};
     $self->{'CERT'}   = $query_result->fetchrow_hashref();
-    $self->{'url'}    = undef;
     $self->{'stored'} = 1;
     bless($self, $class);
     my $cert = $self->cert();
@@ -98,6 +97,7 @@ sub DN($)		{ return field($_[0], "DN"); }
 sub privkey($)		{ return field($_[0], "privkey"); }
 sub revoked($)		{ return field($_[0], "revoked"); }
 sub certfile($)		{ return field($_[0], "certfile"); }
+sub uri($)              { return field($_[0], "uri"); }
 sub GetCertificate($)   { return $_[0]; }
 
 #
@@ -315,7 +315,7 @@ sub LoadFromFile($$)
     $self->{'CERT'}->{'revoked'}   = undef;
     $self->{'CERT'}->{'created'}   = undef;
     $self->{'CERT'}->{'certfile'}  = $filename;
-    $self->{'url'}                 = $url;
+    $self->{'CERT'}->{'uri'}       = $url;
     return $self;
 }
 
@@ -336,6 +336,8 @@ sub Store($)
     push(@inserts, "DN=" . DBQuoteSpecial($self->DN()));
     push(@inserts, "privkey=" . DBQuoteSpecial($self->privkey()))
 	if (defined($self->privkey()));
+    push(@inserts, "uri=" . DBQuoteSpecial($self->uri()))
+	if (defined($self->uri()));
 
     return -1
 	if (!DBQueryWarn("replace into geni_certificates set ".
@@ -374,7 +376,7 @@ sub WriteToFile($;$)
 sub URL($)
 {
     my ($self) = @_;
-    my $url    = $self->{'url'};
+    my $url    = $self->uri();
 
     return $url
 	if (defined($url));
@@ -384,10 +386,21 @@ sub URL($)
 	print STDERR "Could not start $OPENSSL on $filename\n";
 	return undef;
     }
+    my $altname = 0;
     while (<X509>) {
-	if ($_ =~ /^\s+URI:([-\w\.\/:]+)$/) {
-	    $url = $1;
-	    chomp($url);
+	if( /^\s+x509v3 Subject Alternative Name:\s*$/ ) {
+	    $altname = 1;
+	} elsif( $altname ) {
+	    # Gah!  OpenSSL is horrible.  Apparently the text output format
+	    # for the subject alternative name is fixed, and neither
+	    # -nameopt nor -certopt will help us.  Worse still, the
+	    # directory entries (e.g. URI, email) are comma separated...
+	    # but commas are legal characters in URIs (see RFC 3986, section
+	    # 2.2)!  We'll have to assume the delimiter is the ", " (comma,
+	    # space) pair...
+	    m'^\s*URI:([-!#$%()*+,./0-9:;=?@A-Z_a-z~]+)\s*$' and $url = $1
+		foreach split( /, / );
+	    $altname = 0;
 	}
     }
     if (!close(X509) || !defined($url)) {
@@ -395,7 +408,7 @@ sub URL($)
 	return undef;
     }
     unlink($filename);
-    $self->{'url'} = $url;
+    $self->{'CERT'}->{'uri'} = $url;
     return $url;
 }
 
@@ -456,8 +469,12 @@ sub StoreCRL($$$)
 # Wrapper for local users.
 #
 package GeniCertificate::LocalUser;
+use GeniHRN;
 use English;
 use emdb;
+
+# Configure variables
+my $OURDOMAIN      = "@OURDOMAIN@";
 
 #
 # Create a wrapper, with the same access names.
@@ -477,6 +494,8 @@ sub Create($$)
 
     my $self           = {};
     $self->{'CERT'}    = $query_result->fetchrow_hashref();
+    $self->{'CERT'}->{'uri'} = GeniHRN::Generate( $OURDOMAIN, "user",
+						  $self->{'CERT'}->{'uid'} );
     $self->{'stored'}  = 1;
     bless($self, $class);
 

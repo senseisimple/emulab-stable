@@ -256,6 +256,10 @@ else {
 }
 print TEMP "CN\t\t= $user_uuid\n";
 print TEMP "emailAddress\t= $user_uid" . "\@" . "$OURDOMAIN\n";
+
+print TEMP "\n[ req_altname ]\nURI=urn:publicid:IDN+$OURDOMAIN" .
+    "+user+$user_uid\nemail=$user_uid" . "\@" . "$OURDOMAIN\n";
+
 close(TEMP)
     or fatal("Could not close usercert.cnf: $!");
 

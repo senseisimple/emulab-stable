@@ -11,6 +11,7 @@ string_mask             = nombstr
 [ request_extensions ]
 basicConstraints=critical,CA:TRUE
 subjectKeyIdentifier=hash
+subjectAltName=@req_altname
 
 # This will be appended to by mkusercert.
 [ req_distinguished_name ]

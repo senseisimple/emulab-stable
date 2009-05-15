@@ -60,6 +60,12 @@ def Decode( gid ):
     f.close()
     return s
 
+def SubjectName( cert ):
+    return ( re.search( r"X509v3 Subject Alternative Name:[ \t]*\n[ \t]*.*URI:"
+                        "(urn:publicid:[-!$%()*+.0-9:;=?@A-Z_a-z~]+)", \
+                        cert ) or \
+             re.search( r"Subject: .*OU=([-\w.]+)", cert ) ).group( 1 )
+
 def ShowCredential( cred, level ):
 
     if level == 0:
@@ -79,14 +85,8 @@ def ShowCredential( cred, level ):
     owner = Decode( Text( Lookup( cred, "owner_gid" ) ) )
     target = Decode( Text( Lookup( cred, "target_gid" ) ) )
 
-    print "    Owner:"
-    print "        Subject:", re.search( r"Subject: (.+)", owner ).group( 1 )
-    print "        Issuer:", re.search( r"Issuer: (.+)", owner ).group( 1 )
-
-    print "    Target:"
-    print "        Subject:", re.search( r"Subject: (.+)", target ).group( 1 )
-    print "        Issuer:", re.search( r"Issuer: (.+)", target ).group( 1 )
-
+    print "    Owner: " + SubjectName( owner )
+    print "    Target: " + SubjectName( target )
     print "    UUID: " + Text( Lookup( cred, "uuid" ) )
     print "    Expires: " + Text( Lookup( cred, "expires" ) )
 

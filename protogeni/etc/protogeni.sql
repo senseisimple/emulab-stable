@@ -148,6 +148,7 @@ CREATE TABLE `geni_certificates` (
   `cert` text,
   `DN` text,
   `privkey` text,
+  `uri` text,
   PRIMARY KEY  (`uuid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
