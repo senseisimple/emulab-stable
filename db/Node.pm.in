@@ -763,6 +763,9 @@ sub MoveReservation($$)
 		" old_eid='$oldeid' ".
 		"where node_id='$node_id'")
 	or return -1;
+
+    # Force this to reload.
+    $self->{"RSRV"} = undef;
     return 0;
 }
 
