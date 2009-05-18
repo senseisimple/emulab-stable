@@ -376,7 +376,7 @@ sub Delete($)
 
     DBQueryWarn("delete from geni_bindings where user_uuid='$uuid'")
 	or return -1;
-    DBQueryWarn("delete from geni_userkeys where user_uuid='$uuid'")
+    DBQueryWarn("delete from geni_userkeys where uuid='$uuid'")
 	or return -1;
     DBQueryWarn("delete from geni_certificates where uuid='$uuid'")
 	or return -1;
