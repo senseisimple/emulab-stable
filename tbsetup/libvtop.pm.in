@@ -2134,17 +2134,20 @@ sub PrintXML($;$)
     my $root = $doc->createElement("vtop");
     $root->setAttribute("pid", "$pid");
     $root->setAttribute("eid", "$eid");
-    $root->setAttribute("xmlns", "http://emulab.net/resources/vtop/0.2");
+    $root->setAttribute("xmlns:vtop", "http://emulab.net/resources/vtop/0.2");
     $doc->setDocumentElement($root);
 
     foreach my $vclass (@{$self->results->{'class'}}) {
 	$self->processVClass($doc, $root, $vclass);
     }
-    foreach my $node (@{$self->results->{'nodes'}}) {
-	$self->processNode($doc, $root, $node);
-    }
-    foreach my $link (@{$self->results->{'links'}}) {
-	$self->processLink($doc, $root, $link);
+    foreach my $ref (@{$self->results->{'nodeslinks'}}) {
+	my ($which, $what) = @{ $ref };
+	if ($which eq "node") {
+	    $self->processNode($doc, $root, $what);
+	}
+	else {
+	    $self->processLink($doc, $root, $what);
+	}
     }
     print $output $doc->toString(1) . "\n";
 
@@ -5496,18 +5499,17 @@ sub processNode($$$$)
 	$nodeTypeName = $1;
 	$isNodeStatic = 1;
     }
-    addNodeWithText($xmlDocument, $NodeTypeNode, "type_name", $nodeTypeName);
+    $NodeTypeNode->setAttribute("type_name", $nodeTypeName);
     
     # If the number of slots is *, then the number of slots is unlimited
     if ($nodeTypeSlots eq "*") {
-	addNode($xmlDocument, $NodeTypeNode, "unlimited");
+	$NodeTypeNode->setAttribute("type_slots", "unlimited");
     }
     else {
-	addNodeWithText($xmlDocument, $NodeTypeNode,
-			"type_slots", $nodeTypeSlots);
+	$NodeTypeNode->setAttribute("type_slots", $nodeTypeSlots);
     }
     if ($isNodeStatic) {
-	addNode($xmlDocument, $NodeTypeNode, "static");
+	$NodeTypeNode->setAttribute("static", "true");
     }
 
     # Handle fixed node.
@@ -5542,39 +5544,31 @@ sub processNode($$$$)
 	    my ($a, $b, $rest) = ($featureName =~ /^(.)(.)(.*)?/);
 
 	    if (! ("$a" eq "*" || "$a" eq "?")) {
-		addNodeWithText($xmlDocument, $FeatureDesireSpecNode,
-				"fd_name", $featureName);
+		$FeatureDesireSpecNode->setAttribute("fd_name", $featureName);
 	    }
 	    else {
-		addNodeWithText($xmlDocument, $FeatureDesireSpecNode,
-				"fd_name", $rest);
+		$FeatureDesireSpecNode->setAttribute("fd_name", $rest);
 	    }
-	    addNodeWithText($xmlDocument, $FeatureDesireSpecNode,
-			    "fd_weight", $featureWeight);
+	    $FeatureDesireSpecNode->setAttribute("fd_weight", $featureWeight);
 	    
 	    if ($featureWeight >= 1.000000) {
-		addNode($xmlDocument, $FeatureDesireSpecNode, "violatable");
+		$FeatureDesireSpecNode->setAttribute("violatable", "true");
 	    }
 
 	    # The desire prefix is "*!"
 	    if ("$b" eq "!") {
-		my $newGlobalNode = addNode($xmlDocument,
-					    $FeatureDesireSpecNode, "global");
-		addNodeWithText($xmlDocument, $newGlobalNode,
-				"operator", "OnceOnly");
+		$FeatureDesireSpecNode->setAttribute("global_operator",
+						     "OnceOnly");
 	    }
 	    # The desire prefix is "*&"
 	    elsif ("$b" eq "&") {
-		my $newGlobalNode = addNode($xmlDocument,
-					    $FeatureDesireSpecNode, "global");
-		addNodeWithText($xmlDocument, $newGlobalNode,
-				"operator", "FirstFree");
+		$FeatureDesireSpecNode->setAttribute("global_operator",
+						     "FirstFree");
 	    }
 	    # The desire prefix is "?+"
 	    elsif ("$b" eq "+") {
-		my $newLocalNode = addNode($xmlDocument,
-					   $FeatureDesireSpecNode, "local");
-		addNodeWithText($xmlDocument, $newLocalNode, "operator", "+");
+		$FeatureDesireSpecNode->setAttribute("local_operator",
+						     "+");
 	    }
 	}
     }
@@ -5610,22 +5604,14 @@ sub processLink($$$$)
     # Add a source interface element
     my $sourceInterfaceNode =
 	addNode($xmlDocument, $newLinkNode, "source_interface");
-    my $innerSourceInterfaceNode =
-	addNode($xmlDocument, $sourceInterfaceNode, "interface");
-    addNodeWithText($xmlDocument, $innerSourceInterfaceNode,
-		    "node_name", $srcName);
-    addNodeWithText($xmlDocument, $innerSourceInterfaceNode,
-		    "interface_name", $srcInterface);
+    $sourceInterfaceNode->setAttribute("node_name", $srcName);
+    $sourceInterfaceNode->setAttribute("interface_name", $srcInterface);
 	
     # Add a destination interface element
     my $destinationInterfaceNode =
 	addNode($xmlDocument, $newLinkNode, "destination_interface");
-    my $innerDestinationInterfaceNode =
-	addNode($xmlDocument, $destinationInterfaceNode, "interface");
-    addNodeWithText($xmlDocument, $innerDestinationInterfaceNode,
-		    "node_name", $destName);
-    addNodeWithText($xmlDocument, $innerDestinationInterfaceNode,
-		    "interface_name", $destInterface);
+    $destinationInterfaceNode->setAttribute("node_name", $destName);
+    $destinationInterfaceNode->setAttribute("interface_name", $destInterface);
 	
     # Add other stuff that appears on the line
     addNodeWithText($xmlDocument, $newLinkNode, "bandwidth", shift(@tokens));
@@ -5634,7 +5620,7 @@ sub processLink($$$$)
 	
     # Add a link_type element
     my $newLinkTypeNode = addNode($xmlDocument, $newLinkNode, "link_type");
-    addNodeWithText($xmlDocument, $newLinkTypeNode,"type_name",shift(@tokens));
+    $newLinkTypeNode->setAttribute("type_name", shift(@tokens));
 	
     # Run through the optional parameters at the end of the line
     foreach my $token (@tokens) {
