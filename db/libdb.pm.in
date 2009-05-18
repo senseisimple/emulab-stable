@@ -994,10 +994,10 @@ sub ExpNodes($$;$$)
     my(@nodes);
     my $clause = "";
 
-    if (defined($localonly)) {
+    if (defined($localonly) && $localonly) {
 	$clause .= " and nt.isremotenode=0";
     }
-    if (defined($physonly)) {
+    if (defined($physonly) && $physonly) {
 	$clause .= " and nt.isvirtnode=0";
     }
 
