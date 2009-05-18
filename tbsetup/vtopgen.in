@@ -10,6 +10,7 @@ use Getopt::Std;
 sub usage ()
 {
     print STDERR "Usage: $0 [-v] [-u [-f]] [-x] [-o filename] pid eid\n";
+    print STDERR " -p   - pre-assign mode, as from tbprerun\n";
     print STDERR " -v   - Enables verbose output\n";
     print STDERR " -u   - Enables update mode\n";
     print STDERR " -x   - XML output\n";
@@ -17,11 +18,12 @@ sub usage ()
     print STDERR " -f   - Fix current resources during update mode\n";
     exit(1);
 }
-my $optlist  = "vufxo:";
-my $verbose  = 1;
+my $optlist  = "vufxo:p";
+my $verbose  = 0;
 my $fixmode  = 0;
 my $updating = 0;
 my $warnings = 0;
+my $preassign= 0;
 my $xml      = 0;
 my $output   = *STDOUT;
 my $retval   = 0;
@@ -75,6 +77,9 @@ if (defined($options{"f"})) {
 if (defined($options{"x"})) {
     $xml = 1;
 }
+if (defined($options{"p"})) {
+    $preassign = 1;
+}
 if (defined($options{"o"})) {
     $filename = $options{"o"};
 }
@@ -106,6 +111,15 @@ if (!defined($vtop)) {
 }
 $vtop->CreateVtop() == 0
     or fatal("Could not create vtop for $experiment");
+
+if ($preassign) {
+    if ($experiment->Update({"maximum_nodes" => $vtop->maximum_nodes(),
+			     "minimum_nodes" => $vtop->minimum_nodes() })){
+	fatal("Could not update min/max nodes for $experiment");
+	return -1;
+    }
+    exit(0);
+}
 
 if ($xml) {
     $retval = $vtop->PrintXML($output);
