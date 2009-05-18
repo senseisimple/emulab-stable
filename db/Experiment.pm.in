@@ -30,6 +30,8 @@ use libtblog_simple;
 
 use vars qw($EXPT_PRELOAD $EXPT_START $EXPT_SWAPIN $EXPT_SWAPUPDATE
 	    $EXPT_SWAPOUT $EXPT_SWAPMOD %physicalTables @virtualTables
+	    $EXPT_FLAGS_NAMESONLY $EXPT_FLAGS_INCLUDEVIRT
+	    $EXPT_FLAGS_LOCALONLY 
 	    @EXPORT_OK);
 
 # Configure variables
@@ -59,6 +61,11 @@ $EXPT_SWAPIN		= TBDB_STATS_SWAPIN();
 $EXPT_SWAPOUT		= TBDB_STATS_SWAPOUT();
 $EXPT_SWAPMOD		= TBDB_STATS_SWAPMODIFY();
 $EXPT_SWAPUPDATE	= TBDB_STATS_SWAPUPDATE();
+
+# Other flags.
+$EXPT_FLAGS_LOCALONLY   = 0x01;
+$EXPT_FLAGS_NAMESONLY   = 0x02;
+$EXPT_FLAGS_INCLUDEVIRT = 0x04;
 
 # For stats gathering code.
 my $EXPT_STARTCLOCK;
@@ -2599,13 +2606,31 @@ sub NodeList($;$$)
     # Must be a real reference. 
     return undef
 	if (! ref($self));
+    $includevirtual = 0
+	if (!defined($includevirtual));
+    $namesonly = 0
+	if (!defined($namesonly));
 
     my $pid = $self->pid();
     my $eid = $self->eid();
 
-    @nodenames = ExpNodes($pid, $eid);
+    my $query_result =
+	DBQueryWarn("select r.node_id,nt.isvirtnode from reserved as r ".
+		    "left join nodes as n on n.node_id=r.node_id ".
+		    "left join node_types as nt on nt.type=n.type ".
+		    "where r.pid='$pid' and r.eid='$eid'");
+    return undef
+	if (!$query_result);
+    return ()
+	if (!$query_result->numrows);
+
+    while (my ($nodeid,$isvirt) = $query_result->fetchrow_array()) {
+	next
+	    if ($isvirt && !$includevirtual);
+	push(@nodenames, $nodeid);
+    }
     return @nodenames
-	if (defined($namesonly) && $namesonly);
+	if ($namesonly);
 
     my @nodes = ();
 
@@ -2616,14 +2641,6 @@ sub NodeList($;$$)
 	    return undef;
 	}
 	push(@nodes, $node);
-	if (defined($includevirtual) && $includevirtual) {
-	    my @virtuals = ();
-	    if ($node->VirtualNodes(\@virtuals) != 0) {
-		print STDERR "*** Could not get virtual node list for $node\n";
-	    }
-	    push(@nodes, @virtuals)
-		if (@virtuals);
-	}
     }
     return @nodes;
 }
