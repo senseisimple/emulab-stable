@@ -13,13 +13,17 @@ use POSIX ":sys_wait_h";
 sub usage ()
 {
     print STDERR "Usage: $0 [-v] [-p] pid eid\n";
-    print STDERR " -v   - Enables verbose output\n";
-    print STDERR " -p   - Turn on assign prepass\n";
+    print STDERR " -v     - Enables verbose output\n";
+    print STDERR " -n     - Skip the diffs\n";
+    print STDERR " -p     - Turn on assign prepass\n";
+    print STDERR " -m <N> - Set the multiplex factor for the prepass\n";
     exit(1);
 }
-my $optlist    = "vpm:";
+my $optlist    = "vpm:ns:";
 my $verbose    = 0;
 my $prepass    = 0;
+my $nodiff     = 0;
+my $startwith  = 0;
 my $mfactor;
 my $optarg     = "";
 
@@ -65,6 +69,9 @@ if (defined($options{"v"})) {
     $verbose++;
     $optarg = "-v";
 }
+if (defined($options{"n"})) {
+    $nodiff++;
+}
 if (defined($options{"p"})) {
     $prepass = 1;
     $optarg  = "$optarg -x";
@@ -72,6 +79,9 @@ if (defined($options{"p"})) {
 if (defined($options{"m"})) {
     $mfactor = $options{"m"};
     $optarg  = "$optarg -m $mfactor";
+}
+if (defined($options{"s"})) {
+    $startwith = $options{"s"};
 }
 
 my $this_user = User->ThisUser();
@@ -115,6 +125,10 @@ if (@ARGV) {
 foreach my $ref (@builtintests) {
     my ($pid, $eid) = @{$ref};
 
+    if ($startwith > 0) {
+	$startwith--;
+	next;
+    }
     my $experiment = Experiment->Lookup($pid, $eid);
     if (!defined($experiment)) {
 	fatal("Could not lookup experiment object $pid,$eid!");
@@ -167,10 +181,12 @@ sub DoRegression($)
     $howlong = time() - $now;
     print "    Done in $howlong seconds\n";
 
-    print "  Diffing the results ...\n";
-    system("diff -r -q Mapper/$pid/$eid/$pid-$eid.pstate ".
-	   "           Wrapper/$pid/$eid/$pid-$eid.pstate") == 0
-	   or fatal("Results differed!");
+    if (! $nodiff) {
+	print "  Diffing the results ...\n";
+	system("diff -r -q Mapper/$pid/$eid/$pid-$eid.pstate ".
+	       "           Wrapper/$pid/$eid/$pid-$eid.pstate") == 0
+	       or fatal("Results differed!");
+    }
 
     print " Running in reverse mode ...\n";
 
@@ -197,13 +213,12 @@ sub DoRegression($)
     $howlong = time() - $now;
     print "    Done in $howlong seconds\n";
 
-    print "  Diffing the results ...\n";
-    system("diff -r -q Mapper/$pid/$eid/$pid-$eid.pstate ".
-	   "           Wrapper/$pid/$eid/$pid-$eid.pstate") == 0
-	   or fatal("Results differed!");
-
-    
-
+    if (! $nodiff) {
+	print "  Diffing the results ...\n";
+	system("diff -r -q Mapper/$pid/$eid/$pid-$eid.pstate ".
+	       "           Wrapper/$pid/$eid/$pid-$eid.pstate") == 0
+	       or fatal("Results differed!");
+    }
     return 0;
 }
 
