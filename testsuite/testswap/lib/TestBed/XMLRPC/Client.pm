@@ -21,7 +21,7 @@ BEGIN {
 }
 
 #constructs RPC::XML::Client with 10 minute socket timeout
-my $HTTP_TIMEOUT = (60 * 10);
+my $HTTP_TIMEOUT = $TBConfig::XMLRPC_SERVER_TIMEOUT;
 has 'client' => ( isa => 'RPC::XML::Client', is => 'rw', default => sub { 
   my $c = RPC::XML::Client->new($TBConfig::XMLRPC_SERVER, 'timeout' => ($HTTP_TIMEOUT));
   $c->{'__useragent'}->timeout($HTTP_TIMEOUT);

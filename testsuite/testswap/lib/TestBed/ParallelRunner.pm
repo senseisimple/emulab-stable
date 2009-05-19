@@ -95,15 +95,15 @@ sub setup_test_builder_ouputs {
   $b->todo_output($out);
 }
 
-use Carp;
-$SIG{ __DIE__ } = sub { Carp::confess( @_ ) };
+#use Carp;
+#$SIG{ __DIE__ } = sub { Carp::confess( @_ ) };
 
-our $SUBTESTS = 0;
+our $ENABLE_SUBTESTS_FEATURE = 0;
 
 sub tap_wrapper {
   my ($te) = @_;
   
-  if ($SUBTESTS) {
+  if ($ENABLE_SUBTESTS_FEATURE) {
     TestBed::ForkFramework::Scheduler->redir_std_fork( sub {
       my ($in, $out, $err, $pid) = @_;
       #while(<$out>) { print "K2" . $_; }
@@ -112,10 +112,10 @@ sub tap_wrapper {
       while ( defined( my $result = $tapp->next ) ) {
         #sayd($result);
       }
-      ok(1, $te->desc) if $SUBTESTS && $tapp;
+      ok(1, $te->desc) if $ENABLE_SUBTESTS_FEATURE && $tapp;
     },
     sub {
-      reset_test_builder($te->test_count) if $SUBTESTS;
+      reset_test_builder($te->test_count) if $ENABLE_SUBTESTS_FEATURE;
       setup_test_builder_ouputs(*STDOUT, *STDERR);
       $te->run_ensure_kill;
     });
@@ -123,8 +123,6 @@ sub tap_wrapper {
   else {
     $te->run_ensure_kill;
   }
-
-
   return 0;
 }
 

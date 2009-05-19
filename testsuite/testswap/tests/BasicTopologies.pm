@@ -2,7 +2,7 @@
 use SemiModern::Perl;
 use TestBed::TestSuite;
 use BasicNSs;
-use Test::More tests => 4;
+use Test::More;
 use Data::Dumper;
 
 my $linkupdowntest = sub {

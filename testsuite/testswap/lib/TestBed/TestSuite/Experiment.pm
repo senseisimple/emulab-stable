@@ -5,6 +5,8 @@ use Mouse;
 use TestBed::XMLRPC::Client::Experiment;
 use TestBed::Wrap::tevc;
 use TestBed::Wrap::linktest;
+use TestBed::Wrap::loghole;
+use Tools;
 use Tools::TBSSH;
 use Data::Dumper;
 use TestBed::TestSuite;
@@ -38,6 +40,28 @@ sub link {
   my ($e, $linkname) = @_;
   TestBed::TestSuite::Link->new('experiment' => $e, 'name' => $linkname);
 }
+
+=item C<< $e->nodenames() >>
+
+returns a list of node names representing each node in the experiment
+=cut
+sub nodenames {
+  my ($e) = @_;
+  my $nodenames = $e->nodeinfo();
+  return wantarray ? @{$nodenames} : $nodenames;
+}
+
+=item C<< $e->hostnames() >>
+
+returns a list of node hostnames representing each node in the experiment
+=cut
+sub hostnames {
+  my ($e) = @_;
+  my $nodenames = $e->nodeinfo();
+  my @hostnames = map { $_ =~ /([^\.]*)/; $1 } @$nodenames;
+  return wantarray ? @hostnames : \@hostnames;
+}
+
 
 =item C<< $e->nodes() >>
 
@@ -88,6 +112,57 @@ takes an argument string such as "now link1 down"
 sub tevc {
   my ($e) = shift;
   TestBed::Wrap::tevc::tevc($e->pid, $e->eid, @_);
+}
+
+=item C<< $e->parallel_tevc($proc, $items) >>
+
+runs tevc on ops for each cmdline produced by calling $proc on each $item.
+=cut
+sub parallel_tevc {
+  my ($e, $proc, $items) = @_;
+  my $result = TestBed::ForkFramework::ForEach::work(sub {
+    my @tevc_cmd = $proc->(@_);
+    TestBed::Wrap::tevc::tevc($e->pid, $e->eid, @tevc_cmd);
+  }, $items);
+  if ($result->[0]) {
+    sayd($result->[2]);
+    die 'TestBed::ParallelRunner::runtests died during parallel_tevc';
+  }
+}
+
+=item C<< $e->loghole($cmd) >>
+
+=cut
+sub loghole {
+  my ($e) = shift;
+  TestBed::Wrap::loghole::loghole($e, @_);
+}
+
+=item C<< $e->loghole_sync_allnodes($cmd) >>
+
+=cut
+sub loghole_sync_allnodes {
+  my ($e) = shift;
+  my @hostnames = $e->hostnames;
+  TestBed::Wrap::loghole::loghole($e, "sync @hostnames");
+}
+
+=item C<< $e->splat($cmd) >>
+
+=cut
+sub splat {
+  my ($e, $data, $fn) = @_;
+  my $temp = splat_to_temp($data);
+  my $rc = 0;
+  for (@{$e->nodes}) {
+    my $user = $TBConfig::EMULAB_USER;
+    my $host = $_->name;
+    my $dest = "$user\@$host:$fn";
+    my @results = $_->scp($temp, $dest);
+    $rc ||= $results[0];
+    die "splat to $dest failed" if $rc;
+  }
+  return !$rc;
 }
 
 =item C<< $e->linkup($linkname) >>

@@ -204,6 +204,36 @@ sub redir_std_fork {
   }
 }
 
+sub doItem { my ($s, $itemid) = @_; $s->proc->($s->items->[$itemid]); }
+sub jobDone { }
+
+package TestBed::ForkFramework::ForEach;
+use SemiModern::Perl;
+use Mouse;
+
+has 'iter'       => ( isa => 'CodeRef'  , is => 'rw');
+
+extends 'TestBed::ForkFramework::Scheduler';
+
+sub spawnWorker { shift->nextJob; }
+sub nextJob { 
+  my @res = shift->iter->();
+  $res[0];
+}
+
+sub work {
+  my ($proc, $items) = @_;
+  my $s = TestBed::ForkFramework::ForEach->new(
+    'workers' => [],
+    'results' => [],
+    'items' => $items,
+    'errors' => [],
+    'proc' => $proc,
+    'iter' => TestBed::ForkFramework::Scheduler::_gen_iterator($items),
+    'selector' => IO::Select->new);
+  $s->workloop;
+}
+
 package TestBed::ForkFramework::MaxWorkersScheduler;
 use SemiModern::Perl;
 use Mouse;
@@ -243,8 +273,6 @@ sub nextJob {
   $s->{'pos'}++; 
   $pos;
 }
-sub doItem { my ($s, $itemid) = @_; $s->proc->($s->items->[$itemid]); }
-sub jobDone { }
 
 package TestBed::ForkFramework::RateScheduler;
 use SemiModern::Perl;
@@ -309,6 +337,5 @@ sub nextJob {
     return;
   }
 }
-sub doItem { my ($s, $itemid) = @_; $s->proc->($s->items->[$itemid]); }
 sub jobDone { my ($s, $itemid) = @_;  $s->{'currnodes'} -= $s->weight->[$itemid];  }
 1;

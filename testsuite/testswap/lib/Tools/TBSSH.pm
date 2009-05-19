@@ -23,20 +23,31 @@ sub instance {
 
 sub wrapped_ssh {
   my ($invocant, $user, $cmd, $checker) = @_;
-  my @results;
-  if (ref $invocant) {
-    @results = $invocant->cmd($cmd);
-  }
+  my $ssh;
+  if (ref $invocant) { $ssh = $invocant }
   else {
-    my $ssh = Tools::TBSSH->new('host' => $invocant, 'user' => $user);
-    @results = $ssh->cmd($cmd);
+    $ssh = Tools::TBSSH->new('host' => $invocant, 'user' => $user);
   }
+  my @results = $ssh->cmd($cmd);
 
   if (defined $checker) {
     &$checker(@results) || die "ssh checker of cmd $cmd failed";
   }
   ($results[2], @results);
 }
+
+sub wrapped_scp {
+  my ($invocant, $user, $lfile, $rfile) = @_;
+  my $ssh;
+  if (ref $invocant) { $ssh = $invocant }
+  else {
+    $ssh = Tools::TBSSH->new('host' => $invocant, 'user' => $user);
+  }
+  my @results = $ssh->scp_worker($lfile, $rfile);
+
+  ($results[2], @results);
+}
+
 
 sub cmdcheckoutput {
   my ($host, $cmd, $checker) = @_;
@@ -61,6 +72,11 @@ sub cmdfailure {
 sub cmdfailuredump {
   my ($host, $cmd) = @_;
   return wrapped_ssh($host, $TBConfig::EMULAB_USER, $cmd, sub { print Dumper(\@_); $_[2] != 0; } );
+}
+
+sub scp {
+  my ($host, @files) = @_;
+  return wrapped_scp($host, $TBConfig::EMULAB_USER, @files);
 }
 
 =head1 NAME

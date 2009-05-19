@@ -7,8 +7,8 @@ use Log::Log4perl qw(get_logger :levels);
 
 require Exporter;
 our @ISA = qw(Exporter);
-our @EXPORT = qw(prettytimestamp timestamp sayts sayperl slurp splat toperl
-                 init_tbts_logger concretize yn_prompt);
+our @EXPORT = qw(prettytimestamp timestamp sayts sayperl slurp toperl
+                 init_tbts_logger concretize yn_prompt splat_to_temp);
 
 =head1 NAME
 
@@ -202,6 +202,15 @@ sub yn_prompt {
   my $r = getyn;
   print "\n";
   return $r;
+}
+
+sub splat_to_temp {
+ my $data = shift;
+  use File::Temp;
+  my $tmp = File::Temp->new;
+  print $tmp $data;
+  close $tmp;
+  return $tmp;
 }
 
 =back

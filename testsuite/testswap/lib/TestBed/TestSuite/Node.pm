@@ -36,15 +36,24 @@ sub single_node_tests {
   $ssh->cmdsuccess("mount");
 }
 
-=item C<$n->ssh>
+=item C<< $n->ssh >>
 
 returns a $ssh connection to the node
 =cut
 sub ssh {
   my $self = shift;
-  my $fqname = $self->name . "." . $self->experiment->eid . "." . $self->experiment->pid . ".emulab.net";
-  my $ssh = Tools::TBSSH::instance($fqname);
+  return Tools::TBSSH::instance($self->name);
 }
+
+=item C<< $n->scp($lfile, $rfile) >>
+
+returns a $ssh connection to the node
+=cut
+sub scp {
+  my $self = shift;
+  return Tools::TBSSH::scp($self->name, @_);
+}
+
 
 =back 
 

@@ -6,6 +6,12 @@ REQUIREMENTS
 
 INSTALLATION INSTRUCTIONS
   perl ./localcpan.pl #this install dependencies in your homdir if you don't have root access to do it yourself
+    When prompted:
+      UUID state storage [/tmp] (HIT ENTER)
+      default umask [0007] (HIT ENTER)
+      Which SSL install path do you want to use? [/usr] (HIT ENTER)
+      Do you want to run the live tests (y/N) ? [N] (HIT ENTER)
+
   add export PERL5LIB=~/lib/perl5 to your environment
   copy TBConfig.pm.in to TBConfig.pm and edit it to point to your emulab SSL client certificate and corresponding decrypted private key.
 

@@ -2,6 +2,11 @@ DOCS TODO
   Overview / howto write a test
 
 TODO
+  TIMEOUT of XMLRPC Calls
+  TESTLWP
+  scp cleanup
+  chmod +x
+  wait for end of experiment
   cmdline params (-D)
   VERBOSENESS
   Add basic image-test parameterization examples
