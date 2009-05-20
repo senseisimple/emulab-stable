@@ -59,6 +59,25 @@ using namespace __gnu_cxx;
 #endif
 
 /*
+ * Parameters used to control annealing
+ */
+extern int init_temp;
+extern int temp_prob;
+extern float temp_stop;
+extern int CYCLES;
+
+// Initial acceptance ratio for melting
+extern float X0;
+extern float epsilon;
+extern float delta;
+
+// Number of runs to spend melting
+extern int melt_trans;
+extern int min_neighborhood_size;
+
+extern float temp_rate;
+
+/*
  * Globals - XXX made non-global!
  */
 /* From assign.cc */
@@ -80,8 +99,9 @@ inline bool accept(double change, double temperature);
 tb_pnode *find_pnode(tb_vnode *vn);
 
 /* The big guy! */
-void anneal(bool scoring_selftest, double scale_neighborhood,
-    double *initial_temperature, double use_connected_pnode_find);
+void anneal(bool scoring_selftest, bool check_fixed_nodes,
+        double scale_neighborhood, double *initial_temperature,
+        double use_connected_pnode_find);
 
 typedef hash_map<fstring,fstring> name_name_map;
 typedef slist<fstring> name_slist;

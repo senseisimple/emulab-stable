@@ -15,6 +15,20 @@
 #include <iostream>
 using namespace std;
 
+
+namespace featuredesire {
+    // The weight at which a feature or desire triggers a violations if
+    // unstatisfied or unused
+    const float FD_VIOLATION_WEIGHT = 1.0;
+    
+    enum fd_type {
+	FD_TYPE_NORMAL,
+	FD_TYPE_LOCAL_ADDITIVE,
+	FD_TYPE_GLOBAL_ONE_IS_OKAY,
+	FD_TYPE_GLOBAL_MORE_THAN_ONE
+    };
+};
+
 /*
  * This small class is used to describe policies in force regarding features
  * and desires. The idea behind putting this it its own class is that you want
@@ -65,11 +79,24 @@ class tb_featuredesire {
 	~tb_featuredesire() { ; }
 
 	/*
-	 * Get the object for a particular feature/desire - if one does not
-	 * exist, creates a new one. Otherwise, returns the existing object
+	 * Get the object for a particular feature/desire - returns NULL if
+	 * the feature/desire does not exist.
 	 */
-	static tb_featuredesire *get_featuredesire_obj(const fstring name);
+	static tb_featuredesire *get_featuredesire_by_name(const fstring name);
 
+	/*
+	 * Get the object for a particular feature/desire if it already exists,
+	 * or creates a new one if it does not. DEPRECATED, use the next version
+	 * below.
+	 */
+	static tb_featuredesire *get_or_create_featuredesire(const fstring name);
+        
+       /*
+	* Get the object for a particular feature/desire if it already exists,
+	* or creates a new one if it does not.
+        */
+        static tb_featuredesire *get_or_create_featuredesire(const fstring name,
+					    featuredesire::fd_type type);
 	/*
 	 * Silly accessor functions
 	 */
@@ -134,6 +161,13 @@ class tb_featuredesire {
 	 * if there is one
 	 */
 	explicit tb_featuredesire(fstring _my_name);
+    
+        /*
+	 * This version of the constructor takes the type of the FD explicitly,
+	 * no mucking around with trying to find "flags" in the name.
+	 */
+	explicit tb_featuredesire(fstring _my_name,
+				  featuredesire::fd_type _fd_type);
 
 	// Globally unique identifier
 	int id;
@@ -169,6 +203,11 @@ class tb_featuredesire {
 	 */
 	int desire_users;
 	double desire_total_weight;
+    
+        /*
+	 * Used to assign unque IDs to each feature/desire
+	 */
+        static int highest_id;
 };
 
 /*
@@ -177,8 +216,19 @@ class tb_featuredesire {
  */
 class tb_node_featuredesire {
     public:
+        /*
+	 * This version of the constructor takes "legacy" names, with the
+	 * special flags at the beginning, and parses them
+	 */
 	tb_node_featuredesire(fstring _name, double _weight);
 
+	/*
+	 * This version of the constructor passes all type information
+	 * explicitly, and leaves the name alone
+	 */
+	tb_node_featuredesire(fstring _name, double _weight,
+			      bool _violatable, featuredesire::fd_type _type);
+    
 	~tb_node_featuredesire() { ; }
 
 	/*

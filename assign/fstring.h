@@ -35,7 +35,6 @@ using namespace __gnu_cxx;
 #endif
 
 #include <string>
-#include <cstring>
 using namespace std;
 
 class fstring {
@@ -149,8 +148,8 @@ class fstring {
         }
 
     private:
-        // This is the only actual intatiable data method of an fstring
-        const char *str;
+        // This is the only a pointer to the One True Copy of the the string
+	const char *str;
 
         /*
          * Used so that we can put char*s in maps
@@ -196,7 +195,7 @@ template<> struct hash<fstring> {
   }
 };
 #ifdef NEW_GCC
-};
+}
 #endif
 
 #endif /*FSTRING_H_*/

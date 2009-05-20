@@ -43,9 +43,13 @@ using namespace boost;
 #include "solution.h"
 #include "maps.h"
 #include "anneal.h"
+#include "config.h"
+
 #ifdef WITH_XML
 #include "parse_ptop_xml.h"
-#include "parse_top_xml.h"
+#include "parse_vtop_xml.h"
+#include "parse_advertisement_rspec.h"
+#include "parse_request_rspec.h"
 #endif
 
 // Here we set up all our graphs.  Need to create the graphs
@@ -126,11 +130,18 @@ bool print_summary = false;
 // Use the 'connected' find algorithm
 double use_connected_pnode_find = 0.0f;
 
-#ifdef WITH_XML
+// Whether or not to perform all checks on fixed nodes
+bool check_fixed_nodes = false;
+
 // Use XML for file input
-bool xml_input = false;
+// bool xml_input = false;
+#ifdef WITH_XML
+bool ptop_xml_input = false;
+bool vtop_xml_input = false;
+bool ptop_rspec_input = false;
+bool vtop_rspec_input = false;
 #endif
-  
+
 // XXX - shouldn't be in this file
 double absbest;
 int absbestviolated, iters, iters_to_best;
@@ -150,6 +161,18 @@ float used_time() {
     ru.ru_stime.tv_sec+ru.ru_stime.tv_usec/1000000.0;
 }
 
+// Constructs the output file name for the annotated rspec
+string annotated_filename (const char* filepath)
+{
+	string input_filepath = string(filepath);
+	int pos_last_backslash = input_filepath.find_last_of("/");
+	string input_filename = input_filepath.substr(pos_last_backslash+1, input_filepath.length()-pos_last_backslash-1);
+	string output_filepath = input_filepath.substr(0, pos_last_backslash+1);
+	output_filepath.append("annotated-");
+	output_filepath.append(input_filename);
+	return (output_filepath);
+}
+
 // Read in the .ptop file
 void read_physical_topology(char *filename) {
   ifstream ptopfile;
@@ -160,13 +183,16 @@ void read_physical_topology(char *filename) {
   }
   
 #ifdef WITH_XML
-  if (!xml_input) {
+  if (ptop_xml_input) {
+		cout << "Physical Graph: " << parse_ptop_xml(PG,SG,filename) << endl;
+  } else if (ptop_rspec_input) {
+	  cout << "Physical Graph: " << parse_ptop_rspec (PG, SG, filename) << endl;
+	}
+	else {
       cout << "Physical Graph: " << parse_ptop(PG,SG,ptopfile) << endl;
-  } else {
-      cout << "Physical Graph: " << parse_ptop_xml(PG,SG,filename) << endl;
   }
 #else
-cout << "Physical Graph: " << parse_ptop(PG,SG,ptopfile) << endl;
+	cout << "Physical Graph: " << parse_ptop(PG,SG,ptopfile) << endl;
 #endif
 
 #ifdef DUMP_GRAPH
@@ -276,14 +302,18 @@ void read_virtual_topology(char *filename) {
       exit(EXIT_FATAL);
   }
   
-#ifdef WITH_XML
-  if (!xml_input) {
+#ifdef WITH_XML  
+  if (vtop_xml_input) {
+	cout << "Virtual Graph: " << parse_vtop_xml(VG,filename) << endl;
+  }
+  else if (vtop_rspec_input){
+  	  cout << "Virtual Graph: " << parse_vtop_rspec (VG, filename) << endl ;
+  }
+  else {
       cout << "Virtual Graph: " << parse_top(VG,topfile) << endl;
-  } else {
-      cout << "Virtual Graph: " << parse_top_xml(VG,filename) << endl;
   }
 #else
-cout << "Virtual Graph: " << parse_top(VG,topfile) << endl;
+	cout << "Virtual Graph: " << parse_top(VG,topfile) << endl;
 #endif
 
 #ifdef DUMP_GRAPH
@@ -353,7 +383,7 @@ void prune_unusable_pclasses() {
                     /*
                      * Remove it from the current ptype
                      */
-                    this_type_p->remove_slots(tm_iterator->second->max_load);
+                    this_type_p->remove_slots(tm_iterator->second->get_max_load());
 
                     /*
                      * Move on to the next node
@@ -406,9 +436,20 @@ void print_help() {
   cout << "  -c <float>  - Use the 'connected' pnode finding algorithm " <<
       "<float>*100% of the time." << endl;
   cout << "  -n          - Don't anneal - just do the prechecks." << endl;
+
+  cout << "  -x <file>   - Specify a text ptop file" << endl;
 #ifdef WITH_XML
-  cout << "  -x          - Use XML top and ptop files (still incomplete)" << endl;
+  cout << "  -X <file>   - Specify a XML ptop file" << endl;
 #endif
+  cout << "  -y <file>   - Specify a text top file" << endl;
+#ifdef WITH_XML
+  cout << "  -Y <file>   - Specify a XML vtop file" << endl;
+#endif
+#ifdef WITH_XML
+  cout << "  -q <file>   - Specify a rspec ptop file" << endl;
+  cout << "  -w <file>   - Specify a rspec vtop file" << endl;
+#endif
+  cout << "  -F          - Apply additional checking to fixed noded" << endl;
   exit(EXIT_FATAL);
 }
  
@@ -547,9 +588,9 @@ int mapping_precheck() {
 	map<fstring,bool> matched_links;
 
 	tb_vclass *vclass = v->vclass;
-	tb_vclass::members_map::iterator mit;
+	tb_vclass::members_map::const_iterator mit;
 	if (vclass) {
-	    mit = vclass->members.begin();
+	    mit = vclass->get_members().begin();
 	}
 	for (;;) {
 	    // Loop over all types this node can take on, which might be only
@@ -583,16 +624,17 @@ int mapping_precheck() {
 		if (pnode->total_bandwidth >= v->total_bandwidth) {
 		    matched_bw++;
 		} else {
-		    potential_match = false;
+			potential_match = false;
 		}
 
 		// Check to see if if the pnode has enough slots of the
 		// appropriate type available
-		tb_pnode::types_map::iterator mit = pnode->types.find(v->type);
-		if (mit == pnode->types.end()) {
+		tb_pnode::types_map::iterator type_iterator =
+		    pnode->types.find(v->type);
+		if (type_iterator == pnode->types.end()) {
 		    // Must have been a vtype to get here - ignore it
 		} else {
-		    if (v->typecount > mit->second->max_load) {
+		    if (v->typecount > type_iterator->second->get_max_load()) {
 			// Nope, this vnode is too demanding
 			potential_match = false;
 		    }
@@ -642,11 +684,12 @@ int mapping_precheck() {
                 // ports on a switch available, but we could map by using
                 // the trunk links
                 if (this_type != "lan") {
-                  tb_vnode::link_counts_map::iterator vit;
-                  for (vit = v->link_counts.begin(); vit != v->link_counts.end();
-                      vit++) {
-                    fstring type = vit->first;
-                    int count = vit->second;
+                  tb_vnode::link_counts_map::iterator link_it;
+                  for (link_it = v->link_counts.begin();
+		       link_it != v->link_counts.end();
+                       link_it++) {
+                    fstring type = link_it->first;
+                    int count = link_it->second;
                     desired_links[type] = count;
                     if (pnode->link_counts.find(type) !=
                           pnode->link_counts.end()) {
@@ -680,7 +723,7 @@ int mapping_precheck() {
 nosuchtype:
 	    if (vclass) { 
 		mit++;
-		if (mit == vclass->members.end()) {
+		if (mit == vclass->get_members().end()) {
 		    break;
 		}
 	    } else {
@@ -772,6 +815,7 @@ void status_report(int signal) {
   cout << "I: " << iters << " T: " << temp << " S: " << get_score() << " V: "
     << violated << " (Best S: " << absbest << " V:" << absbestviolated << ")"
     << endl;
+  cout.flush();
 }
 
 // From anneal.cc - the best solution found
@@ -789,11 +833,15 @@ int main(int argc,char **argv) {
   char ch;
   timelimit = 0.0;
   timetarget = 0.0;
-  while ((ch = getopt(argc,argv,"s:v:l:t:rpPTdH:oguc:nx")) != -1) {
+  
+  char* ptopFilename = "";
+  char* vtopFilename = "";
+  
+  while ((ch = getopt(argc,argv,"s:v:l:t:rpPTdH:oguc:nx:X:y:Y:q:w:F")) != -1) {
     switch (ch) {
     case 's':
       if (sscanf(optarg,"%d",&seed) != 1) {
-	print_help();
+		print_help();
       }
       break;
 #ifdef GRAPHVIZ_SUPPORT
@@ -852,17 +900,81 @@ int main(int argc,char **argv) {
       prechecks_only = true;
       cout << "Doing only prechecks, exiting early" << endl;
       break;
-#ifdef WITH_XML
     case 'x':
-      xml_input = true;
-      break;
+#ifdef WITH_XML
+      ptop_xml_input = false;
 #endif
+      if (strcmp(optarg, "") == 0) {
+      	print_help();
+	  }
+	  ptopFilename = optarg;
+      break;
+#ifdef WITH_XML      
+    case 'X':
+      ptop_xml_input = true;
+      if (strcmp(optarg, "") == 0) {
+      	print_help();
+	  }
+	  ptopFilename = optarg;
+    break;
+#endif
+    case 'y':
+#ifdef WITH_XML
+      vtop_xml_input = false;
+#endif
+      if (strcmp(optarg, "") == 0) {
+      	print_help();
+	  }
+	  vtopFilename = optarg;
+    break;
+#ifdef WITH_XML
+    case 'Y':
+      vtop_xml_input = true;
+      if (strcmp(optarg, "") == 0) {
+      	print_help();
+	  }
+	  vtopFilename = optarg;
+    break;
+#endif
+#ifdef WITH_XML
+	case 'q':
+	  ptop_rspec_input = true;
+	  if (strcmp(optarg, "") == 0) {
+	  	print_help();
+	  }
+	  ptopFilename = optarg;
+    break;
+
+	case 'w':
+	  vtop_rspec_input = true;
+	  if (strcmp(optarg, "") == 0) {
+	  	print_help();
+	  }
+	  vtopFilename = optarg;
+    break;
+#endif
+        case 'F':
+          check_fixed_nodes = true;
+    break;
+
     default:
       print_help();
     }
   }
   argc -= optind;
   argv += optind;
+  
+  if (argc == 2)
+  {
+	  ptopFilename = argv[0];
+	  vtopFilename = argv[1];
+  }
+  
+  if (strcmp(ptopFilename, "") == 0)
+	  print_help();
+  	
+  if (strcmp(vtopFilename, "") == 0)
+	  print_help();	
   
   if (seed == 0) {
     if (getenv("ASSIGN_SEED") != NULL) {
@@ -880,10 +992,9 @@ int main(int argc,char **argv) {
   }
 #endif
 
-  if (argc == 0) {
-    print_help();
-  }
-
+//   if (argc == 0) {
+//       print_help();
+//   }
 
   // Set up a signal handler for USR1 that exits with an unretryable error
   struct sigaction action;
@@ -903,9 +1014,9 @@ int main(int argc,char **argv) {
 #endif 
   
   // Convert options to the common.h parameters.
-  parse_options(argv, options, noptions);
+  //parse_options(argv, options, noptions);
 #ifdef SCORE_DEBUG
-  dump_options("Configuration options:", options, noptions);
+  //dump_options("Configuration options:", options, noptions);
 #endif
 
 #ifdef GNUPLOT_OUTPUT
@@ -917,10 +1028,10 @@ int main(int argc,char **argv) {
   cout << "seed = " << seed << endl;
   srandom(seed);
 
-  read_physical_topology(argv[0]);
+  read_physical_topology(ptopFilename);
   calculate_switch_MST();
 
-  read_virtual_topology(argv[1]);
+  read_virtual_topology(vtopFilename);
 
   // Time while we make pclasses and do the type prechecks
   timestart = used_time();
@@ -1004,8 +1115,8 @@ int main(int argc,char **argv) {
   }
  
   // Note, time is started earlier now, up by where we make pclasses
-  anneal(scoring_selftest, scale_neighborhood, initial_temperature_pointer,
-      use_connected_pnode_find);
+  anneal(scoring_selftest, check_fixed_nodes, scale_neighborhood,
+          initial_temperature_pointer, use_connected_pnode_find);
   timeend = used_time();
 
 #ifdef GNUPLOT_OUTPUT
@@ -1028,7 +1139,16 @@ int main(int argc,char **argv) {
   cout << "Violations: " << violated << endl;
   cout << vinfo;
 
+#ifdef WITH_XML
+  if (vtop_rspec_input || vtop_xml_input)
+  {
+	  print_solution(best_solution, annotated_filename(vtopFilename).c_str());
+  }
+  else
+	  print_solution(best_solution);
+#else
   print_solution(best_solution);
+#endif
 
   if (print_summary) {
     print_solution_summary(best_solution);

@@ -4,6 +4,8 @@
  * All rights reserved.
  */
 
+static const char rcsid[] = "$Id: parse_top.cc,v 1.42 2009-05-20 18:06:08 tarunp Exp $";
+
 #include "port.h"
 
 #include <boost/config.hpp>
@@ -41,12 +43,12 @@ extern vvertex_vector virtual_nodes;
 // dependant on their ordering in the top file, which can be annoying to get
 // right.
 // Returns the number of errors found
-int bind_top_subnodes() {
+int bind_top_subnodes(tb_vgraph &vg) {
     int errors = 0;
 
     // Iterate through all vnodes looking for ones that are subnodes
     vvertex_iterator vit,vendit;
-    tie(vit,vendit) = vertices(VG);
+    tie(vit,vendit) = vertices(vg);
     for (;vit != vendit;++vit) {
 	tb_vnode *vnode = get(vvertex_pmap, *vit);
 	if (!vnode->subnode_of_name.empty()) {
@@ -67,16 +69,16 @@ int bind_top_subnodes() {
 
 extern name_vclass_map vclass_map;
 
-int parse_top(tb_vgraph &VG, istream& i)
+int parse_top(tb_vgraph &vg, istream& input)
 {
   string_vector parsed_line;
   int errors=0,line=0;
   int num_nodes = 0;
   char inbuf[1024];
   
-  while (!i.eof()) {
+  while (!input.eof()) {
     line++;
-    i.getline(inbuf,1024);
+    input.getline(inbuf,1024);
     parsed_line = split_line(inbuf,' ');
     if (parsed_line.size() == 0) {continue;}
 
@@ -101,32 +103,27 @@ int parse_top(tb_vgraph &VG, istream& i)
 	}
 
 	num_nodes++;
-	tb_vnode *v = new tb_vnode();
-	vvertex vv = add_vertex(VG);
+        tb_vclass *vclass;
+	
+	name_vclass_map::iterator dit = vclass_map.find(type);
+	if (dit != vclass_map.end()) {
+	  type = "";
+	  vclass = (*dit).second;
+	} else {
+	  vclass = NULL;
+	  if (vtypes.find(type) == vtypes.end()) {
+	      vtypes[type] = typecount;
+	  } else {
+	      vtypes[type] += typecount;
+	  }
+	}
+
+	tb_vnode *v = new tb_vnode(name,type,typecount);
+	v->vclass = vclass;
+	vvertex vv = add_vertex(vg);
 	vname2vertex[name] = vv;
 	virtual_nodes.push_back(vv);
 	put(vvertex_pmap,vv,v);
-	v->name = name;
-	name_vclass_map::iterator dit = vclass_map.find(type);
-	if (dit != vclass_map.end()) {
-	  v->type="";
-	  v->vclass = (*dit).second;
-	} else {
-	  v->type=type;
-	  v->vclass=NULL;
-	  if (vtypes.find(v->type) == vtypes.end()) {
-	      vtypes[v->type] = typecount;
-	  } else {
-	      vtypes[v->type] += typecount;
-	  }
-	}
-	v->typecount = typecount;
-#ifdef PER_VNODE_TT
-	v->num_links = 0;
-	v->total_bandwidth = 0;
-#endif
-	v->disallow_trivial_mix = false;
-	v->nontrivial_links = v->trivial_links = 0;
 	
 	for (unsigned int i = 3;i < parsed_line.size();++i) {
 	  string desirename,desireweight;
@@ -238,7 +235,7 @@ int parse_top(tb_vgraph &VG, istream& i)
 
 	vvertex node1 = vname2vertex[src];
 	vvertex node2 = vname2vertex[dst];
-	e = add_edge(node1,node2,VG).first;
+	e = add_edge(node1,node2,vg).first;
 	tb_vlink *l = new tb_vlink();
 	l->src = node1;
 	l->dst = node2;
@@ -348,7 +345,7 @@ int parse_top(tb_vgraph &VG, istream& i)
     }
   }
 
-  errors += bind_top_subnodes();
+  errors += bind_top_subnodes(vg);
 
   if (errors > 0) {exit(EXIT_FATAL);}
   

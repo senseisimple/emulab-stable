@@ -9,6 +9,8 @@
  * solution.
  */
 
+static const char rcsid[] = "$Id: neighborhood.cc,v 1.4 2009-05-20 18:06:08 tarunp Exp $";
+
 #include "neighborhood.h"
 
 // From asssign.cc
@@ -31,10 +33,10 @@ inline bool pnode_is_match(tb_vnode *vn, tb_pnode *pn) {
 
   bool matched = false;
   tb_pnode::type_record *tr = mit->second;
-  if (tr->is_static) {
-    if ((tr->current_load + vn->typecount) > tr->max_load) {
+  if (tr->is_static()) {
+    if ((tr->get_current_load() + vn->typecount) > tr->get_max_load()) {
       // This would put us over its max load
-      if (allow_overload && (tr->max_load > 1)) {
+      if (allow_overload && (tr->get_max_load() > 1)) {
 	// That's okay, we're allowing overload
 	matched = true;
       } else {
@@ -51,13 +53,13 @@ inline bool pnode_is_match(tb_vnode *vn, tb_pnode *pn) {
 	// Failure - the pnode has a type, and it isn't ours
 	matched = false;
       } else {
-	if ((pn->current_type_record->current_load + vn->typecount) >
-	    pn->current_type_record->max_load) {
+	if ((pn->current_type_record->get_current_load() + vn->typecount) >
+	    pn->current_type_record->get_max_load()) {
 	  // This would put us over its max load
 	  //if (allow_overload && (tr->max_load > 1) &&
 	  //    ((pn->current_type_record->current_load + vn->typecount) <
 	  //    (pn->current_type_record->max_load + 2))) {
-	  if (allow_overload && (tr->max_load > 1)) {
+	  if (allow_overload && (tr->get_max_load() > 1)) {
 	    // That's okay, we're allowing overload
 	    matched = true;
 	  } else {
@@ -132,14 +134,14 @@ tb_pnode *find_pnode_connected(vvertex vv, tb_vnode *vn) {
   for (int i = 0; vedge_it != end_vedge_it; vedge_it++, i++) {
     visit_order[i] = *vedge_it;
   }
-  for (int i = 0; i < visit_order.size(); i++) {
+  for (size_t i = 0; i < visit_order.size(); i++) {
 	int i1 = RANDOM() % visit_order.size();
 	int i2 = RANDOM() % visit_order.size();
 	vedge tmp = visit_order[i1];
 	visit_order[i1] = visit_order[i2];
 	visit_order[i2] = tmp;
   }
-  for (int i = 0; i < visit_order.size(); i++) {
+  for (size_t i = 0; i < visit_order.size(); i++) {
     vvertex neighbor_vv = target(visit_order[i],VG);
     tb_vnode *neighbor_vn = get(vvertex_pmap,neighbor_vv);
     //cerr << "    trying " << neighbor_vn->name << endl;

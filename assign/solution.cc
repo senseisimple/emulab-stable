@@ -4,9 +4,35 @@
  * All rights reserved.
  */
 
+static const char rcsid[] = "$Id: solution.cc,v 1.13 2009-05-20 18:06:08 tarunp Exp $";
+
 #include "solution.h"
 #include "vclass.h"
+				 
 #include <string>
+#include <list>
+#include <utility>
+
+#ifdef WITH_XML
+	#include "annotate_rspec.h"
+	#include "annotate_vtop.h"
+	#include "xstr.h"
+#endif
+
+extern bool ptop_xml_input;
+extern bool ptop_rspec_input;
+
+extern bool vtop_xml_input;
+extern bool vtop_rspec_input;
+
+bool both_inputs_rspec = false;
+bool both_inputs_xml = false;
+
+#ifdef WITH_XML
+	annotate_rspec *rspec_annotater;
+	annotate_vtop *vtop_annotater;
+#endif
+
 using namespace std;
 
 bool compare_scores(double score1, double score2) {
@@ -24,6 +50,15 @@ void print_solution(const solution &s) {
     vvertex_iterator vit,veit;
     tb_vnode *vn;
 
+#ifdef WITH_XML
+	bool both_inputs_xml = ptop_xml_input && vtop_xml_input;
+	bool both_inputs_rspec = ptop_rspec_input && vtop_rspec_input;
+	
+	if (both_inputs_rspec == true)
+		rspec_annotater = new annotate_rspec ();
+	else if (both_inputs_xml == true)
+		vtop_annotater = new annotate_vtop();
+#endif	
     /*
      * Start by printing out all node mappings
      */
@@ -34,10 +69,21 @@ void print_solution(const solution &s) {
 	if (! s.is_assigned(*vit)) {
 	    cout << "unassigned: " << vn->name << endl;
 	} else {
-	    cout << vn->name << " "
-		<< get(pvertex_pmap,s.get_assignment(*vit))->name << endl;
+		cout << vn->name << " " << get(pvertex_pmap,s.get_assignment(*vit))->name << endl;
+	    #ifdef WITH_XML
+		const char* node_name = XStr(vn -> name).c();
+		const char* assigned_to = XStr (get(pvertex_pmap,s.get_assignment(*vit))->name).c() ;
+		if (both_inputs_rspec == true)
+		{
+			rspec_annotater->annotate_element(node_name, assigned_to);
+		}
+		else if (both_inputs_xml == true)
+		{
+			vtop_annotater->annotate_element(node_name, assigned_to);
+		}
+		#endif
 	}
-    }
+	}
     cout << "End Nodes" << endl;
 
     /*
@@ -50,14 +96,29 @@ void print_solution(const solution &s) {
 	tb_vlink *vlink = get(vedge_pmap,*eit);
 
 	cout << vlink->name;
+	
+	list<const char*> links;
 
 	if (vlink->link_info.type_used == tb_link_info::LINK_DIRECT) {
 	    // Direct link - just need the source and destination
 	    tb_plink *p = get(pedge_pmap,vlink->link_info.plinks.front());
 	    tb_plink *p2 = get(pedge_pmap,vlink->link_info.plinks.back());
+		// XXX: This is not correct because it contradicts the comment earlier
+		// It seems that it will work because the front and back of the list will have the same node
+		// But it needs to be checked anyway.
 	    cout << " direct " << p->name << " (" <<
 		p->srcmac << "," << p->dstmac << ") " <<
 		p2->name << " (" << p2->srcmac << "," << p2->dstmac << ")";
+#ifdef WITH_XML
+		if (both_inputs_rspec == true)
+		{
+			rspec_annotater->annotate_element((vlink->name).c_str(), (p->name).c_str());
+		}
+		else if (both_inputs_xml == true)
+		{
+// 			annotate_vtop((vlink->name).c_str(), (p->name).c_str());
+		}
+#endif
 	} else if (vlink->link_info.type_used ==
 		tb_link_info::LINK_INTRASWITCH) {
 	    // Intraswitch link - need to grab the plinks to both nodes
@@ -66,16 +127,41 @@ void print_solution(const solution &s) {
 	    cout << " intraswitch " << p->name << " (" <<
 		p->srcmac << "," << p->dstmac << ") " <<
 		p2->name << " (" << p2->srcmac << "," << p2->dstmac << ")";
+#ifdef WITH_XML
+		links.push_back((p->name).c_str());
+		links.push_back((p2->name).c_str());
+		if (both_inputs_rspec == true)
+		{
+			rspec_annotater->annotate_element((vlink->name).c_str(), &links);
+		}
+		else if (both_inputs_xml == true)
+		{
+ 			vtop_annotater->annotate_element((vlink->name).c_str(), &links);
+		}
+#endif
 	} else if (vlink->link_info.type_used ==
 		tb_link_info::LINK_INTERSWITCH) {
 	    // Interswitch link - iterate through each intermediate link
 	    cout << " interswitch ";
-	    for (pedge_path::iterator it=vlink->link_info.plinks.begin();
-		    it != vlink->link_info.plinks.end();++it) {
-		tb_plink *p = get(pedge_pmap,*it);
-		cout << " " << p->name << " (" << p->srcmac << "," <<
-		    p->dstmac << ")";
+	    for (pedge_path::iterator it=vlink->link_info.plinks.begin(); it != vlink->link_info.plinks.end();++it) {
+			tb_plink *p = get(pedge_pmap,*it);
+#ifdef WITH_XML
+			links.push_back((p->name).c_str());
+#endif
+			cout << " " << p->name << " (" << p->srcmac << "," << p->dstmac << ")";
 	    }
+#ifdef WITH_XML
+		if (both_inputs_rspec == true)
+		{
+			rspec_annotater->annotate_element((vlink->name).c_str(), &links);
+		}
+		else if (both_inputs_xml == true)
+		{
+			vtop_annotater->annotate_element((vlink->name).c_str(), &links);
+		}
+
+
+#endif
 	} else if (vlink->link_info.type_used == tb_link_info::LINK_TRIVIAL) {
 	    // Trivial link - we really don't have useful information to
 	    // print, but we'll fake a bunch of output here just to make it
@@ -88,17 +174,35 @@ void print_solution(const solution &s) {
 		" (" << pnode->name << "/null,(null)) " <<
 		pnode->name << ":loopback" << " (" << pnode->name <<
 		"/null,(null)) ";
+		// TODO: Annotate trivial links in the rspec
 	} else {
 	    // No mapping at all
 	    cout << " Mapping Failed";
 	}
-
 	cout << endl;
     }
-
     cout << "End Edges" << endl;
-
     cout << "End solution" << endl;
+}
+
+/* Print out the current solution and annotate the rspec */
+void print_solution (const solution &s, const char* output_filename)
+{
+	print_solution(s);
+#ifdef WITH_XML
+	// This will work because print_solution is called already
+	// and the objects have been created there
+	if (both_inputs_rspec == true)
+	{
+		cout << "Writing annotated file to " << output_filename << endl;
+		rspec_annotater->write_annotated_file (output_filename);
+	}
+	else if (both_inputs_xml == true)
+	{
+		cout << "Writing annotated file to " << output_filename << endl;
+		vtop_annotater->write_annotated_file (output_filename);
+	}
+#endif
 }
 
 /*
@@ -200,7 +304,7 @@ void vvertex_writer::operator()(ostream &out,const vvertex &v) const {
     if (vnode->vclass == NULL) {
 	out << vnode->type;
     } else {
-	out << vnode->vclass->name;
+	out << vnode->vclass->get_name();
     }
     out << "\"";
     if (vnode->fixed) {
@@ -282,6 +386,7 @@ void solution_edge_writer::operator()(ostream &out,const vedge &v) const {
 	    }
 	    break;
 	case tb_link_info::LINK_TRIVIAL: style="dashed";color="blue"; break;
+	case tb_link_info::LINK_DELAYED: style="dotted";color="green"; break;
     }
     out << "style=" << style << " color=" << color;
     if (label.size() != 0) {

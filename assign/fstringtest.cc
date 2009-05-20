@@ -6,6 +6,8 @@
  * Test program for the fstring library.
  */
 
+static const char rcsid[] = "$Id: fstringtest.cc,v 1.4 2009-05-20 18:06:08 tarunp Exp $";
+
 #include "fstring.h"
 #include <iostream>
 using namespace std;

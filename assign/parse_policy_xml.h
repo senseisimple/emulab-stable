@@ -1,17 +1,17 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2005-2006 University of Utah and the Flux Group.
+ * Copyright (c) 2008-2009 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
 /*
- * Parsing for the (experimental) ptop XML format
+ * Parsing for the (experimental) policy XML format
  */
 
-#ifdef WITH_XML 
+#ifdef WITH_XML
 
-#ifndef __PARSE_PTOP_XML_H
-#define __PARSE_PTOP_XML_H
+#ifndef __PARSE_POLICY_XML_H
+#define __PARSE_POLICY_XML_H
 
 #include "physical.h"
 #include "port.h"
@@ -25,8 +25,8 @@
 #include <xercesc/sax/HandlerBase.hpp>
 XERCES_CPP_NAMESPACE_USE
 
-int parse_ptop_xml(tb_pgraph &PG, tb_sgraph &SG, char *filename);
+int parse_policy_xml(char *filename);
 
-#endif // for __PARSE_PTOP_XML_H
+#endif // for __PARSE_POLICY_XML
 
 #endif // for WITH_XML

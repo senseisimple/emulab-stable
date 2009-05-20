@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2007 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -36,8 +36,6 @@ using namespace __gnu_cxx;
 #include <hash_set>
 #include <hash_map>
 #endif
-
-#include "featuredesire.h"
 
 // Icky, but I can't include virtual.h here
 class tb_vnode;
@@ -99,6 +97,10 @@ extern tb_pgraph_edge_pmap pedge_pmap;
 extern tb_sgraph_vertex_pmap svertex_pmap;
 extern tb_sgraph_edge_pmap sedge_pmap;
 
+// These are down here because forwarding.h need tb_pgraph and related types
+#include "featuredesire.h"
+#include "forwarding.h"
+
 /*
  * Represents a physical type
  */
@@ -128,8 +130,8 @@ class tb_ptype {
 		return 0;
 	    }
 	}
-	inline void set_max_users(int users) {
-	    max_users = users;
+	inline void set_max_users(int _max_users) {
+	    max_users = _max_users;
 	}
 	inline void add_slots(int additional_slots) {
 	    slots += additional_slots;
@@ -159,37 +161,63 @@ public:
 			  my_class(NULL), my_own_class(NULL), assigned_nodes(),
 			  trivial_bw(0), trivial_bw_used(0), subnode_of(NULL),
 			  subnode_of_name(""), has_subnode(false),
-			  unique(false), is_switch(false) {;}
+			  unique(false), is_switch(false), forwarding() {;}
 
   class type_record {
       public:
-	  type_record(int _max_load, bool _is_static, tb_ptype *_ptype) :
+	  type_record(int _max_load, bool _static_type, tb_ptype *_ptype) :
 	      max_load(_max_load), current_load(0),
-	      is_static(_is_static), ptype(_ptype) { ; }
-	  int max_load;		// maximum load for this type
-	  int current_load;	// how many vnodes are assigned of this type
-	  bool is_static;	// whether this type is static or dynamic
-
-	  tb_ptype *ptype;	// Pointer to the global ptype strucutre for
-	  			// type
+	      static_type(_static_type), ptype(_ptype) { ; }
 
 	  bool operator==(const type_record &b) {
-	      return ((max_load == b.max_load) && (is_static == b.is_static));
+	      return ((max_load == b.max_load) && (static_type == b.static_type));
 	  }
-
+      
+	  tb_ptype *get_ptype() const {
+	      return(ptype);
+          }
+      
+          bool is_static() const {
+   	      return(static_type);
+          }
+      
+          int get_max_load() const {
+	      return(max_load);
+          }
+      
+          int get_current_load() const {
+	      return(current_load);
+          }
+      
+          void add_load(int howmuch) {
+              current_load += howmuch;
+	  }
+      
+          void remove_load(int howmuch) {
+	      current_load -= howmuch;
+          }
+      
 	  friend ostream &operator<<(ostream &o, const type_record& node)
 	  {
-	      o << "max_load = " << node.max_load <<
+	      return (o << "max_load = " << node.max_load <<
 		   " current_load = " << node.current_load <<
-		   " is_static = " << node.is_static;
+		   " static_type = " << node.static_type);
 	  }
+      private:
+          int max_load;		// maximum load for this type
+          int current_load;	// how many vnodes are assigned of this type
+          bool static_type;	// whether this type is static or dynamic
+      
+          tb_ptype *ptype;	// Pointer to the global ptype strucutre for
+	     		        // type
+      
   };
 
   // Contains max nodes for each type
   // NOTE: Parallel data strucure, see below!
   typedef hash_map<fstring,type_record*> types_map;
   types_map types;
-  
+
   // Same as above, but a list for fast iteration
   // If you touch the above list, you must touch this one too
   typedef list<type_record*> types_list;
@@ -243,7 +271,11 @@ public:
 
   bool is_switch;		// Indicates whether or not this pnode is a
                                 // switch
-				//
+				// XXX: Should go away soon!
+				
+  forwarding_info forwarding;	// Records the set of protocols this node can
+                                // forward
+    
   link_type_count_map link_counts; // Counts how many links of each type this
   				   // node has 
 	
@@ -320,11 +352,9 @@ public:
   typedef enum {PLINK_NORMAL,PLINK_INTERSWITCH,PLINK_LAN} plinkType;
   typedef hash_set<fstring> type_set;
 
-  tb_plink(fstring _name, plinkType _is_type, fstring _type, fstring _srcnode,
-          fstring _dstnode, fstring _srcmac, fstring _dstmac,
-          fstring _srciface, fstring _dstiface)
-    : name(_name), srcnode(_srcnode), dstnode(_dstnode), srcmac(_srcmac),
-      dstmac(_dstmac), is_type(_is_type),
+  tb_plink(fstring _name, plinkType _is_type, fstring _type, fstring _srcmac, fstring
+      _dstmac, fstring _srciface, fstring _dstiface)
+    : name(_name), srcmac(_srcmac), dstmac(_dstmac), is_type(_is_type),
       srciface(_srciface), dstiface(_dstiface),
       delay_info(), bw_used(0), emulated(0), nonemulated(0),
       penalty(0.0), fixends(false), current_endpoints(), current_count(0),
@@ -333,7 +363,6 @@ public:
       }
 
   fstring name;			// the name
-  fstring srcnode, dstnode;     // source and destination node names
   fstring srcmac,dstmac;	// source and destination MAC addresses.
   fstring srciface, dstiface;	// source and destination interface names
 
@@ -353,22 +382,34 @@ public:
 				// pnode endpoints
   nodepair_count_map vedge_counts; // list, and count, of all pairs of pnode
 				   // endpoints sharing this link
-				   
+
+  bool has_type(fstring type) const {	// Returns true if the given type is one
+				        // of the types supported by this link
+    return(types.find(type) != types.end());
+  }
+    
   friend ostream &operator<<(ostream &o, const tb_plink& link)
   {
     o << "tb_plink: " << link.name << " (" << &link << ")" << endl;
-    o << "  type: ";
-    switch (link.is_type) {
-    case tb_plink::PLINK_NORMAL:
-      o << "normal" << endl;
-      break;
-    case tb_plink::PLINK_INTERSWITCH:
-      o << "interswitch" << endl;
-      break;
-    case tb_plink::PLINK_LAN:
-      o << "lan" << endl;
-      break;
+    o << "  types=";
+    for (type_set::iterator it = link.types.begin();
+	 it != link.types.end();
+	 it++) {
+	o << *it << " ";
     }
+    o << endl;
+    o << "  interswitch type: ";
+      switch (link.is_type) {
+	  case tb_plink::PLINK_NORMAL:
+	      o << "normal" << endl;
+	      break;
+	  case tb_plink::PLINK_INTERSWITCH:
+	      o << "interswitch" << endl;
+	      break;
+	  case tb_plink::PLINK_LAN:
+	      o << "lan" << endl;
+	      break;
+      }      
     o << "  bw_used=" << link.bw_used <<
       " srcmac=" << link.srcmac << " dstmac=" << link.dstmac <<
       " emulated=" << link.emulated << " nonemulated=" <<

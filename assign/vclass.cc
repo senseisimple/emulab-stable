@@ -4,6 +4,8 @@
  * All rights reserved.
  */
 
+static const char rcsid[] = "$Id: vclass.cc,v 1.13 2009-05-20 18:06:08 tarunp Exp $";
+
 #include "port.h"
 
 #include <stdlib.h>
@@ -33,7 +35,7 @@ void tb_vclass::add_type(fstring type)
   }
 }
 
-bool tb_vclass::has_type(fstring type) {
+bool tb_vclass::has_type(fstring type) const {
     return (members.find(type) != members.end());
 }
 
@@ -80,7 +82,7 @@ double tb_vclass::unassign_node(fstring type)
   return delta;
 }
 
-fstring tb_vclass::choose_type()
+fstring tb_vclass::choose_type() const
 {
   // This may take some tweaking - i.e. might want to make more
   // efficient, although members is usually a very small hash.
@@ -88,7 +90,7 @@ fstring tb_vclass::choose_type()
     return dominant;
   }
   int r = RANDOM()%members.size();
-  members_map::iterator dit;
+  members_map::const_iterator dit;
   for (dit=members.begin();dit != members.end();++dit) {
     if (r == 0) break;
     r--;
@@ -96,8 +98,8 @@ fstring tb_vclass::choose_type()
   return (*dit).first;
 }
 
-bool tb_vclass::empty() {
-    members_map::iterator dit;
+bool tb_vclass::empty() const {
+    members_map::const_iterator dit;
     for (dit=members.begin();dit != members.end();++dit) {
         if ((*dit).second > 0) {
             return false;

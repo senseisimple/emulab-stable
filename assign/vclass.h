@@ -38,23 +38,14 @@ class tb_vclass {
 public:
   tb_vclass(fstring n,double w) : name(n), weight(w), score(0) {;}
 
-  fstring name;			// Name of the vclass
-
-  typedef hash_map<fstring,int> members_map; 
-  members_map members;		// Maps type to number of members of that
-				// type.
-  
-  double weight;		// Weight of class
-  double score;			// the current score of the vclass
-  
+  typedef hash_map<fstring,int> members_map;   
+    
   void add_type(fstring type);	// Add a member of a certain type to the
 				// vclass
 
-  bool has_type(fstring type);     // Does the vclass contain the given type?
+  bool has_type(fstring type) const; // Does the vclass contain the given type?
 
-  fstring dominant;		// Current dominant type
-
-  bool empty();                 // True if no vnodes use this vlcass
+  bool empty() const;                // True if no vnodes use this vlcass
 
   // The next two routines report the *change* in score.  The score
   // for the vclass as a whole is 0 if all nodes are of the dominant
@@ -63,7 +54,7 @@ public:
   double unassign_node(fstring type);
 
   // Semi randomly choose a type from a vclass.
-  fstring choose_type();
+  fstring choose_type() const;
 
   friend ostream &operator<<(ostream &o, const tb_vclass& c)
   {
@@ -77,6 +68,34 @@ public:
     o << endl;
     return o;
   }
+  
+  // Get the list of members
+  const members_map &get_members() const {
+    return(members);
+  }
+  
+  // Just get the name
+  fstring get_name() const {
+    return(name);
+  }
+  
+  // Get the name of the dominant type
+  fstring get_dominant() const {
+    return(dominant);
+  }
+
+private:
+      
+  fstring name;			// Name of the vclass
+
+  members_map members;		// Maps type to number of members of that
+				// type.
+  
+  double weight;		// Weight of class
+  double score;			// the current score of the vclass
+  
+  fstring dominant;		// Current dominant type
+
 };
 
 typedef hash_map<fstring,tb_vclass*> name_vclass_map;
