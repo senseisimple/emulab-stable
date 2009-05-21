@@ -1,0 +1,60 @@
+#!/usr/bin/perl
+
+# 
+# EMULAB-COPYRIGHT 
+# Copyright (c) 2009 University of Utah and the Flux Group. 
+# All rights reserved. 
+#
+
+require common;
+
+use strict;
+
+#
+# Run all tests specified in a testfile
+#
+
+#
+# Read config from file passed on command line
+#
+die "Usage: $0 <testfile>" unless @ARGV==1;
+my ($testfile) = @ARGV;
+readtestfile($testfile);
+
+#
+# Set up global vars that store directory locations, etc.
+#
+setglobals();
+
+#
+# Make intermediate directories
+#
+if (-d $::testdir) {
+    print "Clearing out old testdir\n";
+    system "rm -rf $::testdir";
+}
+
+foreach my $dir ($::testdir, $::outdir, $::statdir) {
+    mkdir $dir or die "Unable to make $dir: $!";
+}
+
+#
+# Actually run assign
+#
+foreach my $test (enumeratetests()) {
+    my $cmdline = "bin/assign $CFG::assignopts " . ptopfile($test) .
+                                             " " . topfile($test);
+    my $logfile = logfile($test);
+    print "Running $test ... ";
+    my $oldtime = time();
+    my $rv = system "$cmdline > $logfile 2>&1";
+    my $newtime = time();
+    my $delta = $newtime - $oldtime;
+    print "($delta seconds)\n";
+    if ($rv) {
+        print "Failed!\n";
+        system "touch " . failedfile($test);
+    } else {
+        system "touch " . passedfile($test);
+    }
+}

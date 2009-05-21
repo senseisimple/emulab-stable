@@ -1,0 +1,111 @@
+#!/usr/bin/perl -w
+
+# 
+# EMULAB-COPYRIGHT 
+# Copyright (c) 2009 University of Utah and the Flux Group. 
+# All rights reserved. 
+#
+
+#
+# Makes a simple physical topology, based on a number of parameters (which
+# are mostly hardcoded for now.) The topology simply fills up switches
+# according to some simple rules about the number of interfaces per node and
+# the number of ports per switch. Switches are connected in a "star" with
+# a "hub" switch in middle to which all node switches have trunks
+#
+
+$| = 1;
+
+use strict;
+use POSIX qw(ceil floor);
+
+my $nodes;
+
+#
+# Parameters
+#
+
+# Interfaces per node
+my $IFACES = 4;
+# Ports per switch (1000 looks like a 
+my $PPS = 1000;
+
+# Types that are assigned to every switch
+my @SWITCHTYPES = ("switch:*","*lan:*");
+# Features to be assigned to every switch
+my @SWITCHFEATURES = ();
+# Types that are assigned to every node
+my @NODETYPES = ("pc:1", "pcvm:10");
+# Features that are assigned to every node
+my @NODEFEATURES = ();
+# Type of links in use
+my @LINKTYPES = ("ethernet");
+# Speed of node interfaces (gigabit)
+my $NODESPEED = "1000";
+# Speed of trunk links - relative to speed of node interfaces (here, a single
+# 100 gbit interface or 10 trunked 10gbit interfaces)
+my $TRUNKSPEED = $NODESPEED * 100;
+
+if (@ARGV == 1) {
+    ($nodes) = @ARGV;
+} elsif (@ARGV == 3) {
+    my $trunkmult;
+    ($nodes, $PPS, $trunkmult) = @ARGV;
+    $TRUNKSPEED = $NODESPEED * $trunkmult;
+} else {
+    die "Usage: $0 <nodes> [pps trunkmult]\n";
+}
+
+#
+# How many nodes will fit on each swich
+#
+my $nodesperswitch = ($PPS*1.0/$IFACES);
+
+#
+# How many 'edge' switches are needed
+#
+my $switchcount = ceil($nodes*1.0 / $nodesperswitch);
+
+#
+# Print out a node with the given types and features
+#
+sub node($$$) {
+    my ($name,$typeref,$fref) = @_;
+    my @types = @$typeref;
+    my @features = @$fref;
+    print "node $name ". join(" ",@types) . " - " . join(" ",@features) . "\n";
+}
+
+#
+# Print out n links with the given source, destination, and speed
+#
+sub links($$$$) {
+    my ($count, $src, $dst, $speed) = @_;
+    for (my $i = 0; $i < $count; $i++) {
+        print "link $src-$dst-$i $src:(null)/$i $dst:(null)/$i $speed 0 0 " .
+            join(" ",@LINKTYPES) . "\n";
+    }
+}
+
+if ($switchcount > 1) {
+    # Print out node line for the interconnect switch
+    node("hub",\@SWITCHTYPES,\@SWITCHFEATURES);
+}
+
+for (my $i = 0; $i < $nodes; $i++) {
+    my $switchname = "switch" . floor(($i / $nodesperswitch));
+    #
+    # Start a new switch
+    #
+    if ($i % $nodesperswitch == 0) {
+        # Print out the switch for this set of nodes
+        node($switchname, \@SWITCHTYPES, \@SWITCHFEATURES);
+        # Link to the hub switch
+        if ($switchcount > 1) {
+            links(1,$switchname,"hub",$TRUNKSPEED);
+        }
+    }
+    my $pcname = "pc" . $i;
+    node($pcname,\@NODETYPES,\@NODEFEATURES);
+    links($IFACES,$pcname,$switchname,$NODESPEED);
+}
