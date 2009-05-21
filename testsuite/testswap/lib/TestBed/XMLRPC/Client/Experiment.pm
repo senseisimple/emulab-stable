@@ -30,6 +30,19 @@ sub args {
   return { 'pid' => $pid, 'gid' => $gid, 'eid' => $eid, @_ };
 }
 
+sub retry_on_TIMEOUT(&) {
+  my ($sub) = @_;
+RETRY: 
+  { 
+    my $result = eval { $sub->(); };
+    if ($@ && $@ =~ /SSL_SOCKET_TIMEOUT/) {
+      warn "SSL_SOCKET_TIMEOUT after $TBConfig::XMLRPC_SERVER_TIMEOUT seconds";
+      redo RETRY;
+    }
+    $result;
+  }
+}
+
 sub echo           { shift->augment_output( 'str' => shift ); }
 sub getlist_brief  { shift->augment( 'format' => 'brief'); }
 sub getlist_full   { shift->augment( 'format' => 'full' ); }
@@ -39,8 +52,8 @@ sub swapin         { shift->augment_func_code( 'swapexp', 'direction' => 'in' );
 sub swapout        { shift->augment_func_code( 'swapexp', 'direction' => 'out' ); }
 sub end            { shift->augment_func_code( 'endexp' ); }
 sub nodeinfo       { parseNodeInfo(shift->augment_func_output('expinfo', 'show' => 'nodeinfo')); }
-sub waitforactive  { shift->augment_code(@_) }
-sub waitforswapped { shift->augment_func_code( 'statewait', 'state' => 'swapped' ) }
+sub waitforactive  { my $e = shift; retry_on_TIMEOUT { $e->augment_func_code('waitforactive', @_) }; }
+sub waitforswapped { my $e = shift; retry_on_TIMEOUT { $e->augment_func_code( 'statewait', 'state' => 'swapped' ) }; }
 
 sub startexp_ns { batchexp_ns(@_, 'batch' => 0); }
 sub startexp_ns_wait { batchexp_ns_wait(@_, 'batch' => 0); }

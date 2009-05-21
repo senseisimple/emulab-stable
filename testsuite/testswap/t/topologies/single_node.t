@@ -14,4 +14,4 @@ set node1 [$ns node]
 $ns run
 NSEND
 
-ok(e('tewkt')->launchpingswapkill($ns));
+ok(e('sn1')->launchpingswapkill($ns));

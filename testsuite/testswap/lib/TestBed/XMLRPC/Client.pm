@@ -21,8 +21,8 @@ BEGIN {
 }
 
 #constructs RPC::XML::Client with 10 minute socket timeout
-my $HTTP_TIMEOUT = $TBConfig::XMLRPC_SERVER_TIMEOUT;
 has 'client' => ( isa => 'RPC::XML::Client', is => 'rw', default => sub { 
+  my $HTTP_TIMEOUT = $TBConfig::XMLRPC_SERVER_TIMEOUT;
   my $c = RPC::XML::Client->new($TBConfig::XMLRPC_SERVER, 'timeout' => ($HTTP_TIMEOUT));
   $c->{'__useragent'}->timeout($HTTP_TIMEOUT);
   $c; } );
@@ -71,6 +71,9 @@ sub single_request {
   if ($TBConfig::DEBUG_XML_CLIENT) {
     say("Received");
     say Dumper($resp);
+  }
+  if ((!ref($resp)) && ($resp =~ /SSL \w+ timeout/)) {
+    die "SSL_SOCKET_TIMEOUT";
   }
   $resp;
 }
