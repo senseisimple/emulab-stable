@@ -1451,7 +1451,6 @@ sub enablePortTrunking2($$$$) {
 	return 0;
     }
     my ($ifIndex) = $self->convertPortFormat($PORT_FORMAT_IFINDEX,$port);
-    my $portIndex = $self->{PORTINDEX}{$ifIndex};
     #
     # portSetVlan will clear out all other vlans and set the PVID
     #
@@ -1464,7 +1463,7 @@ sub enablePortTrunking2($$$$) {
     # Set port type apropriately.
     #
     if ($equaltrunking) {
-	my $portType = [$aftOID,$portIndex,"admitOnlyVlanTagged","INTEGER"];
+	my $portType = [$aftOID,$ifIndex,"admitOnlyVlanTagged","INTEGER"];
 	$rv = $self->{SESS}->set($portType);
 	if (!defined($rv)) {
 	    warn "enablePortTrunking: Unable to set port type\n";
@@ -1473,7 +1472,7 @@ sub enablePortTrunking2($$$$) {
     } else {
 	$self->lock();
 	my $defLists = $self->getVlanLists(1);
-	@{@$defLists[0]}[$portIndex - 1] = 1;  # add to forbid list of default 
+	@{@$defLists[0]}[$ifIndex - 1] = 1;  # add to forbid list of default 
 	$rv = $self->setVlanLists(1, $defLists);
 	$self->unlock();
 	if (!defined($rv)) {
@@ -1555,7 +1554,7 @@ my %blade_sizes = (
 # members,
 #
 # usage: readifIndex(self)
-#        returns nothing but sets instance variables IFINDEX and PORTINDEX
+#        returns nothing but sets the instance variable IFINDEX.
 #
 # TODO: XXXXXXXXXXXXXXXXXXXXXXX - the 288 is a crock; 
 # for some reason doing an swalk of ifType returns 161 instead of
