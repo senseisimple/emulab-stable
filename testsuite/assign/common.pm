@@ -23,6 +23,32 @@ sub lsptop($) {
 }
 
 #
+# Same for top/
+#
+sub lstop($) {
+    my ($pattern) = @_;
+    my @filenames = `ls -1 top/$pattern`;
+    @filenames = map { `basename $_` } @filenames;
+    chomp @filenames;
+    return @filenames;
+}
+
+#
+# Filter a list, returning on the elements for which the given fucntion
+# returns true
+#
+sub filter(&@) {
+    my ($fref, @list) = @_;
+    my @rv = ();
+    foreach my $elt (@list) {
+        if (&$fref($elt)) {
+            push @rv, $elt;
+        }
+    }
+    return @rv;
+}
+
+#
 # Parse a file describing some tests to run - really, it's just some perl code
 # to execute that's expected to set certain variables.
 #
