@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004-2008 University of Utah and the Flux Group.
+# Copyright (c) 2004-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -396,7 +396,7 @@ sub doboot()
 		    warning("Error adding new user $login");
 		    next;
 		}
-
+		
 		if (PLAB() && ! -e $hdir) {
 		    if ($doit && !os_mkdir($hdir, "0755")) {
 			warning("Error creating user homedir");
@@ -405,12 +405,13 @@ sub doboot()
 		    chown($uid, $gid, $hdir)
 			if ($doit);
 		}
+
 		#
 		# Might be a local node that does not mount /user from ops.
 		# Or a remote node.
 		#
 		$doupdate = 1
-		    if (! -e "$hdir/.ssh");
+		    if (! -e "$hdir/.ssh" || ! -d "$hdir/.ssh");
 		
 		# Add to DB only if successful. 
 		$PWDDB{$login} = "$uid:$serial";
@@ -430,11 +431,20 @@ sub doboot()
 		    my $sshdir  = "$homedir/.ssh";
 		    my $forward = "$homedir/.forward";
 
+		    # Sanity; this does not always happen correctly.
+		    my $cmd = "$CHMOD 755 $homedir";
+		    if (system($cmd) != 0) {
+			warning("Failed $cmd: $!");
+		    }
+
 		    #
 		    # Create .ssh dir and populate it with an authkeys file.
+		    # XXX as a sanity check, do nothing if tmcd gaves us
+		    # no keys for any user. Means that something went wrong.
 		    #
 		    TBNewsshKeyfile($sshdir, $uid, $gid, 0,
-				    @{$pubkeys{$login}});
+				    @{$pubkeys{$login}})
+			if (keys(%pubkeys));
 
 		    #
 		    # Give user a .forward back to emulab.

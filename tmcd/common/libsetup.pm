@@ -30,6 +30,7 @@ use Exporter;
 
 	 SIMTRAFGEN SIMHOST ISDELAYNODEPATH JAILHOST DELAYHOST STARGATE
 	 ISFW FAKEJAILED LINUXJAILED GENVNODE GENVNODETYPE GENVNODEHOST
+	 SHAREDHOST
 
 	 CONFDIR LOGDIR TMDELAY TMJAILNAME TMSIMRC TMCC TMCCBIN
 	 TMNICKNAME TMSTARTUPCMD FINDIF
@@ -386,8 +387,10 @@ sub SIMHOST()   { if ($role eq "simhost") { return 1; } else { return 0; } }
 sub SIMTRAFGEN(){ if (-e ISSIMTRAFGENPATH())  { return 1; } else { return 0; } }
 
 # A jail host?
-sub JAILHOST()  { if ($role eq "virthost") { return 1; } else { return 0; } }
-sub GENVNODEHOST() { if ($role eq "virthost") { return 1; } else { return 0; } }
+sub JAILHOST()     { return (($role eq "virthost" ||
+			      $role eq "sharedhost") ? 1 : 0); }
+sub GENVNODEHOST() { if ($role eq "virthost") { return 1; } else { return 0; }}
+sub SHAREDHOST()   { return ($role eq "sharedhost" ? 1 : 0); }
 
 # A delay host?  Either a delay node or a node using linkdelays
 sub DELAYHOST()	{ if (-e ISDELAYNODEPATH()) { return 1; } else { return 0; } }

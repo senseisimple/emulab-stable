@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -422,11 +422,35 @@ sub jailmount()
     # the unmounts. In the meantime, the physical node might change its
     # mount set, but we will not care (of course, if a dir is unmounted
     # from the pnode, something is probably going to break). 
-    # 
-    dbmopen(%MDB, $MOUNTDB, 0444);
+    #
+    my %MOUNTS = ();
     dbmopen(%SDB, $JAILDB,  0644);
-    
-    while (my ($remote, $path) = each %MDB) {
+
+    if (SHAREDHOST()) {
+	my @tmccresults;
+
+	if (tmcc(TMCCCMD_ACCT, undef, \@tmccresults) < 0) {
+	    warn("Could not get account info from server!\n");
+	    return -1;
+	}
+	foreach my $str (@tmccresults) {
+	    if ($str =~ /^ADDUSER LOGIN=([-\w]+) .* HOMEDIR=([^\s]+)/) {
+		$MOUNTS{$2} = $2;
+	    }
+	}
+	my ($pid, $eid, $myname) = check_nickname();
+	$MOUNTS{"/proj/$pid"} = "/proj/$pid"
+	    if ($pid);
+    }
+    else {
+        dbmopen(%MDB, $MOUNTDB, 0444);
+	while (my ($remote, $path) = each %MDB) {
+	    $MOUNTS{$remote} = $path;
+	}
+	dbmclose(%MDB);	   
+    }
+
+    while (my ($remote, $path) = each %MOUNTS) {
 	$local = "$rootpath$path";
 	    
 	if (! -e $local) {
@@ -447,7 +471,6 @@ sub jailmount()
 	}
 	$SDB{$remote} = $local;	
     }
-    dbmclose(%MDB);	   
     dbmclose(%SDB);
     return 0;
 }
