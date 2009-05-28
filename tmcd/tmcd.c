@@ -2648,7 +2648,7 @@ COMMAND_PROTOTYPE(dolinkdelay)
 		strcpy(buf, "and v.vnode_id is NULL");
 
 	res = mydb_query("select i.MAC,d.type,vlan,vnode,d.ip,netmask, "
-		 "pipe,delay,bandwidth,lossrate, "
+		 "pipe,delay,d.bandwidth,lossrate, "
 		 "rpipe,rdelay,rbandwidth,rlossrate, "
 		 "q_red,q_limit,q_maxthresh,q_minthresh,q_weight,q_linterm, " 
 		 "q_qinbytes,q_bytes,q_meanpsize,q_wait,q_setbit, " 
