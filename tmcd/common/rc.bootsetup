@@ -333,7 +333,7 @@ sub doboot()
     #
     # Start the elvin proxy.
     #
-    if (-x "$BINDIR/evproxy" && !(REMOTE() && !REMOTEDED())) {
+    if (-x "$BINDIR/evproxy" && !(REMOTE() && !REMOTEDED()) && !GENVNODE()) {
 	my $eventserver = "event-server";
         if (REMOTE()) {
             $eventserver = TB_EVENTSERVER();
