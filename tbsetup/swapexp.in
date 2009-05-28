@@ -18,7 +18,7 @@ use POSIX qw(isatty setsid);
 sub usage()
 {
     print(STDERR
-	  "Usage: swapexp [-q] [-b | -w] [-i | -a | -f] [-r] [-e]\n".
+	  "Usage: swapexp [-q] [-b | -w] [-i | -a | -f] [-r] [-e] [-N]\n".
 	  "               <-s in | out | restart | modify | pause>\n".
 	  "               <pid> <eid> [<nsfile>]\n".
 	  "switches and arguments:\n".
@@ -27,12 +27,13 @@ sub usage()
 	  "-r       - reboot nodes when doing a modify experiment\n".
 	  "-e       - restart event scheduler when doing a modify experiment\n".
 	  "-s <op>  - Operation to perform; one of those listed above\n".
+	  "-N       - Suppress most email to the user and testbed-ops\n".
 	  "<pid>    - The project the experiment belongs to\n".
 	  "<eid>    - The experiment name (id)\n".
 	  "<nsfile> - Optional NS file to parse for experiment modify\n");
     exit(-1);
 }
-my  $optlist = "biafres:wqxg";
+my  $optlist = "biafres:wqxgN";
 
 #
 # Exit codes are important; they tell the web page what has happened so
@@ -110,6 +111,7 @@ my $modifyHosed   = 0;
 my $modifySwapped = 0;
 my $robotexp = 0;
 my $template_node = 0;
+my $noemail      = 0;
 
 my $inout;
 my $logfile;
@@ -183,6 +185,9 @@ if (defined($options{"q"})) {
 }
 if (defined($options{"x"})) {
     $template_mode = 1;
+}
+if (defined($options{"N"})) {
+    $noemail = 1;
 }
 if (defined($options{"s"})) {
     $inout = $options{"s"};
@@ -1310,12 +1315,13 @@ $message .=
     "Appended below is the output. If you have any questions or comments,\n" .
     "please include the output in your message to $TBOPS\n";
 
-SENDMAIL("$user_name <$user_email>",
+SENDMAIL(($noemail ? $TBLOGS : "$user_name <$user_email>") ,
 	 "Experiment $pid/$eid \u$action",
 	 $message,
 	 ($idleswap ? $TBOPS : "$user_name <$user_email>"),
-	 "Cc:  $expt_head_name <$expt_head_email>\n".
-	 "Bcc: $TBLOGS",
+	 ($noemail ? ""
+	  : "Cc:  $expt_head_name <$expt_head_email>\n".
+	    "Bcc: $TBLOGS"),
 	 (($inout eq "restart") ? ($logname) :
 	  (($repfile, $logname), (defined($nsfile) ? ($nsfile) : ()))));
 
@@ -1458,7 +1464,8 @@ sub cleanup()
 			  "Cc:  $expt_head_name <$expt_head_email> $rcops",
 			  "Cc:  $TBOPS $rcops",
 			  $modifyError,
-			  (($logname), (defined($modnsfile) ? ($modnsfile) : ())));
+			  (($logname), (defined($modnsfile) ? ($modnsfile) : ())))
+	    unless $noemail;
     }
 	
     if ($modifyHosed) {

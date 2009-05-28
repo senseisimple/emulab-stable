@@ -31,7 +31,7 @@ use Errno qw(EDQUOT);
 sub usage()
 {
     print(STDERR
-	  "Usage: batchexp [-q] [-i [-w]] [-n] [-f] [-E description] [-g gid]\n".
+	  "Usage: batchexp [-q] [-i [-w]] [-n] [-f] [-N] [-E description] [-g gid]\n".
 	  "                [-S reason] [-L reason] [-a <time>] [-l <time>]\n".
 	  "                -p <pid> -e <eid> <nsfile>\n".
 	  "switches and arguments:\n".
@@ -49,6 +49,7 @@ sub usage()
 	  "-p <pid> - The project in which to create the experiment\n".
 	  "-g <gid> - The group in which to create the experiment\n".
 	  "-e <eid> - The experiment name (unique, alphanumeric, no blanks)\n".
+	  "-N       - Suppress most email to the user and testbed-ops\n".
 	  "<nsfile> - NS file to parse for experiment.\n");
     exit(-1);
 }
@@ -58,7 +59,7 @@ sub CheckCopyArgs();
 sub CopyInArchive();
 sub fatal($;$);
 
-my $optlist = "iE:g:e:p:S:L:a:l:sfwqt:nzc:bx:y:h:jk";	# Enough options?
+my $optlist = "iE:g:e:p:S:L:a:l:sfwqt:nzc:bx:y:h:jkN";	# Enough options?
 my $batchmode= 1;
 my $frontend = 0;
 my $waitmode = 0;
@@ -161,6 +162,7 @@ my $now          = localtime();
 my $committed    = 0;
 my $experiment;
 my $copy_experiment;
+my $noemail      = 0;
 
 #
 # Verify user and get his DB uid and other info for later.
@@ -658,7 +660,7 @@ if (! ($frontend || $batchmode)) {
 	    DBQueryFatal("select pid from virt_lans ".
 			 "where pid='$pid' and eid='$eid'");
     
-	if (!$vlans_result->numrows) {
+	if (!$vlans_result->numrows && !$noemail) {
 	    SENDMAIL("$user_name <$user_email>",
 		     "WARNING: Experiment Configuration: $pid/$eid",
 		     "This experiment has zero network links defined.\n".
@@ -801,12 +803,12 @@ $message .=
     "have any questions or comments, please include the output below\n" .
     "in your message to $TBOPS";
 
-SENDMAIL("$user_name <$user_email>",
+SENDMAIL(($noemail ? $TBLOGS : "$user_name <$user_email>"),
 	 "New Experiment " . (($frontend == 0) ? "Started" : "Created") .
 	 ": $pid/$eid",
 	 $message,
 	 "$user_name <$user_email>",
-	 "Bcc: $TBLOGS",
+	 ($noemail ? "" : "Bcc: $TBLOGS"),
 	 ($repfile, $logname, $nsfile))
     if (!$zeemode);
 
@@ -893,7 +895,8 @@ sub cleanup()
 			  "",
 			  "Cc: $TBOPS",
 			  "",
-			  ($logname, "assign.log", "wanassign.log", $nsfile));
+			  ($logname, "assign.log", "wanassign.log", $nsfile))
+	    unless $noemail;
     } 	
 	
     #
@@ -1163,6 +1166,9 @@ sub ParseArgs()
 		tbdie("No such template instance $instance_idx");
 	    }
 	}
+    }
+    if (defined($options{"N"})) {
+	$noemail = 1;
     }
 }
 

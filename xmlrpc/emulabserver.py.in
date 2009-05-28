@@ -1212,8 +1212,12 @@ class experiment:
                     return EmulabResponse(RESPONSE_SERVERERROR,
                                          output="Server Error")
                 pass
+            elif opt == "noemail":
+                if xbool(val):
+                    argstr += " -N "
+                    pass
+                pass
             pass
-
         if nsfilename:
             argstr += " " + nsfilename
             pass
@@ -1270,6 +1274,11 @@ class experiment:
             if opt == "wait":
                 if xbool(val):
                     argstr += " -w "
+                    pass
+                pass
+            elif opt == "noemail":
+                if xbool(val):
+                    argstr += " -N "
                     pass
                 pass
             pass
@@ -1350,6 +1359,11 @@ class experiment:
                     return EmulabResponse(RESPONSE_SERVERERROR,
                                          output="Server Error")
                 pass
+            elif opt == "noemail":
+                if xbool(val):
+                    argstr += " -N "
+                    pass
+                pass
             pass
 
         argstr += " -s modify"
@@ -1401,6 +1415,11 @@ class experiment:
             if opt == "wait":
                 if xbool(val):
                     argstr += " -w "
+                    pass
+                pass
+            elif opt == "noemail":
+                if xbool(val):
+                    argstr += " -N "
                     pass
                 pass
             pass

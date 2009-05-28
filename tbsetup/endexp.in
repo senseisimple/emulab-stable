@@ -23,22 +23,24 @@ use strict;
 sub usage()
 {
     print(STDERR
-	  "Usage: endexp [-q] [-p] [-b | -w] <eid>\n".
+	  "Usage: endexp [-q] [-p] [-b | -w] [-N] <eid>\n".
 	  "switches and arguments:\n".
 	  "-w       - wait for non-batchmode experiment terminate\n".
 	  "-q       - be less chatty\n".
+	  "-N       - Suppress most email to the user and testbed-ops\n".
 	  "<eid>    - The experiment id\n");
     exit(-1);
 }
 
 sub fatal($;$);
 
-my $optlist  = "bwqxp";
+my $optlist  = "bwqxpN";
 my $waitmode = 0;
 my $batch    = 0;
 my $quiet    = 0;
 my $purge    = 0;
 my $template_mode = 0;
+my $noemail  = 0;
 
 #
 # Exit codes are important; they tell the web page what has happened so
@@ -127,6 +129,9 @@ if (defined($options{"q"})) {
 }
 if (defined($options{"x"})) {
     $template_mode = 1;
+}
+if (defined($options{"N"})) {
+    $noemail = 1;
 }
 usage()
     if ($waitmode && $batch);
@@ -521,12 +526,14 @@ my $message =
     "Experiment `$eid' in project `$pid' has been terminated.\n" .
     "You may now reuse `$eid' as an experiment name.\n";
 
-SENDMAIL("$user_name <$user_email>",
+SENDMAIL(($noemail ? $TBLOGS : "$user_name <$user_email>"),
 	 "Experiment $pid/$eid Terminated",
 	 $message,
 	 "$user_name <$user_email>",
-	 "Cc:  $expt_head_name <$expt_head_email>\n".
-	 "Bcc: $TBLOGS", ($logname));
+	 ($noemail ? "" 
+	  : "Cc:  $expt_head_name <$expt_head_email>\n".
+	    "Bcc: $TBLOGS"), 
+         ($logname));
 
 exit 0;
 

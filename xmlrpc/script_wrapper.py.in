@@ -1205,7 +1205,7 @@ class startexp:
     def apply(self):
         try:
             opts, req_args = getopt.getopt(self.argv,
-                                           "iwfqS:L:a:l:E:g:p:e:",
+                                           "iwfqS:L:a:l:E:g:p:e:N",
                                            [ "help" ]);
             pass
         except getopt.error, e:
@@ -1253,6 +1253,9 @@ class startexp:
             elif opt == "-w":
                 params["wait"] = "yes"
                 pass
+            elif opt == "-N":
+                params["noemail"] = "yes"
+                pass
             pass
 
         # Do this after so --help is seen.
@@ -1272,7 +1275,7 @@ class startexp:
         return rval;
 
     def usage(self):
-        print "startexp [-q] [-i [-w]] [-f] [-E description] [-g gid]";
+        print "startexp [-q] [-i [-w]] [-f] [-N] [-E description] [-g gid]";
         print "         [-S reason] [-L reason] [-a <time>] [-l <time>]";
         print "         -p <pid> -e <eid> <nsfile>";
 	print "where:";
@@ -1288,6 +1291,7 @@ class startexp:
         print "   -g   - The subgroup in which to create the experiment";
         print "   -p   - The project in which to create the experiment";
         print "   -e   - The experiment name (unique, alphanumeric, no blanks)";
+	print "   -N   - Suppress most email to the user and testbed-ops";
         print "nsfile  - NS file to parse for experiment";
         wrapperoptions();
         return
@@ -1303,7 +1307,7 @@ class swapexp:
 
     def apply(self):
         try:
-            opts, req_args = getopt.getopt(self.argv, "we:s:", [ "help" ]);
+            opts, req_args = getopt.getopt(self.argv, "wNe:s:", [ "help" ]);
             pass
         except getopt.error, e:
             print e.args[0]
@@ -1317,6 +1321,9 @@ class swapexp:
                 return 0
             elif opt == "-w":
                 params["wait"] = "yes"
+                pass
+            elif opt == "-N":
+                params["noemail"] = "yes"
                 pass
             elif opt == "-s":
                 params["direction"] = val
@@ -1358,6 +1365,7 @@ class swapexp:
 	print "where:";
 	print "     -w   - Wait for experiment to finish swapping";
  	print "     -e   - Project and Experiment ID";
+	print "     -N   - Suppress most email to the user and testbed-ops";
         print "     in   - Swap experiment in  (must currently be swapped out)";
         print "    out   - Swap experiment out (must currently be swapped in)";
         print ""
@@ -1378,7 +1386,7 @@ class modexp:
 
     def apply(self):
         try:
-            opts, req_args = getopt.getopt(self.argv, "rswe:", [ "help" ]);
+            opts, req_args = getopt.getopt(self.argv, "rswNe:", [ "help" ]);
             pass
         except getopt.error, e:
             print e.args[0]
@@ -1398,6 +1406,9 @@ class modexp:
                 pass
             elif opt == "-s":
                 params["restart_eventsys"] = "yes"
+                pass
+            elif opt == "-N":
+                params["noemail"] = "yes"
                 pass
             elif opt == "-e":
                 pid,eid = string.split(val, ",")
@@ -1438,13 +1449,14 @@ class modexp:
         return rval;
 
     def usage(self):
-	print "modexp [-r] [-s] [-w] -e pid,eid nsfile";
-	print "modexp [-r] [-s] [-w] pid eid nsfile";
+	print "modexp [-r] [-s] [-w] [-N] -e pid,eid nsfile";
+	print "modexp [-r] [-s] [-w] [-N] pid eid nsfile";
 	print "where:";
 	print "     -w   - Wait for experiment to finish swapping";
  	print "     -e   - Project and Experiment ID";
         print "     -r   - Reboot nodes (when experiment is active)";
         print "     -s   - Restart event scheduler (when experiment is active)";
+	print "     -N   - Suppress most email to the user and testbed-ops";
         print ""
         print "By default, modexp runs in the background, sending you email ";
         print "when the transition has completed. Use the -w option to wait";
@@ -1469,7 +1481,7 @@ class endexp:
 
     def apply(self):
         try:
-            opts, req_args = getopt.getopt(self.argv, "we:", [ "help" ]);
+            opts, req_args = getopt.getopt(self.argv, "wNe:", [ "help" ]);
             pass
         except getopt.error, e:
             print e.args[0]
@@ -1483,6 +1495,9 @@ class endexp:
                 return 0
             elif opt == "-w":
                 params["wait"] = "yes"
+                pass
+            elif opt == "-N":
+                params["noemail"] = "yes"
                 pass
             elif opt == "-e":
                 pid,eid = string.split(val, ",")
@@ -1511,11 +1526,12 @@ class endexp:
         return rval;
 
     def usage(self):
-	print "endexp [-w] -e pid,eid";
-	print "endexp [-w] pid eid";
+	print "endexp [-w] [-N] -e pid,eid";
+	print "endexp [-w] [-N] pid eid";
 	print "where:";
 	print "     -w   - Wait for experiment to finish terminating";
  	print "     -e   - Project and Experiment ID";
+	print "     -N   - Suppress most email to the user and testbed-ops";
         print ""
         print "By default, endexp runs in the background, sending you email ";
         print "when the transition has completed. Use the -w option to wait";
