@@ -3849,14 +3849,15 @@ sub LoadPhysInfo()
     while (my ($iface_type, $node_type) = $query_result->fetchrow()) {
 	my $node_class = nodetypeclass($node_type);
 
+	if (!defined($interface_capabilities{$iface_type}->{"protocols"})) {
+	    tbinfo("No protocols listed in capabilities for $iface_type!\n");
+	    next;
+	}
 	$node_type_linkbw{$node_type} = {}
 	    if (!defined($node_type_linkbw{$node_type}));
 	$node_type_linkbw{$node_class} = {}
 	    if (!defined($node_type_linkbw{$node_class}));
 
-	if (!defined($interface_capabilities{$iface_type}->{"protocols"})) {
-	    fatal("No protocols listed in capabilities for $iface_type!");
-	}
 	my @protolist =
 	    split(",", $interface_capabilities{$iface_type}->{"protocols"});
 
