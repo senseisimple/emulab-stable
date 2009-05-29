@@ -46,8 +46,11 @@ my $SLICESHUTDOWN  = "$TB/sbin/protogeni/shutdownslice";
 #
 sub GetCredential($)
 {
+    # FIXME once migration to URNs is complete, $uuid should be removed,
+    # and $type automatically deduced from the URN.
     my ($argref) = @_;
     my $uuid = $argref->{'uuid'};
+    my $urn = $argref->{'urn'};
     my $cred = $argref->{'credential'};
     my $type = $argref->{'type'};
     
@@ -71,6 +74,9 @@ sub GetCredential($)
 	#
 	# This credential is for access to this SA.
 	#
+	# FIXME We need to update this to use authority and user URNs,
+	# not UUIDs.  But that will require more thought to avoid
+	# breaking stuff.
 	my $authority = GeniAuthority->Lookup($ENV{'MYUUID'});
 	if (!defined($authority)) {
 	    print STDERR "Could not find local authority object\n";
@@ -88,9 +94,14 @@ sub GetCredential($)
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS,
 				    $credential->asString());
     }
-    if (! (defined($uuid) && ($uuid =~ /^[-\w]*$/))) {
-	return GeniResponse->MalformedArgsResponse();
-    }
+    # Currently accept either a UUID or a URN, but not both.  Once we
+    # have migrated the federation to URNs, UUID support will be removed.
+    return GeniResponse->MalformedArgsResponse()
+	if( defined( $uuid ) == defined( $urn ) );
+    return GeniResponse->MalformedArgsResponse()
+	if( defined( $uuid ) && $uuid !~ /^[-\w]*$/ );
+    return GeniResponse->MalformedArgsResponse()
+	if( defined( $urn ) && !GeniHRN::IsValid( $urn ) );
 
     my $credential = GeniCredential->CreateFromSigned($cred);
     if (!defined($credential)) {
@@ -131,10 +142,10 @@ sub GetCredential($)
     
     #
     # User provided a credential, and wants a new credential to access
-    # the object referenced by the uuid.
+    # the object referenced by the URN.
     #
     if ($type eq "Slice") {
-	my $slice = GeniSlice->Lookup($uuid);
+	my $slice = GeniSlice->Lookup( defined( $urn ) ? $urn : $uuid );
 	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
 				    "No such Slice")
 	    if (!defined($slice));
@@ -297,6 +308,9 @@ sub Resolve($)
 		     "uuid"         => $slice->uuid(),
 		     "creator_uuid" => $slice->creator_uuid(),
 		     "gid"          => $slice->cert(),
+		     "urn"          => GeniHRN::Generate( $OURDOMAIN,
+							  "slice",
+							  $slice->slicename() )
 		 };
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
     }
@@ -312,6 +326,8 @@ sub Resolve($)
 #
 sub Register($)
 {
+    # FIXME once migration to URNs is complete, $type should be removed
+    # (it's deduced automatically from the URN).
     my ($argref) = @_;
     my $cred  = $argref->{'credential'};
     my $type  = $argref->{'type'};
@@ -321,10 +337,22 @@ sub Register($)
 	return GeniResponse->MalformedArgsResponse();
     }
 
-    if (! ($hrn =~ /^[-\w\.]*$/)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "hrn: Invalid characters");
+    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				"Invalid URN")
+	if( !GeniHRN::IsValid( $hrn ) && $hrn !~ /^[-\w\.]*$/);
+
+    if( GeniHRN::IsValid( $hrn ) ) {
+	my ($auth,$t,$id) = GeniHRN::Parse( $hrn );
+
+	return GeniResponse->Create( GENIRESPONSE_ERROR, undef,
+				     "Authority mismatch" )
+	    if( $auth ne $OURDOMAIN );
+	
+	$type = $t;
+
+	$hrn = $id;
     }
+
     my $credential = GeniCredential->CreateFromSigned($cred);
     if (!defined($credential)) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
@@ -367,10 +395,10 @@ sub Register($)
 				    undef, "Who are you?");
     }
     
-    if ($type eq "Slice") {
+    if ( lc( $type ) eq "slice") {
 	my $userbindings = $argref->{'userbindings'};
 	
-	if (! ($hrn =~ /^\w*$/)) {
+	if (! ($hrn =~ /^[-\w]+$/)) {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					"hrn: Single token only please");
 	}
@@ -484,11 +512,28 @@ sub Register($)
 #
 sub Remove($)
 {
+    # FIXME once migration to URNs is complete, $type should be removed
+    # (it's deduced automatically from the URN).  $uuid should die, too.
     my ($argref) = @_;
     my $uuid = $argref->{'uuid'};
     my $hrn  = $argref->{'hrn'};
     my $cred = $argref->{'credential'};
-    my $type = $argref->{'type'};
+    my $type = lc( $argref->{'type'} );
+
+    if( defined( $hrn ) && GeniHRN::IsValid( $hrn ) ) {
+	# this is pretty ugly, but since this section will have to be
+	# cleaned up eventually to remove support for deprecated HRNs,
+	# it will do for now.
+	my ($auth,$t,$id) = GeniHRN::Parse( $hrn );
+
+	return GeniResponse->Create( GENIRESPONSE_ERROR, undef,
+				     "Authority mismatch" )
+	    if( $auth ne $OURDOMAIN );
+
+	$type = lc( $t );
+	
+	$hrn = $id;
+    }
 
     if (! (defined($uuid) || defined($hrn))) {
 	return GeniResponse->MalformedArgsResponse();
@@ -499,7 +544,7 @@ sub Remove($)
     if (defined($hrn) && !($hrn =~ /^[-\w\.]*$/)) {
 	return GeniResponse->MalformedArgsResponse();
     }
-    if (! (defined($type) && ($type =~ /^(SA|MA|Component|Slice|User)$/))) {
+    if (! (defined($type) && ($type =~ /^(sa|ma|component|slice|user)$/))) {
 	return GeniResponse->MalformedArgsResponse();
     }
     if (! defined($cred)) {
@@ -548,7 +593,7 @@ sub Remove($)
 				    undef, "Who are you?");
     }
     
-    if ($type eq "Slice") {
+    if ($type eq "slice") {
 	my $slice;
 	
 	if (defined($uuid)) {

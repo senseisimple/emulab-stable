@@ -53,7 +53,7 @@ sub mysystem($)
 }
 
 #
-# Lookup by idx or uuid.
+# Lookup by idx, URN or uuid.
 #
 sub Lookup($$)
 {

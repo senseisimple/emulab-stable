@@ -208,7 +208,6 @@ def get_self_credential():
         f.close()
         return c
     params = {}
-    params["uuid"] = "0b2eb97e-ed30-11db-96cb-001143e453fe"
     rval,response = do_method("sa", "GetCredential", params)
     if rval:
         Fatal("Could not get my credential")
@@ -237,7 +236,10 @@ def get_slice_credential( slice, selfcredential ):
     params = {}
     params["credential"] = selfcredential
     params["type"]       = "Slice"
-    params["uuid"]       = slice["uuid"]
+    if "urn" in slice:
+        params["urn"]       = slice["urn"]
+    else:
+        params["uuid"]       = slice["uuid"]
     rval,response = do_method("sa", "GetCredential", params)
     if rval:
         Fatal("Could not get Slice credential")

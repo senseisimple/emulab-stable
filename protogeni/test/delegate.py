@@ -155,10 +155,6 @@ c.appendChild( Lookup( old, "target_gid" ).cloneNode( True ) )
 
 c.appendChild( SimpleNode( doc, "uuid", str( uuid.uuid4() ) ) )
 
-t = datetime.datetime.utcnow() + datetime.timedelta( hours = 6 )
-t = t.replace( microsecond = 0 )
-c.appendChild( SimpleNode( doc, "expires", t.isoformat() ) )
-
 for n in old.childNodes:
     if n.nodeName in ( "privileges", "capabilities" ):
         if len( args ) > 2:
@@ -193,7 +189,7 @@ for n in old.childNodes:
                     # a privilege which cannot be delegated: delete it
                     # from the clone
                     clone.removeChild( child )
-    elif n.nodeName in ( "ticket", "extensions" ):
+    elif n.nodeName in ( "ticket", "extensions", "expires" ):
         c.appendChild( n.cloneNode( True ) )
 
 doc.documentElement.replaceChild( c, old )
