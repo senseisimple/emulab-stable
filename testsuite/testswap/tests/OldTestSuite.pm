@@ -1,6 +1,6 @@
-package Testbed::OldTestSuite;
+package OldTestSuite;
 
-our $data = {
+our $tests = {
           'frontend' => {},
           'cbr' => {
                      'info' => 'Test UDP and a TCP agent/CBR. Also throw in some events to start/stop

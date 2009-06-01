@@ -30,64 +30,60 @@ sub args {
   return { 'pid' => $pid, 'gid' => $gid, 'eid' => $eid, @_ };
 }
 
-sub retry_on_TIMEOUT(&) {
-  my ($sub) = @_;
+sub retry_on_TIMEOUT(&$) {
+  my ($sub, $message) = @_;
 RETRY: 
   { 
     my $result = eval { $sub->(); };
     if ($@ && $@ =~ /SSL_SOCKET_TIMEOUT/) {
-      warn "SSL_SOCKET_TIMEOUT after $TBConfig::XMLRPC_SERVER_TIMEOUT seconds";
+      warn "SSL_SOCKET_TIMEOUT after $TBConfig::XMLRPC_SERVER_TIMEOUT seconds in $message";
       redo RETRY;
     }
     $result;
   }
 }
 
+sub noemail        { @TBConfig::EXPERIMENT_OPS_PARAMS; }
 sub echo           { shift->augment_output( 'str' => shift ); }
 sub getlist_brief  { shift->augment( 'format' => 'brief'); }
 sub getlist_full   { shift->augment( 'format' => 'full' ); }
-sub batchexp_ns    { shift->augment_code( 'nsfilestr' => shift, @_ ); }
-sub modify_ns      { shift->augment_code( 'nsfilestr' => shift, @_ ); }
-sub swapin         { shift->augment_func_code( 'swapexp', 'direction' => 'in' ); }
-sub swapout        { shift->augment_func_code( 'swapexp', 'direction' => 'out' ); }
-sub end            { shift->augment_func_code( 'endexp' ); }
+sub batchexp_ns    { shift->augment_code( 'nsfilestr' => shift, 'noswapin' =>1, noemail, @_ ); }
+sub modify_ns      { shift->augment_code( 'nsfilestr' => shift, noemail, @_ ); }
+sub swapin         { shift->augment_func_code( 'swapexp', noemail, 'direction' => 'in' ); }
+sub swapout        { shift->augment_func_code( 'swapexp', noemail, 'direction' => 'out' ); }
+sub end            { shift->augment_func_code( 'endexp', noemail); }
 sub nodeinfo       { parseNodeInfo(shift->augment_func_output('expinfo', 'show' => 'nodeinfo')); }
-sub waitforactive  { my $e = shift; retry_on_TIMEOUT { $e->augment_func_code('waitforactive', @_) }; }
-sub waitforswapped { my $e = shift; retry_on_TIMEOUT { $e->augment_func_code( 'statewait', 'state' => 'swapped' ) }; }
+sub waitforactive  { my $e = shift; retry_on_TIMEOUT { $e->augment_func_code('waitforactive', @_) } 'waitforactive'; }
+sub waitforswapped { my $e = shift; retry_on_TIMEOUT { $e->augment_func_code( 'statewait', 'state' => 'swapped' ) } 'waitforswapped'; }
 
 sub startexp_ns { batchexp_ns(@_, 'batch' => 0); }
 sub startexp_ns_wait { batchexp_ns_wait(@_, 'batch' => 0); }
 
 sub create_and_get_metadata {
   my $self = shift;
-  $self->startexp_ns(@_, 'noswapin' => 1, 'wait' => 1);
+  $self->startexp_ns_wait(shift);
   $self->metadata;
 }
 
-sub batchexp_ns_wait { 
-  my $self = shift;
-  my $rc = $self->batchexp_ns(@_);
-  if ($rc) { return $rc }
-  $self->waitforactive;
-}
+sub batchexp_ns_wait { shift->batchexp_ns(@_,'wait' => 1); }
 
 use constant EXPERIMENT_NAME_ALREADY_TAKEN => 2;
 sub ensure_active_ns {
   my $self = shift;
-  my $rc = $self->batchexp_ns(@_);
+  my $rc = $self->startexp_ns_wait(@_);
   if ($rc && $rc != EXPERIMENT_NAME_ALREADY_TAKEN) { return $rc }
-  $self->waitforactive;
+  $self->swapin_wait;
 }
 
 sub swapin_wait { 
   my $self = shift;
-  $self->augment_func_code( 'swapexp', 'direction' => 'in',  'wait' => 1 );
+  $self->augment_func_code( 'swapexp', 'direction' => 'in',  'wait' => 1, noemail );
   $self->waitforactive;
 }
 
 sub swapout_wait { 
   my $self = shift;
-  $self->augment_func_code( 'swapexp', 'direction' => 'out',  'wait' => 1 );
+  $self->augment_func_code( 'swapexp', 'direction' => 'out',  'wait' => 1, noemail );
   $self->waitforswapped
 }
 

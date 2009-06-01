@@ -1,0 +1,61 @@
+HOWTO write a parallel test.
+
+1. create a perl module in tests/ e.g. test/BasicTopologies.pm
+
+  TestBed::TestStute provides the rege (register experiment for parallel execution) function
+  rege has the following signature
+  rege($eid, $ns_file_contents, $test_body_sub, $number_of_tests_in_test_body, $test_description);
+
+  when the experiment is swapped in $test_body_sub will get called with a single argument $e, the TestBed::TestSuite::Experiement object.
+
+  EXTRA DETAILS:
+    SemiModern::Perl   provides the say function and turns on strict and warnings;
+    TestBed::TestSuite provides the rege constructor function
+    BasicNSs           provides some common $ns_file_contents
+    Test::More         provides Perl's basic test functions
+    Perl Modules should end with a single statement, e.g.  1;
+    DO NOT give Test::More any use argumentes i.e. 
+      use Test::More tests => 1;  # DO NOT DO THIS, parallel tests in tests/ may be ran with othere testsuites.
+      specify the number of test in the rege call.
+
+3. run the set of parallel tests 
+  ./tbts test/BasicTopologies.pm
+
+
+### test/BasicTopologies.pm ### 
+
+#!/usr/bin/perl
+use SemiModern::Perl;
+use TestBed::TestSuite;
+use BasicNSs;
+use Test::More;
+
+my $linkupdowntest = sub {
+  my ($e) = @_;
+  my $eid = $e->eid;
+  ok($e->linktest, "$eid linktest");
+
+  ok($e->link("link1")->down, "link down");
+  sleep(2);
+
+  my $n1ssh = $e->node("node1")->ssh;
+  ok($n1ssh->cmdfailuredump("ping -c 5 10.1.2.3"));
+
+  ok($e->link("link1")->up, "link up");
+  sleep(2);
+  ok($n1ssh->cmdsuccessdump("ping -c 5 10.1.2.3"));
+};
+
+rege('linkupdown', $BasicNSs::TwoNodeLanWithLink, $linkupdowntest, 5, 'link up and down with ping on link');
+
+my $twonodelan5Mbtest = sub {
+  my ($e) = @_;
+  my $eid = $e->eid;
+  ok($e->linktest, "$eid linktest");
+};
+
+rege('2nodelan5Mb', $BasicNSs::TwoNodeLan5Mb, $twonodelan5Mbtest, 1, 'two node 5mb lan pingswapkill');
+rege('singlenode', $BasicNSs::SingleNode, sub { ok(shift->pingswapkill); }, 1, 'single node pingswapkill');
+rege('2nodelan', $BasicNSs::TwoNodeLan, sub { ok(shift->pingswapkill); }, 1, 'two node lan pingswapkill');
+
+1;

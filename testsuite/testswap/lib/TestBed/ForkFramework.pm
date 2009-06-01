@@ -66,6 +66,29 @@ sub in              { shift->pipes->[0]; }
 sub out             { shift->pipes->[1]; }
 sub err             { shift->pipes->[2]; }
 
+package TestBed::ForkFramework;
+sub redir_fork {
+  my ($worker) = @_;
+  my $redir = TestBed::ForkFramework::Redir::build;
+
+  if ( my $pid = fork ) {
+    #Parent
+    my $handles = $redir->parentAfterFork;
+    return (@$handles, $pid);
+  }
+  else {
+    #Child
+    $redir->childAfterFork;
+    
+    use POSIX '_exit';
+    eval q{END { _exit 0 }};
+  
+    $worker->();
+
+    CORE::exit;
+  }
+}
+
 package TestBed::ForkFramework::Scheduler;
 use SemiModern::Perl;
 use Mouse;

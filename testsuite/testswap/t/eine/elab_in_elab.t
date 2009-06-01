@@ -33,6 +33,8 @@ sub run_inside_exper {
   my $boss_name = $e->node('myboss.eine.tbres.emulab.net')->name;
   my $boss_url = "https://$boss_name:3069/usr/testbed";
   say $boss_url;
-  ok(!system("./tbts -x -v https://$boss_url/usr/testbed t/xmlrpc/experiment.t"), 'eine single node experiment');
+  my $cmd = "./tbts -d -x '$boss_url' t/xmlrpc/experiment.t";
+  say $cmd;
+  ok(!system($cmd), 'eine single node experiment');
 }
 run_inside_exper;

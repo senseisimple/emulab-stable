@@ -31,8 +31,9 @@ use SemiModern::Perl;
 use TestBed::ParallelRunner::Test;
 use TestBed::ForkFramework;
 use Data::Dumper;
+use Mouse;
 
-my $ExperimentTests = [];
+our $ExperimentTests = [];
 
 my $teste_desc = <<'END';
 Not enough arguments to teste
@@ -44,12 +45,12 @@ END
 sub add_experiment { push @$ExperimentTests, TestBed::ParallelRunner::Test::tn(@_); }
 
 sub runtests {
-  #prep step
-#  say "Prepping";
-  my $result = TestBed::ForkFramework::MaxWorkersScheduler::work(4, sub { 
-    #return { 'maximum_nodes' => 3};  
-    $_[0]->prep 
-  }, $ExperimentTests);
+  my ($concurrent_pre_runs, $concurrent_node_count_usage ) = @_;
+  $concurrent_pre_runs ||= 4;
+  $concurrent_node_count_usage ||= 20;
+
+  #prerun step
+  my $result = TestBed::ForkFramework::MaxWorkersScheduler::work($concurrent_pre_runs, sub { $_[0]->prep }, $ExperimentTests);
   if ($result->[0]) {
     sayd($result->[2]);
     die 'TestBed::ParallelRunner::runtests died during test prep';
@@ -58,7 +59,12 @@ sub runtests {
   #create schedule step
   my @weighted_experiements;
   for (@{$result->[1]}) {
-    push @weighted_experiements, [ $_->[0]->{'maximum_nodes'}, $_->[1] ];
+    my ($hash, $item_id) = @$_;
+    my $maximum_nodes = $hash->{'maximum_nodes'};
+    my $eid = $ExperimentTests->[$item_id]->e->eid;
+    #say "$eid $item_id $maximum_nodes";
+
+    push @weighted_experiements, [ $maximum_nodes, $item_id ];
   }
   @weighted_experiements = sort { $a->[0] <=> $b->[0] } @weighted_experiements;
 
@@ -66,14 +72,18 @@ sub runtests {
   my $test_count = 0;
   map { $test_count += $_->test_count } @$ExperimentTests;
 
-#  say "Running";
+  #run tests
   reset_test_builder($test_count, no_numbers => 1);
-  $result = TestBed::ForkFramework::RateScheduler::work(20, \&tap_wrapper, \@weighted_experiements, $ExperimentTests);
+  $result = TestBed::ForkFramework::RateScheduler::work($concurrent_node_count_usage, \&tap_wrapper, \@weighted_experiements, $ExperimentTests);
+  set_test_builder_to_end_state($test_count);
+  return;
+}
+
+sub set_test_builder_to_end_state {
+  my ($test_count, %options) = @_;
   use Test::Builder;
   my $b = Test::Builder->new;
   $b->current_test($test_count); 
-  #sayd($result);
-  return;
 }
 
 sub reset_test_builder {
@@ -124,6 +134,12 @@ sub tap_wrapper {
     $te->run_ensure_kill;
   }
   return 0;
+}
+
+sub build_TAP_stream {
+  use TestBed::TestSuite;
+  my ($in, $out, $err, $pid) = TestBed::ForkFramework::redir_fork(sub { runtests; });
+  return TAP::Parser::Iterator::StdOutErr->new($out, $err, $pid);
 }
 
 1;

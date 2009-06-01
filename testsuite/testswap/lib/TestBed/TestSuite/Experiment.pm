@@ -187,16 +187,19 @@ sub linkdown {
 
 catches exceptions while a test is running and cleans up the experiment
 =cut
+use constant TRYTEST_SUCCES  => 1;
+use constant TRYTEST_FAILURE => 0;
 sub trytest(&$) {
   my ($sub, $e) = @_;
   eval {$sub->()};
   if ($@) {
     say $@;
-    $e->end;
-    0; 
+    eval {$e->end};
+    if ($@) { my $eid = $e->eid; warn "finally cleanup of $eid failed in trytest";}
+    TRYTEST_FAILURE; 
   }
   else {
-    1;
+    TRYTEST_SUCCES;
   }
 }
 
@@ -210,7 +213,7 @@ sub startrunkill {
   my ($e, $ns, $worker) = @_;
   my $eid = $e->eid;
   trytest {
-    $e->startexp_ns_wait($ns) && die "batchexp $eid failed";
+    $e->ensure_active_ns($ns) && die "batchexp $eid failed";
     $worker->($e)             || die "worker function failed";
     $e->end                   && die "exp end $eid failed";
   } $e;
@@ -219,7 +222,7 @@ sub startrunkill {
 sub startrun {
   my ($e, $ns, $worker) = @_;
   my $eid = $e->eid;
-  $e->startexp_ns_wait($ns) && die "batchexp $eid failed";
+  $e->ensure_active_ns($ns) && die "batchexp $eid failed";
   $worker->($e)             || die "worker function failed";
 }
 
@@ -231,7 +234,7 @@ sub launchpingkill {
   my ($e, $ns) = @_;
   my $eid = $e->eid;
   trytest {
-    $e->startexp_ns_wait($ns) && die "batchexp $eid failed";
+    $e->ensure_active_ns($ns) && die "batchexp $eid failed";
     $e->ping_test             && die "connectivity test $eid failed";
     $e->end                   && die "exp end $eid failed";
   } $e;
@@ -247,7 +250,7 @@ sub launchpingswapkill {
   my ($e, $ns) = @_;
   my $eid = $e->eid;
 trytest {
-    $e->startexp_ns_wait($ns) && die "batchexp $eid failed";
+    $e->ensure_artive_ns($ns) && die "batchexp $eid failed";
     $e->ping_test             && die "connectivity test $eid failed";
     $e->swapout_wait          && die "swap out $eid failed";
     $e->swapin_wait           && die "swap in $eid failed";
@@ -256,7 +259,21 @@ trytest {
   } $e;
 }
 
-=item C<pingkill($e)>
+=item C<< $e->pingkill() >>
+
+method that runs a ping_test, and ends the experiment
+=cut
+sub pingkill {
+  my ($e, $ns) = @_;
+  my $eid = $e->eid;
+  trytest {
+    $e->ping_test             && die "connectivity test $eid failed";
+    $e->end                   && die "exp end $eid failed";
+  } $e;
+}
+
+
+=item C<< $e->pingswapkill() >>
 
 method that runs a ping_test, 
 swaps the experiment out and then back in, runs a ping test, and finally

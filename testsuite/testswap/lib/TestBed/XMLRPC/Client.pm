@@ -75,6 +75,9 @@ sub single_request {
   if ((!ref($resp)) && ($resp =~ /SSL \w+ timeout/)) {
     die "SSL_SOCKET_TIMEOUT";
   }
+  if ($resp->isa('RPC::XML::struct') && $resp->value->{'code'} != 0 ) {
+    die $resp;
+  }
   $resp;
 }
 

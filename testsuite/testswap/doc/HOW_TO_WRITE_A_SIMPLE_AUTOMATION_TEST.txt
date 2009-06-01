@@ -1,0 +1,74 @@
+HOWTO write a simple automation test.
+
+1. create a perl script in t/ e.g. t/topologies/link_up_link_down.t
+
+  TestBed::TestStute provides the e (experiment constructor) function
+  e has the following signatures
+  e($eid);
+  e($pid, $eid);
+  e($pid, $gid, $eid);
+
+  EXTRA DETAILS:
+    SemiModern::Perl   provides the say function and turns on strict and warnings
+    TestBed::TestSuite provides the e constructor function
+    BasicNSs           provides some common $ns_file_contents
+    Test::More         provides Perl's basic test functions
+
+    specify atest plan
+      use Test::More tests => 5;   #says there are 5 ok tests in this test script
+      use Test::More 'no_plan';    #says there is no predetermined plan, Test::More wont't ensure that 5 tests run, only that there are no failures.
+
+    my $ns = <<'NSEND';  #this is heredoc syntax that allows embedding of multiline text until the NSEND token is reached;
+
+    see lib/TestBed/XMLRPC/Client/Experiment.pm lib/TestBed/TestSuite/Experiment.pm for api details that you can use on an experiment.
+      pod2text lib/TestBed/XMLRPC/Client/Experiment.pm
+      pod2text lib/TestBed/TestSuite/Experiment.pm
+
+
+2. run the set of parallel tests 
+  ./tbts t/topologies/link_up_link_down.t
+
+
+### test/BasicTopologies.pm ### 
+
+#!/usr/bin/perl
+use SemiModern::Perl;
+use TestBed::TestSuite;
+use Test::More tests => 5;
+
+my $ns = <<'NSEND';
+source tb_compat.tcl
+
+set ns [new Simulator]
+
+set node1 [$ns node]
+set node2 [$ns node]
+
+set lan1 [$ns make-lan "$node1 $node2" 5Mb 20ms]
+
+set link1 [$ns duplex-link $node1 $node2 100Mb 50ms DropTail]
+
+$ns run
+NSEND
+
+my $eid='linkupdown';
+my $e = e($eid);
+
+$e->startexp_ns_wait($ns) && die "batchexp $eid failed";
+
+
+    ok($e->linktest, "$eid linktest");
+
+    ok($e->link("link1")->down, "link down");
+    sleep(2);
+
+    my $n1ssh = $e->node("node1")->ssh;
+    ok($n1ssh->cmdfailuredump("ping -c 5 10.1.2.3"));
+
+    ok($e->link("link1")->up, "link up");
+    sleep(2);
+    ok($n1ssh->cmdsuccessdump("ping -c 5 10.1.2.3"));
+
+
+$e->end                   && die "exp end $eid failed";
+
