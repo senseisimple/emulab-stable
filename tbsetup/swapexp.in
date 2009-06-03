@@ -9,6 +9,7 @@
 use English;
 use Getopt::Std;
 use POSIX qw(isatty setsid);
+use RPC::XML;
 
 #
 # This gets invoked from the Web interface.
@@ -33,7 +34,7 @@ sub usage()
 	  "<nsfile> - Optional NS file to parse for experiment modify\n");
     exit(-1);
 }
-my  $optlist = "biafres:wqxgN";
+my  $optlist = "biafres:wqxgNX";
 
 #
 # Exit codes are important; they tell the web page what has happened so
@@ -112,6 +113,7 @@ my $modifySwapped = 0;
 my $robotexp = 0;
 my $template_node = 0;
 my $noemail      = 0;
+my $xmlout       = 0;
 
 my $inout;
 my $logfile;
@@ -188,6 +190,10 @@ if (defined($options{"x"})) {
 }
 if (defined($options{"N"})) {
     $noemail = 1;
+}
+if (defined($options{"X"})) {
+    $quiet = 1;
+    $xmlout = 1;
 }
 if (defined($options{"s"})) {
     $inout = $options{"s"};
@@ -854,9 +860,23 @@ if (! $batch && ! $template_mode && !$genimode) {
 
 	if ($exit_code != 0) {
 	    my $d = tblog_lookup_error();
-	    print tblog_format_error($d);
+	    my $output = tblog_format_error($d);
+	    if ($xmlout) {
+		use libtblog '*SOUT'; # to avoid an unnecessary, and large,
+                                      # log entry
+		if (open(IN, "$logname")) {
+		    $d->{log} = '';
+		    while (<IN>) {
+			$d->{log} .= $_;
+		    }
+		    close IN;
+		}
+		$d->{output} = $output;
+	        print SOUT RPC::XML::response->new($d)->as_string(), "\n";
+	    } else {
+		print $output;
+	    }
 	}
-
 	exit $exit_code;
 
     }

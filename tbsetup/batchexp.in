@@ -9,6 +9,7 @@ use Getopt::Std;
 use POSIX qw(isatty setsid);
 use POSIX qw(strftime);
 use Errno qw(EDQUOT);
+use RPC::XML;
 
 #
 # Create an experiment. The experiment is either run immediately, or
@@ -59,7 +60,7 @@ sub CheckCopyArgs();
 sub CopyInArchive();
 sub fatal($;$);
 
-my $optlist = "iE:g:e:p:S:L:a:l:sfwqt:nzc:bx:y:h:jkN";	# Enough options?
+my $optlist = "iE:g:e:p:S:L:a:l:sfwqt:nzc:bx:y:h:jkNX";	# Enough options?
 my $batchmode= 1;
 my $frontend = 0;
 my $waitmode = 0;
@@ -163,6 +164,7 @@ my $committed    = 0;
 my $experiment;
 my $copy_experiment;
 my $noemail      = 0;
+my $xmlout       = 0;
 
 #
 # Verify user and get his DB uid and other info for later.
@@ -565,7 +567,22 @@ if (my $childpid = TBBackGround($logname)) {
     
     if ($exit_code != 0) {
 	my $d = tblog_lookup_error();
-	print tblog_format_error($d);
+	my $output = tblog_format_error($d);
+	if ($xmlout) {
+	    use libtblog '*SOUT'; # to avoid an unnecessary, and large, 
+                                  # log entry
+	    if (open(IN, "$logname")) {
+		$d->{log} = '';
+		while (<IN>) {
+		    $d->{log} .= $_;
+		}
+		close IN;
+	    }
+	    $d->{output} = $output;
+	    print SOUT RPC::XML::response->new($d)->as_string(), "\n";
+	} else {
+	    print $output;
+	}
     }
     
     exit $exit_code;
@@ -1169,6 +1186,10 @@ sub ParseArgs()
     }
     if (defined($options{"N"})) {
 	$noemail = 1;
+    }
+    if (defined($options{"X"})) {
+	$quiet = 1;
+	$xmlout = 1;
     }
 }
 

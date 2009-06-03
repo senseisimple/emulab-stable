@@ -1133,6 +1133,7 @@ class experiment:
 
         nsfilename = None
         argstr     = "-q"
+	extrainfo  = False
         
         for opt, val in argdict.items():
             if opt == "batch":
@@ -1217,14 +1218,32 @@ class experiment:
                     argstr += " -N "
                     pass
                 pass
+	    elif opt == "extrainfo":
+		if xbool(val):
+		    argstr += " -X "
+		    extrainfo = True
+		    pass
+                pass
             pass
+
+
         if nsfilename:
             argstr += " " + nsfilename
             pass
 
         (exitval, output) = runcommand(TBDIR + "/bin/batchexp " + argstr)
         if exitval:
-            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+	    if extrainfo:
+		try:
+		    value = xmlrpclib.loads(output)[0][0]
+		except:
+		    return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+		value["exitval"] = exitval >> 8
+		output = value["output"]
+		del value["output"]
+		return EmulabResponse(RESPONSE_ERROR, value, output=output)
+	    else:
+            	return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
         
         return EmulabResponse(RESPONSE_SUCCESS, output=output)
 
@@ -1270,6 +1289,8 @@ class experiment:
                                   output="direction must be 'in' or 'out'");
 
         argstr = "-q"
+	extrainfo = False
+
         for opt, val in argdict.items():
             if opt == "wait":
                 if xbool(val):
@@ -1281,6 +1302,12 @@ class experiment:
                     argstr += " -N "
                     pass
                 pass
+	    elif opt == "extrainfo":
+		if xbool(val):
+		    argstr += " -X "
+		    extrainfo = True
+		    pass
+                pass
             pass
 
         argstr += " -s " + escapeshellarg(argdict["direction"])
@@ -1289,7 +1316,17 @@ class experiment:
 
         (exitval, output) = runcommand(TBDIR + "/bin/swapexp " + argstr)
         if exitval:
-            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+	    if extrainfo:
+		try:
+		    value = xmlrpclib.loads(output)[0][0]
+		except:
+		    return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+		value["exitval"] = exitval >> 8
+		output = value["output"]
+		del value["output"]
+		return EmulabResponse(RESPONSE_ERROR, value, output=output)
+	    else:
+            	return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
         
         return EmulabResponse(RESPONSE_SUCCESS, output=output)
 
@@ -1326,6 +1363,7 @@ class experiment:
 
         nsfilename = None
         argstr     = "-q"
+	extrainfo  = False
         
         for opt, val in argdict.items():
             if opt == "wait":
@@ -1364,6 +1402,12 @@ class experiment:
                     argstr += " -N "
                     pass
                 pass
+	    elif opt == "extrainfo":
+		if xbool(val):
+		    argstr += " -X "
+		    extrainfo = True
+		    pass
+                pass
             pass
 
         argstr += " -s modify"
@@ -1376,7 +1420,17 @@ class experiment:
 
         (exitval, output) = runcommand(TBDIR + "/bin/swapexp " + argstr)
         if exitval:
-            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+	    if extrainfo:
+		try:
+		    value = xmlrpclib.loads(output)[0][0]
+		except:
+		    return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+		value["exitval"] = exitval >> 8
+		output = value["output"]
+		del value["output"]
+		return EmulabResponse(RESPONSE_ERROR, value, output=output)
+	    else:
+            	return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
         
         return EmulabResponse(RESPONSE_SUCCESS, output=output)
 
