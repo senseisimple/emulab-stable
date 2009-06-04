@@ -43,6 +43,7 @@ sub slurp {
   close($fh);
   return $data;
 }
+
 =item C<splat($filename, $file_data)>
 
 writes $file_data out to $filename
@@ -74,7 +75,7 @@ sub timestamp {
   sprintf "%4d%02d%02d%02d%02d%02d", $year+1900,$mon+1,$mday,$hour,$min,$sec;
 }
 
-=item C<saysts($msg)>
+=item C<sayts($msg)>
 
 prints "2009-01-30T10:10:20 $msg\n"
 =cut
@@ -190,7 +191,7 @@ sub getyn {
   lc($key) eq 'y';
 }
 
-=item C<yn($prompt)>
+=item C<yn_prompt($prompt)>
 
 prints $prompt
 returns 1 if user types Y or y 0 otherwise
@@ -203,6 +204,12 @@ sub yn_prompt {
   print "\n";
   return $r;
 }
+
+=item C<splat_to_temp($data)>
+
+writes $data to tempfile and returns a File::Temp object
+
+=cut
 
 sub splat_to_temp {
  my $data = shift;

@@ -19,8 +19,6 @@ ensures perl version >= 5.008
 
 implements a perl5.10 like say for perl < 5.10
 
-=back
-
 =cut
 
 sub say {
@@ -40,10 +38,21 @@ sub say {
     croak $warning;
 }
 
+=item sayd
+
+dumps args and prints result with say
+
+=cut
+
 sub sayd {
   use Data::Dumper;
   say Dumper(@_);
 }
+
+=back
+
+=cut
+
 
 if (1 || $] < 5.010) {
   *IO::Handle::say = \&say if ! defined &IO::Handle::say;

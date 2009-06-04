@@ -42,21 +42,13 @@ Tools::TBSSH
 
 =over 4
 
-=item C< wrapped_ssh($host, $user, $cmd, $checker)>
+=item C<< $ssh->cmd($cmd) >>
 
-B<LOWLEVEL SUB> execute $cmd on $host as $user and check result with $checker sub
+B<LOWLEVEL SUB> execute $cmd on $host as $user by wrapping cmdline ssh
 
-=item C<cmdcheckoutput($host, $cmd, $checker = sub { my ($out, $err, $resultcode) = @_; ... }>
+=item C<< $ssh->scp_worker(@files)  >>
 
-executes $cmd as $TBConfig::EMULAB_USER on $host and calls checker with ($out, $err, $resultcode)
-
-=item C<cmdsuccess($host, $cmd)>
-
-returns the ssh result code of executing $cmd as $TBConfig::EMULAB_USER
-
-=item C<cmdsuccessdump($host, $cmd)>
-
-returns the ssh result code of executing $cmd as $TBConfig::EMULAB_USER and dumps the ssh stdout, stderr, resultcode
+B<LOWLEVEL SUB> execute $scp with $files as arguments
 
 =back
 

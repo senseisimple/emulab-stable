@@ -165,6 +165,10 @@ B<INTERNAL:> reaches up the caller chain three levels and returns the XMLRPC pac
 
 B<INTERNAL:> executes a single XMLRPC $command with @args and returns a XMLRPC response
 
+=item C<< $client->xmlrpc_req(@args) >>
+
+B<INTERNAL:> returns the response of a XMLRPC call with @args 
+
 =item C<< $client->xmlrpc_req_value(@args) >>
 
 B<INTERNAL:> returns the value member of a XMLRPC call with @args 
@@ -205,6 +209,23 @@ returns XMLRPC reponse output
 =item C<< $client->augment_code($funcname, @other_args) >>
 
 executes xmlrpc request divining the XMLRPC package from the current perl package
+returns XMLRPC reponse code
+
+=item C<< $client->augment_code0($funcname, @other_args) >>
+
+executes xmlrpc request divining the XMLRPC package from the current perl package
+prints the output if response code is nonzero
+returns XMLRPC reponse code
+
+=item C<< $client->augment_func_code($funcname, @other_args) >>
+
+executes xmlrpc request divining the XMLRPC package from the current perl package
+returns XMLRPC reponse code
+
+=item C<< $client->augment_func_code0($funcname, @other_args) >>
+
+executes xmlrpc request divining the XMLRPC package from the current perl package
+prints the output if response code is nonzero
 returns XMLRPC reponse code
 
 =back

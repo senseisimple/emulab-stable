@@ -142,4 +142,38 @@ sub build_TAP_stream {
   return TAP::Parser::Iterator::StdOutErr->new($out, $err, $pid);
 }
 
+=head1 NAME
+
+TestBed::ParallelRunner
+
+=over 4
+
+=item C<< add_experiment >>
+
+helper function called by rege.
+creates a TestBed::ParallelRunner::Test job and pushes it onto @$ExperimentTests
+
+=item C<< runtests >>
+
+kicks off execution of parallel tests.
+
+=item C<< set_test_builder_to_end_state >>
+=item C<< reset_test_builder >>
+=item C<< setup_test_builder_ouputs >>
+
+B<INTERNAL> functions to get Test::Builder to behave correctly with parallel tests
+
+=item C<< tap_wrapper >>
+
+wraps two different ways of executing parallel tests and wrapping their TAP output stream
+
+=item C<< build_TAP_stream >>
+
+given a TestBed::ParallelRunner returns a TAP stream
+
+=back
+
+=cut
+
 1;
+

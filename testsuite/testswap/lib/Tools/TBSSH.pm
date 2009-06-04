@@ -5,6 +5,7 @@ use Data::Dumper;
 use Mouse;
 
 eval{
+  #force use of 'Tools::WrappedSSH'
   require BOZO;
 };
 if ($@) {
@@ -85,6 +86,20 @@ Tools::TBSSH
 
 =over 4
 
+=item C< instance($host, %options) >
+
+creates a new $ssh object with $host, $user = $TBConfig::EMULAB_USER, and %options
+
+=item C<< $ssh->wrapped_ssh($user, $cmd, $checker) >>
+
+=item C<< $host->wrapped_ssh($user, $cmd, $checker) >>
+
+=item C<< $ssh->wrapped_scp($user, @files) >>
+
+=item C<< $host->wrapped_scp($user, #files) >>
+
+=item C<< $host->scp($host, #files) >>
+
 =item C<cmdcheckoutput($host, $cmd, $checker = sub { my ($out, $err, $resultcode) = @_; ... }>
 
 executes $cmd as $TBConfig::EMULAB_USER on $host and calls checker with ($out, $err, $resultcode)
@@ -94,6 +109,14 @@ executes $cmd as $TBConfig::EMULAB_USER on $host and calls checker with ($out, $
 returns the ssh result code of executing $cmd as $TBConfig::EMULAB_USER
 
 =item C<cmdsuccessdump($host, $cmd)>
+
+returns the ssh result code of executing $cmd as $TBConfig::EMULAB_USER and dumps the ssh stdout, stderr, resultcode
+
+=item C<cmdfailure($host, $cmd)>
+
+returns the ssh result code of executing $cmd as $TBConfig::EMULAB_USER
+
+=item C<cmdfailuredump($host, $cmd)>
 
 returns the ssh result code of executing $cmd as $TBConfig::EMULAB_USER and dumps the ssh stdout, stderr, resultcode
 

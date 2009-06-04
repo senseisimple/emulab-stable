@@ -307,8 +307,8 @@ extends 'TestBed::ForkFramework::Scheduler';
 
 has 'maxnodes'  => ( isa => 'Int'      , is => 'rw');
 has 'currnodes' => ( isa => 'Int'      , is => 'rw');
-has 'schedule' => ( isa => 'ArrayRef', is => 'rw');
-has 'weight' => ( isa => 'ArrayRef', is => 'rw');
+has 'schedule'  => ( isa => 'ArrayRef' , is => 'rw');
+has 'weight'    => ( isa => 'ArrayRef' , is => 'rw');
 
 sub work {
   my ($max_nodes, $proc, $weight, $items) = @_;

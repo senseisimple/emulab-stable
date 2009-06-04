@@ -37,8 +37,33 @@ sub runharness {
 
   my $harness = TAP::Harness->new( \%harness_args );
   $harness->callback('parser_args', \&parser_args_callback);
-  push @$ts, TestBed::ParallelRunner->new() if @$pms;
+  push @$ts, [TestBed::ParallelRunner->new(), 'Parallel Tests'] if @$pms;
   $harness->runtests(@$ts);
 }
+
+=head1 NAME
+
+TestBed::Harness
+
+=over 4
+
+=item C<< runharness(@test_file_names) >>
+
+ex. runharness( 't/lib/*.t', 't/xmlrpc/*.t' 'test/BasicTopologies.pm' ) 
+
+runs the specified test in a TAP::harness
+pushes a ParallelRunner on if .pm parallel test modules are specified
+
+=item C<< split_t_pm(@test_file_names) >>
+
+splits test filenames into to lists based on .t and .pm extensions
+
+=item C<< parser_args_callback >>
+
+TAP::Harness parser_args callback that allow for special processing (pre_running) of parallel tests
+
+=back
+
+=cut
 
 1;

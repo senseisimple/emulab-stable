@@ -56,4 +56,38 @@ sub kill {
   $self->e->end;
 }
 
+=head1 NAME
+
+TestBed::ParallelRunner::Test
+
+Represents a ParallelRunner Job
+
+=over 4
+
+=item C<< tn($e, $ns, $sub, $test_count, $desc) >>
+
+constructs a TestBed::ParallelRunner::Test job
+
+=item C<< $prt->prep >>
+
+executes the pre_running phase of experiment and determines min and max node counts.
+
+=item C<< $prt->run >>
+
+swaps in the experiment and runs the specified test
+
+=item C<< $prt->run_ensure_kill >>
+
+swaps in the experiment and runs the specified test
+it kills the experiment unconditionaly after the test returns
+
+=item C<< $prt->kill >>
+
+kills the experiment
+
+=back
+
+=cut
+
+
 1;

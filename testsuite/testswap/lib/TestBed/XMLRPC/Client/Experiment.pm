@@ -229,6 +229,35 @@ returns experiment linkinfo
 
 returns experiment link shaping
 
+=item C<< $e->create_and_get_metadata($ns) >>
+
+creates the experiment and returns the create metadata
+i.e. min and max nodes, as well as a bunch of other stuff
+
+=item C<< $e->ensure_active_ns($ns) >>
+
+creates the experiment if it doesn't already exist and ensures that the experiement is swapped in
+
+=item C<< $e->gen_random_eid >>
+
+hook for generating a random $eid if desired
+
+=item C<< $e->modify_ns($ns) >>
+
+modifies the current experiment with the give $ns file
+
+=item C<< $e->noemail >>
+
+B<INTERNAL>: generates the noemail attribute for xmlrpc calls if so configured in TBConfig
+
+=item C<< gen_expinfo_funcs >>
+
+B<INTERNAL>: generates expinfo subs 
+
+=item C<< retry_on_TIMEOUT(&sub, $messag) >>
+
+B<INTERNAL>: catches socket timeout exceptions and rexecutes &sub after printing $message
+
 =back 
 
 =cut

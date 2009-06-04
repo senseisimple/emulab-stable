@@ -6,18 +6,6 @@ our @ISA = qw(Exporter);
 our @EXPORT = qw(pretty_listexp experiments_hash_to_list);
 use Data::Dumper;
 
-=head1 NAME
-
-TestBed::XMLRPC::Client::Pretty;
-
-=over 4
-
-=item C<pretty_listexp>
-
-pretty prints the XMLRPC response from listexp
-
-=cut
-
 sub pretty_listexp {
   for my $ed (experiments_hash_to_list(@_)) {
     my ($pid, $gid, $eid,) = @{ $ed->[0] };
@@ -45,6 +33,20 @@ sub experiments_hash_to_list {
   }
   return wantarray ? @exper_list : \@exper_list;
 }
+
+=head1 NAME
+
+TestBed::XMLRPC::Client::Pretty;
+
+=over 4
+
+=item C<pretty_listexp>
+
+pretty prints the XMLRPC response from listexp
+
+=item C<experiments_hash_to_list>
+
+converts the nested explist hash to an array of [ [$pid, $gid, $pid] $e] 
 
 =back
 

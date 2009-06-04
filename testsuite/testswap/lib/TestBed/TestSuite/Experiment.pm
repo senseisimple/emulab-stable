@@ -132,6 +132,7 @@ sub parallel_tevc {
 
 =item C<< $e->loghole($cmd) >>
 
+runs loghole on ops
 =cut
 sub loghole {
   my ($e) = shift;
@@ -140,6 +141,7 @@ sub loghole {
 
 =item C<< $e->loghole_sync_allnodes($cmd) >>
 
+runs loghole sync all hostnames on ops
 =cut
 sub loghole_sync_allnodes {
   my ($e) = shift;
@@ -147,8 +149,9 @@ sub loghole_sync_allnodes {
   TestBed::Wrap::loghole::loghole($e, "sync @hostnames");
 }
 
-=item C<< $e->splat($cmd) >>
+=item C<< $e->splat($data, $filename) >>
 
+splats $data to $filename on each node
 =cut
 sub splat {
   my ($e, $data, $fn) = @_;
@@ -219,6 +222,11 @@ sub startrunkill {
   } $e;
 }
 
+=item C<< $e->startrun($ns_contents, $worker_sub) >>
+
+starts an experiment given a $ns file and a $worker
+call the $worker passing in the experiment $e
+=cut
 sub startrun {
   my ($e, $ns, $worker) = @_;
   my $eid = $e->eid;
@@ -240,7 +248,7 @@ sub launchpingkill {
   } $e;
 }
 
-=item C<launchpingkill($e, $ns)>
+=item C<launchpingswapkill($e, $ns)>
 
 method that starts an experiment, runs a ping_test, 
 swaps the experiment out and then back in, runs a ping test, and finally

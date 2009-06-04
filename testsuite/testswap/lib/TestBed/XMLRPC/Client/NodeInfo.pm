@@ -71,7 +71,7 @@ sub splitlines {
   \@lines;
 }
 
-=item beforeaftermatch
+=item C< beforeaftermatch($pattern, $array) >
 
 Return lines from $array before and after matching $pattern
 =cut
@@ -92,6 +92,10 @@ sub beforeaftermatch {
   (\@before, \@after);
 }
 
+=item C< aftermatch($pattern, $array) >
+
+Return lines from $array after matching $pattern
+=cut
 sub aftermatch { 
   [beforeaftermatch(@_)]->[1]
 }

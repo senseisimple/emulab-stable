@@ -26,6 +26,30 @@ B<EXPERIMENTAL>
 
 provides some common used class methods as global functions in the current package namespace
 
+=over 4
+
+=item echo
+
+deprecated
+
+=item list
+
+deprecated
+
+=item list_brief
+
+deprecated
+
+=item list_full
+
+deprecated
+
+=item plistexps
+
+deprecated
+
+=back
+
 =cut
 
 1;
