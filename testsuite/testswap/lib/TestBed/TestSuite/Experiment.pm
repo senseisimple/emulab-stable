@@ -104,7 +104,7 @@ sub linktest {
   TestBed::Wrap::linktest::linktest($e->pid, $e->eid);
 }
 
-=item C<< $e->tevc($arg) >>
+=item C<< $e->tevc(@args) >>
 
 runs tevc on ops for this experiment.
 takes an argument string such as "now link1 down"
@@ -112,6 +112,17 @@ takes an argument string such as "now link1 down"
 sub tevc {
   my ($e) = shift;
   TestBed::Wrap::tevc::tevc($e->pid, $e->eid, @_);
+}
+
+=item C<< $e->tevc_at_host($host, @args) >>
+
+runs tevc on $host for this experiment.
+takes an argument string such as "now link1 down"
+=cut
+
+sub tevc_at_host {
+  my ($e) = shift;
+  TestBed::Wrap::tevc::tevc_at_host($e->pid, $e->eid, @_);
 }
 
 =item C<< $e->parallel_tevc($proc, $items) >>
@@ -123,6 +134,22 @@ sub parallel_tevc {
   my $result = TestBed::ForkFramework::ForEach::work(sub {
     my @tevc_cmd = $proc->(@_);
     TestBed::Wrap::tevc::tevc($e->pid, $e->eid, @tevc_cmd);
+  }, $items);
+  if ($result->[0]) {
+    sayd($result->[2]);
+    die 'TestBed::ParallelRunner::runtests died during parallel_tevc';
+  }
+}
+
+=item C<< $e->parallel_tevc_at_host($host, $proc, $items) >>
+
+runs tevc on $host for each cmdline produced by calling $proc on each $item.
+=cut
+sub parallel_tevc_at_host {
+  my ($e, $host, $proc, $items) = @_;
+  my $result = TestBed::ForkFramework::ForEach::work(sub {
+    my @tevc_cmd = $proc->(@_);
+    TestBed::Wrap::tevc::tevc_at_host($e->pid, $e->eid, $host, @tevc_cmd);
   }, $items);
   if ($result->[0]) {
     sayd($result->[2]);
@@ -258,7 +285,7 @@ sub launchpingswapkill {
   my ($e, $ns) = @_;
   my $eid = $e->eid;
 trytest {
-    $e->ensure_artive_ns($ns) && die "batchexp $eid failed";
+    $e->ensure_active_ns($ns) && die "batchexp $eid failed";
     $e->ping_test             && die "connectivity test $eid failed";
     $e->swapout_wait          && die "swap out $eid failed";
     $e->swapin_wait           && die "swap in $eid failed";

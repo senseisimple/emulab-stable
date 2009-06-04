@@ -31,10 +31,15 @@ TestBed::Wrap::tevc
 
 =over 4
 
-=item C<tevc($pid, $eid, $arg)>
+=item C<tevc($pid, $eid, @args)>
 
 executes tevc on $pid and $eid with $arg string such as "now link1 down"
 by sshing to ops
+
+=item C<tevc_at_host($pid, $eid, $host, @args)>
+
+executes tevc on $pid and $eid with $arg string such as "now link1 down"
+by sshing to $host
 
 =back
 
@@ -42,9 +47,14 @@ by sshing to ops
 
 sub tevc {
   my ($pid, $eid, @args) = @_;
+  tevc_at_host($pid, $eid, $TBConfig::OPS_SERVER, @args);
+}
+
+sub tevc_at_host {
+  my ($pid, $eid, $host, @args) = @_;
   my $cmd = 'PATH=/usr/testbed/bin:$PATH tevc ' . "-e $pid/$eid " . join(" ", @args);
   say $cmd;
-  Tools::TBSSH::cmdsuccess($TBConfig::OPS_SERVER, $cmd);
+  Tools::TBSSH::cmdsuccess($host, $cmd);
 }
 
 1;

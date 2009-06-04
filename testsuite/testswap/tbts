@@ -30,7 +30,7 @@ use Data::Dumper;
   my $xmlrpcurl;
   my $result = GetOptions (
 #      "D=s%"        => \$defines,
-      "jobs=i"      => \$pjobs,
+#      "jobs=i"      => \$pjobs,
       "logging=i"   => \$logging,
       "timing"      => \$timing,
       "verbose"     => \$verbose,
@@ -104,6 +104,7 @@ if (@ARGV) {
   elsif (/lib/)             { runharness qw(t/lib/*.t t/lib/*/*.t); }
   elsif (/xmlrpc/)          { runharness qw(t/xmlrpc/*.t); }
   elsif (/test/)            { runharness qw(t/topologies/*.t); }
+  elsif (/coding/)            { runharness qw(t/coding/pod_coverage.t); }
 }
 else {
   print usage();
