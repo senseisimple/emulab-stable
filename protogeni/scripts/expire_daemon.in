@@ -112,13 +112,8 @@ sub ExpireTickets()
 	    # Ticket is gone, lets not worry.
 	   next;
 	}
-	my $slice = GeniSlice->Lookup($ticket->slice_uuid());
-	if (!defined($slice)) {
-	    print STDERR "No slice for $ticket\n";
-	    goto skip;
-	}
-	if ($slice->Lock() != 0) {
-	    print STDERR "Could not lock slice $slice.\n";
+	if ($ticket->Lock() != 0) {
+	    print STDERR "Could not lock ticket $ticket\n";
 	    goto skip;
 	}
 	print "Expiring ticket $ticket\n";
@@ -127,14 +122,12 @@ sub ExpireTickets()
 	    print STDERR "Could not delete $ticket\n";
 	    SENDMAIL($TBOPS, "Could not delete ticket $idx",
 		     "Could not delete ticket $ticket");
+	    # We leave it locked.
 	}
 	else {
 	    print STDERR "$ticket has been deleted\n";
 	}
-	$slice->UnLock();
       skip:
-	$slice->Flush()
-	    if (defined($slice));
 	$ticket->Flush();
     }
 }
