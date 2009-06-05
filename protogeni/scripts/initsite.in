@@ -45,6 +45,7 @@ my $GENCRL        = "$TB/sbin/protogeni/gencrl";
 my $GENCRLBUNDLE  = "$TB/sbin/protogeni/gencrlbundle";
 my $MKSYSCERT	  = "$TB/sbin/mksyscert";
 my $MKUSERCERT	  = "$TB/sbin/mkusercert";
+my $BATCHEXP      = "$TB/bin/batchexp";
 my $WAP           = "$TB/sbin/withadminprivs";
 my $SACERT	  = "$TB/etc/genisa.pem";
 my $CMCERT	  = "$TB/etc/genicm.pem";
@@ -75,6 +76,7 @@ use libtestbed;
 use libdb qw(TBSetSiteVar TBOPSPID DBQueryFatal);
 use User;
 use Project;
+use Experiment;
 use OSinfo;
 
 if ($UID != 0) {
@@ -316,6 +318,20 @@ if (!defined($sslcert)) {
     my $passwd = substr(TBGenSecretKey(), 0, 10);
     system("$SUDO -u $PROTOUSER $WAP $MKUSERCERT -p '$passwd' $geniuserid");
     fatal("Could not create encrypted certificate for geni user")
+	if ($?);
+}
+
+#
+# Create holding experiment.
+#
+my $experiment = Experiment->Lookup($geniprojid, "reservations");
+if (!defined($experiment)) {
+    system("$SUDO -u $geniuserid $WAP $BATCHEXP ".
+	   "  -q -i -k -w -f -n -S 'System Experiment' ".
+	   "  -L 'System Experiment' ".
+	   "  -E 'Holding Pattern for Reservations - DO NOT DELETE' ".
+	   "  -p $geniprojid -e reservations -h " . NewUUID());
+    fatal("Could not create create reservations holding experiment")
 	if ($?);
 }
 
