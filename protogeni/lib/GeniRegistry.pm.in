@@ -464,14 +464,14 @@ sub RemoveSlice($$)
 #
 sub Shutdown($$$)
 {
-    my ($self, $uuid, $onoff) = @_;
+    my ($self, $uuid, $clear) = @_;
 
     my $response =
 	Genixmlrpc::CallMethod($self->authority(),
 			       $self->context(),
 			       "Shutdown",
 			       { "credential" => $self->credential(),
-				 "onoff"      => $onoff,
+				 "clear"      => $clear,
 			         "uuid"       => $uuid });
     return -1
 	if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS);

@@ -59,8 +59,7 @@ elif len( args ) == 1:
         sys.exit( 1 )
 else:
     rspec = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
-            " <node uuid=\"*\" " +\
-            "       nickname=\"geni1\" "+\
+            " <node virtual_id=\"geni1\" "+\
             "       virtualization_type=\"emulab-vnode\"> " +\
             " </node>" +\
             "</rspec>"    
@@ -117,6 +116,9 @@ else:
     print "Got the slice credential"
     pass
 
+url = "https://myboss.myelab.testbed.emulab.net/protogeni/xmlrpc/cm"
+url = "https://boss.cmcl.cs.cmu.edu/protogeni/xmlrpc/cm"
+
 #
 # Get a ticket. We do not have a real resource discovery tool yet, so
 # as a debugging aid, you can wildcard the uuid, and the CM will find
@@ -138,6 +140,7 @@ print "Got a ticket from the CM. Redeeming the ticket ..."
 # Create the sliver.
 #
 params = {}
+params["credential"] = myslice
 params["ticket"]   = ticket
 params["keys"]     = mykeys
 params["impotent"] = impotent
@@ -145,8 +148,39 @@ rval,response = do_method("cm", "RedeemTicket", params)
 if rval:
     Fatal("Could not redeem ticket")
     pass
-sliver = response["value"]
-print "Created the sliver. Starting the sliver ..."
+sliver,manifest = response["value"]
+print "Created the sliver"
+print str(manifest)
+
+#
+# Get an updated ticket using the manifest. Normally the user would
+# actually change the contents.
+#
+print "Updating the original ticket ..."
+params = {}
+params["credential"] = myslice
+params["ticket"]     = ticket
+params["rspec"]      = manifest
+rval,response = do_method("cm", "UpdateTicket", params)
+if rval:
+    Fatal("Could not update the ticket")
+    pass
+newticket = response["value"]
+print "Got an updated ticket from the CM. Updating the sliver ..."
+
+#
+# Update the sliver
+#
+params = {}
+params["credential"] = sliver
+params["ticket"]     = newticket
+rval,response = do_method("cm", "UpdateSliver", params)
+if rval:
+    Fatal("Could not update sliver on CM")
+    pass
+manifest = response["value"]
+print "Updated the sliver on the CM. Starting the sliver ..."
+print str(manifest)
 
 #
 # Start the sliver.
@@ -158,5 +192,20 @@ rval,response = do_method("cm", "StartSliver", params)
 if rval:
     Fatal("Could not start sliver")
     pass
-print "Sliver has been started."
+print "Sliver has been started. Asking for a new manifest/ticket ..."
 
+#
+# Grab a sliver ticket just for the hell of it.
+#
+params = {}
+params["credential"] = sliver
+rval,response = do_method("cm", "SliverTicket", params)
+if rval:
+    Fatal("Could not get sliver ticket/manifest")
+    pass
+print "Got a new manifest/ticket"
+ticket = response["value"]
+print str(ticket);
+
+print ""
+print "Delete this sliver with deletesliver.py"

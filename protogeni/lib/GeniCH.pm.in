@@ -687,9 +687,9 @@ sub Shutdown($)
     # Pass the whole thing off to a script that will contact the
     # CMs.
     #
-    my $arg = ($clear ? "resume": "");
+    my $opt = ($clear ? "-u": "");
     # -c option indicates acting as CH. 
-    system("$SLICESHUTDOWN -c $uuid $arg");
+    system("$SLICESHUTDOWN -c $opt $uuid");
     if ($?) {
 	print STDERR "Could not shutdown $uuid!\n";
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,

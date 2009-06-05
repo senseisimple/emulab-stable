@@ -111,26 +111,25 @@ else:
 # Get a ticket from the local CM.
 #
 rspec = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
-        " <node uuid=\"*\" " +\
-        "       nickname=\"geni1\" "+\
+        " <node virtual_id=\"geni1\" "+\
         "       virtualization_type=\"emulab-vnode\"> " +\
         " </node>" +\
-        " <node uuid=\"*\" " +\
-        "       nickname=\"geni2\" "+\
+        " <node virtual_id=\"geni2\" "+\
         "       virtualization_type=\"emulab-vnode\"> " +\
         " </node>" +\
-        " <link name=\"link0\" nickname=\"link0\" link_type=\"tunnel\"> " +\
-        "  <linkendpoints nickname=\"destination_interface\" " +\
-        "            tunnel_ip=\"192.168.1.1\" " +\
-        "            node_nickname=\"geni1\" " +\
-        "            node_uuid=\"*\" /> " +\
-        "  <linkendpoints nickname=\"source_interface\" " +\
-        "            tunnel_ip=\"192.168.1.2\" " +\
-        "            node_nickname=\"geni2\" " +\
-        "            node_uuid=\"*\" /> " +\
+        " <link virtual_id=\"link0\" link_type=\"tunnel\"> " +\
+        "  <interface_ref virtual_node_id=\"geni1\" " +\
+        "                 virtual_interface_id=\"virt0\" " +\
+        "                 tunnel_ip=\"192.168.1.1\" " +\
+        "                  /> " +\
+        "  <interface_ref virtual_node_id=\"geni2\" " +\
+        "                 virtual_interface_id=\"virt0\" " +\
+        "                 tunnel_ip=\"192.168.1.2\" " +\
+        "                 /> " +\
         " </link>" +\
         "</rspec>"
 
+print "Asking the CM for a ticket ..."
 params = {}
 params["credential"] = myslice
 params["rspec"]      = rspec
@@ -139,19 +138,21 @@ if rval:
     Fatal("Could not get ticket")
     pass
 ticket = response["value"]
-print "Got a ticket from CM"
+print "Got a ticket from CM, redeeming the ticket ..."
 
 #
 # Create the sliver
 #
 params = {}
+params["credential"] = myslice
 params["ticket"]   = ticket
 rval,response = do_method("cm", "RedeemTicket", params)
 if rval:
     Fatal("Could not redeem ticket on CM")
     pass
-sliver = response["value"]
-print "Created a sliver CM"
+sliver,manifest = response["value"]
+print "Created the sliver. Starting the sliver ..."
+print str(manifest)
 
 #
 # Start the slivers
@@ -163,18 +164,7 @@ if rval:
     Fatal("Could not start sliver on CM")
     pass
 
-print "Slivers have been started, waiting for input to delete it"
+print "Sliver has been started."
 print "You should be able to log into the sliver after a little bit"
-sys.stdin.readline();
-
-#
-# Delete the sliver.
-#
-print "Deleting sliver now"
-params = {}
-params["credential"] = sliver
-rval,response = do_method("cm", "DeleteSliver", params)
-if rval:
-    Fatal("Could not delete sliver on CM")
-    pass
-print "Sliver has been deleted"
+print ""
+print "Delete this sliver with deletesliver.py"

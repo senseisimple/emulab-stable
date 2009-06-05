@@ -14,7 +14,8 @@ use Exporter;
 use vars qw(@ISA @EXPORT);
 
 @ISA    = "Exporter";
-@EXPORT = qw (TICKET_PURGED TICKET_EXPIRED TICKET_REDEEMED TICKET_RELEASED);
+@EXPORT = qw (TICKET_PURGED TICKET_EXPIRED TICKET_REDEEMED
+	      TICKET_RELEASED TICKET_DELETED);
 
 use GeniDB;
 use GeniCredential;
@@ -48,6 +49,7 @@ sub TICKET_PURGED()	{ return 1; }
 sub TICKET_REDEEMED()	{ return 2; }
 sub TICKET_EXPIRED()	{ return 3; }
 sub TICKET_RELEASED()	{ return 4; }
+sub TICKET_DELETED()	{ return 5; }
 
 # Cache of tickets.
 my %tickets = ();
@@ -65,14 +67,29 @@ BEGIN {
 #
 sub Lookup($$)
 {
-    my ($class, $idx) = @_;
+    my ($class, $token) = @_;
+    my $idx;
+    my $query_result;
 
-    return undef
-	if (! ($idx =~ /^\d*$/));
+    if ($token =~ /^\d+$/) {
+	$idx = $token;
+    }
+    elsif ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
+	$query_result =
+	    DBQueryWarn("select idx from geni_tickets ".
+			"where ticket_uuid='$token'");
+	    return undef
+		if (! $query_result || !$query_result->numrows);
+
+	    ($idx) = $query_result->fetchrow_array();
+    }
+    else {
+	return undef;
+    }
     return $tickets{"$idx"}
         if (exists($tickets{"$idx"}));
 
-    my $query_result =
+    $query_result =
 	DBQueryWarn("select * from geni_tickets where idx='$idx'");
 
     return undef
@@ -99,6 +116,7 @@ sub Lookup($$)
     # Mark as coming from the DB.
     $ticket->{'idx'}    = $idx;
     $ticket->{'stored'} = 1;
+    $ticket->{'LOCKED'}   = 0;
 
     # Cache.
     $tickets{"$idx"} = $ticket;
@@ -106,53 +124,29 @@ sub Lookup($$)
 }
 
 #
-# Lookup a ticket for a slice. This assumes only a single slice ticket.
-#
-sub LookupForSlice($$)
-{
-    my ($class, $slice) = @_;
-
-    return undef
-	if (! ref($slice));
-
-    my $slice_uuid = $slice->uuid();
-    my $query_result =
-	DBQueryWarn("select idx from geni_tickets ".
-		    "where slice_uuid='$slice_uuid'");
-    return undef
-	if (!$query_result || !$query_result->numrows);
-
-    if ($query_result->numrows != 1) {
-	print STDERR "Too many tickets stored for $slice\n";
-	return undef;
-    }
-    my ($idx) = $query_result->fetchrow_array();
-    return GeniTicket->Lookup($idx);
-}
-
-#
 # Create an unsigned ticket object, to be populated and signed and returned.
 #
 sub Create($$$$)
 {
-    my ($class, $slice, $owner, $rspec) = @_;
+    my ($class, $target, $owner, $rspec) = @_;
 
     # Every Ticket gets a new unique index (sequence number).
     my $seqno = TBGetUniqueIndex('next_ticket', 1);
-    
+
     my $self = {};
     $self->{'rspec'}         = $rspec;
     $self->{'ticket_uuid'}   = undef;
-    $self->{'slice_uuid'}    = $slice->uuid();
     $self->{'owner_uuid'}    = $owner->uuid();
-    $self->{'slice_hrn'}     = $slice->hrn();
     $self->{'owner_hrn'}     = $owner->hrn();
-    $self->{'slice_cert'}    = $slice->GetCertificate();
     $self->{'owner_cert'}    = $owner->GetCertificate();
+    $self->{'target_uuid'}   = $target->uuid();
+    $self->{'target_hrn'}    = $target->hrn();
+    $self->{'target_cert'}   = $target->GetCertificate();
     $self->{'seqno'}         = $seqno;
     $self->{'ticket_string'} = undef;
     $self->{'component'}     = undef;
     $self->{'stored'}        = 0;	# Stored to the DB.
+    $self->{'LOCKED'}        = 0;
 
     #
     # For now, all tickets expire very quickly ...
@@ -177,13 +171,11 @@ sub field($$)           { return ($_[0]->{$_[1]}); }
 sub idx($)		{ return field($_[0], "idx"); }
 sub seqno($)		{ return field($_[0], "seqno"); }
 sub rspec($)		{ return field($_[0], "rspec"); }
-sub slice_uuid($)	{ return field($_[0], "slice_uuid"); }
-sub target_uuid($)	{ return field($_[0], "slice_uuid"); }
+sub target_uuid($)	{ return field($_[0], "target_uuid"); }
 sub owner_uuid($)	{ return field($_[0], "owner_uuid"); }
-sub slice_hrn($)	{ return field($_[0], "slice_hrn"); }
-sub target_hrn($)	{ return field($_[0], "slice_hrn"); }
+sub target_hrn($)	{ return field($_[0], "target_hrn"); }
 sub owner_hrn($)	{ return field($_[0], "owner_hrn"); }
-sub slice_cert($)	{ return field($_[0], "slice_cert"); }
+sub target_cert($)	{ return field($_[0], "target_cert"); }
 sub owner_cert($)	{ return field($_[0], "owner_cert"); }
 sub uuid($)		{ return field($_[0], "ticket_uuid"); }
 sub ticket_uuid($)	{ return field($_[0], "ticket_uuid"); }
@@ -191,9 +183,11 @@ sub ticket($)		{ return field($_[0], "ticket"); }
 sub asString($)		{ return field($_[0], "ticket_string"); }
 sub ticket_string($)	{ return field($_[0], "ticket_string"); }
 sub redeem_before($)	{ return field($_[0], "redeem_before"); }
+sub redeemed($   )	{ return field($_[0], "redeemed"); }
 sub component_uuid($)	{ return field($_[0], "component_uuid"); }
 sub component($)	{ return field($_[0], "component"); }
 sub stored($)		{ return field($_[0], "stored"); }
+sub LOCKED($)           { return $_[0]->{'LOCKED'}; }
 
 #
 # Stringify for output.
@@ -207,9 +201,9 @@ sub Stringify($)
 	my $seqno = $self->seqno();
 	$idx = "S$seqno";
     }
-    my $slice_uuid = $self->slice_uuid();
+    my $owner_hrn = $self->owner_hrn();
     
-    return "[GeniTicket: $idx, slice:$slice_uuid]";
+    return "[GeniTicket: $idx, owner:$owner_hrn]";
 }
 
 #
@@ -264,15 +258,21 @@ sub CreateFromSignedTicket($$;$$)
 
     # Dig out the rspec.
     my ($rspec_node) = $doc->getElementsByTagName("rspec");
-    return undef
-	if (!defined($rspec_node));
-    my $rspec = XMLin($rspec_node->toString(), ForceArray => ["node",
-							      "link"]);
+    if (!defined($rspec_node)) {
+	print STDERR "Ticket is missing rspec node\n";
+	return undef;
+    }
+    
+    my $rspec = XMLin($rspec_node->toString(), KeyAttr => [],
+		      ForceArray => ["node", "link", "interface",
+				     "interface_ref", "linkendpoints"]);
 
     # Dig out the ticket uuid.
     my ($uuid_node) = $doc->getElementsByTagName("uuid");
-    return undef
-	if (!defined($uuid_node));
+    if (!defined($uuid_node)) {
+	print STDERR "Ticket is missing uuid node\n";
+	return undef;
+    }
     my $ticket_uuid = $uuid_node->to_literal();
 
     if (! ($ticket_uuid =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/)) {
@@ -282,12 +282,16 @@ sub CreateFromSignedTicket($$;$$)
 
     # Dig out the target certificate.
     my ($cert_node) = $doc->getElementsByTagName("target_gid");
-    return undef
-	if (!defined($cert_node));
+    if (!defined($cert_node)) {
+	print STDERR "Ticket is missing target gid node\n";
+	return undef;
+    }
     my $target_certificate =
 	GeniCertificate->LoadFromString($cert_node->to_literal());
-    return undef
-	if (!defined($target_certificate));
+    if (!defined($target_certificate)) {
+	print STDERR "Could not get target certificate from string\n";
+	return undef;
+    }
 
     if (!($target_certificate->uuid() =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/)) {
 	print STDERR "Invalid target_uuid in credential\n";
@@ -300,14 +304,16 @@ sub CreateFromSignedTicket($$;$$)
 
     # Dig out the owner certificate.
     ($cert_node) = $doc->getElementsByTagName("owner_gid");
-    return undef
-	if (!defined($cert_node));
-
+    if (!defined($cert_node)) {
+	print STDERR "Ticket is missing owner gid node\n";
+	return undef;
+    }
     my $owner_certificate =
 	GeniCertificate->LoadFromString($cert_node->to_literal());
-    return undef
-	if (!defined($owner_certificate));
-
+    if (!defined($target_certificate)) {
+	print STDERR "Could not get owner certificate from string\n";
+	return undef;
+    }
     if (!($owner_certificate->uuid() =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/)) {
 	print STDERR "Invalid target_uuid in credential\n";
 	return undef;
@@ -319,8 +325,10 @@ sub CreateFromSignedTicket($$;$$)
 
     # Sequence number
     my ($seqno_node) = $doc->getElementsByTagName("serial");
-    return undef
-	if (!defined($seqno_node));
+    if (!defined($seqno_node)) {
+	print STDERR "Ticket is missing seqno node\n";
+	return undef;
+    }
     my $seqno = $seqno_node->to_literal();
 
     if (! ($seqno =~ /^\w+$/)) {
@@ -332,33 +340,33 @@ sub CreateFromSignedTicket($$;$$)
     $self->{'idx'}           = undef;
     $self->{'rspec'}         = $rspec;
     $self->{'ticket_uuid'}   = $ticket_uuid;
-    $self->{'slice_uuid'}    = $target_certificate->uuid();
+    $self->{'target_uuid'}   = $target_certificate->uuid();
     $self->{'owner_uuid'}    = $owner_certificate->uuid();
-    $self->{'slice_hrn'}     = $target_certificate->hrn();
+    $self->{'target_hrn'}    = $target_certificate->hrn();
     $self->{'owner_hrn'}     = $owner_certificate->hrn();
-    $self->{'slice_cert'}    = $target_certificate;
+    $self->{'target_cert'}   = $target_certificate;
     $self->{'owner_cert'}    = $owner_certificate;
     $self->{'ticket_string'} = $ticket_string;
     $self->{'xmlref'}        = $doc;
     $self->{'component'}     = $component;
     $self->{'seqno'}         = $seqno;
     $self->{'stored'}        = 0;
+    $self->{'LOCKED'}        = 0;
     
     #
-    # We save copies of the tickets we hand out; lets find that record
-    # in the DB, just to verify.
+    # We save copies of the tickets we hand out, but delete them
+    # when redeemed. If we still have it, mark it.
     #
     if (! $nosig) {
 	my $query_result =
 	    DBQueryWarn("select * from geni_tickets where idx='$seqno'");
-	if (!$query_result || !$query_result->numrows) {
-	    print STDERR "Could not find the ticket $seqno in the DB\n";
-	    return undef;
+
+	if ($query_result && $query_result->numrows) {
+	    my $row = $query_result->fetchrow_hashref();
+	    $self->{'redeem_before'} = $row->{'redeem_before'};
+	    $self->{'idx'}    = $seqno;
+	    $self->{'stored'} = 1;
 	}
-	my $row = $query_result->fetchrow_hashref();
-	$self->{'redeem_before'} = $row->{'redeem_before'};
-	$self->{'idx'}    = $seqno;
-	$self->{'stored'} = 1;
     }
     bless($self, $class);
 
@@ -388,11 +396,6 @@ sub Delete($$)
 		or print STDERR "GeniTicket::Delete: ".
 		    "GeniUsage->DeleteTicket($self) failed\n";
 	}
-	elsif ($flag == TICKET_REDEEMED) {
-	    GeniUsage->RedeemTicket($self) == 0 
-		or print STDERR "GeniTicket::Delete: ".
-		    "GeniUsage->RedeemTicket($self) failed\n";
-	}
 	elsif ($flag == TICKET_RELEASED) {
 	    GeniUsage->ReleaseTicket($self) == 0 
 		or print STDERR "GeniTicket::Delete: ".
@@ -403,9 +406,67 @@ sub Delete($$)
 		or print STDERR "GeniTicket::Delete: ".
 		    "GeniUsage->ExpireTicket($self) failed\n";
 	}
-
+	elsif ($flag == TICKET_REDEEMED) {
+	    GeniUsage->RedeemTicket($self) == 0 
+		or print STDERR "GeniTicket::Delete: ".
+		"GeniUsage->RedeemTicket($self) failed\n";
+	}
+	elsif ($flag == TICKET_DELETED) {
+	    # Do nothing for this. Just removing from the tickets table,
+	    # but want to leave it in the history.
+	}
 	delete($tickets{"$idx"});
     }
+    return 0;
+}
+
+#
+# We lock at a very coarse grain, mostly in the CM. 
+#
+sub Lock($)
+{
+    my ($self) = @_;
+    my $idx    = $self->idx();
+
+    # We already have it locked.
+    return 0
+	if ($self->LOCKED());
+
+    # Not in the DB, so does not matter.
+    return 0
+	if (!$self->stored());
+
+    DBQueryWarn("lock tables geni_tickets write")
+	or return -1;
+
+    my $query_result =
+	DBQueryWarn("select locked from geni_tickets ".
+		    "where idx='$idx' and locked is null");
+    if (!$query_result || !$query_result->numrows) {
+	DBQueryWarn("unlock tables");
+	return 1;
+    }
+    $query_result =
+	DBQueryWarn("update geni_tickets set locked=now() where idx='$idx'");
+    DBQueryWarn("unlock tables");
+
+    return 1
+	if (!$query_result);
+    $self->{'LOCKED'} = $$;
+    return 0;
+}
+sub UnLock($)
+{
+    my ($self) = @_;
+    my $idx    = $self->idx();
+
+    return 1
+	if (!$self->LOCKED());
+
+    DBQueryWarn("update geni_tickets set locked=NULL where idx='$idx'")
+	or return -1;
+    
+    $self->{'LOCKED'} = 0;
     return 0;
 }
 
@@ -451,12 +512,12 @@ sub Store($)
     my ($self) = @_;
     my @insert_data  = ();
 
-    my $idx        = $self->idx();
-    my $seqno      = $self->seqno();
-    my $slice_uuid = $self->slice_uuid();
-    my $owner_uuid = $self->owner_uuid();
-    my $ticket_uuid= $self->ticket_uuid();
-    my $expires    = $self->redeem_before();
+    my $idx         = $self->idx();
+    my $seqno       = $self->seqno();
+    my $target_uuid = $self->target_uuid();
+    my $owner_uuid  = $self->owner_uuid();
+    my $ticket_uuid = $self->ticket_uuid();
+    my $expires     = $self->redeem_before();
 
     #
     # For a locally created/signed ticket, seqno=idx. For a ticket from
@@ -476,7 +537,7 @@ sub Store($)
     push(@insert_data, "idx='$idx'");
     push(@insert_data, "seqno='$seqno'");
     push(@insert_data, "ticket_uuid='$ticket_uuid'");
-    push(@insert_data, "slice_uuid='$slice_uuid'");
+    push(@insert_data, "target_uuid='$target_uuid'");
     push(@insert_data, "owner_uuid='$owner_uuid'");
     push(@insert_data, "redeem_before='$expires'");
     
@@ -498,8 +559,20 @@ sub Store($)
 }
 
 #
-# Sign the ticket before returning it. We capture the output, which is
-# in XML. 
+# When we redeem a ticket, we update the history file and delete it.
+#
+sub Redeem($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (!ref($self));
+
+    return $self->Delete(TICKET_REDEEMED);
+}
+
+#
+# Sign the ticket before returning it.
 #
 sub Sign($)
 {
@@ -508,18 +581,41 @@ sub Sign($)
     return -1
 	if (!ref($self));
 
-    my $idx        = $self->seqno();
-    my $expires    = $self->redeem_before();
-    my $slice_cert = $self->slice_cert()->cert();
-    my $owner_cert = $self->owner_cert()->cert();
-    my $rspec_xml  = XMLout($self->rspec(), "NoAttr" => 1);
-    $rspec_xml =~ s/opt\>/rspec\>/g;
-
     #
     # Every ticket/credential gets its own uuid.
     #
     my $ticket_uuid = NewUUID();
-    $self->{'ticket_uuid'} = $ticket_uuid;
+    $self->{'ticket_uuid'} = GeniUtil::NewUUID();
+
+    $self->RunSigner() == 0
+	or return -1;
+
+    return 0;
+}
+
+#
+# Sign the ticket before returning it. We capture the output, which is
+# in XML. 
+#
+sub RunSigner($$)
+{
+    my ($self) = @_;
+
+    return -1
+	if (!ref($self));
+
+    my $idx         = $self->seqno();
+    my $expires     = $self->redeem_before();
+    my $target_cert = $self->target_cert()->cert();
+    my $owner_cert  = $self->owner_cert()->cert();
+    my $ticket_uuid = $self->{'ticket_uuid'};
+    my $rspec_xml   = $self->rspec();
+
+    # Allow for the rspec to be in XML already.
+    if (ref($rspec_xml)) {
+	$rspec_xml = XMLout($rspec_xml, "NoAttr" => 1);
+	$rspec_xml =~ s/opt\>/rspec\>/g;
+    }
 
     # Convert to GMT.
     $expires = POSIX::strftime("20%y-%m-%dT%H:%M:%S",
@@ -534,7 +630,7 @@ sub Sign($)
 	" <type>ticket</type>\n".
 	" <serial>$idx</serial>\n".
 	" <owner_gid>$owner_cert</owner_gid>\n".
-	" <target_gid>$slice_cert</target_gid>\n".
+	" <target_gid>$target_cert</target_gid>\n".
 	" <uuid>$ticket_uuid</uuid>\n".
 	" <expires>$expires</expires>\n".
 	" <ticket>\n".
@@ -568,51 +664,6 @@ sub Sign($)
 	return -1;
     }
     $self->{'ticket_string'} = $ticket;
-
-    $self->Store() == 0
-	or return -1;
-
-    unlink($filename);
-    return 0;
-}
-
-#
-# Get the experiment for the slice this sliver belongs to.
-#
-sub GetExperiment($)
-{
-    my ($self) = @_;
-
-    return undef
-	if (! ref($self));
-
-    return Experiment->Lookup($self->slice_uuid());
-}
-
-#
-# Look up a list of tickets for a locally instantiated slice. 
-# Used by the CM.
-#
-sub SliceTickets($$$)
-{
-    my ($class, $slice, $pref) = @_;
-
-    my $slice_uuid = $slice->uuid();
-    my @result = ();
-
-    my $query_result =
-	DBQueryWarn("select idx from geni_tickets ".
-		    "where slice_uuid='$slice_uuid'");
-    return -1
-	if (!$query_result);
-
-    while (my ($idx) = $query_result->fetchrow_array()) {
-	my $ticket = GeniTicket->Lookup($idx);
-	return -1
-	    if (!defined($ticket));
-	push(@result, $ticket);
-    }
-    @$pref = @result;
     return 0;
 }
 
@@ -627,12 +678,13 @@ sub Release($$)
     return -1
 	if (! ref($self));
 
-    my $experiment = Experiment->Lookup($self->slice_uuid());
+    my $experiment = Experiment->Lookup("GeniSlices", "reservations");
     if (!defined($experiment)) {
 	#
-	# Cannot be any nodes if no experiment.
+	# This experiment has to exist!
 	#
-	return $self->Delete($flag);
+	print STDERR "Could not find Geni reservations experiment!";
+	return -1;
     }
     my $pid     = $experiment->pid();
     my $eid     = $experiment->eid();
@@ -640,7 +692,7 @@ sub Release($$)
     my @nodes   = ();
 
     foreach my $ref (@{$self->rspec()->{'node'}}) {
-	my $resource_uuid = $ref->{'uuid'};
+	my $resource_uuid = $ref->{'component_uuid'} || $ref->{'uuid'};
 	my $node = Node->Lookup($resource_uuid);
 	next
 	    if (!defined($node));
@@ -652,7 +704,11 @@ sub Release($$)
 	# Watch for duplicates, as in multiple vnodes on a pnode.
 	next
 	    if (grep {$_ eq $node->node_id()} @nodeids);
-	    
+
+	#
+	# If the node is still in the reservations experiment, it
+	# is by definition, not in use by a slice. 
+	#
 	if ($reservation->SameExperiment($experiment)) {
 	    push(@nodeids, $node->node_id());
 	    push(@nodes, $node);
@@ -697,6 +753,31 @@ sub Expired($)
 		    "       UNIX_TIMESTAMP(redeem_before))");
     
     return $query_result->numrows;
+}
+
+#
+# List all tickets for a user.
+#
+sub ListUserTickets($$$)
+{
+    my ($class, $user, $pref) = @_;
+    my @result = ();
+
+    my $user_uuid = $user->uuid();
+    my $query_result = DBQueryWarn("select idx from geni_tickets ".
+				   "where owner_uuid='$user_uuid'");
+    return -1
+	if (!$query_result);
+
+    while (my ($idx) = $query_result->fetchrow_array()) {
+	my $ticket = GeniTicket->Lookup($idx);
+	return -1
+	    if (!defined($ticket));
+	push(@result, $ticket);
+    }
+
+    @$pref = @result;
+    return 0;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

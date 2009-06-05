@@ -111,8 +111,10 @@ CREATE TABLE `geni_tickets` (
   `ticket_uuid` varchar(40) NOT NULL default '',
   `owner_uuid` varchar(40) NOT NULL default '',
   `slice_uuid` varchar(40) NOT NULL default '',
+  `target_uuid` varchar(40) NOT NULL default '',
   `created` datetime default NULL,
   `redeem_before` datetime default NULL,
+  `redeemed` datetime default NULL,
   `locked` datetime default NULL,
   `valid_until` datetime default NULL,
   `component_uuid` varchar(40) NOT NULL default '',
@@ -159,6 +161,15 @@ CREATE TABLE `geni_crls` (
   `expires` datetime default NULL,
   `cert` text,
   PRIMARY KEY  (`uuid`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+CREATE TABLE `geni_manifests` (
+  `idx` int(10) unsigned NOT NULL auto_increment,
+  `slice_uuid` varchar(40) NOT NULL default '',
+  `created` datetime default NULL,
+  `manifest` text,
+  PRIMARY KEY  (`idx`),
+  UNIQUE KEY `slice_uuid` (`slice_uuid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 DROP TABLE IF EXISTS `geni_userkeys`;
@@ -242,7 +253,9 @@ CREATE TABLE `ticket_history` (
   `owner_uuid` varchar(40) NOT NULL default '',
   `owner_hrn` varchar(256) NOT NULL default '',
   `slice_uuid` varchar(40) NOT NULL default '',
+  `target_uuid` varchar(40) NOT NULL default '',
   `slice_hrn` varchar(256) NOT NULL default '',
+  `target_hrn` varchar(256) NOT NULL default '',
   `created` datetime default NULL,
   `redeemed` datetime default NULL,
   `expired` datetime default NULL,

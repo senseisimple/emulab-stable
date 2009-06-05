@@ -23,6 +23,7 @@ use GeniCertificate;
 use GeniSliver;
 use GeniSlice;
 use GeniRegistry;
+use GeniUtil;
 use emutil;
 use English;
 use overload ('""' => 'Stringify');
@@ -145,7 +146,6 @@ sub Create($$$$$$)
     my $uuid        = $certificate->uuid();
     my $slice_uuid  = $slice->uuid();
     my $owner_uuid  = $owner->uuid();
-
     $aggregate_type = "Aggregate"
     	if (! defined($aggregate_type));
 
@@ -809,19 +809,22 @@ use GeniCredential;
 use GeniCertificate;
 use GeniRegistry;
 use GeniAggregate;
+use GeniUtil;
 use Experiment;
 use Interface;
 use Data::Dumper;
 
 sub Create($$$$$$)
 {
-    my ($class, $slice, $owner, $node1sliver, $node2sliver, $rspec) = @_;
+    my ($class, $slice, $owner, $node1sliver, $node2sliver,
+	$linkrspec, $node1rspec, $node2rspec) = @_;
     my $clearinghouse;
 
-    my $linkname = $rspec->{'nickname'};
+    my $linkname = $linkrspec->{"nickname"} || $linkrspec->{"virtual_id"};
     return undef
 	if (!defined($linkname));
-
+    my @interfaces = @{ $linkrspec->{'interface_ref'} };
+    
     my $experiment = Experiment->Lookup($slice->uuid());
     if (!defined($experiment)) {
 	print STDERR "Could not map $slice to its experiment\n";
@@ -847,12 +850,12 @@ sub Create($$$$$$)
 	return undef;
     }
 
-    my $node1ref = (@{$rspec->{'linkendpoints'}})[0];
-    my $node2ref = (@{$rspec->{'linkendpoints'}})[1];
+    my $iface1ref = $interfaces[0];
+    my $iface2ref = $interfaces[1];
 
     # These are the ips of the tunnel.
-    my $ip1      = $node1ref->{'tunnel_ip'};
-    my $ip2      = $node2ref->{'tunnel_ip'};
+    my $ip1      = $iface1ref->{'tunnel_ip'};
+    my $ip2      = $iface2ref->{'tunnel_ip'};
     my $ctrlip1;
     my $ctrlip2;
     my $iface1;
@@ -861,7 +864,11 @@ sub Create($$$$$$)
     # We need the control network addresses, but it is possible that
     # one of the nodes is not on this testbed.
     if (defined($node1sliver)) {
-	my $node1 = Node->Lookup($node1ref->{'node_uuid'});
+	my $node1 = Node->Lookup($node1sliver->resource_uuid());
+	if (!defined($node1)) {
+	    print STDERR "Tunnel: Could not lookup node for $node1sliver\n";
+	    goto bad;
+ 	}
 	my $interface = Interface->LookupControl($node1);
 	goto bad
 	    if (!defined($interface));
@@ -879,7 +886,7 @@ sub Create($$$$$$)
 	$clearinghouse = GeniRegistry::ClearingHouse->Create();
 	
 	my $blob;
-	if ($clearinghouse->Resolve($node1ref->{'node_uuid'},
+	if ($clearinghouse->Resolve($node1rspec->{'component_uuid'},
 				    "Component", \$blob) != 0) {
 	    print STDERR "Could not lookup node at clearinghouse\n";
 	    goto bad;
@@ -909,18 +916,22 @@ sub Create($$$$$$)
 	    print STDERR "Could not create a registry client for $component\n";
 	    goto bad;
 	}
-	$registry->Resolve($node1ref->{'node_uuid'}, "Node", \$blob);
+	$registry->Resolve($node1rspec->{'component_uuid'}, "Node", \$blob);
 	$ctrlip1 = $blob->{'physctrl'}
 	    if (defined($blob) && exists($blob->{'physctrl'}));
 
 	if (!defined($ctrlip1)) {
 	    print STDERR "Could get control IP for ".
-		"$node1ref->{'node_uuid'} at $component\n";
+		"$node1rspec->{'component_uuid'} at $component\n";
 	    goto bad;
 	}
     }
     if (defined($node2sliver)) {
-	my $node2 = Node->Lookup($node2ref->{'node_uuid'});
+	my $node2 = Node->Lookup($node2sliver->resource_uuid());
+	if (!defined($node2)) {
+	    print STDERR "Tunnel: Could not lookup node for $node2sliver\n";
+	    goto bad;
+ 	}
 	my $interface = Interface->LookupControl($node2);
 	goto bad
 	    if (!defined($interface));
@@ -939,7 +950,7 @@ sub Create($$$$$$)
 	    if (!defined($clearinghouse));
 	
 	my $blob;
-	if ($clearinghouse->Resolve($node2ref->{'node_uuid'},
+	if ($clearinghouse->Resolve($node2rspec->{'component_uuid'},
 				    "Component", \$blob) != 0) {
 	    print STDERR "Could not lookup node at clearinghouse\n";
 	    goto bad;
@@ -968,13 +979,13 @@ sub Create($$$$$$)
 	    print STDERR "Could not create a registry client for $component\n";
 	    goto bad;
 	}
-	$registry->Resolve($node2ref->{'node_uuid'}, "Node", \$blob);
+	$registry->Resolve($node2rspec->{'component_uuid'}, "Node", \$blob);
 	$ctrlip2 = $blob->{'physctrl'}
 	    if (defined($blob) && exists($blob->{'physctrl'}));
 
 	if (!defined($ctrlip2)) {
 	    print STDERR "Could get control IP for ".
-		"$node2ref->{'node_uuid'} at $component\n";
+		"$node2rspec->{'component_uuid'} at $component\n";
 	    goto bad;
 	}
     }
@@ -1005,7 +1016,7 @@ sub Create($$$$$$)
   bad:
     $tunnel->Destroy()
 	if (defined($tunnel));
-    $aggregate->Delete(1)
+    $aggregate->Delete(GENI_PURGEFLAG)
 	if (defined($aggregate));
     return undef;
 }

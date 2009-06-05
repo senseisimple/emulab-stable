@@ -187,16 +187,16 @@ sub NewTicket($$)
 
     my $ticket_idx     = $ticket->idx();
     my $ticket_uuid    = $ticket->uuid();
-    my $slice_uuid     = $ticket->slice_uuid();
-    my $slice_hrn      = $ticket->slice_hrn();
+    my $target_uuid    = $ticket->target_uuid();
+    my $target_hrn     = $ticket->target_hrn();
     my $owner_uuid     = $ticket->owner_uuid();
     my $owner_hrn      = $ticket->owner_hrn();
 
     # Now tack on other stuff we need.
     push(@insert_data, "idx='$ticket_idx'");
     push(@insert_data, "uuid='$ticket_uuid'");
-    push(@insert_data, "slice_uuid=" . DBQuoteSpecial($slice_uuid));
-    push(@insert_data, "slice_hrn=" . DBQuoteSpecial($slice_hrn));
+    push(@insert_data, "target_uuid=" . DBQuoteSpecial($target_uuid));
+    push(@insert_data, "target_hrn=" . DBQuoteSpecial($target_hrn));
     push(@insert_data, "owner_uuid=" . DBQuoteSpecial($owner_uuid));
     push(@insert_data, "owner_hrn=" . DBQuoteSpecial($owner_hrn));
     push(@insert_data, "created=now()");

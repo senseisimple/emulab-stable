@@ -11,7 +11,7 @@ use Exporter;
 use vars qw(@ISA @EXPORT);
 
 @ISA    = "Exporter";
-@EXPORT = qw(NewUUID);
+@EXPORT = qw(NewUUID GENI_PURGEFLAG);
 
 use English;
 use Data::Dumper;
@@ -22,6 +22,8 @@ my $TB		   = "@prefix@";
 my $TBOPS          = "@TBOPSEMAIL@";
 my $user	   = "geniuser";
 my $group          = "GeniSlices";
+
+sub GENI_PURGEFLAG()	{ return 1; }
 
 #
 # In the prototype, we accept certificate signed by trusted roots (CA

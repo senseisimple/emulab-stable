@@ -687,6 +687,7 @@ use GeniComponent;
 use GeniSlice;
 use GeniCredential;
 use GeniCertificate;
+use GeniUtil;
 use Experiment;
 use XML::Simple;
 use libdb qw(TBDB_ALLOCSTATE_RES_INIT_DIRTY);
@@ -699,6 +700,12 @@ sub Create($$$$$$)
     my $experiment = $slice->GetExperiment();
     if (!defined($experiment)) {
 	print STDERR "Could not map $slice to its experiment\n";
+	return undef;
+    }
+    $sliver_uuid = GeniUtil::NewUUID()
+	if (!defined($sliver_uuid));
+    if (!defined($sliver_uuid)) {
+	print STDERR "Could not generate a sliver UUID for node in $slice\n";
 	return undef;
     }
 
@@ -719,13 +726,13 @@ sub Create($$$$$$)
 	    return undef;
 	}
 	if (! $reservation->SameExperiment($experiment)) {
-	    print STDERR "$node is reserved to another, not $reservation\n";
+	    print STDERR "$node is reserved to another, not $experiment\n";
 	    # Signal error so we can look at what happened.
 	    return undef;
 	}
     }
     my $hrn = "${PGENIDOMAIN}." . $node->node_id();
-    my $nickname = $rspec->{'nickname'};
+    my $nickname = $rspec->{'virtual_id'};
     
     #
     # The resource UUID refers to the physical node, but the virtualization
@@ -809,7 +816,7 @@ sub Provision($;$)
 	return -1;
     }
     if (! $reservation->SameExperiment($experiment)) {
-	print STDERR "$node is reserved to another, not $reservation\n";
+	print STDERR "$node is reserved to another, not $experiment\n";
 	# Signal error so we can look at what happened.
 	return -1;
     }
@@ -918,12 +925,14 @@ sub Provision($;$)
 #
 # Unprovision a sliver. 
 #
-sub UnProvision($)
+sub UnProvision($;$)
 {
-    my ($self) = @_;
+    my ($self, $nophysfree) = @_;
 
     return -1
 	if (! ref($self));
+    $nophysfree = 0
+	if (!defined($nophysfree));
 
     my $experiment = Experiment->Lookup($self->slice_uuid());
     if (!defined($experiment)) {
@@ -981,7 +990,7 @@ sub UnProvision($)
 		return -1;
 	    }
 
-	    if (scalar(@vnodes) > 1) {
+	    if (scalar(@vnodes) > 1 || $nophysfree) {
 		system("$NFREE -q $pid $eid $node_id");
 	    }
 	    else {
@@ -995,6 +1004,8 @@ sub UnProvision($)
 	    }
 	}
 	else {
+	    goto skip
+		if (!$nophysfree);
 	    system("$NFREE -q $pid $eid $node_id");
 	}
 	if ($?) {
@@ -1002,6 +1013,7 @@ sub UnProvision($)
 	    $node->Refresh();
 	    return -1;
 	}
+      skip:
 	$node->Refresh();
     }
     else {
@@ -1080,11 +1092,11 @@ use GeniCertificate;
 sub Create()
 {
     my ($class, $slice, $user,
-	$interface_uuid, $node, $rspec) = @_;
+	$interface_uuid, $node, $linkname, $rspec) = @_;
 
-    my $nickname = $rspec->{'nickname'};
-    my $hrn = "${PGENIDOMAIN}." .
-	$node->node_id() . "." . $rspec->{'iface_name'};
+    my $nickname = $node->node_id() . ".$linkname." .
+	$rspec->{'virtual_interface_id'};
+    my $hrn = "${PGENIDOMAIN}.$nickname";
 
     return GeniSliver->Create($slice, $user, $interface_uuid,
 			      $node->uuid(), "Interface",

@@ -158,16 +158,19 @@ else:
     url1 = components[0]["url"]
     url2 = components[1]["url"]
 
+#url1 = "https://boss.emulab.net/protogeni/stoller/xmlrpc/cm"
+#url2 = "https://myboss.myelab.testbed.emulab.net/protogeni/xmlrpc/cm"
+
 #
 # Get a ticket for a node on a CM.
 #
 rspec1 = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
-        " <node uuid=\"*\" " +\
-        "       nickname=\"geni1\" "+\
+        " <node virtual_id=\"geni1\" "+\
         "       virtualization_type=\"emulab-vnode\"> " +\
         " </node>" +\
         "</rspec>"
 
+print "Asking for a ticket from CM1 ..."
 params = {}
 params["credential"] = myslice
 params["rspec"]      = rspec1
@@ -176,24 +179,20 @@ if rval:
     Fatal("Could not get ticket")
     pass
 ticket1 = response["value"]
-print "Got a ticket from CM1"
+print "Got a ticket from CM1, asking for a ticket from CM2 ..."
 
 #
 # Get the uuid of the node assigned so we can specify it in the tunnel.
 #
 ticket_element = findElement("ticket", ticket1)
 node_element   = findElement("node", str(ticket_element.string))
-uuid_element   = findElement("uuid", str(node_element.string))
-node1_uuid     = uuid_element.value
-uuid_element   = findElement("sliver_uuid", str(node_element.string))
-node1_sliveruuid = uuid_element.value
+node1_rspec    = str(node_element.string);
 
 #
 # Get a ticket for a node on another CM.
 #
 rspec2 = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
-        " <node uuid=\"*\" " +\
-        "       nickname=\"geni2\" "+\
+        " <node virtual_id=\"geni2\" "+\
         "       virtualization_type=\"emulab-vnode\"> " +\
         " </node>" +\
         "</rspec>"
@@ -206,102 +205,108 @@ if rval:
     Fatal("Could not get ticket")
     pass
 ticket2 = response["value"]
-print "Got a ticket from CM2"
+print "Got a ticket from CM2, redeeming ticket on CM1 ..."
 
 #
 # Get the uuid of the node assigned so we can specify it in the tunnel.
 #
 ticket_element = findElement("ticket", ticket2)
 node_element   = findElement("node", str(ticket_element.string))
-uuid_element   = findElement("uuid", str(node_element.string))
-node2_uuid     = uuid_element.value
-uuid_element   = findElement("sliver_uuid", str(node_element.string))
-node2_sliveruuid = uuid_element.value
+node2_rspec    = str(node_element.string);
 
 #
 # Create the slivers.
 #
 params = {}
+params["credential"] = myslice
 params["ticket"]   = ticket1
 rval,response = do_method(None, "RedeemTicket", params, url1)
 if rval:
     Fatal("Could not redeem ticket on CM1")
     pass
-sliver1 = response["value"]
-print "Created a sliver CM1"
+sliver1,manifest1 = response["value"]
+print "Created a sliver on CM1, redeeming ticket on CM2 ..."
+print str(manifest1);
 
 params = {}
+params["credential"] = myslice
 params["ticket"]   = ticket2
 rval,response = do_method(None, "RedeemTicket", params, url2)
 if rval:
     Fatal("Could not redeem ticket on CM2")
     pass
-sliver2 = response["value"]
+sliver2,manifest2 = response["value"]
 print "Created a sliver on CM2"
+print str(manifest2)
 
 #
 # Now add the tunnel part since we have the uuids for the two nodes.
 #
-rspec1 = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
-        " <node uuid=\"" + node1_uuid + "\" " +\
-        "       sliver_uuid=\"" + node1_sliveruuid + "\" " +\
-        "       nickname=\"geni1\" "+\
-        "       virtualization_type=\"emulab-vnode\"> " +\
-        " </node>" +\
-        " <link name=\"link0\" nickname=\"link0\" link_type=\"tunnel\"> " +\
-        "  <linkendpoints nickname=\"destination_interface\" " +\
-        "            tunnel_ip=\"192.168.1.1\" " +\
-        "            node_nickname=\"geni1\" " +\
-        "            sliver_uuid=\"" + node1_sliveruuid + "\" " +\
-        "            node_uuid=\"" + node1_uuid + "\" /> " +\
-        "  <linkendpoints nickname=\"source_interface\" " +\
-        "            tunnel_ip=\"192.168.1.2\" " +\
-        "            node_nickname=\"geni2\" " +\
-        "            sliver_uuid=\"" + node2_sliveruuid + "\" " +\
-        "            node_uuid=\"" + node2_uuid + "\" /> " +\
+rspec = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +\
+        "<rspec xmlns=\"http://www.protogeni.net/resources/rspec/0.1\" " +\
+        "        type=\"request\"> " + node1_rspec + " " + node2_rspec + " " +\
+        " <link virtual_id=\"link0\" link_type=\"tunnel\"> " +\
+        "  <interface_ref virtual_node_id=\"geni1\" " +\
+        "                 virtual_interface_id=\"virt0\" "+\
+        "                 tunnel_ip=\"192.168.1.1\" />" +\
+        "  <interface_ref virtual_node_id=\"geni2\" " +\
+        "                 virtual_interface_id=\"virt0\" "+\
+        "                 tunnel_ip=\"192.168.1.2\" />" +\
         " </link> " +\
         "</rspec>"
 
+#print str(rspec)
+
+print "Updating ticket on CM1 with tunnel stuff ..."
+params = {}
+params["credential"] = myslice
+params["ticket"]     = ticket1
+params["rspec"]      = rspec
+rval,response = do_method(None, "UpdateTicket", params, url1)
+if rval:
+    Fatal("Could not update ticket on CM1")
+    pass
+ticket1 = response["value"]
+print "Updated ticket on CM1. Updating ticket on CM2 with tunnel stuff ..."
+
+#
+# And again for the second ticket.
+#
+params = {}
+params["credential"] = myslice
+params["ticket"]     = ticket2
+params["rspec"]      = rspec
+rval,response = do_method(None, "UpdateTicket", params, url2)
+if rval:
+    Fatal("Could not update ticket on CM2")
+    pass
+ticket2 = response["value"]
+print "Updated ticket on CM2. Updating sliver on CM1 with new ticket ..."
+
+#
+# Update the slivers with the new tickets, to create the tunnels
+#
 params = {}
 params["credential"] = sliver1
-params["rspec"]      = rspec1
+params["ticket"]     = ticket1
 rval,response = do_method(None, "UpdateSliver", params, url1)
 if rval:
     Fatal("Could not update sliver on CM1")
     pass
-print "Updated sliver on CM1 with tunnel stuff"
-
-#
-# And again for the second sliver.
-#
-rspec2 = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
-        " <node uuid=\"" + node2_uuid + "\" " +\
-        "       sliver_uuid=\"" + node2_sliveruuid + "\" " +\
-        "       nickname=\"geni2\" "+\
-        "       virtualization_type=\"emulab-vnode\"> " +\
-        " </node>" +\
-        " <link name=\"link0\" nickname=\"link0\" link_type=\"tunnel\"> " +\
-        "  <linkendpoints nickname=\"destination_interface\" " +\
-        "            tunnel_ip=\"192.168.1.1\" " +\
-        "            node_nickname=\"geni1\" " +\
-        "            sliver_uuid=\"" + node1_sliveruuid + "\" " +\
-        "            node_uuid=\"" + node1_uuid + "\" /> " +\
-        "  <linkendpoints nickname=\"source_interface\" " +\
-        "            tunnel_ip=\"192.168.1.2\" " +\
-        "            node_nickname=\"geni2\" " +\
-        "            sliver_uuid=\"" + node2_sliveruuid + "\" " +\
-        "            node_uuid=\"" + node2_uuid + "\" /> " +\
-        " </link> " +\
-        "</rspec>"
+manifest1 = response["value"]
+print "Updated sliver on CM1. Updating sliver on CM2 with new ticket ..."
+#print str(manifest1);
 
 params = {}
 params["credential"] = sliver2
-params["rspec"]      = rspec2
+params["ticket"]     = ticket2
 rval,response = do_method(None, "UpdateSliver", params, url2)
 if rval:
-    Fatal("Could not update sliver on CM2")
+    Fatal("Could not start sliver on CM2")
     pass
-print "Updated sliver on CM2 with tunnel stuff"
+manifest2 = response["value"]
+print "Updated sliver on CM2. Starting sliver on CM1 ..."
+#print str(manifest1);
 
 #
 # Start the slivers.
@@ -312,6 +317,7 @@ rval,response = do_method(None, "StartSliver", params, url1)
 if rval:
     Fatal("Could not start sliver on CM1")
     pass
+print "Started sliver on CM1. Starting sliver on CM2 ..."
 
 params = {}
 params["credential"] = sliver2

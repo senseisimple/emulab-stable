@@ -126,6 +126,7 @@ my $responder = Frontier::Responder->new( "methods" => {
     "Resolve"	        => \&GeniCM::Resolve,
     "DiscoverResources" => \&GeniCM::DiscoverResources,
     "GetTicket"         => \&GeniCM::GetTicket,
+    "UpdateTicket"      => \&GeniCM::UpdateTicket,
     "ReleaseTicket"     => \&GeniCM::ReleaseTicket,
     "RedeemTicket"      => \&GeniCM::RedeemTicket,
     "StartSliver"       => \&GeniCM::StartSliver,
@@ -139,17 +140,23 @@ my $responder = Frontier::Responder->new( "methods" => {
     "ListUsage"         => \&GeniCM::ListUsage,
     "SliceStatus"       => \&GeniCM::SliceStatus,
     "SliverStatus"      => \&GeniCM::SliverStatus,
+    "SliverTicket"      => \&GeniCM::SliverTicket,
+    "ListTickets"       => \&GeniCM::ListTickets,
    },
 );
+
+# Add stuff for log message if sent.
+AddAuditInfo("message", $request);
+# CC errors to Utah for now.
+AddAuditInfo("cc", "protogeni-errors\@flux.utah.edu")
+    if (!$MAINSITE);
 
 my $response = $responder->{'_decode'}->serve($request,
 					      $responder->{'methods'});
 
 # Add stuff for log message if sent.
 AddAuditInfo("message", $response . "\n\n" . $request);
-# CC errors to Utah for now.
-AddAuditInfo("cc", "protogeni-errors\@flux.utah.edu")
-    if (!$MAINSITE);
+
 #
 # Terminate the log capture so that we can print the response to STDOUT
 # for the web server.
@@ -158,3 +165,22 @@ LogEnd(0);
 
 print "Content-Type: text/xml \n\n" . $response;
 exit(0);
+
+#
+# Want to prevent bad exit.
+#
+END {
+    my $exitcode = $?;
+
+    if ($exitcode) {
+	LogEnd(0);
+
+	my $decoder = Frontier::RPC2->new();
+	print "Content-Type: text/xml \n\n";
+	print $decoder->encode_fault(-1, "XMLRPC Server Error");
+
+	# Since we converted to a normal error and sent the log message.
+	$? = 0;
+    }
+}
+

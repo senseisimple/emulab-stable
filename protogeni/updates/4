@@ -1,0 +1,44 @@
+#
+# Add a history table for tracking usage stats. Primitive!
+#
+use strict;
+use GeniDB;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    DBSetDefault($dbhandle);
+
+    if (!DBSlotExists("geni_tickets", "redeemed")) {
+	DBQueryFatal("alter table geni_tickets add ".
+		     "redeemed datetime default NULL after redeem_before");
+    }
+    if (!DBSlotExists("geni_tickets", "target_uuid")) {
+	DBQueryFatal("alter table geni_tickets add ".
+		     "target_uuid varchar(40) NOT NULL default '' ".
+		     "after slice_uuid");
+    }
+    if (!DBSlotExists("ticket_history", "target_uuid")) {
+	DBQueryFatal("alter table ticket_history add ".
+		     "target_uuid varchar(40) NOT NULL default '' ".
+		     "after slice_uuid");
+    }
+    if (!DBSlotExists("ticket_history", "target_hrn")) {
+	DBQueryFatal("alter table ticket_history add ".
+		     "target_hrn varchar(256) NOT NULL default '' ".
+		     "after slice_hrn");
+    }
+    if (!DBTableExists("geni_manifests")) {
+	DBQueryFatal("create table `geni_manifests` ( ".
+		     "  `idx` int(10) unsigned NOT NULL auto_increment, ".
+		     "  `slice_uuid` varchar(40) NOT NULL default '', ".
+		     "  `created` datetime default NULL, ".
+		     "  `manifest` text, ".
+		     "  PRIMARY KEY  (`idx`), ".
+		     "  UNIQUE KEY `slice_uuid` (`slice_uuid`) ".
+		     ") ENGINE=MyISAM DEFAULT CHARSET=latin1");
+    }
+    return 0;
+}
+1;

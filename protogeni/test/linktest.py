@@ -89,23 +89,23 @@ else:
 print "Asking for a ticket from the local CM"
 
 rspec = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
-        " <node uuid=\"*\" " +\
-        "       nickname=\"geni1\" "+\
+        " <node virtual_id=\"geni1\" "+\
         "       virtualization_type=\"emulab-vnode\"> " +\
+        "   <interface virtual_id=\"virt0\"/> " +\
         " </node>" +\
-        " <node uuid=\"*\" " +\
-        "       nickname=\"geni2\" "+\
+        " <node virtual_id=\"geni2\" "+\
         "       virtualization_type=\"emulab-vnode\"> " +\
+        "   <interface virtual_id=\"virt0\"/> " +\
         " </node>" +\
-        " <link name=\"link0\" nickname=\"link0\"> " +\
-        "  <linkendpoints nickname=\"destination_interface\" " +\
-        "            iface_name=\"*\" " +\
-        "            node_nickname=\"geni1\" " +\
-        "            node_uuid=\"*\" /> " +\
-        "  <linkendpoints nickname=\"source_interface\" " +\
-        "            iface_name=\"*\" " +\
-        "            node_nickname=\"geni2\" " +\
-        "            node_uuid=\"*\" /> " +\
+        " <link virtual_id=\"link0\"> " +\
+        "  <interface_ref " +\
+        "            virtual_interface_id=\"virt0\" " +\
+        "            virtual_node_id=\"geni1\" " +\
+        "            /> " +\
+        "  <interface_ref " +\
+        "            virtual_interface_id=\"virt0\" " +\
+        "            virtual_node_id=\"geni2\" " +\
+        "            /> " +\
         " </link> " +\
         "</rspec>"
 params = {}
@@ -123,6 +123,7 @@ if debug: print str(response["output"])
 # Create the sliver.
 #
 params = {}
+params["credential"] = myslice
 params["ticket"]   = ticket
 params["keys"]     = mykeys
 params["impotent"] = impotent
@@ -130,8 +131,9 @@ rval,response = do_method("cm", "RedeemTicket", params)
 if rval:
     Fatal("Could not redeem ticket")
     pass
-sliver = response["value"]
+sliver,manifest = response["value"]
 print "Created the sliver. Starting the sliver ..."
+print str(manifest)
 
 #
 # Start the sliver.
@@ -143,5 +145,8 @@ rval,response = do_method("cm", "StartSliver", params)
 if rval:
     Fatal("Could not start sliver")
     pass
-print "Sliver has been started."
 
+print "Sliver has been started."
+print "You should be able to log into the sliver after a little bit"
+print ""
+print "Delete this sliver with deletesliver.py"

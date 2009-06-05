@@ -17,6 +17,7 @@ use GeniRegistry;
 use GeniAuthority;
 use GeniCredential;
 use GeniCertificate;
+use GeniAggregate;
 use English;
 use Data::Dumper;
 use vars qw();

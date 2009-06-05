@@ -473,9 +473,6 @@ use GeniHRN;
 use English;
 use emdb;
 
-# Configure variables
-my $OURDOMAIN      = "@OURDOMAIN@";
-
 #
 # Create a wrapper, with the same access names.
 #

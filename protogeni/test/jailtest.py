@@ -87,18 +87,16 @@ else:
 node_uuid = "*";
 #node_uuid = "de9803c2-773e-102b-8eb4-001143e453fe";
 
-print "Asking for a ticket from the local CM"
+print "Asking for a ticket from the local CM ..."
 
 rspec = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
-        " <node uuid=\"" + node_uuid + "\" " +\
-        "       nickname=\"geni1\" "+\
-        "       phys_nickname=\"geni1\" "+\
+        " <node virtual_id=\"geni1\" "+\
+        "       colocate=\"geni1\" "+\
         "       virtualization_type=\"emulab-vnode\" " +\
         "       virtualization_subtype=\"emulab-jail\"> " +\
         " </node>" +\
-        " <node uuid=\"" + node_uuid + "\" " +\
-        "       nickname=\"geni2\" "+\
-        "       phys_nickname=\"geni1\" "+\
+        " <node virtual_id=\"geni2\" "+\
+        "       colocate=\"geni1\" "+\
         "       virtualization_type=\"emulab-vnode\" " +\
         "       virtualization_subtype=\"emulab-jail\"> " +\
         " </node>" +\
@@ -111,14 +109,13 @@ if rval:
     Fatal("Could not get ticket")
     pass
 ticket = response["value"]
-print str(ticket)
-
 print "Got a ticket from the CM. Redeeming the ticket ..."
 
 #
 # Create the sliver.
 #
 params = {}
+params["credential"] = myslice
 params["ticket"]   = ticket
 params["keys"]     = mykeys
 params["impotent"] = impotent
@@ -126,8 +123,9 @@ rval,response = do_method("cm", "RedeemTicket", params)
 if rval:
     Fatal("Could not redeem ticket")
     pass
-sliver = response["value"]
+sliver,manifest = response["value"]
 print "Created the sliver. Starting the sliver ..."
+print str(manifest)
 
 #
 # Start the sliver.
@@ -140,4 +138,5 @@ if rval:
     Fatal("Could not start sliver")
     pass
 print "Sliver has been started."
-
+print ""
+print "Delete this sliver with deletesliver.py"

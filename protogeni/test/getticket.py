@@ -76,8 +76,7 @@ else:
 print "Asking for a ticket from the local CM"
 
 rspec = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
-        " <node uuid=\"*\" " +\
-        "       nickname=\"geni1\" "+\
+        " <node virtual_id=\"geni1\" "+\
         "       virtualization_type=\"emulab-vnode\"> " +\
         " </node>" +\
         "</rspec>"
@@ -91,12 +90,49 @@ if rval:
 ticket = response["value"]
 print "Got a ticket from the CM. Delaying a moment ..."
 if debug: print str(ticket)
+#print str(ticket)
 
-time.sleep(5)
+time.sleep(2)
+
+print "Doing a ticket update ..."
+params = {}
+params["credential"] = myslice
+params["ticket"]  = ticket
+params["rspec"]   = rspec
+rval,response = do_method("cm", "UpdateTicket", params)
+if rval:
+    Fatal("Could not update ticket")
+    pass
+ticket = response["value"]
+print "Got an updated ticket from the CM. Delaying a moment ..."
+if debug: print str(ticket)
+#print str(ticket)
+
+time.sleep(2)
+
+print "Getting a list of all your tickets ..."
+params = {}
+params["credential"] = myslice
+rval,response = do_method("cm", "ListTickets", params)
+if rval:
+    Fatal("Could not get ticket list")
+    pass
+tickets = response["value"]
+print str(tickets);
+
+print "Asking for a copy of the ticket ..."
+params = {}
+params["credential"] = myslice
+params["uuid"]       = tickets[0]["uuid"]
+rval,response = do_method("cm", "GetTicket", params)
+if rval:
+    Fatal("Could not get ticket list")
+    pass
+ticketcopy = response["value"]
 
 print "Releasing the ticket now ..."
 params = {}
-params["ticket"] = ticket
+params["ticket"] = ticketcopy
 rval,response = do_method("cm", "ReleaseTicket", params)
 if rval:
     Fatal("Could not release ticket")
