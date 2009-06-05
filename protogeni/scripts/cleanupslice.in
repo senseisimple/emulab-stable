@@ -49,6 +49,14 @@ use Genixmlrpc;
 use GeniCertificate;
 
 #
+# We don't want to run this script unless its the real version.
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root! Maybe its a development version?\n");
+}
+
+#
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
 #
