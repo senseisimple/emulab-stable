@@ -114,10 +114,15 @@ sub MalformedArgsResponse($)
 				undef, "Malformed arguments to method");
 }
 
-sub BusyResponse($)
+sub BusyResponse($;$)
 {
+    my (undef,$resource) = @_;
+
+    $resource = "resource"
+	if (!defined($resource));
+    
     return GeniResponse->Create(GENIRESPONSE_BUSY,
-				undef, "resource is busy; try again later");
+				undef, "$resource is busy; try again later");
 }
 
 sub BadArgsResponse(;$)
