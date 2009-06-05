@@ -136,10 +136,6 @@ parse_request_rspec.o: parse_request_rspec.cc parse_request_rspec.h \
 parse_top.o: parse_top.cc port.h common.h fstring.h vclass.h delay.h \
   physical.h featuredesire.h forwarding.h virtual.h parser.h anneal.h \
   pclass.h
-parse_top_xml.o: parse_top_xml.cc port.h common.h fstring.h vclass.h \
-  delay.h physical.h featuredesire.h forwarding.h virtual.h parser.h \
-  anneal.h pclass.h parse_top_xml.h xmlhelpers.h xstr.h \
-  parse_error_handler.h
 parse_vtop_rspec.o: parse_vtop_rspec.cc parse_vtop_rspec.h \
   common.h port.h fstring.h delay.h featuredesire.h forwarding.h \
   virtual.h xmlhelpers.h xstr.h parse_error_handler.h anneal.h \
