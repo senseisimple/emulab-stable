@@ -476,6 +476,7 @@ sub SetupVlans($)
     }
     # Not doing stacks yet.
     my $stackopt = "";
+    my $debugopt = ($debug ? "-v" : "");
     
     # Now call snmpit to create the actual vlans.
     if ($debug) {
@@ -484,7 +485,7 @@ sub SetupVlans($)
     return $errors
 	if ($impotent);
     
-    system("$TB/bin/snmpit $stackopt -t $pid $eid @outer_ids");
+    system("$TB/bin/snmpit $debugopt $stackopt -t $pid $eid @outer_ids");
     if ($?) {
 	#
 	# Yuck failed. We leave things as is, and wait for experiment
@@ -609,11 +610,12 @@ sub DestroyVlans($)
 	my $stack    = $vlan->GetStack();
 	# Not doing stacks yet;
 	my $stackopt = "";
+	my $debugopt = ($debug ? "-v" : "");
 
 	if ($debug) {
 	    print STDERR "Running 'snmpit $stackopt -r $pid $eid $outer_id'\n";
 	}
-	system("$TB/bin/snmpit $stackopt -r $pid $eid $outer_id");
+	system("$TB/bin/snmpit $debugopt $stackopt -r $pid $eid $outer_id");
 	if ($?) {
 	    #
 	    # Yuck failed. We leave things as is, and wait for the
@@ -723,6 +725,7 @@ sub Trunk($)
 	    fatal("Trunk: Improper stack argument: $stack");
 	}
     }
+    my $debugopt = ($debug ? "-v" : "");
 
     $port =~ /^(.+):(.+)/;
     my ($node, $card) = ($1,$2);
@@ -758,7 +761,7 @@ sub Trunk($)
 	if ($debug) {
 	    print STDERR "Running 'snmpit $stackopt -U $port'\n";
 	}
-	system("$TB/bin/snmpit $stackopt -U $port");
+	system("$TB/bin/snmpit $debugopt $stackopt -U $port");
 	if ($?) {
 	    # Yuck failed.
 	    fatal("snmpit $stackopt -U failed!");
@@ -802,7 +805,7 @@ sub Trunk($)
 	# Okay, ask snmpit to trunk these vlans. 
 	#
 	my $command =
-	    "$TB/bin/snmpit $stackopt $mode $port @outer_ids";
+	    "$TB/bin/snmpit $debugopt $stackopt $mode $port @outer_ids";
 	if ($debug) { print STDERR "Running $command\n"; }
 	system($command);
 	if ($?) {
@@ -829,7 +832,8 @@ sub PortControl($)
     my @ports   = @{ $args->{'ports'} };
 
     # Not doing stacks yet;
-    my $stack   = "Experimental";
+    my $stack    = "Experimental";
+    my $debugopt = ($debug ? "-v" : "");
 
     #
     # Check the ports. Must be valid format and belong to node reserved
@@ -899,7 +903,7 @@ sub PortControl($)
     if ($debug) {
 	print STDERR "Running 'snmpit $command @ports\n";
     }
-    system("$TB/bin/snmpit $command @ports");
+    system("$TB/bin/snmpit $debugopt $command @ports");
     if ($?) {
 	# Yuck failed.
 	fatal("snmpit $command @ports");
