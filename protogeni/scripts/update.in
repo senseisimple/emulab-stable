@@ -30,6 +30,10 @@ my $DBUPDATE	  = "$TB/sbin/dbupdate";
 my $WAP           = "$TB/sbin/withadminprivs";
 my $SACERT	  = "$TB/etc/genisa.pem";
 my $CMCERT	  = "$TB/etc/genicm.pem";
+my $geniuserid    = "geniuser";
+my $geniprojid    = "GeniSlices";
+my $SUDO	  = "/usr/local/bin/sudo";
+my $BATCHEXP      = "$TB/bin/batchexp";
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
@@ -48,6 +52,7 @@ $| = 1;
 use lib "@prefix@/lib";
 use libtestbed;
 use libdb qw(TBSetSiteVar TBSiteVarExists TBGetSiteVar);
+use Experiment;
 use GeniDB;
 use GeniCertificate;	  
 
@@ -107,6 +112,16 @@ sub OneShot()
 	    fatal("Could not load certificate from $CMCERT\n");
 	}
 	TBSetSiteVar('protogeni/cm_uuid', $certificate->uuid());
+    }
+    my $experiment = Experiment->Lookup($geniprojid, "reservations");
+    if (!defined($experiment)) {
+	system("$SUDO -u $geniuserid $WAP $BATCHEXP ".
+	       "  -q -i -k -w -f -n -S 'System Experiment' ".
+	       "  -L 'System Experiment' ".
+	       "  -E 'Holding Pattern for Reservations - DO NOT DELETE' ".
+	       "  -p $geniprojid -e reservations -h " . NewUUID());
+	fatal("Could not create create reservations holding experiment")
+	    if ($?);
     }
 }
 
