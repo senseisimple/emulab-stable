@@ -123,7 +123,7 @@ else {
     fatal("Tainted argument $xmldoc");
 }
 # Cause we are invoked from the xmlrpc server with this name format.
-if (! ($xmldoc =~ /^\/var\/tmp\/php\w+/)) {
+if (! ($xmldoc =~ /^\/var\/tmp\/php[-\w]+/)) {
     fatal("$xmldoc does not resolve to an appropriate directory!");
 }
 if (! -e $xmldoc) {
