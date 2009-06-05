@@ -15,7 +15,7 @@ SBIN_STUFF	= cleanupslice
 PSBIN_STUFF	= register_resources expire_daemon gencrl postcrl \
 		  createcerts initsite addauthority getcacerts \
 		  gencrlbundle shutdownslice remauthority listusage \
-		  update reregister
+		  update reregister cleanupticket
 
 # These scripts installed setuid, with sudo. 
 SETUID_BIN_SCRIPTS   = 
