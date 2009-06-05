@@ -1016,6 +1016,8 @@ sub setPortVlan($$@) {
 	    $errors++;
 	    next;
 	}
+	$self->debug("Port trunk mode is $retval\n");
+	
 	if (!(($retval eq "on") || ($retval eq "onNoNegotiate"))) {
 	    #
 	    # Convert ports to the correct format
