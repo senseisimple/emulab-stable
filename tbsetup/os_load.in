@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -22,11 +22,11 @@ sub usage()
 	  "Use -m to specify the internal name if an image ID.\n".
 	  "Use -s to start reload, but do not wait for it to complete.\n".
 	  "Use -w to wait for the nodes to finish booting.\n".
-	  "Use -r to supress rebooting nodes - you'll need to to it yourself\n".
+	  "Use -r to supress rebooting nodes - you need to to it yourself\n".
 	  "Use -e to reload all the nodes in an experiment.\n" .
 	  "Use -l to get a list of images you are permitted to load.\n".
 	  "Use -z <style> to zero all unallocated blocks on the disk\n".
-	  "       style==0: don't zero (same as not using -z)\n".
+	  "       style==0: do not zero (same as not using -z)\n".
 	  "       style==1: let frisbee do the zeroing\n".
 	  "       style==2: zero disk before running frisbee\n");
     exit(-1);
@@ -52,6 +52,8 @@ use lib "@prefix@/lib";
 use libdb;
 use libosload;
 use libtestbed;
+use Experiment;
+use Node;
 
 # Be careful not to exit on transient error
 $libdb::DBQUERY_MAXTRIES = 30;
@@ -97,13 +99,19 @@ $zerofree = $options{"z"}
 if (defined($options{"e"})) {
     usage()
 	if (@ARGV);
-    
+
     my $pideid = $options{"e"};
 
     if ($pideid =~ /([-\w]*),([-\w]*)/) {
 	$pid = $1;
 	$eid = $2;
-	if (! (@nodes = ExpNodes($pid, $eid))) {
+
+        my $experiment = Experiment->Lookup($pid, $eid);
+	if (!defined($experiment)) {
+	    die("*** $0:\n".
+		"    No such experiment $pid/$eid!\n");
+	}
+	if (! (@nodes = $experiment->NodeList(0, 1))) {
 	    die("*** $0:\n".
 		"    There are no nodes in $pid/$eid!\n");
 	}
@@ -117,15 +125,17 @@ if (defined($options{"e"})) {
 else {
     usage()
 	if (! @ARGV);
-    
-    # Untaint nodes.
-    foreach my $node (@ARGV) {
-	if ($node =~ /^([-\w]+)$/) {
-	    $node = $1;
+
+    foreach my $nodeid (@ARGV) {
+	my $node = Node->Lookup($nodeid);
+	if (!defined($node)) {
+	    die("*** $0:\n".
+		"    No such node $nodeid!\n");
 	}
-	else {
-	    die("*** Bad node name: $node.\n");
-	}
+	if (!$node->IsReserved()) {
+	    die("*** $0:\n".
+		"    Node $nodeid is not reserved; reserve it first!\n");
+	}    
 	push(@nodes, $node);
     }
 }
@@ -210,7 +220,8 @@ if (defined($options{"m"})) {
 my $first = 1;
 my @temp = ();
 foreach my $node ( @nodes ) {
-    if (!TBIsNodeImageable($node)) {
+    if (!$node->imageable()) {
+	my $nodeid = $node->node_id();
 	#
 	# Common mistake: forget the -i before the imagename, e.g.,
 	# "os_load FBSD54-STD pcNN", which results in pcNN getting loaded
@@ -218,11 +229,11 @@ foreach my $node ( @nodes ) {
 	# is an image ID, assume they have made this mistake and stop.
 	#
 	my $_pid = defined($imagepid) ? $imagepid : TB_OPSPID();
-	if ($first && !defined($imagename) && TBImageID($_pid, $node)) {
-	    print "*** reload: forgot the -i before image name $node?\n";
+	if ($first && !defined($imagename) && TBImageID($_pid, $nodeid)) {
+	    print "*** reload: forgot the -i before image name $nodeid?\n";
 	    exit(1);
 	}
-	print "*** reload ($node): cannot image node, skipped.\n";
+	print "*** reload ($nodeid): cannot image node, skipped.\n";
 	$first = 0;
 	next;
     }
@@ -248,7 +259,7 @@ $osloadargs{'debug'}    = $debug;
 $osloadargs{'waitmode'} = $waitmode;
 $osloadargs{'noreboot'} = $noreboot;
 $osloadargs{'zerofree'} = $zerofree;
-$osloadargs{'nodelist'} = [ @nodes ];
+$osloadargs{'nodelist'} = [ map { $_->node_id() } @nodes ];
 # No imageid means to load the default image.
 $osloadargs{'imageid'}  = $imageid
     if (defined($imageid));
