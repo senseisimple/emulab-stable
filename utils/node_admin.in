@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -144,7 +144,10 @@ else {
 	    die("*** $0:\n".
 		"    Node $n does not exist!\n");
 	}
-
+	if (!$node->IsReserved()) {
+	    die("*** $0:\n".
+		"    Node $n is not reserved; reserve it first!\n");
+	}    
 	if ($UID && !$this_user->IsAdmin() &&
 	    ! $node->AccessCheck($this_user, TB_NODEACCESS_LOADIMAGE)) {
 	    die("*** $0:\n".
