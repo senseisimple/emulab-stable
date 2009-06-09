@@ -2971,7 +2971,8 @@ class experiment:
                       "left join nodes as n on n.node_id=r.node_id "
                       "left join interfaces as i on i.node_id=n.phys_nodeid "
                       "  and i.role='ctrl' "
-                      "where r.pid=%s and r.eid=%s and n.type='pcplab' "
+                      "where r.pid=%s and r.eid=%s and n.isvirtnode=1 and "
+                      "      (n.type='pcplab' or r.sharing_mode is not null) "
                       "group by n.phys_nodeid",
                       (argdict["proj"], argdict["exp"]))
 
@@ -3088,7 +3089,8 @@ class experiment:
                       "left join nodes as n on n.node_id=r.node_id "
                       "left join interfaces as i on i.node_id=n.phys_nodeid "
                       "  and i.role='ctrl' "
-                      "where r.pid=%s and r.eid=%s and n.type='pcplab' "
+                      "where r.pid=%s and r.eid=%s and n.isvirtnode=1 and "
+                      "      (n.type='pcplab' or r.sharing_mode is not null) "
                       "group by n.phys_nodeid",
                       (argdict["proj"], argdict["exp"]))
 
@@ -4457,6 +4459,43 @@ class elabinelab:
         argstr = "-p " + self.pid + " -e " + self.eid + " " + xmlfilename;
 
         (exitval, output) = runcommand(TBDIR + "/sbin/snmpit.proxynew " + argstr)
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+        
+        return EmulabResponse(RESPONSE_SUCCESS, output=output)
+    
+    def vlansv2(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("xmldoc",))
+        if (argerror):
+            return argerror
+
+        verifyerror = self.verifystuff();
+        if (verifyerror):
+            return verifyerror
+
+        #
+        # We get an xmldoc as the argument, which we give to the proxy
+        # to decode on its own. Easier then trying to decode a bunch
+        # of stuff to pass on the commandline.
+        #
+        (xmlfp, xmlfilename) = writensfile(argdict["xmldoc"]);
+        if not xmlfilename:
+            return EmulabResponse(RESPONSE_SERVERERROR, output="Server Error")
+
+        argstr = "-p " + self.pid + " -e " + self.eid + " " + xmlfilename;
+
+        (exitval, output) = runcommand("/usr/testbed/devel/stoller" +
+                                       "/sbin/snmpit.proxyv2 " + argstr)
         if exitval:
             return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
         
