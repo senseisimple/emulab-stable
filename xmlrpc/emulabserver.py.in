@@ -2969,7 +2969,7 @@ class experiment:
 
         res = DBQuery("select n.phys_nodeid,i.IP from reserved as r "
                       "left join nodes as n on n.node_id=r.node_id "
-                      "left join node_types as nt on nt.type=n.type ".
+                      "left join node_types as nt on nt.type=n.type "
                       "left join interfaces as i on i.node_id=n.phys_nodeid "
                       "  and i.role='ctrl' "
                       "where r.pid=%s and r.eid=%s and nt.isvirtnode=1 and "
@@ -3088,7 +3088,7 @@ class experiment:
         
         res = DBQuery("select n.phys_nodeid,i.IP from reserved as r "
                       "left join nodes as n on n.node_id=r.node_id "
-                      "left join node_types as nt on nt.type=n.type ".
+                      "left join node_types as nt on nt.type=n.type "
                       "left join interfaces as i on i.node_id=n.phys_nodeid "
                       "  and i.role='ctrl' "
                       "where r.pid=%s and r.eid=%s and nt.isvirtnode=1 and "
