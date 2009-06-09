@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -72,7 +72,7 @@ function SPITFORM($target_user, $formfields, $errors)
           Emulab XMLRPC Reference</a>.</blockquote><br>\n";
     
     echo "<center>
-          Create an SSL Certificate
+          Create an SSL Certificate[<b>1</b>]
           </center><br>\n";
 
     if ($errors) {
@@ -104,7 +104,7 @@ function SPITFORM($target_user, $formfields, $errors)
 	         "value=$target_webid>\n";
 
     echo "<tr>
-              <td>PassPhrase[<b>1</b>]:</td>
+              <td>PassPhrase[<b>2</b>]:</td>
               <td class=left>
                   <input type=password
                          name=\"formfields[passphrase1]\"
@@ -124,7 +124,7 @@ function SPITFORM($target_user, $formfields, $errors)
     #
     if (!$isadmin) {
 	echo "<tr>
-                  <td>Emulab Password[<b>2</b>]:</td>
+                  <td>Emulab Password[<b>3</b>]:</td>
                   <td class=left>
                       <input type=password
                              name=\"formfields[password]\"
@@ -143,14 +143,17 @@ function SPITFORM($target_user, $formfields, $errors)
 
     echo "<blockquote><blockquote><blockquote>
           <ol>
+            <li> This is an <b>encrypted key</b> and should <b>not</b> replace
+                 your <tt>emulab.pem</tt> in your <tt>.ssl</tt> directory.
             <li> You must supply a passphrase to use when encrypting the
                  private key for your SSL certificate. You will be prompted
                  for this passphrase whenever you attempt to use it. Pick
-                 a good one!
-
-            <li> As a security precaution, you must supply your Emulab user
-                 password when creating new ssl certificates. 
-          </ol>
+                 a good one!";
+    if (!$isadmin) {
+	echo "<li> As a security precaution, you must supply your Emulab user
+                 password when creating new ssl certificates. ";
+    }
+    echo "</ol>
           </blockquote></blockquote></blockquote>\n";
 }
 
