@@ -33,7 +33,8 @@ post-install:
 
 $(INSTALL_LIBEXECDIR)/node_usage/%: %
 	@echo "Installing $<"
-	-mkdir -p @prefix@/data/node_usage
+	sudo mkdir -p @prefix@/data/node_usage
+	sudo chmod 775 @prefix@/data/node_usage
 	-mkdir -p $(INSTALL_LIBEXECDIR)/node_usage
 	$(INSTALL) $< $@
 
