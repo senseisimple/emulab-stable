@@ -12,3 +12,4 @@ TBSTATEDEMAIL=kevina@fast.cs.utah.edu
 TBTESTSUITEEMAIL=kevina@fast.cs.utah.edu
 WWW=www.emulab.net/dev/kevina
 THISHOMEBASE=Kevina.Emulab.Net
+NODE_USAGE_SUPPORT=1

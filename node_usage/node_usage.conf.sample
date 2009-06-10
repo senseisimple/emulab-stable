@@ -1,0 +1,50 @@
+#
+# This is the utah's emulab config file for the node_usage scripts,
+# customize for your testbed, and move to:
+#   /usr/testbed/etc/node_usage.conf
+#
+# This is perl code.
+#
+
+#
+# When to start the node_usage graphs
+#
+$START = 1125727200;
+
+#
+# Database to use to hold working data, if the database doesn't exist
+# it will be created.  
+#
+$NODE_USAGE_DB = 'node_usage';
+
+#
+# What to plot. A nested perl array of the form
+# ([ <PLOT LABEL>, [<LIST OF PCS TO INCLUDE>]],
+#   ...
+#
+@to_plot = (
+  ["pc600 pc850 pc2000 pc3000s", [qw(pc600 pc850 pc2000 pc3000s)]],
+  ["pc3000s", [qw(pc3000)]]
+);
+
+#
+# PHP page header and footer for main page.
+# Put raw HTML code between the variable name and the "---".
+#
+$avail_header = <<'---';
+---
+
+$avail_footer = <<'---';
+---
+
+#
+# PHP page header and footer for usage page
+# Put raw HTML code between the variable name and the "---".
+#
+$usage_header = <<'---';
+---
+
+$usage_footer = <<'---';
+---
+
+1;

@@ -15,21 +15,22 @@ $Data::Dumper::Indent = 1;
 use strict;
 use warnings;
 
+our $NODE_USAGE_DB;
+require "@prefix@/etc/node_usage.conf";
+
 my $prep    = 1;
 my $results = 1;
 my $fresh = 0;
-
-my $TB		= "/usr/testbed/";
 
 # Turn off line buffering on output
 $| = 1; 
 
 # Load the Testbed support stuff.
-use lib "/usr/testbed/lib";
+use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 
-chdir "/usr/testbed/data/node_usage/data";
+chdir "@prefix@/data/node_usage";
 
 $fresh = 1 unless -e "gather.state.1" && "gather.state.2";
 
@@ -55,11 +56,17 @@ our $last_history_id = -1;
 
 if ($prep) {
 
-    DBQueryFatal("insert into node_usage.node_history_copy select * from node_history where history_id > (select max(history_id) from node_usage.node_history_copy)");
+    if ($fresh) {
+	DBQueryFatal("create database if not exists $NODE_USAGE_DB");
+	DBQueryFatal("drop table if exists $NODE_USAGE_DB.node_history_copy");
+	DBQueryFatal("create table $NODE_USAGE_DB.node_history_copy like node_history");
+    }
+
+    DBQueryFatal("insert into $NODE_USAGE_DB.node_history_copy select * from node_history where history_id > IFNULL((select max(history_id) from $NODE_USAGE_DB.node_history_copy), 0)");
 
     if ($fresh) {
-	DBQueryFatal("drop table if exists node_usage.node_trans");
-	DBQueryFatal("create table node_usage.node_trans (".
+	DBQueryFatal("drop table if exists $NODE_USAGE_DB.node_trans");
+	DBQueryFatal("create table $NODE_USAGE_DB.node_trans (".
 		     "  history_id int unsigned not null primary key,".
 		     "  stamp int unsigned not null, ".
 		     "  node_id char(8) not null, ".
@@ -74,7 +81,7 @@ if ($prep) {
 	do "gather.state.1";
     }
     
-    $qr = DBQueryFatal("select history_id,node_id,op,stamp from node_usage.node_history_copy where history_id > $last_history_id order by history_id");
+    $qr = DBQueryFatal("select history_id,node_id,op,stamp from $NODE_USAGE_DB.node_history_copy where history_id > $last_history_id order by history_id");
 
     local $last_history_id;
     
@@ -92,9 +99,9 @@ if ($prep) {
 	}
 	if ($invalid) {
 	    #print STDERR "WARNING: $history_id ($stamp) $last_trans{$node_id}: $invalid\n";
-	    DBQueryFatal("update node_usage.node_trans set op = 'invalid' where history_id=$last_trans{$node_id}");
+	    DBQueryFatal("update $NODE_USAGE_DB.node_trans set op = 'invalid' where history_id=$last_trans{$node_id}");
 	} elsif (!defined $prev_state || $prev_state ne $node_state{$node_id}) {
-	    DBQueryFatal("insert into node_usage.node_trans values ($history_id, $stamp, '$node_id', '$node_state{$node_id}')");
+	    DBQueryFatal("insert into $NODE_USAGE_DB.node_trans values ($history_id, $stamp, '$node_id', '$node_state{$node_id}')");
 	    $last_trans{$node_id} = $history_id;
 	}
 	$last_history_id = $history_id;
@@ -121,7 +128,7 @@ if ($results) {
 
     open F, ">>node_usage.raw";
 
-    $qr = DBQueryFatal("select history_id,stamp,node_id,op from node_usage.node_trans where history_id > $last_history_id order by history_id");
+    $qr = DBQueryFatal("select history_id,stamp,node_id,op from $NODE_USAGE_DB.node_trans where history_id > $last_history_id order by history_id");
     
     while (my ($history_id,$stamp,$node_id,$op) = $qr->fetchrow()) {
 	my $type = $node_type{$node_id};
@@ -152,6 +159,14 @@ if ($results) {
     print F Data::Dumper->Dump([$prev, $prev_line], ['*prev', '*prev_line']);
     close F;
 }
+
+
+
+
+
+
+
+
 
 
 

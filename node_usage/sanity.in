@@ -5,7 +5,7 @@ use Data::Dumper;
 # Turn off line buffering on output
 $| = 1; 
 
-chdir "/usr/testbed/data/node_usage/data";
+chdir "@prefix@/data/node_usage";
 
 open A, "node_usage.raw";
 
@@ -88,4 +88,3 @@ while (<B>) {
     }
     print "\n";
 }
-

@@ -7,9 +7,14 @@ use strict;
 use warnings;
 no warnings 'uninitialized';
 
-chdir "/usr/testbed/data/node_usage/data";
+our (@to_plot);
+require "@prefix@/etc/node_usage.conf";
+
+chdir "@prefix@/data/node_usage";
 
 my $TOLERANCE_INTERVAL = 1/3;
+
+my @idxs = (0 .. (@to_plot * 2 - 1));
 
 my %res;
 
@@ -19,7 +24,7 @@ sub tally ($$@) {
 	$res{$what}{data}{$str}{invalid}++;
     } else {
 	$res{$what}{data}{$str}{count}++;
-	foreach my $i (0 .. 3) {
+	foreach my $i (@idxs) {
 	    $res{$what}{data}{$str}{data}[$i] += $d[$i];
 	}
     }
@@ -29,7 +34,7 @@ sub tally_mod ($$@) {
     my ($bin, $what, @d) = @_;
     return if $d[0] != $d[0]; # ie NaN
     $res{$what}{data}[$bin]{count}++;
-    foreach my $i (0 .. 3) {
+    foreach my $i (@idxs) {
 	$res{$what}{data}[$bin]{data}[$i] += $d[$i];
     }
 }
@@ -84,13 +89,13 @@ foreach my $k (keys %res) {
 	    my $invalid = $d->{invalid};
 	    my $count = $d->{count};
 	    if ($invalid / ($invalid + $count) > $TOLERANCE_INTERVAL) {
-		@r = ('NaN', 'NaN', 'NaN', 'NaN');
+		@r = map {'NaN'} @idxs;
 	    } else {
-		foreach my $j (0 .. 3) {
+		foreach my $j (@idxs) {
 		    $r[$j] = $d->{data}[$j]/$count;
 		}
 	    }
-	    printf F ("%s  %5.1f %5.1f %5.1f %5.1f\n", $i, @r);
+	    print F join(' ', "$i ", map {sprintf("%5.1f", $_)} @r),"\n" 
 	}
     } else {
 	my $div = $res{$k}{div};
@@ -99,10 +104,10 @@ foreach my $k (keys %res) {
 	    my @r;
 	    my $d = $res{$k}{data}[$i];
 	    my $count = $d->{count};
-	    foreach my $j (0 .. 3) {
+	    foreach my $j (@idxs) {
 		$r[$j] = $d->{data}[$j]/$count;
 	    }
-	    printf F ("%6.3f  %5.1f %5.1f %5.1f %5.1f\n", $i/$div, @r);
+	    print F join(' ', sprintf("%6.3f ", $i/$div), map {sprintf("%5.1f", $_)} @r),"\n" 
 	}
     }
 }

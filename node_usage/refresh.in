@@ -2,10 +2,11 @@
 
 set -e
 
-cd /usr/testbed/data/node_usage/scripts
+cd @prefix@/libexec/node_usage
 
 ./gather
 ./analy
 ./analy2
 ./mk-plots
+./mk-php-pages
 ./publish

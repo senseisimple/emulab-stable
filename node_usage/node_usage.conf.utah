@@ -1,0 +1,79 @@
+#
+# This is the utah's emulab config file for the node_usage scripts,
+# customize for your testbed, and move to:
+#   /usr/testbed/etc/node_usage.conf
+#
+# This is perl code.
+#
+
+#
+# When to start the node_usage graphs
+#
+$START = 1125727200;
+
+#
+# Database to use to hold working data, if the database doesn't exist
+# it will be created.  
+#
+$NODE_USAGE_DB = 'node_usage';
+
+#
+# What to plot. A nested perl array of the form
+# ([ <PLOT LABEL>, [<LIST OF PCS TO INCLUDE>]],
+#   ...
+#
+@to_plot = (
+  ["pc600 pc850 pc2000 pc3000s", [qw(pc600 pc850 pc2000 pc3000s)]],
+  ["pc3000s", [qw(pc3000)]]
+);
+
+#
+# PHP page header and footer for main page
+#
+$avail_header = <<'---';
+<p>
+
+These graphs show the average number of free nodes over various time
+periods. Nodes are broken down into two classes: The first class are the 
+<a href="http://users.emulab.net/trac/emulab/wiki/pc3000">pc3000</a>s,
+which are the most numerous, and are fairly modern. They are
+most experimenters' nodes of choice. For many experimenters, the number of
+free pc3000s limits the size of the experiments they can run.
+The second class includes other, older PCs (along with the pc3000s) to give
+a sense for how many nodes are available if one is willing to use some
+slower nodes.
+</p>
+
+<p>
+Emulab currently includes around 350 PC nodes. As you can see, most of those
+are in use even during our periods of &quot;light&quot; usage.
+</p>
+
+<p>
+Hourly graphs show the average number of free nodes in the
+given hour. Daily graphs show the average number of free nodes in the
+given day, etc. All times are given in Mountain Time. Note that because
+some data in these graphs is averaged over a very long time period (up to four
+years), it may not reflect recent
+trends.
+</p>
+---
+
+$avail_footer = <<'---';
+<p align=center>
+Note: The gap in the last two graphs represents periods when no data
+was availabe due to bugs in our system.
+</p>
+---
+
+#
+# PHP page header and footer for usage page
+#
+$usage_header = <<'---';
+---
+
+$usage_footer = <<'---';
+---
+
+1;
+

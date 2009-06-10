@@ -14,21 +14,16 @@ use strict;
 use warnings;
 
 #
-# Configure variables
-#
-my $TB		= "/usr/testbed/";
-
-#
 # Turn off line buffering on output
 #
 $| = 1; 
 
 # Load the Testbed support stuff.
-use lib "/usr/testbed/lib";
+use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 
-chdir "/usr/testbed/data/node_usage/data";
+chdir "@prefix@/data/node_usage";
 
 my $qr = DBQueryFatal("select t.idx,action,t.exptidx,eid,pid,UNIX_TIMESTAMP(start_time), UNIX_TIMESTAMP(end_time) from testbed_stats as t left join experiment_stats as e on t.exptidx = e.exptidx where (t.action='swapin' or t.action='start') and exitcode=0 and start_time >= '2005-09-03' order by t.idx");
 

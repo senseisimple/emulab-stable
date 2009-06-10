@@ -31,7 +31,7 @@ include Makeconf
 SUBDIRS = lib db assign www @optional_subdirs@ ipod security sensors \
 		pxe tbsetup account tmcd utils backend tip capture ipod vis \
 		sensors os xmlrpc install/newnode_sshkeys mote tools/whol \
-		tools/svn wiki bugdb collab tools/rmanage protogeni 
+		tools/svn wiki bugdb collab tools/rmanage protogeni node_usage
 
 all:		all-subdirs 
 
@@ -77,6 +77,9 @@ endif
 	@$(MAKE) -C bugdb post-install
 	@$(MAKE) -C collab post-install
 	@$(MAKE) -C utils post-install
+ifeq ($(NODE_USAGE_SUPPORT),1)
+	@$(MAKE) -C node_usage post-install
+endif
 
 #
 # For installation on the 'ops' or 'users' node (okay, plastic)
