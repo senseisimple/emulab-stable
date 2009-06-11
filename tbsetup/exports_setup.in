@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -154,7 +154,8 @@ if ($WINSUPPORT) {
 # VIRTNODE HACK: Virtual nodes are special, so do not export. (isvirtnode).
 #
 $nodes_result =
-    DBQueryFatal("select r.node_id,r.pid,r.eid,e.gid,i.IP,u.admin ".
+    DBQueryFatal("select r.node_id,r.pid,r.eid,e.gid,i.IP,u.admin, ".
+		 "       r.sharing_mode,r.erole ".
 		 "from reserved as r ".
 		 "left join experiments as e on r.pid=e.pid and r.eid=e.eid ".
 		 "left join nodes on r.node_id=nodes.node_id ".
@@ -193,6 +194,8 @@ while (@row = $nodes_result->fetchrow_array) {
     my $gid     = $row[3];
     my $ip      = $row[4];
     my $admin	= $row[5];
+    my $shared  = $row[6];
+    my $erole   = $row[7];
     my %fslist = ();
     my @dirlist = ();
     my @smbshares = ();
@@ -219,63 +222,76 @@ while (@row = $nodes_result->fetchrow_array) {
 	$lastgid=$gid;
 	$lastadmin=$admin;
 
-	# Construct a list of directories accessible from this node.
-	# First the project and group directories.
-	# XXX needs to be fixed for shared experiments?
-	if (-d "$PROJROOT/$pid") {
-	    push(@dirlist, "$projdir/$pid");
-            push(@smbshares, ["proj-$pid", "$projdir/$pid"]);
+	if ($erole eq "sharedhost") {
+	    #
+	    # Shared local nodes get toplevel mounts.
+	    #
+	    push(@dirlist, "$projdir");
+	    push(@dirlist, "$scratchdir")
+		if ($scratchdir && -d "$SCRATCHROOT");
+	    push(@dirlist, "$usersdir");
 	}
 	else {
-	    print STDERR "*** exports_setup: $PROJROOT/$pid does not exist!\n";
-	}
+	    # Construct a list of directories accessible from this node.
+	    # First the project and group directories.
+	    # XXX needs to be fixed for shared experiments?
+	    if (-d "$PROJROOT/$pid") {
+		push(@dirlist, "$projdir/$pid");
+		push(@smbshares, ["proj-$pid", "$projdir/$pid"]);
+	    }
+	    else {
+		print STDERR
+		    "*** exports_setup: $PROJROOT/$pid does not exist!\n";
+	    }
 	
-	if ($gid ne $pid) {
-	    if (-d "$GROUPROOT/$pid/$gid") {
-		push(@dirlist, "$groupdir/$pid/$gid");
-                push(@smbshares, ["${pid}-${gid}", "$groupdir/$pid/$gid"]);
+	    if ($gid ne $pid) {
+		if (-d "$GROUPROOT/$pid/$gid") {
+		    push(@dirlist, "$groupdir/$pid/$gid");
+		    push(@smbshares, ["${pid}-${gid}", "$groupdir/$pid/$gid"]);
+		}
+		else {
+		    print STDERR "*** exports_setup: ".
+			"$GROUPROOT/$pid/$gid does not exist!\n";
+		}
 	    }
-	    else {
-		print STDERR "*** exports_setup: ".
-		    "$GROUPROOT/$pid/$gid does not exist!\n";
+
+	    if ($scratchdir && -d "$SCRATCHROOT/$pid") {
+		push(@dirlist, "$scratchdir/$pid");
+		push(@smbshares, ["scratch-$pid", "$scratchdir/$pid"]);
 	    }
-	}
 
-	if ($scratchdir && -d "$SCRATCHROOT/$pid") {
-	    push(@dirlist, "$scratchdir/$pid");
-            push(@smbshares, ["scratch-$pid", "$scratchdir/$pid"]);
-	}
-
-	# Determine the users that can access this node, and add those
-	# users' directories to the list.
-	# XXX needs to be fixed for shared experiments?
-	#
-	# Note that if we are isolating admins, only those users with
-	# the same admin status as the swapper are allowed.
-	my $adminclause = "";
-	if ($ISOLATEADMIN) {
-	    $adminclause = "u.admin=$admin and ";
-	}
-
-	$users_result =
-	    DBQueryFatal("select distinct g.uid from group_membership as g ".
-			 "left join users as u on u.uid_idx=g.uid_idx ".
-			 "where g.pid='$pid' and g.gid='$gid' and ".
-			 "      (g.trust!='none' and ".
-			 "       u.webonly=0 and ".
-			 "       $adminclause ".
-			 "       u.status='" . USERSTATUS_ACTIVE() . "')");
-
-	while (@usersrow = $users_result->fetchrow_array) {
-	    my $uid = $usersrow[0];
-
-	    if (-d "$USERROOT/$uid") {
-		push(@dirlist, "$usersdir/$uid");
-		push(@smbshares, [$uid, "$usersdir/$uid"]);
+	    # Determine the users that can access this node, and add those
+	    # users' directories to the list.
+	    # XXX needs to be fixed for shared experiments?
+	    #
+	    # Note that if we are isolating admins, only those users with
+	    # the same admin status as the swapper are allowed.
+	    my $adminclause = "";
+	    if ($ISOLATEADMIN) {
+		$adminclause = "u.admin=$admin and ";
 	    }
-	    else {
-		print STDERR "*** exports_setup: ".
-		    "$USERROOT/$uid does not exist!\n";
+
+	    $users_result =
+		DBQueryFatal("select distinct ".
+			     " g.uid from group_membership as g ".
+			     "left join users as u on u.uid_idx=g.uid_idx ".
+			     "where g.pid='$pid' and g.gid='$gid' and ".
+			     "      (g.trust!='none' and ".
+			     "       u.webonly=0 and ".
+			     "       $adminclause ".
+			     "       u.status='" . USERSTATUS_ACTIVE() . "')");
+
+	    while (@usersrow = $users_result->fetchrow_array) {
+		my $uid = $usersrow[0];
+
+		if (-d "$USERROOT/$uid") {
+		    push(@dirlist, "$usersdir/$uid");
+		    push(@smbshares, [$uid, "$usersdir/$uid"]);
+		}
+		else {
+		    print STDERR "*** exports_setup: ".
+			"$USERROOT/$uid does not exist!\n";
+		}
 	    }
 	}
 
