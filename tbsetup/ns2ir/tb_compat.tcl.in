@@ -510,6 +510,12 @@ proc tb-set-ip-routing {type} {
     }
     set default_ip_routing_type $type
 }
+proc tb-set-node-usesharednode {node weight} {
+    $node add-desire "pcshared" $weight
+}
+proc tb-set-node-sharingmode {node sharemode} {
+    $node set sharing_mode $sharemode
+}
 
 # Lan/Link state routines.
 

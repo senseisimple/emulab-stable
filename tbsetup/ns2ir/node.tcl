@@ -80,6 +80,7 @@ Node instproc init {s} {
     $self set plab_plcnet "none"
     $self set fixed ""
     $self set nseconfig ""
+    $self set sharing_mode ""
 
     $self set topo ""
 
@@ -158,6 +159,7 @@ Node instproc updatedb {DB} {
     $self instvar desirelist
     $self instvar nseconfig
     $self instvar simulated
+    $self instvar sharing_mode
     $self instvar topo
     $self instvar X_
     $self instvar Y_
@@ -284,6 +286,11 @@ Node instproc updatedb {DB} {
     if { $plab_plcnet != "" } {
 	lappend fields "plab_plcnet"
 	lappend values $plab_plcnet
+    }
+
+    if { $sharing_mode != "" } {
+	lappend fields "sharing_mode"
+	lappend values $sharing_mode
     }
 
     if { $numeric_id != {} } {

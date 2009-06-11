@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006, 2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -53,6 +53,7 @@ proc tb-set-link-encap {link style} {}
 proc tb-set-allowcolocate {lanlink onoff} {}
 proc tb-set-colocate-factor {factor} {}
 proc tb-set-sync-server {node} {}
+proc tb-set-node-usesharednode {node} {}
 proc tb-set-mem-usage {usage} {}
 proc tb-set-cpu-usage {usage} {}
 proc tb-bind-parent {sub phys} {}
@@ -93,6 +94,8 @@ proc tb-set-node-plab-role {node role} {}
 proc tb-set-node-plab-plcnet {node lanlink} {}
 proc tb-set-dpdb {onoff} {}
 proc tb-fix-interface {vnode lanlink iface} {}
+proc tb-set-node-usesharednode {node weight} {}
+proc tb-set-node-sharingmode {node sharemode} {}
 
 proc tb-set-security-level {level} {
 
