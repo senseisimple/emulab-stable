@@ -100,8 +100,8 @@ SWITCH: for ($action) {
 exit(0);
 
 # More protos
-sub jailmount();
-sub jailunmount();
+sub VMmount();
+sub VMunmount();
 
 #
 # Boot Action.
@@ -109,7 +109,7 @@ sub jailunmount();
 sub doboot()
 {
     # Special Case.
-    return jailmount()
+    return VMmount()
 	if (defined($vnodeid));
 	
     #
@@ -353,7 +353,7 @@ sub doboot()
 sub doshutdown()
 {
     # Special Case.
-    return jailunmount()
+    return VMunmount()
 	if (defined($vnodeid));
 	
     # Otherwise nothing.
@@ -386,22 +386,21 @@ sub docleanup()
 }
 
 #
-# Aux function called from the mkjail code to do mounts outside of a
-# jail. Can use either NFS or local loopback. Maybe SFS someday. Local
-# only, of course.
+# Aux function called from the mkjail/VM code to do mounts outside of
+# a jail/VM. Can use either NFS or local loopback. 
 #
-# mkjail calls this routine to both mount and unmount since when a jail
+# Call this routine to both mount and unmount since when a jail/VM
 # exits it cannot leave any mounts around. Any failures in unmount has
 # to stop mkjail, since otherwise really really bad things can happen
 # (homedirs getting deleted on the file server)!
 # 
-sub jailmount()
+sub VMmount()
 {
     my $JAILDB    = CONFDIR() . "/mounts";
     my $mountstr;
 
     #
-    # No NFS mounts on remote nodes.
+    # No mounts on remote nodes.
     # 
     if (REMOTE()) {
 	return ();
@@ -416,7 +415,7 @@ sub jailmount()
 
     #
     # We mount all the mounts that the physical node has mounted, into
-    # the jail. Since this is not going to be updated (no support for
+    # the jail/VM. Since this is not going to be updated (no support for
     # updating mounts yet), we construct a copy of the DB in the jail
     # directory so we know exactly what we did when it comes time to do
     # the unmounts. In the meantime, the physical node might change its
@@ -480,10 +479,11 @@ sub jailmount()
 # Must be sure to delete the DB file at the end so that the jail directory
 # is not left with crud in it.
 # 
-sub jailunmount()
+sub VMunmount()
 {
-    my $JAILDB = CONFDIR() . "/mounts";
-    my $errors = 0;
+    my $JAILDB  = CONFDIR() . "/mounts";
+    my $errors  = 0;
+    my @deletes = ();
 
     #
     # No NFS mounts on remote nodes.
@@ -502,9 +502,13 @@ sub jailunmount()
 	print STDOUT "  Unmounting $path\n";
 	
 	if (system("$UMOUNT $path")) {
-	    warning("Could not unmount $local");
+	    warning("Could not unmount $path");
 	    $errors++;
 	}
+	push(@deletes, $remote);
+    }
+    foreach my $remote (@deletes) {
+	delete($SDB{$remote});
     }
     dbmclose(%SDB);
 
