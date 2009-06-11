@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -172,7 +172,7 @@ if (defined($this_user) && !$this_user->IsAdmin() &&
 #
 # Get the list of nodes in this experiment.
 #
-my @nodes = $experiment->NodeList(1);
+my @nodes = $experiment->NodeList(1, 1);
 if (! @nodes) {
     tbwarn("No allocated nodes in experiment $pid/$eid.");
     exit(0);
@@ -218,7 +218,7 @@ foreach my $node (@nodes) {
     my $pnode      = $nodeobj->phys_nodeid();
     my $allocstate = $nodeobj->allocstate();
     my $geninode   = $nodeobj->isfednode();
-
+    my $shared     = defined($nodeobj->sharing_mode());
     next
 	if (!$nodeobj->isvirtnode());
 
@@ -240,7 +240,7 @@ foreach my $node (@nodes) {
 	    #
 	    # When swapping, local vnodes go down with the physnode.
 	    #
-	    if (! $remote) {
+	    if (! ($remote || $shared)) {
 		print "$node will $mode with local node $pnode.\n";
 		next;
 	    }
@@ -269,7 +269,7 @@ foreach my $node (@nodes) {
 	    # assumed that these booted okay, and need to be torndown,
 	    # even though they are not RES_READY.
 	    #
-	    if (! $remote) {
+	    if (! ($remote || $shared)) {
 		if ($killmode) {
 		    if ($allocstate eq TBDB_ALLOCSTATE_DOWN) {
 			print "$node failed to boot; skipping $mode.\n";
@@ -311,15 +311,15 @@ foreach my $node (@nodes) {
 		    }
 		}
 		elsif ($allocstate eq TBDB_ALLOCSTATE_RES_READY()) {
-		    print "$node is already set up on remote node $pnode\n";
+		    print "$node is already set up on $pnode\n";
 		    next;
 		}
 		elsif ($allocstate eq TBDB_ALLOCSTATE_RES_INIT_DIRTY()) {
-		    print "$node needs a reboot on remote node $pnode\n";
+		    print "$node needs a reboot on $pnode\n";
 		    $mode = "reboot";
 		}
 		elsif ($allocstate eq TBDB_ALLOCSTATE_RES_RECONFIG()) {
-		    print "$node needs a reconfig on remote node $pnode\n";
+		    print "$node needs a reconfig on $pnode\n";
 		    # We do not actually reconfig virtual nodes; just
 		    # reboot them. Might reconfig someday, in which case
 		    # this would move up into os_setup.
@@ -477,7 +477,7 @@ while (1) {
 		# best to simply try and free the vserver below.
 		my $args = (($mode eq "teardown") ? "-k " :
 			    ($mode eq "reboot" ? "-r " : " "));
-		$args   .= ($jailed   ? "-j " : ($plab ? "-p " : "-i "));
+		$args   .= ($jailed   ? "-jVt " : ($plab ? "-p " : "-i "));
 		$args   .= "$vnode ";
 		
 		# If it's a plab node, we must ssh to the vnode, not pnode.
