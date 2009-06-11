@@ -3597,8 +3597,10 @@ sub NewVirtIface($$$;$)
 	my $speed = interfacespeedmbps(physinterfacetype($pnode, $pport),
 				       "ethernet");
 	
+	my $trunk = ($type eq "vlan" ? 1 : 0);
+
 	DBQueryFatal("update interfaces set " .
-		     "   current_speed='$speed' " .
+		     "   current_speed='$speed',trunk=$trunk " .
 		     "where node_id='$pnode' and iface='$pport'");
     }
 
