@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-LGPL
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -185,15 +185,13 @@ sub getExperimentTrunks($$) {
     my ($pid, $eid) = @_;
     my @ports;
 
-    my $query = "select distinct r.node_id,v.iface from reserved as r " .
-		  "left join vinterfaces as v on v.node_id=r.node_id " .
-		  "where r.pid='$pid' and r.eid='$eid' and v.type='vlan' and " .
-		  "v.iface is not NULL";
+    my $query_result =
+	DBQueryFatal("select distinct r.node_id,i.iface from reserved as r " .
+		     "left join interfaces as i on i.node_id=r.node_id " .
+		     "where r.pid='$pid' and r.eid='$eid' and " .
+		     "      i.trunk!=0");
 
-#    $query = "select node_id , iface from trunk_test";
-
-    my $result = DBQueryFatal($query);
-    while (my ($node, $iface) = $result->fetchrow()) {
+    while (my ($node, $iface) = $query_result->fetchrow()) {
 	$node = $node . ":" . $iface;
 	push @ports, $node;
     }
