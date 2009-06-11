@@ -41,6 +41,8 @@ my $THISHOMEBASE   = "@THISHOMEBASE@";
 my $TESTMODE       = @TESTMODE@;
 my $DISABLE_EVENTS = "@DISABLE_EVENT_SCHED@";
 my $piper          = "$TBROOT/sbin/locpiper";
+my $mapper         = "$TBROOT/bin/mapper";
+my $wrapper        = "$TBROOT/libexec/assign_wrapper";
 my $NFSTRACESUPPORT= @NFSTRACESUPPORT@;
 
 # Untaint the path
@@ -528,7 +530,7 @@ sub doSwapout($) {
 	# When modifying an elabinelab experiment, leave the vlans intact
 	# so that the inner networks are not suddenly disconnected.
 	#
-	if ($type != MODIFY) {
+	if ($type != MODIFY || ($type == MODIFY && Lan->GotTrunks($experiment))) {
 	    TBDebugTimeStamp("snmpit started");
 	    print STDERR "Removing VLANs.\n";
 	    if (system("snmpit -r $pid $eid")) {
@@ -871,7 +873,7 @@ sub doSwapin($) {
 	}
 	
 	print "Mapping to physical reality ...\n";
-	TBDebugTimeStamp("assign_wrapper started");
+	TBDebugTimeStamp("mapper wrapper started");
 
 	#
 	# Pass the -u (update) switch into assign_wrapper, which turns on
@@ -880,11 +882,15 @@ sub doSwapin($) {
 	# that did not boot.
 	#
 	my $exitcode;
-	my $wrapper = "assign_wrapper -u";
-	$wrapper .= " -f"
+	my $cmd = "$wrapper";
+	if ($pid eq "testbed" || $pid eq "tbres" || $pid eq "emulab-ops" ||
+	    $this_user->stud()) {
+	    $cmd = "$mapper";
+	}
+	$cmd .= " -f"
 	    if ($type == RETRY);
 	
-	if (system("$wrapper $pid $eid")) {
+	if (system("$cmd -u $pid $eid")) {
 	    $exitcode = $? >> 8;
 
 	    tberror "Failed ($exitcode) to map to reality.";
@@ -892,16 +898,16 @@ sub doSwapin($) {
 	    # Wrapper sets this bit when recovery is possible.
 	    if ($exitcode & 64) {
 		# We can recover. 
-		tbreport(SEV_SECONDARY, 'assign_wrapper_failed', $exitcode);
+		tbreport(SEV_SECONDARY, 'mapper_wrapper_failed', $exitcode);
 		return 7;
 	    }
 	    else {
 		# No recovery, no retry.
-		tbreport(SEV_SECONDARY, 'assign_wrapper_failed', $exitcode);
+		tbreport(SEV_SECONDARY, 'mapper_wrapper_failed', $exitcode);
 		return 1;
 	    }
 	}
-	TBDebugTimeStamp("assign_wrapper finished");
+	TBDebugTimeStamp("mapper wrapper finished");
 
 	print "Mapped to physical reality!\n";
     }
