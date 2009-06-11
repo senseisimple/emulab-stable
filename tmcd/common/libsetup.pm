@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # TODO: Signal handlers for protecting db files.
@@ -1915,6 +1915,7 @@ sub getgenvnodeconfig($;$)
 sub genvnodesetup($;$$)
 {
     my ($vid) = @_;
+    my $issharedhost = SHAREDHOST();
 
     #
     # Set global vnodeid for tmcc commands.
@@ -1980,6 +1981,8 @@ sub genvnodesetup($;$$)
     # have to call initsfs() first). The full config will be copied
     # to the proper location inside the jail by mkjail.
     #
+    tmccclrconfig()
+	if ($issharedhost);
     tmccgetconfig();
     
     #
