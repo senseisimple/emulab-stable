@@ -1,0 +1,58 @@
+#
+# Add slot to the virt_nodes table. 
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (!DBSlotExists("virt_nodes", "sharing_mode")) {
+	DBQueryFatal("alter table virt_nodes add ".
+		     "sharing_mode varchar(32) default NULL");
+    }
+    if (!DBSlotExists("interfaces", "trunk")) {
+	DBQueryFatal("alter table interfaces add ".
+		     "trunk tinyint(1) NOT NULL default '0' after whol");
+    }
+    # Initialize new trunk field from vinterfaces table.
+    my $query_result =
+	DBQueryFatal("select v.node_id,v.iface from vinterfaces as v " .
+		     "where v.type='vlan' and v.iface is not NULL");
+    while (my ($nodeid,$iface) = $query_result->fetchrow_array()) {
+	DBQueryFatal("update interfaces set trunk=1 ".
+		     "where node_id='$nodeid' and iface='$iface'");
+    }
+    if (!DBSlotExists("interface_state", "remaining_bandwidth")) {
+	DBQueryFatal("alter table interface_state add ".
+		     "remaining_bandwidth int(11) NOT NULL default '0'");
+    }
+    if (!DBSlotExists("vinterfaces", "bandwidth")) {
+	DBQueryFatal("alter table vinterfaces add ".
+		     "bandwidth int(10) NOT NULL default '0'");
+    }
+    DBQueryFatal("alter table reserved change `erole` ".
+		 "  `erole` enum('node','virthost','delaynode','simhost', ".
+		 "               'sharedhost') NOT NULL default 'node'");
+    
+    DBQueryFatal("alter table os_info change osfeatures osfeatures ".
+		 "  set('ping','ssh','ipod','isup','veths','veth-ne', ".
+	         "      'veth-en','mlinks','linktest','linkdelays','vlans') ".
+		 " default NULL");
+    $query_result =
+	DBQueryFatal("select osid,osfeatures from os_info ".
+		     "where FIND_IN_SET('veths',osfeatures) != 0 and ".
+		     "      FIND_IN_SET('veth-en',osfeatures) = 0");
+    while (my ($osid,$osfeatures) = $query_result->fetchrow_array()) {
+	DBQueryFatal("update os_info set ".
+		     "    osfeatures='$osfeatures,veth-ne,veth-en,vlans' ".
+		     "where osid='$osid'");
+    }
+
+    DBQueryFatal("alter table linkdelays drop primary key");
+    DBQueryFatal("alter table linkdelays add primary key ".
+		 "(`exptidx`,`node_id`,`vlan`,`vnode`)");
+    return 0;
+}
+1;

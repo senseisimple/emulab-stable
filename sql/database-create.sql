@@ -1499,6 +1499,7 @@ CREATE TABLE `interface_state` (
   `iface` varchar(32) NOT NULL,
   `enabled` tinyint(1) default '1',
   `tagged` tinyint(1) default '0',
+  `remaining_bandwidth` int(11) NOT NULL default '0',
   PRIMARY KEY  (`node_id`,`card`,`port`),
   KEY `nodeiface` (`node_id`,`iface`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
@@ -1540,6 +1541,7 @@ CREATE TABLE `interfaces` (
   `rtabid` smallint(5) unsigned NOT NULL default '0',
   `vnode_id` varchar(32) default NULL,
   `whol` tinyint(4) NOT NULL default '0',
+  `trunk` tinyint(1) NOT NULL default '0',
   `uuid` varchar(40) NOT NULL default '',
   PRIMARY KEY  (`node_id`,`card`,`port`),
   KEY `mac` (`mac`),
@@ -1712,7 +1714,7 @@ CREATE TABLE `linkdelays` (
   `q_droptail` int(11) default '0',
   `q_red` tinyint(4) default '0',
   `q_gentle` tinyint(4) default '0',
-  PRIMARY KEY  (`node_id`,`vlan`,`vnode`),
+  PRIMARY KEY  (`exptidx`,`node_id`,`vlan`,`vnode`),
   KEY `id` (`pid`,`eid`),
   KEY `exptidx` (`exptidx`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
@@ -2446,7 +2448,7 @@ CREATE TABLE `os_info` (
   `path` tinytext,
   `magic` tinytext,
   `machinetype` varchar(30) NOT NULL default '',
-  `osfeatures` set('ping','ssh','ipod','isup','veths','mlinks','linktest','linkdelays') default NULL,
+  `osfeatures` set('ping','ssh','ipod','isup','veths','veth-ne','veth-en','mlinks','linktest','linkdelays','vlans') default NULL,
   `ezid` tinyint(4) NOT NULL default '0',
   `shared` tinyint(4) NOT NULL default '0',
   `mustclean` tinyint(4) NOT NULL default '1',
@@ -3029,7 +3031,7 @@ CREATE TABLE `reserved` (
   `exptidx` int(11) NOT NULL default '0',
   `rsrv_time` timestamp NOT NULL default CURRENT_TIMESTAMP on update CURRENT_TIMESTAMP,
   `vname` varchar(32) default NULL,
-  `erole` enum('node','virthost','delaynode','simhost','modelnet-core','modelnet-edge') NOT NULL default 'node',
+  `erole` enum('node','virthost','delaynode','simhost','sharedhost') NOT NULL default 'node',
   `simhost_violation` tinyint(3) unsigned NOT NULL default '0',
   `old_pid` varchar(12) NOT NULL default '',
   `old_eid` varchar(32) NOT NULL default '',
@@ -3042,7 +3044,7 @@ CREATE TABLE `reserved` (
   `mustwipe` tinyint(4) NOT NULL default '0',
   `genisliver_idx` int(10) unsigned default NULL,
   `tmcd_redirect` tinytext,
-  `sharing_mode` tinytext,
+  `sharing_mode` varchar(32) default NULL,
   PRIMARY KEY  (`node_id`),
   UNIQUE KEY `vname` (`pid`,`eid`,`vname`),
   UNIQUE KEY `vname2` (`exptidx`,`vname`),
@@ -3566,6 +3568,7 @@ CREATE TABLE `vinterfaces` (
   `exptidx` int(10) NOT NULL default '0',
   `virtlanidx` int(11) NOT NULL default '0',
   `vlanid` int(11) NOT NULL default '0',
+  `bandwidth` int(10) NOT NULL default '0',
   PRIMARY KEY  (`node_id`,`unit`),
   KEY `bynode` (`node_id`,`iface`),
   KEY `type` (`type`)
@@ -3789,6 +3792,7 @@ CREATE TABLE `virt_nodes` (
   `plab_role` enum('plc','node','none') NOT NULL default 'none',
   `plab_plcnet` varchar(32) NOT NULL default 'none',
   `numeric_id` int(11) default NULL,
+  `sharing_mode` varchar(32) default NULL,
   PRIMARY KEY  (`exptidx`,`vname`),
   UNIQUE KEY `pideid` (`pid`,`eid`,`vname`),
   KEY `pid` (`pid`,`eid`,`vname`)
