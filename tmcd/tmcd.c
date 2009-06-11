@@ -1506,30 +1506,23 @@ COMMAND_PROTOTYPE(doifconfig)
 		return 0;
 
 	/*
-	 * First, return config info the physical interfaces underlying
-	 * the virtual interfaces so that those can be set up.
-	 *
-	 * For virtual nodes, we do this just for the physical node;
-	 * no need to send it back for every vnode!
+	 * First, return config info for physical interfaces underlying
+	 * the virtual interfaces or delay interfaces. These are marked
+	 * with a current_speed!=0 but no IP address.
 	 */
 	if (vers >= 18 && !reqp->isvnode) {
 		char *aliasstr;
 
-		/*
-		 * First do phys interfaces underlying veth/vlan interfaces
-		 */
-		res = mydb_query("select distinct "
-				 "       i.interface_type,i.mac, "
+		res = mydb_query("select i.interface_type,i.mac, "
 				 "       i.current_speed,i.duplex "
-				 "  from vinterfaces as v "
-				 "left join interfaces as i on "
-				 "  i.node_id=v.node_id and i.iface=v.iface "
-				 "where v.iface is not null and "
-				 "      v.type!='alias' and v.node_id='%s'",
+				 "  from interfaces as i "
+				 "where i.current_speed!=0 and "
+				 "      (i.IP='' or i.IP is null) and "
+				 "      i.role='expt' and i.node_id='%s'",
 				 4, reqp->pnodeid);
 		if (!res) {
 			error("%s: IFCONFIG: "
-			     "DB Error getting interfaces underlying veths!\n",
+			     "DB Error getting active physical interfaces!\n",
 			      reqp->nodeid);
 			return 1;
 		}
@@ -1550,54 +1543,6 @@ COMMAND_PROTOTYPE(doifconfig)
 				       "SPEED=%sMbps DUPLEX=%s "
 				       "%sIFACE= RTABID= LAN=\n",
 				       row[0], row[1], row[2], row[3],
-				       aliasstr);
-
-			client_writeback(sock, buf, strlen(buf), tcp);
-			if (verbose)
-				info("%s: IFCONFIG: %s", reqp->nodeid, buf);
-			nrows--;
-		}
-		mysql_free_result(res);
-
-		/*
-		 * Now do phys interfaces underlying delay interfaces.
-		 */
-		res = mydb_query("select i.interface_type,i.MAC,"
-				 "       i.current_speed,i.duplex, "
-				 "       j.interface_type,j.MAC,"
-				 "       j.current_speed,j.duplex "
-				 " from delays as d "
-				 "left join interfaces as i on "
-				 "    i.node_id=d.node_id and i.iface=iface0 "
-				 "left join interfaces as j on "
-				 "    j.node_id=d.node_id and j.iface=iface1 "
-				 "where d.node_id='%s'",
-				 8, reqp->pnodeid);
-		if (!res) {
-			error("%s: IFCONFIG: "
-			    "DB Error getting interfaces underlying delays!\n",
-			      reqp->nodeid);
-			return 1;
-		}
-		nrows = (int)mysql_num_rows(res);
-		while (nrows) {
-			char *bufp   = buf;
-			row = mysql_fetch_row(res);
-
-			bufp += OUTPUT(bufp, ebufp - bufp,
-				       "INTERFACE IFACETYPE=%s "
-				       "INET= MASK= MAC=%s "
-				       "SPEED=%sMbps DUPLEX=%s "
-				       "%sIFACE= RTABID= LAN=\n",
-				       row[0], row[1], row[2], row[3],
-				       aliasstr);
-
-			bufp += OUTPUT(bufp, ebufp - bufp,
-				       "INTERFACE IFACETYPE=%s "
-				       "INET= MASK= MAC=%s "
-				       "SPEED=%sMbps DUPLEX=%s "
-				       "%sIFACE= RTABID= LAN=\n",
-				       row[4], row[5], row[6], row[7],
 				       aliasstr);
 
 			client_writeback(sock, buf, strlen(buf), tcp);
@@ -1629,12 +1574,12 @@ COMMAND_PROTOTYPE(doifconfig)
 			 "left join interfaces as i on "
 			 "  i.node_id=v.node_id and i.iface=v.iface "
 			 "left join virt_lan_lans as vll on "
-			 "  vll.idx=v.virtlanidx and vll.exptidx='%d' "
+			 "  vll.idx=v.virtlanidx and vll.exptidx=v.exptidx "
 			 "left join lan_attributes as la on "
 			 "  la.lanid=v.vlanid and la.attrkey='vlantag' "
 			 "left join lan_attributes as la2 on "
 			 "  la2.lanid=v.vlanid and la2.attrkey='stack' "
-			 "where v.node_id='%s' and "
+			 "where v.exptidx='%d' and v.node_id='%s' and "
 			 "      (la2.attrvalue='Experimental' or "
 			 "       la2.attrvalue is null) "
 			 "      and %s",
@@ -1977,7 +1922,8 @@ COMMAND_PROTOTYPE(doaccounts)
 				 "order by u.uid",
 				 18, reqp->nodeid);
 	}
-	else if (reqp->isvnode || reqp->islocal) {
+	else if (reqp->isvnode ||
+		 (reqp->islocal && !reqp->sharing_mode[0])) {
 		/*
 		 * This crazy join is going to give us multiple lines for
 		 * each user that is allowed on the node, where each line
@@ -2011,10 +1957,13 @@ COMMAND_PROTOTYPE(doaccounts)
 				 "order by u.uid",
 				 18, reqp->pid, adminclause);
 	}
-	else if (reqp->jailflag && !reqp->islocal) {
+	else if ((reqp->jailflag && !reqp->islocal) ||
+		 (reqp->islocal && reqp->sharing_mode[0])) {
 		/*
-		 * A remote node, doing jails. We still want to return
-		 * accounts for the admin people outside the jails.
+		 * A remote node, doing jails or a local node being
+		 * shared.  We still want to return accounts for the
+		 * admin people outside the jails. Note that remote jail
+		 * case is effectively deprecated at this point.
 		 */
 		res = mydb_query("select distinct "
 			     "  u.uid,'*',u.unix_uid,u.usr_name, "
@@ -2340,7 +2289,9 @@ COMMAND_PROTOTYPE(doaccounts)
 		 * Add an argument of "pubkeys" to get the PUBKEY data.
 		 * An "windows" argument also returns a user's Windows Password.
 		 */
-		if (reqp->islocal && !reqp->genisliver_idx &&
+		if (reqp->islocal &&
+		    ! reqp->genisliver_idx &&
+		    ! reqp->sharing_mode[0] && 
 		    ! (strncmp(rdata, "pubkeys", 7) == 0
 		       || strncmp(rdata, "windows", 7) == 0))
 			goto skipsshkeys;
@@ -3298,7 +3249,7 @@ COMMAND_PROTOTYPE(domounts)
 	 * maybe fix that) so that the phys node still looks like it
 	 * belongs to the experiment (people can log into it). 
 	 */
-	if (reqp->jailflag || reqp->sharing_mode[0]) 
+	if (reqp->jailflag)
 		return 0;
 
 	/*
@@ -3306,6 +3257,41 @@ COMMAND_PROTOTYPE(domounts)
 	 */
 	if (reqp->genisliver_idx)
 		return 0;
+
+	/*
+	 * A node acting as a shared host gets toplevel mounts now.
+	 * Might change.
+	 */
+	if (reqp->sharing_mode[0]) {
+	  if (!usesfs) {
+		OUTPUT(buf, sizeof(buf), "REMOTE=%s LOCAL=%s\n",
+		       FSUSERDIR, USERDIR);
+		client_writeback(sock, buf, strlen(buf), tcp);
+		/* Leave this logging on all the time for now. */
+		info("MOUNTS: %s", buf);
+
+		OUTPUT(buf, sizeof(buf), "REMOTE=%s LOCAL=%s\n",
+		       FSPROJDIR, PROJDIR);
+		client_writeback(sock, buf, strlen(buf), tcp);
+		/* Leave this logging on all the time for now. */
+		info("MOUNTS: %s", buf);
+#ifdef FSSCRATCHDIR
+		OUTPUT(buf, sizeof(buf), "REMOTE=%s LOCAL=%s\n",
+		       FSSCRATCHDIR, SCRATCHDIR);
+		client_writeback(sock, buf, strlen(buf), tcp);
+		/* Leave this logging on all the time for now. */
+		info("MOUNTS: %s", buf);
+#endif
+#ifdef FSSHAREDIR
+		OUTPUT(buf, sizeof(buf),
+		       "REMOTE=%s LOCAL=%s\n", FSSHAREDIR, SHAREDIR);
+		client_writeback(sock, buf, strlen(buf), tcp);
+		/* Leave this logging on all the time for now. */
+		info("MOUNTS: %s", buf);
+#endif
+	  }
+	  return 0;
+	}
 	
 	/*
 	 * If SFS is in use, the project mount is done via SFS.
@@ -5957,10 +5943,12 @@ COMMAND_PROTOTYPE(dodoginfo)
 		iv_ntpdrift = 0;
 	else
 		iv_cvsup = 0;
-	if (!reqp->isplabsvc)
-		iv_rusage = 0;
-	else
+	if (reqp->isplabsvc) 
 		iv_isalive = 0;
+	else if (reqp->islocal && reqp->sharing_mode[0] && !reqp->isvnode)
+		iv_rusage = 60;
+	else
+		iv_rusage = 0;
 
 	bp = buf;
 	bp += OUTPUT(bp, sizeof(buf),
