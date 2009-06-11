@@ -204,7 +204,7 @@ $vtopflags |= $libvtop::VTOP_FLAGS_VERBOSE
 $vtopflags |= $libvtop::VTOP_FLAGS_UPDATE
     if ($updating);
 $vtopflags |= $libvtop::VTOP_FLAGS_FIXNODES
-    if ($fixmode);
+    if ($fixmode || $usecurrent);
 $vtopflags |= $libvtop::VTOP_FLAGS_IMPOTENT
     if ($impotent);
 $vtopflags |= $libvtop::VTOP_FLAGS_REGRESSION
@@ -230,23 +230,12 @@ sub MapperWrapper()
     chat("Starting the new and improved mapper wrapper.\n");
 
     TBDebugTimeStamp("Create libvtop started");
-    $vtop = libvtop->Create($experiment, $vtopflags);
+    $vtop = libvtop->Create($experiment, $this_user, $vtopflags);
     if (!defined($vtop)) {
 	fatal("Could not create vtop structure for $experiment");
     }
     TBDebugTimeStamp("Create libvtop ended");
 
-    #
-    # If updating, load current experiment resources. We have to be
-    # careful of how this is merged in with the (new) desired
-    # topology.
-    #
-    if ($updating || $usecurrent) {
-	TBDebugTimeStamp("LoadCurrentResources started");
-	$vtop->LoadCurrentResources() == 0
-	    or fatal("Could not load current resources into mapper");
-	TBDebugTimeStamp("LoadCurrentResources ended");
-    }
     if (!$impotent && ($updating || $clear)) {
 	if ($clear) {
 	    chat("Freeing reserved nodes ...\n");
@@ -466,10 +455,8 @@ sub RunAssign($$)
     }
 
     # Run assign
-    my $cmd  = "assign-dev";
-    my $args = "-P -x $ptopfile -y $vtopfile";
-#    my $cmd  = "assign";
-#    my $args = "-P $ptopfile $vtopfile";
+    my $cmd  = "assign";
+    my $args = "-P $ptopfile $vtopfile";
     $args = "-uod -c .75 $args"
 	if ($vtop->virtnodecount() || $vtop->simnodecount());
     $args = "-n $args"
