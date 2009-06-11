@@ -40,7 +40,8 @@ static char nodeidstr[BUFSIZ], ipaddr[32];
 void
 usage(char *progname)
 {
-    fprintf(stderr, "Usage: %s [-s server] [-p port] -n pnodeid -l local_elvin_port\n", progname);
+    fprintf(stderr, "Usage: %s [-s server] [-p port] [-l local_elvin_port] "
+	    "-n pnodeid \n", progname);
     exit(-1);
 }
 
@@ -118,9 +119,8 @@ main(int argc, char **argv)
 	if (argc)
 		usage(progname);
 
-	if ((! pnodeid) || (! lport))
-	   fatal("Must provide pnodeid and local event server port"); 
-
+	if (! pnodeid)
+	   fatal("Must provide pnodeid"); 
 
 	if (debug) {
 	        loginit(0, 0);
@@ -190,7 +190,9 @@ main(int argc, char **argv)
 	snprintf(nodeidstr, sizeof(nodeidstr), "__%s_proxy", pnodeid);
 
 	/* Register with the event system on the local node */
-	snprintf(buf, sizeof(buf), "elvin://localhost:%s",lport);
+	snprintf(buf, sizeof(buf), "elvin://localhost%s%s",
+		 (lport ? ":"  : ""),
+		 (lport ? lport : ""));
 	localhandle = event_register(buf, 0);
 	if (localhandle == NULL) {
 		fatal("could not register with local event system");

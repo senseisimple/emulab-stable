@@ -95,6 +95,7 @@ $(PROGRAMS):	../lib/libevent.a ../lib/event.h
 client: evproxy
 client-install: client
 	$(INSTALL_PROGRAM) evproxy$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/evproxy$(EXE)
+	$(INSTALL_PROGRAM) evproxyplab$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/evproxy_shared$(EXE)
 
 clean:
 	/bin/rm -f *.o $(PROGRAMS) *-debug
