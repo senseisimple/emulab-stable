@@ -1,4 +1,4 @@
-#!/usr/bin/perl -wT
+#!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2008-2009 University of Utah and the Flux Group.
@@ -10,7 +10,7 @@ package libvnode;
 use Exporter;
 @ISA    = "Exporter";
 @EXPORT = qw( VNODE_STATUS_RUNNING VNODE_STATUS_STOPPED VNODE_STATUS_BOOTING 
-              VNODE_STATUS_INIT VNODE_STATUS_STOPPING
+              VNODE_STATUS_INIT VNODE_STATUS_STOPPING VNODE_STATUS_UNKNOWN
               ipToMac macAddSep fatal mysystem
             );
 
@@ -20,7 +20,6 @@ sub VNODE_STATUS_BOOTING() { return "booting"; }
 sub VNODE_STATUS_INIT() { return "init"; }
 sub VNODE_STATUS_STOPPING() { return "stopping"; }
 sub VNODE_STATUS_UNKNOWN() { return "unknown"; }
-
 
 sub ipToMac($) {
     my $ip = shift;
@@ -71,5 +70,6 @@ sub mysystem($)
     }
 }
 
+#
 # Life's a rich picnic.  And all that.
 1;
