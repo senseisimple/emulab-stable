@@ -1708,6 +1708,35 @@ sub Create($$$$$$;$)
 }
 
 #
+# Modify the keys.
+#
+sub ModifyKeys($$)
+{
+    my ($self, $sshkeys) = @_;
+
+    return 0
+	if ($self->shadow());
+
+    my $idx = $self->uid_idx();
+    my $uid = $self->uid();
+    
+    DBQueryWarn("delete from user_pubkeys where uid_idx='$idx'")
+	or return -1;
+    
+    if (defined($sshkeys)) {
+	foreach my $sshkey (@{ $sshkeys }) {
+	    my $safe_sshkey = DBQuoteSpecial($sshkey);
+
+	    DBQueryWarn("insert into user_pubkeys set ".
+			"  uid='$uid', uid_idx='$idx', ".
+			"  idx=NULL, stamp=now(), pubkey=$safe_sshkey")
+		or return -1;
+	}
+    }
+    return 0;
+}
+
+#
 # Delete the user, as for registration errors.
 #
 sub Delete($)
