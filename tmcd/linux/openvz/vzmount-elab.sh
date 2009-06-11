@@ -20,48 +20,25 @@ fi
 
 RETVAL=0
 
-__vzmount() {
-    mount -t nfs | sed -n -r -e 's/^.*on ([^ ]*) .*$/\1/p' | grep $1 | \
-	while read point; \
-	do \
-            mkdir -p "${MYROOT}${point}"
-            echo -n "Mounting $point at ${MYROOT}${point}... "
-            mount -n -o bind $point "${MYROOT}${point}"
-	    if [ $? = 0 ]; then
-		echo "ok."
-	    else
-		echo "FAILED with exit code $?"
-		RETVAL=1
-	    fi
-        done
-}
-
-#
-# Grab our list of /users mounts:
-#
-__vzmount '/users'
-
-#
-# Same deal with /proj:
-#
-__vzmount '/proj'
-
-#
-# Quick /share:
-#
-__vzmount '/share'
-
 #
 # This is an utter disgrace.  OpenVZ does not called a prestart or start script
 # in the root context before booting a container, so this is the only place we
 # can perform such actions.
 #
 # Find our vnode_id:
-pat="s/^([a-zA-Z0-9\-]+)(\s+${VEID})(.+)\$/\\1/p"
-vnodeid=`sed -n -r -e $pat /var/emulab/vnode.map`
+vnodeid=`cat /var/emulab/vms/vnode.${VEID}`
 if [ -z $vnodeid ]; then
     echo "No vnodeid found for $VEID in /var/emulab/vnode.map;"
     echo "  cannot start tmcc proxy!"
+    exit 44
+fi
+
+echo "Doing Emulab mounts."
+/usr/local/etc/emulab/rc/rc.mounts -j $vnodeid $MYROOT 0 boot
+if [ $? = 0 ]; then
+    echo "ok."
+else
+    echo "FAILED with exit code $?"
     exit 44
 fi
 
