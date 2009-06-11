@@ -2,5 +2,7 @@
 
 cd @prefix@/data/node_usage/
 
+mkdir -p @prefix@/www/node_usage/
+
 cp *.png index.php usage.php @prefix@/www/node_usage/
 

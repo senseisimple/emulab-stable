@@ -11,7 +11,11 @@ SUBDIR		= node_usage
 
 include $(OBJDIR)/Makeconf
 
+ifeq ($(NODE_USAGE_SUPPORT),1)
 LIBEXEC_NODE_USAGE = analy mk-plots refresh analy2 gather publish mk-php-pages get-start-date
+else
+LIBEXEC_NODE_USAGE =
+endif
 
 #
 # These are Utah emulab specific
