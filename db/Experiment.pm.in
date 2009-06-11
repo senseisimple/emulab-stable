@@ -3085,18 +3085,48 @@ sub RemovePhysicalState($)
     my $eid = $self->eid();
     my $errors = 0;
     
+    # Need list of node names, partitioned by phys vs virt.
+    my @pnodenames = ();
+    my @vnodenames = ();
+    
+    my $query_result =
+	DBQueryWarn("select r.node_id,nt.isvirtnode from reserved as r ".
+		    "left join nodes as n on n.node_id=r.node_id ".
+		    "left join node_types as nt on nt.type=n.type ".
+		    "where r.pid='$pid' and r.eid='$eid'");
+    return -1
+	if (!$query_result);
+    while (my ($nodeid,$isvirtnode) = $query_result->fetchrow_array()) {
+	if ($isvirtnode) {
+	    push(@vnodenames, $nodeid);
+	}
+	else {
+	    push(@pnodenames, $nodeid);
+	}
+    }
     return -1
 	if (Lan->DestroyExperimentLans($self) != 0);
     
-    my @pnodenames = ExpNodes($pid, $eid, 0, 1);
+    if (@pnodenames || @vnodenames) {
+	my $clause1 = join(" or ", map("node_id='$_'",  @pnodenames))
+	    if (@pnodenames);
+	my $clause2 = join(" or ", map("vnode_id='$_'", @vnodenames))
+	    if (@vnodenames);
+	my $clause = ((defined($clause1) && defined($clause2) ?
+		       "$clause1 or $clause2" :
+		       (defined($clause1) ? $clause1 : $clause2)));
+
+	# This table are also cleaned in nfree.
+	DBQueryWarn("delete from vinterfaces where $clause")
+	    or $errors++;
+    }
     if (@pnodenames) {
 	my $clause = join(" or ", map("node_id='$_'", @pnodenames));
 
-	# These tables are also cleaned in nfree.
-	foreach my $table ("vinterfaces", "interface_settings") {
-	    DBQueryWarn("delete from $table where $clause")
-		or $errors++;
-	}
+	# This table are also cleaned in nfree.
+	DBQueryWarn("delete from interface_settings where $clause")
+	    or $errors++;
+
 	# Interfaces table is special. Also cleaned in nfree.
 	DBQueryWarn("update interfaces set IP='',IPaliases=NULL,mask=NULL,".
 		    "       rtabid='0',vnode_id=NULL " .
@@ -3134,23 +3164,56 @@ sub BackupPhysicalState($;$$)
 	    or return 1;
     }
 
+    # Need list of node names, partitioned by phys vs virt.
+    my @pnodenames = ();
+    my @vnodenames = ();
+    
+    my $query_result =
+	DBQueryWarn("select r.node_id,nt.isvirtnode from reserved as r ".
+		    "left join nodes as n on n.node_id=r.node_id ".
+		    "left join node_types as nt on nt.type=n.type ".
+		    "where r.pid='$pid' and r.eid='$eid'");
+    return -1
+	if (!$query_result);
+    while (my ($nodeid,$isvirtnode) = $query_result->fetchrow_array()) {
+	if ($isvirtnode) {
+	    push(@vnodenames, $nodeid);
+	}
+	else {
+	    push(@pnodenames, $nodeid);
+	}
+    }
     return -1
 	if (Lan->BackupExperimentLans($self, $pstateDir) != 0);
 
-    my @pnodenames = ExpNodes($pid, $eid, 0, $physonly);
-    if (@pnodenames) {
-	my $clause = join(" or ", map("node_id='$_'", @pnodenames));
+    if (@pnodenames || @vnodenames) {
+	my $clause = join(" or ", map("node_id='$_'",
+				      (@pnodenames, @vnodenames)));
 
 	# This ordering is for wrapper/mapper regression testing. 
 	DBQueryWarn("select * from nodes where $clause ".
 		    "order by node_id ".
 		    "into outfile '$pstateDir/nodes' ")
 	    or $errors++;
+	
+	my $clause1 = join(" or ", map("node_id='$_'",  @pnodenames))
+	    if (@pnodenames);
+	my $clause2 = join(" or ", map("vnode_id='$_'", @vnodenames))
+	    if (@vnodenames);
+	$clause = ((defined($clause1) && defined($clause2) ?
+		    "$clause1 or $clause2" :
+		    (defined($clause1) ? $clause1 : $clause2)));
+
 	# This ordering is for wrapper/mapper regression testing. 
 	DBQueryWarn("select * from vinterfaces where $clause ".
 		    "order by node_id,unit ".
 		    "into outfile '$pstateDir/vinterfaces' ")
 	    or $errors++;
+    }
+	
+    if (@pnodenames) {
+	my $clause = join(" or ", map("node_id='$_'", @pnodenames));
+
 	# This ordering is for wrapper/mapper regression testing. 
 	DBQueryWarn("select * from interface_settings where $clause ".
 		    "order by node_id,iface,capkey ".
