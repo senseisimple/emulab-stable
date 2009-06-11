@@ -41,6 +41,7 @@ my $TBOPS       = "@TBOPSEMAIL@";
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use User;
 use libtblog;
 use libvtop;
 
@@ -90,6 +91,11 @@ if (!defined($experiment)) {
     fatal("Could not lookup experiment object $pid,$eid!")
 }
 
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
+}
+
 my $flags = 0;
 $flags |= $libvtop::VTOP_FLAGS_VERBOSE
     if ($verbose);
@@ -105,7 +111,7 @@ if (defined($filename)) {
     $output = *OUT;
 }
 
-my $vtop = libvtop->Create($experiment, $flags);
+my $vtop = libvtop->Create($experiment, $this_user, $flags);
 if (!defined($vtop)) {
     fatal("Could not create vtop structure for $experiment");
 }
