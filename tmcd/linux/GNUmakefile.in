@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -259,9 +259,8 @@ openvz-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/openvz/vznetinit-elab.sh $(BINDIR)/
 	$(INSTALL) -m 755 $(SRCDIR)/vnodectl $(BINDIR)/
 	echo "openvz" > $(ETCDIR)/genvmtype
-	-ln -sf $(BINDIR)/vnodectl $(BINDIR)/vnodesetup
-	-ln -sf $(BINDIR)/vnodectl $(BINDIR)/bootvnodes
 	$(INSTALL) -m 755 $(SRCDIR)/openvz/vzmount-elab.sh $(BINDIR)/
 	-ln -sf $(BINDIR)/vzmount-elab.sh /etc/vz/conf/vps.mount
 	$(INSTALL) -m 755 $(SRCDIR)/openvz/vzumount-elab.sh $(BINDIR)/
 	-ln -sf $(BINDIR)/vzumount-elab.sh /etc/vz/conf/vps.umount
+	$(INSTALL) -m 755 $(SRCDIR)/mkvnode.pl $(BINDIR)/mkvnode.pl
