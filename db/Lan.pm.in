@@ -421,6 +421,26 @@ sub CompareVlansWithSwitches($$$)
 }
 
 #
+# Class method to see if an experiment has any active trunks. If it does,
+# do not optimize vlan setup/teardown (see above function) when doing a
+# swapmod. Too difficult to deal with right now; the problem is that the
+# trunked interface is potentially a shared resource for multiple vlans,
+# and the bookkeeping does not support dealing with it.
+#
+sub GotTrunks($$)
+{
+    my ($class, $experiment) = @_;
+    my $exptidx = $experiment->idx();
+
+    my $query_result =
+	DBQueryWarn("select distinct r.node_id,i.iface from reserved as r " .
+		    "left join interfaces as i on i.node_id=r.node_id " .
+		    "where r.exptidx='$exptidx' i.trunk!=0");
+
+    return $query_result->numrows;
+}
+
+#
 # Stringify for output.
 #
 sub Stringify($)
@@ -1620,24 +1640,47 @@ sub Instantiate($)
 
     # Members ...
     foreach my $key (sort(keys(%{ $self->{"MEMBERS"} }))) {
-	my $member = $self->{"MEMBERS"}->{$key};
-
-	if (!$lan->AddMember($member->{'node'}, $member->{'iface'})) {
+	my $protomember = $self->{"MEMBERS"}->{$key};
+	my $node        = $protomember->{'node'};
+	my $iface       = $protomember->{'iface'};
+	my $attributes  = $protomember->{'attrs'};
+	my $member      = $lan->AddMember($node, $iface);
+	
+	if (!defined($member)) {
 	    $lan->Destroy();
 	    return -1;
+	}
+
+	if (defined($attributes)) {
+	    foreach my $attrkey (keys(%{$attributes})) {
+		my $attrvalue = $attributes->{$attrkey};
+
+		$member->SetAttribute($attrkey, $attrvalue);
+	    }
 	}
     }
 
     # Interfaces ...
     foreach my $key (sort(keys(%{ $self->{"IFACES"} }))) {
-	my $interface = $self->{"IFACES"}->{$key};
-
-	if (!$lan->AddInterface($interface->{'node'},
-			       $interface->{'vnode'},
-			       $interface->{'vport'},
-			       $interface->{'iface'})) {
+	my $protomember = $self->{"IFACES"}->{$key};
+	my $node        = $protomember->{'node'};
+	my $vnode       = $protomember->{'vnode'};
+	my $vport       = $protomember->{'vport'};
+	my $iface       = $protomember->{'iface'};
+	my $attributes  = $protomember->{'attrs'};
+	my $interface   = $lan->AddInterface($node, $vnode, $vport, $iface);
+	
+	if (!defined($interface)) {
 	    $lan->Destroy();
 	    return -1;
+	}
+
+	if (defined($attributes)) {
+	    foreach my $attrkey (keys(%{$attributes})) {
+		my $attrvalue = $attributes->{$attrkey};
+
+		$interface->SetAttribute($attrkey, $attrvalue);
+	    }
 	}
     }
     $self->{'INSTANCE'} = $lan;
@@ -1744,9 +1787,9 @@ sub Dump($)
 #
 # Add an interface to a protolan.
 #
-sub AddInterface($$$$$)
+sub AddInterface($$$$$;$)
 {
-    my ($self, $node, $vnode, $vport, $iface) = @_;
+    my ($self, $node, $vnode, $vport, $iface, $attributes) = @_;
 
     if (!ref($node)) {
 	$node = Node->Lookup($node);
@@ -1763,7 +1806,8 @@ sub AddInterface($$$$$)
     $self->{'IFACES'}->{"$vnode:$vport"} = { "node"  => $node,
 					     "vnode" => $vnode,
 					     "vport" => $vport,
-					     "iface" => $iface
+					     "iface" => $iface,
+					     "attrs" => $attributes,
 					    };
     return 0;
 }
@@ -1771,9 +1815,9 @@ sub AddInterface($$$$$)
 #
 # Add a member to a vlan, as for delay node links and tagged vlans.
 #
-sub AddMember($$$)
+sub AddMember($$$;$)
 {
-    my ($self, $node, $iface) = @_;
+    my ($self, $node, $iface, $attributes) = @_;
 
     if (!ref($node)) {
 	$node = Node->Lookup($node);
@@ -1789,7 +1833,8 @@ sub AddMember($$$)
     }
     
     $self->{'MEMBERS'}->{"$nodeid:$iface"} = { "node"  => $node,
-					       "iface" => $iface
+					       "iface" => $iface,
+					       "attrs" => $attributes,
 					     };
     return 0;
 }
@@ -1858,7 +1903,7 @@ sub IfaceNode($$)
 }
 
 #
-# Set value of an attribute.
+# Set value of an attribute for a member;
 #
 sub SetAttribute($$$;$)
 {
