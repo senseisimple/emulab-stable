@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -97,7 +97,7 @@ my $signaled = 0;
 my $tbdir    = "$TB/bin";
 my $tbdata   = "tbdata";
 my $checkquota = "$TB/sbin/checkquota";
-my $wrapper    = "$TB/libexec/assign_wrapper";
+my $vtopgen  = "$TBROOT/bin/vtopgen";
 my $batch    = 0;
 my $idleswap = 0;
 my $autoswap = 0;
@@ -1062,7 +1062,7 @@ elsif ($inout eq "modify") {
 	# Need the min/max numbers, usually done during prerun.
 	#
 	print "Doing a pre-assign ...\n";
-	if (system("$wrapper -t $pid $eid")) {
+	if (system("$vtopgen -p $pid $eid")) {
 	    fatal({type => 'secondary', severity => SEV_SECONDARY,
 		   error => ['update_aborted', undef]},
 		  "assign prerun failed!");
