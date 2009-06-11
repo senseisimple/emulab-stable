@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005, 2006, 2007, 2008 University of Utah and the Flux Group.
+# Copyright (c) 2004-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -286,7 +286,7 @@ sub doboot()
 	# If it fails, that is okay. Keep going.
     }
     
-    if (-x "$RCDIR/rc.slothd" && ! REMOTE()) {
+    if (-x "$RCDIR/rc.slothd" && !(REMOTE() || GENVNODE())) {
 	print("Starting slothd usage detector\n");
 	system("$RCDIR/rc.slothd start");
 	if ($?) {
@@ -333,15 +333,31 @@ sub doboot()
     #
     # Start the elvin proxy.
     #
-    if (-x "$BINDIR/evproxy" && !(REMOTE() && !REMOTEDED()) && !GENVNODE()) {
-	my $eventserver = "event-server";
-        if (REMOTE()) {
-            $eventserver = TB_EVENTSERVER();
-        }
-	print("Starting elvin proxy daemon\n");
-	system("$BINDIR/evproxy -s $eventserver -e $pid/$eid");
-	if ($?) {
-	    fatal("Error running $BINDIR/evproxy");
+    if (SHAREDHOST() || (!(REMOTE() && !REMOTEDED()) && !GENVNODE())) {  
+	my $evproxy =
+	    (SHAREDHOST() ? "$BINDIR/evproxy_shared" : "$BINDIR/evproxy");
+
+	if (-x $evproxy) {
+	    my $eventserver = "event-server";
+	    if (REMOTE()) {
+		$eventserver = TB_EVENTSERVER();
+	    }
+	    print("Starting elvin proxy daemon\n");
+	    if (SHAREDHOST()) {
+		my $file    = TMNODEID();
+		my $pnodeid = `cat $file`;
+		chomp($pnodeid);
+		system("$evproxy -s $eventserver -n $pnodeid");
+	    }
+	    else {
+		system("$evproxy -s $eventserver -e $pid/$eid");
+	    }
+	    if ($?) {
+		fatal("Error running $evproxy");
+	    }
+	}
+	else {
+	    print("$evproxy does not exist!\n");
 	}
     }
 
