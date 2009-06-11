@@ -16,7 +16,7 @@ use Exporter;
               vz_vnodePreConfig 
               vz_vnodePreConfigControlNetwork vz_vnodePreConfigExpNetwork 
               vz_vnodeConfigResources vz_vnodeConfigDevices
-              vz_vnodePostConfig
+              vz_vnodePostConfig vz_vnodeExec
             );
 
 %ops = ( 'init' => \&vz_init,
@@ -30,6 +30,7 @@ use Exporter;
 	 'vnodeBoot' => \&vz_vnodeBoot,
 	 'vnodeHalt' => \&vz_vnodeHalt,
 	 'vnodeReboot' => \&vz_vnodeReboot,
+	 'vnodeExec' => \&vz_vnodeExec,
 	 'vnodePreConfig' => \&vz_vnodePreConfig,
 	 'vnodePreConfigControlNetwork' => \&vz_vnodePreConfigControlNetwork,
 	 'vnodePreConfigExpNetwork' => \&vz_vnodePreConfigExpNetwork,
@@ -46,6 +47,7 @@ use Data::Dumper;
 # Pull in libvnode
 require "/etc/emulab/paths.pm"; import emulabpaths;
 use libvnode;
+use libtestbed;
 
 #
 # Turn off line buffering on output
@@ -77,6 +79,8 @@ my $MKEXTRAFS = "/usr/local/etc/emulab/mkextrafs.pl";
 my $VZROOT = "/vz/root";
 
 my $CTRLIPFILE = "/var/emulab/boot/myip";
+my $IMQDB      = "/var/emulab/boot/imqdb";
+my $MAXIMQ     = 16;
 
 my $CONTROL_IFNUM  = 999;
 my $CONTROL_IFDEV  = "eth${CONTROL_IFNUM}";
@@ -127,6 +131,24 @@ sub vz_init {
 # Prepare the root context.  Run once at boot.
 #
 sub vz_rootPreConfig {
+    #
+    # Only want to do this once, so use file in /var/run, which
+    # is cleared at boot.
+    #
+    return 0
+	if (-e "/var/run/openvz.ready");
+
+    if ((my $locked = TBScriptLock("vzconf", TBSCRIPTLOCK_GLOBALWAIT(), 90)) 
+	!= TBSCRIPTLOCK_OKAY()) {
+	return 0
+	    if ($locked == TBSCRIPTLOCK_IGNORE());
+	print STDERR "Could not get the vzinit lock after a long time!\n";
+	return -1;
+    }
+    # 
+    return 0
+	if (-e "/var/run/openvz.ready");
+    
     # make sure filesystem is setup 
     # about the funny quoting: don't ask... emacs perl mode foo.
     if (system('grep -q '."'".'^/dev/.*/vz.*$'."'".' /etc/fstab')) {
@@ -194,6 +216,24 @@ sub vz_rootPreConfig {
     # XXX only needed for fake mac hack, which should go away someday
     mysystem("echo 1 > /proc/sys/net/ipv4/conf/$iface/proxy_arp");
 
+    # Ug, pre-create a bunch of imq devices, since adding news ones
+    # does not work right yet.
+    mysystem("$MODPROBE imq numdevs=$MAXIMQ");
+    mysystem("$MODPROBE ipt_IMQ");
+
+    # Create a DB to manage them.
+    my %MDB;
+    if (!dbmopen(%MDB, $IMQDB, 0660)) {
+	print STDERR "*** Could not create $IMQDB\n";
+	return -1;
+    }
+    for (my $i = 0; $i < $MAXIMQ; $i++) {
+	$MDB{"$i"} = "";
+    }
+    dbmclose(%MDB);
+
+    mysystem("touch /var/run/openvz.ready");
+    TBScriptUnlock();
     return 0;
 }
 
@@ -203,6 +243,14 @@ sub vz_rootPreConfig {
 # and configuring them as necessary.
 #
 sub vz_rootPreConfigNetwork {
+    if (TBScriptLock("vzconf", 0, 90) != TBSCRIPTLOCK_OKAY()) {
+	print STDERR "Could not get the vznetwork lock after a long time!\n";
+	return -1;
+    }
+    # Do this again after lock.
+    makeIfaceMaps();
+    makeBridgeMaps();
+    
     my ($node_ifs,$node_ifsets,$node_lds) = @_;
 
     # figure out what bridges we need to make:
@@ -272,81 +320,55 @@ sub vz_rootPreConfigNetwork {
 	}
     }
 
-    #
-    # Figure out how many IMQ devices we need.
-    #
-    my $imqnum = 0;
+    # Use the IMQDB to reserve the devices to the container. We have the lock.
+    my %MDB;
+    if (!dbmopen(%MDB, $IMQDB, 0660)) {
+	print STDERR "*** Could not create $IMQDB\n";
+	TBScriptUnlock();
+	return -1;
+    }
+    my $i = 0;
     foreach my $node (keys(%$node_lds)) {
         foreach my $ldc (@{$node_lds->{$node}}) {
 	    if ($ldc->{"TYPE"} eq 'duplex') {
-		++$imqnum;
-	    }
-	}
-    }
+		while ($i < $MAXIMQ) {
+		    my $current = $MDB{"$i"};
 
-    my $numchanged = 0;
-    #
-    # Find out how many already devices we configured last time (there is no
-    # way to tell how many there are if some have already been dedicated to
-    # running containers, so we have to check by writing a file...)
-    #
-    my $nidf = "${emulabpaths::VARDIR}/numimqdevs";
-    my $oldimqnum;
-    if (-e $nidf) {
-	open(FD,"$nidf") or die "could not open $nidf for read: $!\n";
-	$oldimqnum = <FD>;
-	chomp($oldimqnum);
-	close(FD);
-
-	if ($oldimqnum eq "$imqnum") {
-	    $numchanged = 1;
-	}
-    }
-
-    if (!defined($oldimqnum) || $numchanged) {
-	open(FD,">$nidf") or die "could not open $nidf for write: $!\n";
-	print FD "$imqnum\n";
-	close(FD);
-    }
-
-    #
-    # XXX: we have to rmmod the imq module to change the number of allocated
-    # devices, ugh!  So, all the VMs had better be stopped before we do this!
-    # 
-    if (!defined($oldimqnum) || $numchanged) {
-	if (!system('lsmod | grep -q imq')) {
-	    system("$MODPROBE -r imq");
-	}
-
-	if ($imqnum) {
-	    mysystem("$MODPROBE imq numdevs=$imqnum");
-	    mysystem("$MODPROBE ipt_IMQ");
-
-	    #
-	    # This is ugly -- we write a map file that tells 
-	    # vz_vnodePreConfigExpNetwork which container gets which imq devs.
-	    #
-	    open(FD,">${emulabpaths::VARDIR}/imqmap") 
-		or die "could not open ${emulabpaths::VARDIR}/imqmap for write: $!\n";
-	    my $ii = 0;
-	    foreach my $node (sort(keys(%$node_lds))) {
-		my @nidevs = ();
-		foreach my $ldc (@{$node_lds->{$node}}) {
-		    if ($ldc->{"TYPE"} eq 'duplex') {
-			push(@nidevs,"imq$ii");
-			++$ii;
+		    if (!defined($current) ||
+			$current eq "" || $current eq $node) {
+			$MDB{"$i"} = $node;
+			$i++;
+			last;
 		    }
+		    $i++;
 		}
-		print FD "$node\t" . join(',',@nidevs) . "\n";
+		if ($i == $MAXIMQ) {
+		    print STDERR "*** No more IMQs\n";
+		    TBScriptUnLock();
+		    return -1;
+		}
 	    }
-	    close(FD);
+	}
+	# Clear anything else this node is using; no longer needed.
+	for (my $j = $i; $j < $MAXIMQ; $j++) {
+	    my $current = $MDB{"$j"};
+
+	    if (!defined($current)) {
+		$MDB{"$j"} = $current = "";
+	    }
+	    if ($current eq $node) {
+		$MDB{"$j"} = "";
+	    }
 	}
     }
+    dbmclose(%MDB);
 
+    TBScriptUnlock();
     return 0;
 }
 
 sub vz_rootPostConfig {
+    # Locking, if this ever does something?
     return 0;
 }
 
@@ -381,6 +403,37 @@ sub vz_vnodeDestroy {
     my ($vnode_id,$vmid) = @_;
 
     mysystem("$VZCTL destroy $vnode_id");
+    return -1
+	if ($?);
+
+    #
+    # Clear the IMQ reservations. Must lock since IMQDB is a shared
+    # resource.
+    #
+    if (TBScriptLock("vzconf", 0, 90) != TBSCRIPTLOCK_OKAY()) {
+	print STDERR "Could not get the vzpreconfig lock after a long time!\n";
+	return -1;
+    }
+    my %MDB;
+    if (!dbmopen(%MDB, $IMQDB, 0660)) {
+	print STDERR "*** Could not open $IMQDB\n";
+	TBScriptUnlock();
+	return -1;
+    }
+    for (my $i = 0; $i < $MAXIMQ; $i++) {
+	next
+	    if ($MDB{"$i"} ne $vnode_id);
+	$MDB{"$i"} = "";
+    }
+    dbmclose(%MDB);
+    TBScriptUnlock();
+    return 0;
+}
+
+sub vz_vnodeExec {
+    my ($vnode_id,$vmid,$command) = @_;
+
+    mysystem("$VZCTL exec $vnode_id $command");
 
     return 0;
 }
@@ -427,24 +480,31 @@ sub vz_vnodePreConfig {
     my ($vnode_id,$vmid) = @_;
 
     #
-    # Look and see if this node already has imq devs mapped into it -- if those
-    # match the ones in the map file (${emulabpaths::VARDIR}/imqmap), do nothing, else fixup.
+    # Look and see if this node already has imq devs mapped into it -- if
+    # those match the ones in the IMQDB, do nothing, else fixup. Must lock
+    # since IMQDB is a shared resource.
     #
-
-    my %devs = ();
-    if (-e "${emulabpaths::VARDIR}/imqmap") {
-	open(FD,"${emulabpaths::VARDIR}/imqmap") or die "could not open ${emulabpaths::VARDIR}/imqmap: $!\n";
-	while (<FD>) {
-	    chomp($_);
-	    if ($_ =~ /^([^\s]+)\s+([^\s]+)$/ && $1 eq $vnode_id) {
-		foreach my $dev (split(/,/,$2)) {
-		    $devs{$dev} = 1;
-		}
-	    }
-	}
-	close(FD);
+    if (TBScriptLock("vzconf", 0, 90) != TBSCRIPTLOCK_OKAY()) {
+	print STDERR "Could not get the vzpreconfig lock after a long time!\n";
+	return -1;
     }
+    my %MDB;
+    if (!dbmopen(%MDB, $IMQDB, 0660)) {
+	print STDERR "*** Could not open $IMQDB\n";
+	TBScriptUnlock();
+	return -1;
+    }
+    my %devs = ();
 
+    for (my $i = 0; $i < $MAXIMQ; $i++) {
+	next
+	    if ($MDB{"$i"} ne $vnode_id);
+
+	$devs{"$i"} = 1;
+    }
+    dbmclose(%MDB);
+    TBScriptUnlock();
+    
     my $existing = `sed -n -r -e 's/NETDEV="(.*)"/\1/p' /etc/vz/conf/$vmid.conf`;
     chomp($existing);
     foreach my $dev (split(/,/,$existing)) {
