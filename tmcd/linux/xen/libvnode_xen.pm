@@ -23,7 +23,7 @@ use Exporter;
 	      vnodePreConfig vnodePreConfigControlNetwork
               vnodePreConfigFinal
               vnodePreConfigExpNetwork vnodeConfigResources
-              vnodeConfigDevices vnodePostConfig
+              vnodeConfigDevices vnodePostConfig vnodeExec
 	    );
 
 %ops = ( 'init' => \&init,
@@ -39,6 +39,7 @@ use Exporter;
          'vnodeBoot' => \&vnodeBoot,
          'vnodeHalt' => \&vnodeHalt,
          'vnodeReboot' => \&vnodeReboot,
+         'vnodeExec' => \&vnodeExec,
          'vnodeKill' => \&vnodeKill,
          'vnodePreConfig' => \&vnodePreConfig,
          'vnodePreConfigFinal' => \&vnodePreConfigFinal,
@@ -508,6 +509,12 @@ sub vnodeReboot($){
     mysystem("/usr/sbin/xm destroy $id");
     my $file = configFile($id);
     mysystem("/usr/sbin/xm create $file");
+}
+
+sub vnodeExec {
+    my ($vnode_id,$vmid,$command) = @_;
+
+    return -1;
 }
 
 1
