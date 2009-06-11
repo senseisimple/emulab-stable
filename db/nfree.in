@@ -247,15 +247,44 @@ if (! $moveToOldReserved) {
 #
 ######################################################################
 
-DBQueryFatal("lock tables reserved write");
+DBQueryFatal("lock tables reserved write, nodes read");
+
+#
+# This sanity check for shared nodes; do not want to free a shared
+# physical node that still has virtual nodes on it. Bail early.
+#
+# It has to be done with tables locked to avoid a race with a swapin
+# trying to add a new virtnode on it. 
+#
+if (! $moveToOldReserved) {
+    foreach my $node (@nodes) {
+	next
+	    if ($node->isvirtnode() || $node->isremotenode());
+
+	if (defined($node->sharing_mode()) && $node->HasVirtualNodes()) {
+	    print STDERR "$node is shared but has virtual nodes on it.\n";
+	    $error++;
+	}
+    }
+    if ($error) {
+	die("*** $0:\n".
+	    "    Please cleanup the previous errors.\n");
+    }
+}
 
 foreach my $node (@nodes) {
     my $node_id = $node->node_id();
-    
+
+    #
     # Check to make sure they have actually reserved the nodes, now that
     # the reserved table is locked.
+    #
+    # Force reload after table lock.
+    $node->FlushReserved();
+
     my $rowref = $node->ReservedTableEntry();
-    unless (defined($rowref) && $rowref->{'pid'} eq $pid && $rowref->{'eid'} eq $eid) {
+    unless (defined($rowref) &&
+	    $rowref->{'pid'} eq $pid && $rowref->{'eid'} eq $eid) {
 	print STDERR "$node is not reserved by your experiment.\n";
 	$error++;
 	next;
@@ -384,6 +413,18 @@ foreach my $node (@freed_nodes) {
     }
 
     #
+    # If the node is virtual, release the shared bandwidth it had
+    # reserved on the physical node.
+    #
+    if ($isvirt) {
+	if ($node->ReleaseSharedBandwidth() == 0) {
+	    # Clean the vinterfaces table for this virtual node.
+	    DBQueryWarn("delete from vinterfaces where vnode_id='$node_id'")
+		or $error++;
+	}
+    }
+
+    #
     # If the node is a dynamic virtual node, just save it for later.
     # We will call into the Node library to delete it. 
     #
@@ -410,7 +451,7 @@ foreach my $node (@freed_nodes) {
 		"tarballs='',failureaction='fatal', routertype='none', ".
 		"def_boot_cmd_line='',next_boot_cmd_line='', ".
 		"temp_boot_osid=NULL,next_boot_osid=NULL, ".
-		"update_accounts=0,ipport_next=ipport_low, ".
+		"update_accounts=0,ipport_next=ipport_low,rtabid=0, ".
 		"sfshostid=NULL,allocstate='$allocFreeState',boot_errno=0, ".
 		"destination_x=NULL,destination_y=NULL, ".
 		"destination_orientation=NULL ".
