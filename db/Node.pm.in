@@ -246,7 +246,7 @@ sub AUTOLOAD {
     elsif (exists($self->{'HASH'}->{$name})) {
 	return $self->{'HASH'}->{$name};
     }
-    print STDERR "$self: tried access unknown slot $name\n";
+    print STDERR "$self: tried to access unknown slot $name\n";
     return undef;
 }
 
@@ -531,6 +531,17 @@ sub IsReserved($)
 	return 1;
     }
     return 1;
+}
+
+#
+# Flush the reserve info so it reloads.
+#
+sub FlushReserved($)
+{
+    my ($self) = @_;
+
+    $self->{"RSRV"} = undef;
+    return 0;
 }
 
 #
@@ -858,9 +869,9 @@ sub OldReservationID($)
 #
 # Return the tip server (and tipname) for a node.
 #
-sub TipServer($$;$)
+sub TipServer($$;$$$)
 {
-    my ($self, $pserver, $ptipname) = @_;
+    my ($self, $pserver, $ptipname, $pportnum, $pkeydata) = @_;
 
     return -1
 	if (! ref($self));
@@ -872,7 +883,7 @@ sub TipServer($$;$)
     my $nodeid = $self->node_id();
 	
     my $query_result =
-	DBQueryWarn("select server,tipname from tiplines " .
+	DBQueryWarn("select server,tipname,portnum,keydata from tiplines " .
 		    "where node_id='$nodeid'");
     return -1
 	if (!$query_result);
@@ -880,10 +891,14 @@ sub TipServer($$;$)
     return 0
 	if (!$query_result->numrows);
 
-    my ($server, $tipname) = $query_result->fetchrow_array();
+    my ($server,$tipname,$portnum,$keydata) = $query_result->fetchrow_array();
     $$pserver  = $server;
     $$ptipname = $tipname
 	if (defined($ptipname));
+    $$pkeydata = $keydata
+	if (defined($pkeydata));
+    $$pportnum = $portnum
+	if (defined($pportnum));
 
     return 0;
 }
@@ -948,6 +963,27 @@ sub VirtualNodes($$)
     return 0;
 }
 
+#
+# Does a node have any virtual nodes on it. Table might be locked.
+#
+sub HasVirtualNodes($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $node_id = $self->node_id();
+
+    my $query_result = 
+	DBQueryWarn("select node_id from nodes ".
+		    "where phys_nodeid='$node_id' and node_id!=phys_nodeid");
+    return -1
+	if (!$query_result);
+    
+    return $query_result->numrows;
+}
+
 # Need to create a set of access methods for the reservation.
 sub vname($)
 {
@@ -972,6 +1008,18 @@ sub sharing_mode($)
 	if (! $self->IsReserved());
 
     return $self->{"RSRV"}->{'sharing_mode'};
+}
+sub erole($)
+{
+    my ($self) = @_;
+
+    return undef
+	if (! ref($self));
+
+    return undef
+	if (! $self->IsReserved());
+
+    return $self->{"RSRV"}->{'erole'};
 }
 
 #
@@ -1168,9 +1216,6 @@ sub InsertNodeLogEntry($$$$)
 #
 # Clear the experimental interfaces for a node.
 #
-#
-# Insert a Log entry for a node.
-#
 sub ClearInterfaces($)
 {
     my ($self) = @_;
@@ -1182,11 +1227,53 @@ sub ClearInterfaces($)
     my $node_id = $self->node_id();
 
     DBQueryWarn("update interfaces set IP='',IPaliases=NULL,mask=NULL,".
-		"       rtabid='0',vnode_id=NULL,current_speed='0' ".
+		"       rtabid='0',vnode_id=NULL,current_speed='0',trunk='0' ".
 		"where node_id='$node_id' and ".
 		"  role='" . TBDB_IFACEROLE_EXPERIMENT() . "'")
 	or return -1;
 
+    DBQueryWarn("update interface_state,interfaces set ".
+		"       remaining_bandwidth=0 ".
+		"where interface_state.node_id=interfaces.node_id and ".
+		"      interface_state.iface=interfaces.iface and ".
+		"      interfaces.node_id='$node_id' and ".
+		"  role='" . TBDB_IFACEROLE_EXPERIMENT() . "'")
+	or return -1;
+
+    return 0;
+}
+
+#
+# Clear the shared bandwidth being used by a (virtual) node.
+#
+sub ReleaseSharedBandwidth($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $node_id  = $self->node_id();
+
+    DBQueryWarn("lock tables vinterfaces write, interface_state write")
+	or return -1;
+
+    if (!DBQueryWarn("update interface_state,vinterfaces set ".
+		     "     remaining_bandwidth=remaining_bandwidth+bandwidth ".
+		     "where interface_state.node_id=vinterfaces.node_id and ".
+		     "      interface_state.iface=vinterfaces.iface and ".
+		     "      vinterfaces.vnode_id='$node_id' and ".
+		     "      vinterfaces.iface is not null")) {
+	DBQueryWarn("unlock tables");
+	return -1;
+    }
+    if (!DBQueryWarn("update vinterfaces set bandwidth=0 ".
+		     "where vinterfaces.vnode_id='$node_id'")) {
+	DBQueryWarn("unlock tables");
+	return -1;
+    }
+    DBQueryWarn("unlock tables");
     return 0;
 }
 
@@ -1443,7 +1530,6 @@ sub CreateVnodes($$)
     }
     my $isremote = $nodetype->isremotenode();
     my $isjailed = $nodetype->isjailed();
-    my $sharing_mode = $node->sharing_mode();
 
     #
     # Make up a priority (just used for sorting). We need the name prefix
@@ -1531,6 +1617,19 @@ sub CreateVnodes($$)
     #
     DBQueryFatal("lock tables nodes write, reserved write, ".
 		 "node_status write, node_hostkeys write");
+
+    #
+    # Reload the reservation status now that tables are locked and confirm
+    # that the shared node is still reserved. See nfree, which checks shared
+    # nodes after locking reserved table.
+    #
+    $node->FlushReserved();
+    if (! $node->IsReserved()) {
+	print STDERR "*** CreateVnodes: $node is no longer reserved!\n";
+	DBQueryFatal("unlock tables");
+	return -1;
+    }
+    my $sharing_mode = $node->sharing_mode();
 
     if (0 && !$isremote) {
 	for (my $i = 1; $i <= $count; $i++) {
@@ -2044,8 +2143,35 @@ sub OSSelect($$$$)
 	or return -1;
 
     return Refresh($self);
-}    
+}
+
+#
+# Get the next rtabid for a shared node. Need locking in this case
+# since multiple mappers can be running at once.
+#
+sub Nextrtabid($)
+{
+    my ($self) = @_;
+    my $rtabid = undef;
+
+    my $node_id = $self->node_id();
+    
+    DBQueryWarn("lock tables nodes write")
+	or return undef;
+
+    DBQueryWarn("update nodes set rtabid=rtabid+1 ".
+		"where node_id='$node_id'")
+	or goto bad;
+    my $query_result =
+	DBQueryWarn("select rtabid from nodes ".
+		    "where node_id='$node_id'");
+    goto bad
+	if (!$query_result || !$query_result->numrows);
+    ($rtabid) = $query_result->fetchrow_array();
+  bad:
+    DBQueryWarn("unlock tables");
+    return $rtabid;
+}
 
 # _Always_ make sure that this 1 is at the end of the file...
-
 1;
