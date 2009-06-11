@@ -2,15 +2,13 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
 use English;
 use Getopt::Std;
 use XML::Parser;
-#use RPC::XML;
-#use RPC::XML::Parser;
 
 #
 # Convert between XML and DB representation of a virtual experiment.
@@ -57,127 +55,72 @@ my %virtual_tables =
     ("experiments"		=> { rows  => undef, 
 				     tag   => "settings",
 				     # Indicates a single row.
-				     row   => undef,
-				     attrs => [ ] },
+				     row   => undef},
      "virt_nodes"		=> { rows  => undef, 
 				     tag   => "nodes",
-				     row   => "node",
-				     attrs => [ "vname" ]},
+				     row   => "node"},
      "virt_lans"		=> { rows  => undef, 
 				     tag   => "lan_members",
-				     row   => "lan_member",
-				     attrs => [ "vname" ]},
+				     row   => "lan_member"},
      "virt_lan_lans"		=> { rows  => undef, 
 				     tag   => "lans",
-				     row   => "lan",
-				     attrs => [ "vname" ]},
+				     row   => "lan"},
      "virt_lan_settings"	=> { rows  => undef, 
 				     tag   => "lan_settings",
-				     row   => "lan_setting",
-				     attrs => [ "vname", "capkey" ]},
+				     row   => "lan_setting"},
      "virt_lan_member_settings" => { rows  => undef, 
 				     tag   => "lan_member_settings",
-				     row   => "lan_member_setting",
-				     attrs => [ "vname", "member", "capkey" ]},
+				     row   => "lan_member_setting"},
      "virt_trafgens"		=> { rows  => undef, 
 				     tag   => "trafgens",
-				     row   => "trafgen",
-				     attrs => [ "vname", "vnode" ]},
+				     row   => "trafgen"},
      "virt_agents"		=> { rows  => undef, 
 				     tag   => "agents",
-				     row   => "agent",
-				     attrs => [ "vname", "vnode" ]},
+				     row   => "agent"},
      "virt_node_desires"	=> { rows  => undef, 
 				     tag   => "node_desires",
-				     row   => "node_desire",
-				     attrs => [ "vname", "desire" ]},
+				     row   => "node_desire"},
      "virt_node_startloc"	=> { rows  => undef, 
 				     tag   => "node_startlocs",
-				     row   => "node_startloc",
-				     attrs => [ "vname", "building" ]},
+				     row   => "node_startloc"},
      "virt_routes"		=> { rows  => undef, 
 				     tag   => "routes",
-				     row   => "route",
-				     attrs => [ "vname", "src", "dst" ]},
+				     row   => "route"},
      "virt_vtypes"		=> { rows  => undef, 
 				     tag   => "vtypes",
-				     row   => "vtype",
-				     attrs => [ "name" ]},
+				     row   => "vtype"},
      "virt_programs"		=> { rows  => undef, 
 				     tag   => "programs",
-				     row   => "program",
-				     attrs => [ "vname", "vnode" ]},
+				     row   => "program"},
      "virt_user_environment"	=> { rows  => undef, 
 				     tag   => "user_environments",
-				     row   => "user_environment",
-				     attrs => [ "name", "value" ]},
+				     row   => "user_environment"},
      "nseconfigs"		=> { rows  => undef, 
 				     tag   => "nseconfigs",
-				     row   => "nseconfig",
-				     attrs => [ "vname" ]},
+				     row   => "nseconfig"},
      "eventlist"		=> { rows  => undef, 
 				     tag   => "events",
-				     row   => "event",
-				     attrs => [ "vname" ]},
+				     row   => "event"},
      "event_groups"		=> { rows  => undef, 
 				     tag   => "event_groups",
-				     row   => "event_group",
-				     attrs => [ "group_name", "agent-name" ]},
+				     row   => "event_group"},
      "virt_firewalls"		=> { rows  => undef, 
 				     tag   => "virt_firewalls",
-				     row   => "virt_firewall",
-				     attrs => [ "fwname", "type", "style" ]},
+				     row   => "virt_firewall"},
      "firewall_rules"		=> { rows  => undef, 
 				     tag   => "firewall_rules",
-				     row   => "firewall_rule",
-				     attrs => [ "fwname", "ruleno", "rule" ]},
+				     row   => "firewall_rule"},
      "virt_tiptunnels"		=> { rows  => undef, 
 				     tag   => "tiptunnels",
-				     row   => "tiptunnel",
-				     attrs => [ "host", "vnode" ]},
+				     row   => "tiptunnel"},
      "virt_parameters"           => { rows  => undef, 
 				      tag   => "parameters",
-				      row   => "parameter",
-				      attrs => [ "name", "value" ]},
+				      row   => "parameter"},
      # This is a fake table. See below. If we add more, lets generalize.
      "external_sourcefiles"	=> { rows  => undef, 
 				     tag   => "nsfiles",
-				     row   => "nsfiles",
-				     attrs => [ "pathname" ]}
+				     row   => "nsfiles"},
      );
-
-# XXX
-# The experiment table is special. Only certain fields are allowed to
-# be updated. Not sure what the right approach for this is.
-# Note that I regex the data before inserting it below.
-#
-my %experiment_fields = ("multiplex_factor"		=> 1,
-			 "forcelinkdelays"		=> 1,
-			 "uselinkdelays"		=> 1,
-			 "usewatunnels"			=> 1,
-			 "uselatestwadata"		=> 1,
-			 "wa_delay_solverweight"	=> 1,
-			 "wa_bw_solverweight"		=> 1,
-			 "wa_plr_solverweight"		=> 1,
-			 "cpu_usage"			=> 1,
-			 "mem_usage"			=> 1,
-			 "allowfixnode"			=> 1,
-			 "encap_style"			=> 1,
-			 "jail_osname"			=> 1,
-			 "delay_osname"			=> 1,
-			 "sync_server"			=> 1,
-		         "use_ipassign"			=> 1,
-		         "ipassign_args"		=> 1,
-		         "usemodelnet"			=> 1,
-		         "modelnet_cores"		=> 1,
-		         "modelnet_edges"		=> 1,
-		         "elab_in_elab"			=> 1,
-		         "elabinelab_eid"		=> 1,
-		         "elabinelab_cvstag"		=> 1,
-		         "elabinelab_singlenet"		=> 1,
-		         "security_level"		=> 1,
-		         "delay_capacity"		=> 1,
-			 "dpdb"				=> 1);
 
 # New parsing code state machine control.
 my $PARSING_NOTYET	= 0;
@@ -206,6 +149,7 @@ use libdb;
 use libtestbed;
 use libArchive;
 use Experiment;
+use VirtExperiment;
 
 sub fatal($);
 
@@ -267,14 +211,7 @@ if (!defined($experiment)) {
 }
 my $exptidx = $experiment->idx();
 
-my %event_objtypes;
-my $query_result = DBQueryFatal("select idx,type from event_objecttypes");
-while (my ($idx,$type) = $query_result->fetchrow_array()) {
-    $event_objtypes{$type} = $idx;
-}
-
 # Do it
-
 sub readXML($$$$$);
 sub writeXML_XML($$);
 
@@ -345,11 +282,17 @@ sub readXML($$$$$) {
 	    if (eval { $parser->parse(*STDIN); return 1; } != 1);
     }
 
-    # If these are the results of parsing the nse specifications,
-    # we don't expect updates to the experiments table
-    my %experiments_table;
-    if ( ! $simparse ) {
+    #
+    # Create a virt topology object. We do not load the current tables
+    # since that is a waste of work.
+    #
+    my $virtexperiment = VirtExperiment->CreateNew($experiment);
+    fatal("Could not create virtual experiment object")
+	if (!defined($virtexperiment));
 
+    # If these are the results of parsing the nse specifications,
+    # we do not expect to get updates to the experiments table.
+    if ( ! $simparse ) {
 	#
 	# Verify. 
 	#
@@ -359,11 +302,6 @@ sub readXML($$$$$) {
 	#
 	if (scalar(@{ $virtual_tables{"experiments"}->{"rows"} }) != 1) {
 	    fatal("Must be exactly one experiments table row!");
-	}
-	%experiments_table = %{@{$virtual_tables{"experiments"}->{"rows"}}[0]};
-	foreach my $key (keys(%experiments_table)) {
-	    delete($experiments_table{$key})
-		if (!exists($experiment_fields{$key}));
 	}
     }
 
@@ -383,68 +321,30 @@ sub readXML($$$$$) {
     #
     # Okay, thats all the checking we do! There is not much that can
     # screw up the DB just by inserting rows into the allowed set of
-    # virtual experiment tables, since we ignore the pid/eid in the xml. 
+    # virtual experiment tables, since we ignore dangerous fields in
+    # the xml.
     #
-    # First the experiments table, which gets an update statement, if there
-    # is anything to update.
+    # First update the experiments table part of the virt experiment.
     #
-    if ( (! $simparse) && scalar(keys(%experiments_table))) {
-	my @setlist  = ();
+    if (!$simparse) {
+	my %table = %{@{$virtual_tables{"experiments"}->{"rows"}}[0]};
 
-	my $describe_result =
-	    DBQueryFatal("describe experiments");
+	foreach my $key (keys(%table)) {
+	    my $val = $table{$key};
 
-	#
-	# Need to find the default values for slots that are not sent to
-	# us in the xml so that we can set them properly.
-	#
-	while (my $rowref = $describe_result->fetchrow_hashref()) {
-	    my $slot  = $rowref->{"Field"};
-	    my $value = $rowref->{"Default"};
+	    # Extra safety.
+	    next
+		if (!exists($VirtExperiment::experiment_fields{$key}));
 
-	    if (exists($experiment_fields{$slot}) &&
-		! exists($experiments_table{$slot})) {
-		$experiments_table{$slot} =
-		    (defined($value) ? $value : "NULL");
-	    }
+	    $virtexperiment->$key($val);
 	}
-
-	foreach my $key (keys(%experiments_table)) {
-	    my $val = $experiments_table{$key};
-
-	    if (!defined($val) || $val eq "NULL" || $val eq "") {
-		push(@setlist, "$key=NULL");
-	    }
-	    else {
-		# Sanity check the fields.
-		if (TBcheck_dbslot($val, "experiments", $key,
-			TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
-		    $val = DBQuoteSpecial($val);
-		    
-		    push(@setlist, "$key=$val");
-		}
-		else {
-		    fatal("Illegal characters in table data: ".
-			  "experiments:$key - $val");
-		}
-	    }	    
-	}
-	my $query = "update experiments ".
-	            "set " . join(",", @setlist) . " " .
-		    "where eid='$eid' and pid='$pid'";
-
-	print "$query\n"
-	    if ($debug);
-	DBQueryFatal($query)
-	    if (!$impotent);
     }
 
     #
-    # Now all the other tables, which get inserts. Need to delete all the
-    # old info too.
+    # Now all the other tables.
     #
     foreach my $table (keys(%virtual_tables)) {
-	# Don't want to muck with this table! Done above. 
+	# Don't want to muck with this table. Done above. 
 	next
 	    if ($table eq "experiments");
 
@@ -471,92 +371,36 @@ sub readXML($$$$$) {
 	    next;
 	}
 
-	# Delete only during the initial parsing and not
-	# during parsing of nse specifications
-	if ( ! $simparse ) {
-	    DBQueryFatal("delete from $table ".
-			 "where eid='$eid' and pid='$pid'")
-		if (!$impotent);
-	} else {
-	    # The nseconfigs table is special. During a
-	    # simparse, we need delete all rows for the
-	    # experiment except the one with the vname
-	    # 'fullsim'. This row is essentially virtual
-	    # info and does not change across swapins
-	    # where as the other rows depend on the
-	    # mapping
-	    if ( !$impotent && ($table eq "nseconfigs") ) {
-		DBQueryFatal("delete from $table ". 
-		             "where eid='$eid' and pid='$pid' and ".
-			     "vname!='fullsim'")
-	    } elsif ( !$impotent && (($table eq "eventlist") ||
-				       ($table eq "virt_agents")) ) {
-	        # Both eventlist and virt_agents need to be cleared
-		# for NSE event objecttype since entries in this
-		# table depend on the particular mapping
-		my $nse_objtype = $event_objtypes{"NSE"};
-		DBQueryFatal("delete from $table ". 
-		             "where pid='$pid' and eid='$eid' and ".
-			     "objecttype='$nse_objtype'");
-	    } 
-	}
 	next
 	    if (!defined($virtual_tables{$table}->{"rows"}));
 
 	foreach my $rowref (@{$virtual_tables{$table}->{"rows"}}) {
 	    my %rowhash = %{ $rowref };
-	    my @fields  = ("exptidx", "pid", "eid");
-	    my @values  = ("'$exptidx'", "'$pid'", "'$eid'");
 
-	    # If no actual rows, then skip. Might happen.
+	    # If no actual data, then skip. Might happen.
 	    last
 		if (! scalar(keys(%rowhash)));
 
-	    foreach my $key (keys(%rowhash)) {
-		my $val = $rowhash{$key};
-
-		if (!defined($val) || $val eq "NULL") {
-		    push(@values, "NULL");
-		}
-		elsif ($val eq "") {
-		    push(@values, "''");
-		}
-		else {
-		    # Sanity check the fields.
-		    if (TBcheck_dbslot($val, $table, $key,
-				 TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
-			push(@values, DBQuoteSpecial($val));
-		    }
-		    else {
-			fatal("Illegal characters in table data: ".
-			      "$table:$key - $val");
-		    }
-		}
-		push(@fields, $key);
+	    # New table row for data.
+	    my $tablerow = $virtexperiment->NewTableRow($table, \%rowhash);
+	    if (!defined($tablerow)) {
+		fatal("Could not add new tablerow");
 	    }
-	    # If we are called after an nseparse, we need to
-	    # use replace coz some of the tables such as 
-	    # virt_agents and eventlist are not truly
-	    # virtual tables. That is coz they contain the
-	    # vnode field which is the same as the vname
-	    # field in the reserved table. For simulated
-	    # nodes, the mapping may change across swapins
-	    # and the event may have to be delivered to a
-	    # different simhost
-	    if ( $simparse ) {
-		$query = "replace into $table (" . join(",", @fields) . ") ".
-		"values (" . join(",", @values) . ") ";
-	    } else {
-		$query = "insert into $table (" . join(",", @fields) . ") ".
-		"values (" . join(",", @values) . ") ";
-	    }
-
-	    print "$query\n"
-		if ($debug);
-	    DBQueryFatal($query)
-		if (!$impotent);
 	}
     }
+    $virtexperiment->Dump()
+	if ($debug > 1);
+	
+    # Now store it.
+    my $flags = 0;
+    $flags |= $VirtExperiment::STORE_FLAGS_DEBUG
+	if ($debug);
+    $flags |= $VirtExperiment::STORE_FLAGS_IMPOTENT
+	if ($impotent);
+    $flags |= $VirtExperiment::STORE_FLAGS_SIMPARSE
+	if ($simparse);
+    $virtexperiment->Store($flags) == 0
+	or fatal("Could not store new experiment topology");
     return 0;
 }
 
@@ -915,7 +759,7 @@ sub writeXML_XML($$) {
     # 
     foreach my $table (keys(%virtual_tables)) {
 	next
-	    if ($table eq "experiments");
+	    if ($table eq "experiments" || $table eq "external_sourcefiles");
 	
 	my $tabletag = $virtual_tables{$table}->{"tag"};
 	my $rowtag   = $virtual_tables{$table}->{"row"};
