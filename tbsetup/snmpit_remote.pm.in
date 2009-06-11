@@ -73,7 +73,7 @@ sub commonTail($$)
     my $args  = {"op"    => $op, "args"   => $arg};
     my ($obj) = RPC::XML::smart_encode($args);
 
-    my $response = libxmlrpc::CallMethod0("elabinelab", "vlansnew",
+    my $response = libxmlrpc::CallMethod0("elabinelab", "vlansv2",
 					  {"xmldoc" => $obj->as_string()});
 
     # sklower is temporarily going to way violate layering
@@ -85,7 +85,7 @@ sub commonTail($$)
 	defined($response->{"output"}) && $response->{"output"} ne "") {
 	print $response->{"output"};
     }
-    #print $response->{"output"};
+    print STDERR $response->{"output"};
     return $response;
 }
 
@@ -93,11 +93,12 @@ sub commonTail($$)
 #
 # Ask outer boss to setup a bunch of vlans for an experiment.
 #
-sub RemoteDoVlansFromTables(@)
+sub RemoteDoVlansFromTables($@)
 {
-    my @vlanids   = @_;
-    my $vlantable = {};
-    my %vlans     = ();
+    my $experiment = shift();
+    my @vlanids    = @_;
+    my $vlantable  = {};
+    my %vlans      = ();
 
     return 0
 	if (! @vlanids);
@@ -115,11 +116,15 @@ sub RemoteDoVlansFromTables(@)
     foreach my $id (keys(%vlans)) {
 	my $vlan  = $vlans{"$id"};
 	my @members;
+	my $trunk_mode;
+	$vlan->GetAttribute("trunk_mode", \$trunk_mode);
 
 	$vlantable->{$id} = {};
-	$vlantable->{$id}->{"virtual"} = $vlan->vname();
-	$vlantable->{$id}->{"stack"}   = $vlan->GetStack();
-	$vlantable->{$id}->{"members"} = {};
+	$vlantable->{$id}->{"virtual"}    = $vlan->vname();
+	$vlantable->{$id}->{"stack"}      = $vlan->GetStack();
+	$vlantable->{$id}->{"trunk_mode"} = $trunk_mode
+	    if (defined($trunk_mode));
+	$vlantable->{$id}->{"members"}    = {};
 
 	if ($vlan->MemberList(\@members) != 0) {
 	    warn "WARNING: Could not get members for $vlan\n";
@@ -141,21 +146,24 @@ sub RemoteDoVlansFromTables(@)
 	    my $port    = "$node_id:$iface";
 	    
 	    my $result =
-		DBQueryFatal("select current_speed,duplex from interfaces " .
+		DBQueryFatal("select current_speed,duplex,trunk ".
+			     "  from interfaces " .
 			     "where node_id='$node_id' and iface='$iface'");
 	    if (!$result->num_rows()) {
-		warn "WARNING: Bad node/iface pair in VLAN: $port - skipping\n";
+		warn "WARNING: Bad node/iface pair in VLAN: ".
+		    "$port - skipping\n";
 		next;
 	    }
-	    my ($speed,$duplex) = $result->fetchrow();
+	    my ($speed,$duplex,$trunk) = $result->fetchrow();
 
 	    if ($prefix ne "") {
 		$port =~ s/$prefix// ;
 	    }
 
 	    $vlantable->{$id}->{"members"}->{$port} = {};
-	    $vlantable->{$id}->{"members"}->{$port}->{"speed"} = $speed;
+	    $vlantable->{$id}->{"members"}->{$port}->{"speed"}  = $speed;
 	    $vlantable->{$id}->{"members"}->{$port}->{"duplex"} = $duplex;
+	    $vlantable->{$id}->{"members"}->{$port}->{"trunk"}  = $trunk;
 	}
     }
     return 0
@@ -224,15 +232,18 @@ sub RemoteDeleteVlan($)
 #
 # Ask outer boss to tear down a bunch of vlans for an experiment.
 #
-sub RemoteDoReset(@)
+sub RemoteDoReset($$@)
 {
-    my @vlans   = @_;
+    my $experiment  = shift();
+    my $cleartrunks = shift();
+    my @vlans = @_;
     
     return 0
 	if (! @vlans);
 
     my $arg = {};
-    $arg->{"vlans"} = [ @vlans ];
+    $arg->{"cleartrunks"} = $cleartrunks;
+    $arg->{"vlans"}       = [ @vlans ];
     
     my $response = commonTail("destroy", $arg);
     return 1
