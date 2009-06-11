@@ -211,7 +211,7 @@ AddAuditInfo("message", "$op\n\n" . Dumper($args) . "\n\n$output\n");
 # Terminate the log capture so that we can print the response to STDOUT
 # for the RPC server. 
 #
-if ($exitval) {
+if ($exitval || $debug) {
     LogEnd($exitval);
 }
 else {
@@ -236,8 +236,7 @@ sub SetupVlans($)
     
     my $vlantable = {};
     my %vmaptable = ();
-    my %vtagtable = ();
-    my %stacktable= ();
+    my $attrtable = {};
     my %nodes     = ();
     my @outer_ids = ();
     my $errors    = 0;
@@ -246,6 +245,8 @@ sub SetupVlans($)
 	my $vtag    = $argtable->{$id}->{'virtual'};
 	my $stack   = $argtable->{$id}->{'stack'};
 	my $members = $argtable->{$id}->{'members'};
+	my $trunk_mode = $argtable->{$id}->{'trunk_mode'}
+	    if (exists($argtable->{$id}->{'trunk_mode'}));
 
 	if (! ($id =~ /^[\d]+$/)) {
 	    fatal("SetupVlans: Illegal id '$id'");
@@ -263,6 +264,7 @@ sub SetupVlans($)
 	foreach my $port (keys(%{ $members })) {
 	    my $speed  = $members->{$port}->{'speed'};
 	    my $duplex = $members->{$port}->{'duplex'};
+	    my $trunk  = $members->{$port}->{'trunk'};
 	    my $node;
 	    my $iface;
 
@@ -278,10 +280,11 @@ sub SetupVlans($)
 
 	    if (! exists($vlantable->{$id})) {
 		$vlantable->{$id} = {};
-		$vtagtable{$id}   = $vtag;
-		$stacktable{$id}  = $stack;
+		$attrtable->{$id} = {"virtual"    => $vtag,
+				     "stack"      => $stack,
+				     "trunk_mode" => $trunk_mode};
 	    }
-	    $vlantable->{$id}->{$port} = [$speed, $duplex];
+	    $vlantable->{$id}->{$port} = [$speed, $duplex, $trunk];
 
 	    # For doing access and sanity checks below.
 	    if ($port =~ /^(.+):(.+)$/) {
@@ -371,15 +374,16 @@ sub SetupVlans($)
     #
     foreach my $id (keys(%$vlantable)) {
 	foreach my $port (keys(%{ $vlantable->{$id} })) {
-	    my ($speed, $duplex) = @{ $vlantable->{$id}->{$port} };
+	    my ($speed, $duplex, $trunk) = @{ $vlantable->{$id}->{$port} };
 	    my ($node,$iface)    = ($port =~ /^(.+):(.+)$/);
 
 	    if ($debug) {
-		print STDERR "$id $node:$iface $speed $duplex\n";
+		print STDERR "$id $node:$iface $speed $duplex trunk:$trunk\n";
 	    }
 	    if (! $impotent) {
 		DBQueryFatal("update interfaces set ".
-			     "   current_speed=$speed,duplex='$duplex'".
+			     "   current_speed='$speed',duplex='$duplex', ".
+			     "   trunk=$trunk ".
 			     "where node_id='$node' and iface='$iface'");
 	    }
 	}
@@ -396,8 +400,9 @@ sub SetupVlans($)
     # Not sure if this is the right approach though.
     # 
     foreach my $id (keys(%$vlantable)) {
-	my $vtag    = $vtagtable{$id};
-	my $stack   = $stacktable{$id};
+	my $vtag    = $attrtable->{$id}->{"virtual"};
+	my $stack   = $attrtable->{$id}->{"stack"};
+	my $trunk_mode = $attrtable->{$id}->{"trunk_mode"};
 	my @members = keys(%{ $vlantable->{$id} });
 	my $mstring = "@members";
 	my $outer_id;
@@ -436,6 +441,8 @@ sub SetupVlans($)
 	    }
 	    $vlan->SetStack($stack);
 	    $outer_id = $vlan->lanid();
+	    $vlan->SetAttribute("trunk_mode", $trunk_mode)
+		if (defined($trunk_mode));
 
 	    # Insert mapping between inner and outer vlan entries.
 	    $query_result =
@@ -590,10 +597,12 @@ sub DestroyVlans($)
     if (! exists($args->{'vlans'})) {
 	fatal("DestroyVlans: Missing arguments");
     }
-    my @vlanids  = @{ $args->{'vlans'} };
+    my @vlanids     = @{ $args->{'vlans'} };
+    my $cleartrunks = $args->{'cleartrunks'};
     my @done     = ();
     my $errors   = 0;
     my $stack;
+    my $debugopt = ($debug ? "-v $dlevel" : "");
     
     MapVlans(@vlanids);
     # If no vlans, do nothing! snmpit will end up removing all the vlans!
@@ -603,30 +612,66 @@ sub DestroyVlans($)
 	if ($impotent);
 
     #
+    # Clear the trunks first.
+    #
+    if ($cleartrunks) {
+	my %ports    = ();
+	my @portlist;
+
+	foreach my $vlanid (@vlanids) {
+	    my $outer_id = $mapping{$vlanid};
+	    my $vlan     = $outer_vlans{$outer_id};
+	
+	    $vlan->PortList(\@portlist);
+	    foreach my $port (@portlist) {
+		$ports{$port} = $port;
+	    }
+	}
+	foreach my $port (keys(%ports)) {
+	    my ($nodeid, $iface) = split(":", $port);
+	    
+	    if ($debug) {
+		print STDERR "Running 'snmpit -U $port'\n";
+	    }
+	    system("$TB/bin/snmpit $debugopt -U $port");
+
+	    if ($?) {
+		print STDERR "*** $0:\n".
+		    "    snmpit -U $port failed!\n";
+		$errors = $? >> 8;
+		goto bad;
+	    }
+	    DBQueryFatal("update interfaces set ".
+			 "   current_speed=0,trunk=0 ".
+			 "where node_id='$nodeid' and iface='$iface'");
+	}
+    }
+
+    #
     # Okay, ask snmpit to tear down these vlans. 
     #
     foreach my $vlanid (@vlanids) {
 	my $outer_id = $mapping{$vlanid};
 	my $vlan     = $outer_vlans{$outer_id};
+	my $vname    = 
 	my $stack    = $vlan->GetStack();
 	# Not doing stacks yet;
 	my $stackopt = "";
-	my $debugopt = ($debug ? "-v $dlevel" : "");
 
 	if ($debug) {
-	    print STDERR "Running 'snmpit $stackopt -r $pid $eid $outer_id'\n";
+	    print STDERR "Running 'snmpit $stackopt -f -o $outer_id'\n";
 	}
-	system("$TB/bin/snmpit $debugopt $stackopt -r $pid $eid $outer_id");
+	system("$TB/bin/snmpit $debugopt $stackopt -f -o $outer_id");
 	if ($?) {
 	    #
 	    # Yuck failed. We leave things as is, and wait for the
 	    # inner elab to request experiment teardown again. This
-	    # mirrors what happens on a normal swapout; snmpit -r can
+	    # mirrors what happens on a normal swapout; snmpit -o can
 	    # be retried until all of the vlans are finally gone; At
 	    # that point the DB state can be removed.
 	    #
 	    print STDERR "*** $0:\n".
-		         "    snmpit $stackopt -r $outer_id failed!\n";
+		"    snmpit $stackopt -f -o $outer_id failed!\n";
 	    $errors = $? >> 8;
 	    goto bad;
 	}
@@ -772,35 +817,16 @@ sub Trunk($)
 	#
 	if ($stack eq "Experimental") {
 	    $query_result =
-		DBQueryFatal("delete from vinterfaces " .
-			     "where node_id='$node' and type='vlan' and ".
-			     "      iface='$iface'");
+		DBQueryFatal("update interfaces set trunk=0 " .
+			     "where node_id='$node' and iface='$iface'");
 	}
 	return 0;
     }
     if (($mode eq "-E") || ($mode eq "-T")) {
 	# First, update the status of the port in the database
-	# The code here is wrong and needs futher work.
-	# apparently there is a vinterfaces entry for each vlan
-	# however in order to figure out which one you have to
-	# do a join through both the vlans and virt_lans tables.
-	# There's no convenient way, given the management
-	# interface, to come up with a unique IP address that's
-	# appropriate to stuff.  It seems likely that the structure
-	# of the database will be revised, in this area, but
-	# for now, we'll just play Joe Isuzu.
 	if ($stack eq "Experimental") {
-	    $query_result =
-		DBQueryFatal("select iface from vinterfaces where " .
-			     "node_id='$node' and iface='$iface'");
-	    if ($query_result->numrows != 0) {
-		DBQueryFatal("update vinterfaces set type='vlan' where " .
-			     "node_id='$node' and iface='$iface'");
-	    }
-	    else {
-		DBQueryFatal("replace into vinterfaces (node_id,iface,type) " .
-			     "values ('$node','$iface','vlan')");
-	    }
+	    DBQueryFatal("update interfaces set trunk=1 " .
+			 "where node_id='$node' and iface='$iface'");
 	}
 	#
 	# Okay, ask snmpit to trunk these vlans. 
