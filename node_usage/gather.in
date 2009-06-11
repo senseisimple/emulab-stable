@@ -83,7 +83,9 @@ if ($prep) {
     
     $qr = DBQueryFatal("select history_id,node_id,op,stamp from $NODE_USAGE_DB.node_history_copy where history_id > $last_history_id order by history_id");
 
-    local $last_history_id;
+    my $prev_history_id = $last_history_id;
+
+    local $last_history_id = $prev_history_id;
     
     while (my ($history_id,$node_id,$op,$stamp) = $qr->fetchrow()) {
 	my $type = $node_type{$node_id};
