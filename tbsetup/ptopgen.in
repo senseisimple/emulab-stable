@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -23,6 +23,7 @@ sub usage()
 	  "       -v Include stuff for topologies with virtual nodes\n".
 	  "       -r Include stuff for topologies with widearea nodes\n".
 	  "       -s Include stuff for topologies with simulated nodes\n".
+	  "       -h Include stuff for topologies with shared nodes\n".
 	  "       -a Include even reserved nodes\n".
 	  "       -m Override multiplex_factor\n".
 	  "       -u Prune unused interfaces of allocated nodes (-e)\n".
@@ -33,7 +34,7 @@ sub usage()
         exit(-1);
 }
 
-my $optlist = "s:e:m:vp:rSan:c:uxg";
+my $optlist = "s:e:m:vp:rSan:c:uxgh";
 my $mfactor;
 my $virtstuff = 0;
 my $widearea  = 0;
@@ -44,6 +45,7 @@ my $mnetedges = 0;
 my $prune     = 0;
 my $do_xml    = 0;
 my $genimode  = 0;
+my $useshared = 0;
 
 my $cmuuid = TBGetSiteVar('protogeni/cm_uuid');
 
@@ -92,6 +94,8 @@ my %typemap       = ();
 my %auxtypemap    = ();
 my %areamap       = ();
 my %globalcounts  = ();
+my %interfacestate= ();
+my %rusagedata    = ();
 
 my $DEADPID = NODEDEAD_PID();
 my $DEADEID = NODEDEAD_EID();
@@ -116,6 +120,9 @@ if (defined($options{"s"})) {
 }
 if (defined($options{"m"})) {
     $mfactor = $options{"m"};
+}
+if (defined($options{"h"})) {
+    $useshared = 1;
 }
 if (defined($options{"v"})) {
     $virtstuff = 1;
@@ -180,7 +187,7 @@ my %nodetoavailable;
 
 $result = DBQueryFatal("SELECT n.node_id, n.eventstate, n.role, n.uuid, " .
 		       "b.node_id, nt.isremotenode, " .
-		       "dedicated_wa_types.attrvalue " .
+		       "dedicated_wa_types.attrvalue, b.sharing_mode " .
 		       "from nodes as n " .
 		       "left join reserved as b on n.node_id=b.node_id " .
 		       "left join node_types as nt on nt.type=n.type " .
@@ -192,7 +199,7 @@ $result = DBQueryFatal("SELECT n.node_id, n.eventstate, n.role, n.uuid, " .
 		       "  on nt.type=dedicated_wa_types.type " .
 		       "where nt.isvirtnode = 0 or nt.isvirtnode is null;");
 while (($node,$eventstate, $role, $uuid, $reserved, $isremotenode,
-	$wa_attrvalue) = $result->fetchrow_array) {
+	$wa_attrvalue, $sharing_mode) = $result->fetchrow_array) {
     $nodetouuid{$node} = $uuid;
     my $islocal = $role eq 'testnode'
 	&& ((! defined($isremotenode) || $isremotenode == 0)
@@ -202,7 +209,9 @@ while (($node,$eventstate, $role, $uuid, $reserved, $isremotenode,
 	    || $eventstate eq "TBDB_NODESTATE_PXEWAIT"
 	    || $eventstate eq "TBDB_NODESTATE_POWEROFF"
 	    || $eventstate eq "TBDB_NODESTATE_ALWAYSUP");
-    my $isfree = !$islocal || (! defined($reserved) && $isup);
+    my $isfree = !$islocal || (! defined($reserved) && $isup) ||
+	(defined($sharing_mode) &&
+	 $sharing_mode eq "shared_local" && $useshared && $isup);
     $nodetoavailable{$node} = $isfree;
 }
 
@@ -223,6 +232,7 @@ while (my ($class,$type,$isvirt) = $result->fetchrow_array) {
     $map->{'OSID'}     = $typeinfo->default_osid();
     $map->{'IMAGEABLE'}= $typeinfo->imageable();
     $map->{'TRIVSPEED'}= $typeinfo->trivlink_maxspeed();
+    $map->{'SHARED'}   = $typeinfo->shared();
     $map->{'TYPEINFO'} = $typeinfo;
     $map->{'FEATURES'} = [];
     $map->{'AUXTYPES'} = {};
@@ -419,6 +429,13 @@ if ($genimode) {
 	"(nat.attrvalue is null or nat.attrvalue=0))";
 }
 
+# In shared mode, allow allocated nodes whose sharing_mode is set.
+if ($useshared) {
+    $free_condition = "($free_condition or ".
+	"(b.node_id is not null && b.sharing_mode='shared_local' && ".
+	" np.eventstate='" . TBDB_NODESTATE_ISUP . "'))";
+}
+
 # If the user wants all nodes, we consider everything to be free (this
 # overrides the other possible free conditions
 if ($allnodes) {
@@ -427,9 +444,11 @@ if ($allnodes) {
 
 $result =
     DBQueryFatal("select a.node_id,a.type,a.phys_nodeid,t.class,t.issubnode," .
-		 "a.def_boot_osid, (b.pid is not null and b.eid is not null), " .
+		 "a.def_boot_osid,(b.pid is not null and b.eid is not null), ".
 		 "  np.reserved_pid is not null,np.eventstate, ".
-		 "  np.battery_percentage,np.uuid ".
+		 "  np.battery_percentage,np.uuid,b.sharing_mode, ".
+		 "  ru.load_1min, ru.load_5min, ru.status_timestamp, ".
+		 "  a.def_boot_osid ".
 		 "from nodes as a ".
 		 "left join reserved as b on a.node_id=b.node_id ".
 		 "left join reserved as m on a.phys_nodeid=m.node_id ".
@@ -438,6 +457,7 @@ $result =
 		 "left join node_attributes as nat on ".
 		 "     nat.node_id=a.node_id and ".
 		 "     nat.attrkey='protogeni_exclude' ".
+		 "left join node_rusage as ru on ru.node_id=a.node_id ".
 		 "left outer join ". 
 		 "  (select type,attrvalue ".
 		 "   from node_type_attributes ".
@@ -455,8 +475,8 @@ $result =
 # the type/class of node.
 #
 while (($node,$type,$physnode,$class,$issubnode,$def_boot_osid,$reserved,
-	$prereserved,$eventstate,$battery_perc,$uuid) =
-       $result->fetchrow_array) {
+	$prereserved,$eventstate,$battery_perc,$uuid,$sharing_mode,
+	$load_1min,$load_5min,$load_tstamp,$osid) = $result->fetchrow_array) {
     $nodes{$node} = $type
 	if (!defined($pid) ||
 	    ($permissions{$type} && $permissions{$class}));
@@ -470,6 +490,15 @@ while (($node,$type,$physnode,$class,$issubnode,$def_boot_osid,$reserved,
 	$is_reserved{$node} = 1;
     } else {
 	$is_reserved{$node} = 0;
+    }
+    if ($sharing_mode) {
+	$sharing_mode{$node} = { "load_1min"   => $load_1min,
+				 "load_5min"   => $load_5min,
+				 "load_tstamp" => $load_tstamp,
+				 "osid"        => $osid};
+    }
+    else {
+	$sharing_mode{$node} = 0;
     }
 
     $is_prereserved{$node} = $prereserved;
@@ -542,6 +571,18 @@ foreach $node (keys(%nodes)) {
 	
 	push @types, "delay:$delay_capacity";
 	push @types, "delay-${type}:$delay_capacity";
+    }
+
+    #
+    # Prototype shared mode.
+    #
+    if ($sharing_mode{$node}) {
+	#
+	# Add a feature that says this node should not be picked
+	# unless the cooresponding desire is in the vtop. This
+	# allows the node to be picked, subject to other type constraints.
+	#
+	push(@features, "pcshared:1.0");
     }
 
     #
@@ -630,10 +671,22 @@ foreach $node (keys(%nodes)) {
     }
 
     #
-    # Add in features for all of the OSes that this node (as evidenced by its
-    # type) can support
+    # Add in OS features.
     #
-    if ($node_type_osids{$type}) {
+    if ($sharing_mode{$node}) {
+	#
+	# A shared node is running just one OS, and we put that in
+	# so that the user can specify which of the current VM types
+	# is wanted.
+	#
+	my $osid = $sharing_mode{$node}->{'osid'};
+	push(@features, "OS-$osid:0.5");
+    }
+    elsif ($node_type_osids{$type}) {
+	#
+	# Add in features for all of the OSes that this node (as
+	# evidenced by its type) can support
+	#
 	push @features, map "OS-$_:0", @{$node_type_osids{$type}};
     }
     elsif (! $typemap{$type}->{'IMAGEABLE'} &&
@@ -903,6 +956,15 @@ while (($node,$iface,$card,$port,$IP) = $result->fetchrow_array) {
 
     $interfacecardports{"$node:$iface"} = [$card,$port];
 }
+# Read interface_state
+$result = DBQueryFatal("select * from interface_state");
+
+while (my $ref = $result->fetchrow_hashref()) {
+    my $node  = $ref->{'node_id'};
+    my $iface = $ref->{'iface'};
+    
+    $interfacestate{"$node:$iface"} = $ref;
+}
 
 $result = DBQueryFatal("SELECT node_id1,card1,port1,node_id2,card2,port2" .
  		    " from wires where type=\"Node\" or type=\"Trunk\"");
@@ -969,6 +1031,13 @@ while (($node1,$card1,$port1,$node2,$card2,$port2) =
                     $interfacetypes{"$node1:$card1:$port1"};
             }
             push @types, "$basetype-$bw";
+
+	    if ($sharing_mode{$node1}) {
+		$bw =
+		    $interfacestate{"$node1:$iface1"}->{'remaining_bandwidth'};
+		next
+		    if ($bw == 0);
+	    }
 
 	    print_simple_link($node1, $iface1,
 			      $node2, $iface2,
