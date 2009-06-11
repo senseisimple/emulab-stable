@@ -65,7 +65,7 @@ my $debug	      = 0;
      "virt_programs"		=> [ "vname", "vnode" ],
      "virt_user_environment"	=> [ "name", "value" ],
      "nseconfigs"		=> [ "vname" ],
-     "eventlist"		=> [ "vname", "idx"],
+     "eventlist"		=> [ "vnode", "vname"],
      "event_groups"		=> [ "group_name", "agent_name" ],
      "virt_firewalls"		=> [ "fwname", "type", "style" ],
      "firewall_rules"		=> [ "fwname", "ruleno", "rule" ],
@@ -73,10 +73,9 @@ my $debug	      = 0;
      "virt_parameters"          => [ "name", "value" ],
 );
 
-# XXX
+# 
 # The experiment table is special. Only certain fields are allowed to
-# be updated. Not sure what the right approach for this is.
-# Note that I regex the data before inserting it below.
+# be updated.
 #
 %experiment_fields = ("multiplex_factor"	=> 1,
 		      "forcelinkdelays"		=> 1,
