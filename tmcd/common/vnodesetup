@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -102,6 +102,11 @@ if ($UID) {
     }
 }
 
+# We need to know this below.
+my $sysname = `uname -s`;
+chomp($sysname);
+my $islinux = ($sysname eq "Linux");
+
 #
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
@@ -197,7 +202,10 @@ if ( $doplab && !($killit || $haltit) && -e "/vsys/enter_admin.in" ) {
 libsetup_setvnodeid($vnodeid);
 # Tell tmcc library too, although thats already been done with previous call.
 configtmcc("subnode", $vnodeid);
-
+if (SHAREDHOST()) {
+    # Nodes come and go ...
+    configtmcc("nocache", 1);
+}
 # Pass this along for tmcc clients.
 $ENV{'TMCCVNODEID'} = $vnodeid;
 
@@ -377,6 +385,9 @@ if ($doplab) {
     $GID = 0;
     ($pid, $eid, $vname) = vnodeplabsetup($vnodeid);
 }
+elsif ($islinux) {
+    ($pid, $eid, $vname) = genvnodesetup($vnodeid);
+}
 else {
     ($pid, $eid, $vname) = vnodejailsetup($vnodeid);
 }
@@ -430,17 +441,25 @@ if ($dojail) {
     }
     else {
 	my $options      = "";
-	my $jailhostname = "$vname.$eid.$pid.$DOMAINNAME";
-	
-	if ($interactive) {
-	    $options .= "-s ";
+	my $mkv;
+
+	if ($islinux) {
+	    $mkv = "mkvnode.pl";
 	}
-	if ($usevcnetroutes) {
-	    $options .= "-V ";
+	else {
+	    $mkv = "mkjail.pl";
+
+	    if ($interactive) {
+		$options .= "-s ";
+	    }
+	    if ($usevcnetroutes) {
+		$options .= "-V ";
+	    }
+	    $options .= "-p $pid -h $vname.$eid.$pid.$DOMAINNAME";
 	}
-	TBDebugTimeStamp("vnodesetup calling mkjail.pl");
+	TBDebugTimeStamp("vnodesetup calling $mkv");
 	
-	exec("mkjail.pl $options -p $pid -h $jailhostname $vnodeid");
+	exec("$mkv $options $vnodeid");
 	die("*** $0:\n".
 	    "    Could not start the jail!\n");
     }
@@ -839,6 +858,9 @@ sub hackwaitandexit()
     elsif ($fakevnode) {
 	$goofy = CONFDIR() . "/evproxy.pid";
     }
+    elsif ($dojail && -e "/vz") {
+	$goofy = CONFDIR() . "/running";
+    }
     else {
 	$goofy = CONFDIR() . "/root/var/run/emulab-watchdog.pid";
     }
@@ -853,6 +875,5 @@ sub hackwaitandexit()
 		if ($mtime >= $now || $ctime >= $now);
 	}
     }
-
     exit(1);
 }
