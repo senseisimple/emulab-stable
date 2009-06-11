@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -727,15 +727,15 @@ if ($showdelays && $state eq EXPTSTATE_ACTIVE) {
     if ($result_linkdelays->numrows) {
 	while (my %row = $result_linkdelays->fetchhash()) {
 	    push @data, [$row{vlan}, $row{vnode}, $row{node_id},
-			 $row{delay}, $row{bandwidth}, $row{lossrate},
+			 $row{delay}, $row{bandwidth}, undef, $row{lossrate},
 			 $row{pipe}];
 
 
 	    # Lan node, from the switch
 	    if ($row{type} eq "duplex") {
 		push @data, ["", "", "",
-			     $row{rdelay}, $row{rbandwidth}, $row{rlossrate},
-			     $row{rpipe}];
+			     $row{rdelay}, $row{rbandwidth}, undef,
+			     $row{rlossrate}, $row{rpipe}];
 	    }
 	}
 	push @data, [];
@@ -1008,7 +1008,7 @@ exit(0);
 
 #
 # dump_table: Dumps a formated table, skipping over any column that
-#   don't have a value if they are listed in the optional array;
+#   does not have a value if they are listed in the optional array;
 #
 sub skip_over ($$);
 sub dump_table($$$$) { # all parameters are expected to be array references
