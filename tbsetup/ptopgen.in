@@ -742,7 +742,8 @@ foreach $node (keys(%nodes)) {
     if ($subnode_of{$node}) {
 	# We don't want to include subnodes unless their parent node is going
 	# to be in the ptop file too
-	if (!$nodes{$subnode_of{$node}}) {
+	if (!$nodes{$subnode_of{$node}} ||
+	    $sharing_mode{$subnode_of{$node}}) {
 	    # In fact, nuke it from %nodes so that we don't include its links,
 	    # either
 	    delete $nodes{$node};
