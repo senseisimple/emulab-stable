@@ -53,6 +53,10 @@ sub DoUpdate($$$)
     DBQueryFatal("alter table linkdelays drop primary key");
     DBQueryFatal("alter table linkdelays add primary key ".
 		 "(`exptidx`,`node_id`,`vlan`,`vnode`)");
+
+    DBQueryFatal("replace into table_regex values ".
+		 " ('virt_nodes','sharing_mode','text','regex', ".
+		 "  '^[-\\w]+$',1,32,NULL)");
     return 0;
 }
 1;
