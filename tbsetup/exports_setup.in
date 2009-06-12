@@ -51,7 +51,7 @@ my $SSH		= "$TB/bin/sshtb -l root -host $FSNODE";
 my $PROG	= "$TB/sbin/exports_setup.proxy";
 my $exportstail = "/var/tmp/exports.tail";
 my $smbconftail = "/var/tmp/smbconf.tail";
-my $dbg		= 1;
+my $dbg		= 0;
 my @row; 
 
 # For determining file server mountpoints (XXX BSD specific)
@@ -207,17 +207,15 @@ while (@row = $nodes_result->fetchrow_array) {
         print "WARNING: exports_setup: Skipping database row with undefined values\n";
 	next;
     }
-
+    
     if ($lastpid eq $pid && $lastgid eq $gid &&
-	(!$ISOLATEADMIN || $lastadmin eq $admin)) {
-
+	(!$ISOLATEADMIN || $lastadmin eq $admin) && $erole ne "sharedhost") {
 	# If this is for the same proj and group again, don't requery the db 
 	# and don't recompute everything.
 	%fslist    = %lastfslist;
         @smbshares = @lastsmbshares;
 
     } else {
-
 	$lastpid=$pid;
 	$lastgid=$gid;
 	$lastadmin=$admin;
@@ -294,6 +292,7 @@ while (@row = $nodes_result->fetchrow_array) {
 		}
 	    }
 	}
+      skip:
 
 	# Build up filesystem sub-lists.
 	# Iterate through directory list dividing it according to filesystem.
@@ -308,9 +307,14 @@ while (@row = $nodes_result->fetchrow_array) {
 	    }
 
 	}
-
-	%lastfslist    = %fslist;
-        @lastsmbshares = @smbshares;
+	if ($erole eq "sharedhost") {
+	    %lastfslist    = ();
+	    @lastsmbshares = ();
+	}
+	else {
+	    %lastfslist    = %fslist;
+	    @lastsmbshares = @smbshares;
+	}
     }
 
     # For each FS directory list, create a hash key out of its directory list.
@@ -366,6 +370,9 @@ foreach my $str ( keys(%ipgroups) ) {
     my @iplist = sort sortbyip @{ $ipgroups{$str} };
 
     print MAP "$str -maproot=root @iplist\n";
+    
+    print "$str -maproot=root @iplist\n"
+	if ($dbg);
 }
 
 print MAP "\n";
