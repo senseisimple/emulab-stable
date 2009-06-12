@@ -456,7 +456,9 @@ sub RunAssign($$)
 
     # Run assign
     my $cmd  = "assign";
-    my $args = "-P $ptopfile $vtopfile";
+    my $args = "$ptopfile $vtopfile";
+    $args = "-P $args"
+	if (!$vtop->sharednodecount());
     $args = "-uod -c .75 $args"
 	if ($vtop->virtnodecount() || $vtop->simnodecount());
     $args = "-n $args"
