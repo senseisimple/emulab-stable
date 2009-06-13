@@ -435,7 +435,7 @@ sub GotTrunks($$)
     my $query_result =
 	DBQueryWarn("select distinct r.node_id,i.iface from reserved as r " .
 		    "left join interfaces as i on i.node_id=r.node_id " .
-		    "where r.exptidx='$exptidx' i.trunk!=0");
+		    "where r.exptidx='$exptidx' and i.trunk!=0");
 
     return $query_result->numrows;
 }
