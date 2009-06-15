@@ -1516,7 +1516,7 @@ COMMAND_PROTOTYPE(doifconfig)
 		res = mydb_query("select i.interface_type,i.mac, "
 				 "       i.current_speed,i.duplex "
 				 "  from interfaces as i "
-				 "where i.current_speed!=0 and "
+				 "where i.current_speed!='0' and "
 				 "      (i.IP='' or i.IP is null) and "
 				 "      i.role='expt' and i.node_id='%s'",
 				 4, reqp->pnodeid);
@@ -6019,7 +6019,7 @@ COMMAND_PROTOTYPE(dohostkeys)
 	 * run it through mysql_escape_string() it could potentially double
 	 * in size (although that is very unlikely).
 	 */
-	rsav1[0] = rsav2[0] = dsav2[0] = (char) NULL;
+	rsav1[0] = rsav2[0] = dsav2[0] = 0;
 
 	/*
 	 * Sheesh, perl string matching would be so much easier!
@@ -6783,7 +6783,7 @@ COMMAND_PROTOTYPE(dolocalize)
 	char		*bufp = buf, *ebufp = &buf[sizeof(buf)];
 	int		nrows;
 
-	*bufp = (char) NULL;
+	*bufp = 0;
 
 	/*
 	 * XXX sitevar fetching should be a library function.
