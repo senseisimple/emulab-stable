@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -10,6 +10,10 @@ OBJDIR		= ../../..
 SUBDIR		= os/imagezip/ntfs
 MAINDIR		= $(SRCDIR)/..
 
+NTFSVER		= 1.7.1
+#NTFSVER		= 2.0.0
+export NTFSVER
+
 include $(OBJDIR)/Makeconf
 
 LIBS		= libntfs.a
@@ -17,10 +21,15 @@ ifndef HAVE_LOCALE
 LIBS		+= liblocale.a
 endif
 
+ifeq ($(NTFSVER),1.7.1)
+CFLAGS += -DOLD_LIBNTFS
+endif
+
 ifndef HAVE_GCC3
 CC		= gcc30
 endif
-CFLAGS		+= $(SUBDIRCFLAGS) -I$(MAINDIR) -Ilibntfs/ntfsprogs/include
+CFLAGS		+= $(SUBDIRCFLAGS) -I$(MAINDIR) -DHAVE_CONFIG_H \
+		   -Ilibntfs/ntfsprogs/include -Ilibntfs/ntfsprogs/include/ntfs
 ifndef LINUX
 CFLAGS		+= -I$(SRCDIR)/extra_bsd_includes \
 		   -I$(SRCDIR)/liblocale/include
