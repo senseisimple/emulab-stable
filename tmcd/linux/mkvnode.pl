@@ -25,6 +25,7 @@ my $optlist  = "d";
 my $debug    = 1;
 my $leaveme  = 0;
 my $cleaning = 0;
+my $rebooting= 0;
 my $vnodeid;
 
 #
@@ -243,8 +244,8 @@ else {
     }
     if ($ret ne VNODE_STATUS_STOPPED()) {
 	MyFatal("vnode $vnodeid not stopped, no booting!");
-	
     }
+    $rebooting = 1;
 }
 
 #
@@ -255,7 +256,8 @@ sub callback($)
     my ($path) = @_;
 
     if (SHAREDHOST()) {
-	if (system("/bin/cp -f ".
+	if (!$rebooting &&
+	    system("/bin/cp -f ".
 		   "$TMGROUP $TMPASSWD $TMSHADOW $TMGSHADOW $path/etc") != 0) {
 	    return -1;
 	}
