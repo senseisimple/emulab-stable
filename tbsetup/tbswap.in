@@ -898,12 +898,12 @@ sub doSwapin($) {
 	    # Wrapper sets this bit when recovery is possible.
 	    if ($exitcode & 64) {
 		# We can recover. 
-		tbreport(SEV_SECONDARY, 'mapper_wrapper_failed', $exitcode);
+		tbreport(SEV_SECONDARY, 'assign_wrapper_failed', $exitcode);
 		return 7;
 	    }
 	    else {
 		# No recovery, no retry.
-		tbreport(SEV_SECONDARY, 'mapper_wrapper_failed', $exitcode);
+		tbreport(SEV_SECONDARY, 'assign_wrapper_failed', $exitcode);
 		return 1;
 	    }
 	}
