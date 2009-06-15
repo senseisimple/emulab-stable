@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use Getopt::Std;
@@ -216,11 +216,19 @@ sub prebootvnodes($$)
     my ($cvn, $nvn) = @_;
 
     #
+    # XXX OS dependent stuff.  Should move elsewhere.
+    #
+    if ($islinux) {
+	# This is handled in the libvnode libraries.
+	return;
+    }
+
+    #
     # For local vnodes, create the extra FS for filesystems and other state.
     # This will fail if it already exists, so just keep going.
     #
     if (!REMOTE()) {
-	my $mntdir = $islinux ? "/vservers" : $vndir;
+	my $mntdir = $vndir;
 	system("mkextrafs.pl $mntdir");
     }
 
@@ -229,13 +237,6 @@ sub prebootvnodes($$)
     #
     if (! -e "/local") {
 	system("ln -s " . LOCALROOTFS() . " /local");
-    }
-
-    #
-    # XXX OS dependent stuff.  Should move elsewhere
-    #
-    if ($islinux) {
-	return;
     }
 
     #
