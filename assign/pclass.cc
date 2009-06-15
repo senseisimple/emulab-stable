@@ -4,7 +4,7 @@
  * All rights reserved.
  */
 
-static const char rcsid[] = "$Id: pclass.cc,v 1.30 2009-05-20 18:06:08 tarunp Exp $";
+static const char rcsid[] = "$Id: pclass.cc,v 1.31 2009-06-15 19:42:26 ricci Exp $";
 
 #include "port.h"
 
@@ -282,6 +282,7 @@ int generate_pclasses(tb_pgraph &pg, bool pclass_for_each_pnode,
       n->name = pnode->name + "-own";
       n->add_member(pnode,true);
       n->disabled = true;
+      n->is_dynamic = true;
     }
   }
 

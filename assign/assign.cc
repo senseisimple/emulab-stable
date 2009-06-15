@@ -368,27 +368,32 @@ void prune_unusable_pclasses() {
                 /*
                  * For every node with this type, we want to remove its slot
                  * count from the total slot count for the type, since we know
-                 * we will never use this particular node
+                 * we will never use this particular node.
+                 * Note: We only have to do this for pclasses that are "real",
+                 * not dynamic ones.
                  */
-                tb_pnodelist::list_iter pnode_iterator =
-                    ptype_iterator->second->L.begin();
-                while (pnode_iterator != ptype_iterator->second->L.end()) {
-                    /*
-                     * Get the slotcount for this ptype
-                     */
-                    tb_pnode::types_map::iterator tm_iterator;
-                    tm_iterator = (*pnode_iterator)->types.find(this_type);
-                    assert(tm_iterator != (*pnode_iterator)->types.end());
+                if (!(*pclass_iterator)->is_dynamic) {
+                    tb_pnodelist::list_iter pnode_iterator =
+                        ptype_iterator->second->L.begin();
+                    while (pnode_iterator != ptype_iterator->second->L.end()) {
+                        /*
+                         * Get the slotcount for this ptype
+                         */
+                        tb_pnode::types_map::iterator tm_iterator;
+                        tm_iterator = (*pnode_iterator)->types.find(this_type);
+                        assert(tm_iterator != (*pnode_iterator)->types.end());
 
-                    /*
-                     * Remove it from the current ptype
-                     */
-                    this_type_p->remove_slots(tm_iterator->second->get_max_load());
+                        /*
+                         * Remove it from the current ptype
+                         */
+                        this_type_p->remove_slots(
+                                tm_iterator->second->get_max_load());
 
-                    /*
-                     * Move on to the next node
-                     */
-                    pnode_iterator++;
+                        /*
+                         * Move on to the next node
+                         */
+                        pnode_iterator++;
+                    }
                 }
                 ptype_iterator++;
             }

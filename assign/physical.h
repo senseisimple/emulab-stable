@@ -134,9 +134,13 @@ class tb_ptype {
 	    max_users = _max_users;
 	}
 	inline void add_slots(int additional_slots) {
+	    //cerr << "Adding " << additional_slots << " to " << my_name
+            //<< endl; 
 	    slots += additional_slots;
 	}
 	inline void remove_slots(int slots_to_remove) {
+	    //cerr << "Removing " << slots_to_remove << " from " << my_name
+            //<< endl;
 	    slots -= slots_to_remove;
 	}
     private:
