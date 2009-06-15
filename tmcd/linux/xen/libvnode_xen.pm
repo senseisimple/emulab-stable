@@ -110,8 +110,8 @@ sub disk_hacks($){
     copy($filetobecopied, $newfile) or die $!;
 }
 
-sub createDisk($){
-    my ($name) = @_;
+sub createDisk($$){
+    my ($name,$callback) = @_;
     my $disk = $name;
     my $disk_path = "/mnt/xen/disk";
     my $root_path = "/mnt/xen/root";
@@ -130,9 +130,11 @@ sub createDisk($){
 
     # hacks to make things work!
     disk_hacks($disk_path);
+    my $ret = &$callback($disk_path);
 
     mysystem("umount $root_path");
     mysystem("umount $disk_path");
+    return $ret;
 }
 
 sub diskName($){
@@ -198,11 +200,10 @@ sub createConfig($$$){
     close FILE;
 }
 
-sub vnodePreConfig($){
-    my ($id,) = @_;
+sub vnodePreConfig($$$){
+    my ($id,$vmid,$callback) = @_;
     return 0 if (-e diskName($id));
-    createDisk(diskName($id));
-    return 0;
+    return createDisk(diskName($id),$callback);
 }
 
 my @dhcp;

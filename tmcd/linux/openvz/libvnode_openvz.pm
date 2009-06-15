@@ -9,7 +9,7 @@
 package libvnode_openvz;
 use Exporter;
 @ISA    = "Exporter";
-@EXPORT = qw( vz_init vz_setDebug 
+@EXPORT = qw( vz_init vz_setDebug
               vz_rootPreConfig vz_rootPreConfigNetwork vz_rootPostConfig 
               vz_vnodeCreate vz_vnodeDestroy vz_vnodeState 
               vz_vnodeBoot vz_vnodeHalt vz_vnodeReboot 
@@ -477,7 +477,7 @@ sub vz_vnodeReboot {
 }
 
 sub vz_vnodePreConfig {
-    my ($vnode_id,$vmid) = @_;
+    my ($vnode_id,$vmid,$callback) = @_;
 
     #
     # Look and see if this node already has imq devs mapped into it -- if
@@ -526,8 +526,19 @@ sub vz_vnodePreConfig {
 	    mysystem("$VZCTL set $vnode_id --netdev_del $dev --save");
 	}
     }
-
-    return 0;
+    #
+    # Make sure container is mounted before calling the callback.
+    #
+    my $status = vmstatus($vmid);
+    my $didmount = 0;
+    if ($status ne 'running' && $status ne 'mounted') {
+	mysystem("$VZCTL mount $vnode_id");
+    }
+    my $ret = &$callback("$VZROOT/$vmid");
+    if ($didmount) {
+	mysystem("$VZCTL umount $vnode_id");
+    }
+    return $ret;
 }
 
 #

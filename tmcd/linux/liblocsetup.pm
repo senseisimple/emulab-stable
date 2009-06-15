@@ -13,7 +13,7 @@ use Exporter;
 @ISA = "Exporter";
 @EXPORT =
     qw ( $CP $EGREP $NFSMOUNT $UMOUNT $TMPASSWD $SFSSD $SFSCD $RPMCMD
-	 $HOSTSFILE $LOOPBACKMOUNT
+	 $HOSTSFILE $LOOPBACKMOUNT $TMGROUP $TMSHADOW $TMGSHADOW
 	 os_account_cleanup os_ifconfig_line os_etchosts_line
 	 os_setup os_groupadd os_useradd os_userdel os_usermod os_mkdir
 	 os_ifconfig_veth os_viface_name os_modpasswd
@@ -59,6 +59,9 @@ $NFSMOUNT	= "/bin/mount -o vers=2,udp"; # Force NFS Version 2 over UDP
 $LOOPBACKMOUNT	= "/bin/mount -n -o bind ";
 $UMOUNT		= "/bin/umount";
 $TMPASSWD	= "$ETCDIR/passwd";
+$TMGROUP	= "$ETCDIR/group";
+$TMSHADOW       = "$ETCDIR/shadow";
+$TMGSHADOW      = "$ETCDIR/gshadow";
 $SFSSD		= "/usr/local/sbin/sfssd";
 $SFSCD		= "/usr/local/sbin/sfscd";
 $RPMCMD		= "/bin/rpm";

@@ -42,6 +42,7 @@ BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 use libsetup;
 use libtmcc;
 use libtestbed;
+use liblocsetup;
     
 # Pull in libvnode
 use libvnode;
@@ -246,8 +247,24 @@ else {
     }
 }
 
+#
+# Call back to do things to the container before it boots.
+#
+sub callback($)
+{
+    my ($path) = @_;
+
+    if (SHAREDHOST()) {
+	if (system("/bin/cp -f ".
+		   "$TMGROUP $TMPASSWD $TMSHADOW $TMGSHADOW $path/etc") != 0) {
+	    return -1;
+	}
+    }
+    return 0;
+}
+
 # OP: preconfig
-if (safeLibOp($vnodeid,'vnodePreConfig',1,1,$vnodeid,$vmid)) {
+if (safeLibOp($vnodeid,'vnodePreConfig',1,1,$vnodeid,$vmid,\&callback)) {
     MyFatal("vnodePreConfig failed");
 }
 
