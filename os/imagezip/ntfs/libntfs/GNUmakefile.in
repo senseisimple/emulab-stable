@@ -8,7 +8,6 @@ SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ../../../..
 SUBDIR		= os/imagezip/ntfs/libntfs
-NTFSVER		= ntfsprogs-1.7.1
 NTFSDIR		= ntfsprogs
 LIBSRCDIR	= $(NTFSDIR)/libntfs
 LOCALPKGHOST	= @OUTERBOSS_NODENAME@
@@ -22,10 +21,10 @@ endif
 ifdef LINUX
 INCLUDES        = -I${NTFSDIR}/include -I${OBJDIR}
 FETCH		= wget -q -N
-PATCH		= patch -sN -d $(NTFSVER) -p1
+PATCH		= patch -sN -d ntfsprogs-$(NTFSVER) -p1
 else
-INCLUDES        = -nostdinc -I${NTFSDIR}/include -I${OBJDIR} \
-                  -I${SRCDIR}/../extra_bsd_includes \
+INCLUDES        = -nostdinc -I${NTFSDIR}/include -I${NTFSDIR}/include/ntfs \
+		  -I${OBJDIR} -I${SRCDIR}/../extra_bsd_includes \
                   -I/usr/include \
                   -I/usr/local/include
 FETCH		= fetch -m
@@ -63,37 +62,54 @@ SRCS=	$(patsubst %.o,$(LIBSRCDIR)/%.c,$(OBJS))
 %.o:	$(LIBSRCDIR)/%.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-libntfs.a: $(LIBSRCDIR)/patched $(OBJS)
+libntfs.a: libntfs-$(NTFSVER).a
+	cp -p libntfs-$(NTFSVER).a libntfs.a
+
+libntfs-1.7.1.a: $(LIBSRCDIR)/patched $(OBJS)
 	$(AR) crv $@ $(OBJS)
 	$(RANLIB) $@
+
+libntfs-2.0.0.a: $(LIBSRCDIR)/patched
+	$(MAKE) -C $(LIBSRCDIR) all
+	cp -p $(LIBSRCDIR)/.libs/libntfs.a $@
 
 $(SRCS): $(LIBSRCDIR)/patched
 
 $(LIBSRCDIR)/patched:
-	@if [ ! -e "$(NTFSVER).tar.gz" ]; then \
+	@if [ ! -e "ntfsprogs-$(NTFSVER).tar.gz" ]; then \
 	    if [ -n "$(LOCALPKGHOST)" ]; then \
-	        if [ `$(FETCH) http://$(LOCALPKGHOST)/downloads/$(NTFSVER).tar.gz` ]; then \
-		    $(FETCH) http://$(PKGHOST)/downloads/$(NTFSVER).tar.gz; \
+	        if [ `$(FETCH) http://$(LOCALPKGHOST)/downloads/ntfsprogs-$(NTFSVER).tar.gz` ]; then \
+		    $(FETCH) http://$(PKGHOST)/downloads/ntfsprogs-$(NTFSVER).tar.gz; \
 	        fi \
 	    else \
-		$(FETCH) http://$(PKGHOST)/downloads/$(NTFSVER).tar.gz; \
+		$(FETCH) http://$(PKGHOST)/downloads/ntfsprogs-$(NTFSVER).tar.gz; \
 	    fi \
 	fi
-	$(UNPACK) $(NTFSVER).tar.gz
+	$(UNPACK) ntfsprogs-$(NTFSVER).tar.gz
+ifeq ($(NTFSVER),1.7.1)
 	$(PATCH) < $(SRCDIR)/ntfs_lvalue.patch
 ifdef LINUX
 	$(PATCH) < $(SRCDIR)/ntfs.linuxpatch
 else
 	$(PATCH) < $(SRCDIR)/ntfs.patch
 endif
-	$(MV) $(NTFSVER) $(NTFSDIR)
+	$(MV) ntfsprogs-$(NTFSVER) $(NTFSDIR)
 	$(NTFSDIR)/configure
 	$(MV) config.h $(NTFSDIR)/include
+else
+	$(PATCH) < $(SRCDIR)/ntfsprogs-$(NTFSVER).patch
+	@if [ -e "freebsd_io.c" ]; then \
+		$(MV) freebsd_io.c* ntfsprogs-$(NTFSVER)/libntfs/; \
+	fi
+	$(MV) ntfsprogs-$(NTFSVER) $(NTFSDIR)
+	(cd $(NTFSDIR); configure)
+	cp -p $(NTFSDIR)/config.h $(NTFSDIR)/include
+endif
 	touch $(LIBSRCDIR)/patched
 
 clean:
-	-rm -f *.o *~ *.a config.* Makefile
-	-rm -rf $(NTFSDIR) 
+	-rm -f *.o *~ *.a config.* Makefile libtool *.spec stamp-h
+	-rm -rf $(NTFSDIR) doc include libntfs
 
 distclean:
 	-rm -rf *.gz *.spec *-h doc libtool include libntfs

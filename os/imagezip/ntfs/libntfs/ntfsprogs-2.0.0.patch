@@ -1,0 +1,878 @@
+diff -Nru ntfsprogs-2.0.0-orig/include/ntfs/device.h ntfsprogs-2.0.0/include/ntfs/device.h
+--- ntfsprogs-2.0.0-orig/include/ntfs/device.h	2007-09-26 12:28:40.000000000 -0600
++++ ntfsprogs-2.0.0/include/ntfs/device.h	2009-06-03 20:24:45.000000000 -0600
+@@ -97,6 +97,8 @@
+ 	int (*sync)(struct ntfs_device *dev);
+ 	int (*stat)(struct ntfs_device *dev, struct stat *buf);
+ 	int (*ioctl)(struct ntfs_device *dev, int request, void *argp);
++	/* XXX for FreeBSD */
++	void (*setiobase)(struct ntfs_device *dev, const s64 doffset);
+ };
+ 
+ extern struct ntfs_device *ntfs_device_alloc(const char *name, const long state,
+diff -Nru ntfsprogs-2.0.0-orig/include/ntfs/device_io.h ntfsprogs-2.0.0/include/ntfs/device_io.h
+--- ntfsprogs-2.0.0-orig/include/ntfs/device_io.h	2007-09-26 12:28:40.000000000 -0600
++++ ntfsprogs-2.0.0/include/ntfs/device_io.h	2009-05-08 23:15:54.000000000 -0600
+@@ -30,9 +30,18 @@
+ 
+ #ifndef __CYGWIN32__
+ 
++#ifdef __FreeBSD__
++
++/* FreeBSD; use FreeBSD style low level device operations. */
++#define ntfs_device_default_io_ops ntfs_device_freebsd_io_ops
++
++#else /* __FreeBSD__ */
++
+ /* Not on Cygwin; use standard Unix style low level device operations. */
+ #define ntfs_device_default_io_ops ntfs_device_unix_io_ops
+ 
++#endif /* __FreeBSD__ */
++
+ #else /* __CYGWIN32__ */
+ 
+ #ifndef HDIO_GETGEO
+diff -Nru ntfsprogs-2.0.0-orig/include/ntfs/list.h ntfsprogs-2.0.0/include/ntfs/list.h
+--- ntfsprogs-2.0.0-orig/include/ntfs/list.h	2007-09-26 12:28:40.000000000 -0600
++++ ntfsprogs-2.0.0/include/ntfs/list.h	2009-05-08 22:52:04.000000000 -0600
+@@ -22,6 +22,9 @@
+ #ifndef _NTFS_LIST_H
+ #define _NTFS_LIST_H
+ 
++/* XXX BSD */
++#undef LIST_HEAD
++
+ /**
+  * struct list_head - Simple doubly linked list implementation.
+  *
+diff -Nru ntfsprogs-2.0.0-orig/include/ntfs/volume.h ntfsprogs-2.0.0/include/ntfs/volume.h
+--- ntfsprogs-2.0.0-orig/include/ntfs/volume.h	2007-09-27 06:32:20.000000000 -0600
++++ ntfsprogs-2.0.0/include/ntfs/volume.h	2009-06-03 20:00:43.000000000 -0600
+@@ -237,6 +237,7 @@
+ extern int ntfs_device_umount(ntfs_volume *vol, const BOOL force);
+ 
+ extern ntfs_volume *ntfs_mount(const char *name, ntfs_mount_flags flags);
++extern ntfs_volume *ntfs_mount_with_offset(const char *name, ntfs_mount_flags flags, const s64 doffset);
+ extern int ntfs_umount(ntfs_volume *vol, const BOOL force);
+ 
+ extern int ntfs_version_is_supported(ntfs_volume *vol);
+diff -Nru ntfsprogs-2.0.0-orig/libntfs/freebsd_io.c ntfsprogs-2.0.0/libntfs/freebsd_io.c
+--- ntfsprogs-2.0.0-orig/libntfs/freebsd_io.c	1969-12-31 17:00:00.000000000 -0700
++++ ntfsprogs-2.0.0/libntfs/freebsd_io.c	2009-06-03 21:11:59.000000000 -0600
+@@ -0,0 +1,536 @@
++/**
++ * freebsd_io.c - FreeBSD (actually, traditional Unix) style disk io functions.
++ * Part of the Linux-NTFS project.
++ *
++ * Copyright (c) 2000-2006 Anton Altaparmakov
++ *
++ * This program/include file is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as published
++ * by the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program/include file is distributed in the hope that it will be
++ * useful, but WITHOUT ANY WARRANTY; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program (in the main directory of the Linux-NTFS
++ * distribution in the file COPYING); if not, write to the Free Software
++ * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ */
++
++#ifdef HAVE_CONFIG_H
++#include "config.h"
++#endif
++
++#ifdef HAVE_UNISTD_H
++#include <unistd.h>
++#endif
++#ifdef HAVE_STDLIB_H
++#include <stdlib.h>
++#endif
++#ifdef HAVE_STRING_H
++#include <string.h>
++#endif
++#ifdef HAVE_ERRNO_H
++#include <errno.h>
++#endif
++#ifdef HAVE_STDIO_H
++#include <stdio.h>
++#endif
++#ifdef HAVE_SYS_TYPES_H
++#include <sys/types.h>
++#endif
++#ifdef HAVE_SYS_STAT_H
++#include <sys/stat.h>
++#endif
++#ifdef HAVE_FCNTL_H
++#include <fcntl.h>
++#endif
++#ifdef HAVE_SYS_IOCTL_H
++#include <sys/ioctl.h>
++#endif
++#ifdef HAVE_LINUX_FD_H
++#include <linux/fd.h>
++#endif
++
++#include "types.h"
++#include "mst.h"
++#include "debug.h"
++#include "device.h"
++#include "logging.h"
++
++typedef struct {
++	int fd;
++	s64 iobase;
++
++	/* cache stuff */
++	off_t ntfs_dev_offset;	/* where the lib thinks we are (unaligned) */
++	off_t dev_offset;	/* the real device offset (aligned) */
++	off_t cache_offset;	/* the offset of the current cached block */
++	char cache_buffer[DEV_BSIZE];
++	int cb_count;
++} freebsd_fd;
++
++#define DEV_FD(dev)		(((freebsd_fd *)dev->d_private)->fd)
++#define DEV_IOBASE(dev)		(((freebsd_fd *)dev->d_private)->iobase)
++#define DEV_NTFS_OFFSET(dev)	(((freebsd_fd *)dev->d_private)->ntfs_dev_offset)
++#define DEV_REAL_OFFSET(dev)	(((freebsd_fd *)dev->d_private)->dev_offset)
++#define DEV_CACHE_OFFSET(dev)	(((freebsd_fd *)dev->d_private)->cache_offset)
++#define DEV_CACHE_BUFFER(dev)	(((freebsd_fd *)dev->d_private)->cache_buffer)
++#define DEV_CB_COUNT(dev)	(((freebsd_fd *)dev->d_private)->cb_count)
++
++/* Define to nothing if not present on this system. */
++#ifndef O_EXCL
++#	define O_EXCL 0
++#endif
++
++/*
++ * Functions to handle partial and unaligned block IO which the BSD
++ * (and traditional UNIX) raw IO mechanism don't allow.
++ *
++ * Uses a stupid-simple single-block "cache" to handle unaligned seeks
++ * and reads.
++ */
++#define ntfs_freebsd_alignbase(offset)	((offset) & ~(DEV_BSIZE-1))
++#define ntfs_freebsd_alignoff(offset)	((offset) & (DEV_BSIZE-1))
++#define ntfs_freebsd_isaligned(offset)	(ntfs_freebsd_alignoff(offset) == 0)
++
++static s64 ntfs_device_freebsd_io_seek(struct ntfs_device *dev, s64 offset,
++				       int whence);
++static s64 ntfs_device_freebsd_io_read(struct ntfs_device *dev, void *buf,
++				       s64 count);
++
++/*
++ * Fill cache buffer from current device offset
++ */
++static s64 ntfs_freebsd_fill_cache_buffer(struct ntfs_device *dev)
++{
++	s64 rv = read(DEV_FD(dev), DEV_CACHE_BUFFER(dev), DEV_BSIZE);
++	if (rv < 0)
++		return rv;
++
++	DEV_CB_COUNT(dev) = rv;
++	DEV_CACHE_OFFSET(dev) = DEV_REAL_OFFSET(dev);
++	DEV_REAL_OFFSET(dev) += DEV_BSIZE;
++	return DEV_BSIZE;
++}
++
++/*
++ * Seek to DEV_BSIZE boundary before requested offset and read entire block.
++ */
++static s64 ntfs_freebsd_unaligned_seek(struct ntfs_device *dev, s64 offset,
++				       int whence)
++{
++	s64 roffset = ntfs_freebsd_alignbase(offset);
++	s64 soff, iobase = 0;
++
++	if (whence == SEEK_SET)
++		iobase = DEV_IOBASE(dev);
++
++	soff = lseek(DEV_FD(dev), roffset + iobase, whence);
++	if (soff >= 0) {
++		DEV_REAL_OFFSET(dev) = soff - iobase;
++		s64 rv = ntfs_freebsd_fill_cache_buffer(dev);
++		if (rv < 0)
++			return rv;
++		soff += offset - roffset;
++		DEV_NTFS_OFFSET(dev) = soff;
++	}
++	return soff;
++}
++
++/*
++ * Read from the current DEV_NTFS_OFFSET.  Offset, size or both might be
++ * unaligned.
++ */
++static s64 ntfs_freebsd_unaligned_read(struct ntfs_device *dev, void *buf,
++				       s64 count)
++{
++	s64 rcnt = 0;
++	s64 rv;
++
++	/* Read any initial partial block */
++	if (!ntfs_freebsd_isaligned(DEV_NTFS_OFFSET(dev))) {
++		size_t coff = ntfs_freebsd_alignoff(DEV_NTFS_OFFSET(dev));
++		size_t ccnt = DEV_CB_COUNT(dev) - coff;
++		if (ccnt > count)
++			ccnt = count;
++		memcpy(buf, &(DEV_CACHE_BUFFER(dev)[coff]), ccnt);
++		buf += ccnt;
++		count -= ccnt;
++		rcnt += ccnt;
++
++		DEV_NTFS_OFFSET(dev) += ccnt;
++	}
++
++	/* Read full blocks */
++	if (count >= DEV_BSIZE) {
++		size_t dcnt = ntfs_freebsd_alignbase(count);
++
++		rv = read(DEV_FD(dev), buf, dcnt);
++		if (rv < 0) {
++			/*
++			 * What to do? Return partial count that we may
++			 * have copied above? Or just return total failure?
++			 * We do the latter.
++			 */
++			return rv;
++		}
++		buf += dcnt;
++		count -= dcnt;
++		rcnt += dcnt;
++
++		DEV_NTFS_OFFSET(dev) += dcnt;
++		DEV_REAL_OFFSET(dev) += dcnt;
++
++		if (rv != dcnt) {
++			/* Premature EOF */
++			return rcnt;
++		}
++	}
++
++	/* Read any final partial block */
++	if (count) {
++		rv = ntfs_freebsd_fill_cache_buffer(dev);
++		if (rv < 0) {
++			/*
++			 * What to do? Return partial count that we may
++			 * have copied/read above? Or just return total failure?
++			 * We do the former as we have changed the file ptr.
++			 */
++			return rcnt;
++		}
++
++		size_t ccnt = DEV_CB_COUNT(dev);
++		if (ccnt > count)
++			ccnt = count;
++		memcpy(buf, DEV_CACHE_BUFFER(dev), ccnt);
++		buf += ccnt;
++		count -= ccnt;
++		rcnt += ccnt;
++
++		DEV_NTFS_OFFSET(dev) += ccnt;
++	}
++
++	return rcnt;
++}
++
++static s64 ntfs_unaligned_write(struct ntfs_device *dev, const void *buf,
++		s64 count)
++{
++	return -1;
++}
++
++/*
++ * XXX mighty hack: save off current offset, do a regular read, restore offset.
++ */
++static s64 ntfs_freebsd_unaligned_pread(struct ntfs_device *dev, void *buf,
++					s64 count, s64 offset)
++{
++	s64 rv;
++	s64 toff = DEV_NTFS_OFFSET(dev);
++
++	rv = ntfs_device_freebsd_io_seek(dev, offset, SEEK_SET);
++	if (rv >= 0)
++		rv = ntfs_device_freebsd_io_read(dev, buf, count);
++
++	(void)ntfs_device_freebsd_io_seek(dev, toff, SEEK_SET);
++
++	return rv;
++}
++
++/**
++ * ntfs_device_freebsd_io_open - Open a device and lock it exclusively
++ * @dev:
++ * @flags:
++ *
++ * Description...
++ *
++ * Returns:
++ */
++static int ntfs_device_freebsd_io_open(struct ntfs_device *dev, int flags)
++{
++	struct flock flk;
++	struct stat sbuf;
++	int err;
++
++	if (NDevOpen(dev)) {
++		errno = EBUSY;
++		return -1;
++	}
++	if (!(dev->d_private = ntfs_malloc(sizeof(freebsd_fd))))
++		return -1;
++	DEV_FD(dev) = open(dev->d_name, flags);
++	if (DEV_FD(dev) == -1) {
++		err = errno;
++		goto err_out;
++	}
++	/* Setup our read-only flag. */
++	if ((flags & O_RDWR) != O_RDWR)
++		NDevSetReadOnly(dev);
++	/* Acquire exclusive (mandatory) lock on the whole device. */
++	memset(&flk, 0, sizeof(flk));
++	if (NDevReadOnly(dev))
++		flk.l_type = F_RDLCK;
++	else
++		flk.l_type = F_WRLCK;
++	flk.l_whence = SEEK_SET;
++	flk.l_start = flk.l_len = 0LL;
++	if (fcntl(DEV_FD(dev), F_SETLK, &flk)) {
++		err = errno;
++		ntfs_log_debug("ntfs_device_freebsd_io_open: Could not lock %s "
++				"for %s\n", dev->d_name, NDevReadOnly(dev) ?
++				"reading" : "writing");
++		if (close(DEV_FD(dev)))
++			ntfs_log_perror("ntfs_device_freebsd_io_open: Warning: "
++					"Could not close %s", dev->d_name);
++		goto err_out;
++	}
++	/* Determine if device is a block device or not, ignoring errors. */
++	if (!fstat(DEV_FD(dev), &sbuf) && S_ISBLK(sbuf.st_mode))
++		NDevSetBlock(dev);
++	/* Set our open flag. */
++	NDevSetOpen(dev);
++
++	DEV_NTFS_OFFSET(dev) = DEV_REAL_OFFSET(dev) = 0;
++	DEV_CACHE_OFFSET(dev) = -1;
++
++	return 0;
++err_out:
++	free(dev->d_private);
++	dev->d_private = NULL;
++	errno = err;
++	return -1;
++}
++
++/**
++ * ntfs_device_freebsd_io_close - Close the device, releasing the lock
++ * @dev:
++ *
++ * Description...
++ *
++ * Returns:
++ */
++static int ntfs_device_freebsd_io_close(struct ntfs_device *dev)
++{
++	struct flock flk;
++
++	if (!NDevOpen(dev)) {
++		errno = EBADF;
++		return -1;
++	}
++	if (NDevDirty(dev))
++		fsync(DEV_FD(dev));
++	/* Release exclusive (mandatory) lock on the whole device. */
++	memset(&flk, 0, sizeof(flk));
++	flk.l_type = F_UNLCK;
++	flk.l_whence = SEEK_SET;
++	flk.l_start = flk.l_len = 0LL;
++	if (fcntl(DEV_FD(dev), F_SETLK, &flk))
++		ntfs_log_perror("ntfs_device_freebsd_io_close: Warning: Could not "
++				"unlock %s", dev->d_name);
++	/* Close the file descriptor and clear our open flag. */
++	if (close(DEV_FD(dev)))
++		return -1;
++	NDevClearOpen(dev);
++	free(dev->d_private);
++	dev->d_private = NULL;
++	return 0;
++}
++
++/**
++ * ntfs_device_freebsd_io_seek - Seek to a place on the device
++ * @dev:
++ * @offset:
++ * @whence:
++ *
++ * Description...
++ *
++ * Returns:
++ */
++static s64 ntfs_device_freebsd_io_seek(struct ntfs_device *dev, s64 offset,
++		int whence)
++{
++	s64 rv, iobase = 0;
++
++	if (!ntfs_freebsd_isaligned(offset) || whence != SEEK_SET) {
++		if (offset == 0 && whence == SEEK_CUR)
++			return DEV_NTFS_OFFSET(dev);
++		return ntfs_freebsd_unaligned_seek(dev, offset, whence);
++	}
++
++	if (whence == SEEK_SET)
++		iobase = DEV_IOBASE(dev);
++	rv = lseek(DEV_FD(dev), offset + iobase, whence);
++	if (rv >= 0)
++		DEV_NTFS_OFFSET(dev) = DEV_REAL_OFFSET(dev) = rv - iobase;
++	return rv;
++}
++
++/**
++ * ntfs_device_freebsd_io_read - Read from the device, from the current location
++ * @dev:
++ * @buf:
++ * @count:
++ *
++ * Description...
++ *
++ * Returns:
++ */
++static s64 ntfs_device_freebsd_io_read(struct ntfs_device *dev, void *buf,
++		s64 count)
++{
++	if (!ntfs_freebsd_isaligned(DEV_NTFS_OFFSET(dev)) ||
++	    !ntfs_freebsd_isaligned(count)) {
++		return ntfs_freebsd_unaligned_read(dev, buf, count);
++	}
++
++	return read(DEV_FD(dev), buf, count);
++}
++
++/**
++ * ntfs_device_freebsd_io_write - Write to the device, at the current location
++ * @dev:
++ * @buf:
++ * @count:
++ *
++ * Description...
++ *
++ * Returns:
++ */
++static s64 ntfs_device_freebsd_io_write(struct ntfs_device *dev, const void *buf,
++		s64 count)
++{
++#if 1
++	errno = ENODEV;
++	return -1;
++#else
++	if (NDevReadOnly(dev)) {
++		errno = EROFS;
++		return -1;
++	}
++	NDevSetDirty(dev);
++	return write(DEV_FD(dev), buf, count);
++#endif
++}
++
++/**
++ * ntfs_device_freebsd_io_pread - Perform a positioned read from the device
++ * @dev:
++ * @buf:
++ * @count:
++ * @offset:
++ *
++ * Description...
++ *
++ * Returns:
++ */
++static s64 ntfs_device_freebsd_io_pread(struct ntfs_device *dev, void *buf,
++		s64 count, s64 offset)
++{
++	if (!ntfs_freebsd_isaligned(offset) || !ntfs_freebsd_isaligned(count)) {
++		return ntfs_freebsd_unaligned_pread(dev, buf, count, offset);
++	}
++	return pread(DEV_FD(dev), buf, count, offset + DEV_IOBASE(dev));
++}
++
++/**
++ * ntfs_device_freebsd_io_pwrite - Perform a positioned write to the device
++ * @dev:
++ * @buf:
++ * @count:
++ * @offset:
++ *
++ * Description...
++ *
++ * Returns:
++ */
++static s64 ntfs_device_freebsd_io_pwrite(struct ntfs_device *dev, const void *buf,
++		s64 count, s64 offset)
++{
++#if 1
++	errno = ENODEV;
++	return -1;
++#else
++	if (NDevReadOnly(dev)) {
++		errno = EROFS;
++		return -1;
++	}
++	NDevSetDirty(dev);
++	return pwrite(DEV_FD(dev), buf, count, offset + DEV_IOBASE(dev));
++#endif
++}
++
++/**
++ * ntfs_device_freebsd_io_sync - Flush any buffered changes to the device
++ * @dev:
++ *
++ * Description...
++ *
++ * Returns:
++ */
++static int ntfs_device_freebsd_io_sync(struct ntfs_device *dev)
++{
++	if (!NDevReadOnly(dev) && NDevDirty(dev)) {
++		int res = fsync(DEV_FD(dev));
++		if (!res)
++			NDevClearDirty(dev);
++		return res;
++	}
++	return 0;
++}
++
++/**
++ * ntfs_device_freebsd_io_stat - Get information about the device
++ * @dev:
++ * @buf:
++ *
++ * Description...
++ *
++ * Returns:
++ */
++static int ntfs_device_freebsd_io_stat(struct ntfs_device *dev, struct stat *buf)
++{
++	return fstat(DEV_FD(dev), buf);
++}
++
++/**
++ * ntfs_device_freebsd_io_ioctl - Perform an ioctl on the device
++ * @dev:
++ * @request:
++ * @argp:
++ *
++ * Description...
++ *
++ * Returns:
++ */
++static int ntfs_device_freebsd_io_ioctl(struct ntfs_device *dev, int request,
++		void *argp)
++{
++	return ioctl(DEV_FD(dev), request, argp);
++}
++
++static void ntfs_device_freebsd_io_setiobase(struct ntfs_device *dev,
++		const s64 doffset)
++{
++	DEV_IOBASE(dev) = doffset;
++}
++
++/**
++ * Device operations for working with unix style devices and files.
++ */
++struct ntfs_device_operations ntfs_device_freebsd_io_ops = {
++	.open		= ntfs_device_freebsd_io_open,
++	.close		= ntfs_device_freebsd_io_close,
++	.seek		= ntfs_device_freebsd_io_seek,
++	.read		= ntfs_device_freebsd_io_read,
++	.write		= ntfs_device_freebsd_io_write,
++	.pread		= ntfs_device_freebsd_io_pread,
++	.pwrite		= ntfs_device_freebsd_io_pwrite,
++	.sync		= ntfs_device_freebsd_io_sync,
++	.stat		= ntfs_device_freebsd_io_stat,
++	.ioctl		= ntfs_device_freebsd_io_ioctl,
++	.setiobase	= ntfs_device_freebsd_io_setiobase,
++};
+diff -Nru ntfsprogs-2.0.0-orig/libntfs/unix_io.c ntfsprogs-2.0.0/libntfs/unix_io.c
+--- ntfsprogs-2.0.0-orig/libntfs/unix_io.c	2007-09-26 12:28:34.000000000 -0600
++++ ntfsprogs-2.0.0/libntfs/unix_io.c	2009-06-12 23:59:34.000000000 -0600
+@@ -60,7 +60,13 @@
+ #include "device.h"
+ #include "logging.h"
+ 
+-#define DEV_FD(dev)	(*(int *)dev->d_private)
++typedef struct {
++	int fd;
++	s64 iobase;
++} unix_fd;
++
++#define DEV_FD(dev)		(((unix_fd *)dev->d_private)->fd)
++#define DEV_IOBASE(dev)		(((unix_fd *)dev->d_private)->iobase)
+ 
+ /* Define to nothing if not present on this system. */
+ #ifndef O_EXCL
+@@ -86,10 +92,10 @@
+ 		errno = EBUSY;
+ 		return -1;
+ 	}
+-	if (!(dev->d_private = ntfs_malloc(sizeof(int))))
++	if (!(dev->d_private = ntfs_malloc(sizeof(unix_fd))))
+ 		return -1;
+-	*(int*)dev->d_private = open(dev->d_name, flags);
+-	if (*(int*)dev->d_private == -1) {
++	DEV_FD(dev) = open(dev->d_name, flags);
++	if (DEV_FD(dev) == -1) {
+ 		err = errno;
+ 		goto err_out;
+ 	}
+@@ -175,7 +181,11 @@
+ static s64 ntfs_device_unix_io_seek(struct ntfs_device *dev, s64 offset,
+ 		int whence)
+ {
+-	return lseek(DEV_FD(dev), offset, whence);
++	s64 iobase = 0;
++
++	if (whence == SEEK_SET)
++		iobase = DEV_IOBASE(dev);
++	return lseek(DEV_FD(dev), offset + iobase, whence);
+ }
+ 
+ /**
+@@ -229,7 +239,7 @@
+ static s64 ntfs_device_unix_io_pread(struct ntfs_device *dev, void *buf,
+ 		s64 count, s64 offset)
+ {
+-	return pread(DEV_FD(dev), buf, count, offset);
++	return pread(DEV_FD(dev), buf, count, offset + DEV_IOBASE(dev));
+ }
+ 
+ /**
+@@ -251,7 +261,7 @@
+ 		return -1;
+ 	}
+ 	NDevSetDirty(dev);
+-	return pwrite(DEV_FD(dev), buf, count, offset);
++	return pwrite(DEV_FD(dev), buf, count, offset + DEV_IOBASE(dev));
+ }
+ 
+ /**
+@@ -303,6 +313,12 @@
+ 	return ioctl(DEV_FD(dev), request, argp);
+ }
+ 
++static void ntfs_device_unix_io_setiobase(struct ntfs_device *dev,
++		const s64 doffset)
++{
++	DEV_IOBASE(dev) = doffset;
++}
++
+ /**
+  * Device operations for working with unix style devices and files.
+  */
+@@ -317,4 +333,5 @@
+ 	.sync		= ntfs_device_unix_io_sync,
+ 	.stat		= ntfs_device_unix_io_stat,
+ 	.ioctl		= ntfs_device_unix_io_ioctl,
++	.setiobase	= ntfs_device_unix_io_setiobase,
+ };
+diff -Nru ntfsprogs-2.0.0-orig/libntfs/volume.c ntfsprogs-2.0.0/libntfs/volume.c
+--- ntfsprogs-2.0.0-orig/libntfs/volume.c	2007-09-27 06:55:33.000000000 -0600
++++ ntfsprogs-2.0.0/libntfs/volume.c	2009-06-03 20:58:56.000000000 -0600
+@@ -423,6 +423,10 @@
+ 	return -1;
+ }
+ 
++/* Internal */
++static ntfs_volume *ntfs_volume_startup_internal(struct ntfs_device *dev,
++		ntfs_mount_flags flags, const s64 doffset);
++
+ /**
+  * ntfs_volume_startup - allocate and setup an ntfs volume
+  * @dev:	device to open
+@@ -438,6 +442,12 @@
+ ntfs_volume *ntfs_volume_startup(struct ntfs_device *dev,
+ 		ntfs_mount_flags flags)
+ {
++	return ntfs_volume_startup_internal(dev, flags, 0LL);
++}
++
++ntfs_volume *ntfs_volume_startup_internal(struct ntfs_device *dev,
++		ntfs_mount_flags flags, const s64 doffset)
++{
+ 	LCN mft_zone_size, mft_lcn;
+ 	s64 br;
+ 	ntfs_volume *vol;
+@@ -485,6 +495,11 @@
+ 		ntfs_log_perror("Error opening partition device");
+ 		goto error_exit;
+ 	}
++
++	/* XXX FreeBSD specific: set a device offset */
++	if (dev->d_ops->setiobase)
++		dev->d_ops->setiobase(dev, doffset);
++
+ 	/* Attach the device to the volume. */
+ 	vol->dev = dev;
+ 	/* Now read the bootsector. */
+@@ -882,7 +897,7 @@
+  * Return the allocated volume structure on success and NULL on error with
+  * errno set to the error code.
+  */
+-ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, ntfs_mount_flags flags)
++ntfs_volume *ntfs_device_mount_with_offset(struct ntfs_device *dev, ntfs_mount_flags flags, const s64 doffset)
+ {
+ 	s64 l;
+ #ifdef DEBUG
+@@ -900,7 +915,7 @@
+ 	int i, j, eo;
+ 	u32 u;
+ 
+-	vol = ntfs_volume_startup(dev, flags);
++	vol = ntfs_volume_startup_internal(dev, flags, doffset);
+ 	if (!vol) {
+ 		ntfs_log_perror("Failed to startup volume");
+ 		return NULL;
+@@ -1290,6 +1305,11 @@
+ 	return NULL;
+ }
+ 
++ntfs_volume *ntfs_device_mount(struct ntfs_device *dev, ntfs_mount_flags flags)
++{
++	return ntfs_device_mount_with_offset(dev, flags, 0LL);
++}
++
+ /**
+  * ntfs_mount - open ntfs volume
+  * @name:	name of device/file to open
+@@ -1313,8 +1333,10 @@
+  * Note, that a copy is made of @name, and hence it can be discarded as
+  * soon as the function returns.
+  */
+-ntfs_volume *ntfs_mount(const char *name __attribute__((unused)),
+-		ntfs_mount_flags flags __attribute__((unused)))
++ntfs_volume *ntfs_mount_with_offset(const char *name __attribute__((unused)),
++		ntfs_mount_flags flags __attribute__((unused)),
++		const s64 doffset)
++
+ {
+ #ifndef NO_NTFS_DEVICE_DEFAULT_IO_OPS
+ 	struct ntfs_device *dev;
+@@ -1325,7 +1347,7 @@
+ 	if (!dev)
+ 		return NULL;
+ 	/* Call ntfs_device_mount() to do the actual mount. */
+-	vol = ntfs_device_mount(dev, flags);
++	vol = ntfs_device_mount_with_offset(dev, flags, doffset);
+ 	if (!vol) {
+ 		int eo = errno;
+ 		ntfs_device_free(dev);
+@@ -1343,6 +1365,12 @@
+ #endif
+ }
+ 
++ntfs_volume *ntfs_mount(const char *name __attribute__((unused)),
++		ntfs_mount_flags flags __attribute__((unused)))
++{
++	ntfs_mount_with_offset(name, flags, 0LL);
++}
++
+ /**
+  * ntfs_device_umount - close ntfs volume
+  * @vol: address of ntfs_volume structure of volume to close
+diff -Nru ntfsprogs-2.0.0-orig/ntfsprogs/ntfsls.c ntfsprogs-2.0.0/ntfsprogs/ntfsls.c
+--- ntfsprogs-2.0.0-orig/ntfsprogs/ntfsls.c	2007-09-19 10:51:09.000000000 -0600
++++ ntfsprogs-2.0.0/ntfsprogs/ntfsls.c	2009-06-03 21:07:29.000000000 -0600
+@@ -118,6 +118,7 @@
+ 	int classify;
+ 	int recursive;
+ 	const char *path;
++	s64 doffset;
+ } opts;
+ 
+ typedef struct {
+@@ -192,7 +193,7 @@
+  */
+ static int parse_options(int argc, char *argv[])
+ {
+-	static const char *sopt = "-aFfh?ilp:qRsVvx";
++	static const char *sopt = "-aFfh?ilp:qRsVvxO:";
+ 	static const struct option lopt[] = {
+ 		{ "all",	 no_argument,		NULL, 'a' },
+ 		{ "classify",	 no_argument,		NULL, 'F' },
+@@ -277,6 +278,9 @@
+ 		case 'R':
+ 			opts.recursive++;
+ 			break;
++		case 'O':
++			opts.doffset = strtoll(optarg, 0, 10) * 512;
++			break;
+ 		default:
+ 			ntfs_log_error("Unknown option '%s'.\n", argv[optind - 1]);
+ 			err++;
+@@ -651,8 +655,14 @@
+ 
+ 	utils_set_locale();
+ 
+-	vol = utils_mount_volume(opts.device, NTFS_MNT_RDONLY |
+-			(opts.force ? NTFS_MNT_FORCE : 0));
++	if (opts.doffset)
++		vol = utils_mount_volume_with_offset(opts.device,
++					 NTFS_MNT_RDONLY |
++					 (opts.force ? NTFS_MNT_FORCE : 0),
++					 opts.doffset);
++	else
++		vol = utils_mount_volume(opts.device, NTFS_MNT_RDONLY |
++					 (opts.force ? NTFS_MNT_FORCE : 0));
+ 	if (!vol) {
+ 		// FIXME: Print error... (AIA)
+ 		return 2;
+diff -Nru ntfsprogs-2.0.0-orig/ntfsprogs/utils.c ntfsprogs-2.0.0/ntfsprogs/utils.c
+--- ntfsprogs-2.0.0-orig/ntfsprogs/utils.c	2007-09-19 10:51:09.000000000 -0600
++++ ntfsprogs-2.0.0/ntfsprogs/utils.c	2009-06-03 20:49:28.000000000 -0600
+@@ -205,7 +205,7 @@
+ /**
+  * utils_mount_volume - Mount an NTFS volume
+  */
+-ntfs_volume * utils_mount_volume(const char *device, ntfs_mount_flags flags)
++ntfs_volume * utils_mount_volume_with_offset(const char *device, ntfs_mount_flags flags, const s64 doffset)
+ {
+ 	ntfs_volume *vol;
+ 
+@@ -217,7 +217,10 @@
+ 	if (!utils_valid_device(device, flags & NTFS_MNT_FORCE))
+ 		return NULL;
+ 
+-	vol = ntfs_mount(device, flags);
++	if (doffset)
++		vol = ntfs_mount_with_offset(device, flags, doffset);
++	else
++		vol = ntfs_mount(device, flags);
+ 	if (!vol) {
+ 		ntfs_log_perror("Failed to mount '%s'", device);
+ 		if (errno == EINVAL)
+@@ -247,6 +250,11 @@
+ 	return vol;
+ }
+ 
++ntfs_volume * utils_mount_volume(const char *device, ntfs_mount_flags flags)
++{
++	return utils_mount_volume_with_offset(device, flags, 0LL);
++}
++
+ /**
+  * utils_parse_size - Convert a string representing a size
+  * @value:  String to be parsed
+diff -Nru ntfsprogs-2.0.0-orig/ntfsprogs/utils.h ntfsprogs-2.0.0/ntfsprogs/utils.h
+--- ntfsprogs-2.0.0-orig/ntfsprogs/utils.h	2007-09-19 10:51:09.000000000 -0600
++++ ntfsprogs-2.0.0/ntfsprogs/utils.h	2009-06-03 20:49:52.000000000 -0600
+@@ -57,6 +57,7 @@
+ 
+ int utils_valid_device(const char *name, int force);
+ ntfs_volume * utils_mount_volume(const char *device, ntfs_mount_flags flags);
++ntfs_volume * utils_mount_volume_with_offset(const char *device, ntfs_mount_flags flags, const s64 doffset);
+ 
+ /**
+  * defines...
