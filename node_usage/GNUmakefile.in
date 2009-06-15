@@ -33,14 +33,15 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 install: \
 	$(addprefix $(INSTALL_LIBEXECDIR)/node_usage/, $(LIBEXEC_NODE_USAGE))
 
-post-install:
-
 $(INSTALL_LIBEXECDIR)/node_usage/%: %
 	@echo "Installing $<"
 	sudo mkdir -p @prefix@/data/node_usage
 	sudo chmod 775 @prefix@/data/node_usage
-	-mkdir -p $(INSTALL_LIBEXECDIR)/node_usage
+	mkdir -p $(INSTALL_LIBEXECDIR)/node_usage
+	chmod 775 $(INSTALL_LIBEXECDIR)/node_usage
 	$(INSTALL) $< $@
+
+post-install:
 
 clean:
 
