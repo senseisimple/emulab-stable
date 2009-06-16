@@ -35,6 +35,8 @@ sub DoUpdate($$$)
     DBQueryFatal("alter table reserved change `erole` ".
 		 "  `erole` enum('node','virthost','delaynode','simhost', ".
 		 "               'sharedhost') NOT NULL default 'node'");
+    DBQueryFatal("alter table reserved change `sharing_mode` ".
+    		 "  `sharing_mode` varchar(32) default NULL");
     
     DBQueryFatal("alter table os_info change osfeatures osfeatures ".
 		 "  set('ping','ssh','ipod','isup','veths','veth-ne', ".
@@ -56,7 +58,7 @@ sub DoUpdate($$$)
 
     DBQueryFatal("replace into table_regex values ".
 		 " ('virt_nodes','sharing_mode','text','regex', ".
-		 "  '^[-\\w]+$',1,32,NULL)");
+		 "  '^[-\\w]+\$',1,32,NULL)");
     return 0;
 }
 1;
