@@ -1,0 +1,1241 @@
+--- linux-2.6.27-d/include/linux/pkt_sched.h.orig	2008-10-09 16:13:53.000000000 -0600
++++ linux-2.6.27-d/include/linux/pkt_sched.h	2009-06-15 21:32:57.000000000 -0600
+@@ -112,6 +112,41 @@
+ 	__u32	limit;	/* Queue length: bytes for bfifo, packets for pfifo */
+ };
+ 
++/* PLR section */
++
++struct tc_plr_qopt
++{
++        __u32 plr; /* % drop rate (0-100) */
++};
++
++enum
++{
++  TCA_PLR_UNSPEC,
++  TCA_PLR_PARMS,
++  TCA_PLR_INIT,
++  __TCA_PLR_MAX,
++};
++
++#define TCA_PLR_MAX (__TCA_PLR_MAX - 1)
++
++/* DELAY section */
++
++struct tc_delay_qopt
++{
++        __u32 delay_usec; /* # of usecs to delay */
++        __u8  reset_time;       /* flag: reset time on dequeue, or not */
++};
++
++enum
++{
++  TCA_DELAY_UNSPEC,
++  TCA_DELAY_PARMS,
++  TCA_DELAY_INIT,
++  __TCA_DELAY_MAX,
++};
++
++#define TCA_DELAY_MAX (__TCA_DELAY_MAX - 1)
++
+ /* PRIO section */
+ 
+ #define TCQ_PRIO_BANDS	16
+--- linux-2.6.27-d/net/sched/Kconfig.orig	2008-10-09 16:13:53.000000000 -0600
++++ linux-2.6.27-d/net/sched/Kconfig	2009-06-15 21:32:57.000000000 -0600
+@@ -43,6 +43,34 @@
+ 
+ comment "Queueing/Scheduling"
+ 
++config NET_SCH_PLR
++       tristate "PLR packet scheduler"
++       ---help---
++         Provides the facility to drop packets on a given interface
++	 at a specified packet loss rate (percentage 0-100). In general,
++	 there's no need for this option unless you want to perform
++	 network testing with artificially produced packet loss.
++
++	 If you say Y or M now, your networking will not be affected
++	 unless you enable the packet scheduler via the iproute2+tc
++	 package.
++
++	 If unsure, say N now.
++
++config NET_SCH_DELAY
++       tristate "Delay packet scheduler"
++       ---help---
++         Provides the facility to delay the delivery of IP packets on
++	 a given interface for a specified number of usecs. In general,
++	 there's no need for this option unless you want to perform
++	 network testing with artificially produced latencies.
++
++	 If you say Y or M now, your networking will not be affected
++	 unless you enable the packet scheduler via the iproute2tc
++	 package.
++
++	 If unsure, say N now.
++
+ config NET_SCH_CBQ
+ 	tristate "Class Based Queueing (CBQ)"
+ 	---help---
+--- linux-2.6.27-d/net/sched/Makefile.orig	2008-10-09 16:13:53.000000000 -0600
++++ linux-2.6.27-d/net/sched/Makefile	2009-06-15 21:32:57.000000000 -0600
+@@ -15,6 +15,8 @@
+ obj-$(CONFIG_NET_ACT_PEDIT)	+= act_pedit.o
+ obj-$(CONFIG_NET_ACT_SIMP)	+= act_simple.o
+ obj-$(CONFIG_NET_SCH_FIFO)	+= sch_fifo.o
++obj-$(CONFIG_NET_SCH_DELAY)     += sch_delay.o
++obj-$(CONFIG_NET_SCH_PLR)       += sch_plr.o
+ obj-$(CONFIG_NET_SCH_CBQ)	+= sch_cbq.o
+ obj-$(CONFIG_NET_SCH_HTB)	+= sch_htb.o
+ obj-$(CONFIG_NET_SCH_HFSC)	+= sch_hfsc.o
+--- linux-2.6.27-d/net/sched/sch_delay.c.orig	2009-06-15 21:32:57.000000000 -0600
++++ linux-2.6.27-d/net/sched/sch_delay.c	2009-06-16 12:14:12.000000000 -0600
+@@ -0,0 +1,727 @@
++/*
++ * net/sched/sch_delay.c       Add a delay to anything going out...
++ *
++ *             This program is free software; you can redistribute it and/or
++ *             modify it under the terms of the GNU General Public License
++ *             as published by the Free Software Foundation; either version
++ *             2 of the License, or (at your option) any later version.
++ *
++ * Authors:
++ *         David T McWherter, <dtm@vramp.net>
++ *         Alexey Kuznetsov, <kuznet@ms2.inr.ac.ru>
++ */
++
++#include <linux/module.h>
++#include <asm/uaccess.h>
++#include <asm/system.h>
++#include <asm/bitops.h>
++#include <linux/types.h>
++#include <linux/kernel.h>
++#include <linux/sched.h>
++#include <linux/string.h>
++#include <linux/mm.h>
++#include <linux/socket.h>
++#include <linux/sockios.h>
++#include <linux/in.h>
++#include <linux/errno.h>
++#include <linux/interrupt.h>
++#include <linux/if_ether.h>
++#include <linux/inet.h>
++#include <linux/netdevice.h>
++#include <linux/etherdevice.h>
++#include <linux/notifier.h>
++#include <net/ip.h>
++#include <net/route.h>
++#include <linux/skbuff.h>
++#include <linux/rtnetlink.h>
++#include <net/sock.h>
++#include <net/pkt_sched.h>
++#include <net/netlink.h>
++
++/*  Delay Scheduler
++    =======================================
++       Provides the facility to delay the delivery of IP packets on
++       a given interface for a specified number of usecs. In general,
++       there's no need for this option unless you want to perform
++       network testing with artificially produced latencies.
++ */
++
++#define DQDISC (1<<16)
++#define DCLASS (1<<17)
++#define DSTATS (1<<18)
++
++/* debugging level & bitmask: upper 16 bits are debug mask, lower 16
++   are level */
++/* bits for mask are defined above, and level is 0 - 1000 */
++#define DBG DSTATS | 1000
++
++#if 0
++#define DMSK(lvl) ((lvl) & 0xffff0000)
++#define DLVL(lvl)  ((lvl) & 0x0000ffff)
++#define DPRINTK(lvl, fmt, args...)   if ((DMSK(lvl) & DMSK(DBG)) && \
++                                         (DLVL(lvl) < DLVL(DBG))) \
++                                       { printk(KERN_DEBUG fmt, ##args); }
++#else
++#define DMSK(lvl)
++#define DLVL(lvl)
++#define DPRINTK(lvl, fmt, args...)
++#endif
++
++#define EPRINTK(fmt, args...)    printk(KERN_ERR fmt, ##args);
++
++#define TN_MAGIC 94343939L
++
++/* delay packet queue lock */
++static rwlock_t delay_mod_lock = RW_LOCK_UNLOCKED;
++
++/* XXX: temp for debugging */
++static __u32 oldbklog;
++
++struct time_node {
++  struct list_head      link;
++  long                  magic;
++  psched_time_t                time;
++};
++
++#define LIST_ENTRY(x)           list_entry((x), struct time_node, link)
++
++struct delay_sched_data
++{
++  struct Qdisc      *qd;         /* Child qdisc pointer */
++  struct tcf_proto  *filter_list; /* tc filter chain - unused. */
++  struct time_node  times_queue; /* The queue of socket input times */
++  struct qdisc_watchdog watchdog;    /* watchdog timer */
++  psched_tdiff_t    delaytime;   /* The amount of time to delay sending packets */
++  __u8              reset_time;  /* Should sk_buff time get reset?: flag */
++};
++
++
++/**
++ * time_node utility functions.
++ */
++static struct time_node *
++time_node_alloc (void)
++{
++  struct time_node * out;
++  DPRINTK(DQDISC | 50, "{ time_node_alloc\n");
++  out = (struct time_node*)kmalloc( sizeof(struct time_node), GFP_ATOMIC );
++  if ( !out )
++    {
++      EPRINTK("!!! - NULL time_node_alloc\n");
++    } else {
++      out->magic = TN_MAGIC;
++    }
++  DPRINTK(DQDISC | 50, "} time_node_alloc\n");
++  return out;
++}
++
++
++static void
++time_node_free( struct time_node * nd )
++{
++  if ( nd )
++    {
++      if ( nd->magic != TN_MAGIC )
++       {
++         EPRINTK("!!! - time_node_free of %p with bad magic! (%ld)\n",
++                       nd, (long)nd->magic);
++       } else {
++          kfree(nd);
++       }
++    }   
++}
++
++
++static struct time_node *
++time_node_stamp ( struct time_node * nd )
++{
++  if ( nd )
++    nd->time = psched_get_time();
++  return nd;
++}
++
++
++static struct time_node *
++time_node_queue_enqueue_head ( struct time_node * head, struct time_node * nd )
++{
++  if ( head && nd )
++    {
++      list_add(&nd->link, &head->link);
++    }
++  return nd;
++}
++
++
++static struct time_node *
++time_node_queue_enqueue_tail ( struct time_node * head, struct time_node * nd )
++{
++  DPRINTK(DQDISC | 50, "{ time_node_queue_enqueue_tail\n");
++  if ( head && nd )
++    {
++      list_add_tail(&nd->link, &head->link);
++    }
++  DPRINTK(DQDISC | 50, "} time_node_queue_enqueue_tail\n");
++  return nd;
++}
++ 
++
++static struct time_node *
++time_node_queue_dequeue_head ( struct time_node * head )
++{
++  struct time_node * first = NULL;
++  DPRINTK(DQDISC | 50, "{ time_node_queue_dequeue_head\n");
++  if ( head )
++    {
++      if ( !list_empty(&head->link) )
++       {
++          first = LIST_ENTRY(head->link.next);
++          list_del(head->link.next);
++       }
++    }
++  DPRINTK(DQDISC | 50, "} time_node_queue_dequeue_head\n");
++  return first;
++}
++
++
++static struct time_node *
++time_node_queue_peek_head ( struct time_node * head )
++{
++  struct time_node * first = NULL;
++  DPRINTK(DQDISC | 50, "{ time_node_queue_peek_head\n");
++  if ( head )
++    {
++      if ( !list_empty(&head->link) )
++       {
++          first = LIST_ENTRY(head->link.next);
++       }
++    }   
++  DPRINTK(DQDISC | 50, "} time_node_queue_peek_head\n");
++  return first;
++}
++
++
++static struct time_node *
++time_node_queue_purge ( struct time_node * head )
++{
++  DPRINTK(DQDISC | 50, "{ time_node_queue_purge(%p)\n", head);
++  if ( head )
++    {
++      for ( ; !list_empty(&head->link) ; )
++       {
++         struct time_node * nd;
++         nd = time_node_queue_dequeue_head ( head );
++         time_node_free( nd );
++       }
++    }
++  DPRINTK(DQDISC | 50, "} time_node_queue_purge\n");
++  return head;
++}
++
++/* ------------------------------------------------------------------------- */
++/* Class functions --------------------------------------------------------- */
++/* ------------------------------------------------------------------------- */
++
++static int
++delay_graft(struct Qdisc *sch,unsigned long arg,
++          struct Qdisc *new1,struct Qdisc **old)
++{
++  struct delay_sched_data *p = qdisc_priv(sch);
++
++  DPRINTK(DCLASS | 100, "delay_graft(sch %p,[qdisc %p],new %p,old %p)\n",
++          sch,p,new1,old);
++  if (!new1)
++    new1 = &noop_qdisc;
++  sch_tree_lock(sch);
++  *old = xchg(&p->qd,new1);
++  /* XXX: decrease qlen? */
++  qdisc_reset(*old);
++  sch_tree_unlock(sch); /* @@@ move up ? */
++  return 0;
++}
++
++
++static struct Qdisc*
++delay_leaf(struct Qdisc *sch, unsigned long arg)
++{
++  struct delay_sched_data *p = qdisc_priv(sch);
++
++  return p->qd;
++}
++
++
++static unsigned long
++delay_get(struct Qdisc *sch,u32 classid)
++{
++  struct delay_sched_data *p __attribute__((unused)) = qdisc_priv(sch);
++
++  DPRINTK(DCLASS | 100, "delay_get(sch %p,[qdisc %p],classid %x)\n",
++          sch,p,classid);
++  return 1; /* we currently only support one class so.. */
++}
++
++static int
++delay_class_change(struct Qdisc *sch, u32 classid, u32 parent,
++		   struct nlattr **tca, unsigned long *arg)
++{
++  return 0;
++}
++
++static unsigned long
++delay_bind_filter(struct Qdisc *sch, unsigned long parent, u32 classid)
++{
++  return delay_get(sch,classid);
++}
++
++
++static void
++delay_put(struct Qdisc *sch, unsigned long cl)
++{
++}
++
++static int
++delay_delete(struct Qdisc *sch,unsigned long arg)
++{
++  struct delay_sched_data *p __attribute__((unused)) = qdisc_priv(sch);
++
++  if (!arg)
++    return -EINVAL;
++
++  return 0;
++}
++ 
++
++static void
++delay_walk(struct Qdisc *sch,struct qdisc_walker *walker)
++{
++  DPRINTK(DCLASS | 100, "delay_walk(sch %p,[qdisc %p],walker %p)\n",
++          sch,(struct delay_sched_data *)qdisc_priv(sch),walker);
++
++  if (!walker->stop) {
++    if (walker->count >= walker->skip) {
++      if (walker->fn(sch, 1, walker) < 0) {
++	walker->stop = 1;
++	return;
++      }
++    }
++    walker->count++;
++  }
++}
++
++
++static struct tcf_proto**
++delay_find_tcf(struct Qdisc *sch,unsigned long cl)
++{
++       struct delay_sched_data *p = qdisc_priv(sch);
++
++       return &p->filter_list;
++}
++
++
++static int
++delay_dump_class(struct Qdisc *sch, unsigned long cl,
++               struct sk_buff *skb, struct tcmsg *tcm)
++{
++  /* struct nlattr *nest; */
++
++  DPRINTK(DCLASS | 100, "delay_dump_class(sch %p,[qdisc %p],class %ld\n",
++          sch,(struct delay_sched_data *)qdisc_priv(sch),cl);
++  tcm->tcm_handle = TC_H_MAKE(TC_H_MAJ(sch->handle),1);
++
++  /*
++  nest = nla_nest_start(skb, TCA_OPTIONS);
++  if (nest == NULL)
++    goto nla_put_failure;
++  NLA_PUT(skb, TCA_DELAY_PARMS, 0, NULL);
++  nla_nest_end(skb, nest);
++  */
++  NLA_PUT(skb, TCA_OPTIONS, 0, NULL);
++
++  return skb->len;
++
++ nla_put_failure:
++  /* nla_nest_cancel(skb, nest); */
++  return -1;
++}
++
++
++/* ------------------------------------------------------------------------- */
++/* Qdisc functions --------------------------------------------------------- */
++/* ------------------------------------------------------------------------- */
++
++static int
++delay_enqueue(struct sk_buff *skb, struct Qdisc* sch)
++{
++  struct delay_sched_data *q = qdisc_priv(sch);
++  int out = NET_XMIT_DROP;
++
++  DPRINTK(DQDISC, "{ delay_enqueue\n");
++
++  {
++    struct time_node * nd;
++    psched_time_t currtime;
++
++    currtime = psched_get_time();
++    DPRINTK(DQDISC | 200, "Enqueueing at: %llu\n", currtime);
++    nd = time_node_stamp(time_node_alloc());
++    if ( nd )
++      {
++        write_lock(&delay_mod_lock);
++       (void) time_node_queue_enqueue_tail( &q->times_queue, nd );
++       __skb_queue_tail(&sch->q, skb);
++        write_unlock(&delay_mod_lock);
++       sch->qstats.backlog += skb->len;
++        if (sch->qstats.backlog > oldbklog) {
++          oldbklog = sch->qstats.backlog;
++          DPRINTK(DSTATS | 100, "Backlog increased to: %u\n", oldbklog);
++          DPRINTK(DSTATS | 100, "Queue size is: %u\n", sch->q.qlen);
++        }
++       sch->bstats.bytes += skb->len;
++       sch->bstats.packets++;
++       sch->q.qlen++;
++       out = 0; /* We don't drop packets - XXX: REVISE!*/
++      }
++  }
++
++  DPRINTK(DQDISC, "} delay_enqueue\n");
++
++  return out;
++}
++
++static int
++delay_requeue(struct sk_buff *skb, struct Qdisc* sch)
++{
++  /* XXX: ret 0 ? */
++  int out = NET_XMIT_SUCCESS;
++  struct delay_sched_data *p = qdisc_priv(sch);
++
++  DPRINTK(DQDISC, "{ delay_requeue\n");
++
++  /* We don't delay it a second time, just pass to inner queue. */
++  if ((out = p->qd->ops->requeue(skb, p->qd)) == 0) {
++    sch->q.qlen++;
++    sch->qstats.requeues++;
++  }
++  else {
++    sch->qstats.drops++;
++    /* XXX: ret 0? */
++    out = NET_XMIT_DROP;
++  }
++
++  DPRINTK(DQDISC, "} delay_requeue\n");
++  return out;
++}
++
++static struct sk_buff *
++delay_dequeue(struct Qdisc* sch)
++{
++  struct delay_sched_data *p = qdisc_priv(sch);
++  struct sk_buff *skb = 0;
++  struct time_node * nd;
++  psched_time_t currtime;
++  psched_time_t tmp;
++
++  DPRINTK(DQDISC, "{ delay_dequeue\n");
++
++  currtime = psched_get_time();
++
++  write_lock(&delay_mod_lock);
++  nd = time_node_queue_dequeue_head ( &p->times_queue );
++  if ( nd )
++    {
++      tmp = nd->time + p->delaytime;
++
++      if (tmp < currtime)
++       {
++          // dequeue the skb
++         DPRINTK(DQDISC | 200, "time ((%llu+%ld)=%llu) < %llu, dequeuing\n",
++                  nd->time,p->delaytime,tmp,currtime);
++         skb = __skb_dequeue( &sch->q );
++          /* XXX: should always be an sk_buff to accompany the time_node */
++         if ( skb )
++           {
++              if (p->reset_time) {
++		/* We do seem to go from us to ns, so we're losing 
++		 * precision, but it doesn't matter I think. */
++		skb->tstamp = ns_to_ktime(PSCHED_US2NS(currtime));
++              }
++	      sch->qstats.backlog -= skb->len;
++              time_node_free(nd);
++           }
++          if (p->qd->ops->enqueue(skb, p->qd) != 0)
++            {
++              DPRINTK(DQDISC | DCLASS, "Child qdisc dropped delayed packet!\n");
++              sch->qstats.drops++;
++              sch->q.qlen--;
++            }
++       } else {
++         /* psched_time_t diff; */
++
++         DPRINTK(DQDISC | 200, "time ((%llu+%ld)=%llu) >= %llu, "
++                  "NOT dequeueing\n",
++                  nd->time,p->delaytime,tmp,currtime);
++          /* requeue the time */
++         time_node_queue_enqueue_head ( &p->times_queue, nd );
++        }
++
++      /* update timer if any packets still exist in the queue */
++      nd = time_node_queue_peek_head( &p->times_queue );
++      if (nd && !netif_queue_stopped(qdisc_dev(sch)))
++        {
++          psched_tdiff_t diff;
++
++          /* Calculate the wait time before we should be awakened */
++          tmp = nd->time + p->delaytime;
++          diff = tmp - currtime;
++
++          if (diff < 1)
++            diff = 1;
++
++	  /*
++          DPRINTK(DQDISC | 500, "Setting timer to expire at %lu jiffies.  "
++                  "Diff is %lu  Jiffies is %lu  HZ is %u\n",
++                  jiffies + PSCHED_US2JIFFIE(diff),
++                  PSCHED_US2JIFFIE(diff),
++                  jiffies,
++                  HZ);
++	  */
++
++	  qdisc_watchdog_schedule(&p->watchdog, currtime + diff); /* removed +100 */
++       }
++    }
++  write_unlock(&delay_mod_lock);
++
++  skb = p->qd->ops->dequeue(p->qd);
++  if ( skb )
++    {
++      DPRINTK(DQDISC | 100, "delay_dequeue: really dequeueing packet\n");
++      sch->q.qlen--;
++    }
++
++  DPRINTK(DQDISC, "} delay_dequeue\n");
++  return skb;
++}
++
++
++static unsigned int
++delay_drop(struct Qdisc* sch)
++{
++  struct delay_sched_data *p = qdisc_priv(sch);
++  struct sk_buff *skb;
++  int out = 0;
++
++  DPRINTK(DQDISC, "{ delay_drop\n");
++
++  write_lock(&delay_mod_lock);
++  skb = __skb_dequeue_tail(&sch->q);
++  if ( skb )
++    {
++      struct time_node * nd =
++        time_node_queue_dequeue_head ( &p->times_queue );
++      time_node_free( nd );
++
++      sch->qstats.backlog -= skb->len;
++      sch->qstats.drops++;
++      sch->q.qlen--;
++      kfree_skb(skb);
++      out = 1; /* We succeeded */
++    }
++  else if (p->qd->ops->drop(p->qd))
++    {
++      sch->q.qlen--;
++      out = 1;
++    }
++  write_unlock(&delay_mod_lock);
++
++  DPRINTK(DQDISC, "} delay_drop\n");
++  return out;
++}
++
++static void
++delay_reset(struct Qdisc* sch)
++{
++  struct delay_sched_data *p = qdisc_priv(sch);
++
++  DPRINTK(DQDISC, "{ delay_reset\n");
++
++  qdisc_watchdog_cancel(&p->watchdog);
++  skb_queue_purge(&sch->q);
++  time_node_queue_purge ( &p->times_queue );
++  sch->qstats.backlog = 0;
++  qdisc_reset(p->qd);
++  sch->q.qlen = 0;
++
++  DPRINTK(DQDISC, "} delay_reset\n");
++}
++
++static int
++delay_change(struct Qdisc *sch, struct nlattr *opt)
++{
++  int err = -EINVAL;
++  struct delay_sched_data *p = qdisc_priv(sch);
++  struct tc_delay_qopt *qopt;
++
++  DPRINTK(DQDISC, "{ delay_change\n");
++
++  if (opt == NULL)
++    goto done;
++
++  qopt = nla_data(opt);
++
++  if ( nla_len(opt) < sizeof(*qopt) )
++    {
++      EPRINTK("delay_change: opt is too small\n");
++      goto done;
++    }
++
++  DPRINTK(DSTATS, "About to lock tree in change\n");
++  sch_tree_lock(sch);
++  DPRINTK(DSTATS, "Tree locked\n");
++  p->delaytime = qopt->delay_usec;
++  p->reset_time = qopt->reset_time;
++  DPRINTK(DSTATS, "Reseting timer\n");
++  qdisc_watchdog_init(&(p->watchdog),sch);
++  DPRINTK(DSTATS, "Timer reset\n");
++  sch_tree_unlock(sch);
++  DPRINTK(DSTATS, "Tree unlocked\n");
++
++  DPRINTK(DQDISC, "delay_change: usec: %u\n", qopt->delay_usec);
++
++  err = 0;
++ done:
++  DPRINTK(DQDISC, "} delay_change\n");
++  return err;
++}
++
++static int
++delay_init(struct Qdisc *sch, struct nlattr *opt)
++{
++  struct delay_sched_data *p = qdisc_priv(sch);
++  int err = -EINVAL;
++
++  DPRINTK(DQDISC, "{ delay_init\n");
++
++  DPRINTK(DQDISC, ">> initializing queue\n");
++  INIT_LIST_HEAD(&p->times_queue.link);
++  oldbklog = 0; /* XXX: temp */
++
++  if ( delay_change(sch, opt) != 0 )
++    {
++      DPRINTK(DQDISC, ">> delay_change failed\n");
++    }
++  else
++    { 
++      p->filter_list = NULL;
++      if (!(p->qd = qdisc_create_dflt(qdisc_dev(sch), sch->dev_queue,
++				      &pfifo_qdisc_ops,
++				      TC_H_MAKE(sch->handle, 1))))
++        p->qd = &noop_qdisc;
++
++      err = 0;
++    }
++
++  DPRINTK(DQDISC, "} delay_init\n");
++  return err;
++}
++ 
++static
++void delay_destroy(struct Qdisc *sch)
++{
++  struct delay_sched_data *p = qdisc_priv(sch);
++  struct tcf_proto *tp;
++
++  DPRINTK(DQDISC, "{ delay_destroy\n");
++
++  DPRINTK(DQDISC | 100, ">> del_timer\n");
++
++  qdisc_watchdog_cancel(&p->watchdog);
++  skb_queue_purge(&sch->q);
++  time_node_queue_purge ( &p->times_queue );
++  sch->qstats.backlog = 0;
++
++  while (p->filter_list) {
++    tp = p->filter_list;
++    p->filter_list = tp->next;
++    tp->ops->destroy(tp);
++  }
++   
++  qdisc_destroy(p->qd);
++  p->qd = &noop_qdisc;
++
++  sch->q.qlen = 0;
++
++  DPRINTK(DQDISC, "} delay_destroy\n");
++}
++
++
++static int
++delay_dump(struct Qdisc *sch, struct sk_buff *skb)
++{
++  struct delay_sched_data *p = qdisc_priv(sch);
++  struct nlattr           *nest;
++  struct tc_delay_qopt    opt;
++
++  DPRINTK(DQDISC, "{ delay_dump\n");
++
++  /* XXX: fix locking */
++  //sch_tree_lock(sch);
++  opt.delay_usec = p->delaytime;
++  opt.reset_time = p->reset_time;
++  //sch_tree_unlock(sch);
++
++  nest = nla_nest_start(skb, TCA_OPTIONS);
++  if (nest == NULL)
++    goto nla_put_failure;
++  NLA_PUT(skb, TCA_DELAY_PARMS, sizeof(opt), &opt);
++  nla_nest_end(skb, nest);
++
++  DPRINTK(DQDISC, "} delay_dump\n");
++  return skb->len;
++
++ nla_put_failure:
++  nla_nest_cancel(skb, nest);
++  DPRINTK(DQDISC, "} delay_dump - failed!\n");
++  return -1;
++}
++
++static struct Qdisc_class_ops delay_class_ops = {
++    .graft      = delay_graft,                 /* graft */
++    .leaf       = delay_leaf,                  /* leaf */
++    .get        = delay_get,                   /* get */
++    .put        = delay_put,                   /* put */
++    .change     = delay_class_change,          /* change */
++    .delete     = delay_delete,                /* delete */
++    .walk       = delay_walk,                  /* walk */
++    .tcf_chain  = delay_find_tcf,              /* tcf_chain */
++    .bind_tcf   = delay_bind_filter,           /* bind_tcf */
++    .unbind_tcf = delay_put,                   /* unbind_tcf */
++    .dump       = delay_dump_class,            /* dump */
++};
++  
++struct Qdisc_ops delay_qdisc_ops = {
++    .next      = NULL,
++    .cl_ops    = &delay_class_ops,
++    .id        = "delay",
++    .priv_size = sizeof(struct delay_sched_data),
++    .enqueue   = delay_enqueue,
++    .dequeue   = delay_dequeue,
++    .requeue   = delay_requeue,
++    .drop      = delay_drop,
++    .init      = delay_init,
++    .reset     = delay_reset,
++    .destroy   = delay_destroy,
++    .change    = delay_change,
++    .dump      = delay_dump,
++    .owner     = THIS_MODULE,
++};
++
++static int __init delay_module_init(void)
++{  
++  return register_qdisc(&delay_qdisc_ops);
++}
++static void __exit delay_module_exit(void)
++{
++  unregister_qdisc(&delay_qdisc_ops);
++}
++module_init(delay_module_init)
++module_exit(delay_module_exit)
++MODULE_LICENSE("GPL");
+--- linux-2.6.27-d/net/sched/sch_plr.c.orig	2009-06-15 21:32:57.000000000 -0600
++++ linux-2.6.27-d/net/sched/sch_plr.c	2009-06-16 12:14:45.000000000 -0600
+@@ -0,0 +1,416 @@
++/*
++ * net/sched/sch_plr.c probibalistically drop packets
++ *
++ *             This program is free software; you can redistribute it and/or
++ *             modify it under the terms of the GNU General Public License
++ *             as published by the Free Software Foundation; either version
++ *             2 of the License, or (at your option) any later version.
++ *
++ * Authors:
++ *         David Johnson <johnsond@cs.utah.edu> (2.4 to 2.6)
++ *         Kirk Webb <kwebb@cs.utah.edu>
++ *
++ */
++
++#include <linux/module.h>
++#include <linux/types.h>
++#include <linux/kernel.h>
++#include <linux/errno.h>
++#include <linux/netdevice.h>
++#include <linux/etherdevice.h>
++#include <linux/skbuff.h>
++#include <linux/rtnetlink.h>
++#include <net/sock.h>
++#include <net/pkt_sched.h>
++#include <net/netlink.h>
++
++/*
++    Simple PLR "scheduler" We drop packets based on a uniform
++    probability dist, set within the range of an u32.  The tc tool
++    expects a floating pt. number between 0 and 1, and subsequently
++    scales it to the appropriate closest u32 value (btw 0 and 2^32)
++    before handing it off to this module via rtnetlink.
++ */
++
++#define DQDISC (1<<16)
++#define DCLASS (1<<17)
++
++/* debugging level & bitmask: upper 16 bits are debug mask, lower 16
++   are level */
++/* bits for mask are defined above, and level is 0 - 1000 */
++#define DBG DQDISC | DCLASS | 1000
++
++#if 0
++#define DMSK(lvl) ((lvl) & 0xffff0000)
++#define DLVL(lvl)  ((lvl) & 0x0000ffff)
++#define DPRINTK(lvl, fmt, args...)   if ((DMSK(lvl) & DMSK(DBG)) && \
++                                         (DLVL(lvl) < DLVL(DBG))) \
++                                       { printk(KERN_DEBUG fmt, ##args); }
++#else
++#define DMSK(lvl)
++#define DLVL(lvl)
++#define DPRINTK(lvl, fmt, args...)
++#endif
++
++#define EPRINTK(fmt, args...)    printk(KERN_ERR fmt, ##args);
++
++struct plr_sched_data
++{
++  struct Qdisc      *qd;            /* child qdisc - we only support 1 */
++  u32               plr;            /* packet loss rate */
++};
++
++/* ------------------------------------------------------------------------- */
++/* Class functions --------------------------------------------------------- */
++/* ------------------------------------------------------------------------- */
++
++static int plr_graft(struct Qdisc *sch,unsigned long arg,
++		     struct Qdisc *new1,struct Qdisc **old)
++{
++  struct plr_sched_data *p = qdisc_priv(sch);
++
++  DPRINTK(DCLASS | 100, "plr_graft(sch %p,[qdisc %p],new %p,old %p)\n",
++          sch,p,new1,old);
++  if (!new1)
++    new1 = &noop_qdisc;
++  sch_tree_lock(sch);
++  *old = xchg(&p->qd,new1);
++  qdisc_tree_decrease_qlen(*old, (*old)->q.qlen);
++  qdisc_reset(*old);
++  sch_tree_unlock(sch); /* @@@ move up ? */
++
++  return 0;
++}
++
++
++static struct Qdisc* plr_leaf(struct Qdisc *sch, unsigned long arg)
++{
++  struct plr_sched_data *p = qdisc_priv(sch);
++  return p->qd;
++}
++
++static unsigned long plr_get(struct Qdisc *sch,u32 classid)
++{
++  return 1; /* we currently only support one class so.. */
++}
++
++static int plr_class_change(struct Qdisc *sch, u32 classid, u32 parent,
++			    struct nlattr **tca, unsigned long *arg)
++{
++  return -ENOSYS;
++}
++
++static void plr_put(struct Qdisc *sch, unsigned long cl)
++{
++}
++
++static int plr_delete(struct Qdisc *sch,unsigned long arg)
++{
++  return -ENOSYS;
++}
++
++
++static void plr_walk(struct Qdisc *sch,struct qdisc_walker *walker)
++{
++  if (!walker->stop) {
++    if (walker->count >= walker->skip) {
++      if (walker->fn(sch, 1, walker) < 0) {
++	walker->stop = 1;
++	return;
++      }
++    }
++    walker->count++;
++  }
++}
++
++static struct tcf_proto** plr_find_tcf(struct Qdisc *sch,unsigned long cl)
++{
++  return NULL;
++}
++
++static int plr_dump_class(struct Qdisc *sch, unsigned long cl,
++			  struct sk_buff *skb, struct tcmsg *tcm)
++{
++  struct plr_sched_data *p = qdisc_priv(sch);
++  /* unsigned char *b = skb->tail; */
++
++  if (cl != 1) 
++    return -ENOENT;
++
++  DPRINTK(DCLASS | 100, "plr_dump_class(sch %p,[qdisc %p],class %ld\n",
++          sch,p,cl);
++
++  /*
++   * tcm->tcm_handle = TC_H_MAKE(sch->handle,1);
++   * RTA_PUT(skb,TCA_OPTIONS,0,NULL);
++
++   * return skb->len;
++
++   * rtattr_failure:
++   * skb_trim(skb,b-skb->data);
++   * return -1;
++   */
++
++  tcm->tcm_handle |= TC_H_MIN(1);
++  tcm->tcm_info = p->qd->handle;
++
++  return 0;
++}
++
++
++/* ------------------------------------------------------------------------- */
++/* Qdisc functions --------------------------------------------------------- */
++/* ------------------------------------------------------------------------- */
++
++static int plr_enqueue(struct sk_buff *skb, struct Qdisc* sch)
++{
++  struct plr_sched_data *p = qdisc_priv(sch);
++  int ret;
++
++  DPRINTK(DQDISC, "{ plr_enqueue\n");
++
++  {
++    u32 rnd = net_random();
++    psched_time_t currtime;
++
++    currtime = psched_get_time();
++    DPRINTK(DQDISC | 100, "Enqueueing at: %llu\n", currtime);
++
++    if ( rnd < p->plr)
++      {
++        /*
++           Drop, but don't tell the network device we did.
++           Keep track though in stats.
++        */
++	DPRINTK(DQDISC | 200, "Dropped incoming packet, rand val: %u\n", rnd);
++	kfree_skb(skb);
++	sch->qstats.drops++;
++	return NET_XMIT_DROP;
++      }
++
++    if ((ret = p->qd->ops->enqueue(skb,p->qd)) != 0) 
++      {
++	DPRINTK(DQDISC | 200, "Didn't enqueue incoming packet, rand val: %u\n", rnd);
++	sch->qstats.drops++;
++	return ret;
++      }
++
++    sch->q.qlen++;
++    sch->bstats.bytes += skb->len;
++    sch->bstats.packets++;
++  }
++
++  DPRINTK(DQDISC, "} plr_enqueue\n");
++
++  return ret;
++}
++ 
++static int plr_requeue(struct sk_buff *skb, struct Qdisc* sch)
++{
++  struct plr_sched_data *p = qdisc_priv(sch);
++  int out = 0;
++
++  DPRINTK(DQDISC, "{ plr_requeue\n");
++
++  if ((out = p->qd->ops->requeue(skb, p->qd)) == 0) {
++    sch->q.qlen++;
++    sch->qstats.requeues++;
++  }
++  else {
++    sch->qstats.drops++;
++  }
++
++  DPRINTK(DQDISC, "} plr_requeue\n");
++
++  return out;
++}
++
++static struct sk_buff *plr_dequeue(struct Qdisc* sch)
++{
++  struct plr_sched_data *p = qdisc_priv(sch);
++  struct sk_buff *skb = NULL;
++  psched_time_t currtime;
++
++  DPRINTK(DQDISC, "{ plr_dequeue\n");
++
++  currtime = psched_get_time();
++
++  // dequeue the skb
++  DPRINTK(DQDISC | 200, "time %llu, dequeuing\n", currtime);
++  skb = p->qd->ops->dequeue(p->qd);
++  if ( skb )
++    {
++      sch->q.qlen--;
++    }
++
++  DPRINTK(DQDISC, "} plr_dequeue\n");
++  return skb;
++}
++
++
++static unsigned int plr_drop(struct Qdisc* sch)
++{
++  struct plr_sched_data *p = qdisc_priv(sch);
++  int out = 0;
++
++  DPRINTK(DQDISC, "{ plr_drop\n");
++
++  if ((out = p->qd->ops->drop(p->qd)) == 1) {
++    sch->q.qlen--;
++    sch->qstats.drops++; /* XXX: should we report a drop too? */  /* Yes. */
++  }
++
++  DPRINTK(DQDISC, "} plr_drop\n");
++  return out;
++}
++
++static void plr_reset(struct Qdisc* sch)
++{
++  struct plr_sched_data *p = qdisc_priv(sch);
++
++  DPRINTK(DQDISC, "{ plr_reset\n");
++
++  qdisc_reset(p->qd);
++  sch->q.qlen = 0;
++
++  DPRINTK(DQDISC, "} plr_reset\n");
++}
++ 
++static int plr_change(struct Qdisc *sch, struct nlattr *opt)
++{
++  int err = -EINVAL;
++  struct plr_sched_data *p = qdisc_priv(sch);
++  struct tc_plr_qopt *qopt;
++
++  DPRINTK(DQDISC, "{ plr_change\n");
++
++  if (opt == NULL) 
++    goto done;
++
++  qopt = nla_data(opt);
++
++  if ( nla_len(opt) < sizeof(u32) )
++    {
++      EPRINTK("plr_change: opt is too small\n");
++      goto done;
++    }
++
++  sch_tree_lock(sch);
++  p->plr = qopt->plr;
++  sch_tree_unlock(sch);
++
++  DPRINTK(DQDISC | 100, "plr_change: plr: %u\n", qopt->plr );
++
++  err = 0;
++ done:
++  DPRINTK(DQDISC, "} plr_change\n");
++  return err;
++}
++
++static int plr_init(struct Qdisc *sch, struct nlattr *opt)
++{
++  struct plr_sched_data *p = qdisc_priv(sch);
++  int err = -EINVAL;
++
++  DPRINTK(DQDISC, "{ plr_init\n");
++
++  if ( plr_change(sch, opt) != 0 )
++    {
++      DPRINTK(DQDISC, ">> plr_change failed\n");
++    }
++  else
++    { 
++      if (!(p->qd = qdisc_create_dflt(qdisc_dev(sch), sch->dev_queue,
++				      &pfifo_qdisc_ops,
++				      TC_H_MAKE(sch->handle, 1))))
++        p->qd = &noop_qdisc;
++
++      err = 0;
++    }
++
++  DPRINTK(DQDISC | 100, "} plr_init\n");
++  return err;
++}
++ 
++static void plr_destroy(struct Qdisc *sch)
++{
++  struct plr_sched_data *p = qdisc_priv(sch);
++
++  DPRINTK(DQDISC, "{ plr_destroy\n");
++
++  qdisc_destroy(p->qd);
++
++  DPRINTK(DQDISC, "} plr_destroy\n");
++}
++
++
++static int plr_dump(struct Qdisc *sch, struct sk_buff *skb)
++{
++  struct plr_sched_data *p = qdisc_priv(sch);
++  struct nlattr         *nest;
++  struct tc_plr_qopt opt;
++
++  DPRINTK(DQDISC, "{ plr_dump\n");
++
++  /* XXX: fix locking */
++  //sch_tree_lock(sch);
++  opt.plr = p->plr;
++  //sch_tree_unlock(sch);
++
++  DPRINTK(DQDISC, "  plr_dump b\n");
++
++  nest = nla_nest_start(skb, TCA_OPTIONS);
++  if (nest == NULL)
++    goto nla_put_failure;
++  NLA_PUT(skb, TCA_PLR_PARMS, sizeof(opt), &opt);
++  nla_nest_end(skb, nest);
++
++  DPRINTK(DQDISC, "} plr_dump\n");
++  return skb->len;
++
++ nla_put_failure:
++  nla_nest_cancel(skb, nest);
++  DPRINTK(DQDISC, "} plr_dump (failed!)\n");
++  return -1;
++}
++
++static struct Qdisc_class_ops plr_class_ops = {
++    .graft     = plr_graft,                   /* graft */
++    .leaf      = plr_leaf,                    /* leaf */
++    .get       = plr_get,                     /* get */
++    .put       = plr_put,                     /* put */
++    .change    = plr_class_change,            /* change */
++    .delete    = plr_delete,                  /* delete */
++    .walk      = plr_walk,                    /* walk */
++    .tcf_chain = plr_find_tcf,                /* tcf_chain */
++    .dump      = plr_dump_class,              /* dump */
++};
++
++static struct Qdisc_ops plr_qdisc_ops = {
++    .next      = NULL,
++    .cl_ops    = &plr_class_ops,
++    .id        = "plr",
++    .priv_size = sizeof(struct plr_sched_data),
++    .enqueue   = plr_enqueue,
++    .dequeue   = plr_dequeue,
++    .requeue   = plr_requeue,
++    .drop      = plr_drop,
++    .init      = plr_init,
++    .reset     = plr_reset,
++    .destroy   = plr_destroy,
++    .change    = plr_change,
++    .dump      = plr_dump,
++    .owner     = THIS_MODULE,
++};
++
++static int __init plr_module_init(void)
++{
++    return register_qdisc(&plr_qdisc_ops);
++}
++static void __exit plr_module_exit(void)
++{
++    unregister_qdisc(&plr_qdisc_ops);
++}
++module_init(plr_module_init)
++module_exit(plr_module_exit)
++MODULE_LICENSE("GPL");
