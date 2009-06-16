@@ -24,7 +24,8 @@ all: assign
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 OBJS=parse_top.o parse_ptop.o assign.o pclass.o vclass.o score.o \
-     parser.o solution.o anneal.o featuredesire.o neighborhood.o fstring.o
+     parser.o solution.o anneal.o featuredesire.o neighborhood.o fstring.o \
+     config.o
 LIBS+= -lm
 LDFLAGS+= -pipe -O3
 CXXFLAGS = -pipe -I/usr/local/include -ftemplate-depth-40
@@ -95,15 +96,12 @@ clean:
 anneal.o: anneal.cc anneal.h port.h delay.h physical.h common.h fstring.h \
   featuredesire.h forwarding.h pclass.h virtual.h maps.h score.h \
   solution.h vclass.h neighborhood.h
+annotate.o: annotate.cc
+annotate_rspec.o: annotate_rspec.cc
+annotate_vtop.o: annotate_vtop.cc
 assign.o: assign.cc port.h common.h fstring.h delay.h physical.h \
   featuredesire.h forwarding.h virtual.h vclass.h pclass.h score.h \
-  solution.h maps.h anneal.h config.h parse_advertisement_rspec.h parse_ptop_xml.h xmlhelpers.h \
-  xstr.h parse_request_rspec.h parse_vtop_xml.h 
-annotate.o: annotate.cc annotate.h
-annotate_rspec.o: annotate.cc annotate.h annotate_rspec.cc annotate_rspec.h \
-  xmlhelpers.h xstr.h 
-annotate_vtop.o: annotate.cc annotate.h annotate_vtop.cc annotate_vtop.h \
-  xmlhelpers.h xstr.h
+  solution.h maps.h anneal.h config.h
 config.o: config.cc config.h common.h port.h fstring.h score.h physical.h \
   delay.h featuredesire.h forwarding.h virtual.h anneal.h pclass.h
 featuredesire.o: featuredesire.cc featuredesire.h common.h port.h \
@@ -115,35 +113,18 @@ fstringtest.o: fstringtest.cc fstring.h port.h
 neighborhood.o: neighborhood.cc neighborhood.h port.h common.h fstring.h \
   physical.h delay.h featuredesire.h forwarding.h vclass.h virtual.h \
   pclass.h
-parse_error_handler.o: parse_error_handler.cc parse_error_handler.h \
-  xmlhelpers.h featuredesire.h common.h port.h fstring.h xstr.h
-parse_policy_xml.o: parse_policy_xml.cc parse_policy_xml.h physical.h \
-  common.h port.h fstring.h delay.h featuredesire.h forwarding.h \
-  xmlhelpers.h xstr.h parse_error_handler.h
+parse_advertisement_rspec.o: parse_advertisement_rspec.cc
+parse_error_handler.o: parse_error_handler.cc
+parse_policy_xml.o: parse_policy_xml.cc
 parse_ptop.o: parse_ptop.cc port.h delay.h physical.h common.h fstring.h \
   featuredesire.h forwarding.h parser.h
-parse_ptop_xml.o: parse_ptop_xml.cc parse_ptop_xml.h physical.h common.h \
-  port.h fstring.h delay.h featuredesire.h forwarding.h xmlhelpers.h \
-  xstr.h parse_error_handler.h
-parser.o: parser.cc parser.h port.h
-parse_advertisement_rspec.o: parse_advertisement_rspec.cc parse_advertisement_rspec.h \
-  common.h port.h fstring.h delay.h featuredesire.h forwarding.h \
-  xmlhelpers.h xstr.h parse_error_handler.h anneal.h
-parse_request_rspec.o: parse_request_rspec.cc parse_request_rspec.h \
-  common.h port.h fstring.h delay.h featuredesire.h forwarding.h \
-  virtual.h xmlhelpers.h xstr.h parse_error_handler.h anneal.h \
-  vclass.h
+parse_ptop_xml.o: parse_ptop_xml.cc
+parse_request_rspec.o: parse_request_rspec.cc
 parse_top.o: parse_top.cc port.h common.h fstring.h vclass.h delay.h \
   physical.h featuredesire.h forwarding.h virtual.h parser.h anneal.h \
   pclass.h
-parse_vtop_rspec.o: parse_vtop_rspec.cc parse_vtop_rspec.h \
-  common.h port.h fstring.h delay.h featuredesire.h forwarding.h \
-  virtual.h xmlhelpers.h xstr.h parse_error_handler.h anneal.h \
-  vclass.h
-parse_vtop_xml.o: parse_vtop_xml.cc port.h common.h fstring.h vclass.h \
-  delay.h physical.h featuredesire.h forwarding.h virtual.h parser.h \
-  anneal.h pclass.h parse_vtop_xml.h xmlhelpers.h xstr.h \
-  parse_error_handler.h
+parse_vtop_xml.o: parse_vtop_xml.cc
+parser.o: parser.cc parser.h port.h
 pclass.o: pclass.cc port.h common.h fstring.h delay.h physical.h \
   featuredesire.h forwarding.h virtual.h pclass.h
 score.o: score.cc port.h common.h fstring.h vclass.h delay.h physical.h \
@@ -152,5 +133,4 @@ solution.o: solution.cc solution.h port.h delay.h physical.h common.h \
   fstring.h featuredesire.h forwarding.h virtual.h maps.h vclass.h
 vclass.o: vclass.cc port.h common.h fstring.h vclass.h delay.h physical.h \
   featuredesire.h forwarding.h virtual.h
-xmlhelpers.o: xmlhelpers.cc xmlhelpers.h featuredesire.h common.h port.h \
-  fstring.h xstr.h
+xmlhelpers.o: xmlhelpers.cc

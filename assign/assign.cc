@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2006 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2009 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -132,6 +132,9 @@ double use_connected_pnode_find = 0.0f;
 
 // Whether or not to perform all checks on fixed nodes
 bool check_fixed_nodes = false;
+
+// If true, dump a bunch of configrution information
+bool dump_config = false;
 
 // Use XML for file input
 // bool xml_input = false;
@@ -416,7 +419,7 @@ void prune_unusable_pclasses() {
 }
 
 void print_help() {
-  cout << "assign [options] ptopfile topfile [config params]" << endl;
+  cout << "assign [options] ptopfile topfile [cparams]" << endl;
   cout << "Options: " << endl;
 #ifdef TIME_TERMINATE
   cout << "  -l <time>   - Limit runtime." << endl;
@@ -439,7 +442,7 @@ void print_help() {
       << endl;
   cout << "  -u          - Print a summary of the solution." << endl;
   cout << "  -c <float>  - Use the 'connected' pnode finding algorithm " <<
-      "<float>*100% of the time." << endl;
+      "<float>*100%" << endl << "                of the time." << endl;
   cout << "  -n          - Don't anneal - just do the prechecks." << endl;
 
   cout << "  -x <file>   - Specify a text ptop file" << endl;
@@ -454,7 +457,11 @@ void print_help() {
   cout << "  -q <file>   - Specify a rspec ptop file" << endl;
   cout << "  -w <file>   - Specify a rspec vtop file" << endl;
 #endif
-  cout << "  -F          - Apply additional checking to fixed noded" << endl;
+  cout << "  -F          - Apply additional checking to fixed nodes" << endl;
+  cout << "  -D          - Dump configuration options" << endl;
+  cout << "  cparams     - You probably don't want to touch these!" << endl;
+  cout << "                If you must, see config.h in the source for a list"
+       << endl;
   exit(EXIT_FATAL);
 }
  
@@ -842,7 +849,7 @@ int main(int argc,char **argv) {
   char* ptopFilename = "";
   char* vtopFilename = "";
   
-  while ((ch = getopt(argc,argv,"s:v:l:t:rpPTdH:oguc:nx:X:y:Y:q:w:F")) != -1) {
+  while ((ch = getopt(argc,argv,"s:v:l:t:rpPTdH:oguc:nx:X:y:Y:q:w:FD")) != -1) {
     switch (ch) {
     case 's':
       if (sscanf(optarg,"%d",&seed) != 1) {
@@ -905,6 +912,9 @@ int main(int argc,char **argv) {
       prechecks_only = true;
       cout << "Doing only prechecks, exiting early" << endl;
       break;
+    case 'D':
+      dump_config = true;
+      break;
     case 'x':
 #ifdef WITH_XML
       ptop_xml_input = false;
@@ -966,13 +976,30 @@ int main(int argc,char **argv) {
       print_help();
     }
   }
+
+  // Save argv and argc, and advance past the initial options
+  char **oldargv = argv;
+  int oldargc = argc;
   argc -= optind;
   argv += optind;
+
+  if (strcmp(ptopFilename, "") == 0 && argc >= 1) {
+      ptopFilename = argv[0];
+      argc -= 1;
+      argv += 1;
+  }
+
+  if (strcmp(vtopFilename, "") == 0 && argc >= 1) {
+      vtopFilename = argv[0];
+      argc -= 1;
+      argv += 1;
+  }
   
-  if (argc == 2)
+  if (argc > 0)
   {
-	  ptopFilename = argv[0];
-	  vtopFilename = argv[1];
+      // If there are still more options, they must be from the common.h
+      // parameters.
+      parse_options(argv, options, noptions);
   }
   
   if (strcmp(ptopFilename, "") == 0)
@@ -1018,12 +1045,6 @@ int main(int argc,char **argv) {
   sigaction(SIGINFO,&action2,NULL);
 #endif 
   
-  // Convert options to the common.h parameters.
-  //parse_options(argv, options, noptions);
-#ifdef SCORE_DEBUG
-  //dump_options("Configuration options:", options, noptions);
-#endif
-
 #ifdef GNUPLOT_OUTPUT
   scoresout = fopen("scores.out","w");
   tempout = fopen("temp.out","w");
@@ -1032,6 +1053,16 @@ int main(int argc,char **argv) {
 
   cout << "seed = " << seed << endl;
   srandom(seed);
+
+  // Print out information about how we were called
+  if (dump_config) {
+      cout << "Command line:";
+      for (int i = 0; i < oldargc; i++) {
+          cout << " " << oldargv[i];
+      }
+      cout << endl;
+      dump_options("Config parameters", options, noptions);
+  }
 
   read_physical_topology(ptopFilename);
   calculate_switch_MST();
