@@ -261,7 +261,8 @@ if (! $moveToOldReserved) {
 	next
 	    if ($node->isvirtnode() || $node->isremotenode());
 
-	if (defined($node->sharing_mode()) && $node->HasVirtualNodes()) {
+	if (defined($node->sharing_mode()) && $node->sharing_mode() ne "" &&
+	    $node->HasVirtualNodes()) {
 	    print STDERR "$node is shared but has virtual nodes on it.\n";
 	    $error++;
 	}
