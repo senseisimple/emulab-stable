@@ -5350,10 +5350,14 @@ def escapeshellarg(s):
 # Run a command. args is a list of strings to pass as arguments to cmd.
 # Return the exitcode and the output as a tuple.
 # 
-def runcommand(cmd, separate_stderr=False):
+def runcommand(cmd, separate_stderr=None):
     from subprocess import *
-    if separate_stderr:
+    if separate_stderr == True:
     	p = Popen(cmd, stdin=None, stdout=PIPE, stderr=PIPE, shell=True)
+    	(stdoutdata, stderrdata) = p.communicate()
+        return (p.returncode << 8, stdoutdata, stderrdata)
+    elif separate_stderr == False:
+    	p = Popen(cmd, stdin=None, stdout=PIPE, stderr=STDOUT, shell=True)
     	(stdoutdata, stderrdata) = p.communicate()
         return (p.returncode << 8, stdoutdata, stderrdata)
     else:
