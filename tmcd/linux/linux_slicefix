@@ -142,9 +142,10 @@ case $# in
 2)
 	part=$1
 	disk=$2
+	old_disk=$3
 	;;
 *)
-	echo "Usage: $0 partition [disk]"
+	echo "Usage: $0 partition [disk] [old_disk]"
 	exit 1
 esac
 
@@ -160,9 +161,7 @@ mount -t $fstype $real_root_dev /mnt 2> /dev/null || {
 	}
 }
 
-$BINDIR/remap_ide_disks > /tmp/disk_map
-new_disk=`map_disk $disk /tmp/disk_map`
-translated_root_dev=/dev/$new_disk$part
+translated_root_dev=/dev/$old_disk$part
 
 # XXX Ugly, disgusting compatibility hack follows
 

@@ -29,8 +29,8 @@ case $# in
 	exit 1
 esac
 
-linux_disk=`$BINDIR/freebsd_to_linux_disk $freebsd_disk $part`
-lrootdev=${linux_disk#* }
+linux_disk=`$BINDIR/freebsd_to_linux_disk $freebsd_disk`
+old_linux_disk=${linux_disk#* }
 linux_disk=${linux_disk%% *}
 
 if [ $OS = Linux ]; then
@@ -412,7 +412,7 @@ lilogetkernel() {
 
 dolinux() {
 
-	$BINDIR/linux_slicefix $part $linux_disk
+	$BINDIR/linux_slicefix.pl /dev/$linux_disk$part /dev/$old_linux_disk$part
 	return $?
 }
 

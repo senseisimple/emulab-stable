@@ -31,8 +31,8 @@ else
 fi
 
 # See if we can map drive names to BIOS numbers via EDD
-if [ -x $BINDIR/get_edd_map ]; then
-	$BINDIR/get_edd_map > $BOOTDIR/edd_map
+if [ -x $BINDIR/get_edd_map.pl ]; then
+	$BINDIR/get_edd_map.pl > $BOOTDIR/edd_map
 fi
 
 
