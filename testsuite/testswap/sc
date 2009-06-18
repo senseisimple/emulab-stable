@@ -45,6 +45,7 @@ sub end_all_experiments {
   say "";
   if (yn_prompt("Are you sure you want to terminate all experiments?")) {
     e(@{$_->[0]})->end for( experiments_hash_to_list(list_full));
+    e(@{$_->[0]})->waitforended for( experiments_hash_to_list(list_full));
   }
 }
 if (@ARGV) {
@@ -54,7 +55,7 @@ if (@ARGV) {
   else {
     my $e = e(shift);
     if (/--help/) { usage; } 
-    elsif (/end/) { $e->end; }
+    elsif (/end/) { $e->end_wait; }
     elsif (/ping/ ) { $e->ping_test; }
     elsif (/swapin/) { $e->swapin_wait; }
     elsif (/swapout/) { $e->swapout_wait; }
@@ -64,7 +65,7 @@ if (@ARGV) {
     elsif (/single_node_tests/) { $e->single_node_tests; }
     elsif (/ni/) { say Dumper($e->nodeinfo) ;}
     elsif (/li/) { say Dumper($e->linkinfo) ;}
-    elsif (/ex/) { 
+    elsif ($_ eq'ex') { 
       say $ARGV[0];
       my $result = eval $ARGV[0];
       sayd($result);

@@ -47,16 +47,17 @@ sub noemail        { @TBConfig::EXPERIMENT_OPS_PARAMS; }
 sub echo           { shift->augment_output( 'str' => shift ); }
 sub getlist_brief  { shift->augment( 'format' => 'brief'); }
 sub getlist_full   { shift->augment( 'format' => 'full' ); }
-sub batchexp_ns    { shift->augment_code( 'nsfilestr' => shift, 'noswapin' =>1, noemail, @_ ); }
+sub batchexp_ns    { shift->augment_code( 'nsfilestr' => shift, 'noswapin' =>1, noemail, 'extrainfo' => 1, @_ ); }
 sub modify_ns      { shift->augment_code( 'nsfilestr' => shift, noemail, @_ ); }
-sub swapin         { shift->augment_func_code( 'swapexp', noemail, 'direction' => 'in' ); }
-sub swapout        { shift->augment_func_code( 'swapexp', noemail, 'direction' => 'out' ); }
+sub swapin         { shift->augment_func_code( 'swapexp', noemail, 'direction' => 'in', 'extrainfo' => 1, @_ ); }
+sub swapout        { shift->augment_func_code( 'swapexp', noemail, 'direction' => 'out','extrainfo' => 1, @_ ); }
 sub end            { shift->augment_func_code( 'endexp', noemail); }
+sub end_wait       { shift->augment_func_code( 'endexp', noemail, 'wait' => 1); }
 sub nodeinfo       { parseNodeInfo(shift->augment_func_output('expinfo', 'show' => 'nodeinfo')); }
 sub waitforactive  { my $e = shift; retry_on_TIMEOUT { $e->augment_func_code('waitforactive', @_) } 'waitforactive'; }
 sub waitforswapped { my $e = shift; retry_on_TIMEOUT { $e->augment_func_code( 'statewait', 'state' => 'swapped' ) } 'waitforswapped'; }
-
-sub startexp_ns { batchexp_ns(@_, 'batch' => 0); }
+sub waitforended   { my $e = shift; retry_on_TIMEOUT { $e->augment_func_code( 'statewait', 'state' => 'ended' ) } 'waitforended'; }
+sub startexp_ns    { batchexp_ns(@_, 'batch' => 0); }
 sub startexp_ns_wait { batchexp_ns_wait(@_, 'batch' => 0); }
 
 sub create_and_get_metadata {
@@ -70,20 +71,32 @@ sub batchexp_ns_wait { shift->batchexp_ns(@_,'wait' => 1); }
 use constant EXPERIMENT_NAME_ALREADY_TAKEN => 2;
 sub ensure_active_ns {
   my $self = shift;
-  my $rc = $self->startexp_ns_wait(@_);
-  if ($rc && $rc != EXPERIMENT_NAME_ALREADY_TAKEN) { return $rc }
-  $self->swapin_wait;
+  eval { $self->startexp_ns_wait(@_); };
+  my $exception = $@;
+  if ($exception) {
+    unless ($exception->isa('RPC::XML::struct') and $exception->value->{ 'code' } == EXPERIMENT_NAME_ALREADY_TAKEN) {
+      die $exception;
+    }
+  }
+  my $rc = eval { $self->swapin_wait; };
+  $exception = $@;
+  if ($exception) {
+    unless ($exception->isa('RPC::XML::struct') and $exception->value->{ 'code' } == 2) {
+      die $exception;
+    }
+  }
+  $rc;
 }
 
 sub swapin_wait { 
   my $self = shift;
-  $self->augment_func_code( 'swapexp', 'direction' => 'in',  'wait' => 1, noemail );
+  $self->swapin('wait' => 1);
   $self->waitforactive;
 }
 
 sub swapout_wait { 
   my $self = shift;
-  $self->augment_func_code( 'swapexp', 'direction' => 'out',  'wait' => 1, noemail );
+  $self->swapout('wait' => 1);
   $self->waitforswapped
 }
 
@@ -179,6 +192,10 @@ swaps the experiment out
 
 ends the experiment
 
+=item C<< $e->end_wait >>
+
+ends the experiment, waits for it to reach the ended state
+
 =item C<< $e->nodeinfo >>
 
 returns a list of node names in the experiment
@@ -190,6 +207,11 @@ waits for the experiment to enter the active state
 =item C<< $e->waitforswapped >>
 
 waits for the experiment to enter the swapped state
+
+=item C<< $e->waitforended >>
+
+waits for the experiment to enter the ended state
+
 
 =item C<< $e->startexp_ns($nsfile_contents, @args) >>
 

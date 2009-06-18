@@ -23,7 +23,7 @@ vtypes (may want to parameterize the vtypes)
 fixed (you will have to change the ns file depending on which nodes are available)
 =cut
 
-for (@should_pass) {
+for (@who_knows) {
   my $eid = $_;
   my $ns = $OldTestSuite::tests->{$_}->{'nsfile'};
   rege($_, $ns, sub { ok(!shift->ping_test, $eid); }, 1, $_)

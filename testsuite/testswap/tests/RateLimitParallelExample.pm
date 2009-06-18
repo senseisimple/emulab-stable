@@ -6,9 +6,11 @@ use Test::More;
 
 my $test_body = sub {
   my $e = shift;
+  sleep(5);
   ok(!($e->ping_test), 'Ping Test');
+  sleep(5);
 };
 
-rege("k$_", $BasicNSs::TwoNodeLan, $test_body, 1, "k$_ desc" ) for (1..2);
+rege("ksks$_", $BasicNSs::SingleNode, $test_body, 1, "k$_ desc" ) for (1..5);
 
 1;

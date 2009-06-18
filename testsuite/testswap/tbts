@@ -28,6 +28,8 @@ use Data::Dumper;
   my $group;
   my $defines;
   my $xmlrpcurl;
+  my $concurrent_prerun_jobs;
+  my $concurrent_node_usage;
   my $result = GetOptions (
 #      "D=s%"        => \$defines,
 #      "jobs=i"      => \$pjobs,
@@ -37,7 +39,10 @@ use Data::Dumper;
       "project=s"   => \$project,
       "xmlrpcurl=s" => \$xmlrpcurl,
       "group=s"     => \$group,
-      "debug"       => \$debug);
+      "debug"       => \$debug,
+      "cprj=i"      => \$concurrent_prerun_jobs,
+      "cnu=i"       => \$concurrent_node_usage,
+    );
 
   if ($debug)     { $ENV { 'TBTS_DEBUG'      } = 1; }
   if ($group)     { $ENV { 'TBTS_GROUP'      } = $group;  }
@@ -100,11 +105,11 @@ if (@ARGV) {
 
 }
   elsif (/critic/)          { exec 'perlcritic lib t'; }
-  elsif (/sanity/)          { runharness( qw(t/lib/*.t t/lib/*/*.t t/xmlrpc/*.t)); }
+  elsif (/sanity/)          { runharness( qw(t/lib/*.t t/lib/*/*.t t/xmlrpc/*.t) ); }
   elsif (/lib/)             { runharness qw(t/lib/*.t t/lib/*/*.t); }
   elsif (/xmlrpc/)          { runharness qw(t/xmlrpc/*.t); }
   elsif (/test/)            { runharness qw(t/topologies/*.t); }
-  elsif (/coding/)            { runharness qw(t/coding/pod_coverage.t); }
+  elsif (/coding/)          { runharness qw(t/coding/pod_coverage.t); }
 }
 else {
   print usage();

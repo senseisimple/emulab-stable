@@ -25,13 +25,13 @@ sub _initialize {
     return $self;
 }
 
-
 package TestBed::ParallelRunner;
 use SemiModern::Perl;
 use TestBed::ParallelRunner::Test;
 use TestBed::ForkFramework;
 use Data::Dumper;
 use Mouse;
+use TBConfig;
 
 our $ExperimentTests = [];
 
@@ -42,12 +42,16 @@ Not enough arguments to teste
   teste($pid, $gid, $eid, $ns, $sub, $test_count, $desc);
 END
       
-sub add_experiment { push @$ExperimentTests, TestBed::ParallelRunner::Test::tn(@_); }
+sub add_experiment { 
+  my $te = TestBed::ParallelRunner::Test::tn(@_);
+  push @$ExperimentTests, $te;
+  $te;
+} 
 
 sub runtests {
   my ($concurrent_pre_runs, $concurrent_node_count_usage ) = @_;
-  $concurrent_pre_runs ||= 4;
-  $concurrent_node_count_usage ||= 20;
+  $concurrent_pre_runs ||= $TBConfig::concurrent_prerun_jobs;
+  $concurrent_node_count_usage ||= $TBConfig::concurrent_node_usage;
 
   #prerun step
   my $result = TestBed::ForkFramework::MaxWorkersScheduler::work($concurrent_pre_runs, sub { $_[0]->prep }, $ExperimentTests);
@@ -63,14 +67,18 @@ sub runtests {
     my $maximum_nodes = $hash->{'maximum_nodes'};
     my $eid = $ExperimentTests->[$item_id]->e->eid;
     #say "$eid $item_id $maximum_nodes";
-
-    push @weighted_experiements, [ $maximum_nodes, $item_id ];
+    if ($maximum_nodes > $concurrent_node_count_usage) {
+      warn "$eid requires upto $maximum_nodes nodes, only $concurrent_node_count_usage concurrent nodes permitted\n$eid will not be run";
+    }
+    else {
+      push @weighted_experiements, [ +$maximum_nodes, +$item_id ];
+    }
   }
   @weighted_experiements = sort { $a->[0] <=> $b->[0] } @weighted_experiements;
 
   #count tests step
   my $test_count = 0;
-  map { $test_count += $_->test_count } @$ExperimentTests;
+  map { $test_count += $ExperimentTests->[$_->[1]]->test_count } @weighted_experiements;
 
   #run tests
   reset_test_builder($test_count, no_numbers => 1);
@@ -114,7 +122,7 @@ sub tap_wrapper {
   my ($te) = @_;
   
   if ($ENABLE_SUBTESTS_FEATURE) {
-    TestBed::ForkFramework::Scheduler->redir_std_fork( sub {
+    TestBed::ForkFramework::fork_redir( sub {
       my ($in, $out, $err, $pid) = @_;
       #while(<$out>) { print "K2" . $_; }
       use TAP::Parser;  
@@ -138,7 +146,7 @@ sub tap_wrapper {
 
 sub build_TAP_stream {
   use TestBed::TestSuite;
-  my ($in, $out, $err, $pid) = TestBed::ForkFramework::redir_fork(sub { runtests; });
+  my ($in, $out, $err, $pid) = TestBed::ForkFramework::fork_child_redir(sub { runtests; });
   return TAP::Parser::Iterator::StdOutErr->new($out, $err, $pid);
 }
 

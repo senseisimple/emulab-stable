@@ -1,23 +1,19 @@
 DOCS TODO
-  Overview / howto write a test
 
 TODO
   TIMEOUT of XMLRPC Calls
   TESTLWP
   scp cleanup
   chmod +x
-  wait for end of experiment
   cmdline params (-D)
   VERBOSENESS
   Add basic image-test parameterization examples
   EXAMPLES, Get some tests
   traffic generation
   convert more old tests
-  general result code handling framework
 
 STILL MESSY
-  XMLRPC/Client/Experiment TestSuite/Experiment return codes, exceptions, composability
-  Calling parallel tests 
+  XMLRPC/Client/Experiment TestSuite/Experiment dsl
 
 EXPAND CURRENT IMPLEMENTATION
   event subsystem
@@ -30,7 +26,6 @@ LATER
   Large External Tars and Resources for experiements
   buildup, teardown using Test::Class
   create BSD virtual machine for testing
-  possibly collapse tbts and t/harness
 
 Parallel TODOS
   retry
