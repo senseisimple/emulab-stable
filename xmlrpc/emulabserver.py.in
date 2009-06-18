@@ -1231,16 +1231,19 @@ class experiment:
             argstr += " " + nsfilename
             pass
 
-        (exitval, output) = runcommand(TBDIR + "/bin/batchexp " + argstr)
+        (exitval, output, errout) = runcommand(TBDIR + "/bin/batchexp " + argstr, 
+                                               separate_stderr=extrainfo);
         if exitval:
 	    if extrainfo:
 		try:
 		    value = xmlrpclib.loads(output)[0][0]
 		except:
+		    output = errout + output
 		    return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
 		value["exitval"] = exitval >> 8
 		output = value["output"]
 		del value["output"]
+		value["errout"] = errout
 		return EmulabResponse(RESPONSE_ERROR, value, output=output)
 	    else:
             	return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
@@ -1314,16 +1317,19 @@ class experiment:
         argstr += " " + escapeshellarg(argdict["proj"])
         argstr += " " + escapeshellarg(argdict["exp"])
 
-        (exitval, output) = runcommand(TBDIR + "/bin/swapexp " + argstr)
+        (exitval, output, errout) = runcommand(TBDIR + "/bin/swapexp " + argstr,
+                                               separate_stderr=extrainfo);
         if exitval:
 	    if extrainfo:
 		try:
 		    value = xmlrpclib.loads(output)[0][0]
 		except:
+		    output = errout + output
 		    return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
 		value["exitval"] = exitval >> 8
 		output = value["output"]
 		del value["output"]
+		value["errout"] = errout
 		return EmulabResponse(RESPONSE_ERROR, value, output=output)
 	    else:
             	return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
@@ -1418,16 +1424,19 @@ class experiment:
             argstr += " " + nsfilename
             pass
 
-        (exitval, output) = runcommand(TBDIR + "/bin/swapexp " + argstr)
+        (exitval, output, errout) = runcommand(TBDIR + "/bin/swapexp " + argstr, 
+                                               separate_stderr=extrainfo)
         if exitval:
 	    if extrainfo:
 		try:
 		    value = xmlrpclib.loads(output)[0][0]
 		except:
+		    output = errout + output
 		    return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
 		value["exitval"] = exitval >> 8
 		output = value["output"]
 		del value["output"]
+		value["errout"] = errout
 		return EmulabResponse(RESPONSE_ERROR, value, output=output)
 	    else:
             	return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
@@ -5341,17 +5350,16 @@ def escapeshellarg(s):
 # Run a command. args is a list of strings to pass as arguments to cmd.
 # Return the exitcode and the output as a tuple.
 # 
-def runcommand(cmd):
-    child  = popen2.Popen4(cmd)
-    output = ""
-    while (True):
-        foo = child.fromchild.read(1024 * 16)
-        if foo == "":
-            break
-        output += foo
-        pass
-    
-    return (child.wait(), output)
+def runcommand(cmd, separate_stderr=False):
+    from subprocess import *
+    if separate_stderr:
+    	p = Popen(cmd, stdin=None, stdout=PIPE, stderr=PIPE, shell=True)
+    	(stdoutdata, stderrdata) = p.communicate()
+        return (p.returncode << 8, stdoutdata, stderrdata)
+    else:
+    	p = Popen(cmd, stdin=None, stdout=PIPE, stderr=STDOUT, shell=True)
+    	(stdoutdata, stderrdata) = p.communicate()
+        return (p.returncode << 8, stdoutdata)
 
 def writensfile(str):
     tempfile.tempdir = "/var/tmp"
