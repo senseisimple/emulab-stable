@@ -32,6 +32,7 @@ use GeniSliver;
 use GeniUser;
 use GeniRegistry;
 use GeniUtil;
+use GeniHRN;
 use libtestbed qw(SENDMAIL);
 use emutil;
 # Hate to import all this crap; need a utility library.
@@ -79,17 +80,28 @@ sub Resolve($)
     my ($argref) = @_;
     my $uuid       = $argref->{'uuid'};
     my $cred       = $argref->{'credential'};
-    my $type       = $argref->{'type'};
-    my $hrn;
+    my $type       = lc( $argref->{'type'} );
+    my $hrn        = $argref->{'hrn'};
 
     if (! defined($cred)) {
 	return GeniResponse->MalformedArgsResponse();
     }
-    if (! (defined($type) && ($type =~ /^(Node)$/))) {
+    if( defined( $hrn ) && GeniHRN::IsValid( $hrn ) ) {
+	my ($auth,$t,$id) = GeniHRN::Parse( $hrn );
+
+	return GeniResponse->Create( GENIRESPONSE_ERROR, undef,
+				     "Authority mismatch" )
+	    if( $auth ne $OURDOMAIN );
+
+	$type = lc( $t );
+	
+	$hrn = $id;	
+    }
+    if (! (defined($type) && ($type =~ /^(node)$/))) {
 	return GeniResponse->MalformedArgsResponse();
     }
     # Allow lookup by uuid or hrn.
-    if (! defined($uuid)) {
+    if (! defined($uuid) && !defined( $hrn ) ) {
 	return GeniResponse->MalformedArgsResponse();
     }
     if (defined($uuid) && !($uuid =~ /^[-\w]*$/)) {
@@ -110,7 +122,7 @@ sub Resolve($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "This is not your credential!");
     }
-    if ($type eq "Node") {
+    if ($type eq "node") {
 	my $node;
 	
 	if (defined($uuid)) {
@@ -137,6 +149,9 @@ sub Resolve($)
 		     "hostname"     => $node->node_id() . ".${OURDOMAIN}",
 		     "physctrl"     => 
 			 Interface->LookupControl( $node->phys_nodeid() )->IP(),
+		     "urn"          => GeniHRN::Generate( $OURDOMAIN,
+							  "node",
+							  $node->node_id() )
 		   };
 
 	#
@@ -153,6 +168,9 @@ sub Resolve($)
 	    next
 		if (!defined($interface->switch_id()));
 		
+	    my $urn = GeniHRN::Generate( $OURDOMAIN, "interface",
+					 $node->node_id() . ":" .
+					 $interface->iface() );
 	    my $iblob = { "uuid"	=> $interface->uuid(),
 			  "iface"	=> $interface->iface(),
 			  "type"	=> $interface->type(),
@@ -167,6 +185,7 @@ sub Resolve($)
 			  "switch_card"	=> $interface->switch_card(),
 			  "switch_port"	=> $interface->switch_port(),
 			  "wire_type"	=> $interface->wire_type(),
+			  "urn"         => $urn
 		      };
 
 	    push(@iblobs, $iblob);
