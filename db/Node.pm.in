@@ -1624,7 +1624,7 @@ sub CreateVnodes($$)
     # nodes after locking reserved table.
     #
     $node->FlushReserved();
-    if (! $node->IsReserved()) {
+    if (!$impotent && !$node->IsReserved()) {
 	print STDERR "*** CreateVnodes: $node is no longer reserved!\n";
 	DBQueryFatal("unlock tables");
 	return -1;
