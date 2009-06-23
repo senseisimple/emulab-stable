@@ -33,11 +33,11 @@ where "object" specifies the entity for which privileges are to be delegated;
 "principal" identifies the agent to whom those privileges are granted; and
 "privilege" lists which classes of operations the delegate may invoke.
 
-Each of "object" and "principal" may be specified as a UUID, an HRN, or
-a filename.  Each "privilege" must be of the form <name>[-], where "name"
-is a privilege identifier and the optional "-" symbol indicates that the
-privilege cannot be re-delegated.  If no privileges are specified, then
-all possible privileges held are delegated.
+Each of "object" and "principal" may be specified as a URN (or a deprecated
+UUID or HRN), or a filename.  Each "privilege" must be of the form <name>[-],
+where "name" is a privilege identifier and the optional "-" symbol indicates
+that the privilege cannot be re-delegated.  If no privileges are specified,
+then all possible privileges held are delegated.
 
 Options:
     -c file, --credentials=file         read self-credentials from file
@@ -55,6 +55,47 @@ execfile( "test-common.py" )
 if len( args ) < 2:
     Usage()
     sys.exit( 1 )
+
+def is_urn( u ):
+    # Reject %00 sequences (see RFC 3986, section 7.3).
+    if re.search( "%00", u ): return None
+
+    # We accept ANY other %-encoded octet (following RFC 3987, section 5.3.2.3
+    # in favour of RFC 2141, section 5, which specifies the opposite).
+    # You would think that urllib.unquote and urllib.quote could do this
+    # for us, but it can't; it's not safe to unquote ALL characters yet,
+    # since we must still maintain a distinction between encoded delimiter
+    # characters and real (unencoded) delimiters, and urllib.unquote would
+    # conflate the two.
+    urn = ""
+    m = re.match( "([^%]*)%([0-9A-Fa-f]{2})(.*)", u )
+    while m:
+        urn += m.group( 1 )
+        val = int( m.group( 2 ), 16 )
+	# Transform %-encoded sequences back to unreserved characters
+	# where possible (see RFC 3986, section 2.3).
+        if( val == 0x2D or val == 0x2E or
+            ( val >= 0x30 and val <= 0x39 ) or
+	    ( val >= 0x41 and val <= 0x5A ) or
+	    val == 0x5F or
+	    ( val >= 0x61 and val <= 0x7A ) or
+	    val == 0x7E ): urn += chr( val )
+        else: urn += '%' + m.group( 2 )
+        u = m.group( 3 )
+        # this is only so $#&*(#%ing ugly because Python does not know
+        # that assignments are expressions
+        m = re.match( "([^%]*)%([0-9A-Fa-f]{2})(.*)", u )
+    urn += u
+
+    # The "urn" prefix is case-insensitive (see RFC 2141, section 2).
+    # The "publicid" NID is case-insensitive (see RFC 2141, section 3).
+    # The "IDN" specified by Viecco is believed to be case-sensitive (no
+    #   authoritative reference known).
+    # We regard Viecco's optional resource-type specifier as being
+    #   mandatory: partly to avoid ambiguity between resource type
+    #   namespaces, and partly to avoid ambiguity between a resource-type
+    #   and a resource-name containing (escaped) whitespace.
+    return re.match( r'^[uU][rR][nN]:[pP][uU][bB][lL][iI][cC][iI][dD]:IDN\+[A-Za-z0-9.-]+(?::[A-Za-z0-9.-]+)*\+\w+\+(?:[-!$()*,.0-9=@A-Z_a-z]|(?:%[0-9A-Fa-f][0-9A-Fa-f]))+', urn )
 
 def is_uuid( u ):
     return re.match( "\w+\-\w+\-\w+\-\w+\-\w+$", u )
@@ -83,9 +124,11 @@ def SimpleNode( d, elem, body ):
 
 mycredential = get_self_credential()
 
+slice_urn = None
 slice_uuid = None
 
-if is_uuid( args[ 0 ] ): slice_uuid = args[ 0 ]
+if is_urn( args[ 0 ] ): slice_urn = args[ 0 ]
+elif is_uuid( args[ 0 ] ): slice_uuid = args[ 0 ]
 elif is_hrn( args[ 0 ] ):
     rval, response = do_method( "sa", "Resolve", 
                                 dict( credential = mycredential, 
@@ -94,9 +137,19 @@ elif is_hrn( args[ 0 ] ):
     if not rval and "value" in response and "uuid" in response[ "value" ]:
         slice_uuid = response[ "value" ][ "uuid" ]
 
-if slice_uuid:
+if slice_urn:
+    # we were given a URN, and can request credentials from the SA
+    rval, response = do_method( "sa", "GetCredential", 
+                                dict( credential = mycredential, 
+                                      type = "Slice", 
+                                      urn = slice_urn ) )
+    if rval:
+        Fatal( sys.argv[ 0 ] + ": could not get slice credential" )
+
+    doc = xml.dom.minidom.parseString( response[ "value" ] )
+elif slice_uuid:
     # we were given a UUID, or a slice HRN which resolved to one: use
-    # that UUID to request credentials from the SA
+    # that UUID to request credentials from the SA (deprecated)
     rval, response = do_method( "sa", "GetCredential", 
                                 dict( credential = mycredential, 
                                       type = "Slice", 
@@ -106,12 +159,19 @@ if slice_uuid:
 
     doc = xml.dom.minidom.parseString( response[ "value" ] )
 else:
-    # we got neither a UUID or a valid slice HRN; assume the parameter is
+    # we didn't get any kind of slice identifier; assume the parameter is
     # the name of a file containing slice credentials
     doc = xml.dom.minidom.parse( args[ 0 ] )
 
 delegate = None
 
+if is_urn( args[ 1 ] ):
+    rval, response = do_method( "sa", "Resolve", 
+                                dict( credential = mycredential, 
+                                      type = "User", 
+                                      urn = args[ 1 ] ) )
+    if not rval and "value" in response and "gid" in response[ "value" ]:
+        delegate = response[ "value" ][ "gid" ]
 if is_uuid( args[ 1 ] ):
     rval, response = do_method( "sa", "Resolve", 
                                 dict( credential = mycredential, 
@@ -128,7 +188,7 @@ elif is_hrn( args[ 1 ] ):
         delegate = response[ "value" ][ "gid" ]
 
 if not delegate:
-    # we got neither a UUID or a valid user HRN; assume the parameter is
+    # we didn't get any kind of user identifier; assume the parameter is
     # the name of a file containing the delegate's GID
     principal = open( args[ 1 ] )
     delegate = re.search( r"^-----BEGIN CERTIFICATE-----\s*(.*)" +
