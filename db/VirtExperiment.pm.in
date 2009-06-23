@@ -65,7 +65,7 @@ my $debug	      = 0;
      "virt_programs"		=> [ "vname", "vnode" ],
      "virt_user_environment"	=> [ "name", "value" ],
      "nseconfigs"		=> [ "vname" ],
-     "eventlist"		=> [ "vname"],
+     "eventlist"		=> [ "vnode", "vname"],
      "event_groups"		=> [ "group_name", "agent_name" ],
      "virt_firewalls"		=> [ "fwname", "type", "style" ],
      "firewall_rules"		=> [ "fwname", "ruleno", "rule" ],
@@ -664,9 +664,9 @@ sub Dump($)
 #
 # Store rows for table.
 #
-sub Store($)
+sub Store($$)
 {
-    my ($self) = @_;
+    my ($self,$flags) = @_;
 
     my @rows = @{ $self->{'TABLELIST'} };
 
@@ -674,7 +674,7 @@ sub Store($)
 	if (!@rows);
 	    
     foreach my $rowref (@rows) {
-	$rowref->Store() == 0
+	$rowref->Store($flags) == 0
 	    or return -1;
     }
     return 0;
@@ -908,7 +908,7 @@ sub Store($;$)
     
     my @fields  = ("exptidx", "pid", "eid");
     my @values  = ("'$exptidx'", "'$pid'", "'$eid'");
-    
+
     foreach my $key (keys(%{ $row })) {
 	my $val = $row->{$key};
 
@@ -945,10 +945,10 @@ sub Store($;$)
 		     "    $key - $val: ". TBFieldErrorString() . "\n");
 		return -1;
 	    }
-	    # If a key remove from the list; we got it.
-	    delete($pkeys{$key})
-		if (exists($pkeys{$key}));
 	}
+	# If a key remove from the list; we got it.
+	delete($pkeys{$key})
+	    if (exists($pkeys{$key}));
 	push(@fields, $key);
     }
     if (keys(%pkeys)) {
