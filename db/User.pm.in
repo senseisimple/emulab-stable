@@ -1532,8 +1532,33 @@ sub AccessCheck($$$)
     return 1
 	if ($user->IsAdmin());
 
-    # Otherwise, better be the same user.
-    return SameUser($self, $user);
+    # User can muck with his own stuff.
+    return 1
+	if SameUser($self, $user);
+
+    my $auth_idx = $user->uid_idx();
+    my $this_idx = $self->uid_idx();
+
+    #
+    # Only project leader in same project as user.
+    #
+    if ($access_type == TB_USERINFO_MODIFYINFO) {
+        #
+        # This join will allow the operation if the current user is in the 
+        # same project (any project) as the target user, but with root permissions.
+        # 
+	my $query_result =
+	    DBQueryFatal("select g.trust from group_membership as g ".
+			 "left join group_membership as authed on ".
+			 "     g.pid_idx=authed.pid_idx and ".
+			 "     g.gid_idx=authed.gid_idx and ".
+			 "     g.uid_idx='$this_idx' ".
+			 "where authed.uid_idx='$auth_idx' and ".
+			 "      (authed.trust='project_root')");
+
+	return $query_result->numrows;
+    }
+    return 0;
 }
 
 #
