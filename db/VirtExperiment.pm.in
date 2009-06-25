@@ -65,7 +65,7 @@ my $debug	      = 0;
      "virt_programs"		=> [ "vname", "vnode" ],
      "virt_user_environment"	=> [ "name", "value" ],
      "nseconfigs"		=> [ "vname" ],
-     "eventlist"		=> [ "vnode", "vname"],
+     "eventlist"		=> [ "idx" ],
      "event_groups"		=> [ "group_name", "agent_name" ],
      "virt_firewalls"		=> [ "fwname", "type", "style" ],
      "firewall_rules"		=> [ "fwname", "ruleno", "rule" ],
@@ -545,6 +545,7 @@ sub Create($$$)
     $self->{'SLOTNAMES'}  = $slotnames;
     $self->{'TABLEHASH'}  = {};
     $self->{'TABLELIST'}  = [];
+    $self->{'COUNTER'}    = 1;
     bless($self, $class);
 
     return $self;
@@ -566,6 +567,7 @@ sub DESTROY {
     $self->{'SLOTNAMES'}  = undef;
     $self->{'TABLEHASH'}  = undef;
     $self->{'TABLELIST'}  = undef;
+    $self->{'COUNTER'}    = undef;
 }
 
 #
@@ -621,8 +623,13 @@ sub NewRow($$)
     my @pvals = ();
     foreach my $key (@pkeys) {
 	if (!exists($argref->{$key})) {
-	    carp("Missing table key for new table in $tablename");
-	    return undef;
+	    if ($tablename eq "eventlist" && $key eq "idx") {
+		$argref->{$key} = $self->{'COUNTER'}++;
+	    }
+	    else {
+		carp("Missing table key for new table in $tablename");
+		return undef;
+	    }
 	}
 	push(@pvals, $argref->{$key});
     }
@@ -918,8 +925,11 @@ sub Store($;$)
 	    if ($key eq "pid" ||$key eq "eid" || $key eq "exptidx");
 	
 	if ($key eq "idx") {
-	    # XXX 
-	    if ($val =~ /^\d*$/) {
+	    # This test for eventlist.
+	    if ($tablename eq "eventlist") {
+		push(@values, "NULL");
+	    }
+	    elsif ($val =~ /^\d*$/) {
 		push(@values, DBQuoteSpecial($val));
 	    }
 	    else {
