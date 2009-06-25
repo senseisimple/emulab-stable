@@ -1,4 +1,4 @@
-my $FFD = 0;
+my $FFDEBUG = 0;
 
 package TestBed::ForkFramework::Channel;
 use SemiModern::Perl;
@@ -21,14 +21,7 @@ sub send            { sendfd(shift->wr, shift); }
 sub receivefd       { my $fd = shift; my $r = fd_retrieve $fd;  return $r->[0]; }
 sub sendfd          { my $fd = shift; store_fd [shift], $fd;    $fd->flush; }
 sub sendEnd         { my $s = shift; $s->send(undef); $s->closeWr }
-sub sendError       { shift->send( [ 'E', @_ ] ) }
-sub sendResult      { shift->send( [ 'R', @_ ] ) }
 sub selectInit      { my $s = shift; return [ $s->rd, $s->wr, 0, $s ]; }
-sub sendWorkStatus  { 
-  my ($self, $jobid, $result, $error) = @_;
-  if ($error) { $self->sendError($jobid, $error); }
-  else        { $self->sendResult($jobid, $result); } 
-}
 sub closeRd         { my $s = shift; my $fh = $s->rd; close($fh) if defined $fh; $s->rd(undef); }
 sub closeWr         { my $s = shift; my $fh = $s->wr; close($fh) if defined $fh; $s->wr(undef); }
 sub close           { my $s = shift; $s->closeRd; $s->closeWr; }
@@ -53,6 +46,35 @@ sub childAfterFork  {
   $s->close
 }
 sub close           { my $hs = shift->pipes; map { close $_; } @$hs; }
+
+package TestBed::ForkFramework::Results;
+use SemiModern::Perl;
+use Mouse;
+
+has 'successes' => ( isa => 'ArrayRef', is => 'rw', default => sub { [ ] } );
+has 'errors' => ( isa => 'ArrayRef', is => 'rw', default => sub { [ ] } );
+
+sub push_success { push @{shift->successes}, shift; }
+sub push_error { push @{shift->errors}, shift; }
+sub has_errors { scalar @{shift->errors};}
+sub handle_result { 
+  my ($self, $result) = @_;
+  if   ( $result->is_error ) { $self->push_error($result); } 
+  else { $self->push_success($result); } 
+}
+
+package TestBed::ForkFramework::ItemResult;
+use SemiModern::Perl;
+use Mouse;
+
+has 'result' => ( is => 'rw');
+has 'error'  => ( is => 'rw');
+has 'itemid' => ( is => 'rw');
+
+sub is_error { shift->error; }
+
+use SemiModern::Perl;
+use Mouse;
 
 package TestBed::ForkFramework;
 sub forkit {
@@ -86,9 +108,6 @@ sub fork_redir {
     my ($pid) = @_;
     my $handles = $redir->parentAfterFork;
     return $parent_worker->(@$handles, $pid);
-    #waitpid($pid, 0);
-    #return $pworker->(@$handles, $pid);
-    #return (@$handles, $pid);
   },
   sub {
     $redir->childAfterFork;
@@ -96,7 +115,6 @@ sub fork_redir {
   }
   );
 }
-
 
 package TestBed::ForkFramework::Scheduler;
 use SemiModern::Perl;
@@ -106,8 +124,7 @@ use Carp;
 use Data::Dumper;
 
 has 'workers'    => ( is => 'rw', default => sub { [] });
-has 'results'    => ( is => 'rw', default => sub { [] });
-has 'errors'     => ( is => 'rw', default => sub { [] });
+has 'results'    => ( is => 'rw', default => sub { TestBed::ForkFramework::Results->new; });
 has 'selector'   => ( is => 'rw', default => sub { IO::Select->new; });
 has 'items'      => ( is => 'rw', isa => 'ArrayRef', required => 1 );
 has 'proc'       => ( is => 'rw', isa => 'CodeRef' , required => 1 );
@@ -134,21 +151,20 @@ sub workloop {
   my ($self) = @_;
   LOOP: {
     while( defined ( my $jobid = $self->spawnWorker ) ) {
-      say "spawnWorker $jobid" if $FFD;
+      say "spawnWorker $jobid" if $FFDEBUG;
       $self->fffork($jobid);
     }
-    say "CALL SELECT" if $FFD;
+    say "CALL SELECT" if $FFDEBUG;
     if ($self->selectloop) {
       redo LOOP;
     }
   }
   $self->wait_for_all_children_to_exit;
 
-  my @results = (scalar @{$self->errors}, $self->results, $self->errors);
-  return wantarray ? @results : \@results;
+  return $self->results;
 }
 
-use constant SELECT_HAS_HANDLES  => 1;
+use constant SELECT_HAS_HANDLES => 1;
 use constant SELECT_NO_HANDLES  => 0;
 
 sub selectloop {
@@ -159,36 +175,36 @@ sub selectloop {
       for my $r ($selector->can_read) {
         my ($rh, $wh, $eof, $ch) = @$r;
         if (defined (my $result = $ch->receive)) {
-          $self->jobDone(@$result);
+          $self->handleResult($result);
           
           unless ( $eof ) {
             if( my $jobid = $self->nextJob ) { 
-              say "newjob $jobid" if $FFD;
+              say "newjob $jobid" if $FFDEBUG;
               $ch->send($jobid); }
             else {
-              say "no work killing $rh" if $FFD;
+              say "no work killing $rh" if $FFDEBUG;
               $ch->sendEnd;
               @{$r}[1,2] = (undef, 1);            
             }
           }
         }
         else {
-          say "received null ack from $rh" if $FFD;
+          say "received null ack from $rh" if $FFDEBUG;
           $selector->remove($r);
           $ch->close;
         }
       }
     };
     if ( my $error = $@ ) {
-      say "SELECT HAS ERRORS" if $FFD;
+      say "SELECT HAS ERRORS" if $FFDEBUG;
       $_->[3]->sendEnd for $selector->handles;
       $self->wait_for_all_children_to_exit;
       die $error;
     }
-    say "SELECT_HAS_HANDLES" if $FFD;
+    say "SELECT_HAS_HANDLES" if $FFDEBUG;
     return SELECT_HAS_HANDLES;
   }
-  say "SELECT_NO_HANDLES" if $FFD;
+  say "SELECT_NO_HANDLES" if $FFDEBUG;
   return SELECT_NO_HANDLES;
 }
 
@@ -213,7 +229,7 @@ sub fffork {
     while ( defined( my $itemid = $ch->receive )) {
       my $result = eval { $self->doItem($itemid); };
       my $error  = $@;
-      $ch->sendWorkStatus($itemid, $result, $error);
+      $ch->send(TestBed::ForkFramework::ItemResult->new(itemid => $itemid, result => $result, error => $error));
     }
     $ch->sendEnd;
     $ch->close;
@@ -223,12 +239,8 @@ sub fffork {
 }
 
 sub doItem { my ($s, $itemid) = @_; $s->proc->($s->items->[$itemid]); }
-sub jobDone { 
-  my ($self, $type, @rest) = @_;
-  if    ( $type eq 'R' ) { push @{ $self->results }, \@rest}
-  elsif ( $type eq 'E' ) { push @{ $self->errors  }, \@rest}
-  else { die "Bad result type: $type"; }
-}
+sub handleResult { recordResult(@_); }
+sub recordResult { shift->results->handle_result(shift); }
 
 package TestBed::ForkFramework::ForEach;
 use SemiModern::Perl;
@@ -301,26 +313,38 @@ has 'maxnodes'  => ( isa => 'Int'      , is => 'rw', default => 20);
 has 'currnodes' => ( isa => 'Int'      , is => 'rw', default => 0);
 has 'schedule'  => ( isa => 'ArrayRef' , is => 'rw', required => 1);
 has 'weight'    => ( isa => 'ArrayRef' , is => 'rw', required => 1);
-has 'retry'     => ( isa => 'ArrayRef' , is => 'rw', default => sub { [] } );
-has 'inRetry'   => ( isa => 'Int' , is => 'rw', default => 0);
+has 'retryItems'=> ( isa => 'ArrayRef' , is => 'rw', default => sub { [] } );
+has 'inRetry'   => ( isa => 'Int'      , is => 'rw', default => 0);
+
+
+sub incr_currnodes {
+  my ($s, $quantity) = @_;
+  $s->{'currnodes'} += $quantity;
+}
+
+sub return_node_resources {
+  my ($s, $itemid) = @_;
+  $s->{'currnodes'} -= $s->weight->[$itemid];
+}
 
 sub work {
-  my ($max_nodes, $proc, $weight, $items) = @_;
+  my ($max_nodes, $proc, $schedule, $items) = @_;
   my $s = TestBed::ForkFramework::RateScheduler->new(
     'maxnodes' => $max_nodes, 
     'items' => $items,
     'proc' => $proc,
-    'schedule' => $weight,
-    'weight' => [ map { $_->[0] } (sort { $a->[1] <=> $b->[1] } @$weight) ],
+    'schedule' => $schedule,
+    'weight' => [ map { $_->[0] } (sort { $a->[1] <=> $b->[1] } @$schedule) ],
   ); 
-  say toperl("SCHEDULE", $s->schedule) if $FFD;
-  say toperl("WEIGHTS", $s->weight) if $FFD;
+  say toperl("SCHEDULE", $s->schedule) if $FFDEBUG;
+  say toperl("WEIGHTS", $s->weight) if $FFDEBUG;
   $s->workloop;
-  say("RETRYING") if $FFD;
+  say("RETRYING") if $FFDEBUG;
   $s->inRetry(1);
-  $s->schedule( [ map { [$s->weight->[$_], $_] } @{$s->retry} ] );
-  say toperl("SCHEDULE", $s->schedule) if $FFD;
-  say toperl("WEIGHTS", $s->weight) if $FFD;
+  $s->schedule( [ map { [$s->weight->[$_], $_] } @{$s->retryItems} ] );
+  $s->retryItems([]);
+  say toperl("SCHEDULE", $s->schedule) if $FFDEBUG;
+  say toperl("WEIGHTS", $s->weight) if $FFDEBUG;
   $s->workloop;
 }
 
@@ -330,7 +354,11 @@ sub find_largest_item {
 
   #find largest item that is small enough
   for (@{ $s->schedule }) {
-    $found = $_ if $_->[0] <= $max_size;
+    my $itemsize = $_->[0];
+
+    last if $itemsize > $max_size;
+    next if ($found and $found->[0] >= $itemsize);
+    $found = $_ if $itemsize <= $max_size;
   }
 
   #remove found from schedule
@@ -349,32 +377,46 @@ sub nextJob {
 
   if ($tuple) {
     my ($e_node_size, $eindex) = @$tuple;
-    say(sprintf("found %s size %s max_size $max_size currnodes %s maxnodes %s newcurrnodes %s", $eindex, $e_node_size, $s->currnodes, $s->maxnodes, $s->currnodes +$e_node_size)) if $FFD;
+    say(sprintf("found %s size %s max_size $max_size currnodes %s maxnodes %s newcurrnodes %s", $eindex, $e_node_size, $s->currnodes, $s->maxnodes, $s->currnodes +$e_node_size)) if $FFDEBUG;
     $s->{'currnodes'} += $e_node_size;
     return $eindex;
   }
+  else { return; }
+}
+
+use TestBed::ParallelRunner::ErrorConstants;
+
+sub return_and_report {
+  my ($s, $result) = @_;
+  $s->recordResult($result);
+  $s->return_node_resources($result->itemid);
+}
+
+sub handleResult { 
+  my ($s, $result) = @_;
+  my $executor = $s->items->[$result->itemid];
+  if ($executor->can('handleResult')) {
+    my $rc = $executor->handleResult($s, $result);
+    if ($rc == RETURN_AND_REPORT) { $s->return_and_report($result) }
+  }
   else {
-    return;
+    $s->return_and_report($result);
   }
 }
 
-sub jobDone { 
-  my $s = shift;
-  my ($type, $itemid, $result) = @_;
-  if ($type eq 'E') {
-    if ($result->isa('TestBed::ParallelRunner::SwapOutFailed')) { return; }
-    elsif ($result->isa('TestBed::ParallelRunner::RetryAtEnd')) {
-      if ($s->inRetry) {
-        push @{ $s->retry }, $itemid;
-        $s->{'currnodes'} -= $s->weight->[$itemid];
-        return;
-      }
-      else {
-        $result = $result->original;
-      }
-    }
+sub retry {
+  my ($s, $result) = @_;
+  my $itemid = $result->itemid;
+  if (!$s->inRetry) {
+    push @{ $s->retryItems }, $itemid;
+    $s->return_node_resources($itemid);
+    say "RETRYING item# $itemid";
+    return 1;
   }
-  $s->SUPER::jobDone($type, $itemid, $result);
-  $s->{'currnodes'} -= $s->weight->[$itemid];
+  else { 
+    say "DONE RETRYING";
+    $s->return_and_report($result); 
+  }
 }
+
 1;

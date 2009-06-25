@@ -6,9 +6,18 @@ use TestBed::ParallelRunner;
 use Data::Dumper;
 use Tools;
 
+my $error_sub = sub {
+  use Carp qw(longmess);
+  say "Caught here " . __FILE__;
+  say(@_);
+  say longmess;
+  die @_;
+};
+#$SIG{ __DIE__ } = $error_sub;
+
 require Exporter;
 our @ISA = qw(Exporter);
-our @EXPORT = qw(e CartProd CartProdRunner concretize defaults override rege runtests);
+our @EXPORT = qw(e CartProd CartProdRunner concretize defaults override rege runtests pr_e);
 
 sub e { TestBed::TestSuite::Experiment->new(_build_e_from_positionals(@_)); }
 
@@ -19,22 +28,14 @@ sub rege {
   elsif (@_ == 6) { $e = e(shift, shift); }
   elsif (@_ == 7) { $e = e(shift, shift, shift); }
   else { die 'Too many args to rege'; }
-  return TestBed::ParallelRunner::add_experiment($e, @_);
+  return TestBed::ParallelRunner::build_executor($e, @_);
 }
 
-sub rege_with_strategy {
-  my $strategy = pop @_;
-  my $te = rege(@_);
-  $te->strategy($strategy);
-  $te;
-}
-
-sub rege_with_retry {
-  rege_with_strategy(@_, TestBed::ParallelRunner::ErrorRetryStrategy->new);
+sub pr_e {
+  return TestBed::ParallelRunner::build_executor(@_);
 }
 
 sub runtests { TestBed::ParallelRunner::runtests(@_); }
-
 
 sub _build_e_from_positionals {
   if (@_ == 0) { return {}; }
@@ -111,13 +112,6 @@ sub override {
   return { %{($params || {})}, %overrides };
 }
 
-use Carp;
-$SIG{ __DIE__ } = sub { 
-  say Dumper($_[0]) if ref($_[0]) eq 'HASH';
-  Carp::confess( @_ ) 
-};
-
-
 =head1 NAME
 
 TestBed::TestSuite
@@ -145,14 +139,6 @@ creates a new experiment with pid, gid, and eid
 =item C<rege($pid, $gid, $eid, $ns_contents, &test_sub, $test_count, $desc)>
 
 registers experiement with parallel test running engine
-
-=item C<rege_with_strategy(rege args ..., $strategy)>
-
-registers experiement with a error strategy
-
-=item C<rege_with_retry(rege args ...)>
-
-registers experiement with the retry if fail on swapin strategy
 
 =item C<runtests($concurrent_pre_runs, $concurrent_node_count_usage) >
 

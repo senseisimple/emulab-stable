@@ -1,4 +1,5 @@
 DOCS TODO
+  retry example
 
 TODO
   TIMEOUT of XMLRPC Calls
@@ -28,12 +29,5 @@ LATER
   create BSD virtual machine for testing
 
 Parallel TODOS
-  retry
   clean up FFF, Roles, constructors
   CartProd teste - image test example
-
-DONE
-  POD function documentation
-  better general result code handling (ping_test single_node_test)
-  ForkFramework Constants
-

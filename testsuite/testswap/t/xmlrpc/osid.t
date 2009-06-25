@@ -16,6 +16,7 @@ ok($osid, 'osid new works');
 isa_ok($osid, 'TestBed::XMLRPC::Client::OSID');
 
 my $resp = $osid->getlist;
+sayd(keys %$resp);
 ok($resp, 'getlist response');
 okcontains($resp, 'RHL-STD', 'RHL90-STD', 'FBSD63-STD');
 

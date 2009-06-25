@@ -4,10 +4,20 @@ use SemiModern::Perl;
 use TBConfig;
 use TestBed::TestSuite;
 use TestBed::XMLRPC::Client::Pretty;
-use TestBed::TestSuite::Experiment::Macros;
 use Data::Dumper;
 use Tools;
 use TestBed::Wrap::tevc;
+
+$SIG{ __DIE__ } = sub {
+  use Carp qw(longmess);
+  say "Caught here " . __FILE__;
+  sayd(@_);
+  say "SAYD DONE";
+  say longmess;
+  say "LONGMESS DONE";
+  Carp::confess( "DIED IN SC\n", @_ );
+  say "CARP DONE";
+};
 
 my $ns = <<'NSEND';
 source tb_compat.tcl
@@ -41,13 +51,26 @@ END
 }
 
 sub end_all_experiments {
-  plistexps;
+  e->pretty_list;
   say "";
   if (yn_prompt("Are you sure you want to terminate all experiments?")) {
-    e(@{$_->[0]})->end for( experiments_hash_to_list(list_full));
-    e(@{$_->[0]})->waitforended for( experiments_hash_to_list(list_full));
+    e(@{$_->[0]})->end for( experiments_hash_to_list(e->list_full));
+    e(@{$_->[0]})->waitforended for( experiments_hash_to_list(e->list_full));
   }
 }
+
+sub watch {
+  my $e = shift;
+  my $result = "INIT";
+  my $eid = $e->eid;
+  while ($result) {
+    my $result = $e->state;
+    say prettytimestamp . " Watch $eid = $result";
+    sleep(2);
+  }
+}
+
+eval {
 if (@ARGV) {
   $_ = shift;
   if (/endall/) { end_all_experiments; }
@@ -65,6 +88,7 @@ if (@ARGV) {
     elsif (/single_node_tests/) { $e->single_node_tests; }
     elsif (/ni/) { say Dumper($e->nodeinfo) ;}
     elsif (/li/) { say Dumper($e->linkinfo) ;}
+    elsif (/watch/) { watch($e); }
     elsif ($_ eq'ex') { 
       say $ARGV[0];
       my $result = eval $ARGV[0];
@@ -79,7 +103,11 @@ if (@ARGV) {
 }
 else {
   usage;
-  plistexps;
+  e->pretty_list;
+}
+};
+if ($@) {
+  sayd($@);
 }
 
 # vim: ft=perl:

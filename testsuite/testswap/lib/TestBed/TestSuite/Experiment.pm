@@ -213,6 +213,12 @@ sub linkdown {
   TestBed::Wrap::tevc::tevc($e->pid, $e->eid, "now $link down");
 }
 
+
+sub pretty_list {
+  use TestBed::XMLRPC::Client::Pretty;
+  pretty_listexp(shift->getlist_full);
+}
+
 =item C<trytest { code ... } $e>
 
 catches exceptions while a test is running and cleans up the experiment

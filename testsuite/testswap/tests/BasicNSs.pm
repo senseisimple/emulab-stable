@@ -50,7 +50,6 @@ $ns run
 END
 
 our $TooManyLans = << 'END';
-my $ns = <<'NSEND';
 source tb_compat.tcl
 
 set ns [new Simulator]

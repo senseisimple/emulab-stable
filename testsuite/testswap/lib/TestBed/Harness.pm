@@ -28,7 +28,10 @@ sub split_t_pm {
 
 sub runharness {
   my @parts = my ($ts, $pms) = split_t_pm(@_);
-  for (@$pms) { eval "require \'$_\';"; }
+  for (@$pms) { 
+    eval "require \'$_\';"; 
+    die $@ if $@;
+  }
 
   my %harness_args = (
       verbosity => 1,

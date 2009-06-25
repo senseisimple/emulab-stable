@@ -26,7 +26,9 @@ sub args {
   my $pid = $self->pid;
   my $gid = $self->gid;
   my $eid = $self->eid;
-  
+ 
+  die "Odd number of args" . sayd(@_) if ((scalar @_) % 2 !=0);
+
   return { 'pid' => $pid, 'gid' => $gid, 'eid' => $eid, @_ };
 }
 
@@ -48,7 +50,7 @@ sub echo           { shift->augment_output( 'str' => shift ); }
 sub getlist_brief  { shift->augment( 'format' => 'brief'); }
 sub getlist_full   { shift->augment( 'format' => 'full' ); }
 sub batchexp_ns    { shift->augment_code( 'nsfilestr' => shift, 'noswapin' =>1, noemail, 'extrainfo' => 1, @_ ); }
-sub modify_ns      { shift->augment_code( 'nsfilestr' => shift, noemail, @_ ); }
+sub modify_ns      { shift->augment_code( 'nsfilestr' => shift, 'noswapin' =>1, noemail, 'extrainfo' => 1, @_ ); }
 sub swapin         { shift->augment_func_code( 'swapexp', noemail, 'direction' => 'in', 'extrainfo' => 1, @_ ); }
 sub swapout        { shift->augment_func_code( 'swapexp', noemail, 'direction' => 'out','extrainfo' => 1, @_ ); }
 sub end            { shift->augment_func_code( 'endexp', noemail); }
@@ -66,6 +68,7 @@ sub create_and_get_metadata {
   $self->metadata;
 }
 
+sub modify_ns_wait   { shift->modify_ns(@_,'wait' => 1); }
 sub batchexp_ns_wait { shift->batchexp_ns(@_,'wait' => 1); }
 
 use constant EXPERIMENT_NAME_ALREADY_TAKEN => 2;
