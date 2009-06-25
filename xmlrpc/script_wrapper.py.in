@@ -92,6 +92,9 @@ API = {
                                      "in an experiment" },
     "node_avail"        : { "func" : "node_avail",
                             "help" : "Print free node counts" },
+    "node_avail_list"   : { "func" : "node_avail_list",
+                            "help" : "Print physical node_ids for matching" +
+                                     "free nodes" },
     "delay_config"      : { "func" : "delay_config",
                             "help" : "Change the link shaping characteristics " +
                                      "for a link or lan" },
@@ -648,6 +651,65 @@ class node_avail:
         print
         print "example:"
         print "  $ node_avail -t pc850"
+        wrapperoptions()
+        return
+
+    pass
+
+
+#
+# node_avail_list
+#
+class node_avail_list:
+    def __init__(self, argv=None):
+        self.argv = argv;
+        return
+
+    def apply(self):
+        params = {}
+        
+        try:
+            opts, req_args = getopt.getopt(self.argv, "hp:t:c:n:", [
+                "help", "project=", "node-type=", "node-class=", "nodes=" ])
+
+            for opt, val in opts:
+                if opt in ("-h", "--help"):
+                    self.usage();
+                    return 0
+                elif opt in ("-p", "--project"):
+                    params["proj"] = val
+                    pass
+                elif opt in ("-c", "--node-class"):
+                    params["class"] = val
+                    pass
+                elif opt in ("-t", "--node-type"):
+                    params["type"] = val
+                    pass
+                elif opt in ("-n", "--nodes"):
+                    params["nodes"] = val
+                    pass
+                pass
+            pass
+        except  getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+
+        rval,response = do_method("node", "getlist", params)
+        return rval
+
+    def usage(self):
+        print "node_avail_list [-p project] [-c class] [-t type] [-n nodes]"
+        print "Print physical node_ids of available nodes."
+        print "where:"
+        print "     -p project         - Specify project credentials for node"
+        print "                          types that are restricted"
+        print "     -c class           - The node class (Default: pc)"
+        print "     -t type            - The node type"
+        print "     -n pcX,pcY,...,pcZ - A list of physical node_ids"
+        print
+        print "example:"
+        print "  $ node_avail_list -t pc850"
         wrapperoptions()
         return
 
