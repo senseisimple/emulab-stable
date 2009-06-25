@@ -47,7 +47,7 @@ returns a list of node names representing each node in the experiment
 =cut
 sub nodenames {
   my ($e) = @_;
-  my $nodenames = $e->nodeinfo();
+  my $nodenames = $e->fqnodenames();
   return wantarray ? @{$nodenames} : $nodenames;
 }
 
@@ -57,7 +57,7 @@ returns a list of node hostnames representing each node in the experiment
 =cut
 sub hostnames {
   my ($e) = @_;
-  my $nodenames = $e->nodeinfo();
+  my $nodenames = $e->fqnodenames();
   my @hostnames = map { $_ =~ /([^\.]*)/; $1 } @$nodenames;
   return wantarray ? @hostnames : \@hostnames;
 }
@@ -69,7 +69,7 @@ returns a list of node objects representing each node in the experiment
 =cut
 sub nodes {
   my ($e) = @_;
-  my @node_instances = map { TestBed::TestSuite::Node->new('experiment' => $e, 'name'=>$_); } @{$e->nodeinfo()};
+  my @node_instances = map { TestBed::TestSuite::Node->new('experiment' => $e, 'name'=>$_); } @{$e->fqnodenames()};
   \@node_instances;
 }
 
@@ -90,9 +90,8 @@ runs a single_node_tests test across all nodes
 =cut
 sub single_node_tests {
   my ($e) = @_;
-  for (@{$e->nodes}) {
-    die $_->name . "failed single_node_tests" unless $_->single_node_tests();
-  }
+  for (@{$e->nodes}) {$_->single_node_tests(); }
+  return 1;
 }
 
 =item C<< $e->linktest >>

@@ -55,7 +55,7 @@ sub swapin         { shift->augment_func_code( 'swapexp', noemail, 'direction' =
 sub swapout        { shift->augment_func_code( 'swapexp', noemail, 'direction' => 'out','extrainfo' => 1, @_ ); }
 sub end            { shift->augment_func_code( 'endexp', noemail); }
 sub end_wait       { shift->augment_func_code( 'endexp', noemail, 'wait' => 1); }
-sub nodeinfo       { parseNodeInfo(shift->augment_func_output('expinfo', 'show' => 'nodeinfo')); }
+sub fqnodenames    { parseNodeInfo(shift->nodeinfo); }
 sub waitforactive  { my $e = shift; retry_on_TIMEOUT { $e->augment_func_code('waitforactive', @_) } 'waitforactive'; }
 sub waitforswapped { my $e = shift; retry_on_TIMEOUT { $e->augment_func_code( 'statewait', 'state' => 'swapped' ) } 'waitforswapped'; }
 sub waitforended   { my $e = shift; retry_on_TIMEOUT { $e->augment_func_code( 'statewait', 'state' => 'ended' ) } 'waitforended'; }
@@ -111,7 +111,7 @@ sub inject_sub {
 
 sub gen_expinfo_funcs {
   my ($package) = caller();
-  for my $funcname (qw(mapping linkinfo shaping) ) {
+  for my $funcname (qw(mapping linkinfo shaping nodeinfo) ) {
     my $sub = sub {
       shift->augment_func_output('expinfo', 'show' => $funcname );
     };

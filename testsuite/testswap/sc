@@ -8,15 +8,14 @@ use Data::Dumper;
 use Tools;
 use TestBed::Wrap::tevc;
 
+#$TBConfig::DEBUG_XML_CLIENT = 1;
+
 $SIG{ __DIE__ } = sub {
   use Carp qw(longmess);
   say "Caught here " . __FILE__;
   sayd(@_);
   say "SAYD DONE";
-  say longmess;
-  say "LONGMESS DONE";
   Carp::confess( "DIED IN SC\n", @_ );
-  say "CARP DONE";
 };
 
 my $ns = <<'NSEND';
@@ -70,11 +69,20 @@ sub watch {
   }
 }
 
+sub watchall {
+  while (1) {
+    say prettytimestamp;
+    e->pretty_list;
+    sleep(5);
+  }
+}
+
 eval {
 if (@ARGV) {
   $_ = shift;
   if (/endall/) { end_all_experiments; }
   elsif (/end/) { e($_)->end for(@ARGV); }
+  elsif (/watchall/) { watchall; }
   else {
     my $e = e(shift);
     if (/--help/) { usage; } 
@@ -86,12 +94,18 @@ if (@ARGV) {
     elsif (/tevc/) { $e->tevc(@ARGV); }
     elsif (/linktest/) { $e->linktest; }
     elsif (/single_node_tests/) { $e->single_node_tests; }
+    elsif (/fqnn/) { say Dumper($e->fqnodenames) ;}
     elsif (/ni/) { say Dumper($e->nodeinfo) ;}
     elsif (/li/) { say Dumper($e->linkinfo) ;}
+    elsif (/im/) { say Dumper($e->info(aspect => 'mapping')) ;}
+    elsif (/ip/) { say Dumper($e->info(aspect => 'physical')) ;}
+    elsif (/it/) { say Dumper($e->info(aspect => 'traces')) ;}
+    elsif (/il/) { say Dumper($e->info(aspect => 'links')) ;}
     elsif (/watch/) { watch($e); }
     elsif ($_ eq'ex') { 
       say $ARGV[0];
       my $result = eval $ARGV[0];
+      say $@ if $@;
       sayd($result);
     }
     else {

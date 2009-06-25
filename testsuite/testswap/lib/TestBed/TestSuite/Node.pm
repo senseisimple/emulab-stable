@@ -2,7 +2,6 @@
 package TestBed::TestSuite::Node;
 use SemiModern::Perl;
 use Mouse;
-#use TestBed::XMLRPC::Client::Node;
 use Tools::Network;
 use Tools::TBSSH;
 use Data::Dumper;
@@ -29,10 +28,10 @@ sub ping_test {
 executes hostname, sudo ls, mount via ssh on the remote node
 =cut
 sub single_node_tests {
-  my ($self) = @_;
-  my $ssh = $self->ssh();
+  my ($s) = @_;
+  my $ssh = $s->ssh();
   $ssh->cmdsuccess("hostname");
-  $ssh->cmdsuccess("sudo ls");
+  $ssh->cmdsuccess("sudo id");
   $ssh->cmdsuccess("mount");
 }
 
@@ -53,7 +52,6 @@ sub scp {
   my $self = shift;
   return Tools::TBSSH::scp($self->name, @_);
 }
-
 
 =back 
 

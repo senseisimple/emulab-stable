@@ -19,8 +19,6 @@ sub handleResult {
     say "In TooManyLans::handleResult";
     $executor->e->modify_ns_wait($newns);
     say "Done with TooManyLans->modify_ns_wait";
-    $executor->e->swapin_wait;
-    exit;
   }
 }
 

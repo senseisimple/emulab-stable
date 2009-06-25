@@ -30,6 +30,10 @@ sub wrapped_ssh {
     $ssh = Tools::TBSSH->new('host' => $invocant, 'user' => $user);
   }
   my @results = $ssh->cmd($cmd);
+  if ($TBConfig::DEBUG_XML_CLIENT) {
+    $ssh->saydebug($cmd);
+    sayd @results;
+  }
 
   if (defined $checker) {
     &$checker(@results) || die "ssh checker of cmd $cmd failed";

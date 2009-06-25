@@ -62,7 +62,7 @@ sub runtests {
   my $result = TestBed::ForkFramework::MaxWorkersScheduler::work($concurrent_pre_runs, sub { shift->prep }, $Executors);
   if ($result->has_errors) {
     sayd($result->errors);
-    die 'TestBed::ParallelRunner::runtests died during test prep';
+    warn 'TestBed::ParallelRunner::runtests died during test prep';
   }
 
   #create schedule step
@@ -91,6 +91,10 @@ sub runtests {
   reset_test_builder($test_count, no_numbers => 1);
   $result = TestBed::ForkFramework::RateScheduler::work($concurrent_node_count_usage, \&tap_wrapper, \@schedule, $Executors);
   set_test_builder_to_end_state($test_count);
+  if ($result->has_errors) {
+    sayd($result->errors);
+    die 'TestBed::ParallelRunner::runtests died during test execution';
+  }
   return;
 }
 

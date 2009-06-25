@@ -16,7 +16,6 @@ sub cmd {
   my $host = $ssh->host;
   my $user = $ssh->user;
   my $sshcmd = "ssh -x -o BatchMode=yes -o StrictHostKeyChecking=no $user\@$host $cmd";
-  say $sshcmd if ($TBConfig::DEBUG_XML_CLIENT);
   run3($sshcmd, undef, \$out, \$err);
   my $rc = $? >> 8;
   ($out, $err, $rc);
@@ -29,12 +28,15 @@ sub scp_worker {
   my $host = $ssh->host;
   my $user = $ssh->user;
   my $sshcmd = "scp -o BatchMode=yes -o StrictHostKeyChecking=no @files";
-  say $sshcmd if ($TBConfig::DEBUG_XML_CLIENT);
   run3($sshcmd, undef, \$out, \$err);
   my $rc = $? >> 8;
   ($out, $err, $rc);
 }
 
+sub saydebug {
+  my $s = shift; 
+  say sprintf("ssh %s@%s %s", $s->user, $s->host, "@_");
+}
 
 =head1 NAME
 

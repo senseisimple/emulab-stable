@@ -88,13 +88,17 @@ sub execute {
   die TestBed::ParallelRunner::Executor::SwapinError->new( original => $@ ) if $@;
 
   eval { $self->proc->($e); };
-  die TestBed::ParallelRunner::Executor::RunError->new( original => $@ ) if $@;
+  my $run_exception = $@;
 
   eval { $e->swapout_wait; };
-  die TestBed::ParallelRunner::Executor::SwapoutError->new( original => $@ ) if $@;
+  my $swapout_exception = $@;
 
   eval { $e->end_wait; };
-  die TestBed::ParallelRunner::Executor::KillError->new( original => $@ ) if $@;
+  my $end_exception = $@;
+
+  die TestBed::ParallelRunner::Executor::RunError->new( original => $run_exception ) if $run_exception;
+  die TestBed::ParallelRunner::Executor::SwapoutError->new( original => $swapout_exception ) if $swapout_exception;
+  die TestBed::ParallelRunner::Executor::KillError->new( original => $end_exception ) if $end_exception;
   
   return 1;
 }
