@@ -25,9 +25,12 @@ use libdb;
 
 use IO::Pty;
 use POSIX qw(setsid);
+use POSIX ":sys_wait_h";
 
 my $debug = 0;
-my $parallelize = 0;
+# Always parallelize for now cause we are vulnerable to timeouts with 
+# unreachable nodes or weird iLO crap.
+my $parallelize = 1;
 
 # Turn off line buffering on output
 $| = 1;
@@ -83,30 +86,40 @@ sub iloctrl($$@) {
 	$ilo_nodeinfo{$n} = [ $IP,$krole,$kuid,$kkey ];
     }
 
+    my %kids = ();
+    my $timeout = 30;
+
     for my $n (keys(%ilo_nodeinfo)) {
 	my ($IP,$krole,$kuid,$kkey) = @{$ilo_nodeinfo{$n}};
 
 	if ($parallelize) {
 	    if (my $pid = fork()) {
-		push @kids, $pid;
+		$kids{$pid} = 1;
 	    }
 	    else {
-		my $tret = iloexec($n,$type,$cmd,$IP,$krole,$kuid,$kkey);
-		exit $tret;
+		my $tret;
+		eval {
+		    $tret = iloexec($n,$type,$cmd,$IP,$krole,$kuid,$kkey,
+				    $timeout);
+		};
+		if ($@) {
+		    print "$@";
+		    exit -1;
+		}
 	    }
 	}
 	else {
-	    if (iloexec($n,$type,$cmd,$IP,$krole,$kuid,$kkey)) {
+	    if (iloexec($n,$type,$cmd,$IP,$krole,$kuid,$kkey,$timeout)) {
 		++$exitval;
 	    }
 	}
+    }
 
-	# grab child exit vals
-	if ($parallelize) {
-	    while (wait() > 0) {
-		if ($?) {
-		    ++$exitval;
-		}
+    # grab child exit vals
+    if ($parallelize) {
+	while (wait() > 0) {
+	    if ($?) {
+		++$exitval;
 	    }
 	}
     }
@@ -115,10 +128,10 @@ sub iloctrl($$@) {
 }
 
 #
-# Arguments: $node_id,$type,$cmd,$IP,$key_role,$key_uid,$key
+# Arguments: $node_id,$type,$cmd,$IP,$key_role,$key_uid,$key[,$timeout]
 #
-sub iloexec($$$$$$$) {
-    my ($node_id,$type,$cmd,$IP,$key_role,$key_uid,$key) = @_;
+sub iloexec($$$$$$$;$) {
+    my ($node_id,$type,$cmd,$IP,$key_role,$key_uid,$key,$timeout) = @_;
 
     if ($debug) {
 	print "iloexec called with (" . join(',',@_) . ")\n";
@@ -156,7 +169,7 @@ sub iloexec($$$$$$$) {
     }
 
     my @expect_seq;
-    my $ssh_cmd = "ssh -l '$key_uid'";
+    my $ssh_cmd = "ssh -o StrictHostKeyChecking=no -l '$key_uid'";
 
     if ($key_role eq 'ssh-key') {
 	if ($key ne '') {
@@ -181,8 +194,28 @@ sub iloexec($$$$$$$) {
 
     $ssh_cmd .= " $IP";
 
+    my $pid;
+    my $sentall = 0;
+    # Setup some signal handlers so we can avoid leaving ssh zombies.
+    $SIG{'CHLD'} = sub { die "iloexec($node_id) child ssh died unexpectedly!"; };
+    $SIG{'PIPE'} = sub { die "iloexec($node_id) ssh died unexpectedly!"; };
+    if (defined($timeout)) {
+	$SIG{'ALRM'} = sub {
+	    $SIG{'PIPE'} = 'IGNORE';
+	    $SIG{'CHLD'} = 'IGNORE';
+	    kill(INT,$pid);
+	    select(undef,undef,undef,0.1);
+	    kill(TERM,$pid);
+	    select(undef,undef,undef,0.1);
+	    kill(KILL,$pid);
+	    die "iloexec($node_id) timed out in ssh!";
+	};
+
+	alarm($timeout);
+    }
+
     my $pty = IO::Pty->new() || die "can't make pty: $!";
-    defined (my $pid = fork()) || die "fork: $!";
+    defined ($pid = fork()) || die "fork: $!";
     if (!$pid) {
 	# Flip to UID 0 to ensure we can read whatever private key we need
 	$EUID = 0;
@@ -207,6 +240,10 @@ sub iloexec($$$$$$$) {
 
 	# Don't want ssh to prompt us via ssh-askpass!
 	delete $ENV{DISPLAY};
+
+	if ($debug) {
+	    print "ssh_cmd($node_id): $ssh_cmd\n";
+	}
 	
 	exec("$ssh_cmd") || die "exec: $!";
     }
@@ -257,6 +294,24 @@ sub iloexec($$$$$$$) {
 	    return -16;
 	}
     }
+    # this is a race, but there's nothing better, because we want the remote 
+    # side to see an appropriate exit so it frees its resources, so there is
+    # a very miniscule chance that the connection could break and ssh could 
+    # exit before we get here... but it seems unlikely.
+    $SIG{'CHLD'} = 'IGNORE';
+
+    # make sure the local ssh dies:
+    my $i = 5;
+    my $dead = 0;
+    while (--$i) {
+	my $ret = waitpid($pid,WNOHANG);
+	if ($ret == -1 || $ret == $pid) {
+	    $dead = 1;
+	    last;
+	}
+	sleep(1);
+    }
+    kill(KILL,$pid) if (!$dead);
 
     # if we get here, things probably went ok...
     return 0;
