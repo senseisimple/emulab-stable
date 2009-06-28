@@ -4072,6 +4072,9 @@ sub InterpLinks($)
 	my $pnode = $self->pnodes()->{$self->solution_v2p()->{$virtual}};
 	my $virtnode = $self->vnodes()->{$virtual};
 
+	# internally created node ...
+	next
+	    if (!defined($virtnode));
 	next
 	    if ($pnode->_reuse() eq "unused");
 	next
@@ -4588,9 +4591,13 @@ sub NewVirtIface($$$$;$)
     
     #
     # For veth and vlan interfaces, we need to set the characteristics
-    # of the underlying physical interface.
+    # of the underlying physical interface, but only if we actually own
+    # the node; it might be a veth on a shread physical node.
     #
-    if (defined($pport) && $isvdev) {
+    # If the pnode is a shared host, we do not want to do this; the physical
+    # interfaces are all set up the right way, do not mess it up. 
+    #
+    if (defined($pport) && $isvdev && !$pnode->_sharedhost()) {
 	my $speed = $self->interfacespeedmbps(physinterfacetype($pnode,$pport),
 					      "ethernet");
 	my $trunk = ($type eq "vlan" ? 1 : 0);
