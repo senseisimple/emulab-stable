@@ -2432,9 +2432,13 @@ COMMAND_PROTOTYPE(doaccounts)
 	}
 
 	/*
-	 * When sharing mode is on, do not return these accounts. 
+	 * When sharing mode is on, do not return these accounts to pnodes.
+	 * Note that sharing_mode and genisliver_idx should not both be set
+	 * on a pnode, but lets be careful.
+	 * but
 	 */
-	if (reqp->genisliver_idx && !didnonlocal && !reqp->sharing_mode[0]) {
+	if (reqp->genisliver_idx && !didnonlocal &&
+	    (reqp->isvnode || !reqp->sharing_mode[0])) {
 	        didnonlocal = 1;
 
 		res = mydb_query("select distinct "
