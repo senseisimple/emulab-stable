@@ -44,25 +44,37 @@ has 'test_count' => ( isa => 'Any', is => 'rw');
 has 'error_strategy' => ( is => 'rw', lazy => 1, default => sub { TestBed::ParallelRunner::ErrorStrategy->new; } );
 has 'pre_result_handler' => ( isa => 'CodeRef', is => 'rw');
 
-sub build {
-  my ($e, $ns, $sub, $test_count, $desc) = (shift, shift, shift, shift, shift);
+sub parse_options {
   my %options = @_;
 
   if (defined (delete $options{retry})) {
     $options{error_strategy} = TestBed::ParallelRunner::ErrorRetryStrategy->new;
   }
+
+  if (defined (my $params = delete $options{backoff})) {
+    $options{error_strategy} = TestBed::ParallelRunner::BackoffStrategy->build($params);
+    
+  }
   
   if (defined (my $strategy = delete $options{strategy})) {
     $options{error_strategy} = $strategy;
   }
+  
+  %options;
+}
 
+sub buildt { shift; TestBed::ParallelRunner::Executor->new( parse_options(@_)); }
+
+sub build {
+  shift;
+  my ($e, $ns, $sub, $test_count, $desc) = (shift, shift, shift, shift, shift);
   return TestBed::ParallelRunner::Executor->new(
     'e'          => $e,
     'ns'         => $ns,
     'proc'       => $sub,
     'test_count' => $test_count,
     'desc'       => $desc,
-    %options
+    parse_options(@_)
   );
 }
 
@@ -127,6 +139,15 @@ handles the result using a error strategy
 
 swaps in the experiment and runs the specified test
 it kills the experiment unconditionaly after the test returns
+
+=item C<< $prt->parse_options >>
+
+parses retry =>1, backoff => "\d+:\d+:\d+:\d+", strategy => '....' options
+and build the appropriate error_strategy object
+
+=item C<< $prt->buildt >>
+
+builds a naked TestBed::ParallelRunner::Executor for testing purposes
 
 =back
 

@@ -212,7 +212,10 @@ sub linkdown {
   TestBed::Wrap::tevc::tevc($e->pid, $e->eid, "now $link down");
 }
 
+=item C<< $e->pretty_list() >>
 
+prints a list of all experiments and there status
+=cut
 sub pretty_list {
   use TestBed::XMLRPC::Client::Pretty;
   pretty_listexp(shift->getlist_full);

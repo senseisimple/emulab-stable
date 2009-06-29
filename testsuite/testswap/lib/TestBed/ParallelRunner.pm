@@ -59,38 +59,53 @@ sub runtests {
   $concurrent_node_count_usage ||= $TBConfig::concurrent_node_usage;
 
   #prerun step
-  my $result = TestBed::ForkFramework::MaxWorkersScheduler::work($concurrent_pre_runs, sub { shift->prep }, $Executors);
+  my $result = TestBed::ForkFramework::ForEach::max_work($concurrent_pre_runs, sub { shift->prep }, $Executors);
   if ($result->has_errors) {
     sayd($result->errors);
     warn 'TestBed::ParallelRunner::runtests died during test prep';
   }
 
-  #create schedule step
-  my @schedule;
+
+  my $workscheduler =  TestBed::ForkFramework::WeightedScheduler->new( 
+    items => $Executors,
+    proc => &tap_wrapper,
+    maxnodes => $concurrent_node_count_usage,
+  );
+
+  #add taskss to scheduler step
+  my $total_test_count = 0;
   for (@{$result->successes}) {
-    my $item_id = $_->itemid;
+    my $itemId = $_->itemid;
+    my $executor = $Executors->[$itemId];
     my $maximum_nodes = $_->result->{'maximum_nodes'};
-    my $eid = $Executors->[$item_id]->e->eid;
-    #say "$eid $item_id $maximum_nodes";
+    my $eid = $executor->e->eid;
 
     if ($maximum_nodes > $concurrent_node_count_usage) {
       warn "$eid requires upto $maximum_nodes nodes, only $concurrent_node_count_usage concurrent nodes permitted\n$eid will not be run";
     }
     else {
-      push @schedule, [ +$maximum_nodes, +$item_id ];
+      $workscheduler->add_task($itemId, $maximum_nodes);
+      $total_test_count += $executor->test_count;
     }
   }
 
-  @schedule = sort { $a->[0] <=> $b->[0] } @schedule;
-
-  #count tests step
-  my $test_count = 0;
-  map { $test_count += $Executors->[$_->[1]]->test_count } @schedule;
+  USE_TESTBULDER_PREAMBLE: {
+    reset_test_builder($total_test_count, no_numbers => 1);
+  }
 
   #run tests
-  reset_test_builder($test_count, no_numbers => 1);
-  $result = TestBed::ForkFramework::RateScheduler::work($concurrent_node_count_usage, \&tap_wrapper, \@schedule, $Executors);
-  set_test_builder_to_end_state($test_count);
+  $result = $workscheduler->run;
+
+  USE_TESTBULDER_POSTAMBLE: {
+    $total_test_count = 0;
+    for (@{$result->successes}) {
+      my $item_id = $_->itemid;
+      my $executor = $Executors->[$item_id];
+      $total_test_count += $executor->test_count;
+    }
+    set_test_builder_to_end_state($total_test_count);
+  }
+
   if ($result->has_errors) {
     sayd($result->errors);
     die 'TestBed::ParallelRunner::runtests died during test execution';
@@ -167,10 +182,14 @@ TestBed::ParallelRunner
 
 =over 4
 
-=item C<< add_executor >>
+=item C<< build_executor >>
 
 helper function called by rege.
-creates a TestBed::ParallelRunner::Execu:or job and pushes it onto @$Executors
+creates a TestBed::ParallelRunner::Executor job
+
+=item C<< add_executor($executor) >>
+
+pushes $executor onto @$Executors
 
 =item C<< runtests >>
 

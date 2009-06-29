@@ -140,6 +140,10 @@ creates a new experiment with pid, gid, and eid
 
 registers experiement with parallel test running engine
 
+=item C<pr_e($e, $ns_contents, &test_sub, $test_count, $desc, %options)>
+
+registers experiement with parallel test running engine
+
 =item C<runtests($concurrent_pre_runs, $concurrent_node_count_usage) >
 
 allows a maximum of $concurrent_pre_runs during parallel execution

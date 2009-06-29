@@ -30,9 +30,11 @@ executes hostname, sudo ls, mount via ssh on the remote node
 sub single_node_tests {
   my ($s) = @_;
   my $ssh = $s->ssh();
-  $ssh->cmdsuccess("hostname");
-  $ssh->cmdsuccess("sudo id");
-  $ssh->cmdsuccess("mount");
+  my $eid = $s->experiment->eid;
+  my $name = $s->name;
+  $ssh->cmdmatch("hostname", qr/$name/, "$eid $name hostname died");
+  $ssh->cmdmatch("sudo id", qr/uid=0\(root\)/, "$eid $name sudo died");
+  $ssh->cmdmatch("mount", qr{/proj/}, "$eid $name mountdied");
 }
 
 =item C<< $n->ssh >>

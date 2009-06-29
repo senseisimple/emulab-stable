@@ -271,6 +271,14 @@ hook for generating a random $eid if desired
 
 modifies the current experiment with the give $ns file
 
+=item C<< $e->modify_ns_wait($ns) >>
+
+modifies the current experiment with the give $ns file and waits for the modifications to complete
+
+=item C<< $e->fqnodenames >>
+
+returns a list of fully qualified node names in the experiement
+
 =item C<< $e->noemail >>
 
 B<INTERNAL>: generates the noemail attribute for xmlrpc calls if so configured in TBConfig

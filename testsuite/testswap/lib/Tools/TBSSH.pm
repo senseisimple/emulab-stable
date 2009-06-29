@@ -23,7 +23,7 @@ sub instance {
 }
 
 sub wrapped_ssh {
-  my ($invocant, $user, $cmd, $checker) = @_;
+  my ($invocant, $user, $cmd, $checker, $diemessage) = @_;
   my $ssh;
   if (ref $invocant) { $ssh = $invocant }
   else {
@@ -36,7 +36,7 @@ sub wrapped_ssh {
   }
 
   if (defined $checker) {
-    &$checker(@results) || die "ssh checker of cmd $cmd failed";
+    &$checker(@results) || die ($diemessage || "ssh checker of cmd $cmd failed");
   }
   ($results[2], @results);
 }
@@ -62,6 +62,11 @@ sub cmdcheckoutput {
 sub cmdsuccess {
   my ($host, $cmd) = @_;
   return wrapped_ssh($host, $TBConfig::EMULAB_USER, $cmd, sub { $_[2] == 0; } );
+}
+
+sub cmdmatch {
+  my ($host, $cmd, $regex, $diemessage) = @_;
+  return wrapped_ssh($host, $TBConfig::EMULAB_USER, $cmd, sub { $_[0] =~ $regex; }, $diemessage );
 }
 
 sub cmdsuccessdump {
@@ -123,6 +128,10 @@ returns the ssh result code of executing $cmd as $TBConfig::EMULAB_USER
 =item C<cmdfailuredump($host, $cmd)>
 
 returns the ssh result code of executing $cmd as $TBConfig::EMULAB_USER and dumps the ssh stdout, stderr, resultcode
+
+=item C<cmdmatch($host, $cmd, $regex, $diemessage)>
+
+executes $cmd as $TBConfig::EMULAB_USER and dies with diemessage if stdout doesn't match $regex
 
 =back
 

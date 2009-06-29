@@ -48,9 +48,13 @@ Tools::TBSSH
 
 B<LOWLEVEL SUB> execute $cmd on $host as $user by wrapping cmdline ssh
 
-=item C<< $ssh->scp_worker(@files)  >>
+=item C<< $ssh->scp_worker(@files) >>
 
 B<LOWLEVEL SUB> execute $scp with $files as arguments
+
+=item C<< $ssh->saydebug() >>
+
+B<LOWLEVEL SUB> prints out ssh command line 
 
 =back
 

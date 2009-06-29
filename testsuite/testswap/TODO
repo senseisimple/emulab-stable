@@ -1,5 +1,9 @@
+ImageTest
+Parameters
+OldTests
+
 DOCS TODO
-  retry example
+  backoff example
 
 TODO
   TIMEOUT of XMLRPC Calls
@@ -18,11 +22,10 @@ STILL MESSY
 
 EXPAND CURRENT IMPLEMENTATION
   event subsystem
-  parallel support (custom test harness)
+  Test::Builder support
 
 LATER
   Client.pm duplicate code elimination - Maybe this would make the code too unreadable
-  TestSuite::Experiment::Macros should be a monadic language like JQuery
   test groupings
   Large External Tars and Resources for experiements
   buildup, teardown using Test::Class
