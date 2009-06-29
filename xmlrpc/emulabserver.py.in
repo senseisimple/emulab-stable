@@ -3393,18 +3393,19 @@ class node:
             pass
 
         pid_clause = ""
+        pid_clause_list = ""
         if argdict.has_key("proj"):
             permerror = CheckProjPermission(self.uid, argdict["proj"])
             if permerror:
                 return permerror
 
-            pid_clause = " or p.pid='%s'" % (str(argdict["proj"]),)
+            pid_clause_list = str(argdict["proj"])
+            pid_clause = " or p.pid='%s'" % (pid_clause_list,)
             pass
         else:
-            pid_clause = (" or p.pid in ("
-                          + ",".join([("'" + x + "'")
-                                      for x in GetProjects(self.uid)])
-                          + ")")
+            pid_clause_list = ",".join([("'" + x + "'")
+                                        for x in GetProjects(self.uid)])
+            pid_clause = (" or p.pid in (" + pid_clause_list + ")")
             pass
 
         node_clause = ""
@@ -3423,7 +3424,9 @@ class node:
             "  (a.eventstate='ISUP' or "
             "   a.eventstate='PXEWAIT' or "
             "   a.eventstate='POWEROFF'),wn.site,nfcpu.weight, "
-            "   GROUP_CONCAT(DISTINCT aux.type),wn.hostname "
+            "  GROUP_CONCAT(DISTINCT aux.type),wn.hostname, "
+            "  a.reserved_pid is null or a.reserved_pid in "
+            "   (" + pid_clause_list + ") "
             "FROM nodes AS a "
             "left join reserved as b on a.node_id=b.node_id "
             "left join node_types as nt on a.type=nt.type "
@@ -3449,7 +3452,7 @@ class node:
                 result[row[0]] = {
                     "node_id" : row[0],
                     "type" : row[1],
-                    "free" : (row[2] == 1 and row[3] == 1),
+                    "free" : (row[2] == 1 and row[3] == 1 and row[8] == 1),
                     }
                 if row[4]:
                     result[row[0]]["site"] = row[4]
