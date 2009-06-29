@@ -11,6 +11,15 @@
 #
 
 #
+# Default configuration options
+#
+{
+    package CFG;
+    $assignopts = "-P";
+    $assignbin = "bin/assign";
+}
+
+#
 # List all files in the ptop/ directory that match a certain pattern (passed
 # to a shell). Return a list.
 #
@@ -102,6 +111,15 @@ sub readfileinfo() {
             chomp(my $linkcount = `cat $linkcountfile`);
             $$hashref{$file}{'links'} = $linkcount;
 
+            my $fdcountfile = "$type/counts/$file.fds";
+            if (!-e $fdcountfile) {
+                print "(re)Generating $fdcountfile for $type/$file\n";
+                system "egrep '^node' $type/$file | cut -f 2 -d '-' | wc  -w > $fdcountfile";
+            }
+            chomp(my $fdcount = `cat $fdcountfile`);
+            $$hashref{$file}{'fds'} = $fdcount;
+
+
         }
     }
     return (\%topinfo, \%ptopinfo);
@@ -121,6 +139,8 @@ sub parseassignlog($) {
         if ($line =~ /BEST SCORE:\s+(\d*\.*\d+) in (\d+) iters and (\d*\.*\d+) seconds/) {
             ($assigninfo{'bestscore'},$assigninfo{'iters'},
              $assigninfo{'runtime'} ) = ($1,$2,$3);
+        } elsif ($line =~ /Generating physical equivalence classes:\s*(\d+)/) {
+             $assigninfo{'pclasses'} = $1;
         }
     }
     if (!exists($assigninfo{'runtime'})) {

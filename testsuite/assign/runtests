@@ -42,7 +42,7 @@ foreach my $dir ($::testdir, $::outdir, $::statdir) {
 # Actually run assign
 #
 foreach my $test (enumeratetests()) {
-    my $cmdline = "bin/assign $CFG::assignopts " . ptopfile($test) .
+    my $cmdline = "$CFG::assignbin $CFG::assignopts " . ptopfile($test) .
                                              " " . topfile($test);
     my $logfile = logfile($test);
     print "Running $test ... ";
