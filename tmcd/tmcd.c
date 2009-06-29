@@ -3248,37 +3248,15 @@ COMMAND_PROTOTYPE(domounts)
 		return 0;
 
 	/*
-	 * Jailed nodes (the phys or virt node) do not get mounts.
-	 * Locally, though, the jailflag is not set on nodes (hmm,
-	 * maybe fix that) so that the phys node still looks like it
-	 * belongs to the experiment (people can log into it). 
+	 * A local phys node acting as a shared host gets toplevel mounts only.
 	 */
-	if (reqp->jailflag)
-		return 0;
-
-	/*
-	 * XXX
-	 */
-	if (reqp->genisliver_idx)
-		return 0;
-
-	/*
-	 * A node acting as a shared host gets toplevel mounts now.
-	 * Might change.
-	 */
-	if (reqp->sharing_mode[0]) {
-	  if (!usesfs) {
+	if (reqp->sharing_mode[0] && !reqp->isvnode) {
 		OUTPUT(buf, sizeof(buf), "REMOTE=%s LOCAL=%s\n",
 		       FSUSERDIR, USERDIR);
 		client_writeback(sock, buf, strlen(buf), tcp);
 		/* Leave this logging on all the time for now. */
 		info("MOUNTS: %s", buf);
 
-		OUTPUT(buf, sizeof(buf), "REMOTE=%s LOCAL=%s\n",
-		       FSPROJDIR, PROJDIR);
-		client_writeback(sock, buf, strlen(buf), tcp);
-		/* Leave this logging on all the time for now. */
-		info("MOUNTS: %s", buf);
 #ifdef FSSCRATCHDIR
 		OUTPUT(buf, sizeof(buf), "REMOTE=%s LOCAL=%s\n",
 		       FSSCRATCHDIR, SCRATCHDIR);
@@ -3293,14 +3271,14 @@ COMMAND_PROTOTYPE(domounts)
 		/* Leave this logging on all the time for now. */
 		info("MOUNTS: %s", buf);
 #endif
-	  }
-	  return 0;
+		OUTPUT(buf, sizeof(buf), "REMOTE=%s LOCAL=%s\n",
+		       FSPROJDIR, PROJDIR);
+		client_writeback(sock, buf, strlen(buf), tcp);
+		/* Leave this logging on all the time for now. */
+		info("MOUNTS: %s", buf);
+		return 0;
 	}
-	
-	/*
-	 * If SFS is in use, the project mount is done via SFS.
-	 */
-	if (!usesfs) {
+	else if (!usesfs) {
 		/*
 		 * Return project mount first. 
 		 */
@@ -3309,6 +3287,12 @@ COMMAND_PROTOTYPE(domounts)
 		client_writeback(sock, buf, strlen(buf), tcp);
 		/* Leave this logging on all the time for now. */
 		info("MOUNTS: %s", buf);
+
+		/*
+		 * Skip all this for a vnode; client does not ask.
+		 */
+		if (reqp->isvnode)
+			goto dousers;
 		
 #ifdef FSSCRATCHDIR
 		/*
@@ -3344,7 +3328,7 @@ COMMAND_PROTOTYPE(domounts)
 			info("MOUNTS: %s", buf);
 		}
 	}
-	else {
+	else if (usesfs) {
 		/*
 		 * Return SFS-based mounts. Locally, we send back per
 		 * project/group mounts (really symlinks) cause thats the
@@ -3462,42 +3446,17 @@ COMMAND_PROTOTYPE(domounts)
 #endif
 		}
 	}
-
+ dousers:
 	/*
-	 * Remote nodes do not get per-user mounts. See above.
+	 * Remote nodes do not get per-user mounts.
+	 * ProtoGeni nodes do not get them either. 
 	 */
 	if (!reqp->islocal || reqp->genisliver_idx)
 	        return 0;
 	
 	/*
-	 * Now check for aux project access. Return a list of mounts for
-	 * those projects.
-	 */
-	res = mydb_query("select pid from exppid_access "
-			 "where exp_pid='%s' and exp_eid='%s'",
-			 1, reqp->pid, reqp->eid);
-	if (!res) {
-		error("MOUNTS: %s: DB Error getting users!\n", reqp->pid);
-		return 1;
-	}
-
-	if ((nrows = (int)mysql_num_rows(res))) {
-		while (nrows) {
-			row = mysql_fetch_row(res);
-			
-			OUTPUT(buf, sizeof(buf), "REMOTE=%s/%s LOCAL=%s/%s\n",
-				FSPROJDIR, row[0], PROJDIR, row[0]);
-			client_writeback(sock, buf, strlen(buf), tcp);
-
-			nrows--;
-		}
-	}
-	mysql_free_result(res);
-
-	/*
 	 * Now a list of user directories. These include the members of the
-	 * experiments projects, plus all the members of all of the projects
-	 * that have been granted access to share the nodes in that expt.
+	 * experiments projects if its a regular experimental node. 
 	 */
 	res = mydb_query("select u.uid,u.admin from users as u "
 			 "left join group_membership as p on "
