@@ -46,14 +46,30 @@ my $NODESPEED = "1000";
 # 100 gbit interface or 10 trunked 10gbit interfaces)
 my $TRUNKSPEED = $NODESPEED * 100;
 
+#
+# Generate a list of (0-weight) features
+#
+sub featurelist($) {
+    my ($howmany) = @_;
+    my @features;
+    foreach my $i (0 .. $howmany -1) {
+        push @features, "FD$i:0";
+    }
+    return @features;
+}
+
 if (@ARGV == 1) {
     ($nodes) = @ARGV;
+} elsif (@ARGV == 2) {
+    my $featurecount;
+    ($nodes,$featurecount) = @ARGV;
+    @NODEFEATURES = featurelist($featurecount);
 } elsif (@ARGV == 3) {
     my $trunkmult;
     ($nodes, $PPS, $trunkmult) = @ARGV;
     $TRUNKSPEED = $NODESPEED * $trunkmult;
 } else {
-    die "Usage: $0 <nodes> [pps trunkmult]\n";
+    die "Usage: $0 <nodes> [pps trunkmult] | [ featurecount ]\n";
 }
 
 #
