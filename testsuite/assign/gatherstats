@@ -29,7 +29,8 @@ setglobals();
 #
 my ($topinfo,$ptopinfo)  = readfileinfo();
 
-my (@pnode_time, @vnode_time, @plink_time, @vlink_time);
+my (@pnode_time, @vnode_time, @plink_time, @vlink_time, @feature_time,
+    @pclass_time);
 
 #
 # Loop through every test, gathering stats
@@ -40,16 +41,21 @@ foreach my $test (enumeratetests()) {
         my $top = top($test);
         my $ptop = ptop($test);
         my $time = $$assigninfo{'runtime'};
+        my $pclasses = $$assigninfo{'pclasses'};
 
         my $topnodes = $$topinfo{$top}{'nodes'};
         my $toplinks = $$topinfo{$top}{'links'};
         my $ptopnodes = $$ptopinfo{$ptop}{'nodes'};
         my $ptoplinks = $$ptopinfo{$ptop}{'links'};
+        my $topfds = $$topinfo{$top}{'fds'};
+        my $ptopfds = $$ptopinfo{$ptop}{'fds'};
 
         push @pnode_time, [$ptopnodes, $time];
         push @vnode_time, [$topnodes, $time];
         push @plink_time, [$ptoplinks, $time];
         push @vlink_time, [$toplinks, $time];
+        push @feature_time, [$ptopfds, $time];
+        push @pclass_time, [$pclasses, $time];
 
     } else {
         print "NOTICE: Test $test failed, skipping\n";
@@ -61,3 +67,5 @@ write_sortedfile(statfile("pnode_time"), \@pnode_time);
 write_sortedfile(statfile("vnode_time"), \@vnode_time);
 write_sortedfile(statfile("plink_time"), \@plink_time);
 write_sortedfile(statfile("vlink_time"), \@vlink_time);
+write_sortedfile(statfile("feature_time"), \@feature_time);
+write_sortedfile(statfile("pclass_time"), \@pclass_time);
