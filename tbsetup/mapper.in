@@ -577,9 +577,13 @@ sub RunAssign($$)
 		"Cancel flag set; aborting assign run!\n");
 	return -1;
     }
-    if ($vtop->AllocNodes() != 0) {
-	print("Could not allocate nodes.\n");
-	return -1;
+    my $retval = $vtop->AllocNodes();
+    if ($retval != 0) {
+	if ($retval < 1) {
+	    print("Could not allocate any nodes.\n");
+	    return -1;
+	}
+	return 1;
     }
     TBDebugTimeStamp("AllocNodes ended, InterpLinks Started");
     if ($vtop->InterpLinks() != 0) {
