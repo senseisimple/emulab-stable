@@ -830,7 +830,7 @@ sub List($)
     my $type = $argref->{'type'};
     my @results = ();
 
-    if (! (defined($type) && ($type =~ /^(Authorities|Components|Slices)$/i))){
+    if (! (defined($type) && ($type =~ /^(Authorities|Components|Slices|Users)$/i))){
 	return GeniResponse->MalformedArgsResponse();
     }
     $type = lc($type);
@@ -891,6 +891,20 @@ sub List($)
 	    my $blob = {"gid"  => $authority->cert(),
 			"hrn"  => $authority->hrn(),
 			"uuid" => $authority->uuid() };
+	    
+	    push(@results, $blob);
+	}
+    }
+    elsif ($type eq "users") {
+	my @users;
+
+	if (GeniUser->ListAll(\@users) != 0) {
+	    return GeniResponse->Create(GENIRESPONSE_ERROR);
+	}
+	foreach my $user (@users) {
+	    my $blob = {"gid"  => $user->cert(),
+			"hrn"  => $user->hrn(),
+			"uuid" => $user->uuid() };
 	    
 	    push(@results, $blob);
 	}

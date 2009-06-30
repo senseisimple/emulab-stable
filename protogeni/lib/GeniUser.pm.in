@@ -560,7 +560,7 @@ sub IsLocal($)
 }
 
 #
-# Delete all slices for an authority.
+# Delete all users for an authority.
 #
 sub DeleteAll($$)
 {
@@ -609,6 +609,35 @@ sub DeleteAll($$)
 	}
     }
 
+    return 0;
+}
+
+#
+# List All users.
+#
+sub ListAll($$)
+{
+    my ($class, $pref) = @_;
+    my @result = ();
+    @$pref = ();
+
+    my $query_result =
+	DBQueryWarn("select uuid from geni_users");
+
+    return -1
+	if (! $query_result);
+    return 0
+	if (!$query_result->numrows);
+
+    while (my ($uuid) = $query_result->fetchrow_array()) {
+	my $user = GeniUser->Lookup($uuid);
+	if (!defined($user)) {
+	    print STDERR "Could not lookup user $uuid\n";
+	    return -1;
+	}
+	push(@result, $user);
+    }
+    @$pref = @result;
     return 0;
 }
 
