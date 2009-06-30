@@ -2913,9 +2913,9 @@ sub InterpNodes($)
 		tbwarn("Could not lookup subnode host $physical\n");
 		return -1;
 	    }
-	    if (! exists($self->pnodes()->{$subnode_pnode->phys_nodeid()})) {
-		my $parentname = $subnode_pnode->phys_nodeid();
-		
+	    my $parentname = $subnode_pnode->phys_nodeid();
+	    
+	    if (! exists($self->solution()->{'P2V'}->{$parentname})) {
 		# Make up a name and add to the reserve list.
 		my $newvname = $self->newvname($parentname, "phost");
 
