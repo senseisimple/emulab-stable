@@ -686,7 +686,7 @@ sub fatal(@)
 	
 	    if (@newreservednodes) {
 		$NoRecover = 0
-		    if (system("nfree -x $pid $eid @newreservednodes") == 0);
+		    if (system("$NFREE -x $pid $eid @newreservednodes") == 0);
 	    }
 	    else {
 		# When not updating this is meaningless to tbswap.
