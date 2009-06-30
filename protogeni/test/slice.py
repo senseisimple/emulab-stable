@@ -80,8 +80,6 @@ print "Got SA credential.  Looking up slice " + SLICENAME + "..."
 # Look up the slice and obtain credentials.
 #
 slice = resolve_slice( SLICENAME, mycredential )
-sliceuuid  = slice[ "uuid" ]
-if debug: print sliceuuid
 print "Found slice " + SLICENAME + ", asking for a credential..."
 
 slicecred = get_slice_credential( slice, mycredential )

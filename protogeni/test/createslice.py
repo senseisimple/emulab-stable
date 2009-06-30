@@ -43,14 +43,11 @@ params["type"]       = "Slice"
 params["hrn"]        = SLICENAME
 rval,response = do_method("sa", "Resolve", params)
 if rval == 0:
-    myslice = response["value"]
-    myuuid  = myslice["uuid"]
-
     print "Deleting previously registered slice";
     params = {}
     params["credential"] = mycredential
     params["type"]       = "Slice"
-    params["uuid"]       = myuuid
+    params["hrn"]        = SLICENAME
     rval,response = do_method("sa", "Remove", params)
     if rval:
         Fatal("Could not remove slice record")

@@ -35,16 +35,13 @@ mycredential = get_self_credential()
 print "Got my SA credential"
 
 #
-# Lookup slice, and delete.
+# Delete slice.
 #
-myslice = resolve_slice( SLICENAME, mycredential )
-myuuid  = myslice["uuid"]
-
 print "Deleting previously registered slice";
 params = {}
 params["credential"] = mycredential
 params["type"]       = "Slice"
-params["uuid"]       = myuuid
+params["hrn"]        = SLICENAME
 rval,response = do_method("sa", "Remove", params)
 if rval:
     Fatal("Could not remove slice record")
