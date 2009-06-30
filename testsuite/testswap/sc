@@ -53,8 +53,9 @@ sub end_all_experiments {
   e->pretty_list;
   say "";
   if (yn_prompt("Are you sure you want to terminate all experiments?")) {
-    e(@{$_->[0]})->end for( experiments_hash_to_list(e->list_full));
-    e(@{$_->[0]})->waitforended for( experiments_hash_to_list(e->list_full));
+    my @experiment_names = experiments_hash_to_list(e->getlist_full);
+    e(@{$_->[0]})->end for(@experiment_names);
+    e(@{$_->[0]})->waitforended for(@experiment_names);
   }
 }
 

@@ -72,12 +72,9 @@ sub single_request {
     say("Received");
     say Dumper($resp);
   }
-  if ((!ref($resp)) && ($resp =~ /SSL \w+ timeout/)) {
-    die "SSL_SOCKET_TIMEOUT";
-  }
-  if ($resp->isa('RPC::XML::struct') && $resp->value->{'code'} != 0 ) {
-    die $resp;
-  }
+  if ((!ref($resp)) && ($resp =~ /SSL \w+ timeout/)) { die "SSL_SOCKET_TIMEOUT"; }
+  if ($resp->isa('RPC::XML::fault')) { die $resp->{faultString}; }
+  if ($resp->isa('RPC::XML::struct') && $resp->value->{'code'} != 0 ) { die $resp; }
   $resp;
 }
 

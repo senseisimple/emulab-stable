@@ -68,7 +68,7 @@ sub runtests {
 
   my $workscheduler =  TestBed::ForkFramework::WeightedScheduler->new( 
     items => $Executors,
-    proc => &tap_wrapper,
+    proc => \&tap_wrapper,
     maxnodes => $concurrent_node_count_usage,
   );
 
@@ -84,7 +84,7 @@ sub runtests {
       warn "$eid requires upto $maximum_nodes nodes, only $concurrent_node_count_usage concurrent nodes permitted\n$eid will not be run";
     }
     else {
-      $workscheduler->add_task($itemId, $maximum_nodes);
+      $workscheduler->add_task($executor, $maximum_nodes);
       $total_test_count += $executor->test_count;
     }
   }

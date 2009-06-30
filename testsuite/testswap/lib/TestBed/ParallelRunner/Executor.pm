@@ -66,7 +66,6 @@ sub parse_options {
 sub buildt { shift; TestBed::ParallelRunner::Executor->new( parse_options(@_)); }
 
 sub build {
-  shift;
   my ($e, $ns, $sub, $test_count, $desc) = (shift, shift, shift, shift, shift);
   return TestBed::ParallelRunner::Executor->new(
     'e'          => $e,
