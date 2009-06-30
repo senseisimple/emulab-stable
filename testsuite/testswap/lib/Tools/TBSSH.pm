@@ -64,6 +64,12 @@ sub cmdsuccess {
   return wrapped_ssh($host, $TBConfig::EMULAB_USER, $cmd, sub { $_[2] == 0; } );
 }
 
+sub cmdoutput {
+  my ($host, $cmd, $diemessage) = @_;
+  my @results = wrapped_ssh($host, $TBConfig::EMULAB_USER, $cmd, sub { $_[2] == 0; }, $diemessage );
+  return $results[1];
+}
+
 sub cmdmatch {
   my ($host, $cmd, $regex, $diemessage) = @_;
   return wrapped_ssh($host, $TBConfig::EMULAB_USER, $cmd, sub { $_[0] =~ $regex; }, $diemessage );

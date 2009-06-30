@@ -10,7 +10,7 @@ use Tools;
 
 my $loglevel = "INFO";
 $loglevel = "DEBUG" if $TBConfig::DEBUG_XML_CLIENT;
-my $logger = init_tbts_logger("XMLRPCClient", undef, "INFO", "SCREEN");
+my $logger = Tools::init_tbts_logger("XMLRPCClient", undef, "INFO", "SCREEN");
 
 
 #ensures loading of client side SSL certificates
@@ -59,11 +59,11 @@ sub func    { (shift->pkgfunclist())[2]; }
 
 sub single_request {
   my ($self, $command, @args) = @_;
-  $logger->debug(toperl($command, @args));
+  $logger->debug(Tools::toperl($command, @args));
   $logger->debug("Sent");
   if ($TBConfig::DEBUG_XML_CLIENT) {
     say("Sent");
-    sayperl($command, @args)
+    Tools::sayperl($command, @args)
   }
   my $resp = $self->client->send_request($command, $TBConfig::XMLRPC_VERSION, @args); 
   $logger->debug("Received");

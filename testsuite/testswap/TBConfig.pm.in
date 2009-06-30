@@ -17,6 +17,10 @@ our $DEFAULT_PID      = $ENV{'TBTS_PROJECT'} || 'tbres';
 our $DEFAULT_GID      = $ENV{'TBTS_GROUP'}   || '';
 our $DEBUG_XML_CLIENT = $ENV{'TBTS_DEBUG'}   || 0;
 our $CMDLINE_OPTIONS  = {};
+our @EXPERIMENT_OPS_PARAMS = ('noemail' => 1);
+our $concurrent_prerun_jobs = 4;
+our $concurrent_node_usage  = 20;
+our $EMULAB_SUFFIX    = "emulab.net";
 
 sub get_emulab_user {
   my $cert = slurp($SSL_CLIENT_CERT);

@@ -3,8 +3,9 @@ package TestBed::TestSuite;
 use SemiModern::Perl;
 use TestBed::TestSuite::Experiment;
 use TestBed::ParallelRunner;
+use TestBed::ForkFramework;
 use Data::Dumper;
-use Tools;
+use Tools qw(concretize);
 
 my $error_sub = sub {
   use Carp qw(longmess);
@@ -17,7 +18,7 @@ my $error_sub = sub {
 
 require Exporter;
 our @ISA = qw(Exporter);
-our @EXPORT = qw(e CartProd CartProdRunner concretize defaults override rege runtests pr_e);
+our @EXPORT = qw(e CartProd CartProdRunner concretize defaults override rege runtests pr_e prun prunout);
 
 sub e { TestBed::TestSuite::Experiment->new(_build_e_from_positionals(@_)); }
 
@@ -110,6 +111,17 @@ sub defaults {
 sub override {
   my ($params, %overrides) = @_;
   return { %{($params || {})}, %overrides };
+}
+
+sub prun {
+  my $results = TestBed::ForkFramework::ForEach::worksubs( @_);
+  die ("prun item failed", $results)  if ($results->has_errors);
+  return $results;
+}
+
+sub prunout {
+  my $results = prun(@_);
+  return $results->sorted_results;
 }
 
 =head1 NAME

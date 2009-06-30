@@ -7,7 +7,7 @@ use Log::Log4perl qw(get_logger :levels);
 
 require Exporter;
 our @ISA = qw(Exporter);
-our @EXPORT = qw(prettytimestamp timestamp sayts sayperl slurp toperl
+our @EXPORT_OK = qw(prettytimestamp timestamp sayts sayperl slurp toperl
                  init_tbts_logger concretize yn_prompt splat_to_temp);
 
 =head1 NAME

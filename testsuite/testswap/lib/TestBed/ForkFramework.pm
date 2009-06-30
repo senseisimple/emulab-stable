@@ -57,6 +57,10 @@ has 'errors' => ( isa => 'ArrayRef', is => 'rw', default => sub { [ ] } );
 sub push_success { push @{shift->successes}, shift; }
 sub push_error { push @{shift->errors}, shift; }
 sub has_errors { scalar @{shift->errors};}
+sub successful { ! shift->has_errors;}
+sub sorted_results {
+  return map { $_->result } (sort { $a->itemid <=> $b->itemid } @{shift->successes});
+}
 sub handle_result { 
   my ($self, $result) = @_;
   if   ( $result->is_error ) { $self->push_error($result); } 
@@ -277,6 +281,11 @@ sub max_work {
     'iter' => _gen_iterator($items),
   );
   $s->workloop;
+}
+
+sub worksubs {
+  my $items = [@_];
+  return max_work(scalar @$items, sub { $_[0]->() } , $items);
 }
 
 sub doItem { my ($s, $itemid) = @_; $s->proc->($s->items->[$itemid]); }

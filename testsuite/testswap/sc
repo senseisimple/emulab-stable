@@ -32,7 +32,7 @@ $ns run
 NSEND
 
 sub usage {
-say <<"END"
+say <<'END'
 ShortCut
 ./sc CMD EID ARGS
 
@@ -40,19 +40,28 @@ ShortCut
         swapin
         swapout
         end
+        endall
+        watch
+        watchall
         ping
         tevc
         linktest
         single_node_tests
-        ni    // nodeinfo
-        li    // linkinfo
+        ni    // nodeinfo expinfo
+        li    // linkinfo expinfo
+        fqnn  // list fully qualified node names
+        im    // $e->info(aspect => 'mapping'))
+        ip    // $e->info(aspect => 'physical'))
+        it    // $e->info(aspect => 'traces'))
+        il    // $e->info(aspect => 'links'))
+        ex    execute arbitrary perl code
 END
 }
 
 sub end_all_experiments {
   e->pretty_list;
   say "";
-  if (yn_prompt("Are you sure you want to terminate all experiments?")) {
+  if (Tools::yn_prompt("Are you sure you want to terminate all experiments?")) {
     my @experiment_names = experiments_hash_to_list(e->getlist_full);
     e(@{$_->[0]})->end for(@experiment_names);
     e(@{$_->[0]})->waitforended for(@experiment_names);
@@ -65,14 +74,14 @@ sub watch {
   my $eid = $e->eid;
   while ($result) {
     my $result = $e->state;
-    say prettytimestamp . " Watch $eid = $result";
+    say Tools::prettytimestamp . " Watch $eid = $result";
     sleep(2);
   }
 }
 
 sub watchall {
   while (1) {
-    say prettytimestamp;
+    say Tools::prettytimestamp;
     e->pretty_list;
     sleep(5);
   }

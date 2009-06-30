@@ -23,13 +23,28 @@ framwork class for starting and testing experiments
 
 =over 4
 
+=item C<< $e->resolve($nodename) >>
+
+resolves node name into a fully qualified node name
+=cut
+sub resolve {
+  my ($e, $name) = @_;
+  if ($name !~ m{\.}) {
+    my $eid = $e->eid;
+    my $pid = $e->pid;
+    my $suffix = $TBConfig::EMULAB_SUFFIX;
+    return "$name.$eid.$pid.$suffix";
+  }
+  return $name;
+}
+
 =item C<< $e->node($nodename) >>
 
 returns a node object representing node $nodename in the experiment
 =cut
 sub node {
   my ($e, $nodename) = @_;
-  TestBed::TestSuite::Node->new('experiment' => $e, 'name' => $nodename);
+  TestBed::TestSuite::Node->new('experiment' => $e, 'name' => $e->resolve($nodename));
 }
 
 =item C<< $e->link($linkname) >>
@@ -181,12 +196,10 @@ splats $data to $filename on each node
 =cut
 sub splat {
   my ($e, $data, $fn) = @_;
-  my $temp = splat_to_temp($data);
+  my $temp = Tools::splat_to_temp($data);
   my $rc = 0;
   for (@{$e->nodes}) {
-    my $user = $TBConfig::EMULAB_USER;
-    my $host = $_->name;
-    my $dest = "$user\@$host:$fn";
+    my $dest = $_->build_remote_name($fn);
     my @results = $_->scp($temp, $dest);
     $rc ||= $results[0];
     die "splat to $dest failed" if $rc;

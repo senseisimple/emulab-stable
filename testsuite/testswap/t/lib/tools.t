@@ -16,4 +16,4 @@ Dooh
 RedHatAnchient
 Dooh
 END
-ok(concretize($a, OS=>'RedHatAnchient') eq $b, 'concretize templating utility');
+ok(Tools::concretize($a, OS=>'RedHatAnchient') eq $b, 'concretize templating utility');

@@ -2,6 +2,7 @@
 package TestBed::TestSuite::Node;
 use SemiModern::Perl;
 use Mouse;
+use Tools;
 use Tools::Network;
 use Tools::TBSSH;
 use Data::Dumper;
@@ -53,6 +54,39 @@ returns a $ssh connection to the node
 sub scp {
   my $self = shift;
   return Tools::TBSSH::scp($self->name, @_);
+}
+
+sub build_remote_name {
+  my ($s, $fn) = @_;
+  my $user = $TBConfig::EMULAB_USER;
+  my $host = $s->name;
+  return "$user\@$host:$fn";
+}
+
+sub splat {
+  my ($s, $data, $fn) = @_;
+  my $temp = Tools::splat_to_temp($data);
+  my $dest = $s->build_remote_name($fn);
+  my @results = $s->scp($temp, $dest);
+  die "splat to $dest failed" if $results[0];
+  return 1;
+}
+
+sub splatex {
+  my ($s, $data, $fn) = @_;
+  $s->splat($data, $fn);
+  $s->ssh->cmdsuccess("chmod +x $fn");
+}
+
+sub slurp {
+  my ($s, $fn) = @_;
+  use File::Temp;
+  my $temp = File::Temp->new;
+  my $src = $s->build_remote_name($fn);
+  my @results = $s->scp($src, $temp);
+  die "spurp from $src failed" if $results[0];
+  return Tools::slurp($temp);
+  return 1;
 }
 
 =back 
