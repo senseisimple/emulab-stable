@@ -849,7 +849,7 @@ sub snmpitDoIt($$$;$) {
 	$array_size = 4;
     }
 
-    if ((ref($var) ne "SNMP::Varbind") &&
+    if (((ref($var) ne "SNMP::Varbind") && (ref($var) ne "SNMP::VarList")) &&
 	    ((ref($var) ne "ARRAY") || ((@$var != $array_size) && (@$var != 4)))) {
 	$snmpitErrorString = "Invalid SNMP variable given ($var)!\n";
 	return undef;
