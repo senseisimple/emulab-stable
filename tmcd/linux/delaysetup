@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -87,7 +87,7 @@ my $KERNELJAIL  = "jail";
 my $KERNELLDELAY= "linkdelay";
 
 my $TMDELMAP	= TMDELMAP;	# Really comes from libloc.
-my $TC          = "/usr/local/sbin/tc";               # This is the working version!
+my $TC          = "/usr/local/sbin/tc";       # This is the working version!
 my $IPTABLES    = "/usr/local/sbin/iptables"; # This is the working version!
 
 # This should never happen!
@@ -107,7 +107,10 @@ if ($uninstall) {
 # Update the delays configuration. Also run the the commands to make
 # the changes.
 #
-LinkDelaySetup();
+if (LinkDelaySetup()) {
+    exit(1);
+}
+
 if ($install) {
     system(TMLINKDELAY)
 	if (-e TMLINKDELAY);
@@ -224,7 +227,10 @@ sub LinkDelaySetup()
 	    # address which is the unique characteristic for some forms
 	    # of virtual interface.
 	    # 
-	    $iface        = findiface($iface,$inet);
+	    if (!($iface = findiface($iface,$inet))) {
+		warn("*** WARNING: Could not map $1/$inet to an interface!\n");
+		return -1;
+	    }
 
 	    #
 	    # Delays are floating point numbers (unit is ms). ipfw does not

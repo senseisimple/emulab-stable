@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -152,14 +152,18 @@ if ($reinstall || $uninstall) {
 # the changes. Since a node cannot be doing delays and linkdelays at the
 # same time, try each and exit.
 #
-DelaySetup();
+if (DelaySetup()) {
+    exit(1);
+}
 if (-e TMDELAY) {
     system(TMDELAY . " enable")
 	if ($install || $reinstall);
     exit(0);
 }
 
-LinkDelaySetup();
+if (LinkDelaySetup()) {
+    exit(1);
+}
 if (-e TMLINKDELAY) {
     system(TMLINKDELAY . " enable")
 	if ($install || $reinstall);
@@ -669,7 +673,10 @@ sub LinkDelaySetup
 	    # address which is the unique characteristic for some forms
 	    # of virtual interface.
 	    # 
-	    $iface        = findiface($iface,$inet);
+	    if (!($iface = findiface($iface,$inet))) {
+		warn("*** WARNING: Could not map $1/$inet to an interface!\n");
+		return -1;
+	    }
 
 	    #
 	    # Delays are floating point numbers (unit is ms). ipfw does not
@@ -727,15 +734,7 @@ sub LinkDelaySetup
 	    }
 
 	    $upcmds .= "ipfw add $pipeno pipe $pipeno ip from any to ".
-		       "any out xmit $iface ";
-	    #
-	    # XXX only our specially hacked FBSD4 kernel has the nexthop
-	    # option.  It should not be needed anymore, but just in case...
-	    #
-	    if ($FBSD_VERSION <= 4) {
-		$upcmds .= "nexthop $inet:$mask";
-	    }
-	    $upcmds .= "\n    ";
+		       "any out xmit $iface\n    ";
 
 	    $upcmds .= "ipfw pipe $pipeno config delay ${delay}ms " .
 	               "bw ${bandw}Kbit/s plr $plr $queue $redparams\n    ";
