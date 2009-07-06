@@ -1663,7 +1663,7 @@ COMMAND_PROTOTYPE(doifconfig)
 			if (isveth)
 				tag = row[8];
 			else if (strcmp(row[6], "vlan") == 0)
-				tag = row[9];
+				tag = row[9] ? row[9] : "0";
 
 			/* sanity check the tag */
 			if (!isdigit(tag[0])) {
