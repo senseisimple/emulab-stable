@@ -950,7 +950,13 @@ sub findiface($;$)
     $iface = <FIF>;
     
     if (! close(FIF)) {
-	return 0;
+	if (!defined($ip)) {
+	    return 0;
+	}
+	#
+	# MAC was bogus, if we had an IP, look that up instead
+	#
+	$iface = "";
     }
     
     $iface =~ s/\n//g;
@@ -1844,7 +1850,7 @@ sub vnodejailsetup($)
     dojailconfig();
 
     return ($pid, $eid, $vname);
-}   
+}
 
 #
 # All we do is store it away in the file. This makes it avail later.
