@@ -39,7 +39,7 @@ sub new($$;$) {
     $SNMP::debugging = ($debug - 5) if $debug > 5;
     my $mibpath = "/usr/local/share/snmp/mibs";
     &SNMP::addMibDirs($mibpath);
-    &SNMP::addMibFiles("$mibpath/RFC1155-SMI.txt",
+    &SNMP::addMibFiles("$mibpath/SNMPv2-MIB.txt", "$mibpath/RFC1155-SMI.txt",
 	"$mibpath/PowerNet-MIB.txt");
 
     $SNMP::save_descriptions = 1; # must be set prior to mib initialization
