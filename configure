@@ -2685,6 +2685,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	install/ops-install install/boss-install install/fs-install \
 	install/load-descriptors install/dump-descriptors \
 	install/newnode_sshkeys/GNUmakefile install/smb.conf.head \
+        install/clrhouse-install \
 	mote/GNUmakefile mote/tbuisp mote/tbsgmotepower mote/newmote \
 	mote/sgtools/GNUmakefile \
 	robots/GNUmakefile robots/tbsetdest/GNUmakefile \
