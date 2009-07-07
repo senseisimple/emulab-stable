@@ -147,7 +147,8 @@ readboot(dosfs, boot)
 			perror("could not read backup bootblock");
 			return FSFATAL;
 		}
-		if (memcmp(block, backup, DOSBOOTBLOCKSIZE)) {
+		backup[65] = block[65];				/* XXX */
+		if (memcmp(block + 11, backup + 11, 79)) {
 			/* Correct?					XXX */
 			pfatal("backup doesn't compare to primary bootblock");
 			return FSFATAL;
