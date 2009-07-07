@@ -34,7 +34,9 @@ endif
 ifeq ($(FBSDREL),5.3)
 WITH_LTHREADS	= 0
 else
+ifneq ($(FBSDMAJ),7)
 WITH_LTHREADS	= 1
+endif
 endif
 
 # XXX special checkpoint/shadow device support
