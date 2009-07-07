@@ -220,5 +220,18 @@ sub Authoritative($$)
     return $hrn[ 0 ] eq $authority;
 }
 
+# Helper functions to make special cases slightly less messy:
+
+# Generate an interface URN given a node and an interface ID on that node.
+# This will probably fail horribly if the node ends and/or the interface
+# begins with a '/' character, but anybody who does that probably deserves
+# what they get.
+sub GenerateInterface($$$)
+{
+    my ($authority,$node,$interface) = @_;
+
+    return Generate( $authority, "interface", $node . "//" . $interface );
+}
+
 # _Always_ make sure that this 1 is at the end of the file...
 1;
