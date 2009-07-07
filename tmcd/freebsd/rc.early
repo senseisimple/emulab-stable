@@ -1,0 +1,20 @@
+#
+# We need to disable the "deny all" firewall (i.e., let traffic through)
+# until we can configure ourselves, including the Emulab firewall setup.
+#
+# This is not at all the right place for this, but I cannot put it in
+# sysctl.conf, because those actions are performed *twice*.  The net result
+# was that the Emulab scripts would setup the firewall, and then the second
+# invocation of rc.sysctl would promptly disable the firewall.  So here we are!
+#
+if sysctl net.inet.ip.fw.enable >/dev/null 2>&1; then
+    #
+    # XXX oh so lame.  Only do this on firewall kernel.  Others, like the
+    # jail kernel, will never reenable the firewall if we turn it off here.
+    #
+    bootfile=`sysctl -n kern.bootfile 2>/dev/null`
+    if [ -n "$bootfile" -a $bootfile = "/kernel.fw" ]; then
+	echo "WARNING: firewall disabled for initial bootstrap"
+	sysctl net.inet.ip.fw.enable=0
+    fi
+fi
