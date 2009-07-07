@@ -13,6 +13,14 @@ use Math::BigInt;
 use lib "@prefix@/lib";
 use libdb qw(TBGetSiteVar);
 
+my $PGENISUPPORT = @PROTOGENI_SUPPORT@;
+
+if ($PGENISUPPORT) {
+  require GeniHRN;
+}
+
+use GeniHRN;
+
 sub usage()
 {
     print("Usage: ptopgen [-v] [-s switch] [-p pid [-e eid]] [-m factor] " .
@@ -47,7 +55,12 @@ my $do_xml    = 0;
 my $genimode  = 0;
 my $useshared = 0;
 
+my $OURDOMAIN = "@OURDOMAIN@";
 my $cmuuid = TBGetSiteVar('protogeni/cm_uuid');
+my $cmurn = "";
+if ($PGENISUPPORT) {
+    $cmurn = GeniHRN::Generate($OURDOMAIN, "authority", "cm");
+}
 
 my $delaycap_override;
 
@@ -161,7 +174,7 @@ if (defined($options{"e"})) {
 }
 if (defined($options{"x"})) {
     $genimode = 1
-	if (defined($options{"g"}));
+	if (defined($options{"g"}) && $PGENISUPPORT);
     $do_xml = 1;
 }
 usage()
@@ -173,7 +186,7 @@ my %nodetointerface;
 
 # Read interfaces
 my $result = DBQueryFatal("SELECT node_id,card,port,iface,interface_type" .
-		     " from interfaces");
+		     " from interfaces;");
 while (($node,$card,$port,$iface,$type) = $result->fetchrow_array) {
     push @{ $nodetointerface{"$node"} }, $iface;
     $interfacemap{"$node:$card:$port"} = $iface;
@@ -200,7 +213,10 @@ $result = DBQueryFatal("SELECT n.node_id, n.eventstate, n.role, n.uuid, " .
 		       "where nt.isvirtnode = 0 or nt.isvirtnode is null;");
 while (($node,$eventstate, $role, $uuid, $reserved, $isremotenode,
 	$wa_attrvalue, $sharing_mode) = $result->fetchrow_array) {
-    $nodetouuid{$node} = $uuid;
+    if (defined($uuid) && $uuid ne "")
+    {
+	$nodetouuid{$node} = $uuid;
+    }
     my $islocal = $role eq 'testnode'
 	&& ((! defined($isremotenode) || $isremotenode == 0)
 	    || (defined($wa_attrvalue) && $wa_attrvalue == 1));
@@ -484,7 +500,6 @@ while (($node,$type,$physnode,$class,$issubnode,$def_boot_osid,$reserved,
 	$subnode_of{$node} = $physnode;
     }
     $node_def_boot_osid{$node} = $def_boot_osid;
-    $node_uuids{$node} = $uuid;
 
     if ($reserved) {
 	$is_reserved{$node} = 1;
@@ -540,7 +555,7 @@ foreach $node (keys(%nodes)) {
     my $cpu_speed = $typemap{$type}->{'SPEED'};
     my $ram = $typemap{$type}->{'RAM'};
     my $trivspeed = $typemap{$type}->{'TRIVSPEED'};
-    my $uuid = $node_uuids{$node};
+    my $uuid = $nodetouuid{$node};
     
     my @types = ("$type:1");
     my @features;
@@ -1129,10 +1144,9 @@ foreach $interconnect (keys(%interconnects)) {
 #
 my @wireless_protos = ("80211", "80211a", "80211b", "80211g", "flex900");
 my $fake_switch = "airswitch";
-if (!$genimode) {
-    my @fake_switch_types = map("*$_:*", @wireless_protos);
-    print_node($fake_switch, \@fake_switch_types, [], [], undef, []);
-}
+
+my @fake_switch_types = map("*$_:*", @wireless_protos);
+print_node($fake_switch, \@fake_switch_types, [], [], undef, []);
 
 foreach my $interface (keys(%interfacetypes)) {
     my ($node,$card,$port) = split(":", $interface);
@@ -1290,23 +1304,19 @@ sub print_node
     } elsif ($genimode) {
 	# rspec format
 	print "<node ";
-	print "component_manager_uuid=\"${cmuuid}\" ";
+	print "component_manager_uuid=\"$cmurn\" ";
 	print "component_name=\"$name\" ";
-	if (defined($uuid)) {
-	    print " component_uuid=\"$uuid\" ";
-	}
+	my $urn = GeniHRN::Generate($OURDOMAIN, "node", $name);
+	print " component_uuid=\"$urn\" ";
 	print ">\n";
 	# TODO: Virtualization type
 	print_node_types(@$types);
-	if ($nodetoavailable{$name})
-	{
-	    print "  <available>true</available>";
+	if ($nodetoavailable{$name}) {
+	    print "  <available>true</available>\n";
+	} else {
+	    print "  <available>false</available>\n";
 	}
-	else
-	{
-	    print "  <available>false</available>";
-	}
-	print_node_interfaces(@$interfaces);
+	print_node_interfaces($name, @$interfaces);
 	print "</node>\n";
     } else {
 	# ptop format
@@ -1398,10 +1408,13 @@ sub print_node_flags
 
 sub print_node_interfaces
 {
+    my $nodeName = shift(@_);
+    my @interfaces = @_;
     my $i = 0;
-    for (; $i < scalar(@_); ++$i) {
-	my $name = $_[$i];
-	print "  <interface component_name=\"${name}\"/>\n";
+    for (; $i < scalar(@interfaces); ++$i) {
+	my $name = $interfaces[$i];
+	my $urn = GeniHRN::GenerateInterface($OURDOMAIN, $nodeName, $name);
+	print "  <interface component_name=\"$urn\"/>\n";
     }
 }
 
@@ -1440,22 +1453,23 @@ sub print_named_link_xml
     my $loss = shift(@_);
     my $proto_count = scalar(@_);
     if ($genimode) {
-	print "<link>\n";
-	print "  <component_link ";
+	print "<link ";
 	print "component_manager_uuid=\"${cmuuid}\" ";
 	print "component_name=\"$name\" ";
-# TODO: link uuid
-	print "component_uuid=\"00000\" ";
-	print "/>\n";
+	my $urn = GeniHRN::Generate($OURDOMAIN, "link", $name);
+	print "component_uuid=\"$urn\" ";
+	print ">\n";
+	print_interface($source, $source_if);
+	print_interface($dest, $dest_if);
     } else {
 	print "<link name=\"$name\">\n";
+	print "  <source_interface><interface>\n";
+	print_interface_contents($source, $source_if);
+	print "  </interface></source_interface>\n";
+	print "  <destination_interface><interface>\n";
+	print_interface_contents($dest, $dest_if);
+	print "  </interface></destination_interface>\n";
     }
-    print "  <source_interface><interface>\n";
-    print_interface_contents($source, $source_if);
-    print "  </interface></source_interface>\n";
-    print "  <destination_interface><interface>\n";
-    print_interface_contents($dest, $dest_if);
-    print "  </interface></destination_interface>\n";
     print "  <bandwidth>$bw</bandwidth>\n";
     print "  <latency>$delay</latency>\n";
     print "  <packet_loss>$loss</packet_loss>\n";
@@ -1467,25 +1481,26 @@ sub print_named_link_xml
     print "</link>\n\n";
 }
 
+sub print_interface
+{
+    my $node = shift(@_);
+    my $interface = shift(@_);
+    print "  <interface ";
+    print "component_node_uuid=\"";
+    my $nodeUrn = GeniHRN::Generate($OURDOMAIN, "node", $node);
+    print $nodeUrn;
+    my $interfaceUrn = GeniHRN::GenerateInterface($OURDOMAIN, $node,
+						  $interface);
+    print "\" component_interface_name=\"" . $interfaceUrn . "\"";
+    print "/>\n";
+}
+
 sub print_interface_contents
 {
     my $node = shift(@_);
     my $interface = shift(@_);
-    if ($genimode) {
-	print "    <component_node_uuid>";
-	my $uuid = $nodetouuid{$node};
-	if (defined($uuid)) {
-	    print "$uuid";
-	} else {
-	    print "0000";
-	}
-	print "</component_node_uuid>\n";
-	print "    <component_interface_name>$interface</component_interface_name>\n";
-    } else {
-	print "    <node_name>$node</node_name>\n";
-	print "    <interface_name>$interface</interface_name>\n";
-    }
-
+    print "    <node_name>$node</node_name>\n";
+    print "    <interface_name>$interface</interface_name>\n";
 }
 
 # Print a link with a unique name not necessarily related to source,

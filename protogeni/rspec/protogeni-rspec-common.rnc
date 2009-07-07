@@ -32,7 +32,7 @@ NodeContents =
     }*
 
   LinkContents =
-	# Each link has exactly one virtualization technology, which we simply
+    # Each link has exactly one virtualization technology, which we simply
     # enumerate here
     attribute virtualization_type { "raw" | "trellis-vserver" |
       "planetlab-vserver" | "emulab-vnode" }? &
