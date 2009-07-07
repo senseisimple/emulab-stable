@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007, 2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -184,6 +184,7 @@ sysetc-install:	dir-install
 			$(SYSETCDIR)/dhclient-enter-hooks
 	$(INSTALL) -m 755 $(SRCDIR)/periodic.conf $(SYSETCDIR)/periodic.conf
 	$(INSTALL) -m 755 $(SRCDIR)/testbed.sh $(RCDIR)/testbed.sh
+	$(INSTALL) -m 755 $(SRCDIR)/rc.early $(SYSETCDIR)/rc.early
 
 script-install:	dir-install $(SCRIPTS)
 	$(INSTALL) -m 755 $(SRCDIR)/prepare $(BINDIR)/prepare
