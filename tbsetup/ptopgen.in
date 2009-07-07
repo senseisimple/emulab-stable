@@ -1341,17 +1341,17 @@ sub print_node_types
 	    $name = substr($name, 1);
 	    $is_static = 1;
 	}
-	print "  <node_type>\n";
-	print "    <type_name>$name</type_name>\n";
+	print "  <node_type \n";
+	print "    type_name=\"$name\"\n";
 	if ($count eq "*") {
-	    print "    <unlimited/>\n";
+	    print "    type_slots=\"unlimited\"\n";
 	} else {
-	    print "    <type_slots>$count</type_slots>\n";
+	    print "    type_slots=\"$count\"\n";
 	}
 	if ($is_static) {
-	    print "    <static/>\n";
+	    print "    static=\"true\"\n";
 	}
-	print "  </node_type>\n";
+	print "  />\n";
     }
 }
 
@@ -1414,7 +1414,7 @@ sub print_node_interfaces
     for (; $i < scalar(@interfaces); ++$i) {
 	my $name = $interfaces[$i];
 	my $urn = GeniHRN::GenerateInterface($OURDOMAIN, $nodeName, $name);
-	print "  <interface component_name=\"$urn\"/>\n";
+	print "  <interface component_id=\"$urn\"/>\n";
     }
 }
 
@@ -1473,10 +1473,17 @@ sub print_named_link_xml
     print "  <bandwidth>$bw</bandwidth>\n";
     print "  <latency>$delay</latency>\n";
     print "  <packet_loss>$loss</packet_loss>\n";
-    my $i = 0;
-    for (; $i < $proto_count; ++$i) {
-	print "  <link_type><type_name>" . $_[$i]
-	    . "</type_name></link_type>\n";
+    if ($genimode) {
+	my $i = 0;
+	for (; $i < $proto_count; ++$i) {
+	    print "  <link_type type_name=\"" . $_[$i] . "\" />\n";
+	}
+    } else {
+	my $i = 0;
+	for (; $i < $proto_count; ++$i) {
+	    print "  <link_type><type_name>" . $_[$i]
+		. "</type_name></link_type>\n";
+	}
     }
     print "</link>\n\n";
 }
@@ -1485,13 +1492,13 @@ sub print_interface
 {
     my $node = shift(@_);
     my $interface = shift(@_);
-    print "  <interface ";
+    print "  <interface_ref ";
     print "component_node_uuid=\"";
     my $nodeUrn = GeniHRN::Generate($OURDOMAIN, "node", $node);
     print $nodeUrn;
     my $interfaceUrn = GeniHRN::GenerateInterface($OURDOMAIN, $node,
 						  $interface);
-    print "\" component_interface_name=\"" . $interfaceUrn . "\"";
+    print "\" component_interface_id=\"" . $interfaceUrn . "\"";
     print "/>\n";
 }
 
