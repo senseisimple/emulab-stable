@@ -71,6 +71,74 @@ sub IsValid($)
     return $hrn =~ m'^[uU][rR][nN]:[pP][uU][bB][lL][iI][cC][iI][dD]:IDN\+[A-Za-z0-9.-]+(?::[A-Za-z0-9.-]+)*\+\w+\+(?:[-!$()*,.0-9=@A-Z_a-z]|(?:%[0-9A-Fa-f][0-9A-Fa-f]))+$';
 }
 
+# Perform RFC 3151 transcription (from a string of legal public identifier
+# characters to a URN (sub)string).
+sub Transcribe($)
+{
+    my ($str) = @_;
+
+    # Perform whitespace normalisation (see RFC 3151, section 1.1).
+    $str =~ s/^[ \t\r\n]*//;
+    $str =~ s/[ \t\r\n]*$//;
+    # The replacement with a space is arbitrary and temporary; the space
+    # will later be replaced with a '+' below (we can't directly use a '+'
+    # yet, because we want to treat literal '+'s in the input differently).
+    $str =~ s/[ \t\r\n]+/ /g;
+
+    # The order here is critical: the intent is that from now on, at most
+    # one transformation will apply to any character.
+    $str =~ s/%/%25/g;
+    # '% characters have been escaped; it is now unambiguous to translate
+    # sequences that will contain '%'s.
+    $str =~ s/#/%23/g;
+    $str =~ s/'/%27/g;
+    $str =~ s/\+/%2B/g;
+    $str =~ s/;/%3B/g;
+    $str =~ s/\?/%3F/g;
+    # '+' characters have been escaped; it is now safe to translate ' ' to '+'.
+    $str =~ s/ /+/g;
+    # ';' characters have been escaped; it is now safe to translate '::' to
+    # ';'.
+    $str =~ s/::/;/g;
+    # '::' sequences have been translated; any remaining ':' character must
+    # have been a singleton, and can now be escaped.
+    $str =~ s/:/%3A/g;
+    # All ':' characters have been escaped; we can now translate '//' to ':'.
+    $str =~ s|//|:|g;
+    # '//' sequences have been translated; any remaining '/' character must
+    # have been a singleton, and can now be escaped.
+    $str =~ s|/|%2F|g;
+
+    return $str;
+}
+
+# Perform RFC 3151 inverse transcription (from a URN (sub)string to a
+# (partial) public identifier).
+sub Untranscribe($)
+{
+    my ($str) = @_;
+
+    # Do this in exactly the opposite order to Transcribe, for exactly
+    # the same reason.
+    $str =~ s|%2F|/|gi;
+    $str =~ s|:|//|g;
+    $str =~ s/%3A/:/gi;
+    $str =~ s/;/::/g;
+    $str =~ s/\+/ /g;
+    $str =~ s/%3F/?/gi;
+    $str =~ s/%3B/;/gi;
+    $str =~ s/%2B/+/gi;
+    $str =~ s/%27/'/gi;
+    $str =~ s/%23/#/gi;
+    $str =~ s/%25/%/gi;
+
+    # Note that whitespace normalisation is inherently lossy, so we couldn't
+    # undo it even if we wanted to: all leading and trailing whitespace is
+    # irretrievably gone, and all internal whitespace sequences have collapsed
+    # to single space characters.
+    return $str;
+}
+
 # Break a URN into (sub-)authority, type, and ID components.  There
 # might be further structure in the authority part, but we'll ignore
 # that for now.
@@ -84,17 +152,14 @@ sub Parse($)
 
     $hrn =~ /^[^+]*\+([^+]+)\+([^+]+)\+(.+)$/;
 
-    return ($1, $2, $3);
+    return ($1, $2, Untranscribe( $3 ));
 }
 
-# Generate a ProtoGENI URN.  Note that this is more restrictive than
-# the general GENI naming scheme requires: we rely on the fact that
-# Emulab identifiers are derived from very limited character sets to
-# obtain the guarantee that escaping is never required.  (See the
-# tbdb database regex table.)  This approach should suffice even
-# if and when other GENI implementations decide to distribute URNs
-# containing exotic characters, as long as we are careful to treat
-# foreign URNs as opaque.
+# Generate a ProtoGENI URN.  Note that this is a little bit more
+# restrictive than the general GENI naming scheme requires: we don't
+# currently apply transcription to the authority or type fields,
+# though it would be easy enough to add if anybody were perverse
+# enough to want it.
 sub Generate($$$)
 {
     my ($authority, $type, $id) = @_;
@@ -102,12 +167,19 @@ sub Generate($$$)
     # Assume that any sub-authorities are already encoded (see
     # RFC 3151, section 2).  We don't currently handle sub-authorities,
     # so this is irrelevant for now.
+
+    # Apply case normalisation to the authority; see RFC 3987, section
+    # 5.3.2.1.  According to section 5.3.3, we are supposed to go
+    # further and perform RFC 3490 ToASCII UseSTD3ASCIIRules and
+    # AllowUnassigned and RFC 3491 Nameprep validation to interpret IRIs,
+    # but quite frankly I think I've done more than enough RFC chasing already.
     $authority =~ tr/A-Z/a-z/;
     return undef if $authority !~ /^[-.0-9A-Za-z:]+$/;
     return undef if $type !~ /^[-.0-9A-Z_a-z~]+$/;
-    return undef if $id !~ /^[-.0-9A-Z_a-z~]+$/;
+    return undef if $id !~ m{^[-\t\n\r !#$%'()*+,./0-9:;=?\@A-Z_a-z]+$};
 
-    return "urn:publicid:IDN+" . $authority . "+" . $type . "+" . $id;
+    return "urn:publicid:IDN+" . $authority . "+" . $type . "+" .
+        Transcribe( $id );
 }
 
 # Apply scheme-based (and other) normalisations to a URN (see RFC 3987,
@@ -122,15 +194,7 @@ sub Normalise($)
     return undef if !IsValid( $hrn );
 
     my ($authority, $type, $id) = Parse( $hrn );
-
-    # Apply case normalisation to the authority; see RFC 3987, section
-    # 5.3.2.1.  According to section 5.3.3, we are supposed to go
-    # further and perform RFC 3490 ToASCII UseSTD3ASCIIRules and
-    # AllowUnassigned and RFC 3491 Nameprep validation to interpret IRIs,
-    # but quite frankly I think I've done more than enough RFC chasing already.
-    $authority =~ tr/A-Z/a-z/;
-
-    return "urn:publicid:IDN+" . $authority . "+" . $type . "+" . $id;
+    return Generate( $authority, $type, $id );
 }
 
 sub Equal($$)
