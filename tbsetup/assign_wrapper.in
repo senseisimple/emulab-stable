@@ -3566,9 +3566,9 @@ sub NewVirtIface($$$;$)
 
     #
     # Make up a MAC address.  For now, just derive it from the assigned
-    # IP address.  Note that this is only needed for "veth" type interfaces.
+    # IP address.
     #
-    if ($isveth) {
+    if ($ip =~ /^\d+\.\d+\.\d+\.\d+$/) {
 	$mac = sprintf "0000%.2x%.2x%.2x%.2x", split(/\./, $ip);
     } else {
 	$mac = "000000000000";
