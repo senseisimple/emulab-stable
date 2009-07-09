@@ -50,7 +50,7 @@ sub usage ()
 		 "implies -n\n";
     exit($WRAPPER_FAILED);
 }
-my $optlist    = "dvunfprqczxm:k";
+my $optlist    = "dvunfprqczxm:ko:";
 my $verbose    = 0;
 my $debug      = 0;
 my $fixmode    = 0;
@@ -58,6 +58,7 @@ my $updating   = 0;
 my $impotent   = 0;
 my $precheck   = 0;
 my $prepass    = 0;
+my $outfile;
 my $mfactor;
 my $regression = 0;
 my $noassign   = 0;  # Only with regression mode, use previous solution.
@@ -100,6 +101,7 @@ sub RunAssign($$);
 sub FinalizeRegression($);
 sub AssignLoop();
 sub MapperWrapper();
+sub PrintSolution();
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -149,6 +151,9 @@ if (defined($options{"p"})) {
 }
 if (defined($options{"x"})) {
     $prepass = 1;
+}
+if (defined($options{"o"})) {
+    $outfile = $options{"o"};
 }
 if (defined($options{"m"})) {
     $mfactor = $options{"m"};
@@ -201,6 +206,8 @@ $mfactor = $experiment->multiplex_factor()
 my $vtopflags = 0;
 $vtopflags |= $libvtop::VTOP_FLAGS_VERBOSE
     if ($verbose);
+$vtopflags |= $libvtop::VTOP_FLAGS_QUIET
+    if ($quiet);
 $vtopflags |= $libvtop::VTOP_FLAGS_UPDATE
     if ($updating);
 $vtopflags |= $libvtop::VTOP_FLAGS_FIXNODES
@@ -223,6 +230,8 @@ if ($regression) {
     }
     FinalizeRegression(0);
 }
+PrintSolution()
+    if ($outfile);
 exit(0);
 
 sub MapperWrapper()
@@ -465,7 +474,9 @@ sub RunAssign($$)
     	if ($precheck);
     $args = "-s 123456 $args"
 	if ($regression);
-
+    $args .= " PN=1.0"
+	if ($vtop->sharednodecount());
+    
     # The prepass speeds up assign on big topos with virtual nodes.
     if ($prepass) {
     	$cmd = "assign_prepass";
@@ -649,6 +660,29 @@ sub FinalizeRegression($)
 	    exit(1);
 	}
     }
+    return 0;
+}
+
+#
+# Print a solution in rspec format.
+#
+sub PrintSolution()
+{
+    my $output = undef;
+    
+    if ($outfile ne "-") {
+	if (! open(OUTFILE, "> $outfile")) {
+	    tberror("Could not open $outfile: $!\n");
+	    return -1;
+	}
+	$output = *OUTFILE;
+    }
+    if ($vtop->PrintSolution($output) != 0) {
+	tberror("Could not print solution for $experiment\n");
+	return -1;
+    }
+    close($output)
+	if (defined($output));
     return 0;
 }
 

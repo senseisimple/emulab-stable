@@ -9,7 +9,7 @@ package libvtop;
 use strict;
 use Exporter;
 use vars qw(@ISA @EXPORT @EXPORT_OK
-	    $VTOP_FLAGS_UPDATE $VTOP_FLAGS_VERBOSE
+	    $VTOP_FLAGS_UPDATE $VTOP_FLAGS_VERBOSE $VTOP_FLAGS_QUIET
 	    $VTOP_FLAGS_FIXNODES $VTOP_FLAGS_IMPOTENT
 	    $VTOP_FLAGS_REGRESSION);
 
@@ -47,9 +47,10 @@ $VTOP_FLAGS_UPDATE	= 0x02;
 $VTOP_FLAGS_FIXNODES	= 0x04;
 $VTOP_FLAGS_IMPOTENT	= 0x08;
 $VTOP_FLAGS_REGRESSION  = 0x10;
+$VTOP_FLAGS_QUIET       = 0x20;
 
 @EXPORT_OK = qw($VTOP_FLAGS_UPDATE $VTOP_FLAGS_VERBOSE $VTOP_FLAGS_FIXNODES
-		$VTOP_FLAGS_IMPOTENT $VTOP_FLAGS_REGRESSION);
+		$VTOP_FLAGS_IMPOTENT $VTOP_FLAGS_REGRESSION $VTOP_FLAGS_QUIET);
 
 #
 # Create an object representing the stuff we need to create the vtop file.
@@ -156,6 +157,7 @@ sub isadelaynode($$)    { return exists($_[0]->delaynodes()->{$_[1]}); }
 
 # Debug output.
 sub verbose($)		{ return $_[0]->flags() & $VTOP_FLAGS_VERBOSE; }
+sub quiet($)		{ return $_[0]->flags() & $VTOP_FLAGS_QUIET; }
 sub updating($)		{ return $_[0]->flags() & $VTOP_FLAGS_UPDATE; }
 sub fixcurrent($)	{ return $_[0]->flags() & $VTOP_FLAGS_FIXNODES; }
 sub impotent($)		{ return $_[0]->flags() & $VTOP_FLAGS_IMPOTENT; }
@@ -735,7 +737,7 @@ sub LoadVirtNodes($)
 	my $startloc = undef;
 
 	# Other fields we need.
-	my $ips     = $vnode->ips();
+	my $ips     = $vnode->ips() || "";
 	my $type    = $vnode->type();
 	my $fixed   = $vnode->fixed();
 	my $osname  = $vnode->osname();
@@ -995,6 +997,11 @@ sub LoadVirtLans($)
 	my $mustdelay      = $vlanmember->mustdelay();
 	my $encap          = $vlanmember->encap_style();
 	my $mask           = $vlanmember->mask();
+	my $ip             = $vlanmember->ip();
+	my ($vname,$vport) = split(":", $vlanmember->member());
+
+	# virt_nodes:ips is actually deprecated; this overrides it.
+	$self->{'IPS'}->{"$vname:$vport"} = $ip;
 
 	#
 	# So all this stuff is really per-lan state, but an artifact of
@@ -1261,19 +1268,21 @@ sub PrintSummaryStats($)
     my $reserved_virtcount = $self->counters()->{'reserved_virtcount'};
     my $reserved_physcount = $self->counters()->{'reserved_physcount'};
 
-    print "Minimum nodes   = $minimum_nodes\n";
-    print "Maximum nodes   = $maximum_nodes\n";
-    if ($virtnode_count) {
-	print "Virtual nodes     = $virtnode_count\n";
-    }
-    if ($simnode_count) {
-	print "Simulated nodes   = $simnode_count\n";
-    }
-    if ($reserved_virtcount) {
-	print "Reserved vnodes   = $reserved_virtcount\n";
-    }
-    if ($reserved_physcount) {
-	print "Reserved pnodes   = $reserved_physcount\n";
+    if (!$self->quiet()) {
+	print "Minimum nodes   = $minimum_nodes\n";
+	print "Maximum nodes   = $maximum_nodes\n";
+	if ($virtnode_count) {
+	    print "Virtual nodes     = $virtnode_count\n";
+	}
+	if ($simnode_count) {
+	    print "Simulated nodes   = $simnode_count\n";
+	}
+	if ($reserved_virtcount) {
+	    print "Reserved vnodes   = $reserved_virtcount\n";
+	}
+	if ($reserved_physcount) {
+	    print "Reserved pnodes   = $reserved_physcount\n";
+	}
     }
     return 0;
 }
@@ -2585,6 +2594,7 @@ sub solution_vethmap($)   { return $_[0]->{'SOLUTION'}->{'VETHMAP'}; }
 sub solution_vethpatch($) { return $_[0]->{'SOLUTION'}->{'VETHPATCHES'}; }
 sub solution_portmap($)   { return $_[0]->{'SOLUTION'}->{'PORTMAP'}; }
 sub solution_vifacemap($) { return $_[0]->{'SOLUTION'}->{'VIFACEMAP'}; }
+sub solution_ifacemap($)  { return $_[0]->{'SOLUTION'}->{'IFACEMAP'}; }
 
 sub ReadSolution($$)
 {
@@ -2603,6 +2613,7 @@ sub ReadSolution($$)
     $self->{'SOLUTION'}->{'VETHPATCHES'} = {};
     $self->{'SOLUTION'}->{'PORTMAP'}     = undef;
     $self->{'SOLUTION'}->{'VIFACEMAP'}   = {};
+    $self->{'SOLUTION'}->{'IFACEMAP'}    = {};
 
     #
     # Still using the old assign format.
@@ -4330,10 +4341,13 @@ sub InitializePhysNode($$$)
 		    $inner_elab_role eq "boss+router")) {
 		$cmdline = $self->osidbootcmd($osid, "linkdelay", "");
 	    }
+	    if (!defined($cmdline)) {
+		tberror("Error determining boot command line for $pnode\n");
+		return -1;
+	    }
 	}
-	if (!defined($cmdline)) {
-	    tberror("Error determining boot command line for $pnode\n");
-	    return -1;
+	else {
+	    $cmdline = "";
 	}
 	if (!$pnode->isvirtnode() &&
 	    defined($virtnode->sharing_mode()) &&
@@ -4349,7 +4363,7 @@ sub InitializePhysNode($$$)
 		     # This is no longer used for anything.
 		     "deltas"            => '', 
 		     "ready"             => 0,
-		     "startupcmd"        => $startupcmd,
+		     "startupcmd"        => $startupcmd || '',
 		     "failureaction"     => $failureaction,
 		     "routertype"        => $routertype);
 
@@ -5933,4 +5947,62 @@ sub processVClass($$$$)
     }
     return 0;
 }
+
+################################################################################
+# Print the solution as an rspec. 
+#
+sub PrintSolution($$)
+{
+    my ($self, $output) = @_;
+    $output = *STDOUT
+	if (!defined($output));
+
+    my $pid = $self->experiment()->pid();
+    my $eid = $self->experiment()->eid();
+
+    my $doc = XML::LibXML::Document->new();
+
+    my $root = $doc->createElement("rspec");
+    $root->setAttribute("pid", "$pid");
+    $root->setAttribute("eid", "$eid");
+    $root->setAttribute("xmlns:rspec", "http://emulab.net/resources/rspec/0.1");
+    $doc->setDocumentElement($root);
+
+    foreach my $pnodename (keys(%{ $self->solution_p2v() })) {
+	my @vnodenames = @{ $self->solution_p2v()->{$pnodename} };
+	my $pnode = $self->pnodes()->{$pnodename};
+
+	foreach my $vnodename (@vnodenames) {
+	    my $newNode = addNode($doc, $root, "node");
+	    
+	    $newNode->setAttribute("virtual_id", $vnodename);
+	    $newNode->setAttribute("component_uuid", $pnode->uuid());
+	}
+    }
+    foreach my $virtlan (values(%{ $self->vlans() })) {
+	my $vlanname = $virtlan->vname();
+
+	my $newLink = addNode($doc, $root, "link");
+	$newLink->setAttribute("virtual_id", $vlanname);
+	    
+	foreach my $member ($virtlan->memberlist()) {
+	    # Will this happen?
+	    next
+		if (!exists($self->solution_portmap()->{$member}));
+		
+	    my $vnode  = $member->vnode();
+	    my $vport  = $member->vport();
+	    my $pport  = $member->_pport();
+
+	    my $newMember = addNode($doc, $newLink, "interface_ref");
+	    $newMember->setAttribute("virtual_node_id", $vnode);
+	    $newMember->setAttribute("virtual_port_id", $vport);
+	    $newMember->setAttribute("component_id", $pport);
+	}
+    }
+    print $output $doc->toString(1) . "\n";
+
+    return 0;
+}
+
 1;
