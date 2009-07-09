@@ -1,5 +1,5 @@
 /* GENIPUBLIC-COPYRIGHT
- * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
+ * Copyright (c) 2009 University of Utah and the Flux Group.
  * All rights reserved.
  *
  * Permission to use, copy, modify and distribute this software is hereby
@@ -14,167 +14,131 @@
 
 package
 {
-  // This object populates and takes events from both 'select', a
-  // combo-box used to specify the component manager and 'list', a
-  // listbox with all of the nodes managed by the component manager.
-
-  import fl.controls.ComboBox;
-  import fl.controls.List;
-  import fl.events.ListEvent;
-  import flash.events.Event;
   import flash.utils.Dictionary;
 
   class ComponentManager
   {
-    public function ComponentManager(newSelect : ComboBox,
-                                     newList : List,
-                                     newNodes : ActiveNodes) : void
+
+    static var NORMAL = 0;
+    static var LOADING = 1;
+    static var FAILED = 2;
+
+    public function ComponentManager(newId : String,
+                                     newName : String,
+                                     newHostName : String,
+                                     newUrl : String,
+                                     newUpdate : Function) : void
     {
-      select = newSelect;
-      list = newList;
-      list.allowMultipleSelection = true;
-      listStatus = new ListStatusClip();
-      list.addChild(listStatus);
-      listStatus.alpha = 0.3;
-      nodes = newNodes;
+      id = newId;
+      name = newName;
+      hostName = newHostName;
+      url = newUrl;
+      update = newUpdate;
 
       components = new Array();
-
       used = new Array();
-      tickets = new Array();
-      states = new Array();
-
-      select.removeAll();
-      select.selectedIndex = 0;
-      select.rowCount = 4;
-
-      var i : int = 0;
-      for (; i < cmNames.length; ++i)
-      {
-        select.addItem(new ListItem(cmNames[i], null));
-        components.push(new Array());
-        used.push(new Array());
-        tickets.push(null);
-        states.push(LOADING);
-//        if (cmResults[i] != null)
-//        {
-//          populateNodes(i, cmResults[i]);
-//        }
-      }
-
-      states[0] = NORMAL;
-
-      list.addEventListener(ListEvent.ITEM_CLICK, clickItem);
-      list.addEventListener(Event.CHANGE, changeItem);
-      select.addEventListener(Event.CHANGE, changeComponent);
-
-      updateList();
+      ticket = null;
+      sliver = null;
+      state = LOADING;
     }
 
-    public function cleanup() : void
+    public function getName() : String
     {
-      list.removeEventListener(ListEvent.ITEM_CLICK, clickItem);
-      list.removeEventListener(Event.CHANGE, changeItem);
-      select.removeEventListener(Event.CHANGE, changeComponent);
-      listStatus.parent.removeChild(listStatus);
+      return name;
     }
 
-    public function getTicket(index : int) : String
+    public function getUrl() : String
     {
-      return tickets[index];
+      return url;
     }
 
-    public function setTicket(index : int, value : String) : void
+    public function getHostName() : String
     {
-      tickets[index] = value;
+      return hostName;
     }
 
-    public function getUrl(index : int) : String
+    public function getId() : String
     {
-      return cmUrls[index];
+      return id;
     }
 
-    public function getCmCount() : int
+    public function setState(newState : int) : void
     {
-      return cmNames.length;
+      state = newState;
     }
 
-    public function removeNode(cmIndex : int, nodeIndex : int) : void
+    public function getState() : int
     {
-      var target : int = used[cmIndex].indexOf(nodeIndex);
+      return state;
+    }
+
+    public function setTicket(newTicket : String) : void
+    {
+      ticket = newTicket;
+    }
+
+    public function getTicket() : String
+    {
+      return ticket;
+    }
+
+    public function setSliver(newSliver : String) : void
+    {
+      sliver = newSliver;
+    }
+
+    public function getSliver() : String
+    {
+      return sliver;
+    }
+
+    public function isUsed(nodeIndex : int) : Boolean
+    {
+      return used.indexOf(nodeIndex) != -1;
+    }
+
+    public function addUsed(nodeIndex : int) : void
+    {
+      used.push(nodeIndex);
+    }
+
+    public function removeUsed(nodeIndex : int) : void
+    {
+      var target : int = used.indexOf(nodeIndex);
       if (target != -1)
       {
-        used[cmIndex].splice(target, 1);
+        used.splice(target, 1);
       }
-      if (cmIndex == select.selectedIndex)
-      {
-        list.selectedIndices = used[select.selectedIndex].slice();
-      }
+      update();
     }
 
-    function clickItem(event : ListEvent) : void
+    public function getUsed() : Array
     {
-      if (used[select.selectedIndex].indexOf(event.index) == -1)
-      {
-        var com = components[select.selectedIndex][event.index];
-        nodes.addNode(com.name,
-                      com.uuid,
-                      com.interfaces,
-                      select.selectedIndex,
-                      event.index,
-                      removeNode,
-                      select.stage.mouseX,
-                      select.stage.mouseY);
-        used[select.selectedIndex].push(event.index);
-      }
-      list.selectedIndices = used[select.selectedIndex].slice();
+      return used.slice();
     }
 
-    function changeItem(event : Event) : void
+    public function getComponent(nodeIndex : int) : Component
     {
-      list.selectedIndices = used[select.selectedIndex].slice();
+      return components[nodeIndex];
     }
 
-    function changeComponent(event : Event) : void
+    public function getComponentCount() : int
     {
-      updateList();
+      return components.length;
     }
 
-    function updateList() : void
+    public function resourceFailure() : void
     {
-      var current = select.selectedIndex;
-      list.removeAll();
-      list.clearSelection();
-      var i : int = 0;
-      for (; i < components[current].length; ++i)
-      {
-        list.addItem(new ListItem(components[current][i].name, "NodeNone"));
-      }
-      list.selectedIndices = used[current].slice();
-      if (states[current] == NORMAL)
-      {
-        listStatus.visible = false;
-      }
-      else if (states[current] == LOADING)
-      {
-        listStatus.visible = true;
-        listStatus.text.text = "Loading";
-        listStatus.text.backgroundColor = 0x00ff00;
-      }
-      else
-      {
-        listStatus.visible = true;
-        listStatus.text.text = "Failed";
-        listStatus.text.backgroundColor = 0xff0000;
-      }
+      setState(FAILED);
+      update();
     }
 
-    public function populateNodes(index : int, str : String) : void
+    public function resourceSuccess(str : String) : void
     {
       var console = Main.getConsole();
       if (console != null)
       {
-        console.appendText("\npopulateNodes: " + cmNames[index] + "\n");
+        console.appendText("\npopulateNodes: " + name + "\n");
       }
       try
       {
@@ -196,25 +160,28 @@ package
           var i : int = 0;
           for (; i < xmlNodes.length; ++i)
           {
-            var com : Component = new Component();
-            components[index].push(com);
-            var uuid : String = xmlNodes[i].attribute("component_uuid");
-            uuidToNode[uuid] = com;
-            com.name = xmlNodes[i].attribute("component_name");
-            com.uuid = uuid;
-            var interfaceName = new QName(rspec.namespace(), "interface");
-            var interfaceList = xmlNodes[i].elements(interfaceName);
-            for each (var inter in interfaceList)
+            if (isAvailable(xmlNodes[i]))
             {
-              var interName = inter.attribute("component_name");
-              com.interfaces.push(new Interface(interName));
+              var com : Component = new Component();
+              components.push(com);
+              var uuid : String = xmlNodes[i].attribute("component_uuid");
+              uuidToNode[uuid] = com;
+              com.name = xmlNodes[i].attribute("component_name");
+              com.uuid = uuid;
+              com.managerId = xmlNodes[i].attribute("component_manager_uuid");
+              var interfaceName = new QName(rspec.namespace(), "interface");
+              var interfaceList = xmlNodes[i].elements(interfaceName);
+              for each (var inter in interfaceList)
+              {
+                var interName = inter.attribute("component_id");
+                com.interfaces.push(new Interface(interName));
+              }
             }
           }
 
           parseLinks(rspec, uuidToNode);
         }
-        states[index] = NORMAL;
-        updateList();
+        setState(NORMAL)
       }
       catch (e : Error)
       {
@@ -223,7 +190,9 @@ package
         {
           text.appendText("\n" + e.toString() + "\n");
         }
+        setState(FAILED);
       }
+      update();
     }
 
     function parseLinks(rspec : XML, uuidToNode : Dictionary) : void
@@ -231,15 +200,18 @@ package
       var linkName : QName = new QName(rspec.namespace(), "link");
       for each (var link in rspec.elements(linkName))
       {
-        var interElement : QName = new QName(rspec.namespace(), "interface");
+        var interElement : QName = new QName(rspec.namespace(),
+                                             "interface_ref");
         for each (var inter in link.descendants(interElement))
         {
-               var uuidList = inter.elements(new QName(rspec.namespace(),
-                                                  "component_node_uuid"));
-          var uuid : String = uuidList.text();
-          var nameList = inter.elements(new QName(rspec.namespace(),
-                                                  "component_interface_name"));
-          var interName : String = nameList.text();
+//          var uuidList = inter.elements(new QName(rspec.namespace(),
+//                                                  "component_node_uuid"));
+//          var uuid : String = uuidList.text();
+          var uuid : String = inter.attribute("component_node_uuid");
+//          var nameList = inter.elements(new QName(rspec.namespace(),
+//                                                  "component_interface_name"));
+//          var interName : String = nameList.text();
+          var interName : String = inter.attribute("component_interface_id");
           var node : Component = uuidToNode[uuid];
           if (node != null)
           {
@@ -247,12 +219,30 @@ package
             {
               if (interName == nodeInter.name)
               {
-                nodeInter.used = false;
+                nodeInter.role = Interface.EXPERIMENTAL;
               }
             }
           }
         }
       }
+    }
+
+    function isAvailable(node : XML) : Boolean
+    {
+      var result : Boolean = false;
+      var availableName : QName = new QName(node.namespace(),
+                                            "available");
+      var available = node.elements(availableName);
+      for each (var element in available)
+      {
+        var text = element.text();
+        if (text.toString() == "true")
+        {
+          result = true;
+          break;
+        }
+      }
+      return result;
     }
 
 
@@ -287,76 +277,17 @@ package
       }
     }
 
-    public function failResources(index : int)
-    {
-      states[index] = FAILED;
-      updateList();
-    }
+    var id : String;
+    var name : String;
+    var hostName : String;
+    var url : String;
 
-    var select : ComboBox;
-    var list : List;
-    var listStatus : ListStatusClip;
-    var nodes : ActiveNodes;
-    // An array of arrays. Outer == CM, inner == Component
     var components : Array;
-
     var used : Array;
-    var tickets : Array;
-    var states : Array;
-
-    var NORMAL = 0;
-    var LOADING = 1;
-    var FAILED = 2;
-
-    public static var hostName : Array = new Array("",
-                                                   ".emulab.net",
-                                                   ".emulab.net",
-                                                   ".emulab.net",
-                                                   ".uky.emulab.net",
-                                                   ".schooner.wail.wisc.edu",
-                                                   ".cmcl.cs.cmu.edu");
-
-    public static var cmNames : Array = new Array("", "ProtoGENI", "Emulab",
-                                                  "gtwelab", "Kentucky",
-                                                  "Wisconsin", "CMU");
-    static var cmUrls : Array =
-      new Array(null,
-                "https://myboss.myelab.testbed.emulab.net:443/protogeni/xmlrpc",
-                "https://boss.emulab.net:443/protogeni/xmlrpc/",
-                "https://myboss.emulab.geni.emulab.net:443/protogeni/xmlrpc",
-                "https://www.uky.emulab.net/protogeni/xmlrpc",
-                "https://www.schooner.wail.wisc.edu/protogeni/xmlrpc",
-                "https://boss.cmcl.cs.cmu.edu/protogeni/xmlrpc");
-    static var cmResults : Array =
-      new Array(null,
-                "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> "+
-                " <node uuid=\"de9803c2-773e-102b-8eb4-001143e453fe\" " +
-                "       name=\"geni1\" " +
-                "       virtualization_type=\"emulab-vnode\"> " +
-                " </node>" +
-                " <node uuid=\"de995217-773e-102b-8eb4-001143e453fe\" " +
-                "       name=\"geni-other\" " +
-                "       virtualization_type=\"emulab-vnode\"> " +
-                " </node>" +
-                "</rspec>",
-
-                "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> "+
-                " <node uuid=\"deb23428-773e-102b-8eb4-001143e453fe\" " +
-                "       name=\"pgeni4\" " +
-                "       virtualization_type=\"emulab-vnode\"> " +
-                " </node>" +
-                " <node uuid=\"deb06bd8-773e-102b-8eb4-001143e453fe\" " +
-                "       name=\"pgeni2\" " +
-                "       virtualization_type=\"plab_node\"> " +
-                " </node>" +
-                " <node uuid=\"deaaad4b-773e-102b-8eb4-001143e453fe\" " +
-                "       name=\"pgeni3\" " +
-                "       virtualization_type=\"plab_node\"> " +
-                " </node>" +
-                "</rspec>",
-                null,
-                null,
-                null,
-                null);
+    var ticket : String;
+    // Credential for the sliver
+    var sliver : String;
+    var state : int;
+    var update : Function;
   }
 }

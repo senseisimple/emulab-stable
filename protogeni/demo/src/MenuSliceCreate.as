@@ -114,7 +114,7 @@ package
       opName = "Acquiring credential";
       clip.loadText.text = opName;
       op.reset(Geni.getCredential);
-      op.addField("uuid", "0b2eb97e-ed30-11db-96cb-001143e453fe");
+//      op.addField("uuid", "0b2eb97e-ed30-11db-96cb-001143e453fe");
       op.call(completeCredential, failure);
       addSend();
     }
@@ -149,7 +149,8 @@ package
       if (code == 0)
       {
         credential.ssh = response.value;
-        startUserLookup();
+        startSliceDelete();
+//        startUserLookup();
       }
       else
       {
@@ -216,7 +217,8 @@ package
       clip.loadText.text = "Deleting existing slice";
       op.reset(Geni.remove);
       op.addField("credential", credential.base);
-      op.addField("uuid", sliceId);
+//      op.addField("uuid", sliceId);
+      op.addField("hrn", "urn:publicid:IDN+emulab.net+slice+"+sliceName);
       op.addField("type", "Slice");
       op.call(completeSliceDelete, failure);
       addSend();
@@ -225,7 +227,7 @@ package
     function completeSliceDelete(code : Number, response : Object) : void
     {
       addResponse();
-      if (code == 0)
+      if (code == 0 || code == 12)
       {
         startSliceCreate();
       }
@@ -241,9 +243,10 @@ package
       clip.loadText.text = "Creating new slice";
       op.reset(Geni.register);
       op.addField("credential", credential.base);
-      op.addField("hrn", sliceName);
+      op.addField("hrn", "urn:publicid:IDN+emulab.net+slice+"+sliceName);
+//      op.addField("hrn", sliceName);
       op.addField("type", "Slice");
-      op.addField("userbindings", new Array(user.uuid));
+//      op.addField("userbindings", new Array(user.uuid));
       op.call(completeSliceCreate, failure);
       addSend();
     }

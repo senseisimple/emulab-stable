@@ -37,6 +37,7 @@ package
       clip.sliceName.setSelection(0, clip.sliceName.length);
       clip.sliceName.alwaysShowSelection = true;
       clip.stage.focus = clip.sliceName;
+      clip.sliceName.restrict = "a-zA-Z";
 
       clip.stage.addEventListener(KeyboardEvent.KEY_UP, keyUp);
     }

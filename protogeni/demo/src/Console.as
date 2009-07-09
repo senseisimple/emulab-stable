@@ -27,45 +27,19 @@ package
   class Console
   {
     public function Console(parent : DisplayObjectContainer,
-                            newNodes : ActiveNodes, newCm : ComponentManager,
+                            newNodes : ActiveNodes,
+                            newManagers : ComponentView,
                             newArena : SliceDetailClip,
                             newCredential : Credential,
                             newText : String) : void
     {
       nodes = newNodes;
-      cm = newCm;
+      managers = newManagers;
       arena = newArena;
-/*
-      consoleButton = newConsoleButton;
-      consoleButton.label = "Console";
-      consoleButton.addEventListener(MouseEvent.CLICK, clickConsole);
-      createSliversButton = newCreateSliversButton;
-      createSliversButton.label = "Create Slivers";
-      createSliversButton.addEventListener(MouseEvent.CLICK,
-                                           clickCreateSlivers);
-      bootSliversButton = newBootSliversButton;
-      bootSliversButton.label = "Boot Slivers";
-      bootSliversButton.addEventListener(MouseEvent.CLICK,
-                                         clickBootSlivers);
-      runSpeedTestButton = newRunSpeedTestButton;
-      runSpeedTestButton.label = "Speed Test";
-      runSpeedTestButton.addEventListener(MouseEvent.CLICK,
-                                          clickRunSpeedTest);
-      deleteSliversButton = newDeleteSliversButton;
-      deleteSliversButton.label = "Delete Slivers";
-      deleteSliversButton.addEventListener(MouseEvent.CLICK,
-                                           clickDeleteSlivers);
-*/
       credential = newCredential;
 
       clip = new ConsoleClip();
       parent.addChild(clip);
-/*
-      clip.back.label = "Back";
-      clip.back.addEventListener(MouseEvent.CLICK, clickBack);
-      clip.rspec.label = "RSpec";
-      clip.rspec.addEventListener(MouseEvent.CLICK, clickRspec);
-*/
       clip.visible = false;
       clip.text.text = newText;
 
@@ -93,17 +67,6 @@ package
 
     public function cleanup() : void
     {
-/*
-      consoleButton.removeEventListener(MouseEvent.CLICK, clickConsole);
-      createSliversButton.removeEventListener(MouseEvent.CLICK,
-                                              clickCreateSlivers);
-      bootSliversButton.removeEventListener(MouseEvent.CLICK,
-                                            clickBootSlivers);
-      runSpeedTestButton.removeEventListener(MouseEvent.CLICK,
-                                          clickRunSpeedTest);
-      clip.back.removeEventListener(MouseEvent.CLICK, clickBack);
-      clip.rspec.removeEventListener(MouseEvent.CLICK, clickRspec);
-*/
       buttons.cleanup();
       clip.parent.removeChild(clip);
     }
@@ -118,14 +81,9 @@ package
       return clip.text;
     }
 
-    function discoverSliver(index : int) : Request
+    function discoverSliver(cm : ComponentManager) : Request
     {
-      var result : Request = null;
-      if (cm.getUrl(index) != null)
-      {
-        result = new RequestResourceDiscovery(index, cm);
-      }
-      return result;
+      return new RequestResourceDiscovery(cm);
     }
 
     function clickConsole(event : MouseEvent) : void
@@ -135,16 +93,14 @@ package
 
     function forEachComponent(func : Function) : void
     {
-      var i : int = 0;
-      for (; i < cm.getCmCount(); ++i)
+      for each (var cm in managers.getManagers())
       {
-        if (cm.getUrl(i) != null)
+        if (cm.getUrl() != null)
         {
-          var newRequest = func(i);
+          var newRequest = func(cm);
           if (newRequest != null)
           {
             queue.push(newRequest);
-//            nodes.changeState(i, ActiveNodes.PENDING);
             if (! working)
             {
               start();
@@ -162,20 +118,22 @@ package
       }
     }
 
-    function createSliver(index : int) : Request
+    function createSliver(cm : ComponentManager) : Request
     {
       var result : Request = null;
-      var rspec = nodes.getXml(index, false);
-      if (rspec != null)
+      var shouldSend = nodes.managerUsed(cm);
+      if (shouldSend)
       {
-        if (credential.slivers[index] == null)
+        var rspec = null;
+        if (cm.getSliver() == null)
         {
-          result = new RequestSliverCreate(index, nodes, cm, rspec);
+          rspec = nodes.getXml(false);
+          result = new RequestSliverCreate(cm, nodes, rspec);
         }
         else
         {
-          rspec = nodes.getXml(index, true);
-          result = new RequestSliverUpdate(index, nodes, cm, rspec, true);
+          rspec = nodes.getXml(true);
+          result = new RequestSliverUpdate(cm, nodes, rspec, false);
         }
       }
       return result;
@@ -189,12 +147,12 @@ package
       }
     }
 
-    function bootSliver(index : int) : Request
+    function bootSliver(cm : ComponentManager) : Request
     {
       var result : Request = null;
-      if (nodes.existsState(index, ActiveNodes.CREATED))
+      if (nodes.existsState(cm, ActiveNodes.CREATED))
       {
-        result = new RequestSliverStart(index, nodes, cm.getUrl(index));
+        result = new RequestSliverStart(cm, nodes);
       }
       return result;
     }
@@ -220,14 +178,14 @@ package
       }
     }
 
-    function deleteSliver(index : int) : Request
+    function deleteSliver(cm : ComponentManager) : Request
     {
       var result : Request = null;
-      if (nodes.existsState(index, ActiveNodes.PENDING)
-          || nodes.existsState(index, ActiveNodes.CREATED)
-          || nodes.existsState(index, ActiveNodes.BOOTED))
+      if (nodes.existsState(cm, ActiveNodes.PENDING)
+          || nodes.existsState(cm, ActiveNodes.CREATED)
+          || nodes.existsState(cm, ActiveNodes.BOOTED))
       {
-        result = new RequestSliverDestroy(index, nodes, cm.getUrl(index));
+        result = new RequestSliverDestroy(cm, nodes);
       }
       return result;
     }
@@ -249,18 +207,8 @@ package
       clip.rspecScroll.visible = ! clip.rspecScroll.visible;
 
       clip.rspecText.text = "";
-      var i : int = 0;
-      for (; i < ComponentManager.cmNames.length; ++i)
-      {
-        var xml = nodes.getXml(i, true);
-        if (xml != null)
-        {
-          clip.rspecText.appendText("\n\n\n\n--------------------------------\n");
-          clip.rspecText.appendText(ComponentManager.cmNames[i] + "\n");
-          clip.rspecText.appendText("--------------------------------\n\n");
-          clip.rspecText.appendText(xml.toString());
-        }
-      }
+      var xml = nodes.getXml(true);
+      clip.rspecText.appendText(xml.toString());
       clip.rspecScroll.update();
     }
 
@@ -328,7 +276,7 @@ package
 
     var clip : ConsoleClip;
     var nodes : ActiveNodes;
-    var cm : ComponentManager;
+    var managers : ComponentView;
     var arena : SliceDetailClip;
 
     var buttons : ButtonList;

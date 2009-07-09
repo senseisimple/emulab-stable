@@ -16,10 +16,8 @@ package
 {
   class RequestResourceDiscovery extends Request
   {
-    public function RequestResourceDiscovery(newCmIndex : int,
-                                             newCm : ComponentManager) : void
+    public function RequestResourceDiscovery(newCm : ComponentManager) : void
     {
-      cmIndex = newCmIndex;
       cm = newCm;
     }
 
@@ -33,7 +31,7 @@ package
       opName = "Requesting Resources";
       op.reset(Geni.discoverResources);
       op.addField("credential", credential.slice);
-      op.setUrl(cm.getUrl(cmIndex));
+      op.setUrl(cm.getUrl());
       return op;
     }
 
@@ -42,16 +40,15 @@ package
     {
       if (code == 0)
       {
-        cm.populateNodes(cmIndex, response.value);
+        cm.resourceSuccess(response.value);
       }
       else
       {
-        cm.failResources(cmIndex);
+        cm.resourceFailure();
       }
       return null;
     }
 
-    var cmIndex : int;
     var cm : ComponentManager;
   }
 }

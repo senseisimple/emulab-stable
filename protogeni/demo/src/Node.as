@@ -23,24 +23,22 @@ package
   public class Node
   {
     public function Node(parent : DisplayObjectContainer,
-                         newName : String, newId : String,
-                         newInterfaces : Array,
-                         newCmIndex : int, newNodeIndex : int,
-                         newCleanupMethod : Function, newNumber : int,
-                         newMouseDownNode : Function,
+                         newComponent : Component,
+                         newManager : ComponentManager, newNodeIndex : int,
+                         newNumber : int, newMouseDownNode : Function,
                          newMouseDownLink : Function) : void
     {
-      name = newName;
-      id = newId;
+      name = newComponent.name;
+      id = newComponent.uuid;
+      managerId = newComponent.managerId;
       sliverId = "";
       interfaces = new Array();
-      for each (var inter in newInterfaces)
+      for each (var inter in newComponent.interfaces)
       {
         interfaces.push(inter.clone());
       }
-      cmIndex = newCmIndex;
+      manager = newManager;
       nodeIndex = newNodeIndex;
-      cleanupMethod = newCleanupMethod;
       mouseDownNode = newMouseDownNode;
       mouseDownLink = newMouseDownLink;
 
@@ -49,8 +47,7 @@ package
       clip.width = WIDTH;
       clip.height = HEIGHT;
       clip.node.nameField.text = name;
-      clip.node.cmField.text
-        = ComponentManager.cmNames[cmIndex].substring(0, 1);
+      clip.node.cmField.text = manager.getName().substring(0, 1);
       clip.node.mouseChildren = false;
       clip.node.addEventListener(MouseEvent.MOUSE_DOWN, mouseDownNode);
       clip.node.selected.visible = false;
@@ -65,7 +62,7 @@ package
 
     public function cleanup() : void
     {
-      cleanupMethod(cmIndex, nodeIndex);
+      manager.removeUsed(nodeIndex);
       clip.node.removeEventListener(MouseEvent.MOUSE_DOWN, mouseDownNode);
       clip.addLink.removeEventListener(MouseEvent.MOUSE_DOWN, mouseDownLink);
       clip.parent.removeChild(clip);
@@ -155,10 +152,16 @@ package
     {
       return name;
     }
-
+/*
     public function getCmIndex() : int
     {
       return cmIndex;
+    }
+*/
+
+    public function getManager() : ComponentManager
+    {
+      return manager;
     }
 
     public function isBooted() : Boolean
@@ -168,7 +171,7 @@ package
 
     public function getHostName() : String
     {
-      return name + ComponentManager.hostName[cmIndex];
+      return name + manager.getHostName();
     }
 
     public function allocateInterface() : String
@@ -176,7 +179,7 @@ package
       var result = "*";
       for each (var candidate in interfaces)
       {
-        if (! candidate.used)
+        if (! candidate.used && candidate.role == Interface.EXPERIMENTAL)
         {
           candidate.used = true;
           result = candidate.name;
@@ -198,18 +201,18 @@ package
       }
     }
 
-    public function changeState(index : int, state : int) : void
+    public function changeState(target : ComponentManager, state : int) : void
     {
-      if (index == cmIndex)
+      if (target == manager)
       {
         newState = state;
         updateState();
       }
     }
 
-    public function commitState(index : int) : void
+    public function commitState(target : ComponentManager) : void
     {
-      if (index == cmIndex)
+      if (target == manager)
       {
         clip.node.nameField.textColor = 0x000000;
         oldState = newState;
@@ -217,9 +220,9 @@ package
       }
     }
 
-    public function revertState(index : int) : void
+    public function revertState(target : ComponentManager) : void
     {
-      if (index == cmIndex)
+      if (target == manager)
       {
         clip.node.nameField.textColor = 0xff0000;
         newState = oldState;
@@ -244,31 +247,44 @@ package
     }
 
 
-    public function getXml(targetIndex : int, useTunnels : Boolean) : XML
+    public function getXml(useTunnels : Boolean) : XML
     {
       var result : XML = null;
-      if (cmIndex == targetIndex)
       {
 //        result = <node> </node>;
 //        result.@uuid = id;
 //        result.@nickname = name;
 //        result.@virtualization_type = virtType;
-        var str : String = "<node uuid=\"" + id + "\" nickname=\"" + name
+        var str : String = "<node component_uuid=\"" + id
+          + "\" component_manager_uuid=\"" + managerId
+          + "\" virtual_id=\"" + name
           + "\" virtualization_type=\"" + virtType + "\" ";
-        if (useTunnels)
+//        if (useTunnels)
+//        {
+//          str += "sliver_uuid=\"" + sliverId + "\" ";
+//        }
+        str += ">";
+        for each (var current in interfaces)
         {
-          str += "sliver_uuid=\"" + sliverId + "\" ";
+          if (current.used)
+          {
+            str += "<interface virtual_id=\"" + current.name
+              + "\" component_id=\"" + current.name
+              + "\" />";
+          }
         }
-        str += "> </node>";
+        str += "<interface virtual_id=\"control\" />";
+        str += " </node>";
         result = XML(str);
       }
       return result;
     }
 
-    public function isState(index : int, exemplar : int) : Boolean
+    public function isState(target : ComponentManager,
+                            exemplar : int) : Boolean
     {
       var state : int = calculateState();
-      return index == cmIndex && state == exemplar;
+      return target == manager && state == exemplar;
     }
 
     public function getStatusText() : String
@@ -283,7 +299,7 @@ package
           + sliverId + "\n";
       }
       result += "<font color=\"#7777ff\">Component Manager:</font> "
-        + ComponentManager.cmNames[cmIndex] + "\n";
+        + manager.getName() + "\n";
       if (state != ActiveNodes.PLANNED)
       {
         result += "<font color=\"#7777ff\">Status:</font> "
@@ -300,10 +316,10 @@ package
     var clip : NodeClip;
     var name : String;
     var id : String;
+    var managerId : String;
     var sliverId : String;
-    var cmIndex : int;
+    var manager : ComponentManager;
     var nodeIndex : int;
-    var cleanupMethod : Function;
     var links : Array;
     var mouseDownNode : Function;
     var mouseDownLink : Function;

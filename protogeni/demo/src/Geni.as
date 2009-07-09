@@ -27,6 +27,7 @@ package
 
     public static var discoverResources = new Array(cm, "DiscoverResources");
     public static var getTicket = new Array(cm, "GetTicket");
+    public static var updateTicket = new Array(cm, "UpdateTicket");
     public static var redeemTicket = new Array(cm, "RedeemTicket");
     public static var releaseTicket = new Array(cm, "ReleaseTicket");
     public static var deleteSliver = new Array(cm, "DeleteSliver");

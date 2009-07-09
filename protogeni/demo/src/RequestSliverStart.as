@@ -16,13 +16,11 @@ package
 {
   class RequestSliverStart extends Request
   {
-    public function RequestSliverStart(newCmIndex : int,
-                                       newNodes : ActiveNodes,
-                                       newUrl : String) : void
+    public function RequestSliverStart(newManager : ComponentManager,
+                                       newNodes : ActiveNodes) : void
     {
-      cmIndex = newCmIndex;
+      manager = newManager;
       nodes = newNodes;
-      url = newUrl;
     }
 
     override public function cleanup() : void
@@ -32,12 +30,12 @@ package
 
     override public function start(credential : Credential) : Operation
     {
-      nodes.changeState(cmIndex, ActiveNodes.CREATED, ActiveNodes.BOOTED);
+      nodes.changeState(manager, ActiveNodes.CREATED, ActiveNodes.BOOTED);
       opName = "Booting Sliver";
       op.reset(Geni.startSliver);
-      op.addField("credential", credential.slivers[cmIndex]);
+      op.addField("credential", manager.getSliver());
       op.addField("impotent", Request.IMPOTENT);
-      op.setUrl(url);
+      op.setUrl(manager.getUrl());
       return op;
     }
 
@@ -46,17 +44,16 @@ package
     {
       if (code == 0)
       {
-        nodes.commitState(cmIndex);
+        nodes.commitState(manager);
       }
       else
       {
-        nodes.revertState(cmIndex);
+        nodes.revertState(manager);
       }
       return null;
     }
 
-    var cmIndex : int;
+    var manager : ComponentManager;
     var nodes : ActiveNodes;
-    var url : String;
   }
 }

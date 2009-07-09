@@ -16,17 +16,16 @@ package
 {
   class RequestSliverUpdate extends Request
   {
-    public function RequestSliverUpdate(newCmIndex : int,
+    public function RequestSliverUpdate(newManager : ComponentManager,
                                         newNodes : ActiveNodes,
-                                        newCm : ComponentManager,
                                         newRspec : String,
                                         newBeginTunnel : Boolean) : void
     {
-      cmIndex = newCmIndex;
+      manager = newManager;
       nodes = newNodes;
-      cm = newCm;
       rspec = newRspec;
       beginTunnel = newBeginTunnel;
+      ticket = null;
     }
 
     override public function cleanup() : void
@@ -36,47 +35,75 @@ package
 
     override public function start(credential : Credential) : Operation
     {
-      if (! beginTunnel)
+      if (ticket == null)
       {
-        nodes.changeState(cmIndex, ActiveNodes.PLANNED, ActiveNodes.CREATED);
+        if (! beginTunnel)
+        {
+          nodes.changeState(manager, ActiveNodes.PLANNED, ActiveNodes.CREATED);
+        }
+        opName = "Updating Ticket";
+        op.reset(Geni.updateTicket);
+        op.addField("credential", credential.slice);
+        op.addField("ticket", manager.getTicket());
+        op.addField("rspec", rspec);
       }
-      opName = "Updating Sliver";
-      op.reset(Geni.updateSliver);
-      op.addField("credential", credential.slivers[cmIndex]);
-      op.addField("rspec", rspec);
-      op.addField("keys", credential.ssh);
-      op.addField("impotent", Request.IMPOTENT);
-      op.setUrl(cm.getUrl(cmIndex));
+      else
+      {
+        opName = "Updating Sliver";
+        op.reset(Geni.updateSliver);
+        op.addField("credential", manager.getSliver());
+        op.addField("ticket", ticket);
+      }
+      op.setUrl(manager.getUrl());
       return op;
     }
 
     override public function complete(code : Number, response : Object,
                                       credential : Credential) : Request
     {
-      var result = null;
+      var result : Request = null;
       if (code == 0)
       {
-        nodes.commitState(cmIndex);
-      }
-      else
-      {
-        if (beginTunnel)
+        if (ticket == null)
         {
-          nodes.commitState(cmIndex);
-          nodes.revertState(cmIndex);
+          var r = new RequestSliverUpdate(manager, nodes, rspec, beginTunnel);
+          r.setTicket(response.value);
+          result = r;
         }
         else
         {
-          nodes.revertState(cmIndex);
+          manager.setTicket(ticket);
+          nodes.commitState(manager);
+        }
+      }
+      else
+      {
+        if (ticket != null)
+        {
+          result = new RequestReleaseTicket(ticket, manager.getUrl());
+        }
+        if (beginTunnel)
+        {
+          nodes.commitState(manager);
+          nodes.revertState(manager);
+        }
+        else
+        {
+          nodes.revertState(manager);
         }
       }
       return result;
     }
 
-    var cmIndex : int;
+    function setTicket(newTicket : String) : void
+    {
+      ticket = newTicket;
+    }
+
+    var manager : ComponentManager;
     var nodes : ActiveNodes;
-    var cm : ComponentManager;
     var rspec : String;
     var beginTunnel : Boolean;
+    var ticket : String;
   }
 }

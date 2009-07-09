@@ -16,14 +16,12 @@ package
 {
   class RequestSliverCreate extends Request
   {
-    public function RequestSliverCreate(newCmIndex : int,
+    public function RequestSliverCreate(newManager : ComponentManager,
                                         newNodes : ActiveNodes,
-                                        newCm : ComponentManager,
                                         newRspec : String) : void
     {
-      cmIndex = newCmIndex;
+      manager = newManager;
       nodes = newNodes;
-      cm = newCm;
       rspec = newRspec;
     }
 
@@ -34,24 +32,25 @@ package
 
     override public function start(credential : Credential) : Operation
     {
-      if (cm.getTicket(cmIndex) == null)
+      if (manager.getTicket() == null)
       {
-        nodes.changeState(cmIndex, ActiveNodes.PLANNED, ActiveNodes.CREATED);
+        nodes.changeState(manager, ActiveNodes.PLANNED, ActiveNodes.CREATED);
         opName = "Getting Ticket";
         op.reset(Geni.getTicket);
         op.addField("credential", credential.slice);
         op.addField("rspec", rspec);
         op.addField("impotent", Request.IMPOTENT);
-        op.setUrl(cm.getUrl(cmIndex));
+        op.setUrl(manager.getUrl());
       }
       else
       {
         opName = "Redeeming Ticket";
         op.reset(Geni.redeemTicket);
-        op.addField("ticket", cm.getTicket(cmIndex));
+        op.addField("credential", credential.slice);
+        op.addField("ticket", manager.getTicket());
         op.addField("impotent", Request.IMPOTENT);
         op.addField("keys", credential.ssh);
-        op.setUrl(cm.getUrl(cmIndex));
+        op.setUrl(manager.getUrl());
       }
       return op;
     }
@@ -62,26 +61,25 @@ package
       var result : Request = null;
       if (code == 0)
       {
-        if (cm.getTicket(cmIndex) == null)
+        if (manager.getTicket() == null)
         {
           var ticket : String = response.value;
-          cm.setTicket(cmIndex, ticket);
-          setSliverIds(ticket);
-          result = new RequestSliverCreate(cmIndex, nodes, cm, rspec);
+          manager.setTicket(ticket);
+//          setSliverIds(ticket);
+          result = new RequestSliverCreate(manager, nodes, rspec);
         }
         else
         {
-          credential.slivers[cmIndex] = response.value;
-          cm.setTicket(cmIndex, null);
+          manager.setSliver(response.value[0]);
 
-          if (! nodes.hasTunnels(cmIndex))
+          if (! nodes.hasTunnels(manager))
           {
-            nodes.commitState(cmIndex);
+            nodes.commitState(manager);
           }
           else
           {
-            var newRspec = nodes.getXml(cmIndex, true);
-            result = new RequestSliverUpdate(cmIndex, nodes, cm, newRspec,
+            var newRspec = nodes.getXml(true);
+            result = new RequestSliverUpdate(manager, nodes, newRspec,
                                              true);
           }
         }
@@ -89,7 +87,7 @@ package
       else
       {
         result = releaseTicket();
-        nodes.revertState(cmIndex);
+        nodes.revertState(manager);
       }
       return result;
     }
@@ -97,21 +95,21 @@ package
     override public function fail() : Request
     {
       var result : Request = releaseTicket();
-      nodes.revertState(cmIndex);
+      nodes.revertState(manager);
       return result;
     }
 
     function releaseTicket() : Request
     {
       var result : Request = null;
-      if (cm.getTicket(cmIndex) != null)
+      if (manager.getTicket() != null)
       {
-        result = new RequestReleaseTicket(cm.getTicket(cmIndex),
-                                          cm.getUrl(cmIndex));
+        result = new RequestReleaseTicket(manager.getTicket(),
+                                          manager.getUrl());
       }
       return result;
     }
-
+/*
     function setSliverIds(signedCredStr : String) : void
     {
       var signedCred : XML = XML(signedCredStr);
@@ -125,10 +123,9 @@ package
         }
       }
     }
-
-    var cmIndex : int;
+*/
+    var manager : ComponentManager;
     var nodes : ActiveNodes;
-    var cm : ComponentManager;
     var rspec : String;
   }
 }

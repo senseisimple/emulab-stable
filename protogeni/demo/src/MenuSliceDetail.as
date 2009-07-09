@@ -36,9 +36,8 @@ package
 
       clip.sliceName.text = sliceName;
       nodes = new ActiveNodes(parent, clip.nodeList, clip.description);
-      cm = new ComponentManager(clip.cmSelect, clip.nodeList, nodes);
-      credential.setupSlivers(cm.getCmCount());
-      console = new Console(parent, nodes, cm, clip,
+      managers = new ComponentView(clip.cmSelect, clip.nodeList, nodes);
+      console = new Console(parent, nodes, managers, clip,
                             credential, Main.getText());
       console.discoverResources();
     }
@@ -46,7 +45,7 @@ package
     override public function cleanup() : void
     {
       console.cleanup();
-      cm.cleanup();
+      managers.cleanup();
       nodes.cleanup();
       clip.parent.removeChild(clip);
     }
@@ -62,7 +61,7 @@ package
     var parent : DisplayObjectContainer;
     var clip : SliceDetailClip;
     var nodes : ActiveNodes;
-    var cm : ComponentManager;
+    var managers : ComponentView;
     var console : Console;
   }
 }

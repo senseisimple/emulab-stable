@@ -16,13 +16,11 @@ package
 {
   class RequestSliverDestroy extends Request
   {
-    public function RequestSliverDestroy(newCmIndex : int,
-                                         newNodes : ActiveNodes,
-                                         newUrl : String) : void
+    public function RequestSliverDestroy(newManager : ComponentManager,
+                                         newNodes : ActiveNodes) : void
     {
-      cmIndex = newCmIndex;
+      manager = newManager;
       nodes = newNodes;
-      url = newUrl;
     }
 
     override public function cleanup() : void
@@ -32,15 +30,15 @@ package
 
     override public function start(credential : Credential) : Operation
     {
-      // TODO: Check to make sure that credential.slivers[cmIndex]
+      // TODO: Check to make sure that manager.getSliver()
       // exists and perform a no-op if it doesn't.
-      nodes.changeState(cmIndex, ActiveNodes.CREATED, ActiveNodes.PLANNED);
-      nodes.changeState(cmIndex, ActiveNodes.BOOTED, ActiveNodes.PLANNED);
+      nodes.changeState(manager, ActiveNodes.CREATED, ActiveNodes.PLANNED);
+      nodes.changeState(manager, ActiveNodes.BOOTED, ActiveNodes.PLANNED);
       opName = "Deleting Sliver";
       op.reset(Geni.deleteSliver);
-      op.addField("credential", credential.slivers[cmIndex]);
+      op.addField("credential", manager.getSliver());
       op.addField("impotent", Request.IMPOTENT);
-      op.setUrl(url);
+      op.setUrl(manager.getUrl());
       return op;
     }
 
@@ -49,18 +47,18 @@ package
     {
       if (code == 0)
       {
-        nodes.commitState(cmIndex);
+        nodes.commitState(manager);
       }
       else
       {
-        nodes.revertState(cmIndex);
+        nodes.revertState(manager);
       }
-      credential.slivers[cmIndex] = null;
+      manager.setSliver(null);
+      manager.setTicket(null);
       return null;
     }
 
-    var cmIndex : int;
+    var manager : ComponentManager;
     var nodes : ActiveNodes;
-    var url : String;
   }
 }

@@ -66,7 +66,9 @@ package
       removeClick = null;
       canvas.parent.removeChild(canvas);
       canvas = null;
+      left.freeInterface(leftInterface);
       left.removeLink(this);
+      right.freeInterface(rightInterface);
       right.removeLink(this);
     }
 
@@ -79,7 +81,7 @@ package
     {
       canvas.graphics.clear();
       var color = ESTABLISHED_COLOR;
-      if (left.getCmIndex() != right.getCmIndex())
+      if (isTunnel())
       {
         color = TUNNEL_COLOR;
       }
@@ -97,51 +99,38 @@ package
         || (left == otherRight && right == otherLeft);
     }
 
-    public function getXml(cmIndex : int, useTunnels : Boolean) : XML
+    public function getXml(useTunnels : Boolean) : XML
     {
       var result : XML = null;
-      if (left.getCmIndex() == cmIndex || right.getCmIndex() == cmIndex)
+      if (!isTunnel() || useTunnels)
       {
-        if (!isTunnel() || useTunnels)
+        result = <link />;
+//          result.@name = "link" + String(number);
+        result.@virtual_id = "link" + String(number);
+        if (isTunnel())
         {
-          result = <link />;
-          result.@name = "link" + String(number);
-          result.@nickname = "link" + String(number);
-          if (isTunnel())
-          {
-            result.@link_type= "tunnel";
-          }
-
-          var child = <linkendpoints nickname="destination_interface" />;
-          if (isTunnel())
-          {
-            child.@tunnel_ip = ipToString(tunnelIp);
-          }
-          else
-          {
-            child.@iface_name = leftInterface;
-          }
-          child.@node_uuid = left.getId();
-          child.@sliver_uuid = left.getSliverId();
-          child.@node_nickname = left.getName();
-
-          result.appendChild(child);
-
-          child = <linkendpoints nickname="source_interface" />;
-          if (isTunnel())
-          {
-            child.@tunnel_ip = ipToString(tunnelIp + 1);
-          }
-          else
-          {
-            child.@iface_name = rightInterface;
-          }
-          child.@node_uuid = right.getId();
-          child.@sliver_uuid = right.getSliverId();
-          child.@node_nickname = right.getName();
-
-          result.appendChild(child);
+          result.@link_type= "tunnel";
         }
+
+        result.appendChild(getInterfaceXml(left, leftInterface, 0));
+        result.appendChild(getInterfaceXml(right, rightInterface, 1));
+      }
+      return result;
+    }
+
+    function getInterfaceXml(node : Node, interfaceName : String,
+                             ipOffset : int) : XML
+    {
+      var result = <interface_ref />;
+      result.@virtual_node_id = node.getName();
+      if (isTunnel())
+      {
+        result.@tunnel_ip = ipToString(tunnelIp + ipOffset);
+        result.@virtual_interface_id = "control";
+      }
+      else
+      {
+        result.@virtual_interface_id = interfaceName;
       }
       return result;
     }
@@ -155,13 +144,13 @@ package
 
     public function isTunnel() : Boolean
     {
-      return left.getCmIndex() != right.getCmIndex();
+      return left.getManager() != right.getManager();
     }
 
-    public function hasTunnelTo(cmIndex : int) : Boolean
+    public function hasTunnelTo(target : ComponentManager) : Boolean
     {
-      return isTunnel() && (cmIndex == left.getCmIndex()
-                            || cmIndex == right.getCmIndex());
+      return isTunnel() && (left.getManager() == target
+                            || right.getManager() == target);
     }
 
     var number : int;

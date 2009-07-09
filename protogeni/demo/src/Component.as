@@ -23,11 +23,13 @@ package
     {
       name = "";
       uuid = "";
+      managerId = "";
       interfaces = new Array();
     }
 
     public var name : String;
     public var uuid : String;
+    public var managerId : String;
     public var interfaces : Array;
   }
 }

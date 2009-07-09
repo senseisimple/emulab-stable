@@ -19,17 +19,23 @@ package
     public function Interface(newName : String) : void
     {
       name = newName;
-      used = true;
+      used = false;
+      role = CONTROL;
     }
 
     public function clone() : Interface
     {
       var result = new Interface(name);
       result.used = used;
+      result.role = role;
       return result;
     }
 
     public var name : String;
     public var used : Boolean;
+    public var role : int;
+
+    public static var CONTROL = 0;
+    public static var EXPERIMENTAL = 1;
   }
 }
