@@ -142,6 +142,7 @@ my $responder = Frontier::Responder->new( "methods" => {
     "SliverStatus"      => \&GeniCM::SliverStatus,
     "SliverTicket"      => \&GeniCM::SliverTicket,
     "ListTickets"       => \&GeniCM::ListTickets,
+    "ListHistory"       => \&GeniCM::ListHistory,
    },
 );
 
