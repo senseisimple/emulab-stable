@@ -4,7 +4,7 @@
  * All rights reserved.
  */
 
-static const char rcsid[] = "$Id: solution.cc,v 1.13 2009-05-20 18:06:08 tarunp Exp $";
+static const char rcsid[] = "$Id: solution.cc,v 1.14 2009-07-09 23:19:27 gtw Exp $";
 
 #include "solution.h"
 #include "vclass.h"
@@ -51,8 +51,8 @@ void print_solution(const solution &s) {
     tb_vnode *vn;
 
 #ifdef WITH_XML
-	bool both_inputs_xml = ptop_xml_input && vtop_xml_input;
-	bool both_inputs_rspec = ptop_rspec_input && vtop_rspec_input;
+	both_inputs_xml = ptop_xml_input && vtop_xml_input;
+	both_inputs_rspec = ptop_rspec_input && vtop_rspec_input;
 	
 	if (both_inputs_rspec == true)
 		rspec_annotater = new annotate_rspec ();
