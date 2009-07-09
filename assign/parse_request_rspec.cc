@@ -8,7 +8,7 @@
  * XML Parser for RSpec ptop files
  */
 
-static const char rcsid[] = "$Id: parse_request_rspec.cc,v 1.3 2009-07-09 21:45:55 gtw Exp $";
+static const char rcsid[] = "$Id: parse_request_rspec.cc,v 1.4 2009-07-09 22:19:35 ricci Exp $";
 
 #ifdef WITH_XML
 
@@ -366,7 +366,9 @@ bool populate_nodes_rspec(DOMElement *root, tb_vgraph &vg) {
 		
 		tb_vnode *v = NULL;
 		if (no_type)
-			v = new tb_vnode(str_virtual_uuid.c_str(), "", type_slots);
+                        // If they gave no type, just assume it's a PC for
+                        // now. This is not really a good assumption.
+			v = new tb_vnode(str_virtual_uuid.c_str(), "pc", type_slots);
 		else
 			v = new tb_vnode(str_virtual_uuid.c_str(), s_type_name.c_str(), type_slots);
 		
