@@ -79,8 +79,8 @@ my $MKEXTRAFS = "/usr/local/etc/emulab/mkextrafs.pl";
 my $VZROOT = "/vz/root";
 
 my $CTRLIPFILE = "/var/emulab/boot/myip";
-my $IMQDB      = "/var/emulab/boot/imqdb";
-my $MAXIMQ     = 16;
+my $IMQDB      = "/var/emulab/db/imqdb";
+my $MAXIMQ     = 127;
 
 my $CONTROL_IFNUM  = 999;
 my $CONTROL_IFDEV  = "eth${CONTROL_IFNUM}";
@@ -228,7 +228,8 @@ sub vz_rootPreConfig {
 	return -1;
     }
     for (my $i = 0; $i < $MAXIMQ; $i++) {
-	$MDB{"$i"} = "";
+	$MDB{"$i"} = ""
+	    if (!exists($MDB{"$i"}));
     }
     dbmclose(%MDB);
 
@@ -433,9 +434,10 @@ sub vz_vnodeDestroy {
 sub vz_vnodeExec {
     my ($vnode_id,$vmid,$command) = @_;
 
-    mysystem("$VZCTL exec $vnode_id $command");
+    # Note: do not use mysystem here since that exits.
+    system("$VZCTL exec2 $vnode_id $command");
 
-    return 0;
+    return $?;
 }
 
 sub vz_vnodeState {
