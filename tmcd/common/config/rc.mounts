@@ -428,18 +428,15 @@ sub VMmount()
     if (SHAREDHOST()) {
 	my @tmccresults;
 
-	if (tmcc(TMCCCMD_ACCT, undef, \@tmccresults) < 0) {
-	    warn("Could not get account info from server!\n");
+	if (tmcc(TMCCCMD_MOUNTS, undef, \@tmccresults) < 0) {
+	    warn("Could not get mount info from server!\n");
 	    return -1;
 	}
 	foreach my $str (@tmccresults) {
-	    if ($str =~ /^ADDUSER LOGIN=([-\w]+) .* HOMEDIR=([^\s]+)/) {
+	    if ($str =~ /^REMOTE=([-:\@\w\.\/]+) LOCAL=([-\@\w\.\/]+)/) {
 		$MOUNTS{$2} = $2;
 	    }
 	}
-	my ($pid, $eid, $myname) = check_nickname();
-	$MOUNTS{"/proj/$pid"} = "/proj/$pid"
-	    if ($pid);
     }
     else {
         dbmopen(%MDB, $MOUNTDB, 0444);
