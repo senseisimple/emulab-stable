@@ -545,9 +545,12 @@ sub Start($)
 	    return -1;
 	}
 
-	# Remote nodes are handled special.
-	if ($node->isremotenode()) {
-	    $sliver->Start();
+	# Remote/shared nodes are handled special.
+	if ($node->isremotenode() ||
+	    ($node->isvirtnode() && $node->sharing_mode())) {
+	    $sliver->Start() == 0
+		or return -1;
+	    next;
 	}
 
 	# We assume local nodes are not shared, so reboot pnode; this
@@ -678,7 +681,8 @@ sub Create($$$)
 }
 
 #
-# Provision all the slivers in the aggregate.
+# Provision all the slivers in the aggregate. For links, this is done
+# for the entire aggregate (experiment) at once.
 #
 sub Provision($;$)
 {
@@ -687,52 +691,16 @@ sub Provision($;$)
     return -1
 	if (! ref($self));
 
-    my @slivers = ();
-    if ($self->SliverList(\@slivers) != 0) {
-	print STDERR "Could not get sliver list for $self\n";
-	return -1;
-    }
-
-    my $experiment = Experiment->Lookup($self->slice_uuid());
-    if (!defined($experiment)) {
-	print STDERR "Could not map $self to its experiment\n";
-	return -1;
-    }
-
-    my $vlan = VLan->Create($experiment, $self->uuid());
-    if (!defined($vlan)) {
-	print STDERR "Could not create vlan for $self\n";
-	goto bad;
-    }
-
-    foreach my $sliver (@slivers) {
-	my $interface = Interface->LookupByUUID($sliver->uuid());
-	if (! defined($interface)) {
-	    print STDERR "Could not map $sliver to its interface object\n";
-	    goto bad;
-	}
-	if (! $vlan->AddMember($interface->node_id(), $interface->iface())) {
-	    print STDERR "$self: Could not add $interface to $vlan\n";
-	    goto bad;
-	}
-    }
-    if ($vlan->Instantiate(1) != 0) {
-	print STDERR "$self: Could not instantiate $vlan on switches\n";
-	goto bad;
-    }
     $self->SetStatus("ready");
     return 0;
 
   bad:
-    $vlan->UnInstantiate(1)
-	if (defined($vlan));
-    $vlan->Destroy()
-	if (defined($vlan));
     return -1
 }
 
 #
-# Unprovision all the slivers in the aggregate.
+# Unprovision all the slivers in the aggregate. For links, this is done
+# for the entire aggregate (experiment) at once.
 #
 sub UnProvision($)
 {
@@ -741,30 +709,6 @@ sub UnProvision($)
     return -1
 	if (! ref($self));
 
-    my @slivers = ();
-    if ($self->SliverList(\@slivers) != 0) {
-	print STDERR "Could not get sliver list for $self\n";
-	return -1;
-    }
-    my $experiment = Experiment->Lookup($self->slice_uuid());
-    if (!defined($experiment)) {
-	print STDERR "Could not map $self to its experiment\n";
-	return -1;
-    }
-
-    my $vlan = VLan->Lookup($experiment, $self->uuid());
-    if (! defined($vlan)) {
-	print STDERR "No vlan associated with $self\n";
-	return 0;
-    }
-    if ($vlan->UnInstantiate(1) != 0) {
-	print STDERR "Could not uninstantiate $vlan\n";
-	return -1;
-    }
-    if ($vlan->Destroy() != 0) {
-	print STDERR "Could not destroy $vlan\n";
-	return -1;
-    }
     return 0;
 }
 
