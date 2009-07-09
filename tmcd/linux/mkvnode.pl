@@ -9,6 +9,7 @@ use Getopt::Std;
 use English;
 use Errno;
 use POSIX qw(strftime);
+use POSIX ":sys_wait_h";
 use Data::Dumper;
 
 #
@@ -51,6 +52,7 @@ use libvnode;
 # Helpers
 sub MyFatal($);
 sub safeLibOp($$$$;@);
+sub Cleanup(); 
 
 # Locals
 my $CTRLIPFILE = "/var/emulab/boot/myip";
@@ -381,6 +383,12 @@ RUNNING: while (1) {
 	    # or if the sleep just ended.
 	    #
 	    if ($kidpid == $childpid) {
+		# If the sleep exits, we are going to tear down the
+		# VM, but leave it intact if it exited from within
+		# (reboot from inside). Otherwise, we get our marching
+		# orders from our parent (vnodesetup).
+		$leaveme = 1
+		    if (!$cleaning);
 		last RUNNING;
 	    }
 	    else {
@@ -389,16 +397,13 @@ RUNNING: while (1) {
 	    }
 	}
     } else {
-	$SIG{TERM} = 'DEFAULT';
+	my $exitval = safeLibOp($vnodeid,'vnodeExec',
+				1,1,$vnodeid,$vmid,"sleep 100000000");
 
-	if (safeLibOp($vnodeid,'vnodeExec',
-		      1,1,$vnodeid,$vmid,"sleep 100000000")) {
-	    exit(1);
-	}
-	exit(0);
+	exit($exitval);
     }
 }
-cleanup();
+Cleanup();
 exit(0);
 
 #
