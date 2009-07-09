@@ -199,8 +199,9 @@ my %nodetouuid;
 my %nodetoavailable;
 
 $result = DBQueryFatal("SELECT n.node_id, n.eventstate, n.role, n.uuid, " .
-		       "b.node_id, nt.isremotenode, " .
-		       "dedicated_wa_types.attrvalue, b.sharing_mode " .
+		       "nt.isremotenode, " .
+		       "dedicated_wa_types.attrvalue, b.sharing_mode, " .
+		       "n.reserved_pid, b.eid " .
 		       "from nodes as n " .
 		       "left join reserved as b on n.node_id=b.node_id " .
 		       "left join node_types as nt on nt.type=n.type " .
@@ -211,8 +212,9 @@ $result = DBQueryFatal("SELECT n.node_id, n.eventstate, n.role, n.uuid, " .
 		       "   group by type) as dedicated_wa_types " .
 		       "  on nt.type=dedicated_wa_types.type " .
 		       "where nt.isvirtnode = 0 or nt.isvirtnode is null;");
-while (($node,$eventstate, $role, $uuid, $reserved, $isremotenode,
-	$wa_attrvalue, $sharing_mode) = $result->fetchrow_array) {
+while (($node,$eventstate, $role, $uuid, $isremotenode,
+	$wa_attrvalue, $sharing_mode,
+	$reserved_pid, $reserved_eid) = $result->fetchrow_array) {
     if (defined($uuid) && $uuid ne "")
     {
 	$nodetouuid{$node} = $uuid;
@@ -221,13 +223,20 @@ while (($node,$eventstate, $role, $uuid, $reserved, $isremotenode,
 	&& ((! defined($isremotenode) || $isremotenode == 0)
 	    || (defined($wa_attrvalue) && $wa_attrvalue == 1));
     my $isup = defined($eventstate)
-	&& ($eventstate eq "TBDB_NODESTATE_ISUP"
-	    || $eventstate eq "TBDB_NODESTATE_PXEWAIT"
-	    || $eventstate eq "TBDB_NODESTATE_POWEROFF"
-	    || $eventstate eq "TBDB_NODESTATE_ALWAYSUP");
-    my $isfree = !$islocal || (! defined($reserved) && $isup) ||
-	(defined($sharing_mode) &&
-	 $sharing_mode eq "shared_local" && $useshared && $isup);
+	&& ($eventstate eq TBDB_NODESTATE_ISUP
+	    || $eventstate eq TBDB_NODESTATE_PXEWAIT
+	    || $eventstate eq TBDB_NODESTATE_POWEROFF
+	    || $eventstate eq TBDB_NODESTATE_ALWAYSUP);
+    my $isshared = (defined($sharing_mode)
+		    && $sharing_mode eq "shared_local"
+		    && $useshared
+		    && $isup);
+    my $isreserved = (defined($reserved_eid)
+		      || (defined($reserved_pid)
+			  && (! defined($pid) || $pid != $reserved_pid)));
+    my $isfree = (!$islocal
+		  || (! $isreserved && $isup)
+		  || $isshared);
     $nodetoavailable{$node} = $isfree;
 }
 
@@ -439,17 +448,16 @@ if (defined($exempt_eid)) {
 	"(b.pid='$pid' and b.eid='$exempt_eid'))"; 
 }
 
-# In genimode exclude nodes with exclusion attribute.
-if ($genimode) {
-    $free_condition = "($free_condition and ".
-	"(nat.attrvalue is null or nat.attrvalue=0))";
-}
-
 # In shared mode, allow allocated nodes whose sharing_mode is set.
 if ($useshared) {
     $free_condition = "($free_condition or ".
 	"(b.node_id is not null && b.sharing_mode='shared_local' && ".
 	" np.eventstate='" . TBDB_NODESTATE_ISUP . "'))";
+}
+
+# In genimode exclude nodes with exclusion attribute.
+if ($genimode) {
+    $free_condition = "(nat.attrvalue is null or nat.attrvalue=0)";
 }
 
 # If the user wants all nodes, we consider everything to be free (this
@@ -1454,7 +1462,8 @@ sub print_named_link_xml
     my $proto_count = scalar(@_);
     if ($genimode) {
 	print "<link ";
-	print "component_manager_uuid=\"${cmuuid}\" ";
+	my $cmurn = GeniHRN::Generate($OURDOMAIN, "authority", "sa");
+	print "component_manager_uuid=\"$cmurn\" ";
 	print "component_name=\"$name\" ";
 	my $urn = GeniHRN::Generate($OURDOMAIN, "link", $name);
 	print "component_uuid=\"$urn\" ";
