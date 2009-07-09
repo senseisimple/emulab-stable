@@ -8,7 +8,7 @@
  * XML Parser for RSpec ptop files
  */
 
-static const char rcsid[] = "$Id: parse_request_rspec.cc,v 1.2 2009-05-20 18:06:08 tarunp Exp $";
+static const char rcsid[] = "$Id: parse_request_rspec.cc,v 1.3 2009-07-09 21:45:55 gtw Exp $";
 
 #ifdef WITH_XML
 
@@ -251,7 +251,7 @@ bool populate_nodes_rspec(DOMElement *root, tb_vgraph &vg) {
 		*/
 		int type_slots = 0;
 		bool no_type = false;
-		tb_vclass *vclass;
+		tb_vclass *vclass = NULL;
 		const char* str_type_name;
 		// XXX: This a ghastly hack. Find a way around it ASAP.
 		string s_type_name = string("");
