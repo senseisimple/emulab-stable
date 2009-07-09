@@ -1,0 +1,84 @@
+#!/usr/bin/perl -w
+
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+
+#
+# genischemacheck - Make sure that the scehma in the currently-running database
+# matches the one in the checked-out source. Exits with value 1 if the two
+# differ, 0 if they do not, and -1 if some error (such as the mysql server is
+# not running, or the database does not exist) prevents us from telling if
+# they differ or not
+#
+
+#
+# Function prototypes
+#
+sub fatal(@);
+
+#
+# Configure variables
+#
+my $testbed_srcdir = "@top_srcdir@";
+
+#
+# XXX: Requires that mysql be in caller's $PATH - probably an OK
+# assumption, but maybe not always
+#
+my $mysql = "mysql -N -B";
+
+my $latest = 0;
+opendir( DIR, "$testbed_srcdir/protogeni/updates" );
+while( my $entry = readdir( DIR ) ) {
+    $latest = $entry if $entry =~ /\d+/ && $entry > $latest;
+}
+closedir( DIR );
+
+# It would be much cleaner to use GeniDB for all this.  But I
+# don't think we can rely on that stuff being installed at this point...
+my $outofdate = 0;
+for my $db ( "geni", "geni-ch", "geni-cm" ) {
+    my $dbversion = qx{$mysql $db -e "SELECT value FROM version_info WHERE name='dbrev';"};
+    $outofdate = 1 if $dbversion != $latest;
+}
+
+if ( $outofdate ) {
+    chdir( ".." );
+    my $objdir = `/bin/pwd`;
+    chomp($objdir);
+    
+    print << "EOSTR";
+The schemata described in $testbed_srcdir/protogeni/updates differ from
+the running databases. As a safety measure, you will not be able to
+install until this is resolved.
+
+If you are a user of the emulab software outside of Utah, this is
+probably because your database was created for an older version of the
+emulab software. You can update your database by:
+
+	boss> cd /your/srcdir/protogeni/updates
+	boss> sudo perl $objdir/scripts/update
+
+EOSTR
+
+    exit(1);
+} else {
+    exit(0);
+}
+
+sub fatal(@) {
+
+    # Offset the text with a few blank lines, so it doesn't get lost in the
+    # make messages
+    warn "\n\n";
+    warn "*** genischemacheck - Unable to check database schema:\n";
+    warn @_;
+    warn "\n\n";
+
+    exit(-1);
+
+}
