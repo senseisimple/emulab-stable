@@ -282,3 +282,21 @@ sub ReleaseTicket($$)
 
     return 0;
 }
+
+sub ListTickets($$)
+{
+    my ($class, $pref) = @_;
+    my @result = ();
+
+    my $query_result =
+	DBQueryWarn("select * from ticket_history order by idx");
+    return -1
+	if (!$query_result);
+
+    while (my $row = $query_result->fetchrow_hashref()) {
+	push(@result, $row);
+
+    }
+    @$pref = @result;
+    return 0;
+}
