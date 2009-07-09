@@ -8,7 +8,7 @@
  * XML Parser for RSpec ptop files
  */
 
-static const char rcsid[] = "$Id: parse_request_rspec.cc,v 1.4 2009-07-09 22:19:35 ricci Exp $";
+static const char rcsid[] = "$Id: parse_request_rspec.cc,v 1.5 2009-07-09 22:54:39 gtw Exp $";
 
 #ifdef WITH_XML
 
@@ -250,13 +250,15 @@ bool populate_nodes_rspec(DOMElement *root, tb_vgraph &vg) {
 		* Add on types
 		*/
 		int type_slots = 0;
-		bool no_type = false;
 		tb_vclass *vclass = NULL;
 		const char* str_type_name;
 		// XXX: This a ghastly hack. Find a way around it ASAP.
 		string s_type_name = string("");
 		DOMNodeList *types = elt->getElementsByTagName(XStr("node_type").x());
-		for (int i = 0; i < types->getLength(); i++) 
+		int num_types = types->getLength();
+		bool no_type = !num_types;
+
+		for (int i = 0; i < num_types; i++) 
 		{
 			DOMElement *node_type = dynamic_cast<DOMElement*>(types->item(i));
 			XStr node_type_name (node_type->getAttribute(XStr("type_name").x()));
