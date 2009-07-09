@@ -1,9 +1,10 @@
 #!/usr/bin/perl
 use SemiModern::Perl;
+use TBConfig;
 use TestBed::TestSuite;
 use Data::Dumper;
 use Test::Exception;
-use Test::More tests => 11;
+use Test::More tests => 13;
 
 my $a = { 
   'a' => [qw(a1 a2 a3)],
@@ -54,3 +55,8 @@ is_deeply(TestBed::TestSuite::_build_e_from_positionals('p1', 'e1'), { 'pid' => 
 is_deeply(TestBed::TestSuite::_build_e_from_positionals('p1', 'g1', 'e1'), {  'pid' => 'p1', 'gid' => 'g1', 'eid' => 'e1' }, 'e($pid, $gid, $eid)');
 dies_ok( sub { TestBed::TestSuite::_build_e_from_positionals(1, 2, 3, 4) }, 'e(1,2,3,4) dies');
 is(e()->eid, "RANDEID1", 'random eid');
+
+
+is_deeply(concretize('@OS@', OS=>'FOOBAR'), "FOOBAR", 'OS=>FOOBAR');
+$TBConfig::cmdline_defines = { OS=>'GOODBYE' };
+is_deeply(concretize('@OS@', OS=>'FOOBAR'), "GOODBYE", 'OS=>FOOBAR -D OS=GOODBY');

@@ -22,5 +22,5 @@ sub handleResult {
   }
 }
 
-pr_e(e('toomanylans'), $BasicNSs::TooManyLans, $test_body, 1, "too many lans", retry => 1, pre_result_handler => \&handleResult);
+rege(e('toomanylans'), $BasicNSs::TooManyLans, $test_body, 1, "too many lans", retry => 1, pre_result_handler => \&handleResult);
 1;

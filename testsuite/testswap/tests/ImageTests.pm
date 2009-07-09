@@ -236,16 +236,6 @@ tb-set-sync-server $node0
 $ns run
 END
 
-my $image_tests = [
-['threenodelan', $ThreeNodeLan, 'Simple three node experment connected via a lan'], #lan
-['twonodelink', $TwoNodeLink, 'Two node experiment with a single link between them'], #pair
-['linkdelay', $LinkDelay, 'Per-Link Traffic Shaping' ],
-['linktestnse', $LinkTestNSE, 'Test linktest on a topo with NSE hanging around sucking CPU.'],
-['linktesthilat', $LinkTestHilat,'Test linktest on a topo with long delays.'],
-['linktestlobw', $LinkTestLoBW, 'Test linktest on a topo with low bandwidth.'],
-['router', $Router, '5 node routing experiement'],
-['routermanual', $RouterManual, 'Tests manual routing and tb-set-ip/netmask.'],
-];
 
 =pod
 sub router_test {
@@ -272,9 +262,20 @@ test_traceroute 'nodeA', 'node3', qw(node3-link);
 test_traceroute 'node1', 'node3', qw(node3-lan);
 test_traceroute 'node3', 'node1', qw(node1-lan);
 }
+#['router', $Router, '5 node routing experiement'],
+#['routermanual', $RouterManual, 'Tests manual routing and tb-set-ip/netmask.'],
 =cut
 
 my $OS ="RHL90-STD";
+
+my $image_basic_tests = [
+['threenodelan', $ThreeNodeLan, 'Simple three node experment connected via a lan'], #lan
+['twonodelink', $TwoNodeLink, 'Two node experiment with a single link between them'], #pair
+['linkdelay', $LinkDelay, 'Per-Link Traffic Shaping' ],
+['linktestnse', $LinkTestNSE, 'Test linktest on a topo with NSE hanging around sucking CPU.'],
+['linktesthilat', $LinkTestHilat,'Test linktest on a topo with long delays.'],
+['linktestlobw', $LinkTestLoBW, 'Test linktest on a topo with low bandwidth.'],
+];
 
 sub basic_test {
 my $e = shift;
@@ -283,11 +284,11 @@ my $e = shift;
   ok($e->linktest, "$eid linktest");
 }
 
-for (@$image_tests[0..1]) {
+for (@$image_basic_tests) {
   my ($eid, $orig_ns, $desc) = @$_;
-  my $ns = concretize($orig_ns, OS => 'RHL90-STD');
-  #say "$eid\n$ns\n$desc";
-  pr_e(e($eid), $ns, \&basic_test, 2, $desc);
+  my $ns = concretize($orig_ns, OS => $OS);
+  say "$eid\n$ns\n$desc";
+  rege(e($eid), $ns, \&basic_test, 2, $desc);
 }
 
 sub sync_test {
@@ -332,14 +333,15 @@ cat node3up node4up > node4res
 END
 );
   my $e = shift;
+  my $eid = $e->eid;
   my @ids = (0..4);
-  ok( prun( map { my $n = $_; sub { $e->node('node'.$n)->splatex($cmds{$n}, 'startcmd'.$n.'.sh'); } } @ids ) );
-  ok( prun( map { my $n = $_; sub { $e->node('node'.$n)->ssh->cmdoutput('./startcmd'.$n.'.sh'); } } @ids ) );
+  ok( prun( map { my $n = $_; sub { $e->node('node'.$n)->splatex($cmds{$n}, 'startcmd'.$n.'.sh'); } } @ids ), "$eid prun splat" );
+  ok( prun( map { my $n = $_; sub { $e->node('node'.$n)->ssh->cmdoutput('./startcmd'.$n.'.sh'); } } @ids ), "$eid prun sh" );
   my @results = prunout( map { my $n = $_; sub { $e->node('node'.$n)->slurp('node'.$n.'res'); } } @ids );
-  ok( /^0\n1\n2\n$/ ) for (@results[0..2]);
-  ok( /^3\n4\n$/ ) for (@results[3..4]);
+  ok( /^0\n1\n2\n$/,  "noderes") for (@results[0..2]);
+  ok( /^3\n4\n$/, "noderes") for (@results[3..4]);
 }
 
-pr_e(e('sync'), concretize($Sync, OS => 'RHL90-STD'), \&sync_test, 7, 'ImageTest-sync test');
+rege(e('sync'), concretize($Sync, OS => $OS), \&sync_test, 7, 'ImageTest-sync test');
 
 1;

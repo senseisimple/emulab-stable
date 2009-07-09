@@ -14,6 +14,6 @@ set node1 [$ns node]
 $ns run
 NSEND
 
-#ok(e('sn1')->startrunkill($ns, sub { shift->single_node_tests }), 'single_node_tests');
-ok(e('sn1')->startrun($ns, sub { shift->single_node_tests }), 'single_node_tests');
+ok(e('sn1')->startrunkill($ns, sub { shift->single_node_tests }), 'single_node_tests');
+#ok(e('sn1')->startrun($ns, sub { shift->single_node_tests }), 'single_node_tests');
 #ok(e('sn1')->single_node_tests, 'single_node_tests');

@@ -123,6 +123,10 @@ executes $cmd as $TBConfig::EMULAB_USER on $host and calls checker with ($out, $
 
 returns the ssh result code of executing $cmd as $TBConfig::EMULAB_USER
 
+=item C<cmdoutput($host, $cmd, $diemessage)>>
+
+returns the ssh stdout of executing $cmd as $TBConfig::EMULAB_USER
+
 =item C<cmdsuccessdump($host, $cmd)>
 
 returns the ssh result code of executing $cmd as $TBConfig::EMULAB_USER and dumps the ssh stdout, stderr, resultcode

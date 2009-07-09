@@ -11,6 +11,6 @@ my $test_body = sub {
   sleep(5);
 };
 
-rege("ksks$_", $BasicNSs::SingleNode, $test_body, 1, "k$_ desc" ) for (1..5);
+rege(e("ksks$_"), $BasicNSs::SingleNode, $test_body, 1, "k$_ desc" ) for (1..5);
 
 1;

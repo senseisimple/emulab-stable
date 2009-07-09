@@ -16,7 +16,7 @@ INSTALLATION INSTRUCTIONS
   copy TBConfig.pm.in to TBConfig.pm and edit it to point to your emulab SSL client certificate and corresponding decrypted private key.
 
 HOWTO create a cert file and a decrypted private key file from your emulab(cert+key) file.
-  openssl rsa -in emulab -out decrypted_emulab.pem
+  openssl rsa -in emulab -out decrypted_emulab.key
   openssl x509 -in emulab -out emulab.cert
 
 TO SEE Tests available to run
@@ -25,7 +25,7 @@ TO SEE Tests available to run
 TO RUN Tests
   ./tbts test
   ./tbts t/old/old.t
-  ./tbts t/topologies/basic.t
+  ./tbts t/topologies/single_node.t
 
 EXAMPLE Tests to look at to GET STARTED:
   t/topologies/single_node.t

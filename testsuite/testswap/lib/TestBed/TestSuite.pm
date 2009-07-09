@@ -5,7 +5,7 @@ use TestBed::TestSuite::Experiment;
 use TestBed::ParallelRunner;
 use TestBed::ForkFramework;
 use Data::Dumper;
-use Tools qw(concretize);
+use Tools;
 
 my $error_sub = sub {
   use Carp qw(longmess);
@@ -18,21 +18,11 @@ my $error_sub = sub {
 
 require Exporter;
 our @ISA = qw(Exporter);
-our @EXPORT = qw(e CartProd CartProdRunner concretize defaults override rege runtests pr_e prun prunout);
+our @EXPORT = qw(e CartProd CartProdRunner concretize defaults override rege runtests prun prunout);
 
 sub e { TestBed::TestSuite::Experiment->new(_build_e_from_positionals(@_)); }
 
 sub rege {
-  my $e;
-  if (@_ == 4)    { $e = e(); }
-  elsif (@_ == 5) { $e = e(shift); }
-  elsif (@_ == 6) { $e = e(shift, shift); }
-  elsif (@_ == 7) { $e = e(shift, shift, shift); }
-  else { die 'Too many args to rege'; }
-  return TestBed::ParallelRunner::build_executor($e, @_);
-}
-
-sub pr_e {
   return TestBed::ParallelRunner::build_executor(@_);
 }
 
@@ -103,6 +93,10 @@ sub CartProdRunner {
   for (CartProd(@_)) { $proc->($_); }
 }
 
+sub concretize {
+ Tools::concretize(shift, %{ override( { @_ }, %{ $TBConfig::cmdline_defines } ) } );
+}
+
 sub defaults {
   my ($params, %defaults) = @_;
   return { %defaults, %{($params || {})} };
@@ -145,14 +139,7 @@ creates a new experiment with pid and eid and uses the default gid in TBConfig
 
 creates a new experiment with pid, gid, and eid
 
-=item C<rege($ns_contents, &test_sub, $test_count, $desc)>
-=item C<rege($eid, $ns_contents, &test_sub, $test_count, $desc)>
-=item C<rege($pid, $eid, $ns_contents, &test_sub, $test_count, $desc)>
-=item C<rege($pid, $gid, $eid, $ns_contents, &test_sub, $test_count, $desc)>
-
-registers experiement with parallel test running engine
-
-=item C<pr_e($e, $ns_contents, &test_sub, $test_count, $desc, %options)>
+=item C<rege($e, $ns_contents, &test_sub, $test_count, $desc, %options)>
 
 registers experiement with parallel test running engine
 
@@ -199,6 +186,14 @@ returns a modified hash ref
 =item C<override($hashref, %overrides)> provides hash entry overrides for a params hash ref
 
 returns a modified hash ref
+
+=item C<prun(@anonymous_funcs)>
+
+executes anonymous funcs in parallel dying if any fail
+
+=item C<prunout(@anonymous_funcs)>
+
+executes anonymous funcs in parallel returning the output results
 
 =back
 

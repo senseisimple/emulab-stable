@@ -56,6 +56,10 @@ sub scp {
   return Tools::TBSSH::scp($self->name, @_);
 }
 
+=item C<< $n->build_remote_name($filename) >>
+
+builds "$user\@$host:$fn"
+=cut
 sub build_remote_name {
   my ($s, $fn) = @_;
   my $user = $TBConfig::EMULAB_USER;
@@ -63,6 +67,10 @@ sub build_remote_name {
   return "$user\@$host:$fn";
 }
 
+=item C<< $n->splat($data, $filename) >>
+
+cats $data to $filename on the node
+=cut
 sub splat {
   my ($s, $data, $fn) = @_;
   my $temp = Tools::splat_to_temp($data);
@@ -72,12 +80,20 @@ sub splat {
   return 1;
 }
 
+=item C<< $n->splatex($data, $filename) >>
+
+cats $data to $filename on the node and make it executable
+=cut
 sub splatex {
   my ($s, $data, $fn) = @_;
   $s->splat($data, $fn);
   $s->ssh->cmdsuccess("chmod +x $fn");
 }
 
+=item C<< $n->slurp($filename) >>
+
+pulls $filename content from node
+=cut
 sub slurp {
   my ($s, $fn) = @_;
   use File::Temp;

@@ -3,6 +3,7 @@
 use lib qw(lib tests);
 use SemiModern::Perl;
 
+
 #add localcpan path to library search path
 if (-f glob("~/lib/perl5/Test/Harness.pm")) {
   my $localcpan_path = glob('~/lib/perl5');
@@ -20,18 +21,20 @@ use Data::Dumper;
 {
   use Getopt::Long;
   my $pjobs   = 1;
-  my $logging = 0;
   my $timing;
   my $verbose;
+
+  my $logging = 0;
   my $debug;
   my $project;
   my $group;
-  my $defines;
   my $xmlrpcurl;
+
+  my $cmdline_defines;
   my $concurrent_prerun_jobs;
   my $concurrent_node_usage;
   my $result = GetOptions (
-#      "D=s%"        => \$defines,
+      "D=s%"        => \$cmdline_defines,
 #      "jobs=i"      => \$pjobs,
       "logging=i"   => \$logging,
       "timing"      => \$timing,
@@ -44,13 +47,20 @@ use Data::Dumper;
       "cnu=i"       => \$concurrent_node_usage,
     );
 
-  if ($debug)     { $ENV { 'TBTS_DEBUG'      } = 1; }
-  if ($group)     { $ENV { 'TBTS_GROUP'      } = $group;  }
   if ($pjobs > 1) { $ENV { 'HARNESS_OPTIONS' } = "j$pjobs"; }
-  if ($project)   { $ENV { 'TBTS_PROJECT'    } = $project; }
   if ($timing)    { $ENV { 'HARNESS_TIMER'   } = 1; }
   if ($verbose)   { $ENV { 'HARNESS_VERBOSE' } = 1; $ENV { 'HARNESS_COLOR' } = 1; }
+
+  if ($debug)     { $ENV { 'TBTS_DEBUG'      } = 1; }
+  if ($group)     { $ENV { 'TBTS_GROUP'      } = $group;  }
+  if ($project)   { $ENV { 'TBTS_PROJECT'    } = $project; }
   if ($xmlrpcurl) { $ENV { 'TBTS_XMLRPC_URL' } = $xmlrpcurl; }
+  use TBConfig;
+  if ($concurrent_prerun_jobs) { $TBConfig::concurrent_prerun_jobs = $concurrent_prerun_jobs; }
+  if ($concurrent_node_usage) { $TBConfig::concurrent_node_usage = $concurrent_node_usage; }
+  if ($cmdline_defines) { $TBConfig::cmdline_defines = $cmdline_defines; }
+
+  sayd($TBConfig::cmdline_defines);
 }
 
 sub usage {
