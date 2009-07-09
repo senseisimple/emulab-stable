@@ -2149,6 +2149,9 @@ sub OSSelect($$$$)
 # Get the next rtabid for a shared node. Need locking in this case
 # since multiple mappers can be running at once.
 #
+# We only need to do this on the physical node. On the virtual node, use
+# the same slot to store what rtabid was assigned to the vnode.
+#
 sub Nextrtabid($)
 {
     my ($self) = @_;
@@ -2171,6 +2174,24 @@ sub Nextrtabid($)
   bad:
     DBQueryWarn("unlock tables");
     return $rtabid;
+}
+
+#
+# Set rtabid for a node.
+#
+sub Setrtabid($$)
+{
+    my ($self, $rtabid) = @_;
+
+    return -1
+	if (! (ref($self)));
+    
+    my $node_id = $self->node_id();
+    
+    DBQueryWarn("update nodes set rtabid='$rtabid' where node_id='$node_id'")
+	or return -1;
+
+    return Refresh($self);
 }
 
 # _Always_ make sure that this 1 is at the end of the file...
