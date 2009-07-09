@@ -472,15 +472,18 @@ $result =
 		 "  np.reserved_pid is not null,np.eventstate, ".
 		 "  np.battery_percentage,np.uuid,b.sharing_mode, ".
 		 "  ru.load_1min, ru.load_5min, ru.status_timestamp, ".
-		 "  a.def_boot_osid ".
+		 "  a.def_boot_osid, nat2.attrvalue ".
 		 "from nodes as a ".
 		 "left join reserved as b on a.node_id=b.node_id ".
 		 "left join reserved as m on a.phys_nodeid=m.node_id ".
 		 "left join nodes as np on a.phys_nodeid=np.node_id ".
 		 "left join node_types as t on t.type=a.type ".
-		 "left join node_attributes as nat on ".
-		 "     nat.node_id=a.node_id and ".
-		 "     nat.attrkey='protogeni_exclude' ".
+		 "left join node_attributes as nat1 on ".
+		 "     nat1.node_id=a.node_id and ".
+		 "     nat1.attrkey='protogeni_exclude' ".
+		 "left join node_attributes as nat2 on ".
+		 "     nat2.node_id=a.node_id and ".
+		 "     nat2.attrkey='shared_weight' ".
 		 "left join node_rusage as ru on ru.node_id=a.node_id ".
 		 "left outer join ". 
 		 "  (select type,attrvalue ".
@@ -500,7 +503,7 @@ $result =
 #
 while (($node,$type,$physnode,$class,$issubnode,$def_boot_osid,$reserved,
 	$prereserved,$eventstate,$battery_perc,$uuid,$sharing_mode,
-	$load_1min,$load_5min,$load_tstamp,$osid) = $result->fetchrow_array) {
+	$load_1min,$load_5min,$load_tstamp,$osid,$weight) = $result->fetchrow_array) {
     $nodes{$node} = $type
 	if (!defined($pid) ||
 	    ($permissions{$type} && $permissions{$class}));
@@ -518,7 +521,8 @@ while (($node,$type,$physnode,$class,$issubnode,$def_boot_osid,$reserved,
 	$sharing_mode{$node} = { "load_1min"   => $load_1min,
 				 "load_5min"   => $load_5min,
 				 "load_tstamp" => $load_tstamp,
-				 "osid"        => $osid};
+				 "osid"        => $osid,
+				 "weight"      => $weight};
     }
     else {
 	$sharing_mode{$node} = 0;
@@ -606,6 +610,51 @@ foreach $node (keys(%nodes)) {
 	# allows the node to be picked, subject to other type constraints.
 	#
 	push(@features, "pcshared:1.0");
+
+	#
+	# The pool daemon may override the share weight.
+	#
+	if (defined($sharing_mode{$node}->{"weight"})) {
+	    my $weight = $sharing_mode{$node}->{"weight"};
+	    
+	    push(@features, "shareweight:$weight");
+	}
+	else {
+	    #
+	    # The point of this feature is to have assign favor shared nodes
+	    # that already have nodes on them, so that they are well packed.
+	    # Shared nodes with just a few vnodes on them are avoided so that
+	    # they will free up eventually. 
+	    #
+	    my $maxvnodes = 10;
+	    my $weight    = 0.5;
+	    my $gcount    = $globalcounts{$node} || 0.0;
+
+	    foreach my $auxinfo (@{$auxtypes{$node}}) {
+		my ($auxtype,$count) = split(":", $auxinfo);
+		
+		if ($auxtype eq "pcvm") {
+		    $maxvnodes = $count;
+		    last;
+		}
+	    }
+	    #
+	    # No point in the feature if no room left. 
+	    #
+	    if ($maxvnodes > $gcount) {
+		my $factor = ($gcount / $maxvnodes);
+		if ($factor < 0.25) {
+		    $weight = 0.8;
+		}
+		elsif ($factor > 0.75) {
+		    $weight = 0.1;
+		}
+		else {
+		    $weight = 0.3;
+		}
+		#push(@features, "shareweight:$weight");
+	    }
+	}
     }
 
     #
