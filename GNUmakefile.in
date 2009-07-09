@@ -51,7 +51,8 @@ install:
 # For installation on boss node
 # 
 boss-install:	install-schemacheck install-sitevarscheck install-dbfillcheck \
-		install-subdirs install-mkdirs install-setbuildinfo
+		install-genischemacheck install-subdirs install-mkdirs \
+		install-setbuildinfo
 	@echo "Boss node installed!"
 
 #
@@ -305,6 +306,9 @@ endif
 install-setbuildinfo:
 	@echo "Setting the Build and Version info"
 	$(SETBUILDINFO)
+
+install-genischemacheck:
+	@$(MAKE) -C protogeni install-genischemacheck
 
 # We use separate src and obj trees in Emulab, so the traditional distclean to
 # clean "made" files from a mingled source-and-obj tree is unnecessary.

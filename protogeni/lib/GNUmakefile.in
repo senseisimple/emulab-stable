@@ -32,7 +32,7 @@ all:	$(LIB_SCRIPTS) $(SBIN_SCRIPTS) $(SCRIPTS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-install: install-schemacheck $(addprefix $(INSTALL_LIBDIR)/, $(LIB_SCRIPTS)) \
+install: $(addprefix $(INSTALL_LIBDIR)/, $(LIB_SCRIPTS)) \
 	 $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS)) \
 	 $(addprefix $(INSTALL_DIR)/opsdir/lib/, $(OPS_LIBS))
 
@@ -45,7 +45,7 @@ SCHEMACHECK= cd $(OBJDIR)/protogeni/lib && perl genischemacheck.pl
 else
 SCHEMACHECK= @echo "Skipping schema check, since prefix isn't /usr/testbed"
 endif
-install-schemacheck: genischemacheck.pl
+install-genischemacheck: genischemacheck.pl
 	@echo "Checking DB schema..."
 	$(SCHEMACHECK)
 
