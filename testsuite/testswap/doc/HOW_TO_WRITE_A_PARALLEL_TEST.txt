@@ -4,8 +4,9 @@ HOWTO write a parallel test.
 
   TestBed::TestStute provides the rege (register experiment for parallel execution) function
   rege has the following signature
-  rege($eid, $ns_file_contents, $test_body_sub, $number_of_tests_in_test_body, $test_description);
+  rege($e, $ns_file_contents, $test_body_sub, $number_of_tests_in_test_body, $test_description);
 
+  $e is the experiment object created with the e($eid) constructor.
   when the experiment is swapped in $test_body_sub will get called with a single argument $e, the TestBed::TestSuite::Experiement object.
 
   EXTRA DETAILS:
@@ -54,8 +55,8 @@ my $twonodelan5Mbtest = sub {
   ok($e->linktest, "$eid linktest");
 };
 
-rege('2nodelan5Mb', $BasicNSs::TwoNodeLan5Mb, $twonodelan5Mbtest, 1, 'two node 5mb lan pingswapkill');
-rege('singlenode', $BasicNSs::SingleNode, sub { ok(shift->pingswapkill); }, 1, 'single node pingswapkill');
-rege('2nodelan', $BasicNSs::TwoNodeLan, sub { ok(shift->pingswapkill); }, 1, 'two node lan pingswapkill');
+rege(e('2nodelan5Mb'), $BasicNSs::TwoNodeLan5Mb, $twonodelan5Mbtest, 1, 'two node 5mb lan pingswapkill');
+rege(e('singlenode'), $BasicNSs::SingleNode, sub { ok(shift->pingswapkill); }, 1, 'single node pingswapkill');
+rege(e('2nodelan'), $BasicNSs::TwoNodeLan, sub { ok(shift->pingswapkill); }, 1, 'two node lan pingswapkill');
 
 1;

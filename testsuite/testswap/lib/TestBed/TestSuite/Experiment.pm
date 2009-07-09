@@ -8,6 +8,7 @@ use TestBed::Wrap::linktest;
 use TestBed::Wrap::loghole;
 use Tools;
 use Tools::TBSSH;
+use Tools::Network;
 use Data::Dumper;
 use TestBed::TestSuite;
 use TestBed::TestSuite::Node;
@@ -97,6 +98,20 @@ sub ping_test {
   for (@{$e->nodes}) {
     die $_->name . "failed ping" unless $_->ping();
   }
+}
+
+sub wait_for_nodes_to_activate {
+  my ($e) = shift;
+  for (@_) {
+    while ($e->node($_)->ping) { }
+  }
+}
+
+sub traceroute { 
+  my ($e) = shift;
+  my $src  = $e->resolve(shift);
+  my $dest = $e->resolve(shift);
+  Tools::Network::traceroute($src, $dest, @_);
 }
 
 =item C<< $e->single_node_tests() >>

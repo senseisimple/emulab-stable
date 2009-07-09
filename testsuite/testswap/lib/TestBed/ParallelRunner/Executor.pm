@@ -38,11 +38,20 @@ use Data::Dumper;
 
 has 'e'    => ( isa => 'TestBed::TestSuite::Experiment', is => 'rw');
 has 'desc' => ( isa => 'Str', is => 'rw');
-has 'ns'   => ( isa => 'Str', is => 'rw');
+has 'ns'   => ( is => 'rw');
 has 'proc' => ( isa => 'CodeRef', is => 'rw');
 has 'test_count' => ( isa => 'Any', is => 'rw');
 has 'error_strategy' => ( is => 'rw', lazy => 1, default => sub { TestBed::ParallelRunner::ErrorStrategy->new; } );
 has 'pre_result_handler' => ( isa => 'CodeRef', is => 'rw');
+
+sub ns_text {
+  my $s = shift;
+  my $ns = $s->ns;
+  if (ref($ns) eq 'CODE') {
+    return $ns->();
+  }
+  return $ns;
+}
 
 sub parse_options {
   my %options = @_;
@@ -85,26 +94,34 @@ sub handleResult {
 }
 
 sub prep {
-  my $self = shift;
-  my $r = eval { $self->e->create_and_get_metadata($self->ns); };
+  my $s = shift;
+  if (checkno('create')) {
+    return +{'maximum_nodes' => 0};
+  }
+  my $r = eval { $s->e->create_and_get_metadata($s->ns_text); };
   die TestBed::ParallelRunner::Executor::PrepError->new( original => $@ ) if $@;
   return $r;
 }
 
-sub execute {
-  my $self = shift;
-  my $e = $self->e;
+sub checkno {
+  my $stage = shift;
+  return grep { $_ = $stage } @{ $TBConfig::exclude_steps };
+}
 
-  eval { $e->swapin_wait; };
+sub execute {
+  my $s = shift;
+  my $e = $s->e;
+
+  eval { $e->swapin_wait; } unless checkno('swapin');
   die TestBed::ParallelRunner::Executor::SwapinError->new( original => $@ ) if $@;
 
-  eval { $self->proc->($e); };
+  eval { $s->proc->($e); } unless checkno('run');
   my $run_exception = $@;
 
-  eval { $e->swapout_wait; };
+  eval { $e->swapout_wait; } unless checkno('swapout');
   my $swapout_exception = $@;
 
-  eval { $e->end_wait; };
+  eval { $e->end_wait; } unless checkno('end');
   my $end_exception = $@;
 
   die TestBed::ParallelRunner::Executor::RunError->new( original => $run_exception ) if $run_exception;

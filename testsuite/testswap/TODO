@@ -1,7 +1,13 @@
 ImageTest
-Parameters
 OldTests
 Cleanup SSH
+
+Painpoints
+=================================
+Teststeps  - don't run certian parts create, swapin, run, swapout, end, 
+  implemented for parallel tests
+Testlayout - Suites and  Tests
+Testoutput -
 
 DOCS TODO
   backoff example

@@ -15,13 +15,13 @@ TestBed::TestSuite::Node
 
 =over 4
 
-=item C<< $n->ping_test >>
+=item C<< $n->ping >>
 
 =cut
 
-sub ping_test {
+sub ping {
   my ($self) = @_;
-  ping($self->name);
+  Tools::Network::ping($self->name);
 }
 
 =item C<< $n->single_node_tests >>

@@ -38,6 +38,8 @@ sub AUTOLOAD {
 
 sub args { 
   my $self = shift;
+
+  die "Odd number of args" . sayd(@_) if ((scalar @_) % 2 !=0);
   +{ @_ };
 }
 

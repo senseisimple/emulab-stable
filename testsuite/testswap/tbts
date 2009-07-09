@@ -33,8 +33,11 @@ use Data::Dumper;
   my $cmdline_defines;
   my $concurrent_prerun_jobs;
   my $concurrent_node_usage;
+  my $exclude_steps;
   my $result = GetOptions (
-      "D=s%"        => \$cmdline_defines,
+      "d"       => \$debug,
+      "debug"       => \$debug,
+      "define=s%"   => \$cmdline_defines,
 #      "jobs=i"      => \$pjobs,
       "logging=i"   => \$logging,
       "timing"      => \$timing,
@@ -42,9 +45,9 @@ use Data::Dumper;
       "project=s"   => \$project,
       "xmlrpcurl=s" => \$xmlrpcurl,
       "group=s"     => \$group,
-      "debug"       => \$debug,
       "cprj=i"      => \$concurrent_prerun_jobs,
       "cnu=i"       => \$concurrent_node_usage,
+      "exsteps=s@"  => \$exclude_steps,
     );
 
   if ($pjobs > 1) { $ENV { 'HARNESS_OPTIONS' } = "j$pjobs"; }
@@ -59,8 +62,7 @@ use Data::Dumper;
   if ($concurrent_prerun_jobs) { $TBConfig::concurrent_prerun_jobs = $concurrent_prerun_jobs; }
   if ($concurrent_node_usage) { $TBConfig::concurrent_node_usage = $concurrent_node_usage; }
   if ($cmdline_defines) { $TBConfig::cmdline_defines = $cmdline_defines; }
-
-  sayd($TBConfig::cmdline_defines);
+  if ($exclude_steps) { $TBConfig::exclude_steps = $exclude_steps; }
 }
 
 sub usage {
@@ -106,7 +108,7 @@ if (@ARGV) {
   elsif ($_ eq 'podc')      { system 'for x in `find lib -iname "*.pm"`; do podchecker $x 2>&1 |grep contain; done; '; }
   elsif ($_ eq 'pode')      { system 'for x in `find lib -iname "*.pm"`; do podchecker $x 2>&1 |grep ERROR; done;'; }
   elsif ($_ eq 'pode')      {
-    eval { use Pod::Coverage; };
+    eval "use Pod::Coverage;";
     unless ($@) {
       my $pc = Pod::Coverage->new(package => 'Pod::Coverage');
       print "We rock!" if $pc->coverage == 1;

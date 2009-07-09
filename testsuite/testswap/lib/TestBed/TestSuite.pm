@@ -4,6 +4,7 @@ use SemiModern::Perl;
 use TestBed::TestSuite::Experiment;
 use TestBed::ParallelRunner;
 use TestBed::ForkFramework;
+use TestBed::XMLRPC::Client::Node;
 use Data::Dumper;
 use Tools;
 
@@ -18,7 +19,7 @@ my $error_sub = sub {
 
 require Exporter;
 our @ISA = qw(Exporter);
-our @EXPORT = qw(e CartProd CartProdRunner concretize defaults override rege runtests prun prunout);
+our @EXPORT = qw(e CartProd CartProdRunner concretize defaults override rege runtests prun prunout get_free_node_names);
 
 sub e { TestBed::TestSuite::Experiment->new(_build_e_from_positionals(@_)); }
 
@@ -116,6 +117,10 @@ sub prun {
 sub prunout {
   my $results = prun(@_);
   return $results->sorted_results;
+}
+
+sub get_free_node_names {
+  TestBed::XMLRPC::Client::Node->new()->get_free_node_names(@_);
 }
 
 =head1 NAME
