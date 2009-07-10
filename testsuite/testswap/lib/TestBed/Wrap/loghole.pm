@@ -30,7 +30,7 @@ sub loghole {
   my ($e, @args) = @_;
   my ($pid, $eid) = ($e->pid, $e->eid);
   my $cmd = 'PATH=/usr/testbed/bin:$PATH loghole ' . "-e $pid/$eid " . join(" ", @args);
-  say $cmd;
+  #say $cmd;
   Tools::TBSSH::cmdsuccess($TBConfig::OPS_SERVER, $cmd);
 }
 

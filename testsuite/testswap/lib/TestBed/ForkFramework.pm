@@ -61,7 +61,7 @@ sub successful { ! shift->has_errors;}
 sub sorted_results {
   return map { $_->result } (sort { $a->itemid <=> $b->itemid } @{shift->successes});
 }
-sub handle_result { 
+sub handleResult { 
   my ($self, $result) = @_;
   if   ( $result->is_error ) { $self->push_error($result); } 
   else { $self->push_success($result); } 
@@ -74,6 +74,7 @@ use Mouse;
 has 'result' => ( is => 'rw');
 has 'error'  => ( is => 'rw');
 has 'itemid' => ( is => 'rw');
+has 'name'   => ( is => 'rw');
 
 sub is_error { shift->error; }
 
@@ -163,8 +164,8 @@ sub process_select {
     eval {
       for my $r ($selector->can_read($self->selecttimeout)) {
         my ($rh, $wh, $eof, $ch) = @$r;
-        if (defined (my $result = $ch->receive)) {
-          $self->handleResult($result);
+        if (defined (my $itemResult = $ch->receive)) {
+          $self->handleItemResult($itemResult);
           
           unless ( $eof ) {
             if( my $jobid = $self->nextJob ) { 
@@ -228,8 +229,8 @@ sub fffork {
 }
 
 sub doItem { die "HAVE TO IMPLEMENT doItem"; }
-sub handleResult { recordResult(@_); }
-sub recordResult { shift->results->handle_result(shift); }
+sub handleItemResult { recordItemResult(@_); }
+sub recordItemResult { shift->results->handleResult(shift); }
 sub schedule { 0; }
 
 package TestBed::ForkFramework::ForEach;
@@ -423,13 +424,14 @@ use TestBed::ParallelRunner::ErrorConstants;
 
 sub return_and_report {
   my ($s, $result) = @_;
-  $s->recordResult($result);
+  $s->recordItemResult($result);
   $s->return_node_resources($s->task($result->itemid));
 }
 
-sub handleResult { 
+sub handleItemResult { 
   my ($s, $result) = @_;
   my $executor = $s->tasks->[$result->itemid]->item;
+  $result->name($executor->e->eid);
   if ($executor->can('handleResult')) {
     my $rc = $executor->handleResult($s, $result);
     if ($rc == RETURN_AND_REPORT) { $s->return_and_report($result) }

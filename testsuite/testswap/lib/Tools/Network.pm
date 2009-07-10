@@ -3,10 +3,8 @@ package Tools::Network;
 use SemiModern::Perl;
 use Net::Ping;
 use Tools::TBSSH;
-require Exporter;
-our @ISA = qw(Exporter);
-our @EXPORT = qw();
 use Data::Dumper;
+use Test::More;
 
 =head1 NAME
 
@@ -33,27 +31,29 @@ sub ping {
 ssh to host $src and executes a traceroute to $dest ensuring it follows the path specified
 returns 0 or 1
 =cut
-sub traceroute ($$@) {
+sub traceroute {
   my ($src,$dest,@path) = @_;
-  Tools::TBSSH::cmdcheckoutput($src, "traceroute $dest", 
+  Tools::TBSSH::cmdcheckoutput($src, "/usr/sbin/traceroute $dest", 
   sub {
-    local $_ = $_[0];
-    local @_ = grep {!/^traceroute/} split /\n/;
-    if (@_+0 != @path+0) {
-      printf "*** traceroute $src->$dest: expected %d hops but got %d.\n",
-      @path+0, @_+0;
-      return 0;
+    my ($sshoutput) = @_;
+    my @lines = grep {!/^traceroute/} split(/\n/, $sshoutput) ;
+    if ( (scalar @lines) != (scalar @path) ) {
+      die sprintf("*** traceroute $src->$dest: expected %d hops but got %d.\n$sshoutput", (scalar @path), (scalar @lines));
     }
-    for (my $i = 0; $i < @_; $i++) {
-      local $_ = $_[$i];
-      my ($n) = /^\s*\d+\s*(\S+)/;
-      next if $n eq $path[$i];
-      printf "*** traceroute $src->$dest: expected %s for hop %d but got %s\n",
-      $path[0], $i+1, $n;
-      return 0;
+    for (0 .. ((scalar @lines)-1) ) {
+      my $hop = $path[$_];
+      my $line = $lines[$_];
+      my ($host) = ($line =~ /^\s*\d+\s*(\S+)/);
+      next if $host eq $hop;
+      die sprintf("*** traceroute $src->$dest: expected %s for hop %d but got %s\n$sshoutput", $hop, $_+1, $host);
     }
     return 1;
   });
+}
+
+sub traceroute_ok {
+  my ($src,$dest,@path) = @_;
+  ok(traceroute(@_), "traceroute $src to $dest");
 }
 
 =back

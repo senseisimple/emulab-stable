@@ -34,11 +34,11 @@ use Data::Dumper;
   my $concurrent_prerun_jobs;
   my $concurrent_node_usage;
   my $exclude_steps;
+  my $single;
   my $result = GetOptions (
-      "d"       => \$debug,
-      "debug"       => \$debug,
+      "d|debug"     => \$debug,
       "define=s%"   => \$cmdline_defines,
-#      "jobs=i"      => \$pjobs,
+      "jobs=i"      => \$pjobs,
       "logging=i"   => \$logging,
       "timing"      => \$timing,
       "verbose"     => \$verbose,
@@ -47,7 +47,8 @@ use Data::Dumper;
       "group=s"     => \$group,
       "cprj=i"      => \$concurrent_prerun_jobs,
       "cnu=i"       => \$concurrent_node_usage,
-      "exsteps=s@"  => \$exclude_steps,
+      "exsteps=s"   => \$exclude_steps,
+      "single=s"   => \$single,
     );
 
   if ($pjobs > 1) { $ENV { 'HARNESS_OPTIONS' } = "j$pjobs"; }
@@ -62,7 +63,8 @@ use Data::Dumper;
   if ($concurrent_prerun_jobs) { $TBConfig::concurrent_prerun_jobs = $concurrent_prerun_jobs; }
   if ($concurrent_node_usage) { $TBConfig::concurrent_node_usage = $concurrent_node_usage; }
   if ($cmdline_defines) { $TBConfig::cmdline_defines = $cmdline_defines; }
-  if ($exclude_steps) { $TBConfig::exclude_steps = $exclude_steps; }
+  if ($exclude_steps) { $TBConfig::exclude_steps = [split(/ /, $exclude_steps)]; }
+  if ($single) { $TBConfig::single = $single; }
 }
 
 sub usage {
@@ -73,17 +75,24 @@ sub usage {
   use File::Find;
   find(\&scandir_t, 't');
   find(\&scandir_tests, 'tests');
-
+=pod old options
+        -j --jobs=i    parallel jobs
+        -t --timing
+        -v --verbose
+=cut
   print <<"USAGE";
 TestBed TestSwap
 ./tbts OPTIONS TESTSUITE|TESTFILE
         -d --debug
         -g --group=GROUPNAME
-        -j --jobs=i    parallel jobs
         -p --project=PROJECTNAME
-        -t --timing
-        -v --verbose
         -x --xmlrpcurl=XMLRPCURL
+        --define OS=FBSD410-UPDATE
+        --cprj=4  => \$concurrent_prerun_jobs,
+        --cnu=20  => \$concurrent_node_usage,
+        --exsteps "swapout end"
+        --exsteps "create swapin swapout end"
+        --exsteps "run"
 
     TESTSUITES:
         test     - all topology tests

@@ -122,16 +122,16 @@ set lan0 [$ns make-lan "$node0 $node00 $node000 $node0000 " 1Mb 0ms]
 set lan1 [$ns make-lan "$node0000 $node00000 " 100Mb 0ms]
 set lan00 [$ns make-lan "$node001 $node0010 $node00100 $node00000 " 1Mb 0ms]
 
-tb-set-node-lan-params $node0 $lan0 100ms 1Mb 0.0
-tb-set-node-lan-params $node00 $lan0 100ms 1Mb 0.0
-tb-set-node-lan-params $node000 $lan0 100ms 1Mb 0.0
-tb-set-node-lan-params $node0000 $lan0 100ms 1Mb 0.0
-tb-set-node-lan-params $node0000 $lan1 50ms 100Mb 0.0
-tb-set-node-lan-params $node00000 $lan1 50ms 100Mb 0.0
-tb-set-node-lan-params $node001 $lan00 100ms 1Mb 0.0
-tb-set-node-lan-params $node0010 $lan00 100ms 1Mb 0.0
-tb-set-node-lan-params $node00100 $lan00 100ms 1Mb 0.0
-tb-set-node-lan-params $node00000 $lan00 100ms 1Mb 0.0
+tb-set-node-lan-params $node0 $lan0 100ms 1Mb 0.01
+tb-set-node-lan-params $node00 $lan0 100ms 1Mb 0.01
+tb-set-node-lan-params $node000 $lan0 100ms 1Mb 0.01
+tb-set-node-lan-params $node0000 $lan0 100ms 1Mb 0.01
+tb-set-node-lan-params $node0000 $lan1 50ms 100Mb 0.01
+tb-set-node-lan-params $node00000 $lan1 50ms 100Mb 0.01
+tb-set-node-lan-params $node001 $lan00 100ms 1Mb 0.01
+tb-set-node-lan-params $node0010 $lan00 100ms 1Mb 0.01
+tb-set-node-lan-params $node00100 $lan00 100ms 1Mb 0.01
+tb-set-node-lan-params $node00000 $lan00 100ms 1Mb 0.01
 
 
 $ns rtproto Static
@@ -149,7 +149,7 @@ tb-set-node-os $nodeA @OS@
 tb-set-node-os $nodeB @OS@
 
 set linkAB [$ns duplex-link $nodeA $nodeB 64kb 50ms DropTail]
-tb-set-link-loss $linkAB 0.0
+tb-set-link-loss $linkAB 0.1
 
 $ns rtproto Static
 $ns run
@@ -237,35 +237,32 @@ $ns run
 END
 
 
-=pod
 sub router_test {
-test_traceroute 'node0', 'node4', qw(node2-link0 node3-link2 node4-link3);
-test_traceroute 'node4', 'node0', qw(node3-link3 node2-link2 node0-link0);
+  my $e = shift;
+  $e->traceroute_ok('node0', 'node4', qw(node2-link0 node3-link2 node4-link3));
+  $e->traceroute_ok('node4', 'node0', qw(node3-link3 node2-link2 node0-link0));
 
-test_traceroute 'node0', 'node1', qw(node2-link0 node1-link1);
-test_traceroute 'node1', 'node0', qw(node2-link1 node0-link0);
+  $e->traceroute_ok('node0', 'node1', qw(node2-link0 node1-link1));
+  $e->traceroute_ok('node1', 'node0', qw(node2-link1 node0-link0));
 
-test_traceroute 'node1', 'node4', qw(node2-link1 node3-link2 node4-link3);
-test_traceroute 'node4', 'node1', qw(node3-link3 node2-link2 node1-link1);
+  $e->traceroute_ok('node1', 'node4', qw(node2-link1 node3-link2 node4-link3));
+  $e->traceroute_ok('node4', 'node1', qw(node3-link3 node2-link2 node1-link1));
 }
 
 sub router_manual_test {
-test_traceroute 'node1', 'nodeA', qw(node3-lan nodeA-link);
-test_traceroute 'nodeA', 'node1', qw(node3-link node1-lan);
+  my $e = shift;
+  $e->traceroute_ok('node1', 'nodeA', qw(node3-lan nodeA-link));
+  $e->traceroute_ok('nodeA', 'node1', qw(node3-link node1-lan));
 
-test_traceroute 'node2', 'nodeA', qw(node3-lan nodeA-link);
-test_traceroute 'nodeA', 'node2', qw(node3-link node2-lan);
+  $e->traceroute_ok('node2', 'nodeA', qw(node3-lan nodeA-link));
+  $e->traceroute_ok('nodeA', 'node2', qw(node3-link node2-lan));
 
-test_traceroute 'node3', 'nodeA', qw(nodeA-link);
-test_traceroute 'nodeA', 'node3', qw(node3-link);
+  $e->traceroute_ok('node3', 'nodeA', qw(nodeA-link));
+  $e->traceroute_ok('nodeA', 'node3', qw(node3-link));
 
-test_traceroute 'node1', 'node3', qw(node3-lan);
-test_traceroute 'node3', 'node1', qw(node1-lan);
+  $e->traceroute_ok('node1', 'node3', qw(node3-lan));
+  $e->traceroute_ok('node3', 'node1', qw(node1-lan));
 }
-#['router', $Router, '5 node routing experiement'],
-#['routermanual', $RouterManual, 'Tests manual routing and tb-set-ip/netmask.'],
-=cut
-
 my $OS ="RHL90-STD";
 
 my $image_basic_tests = [
@@ -276,6 +273,13 @@ my $image_basic_tests = [
 ['linktesthilat', $LinkTestHilat,'Test linktest on a topo with long delays.'],
 ['linktestlobw', $LinkTestLoBW, 'Test linktest on a topo with low bandwidth.'],
 ];
+my $router_test = sub { my $e = shift; router_test($e); basic_test($e); };
+my $router_manual_test = sub { my $e = shift; basic_test($e); router_manual_test($e); };
+
+my $image_router_tests = [
+['router', $Router, '5 node routing experiement', $router_test],
+['routermanual', $RouterManual, 'Tests manual routing and tb-set-ip/netmask.', $router_manual_test],
+];
 
 sub basic_test {
 my $e = shift;
@@ -284,12 +288,29 @@ my $e = shift;
   ok($e->linktest, "$eid linktest");
 }
 
+sub osmatch {
+  shift =~ /^(.*tb-set-node-os.*)$/m;
+  return $1;
+}
+
 for (@$image_basic_tests) {
   my ($eid, $orig_ns, $desc) = @$_;
   my $ns = concretize($orig_ns, OS => $OS);
-  say "$eid\n$ns\n$desc";
+  #say "$eid -- " . osmatch($ns);
   rege(e($eid), $ns, \&basic_test, 2, $desc);
 }
+
+=pod
+for (@$image_router_tests) {
+  my ($eid, $orig_ns, $desc, $testsub) = @$_;
+  my $ns = concretize($orig_ns, OS => $OS, RTPROTO => 'Static');
+  rege(e($eid), $ns, $testsub, 8, $desc);
+}
+=cut
+
+rege(e('routerstatic'), concretize($Router, OS => $OS, RTPROTO => 'Static'), $router_test, 8, '5 node routing experiement - static');
+#rege(e('routersession'), concretize($Router, OS => $OS, RTPROTO => 'Session'), $router_test, 8, '5 node routing experiement - session');
+rege(e('routermanual'), concretize($RouterManual, OS => $OS), $router_manual_test, 10, 'Tests manual routing and tb-set-ip/netmask.');
 
 sub sync_test {
   my %cmds = (
@@ -338,8 +359,8 @@ END
   ok( prun( map { my $n = $_; sub { $e->node('node'.$n)->splatex($cmds{$n}, 'startcmd'.$n.'.sh'); } } @ids ), "$eid prun splat" );
   ok( prun( map { my $n = $_; sub { $e->node('node'.$n)->ssh->cmdoutput('./startcmd'.$n.'.sh'); } } @ids ), "$eid prun sh" );
   my @results = prunout( map { my $n = $_; sub { $e->node('node'.$n)->slurp('node'.$n.'res'); } } @ids );
-  ok( /^0\n1\n2\n$/,  "noderes") for (@results[0..2]);
-  ok( /^3\n4\n$/, "noderes") for (@results[3..4]);
+  ok( $results[$_] =~ /^0\n1\n2\n$/,  "noderes$_") for (0..2);
+  ok( $results[$_] =~ /^3\n4\n$/, "noderes$_") for (3..4);
 }
 
 rege(e('sync'), concretize($Sync, OS => $OS), \&sync_test, 7, 'ImageTest-sync test');

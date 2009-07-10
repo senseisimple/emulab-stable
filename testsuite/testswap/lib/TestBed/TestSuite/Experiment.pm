@@ -101,17 +101,26 @@ sub ping_test {
 }
 
 sub wait_for_nodes_to_activate {
-  my ($e) = shift;
+  my ($e, $timeout) = (shift, shift);
+  my $start = time;
   for (@_) {
-    while ($e->node($_)->ping) { }
+    while ($e->node($_)->ping) { 
+      sleep 1;
+      if ((time - $start) >  $timeout) { die "Timeout before $_ activated"; }
+    }
   }
 }
 
 sub traceroute { 
   my ($e) = shift;
   my $src  = $e->resolve(shift);
-  my $dest = $e->resolve(shift);
-  Tools::Network::traceroute($src, $dest, @_);
+  Tools::Network::traceroute($src, @_);
+}
+
+sub traceroute_ok { 
+  my ($e) = shift;
+  my $src  = $e->resolve(shift);
+  Tools::Network::traceroute_ok($src, @_);
 }
 
 =item C<< $e->single_node_tests() >>

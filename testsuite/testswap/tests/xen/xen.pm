@@ -73,7 +73,7 @@ EOF
 
 sub testbody($){
   my ($e) = @_;
-  $e->wait_for_nodes_to_activate(qw(a1 b1));
+  $e->wait_for_nodes_to_activate(60 * 30, qw(a1 b1)); #thirty minute timeout
   ok($e->traceroute('a1', 'b1', qw(a1-lan0)), 'traceroute between a1 and b1');
 }
 

@@ -58,6 +58,10 @@ sub runtests {
   $concurrent_pre_runs         ||= $TBConfig::concurrent_prerun_jobs;
   $concurrent_node_count_usage ||= $TBConfig::concurrent_node_usage;
 
+  if ( $TBConfig::single ) {
+    $Executors = [ (grep { $_->e->eid eq $TBConfig::single } @$Executors) ];
+  }
+
   #prerun step
   my $result = TestBed::ForkFramework::ForEach::max_work($concurrent_pre_runs, sub { shift->prep }, $Executors);
   if ($result->has_errors) {

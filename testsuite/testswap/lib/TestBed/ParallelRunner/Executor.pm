@@ -105,25 +105,31 @@ sub prep {
 
 sub checkno {
   my $stage = shift;
-  return grep { $_ = $stage } @{ $TBConfig::exclude_steps };
+  return grep { $_ eq $stage } @{ $TBConfig::exclude_steps };
 }
 
 sub execute {
   my $s = shift;
   my $e = $s->e;
 
+  my $run_exception;
+  my $swapout_exception;
+
   eval { $e->swapin_wait; } unless checkno('swapin');
-  die TestBed::ParallelRunner::Executor::SwapinError->new( original => $@ ) if $@;
+  my $swapin_exception = $@;
 
-  eval { $s->proc->($e); } unless checkno('run');
-  my $run_exception = $@;
+  unless ($swapin_exception) {
+    eval { $s->proc->($e); } unless checkno('run');
+    $run_exception = $@;
 
-  eval { $e->swapout_wait; } unless checkno('swapout');
-  my $swapout_exception = $@;
+    eval { $e->swapout_wait; } unless checkno('swapout');
+    $swapout_exception = $@;
+  }
 
   eval { $e->end_wait; } unless checkno('end');
   my $end_exception = $@;
 
+  die TestBed::ParallelRunner::Executor::SwapinError->new( original => $@ ) if $swapin_exception;
   die TestBed::ParallelRunner::Executor::RunError->new( original => $run_exception ) if $run_exception;
   die TestBed::ParallelRunner::Executor::SwapoutError->new( original => $swapout_exception ) if $swapout_exception;
   die TestBed::ParallelRunner::Executor::KillError->new( original => $end_exception ) if $end_exception;

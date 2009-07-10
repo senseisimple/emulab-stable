@@ -1,11 +1,11 @@
-ImageTest
+ImageTest - Traffic Generation
 OldTests
 Cleanup SSH
+Retry Prep
 
 Painpoints
 =================================
-Teststeps  - don't run certian parts create, swapin, run, swapout, end, 
-  implemented for parallel tests
+Teststeps  - don't run certian parts create, swapin, run, swapout, end, implemented for parallel tests
 Testlayout - Suites and  Tests
 Testoutput -
 
@@ -16,13 +16,9 @@ TODO
   TIMEOUT of XMLRPC Calls
   TESTLWP
   scp cleanup
-  chmod +x
-  cmdline params (-D)
   VERBOSENESS
   Add basic image-test parameterization examples
   EXAMPLES, Get some tests
-  traffic generation
-  convert more old tests
 
 STILL MESSY
   XMLRPC/Client/Experiment TestSuite/Experiment dsl
@@ -36,7 +32,6 @@ LATER
   test groupings
   Large External Tars and Resources for experiements
   buildup, teardown using Test::Class
-  create BSD virtual machine for testing
 
 Parallel TODOS
   clean up FFF, Roles, constructors
