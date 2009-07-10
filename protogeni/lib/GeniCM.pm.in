@@ -173,9 +173,8 @@ sub Resolve($)
 	    next
 		if (!defined($interface->switch_id()));
 		
-	    my $urn = GeniHRN::Generate( $OURDOMAIN, "interface",
-					 $node->node_id() . ":" .
-					 $interface->iface() );
+	    my $urn = GeniHRN::GenerateInterface( $OURDOMAIN, $node->node_id(),
+						  $interface->iface() );
 	    my $iblob = { "uuid"	=> $interface->uuid(),
 			  "iface"	=> $interface->iface(),
 			  "type"	=> $interface->type(),

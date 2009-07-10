@@ -50,6 +50,7 @@ my $WAP           = "$TB/sbin/withadminprivs";
 my $SACERT	  = "$TB/etc/genisa.pem";
 my $CMCERT	  = "$TB/etc/genicm.pem";
 my $CHCERT	  = "$TB/etc/genich.pem";
+my $SESCERT	  = "$TB/etc/genises.pem";
 my $SUDO	  = "/usr/local/bin/sudo";
 my $MYSQL         = "/usr/local/bin/mysql";
 my $MYSQLADMIN    = "/usr/local/bin/mysqladmin";
@@ -389,6 +390,12 @@ if (! -e $SACERT) {
 	   "  -u $TBBASE/protogeni/xmlrpc/sa $PGENIDOMAIN.sa") == 0
 	   or fatal("Could not generate $SACERT");
 }
+if (! -e $SESCERT) {
+    print "Creating SES certificate ...\n";
+    system("$SUDO -u $PROTOUSER $MKSYSCERT -o $SESCERT ".
+	   "  -u $TBBASE/protogeni/xmlrpc/ses $PGENIDOMAIN.ses") == 0
+	   or fatal("Could not generate $SESCERT");
+}
 if ($asch) {
     if (! -e $CHCERT) {
 	print "Creating CH certificate ...\n";
@@ -461,6 +468,8 @@ system("$ADDAUTHORITY $SACERT sa") == 0
     or fatal("Could not add SA certificate");
 system("$ADDAUTHORITY $CMCERT cm") == 0
     or fatal("Could not add CM certificate");
+system("$ADDAUTHORITY $SESCERT ses") == 0
+    or fatal("Could not add SES certificate");
 
 #
 # Register our certs at the clearinghouse.
@@ -477,12 +486,24 @@ print "Registering CM cert at the clearinghouse.\n";
 if ($clearinghouse->Register("CM", $cmcert->cert())) {
     fatal("Could not register CM cert at the clearinghouse");
 }
+my $sescert = GeniCertificate->LoadFromFile($SESCERT);
+if (!defined($sescert)) {
+    fatal("Could not load certificate from $SESCERT\n");
+}
+# Maybe we want to register random services (like the SES) with
+# the clearing house.  Maybe not.  But it can't currently cope with
+# SES registries in any case, so leave this commented out for now.
+#print "Registering SES cert at the clearinghouse.\n";
+#if ($clearinghouse->Register("SES", $sescert->cert())) {
+#    fatal("Could not register SES cert at the clearinghouse");
+#}
 
 #
 # Local SiteVars to hold the UUIDs.
 #
 TBSetSiteVar('protogeni/sa_uuid', $certificate->uuid());
 TBSetSiteVar('protogeni/cm_uuid', $cmcert->uuid());
+TBSetSiteVar('protogeni/ses_uuid', $sescert->uuid());
 
 exit(0);
 

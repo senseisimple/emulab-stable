@@ -20,8 +20,8 @@ SETUID_LIBX_SCRIPTS  =
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
-all:	protogeni-cm.pl protogeni-ch.pl protogeni-sa.pl Genixmlrpc.pm \
-	GeniResponse.pm
+all:	protogeni-cm.pl protogeni-ch.pl protogeni-sa.pl protogeni-ses.pl \
+	Genixmlrpc.pm GeniResponse.pm
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -32,13 +32,16 @@ install-libs: $(INSTALL_LIBDIR)/Genixmlrpc.pm \
 
 install-scripts: $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-sa.pl \
 		$(INSTALL_DIR)/protogeni/xmlrpc/protogeni-cm.pl \
-		$(INSTALL_DIR)/protogeni/xmlrpc/protogeni-ch.pl
+		$(INSTALL_DIR)/protogeni/xmlrpc/protogeni-ch.pl \
+		$(INSTALL_DIR)/protogeni/xmlrpc/protogeni-ses.pl
 	$(SUDO) chown root $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-sa.pl
 	$(SUDO) chmod u+s  $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-sa.pl
 	$(SUDO) chown root $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-ch.pl
 	$(SUDO) chmod u+s  $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-ch.pl
 	$(SUDO) chown root $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-cm.pl
 	$(SUDO) chmod u+s  $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-cm.pl
+	$(SUDO) chown root $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-ses.pl
+	$(SUDO) chmod u+s  $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-ses.pl
 
 install: install-libs install-scripts
 

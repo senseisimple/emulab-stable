@@ -1,0 +1,145 @@
+#!/usr/bin/perl -w
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Simple CGI interfce to the GENI xmlrpc interface. This script is invoked
+# from the web server. The certificate information is in the environment
+# set up by apache.
+#
+use strict;
+use English;
+use Frontier::Responder;
+use Data::Dumper;
+use POSIX;
+
+# Yack. apache does not close fds before the exec, and if this dies
+# we are left with a giant mess.
+BEGIN {
+    no warnings;
+    for (my $i = 3; $i < 2048; $i++) {
+      POSIX:close($i);
+    }
+}
+
+# Do this early so that we talk to the right DB.
+use vars qw($GENI_DBNAME);
+BEGIN { $GENI_DBNAME = "geni"; }
+
+# Configure variables
+my $EMULAB_PEMFILE = "@prefix@/etc/genises.pem";
+my $MAINSITE 	   = @TBMAINSITE@;
+
+# Testbed libraries.
+use lib '@prefix@/lib';
+use GeniSES;
+use Genixmlrpc;
+use GeniResponse;
+use libaudit;
+
+# Geniuser.
+my $user  = "geniuser";
+my $group = "GeniSlices";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+#
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# So we know who/what we are acting as.
+#
+my $certificate = GeniCertificate->LoadFromFile($EMULAB_PEMFILE);
+if (!defined($certificate)) {
+    die("*** $0:\n".
+	"    Could not get uuid from $EMULAB_PEMFILE\n");
+}
+$ENV{'MYUUID'} = $certificate->uuid();
+
+#
+# In the prototype, we accept certificate signed by trusted roots
+# (CA certs we have locally cached). This script runs as "geniuser"
+# so that there is an emulab user context, or many of the scripts we
+# invoke will complain and croak. 
+#
+my $unix_uid = getpwnam("$user") or
+    die("*** $0:\n".
+	"    No such user $user\n");
+my $unix_gid = getgrnam("$group") or
+    die("*** $0:\n".
+	"    No such group $group\n");
+
+# Flip to user and never go back
+$GID            = $unix_gid;
+$EGID           = "$unix_gid $unix_gid";
+$EUID = $UID    = $unix_uid;
+$ENV{'USER'}    = $user;
+$ENV{'LOGNAME'} = $user;
+
+#
+# The UUID of the client certificate is in the env var SSL_CLIENT_S_DN_CN.
+# If it actually looks like a UUID, then this correponds to an actual user,
+# and the supplied credentials/tickets must match. At present, if there is
+# no UUID, it is another emulab making a request directly, with no user
+# context, and we just let that pass for now.
+#
+if (exists($ENV{'SSL_CLIENT_S_DN_CN'}) &&
+    $ENV{'SSL_CLIENT_S_DN_CN'} =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
+    $ENV{'GENIUSER'} = $ENV{'SSL_CLIENT_S_DN_CN'};
+    $ENV{'GENIUUID'} = $ENV{'SSL_CLIENT_S_DN_CN'};
+}
+else {
+    my $decoder = Frontier::RPC2->new();
+    print "Content-Type: text/xml \n\n";
+    print $decoder->encode_fault(-1, "Invalid certificate; no UUID");
+    exit(0);
+}
+#
+# Reaching into the Frontier code so I can debug this crap.
+#
+my $request = Frontier::Responder::get_cgi_request();
+if (!defined($request)) {
+    print "Content-Type: text/txt\n\n";
+    exit(0);
+}
+
+#
+# Use libaudit to capture any output from libraries and programs.
+# Send that to tbops so they can be fixed.
+#
+LogStart(0, undef, LIBAUDIT_LOGTBOPS());
+
+#
+# Create and set our RPC context for any calls we end up making.
+#
+Genixmlrpc->SetContext(Genixmlrpc->Context($certificate));
+
+my $responder = Frontier::Responder->new( "methods" => {
+    "Map" => \&GeniSES::Map
+   }
+);
+
+my $response = $responder->{'_decode'}->serve($request,
+					      $responder->{'methods'});
+
+# Add stuff for log message if sent.
+AddAuditInfo("message", $response . "\n\n" . $request);
+# CC errors to Utah for now.
+AddAuditInfo("cc", "protogeni-errors\@flux.utah.edu")
+    if (!$MAINSITE);
+#
+# Terminate the log capture so that we can print the response to STDOUT
+# for the web server.
+#
+LogEnd();
+
+print "Content-Type: text/xml \n\n" . $response;
