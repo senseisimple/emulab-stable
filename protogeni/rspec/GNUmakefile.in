@@ -1,0 +1,33 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= protogeni/rspec
+
+include $(OBJDIR)/Makeconf
+
+SCHEMATA	= rspec-ad-common.xsd rspec-ad-top.xsd rspec-ad.xsd \
+		  rspec-request-common.xsd rspec-request-top.xsd \
+		  rspec-request.xsd
+
+# No explicit dependencies here.  xsdgen must be run manually if necessary.
+all:
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+install: $(addprefix $(INSTALL_LIBDIR)/assign/, $(SCHEMATA))
+
+control-install:
+
+clean:
+	rm -f *.o core
+
+$(INSTALL_LIBDIR)/assign/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_LIBDIR)/assign
+	$(INSTALL) $< $@
