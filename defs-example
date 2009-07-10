@@ -280,3 +280,9 @@ FRISEBEEMCASTPORT=3564
 # Sometimes the main page is down in a directory on WWWHOST
 # No trailing '/'!
 #WWW=www.example.emulab.net/emulab-www
+
+# Some switches do not support the stack MIB. This means snmpit cannot
+# set the port/duplex during swapin, so youare stuck at a particular
+# bandwidth, and have to change them from the console. Set to 1 if
+# your switch has no stack MIB.
+NOSTACKMIB=0
