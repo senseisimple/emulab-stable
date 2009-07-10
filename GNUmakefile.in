@@ -12,7 +12,7 @@ TESTBED_SRCDIR  = @top_srcdir@
 DISTCLEAN_FILES = @DISTCLEAN_FILES@ 
 EVENTSYS	= @EVENTSYS@
 PELABSUPPORT	= @PELABSUPPORT@
-
+PGENISUPPORT    = @PROTOGENI_SUPPORT@
 SYSTEM	       := $(shell uname -s)
 
 include Makeconf
@@ -28,10 +28,14 @@ include Makeconf
 #   pxe tbsetup tmcd utils backend www tip capture vis
 # Then things that depend on stuff we just did:
 #
+ifeq ($(STANDALONE_CLEARINGHOUSE),0)
 SUBDIRS = lib db assign www @optional_subdirs@ ipod security sensors \
 		pxe tbsetup account tmcd utils backend tip capture ipod vis \
 		sensors os xmlrpc install/newnode_sshkeys mote tools/whol \
 		tools/svn wiki bugdb collab tools/rmanage protogeni node_usage
+else
+SUBDIRS = db tbsetup account protogeni
+endif
 
 all:		all-subdirs 
 
@@ -42,10 +46,14 @@ all:		all-subdirs
 all-static:
 	@LDSTATIC=-static $(MAKE) all
 
+ifeq ($(STANDALONE_CLEARINGHOUSE),0)
 install:	
 	@echo "Choose either boss-install, ops-install or fs-install"
 	@echo "Choose opsfs-install instead of ops-install for a combined ops/fs machine"
 	@echo "Choose tipserv-install for dedicated tip server machines."
+else
+install: clrhouse-install
+endif
 
 #
 # For installation on boss node
@@ -60,6 +68,9 @@ boss-install:	install-schemacheck install-sitevarscheck install-dbfillcheck \
 # 
 boss-install-force:	install-subdirs install-mkdirs install-setbuildinfo
 	@echo "Boss node installed!"
+
+clrhouse-install:	install-subdirs install-mkdirs
+	@echo "CleaingHouse code installed!"
 
 post-install:
 	@$(MAKE) -C db post-install
@@ -118,14 +129,18 @@ opsfs-install: ops-install fs-install
 	@echo "Combined ops/fs install done."
 
 install-mkdirs:
-	-mkdir -p $(INSTALL_TOPDIR)/opsdir
 	-mkdir -p $(INSTALL_TOPDIR)/locks
 	-mkdir -p $(INSTALL_TOPDIR)/log
 	-mkdir -p $(INSTALL_TOPDIR)/log/mysql
+	-mkdir -p $(INSTALL_TOPDIR)/etc
+	-mkdir -p $(INSTALL_TOPDIR)/www
+	-mkdir -p $(INSTALL_TOPDIR)/ssl
+	-chmod 770 $(INSTALL_TOPDIR)/ssl
+ifeq ($(STANDALONE_CLEARINGHOUSE),0)
+	-mkdir -p $(INSTALL_TOPDIR)/opsdir
 	-mkdir -p $(INSTALL_TOPDIR)/log/exports
 	-mkdir -p $(INSTALL_TOPDIR)/lists
 	-mkdir -p $(INSTALL_TOPDIR)/backup
-	-mkdir -p $(INSTALL_TOPDIR)/etc
 	-mkdir -p $(INSTALL_TOPDIR)/expwork
 	-mkdir -p $(INSTALL_TOPDIR)/batch
 	-chmod 777 $(INSTALL_TOPDIR)/batch
@@ -138,8 +153,7 @@ install-mkdirs:
 	-mkdir -p $(INSTALL_TOPDIR)/images
 	-chmod 775 $(INSTALL_TOPDIR)/images
 	-ln -s /usr/testbed/bin/nse $(INSTALL_TOPDIR)/bin
-	-mkdir -p $(INSTALL_TOPDIR)/ssl
-	-chmod 770 $(INSTALL_TOPDIR)/ssl
+endif
 
 tipserv-install:
 	-mkdir -p $(INSTALL_TOPDIR)/log/tiplogs
@@ -308,7 +322,9 @@ install-setbuildinfo:
 	$(SETBUILDINFO)
 
 install-genischemacheck:
+ifeq ($(PGENISUPPORT),1)
 	@$(MAKE) -C protogeni install-genischemacheck
+endif
 
 # We use separate src and obj trees in Emulab, so the traditional distclean to
 # clean "made" files from a mingled source-and-obj tree is unnecessary.
@@ -338,7 +354,7 @@ elabinelab:
 # By default, make any target by descending into subdirectories.
 %: %-subdirs ;
 
-.PHONY: post-install install-mkdirs
+.PHONY: post-install install-mkdirs clrhouse-install install
 
 # Get rid of a bunch of nasty built-in implicit rules.
 .SUFFIXES:
