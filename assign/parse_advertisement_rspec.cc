@@ -8,7 +8,7 @@
  * XML Parser for RSpec ptop files
  */
 
-static const char rcsid[] = "$Id: parse_advertisement_rspec.cc,v 1.2 2009-05-20 18:06:08 tarunp Exp $";
+static const char rcsid[] = "$Id: parse_advertisement_rspec.cc,v 1.3 2009-07-10 20:06:20 gtw Exp $";
 
 #ifdef WITH_XML
 
@@ -26,7 +26,7 @@ static const char rcsid[] = "$Id: parse_advertisement_rspec.cc,v 1.2 2009-05-20 
 #define ISSWITCH(n) (n->types.find("switch") != n->types.end())
 
 #ifdef TBROOT
-	#define SCHEMA_LOCATION TBROOT"/lib/assign/rspec-advertisement.xsd"
+	#define SCHEMA_LOCATION TBROOT"/lib/assign/rspec-ad.xsd"
 #else
 	#define SCHEMA_LOCATION "rspec-ad.xsd"
 #endif
@@ -203,6 +203,7 @@ bool populate_nodes_rspec(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg) {
 		string str_component_manager_uuid = string(componentSpec.component_manager_uuid);
 		string str_component_name = string(componentSpec.component_name);
 		string str_component_uuid = string(componentSpec.component_uuid);
+
 // 		}
 		
 		if (str_component_uuid == "")
@@ -225,7 +226,7 @@ bool populate_nodes_rspec(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg) {
 		DOMNodeList *interfaces = elt->getElementsByTagName(XStr("interface").x());
 		string *str_component_interface_names = new string [interfaces->getLength()];
 		for (int index = 0; index < interfaces->getLength(); ++index)
-			str_component_interface_names[index] = string(XStr((dynamic_cast<DOMElement*>(interfaces->item(index)))->getAttribute(XStr("component_name").x())).c());
+			str_component_interface_names[index] = string(XStr((dynamic_cast<DOMElement*>(interfaces->item(index)))->getAttribute(XStr("component_id").x())).c());
 
 		/* Deal with the location tag */
 		string country = string("");
@@ -487,7 +488,7 @@ bool populate_links_rspec(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg) {
         string src_iface;
         string dst_node;
         string dst_iface;
-		DOMNodeList *interfaces = elt->getElementsByTagName(XStr("interface").x());
+		DOMNodeList *interfaces = elt->getElementsByTagName(XStr("interface_ref").x());
 		/* NOTE: In a request, we assume that each link has only two interfaces specified. 
 		* Although the order is immaterial, assign expects a source and a destination and we assume 
 		* that the first is the source and the second is the destination. */
