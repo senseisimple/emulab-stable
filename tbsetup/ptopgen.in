@@ -233,7 +233,7 @@ while (($node,$eventstate, $role, $uuid, $isremotenode,
 		    && $isup);
     my $isreserved = (defined($reserved_eid)
 		      || (defined($reserved_pid)
-			  && (! defined($pid) || $pid != $reserved_pid)));
+			  && (! defined($pid) || $pid ne $reserved_pid)));
     my $isfree = (!$islocal
 		  || (! $isreserved && $isup)
 		  || $isshared);
