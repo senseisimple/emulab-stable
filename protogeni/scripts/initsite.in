@@ -97,6 +97,15 @@ if (defined($options{"c"})) {
 }
 
 #
+# People seem to miss this.
+#
+if ($PROTOGENI_DOMAIN =~ /^unknown/i) {
+    print STDERR "Please define PROTOGENI_DOMAIN in your defs file!\n";
+    print STDERR "Then reconfig,rebuild,reinstall, then try this again.\n";
+    exit(1);
+}
+
+#
 # Have you sent in your certificate to Utah?
 #
 if (! -e "$TB/etc/.federated") {
