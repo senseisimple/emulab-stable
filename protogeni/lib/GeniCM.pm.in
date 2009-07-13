@@ -579,10 +579,14 @@ sub GetTicket($;$)
 	foreach my $ref (@{$ticket->rspec()->{'node'}}) {
 	    my $resource_uuid = $ref->{'component_uuid'} || $ref->{'uuid'};
 	    my $manager_uuid  = $ref->{'component_manager_uuid'};
+	    my $manager_urn  = $ref->{'component_manager_urn'};
 	    my $node_nickname = $ref->{'virtual_id'} || $ref->{'nickname'};
 	    my $colocate      = $ref->{'colocate'} || $ref->{'phys_nickname'};
 
 	    # Let remote nodes pass through.
+	    next
+		if (defined($manager_urn) &&
+		    !GeniHRN::Equal( $manager_urn, $ENV{'MYURN'} ) );
 	    next
 		if (defined($manager_uuid) && $manager_uuid ne $ENV{'MYUUID'});
 
@@ -611,6 +615,7 @@ sub GetTicket($;$)
     foreach my $ref (@{$rspec->{'node'}}) {
 	my $resource_uuid = $ref->{'component_uuid'} || $ref->{'uuid'};
 	my $manager_uuid  = $ref->{'component_manager_uuid'};
+	my $manager_urn   = $ref->{'component_manager_urn'};
 	my $node_nickname = $ref->{'virtual_id'} || $ref->{'nickname'};
 	my $colocate      = $ref->{'colocate'} || $ref->{'phys_nickname'};
 	my $virtualization_type    = $ref->{'virtualization_type'};
@@ -621,6 +626,9 @@ sub GetTicket($;$)
 	my $node;
 
 	# Let remote nodes pass through.
+	next
+	    if (defined($manager_urn) &&
+		!GeniHRN::Equal( $manager_urn, $ENV{'MYURN'} ) );
 	next
 	    if (defined($manager_uuid) && $manager_uuid ne $ENV{'MYUUID'});
 
@@ -890,6 +898,7 @@ sub GetTicket($;$)
 	    $rspec->{'phys_nickname'};
 	
 	$rspec->{'component_uuid'} = $component_uuid;
+	$rspec->{'component_manager_urn'} = $ENV{'MYURN'};
 	$rspec->{'component_manager_uuid'} = $ENV{'MYUUID'};
 
 	# Also update the virtexperiment table row.
@@ -1285,9 +1294,13 @@ sub SliverWork($$)
     foreach my $ref (@{$rspec->{'node'}}) {
 	my $resource_uuid = $ref->{'component_uuid'} || $ref->{'uuid'};
 	my $node_nickname = $ref->{'virtual_id'} || $ref->{'nickname'};
+	my $manager_urn   = $ref->{'component_manager_urn'};
 	my $manager_uuid  = $ref->{'component_manager_uuid'};
 	
 	# Let remote nodes pass through.
+	next
+	    if (defined($manager_urn) &&
+		!GeniHRN::Equal( $manager_urn, $ENV{'MYURN'} ) );
 	next
 	    if (defined($manager_uuid) && $manager_uuid ne $ENV{'MYUUID'});
 
@@ -1499,11 +1512,15 @@ sub SliverWork($$)
     foreach my $ref (@{$rspec->{'node'}}) {
 	my $resource_uuid = $ref->{'component_uuid'} || $ref->{'uuid'};
 	my $virtual_id    = $ref->{'virtual_id'} || $ref->{'nickname'};
+	my $manager_urn   = $ref->{'component_manager_urn'};
 	my $manager_uuid  = $ref->{'component_manager_uuid'};
 
 	$rspecmap{$virtual_id} = $ref;
 
 	# Let remote nodes pass through.
+	next
+	    if (defined($manager_urn) &&
+		!GeniHRN::Equal( $manager_urn, $ENV{'MYURN'} ) );
 	next
 	    if (defined($manager_uuid) && $manager_uuid ne $ENV{'MYUUID'});
 
