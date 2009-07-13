@@ -90,6 +90,11 @@ sub GetCredential($)
 				    "Could not find URL in the certificate")
 	    if (!defined($url));
 
+	if ($certificate->hrn() =~ /^unknown/i) {
+	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+					"Please define PROTOGENI_DOMAIN");
+	}
+
 	#
 	# Check for an existing authority. 
 	#
@@ -533,6 +538,11 @@ sub Register($)
 				    "Could not find URL in the certificate")
 	    if (!defined($url));
 
+	if ($certificate->hrn() =~ /^unknown/i) {
+	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+					"Please define PROTOGENI_DOMAIN");
+	}
+	
 	SENDMAIL($TBOPS, "ProtoGeni Authority Registration",
 		 $certificate->asText());
 	
