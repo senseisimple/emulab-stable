@@ -579,16 +579,14 @@ sub GetTicket($;$)
 	foreach my $ref (@{$ticket->rspec()->{'node'}}) {
 	    my $resource_uuid = $ref->{'component_uuid'} || $ref->{'uuid'};
 	    my $manager_uuid  = $ref->{'component_manager_uuid'};
-	    my $manager_urn  = $ref->{'component_manager_urn'};
 	    my $node_nickname = $ref->{'virtual_id'} || $ref->{'nickname'};
 	    my $colocate      = $ref->{'colocate'} || $ref->{'phys_nickname'};
 
 	    # Let remote nodes pass through.
 	    next
-		if (defined($manager_urn) &&
-		    !GeniHRN::Equal( $manager_urn, $ENV{'MYURN'} ) );
-	    next
-		if (defined($manager_uuid) && $manager_uuid ne $ENV{'MYUUID'});
+		if (defined($manager_uuid) &&
+		    !GeniHRN::Equal( $manager_uuid, $ENV{'MYURN'} ) &&
+		    $manager_uuid ne $ENV{'MYUUID'});
 
 	    my $node = Node->Lookup($resource_uuid);
 	    if (!defined($node)) {
@@ -627,10 +625,9 @@ sub GetTicket($;$)
 
 	# Let remote nodes pass through.
 	next
-	    if (defined($manager_urn) &&
-		!GeniHRN::Equal( $manager_urn, $ENV{'MYURN'} ) );
-	next
-	    if (defined($manager_uuid) && $manager_uuid ne $ENV{'MYUUID'});
+	    if (defined($manager_uuid) &&
+		!GeniHRN::Equal( $manager_uuid, $ENV{'MYURN'} ) &&
+		$manager_uuid ne $ENV{'MYUUID'});
 
 	if (defined($virtualization_type)) {
 	    if ($virtualization_type eq "emulab-vnode") {
@@ -1299,10 +1296,9 @@ sub SliverWork($$)
 	
 	# Let remote nodes pass through.
 	next
-	    if (defined($manager_urn) &&
-		!GeniHRN::Equal( $manager_urn, $ENV{'MYURN'} ) );
-	next
-	    if (defined($manager_uuid) && $manager_uuid ne $ENV{'MYUUID'});
+	    if (defined($manager_uuid) &&
+		!GeniHRN::Equal( $manager_uuid, $ENV{'MYURN'} ) &&
+		$manager_uuid ne $ENV{'MYUUID'});
 
 	my $node = Node->Lookup($resource_uuid);
 	if (!defined($node)) {
@@ -1519,10 +1515,9 @@ sub SliverWork($$)
 
 	# Let remote nodes pass through.
 	next
-	    if (defined($manager_urn) &&
-		!GeniHRN::Equal( $manager_urn, $ENV{'MYURN'} ) );
-	next
-	    if (defined($manager_uuid) && $manager_uuid ne $ENV{'MYUUID'});
+	    if (defined($manager_uuid) &&
+		!GeniHRN::Equal( $manager_uuid, $ENV{'MYURN'} ) &&
+		$manager_uuid ne $ENV{'MYUUID'});
 
 	# Already in the aggregate?
 	next
