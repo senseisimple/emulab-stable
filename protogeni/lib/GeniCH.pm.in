@@ -310,7 +310,7 @@ sub Register($)
     my $info  = $argref->{'info'};
     my $type  = $argref->{'type'};
 
-    if (! (defined($type) && ($type =~ /^(SA|MA|CM|Component|Slice|User)$/i))){
+    if (! (defined($type) && ($type =~ /^(SA|MA|CM|SES|Component|Slice|User)$/i))){
 	return GeniResponse->MalformedArgsResponse();
     }
     $type = lc($type);
@@ -523,7 +523,7 @@ sub Register($)
 	}
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS);
     }
-    if ($type eq "cm" || $type eq "sa") {
+    if ($type eq "cm" || $type eq "sa" || $type eq "ses") {
 	#
 	# Check for an existing authority. 
 	#

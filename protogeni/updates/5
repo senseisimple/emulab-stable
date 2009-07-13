@@ -1,0 +1,19 @@
+#
+# Add an "ses" entry in the authority type enum.
+#
+use strict;
+use GeniDB;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    DBSetDefault($dbhandle);
+
+    DBQueryFatal( "ALTER TABLE `geni_authorities` " .
+		  "MODIFY `type` enum( 'sa', 'ma', 'ch', 'cm', 'ses' ) " .
+		  "NOT NULL DEFAULT 'sa'" );
+    
+    return 0;
+}
+1;

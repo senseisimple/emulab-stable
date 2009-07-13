@@ -499,13 +499,12 @@ my $sescert = GeniCertificate->LoadFromFile($SESCERT);
 if (!defined($sescert)) {
     fatal("Could not load certificate from $SESCERT\n");
 }
-# Maybe we want to register random services (like the SES) with
-# the clearing house.  Maybe not.  But it can't currently cope with
-# SES registries in any case, so leave this commented out for now.
-#print "Registering SES cert at the clearinghouse.\n";
-#if ($clearinghouse->Register("SES", $sescert->cert())) {
-#    fatal("Could not register SES cert at the clearinghouse");
-#}
+# Don't treat SES registration failure as a fatal error quite yet, until
+# we're certain that server-side support exists everywhere.
+print "Registering SES cert at the clearinghouse.\n";
+if ($clearinghouse->Register("SES", $sescert->cert())) {
+    print("Warning: could not register SES cert at the clearinghouse\n");
+}
 
 #
 # Local SiteVars to hold the UUIDs.
