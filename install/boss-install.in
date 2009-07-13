@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003-2008 University of Utah and the Flux Group.
+# Copyright (c) 2003-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -226,6 +226,10 @@ my %EXPERIMENTS =
 			 "description" => "Nodes in limbo during nfree"},
      "opsnodes"	     => {"pid"	       => "emulab-ops",
 			 "description" => "Nodes designated as Ops Nodes"},
+     "holding"	     => {"pid"	       => "emulab-ops",
+			 "description" => "Nodes in a holding pattern"},
+     "shared-nodes"  => {"pid"	       => "emulab-ops",
+			 "description" => "Nodes in shared mode"},
     );
 
 #
