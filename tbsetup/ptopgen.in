@@ -457,7 +457,7 @@ if ($useshared) {
 
 # In genimode exclude nodes with exclusion attribute.
 if ($genimode) {
-    $free_condition = "(nat.attrvalue is null or nat.attrvalue=0)";
+    $free_condition = "(nat1.attrvalue is null or nat1.attrvalue=0)";
 }
 
 # If the user wants all nodes, we consider everything to be free (this
