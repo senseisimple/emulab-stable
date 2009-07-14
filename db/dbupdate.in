@@ -102,16 +102,13 @@ if (!defined($version)) {
 	emdbi::DBQueryN($dbnumber,
 			"select value from version_info ".
 			"where name='dbrev'");
-    if (!$query_result) {
+    if (!$query_result || !$query_result->numrows) {
 	if ($dbname eq $DEFDBNAME) {
 	    $version = "4.0";
 	}
 	else {
 	    $version = "0";
 	}
-    }
-    elsif (!$query_result->numrows) {
-	Fatal("No version info in the DB");
     }
     else {
 	($version) = $query_result->fetchrow_array();
