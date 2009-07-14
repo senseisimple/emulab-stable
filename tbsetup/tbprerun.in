@@ -205,7 +205,8 @@ my $query_result =
     DBQueryFatal("select sharing_mode from virt_nodes ".
 		 "where pid='$pid' and eid='$eid' and ".
 		 "      sharing_mode is not null");
-if ($query_result->numrows && !$this_user->IsAdmin()) {
+if ($query_result->numrows &&
+    !($this_user->IsAdmin() || $this_user->uid eq "elabman")) {
     fatal("Only testbed admininstrators can set the sharing mode on nodes");
 }
 
