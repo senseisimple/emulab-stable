@@ -517,7 +517,7 @@ while (($node,$type,$physnode,$class,$issubnode,$def_boot_osid,$reserved,
     } else {
 	$is_reserved{$node} = 0;
     }
-    if ($sharing_mode) {
+    if ($useshared && $sharing_mode) {
 	$sharing_mode{$node} = { "load_1min"   => $load_1min,
 				 "load_5min"   => $load_5min,
 				 "load_tstamp" => $load_tstamp,
