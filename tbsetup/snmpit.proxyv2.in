@@ -205,7 +205,8 @@ SWITCH: for ($op) {
 }
 
 # Update with output for log message if sent.
-AddAuditInfo("message", "$op\n\n" . Dumper($args) . "\n\n$output\n");
+AddAuditInfo("message", "$op\n\n" . Dumper($args) .
+	     (defined($output) ? "\n\n$output\n" : "\n"));
 
 #
 # Terminate the log capture so that we can print the response to STDOUT
