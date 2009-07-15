@@ -249,12 +249,17 @@ if (! $moveToOldReserved) {
 
 DBQueryFatal("lock tables reserved write, nodes read");
 
+# Force reload after table lock.
+foreach my $node (@nodes) {
+    $node->FlushReserved();
+}
+
 #
 # This sanity check for shared nodes; do not want to free a shared
 # physical node that still has virtual nodes on it. Bail early.
 #
-# It has to be done with tables locked to avoid a race with a swapin
-# trying to add a new virtnode on it. 
+# It has to be done with tables locked to avoid a race with the mapper
+# trying to add a new virtnode to it. See the pool daemon too.
 #
 if (! $moveToOldReserved) {
     foreach my $node (@nodes) {
@@ -280,9 +285,6 @@ foreach my $node (@nodes) {
     # Check to make sure they have actually reserved the nodes, now that
     # the reserved table is locked.
     #
-    # Force reload after table lock.
-    $node->FlushReserved();
-
     my $rowref = $node->ReservedTableEntry();
     unless (defined($rowref) &&
 	    $rowref->{'pid'} eq $pid && $rowref->{'eid'} eq $eid) {
