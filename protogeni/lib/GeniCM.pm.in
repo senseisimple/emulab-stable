@@ -680,7 +680,7 @@ sub GetTicket($;$)
 	}
 	else {
 	    $response = GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
-			     "virtualization_subtype must be emulab-vnode");
+				     "Must provide a virtualization_type");
 	    goto bad;
 
 	}
@@ -854,7 +854,7 @@ sub GetTicket($;$)
 					  "vport"       => $iface_vport,
 					  "ip"          => $ip,
 					  "delay"       => 0.0,
-					  "bandwidth"   => 1000000, # kbps
+					  "bandwidth"   => 100000, # kbps
 					  "lossrate"    => 0.0,
 					  "member"      => $member,
 					  "mask"        => $mask,
