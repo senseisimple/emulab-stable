@@ -1495,6 +1495,8 @@ sub CreateVnodes($$)
     my $verbose = defined($options->{'verbose'}) && $options->{'verbose'};
     my $regression = defined($options->{'regression'}) &&
 	$options->{'regression'};
+    my $sharedokay = defined($options->{'sharedokay'}) &&
+	$options->{'sharedokay'};
     my $pid     = $options->{'pid'};
     my $eid     = $options->{'eid'};
     my $count   = $options->{'count'};
@@ -1624,12 +1626,30 @@ sub CreateVnodes($$)
     # nodes after locking reserved table.
     #
     $node->FlushReserved();
-    if (!$impotent && !$node->IsReserved()) {
-	print STDERR "*** CreateVnodes: $node is no longer reserved!\n";
-	DBQueryFatal("unlock tables");
-	return -1;
-    }
     my $sharing_mode = $node->sharing_mode();
+    
+    if (!$impotent) {
+	my $reservation = $node->Reservation();
+	if (!defined($reservation)) {
+	    print STDERR "*** CreateVnodes: no reservation for $node!\n";
+	    DBQueryFatal("unlock tables");
+	    return -1;
+	}
+
+	#
+	# The only time that the reservation can be different then the
+	# the experiment we are creating for, is if the sharedokay flag
+	# is on and the pnode is in sharedmode. Locking in nfree and in
+	# the pool daemon prevents the race. 
+	#
+	if (!$experiment->SameExperiment($reservation)) {
+	    if (! ($sharedokay && $sharing_mode)) {
+		print STDERR "*** CreateVnodes: $node is not shared!\n";
+		DBQueryFatal("unlock tables");
+		return -1;
+	    }
+	}
+    }
 
     if (0 && !$isremote) {
 	for (my $i = 1; $i <= $count; $i++) {
@@ -2192,6 +2212,31 @@ sub Setrtabid($$)
 	or return -1;
 
     return Refresh($self);
+}
+
+#
+# Get the max share count for a node. This is actually the pcvm count
+# from the aux table, but might change someday, I hope.
+#
+sub MaxShareCount($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! (ref($self)));
+    
+    my $node_id = $self->node_id();
+
+    my $query_result =
+	DBQueryWarn("select count from node_auxtypes ".
+		     "where node_id='$node_id' and type='pcvm'");
+    return -1
+	if (!$query_result);
+    return 10
+	if (!$query_result->numrows);
+
+    my ($count) = $query_result->fetchrow_array();
+    return $count;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...
