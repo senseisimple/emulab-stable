@@ -39,7 +39,6 @@ use emutil;
 use libdb qw(TBGetSiteVar EXPTSTATE_SWAPPED EXPTSTATE_ACTIVE);
 use User;
 use Node;
-use libadminctrl;
 use Interface;
 use English;
 use Data::Dumper;
