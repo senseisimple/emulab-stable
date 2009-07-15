@@ -3083,6 +3083,7 @@ sub RemovePhysicalState($)
 
     my $pid = $self->pid();
     my $eid = $self->eid();
+    my $idx = $self->idx();
     my $errors = 0;
     
     # Need list of node names, partitioned by phys vs virt.
@@ -3115,10 +3116,7 @@ sub RemovePhysicalState($)
 	my $clause = ((defined($clause1) && defined($clause2) ?
 		       "$clause1 or $clause2" :
 		       (defined($clause1) ? $clause1 : $clause2)));
-
-	# This table are also cleaned in nfree.
-	DBQueryWarn("delete from vinterfaces where $clause")
-	    or $errors++;
+	;
     }
     if (@pnodenames) {
 	my $clause = join(" or ", map("node_id='$_'", @pnodenames));
@@ -3139,6 +3137,11 @@ sub RemovePhysicalState($)
 	DBQueryWarn("DELETE FROM $table WHERE pid='$pid' AND eid='$eid'")
 	    or $errors++;
     }
+    # This table are also cleaned in nfree.
+    # Why does this table not have pid,eid?
+    DBQueryWarn("delete from vinterfaces where exptidx='$idx'")
+	or $errors++;
+    
     return $errors;
 }
 sub BackupPhysicalState($;$$)
@@ -3151,6 +3154,7 @@ sub BackupPhysicalState($;$$)
 
     my $pid = $self->pid();
     my $eid = $self->eid();
+    my $idx = $self->idx();
     my $pstateDir = (defined($directory) ?
 		     $directory : $self->WorkDir() . "/pstate");
     my $physonly  = (defined($regression) ? undef : 1);
@@ -3203,12 +3207,7 @@ sub BackupPhysicalState($;$$)
 	$clause = ((defined($clause1) && defined($clause2) ?
 		    "$clause1 or $clause2" :
 		    (defined($clause1) ? $clause1 : $clause2)));
-
-	# This ordering is for wrapper/mapper regression testing. 
-	DBQueryWarn("select * from vinterfaces where $clause ".
-		    "order by node_id,unit ".
-		    "into outfile '$pstateDir/vinterfaces' ")
-	    or $errors++;
+	;
     }
 	
     if (@pnodenames) {
@@ -3242,6 +3241,12 @@ sub BackupPhysicalState($;$$)
 		    "INTO OUTFILE '$pstateDir/$table' ")
 	    or $errors++;
     }
+    # This ordering is for wrapper/mapper regression testing. 
+    DBQueryWarn("select * from vinterfaces where exptidx='$idx' ".
+		"order by node_id,unit ".
+		"into outfile '$pstateDir/vinterfaces' ")
+	or $errors++;
+    
     return $errors;
 }
 sub RestorePhysicalState($)
@@ -3293,7 +3298,10 @@ sub RestorePhysicalState($)
 	my $node_id = $row->{"node_id"};
 	
 	delete($row->{"node_id"});
-	my $sets = join(",", map("$_='" . $row->{$_} . "'", keys(%{$row})));
+	my $sets = join(",",
+			map("$_=" . (defined($row->{$_}) ?
+				     "'" . $row->{$_} . "'" : "NULL"),
+			    keys(%{$row})));
 	    
 	my $update_result =
 	    DBQueryWarn("update reserved set $sets ".
