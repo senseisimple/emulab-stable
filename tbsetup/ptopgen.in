@@ -173,7 +173,7 @@ if (defined($options{"e"})) {
 	if (!defined($pid));
 }
 if (defined($options{"x"})) {
-    $genimode = 1
+    $genimode = $useshared = 1
 	if (defined($options{"g"}) && $PGENISUPPORT);
     $do_xml = 1;
 }
@@ -1372,6 +1372,12 @@ sub print_node
 	    print "  <available>true</available>\n";
 	} else {
 	    print "  <available>false</available>\n";
+	}
+	if ($sharing_mode{$name}) {
+	    print "  <exclusive>false</exclusive>\n";
+	}
+	else {
+	    print "  <exclusive>true</exclusive>\n";
 	}
 	print_node_interfaces($name, @$interfaces);
 	print "</node>\n";
