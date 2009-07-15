@@ -68,7 +68,7 @@ sub IsValid($)
     #   mandatory: partly to avoid ambiguity between resource type
     #   namespaces, and partly to avoid ambiguity between a resource-type
     #   and a resource-name containing (escaped) whitespace.
-    return $hrn =~ m'^[uU][rR][nN]:[pP][uU][bB][lL][iI][cC][iI][dD]:IDN\+[A-Za-z0-9.-]+(?::[A-Za-z0-9.-]+)*\+\w+\+(?:[-!$()*,.0-9=@A-Z_a-z]|(?:%[0-9A-Fa-f][0-9A-Fa-f]))+$';
+    return $hrn =~ m'^[uU][rR][nN]:[pP][uU][bB][lL][iI][cC][iI][dD]:IDN\+[A-Za-z0-9.-]+(?::[A-Za-z0-9.-]+)*\+\w+\+(?:[-!$()*,./0-9:=@A-Z_a-z]|(?:%[0-9A-Fa-f][0-9A-Fa-f]))+$';
 }
 
 # Perform RFC 3151 transcription (from a string of legal public identifier
@@ -231,6 +231,20 @@ sub GenerateInterface($$$)
     my ($authority,$node,$interface) = @_;
 
     return Generate( $authority, "interface", $node . "//" . $interface );
+}
+
+# Undo the GenerateInterface into a authority/name/interface triplet.
+sub ParseInterface($)
+{
+    my ($urn) = @_;
+
+    my ($authority,$type,$id) = Parse( $urn );
+
+    return undef if $type ne "interface";
+
+    return undef unless $id =~ m{(.*)//(.*)};
+
+    return ( $authority, $1, $2 );
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

@@ -837,6 +837,10 @@ sub GetTicket($;$)
 	    }
 	    my $iface_ref   = $ifacemap{$node_nickname}->{$iface_id}->{"rspec"};
 	    my $iface_name  = $iface_ref->{"component_id"} || "";
+	    if( GeniHRN::IsValid( $iface_name ) ) {
+		my ($urn_authority,$urn_node,$urn_iface) = GeniHRN::ParseInterface( $iface_name );
+		$iface_name = $urn_iface;
+	    }
 	    my $iface_vport = $ifacemap{$node_nickname}->{$iface_id}->{"vport"};
 
 	    # XXX
