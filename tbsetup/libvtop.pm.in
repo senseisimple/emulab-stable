@@ -3113,6 +3113,32 @@ sub AllocNodes($)
     }
 
     #
+    # Lets do a check to see if the shared nodes are still shared. This
+    # check is advisory; we will not really know until CreateVnodes()
+    # locks the tables, but if the node is not shared now cause the pool
+    # daemon released it, we can still recover with another run. 
+    #
+    my $rerun = 0;
+    
+    foreach my $physical (sort(keys(%{ $self->solution_virtnodes() }))) {
+	my $pnode = Node->Lookup($physical);
+	if (!defined($pnode)) {
+	    tberror("Could not get object for $physical\n");
+	    return -1;
+	}
+	$pnode->FlushReserved();
+	my $reservation = $pnode->Reservation();
+	if (! (defined($reservation) &&
+	       defined($pnode->sharing_mode()) &&
+	       $pnode->sharing_mode() eq "shared_local")) {
+	    tbinfo("$pnode is not in shared mode.\n");
+	    $rerun++;
+	}
+    }
+    return 1
+	if ($rerun);
+
+    #
     # Set the node allocstate for unused/dirty nodes.
     #
     foreach my $pnode (values(%{ $self->pnodes() })) {
@@ -3387,7 +3413,18 @@ sub AllocVirtNodes($)
 	    if ($virtnode->_isdynamic()) {
 		# Always use the base type ... node type system sucks.
 		my $basetype = $virtnode->_typeinfo->type();
-	    
+
+		#
+		# We might be expecting to allocate a shared vnode on
+		# a shared host. We cannot be sure until CreateVnodes
+		# does the table locking, and so it might actually
+		# fail (CreateVnodes will make sure).  At this time I
+		# am not going to worry about rerunning the
+		# assignment; we will fail with a temp resource
+		# shortage and let the user try again.
+		#
+		my $sharedokay = $virtnode->_sharedokay();
+		
 		#
 		# Call into library. Be sure to pass impotent mode along.
 		#
@@ -3400,6 +3437,7 @@ sub AllocVirtNodes($)
 					"debug"    => 0,
 					"verbose"  => $self->verbose(),
 					"impotent" => $self->impotent(),
+					"sharedokay" => $sharedokay,
 					"regression" => $self->regression()})
 		    < 0) {
 		    tberror("Could not allocate vnodes on $physical\n");
