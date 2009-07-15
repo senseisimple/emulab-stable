@@ -420,7 +420,7 @@ function WRITESIDEBAR() {
 	$rootEmulab = 0;
     }
     if ($rootEmulab) {
-	NavMenuButtonNew("Other Emulabs", 
+	NavMenuButton("Other Emulabs", 
 		      "$WIKIDOCURL/OtherEmulabs");
     } else {
 	NavMenuButton("Utah Emulab", "http://www.emulab.net/");
@@ -443,7 +443,7 @@ function WRITESIDEBAR() {
 		      "$TBDOCBASE/people.php3");
 	NavMenuButton("Photo Gallery",
 		      "$TBDOCBASE/gallery/gallery.php3");
-	NavMenuButtonNew("Emulab Users",
+	NavMenuButton("Emulab Users",
 		      "$TBDOCBASE/doc/docwrapper.php3?docname=users.html");
 	NavMenuButton("Emulab Sponsors",
 		      "$TBDOCBASE/docwrapper.php3?docname=sponsors.html");
