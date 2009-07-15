@@ -140,7 +140,8 @@ sub Create($$$$$$)
     # Create a cert pair, which gives us a new uuid.
     my $certificate = GeniCertificate->Create("aggregate", $hrn, $TBOPS);
     if (!defined($certificate)) {
-	print STDERR "Could not generate new certificate and UUID!\n";
+	print STDERR "GeniAggregate::Create: ".
+	    "Could not generate new certificate and UUID for $hrn\n";
 	return undef;
     }
     my $uuid        = $certificate->uuid();

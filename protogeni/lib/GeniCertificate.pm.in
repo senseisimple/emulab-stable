@@ -146,7 +146,7 @@ sub Create($$$$;$$)
 	push(@certlines, $_);
     }
     if (!close(CERT)) {
-	print STDERR "Could not generate a new certificate with $MKCERT\n";
+	print STDERR "$MKCERT failed!\n";
 	return undef;
     }
     my $cert;
@@ -173,10 +173,16 @@ sub Create($$$$;$$)
     }
     if (! (defined($privkey) && defined($cert))) {
 	print STDERR "Could not generate a new certificate with $MKCERT\n";
+	foreach my $line (@certlines) {
+	    print STDERR $line;
+	}
 	return undef;
     }
     if (! ($cert =~ /^[\012\015\040-\176]*$/)) {
 	print STDERR "Improper chars in certificate string\n";
+	foreach my $line (@certlines) {
+	    print STDERR $line;
+	}
 	return undef;
     }
 

@@ -176,7 +176,8 @@ sub Create($$$$$$$$;$$$)
 	# Create a cert pair, for this resource uuid. 
 	$certificate = GeniCertificate->Create("sliver", $hrn, $TBOPS, $uuid);
 	if (!defined($certificate)) {
-	    print STDERR "Could not generate new certificate and UUID!\n";
+	    print STDERR "GeniSliver::Create: ".
+		"Could not generate new certificate and UUID for $hrn/$uuid\n";
 	    return undef;
 	}
     }
