@@ -163,9 +163,6 @@ if (!defined($uuid)) {
 	fatal("Could not generate a new uuid");
     }
 }
-if (!($uuid =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/)) {
-    fatal("uuid not in proper format");
-}
 if (!defined($email)) {
     $email = $TBOPS;
 }
