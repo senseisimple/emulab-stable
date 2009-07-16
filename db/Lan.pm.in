@@ -1517,9 +1517,9 @@ sub Lookup($$$)
 #
 # Create a new ProtoLan object and return it. 
 #
-sub Create($$$;$)
+sub Create($$$$;$)
 {
-    my ($class, $experiment, $vname, $link) = @_;
+    my ($class, $experiment, $vname, $impotent, $link) = @_;
 
     return undef
 	if (!ref($experiment));
@@ -1529,7 +1529,7 @@ sub Create($$$;$)
     #
     # Make sure no existing lan ...
     #
-    if (Lan->Lookup($experiment, $vname)) {
+    if (!$impotent && Lan->Lookup($experiment, $vname)) {
 	print STDERR "*** Protolan Create: ".
 	    "Duplicate lan $vname in $experiment\n";
 	return undef;

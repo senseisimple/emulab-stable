@@ -3651,12 +3651,15 @@ sub InterpLinks($)
 			   "$nodeA:$portA,$nodeB:$portB,".
 			   "$nodeD:$portD,$nodeC:$portC\n");
 
-	    my $protolan    = ProtoLan->Create($experiment, "$lan");
+	    my $protolan    = ProtoLan->Create($experiment, "$lan",
+					       $self->impotent());
 	    my $protolansrc = ProtoLan->Create($experiment,
 					       "$lan" . "-delaysrc",
+					       $self->impotent(),
 					       $protolan);
 	    my $protolandst = ProtoLan->Create($experiment,
 					       "$lan" . "-delaydst",
+					       $self->impotent(),
 					       $protolan);
 	    $protolansrc->SetType("vlan");
 	    $protolandst->SetType("vlan");
@@ -3710,7 +3713,8 @@ sub InterpLinks($)
 
 	    my $protolan = ProtoLan->Lookup($experiment, $lan);
 	    if (!defined($protolan)) {
-		$protolan = ProtoLan->Create($experiment, "$lan");
+		$protolan = ProtoLan->Create($experiment, "$lan",
+					     $self->impotent());
 		$protolan->SetRole("link/lan");
 	    }
 	    $protolan->AddInterface($nodeA, $vnodeA, $vportA, $portA);
@@ -3720,14 +3724,16 @@ sub InterpLinks($)
 	    if (!defined($protolanlan)) {
 		$protolanlan = ProtoLan->Create($experiment,
 						$lan . "-delaylan",
+						$self->impotent(),
 						$protolan);
 		$protolanlan->SetType("vlan");
 		$protolanlan->SetRole("delay");
 	    }
 	    $protolanlan->AddMember($nodeD, $portD);
 	
-	    my $protolanlink = ProtoLan->Create($experiment,
-						$dlink, $protolan);
+	    my $protolanlink = ProtoLan->Create($experiment, $dlink,
+						$self->impotent(),
+						$protolan);
 	    $protolanlink->SetType("vlan");
 	    $protolanlink->SetRole("delay");
 	    $protolanlink->AddMember($nodeA, $portA);
@@ -3790,7 +3796,8 @@ sub InterpLinks($)
 			   $virtnodeB->_onsharednode())) {
 			my $lanid = "v" . "$lan" . $vlanid++;
 
-			$protovlan = ProtoLan->Create($experiment, $lanid);
+			$protovlan = ProtoLan->Create($experiment, $lanid,
+						      $self->impotent());
 			$protovlan->SetRole("encapsulation");
 			$protovlan->SetType("vlan");
 			$protovlan->SetEncapStyle($virtlan->_encapstyle());
@@ -3839,8 +3846,9 @@ sub InterpLinks($)
 		    $portA = $virtifaceA->viface();
 		    $portB = $virtifaceB->viface();
 
-		    $protolink = ProtoLan->Create($experiment,
-						  $lan, $protovlan);
+		    $protolink = ProtoLan->Create($experiment, $lan,
+						  $self->impotent(),
+						  $protovlan);
 		    $protolink->SetType((defined($protovlan) ?
 					"emulated" : "emulated-shared"));
 		    $protolink->SetRole("link/lan");
@@ -3848,7 +3856,8 @@ sub InterpLinks($)
  		    $protolink->AddInterface($nodeB, $vnodeB, $vportB, $portB);
 		}
 		else {
-		    $protolink = ProtoLan->Create($experiment, $lan);
+		    $protolink = ProtoLan->Create($experiment, $lan,
+						  $self->impotent());
 		    $protolink->SetType("vlan");
 		    $protolink->SetRole("link/lan");
 		    $protolink->AddInterface($nodeA, $vnodeA, $vportA, $portA);
@@ -3880,7 +3889,8 @@ sub InterpLinks($)
 		    $self->printdb("LINK simple (trivial): $virtA,$virtB - ".
 				   "$nodeA:$portA,$nodeB:$portB\n");
 		    
-		    $protolink = ProtoLan->Create($experiment, $lan);
+		    $protolink = ProtoLan->Create($experiment, $lan,
+						  $self->impotent());
 		    $protolink->SetType("trivial");
 		    $protolink->SetRole("link/lan");
 		    $protolink->AddInterface($nodeA, $vnodeA, $vportA, $portA);
@@ -3944,7 +3954,8 @@ sub InterpLinks($)
 			}
 			else {
 			    my $lanid = "v" . "$lan" . $vlanid++;
-			    $protovlan = ProtoLan->Create($experiment, $lanid);
+			    $protovlan = ProtoLan->Create($experiment, $lanid,
+							  $self->impotent());
 			    $protovlan->SetRole("encapsulation");
 			    $protovlan->SetType("vlan");
 			    $protovlan->SetEncapStyle($virtlan->_encapstyle());
@@ -3994,8 +4005,9 @@ sub InterpLinks($)
 			}
 		    }
 		    else {
-			$protolan = ProtoLan->Create($experiment,
-						     $lan, $protovlan);
+			$protolan = ProtoLan->Create($experiment, $lan,
+						     $self->impotent(),
+						     $protovlan);
 		    }
 		    $protolan->SetType((defined($protovlan) ?
 				       "emulated" : "emulated-shared"));
@@ -4031,12 +4043,14 @@ sub InterpLinks($)
 			# non-delayed members. We should create the
 			# protolans earlier.
 			#
-			$protolan = ProtoLan->Create($experiment, $lan);
+			$protolan = ProtoLan->Create($experiment, $lan,
+						     $self->impotent());
 		    
 			if ($virtlan->_delayed()) {
 			    my $protolanlan =
 				ProtoLan->Create($experiment,
 						 $lan . "-delaylan",
+						 $self->impotent(),
 						 $protolan);
 			    $protolanlan->SetType("vlan");
 			    $protolanlan->SetRole("delay");
@@ -4074,7 +4088,8 @@ sub InterpLinks($)
 
 		    $protolan = ProtoLan->Lookup($experiment, $lan);
 		    if (!defined($protolan)) {
-			$protolan = ProtoLan->Create($experiment, $lan);
+			$protolan = ProtoLan->Create($experiment, $lan,
+						     $self->impotent());
 			$protolan->SetType("trivial");
 			$protolan->SetRole("link/lan");
 		    }
@@ -4114,7 +4129,7 @@ sub InterpLinks($)
 	    $self->printdb("FakeLan - $virtA - $nodeA:$portA\n");
 	    
 	    my $protolan = ProtoLan->Lookup($experiment, $lan);
-	    $protolan = ProtoLan->Create($experiment, $lan)
+	    $protolan = ProtoLan->Create($experiment, $lan, $self->impotent())
 		if (!defined($protolan));
 	    $protolan->SetType("fakelan");
 	    $protolan->SetRole("link/lan");
@@ -4162,7 +4177,8 @@ sub InterpLinks($)
 	}
     }
     if (@sharedpnodes > 1) {
-	my $protovlan = ProtoLan->Create($experiment, "sharedlan");
+	my $protovlan = ProtoLan->Create($experiment, "sharedlan",
+					 $self->impotent());
 	$protovlan->SetRole("encapsulation");
 	$protovlan->SetType("vlan");
 	$protovlan->SetEncapStyle("default");
