@@ -8,7 +8,7 @@
  * XML Parser for RSpec ptop files
  */
 
-static const char rcsid[] = "$Id: parse_advertisement_rspec.cc,v 1.3 2009-07-10 20:06:20 gtw Exp $";
+static const char rcsid[] = "$Id: parse_advertisement_rspec.cc,v 1.4 2009-07-16 22:37:30 gtw Exp $";
 
 #ifdef WITH_XML
 
@@ -18,6 +18,7 @@ static const char rcsid[] = "$Id: parse_advertisement_rspec.cc,v 1.3 2009-07-10 
 
 #include <fstream>
 #include <map>
+#include <set>
 
 #include "anneal.h"
 #include "vclass.h"
@@ -65,8 +66,10 @@ int bind_vtop_subnodes(tb_vgraph &vg);
  * These are not meant to be used outside of this file, so they are only
  * declared in here
  */
-bool populate_nodes_rspec(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg);
-bool populate_links_rspec(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg);
+bool populate_nodes_rspec(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
+			  set<string> &unavailable);
+bool populate_links_rspec(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
+			  set<string> &unavailable);
 
 void populate_policies(DOMElement *root);
 
@@ -121,7 +124,9 @@ int parse_ptop_rspec(tb_pgraph &pg, tb_sgraph &sg, char *filename) {
         */
         DOMDocument *doc = parser->getDocument();
         advertisement_root = doc->getDocumentElement();
-        
+        set<string> unavailable; // this should really be an unordered_set,
+	    // but that's not very portable yet
+
         bool is_physical;
         XStr type (advertisement_root->getAttribute(XStr("type").x()));
         if (strcmp(type.c(), "advertisement") == 0)
@@ -139,7 +144,7 @@ int parse_ptop_rspec(tb_pgraph &pg, tb_sgraph &sg, char *filename) {
         */
         // clock_t startNode = clock();
         XMLDEBUG("starting node population" << endl);
-        if (!populate_nodes_rspec(advertisement_root,pg,sg)) {
+        if (!populate_nodes_rspec(advertisement_root,pg,sg,unavailable)) {
         cerr << "Error reading nodes from physical topology " << filename << endl;
         exit(EXIT_FATAL);
         }
@@ -148,7 +153,7 @@ int parse_ptop_rspec(tb_pgraph &pg, tb_sgraph &sg, char *filename) {
 
 		// clock_t startLink = clock();
         XMLDEBUG("starting link population" << endl);
-        if (!populate_links_rspec(advertisement_root,pg,sg)) {
+        if (!populate_links_rspec(advertisement_root,pg,sg,unavailable)) {
         cerr << "Error reading links from physical topology " << filename << endl;
         exit(EXIT_FATAL);
         }
@@ -171,7 +176,8 @@ int parse_ptop_rspec(tb_pgraph &pg, tb_sgraph &sg, char *filename) {
 /*
  * Pull nodes from the document, and populate assign's own data structures
  */
-bool populate_nodes_rspec(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg) {
+bool populate_nodes_rspec(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
+			  set<string> &unavailable) {
 	bool is_ok = true;
 	pair<map<string, DOMElement*>::iterator, bool> insert_ret;
     /*
@@ -191,19 +197,20 @@ bool populate_nodes_rspec(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg) {
 		// this list came from the getElementsByTagName() call
 		DOMElement *elt = dynamic_cast<DOMElement*>(node);
 				
-		XStr available (getChildValue(elt, "available"));
-		if (strcmp(available, "false") == 0)
-		{
-			continue;
-		}
-		
-		++availableCount;
-		
 		component_spec componentSpec = parse_component_spec(elt);
 		string str_component_manager_uuid = string(componentSpec.component_manager_uuid);
 		string str_component_name = string(componentSpec.component_name);
 		string str_component_uuid = string(componentSpec.component_uuid);
 
+		XStr available (getChildValue(elt, "available"));
+		if (strcmp(available, "false") == 0)
+		{
+		    unavailable.insert( str_component_uuid );
+		    continue;
+		}
+		
+		++availableCount;
+		
 // 		}
 		
 		if (str_component_uuid == "")
@@ -330,7 +337,15 @@ bool populate_nodes_rspec(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg) {
 			}
 			p->type_list.push_back(p->types[str_type_name]);
 		}
-			
+
+		if( hasChildTag( elt, "exclusive" ) ) {
+		    XStr exclusive( getChildValue( elt, "exclusive" ) );
+		    fstring feature( "shared" );
+
+		    if( !strcmp( exclusive, "false" ) )
+			p->features.push_front( tb_node_featuredesire( feature, 
+								       1.0 ) );
+		}
 
 		/*
 		* Parse out the features
@@ -394,7 +409,8 @@ bool populate_nodes_rspec(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg) {
 /*
  * Pull the links from the ptop file, and populate assign's own data sturctures
  */
-bool populate_links_rspec(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg) {
+bool populate_links_rspec(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
+			  set<string> &unavailable) {
     
     bool is_ok = true;
     pair<map<string, DOMElement*>::iterator, bool> insert_ret;
@@ -519,6 +535,12 @@ bool populate_links_rspec(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg) {
 			continue;
 		}
 
+		if( unavailable.count( src_node ) || 
+		    unavailable.count( dst_node ) )
+		    // one or both of the endpoints are unavailable; silently
+		    // ignore the link
+		    continue;
+
         /*
         * Get standard link characteristics
         */
@@ -526,12 +548,6 @@ bool populate_links_rspec(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg) {
         XStr latency(getChildValue(elt,"latency"));
         XStr packet_loss(getChildValue(elt,"packet_loss"));
         
-		/* TODO: Since we are not sure how to handle link availability for the moment,
-		and we do have node availability which messes up this check, 
-		the error flag is not being set, so although assign will protest,
-		it should still work correctly
-		*/
-		
         /*
         * Check to make sure the referenced nodes actually exist
         */

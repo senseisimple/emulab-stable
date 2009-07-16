@@ -8,7 +8,7 @@
  * XML Parser for RSpec ptop files
  */
 
-static const char rcsid[] = "$Id: parse_request_rspec.cc,v 1.5 2009-07-09 22:54:39 gtw Exp $";
+static const char rcsid[] = "$Id: parse_request_rspec.cc,v 1.6 2009-07-16 22:37:31 gtw Exp $";
 
 #ifdef WITH_XML
 
@@ -301,7 +301,7 @@ bool populate_nodes_rspec(DOMElement *root, tb_vgraph &vg) {
 				}
 			}
 		}
-		
+
 		/*
 		* Parse out the features
 		* TODO: We are still not sure how to add features and desires in Protogeni.
@@ -378,6 +378,17 @@ bool populate_nodes_rspec(DOMElement *root, tb_vgraph &vg) {
 		v -> disallow_trivial_mix = is_disallow_trivial_mix;
 		if (subnode_of_name != NULL)
 			v -> subnode_of_name = (*subnode_of_name).c();
+		
+		if( hasChildTag( elt, "exclusive" ) ) {
+		    XStr exclusive( getChildValue( elt, "exclusive" ) );
+		    fstring desirename( "shared" );
+
+		    if( !strcmp( exclusive, "false" ) ) {
+			tb_node_featuredesire node_fd( desirename, 1.0 );
+			node_fd.add_desire_user( 1.0 );
+			v->desires.push_front( node_fd );
+		    }
+		}
 		
 		v->vclass = vclass;
 		vvertex vv = add_vertex(vg);
