@@ -24,6 +24,7 @@
       <xs:choice>
         <xs:element ref="rspec:location"/>
         <xs:element ref="rspec:available"/>
+        <xs:element ref="rspec:exclusive"/>
       </xs:choice>
     </xs:choice>
     <xs:attribute name="virtualization_type">
@@ -40,6 +41,7 @@
   </xs:complexType>
   <xs:element name="interface" type="rspec:InterfaceDecl"/>
   <xs:element name="available" type="xs:boolean"/>
+  <xs:element name="exclusive" type="xs:boolean"/>
   <xs:complexType name="LinkContents">
     <xs:choice minOccurs="0" maxOccurs="unbounded">
       <xs:choice>

@@ -23,7 +23,11 @@ NodeContents &=
   # that we can later get updates that include only this attribute (and a
   # UUID) Just binary for now - probably will include more things, such
   # as a number of "free slots", later
-  element available { xsd:boolean }
+  element available { xsd:boolean } &
+
+  # Indicates whether the node is in sharing mode: exclusive is true if
+  # the component manager will agree to promise not to share it.
+  element exclusive { xsd:boolean }
 
 LinkContents &=
   # Component identifiers
