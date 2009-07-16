@@ -59,6 +59,8 @@ sub GetCredential($)
     my $caller_uuid = $ENV{'GENIUUID'};
     my $caller_authority = GeniAuthority->Lookup($ENV{'GENIUUID'});
     if (!defined($caller_authority)) {
+	print STDERR "GetCredential()\n";
+	
         if (!defined($gid)) {
 	    return GeniResponse->Create(GENIRESPONSE_REFUSED,
 					undef, "Who are You?");
