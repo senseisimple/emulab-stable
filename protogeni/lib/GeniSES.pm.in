@@ -91,9 +91,15 @@ sub Map($)
     print $reqfile $req;
     close $reqfile;
 
-    system( "$ASSIGN -q $adfilename -w $reqfilename > /dev/null 2>&1" ) and
-	return GeniResponse->Create( GENIRESPONSE_ERROR, undef,
-				     "Assign process failed" );
+    open( ASSIGN, "$ASSIGN -q $adfilename -w $reqfilename 2>&1 |" )
+	or return GeniResponse->Create( GENIRESPONSE_ERROR, undef,
+					"Assign process failed" );
+
+    my $assignverbosity = "";
+    while( <ASSIGN> ) {
+	$assignverbosity .= $_;
+    }
+    close ASSIGN;
 
     unlink $adfilename;
     unlink $reqfilename;
@@ -103,7 +109,9 @@ sub Map($)
 
     open( ANNOTATED, "<$annfilename" ) or
 	return GeniResponse->Create( GENIRESPONSE_ERROR, undef,
-				     "Could not read assign output" );
+				     "Failed to map topolgy:\n" .
+				     $assignverbosity );
+
     my $xml = "";
     while ( <ANNOTATED> ) {
 	$xml .= $_;
