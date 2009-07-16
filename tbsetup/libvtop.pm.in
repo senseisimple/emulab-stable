@@ -93,11 +93,12 @@ sub Create($$$$)
     $self->{'CURRENT_V2P'} = {};
     $self->{'CURRENT_P2V'} = {};
     $self->{'CURRENT_V2V'} = {};
+    $self->{'OLDRSRVCLEAN_FLAG'}  = 0;
+    $self->{'OLDRSRVCLEAN_NODES'} = {};
 
     # Below is for interpretation of assign results.
     $self->{'PNODES'}      = {};
     $self->{'SOLUTION'}    = {};
-    $self->{'OLDRSRVCLEAN'}= 0;
     $self->{'NEWRESERVED'} = {};	# Newly reserved nodes.
     $self->{'NORECOVER'}   = 0;	
     
@@ -132,6 +133,7 @@ sub pnodes($)           { return $_[0]->{'PNODES'}; }
 sub fixednodes($)       { return $_[0]->{'FIXEDNODES'}; }
 sub newreserved($)      { return $_[0]->{'NEWRESERVED'}; }
 sub newreservednodes($) { return keys(%{ $_[0]->{'NEWRESERVED'} }); }
+sub oldreservednodes($) { return $_[0]->{'OLDRSRVCLEAN_NODES'}; }
 sub norecover($)        { return $_[0]->{'norecover'}; }
 sub pid($)		{ return $_[0]->experiment()->pid(); }
 sub pid_idx($)		{ return $_[0]->experiment()->pid_idx(); }
@@ -688,6 +690,15 @@ sub LoadCurrentResources($)
 	    # Mark the node as unused until later.
 	    $pnode->_reuse("unused");
 	    $ppnode->_reuse("unused");
+
+	    #
+	    # Add the pnode node to the oldreserved list for nfree.
+	    # See the comment below. We cannot use p2v because we
+	    # might not own all those nodes, if on a shared node.
+	    # We do not add the ppnode. It will get added in the
+	    # next clause if we actually own it.
+	    #
+	    $self->oldreservednodes()->{$pnode->node_id()} = $pnode;
 	    
 	    $self->printdb("current v2p: $node_id ($ppnode_id) -> $vname\n");
 	}
@@ -712,6 +723,13 @@ sub LoadCurrentResources($)
 		push(@{ $self->current_p2v()->{$node_id} }, $vname);
 		# Mark the node as unused until later.
 		$pnode->_reuse("unused");
+
+		#
+		# Add the pnode node to the oldreserved list for nfree.
+		# See the comment below. We cannot use p2v because we
+		# might not own all those nodes, if on a shared node.
+		#
+		$self->oldreservednodes()->{$pnode->node_id()} = $pnode;
 
 		$self->printdb("current v2p: $node_id -> $vname\n");
 	    }
@@ -2967,7 +2985,7 @@ sub AllocNodes($)
     # mapping.
     #
     # Another reason to do this just before nalloc of a new toreserve
-    # nodes is that, we can get into name clashes For example, lets
+    # nodes is that, we can get into name clashes. For example, lets
     # say the user called his node pc2 and it was actually mapped to
     # pc99 in the initial swapin. If this was a swapmod where the user
     # asked for another node node0 which got mapped to pc2. nalloc of
@@ -2983,8 +3001,8 @@ sub AllocNodes($)
     # called coz only some pnode resources got nalloced, we do not
     # have to do the above again.
     #
-    my @nodeids = keys(%{ $self->current_p2v() });
-    if (@nodeids && !$self->{'OLDRSRVCLEAN'}) {
+    my @nodeids = keys(%{ $self->oldreservednodes() });
+    if (@nodeids && !$self->{'OLDRSRVCLEAN_FLAG'}) {
 	system("$NFREE -o $pid $eid @nodeids");
 	if ($?) {
 	    tberror("Could not move nodes to old reserved holding\n");
@@ -2995,7 +3013,7 @@ sub AllocNodes($)
 	    tberror("Could not move nodes back from old reserved holding\n");
 	    return -1;
 	}
-	$self->{'OLDRSRVCLEAN'} = 1;
+	$self->{'OLDRSRVCLEAN_FLAG'} = 1;
     }
 
     #
@@ -3128,12 +3146,12 @@ sub AllocNodes($)
 	}
 	$pnode->FlushReserved();
 	my $reservation = $pnode->Reservation();
-	if (! (defined($reservation) &&
-	       defined($pnode->sharing_mode()) &&
-	       $pnode->sharing_mode() eq "shared_local")) {
-	    tbinfo("$pnode is not in shared mode.\n");
-	    $rerun++;
-	}
+#	if (! (defined($reservation) &&
+#	       defined($pnode->sharing_mode()) &&
+#	       $pnode->sharing_mode() eq "shared_local")) {
+#	    tbinfo("$pnode is not in shared mode.\n");
+#	    $rerun++;
+#	}
     }
     return 1
 	if ($rerun);
