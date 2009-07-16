@@ -2840,15 +2840,19 @@ sub InterpNodes($)
 
 	#
 	# A node already allocated to this experiment, and still wanted.
+	# We also have to watch for shared nodes; we will not have the
+	# pnode loaded cause it is not actually ours. Instead, have to
+	# look in the current_p2v table to see if we are using it. 
 	#
-	if (defined($pnode)) {
+	if (defined($pnode) ||
+	    exists($self->current_p2v()->{$physical})) {
 	    #
-	    # Mark node as being reused.
+	    # Mark pnode as being reused.
 	    #
 	    # Look at node being mapped to the pnode;
 	    # if it not in the previous map, mark node for reboot.
 	    #
-	    if ($pnode->_reuse() eq "reboot") {
+	    if (defined($pnode) && $pnode->_reuse() eq "reboot") {
 		# No changes once it goes into reboot.
 		;
 	    }
@@ -2866,7 +2870,8 @@ sub InterpNodes($)
 		# (which would require a reboot of the the virtual
 		# node). 
 		#
-		$pnode->_reuse("reused");
+		$pnode->_reuse("reused")
+		    if (defined($pnode));
 
 		if (exists($self->current_v2p()->{$virtual}) &&
 		    $self->current_v2p()->{$virtual} eq $physical) {
@@ -3001,6 +3006,9 @@ sub AllocNodes($)
     # called coz only some pnode resources got nalloced, we do not
     # have to do the above again.
     #
+    # XXX Is there a race with the shared pool deamon; the shared node
+    # could get deallocated.
+    # 
     my @nodeids = keys(%{ $self->oldreservednodes() });
     if (@nodeids && !$self->{'OLDRSRVCLEAN_FLAG'}) {
 	system("$NFREE -o $pid $eid @nodeids");
@@ -3146,12 +3154,13 @@ sub AllocNodes($)
 	}
 	$pnode->FlushReserved();
 	my $reservation = $pnode->Reservation();
-#	if (! (defined($reservation) &&
-#	       defined($pnode->sharing_mode()) &&
-#	       $pnode->sharing_mode() eq "shared_local")) {
-#	    tbinfo("$pnode is not in shared mode.\n");
-#	    $rerun++;
-#	}
+	if (!defined($reservation) ||
+	    (! $reservation->SameExperiment($self->experiment()) &&
+	     ! (defined($pnode->sharing_mode()) &&
+		$pnode->sharing_mode() eq "shared_local"))) {
+	    tbinfo("$pnode is not in shared mode.\n");
+	    $rerun++;
+	}
     }
     return 1
 	if ($rerun);
@@ -3159,7 +3168,7 @@ sub AllocNodes($)
     #
     # Set the node allocstate for unused/dirty nodes.
     #
-    foreach my $pnode (values(%{ $self->pnodes() })) {
+    foreach my $pnode (values(%{ $self->oldreservednodes() })) {
 	if ($pnode->_reuse() eq "unused") {
 	    #
 	    # Node was used in previous incarnation, but not any more.
