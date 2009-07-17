@@ -96,7 +96,7 @@ sub Map($)
     print $reqfile $req;
     close $reqfile;
 
-    open( ASSIGN, "$ASSIGN -q $adfilename -w $reqfilename 2>&1 |" )
+    open( ASSIGN, "$ASSIGN -P -q $adfilename -w $reqfilename 2>&1 |" )
 	or return GeniResponse->Create( GENIRESPONSE_ERROR, undef,
 					"Assign process failed" );
 
