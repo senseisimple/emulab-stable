@@ -19,7 +19,7 @@ sub usage()
     exit(-1);
 }
 my $optlist = "do:c:";
-my $debug   = 1;
+my $debug   = 0;
 my $outfile;
 my $capfile;
 my $certificate;
@@ -305,7 +305,7 @@ sub cleanup()
 sub fatal($)
 {
     my($mesg) = $_[0];
-#    cleanup();
+    cleanup();
     die("*** $0:\n".
 	"    $mesg\n");
 }
