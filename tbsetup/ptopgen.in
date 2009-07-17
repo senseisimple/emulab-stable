@@ -173,7 +173,7 @@ if (defined($options{"e"})) {
 	if (!defined($pid));
 }
 if (defined($options{"x"})) {
-    $genimode = $useshared = 1
+    $genimode = $useshared = $virtstuff = 1
 	if (defined($options{"g"}) && $PGENISUPPORT);
     $do_xml = 1;
 }
