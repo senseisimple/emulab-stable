@@ -39,6 +39,7 @@ use emutil;
 use libdb qw(TBGetSiteVar EXPTSTATE_SWAPPED EXPTSTATE_ACTIVE);
 use User;
 use Node;
+use OSinfo;
 use Interface;
 use English;
 use Data::Dumper;
@@ -709,8 +710,11 @@ sub GetTicket($;$)
 					 "Bad resource $resource_uuid");
 		goto bad;
 	    }
-	    $osname = $node->default_osid()
-		if (defined($node->default_osid()));
+	    if (defined($node->default_osid())) {	    
+		my $osinfo = OSinfo->Lookup($node->default_osid());
+		$osname = $osinfo->osname()
+		    if (defined($osinfo));
+	    }
 	}
 	my $virtnode =
 	    $virtexperiment->NewTableRow("virt_nodes",
