@@ -709,6 +709,8 @@ sub GetTicket($;$)
 					 "Bad resource $resource_uuid");
 		goto bad;
 	    }
+	    $osname = $node->default_osid()
+		if (defined($node->default_osid()));
 	}
 	my $virtnode =
 	    $virtexperiment->NewTableRow("virt_nodes",
