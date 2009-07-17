@@ -4,7 +4,7 @@
  * All rights reserved.
  */
 
-static const char rcsid[] = "$Id: annotate_rspec.cc,v 1.2 2009-05-20 18:06:07 tarunp Exp $";
+static const char rcsid[] = "$Id: annotate_rspec.cc,v 1.3 2009-07-17 18:59:30 gtw Exp $";
 
 #ifdef WITH_XML
 
@@ -103,11 +103,11 @@ DOMElement* annotate_rspec::create_component_hop (const DOMElement* plink, DOMEl
 	DOMElement* component_hop_interface = doc->createElement(XStr("interface").x());
 		
 	// We assume the first interface is the source and the second is the destination
-	DOMNodeList* pinterfaces = plink->getElementsByTagName(XStr("interface").x());
+	DOMNodeList* pinterfaces = plink->getElementsByTagName(XStr("interface_ref").x());
 	DOMElement* plink_src_iface = dynamic_cast<DOMElement*>(pinterfaces->item(0));
 	DOMElement* plink_dst_iface = dynamic_cast<DOMElement*>(pinterfaces->item(1));
 				
-	DOMNodeList* vinterfaces = vlink->getElementsByTagName(XStr("interface").x());
+	DOMNodeList* vinterfaces = vlink->getElementsByTagName(XStr("interface_ref").x());
 	DOMElement* vlink_src_iface = dynamic_cast<DOMElement*>(vinterfaces->item(0));
 	DOMElement* vlink_dst_iface = dynamic_cast<DOMElement*>(vinterfaces->item(1));
 		
@@ -120,7 +120,7 @@ DOMElement* annotate_rspec::create_component_hop (const DOMElement* plink, DOMEl
 	if (prev_component_hop != NULL)
 	{
 		// Find the destination of the previous component hop
-		DOMElement* prev_hop_dst_iface = dynamic_cast<DOMElement*>((prev_component_hop->getElementsByTagName(XStr("interface").x()))->item(1));
+		DOMElement* prev_hop_dst_iface = dynamic_cast<DOMElement*>((prev_component_hop->getElementsByTagName(XStr("interface_ref").x()))->item(1));
 		XStr prev_hop_dst_uuid (prev_hop_dst_iface->getAttribute(XStr("component_node_uuid").x()));
 		
 		// We need to do this because in advertisements, all links are from nodes to switches
@@ -152,7 +152,7 @@ DOMElement* annotate_rspec::create_component_hop (const DOMElement* plink, DOMEl
 // Annotates the interface element on a link and updates the node which is the end point of the link as well
 void annotate_rspec::annotate_interface (const DOMElement* plink, DOMElement* vlink, int interface_number)
 {
-	DOMNodeList* vinterfaces = vlink->getElementsByTagName(XStr("interface").x());
+	DOMNodeList* vinterfaces = vlink->getElementsByTagName(XStr("interface_ref").x());
 	DOMElement* vlink_iface = dynamic_cast<DOMElement*>(vinterfaces->item(interface_number));
 			
 	// Get the virtual_id on the end points of the interface
@@ -160,13 +160,13 @@ void annotate_rspec::annotate_interface (const DOMElement* plink, DOMElement* vl
 	DOMElement* vnode = getElementByAttributeValue(this->virtual_root, "node", "virtual_id", vlink_iface_virtual_id.c());
 	XStr node_component_uuid (vnode->getAttribute(XStr("component_uuid").x()));
 	
-	DOMElement* p_iface = getElementByAttributeValue(plink, "interface", "component_node_uuid", node_component_uuid.c());
-		
+	DOMElement* p_iface = getElementByAttributeValue(plink, "interface_ref", "component_node_uuid", node_component_uuid.c());
+
 	vlink_iface->setAttribute(XStr("component_node_uuid").x(), p_iface->getAttribute(XStr("component_node_uuid").x()));
-	vlink_iface->setAttribute(XStr("component_interface_name").x(), p_iface->getAttribute(XStr("component_interface_name").x()));
+	vlink_iface->setAttribute(XStr("component_interface_id").x(), p_iface->getAttribute(XStr("component_interface_id").x()));
 	
-	XStr component_interface_name (vlink_iface->getAttribute(XStr("component_interface_name").x()));
-	XStr virtual_interface_name (vlink_iface->getAttribute(XStr("virtual_interface_name").x()));
+	XStr component_interface_name (vlink_iface->getAttribute(XStr("component_interface_id").x()));
+	XStr virtual_interface_name (vlink_iface->getAttribute(XStr("virtual_interface_id").x()));
 	
 	// Get the interface for the node and update 
 	DOMElement* vnode_iface_decl = getElementByAttributeValue(vnode, "interface", "virtual_id", virtual_interface_name.c());
