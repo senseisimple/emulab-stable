@@ -8,7 +8,7 @@
  * XML Parser for RSpec ptop files
  */
 
-static const char rcsid[] = "$Id: parse_request_rspec.cc,v 1.9 2009-07-17 19:20:37 gtw Exp $";
+static const char rcsid[] = "$Id: parse_request_rspec.cc,v 1.10 2009-07-17 21:59:55 ricci Exp $";
 
 #ifdef WITH_XML
 
@@ -517,10 +517,14 @@ bool populate_links_rspec(DOMElement *root, tb_vgraph &vg) {
 		/*
 		* Get the link type - we know there is at least one, and we
 		* need it for the constructor
+                * Note: Changed from element to attribute
 		*/
+                /*
 		DOMNodeList *type = elt->getElementsByTagName(XStr ("link_type").x());
 		DOMElement *type_tag = dynamic_cast<DOMElement*>(type->item(0));
 		XStr link_type(type_tag->getAttribute(XStr("type_name").x()));
+                */
+		XStr link_type(elt->getAttribute(XStr("link_type").x()));
 		
 		
 		/* ------------------- vtop stuff goes here --------------------------- */
