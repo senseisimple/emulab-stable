@@ -939,7 +939,7 @@ sub GetTicket($;$)
 	    $rspec->{'phys_nickname'};
 	
 	$rspec->{'component_uuid'} = $component_uuid;
-	$rspec->{'component_manager_uuid'} = $use_urns ? $ENV{'MYURN'} : $ENV{'MYUUID'};
+	$rspec->{'component_manager_uuid'} = $use_urns >= 0 ? $ENV{'MYURN'} : $ENV{'MYUUID'};
 
 	# Also update the virtexperiment table row.
 	$virtnode->fixed($node->node_id());
