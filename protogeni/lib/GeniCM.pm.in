@@ -1548,6 +1548,20 @@ sub SliverWork($$)
 		!GeniHRN::Equal( $manager_uuid, $ENV{'MYURN'} ) &&
 		$manager_uuid ne $ENV{'MYUUID'});
 
+	#
+	# For a map of the interfaces.
+	#
+	foreach my $linkref (@{$ref->{'interface'}}) {
+	    my $component_id     = $linkref->{"component_id"};
+	    my $virtual_iface_id = $linkref->{"virtual_id"};
+
+	    $ifacemap{$virtual_id} = {}
+	        if (!exists($ifacemap{$virtual_id}));
+
+	    # Store reference so we can munge it below. 
+	    $ifacemap{$virtual_id}->{$virtual_iface_id} = $component_id;
+	}
+
 	# Already in the aggregate?
 	next
 	    if (grep {$_ eq $virtual_id} keys(%nodemap));
@@ -1586,20 +1600,6 @@ sub SliverWork($$)
 		goto bad;
 	    }
 	    push(@plabnodes, $vnode);
-	}
-
-	#
-	# For a map of the interfaces.
-	#
-	foreach my $linkref (@{$ref->{'interface'}}) {
-	    my $component_id     = $linkref->{"component_id"};
-	    my $virtual_iface_id = $linkref->{"virtual_id"};
-
-	    $ifacemap{$virtual_id} = {}
-	        if (!exists($ifacemap{$virtual_id}));
-
-	    # Store reference so we can munge it below. 
-	    $ifacemap{$virtual_id}->{$virtual_iface_id} = $component_id;
 	}
     }
 
