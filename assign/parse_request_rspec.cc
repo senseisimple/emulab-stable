@@ -8,7 +8,7 @@
  * XML Parser for RSpec ptop files
  */
 
-static const char rcsid[] = "$Id: parse_request_rspec.cc,v 1.8 2009-07-17 18:10:13 gtw Exp $";
+static const char rcsid[] = "$Id: parse_request_rspec.cc,v 1.9 2009-07-17 19:20:37 gtw Exp $";
 
 #ifdef WITH_XML
 
@@ -249,7 +249,7 @@ bool populate_nodes_rspec(DOMElement *root, tb_vgraph &vg) {
 		/*
 		* Add on types
 		*/
-		int type_slots = 0;
+		int type_slots = 1;
 		tb_vclass *vclass = NULL;
 		const char* str_type_name;
 		// XXX: This a ghastly hack. Find a way around it ASAP.
@@ -263,13 +263,13 @@ bool populate_nodes_rspec(DOMElement *root, tb_vgraph &vg) {
 			DOMElement *node_type = dynamic_cast<DOMElement*>(types->item(i));
 			XStr node_type_name (node_type->getAttribute(XStr("type_name").x()));
 			
-			XStr type_slots (node_type->getAttribute(XStr("type_slots").x()));
+			XStr type_slots_str (node_type->getAttribute(XStr("type_slots").x()));
 			int node_type_slots = 1;
 			bool is_unlimited = false;
-			if (strcmp(type_slots.c(), "unlimited") == 0)
+			if (strcmp(type_slots_str.c(), "unlimited") == 0)
 				is_unlimited = true;
 			else
-				node_type_slots = type_slots.i();
+				type_slots = node_type_slots = type_slots_str.i();
 
 			bool is_static = node_type->hasAttribute(XStr("static").x());
 			
