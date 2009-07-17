@@ -1244,6 +1244,8 @@ sub SliverWork($$)
     my $rspec    = $ticket->rspec();
     my $needplabslice = 0;
 
+    print Dumper($rspec);
+
     #
     # Find current slivers and save.
     #
@@ -1711,6 +1713,10 @@ sub SliverWork($$)
 	    # The interface was set above.
 	    #
 	    my $iface_name = $ifacemap{$node_id}->{$iface_id};
+	    if (!defined($iface_name)) {
+		$message = "Inconsistent ifacemap; $node_id,$iface_id";
+		goto bad;
+	    }
 
 	    my $interface = Interface->LookupByIface($nodeobject, $iface_name);
 	    if (!defined($interface)) {
