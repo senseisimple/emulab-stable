@@ -36,6 +36,7 @@
     <xs:attribute name="component_uuid"/>
     <xs:attribute name="colocate"/>
     <xs:attribute name="virtualization_subtype"/>
+    <xs:attribute name="exclusive"/>
   </xs:complexType>
   <xs:element name="interface">
     <xs:complexType>

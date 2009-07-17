@@ -18,7 +18,8 @@ NodeContents &=
   ComponentName? &
   attribute colocate { text }? &
   # TODO: Remove and replace with something more exensible
-  attribute virtualization_subtype { text }?
+  attribute virtualization_subtype { text }? &
+  attribute exclusive { text }?
 
 # The LinkMapping will only be available after an assignment
 LinkContents &=

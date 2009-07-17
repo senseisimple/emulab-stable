@@ -8,7 +8,7 @@
  * XML Parser for RSpec ptop files
  */
 
-static const char rcsid[] = "$Id: parse_request_rspec.cc,v 1.6 2009-07-16 22:37:31 gtw Exp $";
+static const char rcsid[] = "$Id: parse_request_rspec.cc,v 1.7 2009-07-17 16:46:17 gtw Exp $";
 
 #ifdef WITH_XML
 
@@ -379,8 +379,9 @@ bool populate_nodes_rspec(DOMElement *root, tb_vgraph &vg) {
 		if (subnode_of_name != NULL)
 			v -> subnode_of_name = (*subnode_of_name).c();
 		
-		if( hasChildTag( elt, "exclusive" ) ) {
-		    XStr exclusive( getChildValue( elt, "exclusive" ) );
+		if( elt->hasAttribute( XStr( "exclusive" ).x() ) ) {
+		    XStr exclusive( elt->getAttribute( XStr(
+			"exclusive" ).x() ) );
 		    fstring desirename( "shared" );
 
 		    if( !strcmp( exclusive, "false" ) ) {
