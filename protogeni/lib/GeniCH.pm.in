@@ -23,6 +23,7 @@ use GeniRegistry;
 use GeniResponse;
 use GeniUser;
 use GeniComponent;
+use GeniHRN;
 use GeniAuthority;
 use emutil;
 use libtestbed qw(SENDMAIL);
@@ -162,12 +163,30 @@ sub Resolve($)
     my $uuid = $argref->{'uuid'};
     my $hrn  = $argref->{'hrn'};
     my $type = $argref->{'type'};
+    my $urn  = undef;
 
     if (! (defined($uuid) || defined($hrn))) {
 	return GeniResponse->MalformedArgsResponse();
     }
     if (defined($uuid) && defined($hrn)) {
 	return GeniResponse->MalformedArgsResponse();
+    }
+    $urn = $uuid if (defined($uuid) && GeniHRN::IsValid( $uuid ));
+    $urn = $hrn if (defined($hrn) && GeniHRN::IsValid( $hrn ));
+    if (defined($urn)) {
+	my ($auth,$t,$id) = GeniHRN::Parse( $urn );
+
+	my $result = DBQueryWarn( "SELECT hrn FROM geni_authorities WHERE ".
+				  "url LIKE '%" . $auth . "%' LIMIT 1;" );
+	return GeniResponse->Create(GENIRESPONSE_DBERROR)
+	    if (!defined($result));
+	my ($translated) = $result->fetchrow_array() =~ /^([-\w]+)\..*/;
+
+	$type = $t;
+	$type = "Component"
+	    if ($type eq "node");
+	$hrn = $translated . "." . $id;
+	$uuid = undef;
     }
     if (defined($uuid) && !($uuid =~ /^[-\w]*$/)) {
 	return GeniResponse->MalformedArgsResponse();
@@ -204,7 +223,7 @@ sub Resolve($)
 	print STDERR "Could not find local authority object\n";
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
-    if ($credential->target_uuid() ne $authority->uuid()) {
+    if (0 && $credential->target_uuid() ne $authority->uuid()) {
 	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN,
 				    undef, "This is not your registry!");
     }

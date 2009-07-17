@@ -57,6 +57,16 @@ sub Lookup($$)
     if ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
 	$uuid = $token;
     }
+    elsif ($token =~ /^[-\w\.]*$/) {
+	$query_result =
+	    DBQueryWarn("select uuid from geni_components ".
+			"where hrn='$token'");
+
+	return undef
+	    if (!$query_result || !$query_result->numrows);
+
+	($uuid) = $query_result->fetchrow_array();
+    }
     else {
 	return undef;
     }
