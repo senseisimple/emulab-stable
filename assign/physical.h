@@ -307,21 +307,21 @@ public:
       o << "  Types:" << endl;
       for (types_map::const_iterator it = node.types.begin();
 	   it!=node.types.end();it++) 
-	o << "    " << (*it).first << " -> " << (*it).second << endl;
+	o << "    " << (*it).first << " -> " << *((*it).second) << endl;
       o << "  Features:" << endl;
       for (node_feature_set::const_iterator it = node.features.begin();
 	   it != node.features.end(); it++) 
 	cout << "    " << it->name() << " -> " << it->cost() << endl;
-      o << "  Current Type: " << node.current_type << endl; /* <<
+      /* o << "  Current Type: " << node.current_type << endl; <<
 	" (" << node.current_load << "/" << node.max_load << ")" <<  endl; */
-      o << "  switches=";
+      /*o << "  switches=";
       for (pvertex_set::const_iterator it = node.switches.begin();
 	   it != node.switches.end();++it) {
 	o << " " << get(pvertex_pmap,*it)->name;
       }
       o << endl;
       o << " sgraph_switch=" << node.sgraph_switch
-	  << " my_class=" << node.my_class << endl;
+	  << " my_class=" << node.my_class << endl; */
       return o;
     }
 
