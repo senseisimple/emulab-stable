@@ -574,6 +574,10 @@ sub GetTicket($;$)
     my @nodeids  = ();
     my @dealloc;
 
+    # Try to make the output format mimic the input, until everybody
+    # has migrated to URNs.
+    my $use_urns = 0; # +ve yes; -ve no; 0 guess
+
     #
     # If this is a ticket update, we want to seed the namemap with
     # existing nodes. This is cause the rspec might refer to wildcards
@@ -606,6 +610,14 @@ sub GetTicket($;$)
 	    my $node_nickname = $ref->{'virtual_id'} || $ref->{'nickname'};
 	    my $colocate      = $ref->{'colocate'} || $ref->{'phys_nickname'};
 
+	    if( defined( $manager_uuid ) ) {
+		if( GeniHRN::IsValid( $manager_uuid ) ) {
+		    $use_urns++;
+		} else {
+		    $use_urns--;
+		}
+	    }
+
 	    # Let remote nodes pass through.
 	    next
 		if (defined($manager_uuid) &&
@@ -637,7 +649,6 @@ sub GetTicket($;$)
     foreach my $ref (@{$rspec->{'node'}}) {
 	my $resource_uuid = $ref->{'component_uuid'} || $ref->{'uuid'};
 	my $manager_uuid  = $ref->{'component_manager_uuid'};
-	my $manager_urn   = $ref->{'component_manager_urn'};
 	my $node_nickname = $ref->{'virtual_id'} || $ref->{'nickname'};
 	my $colocate      = $ref->{'colocate'} || $ref->{'phys_nickname'};
 	my $virtualization_type    = $ref->{'virtualization_type'};
@@ -928,8 +939,7 @@ sub GetTicket($;$)
 	    $rspec->{'phys_nickname'};
 	
 	$rspec->{'component_uuid'} = $component_uuid;
-	$rspec->{'component_manager_urn'} = $ENV{'MYURN'};
-	$rspec->{'component_manager_uuid'} = $ENV{'MYUUID'};
+	$rspec->{'component_manager_uuid'} = $use_urns ? $ENV{'MYURN'} : $ENV{'MYUUID'};
 
 	# Also update the virtexperiment table row.
 	$virtnode->fixed($node->node_id());
@@ -1326,7 +1336,6 @@ sub SliverWork($$)
     foreach my $ref (@{$rspec->{'node'}}) {
 	my $resource_uuid = $ref->{'component_uuid'} || $ref->{'uuid'};
 	my $node_nickname = $ref->{'virtual_id'} || $ref->{'nickname'};
-	my $manager_urn   = $ref->{'component_manager_urn'};
 	my $manager_uuid  = $ref->{'component_manager_uuid'};
 	
 	# Let remote nodes pass through.
@@ -1543,7 +1552,6 @@ sub SliverWork($$)
     foreach my $ref (@{$rspec->{'node'}}) {
 	my $resource_uuid = $ref->{'component_uuid'} || $ref->{'uuid'};
 	my $virtual_id    = $ref->{'virtual_id'} || $ref->{'nickname'};
-	my $manager_urn   = $ref->{'component_manager_urn'};
 	my $manager_uuid  = $ref->{'component_manager_uuid'};
 
 	$rspecmap{$virtual_id} = $ref;
