@@ -1080,6 +1080,28 @@ int main(int argc,char **argv) {
   pclass_debug();
 #endif
 
+#ifdef NODE_DUMP_DEBUG
+  cerr << "========== Physical nodes" << endl;
+  pvertex_iterator vit,vendit;
+  tie(vit,vendit) = vertices(PG);
+  for (;vit != vendit;++vit) {
+      pvertex cur = *vit;
+      tb_pnode *curP = get(pvertex_pmap,cur);
+      cerr << *curP;
+  }
+  cerr << "========== End physical nodes" << endl;
+
+  cerr << "========== Virtual nodes" << endl;
+  vvertex_iterator vvit,vvendit;
+  tie(vvit,vvendit) = vertices(VG);
+  for (;vvit != vvendit;++vvit) {
+      vvertex cur = *vvit;
+      tb_vnode *curV = get(vvertex_pmap,cur);
+      cerr << *curV;
+  }
+  cerr << "========== End virtual nodes" << endl;
+#endif
+
   /*
    * There is a reason for the ordering of the prechecks. The mapping precheck
    * basically assumes that the type precheck has already run, so it doesn't
