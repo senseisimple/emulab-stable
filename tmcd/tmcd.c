@@ -5965,7 +5965,7 @@ COMMAND_PROTOTYPE(dohostinfo)
  */
 COMMAND_PROTOTYPE(dohostkeys)
 {
-#define MAXKEY		1024
+#define MAXKEY		4096
 #define RSAV1_STR	"SSH_HOST_KEY='"
 #define RSAV2_STR	"SSH_HOST_RSA_KEY='"
 #define DSAV2_STR	"SSH_HOST_DSA_KEY='"
