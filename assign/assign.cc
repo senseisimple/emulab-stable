@@ -1200,7 +1200,13 @@ int main(int argc,char **argv) {
 #ifdef WITH_XML
   if (vtop_rspec_input || vtop_xml_input)
   {
+      // For now, only produce annotated file if we succeeded - print the
+      // text version regardless
+      if (violated == 0) {
 	  print_solution(best_solution, annotated_filename(vtopFilename).c_str());
+      } else {
+	  print_solution(best_solution);
+      }
   }
   else
 	  print_solution(best_solution);
