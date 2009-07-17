@@ -73,6 +73,11 @@ sub Map($)
     return GeniResponse->Create( GENIRESPONSE_UNSUPPORTED )
 	unless $HAVE_XERCES eq "yes";
 
+    # Temporary ugly hack: ptopgen occasionally spits out invalid
+    # bandwidth elements.  We'll patch them up by hand until ptopgen
+    # is fixed...
+    $ad =~ s{<bandwidth></bandwidth>}{<bandwidth>100000</bandwidth>}g;
+
     #
     # Use assign in xml mode to spit back an xml file. 
     #
