@@ -8,7 +8,7 @@
  * XML Parser for RSpec ptop files
  */
 
-static const char rcsid[] = "$Id: parse_request_rspec.cc,v 1.7 2009-07-17 16:46:17 gtw Exp $";
+static const char rcsid[] = "$Id: parse_request_rspec.cc,v 1.8 2009-07-17 18:10:13 gtw Exp $";
 
 #ifdef WITH_XML
 
@@ -459,7 +459,7 @@ bool populate_links_rspec(DOMElement *root, tb_vgraph &vg) {
         string src_iface;
         string dst_node;
         string dst_iface;
-		DOMNodeList *interfaces = elt->getElementsByTagName(XStr("interface").x());
+		DOMNodeList *interfaces = elt->getElementsByTagName(XStr("interface_ref").x());
 		/* NOTE: In a request, we assume that each link has only two interfaces specified. 
 		 * Although the order is immaterial, assign expects a source and a destination and we assume 
 		 * that the first is the source and the second is the destination. */
@@ -490,12 +490,18 @@ bool populate_links_rspec(DOMElement *root, tb_vgraph &vg) {
 			continue;
 		}
         
-        /*
-        * Get standard link characteristics
-        */
-        XStr bandwidth(getChildValue(elt,"bandwidth"));
-        XStr latency(getChildValue(elt,"latency"));
-        XStr packet_loss(getChildValue(elt,"packet_loss"));
+		/*
+		 * Get standard link characteristics
+		 */
+		XStr bandwidth( hasChildTag( elt, "bandwidth" ) ?
+				getChildValue(elt,"bandwidth") :
+				XStr( "100000" ).x() );
+		XStr latency( hasChildTag( elt, "latency" ) ?
+			      getChildValue(elt,"latency") :
+			      XStr( "0" ).x() );
+		XStr packet_loss( hasChildTag( elt, "packet_loss" ) ?
+				  getChildValue(elt,"packet_loss") :
+				  XStr( "0" ).x() );
 	
 		if (vname2vertex.find(src_node.c_str()) == vname2vertex.end()) {
 			cerr << "Bad link, non-existent source node " << src_node << " which has length " << src_node.length() << endl;
