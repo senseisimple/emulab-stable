@@ -466,7 +466,7 @@ sub StoreCRL($$$)
 		"  uuid='$uuid', created=now(), expires=$dateconvert, ".
 		"  cert=$safe_cert")
 	or return -1;
-
+    unlink($filename);
     return 0;
 }
 
@@ -536,6 +536,7 @@ sub DN($)
     }
     chomp($dn);
     $self->{'CERT'}->{'DN'} = $dn;
+    unlink($filename);
     return $dn;
 }
 
