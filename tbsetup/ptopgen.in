@@ -56,6 +56,7 @@ my $genimode  = 0;
 my $useshared = 0;
 
 my $OURDOMAIN = "@OURDOMAIN@";
+my $MAINSITE  = @TBMAINSITE@;
 my $cmuuid = TBGetSiteVar('protogeni/cm_uuid');
 my $cmurn = "";
 if ($PGENISUPPORT) {
@@ -458,6 +459,11 @@ if ($useshared) {
 # In genimode exclude nodes with exclusion attribute.
 if ($genimode) {
     $free_condition = "(nat1.attrvalue is null or nat1.attrvalue=0)";
+    
+    if ($pid && $MAINSITE) {
+	$free_condition = "($free_condition and ".
+	    "(np.reserved_pid is not null and np.reserved_pid='$pid'))";
+    }
 }
 
 # If the user wants all nodes, we consider everything to be free (this
