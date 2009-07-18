@@ -659,7 +659,7 @@ sub GetTicket($;$)
 	my $virtualization_subtype = $ref->{'virtualization_subtype'};
 	my $exclusive     = $ref->{'exclusive'};
 	my $pctype        = "pc";
-	my $osname        = "";
+	my $osname;
 	my $node;
 
 	# Let remote nodes pass through.
@@ -725,12 +725,21 @@ sub GetTicket($;$)
 					 "Bad resource $resource_uuid");
 		goto bad;
 	    }
+	}
+	#
+	# If no isname by this point, try for the default.
+	#
+	if (defined($node) && !defined($osname)) {
 	    if (defined($node->default_osid())) {	    
 		my $osinfo = OSinfo->Lookup($node->default_osid());
 		$osname = $osinfo->osname()
 		    if (defined($osinfo));
 	    }
 	}
+	# The slot does not like to be NULL.
+	$osname = ""
+	    if (!defined($osname));
+	
 	my $virtnode =
 	    $virtexperiment->NewTableRow("virt_nodes",
 					 {"vname"   => $node_nickname,
