@@ -460,7 +460,7 @@ if ($useshared) {
 if ($genimode) {
     $free_condition = "(nat1.attrvalue is null or nat1.attrvalue=0)";
     
-    if ($pid && $MAINSITE) {
+    if (0 && $pid && $MAINSITE) {
 	$free_condition = "($free_condition and ".
 	    "(np.reserved_pid is not null and np.reserved_pid='$pid'))";
     }
