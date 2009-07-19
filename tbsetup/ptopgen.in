@@ -30,7 +30,7 @@ sub usage()
 	  "          in the ptopfile (as if they were free)\n" .
 	  "       -v Include stuff for topologies with virtual nodes\n".
 	  "       -r Include stuff for topologies with widearea nodes\n".
-	  "       -s Include stuff for topologies with simulated nodes\n".
+#	  "       -s Include stuff for topologies with simulated nodes\n".
 	  "       -h Include stuff for topologies with shared nodes\n".
 	  "       -a Include even reserved nodes\n".
 	  "       -m Override multiplex_factor\n".
@@ -1348,7 +1348,12 @@ sub print_switch
 {
     my $name = shift(@_);
     my $uuid = shift(@_);
-    print_node($name, ["switch:1", "*lan:*"], [], [], $uuid, []);
+    my $interfaces = [];
+    if ($do_xml && $genimode)
+    {
+	push @$interfaces, "(null)";
+    }
+    print_node($name, ["switch:1", "*lan:*"], [], [], $uuid, $interfaces);
 }
 
 sub print_node
