@@ -1023,6 +1023,7 @@ use GeniComponent;
 use GeniSlice;
 use GeniCredential;
 use GeniCertificate;
+use GeniUtil;
 
 sub Create()
 {
@@ -1032,6 +1033,10 @@ sub Create()
     my $nickname = $node->node_id() . ".$linkname." .
 	$rspec->{'virtual_interface_id'};
     my $hrn = "${PGENIDOMAIN}.$nickname";
+
+    # Ignore the interface uuid and create a new one.
+    # Temporary fix cause of shared interfaces on shared nodes.
+    $interface_uuid = GeniUtil::NewUUID();
 
     return GeniSliver->Create($slice, $user, $interface_uuid,
 			      $node->uuid(), "Interface",
