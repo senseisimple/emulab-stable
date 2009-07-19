@@ -25,6 +25,7 @@ use GeniSlice;
 use GeniRegistry;
 use GeniUtil;
 use emutil;
+use Data::Dumper;
 use English;
 use overload ('""' => 'Stringify');
 use XML::Simple;
@@ -825,24 +826,25 @@ sub Create($$$$$$)
 	}
     }
     else {
-	#
-	# Need to ask the clearinghouse where this node comes from.
-	#
-	$clearinghouse = GeniRegistry::ClearingHouse->Create();
-	
+	my $component = GeniComponent->Lookup($node1rspec->{'component_uuid'});
 	my $blob;
-	if ($clearinghouse->Resolve($node1rspec->{'component_uuid'},
-				    "Component", \$blob) != 0) {
-	    print STDERR "Could not lookup node at clearinghouse\n";
-	    goto bad;
-	}
 	
-	my $certificate = GeniCertificate->LoadFromString($blob->{'gid'});
-	goto bad
-	    if (!defined($certificate));
-	
-	my $component = GeniComponent->Lookup($certificate->uuid());
 	if (!defined($component)) {
+	    #
+	    # Need to ask the clearinghouse where this node comes from.
+	    #
+	    $clearinghouse = GeniRegistry::ClearingHouse->Create();
+	
+	    if ($clearinghouse->Resolve($node1rspec->{'component_uuid'},
+					"Component", \$blob) != 0) {
+		print STDERR "Could not lookup node at clearinghouse\n";
+		print STDERR Dumper($node1rspec);
+		goto bad;
+	    }
+	    my $certificate = GeniCertificate->LoadFromString($blob->{'gid'});
+	    goto bad
+		if (!defined($certificate));
+	
 	    $component = GeniComponent->CreateFromCertificate($certificate);
 	    if (!defined($component)) {
 		print STDERR "Could not create component from $certificate\n";
@@ -866,7 +868,7 @@ sub Create($$$$$$)
 	    if (defined($blob) && exists($blob->{'physctrl'}));
 
 	if (!defined($ctrlip1)) {
-	    print STDERR "Could get control IP for ".
+	    print STDERR "Could not get control IP for ".
 		"$node1rspec->{'component_uuid'} at $component\n";
 	    goto bad;
 	}
@@ -888,24 +890,24 @@ sub Create($$$$$$)
 	}
     }
     else {
-	#
-	# Need to ask the clearinghouse where this node comes from.
-	#
-	$clearinghouse = GeniRegistry::ClearingHouse->Create()
-	    if (!defined($clearinghouse));
-	
 	my $blob;
-	if ($clearinghouse->Resolve($node2rspec->{'component_uuid'},
-				    "Component", \$blob) != 0) {
-	    print STDERR "Could not lookup node at clearinghouse\n";
-	    goto bad;
-	}
-	my $certificate = GeniCertificate->LoadFromString($blob->{'gid'});
-	goto bad
-	    if (!defined($certificate));
-	
-	my $component = GeniComponent->Lookup($certificate->uuid());
+	my $component = GeniComponent->Lookup($node2rspec->{'component_uuid'});
 	if (!defined($component)) {
+	    #
+	    # Need to ask the clearinghouse where this node comes from.
+	    #
+	    $clearinghouse = GeniRegistry::ClearingHouse->Create();
+	
+	    if ($clearinghouse->Resolve($node2rspec->{'component_uuid'},
+					"Component", \$blob) != 0) {
+		print STDERR "Could not lookup node at clearinghouse\n";
+		print STDERR Dumper($node2rspec);
+		goto bad;
+	    }
+	    my $certificate = GeniCertificate->LoadFromString($blob->{'gid'});
+	    goto bad
+		if (!defined($certificate));
+	
 	    $component = GeniComponent->CreateFromCertificate($certificate);
 	    if (!defined($component)) {
 		print STDERR "Could not create component from $certificate\n";
@@ -929,7 +931,7 @@ sub Create($$$$$$)
 	    if (defined($blob) && exists($blob->{'physctrl'}));
 
 	if (!defined($ctrlip2)) {
-	    print STDERR "Could get control IP for ".
+	    print STDERR "Could not get control IP for ".
 		"$node2rspec->{'component_uuid'} at $component\n";
 	    goto bad;
 	}

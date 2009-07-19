@@ -173,8 +173,19 @@ sub Create($$$$$$$$;$$$)
 	    if ($credential->Store() != 0);
     }
     else {
-	# Create a cert pair, for this resource uuid. 
-	$certificate = GeniCertificate->Create("sliver", $hrn, $TBOPS, $uuid);
+	# Create a cert pair, for this resource uuid.
+	if (defined($uuid) && $resource_type eq "Node") {
+	    $certificate = GeniCertificate->Lookup($uuid);
+
+	    if (defined($certificate) && $certificate->hrn() ne $hrn) {
+		print STDERR "GeniSliver::Create: ".
+		    "Already have a certificate for $hrn/$uuid\n";
+		return undef;
+	    }
+	}
+	$certificate = GeniCertificate->Create("sliver", $hrn, $TBOPS, $uuid)
+	    if (!defined($certificate));
+	
 	if (!defined($certificate)) {
 	    print STDERR "GeniSliver::Create: ".
 		"Could not generate new certificate and UUID for $hrn/$uuid\n";
@@ -274,8 +285,10 @@ sub Delete($$)
     }
     DBQueryWarn("delete from geni_credentials where this_uuid='$uuid'")
 	or return -1;
-    DBQueryWarn("delete from geni_certificates where uuid='$uuid'")
-	or return -1;
+    if ($self->resource_type() ne "Node") {
+	DBQueryWarn("delete from geni_certificates where uuid='$uuid'")
+	    or return -1;
+    }
     DBQueryWarn("delete from geni_slivers where idx='$idx'")
 	or return -1;
 
