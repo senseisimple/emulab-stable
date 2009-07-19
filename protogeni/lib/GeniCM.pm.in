@@ -924,7 +924,7 @@ sub GetTicket($;$)
 				 "Could not verify topo");
 	goto bad;
     }
-    system("$MAPPER -n -d -v -m 1 -u -o $tmpfile $pid $eid");
+    system("$MAPPER -n -d -v -m 3 -u -o $tmpfile $pid $eid");
     if ($?) {
 	$response =
 	    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
@@ -1549,7 +1549,7 @@ sub SliverWork($$)
 	goto bad;
     }
     # Add -u for update mode, but not -f (fixnode). 
-    system("$MAPPER -d -v -u -m 1 $pid $eid");
+    system("$MAPPER -d -v -u -m 3 $pid $eid");
     if ($?) {
 	print STDERR "Mapper failed!\n";
 	goto bad;
