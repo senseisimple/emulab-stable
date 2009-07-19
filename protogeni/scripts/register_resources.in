@@ -14,11 +14,12 @@ use Getopt::Std;
 # 
 sub usage()
 {
-    print "Usage: register_resources [-f]\n";
+    print "Usage: register_resources [-f] [-r]\n";
     exit(1);
 }
-my $optlist = "f";
+my $optlist = "fr";
 my $force   = 0;
+my $remove  = 0;
 
 # Configure variables
 my $TB		   = "@prefix@";
@@ -37,6 +38,9 @@ if (! getopts($optlist, \%options)) {
 }
 if (defined($options{"f"})) {
     $force = 1;
+}
+if (defined($options{"r"})) {
+    $remove = 1;
 }
 use vars qw($GENI_DBNAME);
 $GENI_DBNAME = "geni-cm";
@@ -97,6 +101,10 @@ foreach my $node_id (@nodes) {
 	    "    Could not map $node_id to object\n");
     }
     my $component = GeniComponent->Lookup($node->uuid());
+    if (defined($component) && $remove) {
+	$component->Delete();
+	$component = undef;
+    }
     if (!defined($component)) {
 	$certificate = GeniCertificate->Lookup($node->uuid());
 	if (!defined($certificate)) {
