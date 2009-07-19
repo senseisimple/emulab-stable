@@ -4,7 +4,7 @@
  * All rights reserved.
  */
 
-static const char rcsid[] = "$Id: annotate_rspec.cc,v 1.3 2009-07-17 18:59:30 gtw Exp $";
+static const char rcsid[] = "$Id: annotate_rspec.cc,v 1.4 2009-07-19 20:47:08 gtw Exp $";
 
 #ifdef WITH_XML
 
@@ -84,12 +84,14 @@ void annotate_rspec::annotate_element (const char* v_name, list<const char*>* li
 	annotate_interface(p_switch_dst_link, vlink, 1);
 	
 	DOMElement* prev_component_hop = create_component_hop (p_src_switch_link, vlink, SOURCE, NULL);
+#if 0
 	for (DOMElement *prev_link_in_path = p_src_switch_link; !links->empty(); )
 	{
 		DOMElement* p_switch_switch_link = find_next_link_in_path (prev_link_in_path, links);
 		prev_component_hop = create_component_hop (p_switch_switch_link, vlink, NEITHER, prev_component_hop);
 		prev_link_in_path = p_switch_switch_link;
 	}
+#endif
 	create_component_hop (p_switch_dst_link, vlink, DESTINATION, prev_component_hop);
 }
 
