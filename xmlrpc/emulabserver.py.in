@@ -4508,8 +4508,7 @@ class elabinelab:
 
         argstr = "-p " + self.pid + " -e " + self.eid + " " + xmlfilename;
 
-        (exitval, output) = runcommand("/usr/testbed/devel/stoller" +
-                                       "/sbin/snmpit.proxyv2 " + argstr)
+        (exitval, output) = runcommand(TBDIR + "/sbin/snmpit.proxyv2 " + argstr)
         if exitval:
             return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
         
