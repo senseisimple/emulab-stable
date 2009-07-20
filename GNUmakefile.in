@@ -325,6 +325,7 @@ install-genischemacheck:
 ifeq ($(PGENISUPPORT),1)
 	@$(MAKE) -C protogeni install-genischemacheck
 endif
+	@echo "Done"
 
 # We use separate src and obj trees in Emulab, so the traditional distclean to
 # clean "made" files from a mingled source-and-obj tree is unnecessary.
