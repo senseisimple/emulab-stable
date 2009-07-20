@@ -186,8 +186,11 @@ print_header();
 my %nodetointerface;
 
 # Read interfaces
-my $result = DBQueryFatal("SELECT node_id,card,port,iface,interface_type" .
-		     " from interfaces;");
+my $result =
+    DBQueryFatal("SELECT node_id,card,port,iface,interface_type" .
+		 " from interfaces " .
+		 ($genimode ? "where role!='other' and role!='gw'" : ""));
+		 
 while (($node,$card,$port,$iface,$type) = $result->fetchrow_array) {
     push @{ $nodetointerface{"$node"} }, $iface;
     $interfacemap{"$node:$card:$port"} = $iface;
@@ -449,21 +452,21 @@ if (defined($exempt_eid)) {
 	"(b.pid='$pid' and b.eid='$exempt_eid'))"; 
 }
 
+# In genimode exclude nodes with exclusion attribute.
+if ($genimode) {
+    $free_condition = "(nat1.attrvalue is null or nat1.attrvalue=0)";
+    
+    if ($pid && $MAINSITE) {
+	$free_condition = "($free_condition and ".
+	    "(np.reserved_pid is not null and np.reserved_pid='$pid'))";
+    }
+}
+
 # In shared mode, allow allocated nodes whose sharing_mode is set.
 if ($useshared) {
     $free_condition = "($free_condition or ".
 	"(b.node_id is not null && b.sharing_mode='shared_local' && ".
 	" np.eventstate='" . TBDB_NODESTATE_ISUP . "'))";
-}
-
-# In genimode exclude nodes with exclusion attribute.
-if ($genimode) {
-    $free_condition = "(nat1.attrvalue is null or nat1.attrvalue=0)";
-    
-    if (0 && $pid && $MAINSITE) {
-	$free_condition = "($free_condition and ".
-	    "(np.reserved_pid is not null and np.reserved_pid='$pid'))";
-    }
 }
 
 # If the user wants all nodes, we consider everything to be free (this
