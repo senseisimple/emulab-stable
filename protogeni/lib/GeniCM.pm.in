@@ -881,6 +881,7 @@ sub GetTicket($;$)
 					 {"vname"       => $nickname,
 					  "vnode"       => $node_nickname,
 					  "vport"       => $iface_vport,
+					  "trivial_ok"  => 1,
 					  "ip"          => $ip,
 					  "delay"       => 0.0,
 					  "bandwidth"   => 100000, # kbps
@@ -986,7 +987,8 @@ sub GetTicket($;$)
 	    my $component_id      = $iface_ref->{"component_id"};
 	    my $linkref     = $ifacemap{"$virtual_node_id:$virtual_port_id"};
 	
-	    $linkref->{'component_id'} = $component_id;
+	    $linkref->{'component_id'} = $component_id
+		if (defined($component_id));
 	}
     }
     # Store the virt topo again since we changed it above.
