@@ -8,7 +8,7 @@
  * XML Parser for RSpec ptop files
  */
 
-static const char rcsid[] = "$Id: parse_request_rspec.cc,v 1.11 2009-07-20 08:14:00 ricci Exp $";
+static const char rcsid[] = "$Id: parse_request_rspec.cc,v 1.12 2009-07-20 15:36:21 gtw Exp $";
 
 #ifdef WITH_XML
 
@@ -384,11 +384,23 @@ bool populate_nodes_rspec(DOMElement *root, tb_vgraph &vg) {
 			"exclusive" ).x() ) );
 		    fstring desirename( "shared" );
 
-		    if( !strcmp( exclusive, "false" ) ) {
+		    if( !strcmp( exclusive, "false" ) ||
+			!strcmp( exclusive, "0" ) ) {
 			tb_node_featuredesire node_fd( desirename, 1.0,
                                 true, featuredesire::FD_TYPE_NORMAL);
 			node_fd.add_desire_user( 1.0 );
 			v->desires.push_front( node_fd );
+		    } else if( strcmp( exclusive, "true" ) &&
+			       strcmp( exclusive, "1" ) ) {
+			static int syntax_error;
+
+			if( !syntax_error ) {
+			    syntax_error = 1;
+
+			    cout << "Warning: unrecognised exclusive "
+				"attribute \"" << exclusive << "\"; will "
+				"assume exclusive=\"true\"\n";
+			}
 		    }
 		}
 		

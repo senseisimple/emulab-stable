@@ -4,7 +4,7 @@
  * All rights reserved.
  */
 
-static const char rcsid[] = "$Id: annotate_rspec.cc,v 1.4 2009-07-19 20:47:08 gtw Exp $";
+static const char rcsid[] = "$Id: annotate_rspec.cc,v 1.5 2009-07-20 15:36:21 gtw Exp $";
 
 #ifdef WITH_XML
 
@@ -90,6 +90,16 @@ void annotate_rspec::annotate_element (const char* v_name, list<const char*>* li
 		DOMElement* p_switch_switch_link = find_next_link_in_path (prev_link_in_path, links);
 		prev_component_hop = create_component_hop (p_switch_switch_link, vlink, NEITHER, prev_component_hop);
 		prev_link_in_path = p_switch_switch_link;
+	}
+#else
+	{
+	    static int gave_apology;
+
+	    if( !gave_apology ) {
+		gave_apology = 1;
+		cout << "Warning: unable to locate interfaces on "
+		    "switch/switch links; omitting those\n";
+	    }
 	}
 #endif
 	create_component_hop (p_switch_dst_link, vlink, DESTINATION, prev_component_hop);
