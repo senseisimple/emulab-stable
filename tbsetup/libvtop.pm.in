@@ -4207,13 +4207,20 @@ sub InterpLinks($)
 			    "where node_id='$pnodename' and iface='$iface'")
 		    or return -1 if (!$self->impotent());
 
-		# Must convert this to kbps like everything else is.
-		$speed = $speed * 1000;
+		#
+		# Do not do this for nodes already in the shared experiment.
+		# It would reset the in-use bandwidth. Bad.
+		#
+		if (!exists($self->current_p2v()->{$pnodename})) {
+		    # Must convert this to kbps like everything else is.
+		    $speed = $speed * 1000;
 		
-		DBQueryWarn("update interface_state set " .
-			    "   remaining_bandwidth='$speed' " .
-			    "where node_id='$pnodename' and iface='$iface'")
-		    or return -1 if (!$self->impotent());
+		    DBQueryWarn("update interface_state set " .
+				"   remaining_bandwidth='$speed' " .
+				"where node_id='$pnodename' and ".
+				"      iface='$iface'")
+			or return -1 if (!$self->impotent());
+		}
 	    }
 	}
     }
@@ -6078,7 +6085,11 @@ sub PrintSolution($$)
 	    my $newMember = addNode($doc, $newLink, "interface_ref");
 	    $newMember->setAttribute("virtual_node_id", $vnode);
 	    $newMember->setAttribute("virtual_port_id", $vport);
-	    $newMember->setAttribute("component_id", $pport);
+	    #
+	    # XXX Ignore for now. Need to fix.
+	    #
+	    $newMember->setAttribute("component_id", $pport)
+		if (defined($pport));
 	}
     }
     print $output $doc->toString(1) . "\n";
