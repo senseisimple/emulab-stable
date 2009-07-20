@@ -1751,7 +1751,7 @@ sub SliverWork($$)
 	    }
 	    my $interface;
 
-	    if ($iface_name != "lo0") {
+	    if ($iface_name ne "lo0") {
 		$interface = Interface->LookupByIface($nodeobject,$iface_name);
 		if (!defined($interface)) {
 		    $message = "No such interface ".
