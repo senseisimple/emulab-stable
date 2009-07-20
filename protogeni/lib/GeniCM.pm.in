@@ -986,9 +986,11 @@ sub GetTicket($;$)
 	    my $virtual_port_id   = $iface_ref->{"virtual_port_id"};
 	    my $component_id      = $iface_ref->{"component_id"};
 	    my $linkref     = $ifacemap{"$virtual_node_id:$virtual_port_id"};
+
+	    $component_id = "lo0"
+		if (!defined($component_id));
 	
-	    $linkref->{'component_id'} = $component_id
-		if (defined($component_id));
+	    $linkref->{'component_id'} = $component_id;
 	}
     }
     # Store the virt topo again since we changed it above.
@@ -1747,26 +1749,31 @@ sub SliverWork($$)
 		$message = "Inconsistent ifacemap; $node_id,$iface_id";
 		goto bad;
 	    }
+	    my $interface;
 
-	    my $interface = Interface->LookupByIface($nodeobject, $iface_name);
-	    if (!defined($interface)) {
-		$message = "No such interface $iface_name on node $nodeobject";
-		goto bad;
+	    if ($iface_name != "lo0") {
+		$interface = Interface->LookupByIface($nodeobject,$iface_name);
+		if (!defined($interface)) {
+		    $message = "No such interface ".
+			"$iface_name on node $nodeobject";
+		    goto bad;
+		}
 	    }
 	    my $sliver = GeniSliver::Interface->Create($slice,
 						       $owner,
-						       $interface->uuid(),
+						       undef,
 						       $nodeobject,
 						       $linkname,
 						       $ifaceref);
 	    if (!defined($sliver)) {
-		$message = "Could not create GeniSliver ".
-		    "$interface in $linkname";
+		$message = "Could not create GeniSliver for ".
+		    "$iface_name in $linkname";
 		goto bad;
 	    }
 	    # Manifest goes back to the user.
 	    $ifaceref->{'sliver_uuid'} = $sliver->uuid();
-	    $ifaceref->{'MAC'} = $interface->mac();
+	    $ifaceref->{'MAC'} = $interface->mac()
+		if (defined($interface));
 	    
 	    if ($sliver->SetAggregate($linkaggregate) != 0) {
 		$message = "Could not add link sliver $sliver to $aggregate";
