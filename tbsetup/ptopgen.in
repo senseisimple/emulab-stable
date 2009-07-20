@@ -189,7 +189,7 @@ my %nodetointerface;
 my $result =
     DBQueryFatal("SELECT node_id,card,port,iface,interface_type" .
 		 " from interfaces " .
-		 ($genimode ? "where role!='other' and role!='gw'" : ""));
+		 ($genimode ? "where role!='gw'" : ""));
 		 
 while (($node,$card,$port,$iface,$type) = $result->fetchrow_array) {
     push @{ $nodetointerface{"$node"} }, $iface;
