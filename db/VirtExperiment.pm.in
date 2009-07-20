@@ -796,7 +796,7 @@ sub AUTOLOAD {
     my $row = $self->tablerow();
 
     unless (exists($self->{'SLOTNAMES'}->{$name})) {
-	carp("No such slot '$name' field in class $type");
+	print STDERR "No such slot '$name' field in class $type\n";
 	return undef;
     }
     if (@_) {
