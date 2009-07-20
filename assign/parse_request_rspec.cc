@@ -8,7 +8,7 @@
  * XML Parser for RSpec ptop files
  */
 
-static const char rcsid[] = "$Id: parse_request_rspec.cc,v 1.10 2009-07-17 21:59:55 ricci Exp $";
+static const char rcsid[] = "$Id: parse_request_rspec.cc,v 1.11 2009-07-20 08:14:00 ricci Exp $";
 
 #ifdef WITH_XML
 
@@ -385,7 +385,8 @@ bool populate_nodes_rspec(DOMElement *root, tb_vgraph &vg) {
 		    fstring desirename( "shared" );
 
 		    if( !strcmp( exclusive, "false" ) ) {
-			tb_node_featuredesire node_fd( desirename, 1.0 );
+			tb_node_featuredesire node_fd( desirename, 1.0,
+                                true, featuredesire::FD_TYPE_NORMAL);
 			node_fd.add_desire_user( 1.0 );
 			v->desires.push_front( node_fd );
 		    }
@@ -543,7 +544,8 @@ bool populate_links_rspec(DOMElement *root, tb_vgraph &vg) {
 		//This section has a whole bunch of defaults for tags that were present earlier
 		// but are not in Protogeni. We will eventually decide whether or not we want them.
 		bool allow_delayed = true;
-		bool allow_trivial = false;
+		//bool allow_trivial = false;
+		bool allow_trivial = true;
 		bool fix_src_iface = false;
 		bool fix_dst_iface = false;
 		fstring fixed_src_iface = "";

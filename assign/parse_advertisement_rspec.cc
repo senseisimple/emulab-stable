@@ -8,7 +8,7 @@
  * XML Parser for RSpec ptop files
  */
 
-static const char rcsid[] = "$Id: parse_advertisement_rspec.cc,v 1.4 2009-07-16 22:37:30 gtw Exp $";
+static const char rcsid[] = "$Id: parse_advertisement_rspec.cc,v 1.5 2009-07-20 08:14:00 ricci Exp $";
 
 #ifdef WITH_XML
 
@@ -344,7 +344,9 @@ bool populate_nodes_rspec(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
 
 		    if( !strcmp( exclusive, "false" ) )
 			p->features.push_front( tb_node_featuredesire( feature, 
-								       1.0 ) );
+								       1.0,
+                                                                       true,
+                                                                       featuredesire::FD_TYPE_NORMAL) );
 		}
 
 		/*
