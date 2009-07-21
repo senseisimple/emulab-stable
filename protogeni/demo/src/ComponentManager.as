@@ -27,13 +27,17 @@ package
                                      newName : String,
                                      newHostName : String,
                                      newUrl : String,
-                                     newUpdate : Function) : void
+                                     newUpdate : Function,
+                                     newVersion : int) : void
     {
       id = newId;
       name = newName;
       hostName = newHostName;
       url = newUrl;
+      ad = "";
       update = newUpdate;
+      version = newVersion;
+      changed = false;
 
       components = new Array();
       used = new Array();
@@ -50,6 +54,11 @@ package
     public function getUrl() : String
     {
       return url;
+    }
+
+    public function getAd() : String
+    {
+      return ad;
     }
 
     public function getHostName() : String
@@ -127,6 +136,63 @@ package
       return components.length;
     }
 
+    public function getVersion() : int
+    {
+      return version;
+    }
+
+    public function setChanged() : void
+    {
+      changed = true;
+    }
+
+    public function clearChanged() : void
+    {
+      changed = false;
+    }
+
+    public function hasChanged() : Boolean
+    {
+      return changed;
+    }
+
+    public function isUsedString(id : String) : Boolean
+    {
+      var result = true;
+      var index = findId(id);
+      if (index != -1)
+      {
+        result = isUsed(index);
+      }
+      return result;
+    }
+
+    // Returns the node index of the now used node.
+    public function makeUsed(id : String) : int
+    {
+      var index = findId(id);
+      if (index != -1 && ! isUsed(index))
+      {
+        addUsed(index);
+        update();
+      }
+      return index;
+    }
+
+    function findId(id : String) : int
+    {
+      var result : int = -1;
+      var i : int = 0;
+      for (; i < components.length && result == -1; ++i)
+      {
+        if (components[i].uuid == id)
+        {
+          result = i;
+        }
+      }
+      return result;
+    }
+
     public function resourceFailure() : void
     {
       setState(FAILED);
@@ -142,6 +208,7 @@ package
       }
       try
       {
+        ad = str;
         if (str != null)
         {
           var uuidToNode = new Dictionary();
@@ -160,7 +227,7 @@ package
           var i : int = 0;
           for (; i < xmlNodes.length; ++i)
           {
-            if (isAvailable(xmlNodes[i]))
+            if (version < 2 || isAvailable(xmlNodes[i]))
             {
               var com : Component = new Component();
               components.push(com);
@@ -168,13 +235,33 @@ package
               uuidToNode[uuid] = com;
               com.name = xmlNodes[i].attribute("component_name");
               com.uuid = uuid;
-              com.managerId = xmlNodes[i].attribute("component_manager_uuid");
+              if (version < 2)
+              {
+                com.managerId = id;
+              }
+              else
+              {
+                com.managerId = xmlNodes[i].attribute("component_manager_uuid");
+              }
               var interfaceName = new QName(rspec.namespace(), "interface");
               var interfaceList = xmlNodes[i].elements(interfaceName);
+              var interfaceNumber = 0;
               for each (var inter in interfaceList)
               {
-                var interName = inter.attribute("component_id");
-                com.interfaces.push(new Interface(interName));
+                var interName = null;
+                if (version < 2)
+                {
+                  interName = inter.attribute("component_name");
+                }
+                else
+                {
+                  interName = inter.attribute("component_id");
+                }
+                var newInterface = new Interface("virt-"
+                                                 + String(interfaceNumber),
+                                                 interName);
+                com.interfaces.push(newInterface);
+                ++interfaceNumber;
               }
             }
           }
@@ -202,16 +289,28 @@ package
       {
         var interElement : QName = new QName(rspec.namespace(),
                                              "interface_ref");
+        if (version < 2)
+        {
+          interElement = new QName(rspec.namespace(), "interface");
+        }
         for each (var inter in link.descendants(interElement))
         {
-//          var uuidList = inter.elements(new QName(rspec.namespace(),
-//                                                  "component_node_uuid"));
-//          var uuid : String = uuidList.text();
-          var uuid : String = inter.attribute("component_node_uuid");
-//          var nameList = inter.elements(new QName(rspec.namespace(),
-//                                                  "component_interface_name"));
-//          var interName : String = nameList.text();
-          var interName : String = inter.attribute("component_interface_id");
+          var interName : String = null;
+          var uuid : String = null;
+          if (version < 2)
+          {
+            var uuidList = inter.elements(new QName(rspec.namespace(),
+                                                    "component_node_uuid"));
+            uuid = uuidList.text();
+            var nameList = inter.elements(new QName(rspec.namespace(),
+                                                  "component_interface_name"));
+            interName = nameList.text();
+          }
+          else
+          {
+            uuid = inter.attribute("component_node_uuid");
+            interName = inter.attribute("component_interface_id");
+          }
           var node : Component = uuidToNode[uuid];
           if (node != null)
           {
@@ -281,6 +380,7 @@ package
     var name : String;
     var hostName : String;
     var url : String;
+    var ad : String;
 
     var components : Array;
     var used : Array;
@@ -289,5 +389,12 @@ package
     var sliver : String;
     var state : int;
     var update : Function;
+
+    var changed : Boolean;
+
+    // Version 0 is baseline from GEC 4
+    // Version 1 is request converted but advertisement the same
+    // Version 2 is both ad and request converted
+    var version : int;
   }
 }

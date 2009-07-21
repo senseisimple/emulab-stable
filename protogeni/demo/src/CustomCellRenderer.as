@@ -12,28 +12,20 @@
  * FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
  */
 
-// A component has the raw information from the ptop file which is
-// used to create nodes.
-
 package
 {
-  public class Component
-  {
-    public function Component() : void
-    {
-      name = "";
-      uuid = "";
-      managerId = "";
-      interfaces = new Array();
-      isVirtual = false;
-      isShared = false;
-    }
+  import fl.controls.listClasses.CellRenderer;
+  import flash.text.TextFormat;
 
-    public var name : String;
-    public var uuid : String;
-    public var managerId : String;
-    public var interfaces : Array;
-    public var isVirtual : Boolean;
-    public var isShared : Boolean;
+  public class CustomCellRenderer extends CellRenderer
+  {
+    public function CustomCellRenderer() : void
+    {
+      super();
+      var format = new TextFormat();
+      format.size = 18;
+      setStyle("textFormat", format);
+      setSize(150, 30);
+    }
   }
 }

@@ -1,5 +1,5 @@
 /* GENIPUBLIC-COPYRIGHT
- * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
+ * Copyright (c) 2009 University of Utah and the Flux Group.
  * All rights reserved.
  *
  * Permission to use, copy, modify and distribute this software is hereby
@@ -14,14 +14,18 @@
 
 package
 {
-  class RequestSliverDestroy extends Request
+  class RequestSliceEmbedding extends Request
   {
-    public function RequestSliverDestroy(newManager : ComponentManager,
-                                         newNodes : ActiveNodes) : void
+    public function RequestSliceEmbedding(newManager : ComponentManager,
+                                          newNodes : ActiveNodes,
+                                          newRequest : String,
+                                          newUrl : String) : void
     {
-      super(newManager.getName());
+      super("SES");
       manager = newManager;
       nodes = newNodes;
+      request = newRequest;
+      url = newUrl;
     }
 
     override public function cleanup() : void
@@ -31,15 +35,12 @@ package
 
     override public function start(credential : Credential) : Operation
     {
-      // TODO: Check to make sure that manager.getSliver()
-      // exists and perform a no-op if it doesn't.
-      nodes.changeState(manager, ActiveNodes.CREATED, ActiveNodes.PLANNED);
-      nodes.changeState(manager, ActiveNodes.BOOTED, ActiveNodes.PLANNED);
-      opName = "Deleting Sliver";
-      op.reset(Geni.deleteSliver);
-      op.addField("credential", manager.getSliver());
-      op.addField("impotent", Request.IMPOTENT);
-      op.setUrl(manager.getUrl());
+      opName = "Embedding Slice";
+      op.reset(Geni.map);
+      op.addField("credential", credential.base);
+      op.addField("advertisement", manager.getAd());
+      op.addField("request", request);
+      op.setUrl(url);
       return op;
     }
 
@@ -48,18 +49,19 @@ package
     {
       if (code == 0)
       {
-        nodes.commitState(manager);
+        nodes.mapRequest(response.value, manager);
       }
-      else
-      {
-        nodes.revertState(manager);
-      }
-      manager.setSliver(null);
-      manager.setTicket(null);
+      return null;
+    }
+
+    override public function fail() : Request
+    {
       return null;
     }
 
     var manager : ComponentManager;
     var nodes : ActiveNodes;
+    var request : String;
+    var url : String;
   }
 }

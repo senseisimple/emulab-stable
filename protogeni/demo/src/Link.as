@@ -42,10 +42,6 @@ package
       {
         leftInterface = left.allocateInterface();
         rightInterface = right.allocateInterface();
-        if (leftInterface == "*" || rightInterface == "*")
-        {
-          Main.getConsole().appendText("\n\nWARNING: Interface not found\n\n");
-        }
       }
 
       removeClick = newRemoveClick;
@@ -99,38 +95,80 @@ package
         || (left == otherRight && right == otherLeft);
     }
 
-    public function getXml(useTunnels : Boolean) : XML
+    public function getXml(useTunnels : Boolean, version : int) : XML
     {
       var result : XML = null;
       if (!isTunnel() || useTunnels)
       {
         result = <link />;
-//          result.@name = "link" + String(number);
-        result.@virtual_id = "link" + String(number);
-        if (isTunnel())
+        if (version < 1)
         {
-          result.@link_type= "tunnel";
+          result.@name = "link" + String(number);
+          result.@nickname = "link" + String(number);
+        }
+        else
+        {
+          result.@virtual_id = "link" + String(number);
         }
 
-        result.appendChild(getInterfaceXml(left, leftInterface, 0));
-        result.appendChild(getInterfaceXml(right, rightInterface, 1));
+        if (isTunnel())
+        {
+          result.@link_type = "tunnel";
+        }
+        else if (version >= 1)
+        {
+          result.@link_type = "ethernet";
+        }
+
+        result.appendChild(getInterfaceXml(left, leftInterface, 0, version));
+        result.appendChild(getInterfaceXml(right, rightInterface, 1, version));
       }
       return result;
     }
 
     function getInterfaceXml(node : Node, interfaceName : String,
-                             ipOffset : int) : XML
+                             ipOffset : int, version : int) : XML
     {
-      var result = <interface_ref />;
-      result.@virtual_node_id = node.getName();
-      if (isTunnel())
+      var result : XML = null;
+      if (version < 1)
       {
-        result.@tunnel_ip = ipToString(tunnelIp + ipOffset);
-        result.@virtual_interface_id = "control";
+        result = <linkendpoints />;
+        if (ipOffset == 0)
+        {
+          result.@nickname = "destination_interface";
+        }
+        else
+        {
+          result.@nickname = "source_interface";
+        }
+        if (isTunnel())
+        {
+          result.@tunnel_ip = ipToString(tunnelIp + ipOffset);
+        }
+        else
+        {
+          result.@iface_name = interfaceName;
+        }
+        result.@node_uuid = node.getId();
+        if (node.getSliverId() != null)
+        {
+          result.@sliver_uuid = node.getSliverId();
+        }
+        result.@node_nickname = node.getName();
       }
       else
       {
-        result.@virtual_interface_id = interfaceName;
+        result = <interface_ref />;
+        result.@virtual_node_id = node.getName();
+        if (isTunnel())
+        {
+          result.@tunnel_ip = ipToString(tunnelIp + ipOffset);
+          result.@virtual_interface_id = "control";
+        }
+        else
+        {
+          result.@virtual_interface_id = interfaceName;
+        }
       }
       return result;
     }
@@ -151,6 +189,21 @@ package
     {
       return isTunnel() && (left.getManager() == target
                             || right.getManager() == target);
+    }
+
+    public function isConnectedTo(target : ComponentManager) : Boolean
+    {
+      return target == left.getManager() || target == right.getManager();
+    }
+
+    public function getLeft() : Node
+    {
+      return left;
+    }
+
+    public function getRight() : Node
+    {
+      return right;
     }
 
     var number : int;

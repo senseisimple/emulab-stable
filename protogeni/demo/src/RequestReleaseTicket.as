@@ -17,8 +17,10 @@ package
   class RequestReleaseTicket extends Request
   {
     public function RequestReleaseTicket(newTicket : String,
-                                         newUrl : String) : void
+                                         newUrl : String,
+                                         newServer : String) : void
     {
+      super(newServer);
       ticket = newTicket;
       url = newUrl;
     }

@@ -62,7 +62,7 @@ package
       {
         clip.xmlText.scrollV += 3;
       }
-      clip.waitIcon.rotation += 15;
+      clip.waitIcon.rotation += 5;
     }
 
     function failure(event : ErrorEvent, fault : MethodFault) : void

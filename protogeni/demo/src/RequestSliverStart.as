@@ -19,6 +19,7 @@ package
     public function RequestSliverStart(newManager : ComponentManager,
                                        newNodes : ActiveNodes) : void
     {
+      super(newManager.getName());
       manager = newManager;
       nodes = newNodes;
     }

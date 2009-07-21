@@ -20,6 +20,7 @@ package
                                         newNodes : ActiveNodes,
                                         newRspec : String) : void
     {
+      super(newManager.getName());
       manager = newManager;
       nodes = newNodes;
       rspec = newRspec;
@@ -70,7 +71,15 @@ package
         }
         else
         {
-          manager.setSliver(response.value[0]);
+          if (manager.getVersion() == 0)
+          {
+            manager.setSliver(response.value);
+            setSliverIds(response.value);
+          }
+          else
+          {
+            manager.setSliver(response.value[0]);
+          }
 
           if (! nodes.hasTunnels(manager))
           {
@@ -78,7 +87,7 @@ package
           }
           else
           {
-            var newRspec = nodes.getXml(true);
+            var newRspec = nodes.getXml(true, manager);
             result = new RequestSliverUpdate(manager, nodes, newRspec,
                                              true);
           }
@@ -105,11 +114,13 @@ package
       if (manager.getTicket() != null)
       {
         result = new RequestReleaseTicket(manager.getTicket(),
-                                          manager.getUrl());
+                                          manager.getUrl(),
+                                          manager.getName());
+        manager.setTicket(null);
       }
       return result;
     }
-/*
+
     function setSliverIds(signedCredStr : String) : void
     {
       var signedCred : XML = XML(signedCredStr);
@@ -119,11 +130,11 @@ package
         var sliverId : String = node.elements("sliver_uuid");
         if (name != "" && sliverId != "")
         {
-          nodes.setSliverId(cmIndex, name, sliverId);
+          nodes.setSliverId(manager, name, sliverId);
         }
       }
     }
-*/
+
     var manager : ComponentManager;
     var nodes : ActiveNodes;
     var rspec : String;

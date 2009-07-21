@@ -88,6 +88,7 @@ package
       newNode.move(x - dragX, y - dragY);
       nodes.push(newNode);
       beginDrag(newNode);
+      newNode.getManager().setChanged();
     }
 
     function removeNode(doomedNode : Node) : void
@@ -98,6 +99,7 @@ package
       {
         removeLink(nodeLinks[i]);
       }
+      doomedNode.getManager().setChanged();
       doomedNode.cleanup();
 
       var index = nodes.indexOf(doomedNode);
@@ -239,6 +241,8 @@ package
       var newLink = new Link(linkLayer, links.length, source, dest,
                              removeLinkEvent);
       links.push(newLink);
+      source.getManager().setChanged();
+      dest.getManager().setChanged();
     }
 
     function removeLinkEvent(event : MouseEvent)
@@ -248,6 +252,8 @@ package
 
     function removeLink(doomedLink : Link)
     {
+      doomedLink.getLeft().getManager().setChanged();
+      doomedLink.getRight().getManager().setChanged();
       doomedLink.cleanup();
       var index : int = links.indexOf(doomedLink);
       if (index != -1)
@@ -284,41 +290,55 @@ package
       }
       return result;
     }
-/*
-    public function setSliverId(cmIndex : int, name : String,
+
+    public function setSliverId(cm : ComponentManager, name : String,
                                 sliverId : String) : void
     {
       var i : int = 0;
       for (; i < nodes.length; ++i)
       {
-        if (nodes[i].getCmIndex() == cmIndex
+        if (nodes[i].getManager() == cm
             && nodes[i].getName() == name)
         {
           nodes[i].setSliverId(sliverId);
         }
       }
     }
-*/
-    public function getXml(useTunnels : Boolean) : XML
+
+    public function getXml(useTunnels : Boolean, cm : ComponentManager) : XML
     {
-      var result = <rspec xmlns="http://protogeni.net/resources/rspec/0.1" />;
+      var version = 2;
+      if (cm != null)
+      {
+        version = cm.getVersion();
+      }
+      var result = XML("<?xml version=\"1.0\" encoding=\"UTF-8\"?> "
+                       + "<rspec "
+                       + "xmlns=\"http://www.protogeni.net/resources/rspec/0.1\" "
+                       + "type=\"request\" />");
       var i : int = 0;
 
       for (i = 0; i < nodes.length; ++i)
       {
-        var currentNode : XML = nodes[i].getXml(useTunnels);
-        if (currentNode != null)
+        if (version >= 1 || cm == nodes[i].getManager())
         {
-          result.appendChild(currentNode);
+          var currentNode : XML = nodes[i].getXml(useTunnels, version);
+          if (currentNode != null)
+          {
+            result.appendChild(currentNode);
+          }
         }
       }
 
       for (i = 0; i < links.length; ++i)
       {
-        var currentLink : XML = links[i].getXml(useTunnels);
-        if (currentLink != null)
+        if (version >= 3 || links[i].isConnectedTo(cm))
         {
-          result.appendChild(currentLink);
+          var currentLink : XML = links[i].getXml(useTunnels, version);
+          if (currentLink != null)
+          {
+            result.appendChild(currentLink);
+          }
         }
       }
 
@@ -362,6 +382,7 @@ package
       {
         nodes[i].revertState(target);
       }
+      updateSelectText();
     }
 
     public function commitState(target : ComponentManager) : void
@@ -371,6 +392,7 @@ package
       {
         nodes[i].commitState(target);
       }
+      updateSelectText();
     }
 
     public function existsState(target : ComponentManager,
@@ -428,6 +450,20 @@ package
         result += "hostnames=" + hostnames;
       }
       return result;
+    }
+
+    public function mapRequest(request : String,
+                               manager : ComponentManager) : void
+    {
+      var root : XML = XML(request);
+      var nodeName : QName = new QName(root.namespace(), "node");
+      var nodeXml = root.elements(nodeName);
+      var i : int = 0;
+      for (; i < nodes.length; ++i)
+      {
+        nodes[i].mapRequest(nodeXml[i], manager);
+      }
+      updateSelectText();
     }
 
     var nodes : Array;

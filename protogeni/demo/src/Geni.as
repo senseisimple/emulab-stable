@@ -18,6 +18,10 @@ package
   {
     static var ch : String = "sa";
     static var cm : String = "cm";
+    static var ses : String = "ses";
+
+    static var sesUrl : String = "https://myboss.emulab.geni.emulab.net/protogeni/xmlrpc/";
+//"https://boss.emulab.net:443/protogeni/xmlrpc/";
 
     public static var getCredential = new Array(ch, "GetCredential");
     public static var getKeys = new Array(ch, "GetKeys");
@@ -34,5 +38,7 @@ package
     public static var startSliver = new Array(cm, "StartSliver");
     public static var updateSliver = new Array(cm, "UpdateSliver");
     public static var resolveNode = new Array(cm, "Resolve");
+
+    public static var map = new Array(ses, "Map");
   }
 }

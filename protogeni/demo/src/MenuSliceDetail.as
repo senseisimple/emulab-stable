@@ -40,10 +40,14 @@ package
       console = new Console(parent, nodes, managers, clip,
                             credential, Main.getText());
       console.discoverResources();
+      wait = new SliceWait(clip.wait, clip.opText, console);
+      abstract = new AbstractNodes(clip, nodes, managers);
     }
 
     override public function cleanup() : void
     {
+      abstract.cleanup();
+      wait.cleanup();
       console.cleanup();
       managers.cleanup();
       nodes.cleanup();
@@ -63,5 +67,7 @@ package
     var nodes : ActiveNodes;
     var managers : ComponentView;
     var console : Console;
+    var wait : SliceWait;
+    var abstract : AbstractNodes;
   }
 }

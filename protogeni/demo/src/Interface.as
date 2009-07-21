@@ -16,8 +16,9 @@ package
 {
   public class Interface
   {
-    public function Interface(newName : String) : void
+    public function Interface(newVirtualId : String, newName : String) : void
     {
+      virtualId = newVirtualId;
       name = newName;
       used = false;
       role = CONTROL;
@@ -25,12 +26,13 @@ package
 
     public function clone() : Interface
     {
-      var result = new Interface(name);
+      var result = new Interface(virtualId, name);
       result.used = used;
       result.role = role;
       return result;
     }
 
+    public var virtualId : String;
     public var name : String;
     public var used : Boolean;
     public var role : int;

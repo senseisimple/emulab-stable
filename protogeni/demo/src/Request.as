@@ -16,10 +16,11 @@ package
 {
   class Request
   {
-    public function Request() : void
+    public function Request(newServer : String) : void
     {
       op = new Operation(null);
       opName = "";
+      opServer = newServer;
     }
 
     public function cleanup() : void
@@ -39,7 +40,7 @@ package
 
     public function getOpName() : String
     {
-      return opName;
+      return opName + " (" + opServer + ")";
     }
 
     public function getUrl() : String
@@ -65,6 +66,7 @@ package
 
     protected var op : Operation;
     protected var opName : String;
+    protected var opServer : String;
 
     public static var IMPOTENT : int = 0;
   }

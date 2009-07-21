@@ -21,6 +21,7 @@ package
                                         newRspec : String,
                                         newBeginTunnel : Boolean) : void
     {
+      super(newManager.getName());
       manager = newManager;
       nodes = newNodes;
       rspec = newRspec;
@@ -35,7 +36,20 @@ package
 
     override public function start(credential : Credential) : Operation
     {
-      if (ticket == null)
+      if (manager.getVersion() == 0)
+      {
+        if (! beginTunnel)
+        {
+          nodes.changeState(manager, ActiveNodes.PLANNED, ActiveNodes.CREATED);
+        }
+        opName = "Updating Sliver";
+        op.reset(Geni.updateSliver);
+        op.addField("credential", manager.getSliver());
+        op.addField("rspec", rspec);
+        op.addField("keys", credential.ssh);
+        op.addField("impotent", Request.IMPOTENT);
+      }
+      else if (ticket == null)
       {
         if (! beginTunnel)
         {
@@ -64,7 +78,11 @@ package
       var result : Request = null;
       if (code == 0)
       {
-        if (ticket == null)
+        if (manager.getVersion() == 0)
+        {
+          nodes.commitState(manager);
+        }
+        else if (ticket == null)
         {
           var r = new RequestSliverUpdate(manager, nodes, rspec, beginTunnel);
           r.setTicket(response.value);
@@ -78,9 +96,11 @@ package
       }
       else
       {
-        if (ticket != null)
+        if (ticket != null && manager.getVersion() > 0)
         {
-          result = new RequestReleaseTicket(ticket, manager.getUrl());
+          result = new RequestReleaseTicket(ticket, manager.getUrl(),
+                                            manager.getName());
+          manager.setTicket(null);
         }
         if (beginTunnel)
         {

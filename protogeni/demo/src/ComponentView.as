@@ -31,46 +31,46 @@ package
       select = newSelect;
       list = newList;
       list.allowMultipleSelection = true;
+      list.setStyle("cellRenderer", CustomCellRenderer);
+
       listStatus = new ListStatusClip();
       list.addChild(listStatus);
       listStatus.alpha = 0.3;
       nodes = newNodes;
 
       managers = new Array(
-        new ComponentManager("", "", "", "", updateList),
-/*
+        new ComponentManager("", "", "", "", updateList, 2),
         new ComponentManager("e2a9e480-aa9f-11dd-9fcd-001143e43770",
                              "ProtoGENI",
                              ".emulab.net",
                              "https://myboss.myelab.testbed.emulab.net:443/protogeni/xmlrpc",
-                             updateList),
-*/
+                             updateList, 2),
         new ComponentManager("28a10955-aa00-11dd-ad1f-001143e453fe",
                              "Emulab",
                              ".emulab.net",
                              "https://boss.emulab.net:443/protogeni/xmlrpc/",
-                             updateList)/*,
+// Doesn't work ???                             "https://boss.emulab.net:443/dev/stoller/protogeni/xmlrpc/",
+                             updateList, 2),
         new ComponentManager("be300821-ecb7-11dd-a0f8-001143e43ff3",
                              "gtwelab",
                              ".emulab.net",
                              "https://myboss.emulab.geni.emulab.net:443/protogeni/xmlrpc",
-                             updateList),
+                             updateList, 2),
         new ComponentManager("b83b47be-e7f0-11dd-848b-0013468d3dc8",
                              "Kentucky",
                              ".uky.emulab.net",
                              "https://www.uky.emulab.net/protogeni/xmlrpc",
-                             updateList),
+                             updateList, 0),
         new ComponentManager("f38e8571-f7af-11dd-ab88-00304868a4be",
                              "Wisconsin",
                              ".schooner.wail.wisc.edu",
                              "https://www.schooner.wail.wisc.edu/protogeni/xmlrpc",
-                             updateList),
+                             updateList, 0),
         new ComponentManager("", "CMU", ".cmcl.cs.cmu.edu",
                              "https://boss.cmcl.cs.cmu.edu/protogeni/xmlrpc",
-                             updateList)*/);
+                             updateList, 0));
       select.removeAll();
       select.selectedIndex = 0;
-      select.rowCount = 4;
 
       var i : int = 0;
       for (; i < managers.length; ++i)
@@ -100,38 +100,16 @@ package
       return managers;
     }
 
-/*
-    public function getTicket(index : int) : String
+    public function getCurrentManager() : ComponentManager
     {
-      return tickets[index];
+      return managers[select.selectedIndex];
     }
 
-    public function setTicket(index : int, value : String) : void
+    public function isValidManager() : Boolean
     {
-      tickets[index] = value;
+      return select.selectedIndex != 0;
     }
 
-    public function getUrl(index : int) : String
-    {
-      return cmUrls[index];
-    }
-*/
-/*
-    public function getCmCount() : int
-    {
-      return managers.length;
-    }
-*/
-/*
-    public function removeNode(cm : ComponentManager, nodeIndex : int) : void
-    {
-      cm.removeUsed(nodeIndex);
-      if (cm == select.selectedItem.data)
-      {
-        updateList();
-      }
-    }
-*/
     function clickItem(event : ListEvent) : void
     {
       var cm : ComponentManager = managers[select.selectedIndex];
@@ -153,6 +131,7 @@ package
     function changeComponent(event : Event) : void
     {
       updateList();
+      list.scrollToIndex(0);
     }
 
     function updateList() : void
@@ -183,39 +162,12 @@ package
         listStatus.text.backgroundColor = 0xff0000;
       }
     }
-/*
-    public function succeedResources(cm : ComponentManager, str : String)
-    {
-      cm.populateNodes(str);
-      updateList();
-    }
 
-    public function failResources(cm : ComponentManager)
-    {
-      cm.setState(FAILED);
-      updateList();
-    }
-*/
     var select : ComboBox;
     var list : List;
     var listStatus : ListStatusClip;
     var nodes : ActiveNodes;
     // The ComponentManagers
     var managers : Array;
-/*
-    // An array of arrays. Outer == CM, inner == Component
-    var components : Array;
-
-    var used : Array;
-    var tickets : Array;
-    var states : Array;
-*/
-/*
-    public static var hostName : Array = new Array("",
-    public static var cmNames : Array = new Array("", ,
-    static var cmUrls : Array =
-    static var cmUuids : Array =
-    static var cmResults : Array =
-*/
   }
 }

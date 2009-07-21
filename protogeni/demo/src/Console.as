@@ -15,12 +15,15 @@
 package
 {
   import flash.display.DisplayObjectContainer;
-  import flash.text.TextField;
   import flash.events.MouseEvent;
   import flash.events.ErrorEvent;
   import flash.net.navigateToURL;
   import flash.net.URLRequest;
+  import flash.system.System;
+  import flash.text.TextField;
+
   import fl.controls.Button;
+
   import com.mattism.http.xmlrpc.MethodFault;
 
 
@@ -51,15 +54,19 @@ package
                                              arena.bootButton,
                                              arena.speedButton,
                                              arena.deleteButton,
+                                             arena.embedButton,
+                                             arena.rspecButton,
                                              clip.backButton,
-                                             clip.rspecButton),
+                                             clip.copyButton),
                                    new Array(clickConsole,
                                              clickCreateSlivers,
                                              clickBootSlivers,
                                              clickRunSpeedTest,
                                              clickDeleteSlivers,
+                                             clickEmbed,
+                                             clickRspec,
                                              clickBack,
-                                             clickRspec));
+                                             clickCopy));
 
       queue = new Queue();
       working = false;
@@ -83,11 +90,22 @@ package
 
     function discoverSliver(cm : ComponentManager) : Request
     {
-      return new RequestResourceDiscovery(cm);
+      if (cm != managers.getManagers()[0])
+      {
+        return new RequestResourceDiscovery(cm);
+      }
+      else
+      {
+        return null;
+      }
     }
 
     function clickConsole(event : MouseEvent) : void
     {
+      clip.text.visible = true;
+      clip.textScroll.visible = true;
+      clip.rspecText.visible = false;
+      clip.rspecScroll.visible = false;
       clip.visible = true;
     }
 
@@ -98,14 +116,19 @@ package
         if (cm.getUrl() != null)
         {
           var newRequest = func(cm);
-          if (newRequest != null)
-          {
-            queue.push(newRequest);
-            if (! working)
-            {
-              start();
-            }
-          }
+          pushRequest(newRequest);
+        }
+      }
+    }
+
+    function pushRequest(newRequest : Request) : void
+    {
+      if (newRequest != null)
+      {
+        queue.push(newRequest);
+        if (! working)
+        {
+          start();
         }
       }
     }
@@ -122,17 +145,18 @@ package
     {
       var result : Request = null;
       var shouldSend = nodes.managerUsed(cm);
-      if (shouldSend)
+      if (shouldSend && cm.hasChanged())
       {
+        cm.clearChanged();
         var rspec = null;
         if (cm.getSliver() == null)
         {
-          rspec = nodes.getXml(false);
+          rspec = nodes.getXml(false, cm);
           result = new RequestSliverCreate(cm, nodes, rspec);
         }
-        else
+        else if (cm.getVersion() >= 2)
         {
-          rspec = nodes.getXml(true);
+          rspec = nodes.getXml(true, cm);
           result = new RequestSliverUpdate(cm, nodes, rspec, false);
         }
       }
@@ -190,25 +214,60 @@ package
       return result;
     }
 
+    function clickEmbed(event : MouseEvent) : void
+    {
+      if (managers.isValidManager() && queue.isEmpty())
+      {
+        var currentManager = managers.getCurrentManager();
+        var request = new RequestSliceEmbedding(currentManager, nodes,
+                                                nodes.getXml(false,
+                                                             currentManager),
+                                                Geni.sesUrl);
+        pushRequest(request);
+      }
+    }
+
     function clickBack(event : MouseEvent) : void
     {
       clip.visible = false;
-      clip.text.visible = true;
-      clip.textScroll.visible = true;
-      clip.rspecText.visible = false;
-      clip.rspecScroll.visible = false;
+    }
+
+    function clickCopy(event : MouseEvent) : void
+    {
+      if (clip.text.visible)
+      {
+        System.setClipboard(clip.text.text);
+      }
+      else if (clip.rspecText.visible)
+      {
+        System.setClipboard(clip.rspecText.text);
+      }
     }
 
     function clickRspec(event : MouseEvent) : void
     {
-      clip.text.visible = ! clip.text.visible;
-      clip.textScroll.visible = ! clip.textScroll.visible;
-      clip.rspecText.visible = ! clip.rspecText.visible;
-      clip.rspecScroll.visible = ! clip.rspecScroll.visible;
+      clip.text.visible = false;
+      clip.textScroll.visible = false;
+      clip.rspecText.visible = true;
+      clip.rspecScroll.visible = true;
+      clip.visible = true;
 
       clip.rspecText.text = "";
-      var xml = nodes.getXml(true);
+      clip.rspecText.appendText("--------------------------------------\n");
+      clip.rspecText.appendText("Request: "
+                                + managers.getCurrentManager().getName()
+                                + "\n");
+      clip.rspecText.appendText("--------------------------------------\n\n");
+      var xml = nodes.getXml(true, managers.getCurrentManager());
       clip.rspecText.appendText(xml.toString());
+
+      clip.rspecText.appendText("\n\n--------------------------------------\n");
+      clip.rspecText.appendText("Advertisement: "
+                                + managers.getCurrentManager().getName()
+                                + "\n");
+      clip.rspecText.appendText("--------------------------------------\n\n");
+      clip.rspecText.appendText(managers.getCurrentManager().getAd());
+
       clip.rspecScroll.update();
     }
 
@@ -218,6 +277,7 @@ package
       {
         var front = queue.front();
         var op = front.start(credential);
+        arena.opText.text = front.getOpName();
         clip.text.appendText(Util.getSend(front.getOpName(), front.getUrl(),
                                           ""));
         clip.text.scrollV = clip.text.maxScrollV;
@@ -240,6 +300,7 @@ package
       arena.bootButton.gotoAndStop(newState);
       arena.speedButton.gotoAndStop(newState);
       arena.deleteButton.gotoAndStop(newState);
+      arena.embedButton.gotoAndStop(newState);
     }
 
     function failure(event : ErrorEvent, fault : MethodFault) : void
@@ -272,6 +333,11 @@ package
         queue.push(next);
       }
       start();
+    }
+
+    public function isWorking() : Boolean
+    {
+      return working;
     }
 
     var clip : ConsoleClip;
