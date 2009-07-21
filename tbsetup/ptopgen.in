@@ -458,16 +458,6 @@ if (defined($exempt_eid)) {
 	"(b.pid='$pid' and b.eid='$exempt_eid'))"; 
 }
 
-# In genimode exclude nodes with exclusion attribute.
-if ($genimode) {
-    $free_condition = "(nat1.attrvalue is null or nat1.attrvalue=0)";
-    
-    if ($pid && $MAINSITE) {
-	$free_condition = "($free_condition and ".
-	    "(np.reserved_pid is not null and np.reserved_pid='$pid'))";
-    }
-}
-
 # In shared mode, allow allocated nodes whose sharing_mode is set.
 if ($useshared) {
     $free_condition = "($free_condition or ".
@@ -479,6 +469,12 @@ if ($useshared) {
 # overrides the other possible free conditions
 if ($allnodes) {
     $free_condition = "1";
+}
+
+# In genimode exclude nodes with exclusion attribute.
+if ($genimode) {
+    $free_condition = "($free_condition and ".
+	"(nat1.attrvalue is null or nat1.attrvalue=0))";
 }
 
 $result =
