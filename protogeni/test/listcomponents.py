@@ -53,6 +53,7 @@ for manager in response["value"]:
     #
     params = {}
     params["credential"] = mycredential
+    params["available"] = True
     rval,response = do_method(None,
                               "DiscoverResources", params, manager["url"])
     if rval:
