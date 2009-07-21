@@ -23,6 +23,7 @@ import os
 import re
 import xmlrpclib
 from M2Crypto import X509
+import zlib
 
 execfile( "test-common.py" )
 
@@ -54,9 +55,14 @@ for manager in response["value"]:
     params = {}
     params["credential"] = mycredential
     params["available"] = True
+    params["compress"] = True
     rval,response = do_method(None,
                               "DiscoverResources", params, manager["url"])
     if rval:
         print "Could not get a list of resources"
-    elif debug:
-        print response[ "value" ]
+    else:
+        if isinstance( response[ "value" ], xmlrpclib.Binary ):
+            response[ "value" ] = zlib.decompress( str( response[ "value" ] ) )
+
+        if debug:
+            print response[ "value" ]

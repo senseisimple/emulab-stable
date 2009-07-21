@@ -50,6 +50,8 @@ use Time::Local;
 use Experiment;
 use VirtExperiment;
 use Firewall;
+use Compress::Zlib;
+use MIME::Base64;
 
 # Configure variables
 my $TB		   = "@prefix@";
@@ -238,6 +240,7 @@ sub DiscoverResources($)
     my ($argref) = @_;
     my $credential = $argref->{'credential'};
     my $available = $argref->{'available'};
+    my $compress = $argref->{'compress'};
     my $user_uuid  = $ENV{'GENIUSER'};
 
     $credential = GeniCredential->CreateFromSigned($credential);
@@ -255,6 +258,7 @@ sub DiscoverResources($)
     # Boolean as its own object type -- which Perl always interprets as
     # true, regardless of the object's value.  Undo all of that silliness.
     $available = defined( $available ) && $available->value;
+    $compress = defined( $compress ) && $compress->value;
 
     #
     # A sitevar controls whether external users can get any nodes.
@@ -287,6 +291,12 @@ sub DiscoverResources($)
 	$xml .= $_;
     }
     close(AVAIL);
+
+    if( $compress ) {
+	my $coder = Frontier::RPC2->new();
+	my $base64 = encode_base64( compress( $xml ) );
+	$xml = $coder->base64( $base64 );	
+    }
 
     return GeniResponse->Create(GENIRESPONSE_SUCCESS, $xml);
 }
