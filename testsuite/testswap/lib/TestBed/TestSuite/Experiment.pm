@@ -117,6 +117,34 @@ sub traceroute {
   Tools::Network::traceroute($src, @_);
 }
 
+sub cartesian_ping{
+ my ($e) = shift;
+ my @nodes = $e->nodenames();
+ my @hosts = $e->hostnames();
+
+ my @work;
+ for (@nodes){
+   my $node1 = $_;
+   for (@hosts){
+     my $node2 = $_;
+     if ($node1 ne $node2){
+       push @work, sub{$e->ping_from_to($node1, $node2)};
+     }
+   }
+ }
+
+ TestBed::TestSuite::prun(@work);
+}
+
+sub ping_from_to($$$){
+        my ($e, $from, $to) = @_;
+        Tools::TBSSH::cmdcheckoutput($from, "'sh -c \"PATH=/bin:/usr/sbin:/usr/sbin:/sbin ping -c 5 $to\"'",
+        sub {
+                return 1;
+        });
+}
+
+
 sub traceroute_ok { 
   my ($e) = shift;
   my $src  = $e->resolve(shift);
@@ -149,7 +177,7 @@ takes an argument string such as "now link1 down"
 =cut
 sub tevc {
   my ($e) = shift;
-  TestBed::Wrap::tevc::tevc($e->pid, $e->eid, @_);
+  TestBed::Wrap::tevc::tevc($e, @_);
 }
 
 =item C<< $e->tevc_at_host($host, @args) >>
@@ -160,7 +188,7 @@ takes an argument string such as "now link1 down"
 
 sub tevc_at_host {
   my ($e) = shift;
-  TestBed::Wrap::tevc::tevc_at_host($e->pid, $e->eid, @_);
+  TestBed::Wrap::tevc::tevc_at_host($e, @_);
 }
 
 =item C<< $e->parallel_tevc($proc, $items) >>
@@ -171,7 +199,7 @@ sub parallel_tevc {
   my ($e, $proc, $items) = @_;
   my $result = TestBed::ForkFramework::ForEach::work(sub {
     my @tevc_cmd = $proc->(@_);
-    TestBed::Wrap::tevc::tevc($e->pid, $e->eid, @tevc_cmd);
+    TestBed::Wrap::tevc::tevc($e, @tevc_cmd);
   }, $items);
   if ($result->[0]) {
     sayd($result->[2]);
@@ -187,7 +215,7 @@ sub parallel_tevc_at_host {
   my ($e, $host, $proc, $items) = @_;
   my $result = TestBed::ForkFramework::ForEach::work(sub {
     my @tevc_cmd = $proc->(@_);
-    TestBed::Wrap::tevc::tevc_at_host($e->pid, $e->eid, $host, @tevc_cmd);
+    TestBed::Wrap::tevc::tevc_at_host($e, $host, @tevc_cmd);
   }, $items);
   if ($result->[0]) {
     sayd($result->[2]);

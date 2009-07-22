@@ -111,6 +111,7 @@ if (@ARGV) {
     elsif (/ip/) { say Dumper($e->info(aspect => 'physical')) ;}
     elsif (/it/) { say Dumper($e->info(aspect => 'traces')) ;}
     elsif (/il/) { say Dumper($e->info(aspect => 'links')) ;}
+    elsif ($_ eq 'syncs') { prun( map { my $n = $_; sub { $e->node('node1')->ssh->cmdoutput('/usr/testbed/bin/emulab-sync'); } } (1..shift)); }
     elsif (/watch/) { watch($e); }
     elsif ($_ eq'ex') { 
       say $ARGV[0];

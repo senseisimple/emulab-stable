@@ -110,7 +110,7 @@ sub override {
 
 sub prun {
   my $results = TestBed::ForkFramework::ForEach::worksubs( @_);
-  die ("prun item failed", $results)  if ($results->has_errors);
+  die ("prun item failed", Dumper($results))  if ($results->has_errors);
   return $results;
 }
 

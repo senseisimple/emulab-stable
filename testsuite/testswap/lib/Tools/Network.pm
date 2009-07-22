@@ -33,7 +33,7 @@ returns 0 or 1
 =cut
 sub traceroute {
   my ($src,$dest,@path) = @_;
-  Tools::TBSSH::cmdcheckoutput($src, "/usr/sbin/traceroute $dest", 
+  Tools::TBSSH::cmdcheckoutput($src, "'sh -c \"PATH=/bin:/usr/sbin:/usr/sbin:/sbin traceroute $dest\"'", 
   sub {
     my ($sshoutput) = @_;
     my @lines = grep {!/^traceroute/} split(/\n/, $sshoutput) ;

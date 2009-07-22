@@ -55,10 +55,10 @@ use Data::Dumper;
   if ($timing)    { $ENV { 'HARNESS_TIMER'   } = 1; }
   if ($verbose)   { $ENV { 'HARNESS_VERBOSE' } = 1; $ENV { 'HARNESS_COLOR' } = 1; }
 
-  if ($debug)     { $ENV { 'TBTS_DEBUG'      } = 1; }
-  if ($group)     { $ENV { 'TBTS_GROUP'      } = $group;  }
-  if ($project)   { $ENV { 'TBTS_PROJECT'    } = $project; }
-  if ($xmlrpcurl) { $ENV { 'TBTS_XMLRPC_URL' } = $xmlrpcurl; }
+  if ($debug)     { $ENV { 'TBTS_DEBUG'      } = 1          ; $TBConfig::DEBUG_XML_CLIENT = 1       ; }
+  if ($group)     { $ENV { 'TBTS_GROUP'      } = $group     ; $TBConfig::DEFAULT_GID = $group       ; }
+  if ($project)   { $ENV { 'TBTS_PROJECT'    } = $project   ; $TBConfig::DEFAULT_PID = $project     ; }
+  if ($xmlrpcurl) { $ENV { 'TBTS_XMLRPC_URL' } = $xmlrpcurl ; $TBConfig::XMLRPC_SERVER = $xmlrpcurl ; }
   use TBConfig;
   if ($concurrent_prerun_jobs) { $TBConfig::concurrent_prerun_jobs = $concurrent_prerun_jobs; }
   if ($concurrent_node_usage) { $TBConfig::concurrent_node_usage = $concurrent_node_usage; }

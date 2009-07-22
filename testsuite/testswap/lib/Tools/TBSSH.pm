@@ -36,7 +36,7 @@ sub wrapped_ssh {
   }
 
   if (defined $checker) {
-    &$checker(@results) || die ($diemessage || "ssh checker of cmd $cmd failed");
+    &$checker(@results) || die ($diemessage || "ssh checker of cmd $cmd failed " . Dumper(\@results));
   }
   ($results[2], @results);
 }

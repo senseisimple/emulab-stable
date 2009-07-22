@@ -27,7 +27,7 @@ sub args {
   my $gid = $self->gid;
   my $eid = $self->eid;
  
-  die "Odd number of args" . sayd(@_) if ((scalar @_) % 2 !=0);
+  confess ("Odd number of args" . sayd(@_)) if ((scalar @_) % 2 !=0);
 
   return { 'pid' => $pid, 'gid' => $gid, 'eid' => $eid, @_ };
 }

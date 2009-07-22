@@ -1,5 +1,14 @@
 my $FFDEBUG = 0;
 
+package TestBed::ForkFramework::Process;
+use SemiModern::Perl;
+use Mouse;
+use POSIX ":sys_wait_h";
+has 'pid' => (is => 'rw');
+
+sub isalive { waitpid(shift->pid, WNOHANG) <= 0; }
+sub wait    { waitpid(shift->pid, 0); }
+
 package TestBed::ForkFramework::Channel;
 use SemiModern::Perl;
 use Mouse;
@@ -95,6 +104,11 @@ sub forkit {
 
     CORE::exit;
   }
+}
+
+sub spawn {
+  my ($worker) = @_;
+  forkit( sub { return TestBed::ForkFramework::Process->new( pid => $_[0]); } , $worker);
 }
 
 sub fork_redir {
