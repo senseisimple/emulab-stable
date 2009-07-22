@@ -22,6 +22,7 @@ import getopt
 import os
 import re
 import xmlrpclib
+import zlib
 from M2Crypto import X509
 
 def Usage():
@@ -63,7 +64,7 @@ mycredential = get_self_credential()
 #
 params = {}
 params[ "credential" ] = mycredential
-params[ "advertisement" ] = ad
+params[ "advertisement" ] = xmlrpclib.Binary( zlib.compress( ad ) )
 params[ "request" ] = req
 rval,response = do_method("ses", "Map", params)
 if rval:

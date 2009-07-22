@@ -33,6 +33,9 @@ use English;
 use XML::Simple;
 use Data::Dumper;
 use File::Temp qw/tempfile/;
+use Scalar::Util;
+use MIME::Base64;
+use Compress::Zlib;
 
 # Configure variables
 my $TB		   = "@prefix@";
@@ -72,6 +75,12 @@ sub Map($)
     # if assign wasn't compiled with XML (i.e. rspec) support.
     return GeniResponse->Create( GENIRESPONSE_UNSUPPORTED )
 	unless $HAVE_XERCES eq "yes";
+
+    # If the ad is Binary typed (and therefore base64 encoded), assume
+    # it is compressed.
+    if( Scalar::Util::blessed( $ad ) && $ad->isa( "Frontier::RPC2::Base64" ) ) {
+	$ad = uncompress( decode_base64( $ad->value ) );
+    }
 
     # Temporary ugly hack: ptopgen occasionally spits out invalid
     # bandwidth elements.  We'll patch them up by hand until ptopgen
