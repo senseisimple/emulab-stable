@@ -607,6 +607,14 @@ sub RunAssign($$)
 	return -1;
     }
     TBDebugTimeStamp("InitializePhysNodes ended");
+    if (! ($impotent || $regression)) {
+	TBDebugTimeStamp("ReserveSharedBandwidth started");
+	if ($experiment->ReserveSharedBandwidth($updating) != 0) {
+	    print("Could not reserve shared bandwidth\n");
+	    return -1;
+	}
+	TBDebugTimeStamp("ReserveSharedBandwidth ended");
+    }
     return 0;
 }
 
