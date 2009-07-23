@@ -13,7 +13,7 @@ package snmpit_lib;
 
 use Exporter;
 @ISA = ("Exporter");
-@EXPORT = qw( macport portnum Dev vlanmemb vlanid
+@EXPORT = qw( macport portnum portiface Dev vlanmemb vlanid
 		getTestSwitches getControlSwitches getSwitchesInStack
 		getVlanPorts convertPortsFromIfaces convertPortFromIface
 		getExperimentTrunks setVlanTag
@@ -28,7 +28,8 @@ use Exporter;
 		snmpitSet snmpitSetWarn snmpitSetFatal 
                 snmpitBulkwalk snmpitBulkwalkWarn snmpitBulkwalkFatal
 	        setPortEnabled setPortTagged
-		printVars tbsort );
+		printVars tbsort getExperimentCurrentTrunks
+	        getExperimentVlanPorts);
 
 use English;
 use libdb;
@@ -54,6 +55,9 @@ my %Devices=();
 
 my %Interfaces=();
 # Interfaces maps pcX:Y<==>MAC
+
+my %PortIface=();
+# Maps pcX:Y<==>pcX:iface
 
 my %Ports=();
 # Ports maps pcX:Y<==>switch:port
@@ -87,7 +91,15 @@ sub macport {
 }
 
 #
-# Map between interfaces and port numbers
+# Map between node:iface and port numbers
+#
+sub portiface {
+    my $val = shift || "";
+    return $PortIface{$val};
+}
+
+#
+# Map between switch interfaces and port numbers
 #
 sub portnum {
     my $val = shift || "";
@@ -109,16 +121,21 @@ sub Dev {
 sub ReadTranslationTable {
     my $name="";
     my $mac="";
+    my $iface="";
     my $switchport="";
 
     print "FILLING %Interfaces\n" if $debug;
-    my $result = DBQueryFatal("select * from interfaces;");
+    my $result =
+	DBQueryFatal("select node_id,card,port,mac,iface from interfaces");
     while ( @_ = $result->fetchrow_array()) {
 	$name = "$_[0]:$_[1]";
+	$iface = "$_[0]:$_[4]";
 	if ($_[2] != 1) {$name .=$_[2]; }
 	$mac = "$_[3]";
 	$Interfaces{$name} = $mac;
 	$Interfaces{$mac} = $name;
+	$PortIface{$name} = $iface;
+	$PortIface{$iface} = $name;
 	print "Interfaces: $mac <==> $name\n" if $debug > 1;
     }
 
@@ -196,6 +213,47 @@ sub getExperimentTrunks($$) {
 	push @ports, $node;
     }
     return convertPortsFromIfaces(@ports);
+}
+
+#
+# Returns an an array of trunked ports (in node:card form) used by an
+# experiment. These are the ports that are actually in trunk mode,
+# rather then the ports we want to be in trunk mode (above function).
+#
+sub getExperimentCurrentTrunks($$) {
+    my ($pid, $eid) = @_;
+    my @ports;
+
+    my $query_result =
+	DBQueryFatal("select distinct r.node_id,i.iface from reserved as r " .
+		     "left join interface_state as i on i.node_id=r.node_id " .
+		     "where r.pid='$pid' and r.eid='$eid' and " .
+		     "      i.tagged!=0");
+
+    while (my ($node, $iface) = $query_result->fetchrow()) {
+	$node = $node . ":" . $iface;
+	push @ports, $node;
+    }
+    return convertPortsFromIfaces(@ports);
+}
+
+#
+# Returns an an array of ports (in node:card form) that currently in
+# the given vlan.
+#
+sub getExperimentVlanPorts($) {
+    my ($vlanid) = @_;
+
+    my $query_result =
+	DBQueryFatal("select members from vlans as v ".
+		     "where v.id='$vlanid'");
+    return ()
+	if (!$query_result->numrows());
+
+    my ($members) = $query_result->fetchrow_array();
+    my @members   = split(/\s+/, $members);
+
+    return convertPortsFromIfaces(@members);
 }
 
 #
