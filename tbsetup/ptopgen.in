@@ -175,7 +175,7 @@ if (defined($options{"e"})) {
     $exempt_eid = $options{"e"};
     usage()
 	if (!defined($pid));
-    my $experiment = Experiment->Lookup($pid, $exempt_eid);
+    $experiment = Experiment->Lookup($pid, $exempt_eid);
     die("Could not look up experiment $pid,$exempt_eid\n")
 	if (!defined($experiment));
 }
@@ -1036,7 +1036,8 @@ $result = DBQueryFatal("SELECT node_id, iface, card, port, IP ".
 
 while (($node,$iface,$card,$port,$IP) = $result->fetchrow_array) {
     next
-	if ($prune && $is_reserved{$node} && (!defined($IP) || $IP eq ""));
+	if ($prune && $is_reserved{$node} && !$sharing_mode{$node} && 
+	    (!defined($IP) || $IP eq ""));
 
     $interfacecardports{"$node:$iface"} = [$card,$port];
 }
@@ -1052,14 +1053,24 @@ while (my $ref = $result->fetchrow_hashref()) {
 }
 
 #
-# This does not work cause the physical state is gone. 
+# Add back in the used shared bandwidth.
 #
-if (0 && defined($experiment)) {
+if (defined($experiment)) {
     # Read the vinterfaces table to get any bandwidth in use by
     # this experiment.
-    my $exptidx = $experiment->idx();
+    my $exptidx   = $experiment->idx();
+    my $pstateDir = $experiment->WorkDir() . "/pstate";
+
+    DBQueryFatal("create temporary table if not exists ".
+		 "vinterfaces_${exptidx} like vinterfaces");
+
+    DBQueryFatal("delete from vinterfaces_${exptidx}");
     
-    $result = DBQueryFatal("select * from vinterfaces ".
+    DBQueryFatal("load data infile '$pstateDir/vinterfaces' ".
+		 "into table vinterfaces_${exptidx}")
+	    if (-e "$pstateDir/vinterfaces");
+    
+    $result = DBQueryFatal("select * from vinterfaces_$exptidx ".
 			   "where exptidx=$exptidx");
 
     while (my $row = $result->fetchrow_hashref()) {
@@ -1068,7 +1079,7 @@ if (0 && defined($experiment)) {
 	my $bandwidth = $row->{'bandwidth'};
 
 	next
-	    if (!defined($iface) || $bandwidth == 0);
+	    if (!defined($iface) || $bandwidth <= 0);
 	next
 	    if (!exists($interfacestate{"$node:$iface"}));
 
@@ -1144,7 +1155,8 @@ while (($node1,$card1,$port1,$node2,$card2,$port2) =
             }
             push @types, "$basetype-$bw";
 
-	    if ($sharing_mode{$node1} && !$genimode) {
+	    if ($sharing_mode{$node1}) {
+
 		$bw =
 		    $interfacestate{"$node1:$iface1"}->{'remaining_bandwidth'};
 		next
