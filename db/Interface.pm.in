@@ -559,69 +559,14 @@ sub ReserveSharedBandwidth($$)
 	if (!defined($iface));
 
     #
-    # A non-zero bandwidth in the vinterfaces table tells us what has
-    # bee reserved for each interface. These are combined in the
-    # interface_state table to ensure we do not oversubscribe the physical
-    # link. When releasing a node, we have to be careful to release the
-    # shared bandwidth for each vinterface on that node. 
+    # Set the bw to the negative value; this is the bw that we need
+    # to reserve later. Negative indicates we have not done it yet.
     #
-    DBQueryWarn("lock tables vinterfaces write, interface_state write")
+    DBQueryWarn("update vinterfaces set bandwidth=0-${bandwidth} ".
+		"where node_id='$nodeid' and unit='$unit'")
 	or return -1;
-
-    my $query_result =
-	DBQueryWarn("update interface_state set ".
-		    "  remaining_bandwidth=remaining_bandwidth-${bandwidth} ".
-		    "where node_id='$nodeid' and iface='$iface' and ".
-		    "remaining_bandwidth>=$bandwidth");
-    
-    if (!$query_result || !$query_result->affectedrows) {
-	DBQueryWarn("unlock tables");
-	return -1;
-    }
-    if (!DBQueryWarn("update vinterfaces set bandwidth=$bandwidth ".
-		     "where node_id='$nodeid' and unit='$unit'")) {
-	DBQueryWarn("update interface_state set ".
-		    "  remaining_bandwidth=remaining_bandwidth+${bandwidth} ".
-		    "where node_id='$nodeid' and iface='$iface'");
-	DBQueryWarn("unlock tables");
-	return -1;
-    }
-    $self->{"DBROW"}->{'bandwidth'} = $bandwidth;
-    DBQueryWarn("unlock tables");
-    return 0;
-}
-
-sub ReleaseSharedBandwidth($)
-{
-    my ($self) = @_;
-
-    my $nodeid    = $self->node_id();
-    my $unit      = $self->unit();
-    my $iface     = $self->iface();
-    my $bandwidth = $self->bandwidth();
-
-    # Trivial link?
-    return 0
-	if (!$bandwidth);
-    
-    DBQueryWarn("lock tables vinterfaces write, interface_state write")
-	or return -1;
-
-    if (!DBQueryWarn("update interface_state set ".
-		     "  remaining_bandwidth=remaining_bandwidth+${bandwidth} ".
-		     "where node_id='$nodeid' and iface='$iface'")) {
-	DBQueryWarn("unlock tables");
-	return -1;
-    }
-    # If this fails we need to clean up by hand. I will add a section
-    # to the nightly DB check that scans for mismatches.
-    if (!DBQueryWarn("update vinterfaces set bandwidth=0 ".
-		     "where node_id='$nodeid' and unit='$unit'")) {
-	DBQueryWarn("unlock tables");
-	return -1;
-    }
-    $self->{"DBROW"}->{'bandwidth'} = 0;
-    DBQueryWarn("unlock tables");
+	
+    $self->{'DBROW'}->{'bandwidth'} = $bandwidth;
     return 0;
 }
 
