@@ -695,6 +695,115 @@ sub removeVlan($@) {
 }
 
 #
+# Remove some ports from a single vlan. Ports should not be in trunk mode.
+#
+# usage: removeSomePortsFromVlan(self, vlanid, portlist)
+#
+# returns: 1 on success
+# returns: 0 on failure
+#
+sub removeSomePortsFromVlan($$@) {
+    my $self = shift;
+    my $vlan_id = shift;
+    my @ports = @_;
+    my $errors = 0;
+    
+    my %vlan_numbers = $self->findVlans($vlan_id);
+    
+    #
+    # First, make sure that the VLAN really does exist
+    #
+    if (!exists($vlan_numbers{$vlan_id})) {
+	warn "ERROR: VLAN $vlan_id not found on switch!";
+	return 0;
+    }
+
+    #
+    # Now, we go through each device and remove all ports from the VLAN
+    # on that device. Note the reverse sort order! This way, we do not
+    # interfere with another snmpit processes, since createVlan tries
+    # in 'forward' order (we will remove the VLAN from the 'last' switch
+    # first, so the other snmpit will not see it free until it's been
+    # removed from all switches)
+    #
+    foreach my $devicename (sort {tbsort($b,$a)} keys %{$self->{DEVICES}}) {
+	my $device = $self->{DEVICES}{$devicename};
+	my %vlan_numbers = $device->findVlans($vlan_id);
+
+	#
+	# Only remove ports from the VLAN if it exists on this device.
+	#
+	next
+	    if (!defined($vlan_numbers{$vlan_id}));
+
+	my $vlan_number = $vlan_numbers{$vlan_id};
+	    
+	print "Removing ports on $devicename from VLAN $vlan_id ($vlan_number)\n"
+	    if $self->{DEBUG};
+
+	$errors += $device->removeSomePortsFromVlan($vlan_number, @ports);
+    }
+
+    return ($errors == 0);
+}
+
+#
+# Remove some ports from a single trunk.
+#
+# usage: removeSomePortsFromTrunk(self, vlanid, portlist)
+#
+# returns: 1 on success
+# returns: 0 on failure
+#
+sub removeSomePortsFromTrunk($$@) {
+    my $self = shift;
+    my $vlan_id = shift;
+    my @ports = @_;
+    my $errors = 0;
+    
+    my %vlan_numbers = $self->findVlans($vlan_id);
+    
+    #
+    # First, make sure that the VLAN really does exist
+    #
+    if (!exists($vlan_numbers{$vlan_id})) {
+	warn "ERROR: VLAN $vlan_id not found on switch!";
+	return 0;
+    }
+
+    #
+    # Now, we go through each device and remove all ports from the trunk
+    # on that device. Note the reverse sort order! This way, we do not
+    # interfere with another snmpit processes, since createVlan tries
+    # in 'forward' order (we will remove the VLAN from the 'last' switch
+    # first, so the other snmpit will not see it free until it's been
+    # removed from all switches)
+    #
+    foreach my $devicename (sort {tbsort($b,$a)} keys %{$self->{DEVICES}}) {
+	my $device = $self->{DEVICES}{$devicename};
+	my %vlan_numbers = $device->findVlans($vlan_id);
+
+	#
+	# Only remove ports from the VLAN if it exists on this device.
+	#
+	next
+	    if (!defined($vlan_numbers{$vlan_id}));
+
+	my $vlan_number = $vlan_numbers{$vlan_id};
+	    
+	print "Removing ports on $devicename from VLAN $vlan_id ($vlan_number)\n"
+	    if $self->{DEBUG};
+
+	foreach my $port (@ports) {
+	    return 0
+		if (! $device->setVlanOnTrunks($port, 0, $vlan_number));
+	}
+    }
+
+    return 1;
+}
+
+#
 # Set a variable associated with a port. 
 # TODO: Need a list of variables here
 #

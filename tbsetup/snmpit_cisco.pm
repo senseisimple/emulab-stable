@@ -1158,6 +1158,70 @@ sub removePortsFromVlan($@) {
 }
 
 #
+# Remove some ports from the given VLAN, which are given as Cisco-specific
+# VLAN numbers. Do not specify trunked ports here.
+#
+# usage: removeSomePortsFromVlan(self,int vlan, ports)
+#	 returns 0 on sucess.
+#	 returns the number of failed ports on failure.
+#
+sub removeSomePortsFromVlan($$@) {
+    my $self = shift;
+    my $vlan_number = shift;
+    my @ports = @_;
+
+    #
+    # Make sure the VLANs actually exist
+    #
+    if (!$self->vlanNumberExists($vlan_number)) {
+	print STDERR "ERROR: VLAN $vlan_number does not exist\n";
+	return 1;
+    }
+
+    #
+    # Make a hash of the ports for easy lookup later.
+    #
+    my %ports = ();
+    @ports{@ports} = @ports;
+
+    #
+    # Get a list of the ports in the VLAN
+    #
+    my $VlanPortVlan;
+    if ($self->{OSTYPE} eq "CatOS") {
+	$VlanPortVlan = "vlanPortVlan"; #index is ifIndex
+    } elsif ($self->{OSTYPE} eq "IOS") {
+	$VlanPortVlan = "vmVlan"; #index is ifIndex
+    }
+    my @remports;
+
+    #
+    # Walk the tree to find VLAN membership
+    #
+    my ($rows) = snmpitBulkwalkFatal($self->{SESS},[$VlanPortVlan]);
+    foreach my $rowref (@$rows) {
+	my ($name,$modport,$port_vlan_number) = @$rowref;
+	my ($trans) = convertPortFormat($PORT_FORMAT_NODEPORT,$modport);
+	if (!defined $trans) {
+	    $trans = ""; # Guard against some uninitialized value warnings
+	}
+
+	$self->debug("Got $name $modport ($trans) $port_vlan_number\n");
+	
+	push(@remports, $modport)
+	    if ("$port_vlan_number" eq "$vlan_number" &&
+		exists($ports{$trans}));
+    }
+
+    $self->debug("About to remove ports " . join(",",@remports) . "\n");
+    if (@remports) {
+	return $self->setPortVlan(1,@remports);
+    } else {
+	return 0;
+    }
+}
+
+#
 # Remove the given VLAN from this switch. This presupposes that all of its
 # ports have already been removed with removePortsFromVlan(). The VLAN is
 # given as a Cisco-specific VLAN number
