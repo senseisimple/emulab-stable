@@ -37,6 +37,7 @@ my $TBROOT         = "@prefix@";
 my $TBOPS          = "@TBOPSEMAIL@";
 my $TBLOGS         = "@TBLOGSEMAIL@";
 my $MAINSITE	   = @TBMAINSITE@;
+my $ELABINELAB     = @ELABINELAB@;
 my $THISHOMEBASE   = "@THISHOMEBASE@";
 my $TESTMODE       = @TESTMODE@;
 my $DISABLE_EVENTS = "@DISABLE_EVENT_SCHED@";
@@ -142,7 +143,7 @@ while ($#ARGV > 1) {
     } elsif ($arg eq "-eventsys_restart" && $swapop eq "modify") {
 	$update_Eventsys_restart = 1;
     } elsif ($arg eq "-noswapout") {
-	$noswapout = 0;
+	$noswapout = 1;
     } else {
 	usage();
     }
@@ -302,9 +303,14 @@ elsif ($swapop eq "update" || $swapop eq "modify") {
     if ($errors) {
 	#
 	# Clean up the mess, leaving the experiment in the SWAPPED state,
-	# 
-	print STDERR "Cleaning up after errors.\n";
-	doSwapout(CLEANUP);
+	#
+	if ($noswapout) {
+	    print STDERR "Leaving experiment swapped in as directed.\n";
+	}
+	else {
+	    print STDERR "Cleaning up after errors.\n";
+	    doSwapout(CLEANUP);
+	}
 	$updatehosed = 1;
     }
     else {
@@ -330,10 +336,11 @@ elsif ($swapop eq "update" || $swapop eq "modify") {
 		# It is safe to remove the phystate since we know it was
 		# backed up above, and cause we do not know if assign_wrapper
 		# made it to that point before it failed. 
-		if ($experiment->RemoveVirtualState($pid, $eid) ||
-		    $experiment->RestoreVirtualState($pid, $eid) ||
-		    $experiment->RemovePhysicalState($pid, $eid) ||
-		    $experiment->RestorePhysicalState($pid,$eid)) {
+		if ($experiment->RemoveVirtualState() ||
+		    $experiment->RestoreVirtualState() ||
+		    $experiment->ReserveSharedBandwidth(1, 1) ||
+		    $experiment->RemovePhysicalState() ||
+		    $experiment->RestorePhysicalState()) {
 		    print STDERR "Could not restore backed-up state; ";
 		    $CanRecover = 0;
 		}
@@ -530,7 +537,8 @@ sub doSwapout($) {
 	# When modifying an elabinelab experiment, leave the vlans intact
 	# so that the inner networks are not suddenly disconnected.
 	#
-	if ($type != MODIFY || ($type == MODIFY && Lan->GotTrunks($experiment))) {
+	if ($type != MODIFY ||
+	    ($type == MODIFY && $ELABINELAB && Lan->GotTrunks($experiment))) {
 	    TBDebugTimeStamp("snmpit started");
 	    print STDERR "Removing VLANs.\n";
 	    if (system("snmpit -r $pid $eid")) {
@@ -926,25 +934,45 @@ sub doSwapin($) {
     # exist on the switches will be left as is by snmpit.
     #
     # We must do this before the nfree of deleted nodes in the next section
-    # because the new test in nfree the prevents nodes from accidentally
+    # because the new test in nfree that prevents nodes from accidentally
     # getting released when they are in a vlan.
     #
     if ($type == MODIFY) {
 	my @diff = ();
 	my @same = ();
-	if (Lan->CompareVlansWithSwitches($experiment, \@diff, \@same) != 0) {
+	my $ret;
+
+	if ($ELABINELAB) {
+	    $ret = Lan->CompareVlansWithSwitches($experiment, \@diff, \@same);
+	}
+	else {
+	    $ret = Lan->CompareVlansWithSwitches2($experiment);
+	}
+	if ($ret) {
 	    tberror({type => 'summary', severity => SEV_SECONDARY,
 		     error => ['vlan_setup_failed']},
 		    "Failed to compare old vlans");
 	    return 1;
 	}
-	if (@diff) {
-	    print "Removing obsolete vlans @diff\n";
-	    system("snmpit -f ". join(" ", map("-o $_", @diff)));
+	if ($ELABINELAB) {
+	    if (@diff) {
+		print "Removing obsolete vlans @diff\n";
+		system("snmpit -f ". join(" ", map("-o $_", @diff)));
+		if ($?) {
+		    tberror({type => 'summary', severity => SEV_SECONDARY,
+			     error => ['vlan_setup_failed']},
+			    "Failed to remove obsolete VLANs.");
+		    return 1;
+		}
+	    }
+	}
+	else {
+	    print "Synchronizing VLANs.\n";
+	    system("snmpit -X $pid $eid");
 	    if ($?) {
 		tberror({type => 'summary', severity => SEV_SECONDARY,
 			 error => ['vlan_setup_failed']},
-			"Failed to remove old vlans");
+			"Failed to synchronize VLANs.");
 		return 1;
 	    }
 	}
@@ -1253,16 +1281,17 @@ sub doSwapin($) {
     # the step has completed and 2) It's OK for the command to run in
     # parallel with os_setup (no DB dependencies, etc.)
     #
-
-    print "Setting up VLANs.\n";
-    TBDebugTimeStamp("snmpit started");
-    if (system("snmpit -t $pid $eid")) {
-	tberror({type => 'summary', severity => SEV_SECONDARY,
-		 error => ['vlan_setup_failed']},
-		"Failed to set up VLANs.");
-	return 1;
+    if ($type != MODIFY || $ELABINELAB) {
+	print "Setting up VLANs.\n";
+	TBDebugTimeStamp("snmpit started");
+	if (system("snmpit -t $pid $eid")) {
+	    tberror({type => 'summary', severity => SEV_SECONDARY,
+		     error => ['vlan_setup_failed']},
+		    "Failed to set up VLANs.");
+	    return 1;
+	}
+	TBDebugTimeStamp("snmpit finished");
     }
-    TBDebugTimeStamp("snmpit finished");
 
     # No need to do this except during a real swapin.
     if ($type == REAL) {
