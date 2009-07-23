@@ -1936,8 +1936,11 @@ sub SliverWork($$)
 	# Restore old physical state. 
 	#
 	if ($restorephys) {
-	    $experiment->RemovePhysicalState();
-	    $experiment->RestorePhysicalState();
+	    if ($experiment->ReserveSharedBandwidth(1, 1) ||
+		$experiment->RemovePhysicalState() ||
+		$experiment->RestorePhysicalState()) {
+		print STDERR "Could not restore backup state for $pid,$eid\n";
+	    }
 	}
 	system("$SNMPIT -t $pid $eid");
 	if ($?) {
