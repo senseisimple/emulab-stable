@@ -159,7 +159,7 @@ sub mysystem($)
     my ($command) = @_;
 
     my $cwd;
-    chomp($cwd = `pwd`);
+    chomp($cwd = `/bin/pwd`);
 
     print STDERR "Running '$command' in $cwd\n"
 	if ($debug);
@@ -3268,8 +3268,11 @@ sub RestorePhysicalState($)
     
     foreach my $table (keys(%physicalTables),
 		       "vinterfaces", "interface_settings") {
-	DBQueryWarn("LOAD DATA INFILE '$pstateDir/$table' INTO TABLE $table")
-	    or $errors++;
+	if (-e "$pstateDir/$table") {
+	    DBQueryWarn("LOAD DATA INFILE '$pstateDir/$table' ".
+			"INTO TABLE $table")
+		or $errors++;
+	}
     }
     # interfaces table is special, and this is probably wrong to do anyway
     # since we overwrite columns that are fixed.
@@ -4110,6 +4113,254 @@ sub SetPortRange($$)
     }
     DBQueryWarn("unlock tables");
     return ($newlow, $newhigh);
+}
+
+#
+# Reserve all of the shared BW we need. The vinterfaces table has
+# already been filled, and now we want to collect all that up for
+# each node, and reserve it in the interface_state table. Locked
+# of course.
+#
+# If this is an update.
+#
+sub ReserveSharedBandwidth($;$$)
+{
+    my ($self, $isupdate, $rollback) = @_;
+    
+    my $idx = $self->idx();
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+    my $pstateDir = $self->WorkDir() . "/pstate";
+    my %current  = ();
+    my %previous = ();
+    my $previous_result;
+
+    $isupdate = 0
+	if (!defined($isupdate));
+    $rollback = 0
+	if (!defined($rollback));
+
+    #
+    # If this is an update, grab the old vinterfaces. Unless we are rolling
+    # back, in which case we want the current vinterfaces table since it
+    # has been restored by tbswap.
+    #
+    if ($isupdate) {
+	DBQueryWarn("create temporary table if not exists ".
+		    "vinterfaces_${idx} like vinterfaces")
+	    or return -1;
+
+	DBQueryWarn("delete from vinterfaces_${idx}")
+	    or return -1;
+
+	if (-e "$pstateDir/vinterfaces") {	
+	    DBQueryWarn("load data infile '$pstateDir/vinterfaces' ".
+			"into table vinterfaces_${idx}")
+		or return -1;
+
+	    $previous_result =
+		DBQueryWarn("select node_id,unit,iface,bandwidth ".
+			    "  from vinterfaces_${idx} ".
+			    "where exptidx=$idx and bandwidth!=0 and ".
+			    "      iface is not null ".
+			    "order by node_id,unit");
+
+	    return -1
+		if (!$previous_result);
+	}
+    }
+
+    DBQueryWarn("lock tables vinterfaces write, interface_state write ".
+		($isupdate ? ", vinterfaces_${idx} write" : ""))
+	or return -1;
+
+    my $query_result =
+	DBQueryWarn("select node_id,unit,iface,bandwidth from vinterfaces ".
+		    "where exptidx=$idx and bandwidth!=0 and ".
+		    "      iface is not null ".
+		    "order by node_id,unit");
+    goto bad
+	if (!$query_result);
+    goto good
+	if (!$query_result->num_rows && !$isupdate);
+
+    # Switcheroo on rollback; want to restore from old table. 
+    if ($rollback) {
+	my $tmp = $query_result;
+	$query_result  = $previous_result;
+	$previous_result = $tmp;
+    }
+
+    #
+    # This is how much we need to release.
+    #
+    if ($isupdate && defined($previous_result)) {
+	while (my ($node_id,$unit,$iface,$bw) =
+	       $previous_result->fetchrow_array()) {
+
+	    # Negative bw was not reserved.
+	    next
+		if ($bw <= 0);
+	    
+	    $previous{"$node_id:$iface"} = 0
+		if (!exists($previous{"$node_id:$iface"}));
+
+	    $previous{"$node_id:$iface"} += $bw;
+	}
+	$previous_result->dataseek(0);
+    }
+
+    #
+    # Compute the per interface totals from the current table.
+    #
+    while (my ($node_id,$unit,$iface,$bw) = $query_result->fetchrow_array()) {
+	$current{"$node_id:$iface"} = 0
+	    if (!exists($current{"$node_id:$iface"}));
+
+	#
+	# In a swapin or update situation we are looking for negative values.
+	# This is bandwidth we need to reserve from the current table.
+	#
+	# In a rollback situation, this is really the previous table,
+	# and positive numbers mean bandwidth we already have reserved.
+	# We do not need to reserve that again.
+	#
+	$current{"$node_id:$iface"} += (0 - $bw)
+	    if ($bw < 0);
+    }
+
+    #
+    # Now check the interface_state table for all of them to make sure
+    # the operation is going to succeed.
+    #
+    foreach my $tmp (keys(%current)) {
+	my ($node_id,$iface) = split(":", $tmp);
+	my $bandwidth = $current{$tmp};
+
+	#
+	# Then modify the total if we are doing an update. This is how
+	# much we really need.
+	#
+	if (exists($previous{$tmp})) {
+	    $bandwidth -= $previous{$tmp};
+	}
+	# We are giving up more then we want.
+	next
+	    if ($bandwidth <= 0);
+
+	my $check_result =
+	    DBQueryWarn("select node_id,iface from interface_state ".
+			"where node_id='$node_id' and iface='$iface' and ".
+			"      remaining_bandwidth>=$bandwidth");
+	goto bad
+	    if (!$check_result);
+	
+	if (!$check_result->num_rows) {
+	    print STDERR "Not enough reserve bandwidth; $bandwidth on $tmp\n";
+	    DBQueryWarn("unlock tables");
+	    return 1;
+	}
+    }
+
+    #
+    # In update mode, clear the bandwidth we currently have before
+    # reserving the new bandwidth. Failure after this point can result
+    # in the experiment getting swapped out if someone else picks up
+    # the bw after the tables are unlocked. Not much to do about that.
+    #
+    if ($isupdate) {
+	my $table = ($rollback ? "vinterfaces" : "vinterfaces_${idx}");
+		     
+	if (!DBQueryWarn("update interface_state,$table set ".
+		     "     remaining_bandwidth=remaining_bandwidth+bandwidth,".
+		     "     bandwidth=0-bandwidth ".
+		     "where interface_state.node_id=${table}.node_id and ".
+		     "      interface_state.iface=${table}.iface and ".
+		     "      ${table}.exptidx='$idx' and ".
+		     "      ${table}.iface is not null and ".
+		     "      ${table}.bandwidth>0")) {
+	    print STDERR "Could not release shared bandwidth\n";
+	    goto bad;
+	}
+	#
+	# Now that we have released the bw, replace the backup table
+	# cause otherwise we will not know to reallocate the bw if
+	# we fail and rollback.
+	#
+	if (!$rollback && -e $pstateDir) {
+	    DBQueryWarn("select * from vinterfaces_${idx} ".
+			"where exptidx='$idx' ".
+			"order by node_id,unit ".
+			"into outfile '$pstateDir/vinterfaces.$$' ")
+		or goto bad;
+
+	    if (mysystem("/bin/mv -f ".
+			 "$pstateDir/vinterfaces.$$ $pstateDir/vinterfaces")) {
+		print STDERR "Could not update $pstateDir/vinterfaces\n";
+		goto bad;
+	    }
+	}
+    }
+
+    #
+    # Now do it. We are going to process one at a time since we do
+    # not have transactional commands with isam tables. Since we did
+    # the check above, the only thing that can go wrong is a DB error,
+    # in which case we are screwed anyway. 
+    #
+    $query_result->dataseek(0);
+    
+    while (my ($node_id,$unit,$iface,$bw) = $query_result->fetchrow_array()) {
+	# Positive bw already reserved.
+	next
+	    if ($bw >= 0);
+	
+	my $rbw = 0 - $bw;
+	my $table = ($rollback ? "vinterfaces_${idx}" : "vinterfaces");
+	
+	if (!DBQueryWarn("update interface_state,${table} set ".
+			 "     remaining_bandwidth=remaining_bandwidth-$rbw, ".
+			 "     bandwidth=$rbw ".
+			 "where interface_state.node_id=${table}.node_id ".
+			 "  and interface_state.iface=${table}.iface and ".
+			 "      ${table}.node_id='$node_id' and ".
+			 "      ${table}.iface='$iface' and ".
+			 "      ${table}.unit='$unit'")) {
+	    print STDERR "Could not reserve shared bandwidth $bw ($unit) on ".
+		"$node_id:$iface\n";
+	    goto bad;
+	}
+    }
+
+    #
+    # If this is a rollback, we have to undo what we did above
+    # when we wrote out the modified vinterfaces_${idx} table
+    # during the initial update. Otherwise that table will come
+    # back in later with negative values (RestorePhysicalState()).
+    #
+    # A better approach perhaps is to move vinterfaces out of
+    # BackupPhysicalState() and RestorePhysicalState() entirely. 
+    #
+    if ($rollback && -e $pstateDir) {
+	DBQueryWarn("select * from vinterfaces_${idx} ".
+		    "where exptidx='$idx' ".
+		    "order by node_id,unit ".
+		    "into outfile '$pstateDir/vinterfaces.$$' ")
+	    or goto bad;
+
+	if (mysystem("/bin/mv -f ".
+		     "$pstateDir/vinterfaces.$$ $pstateDir/vinterfaces")) {
+	    print STDERR "Could not update $pstateDir/vinterfaces\n";
+	    goto bad;
+	}
+    }
+
+  good:
+    DBQueryWarn("unlock tables");
+    return 0;
+  bad:
+    DBQueryWarn("unlock tables");
+    return -1;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...
