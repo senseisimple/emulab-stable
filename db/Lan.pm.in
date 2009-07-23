@@ -421,6 +421,64 @@ sub CompareVlansWithSwitches($$$)
 }
 
 #
+# New version to coexist with syncVlansFromTables() in snmpit. Adding or
+# subtracting ports to an existing vlan is not considered a change now,
+# since syncVlansFromTables() can deal with that. The point of this function
+# then is to compare the vlan names and update the lanids of the newly
+# created lans.
+# 
+#
+sub CompareVlansWithSwitches2($$)
+{
+    my ($class, $experiment) = @_;
+
+    my $exptidx = $experiment->idx();
+
+    #
+    # Grab the existing vlans from the vlans table (managed by snmpit).
+    #
+    my $query_result =
+	DBQueryWarn("select id,virtual,members,tag from vlans ".
+		    "where exptidx='$exptidx'");
+    return -1
+	if (!$query_result);
+    
+    while (my ($oldid,$vname,$oldmembers,$tag) =
+	   $query_result->fetchrow_array()) {
+
+	my $vlan = VLan->Lookup($experiment, $vname);
+	if (!defined($vlan) || $vlan->type ne "vlan") {
+	    #
+	    # The vlan was deleted.
+	    #
+	    print STDERR "$vname is not a vlan!\n"
+		if (defined($vlan));
+	    next;
+	}
+	#
+	# Old vlan exists by the same name in the new set. We can just
+	# change the port membership on the switches.
+	#
+	my $newid = $vlan->lanid();
+
+	#
+	# Change the new lan (and its partner entries) to have the old id
+	# number, so that it matches what is on the switch, as told by
+	# the vlans table. 
+	#
+	# This is bad; if one of these updates fails, we are screwed.
+	#
+	foreach my $table ("lans", "lan_attributes", "lan_members",
+			   "lan_member_attributes", "ifaces") {
+	    DBQueryWarn("update $table set lanid=$oldid ".
+			"where lanid='$newid'")
+		or return -1;
+	}
+    }
+    return 0;
+}
+
+#
 # Class method to see if an experiment has any active trunks. If it does,
 # do not optimize vlan setup/teardown (see above function) when doing a
 # swapmod. Too difficult to deal with right now; the problem is that the
@@ -2495,6 +2553,42 @@ sub RecordVLanDeletion($$)
     my ($class, $id) = @_;
 
     DBQueryWarn("delete from vlans where id='$id'")
+	or return -1;
+
+    return 0;
+}
+
+sub RecordVLanModification($$$$)
+{
+    my ($class, $lanid, $added, $removed) = @_;
+
+    my $query_result =
+	DBQueryWarn("select members from vlans where id='$lanid'");
+
+    return -1
+	if (!$query_result);
+    my ($current) = $query_result->fetchrow_array();
+    my %current   = map { $_ => $_ } split(/\s+/, $current);
+
+    if ($added) {
+	foreach my $port (@$added) {
+	    my ($nodeid,$iface) = ($port =~ /(.+):(.+)/);
+
+	    $current{"$nodeid:$iface"} = "$nodeid:$iface";
+	}
+    }
+    if ($removed) {
+	foreach my $port (@$removed) {
+	    my ($nodeid,$iface) = ($port =~ /(.+):(.+)/);
+	    
+	    delete($current{"$nodeid:$iface"})
+		if (exists($current{"$nodeid:$iface"}));
+	}
+    }
+    my $members = join(" ", keys(%current));
+    
+    DBQueryWarn("update vlans set members='$members' ".
+		"where id='$lanid'")
 	or return -1;
 
     return 0;
