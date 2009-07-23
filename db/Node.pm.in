@@ -1259,12 +1259,16 @@ sub ReleaseSharedBandwidth($)
     DBQueryWarn("lock tables vinterfaces write, interface_state write")
 	or return -1;
 
+    #
+    # A negative BW is not reserved yet.
+    #
     if (!DBQueryWarn("update interface_state,vinterfaces set ".
 		     "     remaining_bandwidth=remaining_bandwidth+bandwidth ".
 		     "where interface_state.node_id=vinterfaces.node_id and ".
 		     "      interface_state.iface=vinterfaces.iface and ".
 		     "      vinterfaces.vnode_id='$node_id' and ".
-		     "      vinterfaces.iface is not null")) {
+		     "      vinterfaces.iface is not null and ".
+		     "      vinterfaces.bandwidth>0")) {
 	DBQueryWarn("unlock tables");
 	return -1;
     }
