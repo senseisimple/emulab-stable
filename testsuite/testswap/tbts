@@ -1,30 +1,26 @@
 #!/usr/bin/perl
-#add lib directory to library search path
+BEGIN {
+  #add localcpan path to library search path
+  if (-f glob("~/lib/perl5/Test/Harness.pm")) {
+    my $localcpan_path = glob('~/lib/perl5');
+    my $p5l = $ENV{PERL5LIB};
+    unless ( (defined $p5l) && ($p5l =~ /$localcpan_path/)) {
+      my $sep = (defined $p5l) ? ":" : "";
+      $ENV { PERL5LIB} .= "$sep" . " $localcpan_path";
+      push @INC, $localcpan_path;
+    }
+  }
+  $ENV{PERL5LIB} .= ":tests";
+  push @INC,"/Users/grahamellis/jan06";
+}
+
 use lib qw(lib tests);
 use SemiModern::Perl;
-
-
-#add localcpan path to library search path
-if (-f glob("~/lib/perl5/Test/Harness.pm")) {
-  my $localcpan_path = glob('~/lib/perl5');
-  my $p5l = $ENV{PERL5LIB};
-  unless ( (defined $p5l) && ($p5l =~ /$localcpan_path/)) {
-    my $sep = (defined $p5l) ? ":" : "";
-    $ENV { PERL5LIB} .= "$sep" . " $localcpan_path";
-  }
-}
-#add tests directory to library search path
-$ENV{PERL5LIB} .= ":tests";
-
 use Data::Dumper;
+use TBConfig;
 
 {
   use Getopt::Long;
-  my $pjobs   = 1;
-  my $timing;
-  my $verbose;
-
-  my $logging = 0;
   my $debug;
   my $project;
   my $group;
@@ -35,36 +31,36 @@ use Data::Dumper;
   my $concurrent_node_usage;
   my $exclude_steps;
   my $single;
+  my $dontkill;
+  my $alreadyalive;
+  my $daemonize;
   my $result = GetOptions (
-      "d|debug"     => \$debug,
-      "define=s%"   => \$cmdline_defines,
-      "jobs=i"      => \$pjobs,
-      "logging=i"   => \$logging,
-      "timing"      => \$timing,
-      "verbose"     => \$verbose,
-      "project=s"   => \$project,
-      "xmlrpcurl=s" => \$xmlrpcurl,
-      "group=s"     => \$group,
-      "cprj=i"      => \$concurrent_prerun_jobs,
-      "cnu=i"       => \$concurrent_node_usage,
-      "exsteps=s"   => \$exclude_steps,
-      "single=s"   => \$single,
+      "d|debug"        => \$debug,
+      "define=s%"      => \$cmdline_defines,
+      "project=s"      => \$project,
+      "xmlrpcurl=s"    => \$xmlrpcurl,
+      "group=s"        => \$group,
+      "cprj=i"         => \$concurrent_prerun_jobs,
+      "cnu=i"          => \$concurrent_node_usage,
+      "excludesteps=s" => \$exclude_steps,
+      "single=s"       => \$single,
+      "dontkill"       => \$dontkill,
+      "alreadyalive"   => \$alreadyalive,
+      "daemonize"      => \$daemonize,
     );
-
-  if ($pjobs > 1) { $ENV { 'HARNESS_OPTIONS' } = "j$pjobs"; }
-  if ($timing)    { $ENV { 'HARNESS_TIMER'   } = 1; }
-  if ($verbose)   { $ENV { 'HARNESS_VERBOSE' } = 1; $ENV { 'HARNESS_COLOR' } = 1; }
 
   if ($debug)     { $ENV { 'TBTS_DEBUG'      } = 1          ; $TBConfig::DEBUG_XML_CLIENT = 1       ; }
   if ($group)     { $ENV { 'TBTS_GROUP'      } = $group     ; $TBConfig::DEFAULT_GID = $group       ; }
   if ($project)   { $ENV { 'TBTS_PROJECT'    } = $project   ; $TBConfig::DEFAULT_PID = $project     ; }
   if ($xmlrpcurl) { $ENV { 'TBTS_XMLRPC_URL' } = $xmlrpcurl ; $TBConfig::XMLRPC_SERVER = $xmlrpcurl ; }
-  use TBConfig;
   if ($concurrent_prerun_jobs) { $TBConfig::concurrent_prerun_jobs = $concurrent_prerun_jobs; }
-  if ($concurrent_node_usage) { $TBConfig::concurrent_node_usage = $concurrent_node_usage; }
-  if ($cmdline_defines) { $TBConfig::cmdline_defines = $cmdline_defines; }
-  if ($exclude_steps) { $TBConfig::exclude_steps = [split(/ /, $exclude_steps)]; }
-  if ($single) { $TBConfig::single = $single; }
+  if ($concurrent_node_usage)  { $TBConfig::concurrent_node_usage = $concurrent_node_usage; }
+  if ($cmdline_defines)        { $TBConfig::cmdline_defines = $cmdline_defines; }
+  if ($exclude_steps)          { $TBConfig::exclude_steps = [split(/ /, $exclude_steps)]; }
+  if ($single)                 { $TBConfig::single = $single; }
+  if ($dontkill)               { $TBConfig::exclude_steps = [qw/swapout end/]}
+  if ($alreadyalive)           { $TBConfig::exclude_steps = [qw/create swapin swapout end/]}
+  if ($daemonize)              { Tools::daemonize; }
 }
 
 sub usage {
@@ -75,11 +71,6 @@ sub usage {
   use File::Find;
   find(\&scandir_t, 't');
   find(\&scandir_tests, 'tests');
-=pod old options
-        -j --jobs=i    parallel jobs
-        -t --timing
-        -v --verbose
-=cut
   print <<"USAGE";
 TestBed TestSwap
 ./tbts OPTIONS TESTSUITE|TESTFILE
@@ -90,9 +81,11 @@ TestBed TestSwap
         --define OS=FBSD410-UPDATE
         --cprj=4  => \$concurrent_prerun_jobs,
         --cnu=20  => \$concurrent_node_usage,
-        --exsteps "swapout end"
-        --exsteps "create swapin swapout end"
-        --exsteps "run"
+        --dontkill => --excludesteps "swapout end"
+        --alreadylive => --excludesteps "create swapin swapout end"
+        --excludesteps "swapout end"
+        --excludesteps "create swapin swapout end"
+        --daemonize
 
     TESTSUITES:
         test     - all topology tests
@@ -125,10 +118,10 @@ if (@ARGV) {
   }
   elsif (/critic/)          { exec 'perlcritic lib t'; }
   elsif (/sanity/)          { runharness( qw(t/lib/*.t t/lib/*/*.t t/xmlrpc/*.t) ); }
-  elsif (/lib/)             { runharness qw(t/lib/*.t t/lib/*/*.t); }
-  elsif (/xmlrpc/)          { runharness qw(t/xmlrpc/*.t); }
-  elsif (/test/)            { runharness qw(t/topologies/*.t); }
-  elsif (/coding/)          { runharness qw(t/coding/pod_coverage.t); }
+  elsif (/lib/)             { runharness( qw(t/lib/*.t t/lib/*/*.t) ); }
+  elsif (/xmlrpc/)          { runharness( qw(t/xmlrpc/*.t) ); }
+  elsif (/test/)            { runharness( qw(t/topologies/*.t) ); }
+  elsif (/coding/)          { runharness( qw(t/coding/pod_coverage.t) ); }
 }
 else {
   print usage();

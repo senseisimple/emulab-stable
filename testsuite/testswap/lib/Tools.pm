@@ -1,6 +1,7 @@
 package Tools;
 use SemiModern::Perl;
 use Log::Log4perl qw(get_logger :levels);
+use POSIX qw(setsid);
 #use Log::Log4perl::Appender::Screen
 #use Log::Log4perl::Appender::ScreenColoredLevels
 #use Log::Log4perl::Appender::File
@@ -218,6 +219,21 @@ sub splat_to_temp {
   print $tmp $data;
   close $tmp;
   return $tmp;
+}
+
+sub ForkOrDie {
+  my $pid;
+  return $pid if (defined($pid = fork));
+  die "Fork failed: $!";
+}
+
+sub daemonize {
+  exit if ForkOrDie;
+  die "Cannot detach from controlling Terminal" unless POSIX::setsid;
+  exit if ForkOrDie;
+  open(STDIN,  "+>/dev/null");
+  open(STDOUT, "+>", "stdout.$$");
+  open(STDERR, "+>", "stderr.$$");
 }
 
 =back

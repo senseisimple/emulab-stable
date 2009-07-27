@@ -37,9 +37,12 @@ sub retry_on_TIMEOUT(&$) {
 RETRY: 
   { 
     my $result = eval { $sub->(); };
-    if ($@ && $@ =~ /SSL_SOCKET_TIMEOUT/) {
-      warn "SSL_SOCKET_TIMEOUT after $TBConfig::XMLRPC_SERVER_TIMEOUT seconds in $message";
-      redo RETRY;
+    if ($@) {
+      if ($@ =~ /SSL_SOCKET_TIMEOUT/) {
+        warn "SSL_SOCKET_TIMEOUT after $TBConfig::XMLRPC_SERVER_TIMEOUT seconds in $message";
+        redo RETRY;
+      }
+      else { die $@; }
     }
     $result;
   }
@@ -51,7 +54,7 @@ sub getlist_brief  { shift->augment( 'format' => 'brief'); }
 sub getlist_full   { shift->augment( 'format' => 'full' ); }
 sub batchexp_ns    { shift->augment_code( 'nsfilestr' => shift, 'noswapin' =>1, noemail, 'extrainfo' => 1, @_ ); }
 sub modify_ns      { shift->augment_code( 'nsfilestr' => shift, 'noswapin' =>1, noemail, 'extrainfo' => 1, @_ ); }
-sub swapin         { shift->augment_func_code( 'swapexp', noemail, 'direction' => 'in', 'extrainfo' => 1, @_ ); }
+sub swapin         { my $e = shift; retry_on_TIMEOUT { $e->augment_func_code( 'swapexp', noemail, 'direction' => 'in', 'extrainfo' => 1, @_ ) } 'swapin'; }
 sub swapout        { shift->augment_func_code( 'swapexp', noemail, 'direction' => 'out','extrainfo' => 1, @_ ); }
 sub end            { shift->augment_func_code( 'endexp', noemail); }
 sub end_wait       { shift->augment_func_code( 'endexp', noemail, 'wait' => 1); }
