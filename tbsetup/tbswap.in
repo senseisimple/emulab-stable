@@ -195,7 +195,7 @@ my $experiment = Experiment->Lookup($pid, $eid);
 if (!defined($experiment)) {
     tbdie("Could not lookup experiment object!")
 }
-my $special = ($pid eq "testbed" || $pid eq "tbres" || $pid eq "emulab_ops");
+my $special = ($pid eq "testbed" || $pid eq "tbres" || $pid eq "emulab-ops");
 
 #
 # Print starting message.
