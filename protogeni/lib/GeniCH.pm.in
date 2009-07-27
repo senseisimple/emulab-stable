@@ -60,8 +60,6 @@ sub GetCredential($)
     my $caller_uuid = $ENV{'GENIUUID'};
     my $caller_authority = GeniAuthority->Lookup($ENV{'GENIUUID'});
     if (!defined($caller_authority)) {
-	print STDERR "GetCredential()\n";
-	
         if (!defined($gid)) {
 	    return GeniResponse->Create(GENIRESPONSE_REFUSED,
 					undef, "Who are You?");
@@ -79,6 +77,8 @@ sub GetCredential($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not parse certificate")
 	    if (!defined($certificate));
+
+	print STDERR "GetCredential(): " . $certificate->DN() . "\n";
 
 	if (! ($certificate->uuid() =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/)) {
 	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
@@ -182,6 +182,8 @@ sub Resolve($)
 	    if (!defined($result));
 	my ($translated) = $result->fetchrow_array() =~ /^([-\w]+)\..*/;
 
+#	print STDERR "$auth, $t, $id, $translated\n";
+
 	$type = $t;
 	$type = "Component"
 	    if ($type eq "node");
@@ -223,7 +225,7 @@ sub Resolve($)
 	print STDERR "Could not find local authority object\n";
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
-    if (0 && $credential->target_uuid() ne $authority->uuid()) {
+    if ($credential->target_uuid() ne $authority->uuid()) {
 	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN,
 				    undef, "This is not your registry!");
     }
