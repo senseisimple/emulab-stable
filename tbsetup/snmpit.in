@@ -1567,6 +1567,25 @@ sub syncVlansFromTables($$) {
 
 	    if (!$impotent) {
 		foreach my $vlanid (@existant_vlans) {
+		    my @curports   = getExperimentVlanPorts($vlanid);
+		    my @trunkports = ();
+
+		    foreach my $port (@curports) {
+			if (exists($currentTrunks{$port})) {
+			    push(@trunkports, $port);
+			}
+		    }
+		    if (@trunkports) {
+			$stack->removeSomePortsFromTrunk($vlanid, @trunkports)
+			    or goto bad;
+
+			# Convert the ports to node:iface for the next call.
+			@trunkports = map { portiface($_) } @trunkports;
+
+			VLan->RecordVLanModification($vlanid,
+						     undef, \@trunkports)
+			    == 0 or goto bad;
+		    }
 		    if (!$stack->removeVlan($vlanid)) {
 			print STDERR "Could not remove vlan: $vlanid\n";
 			goto bad;
