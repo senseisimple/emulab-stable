@@ -1331,11 +1331,10 @@ sub get_iface {
 sub get_ifacebw {
     ($node,$card,$port,$protocol) = @_;
     if (defined($interfacetypes{"$node:$card:$port"})) {
-	return $interfacespeeds{$interfacetypes{"$node:$card:$port"}}{$protocol};
+	my $bw = $interfacespeeds{$interfacetypes{"$node:$card:$port"}}{$protocol};
+	return $bw if defined( $bw );
     }
-    else {
-	return $default_switchport_speed;
-    }
+    return $default_switchport_speed;
 }
 
 sub get_ifaceswitch {

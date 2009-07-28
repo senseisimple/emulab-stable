@@ -82,11 +82,6 @@ sub Map($)
 	$ad = uncompress( decode_base64( $ad->value ) );
     }
 
-    # Temporary ugly hack: ptopgen occasionally spits out invalid
-    # bandwidth elements.  We'll patch them up by hand until ptopgen
-    # is fixed...
-    $ad =~ s{<bandwidth></bandwidth>}{<bandwidth>100000</bandwidth>}g;
-
     #
     # Use assign in xml mode to spit back an xml file. 
     #
