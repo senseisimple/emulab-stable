@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -443,6 +443,7 @@ Node instproc set_fixed {pnode} {
     $self instvar topo
     $self instvar fixed
     $self instvar issubnode
+    $self instvar isvirt
 
     if { [Node info instances $pnode] != {} } {
         # $pnode is an object instance of class Node
@@ -456,7 +457,7 @@ Node instproc set_fixed {pnode} {
     }
     set fixed $pnode
 
-    if {[info exists physnodes($pnode)]} {
+    if {$isvirt == 0 && [info exists physnodes($pnode)]} {
 	set type $physnodes($pnode)
 	
 	if {$topo != ""} {
