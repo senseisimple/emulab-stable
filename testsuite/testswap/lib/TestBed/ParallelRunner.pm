@@ -53,7 +53,7 @@ sub runtests {
   #add taskss to scheduler step
   my $total_test_count = 0;
   for (@{$result->successes}) {
-    my $executor = $s->executor($_->itemId);
+    my $executor = $s->executor($_->itemid);
     my $maximum_nodes = $_->result->{'maximum_nodes'};
     my $eid = $executor->e->eid;
 
@@ -76,7 +76,7 @@ sub runtests {
   USE_TESTBULDER_POSTAMBLE: {
     $total_test_count = 0;
     for (@{$result->successes}) {
-      my $executor = $s->executor($_->itemId);
+      my $executor = $s->executor($_->itemid);
       $total_test_count += $executor->test_count;
     }
     TestBed::TestBuilderWrapper::set_test_builder_to_end_state($total_test_count);

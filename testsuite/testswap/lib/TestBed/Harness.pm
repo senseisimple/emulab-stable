@@ -31,7 +31,7 @@ use TestBed::ParallelRunner;
 
 sub build_TAP_stream {
   use TestBed::TestSuite;
-  my ($in, $out, $err, $pid) = TestBed::ForkFramework::fork_child_redir(sub { TestBed::ParallelRunner::GlobalRunner->runtests; });
+  my ($in, $out, $err, $pid) = TestBed::ForkFramework::fork_child_redir(sub { $TestBed::ParallelRunner::GlobalRunner->runtests; });
   return TAP::Parser::Iterator::StdOutErr->new($out, $err, $pid);
 }
 

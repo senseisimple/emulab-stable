@@ -23,7 +23,7 @@ our @EXPORT = qw(e CartProd CartProdRunner concretize defaults override rege pru
 
 sub e { TestBed::TestSuite::Experiment::build_e(@_); }
 
-sub rege { TestBed::ParallelRunner::GlobalRunner->build_executor(@_); }
+sub rege { $TestBed::ParallelRunner::GlobalRunner->build_executor(@_); }
 
 sub CartProd {
   my $config = shift;
