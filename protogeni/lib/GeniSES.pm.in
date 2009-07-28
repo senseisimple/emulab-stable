@@ -44,6 +44,18 @@ my $PGENIDOMAIN    = "@PROTOGENI_DOMAIN@";
 my $HAVE_XERCES    = "@HAVE_XERCES@";
 my $ASSIGN	   = "$TB/libexec/assign";
 
+my $API_VERSION = 1;
+
+#
+# Tell the client what API revision we support.  The correspondence
+# between revision numbers and API features is to be specified elsewhere.
+# No credentials are required.
+#
+sub GetVersion()
+{
+    return GeniResponse->Create( GENIRESPONSE_SUCCESS, $API_VERSION );
+}
+
 #
 # Map a virtual topology onto (a subset of) an advertised physical
 # topology.

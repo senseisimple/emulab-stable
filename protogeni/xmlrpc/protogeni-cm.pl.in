@@ -128,6 +128,7 @@ LogStart(0, undef, LIBAUDIT_LOGTBOPS());
 Genixmlrpc->SetContext(Genixmlrpc->Context($certificate));
 
 my $responder = Frontier::Responder->new( "methods" => {
+    "GetVersion"        => \&GeniCM::GetVersion,
     "Resolve"	        => \&GeniCM::Resolve,
     "DiscoverResources" => \&GeniCM::DiscoverResources,
     "GetTicket"         => \&GeniCM::GetTicket,

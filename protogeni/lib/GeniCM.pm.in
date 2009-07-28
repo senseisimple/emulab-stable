@@ -79,6 +79,18 @@ my $SNMPIT         = "$TB/bin/snmpit";
 my $PRERENDER      = "$TB/libexec/vis/prerender";
 my $EMULAB_PEMFILE = "@prefix@/etc/genicm.pem";
 
+my $API_VERSION = 1;
+
+#
+# Tell the client what API revision we support.  The correspondence
+# between revision numbers and API features is to be specified elsewhere.
+# No credentials are required.
+#
+sub GetVersion()
+{
+    return GeniResponse->Create( GENIRESPONSE_SUCCESS, $API_VERSION );
+}
+
 # Look up a node by an identifier of unspecified type (perhaps a URN, an
 # (obsolete) UUID, or an old-style HRN.  Ultimately, all IDs should be
 # URNs and this mess will go away, but for now we try not to make

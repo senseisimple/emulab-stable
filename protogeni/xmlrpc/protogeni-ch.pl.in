@@ -118,6 +118,7 @@ if (!defined($request)) {
 LogStart(0, undef, LIBAUDIT_LOGTBOPS());
 
 my $responder = Frontier::Responder->new( "methods" => {
+    "GetVersion"            => \&GeniCH::GetVersion,
     "GetCredential"         => \&GeniCH::GetCredential,
     "Resolve"               => \&GeniCH::Resolve,
     "Register"              => \&GeniCH::Register,
