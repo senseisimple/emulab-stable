@@ -56,6 +56,10 @@ sub traceroute_ok {
   ok(traceroute(@_), "traceroute $src to $dest");
 }
 
+=item C<traceroute_ok($src, $dest, ['hop1_host', 'hop2_host', ...])>
+
+calls traceroute and ok if successfull
+
 =back
 
 =cut

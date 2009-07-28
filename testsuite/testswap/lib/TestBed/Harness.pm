@@ -1,9 +1,39 @@
+package TAP::Parser::Iterator::StdOutErr;
+use strict;
+use warnings;
+use vars qw($VERSION @ISA);
+
+use TAP::Parser::Iterator::Process ();
+use IO::Select;
+
+@ISA = 'TAP::Parser::Iterator::Process';
+
+sub _initialize {
+    my $self = shift;
+    $self->{out}        = shift || die "Need out";
+    $self->{err}        = shift || die "Need err";
+    $self->{sel}        = IO::Select->new( $self->{out}, $self->{err} );
+    $self->{pid}        = shift || die "Need pid";
+    $self->{exit}       = undef;
+    $self->{chunk_size} = 65536;
+    return $self;
+}
+
+package TestBed::Harness;
 use SemiModern::Perl;
 use TAP::Harness;
 require Exporter;
 our @ISA = qw(Exporter TAP::Harness);
 our @EXPORT = qw(runharness);
 use TestBed::TestSuite;
+use TestBed::ForkFramework;
+use TestBed::ParallelRunner;
+
+sub build_TAP_stream {
+  use TestBed::TestSuite;
+  my ($in, $out, $err, $pid) = TestBed::ForkFramework::fork_child_redir(sub { TestBed::ParallelRunner::GlobalRunner->runtests; });
+  return TAP::Parser::Iterator::StdOutErr->new($out, $err, $pid);
+}
 
 sub parser_args_callback {
   my $args = shift;
@@ -11,7 +41,7 @@ sub parser_args_callback {
   
   if (ref $ref and $ref->isa('TestBed::ParallelRunner')) {
     delete $args->{source};
-    $args->{'stream'} = $ref->build_TAP_stream;
+    $args->{'stream'} = build_TAP_stream;
   }
   $args;
 }
@@ -44,11 +74,16 @@ sub runharness {
   $harness->runtests(@$ts);
 }
 
+
 =head1 NAME
 
 TestBed::Harness
 
 =over 4
+
+=item C<< build_TAP_stream >>
+
+given a TestBed::ParallelRunner returns a TAP stream
 
 =item C<< runharness(@test_file_names) >>
 

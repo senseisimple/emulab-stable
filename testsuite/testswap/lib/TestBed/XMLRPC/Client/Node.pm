@@ -73,7 +73,7 @@ given a list of nodeshashes return nodehashes for nodes that are free
 
 returns a list of free node names that meet criteria of params => values
 
-=item C<get_free_names($qrt, )>
+=item C<get_free_node_names($qrt, )>
 
 returns a list of at least $qty free node names that meet criteria of params => values
 

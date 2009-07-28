@@ -82,7 +82,7 @@ TestBed TestSwap
         --cprj=4  => \$concurrent_prerun_jobs,
         --cnu=20  => \$concurrent_node_usage,
         --dontkill => --excludesteps "swapout end"
-        --alreadylive => --excludesteps "create swapin swapout end"
+        --alreadyalive => --excludesteps "create swapin swapout end"
         --excludesteps "swapout end"
         --excludesteps "create swapin swapout end"
         --daemonize
@@ -109,13 +109,6 @@ if (@ARGV) {
   if (/.*\.t$/ || /.*\.pm$/) { runharness(@ARGV); }
   elsif ($_ eq 'podc')      { system 'for x in `find lib -iname "*.pm"`; do podchecker $x 2>&1 |grep contain; done; '; }
   elsif ($_ eq 'pode')      { system 'for x in `find lib -iname "*.pm"`; do podchecker $x 2>&1 |grep ERROR; done;'; }
-  elsif ($_ eq 'pode')      {
-    eval "use Pod::Coverage;";
-    unless ($@) {
-      my $pc = Pod::Coverage->new(package => 'Pod::Coverage');
-      print "We rock!" if $pc->coverage == 1;
-    }
-  }
   elsif (/critic/)          { exec 'perlcritic lib t'; }
   elsif (/sanity/)          { runharness( qw(t/lib/*.t t/lib/*/*.t t/xmlrpc/*.t) ); }
   elsif (/lib/)             { runharness( qw(t/lib/*.t t/lib/*/*.t) ); }

@@ -54,12 +54,12 @@ sub getlist_brief  { shift->augment( 'format' => 'brief'); }
 sub getlist_full   { shift->augment( 'format' => 'full' ); }
 sub batchexp_ns    { shift->augment_code( 'nsfilestr' => shift, 'noswapin' =>1, noemail, 'extrainfo' => 1, @_ ); }
 sub modify_ns      { shift->augment_code( 'nsfilestr' => shift, 'noswapin' =>1, noemail, 'extrainfo' => 1, @_ ); }
-sub swapin         { my $e = shift; retry_on_TIMEOUT { $e->augment_func_code( 'swapexp', noemail, 'direction' => 'in', 'extrainfo' => 1, @_ ) } 'swapin'; }
+sub swapin         { my $e = shift; my @args = @_; retry_on_TIMEOUT { $e->augment_func_code( 'swapexp', noemail, 'direction' => 'in', 'extrainfo' => 1, @args ) } 'swapin'; }
 sub swapout        { shift->augment_func_code( 'swapexp', noemail, 'direction' => 'out','extrainfo' => 1, @_ ); }
 sub end            { shift->augment_func_code( 'endexp', noemail); }
 sub end_wait       { shift->augment_func_code( 'endexp', noemail, 'wait' => 1); }
 sub fqnodenames    { parseNodeInfo(shift->nodeinfo); }
-sub waitforactive  { my $e = shift; retry_on_TIMEOUT { $e->augment_func_code('waitforactive', @_) } 'waitforactive'; }
+sub waitforactive  { my $e = shift; my @args = @_; retry_on_TIMEOUT { $e->augment_func_code('waitforactive', @args) } 'waitforactive'; }
 sub waitforswapped { my $e = shift; retry_on_TIMEOUT { $e->augment_func_code( 'statewait', 'state' => 'swapped' ) } 'waitforswapped'; }
 sub waitforended   { my $e = shift; retry_on_TIMEOUT { $e->augment_func_code( 'statewait', 'state' => 'ended' ) } 'waitforended'; }
 sub startexp_ns    { batchexp_ns(@_, 'batch' => 0); }

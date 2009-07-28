@@ -4,7 +4,7 @@ use Mouse;
   has original => ( is => 'rw');
 no Mouse;
 
-package TestBed::ParallelRunner::Executor::PrepError;
+package TestBed::ParallelRunner::Executor::PrerunError;
 use Mouse;
   extends('TestBed::ParallelRunner::Executor::Exception');
 no Mouse;
@@ -93,17 +93,17 @@ sub handleResult {
   $s->error_strategy->handleResult( @_); 
 }
 
-sub prep {
+sub prerun{
   my $s = shift;
-  if (checkno('create')) {
+  if (checkexclude('create')) {
     return +{'maximum_nodes' => 0};
   }
   my $r = eval { $s->e->create_and_get_metadata($s->ns_text); };
-  die TestBed::ParallelRunner::Executor::PrepError->new( original => $@ ) if $@;
+  die TestBed::ParallelRunner::Executor::PrerunError->new( original => $@ ) if $@;
   return $r;
 }
 
-sub checkno {
+sub checkexclude {
   my $stage = shift;
   return grep { $_ eq $stage } @{ $TBConfig::exclude_steps };
 }
@@ -115,18 +115,18 @@ sub execute {
   my $run_exception;
   my $swapout_exception;
 
-  eval { $e->swapin_wait; } unless checkno('swapin');
+  eval { $e->swapin_wait; } unless checkexclude('swapin');
   my $swapin_exception = $@;
 
   unless ($swapin_exception) {
-    eval { $s->proc->($e); } unless checkno('run');
+    eval { $s->proc->($e); } unless checkexclude('run');
     $run_exception = $@;
 
-    eval { $e->swapout_wait; } unless checkno('swapout');
+    eval { $e->swapout_wait; } unless checkexclude('swapout');
     $swapout_exception = $@;
   }
 
-  eval { $e->end_wait; } unless checkno('end');
+  eval { $e->end_wait; } unless checkexclude('end');
   my $end_exception = $@;
 
   die TestBed::ParallelRunner::Executor::SwapinError->new( original => $@ ) if $swapin_exception;
@@ -149,7 +149,15 @@ Represents a ParallelRunner Job
 
 constructs a TestBed::ParallelRunner::Test job
 
-=item C<< $prt->prep >>
+=item C<< checkexclude($stage_name) >>
+
+checks if $stage_name is in $TBConfig::exclude_steps
+
+=item C<< $prt->ns_text >>
+
+checks if ns_text is a CODE reference, is so execute it otherwise return ns_text
+
+=item C<< $prt->prerun >>
 
 executes the pre_running phase of experiment and determines min and max node counts.
 

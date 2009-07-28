@@ -445,7 +445,9 @@ sub return_and_report {
 sub handleItemResult { 
   my ($s, $result) = @_;
   my $executor = $s->tasks->[$result->itemid]->item;
-  $result->name($executor->e->eid);
+  if ($executor->can('e') and $executor->e) {
+    $result->name($executor->e->eid);
+  }
   if ($executor->can('handleResult')) {
     my $rc = $executor->handleResult($s, $result);
     if ($rc == RETURN_AND_REPORT) { $s->return_and_report($result) }

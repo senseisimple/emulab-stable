@@ -2,6 +2,7 @@
 package TestBed::TestSuite::Experiment;
 use SemiModern::Perl;
 use Mouse;
+use TBConfig;
 use TestBed::XMLRPC::Client::Experiment;
 use TestBed::Wrap::tevc;
 use TestBed::Wrap::linktest;
@@ -23,6 +24,24 @@ TestBed::TestSuite::Experiment
 framwork class for starting and testing experiments
 
 =over 4
+
+=item C<< build_e(...) >>
+
+builds a TestBed::TestSuite::Experiment given either
+()
+($eid)
+($pid, $eid)
+($pid, $gid, $eid)
+=cut
+sub build_e {
+  my $args;
+  if (@_ == 0) { $args = {}; }
+  if (@_ == 1) { $args = { 'eid' => shift }; }
+  if (@_ == 2) { $args = { 'pid' => shift, 'eid' => shift }; }
+  if (@_ == 3) { $args = { 'pid' => shift, 'gid' => shift, 'eid' => shift }; }
+  if (@_ >  3) { die 'Too many args to e'; }
+  TestBed::TestSuite::Experiment->new(%$args);
+}
 
 =item C<< $e->resolve($nodename) >>
 
@@ -100,6 +119,10 @@ sub ping_test {
   }
 }
 
+=item C<< $e->wait_for_nodes_to_activate($timeout, @nodes) >>
+
+waits until $timeout for @nodes to respond to ping
+=cut
 sub wait_for_nodes_to_activate {
   my ($e, $timeout) = (shift, shift);
   my $start = time;
@@ -111,12 +134,31 @@ sub wait_for_nodes_to_activate {
   }
 }
 
+=item C<< $e->traceroute >>
+
+run Tools::Network::traceroute
+=cut
 sub traceroute { 
   my ($e) = shift;
   my $src  = $e->resolve(shift);
   Tools::Network::traceroute($src, @_);
 }
 
+=item C<< $e->traceroute_ok >>
+
+run Tools::Network::traceroute_ok
+=cut
+sub traceroute_ok { 
+  my ($e) = shift;
+  my $src  = $e->resolve(shift);
+  Tools::Network::traceroute_ok($src, @_);
+}
+
+
+=item C<< $e->cartesian_ping() >>
+
+runs a nxn ping test across all nodes
+=cut
 sub cartesian_ping{
  my ($e) = shift;
  my @nodes = $e->nodenames();
@@ -124,11 +166,11 @@ sub cartesian_ping{
 
  my @work;
  for (@nodes){
-   my $node1 = $_;
+   my $src_node = $_;
    for (@hosts){
-     my $node2 = $_;
-     if ($node1 ne $node2){
-       push @work, sub{$e->ping_from_to($node1, $node2)};
+     my $dest_node = $_;
+     if ($src_node ne $dest_node){
+       push @work, sub{$e->ping_from_to($src_node, $dest_node)};
      }
    }
  }
@@ -136,19 +178,13 @@ sub cartesian_ping{
  TestBed::TestSuite::prun(@work);
 }
 
-sub ping_from_to($$$){
-        my ($e, $from, $to) = @_;
-        Tools::TBSSH::cmdcheckoutput($from, "'sh -c \"PATH=/bin:/usr/sbin:/usr/sbin:/sbin ping -c 5 $to\"'",
-        sub {
-                return 1;
-        });
-}
+=item C<< $e->ping_from_to($src, $dest) >>
 
-
-sub traceroute_ok { 
-  my ($e) = shift;
-  my $src  = $e->resolve(shift);
-  Tools::Network::traceroute_ok($src, @_);
+ssh to $src and ping $dest
+=cut
+sub ping_from_to {
+  my ($e, $from, $to) = @_;
+  Tools::TBSSH::cmdsuccess($from, "'sh -c \"PATH=/bin:/usr/sbin:/usr/sbin:/sbin ping -c 5 $to\"'", "ping from $from to $to");
 }
 
 =item C<< $e->single_node_tests() >>
@@ -196,15 +232,7 @@ sub tevc_at_host {
 runs tevc on ops for each cmdline produced by calling $proc on each $item.
 =cut
 sub parallel_tevc {
-  my ($e, $proc, $items) = @_;
-  my $result = TestBed::ForkFramework::ForEach::work(sub {
-    my @tevc_cmd = $proc->(@_);
-    TestBed::Wrap::tevc::tevc($e, @tevc_cmd);
-  }, $items);
-  if ($result->[0]) {
-    sayd($result->[2]);
-    die 'TestBed::ParallelRunner::runtests died during parallel_tevc';
-  }
+  parallel_tevc_at_host(shift, $TBConfig::OPS_SERVER, @_);
 }
 
 =item C<< $e->parallel_tevc_at_host($host, $proc, $items) >>
@@ -219,7 +247,7 @@ sub parallel_tevc_at_host {
   }, $items);
   if ($result->[0]) {
     sayd($result->[2]);
-    die 'TestBed::ParallelRunner::runtests died during parallel_tevc';
+    die 'TestBed::ForkFramework::ForEach::work died during parallel_tevc';
   }
 }
 

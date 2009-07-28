@@ -1,11 +1,13 @@
-ImageTest - Traffic Generation
+Bug Report sync
+Bug Report TempResourceError
+Fix Exector dies
+
 OldTests
 Cleanup SSH
 Retry Prep
 
 Painpoints
 =================================
-Teststeps  - don't run certian parts create, swapin, run, swapout, end, implemented for parallel tests
 Testlayout - Suites and  Tests
 Testoutput -
 
@@ -13,7 +15,6 @@ DOCS TODO
   backoff example
 
 TODO
-  TIMEOUT of XMLRPC Calls
   TESTLWP
   scp cleanup
   VERBOSENESS

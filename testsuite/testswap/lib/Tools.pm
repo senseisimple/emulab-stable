@@ -236,6 +236,14 @@ sub daemonize {
   open(STDERR, "+>", "stderr.$$");
 }
 
+=item C<ForkOrDie>
+
+dies if fork fails
+
+=item C<daemonize>
+
+daemonizes the process redirecting stdout and stderr to files
+
 =back
 
 =cut
