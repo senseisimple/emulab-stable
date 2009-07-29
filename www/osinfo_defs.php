@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007, 2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -290,6 +290,7 @@ class OSinfo
 	$max_concurrent = $this->max_concurrent();
 	$reboot_waittime= $this->reboot_waittime();
 	$uuid           = $this->uuid();
+	$ezid           = $this->ezid();
 
 	if (! ($creator_user = User::Lookup($creator))) {
 	    TBERROR("Error getting object for user $creator", 1);
@@ -410,6 +411,14 @@ class OSinfo
                         <td class=left>
                             <a href='showosinfo.php3?osid=$nextosid'>
                                             $nextosid</a></td>
+                      </tr>\n";
+	}
+	if ($ezid) {
+		echo "<tr>
+                        <td>Image Link: </td>
+                        <td class=left>
+                            <a href='showimageid.php3?imageid=$osid'>
+                                            $os_osname</a></td>
                       </tr>\n";
 	}
 
