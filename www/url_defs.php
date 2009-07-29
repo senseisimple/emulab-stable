@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006, 2007, 2008 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007, 2008, 2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -690,7 +690,7 @@ function ValidateArgument($name, $arg)
     case PAGEARG_EXPERIMENT:
     case PAGEARG_NODE:
     case PAGEARG_LOGFILE:
-	if (preg_match("/^[-\w]+$/", $arg)) {
+	if (preg_match("/^[-\w]+$/", "$arg")) {
 	    return 1;
 	}
 	PAGEARGERROR("Invalid argument for '$name': $arg");
@@ -700,7 +700,7 @@ function ValidateArgument($name, $arg)
     case PAGEARG_IMAGE:
     case PAGEARG_OSID:
     case PAGEARG_OSINFO:
-	if (preg_match("/^[-\w\.\+]+$/", $arg)) {
+	if (preg_match("/^[-\w\.\+]+$/", "$arg")) {
 	    return 1;
 	}
 	PAGEARGERROR("Invalid argument for '$name': $arg");
@@ -710,14 +710,14 @@ function ValidateArgument($name, $arg)
     case PAGEARG_GUID:
     case PAGEARG_VERS:
     case PAGEARG_INSTANCE:
-	if (preg_match("/^[\d]+$/", $arg)) {
+	if (preg_match("/^[\d]+$/", "$arg")) {
 	    return 1;
 	}
 	PAGEARGERROR("Invalid argument for '$name': $arg");
 	break;
 
     case PAGEARG_METADATA:
-	if (preg_match("/^[\d]+\/[\d]+$/", $arg)) {
+	if (preg_match("/^[\d]+\/[\d]+$/", "$arg")) {
 	    return 1;
 	}
 	PAGEARGERROR("Invalid argument for '$name': $arg");
