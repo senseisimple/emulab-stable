@@ -34,13 +34,34 @@ sub args {
 
 sub retry_on_TIMEOUT(&$) {
   my ($sub, $message) = @_;
+  my $retry_count = 0;
 RETRY: 
   { 
     my $result = eval { $sub->(); };
     if ($@) {
       if ($@ =~ /SSL_SOCKET_TIMEOUT/) {
         warn "SSL_SOCKET_TIMEOUT after $TBConfig::XMLRPC_SERVER_TIMEOUT seconds in $message";
+        $retry_count++;
         redo RETRY;
+      }
+      elsif ($retry_count > 0 and $@->isa('RPC::XML::struct') and $@->value->{'output'} =~ /\*\*\* swapexp: Experiment .* is not swapped out!/) {
+        return 1;         
+      }
+      else { die $@; }
+    }
+    $result;
+  }
+}
+
+sub succeed_on_TIMEOUT(&$) {
+  my ($sub, $message) = @_;
+RETRY: 
+  { 
+    my $result = eval { $sub->(); };
+    if ($@) {
+      if ($@ =~ /SSL_SOCKET_TIMEOUT/) {
+        warn "SSL_SOCKET_TIMEOUT after $TBConfig::XMLRPC_SERVER_TIMEOUT seconds in $message";
+        return 1;
       }
       else { die $@; }
     }
