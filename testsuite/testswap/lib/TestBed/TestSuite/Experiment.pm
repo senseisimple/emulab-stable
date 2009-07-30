@@ -427,6 +427,27 @@ trytest {
   } $e;
 }
 
+=item C<< $n->reboot >>
+
+=cut
+
+sub reboot {
+  my ($e) = shift;
+  my ($pid, $eid) = ($e->pid, $e->eid);
+  Tools::Network::node_reboot(@_ , "-e $pid.$eid");
+}
+
+=item C<< $n->powercycle >>
+
+=cut
+
+sub powercycle {
+  my ($e) = shift;
+  my ($pid, $eid) = ($e->pid, $e->eid);
+  Tools::Network::node_reboot('-f', "-e $pid.$eid");
+}
+
+
 =back
 
 =cut

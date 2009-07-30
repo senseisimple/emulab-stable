@@ -30,7 +30,7 @@ use TBConfig;
   my $concurrent_prerun_jobs;
   my $concurrent_node_usage;
   my $exclude_steps;
-  my $single;
+  my $runonly;
   my $dontkill;
   my $alreadyalive;
   my $daemonize;
@@ -43,7 +43,7 @@ use TBConfig;
       "cprj=i"         => \$concurrent_prerun_jobs,
       "cnu=i"          => \$concurrent_node_usage,
       "excludesteps=s" => \$exclude_steps,
-      "single=s"       => \$single,
+      "runonly=s"       => \$runonly,
       "dontkill"       => \$dontkill,
       "alreadyalive"   => \$alreadyalive,
       "daemonize"      => \$daemonize,
@@ -57,7 +57,7 @@ use TBConfig;
   if ($concurrent_node_usage)  { $TBConfig::concurrent_node_usage = $concurrent_node_usage; }
   if ($cmdline_defines)        { $TBConfig::cmdline_defines = $cmdline_defines; }
   if ($exclude_steps)          { $TBConfig::exclude_steps = [split(/ /, $exclude_steps)]; }
-  if ($single)                 { $TBConfig::single = $single; }
+  if ($runonly)                { $TBConfig::runonly = [split(/ /, $runonly)]; }
   if ($dontkill)               { $TBConfig::exclude_steps = [qw/swapout end/]}
   if ($alreadyalive)           { $TBConfig::exclude_steps = [qw/create swapin swapout end/]}
   if ($daemonize)              { Tools::daemonize; }

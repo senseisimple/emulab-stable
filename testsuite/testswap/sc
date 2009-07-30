@@ -6,6 +6,7 @@ use TestBed::TestSuite;
 use TestBed::XMLRPC::Client::Pretty;
 use Data::Dumper;
 use Tools;
+use Tools::Network;
 use TestBed::Wrap::tevc;
 
 #$TBConfig::DEBUG_XML_CLIENT = 1;
@@ -55,6 +56,7 @@ ShortCut
         it    // $e->info(aspect => 'traces'))
         il    // $e->info(aspect => 'links'))
         ex    execute arbitrary perl code
+        rn    // node_reboot pc137
 END
 }
 
@@ -93,6 +95,7 @@ if (@ARGV) {
   if (/endall/) { end_all_experiments; }
   elsif (/end/) { e($_)->end for(@ARGV); }
   elsif (/watchall/) { watchall; }
+  elsif (/rn/)  { (say Dumper(Tools::Network::node_reboot($_))) for @ARGV; }
   else {
     my $e = e(shift);
     if (/--help/) { usage; } 
@@ -111,6 +114,7 @@ if (@ARGV) {
     elsif (/ip/) { say Dumper($e->info(aspect => 'physical')) ;}
     elsif (/it/) { say Dumper($e->info(aspect => 'traces')) ;}
     elsif (/il/) { say Dumper($e->info(aspect => 'links')) ;}
+    elsif (/kk/) { say Dumper($e->node('node1')->reboot) ;}
     elsif ($_ eq 'syncs') { prun( map { my $n = $_; sub { $e->node('node1')->ssh->cmdoutput('/usr/testbed/bin/emulab-sync'); } } (1..shift)); }
     elsif (/watch/) { watch($e); }
     elsif ($_ eq'ex') { 

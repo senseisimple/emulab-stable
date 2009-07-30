@@ -1,38 +1,33 @@
-Bug Report sync
-Bug Report TempResourceError
-Fix Exector dies
-
+Fix Executor dies
+Fix Swapin timeout
 OldTests
-Cleanup SSH
-Retry Prep
+email
+Massive Run
+test daemonize
+
 
 Painpoints
 =================================
-Testlayout - Suites and  Tests
-Testoutput -
+Testlayout - Suites and  Tests, buildup, teardown using Test::Class
+Testoutput - TestBuilderWrapper
 
 DOCS TODO
   backoff example
 
 TODO
   TESTLWP
-  scp cleanup
-  VERBOSENESS
-  Add basic image-test parameterization examples
-  EXAMPLES, Get some tests
+  SSH SCP Cleanup
 
 STILL MESSY
   XMLRPC/Client/Experiment TestSuite/Experiment dsl
 
 EXPAND CURRENT IMPLEMENTATION
   event subsystem
-  Test::Builder support
 
 LATER
   Client.pm duplicate code elimination - Maybe this would make the code too unreadable
   test groupings
   Large External Tars and Resources for experiements
-  buildup, teardown using Test::Class
 
 Parallel TODOS
   clean up FFF, Roles, constructors

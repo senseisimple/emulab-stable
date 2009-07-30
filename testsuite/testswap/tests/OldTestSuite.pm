@@ -188,7 +188,8 @@ tb_run("tbend",0);
           'singlenode' => {
                             'info' => 'One node.
 ',
-                            'nsfile' => 'set ns [new Simulator]
+                            'nsfile' => 'source tb_compat.tcl
+set ns [new Simulator]
 set node [$ns node]
 $ns run
 
@@ -309,8 +310,8 @@ set router [$ns node]
 set client [$ns node]
 set server [$ns node]
 
-set client-lan [$ns make-lan "$send $router $client" 100Mb 1ms]
-set server-lan [$ns make-lan "$consume $server $router" 100Mb 1ms]
+set client-lan [$ns make-lan "$send $router $client" 100Mb 2ms]
+set server-lan [$ns make-lan "$consume $server $router" 100Mb 2ms]
 
 tb-set-node-startup $router /users/newbold/trafgen/fbsd-router-startup
 
@@ -601,8 +602,8 @@ tb_run("tbend",0);
 node0 to node3 is delayed.
 
 ',
-                       'nsfile' => 'set ns [new Simulator]
-
+                       'nsfile' => 'source tb_compat.tcl
+set ns [new Simulator]
 set node0 [$ns node]
 set node1 [$ns node]
 set node2 [$ns node]
@@ -610,11 +611,11 @@ set node3 [$ns node]
 set node4 [$ns node]
 set node5 [$ns node]
 
-set link0 [$ns duplex-link $node0 $node1 100Mb .1ms DropTail]
-set link1 [$ns duplex-link $node0 $node2 100Mb .1ms DropTail]
+set link0 [$ns duplex-link $node0 $node1 100Mb 2ms DropTail]
+set link1 [$ns duplex-link $node0 $node2 100Mb 2ms DropTail]
 set link2 [$ns duplex-link $node0 $node3 10Mb 100ms DropTail]
-set link3 [$ns duplex-link $node3 $node4 100Mb .1ms DropTail]
-set link4 [$ns duplex-link $node3 $node5 100Mb .1ms DropTail]
+set link3 [$ns duplex-link $node3 $node4 100Mb 2ms DropTail]
+set link4 [$ns duplex-link $node3 $node5 100Mb 2ms DropTail]
 
 # Turn on manual routing.
 $ns rtproto Manual
@@ -858,7 +859,7 @@ tb_run("tbswap out",0);
 tb_run("tbend",0);
 '
                      },
-          'set-ip' => {
+          'setip' => {
                         'info' => 'Sets up a basic topology and then tries out all the tb-set-ip commands.
 
 ',

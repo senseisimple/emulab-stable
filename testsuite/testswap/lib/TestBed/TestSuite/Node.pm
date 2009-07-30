@@ -20,8 +20,47 @@ TestBed::TestSuite::Node
 =cut
 
 sub ping {
-  my ($self) = @_;
-  Tools::Network::ping($self->name);
+  my ($s) = @_;
+  Tools::Network::ping($s->name);
+}
+
+=item C<< $n->reboot >>
+
+=cut
+
+sub reboot {
+  my ($s) = shift;
+  Tools::Network::node_reboot(@_, $s->pcXXX_name);
+}
+
+=item C<< $n->powercycle >>
+
+=cut
+
+sub powercycle {
+  my ($s) = shift;
+  Tools::Network::node_reboot('-f', $s->pcXXX_name);
+}
+
+=item C<< $n->hostname >>
+
+=cut
+
+sub hostname {
+  my ($s) = shift;
+  my $name = $s->name;
+  $name =~ /([^\.]*)/; 
+  $1;
+}
+
+=item C<< $n->pcXXX_name >>
+
+=cut
+
+sub pcXXX_name {
+  my ($s) = shift;
+  return $s->experiment->info(aspect => 'mapping')->{$s->hostname}->{node};
+  
 }
 
 =item C<< $n->single_node_tests >>
