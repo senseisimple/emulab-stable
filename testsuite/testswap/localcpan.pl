@@ -42,7 +42,7 @@ sub install_deps_from_cpan {
       Test::Exception
       Term::ReadKey
       );
-#      Test::Class
+#Test::Class
 #Crypt::SSLeay # required for SSL
 #Data::UUID requires user input
 #Net::Ping #tests fail, default installed version 2.31 is good enough
@@ -74,15 +74,27 @@ sub automate_ssh_install {
 }
 
 sub main {
+  if (!(grep {$_ eq '--override' } @ARGV) and -e glob("~/.cpan")) {
+    die "NOT installing local CPAN ~/.cpan exists, specify --override to ignore check";
+  }
+
+  print "WARNING installing local CPAN to '~/lib/perl5' -- type yes <ENTER> to continue\n";
+  my $response = <STDIN>;
+  chomp $response;
+  if ($response ne "yes") {
+    die "$response does not match yes";
+  }
+
   prep_local_cpan;
   $ENV{PERL5LIB} = glob('~/lib/perl5');
 
   if ($ARGV[0] && $ARGV[0] eq 'MI') {
-    automate_module_install;  #too complicated on FreeBSD
-    automate_ssh_install;     #too complicated on FreeBSD
+    automate_module_install;  #too complicated for fluxers on FreeBSD
+    automate_ssh_install;     #too complicated for fluxers on FreeBSD
   }
   else {
     install_deps_from_cpan;
   }
 }
-#main;
+
+main;

@@ -1,7 +1,5 @@
 OldTests
-email
 Massive Run
-test daemonize
 
 
 Painpoints
@@ -11,6 +9,7 @@ Testoutput - TestBuilderWrapper
 
 DOCS TODO
   backoff example
+  more prose docs
 
 TODO
   TESTLWP

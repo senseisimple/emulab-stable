@@ -221,28 +221,6 @@ sub splat_to_temp {
   return $tmp;
 }
 
-sub ForkOrDie {
-  my $pid;
-  return $pid if (defined($pid = fork));
-  die "Fork failed: $!";
-}
-
-sub daemonize {
-  exit if ForkOrDie;
-  die "Cannot detach from controlling Terminal" unless POSIX::setsid;
-  exit if ForkOrDie;
-  open(STDIN,  "+>/dev/null");
-  open(STDOUT, "+>", "stdout.$$");
-  open(STDERR, "+>", "stderr.$$");
-}
-
-=item C<ForkOrDie>
-
-dies if fork fails
-
-=item C<daemonize>
-
-daemonizes the process redirecting stdout and stderr to files
 
 =back
 

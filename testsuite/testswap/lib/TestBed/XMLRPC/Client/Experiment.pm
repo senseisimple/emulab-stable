@@ -315,6 +315,10 @@ B<INTERNAL>: generates expinfo subs
 
 B<INTERNAL>: catches socket timeout exceptions and rexecutes &sub after printing $message
 
+=item C<< succeed_on_TIMEOUT(&sub, $messag) >>
+
+B<INTERNAL>: catches socket timeout exceptions and returns success
+
 =back 
 
 =cut

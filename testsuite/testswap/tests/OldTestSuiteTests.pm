@@ -6,13 +6,9 @@ use Data::Dumper;
 use OldTestSuite;
 
 our @should_pass      = qw( basic cbr complete5 delaylan1 delaylink );
-our @who_knows_passed = qw( lan1 multilink );
-our @who_knows        = qw( ixp lan1 nodes singlenode trafgen simplelink simplex setip red ping );
+our @who_knows_passed = qw( multilink ixp lan1 nodes singlenode trafgen simplelink simplex setip red ping );
 our @should_fail      = qw( negprerun toomanylinks toofast );
 
-#cbr basic complete5 delaylan1 delaylink 
-#lan1 multilink 
-#ixp nodes singlenode trafgen simplelink simplex red ping 
 #negprerun toomanylinks toofast
 
 #unclassified
@@ -23,7 +19,7 @@ vtypes (may want to parameterize the vtypes)
 fixed (you will have to change the ns file depending on which nodes are available)
 =cut
 
-for (@who_knows) {
+for (@should_fail) {
   my $eid = $_;
   my $ns = $OldTestSuite::tests->{$_}->{'nsfile'};
   rege(e($_), $ns, sub { ok(!shift->ping_test, $eid); }, 1, $_)

@@ -9,16 +9,19 @@ BEGIN {
       $ENV { PERL5LIB} .= "$sep" . " $localcpan_path";
       push @INC, $localcpan_path;
     }
+    push @INC, $localcpan_path;
   }
   $ENV{PERL5LIB} .= ":tests";
-  push @INC,"/Users/grahamellis/jan06";
 }
 
 use lib qw(lib tests);
 use SemiModern::Perl;
 use Data::Dumper;
 use TBConfig;
+use TestBed::Daemonize;
 
+my $emailme;
+my $daemonize;
 {
   use Getopt::Long;
   my $debug;
@@ -47,6 +50,7 @@ use TBConfig;
       "dontkill"       => \$dontkill,
       "alreadyalive"   => \$alreadyalive,
       "daemonize"      => \$daemonize,
+      "emailme=s"      => \$emailme,
     );
 
   if ($debug)     { $ENV { 'TBTS_DEBUG'      } = 1          ; $TBConfig::DEBUG_XML_CLIENT = 1       ; }
@@ -60,7 +64,7 @@ use TBConfig;
   if ($runonly)                { $TBConfig::runonly = [split(/ /, $runonly)]; }
   if ($dontkill)               { $TBConfig::exclude_steps = [qw/swapout end/]}
   if ($alreadyalive)           { $TBConfig::exclude_steps = [qw/create swapin swapout end/]}
-  if ($daemonize)              { Tools::daemonize; }
+  if ($daemonize or $emailme)  { TestBed::Daemonize::daemonize; }
 }
 
 sub usage {
@@ -85,14 +89,16 @@ TestBed TestSwap
         --alreadyalive => --excludesteps "create swapin swapout end"
         --excludesteps "swapout end"
         --excludesteps "create swapin swapout end"
+        --runonly "testname1 testname2 testname3"
         --daemonize
+        --emailme user\@emulab.net
+        
 
     TESTSUITES:
         test     - all topology tests
         sanity   - all framework utility and xmlrpc client modules test
         lib      - all framework utility tests
         xmlrpc   - all xmlrpc client modules tests
-        
         critic   - runs perl critic on framework code
 
     TESTFILES:
@@ -117,6 +123,7 @@ if (@ARGV) {
   elsif (/coding/)          { runharness( qw(t/coding/pod_coverage.t) ); }
 }
 else {
-  print usage();
+  usage();
 }
 
+TestBed::Daemonize::email_daemonize_logs($emailme) if $emailme;

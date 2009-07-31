@@ -1,4 +1,11 @@
 #!/usr/bin/perl
+BEGIN {
+  #add localcpan path to library search path
+  if (-f glob("~/lib/perl5/Test/Harness.pm")) {
+    my $localcpan_path = glob('~/lib/perl5');
+    push @INC, $localcpan_path;
+  }
+}
 use lib 'lib';
 use SemiModern::Perl;
 use TBConfig;
