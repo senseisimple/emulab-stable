@@ -24,16 +24,23 @@ sub email {
   return $s;
 }
 
+sub attach_text {
+  use File::Basename;
+  my ($s, $fn) = @_;
+  my $bn = File::Basename::basename($fn) or undef;
+  return $s->attach(Tools::slurp($fn), name => $bn, filename => $bn, content_type => 'text/plain');
+} 
+
 sub email_daemonize_logs {
   my ($to) = @_;
   my $s = email;
   $s->from     ('TestSwap__dont_reply@emulab.net' )
     ->to       ($to )
     ->subject  ("TestSwap run $$")
-    ->text_body("TestSwap run $$")
-    ->attach_file("stdout.$$")
-    ->attach_file("stderr.$$")
-    ->send;
+    ->text_body("TestSwap run $$");
+  attach_text($s,"stdout.$$");
+  attach_text($s,"stderr.$$");
+  $s->send;
 }
 =pod
 
