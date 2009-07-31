@@ -103,7 +103,7 @@ else {
 	    }
 	    $hostname = $node->phys_nodeid();
 	}
-	elsif ($node->isremotenode()) {
+	elsif ($node->isremotenode() && !$node->isdedicatedremote()) {
 	    $user = "emulabman";
 	}
     }
