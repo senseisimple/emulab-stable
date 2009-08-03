@@ -47,7 +47,9 @@ BEGIN
 sub REMOTE()	{ return libsetup::REMOTE(); }
 sub REMOTEDED()	{ return libsetup::REMOTEDED(); }
 sub PLAB()	{ return libsetup::PLAB(); }
-sub LINUXJAILED(){ return libsetup::LINUXJAILED(); }
+sub LINUXJAILED()  { return libsetup::LINUXJAILED(); }
+sub GENVNODE()     { return libsetup::GENVNODE(); }
+sub GENVNODETYPE() { return libsetup::GENVNODETYPE(); }
 
 #
 # Various programs and things specific to Linux and that we want to export.
@@ -1556,11 +1558,20 @@ sub os_config_gre($$$$$$$)
 
     my $dev = "$name$unit";
 
-    if (system("ip tunnel add $dev mode gre remote $dsthost local $srchost") ||
-	system("ip link set $dev up") ||
-	system("ip addr add $inetip dev $dev") ||
-	system("$IFCONFIGBIN $dev netmask $mask")) {
-	warn("Could not start tunnel!\n");
+    if (GENVNODE() && GENVNODETYPE() eq "openvz") {
+	$dev = "gre$unit";
+	
+	if (system("$IFCONFIGBIN $dev $inetip netmask $mask up")) {
+	    warn("Could not start tunnel $dev!\n");
+	    return -1;
+	}
+    }
+    elsif (system("ip tunnel add $dev mode gre ".
+		  "remote $dsthost local $srchost") ||
+	   system("ip link set $dev up") ||
+	   system("ip addr add $inetip dev $dev") ||
+	   system("$IFCONFIGBIN $dev netmask $mask")) {
+	warn("Could not start tunnel $dev!\n");
 	return -1;
     }
     return 0;
