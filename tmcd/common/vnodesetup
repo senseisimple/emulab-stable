@@ -837,6 +837,10 @@ sub removeconfdir($)
 	die("*** $0:\n".
 	    "    $dir/root is not empty! This is very bad!\n");
     }
+    elsif (-e "$dir/vnode.info") {
+	die("*** $0:\n".
+	    "    $dir/vnode.info is still there. This is very bad!\n");
+    }
     system("rm -rf $dir");
 }
 
