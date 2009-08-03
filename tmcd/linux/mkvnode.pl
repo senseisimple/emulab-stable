@@ -17,7 +17,7 @@ use Data::Dumper;
 #
 sub usage()
 {
-    print "Usage: vnodectl [-h] [-d] vnodeid\n" . 
+    print "Usage: mkvnode [-d] vnodeid\n" . 
           "  -d   Debug mode.\n" .
           "";
     exit(1);
@@ -186,8 +186,10 @@ TBDebugTimeStamp("finished $vmtype rootPreConfig()")
 # Link and linkdelay stuff we need in the root context.
 my %ifconfigs = ();
 my %ldconfigs = ();
+my %tunconfig = ();
 my @tmp1;
 my @tmp2;
+my $tmp3;
 
 fatal("getifconfig($vnodeid): $!")
     if (getifconfig(\@tmp1));
@@ -197,10 +199,15 @@ fatal("getlinkdelayconfig($vnodeid): $!")
     if (getlinkdelayconfig(\@tmp2));
 $ldconfigs{$vnodeid} = \@tmp2;
 
+fatal("gettunnelconfig($vnodeid): $!")
+    if (gettunnelconfig(\$tmp3));
+$tunconfig{$vnodeid} = $tmp3;
+
 if ($debug) {
     print "vnconfig:\n" . Dumper(%vnconfig);
     print "ifconfig:\n" . Dumper(%ifconfigs);
     print "ldconfig:\n" . Dumper(%ldconfigs);
+    print "tunconfig:\n" . Dumper(%tunconfig);
 }
 
 TBDebugTimeStamp("starting $vmtype rootPreConfigNetwork")
@@ -292,7 +299,8 @@ if (safeLibOp($vnodeid,'vnodePreConfigControlNetwork',1,1,
 
 # OP: exp net preconfig
 if (safeLibOp($vnodeid,'vnodePreConfigExpNetwork',1,1,$vnodeid,$vmid,
-	      $ifconfigs{$vnodeid}, $ldconfigs{$vnodeid})) {
+	      $ifconfigs{$vnodeid},
+	      $ldconfigs{$vnodeid},$tunconfig{$vnodeid})) {
     MyFatal("vnodePreConfigExpNetwork failed");
 }
 if (safeLibOp($vnodeid,'vnodeConfigResources',1,1,$vnodeid,$vmid)) {
@@ -403,8 +411,7 @@ RUNNING: while (1) {
 	exit($exitval);
     }
 }
-Cleanup();
-exit(0);
+exit(Cleanup());
 
 #
 # Clean things up.
@@ -418,7 +425,7 @@ sub Cleanup()
     $cleaning = 1;
 
     # If the container was never built, there is nothing to do.
-    return
+    return 0
 	if (! -e "$VNDIR/vnode.info" || !defined($vmid));
 
     # if not halted, try that first
@@ -426,23 +433,38 @@ sub Cleanup()
     if ($err) {
 	print STDERR "*** ERROR: vnodeState: ".
 	    "failed to cleanup $vnodeid: $err\n";
-	return;
+	return -1;
     }
-    if ($ret ne VNODE_STATUS_STOPPED()) {
+    if ($ret eq VNODE_STATUS_RUNNING()) {
 	print STDERR "cleanup: $vnodeid not stopped, trying to halt it.\n";
-	safeLibOp($vnodeid,'vnodeHalt',1,1,$vnodeid,$vmid);
+	($ret,$err) = safeLibOp($vnodeid,'vnodeHalt',1,1,$vnodeid,$vmid);
+	if ($err) {
+	    print STDERR "*** ERROR: vnodeHalt: ".
+		"failed to halt $vnodeid: $err\n";
+	    return -1;
+	}
     }
-    return
+    elsif ($ret eq VNODE_STATUS_MOUNTED()) {
+	print STDERR "cleanup: $vnodeid is mounted, trying to unmount it.\n";
+	($ret,$err) = safeLibOp($vnodeid,'vnodeUnmount',1,1,$vnodeid,$vmid);
+	if ($err) {
+	    print STDERR "*** ERROR: vnodeUnmount: ".
+		"failed to unmount $vnodeid: $err\n";
+	    return -1;
+	}
+    }
+    return 0
 	if ($leaveme);
 
     # now destroy
     ($ret,$err) = safeLibOp($vnodeid,'vnodeDestroy',1,1,$vnodeid,$vmid);
     if ($err) {
 	print STDERR "*** ERROR: failed to destroy $vnodeid: $err\n";
-	return;
+	return -1;
     }
     unlink("$VNDIR/vnode.info");
     unlink("$VMPATH/vnode.$vmid");
+    return 0;
 }
     
 #
