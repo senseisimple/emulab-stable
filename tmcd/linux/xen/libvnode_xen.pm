@@ -20,6 +20,7 @@ use Exporter;
               rootPreConfigNetwork rootPostConfig
 	      vnodeCreate vnodeDestroy vnodeState
 	      vnodeBoot vnodePreBoot vnodeHalt vnodeReboot vnodeKill
+	      vnodeUnmount
 	      vnodePreConfig vnodePreConfigControlNetwork
               vnodePreConfigFinal
               vnodePreConfigExpNetwork vnodeConfigResources
@@ -38,6 +39,7 @@ use Exporter;
          'vnodeState' => \&vnodeState,
          'vnodeBoot' => \&vnodeBoot,
          'vnodeHalt' => \&vnodeHalt,
+         'vnodeUnmount' => \&vnodeUnmount,
          'vnodeReboot' => \&vnodeReboot,
          'vnodeExec' => \&vnodeExec,
          'vnodeKill' => \&vnodeKill,
@@ -514,6 +516,11 @@ sub vnodeReboot($){
 
 sub vnodeExec {
     my ($vnode_id,$vmid,$command) = @_;
+
+    return -1;
+}
+sub vnodeUnmount {
+    my ($vnode_id,$vmid) = @_;
 
     return -1;
 }
