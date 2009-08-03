@@ -390,6 +390,11 @@ dolinux() {
 		dtype="sd"
 		lrootdev="8${dunit}${part}"
 		;;
+	# perc
+	mfid[0-15])
+		dtype="sd"
+		lrootdev="8${dunit}${part}"
+		;;
 	# Megaraid
 	amrd[0-7])
 		dunit=`echo $disk | sed -e 's/amrd\([0-7]\)/\1/'`
