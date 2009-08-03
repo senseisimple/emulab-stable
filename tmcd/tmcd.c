@@ -67,6 +67,7 @@
 #define RUNASUSER	"nobody"
 #define RUNASGROUP	"nobody"
 #define NTPSERVER       "ntp1"
+#define PROTOUSER	"elabman"
 
 /* socket read/write timeouts in ms */
 #define READTIMO	3000
@@ -1978,9 +1979,10 @@ COMMAND_PROTOTYPE(doaccounts)
 			     "join groups as g on "
 			     "     p.pid=g.pid and p.gid=g.gid "
 			     "where (p.pid='%s') and p.trust!='none' "
-			     "      and u.status='active' and u.admin=1 "
+			     "      and u.status='active' and "
+			     "      (u.admin=1 or u.uid='%s') "
 			     "      order by u.uid",
-			     18, RELOADPID);
+			     18, RELOADPID, PROTOUSER);
 	}
 	else if (!reqp->islocal && reqp->isdedicatedwa) {
 		/*
