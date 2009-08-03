@@ -499,8 +499,14 @@ sub VMunmount()
 	print STDOUT "  Unmounting $path\n";
 	
 	if (system("$UMOUNT $path")) {
-	    warning("Could not unmount $path");
-	    $errors++;
+	    #
+	    # If the directory is empty (rmdir works), then lets not
+	    # call it an error.
+	    #
+	    if (!rmdir("$path")) {
+		warning("Could not unmount or rmdir $path");
+		$errors++;
+	    }
 	}
 	push(@deletes, $remote);
     }
