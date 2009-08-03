@@ -26,16 +26,15 @@ if [ -z $vnodeid ]; then
     exit 44
 fi
 
-# Not working yet.
 #
-#echo "Undoing Emulab mounts."
-#/usr/local/etc/emulab/rc/rc.mounts -j $vnodeid $MYROOT 0 shutdown
-#if [ $? = 0 ]; then
-#    echo "ok."
-#else
-#    echo "FAILED with exit code $?"
-#    exit 44
-#fi
+echo "Undoing Emulab mounts."
+/usr/local/etc/emulab/rc/rc.mounts -j $vnodeid $MYROOT 0 shutdown
+if [ $? = 0 ]; then
+    echo "ok."
+else
+    echo "FAILED with exit code $?"
+    exit 44
+fi
 
 kill `cat /var/run/tmccproxy.$vnodeid.pid`
 rm -f /var/run/tmccproxy.$vnodeid.pid
