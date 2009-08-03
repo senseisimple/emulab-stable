@@ -11,14 +11,16 @@ use Exporter;
 @ISA    = "Exporter";
 @EXPORT = qw( VNODE_STATUS_RUNNING VNODE_STATUS_STOPPED VNODE_STATUS_BOOTING 
               VNODE_STATUS_INIT VNODE_STATUS_STOPPING VNODE_STATUS_UNKNOWN
-              ipToMac macAddSep fatal mysystem
+	      VNODE_STATUS_MOUNTED
+              ipToMac macAddSep fatal mysystem mysystem2
             );
 
 sub VNODE_STATUS_RUNNING() { return "running"; }
 sub VNODE_STATUS_STOPPED() { return "stopped"; }
+sub VNODE_STATUS_MOUNTED() { return "mounted"; }
 sub VNODE_STATUS_BOOTING() { return "booting"; }
-sub VNODE_STATUS_INIT() { return "init"; }
-sub VNODE_STATUS_STOPPING() { return "stopping"; }
+sub VNODE_STATUS_INIT()    { return "init"; }
+sub VNODE_STATUS_STOPPING(){ return "stopping"; }
 sub VNODE_STATUS_UNKNOWN() { return "unknown"; }
 
 sub ipToMac($) {
@@ -67,6 +69,19 @@ sub mysystem($)
     system($command);
     if ($?) {
 	fatal("Command failed: $? - $command");
+    }
+}
+sub mysystem2($)
+{
+    my ($command) = @_;
+
+    if (1) {
+	print STDERR "mysystem: '$command'\n";
+    }
+
+    system($command);
+    if ($?) {
+	print STDERR "Command failed: $? - '$command'\n";
     }
 }
 
