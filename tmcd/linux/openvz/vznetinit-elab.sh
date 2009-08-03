@@ -67,7 +67,9 @@ echo "$ELABIFS" | sed -e 's/;/\n/g' | \
 
 	if [ $_if = $DEV ]; then
 	    echo "Emulab configuring CT0 network for CT$VEID: exp net ($_if)"
-	    $BRCTL addif $_br $_if
+    	    if [ "x$_br" != "x" ]; then
+	        $BRCTL addif $_br $_if
+	    fi
 	    $IFCONFIG $_if 2&>1 > /dev/null
 	    while [ $? -ne 0 ]; do
 		echo "Waiting for $_if to appear"
@@ -78,6 +80,21 @@ echo "$ELABIFS" | sed -e 's/;/\n/g' | \
 	    $IFCONFIG $_if 0 up
 	    echo 1 > /proc/sys/net/ipv4/conf/$_if/forwarding
 	    echo 1 > /proc/sys/net/ipv4/conf/$_if/proxy_arp
+	fi
+    done
+
+#
+# Get the routes, as for tunnels. This is not a workable approach.
+#
+echo "$ELABROUTES" | sed -e 's/;/\n/g' | \
+    while read route; \
+    do \
+        _if=`echo "$route" | sed -r -e 's/([^,]*),[^,]*/\1/'`
+        _rt=`echo "$route" | sed -r -e 's/[^,]*,([^,]*)/\1/'`
+
+	if [ $_if = $DEV ]; then
+	    echo "Emulab configuring route for CT$VEID: exp net ($_if)"
+	    $ROUTE add -host $_rt dev $_if
 	fi
     done
 

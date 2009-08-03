@@ -13,7 +13,7 @@ use Exporter;
               vz_rootPreConfig vz_rootPreConfigNetwork vz_rootPostConfig 
               vz_vnodeCreate vz_vnodeDestroy vz_vnodeState 
               vz_vnodeBoot vz_vnodeHalt vz_vnodeReboot 
-              vz_vnodePreConfig 
+              vz_vnodePreConfig vz_vnodeUnmount
               vz_vnodePreConfigControlNetwork vz_vnodePreConfigExpNetwork 
               vz_vnodeConfigResources vz_vnodeConfigDevices
               vz_vnodePostConfig vz_vnodeExec
@@ -29,6 +29,7 @@ use Exporter;
 	 'vnodeState' => \&vz_vnodeState,
 	 'vnodeBoot' => \&vz_vnodeBoot,
 	 'vnodeHalt' => \&vz_vnodeHalt,
+	 'vnodeUnmount' => \&vz_vnodeUnmount,
 	 'vnodeReboot' => \&vz_vnodeReboot,
 	 'vnodeExec' => \&vz_vnodeExec,
 	 'vnodePreConfig' => \&vz_vnodePreConfig,
@@ -43,6 +44,7 @@ use Exporter;
 use strict;
 use English;
 use Data::Dumper;
+use Socket;
 
 # Pull in libvnode
 require "/etc/emulab/paths.pm"; import emulabpaths;
@@ -63,6 +65,7 @@ my $defaultImage = "emulab-default";
 
 sub VZSTAT_RUNNING() { return "running"; }
 sub VZSTAT_STOPPED() { return "stopped"; }
+sub VZSTAT_MOUNTED() { return "mounted"; }
 
 my $VZCTL  = "/usr/sbin/vzctl";
 my $VZLIST = "/usr/sbin/vzlist";
@@ -153,11 +156,11 @@ sub vz_rootPreConfig {
     # about the funny quoting: don't ask... emacs perl mode foo.
     if (system('grep -q '."'".'^/dev/.*/vz.*$'."'".' /etc/fstab')) {
 	mysystem("$VZRC stop");
-	mysystem("mv /vz /vz.orig");
+	mysystem("rm -rf /vz")
+	    if (-e "/vz");
 	mysystem("mkdir /vz");
 	mysystem("$MKEXTRAFS -f /vz");
-	mysystem("cp -pR /vz.orig/* /vz/");
-	mysystem("rm -rf /vz.orig");
+	mysystem("cp -pR /vz.save/* /vz/");
     }
     if (system('mount | grep -q \'on /vz\'')) {
 	mysystem("mount /vz");
@@ -174,6 +177,9 @@ sub vz_rootPreConfig {
     }
     # this is what we need for veths
     mysystem("$MODPROBE vzethdev");
+
+    # For tunnels
+    mysystem("$MODPROBE ip_gre");
 
     # we need this stuff for traffic shaping -- only root context can
     # modprobe, for now.
@@ -450,6 +456,9 @@ sub vz_vnodeState {
     elsif ($status eq 'stopped') {
 	return VNODE_STATUS_STOPPED();
     }
+    elsif ($status eq 'mounted') {
+	return VNODE_STATUS_MOUNTED();
+    }
 
     return VNODE_STATUS_UNKNOWN();
 }
@@ -466,6 +475,14 @@ sub vz_vnodeHalt {
     my ($vnode_id,$vmid) = @_;
 
     mysystem("$VZCTL stop $vnode_id");
+
+    return 0;
+}
+
+sub vz_vnodeUnmount {
+    my ($vnode_id,$vmid) = @_;
+
+    mysystem("$VZCTL umount $vnode_id");
 
     return 0;
 }
@@ -535,6 +552,7 @@ sub vz_vnodePreConfig {
     my $didmount = 0;
     if ($status ne 'running' && $status ne 'mounted') {
 	mysystem("$VZCTL mount $vnode_id");
+	$didmount = 1;
     }
     my $ret = &$callback("$VZROOT/$vmid");
     if ($didmount) {
@@ -730,9 +748,10 @@ sub vz_vnodePreConfigControlNetwork {
 # Preconfigures experimental interfaces in the vnode before its first boot.
 #
 sub vz_vnodePreConfigExpNetwork {
-    my ($vnode_id,$vmid,$ifs,$lds) = @_;
+    my ($vnode_id,$vmid,$ifs,$lds,$tunnels) = @_;
 
     my $elabifs = "";
+    my $elabroutes = "";
     my %netif_strs = ();
     foreach my $ifc (@$ifs) {
 	next if (!$ifc->{ISVIRT});
@@ -776,11 +795,86 @@ sub vz_vnodePreConfigExpNetwork {
         $netif_strs{$eth} = "$eth,$ethmac,$veth,$vethmac";
     }
 
+    if (values(%{ $tunnels })) {
+	#
+	# Get current list.
+	#
+	if (! open(IP, "/sbin/ip tunnel show|")) {
+	    print STDERR "Could not start /sbin/ip\n";
+	    return -1;
+	}
+	my %gre2ip = ();
+	my %ip2gre = ();
+
+	while (<IP>) {
+	    if ($_ =~ /^(gre\d*):.*remote\s*([\d\.]*)\s*local\s*([\d\.]*)/) {
+		$gre2ip{$1} = "$2:$3";
+		$ip2gre{"$2:$3"} = $1;
+	    }
+	}
+	if (!close(IP)) {
+	    print STDERR "Could not get tunnel list\n";
+	    return -1;
+	}
+
+	foreach my $tunnel (values(%{ $tunnels })) {
+	    next
+		if ($tunnel->{"tunnel_style"} ne "gre");
+	
+	    my $name     = $tunnel->{"tunnel_lan"};
+	    my $srchost  = $tunnel->{"tunnel_srcip"};
+	    my $dsthost  = $tunnel->{"tunnel_dstip"};
+	    my $inetip   = $tunnel->{"tunnel_ip"};
+	    my $peerip   = $tunnel->{"tunnel_peerip"};
+	    my $mask     = $tunnel->{"tunnel_ipmask"};
+	    my $unit     = $tunnel->{"tunnel_unit"};
+	    my $gre;
+
+	    if (exists($ip2gre{"$dsthost:$srchost"})) {
+		$gre = $ip2gre{"$dsthost:$srchost"};
+	    }
+	    else {
+		$gre = "gre" . (scalar(keys(%ip2gre)) + 1);
+		mysystem2("/sbin/ip tunnel add $gre mode gre ".
+			 "local $srchost remote $dsthost ttl 64");
+		return -1
+		    if ($?);
+		mysystem2("/sbin/ifconfig $gre 0 up");
+		return -1
+		    if ($?);
+
+		$ip2gre{"$dsthost:$srchost"} = $gre;
+		$gre2ip{$gre} = "$dsthost:$srchost";
+	    }
+	    my $net = inet_ntoa(inet_aton($inetip) & inet_aton($mask));
+	    mysystem2("/sbin/ip route replace $net/24 dev $gre");
+	    return -1
+		if ($?);
+
+	    my $veth = "veth$vmid.tun$unit";
+	    my $eth  = "gre$unit";
+	    
+	    $netif_strs{$eth} = "$eth,,$veth";
+	    if ($elabifs ne '') {
+		$elabifs .= ';';
+	    }
+	    # Leave bridge blank; see vznetinit-elab.sh. It does stuff.
+	    $elabifs .= "$veth,";
+	    # Route.
+
+	    if ($elabroutes ne '') {
+		$elabroutes .= ';';
+	    }
+	    $elabroutes .= "$veth,$inetip";
+	}
+    }
+
     #
     # Wait until end to do a single edit for all ifs, since they're all 
     # smashed into a single config file var
     #
-    my %lines = ( 'ELABIFS' => '"' . $elabifs . '"');
+    my %lines = ( 'ELABIFS'    => '"' . $elabifs . '"',
+		  'ELABROUTES' => '"' . $elabroutes . '"');
     editContainerConfigFile($vmid,\%lines);
 
     #
