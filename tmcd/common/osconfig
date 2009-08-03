@@ -591,17 +591,17 @@ sub detectBSD($\%) {
     my ($d,$v) = ('BSD',undef);
     if (defined($KSTRS)) {
 	while (my $line = <$KSTRS>) {
-	    if ($line =~ /(\w+BSD)\s+([\d\.]+\s+\([\w\d\-]+\)\s+#\d+)/i) {
+	    if ($line =~ /^(\w+BSD)\s+([\d\.]+\s+\([\w\d\-]+\)\s+#\d+)/i) {
 		$d = $1;
 		$v = $2;
 		last;
 	    }
-	    elsif ($line =~ /(\w+BSD)\s+([\d\.]+[\w\d\-]*\s+#\d+)/i) {
+	    elsif ($line =~ /^(\w+BSD)\s+([\d\.]+[\w\d\-]*\s+#\d+)/i) {
 		$d = $1;
 		$v = $2;
 		last;
 	    }
-	    elsif ($line =~ /(\w+BSD)\s+([\d\.]+[\w\d\-]*)/i) {
+	    elsif ($line =~ /^(\w+BSD)\s+([\d\.]+[\w\d\-]*)/i) {
 		$d = $1;
 		$v = $2;
 		last;
