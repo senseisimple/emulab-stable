@@ -1,12 +1,11 @@
 #!/usr/bin/perl -wT
-
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 use English;
+use Getopt::Std;
 
 #
 # Create an /etc/exports.tail file based on current reserved table and project
@@ -15,8 +14,17 @@ use English;
 #
 # This script always does the right thing, so it does not matter who calls it. 
 #
-# usage: exports_setup
-#
+sub usage()
+{
+    print(STDERR
+	  "Usage: exports_setup [-n] [-d]\n".
+	  "switches and arguments:\n".
+	  "-n         - impotent; dump exports to stdout\n");
+    exit(-1);
+}
+my $optlist    = "nd";
+my $impotent   = 0;
+my $debug      = 0;
 
 #
 # Function phototypes
@@ -51,7 +59,6 @@ my $SSH		= "$TB/bin/sshtb -l root -host $FSNODE";
 my $PROG	= "$TB/sbin/exports_setup.proxy";
 my $exportstail = "/var/tmp/exports.tail";
 my $smbconftail = "/var/tmp/smbconf.tail";
-my $dbg		= 0;
 my @row; 
 
 # For determining file server mountpoints (XXX BSD specific)
@@ -102,6 +109,22 @@ my $PROJROOT  = PROJROOT();
 my $GROUPROOT = GROUPROOT();
 my $USERROOT  = USERROOT();
 my $SCRATCHROOT  = SCRATCHROOT();
+
+#
+# Check args.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"n"})) {
+    $impotent = 1;
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+usage()
+    if (@ARGV);
 
 #
 # We need to serialize this script to avoid a trashed map file.
@@ -176,6 +199,7 @@ my @lastsmbshares = ();
 my $lastpid     = "";
 my $lastgid     = "";
 my $lastadmin	= "";
+my $lasterole   = "";
 
 my @mountpoints = fsinit();
 
@@ -208,8 +232,8 @@ while (@row = $nodes_result->fetchrow_array) {
 	next;
     }
     
-    if ($lastpid eq $pid && $lastgid eq $gid &&
-	(!$ISOLATEADMIN || $lastadmin eq $admin) && $erole ne "sharedhost") {
+    if ($lastpid eq $pid && $lastgid eq $gid && $lasterole eq $erole &&
+	(!$ISOLATEADMIN || $lastadmin eq $admin)) {
 	# If this is for the same proj and group again, don't requery the db 
 	# and don't recompute everything.
 	%fslist    = %lastfslist;
@@ -219,6 +243,7 @@ while (@row = $nodes_result->fetchrow_array) {
 	$lastpid=$pid;
 	$lastgid=$gid;
 	$lastadmin=$admin;
+	$lasterole=$erole;
 
 	if ($erole eq "sharedhost") {
 	    #
@@ -372,7 +397,7 @@ foreach my $str ( keys(%ipgroups) ) {
     print MAP "$str -maproot=root @iplist\n";
     
     print "$str -maproot=root @iplist\n"
-	if ($dbg);
+	if ($debug);
 }
 
 print MAP "\n";
@@ -406,24 +431,28 @@ if (!$TESTMODE) {
   #
   # Temp Hack! Save a copy of the exports file for debugging.
   #
-  if ($dbg) {
+  if ($debug) {
       my $backup = "$TB/log/exports/" . TBDateTimeFSSafe();
       system("cp $exportstail $backup");
       if ($WINSUPPORT) {
           system("cp $smbconftail $backup");
       }
   }
+  if ($impotent) {
+      system("/bin/cat $exportstail");
+  }
+  else {
+      # First do the NFS exports
+      system("$SSH $PROG < $exportstail") == 0 or
+	  fatal("Failed: $SSH $PROG < $exportstail: $?");
+      unlink("$exportstail");
 
-  # First do the NFS exports
-  system("$SSH $PROG < $exportstail") == 0 or
-    fatal("Failed: $SSH $PROG < $exportstail: $?");
-  unlink("$exportstail");
-
-  # Next the SMB shares
-  if ($WINSUPPORT) {
-      system("$SSH $PROG -S < $smbconftail") == 0 or
-          fatal("Failed: $SSH $PROG < $smbconftail: $?");
-      unlink("$smbconftail");
+      # Next the SMB shares
+      if ($WINSUPPORT) {
+	  system("$SSH $PROG -S < $smbconftail") == 0 or
+	      fatal("Failed: $SSH $PROG < $smbconftail: $?");
+	  unlink("$smbconftail");
+      }
   }
 
   #
