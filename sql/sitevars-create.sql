@@ -62,7 +62,7 @@ INSERT IGNORE INTO sitevariables VALUES ('general/version/build','07/18/2008',''
 INSERT IGNORE INTO sitevariables VALUES ('general/version/major','4','','Source code major revision number');
 INSERT IGNORE INTO sitevariables VALUES ('general/mailman/password','','','Admin password for Emulab generated lists');
 INSERT IGNORE INTO sitevariables VALUES ('general/linux_endnodeshaping','0','1','Use this sitevar to disable endnodeshaping on linux globally on your testbed');
-INSERT IGNORE INTO sitevariables VALUES ('general/open_showexplist',NULL,'','Allow members of this experiment to view all running experiments on the experiment list page');
+INSERT IGNORE INTO sitevariables VALUES ('general/open_showexplist',NULL,'','Allow members of this project to view all running experiments on the experiment list page');
 INSERT IGNORE INTO sitevariables VALUES ('swap/swapout_command',NULL,'','Command to run in admin MFS on each node of an experiment at swapout time. Runs as swapout user.');
 INSERT IGNORE INTO sitevariables VALUES ('swap/swapout_command_failaction',NULL,'warn','What to do if swapout command fails (warn == continue, fail == fail swapout).');
 INSERT IGNORE INTO sitevariables VALUES ('swap/swapout_command_timeout',NULL,'120','Time (in seconds) to allow for command completion');
