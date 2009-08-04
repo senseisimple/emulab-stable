@@ -945,7 +945,7 @@ sub Create($$$$$$)
 	$iface1->SetAttribute("tunnel_dstip", $ctrlip2);
 	$iface1->SetAttribute("tunnel_ipmask", "255.255.255.0");
 	$iface1->SetAttribute("tunnel_lan", $linkname);
-	$iface1->SetAttribute("tunnel_unit", $iface1->memberid());
+	$iface1->SetAttribute("tunnel_unit", $iface1->memberid() + 1);
 	$iface1->SetAttribute("tunnel_style", "gre");
     }
     if (defined($iface2)) {
@@ -955,7 +955,7 @@ sub Create($$$$$$)
 	$iface2->SetAttribute("tunnel_dstip", $ctrlip1);
 	$iface2->SetAttribute("tunnel_ipmask", "255.255.255.0");
 	$iface2->SetAttribute("tunnel_lan", $linkname);
-	$iface2->SetAttribute("tunnel_unit", $iface2->memberid());
+	$iface2->SetAttribute("tunnel_unit", $iface2->memberid() + 1);
 	$iface2->SetAttribute("tunnel_style", "gre");
     }
     return $aggregate;
