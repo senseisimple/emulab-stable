@@ -5504,7 +5504,7 @@ sub UpLoadTunnels($)
 	    $iface0->SetAttribute("tunnel_srcip", $peerip0) ||
 	    $iface0->SetAttribute("tunnel_dstip", $peerip1) ||
 	    $iface0->SetAttribute("tunnel_isserver",
-				  ($server eq $virtnode0 ? 1 : 0)) ||
+				  ($server eq $virtnode0->vname() ? 1 : 0)) ||
 	    $iface0->SetAttribute("tunnel_secretkey", $secretkey) ||
 	    $iface0->SetAttribute("tunnel_ipmask", $mask) ||
 	    $iface0->SetAttribute("tunnel_serverport", $ipport) ||
@@ -5519,7 +5519,7 @@ sub UpLoadTunnels($)
 	    $iface1->SetAttribute("tunnel_srcip", $peerip1) ||
 	    $iface1->SetAttribute("tunnel_dstip", $peerip0) ||
 	    $iface1->SetAttribute("tunnel_isserver",
-				  ($server eq $virtnode1 ? 1 : 0)) ||
+				  ($server eq $virtnode1->vname() ? 1 : 0)) ||
 	    $iface1->SetAttribute("tunnel_secretkey", $secretkey) ||
 	    $iface1->SetAttribute("tunnel_ipmask", $mask) ||
 	    $iface1->SetAttribute("tunnel_serverport", $ipport) ||
