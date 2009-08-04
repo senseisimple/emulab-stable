@@ -400,7 +400,11 @@ foreach my $argkey (keys(%editnodetype_args)) {
 
     $attr_name = $attr_type = $argkey;
     $attr_name =~ s/^attr_${wordpat}_(.*)$/$1/;
-    if ($argkey =~ /_(osid|imageid)$/) {
+    if ($argkey =~ /_default_imageid$/) {
+	# hack, now a comma seperated list, assume valid
+	$attr_type = "imageids";
+    } 
+    elsif ($argkey =~ /_(osid|imageid)$/) {
 	# Special case: the type is the LAST part of the name for ID attrs.
 	$attr_type = $1;
     }
@@ -456,6 +460,13 @@ foreach $attr_name (@attr_names) {
 	UserError("NodeType Image ID Attr: $attr_name is not an imageid.")
 	    if (!exists($imageids->{$attr_value}));
 	$attr_types{$attr_name} = "integer"; # An idx is an integer attr.
+    }
+    elsif ($attr_type eq "imageids") {
+	foreach my $k (split /,/, $attr_value) {
+	    UserError("NodeType Image ID Attr: $attr_name contains an invalid imageid.")
+		if (!exists($imageids->{$k}));
+	}
+	$attr_types{$attr_name} = "string"; # really a comma seperated list
     }
 }
 

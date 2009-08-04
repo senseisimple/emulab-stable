@@ -72,7 +72,7 @@ $initial_attributes = array(
 	  "attrtype" => "integer"),
     array("attrkey" => "default_imageid",
 	  "attrvalue" => $default_image->imageid(),
-	  "attrtype" => "integer"),
+	  "attrtype" => "string"),
     array("attrkey" => "default_osid", "attrvalue" => $rhl_std->osid(),
 	  "attrtype" => "integer"),
     array("attrkey" => "delay_capacity", "attrvalue" => "2",
@@ -116,6 +116,19 @@ function SPITFORM($node_type, $formfields, $attributes, $deletes, $errors)
 {
     global $osid_result, $imageid_result, $mfsosid_result, $new_type;
     global $newattribute_name, $newattribute_value, $newattribute_type;
+
+    #
+    # Split default_imageid
+    #
+
+    $default_imageids = preg_split('/,/', $attributes["default_imageid"]);
+    for ($i = 0; $i != count($default_imageids); $i++) {
+	$attributes["default_imageid_$i"] = $default_imageids[$i];
+    }
+    $last_default_imageid_label = "default_imageid_$i";
+    $attributes["default_imageid_$i"] = 0;
+    unset($attributes["default_imageid"]);
+    ksort($attributes);
 
     #
     # Standard Testbed Header
@@ -308,8 +321,13 @@ function SPITFORM($node_type, $formfields, $attributes, $deletes, $errors)
 	    WRITEOSIDMENU($key, "attributes[$key]", $mfsosid_result, $val,
 			  "deletes[$key]", $deletes[$key]);
 	}
-	elseif ($key == "default_imageid") {
-	    WRITEIMAGEIDMENU($key, "attributes[$key]", $imageid_result, $val,
+	elseif ($key == $last_default_imageid_label) {
+	    WRITEIMAGEIDMENU("$key<sup><b>1</b></sup>", "attributes[$key]", $imageid_result, $val,
+			     "deletes[$key]", $deletes[$key]);
+	}
+	elseif ($key == "default_imageid" || 
+    	        substr($key, 0, strlen("default_imageid_")) == "default_imageid_") {
+	    WRITEIMAGEIDMENU("$key", "attributes[$key]", $imageid_result, $val,
 			     "deletes[$key]", $deletes[$key]);
 	}
 	else {
@@ -375,6 +393,13 @@ function SPITFORM($node_type, $formfields, $attributes, $deletes, $errors)
 
     echo "</form>
           </table>\n";
+
+    echo "<blockquote>
+	      <ol type=1 start=1>
+		 <li> To add more than one image, add the first image and 
+                      submit the form.  Than add the next, etc.</li>
+              </ol>
+              </blockquote>";
 }
 
 if (isset($new_type)) {
@@ -426,6 +451,7 @@ elseif (isset($node_type)) {
 	$attribute_types[$row['attrkey']] = $row['attrtype'];
 	$attribute_deletes[$row['attrkey']] = "";
     }
+    $attribute_types["default_imageid"] = "string";
 }
 else {
     PAGEARGERROR("Must provide one of node_type or new_type");
@@ -470,6 +496,18 @@ if (!isset($new_type)) {
 # Otherwise, must validate and redisplay if errors.
 #
 $errors  = array();
+
+#
+# Combine imageids into a comma seperated list
+#
+$default_imagesids = array();
+for ($i = 0; isset($attributes["default_imageid_$i"]); $i++) {
+    if (!(isset($deletes["default_imageid_$i"]) && $deletes["default_imageid_$i"] == "checked")
+        && $attributes["default_imageid_$i"] != 0)
+        array_push($default_imagesids, $attributes["default_imageid_$i"]);
+    unset($attributes["default_imageid_$i"]);
+}
+$attributes["default_imageid"] = join(',', $default_imagesids);
 
 # Check the attributes.
 while (list ($key, $val) = each ($attributes)) {

@@ -3729,24 +3729,25 @@ COMMAND_PROTOTYPE(dorouting)
  */
 COMMAND_PROTOTYPE(doloadinfo)
 {
-	MYSQL_RES	*res;	
-	MYSQL_ROW	row;
+	MYSQL_RES	*res, *res2;
+	MYSQL_ROW	row, row2;
 	char		buf[MYBUFSIZE];
 	char		*bufp = buf, *ebufp = &buf[sizeof(buf)];
 	char		*disktype, *useacpi, *useasf, address[MYBUFSIZE];
 	char		mbrvers[51];
-	int		disknum, zfill;
+	char            *loadpart, *OS, *prepare;
+	int		disknum, nrows, zfill;
 
 	/*
 	 * Get the address the node should contact to load its image
 	 */
 	res = mydb_query("select load_address,loadpart,OS,frisbee_pid,"
-			 "   mustwipe,mbr_version,access_key,imageid"
+			 "   mustwipe,mbr_version,access_key,imageid,prepare"
 			 "  from current_reloads as r "
 			 "left join images as i on i.imageid = r.image_id "
 			 "left join os_info as o on i.default_osid = o.osid "
-			 "where node_id='%s'",
-			 8, reqp->nodeid);
+			 "where node_id='%s' order by r.idx",
+			 9, reqp->nodeid);
 
 	if (!res) {
 		error("doloadinfo: %s: DB Error getting loading address!\n",
@@ -3754,111 +3755,156 @@ COMMAND_PROTOTYPE(doloadinfo)
 		return 1;
 	}
 
-	if ((int)mysql_num_rows(res) == 0) {
+	if ((nrows = (int)mysql_num_rows(res)) == 0) {
 		mysql_free_result(res);
 		return 0;
 	}
-	row = mysql_fetch_row(res);
 
-	/*
-	 * Remote nodes get a URL for the address. 
-	 */
-	if (!reqp->islocal) {
-		if (!row[6] || !row[6][0]) {
-			error("doloadinfo: %s: "
-			      "No access key associated with imageid %s\n",
-			      reqp->nodeid, row[7]);
-			mysql_free_result(res);
-			return 1;
-		}
-		OUTPUT(address, sizeof(address),
-		       "%s/spewimage.php?imageid=%s&access_key=%s",
-		       TBBASE, row[7], row[6]);
-	}
-	else {
-		/*
-		 * Simple text string.
-		 */
-		if (! row[0] || !row[0][0]) {
-			mysql_free_result(res);
-			return 0;
-		}
-		strcpy(address, row[0]);
+	if (nrows > 1 && vers <= 30) {
 
-		/*
-		 * Sanity check
-		 */
-		if (!row[3] || !row[3][0]) {
-			error("doloadinfo: %s: "
-			      "No pid associated with address %s\n",
-			      reqp->nodeid, row[0]);
-			mysql_free_result(res);
-			return 1;
-		}
-	}
+		bufp += OUTPUT(bufp, ebufp - bufp,
+			       "ADDR=/NEWER-MFS-NEEDED PART=0 PARTOS=Bogus\n");
 
-	bufp += OUTPUT(bufp, ebufp - bufp,
-		       "ADDR=%s PART=%s PARTOS=%s", address, row[1], row[2]);
-
-	/*
-	 * Remember zero-fill free space, mbr version fields, and access_key
-	 */
-	zfill = 0;
-	if (row[4] && row[4][0])
-		zfill = atoi(row[4]);
-	strcpy(mbrvers,"1");
-	if (row[5] && row[5][0])
-		strcpy(mbrvers, row[5]);
-
-	/*
-	 * Get disk type and number
-	 */
-	disktype = DISKTYPE;
-	disknum = DISKNUM;
-	useacpi = "unknown";
-	useasf = "unknown";
-
-	res = mydb_query("select attrkey,attrvalue from nodes as n "
-			 "left join node_type_attributes as a on "
-			 "     n.type=a.type "
-			 "where (a.attrkey='bootdisk_unit' or "
-			 "       a.attrkey='disktype' or "
-			 "       a.attrkey='use_acpi' or "
-			 "       a.attrkey='use_asf') and "
-			 "      n.node_id='%s'", 2, reqp->nodeid);
-	
-	if (!res) {
-		error("doloadinfo: %s: DB Error getting disktype!\n",
+		error("doloadinfo: %s: Old MFS Version found, need version 30\n",
 		      reqp->nodeid);
-		return 1;
-	}
 
-	if ((int)mysql_num_rows(res) > 0) {
-		int nrows = (int)mysql_num_rows(res);
-
-		while (nrows) {
-			row = mysql_fetch_row(res);
-
-			if (row[1] && row[1][0]) {
-				if (strcmp(row[0], "bootdisk_unit") == 0) {
-					disknum = atoi(row[1]);
-				}
-				else if (strcmp(row[0], "disktype") == 0) {
-					disktype = row[1];
-				}
-				else if (strcmp(row[0], "use_acpi") == 0) {
-					useacpi = row[1];
-				}
-				else if (strcmp(row[0], "use_asf") == 0) {
-					useasf = row[1];
-				}
-			}
-			nrows--;
+#ifdef EVENTSYS
+		address_tuple_t tuple;
+		/*
+		 * Send the state out via an event
+		 */
+		/* XXX: Maybe we don't need to alloc a new tuple every time through */
+		tuple = address_tuple_alloc();
+		if (tuple == NULL) {
+			error("doreset: Unable to allocate address tuple!\n");
+			return 1;
 		}
+		
+		tuple->host      = BOSSNODE;
+		tuple->objtype   = "TBNODESTATE";
+		tuple->objname	 = reqp->nodeid;
+		tuple->eventtype = "RELOADOLDMFS";
+		
+		if (myevent_send(tuple)) {
+			error("doloadinfo: %s: Unable to set state to RELOADOLDMFS");
+		}
+		
+		address_tuple_free(tuple);
+#endif
+	} 
+	else while (nrows) {
+
+		row = mysql_fetch_row(res);
+		loadpart = row[1];
+		OS = row[2];
+		prepare = row[8];
+
+		/*
+		 * Remote nodes get a URL for the address. 
+		 */
+		if (!reqp->islocal) {
+			if (!row[6] || !row[6][0]) {
+				error("doloadinfo: %s: "
+				      "No access key associated with imageid %s\n",
+				      reqp->nodeid, row[7]);
+				mysql_free_result(res);
+				return 1;
+			}
+			OUTPUT(address, sizeof(address),
+			       "%s/spewimage.php?imageid=%s&access_key=%s",
+			       TBBASE, row[7], row[6]);
+		}
+		else {
+			/*
+			 * Simple text string.
+			 */
+			if (! row[0] || !row[0][0]) {
+				mysql_free_result(res);
+				return 0;
+			}
+			strcpy(address, row[0]);
+			
+			/*
+			 * Sanity check
+			 */
+			if (!row[3] || !row[3][0]) {
+				error("doloadinfo: %s: "
+				      "No pid associated with address %s\n",
+				      reqp->nodeid, row[0]);
+				mysql_free_result(res);
+				return 1;
+			}
+		}
+		
+		bufp += OUTPUT(bufp, ebufp - bufp,
+			       "ADDR=%s PART=%s PARTOS=%s", address, loadpart, OS);
+		
+		/*
+		 * Remember zero-fill free space, mbr version fields, and access_key
+		 */
+		zfill = 0;
+		if (row[4] && row[4][0])
+			zfill = atoi(row[4]);
+		strcpy(mbrvers,"1");
+		if (row[5] && row[5][0])
+			strcpy(mbrvers, row[5]);
+		
+		/*
+		 * Get disk type and number
+		 */
+		disktype = DISKTYPE;
+		disknum = DISKNUM;
+		useacpi = "unknown";
+		useasf = "unknown";
+		
+		res2 = mydb_query("select attrkey,attrvalue from nodes as n "
+				  "left join node_type_attributes as a on "
+				  "     n.type=a.type "
+				  "where (a.attrkey='bootdisk_unit' or "
+				  "       a.attrkey='disktype' or "
+				  "       a.attrkey='use_acpi' or "
+				  "       a.attrkey='use_asf') and "
+				  "      n.node_id='%s'", 2, reqp->nodeid);
+	
+		if (!res2) {
+			error("doloadinfo: %s: DB Error getting disktype!\n",
+			      reqp->nodeid);
+			return 1;
+		}
+		
+		if ((int)mysql_num_rows(res2) > 0) {
+			int nrows2 = (int)mysql_num_rows(res2);
+			
+			while (nrows2) {
+				row2 = mysql_fetch_row(res2);
+				
+				if (row2[1] && row2[1][0]) {
+					if (strcmp(row2[0], "bootdisk_unit") == 0) {
+						disknum = atoi(row2[1]);
+					}
+					else if (strcmp(row2[0], "disktype") == 0) {
+						disktype = row2[1];
+					}
+					else if (strcmp(row2[0], "use_acpi") == 0) {
+						useacpi = row2[1];
+					}
+					else if (strcmp(row2[0], "use_asf") == 0) {
+						useasf = row2[1];
+					}
+				}
+				nrows2--;
+			}
+		}
+
+		mysql_free_result(res2);
+
+		bufp += OUTPUT(bufp, ebufp - bufp,
+			       " DISK=%s%d ZFILL=%d ACPI=%s MBRVERS=%s ASF=%s PREPARE=%s\n",
+			       disktype, disknum, zfill, useacpi, mbrvers, useasf, prepare);
+
+		nrows--;
 	}
-	bufp += OUTPUT(bufp, ebufp - bufp,
-		       " DISK=%s%d ZFILL=%d ACPI=%s MBRVERS=%s ASF=%s\n",
-		       disktype, disknum, zfill, useacpi, mbrvers, useasf);
+
 	mysql_free_result(res);
 
 	client_writeback(sock, buf, strlen(buf), tcp);

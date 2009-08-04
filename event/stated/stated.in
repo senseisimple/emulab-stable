@@ -842,6 +842,18 @@ sub stateTransition($$) {
 		handleCommand($node,$TBPOWERCYCLE);
 		next;
 	    };
+	    /^RELOADOLDMFS$/ && do {
+		my $frisbee_osid = TBNodeDiskloadOSID($node);
+		my $frisbee_name = DBQuerySingleFatal("select osname from os_info where osid=$frisbee_osid");
+		my $msg = 
+		    ("Attempted to load multiple images on $node using an old Frisbee MFS.\n".
+		     "To make this work please update the $frisbee_name MFS image.\n");
+		SENDMAIL($REALTBOPS,
+			 "$frisbee_name Needs Updating",
+			 $msg,
+			 "Stated Daemon <".$TBOPS.">");
+		next;
+	    };
 	    notify("Unknown trigger '$trig' for $node in $mode/$newstate!\n");
 	}
 	# Clear any of the node triggers that we ran.
