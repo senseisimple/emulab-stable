@@ -73,3 +73,5 @@ INSERT IGNORE INTO sitevariables VALUES ('protogeni/allow_externalusers','1','1'
 INSERT IGNORE INTO sitevariables VALUES ('protogeni/max_externalnodes',NULL,'1024','When set, maximum number of nodes that external users may allocate.');
 INSERT IGNORE INTO sitevariables VALUES ('protogeni/cm_uuid','','','The UUID of the local Component Manager.');
 INSERT IGNORE INTO sitevariables VALUES ('protogeni/sa_uuid','','','The UUID of the local Slice Authority.');
+INSERT IGNORE INTO sitevariables VALUES ('general/minpoolsize','1','1','The Minimum size of the shared pool');
+INSERT IGNORE INTO sitevariables VALUES ('general/maxpoolsize','1','1','The maximum size of the shared pool');
