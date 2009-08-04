@@ -228,9 +228,11 @@ CREATE TABLE `comments` (
 DROP TABLE IF EXISTS `current_reloads`;
 CREATE TABLE `current_reloads` (
   `node_id` varchar(32) NOT NULL default '',
+  `idx` smallint(5) unsigned NOT NULL default '0',
   `image_id` int(8) unsigned NOT NULL default '0',
   `mustwipe` tinyint(4) NOT NULL default '0',
-  PRIMARY KEY  (`node_id`)
+  `prepare` tinyint(4) NOT NULL default '0',
+  PRIMARY KEY  (`node_id`,`idx`)
 ) TYPE=MyISAM;
 
 --

@@ -1,0 +1,30 @@
+#
+# Add slot to the virt_nodes table. 
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (!DBSlotExists("current_reloads", "idx")) {
+	DBQueryFatal
+	    ("alter table current_reloads ".
+	     "add idx smallint(5) unsigned NOT NULL default '0' after node_id, ".
+	     "drop primary key, add primary key (node_id,idx)");
+    }
+    if (!DBSlotExists("current_reloads", "prepare")) {
+	DBQueryFatal("alter table current_reloads add prepare ".
+		     "tinyint(4) NOT NULL default '0'");
+    }
+    DBQueryFatal("replace into  state_transitions VALUES ".
+		 "('RELOAD', 'RELOADSETUP', 'RELOADOLDMFS', '')");
+    DBQueryFatal("replace into  state_transitions VALUES ".
+		 "('RELOAD', 'RELOADOLDMFS', 'SHUTDOWN', '')");
+
+    DBQueryFatal("replace into state_triggers values ".
+		 "('*', 'RELOAD', 'RELOADOLDMFS', 'RELOADOLDMFS')"); 
+    return 0;
+}
+1;

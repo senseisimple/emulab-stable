@@ -524,6 +524,8 @@ REPLACE INTO state_transitions VALUES ('GARCIA-STARGATEv1','TBSETUP','ISUP','Boo
 REPLACE INTO state_transitions VALUES ('GARCIA-STARGATEv1','TBSETUP','TBSETUP','LongSetup');
 REPLACE INTO state_transitions VALUES ('GARCIA-STARGATEv1','TBSETUP','TBFAILED','BootFail');
 REPLACE INTO state_transitions VALUES ('GARCIA-STARGATEv1','TBFAILED','SHUTDOWN','RebootAfterFail');
+REPLACE INTO state_transitions VALUES ('RELOAD','RELOADSETUP','RELOADOLDMFS','');
+REPLACE INTO state_transitions VALUES ('RELOAD','RELOADOLDMFS','SHUTDOWN','');
 
 --
 -- Dumping data for table `state_triggers`
@@ -540,6 +542,7 @@ REPLACE INTO state_triggers VALUES ('*','MINIMAL','ISUP','RESET');
 REPLACE INTO state_triggers VALUES ('*','RELOAD-MOTE','RELOADDONE','RELOADDONE');
 REPLACE INTO state_triggers VALUES ('*','OPSNODEBSD','ISUP','SCRIPT:opsreboot');
 REPLACE INTO state_triggers VALUES ('*','NORMALv2','WEDGED','POWERCYCLE');
+REPLACE INTO state_triggers VALUES ('*','RELOAD','RELOADOLDMFS','RELOADOLDMFS');
 
 --
 -- Dumping data for table `table_regex`
