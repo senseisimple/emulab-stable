@@ -5485,14 +5485,14 @@ sub UpLoadTunnels($)
 	}
 	my $iface0 = $tunnel->AddInterface($pnodename0,
 					   $member0->vnode(),
-					   $member0->vport0());
+					   $member0->vport());
 	if (!defined($iface0)) {
 	    tberror("Could not add $member0 to $tunnel\n");
 	    return -1;
 	}
 	my $iface1 = $tunnel->AddInterface($pnodename1,
 					   $member1->vnode(),
-					   $member1->vport0());
+					   $member1->vport());
 	if (!defined($iface1)) {
 	    tberror("Could not add $member1 to $tunnel\n");
 	    return -1;
@@ -5509,7 +5509,7 @@ sub UpLoadTunnels($)
 	    $iface0->SetAttribute("tunnel_ipmask", $mask) ||
 	    $iface0->SetAttribute("tunnel_serverport", $ipport) ||
 	    $iface0->SetAttribute("tunnel_lan", $virtlan->vname()) ||
-	    $iface0->SetAttribute("tunnel_unit", $iface0->memberid()) ||
+	    $iface0->SetAttribute("tunnel_unit", $iface0->memberid() + 1) ||
 	    $iface0->SetAttribute("tunnel_style", $virtlan->_encapstyle())) {
 	    tberror("Could not set attributes for $iface0 in $tunnel\n");
 	    return -1;
@@ -5524,7 +5524,7 @@ sub UpLoadTunnels($)
 	    $iface1->SetAttribute("tunnel_ipmask", $mask) ||
 	    $iface1->SetAttribute("tunnel_serverport", $ipport) ||
 	    $iface1->SetAttribute("tunnel_lan", $virtlan->vname()) ||
-	    $iface1->SetAttribute("tunnel_unit", $iface1->memberid()) ||
+	    $iface1->SetAttribute("tunnel_unit", $iface1->memberid() + 1) ||
 	    $iface1->SetAttribute("tunnel_style", $virtlan->_encapstyle())) {
 	    tberror("Could not set attributes for $iface1 in $tunnel\n");
 	    return -1;
