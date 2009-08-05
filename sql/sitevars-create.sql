@@ -75,3 +75,4 @@ INSERT IGNORE INTO sitevariables VALUES ('protogeni/cm_uuid','','','The UUID of 
 INSERT IGNORE INTO sitevariables VALUES ('protogeni/sa_uuid','','','The UUID of the local Slice Authority.');
 INSERT IGNORE INTO sitevariables VALUES ('general/minpoolsize','1','1','The Minimum size of the shared pool');
 INSERT IGNORE INTO sitevariables VALUES ('general/maxpoolsize','1','1','The maximum size of the shared pool');
+INSERT IGNORE INTO sitevariables VALUES ('general/poolnodetype','','','The preferred node type of the shared pool');
