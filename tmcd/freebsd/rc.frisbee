@@ -336,24 +336,6 @@ loadone() {
 	    zapsuperblocks $DISK
 	fi
 
-	# HACK ALERT: If we're reloading we need to zap the superblocks and
-	# MBRs of any other disks in the system.  This is to prevent Linux from
-	# finding an old filesystem with the same label or UUID and mounting
-	# that instead of the right one.  We skip the disks that are mounted
-	# and the disk we're going to write to.
-	case $STATUS in
-		*ALLOCATED=emulab-ops/reloading*)
-			disks=`find_disks`
-			for d in $disks; do
-				[ $d = $DISK ] && continue
-				mount | grep "^/dev/$d" > /dev/null && continue
-				zapsuperblocks $d
-				echo "Invalidating MBR on $d"
-				dd if=/dev/zero of=/dev/$d bs=512 count=1
-			done
-			;;
-	esac
-
 	if [ x"$imagefile" != x ]; then
 	    echo "Running /usr/local/bin/imageunzip -o -O -W 32 $ZFILL $imagefile /dev/${DISK}s${PARTITION}"
 	    /usr/local/bin/imageunzip -o -O -W 32 $ZFILL $imagefile /dev/${DISK}s${PARTITION}
@@ -441,6 +423,28 @@ if [ "$1"x = x ]; then
 fi
 
 $BINDIR/tmcc state RELOADING
+
+# HACK ALERT: If we're reloading we need to zap the superblocks and
+# MBRs of any other disks in the system.  This is to prevent Linux from
+# finding an old filesystem with the same label or UUID and mounting
+# that instead of the right one.  We skip the disks that are mounted
+# and the disk we're going to write to.
+# DOUBLE HACK ALERT: Changed this to zap all disks to avoid having
+# to figure out what the other disks are when loading multiple images.
+# Since a new MBR will be laid down anyway there is no harm in doing
+# this as long as we are sure we are in the reloading experiment.
+case $STATUS in
+	*ALLOCATED=emulab-ops/reloading*)
+		disks=`find_disks`
+		for d in $disks; do
+			#[ $d = $DISK ] && continue
+			mount | grep "^/dev/$d" > /dev/null && continue
+			zapsuperblocks $d
+			echo "Invalidating MBR on $d"
+			dd if=/dev/zero of=/dev/$d bs=512 count=1
+		done
+		;;
+esac
 
 #
 # Load each image in turn.
