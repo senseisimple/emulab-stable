@@ -138,7 +138,6 @@ loadone() {
     NUM=$2
 
     echo "Loading image #$NUM"
-    echo $LOADINFO
 
     ADDRESS=`echo $LOADINFO | sed -e 's/.*ADDR=\([^[:space:]]*\).*/\1/'`
     PARTITION=`echo $LOADINFO | sed -e 's/.*PART=\([^[:space:]]*\).*/\1/'`
