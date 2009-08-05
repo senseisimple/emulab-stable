@@ -130,41 +130,34 @@ zapsuperblocks() {
     return
 }
 
-$BINDIR/tmcc state RELOADSETUP
+#
+# Function to load a single image on a disk
+#
+loadone() {
+    LOADINFO=$1
+    NUM=$2
 
-BOSSINFO=`$BINDIR/tmcc bossinfo`
-LOADINFO=`$BINDIR/tmcc loadinfo`
-STATUS=`$BINDIR/tmcc status`
+    echo "Loading image #$NUM"
+    echo $LOADINFO
 
-# For testing purposes.
-#BOSSINFO='boss.emulab.net 155.101.128.70'
-#LOADINFO='ADDR=234.5.6.69:4444'
+    ADDRESS=`echo $LOADINFO | sed -e 's/.*ADDR=\([^[:space:]]*\).*/\1/'`
+    PARTITION=`echo $LOADINFO | sed -e 's/.*PART=\([^[:space:]]*\).*/\1/'`
+    PARTITION=${PARTITION:-'0'}
+    PARTOS=`echo $LOADINFO | sed -e 's/.*PARTOS=\([^[:space:]]*\).*/\1/'`
+    DISK=`echo $LOADINFO | sed -e 's/.*DISK=\([^[:space:]]*\).*/\1/'`
+    DISK=${DISK:-'ad0'}
+    ZFILL=`echo $LOADINFO | sed -e 's/.*ZFILL=\([^[:space:]]*\).*/\1/'`
+    ZFILL=${ZFILL:-'0'}
+    ACPI=`echo $LOADINFO | sed -e 's/.*ACPI=\([^[:space:]]*\).*/\1/'`
+    ACPI=${ACPI:-'unknown'}
+    ASF=`echo $LOADINFO | sed -e 's/.*ASF=\([^[:space:]]*\).*/\1/'`
+    ASF=${ASF:-'unknown'}
+    MBR=`echo $LOADINFO | sed -e 's/.*MBRVERS=\([^[:space:]]*\).*/\1/'`
+    MBR=${MBR:-'1'}
+    PREPARE=`echo $LOADINFO | sed -e 's/.*PREPARE=\([^[:space:]]*\).*/\1/'`
+    PREPARE=${PREPARE:-'0'}
 
-BOSSIP=`echo $BOSSINFO | awk '{ print $2 }'`
-
-# XXX should be part of loadinfo
-LOADIP="-S $BOSSIP"
-
-if [ -x /usr/sbin/ntpdate ]; then
-	/usr/sbin/ntpdate -b $BOSSIP >/dev/null 2>&1
-fi
-
-ADDRESS=`echo $LOADINFO | sed -e 's/.*ADDR=\([^[:space:]]*\).*/\1/'`
-PARTITION=`echo $LOADINFO | sed -e 's/.*PART=\([^[:space:]]*\).*/\1/'`
-PARTITION=${PARTITION:-'0'}
-PARTOS=`echo $LOADINFO | sed -e 's/.*PARTOS=\([^[:space:]]*\).*/\1/'`
-DISK=`echo $LOADINFO | sed -e 's/.*DISK=\([^[:space:]]*\).*/\1/'`
-DISK=${DISK:-'ad0'}
-ZFILL=`echo $LOADINFO | sed -e 's/.*ZFILL=\([^[:space:]]*\).*/\1/'`
-ZFILL=${ZFILL:-'0'}
-ACPI=`echo $LOADINFO | sed -e 's/.*ACPI=\([^[:space:]]*\).*/\1/'`
-ACPI=${ACPI:-'unknown'}
-ASF=`echo $LOADINFO | sed -e 's/.*ASF=\([^[:space:]]*\).*/\1/'`
-ASF=${ASF:-'unknown'}
-MBR=`echo $LOADINFO | sed -e 's/.*MBRVERS=\([^[:space:]]*\).*/\1/'`
-MBR=${MBR:-'1'}
-
-if [ "$PARTITION" != "0" ]; then
+    if [ "$PARTITION" != "0" ]; then
 	SLICE="-s $PARTITION"
 	case $PARTOS in
 	FreeBSD)
@@ -182,21 +175,16 @@ if [ "$PARTITION" != "0" ]; then
 	*)
 		;;
 	esac
-fi
+    fi
 
-# Enable IPoD
-if [ -r $BINDIR/rc.ipod ]; then
-	. $BINDIR/rc.ipod
-fi
-
-#
-# set memory limits:
-#	allow $RESIDMEM MB for non-frisbee stuff
-#	split remaining memory (min of 2MB) between network/disk buffering
-#
-HOSTMEM=`sysctl -n hw.usermem`
-HOSTMEM=`expr $HOSTMEM / 1048576`
-if [ $HOSTMEM -ge `expr $RESIDMEM + 2` ]; then
+    #
+    # set memory limits:
+    #	allow $RESIDMEM MB for non-frisbee stuff
+    #	split remaining memory (min of 2MB) between network/disk buffering
+    #
+    HOSTMEM=`sysctl -n hw.usermem`
+    HOSTMEM=`expr $HOSTMEM / 1048576`
+    if [ $HOSTMEM -ge `expr $RESIDMEM + 2` ]; then
 	HOSTMEM=`expr $HOSTMEM - $RESIDMEM`
 	BYTES=`expr $HOSTMEM \* 1024`
 	DATASEGSZ=`ulimit -d`
@@ -215,18 +203,18 @@ if [ $HOSTMEM -ge `expr $RESIDMEM + 2` ]; then
 	# For Utah, we let the client split up the memory
 	# (50/50, but no more chunk buffers than there are chunks in the image)
 	MEMARGS="-M $HOSTMEM"
-fi
+    fi
 
-#
-# Make sure the necessary device files exist (only necessary on FreeBSD 4.x)
-# Note that we create partition files for all slices, not just slice 1,
-# for the benefit of the slicefix script.
-#
-if [ -x /dev/MAKEDEV -a ! -e /dev/$DISK ]; then
+    #
+    # Make sure the necessary device files exist (only necessary on FreeBSD 4.x)
+    # Note that we create partition files for all slices, not just slice 1,
+	# for the benefit of the slicefix script.
+    #
+    if [ -x /dev/MAKEDEV -a ! -e /dev/$DISK ]; then
 	(cd /dev; ./MAKEDEV $DISK ${DISK}s2a ${DISK}s3a ${DISK}s4a)
-fi 
+    fi 
 
-if [ x"$ADDRESS" != x ]; then
+    if [ x"$ADDRESS" != x ]; then
 	isurl=`echo $ADDRESS | grep http -`
 	ispath=`echo $ADDRESS | grep '^/' -`
 
@@ -236,7 +224,7 @@ if [ x"$ADDRESS" != x ]; then
 	    isurl=1
 	    if [ ! -d /images ]; then
 		echo "Need to create or mount /images directory!"
-		exit 1
+		return 1
 	    fi
 	    
 	    #
@@ -249,10 +237,10 @@ if [ x"$ADDRESS" != x ]; then
 	    
 	    if [ ! -e $ADDRESS ]; then
 		echo "$ADDRESS does not exist!"
-		exit 1
+		return 1
 	    fi
 	    imagefile="$ADDRESS"
-	else
+        else
 	    PORT=`echo $ADDRESS | awk -F: '{ printf $2 }'`
 	    MCAST=`echo $ADDRESS | awk -F: '{ printf $1 }'`
 	    if [ -e $BOOTDIR/myip ]; then
@@ -294,9 +282,16 @@ if [ x"$ADDRESS" != x ]; then
 	# For slice images, ensure that the MBR is the correct version
 	# and replace if not.
 	#
-	if [ "$PARTITION" != "0" ]; then
-	    tweakmbr $DISK $MBR
-	fi
+        if [ $NUM -eq 0 ]; then
+	    if [ "$PARTITION" != "0" ]; then
+		tweakmbr $DISK $MBR
+	    fi
+            FIRSTMBR=$MBR
+        else
+            if [ "$FIRSTMBR" != "$MBR" ]; then
+		echo "MBR Mismatch: First MBR is \"$FIRSTMBR\" while image #$NUM is \"$MBR\""
+	    fi
+        fi
 
 	#
 	# If a remote node and we have a URL, make sure that we have a place
@@ -307,7 +302,7 @@ if [ x"$ADDRESS" != x ]; then
 	    $BINDIR/mkextrafs.pl -c -s 4 -r $DISK /images || {
 		$BINDIR/mkextrafs.pl -n -f -s 4 -r $DISK /images || {
 		    echo "Could not create /images partition"
-		    exit 1
+		    return 1
 		}
 	    }
 	    wget -nv -N -P /images "$ADDRESS"
@@ -318,7 +313,7 @@ if [ x"$ADDRESS" != x ]; then
 		;;
 	    *)
 		echo "wget failed, status $wstat"
-		exit 1
+		return 1
 		;;
 	    esac
 	fi
@@ -335,7 +330,9 @@ if [ x"$ADDRESS" != x ]; then
 	# a reasonable assumption in general, it mostly works in our
 	# environment and at least won't hurt anything if not true.
 	#
-	if [ $isrem -eq 0 -a x"$ZFILL" = x -a "$PARTITION" = "0" ]; then
+	if [ $PREPARE -eq 1 -o \
+             \( $isrem -eq 0 -a x"$ZFILL" = x -a "$PARTITION" = "0" \) ]
+        then
 	    zapsuperblocks $DISK
 	fi
 
@@ -356,8 +353,6 @@ if [ x"$ADDRESS" != x ]; then
 			done
 			;;
 	esac
-
-        $BINDIR/tmcc state RELOADING
 
 	if [ x"$imagefile" != x ]; then
 	    echo "Running /usr/local/bin/imageunzip -o -O -W 32 $ZFILL $imagefile /dev/${DISK}s${PARTITION}"
@@ -389,52 +384,116 @@ if [ x"$ADDRESS" != x ]; then
 
 	case $fstat in
 	0)
-		echo "Frisbee run finished"
-		echo "Resizing final disk partition"
-		$BINDIR/growdisk -vW /dev/$DISK
-		echo "Adjusting slice-related files"
-		export SLICEFIX_ACPI=$ACPI
-		export SLICEFIX_ASF=$ASF
-		$BINDIR/slicefix $PARTITION $DISK
-		echo "Image load complete at `date`"
-
-		#
-		# If requested to reboot, do so.
-		#
-		# Note: there is a race condition with stated here.
-		# If we reboot immediately after sending RELOADDONE,
-		# it is possible that, under heavy server load, we will
-		# finish the reboot and reach the bootinfo stage before
-		# stated gets and processes our RELOADDONE.  So now we
-		# wait around after sending the RELOADDONE.  stated should
-		# force us to reboot when the transition takes place.
-		# For backward compatibility we use a new state: RELOADDONEV2.
-		# For paranoia we just wait around for awhile and then
-		# reboot anyway, just in case stated's reboot fails for
-		# some reason.
-		#
-		if [ $reboot -eq 1 ]; then
-		    $BINDIR/tmcc state RELOADDONEV2
-		    echo "Waiting for server to reboot us ..."
-		    if [ $isrem -eq 1 ]; then
-			sleep 30
-		    else
-			sleep 240
-		    fi
-		    echo "No response from server, rebooting myself ..."
-		    /sbin/reboot
-		    sleep 100
-		else
-		    $BINDIR/tmcc state RELOADDONE
-		fi
-	        exit 0
-		;;
+	    echo "Resizing final disk partition"
+	    $BINDIR/growdisk -vW /dev/$DISK
+	    echo "Adjusting slice-related files"
+	    export SLICEFIX_ACPI=$ACPI
+	    export SLICEFIX_ASF=$ASF
+	    $BINDIR/slicefix $PARTITION $DISK
+	    echo "Image #$NUM load complete at `date`"
+	    return 0
+	    ;;
 	*)
-		echo "Frisbee run failed, status $fstat"
-		;;
+	    echo "Frisbee run failed, status $fstat"
+	    ;;
 	esac
-else
+    else
 	echo "Unable to get address for loading image"
+    fi
+    return 1
+}
+
+$BINDIR/tmcc state RELOADSETUP
+
+BOSSINFO=`$BINDIR/tmcc bossinfo`
+STATUS=`$BINDIR/tmcc status`
+
+# For testing purposes.
+#BOSSINFO='boss.emulab.net 155.101.128.70'
+#LOADINFO='ADDR=234.5.6.69:4444'
+
+BOSSIP=`echo $BOSSINFO | awk '{ print $2 }'`
+
+# XXX should be part of loadinfo
+LOADIP="-S $BOSSIP"
+
+if [ -x /usr/sbin/ntpdate ]; then
+	/usr/sbin/ntpdate -b $BOSSIP >/dev/null 2>&1
 fi
-echo "Failed to load disk, dropping to login prompt at `date`"
-exit 1
+
+# Enable IPoD
+if [ -r $BINDIR/rc.ipod ]; then
+    . $BINDIR/rc.ipod
+fi
+
+#
+# Break the load info into lines by setting IFS to a newline.
+# XXX there must be a better way to do this!
+#
+OIFS=$IFS
+IFS='
+'
+set -- `$BINDIR/tmcc loadinfo`
+IFS=$OIFS
+if [ "$1"x = x ]; then
+    echo "No load information for node"
+    exit 1
+fi
+
+$BINDIR/tmcc state RELOADING
+
+#
+# Load each image in turn.
+# If a load fails, we exit non-zero so that the rc script will drop into
+# single-user mode.  If all loads succeed we either reboot or continue with
+# the rc script as desired by the caller.
+#
+NUM=0
+while [ "$1"x != x ]; do
+    loadone "$1" $NUM || {
+	echo "Failed to load disk, dropping to login prompt at `date`"
+        exit 1
+    }
+    shift
+    NUM=`expr $NUM + 1`
+done
+
+echo "Frisbee run finished"
+
+#
+# If requested to reboot, do so.
+#
+# Note: there is a race condition with stated here.
+# If we reboot immediately after sending RELOADDONE,
+# it is possible that, under heavy server load, we will
+# finish the reboot and reach the bootinfo stage before
+# stated gets and processes our RELOADDONE.  So now we
+# wait around after sending the RELOADDONE.  stated should
+# force us to reboot when the transition takes place.
+# For backward compatibility we use a new state: RELOADDONEV2.
+# For paranoia we just wait around for awhile and then
+# reboot anyway, just in case stated's reboot fails for
+# some reason.
+#
+if [ $reboot -eq 1 ]; then
+    $BINDIR/tmcc state RELOADDONEV2
+    echo "Waiting for server to reboot us ..."
+    if [ $isrem -eq 1 ]; then
+	sleep 30
+    else
+	sleep 240
+    fi
+    echo "No response from server, rebooting myself ..."
+    /sbin/reboot
+    sleep 100
+else
+    $BINDIR/tmcc state RELOADDONE
+fi
+
+echo "Frisbee finished"
+
+exit 0
+
+
+
+
