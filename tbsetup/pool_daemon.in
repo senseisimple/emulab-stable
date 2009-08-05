@@ -51,6 +51,7 @@ use NodeType;
 use Experiment;
 use User;
 use OSinfo;
+use Image;
 
 # We use tblog to determine why swapexp failed.
 tblog_stop_capture();
@@ -120,6 +121,15 @@ my $eid = $experiment->eid();
 my $elabman = User->Lookup("elabman");
 if (!defined($elabman)) {
     fatal("Could not lookup elabman user. Exiting ...");
+}
+
+#
+# We need to have this image available.
+#
+my $image = Image->Lookup(TBOPSPID(), "FEDORA8-OVZ-STD");
+if (!defined($image)) {
+    print STDERR "Pool Daemon exiting since there is suitable image\n";
+    exit(0);
 }
 
 while (1) {
@@ -250,7 +260,7 @@ while (1) {
 	    $vname = "vhost${id}";
 	}
 	print NS "set $vname [\$ns node]\n";
-	print NS "tb-set-node-os \$$vname FEDORA8-OVZ-STD\n";
+	print NS "tb-set-node-os \$$vname " . $image->imagename() . "\n";
 	print NS "tb-set-node-sharingmode \$$vname \"shared_local\"\n";
 	print NS "tb-set-hardware \$$vname $poolnodetype\n"
 	    if (defined($poolnodetype) && $poolnodetype ne "");
