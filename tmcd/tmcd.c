@@ -3760,7 +3760,7 @@ COMMAND_PROTOTYPE(doloadinfo)
 		return 0;
 	}
 
-	if (nrows > 1 && vers <= 30) {
+	if (nrows > 1 && vers <= 29) {
 
 		bufp += OUTPUT(bufp, ebufp - bufp,
 			       "ADDR=/NEWER-MFS-NEEDED PART=0 PARTOS=Bogus\n");
