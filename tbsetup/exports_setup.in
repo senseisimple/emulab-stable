@@ -332,14 +332,8 @@ while (@row = $nodes_result->fetchrow_array) {
 	    }
 
 	}
-	if ($erole eq "sharedhost") {
-	    %lastfslist    = ();
-	    @lastsmbshares = ();
-	}
-	else {
-	    %lastfslist    = %fslist;
-	    @lastsmbshares = @smbshares;
-	}
+	%lastfslist    = %fslist;
+	@lastsmbshares = @smbshares;
     }
 
     # For each FS directory list, create a hash key out of its directory list.
