@@ -70,7 +70,7 @@ $query_result =
 		 "order BY rsrvtime");
 
 echo "These are the nodes in the shared pool. ";
-echo "Please see the <a href='$WIKIDOCURL/SharedNodes'>documention</a> ";
+echo "Please see the <a href='$WIKIDOCURL/SharedNodes'>documentation</a> ";
 echo "on how to use shared nodes in your experiment.<br>";
 
 echo "<table width=\"100%\" border=2 cellpadding=1 cellspacing=2 
