@@ -865,7 +865,7 @@ if (! $batch && ! $template_mode && !$genimode) {
 
 	my $exit_code = $? >> 8;
 
-	if ($exit_code != 0) {
+	if (!$quiet && $exit_code != 0) {
 	    my $d = tblog_lookup_error();
 	    my $output = tblog_format_error($d);
 	    if ($xmlout) {
