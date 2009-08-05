@@ -8,7 +8,7 @@ use strict;
 use English;
 use Getopt::Std;
 use POSIX qw(tmpnam);
-use Data::Dumper();
+use Data::Dumper;
 
 #
 # Manage the pool of shared nodes.
@@ -19,9 +19,10 @@ sub usage()
 	"Use the -d option to prevent daemonization\n";
     exit(-1);
 }
-my $optlist = "d";
-my $debug   = 0;
-my $startup = 0;
+my $optlist = "dn";
+my $debug    = 0;
+my $impotent = 0;
+my $startup  = 0;
 
 #
 # This should run as root.
@@ -87,9 +88,12 @@ if (@ARGV != 0) {
 if (defined($options{"d"})) {
     $debug = $options{"d"};
 }
+if (defined($options{"n"})) {
+    $impotent = $options{"n"};
+}
 
 # Go to ground.
-if (! $debug) {
+if (! ($debug || $impotent)) {
     if (TBBackGround($batchlog)) {
 	exit(0);
     }
@@ -100,7 +104,10 @@ print "Pool Daemon starting... pid $$, at ".`date`;
 # Grab the shared node experiment. This should come from a sitevar.
 # Or perhaps we want to manage multiple shared pools?
 #
-my $experiment = Experiment->Lookup(TBOPSPID(), "shared-nodes");
+my $experiment =
+    Experiment->Lookup(TBOPSPID(), "shared-nodes") ||
+    Experiment->Lookup(TBOPSPID(), "shared-node");
+    
 if (!defined($experiment)) {
     fatal("Could not lookup shared node experiment. Exiting ...");
 }
@@ -123,7 +130,7 @@ while (1) {
     else {
 	sleep(120);
     }
-	
+
     print "Pool Daemon running at ".`date`;
 
     Node->FlushAll();
@@ -135,6 +142,11 @@ while (1) {
     my $loaded   = 0;
     my $unloaded = 0;
     my $newcount = 0;
+
+    # Sitevars to control poolsize. Reloas each loop.
+    my $maxpoolsize  = TBGetSiteVar("general/maxpoolsize");
+    my $minpoolsize  = TBGetSiteVar("general/minpoolsize");
+    my $poolnodetype = TBGetSiteVar("general/poolnodetype");
 
     #
     # Look to see how each of the nodes is packed. This is
@@ -161,8 +173,12 @@ while (1) {
 	    if ($vnodecount < 0);
 
 	if ($vnodecount == 0) {
-	    print "$node no longer has virtual nodes on it\n";
-	    $tofree{$node->node_id()} = $node;
+	    print "$node no longer has virtual nodes on it.\n";
+	    # Free the node unless we would go below the minpoolsize.
+	    if (scalar(@nodelist) - scalar(keys(%tofree)) > $minpoolsize) {
+		print "  Adding to free list.\n";
+		$tofree{$node->node_id()} = $node;
+	    }
 	    next;
 	}
 	# Count up loaded vs. unloaded nodes.
@@ -176,7 +192,7 @@ while (1) {
 	$inuse{$node->vname()} = $node;
     }
     #
-    # Try to keep an unloaded machine available. 
+    # Try to keep at least one unloaded machine available, but stay under max.
     #
     if (scalar(@nodelist) - $loaded <= 1) {
 	if (keys(%tofree)) {
@@ -184,18 +200,15 @@ while (1) {
 	    my $key = (keys(%tofree))[0];
 	    delete($tofree{$key});
 	}
-	else {
+	elsif (scalar(@nodelist) < $maxpoolsize) {
 	    $newcount++;
 	}
     }
-    # But do not let all the nodes go free.
-    if (@nodelist && (scalar(@nodelist) == scalar(keys(%tofree)))) {
-	my $key = (keys(%tofree))[0];
-	delete($tofree{$key});
+    if (! (keys(%tofree) || $newcount)) {
+	exit(0)
+	    if ($impotent);
+	next;
     }
-
-    next
-	if (! (keys(%tofree) || $newcount));
 
     #
     # Generate a new NS file. Be nice to not have to this, but not
@@ -218,6 +231,7 @@ while (1) {
 	    if (exists($tofree{$node->node_id}));
 
 	my $vname  = $node->vname();
+	my $nodeid = $node->node_id();
 	my $osid   = $node->def_boot_osid();
 	my $osinfo = OSinfo->Lookup($osid);
 	my $osname = $osinfo->osname();
@@ -225,6 +239,7 @@ while (1) {
 	print NS "set $vname [\$ns node]\n";
 	print NS "tb-set-node-os \$$vname $osname\n";
 	print NS "tb-set-node-sharingmode \$$vname \"shared_local\"\n";
+	print NS "tb-fix-node \$$vname $nodeid\n";
     }
     while ($newcount) {
 	my $id    = 1;
@@ -237,6 +252,8 @@ while (1) {
 	print NS "set $vname [\$ns node]\n";
 	print NS "tb-set-node-os \$$vname FEDORA8-OVZ-STD\n";
 	print NS "tb-set-node-sharingmode \$$vname \"shared_local\"\n";
+	print NS "tb-set-hardware \$$vname $poolnodetype\n"
+	    if (defined($poolnodetype) && $poolnodetype ne "");
 
 	$newcount--;
     }
@@ -244,6 +261,9 @@ while (1) {
     print NS "\$ns run\n";
     close(NS);
     chmod(0775, $tmpfile);
+
+    exit(0)
+	if ($impotent);
 
     #
     # Start a swapmod. 
@@ -260,9 +280,12 @@ while (1) {
 	print "Swap modify done at " . `date`;
 	$experiment->LockDown(1);
 	if ($exitval) {
-	    my $error_data = tblog_find_error();
-	    print Dumper($error_data);
-	    
+	    my $error_data = tblog_find_error({"quiet" => 1});
+
+	    if ($error_data->{'cause'} eq "temp") {
+		print "Temporary resource shortage; try again later\n";
+		next;
+	    }
 	    fatal("swapmod failed");
 	}
     }
