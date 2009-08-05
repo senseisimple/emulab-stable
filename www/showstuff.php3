@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007, 2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -220,6 +220,7 @@ function SHOWNODES($pid, $eid, $sortby, $showclass) {
 
 	$stalemark = "<b>?</b>";
 	$count = 0;
+	$sharednodes = 0;
 
 	while ($row = mysql_fetch_array($query_result)) {
 	    $node_id = $row["node_id"];
@@ -238,6 +239,7 @@ function SHOWNODES($pid, $eid, $sortby, $showclass) {
 	    $isremote      = $row["isremotenode"];
 	    $tipname       = $row["tipname"];
 	    $iswindowsnode = $row["OS"]=='Windows';
+	    $sharemode     = $row["sharing_mode"];
 
 	    if (! ($node = Node::Lookup($node_id))) {
 		TBERROR("SHOWNODES: Could not map $node_id to its object", 1);
@@ -264,8 +266,13 @@ function SHOWNODES($pid, $eid, $sortby, $showclass) {
 	    $count++;
 
 	    echo "<tr>
-                    <td><a href='shownode.php3?node_id=$node_id'>$node_id</a></td>
-                    <td>$vname</td>\n";
+                    <td><a href='shownode.php3?node_id=$node_id'>$node_id</a>";
+	    if (isset($sharemode) && $sharemode == "using_shared_local") {
+		echo " *";
+		$sharednodes++;
+	    }
+	    echo "</td>\n";
+	    echo "<td>$vname</td>\n";
 
             if ($isplabdslice) {
               echo "  <td>$wasite</td>
@@ -351,14 +358,19 @@ function SHOWNODES($pid, $eid, $sortby, $showclass) {
 	    echo "</tr>\n";
 	}
 	echo "</table>\n";
+	if ($sharednodes) {
+	    echo "<center>* This experiment is using <a href='showpool.php'>";
+	    echo "<b>shared nodes</b></a></center>\n";
+	}
+
 	echo "<div style=\"width:70%; margin:auto;\">\n";
 	echo "<font size=-1>\n";
 	echo "<ol style=\"text-align: left;\">
 	        <li>A $stalemark indicates that the data is stale, and
 	            the node has not reported on its proper schedule.</li>
                 <li>Exit value of the node startup command. A value of
-                        666 indicates a testbed internal error.</li>
-              </ol>
+                        666 indicates a testbed internal error.</li>\n";
+        echo "</ol>
               </font></div>\n";
 	echo "</div>\n";
 	
