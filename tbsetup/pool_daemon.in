@@ -204,7 +204,7 @@ while (1) {
     #
     # Try to keep at least one unloaded machine available, but stay under max.
     #
-    if (scalar(@nodelist) - $loaded <= 1) {
+    if (scalar(@nodelist) - $loaded < 1) {
 	if (keys(%tofree)) {
 	    # rescue one from the free list.
 	    my $key = (keys(%tofree))[0];
