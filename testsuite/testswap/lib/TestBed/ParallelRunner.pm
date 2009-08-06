@@ -39,7 +39,10 @@ sub runtests {
 
   #prerun step
   my $result = TestBed::ForkFramework::ForEach::max_work($concurrent_pre_runs, sub { shift->prerun }, $s->executors);
-  if ($result->has_errors) {
+  if ( $result->has_errors ) { 
+    for (@{$result->errors}) {
+      $s->executor($_->itemid)->handleResult(undef, $_);
+    }
     sayd($result->errors);
     warn 'TestBed::ParallelRunner::runtests died during test prep';
   }

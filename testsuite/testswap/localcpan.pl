@@ -4,6 +4,13 @@ use warnings;
 use CPAN;
 
 sub prep_local_cpan {
+  print "WARNING installing local CPAN to '~/lib/perl5' -- type yes <ENTER> to continue\n";
+  my $response = <STDIN>;
+  chomp $response;
+  if ($response ne "yes") {
+    die "$response does not match yes";
+  }
+
   open(FH, "|cpan");
   print FH "no\n";
   print FH "quit\n";
@@ -49,6 +56,20 @@ sub install_deps_from_cpan {
   CPAN::Shell->install($_) for(@deps);
 }
 
+sub install_ext_deps_from_cpan {
+  my @deps = qw(
+      Email::Stuff
+      Email::Sender
+      Email::Send
+      IO::All
+      );
+#Test::Class
+#Crypt::SSLeay # required for SSL
+#Data::UUID requires user input
+#Net::Ping #tests fail, default installed version 2.31 is good enough
+  CPAN::Shell->install($_) for(@deps);
+}
+
 sub automate_ssh_install {
   my @ssh_math_deps = qw(
       bignum
@@ -74,15 +95,11 @@ sub automate_ssh_install {
 }
 
 sub main {
+  if ((grep {$_ eq '--install_deps' } @ARGV)) { install_deps_from_cpan; exit; }
+  if ((grep {$_ eq '--install_ext_deps' } @ARGV)) { install_ext_deps_from_cpan; exit;
+  }
   if (!(grep {$_ eq '--override' } @ARGV) and -e glob("~/.cpan")) {
     die "NOT installing local CPAN ~/.cpan exists, specify --override to ignore check";
-  }
-
-  print "WARNING installing local CPAN to '~/lib/perl5' -- type yes <ENTER> to continue\n";
-  my $response = <STDIN>;
-  chomp $response;
-  if ($response ne "yes") {
-    die "$response does not match yes";
   }
 
   prep_local_cpan;
@@ -90,7 +107,7 @@ sub main {
 
   if ($ARGV[0] && $ARGV[0] eq 'MI') {
     automate_module_install;  #too complicated for fluxers on FreeBSD
-    automate_ssh_install;     #too complicated for fluxers on FreeBSD
+    #automate_ssh_install;     #too complicated for fluxers on FreeBSD
   }
   else {
     install_deps_from_cpan;

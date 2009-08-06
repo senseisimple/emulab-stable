@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 use SemiModern::Perl;
 use TestBed::TestSuite;
-use Test::More tests => 3;
+use Test::More tests => 7;
 use Test::Exception;
 use Data::Dumper;
 use BasicNSs;

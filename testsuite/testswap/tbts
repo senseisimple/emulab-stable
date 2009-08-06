@@ -67,14 +67,23 @@ my $daemonize;
   if ($daemonize or $emailme)  { TestBed::Daemonize::daemonize; }
 }
 
-sub usage {
-  our $ts;
-  our $tpms;
-  sub scandir_t     { if (-f && /\.t$/)  { $ts   .= "        " . $File::Find::name . "\n"; } }
-  sub scandir_tests { if (-f && /\.pm$/) { $tpms .= "        " . $File::Find::name . "\n"; } }
+sub find_rx_in_dir {
+  my ($rx, $dir) = @_;
+  my @results;
+  my $scandir = sub { if (-f && m/$rx/)  { push @results,   $File::Find::name; } };
   use File::Find;
-  find(\&scandir_t, 't');
-  find(\&scandir_tests, 'tests');
+  find($scandir, $dir);
+  @results;
+}
+
+sub all_ts { find_rx_in_dir(qr{\.t$}, 't'); }
+sub all_tpms { find_rx_in_dir(qr{\.pm$}, 'tests'); }
+
+sub usage {
+  my $ts_text;
+  my $tpms_text;
+  for (all_ts) { $ts_text     .= "        " . $_ . "\n"; }
+  for (all_tpms) { $tpms_text .= "        " . $_ . "\n"; }
   print <<"USAGE";
 TestBed TestSwap
 ./tbts OPTIONS TESTSUITE|TESTFILE
@@ -95,7 +104,7 @@ TestBed TestSwap
         
 
     TESTSUITES:
-        test     - all topology tests
+        all      - all tests
         sanity   - all framework utility and xmlrpc client modules test
         lib      - all framework utility tests
         xmlrpc   - all xmlrpc client modules tests
@@ -103,12 +112,22 @@ TestBed TestSwap
 
     TESTFILES:
 USAGE
-  print $ts;
-  print $tpms;
+  print $ts_text;
+  print $tpms_text;
+}
+
+sub array_single_difference {
+  my ($src, $minus) = @_;
+  grep { my $s = $_; !(grep { $s eq $_ } @$minus) } @$src;
 }
 
 use TestBed::Harness;
 if (@ARGV) {
+  my @xmlrpc = qw(t/xmlrpc/*.t);
+  my @lib = qw(t/lib/*.t t/lib/*/*.t t/tbts/cmdlineargs.t);
+  my @sanity = (@lib, @xmlrpc);
+  my @all = ( @lib, @xmlrpc, qw( t/livetests/*.t ) );
+  @all = sort(array_single_difference([all_ts], [qw(t/coding/pod_coverage.t t/noautorun/tbts_cmdlineargs.t t/eine/elab_in_elab.t)]));
   my $cmd = $ARGV[0];
   $_   = $cmd;
   chomp $_;
@@ -116,10 +135,10 @@ if (@ARGV) {
   elsif ($_ eq 'podc')      { system 'for x in `find lib -iname "*.pm"`; do podchecker $x 2>&1 |grep contain; done; '; }
   elsif ($_ eq 'pode')      { system 'for x in `find lib -iname "*.pm"`; do podchecker $x 2>&1 |grep ERROR; done;'; }
   elsif (/critic/)          { exec 'perlcritic lib t'; }
-  elsif (/sanity/)          { runharness( qw(t/lib/*.t t/lib/*/*.t t/xmlrpc/*.t) ); }
-  elsif (/lib/)             { runharness( qw(t/lib/*.t t/lib/*/*.t) ); }
-  elsif (/xmlrpc/)          { runharness( qw(t/xmlrpc/*.t) ); }
-  elsif (/test/)            { runharness( qw(t/topologies/*.t) ); }
+  elsif (/all/)             { runharness( @all ); }
+  elsif (/sanity/)          { runharness( @sanity ); }
+  elsif (/lib/)             { runharness( @lib ); }
+  elsif (/xmlrpc/)          { runharness( @xmlrpc ); }
   elsif (/coding/)          { runharness( qw(t/coding/pod_coverage.t) ); }
 }
 else {

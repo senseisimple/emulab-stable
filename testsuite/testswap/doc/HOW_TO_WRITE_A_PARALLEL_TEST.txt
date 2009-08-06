@@ -47,7 +47,7 @@ my $linkupdowntest = sub {
   ok($n1ssh->cmdsuccessdump("ping -c 5 10.1.2.3"));
 };
 
-rege('linkupdown', $BasicNSs::TwoNodeLanWithLink, $linkupdowntest, 5, 'link up and down with ping on link');
+rege(e('linkupdown'), $BasicNSs::TwoNodeLanWithLink, $linkupdowntest, 5, 'link up and down with ping on link');
 
 my $twonodelan5Mbtest = sub {
   my ($e) = @_;

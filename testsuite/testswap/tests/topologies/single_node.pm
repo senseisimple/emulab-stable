@@ -11,4 +11,4 @@ set node1 [$ns node]
 $ns run
 NSEND
 
-rege(e('sn'), $ns, sub { ok(shift->single_node_tests); }, 1, 'single_node_tests');
+rege(e('singlenode'), $ns, sub { ok(shift->single_node_tests); }, 1, 'single_node_tests');

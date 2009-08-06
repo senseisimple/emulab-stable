@@ -1,8 +1,7 @@
 #!/usr/bin/perl
 use SemiModern::Perl;
 use TestBed::TestSuite;
-use Test::More tests => 1;
-use Data::Dumper;
+use Test::More;
 
 my $ns = <<'NSEND';
 source tb_compat.tcl
@@ -16,4 +15,4 @@ set lan1 [$ns make-lan "$node1 $node2" 100Mb 0ms]
 $ns run
 NSEND
 
-ok(e('tewkt')->launchpingswapkill($ns));
+rege(e('twonodelan'), $ns, sub { ok(shift->single_node_tests); }, 1, 'two_node_lan single_node_tests');

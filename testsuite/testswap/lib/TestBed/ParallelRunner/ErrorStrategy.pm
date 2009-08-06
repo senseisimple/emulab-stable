@@ -17,7 +17,8 @@ sub handleResult {
 
   if ($result->is_error) {
     my $error = $result->error;
-    if    ( $error->isa ( 'TestBed::ParallelRunner::Executor::SwapinError'))  { return $s->swapin_error  ( @_); }
+    if    ( $error->isa ( 'TestBed::ParallelRunner::Executor::PrerunError'))  { return $s->prerun_error  ( @_); }
+    elsif ( $error->isa ( 'TestBed::ParallelRunner::Executor::SwapinError'))  { return $s->swapin_error  ( @_); }
     elsif ( $error->isa ( 'TestBed::ParallelRunner::Executor::RunError'))     { return $s->run_error     ( @_); }
     elsif ( $error->isa ( 'TestBed::ParallelRunner::Executor::SwapoutError')) { return $s->swapout_error ( @_); }
     elsif ( $error->isa ( 'TestBed::ParallelRunner::Executor::KillError'))    { return $s->end_error     ( @_); }
@@ -47,10 +48,23 @@ sub is_retry_cause {
   return 0;
 }
 
+sub prerun_error  { return RETURN_AND_REPORT; }
 sub swapin_error  { return RETURN_AND_REPORT; }
 sub run_error     { return RETURN_AND_REPORT; }
 sub swapout_error { return RETURN_AND_REPORT; }
 sub end_error     { return RETURN_AND_REPORT; }
+
+package TestBed::ParallelRunner::PrerunExpectFail;
+use SemiModern::Perl;
+use Mouse;
+use TestBed::ParallelRunner::ErrorConstants;
+
+extends 'TestBed::ParallelRunner::ErrorStrategy';
+
+sub prerun_error {
+  my ($s, $executor, $scheduler, $result) = @_;
+  return RETURN_AND_REPORT;
+}
 
 package TestBed::ParallelRunner::ErrorRetryStrategy;
 use SemiModern::Perl;
@@ -142,6 +156,7 @@ handle parallel run errors;
 
   dispatch experiment errors to the right handler
 
+=item C<< $es->prerun_error($error) >>
 =item C<< $es->swapin_error($error) >>
 =item C<< $es->run_error($error) >>
 =item C<< $es->swapout_error($error) >>

@@ -60,6 +60,10 @@ daemonizes the process redirecting stdout and stderr to files
 
 generates a EMail::Stuff object
 
+=item C<attach_text>
+
+attaches a text file to a Email::Stuff object
+
 =item C<email_daemonize_logs($to)>
 
 send logs of daemon activity to $to

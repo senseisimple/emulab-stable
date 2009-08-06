@@ -5,17 +5,24 @@ REQUIREMENTS
   ssh executable in path
 
 INSTALLATION INSTRUCTIONS
-  perl ./localcpan.pl #this install dependencies in your homdir if you don't have root access to do it yourself
-    When prompted:
+   #this configures CPAN and installs CPAN dependencies in your homedir if you don't have root access to do it yourself
+   perl ./localcpan.pl
+
+  #this installs CPAN dependencies into your system as root using CPAN as already configured
+  sudo ./localcpan.pl --install_deps
+    
+  When prompted:
       UUID state storage [/tmp] (HIT ENTER)
       default umask [0007] (HIT ENTER)
       Which SSL install path do you want to use? [/usr] (HIT ENTER)
       Do you want to run the live tests (y/N) ? [N] (HIT ENTER)
 
-  add export PERL5LIB=~/lib/perl5 to your environment
+  add export PERL5LIB=~/lib/perl5 to your environment if you did a local cpan install to your homedir
+
   copy TBConfig.pm.in to TBConfig.pm and edit it to point to your emulab SSL client certificate and corresponding decrypted private key.
 
 HOWTO create a cert file and a decrypted private key file from your emulab(cert+key) file.
+  Generate a emulab certificate USING THE EMULAB WEB INTERFASE
   openssl rsa -in emulab -out decrypted_emulab.key
   openssl x509 -in emulab -out emulab.cert
 
@@ -24,14 +31,15 @@ TO SEE Tests available to run
  
 TO RUN Tests
   ./tbts test
-  ./tbts t/old/old.t
-  ./tbts t/topologies/single_node.t
+  ./tbts tests/topologies/single_node.pm
+  ./tbts -D OS= tests/ImageTests.pm
+  ./tbts tests/OldTestSuiteTests.pm
 
 EXAMPLE Tests to look at to GET STARTED:
-  t/topologies/single_node.t
-  t/topologies/two_node_lan.t
-  t/topologies/simple_two_node_linktest.t
-  t/topologies/link_up_link_down.t
+  tests/topologies/single_node.pm
+  tests/topologies/two_node_lan.pm
+  tests/topologies/simple_two_node_linktest.pm
+  tests/topologies/link_up_link_down.pm
 
 Documentation can be found in the doc directory
 running pod2text on any pm file will produce API docs.
@@ -48,7 +56,7 @@ pod2text lib/TestBed/TestSuite/Experiment.pm
 
 
 
-
+#Deprecated more modern and perlish form of installation
 
 Module Install is a comprehensive installer.
 It will:

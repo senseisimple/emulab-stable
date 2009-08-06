@@ -1,4 +1,4 @@
-testswap is a object orient / declarative test framework for the emulab testbed.
+testswap is a object oriented / declarative test framework for the emulab testbed.
 
 LIBRARY CODE
 ./lib/TestBed/TestSuite/
@@ -23,7 +23,7 @@ xmlrpc tests
 testswap framework tests
 
 
-Exporter is used to export symbols form the defining modules namespace into the module that is using the namespace.
+./lib/TestBed/TestSuite.pm is a very small dsl for defining tests. It exports its symbols into namespace of modules that import it.
 
 Mouse is a lightweight version of the Moose object system for Perl.
 Moose is the best practice way of doing object orientation in Perl and is modeled after Perl6's OO system.
