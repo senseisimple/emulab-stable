@@ -34,7 +34,7 @@ my $mysql = "mysql -N -B";
 my $latest = 0;
 opendir( DIR, "$testbed_srcdir/protogeni/updates" );
 while( my $entry = readdir( DIR ) ) {
-    $latest = $entry if $entry =~ /\d+/ && $entry > $latest;
+    $latest = $entry if $entry =~ /^\d+$/ && $entry > $latest;
 }
 closedir( DIR );
 
@@ -42,6 +42,8 @@ closedir( DIR );
 # don't think we can rely on that stuff being installed at this point...
 my $outofdate = 0;
 for my $db ( "geni", "geni-ch", "geni-cm" ) {
+    next unless qx{$mysql $db}; # if this is a new site, the databases might
+        # not even exist yet
     my $dbversion = qx{$mysql $db -e "SELECT value FROM version_info WHERE name='dbrev';"};
     $outofdate = 1 if $dbversion != $latest;
 }
