@@ -1011,7 +1011,7 @@ CREATE TABLE `experiment_templates` (
   `path` tinytext,
   `maximum_nodes` int(6) unsigned default NULL,
   `minimum_nodes` int(6) unsigned default NULL,
-  `virtual_nodes` int(6) unsigned default NULL,
+  `virtnode_count` int(6) unsigned default NULL,
   `logfile` tinytext,
   `logfile_open` tinyint(4) NOT NULL default '0',
   `prerender_pid` int(11) default '0',
