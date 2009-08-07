@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006, 2007, 2008 University of Utah and the Flux Group.
+# Copyright (c) 2006-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -680,6 +680,7 @@ class Experiment
 	$lastswapreq = $exprow["last_swap_req"];
 	$minnodes    = $exprow["min_nodes"];
 	$maxnodes    = $exprow["max_nodes"];
+	$virtnodes   = $exprow["virtnode_count"];
 	$syncserver  = $exprow["sync_server"];
 	$mem_usage   = $exprow["mem_usage"];
 	$cpu_usage   = $exprow["cpu_usage"];
@@ -920,6 +921,19 @@ class Experiment
 	    else {
 		echo "<tr>
                       <td>Minumum Nodes: </td>
+                      <td class=\"left\"><font color=green>Unknown</font></td>
+                  </tr>\n";
+	    }
+	    if ($virtnodes) {
+		echo "<tr>
+                      <td>Virtual Nodes: </td>
+                      <td class=\"left\"><font>
+                          $virtnodes</font></td>
+                  </tr>\n";
+	    }
+	    else {
+		echo "<tr>
+                      <td>Virtual Nodes: </td>
                       <td class=\"left\"><font color=green>Unknown</font></td>
                   </tr>\n";
 	    }
