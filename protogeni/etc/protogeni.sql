@@ -36,7 +36,7 @@ CREATE TABLE `geni_authorities` (
   `uuid_prefix` varchar(12) NOT NULL default '',
   `created` datetime default NULL,
   `expires` datetime default NULL,
-  `type` enum('sa','ma','ch','cm') NOT NULL default 'sa',
+  `type` enum('sa','ma','ch','cm','ses') NOT NULL default 'sa',
   `url` tinytext,
   PRIMARY KEY  (`uuid`),
   UNIQUE KEY `hrn` (`hrn`)
