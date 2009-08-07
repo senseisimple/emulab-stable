@@ -902,7 +902,7 @@ sub LoadVirtNodes($)
 	}
 	elsif ($isvirt) {
 	    # Silly default.
-	    my $osinfo = OSinfo->LookupByName("FBSD-JAIL");
+	    my $osinfo = OSinfo->LookupByName("OPENVZ-STD");
 	    $vnode->_osinfo($osinfo);
 	}
 
