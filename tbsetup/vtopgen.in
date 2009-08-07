@@ -120,7 +120,8 @@ $vtop->CreateVtop() == 0
 
 if ($preassign) {
     if ($experiment->Update({"maximum_nodes" => $vtop->maximum_nodes(),
-			     "minimum_nodes" => $vtop->minimum_nodes() })){
+			     "minimum_nodes" => $vtop->minimum_nodes(),
+			     "virtnode_count"=> $vtop->virtnodecount() })) {
 	fatal("Could not update min/max nodes for $experiment");
 	return -1;
     }

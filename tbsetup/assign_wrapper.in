@@ -5430,8 +5430,9 @@ sub CreateTopFile()
     $minimum_nodes = POSIX::ceil($minimum_nodes);
 
     if (! ($impotent || $regression)) {
-	DBQueryFatal("UPDATE experiments set maximum_nodes=$maximum_nodes, " .
-		     "                       minimum_nodes=$minimum_nodes ".
+	DBQueryFatal("UPDATE experiments set maximum_nodes=$maximum_nodes, ".
+		     "                       minimum_nodes=$minimum_nodes, ".
+		     "                       virtnode_count=$virtnode_count ".
 		     "where pid='$pid' and eid='$eid'");
     }
 

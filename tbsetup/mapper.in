@@ -457,8 +457,9 @@ sub RunAssign($$)
 
     if (! ($impotent || $regression)) {
 	if ($experiment->Update({"maximum_nodes" => $vtop->maximum_nodes(),
-				 "minimum_nodes" => $vtop->minimum_nodes() })){
-	    tberror("Could not update min/max nodes for $experiment\n");
+				 "minimum_nodes" => $vtop->minimum_nodes(),
+				 "virtnode_count"=> $vtop->virtnodecount() })){
+	    tberror("Could not update min/max/virt nodes for $experiment\n");
 	    return -1;
 	}
     }
