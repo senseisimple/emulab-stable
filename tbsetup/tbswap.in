@@ -893,7 +893,7 @@ sub doSwapin($) {
 	my $exitcode;
 	my $cmd = "$wrapper";
 	if ($pid eq "testbed" || $pid eq "tbres" || $pid eq "emulab-ops" ||
-	    $this_user->stud()) {
+	    $this_user->stud() || $experiment->virtnode_count()) {
 	    $cmd = "$mapper";
 	}
 	$cmd .= " -f"
