@@ -10,7 +10,8 @@ sub DoUpdate($$$)
 
     if (!DBSlotExists("experiments", "virtnode_count")) {
 	DBQueryFatal("alter table experiments add ".
-		     "virtnode_count int(6) unsigned default NULL");
+		     "virtnode_count int(6) unsigned default NULL ".
+		     "after minimum_nodes");
     }
     return 0;
 }
