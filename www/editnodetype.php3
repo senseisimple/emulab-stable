@@ -121,14 +121,20 @@ function SPITFORM($node_type, $formfields, $attributes, $deletes, $errors)
     # Split default_imageid
     #
 
-    $default_imageids = preg_split('/,/', $attributes["default_imageid"]);
-    for ($i = 0; $i != count($default_imageids); $i++) {
-	$attributes["default_imageid_$i"] = $default_imageids[$i];
+    if (isset($attributes["default_imageid"])) {
+	$default_imageids = preg_split('/,/', $attributes["default_imageid"]);
+	for ($i = 0; $i != count($default_imageids); $i++) {
+	    $attributes["default_imageid_$i"] = $default_imageids[$i];
+	}
+	$last_default_imageid_label = "default_imageid_$i";
+	$attributes["default_imageid_$i"] = 0;
+	unset($attributes["default_imageid"]);
+	ksort($attributes);
+    } else {
+	$attributes["default_imageid_0"] = 0;
+	$last_default_imageid_label = "default_imageid_0";
+	ksort($attributes);
     }
-    $last_default_imageid_label = "default_imageid_$i";
-    $attributes["default_imageid_$i"] = 0;
-    unset($attributes["default_imageid"]);
-    ksort($attributes);
 
     #
     # Standard Testbed Header
@@ -501,13 +507,20 @@ $errors  = array();
 # Combine imageids into a comma seperated list
 #
 $default_imagesids = array();
+$default_imagesid_once_defined = 0;
 for ($i = 0; isset($attributes["default_imageid_$i"]); $i++) {
     if (!(isset($deletes["default_imageid_$i"]) && $deletes["default_imageid_$i"] == "checked")
         && $attributes["default_imageid_$i"] != 0)
         array_push($default_imagesids, $attributes["default_imageid_$i"]);
     unset($attributes["default_imageid_$i"]);
+    $default_imagesid_once_defined = 1;
 }
-$attributes["default_imageid"] = join(',', $default_imagesids);
+if (count($default_imagesids) > 0) {
+    $attributes["default_imageid"] = join(',', $default_imagesids);
+} elseif ($default_imagesid_once_defined) {
+    $attributes["default_imageid"] = "0";
+    $deletes["default_imageid"] = "checked";
+}
 
 # Check the attributes.
 while (list ($key, $val) = each ($attributes)) {
