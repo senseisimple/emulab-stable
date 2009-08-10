@@ -187,19 +187,28 @@ sub Resolve($)
     $urn = $hrn if (defined($hrn) && GeniHRN::IsValid( $hrn ));
     if (defined($urn)) {
 	my ($auth,$t,$id) = GeniHRN::Parse( $urn );
+	my $authority     = GeniAuthority->Lookup($urn);
 
-	my $result = DBQueryWarn( "SELECT hrn FROM geni_authorities WHERE ".
-				  "url LIKE '%" . $auth . "%' LIMIT 1;" );
+#	print STDERR "$authority, $urn\n";
+	
 	return GeniResponse->Create(GENIRESPONSE_DBERROR)
-	    if (!defined($result));
-	my ($translated) = $result->fetchrow_array() =~ /^([-\w]+)\..*/;
+	    if (!defined($authority));
+
+	my ($translated) = $authority->hrn() =~ /^([-\w]+)\..*/;
 
 #	print STDERR "$auth, $t, $id, $translated\n";
 
-	$type = $t;
-	$type = "Component"
-	    if ($type eq "node");
+	if ($t eq "node") {
+	    $type = "Component";
+	}
+	elsif ($t eq "authority") {
+	    $type = $id;
+	}
+	else {
+	    $type = $t;
+	}
 	$hrn = $translated . "." . $id;
+#	print STDERR "$auth, $t, $id, $hrn, $type\n";
 	$uuid = undef;
     }
     if (defined($uuid) && !($uuid =~ /^[-\w]*$/)) {
@@ -302,6 +311,7 @@ sub Resolve($)
 	# Return a blob.
 	my $blob = { "gid"         => $manager->cert(),
 		     "url"         => $manager->url(),
+		     "type"        => $manager->type(),
 		 };
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
     }
@@ -312,6 +322,7 @@ sub Resolve($)
 	# Return a blob.
 	my $blob = { "gid"         => $authority->cert(),
 		     "url"         => $authority->url(),
+		     "type"        => $authority->type(),
 		 };
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
     }

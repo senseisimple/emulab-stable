@@ -19,6 +19,7 @@ use vars qw(@ISA @EXPORT);
 # Must come after package declaration!
 use GeniDB;
 use GeniRegistry;
+use GeniHRN;
 use emutil qw(TBGetUniqueIndex);
 use English;
 use overload ('""' => 'Stringify');
@@ -47,7 +48,21 @@ sub Lookup($$)
     my $query_result;
     my $uuid;
 
-    if ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
+    if (GeniHRN::IsValid($token)) {
+	my ($auth,$t,$id) = GeniHRN::Parse($token);
+	my $regexp = "/.[-[:alnum:]]+.${auth}";
+	$regexp =~ s/\./\\\./g;
+
+	$query_result =
+	    DBQueryWarn("select uuid from geni_authorities ".
+			"where url regexp '$regexp' and ".
+			"      type='$id'");
+	return undef
+	    if (! $query_result || !$query_result->numrows);
+
+	($uuid) = $query_result->fetchrow_array();
+    }
+    elsif ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
 	$uuid = $token;
     }
     elsif ($token =~ /^P([\w]+)$/) {
