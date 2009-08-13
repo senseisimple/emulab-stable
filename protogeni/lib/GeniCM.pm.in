@@ -389,6 +389,9 @@ sub GetTicket($;$)
     }
     my $slice_uuid = $credential->target_uuid();
     my $user_uuid  = $credential->owner_uuid();
+
+    print STDERR $credential->target_cert() . "\n";
+    print STDERR $credential->owner_cert() . "\n";
         
     #
     # Make sure the credential was issued to the caller.
