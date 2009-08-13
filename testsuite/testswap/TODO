@@ -15,17 +15,14 @@ TODO
   TESTLWP
   SSH SCP Cleanup
 
-STILL MESSY
-  XMLRPC/Client/Experiment TestSuite/Experiment dsl
-
 EXPAND CURRENT IMPLEMENTATION
   event subsystem
 
 LATER
   Client.pm duplicate code elimination - Maybe this would make the code too unreadable
-  test groupings
+  test groupings - use Perl modules works now
   Large External Tars and Resources for experiements
 
 Parallel TODOS
-  clean up FFF, Roles, constructors
+  clean up FF, Roles, constructors
   CartProd teste - image test example

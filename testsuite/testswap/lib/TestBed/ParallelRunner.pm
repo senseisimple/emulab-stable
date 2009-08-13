@@ -41,7 +41,9 @@ sub runtests {
   my $result = TestBed::ForkFramework::ForEach::max_work($concurrent_pre_runs, sub { shift->prerun }, $s->executors);
   if ( $result->has_errors ) { 
     for (@{$result->errors}) {
-      $s->executor($_->itemid)->handleResult(undef, $_);
+      my $executor = $s->executor($_->itemid);
+      $_->name($executor->e->eid);
+      $executor->handleResult(undef, $_);
     }
     sayd($result->errors);
     warn 'TestBed::ParallelRunner::runtests died during test prep';
@@ -62,6 +64,7 @@ sub runtests {
 
     if ($maximum_nodes > $concurrent_node_count_usage) {
       warn "$eid requires upto $maximum_nodes nodes, only $concurrent_node_count_usage concurrent nodes permitted\n$eid will not be run";
+      $executor->e->end_wait;
     }
     else {
       $workscheduler->add_task($executor, $maximum_nodes);

@@ -129,7 +129,7 @@ sub execute {
   eval { $e->end_wait; } unless checkexclude('end');
   my $end_exception = $@;
 
-  die TestBed::ParallelRunner::Executor::SwapinError->new( original => $@ ) if $swapin_exception;
+  die TestBed::ParallelRunner::Executor::SwapinError->new( original => $swapin_exception ) if $swapin_exception;
   die TestBed::ParallelRunner::Executor::RunError->new( original => $run_exception ) if $run_exception;
   die TestBed::ParallelRunner::Executor::SwapoutError->new( original => $swapout_exception ) if $swapout_exception;
   die TestBed::ParallelRunner::Executor::KillError->new( original => $end_exception ) if $end_exception;

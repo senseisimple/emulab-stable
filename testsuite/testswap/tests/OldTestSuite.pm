@@ -1,7 +1,6 @@
 package OldTestSuite;
 
 our $tests = {
-          'frontend' => {},
           'cbr' => {
                      'info' => 'Test UDP and a TCP agent/CBR. Also throw in some events to start/stop
 the trafgen.
@@ -119,7 +118,7 @@ tb_run("tbswap out",0);
 tb_run("tbend",0);
 '
                     },
-          'mini_nodes' => {
+          'mininodes' => {
                             'info' => 'Six nodes:
 
 	node2 - node0 - node1
@@ -129,7 +128,8 @@ tb_run("tbend",0);
 node0 to node3 is delayed.
 
 ',
-                            'nsfile' => 'set ns [new Simulator]
+                            'nsfile' => 'source tb_compat.tcl
+set ns [new Simulator]
 
 set node0 [$ns node]
 set node1 [$ns node]
@@ -137,10 +137,10 @@ set node2 [$ns node]
 set node3 [$ns node]
 set node4 [$ns node]
 
-$ns duplex-link $node0 $node1 100Mb .1ms DropTail 
+$ns duplex-link $node0 $node1 100Mb 0ms DropTail 
 $ns duplex-link $node0 $node3 10Mb 100ms DropTail
-$ns duplex-link $node2 $node4 100Mb .1ms DropTail
-$ns duplex-link $node3 $node1 100Mb .1ms DropTail
+$ns duplex-link $node2 $node4 100Mb 0ms DropTail
+$ns duplex-link $node3 $node1 100Mb 0ms DropTail
 
 $ns run
 
@@ -498,7 +498,6 @@ tb_run("tbswap out",0);
 tb_run("tbend",0);
 '
                           },
-          'full' => {},
           'simplex' => {
                          'info' => 'Basic with the simplex tb commands.
 ',
@@ -897,7 +896,7 @@ tb_run("tbswap out",0);
 tb_run("tbend",0);
 '
                       },
-          'basic_rsrv' => {
+          'basicrsrv' => {
                             'info' => 'Just a basic initial test.
 
 Topology:
@@ -960,7 +959,7 @@ tb_run("tbend",0);
 (\'pc10\',\'testbed\',\'unavailable\',0,\'pc10\',\'node\');
 '
                           },
-          'widearea_types' => {
+          'wideareatypes' => {
                                 'info' => 'Tests widearea nodes, using general types, such as Internet, Internet2, etc.
 ',
                                 'nsfile' => 'set ns [new Simulator]
@@ -1051,8 +1050,7 @@ tb_run("tbswap out",0);
 tb_run("tbend",0);
 '
                          },
-          'delaycheck' => {},
-          'mini_set-ip' => {
+          'minisetip' => {
                              'info' => 'Sets up a basic topology and then tries out all the tb-set-ip commands.
 
 ',
@@ -1183,7 +1181,6 @@ tb_run("tbswap out",0);
 tb_run("tbend",0);
 '
                    },
-          '10mbit' => {},
           'buddycache' => {
                             'info' => 'This is the buddycache experiment from Brandeis University.  It\'s a LAN of
 7 nodes, one of which, or, has a delay.
@@ -1206,7 +1203,7 @@ set fe5 [$ns node]
 set proxy [$ns node]
 set or [$ns node]
 
-set lan0 [$ns make-lan "$fe1 $fe2 $fe3 $fe4 $fe5 $proxy $or" 100Mb .1ms]
+set lan0 [$ns make-lan "$fe1 $fe2 $fe3 $fe4 $fe5 $proxy $or" 100Mb 2ms]
 tb-set-node-lan-delay $or $lan0 20ms
 
 $ns run
@@ -1223,7 +1220,9 @@ tb_run("tbend",0);
                          'info' => 'Trivial test.  Creates a simulator and runs it.  No nodes, no lans, 
 nothing.
 ',
-                         'nsfile' => 'set ns [new Simulator]
+                         'nsfile' => '
+source tb_compat.tcl
+set ns [new Simulator]
 $ns run
 
 ',
@@ -1235,7 +1234,7 @@ tb_run("tbswap out",0);
 tb_run("tbend",0);
 '
                        },
-          'widearea_mapped' => {
+          'wideareamapped' => {
                                  'info' => 'A widearea test that asks for specific links between nodes, which must be
 mapped with the WAN solver.
 ',
@@ -1265,7 +1264,7 @@ tb_run("tbswap out",0);
 tb_run("tbend",0);
 '
                                },
-          'mini_tbcmd' => {
+          'minitbcmd' => {
                             'info' => 'NOT A FULL TEST!
 
 This is a test of all the tb-* commands.  It also checks does checks on 
@@ -1395,7 +1394,7 @@ tb_run("tbswap in",255);
 tb_run("tbend",0);
 '
                             },
-          'mini_multilink' => {
+          'minimultilink' => {
                                 'info' => 'Two nodes connceted by undelayed links.
 
 ',
