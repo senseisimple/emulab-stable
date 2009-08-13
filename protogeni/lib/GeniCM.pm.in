@@ -36,10 +36,11 @@ use GeniHRN;
 use libtestbed qw(SENDMAIL);
 use emutil;
 # Hate to import all this crap; need a utility library.
-use libdb qw(TBGetSiteVar EXPTSTATE_SWAPPED EXPTSTATE_ACTIVE);
+use libdb qw(TBGetSiteVar EXPTSTATE_SWAPPED EXPTSTATE_ACTIVE TBOPSPID);
 use User;
 use Node;
 use OSinfo;
+use Image;
 use Interface;
 use English;
 use Data::Dumper;
@@ -720,7 +721,6 @@ sub GetTicket($;$)
 		$ref->{'exclusive'} = $exclusive = 1;
 		$ref->{'virtualization_type'} = "raw";
 		$pctype = "pc";
-		$osname = "RHL90-STD";
 	    }
 	}
 	else {
@@ -757,7 +757,7 @@ sub GetTicket($;$)
 	    }
 	}
 	#
-	# If no isname by this point, try for the default.
+	# If no osname by this point, try for the default.
 	#
 	if (defined($node) && !defined($osname)) {
 	    if (defined($node->default_osid())) {	    
@@ -2137,7 +2137,7 @@ sub DeleteSliver($)
 					"Must supply toplevel sliver");
 	}
 	else {
-	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
 					"No such sliver");
 	}
     }
