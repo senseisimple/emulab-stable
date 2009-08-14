@@ -155,7 +155,9 @@ else {
 	SPITERROR("notlocal");
     }
     $node = Node::Lookup($ip);
-    $node_id = $node->node_id();
+    if ($node) {
+	$node_id = $node->node_id();
+    }
 }
 if (!$node) {
     SPITERROR("no such node");
