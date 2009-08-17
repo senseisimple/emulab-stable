@@ -348,7 +348,7 @@ function SPITFORM($formfields, $errors)
     echo "<h4><blockquote><blockquote>
           <ol>
             <li> Please consult our
-                 <a href = '$WIKIDOCURL/Security'>
+                 <a href = '$WIKIDOCURL/SecReqs'>
                  security policies</a> for information
                  regarding passwords and email addresses.\n";
     if (!$wikionly) {
