@@ -50,7 +50,7 @@ LIB_DEPENDS= xml2.5:${PORTSDIR}/textproc/libxml2
 
 RUN_DEPENDS+= \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Crypt/SSLeay.pm:${PORTSDIR}/security/p5-Crypt-SSLeay \
-	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/XML/libXML.pm:${PORTSDIR}/textproc/p5-XML-LibXML \
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/XML/LibXML.pm:${PORTSDIR}/textproc/p5-XML-LibXML \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/Frontier/Client.pm:${PORTSDIR}/net/p5-Frontier-RPC \
 	xmlsec1:${PORTSDIR}/security/xmlsec1
 
