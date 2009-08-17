@@ -30,7 +30,7 @@ my $twonodelan5Mbtest = sub {
 };
 
 rege(e('2nodelan5Mb'), $BasicNSs::TwoNodeLan5Mb, $twonodelan5Mbtest, 1, 'two node 5mb lan pingswapkill');
-rege(e('singlenode'), $BasicNSs::SingleNode, sub { ok(shift->pingswapkill); }, 1, 'single node pingswapkill');
+rege(e('1singlenode'), $BasicNSs::SingleNode, sub { ok(shift->pingswapkill); }, 1, 'single node pingswapkill');
 rege(e('2nodelan'), $BasicNSs::TwoNodeLan, sub { ok(shift->pingswapkill); }, 1, 'two node lan pingswapkill');
 
 1;

@@ -69,20 +69,21 @@ RETRY:
   }
 }
 
+sub mkerrmsg       { my $e = shift; return $e->eid .  " " . shift;}
 sub noemail        { @TBConfig::EXPERIMENT_OPS_PARAMS; }
 sub echo           { shift->augment_output( 'str' => shift ); }
 sub getlist_brief  { shift->augment( 'format' => 'brief'); }
 sub getlist_full   { shift->augment( 'format' => 'full' ); }
 sub batchexp_ns    { shift->augment_code( 'nsfilestr' => shift, 'noswapin' =>1, noemail, 'extrainfo' => 1, @_ ); }
 sub modify_ns      { shift->augment_code( 'nsfilestr' => shift, 'noswapin' =>1, noemail, 'extrainfo' => 1, @_ ); }
-sub swapin         { my $e = shift; my @args = @_; retry_on_TIMEOUT { $e->augment_func_code( 'swapexp', noemail, 'direction' => 'in', 'extrainfo' => 1, @args ) } 'swapin'; }
+sub swapin         { my $e = shift; my @args = @_; retry_on_TIMEOUT { $e->augment_func_code( 'swapexp', noemail, 'direction' => 'in', 'extrainfo' => 1, @args ) } $e->mkerrmsg('swapin'); }
 sub swapout        { shift->augment_func_code( 'swapexp', noemail, 'direction' => 'out','extrainfo' => 1, @_ ); }
 sub end            { shift->augment_func_code( 'endexp', noemail); }
 sub end_wait       { shift->augment_func_code( 'endexp', noemail, 'wait' => 1); }
 sub fqnodenames    { parseNodeInfo(shift->nodeinfo); }
-sub waitforactive  { my $e = shift; my @args = @_; retry_on_TIMEOUT { $e->augment_func_code('waitforactive', @args) } 'waitforactive'; }
-sub waitforswapped { my $e = shift; retry_on_TIMEOUT { $e->augment_func_code( 'statewait', 'state' => 'swapped' ) } 'waitforswapped'; }
-sub waitforended   { my $e = shift; retry_on_TIMEOUT { $e->augment_func_code( 'statewait', 'state' => 'ended' ) } 'waitforended'; }
+sub waitforactive  { my $e = shift; my @args = @_; retry_on_TIMEOUT { $e->augment_func_code('waitforactive', @args) } $e->mkerrmsg('waitforactive'); }
+sub waitforswapped { my $e = shift; retry_on_TIMEOUT { $e->augment_func_code( 'statewait', 'state' => 'swapped' ) } $e->mkerrmsg('waitforswapped'); }
+sub waitforended   { my $e = shift; retry_on_TIMEOUT { $e->augment_func_code( 'statewait', 'state' => 'ended' ) } $e->mkerrmsg('waitforended'); }
 sub startexp_ns    { batchexp_ns(@_, 'batch' => 0); }
 sub startexp_ns_wait { batchexp_ns_wait(@_, 'batch' => 0); }
 
@@ -318,6 +319,10 @@ B<INTERNAL>: catches socket timeout exceptions and rexecutes &sub after printing
 =item C<< succeed_on_TIMEOUT(&sub, $messag) >>
 
 B<INTERNAL>: catches socket timeout exceptions and returns success
+
+=item C<< $e->mkerrmsg($messag) >>
+
+B<INTERNAL>: prepends error message with eid
 
 =back 
 

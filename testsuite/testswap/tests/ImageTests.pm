@@ -363,6 +363,6 @@ END
   ok( $results[$_] =~ /^3\n4\n$/, "noderes$_") for (3..4);
 }
 
-rege(e('sync'), concretize($Sync, OS => $OS), \&sync_test, 7, 'ImageTest-sync test');
+rege(e('itsync'), concretize($Sync, OS => $OS), \&sync_test, 7, 'ImageTest-sync test');
 
 1;

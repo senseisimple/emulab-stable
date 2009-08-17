@@ -18,6 +18,6 @@ NSEND
 rege(e('twonodelinktest'), $ns, 
   sub { 
     my ($e) = @_; 
-    my $e = $e->eid;
+    my $eid = $e->eid;
     ok($e->linktest, "$eid linktest"); 
   }, 1, 'single_node_tests');

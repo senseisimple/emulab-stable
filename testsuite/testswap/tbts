@@ -104,7 +104,8 @@ TestBed TestSwap
         
 
     TESTSUITES:
-        all      - all tests
+        all      - all framework tests
+        all      - all framework tests
         sanity   - all framework utility and xmlrpc client modules test
         lib      - all framework utility tests
         xmlrpc   - all xmlrpc client modules tests
@@ -126,8 +127,9 @@ if (@ARGV) {
   my @xmlrpc = qw(t/xmlrpc/*.t);
   my @lib = qw(t/lib/*.t t/lib/*/*.t t/tbts/cmdlineargs.t);
   my @sanity = (@lib, @xmlrpc);
-  my @all = ( @lib, @xmlrpc, qw( t/livetests/*.t ) );
-  @all = sort(array_single_difference([all_ts], [qw(t/coding/pod_coverage.t t/noautorun/tbts_cmdlineargs.t t/eine/elab_in_elab.t)]));
+  my @all = sort(array_single_difference([all_ts], [qw(t/coding/pod_coverage.t t/noautorun/tbts_cmdlineargs.t t/eine/elab_in_elab.t)]));
+  my @massive = (all_tpms);
+
   my $cmd = $ARGV[0];
   $_   = $cmd;
   chomp $_;
@@ -135,11 +137,12 @@ if (@ARGV) {
   elsif ($_ eq 'podc')      { system 'for x in `find lib -iname "*.pm"`; do podchecker $x 2>&1 |grep contain; done; '; }
   elsif ($_ eq 'pode')      { system 'for x in `find lib -iname "*.pm"`; do podchecker $x 2>&1 |grep ERROR; done;'; }
   elsif (/critic/)          { exec 'perlcritic lib t'; }
+  elsif (/massive/)             { runharness( @massive ); }
   elsif (/all/)             { runharness( @all ); }
   elsif (/sanity/)          { runharness( @sanity ); }
   elsif (/lib/)             { runharness( @lib ); }
   elsif (/xmlrpc/)          { runharness( @xmlrpc ); }
-  elsif (/coding/)          { runharness( qw(t/coding/pod_coverage.t) ); }
+  elsif (/podcov/)          { exec './tbts t/coding/pod_coverage.t 2>&1 | perl devtools/podfailure.pl'; }
 }
 else {
   usage();

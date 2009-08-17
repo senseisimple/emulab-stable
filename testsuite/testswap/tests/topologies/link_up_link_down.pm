@@ -34,4 +34,4 @@ my $test = sub {
   ok($n1ssh->cmdsuccessdump("ping -c 5 10.1.2.3"));
 };
 
-rege(e('linkupdown'), $ns, $test, 5, 'single_node_tests');
+rege(e('tplinkupdown'), $ns, $test, 5, 'single_node_tests');

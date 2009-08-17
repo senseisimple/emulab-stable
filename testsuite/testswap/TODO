@@ -1,7 +1,6 @@
 OldTests
 Massive Run
 
-
 Painpoints
 =================================
 Testlayout - Suites and  Tests, buildup, teardown using Test::Class
@@ -12,17 +11,14 @@ DOCS TODO
   more prose docs
 
 TODO
-  TESTLWP
   SSH SCP Cleanup
-
-EXPAND CURRENT IMPLEMENTATION
-  event subsystem
+  Revisit CartProd
 
 LATER
-  Client.pm duplicate code elimination - Maybe this would make the code too unreadable
-  test groupings - use Perl modules works now
+  test groupings - use - perl modules works for now
   Large External Tars and Resources for experiements
+  EXPAND CURRENT IMPLEMENTATION
+    event subsystem
 
 Parallel TODOS
   clean up FF, Roles, constructors
-  CartProd teste - image test example

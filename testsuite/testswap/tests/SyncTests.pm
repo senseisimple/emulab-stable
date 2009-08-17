@@ -1,4 +1,4 @@
-package ImageTests;
+package SyncTests;
 use SemiModern::Perl;
 use TestBed::TestSuite;
 use Test::More;

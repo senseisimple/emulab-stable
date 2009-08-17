@@ -34,7 +34,7 @@ sub runtests {
   $concurrent_node_count_usage ||= $TBConfig::concurrent_node_usage;
 
   if ( $TBConfig::runonly) {
-    $s->executors([ (grep { my $executor = $_; (grep { $_ eq $executor->e->eid } @{$TBConfig::single}) } @{$s->executors}) ]);
+    $s->executors([ (grep { my $executor = $_; (grep { $_ eq $executor->e->eid } @{$TBConfig::runonly}) } @{$s->executors}) ]);
   }
 
   #prerun step

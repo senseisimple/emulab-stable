@@ -100,7 +100,7 @@ eval {
 if (@ARGV) {
   $_ = shift;
   if (/endall/) { end_all_experiments; }
-  elsif (/end/) { e($_)->end for(@ARGV); }
+  elsif (/end/) {  for(@ARGV) { e(split(/\./, $_))->end; }; }
   elsif (/watchall/) { watchall; }
   elsif (/rn/)  { (say Dumper(Tools::Network::node_reboot($_))) for @ARGV; }
   else {
