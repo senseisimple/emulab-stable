@@ -86,6 +86,7 @@ has 'itemid' => ( is => 'rw');
 has 'name'   => ( is => 'rw');
 
 sub is_error { shift->error; }
+sub error_type { ref(shift->error); }
 
 package TestBed::ForkFramework;
 sub forkit {

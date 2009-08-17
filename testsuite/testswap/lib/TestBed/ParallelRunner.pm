@@ -89,6 +89,10 @@ sub runtests {
   }
 
   if ($result->has_errors) {
+    for (@{$result->errors}) {
+      my $executor = $s->executor($_->itemid);
+      warn $executor->failReason($_);   
+    }
     sayd($result->errors);
     die 'TestBed::ParallelRunner::runtests died during test execution';
   }

@@ -108,6 +108,11 @@ sub checkexclude {
   return grep { $_ eq $stage } @{ $TBConfig::exclude_steps };
 }
 
+sub failReason {
+  my $s = shift;
+  sprintf("FAILURE %s: %s", $s->e->eid, shift->error_type);
+}
+
 sub execute {
   my $s = shift;
   my $e = $s->e;

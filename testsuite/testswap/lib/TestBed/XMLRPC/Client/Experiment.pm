@@ -40,7 +40,7 @@ RETRY:
     my $result = eval { $sub->(); };
     if ($@) {
       if ($@ =~ /SSL_SOCKET_TIMEOUT/) {
-        warn "SSL_SOCKET_TIMEOUT after $TBConfig::XMLRPC_SERVER_TIMEOUT seconds in $message";
+        warn "Retrying: SSL_SOCKET_TIMEOUT after $TBConfig::XMLRPC_SERVER_TIMEOUT seconds in $message";
         $retry_count++;
         redo RETRY;
       }
@@ -60,7 +60,7 @@ RETRY:
     my $result = eval { $sub->(); };
     if ($@) {
       if ($@ =~ /SSL_SOCKET_TIMEOUT/) {
-        warn "SSL_SOCKET_TIMEOUT after $TBConfig::XMLRPC_SERVER_TIMEOUT seconds in $message";
+        warn "Retrying Indefinitely: SSL_SOCKET_TIMEOUT after $TBConfig::XMLRPC_SERVER_TIMEOUT seconds in $message";
         return 1;
       }
       else { die $@; }
