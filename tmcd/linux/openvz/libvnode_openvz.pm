@@ -141,7 +141,8 @@ sub vz_rootPreConfig {
     return 0
 	if (-e "/var/run/openvz.ready");
 
-    if ((my $locked = TBScriptLock("vzconf", TBSCRIPTLOCK_GLOBALWAIT(), 90)) 
+    if ((my $locked = TBScriptLock("vzconf",
+				   TBSCRIPTLOCK_GLOBALWAIT(), 900)) 
 	!= TBSCRIPTLOCK_OKAY()) {
 	return 0
 	    if ($locked == TBSCRIPTLOCK_IGNORE());
@@ -250,7 +251,7 @@ sub vz_rootPreConfig {
 # and configuring them as necessary.
 #
 sub vz_rootPreConfigNetwork {
-    if (TBScriptLock("vzconf", 0, 90) != TBSCRIPTLOCK_OKAY()) {
+    if (TBScriptLock("vzconf", 0, 900) != TBSCRIPTLOCK_OKAY()) {
 	print STDERR "Could not get the vznetwork lock after a long time!\n";
 	return -1;
     }
@@ -417,7 +418,7 @@ sub vz_vnodeDestroy {
     # Clear the IMQ reservations. Must lock since IMQDB is a shared
     # resource.
     #
-    if (TBScriptLock("vzconf", 0, 90) != TBSCRIPTLOCK_OKAY()) {
+    if (TBScriptLock("vzconf", 0, 900) != TBSCRIPTLOCK_OKAY()) {
 	print STDERR "Could not get the vzpreconfig lock after a long time!\n";
 	return -1;
     }
@@ -503,7 +504,7 @@ sub vz_vnodePreConfig {
     # those match the ones in the IMQDB, do nothing, else fixup. Must lock
     # since IMQDB is a shared resource.
     #
-    if (TBScriptLock("vzconf", 0, 90) != TBSCRIPTLOCK_OKAY()) {
+    if (TBScriptLock("vzconf", 0, 900) != TBSCRIPTLOCK_OKAY()) {
 	print STDERR "Could not get the vzpreconfig lock after a long time!\n";
 	return -1;
     }
