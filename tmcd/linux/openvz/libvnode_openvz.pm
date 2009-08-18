@@ -149,9 +149,11 @@ sub vz_rootPreConfig {
 	print STDERR "Could not get the vzinit lock after a long time!\n";
 	return -1;
     }
-    # 
-    return 0
-	if (-e "/var/run/openvz.ready");
+    # we must have the lock, so if we need to return right away, unlock
+    if (-e "/var/run/openvz.ready") {
+        TBScriptUnlock();
+        return 0;
+    }
     
     # make sure filesystem is setup 
     # about the funny quoting: don't ask... emacs perl mode foo.
