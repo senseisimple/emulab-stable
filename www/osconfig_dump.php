@@ -154,7 +154,7 @@ else {
     if (!IsControlNetIP($ip)) {
 	SPITERROR("notlocal");
     }
-    $node = Node::Lookup($ip);
+    $node = Node::LookupByIP($ip);
     if ($node) {
 	$node_id = $node->node_id();
     }

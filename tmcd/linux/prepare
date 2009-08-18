@@ -14,7 +14,7 @@ require 'ctime.pl';
 #
 my $DUMPDATES   = "/etc/dumpdates";
 my @DBFILES     = ();
-my @SYSVARDIRS  = ("lib/dhcp", "lib/dhcp3", "spool/clientmqueue",
+my @SYSVARDIRS  = ("lib/dhcp", "lib/dhclient", "lib/dhcp3", "spool/clientmqueue",
 		   "log/audit", "log/account", "log/mysql", "log/ntpstats");
 my @VARDIRS	= ("logs", "db", "jails", "boot", "lock");
 my @SOCKETS	= ("/dev/log", "/var/run/acpid.socket");

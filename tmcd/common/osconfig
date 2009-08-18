@@ -7,7 +7,7 @@
 use strict;
 use English;
 use Getopt::Std;
-use Data::Dumper;
+#use Data::Dumper;
 
 #
 # This script is intended to be invoked only from the MFS at this point.  The
@@ -67,7 +67,10 @@ if ($EUID != 0) {
 	"    Must be root to run this script!\n");
 }
 
-my $WGET    = "/usr/local/bin/wget";
+my $WGET    = "/usr/bin/wget";
+if (! -x $WGET) {
+	$WGET = "/usr/local/bin/wget";
+}
 
 my $debug = 0;
 my $optlist = "m:M:f:s:D:a:ndc";
@@ -305,7 +308,11 @@ sub doUpdate($$$) {
     }
 
     my $doit = 0;
-    my $cmdstr = "$WGET -o /tmp/update.wget.log -O /tmp/update.file '$uurl'";
+    my $cmdstr = $WGET;
+    # For MFS environments we don't currently install any CA certificates, so
+    # force wget to skip the cert check.
+    $cmdstr .= " --no-check-certificate" if (-f "$ETCDIR/ismfs");
+    $cmdstr .= " -o /tmp/update.wget.log -O /tmp/update.file '$uurl'";
     print STDERR "update URL: '$cmdstr'\n";
     my $retval = system($cmdstr);
     if ($retval) {
@@ -336,7 +343,7 @@ sub doUpdate($$$) {
 	    return 0;
 	}
 
-	if ($mimetype eq "application/x-gzip") {
+	if ($mimetype =~ "^application/x-gzip") {
 	    $retval = system("tar -xzf /tmp/update.file -C /var/emulab/update.tmp");
 	    if ($retval) {
 		print "Error: tar failed!\n";

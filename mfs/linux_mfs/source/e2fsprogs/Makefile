@@ -23,7 +23,7 @@ clean:
 
 LIBS	:= $(addprefix $(TARGET_PATH)/lib/, libext2fs.so libe2p.so libcom_err.so libblkid.so libuuid.so)
 
-install: $(TARGET_PATH)/sbin/mke2fs $(TARGET_PATH)/sbin/tune2fs $(TARGET_PATH)/sbin/e2fsck $(LIBS)
+install: $(TARGET_PATH)/sbin/mke2fs $(TARGET_PATH)/sbin/tune2fs $(TARGET_PATH)/sbin/e2fsck $(TARGET_PATH)/usr/bin/uuidgen $(LIBS)
 
 $(E2FSPROGS_PATH)/.extract-stamp:
 	mkdir -p $(TARGET_BUILD_PATH)
@@ -86,6 +86,11 @@ $(E2FSPROGS_PATH)/misc/tune2fs: $(E2FSPROGS_PATH)/.config-stamp
 		$(TARGET_CONFIGURE_OPTS) LD=i386-linux-uclibc-gcc
 	touch $@
 
+$(E2FSPROGS_PATH)/misc/uuidgen: $(E2FSPROGS_PATH)/.config-stamp
+	LDFLAGS="-rpath ../lib" PATH=$(STAGING_DIR)/usr/bin:$(PATH) $(MAKE) -C $(E2FSPROGS_PATH) \
+		$(TARGET_CONFIGURE_OPTS) LD=i386-linux-uclibc-gcc
+	touch $@
+
 $(E2FSPROGS_PATH)/lib/%.so: $(E2FSPROGS_PATH)/.config-stamp
 	LDFLAGS="-rpath ../lib" PATH=$(STAGING_DIR)/usr/bin:$(PATH) $(MAKE) -C $(E2FSPROGS_PATH) \
 		$(TARGET_CONFIGURE_OPTS) LD=i386-linux-uclibc-gcc
@@ -110,8 +115,8 @@ $(TARGET_PATH)/sbin/e2fsck: $(E2FSPROGS_PATH)/e2fsck/e2fsck
 	install -m 755 $< \
 		$(TARGET_PATH)/sbin/e2fsck
 	$(STRIPCMD) --strip-unneeded $(TARGET_PATH)/sbin/e2fsck
-	ln -s $@ $(dir $@)/fsck.ext2
-	ln -s $@ $(dir $@)/fsck.ext3
+	ln -sf $@ $(dir $@)/fsck.ext2
+	ln -sf $@ $(dir $@)/fsck.ext3
 	touch -c $@
 
 $(TARGET_PATH)/sbin/tune2fs: $(E2FSPROGS_PATH)/misc/tune2fs
@@ -119,4 +124,11 @@ $(TARGET_PATH)/sbin/tune2fs: $(E2FSPROGS_PATH)/misc/tune2fs
 	install -m 755 $(E2FSPROGS_PATH)/misc/tune2fs \
 		$(TARGET_PATH)/sbin/tune2fs
 	$(STRIPCMD) --strip-unneeded $(TARGET_PATH)/sbin/tune2fs
+	touch -c $@
+
+$(TARGET_PATH)/usr/bin/uuidgen: $(E2FSPROGS_PATH)/misc/uuidgen
+	install -d -m 755 $(TARGET_PATH)/usr/bin
+	install -m 755 $(E2FSPROGS_PATH)/misc/uuidgen \
+		$(TARGET_PATH)/usr/bin/uuidgen
+	$(STRIPCMD) --strip-unneeded $(TARGET_PATH)/usr/bin/uuidgen
 	touch -c $@

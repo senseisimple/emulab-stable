@@ -2,7 +2,7 @@ include ../../variables.mk
 
 BUILDROOT	:=	$(PWD)/$(BUILDROOT)
 
-PROGS	:= imageunzip imagezip frisbee growdisk tmcc.bin binoffset groklilo
+PROGS	:= imageunzip imagezip frisbee growdisk tmcc.bin binoffset groklilo teachswitch
 BUILD_TARGETS := $(PROGS)
 INSTALL_TARGETS := $(addsuffix -install,$(PROGS))
 
@@ -10,7 +10,7 @@ INSTALL_TARGETS := $(addsuffix -install,$(PROGS))
 .PHONY: $(BUILD_TARGETS) all
 .PHONY: $(INSTALL_TARGETS) script-install install
 
-TESTBED_PATH = /home/rdjackso/testbed
+TESTBED_PATH = /home/rdjackso/gits/testbed
 TESTBED_BUILD_PATH = $(TARGET_BUILD_PATH)/testbed
 TMCD_PATH = $(TESTBED_PATH)/tmcd
 GROKLILO_PATH = $(TESTBED_PATH)/cdrom/groklilo
@@ -19,12 +19,13 @@ TESTBEDOBJ_PATH = /home/rdjackso/testbed-obj
 FRISBEE_PATH = $(TESTBED_PATH)/os/frisbee.redux
 BINOFFSET_PATH = $(TESTBED_PATH)/tools/binoffset
 IMAGEZIP_PATH = $(TESTBED_PATH)/os/imagezip
+TEACHSWITCH_PATH = $(TESTBED_PATH)/tools/teachswitch
 TMCD_OBJ_PATH = $(TESTBEDOBJ_PATH)/tmcd
 TMCC_OBJ_PATH = $(TARGET_BUILD_PATH)/tmcc
 CFLAGS = -Os
 
 INSTALLED_BINS	:= $(addprefix $(TARGET_PATH)/usr/, \
-			$(addprefix bin/, binoffset imagezip imageunzip tmcc.bin frisbee) \
+			$(addprefix bin/, binoffset imagezip imageunzip tmcc.bin frisbee teachswitch) \
 			$(addprefix sbin/, groklilo growdisk))
 
 all: $(BUILD_TARGETS)
@@ -62,11 +63,11 @@ script-install:
 	install -m 755 $(TMCD_PATH)/linux/freebsd_to_linux_disk $(TARGET_PATH)/etc/testbed
 	install -m 755 $(TMCD_PATH)/linux/check_disklabel $(TARGET_PATH)/etc/testbed
 	install -m 755 $(TMCD_PATH)/linux/remap_ide_disks $(TARGET_PATH)/etc/testbed
-	install -m 755 $(TMCD_PATH)/linux/get_edd_map $(TARGET_PATH)/etc/testbed
-	install -m 755 $(TMCD_PATH)/linux/extract_kernel_info $(TARGET_PATH)/etc/testbed
-	install -m 755 $(TMCD_PATH)/linux/extract_image_info $(TARGET_PATH)/etc/testbed
-	install -m 755 $(TMCD_PATH)/linux/extract_initrd_info $(TARGET_PATH)/etc/testbed
-	install -m 755 $(TMCD_PATH)/linux/linux_slicefix $(TARGET_PATH)/etc/testbed
+	install -m 755 $(TMCD_PATH)/linux/get_edd_map.pl $(TARGET_PATH)/etc/testbed
+	#install -m 755 $(TMCD_PATH)/linux/extract_kernel_info $(TARGET_PATH)/etc/testbed
+	#install -m 755 $(TMCD_PATH)/linux/extract_image_info $(TARGET_PATH)/etc/testbed
+	#install -m 755 $(TMCD_PATH)/linux/extract_initrd_info $(TARGET_PATH)/etc/testbed
+	install -m 755 $(TMCD_PATH)/linux/linux_slicefix.pl $(TARGET_PATH)/etc/testbed
 	install -m 755 $(TESTBED_PATH)/install/newclient $(TARGET_PATH)/etc/testbed
 	install -m 755 $(TMCD_PATH)/common/paths.sh $(TARGET_PATH)/etc/emulab
 	install -m 755 $(TMCD_PATH)/common/paths.pm $(TARGET_PATH)/etc/emulab
@@ -77,6 +78,7 @@ script-install:
 	install -m 755 $(TMCD_PATH)/common/watchdog $(TARGET_PATH)/etc/testbed
 	install -m 755 $(TMCD_PATH)/common/update $(TARGET_PATH)/etc/testbed
 	install -m 755 $(TMCD_PATH)/common/tmcc.pl $(TARGET_PATH)/usr/bin/tmcc
+	install -m 755 $(TMCD_PATH)/common/osconfig $(TARGET_PATH)/etc/testbed
 	ln -sf /usr/bin/tmcc $(TARGET_PATH)/etc/testbed/tmcc
 	install -m 755 $(TMCD_PATH)/common/config/librc.pm $(TARGET_PATH)/etc/testbed
 	install -m 755 $(TMCD_PATH)/common/config/rc.config $(TARGET_PATH)/etc/testbed/rc
@@ -109,6 +111,8 @@ groklilo-install: $(TARGET_PATH)/usr/sbin/groklilo
 
 tmcc.bin-install: $(TARGET_PATH)/usr/bin/tmcc.bin
 
+teachswitch-install: $(TARGET_PATH)/usr/bin/teachswitch
+
 clean:
 		rm -rf $(TESTBED_BUILD_PATH)
 
@@ -138,6 +142,15 @@ $(TESTBED_BUILD_PATH)/growdisk:
 		-I $(TESTBED_PATH)/os/imagezip \
 		-Os \
 		$(GROWDISK_PATH)/growdisk.c
+	$(STRIPCMD) --strip-unneeded $@
+
+$(TESTBED_BUILD_PATH)/teachswitch:
+	mkdir -p $(TESTBED_BUILD_PATH)
+	PATH=$(STAGING_DIR)/usr/bin:$(PATH) \
+	$(CROSS_COMPILER_PREFIX)gcc \
+		-o $@ \
+		-Os \
+		$(TEACHSWITCH_PATH)/teachswitch.c
 	$(STRIPCMD) --strip-unneeded $@
 
 # ARGH! tmcc wants to link against libtb just for the errorc function in libtb/log.c.

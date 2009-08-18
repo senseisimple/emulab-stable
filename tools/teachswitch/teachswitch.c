@@ -27,6 +27,11 @@
 #include <linux/if_arp.h>
 #endif
 
+/* Not defined under uClibc */
+#ifndef ETHERTYPE_LOOPBACK
+#define ETHERTYPE_LOOPBACK      0x9000
+#endif
+
 const int MAX_INTERFACES = 8;
 const int SLEEP_TIME = 30;
 #if defined(__FreeBSD__)

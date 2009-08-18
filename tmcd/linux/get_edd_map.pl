@@ -1,7 +1,5 @@
 #! /usr/bin/perl
 
-use Data::Dumper;
-
 use constant EDD_PREFIX => '/sys/firmware/edd';
 use strict;
 

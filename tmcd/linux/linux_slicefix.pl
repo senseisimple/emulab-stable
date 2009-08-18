@@ -9,9 +9,15 @@ my $RM = '/bin/rm';
 my $CP = '/bin/cp';
 my $CPIO = 'cpio';
 my $GZIP = 'gzip';
+my $MKSWAP = '/sbin/mkswap';
+my $UUIDGEN = 'uuidgen';
+my $LOSETUP = 'losetup';
+my $TUNE2FS = 'tune2fs';
 
 use constant GZHDR1 => 0x1f8b0800;
 use constant GZHDR2 => 0x1f8b0808;
+use constant LARGEST_PAGE_SIZE => 0x4000;
+use constant UUID_OFFSET => 1036;
 
 # Load up the paths. Done like this in case init code is needed.
 BEGIN
@@ -40,7 +46,7 @@ sub get_uuid
 		close CMD;
 	}
 	elsif (-x $BLKID) {
-		open CMD, $BLKID || die
+		open CMD, "$BLKID|" || die
 			"Couldn't run blkid: $!\n";
 
 		while (<CMD>) {
@@ -74,7 +80,7 @@ sub get_label
 		close CMD;
 	}
 	elsif (-x $BLKID) {
-		open CMD, $BLKID || die
+		open CMD, "$BLKID|" || die
 			"Couldn't run blkid: $!\n";
 
 		while (<CMD>) {
@@ -91,6 +97,13 @@ sub get_label
 	}
 
 	return $label;
+}
+
+sub set_random_rootfs_uuid
+{
+	my ($root) = @_;
+	
+	system("$TUNE2FS -U random $root");
 }
 
 sub kernel_version_compare
@@ -132,6 +145,92 @@ sub find_swap_partitions
 	return @swap_devices;
 }
 
+sub set_swap_uuid
+{
+	my ($device, $uuid) = @_;
+	my $swap_header;
+	
+	if (!open DEVICE, "+<$device") {
+		print STDERR "Couldn't open $device: $!\n";      
+		return 1;
+	}
+	
+	my $id;
+	for (my $i = 0x1000; $i <= LARGEST_PAGE_SIZE; $i <<= 1) {
+		seek DEVICE, 0, 0;
+		read DEVICE, $swap_header, $i;
+		$id = unpack('Z10', substr($swap_header, $i - 10));
+		last if ($id eq 'SWAPSPACE2');
+	}
+	                              
+	if ($id ne 'SWAPSPACE2') {
+		print STDERR "Device $device does not contain a new-style swap header\n";
+		close DEVICE;
+		return 1;
+	}
+	
+	my $new_uuid = pack('H8H4H4H4H12', split(/-/, $uuid));
+	substr $swap_header, UUID_OFFSET, 16, $new_uuid;
+	
+	seek DEVICE, 0, 0;
+	print DEVICE $swap_header;
+	
+	close DEVICE;
+}
+
+sub fix_swap_partitions
+{
+	my ($imageroot, $root, $old_root) = @_;
+	my @swapdevs;
+
+	return undef unless (-x $MKSWAP);
+
+	my ($root_disk) = ($root =~ m#^(/dev/[a-z]+)#);
+	my ($old_root_disk) = ($old_root =~ m#^(/dev/[a-z]+)#);
+	my @swap_partitions = find_swap_partitions($root_disk);
+	my ($l, $u) = binary_supports_blkid("$imageroot/sbin/swapon");
+
+	for my $part (@swap_partitions) {
+		my $swapdev = $part;
+		next if system("$MKSWAP $part");
+		my $uuid = get_uuid($part);
+		if ($u) {
+			if ($uuid) {
+				$swapdev = "UUID=$uuid";
+			}
+			else {
+				# BusyBox's mkswap doesn't support UUIDs, so
+				# we'll need to generate it and write it out.
+				$uuid = `$UUIDGEN`;
+				chomp $uuid;
+				set_swap_uuid($swapdev, $uuid);
+				$swapdev="UUID=$uuid";
+			}
+		}
+		elsif ($old_root) {
+			$swapdev =~ s#^$root_disk#$old_root_disk#;
+		}
+
+		push @swapdevs, $swapdev;
+	}
+
+	return undef unless (@swapdevs);
+
+	my @buffer;
+	if (!open FSTAB, "+<$imageroot/etc/fstab") {
+		print STDERR "Failed to open fstab: $!\n";
+		return undef;
+	}
+
+	@buffer = grep {!/^[^#].*\bswap\b.*$/} <FSTAB>;
+	for (@swapdevs) {
+		push @buffer, "$_\tnone\tswap\tsw\t0 0\n";
+	}
+	seek FSTAB, 0, 0;
+	print FSTAB @buffer;
+	close FSTAB;
+}
+
 sub file_replace_root_device
 {
 	my ($imageroot, $file, $old_root, $new_root) = @_;
@@ -147,7 +246,7 @@ sub file_replace_root_device
 
 	seek FILE, 0, 0;
 
-	print FILE $_ for (@buffer);
+	print FILE @buffer;
 
 	close FILE;
 
@@ -185,15 +284,18 @@ sub rewrite_lilo_config
 sub set_runlilo_flag
 {
 	my ($imageroot, $default_entry, $new_root) = @_;
+	my $cmdline;
 
 	open FILE, ">$imageroot/var/emulab/boot/runlilo" ||
 	     die "Couldn't write to runlilo file: $!\n";
+	
+	$cmdline = "$default_entry root=$new_root";
 
-	print FILE "$default_entry root=$new_root\n";
+	print FILE "$cmdline\n";
 
 	close FILE;
 
-	return 1;
+	return $cmdline;
 }
 
 sub find_default_grub_entry
@@ -255,7 +357,7 @@ sub set_grub_root_device
 
 	if (not defined $grub_disk) {
 		$grub_disk = $root;
-		$grub_disk =~ s/^[hs]d(.).*$/$1/;
+		$grub_disk =~ s/^\/dev\/[hs]d(.).*$/$1/;
 		$grub_disk =~ y/[a-h]/[0-7]/;
 		print "Found GRUB root device by guessing\n";
 	}
@@ -271,7 +373,7 @@ sub set_grub_root_device
 		push @buffer, $_;
 	}
 	seek FILE, 0, 0;
-	print FILE $_ for (@buffer);
+	print FILE @buffer;
 	close FILE;
 }
 
@@ -547,6 +649,19 @@ sub check_initrd
 
 	`$UMOUNT "$initrd_dir" > /dev/null 2> /dev/null`;
 	`$RM -rf "$initrd_dir" "$decompressed_initrd"`;
+	
+	my @loopdevs;
+	open LOSETUP, "$LOSETUP|";
+	while (<LOSETUP>) {
+		chomp;
+		split /:/;
+		push @loopdevs, $_[0];
+	}
+	
+	for my $dev (@loopdevs) {
+		`$LOSETUP -d $dev`;
+	}
+		
 
 	return ($handles_label, $handles_uuid);
 }
@@ -637,6 +752,7 @@ sub main
 	my $lilo_default;
 	my $lilo_commandline = 0;
 
+	set_random_rootfs_uuid($root);
 	my $fstype = mount_image($root, $imageroot);
 	my $uuid = get_uuid($root);
 	my $label = get_label($root);
@@ -648,7 +764,7 @@ sub main
 	}
 	elsif ($bootloader eq 'grub') {
 		for (qw#/boot/grub/grub.conf /etc/grub.conf /boot/grub/menu.lst#) {
-			if (-f $_) {
+			if (-f "$imageroot/$_") {
 				$grub_config = $_;
 				last;
 			}
@@ -732,6 +848,9 @@ sub main
 		                         $new_bootloader_root);
 		set_grub_root_device($imageroot, $grub_config, $root);
 	}
+
+	fix_swap_partitions($imageroot, $root,
+		$kernel_has_ide ? $old_root : undef );
 
 	update_random_seed($imageroot);
 	hardwire_boss_node($imageroot);

@@ -9,7 +9,7 @@ STAGING_DIR	=	$(PWD)/buildroot/build_i386/staging_dir
 INITRAMFS	=	$(PWD)/initramfs.gz
 BOOT_PATH	=	$(PWD)/boot
 
-MODULES := busybox zlib linux dropbear testbed hdparm target_template sudo e2fsprogs openssl wget perl portmap
+MODULES := busybox zlib linux dropbear testbed hdparm target_template sudo e2fsprogs openssl wget perl portmap file
 INSTALL_MODULES := $(addsuffix -install,$(MODULES))
 EXTRACT_MODULES := $(addsuffix -extract,$(MODULES))
 PATCH_MODULES := $(addsuffix -patch,$(MODULES))
@@ -62,7 +62,7 @@ devices: $(FAKEROOT_ENVIRONMENT)
 		$(SCRIPTS_PATH)/makedevs.sh \
 		$(SCRIPTS_PATH)/devices $(TARGET_PATH)
 
-permissions: $(FAKEROOT_ENVIRONMENT) devices target-install
+permissions: $(FAKEROOT_ENVIRONMENT) devices install
 	$(STAGING_DIR)/usr/bin/fakeroot -s $(FAKEROOT_ENVIRONMENT) \
 		-i $(FAKEROOT_ENVIRONMENT) \
 		$(SCRIPTS_PATH)/fixperms.sh $(TARGET_PATH)

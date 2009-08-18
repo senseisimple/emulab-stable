@@ -138,6 +138,8 @@ dofreebsd() {
 		fstype=ufs
 		fsopts=ro
 	elif [ $OS = Linux ]; then
+		echo "Reloading partition table for $disk..."
+		echo w | /sbin/fdisk /dev/$disk > /dev/null 2>&1
 		rootdev=/dev/`$BINDIR/check_disklabel $disk $part`
 		[ "$rootdev" = /dev/ ] && exit 1
 		fstype=ufs

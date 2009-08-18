@@ -100,13 +100,13 @@ install_mbr()
 		return 0
 	fi
 
-	if ! [ -r $MBR_PATH/mbr{$new_mbr_ver}.dd ]; then
+	if ! [ -r $MBR_PATH/mbr${new_mbr_ver}.dd ]; then
 		echo "WARNING: cannot find MBR version $new_mbr_ver, not installed"
 		return 255
 	fi
 	
 	echo "Installing MBR version $new_mbr_ver ..."
-	dd if=$MBR_PATH/mbr{$new_mbr_ver}.dd of=$disk bs=512 count=1
+	dd if=$MBR_PATH/mbr${new_mbr_ver}.dd of=$disk bs=512 count=1
 
 	# Linux won't re-read the partition table unless told to do so.
 	# hdparm could be used for this, but it may not be installed.
@@ -198,6 +198,16 @@ get_buffer_sizes()
 	echo $memargs
 }
 
+find_disks() {
+	local disks
+
+	for d in /sys/block/[sh]d*; do
+		disks="$disks $d"
+	done
+
+	echo $disks
+}
+
 # FIXME shouldn't hard code "/images"
 write_image()
 {
@@ -259,6 +269,19 @@ write_image()
 	esac
 
 	$BINDIR/tmcc state RELOADING
+
+	case $STATUS in
+		*ALLOCATED=emulab-ops/reloading*)
+			disks=`find_disks`
+			for d in $disks; do
+				#[ $d = $DISK ] && continue
+				mount | grep "^/dev/$d" > /dev/null && continue
+				zap_superblocks /dev/$d
+				echo "Invalidating MBR on /dev/$d"
+				dd if=/dev/zero of=/dev/$d bs=512 count=1
+			done
+			;;
+	esac
 
 	if [ $protocol = frisbee ]; then
 		$BINDIR/frisbee -m $address -p $port -s $slice $FRISBEE_OPTS $disk
