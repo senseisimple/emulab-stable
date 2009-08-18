@@ -23,7 +23,7 @@ sub prep_local_cpan {
   CPAN::Config->load;
   $CPAN::Config->{'makepl_arg'} = q[PREFIX=~/ SITELIBEXP=~/lib/perl5 LIB=~/lib/perl5 INSTALLMAN1DIR=~/share/man/man1 INSTALLMAN3DIR=~/share/man/man3 INSTALLSITEMAN1DIR=~/share/man/man1 INSTALLSITEMAN3DIR=~/share/man/man3];
   $CPAN::Config->{'prerequisites_policy'} = q[follow];
-  $CPAN::Config->{'urllist'} = [q[ftp://cpan.cs.utah.edu/pub/CPAN/]];
+  $CPAN::Config->{'urllist'} = [q[http://cpan.cs.utah.edu ftp://cpan.cs.utah.edu/pub/CPAN/]];
   CPAN::Config->commit;
 }
 
