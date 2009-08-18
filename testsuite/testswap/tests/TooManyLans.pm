@@ -8,7 +8,8 @@ use TestBed::ParallelRunner;
 
 my $test_body = sub {
   my $e = shift;
-  ok(!($e->ping_test), 'Ping Test');
+  my $eid = $e->eid;
+  ok(!($e->ping_test), "$eid Ping Test");
 };
 
 sub handleResult {

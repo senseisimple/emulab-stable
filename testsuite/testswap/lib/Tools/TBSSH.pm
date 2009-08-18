@@ -60,8 +60,8 @@ sub cmdcheckoutput {
 }
 
 sub cmdsuccess {
-  my ($host, $cmd) = @_;
-  return wrapped_ssh($host, $TBConfig::EMULAB_USER, $cmd, sub { $_[2] == 0; } );
+  my ($host, $cmd, $diemessage) = @_;
+  return wrapped_ssh($host, $TBConfig::EMULAB_USER, $cmd, sub { $_[2] == 0; }, $diemessage);
 }
 
 sub cmdoutput {

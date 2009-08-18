@@ -37,7 +37,7 @@ sub build_e {
   my $args;
   if (@_ == 0) { $args = {}; }
   if (@_ == 1) { $args = { 'eid' => shift }; }
-  if (@_ == 2) { $args = { 'pid' => shift, 'eid' => shift }; }
+  if (@_ == 2) { my $pid = shift; $args = { 'pid' => $pid, 'gid' => $pid, 'eid' => shift }; }
   if (@_ == 3) { $args = { 'pid' => shift, 'gid' => shift, 'eid' => shift }; }
   if (@_ >  3) { die 'Too many args to e'; }
   TestBed::TestSuite::Experiment->new(%$args);
@@ -126,11 +126,17 @@ waits until $timeout for @nodes to respond to ping
 sub wait_for_nodes_to_activate {
   my ($e, $timeout) = (shift, shift);
   my $start = time;
-  for (@_) {
-    while ($e->node($_)->ping) { 
-      sleep 1;
-      if ((time - $start) >  $timeout) { die "Timeout before $_ activated"; }
+  my $done = 0;
+  while (!$done){
+    my $mapping = $e->info(aspect => 'mapping');
+    $done = 1;
+    for my $key (keys %$mapping){
+      if ($mapping->{$key}->{'eventstatus'} ne 'ISUP'){
+        $done = 0;
+      }
     }
+    sleep 4;
+    if ((time - $start) >  $timeout) { die "Timeout before $_ activated"; }
   }
 }
 
@@ -154,6 +160,19 @@ sub traceroute_ok {
   Tools::Network::traceroute_ok($src, @_);
 }
 
+sub gen_try($$){
+  my ($func, $times) = @_;
+  my $work = sub{
+    my $ex;
+    for (1..$times){
+      eval{$func->()};
+      $ex = $@;
+      unless ($ex){ return 1; }
+    }
+    die $ex;
+  };
+  return $work;
+}
 
 =item C<< $e->cartesian_ping() >>
 
@@ -170,7 +189,7 @@ sub cartesian_ping{
    for (@hosts){
      my $dest_node = $_;
      if ($src_node ne $dest_node){
-       push @work, sub{$e->ping_from_to($src_node, $dest_node)};
+       push @work, gen_try(sub{$e->ping_from_to($src_node, $dest_node)}, 5);
      }
    }
  }
@@ -293,7 +312,7 @@ uses tevc to bring down a link
 =cut
 sub linkup {
   my ($e, $link) = @_;
-  TestBed::Wrap::tevc::tevc($e->pid, $e->eid, "now $link up");
+  TestBed::Wrap::tevc::tevc($e, "now $link up");
 }
 
 =item C<< $e->linkdown($linkname) >>
@@ -302,7 +321,7 @@ uses tevc to bring up a link
 =cut
 sub linkdown {
   my ($e, $link) = @_;
-  TestBed::Wrap::tevc::tevc($e->pid, $e->eid, "now $link down");
+  TestBed::Wrap::tevc::tevc($e, "now $link down");
 }
 
 =item C<< $e->pretty_list() >>

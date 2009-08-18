@@ -22,9 +22,12 @@ our $OPS_PATH = "/usr/testbed/bin:/sbin:/bin:/usr/sbin:/usr/bin:/usr/games:/usr/
 
 sub ping {
   my ($host) = @_;
-  my $p = Net::Ping->new('tcp', 2);
-
+  #system("ping -c 2 $host");
+  #my $rc = $?;
+  #returns 0 on success
+  #$rc;
   #Net::Ping returns 0 on success
+  my $p = Net::Ping->new('tcp', 2);
   !$p->ping($host);
 }
 
@@ -61,6 +64,14 @@ sub traceroute {
     }
     return 1;
   });
+}
+
+sub ping_from_to($$){
+ my ($from, $to) = @_;
+ Tools::TBSSH::cmdcheckoutput($from, "'sh -c \"PATH=/bin:/usr/sbin:/usr/sbin:/sbin ping -c 5 $to\"'", 
+ sub {
+   return 1;
+ });
 }
 
 sub traceroute_ok {

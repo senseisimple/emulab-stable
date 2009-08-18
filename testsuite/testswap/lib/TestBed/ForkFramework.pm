@@ -30,7 +30,7 @@ sub send            { sendfd(shift->wr, shift); }
 sub receivefd       { my $fd = shift; my $r = fd_retrieve $fd;  return $r->[0]; }
 sub sendfd          { my $fd = shift; store_fd [shift], $fd;    $fd->flush; }
 sub sendEnd         { my $s = shift; $s->send(undef); $s->closeWr }
-sub selectInit      { my $s = shift; return [ $s->rd, $s->wr, 0, $s ]; }
+sub selectInit      { my $s = shift; return [ $s->rd, $s->wr, 0, $s, shift ]; }
 sub closeRd         { my $s = shift; my $fh = $s->rd; close($fh) if defined $fh; $s->rd(undef); }
 sub closeWr         { my $s = shift; my $fh = $s->wr; close($fh) if defined $fh; $s->wr(undef); }
 sub close           { my $s = shift; $s->closeRd; $s->closeWr; }
@@ -139,6 +139,7 @@ use Mouse;
 use IO::Select;
 use Carp;
 use Data::Dumper;
+use POSIX ":sys_wait_h";
 
 has 'workers'       => ( is => 'rw', default => sub { [] });
 has 'results'       => ( is => 'rw', default => sub { TestBed::ForkFramework::Results->new; });
@@ -148,8 +149,15 @@ has 'proc'          => ( is => 'rw', isa => 'CodeRef' , required => 1 );
 
 
 sub wait_for_all_children_to_exit {
-  my ($self) = @_;
-  waitpid( $_, 0 ) for @{ $self->workers };
+  my ($s) = @_;
+  waitpid( $_, 0 ) for @{ $s->workers };
+}
+
+sub reap_zombies {
+  my ($s) = @_;
+  while ((my $child = waitpid(-1, WNOHANG)) > 0) {
+    $s->workers( [ grep { !($_ == $child) } @{ $s->workers } ]);
+  }
 }
 
 sub workloop {
@@ -162,6 +170,8 @@ sub workloop {
     my $selectrc = $self->process_select; say "CALL SELECT" if $FFDEBUG;
     my $schedulerc = $self->schedule;
 
+    $self->reap_zombies;
+
     if ($selectrc || $schedulerc) { redo LOOP; }
   }
   $self->wait_for_all_children_to_exit;
@@ -172,15 +182,51 @@ sub workloop {
 use constant SELECT_HAS_HANDLES => 1;
 use constant SELECT_NO_HANDLES  => 0;
 
+sub eval_report_error(&$) {
+  my ($p, $m) = @_;
+  eval { $p->(); };
+  if ($@) {
+    say $m;
+    sayd($@);
+  }
+}
+
+sub handle_select_error {
+  my ($s, $r) = @_;
+  my ($rh, $wh, $eof, $ch, $pid) = @$r;
+  say "SELECT HAS EXCEPTION";
+  sayd($r);
+
+  eval_report_error { $ch->sendEnd; } "sendEnd";
+  eval_report_error { $ch->close; } "chclose";
+  eval_report_error { $s->selector->remove($r); } "selectorremove";
+  eval_report_error { @{$r}[1,2] = (undef, 1); } "undefassign";
+  eval_report_error { kill 9, $pid; } "kill $pid";
+
+  say "DONE SELECT HAS EXCEPTION";
+}
+
 sub process_select {
   my ($self) = @_;
   my $selector = $self->selector;
   if ($selector->count) {
+    my ($r, $rh, $wh, $eof, $ch, $pid);
     eval {
-      for my $r ($selector->can_read($self->selecttimeout)) {
-        my ($rh, $wh, $eof, $ch) = @$r;
+      for $r ($selector->has_exception(0)) {
+        $self->handle_select_error($r);
+      }
+    };
+    if ( my $error = $@ ) {
+      say "SELECT HAS EXCEPTION ERRORS";
+      sayd($error);
+      sayd($r);
+      say "DONE SELECT HAS EXCEPTION ERRORS";
+    }
+    eval {
+      for $r ($selector->can_read($self->selecttimeout)) {
+        ($rh, $wh, $eof, $ch, $pid) = @$r;
         if (defined (my $itemResult = $ch->receive)) {
-          $self->handleItemResult($itemResult);
+          eval_report_error { $self->handleItemResult($itemResult); } 'ERROR $self->handleItemResult($itemResult);';
           
           unless ( $eof ) {
             if( my $jobid = $self->nextJob ) { 
@@ -201,10 +247,11 @@ sub process_select {
       }
     };
     if ( my $error = $@ ) {
-      say "SELECT HAS ERRORS" if $FFDEBUG;
-      $_->[3]->sendEnd for $selector->handles;
-      $self->wait_for_all_children_to_exit;
-      die $error;
+      say "SELECT HAS ERRORS";
+      sayd($error);
+      $self->handle_select_error($r);
+      #$_->[3]->sendEnd for $selector->handles;
+      #$self->wait_for_all_children_to_exit;
     }
     say "SELECT_HAS_HANDLES" if $FFDEBUG;
     return SELECT_HAS_HANDLES;
@@ -221,7 +268,7 @@ sub fffork {
     #Parent
     $ch->parentAfterFork;
     push @{ $self->workers }, $pid;
-    $self->selector->add($ch->selectInit);
+    $self->selector->add($ch->selectInit($pid));
     $ch->send($workid);
   }
   else {

@@ -99,31 +99,31 @@ sub watchall {
 eval {
 if (@ARGV) {
   $_ = shift;
-  if (/endall/) { end_all_experiments; }
-  elsif (/end/) {  for(@ARGV) { e(split(/\./, $_))->end; }; }
+  if (/endall/)      { end_all_experiments; }
+  elsif ($_ eq 'st') { e->pretty_list; }
+  elsif (/end/)      { for(@ARGV) { e(split(/\./, $_))->end; }; }
   elsif (/watchall/) { watchall; }
-  elsif (/rn/)  { (say Dumper(Tools::Network::node_reboot($_))) for @ARGV; }
+  elsif (/rn/)       { (say Dumper(Tools::Network::node_reboot($_))) for @ARGV; }
   else {
     my $e = e(shift);
-    if (/--help/) { usage; } 
-    elsif (/end/) { $e->end_wait; }
-    elsif (/ping/ ) { $e->ping_test; }
-    elsif (/swapin/) { $e->swapin_wait; }
-    elsif (/swapout/) { $e->swapout_wait; }
-    elsif (/start/) { $e->startexp_ns_wait($ns); }
-    elsif (/tevc/) { $e->tevc(@ARGV); }
-    elsif (/linktest/) { $e->linktest; }
+    if (/--help/)               { usage; }
+    elsif (/end/)               { $e->end_wait; }
+    elsif (/ping/ )             { $e->ping_test; }
+    elsif (/swapin/)            { $e->swapin_wait; }
+    elsif (/swapout/)           { $e->swapout_wait; }
+    elsif (/start/)             { $e->startexp_ns_wait($ns); }
+    elsif (/tevc/)              { $e->tevc(@ARGV); }
+    elsif (/linktest/)          { $e->linktest; }
     elsif (/single_node_tests/) { $e->single_node_tests; }
-    elsif (/fqnn/) { say Dumper($e->fqnodenames) ;}
-    elsif (/ni/) { say Dumper($e->nodeinfo) ;}
-    elsif (/li/) { say Dumper($e->linkinfo) ;}
-    elsif (/im/) { say Dumper($e->info(aspect => 'mapping')) ;}
-    elsif (/ip/) { say Dumper($e->info(aspect => 'physical')) ;}
-    elsif (/it/) { say Dumper($e->info(aspect => 'traces')) ;}
-    elsif (/il/) { say Dumper($e->info(aspect => 'links')) ;}
-    elsif (/kk/) { say Dumper($e->node('node1')->reboot) ;}
-    elsif ($_ eq 'syncs') { prun( map { my $n = $_; sub { $e->node('node1')->ssh->cmdoutput('/usr/testbed/bin/emulab-sync'); } } (1..shift)); }
-    elsif (/watch/) { watch($e); }
+    elsif (/fqnn/)              { say Dumper($e->fqnodenames) ;}
+    elsif (/ni/)                { say Dumper($e->nodeinfo) ;}
+    elsif (/li/)                { say Dumper($e->linkinfo) ;}
+    elsif (/im/)                { say Dumper($e->info(aspect => 'mapping')) ;}
+    elsif (/ip/)                { say Dumper($e->info(aspect => 'physical')) ;}
+    elsif (/it/)                { say Dumper($e->info(aspect => 'traces')) ;}
+    elsif (/il/)                { say Dumper($e->info(aspect => 'links')) ;}
+    elsif ($_ eq 'syncs')       { prun( map { my $n = $_; sub { $e->node('node1')->ssh->cmdoutput('/usr/testbed/bin/emulab-sync'); } } (1..shift)); }
+    elsif (/watch/)             { watch($e); }
     elsif ($_ eq'ex') { 
       say $ARGV[0];
       my $result = eval $ARGV[0];

@@ -6,8 +6,9 @@ use Test::More;
 
 my $test_body = sub {
   my $e = shift;
+  my $eid = $e->eid;
   sleep(5);
-  ok(!($e->ping_test), 'Ping Test');
+  ok(!($e->ping_test), "$eid Ping Test");
   sleep(5);
 };
 

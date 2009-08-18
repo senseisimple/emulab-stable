@@ -514,7 +514,7 @@ set lan1 [$ns make-lan "$node1 $node2 $node3" 100Mb 0ms]
 set link1 [$ns duplex-link $node4 $node1 100Mb 50ms DropTail]
 set link2 [$ns duplex-link $node4 $node3 10Mb 100ms DropTail]
 
-tb-set-lan-simplex-params $lan1 $node1 0ms 100Mb 0 100ms 10Mb 0.2
+tb-set-lan-simplex-params $lan1 $node1 0ms 100Mb 0.02 100ms 10Mb 0.02
 tb-set-link-simplex-params $link1 $node4 300ms 20Mb 0.4
 
 $ns run

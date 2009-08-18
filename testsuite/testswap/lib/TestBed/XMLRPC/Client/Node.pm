@@ -35,7 +35,6 @@ sub get_free {
 
 sub get_free_names {
   my $x = shift;
-  sayd(keys %{$x->get_free(@_)});
   keys %{$x->get_free(@_)};
 }
 

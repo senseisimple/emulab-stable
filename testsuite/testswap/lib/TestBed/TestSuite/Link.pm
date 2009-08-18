@@ -35,7 +35,7 @@ uses tevc to control link
 sub tevc {
   my ($self, $cmd) = @_;
   my $name = $self->name;
-  TestBed::Wrap::tevc::tevc($self->experiment->pid, $self->experiment->eid, "now $name $cmd");
+  TestBed::Wrap::tevc::tevc($self->experiment, "now $name $cmd");
 }
 
 =back 
