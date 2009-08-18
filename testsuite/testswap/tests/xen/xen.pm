@@ -47,7 +47,7 @@ tb-set-hardware $b1 pcvm
 tb-set-hardware $b2 pcvm
 tb-set-hardware $b3 pcvm
 
-tb-set-vlink-emulation "vlan"
+tb-set-vlink-emulation "veth"
 
 # Links
 set link0 [$ns duplex-link $a1 $a3 100000.0kb 0.0ms DropTail]
@@ -70,6 +70,11 @@ EOF
   return concretize($data, 'physical_host1' => $node1, 'physical_host2' => $node2);
 }
 
+sub node_status($$){
+	my ($e, $node) = @_;
+	my $data = $e->info(aspect => 'mapping');
+}
+
 sub testbody($){
   my (@nodes) = @_;
   return sub{
@@ -77,7 +82,7 @@ sub testbody($){
     $e->wait_for_nodes_to_activate(60 * 30, @nodes); #thirty minute timeout
     # ok($e->traceroute('a1', 'b1', qw(b1-link4)), 'traceroute between a1 and b1');
     # ok($e->traceroute('a1', 'b2', qw(b1-link4 b3-link2 b2-link3)), 'traceroute between a1 and b2');
-    ok($e->cartesian_ping(), 'ping all nodes');
+    ok($e->cartesian_ping(), 'ping all nodes: ' . $e->eid);
     # ok($e->ping_from_to('a1', 'b1'), 'ping from a1 to b1');
     # ok($e->ping_from_to('a1', 'b2'), 'ping from a1 to b2');
   }
@@ -118,7 +123,7 @@ sub make_topology($){
         my ($nodes) = @_;
         my $hosts = {};
         foreach (allHosts($nodes)){
-            if ($_ =~ m/(\w+)\d+/){
+            if ($_ =~ m/([^\d]+)\d+/){
                     my $name = $1;
                     $hosts->{$_} = "physical_host_$name";
             }
@@ -130,7 +135,7 @@ sub make_topology($){
         my ($vnode, $host) = @_;
         my $data = "set $vnode [\$ns node]\n";
         $data .= "tb-fix-node \$$vnode \@$host\@\n";
-        $data .= "tb-set-node-failure-action \$$vnode \"nonfatal\"\n";
+        # $data .= "tb-set-node-failure-action \$$vnode \"nonfatal\"\n";
         $data .= "tb-set-node-os \$$vnode FC8-XEN\n";
         $data .= "tb-set-hardware \$$vnode pcvm\n";
 
@@ -152,25 +157,34 @@ EOF
         # $data .= "set $key \@$value\@\n";
     }
 
+    my %seen;
     my $link = 0;
     foreach my $key (keys %$topology){
         my $from = $key;
         my $to = $topology->{$from};
         foreach (@$to){
-                my $line = "set link$link [\$ns duplex-link \$$from \$$_ 100000.0kb 0.0ms DropTail]\n";
-                $data .= $line;
-                $link = $link + 1;
+		my $id = "{$from}{$_}";
+		my $rid = "{$_}{$from}";
+		if (!$seen{$id}){
+			$seen{$id} = 1;
+			$seen{$rid} = 1;
+			my $line = "set link$link [\$ns duplex-link \$$from \$$_ 100000.0kb 0.0ms DropTail]\n";
+			$data .= $line;
+			$link = $link + 1;
+		}
         }
     }
 
     $data .= <<'EOF';
 
-tb-set-vlink-emulation "vlan"
+tb-set-vlink-emulation "veth"
 $ns rtproto Static
 $ns run
 EOF
 
     my $num_nodes = scalar uniq(values %$hosts);
+    # print "Have $num_nodes nodes\n";
+    # sayd(uniq(values %$hosts));
     return sub{
         my @names = get_free_node_names($num_nodes, 'type' => 'pc3000');
         my %all;
@@ -181,18 +195,241 @@ EOF
 
 # rege(e('xentestingk'), \&build_ns, \&testbody, 1, "testing more xen stuff");
 
-my $nodes = {
+sub do_test($$){
+
+	my ($num, $nodes) = @_;
+	my $foo = make_topology($nodes);
+	# print &$foo() . "\n";
+
+	rege(e('tbres', "xentest$num"), make_topology($nodes), &testbody(allHosts($nodes)), 1, "generate xen testing stuff");
+}
+
+do_test(1, {
   "a1" => ["a3", "b1"],
   "a2" => ["b2"],
   "a3" => ["a2"],
   "b1" => ["b3"],
   "b3" => ["b2"],
-};
+});
 
-my $foo = make_topology($nodes);
-# print &$foo() . "\n";
+do_test(2, {
+  "a1" => ["a2", "c3", "a4", "a5", "c5"],
+  "b1" => ["c2", "a4", "b2", "b3"],
+  "c1" => ["c4", "c5", "a5", "b4"],
+});
 
-rege(e('xentest5'), make_topology($nodes), &testbody(allHosts($nodes)), 1, "generate xen testing stuff");
+# 15 virtual, 3 physical
+do_test(3, {
+"an11" => ["bn3", "bn9",],
+"an5" => ["cn6", "bn1", "bn9",],
+"an13" => ["cn6", "bn1",],
+"an2" => ["cn8", "bn3",],
+"an10" => ["cn6", "cn8",],
+"cn12" => ["bn1", "bn9",],
+"cn4" => ["cn6",],
+"cn7" => ["bn1", "bn3",],
+"bn14" => ["cn8", "bn3", "bn9",],
+"bn15" => ["cn8",],
+});
+
+# 40 virtual, 3 physical
+do_test(4, {
+"an13" => ["bn14", "an25", "cn16", "bn30",],
+"an39" => ["an36", "bn20", "cn28", "bn3",],
+"an27" => ["cn22", "an25", "bn23", "bn20",],
+"an36" => ["an39",],
+"an25" => ["an27", "an17", "cn6", "an13",],
+"an32" => ["cn37", "bn10", "bn21", "cn28",],
+"an38" => ["cn22", "bn9", "bn23", "bn20",],
+"an29" => ["an33", "an40", "bn21",],
+"an18" => ["bn26", "cn8", "bn10", "bn9",],
+"an33" => ["bn10", "an29",],
+"an40" => ["an29",],
+"an31" => ["cn7",],
+"an17" => ["bn10", "an25", "bn20", "cn28",],
+"an24" => ["cn8", "bn9", "bn21", "bn1",],
+"cn37" => ["an32", "bn15", "bn11",],
+"cn22" => ["an27", "an38", "cn2", "bn11",],
+"cn8" => ["an18", "an24",],
+"cn34" => ["cn6", "cn2",],
+"cn16" => ["cn4", "an13",],
+"cn12" => ["cn4", "cn6",],
+"cn2" => ["cn22", "cn34", "cn5", "bn3",],
+"cn5" => ["cn2",],
+"cn35" => ["bn15", "cn7",],
+"cn28" => ["cn4", "an32", "an17", "an39",],
+"cn7" => ["bn26", "bn10", "cn35", "an31",],
+"cn4" => ["cn16", "cn12", "bn23", "cn28",],
+"cn6" => ["cn34", "an25", "cn12", "bn19",],
+"bn11" => ["cn37", "bn26", "cn22", "bn14",],
+"bn26" => ["cn7", "an18", "bn11",],
+"bn14" => ["an13", "bn11",],
+"bn10" => ["an32", "an17", "cn7", "an18", "an33",],
+"bn15" => ["cn37", "bn1", "bn23", "cn35",],
+"bn9" => ["an38", "an18", "an24",],
+"bn21" => ["an32", "an24", "an29",],
+"bn1" => ["bn15", "an24",],
+"bn23" => ["cn4", "an27", "bn15", "an38",],
+"bn20" => ["an27", "an17", "an39", "an38",],
+"bn19" => ["cn6",],
+"bn30" => ["an13",],
+"bn3" => ["an39", "cn2",],
+
+});
+
+# 150 virtual, 5 physical
+do_test(5, {
+"an51" => ["an132", "an65", "en3", "cn12",],
+"an85" => ["en92", "cn71",],
+"an16" => ["cn29", "en144",],
+"an14" => ["cn129", "dn43",],
+"an89" => ["en117", "dn140", "en49", "en3",],
+"an68" => ["en21", "dn115",],
+"an52" => ["en117", "an69", "dn76", "an6",],
+"an69" => ["cn74", "an52", "dn4",],
+"an36" => ["an9", "en19", "dn109",],
+"an101" => ["an132", "an84", "bn139", "an63",],
+"an86" => ["dn115", "bn146",],
+"an100" => ["en44", "dn47",],
+"an121" => ["en18", "en135",],
+"an33" => ["bn102", "en21",],
+"an97" => ["bn55", "bn41", "cn70", "bn26",],
+"an132" => ["an101", "en61", "cn29", "an51",],
+"an56" => ["bn146", "en18", "bn24",],
+"an9" => ["an36", "dn76", "bn139", "dn130",],
+"an83" => ["en61", "en40",],
+"an10" => ["an81", "cn17",],
+"an84" => ["an101", "bn5",],
+"an46" => ["bn102", "cn118",],
+"an65" => ["an51", "dn47",],
+"an2" => ["en144",],
+"an54" => ["dn20", "bn77", "dn130", "cn12",],
+"an127" => ["dn124", "en92", "cn134",],
+"an6" => ["an52", "en92",],
+"an81" => ["dn34", "bn145", "an10",],
+"an63" => ["an101",],
+"an103" => ["bn94",],
+"cn134" => ["bn67", "bn8", "cn137", "an127",],
+"cn88" => ["en107", "en135",],
+"cn142" => ["cn119", "en59", "cn95", "cn35",],
+"cn90" => ["dn115", "en61", "bn24",],
+"cn126" => ["cn38",],
+"cn147" => ["dn133", "bn24",],
+"cn74" => ["bn41", "dn98", "an69", "bn106",],
+"cn119" => ["cn142", "bn150", "cn39", "bn96",],
+"cn129" => ["en45", "an14", "dn23", "bn72",],
+"cn58" => ["bn150", "bn79", "cn64", "dn148",],
+"cn35" => ["cn142", "dn20", "en78", "dn23",],
+"cn39" => ["cn119", "bn102", "en135", "dn47",],
+"cn17" => ["an10", "dn4",],
+"cn118" => ["dn20", "bn112", "an46", "bn1",],
+"cn60" => ["bn91",],
+"cn70" => ["bn30", "en40", "bn141", "an97",],
+"cn53" => ["en45", "bn150", "en78", "cn120",],
+"cn29" => ["an16", "an132", "bn72", "dn50",],
+"cn95" => ["cn142", "en123", "en80", "en93",],
+"cn64" => ["en44", "cn58",],
+"cn42" => ["bn32", "dn34", "bn77", "cn31",],
+"cn137" => ["dn22", "cn134",],
+"cn99" => ["en44", "bn5",],
+"cn149" => ["dn109",],
+"cn120" => ["dn124", "cn53", "bn141", "en7",],
+"cn108" => ["dn124", "bn72",],
+"cn31" => ["cn42",],
+"cn38" => ["cn126", "bn57", "en25",],
+"cn71" => ["dn62", "en117", "an85", "bn67",],
+"cn12" => ["bn91", "an54", "bn146", "an51",],
+"bn141" => ["cn70", "en37", "cn120", "dn143",],
+"bn67" => ["en92", "cn134", "cn71",],
+"bn8" => ["en21", "cn134",],
+"bn150" => ["cn119", "cn53", "cn58",],
+"bn146" => ["an86", "an56", "bn32", "cn12",],
+"bn55" => ["an97",],
+"bn41" => ["cn74", "en19", "an97", "dn43",],
+"bn24" => ["cn90", "cn147", "an56", "bn77",],
+"bn102" => ["cn39", "an33", "dn23", "an46",],
+"bn106" => ["cn74",],
+"bn57" => ["en25", "cn38",],
+"bn112" => ["en59", "cn118",],
+"bn5" => ["dn15", "dn114", "an84", "cn99",],
+"bn73" => ["dn22", "bn30", "en19", "en7",],
+"bn131" => ["dn105", "dn125", "dn113", "en136",],
+"bn75" => ["dn87", "en110", "en136", "dn130",],
+"bn145" => ["dn28", "an81",],
+"bn32" => ["en107", "cn42", "bn146",],
+"bn79" => ["en61", "cn58",],
+"bn128" => ["dn43", "dn47",],
+"bn91" => ["dn104", "cn60", "bn72", "cn12",],
+"bn139" => ["an9", "an101", "dn124",],
+"bn77" => ["an54", "cn42", "en40", "bn24",],
+"bn1" => ["bn30", "cn118",],
+"bn72" => ["bn91", "cn129", "cn29", "en18", "cn108",],
+"bn96" => ["dn22", "cn119",],
+"bn13" => ["dn98", "en78", "en49", "en27",],
+"bn26" => ["dn109", "an97",],
+"bn30" => ["bn73", "cn70", "dn148", "bn1",],
+"bn94" => ["dn20", "dn50", "dn130", "an103",],
+"en117" => ["an52", "an89", "cn71",],
+"en92" => ["an85", "bn67", "an127", "an6",],
+"en45" => ["cn129", "cn53",],
+"en25" => ["bn57", "dn28", "cn38",],
+"en21" => ["bn8", "an68", "an33", "en11",],
+"en40" => ["cn70", "en110", "an83", "bn77",],
+"en19" => ["bn41", "an36", "bn73", "en122",],
+"en18" => ["an121", "an56", "bn72", "en122",],
+"en78" => ["bn13", "cn53", "dn109", "cn35",],
+"en123" => ["cn95",],
+"en135" => ["cn88", "cn39", "an121", "dn111",],
+"en82" => ["en107",],
+"en107" => ["cn88", "en82", "bn32", "dn34", "en11",],
+"en80" => ["cn95",],
+"en48" => ["dn133",],
+"en59" => ["cn142", "bn112", "en136", "dn116",],
+"en110" => ["en40", "bn75",],
+"en44" => ["an100", "dn23", "cn64", "cn99",],
+"en136" => ["bn131", "en59", "bn75",],
+"en144" => ["an16", "dn76", "an2", "dn138",],
+"en7" => ["bn73", "cn120", "dn138", "en66",],
+"en11" => ["en107", "en21",],
+"en61" => ["cn90", "an132", "an83", "bn79",],
+"en37" => ["bn141",],
+"en93" => ["cn95",],
+"en49" => ["bn13", "an89",],
+"en3" => ["an89", "an51",],
+"en27" => ["bn13",],
+"en122" => ["en19", "en18",],
+"en66" => ["en7",],
+"dn62" => ["cn71",],
+"dn104" => ["bn91",],
+"dn115" => ["cn90", "an68", "an86", "dn148",],
+"dn124" => ["cn108", "dn98", "bn139", "cn120", "an127",],
+"dn105" => ["bn131", "dn43",],
+"dn43" => ["an14", "dn105", "bn41", "bn128",],
+"dn98" => ["cn74", "bn13", "dn124",],
+"dn87" => ["bn75", "dn133",],
+"dn20" => ["an54", "cn35", "cn118", "bn94",],
+"dn109" => ["dn4", "an36", "en78", "cn149", "bn26",],
+"dn15" => ["bn5",],
+"dn125" => ["bn131",],
+"dn22" => ["bn73", "cn137", "bn96", "dn50",],
+"dn114" => ["bn5",],
+"dn47" => ["an100", "cn39", "bn128", "an65",],
+"dn28" => ["en25", "bn145",],
+"dn23" => ["en44", "cn129", "bn102", "cn35",],
+"dn113" => ["bn131",],
+"dn76" => ["an9", "an52", "en144",],
+"dn140" => ["an89",],
+"dn148" => ["bn30", "dn115", "cn58",],
+"dn34" => ["en107", "cn42", "an81",],
+"dn116" => ["en59",],
+"dn4" => ["cn17", "an69", "dn109",],
+"dn143" => ["bn141",],
+"dn111" => ["en135", "dn133",],
+"dn50" => ["dn22", "cn29", "bn94",],
+"dn138" => ["en144", "en7",],
+"dn130" => ["an9", "an54", "bn94", "bn75",],
+"dn133" => ["cn147", "dn87", "en48", "dn111",],
+});
 
 1;
 
