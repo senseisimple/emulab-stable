@@ -129,7 +129,7 @@ if (@ARGV) {
   my @lib = qw(t/lib/*.t t/lib/*/*.t t/tbts/cmdlineargs.t);
   my @sanity = (@lib, @xmlrpc);
   my @all = sort(array_single_difference([all_ts], [qw(t/coding/pod_coverage.t t/noautorun/tbts_cmdlineargs.t t/eine/elab_in_elab.t)]));
-  my @massive = (all_tpms);
+  my @massive = array_single_difference([all_tpms], [qw(tests/xen/xen.pm)]);
 
   my $cmd = $ARGV[0];
   $_   = $cmd;

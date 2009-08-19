@@ -4,6 +4,8 @@ use warnings;
 use CPAN;
 
 sub prep_local_cpan {
+  my $P = shift || "~"; 
+
   print "WARNING installing local CPAN to '~/lib/perl5' -- type yes <ENTER> to continue\n";
   my $response = <STDIN>;
   chomp $response;
@@ -21,7 +23,8 @@ sub prep_local_cpan {
   mkdir '~/share/man/man3';
 
   CPAN::Config->load;
-  $CPAN::Config->{'makepl_arg'} = q[PREFIX=~/ SITELIBEXP=~/lib/perl5 LIB=~/lib/perl5 INSTALLMAN1DIR=~/share/man/man1 INSTALLMAN3DIR=~/share/man/man3 INSTALLSITEMAN1DIR=~/share/man/man1 INSTALLSITEMAN3DIR=~/share/man/man3];
+   
+  $CPAN::Config->{'makepl_arg'} = qq[PREFIX=$P/ SITELIBEXP=$P/lib/perl5 LIB=$P/lib/perl5 INSTALLMAN1DIR=$P/share/man/man1 INSTALLMAN3DIR=$P/share/man/man3 INSTALLSITEMAN1DIR=$P/share/man/man1 INSTALLSITEMAN3DIR=$P/share/man/man3];
   $CPAN::Config->{'prerequisites_policy'} = q[follow];
   $CPAN::Config->{'urllist'} = [q[http://cpan.cs.utah.edu ftp://cpan.cs.utah.edu/pub/CPAN/]];
   CPAN::Config->commit;

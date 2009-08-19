@@ -18,13 +18,16 @@ use TestBed::Wrap::tevc;
 
 #$TBConfig::DEBUG_XML_CLIENT = 1;
 
-$SIG{ __DIE__ } = sub {
+my $error_trace = sub {
   use Carp qw(longmess);
   say "Caught here " . __FILE__;
   sayd(@_);
   say "SAYD DONE";
   Carp::confess( "DIED IN SC\n", @_ );
 };
+
+#$SIG{ __DIE__ } = $error_trace;
+
 
 my $ns = <<'NSEND';
 source tb_compat.tcl
@@ -96,6 +99,10 @@ sub watchall {
   }
 }
 
+sub parsee {
+  split(/\./, shift);
+}
+
 eval {
 if (@ARGV) {
   $_ = shift;
@@ -105,7 +112,7 @@ if (@ARGV) {
   elsif (/watchall/) { watchall; }
   elsif (/rn/)       { (say Dumper(Tools::Network::node_reboot($_))) for @ARGV; }
   else {
-    my $e = e(shift);
+    my $e = e(parsee(shift));
     if (/--help/)               { usage; }
     elsif (/end/)               { $e->end_wait; }
     elsif (/ping/ )             { $e->ping_test; }
@@ -122,7 +129,6 @@ if (@ARGV) {
     elsif (/ip/)                { say Dumper($e->info(aspect => 'physical')) ;}
     elsif (/it/)                { say Dumper($e->info(aspect => 'traces')) ;}
     elsif (/il/)                { say Dumper($e->info(aspect => 'links')) ;}
-    elsif ($_ eq 'syncs')       { prun( map { my $n = $_; sub { $e->node('node1')->ssh->cmdoutput('/usr/testbed/bin/emulab-sync'); } } (1..shift)); }
     elsif (/watch/)             { watch($e); }
     elsif ($_ eq'ex') { 
       say $ARGV[0];

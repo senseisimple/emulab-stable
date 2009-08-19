@@ -194,16 +194,14 @@ sub eval_report_error(&$) {
 sub handle_select_error {
   my ($s, $r) = @_;
   my ($rh, $wh, $eof, $ch, $pid) = @$r;
-  say "SELECT HAS EXCEPTION";
   sayd($r);
-
+=pod
   eval_report_error { $ch->sendEnd; } "sendEnd";
   eval_report_error { $ch->close; } "chclose";
   eval_report_error { $s->selector->remove($r); } "selectorremove";
   eval_report_error { @{$r}[1,2] = (undef, 1); } "undefassign";
   eval_report_error { kill 9, $pid; } "kill $pid";
-
-  say "DONE SELECT HAS EXCEPTION";
+=cut
 }
 
 sub process_select {
@@ -213,7 +211,10 @@ sub process_select {
     my ($r, $rh, $wh, $eof, $ch, $pid);
     eval {
       for $r ($selector->has_exception(0)) {
+        say "SELECT FD EXCEPTION";
+        sayd($r);
         $self->handle_select_error($r);
+        say "DONE SELECT FD EXCEPTION";
       }
     };
     if ( my $error = $@ ) {
@@ -247,11 +248,12 @@ sub process_select {
       }
     };
     if ( my $error = $@ ) {
-      say "SELECT HAS ERRORS";
+      say "SELECT BODY HAS ERRORS";
       sayd($error);
       $self->handle_select_error($r);
       #$_->[3]->sendEnd for $selector->handles;
       #$self->wait_for_all_children_to_exit;
+      say "DONE SELECT BODY HAS ERRORS";
     }
     say "SELECT_HAS_HANDLES" if $FFDEBUG;
     return SELECT_HAS_HANDLES;
