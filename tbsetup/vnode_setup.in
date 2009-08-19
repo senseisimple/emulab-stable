@@ -53,7 +53,7 @@ my $sendemail   = 0;
 my $quiet       = 0;
 my $plabonly    = 0;
 my $numbatch    = 10;
-my $childwait   = 600;
+my $childwait   = 3000;
 my $dbuid;
 
 #
