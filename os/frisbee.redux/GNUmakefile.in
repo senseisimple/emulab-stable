@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -14,13 +14,22 @@ DISTFILES	= TODO client.c decls.h event.c event.h log.c log.h \
 EXPANDCOPYRIGHT	= /usr/site/lib/copyright/expand-copyr
 
 SYSTEM	:= $(shell uname -s)
+
+# FreeBSD specific goop
 ifeq ($(SYSTEM),FreeBSD)
 FBSDREL	:= $(shell uname -r | sed -e 's/\([^-][^-]*\)-.*/\1/')
-# XXX 5.3 and linuxthreads don't see to get along
-ifeq ($(FBSDREL),5.3)
+FBSDMAJ := $(basename $(FBSDREL))
+
 WITH_LTHREADS	= 0
-else
+
+# XXX 5.3 and linuxthreads don't see to get along
+# 7.0 and beyond should not need it
+ifneq ($(FBSDREL),5.3)
+ifneq ($(FBSDMAJ),7)
+ifneq ($(FBSDMAJ),8)
 WITH_LTHREADS	= 1
+endif
+endif
 endif
 endif
 
@@ -41,7 +50,7 @@ ifeq ($(WITH_LTHREADS),1)
 PTHREADCFLAGS	= -D_THREAD_SAFE -I/usr/local/include/pthread/linuxthreads
 PTHREADLIBS	= -L/usr/local/lib -llthread -llgcc_r
 else
-PTHREADCFLAGS	= -DCONDVARS_WORK
+PTHREADCFLAGS	= -D_THREAD_SAFE -DCONDVARS_WORK
 PTHREADLIBS	= -lpthread
 endif
 endif
