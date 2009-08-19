@@ -136,6 +136,7 @@ if ($_SERVER["REMOTE_ADDR"] != $ip) {
 # one in the widearea_nodeinfo table.
 $node_id = "";
 if (isset($privkey)) {
+    $privkey = chop($privkey,"\n");
     $qres = DBQueryFatal("select node_id from widearea_nodeinfo" .
 			 " where IP='" . addslashes($ip) . "' and" . 
 			 "   privkey='" . addslashes($privkey) . "'");
