@@ -23,13 +23,13 @@ sub instance {
 }
 
 sub wrapped_ssh {
-  my ($invocant, $user, $cmd, $checker, $diemessage) = @_;
+  my ($invocant, $user, $cmd, $checker, $diemessage, $stdin) = @_;
   my $ssh;
   if (ref $invocant) { $ssh = $invocant }
   else {
     $ssh = Tools::TBSSH->new('host' => $invocant, 'user' => $user);
   }
-  my @results = $ssh->cmd($cmd);
+  my @results = $ssh->cmd($cmd, $stdin);
   if ($TBConfig::DEBUG_XML_CLIENT) {
     $ssh->saydebug($cmd);
     sayd @results;
@@ -62,6 +62,11 @@ sub cmdcheckoutput {
 sub cmdsuccess {
   my ($host, $cmd, $diemessage) = @_;
   return wrapped_ssh($host, $TBConfig::EMULAB_USER, $cmd, sub { $_[2] == 0; }, $diemessage);
+}
+
+sub cmdsuccess_stdin {
+  my ($host, $cmd, $stdin, $diemessage) = @_;
+  return wrapped_ssh($host, $TBConfig::EMULAB_USER, $cmd, sub { $_[2] == 0; }, $diemessage, $stdin);
 }
 
 sub cmdoutput {

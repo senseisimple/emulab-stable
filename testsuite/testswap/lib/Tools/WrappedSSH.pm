@@ -10,13 +10,13 @@ has 'host' => ( isa => 'Str', is => 'rw');
 has 'user' => ( isa => 'Str', is => 'rw');
 
 sub cmd {
-  my ($ssh, $cmd) = @_;
+  my ($ssh, $cmd, $stdin) = @_;
   my $out;
   my $err;
   my $host = $ssh->host;
   my $user = $ssh->user;
   my $sshcmd = "ssh -x -o BatchMode=yes -o StrictHostKeyChecking=no $user\@$host $cmd";
-  run3($sshcmd, undef, \$out, \$err);
+  run3($sshcmd, \$stdin, \$out, \$err);
   my $rc = $? >> 8;
   ($out, $err, $rc);
 }
