@@ -968,6 +968,17 @@ sub GetTicket($;$)
 	    $slice_experiment->RemovePhysicalState();
 	    $slice_experiment->RestorePhysicalState();
 	}
+	#
+	# Lets dump the error log too, so it ends up in the email.
+	# Have to figure out a better approach for this.
+	#
+	if (-e "assign.log") {
+	    print STDERR "----------------------------------------------\n";
+	    print STDERR "------------- Assign Error Log ---------------\n";
+	    my $log = `cat assign.log`;
+	    print STDERR $log . "\n";
+	    print STDERR "----------------------------------------------\n";
+	}	    
 	goto bad;
     }
     my $solution = XMLin($tmpfile, KeyAttr => [],
@@ -1589,6 +1600,17 @@ sub SliverWork($$)
     system("$MAPPER -d -v -u -m 3 $pid $eid");
     if ($?) {
 	print STDERR "Mapper failed!\n";
+	#
+	# Lets dump the error log too, so it ends up in the email.
+	# Have to figure out a better approach for this.
+	#
+	if (-e "assign.log") {
+	    print STDERR "----------------------------------------------\n";
+	    print STDERR "------------- Assign Error Log ---------------\n";
+	    my $log = `cat assign.log`;
+	    print STDERR $log . "\n";
+	    print STDERR "----------------------------------------------\n";
+	}	    
 	goto bad;
     }
     
