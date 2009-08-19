@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -16,8 +16,25 @@ all: pcapper
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-PTHREADCFLAGS = -D_THREAD_SAFE -I/usr/local/include/pthread/linuxthreads
+WITH_LTHREADS = 0
+
+ifeq ($(SYSTEM),FreeBSD)
+FBSDREL	:= $(shell uname -r | sed -e 's/\([^-][^-]*\)-.*/\1/')
+FBSDMAJ := $(basename $(FBSDREL))
+ifneq ($(FBSDMAJ),7)
+ifneq ($(FBSDMAJ),8)
+WITH_LTHREADS = 1
+endif
+endif
+endif
+
+ifeq ($(WITH_LTHREADS),1)
+PTHREADCFLAGS += -D_THREAD_SAFE -I/usr/local/include/pthread/linuxthreads
 PTHREADLIBS   = -L/usr/local/lib -llthread -llgcc_r
+else
+PTHREADCFLAGS = -D_THREAD_SAFE
+PTHREADLIBS   = -lpthread
+endif
 
 ELVINFLAGS    = -I/usr/local/include
 ELVINLIBS     = -L/usr/local/lib -lpubsub -lm
