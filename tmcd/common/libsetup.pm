@@ -570,6 +570,39 @@ sub dorole()
 }
 
 #
+# Get the nodeid
+# 
+sub donodeid()
+{
+    my $nodeid;
+    my @tmccresults;
+
+    if (tmcc(TMCCCMD_NODEID, undef, \@tmccresults) < 0) {
+	warn("*** WARNING: Could not get nodeid from server!\n");
+	return -1;
+    }
+    return 0
+	if (! @tmccresults);
+    
+    #
+    # There should be just one string. Ignore anything else.
+    #
+    if ($tmccresults[0] =~ /([-\w]*)/) {
+	$nodeid = $1;
+    }
+    else {
+	warn "*** WARNING: Bad nodeid line: $tmccresults[0]";
+	return -1;
+    }
+    
+    system("echo '$nodeid' > ". TMNODEID);
+    if ($?) {
+	warn "*** WARNING: Could not write nodeid to " . TMNODEID() . "\n";
+    }
+    return 0;
+}
+
+#
 # Parse the router config and return a hash. This leaves the ugly pattern
 # matching stuff here, but lets the caller do whatever with it (as is the
 # case for the IXP configuration stuff). This is inconsistent with many
@@ -1686,6 +1719,11 @@ sub bootsetup()
     # be expensive.
     #
     dorole();
+
+    #
+    # And the nodeid.
+    #
+    donodeid();
 
     return ($pid, $eid, $vname);
 }
