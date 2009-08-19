@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -89,6 +89,8 @@ symlinks:	dir-install
 	ln -s $(CLIENT_BINDIR)/tevc$(EXE) $(TBBINDIR)/tevc$(EXE)
 	rm -f $(TBBINDIR)/emulab-sync$(EXE)
 	ln -s $(CLIENT_BINDIR)/emulab-sync$(EXE) $(TBBINDIR)/emulab-sync$(EXE)
+	rm -f $(TBBINDIR)/mkextrafs
+	ln -s $(CLIENT_BINDIR)/mkextrafs.pl $(TBBINDIR)/mkextrafs
 	rm -f $(TBLIBDIR)
 	ln -s $(CLIENT_BINDIR) $(TBLIBDIR)
 
