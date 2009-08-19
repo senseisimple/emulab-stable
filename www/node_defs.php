@@ -1024,6 +1024,41 @@ class Node
 	    }
 	}
 
+	if (! ($short || $noperm || $isvirtnode)) {
+	    $query_result =
+		DBQueryFatal("select n.node_id,pid,eid,exptidx ".
+			     " from nodes as n ".
+			     "left join reserved as r on r.node_id=n.node_id ".
+			     "where n.phys_nodeid='$node_id' and ".
+			     "      n.node_id!=n.phys_nodeid");
+	    if (mysql_num_rows($query_result)) {
+		echo "<tr>
+                       <td align=center colspan=2>Virtual/Sub Nodes</td>
+                      </tr>\n";
+		echo "<tr><th>Node ID</th><th>Experiment</th>\n";
+
+		while($row = mysql_fetch_array($query_result)) {
+		    $vnodeid = $row["node_id"];
+		    $vpid    = $row["pid"];
+		    $veid    = $row["eid"];
+		    $vidx    = $row["exptidx"];
+		    $url1    = CreateURL("shownode", URLARG_NODEID, $vnodeid);
+
+		    echo "<tr>
+                            <td><a href='$url1'>$vnodeid</a></td>\n";
+		    
+		    if (isset($veid)) {
+			$url2 = CreateURL("showexp", URLARG_EID, $vidx);
+			echo "<td><a href='$url2'>$vpid/$veid</a></td>\n";
+		    }
+		    else {
+			echo "<td>No Experiment</a></td>\n";
+		    }
+		    echo "</td>\n";
+		}
+	    }
+	}
+
 	echo "</table>\n";
     }
 
