@@ -258,7 +258,7 @@ function CreateURL($page_id)
 		$key = "experiment";
 		$val = $val->idx();
 	    }
-	    elseif (is_int($val)) {
+	    elseif (preg_match("/^[\d]+$/", "$val")) {
 		$key = "experiment";
 	    }
 	    else {
