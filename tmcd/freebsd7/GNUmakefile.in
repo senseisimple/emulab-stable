@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 , 2009University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -69,12 +69,13 @@ dir-install:
 
 basefbsd-install: dir-install
 	(cd ../freebsd5; $(MAKE) all install)
-	rm -f $(SYSETCDIR)/rc.conf.d/dhclient
+	rm -rf $(SYSETCDIR)/rc.conf.d
 	rm -f $(DESTDIR)/usr/local/etc/dhclient*
 	ln -s /etc/dhclient* $(DESTDIR)/usr/local/etc/
 
+# Do not even pretend to do cvsup anymore
 sup-install:	dir-install supfile
-	$(INSTALL) -m 755 ./supfile $(ETCDIR)/supfile
+	rm -f $(ETCDIR)/supfile
 
 bin-install:	dir-install
 
@@ -84,6 +85,7 @@ etc-install:	dir-install sysetc-install
 
 sysetc-install:	dir-install netif-emulab
 	$(INSTALL) -m 444 $(SRCDIR)/rc.conf $(SYSETCDIR)/rc.conf
+	$(INSTALL) -m 444 $(SRCDIR)/sysctl.conf $(SYSETCDIR)/sysctl.conf
 	$(INSTALL) -m 755 $(SRCDIR)/dhclient-exit-hooks \
 			$(SYSETCDIR)/dhclient-exit-hooks
 	$(INSTALL) -m 555 ./netif-emulab $(SYSETCDIR)/rc.d/netif-emulab
