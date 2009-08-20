@@ -142,8 +142,8 @@ void NetlinkPipe::updateParameter(Parameter const & newParameter)
 					cerr << "Couldn't find htb class " << htbClassHandle << endl;
 					return;
 				}
-				rtnl_htb_set_rate(htbClass, newParameter.getValue());
-				rtnl_htb_set_ceil(htbClass, newParameter.getValue());
+				rtnl_htb_set_rate(htbClass, newParameter.getValue() * 1000);
+				rtnl_htb_set_ceil(htbClass, newParameter.getValue() * 1000);
 				rtnl_class_change(nl_handle, htbClass, NULL);
 				rtnl_class_put(htbClass);
                                 break;
@@ -153,7 +153,7 @@ void NetlinkPipe::updateParameter(Parameter const & newParameter)
 					cerr << "Couldn't find delay qdisc " << delayHandle << endl;
 					return;
 				}
-				rtnl_delay_set_delay(qdisc, newParameter.getValue());
+				rtnl_delay_set_delay(qdisc, newParameter.getValue() * 1000);
 				rtnl_qdisc_change(nl_handle, qdisc, NULL);
 				rtnl_qdisc_put(qdisc);
                                 break;

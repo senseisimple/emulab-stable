@@ -12,6 +12,7 @@ public:
   {
     NOTHING,
     BANDWIDTH,
+    // This is the delay in milliseconds
     DELAY,
     // This is the loss rate in thousandths. 1000 is 100% loss. 1 is 0.1% loss. Etc.
     LOSS,

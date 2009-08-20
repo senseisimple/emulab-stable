@@ -7,6 +7,8 @@
 #include <netlink/route/link.h>
 #endif
 
+#include <stdlib.h>
+
 using namespace std;
 
 namespace g
@@ -26,6 +28,11 @@ int stringToInt(std::string const & val)
   istringstream stream(val);
   stream >> result;
   return result;
+}
+
+double stringToDouble(std::string const & val)
+{
+    return strtod(val.c_str(),NULL);
 }
 
 int hexStringToInt(std::string const & val)
