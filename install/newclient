@@ -247,6 +247,8 @@ sub buildURL {
     my $ifaceindex = 0;
     foreach my $aref (@ifaces) {
 	my ($iface, $mac, $status) = @$aref;
+	my $driver = get_iface_driver($iface);
+	$URL .= "&ifacedriver$ifaceindex=" . urlencode($driver);
 	$URL .= "&ifacename$ifaceindex=" . urlencode($iface);
 	$URL .= "&ifacemac$ifaceindex=" . urlencode($mac);
 	$ifaceindex++;
@@ -262,12 +264,12 @@ sub buildURL {
 #
 sub checkin {
     my ($URL) = @_;
-    my $checkin_command = $FETCH;
+    my $checkin_command = "$FETCH -o '-' '$URL'";
     
     if (! -x $FETCH) {
-        $checkin_command = $WGET
+        $checkin_command = "$WGET -O '-' --quiet '$URL'";
     }
-    open(CHECKIN,"$checkin_command -o '-' '$URL'|")
+    open(CHECKIN,"$checkin_command|")
 	or error_fatal($ERROR_CHECKIN,"Unable to check in with boss!\n");
     my $id = undef;
     while (<CHECKIN>) {
@@ -294,6 +296,38 @@ sub find_interfaces
     }
     elsif ($^O eq 'linux') {
         linux_find_interfaces(@_);
+    }
+}
+
+sub linux_get_iface_driver
+{
+    my ($iface) = @_;
+    my $link = "/sys/class/net/$iface/device/driver";
+    my $driver = undef;
+    
+    if (-l $link) {
+    	$driver = (split(/\//, readlink($link)))[-1];
+    }
+    
+    return $driver;
+}
+
+sub freebsd_get_iface_driver
+{
+    my ($iface) = @_;
+    
+    $iface =~ s/\d+$//;
+    
+    return $iface;
+}
+
+sub get_iface_driver
+{
+    if ($^O eq 'freebsd') {
+        freebsd_get_iface_driver(@_);
+    }
+    elsif ($^O eq 'linux') {
+        linux_get_iface_driver(@_);
     }
 }
 

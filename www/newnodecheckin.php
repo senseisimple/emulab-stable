@@ -39,17 +39,21 @@ $tmpIP = getenv("REMOTE_ADDR");
 #
 $interfaces = array();
 foreach ($HTTP_GET_VARS as $key => $value) {
-    if (preg_match("/iface(name|mac)(\d+)/",$key,$matches)) {
+    if (preg_match("/iface(name|mac|driver)(\d+)/",$key,$matches)) {
         $vartype = $matches[1];
     	$ifacenum = $matches[2];
     	if ($vartype == "name") {
 	    if (preg_match("/^([a-z]+)(\d+)$/i",$value,$matches)) {
-		$interfaces[$ifacenum]["type"] = $matches[1];
+		if (!isset($interfaces[$ifacenum]["type"])) {
+		    $interfaces[$ifacenum]["type"] = $matches[1];
+		}
 	        $interfaces[$ifacenum]["card"] = $ifacenum;
 	    } else {
 		echo "Bad interface name $value!";
 		continue;
 	    }
+	} else if ($vartype == "driver") {
+	    $interfaces[$ifacenum]["type"] = $value;
 	} else {
 	    $interfaces[$ifacenum]["mac"] = $value;
 	}
