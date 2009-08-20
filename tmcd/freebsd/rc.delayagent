@@ -92,7 +92,7 @@ my ($pid, $eid, $vname) = check_nickname();
 #
 # The agent always talks to the local elvind, which talks to boss. 
 #
-my $elvind = "localhost";
+my $elvind = getlocalevserver();
 
 system("delay-agent -s $elvind -E $pid/$eid $vnodearg ".
        "-f $MAPFILE -l $logfile -i $pidfile -k $KEYFILE &");
