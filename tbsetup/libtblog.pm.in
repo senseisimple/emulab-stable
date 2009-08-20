@@ -103,7 +103,7 @@ parameter can be combined with the "cause" parameter.  For example:
 
 =head2 Finding the Cause of the Error
 
-Use tblog_find_error, or if you are sure tblog_find_eror was already
+Use tblog_find_error, or if you are sure tblog_find_error was already
 called used tblog_lookup_error.
 
 =head1 ADVANCE USAGE
@@ -269,7 +269,7 @@ my $TBLOG_PID;
 
 my $FORCED_SESSION = 0;
 
-my $REVISION_STR = '$Revision: 2.26 $';
+my $REVISION_STR = '$Revision: 2.27 $';
 
 #
 # Internal Utility Functions
