@@ -4,6 +4,7 @@
 #define LIB_HH_DELAY_AGENT_1
 
 #include <cassert>
+#include <cmath>
 
 #include <string>
 #include <map>

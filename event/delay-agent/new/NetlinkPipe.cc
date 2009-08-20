@@ -142,8 +142,8 @@ void NetlinkPipe::updateParameter(Parameter const & newParameter)
 					cerr << "Couldn't find htb class " << htbClassHandle << endl;
 					return;
 				}
-				rtnl_htb_set_rate(htbClass, newParameter.getValue() * 1000);
-				rtnl_htb_set_ceil(htbClass, newParameter.getValue() * 1000);
+				rtnl_htb_set_rate(htbClass, floor(newParameter.getValue() * 1000 / 8.0));
+				rtnl_htb_set_ceil(htbClass, floor(newParameter.getValue() * 1000 / 8.0));
 				rtnl_class_change(nl_handle, htbClass, NULL);
 				rtnl_class_put(htbClass);
                                 break;
