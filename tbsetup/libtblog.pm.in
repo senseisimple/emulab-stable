@@ -103,7 +103,8 @@ parameter can be combined with the "cause" parameter.  For example:
 
 =head2 Finding the Cause of the Error
 
-Use tblog_find_error.
+Use tblog_find_error, or if you are sure tblog_find_eror was already
+called used tblog_lookup_error.
 
 =head1 ADVANCE USAGE
 
@@ -227,7 +228,7 @@ use Exporter;
 	      tblog_sub_process tblog_find_error tblog_email_error
 	      tblog_start_capture tblog_stop_capture
 	      tblog_new_process tblog_new_child_process
-	      tblog_init_process tblog_exit
+	      tblog_new_session tblog_init_process tblog_exit
 	      tblog_session tblog_lookup_error tblog_format_error
 	      tblog_set_attempt tblog_inc_attempt tblog_get_attempt
 	      tblog_set_cleanup tblog_get_cleanup
@@ -266,7 +267,9 @@ undef $SCRIPTNAME; # signal to use $ENV{TBLOG_SCRIPTNAME}
 my $DB;
 my $TBLOG_PID;
 
-my $REVISION_STR = '$Revision: 2.25 $';
+my $FORCED_SESSION = 0;
+
+my $REVISION_STR = '$Revision: 2.26 $';
 
 #
 # Internal Utility Functions
@@ -434,7 +437,8 @@ sub tblog_new_process(@) {
 #
 # tblog_new_child_process
 #
-# Enter a new child process, which is called after fork.
+# Enter a new child process.  Called after fork, but should not be
+# called if the next action in an exec.
 #
 sub tblog_new_child_process() {
     tblog_init_process(undef);
@@ -541,6 +545,20 @@ sub tblog_sub_process($@) {
 		       @_);
 }
 
+=item tblog_new_session
+
+Force a new session, should be used by daemons before performing some
+sort of swap related activity.  The orignal session information will
+be lost.
+
+=cut
+
+sub tblog_new_session() {
+    check_env();
+    delete $ENV{TBLOG_SESSION};
+    $FORCED_SESSION = 1;
+    tblog_init_process($ENV{TBLOG_SCRIPTNAME});
+}
 
 =item copy_hash %DEST, \%SRC
 
@@ -671,7 +689,9 @@ sub informative_scriptname() {
     } else {
 	$name = "$ENV{TBLOG_SCRIPTNAME} (but really $REAL_SCRIPTNAME)";
     }
-    if ($ENV{TBLOG_CHILD}) {
+    if ($FORCED_SESSION) {
+	$name = "forced session in $name";
+    } elsif ($ENV{TBLOG_CHILD}) {
 	$name = "child of $name";
     }
     return $name;
@@ -1030,7 +1050,7 @@ sub tblog_find_error(;$)
        $res->{other_error} = $r unless $r eq $res;
        my $other_error = $res->{other_error};
 
-       tblog_store_error($res);
+       tblog_store_error($res) unless $options->{nostore};
 
        tblog_dump_error($res) unless $options->{quiet};
     };
