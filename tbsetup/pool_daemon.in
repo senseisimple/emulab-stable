@@ -116,6 +116,18 @@ my $pid = $experiment->pid();
 my $eid = $experiment->eid();
 
 #
+# If the experiment is in the new state, then set it to swapped and exit.
+# If in the swapped state, also exit since the local Emulab is not using
+# shared nodes yet.
+#
+if ($experiment->state() eq EXPTSTATE_NEW()) {
+    $experiment->SetState(EXPTSTATE_SWAPPED());
+}
+if ($experiment->state() eq EXPTSTATE_SWAPPED()) {
+    exit(0);
+}
+
+#
 # We need this user for running swapexp below.
 #
 my $elabman = User->Lookup("elabman");
@@ -275,6 +287,9 @@ while (1) {
     exit(0)
 	if ($impotent);
 
+    # Must do this each time before fork.
+    tblog_new_session();
+
     #
     # Start a swapmod. 
     #
@@ -290,7 +305,7 @@ while (1) {
 	print "Swap modify done at " . `date`;
 	$experiment->LockDown(1);
 	if ($exitval) {
-	    my $error_data = tblog_find_error({"quiet" => 1});
+	    my $error_data = tblog_lookup_error();
 
 	    if ($error_data->{'cause'} eq "temp") {
 		print "Temporary resource shortage; try again later\n";
@@ -304,7 +319,6 @@ while (1) {
 	    fatal("Could not flipto $elabman");
 	}
 	$experiment->LockDown(0);	
-	tblog_new_child_process();
 	exec("$SWAPEXP -q -w -n -s modify $pid $eid $tmpfile");
 	die("Could not exec $SWAPEXP\n");
     }
