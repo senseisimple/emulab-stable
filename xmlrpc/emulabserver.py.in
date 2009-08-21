@@ -5355,15 +5355,15 @@ def escapeshellarg(s):
 def runcommand(cmd, separate_stderr=None):
     from subprocess import *
     if separate_stderr == True:
-    	p = Popen(cmd, stdin=None, stdout=PIPE, stderr=PIPE, shell=True)
+    	p = Popen(cmd, stdin=None, stdout=PIPE, stderr=PIPE, shell=True, close_fds=True)
     	(stdoutdata, stderrdata) = p.communicate()
         return (p.returncode << 8, stdoutdata, stderrdata)
     elif separate_stderr == False:
-    	p = Popen(cmd, stdin=None, stdout=PIPE, stderr=STDOUT, shell=True)
+    	p = Popen(cmd, stdin=None, stdout=PIPE, stderr=STDOUT, shell=True, close_fds=True)
     	(stdoutdata, stderrdata) = p.communicate()
         return (p.returncode << 8, stdoutdata, stderrdata)
     else:
-    	p = Popen(cmd, stdin=None, stdout=PIPE, stderr=STDOUT, shell=True)
+    	p = Popen(cmd, stdin=None, stdout=PIPE, stderr=STDOUT, shell=True, close_fds=True)
     	(stdoutdata, stderrdata) = p.communicate()
         return (p.returncode << 8, stdoutdata)
 
