@@ -42,6 +42,7 @@ my $USERNODE_IP= '@USERNODE_IP@';
 my $FSNODE_IP=   '@FSNODE_IP@';
 my $SCRATCHDIR = '@FSDIR_SCRATCH@';
 my $SHAREDIR   = '@FSDIR_SHARE@';
+my $FRISADDR   = '@FRISBEEMCASTADDR@';
 
 #
 # Fixed paths for clients
@@ -929,6 +930,12 @@ Phase "rc.conf", "Adding testbed content to $RCCONF", sub {
 			qq|named_uid="root"|,
 			qq|named_pidfile="$NAMED_PIDFILE"|));
     }
+
+    # add multicast route for frisbee
+    my ($o1) = split(/\./, $FRISADDR);
+    push(@strings, (qq|static_routes="\$static_routes frisbee"|,
+		    qq|route_frisbee="-net $o1.0.0.0/8 -iface $BOSSNODE_IP"|));
+
     AppendToFileFatal($RCCONF, @strings);
 };
 
