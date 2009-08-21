@@ -42,7 +42,7 @@ my $USERNODE_IP= '@USERNODE_IP@';
 my $FSNODE_IP=   '@FSNODE_IP@';
 my $SCRATCHDIR = '@FSDIR_SCRATCH@';
 my $SHAREDIR   = '@FSDIR_SHARE@';
-my $FRISADDR   = '@FRISBEEMCASTADDR@';
+my $FRISADDR   = '@FRISEBEEMCASTADDR@';
 
 #
 # Fixed paths for clients
