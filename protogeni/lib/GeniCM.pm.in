@@ -1672,6 +1672,7 @@ sub SliverWork($$)
 
 	# Manifest goes back to the user.
 	$ref->{'sliver_uuid'} = $sliver->uuid();
+	$ref->{'component_hostname'} = $node->node_id() . ".${OURDOMAIN}";
 
 	# Add to the aggregate.
 	if ($sliver->SetAggregate($aggregate) != 0) {
