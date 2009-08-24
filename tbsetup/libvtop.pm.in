@@ -4401,6 +4401,12 @@ sub InitializePhysNode($$$)
 
 	%rsrvsets = ("vname"             => $vname,
 		     "erole"             => $role);
+
+	if (!$self->impotent() &&
+	    $self->experiment()->AddInternalProgramAgent($vname)) {
+	    tberror("Error determining boot command line for $pnode\n");
+	    return -1;
+	}
     }
     else {
 	#

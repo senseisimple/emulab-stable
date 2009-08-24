@@ -3528,6 +3528,76 @@ sub SetupNetworkAgents($)
 }
 
 #
+# Add a program agents to address dynamically add nodes, such as a
+# sharedhost node. 
+#
+sub AddInternalProgramAgent($$)
+{
+    my ($self, $vhost) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+    my $idx = $self->idx();
+
+    DBQueryWarn("replace into virt_agents ".
+		" (exptidx, pid, eid, vname, vnode, objecttype) ".
+		" select '$idx', '$pid', '$eid', ".
+		"   '__${vhost}_program-agent', '$vhost', ".
+		"   idx from event_objecttypes where ".
+		"   event_objecttypes.type='PROGRAM'")
+	or return -1;
+
+    DBQueryWarn("replace into event_groups ".
+		" (exptidx, pid, eid, idx, group_name, agent_name) ".
+		" values ('$idx', '$pid', '$eid', NULL, ".
+		"         '__all_program-agents', ".
+		"         '__${vhost}_program-agent')")
+	or return -1;
+
+    return 0;
+}
+sub DeleteInternalProgramAgents($)
+{
+    my ($self, $vhost) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+    my $idx = $self->idx();
+
+    my @nodelist = $self->NodeList();
+    return 0
+	if (! @nodelist);
+
+    foreach my $node (@nodelist) {
+	next
+	    if ($node->erole() eq TBDB_RSRVROLE_NODE());
+
+	my $vhost = $node->vname();
+
+	DBQueryWarn("delete from virt_agents ".
+		    "where exptidx='$idx' and ".
+		    "      vname='__${vhost}_program-agent' and ".
+		    "      vnode='$vhost'")
+	    or return -1;
+
+	DBQueryWarn("delete from event_groups ".
+		    "where exptidx='$idx' and ".
+		    "      group_name='__all_program-agents' and ".
+		    "      agent_name='__${vhost}_program-agent'")
+	    or return -1;
+    }
+    return 0;
+}
+
+#
 # Write the virt program data for the program agent that will run on ops.
 # Ops does not speak to tmcd for experiments, so need to get this info
 # over another way. 
