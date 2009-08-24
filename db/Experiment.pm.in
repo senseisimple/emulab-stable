@@ -3543,6 +3543,9 @@ sub AddInternalProgramAgent($$)
     my $eid = $self->eid();
     my $idx = $self->idx();
 
+    #
+    # This addresses the agent itself.
+    #
     DBQueryWarn("replace into virt_agents ".
 		" (exptidx, pid, eid, vname, vnode, objecttype) ".
 		" select '$idx', '$pid', '$eid', ".
@@ -3558,8 +3561,27 @@ sub AddInternalProgramAgent($$)
 		"         '__${vhost}_program-agent')")
 	or return -1;
 
+    #
+    # And this is a generic program that can used.
+    #
+    DBQueryWarn("replace into virt_agents ".
+		" (exptidx, pid, eid, vname, vnode, objecttype) ".
+		" select '$idx', '$pid', '$eid', ".
+		"   '${vhost}_program', '$vhost', ".
+		"   idx from event_objecttypes where ".
+		"   event_objecttypes.type='PROGRAM'")
+	or return -1;
+
+    DBQueryWarn("replace into virt_programs ".
+		" (exptidx, pid, eid, vname, vnode, command) ".
+		" values ('$idx', '$pid', '$eid', ".
+		"         '${vhost}_program', '$vhost', ".
+		"         '/bin/echo ready >>& /dev/null')")
+	or return -1;
+
     return 0;
 }
+
 sub DeleteInternalProgramAgents($)
 {
     my ($self, $vhost) = @_;
@@ -3592,6 +3614,18 @@ sub DeleteInternalProgramAgents($)
 		    "where exptidx='$idx' and ".
 		    "      group_name='__all_program-agents' and ".
 		    "      agent_name='__${vhost}_program-agent'")
+	    or return -1;
+
+	DBQueryWarn("delete from virt_agents ".
+		    "where exptidx='$idx' and ".
+		    "      vname='${vhost}_program' and ".
+		    "      vnode='$vhost'")
+	    or return -1;
+
+	DBQueryWarn("delete from virt_programs ".
+		    "where exptidx='$idx' and ".
+		    "      vname='${vhost}_program' and ".
+		    "      vnode='$vhost'")
 	    or return -1;
     }
     return 0;
