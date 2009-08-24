@@ -34,7 +34,7 @@ else {
 	     NewTBDBHandle DBQueryN DBQueryFatalN DBQueryWarnN DBErrN
 	     DBQuerySingleFatal DBQuerySingleFatalN TBDBDisconnect
 	     DBTableExists DBSlotExists DBSlotType DBQuoteSpecial
-	     TBDBConnect);
+	     TBDBConnect TBDBReconnect);
 @EXPORT = (@EXPORT, @emdbi::EXPORT);
 
 sub TBDBConnect($)	{ return emdbi::TBDBConnect($_[0], $DBNAME); }
