@@ -169,6 +169,12 @@ sub vz_rootPreConfig {
 	mysystem("mount /vz");
     }
 
+    # We need to increase the size of the net.core.netdev_max_backlog 
+    # sysctl var in the root context; not sure to what amount, or exactly 
+    # why though.  Perhaps there is too much contention when handling enqueued
+    # packets on the veths?
+    mysystem("sysctl -w net.core.netdev_max_backlog=2048");
+
     # make sure the initscript is going...
     if (system("$VZRC status 2&>1 > /dev/null")) {
 	mysystem("$VZRC start");
@@ -178,6 +184,7 @@ sub vz_rootPreConfig {
     if (!system('lsmod | grep -q vznetdev')) {
 	system("$RMMOD vznetdev");
     }
+
     # this is what we need for veths
     mysystem("$MODPROBE vzethdev");
 
@@ -405,6 +412,11 @@ sub vz_vnodeCreate {
 
     # make sure bootvnodes actually starts things up on boot, not openvz
     mysystem("$VZCTL set $vmid --onboot no --name $vnode_id --save");
+
+    # XXX give them cap_net_admin inside containers... necessary to set
+    # txqueuelen on devices inside the container.  This may have other
+    # undesireable side effects, but need it for now.
+    mysystem("$VZCTL set $vmid --capability net_admin:on --save");
 
     return $vmid;
 }
