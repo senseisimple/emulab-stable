@@ -187,7 +187,8 @@ sub Resolve($)
     $urn = $hrn if (defined($hrn) && GeniHRN::IsValid( $hrn ));
     if (defined($urn)) {
 	my ($auth,$t,$id) = GeniHRN::Parse( $urn );
-	my $authority     = GeniAuthority->Lookup($urn);
+	my $manager_urn = GeniHRN::Generate($auth, "authority", "cm");
+	my $authority   = GeniAuthority->Lookup($manager_urn);
 
 #	print STDERR "$authority, $urn\n";
 	
