@@ -315,7 +315,7 @@ sub vz_rootPreConfigNetwork {
 	}
 
 	# building bridges is an important activity
-	if (system("brctl show | grep -q \'^$k\'")) {
+	if (! -d "/sys/class/net/$k/bridge") {
 	    mysystem("$BRCTL addbr $k");
 	}
 	# repetitions of this should not hurt anything
