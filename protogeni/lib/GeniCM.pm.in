@@ -1072,9 +1072,14 @@ sub GetTicket($;$)
 				 "Could not create GeniTicket object");
 	goto bad;
     }
-    if ($newticket->Sign() || $newticket->Store()) {
+    if ($newticket->Sign()) {
 	$response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					 "Could not sign Ticket");
+	goto bad;
+    }
+    if (!$impotent && $newticket->Store()) {
+	$response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					 "Internal error storing Ticket");
 	goto bad;
     }
 
