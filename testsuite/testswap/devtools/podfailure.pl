@@ -3,21 +3,23 @@ use Modern::Perl;
 use File::Temp;
 use Data::Dumper;
 use IPC::Run3;
-my $fn;
+my $fn = "BOZO";
 
 my @todos;
 while(my $line = <STDIN>) {
   given($line) {
-    when(/^not ok \d+ - Pod coverage on (\S+)/) {
+    when(/#   Failed test/) {}
+    when(/#   at /) {}
+    when(/^# Coverage for (\S+)/) {
       $fn = $1;
       $fn =~ s/::/\//g;
       $fn .= '.pm';
-      my $a = <STDIN> for (1..4);
     }
     when( /Looks like you failed/) {
      next;
     }
     when( /^#\s+(\S+)/ ) {
+      say "pushed $fn $1";
       push @todos, [$fn, $1];
     } 
   }
@@ -29,7 +31,8 @@ for (@todos) {
   my $fn = $_->[0];
   my $subname = $_->[1];
   $temp->print("/$subname\n");
-  run3("vim lib/$fn -s $sfn");
+  my $cmd = "vim lib/$fn -s $sfn";
+  run3($cmd);
 }
 
 #say Dumper(\@todos);

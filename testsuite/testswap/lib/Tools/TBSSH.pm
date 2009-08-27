@@ -86,8 +86,8 @@ sub cmdsuccessdump {
 }
 
 sub cmdfailure {
-  my ($host, $cmd) = @_;
-  return wrapped_ssh($host, $TBConfig::EMULAB_USER, $cmd, sub { $_[2] != 0; } );
+  my ($host, $cmd, $diemessage) = @_;
+  return wrapped_ssh($host, $TBConfig::EMULAB_USER, $cmd, sub { $_[2] != 0; }, $diemessage );
 }
 
 sub cmdfailuredump {
@@ -127,6 +127,10 @@ executes $cmd as $TBConfig::EMULAB_USER on $host and calls checker with ($out, $
 =item C<cmdsuccess($host, $cmd)>
 
 returns the ssh result code of executing $cmd as $TBConfig::EMULAB_USER
+
+=item C<cmdsuccess_stdin($host, $cmd, $stdin, $diemessage)>
+
+returns the ssh result code of executing $cmd with $stdin as $TBConfig::EMULAB_USER
 
 =item C<cmdoutput($host, $cmd, $diemessage)>>
 

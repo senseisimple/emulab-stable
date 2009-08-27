@@ -484,8 +484,6 @@ sub nextJob {
 }
 sub doItem { my ($s, $taskid) = @_; $s->proc->($s->tasks->[$taskid]->item); }
 
-use TestBed::ParallelRunner::ErrorConstants;
-
 sub return_and_report {
   my ($s, $result) = @_;
   $s->recordItemResult($result);
@@ -499,8 +497,7 @@ sub handleItemResult {
     $result->name($executor->e->eid);
   }
   if ($executor->can('handleResult')) {
-    my $rc = $executor->handleResult($s, $result);
-    if ($rc == RETURN_AND_REPORT) { $s->return_and_report($result) }
+    $executor->handleResult($s, $result);
   }
   else {
     $s->return_and_report($result);

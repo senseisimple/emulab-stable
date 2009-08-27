@@ -18,16 +18,7 @@ use TestBed::Wrap::tevc;
 
 #$TBConfig::DEBUG_XML_CLIENT = 1;
 
-my $error_trace = sub {
-  use Carp qw(longmess);
-  say "Caught here " . __FILE__;
-  sayd(@_);
-  say "SAYD DONE";
-  Carp::confess( "DIED IN SC\n", @_ );
-};
-
-#$SIG{ __DIE__ } = $error_trace;
-
+#$SIG{ __DIE__ } = $TestBed::TestSuite::error_trace;
 
 my $ns = <<'NSEND';
 source tb_compat.tcl
@@ -75,8 +66,8 @@ sub end_all_experiments {
   say "";
   if (Tools::yn_prompt("Are you sure you want to terminate all experiments?")) {
     my @experiment_names = experiments_hash_to_list(e->getlist_full);
-    e(@{$_->[0]})->end for(@experiment_names);
-    e(@{$_->[0]})->waitforended for(@experiment_names);
+    for(@experiment_names) { eval { say "Ending " . $_->[0]; e(@{$_->[0]})->end; }; }
+    for(@experiment_names) { eval { e(@{$_->[0]})->ensure_end; }; }
   }
 }
 
@@ -131,15 +122,19 @@ if (@ARGV) {
     elsif (/il/)                { say Dumper($e->info(aspect => 'links')) ;}
     elsif (/watch/)             { watch($e); }
     elsif ($_ eq'ex') { 
-      say $ARGV[0];
-      my $result = eval $ARGV[0];
-      say $@ if $@;
+      my $code = $ARGV[0];
+      my $cmdstring = "sayd($code);"; 
+      say $cmdstring;
+      my $result = eval $code;
+      sayd($@) if $@;
       sayd($result);
     }
     else {
       my $cmdstring = "sayd(\$e->$_);"; 
       say $cmdstring;
-      eval $cmdstring;
+      my $result = eval $cmdstring;
+      sayd($@) if $@;
+      sayd($result);
     }
   }
 }

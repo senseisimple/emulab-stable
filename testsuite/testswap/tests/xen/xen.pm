@@ -82,7 +82,7 @@ sub testbody($){
     $e->wait_for_nodes_to_activate(60 * 30, @nodes); #thirty minute timeout
     # ok($e->traceroute('a1', 'b1', qw(b1-link4)), 'traceroute between a1 and b1');
     # ok($e->traceroute('a1', 'b2', qw(b1-link4 b3-link2 b2-link3)), 'traceroute between a1 and b2');
-    ok($e->cartesian_ping(), 'ping all nodes: ' . $e->eid);
+    ok($e->cartesian_connectivity(), 'ensure connectivity all nodes: ' . $e->eid);
     # ok($e->ping_from_to('a1', 'b1'), 'ping from a1 to b1');
     # ok($e->ping_from_to('a1', 'b2'), 'ping from a1 to b2');
   }

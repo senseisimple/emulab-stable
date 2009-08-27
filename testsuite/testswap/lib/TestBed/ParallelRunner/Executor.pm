@@ -108,38 +108,44 @@ sub checkexclude {
   return grep { $_ eq $stage } @{ $TBConfig::exclude_steps };
 }
 
-sub failReason {
-  my $s = shift;
-  sprintf("FAILURE %s: %s", $s->e->eid, shift->error_type);
-}
-
 sub execute {
   my $s = shift;
   my $e = $s->e;
+  my $eid = $e->eid;
 
   my $run_exception;
   my $swapout_exception;
 
   eval { $e->swapin_wait; } unless checkexclude('swapin');
   my $swapin_exception = $@;
+  die TestBed::ParallelRunner::Executor::SwapinError->new( original => $swapin_exception ) if $swapin_exception;
 
-  unless ($swapin_exception) {
-    eval { $s->proc->($e); } unless checkexclude('run');
-    $run_exception = $@;
+  eval { $s->proc->($e); } unless checkexclude('run');
+  $run_exception = $@;
+  die TestBed::ParallelRunner::Executor::RunError->new( original => $run_exception ) if $run_exception;
 
-    eval { $e->swapout_wait; } unless checkexclude('swapout');
-    $swapout_exception = $@;
-  }
+  eval { $e->swapout_wait; } unless checkexclude('swapout');
+  $swapout_exception = $@;
+  die TestBed::ParallelRunner::Executor::SwapoutError->new( original => $swapout_exception ) if $swapout_exception;
 
   eval { $e->end_wait; } unless checkexclude('end');
   my $end_exception = $@;
-
-  die TestBed::ParallelRunner::Executor::SwapinError->new( original => $swapin_exception ) if $swapin_exception;
-  die TestBed::ParallelRunner::Executor::RunError->new( original => $run_exception ) if $run_exception;
-  die TestBed::ParallelRunner::Executor::SwapoutError->new( original => $swapout_exception ) if $swapout_exception;
   die TestBed::ParallelRunner::Executor::KillError->new( original => $end_exception ) if $end_exception;
-  
+
   return 1;
+}
+
+sub ensure_end {
+  my $s = shift;
+  my $e = $s->e;
+  my $eid = $e->eid;
+
+  eval { 
+    $e->ensure_end; 
+  } unless checkexclude('end');
+
+  my $end_exception = $@;
+  die TestBed::ParallelRunner::Executor::KillError->new( original => $end_exception ) if $end_exception;
 }
 
 =head1 NAME
@@ -174,6 +180,10 @@ handles the result using a error strategy
 
 swaps in the experiment and runs the specified test
 it kills the experiment unconditionaly after the test returns
+
+=item C<< $prt->ensure_end >>
+
+calls end on an experiment allowing for experiment doesn't exist and in transition exceptions
 
 =item C<< $prt->parse_options >>
 

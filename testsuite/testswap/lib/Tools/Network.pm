@@ -28,14 +28,14 @@ sub ping {
   #$rc;
   #Net::Ping returns 0 on success
   my $p = Net::Ping->new('tcp', 2);
-  !$p->ping($host);
+  my $rc = $p->ping($host);
+  !$rc;
 }
 
 =item C<node_reboot(@ARGS)>
 
 node_reboot('pc137');
 node_reboot('-f', 'pc137');
-  
 =cut
 sub node_reboot {
   Tools::TBSSH::cmdoutput($TBConfig::OPS_SERVER, "'sh -c \"PATH=$OPS_PATH node_reboot @_\"'", "node_reboot @_ failed"); 
@@ -66,12 +66,13 @@ sub traceroute {
   });
 }
 
+=item C<ping_from_to($from, $to)>
+
+ssh to $from and ping $to
+=cut
 sub ping_from_to($$){
  my ($from, $to) = @_;
- Tools::TBSSH::cmdcheckoutput($from, "'sh -c \"PATH=/bin:/usr/sbin:/usr/sbin:/sbin ping -c 5 $to\"'", 
- sub {
-   return 1;
- });
+ Tools::TBSSH::cmdsuccess($from, "'sh -c \"PATH=/bin:/usr/sbin:/usr/sbin:/sbin ping -c 5 $to\"'", );
 }
 
 sub traceroute_ok {

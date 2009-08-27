@@ -38,6 +38,7 @@ my $daemonize;
   my $dontkill;
   my $alreadyalive;
   my $daemonize;
+  my $prefix;
   my $result = GetOptions (
       "d|debug"        => \$debug,
       "define=s%"      => \$cmdline_defines,
@@ -47,11 +48,12 @@ my $daemonize;
       "cprj=i"         => \$concurrent_prerun_jobs,
       "cnu=i"          => \$concurrent_node_usage,
       "excludesteps=s" => \$exclude_steps,
-      "runonly=s"       => \$runonly,
+      "runonly=s"      => \$runonly,
       "dontkill"       => \$dontkill,
       "alreadyalive"   => \$alreadyalive,
       "daemonize"      => \$daemonize,
       "emailme=s"      => \$emailme,
+      "prefix=s"       => \$prefix,
     );
 
   if ($debug)     { $ENV { 'TBTS_DEBUG'      } = 1          ; $TBConfig::DEBUG_XML_CLIENT = 1       ; }
@@ -65,6 +67,7 @@ my $daemonize;
   if ($runonly)                { $TBConfig::runonly = [split(/ /, $runonly)]; }
   if ($dontkill)               { $TBConfig::exclude_steps = [qw/swapout end/]}
   if ($alreadyalive)           { $TBConfig::exclude_steps = [qw/create swapin swapout end/]}
+  if ($prefix)                 { $TBConfig::prefix = $prefix; }
   if ($daemonize or $emailme)  { TestBed::Daemonize::daemonize; }
 }
 
@@ -102,6 +105,7 @@ TestBed TestSwap
         --runonly "testname1 testname2 testname3"
         --daemonize
         --emailme user\@emulab.net
+	--prefix=PREFIX #prefixes all eids with PREFIX
         
 
     TESTSUITES:
@@ -143,7 +147,17 @@ if (@ARGV) {
   elsif (/sanity/)          { runharness( @sanity ); }
   elsif (/lib/)             { runharness( @lib ); }
   elsif (/xmlrpc/)          { runharness( @xmlrpc ); }
-  elsif (/podcov/)          { exec './tbts t/coding/pod_coverage.t 2>&1 | perl devtools/podfailure.pl'; }
+  elsif (/podcov/)          { 
+    eval "use Test::Pod::Coverage";
+    if ($@) { say "Test::Pod::Coverage not found you need to install it first"; }
+    else { 
+      use IPC::Run3;
+      use Tools;
+      my $out = `./tbts t/coding/pod_coverage.t 2>&1`;
+      #Tools::splat("podcov.data", $out);
+      run3('perl devtools/podfailure.pl', \$out); 
+    }
+  }
 }
 else {
   usage();

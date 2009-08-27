@@ -19,7 +19,18 @@ HOWTO write a parallel test.
       use Test::More tests => 1;  # DO NOT DO THIS, parallel tests in tests/ may be ran with othere testsuites.
       specify the number of test in the rege call.
 
-3. run the set of parallel tests 
+
+  rege can also take optional arguments at the end of the signature list such as
+	strategy => TestBed::ParallelRunner::CustomStrategy->new  # allows you to specify a custom error strategy
+	retry => 2  # number of retry attempts to execute the experiment
+        backoff => "60:5:0" # "waittime:maxretires:exponent:maxtime"
+
+          waittime   is the time in seconds to wait between retries
+          maxretries is the maximum number of retries to attempt before failing
+          exponent   is the exponent to raise the waittime to i.e. (waittime * (2 ** exponent))
+          maxtime    is the maximum total time to be spent attempting to retry
+
+2. run the set of parallel tests 
   ./tbts test/BasicTopologies.pm
 
 

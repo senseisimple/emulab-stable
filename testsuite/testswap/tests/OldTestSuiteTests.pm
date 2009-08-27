@@ -21,7 +21,7 @@ fixed (you will have to change the ns file depending on which nodes are availabl
 for (@should_pass) {
   my $eid = $_;
   my $ns = $OldTestSuite::tests->{$_}->{'nsfile'};
-  rege(e($_), $ns, sub { ok(!shift->ping_test, $eid); }, 1, $_)
+  rege(e($_), $ns, sub { ok(shift->ping_test, $eid); }, 1, $_)
 }
 
 1;

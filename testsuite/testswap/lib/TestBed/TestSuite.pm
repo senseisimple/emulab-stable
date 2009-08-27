@@ -8,14 +8,17 @@ use TestBed::XMLRPC::Client::Node;
 use Data::Dumper;
 use Tools;
 
-my $error_sub = sub {
-  use Carp qw(longmess);
-  say "Caught here " . __FILE__;
-  say(@_);
-  say longmess;
-  die @_;
+
+our $error_trace = sub {
+  use Carp qw(confess longmess);
+
+  say "DEBUG: ERROR CAUGHT HERE " . __FILE__;
+  sayd(\@_);
+  Carp::cluck( "DIED\n", @_ );
+  say "DEBUG: DONE ERROR CAUGHT HERE " . __FILE__;
 };
-#$SIG{ __DIE__ } = $error_sub;
+
+#$SIG{ __DIE__ } = $error_trace;
 
 require Exporter;
 our @ISA = qw(Exporter);
@@ -135,6 +138,7 @@ creates a new experiment with pid, gid, and eid
 =item C<rege($e, $ns_contents, &test_sub, $test_count, $desc, %options)>
 
 registers experiement with parallel test running engine
+see doc/HOW_TO_WRITE_A_PARALLEL_TEST.txt for details on $options
 
 =item C<CartProd($hashref)> Cartesian Product Runner
 
@@ -165,7 +169,7 @@ my $config = {
 
 CartProdRunner(\&VNodeTest::VNodeTest, $config);
 
-=item C< concretize($templated_text, %substitution_values) >
+=item C<concretize($templated_text, %substitution_values)>
 
 substitutes values as well as TBConfig::defines values into $templated_text
 
@@ -185,7 +189,7 @@ executes anonymous funcs in parallel dying if any fail
 
 executes anonymous funcs in parallel returning the output results
 
-=item C< get_free_node_names(%query_options) >
+=item C<get_free_node_names(%query_options)>
 
 reexports TestBed::XMLRPC::Client::Node->new()->get_free_node_names(@_);
 

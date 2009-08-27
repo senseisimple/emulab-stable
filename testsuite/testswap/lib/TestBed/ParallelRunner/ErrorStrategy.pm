@@ -2,7 +2,6 @@
 package TestBed::ParallelRunner::ErrorStrategy;
 use SemiModern::Perl;
 use Mouse;
-use TestBed::ParallelRunner::ErrorConstants;
 
 has 'executor' => (is => 'rw');
 has 'scheduler' => (is => 'rw');
@@ -23,9 +22,9 @@ sub handleResult {
     elsif ( $error->isa ( 'TestBed::ParallelRunner::Executor::SwapoutError')) { return $s->swapout_error ( @_); }
     elsif ( $error->isa ( 'TestBed::ParallelRunner::Executor::KillError'))    { return $s->end_error     ( @_); }
     elsif ( $error->isa ( 'TestBed::ParallelRunner::Executor::Exception'))    { return $s->run_error     ( @_); }
-    else { return RETURN_AND_REPORT; }
+    else { $s->ensure_end_and_report; }
   }
-  else { return RETURN_AND_REPORT; }
+  else { $s->report_to_scheduler; }
 }
 
 sub xmlrpc_error_cause {
@@ -48,28 +47,38 @@ sub is_retry_cause {
   return 0;
 }
 
-sub prerun_error  { return RETURN_AND_REPORT; }
-sub swapin_error  { return RETURN_AND_REPORT; }
-sub run_error     { return RETURN_AND_REPORT; }
-sub swapout_error { return RETURN_AND_REPORT; }
-sub end_error     { return RETURN_AND_REPORT; }
+sub ensure_end_and_report {
+  my $s = shift;
+  #say("ensure_end_and_report " . $s->executor->e->eid);
+  eval { $s->executor->ensure_end; };
+  $s->report_to_scheduler
+}
+
+sub report_to_scheduler {
+  my $s = shift;
+  $s->scheduler->return_and_report($s->result);
+}
+
+sub prerun_error  { shift->ensure_end_and_report; }
+sub swapin_error  { shift->ensure_end_and_report; }
+sub run_error     { shift->ensure_end_and_report; }
+sub swapout_error { shift->ensure_end_and_report; }
+sub end_error     { shift->ensure_end_and_report; }
 
 package TestBed::ParallelRunner::PrerunExpectFail;
 use SemiModern::Perl;
 use Mouse;
-use TestBed::ParallelRunner::ErrorConstants;
 
 extends 'TestBed::ParallelRunner::ErrorStrategy';
 
 sub prerun_error {
   my ($s, $executor, $scheduler, $result) = @_;
-  return RETURN_AND_REPORT;
+  $s->ensure_end_and_report;
 }
 
 package TestBed::ParallelRunner::ErrorRetryStrategy;
 use SemiModern::Perl;
 use Mouse;
-use TestBed::ParallelRunner::ErrorConstants;
 
 extends 'TestBed::ParallelRunner::ErrorStrategy';
 
@@ -79,13 +88,12 @@ sub swapin_error {
     warn "Retrying";# . $executor->e->eid;
     return $s->scheduler->retry($result); 
   }
-  else { return RETURN_AND_REPORT; }
+  else { $s->ensure_end_and_report; }
 }
 
 package TestBed::ParallelRunner::BackoffStrategy;
 use SemiModern::Perl;
 use Mouse;
-use TestBed::ParallelRunner::ErrorConstants;
 
 has 'starttime'  => (is => 'rw', default => sub { time; } );
 has 'retries'    => (is => 'rw', default => 0 );
@@ -121,12 +129,12 @@ sub backoff {
   my $maxretries = $s->maxretries;
   if ($s->retries >= $maxretries) {
     warn "Max retries $maxretries reached, terminating experiment";
-    return RETURN_AND_REPORT;
+    return $s->ensure_end_and_report;
   }
   my $timeout = $s->starttime + $s->maxtime;
   if (time >= $timeout) {
     warn "Max timeout $timeout reached, terminating experiment";
-    return RETURN_AND_REPORT;
+    return $s->ensure_end_and_report;
   }
   
   $s->incr_retries;
@@ -141,7 +149,7 @@ sub swapin_error {
   if ($s->is_retry_cause) {
     return $s->backoff($result); 
   }
-  else { return RETURN_AND_REPORT; }
+  else { return $s->ensure_end_and_report; }
 }
 
 =head1 NAME
@@ -169,6 +177,15 @@ parses the xmlrpc error cause out of the original embedded xmlrpc error
 =item C<< es->is_retry_cause >>
 
 return true if the error is retriable 
+
+=item C<< es->ensure_end_and_report >>
+
+ensures the executor experiment end method has been called and
+reports result to scheduler
+
+=item C<< es->report_to_scheduler >>
+
+reports a result back to the scheduler
 
 =back
 

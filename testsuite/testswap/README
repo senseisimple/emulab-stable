@@ -6,10 +6,10 @@ REQUIREMENTS
 
 INSTALLATION INSTRUCTIONS
    #this configures CPAN and installs CPAN dependencies in your homedir if you don't have root access to do it yourself
-   perl ./localcpan.pl
+  ./install_deps_from_cpan
 
   #this installs CPAN dependencies into your system as root using CPAN as already configured
-  sudo ./localcpan.pl --install_deps
+  sudo ./install_deps_from_cpan --install_deps
     
   When prompted:
       UUID state storage [/tmp] (HIT ENTER)
@@ -32,7 +32,7 @@ TO SEE Tests available to run
 TO RUN Tests
   ./tbts test
   ./tbts tests/topologies/single_node.pm
-  ./tbts -D OS= tests/ImageTests.pm
+  ./tbts -D OS=RHL90-STD tests/ImageTests.pm
   ./tbts tests/OldTestSuiteTests.pm
 
 EXAMPLE Tests to look at to GET STARTED:
@@ -43,11 +43,13 @@ EXAMPLE Tests to look at to GET STARTED:
 
 Documentation can be found in the doc directory
 running pod2text on any pm file will produce API docs.
+
+Almost all test script functionality is provided by the following three files
 pod2text lib/TestBed/XMLRPC/Client/Experiment.pm
 pod2text lib/TestBed/TestSuite/Experiment.pm
+pod2text lib/TestBed/TestSuite.pm
 
-
-
+pod2text lib/Tools/TBSSH.pm provides lots of nice additions to ssh
 
 
 

@@ -15,4 +15,4 @@ set lan1 [$ns make-lan "$node1 $node2" 100Mb 0ms]
 $ns run
 NSEND
 
-rege(e('twonodelan'), $ns, sub { ok(shift->single_node_tests); }, 1, 'two_node_lan single_node_tests');
+rege(e('twonodelan'), $ns, sub { ok(shift->single_node_tests, "twonodelan single node tests"); }, 1, 'two_node_lan single_node_tests');

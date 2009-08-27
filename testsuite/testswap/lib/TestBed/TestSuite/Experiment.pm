@@ -114,9 +114,8 @@ runs a ping test across all nodes
 =cut
 sub ping_test {
   my ($e) = @_;
-  for (@{$e->nodes}) {
-    die $_->name . "failed ping" unless $_->ping();
-  }
+  for (@{$e->nodes}) { die $_->name . "failed ping" unless $_->ping(); }
+  1;
 }
 
 =item C<< $e->wait_for_nodes_to_activate($timeout, @nodes) >>
@@ -160,6 +159,10 @@ sub traceroute_ok {
   Tools::Network::traceroute_ok($src, @_);
 }
 
+=item C<<gen_try($func, $times)>>
+
+generate a new function that tries $func $times before giving up
+=cut
 sub gen_try($$){
   my ($func, $times) = @_;
   my $work = sub{
@@ -178,24 +181,63 @@ sub gen_try($$){
 
 runs a nxn ping test across all nodes
 =cut
-sub cartesian_ping{
+
+sub cartesian_ping {
+  my ($e) = shift;
+  my @nodes = $e->nodenames();
+  my @hosts = $e->hostnames();
+
+  my @work;
+  for (@nodes) {
+    my $src_node = $_;
+    my $for_node = sub {
+      for (@hosts) {
+        my $dest_node = $_;
+        if ($src_node ne $dest_node){
+          gen_try(sub{$e->ping_from_to($src_node, $dest_node)}, 5)->();
+        }
+      }
+    };
+    push @work, $for_node;
+  }
+  TestBed::TestSuite::prun(@work);
+}
+
+=item C<< $e->cartesian_connectivity() >>
+
+runs a nxn socket connect test to port 22 across all nodes
+=cut
+
+sub cartesian_connectivity {
  my ($e) = shift;
  my @nodes = $e->nodenames();
  my @hosts = $e->hostnames();
+     
+ my $hosts = "[" . join(', ', map("'$_'", @hosts)) . "]";
+ my $cmd = <<EOF;
+import sys, socket
+def ok(to):
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.connect((to, 22))
+    print "Connected to %s:22" % to
+for host in $hosts:
+    ok(host)
+sys.exit(0)
+EOF
 
  my @work;
- for (@nodes){
+ for (@nodes) {
    my $src_node = $_;
-   for (@hosts){
-     my $dest_node = $_;
-     if ($src_node ne $dest_node){
-       push @work, gen_try(sub{$e->ping_from_to($src_node, $dest_node)}, 5);
-     }
-   }
+   my $for_node = sub {
+      my $from = $src_node;
+      Tools::TBSSH::cmdsuccess_stdin($from, "\"sh -c 'PATH=/bin:/usr/sbin:/usr/sbin:/sbin:/usr/bin python -'\"", $cmd, "pinged $from");
+   };
+   push @work, $for_node;
  }
 
  TestBed::TestSuite::prun(@work);
 }
+
 
 =item C<< $e->ping_from_to($src, $dest) >>
 
@@ -203,7 +245,7 @@ ssh to $src and ping $dest
 =cut
 sub ping_from_to {
   my ($e, $from, $to) = @_;
-  Tools::TBSSH::cmdsuccess($from, "'sh -c \"PATH=/bin:/usr/sbin:/usr/sbin:/sbin ping -c 5 $to\"'", "ping from $from to $to");
+  Tools::TBSSH::cmdsuccess($from, "'sh -c \"PATH=/bin:/usr/sbin:/usr/sbin:/sbin ping -i 0.2 -c 2 $to\"'", "ping from $from to $to");
 }
 
 =item C<< $e->single_node_tests() >>

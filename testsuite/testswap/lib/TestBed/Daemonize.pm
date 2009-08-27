@@ -44,7 +44,7 @@ sub email_daemonize_logs {
 }
 =pod
 
-=head TestBed::Daemonize
+=head1 TestBed::Daemonize
 
 =over 4
 
