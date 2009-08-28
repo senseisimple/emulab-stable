@@ -576,6 +576,9 @@ sub doSwapout($) {
     }
 	
     if ($type >= CLEANUP) {
+	# XXX Do this before releasing the nodes. Needs more thought.
+	$experiment->DeleteInternalProgramAgents();
+	
 	#
 	# Undo plab in elab specialness.
 	# No need to worry about VLANs here, as all the special abilities
@@ -826,7 +829,6 @@ sub doSwapout($) {
 	$experiment->RemovePhysicalState();
 	# Special. 
 	$experiment->ClearPortRegistration();
-	$experiment->DeleteInternalProgramAgents();
     }
 
     tblog_set_cleanup(0);
