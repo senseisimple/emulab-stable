@@ -1675,8 +1675,22 @@ sub SliverWork($$)
 	$slivers{$sliver->uuid()} = $sliver;
 	$nodemap{$virtual_id} = $sliver;
 
+	#
+	# Find the actual node (might e a vnode) so that we can put
+	# the info into the manifest.
+	#
+	my $realnode = Node->Lookup($sliver->uuid());
+	if (defined($realnode)) {
+	    print STDERR "Could not lookup node for $sliver\n";
+	    $message = "Internal Error finding mapped node for $virtual_id\n";
+	    goto bad;
+	}
+	my $sliver_urn = GeniHRN::Generate($OURDOMAIN, "sliver",
+					   $realnode->node_id());
+
 	# Manifest goes back to the user.
 	$ref->{'sliver_uuid'} = $sliver->uuid();
+	$ref->{'sliver_urn'}  = $sliver_urn;
 	$ref->{'component_hostname'} = $node->node_id() . ".${OURDOMAIN}";
 
 	# Add to the aggregate.
