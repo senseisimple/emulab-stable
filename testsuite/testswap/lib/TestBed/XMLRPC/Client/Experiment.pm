@@ -82,7 +82,7 @@ sub echo           { shift->augment_output( 'str' => shift ); }
 sub getlist_brief  { shift->augment( 'format' => 'brief'); }
 sub getlist_full   { shift->augment( 'format' => 'full' ); }
 sub batchexp_ns    { shift->augment_code( 'nsfilestr' => shift, 'noswapin' =>1, noemail, 'extrainfo' => 1, @_ ); }
-sub modify_ns      { shift->augment_code( 'nsfilestr' => shift, 'noswapin' =>1, noemail, 'extrainfo' => 1, @_ ); }
+sub modify_ns      { my ($e, $ns) = (shift, shift); my @args = @_; succeed_on_TIMEOUT { $e->augment_func_code( 'modify', 'nsfilestr' => $ns, 'noswapin' =>1, noemail, 'extrainfo' => 1, @args ); } $e->mkerrmsg('modify_ns'); }
 sub swapin         { my $e = shift; my @args = @_; retry_on_TIMEOUT { $e->augment_func_code( 'swapexp', noemail, 'direction' => 'in', 'extrainfo' => 1, @args ) } $e->mkerrmsg('swapin'); }
 sub swapout        { shift->augment_func_code( 'swapexp', noemail, 'direction' => 'out','extrainfo' => 1, @_ ); }
 sub end            { shift->augment_func_code( 'endexp', noemail); }
@@ -100,7 +100,13 @@ sub create_and_get_metadata {
   $self->metadata;
 }
 
-sub modify_ns_wait   { shift->modify_ns(@_,'wait' => 1); }
+sub modify_ns_wait { shift->modify_ns(@_, 'wait' => 1); }
+sub modify_ns_swapin_wait { 
+  my $s = shift;
+  $s->modify_ns(@_, 'wait' => 1);
+  $s->swapin_wait;
+}
+
 sub batchexp_ns_wait { shift->batchexp_ns(@_,'wait' => 1); }
 
 use constant EXPERIMENT_NAME_ALREADY_TAKEN => 2;

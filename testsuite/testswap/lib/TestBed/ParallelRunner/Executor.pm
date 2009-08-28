@@ -108,6 +108,11 @@ sub checkexclude {
   return grep { $_ eq $stage } @{ $TBConfig::exclude_steps };
 }
 
+sub failReason {
+  my $s = shift;
+  sprintf("FAILURE %s: %s", $s->e->eid, shift->error_type);
+}
+
 sub execute {
   my $s = shift;
   my $e = $s->e;
@@ -193,6 +198,10 @@ and build the appropriate error_strategy object
 =item C<< $prt->buildt >>
 
 builds a naked TestBed::ParallelRunner::Executor for testing purposes
+
+=item C<< $prt->failReason($reason) >>
+
+prints $eid and fail reason
 
 =back
 
