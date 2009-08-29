@@ -118,7 +118,7 @@ Parameter parseArg(string const & arg)
   else if (key == "PLR" || key == "plr")
   {
     double value = stringToDouble(valueString);
-    result = Parameter(Parameter::DELAY, (int)(value*0x7fffffff));
+    result = Parameter(Parameter::LOSS, (int)(value*0x7fffffff));
   }
   else
   {
