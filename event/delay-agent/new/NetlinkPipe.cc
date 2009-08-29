@@ -43,16 +43,28 @@ void NetlinkPipe::test(void)
 	updateParameter(testParam);
 }
 
+static uint32_t strIntAdd(const char *s,int inc) {
+    uint32_t retval;
+    char *buf;
+    int i = atoi(s);
+    i += 10;
+    buf = (char *)malloc(256);
+    sprintf(buf,"%d",i);
+    retval = strtoul(buf,NULL,16);
+    free(buf);
+    return retval;
+}
+
 int NetlinkPipe::init(void)
 {
 	struct nl_cache *link_cache;
-	int handle;
+	uint32_t handle;
 	string str;
 
 	link_cache = NULL;
 
 	cerr << "Got pipe number " << pipeNumber << endl;
-	handle = hexStringToInt(pipeNumber);
+	handle = (uint32_t)hexStringToInt(pipeNumber);
 	cerr << "handle: " << handle << endl;
 
 	nl_handle = nl_handle_alloc();
@@ -85,8 +97,8 @@ int NetlinkPipe::init(void)
 	}
 
 	plrHandle = handle << 16;
-	delayHandle = (handle + 0x10) << 16;
-	htbHandle = (handle + 0x20) << 16;
+	delayHandle = strIntAdd(pipeNumber.c_str(),10) << 16;
+	htbHandle = strIntAdd(pipeNumber.c_str(),20) << 16;
 
 	class_cache = rtnl_class_alloc_cache(nl_handle, ifindex);
 	if (class_cache == NULL) {
@@ -96,6 +108,7 @@ int NetlinkPipe::init(void)
 
 	htbClassHandle = htbHandle + 1;
 
+	cerr << "handles: (" << plrHandle << "," << delayHandle << "," << htbHandle << "," << htbClassHandle << ")" << endl;
 
 	return 0;
 }
@@ -126,6 +139,16 @@ void NetlinkPipe::reset(void)
 void NetlinkPipe::resetParameter(Parameter const & newParameter)
 {
 	updateParameter(newParameter);
+}
+
+/*
+ * useful for debugging qdisc caches:
+ *   nl_cache_foreach(qdisc_cache,print_qdisc,NULL);
+ */
+static void print_qdisc(struct nl_object *obj,void *arg) {
+    struct rtnl_qdisc *q = (struct rtnl_qdisc *)obj;
+    printf("qdisc handle %d, type %s\n",rtnl_qdisc_get_handle(q),
+	   rtnl_qdisc_get_kind(q));
 }
 
 void NetlinkPipe::updateParameter(Parameter const & newParameter)
