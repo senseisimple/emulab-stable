@@ -523,12 +523,12 @@ COMMAND: foreach my $command (@commands) {
     my @devicenames;
     my @vlans;
     SWITCH: for ($operation) {
-	(/listvlans/ || /getstats/ || /make/ || /remove/ || /vlannumber/ || /synchleader/) && do {
+	(/listvlans/ || /getstats/ || /vlannumber/ || /synchleader/ || /remove/) && do {
 	    @devicenames = $supplied_switches?
 			   @supplied_switches : getTestSwitches();
 	    last;
 	};
-	(/listports/) && do {
+	(/listports/ || /make/ ) && do {
 	    @devicenames = $supplied_switches? @supplied_switches :
 	    (@ports? getDeviceNames(@ports) : getTestSwitches());
 	    last;
@@ -1178,7 +1178,7 @@ sub doRestorePortStatus($@) {
 
     if (@$stacks > 1) {
 	die "Port restoration accross multiple stacks is not yet supported\n" .
-	    "Stacks are " . join(",",@$stacks) . "\n";
+	    "Stacks are " . join(", ",map {$_->{STACKID}} @$stacks) . "\n";
     }
     my ($stack) = @$stacks;
 
@@ -1293,7 +1293,7 @@ sub doVlansFromTables($$@) {
 
     if (@$stacks > 1) {
 	die "VLAN creation accross multiple stacks is not yet supported\n" .
-	    "Stacks are " . join(",",@$stacks) . "\n";
+	    "Stacks are " . join(", ",map {$_->{STACKID}} @$stacks) . "\n";
     }
     
     #
@@ -1515,7 +1515,7 @@ sub syncVlansFromTables($$) {
 
     if (@$stacks > 1) {
 	die "VLAN creation accross multiple stacks is not yet supported\n" .
-	    "Stacks are " . join(",",@$stacks) . "\n";
+	    "Stacks are " . join(", ",map {$_->{STACKID}} @$stacks) . "\n";
     }
     my ($stack) = @$stacks;
     my @needTrunking = getExperimentTrunks($pid,$eid);
@@ -1820,7 +1820,7 @@ sub doMakeVlan($$@) {
 
     if (@$stacks > 1) {
 	die "VLAN creation accross multiple stacks is not yet supported\n" .
-	    "Stacks are " . join(",",@$stacks) . "\n";
+	    "Stacks are " . join(", ",map {$_->{STACKID}} @$stacks) . "\n";
     }
     my ($stack) = @$stacks;
 
@@ -2106,7 +2106,7 @@ sub doPortControl($$@) {
 
     if (@$stacks > 1) {
 	die "Port control accross multiple stacks is not yet supported\n" .
-	    "Stacks are " . join(",",@$stacks) . "\n";
+	    "Stacks are " . join(", ",map {$_->{STACKID}} @$stacks) . "\n";
     }
     my ($stack) = @$stacks;
 
