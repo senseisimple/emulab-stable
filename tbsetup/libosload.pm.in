@@ -50,6 +50,7 @@ my $TBUISP	    = "$TB/bin/tbuisp";
 my %imageinfo       = ();	# Per imageid DB info.
 my $debug           = 0;
 my %children        = ();	# Child pids in when asyncmode=1
+my $remote_mult     = 10;       # Wait lots longer for remote nodes!
 
 sub osload ($$) {
     my ($args, $result) = @_;
@@ -424,6 +425,7 @@ sub osload ($$) {
 	#
 	my $type  = $nodeobject->type();
 	my $class = $nodeobject->class();
+	my $isremote = $nodeobject->isremotenode();
 	my $reload_mode;
 	my $reload_func;
 	my $reboot_required;
@@ -465,7 +467,8 @@ sub osload ($$) {
 	    'reboot'   => $reboot_required,
 	    'zerofree' => $zerofree,
 	    'prepare'  => $prepare,
-	    'maxwait'  => $maxwait
+	    'maxwait'  => $maxwait,
+	    'isremote' => $isremote
 	};
 
 	print "Setting up reload for $node (mode: $reload_mode)\n";
@@ -751,6 +754,8 @@ sub WaitTillReloadDone($$$@)
 		# 1GB/minute.  Did I mention how this would take
 		# a really long time?
 		#
+		# Else, if we have a remote node, we wait another multiplier.
+		#
 		if ($reload_info->{$node}{'zerofree'}) {
 		    my $nodeobject = Node->Lookup($node);
 		    my $disksize   = $nodeobject->disksize();
@@ -758,6 +763,8 @@ sub WaitTillReloadDone($$$@)
 		    $disksize = 20
 			if (!$disksize);
 		    $maxwait = ($disksize * 60);
+		} elsif ($reload_info->{$node}{'isremote'}) {
+		    $maxwait = $reload_info->{$node}{'maxwait'} * $remote_mult;
 		} else {
 		    $maxwait = $reload_info->{$node}{'maxwait'};
 		}
