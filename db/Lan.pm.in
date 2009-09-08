@@ -2364,13 +2364,20 @@ sub SetStack($$)
 
     return $self->GetLan()->SetAttribute("stack", $stack);
 }
-sub GetStack($)
-{
+sub GetStackNoDefault($) {
     my ($self) = @_;
     my $stack;
 
     return $stack
 	if ($self->GetAttribute("stack", \$stack) == 0);
+    return undef;
+}
+sub GetStack($)
+{
+    my ($self) = @_;
+    my $stack = $self->GetStackNoDefault();
+    return $stack if (defined($stack));
+
     # Assume experimental stack.
     return "Experimental";
 }
