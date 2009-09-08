@@ -66,12 +66,12 @@ my $quiet = 0;
 ######################################################################
 sub usage {
     print << "END";
-Usage: $0 [-h] [-v] [-q] [-n] [-i device] [-S stack]
+Usage: $0 [-h] [-v level] [-q] [-n] [-i device] [-S stack]
 	  [-l] [-s] [-g] [-O]
-	  [-m name [ports]]
+	  [-m name pid eid [ports]]
 	  [-T port name]
 	  [-U port]
-	  [-o name]
+	  [-o name pid eid]
           [-N name]
           [-r pid eid]
 	  [-t pid eid]
@@ -98,15 +98,19 @@ VLAN Control:
   -M                Used with -l, print MAC addresses instead of port numbers
   -O                Used with -l, list only orphaned VLANs
   -L <out#in[,o2#i2,...]> stylized -l for snmpit.proxy of specific vlans
-  -m <name> [ports] Create a new VLAN with name <name>, if it doesn't exist,
-                        and put [ports] in it
+  -m <name> <pid> <eid> [ports]
+                    Create a new VLAN with name <name>, if it doesn't exist,
+                        and put [ports] in it. The new VLAN will be
+                        associated with the priject and experiment given
   -y <type>         When used with -m, the new VLAN becomes a private VLAN
                         of type <type>
   -x <primary>      When used with -y, assocates the new private VLAN with
                         the primary VLAN named <primary>
   -z <port>         Used with -y and -x, to specify which port is to be used
                         with the private VLAN
-  -o <name>         Delete the VLAN with name <name>
+  -o <name> <pid> <eid>
+                    Delete the VLAN with name <name>, which is associated with
+                        the given experiment
   -N <name>         Print out the VLAN number for the named VLAN
   -c                Delete ALL VLANs, and recreate from the database. ** USE
                         WITH EXTREME CAUTION **
@@ -523,7 +527,7 @@ COMMAND: foreach my $command (@commands) {
     my @devicenames;
     my @vlans;
     SWITCH: for ($operation) {
-	(/listvlans/ || /getstats/ || /vlannumber/ || /synchleader/ || /remove/) && do {
+	(/listvlans/ || /getstats/ || /vlannumber/ || /synchleader/) && do {
 	    @devicenames = $supplied_switches?
 			   @supplied_switches : getTestSwitches();
 	    last;
@@ -533,6 +537,25 @@ COMMAND: foreach my $command (@commands) {
 	    (@ports? getDeviceNames(@ports) : getTestSwitches());
 	    last;
 	};
+        (/remove/) && do {
+            # Three levels of possible sources for device names (in order):
+            #   passed in on command line
+            #   stack name recorded in database
+            #   if others fail, default to experimental switches
+	    my ($vlan_name) = @args;
+            my ($vlanobj, $stack);
+            if ($supplied_switches) {
+                debug("Remove: using supplied switches\n");
+                @devicenames = @supplied_switches;
+            } elsif (defined($vlanobj = VLan->Lookup($experiment,$vlan_name)) &&
+                     defined($stack = $vlanobj->GetStackNoDefault())) {
+                debug("Remove: found stack $stack in database\n");
+                @devicenames = getSwitchesInStack($stack);
+            } else {
+                debug("Remove: using test switches\n");
+                @devicenames = getTestSwitches();
+            }
+        };
 	(/^tables$/) && do {
 	    @vlans = getExperimentVlans($pid,$eid,@optvlanids);
             if (!@vlans) {
