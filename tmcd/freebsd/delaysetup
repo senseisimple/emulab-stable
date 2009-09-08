@@ -86,6 +86,8 @@ else {
 	"    Cannot determine version\n");
 }
 
+my $canbackfill = 0;
+
 #
 # Delay node configuration goop.
 # First figure out our kernels.
@@ -109,6 +111,7 @@ if ($FBSD_VERSION <= 4) {
 	$KERNELLDELAY = "/kernel.1000HZ";
 	$KERNELJAIL   = "/kernel.1000HZ";
     }
+    $canbackfill = 1;
 }
 elsif ($FBSD_VERSION == 5) {
     # 5.x
@@ -190,9 +193,8 @@ sub DelaySetup
     }
 
     if (@delays) {
-	my $count    = 69;
 	my $mindelay = 10000;
-	my @myifs    = ();
+	my @bridges  = ();
 
 	# before going any further, see if we need to boot a new kernel
  	if (-e $KERNELDELAY) {
@@ -212,11 +214,13 @@ sub DelaySetup
 	open(DEL, ">" . TMDELAY)
 	    or die("Could not open " . TMDELAY . ": $!");
 
+	my $bix = 1;
 	foreach $delay (@delays) {
 	    $delay =~ /DELAY INT0=([\d\w]+) INT1=([\d\w]+) /;
 	    my $iface1 = findiface($1);
 	    my $iface2 = findiface($2);
-	    push @myifs, $iface1, $iface2;
+	    push @bridges, [ $bix, $iface1, $iface2 ];
+	    $bix++;
 	}
 
 	print DEL "#!/bin/sh\n";
@@ -234,9 +238,17 @@ sub DelaySetup
 	    print DEL "    sysctl -w net.link.ether.bridge=0\n";
 	    print DEL "    sysctl -w net.link.ether.bridge_ipfw=0\n";
 	}
-	else {
+	elsif ($FBSD_VERSION <= 6) {
 	    print DEL "    sysctl -w net.link.ether.bridge.enable=0\n";
 	    print DEL "    sysctl -w net.link.ether.bridge.ipfw=0\n";
+	}
+	else {
+	    foreach my $bridge (@bridges) {
+		my ($bix) = @$bridge;
+		print DEL "    ifconfig bridge$bix down destroy\n";
+	    }
+	    print DEL "    sysctl -w net.link.bridge.ipfw=0\n";
+	    print DEL "    sysctl -w net.link.bridge.ipfw_arp=0\n";
 	}
 
 	# ipfw pipes
@@ -249,8 +261,10 @@ sub DelaySetup
 	# polling
 	print DEL "    if [ -n \"`sysctl kern.polling.enable 2>/dev/null`\" ]; then\n";
 	if ($FBSD_VERSION >= 6) {
-	    foreach $dif (@myifs) {
-		print DEL "        ifconfig $dif -polling\n";
+	    foreach my $bridge (@bridges) {
+		my (undef,$if1,$if2) = @$bridge;
+		print DEL "        ifconfig $if1 -polling\n";
+		print DEL "        ifconfig $if2 -polling\n";
 	    }
 	}
 	print DEL "        sysctl -w kern.polling.enable=0\n";
@@ -265,7 +279,38 @@ sub DelaySetup
 	#
 	# We also load the bridge, IPFW2 and dummynet code if necessary.
 	#
-	if ($FBSD_VERSION >= 6) {
+	if ($FBSD_VERSION >= 7) {
+	    my $MPATH = $KERNELDELAY;
+	    $MPATH =~ s/\/[^\/]+$//;
+
+	    print DEL "if [ `sysctl -n kern.ipc.nmbclusters` -lt 65536 ]; then\n";
+	    print DEL "    sysctl -w kern.ipc.nmbclusters=65536\n";
+	    print DEL "fi\n";
+	    print DEL "if ! kldstat -q -m if_bridge >/dev/null 2>&1; then\n";
+	    print DEL "    echo \"Loading bridge module...\"\n";
+	    print DEL "    kldload $MPATH/if_bridge.ko || {\n";
+	    print DEL "        echo '  *** Could not load bridge code'\n";
+	    print DEL "        exit 1\n";
+	    print DEL "    }\n";
+	    print DEL "fi\n";
+	    print DEL "if ! kldstat -q -m ipfw >/dev/null 2>&1; then\n";
+	    print DEL "    echo \"Loading ipfw module...\"\n";
+	    print DEL "    kldload $MPATH/ipfw.ko || {\n";
+	    print DEL "        echo '  *** Could not load ipfw code'\n";
+	    print DEL "        exit 1\n";
+	    print DEL "    }\n";
+	    print DEL "    ipfw add 65534 allow all from any to any\n";
+	    print DEL "fi\n";
+
+	    print DEL "if ! kldstat -q -m dummynet >/dev/null 2>&1; then\n";
+	    print DEL "    echo \"Loading dummynet module...\"\n";
+	    print DEL "    kldload $MPATH/dummynet.ko || {\n";
+	    print DEL "        echo '  *** Could not load dummynet code'\n";
+	    print DEL "        exit 1\n";
+	    print DEL "    }\n";
+	    print DEL "fi\n";
+
+	} elsif ($FBSD_VERSION >= 6) {
 	    my $MPATH = $KERNELDELAY;
 	    $MPATH =~ s/\/[^\/]+$//;
 
@@ -296,35 +341,58 @@ sub DelaySetup
 	    print DEL "fi\n";
 	}
 
-	# Turn these off before setting bridge_cfg.
-	if ($FBSD_VERSION <= 4) {
-	    print DEL "sysctl -w net.link.ether.bridge=0\n";
-	    print DEL "sysctl -w net.link.ether.bridge_ipfw=0\n";
-	    print DEL "sysctl -w net.link.ether.bridge_cfg=";
-	}
-	else {
-	    print DEL "sysctl -w net.link.ether.bridge.enable=0\n";
-	    print DEL "sysctl -w net.link.ether.bridge.ipfw=0\n";
-	    print DEL "sysctl -w net.link.ether.bridge.config=";
-	}
+	#
+	# Starting with FreeBSD 7, we use the new if_bridge module
+	#
+	if ($FBSD_VERSION >= 7) {
+	    # Turn these off before setting bridge_cfg.
+	    print DEL "sysctl -w net.link.bridge.ipfw=0\n";
+	    print DEL "sysctl -w net.link.bridge.ipfw_arp=0\n";
+	    
+	    foreach my $bridge (@bridges) {
+		my ($bix,$if1,$if2) = @$bridge;
+		print DEL "ifconfig bridge$bix create || {\n";
+		print DEL "    echo \"Could not create bridge$bix\"\n";
+		print DEL "    exit 1\n";
+		print DEL "}\n";
+		print DEL "ifconfig bridge$bix addm $if1 addm $if2 up || {\n";
+		print DEL "    echo \"Could not add $if1/$if2 to bridge$bix\"\n";
+		print DEL "    ifconfig bridge$bix down destroy\n";
+		print DEL "    exit 1\n";
+		print DEL "}\n";
+	    }
 
-	foreach $delay (@delays) {
-	    $delay =~ /DELAY INT0=([\d\w]+) INT1=([\d\w]+) /;
-	    my $iface1 = findiface($1);
-	    my $iface2 = findiface($2);
+	    # Now turn them back on.
+	    print DEL "sysctl -w net.link.bridge.ipfw=1\n";
+	    print DEL "sysctl -w net.link.bridge.ipfw_arp=1\n";
+	} else {
+	    # Turn these off before setting bridge_cfg.
+	    if ($FBSD_VERSION <= 4) {
+		print DEL "sysctl -w net.link.ether.bridge=0\n";
+		print DEL "sysctl -w net.link.ether.bridge_ipfw=0\n";
+		print DEL "sysctl -w net.link.ether.bridge_cfg=";
+	    }
+	    else {
+		print DEL "sysctl -w net.link.ether.bridge.enable=0\n";
+		print DEL "sysctl -w net.link.ether.bridge.ipfw=0\n";
+		print DEL "sysctl -w net.link.ether.bridge.config=";
+	    }
+	    foreach my $bridge (@bridges) {
+		my ($count,$iface1,$iface2) = @$bridge;
+		$count += 68;	# XXX backward compat
 
-	    print DEL "$iface1:$count,$iface2:$count,";
-	    $count++;
-	}
-	print DEL "\n";
-	# Now turn them back on.
-	if ($FBSD_VERSION <= 4) {
-	    print DEL "sysctl -w net.link.ether.bridge=1\n";
-	    print DEL "sysctl -w net.link.ether.bridge_ipfw=1\n";
-	}
-	else {
-	    print DEL "sysctl -w net.link.ether.bridge.enable=1\n";
-	    print DEL "sysctl -w net.link.ether.bridge.ipfw=1\n";
+		print DEL "$iface1:$count,$iface2:$count,";
+	    }
+	    print DEL "\n";
+	    # Now turn them back on.
+	    if ($FBSD_VERSION <= 4) {
+		print DEL "sysctl -w net.link.ether.bridge=1\n";
+		print DEL "sysctl -w net.link.ether.bridge_ipfw=1\n";
+	    }
+	    else {
+		print DEL "sysctl -w net.link.ether.bridge.enable=1\n";
+		print DEL "sysctl -w net.link.ether.bridge.ipfw=1\n";
+	    }
 	}
 	print DEL "ipfw -f pipe flush\n";
 	print DEL "ipfw -f flush\n";
@@ -341,8 +409,10 @@ sub DelaySetup
 	print DEL "if [ -n \"`sysctl kern.polling.enable 2>/dev/null`\" ]; then\n";
 	if ($FBSD_VERSION >= 6) {
 	    print DEL "    sysctl -w kern.polling.enable=0\n";
-	    foreach $dif (@myifs) {
-		print DEL "    ifconfig $dif polling\n";
+	    foreach my $bridge (@bridges) {
+		my (undef,$if1,$if2) = @$bridge;
+		print DEL "    ifconfig $if1 polling\n";
+		print DEL "    ifconfig $if2 polling\n";
 	    }
 	} else {
 	    print DEL "    sysctl -w kern.polling.enable=1\n";
@@ -424,6 +494,17 @@ sub DelaySetup
 
 	    my $backfill1  = $41;
 	    my $backfill2  = $42;
+
+	    my $bf1arg = $bf2arg = "";
+	    if ($backfill1 > 0) {
+		$bf1arg = "backfill ${backfill1}Kbits/s";
+	    }
+	    if ($backfill2 > 0) {
+		$bf2arg = "backfill ${backfill2}Kbits/s";
+	    }
+	    if (!$canbackfill && ($bf1arg || $bf2arg)) {
+		print STDOUT "*** WARNING: IPFW does not support backfill\n";
+	    }
 
 	    #
 	    # Noshaping. All we wanted was to set up the bridge (above).
@@ -519,12 +600,22 @@ sub DelaySetup
 	    $p2 += 60000
 		if ($p2 + 60000 < 65535);
 
-	    print DEL "ipfw add $p1 pipe $p1 ip from any to any in recv $iface1\n";
-	    print DEL "ipfw add $p2 pipe $p2 ip from any to any in recv $iface2\n";
+	    #
+	    # As of FreeBSD 7, when filtering at the bridge level, packets are
+	    # only processed by IPFW at the output interface.  Thus we must
+	    # use "out" rather than "in" or packets won't match.
+	    #
+	    if ($FBSD_VERSION < 7) {
+		print DEL "ipfw add $p1 pipe $p1 ip from any to any in recv $iface1\n";
+		print DEL "ipfw add $p2 pipe $p2 ip from any to any in recv $iface2\n";
+	    } else {
+		print DEL "ipfw add $p1 pipe $p1 ip from any to any out recv $iface1\n";
+		print DEL "ipfw add $p2 pipe $p2 ip from any to any out recv $iface2\n";
+	    }
 	    print DEL "ipfw pipe $p1 config delay ${delay1}ms ";
-	    print DEL "bw ${bandw1}Kbit/s backfill ${backfill1}Kbits/s plr $plr1 $queue1 $redparams1\n";
+	    print DEL "bw ${bandw1}Kbit/s $bf1arg plr $plr1 $queue1 $redparams1\n";
 	    print DEL "ipfw pipe $p2 config delay ${delay2}ms ";
-	    print DEL "bw ${bandw2}Kbit/s backfill ${backfill2}Kbits/s plr $plr2 $queue2 $redparams2\n";
+	    print DEL "bw ${bandw2}Kbit/s $bf2arg plr $plr2 $queue2 $redparams2\n";
 
 	    print STDOUT "  $iface1/$iface2 pipe $p1 config delay ";
 	    print STDOUT "${delay1}ms bw ${bandw1}Kbit/s plr $plr1 ";
