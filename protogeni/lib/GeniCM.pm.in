@@ -1680,7 +1680,7 @@ sub SliverWork($$)
 	# the info into the manifest.
 	#
 	my $realnode = Node->Lookup($sliver->uuid());
-	if (defined($realnode)) {
+	if (!defined($realnode)) {
 	    print STDERR "Could not lookup node for $sliver\n";
 	    $message = "Internal Error finding mapped node for $virtual_id\n";
 	    goto bad;
