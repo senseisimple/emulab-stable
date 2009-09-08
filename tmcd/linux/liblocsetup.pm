@@ -21,7 +21,7 @@ use Exporter;
 	 os_routing_add_manual os_routing_del_manual os_homedirdel
 	 os_groupdel os_getnfsmounts os_islocaldir
 	 os_fwconfig_line os_fwrouteconfig_line os_config_gre
-	 os_get_disks os_get_disk_size os_get_partition_info
+	 os_get_disks os_get_disk_size os_get_partition_info os_nfsmount
        );
 
 # Must come after package declaration!
@@ -57,6 +57,9 @@ sub GENVNODETYPE() { return libsetup::GENVNODETYPE(); }
 $CP		= "/bin/cp";
 $DF		= "/bin/df";
 $EGREP		= "/bin/egrep -q";
+# Note that we try multiple versions in os_nfsmount below; this is for legacy
+# code, or code where the mount is best done in the caller itself... or code
+# I didn't want to convert!
 $NFSMOUNT	= "/bin/mount -o vers=2,udp"; # Force NFS Version 2 over UDP
 $LOOPBACKMOUNT	= "/bin/mount -n -o bind ";
 $UMOUNT		= "/bin/umount";
@@ -1636,6 +1639,18 @@ sub os_get_partition_info($$)
     close FDISK;
 
     return -1;
+}
+
+sub os_nfsmount($$)
+{
+    my ($remote,$local) = @_;
+
+    if (system("/bin/mount -o vers=2,udp $remote $local")
+	&& system("/bin/mount -o udp $remote $local")) {
+	return 1;
+    }
+
+    return 0;
 }
 
 1;

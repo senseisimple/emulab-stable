@@ -158,8 +158,8 @@ sub doboot()
 	    }
 	
 	    print STDOUT "  Mounting $remote on $local\n";
-	    if (system("$NFSMOUNT $remote $local")) {
-		warning("Could not $NFSMOUNT $remote on $local\n");
+	    if (os_nfsmount($remote,$local)) {
+		warning("Could not os_nfsmount $remote on $local: $!");
 		next;
 	    }
 	}
@@ -221,8 +221,8 @@ sub doboot()
 	}
 	
 	print STDOUT "  Mounting $remote on $local\n";
-	if (system("$NFSMOUNT $remote $local")) {
-	    warning("Could not $NFSMOUNT $remote on $local: $!");
+	if (os_nfsmount($remote,$local)) {
+	    warning("Could not os_nfsmount $remote on $local: $!");
 	    next;
 	}
 	$curmounts{$remote} = $local;

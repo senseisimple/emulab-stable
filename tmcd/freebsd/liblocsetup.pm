@@ -21,7 +21,7 @@ use Exporter;
 	 os_routing_enable_forward os_routing_enable_gated
 	 os_routing_add_manual os_routing_del_manual os_homedirdel
 	 os_groupdel os_getnfsmounts os_islocaldir
-	 os_fwconfig_line os_fwrouteconfig_line os_config_gre
+	 os_fwconfig_line os_fwrouteconfig_line os_config_gre os_nfsmount
        );
 
 # Must come after package declaration!
@@ -965,6 +965,17 @@ sub os_get_partition_info($$)
   bad:
     close(FDISK);
     return -1;
+}
+
+sub os_nfsmount($$)
+{
+    my ($remote,$local) = @_;
+
+    if (system("$NFSMOUNT $remote $local")) {
+	return 1;
+    }
+
+    return 0;
 }
 
 1;
