@@ -71,10 +71,10 @@ InterfaceRef = empty
 Location = element location {
   # The two-letter ISO 3166 code for the country the node is in.
   attribute country { text } &
-  # Longitude and Lattitude coordinates of the node using the
+  # Longitude and Latitude coordinates of the node using the
   # WGS 84 standard.
   attribute longitude { text }? &
-  attribute lattitude { text }?
+  attribute latitude { text }?
 }
 
 RSpec = element rspec {
