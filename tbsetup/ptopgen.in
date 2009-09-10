@@ -367,6 +367,9 @@ if ($pid) {
 
 my %node_type_osids;
 my %osid_node_types;
+my %node_countries;
+my %node_latitudes;
+my %node_longitudes;
 $result = DBQueryFatal($osidquery);
 while (my ($osid,$type) = $result->fetchrow()) {
     if ($node_type_osids{$type}) {
@@ -405,16 +408,21 @@ while (my ($osid) = $result->fetchrow()) {
 
 # Print switches
 if (defined($switchtouse)) {
-    print_switch($switchtouse);
+    # Should probably get the last four args out of the database, but I don't
+    # think we ever actually use this case...
+    print_switch($switchtouse,undef,undef,undef,undef);
     $switches{$switchtouse} = 1;
 }
 else {
     $result =
-	DBQueryFatal("select node_id,uuid from nodes ".
+	DBQueryFatal("select n.node_id, n.uuid, country, latitude, longitude " .
+                     "from nodes as n left join widearea_nodeinfo as wn ".
+                     "  on n.node_id=wn.node_id " .
 		     "where role='testswitch' or role='widearea_switch'");
 
-    while (($switch, $uuid) = $result->fetchrow_array) {
-	print_switch($switch, $uuid);
+    while (($switch, $uuid, $country, $latitude, $longitude) =
+            $result->fetchrow_array) {
+	print_switch($switch, $uuid, $country, $latitude, $longitude);
 	$switches{$switch} = 1;
     }
 }
@@ -483,7 +491,8 @@ $result =
 		 "  np.reserved_pid is not null,np.eventstate, ".
 		 "  np.battery_percentage,np.uuid,b.sharing_mode, ".
 		 "  ru.load_1min, ru.load_5min, ru.status_timestamp, ".
-		 "  a.def_boot_osid, nat2.attrvalue ".
+		 "  a.def_boot_osid, nat2.attrvalue, wn.country, " .
+                 "  wn.latitude, wn.longitude ".
 		 "from nodes as a ".
 		 "left join reserved as b on a.node_id=b.node_id ".
 		 "left join reserved as m on a.phys_nodeid=m.node_id ".
@@ -502,6 +511,7 @@ $result =
 		 "   where attrkey='dedicated_widearea' ".
 		 "   group by type) as dedicated_wa_types ".
 		 "  on t.type=dedicated_wa_types.type ".
+                 "left join widearea_nodeinfo as wn on a.node_id=wn.node_id ".
 		 "where $free_condition and ".
 		 "      (a.role='testnode' and (t.isremotenode=0 or ".
 		 "                              dedicated_wa_types.attrvalue=1))");
@@ -514,7 +524,8 @@ $result =
 #
 while (($node,$type,$physnode,$class,$issubnode,$def_boot_osid,$reserved,
 	$prereserved,$eventstate,$battery_perc,$uuid,$sharing_mode,
-	$load_1min,$load_5min,$load_tstamp,$osid,$weight) = $result->fetchrow_array) {
+	$load_1min,$load_5min,$load_tstamp,$osid,$weight,$country,$latitude,
+        $longitude) = $result->fetchrow_array) {
     $nodes{$node} = $type
 	if (!defined($pid) ||
 	    ($permissions{$type} && $permissions{$class}));
@@ -543,6 +554,10 @@ while (($node,$type,$physnode,$class,$issubnode,$def_boot_osid,$reserved,
 
     $curr_state{$node} = $eventstate;
     $curr_batt{$node} = $battery_perc;
+
+    $node_countries{$node} = $country;
+    $node_latitudes{$node} = $latitude;
+    $node_longitudes{$node} = $longitude;
 }
 
 #
@@ -584,6 +599,8 @@ foreach $node (keys(%nodes)) {
     my @features;
     my @flags;
     my $needvirtgoo = 0;
+
+    my ($latitude, $longitude, $country);
 
     # XXX temporary hack until node reboot avoidance 
     # is available. Nodes running the FBSD-NSE image
@@ -836,9 +853,16 @@ foreach $node (keys(%nodes)) {
 	push @flags, "subnode_of:$subnode_of{$node}";
     }
 
+    #
+    # Handle node locations
+    #
+    $country = $node_countries{$node};
+    $latitude = $node_latitudes{$node};
+    $longitude = $node_longitudes{$node};
+
     my @parse_features = split(" ", join(" ", @features));
     print_node($node, \@types, \@parse_features, \@flags, $uuid,
-	       $nodetointerface{$node});
+	       $nodetointerface{$node}, $country, $latitude, $longitude);
 }
 
 #
@@ -866,7 +890,8 @@ if ($widearea) {
     my $fake_inet_switch = "internet";
     my @inet_protos = ("ipv4");
     my @types = map("*$_:*", @inet_protos);
-    print_node($fake_inet_switch, \@types, [], [], undef, []);
+    print_node($fake_inet_switch, \@types, [], [], undef, [], undef, undef,
+        undef);
     
     #
     # Note - there is currently an assumption in this query that widearea nodes
@@ -874,6 +899,7 @@ if ($widearea) {
     #
     $result =
 	DBQueryFatal("select n.node_id,nt.type,ns.status,r.pid,r.eid,wn.site,".
+                     "wn.country,wn.latitude,wn.longitude, ".
                      "i.iface,wn.bwlimit,n.uuid ".
 		     "from nodes as n ".
 		     "left join node_types as nt on nt.type=n.type ".
@@ -894,7 +920,8 @@ if ($widearea) {
 		     "        nt.isvirtnode=0 and ".
 		     "        dedicated_wa_types.attrvalue is NULL)");
     
-    while (($physnode,$ptype,$status,$mpid,$meid,$site,$iface,$bwlimit,$uuid)
+    while (($physnode,$ptype,$status,$mpid,$meid,$site,$country,$latitude,
+            $longitude,$iface,$bwlimit,$uuid)
 	   = $result->fetchrow_array) {
 	my $class = $typemap{$ptype}->{'CLASS'};
 	my @types;
@@ -986,7 +1013,7 @@ if ($widearea) {
         }
 
 	print_node($physnode, \@types, \@features, \@flags, $uuid,
-		   $nodetointerface{$physnode});
+		   $nodetointerface{$physnode},$country,$latitude,$longitude);
 
         #
         # Print out a link to the 'internet'.
@@ -1254,7 +1281,8 @@ my @wireless_protos = ("80211", "80211a", "80211b", "80211g", "flex900");
 my $fake_switch = "airswitch";
 
 my @fake_switch_types = map("*$_:*", @wireless_protos);
-print_node($fake_switch, \@fake_switch_types, [], [], undef, []);
+print_node($fake_switch, \@fake_switch_types, [], [], undef, [], undef, undef,
+    undef);
 
 foreach my $interface (keys(%interfacetypes)) {
     my ($node,$card,$port) = split(":", $interface);
@@ -1392,12 +1420,17 @@ sub print_switch
 {
     my $name = shift(@_);
     my $uuid = shift(@_);
+    my $country = shift(@_);
+    my $latitude = shift(@_);
+    my $longitude = shift(@_);
     my $interfaces = [];
     if ($do_xml && $genimode)
     {
 	push @$interfaces, "(null)";
     }
-    print_node($name, ["switch:1", "*lan:*"], [], [], $uuid, $interfaces);
+    # XXX
+    print_node($name, ["switch:1", "*lan:*"], [], [], $uuid, $interfaces,
+        $country, $latitude, $longitude);
 }
 
 sub print_node
@@ -1408,6 +1441,9 @@ sub print_node
     my $flags = shift(@_);
     my $uuid = shift(@_);
     my $interfaces = shift(@_);
+    my $country = shift(@_);
+    my $lat = shift(@_);
+    my $long = shift(@_);
     if (!$do_xml) {
 	my $text = "node $name " .
 	    join(" ", @$types) . " - " . join(" ", @$features) .
@@ -1434,6 +1470,14 @@ sub print_node
 	else {
 	    print "  <exclusive>true</exclusive>\n";
 	}
+        if (defined($lat) && defined($long)) {
+            # TODO: May not be a good default for country
+            if (!defined($country) || $country eq "") {
+                $country = "US";
+            }
+            print "  <location country=\"$country\" longitude=\"$long\" " .
+                  "latitude=\"$lat\" />\n";
+        }
 	print_node_interfaces($name, @$interfaces);
 	print "</node>\n";
     } else {
