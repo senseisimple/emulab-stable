@@ -16,18 +16,18 @@ package
 {
   public class Geni
   {
-    static var ch : String = "sa";
+    static var sa : String = "sa";
     static var cm : String = "cm";
     static var ses : String = "ses";
 
     static var sesUrl : String = "https://myboss.emulab.geni.emulab.net/protogeni/xmlrpc/";
 //"https://boss.emulab.net:443/protogeni/xmlrpc/";
 
-    public static var getCredential = new Array(ch, "GetCredential");
-    public static var getKeys = new Array(ch, "GetKeys");
-    public static var resolve = new Array(ch, "Resolve");
-    public static var remove = new Array(ch, "Remove");
-    public static var register = new Array(ch, "Register");
+    public static var getCredential = new Array(sa, "GetCredential");
+    public static var getKeys = new Array(sa, "GetKeys");
+    public static var resolve = new Array(sa, "Resolve");
+    public static var remove = new Array(sa, "Remove");
+    public static var register = new Array(sa, "Register");
 
     public static var discoverResources = new Array(cm, "DiscoverResources");
     public static var getTicket = new Array(cm, "GetTicket");

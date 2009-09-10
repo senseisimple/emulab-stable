@@ -252,21 +252,23 @@ package
       clip.rspecScroll.visible = true;
       clip.visible = true;
 
+      var managerName = managers.getCurrentManager().getName();
       clip.rspecText.text = "";
       clip.rspecText.appendText("--------------------------------------\n");
-      clip.rspecText.appendText("Request: "
-                                + managers.getCurrentManager().getName()
-                                + "\n");
+      clip.rspecText.appendText("Request: " + managerName + "\n");
       clip.rspecText.appendText("--------------------------------------\n\n");
       var xml = nodes.getXml(true, managers.getCurrentManager());
       clip.rspecText.appendText(xml.toString());
 
       clip.rspecText.appendText("\n\n--------------------------------------\n");
-      clip.rspecText.appendText("Advertisement: "
-                                + managers.getCurrentManager().getName()
-                                + "\n");
+      clip.rspecText.appendText("Advertisement: " + managerName + "\n");
       clip.rspecText.appendText("--------------------------------------\n\n");
       clip.rspecText.appendText(managers.getCurrentManager().getAd());
+
+      clip.rspecText.appendText("\n\n--------------------------------------\n");
+      clip.rspecText.appendText("Manifest: " + managerName + "\n");
+      clip.rspecText.appendText("--------------------------------------\n\n");
+      clip.rspecText.appendText(managers.getCurrentManager().getManifest());
 
       clip.rspecScroll.update();
     }

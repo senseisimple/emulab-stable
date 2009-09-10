@@ -30,7 +30,7 @@ package
     {
       name = newComponent.name;
       id = newComponent.uuid;
-      managerId = newComponent.managerId;
+      managerId = newManager.getId();
       isVirtual = newComponent.isVirtual;
       isShared = newComponent.isShared;
       sliverId = null;
@@ -319,9 +319,9 @@ package
       {
         if (! isVirtual)
         {
-          str += "component_uuid=\"" + id + "\" "
-            + "component_manager_uuid=\"" + managerId + "\" ";
+          str += "component_uuid=\"" + id + "\" ";
         }
+        str += "component_manager_uuid=\"" + managerId + "\" ";
         str += "virtual_id=\"" + name + "\" "
           + "virtualization_type=\"" + virtType + "\" ";
         if (sliverId != null)

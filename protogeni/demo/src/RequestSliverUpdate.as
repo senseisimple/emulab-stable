@@ -91,6 +91,7 @@ package
         else
         {
           manager.setTicket(ticket);
+          manager.setManifest(response.value);
           nodes.commitState(manager);
         }
       }

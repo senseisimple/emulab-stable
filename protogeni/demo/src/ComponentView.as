@@ -48,27 +48,34 @@ package
         new ComponentManager("28a10955-aa00-11dd-ad1f-001143e453fe",
                              "Emulab",
                              ".emulab.net",
-                             "https://boss.emulab.net:443/protogeni/xmlrpc/",
-// Doesn't work ???                             "https://boss.emulab.net:443/dev/stoller/protogeni/xmlrpc/",
+                             "https://boss.emulab.net:443/protogeni/xmlrpc",
+// Doesn't work ???                             "https://boss.emulab.net:443/dev/stoller/protogeni/xmlrpc",
                              updateList, 2),
+/*
         new ComponentManager("be300821-ecb7-11dd-a0f8-001143e43ff3",
                              "gtwelab",
                              ".emulab.net",
                              "https://myboss.emulab.geni.emulab.net:443/protogeni/xmlrpc",
                              updateList, 2),
+*/
         new ComponentManager("b83b47be-e7f0-11dd-848b-0013468d3dc8",
                              "Kentucky",
                              ".uky.emulab.net",
                              "https://www.uky.emulab.net/protogeni/xmlrpc",
-                             updateList, 0),
+                             updateList, 2),
         new ComponentManager("f38e8571-f7af-11dd-ab88-00304868a4be",
                              "Wisconsin",
                              ".schooner.wail.wisc.edu",
                              "https://www.schooner.wail.wisc.edu/protogeni/xmlrpc",
                              updateList, 0),
-        new ComponentManager("", "CMU", ".cmcl.cs.cmu.edu",
+        new ComponentManager("b14b4a9d-8e53-11de-be30-001ec9540a39", "CMU", ".cmcl.cs.cmu.edu",
                              "https://boss.cmcl.cs.cmu.edu/protogeni/xmlrpc",
-                             updateList, 0));
+                             updateList, 2),
+        new ComponentManager("a4539e9b-876a-11de-af17-00a0c9983803",
+                             "umlGENI",
+                             ".uml.emulab.net",
+                             "https://boss.uml.emulab.net/protogeni/xmlrpc",
+                             updateList, 2));
       select.removeAll();
       select.selectedIndex = 0;
 

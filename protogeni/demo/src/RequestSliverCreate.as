@@ -79,6 +79,7 @@ package
           else
           {
             manager.setSliver(response.value[0]);
+            manager.setManifest(response.value[1]);
           }
 
           if (! nodes.hasTunnels(manager))

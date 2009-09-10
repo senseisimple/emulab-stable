@@ -35,6 +35,7 @@ package
       hostName = newHostName;
       url = newUrl;
       ad = "";
+      manifest = "";
       update = newUpdate;
       version = newVersion;
       changed = false;
@@ -59,6 +60,16 @@ package
     public function getAd() : String
     {
       return ad;
+    }
+
+    public function setManifest(newManifest : String) : void
+    {
+      manifest = newManifest;
+    }
+
+    public function getManifest() : String
+    {
+      return manifest;
     }
 
     public function getHostName() : String
@@ -381,6 +392,7 @@ package
     var hostName : String;
     var url : String;
     var ad : String;
+    var manifest : String;
 
     var components : Array;
     var used : Array;
