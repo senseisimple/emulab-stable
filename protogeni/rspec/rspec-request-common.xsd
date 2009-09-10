@@ -145,6 +145,7 @@
   </xs:attributeGroup>
   <xs:attributeGroup name="InterfaceRef">
     <xs:attribute name="tunnel_ip"/>
+    <xs:attribute name="tunnel_netmask"/>
     <xs:attribute name="virtual_node_id" use="required"/>
     <xs:attribute name="virtual_interface_id" use="required"/>
   </xs:attributeGroup>
