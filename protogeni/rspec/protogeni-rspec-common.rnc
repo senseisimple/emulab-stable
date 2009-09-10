@@ -18,7 +18,7 @@ NodeContents =
     # Each node has exactly one virtualization technology, which we simply
     # enumerate here
     attribute virtualization_type { "raw" | "trellis-vserver" |
-      "planetlab-vserver" | "emulab-vnode" }? &
+      "planetlab-vserver" | "emulab-vnode" | "bgpmux" }? &
 
     # Node type list
     NodeTypeList &
@@ -45,12 +45,14 @@ NodeContents =
 
 NodeTypeList = NodeTypeSpec+
 
+NodeTypeContents &= TypeField*
+
 LinkType = element link_type {
     attribute name { text } &
-    LinkTypeField+
+    TypeField*
     }
 
-LinkTypeField = element field {
+TypeField = element field {
     attribute key { text } &
     attribute value { text }
     }

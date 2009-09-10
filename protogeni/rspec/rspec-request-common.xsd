@@ -27,6 +27,7 @@
           <xs:enumeration value="trellis-vserver"/>
           <xs:enumeration value="planetlab-vserver"/>
           <xs:enumeration value="emulab-vnode"/>
+          <xs:enumeration value="bgpmux"/>
         </xs:restriction>
       </xs:simpleType>
     </xs:attribute>
@@ -111,7 +112,7 @@
       <xs:element name="link_type">
         <xs:complexType>
           <xs:sequence>
-            <xs:element maxOccurs="unbounded" ref="rspec:field"/>
+            <xs:element minOccurs="0" maxOccurs="unbounded" ref="rspec:field"/>
           </xs:sequence>
           <xs:attribute name="name" use="required"/>
         </xs:complexType>

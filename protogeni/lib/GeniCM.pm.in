@@ -3403,6 +3403,21 @@ sub GeniExperiment($)
     return $experiment;
 }
 
+sub CreateTicket($)
+{
+    my ($self) = @_;
+    return CreateRspec($self);
+}
+
+sub CreateManifest($)
+{
+    my ($self) = @_;
+    return CreateRspec($self);
+}
+
+sub CreateRspec($)
+{
+}
 
 # _Always_ make sure that this 1 is at the end of the file...
 1;

@@ -13,18 +13,21 @@
 ## Representation of a single node type
 NodeTypeSpec = element node_type {
 	## Name of the type - will almost certainly not be unique
-	attribute type_name { text },
+	attribute type_name { text } &
 	## How many virtual nodes of this type this physical node can
 	## handle.
-	attribute type_slots { xsd:integer { minInclusive = "0" } | "unlimited" },
+	attribute type_slots { xsd:integer { minInclusive = "0" } | "unlimited" } &
 		##element unlimited { empty }?,
 	## A flag that indicates that this physical node *always*
 	## has this type - a node is only allowed to have one dynamic
 	## (ie. not flagged as static) type at a time, but any number
 	## of static types at a time
 	## element static { empty }?
-	attribute static { "true" }?
+	attribute static { "true" }? &
+        NodeTypeContents
 }
+
+NodeTypeContents = empty
 
 ## Link types are currently just a siple string. They will almost certainly 
 ## have to get more complicated, for two reasons:

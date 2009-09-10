@@ -16,36 +16,45 @@
   -->
   <xs:element name="node_type">
     <xs:complexType>
-      <xs:attribute name="type_name" use="required">
-        <xs:annotation>
-          <xs:documentation>Name of the type - will almost certainly not be unique</xs:documentation>
-        </xs:annotation>
-      </xs:attribute>
-      <xs:attribute name="type_slots" use="required">
-        <xs:simpleType>
-          <xs:union>
+      <xs:complexContent>
+        <xs:extension base="rspec:NodeTypeContents">
+          <xs:attribute name="type_name" use="required">
+            <xs:annotation>
+              <xs:documentation>Name of the type - will almost certainly not be unique</xs:documentation>
+            </xs:annotation>
+          </xs:attribute>
+          <xs:attribute name="type_slots" use="required">
             <xs:simpleType>
-              <xs:restriction base="xs:integer">
-                <xs:minInclusive value="0"/>
-              </xs:restriction>
+              <xs:union>
+                <xs:simpleType>
+                  <xs:restriction base="xs:integer">
+                    <xs:minInclusive value="0"/>
+                  </xs:restriction>
+                </xs:simpleType>
+                <xs:simpleType>
+                  <xs:restriction base="xs:token">
+                    <xs:enumeration value="unlimited"/>
+                  </xs:restriction>
+                </xs:simpleType>
+              </xs:union>
             </xs:simpleType>
+          </xs:attribute>
+          <xs:attribute name="static">
             <xs:simpleType>
               <xs:restriction base="xs:token">
-                <xs:enumeration value="unlimited"/>
+                <xs:enumeration value="true"/>
               </xs:restriction>
             </xs:simpleType>
-          </xs:union>
-        </xs:simpleType>
-      </xs:attribute>
-      <xs:attribute name="static">
-        <xs:simpleType>
-          <xs:restriction base="xs:token">
-            <xs:enumeration value="true"/>
-          </xs:restriction>
-        </xs:simpleType>
-      </xs:attribute>
+          </xs:attribute>
+        </xs:extension>
+      </xs:complexContent>
     </xs:complexType>
   </xs:element>
+  <xs:complexType name="NodeTypeContents">
+    <xs:sequence>
+      <xs:element minOccurs="0" maxOccurs="unbounded" ref="rspec:field"/>
+    </xs:sequence>
+  </xs:complexType>
   <xs:group name="LinkTypeSpec">
     <xs:sequence>
       <xs:element name="link_type">
