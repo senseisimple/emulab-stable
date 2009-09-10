@@ -46,11 +46,15 @@
       </xs:attribute>
     </xs:complexType>
   </xs:element>
-  <xs:element name="link_type">
-    <xs:complexType>
-      <xs:attribute name="type_name" use="required"/>
-    </xs:complexType>
-  </xs:element>
+  <xs:group name="LinkTypeSpec">
+    <xs:sequence>
+      <xs:element name="link_type">
+        <xs:complexType>
+          <xs:attribute name="type_name" use="required"/>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:group>
   <xs:group name="LinkEndPoints">
     <xs:sequence>
       <xs:element ref="rspec:source_interface"/>

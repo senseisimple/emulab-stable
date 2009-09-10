@@ -37,7 +37,7 @@ NodeContents =
     attribute virtualization_type { "raw" | "trellis-vserver" |
       "planetlab-vserver" | "emulab-vnode" }? &
     # Link types
-    LinkTypeList &
+    LinkType+ &
     # The interfaces which this link spans.
     element interface_ref {
       InterfaceRef
@@ -45,7 +45,15 @@ NodeContents =
 
 NodeTypeList = NodeTypeSpec+
 
-LinkTypeList = LinkTypeSpec+
+LinkType = element link_type {
+    attribute name { text } &
+    LinkTypeField+
+    }
+
+LinkTypeField = element field {
+    attribute key { text } &
+    attribute value { text }
+    }
 
 VirtualName = attribute virtual_id { text }
 

@@ -46,7 +46,7 @@
   <xs:complexType name="LinkContents">
     <xs:choice minOccurs="0" maxOccurs="unbounded">
       <xs:choice>
-        <xs:group ref="rspec:LinkTypeList"/>
+        <xs:group ref="rspec:LinkType"/>
         <xs:element name="interface_ref">
           <xs:complexType>
             <xs:attributeGroup ref="rspec:InterfaceRef"/>
@@ -72,7 +72,6 @@
         </xs:restriction>
       </xs:simpleType>
     </xs:attribute>
-    <xs:attribute name="link_type"/>
     <xs:attributeGroup ref="rspec:VirtualName"/>
   </xs:complexType>
   <xs:element name="bandwidth">
@@ -107,11 +106,24 @@
       <xs:element maxOccurs="unbounded" ref="rspec:node_type"/>
     </xs:sequence>
   </xs:group>
-  <xs:group name="LinkTypeList">
+  <xs:group name="LinkType">
     <xs:sequence>
-      <xs:element maxOccurs="unbounded" ref="rspec:link_type"/>
+      <xs:element name="link_type">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element maxOccurs="unbounded" ref="rspec:field"/>
+          </xs:sequence>
+          <xs:attribute name="name" use="required"/>
+        </xs:complexType>
+      </xs:element>
     </xs:sequence>
   </xs:group>
+  <xs:element name="field">
+    <xs:complexType>
+      <xs:attribute name="key" use="required"/>
+      <xs:attribute name="value" use="required"/>
+    </xs:complexType>
+  </xs:element>
   <xs:attributeGroup name="VirtualName">
     <xs:attribute name="virtual_id" use="required"/>
   </xs:attributeGroup>
@@ -140,7 +152,7 @@
     <xs:complexType>
       <xs:attribute name="country" use="required"/>
       <xs:attribute name="longitude"/>
-      <xs:attribute name="lattitude"/>
+      <xs:attribute name="latitude"/>
     </xs:complexType>
   </xs:element>
   <xs:element name="rspec" type="rspec:RSpecContents"/>

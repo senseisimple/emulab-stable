@@ -23,7 +23,7 @@ NodeContents &=
 
 # The LinkMapping will only be available after an assignment
 LinkContents &=
-  attribute link_type { text }? &
+#  attribute link_type { text }? &
   VirtualName &
   LinkMapping? &
   # Characteristics (bandwidth, latency, loss) which affect traffic.
