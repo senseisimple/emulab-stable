@@ -24,10 +24,22 @@ all:
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-install:
+FILES	 = $(wildcard *.py)
+FILES   += $(wildcard $(SRCDIR)/*.py)
+ALLFILES = $(notdir $(FILES))
+
+install:	install-mkdir \
+	$(addprefix $(INSTALL_TOPDIR)/opsdir/protogeni/test/, $(ALLFILES))
 
 control-install:
 
+install-mkdir:
+	-mkdir -p $(INSTALL_TOPDIR)/opsdir/protogeni/test
+
 clean:
 	rm -f *.o core *.pl *.pm *.py
+
+$(INSTALL_TOPDIR)/opsdir/protogeni/test/%: %
+	@echo "Installing $<"
+	$(INSTALL_DATA) $(subst $$,\$$,$<) $(subst $$,\$$,$@) 
 

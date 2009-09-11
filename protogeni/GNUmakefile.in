@@ -24,6 +24,7 @@ install:
 	@$(MAKE) -C scripts install
 	@$(MAKE) -C etc install
 	@$(MAKE) -C rspec install
+	@$(MAKE) -C test install
 
 install-genischemacheck:
 	@$(MAKE) -C lib install-genischemacheck
