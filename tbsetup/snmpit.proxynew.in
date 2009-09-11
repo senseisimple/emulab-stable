@@ -244,7 +244,7 @@ sub SetupVlans($)
 
     foreach my $id (keys(%{ $argtable })) {
 	my $vtag    = $argtable->{$id}->{'virtual'};
-	my $stack   = $argtable->{$id}->{'stack'};
+	my $class   = $argtable->{$id}->{'stack'};
 	my $members = $argtable->{$id}->{'members'};
 
 	if (! ($id =~ /^[\d]+$/)) {
@@ -253,11 +253,11 @@ sub SetupVlans($)
 	if (! ($vtag =~ /^[\-\w]+$/)) {
 	    fatal("SetupVlans: Illegal vname '$vtag'");
 	}
-	if (!defined($stack)) {
-	    $stack = "Experimental";
+	if (!defined($class)) {
+	    $class = "Experimental";
 	}
-	elsif ($stack ne "Control" && $stack ne "Experimental") {
-	    fatal("SetupVlans: Illegal stack '$stack'");
+	elsif ($class ne "Control" && $class ne "Experimental") {
+	    fatal("SetupVlans: Illegal class '$class'");
 	}
 
 	foreach my $port (keys(%{ $members })) {
@@ -279,7 +279,7 @@ sub SetupVlans($)
 	    if (! exists($vlantable->{$id})) {
 		$vlantable->{$id} = {};
 		$vtagtable{$id}   = $vtag;
-		$stacktable{$id}  = $stack;
+		$stacktable{$id}  = $class;
 	    }
 	    $vlantable->{$id}->{$port} = [$speed, $duplex];
 
@@ -397,14 +397,14 @@ sub SetupVlans($)
     # 
     foreach my $id (keys(%$vlantable)) {
 	my $vtag    = $vtagtable{$id};
-	my $stack   = $stacktable{$id};
+	my $class   = $stacktable{$id};
 	my @members = keys(%{ $vlantable->{$id} });
 	my $mstring = "@members";
 	my $outer_id;
 	my $vlan;
 
 	# Not doing stacks yet.
-	$stack = "Experimental";
+	$class = "Experimental";
 
 	if ($debug) {
 	    print STDERR "$pid $eid $id $mstring\n";
@@ -434,7 +434,7 @@ sub SetupVlans($)
 		$errors++;
 		next;
 	    }
-	    $vlan->SetStack($stack);
+	    $vlan->SetClass($class);
 	    $outer_id = $vlan->lanid();
 
 	    # Insert mapping between inner and outer vlan entries.
@@ -442,7 +442,7 @@ sub SetupVlans($)
 		DBQueryWarn("insert into elabinelab_vlans ".
 			    "      (exptidx,pid,eid,inner_id,outer_id,stack) ".
 			    "values ($exptidx, '$pid', '$eid', '$id', ".
-			    "        '$outer_id', '$stack')");
+			    "        '$outer_id', '$class')");
 	    if (!$query_result || !$query_result->numrows) {
 		#
 		# Failed, must remove vlans entry too. We keep going though
@@ -593,7 +593,7 @@ sub DestroyVlans($)
     my @vlanids  = @{ $args->{'vlans'} };
     my @done     = ();
     my $errors   = 0;
-    my $stack;
+    my $class;
     
     MapVlans(@vlanids);
     # If no vlans, do nothing! snmpit will end up removing all the vlans!
@@ -608,7 +608,7 @@ sub DestroyVlans($)
     foreach my $vlanid (@vlanids) {
 	my $outer_id = $mapping{$vlanid};
 	my $vlan     = $outer_vlans{$outer_id};
-	my $stack    = $vlan->GetStack();
+	my $class    = $vlan->GetClass();
 	# Not doing stacks yet;
 	my $stackopt = "";
 	my $debugopt = ($debug ? "-v $dlevel" : "");
@@ -718,12 +718,12 @@ sub Trunk($)
 	fatal("Trunk: Illegal port '$port'");
     }
     # Not doing stacks yet.
-    my $stack    = "Experimental";
+    my $class    = "Experimental";
     my $stackopt = "";
     if (0 && exists($args->{'stack'})) {
-	$stack = $args->{'stack'};
-	if ($stack ne "Control" && $stack ne "Experimental") {
-	    fatal("Trunk: Improper stack argument: $stack");
+	$class = $args->{'stack'};
+	if ($class ne "Control" && $class ne "Experimental") {
+	    fatal("Trunk: Improper class argument: $class");
 	}
     }
     my $debugopt = ($debug ? "-v $dlevel" : "");
@@ -747,7 +747,7 @@ sub Trunk($)
     }
     MapVlans(@vlanids);
     if ($mode eq "-U") {
-	if ($stack eq "Experimental") {
+	if ($class eq "Experimental") {
 	    $query_result =
 		DBQueryFatal("select iface from vinterfaces " .
 			     "where node_id='$node' and type='vlan' and ".
@@ -770,7 +770,7 @@ sub Trunk($)
 	#
 	# and clean up the database
 	#
-	if ($stack eq "Experimental") {
+	if ($class eq "Experimental") {
 	    $query_result =
 		DBQueryFatal("delete from vinterfaces " .
 			     "where node_id='$node' and type='vlan' and ".
@@ -789,7 +789,7 @@ sub Trunk($)
 	# appropriate to stuff.  It seems likely that the structure
 	# of the database will be revised, in this area, but
 	# for now, we'll just play Joe Isuzu.
-	if ($stack eq "Experimental") {
+	if ($class eq "Experimental") {
 	    $query_result =
 		DBQueryFatal("select iface from vinterfaces where " .
 			     "node_id='$node' and iface='$iface'");
@@ -833,7 +833,7 @@ sub PortControl($)
     my @ports   = @{ $args->{'ports'} };
 
     # Not doing stacks yet;
-    my $stack    = "Experimental";
+    my $class    = "Experimental";
     my $debugopt = ($debug ? "-v $dlevel" : "");
 
     #

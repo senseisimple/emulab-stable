@@ -121,7 +121,7 @@ sub RemoteDoVlansFromTables($@)
 
 	$vlantable->{$id} = {};
 	$vlantable->{$id}->{"virtual"}    = $vlan->vname();
-	$vlantable->{$id}->{"stack"}      = $vlan->GetStack();
+	$vlantable->{$id}->{"stack"}      = $vlan->GetClass();
 	$vlantable->{$id}->{"trunk_mode"} = $trunk_mode
 	    if (defined($trunk_mode));
 	$vlantable->{$id}->{"members"}    = {};
@@ -206,12 +206,12 @@ sub RemoteDoVlansFromTables($@)
 #
 sub RemoteMakeVlan($$@)
 {
-    my $stack     = shift();
+    my $class     = shift();
     my $vlan_name = shift();
     my @ports     = @_;
 
-    $args->{"stack"}     = $stack
-	if (defined($stack));
+    $args->{"stack"}     = $class
+	if (defined($class));
     $args->{"vlan_name"} = $vlan_name;
     $args->{"ports"}     = [ @ports ];
     
@@ -260,14 +260,14 @@ sub RemoteDoReset($$@)
 #
 sub RemoteDoPortControl($$@)
 {
-    my $stack   = shift();
+    my $class   = shift();
     my $command = shift();
     my @ports   = @_;
 
     my $arg = {};
     $arg->{"command"} = $command;
-    $arg->{"stack"} = $stack
-	if (defined($stack));
+    $arg->{"stack"} = $class
+	if (defined($class));
 
     my $prefix = "" ;
     TBGetSiteVar("federation/localprefix",\$prefix);
@@ -294,13 +294,13 @@ sub RemoteDoPortControl($$@)
 #
 sub RemoteDoTrunking($$$@)
 {
-    my $stack = shift();
+    my $class = shift();
     my $arg = {};
     $arg->{"mode"} = shift();
     my $port = shift();
     my @vlans     = @_;
-    $arg->{"stack"} = $stack
-	if (defined($stack));
+    $arg->{"stack"} = $class
+	if (defined($class));
     $arg->{"vlans"} = [ @vlans ];
     
     my $prefix = "" ;

@@ -244,7 +244,7 @@ sub SetupVlans($)
 
     foreach my $id (keys(%{ $argtable })) {
 	my $vtag    = $argtable->{$id}->{'virtual'};
-	my $stack   = $argtable->{$id}->{'stack'};
+	my $class   = $argtable->{$id}->{'stack'};
 	my $members = $argtable->{$id}->{'members'};
 	my $trunk_mode = $argtable->{$id}->{'trunk_mode'}
 	    if (exists($argtable->{$id}->{'trunk_mode'}));
@@ -255,11 +255,11 @@ sub SetupVlans($)
 	if (! ($vtag =~ /^[\-\w]+$/)) {
 	    fatal("SetupVlans: Illegal vname '$vtag'");
 	}
-	if (!defined($stack)) {
-	    $stack = "Experimental";
+	if (!defined($class)) {
+	    $class = "Experimental";
 	}
-	elsif ($stack ne "Control" && $stack ne "Experimental") {
-	    fatal("SetupVlans: Illegal stack '$stack'");
+	elsif ($class ne "Control" && $class ne "Experimental") {
+	    fatal("SetupVlans: Illegal class '$class'");
 	}
 
 	foreach my $port (keys(%{ $members })) {
@@ -282,7 +282,7 @@ sub SetupVlans($)
 	    if (! exists($vlantable->{$id})) {
 		$vlantable->{$id} = {};
 		$attrtable->{$id} = {"virtual"    => $vtag,
-				     "stack"      => $stack,
+				     "stack"      => $class,
 				     "trunk_mode" => $trunk_mode};
 	    }
 	    $vlantable->{$id}->{$port} = [$speed, $duplex, $trunk];
@@ -402,7 +402,7 @@ sub SetupVlans($)
     # 
     foreach my $id (keys(%$vlantable)) {
 	my $vtag    = $attrtable->{$id}->{"virtual"};
-	my $stack   = $attrtable->{$id}->{"stack"};
+	my $class   = $attrtable->{$id}->{"stack"};
 	my $trunk_mode = $attrtable->{$id}->{"trunk_mode"};
 	my @members = keys(%{ $vlantable->{$id} });
 	my $mstring = "@members";
@@ -410,7 +410,7 @@ sub SetupVlans($)
 	my $vlan;
 
 	# Not doing stacks yet.
-	$stack = "Experimental";
+	$class = "Experimental";
 
 	if ($debug) {
 	    print STDERR "$pid $eid $id $mstring\n";
@@ -440,7 +440,7 @@ sub SetupVlans($)
 		$errors++;
 		next;
 	    }
-	    $vlan->SetStack($stack);
+	    $vlan->SetClass($class);
 	    $outer_id = $vlan->lanid();
 	    $vlan->SetAttribute("trunk_mode", $trunk_mode)
 		if (defined($trunk_mode));
@@ -450,7 +450,7 @@ sub SetupVlans($)
 		DBQueryWarn("insert into elabinelab_vlans ".
 			    "      (exptidx,pid,eid,inner_id,outer_id,stack) ".
 			    "values ($exptidx, '$pid', '$eid', '$id', ".
-			    "        '$outer_id', '$stack')");
+			    "        '$outer_id', '$class')");
 	    if (!$query_result || !$query_result->numrows) {
 		#
 		# Failed, must remove vlans entry too. We keep going though
@@ -602,7 +602,7 @@ sub DestroyVlans($)
     my $cleartrunks = $args->{'cleartrunks'};
     my @done     = ();
     my $errors   = 0;
-    my $stack;
+    my $class;
     my $debugopt = ($debug ? "-v $dlevel" : "");
     
     MapVlans(@vlanids);
@@ -655,7 +655,7 @@ sub DestroyVlans($)
 	my $outer_id = $mapping{$vlanid};
 	my $vlan     = $outer_vlans{$outer_id};
 	my $vname    = 
-	my $stack    = $vlan->GetStack();
+	my $class    = $vlan->GetClass();
 	# Not doing stacks yet;
 	my $stackopt = "";
 
@@ -764,12 +764,12 @@ sub Trunk($)
 	fatal("Trunk: Illegal port '$port'");
     }
     # Not doing stacks yet.
-    my $stack    = "Experimental";
+    my $class    = "Experimental";
     my $stackopt = "";
     if (0 && exists($args->{'stack'})) {
-	$stack = $args->{'stack'};
-	if ($stack ne "Control" && $stack ne "Experimental") {
-	    fatal("Trunk: Improper stack argument: $stack");
+	$class = $args->{'stack'};
+	if ($class ne "Control" && $class ne "Experimental") {
+	    fatal("Trunk: Improper class argument: $class");
 	}
     }
     my $debugopt = ($debug ? "-v $dlevel" : "");
@@ -793,7 +793,7 @@ sub Trunk($)
     }
     MapVlans(@vlanids);
     if ($mode eq "-U") {
-	if ($stack eq "Experimental") {
+	if ($class eq "Experimental") {
 	    $query_result =
 		DBQueryFatal("select iface from vinterfaces " .
 			     "where node_id='$node' and type='vlan' and ".
@@ -816,7 +816,7 @@ sub Trunk($)
 	#
 	# and clean up the database
 	#
-	if ($stack eq "Experimental") {
+	if ($class eq "Experimental") {
 	    $query_result =
 		DBQueryFatal("update interfaces set trunk=0 " .
 			     "where node_id='$node' and iface='$iface'");
@@ -825,7 +825,7 @@ sub Trunk($)
     }
     if (($mode eq "-E") || ($mode eq "-T")) {
 	# First, update the status of the port in the database
-	if ($stack eq "Experimental") {
+	if ($class eq "Experimental") {
 	    DBQueryFatal("update interfaces set trunk=1 " .
 			 "where node_id='$node' and iface='$iface'");
 	}
@@ -860,7 +860,7 @@ sub PortControl($)
     my @ports   = @{ $args->{'ports'} };
 
     # Not doing stacks yet;
-    my $stack    = "Experimental";
+    my $class    = "Experimental";
     my $debugopt = ($debug ? "-v $dlevel" : "");
 
     #

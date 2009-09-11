@@ -2109,7 +2109,7 @@ sub Create($$$;$)
     return undef
 	if (!defined($vlan));
 
-    $vlan->SetStack("Experimental") == 0
+    $vlan->SetClass("Experimental") == 0
 	or return undef;
 
     return $vlan;
@@ -2358,28 +2358,64 @@ sub GetTag($$)
     return $tag;
 	
 }
-sub SetStack($$)
+sub SetClass($$)
 {
-    my ($self, $stack) = @_;
+    my ($self, $class) = @_;
 
-    return $self->GetLan()->SetAttribute("stack", $stack);
+    return $self->GetLan()->SetAttribute("class", $class);
 }
-sub GetStackNoDefault($) {
+sub GetClassNoDefault($) {
     my ($self) = @_;
-    my $stack;
+    my $class;
 
-    return $stack
-	if ($self->GetAttribute("stack", \$stack) == 0);
+    return $class
+	if ($self->GetAttribute("class", \$class) == 0);
     return undef;
 }
-sub GetStack($)
+sub GetClass($)
 {
     my ($self) = @_;
-    my $stack = $self->GetStackNoDefault();
-    return $stack if (defined($stack));
+    my $class = $self->GetClassNoDefault();
+    return $class if (defined($class));
 
-    # Assume experimental stack.
+    # Assume experimental LAN
     return "Experimental";
+}
+
+# Find out which stack a VLAN resides on
+sub GetStack($) {
+    my ($self) = @_;
+
+    my $query_result =
+	DBQueryWarn("select stack from vlans  ".
+		    "where id='" . $self->lanid() . "'");
+    if (!$query_result || !$query_result->numrows) {
+        warn "VLan::GetStack(): Tried to get stack for " . $self->lanid() .
+            ", but missing vlans table entry";
+        return undef;
+    }
+    my ($stack) = $query_result->fetchrow_array();
+    if (!$stack) {
+        return undef;
+    } else {
+        return $stack;
+    }
+}
+# Set the stack that the VLAN resides on
+sub SetStack($$) {
+    my ($self, $stack) = @_;
+
+    my $query_result =
+	DBQueryWarn("select stack from vlans  ".
+		    "where id='" . $self->lanid() . "'");
+    if (!$query_result || !$query_result->numrows) {
+        warn "VLan::SetStack(): Tried to set for " . $self->lanid() .
+            ", but missing vlans table entry";
+        return -1;
+    }
+    DBQueryWarn("update vlans set stack='$stack' ".
+                "where id='" . $self->lanid() . "'") or return -1;
+    return 0;
 }
 
 #
@@ -2399,6 +2435,21 @@ sub IsManual($)
     return $flag
 	if ($self->GetAttribute("cmdline_created", \$flag) == 0);
     return 0;
+}
+
+#
+# Check to see if we think the VLAN actually exists on any switches at the
+# moment (ie. has a vlans table entry)
+#
+sub CreatedOnSwitches() {
+    my ($self) = @_;
+    my $query_result =
+        DBQueryWarn("select * from vlans where id='" . $self->lanid() . "'");
+    if (!$query_result || !$query_result->numrows) {
+        return 0;
+    } else {
+        return 1;
+    }
 }
 
 #
@@ -2442,7 +2493,7 @@ sub ExperimentVLans($$$)
     my $query_result =
 	DBQueryWarn("select l.lanid from lans as l ".
 		    "left join lan_attributes as la on ".
-		    "  la.lanid=l.lanid and la.attrkey='stack' ".
+		    "  la.lanid=l.lanid and la.attrkey='class' ".
 		    "where l.type='vlan' and l.exptidx='$exptidx' and ".
 		    "      (la.attrvalue='Experimental' or ".
 		    "       la.attrvalue is null)");
@@ -2481,7 +2532,7 @@ sub Instantiate($;$)
     my $vname  = $self->vname();
     my $lanid  = $self->lanid();
     my $opt    = ($quiet ? "-q" : "");
-    my $stack  = $self->GetStack();
+    my $class  = $self->GetClass();
 
     #print "Setting up VLAN $vname ($lanid) in $pid/$eid\n";
     system("$SNMPIT $opt -t $pid $eid $lanid");
@@ -2511,7 +2562,7 @@ sub UnInstantiate($;$)
     my $vname  = $self->vname();
     my $lanid  = $self->lanid();
     my $opt    = ($quiet ? "-q" : "");
-    my $stack  = $self->GetStack();
+    my $class  = $self->GetClass();
 
     #print "Removing VLAN $vname ($lanid) from $pid/$eid\n";
     system("$SNMPIT $opt -r $pid $eid $lanid");
@@ -2524,9 +2575,9 @@ sub UnInstantiate($;$)
 # Class methods to maintain the backup vlans table, which records what
 # is on the switches. 
 #
-sub RecordVlanInsertion($$$)
+sub RecordVlanInsertion($$$$)
 {
-    my ($class, $experiment, $lanid) = @_;
+    my ($class, $experiment, $lanid, $stack) = @_;
 
     my $pid     = $experiment->pid();
     my $eid     = $experiment->eid();
@@ -2535,9 +2586,8 @@ sub RecordVlanInsertion($$$)
     return -1
 	if (!defined($vlan));
 
-    my $stack   = $vlan->GetStack();
-    my $vname   = $vlan->vname();
-    my $tag     = $vlan->GetTag(undef);
+    my $vname     = $vlan->vname();
+    my $tag       = $vlan->GetTag(undef);
     return -1
 	if ($tag <= 0);
     
@@ -2660,9 +2710,10 @@ sub StaleVlanList($$$)
     my $exptidx = $experiment->idx();
     my @result  = ();
 
+    # XXX: Hack - want to catch all non-Control VLANs
     my $query_result =
 	DBQueryWarn("select id from vlans ".
-		    "where exptidx=$exptidx and stack='Experimental'");
+		    "where exptidx=$exptidx and stack!='Control'");
     return -1
 	if (!$query_result);
 

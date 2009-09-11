@@ -548,41 +548,109 @@ COMMAND: foreach my $command (@commands) {
                 debug("Remove: using supplied switches\n");
                 @devicenames = @supplied_switches;
             } elsif (defined($vlanobj = VLan->Lookup($experiment,$vlan_name)) &&
-                     defined($stack = $vlanobj->GetStackNoDefault())) {
+                     defined($stack = $vlanobj->GetStack())) {
                 debug("Remove: found stack $stack in database\n");
                 @devicenames = getSwitchesInStack($stack);
             } else {
                 debug("Remove: using test switches\n");
                 @devicenames = getTestSwitches();
             }
+            last;
         };
-	(/^tables$/) && do {
-	    @vlans = getExperimentVlans($pid,$eid,@optvlanids);
+        (/^tables$/) && do {
+            # Grab all stacks that any ports in the experiment are members
+            # of.
+            # (We need the entire stack, since the VLAN may have to traverse
+            # devices that don't explicitly have a port in the VLAN.)
+            @vlans = getExperimentVlans($pid,$eid,@optvlanids);
             if (!@vlans) {
                 print "snmpit: $pid/$eid has no VLANs to create, skipping\n";
                 next COMMAND;
             }
-	    @ports = getVlanPorts(@vlans);
-	    @devicenames = $supplied_switches?
-			   @supplied_switches : getTestSwitches();
-	    last;
-	};
-	(/synctables/) && do {
-	    @devicenames = $supplied_switches?
-			   @supplied_switches : getTestSwitches();
-	    last;
-	};
+            if ($supplied_switches) {
+                debug("Tables: using supplied switches\n");
+                @devicenames = @supplied_switches;
+            } else {
+                @devicenames =
+                    getSwitchesInStacks(getPlannedStacksForVlans(@vlans));
+                debug("Tables: list from database: " . join(",",@devicenames) .
+                    "\n");
+            }
+            if (scalar(@devicenames == 0)) {
+                debug("Tables: falling back to test swtiches\n");
+                @devicenames = getTestSwitches();
+            }
+            last;
+        };
 	(/reset/) && do {
 	    #
-	    # When we reset, we operate on all test switches, just to be safe
+            # We operate on all stacks that we have recorded as having VLANs
+            # that belong to this experiment.
 	    #
 	    @vlans = getExperimentVlans($pid,$eid,@optvlanids);
             if (!@vlans) {
-                print "snmpit: $pid/$eid has no VLANs to remove, skipping\n";
+                print "snmpit: $pid/$eid has no VLANs, skipping\n";
                 next COMMAND;
             }
-	    @devicenames = $supplied_switches?
-			   @supplied_switches : getTestSwitches();
+            @vlans = filterPlannedVlans(@vlans);
+            if (!@vlans) {
+                print "snmpit: $pid/$eid has VLANs, but none have been " .
+                    "created on switches\n  ... skipping\n";
+                next COMMAND;
+            }
+            if ($supplied_switches) {
+                debug("Reset: using supplied switches\n");
+                @devicenames = @supplied_switches;
+            } else {
+                @devicenames =
+                    getSwitchesInStacks(getActualStacksForVlans(@vlans));
+                debug("Reset: list from database: " . join(",",@devicenames) .
+                    "\n");
+            }
+
+            # Fallthrough - if we haven't found any switches yet, operate
+            # on the whole experimetnal net
+            if (scalar(@devicenames) == 0) {
+                debug("Reset: falling back to test swtiches\n");
+                @devicenames = getTestSwitches();
+            }
+	    last;
+	};
+	(/synctables/) && do {
+            # We operate on all stacks on which we think VLANs do, or should,
+            # exist
+            if ($supplied_switches) {
+                debug("Sync: using supplied switches\n");
+                @devicenames = @supplied_switches;
+            } else {
+                # Get both the VLANs that do exist and the VLANs that should
+                # exist
+                my @newvlans = getExperimentVlans($pid,$eid,@optvlanids);
+                @devicenames =
+                    getSwitchesInStacks(getPlannedStacksForVlans(@newvlans));
+                debug("Sync: New devices are " . join(",",@devicenames) .
+                    "\n");
+
+                my @oldvlans;
+                VLan->StaleVlanList($experiment,\@oldvlans);
+                my @oldports;
+                foreach my $oldvlan (@oldvlans) {
+                    push @oldports, getExperimentVlanPorts($oldvlan);
+                }
+                push @devicenames,
+                    getSwitchesInStacks(getStacksForSwitches(getDeviceNames(@oldports)));
+                debug("Sync: With old devices, list is " .
+                    join(",",@devicenames) .  "\n");
+
+                @devicenames = uniq(@devicenames);
+            }
+
+            # Fallthrough - if we haven't found any switches yet, operate
+            # on the whole experimetnal net
+            if (scalar(@devicenames) == 0) {
+                debug("Reset: falling back to test swtiches\n");
+                @devicenames = getTestSwitches();
+            }
 	    last;
 	};
 	(/portcontrol/ || /trunkdisable/ || /portstatus/) && do {
@@ -1443,7 +1511,7 @@ sub CreateOneVlan($$@)
 	}
 	else {
 	    setVlanTag($vlanid, $vlan_number);
-	    VLan->RecordVlanInsertion($experiment, $vlanid);
+	    VLan->RecordVlanInsertion($experiment, $vlanid,$stack->{STACKID});
 	}
     }
     return $errors
@@ -1530,7 +1598,7 @@ sub syncVlansFromTables($$) {
     my %expvlans   = ();
     my %curvlans   = ();
     my %stale      = ();
-    my $impotent   = 1;
+    my $impotent   = 0;
     my $errors     = 0;
     my $vlan_number;
 
@@ -1895,9 +1963,14 @@ sub doMakeVlan($$@) {
 		if (!defined($target_vlan)) {
 		    die("Could not create VLan object for $vlan_name\n");
 		}
-		$target_vlan->SetStack($stackid)
-		    if (defined($stackid));
 		$target_vlan->MarkManual();
+                # XXX: Need a better way to figure out whether class is
+                # Experimental or Control
+                if ($stackid eq "Control") {
+                    $target_vlan->SetClass("Control");
+                } else {
+                    $target_vlan->SetClass("Experimental");
+                }
 	    }
 	    $vlan_id = $target_vlan->id();
 	    # This will add the port *only* if not already in the vlan.
@@ -1958,7 +2031,8 @@ sub doMakeVlan($$@) {
 	    VLan->RecordVLanDeletion($source_vlan->id());
 	}
 	if (defined($target_vlan)) {
-	    VLan->RecordVlanInsertion($experiment, $target_vlan->id());
+	    VLan->RecordVlanInsertion($experiment, $target_vlan->id(),
+                $stack->{STACKID});
 	}
     }
     return $errors;

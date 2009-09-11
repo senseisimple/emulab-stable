@@ -15,21 +15,25 @@ use Exporter;
 @ISA = ("Exporter");
 @EXPORT = qw( macport portnum portiface Dev vlanmemb vlanid
 		getTestSwitches getControlSwitches getSwitchesInStack
+                getSwitchesInStacks
 		getVlanPorts convertPortsFromIfaces convertPortFromIface
-		getExperimentTrunks setVlanTag
+		getExperimentTrunks setVlanTag setVlanStack
 		getExperimentVlans getDeviceNames getDeviceType
 		getInterfaceSettings mapPortsToDevices getSwitchPrimaryStack
-		getSwitchStacks
+		getSwitchStacks getStacksForSwitches
 		getStackType getStackLeader
 		getDeviceOptions getTrunks getTrunksFromSwitches
                 getTrunkHash 
 		getExperimentPorts snmpitGet snmpitGetWarn snmpitGetFatal
                 getExperimentControlPorts
+                getPlannedStacksForVlans getActualStacksForVlans
+                filterPlannedVlans
 		snmpitSet snmpitSetWarn snmpitSetFatal 
                 snmpitBulkwalk snmpitBulkwalkWarn snmpitBulkwalkFatal
 	        setPortEnabled setPortTagged
 		printVars tbsort getExperimentCurrentTrunks
-	        getExperimentVlanPorts);
+	        getExperimentVlanPorts
+                uniq);
 
 use English;
 use libdb;
@@ -257,6 +261,57 @@ sub getExperimentVlanPorts($) {
 }
 
 #
+# Get the list of stacks that the given set of VLANs *will* or *should* exist
+# on
+#
+sub getPlannedStacksForVlans(@) {
+    my @vlans = @_;
+
+    # Get VLAN members, then go from there to devices, then from there to
+    # stacks
+    my @ports = getVlanPorts(@vlans);
+    if ($debug) {
+        print "getPlannedStacksForVlans: got ports " . join(",",@ports) . "\n";
+    }
+    my @devices = getDeviceNames(@ports);
+    if ($debug) {
+        print("getPlannedStacksForVlans: got devices " . join(",",@devices)
+            . "\n");
+    }
+    my @stacks = getStacksForSwitches(@devices);
+    if ($debug) {
+        print("getPlannedStacksForVlans: got stacks " . join(",",@stacks) . "\n");
+    }
+    return @stacks;
+}
+
+#
+# Get the list of stacks that the given VLANs actually occupy
+#
+sub getActualStacksForVlans(@) {
+    my @vlans = @_;
+
+    # Run through all the VLANs and make a list of the stacks they
+    # use
+    my @stacks;
+    foreach my $vlan (@vlans) {
+        my ($vlanobj, $stack);
+        if ($debug) {
+            print("getActualStacksForVlans: looking up ($vlan)\n");
+        }
+        if (defined($vlanobj = VLan->Lookup($vlan)) &&
+            defined($stack = $vlanobj->GetStack())) {
+
+            if ($debug) {
+                print("getActualStacksForVlans: found stack $stack in database\n");
+            }
+            push @stacks, $stack;
+        }
+    }
+    return uniq(@stacks);
+}
+
+#
 # Update database to store vlan tag.
 #
 sub setVlanTag ($$) {
@@ -274,6 +329,42 @@ sub setVlanTag ($$) {
 	if ($vlan->SetTag($tag) != 0);
 
     return 0;
+}
+
+#
+# Ditto for stack that VLAN exists on
+#
+sub setVlanStack($$) {
+    my ($vlan_id, $stack_id) = @_;
+    
+    my $vlan = VLan->Lookup($vlan_id);
+    return ()
+	if (!defined($vlan));
+    return ()
+	if ($vlan->SetStack($stack_id) != 0);
+
+    return 0;
+}
+
+#
+# Given a list of VLANs, return only the VLANs that are beleived to actually
+# exist on the switches
+#
+sub filterPlannedVlans(@) {
+    my @vlans = @_;
+    my @out;
+    foreach my $vlan (@vlans) {
+        my $vlanobj = VLan->Lookup($vlan);
+        if (!defined($vlanobj)) {
+            warn "snmpit: Warning, tried to check status of non-existant " .
+                "VLAN $vlan\n";
+            next;
+        }
+        if ($vlanobj->CreatedOnSwitches()) {
+            push @out, $vlan;
+        }
+    }
+    return @out;
 }
 
 #
@@ -439,6 +530,10 @@ sub getDeviceNames(@) {
 	}
 
 	$devices{$device} = 1;
+
+        if ($debug) {
+            print "getDevicesNames: Mapping $port to $device\n";
+        }
     }
     return (sort {tbsort($a,$b)} keys %devices);
 }
@@ -548,6 +643,20 @@ sub getSwitchesInStack ($) {
 }
 
 #
+# Returns an array with the names of all switches in the given *stacks*, with
+# no switches duplicated
+#
+sub getSwitchesInStacks (@) {
+    my @stack_ids = @_;
+    my @switches;
+    foreach my $stack_id (@stack_ids) {
+        push @switches, getSwitchesInStack($stack_id);
+    }
+
+    return uniq(@switches);
+}
+
+#
 # Returns the stack_id of a switch's primary stack
 #
 sub getSwitchPrimaryStack($) {
@@ -565,6 +674,20 @@ sub getSwitchPrimaryStack($) {
 	my ($stack_id) = ($result->fetchrow());
 	return $stack_id;
     }
+}
+
+#
+# Returns the stack_ids of the primary stacks for the given switches.
+# Surpresses duplicates.
+#
+sub getStacksForSwitches(@) {
+    my (@switches) = @_;
+    my @stacks;
+    foreach my $switch (@switches) {
+        push @stacks, getSwitchPrimaryStack($switch);
+    }
+
+    return uniq(@stacks);
 }
 
 #
@@ -1214,6 +1337,18 @@ sub tbsort {
     }
     return 0;
 }
+
+
+#
+# Silly helper function - returns its input array with duplicates removed
+# (ordering is likely to be changed)
+#
+sub uniq(@) {
+    my %elts;
+    foreach my $elt (@_) { $elts{$elt} = 1; }
+    return keys %elts;
+}
+
 # End with true
 1;
 
