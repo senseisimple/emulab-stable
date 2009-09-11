@@ -1,0 +1,264 @@
+Potential areas of improvement for a new Frisbee Hackfest.
+
+Sources of info for the following include (from the testbed source repo):
+     os/frisbee.redux/TODO
+     os/imagezip/TODO*
+
+
+0. Fodder for another frisbee paper.
+
+   It has been almost 10 years since we designed frisbee.  The PC landscape
+   has changed a lot since then.  Consider a typical desktop/experiment machine
+   that might be imaged, then and now:
+
+   CPU:
+   * sub-1GHz -> 2.4+GHz, 1 core -> 2-4 cores (4-12x increase in compute power)
+   * 32-bit -> 64-bit (enables larger address spaces; good for caching)
+   RAM:
+   * 512MB -> 4-12GB (8-24x increase in capacity)
+   * single-channel SDRAM -> 2-3 channel DDR (??x increase in memory BW)
+   Disk:
+   * 40GB -> 500-1000GB (12-25x increase in capacity)
+   * ~50MB/sec -> ~100-150MB/sec (2-3x increase in throughput)
+   Net:
+   * 100Mb/sec -> 1000Mb/sec (10x increase in BW)
+
+   The bottlenecks and thus trade-offs have changed.  This drives the changes
+   below that we have made to frisbee...blah, blah.
+
+   Is disk imaging still relevant?  There has been an increasing shift toward
+   virtualization, and with that, the use of virtual disks.  These disks can
+   be logically copied from a master disk; e.g., using COW techniques.  There
+   are also more NAS and SAN environments where again disk storage is
+   centralized.  Does frisbee have a role here?
+
+   Wither multicast?  When it works, it has a magnificent effect.  However,
+   it has been our biggest problem over the years; mostly due to IGMP issues
+   with switches.  Maybe broadcast is a suitable alternative for environments
+   where large-scale duplication is happening (e.g., typically not on
+   production networks).
+
+1. Frisbee of regular files.
+   From the TODO file:
+   Another potential use of frisbee is for distributing arbitrary files.
+   In the Emulab context this would be useful for implementing the features
+   allowing installation of tar and rpm files.  We could multicast distribute
+   the files to all nodes in an experiment at once.  A couple of things
+   are needed for this.  One is a discovery protocol in frisbee itself.
+   A frisbee client should be able to contact a known address and ask
+   for an addr/port to use to download a specific file.  While we can
+   get this info "out of band" (like we do now), it would be generally
+   useful to include this in frisbee itself.  The other needed feature
+   is the ability for the frisbee server to generate images on the fly.
+   I would propose that it not bother with compression when creating the
+   image, it would only do the chunking.  Three reasons for this: 1) it is
+   simpler and more efficient for the server, 2) the types of files I
+   envision us really wanting to distribute this way are already
+   compressed (tgz and rpm files), and 3) it makes out-of-order delivery
+   of blocks much easier.  To elaborate on the final point, one of the
+   nice things about frisbee is that clients can request blocks in any
+   order at any time.  For static images, the frisbee server can
+   handle this easily, every chunk is at a fixed offset in the image
+   file.  If we were to dynamically generate compressed images in the
+   server, and the first request it got was for the final chunk of the
+   image, the server would have to compress/chunk the entire source
+   file before being able to present that chunk.  By not compressing,
+   we know in advance, for any chunk, how much and which data will go
+   into that chunk.  Note that we could just say that exactly 1MB of
+   data will go into every chunk and still compress that, but there
+   is no point since we pad out every chunk to 1MB.
+
+2. Server scaling.
+   Our assumptions about where the bottlenecks are have changed over time.
+   With clients having Gb interfaces, we have to start thinking about
+   what it will take to push data out to hundreds of them, maybe over a 
+   10Gb link.  This might require a dedicated server, so we need to think
+   both about scenarios where server resources are completely dedicated
+   and those where they are not.
+
+   - RAM caching.  Using a dedicated caching proxy server, we should be
+     able to trick out a freakish machine with lots of RAM (24GB or so)
+     and use that to cache images.  To make most efficient use of that RAM,
+     we don't just want to mimic a filesystem with discrete images.  We
+     might want to use it for a "block pool" (ala #8 below) where we
+     cache unique blocks independent of their images.  There are also a
+     variety of RAM compression tricks that might be usable, see for example:
+          http://cseweb.ucsd.edu/~vahdat/papers/osdi08-de.pdf
+
+   - Optimize disk bandwidth.  Even in a dedicated server environment we
+     might not be able to keep up, as feeding multiple images may imply
+     more randomized disk access.  The server should be able to manage its
+     own disk cache, again maybe using a "block cache" approach rather than
+     managing individual image files.  Perhaps this should be unified with
+     the RAM caching.  For non-dedicated environments, it should have
+     mechanisms for disk throttling, as we have network throttling, to
+     "play nice."
+
+   - TCP-friendliness.  Speaking of playing nice, we need to revisit the
+     responsiveness of the protocol.  We never really got this working in
+     any satisfactory way.  Maybe the solution is...
+
+   - Multi vs. single instances.  Serve all images from a single,
+     multi-threaded server.  Makes use of disk and network easier, no
+     need for coordiation (implicit or explicit) between servers.
+
+   - Multi-level image distribution.  To achieve large-scale, particularly
+     in environments where a flat multicast distribution is not possible,
+     we should support multiple levels of servers.  Intermediate servers
+     would act as both clients (requesting image from server above) and
+     servers (feeding image to clients below), possibly caching whole images
+     along the way.  This would be particularly useful in Emulab where we
+     could have dedicated image servers, one per control network switch,
+     both taking the load off boss and the firewall through which all data
+     would normally pass.
+     [ A large part of this has already been done by Kevin long ago. ]
+
+3. Differential images.
+   For efficient creation and storage of custom disk images.  Do the
+   Hash Thing to build "delta" images.  Optionally, recombine with parent
+   image off-line.  Look at image repository work of those Swiss folks.
+   [ The "hash thing" was done by Mike and Prashanth. ]
+
+4. Client/server authentication and image integrity/confidentiality.
+   Right now we are pretty feeble.  If a client knows the addr/port,
+   it can download any image.  The server responds to any request it
+   receives on a valid addr/port.  Likewise, a client believes pretty
+   much any reply it gets.  It does one optional check of the IP source addr,
+   but that would not prevent a single client instance from getting blocks
+   from different images or different versions of the same image (the
+   latter is the more likely concern).  We need to use cryptographic
+   techniques for authentication, integrity and confidentiality.
+   [ This has largely been done by Rob and Jon.  See:
+     http://www.cs.utah.edu/flux/papers/frisbeesec-cset08-base.html ]
+
+5. Re-tuning and self-tuning.  The world has changed in the last decade
+   (see #0 above).  Perform a thorough evaluation.  Come up with at least
+   a set of static configs or guidelines for various environments.  Better
+   yet, can we make the frisbee protocol dynamically self-tuning for a diverse
+   range of environments.
+
+6. Multi-thread the server.
+   I have observed instances where the server takes 0.25 seconds or longer
+   to do a disk read.  This triggers timeouts in clients (since the server
+   isn't sending anything while reading from the disk) resulting in excess
+   traffic.
+
+7. Image disk device.
+   Allow off-line read-only access to the contents of images.  Similar
+   to "vn" device: you associate an "ndz" disk with an image file and
+   can then mount the FSes in the image.  Could maybe allow read-write
+   access as well.  Updating an image file would be like updating a
+   tar file, we just append updated chunks at the end of the image,
+   at installation time, the new chunks would overwrite the original
+   ones.  This item is mostly fluff, but I think I had a need for it
+   once upon a time.
+
+8. The image pool.
+   This is somewhat a combination of other aspects.  This is motivated
+   by our Emulab environment where we have lots of machines with CD ROM
+   drives.  The idea is to have a CD-ROM chock-full-o-images that frisbee
+   can use, in preference to loading from the network, to reload a disk.
+   The simple approach is to just put as many common images as possible
+   onto the CD, but it would be more interesting to do the decomposition
+   of images into unique blocks, as identified by hashes, and just save
+   a big pool of common blocks on the CD.  A lot depends on there being
+   sufficient commonality within an image so we could fit a 1GB Windows
+   image on a CD, and between images so we can fit multiple images.
+   Even when we create a new version of an image that is on the CD, there
+   should hopefully still be enough common material that most of the
+   image can be loaded via CD with only "the new stuff" loaded over the
+   net.  The fly in the ointment here is that I suspect compressed images
+   will not have a whole lot of redundancy in any sense, at least given
+   the size of the compressed chunks we produce.  We might need to compress
+   individual disk blocks to realize maximum reuse.  But if we have to
+   load individual 512 byte units, randomly from a CD-ROM, this is not
+   going to be any sort of win.  But, using this in a client-side context
+   is just one possibility.  The other is as the server-side "filesystem"
+   for images.
+
+9. Smart compression support for new image types.  There are new relevant
+   filesystems and block level stores that would be good to support savvy
+   compression for.  "ext4" is becoming the default FS for some Linuxes.
+   LVM and ZFS are block level stores that are commonly used.  The block
+   stores, say LVM, in particular present an interesting issue.  Since LVM
+   is an intermediate layer between filesystems and the physical disk, it
+   is filesystem naive.  That is, what LVM considers allocated may not be
+   currently allocated in the filesystem level above.  So we really should
+   look at both what LVM considers "free blocks" and augment that with what
+   the filesystems atop it believe to be "free blocks".
+
+10.Support for GPT.  Another hold-over from last decade is the dependence
+   on having a PC-style MBR partition table from which we derive the types
+   of filesystems on a disk.  The GUID partition table is a "standard" to
+   replace that.  Both Linux and FreeBSD (at least) support GPT.  More
+   generally, maybe we should reconsider how we determine what is on a
+   partition.  Can we reliably determine this dynamically by looking at
+   specific areas of a partition?  For example, look for a BSD disklabel
+   or superblock at known locations.
+
+Immediate goals:
+
+1. The "master" server.
+   Create a frisbeed master server that runs all the time.  It will accept
+   requests on a known port.  These requests will contain the name of the
+   file which is desired and some optional authentication data.  Initially,
+   the authentication data may just be the IP address of the requester.
+   The master server will look in a config file (or make a DB query in
+   Emulab) to determine if that IP can access the file in question.  If the
+   request is legit, the server will spawn a copy of the real frisbeed to
+   serve up the file (if one is not already running).  Then the master server
+   will send back a reply containing the addr/port to use for connecting.
+   The config info used by the master server might also include resource
+   constraints so that it can limit the cpu/disk/network used by the
+   actual server process (by running it in some sort of resource limited
+   jail, or setting priorities, or whatever).
+
+   In the short term, the master server would replace the hacky out-of-band
+   mechanism we use in Emulab to hook up a client and server.  The tmcc
+   loadinfo would then include a filename rather than an addr/port to
+   request.
+
+   Eventually, the master server could take requests to store images as
+   well.  Then we can use a unicast imagezip client to save disk images
+   back to the server.  Here the master server would spawn a, possibly
+   resource-constrained, instance of a netcat-type program to suck in
+   the image.
+
+   Maybe the master server could also some day serve as a caching proxy
+   for a hierarchical network of frisbeeds, or ultimately as a generic
+   block server as talked about in the TODO file.
+
+2. Server scaling.  Right now we can kill the network with as little as
+   three frisbeeds running, pulling their images across NFS.  We need to
+   implement some better TCP-friendly flow control.  The master server
+   mechanism will give us a better framework for performing admission
+   control and limiting resource usage.  Also, multithread the server for
+   efficiency as mentioned above.
+
+3. Regular file distribution.  We could use this immediately for tarball
+   and RPM distribution as well as TMCD "fullconfig" distribution.
+   Again, the master server mechanism, with its client-initiated requests
+   should make this much easier.
+
+4. Better integrity checks.  At the very least, need to put an image
+   version/serial number in each chunk so we can detect the case where
+   someone changes the image out from under the server; i.e., prevent
+   clients from receiving blocks from two different versions of the
+   image.  If we are going to be modifying the image format again, it
+   would be a good idea to get in other things we might need, like
+   authentication data.  Maybe both can be a part of the frisbee protocol
+   rather than the imagezip format.  For example, frisbeed can just read
+   the image files modtime whenever it reads a chunk of data and pass that
+   in the packet header (or, just outright fail if that value changes).
+
+5. Support for ext4 and LVM.  These are coming sooner, rather than later.
+
+Slightly further out:
+
+1. Image/file distribution over low BW (10Mb) or lossy (wireless) networks.
+   Here we want to investigate the differential images and optimized network
+   usage via hashing.
+   [ Do we think this is relevant? ]
+
+2. Efficient cluster-node swapout.  As an alternative to COW disks or other
+   runtime tracking of changes.
