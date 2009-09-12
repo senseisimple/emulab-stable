@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2006 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2009 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -54,6 +54,7 @@ int	badsectors= 0;
 int	retrywrites= 1;
 int	dorelocs  = 1;
 int	metaoptimize = 0;
+int	filemode  = 0;
 off_t	datawritten;
 partmap_t ignore, forceraw;
 
@@ -214,7 +215,9 @@ devlseek(int fd, off_t off, int whence)
 	off_t noff;
 	assert((off & (DEV_BSIZE-1)) == 0);
 	noff = lseek(fd, off, whence);
-	assert(noff == (off_t)-1 || (noff & (DEV_BSIZE-1)) == 0);
+	if (!filemode) {
+		assert(noff == (off_t)-1 || (noff & (DEV_BSIZE-1)) == 0);
+	}
 	return noff;
 }
 
@@ -372,7 +375,7 @@ main(int argc, char *argv[])
 	extern char build_info[];
 
 	gettimeofday(&sstamp, 0);
-	while ((ch = getopt(argc, argv, "vlbnNdihrs:c:z:oI:1F:DR:S:XC:H:M")) != -1)
+	while ((ch = getopt(argc, argv, "vlbnNdihrs:c:z:ofI:1F:DR:S:XC:H:M")) != -1)
 		switch(ch) {
 		case 'v':
 			version++;
@@ -459,6 +462,10 @@ main(int argc, char *argv[])
 		case 'M':
 			metaoptimize++;
 			break;
+		case 'f':
+			filemode++;
+			rawmode++;
+			break;
 		case 'h':
 		case '?':
 		default:
@@ -507,7 +514,7 @@ main(int argc, char *argv[])
 	else
 		outfilename = argv[1];
 
-	if (!slicemode && dorelocs)
+	if (!slicemode && !filemode && dorelocs)
 		dorelocs = 0;
 
 	infilename = argv[0];
@@ -873,9 +880,16 @@ read_raw(void)
 		return 1;
 	}
 
+	/*
+	 * Round up the size to a sector boundary
+	 */
+	if (filemode)
+		size = sectobytes(bytestosec(size + secsize-1));
+
 	if (debug) {
 		fprintf(stderr, "  Raw Image\n");
-		fprintf(stderr, "        start %12d, size %12lld\n", 0, size);
+		fprintf(stderr, "        start %12d, size %12lld\n",
+			0, (long long)size);
 	}
 	return 0;
 }
@@ -991,7 +1005,7 @@ dumpskips(int verbose)
 	
 	fprintf(stderr,
 		"Total Number of Free Sectors: %d (bytes %lld) in %d ranges\n",
-		total, sectobytes(total), nranges);
+		total, (long long)sectobytes(total), nranges);
 }
 
 #undef DOHISTO
@@ -1043,7 +1057,7 @@ mergeskips(int verbose)
 		if (verbose && culled) {
 			fprintf(stderr,
 				"\nFree Sectors Ignored: %d (%lld bytes) in %d ranges\n",
-				total, sectobytes(total), culled);
+				total, (long long)sectobytes(total), culled);
 #ifdef DOHISTO
 			{
 				int i;
@@ -1647,7 +1661,7 @@ compress_image(void)
 			gettimeofday(&estamp, 0);
 			estamp.tv_sec -= cstamp.tv_sec;
 			fprintf(stderr, "%12lld in %ld seconds.\n",
-				inputoffset + size, estamp.tv_sec);
+				inputoffset + size, (long)estamp.tv_sec);
 		}
 		else if (dots && full) {
 			static int pos;
@@ -1657,7 +1671,7 @@ compress_image(void)
 				gettimeofday(&estamp, 0);
 				estamp.tv_sec -= cstamp.tv_sec;
 				fprintf(stderr, " %12lld %4ld\n",
-					inputoffset+size, estamp.tv_sec);
+					inputoffset+size, (long)estamp.tv_sec);
 				pos = 0;
 			}
 			fflush(stderr);
@@ -2043,6 +2057,21 @@ compress_chunk(off_t off, off_t size, int *full, uint32_t *subblksize)
 			 */
 			finish = 1;
 			break;
+		}
+
+		/*
+		 * In filemode, a file may not be a multiple of the sector
+		 * size.  Pad it so it is.
+		 */
+		if (filemode && (cc & (secsize - 1)) != 0) {
+			int zoff = cc & (secsize - 1);
+			int zsize = secsize - zoff;
+
+			/* XXX minor abuse of reloc: signal short sector */
+			addreloc(off+total+(cc-zoff), zoff, RELOC_SHORTSECTOR);
+
+			memset(&inbuf[cc], 0, zsize);
+			cc += zsize;
 		}
 
 		if (cc != count && !tileof) {

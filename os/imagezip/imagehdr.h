@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2009 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -83,6 +83,7 @@ struct blockreloc {
 #define RELOC_LILOSADDR		3	/* LILO sector address */
 #define RELOC_LILOMAPSECT	4	/* LILO map sector */
 #define RELOC_LILOCKSUM		5	/* LILO descriptor block cksum */
+#define RELOC_SHORTSECTOR	6	/* indicated sector < sectsize */
 
 /* XXX potential future alternatives to hard-wiring BSD disklabel knowledge */
 #define RELOC_ADDPARTOFFSET	100	/* add partition offset to location */

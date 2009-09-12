@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2005 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2009 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -510,6 +510,9 @@ dumpchunk(char *name, char *buf, int chunkno, int checkindex)
 				break;
 			case RELOC_LILOCKSUM:
 				relocstr = "LILOCKSUM";
+				break;
+			case RELOC_SHORTSECTOR:
+				relocstr = "SHORTSECTOR";
 				break;
 			default:
 				relocstr = "??";

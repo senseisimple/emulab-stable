@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2007 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2009 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -97,7 +97,7 @@ void		 writedata(off_t offset, size_t count, void *buf);
 
 static void	zero_remainder(void);
 static void	getrelocinfo(const blockhdr_t *hdr);
-static void	applyrelocs(off_t offset, size_t cc, void *buf);
+static size_t	applyrelocs(off_t offset, size_t cc, void *buf);
 
 static int	 seekable;
 static off_t	 nextwriteoffset;
@@ -198,7 +198,7 @@ dump_stats(int sig)
 			fprintf(stderr, " ");
 		
 		fprintf(stderr, "%4ld %6d\n",
-			estamp.tv_sec, totalchunks - donechunks);
+			(long)estamp.tv_sec, totalchunks - donechunks);
 	}
 	else {
 		if (sig) {
@@ -216,7 +216,7 @@ dump_stats(int sig)
 					donechunks);
 		}
 		fprintf(stderr, "Wrote %lld bytes (%lld actual) in %ld seconds\n",
-			totaledata, totalrdata, estamp.tv_sec);
+			totaledata, totalrdata, (long)estamp.tv_sec);
 	}
 	if (debug)
 		fprintf(stderr, "decompressor blocked: %lu, "
@@ -270,7 +270,7 @@ void dodots(int dottype, off_t cc)
 			gettimeofday(&estamp, 0);
 			estamp.tv_sec -= stamp.tv_sec;
 			fprintf(stderr, "%4ld %6d\n",
-				estamp.tv_sec, totalchunks - donechunks);
+				(long)estamp.tv_sec, totalchunks - donechunks);
 			dotcol = 0;
 		}
 	}
@@ -448,7 +448,7 @@ dowrite_request(writebuf_t *wbuf)
 			/*
 			 * Handle any relocations
 			 */
-			applyrelocs(offset, (size_t)size, buf);
+			size = (off_t)applyrelocs(offset, (size_t)size, buf);
 			writedata(offset, (size_t)size, buf);
 		}
 		free_writebuf(wbuf);
@@ -467,7 +467,8 @@ dowrite_request(writebuf_t *wbuf)
 		/*
 		 * Handle any relocations
 		 */
-		applyrelocs(offset, (size_t)size, buf);
+		size = (off_t)applyrelocs(offset, (size_t)size, buf);
+		wbuf->size = size;
 	}
 
 	/*
@@ -1609,15 +1610,22 @@ getrelocinfo(const blockhdr_t *hdr)
 	memcpy(reloctable, relocs, numrelocs * sizeof(struct blockreloc));
 }
 
-static void
+/*
+ * Perform relocations that apply to this chunk.
+ * Return value is the new size of the valid data in buf.  This value
+ * only changes for the special SHORTSECTOR reloc that indicates a chunk
+ * that is not a multiple of the sector size.
+ */
+static size_t
 applyrelocs(off_t offset, size_t size, void *buf)
 {
 	struct blockreloc *reloc;
 	off_t roffset;
 	uint32_t coff;
+	size_t nsize = size;
 
 	if (numrelocs == 0)
-		return;
+		return nsize;
 
 	offset -= sectobytes(outputminsec);
 
@@ -1654,6 +1662,12 @@ applyrelocs(off_t offset, size_t size, void *buf)
 			case RELOC_LILOCKSUM:
 				reloc_lilocksum(buf, coff, reloc->size);
 				break;
+			case RELOC_SHORTSECTOR:
+				assert(reloc->sectoff == 0);
+				assert(reloc->size < SECSIZE);
+				assert(roffset+SECSIZE == offset+size);
+				nsize -= (SECSIZE - reloc->size);
+				break;
 			default:
 				fprintf(stderr,
 					"Ignoring unknown relocation type %d\n",
@@ -1662,6 +1676,7 @@ applyrelocs(off_t offset, size_t size, void *buf)
 			}
 		}
 	}
+	return nsize;
 }
 
 #ifndef linux
