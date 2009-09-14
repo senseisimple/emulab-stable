@@ -532,9 +532,21 @@ COMMAND: foreach my $command (@commands) {
 			   @supplied_switches : getTestSwitches();
 	    last;
 	};
-	(/listports/ || /make/ ) && do {
+	(/listports/) && do {
 	    @devicenames = $supplied_switches? @supplied_switches :
 	    (@ports? getDeviceNames(@ports) : getTestSwitches());
+	    last;
+	};
+	( /make/ ) && do {
+            if ($supplied_switches) {
+                @devicenames = @supplied_switches;
+            } elsif (@ports) {
+                # Have to operate on whole stacks so that trunks work
+                @devicenames =
+                    getSwitchesInStacks(getStacksForSwitches(getDeviceNames(@ports)));
+            } else {
+                @devicenames = getTestSwitches();
+            }
 	    last;
 	};
         (/remove/) && do {
