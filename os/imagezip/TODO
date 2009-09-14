@@ -8,7 +8,7 @@ Things to do for image*:
    an entire image checksum would be complicated by frisbee's out of order
    receipt of chunks.
 
-2. Imagezip could be multithread so that we can be reading ahead on the
+2. Imagezip could be multithreaded so that we can be reading ahead on the
    input device and overlapping IO with compression.  Maybe a third thread
    for doing output.  Input is a little tricky since imagezip shortens up
    its reads as it gets near the end of a chunk, so the buffer mechanism
@@ -127,3 +127,54 @@ Things to do for image*:
    efficiently recognize such blocks and whether we ultimately save space
    over just allowing zlib to compress the data (presumably blocks of zeros
    compress really well!)
+
+11. Death to bubble sort and singly-linked lists.
+   We represent the set of free and allocated blocks with a singly-linked
+   list.  The process is:
+
+     * Start with an empty "skips" (free) list.
+     * As we traverse all FSes on a disk, we identify free block ranges
+       which are appended to the skips list.
+     * The list is then sorted and abutting ranges merged.
+       We apply an optimization at this step where we throw away free
+       ranges that are less than a certain size.  The logic is that, for
+       a couple of reasons, it is better to include a little bit of free
+       data in the image if it allows for a single larger contiguous
+       allocated range.
+     * The list is then inverted to get the "allocated" block list.
+       This we traverse in order to read the disk, compress, and make
+       the image.
+
+   So the most important operation is insert, and it isn't necessary to
+   maintain a sorted listed.  However, it might prove to be practical to
+   keep it sorted if merge operations can be efficiently performed.  An
+   alternative approach, to avoid the invert operation, would be to start
+   with a single allocated range (blocks 0 - sizeof_disk) and every time
+   we "add a free range" we are actually splitting the allocated range.
+   In other words, we keep a sorted, allocated block list from the beginning.
+
+   How big of lists do we need to worry about?  It is hard to say,
+   realistically, how big a disk is reasonable to image with imagezip.
+   Attempting to image my 1TB disk at home yielded O(100,000) free block
+   ranges.  Consider our current biggest disk at Emulab which is a 16TB array;
+   i.e., over 30 million sectors.  Worst case is that every other sector
+   is free, so the list--be it "free" or "allocated"--would be around 15
+   million entries.  So, whatever data structure we choose, should probably
+   handle O(1,000,000) and probably even 1-2 orders of magnitude larger.
+
+   How efficient does it need to be?  Certainly not N**2 in the number of
+   list entries as it is now!  Consider the 16TB array case above, and note
+   that saving such an image, with 8TB of valid data--even assuming say 10-1
+   compression and 250MB/sec sustained IO throughput--would take around an
+   hour.  Having it take 1-5 minutes for list management would be acceptable.
+
+   Note 1: there is also a "reloc" list, which identifies ranges of
+   allocated blocks for which relocations must be performed in order to
+   keep imagezip data "position independent" so that, e.g., a Linux partition
+   image can be layed down anywhere on a disk.  However, relocations are
+   infrequent enough that we don't necessarily have to optimize this list.
+
+   Note 2: back in ye ole OSKIT days, we created an "address map manager"
+   library which could apply here:
+   http://www.cs.utah.edu/flux/oskit/html/oskit-wwwch26.html#x40-213400026
+   but that was still implemented with singly-linked lists.

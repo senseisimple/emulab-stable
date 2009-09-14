@@ -251,7 +251,19 @@ Immediate goals:
    the image files modtime whenever it reads a chunk of data and pass that
    in the packet header (or, just outright fail if that value changes).
 
+(the following are strictly imagezip):
+
 5. Support for ext4 and LVM.  These are coming sooner, rather than later.
+
+6. Revisit imagezip data structures.  Just imaging my modest 1TB disk at
+   home (re-)revealed an issue.  It took more than 30 minutes just to get
+   to the point of creating the image, because of our singlely-linked list
+   representation of free blocks and the bubble sort we use to sort it.
+   This was with only O(100,000) free block ranges.  We need a better free
+   (or allocated) range representation.  We also need to resize some fields,
+   in particular in the range descriptors and other structs that pass block
+   numbers of range sizes.  These should be 64-bit blocks numbers and sizes.
+   See imagezip/TODO for more thoughts.
 
 Slightly further out:
 
