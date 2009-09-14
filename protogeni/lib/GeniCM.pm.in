@@ -2826,6 +2826,7 @@ sub SliceStatus($)
     #
     my $summary    = "ready";
     my %details    = ();
+    my %detailsNew = ();
     my @slivers    = ();
     if (GeniSliver->SliceSlivers($slice, \@slivers) != 0) {
 	print STDERR "Could not get slivers for $slice\n";
@@ -2843,17 +2844,23 @@ sub SliceStatus($)
 	    print STDERR "Cannot find node by uuid $node_uuid\n";
 	    return GeniResponse->Create(GENIRESPONSE_ERROR);
 	}
+	my $hrn = GeniHRN::Generate($OURDOMAIN, "sliver", $node->node_id());
+
 	if ($node->IsUp()) {
 	    $details{$node_uuid} = "ready";
+	    $detailsNew{$hrn}    = "ready";
 	}
 	else {
 	    $details{$node_uuid} = "notready";
+	    $detailsNew{$hrn}    = "notready";
 	    $summary = "notready";
 	}
     }
     $slice->UnLock();
     my $blob = {"status"  => $summary,
-		"details" => \%details};
+		"details" => \%details,
+		"detailsNew" => \%detailsNew,
+	       };
     return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
 }
 
