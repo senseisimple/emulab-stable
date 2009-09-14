@@ -43,6 +43,12 @@ InterfaceRef &=
   ComponentInterfaceRefName
 
 RSpecContents &=
-  attribute type { "advertisement" }
+  attribute type { "advertisement" } &
+  BgpPrefix*
+
+BgpPrefix = element bgp_prefix {
+  attribute address { text } &
+  attribute netmask { text }
+}
 
 start = RSpec

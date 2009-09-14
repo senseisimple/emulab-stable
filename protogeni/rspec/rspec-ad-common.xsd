@@ -161,8 +161,11 @@
   <xs:element name="rspec" type="rspec:RSpecContents"/>
   <xs:complexType name="RSpecContents">
     <xs:choice minOccurs="0" maxOccurs="unbounded">
-      <xs:element ref="rspec:node"/>
-      <xs:element ref="rspec:link"/>
+      <xs:choice>
+        <xs:element ref="rspec:node"/>
+        <xs:element ref="rspec:link"/>
+      </xs:choice>
+      <xs:element ref="rspec:bgp_prefix"/>
     </xs:choice>
     <xs:attribute name="generated" type="xs:dateTime"/>
     <xs:attribute name="valid_until" type="xs:dateTime"/>
