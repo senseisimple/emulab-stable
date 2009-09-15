@@ -36,7 +36,8 @@ use GeniHRN;
 use libtestbed qw(SENDMAIL);
 use emutil;
 # Hate to import all this crap; need a utility library.
-use libdb qw(TBGetSiteVar EXPTSTATE_SWAPPED EXPTSTATE_ACTIVE TBOPSPID);
+use libdb qw(TBGetSiteVar EXPTSTATE_SWAPPED EXPTSTATE_ACTIVE TBOPSPID
+	     TBDB_NODESTATE_TBFAILED);
 use User;
 use Node;
 use OSinfo;
@@ -2850,6 +2851,11 @@ sub SliceStatus($)
 	    $details{$node_uuid} = "ready";
 	    $detailsNew{$hrn}    = "ready";
 	}
+	elsif ($node->eventstate() eq TBDB_NODESTATE_TBFAILED()) {
+	    $details{$node_uuid} = "failed";
+	    $detailsNew{$hrn}    = "failed";
+	    $summary = "notready";
+	}
 	else {
 	    $details{$node_uuid} = "notready";
 	    $detailsNew{$hrn}    = "notready";
@@ -3053,6 +3059,11 @@ sub SliverStatus($)
 	if ($node->IsUp()) {
 	    $details{$node_uuid} = "ready";
 	    $detailsNew{$hrn}    = "ready";
+	}
+	elsif ($node->eventstate() eq TBDB_NODESTATE_TBFAILED()) {
+	    $details{$node_uuid} = "failed";
+	    $detailsNew{$hrn}    = "failed";
+	    $summary = "notready";
 	}
 	else {
 	    $details{$node_uuid} = "notready";
