@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2007 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2009 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -610,7 +610,7 @@ static pthread_t child_pid;
  * but if the child thread calls exit(-1) from fatal, the frisbee process
  * exits, but with a code of zero; i.e., the child exit code is lost.
  * Granted, a multi-threaded program should not be calling exit willy-nilly,
- * but it does so we deal with it as follows.
+ * but it does, so we deal with it as follows.
  *
  * Since the child should never exit during normal operation (we always
  * kill it), if it does exit we know there is a problem.  So, we catch
@@ -620,7 +620,7 @@ static pthread_t child_pid;
  * Since I don't understand this fully, I am making it a FreeBSD-only
  * thing for now.
  */
-static int	 child_error;
+static long	 child_error;
 
 void
 myexit(void)
