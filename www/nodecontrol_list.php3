@@ -25,6 +25,7 @@ $isadmin   = ISADMIN();
 #
 $optargs = OptionalPageArguments("target_user",	PAGEARG_USER,
 				 "showtype",    PAGEARG_STRING,
+				 "typefilter",  PAGEARG_STRING,
 				 "bypid",       PAGEARG_STRING);
 
 if (isset($target_user)) {
@@ -45,15 +46,12 @@ else {
 #
 PAGEHEADER("Node Control Center");
 
-echo "<b>Show: <a href='nodecontrol_list.php3?showtype=summary'>summary</a>,
+echo "<b>Tabular views: <a href='nodecontrol_list.php3?showtype=summary'>summary</a>,
                <a href='nodecontrol_list.php3?showtype=pcs'>pcs</a>,
-               <a href='floormap.php3'>wireless maps</a>,
                <a href='nodecontrol_list.php3?showtype=wireless'>
-                                                        wireless list</a>,";
+                                                        wireless</a>,";
 if ($TBMAINSITE) {
-    echo "     <a href='floormap.php3?feature=usrp'>
-                  GNU USRP (software defined radio) maps</a>,
-               <a href='robotmap.php3'>robot maps</a>, ";
+    echo "     <a href='nodecontrol_list.php3?showtype=widearea&typefilter=pcpg,pcpg-i2'>protogeni</a>,";
 }
 echo "         <a href='nodecontrol_list.php3?showtype=widearea'>widearea</a>";
 
@@ -62,6 +60,14 @@ if ($isadmin) {
                <a href='nodecontrol_list.php3?showtype=virtnodes'>virtual</a>,
                <a href='nodecontrol_list.php3?showtype=physical'>physical</a>,
                <a href='nodecontrol_list.php3?showtype=all'>all</a>";
+}
+echo ".</b><br>\n";
+
+echo "<b>Map views: <a href='floormap.php3'>wireless</a>";
+if ($TBMAINSITE) {
+    echo ", <a href='floormap.php3?feature=usrp'>
+              GNU USRP (software defined radio)</a>,
+            <a href='robotmap.php3'>robot</a>";
 }
 echo ".</b><br>\n";
 
@@ -115,7 +121,9 @@ elseif (! strcmp($showtype, "widearea")) {
 			   "AS location, ".
 	 		   "wani.connect_type, ".
 			   "wani.hostname, " .
-                           "wani.site";
+                           "wani.site, ".
+	 		   "wani.latitude, ".
+			   "wani.longitude";
     $additionalLeftJoin = "LEFT JOIN widearea_nodeinfo AS wani ".
 			  "ON n.node_id=wani.node_id";
 
@@ -140,6 +148,23 @@ else {
     $clause = "and (nt.class='pc')";
     $view   = "PCs";
 }
+
+# If adding an additional type filter list, do that...
+if (isset($typefilter)) {
+    $types = explode(",",$typefilter);
+    $typeclause = "and nt.type in (";
+    foreach ($types as $t) {
+	# Sanitize.
+	if (!preg_match("/^[-\w]+$/", $t)) {
+	    PAGEARGERROR("Invalid characters in typefilter argument '$t'.");
+	}
+	$typeclause .= "'$t',";
+    }
+    $typeclause = rtrim($typeclause,",");
+    $typeclause .= ")";
+    $clause .= " $typeclause";
+}
+
 # If admin or widearea, show the vname too. 
 $showvnames = 0;
 if ($isadmin || !strcmp($showtype, "widearea")) {
@@ -483,9 +508,10 @@ elseif (strcmp($showtype, "widearea")) {
 
 if (!strcmp($showtype, "widearea")) {
     echo "<th align=center>Site</th>
-          <th align=center>Processor</th>
 	  <th align=center>Connection</th>
-	  <th align=center>Location</th>";
+	  <th align=center>Location</th>
+	  <th align=center>Latitude</th>
+	  <th align=center>Longitude</th>";
 }
     
 echo "</tr></thead>\n";
@@ -507,6 +533,8 @@ while ($row = mysql_fetch_array($query_result)) {
 	$location     = $row["location"];
 	$connect_type = $row["connect_type"];
 	$vname        = $row["hostname"];
+	$latitude     = $row["latitude"];
+	$longitude    = $row["longitude"];
     } 
 
     echo "<tr>";
@@ -577,9 +605,10 @@ while ($row = mysql_fetch_array($query_result)) {
 
     if (!strcmp($showtype, "widearea")) {	
 	echo "<td>$site</td>
-	      <td>$machine_type</td>
 	      <td>$connect_type</td>
-	      <td><font size='-1'>$location</font></td>\n";
+	      <td><font size='-1'>$location</font></td>
+	      <td><font size='-1'>$latitude</font></td>
+	      <td><font size='-1'>$longitude</font></td>\n";
     }
     
     echo "</tr>\n";
