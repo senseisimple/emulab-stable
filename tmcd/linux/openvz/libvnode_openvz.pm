@@ -83,7 +83,7 @@ my $MKEXTRAFS = "/usr/local/etc/emulab/mkextrafs.pl";
 
 my $CTRLIPFILE = "/var/emulab/boot/myip";
 my $IMQDB      = "/var/emulab/db/imqdb";
-my $MAXIMQ     = 127;
+my $MAXIMQ     = 64;
 
 my $CONTROL_IFNUM  = 999;
 my $CONTROL_IFDEV  = "eth${CONTROL_IFNUM}";
@@ -167,10 +167,14 @@ sub vz_rootPreConfig {
 		if (-e "/vz");
 	    mysystem("mkdir /vz");
 	    mysystem("cp -pR /vz.save/* /vz/");
-
-	    # be ready to snapshot later on...
-	    mysystem("$MODPROBE dm-snapshot");
 	}
+
+	# be ready to snapshot later on...
+	mysystem("$MODPROBE dm-snapshot");
+
+	# make sure our volumes are active -- they seem to become inactive
+	# across reboots
+	mysystem("vgchange -a y openvz");
     }
     else {
 	# about the funny quoting: don't ask... emacs perl mode foo.
@@ -573,7 +577,21 @@ sub vz_vnodeExec {
 sub vz_vnodeState {
     my ($vnode_id,$vmid) = @_;
 
+    # Sometimes if the underlying filesystems are not mounted, we might get 
+    # no status even though the vnode has been created (currently, this will
+    # only happen with LVM)... since the openvz utils seem to need to see the
+    # vnode filesystem in order to work properly, which is sensible).
+    if ($DOLVM) {
+	if (-e "/etc/vz/conf/$vmid.conf" && -e "/dev/openvz/$vnode_id"
+	    && ! -e "/mnt/$vnode_id/private") {
+	    print "Trying to mount LVM logical device for vnode $vnode_id: ";
+	    mysystem("mount /dev/openvz/$vnode_id /mnt/$vnode_id");
+	    print "done.\n";
+	}
+    }
+
     my $status = vmstatus($vmid);
+
     if ($status eq 'running') {
 	return VNODE_STATUS_RUNNING();
     }
