@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2005 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2009 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -8,6 +8,7 @@
  * Shared for defintions for frisbee client/server code.
  */
 
+#include <inttypes.h>
 #include <limits.h>	/* CHAR_BIT */
 #include "log.h"
 
@@ -168,38 +169,38 @@
  */
 #define CLIENT_STATS_VERSION	1
 typedef struct {
-	int	version;
+	int32_t	version;
 	union {
 		struct {
-			int	runsec;
-			int	runmsec;
-			int	delayms;
-			unsigned long long rbyteswritten;
-			unsigned long long ebyteswritten;
-			int	chunkbufs;
-			int	maxreadahead;
-			int	maxinprogress;
-			int	pkttimeout;
-			int	startdelay;
-			int	idletimer;
-			int	idledelay;
-			int	redodelay;
-			int	randomize;
-			unsigned long	nochunksready;
-			unsigned long	nofreechunks;
-			unsigned long	dupchunk;
-			unsigned long	dupblock;
-			unsigned long	prequests;
-			unsigned long	recvidles;
-			unsigned long	joinattempts;
-			unsigned long	requests;
-			unsigned long	decompblocks;
-			unsigned long	writeridles;
-			int	writebufmem;
-			unsigned long	lostblocks;
-			unsigned long	rerequests;
-		} v1;
-		unsigned long limit[256];
+			int32_t	 runsec;
+			int32_t	 runmsec;
+			int32_t	 delayms;
+			uint64_t rbyteswritten;
+			uint64_t ebyteswritten;
+			int32_t	 chunkbufs;
+			int32_t	 maxreadahead;
+			int32_t	 maxinprogress;
+			int32_t	 pkttimeout;
+			int32_t	 startdelay;
+			int32_t	 idletimer;
+			int32_t	 idledelay;
+			int32_t	 redodelay;
+			int32_t	 randomize;
+			uint32_t nochunksready;
+			uint32_t nofreechunks;
+			uint32_t dupchunk;
+			uint32_t dupblock;
+			uint32_t prequests;
+			uint32_t recvidles;
+			uint32_t joinattempts;
+			uint32_t requests;
+			uint32_t decompblocks;
+			uint32_t writeridles;
+			int32_t	 writebufmem;
+			uint32_t lostblocks;
+			uint32_t rerequests;
+		} __packed v1;
+		uint32_t limit[256];
 	} u;
 } ClientStats_t;
 
@@ -212,10 +213,10 @@ typedef struct {
  */
 typedef struct {
 	struct {
-		int		type;
-		int		subtype;
-		int		datalen; /* Useful amount of data in packet */
-		unsigned int	srcip;   /* Filled in by network level. */
+		int32_t		type;
+		int32_t		subtype;
+		int32_t 	datalen; /* Useful amount of data in packet */
+		uint32_t	srcip;   /* Filled in by network level. */
 	} hdr;
 	union {
 		/*
@@ -225,31 +226,31 @@ typedef struct {
 		 * We must return the number of chunks in the file though.
 		 */
 		union {
-			unsigned int	clientid;
-			int		blockcount;
+			uint32_t	clientid;
+			int32_t		blockcount;
 		} join;
 		
 		struct {
-			unsigned int	clientid;
-			int		elapsed;	/* Stats only */
+			uint32_t	clientid;
+			int32_t		elapsed;	/* Stats only */
 		} leave;
 
 		/*
 		 * A data block, indexed by chunk,block.
 		 */
 		struct {
-			int		chunk;
-			int		block;
-			char		buf[BLOCKSIZE];
+			int32_t		chunk;
+			int32_t		block;
+			int8_t		buf[BLOCKSIZE];
 		} block;
 
 		/*
 		 * A request for a data block, indexed by chunk,block.
 		 */
 		struct {
-			int		chunk;
-			int		block;
-			int		count;	/* Number of blocks */
+			int32_t		chunk;
+			int32_t		block;
+			int32_t		count;	/* Number of blocks */
 		} request;
 
 		/*
@@ -260,8 +261,8 @@ typedef struct {
 		 * we made.
 		 */
 		struct {
-			int		chunk;
-			int		retries;
+			int32_t		chunk;
+			int32_t		retries;
 			BlockMap_t	blockmap;
 		} prequest;
 
@@ -269,8 +270,8 @@ typedef struct {
 		 * Leave reporting client params/stats
 		 */
 		struct {
-			unsigned int	clientid;
-			int		elapsed;
+			uint32_t	clientid;
+			int32_t		elapsed;
 			ClientStats_t	stats;
 		} leave2;
 	} msg;
