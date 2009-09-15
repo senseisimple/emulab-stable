@@ -63,6 +63,8 @@ $| = 1;
 
 my $defaultImage = "emulab-default";
 
+my $DOLVM = 1;
+
 sub VZSTAT_RUNNING() { return "running"; }
 sub VZSTAT_STOPPED() { return "stopped"; }
 sub VZSTAT_MOUNTED() { return "mounted"; }
@@ -78,8 +80,6 @@ my $RMMOD = "/sbin/rmmod";
 
 my $VZRC   = "/etc/init.d/vz";
 my $MKEXTRAFS = "/usr/local/etc/emulab/mkextrafs.pl";
-
-my $VZROOT = "/vz/root";
 
 my $CTRLIPFILE = "/var/emulab/boot/myip";
 my $IMQDB      = "/var/emulab/db/imqdb";
@@ -156,17 +156,35 @@ sub vz_rootPreConfig {
     }
     
     # make sure filesystem is setup 
-    # about the funny quoting: don't ask... emacs perl mode foo.
-    if (system('grep -q '."'".'^/dev/.*/vz.*$'."'".' /etc/fstab')) {
-	mysystem("$VZRC stop");
-	mysystem("rm -rf /vz")
-	    if (-e "/vz");
-	mysystem("mkdir /vz");
-	mysystem("$MKEXTRAFS -f /vz");
-	mysystem("cp -pR /vz.save/* /vz/");
+    if ($DOLVM) {
+	if (system('vgs | grep -E -q '."'".'^[ ]+openvz.*$'."'")) {
+	    mysystem("$MKEXTRAFS -l -v openvz");
+
+	    # XXX eventually could move this into its own logical volume, but
+	    # we don't ever know how many images we'll have to store.
+	    mysystem("$VZRC stop");
+	    mysystem("rm -rf /vz")
+		if (-e "/vz");
+	    mysystem("mkdir /vz");
+	    mysystem("cp -pR /vz.save/* /vz/");
+
+	    # be ready to snapshot later on...
+	    mysystem("$MODPROBE dm-snapshot");
+	}
     }
-    if (system('mount | grep -q \'on /vz\'')) {
-	mysystem("mount /vz");
+    else {
+	# about the funny quoting: don't ask... emacs perl mode foo.
+	if (system('grep -q '."'".'^/dev/.*/vz.*$'."'".' /etc/fstab')) {
+	    mysystem("$VZRC stop");
+	    mysystem("rm -rf /vz")
+		if (-e "/vz");
+	    mysystem("mkdir /vz");
+	    mysystem("$MKEXTRAFS -f /vz");
+	    mysystem("cp -pR /vz.save/* /vz/");
+	}
+	if (system('mount | grep -q \'on /vz\'')) {
+	    mysystem("mount /vz");
+	}
     }
 
     # We need to increase the size of the net.core.netdev_max_backlog 
@@ -407,16 +425,103 @@ sub vz_vnodeCreate {
 	$image = $defaultImage;
     }
 
+    my $createArg = "";
+    if ($DOLVM) {
+	if (! -e "/var/run/openvz.image.$image.ready") {
+	    if ((my $locked = TBScriptLock("vzimage.$image",
+					   TBSCRIPTLOCK_GLOBALWAIT(), 900))
+		!= TBSCRIPTLOCK_OKAY()) {
+		return 0
+		    if ($locked == TBSCRIPTLOCK_IGNORE());
+		print STDERR "Could not get the vzimage.$image lock after a long time!\n";
+		return -1;
+	    }
+	    # we must have the lock, so if we need to return right away, unlock
+	    if (-e "/var/run/openvz.image.$image.ready") {
+		TBScriptUnlock();
+	    }
+	    else {
+		print "Creating LVM core logical device for image $image\n";
+
+		# ok, create the lvm logical volume for this image.
+		# XXX 8G size is bad, should be function of node capacity
+		# Also, most nodes will not support 50-100 vnodes with 10GB 
+		# each; we are assuming that CoW will save us a lot of real 
+		# space.
+		mysystem("lvcreate -L8G -n $image openvz");
+		mysystem("mkfs -t ext3 /dev/openvz/$image");
+		mysystem("mkdir -p /tmp/mnt/$image");
+		mysystem("mount /dev/openvz/$image /tmp/mnt/$image");
+		mysystem("mkdir -p /tmp/mnt/$image/root /tmp/mnt/$image/private");
+		mysystem("tar -xzf /vz/template/cache/$image.tar.gz -C /tmp/mnt/$image/private");
+		mysystem("umount /tmp/mnt/$image");
+
+		# ok, we're done
+		mysystem("touch /var/run/openvz.image.$image.ready");
+		TBScriptUnlock();
+	    }
+	}
+
+	# Now take a snapshot of this image's logical device
+	mysystem("lvcreate -s -L1G -n $vnode_id /dev/openvz/$image");
+	mysystem("mkdir -p /mnt/$vnode_id");
+	mysystem("mount /dev/openvz/$vnode_id /mnt/$vnode_id");
+
+	$createArg = "--private /mnt/$vnode_id/private" . 
+	    " --root /mnt/$vnode_id/root --nofs yes";
+    }
+
     # build the container
-    mysystem("$VZCTL create $vmid --ostemplate $image");
+    mysystem("$VZCTL create $vmid --ostemplate $image $createArg");
 
     # make sure bootvnodes actually starts things up on boot, not openvz
     mysystem("$VZCTL set $vmid --onboot no --name $vnode_id --save");
+
+    # set some resource limits:
+    my %deflimits = ( "diskspace" => "8G:8G",
+		      "diskinodes" => "unlimited:unlimited",
+		      "numproc" => "unlimited:unlimited",
+		      "numtcpsock" => "unlimited:unlimited",
+		      "numothersock" => "unlimited:unlimited",
+		      "vmguarpages" => "unlimited:unlimited",
+		      "kmemsize" => "unlimited:unlimited",
+		      "tcpsndbuf" => "unlimited:unlimited",
+		      "tcprcvbuf" => "unlimited:unlimited",
+		      "othersockbuf" => "unlimited:unlimited",
+		      "dgramrcvbuf" => "unlimited:unlimited",
+		      "oomguarpages" => "unlimited:unlimited",
+		      "lockedpages" => "unlimited:unlimited",
+		      "privvmpages" => "unlimited:unlimited",
+		      "shmpages" => "unlimited:unlimited",
+		      "numfile" => "unlimited:unlimited",
+		      "numflock" => "unlimited:unlimited",
+		      "numpty" => "unlimited:unlimited",
+		      "numsiginfo" => "unlimited:unlimited",
+		      #"dcachesize" => "unlimited:unlimited",
+		      "numiptent" => "unlimited:unlimited",
+		      "physpages" => "unlimited:unlimited",
+		      #"cpuunits" => "unlimited",
+		      "cpulimit" => "0",
+		      "cpus" => "unlimited",
+		      "meminfo" => "none",
+	);
+    my $savestr = "";
+    foreach my $k (keys(%deflimits)) {
+	$savestr .= " --$k $deflimits{$k}";
+    }
+    mysystem("$VZCTL set $vmid $savestr --save");
 
     # XXX give them cap_net_admin inside containers... necessary to set
     # txqueuelen on devices inside the container.  This may have other
     # undesireable side effects, but need it for now.
     mysystem("$VZCTL set $vmid --capability net_admin:on --save");
+
+    # NOTE: we can't ever umount the LVM logical device because vzlist can't
+    # return status appropriately if a VM's root and private areas don't
+    # exist.
+    if (0 && $DOLVM) {
+	mysystem("umount /mnt/$vnode_id");
+    }
 
     return $vmid;
 }
@@ -424,6 +529,10 @@ sub vz_vnodeCreate {
 sub vz_vnodeDestroy {
     my ($vnode_id,$vmid) = @_;
 
+    if ($DOLVM) {
+	mysystem("umount /mnt/$vnode_id");
+	mysystem("lvremove -f /dev/openvz/$vnode_id");
+    }
     mysystem("$VZCTL destroy $vnode_id");
     return -1
 	if ($?);
@@ -481,6 +590,10 @@ sub vz_vnodeState {
 sub vz_vnodeBoot {
     my ($vnode_id,$vmid) = @_;
 
+    if ($DOLVM) {
+	system("mount /dev/openvz/$vnode_id /mnt/$vnode_id");
+    }
+
     mysystem("$VZCTL start $vnode_id");
 
     return 0;
@@ -512,6 +625,12 @@ sub vz_vnodeReboot {
 
 sub vz_vnodePreConfig {
     my ($vnode_id,$vmid,$callback) = @_;
+
+    # Make sure we're mounted so that vzlist and friends work; see NOTE about
+    # mounting LVM logical devices above.
+    if ($DOLVM) {
+	system("mount /dev/openvz/$vnode_id /mnt/$vnode_id");
+    }
 
     #
     # Look and see if this node already has imq devs mapped into it -- if
@@ -569,7 +688,11 @@ sub vz_vnodePreConfig {
 	mysystem("$VZCTL mount $vnode_id");
 	$didmount = 1;
     }
-    my $ret = &$callback("$VZROOT/$vmid");
+    my $privroot = "/vz/private/$vmid";
+    if ($DOLVM) {
+	$privroot = "/mnt/$vnode_id/private";
+    }
+    my $ret = &$callback("$privroot");
     if ($didmount) {
 	mysystem("$VZCTL umount $vnode_id");
     }
@@ -583,7 +706,16 @@ sub vz_vnodePreConfigControlNetwork {
     my ($vnode_id,$vmid,$ip,$mask,$mac,$gw,
 	$vname,$longdomain,$shortdomain,$bossip) = @_;
 
-    my $myroot = "$VZROOT/$vmid";
+    # Make sure we're mounted so that vzlist and friends work; see NOTE about
+    # mounting LVM logical devices above.
+    if ($DOLVM) {
+	system("mount /dev/openvz/$vnode_id /mnt/$vnode_id");
+    }
+
+    my $privroot = "/vz/private/$vmid";
+    if ($DOLVM) {
+	$privroot = "/mnt/$vnode_id/private";
+    }
 
     # add the control net iface
     my $cnet_veth = "veth${vmid}.${CONTROL_IFNUM}";
@@ -613,13 +745,16 @@ sub vz_vnodePreConfigControlNetwork {
     my $status = vmstatus($vmid);
     my $didmount = 0;
     if ($status ne 'running' && $status ne 'mounted') {
+	if ($DOLVM) {
+	    system("mount /dev/openvz/$vnode_id /mnt/$vnode_id");
+	}
 	mysystem("$VZCTL mount $vnode_id");
     }
 
     #
     # Setup lo
     #
-    open(FD,">$myroot/etc/sysconfig/network-scripts/ifcfg-lo") 
+    open(FD,">$privroot/etc/sysconfig/network-scripts/ifcfg-lo") 
 	or die "vz_vnodePreConfigControlNetwork: could not open ifcfg-lo for $vnode_id: $!";
     print FD "DEVICE=lo\n";
     print FD "IPADDR=127.0.0.1\n";
@@ -631,12 +766,12 @@ sub vz_vnodePreConfigControlNetwork {
     close(FD);
 
     # remove any regular control net junk
-    unlink("$myroot/etc/sysconfig/network-scripts/ifcfg-eth99");
+    unlink("$privroot/etc/sysconfig/network-scripts/ifcfg-eth99");
 
     #
     # setup the control net iface in the FS ...
     #
-    open(FD,">$myroot/etc/sysconfig/network-scripts/ifcfg-${CONTROL_IFDEV}") 
+    open(FD,">$privroot/etc/sysconfig/network-scripts/ifcfg-${CONTROL_IFDEV}") 
 	or die "vz_vnodePreConfigControlNetwork: could not open ifcfg-${CONTROL_IFDEV} for $vnode_id: $!";
     print FD "DEVICE=${CONTROL_IFDEV}\n";
     print FD "IPADDR=$ip\n";
@@ -671,7 +806,7 @@ sub vz_vnodePreConfigControlNetwork {
 
     # setup routes:
     my ($ctrliface,$ctrlip,$ctrlmac) = findControlNet();
-    open(FD,">$myroot/etc/sysconfig/network-scripts/route-${CONTROL_IFDEV}") 
+    open(FD,">$privroot/etc/sysconfig/network-scripts/route-${CONTROL_IFDEV}") 
 	or die "vz_vnodePreConfigControlNetwork: could not open route-${CONTROL_IFDEV} for $vnode_id: $!";
     #
     # HUGE NOTE: we *have* to use the /<bits> form, not the /<netmask> form
@@ -685,7 +820,7 @@ sub vz_vnodePreConfigControlNetwork {
     # ... and make sure it gets brought up on boot:
     # XXX: yes, this would blow away anybody's changes, but don't care now.
     #
-    open(FD,">$myroot/etc/sysconfig/network") 
+    open(FD,">$privroot/etc/sysconfig/network") 
 	or die "vz_vnodePreConfigControlNetwork: could not open sysconfig/networkfor $vnode_id: $!";
     print FD "NETWORKING=yes\n";
     print FD "HOSTNAME=$vname.$longdomain\n";
@@ -697,7 +832,7 @@ sub vz_vnodePreConfigControlNetwork {
     # dhclient-exit-hooks normally writes this stuff on linux, so we'd better
     # do it here.
     #
-    my $mybootdir = "$myroot/var/emulab/boot/";
+    my $mybootdir = "$privroot/var/emulab/boot/";
 
     # and before the dhclient stuff, do this first to tell bootsetup that we 
     # are a GENVNODE...
@@ -739,7 +874,7 @@ sub vz_vnodePreConfigControlNetwork {
     #
     # Let's not hang ourselves before we start
     #
-    open(FD,">$myroot/etc/resolv.conf") 
+    open(FD,">$privroot/etc/resolv.conf") 
 	or die "vz_vnodePreConfigControlNetwork: could not open resolv.conf for $vnode_id: $!";
     print FD "nameserver $bossip\n";
     print FD "search $shortdomain\n";
@@ -764,6 +899,12 @@ sub vz_vnodePreConfigControlNetwork {
 #
 sub vz_vnodePreConfigExpNetwork {
     my ($vnode_id,$vmid,$ifs,$lds,$tunnels) = @_;
+
+    # Make sure we're mounted so that vzlist and friends work; see NOTE about
+    # mounting LVM logical devices above.
+    if ($DOLVM) {
+	system("mount /dev/openvz/$vnode_id /mnt/$vnode_id");
+    }
 
     my $elabifs = "";
     my $elabroutes = "";

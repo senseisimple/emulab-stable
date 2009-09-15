@@ -12,7 +12,14 @@ if [ -z $VEID ]; then
     exit 33
 fi
 
-MYROOT=/vz/root/${VEID}
+if [ -z $VE_CONFFILE ]; then
+    echo "Must set VE_CONFFILE env var!"
+    exit 34
+fi
+
+. $VE_CONFFILE
+
+MYROOT=${VE_ROOT}
 if [ ! -e $MYROOT ]; then
     echo "root dir $MYROOT doesn't seem to be mounted!"
     exit 1
