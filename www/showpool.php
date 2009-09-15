@@ -92,14 +92,15 @@ while ($row = mysql_fetch_array($query_result)) {
     $rsrvtime  = $row["rsrvtime"];
     $type      = $row["type"];
     $status    = $row["nodestatus"];
-    $vcount    = $counts[$node_id];
     $osname    = $row["osname"];
     $osid      = $row["def_boot_osid"];
     $loadavg1  = $row["load_1min"];
     $loadavg5  = $row["load_5min"];
+    $vcount    = 0;
 
-    if (!isset($vcount))
-	$vcount = 0;
+    if (array_key_exists($node_id, $counts)) {
+	$vcount = $counts[$node_id];
+    }
 
     echo "<tr>";
 
