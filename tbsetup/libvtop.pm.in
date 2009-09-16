@@ -4440,7 +4440,8 @@ sub InitializePhysNode($$$)
 		return -1;
 	    }
 	}
-	else {
+	elsif ($pnode->isvirtnode() || defined($virtnode->sharing_mode())) {
+	    # in some situations we don't allow a user-specified command line
 	    $cmdline = "";
 	}
 	if (!$pnode->isvirtnode() &&
