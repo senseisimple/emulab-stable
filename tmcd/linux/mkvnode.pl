@@ -238,6 +238,9 @@ if (! -e "$VNDIR/vnode.info") {
 
     mysystem("echo '$vmid $vmtype' > $VNDIR/vnode.info");
     mysystem("echo '$vnodeid' > $VMPATH/vnode.$vmid");
+
+    # bootvnodes wants this to be here...
+    mysystem("mkdir -p /var/emulab/jails/$vnodeid");
 }
 else {
     my $str = `cat $VNDIR/vnode.info`;
@@ -405,10 +408,10 @@ RUNNING: while (1) {
 	    }
 	}
     } else {
-	my $exitval = safeLibOp($vnodeid,'vnodeExec',
+	($ret,$err) = safeLibOp($vnodeid,'vnodeExec',
 				1,1,$vnodeid,$vmid,"sleep 100000000");
 
-	exit($exitval);
+	exit($ret);
     }
 }
 exit(Cleanup());
