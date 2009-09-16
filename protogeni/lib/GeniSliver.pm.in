@@ -727,7 +727,13 @@ sub Create($$$$$$)
 	print STDERR "Could not map node $resource_uuid to its object\n";
 	return undef;
     }
-    if (! ($node->isremotenode() || $node->sharing_mode())) {
+
+    #
+    # An artifact of Emulab is that for shared/remote nodes, the physical
+    # node is already allocated, but not to the current experiment. An
+    #
+    if (! ($node->sharing_mode() ||
+	   ($node->isremotenode() && $node->isvirtnode()))) {
 	my $reservation = $node->Reservation();
 	if (!defined($reservation)) {
 	    print STDERR "$node was already released from $slice\n";
@@ -854,7 +860,7 @@ sub Provision($;$)
     }
     # See below; remote nodes are currently assumed to be running.
     $self->SetStatus("ready")
-	if (!$node->isremotenode());
+	if (!($node->isremotenode() && $node->isvirtnode()));
     return 0;
 }
 
@@ -894,7 +900,7 @@ sub UnProvision($;$)
 	my $pid = $experiment->pid();
 	my $eid = $experiment->eid();
 
-	if ($node->isremotenode()) {
+	if ($node->isremotenode() && $node->isvirtnode()) {
 	    system("$VNODESETUP -p -q -m -k $pid $eid $node_id");
 	    if ($?) {
 		print STDERR "$VNODESETUP -k failed on $node_id\n";

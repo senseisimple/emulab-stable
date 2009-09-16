@@ -547,8 +547,8 @@ sub Start($)
 	    return -1;
 	}
 
-	# Remote/shared nodes are handled special.
-	if ($node->isremotenode() ||
+	# Remote/shared virtual nodes are handled special.
+	if (($node->isremotenode() && $node->isvirtnode()) ||
 	    ($node->isvirtnode() && $node->sharing_mode())) {
 	    $sliver->Start() == 0
 		or return -1;

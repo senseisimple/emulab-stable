@@ -997,6 +997,9 @@ sub GetTicket($;$)
 	my $node           = LookupNode($component_uuid);
 	my $colocate       = $rspec->{'colocate'} ||
 	    $rspec->{'phys_nickname'};
+	my $exclusive      = $rspec->{'exclusive'};
+	$exclusive = 0
+	    if (!defined($exclusive));
 	
 	$rspec->{'component_uuid'} = $component_uuid;
 	$rspec->{'component_manager_uuid'} =
@@ -1006,12 +1009,13 @@ sub GetTicket($;$)
 	$virtnode->fixed($node->node_id());
 
 	#
-	# Shared and remote nodes do not need to be allocated.
+	# Shared and virt nodes do not need to be allocated.
 	#
 	# XXX This is going to cause breakage since the reservations
 	# are not recorded anyplace until the ticket is redeemed.
 	#
-	if (! ($node->sharing_mode() || $node->isremotenode)) {
+	if (! ($node->sharing_mode() || $node->isplabphysnode() ||
+	       ($node->isremotenode() && !$exclusive))) {
 	    # Need to allocate this node unless already mapped.
 	    push(@nodeids, $node->node_id())
 		if (!exists($namemap{$virtual_id}));
@@ -1420,14 +1424,9 @@ sub SliverWork($$)
 	}
 
 	#
-	# Widearea nodes do not need to be allocated, but for now all
-	# I allow is a plabdslice node.
+	# Plab nodes do not need to be allocated.
 	#
-	if ($node->isremotenode()) {
-	    if (! $node->isplabphysnode()) {
-		$message = "Only plab widearea nodes";
-		goto bad;
-	    }
+	if ($node->isplabphysnode()) {
 	    $needplabslice = 1;
 	    next;
 	}
@@ -1701,8 +1700,8 @@ sub SliverWork($$)
 	    goto bad;
 	}
 
-	# See below; setup all pnodes at once.
-	if ($node->isremotenode()) {
+	# See below; setup all plab nodes at once.
+	if ($node->isplabphysnode()) {
 	    my $vnode = LookupNode($sliver->uuid());
 	    if (!defined($vnode)) {
 		print STDERR "Could not locate vnode $sliver\n";
