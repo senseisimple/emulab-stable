@@ -122,6 +122,7 @@ static unsigned long chunkcount;
 static uint32_t nextsector;
 static uint32_t fmax, fmin, franges, amax, amin, aranges;
 static uint32_t adist[8]; /* <4k, <8k, <16k, <32k, <64k, <128k, <256k, >=256k */
+static int regmax, regmin;
 
 static void
 dumpfile(char *name, int fd)
@@ -228,8 +229,8 @@ dumpfile(char *name, int fd)
 				}
 			}
 
-			printf("%s: %qu bytes, %lu chunks, version %d\n",
-			       name, filesize,
+			printf("%s: %llu bytes, %lu chunks, version %d\n",
+			       name, (unsigned long long)filesize,
 			       (unsigned long)(filesize / SUBBLOCKSIZE),
 			       hdr->magic - COMPRESSED_MAGIC_BASE + 1);
 		} else if (chunkno == 1 && !ignorev1) {
@@ -267,6 +268,8 @@ dumpfile(char *name, int fd)
 
 	printf("  %llu bytes of overhead/wasted space (%5.2f%% of image file)\n",
 	       wasted, (double)wasted / filesize * 100);
+	printf("  %d total regions: %.1f/%d/%d ave/min/max per chunk\n",
+	       aranges, (double)aranges / (chunkno + 1), regmin, regmax);
 	if (relocs)
 		printf("  %d relocations covering %llu bytes\n",
 		       relocs, relocbytes);
@@ -344,6 +347,10 @@ dumpchunk(char *name, char *buf, int chunkno, int checkindex)
 #else
 	wasted += ((SUBBLOCKSIZE - hdr->regionsize) - hdr->size);
 #endif
+	if (regmin == 0 || hdr->regioncount < regmin)
+		regmin = hdr->regioncount;
+	if (regmax == 0 || hdr->regioncount > regmax)
+		regmax = hdr->regioncount;
 
 	if (detail > 0) {
 		printf("  Chunk %d: %u compressed bytes, ",
