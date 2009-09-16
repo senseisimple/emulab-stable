@@ -759,6 +759,7 @@ sub GetTicket($;$)
 					 "Bad resource $resource_uuid");
 		goto bad;
 	    }
+	    $pctype = $node->type();
 	}
 	#
 	# If no osname by this point, try for the default.
