@@ -693,7 +693,7 @@ sub GetTicket($;$)
 	my $virtualization_type    = $ref->{'virtualization_type'};
 	my $virtualization_subtype = $ref->{'virtualization_subtype'};
 	my $exclusive     = $ref->{'exclusive'};
-	my $pctype        = "pc";
+	my $pctype;
 	my $osname;
 	my $node;
 
@@ -724,7 +724,6 @@ sub GetTicket($;$)
 		# Lets force to exclusive real node.
 		$ref->{'exclusive'} = $exclusive = 1;
 		$ref->{'virtualization_type'} = "raw";
-		$pctype = "pc";
 	    }
 	}
 	else {
@@ -759,7 +758,8 @@ sub GetTicket($;$)
 					 "Bad resource $resource_uuid");
 		goto bad;
 	    }
-	    $pctype = $node->type();
+	    $pctype = $node->type()
+		if (!defined($pctype));
 	}
 	#
 	# If no osname by this point, try for the default.
@@ -774,6 +774,9 @@ sub GetTicket($;$)
 	# The slot does not like to be NULL.
 	$osname = ""
 	    if (!defined($osname));
+	# Need some kind of default.
+	$pctype = "pc"
+	    if (!defined($pctype));
 	
 	my $virtnode =
 	    $virtexperiment->NewTableRow("virt_nodes",
