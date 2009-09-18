@@ -705,8 +705,6 @@ sub GetTicket($;$)
 
 	if (defined($virtualization_type)) {
 	    if ($virtualization_type eq "emulab-vnode") {
-		$pctype = "pcvm";
-
 		if (defined($virtualization_subtype)) {
 		    if ($virtualization_subtype eq "emulab-jail") {
 			$osname = "FBSD-JAIL";
@@ -714,6 +712,7 @@ sub GetTicket($;$)
 		    elsif ($virtualization_subtype eq "emulab-openvz") {
 			$osname = "OPENVZ-STD";
 		    }
+		    $pctype = "pcvm";
 		}
 		else {
 		    goto raw;
@@ -778,15 +777,46 @@ sub GetTicket($;$)
 	$pctype = "pc"
 	    if (!defined($pctype));
 	
-	my $virtnode =
-	    $virtexperiment->NewTableRow("virt_nodes",
-					 {"vname"   => $node_nickname,
-					  "type"    => $pctype,
-					  "osname"  => $osname,
-					  "ips"     => '', # deprecated
-					  "cmd_line"=> '', # bogus
-					  "fixed"   => (defined($node) ?
-						     $node->node_id() : "")});
+	my $nodeblob = {"vname"   => $node_nickname,
+			"type"    => $pctype,
+			"osname"  => $osname,
+			"ips"     => '', # deprecated
+			"cmd_line"=> '', # bogus
+			"fixed"   => (defined($node) ?
+				      $node->node_id() : "")};
+
+	# Tarball and startup command.
+	if (exists($ref->{'startup_command'})) {
+	    my $startupcmd = $ref->{'startup_command'};
+	    
+	    if (! TBcheck_dbslot($startupcmd, "virt_nodes", "startupcmd",
+			 TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+		$response =
+		    GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+					 "Invalid startup command");
+		goto bad;
+	    }
+	    $nodeblob->{'startupcmd'} = $startupcmd;
+	}
+	if (exists($ref->{'tarfiles'})) {
+	    my $tarfiles = $ref->{'tarfiles'};
+	    
+	    if (! TBcheck_dbslot($tarfiles, "virt_nodes", "tarballs",
+			 TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+		$response =
+		    GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+					 "Invalid tarfiles");
+		goto bad;
+	    }
+	    $nodeblob->{'tarballs'} = $tarfiles;
+	}
+
+	my $virtnode = $virtexperiment->NewTableRow("virt_nodes", $nodeblob);
+	if (!defined($virtnode)) {
+	    $response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					     "Error creating virtnode");
+	    goto bad;
+	}
 	$virtexperiment->NewTableRow("virt_node_desires",
 				     {"vname"    => $node_nickname,
 				      "desire"   => "pcshared",
