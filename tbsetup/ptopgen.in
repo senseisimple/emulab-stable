@@ -24,7 +24,7 @@ use GeniHRN;
 sub usage()
 {
     print("Usage: ptopgen [-v] [-s switch] [-p pid [-e eid]] [-m factor] " .
-	  "[-n c/e] [-x] [-g]\n".
+	  "[-n c/e] [-x] [-g] [-c component-name]\n".
 	  "       -p include nodes the project has permission to use\n".
 	  "       -e include given experiments resources\n" .
 	  "          in the ptopfile (as if they were free)\n" .
@@ -38,11 +38,12 @@ sub usage()
 	  "       -c Delay capacity override\n".
 	  "       -n Add in modelnet core and edge node features\n".
 	  "       -x Output into the new xml ptop format.\n".
-	  "       -g With -x, geni version\n");
+	  "       -g With -x, geni version\n".
+          "       -1 Print an rspec containing only the node component-name");
         exit(-1);
 }
 
-my $optlist = "s:e:m:vp:rSan:c:uxgh";
+my $optlist = "s:e:m:vp:rSan:c:uxgh1:";
 my $mfactor;
 my $virtstuff = 0;
 my $widearea  = 0;
@@ -54,6 +55,7 @@ my $prune     = 0;
 my $do_xml    = 0;
 my $genimode  = 0;
 my $useshared = 0;
+my $component_name = undef;
 
 my $OURDOMAIN = "@OURDOMAIN@";
 my $MAINSITE  = @TBMAINSITE@;
@@ -184,6 +186,10 @@ if (defined($options{"x"})) {
 	if (defined($options{"g"}) && $PGENISUPPORT);
     $do_xml = 1;
 }
+if (defined($options{"1"})) {
+    $component_name = $options{"1"};
+}
+
 usage()
     if ($prune && !defined($exempt_eid));
 
@@ -407,13 +413,13 @@ while (my ($osid) = $result->fetchrow()) {
 }
 
 # Print switches
-if (defined($switchtouse)) {
+if (defined($switchtouse) && ! defined($component_name)) {
     # Should probably get the last four args out of the database, but I don't
     # think we ever actually use this case...
     print_switch($switchtouse,undef,undef,undef,undef);
     $switches{$switchtouse} = 1;
 }
-else {
+elsif (! defined($component_name)) {
     $result =
 	DBQueryFatal("select n.node_id, n.uuid, country, latitude, longitude " .
                      "from nodes as n left join widearea_nodeinfo as wn ".
@@ -483,6 +489,10 @@ if ($allnodes) {
 if ($genimode) {
     $free_condition = "($free_condition and ".
 	"(nat1.attrvalue is null or nat1.attrvalue=0))";
+}
+
+if (defined($component_name)) {
+    $free_condition = "(a.node_id = \"$component_name\")";
 }
 
 $result =
@@ -880,7 +890,7 @@ foreach $node (keys(%nodes)) {
 # since that is where we define what vtypes are hosted on a particular
 # physnode. 
 #
-if ($widearea) {
+if ($widearea && ! defined($component_name)) {
     #
     # Set up 'the Internet' as a fake switch that all widearea nodes can
     # talk to.
@@ -1121,7 +1131,8 @@ $result = DBQueryFatal("SELECT node_id1,card1,port1,node_id2,card2,port2" .
 while (($node1,$card1,$port1,$node2,$card2,$port2) = 
        $result->fetchrow_array) {
     if ((defined($nodes{$node1}) || defined($switches{$node1})) && 
-	(defined($nodes{$node2}) || defined($switches{$node2}))) {
+	(defined($nodes{$node2}) || defined($switches{$node2})) &&
+	! defined($component_name)) {
 
         
         # Types for this link - for the time being, we assume that all
@@ -1260,18 +1271,20 @@ if ($TRACK_INTERSWITCH_BANDWIDTH) {
     }
 }
 
-# TODO: Figure out how to actually add interconnect interfaces rather than
-#       just having them be (null).
-foreach $interconnect (keys(%interconnects)) {
-    ($src,$dst) = split(":",$interconnect);
-    my $speed = $interconnects{$interconnect};
-    # This is really dumb - BigInts like to print out with a leading '+',
-    # which we don't want. Stript it off.
-    $speed =~ s/^\+|-//;
-    print_named_link("link-$interconnect",
-		     $src, "(null)",
+if (! defined($component_name)) {
+  # TODO: Figure out how to actually add interconnect interfaces rather than
+  #       just having them be (null).
+  foreach $interconnect (keys(%interconnects)) {
+      ($src,$dst) = split(":",$interconnect);
+      my $speed = $interconnects{$interconnect};
+      # This is really dumb - BigInts like to print out with a leading '+',
+      # which we don't want. Stript it off.
+      $speed =~ s/^\+|-//;
+      print_named_link("link-$interconnect",
+  		     $src, "(null)",
 		     $dst, "(null)",
 		     $speed, 0, 0, "ethernet");
+  }
 }
 
 #
@@ -1281,53 +1294,55 @@ my @wireless_protos = ("80211", "80211a", "80211b", "80211g", "flex900");
 my $fake_switch = "airswitch";
 
 my @fake_switch_types = map("*$_:*", @wireless_protos);
-print_node($fake_switch, \@fake_switch_types, [], [], undef, [], undef, undef,
-    undef);
+if (! defined($component_name)) {
+  print_node($fake_switch, \@fake_switch_types, [], [], undef, [], undef,
+	     undef, undef);
 
-foreach my $interface (keys(%interfacetypes)) {
-    my ($node,$card,$port) = split(":", $interface);
+  foreach my $interface (keys(%interfacetypes)) {
+      my ($node,$card,$port) = split(":", $interface);
+      
+      next
+	  if (!defined($nodes{$node}));;
+      
+      my $type    = $interfacetypes{$interface};
+      
+      next
+	  if (!defined($interfaceprotocols{$type}));
+      
+      my @protos  = @{ $interfaceprotocols{$type} };
+      my $iface   = get_iface($node,$card,$port);
 
-    next
-	if (!defined($nodes{$node}));;
-	
-    my $type    = $interfacetypes{$interface};
+      #
+      # Get the intersection of the protocols supported by this interface, and
+      # the wireless protocols we know about
+      #
+      my (%union, %intersection);
+      foreach $proto (@protos, @wireless_protos) {
+	  $union{$proto}++ && $intersection{$proto}++;
+      }
+      
+      my @intersection = keys %intersection;
 
-    next
-	if (!defined($interfaceprotocols{$type}));
-    
-    my @protos  = @{ $interfaceprotocols{$type} };
-    my $iface   = get_iface($node,$card,$port);
-
-    #
-    # Get the intersection of the protocols supported by this interface, and
-    # the wireless protocols we know about
-    #
-    my (%union, %intersection);
-    foreach $proto (@protos, @wireless_protos) {
-	$union{$proto}++ && $intersection{$proto}++;
-    }
-
-    my @intersection = keys %intersection;
-
-    #
-    # Skip this interface if it speaks no wireless protocols
-    #
-    next unless @intersection;
-
-    #
-    # Find the max bandwidth supported by any of the wireless protocols
-    # supported by this interface
-    #
-    my $max_bw = 0;
-    foreach my $proto (@intersection) {
-	my $ifacebw = get_ifacebw($node,$card,$port,$proto);
-	if ($ifacebw > $max_bw) {
-	    $max_bw = $ifacebw;
-	}
-    }
-    print_simple_link($node, $iface,
-		      $fake_switch, "(null)",
-		      $max_bw, 0, 0, @intersection);
+      #
+      # Skip this interface if it speaks no wireless protocols
+      #
+      next unless @intersection;
+      
+      #
+      # Find the max bandwidth supported by any of the wireless protocols
+      # supported by this interface
+      #
+      my $max_bw = 0;
+      foreach my $proto (@intersection) {
+	  my $ifacebw = get_ifacebw($node,$card,$port,$proto);
+	  if ($ifacebw > $max_bw) {
+	      $max_bw = $ifacebw;
+	  }
+      }
+      print_simple_link($node, $iface,
+			$fake_switch, "(null)",
+			$max_bw, 0, 0, @intersection);
+  }
 }
 
 print_footer();
