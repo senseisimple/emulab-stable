@@ -41,6 +41,7 @@ my $PGENIDOMAIN    = "@PROTOGENI_DOMAIN@";
 my $SIGNCRED	   = "$TB/sbin/signgenicred";
 my $VERIFYCRED	   = "$TB/sbin/verifygenicred";
 my $NODEREBOOT	   = "$TB/bin/node_reboot";
+my $VNODESETUP     = "$TB/sbin/vnode_setup";
 
 # Cache of instances to avoid regenerating them.
 my %aggregates     = ();
@@ -529,13 +530,21 @@ sub Start($)
     return -1
 	if (! ref($self));
 
+    my $experiment = Experiment->Lookup($self->slice_uuid());
+    if (!defined($experiment)) {
+	print STDERR "Could not map $self to its experiment\n";
+	return -1;
+    }
+    my $pid = $experiment->pid();
+    my $eid = $experiment->eid();
+
     my @slivers = ();
     if ($self->SliverList(\@slivers) != 0) {
 	print STDERR "Could not get sliver list for $self\n";
 	return -1;
     }
-
-    my %reboots = ();
+    my %pnodes = ();
+    my %vnodes = ();
 
     foreach my $sliver (@slivers) {
 	next
@@ -546,31 +555,62 @@ sub Start($)
 	    print STDERR "Could not map $sliver to a node\n";
 	    return -1;
 	}
-
-	# Remote/shared virtual nodes are handled special.
-	if (($node->isremotenode() && $node->isvirtnode()) ||
-	    ($node->isvirtnode() && $node->sharing_mode())) {
-	    $sliver->Start() == 0
-		or return -1;
-	    next;
+	print STDERR "GeniAggregate:StartSliver $node\n";
+	
+	my $reservation = $node->Reservation();
+	if (!defined($reservation)) {
+	    print STDERR "$node no long belongs to $self\n";
+	    return -1;
 	}
-
-	# We assume local nodes are not shared, so reboot pnode; this
-	# gets all the vnodes on that pnode.
-	if ($node->isvirtnode()) {
-	    $reboots{$node->phys_nodeid()} = 1;
+	if ($reservation->SameExperiment($experiment)) {
+	    if ($node->isvirtnode()) {
+		$vnodes{$node->node_id} = $node;
+	    }
+	    else {
+		# node_reboot is smart enough to know that if a pnode
+		# is rebooted it can ignore the vnodes on it, so do
+		# not optimize this here.
+		$pnodes{$node->node_id} = $node;
+	    }
 	}
-	# node_reboot is smart enough to know that if a pnode is rebooted
-	# it can ignore the vnodes on it, so do not optimize this here. 
-	$reboots{$node->node_id} = 1;
+	else {
+	    print STDERR "$node is reserved to another, not $self\n";
+	    # Signal error so we can look at what happened.
+	    return -1;
+	}
     }
-    my @node_ids = keys(%reboots);
+    #
+    # Cull out vnodes that are going to get rebooted cause the
+    # physnode is getting rebooted. 
+    #
+    my %tmp = %vnodes;
+    foreach my $vnode (values(%vnodes)) {
+	if (!exists($pnodes{$vnode->phys_nodeid()})) {
+	    $tmp{$vnode->node_id()} = $vnode;
+	}
+    }
+    %vnodes = %tmp;
 
-    if (@node_ids) {
+    #
+    # Now reboot the physical nodes, then any leftover virtual nodes.
+    #
+    if (keys(%pnodes)) {
+	my @node_ids = keys(%pnodes);
+
 	#
 	# Should waiting be an option?
 	#
-	system("$NODEREBOOT -s @node_ids");
+	system("$NODEREBOOT @node_ids");
+	return -1
+	    if ($?);
+    }
+    if (keys(%vnodes)) {
+	my @node_ids = keys(%vnodes);
+
+	#
+	# Should waiting be an option?
+	#
+	system("$VNODESETUP -j -m $pid $eid @node_ids");
 	return -1
 	    if ($?);
     }
