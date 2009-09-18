@@ -431,7 +431,7 @@ foreach my $node (@freed_nodes) {
     # If the node is a dynamic virtual node, just save it for later.
     # We will call into the Node library to delete it. 
     #
-    if ($isdynamic) {
+    if ($isvirt && $isdynamic) {
 	push(@dynanodes, $node);
 	next;
     }
