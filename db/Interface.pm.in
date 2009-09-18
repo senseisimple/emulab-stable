@@ -108,8 +108,12 @@ sub LookupAll($$$)
 
 	    return -1
 		if (!$state_result);
-	    return -1
-		if (!$state_result->numrows);
+	    if (!$state_result->numrows) {
+		print STDERR
+		    "*** Missing interface_state table entry for interface\n".
+		    "    card:port $card:$port on $nodeid.\n";
+		return -1;
+	    }
 	    $interface->{'STATE'} = $state_result->fetchrow_hashref();
 
 	    # Cache by card,port and by iface
