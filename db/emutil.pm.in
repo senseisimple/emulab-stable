@@ -13,7 +13,7 @@ use vars qw(@ISA @EXPORT);
 @ISA = "Exporter";
 @EXPORT = qw (TBDB_CHECKDBSLOT_NOFLAGS TBDB_CHECKDBSLOT_WARN
 	      TBDB_CHECKDBSLOT_ERROR TBcheck_dbslot TBFieldErrorString
-	      TBGetUniqueIndex);
+	      TBGetUniqueIndex ParRun);
 
 use emdb;
 use English;
