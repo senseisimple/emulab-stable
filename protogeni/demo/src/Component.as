@@ -27,6 +27,9 @@ package
       interfaces = new Array();
       isVirtual = false;
       isShared = false;
+
+      isBgpMux = false;
+      upstreamAs = "";
     }
 
     public var name : String;
@@ -35,5 +38,8 @@ package
     public var interfaces : Array;
     public var isVirtual : Boolean;
     public var isShared : Boolean;
+
+    public var isBgpMux : Boolean;
+    public var upstreamAs : String;
   }
 }

@@ -28,6 +28,7 @@ package
                          newNumber : int, newMouseDownNode : Function,
                          newMouseDownLink : Function) : void
     {
+      component = newComponent;
       name = newComponent.name;
       id = newComponent.uuid;
       managerId = newManager.getId();
@@ -338,21 +339,35 @@ package
           str += "exclusive=\"1\"";
         }
         str += ">";
-        var nodeType = "pc";
-        if (isShared)
+        if (component.isBgpMux)
         {
-          nodeType = "pcvm";
+          str += '<node_type type_name="bgpmux" type_slots="1"> ';
+          str += '  <field key="upstream_as" value="' + component.upstreamAs
+            + '" /> ';
+          str += '  <field key="prefix" value="' + manager.getBgpAddress()
+            + '" /> ';
+          str += '  <field key="netmask" value="' + manager.getBgpNetmask()
+            + '" /> ';
+          str += '</node_type> ';
         }
         else
         {
-          nodeType = "pc";
+          var nodeType = "pc";
+          if (isShared)
+          {
+            nodeType = "pcvm";
+          }
+          else
+          {
+            nodeType = "pc";
 //          if (manager.getName() == "Emulab")
 //          {
 //            nodeType = "pc600";
 //          }
+          }
+          str += "<node_type type_name=\"" + nodeType
+            + "\" type_slots=\"1\" /> ";
         }
-        str += "<node_type type_name=\"" + nodeType
-          + "\" type_slots=\"1\" /> ";
         for each (var current in interfaces)
         {
           if (current.used)
@@ -463,6 +478,7 @@ package
       }
     }
 
+    var component : Component;
     var clip : NodeClip;
     var name : String;
     var id : String;

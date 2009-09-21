@@ -92,7 +92,15 @@ package
     {
       if (cm != managers.getManagers()[0])
       {
-        return new RequestResourceDiscovery(cm);
+        if (cm.getName() == "Georgia Tech")
+        {
+          cm.resourceSuccess(ComponentView.gaAd);
+          return null;
+        }
+        else
+        {
+          return new RequestResourceDiscovery(cm);
+        }
       }
       else
       {
@@ -145,7 +153,7 @@ package
     {
       var result : Request = null;
       var shouldSend = nodes.managerUsed(cm);
-      if (shouldSend && cm.hasChanged())
+      if (shouldSend && cm.hasChanged() && cm.getName() != "Georgia Tech")
       {
         cm.clearChanged();
         var rspec = null;

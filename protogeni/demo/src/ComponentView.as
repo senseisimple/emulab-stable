@@ -24,6 +24,33 @@ package
 
   class ComponentView
   {
+    static var gaAd = '<rspec type="advertisement" ' +
+'xmlns="http://www.protogeni.net/resources/rspec/0.1"> ' +
+'  <node component_uuid="gtnoise.net+node+atlanta_mux" ' +
+'        component_name="atlanta_mux" ' +
+'        component_manager_uuid="gtnoise.net" ' +
+'        virtualization_type="bgpmux"> ' +
+'    <node_type type_name="bgpmux" type_slots="1"> ' +
+'      <field key="upstream_as" value="2637" /> ' +
+'    </node_type> ' +
+'    <available>true</available> ' +
+'    <exclusive>false</exclusive> ' +
+'    <interface component_id="physical_interface"/> ' +
+'  </node> ' +
+'  <node component_uuid="gtnoise.net+node+madison_mux" ' +
+'        component_name="madison_mux" ' +
+'        component_manager_uuid="gtnoise.net" ' +
+'        virtualization_type="bgpmux"> ' +
+'    <node_type type_name="bgpmux" type_slots="1"> ' +
+'      <field key="upstream_as" value="2831" /> ' +
+'    </node_type> ' +
+'    <available>true</available> ' +
+'    <exclusive>false</exclusive> ' +
+'    <interface component_id="physical_interface"/> ' +
+'  </node> ' +
+'  <bgp_prefix address="168.62.16.0" netmask="21" /> ' +
+'</rspec> ';
+
     public function ComponentView(newSelect : ComboBox,
                                   newList : List,
                                   newNodes : ActiveNodes) : void
@@ -75,7 +102,12 @@ package
                              "umlGENI",
                              ".uml.emulab.net",
                              "https://boss.uml.emulab.net/protogeni/xmlrpc",
-                             updateList, 2));
+                             updateList, 2),
+        new ComponentManager("f00",
+                             "Georgia Tech",
+                             ".ga.edu",
+                             "http://www.ga.edu/protogeni/xmlrpc",
+                             updateList, 3));
       select.removeAll();
       select.selectedIndex = 0;
 

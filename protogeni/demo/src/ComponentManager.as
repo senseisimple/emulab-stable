@@ -40,11 +40,24 @@ package
       version = newVersion;
       changed = false;
 
+      bgpAddress = "";
+      bgpNetmask = "";
+
       components = new Array();
       used = new Array();
       ticket = null;
       sliver = null;
       state = LOADING;
+    }
+
+    public function getBgpAddress() : String
+    {
+      return bgpAddress;
+    }
+
+    public function getBgpNetmask() : String
+    {
+      return bgpNetmask;
     }
 
     public function getName() : String
@@ -254,6 +267,7 @@ package
               {
                 com.managerId = xmlNodes[i].attribute("component_manager_uuid");
               }
+              parseNodeTypes(xmlNodes[i], com);
               var interfaceName = new QName(rspec.namespace(), "interface");
               var interfaceList = xmlNodes[i].elements(interfaceName);
               var interfaceNumber = 0;
@@ -278,6 +292,7 @@ package
           }
 
           parseLinks(rspec, uuidToNode);
+          parseBgpPrefixes(rspec);
         }
         setState(NORMAL)
       }
@@ -291,6 +306,26 @@ package
         setState(FAILED);
       }
       update();
+    }
+
+    function parseNodeTypes(node : XML, com : Component) : void
+    {
+      var typeName = new QName(node.namespace(), "node_type");
+      var fieldName = new QName(node.namespace(), "field");
+      for each (var currentType in node.elements(typeName))
+      {
+        if (currentType.attribute("type_name") == "bgpmux")
+        {
+          com.isBgpMux = true;
+          for each (var currentField in currentType.elements(fieldName))
+          {
+            if (currentField.attribute("key") == "upstream_as")
+            {
+              com.upstreamAs = currentField.attribute("value");
+            }
+          }
+        }
+      }
     }
 
     function parseLinks(rspec : XML, uuidToNode : Dictionary) : void
@@ -334,6 +369,16 @@ package
             }
           }
         }
+      }
+    }
+
+    function parseBgpPrefixes(rspec : XML) : void
+    {
+      var prefixName = new QName(rspec.namespace(), "bgp_prefix");
+      for each (var prefix in rspec.elements(prefixName))
+      {
+        bgpAddress = prefix.attribute("address");
+        bgpNetmask = prefix.attribute("netmask");
       }
     }
 
@@ -403,6 +448,9 @@ package
     var update : Function;
 
     var changed : Boolean;
+
+    var bgpAddress : String;
+    var bgpNetmask : String;
 
     // Version 0 is baseline from GEC 4
     // Version 1 is request converted but advertisement the same

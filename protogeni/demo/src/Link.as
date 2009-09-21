@@ -111,13 +111,30 @@ package
           result.@virtual_id = "link" + String(number);
         }
 
-        if (isTunnel())
+        if (version >= 3)
         {
-          result.@link_type = "tunnel";
+          var link_type = <link_type />;
+          link_type.@name = "GRE";
+          var key = <field />;
+          key.@key = "key";
+          key.@value = "0";
+          var ttl = <field />;
+          ttl.@key = "ttl";
+          ttl.@value = "0";
+          link_type.appendChild(key);
+          link_type.appendChild(ttl);
+          result.appendChild(link_type);
         }
-        else if (version >= 1)
+        else
         {
-          result.@link_type = "ethernet";
+          if (isTunnel())
+          {
+            result.@link_type = "tunnel";
+          }
+          else if (version >= 1)
+          {
+            result.@link_type = "ethernet";
+          }
         }
 
         result.appendChild(getInterfaceXml(left, leftInterface, 0, version));
