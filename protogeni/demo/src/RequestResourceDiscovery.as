@@ -14,7 +14,7 @@
 
 package
 {
-  class RequestResourceDiscovery extends Request
+  public class RequestResourceDiscovery extends Request
   {
     public function RequestResourceDiscovery(newCm : ComponentManager) : void
     {
@@ -50,6 +50,6 @@ package
       return null;
     }
 
-    var cm : ComponentManager;
+    private var cm : ComponentManager;
   }
 }

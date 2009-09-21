@@ -14,7 +14,7 @@
 
 package
 {
-  class Credential
+  public class Credential
   {
     public function Credential() : void
     {

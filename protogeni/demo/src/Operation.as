@@ -18,7 +18,7 @@ package
   import flash.events.Event;
   import com.mattism.http.xmlrpc.ConnectionImpl;
 
-  class Operation
+  public class Operation
   {
     public function Operation(qualifiedMethod : Array) : void
     {
@@ -90,7 +90,7 @@ package
       return String(server._response.data);
     }
 
-    function callSuccess(event : Event) : void
+    private function callSuccess(event : Event) : void
     {
       cleanup();
       success(Number(server.getResponse().code),
@@ -99,7 +99,7 @@ package
               server.getResponse());
     }
 
-    function callFailure(event : ErrorEvent) : void
+    private function callFailure(event : ErrorEvent) : void
     {
       cleanup();
       failure(event, server.getFault());
@@ -111,15 +111,15 @@ package
       server.removeEventListener(ErrorEvent.ERROR, callFailure);
     }
 
-    var module : String;
-    var method : String;
-    var url : String;
-    var param : Object;
-    var server : ConnectionImpl;
-    var success : Function;
-    var failure : Function;
+    private var module : String;
+    private var method : String;
+    private var url : String;
+    private var param : Object;
+    private var server : ConnectionImpl;
+    private var success : Function;
+    private var failure : Function;
 
-    static var XMLRPC_SERVER : String = "boss.emulab.net";
-    static var SERVER_PATH : String = ":443/protogeni/xmlrpc/";
+    private static var XMLRPC_SERVER : String = "boss.emulab.net";
+    private static var SERVER_PATH : String = ":443/protogeni/xmlrpc/";
   }
 }

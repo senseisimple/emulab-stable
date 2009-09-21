@@ -16,12 +16,12 @@ package
 {
   import flash.utils.Dictionary;
 
-  class ComponentManager
+  public class ComponentManager
   {
 
-    static var NORMAL = 0;
-    static var LOADING = 1;
-    static var FAILED = 2;
+    private static var NORMAL = 0;
+    private static var LOADING = 1;
+    private static var FAILED = 2;
 
     public function ComponentManager(newId : String,
                                      newName : String,
@@ -35,7 +35,6 @@ package
       hostName = newHostName;
       url = newUrl;
       ad = "";
-      manifest = "";
       update = newUpdate;
       version = newVersion;
       changed = false;
@@ -73,16 +72,6 @@ package
     public function getAd() : String
     {
       return ad;
-    }
-
-    public function setManifest(newManifest : String) : void
-    {
-      manifest = newManifest;
-    }
-
-    public function getManifest() : String
-    {
-      return manifest;
     }
 
     public function getHostName() : String
@@ -203,7 +192,7 @@ package
       return index;
     }
 
-    function findId(id : String) : int
+    private function findId(id : String) : int
     {
       var result : int = -1;
       var i : int = 0;
@@ -308,7 +297,7 @@ package
       update();
     }
 
-    function parseNodeTypes(node : XML, com : Component) : void
+    private function parseNodeTypes(node : XML, com : Component) : void
     {
       var typeName = new QName(node.namespace(), "node_type");
       var fieldName = new QName(node.namespace(), "field");
@@ -328,7 +317,7 @@ package
       }
     }
 
-    function parseLinks(rspec : XML, uuidToNode : Dictionary) : void
+    private function parseLinks(rspec : XML, uuidToNode : Dictionary) : void
     {
       var linkName : QName = new QName(rspec.namespace(), "link");
       for each (var link in rspec.elements(linkName))
@@ -372,7 +361,7 @@ package
       }
     }
 
-    function parseBgpPrefixes(rspec : XML) : void
+    private function parseBgpPrefixes(rspec : XML) : void
     {
       var prefixName = new QName(rspec.namespace(), "bgp_prefix");
       for each (var prefix in rspec.elements(prefixName))
@@ -382,7 +371,7 @@ package
       }
     }
 
-    function isAvailable(node : XML) : Boolean
+    private function isAvailable(node : XML) : Boolean
     {
       var result : Boolean = false;
       var availableName : QName = new QName(node.namespace(),
@@ -401,7 +390,7 @@ package
     }
 
 
-    function xmlSort(left : XML, right : XML) : int
+    private function xmlSort(left : XML, right : XML) : int
     {
       // TODO: Make this an actual natural sort
       var leftAttribute = left.attribute("component_name");
@@ -432,22 +421,21 @@ package
       }
     }
 
-    var id : String;
-    var name : String;
-    var hostName : String;
-    var url : String;
-    var ad : String;
-    var manifest : String;
+    private var id : String;
+    private var name : String;
+    private var hostName : String;
+    private var url : String;
+    private var ad : String;
 
-    var components : Array;
-    var used : Array;
-    var ticket : String;
+    private var components : Array;
+    private var used : Array;
+    private var ticket : String;
     // Credential for the sliver
-    var sliver : String;
-    var state : int;
-    var update : Function;
+    private var sliver : String;
+    private var state : int;
+    private var update : Function;
 
-    var changed : Boolean;
+    private var changed : Boolean;
 
     var bgpAddress : String;
     var bgpNetmask : String;
@@ -455,6 +443,6 @@ package
     // Version 0 is baseline from GEC 4
     // Version 1 is request converted but advertisement the same
     // Version 2 is both ad and request converted
-    var version : int;
+    private var version : int;
   }
 }

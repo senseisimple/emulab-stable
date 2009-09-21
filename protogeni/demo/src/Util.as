@@ -17,7 +17,7 @@ package
   import flash.events.ErrorEvent;
   import com.mattism.http.xmlrpc.MethodFault;
 
-  class Util
+  public class Util
   {
     public static function getResponse(name : String, url : String,
                                        xml : String) : String

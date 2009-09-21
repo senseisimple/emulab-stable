@@ -14,7 +14,7 @@
 
 package
 {
-  class Request
+  public class Request
   {
     public function Request(newServer : String) : void
     {
