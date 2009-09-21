@@ -94,8 +94,7 @@ fgetln(FILE *stream, size_t *len)
  * virtual database. 0 is returned on success, -1 on failure.
  */
 int
-cgetset(ent)
-	char *ent;
+cgetset(const char *ent)
 {
 	if (ent == NULL) {
 		if (toprec)
@@ -127,11 +126,10 @@ cgetset(ent)
  * return NULL.
  */
 char *
-cgetcap(buf, cap, type)
-	char *buf, *cap;
-	int type;
+cgetcap(char *buf, const char *cap, int type)
 {
-	register char *bp, *cp;
+	char *bp;
+	const char *cp;
 
 	bp = buf;
 	for (;;) {
@@ -179,12 +177,11 @@ cgetcap(buf, cap, type)
  * reference loop is detected.
  */
 int
-cgetent(buf, db_array, name)
-	char **buf, **db_array, *name;
+cgetent(char **buf, char **db_array, const char *name)
 {
 	u_int dummy;
 
-	return (getent(buf, &dummy, db_array, -1, name, 0, NULL));
+	return (getent(buf, &dummy, db_array, -1, (char *)name, 0, NULL));
 }
 
 /*
@@ -206,10 +203,7 @@ cgetent(buf, db_array, name)
  *	  MAX_RECURSION.
  */
 static int
-getent(cap, len, db_array, fd, name, depth, nfield)
-	char **cap, **db_array, *name, *nfield;
-	u_int *len;
-	int fd, depth;
+getent(char **cap, u_int *len, char **db_array, int fd, char *name, int depth, char *nfield)
 {
 	DB *capdbp;
 	register char *r_end, *rp, **db_p;
@@ -564,9 +558,7 @@ tc_exp:	{
 }
 
 static int
-cdbget(capdbp, bp, name)
-	DB *capdbp;
-	char **bp, *name;
+cdbget(DB *capdbp, char **bp, char *name)
 {
 	DBT key, data;
 
@@ -603,10 +595,9 @@ cdbget(capdbp, bp, name)
  * record buf, -1 if not.
  */
 int
-cgetmatch(buf, name)
-	char *buf, *name;
+cgetmatch(const char *buf, const char *name)
 {
-	register char *np, *bp;
+	const char *np, *bp;
 
 	/*
 	 * Start search at beginning of record.
@@ -801,9 +792,7 @@ cgetnext(bp, db_array)
  * allocation failure).
  */
 int
-cgetstr(buf, cap, str)
-	char *buf, *cap;
-	char **str;
+cgetstr(char *buf, const char *cap, char **str)
 {
 	register u_int m_room;
 	register char *bp, *mp;
@@ -930,8 +919,7 @@ cgetstr(buf, cap, str)
  * error was encountered (storage allocation failure).
  */
 int
-cgetustr(buf, cap, str)
-	char *buf, *cap, **str;
+cgetustr(char *buf, const char *cap, char **str)
 {
 	register u_int m_room;
 	register char *bp, *mp;
@@ -999,9 +987,7 @@ cgetustr(buf, cap, str)
  * numeric capability couldn't be found.
  */
 int
-cgetnum(buf, cap, num)
-	char *buf, *cap;
-	long *num;
+cgetnum(char *buf, const char *cap, long *num)
 {
 	register long n;
 	register int base, digit;

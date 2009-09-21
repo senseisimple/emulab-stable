@@ -39,8 +39,8 @@ TUNNELOBJS = tiptunnel.o
 #
 LIBS=
 
-#tip:	$(OBJS)
-#	$(CC) $(LDSTATIC) -o tip $(OBJS) $(LIBS)
+tip.old:	$(OBJS)
+	$(CC) $(LDSTATIC) -o tip $(OBJS) $(LIBS)
 
 tip:	$(TESTBED_SRCDIR)/tip/tip.deprecation
 	cp $(TESTBED_SRCDIR)/tip/tip.deprecation tip
