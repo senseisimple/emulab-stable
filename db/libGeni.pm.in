@@ -1,0 +1,411 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package libGeni;
+
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA    = "Exporter";
+@EXPORT = qw();
+
+# Configure variables
+my $TB		= "@prefix@";
+my $BOSSNODE    = "@BOSSNODE@";
+
+use libdb;
+use libtestbed;
+use emutil;
+use NodeType;
+use Interface;
+use Experiment;
+use OSinfo;
+use GeniEmulab;
+use GeniResource;
+use English;
+use Socket;
+use Data::Dumper;
+
+sub Register($$)
+{
+    my ($experiment, $user) = @_;
+
+    return GeniEmulab::RegisterExperiment($experiment, $user);
+}
+
+sub UnRegister($)
+{
+    my ($experiment) = @_;
+
+    return GeniEmulab::UnRegisterExperiment($experiment);
+}
+
+sub GetTickets($$$$)
+{
+    my ($experiment, $impotent, $user, $rspec) = @_;
+    my %cm_urns = ();
+
+    Register($experiment, $user) == 0
+	or return -1;
+
+    foreach my $ref (@{ $rspec->{'node'} }) {
+	my $node_urn = $ref->{'component_urn'};
+	my ($auth,$type,$node_id) = GeniHRN::Parse($node_urn);
+	my $cm = GeniHRN::Generate($auth, "authority", "cm");
+
+	$ref->{'component_manager_uuid'} = $cm;
+	$ref->{'component_uuid'} = $node_urn;
+
+	$cm_urns{$cm} = $cm;
+    }
+    print STDERR Dumper($rspec);
+
+    #
+    # Get the resource objects.
+    #
+    foreach my $cm (keys(%cm_urns)) {
+	my $resource = GeniResource->Lookup($experiment->idx(), $cm);
+	if (!defined($resource)) {
+	    $resource = GeniResource->Create($experiment, $cm);
+	    if (!defined($resource)) {
+		print STDERR "Could not create GeniResource for $cm\n";
+		return -1;
+	    }
+	}
+	$cm_urns{$cm} = $resource;
+    }
+    #
+    # Ask for tickets.
+    #
+    foreach my $cm (keys(%cm_urns)) {
+	my $resource = $cm_urns{$cm};
+
+	print STDERR "Asking for ticket from $resource\n";
+	if ($resource->GetTicket($user, $rspec, $impotent)) {
+		print STDERR "Could not GetTicket for $resource\n";
+		return -1;
+	}
+    }
+
+    #
+    # If we can get all of the tickets, lets create the physical nodes
+    # we need.
+    #
+    foreach my $cm (keys(%cm_urns)) {
+	my $resource = $cm_urns{$cm};
+	my $ticket   = $resource->Ticket();
+
+	if (!defined($ticket)) {
+	    print STDERR "No ticket defined for $resource\n";
+	    return -1;
+	}
+	my $rspec = $ticket->rspec();
+	if (!defined($rspec)) {
+	    print STDERR "No rspec defined for $ticket on $resource\n";
+	    return -1;
+	}
+	foreach my $ref (@{ $rspec->{'node'} }) {
+	    my $node_urn = $ref->{'component_urn'};
+	    my $cm_urn   = $ref->{'component_manager_uuid'};
+
+	    print STDERR "Creating $node_urn for $resource\n";
+	    my $node = GeniEmulab::CreatePhysNode($node_urn);
+	    if (!defined($node)) {
+		print STDERR "  Could not create $node_urn!\n";
+		return -1;
+	    }
+	}
+    }
+    return 0;
+}
+
+#
+# Redeem the tickets for an experiment. 
+#
+sub RedeemTickets($$$)
+{
+    my ($experiment, $user, $rspec) = @_;
+
+    #
+    # Get the resource objects.
+    #
+    my @resources = GeniResource->LookupAll($experiment);
+    if (! @resources) {
+	print STDERR "RedeemTickets: No resource objects\n";
+	return 0;
+    }
+
+    foreach my $resource (@resources) {
+	print STDERR "Redeeming ticket for $resource\n";
+	if ($resource->RedeemTicket($user)) {
+	    print STDERR
+		"RedeemTicket: Could not redeem ticket for $resource\n";
+	    return -1;
+	}
+    }
+
+    return 0;
+}
+
+#
+# Map the local nodes to the external nodes. This just sets some DB
+# state for now.
+#
+sub MapNodes($)
+{
+    my ($experiment) = @_;
+
+    #
+    # Get the resource objects.
+    #
+    my @resources = GeniResource->LookupAll($experiment);
+    if (! @resources) {
+	return 0;
+    }
+
+    foreach my $resource (@resources) {
+	my $manifest = $resource->Manifest();
+	return -1
+	    if (!defined($manifest));
+
+	foreach my $ref (@{ $manifest->{'node'} }) {
+	    my $sliver_urn = $ref->{'sliver_urn'};
+	    my $vname      = $ref->{'virtual_id'};
+	    my $node       = $experiment->VnameToNode($vname);
+
+	    if (!defined($node)) {
+		print STDERR
+		    "MapNodes: Could not locate node $vname in $experiment\n";
+		return -1;
+	    }
+	    $node->ModifyReservation({"external_resource_index" =>
+					  $resource->idx(),
+				      "external_resource_id"    =>
+				          $sliver_urn})
+		== 0 or return -1;
+
+	    if (exists($ref->{'sshdport'})) {
+		my $sshdport = $ref->{'sshdport'};
+
+		$node->Update({'sshdport' => $sshdport});
+	    }
+	}
+    }
+    return 0;
+}
+
+#
+# Boot (Start) all of the slivers. This does the entire set, and blocks
+# till done.
+#
+sub StartSlivers($$)
+{
+    my ($experiment, $user) = @_;
+
+    #
+    # Get the resource objects.
+    #
+    my @resources = GeniResource->LookupAll($experiment);
+    if (! @resources) {
+	return 0;
+    }
+
+    #
+    # Start slivers in parallel.
+    # 
+    my @results = ();
+    my $coderef = sub {
+	my ($resource) = @_;
+
+	print STDERR "Starting ($$) sliver $resource\n";
+	
+	return $resource->StartSliver($user);
+    };
+    if (ParRun(undef, \@results, $coderef, @resources)) {
+	print STDERR "*** StartSlivers: Internal error starting slivers.\n";
+	return -1;
+    }
+    #
+    # Check the exit codes. Eventually return specific error info.
+    #
+    my $errors = 0;
+    my $count  = 0;
+    my @tmp    = ();
+    foreach my $result (@results) {
+	my $resource = $resources[$count];
+	
+	if ($result != 0) {
+	    print STDERR "*** Error starting slivers for $resource\n";
+	    $errors++;
+	}
+	else {
+	    push(@tmp, $resource);
+	}
+	$count++;
+    }
+    return WaitForSlivers($experiment, $user, @tmp);
+}
+
+sub WaitForSlivers($$@)
+{
+    my ($experiment, $user, @resources) = @_;
+    my %nodemap = ();
+
+    #
+    # Get the resource objects.
+    #
+    @resources = GeniResource->LookupAll($experiment)
+	if (!@resources);
+    
+    if (! @resources) {
+	return 0;
+    }
+
+    #
+    # Build a map of the nodes.
+    #
+    my @nodelist = $experiment->NodeList(0, 1);
+    foreach my $node (@nodelist) {
+	next
+	    if (!defined($node->external_resource_id()) ||
+		$node->external_resource_id() eq "");
+	
+	$nodemap{$node->external_resource_id()} = $node;
+	$node->Refresh();
+    }
+
+    #
+    # Now we use parrun again to get the sliver status. We are waiting
+    # for them to become ready so we can send them into ISUP. 
+    #
+    my $coderef = sub {
+	my ($resource) = @_;
+	my $ref;
+
+	print STDERR "Waiting ($$) for sliver $resource\n";
+
+	if ($resource->SliverStatus($user, \$ref) != 0) {
+	    print STDERR "Error getting sliver status for $resource\n";
+	    # Tell the parent error.
+	    return -1;
+	}
+	print STDERR Dumper($ref);
+
+	#
+	# If the results indicate ready, send ISUP for all of the
+	# nodes. Yes, this treats the nodes as a block. Change later.
+	#
+	if ($ref->{'status'} eq "ready") {
+	    print STDERR "Sliver ready for $resource\n";
+	    
+	    foreach my $key (keys(%{ $ref->{'detailsNew'} })) {
+		my $val  = $ref->{'detailsNew'}->{$key};
+		my $node = $nodemap{$key};
+
+		print STDERR "  Node $key says $val.\n";
+		if (!defined($node)) {
+		    print STDERR "No node in map for $key ($resource)\n";
+		    next;
+		}
+
+		#
+		# Only look for ready transition, and send ISUP.
+		# Eventually have the CM tell us about failure.
+		#
+		if ($val eq "ready" && !$node->IsUp()) {
+		    print STDERR "    Sending ISUP event.\n";
+		    $node->SetEventState(TBDB_NODESTATE_ISUP());
+		}
+	    }
+	    # Tell the parent ready.
+	    return 0;
+	}
+	# Tell the parent not ready.
+	return 1;
+    };
+    while (@resources) {
+	my @results = ();
+	
+	if (ParRun(undef, \@results, $coderef, @resources)) {
+	    print STDERR
+		"*** WaitForSlivers: Internal error waiting on slivers.\n";
+	    return -1;
+	}
+
+	my @tmp = ();
+	while (@results) {
+	    my $result   = pop(@results);
+	    my $resource = pop(@resources);
+	    if ($result > 0) {
+		push(@tmp, $resource);
+	    }
+	}
+	@resources = @tmp;
+
+	sleep(10)
+	    if (@resources);
+    }
+    return 0;
+}
+
+#
+# Delete all slivers for an Experiment.
+#
+sub DeleteAllSlivers($$)
+{
+    my ($experiment, $user) = @_;
+
+    #
+    # Get the resource objects.
+    #
+    my @resources = GeniResource->LookupAll($experiment);
+    if (! @resources) {
+	return 0;
+    }
+
+    foreach my $resource (@resources) {
+	print STDERR "Deleting sliver for $resource\n";
+	if ($resource->Clear($user)) {
+	    print STDERR
+		"DeleteSlivers: Could not delete sliver for $resource\n";
+	    return -1;
+	}
+    }
+
+    return 0;
+}
+
+#
+# Find the proxy (widearea) node given a urn.
+#
+sub LookupProxyNode($)
+{
+    my ($node_urn) = @_;
+
+    my $query_result =
+	DBQueryWarn("select node_id,hostname from widearea_nodeinfo ".
+		    "where external_node_id='$node_urn'");
+    return undef
+	if (!$query_result);
+
+    if ($query_result->numrows) {
+	my ($node_id,$hostname) = $query_result->fetchrow_array();
+	my $node = Node->Lookup($node_id);
+	if (!defined($node)) {
+	    print STDERR "Could not get object for $node_id ($node_urn)\n";
+	    return undef;
+	}
+	return $node;
+    }
+
+    #
+    # We have to create the local node proxy. 
+    #
+    return GeniEmulab::CreatePhysNode($node_urn);
+}
+
+1;
