@@ -927,7 +927,7 @@ if ($widearea && ! defined($component_name)) {
 		     "   group by type) as dedicated_wa_types ".
 		     "  on nt.type=dedicated_wa_types.type ".
 		     "where  (n.role='testnode' and nt.isremotenode=1 and ".
-		     "        nt.isvirtnode=0 and ".
+		     "        nt.isvirtnode=0 and nt.type!='pcfedphys' and ".
 		     "        dedicated_wa_types.attrvalue is NULL)");
     
     while (($physnode,$ptype,$status,$mpid,$meid,$site,$country,$latitude,
