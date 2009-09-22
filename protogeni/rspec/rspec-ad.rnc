@@ -27,7 +27,14 @@ NodeContents &=
 
   # Indicates whether the node is in sharing mode: exclusive is true if
   # the component manager will agree to promise not to share it.
-  element exclusive { xsd:boolean }
+  element exclusive { xsd:boolean } &
+
+  # Marks this node as a stand-in for a large network rather than a
+  # single machine. This means that other CMs can make external
+  # references to this node without a corresponding external reference
+  # in this advertisement. It also means that it makes sense for
+  # multiple physical links to connect to the same interface.
+  element cloud { empty }
 
 LinkContents &=
   # Component identifiers
@@ -42,8 +49,17 @@ InterfaceDecl &=
 InterfaceRef &=
   ComponentInterfaceRefName
 
+# Reference to components managed by other component managers.
+# TODO: Merge ComponentInterfaceRefName into just component_id when
+# length restrictions on URNs end.
+ExternalReference = element external_ref {
+  ComponentInterfaceRefName &
+  attribute component_manager_uuid { text }
+}
+
 RSpecContents &=
   attribute type { "advertisement" } &
+  ExternalReference* &
   BgpPrefix*
 
 BgpPrefix = element bgp_prefix {
