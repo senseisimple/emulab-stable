@@ -35,7 +35,7 @@ my $BOSSNODE    = "@BOSSNODE@";
 my $PGENISUPPORT= @PROTOGENI_SUPPORT@;
 
 if ($PGENISUPPORT) {
-    require GeniEmulab;
+    require libGeni;
 }
 
 #
