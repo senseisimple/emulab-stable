@@ -273,6 +273,14 @@ sub Create($$$)
 	    return undef;
 	}
     }
+    if (! (defined($card) && defined($ifrole) && defined($MAC) &&
+	   defined($IP) && defined($port) && defined($mask) &&
+	   defined($iftype) && defined($iface) && defined($max_speed) &&
+	   defined($duplex) && defined($uuid))) {
+	print STDERR "Interface::Create: Missing fields in arguments:\n";
+	print STDERR Dumper($argref);
+	return undef;
+    }
     DBQueryWarn("insert into interfaces set ".
 		"  node_id='$node_id', " .
 		"  card=$card, port=$port, role='$ifrole', ".
