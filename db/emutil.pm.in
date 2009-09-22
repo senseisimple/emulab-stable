@@ -22,6 +22,12 @@ use English;
 my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $BOSSNODE    = "@BOSSNODE@";
+my $EVENTSYS    = "@EVENTSYS@";
+
+if ($EVENTSYS) {
+    require event;
+    import event;
+}
 
 # Constants for checkslot code.
 sub TBDB_CHECKDBSLOT_NOFLAGS()	{ 0x0; }
@@ -351,7 +357,10 @@ sub ParRun($$$@)
 		$SIG{QUIT} = 'DEFAULT';
 		$SIG{HUP}  = 'DEFAULT';
 		
-		TBdbfork();	# So we get the event system fork too ...
+		if ($EVENTSYS) {
+		    # So we get the event system fork too ...
+		    EventFork();
+		}
 		exit(&$function($object));
 	    }
 	}
