@@ -1989,7 +1989,7 @@ sub readifIndex($) {
    
 	foreach my $rowref (@$rows) {
 	    my ($name,$iid,$descr) = @$rowref;
-	    if ($descr =~ /(\w*)(\d+)\/(\d+)$/) {
+	    if ($descr =~ /(\D*)(\d+)\/(\d+)$/) {
                 my $type = $1;
                 my $module = $2;
                 my $port = $3;
