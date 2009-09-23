@@ -944,6 +944,11 @@ sub GetTicket($;$)
 	    my $ip     = "10.10.${linknum}.${ifacenum}";
 	    my $mask   = "255.255.255.0";
 	    my $member = "$node_nickname:$iface_vport";
+	    my $bandwidth = 100000;
+
+	    # Let user override.
+	    $bandwidth = $linkref->{'bandwidth'}
+	        if (exists($linkref->{'bandwidth'}));
 	    
 	    $virtexperiment->NewTableRow("virt_lans",
 					 {"vname"       => $nickname,
@@ -952,12 +957,12 @@ sub GetTicket($;$)
 					  "trivial_ok"  => 1,
 					  "ip"          => $ip,
 					  "delay"       => 0.0,
-					  "bandwidth"   => 100000, # kbps
+					  "bandwidth"   => $bandwidth, # kbps
 					  "lossrate"    => 0.0,
 					  "member"      => $member,
 					  "mask"        => $mask,
 					  "rdelay"      => 0.0,
-					  "rbandwidth"  => 100000, # kbps
+					  "rbandwidth"  => $bandwidth, # kbps
 					  "rlossrate"   => 0.0,
 					  "fixed_iface" => $iface_name});
 	    $ifacenum++;
