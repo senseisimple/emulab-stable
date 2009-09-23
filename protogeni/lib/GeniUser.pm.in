@@ -686,6 +686,8 @@ sub created($)		{ return $_[0]->{'USER'}->created(); }
 sub name($)		{ return $_[0]->{'USER'}->name(); }
 sub email($)		{ return $_[0]->{'USER'}->email(); }
 sub GetSSHKeys($$)      { return $_[0]->{'USER'}->GetSSHKeys($_[1]); }
+sub SSLPassPhrase($$$)  { return $_[0]->{'USER'}->SSLPassPhrase($_[1],$_[2]); }
+sub HomeDir($)          { return $_[0]->{'USER'}->HomeDir(); }
 
 # Need to construct this since not in User structure.
 sub hrn($)		{ return "${PGENIDOMAIN}." . $_[0]->uid(); }
