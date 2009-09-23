@@ -57,7 +57,8 @@ sub Cleanup();
 # Locals
 my $CTRLIPFILE = "/var/emulab/boot/myip";
 my $VMPATH     = "/var/emulab/vms";
-
+my $IPTABLES   = "/sbin/iptables";
+	    
 #
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
@@ -260,6 +261,16 @@ else {
     $rebooting = 1;
 }
 
+my $cnet_mac = ipToMac($vnconfig{'CTRLIP'});
+my $ext_ctrlip = `cat $CTRLIPFILE`;
+chomp($ext_ctrlip);
+if ($ext_ctrlip !~ /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/) {
+    # cannot/should not really go on if this happens.
+    MyFatal("error prior to vnodePreConfigControlNetwork($vnodeid): " . 
+	    " could not find valid ip in $CTRLIPFILE!");
+}
+my $longdomain = "${eid}.${pid}.${DOMAINNAME}";
+
 #
 # Call back to do things to the container before it boots.
 #
@@ -274,6 +285,21 @@ sub callback($)
 	    return -1;
 	}
     }
+    #
+    # Set up sshd port to listen on. If the vnode has its own IP
+    # then listen on both 22 and the per-vnode port.
+    #
+    if (system('grep -q -e EmulabJail $path/etc/ssh/sshd_config')) {
+	if (exists($vnconfig{'SSHDPORT'}) && $vnconfig{'SSHDPORT'} ne "") {
+	    my $sshdport = $vnconfig{'SSHDPORT'};
+
+	    system("echo '# EmulabJail' >> $path/etc/ssh/sshd_config");
+	    system("echo 'Port $sshdport' >> $path/etc/ssh/sshd_config");
+	    if ($vnconfig{'CTRLIP'} ne $ext_ctrlip) {
+		system("echo 'Port 22' >> $path/etc/ssh/sshd_config");
+	    }
+	}
+    }
     return 0;
 }
 
@@ -283,16 +309,6 @@ if (safeLibOp($vnodeid,'vnodePreConfig',1,1,$vnodeid,$vmid,\&callback)) {
 }
 
 # OP: control net preconfig
-my $cnet_mac = ipToMac($vnconfig{'CTRLIP'});
-my $ext_ctrlip = `cat $CTRLIPFILE`;
-chomp($ext_ctrlip);
-if ($ext_ctrlip !~ /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/) {
-    # cannot/should not really go on if this happens.
-    MyFatal("error prior to vnodePreConfigControlNetwork($vnodeid): " . 
-	    " could not find valid ip in $CTRLIPFILE!");
-}
-my $longdomain = "${eid}.${pid}.${DOMAINNAME}";
-    
 if (safeLibOp($vnodeid,'vnodePreConfigControlNetwork',1,1,
 	      $vnodeid,$vmid,$vnconfig{'CTRLIP'},
 	      $vnconfig{'CTRLMASK'},$cnet_mac,
@@ -311,6 +327,17 @@ if (safeLibOp($vnodeid,'vnodeConfigResources',1,1,$vnodeid,$vmid)) {
 }
 if (safeLibOp($vnodeid,'vnodeConfigDevices',1,1,$vnodeid,$vmid)) {
     MyFatal("vnodeConfigDevices failed");
+}
+
+#
+# Route to inner sshd
+#
+if (exists($vnconfig{'SSHDPORT'}) && $vnconfig{'SSHDPORT'} ne "") {
+    my $sshdport = $vnconfig{'SSHDPORT'};
+    my $ctrlip   = $vnconfig{'CTRLIP'};
+	
+    system("$IPTABLES -v -t nat -A PREROUTING -p tcp -d $ext_ctrlip ".
+	   "--dport $sshdport -j DNAT --to-destination $ctrlip:$sshdport");
 }
 
 #
@@ -430,6 +457,14 @@ sub Cleanup()
     # If the container was never built, there is nothing to do.
     return 0
 	if (! -e "$VNDIR/vnode.info" || !defined($vmid));
+
+    if (exists($vnconfig{'SSHDPORT'}) && $vnconfig{'SSHDPORT'} ne "") {
+	my $sshdport = $vnconfig{'SSHDPORT'};
+	my $ctrlip   = $vnconfig{'CTRLIP'};
+	
+	system("$IPTABLES -v -t nat -D PREROUTING -p tcp -d $ext_ctrlip ".
+	       "--dport $sshdport -j DNAT --to-destination $ctrlip:$sshdport");
+    }
 
     # if not halted, try that first
     my ($ret,$err) = safeLibOp($vnodeid,'vnodeState',1,0,$vnodeid,$vmid);
