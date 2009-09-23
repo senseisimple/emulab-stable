@@ -42,7 +42,16 @@ def Usage():
                                             [default: ~/.ssl/password]
     -r file, --read-commands=file       specify additional configuration file
     -s file, --slicecredentials=file    read slice credentials from file
-                                            [default: query from SA]"""
+                                            [default: query from SA]
+    -u, --update                        perform an update after creation"""
+
+update = False
+# We're supposed to make a temporary copy of a list to iterate over it
+# if we might also mutate it.  Silly Python.
+for arg in sys.argv[:]:
+    if arg == "-u" or ( len( arg ) >= 3 and "--update".find( arg ) == 0 ):
+        sys.argv.remove( arg )
+        update = True
 
 execfile( "test-common.py" )
 
@@ -152,35 +161,36 @@ sliver,manifest = response["value"]
 print "Created the sliver"
 print str(manifest)
 
-#
-# Get an updated ticket using the manifest. Normally the user would
-# actually change the contents.
-#
-print "Updating the original ticket ..."
-params = {}
-params["credential"] = myslice
-params["ticket"]     = ticket
-params["rspec"]      = manifest
-rval,response = do_method("cm", "UpdateTicket", params)
-if rval:
-    Fatal("Could not update the ticket")
-    pass
-newticket = response["value"]
-print "Got an updated ticket from the CM. Updating the sliver ..."
+if update:
+    #
+    # Get an updated ticket using the manifest. Normally the user would
+    # actually change the contents.
+    #
+    print "Updating the original ticket ..."
+    params = {}
+    params["credential"] = myslice
+    params["ticket"]     = ticket
+    params["rspec"]      = manifest
+    rval,response = do_method("cm", "UpdateTicket", params)
+    if rval:
+        Fatal("Could not update the ticket")
+        pass
+    newticket = response["value"]
+    print "Got an updated ticket from the CM. Updating the sliver ..."
 
-#
-# Update the sliver
-#
-params = {}
-params["credential"] = sliver
-params["ticket"]     = newticket
-rval,response = do_method("cm", "UpdateSliver", params)
-if rval:
-    Fatal("Could not update sliver on CM")
-    pass
-manifest = response["value"]
-print "Updated the sliver on the CM. Starting the sliver ..."
-print str(manifest)
+    #
+    # Update the sliver
+    #
+    params = {}
+    params["credential"] = sliver
+    params["ticket"]     = newticket
+    rval,response = do_method("cm", "UpdateSliver", params)
+    if rval:
+        Fatal("Could not update sliver on CM")
+        pass
+    manifest = response["value"]
+    print "Updated the sliver on the CM. Starting the sliver ..."
+    print str(manifest)
 
 #
 # Start the sliver.
