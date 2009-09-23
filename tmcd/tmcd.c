@@ -1074,11 +1074,9 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	}
 
 	/*
-	 * Redirect is allowed from the local host only!
-	 * I use this for testing. See below where I test redirect
-	 * if the verification fails. 
+	 * Redirect is allowed from the local host only.
 	 */
-	if (!insecure && redirect &&
+	if (redirect &&
 	    redirect_client.sin_addr.s_addr != myipaddr.s_addr) {
 		char	buf1[32], buf2[32];
 		
