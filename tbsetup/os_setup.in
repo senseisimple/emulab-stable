@@ -8,6 +8,7 @@
 use English;
 use Getopt::Std;
 require 'ctime.pl';
+use POSIX ":sys_wait_h";
 
 #
 # Reboot the nodes in an experiment. The nodes table will already contain
@@ -39,6 +40,7 @@ my $DBNAME	= "@TBDBNAME@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $TESTMODE    = @TESTMODE@;
 my $TFTP	= "/tftpboot";
+my $PGENISUPPORT= @PROTOGENI_SUPPORT@;
 
 #
 # Testbed Support libraries
@@ -52,8 +54,12 @@ use libtblog;
 use libArchive;
 use Template;
 use NodeType;
+use Experiment;
 use OSinfo;
 use User;
+if ($PGENISUPPORT) {
+    require libGeni;
+}
 
 TBDebugTimeStampsOn();
 
@@ -66,6 +72,7 @@ my $failed      = 0;
 my $noretry     = 0;
 my $failedvnodes= 0;
 my $failedplab  = 0;
+my $failedgeni  = 0;
 my $canceled    = 0;
 my %nodes       = ();
 my %vnodes      = ();
@@ -73,6 +80,7 @@ my %vnodephosts = ();
 my %vnode2pnode = ();
 my %pnodevcount = ();
 my %plabvnodes  = ();
+my %geninodes   = ();
 my %osids       = ();
 my %osmap       = ();
 my %canfail     = ();
@@ -80,6 +88,8 @@ my %bios_waittime   = ();	# Indexed by node_type.
 my %reboot_waittime = ();	# Indexed by osid.
 my %node_types  = ();		# Indexed by node_id.
 my %vname = ();                 # Indexed by node_id.
+my $plab_setup_pid;		# Run plab setup in parallel.
+my $geni_setup_pid;		# Run geni setup in parallel.
 
 #
 # This variable keeps track of the failed nodes of all types.
@@ -107,6 +117,7 @@ my $dolastload  = 1;
 sub SetupReload($$$);
 sub FirewallSetup($);
 sub os_setup_one($$$;$);
+sub KillChildren();
 				  
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -125,6 +136,7 @@ sub die_noretry($;$)
     $parms = shift if ref $_[0] eq 'HASH';
     my ($mesg) = shift;
     tberror($parms, $mesg);
+    KillChildren();
     exit(-1);
 }
 
@@ -163,15 +175,6 @@ else {
 }
 
 #
-# Figure out who called us. Only root, people with admin status
-# in the DB, or the owner of the experiment can run this script.
-#
-if ($UID && !TBAdmin($UID) &&
-    !TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_MODIFY)) {
-    die_noretry("You do not have permission to swap this experiment!");
-}
-
-#
 # Verify user and get his DB uid and other info for later.
 #
 my $this_user = User->ThisUser();
@@ -183,23 +186,29 @@ my $user_name     = $this_user->name();
 my $user_email    = $this_user->email();
 my $user_email_to = "$user_name <$user_email>";
 
+#
+# Check permission.
+#
+my $experiment = Experiment->Lookup($pid, $eid);
+if (!defined($experiment)) {
+    die_noretry("Could not find experiment object for $pid/$eid!");    
+}
+if (!$experiment->AccessCheck($this_user, TB_EXPT_MODIFY)) {
+    die_noretry("You do not have permission to swap this experiment!");
+}
 TBDebugTimeStamp("os_setup started");
 
 #
 # See if the experiment is firewalled
 #
 my $firewall;
-my $firewalled = TBExptFirewall($pid, $eid, \$firewall);
+my $firewalled = $experiment->IsFirewalled(\$firewall);
 my $firewallimage;
 
 #
 # Ditto ElabinElab.
 #
-my $elabinelab;
-if (! TBExptIsElabInElab($pid, $eid, \$elabinelab)) {
-    die("*** $0:\n".
-	"    Could not get elabinelab status for experiment $pid/$eid\n");
-}
+my $elabinelab = $experiment->elabinelab();
 
 #
 # Ditto PlabinElab.
@@ -237,17 +246,31 @@ while (my %row = $db_result->fetchhash()) {
     my $subnode   = $typeinfo->issubnode();
     my $virtnode  = $typeinfo->isvirtnode();
     my $isremote  = $typeinfo->isremotenode();
+    my $isgeninode= $typeinfo->isfednode();
     my $imageable = $typeinfo->imageable();
     my $plabnode  = $typeinfo->isplabdslice();
     my $bios_wait = $typeinfo->bios_waittime();
     my $bootpath  = 0;
     my $osinfo    = undef;
 
-    #
-    # VIRTNODE HACK: Virtual nodes are special. Jailed vnodes can do quite
-    # a bit, and so run them through the checks below.
-    #
-    if ($virtnode) {
+    if ($isgeninode) {
+	#
+	# Geni nodes are currently a lot like plab nodes, but that will
+	# change later.
+	#
+	if ($virtnode) {
+	    $vnodes{$node} = $virtnode;
+	}
+	else {
+	    $nodes{$node}  = $node;
+	}
+	$geninodes{$node}  = 1;
+    }
+    elsif ($virtnode) {
+	#
+	# Virtual nodes are special. Jailed vnodes can do quite a bit,
+	# and so run them through the checks below.
+	#
 	$vnodes{$node} = ($jailnode || $plabnode || $isremote);
 	$plabvnodes{$node} = $plabnode;
 	if (! $jailnode && ! $plabnode && !$isremote) {
@@ -366,7 +389,7 @@ while (my %row = $db_result->fetchhash()) {
     # associated with it, which means the same thing; we don't worry about
     # it.
     #
-    if (!$bootpath && !$virtnode && $imageable) {
+    if (!$bootpath && !$virtnode && !$isgeninode && $imageable) {
 	#
 	# These checks are not necessary if the front end and web page
 	# are doing the right thing, but lets be careful anyway.
@@ -510,6 +533,8 @@ foreach my $vnode (keys(%vnodes)) {
     my $jailed = $vnodes{$vnode};
     my $pnode;
 
+#    print "$vnode, $jailed\n";
+
     if (! $jailed) {
 	next;
     }
@@ -517,6 +542,8 @@ foreach my $vnode (keys(%vnodes)) {
     if (! TBPhysNodeID($vnode, \$pnode)) {
 	die_noretry("Cannot determine phys_nodeid for $vnode!");
     }
+
+#    print "$vnode, $jailed, $pnode\n";
 
     #
     # Count up the number of jailed nodes on this pnode, and add the
@@ -653,7 +680,6 @@ if ($plabinelab) {
 # Start up plab vnode setup now since it doesn't depend on
 # physical node readiness.
 #
-my $plab_setup_pid = -1;
 if (grep($_, values(%plabvnodes))) {
     my $plabnumbatch = TBGetSiteVar("plab/setup/vnode_batch_size");
     my $plabwait     = TBGetSiteVar("plab/setup/vnode_wait_time");
@@ -662,8 +688,40 @@ if (grep($_, values(%plabvnodes))) {
         exec("$vnode_setup -p -n $plabnumbatch -w $plabwait $pid $eid") 
             or die_noretry("Exec failed.");
     } elsif ($plab_setup_pid == -1) {
-        die_noretry("Fork failed.");
+        die_noretry("Plab fork failed.");
     }
+}
+
+#
+# Ditto for Geni nodes. Parent keeps going.
+#
+if (keys(%geninodes)) {
+    TBDebugTimeStamp("Starting Geni setup.");
+
+    #
+    # Need to initialize the eventstate. Move this elsewhere?
+    #
+    foreach my $node (keys(%geninodes)) {
+	TBSetNodeEventState($node, TBDB_NODESTATE_SHUTDOWN())
+	    if (exists($nodes{$node}));
+    }
+
+    $geni_setup_pid = fork();
+    if (! $geni_setup_pid) {
+	TBdbfork();	# So we get the event system fork too ...
+
+	if (libGeni::StartSlivers($experiment, $this_user)) {
+	    print STDERR "*** Could not start Geni slivers\n";
+	    exit(-1);
+	}
+	TBDebugTimeStamp("Geni slivers have been started.");
+	exit(0);
+    }
+    elsif ($geni_setup_pid == -1) {
+        die_noretry("Geni fork failed.");
+    }
+    # Give it a chance to get going.
+    sleep(1);
 }
 
 #
@@ -844,7 +902,7 @@ if (@nodelist) {
 my %retries;
 my %waitstart;
 foreach my $node ( @nodelist ) {
-    $retries{$node} = 1;
+    $retries{$node} = (exists($geninodes{$node}) ? 0 : 1);
     $waitstart{$node} = time;
 }
 
@@ -931,8 +989,9 @@ while ( @nodelist ) {
     # doing the nfree on nodes with a DOWN allocstate).
     #
     my $pidofosid;
-    if (! TBOsidToPid($osids{$node}, \$pidofosid) ||
-	$pidofosid eq TBOPSPID()) {
+    if (!exists($geninodes{$node}) &&
+	(! TBOsidToPid($osids{$node}, \$pidofosid) ||
+	 $pidofosid eq TBOPSPID())) {
 	MarkNodeDown($node);
 	TBSetNodeLogEntry($node, $user_uid, TB_DEFAULT_NODELOGTYPE(),
 			  "'Moved to hwdown by os_setup; ".
@@ -1018,7 +1077,7 @@ foreach my $vnode (@vnodelist) {
     # Default retry count.
     $retries{$vnode} = 0;
 
-    # Remote node, always does setup.
+    # Remote or shared node, always does setup.
     next
 	if (!exists($nodes{$pnode}));
     
@@ -1058,20 +1117,22 @@ elsif (@vnodelist) {
     print "Setting up virtual testbed nodes ...\n";
 
     # Wait for plab vnode setup to finish if it's running.
-    if ($plab_setup_pid > 0) {
+    if (defined($plab_setup_pid) && $plab_setup_pid > 0) {
         my $kid = waitpid($plab_setup_pid,0);
         if ($kid == $plab_setup_pid) {
+	    $plab_setup_pid = undef;
             if ($?) {
                 die_noretry("Failed to setup plab vnodes.");
             }
-        } else {
+        }
+	else {
             die_noretry("Error waiting for plab vnode to finish.");
         }
     }
 
   retry:
     TBDebugTimeStamp("Setting up virtual nodes");
-    # Only fire off local (jailed) nodes here.  Plab vnode setup has
+    # Only fire off local (jailed) nodes here. Plab/Geni vnode setup has
     # already been started at this point.
     system("$vnode_setup -j $pid $eid");
     if ($?) {
@@ -1189,6 +1250,9 @@ elsif (@vnodelist) {
 	if ($plabvnodes{$node}) {
 	    $failedplab++;
 	}
+	if ($geninodes{$node}) {
+	    $failedgeni++;
+	}
 	else {
 	    $failedvnodes++;
 	}
@@ -1221,6 +1285,8 @@ elsif (@vnodelist) {
 	}
     }
 }
+# Make sure Geni child is gone.
+KillChildren();
 
 #
 # Spam time!  Send mail to the user and testbed-ops about failures.
@@ -1443,11 +1509,12 @@ if (defined $tally{reload}) {
 	}
     }
 }
-if ($failed || $failedvnodes || $failedplab) {
+if ($failed || $failedvnodes || $failedplab || $failedgeni) {
     my @msg;
     push @msg, "$failed failed nodes"               if $failed;
     push @msg, "$failedvnodes failed virtual nodes" if $failedvnodes;
     push @msg, "$failedplab failed plab nodes"      if $failedplab;
+    push @msg, "$failedgeni failed geni nodes"      if $failedgeni;
     tberror ({type=>'summary', cause=>($users_fault ? 'user' : 'unknown')}, 
 	     "There were ", join(', ', @msg), ".\n\n", $summary);
 } elsif ($summary) {
@@ -1456,7 +1523,7 @@ if ($failed || $failedvnodes || $failedplab) {
 
 # No retry if vnodes failed. Indicates a fatal problem.
 my $exit_code = 0;
-$exit_code = -1 if ($failedvnodes || $canceled || $noretry);
+$exit_code = -1 if ($failedvnodes || $canceled || $noretry || $failedgeni);
 $exit_code =  1 if ($failed || $failedplab);
 
 #
@@ -1474,7 +1541,8 @@ if ($exit_code == 0) {
 	my %prev_alloc;
 	my $cant_find_prev_alloc = 0;
 	if ($state eq 'modify_reswap') {
-	    die "lastrsrc not set during swapmod" unless defined $lastrsrc;
+	    die_noretry("lastrsrc not set during swapmod")
+		unless defined $lastrsrc;
 	    my $db_result =
 		DBQueryFatal("select node_id from image_history where rsrcidx = $lastrsrc");
 	    if ($db_result->numrows() < 1) {
@@ -1776,3 +1844,43 @@ sub os_setup_one($$$;$)
 
     return 1;
 }
+
+sub KillChildren()
+{
+    # Make sure the Geni setup is finished or killed.
+    if (defined($geni_setup_pid) && $geni_setup_pid > 0) {
+	my $kid = waitpid($geni_setup_pid, &WNOHANG);
+    
+	if ($kid == $geni_setup_pid) {
+	    $geni_setup_pid = undef;
+	}
+	elsif ($kid == -1) {
+	    # Already exited? Odd.
+	    $geni_setup_pid = undef;
+	}
+	else {
+	    # Need to kill it. Block here for now, on the premise that if
+	    # the child hangs on something, I want to come look at it. 
+	    kill('TERM', $geni_setup_pid);
+	    $kid = waitpid($geni_setup_pid, 0);
+	}
+    }
+    if (defined($plab_setup_pid) && $plab_setup_pid > 0) {
+	my $kid = waitpid($plab_setup_pid, &WNOHANG);
+    
+	if ($kid == $plab_setup_pid) {
+	    $plab_setup_pid = undef;
+	}
+	elsif ($kid == -1) {
+	    # Already exited? Odd.
+	    $plab_setup_pid = undef;
+	}
+	else {
+	    # Need to kill it. Block here for now, on the premise that if
+	    # the child hangs on something, I want to come look at it. 
+	    kill('TERM', $plab_setup_pid);
+	    $kid = waitpid($plab_setup_pid, 0);
+	}
+    }
+}
+
