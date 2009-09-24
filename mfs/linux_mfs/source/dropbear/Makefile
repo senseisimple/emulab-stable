@@ -20,7 +20,7 @@ install: $(TARGET_PATH)/usr/sbin/dropbear
 
 $(DROPBEAR_PATH)/.extract-stamp:
 	mkdir -p $(TARGET_BUILD_PATH)
-	cd $(TARGET_BUILD_PATH); tar xzf $(SOURCE_PATH)/dropbear/dropbear-$(DROPBEAR_VERSION).tar.gz
+	cd $(TARGET_BUILD_PATH); tar xzf $(TARBALL_PATH)/dropbear-$(DROPBEAR_VERSION).tar.gz
 	touch $@
 
 $(DROPBEAR_PATH)/.patch-stamp: $(DROPBEAR_PATH)/.extract-stamp

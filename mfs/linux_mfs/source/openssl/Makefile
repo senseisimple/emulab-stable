@@ -28,7 +28,7 @@ OPENSSL_CFLAGS		=	-D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=
 
 $(OPENSSL_PATH)/.extract-stamp:
 	mkdir -p $(TARGET_BUILD_PATH)
-	cd $(TARGET_BUILD_PATH); tar xzf $(SOURCE_PATH)/openssl/openssl-$(OPENSSL_VERSION).tar.gz
+	cd $(TARGET_BUILD_PATH); tar xzf $(TARBALL_PATH)/openssl-$(OPENSSL_VERSION).tar.gz
 	touch $@
 
 $(OPENSSL_PATH)/.patch-stamp: $(OPENSSL_PATH)/.extract-stamp

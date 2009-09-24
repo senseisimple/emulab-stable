@@ -24,11 +24,11 @@ clean:
 
 $(HDPARM_PATH)/.extract-stamp:
 	mkdir -p $(TARGET_BUILD_PATH)
-	cd $(TARGET_BUILD_PATH); tar xzf $(SOURCE_PATH)/hdparm/hdparm-$(HDPARM_VERSION).tar.gz
+	cd $(TARGET_BUILD_PATH); tar xzf $(TARBALL_PATH)/hdparm-$(HDPARM_VERSION).tar.gz
 	touch $@
 
 $(HDPARM_PATH)/.patch-stamp: $(HDPARM_PATH)/.extract-stamp
-	$(SCRIPTS_PATH)/patch-kernel.sh $(HDPARM_PATH) $(SOURCE_PATH)/hdparm/ '*.patch'
+	$(SCRIPTS_PATH)/patch-kernel.sh $(HDPARM_PATH) $(SOURCE_PATH)/hdparm '*.patch'
 	touch $@
 
 $(HDPARM_PATH)/.config-stamp: $(HDPARM_PATH)/.patch-stamp

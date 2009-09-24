@@ -27,11 +27,11 @@ install: $(TARGET_PATH)/sbin/mke2fs $(TARGET_PATH)/sbin/tune2fs $(TARGET_PATH)/s
 
 $(E2FSPROGS_PATH)/.extract-stamp:
 	mkdir -p $(TARGET_BUILD_PATH)
-	cd $(TARGET_BUILD_PATH); tar xzf $(SOURCE_PATH)/e2fsprogs/e2fsprogs-$(E2FSPROGS_VERSION).tar.gz
+	cd $(TARGET_BUILD_PATH); tar xzf $(TARBALL_PATH)/e2fsprogs-$(E2FSPROGS_VERSION).tar.gz
 	touch $@
 
 $(E2FSPROGS_PATH)/.patch-stamp: $(E2FSPROGS_PATH)/.extract-stamp
-	$(SCRIPTS_PATH)/patch-kernel.sh $(E2FSPROGS_PATH) $(SOURCE_PATH)/e2fsprogs/ '*.patch'
+	$(SCRIPTS_PATH)/patch-kernel.sh $(E2FSPROGS_PATH) $(SOURCE_PATH)/e2fsprogs '*.patch'
 	touch $@
 
 		#--build=$(GNU_HOST_NAME) \

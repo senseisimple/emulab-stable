@@ -24,12 +24,15 @@ patch: $(PERL_PATH)/.patch-stamp
 
 config: $(PERL_PATH)/.config-stamp
 
-perl: config
+	     #LD_LIBRARY_PATH=$(STAGING_DIR)/lib:/lib \
+
+$(PERL_PATH)/perl: config
 	PATH=$(STAGING_DIR)/usr/bin:$(PATH) \
-		LD_LIBRARY_PATH=$(STAGING_DIR)/lib \
 		$(MAKE) -C $(PERL_PATH)
 
-install:
+perl: $(PERL_PATH)/perl
+
+install: $(PERL_PATH)/perl
 	$(STRIPCMD) --strip-unneeded $(PERL_PATH)/perl
 	find $(PERL_PATH)/lib -name \*.so | xargs \
 		$(STRIPCMD) --strip-unneeded
@@ -52,12 +55,13 @@ $(PERL_PATH)/.patch-stamp: $(PERL_PATH)/.extract-stamp
 	$(SCRIPTS_PATH)/patch-kernel.sh $(PERL_PATH) $(SOURCE_PATH)/perl/ '*.patch'
 	touch $@
 
+		#LD_LIBRARY_PATH=/lib:$(STAGING_DIR)/lib; \
+
 $(PERL_PATH)/.config-stamp: $(PERL_PATH)/.patch-stamp
 	cp $(SOURCE_PATH)/perl/config.sh $(PERL_PATH)
-	(export PATH=$(STAGING_DIR)/usr/bin:$(PATH) \
-		LD_LIBRARY_PATH=$(STAGING_DIR)/lib; \
+	(export PATH=$(STAGING_DIR)/usr/bin:$(PATH); \
 		cd $(PERL_PATH); \
-		sh ./Configure -der && \
+		sh ./Configure -der -f config.sh && \
 		sh ./makedepend)
 	sed -i /command-line/d $(PERL_PATH)/makefile
 	sed -i /command-line/d $(PERL_PATH)/x2p/makefile

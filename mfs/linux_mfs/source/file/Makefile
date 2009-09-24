@@ -25,7 +25,7 @@ clean:
 
 $(FILE_PATH)/.extract-stamp:
 	mkdir -p $(TARGET_BUILD_PATH)
-	cd $(TARGET_BUILD_PATH); tar xzf $(SOURCE_PATH)/file/file-$(FILE_VERSION).tar.gz
+	cd $(TARGET_BUILD_PATH); tar xzf $(TARBALL_PATH)/file-$(FILE_VERSION).tar.gz
 	touch $@
 
 $(FILE_PATH)/.patch-stamp: $(FILE_PATH)/.extract-stamp

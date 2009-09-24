@@ -24,11 +24,11 @@ clean:
 
 $(WGET_PATH)/.extract-stamp:
 	mkdir -p $(TARGET_BUILD_PATH)
-	cd $(TARGET_BUILD_PATH); tar xzf $(SOURCE_PATH)/wget/wget-$(WGET_VERSION).tar.gz
+	cd $(TARGET_BUILD_PATH); tar xzf $(TARBALL_PATH)/wget-$(WGET_VERSION).tar.gz
 	touch $@
 
 $(WGET_PATH)/.patch-stamp: $(WGET_PATH)/.extract-stamp
-	$(SCRIPTS_PATH)/patch-kernel.sh $(WGET_PATH) $(SOURCE_PATH)/wget/ '*.patch'
+	$(SCRIPTS_PATH)/patch-kernel.sh $(WGET_PATH) $(SOURCE_PATH)/wget '*.patch'
 	touch $@
 
 $(WGET_PATH)/.config-stamp: $(WGET_PATH)/.patch-stamp

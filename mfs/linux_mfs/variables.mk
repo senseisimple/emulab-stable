@@ -2,6 +2,7 @@ TOPDIR			=	$(PWD)
 SOURCE_PATH		=	$(TOPDIR)/source
 SCRIPTS_PATH		=	$(TOPDIR)/scripts
 TOOLCHAIN_BUILD_PATH	=	$(TOPDIR)/toolchain_build
+TARBALL_PATH		=	$(TOPDIR)/tarballs
 
 TARGET_BUILD_PATH	=	$(TOPDIR)/build
 TARGET_PATH		=	$(TOPDIR)/target

@@ -39,11 +39,11 @@ clean:
 
 $(PORTMAP_PATH)/.extract-stamp:
 	mkdir -p $(TARGET_BUILD_PATH)
-	cd $(TARGET_BUILD_PATH); tar xzf $(SOURCE_PATH)/portmap/portmap-$(PORTMAP_VERSION).tar.gz
+	cd $(TARGET_BUILD_PATH); tar xzf $(TARBALL_PATH)/portmap-$(PORTMAP_VERSION).tar.gz
 	touch $@
 
 $(PORTMAP_PATH)/.patch-stamp: $(PORTMAP_PATH)/.extract-stamp
-	$(SCRIPTS_PATH)/patch-kernel.sh $(PORTMAP_PATH) $(SOURCE_PATH)/portmap/ '*.patch'
+	$(SCRIPTS_PATH)/patch-kernel.sh $(PORTMAP_PATH) $(SOURCE_PATH)/portmap '*.patch'
 	touch $@
 
 $(PORTMAP_PATH)/.config-stamp: $(PORTMAP_PATH)/.patch-stamp

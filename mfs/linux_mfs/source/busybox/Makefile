@@ -28,11 +28,11 @@ menuconfig:
 
 $(BUSYBOX_PATH)/.extract-stamp:
 	mkdir -p $(TARGET_BUILD_PATH)
-	cd $(TARGET_BUILD_PATH); tar xjf $(SOURCE_PATH)/busybox/busybox-$(BUSYBOX_VERSION).tar.bz2
+	cd $(TARGET_BUILD_PATH); tar xjf $(TARBALL_PATH)/busybox-$(BUSYBOX_VERSION).tar.bz2
 	touch $@
 
 $(BUSYBOX_PATH)/.patch-stamp: $(BUSYBOX_PATH)/.extract-stamp
-	$(SCRIPTS_PATH)/patch-kernel.sh $(BUSYBOX_PATH) $(SOURCE_PATH)/busybox/ '*.patch'
+	$(SCRIPTS_PATH)/patch-kernel.sh $(BUSYBOX_PATH) $(SOURCE_PATH)/busybox '*.patch'
 	touch $@
 
 $(BUSYBOX_PATH)/.config-stamp: $(BUSYBOX_PATH)/.patch-stamp

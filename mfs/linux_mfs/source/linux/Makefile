@@ -48,7 +48,7 @@ modules-install: modules
 
 $(LINUX_PATH)/.extract-stamp:
 		mkdir -p $(TARGET_BUILD_PATH)
-		cd $(TARGET_BUILD_PATH); tar xjf $(SOURCE_PATH)/linux/linux-$(LINUX_VERSION).tar.bz2
+		cd $(TARGET_BUILD_PATH); tar xjf $(TARBALL_PATH)/linux-$(LINUX_VERSION).tar.bz2
 		touch $@
 
 $(LINUX_PATH)/.patch-stamp: $(LINUX_PATH)/.extract-stamp

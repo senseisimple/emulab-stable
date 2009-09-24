@@ -24,7 +24,7 @@ clean:
 
 $(SUDO_PATH)/.extract-stamp:
 	mkdir -p $(TARGET_BUILD_PATH)
-	cd $(TARGET_BUILD_PATH); tar xzf $(SOURCE_PATH)/sudo/sudo-$(SUDO_VERSION).tar.gz
+	cd $(TARGET_BUILD_PATH); tar xzf $(TARBALL_PATH)/sudo-$(SUDO_VERSION).tar.gz
 	touch $@
 
 $(SUDO_PATH)/.patch-stamp: $(SUDO_PATH)/.extract-stamp
