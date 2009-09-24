@@ -218,7 +218,7 @@ ntfs_skipfile(ntfs_volume *vol, char *filename, u_int32_t offset)
 		fprintf(stderr, "Out of memory\n");
 		exit(1);
 	}
-	bzero(ufilename,sizeof(ntfschar)*strlen(filename)+1);
+	memset(ufilename,0,sizeof(ntfschar)*strlen(filename)+1);
 	ulen = ntfs_mbstoucs(filename, &ufilename, strlen(filename)+1);
 	if(ulen == -1) {
 		perror("ntfs_mbstoucs failed");
