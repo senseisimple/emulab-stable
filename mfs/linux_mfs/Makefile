@@ -26,6 +26,7 @@ CLEAN_MODULES := $(addsuffix -clean,$(MODULES))
 all: $(MODULES)
 
 install: uclibc-install $(INSTALL_MODULES)
+	cp $(SCRIPTS_PATH)/remove_unneeded_modules.pl $(BOOT_PATH)
 
 clean:
 	rm -rf $(TARGET_PATH)
