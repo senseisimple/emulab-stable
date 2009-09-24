@@ -14,8 +14,6 @@ if [ $# -eq 1 -a "$1" = "-noreboot" ]; then
     reboot=0
 fi
 
-OS=`uname -s`
-
 #
 # Amount of memory in MB to leave for everyone else in the system.  If you
 # get out-of-memory or vm_pager error while running frisbee, increase this.
@@ -28,18 +26,6 @@ else
 	BINDIR=/etc/testbed
 	BOOTDIR=/etc/testbed
 	ETCDIR=/etc/testbed
-fi
-
-# See if we can map drive names to BIOS numbers via EDD
-if [ -x $BINDIR/get_edd_map.pl ]; then
-	$BINDIR/get_edd_map.pl > $BOOTDIR/edd_map
-fi
-
-
-# Behave a little different on widearea nodes.
-isrem=0
-if [ -e $ETCDIR/isrem ]; then
-    isrem=1
 fi
 
 get_value()
@@ -60,7 +46,7 @@ get_value()
 # Currently we only install a new MBR if the existing one is the
 # wrong size, just in case the user has customized the boot program.
 #
-install_mbr()
+tweakmbr()
 {
 	local disk=$1
 	local new_mbr_ver=$2
@@ -71,14 +57,9 @@ install_mbr()
 			return 255
 	fi
 
-	if [ "$OS" = Linux ]; then
-		size=`echo -e 'u\np\nq' | fdisk $disk 2> /dev/null| \
-			sed -n "s#^${disk}1 *. *[0-9]* *[0-9]* *\([0-9]*\).*\\$#\1#p"`
-		size=`expr $size '*' 2`
-	elif [ "$OS" = FreeBSD ]; then
-		size=`fdisk -s ${disk##*/} 2>/dev/null | \
-			sed -n -e 's/^ *1: *[0-9][0-9]* *\([0-9][0-9]*\).*$/\1/p'`
-	fi
+	size=`echo -e 'u\np\nq' | fdisk $disk 2> /dev/null| \
+		sed -n "s#^${disk}1 *. *[0-9]* *[0-9]* *\([0-9]*\).*\\$#\1#p"`
+	size=`expr $size '*' 2`
 
 	case ${size}s in
 		6281352s)
@@ -112,10 +93,18 @@ install_mbr()
 	# hdparm could be used for this, but it may not be installed.
 	# fdisk tells the kernel to re-read the table after writing it
 	# to disk, so we'll just use that.
-	if [ $OS = Linux ]; then
-		echo "Re-reading partition table ..."
-		echo w | fdisk $disk > /dev/null 2>&1
-	fi
+	echo "Re-reading partition table ..."
+	echo w | fdisk $disk > /dev/null 2>&1
+}
+
+find_disks() {
+	local disks
+
+	for d in /sys/block/[sh]d*; do
+		disks="$disks $d"
+	done
+
+	echo $disks
 }
 
 #
@@ -129,18 +118,13 @@ install_mbr()
 # via fdisk.  This is unnecessary with Linux, but it's easier just to do it
 # the same way on both OSs rather than have special-case code.
 #
-zap_superblocks()
+zapsuperblocks()
 {
 	local disk=$1
 	local offsets=''
 
-	if [ $OS = Linux ]; then
-		offsets=`echo -e 'u\np\nq' | fdisk $disk 2> /dev/null | \
-			sed -n "s#^${disk}[0-9]* *. *[0-9]* *\([0-9]*\).*\\$#\1#p"`
-	elif [ $OS = FreeBSD ]; then
-		offsets=`fdisk -s ${disk##*/} 2>/dev/null | \
-			sed -n -e 's/^[ 0-9]*: *\([0-9]*\).*$/\1/p'`
-	fi
+	offsets=`echo -e 'u\np\nq' | fdisk $disk 2> /dev/null | \
+		sed -n "s#^${disk}[0-9]* *. *[0-9]* *\([0-9]*\).*\\$#\1#p"`
 
 	if [ x"$offs" = x ]; then
 		return 0
@@ -159,63 +143,33 @@ zap_superblocks()
 	return 0
 }
 
-get_buffer_sizes()
-{
-	local memargs
-	local hostmem
-	local bytes
-	local datasegsz
-
-	# set memory limits:
-	#	allow $RESIDMEM MB for non-frisbee stuff
-	#	split remaining memory (min of 2MB) between network/disk buffering
-	#
-	if [ $OS = FreeBSD ]; then
-		hostmem=`sysctl -n hw.usermem`
-		hostmem=`expr $hostmem / 1048576`
-		if [ $hostmem -ge `expr $RESIDMEM + 2` ]; then
-			hostmem=`expr $hostmem - $RESIDMEM`
-			bytes=`expr $hostmem \* 1024`
-			datasegsz=`ulimit -d`
-			if [ $bytes -gt $datasegsz ]; then
-			    bytes=$datasegsz
-			    hostmem=`expr $bytes / 1024`
-			    echo "WARNING: kernel limits buffering to $hostmem MB"
-			fi
-			ulimit -v $bytes
-
-			## For GaTech we use more memory for disks since the disks are so slow
-			#netmem=`expr $hostmem \* 1 / 3`
-			#diskmem=`expr $hostmem \* 2 / 3`
-			#memargs="-C $netmem -W $diskmem"
-
-			# For Utah, we let the client split up the memory
-			# (50/50, but no more chunk buffers than there are chunks in the image)
-			memargs="-M $hostmem"
-		fi
-	fi
-
-	echo $memargs
-}
-
-find_disks() {
-	local disks
-
-	for d in /sys/block/[sh]d*; do
-		disks="$disks $d"
-	done
-
-	echo $disks
-}
-
 # FIXME shouldn't hard code "/images"
 write_image()
 {
 	local address=$1
 	local disk=$2
 	local slice=$3
+	local zfill=$4
+	local ptype=$5
 	local port=""
 	local imagefile=""
+	local frisbee_opts="$FRISBEE_OPTS"
+	local imageunzip_opts="$IMAGEUNZIP_OPTS"
+
+	# ZFILL==1: use frisbee
+	# ZFILL==2: separate disk-wipe pass (not yet implemented)
+	if [ "$zfill" -ne 0 ]; then
+		frisbee_opts="$frisbee_opts -z"
+		imageunzip_opts="$imageunzip_opts -z"
+	fi
+
+	if [ $slice -ne 0 ]; then
+		frisbee_opts="$frisbee_opts -s $slice"
+		imageunzip_opts="$imageunzip_opts -s $slice"
+		if [ -n "$ptype" ]; then
+			frisbee_opts="$frisbee_opts -D $ptype"
+		fi
+	fi
 
 	local protocol=${address%%://*}
 	if [ $protocol = $address ]; then
@@ -230,7 +184,7 @@ write_image()
 			port=${address##*:}
 			if [ $port = $address ]; then
 				echo "*** WARNING: no port specified for frisbee"
-				return 255
+				return 1
 			fi
 			address=${address%%:*}
 			;;
@@ -255,7 +209,7 @@ write_image()
 				echo "wget succeeded getting the image"
 			else
 				echo "wget failed, status $rc"
-				return 255
+				return 1
 			fi
 			imagefile=/images/${filename##*/}
 			;;
@@ -264,27 +218,14 @@ write_image()
 			;;
 		*)
 			echo "*** WARNING: Unsupported protocol $protocol!"
-			return 255
+			return 1
 			;;
 	esac
 
 	$BINDIR/tmcc state RELOADING
 
-	case $STATUS in
-		*ALLOCATED=emulab-ops/reloading*)
-			disks=`find_disks`
-			for d in $disks; do
-				#[ $d = $DISK ] && continue
-				mount | grep "^/dev/$d" > /dev/null && continue
-				zap_superblocks /dev/$d
-				echo "Invalidating MBR on /dev/$d"
-				dd if=/dev/zero of=/dev/$d bs=512 count=1
-			done
-			;;
-	esac
-
 	if [ $protocol = frisbee ]; then
-		$BINDIR/frisbee -m $address -p $port -s $slice $FRISBEE_OPTS $disk
+		$BINDIR/frisbee -m $address -p $port $frisbee_opts $disk
 		rc=$?
 
 		if [ $rc -ne 0 ]; then
@@ -295,7 +236,7 @@ write_image()
 		echo "Frisbee run finished"
 		rc=0
 	else
-		$BINDIR/imageunzip $IMAGEUNZIP_OPTS -s $slice $imagefile $disk
+		$BINDIR/imageunzip $imageunzip_opts $imagefile $disk
 		rc=$?
 	fi
 
@@ -306,47 +247,35 @@ write_image()
 	return $rc
 }
 
-$BINDIR/tmcc state RELOADSETUP
+handle_loadinfo()
+{
+	local LOADINFO="$@"
+	local ADDRESS=`get_value "$LOADINFO" ADDR`
+	local PARTOS=`get_value "$LOADINFO" PARTOS`
+	local PARTITION=`get_value "$LOADINFO" PART`
+	PARTITION=${PARTITION:-'0'}
 
-echo "Trying to get loadinfo data... "
-time=30
-while [ $time -gt 0 ]; do
-	sleep 1
-	LOADINFO=`$BINDIR/tmcc loadinfo`
-	[ -n "$LOADINFO" ] && break
-	time=$(( $time - 1 ))
-done
+	local FREEBSD_DISK=''
+	local DISK=`get_value "$LOADINFO" DISK`
+	DISK=${DISK:-'ad0'}
 
-if [ $time -eq 0 ]; then
-	echo "*** Failed to get loadinfo data" 1>&2
-	exit 2
-fi
+	local ZFILL=`get_value "$LOADINFO" ZFILL`
+	ZFILL=${ZFILL:-'0'}
 
-echo "Got loadinfo data"
+	local ACPI=`get_value "$LOADINFO" ACPI`
+	local ASF=`get_value "$LOADINFO" ASF`
+	local MBR=`get_value "$LOADINFO" MBRVERS`
+	local PREPARE=`get_value "$LOADINFO" PREPARE`
+	local PTYPE=''
 
-BOSSINFO=`$BINDIR/tmcc bossinfo`
-BOSSIP=${BOSSINFO##* }
+	if [ -z "$ADDRESS" ]; then
+		echo "Unable to get address for loading image"
+		return 1
+	fi
 
-# For testing purposes.
-#BOSSINFO='boss.emulab.net 155.101.128.70'
-#LOADINFO='ADDR=234.5.6.69:4444'
-
-ADDRESS=`get_value "$LOADINFO" ADDR`
-PARTOS=`get_value "$LOADINFO" PARTOS`
-PARTITION=`get_value "$LOADINFO" PART`
-PARTITION=${PARTITION:-'0'}
-DISK=`get_value "$LOADINFO" DISK`
-DISK=${DISK:-'ad0'}
-ZFILL=`get_value "$LOADINFO" ZFILL`
-ZFILL=${ZFILL:-'0'}
-ACPI=`get_value "$LOADINFO" ACPI`
-ASF=`get_value "$LOADINFO" ASF`
-MBR=`get_value "$LOADINFO" MBRVERS`
-
-FREEBSD_DISK=$DISK
-# Convert from the FreeBSD device names to Linux device names
-# if necessary.
-if [ $OS = "Linux" ]; then
+	FREEBSD_DISK=$DISK
+	# Convert from the FreeBSD device names to Linux device names
+	# if necessary.
 	case $DISK in
 		[hs]d[a-z])
 			;;
@@ -356,34 +285,114 @@ if [ $OS = "Linux" ]; then
 			;;
 	esac
 
-	# Try to map disks to BIOS drive numbers via EDD
-	# The map is created now before we touch any disks
-	# since we may need to use the MBR to determine
-	# which disk is which.
-	$BINDIR/get_edd_map > $BOOTDIR/edd_map 2>/dev/null
+	if [ $PARTITION -ne 0 ]; then
+		case $PARTOS in
+			FreeBSD) PTYPE=165 ;;
+			OpenBSD) PTYPE=166 ;;
+			Fedora|Linux)   PTYPE=131 ;;
+		esac
+	fi
+
+	# For slice images, ensure that the MBR is the correct version
+	# and replace if not.
+	if [ -z "$FIRSTMBR" ]; then
+		if [ "$PARTITION" != "0" ]; then
+		    tweakmbr /dev/$DISK $MBR
+		    echo "Resizing final disk partition"
+		    growdisk -vW /dev/$DISK
+		fi
+		FIRSTMBR=$MBR
+	else
+		if [ "$MBR" != "$FIRSTMBR" ]; then
+			echo "MBR Mismatch: First MBR is \"$FIRSTMBR\" while image #$NUM is \"$MBR\""
+		    fi
+	fi
+
+	# If not zeroing the disk and we are loading a full disk image
+	# we need to ensure that we at least invalidate any old superblocks
+	# that might leak through (most likely in partition 4 which isn't
+	# touched by our current image).  We do this before running frisbee
+	# so that any legit filesystems loaded from the image work.
+
+	# Since we do it before frisbee, we are counting on the current
+	# MBR being the same as the MBR being layed down.  While not
+	# a reasonable assumption in general, it mostly works in our
+	# environment and at least won't hurt anything if not true.
+	if [ $PREPARE -eq 1 ] || [ $IS_REMOTE -eq 0 -a $PARTITION -eq 0 \
+	                           -a $ZFILL -eq 0 ]; then
+		zapsuperblocks /dev/$DISK
+	fi
+
+	write_image $ADDRESS /dev/$DISK $PARTITION $ZFILL $PTYPE
+	rc=$?
+	if [ $rc -ne 0 ]; then
+		echo "Failed to write image to disk, status $rc"
+		exit 1
+	fi
+
+	# we resize the 4th partition after writing the image
+	# if we used a full disk image.  Otherwise, the resize
+	# happens before the image write in case we need the
+	# extra partition for an image fetched via HTTP.
+	if [ $PARTITION -eq 0 ]; then
+	    echo "Resizing final disk partition"
+	    growdisk -vW /dev/$DISK
+	fi
+
+	echo "Adjusting slice-related files"
+	export SLICEFIX_ACPI=$ACPI
+	export SLICEFIX_ASF=$ASF
+	$BINDIR/slicefix $PARTITION $FREEBSD_DISK
+	echo "Image load complete at `date`"
+}
+
+get_loadinfo()
+{
+	# Occasionally there is some delay before tmcd reports back valid
+	# loadinfo, so try repeatedly for 30 seconds and give up if we don't
+	# get any data.
+	time=30
+	while [ $time -gt 0 ]; do
+		# Just write it out to a tempfile to avoid extra nasty
+		# shell script hacks.
+		$BINDIR/tmcc loadinfo > /tmp/loadinfo.out
+		[ -s /tmp/loadinfo.out ] && break
+		sleep 1
+		time=$(( $time - 1 ))
+	done
+}
+
+# See if we can map drive names to BIOS numbers via EDD
+if [ -x $BINDIR/get_edd_map.pl ]; then
+	$BINDIR/get_edd_map.pl > $BOOTDIR/edd_map
 fi
 
-FRISBEE_OPTS="-S $BOSSIP"
 
-if [ -z "$ADDRESS" ]; then
-	echo "Unable to get address for loading image"
-	exit 1
+# Behave a little different on widearea nodes.
+IS_REMOTE=0
+[ -e $ETCDIR/isrem ] && IS_REMOTE=1
+
+$BINDIR/tmcc state RELOADSETUP
+
+BOSSINFO=`$BINDIR/tmcc bossinfo`
+BOSSIP=${BOSSINFO##* }
+STATUS=`$BINDIR/tmcc status`
+
+echo "Trying to get loadinfo data... "
+if ! get_loadinfo; then
+	echo "*** Failed to get loadinfo data" 1>&2
+	exit 2
 fi
+
+echo "Got loadinfo data"
+
+# For testing purposes.
+#BOSSINFO='boss.emulab.net 155.101.128.70'
+#LOADINFO='ADDR=234.5.6.69:4444'
 
 # FIXME shouldn't hardcode path
 if [ -x /usr/sbin/ntpdate ]; then
 	/usr/sbin/ntpdate -b $BOSSIP >/dev/null 2>&1
-fi
-
-if [ $PARTITION -ne 0 ]; then
-	FRISBEE_OPTS="$FRISBEE_OPTS -s $PARTITION"
-	case $PARTOS in
-		FreeBSD) PTYPE=165 ;;
-		OpenBSD) PTYPE=166 ;;
-		Fedora|Linux)   PTYPE=131 ;;
-	esac
-
-	[ -n "$PTYPE" ] && FRISBEE_OPTS="$FRISBEE_OPTS -D $PTYPE"
 fi
 
 # Enable IPoD
@@ -391,110 +400,41 @@ if [ -r $BINDIR/rc.ipod ]; then
 	. $BINDIR/rc.ipod
 fi
 
-FRISBEE_OPTS="$FRISBEE_OPTS `get_buffer_sizes`"
+# Try to map disks to BIOS drive numbers via EDD
+# The map is created now before we touch any disks
+# since we may need to use the MBR to determine
+# which disk is which.
+$BINDIR/get_edd_map > $BOOTDIR/edd_map 2>/dev/null
+
+FRISBEE_OPTS="-S $BOSSIP"
 
 if [ -e $BOOTDIR/myip ]; then
 	FRISBEE_OPTS="$FRISBEE_OPTS -i `cat $BOOTDIR/myip`"
 fi
 IMAGEUNZIP_OPTS="-o -O -W 32"
 
-# ZFILL==1: use frisbee
-# ZFILL==2: separate disk-wipe pass (not yet implemented)
-if [ "$ZFILL" != "0" ]; then
-	FRISBEE_OPTS="$FRISBEE_OPTS -z"
-	IMAGEUNZIP_OPTS="$IMAGEUNZIP_OPTS -z"
-fi
+# Wipe the MBR and partition boot blocks on all disks if reloading
+case $STATUS in
+	*ALLOCATED=emulab-ops/reloading*)
+		disks=`find_disks`
+		for d in $disks; do
+			#[ $d = $DISK ] && continue
+			mount | grep "^/dev/$d" > /dev/null && continue
+			zapsuperblocks /dev/$d
+			echo "Invalidating MBR on /dev/$d"
+			dd if=/dev/zero of=/dev/$d bs=512 count=1
+	done
+		;;
+esac
 
-device=/dev/$DISK
-if [ $PARTITION -ne 0 ]; then
-	if [ $OS = Linux ]; then
-		device=$device$PARTITION
-	elif [ $OS = FreeBSD ]; then
-		device=${device}s$PARTITION
+FIRSTMBR=''
+while read line; do
+	if ! handle_loadinfo $line; then
+		echo "Failed to load disk, dropping to login prompt at `date`" 1>&2
+		exit 1
 	fi
-fi
-
-is_remote=0
-[ -e $ETCDIR/isrem ] && is_remote=1
-
-if [ $OS = FreeBSD ]; then
-	# Make sure the necessary device files exist (only necessary on FreeBSD 4.x)
-	# Note that we create partition files for all slices, not just slice 1,
-	# for the benefit of the slicefix script.
-	#
-	if [ -x /dev/MAKEDEV -a ! -e /dev/$DISK ]; then
-		(cd /dev; ./MAKEDEV $DISK ${DISK}s2a ${DISK}s3a ${DISK}s4a)
-	fi 
-fi
-
-# For slice images, ensure that the MBR is the correct version
-# and replace if not.
-if [ "$PARTITION" != "0" ]; then
-    install_mbr /dev/$DISK $MBR
-    echo "Resizing final disk partition"
-    growdisk -vW /dev/$DISK
-fi
-
-# If not zeroing the disk and we are loading a full disk image
-# we need to ensure that we at least invalidate any old superblocks
-# that might leak through (most likely in partition 4 which isn't
-# touched by our current image).  We do this before running frisbee
-# so that any legit filesystems loaded from the image work.
-
-# Since we do it before frisbee, we are counting on the current
-# MBR being the same as the MBR being layed down.  While not
-# a reasonable assumption in general, it mostly works in our
-# environment and at least won't hurt anything if not true.
-if [ $is_remote -eq 0 -a $PARTITION -eq 0 -a $ZFILL -eq 0 ]; then
-	zap_superblocks /dev/$DISK
-fi
-
-if [ $OS = FreeBSD ]; then
-	# Make sure the write-cache is enabled on SCSI disks.  It makes a
-	# huge difference.  We don't worry about data corruption in the
-	# case of a crash, because we will just reload the disk again anyway
-	# in that situation.
-	#
-	turncacheoff=0
-	case $DISK in
-	da*)
-	    if [ -x $BINDIR/camwce ] && $BINDIR/camwce on $DISK; then
-		turncacheoff=1;
-	    fi
-	    ;;
-	esac
-fi
-
-write_image $ADDRESS /dev/$DISK $PARTITION
-rc=$?
-if [ $rc -ne 0 ]; then
-	echo "Failed to write image to disk, status $rc"
-	exit 1
-fi
-
-if [ $OS = FreeBSD ]; then
-	# Turn the cache back off if we turned it on.
-	# Is this sufficient to ensure the cache gets flushed?
-	#
-	if [ $turncacheoff -eq 1 ]; then
-	    $BINDIR/camwce off $DISK
-	fi
-fi
-
-# we resize the 4th partition after writing the image
-# if we used a full disk image.  Otherwise, the resize
-# happens before the image write in case we need the
-# extra partition for an image fetched via HTTP.
-if [ $PARTITION -eq 0 ]; then
-    echo "Resizing final disk partition"
-    growdisk -vW /dev/$DISK
-fi
-
-echo "Adjusting slice-related files"
-export SLICEFIX_ACPI=$ACPI
-export SLICEFIX_ASF=$ASF
-$BINDIR/slicefix $PARTITION $FREEBSD_DISK
-echo "Image load complete at `date`"
+done < /tmp/loadinfo.out
+rm -f /tmp/loadinfo.out
 
 #
 # If requested to reboot, do so.
