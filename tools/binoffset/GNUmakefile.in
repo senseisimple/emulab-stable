@@ -1,0 +1,30 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2003, 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR          = @srcdir@
+TESTBED_SRCDIR  = @top_srcdir@
+OBJDIR          = ../..
+SUBDIR          = tools/binoffset
+
+include $(OBJDIR)/Makeconf
+
+all: binoffset
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+binoffset: GNUmakefile binoffset.o
+	$(CC) $(CFLAGS) $(LDFLAGS) binoffset.o -o binoffset
+		cp binoffset binoffset.debug
+		strip binoffset
+
+binoffset.o: binoffset.c
+	$(CC) -c -o binoffset.o $(CFLAGS) $<
+
+client-install: binoffset
+	$(INSTALL_PROGRAM) binoffset $(DESTDIR)$(CLIENT_BINDIR)
+
+clean:
+	rm -f *.o core binoffset binoffset.debug
