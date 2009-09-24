@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" layout="vertical"
+	title="Component Manager"
+	showCloseButton="true"
+	borderAlpha=".9" borderColor="#D2E1F0" width="400"
+	defaultButton="{okButton}"
+	close="close()"
+	creationComplete="okButton.setFocus()">
+	
+	<mx:Script>
+		<![CDATA[
+			import mx.events.CloseEvent;	
+       		import mx.managers.PopUpManager;
+
+			public var main:pgmap;
+			
+			public function success():void {
+				main.comHandler.ComponentManagerURL = urlInput.text;
+            	main.refresh();
+				close();
+			}
+			
+			public function close():void {
+				PopUpManager.removePopUp(this);
+			}
+			
+			public function open():void {
+				PopUpManager.addPopUp(this, main, true);
+       			PopUpManager.centerPopUp(this);
+				urlInput.text = main.comHandler.ComponentManagerURL;
+			}
+		]]>
+	</mx:Script>
+    
+	<mx:Label text="Please input the URL to the Component Manager"/>
+	<mx:TextInput id="urlInput" width="100%" text=""/>
+	<mx:HBox width="100%" horizontalAlign="right">
+		<mx:Button id="cancelButton" label="Cancel" icon="@Embed('../images/cross.png')" click="close();"/>
+		<mx:Button id="okButton" label="Go" icon="@Embed('../images/tick.png')" click="success();"/>
+	</mx:HBox>
+	
+</mx:TitleWindow>

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Image xmlns:mx="http://www.adobe.com/2006/mxml"
+	mouseDownEffect="{mDown}" mouseUpEffect="{mUp}" rollOverEffect="{mIn}" rollOutEffect="{mOut}"
+	useHandCursor="true" buttonMode="true">
+	
+	<mx:Script>
+		<![CDATA[
+			public var tag:String;
+			public var type:String;
+			
+			public var value1:String;
+			public var value2:String;
+			public var value:String;
+		]]>
+	</mx:Script>
+	
+	<mx:Glow id="mIn" duration="250" 
+        alphaFrom="0.8" alphaTo="0.3" 
+        blurXFrom="0.0" blurXTo="15.0" 
+        blurYFrom="0.0" blurYTo="15.0" 
+        inner="true"
+        color="0x0166cb"/>
+    <mx:Glow id="mOut" duration="250" 
+        alphaFrom="0.3" alphaTo="0.8" 
+        blurXFrom="15.0" blurXTo="0.0" 
+        blurYFrom="15.0" blurYTo="0.0" 
+        inner="true"
+        color="0x0166cb"/>
+        <mx:Glow id="mDown" duration="100" 
+        alphaFrom="1.0" alphaTo="0.8"  
+        blurXFrom="0.0" blurXTo="20.0" 
+        blurYFrom="0.0" blurYTo="20.0" 
+        inner="true"
+        color="0x0166cb"/>
+        <mx:Glow id="mUp" duration="200" 
+        alphaFrom="0.8" alphaTo="1.0"  
+        blurXFrom="20.0" blurXTo="0.0" 
+        blurYFrom="20.0" blurYTo="0.0" 
+        inner="true"
+        color="0x0166cb" />
+</mx:Image>

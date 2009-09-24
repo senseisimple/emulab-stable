@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ResizeWindow xmlns="pgmap.*" xmlns:mx="http://www.adobe.com/2006/mxml"
+	width="700" height="400" showCloseButton="true" layout="vertical"
+	borderAlpha=".9" borderColor="#D2E1F0"
+	resizable="true"
+	title="Node Group Information"
+	close="PopUpManager.removePopUp(this)">
+	
+	<mx:Script>
+		<![CDATA[
+			import com.google.maps.View;
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.Label;
+			import mx.events.CloseEvent;
+			import mx.managers.PopUpManager;
+			
+			[Bindable]
+			public var nodes:ArrayCollection;
+			
+			[Bindable]
+			public var node:Node = null;
+			
+			[Bindable]
+			public var links:ArrayCollection = new ArrayCollection();
+			
+			public var main:pgmap;
+			
+			public function loadGroup(group:NodeGroup):void {
+				if(group.city.length > 0)
+					title = group.city + " Node Group";
+				nodes = new ArrayCollection();
+				
+				for each(var n:Node in group.collection) {
+					nodes.addItem(n);
+				}
+				
+				listNodes.selectedIndex = 0;
+				loadNode(group.collection[0]);
+			}
+			
+			public function loadNode(n:Node):void {
+				node = n;
+				
+				imgAvailable.source = assignIcon(n.available);
+				imgExclusive.source = assignIcon(n.exclusive);
+				
+				links = n.GetLinks();
+			}
+			
+			public function viewRspec():void {
+				var rspecView:XmlWindow = new XmlWindow();
+				PopUpManager.addPopUp(rspecView, main, false);
+       			PopUpManager.centerPopUp(rspecView);
+       			rspecView.loadXml(node.rspec);
+			}
+			
+			[Bindable]
+            [Embed(source="../../images/tick.png")]
+            public var availableIcon:Class;
+
+            [Bindable]
+            [Embed(source="../../images/cross.png")]
+            public var notAvailableIcon:Class;
+
+            private function assignAvailableIcon(item:Object):Class {
+                return assignIcon(item.available);
+            }
+
+			private function assignIcon(val:Boolean):Class {
+                if (val)
+                    return availableIcon;
+                else
+                    return notAvailableIcon;
+            }
+		]]>
+	</mx:Script>
+	<mx:HDividedBox width="100%" height="100%">
+		<mx:List width="25%" height="100%" id="listNodes"
+			dataProvider="{nodes}"
+			labelField="name" change="loadNode(event.target.selectedItem)"
+			iconFunction="assignAvailableIcon"></mx:List>
+		<mx:VBox height="100%" width="75%" verticalGap="0" paddingTop="0" paddingRight="0" paddingLeft="0" paddingBottom="0" horizontalGap="0" id="nodeInfoHolder">
+			<mx:Grid width="100%" height="100%" verticalGap="2" horizontalGap="2">
+				<mx:GridRow width="100%">
+					<mx:GridItem rowSpan="2">
+						<mx:Button label="RSPEC" width="100%" height="100%" click="viewRspec()"/>
+					</mx:GridItem>
+					<mx:GridItem width="100%">
+						<mx:Label text="{node.name}" fontSize="17" fontWeight="bold"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%">
+					<mx:GridItem width="100%">
+						<mx:Label text="Exclusive" fontWeight="bold"/>
+						<mx:Image id="imgExclusive"/>
+						<mx:VRule height="16"/>
+						<mx:Label text="Available" fontWeight="bold"/>
+						<mx:Image id="imgAvailable"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%">
+					<mx:GridItem>
+						<mx:Label text="UUID" fontWeight="bold"/>
+					</mx:GridItem>
+					<mx:GridItem width="100%">
+						<mx:Label text="{node.uuid}"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%">
+					<mx:GridItem>
+						<mx:Label text="Manager" fontWeight="bold"/>
+					</mx:GridItem>
+					<mx:GridItem width="100%">
+						<mx:Label text="{node.manager}"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%" height="100%">
+					<mx:GridItem>
+						<mx:Label text="Types" fontWeight="bold"/>
+					</mx:GridItem>
+					<mx:GridItem width="100%">
+						<mx:DataGrid width="100%" height="100%" id="gridTypes" dataProvider="{node.types}">
+							<mx:columns>
+								<mx:DataGridColumn headerText="Name" dataField="name"/>
+								<mx:DataGridColumn headerText="Slots" dataField="slots"/>
+								<mx:DataGridColumn headerText="Static" dataField="isStatic"/>
+							</mx:columns>
+						</mx:DataGrid>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%" height="100%">
+					<mx:GridItem>
+						<mx:Label text="Interfaces" fontWeight="bold"/>
+					</mx:GridItem>
+					<mx:GridItem width="100%">
+						<mx:List width="100%" height="100%" id="listInterfaces" dataProvider="{node.interfaces.collection}" labelField="id"></mx:List>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%" height="100%">
+					<mx:GridItem>
+						<mx:Label text="Links" fontWeight="bold"/>
+					</mx:GridItem>
+					<mx:GridItem width="100%">
+						<mx:List width="100%" height="100%" id="listLinks" dataProvider="{links}" labelField="name"></mx:List>
+					</mx:GridItem>
+				</mx:GridRow>
+			</mx:Grid>
+		</mx:VBox>
+	</mx:HDividedBox>
+</ResizeWindow>
