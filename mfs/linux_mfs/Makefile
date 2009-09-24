@@ -6,8 +6,8 @@ INITRAMFS_PATH	=	$(PWD)/initramfs.tmp
 BUILDROOT_PATH	=	$(PWD)/buildroot
 FAKEROOT_ENVIRONMENT	=	$(PWD)/fs_fakeroot.env
 STAGING_DIR	=	$(PWD)/buildroot/build_x86_64/staging_dir
-INITRAMFS	=	$(PWD)/initramfs.gz
 BOOT_PATH	=	$(PWD)/boot
+INITRAMFS	=	$(BOOT_PATH)/initramfs.gz
 
 #FAKEROOT_BIN	=	$(STAGING_DIR)/usr/bin/fakeroot
 FAKEROOT_BIN	=	fakeroot

@@ -6,6 +6,8 @@ LINUX_PATH		=	$(TARGET_BUILD_PATH)/linux-$(LINUX_VERSION)
 KERNEL_CONFIG	=	$(SOURCE_PATH)/linux/linux.config
 TARGET_MODULE_PATH =	$(TARGET_PATH)/lib/modules/$(LINUX_VERSION)
 
+MODULE_TARBALL_PATH = $(TOPDIR)/boot/modules-$(LINUX_VERSION).tar.gz
+
 export ARCH=x86_64
 export INSTALL_MOD_PATH=$(TARGET_PATH)
 
@@ -38,13 +40,18 @@ bzImage-install: bzImage
 		cp $(LINUX_PATH)/.config $(TOPDIR)/boot/config-$(LINUX_VERSION)
 
 modules-install: modules
-		mkdir -p $(TARGET_PATH)/lib/modules
-		$(MAKE) -C $(LINUX_PATH) CROSS_COMPILE=$(CROSS_COMPILER_PREFIX) modules_install
-		/sbin/depmod -b $(TARGET_PATH) $(LINUX_VERSION)
-		grep -v 'ide[-_]pci[-_]generic' $(TARGET_PATH)/lib/modules/$(LINUX_VERSION)/modules.alias > \
-			$(TARGET_PATH)/lib/modules/$(LINUX_VERSION)/modules.alias.mod
-		mv -f $(TARGET_PATH)/lib/modules/$(LINUX_VERSION)/modules.alias.mod \
-			$(TARGET_PATH)/lib/modules/$(LINUX_VERSION)/modules.alias
+		mkdir -p $(TARGET_BUILD_PATH)/lib/modules
+		$(MAKE) -C $(LINUX_PATH) INSTALL_MOD_PATH=$(TARGET_BUILD_PATH) CROSS_COMPILE=$(CROSS_COMPILER_PREFIX) modules_install
+		rm -f $(TARGET_BUILD_PATH)/lib/modules/$(LINUX_VERSION)/build
+		rm -f $(TARGET_BUILD_PATH)/lib/modules/$(LINUX_VERSION)/source
+		/sbin/depmod -b $(TARGET_BUILD_PATH) $(LINUX_VERSION)
+		cp -dpR $(TARGET_BUILD_PATH)/lib $(TARGET_PATH)
+		(cd $(TARGET_BUILD_PATH) && tar cvzf $(MODULE_TARBALL_PATH) ./lib)
+		rm -rf $(TARGET_BUILD_PATH)/lib
+		#grep -v 'ide[-_]pci[-_]generic' $(TARGET_PATH)/lib/modules/$(LINUX_VERSION)/modules.alias > \
+		#	$(TARGET_PATH)/lib/modules/$(LINUX_VERSION)/modules.alias.mod
+		#mv -f $(TARGET_PATH)/lib/modules/$(LINUX_VERSION)/modules.alias.mod \
+		#	$(TARGET_PATH)/lib/modules/$(LINUX_VERSION)/modules.alias
 
 $(LINUX_PATH)/.extract-stamp:
 		mkdir -p $(TARGET_BUILD_PATH)
