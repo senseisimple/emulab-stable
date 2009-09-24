@@ -1,6 +1,10 @@
 #! /bin/sh
 
-device=/sys/$PHYSDEVPATH
+if [ -n "$PHYSDEVPATH" ]; then
+	device=/sys/$PHYSDEVPATH
+else
+	device=/sys/$DEVPATH
+fi
 
 [ -L $device/driver ] && exit 0
 [ -f $device/modalias ] || exit 0
