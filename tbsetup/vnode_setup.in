@@ -66,7 +66,7 @@ use libtblog;
 use Experiment;
 use Node;
 if ($PGENISUPPORT) {
-    require GeniEmulab;
+    require libGeni;
 }
 
 # un-taint path
@@ -224,7 +224,7 @@ foreach my $node (@nodes) {
 
     if (($plabonly || $jailonly) and 
         !(($plabonly && $plab) || ($jailonly && (($jailed || $remote) 
-						 && !$plab)))) {
+						 && !($plab || $geninode))))) {
         next;
     }
     if (!defined($pnode)) {
@@ -440,8 +440,7 @@ while (1) {
 		if ($geni) {
 		    $UID  = $SAVEUID;
 		    $EUID = $UID;
-		    $exval = GeniEmulab->StartSlivers($experiment,
-						      [ $nodeobj ]);
+#		    $exval = GeniEmulab->StartSlivers($experiment, [$nodeobj]);
 		}
 		elsif ($plab) {
 		    if (TBForkCmd("$TB/sbin/plabnode ". 
@@ -467,7 +466,7 @@ while (1) {
 		$nodeobj->SetEventState(TBDB_NODESTATE_SHUTDOWN);
 		$UID  = $SAVEUID;
 		$EUID = $UID;
-		$exval = GeniEmulab->DestroySlivers($experiment, [ $nodeobj ]);
+#		$exval = GeniEmulab->DestroySlivers($experiment, [ $nodeobj ]);
 	    }
 	    elsif (!($plab && ($mode eq "cleanup" || $mode eq "teardown"))
 		&& !($mode eq "setup" && $remote && !$plab)) {
