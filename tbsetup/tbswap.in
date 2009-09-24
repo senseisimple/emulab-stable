@@ -45,6 +45,7 @@ my $piper          = "$TBROOT/sbin/locpiper";
 my $mapper         = "$TBROOT/bin/mapper";
 my $wrapper        = "$TBROOT/libexec/assign_wrapper";
 my $NFSTRACESUPPORT= @NFSTRACESUPPORT@;
+my $PGENISUPPORT   = @PROTOGENI_SUPPORT@;
 
 # Untaint the path
 $ENV{'PATH'} = "/usr/bin:$TBROOT/libexec:$TBROOT/libexec/ns2ir" . 
@@ -64,8 +65,9 @@ use Experiment;
 use User;
 use Lan;
 use Firewall;
-
-#require exitonwarn; # exitonwarn isn't really a module, so just require it
+if ($PGENISUPPORT) {
+    require libGeni;
+}
 
 #
 # Actual swap-in and swap-out functions, defined below.
@@ -643,6 +645,16 @@ sub doSwapout($) {
 	if ($soaction{'command'} && doSwapoutAction($pid, $eid, %soaction)) {
 	    tblog_set_cleanup(0);
 	    return 1;
+	}
+
+	#
+	# Clear away Geni slivers. Do not proceed if this fails.
+	#
+	if ($PGENISUPPORT) {
+	    if (libGeni::DeleteAllSlivers($experiment, $this_user)) {
+		tberror("Could not delete slivers\n");
+		return 1;
+	    }
 	}
 
 	#
