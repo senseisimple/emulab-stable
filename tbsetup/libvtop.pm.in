@@ -40,6 +40,11 @@ my $NFREE         = "$TB/bin/nfree";
 my $OS_SELECT     = "$TB/bin/os_select";
 my $DELAYCAPACITY = @DELAYCAPACITY@;	# Can be overridden by user.
 my $DELAYTHRESH   = @DELAYTHRESH@;
+my $PGENISUPPORT= @PROTOGENI_SUPPORT@;
+
+if ($PGENISUPPORT) {
+    require libGeni;
+}
 
 # Flags.
 $VTOP_FLAGS_VERBOSE	= 0x01;
@@ -87,6 +92,7 @@ sub Create($$$$)
 			      "links"  => [],
 			      "class"  => [],
 			      "fixed"  => [] };
+    $self->{'RSPEC'}      = undef;
 
     # Mostly for update mode.
     $self->{'FIXEDNODES'}  = {};
@@ -132,6 +138,7 @@ sub current_v2v($)      { return $_[0]->{'CURRENT_V2V'}; }
 sub pnodes($)           { return $_[0]->{'PNODES'}; }
 sub fixednodes($)       { return $_[0]->{'FIXEDNODES'}; }
 sub newreserved($)      { return $_[0]->{'NEWRESERVED'}; }
+sub rspec($)            { return $_[0]->{'RSPEC'}; }
 sub newreservednodes($) { return keys(%{ $_[0]->{'NEWRESERVED'} }); }
 sub oldreservednodes($) { return $_[0]->{'OLDRSRVCLEAN_NODES'}; }
 sub norecover($)        { return $_[0]->{'norecover'}; }
@@ -774,6 +781,7 @@ sub LoadVirtNodes($)
 	my $isdyn   = 0;	# Only virtnodes are dynamic.
 	my $isvtyped= 0;
 	my $isded   = 0;
+	my $isgeni  = 0;
 
 	# If we have a real type or auxtype ...
 	my $nodetype = NodeType->LookupAny($type);
@@ -802,6 +810,7 @@ sub LoadVirtNodes($)
 	$isvirt   = $nodetype->isvirtnode();
 	$issub    = $nodetype->issubnode();
 	$isplab   = $nodetype->isplabdslice();
+	$isgeni   = $nodetype->isfednode();
 	$issim    = $nodetype->issimnode();
 	$isdyn    = $nodetype->isdynamic();
 	$isded    = $nodetype->isdedicatedremote();
@@ -815,11 +824,15 @@ sub LoadVirtNodes($)
 	$vnode->_isvirtnode($isvirt);
 	$vnode->_issubnode($issub);
 	$vnode->_isplabnode($isplab);
+	$vnode->_isgeninode($isgeni);
 	$vnode->_issimnode($issim);
 	$vnode->_isdynamic($isdyn);
 	$vnode->_isdedremote($isded);
 	# Set below from a desire.
 	$vnode->_sharedokay(0);
+
+	# For a list of interfaces on this node, as for rspec generation
+	$vnode->_virtifaces([]);
 
 	# The mapped osname to actual osinfo structure.
 	$vnode->_osinfo(undef);
@@ -955,7 +968,7 @@ sub LoadVirtNodes($)
 	    if ($ipcount < $self->exptstats()->{"minlinks"});
 
 	# Add to the list.
-	$self->{'VNODES'}->{$vname} = $vnode;
+	$self->vnodes()->{$vname} = $vnode;
     }
     return 0;
 }
@@ -1128,6 +1141,9 @@ sub LoadVirtLans($)
 	$self->printdb("  $vlanname $vlanmember portbw:$portbw - ".
 		       "$delay $bandwidth $lossrate ".
 		       "$rdelay $rbandwidth $rlossrate\n");
+
+	# Temporary, for generating rspecs.
+	push(@{ $vlanmember->virt_node()->_virtifaces() }, "virt-${vport}");
     }
     return 0;
 }
@@ -1163,6 +1179,39 @@ sub GenVirtNodes($)
     foreach my $vname (sort(keys(%{ $self->{'VNODES'} }))) {
 	my $vnode = $self->vnodes()->{$vname};
 	my $type  = $vnode->type();
+
+	#
+	# Temporary rpsec generation.
+	#
+	if ($vnode->_isgeninode()) {
+	    my @ifaces = @{ $vnode->_virtifaces() };
+	    
+	    my $ref = { 'virtual_id'    => $vname,
+			'component_urn' => $vnode->fixed() || '*',
+		      };
+	    if ($vnode->_isvirtnode()) {
+		$ref->{'virtualization_type'} = 'emulab-vnode';
+		$ref->{'virtualization_subtype'} = 'emulab-openvz';
+	    }
+	    else {
+		$ref->{'virtualization_type'} = 'raw';
+		$ref->{'exclusive'} = 1;
+	    }
+
+	    if (@ifaces) {
+		my @refs = ();
+		foreach my $iface (@ifaces) {
+		    push(@refs, {'virtual_id' => $iface});
+		}
+		$ref->{'interfaces'} = [ @refs ];
+	    }
+	    if (!defined($self->rspec())) {
+		$self->{'RSPEC'} = {'type' => 'request',
+				    'node' => [] };
+	    }
+	    push(@{ $self->rspec()->{'node'} }, $ref);
+	    next;
+	}
 
 	my $subnodestr = "";
 	if ($vnode->_issubnode()) {
@@ -1254,7 +1303,14 @@ sub GenFixNodes($)
     # XXX This must be done last since we create internal nodes above.
     #
     foreach my $vname (sort(keys(%{ $self->fixednodes() }))) {
+	my $vnode = $self->vnodes()->{$vname};
 	my $fixed = $self->fixednodes()->{$vname};
+
+	#
+	# Temporary rspec generation.
+	#
+	next
+	    if ($vnode->_isgeninode());
 	
 	if ($self->isatoponode($vname) || $self->isadelaynode($vname)) {
 	    $self->addfixed("$vname $fixed");
@@ -2821,6 +2877,38 @@ sub ReadSolution($$)
 	}
     }
 
+    #
+    # Now process the rspec part. 
+    #
+    if (defined($self->rspec())) {
+	$self->printdb("Processing rspec\n");
+	$self->printdb("Nodes:\n");
+
+	foreach my $ref (@{ $self->rspec()->{'node'} }) {
+	    my $node_urn = $ref->{'component_urn'};
+	
+	    #
+	    # We need the local node object which is essentially a
+	    # proxy for the real node at the remote component manager.
+	    #
+	    my $proxynode = libGeni::LookupProxyNode($node_urn);
+	    if (!defined($proxynode)) {
+		tberror("Could not find proxynode for $node_urn\n");
+		return -1;
+	    }
+	    my $virtual  = $ref->{'virtual_id'};
+	    my $physical = $proxynode->node_id();
+	    
+	    # All we do in this stage is store the results.
+	    $self->solution()->{'V2P'}->{$virtual}  = $physical;
+	    $self->solution()->{'P2V'}->{$physical} = []
+		if (!exists($self->solution()->{'P2V'}->{$physical}));
+
+	    push(@{ $self->solution()->{'P2V'}->{$physical} }, $virtual);
+
+	    $self->printdb("  $virtual $physical\n");
+	}
+    }
     return 0;
 }
 
@@ -3152,6 +3240,10 @@ sub AllocNodes($)
 	    tberror("Could not get object for $physical\n");
 	    return -1;
 	}
+	# Remote node. Not our problem.
+	next
+	    if ($pnode->isfednode());
+	
 	$pnode->FlushReserved();
 	my $reservation = $pnode->Reservation();
 	if (!defined($reservation) ||
@@ -3187,11 +3279,40 @@ sub AllocNodes($)
 	}
     }
   skip:
+    #
+    # Allocate Geni nodes (get tickets). Eventually we want to retry
+    # the assignment and replace tickets that we could not get. 
+    #
+    if (defined($self->rspec())) {
+	$self->printdb("Requesting geni tickets ...\n");
+	
+	if (libGeni::GetTickets($self->experiment(), $self->impotent,
+				$self->user(), $self->rspec())) {
+	    tberror("Could not allocate Geni Tickets\n");
+	    return -1;
+	}
+	tbinfo("Successfully got all geni tickets we needed.\n");
+    }
+    
     if ($self->AllocVirtNodes() != 0) {
 	tberror("Could not allocate virtual nodes\n");
 	return -1;
     }
     if (!$self->impotent()) {
+	#
+	# Redeem the tickets. If this fails, we are going to be
+	# really hosed.
+	#
+	if (defined($self->rspec())) {
+	    $self->printdb("Redeeming geni tickets ...\n");
+	    
+	    if (libGeni::RedeemTickets($self->experiment(),
+				       $self->user(), $self->rspec())) {
+		tberror("Could not redeem Geni Tickets\n");
+		return -1;
+	    }
+	    tbinfo("Successfully redeemed all geni tickets.\n");
+	}
 	tbinfo("Successfully reserved all physical nodes we needed.\n");
     }
 
@@ -3278,7 +3399,7 @@ sub AllocNodes($)
 	my $vpnodename = $self->solution_v2v()->{$vnodename};
 	my $vpnode     = $self->pnodes()->{$vpnodename};
 	
-	if ($vpnode->isjailed() || $vpnode->isplabdslice()) {
+	if ($vpnode->isjailed() || $vpnode->isremotenode()) {
 	    my $pnodename = $self->solution_v2p()->{$vnodename};
 	    my $pnode     = $self->pnodes()->{$pnodename};
 	    my $sshdport  = nextipportnum($pnode);
@@ -4264,6 +4385,15 @@ sub InitializePhysNodes($)
 	$self->InitializePhysNode($vpnodename, $vnodename) == 0
 	    or return -1;
     }
+    #
+    # XXX This is here cause vnames were not set until now. Need to move.
+    #
+    if (defined($self->rspec())) {
+	if (libGeni::MapNodes($self->experiment())) {
+	    tberror("Could not map geni nodes to local nodes.\n");
+	    return -1;
+	}
+    }
     return 0;
 }
 
@@ -4275,6 +4405,8 @@ sub InitializePhysNode($$$)
 {
     my ($self, $pnodename, $vnodename) = @_;
     my $pnode  = $self->pnodes()->{$pnodename};
+
+    $self->printdb("InitPnode: $pnodename,$vnodename\n");
 
     # If this is a node in the topology (in the vnodes() array) then
     # there must be a virtual physical node.
@@ -4288,6 +4420,9 @@ sub InitializePhysNode($$$)
 	    return -1;
 	}
     }
+    $pnode->FlushReserved();
+    my $reservation = $pnode->Reservation();
+    
     my %nodesets = ();
     my %rsrvsets = ();
     my $osid;
@@ -4318,15 +4453,18 @@ sub InitializePhysNode($$$)
     }
     elsif ($pnode->isremotenode() &&
 	   !$pnode->isvirtnode() &&
-	   !$pnode->isdedicatedremote()) {
+	   !$pnode->isdedicatedremote() &&
+	   (!defined($reservation) || 
+	    !$self->experiment()->SameExperiment($reservation))) {
 	#
-	# We never allocate remote pnodes (always allocated), so skip.
-	# Ditto for local pnodes in shared mode. 
+	# Certain kinds of nodes are not actually allocated to the
+	# experiment. 
 	#
 	return 0;
     }
-    elsif (!defined($vpnode) ||
-	   exists($self->solution_virtnodes()->{$pnodename})) {
+    elsif (!$pnode->isremotenode() &&
+	   (!defined($vpnode) ||
+	    exists($self->solution_virtnodes()->{$pnodename}))) {
 
 	#
 	# Watch for a local shared node that is not actually part of
@@ -4471,7 +4609,7 @@ sub InitializePhysNode($$$)
 	    if (defined($sharing_mode));
 
     }
-    $self->printdb("InitPnode: $pnodename $vnodename\n");
+    $self->printdb("InitPnode: Storing info for $pnodename,$vnodename\n");
 
     # Do this in regression mode to avoid timestamp diffs
     if ($self->regression()) {
@@ -4493,7 +4631,7 @@ sub InitializePhysNode($$$)
     #
     # Now call os_select.
     #
-    if (defined($osid)) {
+    if (defined($osid) && !$pnode->isremotenode()) {
 	if ($self->impotent()) {
 	    $self->printdb("  pretending to os_select $osid\n");
 	}
