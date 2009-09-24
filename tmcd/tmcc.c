@@ -295,7 +295,7 @@ main(int argc, char **argv)
 	if ((fp = fopen(keyfile, "r")) != NULL) {
 	    if (fgets(buf, sizeof(buf), fp)) {
 		if ((bp = strchr(buf, '\n')))
-		    *bp = (char) NULL;
+		    *bp = '\0';
 		privkey = strdup(buf);
 	    }
 	    fclose(fp);
@@ -415,7 +415,7 @@ getbossnode(char **bossnode, int *portp)
 		 * Look for port spec
 		 */
 		if ((bp = strchr(buf, ':'))) {
-			*bp++  = (char) NULL;
+			*bp++  = '\0';
 			*portp = atoi(bp);
 		}
 		*bossnode = strdup(buf);
@@ -436,13 +436,13 @@ getbossnode(char **bossnode, int *portp)
 		if ((fp = fopen(buf, "r")) != NULL) {
 			if (fgets(buf, sizeof(buf), fp)) {
 				if ((bp = strchr(buf, '\n')))
-					*bp = (char) NULL;
+					*bp = '\0';
 				fclose(fp);
 				/*
 				 * Look for port spec
 				 */
 				if ((bp = strchr(buf, ':'))) {
-					*bp++  = (char) NULL;
+					*bp++  = '\0'; 
 					*portp = atoi(bp);
 				}
 				*bossnode = strdup(buf);
@@ -929,7 +929,7 @@ rewritecommand(char *redirect, char *command, char **server)
 			
 	bp = strchr(redirect, '\n');
 	if (bp)
-		*bp = (char) NULL;
+		*bp = '\0';
 	bp = strchr(redirect, '=');
 	if (!bp)
 		return -1;
@@ -939,7 +939,7 @@ rewritecommand(char *redirect, char *command, char **server)
 	bp = strchr(bp, ':');
 	if (!bp)
 		return 0;
-	*bp++ = (char) NULL;
+	*bp++ = '\0';
 
 	sprintf(buf, "VNODEID=%s ", bp);
 
