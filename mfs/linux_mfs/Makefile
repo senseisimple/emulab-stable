@@ -5,11 +5,15 @@ SCRIPTS_PATH	=	$(PWD)/scripts
 INITRAMFS_PATH	=	$(PWD)/initramfs.tmp
 BUILDROOT_PATH	=	$(PWD)/buildroot
 FAKEROOT_ENVIRONMENT	=	$(PWD)/fs_fakeroot.env
-STAGING_DIR	=	$(PWD)/buildroot/build_i386/staging_dir
+STAGING_DIR	=	$(PWD)/buildroot/build_x86_64/staging_dir
 INITRAMFS	=	$(PWD)/initramfs.gz
 BOOT_PATH	=	$(PWD)/boot
 
-MODULES := busybox zlib linux dropbear testbed hdparm target_template sudo e2fsprogs openssl wget perl portmap file
+#FAKEROOT_BIN	=	$(STAGING_DIR)/usr/bin/fakeroot
+FAKEROOT_BIN	=	fakeroot
+
+#MODULES := busybox zlib linux dropbear testbed hdparm target_template sudo e2fsprogs openssl wget perl portmap file
+MODULES := busybox zlib linux dropbear testbed hdparm target_template sudo e2fsprogs openssl wget portmap file
 INSTALL_MODULES := $(addsuffix -install,$(MODULES))
 EXTRACT_MODULES := $(addsuffix -extract,$(MODULES))
 PATCH_MODULES := $(addsuffix -patch,$(MODULES))
@@ -48,7 +52,7 @@ $(INSTALL_MODULES):
 
 $(TARGET_PATH)/lib/libc.so.0:
 	mkdir -p $(TARGET_PATH)/lib
-	cp -dpR $(BUILDROOT_PATH)/project_build_i386/uclibc/root/lib/* $(TARGET_PATH)/lib
+	cp -dpR $(BUILDROOT_PATH)/project_build_x86_64/uclibc/root/lib/* $(TARGET_PATH)/lib
 
 uclibc-install: $(TARGET_PATH)/lib/libc.so.0
 
@@ -57,13 +61,13 @@ $(FAKEROOT_ENVIRONMENT):
 
 devices: $(FAKEROOT_ENVIRONMENT)
 	rm -rf $(TARGET_PATH)/dev
-	$(STAGING_DIR)/usr/bin/fakeroot -s $(FAKEROOT_ENVIRONMENT) \
+	$(FAKEROOT_BIN) -s $(FAKEROOT_ENVIRONMENT) \
 		-i $(FAKEROOT_ENVIRONMENT) \
 		$(SCRIPTS_PATH)/makedevs.sh \
 		$(SCRIPTS_PATH)/devices $(TARGET_PATH)
 
 permissions: $(FAKEROOT_ENVIRONMENT) devices install
-	$(STAGING_DIR)/usr/bin/fakeroot -s $(FAKEROOT_ENVIRONMENT) \
+	$(FAKEROOT_BIN) -s $(FAKEROOT_ENVIRONMENT) \
 		-i $(FAKEROOT_ENVIRONMENT) \
 		$(SCRIPTS_PATH)/fixperms.sh $(TARGET_PATH)
 
@@ -72,14 +76,14 @@ initramfs: install
 	cp -dpR $(TARGET_PATH) $(INITRAMFS_PATH)
 	cat /dev/null > $(FAKEROOT_ENVIRONMENT)
 	rm -rf $(INITRAMFS_PATH)/dev
-	$(STAGING_DIR)/usr/bin/fakeroot -s $(FAKEROOT_ENVIRONMENT) \
+	$(FAKEROOT_BIN) -s $(FAKEROOT_ENVIRONMENT) \
 		-i $(FAKEROOT_ENVIRONMENT) \
 		$(SCRIPTS_PATH)/makedevs.sh \
 		$(SCRIPTS_PATH)/devices $(INITRAMFS_PATH)
-	$(STAGING_DIR)/usr/bin/fakeroot -s $(FAKEROOT_ENVIRONMENT) \
+	$(FAKEROOT_BIN) -s $(FAKEROOT_ENVIRONMENT) \
 		-i $(FAKEROOT_ENVIRONMENT) \
 		$(SCRIPTS_PATH)/fixperms.sh $(INITRAMFS_PATH)
-	$(STAGING_DIR)/usr/bin/fakeroot -i $(FAKEROOT_ENVIRONMENT) \
+	$(FAKEROOT_BIN) -i $(FAKEROOT_ENVIRONMENT) \
 		$(SCRIPTS_PATH)/gen_initramfs.sh $(INITRAMFS_PATH) $(INITRAMFS)
 	rm -f $(FAKEROOT_ENVIRONMENT)
 	rm -rf $(INITRAMFS_PATH)

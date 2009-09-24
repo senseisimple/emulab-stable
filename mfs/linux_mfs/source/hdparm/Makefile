@@ -42,7 +42,7 @@ $(HDPARM_PATH)/hdparm: $(HDPARM_PATH)/.config-stamp
 	PATH=$(STAGING_DIR)/usr/bin:$(PATH) \
 	        CC=$(TARGET_CC) \
 	        $(MAKE) -C $(HDPARM_PATH) \
-		$(TARGET_CONFIGURE_OPTS) LD=i386-linux-uclibc-gcc
+		$(TARGET_CONFIGURE_OPTS) LD=x86_64-linux-uclibc-gcc
 	touch $@
 
 $(TARGET_PATH)/sbin/hdparm: $(HDPARM_PATH)/hdparm

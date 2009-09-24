@@ -6,7 +6,7 @@ LINUX_PATH		=	$(TARGET_BUILD_PATH)/linux-$(LINUX_VERSION)
 KERNEL_CONFIG	=	$(SOURCE_PATH)/linux/linux.config
 TARGET_MODULE_PATH =	$(TARGET_PATH)/lib/modules/$(LINUX_VERSION)
 
-export ARCH=i386
+export ARCH=x86_64
 export INSTALL_MOD_PATH=$(TARGET_PATH)
 
 .PHONY: extract patch config bzImage \
@@ -33,7 +33,7 @@ install: bzImage-install modules-install
 
 bzImage-install: bzImage
 		mkdir -p $(TOPDIR)/boot
-		cp $(LINUX_PATH)/arch/i386/boot/bzImage $(TOPDIR)/boot/vmlinuz-$(LINUX_VERSION)
+		cp $(LINUX_PATH)/arch/x86_64/boot/bzImage $(TOPDIR)/boot/vmlinuz-$(LINUX_VERSION)
 		cp $(LINUX_PATH)/System.map $(TOPDIR)/boot/System.map-$(LINUX_VERSION)
 		cp $(LINUX_PATH)/.config $(TOPDIR)/boot/config-$(LINUX_VERSION)
 

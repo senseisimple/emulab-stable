@@ -48,7 +48,7 @@ endif
 ifdef WITH_NTFS
 FSOBJS		+= ntfs/ntfs_glue.o
 FSLIBS		+= ntfs/libntfs/libntfs.a
-CFLAGS		+= -DWITH_NTFS -Intfs/libntfs/ntfsprogs-1.7.1.linux/include
+CFLAGS		+= -DWITH_NTFS -DOLD_LIBNTFS -Intfs/libntfs/ntfsprogs-1.7.1.linux/include
 endif
 
 all:	imagezip imageunzip imagedump

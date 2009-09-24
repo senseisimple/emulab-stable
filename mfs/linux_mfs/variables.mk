@@ -9,12 +9,13 @@ TEMPLATE_PATH		=	$(TOPDIR)/target_template
 TARGET_INITRAMFS	=	$(TOPDIR)/target.cpio.gz
 FAKEROOT_ENVIRONMENT	=	$(TOPDIR)/$(BUILD)_fs_fakeroot.env
 
-TARGET_CC		=	i386-linux-uclibc-gcc
-TARGET_CFLAGS		=	-Os -mtune=i386 -march=i386
+TARGET_CC		=	x86_64-linux-uclibc-gcc
+#TARGET_CFLAGS		=	-Os -mtune=nocona -march=x86_64
+TARGET_CFLAGS		=	-Os
 TARGET_MODULES		=	uclibc-install-target zlib-install-target busybox-install dropbear-install linux-modules-install openssl-install-target kexec-install tmcc-install imagezip-install frisbee-install e2fsprogs-install
 
 BUILDROOT_PATH		=	$(TOPDIR)/buildroot
-STAGING_DIR		=	$(BUILDROOT_PATH)/build_i386/staging_dir/
+STAGING_DIR		=	$(BUILDROOT_PATH)/build_x86_64/staging_dir/
 
 #HOSTMAKE=make
 #HOSTAR=ar
@@ -26,9 +27,9 @@ STAGING_DIR		=	$(BUILDROOT_PATH)/build_i386/staging_dir/
 
 #TOOLCHAIN_PATH="$(STAGING_DIR)/bin:$(STAGING_DIR)/usr/bin:$(PATH)"
 
-CROSS_COMPILER_PREFIX=i386-linux-uclibc-
+CROSS_COMPILER_PREFIX=x86_64-linux-uclibc-
 STRIPCMD=$(STAGING_DIR)/usr/bin/$(CROSS_COMPILER_PREFIX)strip
-#CC=$(STAGING_DIR)/usr/bin/i386-linux-uclibc-gcc -Os  -I$(STAGING_DIR)/usr/include -I$(STAGING_DIR)/include --sysroot=$(STAGING_DIR)/ -isysroot $(STAGING_DIR) -mtune=i386 -march=i386
+#CC=$(STAGING_DIR)/usr/bin/x86_64-linux-uclibc-gcc -Os  -I$(STAGING_DIR)/usr/include -I$(STAGING_DIR)/include --sysroot=$(STAGING_DIR)/ -isysroot $(STAGING_DIR) -mtune=x86_64 -march=x86_64
 
 # Hack for building uClibc -- it can't handle parallel make processes.
 #MAKE1:=$(HOSTMAKE) MAKE="$(firstword $(HOSTMAKE)) -j1"
