@@ -1151,7 +1151,7 @@ sub editContainerConfigFile($$) {
 	    my $k = $1;
 	    if (exists($dedlines{$k}) && $2 ne $dedlines{$k}) {
 		$lines[$i] = "$k=$dedlines{$k}\n";
-		$dedlines{$k} = undef;
+		delete $dedlines{$k};
 	    }
 	}
     }
