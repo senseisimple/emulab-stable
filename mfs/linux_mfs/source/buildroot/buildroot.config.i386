@@ -1,6 +1,6 @@
 #
 # Automatically generated make config: don't edit
-# Wed Sep  2 14:04:56 2009
+# Wed Dec 17 14:13:46 2008
 #
 BR2_HAVE_DOT_CONFIG=y
 BR2_VERSION="0.10.0-svn"
@@ -10,7 +10,7 @@ BR2_VERSION="0.10.0-svn"
 # BR2_avr32 is not set
 # BR2_cris is not set
 # BR2_ia64 is not set
-# BR2_i386 is not set
+BR2_i386=y
 # BR2_m68k is not set
 # BR2_mips is not set
 # BR2_mipsel is not set
@@ -21,15 +21,35 @@ BR2_VERSION="0.10.0-svn"
 # BR2_sh64 is not set
 # BR2_sparc is not set
 # BR2_sparc64 is not set
-BR2_x86_64=y
-# BR2_x86_64_barcelona is not set
-# BR2_x86_64_opteron_sse3 is not set
-# BR2_x86_64_opteron is not set
-# BR2_x86_64_nocona is not set
-BR2_x86_64_core2=y
-BR2_ARCH="x86_64"
+# BR2_x86_64 is not set
+BR2_x86_i386=y
+# BR2_x86_i486 is not set
+# BR2_x86_i586 is not set
+# BR2_x86_i686 is not set
+# BR2_x86_pentiumpro is not set
+# BR2_x86_pentium_mmx is not set
+# BR2_x86_pentium_m is not set
+# BR2_x86_pentium2 is not set
+# BR2_x86_pentium3 is not set
+# BR2_x86_pentium4 is not set
+# BR2_x86_prescott is not set
+# BR2_x86_nocona is not set
+# BR2_x86_core2 is not set
+# BR2_x86_k6 is not set
+# BR2_x86_k6_2 is not set
+# BR2_x86_athlon is not set
+# BR2_x86_athlon_4 is not set
+# BR2_x86_opteron is not set
+# BR2_x86_opteron_sse3 is not set
+# BR2_x86_barcelona is not set
+# BR2_x86_geode is not set
+# BR2_x86_c3 is not set
+# BR2_x86_winchip_c6 is not set
+# BR2_x86_winchip2 is not set
+BR2_ARCH="i386"
 BR2_ENDIAN="LITTLE"
-BR2_GCC_TARGET_TUNE="core2"
+BR2_GCC_TARGET_TUNE="i386"
+BR2_GCC_TARGET_ARCH="i386"
 
 #
 # Target options
@@ -45,9 +65,15 @@ BR2_BANNER="Welcome to the Erik's uClibc development environment."
 #
 # Preset Devices
 #
+# BR2_TARGET_SOEKRIS is not set
+# BR2_TARGET_VIA_EPIA_MII is not set
 
 #
 # Generic Architecture support
+#
+
+#
+# Generic x86 Device Support
 #
 
 #
@@ -674,6 +700,7 @@ BR2_X11_PREFIX="/usr"
 # BR2_TARGET_ROOTFS_SQUASHFS is not set
 # BR2_TARGET_ROOTFS_TAR is not set
 # BR2_TARGET_ROOTFS_CPIO is not set
+# BR2_TARGET_ROOTFS_ISO9660 is not set
 # BR2_TARGET_ROOTFS_INITRAMFS is not set
 # BR2_TARGET_ROOTFS_ROMFS is not set
 
@@ -681,6 +708,7 @@ BR2_X11_PREFIX="/usr"
 # bootloader for target device
 #
 # BR2_TARGET_GRUB is not set
+# BR2_TARGET_SYSLINUX is not set
 # BR2_TARGET_PXELINUX is not set
 # BR2_TARGET_UBOOT is not set
 
