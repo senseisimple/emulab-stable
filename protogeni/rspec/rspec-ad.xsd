@@ -13,6 +13,11 @@
 -->
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" targetNamespace="http://www.protogeni.net/resources/rspec/0.1" xmlns:rspec="http://www.protogeni.net/resources/rspec/0.1">
   <xs:include schemaLocation="rspec-ad-common.xsd"/>
+  <!--
+    Reference to components managed by other component managers.
+    TODO: Merge ComponentInterfaceRefName into just component_id when
+    length restrictions on URNs end.
+  -->
   <xs:element name="external_ref">
     <xs:complexType>
       <xs:attributeGroup ref="rspec:ComponentInterfaceRefName"/>

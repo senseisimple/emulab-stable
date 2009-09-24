@@ -95,6 +95,10 @@ RSpecContents =
   # When this RSpec was generated - optional, can be used for determining
   # staleness
   attribute generated { xsd:dateTime }? &
+  # Who/what generated the rspec. This is purely informative and
+  # should not be used for any policy consideration. The format is
+  # not fixed.
+  attribute generated_by { text }? &
   # How long this rspec is valid - in the case of a ticket, this indicates
   # how long the holder may use the resources. For a resource request, it's
   # how long we want the resources. For an advertisement, it might be a hint

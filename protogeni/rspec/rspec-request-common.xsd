@@ -164,6 +164,7 @@
       <xs:element ref="rspec:link"/>
     </xs:choice>
     <xs:attribute name="generated" type="xs:dateTime"/>
+    <xs:attribute name="generated_by"/>
     <xs:attribute name="valid_until" type="xs:dateTime"/>
     <xs:attribute name="type" use="required">
       <xs:simpleType>
