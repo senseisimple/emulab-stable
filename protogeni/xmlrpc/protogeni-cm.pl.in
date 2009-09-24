@@ -13,6 +13,7 @@
 use strict;
 use English;
 use Frontier::Responder;
+use Frontier::RPC2;
 use Data::Dumper;
 use POSIX;
 
@@ -163,6 +164,11 @@ my $response = $responder->{'_decode'}->serve($request,
 
 # Add stuff for log message if sent.
 AddAuditInfo("message", $response . "\n\n" . $request);
+
+#my $decoder = Frontier::RPC2->new();
+#my $object  = $decoder->decode($response);
+#my $value   = $object->{'value'};
+#print STDERR Dumper($value);
 
 #
 # Terminate the log capture so that we can print the response to STDOUT

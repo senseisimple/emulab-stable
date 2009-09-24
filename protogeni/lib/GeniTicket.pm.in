@@ -15,7 +15,7 @@ use vars qw(@ISA @EXPORT);
 
 @ISA    = "Exporter";
 @EXPORT = qw (TICKET_PURGED TICKET_EXPIRED TICKET_REDEEMED
-	      TICKET_RELEASED TICKET_DELETED);
+	      TICKET_RELEASED TICKET_DELETED TICKET_NOSTATS);
 
 use GeniDB;
 use GeniCredential;
@@ -50,6 +50,7 @@ sub TICKET_REDEEMED()	{ return 2; }
 sub TICKET_EXPIRED()	{ return 3; }
 sub TICKET_RELEASED()	{ return 4; }
 sub TICKET_DELETED()	{ return 5; }
+sub TICKET_NOSTATS()	{ return 0x1; }
 
 # Cache of tickets.
 my %tickets = ();
@@ -145,6 +146,7 @@ sub Create($$$$)
     $self->{'seqno'}         = $seqno;
     $self->{'ticket_string'} = undef;
     $self->{'component'}     = undef;
+    $self->{'slice_uuid'}    = undef;
     $self->{'stored'}        = 0;	# Stored to the DB.
     $self->{'LOCKED'}        = 0;
 
@@ -183,10 +185,12 @@ sub ticket($)		{ return field($_[0], "ticket"); }
 sub asString($)		{ return field($_[0], "ticket_string"); }
 sub ticket_string($)	{ return field($_[0], "ticket_string"); }
 sub redeem_before($)	{ return field($_[0], "redeem_before"); }
+sub expires($)	        { return field($_[0], "expires"); }
 sub redeemed($   )	{ return field($_[0], "redeemed"); }
 sub component_uuid($)	{ return field($_[0], "component_uuid"); }
 sub component($)	{ return field($_[0], "component"); }
 sub stored($)		{ return field($_[0], "stored"); }
+sub slice_uuid($)	{ return field($_[0], "slice_uuid"); }
 sub LOCKED($)           { return $_[0]->{'LOCKED'}; }
 
 #
@@ -201,9 +205,10 @@ sub Stringify($)
 	my $seqno = $self->seqno();
 	$idx = "S$seqno";
     }
-    my $owner_hrn = $self->owner_hrn();
+    my $owner_hrn   = $self->owner_hrn();
+    my $target_uuid = $self->target_uuid();
     
-    return "[GeniTicket: $idx, owner:$owner_hrn]";
+    return "[GeniTicket: $idx, owner:$owner_hrn, target_uuid:$target_uuid]";
 }
 
 #
@@ -336,6 +341,25 @@ sub CreateFromSignedTicket($$;$$)
 	return undef;
     }
 
+    # Expiration
+    my ($expires_node) = $doc->getElementsByTagName("expires");
+    if (!defined($expires_node)) {
+	print STDERR "Ticket is missing expires node\n";
+	return undef;
+    }
+    my $expires = $expires_node->to_literal();
+
+    if (! ($expires =~ /^[-\w:.\/]+/)) {
+	print STDERR "Invalid expires date in ticket\n";
+	return undef;
+    }
+    # Convert to a localtime.
+    my $when = timegm(strptime($expires));
+    if (!defined($when)) {
+	print STDERR "Could not parse expires: '$expires'\n";
+	return undef;
+    }
+    
     my $self = {};
     $self->{'idx'}           = undef;
     $self->{'rspec'}         = $rspec;
@@ -350,7 +374,9 @@ sub CreateFromSignedTicket($$;$$)
     $self->{'xmlref'}        = $doc;
     $self->{'component'}     = $component;
     $self->{'seqno'}         = $seqno;
+    $self->{'expires'}       = $expires;
     $self->{'stored'}        = 0;
+    $self->{'slice_uuid'}    = undef;
     $self->{'LOCKED'}        = 0;
     
     #
@@ -364,6 +390,7 @@ sub CreateFromSignedTicket($$;$$)
 	if ($query_result && $query_result->numrows) {
 	    my $row = $query_result->fetchrow_hashref();
 	    $self->{'redeem_before'} = $row->{'redeem_before'};
+	    $self->{'slice_uuid'}    = $row->{'slice_uuid'};
 	    $self->{'idx'}    = $seqno;
 	    $self->{'stored'} = 1;
 	}
@@ -470,6 +497,14 @@ sub UnLock($)
     return 0;
 }
 
+sub SetSlice($$)
+{
+    my ($self, $slice_uuid) = @_;
+    
+    $self->{'slice_uuid'} = $slice_uuid;
+    return 0;
+}
+
 #
 # Return the rspec in XML for the ticket.
 #
@@ -507,17 +542,21 @@ sub Grant($$)
 # so we have a record of them. We store them on the server and the client
 # side.
 #
-sub Store($)
+sub Store($;$)
 {
-    my ($self) = @_;
+    my ($self, $flags) = @_;
     my @insert_data  = ();
+
+    $flags = 0
+	if (!defined($flags));
 
     my $idx         = $self->idx();
     my $seqno       = $self->seqno();
     my $target_uuid = $self->target_uuid();
     my $owner_uuid  = $self->owner_uuid();
     my $ticket_uuid = $self->ticket_uuid();
-    my $expires     = $self->redeem_before();
+    my $expires     = $self->redeem_before() || $self->expires();
+    my $slice_uuid  = $self->slice_uuid();
 
     #
     # For a locally created/signed ticket, seqno=idx. For a ticket from
@@ -539,6 +578,7 @@ sub Store($)
     push(@insert_data, "ticket_uuid='$ticket_uuid'");
     push(@insert_data, "target_uuid='$target_uuid'");
     push(@insert_data, "owner_uuid='$owner_uuid'");
+    push(@insert_data, "slice_uuid='$slice_uuid'");
     push(@insert_data, "redeem_before='$expires'");
     
     my $safe_ticket = DBQuoteSpecial($self->ticket_string());
@@ -548,9 +588,11 @@ sub Store($)
     DBQueryWarn("insert into geni_tickets set " . join(",", @insert_data))
 	or return -1;
 
-    if (GeniUsage->NewTicket($self)) {
-	print STDERR
-	    "GeniTicket::Store: GeniUsage->NewTicket($self) failed\n";
+    if (! ($flags & TICKET_NOSTATS)) {
+	if (GeniUsage->NewTicket($self)) {
+	    print STDERR
+		"GeniTicket::Store: GeniUsage->NewTicket($self) failed\n";
+	}
     }
 
     $tickets{"$idx"}  = $self;
@@ -678,6 +720,72 @@ sub Release($$)
     return -1
 	if (! ref($self));
 
+    $self->ReleaseHolding($flag) == 0
+	or return -1;
+
+    # Older tickets do not have this, but handled in ReleaseHolding.
+    return 0
+	if (!defined($self->slice_uuid()) || $self->slice_uuid() eq "");
+
+    my $experiment = Experiment->Lookup($self->slice_uuid());
+    if (!defined($experiment)) {
+	$self->Delete($flag);
+	return 0;
+    }
+    my $pid     = $experiment->pid();
+    my $eid     = $experiment->eid();
+    my @nodeids = ();
+    my @nodes   = ();
+
+    foreach my $ref (@{$self->rspec()->{'node'}}) {
+	my $resource_uuid = $ref->{'component_uuid'} || $ref->{'uuid'};
+
+	# Virtual nodes not created until ticket redeemed.
+	my $node = Node->Lookup($resource_uuid);
+	next
+	    if (!defined($node));
+
+	my $reservation = $node->Reservation();
+	next
+	    if (!defined($reservation));
+
+	# Watch for duplicates, as in multiple vnodes on a pnode.
+	next
+	    if (grep {$_ eq $node->node_id()} @nodeids);
+
+	#
+	# If the node is still in the experiment and not incorporated,
+	# release it. genisliver_idx is not defined until ticket redeemed.
+	#
+	if ($reservation->SameExperiment($experiment)) {
+	    my $restable = $node->ReservedTableEntry();
+	    if (defined($restable) &&
+		!defined($restable->{'genisliver_idx'})) {
+		push(@nodeids, $node->node_id());
+		push(@nodes, $node);
+	    }
+	}
+    }
+    if (@nodeids) {
+	system("export NORELOAD=1; $NFREE -x -q $pid $eid @nodeids");
+    }
+    foreach my $node (@nodes) {
+	$node->Refresh();
+    }
+    $self->Delete($flag);
+    return 0;
+}
+
+#
+# Retained for backwards compatability.
+#
+sub ReleaseHolding($$)
+{
+    my ($self, $flag) = @_;
+
+    return -1
+	if (! ref($self));
+
     my $experiment = Experiment->Lookup("GeniSlices", "reservations");
     if (!defined($experiment)) {
 	#
@@ -720,7 +828,6 @@ sub Release($$)
     foreach my $node (@nodes) {
 	$node->Refresh();
     }
-    $self->Delete($flag);
     return 0;
 }
 

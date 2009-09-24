@@ -85,7 +85,8 @@ sub UserContext($$)
     my $password;
 
     my $pkcs12 = $user->HomeDir() . "/.ssl/encrypted.p12";
-    $user->SSLPassPhrase(1, \$password);
+    $user->SSLPassPhrase(1, \$password) == 0
+	or return undef;
 
     my $self = {"certificate"  => undef,
 		"certfile"     => $pkcs12,

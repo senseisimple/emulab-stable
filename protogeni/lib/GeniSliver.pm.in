@@ -90,11 +90,9 @@ sub Lookup($$)
 
     my $self              = {};
     $self->{'SLIVER'}     = $query_result->fetchrow_hashref();
-    $self->{'COMPONENT'}  = undef;	# client
-    $self->{'SLICE'}      = undef;	# client/server
-    $self->{'CREDENTIAL'} = undef;	# client
+    $self->{'SLICE'}      = undef;	# server
     $self->{'AGGREGATE'}  = undef;	# server
-    $self->{'RSPEC'}      = undef;	# client/server
+    $self->{'RSPEC'}      = undef;	# server
 
     my $rspec_string = $self->{'SLIVER'}->{'rspec_string'};
     if (defined($rspec_string) && $rspec_string ne "") {
@@ -145,52 +143,33 @@ sub Stringify($)
 # Create a sliver record in the DB. On the client side we save the credential
 # that allows control of it, for later operations.
 #
-sub Create($$$$$$$$;$$$)
+sub Create($$$$$$$$$)
 {
     my ($class, $slice, $owner, $uuid, $resource_uuid, $resource_type,
-	$hrn, $nickname,
-	$rspec, $credential, $component) = @_;
+	$hrn, $nickname, $rspec) = @_;
     my @insert_data = ();
     my $certificate;
 
     # Every sliver gets a new unique index.
     my $idx = TBGetUniqueIndex('next_sliver', 1);
-    if (defined($credential)) {
-	$certificate = $credential->target_cert();
-	# Store the certificate for later use.
-	if ($certificate->Store() != 0) {
-	    print STDERR "Could not store certificate\n";
-	    return undef;
-	}
-	$resource_uuid = $uuid = $credential->this_uuid();
-	$hrn = $credential->hrn();
-	if (defined($credential->extensions()) &&
-	    exists($credential->extensions()->{'nickname'})) {
-	    $nickname = $credential->extensions()->{'nickname'};
-	}
-	# Store the credential
-	return undef
-	    if ($credential->Store() != 0);
-    }
-    else {
-	# Create a cert pair, for this resource uuid.
-	if (defined($uuid) && $resource_type eq "Node") {
-	    $certificate = GeniCertificate->Lookup($uuid);
+    
+    # Create a cert pair, for this resource uuid.
+    if (defined($uuid) && $resource_type eq "Node") {
+	$certificate = GeniCertificate->Lookup($uuid);
 
-	    if (defined($certificate) && $certificate->hrn() ne $hrn) {
-		print STDERR "GeniSliver::Create: ".
-		    "Already have a certificate for $hrn/$uuid\n";
-		return undef;
-	    }
-	}
-	$certificate = GeniCertificate->Create("sliver", $hrn, $TBOPS, $uuid)
-	    if (!defined($certificate));
-	
-	if (!defined($certificate)) {
+	if (defined($certificate) && $certificate->hrn() ne $hrn) {
 	    print STDERR "GeniSliver::Create: ".
-		"Could not generate new certificate and UUID for $hrn/$uuid\n";
+		"Already have a certificate for $hrn/$uuid\n";
 	    return undef;
 	}
+    }
+    $certificate = GeniCertificate->Create("sliver", $hrn, $TBOPS, $uuid)
+	if (!defined($certificate));
+	
+    if (!defined($certificate)) {
+	print STDERR "GeniSliver::Create: ".
+	    "Could not generate new certificate and UUID for $hrn/$uuid\n";
+	return undef;
     }
     my $slice_uuid     = $slice->uuid();
     my $owner_uuid     = $owner->uuid();
@@ -206,13 +185,6 @@ sub Create($$$$$$$$;$$$)
     push(@insert_data, "resource_type='$resource_type'");
     push(@insert_data, "creator_uuid='$owner_uuid'");
     push(@insert_data, "slice_uuid='$slice_uuid'");
-
-    # Only on the client side.
-    push(@insert_data, "credential_idx=" . $credential->idx())
-	if (defined($credential));
-    # Only on the client side.
-    push(@insert_data, "component_uuid='" . $component->uuid() . "'")
-	if (defined($component));
 
     if (defined($rspec)) {
 	my $rspec_string = XMLout($rspec, RootName => "rspec");
@@ -236,11 +208,6 @@ sub Create($$$$$$$$;$$$)
 	print STDERR
 	    "GeniSliver::Create: GeniUsage->NewSliver($sliver) failed\n";
     }
-    
-    $sliver->{'CREDENTIAL'} = $credential
-	if (defined($credential));
-    $sliver->{'COMPONENT'} = $component
-	if (defined($component));
     $sliver->{'AGGREGATE'} = undef;
     $sliver->{'SLICE'}     = undef;
 
@@ -408,52 +375,6 @@ sub GetExperiment($)
 }
 
 #
-# Get the credential for the sliver.
-#
-sub GetCredential($$)
-{
-    my ($self, $user) = @_;
-
-    return undef
-	if (! ref($self));
-
-    return $self->{'CREDENTIAL'} if (defined($self->{'CREDENTIAL'}));
-
-    my $credential = GeniCredential->Lookup($self, $user);
-    if (!defined($credential)) {
-	print STDERR "Could not get credential object associated with $self\n";
-	return undef;
-    }
-    $self->{'CREDENTIAL'} = $credential;
-    return $credential;
-}
-
-#
-# Get the component for the sliver.
-#
-sub GetComponent($)
-{
-    my ($self) = @_;
-
-    return undef
-	if (! ref($self));
-
-    return $self->{'COMPONENT'} if (defined($self->{'COMPONENT'}));
-
-    if (!defined($self->component_uuid())) {
-	print STDERR "No component associated with $self\n";
-	return undef;
-    }
-    my $component = GeniComponent->Lookup($self->component_uuid());
-    if (!defined($component)) {
-	print STDERR "Could not get component object associated with $self\n";
-	return undef;
-    }
-    $self->{'COMPONENT'} = $component;
-    return $component;
-}
-
-#
 # Get the slice for the sliver.
 #
 sub GetSlice($)
@@ -568,128 +489,6 @@ sub NewCredential($$)
 
 ############################################################################
 #
-# The client side methods are in packages which inherit from above.
-#
-package GeniSliver::Client;
-use vars qw(@ISA);
-@ISA = "GeniSliver";
-
-use GeniDB;
-use GeniComponent;
-use GeniSlice;
-use GeniCredential;
-use GeniCertificate;
-use libdb qw(TBDB_ALLOCSTATE_RES_INIT_DIRTY);
-
-sub Create()
-{
-    my ($class, $slice, $user, $rspec, $credential, $component) = @_;
-
-    return GeniSliver->Create($slice, $user, undef, undef,
-			      "Client", undef, undef, $rspec, 
-			      $credential, $component);
-}
-
-#
-# Client side method to contact the sliver component and start it.
-#
-sub Start($$)
-{
-    my ($self, $user) = @_;
-
-    return -1
-	if (! ref($self));
-
-    my $component = $self->GetComponent();
-    return -1
-	if (!defined($component));
-
-    return -1
-	if ($component->StartSliver($self, $user) != 0);
-
-    return 0;
-}
-
-#
-# Client side method to contact the sliver component and destroy it.
-#
-sub Destroy($$)
-{
-    my ($self, $user) = @_;
-
-    return -1
-	if (! ref($self));
-
-    my $component = $self->GetComponent();
-    return -1
-	if (!defined($component));
-
-    return -1
-	if ($component->DestroySliver($self, $user) != 0);
-
-    # Delete the local object from the DB.
-    $self->Delete(1) == 0
-	or return -1;
-
-    return 0;
-}
-
-#
-# On the client side, the aggregate points to the parent sliver when it
-# contains multiple resources.
-#
-sub SetAggregate($$)
-{
-    my ($self, $parent) = @_;
-
-    return -1
-	if (! (ref($self) && ref($parent)));
-
-    my $idx         = $self->idx();
-    my $parent_uuid = $parent->uuid();
-
-    return -1
-	if (!DBQueryWarn("update geni_slivers set ".
-			 "  aggregate_uuid='$parent_uuid' ".
-			 "where idx='$idx'"));
-
-    return 0;
-}
-sub ClearAggregate($)
-{
-    my ($self) = @_;
-
-    return -1
-	if (! ref($self));
-
-    my $idx         = $self->idx();
-
-    return -1
-	if (!DBQueryWarn("update geni_slivers set ".
-			 "  aggregate_uuid=NULL ".
-			 "where idx='$idx'"));
-    return 0;
-}
-sub GetAggregate($)
-{
-    my ($self) = @_;
-
-    return undef
-	if (! ref($self));
-
-    return undef
-	if (!defined($self->aggregate_uuid()));
-
-    my $parent = GeniSliver->Lookup($self->aggregate_uuid());
-    if (!defined($parent)) {
-	print STDERR "Could not get parent object associated with $self\n";
-	return undef;
-    }
-    return $parent;
-}
-
-############################################################################
-#
 # The server side methods are in packages which inherit from above.
 #
 package GeniSliver::Node;
@@ -704,7 +503,8 @@ use GeniCertificate;
 use GeniUtil;
 use Experiment;
 use XML::Simple;
-use libdb qw(TBDB_ALLOCSTATE_RES_INIT_DIRTY TBDB_NODESTATE_SHUTDOWN);
+use libdb qw(TBDB_ALLOCSTATE_RES_INIT_DIRTY TBDB_NODESTATE_SHUTDOWN
+	     TBResolveNextOSID);
 
 sub Create($$$$$$)
 {
@@ -866,9 +666,7 @@ sub Provision($;$)
 	    return -1;
 	}
     }
-    # See below; remote nodes are currently assumed to be running.
-    $self->SetStatus("ready")
-	if (!($node->isremotenode() && $node->isvirtnode()));
+    $self->SetStatus("ready");
     return 0;
 }
 
@@ -1009,12 +807,6 @@ sub Start($)
     }
     if ($reservation->SameExperiment($experiment)) {
 	my $node_id = $node->node_id();
-
-	# XXX Need to fix up this status stuff.
-	if ($node->isremotenode() && $self->status() eq "created") {
-	    $self->SetStatus("ready");
-	    goto done;
-	}
 
 	#
 	# Reboot and wait?

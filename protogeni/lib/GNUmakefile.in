@@ -17,7 +17,7 @@ LIB_SCRIPTS     = GeniDB.pm GeniUser.pm  \
 		  GeniComponent.pm GeniCH.pm GeniEmulab.pm \
 		  GeniAuthority.pm GeniCertificate.pm GeniAggregate.pm \
 		  GeniUtil.pm GeniRegistry.pm GeniUsage.pm GeniHRN.pm \
-		  GeniSES.pm
+		  GeniSES.pm GeniResource.pm
 SBIN_SCRIPTS	= plabnodewrapper plabslicewrapper
 
 SCRIPTS		= addnode.pl genischemacheck.pl

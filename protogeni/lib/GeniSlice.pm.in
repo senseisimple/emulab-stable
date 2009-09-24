@@ -37,6 +37,7 @@ my $TBAUDIT   	   = "@TBAUDITEMAIL@";
 my $BOSSNODE       = "@BOSSNODE@";
 my $CONTROL	   = "@USERNODE@";
 my $OURDOMAIN      = "@OURDOMAIN@";
+my $PGENIDOMAIN    = "@PROTOGENI_DOMAIN@";
 
 # Cache of instances to avoid regenerating them.
 my %slices     = ();
@@ -223,9 +224,11 @@ sub CreateFromLocal($$$)
 	print STDERR "Could not find the local authority record\n";
 	return undef;
     }
-    
-    my $hrn = $authority->hrn() . "." . $experiment->idx();
-    my $creator_uuid = $user->uuid();
+
+    #
+    # XXX Form hrn from the domain. 
+    #
+    my $hrn = "${PGENIDOMAIN}.slices." . $experiment->idx(); 
 
     #
     # Generate a certificate.
@@ -233,10 +236,10 @@ sub CreateFromLocal($$$)
     $certificate = GeniCertificate->Create("slice", $hrn, $user->email());
     if (!defined($certificate)) {
 	print STDERR "GeniSlice::CreateFromLocal: ".
-	    "Could not generate new certificate and UUID for $hrn\n";
+	    "Could not generate new certificate $experiment\n";
 	return undef;
     }
-    my $slice = GeniSlice->Create($certificate, $creator_uuid,
+    my $slice = GeniSlice->Create($certificate, $user->uuid(),
 				  $authority, $experiment->idx());
     $certificate->Delete()
 	if (!defined($slice));

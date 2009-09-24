@@ -75,6 +75,7 @@ my $PLABSLICE	   = "$TB/sbin/plabslicewrapper";
 my $NAMEDSETUP     = "$TB/sbin/named_setup";
 my $VNODESETUP     = "$TB/sbin/vnode_setup";
 my $GENTOPOFILE    = "$TB/libexec/gentopofile";
+my $TARFILES_SETUP = "$TB/bin/tarfiles_setup";
 my $MAPPER         = "$TB/bin/mapper";
 my $VTOPGEN        = "$TB/bin/vtopgen";
 my $SNMPIT         = "$TB/bin/snmpit";
@@ -376,13 +377,6 @@ sub GetTicket($;$)
     else {
 	return GeniResponse->MalformedArgsResponse();
     }
-    if ($isupdate) {
-	$ticket = GeniTicket->CreateFromSignedTicket($tick);
-	if (!defined($ticket)) {
-	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					"Could not create GeniTicket object");
-	}
-    }
     my $credential = GeniCredential->CreateFromSigned($cred);
     if (!defined($credential)) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
@@ -390,10 +384,10 @@ sub GetTicket($;$)
     }
     my $slice_uuid = $credential->target_uuid();
     my $user_uuid  = $credential->owner_uuid();
-
+    
     print STDERR $credential->target_cert() . "\n";
     print STDERR $credential->owner_cert() . "\n";
-        
+
     #
     # Make sure the credential was issued to the caller.
     #
@@ -402,6 +396,15 @@ sub GetTicket($;$)
 				    "This is not your credential!");
     }
     
+    if ($isupdate) {
+	$ticket = GeniTicket->CreateFromSignedTicket($tick);
+	if (!defined($ticket)) {
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					"Could not create GeniTicket object");
+	}
+	$ticket->SetSlice($slice_uuid);
+    }
+
     defined($credential) &&
 	($credential->HasPrivilege( "pi" ) or
 	 $credential->HasPrivilege( "instantiate" ) or
@@ -606,7 +609,6 @@ sub GetTicket($;$)
     # cannot be granted.
     #
     my %namemap  = ();
-    my %tofree   = ();
     my %colomap  = ();
     my %ifacemap = ();
     my %nodemap  = ();
@@ -670,12 +672,20 @@ sub GetTicket($;$)
 		goto bad;
 	    }
 
-	    # Grab the reservation. We will want to release unused nodes,
-	    # but only if not already assigned to the slice.
+	    #
+	    # Grab the reservation. For backwards compatibility, we want
+	    # to find nodes in the reservations holding area, and move them
+	    # into the slice experiment. The holding area is no longer going
+	    # to be used, at least not until we have a reservations system.
+	    #
 	    my $reservation = $node->Reservation();
-	    if (defined($reservation)) {
-		$tofree{$resource_uuid} = $node
-		    if ($reservation->SameExperiment($reserved_holding));
+	    if (defined($reservation) &&
+		$reservation->SameExperiment($reserved_holding)) {
+		if ($node->MoveReservation($slice_experiment)) {
+		    print STDERR "Could not move $node to $slice_experiment\n";
+		    goto bad;
+		}
+		$node->Refresh();
 	    }
 	    $namemap{$node_nickname} = $node;
 	    $colomap{$colocate} = $node
@@ -773,6 +783,7 @@ sub GetTicket($;$)
 	# The slot does not like to be NULL.
 	$osname = ""
 	    if (!defined($osname));
+	
 	# Need some kind of default.
 	$pctype = "pc"
 	    if (!defined($pctype));
@@ -817,6 +828,7 @@ sub GetTicket($;$)
 					     "Error creating virtnode");
 	    goto bad;
 	}
+
 	$virtexperiment->NewTableRow("virt_node_desires",
 				     {"vname"    => $node_nickname,
 				      "desire"   => "pcshared",
@@ -935,7 +947,8 @@ sub GetTicket($;$)
 	    my $iface_ref   = $ifacemap{$node_nickname}->{$iface_id}->{"rspec"};
 	    my $iface_name  = $iface_ref->{"component_id"} || "";
 	    if( GeniHRN::IsValid( $iface_name ) ) {
-		my ($urn_authority,$urn_node,$urn_iface) = GeniHRN::ParseInterface( $iface_name );
+		my ($urn_authority,$urn_node,$urn_iface) =
+		    GeniHRN::ParseInterface( $iface_name );
 		$iface_name = $urn_iface;
 	    }
 	    my $iface_vport = $ifacemap{$node_nickname}->{$iface_id}->{"vport"};
@@ -1030,6 +1043,12 @@ sub GetTicket($;$)
     foreach my $ref (@{$solution->{'node'}}) {
 	my $virtual_id     = $ref->{"virtual_id"};
 	my $component_uuid = $ref->{"component_uuid"};
+	if (!exists($nodemap{$virtual_id})) {
+	    $response =
+		GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				     "Mapper inserted nodes you did not want");
+	    goto bad;
+	}
 	my $rspec          = $nodemap{$virtual_id}->{'rspec'};
 	my $virtnode       = $nodemap{$virtual_id}->{'virtnode'};
 	my $node           = LookupNode($component_uuid);
@@ -1057,9 +1076,6 @@ sub GetTicket($;$)
 	    # Need to allocate this node unless already mapped.
 	    push(@nodeids, $node->node_id())
 		if (!exists($namemap{$virtual_id}));
-	    # Or make sure we do not free it if already allocated.
-	    delete($tofree{$component_uuid})
-		if ($isupdate && exists($tofree{$component_uuid}));
 	}
 	$namemap{$virtual_id} = $node;
 	$colomap{$colocate} = $node
@@ -1089,7 +1105,7 @@ sub GetTicket($;$)
 
     # Nalloc might fail if the node gets picked up by someone else.
     if (@nodeids && !$impotent) {
-	system("$NALLOC $pid reservations @nodeids");
+	system("$NALLOC $pid $eid @nodeids");
 	if (($? >> 8) < 0) {
 	    $response =
 		GeniResponse->Create(GENIRESPONSE_ERROR, undef,
@@ -1116,6 +1132,8 @@ sub GetTicket($;$)
 				 "Could not create GeniTicket object");
 	goto bad;
     }
+    $newticket->SetSlice($slice_uuid);
+    
     if ($newticket->Sign()) {
 	$response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					 "Could not sign Ticket");
@@ -1133,14 +1151,6 @@ sub GetTicket($;$)
 	#
 	$ticket->Delete(TICKET_RELEASED)
 	    if ($ticket->stored());
-
-	# And release any nodes we no longer wanted.
-	if (keys(%tofree)) {
-	    my @ids = map { $_->node_id() } values(%tofree);
-
-	    system("export NORELOAD=1; ".
-		   "$NFREE -x -q GeniSlices reservations @ids");
-	}
     }
     $slice->UnLock();
     return GeniResponse->Create(GENIRESPONSE_SUCCESS, $newticket->asString());
@@ -1158,7 +1168,7 @@ sub GetTicket($;$)
 	}
 	if (@dealloc) {
 	    system("export NORELOAD=1; ".
-		   "$NFREE -x -q GeniSlices reservations @dealloc");
+		   "$NFREE -x -q GeniSlices $eid @dealloc");
 	}
 	if (defined($slice_experiment) && $restorevirt) {
 	    $slice_experiment->RemoveVirtualState();
@@ -1172,7 +1182,7 @@ sub GetTicket($;$)
 	}
 	elsif (@dealloc) {
 	    system("export NORELOAD=1; ".
-		   "$NFREE -x -q GeniSlices reservations @dealloc");
+		   "$NFREE -x -q GeniSlices $eid @dealloc");
 	}
 	#
 	# Lets leave the experiment lying around; it will get cleaned
@@ -1308,6 +1318,8 @@ sub SliverWork($$)
 					"Already have an aggregate for slice");
 	}
     }
+    $ticket->SetSlice($slice_uuid);
+    
     if ($ticket->Lock() != 0) {
 	return GeniResponse->BusyResponse("ticket");
     }
@@ -1354,6 +1366,15 @@ sub SliverWork($$)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "No local experiment for slice");
     }
+    my $pid = $experiment->pid();
+    my $eid = $experiment->eid();
+
+    if (system("$TARFILES_SETUP $pid $eid")) {
+	$slice->UnLock();
+	$ticket->UnLock();
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not setup tarfiles");
+    }
 
     #
     # Figure out what nodes to allocate or free. 
@@ -1361,13 +1382,11 @@ sub SliverWork($$)
     my %physnodes= ();
     my %nodemap  = ();
     my %linkmap  = ();
-    my %toalloc  = ();
+    my %newnodes = ();
     my %colomap  = ();
     my @allocated= ();
     my @freenodes= ();
     my @freelinks= ();
-    my $pid      = $experiment->pid();
-    my $eid      = $experiment->eid();
     my $rspec    = $ticket->rspec();
     my $needplabslice = 0;
 
@@ -1474,21 +1493,34 @@ sub SliverWork($$)
 	}
 
 	#
-	# See if the node is already reserved. 
+	# See if the node is properly reserved. 
 	#
 	my $reservation = $node->Reservation();
 	if (defined($reservation)) {
-	    # Reserved during previous operation on the sliver.
-	    next
-		if ($reservation->SameExperiment($experiment));
-
-	    # Need to move it into the experiment.
 	    if ($reservation->SameExperiment($reserved_holding)) {
-		$toalloc{$node->node_id()} = $node;
-		next;
+		# This is for backwards compatibility.
+		if ($node->MoveReservation($experiment)) {
+		    print STDERR "Could not move $node to $experiment\n";
+		    goto bad;
+		}
+		$node->Refresh();
 	    }
+	    elsif (!$reservation->SameExperiment($experiment)) {
+		$message = "$resource_uuid ($node) is not available";
+		goto bad;
+	    }
+	}
+	else {
 	    $message = "$resource_uuid ($node) is not available";
 	    goto bad;
+	}
+    
+	# Unincorporated nodes have no genisliver_idx.
+	my $restable = $node->ReservedTableEntry();
+	if (defined($restable) &&
+	    !defined($restable->{'genisliver_idx'})) {
+	    $newnodes{$node->node_id()} = $node;
+	    next;
 	}
     }
 
@@ -1620,16 +1652,6 @@ sub SliverWork($$)
 	}
     }
 
-    # Move the nodes into the experiment.
-    if (keys(%toalloc)) {
-	foreach my $node (values(%toalloc)) {
-	    if ($node->MoveReservation($experiment)) {
-		print STDERR "Could not move $node to $experiment\n";
-		goto bad;
-	    }
-	}
-    }
-
     #
     # Now run the mapper again. All the resources are fixed, and it should
     # just run like it did the first time. The difference is that it will
@@ -1715,7 +1737,7 @@ sub SliverWork($$)
 	$nodemap{$virtual_id} = $sliver;
 
 	#
-	# Find the actual node (might e a vnode) so that we can put
+	# Find the actual node (might be a vnode) so that we can put
 	# the info into the manifest.
 	#
 	my $realnode = Node->Lookup($sliver->uuid());
@@ -1730,7 +1752,9 @@ sub SliverWork($$)
 	# Manifest goes back to the user.
 	$ref->{'sliver_uuid'} = $sliver->uuid();
 	$ref->{'sliver_urn'}  = $sliver_urn;
-	$ref->{'component_hostname'} = $node->node_id() . ".${OURDOMAIN}";
+	$ref->{'component_hostname'} = $realnode->node_id() . ".${OURDOMAIN}";
+	$ref->{'sshdport'}    = $realnode->sshdport()
+	    if ($realnode->isvirtnode());
 
 	# Add to the aggregate.
 	if ($sliver->SetAggregate($aggregate) != 0) {
@@ -1909,7 +1933,7 @@ sub SliverWork($$)
 
     # Do firewall stuff.
     if ($slice->needsfirewall()) {
-	my @nodeids = map { $_->node_id() } values(%toalloc);
+	my @nodeids = map { $_->node_id() } values(%newnodes);
 
 	if (@nodeids && doFWlans($experiment, FWADDNODES, \@nodeids) != 0) {
 	    print STDERR "FireWall setup failed\n";
@@ -2012,18 +2036,18 @@ sub SliverWork($$)
 	    if (! $impotent);
 	$sliver->Delete(GENI_PURGEFLAG);
     }
-    # Move the nodes back into the holding experiment.
-    if (keys(%toalloc)) {
-	my @nodeids = map { $_->node_id() } values(%toalloc);
+    # Mark the nodes as no longer being incorporated. 
+    if (keys(%newnodes)) {
+	my @nodeids = map { $_->node_id() } values(%newnodes);
 	
 	if ($slice->needsfirewall() && $didfwsetup) {
 	    if (@nodeids && doFWlans($experiment, FWDELNODES, \@nodeids)) {
 		print STDERR "FireWall cleanup failed\n";
 	    }
 	}
-	foreach my $node (values(%toalloc)) {
-	    if ($node->MoveReservation($reserved_holding)) {
-		print STDERR "Could not move $node to $reserved_holding\n";
+	foreach my $node (values(%newnodes)) {
+	    if ($node->ModifyReservation({"genisliver_idx" => 0})) {
+		print STDERR "Could not clear genisliver_idx from $node\n";
 	    }
 	}
     }
@@ -2064,26 +2088,30 @@ sub SliverWork($$)
 sub ReleaseTicket($)
 {
     my ($argref) = @_;
-    my $ticket     = $argref->{'ticket'};
+    my $tickstr     = $argref->{'ticket'};
+    my $credstr     = $argref->{'credential'};
 
-    if (! (defined($ticket) &&
-	   !TBcheck_dbslot($ticket, "default", "text",
-			   TBDB_CHECKDBSLOT_ERROR))) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "ticket: ". TBFieldErrorString());
+    if (! (defined($tickstr) && defined($credstr))) {
+	return GeniResponse->MalformedArgsResponse();
     }
-    $ticket = GeniTicket->CreateFromSignedTicket($ticket);
+    my $ticket = GeniTicket->CreateFromSignedTicket($tickstr);
     if (!defined($ticket)) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not create GeniTicket object");
     }
+    my $credential = GeniCredential->CreateFromSigned($credstr);
+    if (!defined($credential)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not create GeniCredential object");
+    }
+    $ticket->SetSlice($credential->target_uuid());
     
     #
-    # Make sure the credential was issued to the caller.
+    # Make sure the ticket was issued to the caller.
     #
     if ($ticket->owner_uuid() ne $ENV{'GENIUUID'}) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "This is not your credential!");
+				    "This is not your ticket!");
     }
     #
     # If the ticket is not stored, it is not a ticket that needs
