@@ -209,7 +209,7 @@ system("cp -f $TEMPLATE syscert.cnf") == 0
 open(TEMP, ">>syscert.cnf")
     or fatal("Could not open $TEMPLATE for append: $!");
 
-print TEMP "OU\t\t= $orgunit\n";
+print TEMP "OU\t\t= \"$orgunit\"\n";
 print TEMP "CN\t\t= $uuid\n";
 print TEMP "emailAddress\t= $email\n";
 
