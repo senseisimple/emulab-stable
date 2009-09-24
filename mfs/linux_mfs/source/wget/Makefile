@@ -37,9 +37,9 @@ $(WGET_PATH)/.config-stamp: $(WGET_PATH)/.patch-stamp
 		PATH=$(STAGING_DIR)/usr/bin:$(PATH) \
 		$(HOST_CONFIGURE_OPTS) \
 		./configure \
-		--target=x86_64-linux-uclibc \
-		--host=x86_64-linux-uclibc \
-		--build=x86_64-linux-gnu \
+		--target=$(MFS_ARCH)-linux-uclibc \
+		--host=$(MFS_ARCH)-linux-uclibc \
+		--build=$(MFS_ARCH)-linux-gnu \
 		--prefix=/usr \
 		--exec-prefix=/usr \
 		--bindir=/usr/bin \
@@ -62,7 +62,7 @@ $(WGET_PATH)/src/wget: $(WGET_PATH)/.config-stamp
 	PATH=$(STAGING_DIR)/usr/bin:$(PATH) \
 	        CC=$(TARGET_CC) \
 	        $(MAKE) -C $(WGET_PATH) \
-		$(TARGET_CONFIGURE_OPTS) LD=x86_64-linux-uclibc-gcc
+		$(TARGET_CONFIGURE_OPTS) LD=$(MFS_ARCH)-linux-uclibc-gcc
 	touch $@
 
 $(TARGET_PATH)/usr/bin/wget: $(WGET_PATH)/src/wget

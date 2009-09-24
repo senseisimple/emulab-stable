@@ -22,7 +22,7 @@ $(PORTMAP_PATH)/portmap: config
 		NO_TCP_WRAPPER=true \
 	        $(MAKE) -C $(PORTMAP_PATH) \
 		LDFLAGS=-fPIE
-		$(TARGET_CONFIGURE_OPTS) LD=x86_64-linux-uclibc-gcc
+		$(TARGET_CONFIGURE_OPTS) LD=$(MFS_ARCH)-linux-uclibc-gcc
 
 install: $(PORTMAP_PATH)/portmap
 	install -m 755 $(PORTMAP_PATH)/portmap $(TARGET_PATH)/sbin

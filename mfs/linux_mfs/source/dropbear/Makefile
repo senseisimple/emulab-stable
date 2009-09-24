@@ -35,8 +35,8 @@ $(DROPBEAR_PATH)/.config-stamp: $(DROPBEAR_PATH)/.patch-stamp
 	cd $(DROPBEAR_PATH);  \
 		$(HOST_CONFIGURE_OPTS) \
 		./configure --prefix=/usr \
-		--target=x86_64-linux-uclibc \
-		--host=x86_64-linux-uclibc \
+		--target=$(MFS_ARCH)-linux-uclibc \
+		--host=$(MFS_ARCH)-linux-uclibc \
 		--sysconfdir=/etc \
 		--localstatedir=/var \
 		--libdir=$(STAGING_DIR)/usr/lib \
@@ -46,7 +46,7 @@ $(DROPBEAR_PATH)/.config-stamp: $(DROPBEAR_PATH)/.patch-stamp
 
 $(DROPBEAR_PATH)/dropbearmulti: $(DROPBEAR_PATH)/.config-stamp
 	PATH=$(STAGING_DIR)/usr/bin:$(PATH) $(MAKE) -C $(DROPBEAR_PATH) \
-		$(TARGET_CONFIGURE_OPTS) LD=x86_64-linux-uclibc-gcc \
+		$(TARGET_CONFIGURE_OPTS) LD=$(MFS_ARCH)-linux-uclibc-gcc \
 		PROGRAMS="dropbear dbclient dropbearkey dropbearconvert scp" \
 		MULTI=1 SCPPROGRESS=1
 	touch $@

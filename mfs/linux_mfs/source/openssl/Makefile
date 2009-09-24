@@ -45,18 +45,18 @@ $(OPENSSL_PATH)/.config-stamp: $(OPENSSL_PATH)/.patch-stamp
 	(cd $(OPENSSL_PATH); \
 		CFLAGS="-DOPENSSL_NO_KRB5 -DOPENSSL_NO_IDEA -DOPENSSL_NO_MDC2 -DOPENSSL_NO_RC5 $(TARGET_CFLAGS)" \
 		PATH=$(STAGING_DIR)/usr/bin:$(PATH) \
-		./Configure linux-x86_64 --prefix=/ \
+		./Configure linux-$(MFS_ARCH) --prefix=/ \
 			--openssldir=/lib/ssl -L$(STAGING_DIR)/lib -ldl \
 			-I$(STAGING_DIR)/usr/include $(OPENSSL_OPTS) threads \
 			shared no-idea no-mdc2 no-rc5)
 	touch $@
 
 $(OPENSSL_PATH)/apps/openssl: $(OPENSSL_PATH)/.config-stamp
-	PATH=$(STAGING_DIR)/usr/bin:$(PATH) $(MAKE) CC=x86_64-linux-uclibc-gcc -C $(OPENSSL_PATH) all build-shared
+	PATH=$(STAGING_DIR)/usr/bin:$(PATH) $(MAKE) CC=$(MFS_ARCH)-linux-uclibc-gcc -C $(OPENSSL_PATH) all build-shared
 	# Work around openssl build bug to link libssl.so with libcrypto.so.
 	-rm $(OPENSSL_PATH)/libssl.so.*.*.*
 	$(MAKE) PATH=$(PATH):$(STAGING_DIR)/usr/bin \
-		CC=x86_64-linux-uclibc-gcc -C $(OPENSSL_PATH) do_linux-shared
+		CC=$(MFS_ARCH)-linux-uclibc-gcc -C $(OPENSSL_PATH) do_linux-shared
 	touch $@
 
 $(STAGING_DIR)/usr/lib/libcrypto.a: $(OPENSSL_PATH)/apps/openssl

@@ -43,7 +43,7 @@ $(ZLIB_PATH)/.patch-stamp: $(ZLIB_PATH)/.extract-stamp
 $(ZLIB_PATH)/.config-stamp: $(ZLIB_PATH)/.patch-stamp
 	rm -f $(ZLIB_PATH)/config.cache
 	cd $(ZLIB_PATH); \
-		$(HOST_CONFIGURE_OPTS) CC=x86_64-linux-uclibc-gcc \
+		$(HOST_CONFIGURE_OPTS) CC=$(MFS_ARCH)-linux-uclibc-gcc \
 		CFLAGS="$(ZLIB_CFLAGS)" \
 		./configure --prefix=/usr \
 		--exec_prefix=$(STAGING_DIR)/usr/bin \

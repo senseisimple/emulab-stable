@@ -1,3 +1,4 @@
+MFS_ARCH	=	x86_64
 SOURCE_PATH	=	$(PWD)/source
 TARGET_PATH	=	$(PWD)/target
 TARGET_BUILD_PATH	=	$(PWD)/build
@@ -5,7 +6,7 @@ SCRIPTS_PATH	=	$(PWD)/scripts
 INITRAMFS_PATH	=	$(PWD)/initramfs.tmp
 BUILDROOT_PATH	=	$(PWD)/buildroot
 FAKEROOT_ENVIRONMENT	=	$(PWD)/fs_fakeroot.env
-STAGING_DIR	=	$(PWD)/buildroot/build_x86_64/staging_dir
+STAGING_DIR	=	$(PWD)/buildroot/build_$(MFS_ARCH)/staging_dir
 BOOT_PATH	=	$(PWD)/boot
 INITRAMFS	=	$(BOOT_PATH)/initramfs.gz
 
@@ -53,7 +54,7 @@ $(INSTALL_MODULES):
 
 $(TARGET_PATH)/lib/libc.so.0:
 	mkdir -p $(TARGET_PATH)/lib
-	cp -dpR $(BUILDROOT_PATH)/project_build_x86_64/uclibc/root/lib/* $(TARGET_PATH)/lib
+	cp -dpR $(BUILDROOT_PATH)/project_build_$(MFS_ARCH)/uclibc/root/lib/* $(TARGET_PATH)/lib
 
 uclibc-install: $(TARGET_PATH)/lib/libc.so.0
 
