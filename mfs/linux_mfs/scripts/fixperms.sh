@@ -9,6 +9,7 @@ fi
 
 chmod 1777 "$target_dir/tmp"
 chmod 1777 "$target_dir/var/tmp"
+chmod 1777 "$target_dir/var/lock"
 chmod 0700 "$target_dir/root/.ssh"
 chmod 0600 "$target_dir/root/.ssh/*"
 chmod 0600 "$target_dir/etc/shadow"
