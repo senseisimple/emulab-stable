@@ -48,7 +48,8 @@ NodeTypeList = NodeTypeSpec+
 NodeTypeContents &= TypeField*
 
 LinkType = element link_type {
-    attribute name { text } &
+    attribute name { text }? &
+    attribute type_name { text }? &
     TypeField*
     }
 

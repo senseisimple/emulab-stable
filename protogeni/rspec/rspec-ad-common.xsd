@@ -115,7 +115,8 @@
           <xs:sequence>
             <xs:element minOccurs="0" maxOccurs="unbounded" ref="rspec:field"/>
           </xs:sequence>
-          <xs:attribute name="name" use="required"/>
+          <xs:attribute name="name"/>
+          <xs:attribute name="type_name"/>
         </xs:complexType>
       </xs:element>
     </xs:sequence>
@@ -146,6 +147,13 @@
       <xs:element minOccurs="0" ref="rspec:monitoring"/>
     </xs:sequence>
     <xs:attributeGroup ref="rspec:ComponentInterfaceDeclName"/>
+    <xs:attribute name="role">
+      <xs:simpleType>
+        <xs:restriction base="xs:token">
+          <xs:enumeration value="control"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
   </xs:complexType>
   <xs:element name="monitoring">
     <xs:complexType>

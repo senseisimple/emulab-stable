@@ -196,18 +196,23 @@ usage()
 print_header();
 
 my %nodetointerface;
+my %interfaceroles = ();
+my %interfacetypes = ();
 
 # Read interfaces
 my $result =
-    DBQueryFatal("SELECT node_id,card,port,iface,interface_type" .
+    DBQueryFatal("SELECT node_id,card,port,iface,interface_type,role" .
 		 " from interfaces " .
 		 ($genimode ? "where role!='gw'" : ""));
 		 
-while (($node,$card,$port,$iface,$type) = $result->fetchrow_array) {
+while (($node,$card,$port,$iface,$type, $role) = $result->fetchrow_array) {
     push @{ $nodetointerface{"$node"} }, $iface;
     $interfacemap{"$node:$card:$port"} = $iface;
     if ((defined $type) && ($type ne "")) {
 	$interfacetypes{"$node:$card:$port"} = $type;
+    }
+    if ((defined $role) && ($role ne "")) {
+	$interfaceroles{"$node:$iface"} = $role;
     }
 }
 
@@ -1591,7 +1596,16 @@ sub print_node_interfaces
     for (; $i < scalar(@interfaces); ++$i) {
 	my $name = $interfaces[$i];
 	my $urn = GeniHRN::GenerateInterface($OURDOMAIN, $nodeName, $name);
-	print "  <interface component_id=\"$urn\"/>\n";
+	print "  <interface component_id=\"$urn\" ";
+	if (exists($interfaceroles{"$nodeName:$name"}))
+	{
+	    my $role = $interfaceroles{"$nodeName:$name"};
+	    if ($role eq "ctrl")
+	    {
+		print "role=\"control\" ";
+	    }
+	}
+	print "/>\n";
     }
 }
 

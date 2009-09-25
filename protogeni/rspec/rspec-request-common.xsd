@@ -114,7 +114,8 @@
           <xs:sequence>
             <xs:element minOccurs="0" maxOccurs="unbounded" ref="rspec:field"/>
           </xs:sequence>
-          <xs:attribute name="name" use="required"/>
+          <xs:attribute name="name"/>
+          <xs:attribute name="type_name"/>
         </xs:complexType>
       </xs:element>
     </xs:sequence>

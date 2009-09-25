@@ -187,9 +187,15 @@ sub Resolve($)
 	else {
 	    $node= LookupNode($hrn);
 	}
-	if (!defined($node)) {
+	if (! defined($node)) {
 	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED,
 					undef, "Nothing here by that name");
+	}
+
+	my $rspec = GetAdvertisement(0, $node->node_id());
+	if (! defined($rspec)) {
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					"Could not start avail");
 	}
 	
 	# Return a blob.
@@ -201,47 +207,10 @@ sub Resolve($)
 			 Interface->LookupControl( $node->phys_nodeid() )->IP(),
 		     "urn"          => GeniHRN::Generate( $OURDOMAIN,
 							  "node",
-							  $node->node_id() )
+							  $node->node_id() ),
+		     "rspec"        => $rspec
 		   };
 
-	#
-	# Get the list of interfaces for the node.
-	#
-	my @interfaces;
-	if ($node->AllInterfaces(\@interfaces) != 0) {
-	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					"Could not get interfaces for $uuid");
-	}
-
-	my @iblobs = ();
-	foreach my $interface (@interfaces) {
-	    next
-		if (!defined($interface->switch_id()));
-		
-	    my $urn = GeniHRN::GenerateInterface( $OURDOMAIN, $node->node_id(),
-						  $interface->iface() );
-	    my $iblob = { "uuid"	=> $interface->uuid(),
-			  "iface"	=> $interface->iface(),
-			  "type"	=> $interface->type(),
-			  "card"	=> $interface->card(),
-			  "port"	=> $interface->port(),
-			  "role"	=> $interface->role(),
-			  "IP"		=> $interface->IP() || "",
-			  "mask"	=> $interface->mask() || "",
-			  "MAC"		=> $interface->mac(),
-			  "switch_id"   => "${OURDOMAIN}." . 
-			      $interface->switch_id(),
-			  "switch_card"	=> $interface->switch_card(),
-			  "switch_port"	=> $interface->switch_port(),
-			  "wire_type"	=> $interface->wire_type(),
-			  "urn"         => $urn
-		      };
-
-	    push(@iblobs, $iblob);
-	}
-	$blob->{'interfaces'} = \@iblobs
-	    if (@iblobs);
-	
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
     }
     return GeniResponse->Create(GENIRESPONSE_UNSUPPORTED);
@@ -293,19 +262,13 @@ sub DiscoverResources($)
     }
 
     #
-    # Use ptopgen in xml mode to spit back an xml file. 
+    # Acquire the advertisement from ptopgen and compress it if requested.
     #
-    my $invocation = "$PTOPGEN -x -g -r -p GeniSlices";
-    $invocation .= " -a" unless $available;
-    if (! open(AVAIL, "$invocation |")) {
+    my $xml = GetAdvertisement($available, undef);
+    if (! defined($xml)) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not start avail");
     }
-    my $xml = "";
-    while (<AVAIL>) {
-	$xml .= $_;
-    }
-    close(AVAIL);
 
     if( $compress ) {
 	my $coder = Frontier::RPC2->new();
@@ -314,6 +277,29 @@ sub DiscoverResources($)
     }
 
     return GeniResponse->Create(GENIRESPONSE_SUCCESS, $xml);
+}
+
+#
+# Use ptopgen in xml mode to spit back an xml file. 
+#
+sub GetAdvertisement($$)
+{
+    my ($available, $pc) = @_;
+    my $xml = undef;
+
+    my $invocation = "$PTOPGEN -x -g -r -p GeniSlices";
+    $invocation .= " -a" unless $available;
+    if (defined($pc)) {
+	$invocation .= " -1 $pc";
+    }
+    if (open(AVAIL, "$invocation |")) {
+	my $xml = "";
+	while (<AVAIL>) {
+	    $xml .= $_;
+	}
+	close(AVAIL);
+    }
+    return $xml;
 }
 
 #
