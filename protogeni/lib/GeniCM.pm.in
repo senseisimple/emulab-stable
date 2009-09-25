@@ -1355,13 +1355,6 @@ sub SliverWork($$)
     my $pid = $experiment->pid();
     my $eid = $experiment->eid();
 
-    if (system("$TARFILES_SETUP $pid $eid")) {
-	$slice->UnLock();
-	$ticket->UnLock();
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "Could not setup tarfiles");
-    }
-
     #
     # Figure out what nodes to allocate or free. 
     #
@@ -1666,6 +1659,14 @@ sub SliverWork($$)
 	goto bad;
     }
     
+    #
+    # Must do this after the mapper runs.
+    #
+    if (system("$TARFILES_SETUP $pid $eid")) {
+	print STDERR "Could not setup tarfiles\n";
+	goto bad;
+    }
+
     #
     # Now for each resource (okay, node) in the ticket create a sliver and
     # add it to the aggregate.
