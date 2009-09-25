@@ -431,7 +431,7 @@ sub vz_vnodeCreate {
 
     my $createArg = "";
     if ($DOLVM) {
-	if (! -e "/var/run/openvz.image.$image.ready") {
+	if (! -e "/var/emulab/run/openvz.image.$image.ready") {
 	    if ((my $locked = TBScriptLock("vzimage.$image",
 					   TBSCRIPTLOCK_GLOBALWAIT(), 900))
 		!= TBSCRIPTLOCK_OKAY()) {
@@ -441,7 +441,7 @@ sub vz_vnodeCreate {
 		return -1;
 	    }
 	    # we must have the lock, so if we need to return right away, unlock
-	    if (-e "/var/run/openvz.image.$image.ready") {
+	    if (-e "/var/emulab/run/openvz.image.$image.ready") {
 		TBScriptUnlock();
 	    }
 	    else {
@@ -461,7 +461,8 @@ sub vz_vnodeCreate {
 		mysystem("umount /tmp/mnt/$image");
 
 		# ok, we're done
-		mysystem("touch /var/run/openvz.image.$image.ready");
+		mysystem("mkdir -p /var/emulab/run");
+		mysystem("touch /var/emulab/run/openvz.image.$image.ready");
 		TBScriptUnlock();
 	    }
 	}
