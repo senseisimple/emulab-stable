@@ -171,6 +171,7 @@ typedef struct {
 	int		swapper_idx;
 	int		swapper_isadmin;
         int		genisliver_idx;
+        int		geniflags;
 	char		nodeid[TBDB_FLEN_NODEID];
 	char		vnodeid[TBDB_FLEN_NODEID];
 	char		pnodeid[TBDB_FLEN_NODEID]; /* XXX */
@@ -189,7 +190,6 @@ typedef struct {
 	char		eventkey[TBDB_FLEN_PRIVKEY];
 	char		sfshostid[TBDB_FLEN_SFSHOSTID];
 	char		testdb[TBDB_FLEN_TINYTEXT];
-	char		tmcd_redirect[TBDB_FLEN_TINYTEXT];
 	char		sharing_mode[TBDB_FLEN_TINYTEXT];
 	char            privkey[TBDB_FLEN_PRIVKEY+1];
 } tmcdreq_t;
@@ -1062,16 +1062,6 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 			goto skipit;
 		}
 	}	
-	/*
-	 * Redirect geni sliver nodes to the tmcd of their origin.
-	 */
-	if (reqp->tmcd_redirect[0]) {
-		char	buf[BUFSIZ];
-
-		sprintf(buf, "REDIRECT=%s\n", reqp->tmcd_redirect);
-		client_writeback(sock, buf, strlen(buf), istcp);
-		goto skipit;
-	}
 
 	/*
 	 * Redirect is allowed from the local host only.
@@ -1310,6 +1300,12 @@ COMMAND_PROTOTYPE(doifconfig)
 	char		buf[MYBUFSIZE], *ebufp = &buf[MYBUFSIZE];
 	int		nrows;
 	int		num_interfaces=0;
+
+	/*
+	 * Do nothing for cooked mode geni nodes; handled by remote config.
+	 */
+	if (reqp->geniflags & 0x2)
+		return 0;
 
 	/* 
 	 * For Virtual Nodes, we return interfaces that belong to it.
@@ -4426,7 +4422,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp, char* nodekey)
 				 " u.admin,dedicated_wa_types.attrvalue "
 				 "   AS isdedicated_wa, "
 				 " r.genisliver_idx,r.tmcd_redirect, "
-				 " r.sharing_mode "
+				 " r.sharing_mode,e.geniflags "
 				 "FROM nodes AS n "
 				 "LEFT JOIN reserved AS r ON "
 				 "  r.node_id=n.node_id "
@@ -4454,7 +4450,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp, char* nodekey)
 				"WHERE n.node_id IN "
                                         "(SELECT node_id FROM widearea_nodeinfo WHERE privkey='%s') "
 				 "  AND nobootinfo_types.attrvalue IS NULL",
-				 33, nodekey);
+				 34, nodekey);
 
 	}
 
@@ -4471,7 +4467,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp, char* nodekey)
 				 " e.idx,e.creator_idx,e.swapper_idx, "
 				 " u.admin,null, "
 				 " r.genisliver_idx,r.tmcd_redirect, "
-				 " r.sharing_mode "
+				 " r.sharing_mode,e.geniflags "
 				 "from nodes as nv "
 				 "left join nodes as np on "
 				 " np.node_id=nv.phys_nodeid "
@@ -4494,7 +4490,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp, char* nodekey)
 				 "where nv.node_id='%s' and "
 				 " ((i.IP='%s' and i.role='ctrl') or "
 				 "  nv.jailip='%s')",
-				 33, reqp->vnodeid,
+				 34, reqp->vnodeid,
 				 inet_ntoa(ipaddr), inet_ntoa(ipaddr));
 	}
 	else {
@@ -4510,7 +4506,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp, char* nodekey)
 				 " u.admin,dedicated_wa_types.attrvalue "
 				 "   as isdedicated_wa, "
 				 " r.genisliver_idx,r.tmcd_redirect, "
-				 " r.sharing_mode "
+				 " r.sharing_mode,e.geniflags "
 				 "from interfaces as i "
 				 "left join nodes as n on n.node_id=i.node_id "
 				 "left join reserved as r on "
@@ -4538,7 +4534,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp, char* nodekey)
 				 "  on n.type=dedicated_wa_types.type "
 				 "where i.IP='%s' and i.role='ctrl' "
 				 "  and nobootinfo_types.attrvalue is NULL",
-				 33, inet_ntoa(ipaddr));
+				 34, inet_ntoa(ipaddr));
 	}
 
 	if (!res) {
@@ -4578,6 +4574,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp, char* nodekey)
 	reqp->elab_in_elab = (row[23] && strcasecmp(row[23], "0")) ? 1 : 0;
 	reqp->singlenet    = (row[24] && strcasecmp(row[24], "0")) ? 1 : 0;
 	reqp->isdedicatedwa = (row[29] && !strncmp(row[29], "1", 1)) ? 1 : 0;
+	reqp->geniflags    = 0;
 
 	if (row[8])
 		strncpy(reqp->testdb, row[8], sizeof(reqp->testdb));
@@ -4632,10 +4629,13 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp, char* nodekey)
 			reqp->genisliver_idx = atoi(row[30]);
 		else
 			reqp->genisliver_idx = 0;
-		if (row[31]) 
-			strcpy(reqp->tmcd_redirect, row[31]);
 		if (row[32]) 
 			strcpy(reqp->sharing_mode, row[32]);
+		/* geni flags idx */
+		if (row[33]) 
+			reqp->geniflags = atoi(row[33]);
+		else
+			reqp->geniflags = 0;
 	}
 	
 	if (row[9])
