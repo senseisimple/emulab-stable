@@ -45,7 +45,8 @@ LinkContents &=
 InterfaceDecl &=
   ComponentInterfaceDeclName &
   element monitoring { attribute user_traffic { text }? }? &
-  attribute role { "control" }?
+  attribute role { "control" }? &
+  attribute public_ipv4 { text }?
 
 InterfaceRef &=
   ComponentInterfaceRefName

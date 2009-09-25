@@ -154,6 +154,7 @@
         </xs:restriction>
       </xs:simpleType>
     </xs:attribute>
+    <xs:attribute name="public_ipv4"/>
   </xs:complexType>
   <xs:element name="monitoring">
     <xs:complexType>

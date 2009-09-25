@@ -193,19 +193,26 @@ if (defined($options{"1"})) {
 usage()
     if ($prune && !defined($exempt_eid));
 
+$fake_inet_switch = "internet";
+$fake_inet_iface = "(null)";
+if ($genimode) {
+    $fake_inet_iface = "border";
+}
+
 print_header();
 
 my %nodetointerface;
 my %interfaceroles = ();
 my %interfacetypes = ();
+my %interfaceips = ();
 
 # Read interfaces
 my $result =
-    DBQueryFatal("SELECT node_id,card,port,iface,interface_type,role" .
+    DBQueryFatal("SELECT node_id,card,port,iface,interface_type,role,IP" .
 		 " from interfaces " .
 		 ($genimode ? "where role!='gw'" : ""));
 		 
-while (($node,$card,$port,$iface,$type, $role) = $result->fetchrow_array) {
+while (($node,$card,$port,$iface,$type,$role,$ip) = $result->fetchrow_array) {
     push @{ $nodetointerface{"$node"} }, $iface;
     $interfacemap{"$node:$card:$port"} = $iface;
     if ((defined $type) && ($type ne "")) {
@@ -213,6 +220,9 @@ while (($node,$card,$port,$iface,$type, $role) = $result->fetchrow_array) {
     }
     if ((defined $role) && ($role ne "")) {
 	$interfaceroles{"$node:$iface"} = $role;
+    }
+    if ((defined $ip) && ($ip ne "")) {
+	$interfaceips{"$node:$iface"} = $ip;
     }
 }
 
@@ -880,6 +890,19 @@ foreach $node (keys(%nodes)) {
 	       $nodetointerface{$node}, $country, $latitude, $longitude);
 }
 
+my @inet_protos = ("ipv4");
+if (($widearea && ! defined($component_name)) || $genimode) {
+    #
+    # Set up 'the Internet' as a fake switch that all widearea nodes can
+    # talk to.
+    # Some day, it may make sense to connect control net ports to this
+    # switch.
+    #
+    my @types = map("*$_:*", @inet_protos);
+    print_node($fake_inet_switch, \@types, [], [], undef, [], undef, undef,
+        undef);
+}
+
 #
 # Widearea Nodes. Includes plab nodes. Note that widearea nodes are never
 # allocated directly (they are in a holding experiment), but assign deals
@@ -896,18 +919,6 @@ foreach $node (keys(%nodes)) {
 # physnode. 
 #
 if ($widearea && ! defined($component_name)) {
-    #
-    # Set up 'the Internet' as a fake switch that all widearea nodes can
-    # talk to.
-    # Some day, it may make sense to connect control net ports to this
-    # switch.
-    #
-    my $fake_inet_switch = "internet";
-    my @inet_protos = ("ipv4");
-    my @types = map("*$_:*", @inet_protos);
-    print_node($fake_inet_switch, \@types, [], [], undef, [], undef, undef,
-        undef);
-    
     #
     # Note - there is currently an assumption in this query that widearea nodes
     # have only one control interface.
@@ -1037,12 +1048,27 @@ if ($widearea && ! defined($component_name)) {
         #
         if ($iface) {
 	    print_simple_link($physnode, $iface,
-			      $fake_inet_switch, "(null)",
+			      $fake_inet_switch, $fake_inet_iface,
 			      100000, 0, 0, @inet_protos);
         }
 
 	# Insert into nodes array in case there are wires entries.
 	$nodes{$physnode} = $ptype;
+    }
+}
+
+if ($genimode) {
+    foreach $key (keys %interfaceroles) {
+	if (is_public_interface($key)) {
+	    $key =~ /^([^:]+):([^:]+)$/;
+	    my $node = $1;
+	    my $iface = $2;
+	    if (defined($nodes{$node})) {
+		print_simple_link($node, $iface,
+				  $fake_inet_switch, $fake_inet_iface,
+				  100000, 0, 0, @inet_protos);
+	    }
+	}
     }
 }
 
@@ -1490,6 +1516,11 @@ sub print_node
 	else {
 	    print "  <exclusive>true</exclusive>\n";
 	}
+	if ($name eq $fake_inet_switch)
+	{
+	    print "  <cloud />\n";
+	    print "  <interface component_id=\"".$fake_inet_iface."\" />\n";
+	}
         if (defined($lat) && defined($long)) {
             # TODO: May not be a good default for country
             if (!defined($country) || $country eq "") {
@@ -1588,6 +1619,54 @@ sub print_node_flags
     }
 }
 
+sub make_ip
+{
+    my $in = shift(@_);
+    my @octets = split(/\./, $in);
+    my $result = 0;
+    my $i = 0;
+    for (; $i < scalar(@octets); ++$i) {
+	$result = (($result << 8) | $octets[$i]);
+    }
+    return $result;
+}
+
+sub is_routable
+{
+    my @privateIps   = (make_ip("10.0.0.0"), make_ip("172.16.0.0"),
+			make_ip("192.168.0.0"));
+    my @privateMasks = (8, 12, 16);
+
+    my $in = shift(@_);
+    my $result = 0;
+    if (defined($in) && $in =~ /\d+\.\d+\.\d+\.\d+/) {
+	$result = 1;
+	my $ip = make_ip($in);
+	my $i = 0;
+	for ($i = 0; $i < scalar(@privateIps); ++$i) {
+	    my $mask = (0xffffffff << (32 - $privateMasks[$i]));
+	    if (($ip & $mask) == ($privateIps[$i] & $mask)) {
+		$result = 0;
+	    }
+	}
+    }
+    return $result;
+}
+
+sub is_public_interface
+{
+    my $key = shift(@_);
+    my $result = 0;
+    if (exists($interfaceroles{$key})
+	&& exists($interfaceips{$key})) {
+	if ($interfaceroles{$key} eq "ctrl"
+	    && is_routable($interfaceips{$key})) {
+	    $result = 1;
+	}
+    }
+    return $result;
+}
+
 sub print_node_interfaces
 {
     my $nodeName = shift(@_);
@@ -1597,13 +1676,13 @@ sub print_node_interfaces
 	my $name = $interfaces[$i];
 	my $urn = GeniHRN::GenerateInterface($OURDOMAIN, $nodeName, $name);
 	print "  <interface component_id=\"$urn\" ";
-	if (exists($interfaceroles{"$nodeName:$name"}))
-	{
-	    my $role = $interfaceroles{"$nodeName:$name"};
-	    if ($role eq "ctrl")
-	    {
-		print "role=\"control\" ";
-	    }
+	if (exists($interfaceroles{"$nodeName:$name"})
+	    && $interfaceroles{"$nodeName:$name"} eq "ctrl") {
+	    print "role=\"control\" ";
+	}
+	if (is_public_interface("$nodeName:$name")) {
+	    my $ip = $interfaceips{"$nodeName:$name"};
+	    print "public_ipv4=\"$ip\" ";
 	}
 	print "/>\n";
     }
