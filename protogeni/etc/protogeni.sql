@@ -183,11 +183,20 @@ CREATE TABLE `geni_userkeys` (
 
 DROP TABLE IF EXISTS `geni_resources`;
 CREATE TABLE `geni_resources` (
-  `resource_uuid` varchar(40) NOT NULL default '',
-  `resource_type` varchar(40) NOT NULL default '',
+  `pid` varchar(12) NOT NULL default '',
+  `eid` varchar(32) NOT NULL default '',
+  `exptidx` int(11) NOT NULL default '0',
+  `idx` mediumint(8) unsigned NOT NULL default '0',
+  `manager_urn` tinytext,
   `created` datetime default NULL,
-  `component_uuid` varchar(40) NOT NULL default '',
-  PRIMARY KEY  (`resource_uuid`)
+  `updated` datetime default NULL,
+  `slice_idx` mediumint(8) unsigned NOT NULL default '0',
+  `credential_idx` mediumint(8) unsigned NOT NULL default '0',
+  `manifest_idx` mediumint(8) unsigned NOT NULL default '0',
+  `ticket_idx` mediumint(8) unsigned NOT NULL default '0',
+  `newticket_idx` mediumint(8) unsigned NOT NULL default '0',
+  PRIMARY KEY  (`idx`),
+  UNIQUE KEY `manager` (`exptidx`,`manager_urn`(255))
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 DROP TABLE IF EXISTS `geni_bindings`;
