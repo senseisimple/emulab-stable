@@ -812,14 +812,14 @@ sub GetTicket($;$)
 	if (exists($ref->{'tarfiles'})) {
 	    my $tarfiles = $ref->{'tarfiles'};
 	    
-	    if (! TBcheck_dbslot($tarfiles, "virt_nodes", "tarballs",
+	    if (! TBcheck_dbslot($tarfiles, "virt_nodes", "tarfiles",
 			 TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
 		$response =
 		    GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 					 "Invalid tarfiles");
 		goto bad;
 	    }
-	    $nodeblob->{'tarballs'} = $tarfiles;
+	    $nodeblob->{'tarfiles'} = $tarfiles;
 	}
 
 	my $virtnode = $virtexperiment->NewTableRow("virt_nodes", $nodeblob);
