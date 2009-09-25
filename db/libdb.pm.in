@@ -661,6 +661,7 @@ sub TBDB_PHYSICAL_NODE_TABLES() {
 	'uidnodelastlogin'	=> [ 'node_id' ],
 	'v2pmap'		=> [ 'node_id' ],
 	'vinterfaces'		=> [ 'node_id' ],
+	'widearea_nodeinfo'	=> [ 'node_id' ],
 	'widearea_accounts'	=> [ 'node_id' ],
 	'widearea_delays'	=> [ 'node_id1', 'node_id2' ],
 	'widearea_recent'	=> [ 'node_id1', 'node_id2' ],
