@@ -30,8 +30,13 @@
 		
 		public var Rspec:XML = null;
 		
+		[Bindable]
+		public var Components:Array = null;
+		
 		public var Nodes:NodeGroupCollection = new NodeGroupCollection();
 		public var Links:LinkGroupCollection = new LinkGroupCollection();
+		
+		public var AfterCall:Function;
 		
 		public function ProtoGeniHandler()
 		{
@@ -41,7 +46,13 @@
 			credential = new Credential();
 		}
 		
-		public function clear() : void
+		public function clearAll() : void
+		{
+			clearResources();
+			Components = null;
+		}
+		
+		public function clearResources() : void
 		{
 			Nodes = new NodeGroupCollection();
 			Links = new LinkGroupCollection();
@@ -51,9 +62,7 @@
 		public function startCredential() : void
 	    {
 	      main.console.clear();
-	      
-	      clear();
-	      
+	      	      
 	      opName = "Acquiring credential";
 	      main.setProgress(opName, Common.waitColor);
 	      main.startWaiting();
@@ -69,12 +78,21 @@
 	      if (code == 0)
 	      {
 	        credential.base = String(response.value);
-	        startSshLookup();
 	      }
 	      else
 	      {
 	        codeFailure();
 	      }
+	      
+	      postCall();
+	    }
+	    
+	    public function postCall() : void {
+	    		main.console.appendText("Seeing if there are any other method to call...\n");
+	    	if(AfterCall != null) {
+	    		main.console.appendText("Doing a post call...\n");
+	        	AfterCall();
+	        }
 	    }
 	    
 	    public function failure(event : ErrorEvent, fault : MethodFault) : void
@@ -136,19 +154,21 @@
 	      if (code == 0)
 	      {
 	        credential.ssh = response.value;
-	        startResourceLookup();
-	//        startUserLookup();
 	      }
 	      else
 	      {
 	        codeFailure();
 	      }
+	      postCall();
 	    }
 	    
 	    public function startResourceLookup() : void
 	    {
+	      clearResources();
+	    
 	      opName = "Looking up resources";
 	      main.setProgress(opName, Common.waitColor);
+	      main.startWaiting();
 	      main.console.appendText(opName + "...\n");
 	      op.reset(Geni.discoverResources);
 	      op.addField("credential", credential.base);
@@ -161,6 +181,7 @@
 	    	main.setProgress("Done", Common.successColor);
 	    	main.stopWaiting();
 	    	main.console.appendText("Resource lookup complete...\n");
+
 	      if (code == 0)
 	      {
 	        Rspec = new XML(response.value);
@@ -171,6 +192,37 @@
 	        codeFailure();
 	        main.console.appendText(op.getResponseXml());
 	      }
+	      postCall();
+	    }
+	    
+	    public function startListComponents() : void
+	    {
+	      opName = "Looking up components";
+	      main.setProgress(opName, Common.waitColor);
+	      main.startWaiting();
+	      main.console.appendText(opName + "...\n");
+	      op.reset(Geni.listComponents);
+	      op.addField("credential", credential.base);
+	      op.setUrl("https://boss.emulab.net:443/protogeni/xmlrpc/ch");
+	      op.call(completeListComponents, failure);
+	    }
+	    
+	    public function completeListComponents(code : Number, response : Object) : void
+	    {
+	    	main.setProgress("Done", Common.successColor);
+	    	main.stopWaiting();
+	    	main.console.appendText("List Components complete...\n");
+	      if (code == 0)
+	      {
+	      	Components = response.value;
+	      	main.console.appendText(op.getResponseXml());
+	      }
+	      else
+	      {
+	        codeFailure();
+	        main.console.appendText(op.getResponseXml());
+	      }
+	      postCall();
 	    }
 	    
 	    private function processRspec():void {

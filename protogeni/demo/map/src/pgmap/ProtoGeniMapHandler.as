@@ -14,8 +14,10 @@ package pgmap
 	import com.google.maps.styles.StrokeStyle;
 	
 	import flash.events.Event;
+	import flash.events.MouseEvent;
 	import flash.geom.Point;
 	
+	import mx.controls.Alert;
 	import mx.managers.PopUpManager;
     	
 	public class ProtoGeniMapHandler
@@ -92,32 +94,16 @@ package pgmap
 
 			main.map.addOverlay(polyline);
 			
-			// Add marker
-			var m:Marker = new Marker(
-		      	new LatLng((lg.latitude1 + lg.latitude2)/2, (lg.longitude1 + lg.longitude2)/2),
-		      	new MarkerOptions({
-		                  strokeStyle: new StrokeStyle({color: 0xFF00FF}),
-		                  fillStyle: new FillStyle({color: 0xFFCFD1, alpha: 1}),
-		                  radius: 10,
-		                  hasShadow: true,
-		                  //tooltip: g.country,
-		                  label: lg.collection.length.toString()
-		      	}));
-		      	
-	        var linkInfo:LinkGroupInfo = new LinkGroupInfo();
-	        linkInfo.Load(lg, main);
-	        
-	       m.addEventListener(MapMouseEvent.CLICK, function(e:Event):void {
-	            m.openInfoWindow(
-	            	new InfoWindowOptions({
-	            		customContent: linkInfo,
-	            		customoffset: new Point(0, 10),
-	            		width:140,
-	            		height:120,
-	            		drawDefaultFrame:true}));
+			// Add link marker
+			var ll:LatLng = new LatLng((lg.latitude1 + lg.latitude2)/2, (lg.longitude1 + lg.longitude2)/2);
+			
+			var t:TooltipOverlay = new TooltipOverlay(ll, Common.kbsToString(lg.TotalBandwidth()));
+	  		t.addEventListener(MouseEvent.CLICK, function(e:Event):void {
+	            e.stopImmediatePropagation();
+	            main.mapHandler.viewLinkGroup(lg)
 	        });
-
-	  		main.map.addOverlay(m);
+	        
+	  		main.map.addOverlay(t);
 	    }
 	    
 	    public function drawMap():void {
@@ -152,6 +138,7 @@ package pgmap
 	    	PopUpManager.addPopUp(lgWindow, main, false);
        		PopUpManager.centerPopUp(lgWindow);
        		lgWindow.loadGroup(group);
+       		
 	    }
 	}
 }

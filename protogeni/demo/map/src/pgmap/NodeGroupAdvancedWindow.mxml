@@ -22,21 +22,30 @@
 			public var node:Node = null;
 			
 			[Bindable]
-			public var links:ArrayCollection = new ArrayCollection();
+			public var linkedNodes:ArrayCollection = new ArrayCollection();
 			
 			public var main:pgmap;
 			
+			public function loadCollection(group:ArrayCollection):void {
+				nodes = group;
+				
+				if(nodes.length > 1) {
+					listNodes.selectedIndex = 0;
+					title += " Group";
+				} else {
+					listNodes.visible = false;
+					listNodes.includeInLayout = false;
+					nodeInfoHolder.percentWidth = 100;
+					title = "Node Information";
+				}
+
+				loadNode(nodes[0]);
+			}
+			
 			public function loadGroup(group:NodeGroup):void {
 				if(group.city.length > 0)
-					title = group.city + " Node Group";
-				nodes = new ArrayCollection();
-				
-				for each(var n:Node in group.collection) {
-					nodes.addItem(n);
-				}
-				
-				listNodes.selectedIndex = 0;
-				loadNode(group.collection[0]);
+					title = group.city + " Node";
+				loadCollection(group.collection);
 			}
 			
 			public function loadNode(n:Node):void {
@@ -45,7 +54,43 @@
 				imgAvailable.source = assignIcon(n.available);
 				imgExclusive.source = assignIcon(n.exclusive);
 				
-				links = n.GetLinks();
+				linkedNodes = new ArrayCollection();
+				
+				for each(var i:NodeInterface in n.interfaces.collection) {
+					for each(var l:Link in i.links) {
+						var ns:String;
+						var ins:String;
+						if(l.interface1 == i) {
+							ns = l.interface2.owner.name;
+							ins = l.interface1.id;
+						} else {
+							ns = l.interface1.owner.name;
+							ins = l.interface2.id;
+						}
+						linkedNodes.addItem({name: ns + " on " + ins, link: l});
+					}
+				}
+			}
+			
+			public function viewLink(l:Link):void {
+				var lgWindow:LinkGroupAdvancedWindow = new LinkGroupAdvancedWindow();
+		    	lgWindow.main = main;
+		    	PopUpManager.addPopUp(lgWindow, main, false);
+	       		PopUpManager.centerPopUp(lgWindow);
+	       		
+	       		var ac:ArrayCollection = new ArrayCollection();
+	       		ac.addItem(l);
+	       		lgWindow.loadCollection(ac);
+	       		lgWindow.title = node.name + "'s Links";
+			}
+			
+			public function viewLinks():void {
+				var lgWindow:LinkGroupAdvancedWindow = new LinkGroupAdvancedWindow();
+		    	lgWindow.main = main;
+		    	PopUpManager.addPopUp(lgWindow, main, false);
+	       		PopUpManager.centerPopUp(lgWindow);
+	       		
+	       		lgWindow.loadCollection(node.GetLinks());
 			}
 			
 			public function viewRspec():void {
@@ -131,18 +176,13 @@
 				</mx:GridRow>
 				<mx:GridRow width="100%" height="100%">
 					<mx:GridItem>
-						<mx:Label text="Interfaces" fontWeight="bold"/>
+					<mx:VBox horizontalAlign="right">
+						<mx:Label text="Links to" fontWeight="bold"/>
+						<mx:Button label="All" click="viewLinks();" width="100%"/>
+					</mx:VBox>
 					</mx:GridItem>
 					<mx:GridItem width="100%">
-						<mx:List width="100%" height="100%" id="listInterfaces" dataProvider="{node.interfaces.collection}" labelField="id"></mx:List>
-					</mx:GridItem>
-				</mx:GridRow>
-				<mx:GridRow width="100%" height="100%">
-					<mx:GridItem>
-						<mx:Label text="Links" fontWeight="bold"/>
-					</mx:GridItem>
-					<mx:GridItem width="100%">
-						<mx:List width="100%" height="100%" id="listLinks" dataProvider="{links}" labelField="name"></mx:List>
+						<mx:List width="100%" height="100%" id="listInterfaces" dataProvider="{linkedNodes}" labelField="name" change="viewLink(listInterfaces.selectedItem.link);"></mx:List>
 					</mx:GridItem>
 				</mx:GridRow>
 			</mx:Grid>

@@ -1,21 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" layout="vertical"
-	title="Component Manager"
+	title="Choose Component Manager"
 	showCloseButton="true"
-	borderAlpha=".9" borderColor="#D2E1F0" width="400"
+	borderAlpha=".9" borderColor="#D2E1F0" width="320"
 	defaultButton="{okButton}"
 	close="close()"
 	creationComplete="okButton.setFocus()">
 	
 	<mx:Script>
 		<![CDATA[
+			import mx.controls.Alert;
 			import mx.events.CloseEvent;	
        		import mx.managers.PopUpManager;
 
+			[Bindable]
 			public var main:pgmap;
 			
 			public function success():void {
-				main.comHandler.ComponentManagerURL = urlInput.text;
+				main.comHandler.ComponentManagerURL = listManagers.selectedItem.url;
             	main.refresh();
 				close();
 			}
@@ -27,14 +29,48 @@
 			public function open():void {
 				PopUpManager.addPopUp(this, main, true);
        			PopUpManager.centerPopUp(this);
-				urlInput.text = main.comHandler.ComponentManagerURL;
+       			if(main.comHandler.Components == null || main.comHandler.Components.length == 0) {
+       				startRefreshList();
+       			}
+       			
+				//urlInput.text = main.comHandler.ComponentManagerURL;
+			}
+			
+			public function startRefreshList():void {
+				progressLabel.text = "Updating list...";
+				waitingIcon.visible = true;
+				if(main.comHandler.credential == null || main.comHandler.credential.base == null) {
+				main.console.appendText("Getting credential...\n");
+					main.comHandler.AfterCall = afterCredential;
+					main.comHandler.startCredential();
+				} else
+					afterCredential();
+				
+			}
+			
+			public function afterCredential():void {
+				main.console.appendText("After credential...\n");
+				main.comHandler.AfterCall = refreshList;
+				main.comHandler.startListComponents();
+			}
+			
+			public function refreshList():void {
+				main.comHandler.AfterCall = null;
+				
+				progressLabel.text = "List updated";
+				waitingIcon.visible = false;
 			}
 		]]>
 	</mx:Script>
-    
-	<mx:Label text="Please input the URL to the Component Manager"/>
-	<mx:TextInput id="urlInput" width="100%" text=""/>
+	
+	<mx:HBox width="100%" verticalAlign="middle">
+	<mx:Button id="refreshButton" label="Refresh" icon="@Embed('../images/server.png')"/>
+	<mx:ComboBox editable="false" width="100%" id="listManagers" dataProvider="{main.comHandler.Components}" labelField="hrn"></mx:ComboBox>
+	</mx:HBox>
 	<mx:HBox width="100%" horizontalAlign="right">
+	<mx:Label id="progressLabel"  fontStyle="normal" fontWeight="bold"/>
+		<mx:SWFLoader id="waitingIcon" source="@Embed('../../images/waiting.swf')" visible="false"/> 
+		<mx:Spacer width="100%"/>
 		<mx:Button id="cancelButton" label="Cancel" icon="@Embed('../images/cross.png')" click="close();"/>
 		<mx:Button id="okButton" label="Go" icon="@Embed('../images/tick.png')" click="success();"/>
 	</mx:HBox>

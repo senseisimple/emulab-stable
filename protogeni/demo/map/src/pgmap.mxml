@@ -38,7 +38,9 @@
         public var console:ConsoleWindow;
         public var rspecView:XmlWindow;
 
+		[Bindable]
 		public var comHandler:ProtoGeniHandler;
+		
 		public var mapHandler:ProtoGeniMapHandler;
 		
 		public var main:Main;
@@ -88,7 +90,13 @@
 	    	map.clearOverlays();
 
 	    	// Get a fresh dataset
-	    	comHandler.startCredential();
+	    	if(comHandler.credential != null && comHandler.credential.base != null) {
+	    		comHandler.AfterCall = null;
+	    		comHandler.startResourceLookup();
+        	} else {
+	    		comHandler.AfterCall = comHandler.startResourceLookup;
+	    		comHandler.startCredential();
+	    	}
 	    }
             
 	    //------------------------------------------
