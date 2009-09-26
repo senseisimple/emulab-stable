@@ -19,6 +19,7 @@ package
     private static var sa : String = "sa";
     private static var cm : String = "cm";
     private static var ses : String = "ses";
+    private static var ch : String = "ch";
 
     public static var sesUrl : String = "https://myboss.emulab.geni.emulab.net/protogeni/xmlrpc/";
 //"https://boss.emulab.net:443/protogeni/xmlrpc/";
@@ -40,5 +41,7 @@ package
     public static var resolveNode : Array = new Array(cm, "Resolve");
 
     public static var map : Array = new Array(ses, "Map");
+    
+    public static var listComponents : Array = new Array(ch, "ListComponents");
   }
 }
