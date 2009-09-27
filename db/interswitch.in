@@ -6,6 +6,29 @@
 #
 use strict;
 use English;
+use Getopt::Long;
+
+sub usage() {
+    print "Usage: $0 [-h] [-a]\n";
+    print " -h    Display this message\n";
+    print " -a    Display all VLANs, not just those that cross trunks\n";
+    return 1;
+}
+
+my %opt;
+GetOptions(\%opt,'h','a');
+if (@ARGV) {
+    exit usage();
+}
+
+if ($opt{h}) {
+    exit usage();
+}
+
+my $show_all = 0;
+if ($opt{a}) {
+    $show_all = 1;
+}
 
 #
 # Turn off line buffering on output
@@ -107,7 +130,7 @@ foreach my $vlan (@vlans) {
     #
     # Report if more than one switch was found
     #
-    if (scalar(keys(%switches)) > 1) {
+    if ($show_all || (scalar(keys(%switches)) > 1)) {
 	$pideid = "$pid/$eid";
 	$members = join(" ", map { "$_ ($switches{$_})" } sort keys %switches);
 	write;
