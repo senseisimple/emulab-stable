@@ -559,7 +559,8 @@ COMMAND: foreach my $command (@commands) {
             if ($supplied_switches) {
                 debug("Remove: using supplied switches\n");
                 @devicenames = @supplied_switches;
-            } elsif (defined($vlanobj = VLan->Lookup($experiment,$vlan_name)) &&
+            } elsif (defined($experiment) &&
+                     defined($vlanobj = VLan->Lookup($experiment,$vlan_name)) &&
                      defined($stack = $vlanobj->GetStack())) {
                 debug("Remove: found stack $stack in database\n");
                 @devicenames = getSwitchesInStack($stack);
