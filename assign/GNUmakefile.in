@@ -21,7 +21,7 @@ include $(OBJDIR)/Makeconf
 
 all: assign
 
-SCHEMATA = vtop.xsd ptop.xsd top.xsd
+SCHEMATA = vtop.xsd ptop.xsd vtop-top.xsd ptop-top.xsd
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 

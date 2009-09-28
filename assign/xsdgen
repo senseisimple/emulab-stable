@@ -1,5 +1,7 @@
 #! /bin/sh
 
+TRANGCMD="java -jar ${TRANG:-/usr/local/share/java/classes/trang.jar}"
+
 # Delete all xsd files which are around
 if [ -e "top.xsd" ]; then 
   rm top.xsd 
@@ -18,13 +20,13 @@ if [ -e "vtop-top.xsd" ]; then
 fi
 
 # Create the ptop file
-java -jar trang.jar ptop.rnc ptop.xsd
+$TRANGCMD ptop.rnc ptop.xsd
 mv top.xsd ptop-top.xsd
 sed 's/top.xsd/ptop-top.xsd/' ptop.xsd > ptop.tmp
 mv ptop.tmp ptop.xsd
 
 # Create the vtop file
-java -jar trang.jar vtop.rnc vtop.xsd
+$TRANGCMD vtop.rnc vtop.xsd
 mv top.xsd vtop-top.xsd
 sed 's/top.xsd/vtop-top.xsd/' vtop.xsd > vtop.tmp
 mv vtop.tmp vtop.xsd

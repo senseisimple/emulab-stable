@@ -11,43 +11,123 @@
   Description of a virtual topology
   
 -->
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" targetNamespace="http://emulab.net/resources/vtop/0.2" xmlns:top="http://emulab.net/resources/top/0.2" xmlns:vtop="http://emulab.net/resources/vtop/0.2">
-  <xs:import namespace="http://emulab.net/resources/top/0.2" schemaLocation="top.xsd"/>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" targetNamespace="http://emulab.net/resources/vtop/0.2" xmlns:vtop="http://emulab.net/resources/vtop/0.2">
+  <xs:include schemaLocation="vtop-top.xsd"/>
   <!--
     
     We include the common topology specification schema, but override a few
     elements
     
   -->
-  <xs:element name="NodeSpec.NodeType" abstract="true">
-    <xs:annotation>
-      <xs:documentation>In the vtop file, a node is only allowed to have a single type</xs:documentation>
-    </xs:annotation>
-    <xs:complexType>
-      <xs:sequence>
-        <xs:group ref="top:type_name"/>
-        <xs:choice>
-          <xs:element ref="top:type_slots"/>
-          <xs:element ref="top:unlimited"/>
-        </xs:choice>
-        <xs:element minOccurs="0" ref="top:static"/>
-      </xs:sequence>
-    </xs:complexType>
-  </xs:element>
-  <xs:group name="LinkSpec.LinkType">
+  <xs:group name="NodeFlagSpec">
     <xs:sequence>
-      <xs:element minOccurs="0" ref="top:link_type"/>
+      <xs:element minOccurs="0" ref="vtop:subnode_of"/>
+      <xs:element minOccurs="0" ref="vtop:unique"/>
+      <xs:element minOccurs="0" ref="vtop:disallow_trivial_mix"/>
     </xs:sequence>
   </xs:group>
+  <xs:element name="subnode_of" type="xs:string"/>
+  <xs:element name="unique">
+    <xs:complexType/>
+  </xs:element>
+  <xs:element name="disallow_trivial_mix">
+    <xs:complexType/>
+  </xs:element>
+  <xs:element name="node" type="vtop:NodeContents"/>
+  <xs:complexType name="NodeContents">
+    <xs:sequence>
+      <xs:element ref="vtop:node_type"/>
+      <xs:group ref="vtop:NodeFlagSpec">
+        <xs:annotation>
+          <xs:documentation>Legacy flags</xs:documentation>
+        </xs:annotation>
+      </xs:group>
+      <xs:element minOccurs="0" maxOccurs="unbounded" ref="vtop:fd">
+        <xs:annotation>
+          <xs:documentation>Legacy features and desires</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element minOccurs="0" maxOccurs="unbounded" ref="vtop:property"/>
+    </xs:sequence>
+    <xs:attribute name="name" use="required"/>
+    <xs:attribute name="assigned_to"/>
+    <xs:attribute name="hint_to"/>
+  </xs:complexType>
+  <xs:element name="link" type="vtop:LinkContents"/>
+  <xs:complexType name="LinkContents">
+    <xs:sequence>
+      <xs:group ref="vtop:LinkEndPoints">
+        <xs:annotation>
+          <xs:documentation>The two interfaces which form the endpoints of this link.</xs:documentation>
+        </xs:annotation>
+      </xs:group>
+      <xs:group ref="vtop:LinkCharacteristics">
+        <xs:annotation>
+          <xs:documentation>The characteristics (bandwidth, latency, loss) which affect traffic.</xs:documentation>
+        </xs:annotation>
+      </xs:group>
+      <xs:element ref="vtop:link_type"/>
+      <xs:group ref="vtop:LinkFlagSpec">
+        <xs:annotation>
+          <xs:documentation>"Legacy" link flags used by assign. Will be replaced by properties</xs:documentation>
+        </xs:annotation>
+      </xs:group>
+      <xs:group minOccurs="0" ref="vtop:LinkMapping">
+        <xs:annotation>
+          <xs:documentation>The annotated link/path</xs:documentation>
+        </xs:annotation>
+      </xs:group>
+      <xs:element minOccurs="0" maxOccurs="unbounded" ref="vtop:property">
+        <xs:annotation>
+          <xs:documentation>Properties of this link</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+    <xs:attribute name="name" use="required">
+      <xs:annotation>
+        <xs:documentation>Name of the link - must be unique in the top</xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+  </xs:complexType>
+  <xs:group name="LinkMapping">
+    <xs:sequence>
+      <xs:element maxOccurs="unbounded" ref="vtop:component_hop"/>
+    </xs:sequence>
+  </xs:group>
+  <xs:element name="component_hop">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="vtop:interface"/>
+        <xs:element ref="vtop:interface"/>
+      </xs:sequence>
+      <xs:attribute name="assigned_to" use="required"/>
+    </xs:complexType>
+  </xs:element>
+  <!--
+    Each interface represents a particular physical interface. If that
+    interface is one of the link end points, it is also mapped to that
+    virtual node and its interface name.
+  -->
+  <xs:element name="interface">
+    <xs:complexType>
+      <xs:attribute name="physical_node_name" use="required"/>
+      <xs:attribute name="physical_interface_name" use="required"/>
+      <xs:attribute name="virtual_node_name"/>
+      <xs:attribute name="virtual_interface_name"/>
+    </xs:complexType>
+  </xs:element>
   <xs:element name="vclass">
     <xs:complexType>
-      <xs:choice>
-        <xs:element ref="vtop:hard"/>
-        <xs:sequence>
-          <xs:element ref="vtop:soft"/>
-          <xs:element ref="vtop:weight"/>
-        </xs:sequence>
-      </xs:choice>
+      <xs:sequence>
+        <xs:choice>
+          <xs:element ref="vtop:hard"/>
+          <xs:sequence>
+            <xs:element ref="vtop:soft"/>
+            <xs:element ref="vtop:weight"/>
+          </xs:sequence>
+        </xs:choice>
+        <xs:element maxOccurs="unbounded" ref="vtop:physical_type"/>
+      </xs:sequence>
       <xs:attribute name="name" use="required">
         <xs:annotation>
           <xs:documentation>Name of the virtual class</xs:documentation>
@@ -68,6 +148,7 @@
       </xs:restriction>
     </xs:simpleType>
   </xs:element>
+  <xs:element name="physical_type" type="xs:string"/>
   <xs:group name="LinkFlagSpec">
     <xs:annotation>
       <xs:documentation>"Legacy" link flags used by assign. Will be replaced by properties</xs:documentation>
@@ -97,23 +178,14 @@
   </xs:element>
   <xs:element name="vtop">
     <xs:complexType>
-      <xs:sequence>
-        <xs:element minOccurs="0" maxOccurs="unbounded" ref="top:node">
-          <xs:annotation>
-            <xs:documentation>Nodes in the topology - zero or more</xs:documentation>
-          </xs:annotation>
-        </xs:element>
-        <xs:group minOccurs="0" maxOccurs="unbounded" ref="top:LinkSpec">
-          <xs:annotation>
-            <xs:documentation>Links in the topology - zero or more</xs:documentation>
-          </xs:annotation>
-        </xs:group>
-        <xs:element minOccurs="0" maxOccurs="unbounded" ref="vtop:vclass">
-          <xs:annotation>
-            <xs:documentation>Vclasses</xs:documentation>
-          </xs:annotation>
-        </xs:element>
-      </xs:sequence>
+      <xs:choice minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Nodes, links and vclasses in the topology - zero or more</xs:documentation>
+        </xs:annotation>
+        <xs:element ref="vtop:node"/>
+        <xs:element ref="vtop:link"/>
+        <xs:element ref="vtop:vclass"/>
+      </xs:choice>
       <xs:attribute name="pid" use="required">
         <xs:annotation>
           <xs:documentation>Project ID</xs:documentation>
@@ -134,7 +206,6 @@
           <xs:documentation>User ID owning the experiment (optional)</xs:documentation>
         </xs:annotation>
       </xs:attribute>
-      <xs:attributeGroup ref="top:NodeSpec"/>
     </xs:complexType>
   </xs:element>
 </xs:schema>
