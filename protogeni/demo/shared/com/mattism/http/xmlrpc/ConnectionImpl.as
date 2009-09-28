@@ -135,14 +135,14 @@ package com.mattism.http.xmlrpc
       }
     }
 
-    function ioError(event : IOErrorEvent) : void
+    protected function ioError(event : IOErrorEvent) : void
     {
       _fault = null;
       dispatchEvent(new ErrorEvent(ErrorEvent.ERROR, false, false,
                                    event.toString()));
     }
 
-    function securityError(event : SecurityErrorEvent) : void
+    protected function securityError(event : SecurityErrorEvent) : void
     {
       _fault = null;
       dispatchEvent(new ErrorEvent(ErrorEvent.ERROR, false, false,

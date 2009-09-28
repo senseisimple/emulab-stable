@@ -9,9 +9,9 @@
 
 package com.mattism.http.xmlrpc
 {
-        import com.mattism.http.xmlrpc.util.XMLRPCUtils;
         import com.mattism.http.xmlrpc.util.XMLRPCDataTypes;
-        import com.mattism.http.xmlrpc.MethodCall;
+        import com.mattism.http.xmlrpc.util.XMLRPCUtils;
+		import com.mattism.http.xmlrpc.MethodCall;
 
         public class MethodCallImpl
         implements MethodCall
