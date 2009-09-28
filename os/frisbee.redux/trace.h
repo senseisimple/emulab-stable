@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2002, 2003, 2004 University of Utah and the Flux Group.
+ * Copyright (c) 2002-2009 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -93,15 +93,19 @@ if (evlogging >= (l)) { \
 #define EV_LONGBURST	39
 #define EV_DUPCHUNK	40
 #define EV_CLIWRSTATUS	41
+#define EV_CLIFOUNDROOM	42
+#define EV_CLIREUSE	43
+#define EV_CLIDUBPROMO	44
+#define EV_CLIDCSTAT	45
 
-#define EV_MAX		41
+#define EV_MAX		45
 
 extern void ClientTraceInit(char *file);
 extern void ClientTraceReinit(char *file);
 extern void ServerTraceInit(char *file);
 extern void TraceStart(int level);
 extern void TraceStop(void);
-extern void TraceDump(void);
+extern void TraceDump(int mkrel);
 #else
 #define EVENT(l, e, ip, a1, a2, a3, a4)
 #define CLEVENT(l, e, a1, a2, a3, a4)
@@ -110,5 +114,5 @@ extern void TraceDump(void);
 #define ServerTraceInit(file)
 #define TraceStart(level)
 #define TraceStop()
-#define TraceDump()
+#define TraceDump(mkrel)
 #endif

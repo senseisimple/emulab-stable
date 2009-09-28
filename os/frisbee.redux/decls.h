@@ -13,22 +13,29 @@
 #include "log.h"
 
 /*
- * Ethernet MTU (1514) - eth header (14) - min UDP/IP (28) - BLOCK msg
+ * Ethernet MTU (1514 or 9000) - eth header (14) - min UDP/IP (28) - BLOCK msg
  * header (24).
  */
+#ifdef JUMBO
+#define MAXBLOCKSIZE	8934
+#else
 #define MAXBLOCKSIZE	1448
+#endif
 
 /*
  * Images are broken into chunks which are the standalone unit of decompression
  * Chunks are broken into blocks which are the unit of transmission
  */
+#ifdef JUMBO
+#define CHUNKSIZE	128
+#define BLOCKSIZE	8192
+#else
 #define CHUNKSIZE	1024
 #define BLOCKSIZE	1024
+#endif
 
 /*
  * Make sure we can fit a block in a single ethernet MTU.
- * This limits the maximum block size to 1448 with the current protocol
- * headers on Ethernet.
  */
 #if BLOCKSIZE > MAXBLOCKSIZE
 #error "Invalid block size"
@@ -66,9 +73,11 @@
 
 /*
  * Socket buffer size, used for both send and receive in client and
- * server right now.
+ * server right now.  If DYN_SOCKBUFSIZE is set, we find the larger
+ * socketbuffer size possible that is less than or equal to SOCKBUFSIZE.
  */
-#define SOCKBUFSIZE	(200 * 1024)
+#define SOCKBUFSIZE	(512 * 1024)
+#define DYN_SOCKBUFSIZE	1
 
 /*
  * The number of read-ahead chunks that the client will request
@@ -202,7 +211,7 @@ typedef struct {
 		} __attribute__((__packed__)) v1;
 		uint32_t limit[256];
 	} u;
-} ClientStats_t;
+} __attribute__((__packed__)) ClientStats_t;
 
 typedef struct {
 	char	map[CHUNKSIZE/CHAR_BIT];
@@ -289,6 +298,7 @@ typedef struct {
 /*
  * Protos.
  */
+int	GetSockbufSize(void);
 int	ClientNetInit(void);
 int	ServerNetInit(void);
 int	ServerNetMCKeepAlive(void);

@@ -67,6 +67,24 @@ CFLAGS		= -O2 -g -Wall -fno-builtin-log $(LDSTATIC) $(PTHREADCFLAGS) -DSTATS
 LDFLAGS		= $(LDSTATIC)
 
 #
+# Define this to break chunks into 8192 byte rather than 1024 byte blocks
+#
+ifeq ($(WITH_JUMBO),1)
+CFLAGS		+= -DJUMBO
+endif
+
+#
+# Define this to run the client and server on the same physical machine
+# over the loopback interface.  You will also have to setup an alias on
+# the loopback interface so that client and server can use different IPs:
+#
+#   ifconfig lo0 alias 127.0.0.2 netmask 255.255.255.255
+#
+# and just use unicast and not multi/broadcast.
+#
+#CFLAGS		+= -DSAME_HOST_HACK
+
+#
 # Define this if your implementation of cond_vars works well
 # ("works well" in this case means doesn't hang forever or burn up
 # the CPU while in condwait).
@@ -74,7 +92,7 @@ LDFLAGS		= $(LDSTATIC)
 #CFLAGS		+= -DCONDVARS_WORK
 
 # Define this to a non-zero value to enable recording of trace data
-#CFLAGS		+= -DNEVENTS=50000
+#CFLAGS		+= -DNEVENTS=500000
 
 # Turn on client event handling
 #CFLAGS		+= -DDOEVENTS
