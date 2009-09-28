@@ -112,6 +112,16 @@ ifeq ($(WITH_NTFS),1)
 ifndef HAVE_GCC3
 CC		= gcc30
 endif
+
+#
+# Default to the old libntfs for now.
+# Once proven, switch to 2.0.0.
+#
+ifndef NTFSVER
+NTFSVER		= 1.7.1
+endif
+export		NTFSVER
+
 CFLAGS		+= -DWITH_NTFS
 SUBDIRS		+= ntfs
 ZIPLIBS		+= ntfs/libntfs.a
@@ -144,7 +154,7 @@ ZIPLIBS		+= hashmap/libhashmap.a
 LIBS		+= -lcrypto $(PTHREADLIBS)
 endif
 
-all:	$(SUBDIRS) imagezip imageunzip imagedump imagehash
+all:	imagezip imageunzip imagedump imagehash
 
 whoami:
 	@echo "SYSTEM is $(SYSTEM)"
@@ -155,7 +165,7 @@ endif
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-imagezip: imagezip.o disksize.o version.o $(ZIPLIBS)
+imagezip: $(SUBDIRS) imagezip.o disksize.o version.o $(ZIPLIBS)
 	$(CC) $(CFLAGS) imagezip.o disksize.o version.o $(ZIPLIBS) $(LIBS) -o imagezip
 
 imagezip.o:	imagezip.c

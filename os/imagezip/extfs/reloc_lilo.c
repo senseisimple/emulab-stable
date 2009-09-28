@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004, 2009 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -31,7 +31,7 @@ static void fixup_sector(u_int32_t poff, sectaddr_t *sect);
 static void fixup_map(int fd, u_int32_t startsect);
 
 #define FOFFSET(_b, _s, _f) \
-	((u_int32_t)&((_s *)0)->_f + (u_int32_t)_b)
+	((u_int32_t)(long)&((_s *)0)->_f + (u_int32_t)_b)
 
 int
 fixup_lilo(int slice, int stype, u_int32_t start, u_int32_t size,

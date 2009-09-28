@@ -10,10 +10,6 @@ OBJDIR		= ../../..
 SUBDIR		= os/imagezip/ntfs
 MAINDIR		= $(SRCDIR)/..
 
-NTFSVER		= 1.7.1
-#NTFSVER		= 2.0.0
-export NTFSVER
-
 include $(OBJDIR)/Makeconf
 
 LIBS		= libntfs.a

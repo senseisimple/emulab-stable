@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2006 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2009 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -237,7 +237,8 @@ read_bsdpartition(int infd, struct disklabel *dlabel, int part)
 
 	if (debug) {
 		fprintf(stderr, "        bfree %9lld, bsize %9d, cgsize %9d\n",
-			fs.fs_cstotal.cs_nbfree, fs.fs_bsize, fs.fs_cgsize);
+			(long long)fs.fs_cstotal.cs_nbfree,
+			fs.fs_bsize, fs.fs_cgsize);
 	}
 	assert(fs.fs_cgsize <= MAXBSIZE);
 	assert((fs.fs_cgsize % secsize) == 0);
@@ -251,7 +252,8 @@ read_bsdpartition(int infd, struct disklabel *dlabel, int part)
 		if (devlseek(infd, sectobytes(cgoff), SEEK_SET) < 0) {
 			warn("BSD Partition '%c': "
 			     "Could not seek to cg %d at %lld",
-			     BSDPARTNAME(part), i, sectobytes(cgoff));
+			     BSDPARTNAME(part), i,
+			     (long long)sectobytes(cgoff));
 			return 1;
 		}
 		if ((cc = devread(infd, &cg, fs.fs_cgsize)) < 0) {

@@ -33,6 +33,9 @@
 #include "sliceinfo.h"
 #include "global.h"
 
+/* XXX this is a hack right now */
+#define USE_HACKSORT 0
+
 #define min(a,b) ((a) <= (b) ? (a) : (b))
 
 char	*infilename;
@@ -96,7 +99,7 @@ struct blockreloc	*relocs;
 int			numregions, numrelocs;
 
 void	dumpskips(int verbose);
-void	sortrange(struct range *head, int domerge,
+static void	sortrange(struct range **head, int domerge,
 		  int (*rangecmp)(struct range *, struct range *));
 int	mergeskips(int verbose);
 int	mergeranges(struct range *head);
@@ -563,7 +566,7 @@ main(int argc, char *argv[])
 			rval = read_shd(chkpointdev, infilename, infd,
 					inputminsec, addvalid);
 			if (rval == 0)
-				sortrange(ranges, 1, 0);
+				sortrange(&ranges, 1, 0);
 		}
 		if (rval) {
 			fprintf(stderr, "* * * Aborting * * *\n");
@@ -601,7 +604,7 @@ main(int argc, char *argv[])
 	if (debug)
 		dumpranges(debug > 1);
 
-	sortrange(fixups, 0, cmpfixups);
+	sortrange(&fixups, 0, cmpfixups);
 	if (debug > 1)
 		dumpfixups(debug > 2);
 	fflush(stderr);
@@ -1027,7 +1030,7 @@ mergeskips(int verbose)
 	memset(histo, 0, sizeof(histo));
 #endif
 
-	sortrange(skips, 0, 0);
+	sortrange(&skips, 0, 0);
 	freed += mergeranges(skips);
 
 	/*
@@ -1083,19 +1086,89 @@ mergeskips(int verbose)
 	return (freed + culled);
 }
 
+#if USE_HACKSORT > 0
+/*
+ * A "better" sort.  Put pointers to all the linked list elements in an
+ * array so that we can use qsort and then rebuild the linked list afterward.
+ * The best sort technology available with less than 5 minutes work!
+ */
+int
+sfunc(void *rfunc, const void *e1, const void *e2)
+{
+	int ((*rangecmp)(struct range *, struct range *)) = rfunc;
+	struct range *r1 = *(struct range **)e1;
+	struct range *r2 = *(struct range **)e2;
+
+	if (r1->start > r2->start ||
+	    (rfunc && (*rangecmp)(r1, r2)))
+		return 1;
+	return -1;
+}
+
+struct range *
+bettersort(struct range *head, int count,
+	       int (*rangecmp)(struct range *, struct range *))
+{
+	struct range **tarray, *nlist, **listp, *prange;
+	int i;
+
+	tarray = calloc(count, sizeof(struct range *));
+	if (tarray == NULL)
+		return NULL;
+
+	i = 0;
+	for (prange = head; prange; prange = prange->next) {
+		assert(i < count);
+		tarray[i] = prange;
+		i++;
+	}
+	assert(i == count);
+	qsort_r(tarray, count, sizeof(struct range *), rangecmp, sfunc);
+	listp = &nlist;
+	for (i = 0; i < count; i++) {
+		assert(tarray[i+1] == NULL ||
+		       tarray[i]->start <= tarray[i+1]->start);
+		prange = tarray[i];
+		*listp = prange;
+		listp = &prange->next;
+	}
+	*listp = NULL;
+	free(tarray);
+	return nlist;
+}
+#endif
+
 /*
  * A very dumb bubblesort!
  */
 void
-sortrange(struct range *head, int domerge,
+sortrange(struct range **headp, int domerge,
 	  int (*rangecmp)(struct range *, struct range *))
 {
-	struct range	*prange, tmp;
+	struct range	*prange, tmp, *head = *headp;
 	int		changed = 1;
 
 	if (head == NULL)
 		return;
 	
+#if USE_HACKSORT > 0
+	{
+		int count = 0;
+		for (prange = head; prange; prange = prange->next)
+			count++;
+		fprintf(stderr, "sorting %d records\n", count);
+		if (count > 10000) {
+			head = bettersort(head, count, rangecmp);
+			for (prange = head; prange; prange = prange->next) {
+				if (prange->next)
+					assert(prange->start+prange->size <= prange->next->start);
+			}
+			*headp = head;
+			return;
+		}
+	}
+#endif
+
 	while (changed) {
 		changed = 0;
 
@@ -1571,7 +1644,7 @@ freerelocs(void)
 /*
  * Compress the image.
  */
-static uint8_t  output_buffer[SUBBLOCKSIZE];
+static uint8_t  output_buffer[CHUNKSIZE];
 static int	buffer_offset;
 static off_t	inputoffset;
 static struct timeval cstamp;
@@ -1914,10 +1987,10 @@ compress_image(void)
 		perror("seeking to get output file size");
 		exit(1);
 	}
-	count = tmpoffset / SUBBLOCKSIZE;
+	count = tmpoffset / CHUNKSIZE;
 
 	for (i = 0, outputoffset = 0; i < count;
-	     i++, outputoffset += SUBBLOCKSIZE) {
+	     i++, outputoffset += CHUNKSIZE) {
 		
 		if (lseek(outfd, (off_t) outputoffset, SEEK_SET) < 0) {
 			perror("seeking to read block header");
@@ -1979,7 +2052,7 @@ compress_status(int sig)
  */
 #define BSIZE		(128 * 1024)
 static char		inbuf[BSIZE];
-static			int subblockleft = SUBBLOCKMAX;
+static			int subblockleft = CHUNKMAX;
 static z_stream		d_stream;	/* Compression stream */
 
 #define CHECK_ZLIB_ERR(err, msg) { \
@@ -1996,10 +2069,10 @@ compress_chunk(off_t off, off_t size, int *full, uint32_t *subblksize)
 	off_t		total = 0;
 
 	/*
-	 * Whenever subblockleft equals SUBBLOCKMAX, it means that a new
+	 * Whenever subblockleft equals CHUNKMAX, it means that a new
 	 * compression subblock needs to be started.
 	 */
-	if (subblockleft == SUBBLOCKMAX) {
+	if (subblockleft == CHUNKMAX) {
 		d_stream.zalloc = (alloc_func)0;
 		d_stream.zfree  = (free_func)0;
 		d_stream.opaque = (voidpf)0;
@@ -2091,7 +2164,7 @@ compress_chunk(off_t off, off_t size, int *full, uint32_t *subblksize)
 			size -= cc;
 		total += cc;
 
-		outsize = SUBBLOCKSIZE - buffer_offset;
+		outsize = CHUNKSIZE - buffer_offset;
 
 		/* XXX match behavior of original compressor */
 		if (oldstyle && outsize > 0x20000)
@@ -2117,7 +2190,7 @@ compress_chunk(off_t off, off_t size, int *full, uint32_t *subblksize)
 		}
 		count = outsize - d_stream.avail_out;
 		buffer_offset += count;
-		assert(buffer_offset <= SUBBLOCKSIZE);
+		assert(buffer_offset <= CHUNKSIZE);
 		bytescompressed += cc - d_stream.avail_in;
 
 		/*
@@ -2149,7 +2222,7 @@ compress_chunk(off_t off, off_t size, int *full, uint32_t *subblksize)
 		compress_finish(subblksize);
 		return total;
 	}
-	*subblksize = SUBBLOCKMAX - subblockleft;
+	*subblksize = CHUNKMAX - subblockleft;
 	return total;
 }
 
@@ -2161,13 +2234,13 @@ compress_finish(uint32_t *subblksize)
 {
 	int		err, count;
 
-	if (subblockleft == SUBBLOCKMAX)
+	if (subblockleft == CHUNKMAX)
 		return 0;
 	
 	d_stream.next_in   = 0;
 	d_stream.avail_in  = 0;
 	d_stream.next_out  = &output_buffer[buffer_offset];
-	d_stream.avail_out = SUBBLOCKSIZE - buffer_offset;
+	d_stream.avail_out = CHUNKSIZE - buffer_offset;
 
 	err = deflate(&d_stream, Z_FINISH);
 	if (err != Z_STREAM_END)
@@ -2178,10 +2251,10 @@ compress_finish(uint32_t *subblksize)
 	/*
 	 * There can be some left even though we use Z_SYNC_FLUSH!
 	 */
-	count = (SUBBLOCKSIZE - buffer_offset) - d_stream.avail_out;
+	count = (CHUNKSIZE - buffer_offset) - d_stream.avail_out;
 	if (count) {
 		buffer_offset += count;
-		assert(buffer_offset <= SUBBLOCKSIZE);
+		assert(buffer_offset <= CHUNKSIZE);
 		subblockleft -= count;
 		assert(subblockleft >= 0);
 	}
@@ -2192,14 +2265,14 @@ compress_finish(uint32_t *subblksize)
 	/*
 	 * The caller needs to know how big the actual data is.
 	 */
-	*subblksize  = SUBBLOCKMAX - subblockleft;
+	*subblksize  = CHUNKMAX - subblockleft;
 		
 	/*
 	 * Pad the subblock out.
 	 */
-	assert(buffer_offset + subblockleft <= SUBBLOCKSIZE);
+	assert(buffer_offset + subblockleft <= CHUNKSIZE);
 	memset(&output_buffer[buffer_offset], 0, subblockleft);
 	buffer_offset += subblockleft;
-	subblockleft = SUBBLOCKMAX;
+	subblockleft = CHUNKMAX;
 	return 1;
 }

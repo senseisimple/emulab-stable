@@ -121,7 +121,7 @@ ntfs_read_data_attr(ntfs_attr *na)
 		assert(tmp != 0 && "Not supposed to happen error!  "
 		       "Either na->data_size is wrong or there is another "
 		       "problem");
-#ifndef linux
+#if !defined(linux) && defined(OLD_LIBNTFS)
 		assert(tmp % secsize == 0 && "Not supposed to happen");
 #endif
 		pos += tmp;

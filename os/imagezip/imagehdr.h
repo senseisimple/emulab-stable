@@ -29,17 +29,17 @@
 
 /*
  * Each compressed block of the file has this little header on it.
- * Since each subblock is independently compressed, we need to know
+ * Since each block is independently compressed, we need to know
  * its internal size (it will probably be shorter than 1MB) since we
  * have to know exactly how much to give the inflator.
  */
 struct blockhdr_V1 {
-	uint32_t	magic;
+	uint32_t	magic;		/* magic/version */
 	uint32_t	size;		/* Size of compressed part */
-	int32_t		blockindex;
-	int32_t		blocktotal;
-	int32_t		regionsize;
-	int32_t		regioncount;
+	int32_t		blockindex;	/* netdisk: which block we are */
+	int32_t		blocktotal;	/* netdisk: total number of blocks */
+	int32_t		regionsize;	/* sizeof header + regions */
+	int32_t		regioncount;	/* number of regions */
 };
 
 /*
@@ -69,7 +69,7 @@ struct blockhdr_V2 {
  * absolute block numbers.  This descriptor tells the unzipper what the
  * data structure is and where it is located in the block.
  *
- * Relocation descriptors follow the region descriptors in the header block.
+ * Relocation descriptors follow the region descriptors in the header area.
  */
 struct blockreloc {
 	uint32_t	type;		/* relocation type (below) */
@@ -105,22 +105,33 @@ struct region {
 };
 
 /*
- * In the new model, each sub region has its own region header info.
- * But there is no easy way to tell how many regions before compressing.
- * Just leave a page, and hope that 512 regions is enough!
+ * Each block has its own region header info.
  *
- * This number must be a multiple of the NFS read size in netdisk.
+ * Since there is no easy way to tell how many regions will fit before
+ * we have compressed the region data, we just have to pick a size here.
+ * If this area is too small, it is possible that a highly fragmented image
+ * will fill this header before filling the data area of a block.  If the
+ * region header area is too large, we will almost always fill up the data
+ * area before filling the region header.  Since the latter is more likely
+ * to be common, we tend to the small-ish side.
+ *
+ * At 4K with 8 byte region descriptors, we can fix 512 regions into a
+ * single chunk.
  */
-#define DEFAULTREGIONSIZE	(1024 * 4)
+#define DEFAULTREGIONSIZE	4096
 
 /*
  * Ah, the frisbee protocol. The new world order is to break up the
- * file into fixed 1MB chunks, with the region info prepended to each
+ * file into fixed chunks, with the region info prepended to each
  * chunk so that it can be layed down on disk independently of all the
  * chunks in the file. 
  */
-#define SUBBLOCKSIZE		(1024 * 1024)
-#define SUBBLOCKMAX		(SUBBLOCKSIZE - DEFAULTREGIONSIZE)
+#define F_BLOCKSIZE		1024
+#define F_BLOCKSPERCHUNK	1024
+
+#define CHUNKSIZE		(F_BLOCKSIZE * F_BLOCKSPERCHUNK)
+#define CHUNKMAX		(CHUNKSIZE - DEFAULTREGIONSIZE)
+
 
 /*
  * Assumed sector (block) size

@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2006 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2009 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -63,7 +63,7 @@ static char *imagename;
 static char *fileid = NULL;
 static char *sigfile = NULL;
 
-static char chunkbuf[SUBBLOCKSIZE];
+static char chunkbuf[CHUNKSIZE];
 
 static void usage(void);
 static int gethashinfo(char *name, struct hashinfo **hinfo);

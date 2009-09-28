@@ -90,8 +90,8 @@ main(int argc, char **argv)
 
 		if (!isstdin) {
 			if ((infd = open(argv[0], O_RDONLY, 0666)) < 0) {
-				perror("opening input file");
-				exit(1);
+				perror(argv[0]);
+				continue;
 			}
 		} else
 			infd = fileno(stdin);
@@ -116,7 +116,7 @@ usage(void)
 	exit(1);
 }	
 
-static char chunkbuf[SUBBLOCKSIZE];
+static char chunkbuf[CHUNKSIZE];
 static unsigned int magic;
 static unsigned long chunkcount;
 static uint32_t nextsector;
@@ -142,6 +142,7 @@ dumpfile(char *name, int fd)
 	fmax = amax = 0;
 	fmin = amin = ~0;
 	franges = aranges = 0;
+	regmin = regmax = 0;
 	memset(adist, 0, sizeof(adist));
 
 	if (!isstdin) {
@@ -151,7 +152,7 @@ dumpfile(char *name, int fd)
 			perror(name);
 			return;
 		}
-		if ((st.st_size % SUBBLOCKSIZE) != 0)
+		if ((st.st_size % CHUNKSIZE) != 0)
 			printf("%s: WARNING: "
 			       "file size not a multiple of chunk size\n",
 			       name);
@@ -205,11 +206,11 @@ dumpfile(char *name, int fd)
 				checkindex = 0;
 			} else
 				chunkcount = hdr->blocktotal;
-			if ((filesize / SUBBLOCKSIZE) != chunkcount) {
+			if ((filesize / CHUNKSIZE) != chunkcount) {
 				if (chunkcount != 0) {
 					if (isstdin)
 						filesize = (off_t)chunkcount *
-							SUBBLOCKSIZE;
+							CHUNKSIZE;
 					else
 						printf("%s: WARNING: file size "
 						       "inconsistant with "
@@ -217,7 +218,7 @@ dumpfile(char *name, int fd)
 						       "(%lu != %lu)\n",
 						       name,
 						       (unsigned long)
-						       (filesize/SUBBLOCKSIZE),
+						       (filesize/CHUNKSIZE),
 						       chunkcount);
 				} else if (magic == COMPRESSED_V1) {
 					if (!ignorev1)
@@ -231,7 +232,7 @@ dumpfile(char *name, int fd)
 
 			printf("%s: %llu bytes, %lu chunks, version %d\n",
 			       name, (unsigned long long)filesize,
-			       (unsigned long)(filesize / SUBBLOCKSIZE),
+			       (unsigned long)(filesize / CHUNKSIZE),
 			       hdr->magic - COMPRESSED_MAGIC_BASE + 1);
 		} else if (chunkno == 1 && !ignorev1) {
 			blockhdr_t *hdr = (blockhdr_t *)chunkbuf;
@@ -257,7 +258,7 @@ dumpfile(char *name, int fd)
 #endif
 
 	if (filesize == 0)
-		filesize = (off_t)(chunkno + 1) * SUBBLOCKSIZE;
+		filesize = (off_t)(chunkno + 1) * CHUNKSIZE;
 
 	cbytes = (unsigned long long)(filesize - wasted);
 	dbytes = SECTOBYTES(sectinuse);
@@ -286,20 +287,29 @@ dumpfile(char *name, int fd)
 		       SECTOBYTES(fmin), SECTOBYTES(fmax));
 	if (aranges) {
 		int maxsz, i;
+		uint32_t adistsum;
 
 		printf("  %d allocated ranges: %llu/%llu/%llu ave/min/max size\n",
 		       aranges, SECTOBYTES(sectinuse)/aranges,
 		       SECTOBYTES(amin), SECTOBYTES(amax));
 		printf("  size distribution:\n");
+		adistsum = 0;
 		maxsz = 4*SECSIZE;
 		for (i = 0; i < 7; i++) {
 			maxsz *= 2;
-			if (adist[i])
-				printf("    < %dk bytes: %d\n",
-				       maxsz/1024, adist[i]);
+			if (adist[i]) {
+				adistsum += adist[i];
+				printf("    <  %3dk bytes: %6d %4.1f%% %4.1f%%\n",
+				       maxsz/1024, adist[i],
+				       (double)adist[i]/aranges*100,
+				       (double)adistsum/aranges*100);
+			}
 		}
-		if (adist[i])
-			printf("    >= %dk bytes: %d\n", maxsz/1024, adist[i]);
+		if (adist[i]) {
+			printf("    >= %3dk bytes: %6d %4.1f%%\n",
+			       maxsz/1024, adist[i],
+			       (double)adist[i]/aranges*100);
+		}
 	}
 }
 
@@ -336,16 +346,16 @@ dumpchunk(char *name, char *buf, int chunkno, int checkindex)
 		       name, hdr->blocktotal, chunkcount, chunkno);
 		return 1;
 	}
-	if (hdr->size > (SUBBLOCKSIZE - hdr->regionsize)) {
+	if (hdr->size > (CHUNKSIZE - hdr->regionsize)) {
 		printf("%s: bad chunksize (%d > %d) in chunk %d\n",
-		       name, hdr->size, SUBBLOCKSIZE-hdr->regionsize, chunkno);
+		       name, hdr->size, CHUNKSIZE-hdr->regionsize, chunkno);
 		return 1;
 	}
 #if 1
 	/* include header overhead */
-	wasted += SUBBLOCKSIZE - hdr->size;
+	wasted += CHUNKSIZE - hdr->size;
 #else
-	wasted += ((SUBBLOCKSIZE - hdr->regionsize) - hdr->size);
+	wasted += ((CHUNKSIZE - hdr->regionsize) - hdr->size);
 #endif
 	if (regmin == 0 || hdr->regioncount < regmin)
 		regmin = hdr->regioncount;
