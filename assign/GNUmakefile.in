@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 SRCDIR		= @srcdir@
@@ -19,7 +19,9 @@ include $(OBJDIR)/Makeconf
 #CPP=cpp33
 #CXX=g++33	
 
-all: assign 
+all: assign
+
+SCHEMATA = vtop.xsd ptop.xsd top.xsd
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -83,8 +85,10 @@ DEPLIBS=$(OBJS)
 
 assign: ${MAKEFILE_IN} ${DEPLIBS} ${OBJS}
 	${CXX} -o assign ${LIBS} $(OBJS) ${LDFLAGS}
-	
-install: $(INSTALL_LIBEXECDIR)/assign 
+
+install: install-schemata $(INSTALL_LIBEXECDIR)/assign
+
+install-schemata: $(addprefix $(INSTALL_LIBDIR)/assign/, $(SCHEMATA))
 
 # XXX: This is a hack having to do with the fact that there have, historically,
 # been both a config.c and a config.cc, and CVS doesn't always delete config.c
@@ -95,6 +99,11 @@ config.o:
 
 clean:
 	-${RM} *.o assign 
+
+$(INSTALL_LIBDIR)/assign/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_LIBDIR)/assign
+	$(INSTALL) $< $@
 
 #
 # All this crap generated with 'g++ -MM' - don't want to do all the makefile goo
