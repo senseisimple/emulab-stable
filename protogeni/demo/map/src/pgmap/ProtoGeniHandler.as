@@ -17,6 +17,9 @@
 	import com.mattism.http.xmlrpc.MethodFault;
 	
 	import flash.events.ErrorEvent;
+	import flash.utils.ByteArray;
+	
+	import mx.utils.Base64Decoder;
     	
 	public class ProtoGeniHandler
 	{
@@ -74,6 +77,8 @@
 	    
 		public function completeCredential(code : Number, response : Object) : void
 	    {
+	    	main.setProgress("Done", Common.successColor);
+	    	main.stopWaiting();
 	      addResponse();
 	      if (code == 0)
 	      {
@@ -141,6 +146,7 @@
 	    {
 	      opName = "Acquiring SSH Keys";
 	      main.setProgress(opName, Common.waitColor);
+	      main.startWaiting();
 	      main.console.appendText(opName);
 	      op.reset(Geni.getKeys);
 	      op.addField("credential", credential.base);
@@ -150,6 +156,8 @@
 	
 	    public function completeSshLookup(code : Number, response : Object) : void
 	    {
+	    	main.setProgress("Done", Common.successColor);
+	    	main.stopWaiting();
 	      addResponse();
 	      if (code == 0)
 	      {
@@ -172,6 +180,7 @@
 	      main.console.appendText(opName + "...\n");
 	      op.reset(Geni.discoverResources);
 	      op.addField("credential", credential.base);
+	      op.addField("compress", true);
 	      op.setUrl(ComponentManagerURL);
 	      op.call(completeResourceLookup, failure);
 	    }
@@ -184,7 +193,13 @@
 
 	      if (code == 0)
 	      {
-	        Rspec = new XML(response.value);
+	      	var x:Base64Decoder = new Base64Decoder();
+	      	x.decode(response.value);
+	      	var s:ByteArray = x.toByteArray();
+	      	s.uncompress();
+	      	var s2:String = s.toString();
+	        Rspec = new XML(s2);
+	        
 	        processRspec();
 	      }
 	      else

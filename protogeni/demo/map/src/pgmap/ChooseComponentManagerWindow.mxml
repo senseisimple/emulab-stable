@@ -2,7 +2,7 @@
 <mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" layout="vertical"
 	title="Choose Component Manager"
 	showCloseButton="true"
-	borderAlpha=".9" borderColor="#D2E1F0" width="320"
+	borderAlpha=".9" borderColor="#D2E1F0" width="400"
 	defaultButton="{okButton}"
 	close="close()"
 	creationComplete="okButton.setFocus()">
@@ -31,14 +31,15 @@
        			PopUpManager.centerPopUp(this);
        			if(main.comHandler.Components == null || main.comHandler.Components.length == 0) {
        				startRefreshList();
-       			}
+       			} else
+       				okButton.enabled = true;
        			
 				//urlInput.text = main.comHandler.ComponentManagerURL;
 			}
 			
 			public function startRefreshList():void {
-				progressLabel.text = "Updating list...";
-				waitingIcon.visible = true;
+				//progressLabel.text = "Updating list...";
+				//waitingIcon.visible = true;
 				if(main.comHandler.credential == null || main.comHandler.credential.base == null) {
 				main.console.appendText("Getting credential...\n");
 					main.comHandler.AfterCall = afterCredential;
@@ -56,15 +57,15 @@
 			
 			public function refreshList():void {
 				main.comHandler.AfterCall = null;
-				
-				progressLabel.text = "List updated";
-				waitingIcon.visible = false;
+				okButton.enabled = true;
+				//progressLabel.text = "List updated";
+				//waitingIcon.visible = false;
 			}
 		]]>
 	</mx:Script>
 	
 	<mx:HBox width="100%" verticalAlign="middle">
-	<mx:Button id="refreshButton" label="Refresh" icon="@Embed('../images/server.png')"/>
+	<mx:Button id="refreshButton" label="Refresh" icon="@Embed('../images/arrow_refresh.png')"/>
 	<mx:ComboBox editable="false" width="100%" id="listManagers" dataProvider="{main.comHandler.Components}" labelField="hrn"></mx:ComboBox>
 	</mx:HBox>
 	<mx:HBox width="100%" horizontalAlign="right">
@@ -72,7 +73,7 @@
 		<mx:SWFLoader id="waitingIcon" source="@Embed('../../images/waiting.swf')" visible="false"/> 
 		<mx:Spacer width="100%"/>
 		<mx:Button id="cancelButton" label="Cancel" icon="@Embed('../images/cross.png')" click="close();"/>
-		<mx:Button id="okButton" label="Go" icon="@Embed('../images/tick.png')" click="success();"/>
+		<mx:Button id="okButton" label="Go" icon="@Embed('../images/tick.png')" click="success();" enabled="false"/>
 	</mx:HBox>
 	
 </mx:TitleWindow>

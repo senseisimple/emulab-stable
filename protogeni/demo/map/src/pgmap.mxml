@@ -140,14 +140,20 @@
 	    	if(color.length > 0) {
 	    		progressLabel.setStyle("color", color);
 	    	}
+	    	chooseCMWindow.progressLabel.text = message;
+	    	if(color.length > 0) {
+	    		chooseCMWindow.progressLabel.setStyle("color", color);
+	    	}
 	    }
 	    
 	    public function startWaiting():void {
 	    	waitingIcon.visible = true;
+	    	chooseCMWindow.waitingIcon.visible = true;
 	    }
 	    
 	    public function stopWaiting():void {
 	    	waitingIcon.visible = false;
+	    	chooseCMWindow.waitingIcon.visible = false;
 	    }
     ]]>
 </mx:Script>
