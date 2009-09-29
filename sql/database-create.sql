@@ -3992,7 +3992,7 @@ CREATE TABLE `vlans` (
   `members` text NOT NULL,
   `id` int(11) NOT NULL auto_increment,
   `tag` smallint(5) NOT NULL default '0',
-  `stack` varchar(32),
+  `stack` varchar(32) default NULL,
   PRIMARY KEY  (`id`),
   KEY `pid` (`pid`,`eid`,`virtual`),
   KEY `exptidx` (`exptidx`,`virtual`)

@@ -1,0 +1,15 @@
+#
+# Minor fix to previous revision.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    DBQueryFatal("ALTER TABLE vlans MODIFY stack varchar(32) default NULL");
+
+    return 0;
+}
+1;
