@@ -3780,7 +3780,9 @@ COMMAND_PROTOTYPE(doloadinfo)
 		tuple->eventtype = "RELOADOLDMFS";
 		
 		if (myevent_send(tuple)) {
-			error("doloadinfo: %s: Unable to set state to RELOADOLDMFS");
+			error("doloadinfo: %s: ".
+			      "Unable to set state to RELOADOLDMFS",
+			      reqp->nodeid);
 		}
 		
 		address_tuple_free(tuple);
