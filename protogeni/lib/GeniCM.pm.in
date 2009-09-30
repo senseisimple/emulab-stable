@@ -1658,7 +1658,7 @@ sub SliverWork($$)
 	}	    
 	goto bad;
     }
-    
+
     #
     # Must do this after the mapper runs.
     #
@@ -3476,7 +3476,7 @@ sub GeniExperiment($)
 	}
 	$experiment = Experiment->Lookup($uuid);
 	$experiment->SetState(EXPTSTATE_SWAPPED());
-	$experiment->Update({"geniflags" => 1});
+	$experiment->Update({"geniflags" => $Experiment::EXPT_GENIFLAGS_EXPT});
     }
     return $experiment;
 }
