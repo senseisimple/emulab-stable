@@ -25,6 +25,7 @@ use GeniUsage;
 use emutil qw(TBGetUniqueIndex);
 use Experiment;
 use OSinfo;
+use Node;
 use English;
 use XML::Simple;
 use Data::Dumper;
@@ -609,25 +610,6 @@ sub Provision($;$)
     my $pid = $experiment->pid();
     my $eid = $experiment->eid();
 
-    my $redirected = 0;
-    if (exists($self->rspec()->{'tmcd_server'}) &&
-	exists($self->rspec()->{'tmcd_nodeid'})) {
-	my $tmcd_redirect =
-	    $self->rspec()->{'tmcd_server'} . ":" .
-	    $self->rspec()->{'tmcd_nodeid'};
-
-	if ($node->ModifyReservation({"tmcd_redirect" => $tmcd_redirect})){
-	    return -1;
-	}
-	$redirected = 1;
-    }
-
-    #
-    # An emulab cluster node uses a vnode on the physnode, even for a
-    # dedicated physical nodes. We need to tell tmcd about the pnode,
-    # but not the vnode since it is going to redirect to tmcd on the
-    # remote Emulab controlling the experiment.
-    #
     if (!$node->isremotenode() &&
 	exists($self->rspec()->{'virtualization_type'}) &&
 	$self->rspec()->{'virtualization_type'} eq "emulab-vnode") {
@@ -637,9 +619,8 @@ sub Provision($;$)
 	    return -1;
 	}
 
-	# Not redirected. Use local tmcd anyway.
-	$node->ModifyReservation({"genisliver_idx" => $self->idx()})
-	    if (!$redirected);
+	# Mark
+	$node->ModifyReservation({"genisliver_idx" => $self->idx()});
 
 	if (exists($self->rspec()->{'virtualization_subtype'})) {
 	    my $subtype = $self->rspec()->{'virtualization_subtype'};
