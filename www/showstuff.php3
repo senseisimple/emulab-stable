@@ -44,7 +44,8 @@ function SHOWNODES($pid, $eid, $sortby, $showclass) {
     }
 
     # XXX
-    if ($pid == "emulab-ops" && $eid == "hwdown") {
+    if ($pid == "emulab-ops" &&
+	($eid == "hwdown" || $eid == "hwbroken")) {
 	$showlastlog = 1;
 	if (empty($showclass)) {
 	    $showclass = "no-pcplabphys";
