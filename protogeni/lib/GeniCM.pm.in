@@ -1930,15 +1930,13 @@ sub SliverWork($$)
     }
 
     #
-    # Now do the provisioning (note that we actually allocated the
-    # node above when the ticket was granted). Then add the sliver to
-    # the aggregate. 
+    # Now do the provisioning. The entire aggregate is provisioned, which
+    # is extra work, but needed since running the mapper above might have
+    # changed some important state.
     #
-    foreach my $sliver (values(%slivers)) {
-	if (!$impotent && $sliver->Provision() != 0) {
-	    $message = "Could not provision $sliver";
-	    goto bad;
-	}
+    if (!$impotent && $aggregate->Provision() != 0) {
+	$message = "Could not provision $aggregate";
+	goto bad;
     }
 
     #
