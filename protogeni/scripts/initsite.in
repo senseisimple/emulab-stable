@@ -27,6 +27,7 @@ my $cflag   = "";
 my $TB		  = "@prefix@";
 my $TBOPS         = "@TBOPSEMAIL@";
 my $TBLOGS        = "@TBLOGSEMAIL@";
+my $OURDOMAIN     = "@OURDOMAIN@";
 my $PGENIDOMAIN   = "@PROTOGENI_DOMAIN@";
 my $PGENISUPPORT  = @PROTOGENI_SUPPORT@;
 my $TBBASE        = "@TBBASE@";
@@ -58,6 +59,7 @@ my $MYSQLSHOW     = "/usr/local/bin/mysqlshow";
 my $MYSQLDUMP     = "/usr/local/bin/mysqldump";
 my $PKG_INFO      = "/usr/sbin/pkg_info";
 my $FETCH	  = "/usr/bin/fetch";
+my $OPENSSL       = "/usr/local/bin/openssl";
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
@@ -106,9 +108,38 @@ if ($PGENIDOMAIN =~ /^unknown/i) {
 }
 
 #
+# Check for (and update) an old (pre-URN) root certificate.
+#
+if( system( "$OPENSSL x509 -text -noout < $TB/etc/emulab.pem | " .
+	    "grep -q -i URI:urn:publicid:IDN" ) ) {
+    my $extfile = "/tmp/$$"; # not worth trying to be secure
+    open( EXTFILE, "> $extfile" ) or die "can't open $extfile";
+    print EXTFILE "subjectAltName=URI:urn:publicid:IDN+${OURDOMAIN}+authority+root\n";
+    print EXTFILE "issuerAltName=URI:urn:publicid:IDN+${OURDOMAIN}+authority+root\n";
+    close EXTFILE;
+
+    print "Adding URN to root certificate...\n";
+
+    rename( "$TB/etc/emulab.pem", "$TB/etc/emulab.pem.orig" ) or
+	die( "could not rename root certificate" );
+    system( "$OPENSSL x509 -text -extfile $extfile " .
+	    "-signkey $TB/etc/emulab.key < $TB/etc/emulab.pem.orig " .
+	    "> $TB/etc/emulab.pem" );
+    # For some reason, OpenSSL can return non-zero even when the certificate
+    # generation succeeded.  Check the output file instead.
+    -s "$TB/etc/emulab.pem" or
+	die( "could not generate new root certificate" );	    
+
+    print "Root certificate updated.  You will need to send the new\n";
+    print "certificate to the clearing house.\n";
+
+    unlink( "$TB/etc/.federated" );
+}
+
+#
 # Have you sent in your certificate to Utah?
 #
-if (! -e "$TB/etc/.federated") {
+if (!$asch && ! -e "$TB/etc/.federated") {
     my $done = 0;
     my $federated = 0;
 
