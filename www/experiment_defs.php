@@ -1062,6 +1062,49 @@ class Experiment
 	    echo " </td>
               </tr>\n";
 	}
+	if (!$short && ISADMIN() && $this->geniflags()) {
+	    $dbid = DBConnect("geni-cm");
+	    $slice_hrn = null;
+	    $user_hrn  = null;
+	    if ($dbid) {
+		$geni_result =
+		    DBQueryFatal("select hrn,creator_uuid from geni_slices ".
+				 "where uuid='$uuid'", $dbid);
+		if ($geni_result &&
+		    mysql_num_rows($geni_result)) {
+		    $genirow = mysql_fetch_array($geni_result);
+		    $creator_uuid = $genirow["creator_uuid"];
+		    $slice_hrn    = $genirow["hrn"];
+
+		    $geni_result =
+			DBQueryFatal("select hrn from geni_users ".
+				     "where uuid='$creator_uuid'", $dbid);
+		    if ($geni_result &&
+			mysql_num_rows($geni_result)) {
+			$genirow = mysql_fetch_array($geni_result);
+			$user_hrn = $genirow["hrn"];
+		    }
+		    else {
+			$user = User::LookupByUUID($creator_uuid);
+			if ($user) {
+			    $user_hrn = $user->uid();
+			}
+		    }
+		    if (! is_null($slice_hrn)) {
+			echo "<tr>
+                               <td>Geni Slice HRN: </td>
+                               <td class=\"left\">$slice_hrn</td>
+                              </tr>\n";
+		    }
+		    if (! is_null($user_hrn)) {
+			echo "<tr>
+                               <td>Geni User HRN: </td>
+                               <td class=\"left\">$user_hrn</td>
+                              </tr>\n";
+		    }
+		}
+	    }
+	}
 	echo "</table>\n";
     }
 

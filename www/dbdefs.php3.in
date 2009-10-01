@@ -713,6 +713,20 @@ if (!mysql_select_db($TBDBNAME)) {
 }
 
 #
+# Connect to alternate DB.
+#
+function DBConnect($dbname)
+{
+    $linkid = mysql_connect("localhost", basename($SCRIPT_NAME), "none", 1);
+    if ($linkid) {
+	if (!mysql_select_db($dbname, $linkid)) {
+	    return null;
+	}
+    }
+    return $linkid;
+}
+
+#
 # Record last DB error string.
 #
 $DBErrorString = "";
@@ -734,11 +748,13 @@ $DBErrorString = "";
 # the error string from the DB module. Use DBFatal (below) to print/email
 # that string, and then exit.
 #
-function DBQuery($query)
+function DBQuery($query, $linkid = NULL)
 {
     global	$TBDBNAME;
     global	$DBErrorString;
     global      $DBlinkid;
+
+    $linkid = is_null($linkid) ? $DBlinkid : $linkid;
     
     # Support for SQL-injection vulnerability checking.  Labeled probe strings
     # should be caught in page input argument checking before they get here.
@@ -753,12 +769,12 @@ function DBQuery($query)
 	USERERROR("Probe label: " . substr($query, $lbl, $end-$lbl), 1);
     }
 
-    $result = mysql_query($query, $DBlinkid);
+    $result = mysql_query($query, $linkid);
 
     if (! $result) {
 	$DBErrorString =
 	    "  Query: $query\n".
-	    "  Error: " . mysql_error();
+	    "  Error: " . mysql_error($linkid);
     }
     return $result;
 }
@@ -766,9 +782,9 @@ function DBQuery($query)
 #
 # Same as above, but die on error. 
 # 
-function DBQueryFatal($query)
+function DBQueryFatal($query, $linkid = NULL)
 {
-    $result = DBQuery($query);
+    $result = DBQuery($query, $linkid);
 
     if (! $result) {
 	DBFatal("DB Query failed");
@@ -780,9 +796,9 @@ function DBQueryFatal($query)
 # Same as above, but just send email on error. This info is useful
 # to the TB system, but the caller has to retain control.
 # 
-function DBQueryWarn($query)
+function DBQueryWarn($query, $linkid = NULL)
 {
-    $result = DBQuery($query);
+    $result = DBQuery($query, $linkid);
 
     if (! $result) {
 	DBWarn("DB Query failed");
@@ -827,11 +843,13 @@ function DBFatal($message)
 # Return the number of affected rows, for the last query. Why is this
 # not stored in the query result?
 # 
-function DBAffectedRows()
+function DBAffectedRows($linkid = NULL)
 {
     global      $DBlinkid;
 
-    return mysql_affected_rows($DBlinkid);
+    $linkid = is_null($linkid) ? $DBlinkid : $linkid;
+
+    return mysql_affected_rows($linkid);
 }
 
 ?>

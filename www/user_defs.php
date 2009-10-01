@@ -130,6 +130,24 @@ class User
 	return User::Lookup($idx);
     }
     
+    function LookupByUUID($uuid) {
+	$safe_uuid = addslashes($uuid);
+	$status_archived = TBDB_USERSTATUS_ARCHIVED;
+
+	$query_result =
+	    DBQueryWarn("select uid_idx from users ".
+			"where uid_uuid='$safe_uuid' and ".
+			"      status!='$status_archived'");
+
+	if (!$query_result || !mysql_num_rows($query_result)) {
+	    return null;
+	}
+	$row = mysql_fetch_array($query_result);
+	$idx = $row['uid_idx'];
+
+	return User::Lookup($idx);
+    }
+    
     #
     # Refresh an instance by reloading from the DB.
     #
