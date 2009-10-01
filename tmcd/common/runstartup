@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -49,7 +49,12 @@ else {
     if (!defined($eid)) {
 	fatal("Could not determine pid/eid");
     }
-    $logtemplate = "/proj/$pid/logs/runlog-$eid.$vname.XXXXXX";
+    if (! -e "/proj/$pid/logs") {
+	$logtemplate = "$VARDIR/logs/runlog.XXXXXX";
+    }
+    else {
+	$logtemplate = "/proj/$pid/logs/runlog-$eid.$vname.XXXXXX";
+    }
 }
 
 #
