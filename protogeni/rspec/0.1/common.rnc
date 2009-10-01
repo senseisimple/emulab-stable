@@ -1,0 +1,95 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Common definitions for advertisements, requests, and tickets
+#
+
+include "top.rnc" 
+
+NodeSpec = element node { NodeContents }
+
+LinkSpec = element link { LinkContents }
+
+NodeContents =
+    # Each node has exactly one virtualization technology, which we simply
+    # enumerate here
+    attribute virtualization_type { "raw" | "trellis-vserver" |
+      "planetlab-vserver" | "emulab-vnode" }? &
+
+    # Node type list
+    NodeTypeList &
+
+    # List of interfaces on this node. Interfaces are declared here. So
+    # all information about a particular interface including types
+    # belongs in the declaration. Other references to interfaces
+    # should just uniquely identify them and refer back here.
+    element interface {
+      InterfaceDecl
+    }*
+
+  LinkContents =
+    # Each link has exactly one virtualization technology, which we simply
+    # enumerate here
+    attribute virtualization_type { "raw" | "trellis-vserver" |
+      "planetlab-vserver" | "emulab-vnode" }? &
+    # Link types
+    LinkTypeList &
+    # The interfaces which this link spans.
+    element interface_ref {
+      InterfaceRef
+    }*
+
+NodeTypeList = NodeTypeSpec+
+
+LinkTypeList = LinkTypeSpec+
+
+VirtualName = attribute virtual_id { text }
+
+ComponentName =
+  # This is the uuid of the aggregate that this node or link belongs
+  # to. It is required in an advertisement.
+  attribute component_manager_uuid { text } &
+  # User-readable name for the component
+  attribute component_name { text }? &
+  # The uuid of the physical component.
+  attribute component_uuid { text }
+
+ComponentInterfaceDeclName = attribute component_id { text }
+
+ComponentInterfaceRefName =
+  attribute component_node_uuid { text } &
+  attribute component_interface_id { text }
+
+InterfaceDecl = empty
+
+InterfaceRef = empty
+
+Location = element location {
+  # The two-letter ISO 3166 code for the country the node is in.
+  attribute country { text } &
+  # Longitude and Lattitude coordinates of the node using the
+  # WGS 84 standard.
+  attribute longitude { text }? &
+  attribute lattitude { text }?
+}
+
+RSpec = element rspec {
+  RSpecContents
+}
+
+RSpecContents =
+  # When this RSpec was generated - optional, can be used for determining
+  # staleness
+  attribute generated { xsd:dateTime }? &
+  # How long this rspec is valid - in the case of a ticket, this indicates
+  # how long the holder may use the resources. For a resource request, it's
+  # how long we want the resources. For an advertisement, it might be a hint
+  # as to how long it's okay to cache this rspec.
+  attribute valid_until { xsd:dateTime }? &
+  # One or more nodes/links
+  NodeSpec* &
+  LinkSpec*

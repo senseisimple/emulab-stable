@@ -1,0 +1,48 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Prototype of an advertisement RSpec, to be used by ProtoGENI
+#
+
+default namespace = "http://www.protogeni.net/resources/rspec/0.1"
+
+include "protogeni-rspec-common.rnc"
+
+NodeContents &=
+  # Component identifiers
+  ComponentName &
+  # Information about the physical location of the node.
+  Location? &
+
+  # Indicate whether or not this node is available - the idea is that a
+  # full dump of the static physical topology will not include this, but
+  # that we can later get updates that include only this attribute (and a
+  # UUID) Just binary for now - probably will include more things, such
+  # as a number of "free slots", later
+  element available { xsd:boolean } &
+
+  # Indicates whether the node is in sharing mode: exclusive is true if
+  # the component manager will agree to promise not to share it.
+  element exclusive { xsd:boolean }
+
+LinkContents &=
+  # Component identifiers
+  ComponentName &
+  # Characteristics (bandwidth, latency, loss) which affect traffic.
+  LinkCharacteristics?
+
+InterfaceDecl &=
+  ComponentInterfaceDeclName &
+  element monitoring { attribute user_traffic { text }? }?
+
+InterfaceRef &=
+  ComponentInterfaceRefName
+
+RSpecContents &=
+  attribute type { "advertisement" }
+
+start = RSpec

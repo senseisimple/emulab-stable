@@ -4,12 +4,14 @@ TRANGCMD="java -jar ${TRANG:-/usr/local/share/java/classes/trang.jar}"
 
 rm -f *.xsd
 
-for schema in rspec-ad rspec-request; do
-  $TRANGCMD ${schema}.rnc ${schema}.xsd
+for path in 0.1; do
+  for schema in ad request; do
+    $TRANGCMD ${path}/${schema}.rnc ${path}/${schema}.xsd
 
-  mv top.xsd ${schema}-top.xsd
-  sed "s/top.xsd/${schema}-top.xsd/" protogeni-rspec-common.xsd > ${schema}-common.xsd
-  rm protogeni-rspec-common.xsd
-  sed "s/protogeni-rspec-common.xsd/${schema}-common.xsd/" ${schema}.xsd > ${schema}.tmp
-  mv ${schema}.tmp ${schema}.xsd
+    mv ${path}/top.xsd ${path}/${schema}-top.xsd
+    sed "s/top.xsd/${schema}-top.xsd/" ${path}/common.xsd > ${path}/${schema}-common.xsd
+    rm ${path}/common.xsd
+    sed "s/common.xsd/${schema}-common.xsd/" ${path}/${schema}.xsd > ${path}/${schema}.tmp
+    mv ${path}/${schema}.tmp ${path}/${schema}.xsd
+  done
 done
