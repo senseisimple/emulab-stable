@@ -2928,7 +2928,7 @@ sub SliceStatus($)
 	elsif ($node->eventstate() eq TBDB_NODESTATE_TBFAILED()) {
 	    $details{$node_uuid} = "failed";
 	    $detailsNew{$hrn}    = "failed";
-	    $summary = "notready";
+	    $summary = "failed";
 	}
 	else {
 	    $details{$node_uuid} = "notready";
@@ -3137,7 +3137,7 @@ sub SliverStatus($)
 	elsif ($node->eventstate() eq TBDB_NODESTATE_TBFAILED()) {
 	    $details{$node_uuid} = "failed";
 	    $detailsNew{$hrn}    = "failed";
-	    $summary = "notready";
+	    $summary = "failed";
 	}
 	else {
 	    $details{$node_uuid} = "notready";
