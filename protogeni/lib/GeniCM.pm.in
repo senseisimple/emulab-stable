@@ -293,7 +293,7 @@ sub GetAdvertisement($$)
 	$invocation .= " -1 $pc";
     }
     if (open(AVAIL, "$invocation |")) {
-	my $xml = "";
+	$xml = "";
 	while (<AVAIL>) {
 	    $xml .= $_;
 	}
