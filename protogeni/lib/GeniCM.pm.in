@@ -783,7 +783,7 @@ sub GetTicket($;$)
 				      $node->node_id() : "")};
 
 	# Tarball and startup command.
-	if (exists($ref->{'startup_command'})) {
+	if (0 && exists($ref->{'startup_command'})) {
 	    my $startupcmd = $ref->{'startup_command'};
 	    
 	    if (! TBcheck_dbslot($startupcmd, "virt_nodes", "startupcmd",
@@ -2122,6 +2122,7 @@ sub StartSliver($)
 {
     my ($argref) = @_;
     my $cred        = $argref->{'credential'};
+    my $manifest    = $argref->{'manifest'};
     my $impotent    = $argref->{'impotent'};
 
     $impotent = 0
@@ -2159,6 +2160,13 @@ sub StartSliver($)
 				    "No such sliver/aggregate $sliver_uuid");
 	}
     }
+
+    if (defined($manifest)) {
+	$manifest = XMLin($manifest, KeyAttr => [],
+			  ForceArray => ["node", "link", "interface",
+					 "interface_ref", "linkendpoints"]);
+    }
+    
     #
     # Lock the slice to avoid concurrent operation.
     #
@@ -2176,6 +2184,21 @@ sub StartSliver($)
 	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
 				    "Slice has been shutdown");
     }
+
+    if (defined($manifest)) {
+	print Dumper($manifest);
+	
+	#
+	# This is not signed, so have to be very careful about using
+	# anything inside it.
+	#
+	if ($sliver->ProcessManifest($manifest) != 0) {
+	    $slice->UnLock();
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					"Could not process manifest");
+	}
+    }
+    
     if (!$impotent && $sliver->Start() != 0) {
 	$slice->UnLock();
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,

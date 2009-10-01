@@ -515,6 +515,33 @@ sub NewCredential($$)
 }
 
 #
+# Process the manifest. Just hand off to the slivers.
+#
+sub ProcessManifest($$)
+{
+    my ($self, $manifest) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my @slivers = ();
+    if ($self->SliverList(\@slivers) != 0) {
+	print STDERR "Could not get sliver list for $self\n";
+	return -1;
+    }
+
+    foreach my $sliver (@slivers) {
+	next
+	    if (ref($sliver) ne "GeniSliver::Node");
+
+	if ($sliver->ProcessManifest($manifest) != 0) {
+	    return -1;
+	}
+    }
+    return 0;
+}
+
+#
 # Start all the slivers in the aggregate. Start is special since it
 # sorta means reboot, and the only thing we reboot are nodes. And,
 # since we might have multiple vnodes on a pnode, we want to be efficient

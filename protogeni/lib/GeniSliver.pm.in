@@ -22,7 +22,7 @@ use GeniCertificate;
 use GeniAggregate;
 use GeniUsage;
 # Hate to import all this crap; need a utility library.
-use emutil qw(TBGetUniqueIndex);
+use emutil;
 use Experiment;
 use OSinfo;
 use Node;
@@ -503,6 +503,7 @@ use GeniCredential;
 use GeniCertificate;
 use GeniUtil;
 use Experiment;
+use emutil;
 use XML::Simple;
 use libdb qw(TBDB_ALLOCSTATE_RES_INIT_DIRTY TBDB_NODESTATE_SHUTDOWN
 	     TBResolveNextOSID);
@@ -746,6 +747,68 @@ sub UnProvision($;$)
 	}
       skip:
 	$node->Refresh();
+    }
+    else {
+	print STDERR "$node is reserved to another, not $self\n";
+	# Signal error so we can look at what happened.
+	return -1;
+    }
+    return 0;
+}
+
+#
+# Process a manifest.
+#
+sub ProcessManifest($$)
+{
+    my ($self, $manifest) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $experiment = Experiment->Lookup($self->slice_uuid());
+    if (!defined($experiment)) {
+	print STDERR "Could not map $self to its experiment\n";
+	return -1;
+    }
+    my $pid = $experiment->pid();
+    my $eid = $experiment->eid();
+    
+    my $uuid = $self->uuid();
+    return 0
+	if (!defined($uuid));
+    my $node       = Node->Lookup($uuid);
+    if (!defined($node)) {
+	print STDERR "Could not map node $uuid to its object\n";
+	return -1;
+    }
+    my $reservation = $node->Reservation();
+    if (!defined($reservation)) {
+	print STDERR "$node was already released from $self\n";
+	return -1;
+    }
+    if ($reservation->SameExperiment($experiment)) {
+	#
+	# Find the corresponding node in the manifest.
+	#
+	foreach my $ref (@{$manifest->{'node'}}) {
+	    if ($ref->{'sliver_uuid'} eq $uuid) {
+		# startup command.
+		if (exists($ref->{'startup_command'})) {
+		    my $startupcmd = $ref->{'startup_command'};
+	    
+		    if (! TBcheck_dbslot($startupcmd, "virt_nodes",
+					 "startupcmd",
+					 TBDB_CHECKDBSLOT_WARN|
+					 TBDB_CHECKDBSLOT_ERROR)) {
+			print STDERR "Invalid startup command '$startupcmd'\n";
+			return -1;
+		    }
+		    $node->Update({"startupcmd" => $startupcmd});
+		}
+		return 0;
+	    }
+	}
     }
     else {
 	print STDERR "$node is reserved to another, not $self\n";
