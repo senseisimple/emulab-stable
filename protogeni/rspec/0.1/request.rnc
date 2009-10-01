@@ -10,7 +10,7 @@
 
 default namespace = "http://www.protogeni.net/resources/rspec/0.1"
 
-include "protogeni-rspec-common.rnc"
+include "common.rnc"
 
 # The ComponentName will only be available after an assignment
 NodeContents &=

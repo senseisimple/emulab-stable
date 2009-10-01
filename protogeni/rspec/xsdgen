@@ -2,9 +2,8 @@
 
 TRANGCMD="java -jar ${TRANG:-/usr/local/share/java/classes/trang.jar}"
 
-rm -f *.xsd
-
 for path in 0.1; do
+  rm -f ${path}/*.xsd
   for schema in ad request; do
     $TRANGCMD ${path}/${schema}.rnc ${path}/${schema}.xsd
 
