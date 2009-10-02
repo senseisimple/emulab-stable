@@ -1676,9 +1676,13 @@ sub print_node_interfaces
 	my $name = $interfaces[$i];
 	my $urn = GeniHRN::GenerateInterface($OURDOMAIN, $nodeName, $name);
 	print "  <interface component_id=\"$urn\" ";
-	if (exists($interfaceroles{"$nodeName:$name"})
-	    && $interfaceroles{"$nodeName:$name"} eq "ctrl") {
-	    print "role=\"control\" ";
+	if (exists($interfaceroles{"$nodeName:$name"})) {
+	    my $roleString = $interfaceroles{"$nodeName:$name"};
+	    if ($roleString eq "ctrl") {
+		print "role=\"control\" ";
+	    } elsif ($roleString eq "expt") {
+		print "role=\"experimental\" ";
+	    }
 	}
 	if (is_public_interface("$nodeName:$name")) {
 	    my $ip = $interfaceips{"$nodeName:$name"};
