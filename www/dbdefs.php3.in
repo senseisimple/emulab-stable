@@ -717,6 +717,8 @@ if (!mysql_select_db($TBDBNAME)) {
 #
 function DBConnect($dbname)
 {
+    global $SCRIPT_NAME;
+
     $linkid = mysql_connect("localhost", basename($SCRIPT_NAME), "none", 1);
     if ($linkid) {
 	if (!mysql_select_db($dbname, $linkid)) {
