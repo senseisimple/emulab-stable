@@ -51,8 +51,8 @@
 			public function loadNode(n:Node):void {
 				node = n;
 				
-				imgAvailable.source = assignIcon(n.available);
-				imgExclusive.source = assignIcon(n.exclusive);
+				imgAvailable.source = assignIcon(n);
+				imgExclusive.source = Common.assignIcon(n.exclusive);
 				
 				linkedNodes = new ArrayCollection();
 				
@@ -99,24 +99,18 @@
        			PopUpManager.centerPopUp(rspecView);
        			rspecView.loadXml(node.rspec);
 			}
-			
-			[Bindable]
-            [Embed(source="../../images/tick.png")]
-            public var availableIcon:Class;
-
-            [Bindable]
-            [Embed(source="../../images/cross.png")]
-            public var notAvailableIcon:Class;
 
             private function assignAvailableIcon(item:Object):Class {
-                return assignIcon(item.available);
+                return assignIcon(item as Node);
             }
 
-			private function assignIcon(val:Boolean):Class {
-                if (val)
-                    return availableIcon;
+			private function assignIcon(val:Node):Class {
+				if(val.slice != null)
+					return Common.ownedIcon;
+                else if (val.available)
+                    return Common.availableIcon;
                 else
-                    return notAvailableIcon;
+                    return Common.notAvailableIcon;
             }
 		]]>
 	</mx:Script>

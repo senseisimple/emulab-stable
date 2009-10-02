@@ -39,9 +39,7 @@
         public var rspecView:XmlWindow;
 
 		[Bindable]
-		public var comHandler:ProtoGeniHandler;
-		
-		public var mapHandler:ProtoGeniMapHandler;
+		public var pgHandler:ProtoGeniHandler;
 		
 		public var main:Main;
 		
@@ -58,11 +56,7 @@
 	    	
 	    	main.setConole(console);
 
-			comHandler = new ProtoGeniHandler();
-			comHandler.main = this;
-			
-			mapHandler = new ProtoGeniMapHandler();
-			mapHandler.main = this;
+			pgHandler = new ProtoGeniHandler(this);
 			
 			chooseCMWindow = new ChooseComponentManagerWindow();
 	    	chooseCMWindow.main = this;	    	
@@ -82,7 +76,7 @@
 	    private function viewRspec():void {
 	    	PopUpManager.addPopUp(rspecView, this, false);
        		PopUpManager.centerPopUp(rspecView);
-       		rspecView.loadXml(comHandler.Rspec);
+       		rspecView.loadXml(pgHandler.rpc.Rspec);
 	    }
             
         public function refresh():void {
@@ -90,14 +84,10 @@
 	    	map.clearOverlays();
 
 	    	// Get a fresh dataset
-	    	if(comHandler.credential != null && comHandler.credential.base != null) {
-	    		comHandler.AfterCall = null;
-	    		comHandler.startResourceLookup();
-        	} else {
-	    		comHandler.AfterCall = comHandler.startResourceLookup;
-	    		comHandler.startCredential();
-	    	}
+	    	pgHandler.guarenteeCredential(pgHandler.getResourcesAndSlices);
 	    }
+	    
+	    
             
 	    //------------------------------------------
 	    // GUI

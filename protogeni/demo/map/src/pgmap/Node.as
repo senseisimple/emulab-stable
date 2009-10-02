@@ -37,6 +37,9 @@
 		public var available:Boolean;
 		public var exclusive:Boolean;
 		
+		public var slice : Slice = null;
+		public var status : String;
+		
 		[Bindable]
 		public var types:ArrayCollection = new ArrayCollection();
 		

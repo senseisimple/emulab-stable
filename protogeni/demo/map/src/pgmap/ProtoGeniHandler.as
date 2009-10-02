@@ -14,233 +14,58 @@
  
  package pgmap
 {
-	import com.mattism.http.xmlrpc.MethodFault;
-	
-	import flash.events.ErrorEvent;
-	import flash.utils.ByteArray;
-	
-	import mx.utils.Base64Decoder;
-    	
 	public class ProtoGeniHandler
 	{
-		public var op : Operation;
-		public var opName : String;
-		public var credential : Credential;
-		
 		public var main : pgmap;
 		
-		public var ComponentManagerURL:String = "https://boss.emulab.net:443/protogeni/xmlrpc/cm";
-		
-		public var Rspec:XML = null;
+		[Bindable]
+		public var rpc : ProtoGeniRpcHandler;
 		
 		[Bindable]
-		public var Components:Array = null;
+		public var map : ProtoGeniMapHandler;
 		
 		public var Nodes:NodeGroupCollection = new NodeGroupCollection();
 		public var Links:LinkGroupCollection = new LinkGroupCollection();
 		
-		public var AfterCall:Function;
+		public var slice:Slice = new Slice();
 		
-		public function ProtoGeniHandler()
+		public function ProtoGeniHandler(m:pgmap)
 		{
-			op = new Operation(null);
-			opName = null;
-			credential = null;
-			credential = new Credential();
+			rpc = new ProtoGeniRpcHandler();
+			map = new ProtoGeniMapHandler();
+			rpc.main = m;
+			map.main = m;
+			main = m;
 		}
 		
-		public function clearAll() : void
-		{
-			clearResources();
-			Components = null;
-		}
-		
-		public function clearResources() : void
+		public function clear() : void
 		{
 			Nodes = new NodeGroupCollection();
 			Links = new LinkGroupCollection();
-			Rspec = null;
 		}
 		
-		public function startCredential() : void
-	    {
-	      main.console.clear();
-	      	      
-	      opName = "Acquiring credential";
-	      main.setProgress(opName, Common.waitColor);
-	      main.startWaiting();
-	      main.console.appendText(opName);
-	      op.reset(Geni.getCredential);
-		  op.call(completeCredential, failure);
-	      addSend();
-	    }
+		public function getCredential(afterCompletion : Function):void {
+			rpc.AfterCall = afterCompletion;
+			rpc.startCredential();
+		}
+		
+		public function guarenteeCredential(afterCompletion : Function):void {
+			if(rpc.hasCredential())
+				afterCompletion();
+			else
+				getCredential(afterCompletion);
+		}
+		
+		public function getComponents(afterCompletion : Function):void {
+			rpc.AfterCall = afterCompletion;
+			rpc.startListComponents();
+		}
+		
+		public function getResourcesAndSlices():void {
+			rpc.startResourceLookup();
+		}
 	    
-		public function completeCredential(code : Number, response : Object) : void
-	    {
-	    	main.setProgress("Done", Common.successColor);
-	    	main.stopWaiting();
-	      addResponse();
-	      if (code == 0)
-	      {
-	        credential.base = String(response.value);
-	      }
-	      else
-	      {
-	        codeFailure();
-	      }
-	      
-	      postCall();
-	    }
-	    
-	    public function postCall() : void {
-	    		main.console.appendText("Seeing if there are any other method to call...\n");
-	    	if(AfterCall != null) {
-	    		main.console.appendText("Doing a post call...\n");
-	        	AfterCall();
-	        }
-	    }
-	    
-	    public function failure(event : ErrorEvent, fault : MethodFault) : void
-	    {
-	    	main.openConsole();
-	    	main.setProgress("Operation failed!", Common.failColor);
-	    	main.stopWaiting();
-	    	main.console.appendText("****fail****");
-	      if (fault != null)
-	      {
-	        main.console.appendText("\nFAILURE fault: " + opName + ": "
-	                                + fault.getFaultString());
-	      }
-	      else
-	      {
-	        main.console.appendText("\nFAILURE event: " + opName + ": "
-	                                + event.toString());
-	      }
-	      main.console.appendText("\nURL: " + op.getUrl());
-	    }
-	
-	    public function codeFailure() : void
-	    {
-	      main.console.appendText("Code Failure: " + opName);
-	    }
-	    
-	    public function addSend() : void
-	    {
-	      main.console.appendText("\n-----------------------------------------\n");
-	      main.console.appendText("SEND: " + opName + "\n");
-	      main.console.appendText("URL: " + op.getUrl() + "\n");
-	      main.console.appendText("-----------------------------------------\n\n");
-	      main.console.appendText(op.getSendXml());
-	//      clip.xmlText.scrollV = clip.xmlText.maxScrollV;
-	    }
-	    
-	    public function addResponse() : void
-	    {
-	      main.console.appendText("\n-----------------------------------------\n");
-	      main.console.appendText("RESPONSE: " + opName + "\n");
-	      main.console.appendText("-----------------------------------------\n\n");
-	      main.console.appendText(op.getResponseXml());
-	    }
-	    
-	    public function startSshLookup() : void
-	    {
-	      opName = "Acquiring SSH Keys";
-	      main.setProgress(opName, Common.waitColor);
-	      main.startWaiting();
-	      main.console.appendText(opName);
-	      op.reset(Geni.getKeys);
-	      op.addField("credential", credential.base);
-	      op.call(completeSshLookup, failure);
-	      addSend();
-	    }
-	
-	    public function completeSshLookup(code : Number, response : Object) : void
-	    {
-	    	main.setProgress("Done", Common.successColor);
-	    	main.stopWaiting();
-	      addResponse();
-	      if (code == 0)
-	      {
-	        credential.ssh = response.value;
-	      }
-	      else
-	      {
-	        codeFailure();
-	      }
-	      postCall();
-	    }
-	    
-	    public function startResourceLookup() : void
-	    {
-	      clearResources();
-	    
-	      opName = "Looking up resources";
-	      main.setProgress(opName, Common.waitColor);
-	      main.startWaiting();
-	      main.console.appendText(opName + "...\n");
-	      op.reset(Geni.discoverResources);
-	      op.addField("credential", credential.base);
-	      op.addField("compress", true);
-	      op.setUrl(ComponentManagerURL);
-	      op.call(completeResourceLookup, failure);
-	    }
-	
-	    public function completeResourceLookup(code : Number, response : Object) : void
-	    {
-	    	main.setProgress("Done", Common.successColor);
-	    	main.stopWaiting();
-	    	main.console.appendText("Resource lookup complete...\n");
-
-	      if (code == 0)
-	      {
-	      	var x:Base64Decoder = new Base64Decoder();
-	      	x.decode(response.value);
-	      	var s:ByteArray = x.toByteArray();
-	      	s.uncompress();
-	      	var s2:String = s.toString();
-	        Rspec = new XML(s2);
-	        
-	        processRspec();
-	      }
-	      else
-	      {
-	        codeFailure();
-	        main.console.appendText(op.getResponseXml());
-	      }
-	      postCall();
-	    }
-	    
-	    public function startListComponents() : void
-	    {
-	      opName = "Looking up components";
-	      main.setProgress(opName, Common.waitColor);
-	      main.startWaiting();
-	      main.console.appendText(opName + "...\n");
-	      op.reset(Geni.listComponents);
-	      op.addField("credential", credential.base);
-	      op.setUrl("https://boss.emulab.net:443/protogeni/xmlrpc/ch");
-	      op.call(completeListComponents, failure);
-	    }
-	    
-	    public function completeListComponents(code : Number, response : Object) : void
-	    {
-	    	main.setProgress("Done", Common.successColor);
-	    	main.stopWaiting();
-	    	main.console.appendText("List Components complete...\n");
-	      if (code == 0)
-	      {
-	      	Components = response.value;
-	      	main.console.appendText(op.getResponseXml());
-	      }
-	      else
-	      {
-	        codeFailure();
-	        main.console.appendText(op.getResponseXml());
-	      }
-	      postCall();
-	    }
-	    
-	    private function processRspec():void {
+	    public function processRspec(afterCompletion : Function):void {
 	    	namespace rsync01namespace = "http://www.protogeni.net/resources/rspec/0.1"; 
 	        use namespace rsync01namespace; 
 	        
@@ -248,7 +73,7 @@
 	        main.console.appendText("Processing RSPEC...\n");
 	        
 	        // Process nodes
-	        var locations:XMLList = Rspec.node.location;
+	        var locations:XMLList = rpc.Rspec.node.location;
 	        main.console.appendText("Detected " + locations.length().toString() + " nodes with location info...\n");
 	        
 	        // Process nodes, combining same locations
@@ -269,8 +94,8 @@
 	        	var p:XML = location.parent();
 	        	n.name = p.@component_name;
 	        	n.uuid = p.@component_uuid;
-	        	n.available = Boolean(p.available);
-	        	n.exclusive = Boolean(p.exclusive);
+	        	n.available = p.available == "true";
+	        	n.exclusive = p.exclusive == "true";
 	        	n.manager = p.@component_manager_uuid;
 	        	
 	        	for each(var ix:XML in p.children()) {
@@ -293,7 +118,7 @@
 	        }
 	        
 	        // Process links
-	        var links:XMLList = Rspec.link;
+	        var links:XMLList = rpc.Rspec.link;
 	        for each(var link:XML in links) {
 	        	var interfaces:XMLList = link.interface_ref;
 	        	// 1
@@ -337,8 +162,15 @@
 	        main.console.appendText("Found " + Links.collection.length + " visible links\n");
 	        
 			main.console.appendText("Detected " + links.length().toString() + " Links...\n");
-	
-			main.mapHandler.drawMap();
+			
+			if(afterCompletion != null)
+				afterCompletion();
+	    }
+	    
+	    public function addSliceNode(urn:String):void {
+	    	var n : Node = Nodes.GetByUUID(urn);
+	    	if(n != null)
+	    		n.slice = slice;
 	    }
 	}
 }

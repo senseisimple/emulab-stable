@@ -17,7 +17,7 @@
 			public var main:pgmap;
 			
 			public function success():void {
-				main.comHandler.ComponentManagerURL = listManagers.selectedItem.url;
+				main.pgHandler.rpc.ComponentManagerURL = listManagers.selectedItem.url;
             	main.refresh();
 				close();
 			}
@@ -29,44 +29,29 @@
 			public function open():void {
 				PopUpManager.addPopUp(this, main, true);
        			PopUpManager.centerPopUp(this);
-       			if(main.comHandler.Components == null || main.comHandler.Components.length == 0) {
+       			if(main.pgHandler.rpc.Components == null || main.pgHandler.rpc.Components.length == 0) {
        				startRefreshList();
        			} else
        				okButton.enabled = true;
-       			
-				//urlInput.text = main.comHandler.ComponentManagerURL;
 			}
 			
 			public function startRefreshList():void {
-				//progressLabel.text = "Updating list...";
-				//waitingIcon.visible = true;
-				if(main.comHandler.credential == null || main.comHandler.credential.base == null) {
-				main.console.appendText("Getting credential...\n");
-					main.comHandler.AfterCall = afterCredential;
-					main.comHandler.startCredential();
-				} else
-					afterCredential();
-				
+				main.pgHandler.guarenteeCredential( getComponents );	
 			}
 			
-			public function afterCredential():void {
-				main.console.appendText("After credential...\n");
-				main.comHandler.AfterCall = refreshList;
-				main.comHandler.startListComponents();
+			public function getComponents():void {
+				main.pgHandler.getComponents( refreshList );
 			}
 			
 			public function refreshList():void {
-				main.comHandler.AfterCall = null;
 				okButton.enabled = true;
-				//progressLabel.text = "List updated";
-				//waitingIcon.visible = false;
 			}
 		]]>
 	</mx:Script>
 	
 	<mx:HBox width="100%" verticalAlign="middle">
 	<mx:Button id="refreshButton" label="Refresh" icon="@Embed('../images/arrow_refresh.png')"/>
-	<mx:ComboBox editable="false" width="100%" id="listManagers" dataProvider="{main.comHandler.Components}" labelField="hrn"></mx:ComboBox>
+	<mx:ComboBox editable="false" width="100%" id="listManagers" dataProvider="{main.pgHandler.rpc.Components}" labelField="hrn"></mx:ComboBox>
 	</mx:HBox>
 	<mx:HBox width="100%" horizontalAlign="right">
 	<mx:Label id="progressLabel"  fontStyle="normal" fontWeight="bold"/>

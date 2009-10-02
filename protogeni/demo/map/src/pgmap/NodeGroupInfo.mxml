@@ -74,6 +74,6 @@
 			</mx:GridItem>
 		</mx:GridRow>
 	</mx:Grid>
-	<mx:Button label="More Info" click="main.mapHandler.viewNodeGroup(group)"/>
+	<mx:Button label="More Info" click="main.pgHandler.map.viewNodeGroup(group)"/>
 	
 </mx:VBox>

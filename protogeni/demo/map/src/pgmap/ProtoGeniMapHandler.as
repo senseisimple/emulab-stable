@@ -60,7 +60,6 @@ package pgmap
 			        }
 			      });
 			        	
-			          
 			  geocoder.addEventListener(GeocodingEvent.GEOCODING_FAILURE,
 			        function(event:GeocodingEvent):void {
 			          //Alert.show("Geocoding failed");
@@ -100,7 +99,7 @@ package pgmap
 			var t:TooltipOverlay = new TooltipOverlay(ll, Common.kbsToString(lg.TotalBandwidth()));
 	  		t.addEventListener(MouseEvent.CLICK, function(e:Event):void {
 	            e.stopImmediatePropagation();
-	            main.mapHandler.viewLinkGroup(lg)
+	            main.pgHandler.map.viewLinkGroup(lg)
 	        });
 	        
 	  		main.map.addOverlay(t);
@@ -111,11 +110,11 @@ package pgmap
 	    	
 	    	main.setProgress("Drawing map",Common.waitColor);
 	    	
-	    	for each(var g:NodeGroup in main.comHandler.Nodes.collection) {
+	    	for each(var g:NodeGroup in main.pgHandler.Nodes.collection) {
 	        	addMarker(g);
 	        }
 	        
-	        for each(var l:LinkGroup in main.comHandler.Links.collection) {
+	        for each(var l:LinkGroup in main.pgHandler.Links.collection) {
 	        	if(!l.IsSameSite()) {
 	        		addLink(l);
 	        	}
