@@ -51,6 +51,8 @@
 		
 		[Bindable]
 		public var types:ArrayCollection = new ArrayCollection();
+		
+		public var slice : Slice = null;
 
 		public var rspec:XML;
 		

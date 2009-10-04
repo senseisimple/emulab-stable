@@ -5,7 +5,7 @@
 	borderAlpha=".9" borderColor="#D2E1F0" width="400"
 	defaultButton="{okButton}"
 	close="close()"
-	creationComplete="okButton.setFocus()">
+	creationComplete="okButton.setFocus()" xmlns:ns1="pgmap.*">
 	
 	<mx:Script>
 		<![CDATA[
@@ -50,8 +50,9 @@
 	</mx:Script>
 	
 	<mx:HBox width="100%" verticalAlign="middle">
-	<mx:Button id="refreshButton" label="Refresh" icon="@Embed('../images/arrow_refresh.png')"/>
+	<ns1:ImageButton id="refreshButton" source="@Embed('../images/arrow_refresh.png')" click="startRefreshList()"/>
 	<mx:ComboBox editable="false" width="100%" id="listManagers" dataProvider="{main.pgHandler.rpc.Components}" labelField="hrn"></mx:ComboBox>
+	<mx:CheckBox label="Compress when available" selected="{main.pgHandler.rpc.useCompression}" />
 	</mx:HBox>
 	<mx:HBox width="100%" horizontalAlign="right">
 	<mx:Label id="progressLabel"  fontStyle="normal" fontWeight="bold"/>

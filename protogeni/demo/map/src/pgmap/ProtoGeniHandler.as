@@ -62,6 +62,7 @@
 		}
 		
 		public function getResourcesAndSlices():void {
+			clear();
 			rpc.startResourceLookup();
 		}
 	    

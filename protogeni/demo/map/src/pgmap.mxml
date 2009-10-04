@@ -4,7 +4,7 @@
 	xmlns:pgmap="pgmap.*"
 	layout="vertical" paddingRight="0" paddingLeft="0" paddingTop="0" paddingBottom="0"
 	backgroundColor="#D2E1F0"
-    preinitialize="Security.allowInsecureDomain('maps.googleapis.com');"
+    preinitialize="preinit()"
 	creationComplete="init();">
 	
 	<mx:Script>
@@ -47,6 +47,10 @@
 	    // Variables needed
 	    private var chooseCMWindow:ChooseComponentManagerWindow;
 	    
+	    private function preinit():void {
+	    	Security.allowInsecureDomain('maps.googleapis.com');
+	    }
+	    
 	    // Start out by asking the user for the CM URL
 	    private function init():void {
 	    	
@@ -87,7 +91,9 @@
 	    	pgHandler.guarenteeCredential(pgHandler.getResourcesAndSlices);
 	    }
 	    
-	    
+	    private function viewInformation():void {
+	    	Alert.show("Current Google Maps API Key is\n"+map.key);
+	    }
             
 	    //------------------------------------------
 	    // GUI
@@ -114,7 +120,24 @@
 	          myMapOptions.zoom = 4;
 	          myMapOptions.center = new LatLng(38,-97);
 	          myMapOptions.mapType = MapType.NORMAL_MAP_TYPE;
-	          this.map.setInitOptions(myMapOptions);
+	          map.setInitOptions(myMapOptions);
+	    }
+	    
+	    private function mappreinit():void {
+	    	// Set correct key
+	          var url : String = mx.core.Application.application.url;
+	          if(url.indexOf("https://users.emulab.net") > -1)
+	          	map.key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hRvSZn5G9iDjkMHpAGYHc8v1OnErBT5Vzf3wT7WhxaP7ouXIub2R00Wxg";
+	          else if(url.indexOf("http://users.emulab.net") > -1)
+	          	map.key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hRQhQD93Qa0bULV_1nZL9DPKN6w4xSZvcNEsTI1o7vjS_yayjPwrn1FOw";
+	          else if(url.indexOf("http://boss.emulab.net") > -1)
+	          	map.key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hT-JTA_kdlWCi1B9UqMb6PoH1IjshRNCq_RwaKn0XBDiQgigKEreNFnfw";
+	          else if(url.indexOf("https://boss.emulab.net") > -1)
+	          	map.key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hTJAI3wyjNM51iUcfoH5qR3p3QFHBQ_Ukk2jOVwrIST7TsKH0dxYswnyg";
+	          else if(url.indexOf("http://www.protogeni.net") > -1)
+	          	map.key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hTfdIoaYgi7tOvtC9dvhWwYlnAj4hTW5IpetuD9FvaEH3LDmTpL2Vs__w";
+	          else if(url.indexOf("https://www.protogeni.net") > -1)
+	          	map.key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hRNcqKgyvlELbhgjE5kl-gFNsMkyxTLoim3vJsPX9zTdq5dy1yGCfLGqw";
 	    }
 	        
 	    private function onMapReady(event:Event):void {
@@ -167,17 +190,24 @@
 			source="@Embed('../images/page_white_code.png')"
 			click="viewRspec()" 
 			toolTip="View the most recent RSpec"/>
+		<mx:VRule height="14"/>
+		<mx:ComboBox id="slicesCombobox"></mx:ComboBox>
+		<mx:CheckBox label="Only my resources" id="onlyMyResourcesCheckbox"/>
 		<mx:Spacer width="100%"/>
 		<mx:Label text="Initialized" id="progressLabel"  fontStyle="normal" fontWeight="bold"/>
 		<mx:SWFLoader id="waitingIcon" source="@Embed('../images/waiting.swf')" visible="false"/> 
 		<mx:Spacer width="100%"/>
+		<pgmap:ImageButton id="infoButton"
+			source="@Embed('../images/information.png')"
+			click="viewInformation()"
+			toolTip="View more information" />
 		<pgmap:ImageButton id="fullscreenButton"
 			source="@Embed('../images/arrow_out.png')"
 			click="toggleFullScreen()"
 			toolTip="Toggle fullscreen" />
 	</mx:ApplicationControlBar>
 
-	<maps:Map height="100%" width="100%" id="map"
+	<maps:Map height="100%" width="100%" id="map" preinitialize="mappreinit()"
 		mapevent_mappreinitialize="onMapPreinitialize(event)"
 		mapevent_mapready="onMapReady(event)"
 		key="ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hRvSZn5G9iDjkMHpAGYHc8v1OnErBT5Vzf3wT7WhxaP7ouXIub2R00Wxg"/>

@@ -1,5 +1,7 @@
 package pgmap
 {
+	import mx.core.Application;
+	
 	public class Common
 	{
 		public static var successColor:String = "#0E8219";
@@ -35,6 +37,10 @@ package pgmap
 				return bandwidth / 1000000 + " Gb\\s"
 			}
 			return bw;
+		}
+		
+		public static function Main():pgmap {
+			return mx.core.Application.application as pgmap;
 		}
 	}
 }
