@@ -32,9 +32,7 @@
       </xs:simpleType>
     </xs:attribute>
     <xs:attributeGroup ref="rspec:VirtualName"/>
-    <xs:attribute name="component_manager_uuid"/>
-    <xs:attribute name="component_name"/>
-    <xs:attribute name="component_uuid"/>
+    <xs:attributeGroup ref="rspec:ComponentName"/>
     <xs:attribute name="colocate"/>
     <xs:attribute name="virtualization_subtype"/>
     <xs:attribute name="exclusive"/>
@@ -130,15 +128,18 @@
     <xs:attribute name="virtual_id" use="required"/>
   </xs:attributeGroup>
   <xs:attributeGroup name="ComponentName">
-    <xs:attribute name="component_manager_uuid" use="required"/>
+    <xs:attribute name="component_manager_uuid"/>
+    <xs:attribute name="component_manager_urn"/>
     <xs:attribute name="component_name"/>
-    <xs:attribute name="component_uuid" use="required"/>
+    <xs:attribute name="component_uuid"/>
+    <xs:attribute name="component_urn"/>
   </xs:attributeGroup>
   <xs:attributeGroup name="ComponentInterfaceDeclName">
     <xs:attribute name="component_id" use="required"/>
   </xs:attributeGroup>
   <xs:attributeGroup name="ComponentInterfaceRefName">
-    <xs:attribute name="component_node_uuid" use="required"/>
+    <xs:attribute name="component_node_uuid"/>
+    <xs:attribute name="component_node_urn"/>
     <xs:attribute name="component_interface_id" use="required"/>
   </xs:attributeGroup>
   <xs:attributeGroup name="InterfaceDecl">

@@ -44,6 +44,7 @@
       <xs:element name="interface_ref">
         <xs:complexType>
           <xs:attribute name="component_node_uuid"/>
+          <xs:attribute name="component_node_urn"/>
           <xs:attribute name="component_interface_id"/>
           <xs:attribute name="virtual_node_id"/>
           <xs:attribute name="virtual_interface_id"/>

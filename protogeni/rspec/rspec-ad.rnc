@@ -56,7 +56,8 @@ InterfaceRef &=
 # length restrictions on URNs end.
 ExternalReference = element external_ref {
   ComponentInterfaceRefName &
-  attribute component_manager_uuid { text }
+  attribute component_manager_uuid { text }? &
+  attribute component_manager_urn { text }?
 }
 
 RSpecContents &=

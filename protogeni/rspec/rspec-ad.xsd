@@ -21,7 +21,8 @@
   <xs:element name="external_ref">
     <xs:complexType>
       <xs:attributeGroup ref="rspec:ComponentInterfaceRefName"/>
-      <xs:attribute name="component_manager_uuid" use="required"/>
+      <xs:attribute name="component_manager_uuid"/>
+      <xs:attribute name="component_manager_urn"/>
     </xs:complexType>
   </xs:element>
   <xs:element name="bgp_prefix">
