@@ -14,6 +14,8 @@
  
  package pgmap
 {
+	import mx.collections.ArrayCollection;
+	
 	public class ProtoGeniHandler
 	{
 		public var main : pgmap;
@@ -24,10 +26,12 @@
 		[Bindable]
 		public var map : ProtoGeniMapHandler;
 		
+		public var CurrentUser:User = new User();
+		
 		public var Nodes:NodeGroupCollection = new NodeGroupCollection();
 		public var Links:LinkGroupCollection = new LinkGroupCollection();
 		
-		public var slice:Slice = new Slice();
+		public var Slices:ArrayCollection = new ArrayCollection();
 		
 		public function ProtoGeniHandler(m:pgmap)
 		{
@@ -42,6 +46,7 @@
 		{
 			Nodes = new NodeGroupCollection();
 			Links = new LinkGroupCollection();
+			Slices = new ArrayCollection();
 		}
 		
 		public function getCredential(afterCompletion : Function):void {
@@ -50,7 +55,7 @@
 		}
 		
 		public function guarenteeCredential(afterCompletion : Function):void {
-			if(rpc.hasCredential())
+			if(CurrentUser.credential != null)
 				afterCompletion();
 			else
 				getCredential(afterCompletion);
@@ -168,10 +173,12 @@
 				afterCompletion();
 	    }
 	    
-	    public function addSliceNode(urn:String):void {
+	    public function addSliceNode(urn:String, status:String, sl:Slice):void {
 	    	var n : Node = Nodes.GetByUUID(urn);
-	    	if(n != null)
-	    		n.slice = slice;
+	    	if(n != null) {
+	    		n.slice = sl;
+	    		n.status = Common.firstToUpper(status);
+	    	}
 	    }
 	}
 }

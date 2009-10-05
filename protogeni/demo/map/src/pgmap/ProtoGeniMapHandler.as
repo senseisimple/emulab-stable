@@ -64,7 +64,8 @@ package pgmap
 			        function(event:GeocodingEvent):void {
 			          //Alert.show("Geocoding failed");
 			        });
-			  geocoder.reverseGeocode(new LatLng(g.latitude, g.longitude));
+
+			  //geocoder.reverseGeocode(new LatLng(g.latitude, g.longitude));
 	        
 	        m.addEventListener(MapMouseEvent.CLICK, function(e:Event):void {
 	            m.openInfoWindow(

@@ -4,7 +4,7 @@
 	xmlns:pgmap="pgmap.*"
 	layout="vertical" paddingRight="0" paddingLeft="0" paddingTop="0" paddingBottom="0"
 	backgroundColor="#D2E1F0"
-    preinitialize="preinit()"
+    preinitialize="preinit();"
 	creationComplete="init();">
 	
 	<mx:Script>
@@ -48,7 +48,8 @@
 	    private var chooseCMWindow:ChooseComponentManagerWindow;
 	    
 	    private function preinit():void {
-	    	Security.allowInsecureDomain('maps.googleapis.com');
+	    	Security.allowDomain("*");
+	    	Security.allowInsecureDomain("*");
 	    }
 	    
 	    // Start out by asking the user for the CM URL

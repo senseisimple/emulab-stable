@@ -38,7 +38,9 @@
 		public var exclusive:Boolean;
 		
 		public var slice : Slice = null;
-		public var status : String;
+		
+		[Bindable]
+		public var status : String = "N/A";
 		
 		[Bindable]
 		public var types:ArrayCollection = new ArrayCollection();
@@ -61,6 +63,21 @@
 			for each(var i:NodeInterface in interfaces.collection) {
 				for each(var l:Link in i.links) {
 					ac.addItem(l);
+				}
+			}
+			return ac;
+		}
+		
+		public function GetNodes():ArrayCollection {
+			var ac:ArrayCollection = new ArrayCollection();
+			for each(var i:NodeInterface in interfaces.collection) {
+				for each(var l:Link in i.links) {
+					if(l.interface1.owner != this && !ac.contains(l.interface1.owner)) {
+						ac.addItem(l.interface1.owner);
+					}
+					if(l.interface2.owner != this && !ac.contains(l.interface2.owner)) {
+						ac.addItem(l.interface2.owner);
+					}
 				}
 			}
 			return ac;
