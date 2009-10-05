@@ -151,6 +151,7 @@
       <xs:simpleType>
         <xs:restriction base="xs:token">
           <xs:enumeration value="control"/>
+          <xs:enumeration value="experimental"/>
         </xs:restriction>
       </xs:simpleType>
     </xs:attribute>
