@@ -4412,14 +4412,15 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp, char* nodekey)
 	 * the nodeid.
 	 */ 
 	if ((nodekey != NULL) && (strlen(nodekey) > 1)) {
-		res = mydb_query("SELECT t.class,t.type,n.node_id,n.jailflag,"
-				 " r.pid,r.eid,r.vname,e.gid,e.testdb, "
-				 " n.update_accounts,n.role, "
-				 " e.expt_head_uid,e.expt_swap_uid, "
+		res = mydb_query("SELECT t.class,t.type,n.node_id,"
+				 " n.jailflag,r.pid,r.eid,r.vname, "
+				 " e.gid,e.testdb,n.update_accounts, "
+				 " n.role,e.expt_head_uid,e.expt_swap_uid, "
 				 " e.sync_server,t.class,t.type, "
 				 " t.isremotenode,t.issubnode,e.keyhash, "
 				 " nk.sfshostid,e.eventkey,0, "
-				 " 0,e.elab_in_elab,e.elabinelab_singlenet, "
+				 " 0, "
+				 " e.elab_in_elab,e.elabinelab_singlenet, "
 				 " e.idx,e.creator_idx,e.swapper_idx, "
 				 " u.admin,dedicated_wa_types.attrvalue "
 				 "   AS isdedicated_wa, "
