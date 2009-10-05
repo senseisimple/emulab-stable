@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004, 2008 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2009 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -94,6 +94,7 @@ static int	dotcp(char *, int, struct in_addr);
 static int	dounix(char *, int, char *);
 static void	beproxy(char *, struct in_addr, char *);
 static int	dooutput(int, char *, int);
+static int	rewritecommand(char *, char *, char **);
 
 char *usagestr = 
  "usage: tmcc [options] <command>\n"
@@ -111,8 +112,6 @@ char *usagestr =
  " -f datafile     Extra stuff to send to tmcd (tcp mode only)\n"
  " -i              Do not use SSL protocol\n"
  "\n";
-
-static int rewritecommand(char *, char *, char **);
 
 void
 usage()
@@ -606,8 +605,9 @@ dotcp(char *data, int outfd, struct in_addr serverip)
 static int
 doudp(char *data, int outfd, struct in_addr serverip, int portnum)
 {
-	int			sock, length, n, cc;
+	int			sock, n, cc;
 	struct sockaddr_in	name, client;
+	socklen_t		length;
 	char			buf[MYBUFSIZE];
 
 	/* Create socket from which to read. */
@@ -755,8 +755,9 @@ beproxy(char *localpath, struct in_addr serverip, char *partial)
 	fprintf(stderr, "proxy mode not supported on this platform!\n");
 	exit(-1);
 #else
-	int			sock, newsock, cc, length;
+	int			sock, newsock, cc;
 	struct sockaddr_un	sunaddr, client;
+	socklen_t		length;
 	char			command[MAXTMCDPACKET], buf[MAXTMCDPACKET];
 	char			*bp, *cp;
 	

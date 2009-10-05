@@ -715,7 +715,8 @@ static int
 makesockets(int portnum, int *udpsockp, int *tcpsockp)
 {
 	struct sockaddr_in	name;
-	int			length, i, udpsock, tcpsock;
+	socklen_t		length;
+	int			i, udpsock, tcpsock;
 
 	/*
 	 * Setup TCP socket for incoming connections.
@@ -797,7 +798,8 @@ udpserver(int sock, int portnum)
 {
 	char			buf[MYBUFSIZE];
 	struct sockaddr_in	client;
-	int			length, cc;
+	socklen_t		length;
+	int			cc;
 	unsigned int		nreq = 0;
 	
 	info("udpserver starting: pid=%d sock=%d portnum=%d\n",
@@ -858,7 +860,8 @@ tcpserver(int sock, int portnum)
 {
 	char			buf[MAXTMCDPACKET];
 	struct sockaddr_in	client;
-	int			length, cc, newsock;
+	socklen_t		length;
+	int			cc, newsock;
 	unsigned int		nreq = 0;
 	struct timeval		tv;
 	
@@ -3550,7 +3553,7 @@ COMMAND_PROTOTYPE(dosfshostid)
 	 * Dig out the hostid. Need to be careful about not overflowing
 	 * the buffer.
 	 */
-	sprintf(buf, "%%%ds", sizeof(nodehostid));
+	sprintf(buf, "%%%ds", (int)sizeof(nodehostid));
 	if (sscanf(rdata, buf, nodehostid) != 1) {
 		error("dosfshostid: No hostid reported!\n");
 		return 1;
@@ -4988,7 +4991,7 @@ COMMAND_PROTOTYPE(doipodinfo)
 	}
 	close(fd);
 
-	bp = hashbuf;
+	bp = (char *)hashbuf;
 	for (i = 0; i < sizeof(randdata); i++) {
 		bp += sprintf(bp, "%02x", randdata[i]);
 	}
@@ -7573,7 +7576,7 @@ COMMAND_PROTOTYPE(doportregister)
 	 * Dig out the service and the port number.
 	 * Need to be careful about not overflowing the buffer.
 	 */
-	sprintf(buf, "%%%ds %%d", sizeof(service));
+	sprintf(buf, "%%%ds %%d", (int)sizeof(service));
 	rc = sscanf(rdata, buf, service, &port);
 
 	if (rc == 0) {
