@@ -87,13 +87,11 @@ package com.mattism.http.xmlrpc
             var TypeNode:XML;
 
             if (parameter is String)
-            {
               parameter = {value:parameter};
-            }
+            else if(parameter is Boolean)
+             parameter = {value:parameter};
             else if (parameter && parameter.value == null)
-            {
-              parameter = {value:parameter};
-            }
+             parameter = {value:parameter};
 
             if ( typeof parameter == "object")
             {
@@ -104,6 +102,8 @@ package com.mattism.http.xmlrpc
                   parameter.type=XMLRPCDataTypes.ARRAY;
                 else if ( v is String )
                   parameter.type=XMLRPCDataTypes.STRING;
+                else if ( v is Boolean )
+                  parameter.type=XMLRPCDataTypes.BOOLEAN;
                 else if ( v is Object )
                   parameter.type=XMLRPCDataTypes.STRUCT;
                 else
