@@ -3156,9 +3156,9 @@ CREATE TABLE `switch_paths` (
   `node_id2` varchar(32) default NULL
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
----
---- Table structure for table `openvpn_config`
----
+--
+-- Table structure for table `openvpn_config`
+--
 
 DROP TABLE IF EXISTS `sw_configfiles`;
 CREATE TABLE `sw_configfiles` (
