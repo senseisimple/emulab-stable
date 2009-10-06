@@ -8,7 +8,7 @@
  * XML Parser for RSpec ptop files
  */
 
-static const char rcsid[] = "$Id: parse_request_rspec.cc,v 1.12 2009-07-20 15:36:21 gtw Exp $";
+static const char rcsid[] = "$Id: parse_request_rspec.cc,v 1.13 2009-10-06 23:53:11 duerig Exp $";
 
 #ifdef WITH_XML
 
@@ -537,7 +537,11 @@ bool populate_links_rspec(DOMElement *root, tb_vgraph &vg) {
 		DOMElement *type_tag = dynamic_cast<DOMElement*>(type->item(0));
 		XStr link_type(type_tag->getAttribute(XStr("type_name").x()));
                 */
-		XStr link_type(elt->getAttribute(XStr("link_type").x()));
+		string str_link_type(XStr(elt->getAttribute(XStr("link_type").x())).c());
+                if (str_link_type == "")
+                {
+                  str_link_type = "ethernet";
+                }
 		
 		
 		/* ------------------- vtop stuff goes here --------------------------- */
@@ -593,8 +597,8 @@ bool populate_links_rspec(DOMElement *root, tb_vgraph &vg) {
 		{
 			src_vnode->num_links++;
 			dst_vnode->num_links++;
-			src_vnode->link_counts[link_type.c()]++;
-			dst_vnode->link_counts[link_type.c()]++;
+			src_vnode->link_counts[str_link_type.c_str()]++;
+			dst_vnode->link_counts[str_link_type.c_str()]++;
 		}
 
 		/*
@@ -605,7 +609,7 @@ bool populate_links_rspec(DOMElement *root, tb_vgraph &vg) {
 		tb_vlink *virt_link = new tb_vlink();
 		
 		virt_link-> name = str_virtual_uuid;
-		virt_link-> type = link_type.f();
+		virt_link-> type = fstring(str_link_type.c_str());
 
 		virt_link-> fix_src_iface = fix_src_iface;
 		virt_link-> src_iface = (fixed_src_iface);//.f();

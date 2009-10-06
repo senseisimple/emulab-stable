@@ -206,7 +206,7 @@ interface_spec parse_interface_rspec_xml(const DOMElement *tag)
 		{	
 			string(XStr(tag->getAttribute(XStr("virtual_node_id").x())).c()),
 			string(XStr(tag->getAttribute(XStr("virtual_interface_id").x())).c()),
-			string(XStr(tag->getAttribute(XStr("component_node_uuid").x())).c()),
+                        string(XStr(find_urn(tag, "component_node"))),
 			string(XStr(tag->getAttribute(XStr("component_interface_id").x())).c())		
 		};
     return rv;
@@ -214,21 +214,37 @@ interface_spec parse_interface_rspec_xml(const DOMElement *tag)
 
 component_spec parse_component_spec (const DOMElement *elt) {
 	component_spec rv = {string(""), string(""), string(""), string("")};
-	rv.component_manager_uuid = string (XStr(elt->getAttribute(XStr("component_manager_uuid").x())).c());
+	rv.component_manager_uuid = string(XStr(find_urn(elt, "component_manager")));
 	if (elt->hasAttribute(XStr("component_name").x()))
 		rv.component_name = string (XStr(elt->getAttribute(XStr("component_name").x())).c());
-	rv.component_uuid = string (XStr(elt->getAttribute(XStr("component_uuid").x())).c());
+	rv.component_uuid = string(XStr(find_urn(elt, "component")));
 	if (elt->hasAttribute(XStr("sliver_uuid").x()))
 		rv.sliver_uuid = string (XStr(elt->getAttribute(XStr("sliver_uuid").x())).c());
 	return rv;
 }
 
+XMLCh const * find_urn(const xercesc::DOMElement* element,
+                       string const & prefix)
+{
+  string uuid = prefix + "_uuid";
+  string urn = prefix + "_urn";
+  if (element->hasAttribute(XStr(uuid.c_str()).x()))
+  {
+    return element->getAttribute(XStr(uuid.c_str()).x());
+  }
+  else //if (element->hasAttribute(XStr(urn.c_str()).x()))
+  {
+    return element->getAttribute(XStr(urn.c_str()).x());
+  }
+}
+
 // Check if the component spec is present. We check if the aggregate UUID and the component UUID are both present
 bool hasComponentSpec (DOMElement* elt)
 {
-	if (elt->hasAttribute(XStr("component_manager_uuid").x()) && elt->hasAttribute(XStr("component_uuid").x()))
-		return true;
-	return false;
+  return ((elt->hasAttribute(XStr("component_manager_uuid").x())
+           || elt->hasAttribute(XStr("component_manager_urn").x()))
+          && (elt->hasAttribute(XStr("component_uuid").x())
+              || elt->hasAttribute(XStr("component_urn").x())));
 }
 
 #endif

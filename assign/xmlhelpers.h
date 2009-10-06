@@ -115,6 +115,13 @@ typedef struct interface_spec
 interface_spec parse_interface_rspec_xml (const xercesc::DOMElement* element);
 
 /*
+ * Get the _uuid or _urn attribute value based on the prefix. If neither
+ * exists, return the empty string.
+ */
+XMLCh const * find_urn(xercesc::DOMElement const * element,
+                       std::string const & prefix);
+
+/*
  * Check if the component spec is present. We check if the aggregate UUID and the component UUID are both present
  */
 bool hasComponentSpec (xercesc::DOMElement* elt);

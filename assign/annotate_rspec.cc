@@ -4,7 +4,7 @@
  * All rights reserved.
  */
 
-static const char rcsid[] = "$Id: annotate_rspec.cc,v 1.5 2009-07-20 15:36:21 gtw Exp $";
+static const char rcsid[] = "$Id: annotate_rspec.cc,v 1.6 2009-10-06 23:53:10 duerig Exp $";
 
 #ifdef WITH_XML
 
@@ -133,12 +133,15 @@ DOMElement* annotate_rspec::create_component_hop (const DOMElement* plink, DOMEl
 	{
 		// Find the destination of the previous component hop
 		DOMElement* prev_hop_dst_iface = dynamic_cast<DOMElement*>((prev_component_hop->getElementsByTagName(XStr("interface_ref").x()))->item(1));
-		XStr prev_hop_dst_uuid (prev_hop_dst_iface->getAttribute(XStr("component_node_uuid").x()));
+		XStr prev_hop_dst_uuid (find_urn(prev_hop_dst_iface,
+                                                 "component_node"));
 		
 		// We need to do this because in advertisements, all links are from nodes to switches
 		// and we need to reverse this order for the last hop of a multi-hop path
 		// This is slightly more expensive, but definitely more robust than checking based on whether a destination interface was specified
-		if (strcmp(prev_hop_dst_uuid.c(), XStr(plink_dst_iface->getAttribute(XStr("component_node_uuid").x())).c()) == 0)
+		if (strcmp(prev_hop_dst_uuid.c(),
+                           XStr(find_urn(plink_dst_iface,
+                                         "component_node")).c()) == 0)
 		{
 			plink_src_iface_clone = dynamic_cast<DOMElement*>(doc->importNode(dynamic_cast<DOMNode*>(plink_dst_iface), true));
 			plink_dst_iface_clone = dynamic_cast<DOMElement*>(doc->importNode(dynamic_cast<DOMNode*>(plink_src_iface), true));
@@ -170,9 +173,14 @@ void annotate_rspec::annotate_interface (const DOMElement* plink, DOMElement* vl
 	// Get the virtual_id on the end points of the interface
 	XStr vlink_iface_virtual_id (vlink_iface->getAttribute(XStr("virtual_node_id").x()));
 	DOMElement* vnode = getElementByAttributeValue(this->virtual_root, "node", "virtual_id", vlink_iface_virtual_id.c());
-	XStr node_component_uuid (vnode->getAttribute(XStr("component_uuid").x()));
+	XStr node_component_uuid (find_urn(vnode, "component"));
+//        XStr node_component_uuid (vnode->getAttribute(XStr("component_uuid").x()));
 	
 	DOMElement* p_iface = getElementByAttributeValue(plink, "interface_ref", "component_node_uuid", node_component_uuid.c());
+        if (p_iface == NULL)
+        {
+          p_iface = getElementByAttributeValue(plink, "interface_ref", "component_node_urn", node_component_uuid.c());
+        }
 
 	vlink_iface->setAttribute(XStr("component_node_uuid").x(), p_iface->getAttribute(XStr("component_node_uuid").x()));
 	vlink_iface->setAttribute(XStr("component_interface_id").x(), p_iface->getAttribute(XStr("component_interface_id").x()));
@@ -210,9 +218,12 @@ DOMElement* annotate_rspec::find_next_link_in_path (DOMElement *prev, list<const
 	for (it = links->begin(); it != links->end(); ++it)
 	{
 		link = (this->physical_elements->find(*it))->second;
-		XStr link_src(getNthInterface(link,0)->getAttribute(XStr("component_node_uuid").x()));
-		XStr link_dst(getNthInterface(link,1)->getAttribute(XStr("component_node_uuid").x()));
-		XStr prev_dst(getNthInterface(prev,1)->getAttribute(XStr("component_node_uuid").x()));
+		XStr link_src(find_urn(getNthInterface(link,0),
+                                       "component_node"));
+		XStr link_dst(find_urn(getNthInterface(link,1),
+                                       "component_node"));
+		XStr prev_dst(find_urn(getNthInterface(prev,1),
+                                       "component_node"));
 		if (strcmp(link_src.c(), prev_dst.c()) == 0 || strcmp(link_dst.c(), prev_dst.c()) == 0)
 		{
 			links->remove(*it);
