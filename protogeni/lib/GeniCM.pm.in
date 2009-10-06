@@ -223,8 +223,8 @@ sub DiscoverResources($)
 {
     my ($argref) = @_;
     my $credential = $argref->{'credential'};
-    my $available = $argref->{'available'};
-    my $compress = $argref->{'compress'};
+    my $available = $argref->{'available'} || 0;
+    my $compress = $argref->{'compress'} || 0;
     my $user_uuid  = $ENV{'GENIUSER'};
 
     $credential = GeniCredential->CreateFromSigned($credential);
@@ -241,8 +241,12 @@ sub DiscoverResources($)
     # Oh, for $*%(s sake.  Frontier::RPC2 insists on representing a
     # Boolean as its own object type -- which Perl always interprets as
     # true, regardless of the object's value.  Undo all of that silliness.
-    $available = defined( $available ) && $available->value;
-    $compress = defined( $compress ) && $compress->value;
+    if (defined($available) && ref($available) eq 'Frontier::RPC2::Boolean') {
+	$available = $available->value;
+    }
+    if (defined($compress) && ref($compress) eq 'Frontier::RPC2::Boolean') {
+	$compress = $compress->value;
+    }
 
     #
     # A sitevar controls whether external users can get any nodes.
