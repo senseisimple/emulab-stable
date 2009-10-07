@@ -296,7 +296,6 @@ sub batchmode($)	{ return field($_[0], 'batchmode'); }
 sub rsrcidx($)		{ return stats($_[0], 'rsrcidx'); }
 sub lastrsrc($)		{ return stats($_[0], 'lastrsrc'); }
 sub creator($)		{ return field($_[0], 'expt_head_uid');}
-sub canceled($)		{ return field($_[0], 'canceled'); }
 sub locked($)		{ return field($_[0], 'expt_locked'); }
 sub elabinelab($)	{ return field($_[0], 'elab_in_elab');}
 sub elabinelab_eid($)   { return field($_[0], 'elabinelab_eid');}
@@ -340,6 +339,27 @@ sub swapin_time($)	{ return resources($_[0], 'swapin_time'); }
 sub swapout_time($)	{ return resources($_[0], 'swapout_time'); }
 sub lastidx($)	        { return resources($_[0], 'lastidx'); }
 sub input_data_idx($)   { return resources($_[0], 'input_data_idx'); }
+
+#
+# For canceled, goto to the DB.
+#
+sub canceled($)
+{
+    my ($self) = @_;
+    
+    my $idx = $self->idx();
+
+    my $query_result =
+	DBQueryWarn("select canceled from experiments where idx='$idx'");
+
+    if (! $query_result ||
+	$query_result->numrows == 0) {
+	return 0;
+    }
+    my ($canceled) = $query_result->fetchrow_array();
+    $self->{'EXPT'}->{'canceled'} = $canceled;
+    return $canceled;
+}
 
 #
 # Lookup an experiment given an experiment index.
