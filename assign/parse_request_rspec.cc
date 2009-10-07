@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2008 University of Utah and the Flux Group.
+ * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -8,7 +8,7 @@
  * XML Parser for RSpec ptop files
  */
 
-static const char rcsid[] = "$Id: parse_request_rspec.cc,v 1.13 2009-10-06 23:53:11 duerig Exp $";
+static const char rcsid[] = "$Id: parse_request_rspec.cc,v 1.14 2009-10-07 20:48:27 stoller Exp $";
 
 #ifdef WITH_XML
 
@@ -228,8 +228,8 @@ bool populate_nodes_rspec(DOMElement *root, tb_vgraph &vg) {
 		string *str_component_interface_names = new string [interfaces->getLength()];
 		for (int index = 0; index < interfaces->getLength(); ++index)
 		{
-			str_virtual_interface_names[index] = string(XStr((dynamic_cast<DOMElement*>(interfaces->item(index)))->getAttribute(XStr("virtual_name").x())).c());
-			str_component_interface_names[index] = string(XStr((dynamic_cast<DOMElement*>(interfaces->item(index)))->getAttribute(XStr("component_name").x())).c());
+			str_virtual_interface_names[index] = string(XStr((dynamic_cast<DOMElement*>(interfaces->item(index)))->getAttribute(XStr("virtual_id").x())).c());
+			str_component_interface_names[index] = string(XStr((dynamic_cast<DOMElement*>(interfaces->item(index)))->getAttribute(XStr("component_id").x())).c());
 		}
 
 		/* Deal with the location tag */
