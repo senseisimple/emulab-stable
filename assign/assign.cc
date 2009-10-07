@@ -456,6 +456,7 @@ void print_help() {
 #ifdef WITH_XML
   cout << "  -q <file>   - Specify a rspec ptop file" << endl;
   cout << "  -w <file>   - Specify a rspec vtop file" << endl;
+  cout << "  -W <file>   - Specify the output rspec file" << endl;
 #endif
   cout << "  -F          - Apply additional checking to fixed nodes" << endl;
   cout << "  -D          - Dump configuration options" << endl;
@@ -848,8 +849,9 @@ int main(int argc,char **argv) {
   
   char* ptopFilename = "";
   char* vtopFilename = "";
-  
-  while ((ch = getopt(argc,argv,"s:v:l:t:rpPTdH:oguc:nx:X:y:Y:q:w:FD")) != -1) {
+  char* vtopOutputFilename = 0;
+
+  while ((ch = getopt(argc,argv,"s:v:l:t:rpPTdH:oguc:nx:X:y:Y:q:w:W:FD")) != -1) {
     switch (ch) {
     case 's':
       if (sscanf(optarg,"%d",&seed) != 1) {
@@ -966,6 +968,13 @@ int main(int argc,char **argv) {
 	  	print_help();
 	  }
 	  vtopFilename = optarg;
+    break;
+
+	case 'W':
+	  if (strcmp(optarg, "") == 0) {
+	  	print_help();
+	  }
+	  vtopOutputFilename = optarg;
     break;
 #endif
         case 'F':
@@ -1203,7 +1212,7 @@ int main(int argc,char **argv) {
       // For now, only produce annotated file if we succeeded - print the
       // text version regardless
       if (violated == 0) {
-	  print_solution(best_solution, annotated_filename(vtopFilename).c_str());
+	  print_solution(best_solution, vtopOutputFilename ? vtopOutputFilename : annotated_filename(vtopFilename).c_str());
       } else {
 	  print_solution(best_solution);
       }
