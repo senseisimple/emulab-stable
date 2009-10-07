@@ -37,9 +37,10 @@ use Node;
 use Interface;
 use Lan;
 use English;
+use XML::Simple;
 use Data::Dumper;
 use Experiment;
-use libdb qw(TBDB_IFACEROLE_CONTROL);
+use libdb qw(TBDB_IFACEROLE_CONTROL TBDB_IFACEROLE_EXPERIMENT);
 
 # Configure variables
 my $TB		   = "@prefix@";
@@ -158,10 +159,13 @@ sub CreatePhysNode($)
 {
     my ($node_urn) = @_;
     my $blob;
-    my $ifaceargs;
+    my @ifaces;
+    my $ctrliface;
 
     my ($auth,$type,$node_id) = GeniHRN::Parse($node_urn);
     my $manager_urn = GeniHRN::Generate($auth, "authority", "cm");
+
+    print STDERR "$node_urn\n";
 
     #
     # Load the SA cert to act as caller context.
@@ -174,6 +178,7 @@ sub CreatePhysNode($)
     my $context = Genixmlrpc->Context($certificate);
     if (!defined($context)) {
 	print STDERR "Could not create context to talk to clearinghouse\n";
+	return undef;
     }
     #
     # Set the default RPC context. 
@@ -194,6 +199,8 @@ sub CreatePhysNode($)
     #
     my ($translated)  = $authority->hrn() =~ /^([-\w]+)\..*/;
     my $node_hrn      = $translated . "." . $node_id;
+
+    print STDERR "$node_hrn\n";
 
     my $component = GeniComponent->Lookup($node_hrn);
     if (defined($component)) {
@@ -223,7 +230,6 @@ sub CreatePhysNode($)
 	print STDERR "Could not resolve $component at $registry\n";
 	return undef;
     }
-#    print STDERR Dumper($blob);
 
     my $hrn      = $blob->{'hrn'};
     my $IP       = $blob->{'physctrl'};
@@ -232,31 +238,31 @@ sub CreatePhysNode($)
     if (! (defined($hrn) && defined($IP) && defined($hostname) &&
 	   defined($uuid))) {
 	print STDERR "Missing stuff in blob from CM for $node_urn\n";
-	return undef;
+	goto bad;
     }
     if (! ($hrn =~ /^[-\w\.]*$/)) {
 	print STDERR "Invalid hrn '$hrn' in blob from CM for $node_urn\n";
-	return undef;
+	goto bad;
     }
     if (! ($IP =~ /^[-\w\.]*$/)) {
 	print STDERR "Invalid IP '$IP' in blob from CM for $node_urn\n";
-	return undef;
+	goto bad;
     }
     if (! ($uuid =~ /^[-\w\.]*$/)) {
 	print STDERR "Invalid uuid '$uuid' in blob from CM for $node_urn\n";
-	return undef;
+	goto bad;
     }
     if (! ($hostname =~ /^[-\w\.]*$/)) {
 	print STDERR
 	    "Invalid hostname '$hostname' in blob from CM for $node_urn\n";
-	return undef;
+	goto bad;
     }
     $node_id = $hrn;
     $node_id =~ s/\./\-/g;
     
     if (length($node_id) > 32) {
 	print STDERR "Nodeid '$node_id' too long for $node_urn\n";
-	return undef;
+	goto bad;
     }
 
     #
@@ -264,29 +270,85 @@ sub CreatePhysNode($)
     #
     if (exists($blob->{'interfaces'})) {
 	foreach my $ref (@{ $blob->{'interfaces'} }) {
-	    if ($ref->{'role'} eq TBDB_IFACEROLE_CONTROL()) {
+	    if ($ref->{'role'} eq TBDB_IFACEROLE_CONTROL() ||
+		$ref->{'role'} eq TBDB_IFACEROLE_EXPERIMENT()) {
 		my $MAC = $ref->{'MAC'};
 		if (!defined($MAC) || !($MAC =~ /^[:\w]*$/)) {
 		    print STDERR "Bad mac in blob for $node_urn:\n";
-		    print STDERR Dumper($blob);
-		    return undef;
+		    goto bad;
 		}
-		$ifaceargs = {
-		    "card"      => 0,
-		    "role"      => TBDB_IFACEROLE_CONTROL(),
+		my $IIP = $ref->{'IP'};
+		if (!defined($IIP) || !($IIP =~ /^[-\w\.]*$/)) {
+		    print STDERR "Bad IP in blob for $node_urn:\n";
+		    goto bad;
+		}
+		my ($card) = ($ref->{'iface'} =~ /^\D*(\d*)$/);
+		if (!defined($card)) {
+		    print STDERR "Bad iface in blob for $node_urn:\n";
+		    goto bad;
+		}
+		
+		my $ifaceargs = {
+		    "card"      => $card,
+		    "role"      => $ref->{'role'},
 		    "MAC"       => $MAC,
-		    "IP"        => $IP,
+		    "IP"        => $IIP,
 		    "type"      => "fxp",
 		};
-		last;
+		push(@ifaces, $ifaceargs);
+
+		$ctrliface = $ifaceargs
+		    if ($ref->{'role'} eq TBDB_IFACEROLE_CONTROL());
 	    }
 	}
-	if (!defined($ifaceargs)) {
-	    print STDERR "No control interface in blob for $node_urn!\n";
-	    return undef;
+    }
+    elsif (exists($blob->{'rspec'})) {
+	my $rspec = XMLin($blob->{'rspec'}, KeyAttr => [],
+			  ForceArray => ["interface"]);
+	
+	foreach my $noderef (@{ $rspec->{'node'} }) {
+	    next
+		if ($noderef->{'component_uuid'} ne $node_urn);
+	    next
+		if (! exists($noderef->{'interface'}));
+
+	    my $count = 0;
+	    
+	    foreach my $ref (@{ $noderef->{'interface'} }) {
+		my $component_id = $ref->{'component_id'};
+		my $role = (exists($ref->{'role'}) ? $ref->{'role'} : "expt");
+		my $MAC  = "00000000000" . $count;
+
+		my ($auth,$id,$iface) = GeniHRN::ParseInterface($component_id);
+
+		my $ifaceargs = {
+		    "card"      => $count,
+		    "iface"     => $iface,
+		    "role"      => $role,
+		    "MAC"       => $MAC,
+		    "IP"        => '',
+		    "type"      => "fxp",
+		};
+		push(@ifaces, $ifaceargs);
+
+		if ($role eq "control") {
+		    $ctrliface = $ifaceargs;
+		    $ifaceargs->{'IP'}   = $ref->{'public_ipv4'};
+		    $ifaceargs->{'role'} = TBDB_IFACEROLE_CONTROL();
+		}
+		$count++;
+		print Dumper($ifaceargs);
+	    }
 	}
     }
-		   
+    if (! @ifaces) {
+	print STDERR "No interfaces in blob for $node_urn!\n";
+	goto bad;
+    }
+    if (!defined($ctrliface)) {
+	print STDERR "No control interface in blob for $node_urn!\n";
+	goto bad;
+    }		   
     my $newnode = Node->Create($node_id, undef,
 			       {"role"      => "testnode",
 				"type"      => "pcfedphys",
@@ -296,18 +358,22 @@ sub CreatePhysNode($)
 				"IP"        => $IP});
     if (!defined($newnode)) {
 	print STDERR "Could not create new node from blob for $node_urn\n";
-	print STDERR Dumper($blob);
-	return undef;
+	goto bad;
     }
-
-    my $interface = Interface->Create($newnode, $ifaceargs);
-    if (!defined($interface)) {
-	$newnode->Delete();
-	print STDERR "Could not create interface from blob for $node_urn\n";
-	print STDERR Dumper($blob);
-	return undef;
+    foreach my $ifaceargs (@ifaces) {
+	my $interface = Interface->Create($newnode, $ifaceargs);
+	if (!defined($interface)) {
+	    $newnode->Delete();
+	    print STDERR
+		"Could not create interface from blob for $node_urn\n";
+	    print STDERR Dumper($ifaceargs);
+	    goto bad;
+	}
     }
     return $newnode;
+  bad:
+    print STDERR Dumper($blob);
+    return undef;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

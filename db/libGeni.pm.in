@@ -16,6 +16,9 @@ use vars qw(@ISA @EXPORT);
 # Configure variables
 my $TB		= "@prefix@";
 my $BOSSNODE    = "@BOSSNODE@";
+my $TBDOCBASE   = "@TBDOCBASE@";
+
+my $ASSIGN	= "$TB/libexec/assign";
 
 use libdb;
 use libtestbed;
@@ -28,7 +31,9 @@ use GeniEmulab;
 use GeniResource;
 use English;
 use Socket;
+use XML::Simple;
 use Data::Dumper;
+use File::Temp;
 
 sub Register($$)
 {
@@ -44,6 +49,169 @@ sub UnRegister($)
     return GeniEmulab::UnRegisterExperiment($experiment);
 }
 
+#
+# Map rspec to resources using assign. 
+#
+sub MapResources($$$)
+{
+    my ($experiment, $user, $rspec) = @_;
+    my %cm_urns   = ();
+    my %fragments = ();
+    my %nodemap   = ();
+    my %node_cms  = ();
+
+    Register($experiment, $user) == 0
+	or return -1;
+
+    foreach my $ref (@{ $rspec->{'node'} }) {
+	my $node_urn = $ref->{'component_urn'};
+	my ($auth,$type,$node_id) = GeniHRN::Parse($node_urn);
+	my $cm = GeniHRN::Generate($auth, "authority", "cm");
+
+	$ref->{'component_manager_uuid'} = $cm;
+	if ($node_id ne "*") {
+	    $ref->{'component_uuid'} = $node_urn;
+	}
+	$cm_urns{$cm} = $cm;
+
+	#
+	# The point of this is to split the rspec apart, since at present
+	# assign cannot handle multiple advertisements, and it will not work
+	# to pass in an rspec that references CMs other then the one
+	# advertisement being passed in.
+	#
+	# This should go away when assign is fixed.
+	#
+	if (!exists($fragments{$cm})) {
+	    $fragments{$cm} = {
+		'type'  => 'request',
+		'xmlns' => 'http://www.protogeni.net/resources/rspec/0.1',
+		'node'  => [] };
+	}
+	push(@{ $fragments{$cm}->{'node'} }, $ref);
+	$node_cms{$ref->{'virtual_id'}} = $cm;
+	$nodemap{$ref->{'virtual_id'}}  = $ref;
+    }
+    #
+    # As above, need to split the interfaces into the correct fragments.
+    #
+    if (exists($rspec->{'link'})) {
+	foreach my $ref (@{ $rspec->{'link'} }) {
+	    my $linkname   = $ref->{'virtual_id'};
+
+	    foreach my $ifaceref (@{ $ref->{'interface_ref'} }) {
+		my $virtual_node_id = $ifaceref->{'virtual_node_id'};
+
+		if (!exists($node_cms{$virtual_node_id}) ||
+		    !exists($fragments{$node_cms{$virtual_node_id}})) {
+		    print STDERR "Inconsistency in rspec link $linkname\n";
+		    print Dumper($rspec);
+		    return -1;
+		}
+		my $fragment = $fragments{$node_cms{$virtual_node_id}};
+		if (!exists($fragment->{'link'})) {
+		    $fragment->{'link'} = [];
+		}
+		push(@{ $fragment->{'link'} }, $ref);
+		#
+		# There should be a sanity check here ... too lazy. 
+		#
+		last;
+	    }
+	}
+    }
+	
+    #
+    # Get the resource objects.
+    #
+    foreach my $cm (keys(%cm_urns)) {
+	my $resource = GeniResource->Lookup($experiment->idx(), $cm);
+	if (!defined($resource)) {
+	    $resource = GeniResource->Create($experiment, $cm);
+	    if (!defined($resource)) {
+		print STDERR "Could not create GeniResource for $cm\n";
+		return -1;
+	    }
+	}
+	$cm_urns{$cm} = $resource;
+    }
+
+    #
+    # Discover resources at the component and run assign.
+    #
+    foreach my $cm (keys(%cm_urns)) {
+	my $resource = $cm_urns{$cm};
+	my $fragment = $fragments{$cm};
+	my $advertisement;
+
+	print STDERR "Asking for resource list from $resource\n";
+	if ($resource->Discover($user, \$advertisement)) {
+		print STDERR "Could not get resource list for $resource\n";
+		return -1;
+	}
+	my $vtop = new File::Temp(TEMPLATE => 'XXXXX',
+				  UNLINK => 0,
+				  SUFFIX => '.vtop');
+	my $ptop = new File::Temp(TEMPLATE => 'XXXXX',
+				  UNLINK => 0,
+				  SUFFIX => '.ptop');
+	my $tmp  = File::Temp::mktemp("/tmp/XXXXX") . ".soln";
+
+	my $reqstring =
+	    eval { XMLout($fragment, "NoAttr" => 0, RootName => "rspec") };
+	if ($@) {
+	    print STDERR "XMLout error: $@\n";
+	    return -1;
+	}
+
+	print $vtop "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+	print $vtop $reqstring;
+	print $ptop $advertisement;
+
+	system("$ASSIGN -uod -c .75 -q $ptop -w $vtop -W $tmp");
+	if ($?) {
+	    print STDERR "Could not map to physical resources on $resource\n";
+	    return -1;
+	}
+	my $solution =
+	    eval { XMLin($tmp, KeyAttr => [],
+			 ForceArray => ["node", "link", "interface",
+					"interface_ref", "linkendpoints"]) };
+	if ($@) {
+	    print STDERR "XMLin error: $@\n";
+	    return -1;
+	}
+	print STDERR Dumper($solution);
+
+	foreach my $ref (@{ $solution->{'node'} }) {
+	    my $virtual_id = $ref->{'virtual_id'};
+	    my $node_urn   = $ref->{'component_uuid'};
+	    my $cm_urn     = $ref->{'component_manager_uuid'};
+	    my $noderef    = $nodemap{$virtual_id};
+
+	    $noderef->{'component_uuid'} = $node_urn;
+
+	    if (exists($ref->{'interface'})) {
+		my $interfaces = $ref->{'interface'};
+
+		foreach my $ifaceref (@{ $interfaces }) {
+		    my $iface_id = $ifaceref->{'virtual_id'};
+		    my $compid   = $ifaceref->{'component_name'};
+
+		    foreach my $oref (@{ $noderef->{'interface'} }) {
+			if ($oref->{'virtual_id'} eq $iface_id) {
+			    $oref->{'component_id'} = $compid;
+			    last;
+			}
+		    }
+		}
+	    }
+	}
+    }
+    print STDERR Dumper($rspec);
+    return 0;
+}
+
 sub GetTickets($$$$)
 {
     my ($experiment, $impotent, $user, $rspec) = @_;
@@ -57,10 +225,13 @@ sub GetTickets($$$$)
 	my ($auth,$type,$node_id) = GeniHRN::Parse($node_urn);
 	my $cm = GeniHRN::Generate($auth, "authority", "cm");
 
-	$ref->{'component_manager_uuid'} = $cm;
-	$ref->{'component_uuid'} = $node_urn;
-
 	$cm_urns{$cm} = $cm;
+
+	#
+	# This is how we get the client side to do cooked mode properly.
+	#
+	$ref->{'tarfiles'} = "/usr/local/etc/emulab ".
+	    "$TBDOCBASE/downloads/geniclient.tar";
     }
     print STDERR Dumper($rspec);
 
@@ -109,8 +280,10 @@ sub GetTickets($$$$)
 	    return -1;
 	}
 	foreach my $ref (@{ $rspec->{'node'} }) {
-	    my $node_urn = $ref->{'component_urn'};
+	    my $node_urn = $ref->{'component_uuid'};
 	    my $cm_urn   = $ref->{'component_manager_uuid'};
+
+	    $ref->{'component_urn'} = $node_urn;
 
 	    print STDERR "Creating $node_urn for $resource\n";
 	    my $node = GeniEmulab::CreatePhysNode($node_urn);
@@ -158,6 +331,7 @@ sub RedeemTickets($$$)
 sub MapNodes($)
 {
     my ($experiment) = @_;
+    my %ifacemap = ();
 
     #
     # Get the resource objects.
@@ -192,6 +366,55 @@ sub MapNodes($)
 		my $sshdport = $ref->{'sshdport'};
 
 		$node->Update({'sshdport' => $sshdport});
+	    }
+	    if (exists($ref->{'interface'})) {
+		foreach my $ifaceref (@{ $ref->{'interface'} }) {
+		    my $virtid = $ifaceref->{'virtual_id'};
+		    my $compid = $ifaceref->{'component_id'};
+
+		    $ifacemap{$virtid} = [$node, $compid];
+		}
+	    }
+	}
+	foreach my $ref (@{ $manifest->{'link'} }) {
+	    my $linkname   = $ref->{"virtual_id"};
+	    my $interfaces = $ref->{'interface_ref'};
+
+	    foreach my $ifaceref (@{ $interfaces }) {
+		my $vname    = $ifaceref->{'virtual_node_id'};
+		my $iface_id = $ifaceref->{'virtual_interface_id'};
+		my $MAC      = $ifaceref->{'MAC'};
+		my ($node, $compid) = @{ $ifacemap{$iface_id} };
+		my $iface;
+
+		if (GeniHRN::IsValid($compid)) {
+		    (undef,undef,$iface) = GeniHRN::ParseInterface($compid);
+		}
+		else {
+		    $iface = $compid;
+		}
+		if (!defined($iface)) {
+		    print STDERR "Could not determine iface for" .
+			"$vname,$iface_id\n";
+		    print Dumper($manifest);
+		    return -1;
+		}
+		my $interface = Interface->LookupByIface($node,$iface);
+		if (!defined($interface)) {
+		    print STDERR "Could not map iface for $node,$iface\n";
+		    print Dumper($manifest);
+		    return -1;
+		}
+		if (! ($MAC =~ /^[\w]*$/)) {
+		    print STDERR "Bad mac '$MAC' for $node,$iface\n";
+		    print Dumper($manifest);
+		    return -1;
+		}
+		if ($interface->Update({"mac" => "$MAC"})) {
+		    print STDERR "Could not update mac for $node,$iface\n";
+		    print Dumper($manifest);
+		    return -1;
+		}
 	    }
 	}
     }
@@ -285,6 +508,7 @@ sub WaitForSlivers($$@)
     my $coderef = sub {
 	my ($resource) = @_;
 	my $ref;
+	my $notready = 0;
 
 	print STDERR "Waiting ($$) for sliver $resource\n";
 
@@ -295,33 +519,35 @@ sub WaitForSlivers($$@)
 	}
 	print STDERR Dumper($ref);
 
-	#
-	# If the results indicate ready, send ISUP for all of the
-	# nodes. Yes, this treats the nodes as a block. Change later.
-	#
-	if ($ref->{'status'} eq "ready") {
-	    print STDERR "Sliver ready for $resource\n";
-	    
-	    foreach my $key (keys(%{ $ref->{'detailsNew'} })) {
-		my $val  = $ref->{'detailsNew'}->{$key};
-		my $node = $nodemap{$key};
+	foreach my $key (keys(%{ $ref->{'detailsNew'} })) {
+	    my $val  = $ref->{'detailsNew'}->{$key};
+	    my $node = $nodemap{$key};
 
-		print STDERR "  Node $key says $val.\n";
-		if (!defined($node)) {
-		    print STDERR "No node in map for $key ($resource)\n";
-		    next;
-		}
-
-		#
-		# Only look for ready transition, and send ISUP.
-		# Eventually have the CM tell us about failure.
-		#
-		if ($val eq "ready" && !$node->IsUp()) {
-		    print STDERR "    Sending ISUP event.\n";
-		    $node->SetEventState(TBDB_NODESTATE_ISUP());
-		}
+	    if (!defined($node)) {
+		print STDERR "No node in map for $key ($resource)\n";
+		next;
 	    }
-	    # Tell the parent ready.
+	    # State was changed in a another process.
+	    $node->Refresh();
+
+	    #
+	    # Only send on state change to avoid multiple events.
+	    #
+	    if ($val eq "ready" && !$node->IsUp()) {
+		print STDERR "    Sending ISUP event.\n";
+		$node->SetEventState(TBDB_NODESTATE_ISUP());
+	    }
+	    elsif ($val eq "failed" &&
+		   $node->eventstate() ne TBDB_NODESTATE_TBFAILED) {
+		print STDERR "    Sending TBFAILED event.\n";
+		$node->SetEventState(TBDB_NODESTATE_TBFAILED());
+	    }
+	    else {
+		$notready++;
+	    }
+	}
+	# Tell the parent to stop if ready or all failed.
+	if ($ref->{'status'} eq "ready" || $notready == 0) {
 	    return 0;
 	}
 	# Tell the parent not ready.
@@ -345,6 +571,34 @@ sub WaitForSlivers($$@)
 	    }
 	}
 	@resources = @tmp;
+
+	#
+	# Check for cancelation. When canceled, go through and mark
+	# any nodes that have not been marked, as failed. This will
+	# stop the waiting up in os_setup.
+	#
+	if ($experiment->canceled()) {
+	    foreach my $resource (@resources) {	
+		my $manifest = $resource->Manifest();
+		next
+		    if (!defined($manifest));
+
+		foreach my $ref (@{ $manifest->{'node'} }) {
+		    my $vname      = $ref->{'virtual_id'};
+		    my $node       = $experiment->VnameToNode($vname);
+		    next
+			if (!defined($node));
+		    # State was changed in child process.
+		    $node->Refresh();
+
+		    if ($node->eventstate() ne TBDB_NODESTATE_ISUP &&
+			$node->eventstate() ne TBDB_NODESTATE_TBFAILED) {
+			$node->SetEventState(TBDB_NODESTATE_TBFAILED());
+		    }
+		}
+	    }
+	    return 0;
+	}
 
 	sleep(10)
 	    if (@resources);

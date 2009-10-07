@@ -1093,6 +1093,83 @@ sub SliverStatus($$$$)
     return 0;
 }
 
+#
+# Call the Discover function, returning the advertisement (xml string).
+#
+sub Discover($$$)
+{
+    my ($self, $user, $pref) = @_;
+    my $response;
+
+    my $slice = GeniSlice->Lookup($self->slice_idx());
+    if (!defined($slice)) {
+	print STDERR "*** SliverStatus: No slice for $self\n";
+	return -1;
+    }
+    my $manager_urn = $self->manager_urn();
+    my $authority   = GeniAuthority->Lookup($manager_urn);
+    if (!defined($authority)) {
+	$authority = GeniAuthority->CreateFromRegistry("cm", $manager_urn);
+	if (!defined($authority)) {
+	    print STDERR "*** Could not find $manager_urn at ClearingHouse\n";
+	    return -1;
+	}
+    }
+
+    #
+    # Create a Geni user from current user doing the operation.
+    #
+    my $geniuser = GeniUser->CreateFromLocal($user);
+    if (!defined($geniuser)) {
+	print STDERR "*** Could not create a geni user from $user\n";
+	return -1;
+    }
+    my $usercontext = Genixmlrpc->UserContext($geniuser);
+    if (!defined($usercontext)) {
+	print STDERR "*** Could not create user context from $geniuser\n";
+	return -1;
+    }
+
+    #
+    # Generate a slice credential for the user. 
+    #
+    my $slice_credential = GeniCredential->Create($slice, $geniuser);
+    if (!defined($slice_credential)) {
+	print STDERR
+	    "*** Could not create a slice credential for $slice/$geniuser!\n";
+	return -1;
+    }
+    if ($slice_credential->Sign($GeniCredential::LOCALSA_FLAG) != 0) {
+	print STDERR
+	    "*** Could not sign slice credential $slice_credential!\n";
+	return -1;
+    }
+
+    #
+    # Do it. 
+    #
+    $response =
+	Genixmlrpc::CallMethod($authority->url(),
+			       $usercontext, "DiscoverResources",
+		       { "credential" => $slice_credential->asString(),
+			 "available"  => "true" });
+
+    if (!defined($response)) {
+	print STDERR
+	    "*** Internal error doing DiscoverResources for $self\n";
+	return -1;
+    }
+    if ($response->code() != GENIRESPONSE_SUCCESS) {
+	print STDERR "Could not discover resources $slice_credential Error: ";
+	print STDERR "  " . $response->output() . "\n";
+	return -1;
+    }
+    $$pref = $response->value()
+	if (defined($pref));
+    
+    return 0;
+}
+
 # _Always_ make sure that this 1 is at the end of the file...
 1;
 

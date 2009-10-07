@@ -40,10 +40,11 @@ my $NFREE         = "$TB/bin/nfree";
 my $OS_SELECT     = "$TB/bin/os_select";
 my $DELAYCAPACITY = @DELAYCAPACITY@;	# Can be overridden by user.
 my $DELAYTHRESH   = @DELAYTHRESH@;
-my $PGENISUPPORT= @PROTOGENI_SUPPORT@;
+my $PGENISUPPORT  = @PROTOGENI_SUPPORT@;
 
 if ($PGENISUPPORT) {
     require libGeni;
+    require GeniHRN;
 }
 
 # Flags.
@@ -1029,6 +1030,7 @@ sub LoadVirtLans($)
 	my $encap          = $vlanmember->encap_style();
 	my $mask           = $vlanmember->mask();
 	my $ip             = $vlanmember->ip();
+	my $fixed_iface    = $vlanmember->fixed_iface();
 	my ($vname,$vport) = split(":", $vlanmember->member());
 
 	# virt_nodes:ips is actually deprecated; this overrides it.
@@ -1067,6 +1069,7 @@ sub LoadVirtLans($)
 	$virtlan->_accesspoint($vlanmember)
 	    if ($vlanmember->is_accesspoint());
 	$virtlan->_sharednodes(0);
+	$virtlan->_geninodes(0);
 
 	if (defined($encap) &&
 	    ($encap eq "vtun" || $encap eq "gre" || $encap eq "egre")) {
@@ -1143,7 +1146,7 @@ sub LoadVirtLans($)
 		       "$rdelay $rbandwidth $rlossrate\n");
 
 	# Temporary, for generating rspecs.
-	push(@{ $vlanmember->virt_node()->_virtifaces() }, "virt-${vport}");
+	push(@{ $vlanmember->virt_node()->_virtifaces() }, $vlanmember);
     }
     return 0;
 }
@@ -1185,9 +1188,13 @@ sub GenVirtNodes($)
 	#
 	if ($vnode->_isgeninode()) {
 	    my @ifaces = @{ $vnode->_virtifaces() };
-	    
+
+	    if (!defined($vnode->fixed()) || $vnode->fixed() eq "") {
+		tberror("Geninode $vnode must be fixed to a CM.\n");
+		return -1;
+	    }
 	    my $ref = { 'virtual_id'    => $vname,
-			'component_urn' => $vnode->fixed() || '*',
+			'component_urn' => $vnode->fixed(),
 		      };
 	    if ($vnode->_isvirtnode()) {
 		$ref->{'virtualization_type'} = 'emulab-vnode';
@@ -1200,14 +1207,22 @@ sub GenVirtNodes($)
 
 	    if (@ifaces) {
 		my @refs = ();
-		foreach my $iface (@ifaces) {
-		    push(@refs, {'virtual_id' => $iface});
+		foreach my $vlanmember (@ifaces) {
+		    my $iface = {'virtual_id'   => "$vlanmember"};
+		    
+		    if ($vlanmember->fixed_iface() ne "") {
+			$iface->{'component_id'}  = $vlanmember->fixed_iface();
+			$iface->{'component_name'}= $vlanmember->fixed_iface();
+		    }
+		    push(@refs, $iface);
 		}
-		$ref->{'interfaces'} = [ @refs ];
+		$ref->{'interface'} = [ @refs ];
 	    }
 	    if (!defined($self->rspec())) {
-		$self->{'RSPEC'} = {'type' => 'request',
-				    'node' => [] };
+		$self->{'RSPEC'} = {
+		    'type'  => 'request',
+		    'xmlns' => 'http://www.protogeni.net/resources/rspec/0.1',
+		    'node'  => [] };
 	    }
 	    push(@{ $self->rspec()->{'node'} }, $ref);
 	    next;
@@ -1395,12 +1410,13 @@ sub GenVirtLans($)
 
 	my @members = $vlan->memberlist();
 	$self->printdb("$vname: " . join(" ",@members) . "\n");
-	
+
 	my $simnodes     = 0;
 	my $realnodes    = 0;
 	my $virtnodes    = 0;
 	my $nonvirtnodes = 0;
 	my $sharednodes  = 0;
+	my $geninodes    = 0;
 	my %nodesdo      = ("alias"=>0, "veth"=>0, "vlan"=>0, "ldelay"=>0,
 			    "veth-ne"=>0, "veth-en"=>0);
 	my $trivial_ok   = 0;
@@ -1422,6 +1438,10 @@ sub GenVirtLans($)
 	    if ($virtnode->_sharedokay()) {
 		$sharednodes++;
 		$vlan->_sharednodes($sharednodes);
+	    }
+	    if ($virtnode->_isgeninode()) {
+		$geninodes++;
+		$vlan->_geninodes($geninodes);
 	    }
 
 	    if ($virtnode->_issimnode()) {
@@ -1836,6 +1856,32 @@ sub GenVirtLans($)
 	    my ($rtraced,$rtrace_endnode) = @{$member1->_traceinfo()};
 
 	    #
+	    # Geni links and lans are dead simple right now. 
+	    #
+	    if ($vlan->_geninodes()) {
+		my $ref = {
+		    'virtual_id'    => $vname,
+		    # The list references are so XML::Simple does not
+		    # turn them into attributes. Need a better solution.
+		    'bandwidth'     => [$bw],
+		    'latency'       => [0],
+		    'packet_loss'   => [0],
+		    'link_type'     => {"type_name" => "ethernet"},
+		    'interface_ref' =>
+			[ {'virtual_node_id' => $vname0,
+			   'virtual_interface_id' => "$member0" },
+			  {'virtual_node_id' => $vname1,
+			   'virtual_interface_id' => "$member1" },
+			],
+		};
+		if (!exists($self->rspec()->{'link'})) {
+		    $self->rspec()->{'link'} = [];
+		}
+		push(@{ $self->rspec()->{'link'} }, $ref);
+		next;
+	    }
+
+	    #
 	    # See if the link is really being shaped, or if the we just
 	    # need a delay node cause of tracing/monitoring.
 	    #
@@ -2046,6 +2092,36 @@ sub GenVirtLans($)
 	    $self->addnode("lan/$vname lan");
 	    # Se we ignore it when it comes back from assign.
 	    $self->lannodes()->{"lan/$vname"} = 1;
+
+	    #
+	    # Geni links and lans are dead simple right now. 
+	    #
+	    if ($vlan->_geninodes()) {
+		my $ref = {'virtual_id'    => $vname,
+			   'latency'       => 0,
+			   'packet_loss'   => 0,
+			   'link_type'     => "ethernet",
+		       };
+		my @irefs = ();
+
+		foreach my $member (@members) {
+		    my (undef,$bw) = @{$member->_delayinfo()};
+		    my $virtnode   = $member->virt_node();
+
+		    push(@irefs, { 'virtual_node_id' => $virtnode->vname(),
+				   'virtual_interface_id' => "$member" });
+
+		    # XXX
+		    $ref->{'bandwidth'} = $bw;
+		}
+		$ref->{'interface_ref'} = \@irefs;
+
+		if (!exists($self->rspec()->{'link'})) {
+		    $self->rspec()->{'link'} = [];
+		}
+		push(@{ $self->rspec()->{'link'} }, $ref);
+		next;
+	    }
 	    
 	    foreach my $member (@members) {
 		my $virtnode   = $member->virt_node();
@@ -2287,9 +2363,7 @@ sub PrintXML($;$)
     my $doc = XML::LibXML::Document->new();
 
     my $root = $doc->createElement("vtop");
-    $root->setAttribute("pid", "$pid");
-    $root->setAttribute("eid", "$eid");
-    $root->setAttribute("xmlns:vtop", "http://emulab.net/resources/vtop/0.2");
+    $root->setAttribute("xmlns", "http://emulab.net/resources/vtop/0.2");
     $doc->setDocumentElement($root);
 
     foreach my $vclass (@{$self->results->{'class'}}) {
@@ -2467,6 +2541,10 @@ sub CreateVtop($)
     $self->exptstats()->{"wanodes"}   = $self->counters()->{'remotecount'};
     $self->exptstats()->{"plabnodes"} = $self->counters()->{'plabcount'};
     $self->exptstats()->{"simnodes"}  = $self->counters()->{'simcount'};
+
+    if ($self->verbose() && defined($self->rspec())) {
+	$self->printdb(Dumper($self->rspec()));
+    }
     
     return 0;
 }
@@ -2677,9 +2755,28 @@ sub solution_portmap($)   { return $_[0]->{'SOLUTION'}->{'PORTMAP'}; }
 sub solution_vifacemap($) { return $_[0]->{'SOLUTION'}->{'VIFACEMAP'}; }
 sub solution_ifacemap($)  { return $_[0]->{'SOLUTION'}->{'IFACEMAP'}; }
 
-sub ReadSolution($$)
+sub MapResources($)
 {
-    my ($self, $input) = @_;
+    my ($self) = @_;
+
+    if (defined($self->rspec())) {
+	my $solution;
+
+	$self->printdb("Mapping geni resources ...\n");
+	
+	if (libGeni::MapResources($self->experiment(),
+				  $self->user(), $self->rspec(), \$solution)) {
+	    tberror("Could not map Geni resources\n");
+	    return -1;
+	}
+	print Dumper($solution);
+    }
+    return -1;
+}
+
+sub ClearSolution($)
+{
+    my ($self) = @_;
 
     # Start with a new solution vector each time.
     $self->{'SOLUTION'} = {};
@@ -2695,6 +2792,128 @@ sub ReadSolution($$)
     $self->{'SOLUTION'}->{'PORTMAP'}     = undef;
     $self->{'SOLUTION'}->{'VIFACEMAP'}   = {};
     $self->{'SOLUTION'}->{'IFACEMAP'}    = {};
+
+    return 0;
+}
+
+sub AddNodeToSolution($$$)
+{
+    my ($self, $virtual, $physical) = @_;
+
+    # Skip LAN/Fake nodes.
+    return 0
+	if (exists($self->lannodes()->{$virtual}));
+
+    # All we do in this stage is store the results.
+    $self->solution()->{'V2P'}->{$virtual}  = $physical;
+    $self->solution()->{'P2V'}->{$physical} = []
+	if (!exists($self->solution()->{'P2V'}->{$physical}));
+
+    push(@{ $self->solution()->{'P2V'}->{$physical} }, $virtual);
+    $self->printdb("  $virtual $physical\n");
+
+    return 0;
+}
+
+sub AddLinkToSolution($$$$$$$)
+{
+    my ($self, $vlink, $trivial, $nodeA, $portA, $nodeB, $portB) = @_;
+	
+    #
+    # Map the solution back to our objects and store the results.
+    #
+    my ($linktag) = ($vlink =~ m|^(\w+)/|);
+    my $virtlan;
+    my $member0;
+    my $member1;
+    my ($lan,$virtA,$virtB) = undef;
+
+    if (($lan,$virtA,$virtB) =
+	($vlink =~ m|^linksdelaysrc/(.+)/(.+),(.+)$|)) {
+	$virtlan = $self->vlans()->{$lan};
+	$member0 = $virtlan->members()->{$virtA};
+	$member1 = $virtlan->members()->{$virtB};
+	$member0->_pnode($nodeA);
+	$member0->_pport($portA);
+	$member0->_delaynode($nodeB);
+	$member0->_delayport($portB);
+    }
+    elsif (($lan,$virtA) =
+	   ($vlink =~ m|^linkdelaysrc/([^/]+)/(.+)$|)) {
+	$virtlan = $self->vlans()->{$lan};
+	$member0 = $virtlan->members()->{$virtA};
+	$member0->_pnode($nodeA);
+	$member0->_pport($portA);
+	$member0->_delaynode($nodeB);
+	$member0->_delayport($portB);
+    }
+    elsif (($lan,$virtA,$virtB) =
+	   ($vlink =~ m|^linksimple/(.+)/(.+),(.+)$|)) {
+	$virtlan = $self->vlans()->{$lan};
+	$member0 = $virtlan->members()->{$virtA};
+	$member1 = $virtlan->members()->{$virtB};
+	if (!$trivial) {
+	    $member0->_pnode($nodeA);
+	    $member0->_pport($portA);
+	    $member1->_pnode($nodeB);
+	    $member1->_pport($portB);
+	}
+    }
+    elsif (($lan,$virtA) =
+	   ($vlink =~ m|^linklan/([^/]+)/(.+)$|)) {
+	$virtlan = $self->vlans()->{$lan};
+	$member0 = $virtlan->members()->{$virtA};
+	if (!$trivial) {
+	    $member0->_pnode($nodeA);
+	    $member0->_pport($portA);
+	    # For a special case, see below.
+	    $member0->_lannode($nodeB);
+	    $member0->_lanport($portB);
+	}
+    }
+    elsif (($lan,$virtA) =
+	   ($vlink =~ m|^fakelan/([^/]+)/(.+)$|)) {
+	$virtlan = $self->vlans()->{$lan};
+	$member0 = $virtlan->members()->{$virtA};
+	$member0->_pnode($nodeA);
+	$member0->_pport($portA);
+    }
+    elsif (($lan,$virtA) =
+	   ($vlink =~ m|^linkdelaydst/([^/]+)/(.+)$|)) {
+	$virtlan = $self->vlans()->{$lan};
+	# Special case since the other side is a lannode.
+	$member0 = $virtlan->members()->{$virtA};
+	$member0->_delayportB($portB);
+    }
+    elsif (($lan,$virtA,$virtB) =
+	   ($vlink =~ m|^linksdelaydst/(.+)/(.+),(.+)$|)) {
+	$virtlan = $self->vlans()->{$lan};
+	$member0 = $virtlan->members()->{$virtA};
+	$member1 = $virtlan->members()->{$virtB};
+	$member0->_pnode($nodeA);
+	$member0->_pport($portA);
+	$member0->_delaynode($nodeB);
+	$member0->_delayport($portB);
+    }
+    else {
+	tberror("Bad vlink in solution: $vlink\n");
+	return -1;
+    }
+	
+    $self->solution_plinks()->{$vlink} =
+	[$linktag,$virtlan,$trivial,$member0,$member1];
+    if (!$trivial) {
+	$self->printdb("  $vlink $nodeA$portA,$nodeB$portB\n");
+    }
+    else {
+	$self->printdb("  $vlink trivial\n");
+    }
+    return 0;
+}
+
+sub ReadTextSolution($$)
+{
+    my ($self, $input) = @_;
 
     #
     # Still using the old assign format.
@@ -2724,17 +2943,7 @@ sub ReadSolution($$)
 	my @info = split;
 	my ($virtual,$physical) = @info[0,1];
 
-	# Skip LAN/Fake nodes.
-	next
-	    if (exists($self->lannodes()->{$virtual}));
-
-	# All we do in this stage is store the results.
-	$self->solution()->{'V2P'}->{$virtual}  = $physical;
-	$self->solution()->{'P2V'}->{$physical} = []
-	    if (!exists($self->solution()->{'P2V'}->{$physical}));
-
-	push(@{ $self->solution()->{'P2V'}->{$physical} }, $virtual);
-	$self->printdb("  $virtual $physical\n");
+	$self->AddNodeToSolution($virtual, $physical);
     }
 
     # read Edges
@@ -2751,6 +2960,7 @@ sub ReadSolution($$)
         tbwarn("Unable to find Edges section in assign output");
         return -1;
     }
+
     $self->printdb("Edges:\n");
     EDGEWHILE: while (<$input>) {
 	my ($vlink,$rawA,$rawB) = undef;
@@ -2782,17 +2992,10 @@ sub ReadSolution($$)
 	    tberror("Found garbage: $line\n");
 	    return -1;
 	}
-	#
-	# Map the solution back to our objects and store the results.
-	#
-	my ($linktag) = ($vlink =~ m|^(\w+)/|);
-	my $virtlan;
-	my $member0;
-	my $member1;
-	my ($lan,$virtA,$virtB,$virtC) = undef;
+
 	my ($nodeportA,$nodeportB) = undef;
 	my ($nodeA,$portA,$nodeB,$portB) = undef;
-
+	
 	if (!$trivial) {
 	    $nodeportA = getnodeport($rawA);
 	    $nodeportB = getnodeport($rawB);
@@ -2802,125 +3005,101 @@ sub ReadSolution($$)
 	    ($nodeA,$portA) = split(":", $nodeportA);
 	    ($nodeB,$portB) = split(":", $nodeportB);
 	}
+	$self->AddLinkToSolution($vlink, $trivial,
+				 $nodeA, $portA, $nodeB, $portB);
+    }
+    return 0;
+}
 
-	if (($lan,$virtA,$virtB) =
-	    ($vlink =~ m|^linksdelaysrc/(.+)/(.+),(.+)$|)) {
-	    $virtlan = $self->vlans()->{$lan};
-	    $member0 = $virtlan->members()->{$virtA};
-	    $member1 = $virtlan->members()->{$virtB};
-	    $member0->_pnode($nodeA);
-	    $member0->_pport($portA);
-	    $member0->_delaynode($nodeB);
-	    $member0->_delayport($portB);
-	}
-	elsif (($lan,$virtA) =
-	       ($vlink =~ m|^linkdelaysrc/([^/]+)/(.+)$|)) {
-	    $virtlan = $self->vlans()->{$lan};
-	    $member0 = $virtlan->members()->{$virtA};
-	    $member0->_pnode($nodeA);
-	    $member0->_pport($portA);
-	    $member0->_delaynode($nodeB);
-	    $member0->_delayport($portB);
-	}
-	elsif (($lan,$virtA,$virtB) =
-	       ($vlink =~ m|^linksimple/(.+)/(.+),(.+)$|)) {
-	    $virtlan = $self->vlans()->{$lan};
-	    $member0 = $virtlan->members()->{$virtA};
-	    $member1 = $virtlan->members()->{$virtB};
-	    if (!$trivial) {
-		$member0->_pnode($nodeA);
-		$member0->_pport($portA);
-		$member1->_pnode($nodeB);
-		$member1->_pport($portB);
-	    }
-	}
-	elsif (($lan,$virtA) =
-	       ($vlink =~ m|^linklan/([^/]+)/(.+)$|)) {
-	    $virtlan = $self->vlans()->{$lan};
-	    $member0 = $virtlan->members()->{$virtA};
-	    if (!$trivial) {
-		$member0->_pnode($nodeA);
-		$member0->_pport($portA);
-		# For a special case, see below.
-		$member0->_lannode($nodeB);
-		$member0->_lanport($portB);
-	    }
-	}
-	elsif (($lan,$virtA) =
-	       ($vlink =~ m|^fakelan/([^/]+)/(.+)$|)) {
-	    $virtlan = $self->vlans()->{$lan};
-	    $member0 = $virtlan->members()->{$virtA};
-	    $member0->_pnode($nodeA);
-	    $member0->_pport($portA);
-	}
-	elsif (($lan,$virtA) =
-	       ($vlink =~ m|^linkdelaydst/([^/]+)/(.+)$|)) {
-	    $virtlan = $self->vlans()->{$lan};
-	    # Special case since the other side is a lannode.
-	    $member0 = $virtlan->members()->{$virtA};
-	    $member0->_delayportB($portB);
-	}
-	elsif (($lan,$virtA,$virtB) =
-	       ($vlink =~ m|^linksdelaydst/(.+)/(.+),(.+)$|)) {
-	    $virtlan = $self->vlans()->{$lan};
-	    $member0 = $virtlan->members()->{$virtA};
-	    $member1 = $virtlan->members()->{$virtB};
-	    $member0->_pnode($nodeA);
-	    $member0->_pport($portA);
-	    $member0->_delaynode($nodeB);
-	    $member0->_delayport($portB);
-	}
-	else {
-	    tbwarn("Bad vlink in solution: $vlink\n");
-	}
+sub ReadRspecSolution($$)
+{
+    my ($self, $rspec) = @_;
+    my %ifacemap = ();
 	
-	$self->solution_plinks()->{$vlink} =
-	    [$linktag,$virtlan,$trivial,$member0,$member1];
-	if (!$trivial) {
-	    $self->printdb("  $vlink $nodeportA,$nodeportB\n");
+    $self->printdb("Processing rspec\n");
+    $self->printdb("Nodes:\n");
+
+    foreach my $ref (@{ $self->rspec()->{'node'} }) {
+	my $node_urn = $ref->{'component_urn'};
+	
+	#
+	# We need the local node object which is essentially a
+	# proxy for the real node at the remote component manager.
+	#
+	my $proxynode = libGeni::LookupProxyNode($node_urn);
+	if (!defined($proxynode)) {
+	    tberror("Could not find proxynode for $node_urn\n");
+	    return -1;
 	}
-	else {
-	    $self->printdb("  $vlink trivial\n");
+	my $virtual  = $ref->{'virtual_id'};
+	my $physical = $proxynode->node_id();
+
+	$self->AddNodeToSolution($virtual, $physical);
+	    
+	$ifacemap{$virtual} = {};
+	foreach my $linkref (@{$ref->{'interface'}}) {
+	    my $component_id  = $linkref->{"component_id"};
+	    my $virtual_id    = $linkref->{"virtual_id"};
+
+	    if (GeniHRN::IsValid($component_id)) {
+		my ($urn_authority,$urn_node,$urn_iface) =
+		    GeniHRN::ParseInterface($component_id);
+		$component_id = $urn_iface;
+	    }
+	    $ifacemap{$virtual}->{$virtual_id} = $component_id;
 	}
     }
+    $self->printdb("Links:\n");
+    foreach my $ref (@{ $self->rspec()->{'link'} }) {
+	my $virtual_id = $ref->{"virtual_id"};
+	my $istunnel   = (exists($ref->{'link_type'}) &&
+			  $ref->{'link_type'} eq "tunnel");
 
-    #
-    # Now process the rspec part. 
-    #
-    if (defined($self->rspec())) {
-	$self->printdb("Processing rspec\n");
-	$self->printdb("Nodes:\n");
-
-	foreach my $ref (@{ $self->rspec()->{'node'} }) {
-	    my $node_urn = $ref->{'component_urn'};
-	
-	    #
-	    # We need the local node object which is essentially a
-	    # proxy for the real node at the remote component manager.
-	    #
-	    my $proxynode = libGeni::LookupProxyNode($node_urn);
-	    if (!defined($proxynode)) {
-		tberror("Could not find proxynode for $node_urn\n");
-		return -1;
-	    }
-	    my $virtual  = $ref->{'virtual_id'};
-	    my $physical = $proxynode->node_id();
+	next
+	    if ($istunnel);
 	    
-	    # All we do in this stage is store the results.
-	    $self->solution()->{'V2P'}->{$virtual}  = $physical;
-	    $self->solution()->{'P2V'}->{$physical} = []
-		if (!exists($self->solution()->{'P2V'}->{$physical}));
+	my $virtlan = $self->vlans()->{$virtual_id};
+	if (!defined($virtlan)) {
+	    tberror("Could not find lan $virtual_id\n");
+	    return -1;
+	}
+	my @ifacerefs = @{ $ref->{'interface_ref'} };
 
-	    push(@{ $self->solution()->{'P2V'}->{$physical} }, $virtual);
+	if (scalar(@ifacerefs) == 2) {
+	    my ($ifaceA,$ifaceB) = @ifacerefs;
 
-	    $self->printdb("  $virtual $physical\n");
+	    my $virtA  = $ifaceA->{'virtual_interface_id'};
+	    my $virtB  = $ifaceB->{'virtual_interface_id'};
+	    my $vnodeA = $ifaceA->{'virtual_node_id'};
+	    my $vnodeB = $ifaceB->{'virtual_node_id'};
+	    my $nodeA  = $self->solution()->{'V2P'}->{$vnodeA};
+	    my $nodeB  = $self->solution()->{'V2P'}->{$vnodeB};
+	    my $portA  = $ifacemap{$vnodeA}->{$virtA};
+	    my $portB  = $ifacemap{$vnodeB}->{$virtB};
+	    
+	    my $vlink = "linksimple/$virtual_id/$virtA,$virtB";
+	    
+	    $self->AddLinkToSolution($vlink, 0,
+				     $nodeA, $portA, $nodeB, $portB);
+	}
+	else {
+	    foreach my $ifaceref (@{ $ref->{'interface_ref'} }) {
+		my $virtA  = $ifaceref->{'virtual_interface_id'};
+		my $vnodeA = $ifaceref->{'virtual_node_id'};
+		my $nodeA  = $self->solution()->{'V2P'}->{$vnodeA};
+		my $portA  = $ifacemap{$vnodeA}->{$virtA};
+	    
+		my $vlink = "linklan/$virtual_id/$virtA";
+	    
+		$self->AddLinkToSolution($vlink, 0, $nodeA, $portA);
+	    }
 	}
     }
     return 0;
 }
 
 #
-# Interpret the results. This really just the first stage.
+# Interpret the results. This is really just the first stage.
 #
 sub InterpNodes($)
 {
@@ -3290,7 +3469,7 @@ sub AllocNodes($)
     # Allocate Geni nodes (get tickets). Eventually we want to retry
     # the assignment and replace tickets that we could not get. 
     #
-    if (defined($self->rspec())) {
+    if (defined($self->rspec()) && !$self->impotent()) {
 	$self->printdb("Requesting geni tickets ...\n");
 	
 	if (libGeni::GetTickets($self->experiment(), $self->impotent,
@@ -4597,6 +4776,10 @@ sub InitializePhysNode($$$)
 	    $cmdline = $self->osidbootcmd($osid, "vnodehost", "")
 		if (!defined($cmdline) || $cmdline eq "");
 	}
+	#
+	# NOTE: We no longer include tarballs and RPMs in this update,
+	# because they are now handled by tarfiles_setup
+	#
 	%nodesets = ("def_boot_cmd_line" => $cmdline,
 		     "startstatus"       => 'none',
 		     "bootstatus"        => 'unknown',
