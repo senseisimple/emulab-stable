@@ -227,6 +227,44 @@ sub Lookup($$$$)
 }
 
 #
+# Refresh instance by reloading from the DB.
+#
+sub Refresh($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $nodeid  = $self->node_id();
+    my $iface   = $self->iface();
+    my $card    = $self->card();
+    my $port    = $self->port();
+
+    my $query_result =
+	DBQueryWarn("select * from interfaces ".
+		    "where node_id='$nodeid' and iface='$iface'");
+    return undef
+	if (!$query_result || !$query_result->numrows);
+
+    $self->{"DBROW"} = $query_result->fetchrow_hashref();
+    
+    #
+    # And the interface_state table.
+    #
+    $query_result =
+	DBQueryWarn("select * from interface_state ".
+		    "where node_id='$nodeid' and ".
+		    "      card='$card' and port='$port'");
+    return undef
+	if (!$query_result || !$query_result->numrows);
+
+    $self->{'STATE'} = $query_result->fetchrow_hashref();
+    
+    return 0;
+}
+
+#
 # Create a new interface record. This also handles the wires table entries.
 #
 sub Create($$$)
@@ -254,8 +292,10 @@ sub Create($$$)
     my $wire_type  = $argref->{'wire_type'};
     my $cable      = $argref->{'cable'};
     my $length     = $argref->{'length'};
-    my $iface      = "eth$card";
-
+    my $iface      = $argref->{'iface'};
+    
+    $iface = "eth$card"    
+	if (!defined($iface));
     $port = 1
 	if (!defined($port));
     $IP = ""
@@ -338,9 +378,13 @@ sub LookupByIface($$$)
     return $all_interfaces{"$nodeid:$iface"}
         if (exists($all_interfaces{"$nodeid:$iface"}));
 
+    # Used from Protogeni code, so be careful.
+    my $safe_nodeid = DBQuoteSpecial($nodeid);
+    my $safe_iface  = DBQuoteSpecial($iface);
+
     my $query_result =
 	DBQueryWarn("select card,port from interfaces ".
-		    "where node_id='$nodeid' and iface='$iface'");
+		    "where node_id=$safe_nodeid and iface=$safe_iface");
 
     return undef
 	if (!$query_result);
@@ -441,7 +485,39 @@ sub LookUpWideAreaSwitch($$)
     return undef;
 }
 
-####################################################################################
+#
+# Perform some updates ...
+#
+sub Update($$)
+{
+    my ($self, $argref) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $nodeid  = $self->node_id();
+    my $iface   = $self->iface();
+    my @sets    = ();
+
+    foreach my $key (keys(%{$argref})) {
+	my $val = $argref->{$key};
+
+	# Treat NULL special.
+	push (@sets, "${key}=" . ($val eq "NULL" ?
+				  "NULL" : DBQuoteSpecial($val)));
+    }
+
+    my $query = "update interfaces set " . join(",", @sets) .
+	" where node_id='$nodeid' and iface='$iface'";
+
+    return -1
+	if (! DBQueryWarn($query));
+
+    return Refresh($self);
+}
+
+##############################################################################
 package Interface::VInterface;
 use libdb;
 use libtestbed;
