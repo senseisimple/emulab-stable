@@ -1015,7 +1015,7 @@ threadquit(void)
 }
 
 #ifdef FRISBEE
-extern void (*DiskIdleCallback)(int);
+extern void (*DiskStatusCallback)(int);
 #endif
 
 void *
@@ -1032,8 +1032,8 @@ DiskWriter(void *arg)
 			if (gotone) {
 				writeridles++;
 #ifdef FRISBEE
-				if (DiskIdleCallback)
-					(*DiskIdleCallback)(1);
+				if (DiskStatusCallback)
+					(*DiskStatusCallback)(1);
 #endif
 			}
 			do {
@@ -1048,9 +1048,15 @@ DiskWriter(void *arg)
 				pthread_testcancel();
 			} while (queue_empty(&writequeue));
 #ifdef FRISBEE
-			if (DiskIdleCallback)
-				(*DiskIdleCallback)(0);
+			if (DiskStatusCallback)
+				(*DiskStatusCallback)(0);
 #endif
+		} else {
+#ifdef FRISBEE
+			if (DiskStatusCallback)
+				(*DiskStatusCallback)(2);
+#endif
+			;
 		}
 		queue_remove_first(&writequeue, wbuf, writebuf_t *, chain);
 		writeinprogress = 1; /* XXX */
