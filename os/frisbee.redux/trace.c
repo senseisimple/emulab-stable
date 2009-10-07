@@ -98,7 +98,7 @@ TraceStop(void)
 }
 
 void
-TraceDump(int serverrel)
+TraceDump(int serverrel, int level)
 {
 	struct event *ptr;
 	int done = 0;
@@ -112,10 +112,10 @@ TraceDump(int serverrel)
 			if (!done) {
 				done = 1;
 				fprintf(fd, "%d of %d events, "
-					"start: %ld.%03ld, level: %d:\n",
+					"start=%ld.%03ld, level=%d:\n",
 					evcount > NEVENTS ? NEVENTS : evcount,
 					evcount, (long)startt.tv_sec,
-					startt.tv_usec/1000, oevlogging);
+					startt.tv_usec/1000, level);
 				/*
 				 * Make all event stamps relative to the
 				 * first event received.  This is specifically
@@ -284,10 +284,10 @@ TraceDump(int serverrel)
 				break;
 			case EV_CLIREUSE:
 				fprintf(fd, "%s: block %lu[%lu], displaces "
-					"dubious chunk %lu from chunk buffer\n",
+					"%lu blocks of dubious chunk %lu from chunk buffer\n",
 					inet_ntoa(ptr->srcip),
 					ptr->args[0], ptr->args[1],
-					ptr->args[2]);
+					ptr->args[2], ptr->args[3]);
 				break;
 			case EV_CLIDUBPROMO:
 				fprintf(fd, "%s: block %lu[%lu], no longer "
@@ -313,17 +313,17 @@ TraceDump(int serverrel)
 				break;
 			case EV_CLISCHUNK:
 				fprintf(fd, "%s: start chunk %lu, block %lu, "
-					"%lu chunks in progress\n",
+					"%lu chunks in progress (goodblks=%lu)\n",
 					inet_ntoa(ptr->srcip),
 					ptr->args[0], ptr->args[1],
-					ptr->args[2]);
+					ptr->args[2], ptr->args[3]);
 				break;
 			case EV_CLIECHUNK:
 				fprintf(fd, "%s: end chunk %lu, block %lu, "
-					"%lu chunks in progress\n",
+					"%lu chunks in progress (goodblks=%lu)\n",
 					inet_ntoa(ptr->srcip),
 					ptr->args[0], ptr->args[1],
-					ptr->args[2]);
+					ptr->args[2], ptr->args[3]);
 				break;
 			case EV_CLILCHUNK:
 				fprintf(fd, "%s: switched from incomplete "
@@ -408,26 +408,39 @@ TraceDump(int serverrel)
 					inet_ntoa(ptr->srcip));
 				break;
 			case EV_CLIWRSTATUS:
-				fprintf(fd, "%s: writer %s",
-					inet_ntoa(ptr->srcip),
-					ptr->args[0] ? "IDLE" : "STARTED");
-				if (ptr->args[0]) {
-					unsigned long long bytes;
-					bytes = (unsigned long long)ptr->args[1] << 32;
-					bytes |= ptr->args[2];
+			{
+				unsigned long long bytes;
+				char *str = "??";
 
-					fprintf(fd, ", %llu bytes written",
-						bytes);
+				switch (ptr->args[0]) {
+				case 0:
+					str = "IDLE";
+					break;
+				case 1:
+					str = "STARTED";
+					break;
+				case 2:
+					str = "RUNNING";
+					break;
 				}
-				fprintf(fd, "\n");
+				fprintf(fd, "%s: writer %s",
+					inet_ntoa(ptr->srcip), str);
+
+				bytes = (unsigned long long)ptr->args[1] << 32;
+				bytes |= ptr->args[2];
+				fprintf(fd, ", %llu bytes written\n",
+					bytes);
 				break;
+			}
 			case EV_CLIGOTPKT:
 				stamp.tv_sec = ptr->args[0];
 				stamp.tv_usec = ptr->args[1];
 				timersub(&ptr->tstamp, &stamp, &stamp);
-				fprintf(fd, "%s: got block, wait=%03ld.%03ld\n",
+				fprintf(fd, "%s: got block, wait=%03ld.%03ld"
+					", %lu good blocks recv (%lu total)\n",
 					inet_ntoa(ptr->srcip),
-					stamp.tv_sec, stamp.tv_usec/1000);
+					stamp.tv_sec, stamp.tv_usec/1000,
+					ptr->args[2], ptr->args[3]);
 				break;
 			case EV_CLIRTIMO:
 				stamp.tv_sec = ptr->args[0];

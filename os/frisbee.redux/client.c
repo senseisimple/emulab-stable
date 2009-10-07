@@ -121,6 +121,10 @@ ChunkBuffer_t   *ChunkBuffer;		/* The cache */
 int		*ChunkRequestList;	/* Randomized chunk request order */
 int		TotalChunkCount;	/* Total number of chunks in file */
 
+#ifdef NEVENTS
+int blocksrecv, goodblocksrecv;
+#endif
+
 /* XXX imageunzip.c */
 extern long long totaledata, totalrdata, totalddata;
 extern unsigned long decompblocks, writeridles;
@@ -162,9 +166,9 @@ usage()
 	exit(1);
 }
 
-void (*DiskIdleCallback)();
+void (*DiskStatusCallback)();
 static void
-WriterIdleCallback(int isidle)
+WriterStatusCallback(int isbusy)
 {
 	uint32_t hi, lo;
 
@@ -175,7 +179,7 @@ WriterIdleCallback(int isidle)
 		hi = (totalrdata >> 32);
 		lo = totalrdata;
 	}
-	CLEVENT(1, EV_CLIWRSTATUS, isidle, hi, lo, 0);
+	CLEVENT((isbusy < 2) ? 1 : 3, EV_CLIWRSTATUS, isbusy, hi, lo, 0);
 }
 
 int
@@ -451,14 +455,14 @@ main(int argc, char **argv)
 		ClientTraceInit(traceprefix);
 		TraceStart(tracing);
 		if (!nothreads)
-			DiskIdleCallback = WriterIdleCallback;
+			DiskStatusCallback = WriterStatusCallback;
 	}
 
 	PlayFrisbee();
 
 	if (tracing) {
 		TraceStop();
-		TraceDump(0);
+		TraceDump(0, tracing);
 	}
 
 	ImageUnzipQuit();
@@ -588,7 +592,7 @@ ClientRecvThread(void *arg)
 
 			CLEVENT(BackOff ? 1 : (p->msg.block.block==0 ? 3 : 4),
 				EV_CLIGOTPKT, pstamp.tv_sec, pstamp.tv_usec,
-				0, 0);
+				goodblocksrecv, blocksrecv);
 #ifdef NEVENTS
 			needstamp = 1;
 #endif
@@ -990,13 +994,16 @@ GotBlock(Packet_t *p)
 	static int lastnoroomchunk = -1, lastnoroomblocks, inprogress;
 	int	nfull = 0, nfill = 0; 
 
+#ifdef NEVENTS
+	blocksrecv++;
+#endif
 #ifndef OLD_SCHOOL
 	/*
 	 * If we have already processed this chunk, bail now.
 	 */
 	if (Chunks[chunk].done) {
 		assert(Chunks[chunk].seen);
-		CLEVENT(3, EV_CLIDUPCHUNK, chunk, block, 0, 0);
+		CLEVENT((block==0)? 3 : 4, EV_CLIDUPCHUNK, chunk, block, 0, 0);
 		DOSTAT(dupchunk++);
 		if (debug > 2)
 			log("Duplicate chunk %d data ignored!", chunk);
@@ -1054,8 +1061,14 @@ GotBlock(Packet_t *p)
 				assert(Chunks[dchunk].done == 0);
 				assert(Chunks[dchunk].seen == 1);
 
+#ifdef NEVENTS
+				{
+				int dblocks = BlockMapIsAlloc(&ChunkBuffer[dubious].blockmap, 0, CHUNKSIZE);
+				goodblocksrecv -= dblocks;
 				CLEVENT(1, EV_CLIREUSE, chunk, block,
-					dchunk, 0);
+					dblocks, dchunk);
+				}
+#endif
 				Chunks[dchunk].seen = 0;
 				Chunks[dchunk].lastreq = 0;
 				lastnoroomchunk = -1;
@@ -1125,7 +1138,8 @@ GotBlock(Packet_t *p)
 		bzero(&ChunkBuffer[i].blockmap,
 		      sizeof(ChunkBuffer[i].blockmap));
 		inprogress++;
-		CLEVENT(1, EV_CLISCHUNK, chunk, block, inprogress, 0);
+		CLEVENT(1, EV_CLISCHUNK, chunk, block, inprogress,
+			goodblocksrecv+1);
 	}
 	assert(Chunks[chunk].seen);
 
@@ -1144,8 +1158,9 @@ GotBlock(Packet_t *p)
 	}
 	ChunkBuffer[i].blockcount--;
 	memcpy(ChunkBuffer[i].blocks[block].data, p->msg.block.buf, BLOCKSIZE);
-
 #ifdef NEVENTS
+	goodblocksrecv++;
+
 	/*
 	 * If we switched chunks before completing the previous, make a note.
 	 */
@@ -1173,7 +1188,8 @@ GotBlock(Packet_t *p)
 		assert(ChunkBuffer[i].thischunk == chunk);
 
 		inprogress--;
-		CLEVENT(1, EV_CLIECHUNK, chunk, block, inprogress, 0);
+		CLEVENT(1, EV_CLIECHUNK, chunk, block, inprogress,
+			goodblocksrecv);
 		if (debug)
 			log("Releasing chunk %d to main thread", chunk);
 		ChunkBuffer[i].state = CHUNK_FULL;

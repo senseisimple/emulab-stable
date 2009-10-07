@@ -973,7 +973,7 @@ main(int argc, char **argv)
 
 	if (tracing) {
 		TraceStop();
-		TraceDump(1);
+		TraceDump(1, tracing);
 	}
 	subtime(&LastReq, &LastReq, &FirstReq);
 

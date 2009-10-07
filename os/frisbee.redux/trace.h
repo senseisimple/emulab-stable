@@ -105,7 +105,7 @@ extern void ClientTraceReinit(char *file);
 extern void ServerTraceInit(char *file);
 extern void TraceStart(int level);
 extern void TraceStop(void);
-extern void TraceDump(int mkrel);
+extern void TraceDump(int mkrel, int level);
 #else
 #define EVENT(l, e, ip, a1, a2, a3, a4)
 #define CLEVENT(l, e, a1, a2, a3, a4)
@@ -114,5 +114,5 @@ extern void TraceDump(int mkrel);
 #define ServerTraceInit(file)
 #define TraceStart(level)
 #define TraceStop()
-#define TraceDump(mkrel)
+#define TraceDump(mkrel, level)
 #endif
