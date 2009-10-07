@@ -383,17 +383,15 @@ sub CreateFromSignedTicket($$;$$)
     # We save copies of the tickets we hand out, but delete them
     # when redeemed. If we still have it, mark it.
     #
-    if (! $nosig) {
-	my $query_result =
-	    DBQueryWarn("select * from geni_tickets where idx='$seqno'");
+    my $query_result =
+	DBQueryWarn("select * from geni_tickets where idx='$seqno'");
 
-	if ($query_result && $query_result->numrows) {
-	    my $row = $query_result->fetchrow_hashref();
-	    $self->{'redeem_before'} = $row->{'redeem_before'};
-	    $self->{'slice_uuid'}    = $row->{'slice_uuid'};
-	    $self->{'idx'}    = $seqno;
-	    $self->{'stored'} = 1;
-	}
+    if ($query_result && $query_result->numrows) {
+	my $row = $query_result->fetchrow_hashref();
+	$self->{'redeem_before'} = $row->{'redeem_before'};
+	$self->{'slice_uuid'}    = $row->{'slice_uuid'};
+	$self->{'idx'}    = $seqno;
+	$self->{'stored'} = 1;
     }
     bless($self, $class);
 
