@@ -4,7 +4,7 @@
  * All rights reserved.
  */
 
-static const char rcsid[] = "$Id: score.cc,v 1.67 2009-05-20 18:06:08 tarunp Exp $";
+static const char rcsid[] = "$Id: score.cc,v 1.68 2009-10-08 02:16:49 ricci Exp $";
 
 #include "port.h"
 
@@ -60,7 +60,8 @@ extern tb_sgraph SG;		// switch fabric
 void score_link(pedge pe,vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode);
 void unscore_link(pedge pe,vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode);
 bool find_best_link(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
-                    pedge &out_edge);
+                    pedge &out_edge, bool check_src_iface,
+                    bool check_dst_iface);
 int find_interswitch_path(pvertex src_pv,pvertex dest_pv,
 			  int bandwidth,pedge_path &out_path,
 			  pvertex_list &out_switches);
@@ -238,8 +239,8 @@ float find_link_resolutions(resolution_vector &resolutions, pvertex pv,
   }
 
   pedge pe;
-  // Direct link
-  if (find_best_link(dest_pv,pv,vlink,pe)) {
+  // Direct link (have to check both interfaces if they are fixed)
+  if (find_best_link(dest_pv,pv,vlink,pe,true,true)) {
     tb_link_info info(tb_link_info::LINK_DIRECT);
     info.plinks.push_back(pe);
     resolutions.push_back(info);
@@ -278,7 +279,9 @@ float find_link_resolutions(resolution_vector &resolutions, pvertex pv,
       }
 
       if (first_link) {
-        if (!find_best_link(pv,*switch_it,vlink,first)) {
+        // Check only whether the source interface is fixed - this is the
+        // first link in a multi-hop path
+        if (!find_best_link(pv,*switch_it,vlink,first,true,false)) {
           SDEBUG(cerr << "    intraswitch failed - no link first" <<
               endl;)
             // No link to this switch
@@ -287,7 +290,9 @@ float find_link_resolutions(resolution_vector &resolutions, pvertex pv,
       }
 
       if (second_link) {
-        if (!find_best_link(dest_pv,*switch_it,vlink,second)) {
+        // Check only whether the dest interface is fixed - this is the
+        // last link in a multi-hop path
+        if (!find_best_link(dest_pv,*switch_it,vlink,second,false,true)) {
           // No link to this switch
           SDEBUG(cerr << "    intraswitch failed - no link second" <<
               endl;)
@@ -352,8 +357,9 @@ float find_link_resolutions(resolution_vector &resolutions, pvertex pv,
         }
 
         if (first_link) {
-          if
-            (!find_best_link(pv,*source_switch_it,vlink,first)) {
+          // Check only whether the source interface is fixed - this is the
+          // first link in a multi-hop path
+          if (!find_best_link(pv,*source_switch_it,vlink,first,true,false)) {
               // No link to this switch
               SDEBUG(cerr << "    interswitch failed - no first link"
                   << endl;)
@@ -362,7 +368,9 @@ float find_link_resolutions(resolution_vector &resolutions, pvertex pv,
         }
 
         if (second_link) {
-          if (!find_best_link(dest_pv,*dest_switch_it,vlink,second)) {
+          // Check only whether the dest interface is fixed - this is the
+          // last link in a multi-hop path
+          if (!find_best_link(dest_pv,*dest_switch_it,vlink,second,false,true)) {
             // No link to tshis switch
             SDEBUG(cerr << "    interswitch failed - no second link" <<                                          endl;)
               continue;
@@ -493,43 +501,6 @@ void resolve_link(vvertex vv, pvertex pv, tb_vnode *vnode, tb_pnode *pnode,
       resolution_vector resolutions;
       float total_weight = find_link_resolutions(resolutions, pv, dest_pv,
           vlink,pnode,dest_pnode,flipped);
-      
-      /*
-       * If they have asked for a specific interface, filter out any
-       * resolutions that don't have it
-       */
-      if (vlink->fix_src_iface) {
-	  resolution_vector::iterator rit;
-	  for (rit = resolutions.begin(); rit != resolutions.end();) {
-	      pedge link = (*rit).plinks.front();
-	      tb_plink *plink = get(pedge_pmap,link);
-	      if (plink->srciface != vlink->src_iface) {
-		  // Doesn't match, remove it!
-		   total_weight -= resolution_cost(rit->type_used);
-		   rit = resolutions.erase(rit);
-	       } else {
-		   rit++;
-	       }
-	  }
-      }
-      
-      if (vlink->fix_dst_iface) {
-	  resolution_vector::iterator rit;
-	  for (rit = resolutions.begin(); rit != resolutions.end();) {
-	      pedge link = (*rit).plinks.back();
-	      tb_plink *plink = get(pedge_pmap,link);
-	      // Yes, this really is srciface
-	      // XXX: This only works because we always have the node as the 'source'
-	      // of a plink! Shouldn't depend on this!
-	      if (plink->srciface != vlink->dst_iface) {
-		  // Doesn't match, remove it!
-		  total_weight -= resolution_cost(rit->type_used);
-		  rit = resolutions.erase(rit);
-	      } else {
-		  rit++;
-	      }
-	  }
-      }
       
       int n_resolutions = resolutions.size();
       //int resolution_index = n_resolutions - 1;
@@ -1412,7 +1383,8 @@ int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed, bool skip
 }
 
 bool find_best_link(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
-			 pedge &out_edge)
+			 pedge &out_edge, bool check_src_iface,
+                         bool check_dst_iface)
 {
   pvertex dest_pv;
   double best_distance = 1000.0;
@@ -1433,6 +1405,36 @@ bool find_best_link(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
       if (plink->types.find(vlink->type) == plink->types.end()) {
 	  continue;
       }
+
+      // If the vlink has a fixed source interface, and it doesn't match
+      // this plink, skip it
+      // XXX: Is this gonna break interswtich?
+      if (vlink->fix_src_iface && check_src_iface) {
+          if (plink->srciface != vlink->src_iface) {
+              SDEBUG(cerr << "find_best_link: Fix source: " << plink->srciface
+                      << " != " << vlink->src_iface << endl);
+              continue;
+          } else {
+              SDEBUG(cerr << "find_best_link: Fix source: " << plink->srciface
+                      << " == " << vlink->src_iface << endl);
+          }
+      }
+
+      // Same for destination
+      // Yes, this really is srciface
+      // XXX: This only works because we always have the node as the 'source'
+      // of a plink! Shouldn't depend on this!
+      if (vlink->fix_dst_iface && check_dst_iface) {
+          if (plink->srciface != vlink->dst_iface) {
+              SDEBUG(cerr << "find_best_link: Fix dst: " << plink->srciface
+                      << " != " << vlink->dst_iface << endl);
+              continue;
+          } else {
+              SDEBUG(cerr << "find_best_link: Fix dst: " << plink->srciface
+                      << " == " << vlink->dst_iface << endl);
+          }
+      }
+
 
       // Get delay characteristics - NOTE: Currently does not actually do
       // anything
