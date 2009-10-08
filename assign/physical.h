@@ -343,7 +343,11 @@ public:
 // Hasher for pairs
 template <class T> struct pairhash { 
     size_t operator()(pair<T,T> const &A) const {
-	hash<T> H;
+#ifdef NEW_GCC
+	__gnu_cxx::hash<T> H;
+#else
+        ::hash<T> H;
+#endif
 	return (H(A.first) | H(A.second));
     }
 };
