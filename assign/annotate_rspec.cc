@@ -4,7 +4,7 @@
  * All rights reserved.
  */
 
-static const char rcsid[] = "$Id: annotate_rspec.cc,v 1.7 2009-10-08 00:31:59 tarunp Exp $";
+static const char rcsid[] = "$Id: annotate_rspec.cc,v 1.8 2009-10-08 20:27:24 tarunp Exp $";
 
 #ifdef WITH_XML
 
@@ -188,7 +188,7 @@ void annotate_rspec::annotate_interface (const DOMElement* plink, DOMElement* vl
 // 	vlink_iface->setAttribute(XStr("component_node_uuid").x(), p_iface->getAttribute(XStr("component_node_uuid").x()));
 // 	vlink_iface->setAttribute(XStr("component_interface_id").x(), p_iface->getAttribute(XStr("component_interface_id").x()));
 	
-	XStr component_interface_id (vlink_iface->getAttribute(XStr("component_interface_id").x()));
+	XStr component_interface_id (p_iface->getAttribute(XStr("component_interface_id").x()));
 	XStr virtual_interface_id (vlink_iface->getAttribute(XStr("virtual_interface_id").x()));
 	
 	// Get the interface for the node and update 
