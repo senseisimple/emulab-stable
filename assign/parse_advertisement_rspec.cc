@@ -8,7 +8,7 @@
  * XML Parser for RSpec ptop files
  */
 
-static const char rcsid[] = "$Id: parse_advertisement_rspec.cc,v 1.5 2009-07-20 08:14:00 ricci Exp $";
+static const char rcsid[] = "$Id: parse_advertisement_rspec.cc,v 1.6 2009-10-08 00:31:59 tarunp Exp $";
 
 #ifdef WITH_XML
 
@@ -344,9 +344,7 @@ bool populate_nodes_rspec(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
 
 		    if( !strcmp( exclusive, "false" ) )
 			p->features.push_front( tb_node_featuredesire( feature, 
-								       1.0,
-                                                                       true,
-                                                                       featuredesire::FD_TYPE_NORMAL) );
+								       1.0, true, featuredesire::FD_TYPE_NORMAL) );
 		}
 
 		/*
@@ -524,6 +522,7 @@ bool populate_links_rspec(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
 		src_iface = source.component_interface_name;
 		dst_node = dest.component_node_uuid;
 		dst_iface = dest.component_interface_name;
+		
 		if (src_node.compare("") == 0 || src_iface.compare("") == 0)
 		{
 			cerr << "Physical link " << str_component_uuid << " must have a component uuid and component interface name specified for the source node" << endl;

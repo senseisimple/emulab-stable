@@ -34,6 +34,10 @@
       <xs:attributeGroup ref="rspec:ComponentName"/>
     </xs:complexType>
   </xs:element>
+  <xs:attributeGroup name="VirtualInterfaceRefName">
+    <xs:attribute name="virtual_node_id" use="required"/>
+    <xs:attribute name="virtual_interface_id" use="required"/>
+  </xs:attributeGroup>
   <!--
     Each interface represents a particular physical interface. If that
     interface is one of the link end points, it is also mapped to that
@@ -43,9 +47,7 @@
     <xs:sequence>
       <xs:element name="interface_ref">
         <xs:complexType>
-          <xs:attribute name="component_node_uuid"/>
-          <xs:attribute name="component_node_urn"/>
-          <xs:attribute name="component_interface_id"/>
+          <xs:attributeGroup ref="rspec:ComponentInterfaceRefName"/>
           <xs:attribute name="virtual_node_id"/>
           <xs:attribute name="virtual_interface_id"/>
         </xs:complexType>

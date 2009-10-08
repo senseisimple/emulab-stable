@@ -8,7 +8,7 @@
  * XML Parser for RSpec ptop files
  */
 
-static const char rcsid[] = "$Id: parse_request_rspec.cc,v 1.14 2009-10-07 20:48:27 stoller Exp $";
+static const char rcsid[] = "$Id: parse_request_rspec.cc,v 1.15 2009-10-08 00:31:59 tarunp Exp $";
 
 #ifdef WITH_XML
 
@@ -62,8 +62,8 @@ int bind_vtop_subnodes(tb_vgraph &vg);
  * These are not meant to be used outside of this file, so they are only
  * declared in here
  */
-bool populate_nodes_rspec(DOMElement *root, tb_vgraph &vg);
-bool populate_links_rspec(DOMElement *root, tb_vgraph &vg);
+bool populate_nodes_rspec(DOMElement *root, tb_vgraph &vg, map< pair<string, string>, pair<string, string> >* fixed_interfaces);
+bool populate_links_rspec(DOMElement *root, tb_vgraph &vg, map< pair<string, string>, pair<string, string> >* fixed_interfaces);
 bool populate_vclasses_rspec (DOMElement *root, tb_vgraph &vg);
 
 bool hasComponentSpec (DOMElement* element);
@@ -134,24 +134,27 @@ int parse_vtop_rspec(tb_vgraph &vg, char *filename) {
         XStr generated (request_root->getAttribute(XStr("generated").x()));
         XStr valid_until(request_root->getAttribute(XStr("valid_until").x()));
         
+		map< pair<string, string>, pair<string, string> > fixed_interfaces;
+				//map< pair<string, string>, pair<string, string> >();
+				
         /*
         * These three calls do the real work of populating the assign data
         * structures
         */
         // clock_t startNode = clock();
         XMLDEBUG("starting node population" << endl);
-        if (!populate_nodes_rspec(request_root,vg)) {
-        cerr << "Error reading nodes from virtual topology " << filename << endl;
-        exit(EXIT_FATAL);
+        if (!populate_nodes_rspec(request_root,vg, &fixed_interfaces)) {
+			cerr << "Error reading nodes from virtual topology " << filename << endl;
+			exit(EXIT_FATAL);
         }
         XMLDEBUG("finishing node population" << endl);
         // //cerr << "Time taken : " << (clock() - startNode) / CLOCKS_PER_SEC << endl;
 
 		// clock_t startLink = clock();
         XMLDEBUG("starting link population" << endl);
-        if (!populate_links_rspec(request_root,vg)) {
-        cerr << "Error reading links from virtual topology " << filename << endl;
-        exit(EXIT_FATAL);
+        if (!populate_links_rspec(request_root,vg, &fixed_interfaces)) {
+			cerr << "Error reading links from virtual topology " << filename << endl;
+			exit(EXIT_FATAL);
         }
         XMLDEBUG("finishing link population" << endl);
 		// //cerr << "Time taken : " << (clock() - startLink) / CLOCKS_PER_SEC << endl;
@@ -172,7 +175,7 @@ int parse_vtop_rspec(tb_vgraph &vg, char *filename) {
 /*
  * Pull nodes from the document, and populate assign's own data structures
  */
-bool populate_nodes_rspec(DOMElement *root, tb_vgraph &vg) {
+bool populate_nodes_rspec(DOMElement *root, tb_vgraph &vg, map< pair<string, string>, pair<string, string> >* fixed_interfaces) {
 	bool is_ok = true;
     /*
      * Get a list of all nodes in this document
@@ -218,18 +221,40 @@ bool populate_nodes_rspec(DOMElement *root, tb_vgraph &vg) {
 		
 		if (str_virtual_uuid == "")
 		{
-			cerr << "Every node must have a virtual_id" << endl;
+			cerr << "ERROR: Every node must have a virtual_id" << endl;
 			is_ok = false;
 			continue;
 		}
 
 		DOMNodeList *interfaces = elt->getElementsByTagName(XStr("interface").x());
-		string *str_virtual_interface_names = new string [interfaces->getLength()];
-		string *str_component_interface_names = new string [interfaces->getLength()];
+		string *str_interface_virtual_ids = new string [interfaces->getLength()];
+		string *str_interface_component_ids = new string [interfaces->getLength()];
 		for (int index = 0; index < interfaces->getLength(); ++index)
 		{
-			str_virtual_interface_names[index] = string(XStr((dynamic_cast<DOMElement*>(interfaces->item(index)))->getAttribute(XStr("virtual_id").x())).c());
-			str_component_interface_names[index] = string(XStr((dynamic_cast<DOMElement*>(interfaces->item(index)))->getAttribute(XStr("component_id").x())).c());
+			DOMElement* interface = dynamic_cast<DOMElement*>(interfaces->item(index));
+			str_interface_virtual_ids[index] = string(XStr(interface->getAttribute(XStr("virtual_id").x())).c());
+			if (interface->hasAttribute(XStr("component_id").x()))
+			{
+				string component_id = string(XStr(interface->getAttribute(XStr("component_id").x())).c());
+				string component_uuid = str_component_uuid;
+				if (component_uuid == "") 
+				{
+					cerr << "ERROR: Found a fixed interface (" << str_interface_virtual_ids[index] << ") on an unfixed node (" << str_virtual_uuid << ")" << endl;
+					is_ok = false;
+					continue;
+				}
+				pair<map< pair<string, string>, pair<string, string> > :: iterator, bool> rv 
+										= fixed_interfaces->insert(make_pair(
+										 	make_pair(str_virtual_uuid, str_interface_virtual_ids[index]),
+											make_pair(str_component_uuid, component_id)));
+				if (rv.second == false) 
+				{
+					is_ok = false;
+					cerr << "The node-interface pair (" << str_virtual_uuid << "," << str_interface_virtual_ids[index] << ") was not unique.";
+					cerr << "Interfaces within a node must have unique identifiers."<< endl;
+					continue;
+				}
+			}
 		}
 
 		/* Deal with the location tag */
@@ -429,7 +454,7 @@ bool populate_nodes_rspec(DOMElement *root, tb_vgraph &vg) {
 /*
  * Pull the links from the ptop file, and populate assign's own data sturctures
  */
-bool populate_links_rspec(DOMElement *root, tb_vgraph &vg) {
+bool populate_links_rspec(DOMElement *root, tb_vgraph &vg, map< pair<string, string>, pair<string, string> >* fixed_interfaces) {
     
     bool is_ok = true;
     
@@ -562,11 +587,32 @@ bool populate_links_rspec(DOMElement *root, tb_vgraph &vg) {
 		bool allow_delayed = true;
 		//bool allow_trivial = false;
 		bool allow_trivial = true;
+		
+		map< pair<string,string>, pair<string,string> >::iterator it;
+		
 		bool fix_src_iface = false;
-		bool fix_dst_iface = false;
 		fstring fixed_src_iface = "";
+		it = fixed_interfaces->find(pair<string,string>(src_node.c_str(), src_iface.c_str()));
+		if (it != fixed_interfaces->end())
+		{
+			cerr << "Found fixed source interface (" << (it->second).first << "," << (it->second).second << ") on (" << (it->first).first << "," << (it->first).second << ")" << endl;
+			fix_src_iface = true;
+			fixed_src_iface = (it->second).second;
+		}
+			
+		
+		bool fix_dst_iface = false;
 		fstring fixed_dst_iface = "";
-
+		it = fixed_interfaces->find(make_pair(dst_node, src_iface));
+		if (it != fixed_interfaces->end())
+		{
+			cerr << "Found fixed destination interface (" << (it->second).first << "," << (it->second).second << ") on (" << (it->first).first << "," << (it->first).second << ")" << endl;
+			fix_dst_iface = true;
+			fixed_dst_iface = (it->second).second;
+		}
+		
+		
+		
 
 /*		bool allow_trivial = false;
 		#ifdef ALLOW_TRIVIAL_DEFAULT

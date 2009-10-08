@@ -46,8 +46,8 @@ class annotate_rspec : public annotate
 		// Creates a hop from a switch till the next end point. Adds the hop to the vlink and returns the hop element that was created
 		 xercesc::DOMElement* create_component_hop (const xercesc::DOMElement* plink, xercesc::DOMElement* vlink, int endpoint_interface, const xercesc::DOMElement* prev_component_hop);
 			
-		// If the interface is the end point of a link/path, add an additional attribute to it
-		 void set_interface_as_link_endpoint (xercesc::DOMElement* interface, const char* _id);
+		// If the interface is the end point of a link/path, add two additional attributes to it
+		 void set_interface_as_link_endpoint (xercesc::DOMElement* interface, const char* virtual_node_id, const char* virtual_interface_id);
 	
 		// Finds the next link in the path returned by assign
 		 xercesc::DOMElement* find_next_link_in_path (xercesc::DOMElement *prev, std::list<const char*>* links);

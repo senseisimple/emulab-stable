@@ -52,13 +52,18 @@ RSpecContents &=
 LinkMapping =
   element component_hop { ComponentName, InterfaceMapping* }+
 
+VirtualInterfaceRefName =
+  (attribute virtual_node_id { text } &
+   attribute virtual_interface_id { text })
+
 # Each interface represents a particular physical interface. If that
 # interface is one of the link end points, it is also mapped to that
 # virtual interface name.
 InterfaceMapping = element interface_ref {
-  ComponentInterfaceRefName |
-  (attribute virtual_node_id { text } &
-   attribute virtual_interface_id { text })
+  ComponentInterfaceRefName &
+  VirtualInterfaceRefName?
+#  (attribute virtual_node_id { text } &
+#   attribute virtual_interface_id { text })?
 #  VirtualName ?
 }
 

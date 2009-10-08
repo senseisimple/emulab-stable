@@ -4,7 +4,7 @@
  * All rights reserved.
  */
 
-static const char rcsid[] = "$Id: annotate_rspec.cc,v 1.6 2009-10-06 23:53:10 duerig Exp $";
+static const char rcsid[] = "$Id: annotate_rspec.cc,v 1.7 2009-10-08 00:31:59 tarunp Exp $";
 
 #ifdef WITH_XML
 
@@ -150,11 +150,14 @@ DOMElement* annotate_rspec::create_component_hop (const DOMElement* plink, DOMEl
 	
 	// If the source interface is an end point
 	if (endpoint_interface == SOURCE || endpoint_interface == BOTH)
-		set_interface_as_link_endpoint(plink_src_iface_clone, XStr(vlink_src_iface->getAttribute(XStr("virtual_node_id").x())).c());
+		set_interface_as_link_endpoint(plink_src_iface_clone, 
+									   		XStr(vlink_src_iface->getAttribute(XStr("virtual_node_id").x())).c(), XStr(vlink_src_iface->getAttribute(XStr("virtual_interface_id").x())).c());
 	
 	// If the destination interface is an end point
 	if (endpoint_interface == DESTINATION || endpoint_interface == BOTH)
-		set_interface_as_link_endpoint(plink_dst_iface_clone, XStr(vlink_dst_iface->getAttribute(XStr("virtual_node_id").x())).c());
+		set_interface_as_link_endpoint(plink_dst_iface_clone, 
+									   		XStr(vlink_dst_iface->getAttribute(XStr("virtual_node_id").x())).c(),
+									  		XStr(vlink_dst_iface->getAttribute(XStr("virtual_interface_id").x())).c());
 		
 	// Add interface specifications to the link in the single hop element
 	component_hop->appendChild(plink_src_iface_clone);
@@ -182,15 +185,15 @@ void annotate_rspec::annotate_interface (const DOMElement* plink, DOMElement* vl
           p_iface = getElementByAttributeValue(plink, "interface_ref", "component_node_urn", node_component_uuid.c());
         }
 
-	vlink_iface->setAttribute(XStr("component_node_uuid").x(), p_iface->getAttribute(XStr("component_node_uuid").x()));
-	vlink_iface->setAttribute(XStr("component_interface_id").x(), p_iface->getAttribute(XStr("component_interface_id").x()));
+// 	vlink_iface->setAttribute(XStr("component_node_uuid").x(), p_iface->getAttribute(XStr("component_node_uuid").x()));
+// 	vlink_iface->setAttribute(XStr("component_interface_id").x(), p_iface->getAttribute(XStr("component_interface_id").x()));
 	
-	XStr component_interface_name (vlink_iface->getAttribute(XStr("component_interface_id").x()));
-	XStr virtual_interface_name (vlink_iface->getAttribute(XStr("virtual_interface_id").x()));
+	XStr component_interface_id (vlink_iface->getAttribute(XStr("component_interface_id").x()));
+	XStr virtual_interface_id (vlink_iface->getAttribute(XStr("virtual_interface_id").x()));
 	
 	// Get the interface for the node and update 
-	DOMElement* vnode_iface_decl = getElementByAttributeValue(vnode, "interface", "virtual_id", virtual_interface_name.c());
-	vnode_iface_decl->setAttribute (XStr("component_name").x(), component_interface_name.x());
+	DOMElement* vnode_iface_decl = getElementByAttributeValue(vnode, "interface", "virtual_id", virtual_interface_id.c());
+	vnode_iface_decl->setAttribute (XStr("component_id").x(), component_interface_id.x());
 }
 
 // Copies the component spec from the source to the destination
@@ -203,9 +206,10 @@ void annotate_rspec::copy_component_spec(const DOMElement* src, DOMElement* dst)
 }
 
 // If the interface belongs to an end point of the link, and additional virtual_id attribute has to be added to it
-void annotate_rspec::set_interface_as_link_endpoint (DOMElement* interface, const char* virtual_id)
+void annotate_rspec::set_interface_as_link_endpoint (DOMElement* interface, const char* virtual_node_id, const char* virtual_interface_id)
 {
-	interface->setAttribute(XStr("virtual_id").x(), XStr(virtual_id).x());
+	interface->setAttribute(XStr("virtual_node_id").x(), XStr(virtual_node_id).x());
+	interface->setAttribute(XStr("virtual_interface_id").x(), XStr(virtual_interface_id).x());
 }
 
 // Finds the next link in the path returned by assign
