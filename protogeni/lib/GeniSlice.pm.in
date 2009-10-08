@@ -152,6 +152,22 @@ sub LookupByExperiment($$)
 }
 
 #
+# Lookup all slice(s) of a specified creator.
+#
+sub LookupByCreator($$)
+{
+    my ($class, $creator) = @_;
+
+    my $creator_uuid = $creator->uuid();
+    my $query_result =
+	DBQueryWarn("select idx from geni_slices ".
+		    "where creator_uuid='$creator_uuid'");
+    return undef unless defined($query_result);
+
+    return map( GeniSlice->Lookup( $_ ), $query_result->fetchcol( 0 ) );
+}
+
+#
 # We lock at a very coarse grain, mostly in the CM. When a slice is busy
 # we cannot expire things from it.
 #

@@ -91,7 +91,7 @@ sub GetCredential($)
 	# breaking stuff.
 	my $authority = GeniAuthority->Lookup($ENV{'MYUUID'});
 	if (!defined($authority)) {
-	    print STDERR "Could not find local authority object\n";
+	    print STDERR "Could not find local authority object for $ENV{'MYUUID'}\n";
 	    return GeniResponse->Create(GENIRESPONSE_ERROR);
 	}
 	my $credential = GeniCredential->Create($authority, $geniuser);
@@ -280,7 +280,11 @@ sub Resolve($)
 	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED,
 					undef, "No one here by that name");
 	}
-	
+
+	my @slices = GeniSlice->LookupByCreator( $geniuser );
+	my @sliceURNs = map( GeniHRN::Generate( $OURDOMAIN, "slice",
+						$_->slicename() ), @slices );
+
 	# Return a blob.
 	my $blob = { "uid"      => $geniuser->uid(),
 		     "hrn"      => $geniuser->hrn(),
@@ -288,6 +292,7 @@ sub Resolve($)
 		     "email"    => $geniuser->email(),
 		     "gid"      => $geniuser->cert(),
 		     "name"     => $geniuser->name(),
+		     "slices"   => \@sliceURNs
 		    };
 	
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
