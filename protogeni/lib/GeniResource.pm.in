@@ -771,11 +771,26 @@ sub Clear($$)
     }
 
     if (defined($newticket)) {
+	#
+	# Generate a slice credential for the user. 
+	#
+	my $slice_credential = GeniCredential->Create($slice, $geniuser);
+	if (!defined($slice_credential)) {
+	    print STDERR
+		"*** Could not create a slice credential for ".
+		"$slice/$geniuser!\n";
+	    return -1;
+	}
+	if ($slice_credential->Sign($GeniCredential::LOCALSA_FLAG) != 0) {
+	    print STDERR
+		"*** Could not sign slice credential $slice_credential!\n";
+	    return -1;
+	}
 	$response =
 	    Genixmlrpc::CallMethod($authority->url(),
 			   $usercontext, "ReleaseTicket",
-			   { "ticket" => $newticket->asString()});
-
+			   { "ticket" => $newticket->asString(),
+			     "credential" => $slice_credential->asString()});
 	if (!defined($response)) {
 	    print STDERR "*** Internal error releasing ticket for $self\n";
 	    return -1;
