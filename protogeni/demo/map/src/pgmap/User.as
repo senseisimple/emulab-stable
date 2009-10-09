@@ -14,14 +14,18 @@
  
  package pgmap
 {
+	import mx.collections.ArrayCollection;
+	
 	public class User
 	{
 		public var uid : String;
+		public var uuid : String = "66f3b32e-9666-11de-9be3-001143e453fe";
 		public var hrn : String;
-		public var uuid : String;
 		public var email : String;
 		public var name : String;
 		public var credential : String;
+		
+		public var slices:ArrayCollection = new ArrayCollection();
 		
 		public function User()
 		{

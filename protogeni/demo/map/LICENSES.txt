@@ -15,10 +15,10 @@ No license provided
 * images/waiting.swf
  - http://www.ajaxload.info/
  
- Creative Commons Attribution 2.5 License
+Creative Commons Attribution 3.0 License
  ----------------------------------------
  * images/*
-  - http://www.famfamfam.com/lab/icons/silk/
+  - http://www.fatcow.com/free-icons/index.bml
   
   ===============================
   Shared code with ProtoGENI Demo

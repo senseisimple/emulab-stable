@@ -22,6 +22,7 @@
 		public var hrn : String = null;
 		public var creator : User = null;
 		public var credential : String = null;
+		public var sliverCredential : String = null;
 		
 		public var Nodes : ArrayCollection = new ArrayCollection();
 		public var Links : ArrayCollection = new ArrayCollection();

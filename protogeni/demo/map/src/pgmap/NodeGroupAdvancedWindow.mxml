@@ -58,6 +58,7 @@
 				imgExclusive.source = Common.assignIcon(n.exclusive);
 				
 				linksEndpointVbox.removeAllChildren();
+				linksStartpointVbox.removeAllChildren();
 				
 				var endpointArray:ArrayCollection = new ArrayCollection();
 				var startpointArray:ArrayCollection = new ArrayCollection();

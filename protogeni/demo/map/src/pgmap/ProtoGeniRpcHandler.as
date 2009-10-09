@@ -32,6 +32,8 @@
 		
 		public var sliceNodes : Array;
 		public var sliceNodesStatus : Array;
+		public var slices : Array;
+		public var sliceCredentials : Array;
 		
 		public var main : pgmap;
 		
@@ -123,44 +125,16 @@
 	    {
 	    	main.setProgress("Done", Common.successColor);
 	    	main.stopWaiting();
+	    	main.console.appendText("Acquiring credential complete...\n");
 	      addResponse();
 	      if (code == 0)
 	      {
-	        main.pgHandler.CurrentUser.credential = String(response.value);
+	      	main.pgHandler.CurrentUser.credential = String(response.value);
 	        postCall();
 	      }
 	      else
 	      {
 	        codeFailure();
-	      }
-	    }
-	    
-	    public function startResolveUser() : void
-	    {
-	      opName = "Looking up user";
-	      main.setProgress(opName, Common.waitColor);
-	      main.startWaiting();
-	      main.console.appendText(opName + "...\n");
-	      op.reset(Geni.resolve);
-	      op.addField("credential", main.pgHandler.CurrentUser.credential);
-	      op.addField("uuid", "66f3b32e-9666-11de-9be3-001143e453fe");
-	      op.addField("type", "User");
-	      op.call(completeResolveUser, failure);
-	    }
-	    
-	    public function completeResolveUser(code : Number, response : Object) : void
-	    {
-	    	main.setProgress("Done", Common.successColor);
-	    	main.stopWaiting();
-	    	main.console.appendText("List Components complete...\n");
-	      if (code == 0)
-	      {
-	      	postCall();
-	      }
-	      else
-	      {
-	        codeFailure();
-	        main.console.appendText(op.getResponseXml());
 	      }
 	    }
 	    
@@ -225,9 +199,50 @@
 		        Rspec = new XML(decodedRspec);
 	      	} else
 	      		Rspec = new XML(response.value);
+	      		
 	        main.pgHandler.processRspec(null);
-	        
-	        startSliceLookup();
+	        // ADD INTERMEDIATE CALL TO GET USER, THEN ...
+	        startResolveUser();
+	      }
+	      else
+	      {
+	        codeFailure();
+	        main.console.appendText(op.getResponseXml());
+	      }
+	    }
+	    
+	    public function startResolveUser() : void
+	    {
+	      opName = "Resolving user";
+	      main.setProgress(opName, Common.waitColor);
+	      main.startWaiting();
+	      main.console.appendText(opName + "...\n");
+	      op.reset(Geni.resolve);
+	      op.addField("credential", main.pgHandler.CurrentUser.credential);
+	      op.addField("uuid", main.pgHandler.CurrentUser.uuid);
+	      op.addField("type", "User");
+	      op.call(completeResolveUser, failure);
+	    }
+	    
+	    public function completeResolveUser(code : Number, response : Object) : void
+	    {
+	    	main.setProgress("Done", Common.successColor);
+	    	main.stopWaiting();
+	    	main.console.appendText("Resolve user complete...\n");
+	      if (code == 0)
+	      {
+	      	main.pgHandler.CurrentUser.uid = response.value.uid;
+	      	main.pgHandler.CurrentUser.hrn = response.value.hrn;
+	      	main.pgHandler.CurrentUser.uuid = response.value.uuid;
+	      	main.pgHandler.CurrentUser.email = response.value.email;
+	      	main.pgHandler.CurrentUser.name = response.value.name;
+	      	
+	      	sliceCredentials = new Array();
+	      	slices = response.value.slices;
+	      	if(slices != null && slices.length > 0)
+	      		startSliceLookup();
+	      	else
+	      		main.pgHandler.map.drawMap();
 	      }
 	      else
 	      {
@@ -238,15 +253,13 @@
 	    
 	    public function startSliceLookup() : void
 	    {
-	      main.console.clear();
-	      	      
-	      opName = "Looking up slice";
+	      opName = "Looking up " + slices.length + " more slice(s)";
 	      main.setProgress(opName, Common.waitColor);
 	      main.startWaiting();
 	      main.console.appendText(opName);
 	      op.reset(Geni.resolve);
 	      op.addField("credential", main.pgHandler.CurrentUser.credential);
-	      op.addField("hrn", "mapslice");
+	      op.addField("hrn", slices.pop());
 	      op.addField("type", "Slice");
 		  op.call(completeSliceLookup, failure);
 	      addSend();
@@ -261,8 +274,16 @@
 	      {
 	      	slice = new Slice();
 	      	slice.uuid = response.value.uuid;
-	      	main.pgHandler.Slices.addItem(slice);
-	      	startSliceCredential();
+	      	slice.creator = main.pgHandler.CurrentUser;
+	      	slice.hrn = response.value.hrn;
+	      	
+	      	sliceCredentials.push(slice);
+	      	main.pgHandler.CurrentUser.slices.addItem(slice);
+
+			if(slices.length > 0)
+				startSliceLookup();
+			else
+	      		startSliceCredential();
 	      }
 	      else
 	      {
@@ -273,9 +294,9 @@
 	    
 	    public function startSliceCredential() : void
 	    {
-	      main.console.clear();
-	      	      
-	      opName = "Acquiring slice credential";
+	      opName = "Acquiring " + sliceCredentials.length + " more slice credential(s)";
+	      slice = sliceCredentials.pop();
+	      slices.push(slice);
 	      main.setProgress(opName, Common.waitColor);
 	      main.startWaiting();
 	      main.console.appendText(opName);
@@ -295,7 +316,114 @@
 	      if (code == 0)
 	      {
 	      	slice.credential = String(response.value);
-	      	startSliceStatus();
+	      	
+	      	if(sliceCredentials.length > 0)
+				startSliceCredential();
+			else
+	      		startGetSliver();
+	      }
+	      else
+	      {
+	        codeFailure();
+	        main.pgHandler.map.drawMap();
+	      }
+	    }
+	    
+	    public function startGetSliver() : void
+	    {
+	      opName = "Acquiring " + slices.length + " more sliver credential(s)";
+	      slice = slices.pop();
+	      main.setProgress(opName, Common.waitColor);
+	      main.startWaiting();
+	      main.console.appendText(opName);
+	      op.reset(Geni.getSliver);
+	      op.addField("credential", slice.credential);
+		  op.call(completeGetSliver, failure);
+	      addSend();
+	    }
+	    
+	    public function completeGetSliver(code : Number, response : Object) : void
+	    {
+	    	main.setProgress("Done", Common.successColor);
+	    	main.stopWaiting();
+	      addResponse();
+	      if (code == 0)
+	      {
+	      	slice.sliverCredential = String(response.value);
+	      	sliceCredentials.push(slice);
+	      }
+	      else
+	      {
+	        //codeFailure();
+	        //main.pgHandler.map.drawMap();
+	      }
+	      
+	      if(slices.length > 0)
+				startGetSliver();
+			else
+	      		startSliverTicket();
+	    }
+	    
+	    public function startSliverTicket() : void
+	    {
+	    	// No info
+	    	if(sliceCredentials.length == 0) {
+	    		main.pgHandler.map.drawMap();
+	    		return;
+	    	}
+	      
+	      opName = "Acquiring " + sliceCredentials.length + " more sliver ticket(s)";
+	      slice = sliceCredentials.pop();
+	      main.setProgress(opName, Common.waitColor);
+	      main.startWaiting();
+	      main.console.appendText(opName);
+	      op.reset(Geni.sliverTicket);
+	      op.addField("credential", slice.sliverCredential);
+		  op.call(completeSliverTicket, failure);
+	      addSend();
+	    }
+	    
+	    public function completeSliverTicket(code : Number, response : Object) : void
+	    {
+	    	main.setProgress("Done", Common.successColor);
+	    	main.stopWaiting();
+	      addResponse();
+	      if (code == 0)
+	      {
+	      	// GO THROUGH RSPEC
+	      	if(sliceCredentials.length > 0)
+	      		startSliverTicket();
+	      	else
+	      		main.pgHandler.map.drawMap();
+	      }
+	      else
+	      {
+	        codeFailure();
+	        main.pgHandler.map.drawMap();
+	      }
+	    }
+	    
+	    public function startSliverStatus() : void
+	    {
+	      opName = "Acquiring sliver status";
+	      main.setProgress(opName, Common.waitColor);
+	      main.startWaiting();
+	      main.console.appendText(opName);
+	      op.reset(Geni.sliverStatus);
+	      op.addField("credential", slice.sliverCredential);
+		  op.call(completeSliverStatus, failure);
+	      addSend();
+	    }
+	    
+	    public function completeSliverStatus(code : Number, response : Object) : void
+	    {
+	    	main.setProgress("Done", Common.successColor);
+	    	main.stopWaiting();
+	      addResponse();
+	      if (code == 0)
+	      {
+	      	sliceNodes = new Array();
+	      	
 	      }
 	      else
 	      {
@@ -306,8 +434,6 @@
 	    
 	    public function startSliceStatus() : void
 	    {
-	      main.console.clear();
-	      	      
 	      opName = "Acquiring slice status";
 	      main.setProgress(opName, Common.waitColor);
 	      main.startWaiting();
@@ -329,10 +455,10 @@
 	      	sliceNodesStatus = new Array();
 	      	// !!!IMPROTANT!!!
 	      	// Iterates over the keys into the array instead of the actual values
-	      	for (var urn : String in response.value.details) {
+	      	for (var urn : String in response.value.detailsNew) {
 	      		sliceNodes.push(urn);
 	      	}
-	      	for each (var ready : String in response.value.details) {
+	      	for each (var ready : String in response.value.detailsNew) {
 	      		sliceNodesStatus.push(ready);
 	      	}
 	      	if(sliceNodes.length > 0)
@@ -349,15 +475,13 @@
 	    
 	    public function startResolveNodes() : void
 	    {
-	      main.console.clear();
-	      	      
 	      opName = "Resolving " + sliceNodes.length + " more node(s)";
 	      main.setProgress(opName, Common.waitColor);
 	      main.startWaiting();
 	      main.console.appendText(opName);
 	      op.reset(Geni.resolveNode);
 	      op.addField("credential", main.pgHandler.CurrentUser.credential);
-	      op.addField("uuid", sliceNodes.pop());
+	      op.addField("urn", sliceNodes.pop());
 	      op.addField("type", "Node");
 		  op.call(completeResolveNode, failure);
 	      addSend();
