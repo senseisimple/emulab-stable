@@ -40,6 +40,9 @@ package
     public static var updateSliver : Array = new Array(cm, "UpdateSliver");
     public static var resolveNode : Array = new Array(cm, "Resolve");
     public static var sliceStatus : Array = new Array(cm, "SliceStatus");
+    public static var getSliver : Array = new Array(cm, "GetSliver");
+    public static var sliverStatus : Array = new Array(cm, "SliverStatus");
+    public static var sliverTicket : Array = new Array(cm, "SliverTicket");
 
     public static var map : Array = new Array(ses, "Map");
     
