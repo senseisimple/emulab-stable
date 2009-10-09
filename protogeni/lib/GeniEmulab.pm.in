@@ -165,7 +165,7 @@ sub CreatePhysNode($)
     my ($auth,$type,$node_id) = GeniHRN::Parse($node_urn);
     my $manager_urn = GeniHRN::Generate($auth, "authority", "cm");
 
-    print STDERR "$node_urn\n";
+#    print STDERR "$node_urn\n";
 
     #
     # Load the SA cert to act as caller context.
@@ -200,7 +200,7 @@ sub CreatePhysNode($)
     my ($translated)  = $authority->hrn() =~ /^([-\w]+)\..*/;
     my $node_hrn      = $translated . "." . $node_id;
 
-    print STDERR "$node_hrn\n";
+#    print STDERR "$node_hrn\n";
 
     my $component = GeniComponent->Lookup($node_hrn);
     if (defined($component)) {
@@ -215,6 +215,8 @@ sub CreatePhysNode($)
 	    return undef;
 	}
     }
+
+    print STDERR "Creating local node for $node_urn\n";
 
     my $credential = GeniRegistry::Client->CreateCredential($component);
     if (!defined($credential)) {
@@ -337,7 +339,7 @@ sub CreatePhysNode($)
 		    $ifaceargs->{'role'} = TBDB_IFACEROLE_CONTROL();
 		}
 		$count++;
-		print Dumper($ifaceargs);
+		#print Dumper($ifaceargs);
 	    }
 	}
     }
