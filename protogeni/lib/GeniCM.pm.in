@@ -974,7 +974,10 @@ sub GetTicket($;$)
     }
   skiplinks:
     $virtexperiment->Dump();
-    $virtexperiment->Store();
+    if ($virtexperiment->Store()) {
+	$response = GeniResponse->Create(GENIRESPONSE_ERROR, undef);
+	goto bad;
+    }
 
     # Must chdir to the work directory for the mapper.
     if (! chdir($slice_experiment->WorkDir())) {
