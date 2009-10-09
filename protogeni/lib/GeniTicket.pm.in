@@ -736,7 +736,18 @@ sub Release($$)
     my @nodes   = ();
 
     foreach my $ref (@{$self->rspec()->{'node'}}) {
+	# Skip lan nodes; they are fake.
+	next
+	    if (exists($ref->{'node_type'}) &&
+		exists($ref->{'node_type'}->{'type_name'}) &&
+		$ref->{'node_type'}->{'type_name'} eq "lan");
+	
 	my $resource_uuid = $ref->{'component_uuid'} || $ref->{'uuid'};
+	if (!defined($resource_uuid)) {
+	    print STDERR "No resource id for node in ticket\n";
+	    print Dumper($ref);
+	    return -1;
+	}
 
 	# Virtual nodes not created until ticket redeemed.
 	my $node = Node->Lookup($resource_uuid);
@@ -798,7 +809,18 @@ sub ReleaseHolding($$)
     my @nodes   = ();
 
     foreach my $ref (@{$self->rspec()->{'node'}}) {
+	# Skip lan nodes; they are fake.
+	next
+	    if (exists($ref->{'node_type'}) &&
+		exists($ref->{'node_type'}->{'type_name'}) &&
+		$ref->{'node_type'}->{'type_name'} eq "lan");
+	
 	my $resource_uuid = $ref->{'component_uuid'} || $ref->{'uuid'};
+	if (!defined($resource_uuid)) {
+	    print STDERR "No resource id for node in ticket\n";
+	    print Dumper($ref);
+	    return -1;
+	}
 	my $node = Node->Lookup($resource_uuid);
 	next
 	    if (!defined($node));
