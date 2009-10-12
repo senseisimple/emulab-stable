@@ -579,14 +579,14 @@ sub GenDefsFile($)
 
 	print TCL "# subOSIDs and parent OSIDs (default parent first element)\n";
 	$query_result =
-	    DBQueryFatal("select oi.osname,oi.def_parentosid," . 
-			 " group_concat(oi2.osname separator '\" \"')" .
-			 " from os_info as oi " . 
-			 " left join os_submap as osm" .
-			 "   on oi.osid=osm.osid" . 
+	    DBQueryFatal("select oi.osname,oi3.osname," . 
+			 "group_concat(oi2.osname separator '\" \"')" . 
+			 " from os_submap as osm" . 
+			 " left join os_info as oi on osm.osid=oi.osid" . 
 			 " left join os_info as oi2 on osm.parent_osid=oi2.osid" . 
+			 " left join os_info as oi3 on oi.def_parentosid=oi3.osid" . 
 			 " where oi.def_parentosid is not NULL" . 
-			 " group by oi2.osname");
+			 " group by oi.osname");
 		     
 	while (my ($osname,$def_parentosid,$parent_osids) = 
 	       $query_result->fetchrow_array()) {
