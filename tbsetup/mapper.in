@@ -571,7 +571,7 @@ sub RunAssign($$)
 	return -1;
     }
     TBDebugTimeStamp("ReadSolution started");
-    if ($vtop->ReadSolution(*ASSIGNFP) != 0) {
+    if ($vtop->ReadTextSolution(*ASSIGNFP) != 0) {
 	print("Could not parse assign logfile! $!\n");
 	return -1;
     }
