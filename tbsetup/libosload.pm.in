@@ -64,6 +64,7 @@ sub osload ($$) {
     my $zerofree    = 0;
     my $prepare     = 0;
     my $swapinfo    = 0;
+    my %nodeflags   = ();
 
     # Locals
     my %retries	    = ();
@@ -90,7 +91,7 @@ sub osload ($$) {
 	$debug = $args->{'debug'};
     }
     if (defined($args->{'imageid'})) {
-	@imageids = split /,/, $args->{'imageid'};
+	@imageids = split(/,/, $args->{'imageid'});
 	$usedefault = 0;
     }
     if (defined($args->{'imageids'})) {
@@ -106,9 +107,11 @@ sub osload ($$) {
     if (defined($args->{'prepare'})) {
 	$prepare = $args->{'prepare'};
     }
-
     if (defined($args->{'swapinfo'})) {
 	$swapinfo = $args->{'swapinfo'};
+    }
+    if (defined($args->{'nodeflags'})) {
+	%nodeflags = %{$args->{'nodeflags'}};
     }
 
     #
@@ -224,26 +227,31 @@ sub osload ($$) {
 	}
 	
 	# Get default imageid for this node.
-	my $default_imageid = $nodeobject->default_imageid();
-	if (! defined($default_imageid)) {
-	    tberror "$node: No default imageid defined!";
-	    goto failednode;
-	}
-	my @default_imageids = split/,/, $default_imageid;
-	my @default_images;
-	foreach my $default_imageid (@default_imageids) {
-	    my $default_image = Image->Lookup($default_imageid);
-	    if (!defined($default_image)) {
-		tberror("Could not map $default_imageid to its object!");
-		return -1;
+	# NOTE that virtnodes don't have default imageids -- they are only 
+	# loaded (and thus arrive here) if the user specifically set a loadable
+	# subOS for the node.
+	if (!$nodeobject->isvirtnode()) {
+	    my $default_imageid = $nodeobject->default_imageid();
+	    if (! defined($default_imageid)) {
+		tberror "$node: No default imageid defined!";
+		goto failednode;
 	    }
-	    push @default_images, $default_image;
-	}
+	    my @default_imageids = split(/,/, $default_imageid);
+	    my @default_images;
+	    foreach my $default_imageid (@default_imageids) {
+		my $default_image = Image->Lookup($default_imageid);
+		if (!defined($default_image)) {
+		    tberror("Could not map $default_imageid to its object!");
+		    return -1;
+		}
+		push @default_images, $default_image;
+	    }
 
-	if ($usedefault) {
-	    $prepare = 1;
-	    @imageids = @default_imageids;
-	    @images   = @default_images;
+	    if ($usedefault) {
+		$prepare = 1;
+		@imageids = @default_imageids;
+		@images   = @default_images;
+	    }
 	}
 	
 	my @imageidxs = (0 .. $#imageids);
@@ -426,6 +434,7 @@ sub osload ($$) {
 	my $type  = $nodeobject->type();
 	my $class = $nodeobject->class();
 	my $isremote = $nodeobject->isremotenode();
+	my $isvirtnode = $nodeobject->isvirtnode();
 	my $reload_mode;
 	my $reload_func;
 	my $reboot_required;
@@ -438,6 +447,11 @@ sub osload ($$) {
 	    $reload_mode = "Frisbee";
 	    $reload_func = \&SetupReloadFrisbee;
 	    $reboot_required = !$noreboot; # Reboot unless $noreboot flag set
+
+	    if (defined($nodeflags{$node}) 
+		&& defined($nodeflags{$node}{'noreboot'})) {
+		$reboot_required = !$nodeflags{$node}{'noreboot'};
+	    }
 
 	    foreach my $i (@imageidxs) {
 		# This is passed along so that remote node can request the file.
@@ -468,7 +482,8 @@ sub osload ($$) {
 	    'zerofree' => $zerofree,
 	    'prepare'  => $prepare,
 	    'maxwait'  => $maxwait,
-	    'isremote' => $isremote
+	    'isremote' => $isremote,
+	    'isvirtnode' => $isvirtnode
 	};
 
 	print "Setting up reload for $node (mode: $reload_mode)\n";
@@ -768,6 +783,16 @@ sub WaitTillReloadDone($$$@)
 		} else {
 		    $maxwait = $reload_info->{$node}{'maxwait'};
 		}
+
+		#
+		# If it's a virtnode, we need to add a bunch of time based
+		# on how long the parent might take.  This is a fool's errand,
+		# given how synchronous our scripts are, so give it 8 mins 
+		# for now.
+		#
+		if ($reload_info->{$node}{'isvirtnode'}) {
+		    $maxwait += 8 * 60;
+		}
 		
 		my $query_result =
 		    DBQueryWarn("select * from current_reloads ".
@@ -853,6 +878,7 @@ sub SetupReloadFrisbee($)
     my $imageids      = $reload_info->{'imageids'};
     my $zerofree      = $reload_info->{'zerofree'};
     my $prepare       = $reload_info->{'prepare'};
+    my $isvirtnode    = $reload_info->{'isvirtnode'};
     my $osid          = TBNodeDiskloadOSID($node);
 
     #
@@ -881,6 +907,12 @@ sub SetupReloadFrisbee($)
 	tberror "os_select $osid failed!";
 	return -1;
     }
+
+    # Need to kick virtnodes so stated picks up the next_op_mode from os_select
+    if ($isvirtnode) {
+	TBSetNodeEventState($node,TBDB_NODESTATE_SHUTDOWN);
+    }
+
     foreach my $imageid (@$imageids) {
 	system("$FRISBEELAUNCHER " . ($debug ? "-d ": "") . "$imageid");
 	if ($?) {

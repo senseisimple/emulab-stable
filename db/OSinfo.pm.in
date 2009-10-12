@@ -44,7 +44,8 @@ my %FEATURES	= ( "ping"	 => 1,
 		    "veths"	 => 0,
 		    "mlinks"	 => 0,
 		    "linktest"	 => 1,
-		    "linkdelays" => 0 );
+		    "linkdelays" => 0,
+		    "suboses"  => 0 );
 
 # Valid OS names. Mirrored in the web interface. The value is a user-okay flag.
 my %OSLIST	= ( "Linux"	 => 1,
@@ -171,6 +172,7 @@ sub nextosid($)		{ return field($_[0], "nextosid"); }
 sub max_concurrent($)   { return field($_[0], "max_concurrent"); }
 sub mfs($)              { return field($_[0], "mfs"); }
 sub reboot_waittime($)  { return field($_[0], "reboot_waittime"); }
+sub def_parentosid($)   { return field($_[0], "def_parentosid"); }
 
 #
 # Create a new os_info. This installs the new record in the DB,
@@ -229,7 +231,8 @@ sub Create($$$$$$)
     foreach my $key ("old_osid", "OS", "version", "path", "machinetype", 
 		     "osfeatures", "ezid", "shared", "mustclean",
 		     "op_mode", "nextosid", "old_nextosid",
-		     "max_concurrent", "mfs", "reboot_waittime") {
+		     "max_concurrent", "mfs", "reboot_waittime",
+		     "def_parentosid") {
 	if (exists($argref->{$key})) {
 	    push(@arg_slots, $key);
 	}
@@ -570,6 +573,49 @@ sub FeatureSupported($$)
 	if (!defined($osfeatures) || $osfeatures eq "");
 
     return grep {$_ eq $feature} split(',', $osfeatures);
+}
+
+#
+# Return 1 if OS is a sub OS (i.e., has a def_parentosid).
+#
+sub IsSubOS($)
+{
+    my ($self,) = @_;
+
+    my $def_parentosid = $self->def_parentosid();
+    return 0
+	if (!defined($def_parentosid) || $def_parentosid eq "");
+
+    return 1;
+}
+
+#
+# Return 1 if OS is a sub OS and runs on the given parent.
+#
+sub RunsOnParent($$)
+{
+    my ($self,$parent) = @_;
+
+    my ($osid,$osname) = ($self->osid(),$self->osname());
+    my $def_parentosid = $self->def_parentosid();
+
+    my ($posid,$posname) = ($parent->osid(),$parent->osname());
+
+    
+    return 0
+	if (!$self->IsSubOS());
+
+    return 1
+	if ($posid == $def_parentosid);
+
+    my $result = DBQueryWarn("select osid from os_submap".
+			     " where osid=$osid and parent_osid=$posid");
+    if (!$result || $result->num_rows() == 0) {
+	warn "Child OS $osname cannot run on any OSes!\n";
+	return 0;
+    }
+
+    return 1;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

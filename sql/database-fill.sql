@@ -210,6 +210,7 @@ REPLACE INTO foreign_keys VALUES ('virt_nodes','osname','os_info','osname');
 REPLACE INTO foreign_keys VALUES ('vlans','pid,eid','experiments','pid,eid');
 REPLACE INTO foreign_keys VALUES ('nseconfigs','eid,pid,vname','virt_nodes','eid,pid,vname');
 REPLACE INTO foreign_keys VALUES ('nseconfigs','eid,pid','experiments','eid,pid');
+REPLACE INTO foreign_keys VALUES ('virt_nodes','parent_osname','os_info','osname');
 
 --
 -- Dumping data for table `mode_transitions`
@@ -276,6 +277,8 @@ REPLACE INTO mode_transitions VALUES ('ALWAYSUP','SHUTDOWN','RELOAD-MOTE','SHUTD
 REPLACE INTO mode_transitions VALUES ('ALWAYSUP','ISUP','RELOAD-MOTE','SHUTDOWN','ReloadStart');
 REPLACE INTO mode_transitions VALUES ('ALWAYSUP','ISUP','RELOAD-MOTE','ISUP','ReloadStart');
 REPLACE INTO mode_transitions VALUES ('RELOAD-MOTE','SHUTDOWN','ALWAYSUP','ISUP','ReloadDone');
+REPLACE INTO mode_transitions VALUES ('PCVM','SHUTDOWN','RELOAD-PCVM','SHUTDOWN','ReloadSetup');
+REPLACE INTO mode_transitions VALUES ('RELOAD-PCVM','SHUTDOWN','PCVM','SHUTDOWN','ReloadDone');
 
 --
 -- Dumping data for table `priorities`
@@ -526,6 +529,10 @@ REPLACE INTO state_transitions VALUES ('GARCIA-STARGATEv1','TBSETUP','TBFAILED',
 REPLACE INTO state_transitions VALUES ('GARCIA-STARGATEv1','TBFAILED','SHUTDOWN','RebootAfterFail');
 REPLACE INTO state_transitions VALUES ('RELOAD','RELOADSETUP','RELOADOLDMFS','');
 REPLACE INTO state_transitions VALUES ('RELOAD','RELOADOLDMFS','SHUTDOWN','');
+REPLACE INTO state_transitions VALUES ('RELOAD-PCVM','RELOADSETUP','RELOADING','ReloadStart');
+REPLACE INTO state_transitions VALUES ('RELOAD-PCVM','RELOADING','RELOADDONE','ReloadDone');
+REPLACE INTO state_transitions VALUES ('RELOAD-PCVM','RELOADDONE','SHUTDOWN','ReloadDone');
+REPLACE INTO state_transitions VALUES ('RELOAD-PCVM','SHUTDOWN','RELOADSETUP','ReloadSetup');
 
 --
 -- Dumping data for table `state_triggers`
@@ -543,6 +550,7 @@ REPLACE INTO state_triggers VALUES ('*','RELOAD-MOTE','RELOADDONE','RELOADDONE')
 REPLACE INTO state_triggers VALUES ('*','OPSNODEBSD','ISUP','SCRIPT:opsreboot');
 REPLACE INTO state_triggers VALUES ('*','NORMALv2','WEDGED','POWERCYCLE');
 REPLACE INTO state_triggers VALUES ('*','RELOAD','RELOADOLDMFS','RELOADOLDMFS');
+REPLACE INTO state_triggers VALUES ('*','RELOAD-PCVM','RELOADDONE','RESET, RELOADDONE');
 
 --
 -- Dumping data for table `table_regex`
@@ -693,6 +701,7 @@ REPLACE INTO table_regex VALUES ('virt_nodes','failureaction','text','regex','^(
 REPLACE INTO table_regex VALUES ('virt_nodes','routertype','text','regex','^(none|ospf|static|manual|static-ddijk|static-old)$',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','fixed','text','redirect','default:tinytext',0,128,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','sharing_mode','text','regex','^[-\\w]+$',1,32,NULL);
+REPLACE INTO table_regex VALUES ('virt_nodes','parent_osname','text','redirect','os_info:osname',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_programs','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_programs','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_programs','vnode','text','redirect','virt_nodes:vname',0,0,NULL);

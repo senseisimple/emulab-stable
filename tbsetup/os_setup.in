@@ -384,12 +384,22 @@ while (my %row = $db_result->fetchhash()) {
     }
 
     #
+    # If the virtnode is running a subOS, we set $imageable because it 
+    # really is going to be reloaded... even though virtnode types are not
+    # typically imageable.
+    #
+    if ($virtnode && defined($osinfo) && $osinfo->def_parentosid()) {
+	$imageable = 1;
+    }
+
+    #
     # If there is a path specified, then we don't worry anymore about it.
     # The user must know what is going on. The OSID might have a path
     # associated with it, which means the same thing; we don't worry about
     # it.
     #
-    if (!$bootpath && !$virtnode && !$isgeninode && $imageable) {
+    if (!$bootpath && (!$virtnode || ($virtnode && $imageable)) 
+	&& !$isgeninode && $imageable) {
 	#
 	# These checks are not necessary if the front end and web page
 	# are doing the right thing, but lets be careful anyway.
@@ -734,7 +744,22 @@ if (!$TESTMODE) {
     foreach my $imageid ( keys(%reloads) ) {
 	my @nodelist = @{ $reloads{$imageid} };
 
+	my %nodeflags = ();
+
 	foreach my $node (@nodelist) {
+	    #
+	    # vnodes only get rebooted if this is a modify and we need to
+	    # reload them (otherwise they will get rebooted because of presence
+	    # in %reboots).
+	    #
+	    if (defined($vnodes{$node})) {
+		my $vstate;
+		TBGetNodeAllocState($node,\$vstate);
+		if ($vstate eq TBDB_ALLOCSTATE_RES_INIT_CLEAN()) {
+		    $nodeflags{$node}{'noreboot'} = 1;
+		}
+	    }
+
 	    TBSetNodeAllocState( $node, TBDB_ALLOCSTATE_RES_RELOAD() );
 	    $nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_RELOAD();
 	    # No point in reboot/reconfig obviously, since node will reboot!
@@ -750,6 +775,7 @@ if (!$TESTMODE) {
 	$reload_args{'asyncmode'} = 1;
 	$reload_args{'imageid'}   = $imageid;
 	$reload_args{'nodelist'}  = [ @nodelist ];
+	$reload_args{'nodeflags'} = \%nodeflags;
 
 	my $pid = osload(\%reload_args, $reload_failures);
 	push(@children, [ $pid, \&osload_wait,
@@ -1650,6 +1676,18 @@ sub SetupReload($$$)
 {
     my ($node, $osinfo, $type) = @_;
 
+    #
+    # We use a special type, "pcvm", for *any* subOS that can boot on a vnode.
+    # For now, we're not going to mess with vnode types -- type checking is 
+    # pretty pointless for this, since what we really want to check for a subOS
+    # is whether it can boot on a specific parentOS.
+    # So, users who make subOSes have to select that they can boot on type
+    # pcvm and that's all that's necessary.
+    #
+    if (defined($vnodes{$node})) {
+	$type = "pcvm";
+    }
+
     if ((my $image = TBMapOSIDtoImageID($osinfo->osid(), $type))) {
 	# XXX firewall is treated special
 	if ($firewalled && ($node eq $firewall)) {
@@ -1667,7 +1705,7 @@ sub SetupReload($$$)
     else {
 	die_noretry({type => 'primary', severity => SEV_ERROR,
 		     error => ['file_not_found', 'image', $osinfo, $node]},
-		    "No image can be found for $osinfo on $node!");
+		    "No image can be found for $osinfo on $node ($type)!");
     }
 }
 

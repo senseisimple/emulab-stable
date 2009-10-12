@@ -2451,12 +2451,13 @@ CREATE TABLE `os_info` (
   `path` tinytext,
   `magic` tinytext,
   `machinetype` varchar(30) NOT NULL default '',
-  `osfeatures` set('ping','ssh','ipod','isup','veths','veth-ne','veth-en','mlinks','linktest','linkdelays','vlans') default NULL,
+  `osfeatures` set('ping','ssh','ipod','isup','veths','veth-ne','veth-en','mlinks','linktest','linkdelays','vlans','suboses') default NULL,
   `ezid` tinyint(4) NOT NULL default '0',
   `shared` tinyint(4) NOT NULL default '0',
   `mustclean` tinyint(4) NOT NULL default '1',
   `op_mode` varchar(20) NOT NULL default 'MINIMAL',
   `nextosid` int(8) unsigned default NULL,
+  `def_parentosid` int(8) unsigned default NULL,
   `old_nextosid` varchar(35) NOT NULL default '',
   `max_concurrent` int(11) default NULL,
   `mfs` tinyint(4) NOT NULL default '0',
@@ -2467,6 +2468,17 @@ CREATE TABLE `os_info` (
   KEY `path` (`path`(255)),
   KEY `old_osid` (`old_osid`),
   KEY `uuid` (`uuid`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `os_submap`
+--
+
+DROP TABLE IF EXISTS `os_submap`;
+CREATE TABLE `os_submap` (
+  `osid` int(8) unsigned NOT NULL default '0',
+  `parent_osid` int(8) unsigned NOT NULL default '0',
+  PRIMARY KEY  (`osid`,`parent_osid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
@@ -3798,6 +3810,7 @@ CREATE TABLE `virt_nodes` (
   `exptidx` int(11) NOT NULL default '0',
   `ips` text,
   `osname` varchar(20) default NULL,
+  `parent_osname` varchar(20) default NULL,
   `cmd_line` text,
   `rpms` text,
   `deltas` text,

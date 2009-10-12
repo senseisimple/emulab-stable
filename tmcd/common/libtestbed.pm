@@ -103,9 +103,9 @@ sub TBSCRIPTLOCK_GLOBALWAIT()	{ 1; }
 #                 need to make sure that everyone waits for the one that is
 #		  running to finish. Use the global option for this.
 #
-sub TBScriptLock($;$$)
+sub TBScriptLock($;$$$)
 {
-    my ($token, $global, $waittime) = @_;
+    my ($token, $global, $waittime, $lockhandle_ref) = @_;
     local *LOCK;
 
     if (!defined($waittime)) {
@@ -142,7 +142,12 @@ sub TBScriptLock($;$$)
 	    sleep(1);
 	}
 	# Okay, got the lock. Save the handle. We need it below.
-	$lockhandle = *LOCK;
+	if (defined($lockhandle_ref)) {
+	    $$lockhandle_ref = *LOCK;
+	}
+	else {
+	    $lockhandle = *LOCK;
+	}
 	return TBSCRIPTLOCK_OKAY();
     }
 
@@ -212,17 +217,28 @@ sub TBScriptLock($;$$)
     my $now = time;
     utime $now, $now, $lockname;
     
-    $lockhandle = *LOCK;
+    if (defined($lockhandle_ref)) {
+	$$lockhandle_ref = *LOCK;
+    }
+    else {
+	$lockhandle = *LOCK;
+    }
     return TBSCRIPTLOCK_OKAY();
 }
 
 #
 # Unlock; Just need to close the file (releasing the lock).
 #
-sub TBScriptUnlock()
+sub TBScriptUnlock(;$)
 {
-    close($lockhandle)
-	if defined($lockhandle);
+    my ($lockhandle_arg) = @_;
+    if (defined($lockhandle_arg)) {
+	close($lockhandle_arg);
+    }
+    else {
+	close($lockhandle)
+	    if defined($lockhandle);
+    }
 }
 
 1;

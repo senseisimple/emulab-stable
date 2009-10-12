@@ -367,7 +367,9 @@ if (! -e CONFDIR()) {
 # Inform the TMCD we are setting up. 
 #
 REBOOT:
-tmcc(TMCCCMD_STATE, "BOOTING");
+if (!($dojail && $islinux)) {
+    tmcc(TMCCCMD_STATE, "BOOTING");
+}
 
 #
 # Invoke vnode setup routine in the setup library. This will talk to
@@ -522,10 +524,12 @@ elsif ($fakevnode) {
     }
 }
 else {
-    #
-    # Inform the TMCD we are ready.
-    #
-    tmcc(TMCCCMD_STATE, "ISUP");
+    if (!($dojail && $islinux)) {
+	#
+	# Inform the TMCD we are ready.
+	#
+	tmcc(TMCCCMD_STATE, "ISUP");
+    }
 
     #
     # Now we just sit and wait to be killed off by a signal sent to the

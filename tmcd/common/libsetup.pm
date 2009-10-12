@@ -22,7 +22,7 @@ use Exporter;
 	 ixpsetup libsetup_refresh gettopomap getfwconfig gettiptunnelconfig
 	 gettraceconfig genhostsfile getmotelogconfig calcroutes fakejailsetup
 	 getlocalevserver genvnodesetup getgenvnodeconfig stashgenvnodeconfig
-         getlinkdelayconfig
+         getlinkdelayconfig getloadinfo getbootwhat
 
 	 TBDebugTimeStamp TBDebugTimeStampsOn
 
@@ -1467,6 +1467,80 @@ sub getmotelogconfig($)
 	}
     }
     @$rptr = @motelogs;
+    return 0;
+}
+
+#
+# Get load info.
+#
+sub getloadinfo($)
+{
+    my ($rptr)   = @_;
+    my @retval = ();
+    my @tmccresults = ();
+    # don't cache this stuff, can't get stale reload info!
+    my %opthash = ( 'nocache' => 1 );
+
+    if (tmcc(TMCCCMD_LOADINFO, undef, \@tmccresults, %opthash) < 0) {
+	warn("*** WARNING: Could not get loadinfo from server!\n");
+	return -1;
+    }
+
+    # accept any key/val pair with basic formatting
+    foreach my $res (@tmccresults) {
+	chomp($res);
+	my @kvs = split(/\s+/,$res);
+	my %resh = ();
+	foreach my $kv (@kvs) {
+	    my @kvpair = split(/=/,$kv);
+	    if (scalar(@kvpair) != 2) {
+		warn("*** WARNING: malformed key-val pair in loadinfo: $kv\n");
+	    }
+	    else {
+		$resh{$kvpair[0]} = $kvpair[1];
+	    }
+	}
+	push @retval, \%resh;
+    }
+
+    @$rptr = @retval;
+    return 0;
+}
+
+#
+# Get load info.
+#
+sub getbootwhat($)
+{
+    my ($rptr)   = @_;
+    my @retval = ();
+    my @tmccresults = ();
+    # don't cache this stuff, can't get stale boot info!
+    my %opthash = ( 'nocache' => 1 );
+
+    if (tmcc(TMCCCMD_BOOTWHAT, undef, \@tmccresults, %opthash) < 0) {
+	warn("*** WARNING: Could not get bootwhat from server!\n");
+	return -1;
+    }
+
+    # accept any key/val pair with basic formatting
+    foreach my $res (@tmccresults) {
+	chomp($res);
+	my @kvs = split(/\s+/,$res);
+	my %resh = ();
+	foreach my $kv (@kvs) {
+	    my @kvpair = split(/=/,$kv);
+	    if (scalar(@kvpair) != 2) {
+		warn("*** WARNING: malformed key-val pair in bootwhat: $kv\n");
+	    }
+	    else {
+		$resh{$kvpair[0]} = $kvpair[1];
+	    }
+	}
+	push @retval, \%resh;
+    }
+
+    @$rptr = @retval;
     return 0;
 }
 

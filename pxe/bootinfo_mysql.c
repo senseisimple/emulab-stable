@@ -47,7 +47,8 @@ open_bootinfo_db(void)
 */
 
 int
-query_bootinfo_db(struct in_addr ipaddr, int version, boot_what_t *info, char* key)
+query_bootinfo_db(struct in_addr ipaddr, char *node_id, int version, 
+		  boot_what_t *info, char* key)
 {
 	int		nrows, rval = 0;
 	MYSQL_RES	*res;
@@ -84,7 +85,46 @@ query_bootinfo_db(struct in_addr ipaddr, int version, boot_what_t *info, char* k
 #define DEFINED(x)		(row[(x)] != NULL && row[(x)][0] != '\0')
 #define TOINT(x)		(atoi(row[(x)]))
 
-	if(! haskey) {
+	if (node_id) {
+		/*
+		 * Right now, this is ONLY used for checking bootinfo for
+		 * imageable vnodes.  All bets off if you try it for something
+		 * else!
+		 */
+		res = mydb_query("select n.def_boot_osid, n.def_boot_cmd_line, "
+				 "        odef.path, odef.mfs, pdef.partition, "
+				 "       n.temp_boot_osid, "
+				 "        otemp.path, otemp.mfs, ptemp.partition, "
+				 "       n.next_boot_osid, n.next_boot_cmd_line, "
+				 "        onext.path, onext.mfs, pnext.partition, "
+				 "       r.pid,n.pxe_boot_path "
+				 " from nodes as n "
+				 "left join reserved as r on n.node_id=r.node_id "
+				 "left join partitions as pdef on "
+				 "     n.node_id=pdef.node_id and "
+				 "     n.def_boot_osid=pdef.osid "
+				 "left join os_info as odef on "
+				 "     odef.osid=n.def_boot_osid "
+				 "left join partitions as ptemp on "
+				 "     n.node_id=ptemp.node_id and "
+				 "     n.temp_boot_osid=ptemp.osid "
+				 "left join os_info as otemp on "
+				 "     otemp.osid=n.temp_boot_osid "
+				 "left join partitions as pnext on "
+				 "     n.node_id=pnext.node_id and "
+				 "     n.next_boot_osid=pnext.osid "
+				 "left join os_info as onext on "
+				 "     onext.osid=n.next_boot_osid "
+				 "left outer join "
+				 "  (select type,attrvalue from node_type_attributes "
+				 "     where attrkey='nobootinfo' and attrvalue='1' "
+				 "     group by type) as nobootinfo_types "
+				 "  on n.type=nobootinfo_types.type "
+				 "where n.node_id='%s' "
+				 "  and nobootinfo_types.attrvalue is NULL",
+				 16, node_id);
+	}
+	else if (! haskey) {
 		res = mydb_query("select n.def_boot_osid, n.def_boot_cmd_line, "
 				 "        odef.path, odef.mfs, pdef.partition, "
 				 "       n.temp_boot_osid, "

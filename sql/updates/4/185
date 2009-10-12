@@ -1,0 +1,71 @@
+#
+# Updates to add support for subOSes (only for vnodes right now)
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    #
+    # Update the schema...
+    #
+
+    # Add a new osfeature
+    DBQueryFatal("ALTER TABLE os_info MODIFY COLUMN osfeatures" . 
+		 " set('ping','ssh','ipod','isup','veths','veth-ne'," . 
+		 "     'veth-en','mlinks','linktest','linkdelays','vlans'," . 
+		 "     'suboses') default NULL");
+
+    # Add the def_parentosid column so that OSes that can be subOSes will
+    # always have a potential parent even if the user does not specify.
+    DBQueryFatal("ALTER TABLE os_info ADD COLUMN" . 
+		 " def_parentosid int(8) unsigned default NULL" . 
+		 " AFTER nextosid");
+
+    # Add a table that describes which (sub)osids can run on which osids.
+    DBQueryFatal("CREATE TABLE os_submap (" . 
+		 "  osid int(8) unsigned NOT NULL default '0'," . 
+		 "  parent_osid int(8) unsigned NOT NULL default '0'," . 
+		 "  PRIMARY KEY (osid,parent_osid))");
+
+    # Add the parent_osname column since we currently have no handle for
+    # virthosts in ns files, and we want to set both the subOS and parent
+    # OS potentially, for a virtnode.  This can go away when assign can
+    # handle virthosts explicitly defined in ns files.
+    DBQueryFatal("ALTER TABLE virt_nodes ADD COLUMN" . 
+		 " parent_osname varchar(20) default NULL" . 
+		 " AFTER osname");
+
+    #
+    # Add some database-fill stuff...
+    #
+
+    DBQueryFatal("REPLACE INTO foreign_keys VALUES" . 
+		 " ('virt_nodes','parent_osname','os_info','osname')");
+
+    DBQueryFatal("REPLACE INTO mode_transitions VALUES" . 
+		 " ('PCVM','SHUTDOWN','RELOAD-PCVM','SHUTDOWN','ReloadSetup')");
+    DBQueryFatal("REPLACE INTO mode_transitions VALUES" . 
+		 " ('RELOAD-PCVM','SHUTDOWN','PCVM','SHUTDOWN','ReloadDone')");
+
+    DBQueryFatal("REPLACE INTO state_transitions VALUES" . 
+		 " ('RELOAD-PCVM','RELOADSETUP','RELOADING','ReloadStart')");
+    DBQueryFatal("REPLACE INTO state_transitions VALUES" . 
+		 " ('RELOAD-PCVM','RELOADING','RELOADDONE','ReloadDone')");
+    DBQueryFatal("REPLACE INTO state_transitions VALUES" . 
+		 " ('RELOAD-PCVM','RELOADDONE','SHUTDOWN','ReloadDone')");
+    DBQueryFatal("REPLACE INTO state_transitions VALUES" . 
+		 " ('RELOAD-PCVM','SHUTDOWN','RELOADSETUP','ReloadSetup')");
+
+    DBQueryFatal("REPLACE INTO state_triggers VALUES" . 
+		 " ('*','RELOAD-PCVM','RELOADDONE','RESET, RELOADDONE')");
+
+    DBQueryFatal("REPLACE INTO table_regex VALUES" . 
+		 " ('virt_nodes','parent_osname','text','redirect','" . 
+		 " os_info:osname',0,0,NULL)");
+
+    return 0;
+}
+1;

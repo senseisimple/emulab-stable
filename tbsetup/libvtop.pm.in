@@ -767,6 +767,7 @@ sub LoadVirtNodes($)
 	my $type    = $vnode->type();
 	my $fixed   = $vnode->fixed();
 	my $osname  = $vnode->osname();
+	my $parent_osname  = $vnode->parent_osname();
 
 	# XXX
 	# If its a vtype, there will not be any node_type data. This
@@ -837,6 +838,9 @@ sub LoadVirtNodes($)
 
 	# The mapped osname to actual osinfo structure.
 	$vnode->_osinfo(undef);
+	# If the virtnode tries to specify its parent os in addition to its own,
+	# store that osinfo here.
+	$vnode->_parent_osinfo(undef);
 	# Eventual physical mapping. 
 	$vnode->_physnode(undef);
 	# Handy to combine these.
@@ -918,6 +922,25 @@ sub LoadVirtNodes($)
 	    # Silly default.
 	    my $osinfo = OSinfo->LookupByName("OPENVZ-STD");
 	    $vnode->_osinfo($osinfo);
+	}
+
+	#
+	# Map the parent_osname to an OSID now.
+	#
+	if (defined($parent_osname) && $parent_osname ne "") {
+	    my $osinfo = OSinfo->Lookup("$pid,$parent_osname");
+	    if (!defined($osinfo)) {
+		$osinfo = OSinfo->LookupByName($parent_osname);
+
+		if (!defined($osinfo)) {
+		    tberror({cause => 'user', type => 'primary',
+			     severity => SEV_ERROR,
+			     error => ['invalid_os', undef, $parent_osname, $pid]},
+			    "Invalid parent OS $parent_osname in project $pid!");
+		    return -1;
+		}
+	    }
+	    $vnode->_parent_osinfo($osinfo);
 	}
 
 	#
@@ -1256,14 +1279,35 @@ sub GenVirtNodes($)
 	# osidtoimageid for it, and thus we leave it off of the desire list
 	if (defined($vnode->_osinfo())) {
 	    my $osinfo = $vnode->_osinfo();
+	    #
+	    # Support subOSes with a multi-OS desire.  Since the pnodes
+	    # will have features like OS-parent and OS-parent-subos, we 
+	    # generate desire to match.  Parent is major since then this 
+	    # all works seamlessly with non-subos stuff.
+	    # 
+	    my $posinfo = $vnode->_parent_osinfo();
 
 	    if ($vnode->_sharedokay()) {
-		my $jailosid = $self->nodejailosid($vnode);
+		if (!defined($posinfo)) {
+		    my $jailosid = $self->nodejailosid($vnode);
 		
-		$desirestr .= " OS-$jailosid:1";
+		    $desirestr .= " OS-$jailosid:1";
+		}
+		else {
+		    $desirestr .= " OS-" . $posinfo->osid() . ":1";
+		    $desirestr .= " OS-" . $posinfo->osid() . 
+			"-" . $osinfo->osid() . ":1";
+		}
 	    }
 	    elsif (!defined($osinfo->path()) || $osinfo->path() eq "") {
-		$desirestr .= " OS-" . $osinfo->osid() . ":1";
+		if (!defined($posinfo)) {
+		    $desirestr .= " OS-" . $osinfo->osid() . ":1";
+		}
+		else {
+		    $desirestr .= " OS-" . $posinfo->osid() . ":1";
+		    $desirestr .= " OS-" . $posinfo->osid() . 
+			"-" . $osinfo->osid() . ":1";
+		}
 	    }
 	}
 
@@ -1473,7 +1517,16 @@ sub GenVirtLans($)
 		    # Doing this before assign chooses the node, is silly
 		    # but no choice right now.
 		    #
-		    if (defined($virtnode->_osinfo())) {
+		    # And now, we only map in this way IF the parent_osid
+		    # is not set (it gets set if the user chooses a subOS and
+		    # a parent is assigned by default in the parser, or
+		    # if they choose both a subOS and a specific parent OS).
+		    #
+		    if (defined($virtnode->_parent_osinfo())) {
+			$osinfo = $virtnode->_parent_osinfo();
+			$osid = $osinfo->osid();
+		    }
+		    elsif (defined($virtnode->_osinfo())) {
 			$osid = $self->nodejailosid($virtnode);
 			if (!defined($osid)) {
 			    tberror("No jailosid for $virtnode\n");
@@ -2914,6 +2967,8 @@ sub AddLinkToSolution($$$$$$$)
 sub ReadTextSolution($$)
 {
     my ($self, $input) = @_;
+
+    $self->ClearSolution();
 
     #
     # Still using the old assign format.
@@ -4690,8 +4745,13 @@ sub InitializePhysNode($$$)
 	    #
 	    # A node hosting virtnodes (like jails).
 	    #
-    	    $osid  = ($self->option("jail_osid") ||
-		      $self->nodejailosid($virtnode));
+	    if (defined($virtnode->_parent_osinfo())) {
+		$osid = $virtnode->_parent_osinfo()->osid();
+	    }
+	    else {
+		$osid  = ($self->option("jail_osid") ||
+			  $self->nodejailosid($virtnode));
+	    }
 	    return -1
 		if (!defined($osid));
 	    my $osinfo = OSinfo->Lookup($osid);
@@ -4861,23 +4921,36 @@ sub nodejailosid($$)
 
     #
     # We know at this point that all vnodes on this pnode want the same
-    # osid cause of assign (osid features/desires). 
+    # osid (at least, the same vhost osid :-)) cause of assign (osid 
+    # features/desires). 
     #
     my $osinfo    = $virtnode->_osinfo();
-    return undef
-	if (!defined($osinfo->nextosid()));
-    $osinfo = $osinfo->ResolveNextOSID($self->experiment());
-    return undef
-	if (!defined($osinfo));
-    my $nextosid = $osinfo->osid();
+    my $posinfo    = $virtnode->_parent_osinfo();
+    my $nextosid;
+
+    if (!defined($posinfo)) {
+	return undef
+	    if (!defined($osinfo->nextosid()));
+	$osinfo = $osinfo->ResolveNextOSID($self->experiment());
+	return undef
+	    if (!defined($osinfo));
+	$nextosid = $osinfo->osid();
     
-    if (defined($nextosid)) {
-	$self->printdb("Mapping VM osinfo $osinfo to ".
-		       "$nextosid on $virtnode\n");
+	if (defined($nextosid)) {
+	    $self->printdb("Mapping VM osinfo $osinfo to ".
+			   "$nextosid on $virtnode\n");
+	}
+	else {
+	    tbwarn("Could not map jail osid to real osid on $virtnode\n");
+	}
     }
     else {
-	tbwarn("Could not map jail osid to real osid on $virtnode\n");
+	# Don't try resolving nextosid if the vnode is booting a subOS.
+	$nextosid = $osinfo->osid();
+	$self->printdb("Mapping VM osinfo to subOS $osinfo".
+		       " on $virtnode\n");
     }
+
     return $nextosid;
 }
 

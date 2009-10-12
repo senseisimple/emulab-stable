@@ -157,6 +157,11 @@ while (my ($type) = $types_result->fetchrow_array()) {
     push(@mtypes_array, $type);
     $xmlfields{"mtype_$type"} = ["mtype", $SLOT_OPTIONAL];
 }
+#
+# Special hack to allow pcvm type -- see SetupReload in os_setup
+#
+push(@mtypes_array, "pcvm");
+$xmlfields{"mtype_pcvm"} = ["mtype", $SLOT_OPTIONAL];
 ## printf "%s mtypes\n", $#mtypes_array + 1;
 ## foreach my $x (@mtypes_array) { printf "%s\n", $x; }
 ## print "\n";

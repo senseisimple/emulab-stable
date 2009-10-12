@@ -3739,12 +3739,15 @@ COMMAND_PROTOTYPE(doloadinfo)
 	 * Get the address the node should contact to load its image
 	 */
 	res = mydb_query("select load_address,loadpart,OS,frisbee_pid,"
-			 "   mustwipe,mbr_version,access_key,imageid,prepare"
+			 "   mustwipe,mbr_version,access_key,imageid,prepare,"
+			 "   i.imagename,p.pid,g.gid,i.path"
 			 "  from current_reloads as r "
 			 "left join images as i on i.imageid = r.image_id "
 			 "left join os_info as o on i.default_osid = o.osid "
+			 "left join projects as p on i.pid_idx=p.pid_idx "
+			 "left join groups as g on i.gid_idx=g.gid_idx "
 			 "where node_id='%s' order by r.idx",
-			 9, reqp->nodeid);
+			 13, reqp->nodeid);
 
 	if (!res) {
 		error("doloadinfo: %s: DB Error getting loading address!\n",
@@ -3898,8 +3901,62 @@ COMMAND_PROTOTYPE(doloadinfo)
 		mysql_free_result(res2);
 
 		bufp += OUTPUT(bufp, ebufp - bufp,
-			       " DISK=%s%d ZFILL=%d ACPI=%s MBRVERS=%s ASF=%s PREPARE=%s\n",
+			       " DISK=%s%d ZFILL=%d ACPI=%s MBRVERS=%s ASF=%s PREPARE=%s",
 			       disktype, disknum, zfill, useacpi, mbrvers, useasf, prepare);
+
+		/*
+		 * If this is a vnode, tack on some additional image metadata
+		 * fields so that all vnodes (shared and not) can uniquely 
+		 * identify the image to load, and see if it needs to be
+		 * re-fetched.
+		 */
+		if (reqp->isvnode) {
+			struct stat sb;
+
+			if (!row[9] || !row[9][0]) {
+				error("doloadinfo: %s: No imagename" 
+				      " associated with imageid %s\n",
+				      reqp->nodeid, row[7]);
+				mysql_free_result(res);
+				return 1;
+			}
+			if (!row[10] || !row[10][0]) {
+				error("doloadinfo: %s: No pid" 
+				      " associated with imageid %s\n",
+				      reqp->nodeid, row[7]);
+				mysql_free_result(res);
+				return 1;
+			}
+			if (!row[11] || !row[11][0]) {
+				error("doloadinfo: %s: No gid" 
+				      " associated with imageid %s\n",
+				      reqp->nodeid, row[7]);
+				mysql_free_result(res);
+				return 1;
+			}
+			if (!row[12] || !row[12][0]) {
+				error("doloadinfo: %s: No path" 
+				      " associated with imageid %s\n",
+				      reqp->nodeid, row[7]);
+				mysql_free_result(res);
+				return 1;
+			}
+			else if (stat(row[12],&sb)) {
+				error("doloadinfo: %s: Could not stat path %s" 
+				      " associated with imageid %s: %s\n",
+				      reqp->nodeid, row[12], row[7],
+				      strerror(errno));
+				mysql_free_result(res);
+				return 1;
+			}
+
+			bufp += OUTPUT(bufp, ebufp - bufp,
+				       " IMAGEID=%s,%s,%s IMAGEMTIME=%d\n",
+				       row[10],row[11],row[9],sb.st_mtime);
+		}
+
+		/* Tack on the newline, finally */
+		bufp += OUTPUT(bufp, ebufp - bufp,"\n");
 
 		nrows--;
 	}
@@ -7673,7 +7730,8 @@ COMMAND_PROTOTYPE(dobootwhat)
 		strncpy(boot_info.data, reqp->privkey, TBDB_FLEN_PRIVKEY);
 	}
 
-	if (bootinfo(reqp->client, &boot_info, (void *) reqp)) {
+	if (bootinfo(reqp->client, (reqp->isvnode) ? reqp->nodeid : NULL,
+		     &boot_info, (void *) reqp, (reqp->isvnode) ? 1 : 0)) {
 		OUTPUT(buf, sizeof(buf), "STATUS=failed\n");
 	}
 	else {

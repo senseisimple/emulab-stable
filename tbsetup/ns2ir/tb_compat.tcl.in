@@ -384,15 +384,24 @@ proc tb-set-hardware {node type args} {
     $node set_hwtype $type $remote $isv $issub
 }
 
-proc tb-set-node-os {node os} {
+proc tb-set-node-os {node os {parentos 0}} {
     if {! ${GLOBALS::anonymous} && ! ${GLOBALS::passmode}} {
 	var_import ::TBCOMPAT::osids
 	if {! [info exists osids($os)]} {
 	    perror "\[tb-set-node-os] Invalid osid $os."
 	    return
 	}
+	if {$parentos != {} && $parentos != 0} {
+	    if {! [info exists osids($parentos)]} {
+		perror "\[tb-set-node-os] Invalid parent osid $parentos."
+		return
+	    }
+	}
     }
     $node set osid $os
+    if {$parentos != {} && $parentos != 0} {
+	$node set parent_osid $parentos
+    }
 }
 proc tb-set-node-cmdline {node cmdline} {
     $node set cmdline $cmdline

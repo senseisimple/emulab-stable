@@ -221,6 +221,43 @@ TBDebugTimeStamp("finished $vmtype rootPreConfigNetwork")
 my ($vmid,$ret,$err);
 
 #
+# see if we 1) are supposed to be "booting" into the reload mfs, and 2) if
+# we have loadinfo.  Need both to reload!
+#
+my $reload = 0;
+my @results = ();
+fatal("getbootwhat($vnodeid): $!") 
+    if (getbootwhat(\@results));
+if (scalar(@results)) {
+    if (defined($results[0]->{"WHAT"}) 
+	&& $results[0]->{"WHAT"} =~ /frisbee-pcvm/) {
+	#
+	# Ok, we're reloading, using the fake frisbee pcvm mfs.
+	#
+	$reload = 1;
+    }
+}
+
+my $image;
+if ($reload) {
+    @results = ();
+    fatal("getloadinfo($vnodeid): $!") 
+	if (getloadinfo(\@results));
+    if (!scalar(@results)) {
+	fatal("vnode $vnodeid in reloading, but got no loadinfo!");
+    }
+    else {
+	if ($results[0]->{"IMAGEID"} =~ /^([-\d\w]+),([-\d\w]+),([-\d\w]+)$/) {
+	    $image = "$1-$2-$3";
+	}
+	else {
+	    fatal("vnode $vnodeid in reloading, but got bogus IMAGEID " . 
+		  $results[0]->{"IMAGEID"} . " from loadinfo!");
+	}
+    }
+}
+
+#
 # If this file exists, we are rebooting an existing container.
 #
 if (! -e "$VNDIR/vnode.info") {
@@ -230,8 +267,16 @@ if (! -e "$VNDIR/vnode.info") {
     #
     $vmtype = GENVNODETYPE();
 
-    # OP: create
-    ($ret,$err) = safeLibOp($vnodeid,'vnodeCreate',0,0,$vnodeid);
+    if ($reload) {
+	# OP: create
+	($ret,$err) = safeLibOp($vnodeid,'vnodeCreate',0,0,$vnodeid,
+				$image,$results[0]);
+    }
+    else {
+	# OP: create
+	($ret,$err) = safeLibOp($vnodeid,'vnodeCreate',0,0,$vnodeid);
+    }
+
     if ($err) {
 	MyFatal("vnodeCreate failed");
     }
@@ -301,6 +346,24 @@ sub callback($)
 	}
     }
     return 0;
+}
+
+if ($rebooting && $reload) {
+    #
+    # vnode is already stopped due to state check above; now just remove it
+    # and recreate it.
+    #
+    ($ret,$err) = safeLibOp($vnodeid,'vnodeDestroy',1,1,$vnodeid,$vmid);
+    if ($err) {
+	MyFatal("failed to destroy $vnodeid: $err");
+    }
+
+    # OP: create
+    ($ret,$err) = safeLibOp($vnodeid,'vnodeCreate',0,0,$vnodeid,
+			    $image,$results[0]);
+    if ($err) {
+	MyFatal("vnodeCreate failed during reboot-reload");
+    }
 }
 
 # OP: preconfig

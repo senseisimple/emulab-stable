@@ -372,7 +372,13 @@ sub EditImageid($$$$)
     my $redo_map = 0;
     while (my ($type) = $types_result->fetchrow_array()) {
 	push(@mtypes_array, $type);
+    }
+    #
+    # Special hack to allow pcvm type -- see SetupReload in os_setup
+    #
+    push @mtypes_array, "pcvm";
 
+    foreach my $type (@mtypes_array) {
 	# Remember when we get one of the mtype_$type args.  These aren't DB
 	# columns to update, but instead control re-creating the rows in the
 	# osidtoimageid table for this imageid, below.

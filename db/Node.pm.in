@@ -1916,6 +1916,10 @@ sub DeleteVnodes(@)
 	DBQueryWarn("delete from node_hostkeys where node_id='$vnodeid'");
 	DBQueryWarn("delete from node_status where node_id='$vnodeid'");
 	DBQueryWarn("delete from node_rusage where node_id='$vnodeid'");
+	# Need to clean out some additional tables since some vnodes can be
+	# reimaged now!
+	DBQueryWarn("delete from current_reloads where node_id='$vnodeid'");
+	DBQueryWarn("delete from partitions where node_id='$vnodeid'");
     }
 
     return 0;
@@ -2303,6 +2307,30 @@ sub MaxShareCount($)
 
     my ($count) = $query_result->fetchrow_array();
     return $count;
+}
+
+sub IsVirtHost($)
+{
+    my $self = shift;
+    return 1
+	if ($self->{"DBROW"}{"role"} eq 'virthost');
+    return 0;
+}
+
+sub GetPhysHost($) {
+    my $self = shift;
+    my $phys_nodeid = $self->{"DBROW"}{"phys_nodeid"};
+    if (defined($phys_nodeid) && $phys_nodeid ne '') {
+	return Node->Lookup($phys_nodeid);
+    }
+    return undef;
+}
+
+sub GetOsids($) {
+    my $self = shift;
+    return ($self->{"DBROW"}{"def_boot_osid"},
+	    $self->{"DBROW"}{"temp_boot_osid"},
+	    $self->{"DBROW"}{"next_boot_osid"});
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

@@ -178,7 +178,7 @@ sub nodereboot($$)
     foreach my $node (@nodes) {
 	my $nodeobject = Node->Lookup($node);
 	my $rebootable = $nodeobject->rebootable();
-	
+
 	$nodeobjects{$node} = $nodeobject;
 	push(@temp,$node) if $rebootable;
     }

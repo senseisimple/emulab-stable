@@ -138,7 +138,8 @@ main(int argc, char **argv)
 			errorc("receiving datagram packet");
 			exit(1);
 		}
-		err = bootinfo(client.sin_addr, &boot_info, (void *) NULL);
+		err = bootinfo(client.sin_addr, (char *) NULL,
+			       &boot_info, (void *) NULL, 0);
 		if (err < 0)
 			continue;
 		if (boot_info.status == BISTAT_SUCCESS)

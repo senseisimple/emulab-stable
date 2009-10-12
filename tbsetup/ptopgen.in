@@ -386,8 +386,28 @@ if ($pid) {
     $osidquery .= " or i.pid='$pid'";
 }
 
+#
+# For subOS support (i.e., vnode OSes running atop vhost OSes), we have to
+# check both the subosid and all the parent_osid it can run on.
+#
+my $subosidquery = "select o.osid,o.parent_osid from os_submap as o " .
+	"left join osidtoimageid as oi1 on o.osid = oi1.osid " .
+	"left join osidtoimageid as oi2 on o.parent_osid = oi2.osid " .
+	"left join images as i1 on oi1.imageid = i1.imageid ".
+	"left join images as i2 on oi2.imageid = i2.imageid ".
+	"where (i1.global = 1";
+if ($pid) {
+    $subosidquery .= " or i1.pid='$pid'";
+}
+$subosidquery .= ") and (i2.global = 1";
+if ($pid) {
+    $subosidquery .= " or i2.pid='$pid'";
+}
+$subosidquery .= ")";
+
 my %node_type_osids;
 my %osid_node_types;
+my %osid_subosids;
 my %node_countries;
 my %node_latitudes;
 my %node_longitudes;
@@ -406,6 +426,17 @@ while (my ($osid,$type) = $result->fetchrow()) {
 	push @{$osid_node_types{$osid}}, $type;
     } else {
 	$osid_node_types{$osid} = [$type];
+    }
+}
+#
+# XXX Note below that for now, subosids cannot redirect to other subosids.
+#
+$result = DBQueryFatal($subosidquery);
+while (my ($subosid,$osid) = $result->fetchrow()) {
+    if ($osid_subosids{$osid}) {
+	push @{$osid_subosids{$osid}}, $subosid;
+    } else {
+	$osid_subosids{$osid} = [$subosid];
     }
 }
 
@@ -806,13 +837,22 @@ foreach $node (keys(%nodes)) {
 	#
 	my $osid = $sharing_mode{$node}->{'osid'};
 	push(@features, "OS-$osid:0.5");
+	# Add any subOSes the shared node osid can support
+	if (defined($osid_subosids{$osid})) {
+	    push (@features, map "OS-$osid-$_:0", @{$osid_subosids{$osid}});
+	}
     }
     elsif ($node_type_osids{$type}) {
 	#
 	# Add in features for all of the OSes that this node (as
 	# evidenced by its type) can support
 	#
-	push @features, map "OS-$_:0", @{$node_type_osids{$type}};
+	foreach my $o1 (@{$node_type_osids{$type}}) {
+	    push @features, "OS-$o1:0";
+	    foreach my $o2 (@{$osid_subosids{$o1}}) {
+		push @features, "OS-$o1-$o2:0";
+	    }
+	}
     }
     elsif (! $typemap{$type}->{'IMAGEABLE'} &&
 	   defined($typemap{$type}->{'OSID'})) {

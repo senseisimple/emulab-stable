@@ -58,6 +58,8 @@ use libosload;
 use libtestbed;
 use Experiment;
 use Node;
+use OSinfo;
+use Image;
 
 # Be careful not to exit on transient error
 $libdb::DBQUERY_MAXTRIES = 30;
@@ -229,8 +231,48 @@ if (defined($options{"m"})) {
 my $first = 1;
 my @temp = ();
 foreach my $node ( @nodes ) {
-    if (!$node->imageable()) {
-	my $nodeid = $node->node_id();
+    my $nodeid = $node->node_id();
+    if ($node->isvirtnode()) {
+	#
+	# Some virtnodes can be reloaded, IF their virthost is running an OS
+	# that supports subimages, and if the new child OS can run on the
+	# current virthost OS.
+	#
+	my $parent = $node->GetPhysHost();
+	my $failed = 0;
+	if (defined($parent)) {
+	    my ($def_boot_osid,undef,undef) = $parent->GetOsids();
+            my $posinfo = OSinfo->Lookup($def_boot_osid);
+            if (defined($posinfo) && $posinfo->FeatureSupported("suboses")) {
+                foreach my $imageid (@imageids) {
+		    my $image = Image->Lookup($imageid);
+		    my $osinfo = OSinfo->Lookup($image->default_osid());
+		    if (!$osinfo->IsSubOS()) {
+			print "*** reload($nodeid): $osinfo is not a subOS and thus cannot run on a virtnode, skipping!\n";
+			$failed = 1;
+		    }
+		    elsif (!$osinfo->RunsOnParent($posinfo)) {
+			print "*** reload($nodeid): subOS $osinfo cannot run on parent node $parent running $posinfo, skipping!\n";
+			$failed = 1;
+		    }
+                }
+            }
+            else {
+                print "*** reload ($nodeid): parent os $posinfo on $parent does not support suboses, skipping!\n";
+                $failed = 1;
+            }
+        }
+        else {
+	    print "*** reload ($nodeid): could not find parent phys host!\n";
+	    $failed = 1;
+        }
+
+        if ($failed) {
+	    $first = 0;
+	    next;
+        }
+    }
+    elsif (!$node->imageable()) {
 	#
 	# Common mistake: forget the -i before the imagename, e.g.,
 	# "os_load FBSD54-STD pcNN", which results in pcNN getting loaded
