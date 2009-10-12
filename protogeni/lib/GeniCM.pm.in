@@ -3231,6 +3231,14 @@ sub SliverStatus($)
 	    $details{$node_uuid} = "failed";
 	    $detailsNew{$hrn}    = "failed";
 	    $summary = "failed";
+
+	    my $bootlog;
+	    my $nodeid = $node->node_id();
+	    if ($node->GetBootLog(\$bootlog) == 0) {
+		print STDERR "\n\n";
+		print STDERR "--------------- $nodeid BootLog -------------\n";
+		print STDERR "$bootlog\n";
+	    }
 	}
 	else {
 	    $details{$node_uuid} = "notready";
