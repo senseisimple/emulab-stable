@@ -1615,27 +1615,27 @@ sub print_node_features
 	my ($name, $value) = split(/:/, $_[$i], 2);
 	my $flags = "    ";
 	if ($value >= 1.0) {
-	    $flags .= "<violatable/>";
+	    $flags .= " violatable=\"true\" ";
 	}
 	if ($name =~ /^\?\+/) {
-	    $flags .= "<local><operator>+</operator></local>";
+	    $flags .= " local_operator=\"+\" ";
 	    $name = substr($name, 2);
 	}
 	elsif ($name =~ /^\*&/) {
-	    $flags .= "<global><operator>FirstFree</operator></global>";
+	    $flags .= " global_operator=\"FirstFree\" ";
 	    $name = substr($name, 2);
 	}
 	elsif ($name =~ /^\*!/) {
-	    $flags .= "<global><operator>OnceOnly</operator></global>";
+	    $flags .= " global_operator=\"OnceOnly\" ";
 	    $name = substr($name, 2);
 	}
-	print "  <fd>\n";
-	print "    <fd_name>$name</fd_name>\n";
-	print "    <fd_weight>$value</fd_weight>\n";
+	print "  <fd \n";
+	print "     fd_name=\"$name\" \n";
+	print "     fd_weight=\"$value\" \n";
 	if ($flags ne "    ") {
 	    print $flags."\n";
 	}
-	print "  </fd>\n";
+	print "  />\n";
     }
 }
 
