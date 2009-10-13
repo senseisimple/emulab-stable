@@ -568,6 +568,17 @@ sub GetTicket($;$)
     }
     my $pid = $slice_experiment->pid();
     my $eid = $slice_experiment->eid();
+
+    #
+    # Mark the experiment locally as coming from the cooked interface.
+    # This changes what tmcd returns to the local nodes.
+    #
+    if (exists($rspec->{'generated_by'}) &&
+	$rspec->{'generated_by'} eq "libvtop") {
+	$slice_experiment->Update({"geniflags" =>
+				       $Experiment::EXPT_GENIFLAGS_EXPT|
+				       $Experiment::EXPT_GENIFLAGS_COOKED});
+    }
     
     #
     # Create a virt topology object. We are going to load this up as we
@@ -603,6 +614,7 @@ sub GetTicket($;$)
     my %ifacemap = ();
     my %nodemap  = ();
     my @nodeids  = ();
+    my %lannodes = ();
     my @dealloc;
 
     # Try to make the output format mimic the input, until everybody
@@ -655,6 +667,12 @@ sub GetTicket($;$)
 		    !GeniHRN::Equal( $manager_uuid, $ENV{'MYURN'} ) &&
 		    $manager_uuid ne $ENV{'MYUUID'});
 
+	    # Skip lan nodes; they are fake.
+	    next
+		if (exists($ref->{'node_type'}) &&
+		    exists($ref->{'node_type'}->{'type_name'}) &&
+		    $ref->{'node_type'}->{'type_name'} eq "lan");
+
 	    my $node = LookupNode($resource_uuid);
 	    if (!defined($node)) {
 		$response = GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
@@ -702,6 +720,18 @@ sub GetTicket($;$)
 	    if (defined($manager_uuid) &&
 		!GeniHRN::Equal( $manager_uuid, $ENV{'MYURN'} ) &&
 		$manager_uuid ne $ENV{'MYUUID'});
+
+	#
+	# Lan nodes are fake and do not go into the virt topo. Need
+	# to remember them though, for when we do the links below.
+	# They are still in the returned ticket though. 
+	#
+	if (exists($ref->{'node_type'}) &&
+	    exists($ref->{'node_type'}->{'type_name'}) &&
+	    $ref->{'node_type'}->{'type_name'} eq "lan") {
+	    $lannodes{$node_nickname} = $ref;
+	    next;
+	}
 
 	if (defined($virtualization_type)) {
 	    if ($virtualization_type eq "emulab-vnode") {
@@ -871,22 +901,39 @@ sub GetTicket($;$)
     my $linknum = 1;
     
     foreach my $linkref (@{$rspec->{'link'}}) {
-	my $nickname   = $linkref->{"nickname"} || $linkref->{"virtual_id"};
+	my $lanname    = $linkref->{"nickname"} || $linkref->{"virtual_id"};
 	my $istunnel   = (exists($linkref->{'link_type'}) &&
 			  $linkref->{'link_type'} eq "tunnel");
 	my $interfaces = $linkref->{'linkendpoints'} ||
 	    $linkref->{'interface_ref'};
 	my $ifacenum   = 1;
 
-	if (!defined($nickname)) {
+	if (!defined($lanname)) {
 	    $response = GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 				     "Must provide a virtual_id for links");
 	    goto bad;
 	}
 
+	#
+	# Ick. Before we create the virt_lan_lans entry, we have to check
+	# inside to see if one of the interfaces is connected to a lan
+	# node. In this case, we want to reuse (if its been created) the
+	# lan name, rather then a bunch of links with one interface, which
+	# would result in a bogus topology. 
+	#
 	if (!$istunnel) {
-	    $virtexperiment->NewTableRow("virt_lan_lans",
-					 {"vname" => $nickname});
+	    foreach my $ref (@{ $interfaces }) {
+		my $node_nickname = $ref->{'virtual_node_id'} ||
+		    $ref->{'node_nickname'};
+
+		if (exists($lannodes{$node_nickname})) {
+		    $lanname = $node_nickname;
+		}
+	    }
+	    if (!defined($virtexperiment->Find("virt_lan_lans", $lanname))) {
+		$virtexperiment->NewTableRow("virt_lan_lans",
+					     {"vname" => $lanname});
+	    }
 	}
 	
 	foreach my $ref (@{ $interfaces }) {
@@ -898,15 +945,24 @@ sub GetTicket($;$)
 	    if (!defined($node_nickname)) {
 		$response =
 		    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				 "$nickname: Need node id for links");
+				 "$lanname: Need node id for links");
 		goto bad;
 	    }
 	    if (!defined($iface_id)) {
 		$response =
 		    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				 "$nickname: Need interface id for links");
+				 "$lanname: Need interface id for links");
 		goto bad;
 	    }
+
+	    #
+	    # Look for links that are really lans; one of the interfaces
+	    # is on a fake lan node, which we caught above. Just skip it
+	    # since in the virt topo, a lan is just a link with more then
+	    # two nodes.
+	    #
+	    next
+		if (exists($lannodes{$node_nickname}));
 
 	    if ($istunnel) {
 		# Might be the other side. Skip for now; might bite later.
@@ -919,7 +975,7 @@ sub GetTicket($;$)
 	    if (!exists($ifacemap{$node_nickname})) {
 		$response =
 		    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				 "$nickname: No such virtual_node_id: ".
+				 "$lanname: No such virtual_node_id: ".
 				 "$node_nickname");
 		goto bad;
 	    }
@@ -930,7 +986,7 @@ sub GetTicket($;$)
 	    if (!exists($ifacemap{$node_nickname}->{$iface_id})) {
 		$response =
 		    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				 "$nickname: No such interface on component: ".
+				 "$lanname: No such interface on component: ".
 				 "$node_nickname:$iface_id");
 		goto bad;
 	    }
@@ -954,7 +1010,7 @@ sub GetTicket($;$)
 	        if (exists($linkref->{'bandwidth'}));
 	    
 	    $virtexperiment->NewTableRow("virt_lans",
-					 {"vname"       => $nickname,
+					 {"vname"       => $lanname,
 					  "vnode"       => $node_nickname,
 					  "vport"       => $iface_vport,
 					  "trivial_ok"  => 1,
@@ -1092,7 +1148,10 @@ sub GetTicket($;$)
     }
     # Store the virt topo again since we changed it above.
     $virtexperiment->Dump();
-    $virtexperiment->Store();
+    if ($virtexperiment->Store()) {
+	$response = GeniResponse->Create(GENIRESPONSE_ERROR, undef);
+	goto bad;
+    }
 
     print Dumper($rspec);
 
@@ -1369,6 +1428,7 @@ sub SliverWork($$)
     my %nodemap  = ();
     my %linkmap  = ();
     my %newnodes = ();
+    my %lannodes = ();
     my %colomap  = ();
     my @allocated= ();
     my @freenodes= ();
@@ -1459,6 +1519,18 @@ sub SliverWork($$)
 	    if (defined($manager_uuid) &&
 		!GeniHRN::Equal( $manager_uuid, $ENV{'MYURN'} ) &&
 		$manager_uuid ne $ENV{'MYUUID'});
+
+	#
+	# Lan nodes are fake and do not go into the virt topo. Need
+	# to remember them though, for when we do the links below.
+	# They are still in the ticket though. 
+	#
+	if (exists($ref->{'node_type'}) &&
+	    exists($ref->{'node_type'}->{'type_name'}) &&
+	    $ref->{'node_type'}->{'type_name'} eq "lan") {
+	    $lannodes{$node_nickname} = $ref;
+	    next;
+	}
 
 	my $node = LookupNode($resource_uuid);
 	if (!defined($node)) {
@@ -1695,6 +1767,10 @@ sub SliverWork($$)
 		!GeniHRN::Equal( $manager_uuid, $ENV{'MYURN'} ) &&
 		$manager_uuid ne $ENV{'MYUUID'});
 
+	# Skip lan nodes; they are fake.
+	next
+	    if (exists($lannodes{$virtual_id}));
+
 	#
 	# For a map of the interfaces.
 	#
@@ -1861,6 +1937,16 @@ sub SliverWork($$)
 	foreach my $ifaceref (@{ $interfaces }) {
 	    my $iface_id   = $ifaceref->{'virtual_interface_id'};
 	    my $node_id    = $ifaceref->{'virtual_node_id'};
+
+	    #
+	    # Look for links that are really lans; one of the interfaces
+	    # is on a fake lan node, which we caught above. Just skip it
+	    # since in the virt topo, a lan is just a link with more then
+	    # two nodes.
+	    #
+	    next
+		if (exists($lannodes{$node_id}));
+
 	    my $nodesliver = $nodemap{$node_id};
 	    
 	    if (!defined($nodesliver)) {
@@ -3145,6 +3231,14 @@ sub SliverStatus($)
 	    $details{$node_uuid} = "failed";
 	    $detailsNew{$hrn}    = "failed";
 	    $summary = "failed";
+
+	    my $bootlog;
+	    my $nodeid = $node->node_id();
+	    if ($node->GetBootLog(\$bootlog) == 0) {
+		print STDERR "\n\n";
+		print STDERR "--------------- $nodeid BootLog -------------\n";
+		print STDERR "$bootlog\n";
+	    }
 	}
 	else {
 	    $details{$node_uuid} = "notready";
