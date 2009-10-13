@@ -13,6 +13,12 @@ package pgmap
 		public static var failColor:String = "#FE0000";
 		public static var waitColor:String = "#FF7F00";
 		
+		public static var hideColor:Object = 0xCCCCCC;
+		public static var linkColor:Object = 0xFFCFD1;
+		public static var linkBorderColor:Object = 0xFF00FF;
+		public static var nodeColor:Object = 0x092B9F;
+		public static var nodeBorderColor:Object = 0xD2E1F0;
+		
 		[Bindable]
         [Embed(source="../../images/tick.png")]
         public static var availableIcon:Class;
@@ -28,6 +34,22 @@ package pgmap
         [Bindable]
         [Embed(source="../../images/link.png")]
         public static var linkIcon:Class;
+        
+        [Bindable]
+        [Embed(source="../../images/flag_green.png")]
+        public static var flagGreenIcon:Class;
+        
+        [Bindable]
+        [Embed(source="../../images/flag_red.png")]
+        public static var flagRedIcon:Class;
+        
+        [Bindable]
+        [Embed(source="../../images/flag_yellow.png")]
+        public static var flagYellowIcon:Class;
+        
+        [Bindable]
+        [Embed(source="../../images/error.png")]
+        public static var errorIcon:Class;
         
         public static function assignIcon(val:Boolean):Class {
 			if (val)

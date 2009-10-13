@@ -37,9 +37,13 @@
         
         public var console:ConsoleWindow;
         public var rspecView:XmlWindow;
+        public var about:AboutWindow = new AboutWindow();
 
 		[Bindable]
 		public var pgHandler:ProtoGeniHandler;
+		
+		[Bindable]
+		public var slicesMenu : ArrayCollection;
 		
 		public var main:Main;
 		
@@ -65,6 +69,11 @@
 			
 			chooseCMWindow = new ChooseComponentManagerWindow();
 	    	chooseCMWindow.main = this;	    	
+	    }
+        
+        public function showAbout():void {
+	    	PopUpManager.addPopUp(about, this, false);
+       		PopUpManager.centerPopUp(about);
 	    }
 	    
 	    //------------------------------------------
@@ -113,6 +122,15 @@
 	      } catch (err:SecurityError) {
 	      	Alert.show("Fullscreen isn't supported on the current system.  Either you are running an older version of Fash or allowFullScreen is not set in the HTML object/embed tags.");
 	      }
+	    }
+	    
+	    // ComboBox
+	    public function fillCombobox():void {
+	    	slicesMenu = pgHandler.CurrentUser.displaySlices();
+	    }
+	    
+	    public function getSliceLabel(s : Slice):String {
+	    	return s.DisplayString();
 	    }
 	    
 	    // Google maps
@@ -192,7 +210,7 @@
 			click="viewRspec()" 
 			toolTip="View the most recent RSpec"/>
 		<mx:VRule height="14"/>
-		<mx:ComboBox id="slicesCombobox"></mx:ComboBox>
+		<mx:ComboBox id="slicesCombobox" dataProvider="{slicesMenu}" labelFunction="getSliceLabel"></mx:ComboBox>
 		<mx:CheckBox label="Only my resources" id="onlyMyResourcesCheckbox"/>
 		<mx:Spacer width="100%"/>
 		<mx:Label text="Initialized" id="progressLabel"  fontStyle="normal" fontWeight="bold"/>
@@ -200,7 +218,7 @@
 		<mx:Spacer width="100%"/>
 		<pgmap:ImageButton id="infoButton"
 			source="@Embed('../images/information.png')"
-			click="viewInformation()"
+			click="showAbout()"
 			toolTip="View more information" />
 		<pgmap:ImageButton id="fullscreenButton"
 			source="@Embed('../images/arrow_out.png')"

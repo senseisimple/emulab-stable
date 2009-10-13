@@ -17,7 +17,6 @@ package pgmap
 	import flash.events.MouseEvent;
 	import flash.geom.Point;
 	
-	import mx.controls.Alert;
 	import mx.managers.PopUpManager;
     	
 	public class ProtoGeniMapHandler
@@ -42,7 +41,7 @@ package pgmap
 		                  //tooltip: g.country,
 		                  label: g.collection.length.toString()
 		      	}));
-		      	
+
 	        var groupInfo:NodeGroupInfo = new NodeGroupInfo();
 	        groupInfo.Load(g, this.main);
 	        
@@ -120,6 +119,8 @@ package pgmap
 	        		addLink(l);
 	        	}
 	        }
+	        
+	        main.fillCombobox();
 	        
 	        main.setProgress("Done", Common.successColor);
 	    }

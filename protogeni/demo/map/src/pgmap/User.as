@@ -30,5 +30,14 @@
 		public function User()
 		{
 		}
+		
+		public function displaySlices():ArrayCollection {
+			var ac : ArrayCollection = new ArrayCollection();
+			ac.addItem(new Slice());
+			for each(var s:Slice in slices) {
+				ac.addItem(s);
+			}
+			return ac;
+		}
 	}
 }

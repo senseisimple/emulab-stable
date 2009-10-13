@@ -19,6 +19,7 @@
 	import flash.events.ErrorEvent;
 	import flash.utils.ByteArray;
 	
+	import mx.controls.Alert;
 	import mx.utils.Base64Decoder;
     	
 	public class ProtoGeniRpcHandler
@@ -30,10 +31,14 @@
 		[Bindable]
 		public var useCompression : Boolean = true;
 		
+		public var sliceUrns : Array;
 		public var sliceNodes : Array;
 		public var sliceNodesStatus : Array;
-		public var slices : Array;
-		public var sliceCredentials : Array;
+		
+		public var allSlices : Array;
+		public var slicesLeft : Array;
+		public var allSlivers : Array;
+		public var sliversLeft : Array;
 		
 		public var main : pgmap;
 		
@@ -57,6 +62,21 @@
 			Components = null;
 			Rspec = null;
 		}
+		
+		public function prepareSlices():void {
+			slicesLeft = new Array();
+			for each(var s:Slice in allSlices) {
+				slicesLeft.push(s);
+			}
+		}
+		
+		public function prepareSlivers():void {
+			sliversLeft = new Array();
+			for each(var s:Slice in allSlices) {
+				if(s.status == "ready")
+					sliversLeft.push(s);
+			}
+		}
 	    
 	    public function postCall() : void {
 	    		main.console.appendText("Seeing if there are any other method to call...\n");
@@ -72,15 +92,20 @@
 	    	main.setProgress("Operation failed!", Common.failColor);
 	    	main.stopWaiting();
 	    	main.console.appendText("****fail****");
+	    	var msg : String = "";
 	      if (fault != null)
 	      {
+	      	msg = fault.getFaultString();
 	        main.console.appendText("\nFAILURE fault: " + opName + ": "
-	                                + fault.getFaultString());
+	                                + msg);
 	      }
 	      else
 	      {
+	      	msg = event.toString();
 	        main.console.appendText("\nFAILURE event: " + opName + ": "
-	                                + event.toString());
+	                                + msg);
+	        if(msg.search("#2048") > -1)
+	        	Alert.show("Stream error, possibly due to server error");
 	      }
 	      main.console.appendText("\nURL: " + op.getUrl());
 	    }
@@ -237,9 +262,8 @@
 	      	main.pgHandler.CurrentUser.email = response.value.email;
 	      	main.pgHandler.CurrentUser.name = response.value.name;
 	      	
-	      	sliceCredentials = new Array();
-	      	slices = response.value.slices;
-	      	if(slices != null && slices.length > 0)
+	      	sliceUrns = response.value.slices;
+	      	if(allSlices != null && allSlices.length > 0)
 	      		startSliceLookup();
 	      	else
 	      		main.pgHandler.map.drawMap();
@@ -253,13 +277,13 @@
 	    
 	    public function startSliceLookup() : void
 	    {
-	      opName = "Looking up " + slices.length + " more slice(s)";
+	      opName = "Looking up " + sliceUrns.length + " more slice(s)";
 	      main.setProgress(opName, Common.waitColor);
 	      main.startWaiting();
 	      main.console.appendText(opName);
 	      op.reset(Geni.resolve);
 	      op.addField("credential", main.pgHandler.CurrentUser.credential);
-	      op.addField("hrn", slices.pop());
+	      op.addField("hrn", sliceUrns.pop());
 	      op.addField("type", "Slice");
 		  op.call(completeSliceLookup, failure);
 	      addSend();
@@ -277,13 +301,15 @@
 	      	slice.creator = main.pgHandler.CurrentUser;
 	      	slice.hrn = response.value.hrn;
 	      	
-	      	sliceCredentials.push(slice);
+	      	allSlices.push(slice);
 	      	main.pgHandler.CurrentUser.slices.addItem(slice);
 
-			if(slices.length > 0)
+			if(sliceUrns.length > 0)
 				startSliceLookup();
-			else
+			else {
+				prepareSlices();
 	      		startSliceCredential();
+			}
 	      }
 	      else
 	      {
@@ -294,9 +320,8 @@
 	    
 	    public function startSliceCredential() : void
 	    {
-	      opName = "Acquiring " + sliceCredentials.length + " more slice credential(s)";
-	      slice = sliceCredentials.pop();
-	      slices.push(slice);
+	      opName = "Acquiring " + slicesLeft.length + " more slice credential(s)";
+	      slice = slicesLeft.pop();
 	      main.setProgress(opName, Common.waitColor);
 	      main.startWaiting();
 	      main.console.appendText(opName);
@@ -317,10 +342,13 @@
 	      {
 	      	slice.credential = String(response.value);
 	      	
-	      	if(sliceCredentials.length > 0)
+	      	if(slicesLeft.length > 0)
 				startSliceCredential();
-			else
-	      		startGetSliver();
+			else {
+				prepareSlices();
+				startSliceStatus();
+			}
+	      		
 	      }
 	      else
 	      {
@@ -329,10 +357,108 @@
 	      }
 	    }
 	    
+	    public function startSliceStatus() : void
+	    {
+	      opName = "Acquiring " + slicesLeft.length + " more slice status report(s)";
+	      slice = slicesLeft.pop();
+	      main.setProgress(opName, Common.waitColor);
+	      main.startWaiting();
+	      main.console.appendText(opName);
+	      op.reset(Geni.sliceStatus);
+	      op.addField("credential", slice.credential);
+		  op.call(completeSliceStatus, failure);
+	      addSend();
+	    }
+	    
+	    public function completeSliceStatus(code : Number, response : Object) : void
+	    {
+	    	main.setProgress("Done", Common.successColor);
+	    	main.stopWaiting();
+	      addResponse();
+	      if (code == 0)
+	      {
+	      	slice.status == response.value.ready;
+	      	
+	      	if(slicesLeft.length > 0)
+	      		startSliceStatus();
+	      	else {
+	      		prepareSlivers();
+	      		if(sliversLeft.length == 0) {
+	      			main.pgHandler.map.drawMap();
+	      		} else {
+	      			startSliverStatus();
+	      		}
+	      	}
+	      	
+	      	/*
+	      	
+	      	sliceNodes = new Array();
+	      	sliceNodesStatus = new Array();
+	      	// !!!IMPROTANT!!!
+	      	// Iterates over the keys into the array instead of the actual values
+	      	for (var urn : String in response.value.detailsNew) {
+	      		sliceNodes.push(urn);
+	      	}
+	      	for each (var ready : String in response.value.detailsNew) {
+	      		sliceNodesStatus.push(ready);
+	      	}
+	      	if(sliceNodes.length > 0)
+	      		startResolveNodes();
+	      	else
+	      		postCall();
+	      	*/
+	      }
+	      else
+	      {
+	        codeFailure();
+	        main.pgHandler.map.drawMap();
+	      }
+	    }
+	    
+	    public function startSliverStatus() : void
+	    {
+	      opName = "Acquiring " + sliversLeft.length + " more sliver status report(s)";
+	      slice = sliversLeft.pop();
+	      main.setProgress(opName, Common.waitColor);
+	      main.startWaiting();
+	      main.console.appendText(opName);
+	      op.reset(Geni.sliverStatus);
+	      op.addField("credential", slice.sliverCredential);
+		  op.call(completeSliverStatus, failure);
+	      addSend();
+	    }
+	    
+	    public function completeSliverStatus(code : Number, response : Object) : void
+	    {
+	    	main.setProgress("Done", Common.successColor);
+	    	main.stopWaiting();
+	      addResponse();
+	      if (code == 0)
+	      {
+	      	slice.sliverStatus = response.value.ready;
+	      	
+	      	if(sliversLeft.length > 0)
+	      		startSliverStatus();
+	      	else {
+	      		prepareSlivers();
+	      		if(sliversLeft.length == 0) {
+	      			main.pgHandler.map.drawMap();
+	      		} else {
+	      			startGetSliver();
+	      		}
+	      	}
+	      }
+	      else
+	      {
+	        codeFailure();
+	        main.pgHandler.map.drawMap();
+	      }
+	    }
+
 	    public function startGetSliver() : void
 	    {
-	      opName = "Acquiring " + slices.length + " more sliver credential(s)";
-	      slice = slices.pop();
+	      opName = "Acquiring " + sliversLeft.length + " more sliver credential(s)";
+	      slice = sliversLeft.pop();
 	      main.setProgress(opName, Common.waitColor);
 	      main.startWaiting();
 	      main.console.appendText(opName);
@@ -350,30 +476,29 @@
 	      if (code == 0)
 	      {
 	      	slice.sliverCredential = String(response.value);
-	      	sliceCredentials.push(slice);
+	      	
+	      	if(sliversLeft.length > 0)
+	      		startGetSliver();
+	      	else {
+	      		prepareSlivers();
+	      		if(sliversLeft.length == 0) {
+	      			main.pgHandler.map.drawMap();
+	      		} else {
+	      			startSliverTicket();
+	      		}
+	      	}
 	      }
 	      else
 	      {
-	        //codeFailure();
-	        //main.pgHandler.map.drawMap();
+	        codeFailure();
+	        main.pgHandler.map.drawMap();
 	      }
-	      
-	      if(slices.length > 0)
-				startGetSliver();
-			else
-	      		startSliverTicket();
 	    }
 	    
 	    public function startSliverTicket() : void
 	    {
-	    	// No info
-	    	if(sliceCredentials.length == 0) {
-	    		main.pgHandler.map.drawMap();
-	    		return;
-	    	}
-	      
-	      opName = "Acquiring " + sliceCredentials.length + " more sliver ticket(s)";
-	      slice = sliceCredentials.pop();
+	      opName = "Acquiring " + sliversLeft.length + " more sliver ticket(s)";
+	      slice = sliversLeft.pop();
 	      main.setProgress(opName, Common.waitColor);
 	      main.startWaiting();
 	      main.console.appendText(opName);
@@ -391,7 +516,8 @@
 	      if (code == 0)
 	      {
 	      	// GO THROUGH RSPEC
-	      	if(sliceCredentials.length > 0)
+	      	
+	      	if(sliversLeft.length > 0)
 	      		startSliverTicket();
 	      	else
 	      		main.pgHandler.map.drawMap();
@@ -403,75 +529,7 @@
 	      }
 	    }
 	    
-	    public function startSliverStatus() : void
-	    {
-	      opName = "Acquiring sliver status";
-	      main.setProgress(opName, Common.waitColor);
-	      main.startWaiting();
-	      main.console.appendText(opName);
-	      op.reset(Geni.sliverStatus);
-	      op.addField("credential", slice.sliverCredential);
-		  op.call(completeSliverStatus, failure);
-	      addSend();
-	    }
-	    
-	    public function completeSliverStatus(code : Number, response : Object) : void
-	    {
-	    	main.setProgress("Done", Common.successColor);
-	    	main.stopWaiting();
-	      addResponse();
-	      if (code == 0)
-	      {
-	      	sliceNodes = new Array();
-	      	
-	      }
-	      else
-	      {
-	        codeFailure();
-	        main.pgHandler.map.drawMap();
-	      }
-	    }
-	    
-	    public function startSliceStatus() : void
-	    {
-	      opName = "Acquiring slice status";
-	      main.setProgress(opName, Common.waitColor);
-	      main.startWaiting();
-	      main.console.appendText(opName);
-	      op.reset(Geni.sliceStatus);
-	      op.addField("credential", slice.credential);
-		  op.call(completeSliceStatus, failure);
-	      addSend();
-	    }
-	    
-	    public function completeSliceStatus(code : Number, response : Object) : void
-	    {
-	    	main.setProgress("Done", Common.successColor);
-	    	main.stopWaiting();
-	      addResponse();
-	      if (code == 0)
-	      {
-	      	sliceNodes = new Array();
-	      	sliceNodesStatus = new Array();
-	      	// !!!IMPROTANT!!!
-	      	// Iterates over the keys into the array instead of the actual values
-	      	for (var urn : String in response.value.detailsNew) {
-	      		sliceNodes.push(urn);
-	      	}
-	      	for each (var ready : String in response.value.detailsNew) {
-	      		sliceNodesStatus.push(ready);
-	      	}
-	      	if(sliceNodes.length > 0)
-	      		startResolveNodes();
-	      	else
-	      		postCall();
-	      }
-	      else
-	      {
-	        codeFailure();
-	        main.pgHandler.map.drawMap();
-	      }
-	    }
+	    /* ************ NOT IN USE CURRENTLY ************ */
 	    
 	    public function startResolveNodes() : void
 	    {
