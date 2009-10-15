@@ -12,18 +12,36 @@
   -->
   <!--
     
-    Simple prototype of an RSpec, to be used by ProtoGENI
+    Common definitions for advertisements, requests, and tickets
     
   -->
-  <!-- Add some more stuff to nodes -->
+  <xs:element name="node" type="NodeContents"/>
+  <xs:element name="link" type="LinkContents"/>
   <xs:complexType name="NodeContents">
-    <xs:sequence>
-      <xs:group ref="NodeSpec.NodeType"/>
-      <xs:element minOccurs="0" ref="available"/>
-      <xs:element minOccurs="0" ref="component_manager_URL"/>
-    </xs:sequence>
-    <xs:attribute name="uuid" use="required"/>
-    <xs:attribute name="name"/>
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:group ref="NodeTypeList"/>
+      <xs:element ref="interface"/>
+    </xs:choice>
+    <xs:attribute name="virtualization_type">
+      <xs:simpleType>
+        <xs:restriction base="xs:token">
+          <xs:enumeration value="raw"/>
+          <xs:enumeration value="trellis-vserver"/>
+          <xs:enumeration value="planetlab-vserver"/>
+          <xs:enumeration value="emulab-vnode"/>
+          <xs:enumeration value="bgpmux"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+  </xs:complexType>
+  <xs:element name="interface">
+    <xs:complexType/>
+  </xs:element>
+  <xs:complexType name="LinkContents">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:group ref="LinkType"/>
+      <xs:element ref="interface_ref"/>
+    </xs:choice>
     <xs:attribute name="virtualization_type">
       <xs:simpleType>
         <xs:restriction base="xs:token">
@@ -35,39 +53,66 @@
       </xs:simpleType>
     </xs:attribute>
   </xs:complexType>
-  <xs:element name="available" type="xs:boolean"/>
-  <xs:complexType name="LinkContents">
+  <xs:element name="interface_ref">
+    <xs:complexType/>
+  </xs:element>
+  <xs:group name="NodeTypeList">
     <xs:sequence>
-      <xs:group ref="LinkEndPoints"/>
-      <xs:group ref="LinkCharacteristics">
-        <xs:annotation>
-          <xs:documentation>The characteristics (bandwidth, latency, loss) which affect traffic.</xs:documentation>
-        </xs:annotation>
-      </xs:group>
-      <xs:group ref="LinkSpec.LinkType"/>
+      <xs:element maxOccurs="unbounded" ref="node_type"/>
     </xs:sequence>
-    <xs:attribute name="uuid" use="required"/>
-    <xs:attribute name="name"/>
-  </xs:complexType>
-  <!-- TODO: Might add a URL for the CM for a link in the future -->
-  <xs:complexType name="InterfaceContents">
+  </xs:group>
+  <xs:group name="LinkType">
     <xs:sequence>
-      <xs:element ref="node_uuid"/>
-      <xs:element minOccurs="0" ref="node_name"/>
-      <xs:element name="interface" type="xs:string"/>
+      <xs:element name="link_type">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element minOccurs="0" maxOccurs="unbounded" ref="field"/>
+          </xs:sequence>
+          <xs:attribute name="name"/>
+          <xs:attribute name="type_name"/>
+        </xs:complexType>
+      </xs:element>
     </xs:sequence>
-  </xs:complexType>
-  <xs:element name="node_uuid" type="xs:string"/>
-  <xs:element name="node_name" type="xs:string"/>
-  <xs:element name="component_manager_URL" type="xs:anyURI"/>
-  <xs:element name="rspec">
+  </xs:group>
+  <xs:element name="field">
     <xs:complexType>
-      <xs:choice minOccurs="0" maxOccurs="unbounded">
-        <xs:element ref="node"/>
-        <xs:element ref="link"/>
-      </xs:choice>
-      <xs:attribute name="generated" use="required" type="xs:dateTime"/>
-      <xs:attribute name="valid_until" use="required" type="xs:dateTime"/>
+      <xs:attribute name="key" use="required"/>
+      <xs:attribute name="value" use="required"/>
     </xs:complexType>
   </xs:element>
+  <xs:attributeGroup name="VirtualName">
+    <xs:attribute name="virtual_id" use="required"/>
+  </xs:attributeGroup>
+  <xs:attributeGroup name="ComponentName">
+    <xs:attribute name="component_manager_uuid"/>
+    <xs:attribute name="component_manager_urn"/>
+    <xs:attribute name="component_name"/>
+    <xs:attribute name="component_uuid"/>
+    <xs:attribute name="component_urn"/>
+  </xs:attributeGroup>
+  <xs:attributeGroup name="ComponentInterfaceDeclName">
+    <xs:attribute name="component_id" use="required"/>
+  </xs:attributeGroup>
+  <xs:attributeGroup name="ComponentInterfaceRefName">
+    <xs:attribute name="component_node_uuid"/>
+    <xs:attribute name="component_node_urn"/>
+    <xs:attribute name="component_interface_id" use="required"/>
+  </xs:attributeGroup>
+  <xs:element name="location">
+    <xs:complexType>
+      <xs:attribute name="country" use="required"/>
+      <xs:attribute name="longitude"/>
+      <xs:attribute name="latitude"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="rspec" type="RSpecContents"/>
+  <xs:complexType name="RSpecContents">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element ref="node"/>
+      <xs:element ref="link"/>
+    </xs:choice>
+    <xs:attribute name="generated" type="xs:dateTime"/>
+    <xs:attribute name="generated_by"/>
+    <xs:attribute name="valid_until" type="xs:dateTime"/>
+  </xs:complexType>
 </xs:schema>
