@@ -76,6 +76,7 @@ my $failedgeni  = 0;
 my $canceled    = 0;
 my %nodes       = ();
 my %vnodes      = ();
+my %sharednodes = ();
 my %vnodephosts = ();
 my %vnode2pnode = ();
 my %pnodevcount = ();
@@ -224,7 +225,7 @@ if (TBExptPlabInElabPLC($pid, $eid, \$plcnode)) {
 # Get the set of nodes, as well as the nodes table information for them.
 #
 my $db_result =
-    DBQueryFatal("select n.*,l.pid,r.vname from reserved as r ".
+    DBQueryFatal("select n.*,l.pid,r.vname,r.sharing_mode from reserved as r ".
 		 "left join nodes as n on n.node_id=r.node_id ".
 		 "left join last_reservation as l on n.node_id=l.node_id ".
 		 "where r.pid='$pid' and r.eid='$eid'");
@@ -245,6 +246,8 @@ while (my %row = $db_result->fetchhash()) {
     my $class     = $typeinfo->class();
     my $subnode   = $typeinfo->issubnode();
     my $virtnode  = $typeinfo->isvirtnode();
+    my $sharednode = defined($row{'sharing_mode'}) 
+	&& $row{'sharing_mode'} eq 'using_shared_local';
     my $isremote  = $typeinfo->isremotenode();
     my $isgeninode= $typeinfo->isfednode();
     my $imageable = $typeinfo->imageable();
@@ -260,6 +263,7 @@ while (my %row = $db_result->fetchhash()) {
 	#
 	if ($virtnode) {
 	    $vnodes{$node} = $virtnode;
+	    $sharednodes{$node} = $sharednode;
 	}
 	else {
 	    $nodes{$node}  = $node;
@@ -272,6 +276,7 @@ while (my %row = $db_result->fetchhash()) {
 	# and so run them through the checks below.
 	#
 	$vnodes{$node} = ($jailnode || $plabnode || $isremote);
+	$sharednodes{$node} = $sharednode;
 	$plabvnodes{$node} = $plabnode;
 	if (! $jailnode && ! $plabnode && !$isremote) {
 	    next;
@@ -758,6 +763,16 @@ if (!$TESTMODE) {
 		if ($vstate eq TBDB_ALLOCSTATE_RES_INIT_CLEAN()) {
 		    $nodeflags{$node}{'noreboot'} = 1;
 		}
+	    }
+
+	    #
+	    # osload should not wait for shared vnodes.  We need vnode_setup
+	    # to boot/reboot them since the underlying pnode won't be booting.
+	    # So for them, osload just sets up the reload and finishes.
+	    #
+	    if (defined($vnodes{$node}) && $sharednodes{$node} == 1) {
+		$nodeflags{$node}{'noreboot'} = 1;
+		$nodeflags{$node}{'nowait'} = 1;
 	    }
 
 	    TBSetNodeAllocState( $node, TBDB_ALLOCSTATE_RES_RELOAD() );

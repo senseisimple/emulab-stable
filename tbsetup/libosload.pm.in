@@ -438,6 +438,7 @@ sub osload ($$) {
 	my $reload_mode;
 	my $reload_func;
 	my $reboot_required;
+	my $wait_required = 1;
 	if ($class eq "mote") {
 	    $reload_mode = "UISP";
 	    $reload_func = \&SetupReloadUISP;
@@ -451,6 +452,11 @@ sub osload ($$) {
 	    if (defined($nodeflags{$node}) 
 		&& defined($nodeflags{$node}{'noreboot'})) {
 		$reboot_required = !$nodeflags{$node}{'noreboot'};
+	    }
+
+	    if (defined($nodeflags{$node}) 
+		&& defined($nodeflags{$node}{'nowait'})) {
+		$wait_required = !$nodeflags{$node}{'nowait'};
 	    }
 
 	    foreach my $i (@imageidxs) {
@@ -479,6 +485,7 @@ sub osload ($$) {
 	    'imageids' => \@imageids,
 	    'osid'     => $defosid,
 	    'reboot'   => $reboot_required,
+	    'wait'     => $wait_required,
 	    'zerofree' => $zerofree,
 	    'prepare'  => $prepare,
 	    'maxwait'  => $maxwait,
@@ -743,7 +750,16 @@ sub WaitTillReloadDone($$$@)
     my $count   = @nodes;
     my @failed  = ();
 
-    foreach my $node ( @nodes ) { $done{$node}  = 0; }
+    foreach my $node ( @nodes ) {
+	if ($reload_info->{$node}{'wait'} == 1) {
+	    $done{$node} = 0;
+	}
+	else {
+	    $done{$node} = 1;
+	    --$count;
+	    print "osload ($node): not waiting for reload of $node.\n";
+	}
+    }
 
     print STDERR "Waiting for @nodes to finish reloading\n".`date` if $debug;
 
