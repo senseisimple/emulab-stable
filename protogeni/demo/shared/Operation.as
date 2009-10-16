@@ -16,6 +16,8 @@ package
 {
   import flash.events.ErrorEvent;
   import flash.events.Event;
+  import flash.utils.Dictionary;
+  import flash.system.Security;
   import com.mattism.http.xmlrpc.ConnectionImpl;
 
   public class Operation
@@ -71,13 +73,32 @@ package
 
     public function call(newSuccess : Function, newFailure : Function) : void
     {
-      success = newSuccess;
-      failure = newFailure;
-      server = new ConnectionImpl(url);
-      server.addEventListener(Event.COMPLETE, callSuccess);
-      server.addEventListener(ErrorEvent.ERROR, callFailure);
-      server.addParam(param, "struct");
-      server.call(method);
+      try
+      {
+        if (visitedSites[url] != true)
+        {
+          visitedSites[url] = true;
+          var hostPattern : RegExp = /^(http(s?):\/\/([^\/]+))(\/.*)?$/;
+          var match = hostPattern.exec(url);
+          if (match != null)
+          {
+            var host : String = match[1];
+            Security.loadPolicyFile(host + "/protogeni/crossdomain.xml");
+          }
+        }
+        success = newSuccess;
+        failure = newFailure;
+        server = new ConnectionImpl(url);
+        server.addEventListener(Event.COMPLETE, callSuccess);
+        server.addEventListener(ErrorEvent.ERROR, callFailure);
+        server.addParam(param, "struct");
+        server.call(method);
+      }
+      catch (e : Error)
+      {
+        Main.getConsole().appendText("\n\nException on XMLRPC Call: "
+                                     + e.toString() + "\n\n");
+      }
     }
 
     public function getSendXml() : String
@@ -119,7 +140,10 @@ package
     private var success : Function;
     private var failure : Function;
 
-    private static var XMLRPC_SERVER : String = "boss.emulab.net";
-    private static var SERVER_PATH : String = ":443/protogeni/xmlrpc/";
+    private static var XMLRPC_SERVER : String = "boss.emulab.net:443";
+//    private static var XMLRPC_SERVER : String = "myboss.jonlab.geni.emulab.net:443";
+    private static var SERVER_PATH : String = "/protogeni/xmlrpc/";
+
+    private static var visitedSites : Dictionary = new Dictionary();
   }
 }
