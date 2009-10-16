@@ -26,7 +26,7 @@ config: $(PERL_PATH)/.config-stamp
 
 	     #LD_LIBRARY_PATH=$(STAGING_DIR)/lib:/lib \
 
-$(PERL_PATH)/perl: config
+$(PERL_PATH)/perl: $(PERL_PATH)/.config-stamp
 	PATH=$(STAGING_DIR)/usr/bin:$(PATH) \
 		$(MAKE) -C $(PERL_PATH)
 
@@ -48,7 +48,7 @@ clean:
 
 $(PERL_PATH)/.extract-stamp:
 	mkdir -p $(TARGET_BUILD_PATH)
-	cd $(TARGET_BUILD_PATH); tar xjf $(SOURCE_PATH)/perl/perl-$(PERL_VERSION).tar.bz2
+	cd $(TARGET_BUILD_PATH); tar xjf $(TARBALL_PATH)/perl-$(PERL_VERSION).tar.bz2
 	touch $@
 
 $(PERL_PATH)/.patch-stamp: $(PERL_PATH)/.extract-stamp
@@ -58,7 +58,7 @@ $(PERL_PATH)/.patch-stamp: $(PERL_PATH)/.extract-stamp
 		#LD_LIBRARY_PATH=/lib:$(STAGING_DIR)/lib; \
 
 $(PERL_PATH)/.config-stamp: $(PERL_PATH)/.patch-stamp
-	cp $(SOURCE_PATH)/perl/config.sh $(PERL_PATH)
+	cp $(SOURCE_PATH)/perl/config.sh.$(MFS_ARCH) $(PERL_PATH)/config.sh
 	(export PATH=$(STAGING_DIR)/usr/bin:$(PATH); \
 		cd $(PERL_PATH); \
 		sh ./Configure -der -f config.sh && \

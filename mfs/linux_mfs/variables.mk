@@ -1,4 +1,4 @@
-MFS_ARCH		=	x86_64
+MFS_ARCH		=	i386
 TOPDIR			=	$(PWD)
 SOURCE_PATH		=	$(TOPDIR)/source
 SCRIPTS_PATH		=	$(TOPDIR)/scripts
