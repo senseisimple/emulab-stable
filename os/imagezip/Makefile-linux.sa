@@ -17,6 +17,7 @@ WITH_EXTFS	= 1
 WITH_FFS	= 1
 WITH_FAT	= 0
 WITH_NTFS	= 0
+WITH_EXT4FS	= 0
 
 PTHREADCFLAGS	= -D_THREAD_SAFE -pthread
 #PTHREADLIBS	= -L/usr/local/lib -llgcc_r
@@ -33,6 +34,11 @@ UNZIPLIBS	= $(LIBS)
 ifdef WITH_EXTFS
 FSOBJS		+= extfs/extfs.o extfs/reloc_lilo.o
 CFLAGS		+= -DWITH_EXTFS -Iextfs
+endif
+
+ifdef WITH_EXT4FS
+FSOBJS		+= ext4fs/ext4fs.o ext4fs/reloc_lilo.o
+CFLAGS		+= -DWITH_EXT4FS -Iext4fs
 endif
 
 ifdef WITH_FFS
