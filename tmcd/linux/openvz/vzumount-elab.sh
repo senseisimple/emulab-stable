@@ -40,6 +40,9 @@ if [ $? = 0 ]; then
     echo "ok."
 else
     echo "FAILED with exit code $?"
+    echo "Current mounts:\n"
+    cat /proc/mounts
+    echo "\n"
     exit 44
 fi
 
