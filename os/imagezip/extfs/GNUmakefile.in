@@ -7,27 +7,27 @@
 SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ../../..
-SUBDIR		= os/imagezip/ext4fs
+SUBDIR		= os/imagezip/extfs
 MAINDIR		= $(SRCDIR)/..
 
 include $(OBJDIR)/Makeconf
 
 CFLAGS		+= $(SUBDIRCFLAGS) -I$(MAINDIR) -I$(SRCDIR)
 
-all:	libext4fs.a
+all:	libextfs.a
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-OBJS = ext4fs.o reloc_lilo.o
+OBJS = extfs.o reloc_lilo.o
 
-ext4fs.o: $(MAINDIR)/sliceinfo.h $(MAINDIR)/global.h
+extfs.o: $(MAINDIR)/sliceinfo.h $(MAINDIR)/global.h
 reloc_lilo.o: $(MAINDIR)/sliceinfo.h $(MAINDIR)/global.h $(MAINDIR)/imagehdr.h
 
-libext4fs.a:	$(OBJS)
+libextfs.a:	$(OBJS)
 	$(AR) $(ARFLAGS) $@ $?
 	$(RANLIB) $@
 
 install: 
 
 clean:
-	rm -f libext4fs.a $(OBJS)
+	rm -f libextfs.a $(OBJS)
