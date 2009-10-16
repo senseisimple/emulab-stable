@@ -636,12 +636,14 @@ sub Remove($)
 	if ($slice->UnRegister()) {
 	    print STDERR "Could not delete $slice from clearinghouse!\n";
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					"$uuid could not be unregistered");
+					(defined($uuid)?$uuid:$hrn)
+					. " could not be unregistered");
 	}
 	if ($slice->Delete()) {
 	    print STDERR "Could not delete $slice from SA!\n";
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					"$uuid could not be unregistered");
+					(defined($uuid)?$uuid:$hrn)
+					. " could not be unregistered");
 	}
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS);
     }
