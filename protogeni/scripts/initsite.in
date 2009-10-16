@@ -363,20 +363,6 @@ if (!defined($sslcert)) {
 }
 
 #
-# Create holding experiment.
-#
-my $experiment = Experiment->Lookup($geniprojid, "reservations");
-if (!defined($experiment)) {
-    system("$SUDO -u $geniuserid $WAP $BATCHEXP ".
-	   "  -q -i -k -w -f -n -S 'System Experiment' ".
-	   "  -L 'System Experiment' ".
-	   "  -E 'Holding Pattern for Reservations - DO NOT DELETE' ".
-	   "  -p $geniprojid -e reservations -h " . NewUUID());
-    fatal("Could not create create reservations holding experiment")
-	if ($?);
-}
-
-#
 # Need this fake type for now.
 #
 my $osinfo = OSinfo->Lookup(TBOPSPID(), "RHL-STD");

@@ -594,15 +594,8 @@ sub GetTicket($;$)
     $virtexperiment->allowfixnode(0);
 
     # This is where nodes are parked until a ticket is redeemed.
+    # This experiment no longer has to exist.
     my $reserved_holding = Experiment->Lookup("GeniSlices", "reservations");
-    if (!defined($reserved_holding)) {
-	#
-	# This experiment has to exist!
-	#
-	print STDERR "Could not find Geni reservations experiment!\n";
-	$response = GeniResponse->Create(GENIRESPONSE_ERROR);
-	goto bad;
-    }
 
     #
     # An rspec is a structure that requests specific nodes. If those
@@ -688,6 +681,7 @@ sub GetTicket($;$)
 	    #
 	    my $reservation = $node->Reservation();
 	    if (defined($reservation) &&
+		defined($reserved_holding) &&
 		$reservation->SameExperiment($reserved_holding)) {
 		if ($node->MoveReservation($slice_experiment)) {
 		    print STDERR "Could not move $node to $slice_experiment\n";
@@ -1497,14 +1491,8 @@ sub SliverWork($$)
     }
 
     # Nodes are in this holding experiment.
+    # This experiment no longer has to exist!
     my $reserved_holding = Experiment->Lookup("GeniSlices", "reservations");
-    if (!defined($reserved_holding)) {
-	#
-	# This experiment has to exist!
-	#
-	print STDERR "Could not find Geni reservations experiment!\n";
-	goto bad;
-    }
 
     #
     # Make sure all nodes requested are allocated. 
@@ -1555,7 +1543,8 @@ sub SliverWork($$)
 	#
 	my $reservation = $node->Reservation();
 	if (defined($reservation)) {
-	    if ($reservation->SameExperiment($reserved_holding)) {
+	    if (defined($reserved_holding) &&
+		$reservation->SameExperiment($reserved_holding)) {
 		# This is for backwards compatibility.
 		if ($node->MoveReservation($experiment)) {
 		    print STDERR "Could not move $node to $experiment\n";
