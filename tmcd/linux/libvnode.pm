@@ -82,17 +82,28 @@ sub findSpareDisks() {
 	    }
 	}
 	elsif ($line =~ /^\s*\d+\s+\d+\s+(\d+)\s+([a-zA-Z]+)(\d+)$/) {
-	    if (exists($retval{$2}{"size"})) {
-		delete $retval{$2}{"size"};
-		if (scalar(keys(%{$retval{$2}})) == 0) {
-		    delete $retval{$2};
+	    my ($dev,$part) = ($2,$3);
+
+	    # XXX don't include extended partitions (the reason is to filter
+	    # out pseudo partitions that linux creates for bsd disklabel 
+	    # slices -- we don't want to use those!
+	    # 
+	    # (of course, a much better approach would be to check if a 
+	    # partition is contained within another and not use it.)
+	    next 
+		if ($part > 4);
+
+	    if (exists($retval{$dev}{"size"})) {
+		delete $retval{$dev}{"size"};
+		if (scalar(keys(%{$retval{$dev}})) == 0) {
+		    delete $retval{$dev};
 		}
 	    }
-	    if (!defined($mounts{"/dev/$2$3"}) 
-		&& !defined($ftents{"/dev/$2$3"})) {
+	    if (!defined($mounts{"/dev/$dev$part"}) 
+		&& !defined($ftents{"/dev/$dev$part"})) {
 
 		# try checking its ext2 label
-		my @outlines = `dumpe2fs -h /dev/$2$3 2>&1`;
+		my @outlines = `dumpe2fs -h /dev/$dev$part 2>&1`;
 		if (!$?) {
 		    my ($uuid,$label);
 		    foreach my $line (@outlines) {
@@ -111,13 +122,13 @@ sub findSpareDisks() {
 		}
 
 		# one final check: partition id
-		my $output = `sfdisk --print-id /dev/$2 $3`;
+		my $output = `sfdisk --print-id /dev/$dev $part`;
 		chomp($output);
-		if (!$? && $output eq "0") {
-		    $retval{$2}{"$3"}{"size"} = $BLKSIZE * $1;
+		if ($?) {
+		    print STDERR "WARNING: findSpareDisks: error running 'sfdisk --print-id /dev/$dev $part': $! ... ignoring /dev/$dev$part\n";
 		}
-		elsif ($?) {
-		    print STDERR "WARNING: findSpareDisks: error running 'sfdisk --print-id /dev/$2 $3': $! ... ignoring /dev/$2$3\n";
+		elsif ($output eq "0") {
+		    $retval{$dev}{"$part"}{"size"} = $BLKSIZE * $1;
 		}
 	    }
 	}
