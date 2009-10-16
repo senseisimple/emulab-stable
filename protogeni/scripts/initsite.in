@@ -196,6 +196,46 @@ if ($needpkgs) {
 }
 
 #
+# crossdomain.xml is needed to allow the flash client to talk to
+# this host.
+#
+
+my $crosstext = <<'CROSSEND';
+<?xml version="1.0"?>
+<cross-domain-policy>
+    <site-control permitted-cross-domain-policies="all"/>
+</cross-domain-policy>
+CROSSEND
+
+open CROSS_OUT, ">$TB/www/crossdomain.xml"
+    or fatal("Could not create $TB/www/crossdomain.xml");
+print CROSS_OUT $crosstext;
+close CROSS_OUT;
+
+chmod(0644, "$TB/www/crossdomain.xml");
+
+if (! -e "$TB/www/protogeni") {
+    mkdir("$TB/www/protogeni", 0775)
+	or fatal("Could not mkdir $TB/www/protogeni");
+}
+
+$crosstext = <<'CROSSEND';
+<?xml version="1.0"?>
+<cross-domain-policy>
+    <allow-access-from domain="boss.emulab.net" />
+    <allow-access-from domain="users.emulab.net" />
+    <allow-access-from domain="*.protogeni.net" />
+</cross-domain-policy>
+CROSSEND
+
+open CROSS_OUT, ">$TB/www/protogeni/crossdomain.xml"
+    or fatal("Could not create $TB/www/protogeni/crossdomain.xml");
+print CROSS_OUT $crosstext;
+close CROSS_OUT;
+
+chmod(0644, "$TB/www/protogeni/crossdomain.xml");
+
+#
 # The web server needs to do client authentication, for the geni xmlrpc
 # interface. A bundle of CA certs from the trusted roots (emulabs) will
 # be used. This bundle will periodically update as sites come online.
