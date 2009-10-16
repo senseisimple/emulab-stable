@@ -2542,7 +2542,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	ipod/GNUmakefile \
 	lib/GNUmakefile lib/libtb/GNUmakefile \
 	os/GNUmakefile os/split-image.sh os/imagezip/GNUmakefile \
-	os/imagezip/ffs/GNUmakefile os/imagezip/extfs/GNUmakefile \
+	os/imagezip/ffs/GNUmakefile os/imagezip/extfs/GNUmakefile os/imagezip/ext4fs/GNUmakefile \
 	os/imagezip/shd/GNUmakefile os/imagezip/hashmap/GNUmakefile \
 	os/frisbee.redux/GNUmakefile os/growdisk/GNUmakefile \
         os/syncd/GNUmakefile os/dijkstra/GNUmakefile \
