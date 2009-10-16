@@ -101,44 +101,26 @@ find_disks() {
 	local disks
 
 	for d in /sys/block/[sh]d*; do
-		disks="$disks $d"
+		disks="$disks ${d##*/}"
 	done
 
 	echo $disks
 }
 
-#
-# Function to zero all potential superblocks in the DOS partitions that
-# could interfere with the OSes on the image being loaded.
-#
-# FreeBSD 4 or 5 goes out of its way to make this hard.  In FBSD4, we
-# cannot overwrite the beginning of partitions that have a legit superblock.
-# In FBSD5, DOS partitions that have a zero type cannot even be accessed.
-# So we have to use the whole-disk special file using offsets extracted
-# via fdisk.  This is unnecessary with Linux, but it's easier just to do it
-# the same way on both OSs rather than have special-case code.
-#
+# Wipe out the superblocks on any partitions by zeroing the first 16 sectors.
+# This implementation doesn't suffer the limitations of the FreeBSD one in that:
+# A) All partitions get zapped, even if not DOS MBR partitions
+# B) We can zap the partition device since Linux isn't overprotective of superblocks,
+#    unlike FreeBSD.
 zapsuperblocks()
 {
-	local disk=$1
-	local offsets=''
-
-	offsets=`echo -e 'u\np\nq' | fdisk $disk 2> /dev/null | \
-		sed -n "s#^${disk}[0-9]* *. *[0-9]* *\([0-9]*\).*\\$#\1#p"`
-
-	if [ x"$offs" = x ]; then
-		return 0
-	fi
-
-	echo -n "Invalidating old potential superblocks: "
-	for off in $offsets; do
-		echo -n "$off "
-		dd if=/dev/zero of=$disk seek=$off bs=512 count=16 > /dev/null 2>&1
-		if [ $? -ne 0 ]; then
-			echo "WARNING: failed to invalidate $off"
-		fi
+	local disk=${1##*/}
+	
+	echo "Invalidating old potential superblocks on $disk"
+	partitions=`echo /sys/block/$disk/$disk* 2>/dev/null`
+	for part in $partitions; do
+		dd if=/dev/zero of=/dev/${part##*/} bs=512 count=16 > /dev/null 2>&1
 	done
-	echo ""
 
 	return 0
 }
@@ -360,6 +342,11 @@ get_loadinfo()
 		sleep 1
 		time=$(( $time - 1 ))
 	done
+	if [ $time -eq 0 ]; then
+		return 1
+	fi
+	
+	return 0
 }
 
 # See if we can map drive names to BIOS numbers via EDD
