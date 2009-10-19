@@ -1488,9 +1488,11 @@ sub SliverWork($$)
     # Make sure all nodes requested are allocated. 
     #
     foreach my $ref (@{$rspec->{'node'}}) {
-	my $resource_uuid = $ref->{'component_uuid'} || $ref->{'uuid'};
+	my $resource_uuid = $ref->{'component_urn'} ||
+	    $ref->{'component_uuid'} || $ref->{'uuid'};
 	my $node_nickname = $ref->{'virtual_id'} || $ref->{'nickname'};
-	my $manager_uuid  = $ref->{'component_manager_uuid'};
+	my $manager_uuid  = $ref->{'component_manager_urn'} ||
+	    $ref->{'component_manager_uuid'};
 	
 	# Let remote nodes pass through.
 	next
