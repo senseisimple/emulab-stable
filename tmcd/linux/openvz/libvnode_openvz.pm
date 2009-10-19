@@ -675,7 +675,7 @@ sub vz_vnodeCreate {
 
     # set some resource limits:
     my %deflimits = ( "diskinodes" => "unlimited:unlimited",
-		      #"diskspace" => "8G:8G",
+		      "diskspace" => "unlimited:unlimited",
 		      "numproc" => "unlimited:unlimited",
 		      "numtcpsock" => "unlimited:unlimited",
 		      "numothersock" => "unlimited:unlimited",
@@ -711,6 +711,16 @@ sub vz_vnodeCreate {
     # txqueuelen on devices inside the container.  This may have other
     # undesireable side effects, but need it for now.
     mysystem("$VZCTL set $vmid --capability net_admin:on --save");
+
+    #
+    # Make some directories in case the guest doesn't have them -- the elab
+    # mount and umount vz scripts need them to be there!
+    #
+    my $privroot = "/vz/private/$vnode_id";
+    if ($DOLVM) {
+	$privroot = "/mnt/$vnode_id/private";
+    }
+    mysystem("mkdir -p $privroot/var/emulab/boot/");
 
     # NOTE: we can't ever umount the LVM logical device because vzlist can't
     # return status appropriately if a VM's root and private areas don't
