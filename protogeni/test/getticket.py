@@ -133,6 +133,7 @@ ticketcopy = response["value"]
 print "Releasing the ticket now ..."
 params = {}
 params["ticket"] = ticketcopy
+params["credential"] = myslice
 rval,response = do_method("cm", "ReleaseTicket", params)
 if rval:
     Fatal("Could not release ticket")
