@@ -2,9 +2,8 @@
 
 #
 # EMULAB-LGPL
-# Copyright (c) 2004, Regents, University of California.
-# Modified from an Netbed/Emulab module, Copyright (c) 2000-2003, University of
-# Utah
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2004-2009, Regents, University of California.
 #
 
 #
@@ -134,7 +133,7 @@ sub new($$$;$) {
     warn ("Opening SNMP session to $self->{NAME}...") if ($self->{DEBUG});
 
     $self->{SESS} = new SNMP::Session(DestHost => $self->{NAME},
-	Community => $self->{COMMUNITY});
+	Community => $self->{COMMUNITY}, Version => "2c");
 
     if (!$self->{SESS}) {
 	#
@@ -184,7 +183,7 @@ sub hammer($$$;$) {
 
 sub get1($$$) {
     my ($self, $obj, $instance) = @_;
-    my $id = "nortel::snmpitGetOnePersistently of $obj, $instance";
+    my $id = $self->{NAME}."::snmpitGetOnePersistently of $obj, $instance";
     my $closure = sub () {
 	my $RetVal = snmpitGet($self->{SESS}, [$obj, $instance], 1);
 	if (!defined($RetVal)) { sleep 2;}
@@ -215,9 +214,6 @@ sub portControl ($$@) {
 
     $self->debug("portControl: $cmd -> (@ports)\n");
 
-    my @p = map { portnum($_) } @ports;
-
-    #
     # Find the command in the %cmdOIDs hash (defined at the top of this file).
     # Some commands involve multiple SNMP commands, so we need to make sure
     # we get all of them
@@ -655,6 +651,61 @@ sub removePortsFromVlan($@) {
 }
 
 #
+# Removes and disables some ports in a given VLAN. The VLAN is given as a VLAN
+# 802.1Q tag value.  Ports are known to be regular ports and not trunked.
+#
+# usage: removeSomePortsFromVlan(self,vlan,@ports)
+#	 returns 0 on sucess.
+#	 returns the number of failed ports on failure.
+#
+sub removeSomePortsFromVlan($$@) {
+    my ($self, $vlan_number, @ports) = @_;
+    my ($errors, $id, %hports) = (0,$self->{NAME}."::removeSomePortsFromVlan");
+
+    $self->debug("$id $vlan_number @ports\n");
+    @ports = $self->convertPortFormat($PORT_FORMAT_IFINDEX,@ports);
+    @hports{@ports} = @ports;
+
+
+    my $field = ["snVLanByPortMemberVLanId"];
+    my ($rows) = snmpitBulkwalkFatal($self->{SESS}, $field);
+    foreach my $rowref (@$rows) {
+	my ($name,$index,$value) = @$rowref;
+	$self->debug("removeSomePortsFromVlan: Got $name $index $value\n",2);
+	if ($value == $vlan_number) {
+	    #
+	    # This table is indexed by vlan.port
+	    #
+	    $index =~ /(\d+)\.(\d+)/;
+	    my ($vlan,$ifIndex) = ($1,$2);
+	    if ($vlan != $vlan_number)
+		{ die "Something seriously hosed on $self->{NAME}\n"; }
+	    next unless ($hports{$ifIndex});
+	    my $portIndex = $self->{PORTINDEX}{$ifIndex};
+	    my $modport = $self->{IFINDEX}{$ifIndex};
+	    #
+	    # disable this port, unless it is tagged.
+	    #
+	    $value = $self->{SESS}->get(["snSwPortInfoTagMode",$portIndex]);
+	    $self->debug("disabling $modport ( $portIndex ) "
+			    . "from vlan $vlan ( $value )\n" );
+	    if (defined($value) && ($value eq "untagged")) {
+		$value = $self->{SESS}->set
+		(["ifAdminStatus",$ifIndex,"down","INTEGER"]);
+	    }
+	    $value = $self->{SESS}->set
+	    (["snVLanByPortMemberRowStatus",$index,"delete","INTEGER"]);
+	    if (!$value) {
+		    $errors++;
+		    print STDERR "couldn't add/remove port $modport" .
+				    "on vlan $vlan_number\n";
+	    }
+	}
+    };
+    return $errors;
+}
+
+#
 # Remove the given VLANs from this switch. Removes all ports from the VLAN,
 # so it's not necessary to call removePortsFromVlan() first. The VLAN is
 # given as a VLAN identifier from the database.
@@ -709,7 +760,7 @@ sub UpdateField($$$@) {
 	# switch:module.port form, or we may have to convert them to it with
 	# portnum
 	#
-	if ($portname =~ /:(\d+)\.(\d+)/) {
+	if ($portname =~ /\.(\d+)\/(\d+)/) {
 	    $module = $1; $port = $2;
 	} else {
 	    $portname = portnum($portname);
@@ -834,10 +885,11 @@ sub listVlans($) {
 		my $node = portnum($portname);
 		if (defined($node)) {
 		    $self->debug("portnum returns $node for  $portname\n",2);
-		    push @{$Members{$index}}, $node;
 		} else {
+		    $node = $prefix . '.' . $slot . "/" . $port ;
 		    $self->debug("no portnum for $portname in $vlan_name\n");
 		}
+		push @{$Members{$index}}, $node;
             }
 	   #@memberlist = $Members{$index};
 	   #$self->debug("constructed list @memberlist\n",2);
@@ -1076,6 +1128,9 @@ sub getChannelIfIndex($@) {
     foreach my $port (@ifIndexes) {
         if ($port) { $ifindex = $port; last; }
     }
+    if (! defined ($ifindex)) {
+	print "Foundry::getChannelIfIndex failed on @ports , @ifIndexes\n";
+    }
     return $ifindex;
 }
 
@@ -1115,19 +1170,30 @@ sub setVlansOnTrunk($$$$) {
 	}
     }
     foreach my $vlan_number (@vlan_numbers) {
+	my $oid = "snVLanByPortMemberRowStatus.$vlan_number.$ifIndex";
 	my $action = ($value == 1) ? "create" : "delete" ;
+	my $readable = ($value == 1) ? "add" : "remove" ;
 	if ($vlan_number == 1) { next ; }
-	$RetVal = $self->{SESS}->set(
-		"snVLanByPortMemberRowStatus.$vlan_number.$ifIndex",$action);
+	$RetVal = $self->{SESS}->set($oid,$action);
 	if (!$RetVal) {
+		$RetVal = $self->{SESS}->get($oid);
+		if (defined($RetVal) && ($RetVal eq "valid")) {
+			# Foundry9604's won't let you add 
+			# a vlan when it's already there
+			if ($value == 1) { next;}
+		}
+		# next happens when  asked to delete a non-existant vlan
+		if (($value == 0) && !$RetVal) { next; }
+		# otherwise, something really did go wrong.
 		$errors++;
-		print STDERR "couldn't add/remove port $modport" .
-				"on vlan $vlan_number\n";
+		print STDERR "couldn't $readable port $modport " .
+			"on vlan $vlan_number (ifIndex $ifIndex)\n";
+		next;
 	}
 	#
 	# If this is a new vlan, need to set name and turn off STP.
 	#
-	$self->newNameNoStp($vlan_number, \$errors);
+	if ($value == 1) { $self->newNameNoStp($vlan_number, \$errors); }
     }
     return !$errors;
 }

@@ -3,7 +3,7 @@
 #
 # EMULAB-LGPL
 # Copyright (c) 2000-2003 University of Utah and the Flux Group.
-# Copyright (c) 2004-2008 Regents, University of California.
+# Copyright (c) 2004-2009 Regents, University of California.
 # All rights reserved.
 
 #
@@ -289,8 +289,6 @@ sub portControl ($$@) {
     my @ports = @_;
 
     $self->debug("portControl: $cmd -> (@ports)\n");
-
-    my @p = map { portnum($_) } @ports;
 
     #
     # Find the command in the %cmdOIDs hash (defined at the top of this file).
@@ -840,6 +838,30 @@ sub removePortsFromVlan($@) {
 }
 
 #
+# Removes and disables some ports in a given VLAN. The VLAN is given as a VLAN
+# 802.1Q tag value.  Ports are known to be regular ports and not trunked.
+#
+# usage: removeSomePortsFromVlan(self,vlan,@ports)
+#	 returns 0 on sucess.
+#	 returns the number of failed ports on failure.
+#
+sub removeSomePortsFromVlan($$@) {
+    my ($self, $vlan_number, @ports) = @_;
+    my ($errors, $id, %hports) = (0,$self->{NAME}."::removeSomePortsFromVlan");
+    @ports = $self->convertPortFormat($PORT_FORMAT_IFINDEX,@ports);
+
+    my $value = $self->get1("rcVlanPortMembers",$vlan_number);
+    return 1 if (!$value);
+
+    @hports{@ports} = @ports;
+    @ports = grep { $hports{$_};} $self->portSetToList($value);
+    $errors += $self->delPortVlan($vlan_number,@ports);
+    $errors += $self->portControl("disable",@ports);
+
+    return $errors;
+}
+
+#
 # Remove the given VLANs from this switch. Removes all ports from the VLAN,
 # so it's not necessary to call removePortsFromVlan() first. The VLAN is
 # given as a VLAN identifier from the database.
@@ -896,26 +918,7 @@ sub UpdateField($$$@) {
 
 
     foreach my $portname (@ports) {
-	#
-	# Check the input format - the ports might already be in
-	# switch:module.port form, or we may have to convert them to it with
-	# portnum
-	#
-	if ($portname =~ /:(\d+)\.(\d+)/) {
-	    $module = $1; $port = $2;
-	} else {
-	    $portname = portnum($portname);
-	    if (!$portname) { next; }
-	    $portname =~ /:(\d+)\.(\d+)/;
-	    $module = $1; $port = $2;
-	}
-	$modport = "$module.$port";
-	$self->debug("port $portname ( $modport ), " );
-	if ($OID =~ /^ifAdmin/) {
-		$row = $self->{IFINDEX}{$modport};
-	} else {
-		$row = $self->{PORTINDEX}{$modport};
-	}
+	my ($row) = $self->convertPortFormat($PORT_FORMAT_IFINDEX,$portname);
 	$self->debug("checking row $row for $val ...\n");
 	$Status = $self->{SESS}->get([$OID,$row]);
 	if (!defined $Status) {
@@ -999,11 +1002,12 @@ sub listVlans($) {
 	    if (!$node) {
 		($modport) = $self->convertPortFormat
 			($PORT_FORMAT_MODPORT,$ifIndex);
-		$node = $self->{NAME} . ":$modport";
+		$modport =~ s/\./\//;
+		$node = $self->{NAME} . ".$modport";
 	    }
 	    push @{$Members{$vlan_number}}, $node;
 	    if (!$Names{$vlan_number}) {
-		$self->debug("listVlans: WARNING: port $self->{NAME}.$modport in non-existant " .
+		$self->debug("listVlans: WARNING: port $node in non-existant " .
 		    "VLAN $vlan_number\n");
 	    }
 	}
@@ -1397,6 +1401,9 @@ sub disablePortTrunking($$) {
 # Reads the IfIndex table from the switch, for SNMP functions that use 
 # IfIndex rather than the module.port style. Fills out the objects IFINDEX
 # members,
+#
+# Unlike Foundry's, Nortel's use same indexes for private port functions
+# and IETF standard ifIndex-ed mibs.
 #
 # usage: readifIndex(self)
 #        returns nothing but sets instance variables IFINDEX and PORTINDEX

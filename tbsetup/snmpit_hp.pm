@@ -2,8 +2,8 @@
 
 #
 # EMULAB-LGPL
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
-# Copyright (c) 2004-2008 Regents, University of California.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2004-2009 Regents, University of California.
 # All rights reserved.
 #
 
@@ -963,6 +963,49 @@ sub removePortsFromVlan($@) {
 	$errors += $self->setVlanLists($vlan_number, $vLists, 1, $defaultLists);
 	$self->unlock();
     }
+    return $errors;
+}
+
+#
+# Removes and disables some ports in a given VLAN. The VLAN is given as a VLAN
+# 802.1Q tag value.  Ports are known to be regular ports and not trunked.
+#
+# usage: removeSomePortsFromVlan(self,vlan,@ports)
+#	 returns 0 on sucess.
+#	 returns the number of failed ports on failure.
+#
+sub removeSomePortsFromVlan($$@) {
+    my ($self, $vlan_number, @ports) = @_;
+    my ($errors, $changes, $id, %porthash) =
+	(0, 0, $self->{NAME} . "::removeSomePortsFromVlan");
+
+    @ports = $self->convertPortFormat($PORT_FORMAT_IFINDEX,@ports);
+    @porthash{@ports} = @ports;
+
+    $self->lock();
+    my $defaultLists = $self->getVlanLists(1);
+    my $vLists = $self->getVlanLists($vlan_number);
+    my @portlist = bitSetToList(@$vLists[2]);
+    $self->debug("$id $vlan_number: @portlist\n",2);
+
+    foreach my $portIndex (@portlist) {
+	next unless $porthash{$portIndex};
+	if (@{@$vLists[1]}[$portIndex - 1]) {
+	    # otherwise, port is tagged, or dual; maybe should complain.
+
+	    @{@$defaultLists[1]}[$portIndex - 1] = 1;
+	    @{@$defaultLists[2]}[$portIndex - 1] = 1;
+	    $self->debug("disabling port $portIndex  "
+			    . "from vlan $vlan_number \n" );
+	    $self->set(["ifAdminStatus",$portIndex,"down","INTEGER"],$id);
+	}
+	@{@$vLists[1]}[$portIndex - 1] = 0;
+	@{@$vLists[2]}[$portIndex - 1] = 0;
+	$changes++;
+    }
+    $errors += $self->setVlanLists($vlan_number, $vLists, 1, $defaultLists)
+	    if ($changes > 0);
+    $self->unlock();
     return $errors;
 }
 
