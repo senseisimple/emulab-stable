@@ -7,14 +7,34 @@
 use English;
 use Getopt::Std;
 
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
 my $FSTAB = "/etc/fstab";
+my $SWAPS = "/proc/swaps";
+my $FIRST_BOOT_FLAG = "$BOOTDIR/added_swaps";
 my $script = $0;
 
+sub removeswaps();
+sub findswaps();
 sub swapenable();
-sub addswap($$);
 
 # Turn off line buffering on output
 $| = 1;
+
+# Remove any existing swap devices from fstab; we can't ensure that they'll
+# work on this node.  This only runs the first time the node is booted after
+# being imaged.  Then look for linux swap partitions on the root disk and add
+# them to fstab.  This way we have sane defaults for swap.  The user is, of
+# course, free to change the swap configration later if necessary.
+if (! -f $FIRST_BOOT_FLAG) {
+
+	removeswaps();
+	findswaps();
+
+	open FD, ">$FIRST_BOOT_FLAG";
+	close FD;
+}
 
 #
 # Figure out if there is a swap device, add it to fstab and intialize if
@@ -24,27 +44,38 @@ swapenable();
 
 exit(0);
 
-sub swapenable()
+sub removeswaps()
 {
-    if (!open(FD, "<$FSTAB")) {
-	print STDERR "*** WARNING: could not open $FSTAB for reading, ".
-	    "no swap enabled\n";
+    my @buffer;
+
+    if (!open(FD, "+<$FSTAB")) {
+	print STDERR "*** WARNING: could not open $FSTAB for writing: $!\n";
 	return;
     }
     while (<FD>) {
+	next if (/^\s*$/ || /^#/);
 	my ($fs,$mpt,$type,$opt) = split;
 	if ($type eq "swap") {
-	    close(FD);
-	    return;
+	    next;
 	}
-    }
-    close(FD);
 
+	push @buffer, $_;
+    }
+
+    truncate FD, 0;
+    seek(FD, 0, 0);
+    print FD $_ for (@buffer);
+    close(FD);
+}
+
+sub findswaps()
+{
     #
     # No swap device.
     # Identify the root disk and see if we can locate a Linux swap partition
     # on it.
     #
+    my @swapdevs;
     my $rdisk;
     my $rootfs = `df / | grep /dev/`;
     if ($rootfs =~ /^(\/dev\/[a-z]+)\d+/) {
@@ -64,39 +95,69 @@ sub swapenable()
 
     chomp(@lines);
     foreach $line (@lines) {
-	if ($line =~ /^\/dev\/(\S+)\s+\d+\s+\d+\s+(\d+)\+?/) {
+	if ($line =~ /^(\/dev\/\S+)\s+\d+\s+\d+\s+(\d+)\+?/) {
 	    my $dev = $1;
 	    my $size = $2;
-	    addswap($dev, $size);
-	    return;
+	    print "Using $dev ($size sectors) for swap\n";
+	    push @swapdevs, $dev;
 	}
     }
 
-    print STDERR "*** WARNING: could not locate a suitable swap device, ".
-	"no swap enabled\n";
+    if (!@swapdevs) {
+        print STDERR "*** WARNING: could not locate a suitable swap device, ".
+	    "no swap enabled\n";
+	return;
+    }
+
+    if (!open(FD, ">>$FSTAB")) {
+	print STDERR "*** WARNING: could not add swap devices to $FSTAB: $!\n";
+	return;
+    }
+
+    print FD "# the following swap devices added by $script\n";
+    for (@swapdevs) {
+	print FD "$_\t\tswap\tswap\tdefaults\t0\t0\n";
+    }
+    close(FD);
 }
 
-sub addswap($$)
+sub swapenable()
 {
-    my ($dev,$size) = @_;
+    my %curswaps;
 
-    print "Using /dev/$dev ($size sectors) for swap\n";
-    if (system("mkswap /dev/$dev")) {
-	print STDERR "*** WARNING: could not initialize swap on /dev/$dev, ".
+    if (!open(FD, "<$SWAPS")) {
+	print STDERR "*** WARNING: could not open $SWAPS for reading: $!\n";
+	return;
+    }
+
+    <FD>; # Throw away the header
+    while(<FD>) {
+	    @_ = split;
+	    $curswaps{$_[0]} = 1;
+    }
+    close FD;
+
+    if (!open(FD, "<$FSTAB")) {
+	print STDERR "*** WARNING: could not open $FSTAB for reading, ".
 	    "no swap enabled\n";
-	exit(0);
+	return;
     }
-    if (system("swapon /dev/$dev")) {
-	print STDERR "*** WARNING: could not enable swap on /dev/$dev, ".
-	    "no swap enabled\n";
-	exit(0);
+    while (<FD>) {
+	next if (/^\s*$/ || /^#/);
+	my ($fs,$mpt,$type,$opt) = split;
+	next if ($type ne "swap" || ! -b $fs || exists $curswaps{$fs});
+	next if ($opt =~ /\bnoauto\b/);
+
+	if (system("mkswap $fs")) {
+		print STDERR "*** WARNING: could not initialize swap on $fs\n";
+		next;
+	}
+
+	if (system("swapon $fs")) {
+	    print STDERR "*** WARNING: could not enable swap on $fs\n";
+	    next;
+	}
     }
-    if (!open(FD, ">>$FSTAB")) {
-	print STDERR "*** WARNING: could not add /dev/$dev to $FSTAB, ".
-	    "swap enabled this boot only\n";
-    }
-    print FD "# the following added by $script\n";
-    print FD "/dev/$dev\t\tswap\tswap\tdefaults\t0\t0\n";
     close(FD);
-    print "Swap enabled\n";
+
 }
