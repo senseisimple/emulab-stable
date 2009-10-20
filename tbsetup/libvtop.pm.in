@@ -1376,7 +1376,7 @@ sub GenFixNodes($)
 	# Temporary rspec generation.
 	#
 	next
-	    if ($vnode->_isgeninode());
+	    if (defined($vnode) && $vnode->_isgeninode());
 	
 	if ($self->isatoponode($vname) || $self->isadelaynode($vname)) {
 	    $self->addfixed("$vname $fixed");
