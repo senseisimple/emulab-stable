@@ -35,6 +35,7 @@ my $PGENISUPPORT  = @PROTOGENI_SUPPORT@;
 my $PGENICLRHOUSE = @PROTOGENI_CLEARINGHOUSE@;
 my $LOGFILE       = "$TB/log/geniexpire";
 my $IDLETIMES	  = "$TB/sbin/idletimes";
+my $EMULAB_PEMFILE = "$TB/etc/genicm.pem";
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
@@ -82,10 +83,21 @@ require GeniUtil;
 require GeniTicket;
 require GeniSlice;
 require GeniCM;
+require GeniCertificate;
 use Experiment;
 use Node;
 use libtestbed;
 use POSIX qw(strftime);
+
+#
+# So we know who/what we are acting as.
+#
+my $certificate = GeniCertificate->LoadFromFile($EMULAB_PEMFILE);
+if (!defined($certificate)) {
+    fatal("Could not get uuid/urn from $EMULAB_PEMFILE\n");
+}
+$ENV{'MYUUID'} = $certificate->uuid();
+$ENV{'MYURN'} = "urn:publicid:IDN+@OURDOMAIN@+authority+cm";
 
 # Go to ground.
 if (! $debug) {
