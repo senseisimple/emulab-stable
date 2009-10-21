@@ -360,9 +360,15 @@ sub GetTicket($;$)
 	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 					"Improper rspec");
 	}
-	$rspec = XMLin($rspec, KeyAttr => [],
-		       ForceArray => ["node", "link", "interface",
-				      "interface_ref", "linkendpoints"]);
+	$rspec =
+	    eval { XMLin($rspec, KeyAttr => [],
+			 ForceArray => ["node", "link", "interface",
+					"interface_ref", "linkendpoints"]) };
+	if ($@) {
+	    print STDERR "XMLin error: $@\n";
+	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+					"XML error in rspec");
+	}
     }
     else {
 	return GeniResponse->MalformedArgsResponse();
@@ -1065,9 +1071,17 @@ sub GetTicket($;$)
 	}	    
 	goto bad;
     }
-    my $solution = XMLin($tmpfile, KeyAttr => [],
-			 ForceArray => ["node", "link", "interface",
-					"interface_ref", "linkendpoints"]);
+    my $solution =
+	eval { XMLin($tmpfile, KeyAttr => [],
+		     ForceArray => ["node", "link", "interface",
+				    "interface_ref", "linkendpoints"]) };
+    if ($@) {
+	print STDERR "XMLin error: $@\n";
+	$response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					 "XML error in solution");
+	goto bad;
+    }
+
     unlink($tmpfile);
     print Dumper($solution);
 
@@ -2047,8 +2061,12 @@ sub SliverWork($$)
     }
 
     # The Manifest.
-    my $manifest = XMLout($rspec, "NoAttr" => 1);
-    $manifest =~ s/opt\>/rspec\>/g;
+    my $manifest =
+	eval { XMLout($rspec, "NoAttr" => 1, RootName => "manifest") };
+    if ($@) {
+	print STDERR "Manifest: XMLout error: $@\n";
+	print STDERR Dumper($rspec);
+    }
 
     #
     # Move this elsewhere.
@@ -2236,9 +2254,15 @@ sub StartSliver($)
     }
 
     if (defined($manifest)) {
-	$manifest = XMLin($manifest, KeyAttr => [],
-			  ForceArray => ["node", "link", "interface",
-					 "interface_ref", "linkendpoints"]);
+	$manifest =
+	    eval { XMLin($manifest, KeyAttr => [],
+			 ForceArray => ["node", "link", "interface",
+					"interface_ref", "linkendpoints"]) };
+	if ($@) {
+	    print STDERR "XMLin error reading manifest: $@\n";
+	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+					"Bad manifest");
+	}
     }
     
     #
