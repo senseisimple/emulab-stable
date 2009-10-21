@@ -148,7 +148,7 @@ Getopt::Long::Configure("no_ignore_case");
 GetOptions(\%opt,
     'a','c','d','e','b','B=s@','g','h','i=s@','l+','m=s@','M','n',
     'N=s@','o=s@','p=s','q','r','s', 'S=s@','t','E=s','T=s','u=s','U','v=s','w',
-    'y=s','x=s','z=s','F','L=s','O', 'D', 'R', 'f', 'X');
+    'y=s','x=s','z=s','F','L=s','O', 'D', 'R', 'f', 'X', 'vlan_tag=i');
 # Unused: f,j
 
 if ($opt{h}) {
@@ -162,6 +162,11 @@ if ($opt{v}) {
 
 if ($opt{q}) {
     $quiet = 1;
+    if ($opt{m} || $opt{o} || $opt{t} || $opt{r} || $opt{X} || $opt{T} ||
+	  $opt{E} || $opt{U} || $opt{u} || $opt{d} || $opt{p} || $opt{e}) {
+	my $nulldev = open(">>/dev/null");
+	select $nulldev; # supresses print foo(); without explicit fileglob
+    }
 }
 
 #
@@ -174,6 +179,7 @@ my @ports;
 my @optvlanids = ();
 my $equaltrunking = 0;
 my $this_user;
+our $next_vlan_tag; # XXX see doMakeVlan for explanation
 
 #
 # Verify user and get his DB uid for later. 
@@ -758,9 +764,7 @@ COMMAND: foreach my $command (@commands) {
 	SWITCH: for ($stack_type) {
 	    (/cisco/ || /catalyst/) && do {
 		require snmpit_cisco_stack;
-		$stack = new snmpit_cisco_stack($stack_id,$debug,$quiet,
-						$single_domain,
-						@{$stacks{$stack_id}});
+		$stack = new snmpit_cisco_stack($stack_id,$debug,$single_domain, 						@{$stacks{$stack_id}});
 		last;
 	    }; # /cisco/
 	    /intel/ && do {
@@ -771,7 +775,7 @@ COMMAND: foreach my $command (@commands) {
 	    };
 	    /generic/ && do {
 		require snmpit_stack;
-		$stack = new snmpit_stack($stack_id,$debug,$quiet,
+		$stack = new snmpit_stack($stack_id,$debug,
 					  @{$stacks{$stack_id}});
 		last;
 	    }; # /generic/
@@ -2006,9 +2010,31 @@ sub doMakeVlan($$@) {
     }
 
     #
+    # special temporary case for using a specific vlan number
+    # will go away when tags are allocated from the database.
+    #
+    if ($next_vlan_tag = $opt{'vlan_tag'}) {
+	my %vlans = $stack->findVlans();
+	my $number = $vlans{$vlan_name};
+	if (defined($number)) {
+	    if ($number != $next_vlan_tag) {
+	bad:	print "VLAN $vlan_name already has vlan_tag $number\n";
+		return 1;
+	    }
+	    goto old_number;
+	} else {
+	    while (my ($id, $tag) = each %vlans) {
+		if ($tag == $next_vlan_tag)
+		    { $vlan_name = $id; $number = $tag; goto bad; }
+	    }
+	    goto new_number;
+	}
+    }
+    #
     # Create it if it doesn't already exist
     #
     if ($stack->vlanExists($vlan_id)) {
+    old_number:
 	print "VLAN $vlan_name already exists\n"
 	    if (!$quiet);
 
@@ -2026,6 +2052,7 @@ sub doMakeVlan($$@) {
 	    $errors += $perrors;
 	}
     } else {
+    new_number:
 	print "Creating VLAN $vlan_name ...\n"
 	    if (!$quiet);
 	my $vlan_number = $stack->createVlan($vlan_id,\@ports,@pvlanArgs);

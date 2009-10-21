@@ -40,7 +40,6 @@ sub new($$$$$@) {
 
     my $stack_id = shift;
     my $debuglevel = shift;
-    my $quiet = shift;
     my $uses_vtp = shift;
     my @devicenames = @_;
 
@@ -57,12 +56,6 @@ sub new($$$$$@) {
     } else {
 	$self->{DEBUG} = 0;
     }
-    if (defined $quiet) {
-	$self->{QUIET} = $quiet;
-    } else {
-	$self->{QUIET} = 0;
-    }
-
     #
     # The ID of this stack
     # 
@@ -424,12 +417,17 @@ sub createVlan($$$;$$$) {
     # VLANs or not
     #
     my $vlan_number;
+
+    # XXX temp, see doMakeVlans in snmpit.in
+    if ($::next_vlan_tag)
+	{ $vlan_number = $::next_vlan_tag; $::next_vlan_tag = 0; }
+
     if ($self->{VTP} || $self->{PRUNE_VLANS}) {
 	#
 	# We just need to create the VLAN on the stack leader
 	#
 	#
-	$vlan_number = $self->{LEADER}->createVlan($vlan_id,undef,@otherargs);
+	$vlan_number = $self->{LEADER}->createVlan($vlan_id,$vlan_number,@otherargs);
     } else {
 	#
 	# We need to create the VLAN on all devices

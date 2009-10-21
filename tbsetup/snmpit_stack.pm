@@ -36,7 +36,6 @@ sub new($$$$@) {
 
     my $stack_id = shift;
     my $debuglevel = shift;
-    my $quiet = shift;
     my @devicenames = @_;
 
     #
@@ -52,11 +51,6 @@ sub new($$$$@) {
 	$self->{DEBUG} = $debuglevel;
     } else {
 	$self->{DEBUG} = 0;
-    }
-    if (defined $quiet) {
-	$self->{QUIET} = $quiet;
-    } else {
-	$self->{QUIET} = 0;
     }
 
     $self->{STACKID} = $stack_id;
@@ -114,8 +108,7 @@ sub new($$$$@) {
 	SWITCH: for ($type) {
 	    (/cisco/) && do {
 		use snmpit_cisco;
-		$device = new snmpit_cisco($devicename,
-					   $self->{DEBUG},$self->{QUIET});
+		$device = new snmpit_cisco($devicename,$self->{DEBUG});
 		last;
 		}; # /cisco/
 	    (/foundry1500/ || /foundry9604/)
@@ -418,6 +411,9 @@ sub newVlanNumber($$) {
 	%vlans = $self->findVlans();
     }
     my $number = $vlans{$vlan_id};
+    # XXX temp, see doMakeVlans in snmpit.in
+    if ($::next_vlan_tag)
+	{$number = $::next_vlan_tag; $::next_vlan_tag = 0; return $number; }
 
     if (defined($number)) { return 0; }
     my @numbers = sort values %vlans;
@@ -461,7 +457,7 @@ sub createVlan($$$;$$$) {
 	$vlan_number = $self->newVlanNumber($vlan_id);
 	if ($vlan_number == 0) { last LOCKBLOCK;}
 	print "Creating VLAN $vlan_id as VLAN #$vlan_number on stack " .
-                 "$self->{STACKID} ... \n" if (! $self->{QUIET});
+                 "$self->{STACKID} ... \n";
 	if ($self->{ALLVLANSONLEADER}) {
 		$res = $self->{LEADER}->createVlan($vlan_id, $vlan_number);
 		$self->unlock();
@@ -489,16 +485,12 @@ sub createVlan($$$;$$$) {
 		#
 		# Ooops, failed. Don't try any more
 		#
-		if ($self->{QUIET}) {
-		    print "$errortype VLAN $vlan_id as VLAN #$vlan_number on ".
-			"stack $self->{STACKID} ... \n";
-		}
 		print "Failed\n";
 		$vlan_number = 0;
 		last LOCKBLOCK;
 	    }
 	}
-	print "Succeeded\n" if (! $self->{QUIET});
+	print "Succeeded\n";
 
     }
     $self->unlock();
