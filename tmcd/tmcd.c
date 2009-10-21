@@ -277,6 +277,8 @@ COMMAND_PROTOTYPE(dointfcmap);
 COMMAND_PROTOTYPE(domotelog);
 COMMAND_PROTOTYPE(doportregister);
 COMMAND_PROTOTYPE(dobootwhat);
+COMMAND_PROTOTYPE(dotpmblob);
+COMMAND_PROTOTYPE(dotpmpubkey);
 
 /*
  * The fullconfig slot determines what routines get called when pushing
@@ -373,6 +375,8 @@ struct command {
 	{ "motelog",      FULLCONFIG_ALL,  F_ALLOCATED, domotelog},
 	{ "portregister", FULLCONFIG_NONE, F_REMNOSSL, doportregister},
 	{ "bootwhat",	  FULLCONFIG_NONE, 0, dobootwhat },
+	{ "tpmblob",	  FULLCONFIG_ALL, 0, dotpmblob },
+	{ "tpmpubkey",	  FULLCONFIG_ALL, 0, dotpmpubkey },
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -916,6 +920,9 @@ tcpserver(int sock, int portnum)
 	}
 	exit(1);
 }
+
+//#define error(x...)	fprintf(stderr, ##x)
+//#define info(x...)	fprintf(stderr, ##x)
 
 static int
 handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
@@ -7761,3 +7768,102 @@ COMMAND_PROTOTYPE(dobootwhat)
 	info("BOOTWHAT: %s: %s\n", reqp->nodeid, buf);
 	return 0;
 }
+
+COMMAND_PROTOTYPE(dotpmblob)
+{
+	MYSQL_RES	*res;	
+	MYSQL_ROW	row;
+	int		nrows,i;
+	unsigned long	*nlen;
+	int		hex = 1;
+	char		buf[MYBUFSIZE];
+	char		*bufp = buf;
+	char		*bufe = &buf[MYBUFSIZE];
+
+	if (rdata)
+		if (strncasecmp(rdata, "nohex", strlen("nohex")) == 0)
+			hex = 0;
+
+	/*
+	 * Get the blob
+	 */
+	res = mydb_query("select tpmblob "
+			"from node_hostkeys "
+			"where node_id='%s' ",
+			1, reqp->nodeid);
+
+	if (!res){
+		error("gettpmblob: %s: DB error getting tpmblob\n",
+			reqp->nodeid);
+		return 1;
+	}
+
+	nrows = mysql_num_rows(res);
+
+	if (!nrows){
+		error("%s: no tpmblob in database for this node.\n",
+			reqp->nodeid);
+		mysql_free_result(res);
+		return 1;
+	}
+
+	row = mysql_fetch_row(res);
+	nlen = mysql_fetch_lengths(res);
+	if (!nlen || !nlen[0]){
+		error("%s: invalid blob length.\n",
+			reqp->nodeid);
+		mysql_free_result(res);
+		return 1;
+	}
+
+	bufp += OUTPUT(bufp, bufe - bufp,
+		(hex ? "BLOBHEX=" : "BLOB="));
+	if (hex){
+		for (i = 0;i < nlen[0];++i)
+			bufp += OUTPUT(bufp, bufe - bufp,
+				"%.02x", (0xff & ((char)*(row[0]+i))));
+	} else{
+		for (i = 0;i < nlen[0];++i)
+			bufp += OUTPUT(bufp, bufe - bufp,
+				"%c", (char)*(row[0]+i));
+	}
+	bufp += OUTPUT(bufp, bufe - bufp, "\n");
+
+	client_writeback(sock, buf, bufp - buf, tcp);
+
+	mysql_free_result(res);
+	return 0;
+}
+
+COMMAND_PROTOTYPE(dotpmpubkey){
+	MYSQL_RES	*res;	
+	MYSQL_ROW	row;
+	int		nrows;
+	char		buf[MYBUFSIZE];
+
+	res = mydb_query("select tpmx509 "
+			"from node_hostkeys "
+			"where node_id='%s' ",
+			1, reqp->nodeid);
+	if (!res){
+		error("gettpmpub: %s: DB error getting tpmx509\n",
+			reqp->nodeid);
+		return 1;
+	}
+	nrows = mysql_num_rows(res);
+	if (!nrows){
+		error("%s: no tpmx509 in database for this node.\n",
+			reqp->nodeid);
+		mysql_free_result(res);
+		return 1;
+	}
+
+	row = mysql_fetch_row(res);
+	OUTPUT(buf, sizeof(buf), "TPMPUB=%s\n", row[0]);
+
+	client_writeback(sock, buf, strlen(buf), tcp);
+
+	mysql_free_result(res);
+	return 0;
+}
+
