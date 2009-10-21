@@ -19,6 +19,9 @@ use snmpit_lib;
 use libdb;
 use libtestbed;
 
+our %devices;
+our $parallelized = 1;
+
 #
 # Creates a new object. A list of devices that will be operated on is given
 # so that the object knows which to connect to. A future version may not 
@@ -28,7 +31,7 @@ use libtestbed;
 # returns a new object blessed into the snmpit_stack class
 #
 
-sub new($$$$@) {
+sub new($$$@) {
 
     # The next two lines are some voodoo taken from perltoot(1)
     my $proto = shift;
@@ -49,6 +52,7 @@ sub new($$$$@) {
     #
     if (defined $debuglevel) {
 	$self->{DEBUG} = $debuglevel;
+	$snmpit_stack_child::child_debug = $debuglevel;
     } else {
 	$self->{DEBUG} = 0;
     }
@@ -83,6 +87,17 @@ sub new($$$$@) {
     $self->{PRUNE_VLANS} = 1;
     $self->{VTP} = 0;
 
+    # must do this before spawning each device object, which forks().
+    bless($self,$class);
+
+    # see if we can run parallelized
+    if ($parallelized && (!(eval "require IO::EventMux") ||
+				!(eval "require RPC::Async"))) {
+	$parallelized = 0;
+	if ($debuglevel) {
+	    print "parallel snmpit_stack requires RPC::Async and friends\n";
+	}
+    }
 
     #
     # Make a device-dependant object for each switch
@@ -90,7 +105,7 @@ sub new($$$$@) {
     foreach my $devicename (@devicenames) {
 	print("Making device object for $devicename\n") if $self->{DEBUG};
 	my $type = getDeviceType($devicename);
-	my $device;
+	my $device = $devices{$devicename};
 
 	#
 	# Check to see if this is a duplicate
@@ -99,38 +114,16 @@ sub new($$$$@) {
 	    warn "WARNING: Device $devicename was specified twice, skipping\n";
 	    next;
 	}
-
 	#
-	# We check the type for two reasons: to determine which kind of
-	# object to create, and for some sanity checking to make sure
-	# we weren't given devicenames for devices that aren't switches.
-	#
-	SWITCH: for ($type) {
-	    (/cisco/) && do {
-		use snmpit_cisco;
-		$device = new snmpit_cisco($devicename,$self->{DEBUG});
-		last;
-		}; # /cisco/
-	    (/foundry1500/ || /foundry9604/)
-		    && do {
-		use snmpit_foundry;
-		$device = new snmpit_foundry($devicename,$self->{DEBUG});
-		last;
-		}; # /foundry.*/
-	    (/nortel1100/ || /nortel5510/)
-		    && do {
-		use snmpit_nortel;
-		$device = new snmpit_nortel($devicename,$self->{DEBUG});
-		last;
-		}; # /nortel.*/
-	    (/hp/)
-		    && do {
-		use snmpit_hp;
-		$device = new snmpit_hp($devicename,$self->{DEBUG});
-		last;
-		}; # /hp.*/
-	    die "Device $devicename is not of a known type, skipping\n";
+	# Also check to see if we already have made this device 
+	# for a different stack ...
+	# 
+	if (defined($device)) {
+	    $self->{DEVICES}{$devicename} = $device;
+	    next;
 	}
+
+	$device = snmpit_jitdev->create($devicename,$type,$self) if (!$device);
 
 		# indented to minimize diffs
 		if (!$device) {
@@ -151,8 +144,11 @@ sub new($$$$@) {
 
     }
 
-    bless($self,$class);
-
+    my %h = $self->reapCall("device_setup");
+    while (my ($devicename, $aref) = each %h) {
+       my $status = @$aref[0];
+       die "$devicename $status\n" if ($status ne "OK");
+    }
     return $self;
 }
 
@@ -175,9 +171,14 @@ sub listVlans($) {
     # the results from each switch, based on the VLAN identifier
     #
     my %vlans = ();
+    while (my ($devicename, $device) = each %{$self->{DEVICES}}) {
+	$device->listVlans_start();
+    }
+    my %collector = $self->reapCall("listVlans");
     foreach my $devicename (sort {tbsort($a,$b)} keys %{$self->{DEVICES}}) {
-	my $device = $self->{DEVICES}{$devicename};
-	foreach my $line ($device->listVlans()) {
+	my @dev_result = @{$collector{$devicename}};
+	next if (!@dev_result);
+	foreach my $line (@dev_result) {
 	    my ($vlan_id, $vlan_number, $memberRef) = @$line;
 	    ${$vlans{$vlan_id}}[0] = $vlan_number;
 	    push @{${$vlans{$vlan_id}}[1]}, @$memberRef;
@@ -413,7 +414,7 @@ sub newVlanNumber($$) {
     my $number = $vlans{$vlan_id};
     # XXX temp, see doMakeVlans in snmpit.in
     if ($::next_vlan_tag)
-	{$number = $::next_vlan_tag; $::next_vlan_tag = 0; return $number; }
+	{ $number = $::next_vlan_tag; $::next_vlan_tag = 0; return $number; }
 
     if (defined($number)) { return 0; }
     my @numbers = sort values %vlans;
@@ -485,7 +486,8 @@ sub createVlan($$$;$$$) {
 		#
 		# Ooops, failed. Don't try any more
 		#
-		print "Failed\n";
+		print STDERR "$errortype VLAN $vlan_id as VLAN #$vlan_number ".
+		    "on stack $self->{STACKID} ... Failed\n";
 		$vlan_number = 0;
 		last LOCKBLOCK;
 	    }
@@ -512,10 +514,12 @@ sub findVlans($@) {
     my %mapping = ();
 
     $self->debug("snmpit_stack::findVlans( @vlan_ids )\n");
+    foreach $device (values %{$self->{DEVICES}})
+	{ $device->findVlans_start(@vlan_ids); }
+    my %results = $self->reapCall("findVlans");
     foreach $devicename (sort {tbsort($a,$b)} keys %{$self->{DEVICES}}) {
 	$self->debug("stack::findVlans calling $devicename\n");
-	$device = $self->{DEVICES}->{$devicename};
-	my %dev_map = $device->findVlans(@vlan_ids);
+	my %dev_map = @{$results{$devicename}};
 	my ($id,$num,$oldnum);
 	while (($id,$num) = each %dev_map) {
 		if (defined($mapping{$id})) {
@@ -547,6 +551,11 @@ sub findVlan($$) {
     my ($self, $vlan_id) = @_;
 
     $self->debug("snmpit_stack::findVlan( $vlan_id )\n");
+    if ($parallelized) {
+	my %dev_map = $self->findVlans($vlan_id);
+	my $vlan_num = $dev_map{$vlan_id};
+	return defined($vlan_num) ? $vlan_num : 0;
+    }
     foreach my $devicename (sort {tbsort($a,$b)} keys %{$self->{DEVICES}}) {
 	my $device = $self->{DEVICES}->{$devicename};
 	my %dev_map = $device->findVlans($vlan_id);
@@ -1134,6 +1143,339 @@ sub unlock($) {
 	if ($lock_held) { TBScriptUnlock(); $lock_held = 0;}
 }
 
+sub reapCall($$) {
+    my ($self,$proc) = @_;
+    $self->debug("snmpit_stack::reapCall($proc)\n");
+    return snmpit_jitdev::reapCall($proc);
+}
+
+
+package snmpit_jitdev;
+use Dumpvalue;
+our $jitdev_dumper;
+
+# class method to do lazy creation of devs.
+# don't want to do an snmp connect, walk tables unless we have to.
+# snmpit_jitdev->create($devicename, $type, $parent);
+
+
+sub create($$$$) {
+    my ($class, $name, $type, $parent) = @_;
+    my $self = { NAME => $name, TYPE => $type,
+		PARENT => $parent, DEBUG => $parent->{DEBUG}};
+    if ($parent->{DEBUG} && !$jitdev_dumper) { $jitdev_dumper = new Dumpvalue; }
+    bless ($self, $class);
+    $devices{$name} = $self;
+    $self->spawn() if ($snmpit_stack::parallelized);
+    $self->startChildCall("device_setup",$name);
+    # reapCall("device_setup"); done in snmpit_stack::new();
+    return $self;
+}
+
+sub debug($$;$) { return &snmpit_stack::debug(@_); }
+
+sub snap($) {
+    my ($self) = @_;
+
+    if (!defined($self->{OBJ})) {
+	my $devicename = $self->{NAME};
+	my $type = $self->{TYPE};
+	my $device;
+
+	if ($self->{DEBUG}) { print "snapping $devicename \n"; }
+
+	#
+	# We check the type for two reasons: to determine which kind of
+	# object to create, and for some sanity checking to make sure
+	# we weren't given devicenames for devices that aren't switches.
+	#
+	SWITCH: for ($type) {
+	    (/cisco/) && do {
+		use snmpit_cisco;
+		$device = new snmpit_cisco($devicename,$self->{DEBUG});
+		last;
+		}; # /cisco/
+	    (/foundry1500/ || /foundry9604/)
+		    && do {
+		use snmpit_foundry;
+		$device = new snmpit_foundry($devicename,$self->{DEBUG});
+		last;
+		}; # /foundry.*/
+	    (/nortel1100/ || /nortel5510/)
+		    && do {
+		use snmpit_nortel;
+		$device = new snmpit_nortel($devicename,$self->{DEBUG});
+		last;
+		}; # /nortel.*/
+	    (/hp/)
+		    && do {
+		use snmpit_hp;
+		$device = new snmpit_hp($devicename,$self->{DEBUG});
+		last;
+		}; # /hp.*/
+	    print "Device $devicename is not of a known type\n";
+	}
+	if (!$device) {
+	    print "Device $devicename could not be instantiated, \n";
+	    return undef;
+	}
+	# this is busted for delayed initialization
+	# Foundry, Nortel's, and HP's have no device specific reason
+	# to reduce the range, and someday the cisco code should be
+	# amended to support 1025 <= tag < 4096.
+
+	my $parent = $self->{PARENT};
+
+	if (defined($device->{MIN_VLAN}) &&
+	    ($parent->{MIN_VLAN} < $device->{MIN_VLAN}))
+		{ $parent->{MIN_VLAN} = $device->{MIN_VLAN}; }
+	if (defined($device->{MAX_VLAN}) &&
+	    ($parent->{MAX_VLAN} > $device->{MAX_VLAN}))
+		{ $parent->{MAX_VLAN} = $device->{MAX_VLAN}; }
+	$self->{OBJ} = $device;
+
+	# someday soon.
+	# %$self = ( %$device );
+	# bless($self, ref($device));
+    }
+}
+
+# Hold your nose -- this device method returns side effects
+# need special casing on the old_style call variant to pass them through.
+
+sub setPortVlan($@) {
+    my ($self, @args) = @_;
+    my $proc = "setPortVlan";
+    $self->debug("jitdev::setPortVlan( @args )\n");
+    $self->startChildCall($proc, @args);
+    my %rhash = reapCall($proc);
+    my ($hr) = @{$rhash{$self->{NAME}}};
+    if ($hr->{"DISPLACED_VLANS"}) {
+	$self->{DISPLACED_VLANS} = $hr->{"DISPLACED_VLANS"};
+    }
+    return $hr->{"errors"};
+}
+
+sub DESTROY () { undef ; }
+
+sub AUTOLOAD($@) {
+    my ($self, @args) = @_;
+    my $method =  our $AUTOLOAD;
+    my ($cname,$name) = split "::", $method;
+    my $proc;
+    if ($jitdev_dumper) { print "Trapping $method \n" ; }
+    if ($name =~ /(\w*)_start$/) {
+	$proc = $1;
+	return $self->startChildCall($proc, @args);
+    } 
+    if ($name =~ /(\w*)_reap$/) {
+	$proc = $1;
+	return reapCall($proc);
+    }
+    $proc = $name;
+    $self->startChildCall($proc, @args);
+    my %result = reapCall($proc);
+    my @rlist =  @{$result{$self->{NAME}}};
+    if (wantarray()) { return @rlist; }
+    else {return $rlist[0];}
+}
+
+# Everything below here is for multithreading stack calls;
+
+use Socket;
+use Fcntl;
+
+#for now only allow one outstanding proc per dev;
+
+my %cur_procs;
+my %cur_callids;
+my %cur_results;
+my %fh_to_rpc;
+my $mux;
+my $fake_callid = 0;
+
+sub URL_connect_fork() {
+    my ($parentSock, $childSock);
+    {
+	local $^F = 1024; # avoid close-on-exec flag being set
+	socketpair($parentSock, $childSock, AF_UNIX, SOCK_STREAM, PF_UNSPEC);
+    }
+    my $client_pid = fork;
+    if ($client_pid == 0) { # child process
+	close $parentSock;
+	snmpit_stack_child::child_loop($childSock);
+	exit(0);
+    }
+    close $childSock;
+    return $parentSock;
+}
+
+sub rpcCallback(@) {
+    my ($devname, $proc, @result) = @_;
+    if ($snmpit_stack_child::child_debug && $jitdev_dumper) 
+    {
+	print "rpcCallback($devname, $proc)\n";
+	# my $wrap = [ @_ ];
+	# $jitdev_dumper->dumpValue($wrap);
+    }
+    my $oproc = $cur_procs{$devname};
+    if (!defined($oproc)) { return ;}
+    if ($oproc ne $proc) {
+	print "rpcCallback($devname) overwriting $oproc by $proc\n";
+    }
+    @{$cur_results{$devname}} = @result;
+    delete $cur_callids{$devname};
+}
+
+sub startChildCall($$;@) {
+    my ($self, $proc, @args) = @_;
+    my $devname = $self->{NAME};
+    $self->debug("$devname -> startChildCall($proc)\n");
+    if (!defined($cur_procs{$devname})) {
+       $cur_procs{$devname} = $proc;
+    } else {
+	print "$devname ->startChildCall($proc) already calling "
+		. $cur_procs{$devname} . "\n";
+	return undef;
+    }
+    if (!$snmpit_stack::parallelized) {
+	my $this_callid = $cur_callids{$devname} = ++$fake_callid;
+	my @arglist = ($this_callid, $devname, $proc, @args);
+	rpcCallback(snmpit_stack_child::rpc_call_wrapper(@arglist));
+	return $this_callid;
+    }
+    my $rpc = $self->{ARPC}->{RPC};
+    $cur_callids{$devname} =
+	$rpc->call_wrapper($devname, $proc, @args, \&rpcCallback);
+}
+
+my ($CL_CALLED, $CL_WAITING, $CL_RESULTS) = (0, 1, 2);
+
+sub callLists($$) {
+    my ($op, $proc) = @_;
+    my @result;
+    while ( my ($devname, $procname) = each %cur_procs) {
+	next if $procname ne $proc;
+	my $id = $cur_callids{$devname};
+	next if ($op == $CL_WAITING && !defined($id));
+	push @result, $devname;
+	push @result, $cur_results{$devname} if ($op == $CL_RESULTS);
+    }
+    return @result;
+}
+
+sub reapCall($) {
+    my ($proc) = @_;
+    while (scalar(callLists($CL_WAITING, $proc))) {
+	my $event = $mux->mux or next;
+	my $rpc = $fh_to_rpc{$event->{fh}};
+	$rpc->io($event);
+    }
+    my @callers = callLists($CL_CALLED, $proc);
+    my @result = callLists($CL_RESULTS, $proc);
+    foreach my $devname (@callers) {
+	delete $cur_procs{$devname};
+	delete $cur_results{$devname};
+    }
+    return @result;
+}
+
+sub spawn($){
+    my $self = shift;
+    my $name = $snmpit_stack_child::child_name = $self->{NAME};
+
+    require IO::EventMux;
+    require RPC::Async::Client;
+
+    $self->debug("spawning $name\n");
+    $mux = IO::EventMux->new if (!defined($mux));
+    my $arpc = $self->{ARPC} = {};
+    my $fh = $arpc->{FH} = URL_connect_fork();  # forks() !
+    # $mux->add($fh); needed for ARPCv2
+    my $rpc = $arpc->{RPC} = RPC::Async::Client->new($mux, $fh);
+    $fh_to_rpc{$fh} = $rpc;
+}
+
+package snmpit_stack_child;
+
+use strict 'refs';
+
+my ($rpc, $owndev);
+our ($child_debug, $child_name) = (0, "");
+
+#
+# This performs the loop waiting for requests and serving them
+# gets passed the fd on which to listen.
+#
+
+sub child_loop($) {
+    my ($sock) = @_;
+    require IO::EventMux;
+    require RPC::Async::Server;
+
+    pdebug("starting child loop for $child_name\n");
+    my $mux = IO::EventMux->new;
+    # $mux->add($sock); needed for ARPCv2
+    $rpc = RPC::Async::Server->new($mux, 'snmpit_stack_child::');
+    $rpc->add_client($sock);
+    while ($rpc->has_clients()) {
+	my $event = $rpc->io($mux->mux) or next;
+	pdebug("child loop after rpc->io()\n");
+    }
+    pdebug("Child($child_name)::child_loop after no more has_clients\n");
+    exit(0);
+}
+
+#  XXXXXXXXXX CHANGE WHEN jitdev blesses objects into different package!!!!!!!!!
+
+sub device_setup(@) {
+    my ($devname) = @_;
+    my $result;
+    if ($owndev = $snmpit_stack::devices{$devname}) {
+	snmpit_jitdev::snap($owndev);
+    } else {
+	print "snmpit_stack_child::setup couldn't find $devname\n";
+	return "device setup failed";
+    }
+    $result = ($owndev->{OBJ}) ? "OK" : "device setup failed";
+    pdebug("device_setup($devname) returns $result\n");
+    return($result);
+}
+
+sub setPortVlan(@) {
+    my $result = { errors => $owndev->{OBJ}->setPortVlan(@_)};
+    if ($owndev->{OBJ}->{DISPLACED_VLANS}) {
+	$result->{DISPLACED_VLANS} = [@{$owndev->{OBJ}->{DISPLACED_VLANS}}];
+	$owndev->{DISPLACED_VLANS} = undef;
+    }
+    return $result;
+}
+
+my %special_funcs = (
+    device_setup => \&device_setup, 
+    setPortVlan => \&setPortVlan
+);
+
+sub rpc_call_wrapper(@) {
+    my ($called_id, $devname, $proc, @args) = @_;
+    my @result;
+    pdebug("Child($devname)::wrapping $proc\n");
+    $owndev = $snmpit_stack::devices{$devname};
+    if (!defined($owndev)) {
+	@result = ("call_wrapper couldn't find dev object for $devname");
+    } elsif (my $special = $special_funcs{$proc}) {
+	@result = $special->(@args);
+    } else {
+	@result = $owndev->{OBJ}->$proc(@args);
+    }
+    if ($snmpit_stack::parallelized) {
+	$rpc->return($called_id, $devname, $proc, @result);
+    } else {
+	return($devname, $proc, @result);
+    }
+}
+
+sub pdebug(@) { print "@_" if ($child_debug); }
 
 # End with true
 1;
