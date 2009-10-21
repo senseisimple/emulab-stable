@@ -1365,11 +1365,13 @@ sub GenFixNodes($)
 	my $vnode = $self->vnodes()->{$vname};
 	my $fixed = $self->fixednodes()->{$vname};
 
-	if (!defined($vnode)) {
-	    tbwarn("GenFixNodes: No vnode for $vname\n");
-	}
 	if (!defined($fixed)) {
 	    tbwarn("GenFixNodes: No fixed node for $vname\n");
+	}
+
+	# Normal nodes have a vnodem but delay nodes do not.
+	if (!defined($vnode) && !$self->isadelaynode($vname)) {
+	    tbwarn("GenFixNodes: No vnode for $vname\n");
 	}
 
 	#
