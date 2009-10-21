@@ -4,7 +4,7 @@
  * All rights reserved.
  */
 
-static const char rcsid[] = "$Id: annotate_rspec.cc,v 1.8 2009-10-08 20:27:24 tarunp Exp $";
+static const char rcsid[] = "$Id: annotate_rspec.cc,v 1.9 2009-10-21 20:49:26 tarunp Exp $";
 
 #ifdef WITH_XML
 
@@ -35,10 +35,40 @@ using namespace std;
 
 annotate_rspec :: annotate_rspec ()
 {
-// 	this->doc = doc;
 	this->virtual_root = request_root;
 	this->physical_elements = advertisement_elements;
+	
+	vector<DOMElement*> lan_links = getElementsHavingAttribute(this->virtual_root, "link", "is_lan");
+	vector<DOMElement*>::iterator it;
+	for (it = lan_links.begin(); it < lan_links.end(); it++)
+	{
+		DOMElement* lan_link = *it;
+		// Removing annotations inserted earlier
+		lan_link->removeAttribute(XStr("is_lan").x());
+		string lan_link_id = string(XStr(lan_link->getAttribute(XStr("virtual_id").x())).c());
+		set<string> virtual_interface_ids;
+		DOMNodeList* interfaces = lan_link->getElementsByTagName(XStr("interface_ref").x());
+		for (int j = 0; j < interfaces->getLength(); j++)
+		{
+			DOMElement* interface = dynamic_cast<DOMElement*>(interfaces->item(j));
+			virtual_interface_ids.insert(string(XStr(interface->getAttribute(XStr("virtual_interface_id").x())).c()));
+		}
+		this->lan_links_map.insert(pair< string, set<string> >(lan_link_id, virtual_interface_ids));
+	}
 }
+
+// Annotate a trivial link
+// NOTE: Are there other ways of specifying trivial links?
+// void annotate_rspec::annotate_trivial_link (const char* v_name)
+// {
+// 	DOMElement* vlink = getElementByAttributeValue(this->virtual_root, "link", "virtual_id", v_name);
+// 	DOMNodeList* interfaces = vlink->getElementByTagName(XStr("interface_ref").x());
+// 	// We only really care about any one interface because both will be identical
+// 	DOMElement* interface = dynamic_cast<DOMElement*>(interfaces->item(0));
+// 	string virtual_node_id = string(XStr(interface->getAttribute(XStr("virtual_node_id").x())).c());
+// 	DOMElement* vnode = getElementByAttributeValue(this->virtual_root, "node", "virtual_id", virtual_node_id.c_str());
+// 	string 
+// }
 
 // This will get called when a node or a direct link needs to be annotated
 void annotate_rspec::annotate_element (const char* v_name, const char* p_name)
@@ -49,18 +79,38 @@ void annotate_rspec::annotate_element (const char* v_name, const char* p_name)
 	// because direct links are never really going to happen
 	if (vnode != NULL)
 	{
-		DOMElement* pnode = (this->physical_elements->find(p_name))->second;
-		copy_component_spec(pnode, vnode);
+		if (!vnode->hasAttribute(XStr("generated_by_assign").x()))
+		{
+			DOMElement* pnode = (this->physical_elements->find(p_name))->second;
+			copy_component_spec(pnode, vnode);
+		}
 	}
 	else
 	{
 		DOMElement* vlink = getElementByAttributeValue(this->virtual_root, "link", "virtual_id", v_name);
 		DOMElement* plink = (this->physical_elements->find(p_name))->second;
 		
+		// If plink is NULL, then it must be a trivial link
+		if (plink == NULL)
+		{
+			
+		}
 		annotate_interface (plink, vlink, 0);
 		annotate_interface (plink, vlink, 1);
 		
 		create_component_hop(plink, vlink, BOTH, NULL);
+		
+		if (vlink->hasAttribute(XStr("generated_by_assign").x()))
+		{
+			string str_lan_link = string(XStr(vlink->getAttribute(XStr("lan_link").x())).c());
+			DOMElement* lan_link = getElementByAttributeValue(this->virtual_root, "link", "virtual_id", str_lan_link.c_str());
+			DOMNodeList* component_hops = vlink->getElementsByTagName(XStr("component_hop").x());
+			for (int i = 0; i < component_hops->getLength(); i++)
+			{
+				DOMElement* component_hop = dynamic_cast<DOMElement*>(component_hops->item(i));
+				copy_component_hop(lan_link, component_hop);
+			}
+		}
 	}
 }
 
@@ -167,32 +217,78 @@ DOMElement* annotate_rspec::create_component_hop (const DOMElement* plink, DOMEl
 	return (component_hop);
 }
 
-// Annotates the interface element on a link and updates the node which is the end point of the link as well
+// Copies the component_hop from the generated_link to the requsted_link
+// Also strips the unnecessary annotations from the component_hop after copying it
+// The "unnecessary annotations" specify the end point of the link to be the auto-generated lan node
+// We could just assume that the second interface_ref in the hop is contains these
+// "unnecessary annotations" since we have generated it in the first place
+// and we can sure that it will always be in exactly that same position,
+// but it sounds like a dirty way of doing it and is not exactly robust,
+// so we shall use the slower, but more robust method
+void annotate_rspec::copy_component_hop(DOMElement* lan_link, DOMElement* component_hop)
+{
+	string lan_link_id = string(XStr(lan_link->getAttribute(XStr("virtual_id").x())).c());
+	DOMNodeList* interfaces = component_hop->getElementsByTagName(XStr("interface_ref").x());
+	for (int i = 0; i < interfaces->getLength(); i++)
+	{
+		DOMElement* interface = dynamic_cast<DOMElement*>(interfaces->item(i));
+		if (interface->hasAttribute(XStr("virtual_interface_id").x()))
+		{
+			string str_virtual_interface_id = string(XStr(interface->getAttribute(XStr("virtual_interface_id").x())).c());
+			if (!has_interface_with_id (lan_link_id, str_virtual_interface_id))
+			{
+				interface->removeAttribute(XStr("virtual_interface_id").x());
+				interface->removeAttribute(XStr("virtual_node_id").x());
+			}	
+		}
+	}
+	lan_link->appendChild(dynamic_cast<DOMElement*>(doc->importNode(component_hop, true)));
+}
+
+// Checks if the link contains an interface with virtual_interface_id = id
+bool annotate_rspec::has_interface_with_id (string link_virtual_id, string id)
+{
+	map< string, set<string> >::iterator map_it;
+	set<string>::iterator set_it;
+	map_it = lan_links_map.find(link_virtual_id);
+	if (map_it == this->lan_links_map.end())
+		return false;
+	set<string> virtual_ids = map_it->second;
+	set_it = virtual_ids.find(id);
+	if (set_it == virtual_ids.end())
+		return false;
+	return true;
+}
+
+// Updates the node which is the end point of the link
+// 1) Find the interface_ref from the list of interface_refs on the link and it's virtual_interface_id
+// 2) Find the virtual node to which the interface_ref is referring and its corresponding interface
+// 3) Use this to find the physical node (component_node_uuid/urn) to which the virtual node has been mapped
+// 4) Find the corresponding interface_ref on the physical link to which the virtual link has been mapped
+//    and get its component_interface_id
+// 5) Annotate the interface on the virtual node obtained in 2) with the interface_id obtained in 4)
 void annotate_rspec::annotate_interface (const DOMElement* plink, DOMElement* vlink, int interface_number)
 {
 	DOMNodeList* vinterfaces = vlink->getElementsByTagName(XStr("interface_ref").x());
 	DOMElement* vlink_iface = dynamic_cast<DOMElement*>(vinterfaces->item(interface_number));
+	XStr vlink_iface_virtual_interface_id (vlink_iface->getAttribute(XStr("virtual_interface_id").x()));
 			
-	// Get the virtual_id on the end points of the interface
-	XStr vlink_iface_virtual_id (vlink_iface->getAttribute(XStr("virtual_node_id").x()));
-	DOMElement* vnode = getElementByAttributeValue(this->virtual_root, "node", "virtual_id", vlink_iface_virtual_id.c());
-	XStr node_component_uuid (find_urn(vnode, "component"));
+	// Get the virtual_id of the node to which the interface belongs
+	XStr vlink_iface_virtual_node_id (vlink_iface->getAttribute(XStr("virtual_node_id").x()));
+	DOMElement* vnode = getElementByAttributeValue(this->virtual_root, "node", "virtual_id", vlink_iface_virtual_node_id.c());
+	DOMElement* vnode_iface_decl = getElementByAttributeValue(vnode, "interface", "virtual_id", vlink_iface_virtual_interface_id.c());
+	XStr component_node_uuid (find_urn(vnode, "component"));
 //        XStr node_component_uuid (vnode->getAttribute(XStr("component_uuid").x()));
 	
-	DOMElement* p_iface = getElementByAttributeValue(plink, "interface_ref", "component_node_uuid", node_component_uuid.c());
-        if (p_iface == NULL)
-        {
-          p_iface = getElementByAttributeValue(plink, "interface_ref", "component_node_urn", node_component_uuid.c());
-        }
+	DOMElement* p_iface = getElementByAttributeValue(plink, "interface_ref", "component_node_uuid", component_node_uuid.c());
+	if (p_iface == NULL)
+	{
+		p_iface = getElementByAttributeValue(plink, "interface_ref", "component_node_urn", component_node_uuid.c());
+	}
 
 // 	vlink_iface->setAttribute(XStr("component_node_uuid").x(), p_iface->getAttribute(XStr("component_node_uuid").x()));
 // 	vlink_iface->setAttribute(XStr("component_interface_id").x(), p_iface->getAttribute(XStr("component_interface_id").x()));
-	
 	XStr component_interface_id (p_iface->getAttribute(XStr("component_interface_id").x()));
-	XStr virtual_interface_id (vlink_iface->getAttribute(XStr("virtual_interface_id").x()));
-	
-	// Get the interface for the node and update 
-	DOMElement* vnode_iface_decl = getElementByAttributeValue(vnode, "interface", "virtual_id", virtual_interface_id.c());
 	vnode_iface_decl->setAttribute (XStr("component_id").x(), component_interface_id.x());
 }
 
@@ -235,6 +331,45 @@ DOMElement* annotate_rspec::find_next_link_in_path (DOMElement *prev, list<const
 		}
 	}
 	return link;
+}
+
+void annotate_rspec::cleanup()
+{
+	vector<DOMElement*>::iterator it;
+	
+	// Remove generated links
+	vector<DOMElement*> generated_links = getElementsHavingAttribute(this->virtual_root, "link", "generated_by_assign");
+	for (it = generated_links.begin(); it < generated_links.end(); it++)
+	{
+		DOMNode* generated_link = dynamic_cast<DOMNode*>(*it);
+		dynamic_cast<DOMNode*>(this->virtual_root)->removeChild(generated_link);
+	}
+	
+	// Remove generated nodes
+	vector<DOMElement*> generated_nodes = getElementsHavingAttribute(this->virtual_root, "node", "generated_by_assign");
+	for (it = generated_nodes.begin(); it < generated_nodes.end(); it++)
+	{
+		DOMNode* generated_link = dynamic_cast<DOMNode*>(*it);
+		dynamic_cast<DOMNode*>(this->virtual_root)->removeChild(generated_link);
+	}
+	
+	// Remove additional attributes added to elements
+	
+	// Remove the is_lan attribute
+	vector<DOMElement*> lan_links = getElementsHavingAttribute(this->virtual_root, "link", "is_lan");
+	for (it = lan_links.begin(); it < lan_links.end(); it++)
+	{
+		DOMElement* lan_link = *it;
+		lan_link->removeAttribute(XStr("is_lan").x());
+	}
+}
+
+bool annotate_rspec::is_generated_element(const char* tag, const char* attr_name, const char* attr_value)
+{
+	DOMElement* element = getElementByAttributeValue(this->virtual_root, tag, attr_name, attr_value);
+	if (element == NULL)
+		return false;
+	return (element->hasAttribute(XStr("generated_by_assign").x()));
 }
 
 #endif

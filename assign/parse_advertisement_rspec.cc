@@ -8,7 +8,7 @@
  * XML Parser for RSpec ptop files
  */
 
-static const char rcsid[] = "$Id: parse_advertisement_rspec.cc,v 1.6 2009-10-08 00:31:59 tarunp Exp $";
+static const char rcsid[] = "$Id: parse_advertisement_rspec.cc,v 1.7 2009-10-21 20:49:26 tarunp Exp $";
 
 #ifdef WITH_XML
 
@@ -518,10 +518,10 @@ bool populate_links_rspec(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
 		interface_spec source = parse_interface_rspec_xml(dynamic_cast<DOMElement*>(interfaces->item(0)));
 		interface_spec dest = parse_interface_rspec_xml(dynamic_cast<DOMElement*>(interfaces->item(1)));
 
-		src_node = source.component_node_uuid;
-		src_iface = source.component_interface_name;
-		dst_node = dest.component_node_uuid;
-		dst_iface = dest.component_interface_name;
+		src_node = source.component_node_id;
+		src_iface = source.component_interface_id;
+		dst_node = dest.component_node_id;
+		dst_iface = dest.component_interface_id;
 		
 		if (src_node.compare("") == 0 || src_iface.compare("") == 0)
 		{

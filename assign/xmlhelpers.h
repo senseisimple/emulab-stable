@@ -48,6 +48,10 @@ xercesc::DOMElement* getElementByAttributeValue (std::vector<const xercesc::DOME
 */
 std::vector<const xercesc::DOMElement*> getElementsByAttributeValue (const xercesc::DOMElement* root, const char* tag, const char* attribute_name, const char* attribute_value);
 
+/* Returns a std::vector of elements which are children of root with name tag and which have an attribute, attribute_name 
+*/
+std::vector<xercesc::DOMElement*> getElementsHavingAttribute(const xercesc::DOMElement* root, const char* tag, const char* attribute_name);
+
 /* This will only work if there is only one element with that tag within the root
  * It is the callers responsibility to ensure that this is the case before calling this function
  */ 
@@ -104,10 +108,10 @@ component_spec parse_component_spec (const xercesc::DOMElement* element);
  */
 typedef struct interface_spec 
 {
-	string virtual_node_uuid;
-	string virtual_interface_name;
-	string component_node_uuid;
-	string component_interface_name;
+	string virtual_node_id;
+	string virtual_interface_id;
+	string component_node_id;
+	string component_interface_id;
 };
 /*
  * Parse the component spec attributes

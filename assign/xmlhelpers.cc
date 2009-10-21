@@ -84,6 +84,18 @@ vector<const DOMElement*> getElementsByAttributeValue (const DOMElement* root, c
 	return elements;
 }
 
+vector<DOMElement*> getElementsHavingAttribute(const DOMElement* root, const char* tag, const char* attribute_name)
+{
+	DOMNodeList* list = root->getElementsByTagName(XStr(tag).x());
+	vector<DOMElement*> elements;
+	for (int i = 0; i < list->getLength(); ++i)
+	{
+		DOMElement* ele = dynamic_cast<DOMElement*>(list->item(i));
+		if (ele->hasAttribute(XStr(attribute_name).x()))
+			elements.push_back(ele);
+	}
+	return elements;
+}
 
 /* This will only work if there is only one element with that tag within the root
  * It is the callers responsibility to ensure that this is the case before calling this function

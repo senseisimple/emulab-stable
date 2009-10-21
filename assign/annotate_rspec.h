@@ -19,6 +19,7 @@
 
 #include <list>
 #include <map>
+#include <set>
 #include <utility>
 #include <string>
 
@@ -29,6 +30,7 @@ class annotate_rspec : public annotate
 	private:
 		// Enumeration of which interface in a hop is an interface to a link end point
 		enum endpoint_interface_enum { NEITHER, SOURCE, DESTINATION, BOTH };
+		std::map< std::string, std::set<std::string> > lan_links_map;
 	
 	public:
 		annotate_rspec ();
@@ -42,6 +44,9 @@ class annotate_rspec : public annotate
 	
 		// Annotates an interface element on a link
 		 void annotate_interface (const xercesc::DOMElement* plink, xercesc::DOMElement* vlink, int interface_number);
+		 
+		 // Annotate a trivial link
+		 void annotate_trivial_link (const char* v_name);
 			
 		// Creates a hop from a switch till the next end point. Adds the hop to the vlink and returns the hop element that was created
 		 xercesc::DOMElement* create_component_hop (const xercesc::DOMElement* plink, xercesc::DOMElement* vlink, int endpoint_interface, const xercesc::DOMElement* prev_component_hop);
@@ -53,7 +58,19 @@ class annotate_rspec : public annotate
 		 xercesc::DOMElement* find_next_link_in_path (xercesc::DOMElement *prev, std::list<const char*>* links);
 		
 		// Copies the component spec from the source to the destination
-		void annotate_rspec::copy_component_spec(const xercesc::DOMElement* src, xercesc::DOMElement* dst);
+		void copy_component_spec(const xercesc::DOMElement* src, xercesc::DOMElement* dst);
+		
+		// Copies the component hop from the auto-generated link to the requested link
+		void copy_component_hop(xercesc::DOMElement* requested_link, xercesc::DOMElement* component_hop);
+		
+		// Checks if the link contains an interface with virtual_interface_id = id
+		bool has_interface_with_id (std::string link_virtual_id, std::string id);
+		
+		// Removes all the extra tags and generated elements from the XML document
+		void cleanup ();
+		
+		// Checks whether an element of type tag with attr_name = attr_value is a generated element
+		bool is_generated_element (const char* tag, const char* attr_name, const char* attr_value);
 };
 
 #endif //for __ANNOTATE_RSPEC_H
