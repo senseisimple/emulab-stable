@@ -268,9 +268,14 @@ sub CreateFromSignedTicket($$;$$)
 	return undef;
     }
     
-    my $rspec = XMLin($rspec_node->toString(), KeyAttr => [],
-		      ForceArray => ["node", "link", "interface",
-				     "interface_ref", "linkendpoints"]);
+    my $rspec =
+	eval { XMLin($rspec_node->toString(), KeyAttr => [],
+		     ForceArray => ["node", "link", "interface",
+				    "interface_ref", "linkendpoints"]) };
+    if ($@) {
+	print STDERR "XMLin error on ticket rspec: $@\n";
+	return undef;
+    }
 
     # Dig out the ticket uuid.
     my ($uuid_node) = $doc->getElementsByTagName("uuid");
@@ -515,8 +520,13 @@ sub rspecXML($)
     return undef
 	if (!defined($self->rspec()));
 
-    my $rspec_xml = XMLout($self->rspec(), "NoAttr" => 1);
-    $rspec_xml =~ s/opt\>/rspec\>/g;
+    my $rspec_xml =
+	eval { XMLout($self->rspec(),
+		      "NoAttr" => 1, RootName => "rspec") };
+    if ($@) {
+	print STDERR "XMLout error on rspec: $@\n";
+	return undef;
+    }
     return $rspec_xml;
 }
 
@@ -653,8 +663,13 @@ sub RunSigner($$)
 
     # Allow for the rspec to be in XML already.
     if (ref($rspec_xml)) {
-	$rspec_xml = XMLout($rspec_xml, "NoAttr" => 1);
-	$rspec_xml =~ s/opt\>/rspec\>/g;
+	$rspec_xml =
+	    eval { XMLout($rspec_xml,
+			  "NoAttr" => 1, RootName => "rspec") };
+	if ($@) {
+	    print STDERR "XMLout error on ticket rspec: $@\n";
+	    return -1;
+	}
     }
 
     # Convert to GMT.
@@ -742,6 +757,13 @@ sub Release($$)
 		exists($ref->{'node_type'}->{'type_name'}) &&
 		$ref->{'node_type'}->{'type_name'} eq "lan");
 	
+	# Skip remote nodes.
+	my $manager_uuid  = $ref->{'component_manager_uuid'};
+	next
+	    if (defined($manager_uuid) &&
+		!GeniHRN::Equal($manager_uuid, $ENV{'MYURN'}) &&
+		$manager_uuid ne $ENV{'MYUUID'});
+	
 	my $resource_uuid = $ref->{'component_uuid'} || $ref->{'uuid'};
 	if (!defined($resource_uuid)) {
 	    print STDERR "No resource id for node in ticket\n";
@@ -798,10 +820,8 @@ sub ReleaseHolding($$)
     my $experiment = Experiment->Lookup("GeniSlices", "reservations");
     if (!defined($experiment)) {
 	#
-	# This experiment has to exist!
-	#
 	print STDERR "Could not find Geni reservations experiment!";
-	return -1;
+	return 0;
     }
     my $pid     = $experiment->pid();
     my $eid     = $experiment->eid();
@@ -814,6 +834,13 @@ sub ReleaseHolding($$)
 	    if (exists($ref->{'node_type'}) &&
 		exists($ref->{'node_type'}->{'type_name'}) &&
 		$ref->{'node_type'}->{'type_name'} eq "lan");
+	
+	# Skip remote nodes.
+	my $manager_uuid  = $ref->{'component_manager_uuid'};
+	next
+	    if (defined($manager_uuid) &&
+		!GeniHRN::Equal($manager_uuid, $ENV{'MYURN'}) &&
+		$manager_uuid ne $ENV{'MYUUID'});
 	
 	my $resource_uuid = $ref->{'component_uuid'} || $ref->{'uuid'};
 	if (!defined($resource_uuid)) {
