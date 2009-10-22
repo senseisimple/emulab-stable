@@ -805,7 +805,7 @@ sub GetTicket($;$)
 				      $node->node_id() : "")};
 
 	# Tarball and startup command.
-	if (0 && exists($ref->{'startup_command'})) {
+	if (exists($ref->{'startup_command'})) {
 	    my $startupcmd = $ref->{'startup_command'};
 	    
 	    if (! TBcheck_dbslot($startupcmd, "virt_nodes", "startupcmd",
