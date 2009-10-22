@@ -45,7 +45,7 @@ my $user  = "geniuser";
 my $group = "GeniSlices";
 
 # Need a command line option.
-my $debug = 1;
+my $debug = 0;
 
 #
 # Turn off line buffering on output
