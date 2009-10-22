@@ -873,7 +873,7 @@ sub vz_vnodePreConfig {
 	next
 	    if ($MDB{"$i"} ne $vnode_id);
 
-	$devs{"$i"} = 1;
+	$devs{"imq$i"} = 1;
     }
     dbmclose(%MDB);
     TBScriptUnlock();
