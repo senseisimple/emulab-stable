@@ -66,11 +66,11 @@ if ($PGENISUPPORT) {
 }
 
 my $default_long = undef;
-TBGetSiteVar('protogeni/default_longitude', \$default_long);
+TBGetSiteVar('general/default_longitude', \$default_long);
 my $default_lat = undef;
-TBGetSiteVar('protogeni/default_latitude', \$default_lat);
+TBGetSiteVar('general/default_latitude', \$default_lat);
 my $default_country = undef;
-TBGetSiteVar('protogeni/default_country', \$default_country);
+TBGetSiteVar('general/default_country', \$default_country);
 
 my $delaycap_override;
 
