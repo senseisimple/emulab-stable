@@ -577,9 +577,9 @@ sub vz_vnodeCreate {
 	return -1;
     }
     if ($DOLVM) {
-	my $MIN_ROOT_LVM_VOL_SIZE = 512;
+	my $MIN_ROOT_LVM_VOL_SIZE = 1024;
 	my $MAX_ROOT_LVM_VOL_SIZE = 8 * 1024;
-	my $MIN_SNAPSHOT_VOL_SIZE = $MIN_ROOT_LVM_VOL_SIZE;
+	my $MIN_SNAPSHOT_VOL_SIZE = 512;
 	my $MAX_SNAPSHOT_VOL_SIZE = $MAX_ROOT_LVM_VOL_SIZE;
 
 	# XXX size our snapshots to assume 50 VMs on the node.
