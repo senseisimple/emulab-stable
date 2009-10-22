@@ -144,28 +144,30 @@ if (-x "/etc/cron.pend/slocate.cron") {
 # need entries, and then put in entries for each filesystem using
 # the current date.
 #
-print "Removing old $DUMPDATES file ...\n";
-if (-e $DUMPDATES) {
-    unlink($DUMPDATES) or
-	die("Could not unlink $DUMPDATES");
-}
+if (-e $FSTAB) {
+    print "Removing old $DUMPDATES file ...\n";
+    if (-e $DUMPDATES) {
+	unlink($DUMPDATES) or
+	    die("Could not unlink $DUMPDATES");
+    }
 
-print "Creating stub /etc/dumpdates file ...\n";
-open(TAB, "$FSTAB") or
-    die("Could not open $FSTAB: $!");
-open(DMP, ">$DUMPDATES") or
-    die("Could not open $DUMPDATES: $!");
+    print "Creating stub /etc/dumpdates file ...\n";
+    open(TAB, "$FSTAB") or
+	die("Could not open $FSTAB: $!");
+    open(DMP, ">$DUMPDATES") or
+	die("Could not open $DUMPDATES: $!");
 
-while (<TAB>) {
-    if ($_ =~ /^([\w\/]+).*(\d).*\d$/) {
-	if ($2 != 0) {
-	    my $t = localtime(time);
-	    print DMP "$1                          0 $t\n";
+    while (<TAB>) {
+	if ($_ =~ /^([\w\/]+).*(\d).*\d$/) {
+	    if ($2 != 0) {
+		my $t = localtime(time);
+		print DMP "$1                          0 $t\n";
+	    }
 	}
     }
+    close(DMP);
+    close(TAB);
 }
-close(DMP);
-close(TAB);
 
 print "Cleaning logfiles ...\n";
 opendir(LOG,$LOGDIR) or
