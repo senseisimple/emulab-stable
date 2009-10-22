@@ -2173,6 +2173,7 @@ sub RenewSliver($)
     my $credstr  = $argref->{'credential'};
     my $expires  = $argref->{'valid_until'};
     my $message  = "Error renewing aggregate";
+    my $slice_uuid;
 
     if (! (defined($credstr) && defined($expires))) {
 	return GeniResponse->Create(GENIRESPONSE_BADARGS);
@@ -2182,7 +2183,7 @@ sub RenewSliver($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not create GeniCredential object");
     }
-    my $sliver_uuid = $credential->target_uuid();
+    my $target_uuid = $credential->target_uuid();
     my $user_uuid   = $credential->owner_uuid();
     
     #
@@ -2197,12 +2198,13 @@ sub RenewSliver($)
 	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
 				     "Insufficient privilege" );
 
-    my $aggregate = GeniAggregate->Lookup($sliver_uuid);
-    if (!defined($aggregate)) {
-	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
-				    "No such aggregate $sliver_uuid");
+    my $aggregate = GeniAggregate->Lookup($target_uuid);
+    if (defined($aggregate)) {
+	$slice_uuid = $aggregate->slice_uuid();
     }
-    my $slice_uuid = $aggregate->slice_uuid();
+    else {
+	$slice_uuid = $target_uuid;
+    }
     my $slice = GeniSlice->Lookup($slice_uuid);
     if (!defined($slice)) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
