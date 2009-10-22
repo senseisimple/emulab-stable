@@ -17,12 +17,13 @@ use Getopt::Std;
 # 
 sub usage()
 {
-    print "Usage: expire_daemon [-d]\n";
+    print "Usage: expire_daemon [-d] [-i]\n";
     exit(1);
 }
-my $optlist = "d";
-my $debug   = 0;
-my $asch    = 0;
+my $optlist   = "di";
+my $debug     = 0;
+my $idlecheck = 0;
+my $asch      = 0;
 
 #
 # Configure variables
@@ -69,6 +70,9 @@ if (! getopts($optlist, \%options)) {
 }
 if (defined($options{"d"})) {
     $debug = 1;
+}
+if (defined($options{"i"})) {
+    $idlecheck = 1;
 }
 
 # Do this early so that we talk to the right DB.
@@ -178,29 +182,31 @@ sub ExpireSlices()
 	    $slice->UnLock();
 	    goto skip;
 	}
-	my $pid = $experiment->pid();
-	my $eid = $experiment->eid();
-	my @localnodes = ();
-
 	#
 	# See if we have any local nodes. No point in using the idle
 	# check if there are no nodes. 
 	#
-	$experiment->LocalNodeListNames(\@localnodes);
-	if (@localnodes) {
-	    #
-	    # Use the idletimes program in summary mode to see if the
-	    # the nodes are idle. If they are then it gets swapped.
-	    # This is going to have to get more sophisticated.
-	    #
-	    print STDERR "Checking to see if $slice is idle\n";
-	    system("$IDLETIMES -s $pid,$eid");
-	    if (! $?) {
-		$slice->UnLock();
-		goto skip;
+	if ($idlecheck) {
+	    my @localnodes = ();
+	    $experiment->LocalNodeListNames(\@localnodes);
+	    if (@localnodes) {
+		my $pid = $experiment->pid();
+		my $eid = $experiment->eid();
+		
+		#
+		# Use the idletimes program in summary mode to see if the
+		# the nodes are idle. If they are then it gets swapped.
+		# This is going to have to get more sophisticated.
+		#
+		print STDERR "Checking to see if $slice ($eid) is idle\n";
+		system("$IDLETIMES -s $pid,$eid");
+		if (! $?) {
+		    $slice->UnLock();
+		    goto skip;
+		}
 	    }
+	    print STDERR "$slice is idle; releasing.\n";
 	}
-	print STDERR "$slice is idle; releasing.\n";
       cleanup:
 	if (GeniCM::CleanupDeadSlice($slice) != 0) {
 	    print STDERR "Could not release $slice\n";
