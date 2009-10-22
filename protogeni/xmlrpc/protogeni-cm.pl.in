@@ -44,6 +44,9 @@ use libaudit;
 my $user  = "geniuser";
 my $group = "GeniSlices";
 
+# Need a command line option.
+my $debug = 1;
+
 #
 # Turn off line buffering on output
 #
@@ -150,6 +153,7 @@ my $responder = Frontier::Responder->new( "methods" => {
     "SliverTicket"      => \&GeniCM::SliverTicket,
     "ListTickets"       => \&GeniCM::ListTickets,
     "ListHistory"       => \&GeniCM::ListHistory,
+    "RenewSliver"	=> \&GeniCM::RenewSliver,
    },
 );
 
@@ -165,10 +169,13 @@ my $response = $responder->{'_decode'}->serve($request,
 # Add stuff for log message if sent.
 AddAuditInfo("message", $response . "\n\n" . $request);
 
-#my $decoder = Frontier::RPC2->new();
-#my $object  = $decoder->decode($response);
-#my $value   = $object->{'value'};
-#print STDERR Dumper($value);
+# When debugging on, generate some output so email is sent.
+if ($debug) {
+    my $decoder = Frontier::RPC2->new();
+    my $object  = $decoder->decode($response);
+    my $value   = $object->{'value'};
+    print STDERR Dumper($value);
+}
 
 #
 # Terminate the log capture so that we can print the response to STDOUT

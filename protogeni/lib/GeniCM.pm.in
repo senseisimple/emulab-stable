@@ -2160,6 +2160,101 @@ sub SliverWork($$)
 }
 
 #
+# Renew a sliver
+#
+sub RenewSliver($)
+{
+    my ($argref) = @_;
+    my $credstr  = $argref->{'credential'};
+    my $expires  = $argref->{'valid_until'};
+    my $message  = "Error renewing aggregate";
+
+    if (! (defined($credstr) && defined($expires))) {
+	return GeniResponse->Create(GENIRESPONSE_BADARGS);
+    }
+    my $credential = GeniCredential->CreateFromSigned($credstr);
+    if (!defined($credential)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not create GeniCredential object");
+    }
+    my $sliver_uuid = $credential->target_uuid();
+    my $user_uuid   = $credential->owner_uuid();
+    
+    #
+    # Make sure the credential was issued to the caller.
+    #
+    if ($credential->owner_uuid() ne $ENV{'GENIUUID'}) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "This is not your credential!");
+    }
+    $credential->HasPrivilege( "pi" ) or
+	$credential->HasPrivilege( "control" ) or
+	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
+				     "Insufficient privilege" );
+
+    my $aggregate = GeniAggregate->Lookup($sliver_uuid);
+    if (!defined($aggregate)) {
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "No such aggregate $sliver_uuid");
+    }
+    my $slice_uuid = $aggregate->slice_uuid();
+    my $slice = GeniSlice->Lookup($slice_uuid);
+    if (!defined($slice)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "No slice record for $slice_uuid");
+    }
+    if ($slice->Lock() != 0) {
+	return GeniResponse->BusyResponse("slice");
+    }
+    # Shutdown slices get nothing.
+    if ($slice->shutdown()) {
+	$message = "Slice has been shutdown";
+	goto bad;
+    }
+    my $experiment = GeniExperiment($slice);
+    if (!defined($experiment)) {
+	$message = "No local experiment for slice";
+	goto bad;
+    }
+
+    #
+    # Figure out new expiration time; this is the time at which we can
+    # idleswap the slice out. 
+    #
+    if (! ($expires =~ /^[-\w:.\/]+/)) {
+	$message = "Illegal valid_until in rspec";
+	goto bad;
+    }
+    # Convert to a localtime.
+    my $when = timegm(strptime($expires));
+    if (!defined($when)) {
+	$message = "Could not parse valid_until";
+	goto bad;
+    }
+    #
+    # No more then 24 hours out ... Needs to be a sitevar?
+    #
+    my $diff = $when - time();
+
+    print STDERR "RenewSliver: $expires, $when, $diff\n";
+    
+    if ($diff < (60 * 5) || $diff > (3600 * 24)) {
+	$message = "valid_until out of range";
+	goto bad;
+    }
+    if ($slice->SetExpiration($when) != 0) {
+	$message = "Could not set expiration time";
+	goto bad;
+    }
+    $slice->UnLock();
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS);
+
+  bad:
+    $slice->UnLock();
+    return GeniResponse->Create(GENIRESPONSE_ERROR, undef, $message);
+}
+
+#
 # Release a ticket.
 #
 sub ReleaseTicket($)
@@ -3115,12 +3210,34 @@ sub SliverTicket($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
     my $row = $query_result->fetchrow_hashref();
-    my $rspec  = $row->{'manifest'};
+    my $rspec =
+	eval { XMLin($row->{'manifest'}, KeyAttr => [],
+		     ForceArray => ["node", "link", "interface",
+				    "interface_ref", "linkendpoints"]) };
+    if ($@) {
+	print STDERR "XMLin error reading manifest: $@\n";
+	$slice->UnLock();
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
+    }
+    #
+    # Update the returned ticket to reflect the current expiration time.
+    #
+    $rspec->{'valid_until'} =
+	POSIX::strftime("20%y-%m-%dT%H:%M:%S",
+			gmtime(str2time($slice->expires())));
+
+    my $rspec_xml =
+	eval { XMLout($rspec, "NoAttr" => 1, RootName => "rspec") };
+    if ($@) {
+	print STDERR "XMLout error on manifest to rspec: $@\n";
+	$slice->UnLock();
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
+    }
 
     #
     # Create a new ticket.
     #
-    my $ticket = GeniTicket->Create($authority, $user, $rspec);
+    my $ticket = GeniTicket->Create($authority, $user, $rspec_xml);
     if (!defined($ticket)) {
 	print STDERR "Could not create new ticket for $slice/$aggregate\n";
 	$slice->UnLock();
