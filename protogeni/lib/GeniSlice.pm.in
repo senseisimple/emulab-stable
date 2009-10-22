@@ -19,6 +19,7 @@ use GeniCredential;
 use GeniCertificate;
 use GeniAggregate;
 use English;
+use Date::Parse;
 use Data::Dumper;
 use vars qw();
 
@@ -468,8 +469,7 @@ sub SetExpiration($$)
     
     return -1
 	if (!$query_result);
-    # XXX Wrong format, but harmless.
-    $self->{'SLICE'}->{'expires'} = time();
+    $self->{'SLICE'}->{'expires'} = $expires;
     return 0;
 }
 
