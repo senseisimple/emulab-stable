@@ -73,6 +73,7 @@ my $TBSWAP	   = "$TB/bin/tbswap";
 my $SWAPEXP	   = "$TB/bin/swapexp";
 my $PLABSLICE	   = "$TB/sbin/plabslicewrapper";
 my $NAMEDSETUP     = "$TB/sbin/named_setup";
+my $EXPORTS_SETUP  = "$TB/sbin/exports_setup";
 my $VNODESETUP     = "$TB/sbin/vnode_setup";
 my $GENTOPOFILE    = "$TB/libexec/gentopofile";
 my $TARFILES_SETUP = "$TB/bin/tarfiles_setup";
@@ -2033,6 +2034,10 @@ sub SliverWork($$)
     # Must have the topofile for node boot. Might need locking on this.
     if (system("$GENTOPOFILE $pid $eid")) {
 	print STDERR "$GENTOPOFILE failed\n";
+	goto bad;
+    }
+    if (system("$EXPORTS_SETUP")) {
+	print STDERR "$EXPORTS_SETUP failed\n";
 	goto bad;
     }
     # The nodes will not boot locally unless there is a DNS record.
