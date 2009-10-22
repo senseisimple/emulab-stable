@@ -160,8 +160,7 @@ my $responder = Frontier::Responder->new( "methods" => {
 # Add stuff for log message if sent.
 AddAuditInfo("message", $request);
 # CC errors to Utah for now.
-AddAuditInfo("cc", "protogeni-errors\@flux.utah.edu")
-    if (!$MAINSITE);
+AddAuditInfo("cc", "protogeni-errors\@flux.utah.edu");
 
 my $response = $responder->{'_decode'}->serve($request,
 					      $responder->{'methods'});

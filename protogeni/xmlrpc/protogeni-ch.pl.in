@@ -135,6 +135,9 @@ my $response = $responder->{'_decode'}->serve($request,
 
 # Add stuff for log message if sent.
 AddAuditInfo("message", $response . "\n\n" . $request);
+# CC errors to Utah for now.
+AddAuditInfo("cc", "protogeni-errors\@flux.utah.edu");
+
 #
 # Terminate the log capture so that we can print the response to STDOUT
 # for the web server.
