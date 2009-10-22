@@ -324,7 +324,7 @@ sub callback($)
     my ($path) = @_;
 
     if (SHAREDHOST()) {
-	if (!$rebooting &&
+	if (0 && !$rebooting &&
 	    system("/bin/cp -f ".
 		   "$TMGROUP $TMPASSWD $TMSHADOW $TMGSHADOW $path/etc") != 0) {
 	    return -1;
