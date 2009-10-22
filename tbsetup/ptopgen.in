@@ -65,6 +65,13 @@ if ($PGENISUPPORT) {
     $cmurn = GeniHRN::Generate($OURDOMAIN, "authority", "cm");
 }
 
+my $default_long = undef;
+TBGetSiteVar('protogeni/default_longitude', \$default_long);
+my $default_lat = undef;
+TBGetSiteVar('protogeni/default_latitude', \$default_lat);
+my $default_country = undef;
+TBGetSiteVar('protogeni/default_country', \$default_country);
+
 my $delaycap_override;
 
 #
@@ -1530,6 +1537,13 @@ sub print_node
     my $country = shift(@_);
     my $lat = shift(@_);
     my $long = shift(@_);
+    if (! defined($lat) || ! defined($long)) {
+	$lat = $default_lat;
+	$long = $default_long;
+    }
+    if (! defined($country)) {
+	$country = $default_country;
+    }
     if (!$do_xml) {
 	my $text = "node $name " .
 	    join(" ", @$types) . " - " . join(" ", @$features) .
