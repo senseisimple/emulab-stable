@@ -307,9 +307,40 @@ sub Manifest($)
 			 ForceArray => ["node", "link", "interface",
 					"interface_ref", "linkendpoints"]);
 
-    $self->{'MANIFEST'} = $manifest;
+    $self->{'MANIFEST'}    = $manifest;
+    $self->{'MANIFESTSTR'} = $manifest_string;
     return $manifest;
 }
+
+sub UpdateManifest($$)
+{
+    my ($self, $manifest) = @_;
+
+    if (! $self->manifest_idx()) {
+	print STDERR "No manifest to update for $self\n";
+	return -1;
+    }
+    my $manifest_idx = $self->manifest_idx();
+    my $manifest_string =
+	eval { XMLout($manifest, "NoAttr" => 1, RootName => "manifest") };
+    if ($@) {
+	print STDERR "UpdateManifest: XMLout error: $@\n";
+	print STDERR Dumper($manifest);
+	return -1;
+    }
+    my $query_result =
+	DBQueryWarn("update geni_manifests set ".
+		    "  manifest=". DBQuoteSpecial($manifest_string) . ", " .
+		    "  created=now() ".
+		    "where idx=$manifest_idx");
+    return -1
+	if (!defined($query_result));
+
+    $self->{'MANIFEST'}    = $manifest;
+    $self->{'MANIFESTSTR'} = $manifest_string;
+    return 0;
+}
+
 
 #
 # Add Resources. We get an rspec to replace the current rspec.
@@ -994,6 +1025,10 @@ sub StartSliver($$$)
 	    "*** Could not sign slice credential $slice_credential!\n";
 	return -1;
     }
+    if (!defined(self->Manifest())) {
+	print STDERR "*** Could not load manifest\n";
+	return -1;
+    }
 
     #
     # Do it. 
@@ -1001,8 +1036,8 @@ sub StartSliver($$$)
     $response =
 	Genixmlrpc::CallMethod($authority->url(),
 			       $usercontext, "StartSliver",
-		       { "credential" => $sliver_credential->asString() });
-
+		       { "credential" => $sliver_credential->asString(),
+			 "manifest"   => $self->{'MANIFESTSTR'} });
     if (!defined($response)) {
 	print STDERR
 	    "*** Internal error starting sliver for $self\n";
@@ -1182,6 +1217,111 @@ sub Discover($$$)
     $$pref = $response->value()
 	if (defined($pref));
     
+    return 0;
+}
+
+#
+# Class method to renew all resources in use.
+#
+sub RenewAll()
+{
+    my $query_result =
+	DBQueryWarn("select idx from geni_resources");
+    return -1
+	if (!$query_result);
+    return 0
+	if (!$query_result->numrows);
+
+    #
+    # Load the SA cert to act as caller context.
+    #
+    my $certificate = GeniCertificate->LoadFromFile($SACERT);
+    if (!defined($certificate)) {
+	print STDERR "*** Could not load certificate from $SACERT\n";
+	return -1;
+    }
+    my $context = Genixmlrpc->Context($certificate);
+    if (!defined($context)) {
+	print STDERR "*** Could not create context to talk to clearinghouse\n";
+	return -1;
+    }
+    
+    #
+    # Set the default RPC context. 
+    #
+    Genixmlrpc->SetContext($context);
+
+    # Good default
+    my $valid_until =
+	POSIX::strftime("20%y-%m-%dT%H:%M:%S", gmtime(time() + (3600*24)));
+
+    # Hash the slice credentials so we generate them only once.
+    my %credentials;
+
+    while (my ($idx) = $query_result->fetchrow_array()) {
+	my $resource = GeniResource->Lookup($idx);
+	if (!defined($resource)) {
+	    print STDERR "RenewAll: Could not lookup resource $idx\n";
+	    next;
+	}
+	# No sliver, skip.
+	next
+	    if (! $resource->credential_idx());
+
+	my $slice = GeniSlice->Lookup($resource->slice_idx());
+	if (!defined($slice)) {
+	    print STDERR "RenewAll: No slice for $resource\n";
+	    next;
+	}
+
+	my $manager_urn = $resource->manager_urn();
+	my $authority   = GeniAuthority->Lookup($manager_urn);
+	if (!defined($authority)) {
+	    print STDERR "RenewAll: Could not locate $manager_urn\n";
+	    next;
+	}
+
+	#
+	# Generate a slice credential.
+	#
+	if (!exists($credentials{$slice->uuid()})) {
+	    my $credential = GeniCredential->Create($slice, $certificate);
+	    if (!defined($credential)) {
+		print STDERR
+		    "RenewAll: Could not create credential for $slice!\n";
+		next;
+	    }
+	    if ($credential->Sign($GeniCredential::LOCALSA_FLAG) != 0) {
+		print STDERR
+		    "RenewAll: Could not sign credential $credential!\n";
+		next;
+	    }
+	    $credentials{$slice->uuid()} = $credential;
+	}
+	my $slice_credential = $credentials{$slice->uuid()};
+	
+	#
+	# Do it. 
+	#
+	print STDERR "Renewing $slice on $authority\n";
+	
+	my $response =
+	    Genixmlrpc::CallMethod($authority->url(),
+				   undef, "RenewSliver",
+			   { "credential"  => $slice_credential->asString(),
+			     "valid_until" => $valid_until });
+
+	if (!defined($response)) {
+	    print STDERR
+		"RenewAll: Internal error doing renew for $resource\n";
+	    next;
+	}
+	if ($response->code() != GENIRESPONSE_SUCCESS) {
+	    print STDERR "RenewAll: Could renew $slice_credential Error: ";
+	    print STDERR "  " . $response->output() . "\n";
+	    next;
+	}
+    }
     return 0;
 }
 
