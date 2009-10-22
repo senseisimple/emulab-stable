@@ -512,6 +512,7 @@ sub created($)		{ return field($_[0], "created"); }
 sub cert($)		{ return field($_[0], "cert"); }
 sub privkey($)		{ return field($_[0], "privkey"); }
 sub revoked($)		{ return field($_[0], "revoked"); }
+sub uri($)              { return field($_[0], "uri"); }
 
 #
 # Need to add DN to the emulab table.
