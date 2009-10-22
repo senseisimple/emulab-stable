@@ -502,10 +502,10 @@ sub GetTicket($;$)
 	}
 	
 	#
-	# No more then 24 hours out ... Needs to be a sitevar?
+	# No more then 25 hours out ... Needs to be a sitevar?
 	#
 	my $diff = $when - time();
-	if ($diff < (60 * 15) || $diff > (3600 * 24)) {
+	if ($diff < (60 * 15) || $diff > (3600 * 25)) {
 	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 					"valid_until out of range");
 	}
@@ -1482,10 +1482,10 @@ sub SliverWork($$)
 					
 	}
 	#
-	# No more then 24 hours out ... Needs to be a sitevar?
+	# No more then 25 hours out ... Needs to be a sitevar?
 	#
 	my $diff = $when - time();
-	if ($diff < (60 * 15) || $diff > (3600 * 24)) {
+	if ($diff < (60 * 15) || $diff > (3600 * 25)) {
 	    $message = "valid_until out of range";
 	    goto bad;
 	}
@@ -2237,13 +2237,13 @@ sub RenewSliver($)
 	goto bad;
     }
     #
-    # No more then 24 hours out ... Needs to be a sitevar?
+    # No more then 25 hours out ... Needs to be a sitevar?
     #
     my $diff = $when - time();
 
     print STDERR "RenewSliver: $expires, $when, $diff\n";
     
-    if ($diff < (60 * 5) || $diff > (3600 * 24)) {
+    if ($diff < (60 * 5) || $diff > (3600 * 25)) {
 	$message = "valid_until out of range";
 	goto bad;
     }
@@ -3584,6 +3584,13 @@ sub CleanupDeadSlice($;$)
 		print STDERR "FireWall cleanup failed\n";
 		return -1;
 	    }
+	}
+	# These are not serious errors.
+	if (system("$EXPORTS_SETUP")) {
+	    print STDERR "$EXPORTS_SETUP failed\n";
+	}
+	if (system("$NAMEDSETUP")) {
+	    print STDERR "$NAMEDSETUP failed\n";
 	}
     }
 
