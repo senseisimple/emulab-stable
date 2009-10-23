@@ -26,6 +26,7 @@ use Exporter;
 
 # Must come after package declaration!
 use English;
+use Fcntl;
 
 # Load up the paths. Its conditionalized to be compatabile with older images.
 # Note this file has probably already been loaded by the caller.
@@ -105,6 +106,10 @@ my $MODPROBE    = '/sbin/modprobe';
 my $IWPRIV      = '/usr/local/sbin/iwpriv';
 my $BRCTL       = "/usr/sbin/brctl";
 
+my $PASSDB   = "$VARDIR/db/passdb";
+my $GROUPDB  = "$VARDIR/db/groupdb";
+my $SYSETCDIR = "/etc";
+
 #
 # OS dependent part of cleanup node state.
 # 
@@ -112,16 +117,195 @@ sub os_account_cleanup()
 {
     unlink @LOCKFILES;
 
-    printf STDOUT "Resetting passwd and group files\n";
-    if (system("$CP -f $TMGROUP $TMPASSWD /etc") != 0) {
-	print STDERR "Could not copy default group file into place: $!\n";
-	return -1;
+    #
+    # Don't just splat the master passwd/group files into place from $ETCDIR.
+    # Instead, grab the current Emulab uids/gids, grab the current group/passwd
+    # files and their shadow counterparts, remove any emulab u/gids from the 
+    # loaded instance of the current files, then push any new/changed uid/gids
+    # into the master files in $ETCDIR.  Also, we remove accounts from the
+    # master files if they no longer appear in the current files.  Finally, we
+    # strip deleted uids from any groups they might appear in (!).
+    #
+    my %PDB;
+    my %GDB;
+
+    dbmopen(%PDB, $PASSDB, undef) or
+	fatal("Cannot open $PASSDB: $!");
+    dbmopen(%GDB, $GROUPDB, undef) or
+	fatal("Cannot open $GROUPDB: $!");
+
+    my %lineHash = ();
+    my %lineList = ();
+
+    foreach my $file ("$SYSETCDIR/passwd","$SYSETCDIR/group",
+		      "$SYSETCDIR/shadow","$SYSETCDIR/gshadow",
+		      "$ETCDIR/passwd","$ETCDIR/group",
+		      "$ETCDIR/shadow","$ETCDIR/gshadow") {
+	open(FD,$file)
+	    or die "open($file): $!";
+	my $i = 0;
+	my $lineCounter = 1;
+	while (my $line = <FD>) {
+	    chomp($line);
+
+	    # store the line in the list
+	    if (!defined($lineList{$file})) {
+		$lineList{$file} = [];
+	    }
+	    $lineList{$file}->[$i] = $line;
+
+	    # fill the hash for fast lookups, and place the array idx of the
+	    # element in the lineList as the hash value so that we can undef
+	    # it if deleting it, while still preserving the line orderings in
+	    # the original files.  whoo!
+	    if ($line ne '' && $line =~ /^([^:]+):.*$/) {
+		if (!defined($lineHash{$file})) {
+		    $lineHash{$file} = {};
+		}
+		$lineHash{$file}->{$1} = $i++;
+	    }
+	    else {
+		print STDERR "malformed line $lineCounter in $file, ignoring!\n";
+	    }
+	    ++$lineCounter;
+	}
     }
-    
-    if (system("$CP -f $TMSHADOW $TMGSHADOW /etc") != 0) {
-	print STDERR "Could not copy default passwd file into place: $!\n";
-	return -1;
+
+    # remove emulab groups first (save a bit of work):
+    while (my ($group,$gid) = each(%GDB)) {
+	foreach my $file ("$SYSETCDIR/group","$SYSETCDIR/gshadow") {
+	    if (defined($lineHash{$file}->{$group})) {
+		# undef its line
+		$lineList{$file}->[$lineHash{$file}->{$group}] = undef;
+		delete $lineHash{$file}->{$group};
+	    }
+	}
     }
+
+    # now remove emulab users from users files, AND from the group list
+    # in any groups :-)
+    while (my ($user,$uid) = each(%PDB)) {
+	foreach my $file ("$SYSETCDIR/passwd","$SYSETCDIR/shadow") {
+	    if (defined($lineHash{$file}->{$user})) {
+		# undef its line
+		$lineList{$file}->[$lineHash{$file}->{$user}] = undef;
+		delete $lineHash{$file}->{$user};
+	    }
+	}
+
+	# this is indeed a lot of extra text processing, but whatever
+	foreach my $file ("$SYSETCDIR/group","$SYSETCDIR/gshadow") {
+	    foreach my $group (keys(%{$lineHash{$file}})) {
+		my $groupLine = $lineList{$file}->[$lineHash{$file}->{$group}];
+		# grab the fields
+		# split using -1 to make sure our empty trailing fields are
+		# added!
+		my @elms = split(/\s*:\s*/,$groupLine,-1);
+		# grab the user list
+		my @ulist = split(/\s*,\s*/,$elms[scalar(@elms)-1]);
+		# build a new list
+		my @newulist = ();
+		my $j = 0;
+		my $k = 0;
+		for ($j = 0; $j < scalar(@ulist); ++$j) {
+		    # only add to the new user list if it's not the user we're
+		    # removing.
+		    my $suser = $ulist[$j];
+		    if ($suser ne $user) {
+			$newulist[$k++] = $suser;
+		    }
+		}
+		# rebuild the user list
+		$elms[scalar(@elms)-1] = join(',',@newulist);
+		# rebuild the line from the fields
+		$groupLine = join(':',@elms);
+		# stick the line back into the "file"
+		$lineList{$file}->[$lineHash{$file}->{$group}] = $groupLine;
+	    }
+	}
+    }
+
+    # now, merge current files into masters.
+    foreach my $pairRef (["$SYSETCDIR/passwd","$ETCDIR/passwd"],
+			 ["$SYSETCDIR/group","$ETCDIR/group"],
+			 ["$SYSETCDIR/shadow","$ETCDIR/shadow"],
+			 ["$SYSETCDIR/gshadow","$ETCDIR/gshadow"]) {
+	my ($real,$master) = @$pairRef;
+
+	foreach my $ent (keys(%{$lineHash{$real}})) {
+	    # skip root and toor!
+	    next 
+		if ($ent eq 'root' || $ent eq 'toor');
+
+	    # push new entities into master
+	    if (!defined($lineHash{$master}->{$ent})) {
+		# append new "line"
+		$lineHash{$master}->{$ent} = scalar(@{$lineList{$master}});
+		$lineList{$master}->[$lineHash{$master}->{$ent}] = 
+		    $lineList{$real}->[$lineHash{$real}->{$ent}];
+	    }
+	    # or replace modified entities
+	    elsif ($lineList{$real}->[$lineHash{$real}->{$ent}] 
+		   ne $lineList{$master}->[$lineHash{$master}->{$ent}]) {
+		$lineList{$master}->[$lineHash{$master}->{$ent}] = 
+		    $lineList{$real}->[$lineHash{$real}->{$ent}];
+	    }
+	}
+
+	# now remove stale lines from the master
+	my @todelete = ();
+	foreach my $ent (keys(%{$lineHash{$master}})) {
+	    if (!defined($lineHash{$real}->{$ent})) {
+		# undef its line
+		$lineList{$master}->[$lineHash{$master}->{$ent}] = undef;
+		push @todelete, $ent;
+	    }
+	}
+	foreach my $delent (@todelete) {
+	    delete $lineHash{$master}->{$delent};
+	}
+    }
+
+    # now write the masters to .new files so we can diff, do the diff for 
+    # files that are world-readable, then mv into place over the masters.
+    my %modes = ( "$ETCDIR/passwd" => 0644,"$ETCDIR/group" => 0644,
+		  "$ETCDIR/shadow" => 0600,"$ETCDIR/gshadow" => 0600 );
+    foreach my $file (keys(%modes)) {
+	sysopen(FD,"${file}.new",O_CREAT | O_WRONLY | O_TRUNC,$modes{$file})
+	    # safe to die here cause we haven't moved any .new files into
+	    # place
+	    or die "sysopen(${file}.new): $!";
+	for (my $i = 0; $i < scalar(@{$lineList{$file}}); ++$i) {
+	    # remember, some lines may be undef cause we deleted them
+	    if (defined($lineList{$file}->[$i])) {
+		print FD $lineList{$file}->[$i] . "\n";
+	    }
+	}
+	close(FD);
+    }
+    foreach my $file (keys(%modes)) {
+	my $retval;
+	if ($modes{$file} == 0644) {
+	    print STDERR "Running 'diff -u $file ${file}.new'\n";
+	    $retval = system("diff -u $file ${file}.new");
+	    if ($retval) {
+		print STDERR "Files ${file}.new and $file differ; updating $file.\n";
+		system("mv ${file}.new $file");
+	    }
+	}
+	else {
+	    print STDERR "Running 'diff -q -u $file ${file}.new'\n";
+	    $retval = system("diff -q -u $file ${file}.new");
+	    if ($retval) {
+		print STDERR "Files ${file}.new and $file differ, but we can't show the changes!  Updating $file anyway!\n";
+		system("mv ${file}.new $file");
+	    }
+	}
+    }
+
+    dbmclose(%PDB);
+    dbmclose(%GDB);
+
     return 0;
 }
 

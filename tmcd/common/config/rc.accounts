@@ -647,6 +647,13 @@ sub doreconfig()
 #
 sub docleanup()
 {
+    my $retval = 0;
+
+    # Hand this off to liblocsetup to restore default passwd/group files.
+    if ($doit) {
+	$retval = os_account_cleanup();
+    }
+
     my $pdb = $PASSDB . ".db";
     my $gdb = $GROUPDB . ".db";
 
@@ -660,10 +667,8 @@ sub docleanup()
 	if (-e $pdb);
     unlink $gdb
 	if (-e $gdb);
-    
-    # Hand this off to liblocsetup to restore default passwd/group files.
-    os_account_cleanup()
-	if ($doit);
+
+    return $retval;
 }
 
 #
