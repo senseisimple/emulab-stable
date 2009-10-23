@@ -129,9 +129,9 @@ sub os_account_cleanup()
     my %PDB;
     my %GDB;
 
-    dbmopen(%PDB, $PASSDB, undef) or
+    dbmopen(%PDB, $PASSDB, 0644) or
 	fatal("Cannot open $PASSDB: $!");
-    dbmopen(%GDB, $GROUPDB, undef) or
+    dbmopen(%GDB, $GROUPDB, 0644) or
 	fatal("Cannot open $GROUPDB: $!");
 
     my %lineHash = ();
