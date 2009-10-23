@@ -1,0 +1,178 @@
+#!/usr/bin/perl -wT
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package GeniCMV2;
+
+#
+# The server side of the CM interface on remote sites. Also communicates
+# with the GMC interface at Geni Central as a client.
+#
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA    = "Exporter";
+@EXPORT = qw ( );
+
+# Must come after package declaration!
+use lib '@prefix@/lib';
+use GeniDB;
+use Genixmlrpc;
+use GeniResponse;
+use GeniTicket;
+use GeniCredential;
+use GeniCertificate;
+use GeniSlice;
+use GeniAggregate;
+use GeniAuthority;
+use GeniSliver;
+use GeniUser;
+use GeniRegistry;
+use GeniUtil;
+use GeniHRN;
+use libtestbed qw(SENDMAIL);
+use emutil;
+# Hate to import all this crap; need a utility library.
+use libdb qw(TBGetSiteVar EXPTSTATE_SWAPPED EXPTSTATE_ACTIVE TBOPSPID
+	     TBDB_NODESTATE_TBFAILED);
+use User;
+use Node;
+use OSinfo;
+use Image;
+use Interface;
+use English;
+use Data::Dumper;
+use XML::Simple;
+use Date::Parse;
+use POSIX qw(strftime tmpnam);
+use Time::Local;
+use Experiment;
+use VirtExperiment;
+use Firewall;
+use Compress::Zlib;
+use MIME::Base64;
+
+# Configure variables
+my $TB		   = "@prefix@";
+my $TBOPS          = "@TBOPSEMAIL@";
+my $TBAPPROVAL     = "@TBAPPROVALEMAIL@";
+my $TBAUDIT   	   = "@TBAUDITEMAIL@";
+my $BOSSNODE       = "@BOSSNODE@";
+my $OURDOMAIN      = "@OURDOMAIN@";
+my $PGENIDOMAIN    = "@PROTOGENI_DOMAIN@";
+my $CREATEEXPT     = "$TB/bin/batchexp";
+my $ENDEXPT        = "$TB/bin/endexp";
+my $NALLOC	   = "$TB/bin/nalloc";
+my $NFREE	   = "$TB/bin/nfree";
+my $AVAIL	   = "$TB/sbin/avail";
+my $PTOPGEN	   = "$TB/libexec/ptopgen";
+my $TBSWAP	   = "$TB/bin/tbswap";
+my $SWAPEXP	   = "$TB/bin/swapexp";
+my $PLABSLICE	   = "$TB/sbin/plabslicewrapper";
+my $NAMEDSETUP     = "$TB/sbin/named_setup";
+my $VNODESETUP     = "$TB/sbin/vnode_setup";
+my $GENTOPOFILE    = "$TB/libexec/gentopofile";
+my $TARFILES_SETUP = "$TB/bin/tarfiles_setup";
+my $MAPPER         = "$TB/bin/mapper";
+my $VTOPGEN        = "$TB/bin/vtopgen";
+my $SNMPIT         = "$TB/bin/snmpit";
+my $PRERENDER      = "$TB/libexec/vis/prerender";
+my $EMULAB_PEMFILE = "@prefix@/etc/genicm.pem";
+
+my $API_VERSION = 2;
+
+#
+# Tell the client what API revision we support.  The correspondence
+# between revision numbers and API features is to be specified elsewhere.
+# No credentials are required.
+#
+sub GetVersion()
+{
+    return GeniResponse->Create( GENIRESPONSE_SUCCESS, $API_VERSION );
+}
+
+#
+# Respond to a Resolve request. 
+#
+sub Resolve($)
+{
+    my ($argref) = @_;
+
+    return GeniResponse->Create(GENIRESPONSE_UNSUPPORTED);
+}
+
+#
+# Discover resources on this component, returning a resource availablity spec
+#
+sub DiscoverResources($)
+{
+    my ($argref) = @_;
+
+    return GeniResponse->Create(GENIRESPONSE_UNSUPPORTED);
+}
+
+#
+# Create a Sliver.
+#
+sub CreateSliver($)
+{
+    my ($argref) = @_;
+
+    return GeniResponse->Create(GENIRESPONSE_UNSUPPORTED);
+}
+
+#
+# Delete a Sliver.
+#
+sub DeleteSliver($)
+{
+    my ($argref) = @_;
+
+    return GeniResponse->Create(GENIRESPONSE_UNSUPPORTED);
+}
+
+#
+# Get a Sliver (credential)
+#
+sub GetSliver($)
+{
+    my ($argref) = @_;
+
+    return GeniResponse->Create(GENIRESPONSE_UNSUPPORTED);
+}
+
+#
+# Get sliver status
+#
+sub SliverStatus($)
+{
+    my ($argref) = @_;
+
+    return GeniResponse->Create(GENIRESPONSE_UNSUPPORTED);
+}
+
+#
+# Shutdown sliver
+#
+sub Shutdown($)
+{
+    my ($argref) = @_;
+
+    return GeniResponse->Create(GENIRESPONSE_UNSUPPORTED);
+}
+
+#
+# Renew a sliver
+#
+sub RenewSliver($)
+{
+    my ($argref) = @_;
+
+    return GeniResponse->Create(GENIRESPONSE_UNSUPPORTED);
+}
+
+# _Always_ make sure that this 1 is at the end of the file...
+1;

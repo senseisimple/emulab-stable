@@ -12,7 +12,7 @@ SUBDIR		= protogeni/lib
 include $(OBJDIR)/Makeconf
 
 LIB_SCRIPTS     = GeniDB.pm GeniUser.pm  \
-		  GeniSlice.pm GeniSA.pm GeniCM.pm \
+		  GeniSlice.pm GeniSA.pm GeniCM.pm GeniCMV2.pm \
 		  GeniTicket.pm GeniSliver.pm GeniCredential.pm \
 		  GeniComponent.pm GeniCH.pm GeniEmulab.pm \
 		  GeniAuthority.pm GeniCertificate.pm GeniAggregate.pm \
