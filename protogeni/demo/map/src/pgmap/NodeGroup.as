@@ -39,9 +39,17 @@
 			collection.addItem(n);
 		}
 
-		public function GetByUUID(uuid:String):Node {
+		public function GetByUrn(urn:String):Node {
 			for each ( var n:Node in collection ) {
-				if(n.uuid == uuid)
+				if(n.urn == urn)
+					return n;
+			}
+			return null;
+		}
+		
+		public function GetByName(name:String):Node {
+			for each ( var n:Node in collection ) {
+				if(n.name == name)
 					return n;
 			}
 			return null;

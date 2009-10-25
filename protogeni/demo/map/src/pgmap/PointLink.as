@@ -16,35 +16,20 @@
 {
 	import mx.collections.ArrayCollection;
 	
-	public class NodeInterfaceCollection
+	public class PointLink
 	{
-		public function NodeInterfaceCollection()
+		public function PointLink()
 		{
 		}
 		
 		[Bindable]
-		public var collection:ArrayCollection = new ArrayCollection();
+		public var node1:Node;
 		
-		public function GetByID(urn:String):NodeInterface {
-			for each(var ni:NodeInterface in collection) {
-				if(ni.id == urn)
-					return ni;
-			}
-			return null;
-		}
+		[Bindable]
+		public var node2:Node;
 		
-		public function Add(ni:NodeInterface):void {
-			collection.addItem(ni);
-		}
-		
-		public function Links():ArrayCollection {
-			var ac:ArrayCollection = new ArrayCollection();
-			for each(var ni:NodeInterface in collection) {
-				for each(var l:Link in ni.links) {
-					ac.addItem(l);
-				}
-			}
-			return ac;
-		}
+		public var slice : Slice = null;
+
+		public var sliverRspec:XML;
 	}
 }

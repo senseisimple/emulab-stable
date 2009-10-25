@@ -38,12 +38,19 @@
         public var console:ConsoleWindow;
         public var rspecView:XmlWindow;
         public var about:AboutWindow = new AboutWindow();
+        public var userWindow:ChangeUserWindow = new ChangeUserWindow();
 
 		[Bindable]
 		public var pgHandler:ProtoGeniHandler;
 		
 		[Bindable]
 		public var slicesMenu : ArrayCollection;
+		
+		[Bindable]
+		public var userResourcesOnly : Boolean = false;
+		
+		[Bindable]
+		public var selectedSlice : Slice = null;
 		
 		public var main:Main;
 		
@@ -74,6 +81,10 @@
         public function showAbout():void {
 	    	PopUpManager.addPopUp(about, this, false);
        		PopUpManager.centerPopUp(about);
+	    }
+	    
+	    public function changeUser():void {
+	    	userWindow.open();
 	    }
 	    
 	    //------------------------------------------
@@ -133,12 +144,18 @@
 	    	return s.DisplayString();
 	    }
 	    
+	    public function sliceSelected():void {
+	    	selectedSlice = slicesCombobox.selectedItem as Slice;
+	    	
+			pgHandler.map.drawMap();
+	    }
+	    
 	    // Google maps
 	    private function onMapPreinitialize(event:Event):void {
 	          var myMapOptions:MapOptions = new MapOptions();
 	          myMapOptions.zoom = 4;
 	          myMapOptions.center = new LatLng(38,-97);
-	          myMapOptions.mapType = MapType.NORMAL_MAP_TYPE;
+	          myMapOptions.mapType = MapType.PHYSICAL_MAP_TYPE;
 	          map.setInitOptions(myMapOptions);
 	    }
 	    
@@ -163,6 +180,9 @@
 	    	map.addControl(new ZoomControl());
 			map.addControl(new PositionControl());
 			map.addControl(new MapTypeControl());
+			
+			map.enableScrollWheelZoom();
+			map.enableContinuousZoom();
 			
 			changeCM();
 	    }
@@ -210,12 +230,17 @@
 			click="viewRspec()" 
 			toolTip="View the most recent RSpec"/>
 		<mx:VRule height="14"/>
-		<mx:ComboBox id="slicesCombobox" dataProvider="{slicesMenu}" labelFunction="getSliceLabel"></mx:ComboBox>
-		<mx:CheckBox label="Only my resources" id="onlyMyResourcesCheckbox"/>
+		<mx:ComboBox id="slicesCombobox" dataProvider="{slicesMenu}" labelFunction="getSliceLabel" change="sliceSelected()"></mx:ComboBox>
+		<mx:CheckBox label="Only my resources" id="onlyMyResourcesCheckbox" click="userResourcesOnly = onlyMyResourcesCheckbox.selected; pgHandler.map.drawMap()"/>
 		<mx:Spacer width="100%"/>
 		<mx:Label text="Initialized" id="progressLabel"  fontStyle="normal" fontWeight="bold"/>
 		<mx:SWFLoader id="waitingIcon" source="@Embed('../images/waiting.swf')" visible="false"/> 
 		<mx:Spacer width="100%"/>
+		<pgmap:ImageButton id="userButton"
+		source="@Embed('../images/user.png')"
+		click="changeUser()" 
+		toolTip="View the most recent RSpec"/>
+		<mx:Label  text="{pgHandler.CurrentUser.uid}"/>
 		<pgmap:ImageButton id="infoButton"
 			source="@Embed('../images/information.png')"
 			click="showAbout()"

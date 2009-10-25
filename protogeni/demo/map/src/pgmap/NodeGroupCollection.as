@@ -32,9 +32,18 @@
 			return null;
 		}
 		
-		public function GetByUUID(uuid:String):Node {
+		public function GetByUrn(urn:String):Node {
 			for each(var ng:NodeGroup in collection) {
-				var n:Node = ng.GetByUUID(uuid);
+				var n:Node = ng.GetByUrn(urn);
+				if(n != null)
+					return n;
+			}
+			return null;
+		}
+		
+		public function GetByName(name:String):Node {
+			for each(var ng:NodeGroup in collection) {
+				var n:Node = ng.GetByName(name);
 				if(n != null)
 					return n;
 			}

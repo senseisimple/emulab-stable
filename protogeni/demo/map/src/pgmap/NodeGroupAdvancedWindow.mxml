@@ -21,9 +21,6 @@
 			[Bindable]
 			public var nodes:ArrayCollection;
 			
-			[Bindable]
-			public var linkedNodes:ArrayCollection = new ArrayCollection();
-			
 			public var main:pgmap;
 			
 			public function loadCollection(group:ArrayCollection):void {

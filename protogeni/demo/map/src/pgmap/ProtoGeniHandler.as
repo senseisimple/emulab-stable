@@ -15,6 +15,7 @@
  package pgmap
 {
 	import mx.collections.ArrayCollection;
+	import mx.managers.PopUpManager;
 	
 	public class ProtoGeniHandler
 	{
@@ -26,6 +27,7 @@
 		[Bindable]
 		public var map : ProtoGeniMapHandler;
 		
+		[Bindable]
 		public var CurrentUser:User = new User();
 		
 		public var Nodes:NodeGroupCollection = new NodeGroupCollection();
@@ -70,6 +72,17 @@
 			clear();
 			rpc.startResourceLookup();
 		}
+		
+		public function showResolveNode(n:Node):void {
+			rpc.startResolveNode(n);
+		}
+		
+		public function showResolveNodeResult():void {
+			var rspecView:XmlWindow = new XmlWindow();
+			PopUpManager.addPopUp(rspecView, main, false);
+   			PopUpManager.centerPopUp(rspecView);
+   			//rspecView.loadXml(node.rspec);
+		}
 	    
 	    public function processRspec(afterCompletion : Function):void {
 	    	namespace rsync01namespace = "http://www.protogeni.net/resources/rspec/0.1"; 
@@ -80,15 +93,12 @@
 	        
 	        // Process nodes
 	        var locations:XMLList = rpc.Rspec.node.location;
-	        main.console.appendText("Detected " + locations.length().toString() + " nodes with location info...\n");
 	        
 	        // Process nodes, combining same locations
 	        for each(var location:XML in locations) {
 	        	var lat:Number = Number(location.@latitude);
 	        	var lng:Number = Number(location.@longitude);
 	        	
-	        	main.console.appendText("Found node at " + lat + ", " + lng + "\n");
-
 	        	var ng:NodeGroup = Nodes.GetByLocation(lat,lng);
 	        	if(ng == null) {
 	        		var cnt:String = location.@country;
@@ -99,7 +109,7 @@
 	        	var n:Node = new Node(ng);
 	        	var p:XML = location.parent();
 	        	n.name = p.@component_name;
-	        	n.uuid = p.@component_uuid;
+	        	n.urn = p.@component_uuid;
 	        	n.available = p.available == "true";
 	        	n.exclusive = p.exclusive == "true";
 	        	n.manager = p.@component_manager_uuid;
@@ -119,7 +129,6 @@
 	        	}
 	        	
 	        	n.rspec = p.copy();
-	        	main.console.appendText(" ... Name: " + n.name + "\n ... UUID: " + n.uuid +  "\n ... Available: " + n.available +  "\n ... Exclusive: " + n.exclusive + "\n");
 	        	ng.Add(n);
 	        }
 	        
@@ -127,7 +136,6 @@
 	        var links:XMLList = rpc.Rspec.link;
 	        for each(var link:XML in links) {
 	        	var interfaces:XMLList = link.interface_ref;
-	        	// 1
 	        	var interface1:String = interfaces[0].@component_interface_id
 	        	var ni1:NodeInterface = Nodes.GetInterfaceByID(interface1);
 	        	if(ni1 != null) {
@@ -142,7 +150,7 @@
 		        		var l:Link = new Link(lg);
 		        		l.name = link.@component_name;
 		        		l.manager = link.@component_manager_uuid;
-		        		l.uuid = link.@component_uuid;
+		        		l.urn = link.@component_uuid;
 		        		l.interface1 = ni1;
 		        		l.interface2 = ni2;
 		        		l.bandwidth = link.bandwidth;
@@ -165,20 +173,8 @@
 	        	}
 	        }
 	        
-	        main.console.appendText("Found " + Links.collection.length + " visible links\n");
-	        
-			main.console.appendText("Detected " + links.length().toString() + " Links...\n");
-			
-			if(afterCompletion != null)
+	        if(afterCompletion != null)
 				afterCompletion();
-	    }
-	    
-	    public function addSliceNode(urn:String, status:String, sl:Slice):void {
-	    	var n : Node = Nodes.GetByUUID(urn);
-	    	if(n != null) {
-	    		n.slice = sl;
-	    		n.status = Common.firstToUpper(status);
-	    	}
 	    }
 	}
 }

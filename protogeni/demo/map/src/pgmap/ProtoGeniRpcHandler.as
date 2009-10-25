@@ -224,8 +224,12 @@
 		        Rspec = new XML(decodedRspec);
 	      	} else
 	      		Rspec = new XML(response.value);
-	      		
+	      	
+	      	//var d1:Date = new Date();
 	        main.pgHandler.processRspec(null);
+	        //var d2:Date = new Date();
+	        //Alert.show((d2.time - d1.time).toString());
+	        
 	        // ADD INTERMEDIATE CALL TO GET USER, THEN ...
 	        startResolveUser();
 	      }
@@ -263,8 +267,10 @@
 	      	main.pgHandler.CurrentUser.name = response.value.name;
 	      	
 	      	sliceUrns = response.value.slices;
-	      	if(allSlices != null && allSlices.length > 0)
+	      	if(sliceUrns != null && sliceUrns.length > 0) {
+	      		allSlices = new Array();
 	      		startSliceLookup();
+	      	}
 	      	else
 	      		main.pgHandler.map.drawMap();
 	      }
@@ -377,18 +383,7 @@
 	      addResponse();
 	      if (code == 0)
 	      {
-	      	slice.status == response.value.ready;
-	      	
-	      	if(slicesLeft.length > 0)
-	      		startSliceStatus();
-	      	else {
-	      		prepareSlivers();
-	      		if(sliversLeft.length == 0) {
-	      			main.pgHandler.map.drawMap();
-	      		} else {
-	      			startSliverStatus();
-	      		}
-	      	}
+	      	slice.status = response.value.status;
 	      	
 	      	/*
 	      	
@@ -407,6 +402,53 @@
 	      	else
 	      		postCall();
 	      	*/
+	      }
+	      else
+	      {
+	        //codeFailure();
+	        //main.pgHandler.map.drawMap();
+	      }
+	      
+	      if(slicesLeft.length > 0)
+	      		startSliceStatus();
+	      	else {
+	      		prepareSlivers();
+	      		if(sliversLeft.length == 0) {
+	      			main.pgHandler.map.drawMap();
+	      		} else {
+	      			startGetSliver();
+	      		}
+	      	}
+	    }
+	    
+	    public function startGetSliver() : void
+	    {
+	      opName = "Acquiring " + sliversLeft.length + " more sliver credential(s)";
+	      slice = sliversLeft.pop();
+	      main.setProgress(opName, Common.waitColor);
+	      main.startWaiting();
+	      main.console.appendText(opName);
+	      op.reset(Geni.getSliver);
+	      op.addField("credential", slice.credential);
+		  op.call(completeGetSliver, failure);
+	      addSend();
+	    }
+	    
+	    public function completeGetSliver(code : Number, response : Object) : void
+	    {
+	    	main.setProgress("Done", Common.successColor);
+	    	main.stopWaiting();
+	      addResponse();
+	      if (code == 0)
+	      {
+	      	slice.sliverCredential = String(response.value);
+	      	
+	      	if(sliversLeft.length > 0)
+	      		startGetSliver();
+	      	else {
+	      		prepareSlivers();
+	      		startSliverStatus();
+	      	}
 	      }
 	      else
 	      {
@@ -435,57 +477,13 @@
 	      addResponse();
 	      if (code == 0)
 	      {
-	      	slice.sliverStatus = response.value.ready;
+	      	slice.sliverStatus = response.value.status;
 	      	
 	      	if(sliversLeft.length > 0)
 	      		startSliverStatus();
 	      	else {
 	      		prepareSlivers();
-	      		if(sliversLeft.length == 0) {
-	      			main.pgHandler.map.drawMap();
-	      		} else {
-	      			startGetSliver();
-	      		}
-	      	}
-	      }
-	      else
-	      {
-	        codeFailure();
-	        main.pgHandler.map.drawMap();
-	      }
-	    }
-
-	    public function startGetSliver() : void
-	    {
-	      opName = "Acquiring " + sliversLeft.length + " more sliver credential(s)";
-	      slice = sliversLeft.pop();
-	      main.setProgress(opName, Common.waitColor);
-	      main.startWaiting();
-	      main.console.appendText(opName);
-	      op.reset(Geni.getSliver);
-	      op.addField("credential", slice.credential);
-		  op.call(completeGetSliver, failure);
-	      addSend();
-	    }
-	    
-	    public function completeGetSliver(code : Number, response : Object) : void
-	    {
-	    	main.setProgress("Done", Common.successColor);
-	    	main.stopWaiting();
-	      addResponse();
-	      if (code == 0)
-	      {
-	      	slice.sliverCredential = String(response.value);
-	      	
-	      	if(sliversLeft.length > 0)
-	      		startGetSliver();
-	      	else {
-	      		prepareSlivers();
-	      		if(sliversLeft.length == 0) {
-	      			main.pgHandler.map.drawMap();
-	      		} else {
-	      			startSliverTicket();
-	      		}
+	      		startSliverTicket();
 	      	}
 	      }
 	      else
@@ -515,7 +513,27 @@
 	      addResponse();
 	      if (code == 0)
 	      {
-	      	// GO THROUGH RSPEC
+	      	var sliverXml:XML = new XML(response.value);
+	      	var sliverRspec:XMLList = sliverXml.descendants("rspec").children();
+	      	if(sliverRspec.length() > 0) {
+	      		for each(var component:XML in sliverRspec) {
+	      			if(component.localName() == "node") {
+	      				var node:Node = main.pgHandler.Nodes.GetByUrn(component.component_urn);
+	      				node.slice = slice;
+	      				node.sliverUrn = component.sliver_urn;
+	      				node.sliverUuid = component.sliver_uuid;
+	      				node.sliverRspec = component;
+	      				slice.Nodes.addItem(node);
+	      			} else if(component.localName() == "link") {
+	      				var nodeNames:XMLList = component.descendants("virtual_node_id");
+	      				var link:PointLink = new PointLink();
+	      				link.node1 = main.pgHandler.Nodes.GetByName(nodeNames[0]);
+	      				link.node2 = main.pgHandler.Nodes.GetByName(nodeNames[1]);
+	      				link.slice = slice;
+	      				slice.Links.addItem(link);
+	      			}
+	      		}
+	      	}
 	      	
 	      	if(sliversLeft.length > 0)
 	      		startSliverTicket();
@@ -541,6 +559,41 @@
 	      op.addField("credential", main.pgHandler.CurrentUser.credential);
 	      op.addField("urn", sliceNodes.pop());
 	      op.addField("type", "Node");
+		  op.call(completeResolveNodes, failure);
+	      addSend();
+	    }
+	    
+	    public function completeResolveNodes(code : Number, response : Object) : void
+	    {
+	    	main.setProgress("Done", Common.successColor);
+	    	main.stopWaiting();
+	      addResponse();
+	      if (code == 0)
+	      {
+	      	//main.pgHandler.addSliceNode(response.value.urn, sliceNodesStatus.pop(), slice);
+	      	// GOT INfO ABOUT NODE
+	      	if(this.sliceNodes.length > 0)
+	      		startResolveNodes();
+	      	else
+	      		main.pgHandler.map.drawMap();
+	      }
+	      else
+	      {
+	        codeFailure();
+	        main.pgHandler.map.drawMap();
+	      }
+	    }
+	    
+	    public function startResolveNode(n:Node) : void
+	    {
+	      opName = "Resolving Node: " + n.urn + "\n";
+	      main.setProgress(opName, Common.waitColor);
+	      main.startWaiting();
+	      main.console.appendText(opName);
+	      op.reset(Geni.resolveNode);
+	      op.addField("credential", main.pgHandler.CurrentUser.credential);
+	      op.addField("urn", n.urn);
+	      op.addField("type", "Node");
 		  op.call(completeResolveNode, failure);
 	      addSend();
 	    }
@@ -552,12 +605,9 @@
 	      addResponse();
 	      if (code == 0)
 	      {
-	      	main.pgHandler.addSliceNode(response.value.urn, sliceNodesStatus.pop(), slice);
+	      	main.pgHandler.showResolveNodeResult();
+	      	//main.pgHandler.addSliceNode(response.value.urn, sliceNodesStatus.pop(), slice);
 	      	// GOT INfO ABOUT NODE
-	      	if(this.sliceNodes.length > 0)
-	      		startResolveNodes();
-	      	else
-	      		main.pgHandler.map.drawMap();
 	      }
 	      else
 	      {

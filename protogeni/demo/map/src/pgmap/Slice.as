@@ -58,15 +58,20 @@
 			switch(status) {
 				case "ready":
 					switch(sliverStatus) {
-						case "ready": hrn += " (All Ready)";
-						case "notready": hrn += " (Sliver Not Ready)";
-						case "failed": hrn += " (Sliver Failed)";
-						default: hrn += " (Unknown Sliver Status)";
+						case "ready": returnString += " (All Ready)";
+							break;
+						case "notready": returnString += " (Sliver Not Ready)";
+							break;
+						case "failed": returnString += " (Sliver Failed)";
+							break;
+						default: returnString += " (Unknown Sliver Status)";
 					}
 					break;
-				case "notready": hrn += " (Not Ready)";
-				case "failed": hrn += " (Unknown)";
-				default: hrn += " (Unknown)";
+				case "notready": returnString += " (Not Ready)";
+					break;
+				case "failed": returnString += " (Unknown)";
+					break;
+				default: returnString += " (Unknown)";
 			}
 			return returnString;
 		}

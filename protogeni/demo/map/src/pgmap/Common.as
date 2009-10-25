@@ -121,25 +121,59 @@ package pgmap
 		}
 		
 		public static function viewLink(l:Link):void {
+			var lgWindow:LinkAdvancedWindow = new LinkAdvancedWindow();
+	    	lgWindow.main = Main();
+	    	PopUpManager.addPopUp(lgWindow, Main(), false);
+       		PopUpManager.centerPopUp(lgWindow);
+       		lgWindow.loadLink(l);
+		}
+		
+		public static function viewLinkCollection(lc:ArrayCollection):void {
+			if(lc.length == 1)
+				viewLink(lc[0]);
+			else {
+				var lgWindow:LinkGroupAdvancedWindow = new LinkGroupAdvancedWindow();
+		    	lgWindow.main = Main();
+		    	PopUpManager.addPopUp(lgWindow, Main(), false);
+	       		PopUpManager.centerPopUp(lgWindow);
+	       		lgWindow.loadCollection(lc);
+			}
+		}
+		
+		public static function viewLinkGroup(lg:LinkGroup):void {
 			var lgWindow:LinkGroupAdvancedWindow = new LinkGroupAdvancedWindow();
 	    	lgWindow.main = Main();
 	    	PopUpManager.addPopUp(lgWindow, Main(), false);
        		PopUpManager.centerPopUp(lgWindow);
-       		
-       		var ac:ArrayCollection = new ArrayCollection();
-       		ac.addItem(l);
-       		lgWindow.loadCollection(ac);
+       		lgWindow.loadGroup(lg);
 		}
 		
 		public static function viewNode(n:Node):void {
+			var ngWindow:NodeAdvancedWindow = new NodeAdvancedWindow();
+	    	ngWindow.main = Main();
+	    	PopUpManager.addPopUp(ngWindow, Main(), false);
+       		PopUpManager.centerPopUp(ngWindow);
+       		ngWindow.loadNode(n);
+		}
+		
+		public static function viewNodeGroup(ng:NodeGroup):void {
 			var ngWindow:NodeGroupAdvancedWindow = new NodeGroupAdvancedWindow();
 	    	ngWindow.main = Main();
 	    	PopUpManager.addPopUp(ngWindow, Main(), false);
        		PopUpManager.centerPopUp(ngWindow);
-       		
-       		var ac:ArrayCollection = new ArrayCollection();
-       		ac.addItem(n);
-       		ngWindow.loadCollection(ac);
+       		ngWindow.loadGroup(ng);
+		}
+		
+		public static function viewNodeCollection(nc:ArrayCollection):void {
+			if(nc.length == 1)
+				viewNode(nc[0]);
+			else {
+				var ngWindow:NodeGroupAdvancedWindow = new NodeGroupAdvancedWindow();
+		    	ngWindow.main = Main();
+		    	PopUpManager.addPopUp(ngWindow, Main(), false);
+	       		PopUpManager.centerPopUp(ngWindow);
+	       		ngWindow.loadCollection(nc);
+			}
 		}
 	}
 }

@@ -32,6 +32,12 @@
 		public var uuid:String;
 		
 		[Bindable]
+		public var urn:String;
+		
+		public var sliverUuid:String;
+		public var sliverUrn:String;
+		
+		[Bindable]
 		public var manager:String;
 		
 		public var available:Boolean;
@@ -49,6 +55,7 @@
 		public var interfaces:NodeInterfaceCollection = new NodeInterfaceCollection();
 		
 		public var rspec:XML;
+		public var sliverRspec:XML;
 
 		public function GetLatitude():Number {
 			return owner.latitude;
@@ -77,6 +84,18 @@
 					}
 					if(l.interface2.owner != this && !ac.contains(l.interface2.owner)) {
 						ac.addItem(l.interface2.owner);
+					}
+				}
+			}
+			return ac;
+		}
+		
+		public function GetNodeLinks(n:Node):ArrayCollection {
+			var ac:ArrayCollection = new ArrayCollection();
+			for each(var i:NodeInterface in interfaces.collection) {
+				for each(var l:Link in i.links) {
+					if(l.interface1.owner == n || l.interface2.owner == n) {
+						ac.addItem(l);
 					}
 				}
 			}

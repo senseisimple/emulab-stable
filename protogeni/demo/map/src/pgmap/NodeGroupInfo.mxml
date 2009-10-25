@@ -30,7 +30,10 @@
 				main = pg;
 				nodesCount = g.collection.length.toString();
 				nodesAvailable = g.Available().toString();
-				linksInternal = g.links.collection.length.toString();
+				if(g.links != null)
+					linksInternal = g.links.collection.length.toString();
+				else
+					linksInternal = "0";
 				linksExternal = g.ExternalLinks().toString();
 			}	
 		]]>
@@ -74,6 +77,6 @@
 			</mx:GridItem>
 		</mx:GridRow>
 	</mx:Grid>
-	<mx:Button label="More Info" click="main.pgHandler.map.viewNodeGroup(group)"/>
+	<mx:Button label="More Info" click="if(group.collection.length > 1) Common.viewNodeGroup(group); else Common.viewNode(group.collection[0]);"/>
 	
 </mx:VBox>

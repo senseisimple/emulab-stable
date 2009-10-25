@@ -29,62 +29,146 @@ package pgmap
 		
 		private function addMarker(g:NodeGroup):void
 	    {
-	    	main.console.appendText("Creating node marker at " + g.latitude + ", " + g.longitude + " in " + g.country + "\n");
+	    	// Create the group to be drawn
+	    	var drawGroup:NodeGroup = new NodeGroup(g.latitude, g.longitude, g.country , main.pgHandler.Nodes);
+	    	drawGroup.owner = g.owner;
+	    	if(main.userResourcesOnly) {
+	    		for each(var n:Node in g.collection) {
+	    			if( n.slice != null &&
+	    			      ((main.selectedSlice == null || main.selectedSlice.status != null) ||
+	    			      (n.slice == main.selectedSlice)) )
+	    			{
+	    				drawGroup.Add(n);
+	    			}
+	    			
+	    			// Figure out links
+	    		}
+	    	} else {
+	    		drawGroup = g;
+	    	}
 	    	
-	        var m:Marker = new Marker(
-		      	new LatLng(g.latitude, g.longitude),
-		      	new MarkerOptions({
-		                  strokeStyle: new StrokeStyle({color: 0x092B9F}),
-		                  fillStyle: new FillStyle({color: 0xD2E1F0, alpha: 1}),
-		                  radius: 12,
-		                  hasShadow: true,
-		                  //tooltip: g.country,
-		                  label: g.collection.length.toString()
-		      	}));
-
-	        var groupInfo:NodeGroupInfo = new NodeGroupInfo();
-	        groupInfo.Load(g, this.main);
+	    	if(drawGroup.collection.length > 0) {
+	    		var m:Marker = new Marker(
+			      	new LatLng(drawGroup.latitude, drawGroup.longitude),
+			      	new MarkerOptions({
+			                  strokeStyle: new StrokeStyle({color: 0x092B9F}),
+			                  fillStyle: new FillStyle({color: 0xD2E1F0, alpha: 1}),
+			                  radius: 12,
+			                  hasShadow: true,
+			                  //tooltip: g.country,
+			                  label: drawGroup.collection.length.toString()
+			      	}));
+	
+		        var groupInfo:NodeGroupInfo = new NodeGroupInfo();
+		        groupInfo.Load(drawGroup, main);
+		        
+		        var geocoder:ClientGeocoder = new ClientGeocoder();
+		    	
+		    	geocoder.addEventListener(GeocodingEvent.GEOCODING_SUCCESS,
+				      function(event:GeocodingEvent):void {
+				      	var placemarks:Array = event.response.placemarks;
+				        if (placemarks.length > 0) {
+				        	try {
+				        		var p:Placemark = event.response.placemarks[0] as Placemark;
+				        		var fullAddress : String = p.address;
+				        		var splitAddress : Array = fullAddress.split(',');
+				        		if(splitAddress.length == 3)
+				        			groupInfo.city = splitAddress[0];
+				        		else 
+				        		if(splitAddress.length == 4)
+				        			groupInfo.city = splitAddress[1];
+				        		else
+				        			drawGroup.city = fullAddress;
+				        	} catch (err:Error) { }
+				        }
+				      });
+				        	
+				  geocoder.addEventListener(GeocodingEvent.GEOCODING_FAILURE,
+				        function(event:GeocodingEvent):void {
+				          //Alert.show("Geocoding failed");
+				        });
+	
+				  //geocoder.reverseGeocode(new LatLng(g.latitude, g.longitude));
+		        
+		        m.addEventListener(MapMouseEvent.CLICK, function(e:Event):void {
+		            m.openInfoWindow(
+		            	new InfoWindowOptions({
+		            		customContent:groupInfo,
+		            		customoffset: new Point(0, 10),
+		            		width:140,
+		            		height:150,
+		            		drawDefaultFrame:true
+		            	}));
+		        });
+	
+		  		main.map.addOverlay(m);
+	    	} else {
+	    		// Draw an empty marker
+	    		var nonodes:Marker = new Marker(
+			      	new LatLng(drawGroup.latitude, drawGroup.longitude),
+			      	new MarkerOptions({
+			                  strokeStyle: new StrokeStyle({color: 0x666666}),
+			                  fillStyle: new FillStyle({color: 0xCCCCCC, alpha: .8}),
+			                  radius: 8,
+			                  hasShadow: false
+			      	}));
+	
+		        main.map.addOverlay(nonodes);
+	    	}
 	        
-	        var geocoder:ClientGeocoder = new ClientGeocoder();
-	    	
-	    	geocoder.addEventListener(GeocodingEvent.GEOCODING_SUCCESS,
-			      function(event:GeocodingEvent):void {
-			      	var placemarks:Array = event.response.placemarks;
-			        if (placemarks.length > 0) {
-			        	try {
-			        		var p:Placemark = event.response.placemarks[0] as Placemark;
-			        		groupInfo.city = p.address.split(",")[1];
-			        		g.city = groupInfo.city;
-			        	} catch (err:Error) { }
-			        }
-			      });
-			        	
-			  geocoder.addEventListener(GeocodingEvent.GEOCODING_FAILURE,
-			        function(event:GeocodingEvent):void {
-			          //Alert.show("Geocoding failed");
-			        });
-
-			  //geocoder.reverseGeocode(new LatLng(g.latitude, g.longitude));
-	        
-	        m.addEventListener(MapMouseEvent.CLICK, function(e:Event):void {
-	            m.openInfoWindow(
-	            	new InfoWindowOptions({
-	            		customContent:groupInfo,
-	            		customoffset: new Point(0, 10),
-	            		width:140,
-	            		height:150,
-	            		drawDefaultFrame:true
-	            	}));
-	        });
-
-	  		main.map.addOverlay(m);
 	    }
 	    
 	    public function addLink(lg:LinkGroup):void {
-	    	// Add line
+	    	// Create the group to be drawn
+	    	var drawGroup:LinkGroup = lg;
+	    	
+	    	if(drawGroup.collection.length > 0) {
+	    		// Add line
+				var polyline:Polyline = new Polyline([
+					new LatLng(drawGroup.latitude1, drawGroup.longitude1),
+					new LatLng(drawGroup.latitude2, drawGroup.longitude2)
+					], new PolylineOptions({ strokeStyle: new StrokeStyle({
+						color: 0xFF00FF,
+						thickness: 4,
+						alpha:1})
+					}));
+	
+				main.map.addOverlay(polyline);
+				
+				// Add link marker
+				var ll:LatLng = new LatLng((drawGroup.latitude1 + drawGroup.latitude2)/2, (drawGroup.longitude1 + drawGroup.longitude2)/2);
+				
+				var t:TooltipOverlay = new TooltipOverlay(ll, Common.kbsToString(drawGroup.TotalBandwidth()));
+		  		t.addEventListener(MouseEvent.CLICK, function(e:Event):void {
+		            e.stopImmediatePropagation();
+		            main.pgHandler.map.viewLinkGroup(drawGroup)
+		        });
+		        
+		  		main.map.addOverlay(t);
+	    	} else {
+	    		// Add line
+				var blankline:Polyline = new Polyline([
+					new LatLng(drawGroup.latitude1, drawGroup.longitude1),
+					new LatLng(drawGroup.latitude2, drawGroup.longitude2)
+					], new PolylineOptions({ strokeStyle: new StrokeStyle({
+						color: 0x666666,
+						thickness: 3,
+						alpha:.8})
+					}));
+	
+				main.map.addOverlay(blankline);
+	    	}
+	    }
+	    
+	    public function addPointLink(pl:PointLink):void {
+	    	// Create the group to be drawn
+	    	if(pl.slice != main.selectedSlice)
+	    		return;
+	    	
+    		// Add line
 			var polyline:Polyline = new Polyline([
-				new LatLng(lg.latitude1, lg.longitude1),
-				new LatLng(lg.latitude2, lg.longitude2)
+				new LatLng(pl.node1.GetLatitude(), pl.node1.GetLongitude()),
+				new LatLng(pl.node2.GetLatitude(), pl.node2.GetLongitude())
 				], new PolylineOptions({ strokeStyle: new StrokeStyle({
 					color: 0xFF00FF,
 					thickness: 4,
@@ -92,21 +176,11 @@ package pgmap
 				}));
 
 			main.map.addOverlay(polyline);
-			
-			// Add link marker
-			var ll:LatLng = new LatLng((lg.latitude1 + lg.latitude2)/2, (lg.longitude1 + lg.longitude2)/2);
-			
-			var t:TooltipOverlay = new TooltipOverlay(ll, Common.kbsToString(lg.TotalBandwidth()));
-	  		t.addEventListener(MouseEvent.CLICK, function(e:Event):void {
-	            e.stopImmediatePropagation();
-	            main.pgHandler.map.viewLinkGroup(lg)
-	        });
-	        
-	  		main.map.addOverlay(t);
 	    }
 	    
 	    public function drawMap():void {
 	    	main.map.closeInfoWindow();
+	    	main.map.clearOverlays();
 	    	
 	    	main.setProgress("Drawing map",Common.waitColor);
 	    	
@@ -114,12 +188,19 @@ package pgmap
 	        	addMarker(g);
 	        }
 	        
-	        for each(var l:LinkGroup in main.pgHandler.Links.collection) {
-	        	if(!l.IsSameSite()) {
-	        		addLink(l);
-	        	}
+	        var drawSlice:Boolean = main.userResourcesOnly && main.selectedSlice != null && main.selectedSlice.status != null;
+	        if(drawSlice) {
+	        	for each(var pl:PointLink in main.selectedSlice.Links) {
+		        	addPointLink(pl);
+		        }
+	        } else {
+	        	for each(var l:LinkGroup in main.pgHandler.Links.collection) {
+		        	if(!l.IsSameSite()) {
+		        		addLink(l);
+		        	}
+		        }
 	        }
-	        
+
 	        main.fillCombobox();
 	        
 	        main.setProgress("Done", Common.successColor);

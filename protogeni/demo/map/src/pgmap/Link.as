@@ -35,6 +35,9 @@
 		public var uuid:String;
 		
 		[Bindable]
+		public var urn:String;
+		
+		[Bindable]
 		public var interface1:NodeInterface;
 		
 		[Bindable]
