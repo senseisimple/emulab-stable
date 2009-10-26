@@ -72,7 +72,14 @@ sub Lookup($$)
     my $idx;
     my $query_result;
 
-    if ($token =~ /^\d+$/) {
+    if (GeniHRN::IsValid($token)) {
+	return undef if !GeniHRN::Authoritative($token, "@OURDOMAIN@");
+
+	my ($authority, $type, $id) = GeniHRN::Parse($token);
+	return undef if $type ne "ticket";
+	$idx = $id;
+    }
+    elsif ($token =~ /^\d+$/) {
 	$idx = $token;
     }
     elsif ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
@@ -508,6 +515,9 @@ sub SetSlice($$)
     return 0;
 }
 
+#
+# Return the outstanding ticket for a slice.
+#
 sub SliceTicket($$)
 {
     my ($class, $slice) = @_;
