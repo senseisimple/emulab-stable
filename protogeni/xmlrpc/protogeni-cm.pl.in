@@ -37,7 +37,6 @@ my $MAINSITE 	   = @TBMAINSITE@;
 # Testbed libraries.
 use lib '@prefix@/lib';
 use GeniCM;
-use GeniCMV2;
 use Genixmlrpc;
 use libaudit;
 
@@ -155,16 +154,6 @@ my $responder = Frontier::Responder->new( "methods" => {
     "ListTickets"       => \&GeniCM::ListTickets,
     "ListHistory"       => \&GeniCM::ListHistory,
     "RenewSliver"	=> \&GeniCM::RenewSliver,
-
-    "GetVersionV2"        => \&GeniCMV2::GetVersion,
-    "ResolveV2"	          => \&GeniCMV2::Resolve,
-    "DiscoverResourcesV2" => \&GeniCMV2::DiscoverResources,
-    "CreateSliverV2"      => \&GeniCMV2::CreateSliver,
-    "DeleteSliverV2"      => \&GeniCMV2::DeleteSliver,
-    "GetSliverV2"         => \&GeniCMV2::GetSliver,
-    "ShutdownV2"          => \&GeniCMV2::Shutdown,
-    "SliverStatusV2"      => \&GeniCMV2::SliverStatus,
-    "RenewSliverV2"       => \&GeniCMV2::RenewSliver,
    },
 );
 
