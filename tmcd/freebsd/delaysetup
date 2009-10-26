@@ -151,6 +151,17 @@ if ($reinstall || $uninstall) {
 }
 
 #
+# Figure out the current clock rate
+#
+my $currenthz = 0;
+if ($FBSD_VERSION >= 6) {
+    $currenthz = `sysctl -n kern.clockrate 2>/dev/null`;
+    if ($currenthz =~ /hz = (\d+),/) {
+	$currenthz = int($1);
+    }
+}
+
+#
 # Update the delays configuration. Also run the the commands to make
 # the changes. Since a node cannot be doing delays and linkdelays at the
 # same time, try each and exit.
@@ -266,8 +277,9 @@ sub DelaySetup
 		print DEL "        ifconfig $if1 -polling\n";
 		print DEL "        ifconfig $if2 -polling\n";
 	    }
+	} else {
+	    print DEL "        sysctl -w kern.polling.enable=0\n";
 	}
-	print DEL "        sysctl -w kern.polling.enable=0\n";
 	print DEL "    fi\n";
 
 	print DEL "    exit 0\n";
@@ -413,6 +425,22 @@ sub DelaySetup
 		my (undef,$if1,$if2) = @$bridge;
 		print DEL "    ifconfig $if1 polling\n";
 		print DEL "    ifconfig $if2 polling\n";
+	    }
+
+	    #
+	    # Our kernel is running hot (10000HZ) so adjust some params.
+	    # XXX this check should be done in the generated shell script,
+	    # but I am too lazy to parse sysctl output with awk/sed and it
+	    # doesn't matter right now as we always rerun this perl wrapper
+	    # to produce the shell script.
+	    #
+	    if ($currenthz > 1000) {
+		print DEL "    # adjustments for kernel at $currenthz HZ\n";
+		# limit register accesses to 50 times a second
+		print DEL "    sysctl -w kern.polling.reg_frac=200\n";
+
+		# 80% of CPU can be used for polling activities
+		print DEL "    sysctl -w kern.polling.user_frac=80\n";
 	    }
 	} else {
 	    print DEL "    sysctl -w kern.polling.enable=1\n";
@@ -949,17 +977,15 @@ sub checkkernel($$)
     # before that, we had special kernels with hardwired HZ for delay nodes.
     #
     if ($FBSD_VERSION >= 6) {
-	my $hz = `sysctl -n kern.clockrate 2>/dev/null`;
-	if ($hz =~ /hz = (\d+),/) {
-	    $hz = int($1);
-	    if ($hz != $kernelhz) {
-		print STDOUT "Updating kernel HZ ($hz -> $kernelhz) ...\n";
+	if ($currenthz > 0) {
+	    if ($currenthz != $kernelhz) {
+		print STDOUT "Updating kernel HZ ($currenthz -> $kernelhz) ...\n";
 		#
 		# See if there is a custom Emulab command line setting.
 		# If so, warn and do not change.
 		#
 		my $binfo = `$BINDIR/tmcc bootwhat`;
-		if ($binfo =~ /HZ=(\d+)/ && int($1) == $hz) {
+		if ($binfo =~ /HZ=(\d+)/ && int($1) == $currenthz) {
 		    print "*** WARNING: custom HZ value on command line, ".
 			  "not changing to $kernelhz.\n";
 		    return 0;
