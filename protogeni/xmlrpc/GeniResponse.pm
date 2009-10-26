@@ -97,6 +97,24 @@ sub code($)		{ return field($_[0], "code"); }
 sub value($)		{ return field($_[0], "value"); }
 sub output($)		{ return field($_[0], "output"); }
 
+# Check for response object. Very bad, but the XML encoder does not
+# allow me to intercept the encoding operation on a blessed object.
+sub IsResponse($)
+{
+    my ($arg) = @_;
+    
+    return (ref($arg) eq "HASH" &&
+	    exists($arg->{'code'}) && exists($arg->{'value'}));
+}
+sub IsError($)
+{
+    my ($arg) = @_;
+    
+    return (ref($arg) eq "HASH" &&
+	    exists($arg->{'code'}) && exists($arg->{'value'}) &&
+	    $arg->{'code'} ne GENIRESPONSE_SUCCESS);
+}
+
 #
 # Stringify for output.
 #
@@ -110,10 +128,15 @@ sub Stringify($)
     return "[GeniResponse: code:$code, value:$value]";
 }
 
-sub MalformedArgsResponse($)
+sub MalformedArgsResponse($;$)
 {
-    return GeniResponse->Create(GENIRESPONSE_BADARGS,
-				undef, "Malformed arguments to method");
+    my (undef,$msg) = @_;
+    my $saywhat = "Malformed arguments";
+    
+    $saywhat .= ": $msg"
+	if (defined($msg));
+
+    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef, $saywhat);
 }
 
 sub BusyResponse($;$)
