@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2007 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2009 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -391,7 +391,6 @@ static void cleanup(int sig)
 int main (int argc, char **argv) {
 	pthread_t thread;
 	int sock;
-	struct protoent *proto;
 	struct sockaddr_in address;
 	struct in_addr ifaddr;
 	struct hostent *host;
@@ -789,9 +788,12 @@ int main (int argc, char **argv) {
 				 */
 				pthread_mutex_lock(&lib_lock);
 
-				fprintf(stderr, "Starting thread for %s(%d): %s",
-					name, interfaces, interface_names[interfaces]);
-				fflush(stderr);
+				if (debug) {
+					fprintf(stderr, "Starting thread for %s(%d): %s",
+						name, interfaces,
+						interface_names[interfaces]);
+					fflush(stderr);
+				}
 
 				args = (struct readpackets_args*)
 					malloc(sizeof(struct  readpackets_args));
@@ -897,6 +899,11 @@ int main (int argc, char **argv) {
 	    
 	    address_tuple_free(tuple);
 
+	    if (debug) {
+		    fprintf(stderr, "Starting thread for eventsys\n");
+		    fflush(stderr);
+	    }
+
 	    /*
 	     * We put the event system main loop into a new thread, since
 	     * we can't use the threaded API with linuxthreads
@@ -942,24 +949,33 @@ int main (int argc, char **argv) {
 			args->interval = filetime;
 			client_connected[i] = 1;
 			active = 1;
+			if (debug) {
+				fprintf(stderr, "Starting thread for %s\n",
+					filenames[i]);
+				fflush(stderr);
+			}
 			pthread_create(&thread,NULL,feedclient,args);
 			pthread_mutex_unlock(&lib_lock);
 			pthread_cond_broadcast(&cond);
 		}
 	}
 
+	if (debug) {
+		fprintf(stderr, "Creating listening socket...");
+		fflush(stderr);
+	}
+
 	/*
 	 * Create a socket to listen on, so that we can tell remote
 	 * applications about the counts we're getting.
 	 */
-	proto = getprotobyname("TCP");
-	sock = socket(AF_INET,SOCK_STREAM,proto->p_proto);
+	sock = socket(AF_INET, SOCK_STREAM, 0);
 	if (sock < 0) {
 		perror("Creating socket");
 		exit(1);
 	}
 
-	//i++;
+	i = 1;
 	if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &i, sizeof(int)) < 0)
 		perror("SO_REUSEADDR");
 
@@ -975,6 +991,11 @@ int main (int argc, char **argv) {
 	if (listen(sock,-1)) {
 		perror("Listening on socket");
 		exit(1);
+	}
+
+	if (debug) {
+		fprintf(stderr, "done\n");
+		fflush(stderr);
 	}
 
 	/*
@@ -1002,6 +1023,12 @@ int main (int argc, char **argv) {
 		action.sa_handler = onusr1;
 		sigaction(SIGUSR1, &action, NULL);
 #endif
+	}
+
+	if (debug) {
+		fprintf(stderr, "%ld: accepting connections\n",
+			(long)pthread_self());
+		fflush(stderr);
 	}
 
 	/*
@@ -1036,9 +1063,11 @@ int main (int argc, char **argv) {
 				}
 				if (++active == 1)
 					pthread_cond_broadcast(&cond);
-#if 0
-				printf("Now have %d clients\n", active);
-#endif
+				if (debug) {
+					fprintf(stderr,"Now have %d clients\n",
+						active);
+					fflush(stderr);
+				}
 				break;
 			}
 		}
@@ -1051,13 +1080,28 @@ int main (int argc, char **argv) {
 			fprintf(stderr,"Too many clients\n");
 			close(fd);
 		} else {
+			pthread_mutex_lock(&lib_lock);
+			if (debug) {
+				fprintf(stderr, "Starting thread for client\n");
+				fflush(stderr);
+			}
 			args = (struct feedclient_args*)
 				malloc(sizeof(struct feedclient_args));
 			args->fd = fd;
 			args->cli = i;
 			args->interval = 0;
 			pthread_create(&thread,NULL,feedclient,args);
+			pthread_mutex_unlock(&lib_lock);
 		}
+	}
+	if (debug) {
+		fprintf(stderr, "%ld: exiting", (long)pthread_self());
+		if (capture_mode && interfaces > 0)
+			fprintf(stderr,
+				" after waiting for %d packet readers",
+				interfaces);
+		fprintf(stderr, "\n");
+		fflush(stderr);
 	}
 	if (capture_mode) {
 		/*
@@ -1275,7 +1319,11 @@ void *feedclient(void *args) {
 			}
 			client_connected[cli] = 0;
 			active--;
-			/* printf("Now have %d clients\n", active); */
+			if (debug) {
+				fprintf(stderr, "Now have %d clients\n",
+					active);
+				fflush(stderr);
+			}
 			pthread_mutex_unlock(&lock);
 			/*
 			 * Client disconnected - exit the loop
@@ -1408,7 +1456,7 @@ void *readpackets_capturemode(void *args)
 
 	if (debug) {
 		fprintf(stderr, "%d/%ld: handling '%s'\n",
-			getpid(), pthread_self(), sargs->devname);
+			getpid(), (long)pthread_self(), sargs->devname);
 		fflush(stderr);
 	}
 
@@ -1471,7 +1519,8 @@ void *readpackets_capturemode(void *args)
 	npkt = 0;
 	while (!killme && !reload) {
 		if (debug > 1) {
-			fprintf(stderr, "%ld: %d pkts\n", pthread_self(), npkt);
+			fprintf(stderr, "%ld: %d pkts\n",
+				(long)pthread_self(), npkt);
 			fflush(stderr);
 		}
 		npkt = pcap_dispatch(dev, -1, dump_packet, (u_char *)sargs);
@@ -1487,7 +1536,7 @@ void *readpackets_capturemode(void *args)
 		pthread_mutex_lock(&lock);
 		fprintf(stderr,
 			"%ld: dispatch done, reload=%d, killme=%d\n",
-			pthread_self(), reload, killme);
+			(long)pthread_self(), reload, killme);
 		pthread_mutex_unlock(&lock);
 	}
 
@@ -1510,7 +1559,8 @@ void *readpackets_capturemode(void *args)
 
 		pthread_mutex_lock(&lock);
 
-		fprintf(stderr, "  %ld: reload=%d\n", pthread_self(), reload);
+		fprintf(stderr, "  %ld: reload=%d\n",
+			(long)pthread_self(), reload);
 		fflush(stderr);
 
 		reload--;
@@ -1524,7 +1574,7 @@ void *readpackets_capturemode(void *args)
 				pthread_cond_wait(&cond, &lock);
 			pthread_mutex_unlock(&lock);
 		}
-		fprintf(stderr, "  %ld: reload done\n", pthread_self());
+		fprintf(stderr, "  %ld: reload done\n", (long)pthread_self());
 		fflush(stderr);
 		goto again;
 	}
@@ -1541,7 +1591,7 @@ void dump_packet(u_char *args, const struct pcap_pkthdr *header,
 	struct readpackets_args *sargs = (struct readpackets_args*) args;
 	
 	if (debug > 1) {
-		fprintf(stderr, "%ld: got packet\n", pthread_self());
+		fprintf(stderr, "%ld: got packet\n", (long)pthread_self());
 		fflush(stderr);
 	}
 	if (!stop)
@@ -1774,7 +1824,7 @@ static void
 onusr1(int sig)
 {
 	if (debug > 1)
-		fprintf(stderr, "%ld: got USR1\n", pthread_self());
+		fprintf(stderr, "%ld: got USR1\n", (long)pthread_self());
 }
 
 static void
@@ -1804,15 +1854,14 @@ pthread_WAKEUPDAMIT(void)
  * variable before it starts
  */
 static void
-callback(event_handle_t handle,
-	         event_notification_t notification, void *data) {
-
+callback(event_handle_t handle, event_notification_t notification, void *data)
+{
 	char	objname[TBDB_FLEN_EVOBJNAME];
 	char	eventtype[TBDB_FLEN_EVEVENTTYPE];
 	char	objtype[TBDB_FLEN_EVOBJTYPE];
-	
-	printf("%d/%ld: received an event\n", getpid(), pthread_self());
-	fflush(stdout);
+
+	pthread_mutex_lock(&lib_lock);
+	printf("%d/%ld: received an event\n", getpid(), (long)pthread_self());
 	
 	event_notification_get_objtype(handle, notification,
 				       objtype, sizeof(objtype));
@@ -1839,6 +1888,8 @@ callback(event_handle_t handle,
 	    }
 	    printf("Event time started at UNIX time %lu.%lu\n",
 		    start_time.tv_sec, start_time.tv_usec);
+	    fflush(stdout);
+	    pthread_mutex_unlock(&lib_lock);
 	    return;
 	}
 	if (!strcmp(objtype,TBDB_OBJECTTYPE_LINKTRACE)) {
@@ -1878,26 +1929,30 @@ callback(event_handle_t handle,
 			if (capture_mode) {
 				int rc;
 				
+				if (debug) {
+					fprintf(stderr, "%ld: reload, waiting for %d threads\n",
+						(long)pthread_self(), interfaces);
+					fflush(stderr);
+				}
+
+				pthread_mutex_unlock(&lib_lock);
 				pthread_mutex_lock(&lock);
 				stop   = 1;
 				reload = interfaces;
-
-				fprintf(stderr,
-					"%ld: reload, waiting for %d threads\n",
-					pthread_self(), reload);
-				fflush(stderr);
-
 #ifdef MUST_WAKEUP_PCAP
 				pthread_WAKEUPDAMIT();
 #endif
 				while (reload)
 					pthread_cond_wait(&cond, &lock);
 				pthread_mutex_unlock(&lock);
+				pthread_mutex_lock(&lib_lock);
 
-				fprintf(stderr, "%ld: sending complete %d\n",
-					pthread_self(), reload_token);
-				fflush(stderr);
-
+				if (debug) {
+					fprintf(stderr,
+						"%ld: sending complete %d\n",
+						(long)pthread_self(), reload_token);
+					fflush(stderr);
+				}
 				rc = event_do(handle,
 					 EA_Experiment, pideid,
 					 EA_Type, TBDB_OBJECTTYPE_LINKTRACE,
@@ -1907,15 +1962,15 @@ callback(event_handle_t handle,
 					 EA_ArgInteger, "CTOKEN", reload_token,
 					 EA_TAG_DONE);
 
-				fprintf(stderr, "%ld: returned %d\n",
-					pthread_self(), rc);
-				fflush(stderr);
-				
+				if (debug) {
+					fprintf(stderr, "%ld: returned %d\n",
+						(long)pthread_self(), rc);
+					fflush(stderr);
+				}
 			}
 		}
-		return;
 	}
-	return;
+	pthread_mutex_unlock(&lib_lock);
 }
 
 /*
