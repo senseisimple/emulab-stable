@@ -3,8 +3,14 @@
 # Starts dropbear sshd.
 #
 
+DROPBEAR_RSA_KEY=/etc/dropbear/dropbear_rsa_key
+DROPBEAR_DSA_KEY=/etc/dropbear/dropbear_dss_key
+SSH_RSA_KEY=/etc/ssh/ssh_host_rsa_key
+SSH_DSA_KEY=/etc/ssh/ssh_host_dsa_key
+
 # Make sure the dropbearkey progam exists
 [ -f /usr/bin/dropbearkey ] || exit 0
+[ -f /usr/bin/dropbearconvert ] || exit 0
 
 start() {
  	echo -n "Starting dropbear sshd: "
@@ -12,17 +18,33 @@ start() {
 	if [ ! -d /etc/dropbear ] ; then
 		mkdir -p /etc/dropbear
 	fi
-	# Check for the Dropbear RSA key
-	if [ ! -f /etc/dropbear/dropbear_rsa_host_key ] ; then
-		echo -n "generating rsa key... "
-		/usr/bin/dropbearkey -t rsa -f /etc/dropbear/dropbear_rsa_host_key > /dev/null 2>&1
+
+	# Check for an OpenSSH v2 RSA key and convert it.  If not present, generate a
+	# new key
+	if ! [ -f $DROPBEAR_RSA_KEY ]; then
+		if [ -f $SSH_RSA_KEY ]; then
+			echo -n "converting OpenSSH RSA key... "
+			/usr/bin/dropbearconvert openssh dropbear $SSH_RSA_KEY \
+				$DROPBEAR_RSA_KEY > /dev/null 2>&1
+		else
+			echo -n "generating rsa key... "
+			/usr/bin/dropbearkey -t rsa -f $DROPBEAR_RSA_KEY > /dev/null 2>&1
+		fi
 	fi
 
-	# Check for the Dropbear DSS key
-	if [ ! -f /etc/dropbear/dropbear_dss_host_key ] ; then
-		echo -n "generating dsa key... "
-		/usr/bin/dropbearkey -t dss -f /etc/dropbear/dropbear_dss_host_key > /dev/null 2>&1
+	# Check for an OpenSSH v2 DSA key and convert it.  If not present, generate a
+	# new key
+	if ! [ -f $DROPBEAR_DSA_KEY ]; then
+		if [ -f $SSH_DSA_KEY ]; then
+			echo -n "converting OpenSSH DSA key... "
+			/usr/bin/dropbearconvert openssh dropbear $SSH_DSA_KEY \
+				$DROPBEAR_DSA_KEY > /dev/null 2>&1
+		else
+			echo -n "generating dss key... "
+			/usr/bin/dropbearkey -t dss -f $DROPBEAR_DSA_KEY > /dev/null 2>&1
+		fi
 	fi
+
 	umask 077
 	start-stop-daemon -S -q -p /var/run/dropbear.pid --exec /usr/sbin/dropbear
 	echo "OK"
