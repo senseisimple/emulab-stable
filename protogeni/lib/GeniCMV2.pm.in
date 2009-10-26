@@ -146,6 +146,85 @@ sub Resolve($)
 
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
     }
+    if ($type eq "slice") {
+	my $slice = GeniSlice->Lookup($urn);
+	if (!defined($slice)) {
+	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED,
+					undef, "Nothing here by that name");
+	}
+	#
+	# In this implementation, the caller must hold a valid slice
+	# credential for the slice being looked up. 
+	#
+	if ($slice->uuid() ne $credential->target_uuid()) {
+	    return GeniResponse->Create(GENIRESPONSE_FORBIDDEN());
+	}
+	# Return a blob.
+	my $blob = { "urn"          => $urn };
+
+	my $aggregate = GeniAggregate->SliceAggregate($slice);
+	if (defined($aggregate)) {
+	    $blob->{'sliver_urn'} =
+		GeniHRN::Generate($OURDOMAIN, "sliver", $aggregate->idx());
+	}
+	my $ticket = GeniTicket->SliceTicket($slice);
+	if (defined($ticket)) {
+	    $blob->{'ticket_urn'} =
+		GeniHRN::Generate($OURDOMAIN, "ticket", $ticket->idx());
+	}
+	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
+    }
+    if ($type eq "sliver") {
+	my $aggregate = GeniAggregate->Lookup($urn);
+	if (!defined($aggregate)) {
+	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED,
+					undef, "Nothing here by that name");
+	}
+	#
+	# In this implementation, the caller must hold a valid slice
+	# or sliver credential for the slice being looked up. 
+	#
+	if (! ($aggregate->uuid() eq $credential->target_uuid() ||
+	       $aggregate->slice_uuid() eq $credential->target_uuid())) {
+	    return GeniResponse->Create(GENIRESPONSE_FORBIDDEN);
+	}
+	my $manifest = $aggregate->GetManifest();
+	if (!defined($aggregate)) {
+	    return GeniResponse->Create(GENIRESPONSE_ERROR);
+	}
+	# Return a blob.
+	my $blob = { "urn"          => $urn,
+		     "manifest"     => $manifest,
+		 };
+	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
+    }
+    if ($type eq "ticket") {
+	my $ticket = GeniTicket->Lookup($urn);
+	if (!defined($ticket)) {
+	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED,
+					undef, "Nothing here by that name");
+	}
+	#
+	# In this implementation, the caller must hold a valid slice
+	# or sliver credential to get the ticket.
+	#
+	my $slice = GeniSlice->Lookup($ticket->slice_uuid());
+	if (!defined($slice)) {
+	    print STDERR "Could not find slice for $ticket\n";
+	    return GeniResponse->Create(GENIRESPONSE_ERROR);
+	}
+	if ($slice->uuid() ne $credential->target_uuid()) {
+	    #
+	    # See if its the sliver credential. 
+	    #
+	    my $aggregate = GeniAggregate->SliceAggregate($slice);
+	    if (!defined($aggregate) ||
+		$aggregate->uuid() ne $credential->target_uuid()) {
+		return GeniResponse->Create(GENIRESPONSE_FORBIDDEN());
+	    }
+	}
+	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $ticket->asString());
+    }
     return GeniResponse->Create(GENIRESPONSE_UNSUPPORTED, undef,
 				"Cannot resolve $type at this authority");
 }
