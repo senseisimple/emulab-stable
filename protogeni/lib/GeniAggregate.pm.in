@@ -29,6 +29,9 @@ use Data::Dumper;
 use English;
 use overload ('""' => 'Stringify');
 use XML::Simple;
+use POSIX qw(strftime);
+use Time::Local;
+use Date::Parse;
 
 # Configure variables
 my $TB		   = "@prefix@";
@@ -56,7 +59,14 @@ sub Lookup($$)
     my $query_result;
     my $idx;
 
-    if ($token =~ /^\d+$/) {
+    if (GeniHRN::IsValid($token)) {
+	return undef if !GeniHRN::Authoritative($token, "@OURDOMAIN@");
+
+	my ($authority, $type, $id) = GeniHRN::Parse($token);
+	return undef if $type ne "sliver";
+	$idx = $id;
+    }
+    elsif ($token =~ /^\d+$/) {
 	$idx = $token;
     }
     elsif ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
@@ -512,6 +522,54 @@ sub NewCredential($$)
 	return undef;
     }
     return $credential;
+}
+
+#
+# Get the manifest for an aggregate. Returns the XML string.
+#
+sub GetManifest($)
+{
+    my ($self) = @_;
+
+    return undef
+	if (! ref($self));
+
+    my $slice      = $self->GetSlice();
+    return undef
+	if (!defined($slice));
+    my $slice_uuid = $slice->uuid();
+
+    my $query_result =
+	DBQueryWarn("select manifest from geni_manifests ".
+		    "where slice_uuid='$slice_uuid'");
+    
+    if (!$query_result || !$query_result->numrows) {
+	print STDERR "GetManifest: Could not locate manifest for $self\n";
+	return undef;
+    }
+    my ($xml) = $query_result->fetchrow_array();
+
+    my $manifest =
+	eval { XMLin($xml, KeyAttr => [],
+		     ForceArray => ["node", "link", "interface",
+				    "interface_ref", "linkendpoints"]) };
+    if ($@) {
+	print STDERR "XMLin error reading manifest: $@\n";
+	return undef;
+    }
+    #
+    # Update the manifest ticket to reflect the current expiration time.
+    #
+    $manifest->{'valid_until'} =
+	POSIX::strftime("20%y-%m-%dT%H:%M:%S",
+			gmtime(str2time($slice->expires())));
+
+    $xml = eval { XMLout($manifest, "NoAttr" => 1, RootName => "manifest") };
+    if ($@) {
+	print STDERR "XMLout error on manifest: $@\n";
+	return undef;
+    }
+    return $xml;
 }
 
 #
