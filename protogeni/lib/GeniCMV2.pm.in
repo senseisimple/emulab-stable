@@ -32,6 +32,7 @@ use GeniSliver;
 use GeniUser;
 use GeniRegistry;
 use GeniUtil;
+use GeniCM;
 use GeniHRN;
 use libtestbed qw(SENDMAIL);
 use emutil;
@@ -51,7 +52,6 @@ use POSIX qw(strftime tmpnam);
 use Time::Local;
 use Experiment;
 use VirtExperiment;
-use Firewall;
 use Compress::Zlib;
 use MIME::Base64;
 
@@ -100,8 +100,54 @@ sub GetVersion()
 sub Resolve($)
 {
     my ($argref) = @_;
+    my $credentials = $argref->{'credentials'};
+    my $urn         = $argref->{'urn'};
 
-    return GeniResponse->Create(GENIRESPONSE_UNSUPPORTED);
+    if (! (defined($credentials) && defined($urn))) {
+	return GeniResponse->MalformedArgsResponse("Missing arguments");
+    }
+    if (! GeniHRN::IsValid($urn)) {
+	return GeniResponse->MalformedArgsResponse("Invalid URN");
+    }
+    my $credential = CheckCredentials($credentials);
+    return $credential
+	if (GeniResponse::IsResponse($credential));
+
+    # The URN encodes the type.
+    my ($auth,$type,$id) = GeniHRN::Parse($urn);
+    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				"Authority mismatch")
+	if ($auth ne $OURDOMAIN);
+    $type = lc($type);
+    
+    if ($type eq "node") {
+	my $node = GeniCM::LookupNode($urn);
+	if (! defined($node)) {
+	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED,
+					undef, "Nothing here by that name");
+	}
+	my $rspec = GeniCM::GetAdvertisement(0, $node->node_id());
+	if (! defined($rspec)) {
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					"Could not start avail");
+	}
+	# Return a blob.
+	my $blob = { "hrn"          => "${PGENIDOMAIN}." . $node->node_id(),
+		     "uuid"         => $node->uuid(),
+		     "role"	    => $node->role(),
+		     "hostname"     => $node->node_id() . ".${OURDOMAIN}",
+		     "physctrl"     => 
+			 Interface->LookupControl($node->phys_nodeid())->IP(),
+		     "urn"          => GeniHRN::Generate($OURDOMAIN,
+							 "node",
+							 $node->node_id()),
+		     "rspec"        => $rspec
+		   };
+
+	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
+    }
+    return GeniResponse->Create(GENIRESPONSE_UNSUPPORTED, undef,
+				"Cannot resolve $type at this authority");
 }
 
 #
@@ -110,8 +156,18 @@ sub Resolve($)
 sub DiscoverResources($)
 {
     my ($argref) = @_;
+    my $credentials = $argref->{'credentials'};
+    my $available   = $argref->{'available'} || 0;
+    my $compress    = $argref->{'compress'} || 0;
 
-    return GeniResponse->Create(GENIRESPONSE_UNSUPPORTED);
+    if (! (defined($credentials))) {
+	return GeniResponse->MalformedArgsResponse("Missing arguments");
+    }
+    my $credential = CheckCredentials($credentials);
+    return $credential
+	if (GeniResponse::IsResponse($credential));
+
+    return GeniCM::DiscoverResourcesAux($available, $compress);
 }
 
 #
@@ -120,8 +176,70 @@ sub DiscoverResources($)
 sub CreateSliver($)
 {
     my ($argref) = @_;
+    my $slice_urn    = $argref->{'slice_urn'};
+    my $rspecstr     = $argref->{'rspec'};
+    my $credentials  = $argref->{'credentials'};
+    my $keys         = $argref->{'keys'};
+    my $impotent     = $argref->{'impotent'} || 0;
+    
+    # For now, I am not worrying about the slice_urn argument.
+    if (! (defined($credentials) && defined($rspecstr))) {
+	return GeniResponse->MalformedArgsResponse("Missing arguments");
+    }
+    my $credential = CheckCredentials($credentials);
+    return $credential
+	if (GeniResponse::IsResponse($credential));
 
-    return GeniResponse->Create(GENIRESPONSE_UNSUPPORTED);
+    my $rspec = GeniCM::GetTicketAux($credential,
+				     $rspecstr, 0, $impotent, 1, undef);
+    return $rspec
+	if (GeniResponse::IsResponse($rspec));
+
+    my $response = GeniCM::SliverWorkAux($credential,
+					 $rspec, $keys, 0, $impotent, 1);
+    
+    if (GeniResponse::IsError($response)) {
+	#
+	# We have to make sure there is nothing left over since there
+	# is no actual ticket, so the resources will not get cleaned
+	# up by the daemon. This is mostly cause I am reaching into
+	# the V1 code, and its messy.
+	#
+	my $slice = GeniSlice->Lookup($credential->target_uuid());
+	if ($slice->Lock() != 0) {
+	    print STDERR "CreateSliver: Could not lock $slice before delete\n";
+	    return $response;
+	}
+	if (defined($slice)) {
+	    GeniCM::CleanupDeadSlice($slice, 1);
+	}
+    }
+    #
+    # Leave the slice intact on error, so we can go look at it. 
+    #
+    my $slice = GeniSlice->Lookup($credential->target_uuid());
+    if (!defined($slice)) {
+	print STDERR "CreateSliver: Could not find slice for $credential\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Internal Error");
+    }
+    if ($slice->Lock() != 0) {
+	print STDERR "CreateSliver: Could not lock $slice before start\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Internal Error");
+    }
+    my $aggregate = GeniAggregate->SliceAggregate($slice);
+    if (!defined($aggregate)) {
+	print STDERR "CreateSliver: Could not find aggregate for $slice\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Internal Error");
+    }
+    if ($aggregate->Start() != 0) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not start sliver");
+    }
+    $slice->UnLock();
+    return $response;
 }
 
 #
@@ -130,8 +248,19 @@ sub CreateSliver($)
 sub DeleteSliver($)
 {
     my ($argref) = @_;
+    my $slice_urn    = $argref->{'slice_urn'};
+    my $credentials  = $argref->{'credentials'};
+    my $impotent     = $argref->{'impotent'} || 0;
 
-    return GeniResponse->Create(GENIRESPONSE_UNSUPPORTED);
+    # For now, I am not worrying about the slice_urn argument.
+    if (! (defined($credentials))) {
+	return GeniResponse->MalformedArgsResponse("Missing arguments");
+    }
+    my $credential = CheckCredentials($credentials);
+    return $credential
+	if (GeniResponse::IsResponse($credential));
+
+    return GeniCM::DeleteSliverAux($credential, $impotent, 1);
 }
 
 #
@@ -140,8 +269,18 @@ sub DeleteSliver($)
 sub GetSliver($)
 {
     my ($argref) = @_;
+    my $slice_urn    = $argref->{'slice_urn'};
+    my $credentials  = $argref->{'credentials'};
 
-    return GeniResponse->Create(GENIRESPONSE_UNSUPPORTED);
+    # For now, I am not worrying about the slice_urn argument.
+    if (! (defined($credentials))) {
+	return GeniResponse->MalformedArgsResponse("Missing arguments");
+    }
+    my $credential = CheckCredentials($credentials);
+    return $credential
+	if (GeniResponse::IsResponse($credential));
+
+    return GeniCM::GetSliverAux($credential);
 }
 
 #
@@ -150,8 +289,123 @@ sub GetSliver($)
 sub SliverStatus($)
 {
     my ($argref) = @_;
+    my $slice_urn    = $argref->{'slice_urn'};
+    my $credentials  = $argref->{'credentials'};
+    my $aggregate;
 
-    return GeniResponse->Create(GENIRESPONSE_UNSUPPORTED);
+    # For now, I am not worrying about the slice_urn argument.
+    if (! (defined($credentials))) {
+	return GeniResponse->MalformedArgsResponse("Missing arguments");
+    }
+    my $credential = CheckCredentials($credentials);
+    return $credential
+	if (GeniResponse::IsResponse($credential));
+
+    $credential->HasPrivilege( "pi" ) or
+	$credential->HasPrivilege( "info" ) or
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+				    "Insufficient privilege");
+
+    #
+    # For now, only allow top level aggregate or the slice
+    #
+    my $slice = GeniSlice->Lookup($credential->target_uuid());
+    if (!defined($slice)) {
+	$aggregate = GeniAggregate->Lookup($credential->target_uuid());
+	if (!defined($aggregate)) {
+	    my $sliver = GeniSliver->Lookup($credential->target_uuid());
+	    if (defined($sliver)) {
+		return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+					    "Must supply toplevel sliver");
+	    }
+	    else {
+		return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+					    "No such sliver");
+	    }
+	}
+	elsif ($aggregate->type() ne "Aggregate") {
+	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+					"Must supply toplevel sliver");
+	}
+	my $slice_uuid = $aggregate->slice_uuid();
+	$slice = GeniSlice->Lookup($slice_uuid);
+	if (!defined($slice)) {
+	    print STDERR "SliverStatus: No slice for $aggregate\n";
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					"Internal Error");
+	}
+    }
+    else {
+	$aggregate = GeniAggregate->SliceAggregate($slice);
+	if (!defined($aggregate)) {
+	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+					"No aggregate for slice");
+	}
+    }
+    if ($slice->Lock() != 0) {
+	return GeniResponse->BusyResponse();
+    }
+
+    #
+    # Grab all the slivers for this slice, and then
+    # look for just the nodes.
+    #
+    my $blob = {
+	"state"   => "started",
+	"status"  => "ready",
+	"details" => {},
+    };
+    my @slivers    = ();
+    if ($aggregate->SliverList(\@slivers) != 0) {
+	print STDERR "SliverStatus: Could not get slivers for $aggregate\n";
+	$slice->UnLock();
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
+    }
+    foreach my $sliver (@slivers) {
+	next
+	    if ($sliver->isa("GeniAggregate"));
+	next
+	    if ($sliver->resource_type() ne "Node");
+
+	my $node_uuid = $sliver->uuid();
+	my $node = GeniCM::LookupNode($node_uuid);
+	if (!defined($node)) {
+	    $slice->UnLock();
+	    print STDERR "SliverStatus: Cannot find node by uuid $node_uuid\n";
+	    return GeniResponse->Create(GENIRESPONSE_ERROR);
+	}
+	my $urn = GeniHRN::Generate($OURDOMAIN, "sliver", $node->node_id());
+	my $state  = "started";
+	my $status = "unknown";
+	my $error  = "";
+	
+	if ($node->IsUp()) {
+	    $status = "ready";
+	}
+	elsif ($node->eventstate() eq TBDB_NODESTATE_TBFAILED()) {
+	    $status = "failed";
+	    $blob->{'status'} = "failed";
+
+	    my $bootlog;
+	    my $nodeid = $node->node_id();
+	    if ($node->GetBootLog(\$bootlog) == 0) {
+		$error = $bootlog;
+	    }
+	}
+	else {
+	    $status = "notready";
+	    # Set to notready unless something already failed. 
+	    $blob->{'status'} = "notready"
+		if ($blob->{'status'} ne "failed");
+	}
+	$blob->{'details'}->{$urn} = {
+	    "state"  => $state,
+	    "status" => $status,
+	    "error"  => $error,
+	};
+    }
+    $slice->UnLock();
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
 }
 
 #
@@ -160,8 +414,19 @@ sub SliverStatus($)
 sub Shutdown($)
 {
     my ($argref) = @_;
+    my $slice_urn    = $argref->{'slice_urn'};
+    my $clear        = $argref->{'clear'} || 0;
+    my $credentials  = $argref->{'credentials'};
 
-    return GeniResponse->Create(GENIRESPONSE_UNSUPPORTED);
+    # For now, I am not worrying about the slice_urn argument.
+    if (! (defined($credentials))) {
+	return GeniResponse->MalformedArgsResponse("Missing arguments");
+    }
+    my $credential = CheckCredentials($credentials);
+    return $credential
+	if (GeniResponse::IsResponse($credential));
+
+    return GeniCM::ShutdownAux($credential, $clear);
 }
 
 #
@@ -170,8 +435,46 @@ sub Shutdown($)
 sub RenewSliver($)
 {
     my ($argref) = @_;
+    my $slice_urn    = $argref->{'slice_urn'};
+    my $valid_until  = $argref->{'valid_until'};
+    my $credentials  = $argref->{'credentials'};
 
-    return GeniResponse->Create(GENIRESPONSE_UNSUPPORTED);
+    # For now, I am not worrying about the slice_urn argument.
+    if (! (defined($credentials))) {
+	return GeniResponse->MalformedArgsResponse("Missing arguments");
+    }
+    my $credential = CheckCredentials($credentials);
+    return $credential
+	if (GeniResponse::IsResponse($credential));
+
+    return GeniCM::RenewSliverAux($credential, $valid_until);
+}
+
+#
+# Initial credential check.
+#
+sub CheckCredentials($)
+{
+    my @credentials = @{ $_[0] };
+
+    if (scalar(@credentials) != 1) {
+	return
+	    GeniResponse->MalformedArgsResponse("Wrong number of credentials");
+    }
+    my $credential = GeniCredential->CreateFromSigned($credentials[0]);
+    if (!defined($credential)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not create credential object");
+    }
+    #
+    # Make sure the credential was issued to the caller, but no special
+    # permission required to resolve component resources.
+    #
+    if ($credential->owner_uuid() ne $ENV{'GENIUUID'}) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "This is not your credential");
+    }
+    return $credential;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...
