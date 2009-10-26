@@ -508,6 +508,24 @@ sub SetSlice($$)
     return 0;
 }
 
+sub SliceTicket($$)
+{
+    my ($class, $slice) = @_;
+
+    my $slice_uuid = $slice->uuid();
+
+    my $query_result =
+	DBQueryWarn("select idx from geni_tickets ".
+		    "where slice_uuid='$slice_uuid'");
+    return undef
+	if (!$query_result);
+    return undef
+	if ($query_result->numrows != 1);
+
+    my ($idx) = $query_result->fetchrow_array();
+    return GeniTicket->Lookup($idx);
+}
+
 #
 # Return the rspec in XML for the ticket.
 #
