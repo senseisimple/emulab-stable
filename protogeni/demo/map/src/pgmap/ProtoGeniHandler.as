@@ -14,7 +14,11 @@
  
  package pgmap
 {
+	import flash.events.Event;
+	import flash.utils.Dictionary;
+	
 	import mx.collections.ArrayCollection;
+	import mx.controls.Alert;
 	import mx.managers.PopUpManager;
 	
 	public class ProtoGeniHandler
@@ -84,18 +88,84 @@
    			//rspecView.loadXml(node.rspec);
 		}
 	    
+	    private static var NODE_PARSE : int = 0;
+	    private static var LINK_PARSE : int = 1;
+	    private static var DONE : int = 2;
+	    
+	    private static var MAX_WORK : int = 60;
+	    
+	    private var myAfter:Function;
+	    private var myIndex:int;
+	    private var myState:int = NODE_PARSE;
+	    private var locations:XMLList;
+	    private var links:XMLList;
+	    private var interfaceDictionary:Dictionary;
+	    
 	    public function processRspec(afterCompletion : Function):void {
+	    	main.setProgress("Parsing RSPEC", Common.waitColor);
+	    	main.startWaiting();
+	    	
 	    	namespace rsync01namespace = "http://www.protogeni.net/resources/rspec/0.1"; 
 	        use namespace rsync01namespace; 
 	        
-	       // main.console.appendText(String(rspec.toXMLString()) + "\n");
-	        main.console.appendText("Processing RSPEC...\n");
+	    	myAfter = afterCompletion;
+	    	myIndex = 0;
+	    	myState = NODE_PARSE;
+	    	locations = rpc.Rspec.node.location;
+	    	links = rpc.Rspec.link;
+	    	interfaceDictionary = new Dictionary();
+	    	main.stage.addEventListener(Event.ENTER_FRAME, parseNext);
+	    }
+	    
+	    private function parseNext(event : Event) : void
+	    {
+			if (myState == NODE_PARSE)	    	
+			{
+	    		//main.setProgress("Parsing " + (locations.length() - myIndex) + " more nodes", Common.waitColor);
+				parseNextNode();
+			}
+			else if (myState == LINK_PARSE)
+			{
+	    		//main.setProgress("Parsing " + (links.length() - myIndex) + " more links", Common.waitColor);
+				parseNextLink();
+			}
+			else if (myState == DONE)
+			{
+				main.setProgress("Done", Common.successColor);
+	    		main.stopWaiting();
+	    		interfaceDictionary = null;
+				Common.Main().stage.removeEventListener(Event.ENTER_FRAME, parseNext);
+				myAfter();
+			}
+			else
+			{
+				main.setProgress("Fail", Common.failColor);
+	    		main.stopWaiting();
+	    		interfaceDictionary = null;
+				Common.Main().stage.removeEventListener(Event.ENTER_FRAME, parseNext);
+				Alert.show("Problem parsing RSPEC");
+				// Throw exception
+			}
+	    }
+	    
+	    private function parseNextNode():void {
+	    	namespace rsync01namespace = "http://www.protogeni.net/resources/rspec/0.1"; 
+	        use namespace rsync01namespace; 
 	        
-	        // Process nodes
-	        var locations:XMLList = rpc.Rspec.node.location;
-	        
-	        // Process nodes, combining same locations
-	        for each(var location:XML in locations) {
+	        var idx:int;
+	        for(idx = 0; idx < MAX_WORK; idx++) {
+	        	var fullIdx:int = myIndex + idx;
+	        	//main.console.appendText("idx:" + idx.toString() + " full:" + fullIdx.toString());
+	        	if(fullIdx == locations.length()) {
+	        		myState = LINK_PARSE;
+	        		myIndex = 0;
+	        		//main.console.appendText("...finished nodes\n");
+	        		return;
+	        	}
+	        	//main.console.appendText("parsing...");
+	        	main.console.appendText(fullIdx.toString());
+	        	var location:XML = locations[fullIdx];
+	        	
 	        	var lat:Number = Number(location.@latitude);
 	        	var lng:Number = Number(location.@longitude);
 	        	
@@ -119,6 +189,7 @@
 	        			var i:NodeInterface = new NodeInterface(n);
 	        			i.id = ix.@component_id;
 	        			n.interfaces.Add(i);
+	        			interfaceDictionary[i.id] = i;
 	        		} else if(ix.localName() == "node_type") {
 	        			var t:NodeType = new NodeType();
 	        			t.name = ix.@type_name;
@@ -130,17 +201,36 @@
 	        	
 	        	n.rspec = p.copy();
 	        	ng.Add(n);
+	        	
+	        	//main.console.appendText("done\n");
 	        }
+	        myIndex += idx;
+	    }
+	    
+	    private function parseNextLink():void {
+	    	namespace rsync01namespace = "http://www.protogeni.net/resources/rspec/0.1"; 
+	        use namespace rsync01namespace; 
 	        
-	        // Process links
-	        var links:XMLList = rpc.Rspec.link;
-	        for each(var link:XML in links) {
+	        var idx:int;
+	        for(idx = 0; idx < MAX_WORK; idx++) {
+	        	var fullIdx:int = myIndex + idx;
+	        	//main.console.appendText("idx:" + idx.toString() + " full:" + fullIdx.toString());
+	        	if(fullIdx == links.length()) {
+	        		myState = DONE;
+	        		//main.console.appendText("...finished links\n");
+	        		return;
+	        	}
+	        	//main.console.appendText("parsing...");
+	        	var link:XML = links[fullIdx];
+	        	
 	        	var interfaces:XMLList = link.interface_ref;
 	        	var interface1:String = interfaces[0].@component_interface_id
-	        	var ni1:NodeInterface = Nodes.GetInterfaceByID(interface1);
+	        	//var ni1:NodeInterface = Nodes.GetInterfaceByID(interface1);
+	        	var ni1:NodeInterface = interfaceDictionary[interface1];
 	        	if(ni1 != null) {
 	        		var interface2:String = interfaces[1].@component_interface_id;
-		        	var ni2:NodeInterface = Nodes.GetInterfaceByID(interface2);
+		        	//var ni2:NodeInterface = Nodes.GetInterfaceByID(interface2);
+	        		var ni2:NodeInterface = interfaceDictionary[interface2];
 		        	if(ni2 != null) {
 		        		var lg:LinkGroup = Links.Get(ni1.owner.GetLatitude(), ni1.owner.GetLongitude(), ni2.owner.GetLatitude(), ni2.owner.GetLongitude());
 		        		if(lg == null) {
@@ -171,10 +261,10 @@
 		        		}
 		        	}
 	        	}
+	        	
+	        	//main.console.appendText("done\n");
 	        }
-	        
-	        if(afterCompletion != null)
-				afterCompletion();
+	        myIndex += idx;
 	    }
 	}
 }

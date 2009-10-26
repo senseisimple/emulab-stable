@@ -226,12 +226,9 @@
 	      		Rspec = new XML(response.value);
 	      	
 	      	//var d1:Date = new Date();
-	        main.pgHandler.processRspec(null);
+	        main.pgHandler.processRspec(startResolveUser);
 	        //var d2:Date = new Date();
 	        //Alert.show((d2.time - d1.time).toString());
-	        
-	        // ADD INTERMEDIATE CALL TO GET USER, THEN ...
-	        startResolveUser();
 	      }
 	      else
 	      {

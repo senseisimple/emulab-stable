@@ -35,6 +35,37 @@
 				
 				loadEndpoints();
 				loadStartpoints();
+				loadSlices();
+			}
+			
+			public function loadSlices():void {
+				slicesVbox.removeAllChildren();
+				if(node.slice != null) {
+					var slice:Label = new Label();
+					slice.text = node.slice.hrn;
+					slicesVbox.addChild(slice);
+					
+					for each(var pl:PointLink in node.slice.Links) {
+						var endNode:Node;
+						if(pl.node1 == node)
+							endNode = pl.node2;
+						else if(pl.node2 == node)
+							endNode = pl.node1;
+						else
+							continue;
+						
+						var pointLinkHbox:HBox = new HBox();
+						var space:Spacer = new Spacer();
+						space.width = 16;
+						pointLinkHbox.addChild(space);
+						pointLinkHbox.addChild(Common.getNodeButton(endNode));
+						slicesVbox.addChild(pointLinkHbox);
+					}
+				} else {
+					var noSlice:Label = new Label();
+					noSlice.text = "N/A";
+					slicesVbox.addChild(noSlice);
+				}
 			}
 			
 			public function loadStartpoints():void {
@@ -266,6 +297,8 @@
 								<mx:VBox label="Endpoint" width="100%" height="100%" id="linksEndpointVbox">
 								</mx:VBox>
 								<mx:VBox label="Startpoint" width="100%" height="100%" id="linksStartpointVbox">
+								</mx:VBox>
+								<mx:VBox label="Slice" width="100%" height="100%" id="slicesVbox">
 								</mx:VBox>
 							</mx:TabNavigator>
 					</mx:GridItem>

@@ -9,6 +9,7 @@
 	
 	<mx:Script>
     <![CDATA[
+    	import mx.events.ListEvent;
     	import mx.events.CollectionEvent;
     	import mx.collections.ArrayCollection;
 
@@ -144,10 +145,9 @@
 	    	return s.DisplayString();
 	    }
 	    
-	    public function sliceSelected():void {
-	    	selectedSlice = slicesCombobox.selectedItem as Slice;
-	    	
-			pgHandler.map.drawMap();
+	    public function sliceSelected(evt:ListEvent):void {
+	    	selectedSlice = evt.currentTarget.selectedItem;
+	    	pgHandler.map.drawMap();
 	    }
 	    
 	    // Google maps
@@ -178,7 +178,7 @@
 	        
 	    private function onMapReady(event:Event):void {
 	    	map.addControl(new ZoomControl());
-			map.addControl(new PositionControl());
+			//map.addControl(new PositionControl());
 			map.addControl(new MapTypeControl());
 			
 			map.enableScrollWheelZoom();
@@ -230,7 +230,7 @@
 			click="viewRspec()" 
 			toolTip="View the most recent RSpec"/>
 		<mx:VRule height="14"/>
-		<mx:ComboBox id="slicesCombobox" dataProvider="{slicesMenu}" labelFunction="getSliceLabel" change="sliceSelected()"></mx:ComboBox>
+		<mx:ComboBox id="slicesCombobox" dataProvider="{slicesMenu}" labelFunction="getSliceLabel" change="sliceSelected(event)"></mx:ComboBox>
 		<mx:CheckBox label="Only my resources" id="onlyMyResourcesCheckbox" click="userResourcesOnly = onlyMyResourcesCheckbox.selected; pgHandler.map.drawMap()"/>
 		<mx:Spacer width="100%"/>
 		<mx:Label text="Initialized" id="progressLabel"  fontStyle="normal" fontWeight="bold"/>

@@ -16,6 +16,7 @@ import flash.filters.DropShadowFilter;
 import flash.geom.Point;
 import flash.text.TextField;
 import flash.text.TextFieldAutoSize;
+import flash.text.TextFormat;
 
 public class TooltipOverlay extends OverlayBase {
   private var latLng:LatLng;
@@ -38,7 +39,10 @@ public class TooltipOverlay extends OverlayBase {
   }
   
   private function onOverlayAdded(event:MapEvent):void {
+    var textFormat:TextFormat = new TextFormat();
+    textFormat.size = 15;
     this.textField = new TextField();
+    this.textField.defaultTextFormat = textFormat;
     this.textField.text = this.label;
     this.textField.selectable = false;
     this.textField.border = true;
@@ -47,8 +51,8 @@ public class TooltipOverlay extends OverlayBase {
     this.textField.multiline = false;
     this.textField.autoSize = TextFieldAutoSize.CENTER;
     this.textField.backgroundColor = 0xFFCFD1;
-    this.textField.mouseEnabled  =false;
-    this.textField.filters = [new DropShadowFilter()];   
+    this.textField.mouseEnabled = false;
+    this.textField.filters = [new DropShadowFilter()];
     
     button = new Sprite();
 	button.buttonMode=true;

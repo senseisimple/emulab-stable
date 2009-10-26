@@ -53,7 +53,7 @@ package pgmap
 			      	new MarkerOptions({
 			                  strokeStyle: new StrokeStyle({color: 0x092B9F}),
 			                  fillStyle: new FillStyle({color: 0xD2E1F0, alpha: 1}),
-			                  radius: 12,
+			                  radius: 14,
 			                  hasShadow: true,
 			                  //tooltip: g.country,
 			                  label: drawGroup.collection.length.toString()
@@ -176,6 +176,10 @@ package pgmap
 				}));
 
 			main.map.addOverlay(polyline);
+	    }
+	    
+	    public function drawAll():void {
+	    	
 	    }
 	    
 	    public function drawMap():void {
