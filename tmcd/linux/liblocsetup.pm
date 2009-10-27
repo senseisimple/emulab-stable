@@ -110,13 +110,13 @@ my $PASSDB   = "$VARDIR/db/passdb";
 my $GROUPDB  = "$VARDIR/db/groupdb";
 my $SYSETCDIR = "/etc";
 
+my $debug = 0;
+
 #
 # OS dependent part of cleanup node state.
 # 
 sub os_account_cleanup()
 {
-    unlink @LOCKFILES;
-
     #
     # Don't just splat the master passwd/group files into place from $ETCDIR.
     # Instead, grab the current Emulab uids/gids, grab the current group/passwd
@@ -129,10 +129,16 @@ sub os_account_cleanup()
     my %PDB;
     my %GDB;
 
-    dbmopen(%PDB, $PASSDB, 0644) or
+    dbmopen(%PDB, $PASSDB, undef) or
 	fatal("Cannot open $PASSDB: $!");
-    dbmopen(%GDB, $GROUPDB, 0644) or
+    dbmopen(%GDB, $GROUPDB, undef) or
 	fatal("Cannot open $GROUPDB: $!");
+
+    if ($debug) {
+	use Data::Dumper;
+	print Dumper(%PDB) . "\n\n";
+	print Dumper(%GDB) . "\n\n";
+    }
 
     my %lineHash = ();
     my %lineList = ();
@@ -171,13 +177,19 @@ sub os_account_cleanup()
 	}
     }
 
+    print Dumper(%lineHash) . "\n\n\n"
+	if ($debug);
+
     # remove emulab groups first (save a bit of work):
     while (my ($group,$gid) = each(%GDB)) {
+	print "DEBUG: $group/$gid\n";
 	foreach my $file ("$SYSETCDIR/group","$SYSETCDIR/gshadow") {
 	    if (defined($lineHash{$file}->{$group})) {
 		# undef its line
 		$lineList{$file}->[$lineHash{$file}->{$group}] = undef;
 		delete $lineHash{$file}->{$group};
+		print "DEBUG: deleted group $group from $file\n"
+		    if ($debug);
 	    }
 	}
     }
@@ -190,6 +202,8 @@ sub os_account_cleanup()
 		# undef its line
 		$lineList{$file}->[$lineHash{$file}->{$user}] = undef;
 		delete $lineHash{$file}->{$user};
+		print "DEBUG: deleted user  $user from $file\n"
+		    if ($debug);
 	    }
 	}
 
@@ -243,12 +257,16 @@ sub os_account_cleanup()
 		$lineHash{$master}->{$ent} = scalar(@{$lineList{$master}});
 		$lineList{$master}->[$lineHash{$master}->{$ent}] = 
 		    $lineList{$real}->[$lineHash{$real}->{$ent}];
+		print "DEBUG: adding $ent to $master\n"
+		    if ($debug);
 	    }
 	    # or replace modified entities
 	    elsif ($lineList{$real}->[$lineHash{$real}->{$ent}] 
 		   ne $lineList{$master}->[$lineHash{$master}->{$ent}]) {
 		$lineList{$master}->[$lineHash{$master}->{$ent}] = 
 		    $lineList{$real}->[$lineHash{$real}->{$ent}];
+		print "DEBUG: updating $ent in $master\n"
+		    if ($debug);
 	    }
 	}
 
@@ -305,6 +323,22 @@ sub os_account_cleanup()
 
     dbmclose(%PDB);
     dbmclose(%GDB);
+
+    #
+    # Splat the new files into place, doh
+    #
+    unlink @LOCKFILES;
+
+    printf STDOUT "Resetting passwd and group files\n";
+    if (system("$CP -f $TMGROUP $TMPASSWD /etc") != 0) {
+        print STDERR "Could not copy default group file into place: $!\n";
+        return -1;
+    }
+
+    if (system("$CP -f $TMSHADOW $TMGSHADOW /etc") != 0) {
+        print STDERR "Could not copy default passwd file into place: $!\n";
+        return -1;
+    }
 
     return 0;
 }
