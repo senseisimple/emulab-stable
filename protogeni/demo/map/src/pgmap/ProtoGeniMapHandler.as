@@ -179,7 +179,8 @@ package pgmap
 	    }
 	    
 	    public function drawAll():void {
-	    	
+	    	drawMap();
+	    	main.fillCombobox();
 	    }
 	    
 	    public function drawMap():void {
@@ -194,6 +195,19 @@ package pgmap
 	        
 	        var drawSlice:Boolean = main.userResourcesOnly && main.selectedSlice != null && main.selectedSlice.status != null;
 	        if(drawSlice) {
+	        	for each(var drawGroup:LinkGroup in main.pgHandler.Links.collection) {
+	        		// Add line
+					var blankline:Polyline = new Polyline([
+						new LatLng(drawGroup.latitude1, drawGroup.longitude1),
+						new LatLng(drawGroup.latitude2, drawGroup.longitude2)
+						], new PolylineOptions({ strokeStyle: new StrokeStyle({
+							color: 0x666666,
+							thickness: 3,
+							alpha:.8})
+						}));
+		
+					main.map.addOverlay(blankline);
+	        	}
 	        	for each(var pl:PointLink in main.selectedSlice.Links) {
 		        	addPointLink(pl);
 		        }
@@ -204,8 +218,6 @@ package pgmap
 		        	}
 		        }
 	        }
-
-	        main.fillCombobox();
 	        
 	        main.setProgress("Done", Common.successColor);
 	    }

@@ -106,6 +106,8 @@
 	                                + msg);
 	        if(msg.search("#2048") > -1)
 	        	Alert.show("Stream error, possibly due to server error");
+	        else if(msg.search("#2032") > -1)
+	        	Alert.show("Error, possibly due to no SSL certificate");
 	      }
 	      main.console.appendText("\nURL: " + op.getUrl());
 	    }
@@ -269,7 +271,7 @@
 	      		startSliceLookup();
 	      	}
 	      	else
-	      		main.pgHandler.map.drawMap();
+	      		main.pgHandler.map.drawAll();
 	      }
 	      else
 	      {
@@ -317,7 +319,7 @@
 	      else
 	      {
 	        codeFailure();
-	        main.pgHandler.map.drawMap();
+	        main.pgHandler.map.drawAll();
 	      }
 	    }
 	    
@@ -356,7 +358,7 @@
 	      else
 	      {
 	        codeFailure();
-	        main.pgHandler.map.drawMap();
+	        main.pgHandler.map.drawAll();
 	      }
 	    }
 	    
@@ -403,7 +405,7 @@
 	      else
 	      {
 	        //codeFailure();
-	        //main.pgHandler.map.drawMap();
+	        //main.pgHandler.map.drawAll();
 	      }
 	      
 	      if(slicesLeft.length > 0)
@@ -411,7 +413,7 @@
 	      	else {
 	      		prepareSlivers();
 	      		if(sliversLeft.length == 0) {
-	      			main.pgHandler.map.drawMap();
+	      			main.pgHandler.map.drawAll();
 	      		} else {
 	      			startGetSliver();
 	      		}
@@ -450,7 +452,7 @@
 	      else
 	      {
 	        codeFailure();
-	        main.pgHandler.map.drawMap();
+	        main.pgHandler.map.drawAll();
 	      }
 	    }
 	    
@@ -486,7 +488,7 @@
 	      else
 	      {
 	        codeFailure();
-	        main.pgHandler.map.drawMap();
+	        main.pgHandler.map.drawAll();
 	      }
 	    }
 	    
@@ -535,12 +537,12 @@
 	      	if(sliversLeft.length > 0)
 	      		startSliverTicket();
 	      	else
-	      		main.pgHandler.map.drawMap();
+	      		main.pgHandler.map.drawAll();
 	      }
 	      else
 	      {
 	        codeFailure();
-	        main.pgHandler.map.drawMap();
+	        main.pgHandler.map.drawAll();
 	      }
 	    }
 	    
@@ -572,12 +574,12 @@
 	      	if(this.sliceNodes.length > 0)
 	      		startResolveNodes();
 	      	else
-	      		main.pgHandler.map.drawMap();
+	      		main.pgHandler.map.drawAll();
 	      }
 	      else
 	      {
 	        codeFailure();
-	        main.pgHandler.map.drawMap();
+	        main.pgHandler.map.drawAll();
 	      }
 	    }
 	    
@@ -609,7 +611,7 @@
 	      else
 	      {
 	        codeFailure();
-	        main.pgHandler.map.drawMap();
+	        main.pgHandler.map.drawAll();
 	      }
 	    }
 	}
