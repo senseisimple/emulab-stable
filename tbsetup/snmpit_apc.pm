@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2006-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -39,9 +39,10 @@ sub new($$;$) {
     $SNMP::debugging = ($debug - 5) if $debug > 5;
     my $mibpath = "/usr/local/share/snmp/mibs";
     &SNMP::addMibDirs($mibpath);
-    &SNMP::addMibFiles("$mibpath/SNMPv2-MIB.txt", "$mibpath/RFC1155-SMI.txt",
-	"$mibpath/PowerNet-MIB.txt");
-
+    &SNMP::addMibFiles("$mibpath/SNMPv2-SMI.txt",
+		       "$mibpath/SNMPv2-MIB.txt",
+		       "$mibpath/RFC1155-SMI.txt",
+		       "$mibpath/PowerNet-MIB.txt");
     $SNMP::save_descriptions = 1; # must be set prior to mib initialization
     SNMP::initMib();              # parses default list of Mib modules
     $SNMP::use_enums = 1;         #use enum values instead of only ints
@@ -63,9 +64,10 @@ sub new($$;$) {
 }
 
 my %CtlOIDS = (
-    default => ["sPDUOutletCtl", "outletOn", "outletOff", "outletReboot"],
-    rPDU    => ["rPDUOutletControlOutletCommand", "immediateOn", "immediateOff",
-		    "immediateReboot"]
+    default => ["sPDUOutletCtl",
+		"outletOn", "outletOff", "outletReboot"],
+    rPDU    => ["rPDUOutletControlOutletCommand",
+		"immediateOn", "immediateOff", "immediateReboot"]
 );
 
 sub power {
