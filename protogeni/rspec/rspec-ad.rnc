@@ -34,7 +34,10 @@ NodeContents &=
   # references to this node without a corresponding external reference
   # in this advertisement. It also means that it makes sense for
   # multiple physical links to connect to the same interface.
-  element cloud { empty }
+  element cloud { empty } &
+
+  # Lists services provided by the CM for this node.
+  element services { ServiceContents }
 
 LinkContents &=
   # Component identifiers
@@ -59,6 +62,32 @@ ExternalReference = element external_ref {
   attribute component_manager_uuid { text }? &
   attribute component_manager_urn { text }?
 }
+
+ServiceContents &=
+  # Login services include ssh-services, serial consoles, etc.
+  element login { LoginServiceContents }* &
+
+  # Install services include download and extraction of a file at
+  # experiment startup.
+  element install { InstallServiceContents }* &
+
+  # Execute services include initialization scripts
+  element execute { ExecuteServiceContents }*
+
+LoginServiceContents &=
+  # Authentication mechanism
+  attribute authentication { "ssh-keys" } &
+  # Access mechanism
+  attribute hostname { text } &
+  attribute port { text }
+
+InstallServiceContents &=
+  # Type(s) of archives supported
+  attribute file_type { "tar.gz" | "tar.bz2" }
+
+ExecuteServiceContents &=
+  # Shell environment allowed
+  attribute shell { "sh" }
 
 RSpecContents &=
   attribute type { "advertisement" } &

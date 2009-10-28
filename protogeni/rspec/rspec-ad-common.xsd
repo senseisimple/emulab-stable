@@ -26,6 +26,7 @@
         <xs:element ref="rspec:available"/>
         <xs:element ref="rspec:exclusive"/>
         <xs:element ref="rspec:cloud"/>
+        <xs:element ref="rspec:services"/>
       </xs:choice>
     </xs:choice>
     <xs:attribute name="virtualization_type">
@@ -47,6 +48,7 @@
   <xs:element name="cloud">
     <xs:complexType/>
   </xs:element>
+  <xs:element name="services" type="rspec:ServiceContents"/>
   <xs:complexType name="LinkContents">
     <xs:choice minOccurs="0" maxOccurs="unbounded">
       <xs:choice>

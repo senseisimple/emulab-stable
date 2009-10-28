@@ -25,6 +25,64 @@
       <xs:attribute name="component_manager_urn"/>
     </xs:complexType>
   </xs:element>
+  <xs:complexType name="ServiceContents">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element ref="rspec:login"/>
+      <xs:element ref="rspec:install"/>
+      <xs:element ref="rspec:execute"/>
+    </xs:choice>
+  </xs:complexType>
+  <xs:element name="login">
+    <xs:complexType>
+      <xs:attributeGroup ref="rspec:LoginServiceContents"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="install" type="rspec:InstallServiceContents"/>
+  <xs:element name="execute">
+    <xs:complexType>
+      <xs:attributeGroup ref="rspec:ExecuteServiceContents"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:attributeGroup name="LoginServiceContents">
+    <xs:attribute name="shell" use="required">
+      <xs:simpleType>
+        <xs:restriction base="xs:token">
+          <xs:enumeration value="sh"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="authentication" use="required">
+      <xs:simpleType>
+        <xs:restriction base="xs:token">
+          <xs:enumeration value="ssh-keys"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="hostname" use="required"/>
+    <xs:attribute name="port" use="required"/>
+  </xs:attributeGroup>
+  <xs:complexType name="InstallServiceContents">
+    <xs:sequence>
+      <xs:element minOccurs="0" maxOccurs="unbounded" ref="rspec:file_type"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:element name="file_type">
+    <xs:simpleType>
+      <xs:restriction base="xs:token">
+        <xs:enumeration value="tar.gz"/>
+        <xs:enumeration value="tar.bz2"/>
+      </xs:restriction>
+    </xs:simpleType>
+  </xs:element>
+  <xs:attributeGroup name="ExecuteServiceContents">
+    <xs:attribute name="shell" use="required">
+      <xs:simpleType>
+        <xs:restriction base="xs:token">
+          <xs:enumeration value="sh"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+  </xs:attributeGroup>
   <xs:element name="bgp_prefix">
     <xs:complexType>
       <xs:attribute name="address" use="required"/>
