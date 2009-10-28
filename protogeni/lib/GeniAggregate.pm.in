@@ -24,6 +24,7 @@ use GeniSliver;
 use GeniSlice;
 use GeniRegistry;
 use GeniUtil;
+use GeniHRN;
 use emutil;
 use Data::Dumper;
 use English;
@@ -205,6 +206,14 @@ sub GetCertificate($)   { return $_[0]->{'CERTIFICATE'}; }
 
 # An alias so that slivers look like aggregates.
 sub resource_type($)	{ return field($_[0], "type"); }
+
+# Return the URN.
+sub urn($)
+{
+    my ($self) = @_;
+
+    return GeniHRN::Generate("@OURDOMAIN@", "sliver", $self->idx());
+}
 
 #
 # Destroy all the slivers in the aggregate, and then the aggregate if there
@@ -527,9 +536,9 @@ sub NewCredential($$)
 #
 # Get the manifest for an aggregate. Returns the XML string.
 #
-sub GetManifest($)
+sub GetManifest($$)
 {
-    my ($self) = @_;
+    my ($self, $asxml) = @_;
 
     return undef
 	if (! ref($self));
@@ -564,6 +573,9 @@ sub GetManifest($)
 	POSIX::strftime("20%y-%m-%dT%H:%M:%S",
 			gmtime(str2time($slice->expires())));
 
+    return $manifest
+	if (!$asxml);
+    
     $xml = eval { XMLout($manifest, "NoAttr" => 1, RootName => "manifest") };
     if ($@) {
 	print STDERR "XMLout error on manifest: $@\n";
@@ -729,9 +741,9 @@ sub Provision($;$)
 #
 # Unprovision all the slivers in the aggregate.
 #
-sub UnProvision($)
+sub UnProvision($;$)
 {
-    my ($self) = @_;
+    my ($self, $nophysfree) = @_;
 
     return -1
 	if (! ref($self));
@@ -770,7 +782,7 @@ sub UnProvision($)
 	}
     }
     foreach my $sliver (@nodes) {
-	if ($sliver->UnProvision() != 0) {
+	if ($sliver->UnProvision($nophysfree) != 0) {
 	    print STDERR "Could not unprovision $sliver in $self\n";
 	    $sliver->SetStatus("broken");
 	    next;
