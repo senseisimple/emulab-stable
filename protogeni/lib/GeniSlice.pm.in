@@ -62,7 +62,6 @@ sub Lookup($$)
 {
     my ($class, $token) = @_;
 
-    # Look in cache first
     return $slices{"$token"}
         if (exists($slices{"$token"}));
 
@@ -75,7 +74,10 @@ sub Lookup($$)
     bless($slice, $class);
 
     # Add to cache. 
-    $slices{$slice->idx()} = $slice;
+    $slices{$slice->idx()}  = $slice;
+    $slices{$slice->urn()}  = $slice;
+    $slices{$slice->uuid()} = $slice;
+    $slices{$slice->hrn()}  = $slice;
     
     return $slice;
 }
@@ -132,6 +134,14 @@ sub slicename($)
 	if (!defined($slicename));
 
     return $slicename;
+}
+
+# Return the URN.
+sub urn($)
+{
+    my ($self) = @_;
+
+    return GeniHRN::Generate("@OURDOMAIN@", "slice", $self->slicename());
 }
 
 #
