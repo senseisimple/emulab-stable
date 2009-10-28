@@ -381,6 +381,29 @@ sub convertVlanName($) {
 	return $id;
 }
 
+#
+# Try to pull a VLAN number out of a long OID string
+#
+sub parseVlanNumberFromOID($) {
+    my ($oid) = @_;
+    # OID must be a dotted string
+    my (@elts) = split /\./, $oid;
+    if (scalar(@elts) < 2) {
+        return undef;
+    }
+    # Second-to-last element must be the right text string or numeric ID
+    if ($elts[$#elts-1] eq "dot1qVlanStaticName" || $elts[$#elts-1] eq "1") {
+        # Last element must be numeric
+        if ($elts[$#elts] =~ /\d+/) {
+            return $elts[$#elts];
+        } else {
+            return undef;
+        }
+    } else {
+        return undef;
+    }
+}
+
 sub checkLACP($$) {
    my ($self, $port) = @_;
    if (my $j = $self->{TRUNKINDEX}{$port})
@@ -516,6 +539,12 @@ sub findVlans($@) {
     foreach my $rowref (@$rows) {
 	($name,$vlan_number,$vlan_name) = @$rowref;
 	$self->debug("$id: Got $name $vlan_number $vlan_name\n",2);
+        # Hack to get around some strange behavior
+        if ((!defined($vlan_number) || $vlan_number eq "") &&
+                defined(parseVlanNumberFromOID($name))) {
+            $vlan_number = parseVlanNumberFromOID($name);
+            $self->debug("Changed vlan_number to $vlan_number\n",3);
+        }
 	$vlan_name = convertVlanName($vlan_name);
 	#
 	# We only want the names - we ignore everything else
@@ -1148,6 +1177,12 @@ sub listVlans($) {
     foreach $rowref (@$rows) {
 	($oid, $vlan_number, $vlan_name) = @$rowref;
 	$self->debug("Got $oid $vlan_number $vlan_name\n",3);
+        # Hack to get around some strange behavior
+        if ((!defined($vlan_number) || $vlan_number eq "") &&
+                defined(parseVlanNumberFromOID($oid))) {
+            $vlan_number = parseVlanNumberFromOID($oid);
+            $self->debug("Changed vlan_number to $vlan_number\n",3);
+        }
 	if ($vlan_number eq "1") { next;}
 	$vlan_name = convertVlanName($vlan_name);
 	if (!$Names{$vlan_number}) {
