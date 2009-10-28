@@ -27,7 +27,6 @@ my $WOL        = "$TB/sbin/whol";
 use lib "@prefix@/lib";
 use libdb;
 use libxmlrpc;
-use power_ipmi;
 use power_rpc27;
 use power_sgmote;
 use power_mail;
@@ -320,20 +319,7 @@ foreach my $power_id (keys %outlets) {
     # of object
     #
     my $errors = 0;
-    if ($type eq "IPMI") {
-        my $device = new power_ipmi($IP,$verbose);
-	if (!defined $device) {
-	    warn "Unable to contact controller for $nodestr. Skipping...\n";
-	    next;
-	} else {
-	    print "Calling device->power($op,@outlets)\n" if $verbose > 1;
-	    if ($device->power($op,@outlets)) {
-		print "Control of $nodestr failed.\n";
-		$errors++;
-	    }
-	}
-    }
-    elsif ($type eq "APC") {
+    if ($type eq "APC") {
 	my $device = new snmpit_apc($IP,$verbose);
 	if (!defined $device) {
 	    warn "Unable to contact controller for $nodestr. Skipping...\n";
