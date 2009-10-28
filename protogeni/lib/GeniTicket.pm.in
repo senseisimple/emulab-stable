@@ -22,6 +22,7 @@ use GeniCredential;
 use GeniCertificate;
 use emutil qw(TBGetUniqueIndex);
 use GeniUtil;
+use GeniHRN;
 use English;
 use XML::Simple;
 use XML::LibXML;
@@ -199,6 +200,15 @@ sub component($)	{ return field($_[0], "component"); }
 sub stored($)		{ return field($_[0], "stored"); }
 sub slice_uuid($)	{ return field($_[0], "slice_uuid"); }
 sub LOCKED($)           { return $_[0]->{'LOCKED'}; }
+
+
+# Return the URN.
+sub urn($)
+{
+    my ($self) = @_;
+
+    return GeniHRN::Generate("@OURDOMAIN@", "ticket", $self->idx());
+}
 
 #
 # Stringify for output.
