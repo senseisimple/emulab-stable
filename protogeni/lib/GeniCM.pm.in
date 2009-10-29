@@ -348,6 +348,10 @@ sub GetTicket($;$)
     if (!defined($rspecstr)) {
 	return GeniResponse->MalformedArgsResponse();
     }
+    if (! ($rspecstr =~ /^[\040-\176\012\015\011]+$/)) {
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "Improper characters in rspec");
+    }
     my $credential = GeniCredential->CreateFromSigned($credstr);
     if (!defined($credential)) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
@@ -369,16 +373,13 @@ sub GetTicket($;$)
 	$ticket->SetSlice($credential->target_uuid());
     }
     return GetTicketAux($credential,
-			$rspecstr, $isupdate, $impotent, 0, $ticket);
+			$rspecstr, $isupdate, $impotent, 0, 1, $ticket);
 }
 
-sub GetTicketAux($$$$$$)
+sub GetTicketAux($$$$$$$)
 {
-    my ($credential, $rspec_string, $isupdate, $impotent, $v2, $ticket) = @_;
-    my $owner_uuid  = $ENV{'GENIUSER'};
-    my $response    = undef;
-    my $restorevirt = 0;	# Flag to restore virtual state
-    my $restorephys = 0;	# Flag to restore physical state
+    my ($credential, $rspecstr, $isupdate, $impotent, $v2, $level,
+	$ticket) = @_;
     
     defined($credential) &&
 	($credential->HasPrivilege( "pi" ) or
@@ -386,35 +387,10 @@ sub GetTicketAux($$$$$$)
 	 $credential->HasPrivilege( "bind" ) or
 	 return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
 				      "Insufficient privilege" ));
-
-    if (! ($rspec_string =~ /^[\040-\176\012\015\011]+$/)) {
-	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
-				    "Improper characters in rspec");
-    }
-    my $rspec =
-	eval { XMLin($rspec_string, KeyAttr => [],
-		     ForceArray => ["node", "link", "interface",
-				    "interface_ref", "linkendpoints"]) };
-    if ($@) {
-	print STDERR "XMLin error: $@\n";
-	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
-				    "XML error in rspec");
-    }
+    
     my $slice_uuid = $credential->target_uuid();
     my $user_uuid  = $credential->owner_uuid();
     
-    print STDERR $credential->target_cert() . "\n";
-    print STDERR $credential->owner_cert() . "\n";
-
-    #
-    # We need this below to sign the ticket.
-    #
-    my $authority = GeniCertificate->LoadFromFile($EMULAB_PEMFILE);
-    if (!defined($authority)) {
-	print STDERR " Could not get uuid from $EMULAB_PEMFILE\n";
-	return GeniResponse->Create(GENIRESPONSE_ERROR);
-    }
-
     #
     # Create slice from the certificate.
     #
@@ -449,6 +425,35 @@ sub GetTicketAux($$$$$$)
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 			    "Could not get user info from ClearingHouse");
 	}
+    }
+    return GetTicketAuxAux($slice, $user, $rspecstr,
+			   $isupdate, $impotent, $v2, $level, $ticket);
+}
+sub GetTicketAuxAux($$$$$$$$)
+{
+    my ($slice, $user,
+	$rspecstr, $isupdate, $impotent, $v2, $level, $ticket) = @_;
+    my $response    = undef;
+    my $restorevirt = 0;	# Flag to restore virtual state
+    my $restorephys = 0;	# Flag to restore physical state
+
+    #
+    # We need this below to sign the ticket.
+    #
+    my $authority = GeniCertificate->LoadFromFile($EMULAB_PEMFILE);
+    if (!defined($authority)) {
+	print STDERR " Could not get uuid from $EMULAB_PEMFILE\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
+    }
+
+    my $rspec =
+	eval { XMLin($rspecstr, KeyAttr => [],
+		     ForceArray => ["node", "link", "interface",
+				    "interface_ref", "linkendpoints"]) };
+    if ($@) {
+	print STDERR "XMLin error: $@\n";
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "XML error in rspec");
     }
 
     #
@@ -526,13 +531,18 @@ sub GetTicketAux($$$$$$)
     # For now, there can be only a single toplevel aggregate per slice.
     # The existence of an aggregate means the slice is active here. 
     #
+    my $aggregate = GeniAggregate->SliceAggregate($slice);
     if (!$isupdate) {
-	my $aggregate = GeniAggregate->SliceAggregate($slice);
 	if (defined($aggregate)) {
 	    $response = GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 				     "Already have an aggregate for slice");
 	    goto bad;
 	}
+    }
+    elsif ($v2 && $level && !defined($ticket) && !defined($aggregate)) {
+	print STDERR "No aggregate for $slice in version two API\n";
+	$response = GeniResponse->Create(GENIRESPONSE_ERROR);
+	goto bad;
     }
 
     #
@@ -623,8 +633,15 @@ sub GetTicketAux($$$$$$)
 	    $response = GeniResponse->Create(GENIRESPONSE_ERROR);
 	    goto bad;
 	}
+	my $oldrspec;
+	if ($v2 && defined($aggregate)) {
+	    $oldrspec = $aggregate->GetManifest(0);
+	}
+	else {
+	    $oldrspec = $ticket->rspec();
+	}
 	
-	foreach my $ref (@{$ticket->rspec()->{'node'}}) {
+	foreach my $ref (@{$oldrspec->{'node'}}) {
 	    my $resource_uuid = $ref->{'component_uuid'} || $ref->{'uuid'};
 	    my $manager_uuid  = $ref->{'component_manager_uuid'};
 	    my $node_nickname = $ref->{'virtual_id'} || $ref->{'nickname'};
@@ -1155,9 +1172,9 @@ sub GetTicketAux($$$$$$)
     }
 
     #
-    # For the version 2 API, just return the annotated rspec.
+    # For the version 2 minimal API, just return the annotated rspec.
     #
-    if ($v2) {
+    if ($v2 && $level == 0) {
 	# Bad, should leave it locked, but Redeem below would fail, and
 	# this whole arrangement is temporary, so lets not worry about it.
 	$slice->UnLock();
@@ -1174,7 +1191,7 @@ sub GetTicketAux($$$$$$)
 				 "Could not create GeniTicket object");
 	goto bad;
     }
-    $newticket->SetSlice($slice_uuid);
+    $newticket->SetSlice($slice->uuid());
     
     if ($newticket->Sign()) {
 	$response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
@@ -1187,7 +1204,7 @@ sub GetTicketAux($$$$$$)
 	goto bad;
     }
 
-    if ($isupdate) {
+    if ($isupdate && defined($ticket)) {
 	#
 	# Delete (not release) the old ticket. 
 	#
@@ -1234,7 +1251,7 @@ sub GetTicketAux($$$$$$)
 	$slice_experiment->RemoveVirtualState()
 	    if (defined($slice_experiment));
     }
-    if ($v2) {
+    if ($v2 && $level == 0) {
 	CleanupDeadSlice($slice, 1)
 	    if (defined($slice));
 	return $response;
@@ -1316,19 +1333,20 @@ sub SliverWork($$)
 	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
 				    "This ticket is for another authority!");
     }
-    return SliverWorkAux($credential, $ticket, $keys, $isupdate, $impotent, 0);
+    return SliverWorkAux($credential, $ticket,
+			 $keys, $isupdate, $impotent, 0, 0);
 }
 
-sub SliverWorkAux($$$$$$)
+sub SliverWorkAux($$$$$$$)
 {
-    my ($credential, $object, $keys, $isupdate, $impotent, $v2) = @_;
+    my ($credential, $object, $keys, $isupdate, $impotent, $v2, $level) = @_;
     my $didfwsetup  = 0;
     my $restorephys = 0;	# Flag to restore physical state
     my $ticket;
     my $rspec;
 
     # V2 API support.
-    if ($v2) {
+    if ($v2 && $level == 0) {
 	$rspec = $object;
     }
     else {
@@ -2502,19 +2520,6 @@ sub DeleteSliverAux($$$)
 	return GeniResponse->BusyResponse();
     }
 
-    #
-    # In the V2 api, cleanup the entire slice and return.
-    #
-    if ($v2) {
-	if (CleanupDeadSlice($slice) != 0) {
-	    $slice->UnLock();
-	    print STDERR "DeleteSliver: CleanupDeadSlice failed\n";
-	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					"Could not delete sliver");
-	}
-	return GeniResponse->Create(GENIRESPONSE_SUCCESS);
-    }
-    
     my $experiment = $slice->GetExperiment();
     my $pid = $experiment->pid();
     my $eid = $experiment->eid();
@@ -2540,7 +2545,7 @@ sub DeleteSliverAux($$$)
 		goto bad;
 	    }
 	}
-	if ($aggregate->UnProvision() != 0) {
+	if ($aggregate->UnProvision($v2) != 0) {
 	    $response = 
 		GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				     "Could not unprovision sliver");
@@ -2551,13 +2556,28 @@ sub DeleteSliverAux($$$)
 					     "Could not delete sliver");
 	    goto bad;
 	}
+	$experiment->RemovePhysicalState();
+	$experiment->SetState(EXPTSTATE_SWAPPED());
+
+	if (system("$EXPORTS_SETUP")) {
+	    print STDERR "$EXPORTS_SETUP failed\n";
+	}
+	if (system("$NAMEDSETUP")) {
+	    print STDERR "$NAMEDSETUP failed\n";
+	}
+
+	#
+	# In the v2 API, caller returns a new ticket for the resources
+	# (which were not released). 
+	#
+	if ($v2) {
+	    # Slice still locked.
+	    return 0;
+	}
+	$experiment->RemoveVirtualState();
 	DBQueryWarn("delete from geni_manifests ".
 		    "where slice_uuid='$slice_uuid'");
-
-	$experiment->RemoveVirtualState();
-	$experiment->RemovePhysicalState();
     }
-    $experiment->SetState(EXPTSTATE_SWAPPED());
     $slice->UnLock();
     return GeniResponse->Create(GENIRESPONSE_SUCCESS);
 
