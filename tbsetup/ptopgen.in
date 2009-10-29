@@ -1583,6 +1583,7 @@ sub print_node
             print "  <location country=\"$country\" longitude=\"$long\" " .
                   "latitude=\"$lat\" />\n";
         }
+	print_node_flags(@$flags);
 	print_node_interfaces($name, @$interfaces);
 	print "</node>\n";
     } else {
@@ -1658,13 +1659,13 @@ sub print_node_flags
     my $i = 0;
     for (; $i < scalar(@_); ++$i) {
 	my ($name, $value) = split(/:/, $_[$i], 2);
-	if ($name eq "trivial_bw") {
+	if ($name eq "trivial_bw" && ! $genimode) {
 	    print "  <trivial_bandwidth>$value</trivial_bandwidth>\n";
 	}
 	elsif ($name eq "subnode_of") {
 	    print "  <subnode_of>$value</subnode_of>\n";
 	}
-	elsif ($name eq "unique") {
+	elsif ($name eq "unique" && ! $genimode) {
 	    print "  <unique/>\n";
 	}
 	elsif ($name eq "disallow_trivial_mix") {

@@ -20,6 +20,11 @@ NodeContents =
     attribute virtualization_type { "raw" | "trellis-vserver" |
       "planetlab-vserver" | "emulab-vnode" | "bgpmux" }? &
 
+    # Each node may be the subnode of (physically located within) another.
+    # In advertisements, this is the URN of the other component.
+    # In requests, this is the virtual_id of the other sliver.
+    element subnode_of { text }? &
+
     # Node type list
     NodeTypeList &
 

@@ -17,6 +17,7 @@
   <xs:element name="link" type="rspec:LinkContents"/>
   <xs:complexType name="NodeContents">
     <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element ref="rspec:subnode_of"/>
       <xs:group ref="rspec:NodeTypeList"/>
       <xs:element ref="rspec:interface"/>
     </xs:choice>
@@ -37,6 +38,7 @@
     <xs:attribute name="virtualization_subtype"/>
     <xs:attribute name="exclusive"/>
   </xs:complexType>
+  <xs:element name="subnode_of" type="xs:string"/>
   <xs:element name="interface">
     <xs:complexType>
       <xs:attributeGroup ref="rspec:InterfaceDecl"/>

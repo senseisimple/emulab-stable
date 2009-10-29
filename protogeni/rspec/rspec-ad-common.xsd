@@ -18,6 +18,7 @@
   <xs:complexType name="NodeContents">
     <xs:choice minOccurs="0" maxOccurs="unbounded">
       <xs:choice>
+        <xs:element ref="rspec:subnode_of"/>
         <xs:group ref="rspec:NodeTypeList"/>
         <xs:element ref="rspec:interface"/>
       </xs:choice>
@@ -42,6 +43,7 @@
     </xs:attribute>
     <xs:attributeGroup ref="rspec:ComponentName"/>
   </xs:complexType>
+  <xs:element name="subnode_of" type="xs:string"/>
   <xs:element name="interface" type="rspec:InterfaceDecl"/>
   <xs:element name="available" type="xs:boolean"/>
   <xs:element name="exclusive" type="xs:boolean"/>
