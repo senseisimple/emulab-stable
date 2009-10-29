@@ -695,6 +695,7 @@ sub GetTicketAuxAux($$$$$$$$)
 	my $manager_uuid  = $ref->{'component_manager_uuid'};
 	my $node_nickname = $ref->{'virtual_id'} || $ref->{'nickname'};
 	my $colocate      = $ref->{'colocate'} || $ref->{'phys_nickname'};
+	my $subnode_of    = $ref->{'subnode_of'};
 	my $virtualization_type    = $ref->{'virtualization_type'};
 	my $virtualization_subtype = $ref->{'virtualization_subtype'};
 	my $exclusive     = $ref->{'exclusive'};
@@ -801,7 +802,10 @@ sub GetTicketAuxAux($$$$$$$$)
 			"ips"     => '', # deprecated
 			"cmd_line"=> '', # bogus
 			"fixed"   => (defined($node) ?
-				      $node->node_id() : "")};
+				      $node->node_id() : 
+				      (defined($subnode_of) ?
+				       $subnode_of : "")),
+			};
 
 	# Tarball and startup command.
 	if (exists($ref->{'startup_command'})) {
