@@ -201,6 +201,7 @@ sub created($)		{ return field($_[0], "created"); }
 sub credential_idx($)	{ return field($_[0], "credential_idx"); }
 sub aggregate_idx($)	{ return field($_[0], "aggregate_idx"); }
 sub status($)		{ return field($_[0], "status"); }
+sub state($)		{ return field($_[0], "state"); }
 sub cert($)		{ return $_[0]->{'CERTIFICATE'}->cert(); }
 sub GetCertificate($)   { return $_[0]->{'CERTIFICATE'}; }
 
@@ -477,6 +478,27 @@ sub SetStatus($$)
 			 "where idx='$idx'"));
     
     $self->{'AGGREGATE'}->{'status'} = $status;
+    return 0;
+}
+
+#
+# Set the state for the aggregate
+#
+sub SetState($$)
+{
+    my ($self, $state) = @_;
+
+    return undef
+	if (! ref($self));
+
+    my $idx = $self->idx();
+    
+    return -1
+	if (!DBQueryWarn("update geni_aggregates set ".
+			 "  state='$state' ".
+			 "where idx='$idx'"));
+    
+    $self->{'AGGREGATE'}->{'state'} = $state;
     return 0;
 }
 

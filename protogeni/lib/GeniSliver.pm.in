@@ -230,6 +230,7 @@ sub component_uuid($)	{ return field($_[0], "component_uuid"); }
 sub aggregate_uuid($)	{ return field($_[0], "aggregate_uuid"); }
 sub rspec_string($)     { return field($_[0], "rspec_string"); }
 sub status($)		{ return field($_[0], "status"); }
+sub state($)		{ return field($_[0], "state"); }
 sub cert($)		{ return $_[0]->{'CERTIFICATE'}->cert(); }
 sub GetCertificate($)   { return $_[0]->{'CERTIFICATE'}; }
 sub rspec($)            { return $_[0]->{'RSPEC'}; }
@@ -359,6 +360,27 @@ sub SetStatus($$)
 			 "where idx='$idx'"));
     
     $self->{'SLIVER'}->{'status'} = $status;
+    return 0;
+}
+
+#
+# Set the state for the sliver.
+#
+sub SetState($$)
+{
+    my ($self, $state) = @_;
+
+    return undef
+	if (! ref($self));
+
+    my $idx = $self->idx();
+    
+    return -1
+	if (!DBQueryWarn("update geni_slivers set ".
+			 "  state='$state' ".
+			 "where idx='$idx'"));
+    
+    $self->{'SLIVER'}->{'state'} = $state;
     return 0;
 }
 
@@ -729,6 +751,9 @@ sub UnProvision($;$)
 
 	    if (scalar(@vnodes) > 1 || $nophysfree) {
 		system("$NFREE -q $pid $eid $node_id");
+		# Unincorporate the node. Bogus, needs fixing.
+		$pnode->ModifyReservation({"genisliver_idx" => 0})
+		    if (! ($pnode->sharing_mode() || scalar(@vnodes) > 1));
 	    }
 	    else {
 		system("$NFREE -x -q $pid $eid $pnode_id");
@@ -736,8 +761,11 @@ sub UnProvision($;$)
 	    }
 	}
 	else {
-	    goto skip
-		if ($nophysfree);
+	    if ($nophysfree) {
+		# Unincorporate the node. Bogus, needs fixing.
+		$node->ModifyReservation({"genisliver_idx" => 0});
+		goto skip;
+	    }
 	    system("$NFREE -q $pid $eid $node_id");
 	}
 	if ($?) {
