@@ -1,0 +1,65 @@
+This is a set of scripts to stress test virtual containers under many
+different conditions. There are two sets of scripts here, in two
+directories:
+
+testswap/ -- Run many experiments using the testswap infrastructure to
+             swapmod into using different numbers of pairs. These
+             scripts need to be run on a machine with testswap set up
+             properly.
+
+ops/ -- Perform a run on an experiment that is already set up
+        properly. These scripts need to be installed on ops.
+
+===============
+Important files
+===============
+
+-------------------------------------------------------------------------------
+
+  testswap/master-virt.pl <proj> <exp> <"type" | "name"> <typeName | nodeName>
+             <runPath> <resultPath> <pairCount [...]>
+
+master-virt.pl will use the testswap framework to setup and run a
+series of experimental runs. <proj> and <exp> must describe an
+experiment which exists but is swapped out. The node selected for test
+can be chosen by type (i.e. 'pc3000') or by name
+(i.e. 'pc24'). runPath is the path on ops of the ops
+scripts. resultPath is the path on ops specifying where results will
+be stored.
+
+master-virt will run experiments using different numbers of pairs of
+nodes. The final arguments specify which particular pair groupings to
+run. '1 2 5' means run the experiment first with just one pair, then
+with 2 pairs, then with 5 pairs.
+
+master-virt will only gather data. You must run process.pl separately
+to generate graphs.
+
+-------------------------------------------------------------------------------
+
+  ops/process.pl <resultPath>
+
+The <resultPath> given to process.pl should be the same as that given
+to master-virt. For each bandwidth, it will create a set of graphs in
+that directory. Note that while you can gather any set of
+bandwidths/pairs using other scripts, process.pl will try (if
+available) to make graphs among the following bandwidths:
+
+my @bwList = (500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, "unlimited");
+
+and the following pairs:
+
+my @pairList = (1, 2, 5, 10, 15, 20, 25, 30, 35);
+
+-------------------------------------------------------------------------------
+
+  ops/parallel-run.pl <run-path> <result-path> <proj> <exp> <pairCount>
+        <"unlimited" | "limited">
+
+If you already have an experiment swapped in and it is set up
+correctly, you can use parallel-run to make an experimental run and
+then gather results on it. <pairCount> should reflect the number of
+pairs in the experiment and <"unlimited" | "limited"> should reflect
+whether or not traffic shaping is turned on in the experiment.
+
+-------------------------------------------------------------------------------
