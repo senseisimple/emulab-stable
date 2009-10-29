@@ -30,6 +30,7 @@ use Data::Dumper;
 use Carp;
 use POSIX;
 use XML::LibXML;
+use XML::Simple;
 
 # Configure variables
 my $TB		  = "@prefix@";
@@ -1235,7 +1236,6 @@ sub GenVirtNodes($)
 		    
 		    if ($vlanmember->fixed_iface() ne "") {
 			$iface->{'component_id'}  = $vlanmember->fixed_iface();
-			$iface->{'component_name'}= $vlanmember->fixed_iface();
 		    }
 		    push(@refs, $iface);
 		}
@@ -1243,6 +1243,7 @@ sub GenVirtNodes($)
 	    }
 	    if (!defined($self->rspec())) {
 		$self->{'RSPEC'} = {
+		    'generated_by' => 'libvtop',
 		    'type'  => 'request',
 		    'xmlns' => 'http://www.protogeni.net/resources/rspec/0.1',
 		    'node'  => [] };
@@ -2145,36 +2146,69 @@ sub GenVirtLans($)
 
 	    # Lan node for assign.
 	    $self->addnode("lan/$vname lan");
-	    # Se we ignore it when it comes back from assign.
+	    # So we ignore it when it comes back from assign.
 	    $self->lannodes()->{"lan/$vname"} = 1;
 
 	    #
 	    # Geni links and lans are dead simple right now. 
 	    #
 	    if ($vlan->_geninodes()) {
-		my $ref = {'virtual_id'    => $vname,
-			   'latency'       => 0,
-			   'packet_loss'   => 0,
-			   'link_type'     => "ethernet",
-		       };
-		my @irefs = ();
+		# Different naming for geni.
+		$self->lannodes()->{"lan-$vname"} = 1;
+
+		#
+		# Need a node for the fake lan node.
+		#
+		my $noderef = {
+		    'virtual_id'          => "lan-$vname",
+		    'virtualization_type' => 'raw',
+		    'exclusive'           => 1,
+		    'node_type'           => {"type_name"  => "lan",
+					      "type_slots" => 1},
+		};
+		if (!exists($self->rspec()->{'link'})) {
+		    $self->rspec()->{'link'} = [];
+		}
+		my @nrefs = ();
 
 		foreach my $member (@members) {
 		    my (undef,$bw) = @{$member->_delayinfo()};
 		    my $virtnode   = $member->virt_node();
+		    my $fixed      = $virtnode->fixed();
 
-		    push(@irefs, { 'virtual_node_id' => $virtnode->vname(),
-				   'virtual_interface_id' => "$member" });
+		    #
+		    # Need to tie the fake lan node to the same CM.
+		    # Should probably sanity check that all the nodes
+		    # in the lan have the same CM.
+		    #
+		    if (defined($fixed) && $fixed ne "") {
+			my ($authority,$type,$nodeid) = GeniHRN::Parse($fixed);
+			
+			$noderef->{'component_urn'} =
+			    GeniHRN::Generate($authority, "node", "*");
+		    }
 
-		    # XXX
-		    $ref->{'bandwidth'} = $bw;
+		    push(@{ $self->rspec()->{'link'} },
+			 { 'virtual_id'    => "$vname:$member",
+			   # The list references are so XML::Simple does not
+			   # turn them into attributes. Need a better solution.
+			   'latency'       => [0],
+			   'packet_loss'   => [0],
+			   'link_type'     => {"type_name" => "ethernet"},
+			   'bandwidth'     => [$bw],
+			   'interface_ref' =>
+			       [
+				{ 'virtual_node_id' => $virtnode->vname(),
+				  'virtual_interface_id' => "$member" },
+				{ 'virtual_node_id' => "lan-$vname",
+				  'virtual_interface_id' => "$member" }
+			       ]
+			       });
+		    
+		    push(@nrefs, { 'virtual_id' => "$member"});
 		}
-		$ref->{'interface_ref'} = \@irefs;
-
-		if (!exists($self->rspec()->{'link'})) {
-		    $self->rspec()->{'link'} = [];
-		}
-		push(@{ $self->rspec()->{'link'} }, $ref);
+		$noderef->{'interface'} = \@nrefs;
+		push(@{ $self->rspec()->{'node'} }, $noderef);
 		next;
 	    }
 	    
@@ -2400,6 +2434,27 @@ sub PrintTop($;$)
     foreach my $fixed (@{$self->results->{'fixed'}}) {
 	print $output "fix-node $fixed\n";
     }
+    return 0;
+}
+
+#
+# Print the rspec part of the topo. Eventually the whole thing needs
+# to be in rspec.
+#
+sub PrintRspec($;$)
+{
+    my ($self, $output) = @_;
+    $output = *STDOUT
+	if (!defined($output));
+
+    my $reqstring =
+	eval { XMLout($self->rspec(), "NoAttr" => 0, RootName => "rspec") };
+    if ($@) {
+	print STDERR "XMLout error: $@\n";
+	print STDERR Dumper($self->rspec());
+	return -1;
+    }
+    print $output $reqstring;
     return 0;
 }
 
@@ -2815,18 +2870,19 @@ sub MapResources($)
     my ($self) = @_;
 
     if (defined($self->rspec())) {
-	my $solution;
-
 	$self->printdb("Mapping geni resources ...\n");
 	
 	if (libGeni::MapResources($self->experiment(),
-				  $self->user(), $self->rspec(), \$solution)) {
+				  $self->user(), $self->rspec())) {
 	    tberror("Could not map Geni resources\n");
 	    return -1;
 	}
-	print Dumper($solution);
+	if ($self->ReadRspecSolution($self->rspec()) != 0) {
+	    tberror("Could not parse rspec solution! $!\n");
+	    return -1;
+	}
     }
-    return -1;
+    return 0;
 }
 
 sub ClearSolution($)
@@ -3078,6 +3134,11 @@ sub ReadRspecSolution($$)
 
     foreach my $ref (@{ $self->rspec()->{'node'} }) {
 	my $node_urn = $ref->{'component_urn'};
+	my $virtual  = $ref->{'virtual_id'};
+
+	# Skip LAN/Fake nodes.
+	return 0
+	    if (exists($self->lannodes()->{$virtual}));
 	
 	#
 	# We need the local node object which is essentially a
@@ -3088,7 +3149,6 @@ sub ReadRspecSolution($$)
 	    tberror("Could not find proxynode for $node_urn\n");
 	    return -1;
 	}
-	my $virtual  = $ref->{'virtual_id'};
 	my $physical = $proxynode->node_id();
 
 	$self->AddNodeToSolution($virtual, $physical);
@@ -4631,7 +4691,7 @@ sub InitializePhysNodes($)
     #
     # XXX This is here cause vnames were not set until now. Need to move.
     #
-    if (defined($self->rspec())) {
+    if (defined($self->rspec()) && !$self->impotent()) {
 	if (libGeni::MapNodes($self->experiment())) {
 	    tberror("Could not map geni nodes to local nodes.\n");
 	    return -1;

@@ -570,13 +570,26 @@ sub RunAssign($$)
 	print("Could not open assign logfile! $!\n");
 	return -1;
     }
+    # New solution each time.
+    $vtop->ClearSolution();
+
     TBDebugTimeStamp("ReadSolution started");
     if ($vtop->ReadTextSolution(*ASSIGNFP) != 0) {
 	print("Could not parse assign logfile! $!\n");
 	return -1;
     }
     close(ASSIGNFP);
-    TBDebugTimeStamp("ReadSolution ended, InterpNodes Started");
+    TBDebugTimeStamp("ReadSolution ended");
+    
+    if (defined($vtop->rspec())) {
+	TBDebugTimeStamp("Map Geni Resources Started");
+	if ($vtop->MapResources() != 0) {
+	    print("Could not map external resources! $!\n");
+	    return -1;
+	}
+	TBDebugTimeStamp("Map Geni Resources ended");
+    }
+    TBDebugTimeStamp("InterpNodes Started");
     if ($vtop->InterpNodes() != 0) {
 	print("Could not interpret nodes.\n");
 	return -1;
