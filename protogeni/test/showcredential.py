@@ -125,8 +125,12 @@ if len( sys.argv ) > 2:
     print "usage: " + sys.argv[ 0 ] + " [filename]"
     sys.exit( 1 )
 
-doc = xml.dom.minidom.parse( sys.argv[ 1 ] if len( sys.argv ) > 1 else
-                             sys.stdin )
+if len( sys.argv ) > 1:
+    docsrc = sys.argv[ 1 ]
+else:
+    docsrc = sys.stdin
+
+doc = xml.dom.minidom.parse( docsrc )
 
 scred = Lookup( doc, "signed-credential" )
 cred = Lookup( scred, "credential" )
