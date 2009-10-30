@@ -59,7 +59,7 @@ my $MYSQLSHOW     = "/usr/local/bin/mysqlshow";
 my $MYSQLDUMP     = "/usr/local/bin/mysqldump";
 my $PKG_INFO      = "/usr/sbin/pkg_info";
 my $FETCH	  = "/usr/bin/fetch";
-my $OPENSSL       = "/usr/local/bin/openssl";
+my $OPENSSL       = "/usr/bin/openssl";
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
@@ -121,10 +121,13 @@ if( system( "$OPENSSL x509 -text -noout < $TB/etc/emulab.pem | " .
 
     print "Adding URN to root certificate...\n";
 
-    rename( "$TB/etc/emulab.pem", "$TB/etc/emulab.pem.orig" ) or
+    my $originalfile = "$TB/etc/emulab.pem.orig";
+    -f $originalfile and
+	die( "refusing to overwrite $originalfile" );
+    rename( "$TB/etc/emulab.pem", "$originalfile" ) or
 	die( "could not rename root certificate" );
     system( "$OPENSSL x509 -days 2000 -text -extfile $extfile " .
-	    "-signkey $TB/etc/emulab.key < $TB/etc/emulab.pem.orig " .
+	    "-signkey $TB/etc/emulab.key < $originalfile " .
 	    "> $TB/etc/emulab.pem" );
     # For some reason, OpenSSL can return non-zero even when the certificate
     # generation succeeded.  Check the output file instead.
@@ -634,7 +637,10 @@ sub UpdateCert($$$$)
 
 	print "Adding URN to $cert...\n";
 
-	rename( "$cert", "${cert}.orig" ) or
+	my $originalfile = "${cert}.orig";
+	-f $originalfile and
+	    die( "refusing to overwrite $originalfile" );
+	rename( "$cert", "$originalfile" ) or
 	    die( "could not rename $cert" );
 
 	system("$SUDO -u $PROTOUSER $MKSYSCERT -o $cert ".
