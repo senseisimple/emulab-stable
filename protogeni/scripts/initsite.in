@@ -123,7 +123,7 @@ if( system( "$OPENSSL x509 -text -noout < $TB/etc/emulab.pem | " .
 
     rename( "$TB/etc/emulab.pem", "$TB/etc/emulab.pem.orig" ) or
 	die( "could not rename root certificate" );
-    system( "$OPENSSL x509 -text -extfile $extfile " .
+    system( "$OPENSSL x509 -days 2000 -text -extfile $extfile " .
 	    "-signkey $TB/etc/emulab.key < $TB/etc/emulab.pem.orig " .
 	    "> $TB/etc/emulab.pem" );
     # For some reason, OpenSSL can return non-zero even when the certificate
