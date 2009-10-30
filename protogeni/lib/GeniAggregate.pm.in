@@ -151,7 +151,9 @@ sub Create($$$$$$)
     my $idx = TBGetUniqueIndex('next_aggregate', 1);
 
     # Create a cert pair, which gives us a new uuid.
-    my $certificate = GeniCertificate->Create("aggregate", $hrn, $TBOPS);
+    $nickname =~ /[.](.+)$/;
+    my $urn = GeniHRN::Generate( "@OURDOMAIN@", "component", $1 );
+    my $certificate = GeniCertificate->Create("aggregate", $urn, $hrn, $TBOPS);
     if (!defined($certificate)) {
 	print STDERR "GeniAggregate::Create: ".
 	    "Could not generate new certificate and UUID for $hrn\n";

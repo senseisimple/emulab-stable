@@ -443,6 +443,7 @@ sub Register($)
 	    }
 	}
 	
+	my $urn = GeniHRN::Generate( "@OURDOMAIN@", "slice", $hrn );
 	#
 	# When using this interface, the HRN does not correspond to an
 	# existing experiment in a project. It is just a token to call
@@ -455,7 +456,7 @@ sub Register($)
 	#
 	# Generate a certificate (and uuid) for this new slice.
 	#
-	my $certificate = GeniCertificate->Create("slice", $hrn,
+	my $certificate = GeniCertificate->Create("slice", $urn, $hrn,
 						  $this_user->email());
 	if (!defined($certificate)) {
 	    print STDERR "Could not create new certificate for slice\n";

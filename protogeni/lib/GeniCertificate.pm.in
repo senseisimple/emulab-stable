@@ -44,22 +44,32 @@ my %certificates  = ();
 BEGIN { use GeniUtil; GeniUtil::AddCache(\%certificates); }
 
 #
-# Lookup by uuid only.
+# Lookup by URN (and also UUID, for compatibility).
 #
 sub Lookup($$)
 {
     my ($class, $token) = @_;
     my $query_result;
+    my $uuid;
 
-    if (! ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/)) {
-	return undef;
-    }
     # Look in cache first
     return $certificates{"$token"}
         if (exists($certificates{"$token"}));
 
+    if (GeniHRN::IsValid($token)) {
+	$query_result =
+	    DBQueryWarn("select uuid from geni_certificates ".
+			"where urn='$token'");
+	($uuid) = $query_result->fetchrow_array()
+	    if( $query_result && $query_result->numrows );
+    } elsif ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
+	$uuid = $token;
+    }
+
+    return undef unless defined( $uuid );
+
     $query_result =
-	DBQueryWarn("select * from geni_certificates where uuid='$token'");
+	DBQueryWarn("select * from geni_certificates where uuid='$uuid'");
     
     return undef
 	if (!$query_result || !$query_result->numrows);
@@ -71,7 +81,9 @@ sub Lookup($$)
     my $cert = $self->cert();
 
     # Add to cache. 
-    $certificates{$token} = $self;
+    $certificates{$uuid} = $self;
+    $certificates{$token} = $self
+	if $token ne $uuid;
     
     return $self;
 }
@@ -99,6 +111,7 @@ sub privkey($)		{ return field($_[0], "privkey"); }
 sub revoked($)		{ return field($_[0], "revoked"); }
 sub certfile($)		{ return field($_[0], "certfile"); }
 sub uri($)              { return field($_[0], "uri"); }
+sub urn($)              { return field($_[0], "urn"); }
 sub GetCertificate($)   { return $_[0]; }
 
 #
@@ -130,15 +143,15 @@ sub email($)
 #
 # Create a certificate pair, which gives us a uuid to use for an object.
 #
-sub Create($$$$;$$)
+sub Create($$$$$;$$)
 {
-    my ($class, $what, $hrn, $email, $uuid, $url) = @_;
+    my ($class, $what, $urn, $hrn, $email, $uuid, $url) = @_;
     # Let mkcert generate a new one.
     $uuid = ""
 	if (!defined($uuid));
     $url  = (defined($url) ? "-u $url" : "");
 
-    if (! open(CERT, "$MKCERT $url -e \"$email\" $hrn $uuid |")) {
+    if (! open(CERT, "$MKCERT -i \"$urn\" $url -e \"$email\" $hrn $uuid |")) {
 	print STDERR "Could not start $MKCERT\n";
 	return undef;
     }
@@ -255,6 +268,7 @@ sub LoadFromFile($$)
 {
     my ($class, $filename) = @_;
     my $url;
+    my $urn;
 
     if (! open(X509, "$OPENSSL x509 -in $filename -subject -text |")) {
 	print STDERR "Could not start $OPENSSL on $filename\n";
@@ -279,19 +293,41 @@ sub LoadFromFile($$)
     # The text output is next. Look for the URL in the extensions. Stop
     # when we get to the certificate line.
     #
+    my ($alturi,$accessuri);
+    my $altname = 0;
+    my $accessinfo = 0;
     while (@certlines) {
 	my $line = shift(@certlines);
 	last
 	    if ($line =~ /^-----BEGIN CERT/);
 
-	if ($line =~ /^\s+URI:([-\w\.\/:]+)$/) {
-	    $url = $1;
-	    chomp($url);
+	if( $line =~ /^\s+X509v3 Subject Alternative Name:\s*$/ ) {
+	    $altname = 1;
+	} elsif( $line =~ /^\s+Authority Information Access:\s*$/ ) {
+	    $accessinfo = 1;
+	} elsif( $altname ) {
+	    m'^\s*URI:([-!#$%()*+,./0-9:;=?@A-Z_a-z~]+)\s*$' and $alturi = $1
+		foreach split( /, /, $line );
+	    $altname = 0;
+	} elsif( $accessinfo ) {
+	    m'^\s*[0-9.]+ - URI:([-!#$%()*+,./0-9:;=?@A-Z_a-z~]+)\s*$' 
+		and $accessuri = $1 foreach split( /, /, $line );
+	    $accessinfo = 0;
 	}
     }
     if (!@certlines) {
 	print STDERR "Could not parse certificate from $filename\n";
 	return undef;
+    }
+
+    if( defined( $alturi ) && $alturi =~ /^urn:/ ) {
+	$urn = $alturi;
+    }
+
+    if( defined( $accessuri ) ) {
+	$url = $accessuri;
+    } elsif( defined( $alturi ) && $alturi !~ /^urn:/ ) {
+	$url = $alturi;
     }
 
     #
@@ -323,6 +359,7 @@ sub LoadFromFile($$)
     $self->{'CERT'}->{'created'}   = undef;
     $self->{'CERT'}->{'certfile'}  = $filename;
     $self->{'CERT'}->{'uri'}       = $url;
+    $self->{'CERT'}->{'urn'}       = $urn;
     return $self;
 }
 
@@ -345,6 +382,8 @@ sub Store($)
 	if (defined($self->privkey()));
     push(@inserts, "uri=" . DBQuoteSpecial($self->uri()))
 	if (defined($self->uri()));
+    push(@inserts, "urn=" . DBQuoteSpecial($self->urn()))
+	if (defined($self->urn()));
 
     return -1
 	if (!DBQueryWarn("replace into geni_certificates set ".
@@ -383,7 +422,7 @@ sub WriteToFile($;$)
 sub URL($)
 {
     my ($self) = @_;
-    my $url    = $self->uri();
+    my $url    = $self->{'URL'};
 
     return $url
 	if (defined($url));
@@ -393,10 +432,18 @@ sub URL($)
 	print STDERR "Could not start $OPENSSL on $filename\n";
 	return undef;
     }
+    # Note that we really want to put only URNs in the subjectAltName,
+    # and all URLs in the subjectInfoAccess.  However, old certificates
+    # used subjectAltName for URLs, so for temporary backward compatibility
+    # we'll look in both places.
+    my ($alturl,$accessurl);
     my $altname = 0;
+    my $accessinfo = 0;
     while (<X509>) {
-	if( /^\s+x509v3 Subject Alternative Name:\s*$/ ) {
+	if( /^\s+X509v3 Subject Alternative Name:\s*$/ ) {
 	    $altname = 1;
+	} elsif( /^\s+Authority Information Access:\s*$/ ) {
+	    $accessinfo = 1;
 	} elsif( $altname ) {
 	    # Gah!  OpenSSL is horrible.  Apparently the text output format
 	    # for the subject alternative name is fixed, and neither
@@ -405,18 +452,60 @@ sub URL($)
 	    # but commas are legal characters in URIs (see RFC 3986, section
 	    # 2.2)!  We'll have to assume the delimiter is the ", " (comma,
 	    # space) pair...
-	    m'^\s*URI:([-!#$%()*+,./0-9:;=?@A-Z_a-z~]+)\s*$' and $url = $1
+	    m'^\s*URI:([-!#$%()*+,./0-9:;=?@A-Z_a-z~]+)\s*$' and $alturl = $1
 		foreach split( /, / );
 	    $altname = 0;
+	} elsif( $accessinfo ) {
+	    m'^\s*[0-9.]+ - URI:([-!#$%()*+,./0-9:;=?@A-Z_a-z~]+)\s*$' and $accessurl = $1
+		foreach split( /, / );
+	    $accessinfo = 0;
 	}
     }
+    $url = defined( $accessurl ) ? $accessurl : 
+	defined( $alturl ) ? $alturl : undef;
     if (!close(X509) || !defined($url)) {
 	print STDERR "Could not find url in certificate from $filename\n";
 	return undef;
     }
     unlink($filename);
     $self->{'CERT'}->{'uri'} = $url;
+    $self->{'URL'} = $url;
     return $url;
+}
+
+#
+# The URN is slightly easier, since it is always in the same place.
+#
+sub URN($)
+{
+    my ($self) = @_;
+    my $urn    = $self->{'URN'};
+
+    return $urn
+	if (defined($urn));
+
+    my $filename = $self->WriteToFile();
+    if (! open(X509, "$OPENSSL x509 -in $filename -text -noout |")) {
+	print STDERR "Could not start $OPENSSL on $filename\n";
+	return undef;
+    }
+    my $altname = 0;
+    while (<X509>) {
+	if( /^\s+X509v3 Subject Alternative Name:\s*$/ ) {
+	    $altname = 1;
+	} elsif( $altname ) {
+	    m'^\s*URI:([-!#$%()*+,./0-9:;=?@A-Z_a-z~]+)\s*$' and $urn = $1
+		foreach split( /, / );
+	    $altname = 0;
+	}
+    }
+    if (!close(X509) || !defined($urn)) {
+	print STDERR "Could not find URN in certificate from $filename\n";
+	return undef;
+    }
+    unlink($filename);
+    $self->{'URN'} = $urn;
+    return $urn;
 }
 
 sub asText($)
@@ -513,6 +602,8 @@ sub cert($)		{ return field($_[0], "cert"); }
 sub privkey($)		{ return field($_[0], "privkey"); }
 sub revoked($)		{ return field($_[0], "revoked"); }
 sub uri($)              { return field($_[0], "uri"); }
+sub URL($)              { return undef; }
+sub URN($)              { return field($_[0], "uri"); }
 
 #
 # Need to add DN to the emulab table.

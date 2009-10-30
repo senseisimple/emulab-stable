@@ -67,6 +67,7 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 # Protos
 sub fatal($);
+sub UpdateCert($$$$);
 
 #
 # Turn off line buffering on output
@@ -447,28 +448,39 @@ require GeniRegistry;
 if (! -e $CMCERT) {
     print "Creating CM certificate ...\n";
     system("$SUDO -u $PROTOUSER $MKSYSCERT -o $CMCERT ".
-	   "  -u $TBBASE/protogeni/xmlrpc/cm $PGENIDOMAIN.cm") == 0
+	   "  -u $TBBASE/protogeni/xmlrpc/cm " .
+	   "  -i urn:publicid:IDN+${OURDOMAIN}+authority+cm " .
+	   "$PGENIDOMAIN.cm") == 0
 	   or fatal("Could not generate $CMCERT");
 }
 if (! -e $SACERT) {
     print "Creating SA certificate ...\n";
     system("$SUDO -u $PROTOUSER $MKSYSCERT -o $SACERT ".
-	   "  -u $TBBASE/protogeni/xmlrpc/sa $PGENIDOMAIN.sa") == 0
+	   "  -u $TBBASE/protogeni/xmlrpc/sa " .
+	   "  -i urn:publicid:IDN+${OURDOMAIN}+authority+sa " .
+	   "$PGENIDOMAIN.sa") == 0
 	   or fatal("Could not generate $SACERT");
 }
 if (! -e $SESCERT) {
     print "Creating SES certificate ...\n";
     system("$SUDO -u $PROTOUSER $MKSYSCERT -o $SESCERT ".
-	   "  -u $TBBASE/protogeni/xmlrpc/ses $PGENIDOMAIN.ses") == 0
+	   "  -u $TBBASE/protogeni/xmlrpc/ses " .
+	   "  -i urn:publicid:IDN+${OURDOMAIN}+authority+ses " .
+	   "$PGENIDOMAIN.ses") == 0
 	   or fatal("Could not generate $SESCERT");
 }
 if ($asch) {
     if (! -e $CHCERT) {
 	print "Creating CH certificate ...\n";
 	system("$SUDO -u $PROTOUSER $MKSYSCERT -o $CHCERT ".
-	       "  -u $TBBASE/protogeni/xmlrpc/ch $PGENIDOMAIN.ch") == 0
+	       "  -u $TBBASE/protogeni/xmlrpc/ch " .
+	       "  -i urn:publicid:IDN+${OURDOMAIN}+authority+ch " .
+	       "$PGENIDOMAIN.ch") == 0
 	       or fatal("Could not generate $CHCERT");
     }
+    UpdateCert( $CHCERT, "$TBBASE/protogeni/xmlrpc/ch",
+		"urn:publicid:IDN+${OURDOMAIN}+authority+ch",
+		"$PGENIDOMAIN.ch" );
     #
     # Copy the CH certificate out to the web interface, but only the public
     # key of course. 
@@ -499,6 +511,19 @@ else {
     system("$FETCH -q -o $CHCERT http://boss.emulab.net/genich.pem") == 0
 	or fatal("Could not fetch clearinghouse certificate from Utah");
 }
+
+#
+# Update obsolete (pre-URN) certificates.
+#
+UpdateCert( $CMCERT, "$TBBASE/protogeni/xmlrpc/cm",
+	    "urn:publicid:IDN+${OURDOMAIN}+authority+cm",
+	    "$PGENIDOMAIN.cm" );
+UpdateCert( $SACERT, "$TBBASE/protogeni/xmlrpc/sa",
+	    "urn:publicid:IDN+${OURDOMAIN}+authority+sa",
+	    "$PGENIDOMAIN.sa" );
+UpdateCert( $SESCERT, "$TBBASE/protogeni/xmlrpc/ses",
+	    "urn:publicid:IDN+${OURDOMAIN}+authority+ses",
+	    "$PGENIDOMAIN.ses" );
 
 #
 # Load the SA cert to act as caller context.
@@ -578,4 +603,42 @@ sub fatal($)
 
     die("*** $0:\n".
 	"    $msg\n");
+}
+
+# Add a URN to old certificates.  (This is horrible, mainly because
+# we want to reuse the same private keys.)
+sub UpdateCert($$$$)
+{
+    my ($cert, $url, $urn, $hrn) = @_;
+
+    if( system( "$OPENSSL x509 -text -noout < $cert | " .
+		"grep -q -i URI:urn:publicid:IDN" ) ) {
+	my $extfile = "/tmp/$$.ext"; # not worth trying to be secure
+	my $keyfile = "/tmp/$$.key";
+	my $uuid = qx{$OPENSSL x509 -subject -noout < $cert};
+
+	die "could not read subject from $cert"
+	    unless defined( $uuid );
+	die "no UUID found in subject"
+	    unless $uuid =~ /CN=([-a-f0-9]+)/;
+	$uuid = $1;
+
+	open( OLDFILE, "< $cert" ) or die "can't open $cert";
+	open( NEWFILE, "> $keyfile" ) or die "can't open $keyfile";
+	while( <OLDFILE> ) {
+	    print NEWFILE;
+	    last if /-----END RSA PRIVATE KEY-----/;
+	}
+	close OLDFILE;
+	close NEWFILE;
+
+	print "Adding URN to $cert...\n";
+
+	rename( "$cert", "${cert}.orig" ) or
+	    die( "could not rename $cert" );
+
+	system("$SUDO -u $PROTOUSER $MKSYSCERT -o $cert ".
+	       "  -u $url -i $urn -k $keyfile $hrn $uuid" ) == 0
+	       or fatal("Could not generate $cert");
+    }
 }

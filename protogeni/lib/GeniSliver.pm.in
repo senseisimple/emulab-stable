@@ -21,6 +21,7 @@ use GeniCredential;
 use GeniCertificate;
 use GeniAggregate;
 use GeniUsage;
+use GeniHRN;
 # Hate to import all this crap; need a utility library.
 use emutil;
 use Experiment;
@@ -164,7 +165,9 @@ sub Create($$$$$$$$$)
 	    return undef;
 	}
     }
-    $certificate = GeniCertificate->Create("sliver", $hrn, $TBOPS, $uuid)
+    $hrn =~ /.*([^.]+)$/;
+    my $urn = GeniHRN::Generate( "@OURDOMAIN@", "sliver", $1 );
+    $certificate = GeniCertificate->Create("sliver", $urn, $hrn, $TBOPS, $uuid)
 	if (!defined($certificate));
 	
     if (!defined($certificate)) {

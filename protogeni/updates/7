@@ -1,0 +1,19 @@
+#
+# Add a URN field to the authority table.
+#
+use strict;
+use GeniDB;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    DBSetDefault($dbhandle);
+
+    DBQueryFatal( "ALTER TABLE `geni_authorities` " .
+    		  "ADD COLUMN `urn` tinytext" )
+        unless DBSlotExists( "geni_authorities", "urn" );
+    
+    return 0;
+}
+1;

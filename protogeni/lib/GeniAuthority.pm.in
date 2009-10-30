@@ -40,7 +40,7 @@ my %authorities    = ();
 BEGIN { use GeniUtil; GeniUtil::AddCache(\%authorities); }
 
 #
-# Lookup by uuid.
+# Lookup by URN (and also UUID, for compatibility).
 #
 sub Lookup($$)
 {
@@ -49,18 +49,29 @@ sub Lookup($$)
     my $uuid;
 
     if (GeniHRN::IsValid($token)) {
-	my ($auth,$t,$id) = GeniHRN::Parse($token);
-	my $regexp = "/.[-[:alnum:]]+.${auth}";
-	$regexp =~ s/\./\\\./g;
-
 	$query_result =
 	    DBQueryWarn("select uuid from geni_authorities ".
-			"where url regexp '$regexp' and ".
-			"      type='$id'");
-	return undef
-	    if (! $query_result || !$query_result->numrows);
+			"where urn='$token'");
+	if( $query_result && $query_result->numrows ) {
+	    ($uuid) = $query_result->fetchrow_array();
+	} else {
+	    # Fallback for backward compatibility (hunt for an
+	    # authority in the database that was never registered with
+	    # a URN).  This is ugly and fragile and needs to go away
+	    # as soon as all authorities have re-registered with URNs.
+	    my ($auth,$t,$id) = GeniHRN::Parse($token);
+	    my $regexp = "/.[-[:alnum:]]+.${auth}";
+	    $regexp =~ s/\./\\\./g;
 
-	($uuid) = $query_result->fetchrow_array();
+	    $query_result =
+		DBQueryWarn("select uuid from geni_authorities ".
+			    "where url regexp '$regexp' and ".
+			    "      type='$id'");
+	    return undef
+		if (! $query_result || !$query_result->numrows);
+
+	    ($uuid) = $query_result->fetchrow_array();
+	}
     }
     elsif ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
 	$uuid = $token;
@@ -133,6 +144,7 @@ sub Create($$$$)
     my ($prefix) = ($certificate->uuid() =~ /^\w+\-\w+\-\w+\-\w+\-(\w+)$/);
 
     my $safe_hrn    = DBQuoteSpecial($certificate->hrn());
+    my $safe_urn    = DBQuoteSpecial($certificate->URN());
     my $safe_url    = DBQuoteSpecial($url);
     my $safe_uuid   = DBQuoteSpecial($certificate->uuid());
     my $safe_prefix = DBQuoteSpecial($prefix);
@@ -141,13 +153,14 @@ sub Create($$$$)
     # Now tack on other stuff we need.
     push(@insert_data, "created=now()");
     push(@insert_data, "hrn=$safe_hrn");
+    push(@insert_data, "urn=$safe_urn");
     push(@insert_data, "url=$safe_url");
     push(@insert_data, "uuid=$safe_uuid");
     push(@insert_data, "uuid_prefix=$safe_prefix");
     push(@insert_data, "type=$safe_type");
 
     if ($certificate->Store() != 0) {
-	print STDERR "Could not store certificate for new user.\n";
+	print STDERR "Could not store certificate for new authority.\n";
 	return undef;
     }
 
@@ -156,12 +169,13 @@ sub Create($$$$)
 	if (!DBQueryWarn("replace into geni_authorities set " .
 			 join(",", @insert_data)));
 
-    return GeniAuthority->Lookup($certificate->uuid());
+    return GeniAuthority->Lookup($certificate->URN());
 }
 # accessors
 sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'AUTHORITY'}->{$_[1]}); }
 sub uuid($)		{ return field($_[0], "uuid"); }
 sub uuid_prefix($)	{ return field($_[0], "uuid_prefix"); }
+sub urn($)		{ return field($_[0], "urn"); }
 sub url($)		{ return field($_[0], "url"); }
 sub hrn($)		{ return field($_[0], "hrn"); }
 sub type($)		{ return field($_[0], "type"); }

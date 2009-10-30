@@ -585,6 +585,10 @@ sub Register($)
 				    "Could not find URL in the certificate")
 	    if (!defined($url));
 
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not find URN in the certificate")
+	    if (!defined( $certificate->URN() ) );
+
 	if ($certificate->hrn() =~ /^unknown/i) {
 	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 					"Please define PROTOGENI_DOMAIN");

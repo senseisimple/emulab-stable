@@ -18,6 +18,7 @@ use GeniAuthority;
 use GeniCredential;
 use GeniCertificate;
 use GeniAggregate;
+use GeniHRN;
 use English;
 use Date::Parse;
 use Data::Dumper;
@@ -256,11 +257,13 @@ sub CreateFromLocal($$$)
     # XXX Form hrn from the domain. 
     #
     my $hrn = "${PGENIDOMAIN}.slices." . $experiment->idx(); 
+    my $urn = GeniHRN::Generate( "@OURDOMAIN@", "slice", 
+				 "slices." . $experiment->idx() );
 
     #
     # Generate a certificate.
     #
-    $certificate = GeniCertificate->Create("slice", $hrn, $user->email());
+    $certificate = GeniCertificate->Create("slice", $urn, $hrn, $user->email());
     if (!defined($certificate)) {
 	print STDERR "GeniSlice::CreateFromLocal: ".
 	    "Could not generate new certificate $experiment\n";
