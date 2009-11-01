@@ -24,84 +24,68 @@
 				imgAvailable.source = Common.assignAvailabilityIcon(n);
 				imgExclusive.source = Common.assignIcon(n.exclusive);
 				
-				sliverButton.visible = n.sliverRspec != null;
+				sliverButton.visible = node.sliverRspec != null && node.slice == main.selectedSlice && main.userResourcesOnly;
 				sliverButton.includeInLayout = sliverButton.visible;
 				
-				linksEndpointVbox.removeAllChildren();
-				linksStartpointVbox.removeAllChildren();
+				physicalLinksVbox.removeAllChildren();
 				
 				var endpointArray:ArrayCollection = new ArrayCollection();
 				var startpointArray:ArrayCollection = new ArrayCollection();
 				
-				loadEndpoints();
-				loadStartpoints();
+				loadPhysicalLinks();
 				loadSlices();
 			}
 			
 			public function loadSlices():void {
-				slicesVbox.removeAllChildren();
-				if(node.slice != null) {
-					var slice:Label = new Label();
-					slice.text = node.slice.hrn;
-					slicesVbox.addChild(slice);
+				sliceLinksVbox.removeAllChildren();
+				
+				if(node.slice != null && node.slice == main.selectedSlice && main.userResourcesOnly) {
+					linkTabs.addChild(sliceLinksVbox);
+					var nodeSliceLinks:ArrayCollection = new ArrayCollection();
+					for each(var l:PointLink in node.slice.Links) {
+						if(l.node1 == node || l.node2 == node)
+							nodeSliceLinks.addItem(l);
+					}
 					
-					for each(var pl:PointLink in node.slice.Links) {
+					sliceLinksVbox.label = "Slice (" + nodeSliceLinks.length + " Nodes)"
+					var connectedLabel:Label = new Label();
+					if(nodeSliceLinks.length > 0)
+						connectedLabel.text = "Connected on " + node.slice.hrn + " to";
+					else
+						connectedLabel.text = "No linked nodes on " + node.slice.hrn;
+					sliceLinksVbox.addChild(connectedLabel);
+					
+					for each(var pl:PointLink in nodeSliceLinks) {
 						var endNode:Node;
 						if(pl.node1 == node)
 							endNode = pl.node2;
-						else if(pl.node2 == node)
+						else
 							endNode = pl.node1;
-						else
-							continue;
 						
-						var pointLinkHbox:HBox = new HBox();
-						var space:Spacer = new Spacer();
-						space.width = 16;
-						pointLinkHbox.addChild(space);
-						pointLinkHbox.addChild(Common.getNodeButton(endNode));
-						slicesVbox.addChild(pointLinkHbox);
+						sliceLinksVbox.addChild(Common.getNodeButton(endNode));
+						//var pointLinkHbox:HBox = new HBox();
+						//var space:Spacer = new Spacer();
+						//space.width = 16;
+						//pointLinkHbox.addChild(space);
+						//sliceLinksVbox.addChild(pointLinkHbox);
 					}
-				} else {
-					var noSlice:Label = new Label();
-					noSlice.text = "N/A";
-					slicesVbox.addChild(noSlice);
-				}
+				} else if(linkTabs.getChildren().length > 1)
+					linkTabs.removeChild(sliceLinksVbox);
 			}
 			
-			public function loadStartpoints():void {
-				linksStartpointVbox.removeAllChildren();
-				var nodes:ArrayCollection = new ArrayCollection();
-				for each(var ni:NodeInterface in node.interfaces.collection) {
-					var niLabel:Label = new Label();
-					niLabel.text = ni.id;
-					linksStartpointVbox.addChild(niLabel);
-					
-					for each(var l:Link in ni.links) {
-						var endNode:Node;
-						if(l.interface1 == ni)
-							endNode = l.interface2.owner;
-						else
-							endNode = l.interface1.owner;
-						
-						if(!nodes.contains(endNode)) {
-							nodes.addItem(endNode);
-							var linkHbox:HBox = new HBox();
-							var space:Spacer = new Spacer();
-							space.width = 16;
-							linkHbox.addChild(space);
-							linkHbox.addChild(Common.getNodeButton(endNode));
-							linksStartpointVbox.addChild(linkHbox);
-						}
-					}
-				}
-			}
-			
-			public function loadEndpoints():void {
-				linksEndpointVbox.removeAllChildren();
+			public function loadPhysicalLinks():void {
+				physicalLinksVbox.removeAllChildren();
 				var nodes:ArrayCollection = node.GetNodes();
+				physicalLinksVbox.label = "Physical (" + nodes.length + " Nodes)"
+				var connectedLabel:Label = new Label();
+				if(nodes.length > 0)
+					connectedLabel.text = "Connected to";
+				else
+					connectedLabel.text = "No physically linked nodes";
+				physicalLinksVbox.addChild(connectedLabel);
 				
 				for each(var n:Node in nodes) {
-					linksEndpointVbox.addChild(Common.getNodeButton(n));
+					physicalLinksVbox.addChild(Common.getNodeButton(n));
 					
 					var nodeLinks:ArrayCollection = n.GetNodeLinks(node);
 					for each(var l:Link in nodeLinks) {
@@ -118,90 +102,14 @@
 						var endInterfaceButton:Button = Common.getLinkButton(endInterface, l);
 						endInterfaceButton.label = endInterface.id;
 						linkHbox.addChild(endInterfaceButton);
-						linksEndpointVbox.addChild(linkHbox);
+						physicalLinksVbox.addChild(linkHbox);
 					}
 				}
-				
-				/*
-				for each(var i:NodeInterface in n.interfaces.collection) {
-					for each(var l:Link in i.links) {
-						var n:Node;
-						var iEnd:NodeInterface;
-						var iStart:NodeInterface;
-						if(l.interface1 == i) {
-							n = l.interface2.owner;
-							iEnd = l.interface2;
-							iStart = l.interface1;
-						} else {
-							n = l.interface1.owner;
-							iEnd = l.interface1;
-							iStart = l.interface2;
-						}
-						
-						// Build up endpoint
-						var nodeFound:Boolean = false;
-						for each(var na:Object in endpointArray) {
-							if(na.node == n) {
-								nodeFound = true;
-								na.links.addItem({i: iEnd, l: l});
-								break;
-							}
-						}
-						if(!nodeFound) {
-							var newLinks:ArrayCollection = new ArrayCollection();
-							newLinks.addItem({i: iEnd, l: l});
-							endpointArray.addItem({node: n, links: newLinks});
-						}
-						
-						// Build up startpoint
-						var interfaceFound:Boolean = false;
-						for each(var ia:Object in startpointArray) {
-							if(ia.link.i == iStart) {
-								interfaceFound = true;
-								if(!ia.nodes.contains(n))
-									ia.nodes.addItem(n);
-								break;
-							}
-						}
-						if(!interfaceFound) {
-							var newNodes:ArrayCollection = new ArrayCollection();
-							newNodes.addItem(n);
-							startpointArray.addItem({link: {i: iStart, l: l}, nodes: newNodes});
-						}
-						
-						// Build endpoint interface
-						for each(var nodeInfo:Object in endpointArray) {
-							linksEndpointVbox.addChild(Common.getNodeButton(nodeInfo.node));
-							
-							for each(var nodeLink:Object in nodeInfo.links) {
-								var linkHbox:HBox = new HBox();
-								var space:Spacer = new Spacer();
-								space.width = 16;
-								linkHbox.addChild(space);
-								linkHbox.addChild(Common.getLinkButton(nodeLink.i, nodeLink.l));
-								linksEndpointVbox.addChild(linkHbox);
-							}
-						}
-					
-						// Build startpoint interface
-						for each(var linkInfo:Object in startpointArray) {
-							linksStartpointVbox.addChild(Common.getLinkButton(linkInfo.link.i, linkInfo.link.l));
-							
-							for each(var node:Node in linkInfo.nodes) {
-								var linkHbox2:HBox = new HBox();
-								var space2:Spacer = new Spacer();
-								space2.width = 16;
-								linkHbox2.addChild(space2);
-								linkHbox2.addChild(Common.getNodeButton(node));
-								linksStartpointVbox.addChild(linkHbox2);
-							}
-						}
-					}
-				}*/
 			}
 			
 			public function viewComponentRspec():void {
 				var rspecView:XmlWindow = new XmlWindow();
+				rspecView.title = "Advertisement RSPEC for " + node.name;
 				PopUpManager.addPopUp(rspecView, main, false);
        			PopUpManager.centerPopUp(rspecView);
        			rspecView.loadXml(node.rspec);
@@ -212,6 +120,7 @@
 					Alert.show("No Sliver RSPEC!");
 				else {
 					var rspecView:XmlWindow = new XmlWindow();
+					rspecView.title = "Request RSPEC for " + node.name;
 					PopUpManager.addPopUp(rspecView, main, false);
 	       			PopUpManager.centerPopUp(rspecView);
 	       			rspecView.loadXml(node.sliverRspec);
@@ -230,11 +139,11 @@
 						<pgmap:ImageButton id="componentButton"
 							source="@Embed('../images/page_white_code.png')"
 							click="viewComponentRspec()"
-							toolTip="Component RSPEC" />
+							toolTip="View Advertisement RSPEC" />
 						<pgmap:ImageButton id="sliverButton"
 							source="@Embed('../images/page_code.png')"
 							click="viewSliverRspec()"
-							toolTip="Sliver RSPEC" visible="false" />
+							toolTip="View Request RSPEC" visible="false" />
 					</mx:GridItem>
 				</mx:GridRow>
 				<mx:GridRow width="100%">
@@ -293,12 +202,10 @@
 					</mx:VBox>
 					</mx:GridItem>
 					<mx:GridItem width="100%">
-						<mx:TabNavigator width="100%" height="100%" paddingTop="2" paddingRight="2" paddingLeft="2" paddingBottom="2">
-								<mx:VBox label="Endpoint" width="100%" height="100%" id="linksEndpointVbox">
+						<mx:TabNavigator id="linkTabs" width="100%" height="100%" paddingTop="2" paddingRight="2" paddingLeft="2" paddingBottom="2">
+								<mx:VBox label="Physical" width="100%" height="100%" id="physicalLinksVbox">
 								</mx:VBox>
-								<mx:VBox label="Startpoint" width="100%" height="100%" id="linksStartpointVbox">
-								</mx:VBox>
-								<mx:VBox label="Slice" width="100%" height="100%" id="slicesVbox">
+								<mx:VBox label="Slice" width="100%" height="100%" id="sliceLinksVbox">
 								</mx:VBox>
 							</mx:TabNavigator>
 					</mx:GridItem>

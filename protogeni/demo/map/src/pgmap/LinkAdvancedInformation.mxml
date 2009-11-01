@@ -24,6 +24,7 @@
 			
 			public function viewRspec():void {
 				var rspecView:XmlWindow = new XmlWindow();
+				rspecView.title = "Advertisement RSPEC for " + link.name;
 				PopUpManager.addPopUp(rspecView, main, false);
        			PopUpManager.centerPopUp(rspecView);
        			rspecView.loadXml(link.rspec);

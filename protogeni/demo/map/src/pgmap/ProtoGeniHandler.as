@@ -18,8 +18,10 @@
 	import flash.utils.Dictionary;
 	
 	import mx.collections.ArrayCollection;
+	import mx.collections.Sort;
 	import mx.controls.Alert;
 	import mx.managers.PopUpManager;
+	import mx.utils.ObjectUtil;
 	
 	public class ProtoGeniHandler
 	{
@@ -37,8 +39,6 @@
 		public var Nodes:NodeGroupCollection = new NodeGroupCollection();
 		public var Links:LinkGroupCollection = new LinkGroupCollection();
 		
-		public var Slices:ArrayCollection = new ArrayCollection();
-		
 		public function ProtoGeniHandler(m:pgmap)
 		{
 			rpc = new ProtoGeniRpcHandler();
@@ -52,7 +52,6 @@
 		{
 			Nodes = new NodeGroupCollection();
 			Links = new LinkGroupCollection();
-			Slices = new ArrayCollection();
 		}
 		
 		public function getCredential(afterCompletion : Function):void {
@@ -163,7 +162,7 @@
 	        		return;
 	        	}
 	        	//main.console.appendText("parsing...");
-	        	main.console.appendText(fullIdx.toString());
+	        	//main.console.appendText(fullIdx.toString());
 	        	var location:XML = locations[fullIdx];
 	        	
 	        	var lat:Number = Number(location.@latitude);

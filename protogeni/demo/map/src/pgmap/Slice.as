@@ -64,16 +64,42 @@
 							break;
 						case "failed": returnString += " (Sliver Failed)";
 							break;
-						default: returnString += " (Unknown Sliver Status)";
+						default: returnString += " (Sliver N/A)";
 					}
 					break;
 				case "notready": returnString += " (Not Ready)";
 					break;
-				case "failed": returnString += " (Unknown)";
+				case "failed": returnString += " (N/A)";
 					break;
-				default: returnString += " (Unknown)";
+				default: returnString += " (N/A)";
 			}
 			return returnString;
+		}
+		
+		public function CompareValue():int {
+			
+			if(hrn == null && uuid == null) {
+				return -1;
+			}
+			
+			switch(status) {
+				case "ready":
+					switch(sliverStatus) {
+						case "ready": return 0;
+							break;
+						case "notready": return 1;
+							break;
+						case "failed": return 2;
+							break;
+						default: return 3;
+					}
+					break;
+				case "notready": return 4;
+					break;
+				case "failed": return 5;
+					break;
+				default: return 6;
+			}
 		}
 	}
 }

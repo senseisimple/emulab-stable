@@ -28,6 +28,8 @@
 		[Bindable]
 		public var node2:Node;
 		
+		public var type:String;
+		
 		public var slice : Slice = null;
 
 		public var sliverRspec:XML;

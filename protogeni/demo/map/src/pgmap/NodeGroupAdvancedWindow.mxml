@@ -8,6 +8,8 @@
 	
 	<mx:Script>
 		<![CDATA[
+			import mx.collections.SortField;
+			import mx.collections.Sort;
 			import mx.controls.Spacer;
 			import mx.containers.HBox;
 			import mx.controls.Button;
@@ -25,6 +27,14 @@
 			
 			public function loadCollection(group:ArrayCollection):void {
 				nodes = group;
+				
+				var nameSort:Sort = new Sort();
+				var dataSortField:SortField = new SortField();
+	            dataSortField.name = "name";
+	            nameSort.fields = [dataSortField];
+	
+				nodes.sort = nameSort;
+				nodes.refresh();
 				
 				if(nodes.length > 1) {
 					listNodes.selectedIndex = 0;

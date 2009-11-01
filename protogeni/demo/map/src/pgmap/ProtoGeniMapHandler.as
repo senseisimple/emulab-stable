@@ -5,6 +5,8 @@ package pgmap
 	import com.google.maps.MapMouseEvent;
 	import com.google.maps.overlays.Marker;
 	import com.google.maps.overlays.MarkerOptions;
+	import com.google.maps.overlays.Polygon;
+	import com.google.maps.overlays.PolygonOptions;
 	import com.google.maps.overlays.Polyline;
 	import com.google.maps.overlays.PolylineOptions;
 	import com.google.maps.services.ClientGeocoder;
@@ -13,10 +15,12 @@ package pgmap
 	import com.google.maps.styles.FillStyle;
 	import com.google.maps.styles.StrokeStyle;
 	
+	import flash.display.DisplayObject;
 	import flash.events.Event;
 	import flash.events.MouseEvent;
 	import flash.geom.Point;
 	
+	import mx.collections.ArrayCollection;
 	import mx.managers.PopUpManager;
     	
 	public class ProtoGeniMapHandler
@@ -26,6 +30,9 @@ package pgmap
 		public function ProtoGeniMapHandler()
 		{
 		}
+		
+		private var markers:ArrayCollection;
+		private var nodeGroupClusters:ArrayCollection;
 		
 		private function addMarker(g:NodeGroup):void
 	    {
@@ -85,10 +92,10 @@ package pgmap
 				        	
 				  geocoder.addEventListener(GeocodingEvent.GEOCODING_FAILURE,
 				        function(event:GeocodingEvent):void {
-				          //Alert.show("Geocoding failed");
+				          main.console.appendText("Geocoding failed!\n");
 				        });
 	
-				  //geocoder.reverseGeocode(new LatLng(g.latitude, g.longitude));
+				  geocoder.reverseGeocode(new LatLng(g.latitude, g.longitude));
 		        
 		        m.addEventListener(MapMouseEvent.CLICK, function(e:Event):void {
 		            m.openInfoWindow(
@@ -102,6 +109,7 @@ package pgmap
 		        });
 	
 		  		main.map.addOverlay(m);
+		  		markers.addItem({marker:m, nodeGroup:g});
 	    	} else {
 	    		// Draw an empty marker
 	    		var nonodes:Marker = new Marker(
@@ -118,11 +126,63 @@ package pgmap
 	        
 	    }
 	    
+	    private function addNodeGroupCluster(nodeGroups:ArrayCollection):void {
+	    	var totalNodes:Number = 0;
+	    	var upperLat:Number = nodeGroups[0].nodeGroup.latitude;
+	    	var lowerLat:Number = nodeGroups[0].nodeGroup.latitude;
+	    	var rightLong:Number = nodeGroups[0].nodeGroup.longitude;
+	    	var leftLong:Number = nodeGroups[0].nodeGroup.longitude;
+	    	for each(var o:Object in nodeGroups) {
+	    		if(o.nodeGroup.latitude > upperLat)
+	    			upperLat = o.nodeGroup.latitude;
+	    		else if(o.nodeGroup.latitude < lowerLat)
+	    			lowerLat = o.nodeGroup.latitude;
+	    		if(o.nodeGroup.longitude > rightLong)
+	    			rightLong = o.nodeGroup.longitude;
+	    		else if(o.nodeGroup.longitude < leftLong)
+	    			leftLong = o.nodeGroup.longitude;
+
+	    		totalNodes += o.nodeGroup.collection.length;
+	    		o.marker.visible = false;
+	    	}
+	    	
+	    	var polygon:Polygon = new Polygon([
+			    new LatLng(upperLat, leftLong),
+			    new LatLng(upperLat, rightLong),
+			    new LatLng(lowerLat, rightLong),
+			    new LatLng(lowerLat, leftLong),
+			    new LatLng(upperLat, leftLong)
+			    ], 
+			    new PolygonOptions({ 
+			    strokeStyle: new StrokeStyle({
+			        color: 0x0000ff,
+			        thickness: 2,
+			        alpha: 0.5}), 
+			    fillStyle: new FillStyle({
+			        color: 0x0000ff,
+			        alpha: 0.5})
+			}));
+			main.map.addOverlay(polygon); 
+	    	
+	    	var m:Marker = new Marker(
+		      	new LatLng((upperLat + lowerLat)/2, (rightLong + leftLong)/2),
+		      	new MarkerOptions({
+		                  strokeStyle: new StrokeStyle({color: 0x092791}),
+		                  fillStyle: new FillStyle({color: 0xa0c8f1, alpha: 1}),
+		                  radius: 14,
+		                  hasShadow: true,
+		                  //tooltip: g.country,
+		                  label: totalNodes.toString()
+		      	}));
+		      	
+	  		main.map.addOverlay(m);
+	    }
+	    
 	    public function addLink(lg:LinkGroup):void {
 	    	// Create the group to be drawn
 	    	var drawGroup:LinkGroup = lg;
 	    	
-	    	if(drawGroup.collection.length > 0) {
+	    	if(drawGroup.collection.length > 0 && !main.userResourcesOnly) {
 	    		// Add line
 				var polyline:Polyline = new Polyline([
 					new LatLng(drawGroup.latitude1, drawGroup.longitude1),
@@ -162,15 +222,19 @@ package pgmap
 	    
 	    public function addPointLink(pl:PointLink):void {
 	    	// Create the group to be drawn
-	    	if(pl.slice != main.selectedSlice)
+	    	if(pl.slice != main.selectedSlice ||
+	    		pl.node1.owner == pl.node2.owner )
 	    		return;
 	    	
     		// Add line
+    		var c:Object = 0x66FF00;
+    		if(pl.type != "tunnel")
+    			c = 0xFF00FF;
 			var polyline:Polyline = new Polyline([
 				new LatLng(pl.node1.GetLatitude(), pl.node1.GetLongitude()),
 				new LatLng(pl.node2.GetLatitude(), pl.node2.GetLongitude())
 				], new PolylineOptions({ strokeStyle: new StrokeStyle({
-					color: 0xFF00FF,
+					color: c,
 					thickness: 4,
 					alpha:1})
 				}));
@@ -189,8 +253,23 @@ package pgmap
 	    	
 	    	main.setProgress("Drawing map",Common.waitColor);
 	    	
+	    	markers = new ArrayCollection();
 	    	for each(var g:NodeGroup in main.pgHandler.Nodes.collection) {
 	        	addMarker(g);
+	        }
+	        
+	        nodeGroupClusters = new ArrayCollection();
+	        var added:ArrayCollection = new ArrayCollection();
+	        for each(var o:Object in markers) {
+	        	if(!added.contains(o)) {
+	        		var overlapping:ArrayCollection = new ArrayCollection();
+		        	getOverlapping(o, overlapping);
+		        	if(overlapping.length > 0) {
+		        		added.addAll(overlapping);
+		        		nodeGroupClusters.addItem(overlapping);
+		        		addNodeGroupCluster(overlapping);
+		        	}
+	        	}
 	        }
 	        
 	        var drawSlice:Boolean = main.userResourcesOnly && main.selectedSlice != null && main.selectedSlice.status != null;
@@ -220,6 +299,21 @@ package pgmap
 	        }
 	        
 	        main.setProgress("Done", Common.successColor);
+	    }
+	    
+	    public function getOverlapping(o:Object, added:ArrayCollection):void {
+	    	var m:Marker = o.marker;
+	        var d:DisplayObject = m.foreground;
+        	for each(var o2:Object in markers) {
+        		if(o2 != o && !added.contains(o2)) {
+		        	var m2:Marker = o2.marker;
+		        	var d2:DisplayObject = m2.foreground;
+	        		if(d.hitTestObject(d2)) {
+	        			added.addItem(o2);
+	        			getOverlapping(o2, added);
+	        		}
+        		}
+	        }
 	    }
 	    
 	    public function viewNodeGroup(group:NodeGroup):void {

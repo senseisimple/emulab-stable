@@ -19,7 +19,6 @@
 	import flash.events.ErrorEvent;
 	import flash.utils.ByteArray;
 	
-	import mx.controls.Alert;
 	import mx.utils.Base64Decoder;
     	
 	public class ProtoGeniRpcHandler
@@ -105,9 +104,9 @@
 	        main.console.appendText("\nFAILURE event: " + opName + ": "
 	                                + msg);
 	        if(msg.search("#2048") > -1)
-	        	Alert.show("Stream error, possibly due to server error");
+	        	main.console.appendText("\nStream error, possibly due to server error");
 	        else if(msg.search("#2032") > -1)
-	        	Alert.show("Error, possibly due to no SSL certificate");
+	        	main.console.appendText("\nIO Error, possibly due to server problems or you have no SSL certificate");
 	      }
 	      main.console.appendText("\nURL: " + op.getUrl());
 	    }
@@ -157,6 +156,8 @@
 	      if (code == 0)
 	      {
 	      	main.pgHandler.CurrentUser.credential = String(response.value);
+	      	var cred:XML = new XML(response.value);
+	      	main.pgHandler.CurrentUser.uuid = cred.credential.owner_urn;
 	        postCall();
 	      }
 	      else
@@ -173,7 +174,7 @@
 	      main.console.appendText(opName + "...\n");
 	      op.reset(Geni.listComponents);
 	      op.addField("credential", main.pgHandler.CurrentUser.credential);
-	      op.setUrl("https://boss.emulab.net:443/protogeni/xmlrpc/ch");
+	      op.setUrl("https://boss.emulab.net:443/protogeni/xmlrpc");
 	      op.call(completeListComponents, failure);
 	    }
 	    
@@ -205,7 +206,7 @@
 	      op.addField("credential", main.pgHandler.CurrentUser.credential);
 	      if(useCompression)
 	      	op.addField("compress", true);
-	      op.setUrl(ComponentManagerURL);
+	      op.setExactUrl(ComponentManagerURL);
 	      op.call(completeResourceLookup, failure);
 	    }
 	
@@ -241,6 +242,7 @@
 	    
 	    public function startResolveUser() : void
 	    {
+	      main.pgHandler.CurrentUser.slices.removeAll();
 	      opName = "Resolving user";
 	      main.setProgress(opName, Common.waitColor);
 	      main.startWaiting();
@@ -249,6 +251,7 @@
 	      op.addField("credential", main.pgHandler.CurrentUser.credential);
 	      op.addField("uuid", main.pgHandler.CurrentUser.uuid);
 	      op.addField("type", "User");
+	      op.setUrl("https://boss.emulab.net:443/protogeni/xmlrpc");
 	      op.call(completeResolveUser, failure);
 	    }
 	    
@@ -290,6 +293,7 @@
 	      op.addField("credential", main.pgHandler.CurrentUser.credential);
 	      op.addField("hrn", sliceUrns.pop());
 	      op.addField("type", "Slice");
+	      op.setUrl("https://boss.emulab.net:443/protogeni/xmlrpc");
 		  op.call(completeSliceLookup, failure);
 	      addSend();
 	    }
@@ -334,6 +338,7 @@
 	      op.addField("credential", main.pgHandler.CurrentUser.credential);
 	      op.addField("uuid", slice.uuid);
 	      op.addField("type", "Slice");
+	      op.setUrl("https://boss.emulab.net:443/protogeni/xmlrpc");
 		  op.call(completeSliceCredential, failure);
 	      addSend();
 	    }
@@ -371,6 +376,7 @@
 	      main.console.appendText(opName);
 	      op.reset(Geni.sliceStatus);
 	      op.addField("credential", slice.credential);
+	      op.setUrl(ComponentManagerURL);
 		  op.call(completeSliceStatus, failure);
 	      addSend();
 	    }
@@ -429,6 +435,7 @@
 	      main.console.appendText(opName);
 	      op.reset(Geni.getSliver);
 	      op.addField("credential", slice.credential);
+	      op.setUrl(ComponentManagerURL);
 		  op.call(completeGetSliver, failure);
 	      addSend();
 	    }
@@ -465,6 +472,7 @@
 	      main.console.appendText(opName);
 	      op.reset(Geni.sliverStatus);
 	      op.addField("credential", slice.sliverCredential);
+	      op.setUrl(ComponentManagerURL);
 		  op.call(completeSliverStatus, failure);
 	      addSend();
 	    }
@@ -501,6 +509,7 @@
 	      main.console.appendText(opName);
 	      op.reset(Geni.sliverTicket);
 	      op.addField("credential", slice.sliverCredential);
+	      op.setUrl(ComponentManagerURL);
 		  op.call(completeSliverTicket, failure);
 	      addSend();
 	    }
@@ -528,6 +537,7 @@
 	      				var link:PointLink = new PointLink();
 	      				link.node1 = main.pgHandler.Nodes.GetByName(nodeNames[0]);
 	      				link.node2 = main.pgHandler.Nodes.GetByName(nodeNames[1]);
+	      				link.type = component.@link_type;
 	      				link.slice = slice;
 	      				slice.Links.addItem(link);
 	      			}

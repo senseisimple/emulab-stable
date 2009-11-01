@@ -9,6 +9,9 @@
 	
 	<mx:Script>
     <![CDATA[
+    	import com.google.maps.MapZoomEvent;
+    	import com.google.maps.MapMoveEvent;
+    	import mx.events.ResizeEvent;
     	import mx.events.ListEvent;
     	import mx.events.CollectionEvent;
     	import mx.collections.ArrayCollection;
@@ -39,7 +42,6 @@
         public var console:ConsoleWindow;
         public var rspecView:XmlWindow;
         public var about:AboutWindow = new AboutWindow();
-        public var userWindow:ChangeUserWindow = new ChangeUserWindow();
 
 		[Bindable]
 		public var pgHandler:ProtoGeniHandler;
@@ -84,10 +86,6 @@
        		PopUpManager.centerPopUp(about);
 	    }
 	    
-	    public function changeUser():void {
-	    	userWindow.open();
-	    }
-	    
 	    //------------------------------------------
 	    // Component Manager
 	    private function changeCM():void {
@@ -102,6 +100,7 @@
 	    private function viewRspec():void {
 	    	PopUpManager.addPopUp(rspecView, this, false);
        		PopUpManager.centerPopUp(rspecView);
+       		rspecView.title = "Advertisement RSPEC from " + pgHandler.rpc.ComponentManagerURL;
        		rspecView.loadXml(pgHandler.rpc.Rspec);
 	    }
             
@@ -183,8 +182,15 @@
 			
 			map.enableScrollWheelZoom();
 			map.enableContinuousZoom();
-			
+
+  			map.addEventListener(MapZoomEvent.ZOOM_CHANGED, afterMove);
+
 			changeCM();
+	    }
+	    
+	    private function afterMove(evt:MapZoomEvent):void
+	    {
+	    	pgHandler.map.drawMap();
 	    }
 	    
 	    public function setProgress(message:String, color:String):void {
@@ -211,7 +217,7 @@
 </mx:Script>
 
 	<mx:ApplicationControlBar dock="true">
-		<mx:Label text="ProtoGENI Component Display" fontWeight="bold" fontSize="12"/>
+		<mx:Label text="ProtoGENI Map" fontWeight="bold" fontSize="12"/>
 		<mx:VRule height="14"/>
 		<pgmap:ImageButton id="refreshButton"
 			source="@Embed('../images/arrow_refresh.png')"
@@ -231,15 +237,11 @@
 			toolTip="View the most recent RSpec"/>
 		<mx:VRule height="14"/>
 		<mx:ComboBox id="slicesCombobox" dataProvider="{slicesMenu}" labelFunction="getSliceLabel" change="sliceSelected(event)"></mx:ComboBox>
-		<mx:CheckBox label="Only my resources" id="onlyMyResourcesCheckbox" click="userResourcesOnly = onlyMyResourcesCheckbox.selected; pgHandler.map.drawMap()"/>
+		<mx:CheckBox label="Mine" id="onlyMyResourcesCheckbox" click="userResourcesOnly = onlyMyResourcesCheckbox.selected; pgHandler.map.drawMap()"/>
 		<mx:Spacer width="100%"/>
 		<mx:Label text="Initialized" id="progressLabel"  fontStyle="normal" fontWeight="bold"/>
 		<mx:SWFLoader id="waitingIcon" source="@Embed('../images/waiting.swf')" visible="false"/> 
 		<mx:Spacer width="100%"/>
-		<pgmap:ImageButton id="userButton"
-		source="@Embed('../images/user.png')"
-		click="changeUser()" 
-		toolTip="View the most recent RSpec"/>
 		<mx:Label  text="{pgHandler.CurrentUser.uid}"/>
 		<pgmap:ImageButton id="infoButton"
 			source="@Embed('../images/information.png')"

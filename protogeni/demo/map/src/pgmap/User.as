@@ -15,23 +15,31 @@
  package pgmap
 {
 	import mx.collections.ArrayCollection;
+	import mx.collections.Sort;
+	import mx.collections.SortField;
+	import mx.utils.ObjectUtil;
 	
 	public class User
 	{
 		[Bindable]
-		public var uid : String = "mstrum";
+		public var uid : String;
 		
-		public var uuid : String = "66f3b32e-9666-11de-9be3-001143e453fe";
+		public var uuid : String;
 		public var hrn : String;
 		public var email : String;
 		public var name : String;
 		public var credential : String;
 		
-		public var slices:ArrayCollection = new ArrayCollection();
+		public var slices:ArrayCollection;
 		
 		public function User()
 		{
+			slices = new ArrayCollection();
 		}
+		
+		private function compareSlices(slicea:Slice, sliceb:Slice):int {
+			return ObjectUtil.compare(slicea.CompareValue(), sliceb.CompareValue());
+        }
 		
 		public function displaySlices():ArrayCollection {
 			var ac : ArrayCollection = new ArrayCollection();
@@ -39,6 +47,14 @@
 			for each(var s:Slice in slices) {
 				ac.addItem(s);
 			}
+			
+			var dataSortField:SortField = new SortField();
+            dataSortField.compareFunction = compareSlices;
+            
+            var sort:Sort = new Sort();
+            sort.fields = [dataSortField];
+			ac.sort = sort;
+	    	ac.refresh();
 			return ac;
 		}
 	}

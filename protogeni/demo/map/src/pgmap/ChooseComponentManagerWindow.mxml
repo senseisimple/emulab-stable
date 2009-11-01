@@ -56,10 +56,10 @@
 	</mx:HBox>
 	<mx:HBox width="100%" horizontalAlign="right">
 	<mx:Label id="progressLabel"  fontStyle="normal" fontWeight="bold"/>
-		<mx:SWFLoader id="waitingIcon" source="@Embed('../../images/waiting.swf')" visible="false"/> 
-		<mx:Spacer width="100%"/>
-		<mx:Button id="cancelButton" label="Cancel" icon="@Embed('../images/cross.png')" click="close();"/>
-		<mx:Button id="okButton" label="Go" icon="@Embed('../images/tick.png')" click="success();" enabled="false"/>
+	<mx:SWFLoader id="waitingIcon" source="@Embed('../../images/waiting.swf')" visible="false"/> 
+	<mx:Spacer width="100%"/>
+	<mx:Button id="cancelButton" label="Cancel" icon="@Embed('../images/cross.png')" click="close();"/>
+	<mx:Button id="okButton" label="Go" icon="@Embed('../images/tick.png')" click="success();" enabled="false"/>
 	</mx:HBox>
 	
 </mx:TitleWindow>
