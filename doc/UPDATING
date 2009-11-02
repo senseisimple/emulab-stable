@@ -18,6 +18,21 @@ Note that some instructions may have steps that need to occur at a few
 different points in the install process - these are marked with the
 earliest time one of the steps needs to occur.
 
+20091030: After install:
+
+	  The certificate format has been extended (to allow URNs
+	  in all certificates), so after installation, in your object
+	  directory:
+
+	      boss> cd ssl
+	      boss> gmake
+	      boss> sudo gmake install-conf
+
+	  Then, to regenerate and reregister the certificates for
+	  the local authorities:
+
+	      boss> sudo /usr/testbed/sbin/protogeni/initsite
+
 20090121: Before install but after reconfigure and rebuild.
 
 	  There are some functions that need to be installed on boss
