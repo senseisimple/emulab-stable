@@ -439,6 +439,12 @@ foreach my $dbname ("geni", "geni-ch", "geni-cm") {
     }
 }
 
+foreach my $dbname( "geni", "geni-ch", "geni-cm" ) {
+    system( "$MYSQL -e \"UPDATE geni_authorities SET type='ses' WHERE " .
+	    "hrn LIKE '%.ses' AND type='';\" $dbname" ) == 0
+	    or fatal( "Could not update SES type: $dbname" );
+}
+
 #
 # Now we can load the libraries.
 #
