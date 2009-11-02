@@ -76,3 +76,6 @@ INSERT IGNORE INTO sitevariables VALUES ('protogeni/sa_uuid','','','The UUID of 
 INSERT IGNORE INTO sitevariables VALUES ('general/minpoolsize','1','1','The Minimum size of the shared pool');
 INSERT IGNORE INTO sitevariables VALUES ('general/maxpoolsize','1','1','The maximum size of the shared pool');
 INSERT IGNORE INTO sitevariables VALUES ('general/poolnodetype','','','The preferred node type of the shared pool');
+INSERT IGNORE INTO sitevariables VALUES ('general/default_latitude',NULL,'','The default latitude of your site');
+INSERT IGNORE INTO sitevariables VALUES ('general/default_longitude',NULL,'','The default longitude of your site');
+INSERT IGNORE INTO sitevariables VALUES ('general/default_country',NULL,'','The default country of your site');
