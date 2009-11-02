@@ -21,8 +21,10 @@
 tty1::respawn:/sbin/getty 38400 tty1
 tty2::respawn:/sbin/getty 38400 tty2
 
-# Put a getty on the serial port
-ttyS0::respawn:/sbin/getty -L ttyS0 115200 vt100
+# DO NOT SPECIFY ANY SERIAL CONSOLES HERE !!!
+# The '/init' script will automatically add
+# lines for any consoles you pass on the kernel
+# command line, so just specify them there.
 
 # Logging junk
 #null::sysinit:/bin/touch /var/log/messages

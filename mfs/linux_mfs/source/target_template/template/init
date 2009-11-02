@@ -1,7 +1,41 @@
 #! /bin/sh
 
+# Parse /proc/cmdline for any serial console devices to add
+# to /etc/inittab.  Also add the specified devices to
+# /etc/securetty if necessary
+mount -n -t proc none /proc
+for token in `cat /proc/cmdline`; do
+	case $token in
+		console=*) ;;
+		*) continue ;;
+	esac
+
+	device=${token##*=}
+	device=${device%%,*}
+	options=${token##*,}
+	[ "$options" = "$token" ] && options=""
+
+	case $device in
+		ttyS*|ttyUSB*) ;;
+		*) continue ;;
+	esac
+
+	# Right now we assume no parity, 8 data bits, 1 stop bit
+	# since other configurations are generally unlikely these
+	# days.
+
+	speed=`echo $options | sed 's/^\([0-9]*\).*$/\1/'`
+	[ -z "$speed" ] && speed=115200
+
+	echo "$device::respawn:/sbin/getty -L $device $speed vt100" >> /etc/inittab
+
+	if ! grep "^$device$" /etc/securetty > /dev/null 2>&1; then
+		echo $device >> /etc/securetty
+	fi
+done
+umount -n /proc
 mkdir -p /newroot
-mount -t tmpfs none /newroot
+mount -n -t tmpfs none /newroot
 tar cf - `ls / | grep -v newroot` | (cd newroot; tar xf-)
 cd /newroot
 exec switch_root -c /dev/console . /sbin/init $@
