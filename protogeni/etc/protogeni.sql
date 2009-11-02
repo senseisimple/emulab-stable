@@ -38,6 +38,7 @@ CREATE TABLE `geni_authorities` (
   `expires` datetime default NULL,
   `type` enum('sa','ma','ch','cm','ses') NOT NULL default 'sa',
   `url` tinytext,
+  `urn` tinytext,
   PRIMARY KEY  (`uuid`),
   UNIQUE KEY `hrn` (`hrn`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
@@ -151,6 +152,7 @@ CREATE TABLE `geni_certificates` (
   `DN` text,
   `privkey` text,
   `uri` text,
+  `urn` text,
   PRIMARY KEY  (`uuid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
