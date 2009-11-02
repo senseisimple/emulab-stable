@@ -18,6 +18,38 @@ Note that some instructions may have steps that need to occur at a few
 different points in the install process - these are marked with the
 earliest time one of the steps needs to occur.
 
+20091102: After install:
+
+	  Some utilities may make use of location information on
+	  nodes. The default location of the nodes in your cluster is
+	  controlled by three sitevars: general/latitude,
+	  general/longitude, and general/country. First, find your
+	  longitude and latitude:
+
+
+	  1) Go to maps.google.com
+	  2) Zoom in on your location
+	  3) Once you've found your location, right click and select
+	     "What's here?".
+	  4) The latitude,longitude of where you right-clicked is now
+	     in the search field.
+
+	  Next, update the sitevars with the proper location information:
+
+
+	  1) Go to red dot mode on web interface
+	  2) Administration -> Edit Site Variables
+	  3) Click green dot in the 'Edit' column to edit a sitevar,
+	     then type value in 'New value', then click 'Change to New
+	     Value' for the following:
+
+	     a) Edit 'general/default_latitude' to contain latitude
+	     b) Edit 'general/default_longitude' to contain longitude
+	     c) Edit 'general/default_country' to contain two-letter
+	        country code in all caps (this should be 'US' for
+	        locations within the United States).
+
+
 20091030: After install:
 
 	  The certificate format has been extended (to allow URNs
