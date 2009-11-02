@@ -279,7 +279,8 @@ if ($asch) {
     system("/bin/cp $TB/etc/emulab.pem $TB/etc/genicacerts") == 0
 	or fatal("Could not initialize $TB/etc/genicacerts");
 }
-if (! -e "$TB/lib/ssl/syscert.cnf") {
+if (! -e "$TB/lib/ssl/syscert.cnf" ||
+    system( "grep -q protogeni_oids \"$TB/lib/ssl/syscert.cnf\"" ) != 0 ) {
     print "Please go to the ssl subdir of your build tree and do:\n";
     print "    sudo gmake install-conf\n";
     print "Then rerun this script\n";
