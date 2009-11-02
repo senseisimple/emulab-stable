@@ -60,8 +60,8 @@ earliest time one of the steps needs to occur.
 	      boss> gmake
 	      boss> sudo gmake install-conf
 
-	  Then, to regenerate and reregister the certificates for
-	  the local authorities:
+	  ProtoGeni sites only: Regenerate and reregister the
+          certificates for the local authorities:
 
 	      boss> sudo /usr/testbed/sbin/protogeni/initsite
 
