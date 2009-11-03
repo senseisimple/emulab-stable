@@ -76,20 +76,7 @@ params["type"]       = "Slice"
 params["hrn"]        = SLICENAME
 rval,response = do_method("sa", "Resolve", params)
 if rval:
-    #
-    # Create a slice. 
-    #
-    print "Creating new slice called " + SLICENAME
-    params = {}
-    params["credential"] = mycredential
-    params["type"]       = "Slice"
-    params["hrn"]        = SLICENAME
-    rval,response = do_method("sa", "Register", params)
-    if rval:
-        Fatal("Could not create new slice")
-        pass
-    myslice = response["value"]
-    print "New slice created"
+    Fatal("No such slice at SA");
     pass
 else:
     #
@@ -97,27 +84,36 @@ else:
     #
     print "Asking for slice credential for " + SLICENAME
     myslice = response["value"]
-    myslice = get_slice_credential( myslice, mycredential )
+    slicecred = get_slice_credential( myslice, mycredential )
     print "Got the slice credential"
     pass
 
 #
-# Create the sliver.
+# Do a resolve to get the sliver urn.
 #
-print "Creating the Sliver ..."
+print "Resolving the slice at the CM"
 params = {}
-params["credentials"] = (myslice,)
-params["slice_urn"]   = SLICEURN
-params["rspec"]       = rspec
-params["keys"]        = mykeys
-params["impotent"]    = impotent
-rval,response = do_method("cmv2", "CreateSliver", params)
+params["credentials"] = (slicecred,)
+params["urn"]         = myslice["urn"]
+rval,response = do_method("cmv2", "Resolve", params)
 if rval:
-    Fatal("Could not create sliver")
+    Fatal("Could not get resolve slice")
     pass
-sliver,manifest = response["value"]
-print "Created the sliver"
-print str(manifest)
+myslice = response["value"]
+print str(myslice)
+
+#
+# Get the sliver credential.
+#
+print "Asking for sliver credential"
+params = {}
+params["credentials"] = (slicecred,)
+rval,response = do_method("cmv2", "GetSliver", params)
+if rval:
+    Fatal("Could not get Sliver credential")
+    pass
+slivercred = response["value"]
+print "Got the sliver credential"
 
 #
 # Renew the sliver, for kicks
@@ -126,12 +122,29 @@ valid_until = time.strftime("%Y%m%dT%H:%M:%S",time.gmtime(time.time() + 6000));
 
 print "Renewing the Sliver until " + valid_until
 params = {}
+params["credentials"]  = (slivercred,)
 params["slice_urn"]    = SLICEURN
-params["credentials"]  = (sliver,)
 params["valid_until"]  = valid_until
 rval,response = do_method("cmv2", "RenewSliver", params)
 if rval:
     Fatal("Could not renew sliver")
     pass
 print "Sliver has been renewed"
+
+#
+# Update the sliver, getting a ticket back
+#
+print "Updating the Sliver ..."
+params = {}
+params["sliver_urn"]  = myslice["sliver_urn"]
+params["credentials"] = (slicecred,)
+params["rspec"]       = rspec
+params["impotent"]    = impotent
+rval,response = do_method("cmv2", "UpdateSliver", params)
+if rval:
+    Fatal("Could not update sliver")
+    pass
+ticket = response["value"]
+print "Updated the sliver, got a new ticket"
+print str(ticket)
 

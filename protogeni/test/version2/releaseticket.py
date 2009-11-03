@@ -20,9 +20,13 @@ import sys
 import pwd
 import getopt
 import os
+import time
 import re
 
 ACCEPTSLICENAME=1
+
+debug    = 0
+impotent = 1
 
 execfile( "../test-common.py" )
 
@@ -30,22 +34,31 @@ execfile( "../test-common.py" )
 # Get a credential for myself, that allows me to do things at the SA.
 #
 mycredential = get_self_credential()
-print "Got my SA credential. Looking for slice ..."
+print "Got my SA credential"
 
 #
-# Lookup slice, delete before proceeding.
+# Lookup slice.
 #
-myslice = resolve_slice( SLICENAME, mycredential )
-print "Found the slice, asking for a credential ..."
+params = {}
+params["credential"] = mycredential
+params["type"]       = "Slice"
+params["hrn"]        = SLICENAME
+rval,response = do_method("sa", "Resolve", params)
+if rval:
+    Fatal("No such slice at SA");
+    pass
+else:
+    #
+    # Get the slice credential.
+    #
+    print "Asking for slice credential for " + SLICENAME
+    myslice = response["value"]
+    slicecred = get_slice_credential( myslice, mycredential )
+    print "Got the slice credential"
+    pass
 
 #
-# Get the slice credential.
-#
-slicecred = get_slice_credential( myslice, mycredential )
-print "Got the slice credential, asking for a sliver credential ..."
-
-#
-# Do a resolve to get the sliver urn.
+# Do a resolve to get the ticket urn.
 #
 print "Resolving the slice at the CM"
 params = {}
@@ -58,35 +71,33 @@ if rval:
 myslice = response["value"]
 print str(myslice)
 
-if not "sliver_urn" in myslice:
-    Fatal("No sliver exists for slice")
+if not "ticket_urn" in myslice:
+    Fatal("No ticket exists for slice")
     pass
 
 #
-# Get the sliver credential.
+# Get the ticket with another call to resolve.
 #
+print "Asking for the ticket"
 params = {}
 params["credentials"] = (slicecred,)
-params["slice_urn"]   = SLICEURN
-rval,response = do_method("cmv2", "GetSliver", params)
+params["urn"]         = myslice["ticket_urn"]
+rval,response = do_method("cmv2", "Resolve", params)
 if rval:
-    Fatal("Could not get Sliver credential")
+    Fatal("Could not get the ticket")
     pass
-slivercred = response["value"]
-print "Got the sliver credential, deleting the sliver";
-
-#
-# Delete the sliver.
-#
-params = {}
-params["credentials"] = (slivercred,)
-params["sliver_urn"]  = myslice["sliver_urn"]
-rval,response = do_method("cmv2", "DeleteSliver", params)
-if rval:
-    Fatal("Could not delete sliver")
-    pass
-print "Sliver has been deleted. Ticket for remaining time:"
 ticket = response["value"]
-print str(ticket);
+print "Got the ticket"
 
+#
+# And release the ticket.
+#
+print "Releasing the ticket"
+params = {}
+params["ticket"] = ticket
+rval,response = do_method("cmv2", "ReleaseTicket", params)
+if rval:
+    Fatal("Could not release the ticket")
+    pass
+print "The ticket has been released"
 

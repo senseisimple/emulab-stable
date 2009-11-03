@@ -48,6 +48,7 @@ print "Got the slice credential, asking for a sliver credential ..."
 # Get the sliver credential.
 #
 params = {}
+params["slice_urn"]   = SLICEURN
 params["credentials"] = (slicecred,)
 rval,response = do_method("cmv2", "GetSliver", params)
 if rval:
@@ -60,6 +61,7 @@ print "Got the sliver credential, asking for sliver status";
 # Get the sliver status
 #
 params = {}
+params["slice_urn"]   = SLICEURN
 params["credentials"] = (slivercred,)
 rval,response = do_method("cmv2", "SliverStatus", params)
 if rval:

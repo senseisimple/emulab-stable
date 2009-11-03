@@ -42,51 +42,19 @@ print "Found the slice, asking for a credential ..."
 # Get the slice credential.
 #
 slicecred = get_slice_credential( myslice, mycredential )
-print "Got the slice credential, asking for a sliver credential ..."
+print "Got the slice credential"
 
 #
-# Do a resolve to get the sliver urn.
+# Delete the Slice
 #
-print "Resolving the slice at the CM"
-params = {}
-params["credentials"] = (slicecred,)
-params["urn"]         = myslice["urn"]
-rval,response = do_method("cmv2", "Resolve", params)
-if rval:
-    Fatal("Could not resolve slice")
-    pass
-myslice = response["value"]
-print str(myslice)
-
-if not "sliver_urn" in myslice:
-    Fatal("No sliver exists for slice")
-    pass
-
-#
-# Get the sliver credential.
-#
+print "Deleting the slice"
 params = {}
 params["credentials"] = (slicecred,)
 params["slice_urn"]   = SLICEURN
-rval,response = do_method("cmv2", "GetSliver", params)
+rval,response = do_method("cmv2", "DeleteSlice", params)
 if rval:
-    Fatal("Could not get Sliver credential")
+    Fatal("Could not delete slice")
     pass
-slivercred = response["value"]
-print "Got the sliver credential, deleting the sliver";
-
-#
-# Delete the sliver.
-#
-params = {}
-params["credentials"] = (slivercred,)
-params["sliver_urn"]  = myslice["sliver_urn"]
-rval,response = do_method("cmv2", "DeleteSliver", params)
-if rval:
-    Fatal("Could not delete sliver")
-    pass
-print "Sliver has been deleted. Ticket for remaining time:"
-ticket = response["value"]
-print str(ticket);
+print "Slice has been deleted."
 
 

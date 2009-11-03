@@ -40,6 +40,7 @@ else:
 mycredential = get_self_credential()
 print "Got my SA credential"
 
+
 print "Resolving at the local CM"
 params = {}
 params["credentials"] = (mycredential,)

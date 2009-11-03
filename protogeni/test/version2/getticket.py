@@ -22,11 +22,10 @@ import getopt
 import os
 import time
 import re
+import xmlrpclib
+from M2Crypto import X509
 
 ACCEPTSLICENAME=1
-
-debug    = 0
-impotent = 1
 
 execfile( "../test-common.py" )
 
@@ -44,28 +43,16 @@ elif len(REQARGS) == 1:
 else:
     rspec = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
             " <node virtual_id=\"geni1\" "+\
-            "       virtualization_type=\"emulab-vnode\" " +\
-            "       startup_command=\"/bin/ls > /tmp/foo\"> " +\
+            "       virtualization_type=\"emulab-vnode\"> " +\
             " </node>" +\
-            "</rspec>"    
+            "</rspec>"
+    pass
 
 #
 # Get a credential for myself, that allows me to do things at the SA.
 #
 mycredential = get_self_credential()
-print "Got my SA credential"
-
-#
-# Lookup my ssh keys.
-#
-params = {}
-params["credential"] = mycredential
-rval,response = do_method("sa", "GetKeys", params)
-if rval:
-    Fatal("Could not get my keys")
-    pass
-mykeys = response["value"]
-if debug: print str(mykeys)
+print "Got my SA credential, looking up " + SLICENAME
 
 #
 # Lookup slice.
@@ -96,42 +83,42 @@ else:
     # Get the slice credential.
     #
     print "Asking for slice credential for " + SLICENAME
-    myslice = response["value"]
-    myslice = get_slice_credential( myslice, mycredential )
+    myslice = get_slice_credential( response[ "value" ], mycredential )
     print "Got the slice credential"
     pass
 
 #
-# Create the sliver.
+# Get a ticket. We do not have a real resource discovery tool yet, so
+# as a debugging aid, you can wildcard the uuid, and the CM will find
+# a free node and fill it in.
 #
-print "Creating the Sliver ..."
+print "Asking for a ticket from the local CM"
+
 params = {}
-params["credentials"] = (myslice,)
 params["slice_urn"]   = SLICEURN
+params["credentials"] = (myslice,)
 params["rspec"]       = rspec
-params["keys"]        = mykeys
-params["impotent"]    = impotent
-rval,response = do_method("cmv2", "CreateSliver", params)
+params["impotent"]    = 0
+rval,response = do_method("cmv2", "GetTicket", params)
 if rval:
-    Fatal("Could not create sliver")
+    Fatal("Could not get ticket")
     pass
-sliver,manifest = response["value"]
-print "Created the sliver"
-print str(manifest)
+ticket = response["value"]
+#print str(ticket)
 
 #
-# Renew the sliver, for kicks
+# Update the ticket.
 #
-valid_until = time.strftime("%Y%m%dT%H:%M:%S",time.gmtime(time.time() + 6000));
-
-print "Renewing the Sliver until " + valid_until
+print "Got the ticket, doing a update on it. "
 params = {}
-params["slice_urn"]    = SLICEURN
-params["credentials"]  = (sliver,)
-params["valid_until"]  = valid_until
-rval,response = do_method("cmv2", "RenewSliver", params)
+params["slice_urn"]   = SLICEURN
+params["ticket"]      = ticket
+params["credentials"] = (myslice,)
+params["rspec"]       = rspec
+params["impotent"]    = 0
+rval,response = do_method("cmv2", "UpdateTicket", params)
 if rval:
-    Fatal("Could not renew sliver")
+    Fatal("Could not update ticket")
     pass
-print "Sliver has been renewed"
-
+ticket = response["value"]
+print str(ticket)
