@@ -1,0 +1,250 @@
+#! /usr/bin/env perl
+
+use strict;
+
+my $progname = $0;
+$progname =~ s/^.*\///;
+
+sub usage
+{
+	print STDERR "Usage: $progname BSD_SLICE MOUNTPOINT\n";
+}
+
+# Scan a block device for a BSD disklabel and return a hash
+# of each partition's size, offset, and fstype hashed by
+# partition letter.  Skips partitions with fstype == 0,
+# handles slice-relative disklabels.
+
+# XXX doesn't support OpenBSD revised labels (48-bit addressing)
+sub scan_bsd_disklabel
+{
+	my ($device, $container_offset, $container_size) = @_;
+	my $data;
+	my $output;
+	my @partnames = split '', 'abcdefghijklmnopqrstuvwxyz';
+
+	open DEV, $device || die "Failed to open $device: $!\n";
+	#seek DEV, 512, 0 || die "Failed to seek on $device: $!\n";
+	read DEV, $data, 512 || die "Failed to read: $!\n";
+	read DEV, $data, 512 || die "Failed to read: $!\n";
+	close DEV;
+
+	my $magic = unpack 'V', substr($data, 0x00, 4);
+	my $magic2 = unpack 'V', substr($data, 0x84, 4);
+	my $secsize = unpack 'V', substr($data, 0x28, 4);
+	my $npartitions = unpack 'v', substr($data, 0x8a, 2);
+
+	if ($magic != 0x82564557 || $magic2 != $magic) {
+		die "invalid magic on $device\n";
+	}
+
+	my $output = {};
+	for (my $i = 0; $i < $npartitions; $i++) {
+		my ($size, $offset, $fsize, $fstype, $frag, $cpg) =
+		unpack 'VVVCCv', substr($data, 0x94 +
+	                                (0x10 * $i), 0x10);
+
+		$$output{$partnames[$i]} = { start => $offset, size => $size,
+		                 fstype => $fstype };
+	}
+
+	my $bsd_part_offset = 0;
+	if ($container_size && $$output{'c'}{fstype} == 0 &&
+	    $$output{'c'}{start} == 0 &&
+	    $$output{'c'}{size} == $container_size) {
+		$bsd_part_offset = $container_offset;
+	}
+
+	for (keys %$output) {
+		if (!$$output{$_}{fstype}) {
+			delete $$output{$_};
+			next;
+		}
+
+		$$output{$_}{start} += $bsd_part_offset;
+	}
+
+
+	return $output;
+}
+
+# Returns a hash of partition offsets and sizes for the supplied disk,
+# hashed by partition device name (i.e. /dev/sda1)
+sub get_partitions
+{
+	my ($disk) = @_;
+	my $dev_name;
+	my $sysfs_dir;
+	my @partitions;
+	my $output;
+
+	if (! -b $disk) {
+		die "$disk: not a valid block device\n";
+	}
+
+	$dev_name = $disk;
+	$dev_name =~ s#^/dev/##;
+	my $sysfs_dir = "/sys/block/$dev_name";
+	for my $file (glob "$sysfs_dir/$dev_name*") {
+		if (-f "$file/start" ) {
+			push @partitions, $file;
+		}
+	}
+
+	$output = {};
+
+	for my $part (@partitions) {
+		my $dev = $part;
+		$dev =~ s#^.*/##;
+		$dev = "/dev/$dev";
+
+		open START, "$part/start" || die;
+		my $start = <START>;
+		chomp $start;
+		close START;
+
+		open SIZE, "$part/size" || die;
+		my $size = <SIZE>;
+		chomp $size;
+		close SIZE;
+
+		$$output{$dev} = { start => $start, size => $size };
+	}
+
+	return $output;
+}
+
+# XXX The linux UFS driver doesn't autodetect the filesystem type, so we must
+# try 44bsd first, then ufs2.
+sub mount_ufs
+{
+	my ($device, $mtpt) = @_;
+
+	if (system("mount -t ufs -o ro,ufstype=44bsd $device $mtpt")) {
+		if (system("mount -t ufs -o ro,ufstype=ufs2 $device $mtpt")) {
+			return undef;
+		}
+	}
+
+	return 1;
+}
+
+# Reads the /etc/fstab file within the directory specified, and returns
+# a hash of BSD disklabel partitions to mount, hashed by their mountpoints.
+# Only returns mounts in the same slice as the root partition, and doesn't
+# return 'swap' or 'mfs' type mounts.
+sub get_bsd_fstab
+{
+	my ($mtpt) = @_;
+	my $mounts = {};
+
+	open FSTAB, "$mtpt/etc/fstab" ||
+	      die "Couldn't open $mtpt/fstab for reading: $!\n";
+
+	while (<FSTAB>) {
+		next if (/^#/ || /^\s*$/);
+		@_ = split /\s+/;
+		next if ($_[2] eq 'swap' || $_[2] eq 'mfs');
+		$$mounts{$_[1]} = $_[0];
+	}
+	close FSTAB;
+
+	if (not exists $$mounts{'/'}) {
+		print STDERR "Couldn't find root device in $mtpt/etc/fstab\n";
+		return undef;
+	}
+
+	my $bsd_slice_dev = $$mounts{'/'};
+	$bsd_slice_dev =~ s/[a-z]$//;
+
+	for my $mount (keys %$mounts) {
+		if ($$mounts{$mount} !~ /^$bsd_slice_dev[a-z]$/) {
+			delete $$mounts{$mount};
+		} else {
+			$$mounts{$mount} =~ s/^.*([a-z])$/$1/;
+		}
+	}
+
+	return $mounts;
+}
+
+sub main
+{
+	if (@ARGV < 2) {
+		usage();
+		exit 1;
+	}
+
+	my $device = $ARGV[0];
+	my $mtpt = $ARGV[1];
+
+	my $disk_dev = $device;
+
+	if ($disk_dev =~ /^(.*\d+)p\d+$/) {
+		$disk_dev = $1;
+	} elsif ($disk_dev =~ /^(.*)\d+$/) {
+		$disk_dev = $1;
+	}
+
+	my %bsd_to_linux;
+	my $bsd_parts;
+	my $linux_parts = get_partitions($disk_dev);
+	if (not exists $$linux_parts{$device}) {
+		print STDERR "Unable to get offset/size info for $device\n";
+		exit 1;
+	}
+
+	$bsd_parts = scan_bsd_disklabel($device,
+					$$linux_parts{$device}{start},
+					$$linux_parts{$device}{size});
+
+	# Map BSD partition to Linux partition
+	for my $bsd_part (keys %$bsd_parts) {
+		my $offset = $$bsd_parts{$bsd_part}{start};
+		my $size = $$bsd_parts{$bsd_part}{size};
+
+		for my $linux_part (keys %$linux_parts) {
+			my $off = $$linux_parts{$linux_part}{start};
+			my $sz = $$linux_parts{$linux_part}{size};
+			my $index = $linux_part;
+			$index =~ s/^.*(\d+)$/$1/;
+
+			# BSD partitions are always >= 5 on Linux
+			next if ($index < 5 ||
+				 $off != $offset ||
+				 $sz != $size ||
+				 exists $bsd_to_linux{$bsd_part});
+
+			$bsd_to_linux{$bsd_part} = $linux_part;
+		}
+	}
+
+	# Get the list of disklabel partitions that need to be mounted
+	# and their mountpoints.
+	mount_ufs($bsd_to_linux{'a'}, $mtpt) ||
+	          die "Unable to mount 'a' partition\n";
+	my $bsd_mounts = get_bsd_fstab($mtpt);
+
+	# Look up the Linux partition for each disklabel
+	# partition in fstab and mount it at the right
+	# mountpoint.  Sort the mountpoints to make sure
+	# we mount everything in the right order (i.e.,
+	# /usr before /usr/local)
+	for my $bsd_mount (sort keys %$bsd_mounts) {
+		my $bsd_part = $$bsd_mounts{$bsd_mount};
+		next if ($bsd_part eq 'a');
+
+		if (not exists $bsd_to_linux{$bsd_part}) {
+			print STDERR "Failed to map BSD partition '$bsd_part' " .
+				     "to Linux partition. Skipping...\n";
+			next;
+		}
+
+		mount_ufs($bsd_to_linux{$bsd_part}, "$mtpt/$bsd_mount") ||
+		     die "Failed to mount $mtpt/$bsd_mount\n";
+	}
+
+	return 0;
+}
+
+&main;
