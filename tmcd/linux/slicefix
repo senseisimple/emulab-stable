@@ -147,7 +147,7 @@ dofreebsd() {
 	fi
 
 	# Try mounting the filesystem as UFSv1 first,
-	# tnen try UFSv2 if that doesn't work.
+	# then try UFSv2 if that doesn't work.
 
 	mount -t $fstype -o $fsopts $rootdev /mnt || {
 		fsopts=ro,ufstype=ufs2
