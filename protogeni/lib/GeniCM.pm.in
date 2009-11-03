@@ -801,10 +801,8 @@ sub GetTicketAuxAux($$$$$$$$)
 			"osname"  => $osname,
 			"ips"     => '', # deprecated
 			"cmd_line"=> '', # bogus
-			"fixed"   => (defined($node) ?
-				      $node->node_id() : 
-				      (defined($subnode_of) ?
-				       $subnode_of : "")),
+			"fixed"   => (defined($subnode_of) ? $subnode_of :
+				      defined($node) ? $node->node_id() : ""),
 			};
 
 	# Tarball and startup command.
