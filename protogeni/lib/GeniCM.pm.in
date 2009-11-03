@@ -1059,6 +1059,14 @@ sub GetTicketAuxAux($$$$$$$$)
 	    $slice_experiment->RemovePhysicalState();
 	    $slice_experiment->RestorePhysicalState();
 	}
+	# Dump the vtop.
+	if (-e "$pid-$eid.vtop") {
+	    print STDERR "----------------------------------------------\n";
+	    print STDERR "------------------ Vtop File -----------------\n";
+	    my $log = `cat $pid-$eid.vtop`;
+	    print STDERR $log . "\n";
+	    print STDERR "----------------------------------------------\n";
+	}	    
 	#
 	# Lets dump the error log too, so it ends up in the email.
 	# Have to figure out a better approach for this.
@@ -1754,6 +1762,14 @@ sub SliverWorkAux($$$$$$$)
     system("$MAPPER -d -v -u -m 3 $pid $eid");
     if ($?) {
 	print STDERR "Mapper failed!\n";
+	# Dump the vtop.
+	if (-e "$pid-$eid.vtop") {
+	    print STDERR "----------------------------------------------\n";
+	    print STDERR "------------------ Vtop File -----------------\n";
+	    my $log = `cat $pid-$eid.vtop`;
+	    print STDERR $log . "\n";
+	    print STDERR "----------------------------------------------\n";
+	}	    
 	#
 	# Lets dump the error log too, so it ends up in the email.
 	# Have to figure out a better approach for this.
