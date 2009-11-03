@@ -61,6 +61,7 @@ script-install:
 	install -m 755 $(TMCD_PATH)/linux/rc.ipod $(TARGET_PATH)/etc/testbed
 	install -m 755 $(TMCD_PATH)/linux/slicefix $(TARGET_PATH)/etc/testbed
 	install -m 755 $(TMCD_PATH)/linux/freebsd_to_linux_disk $(TARGET_PATH)/etc/testbed
+	install -m 755 $(TMCD_PATH)/linux/mount_bsd_slice $(TARGET_PATH)/etc/testbed
 	install -m 755 $(TMCD_PATH)/linux/check_disklabel $(TARGET_PATH)/etc/testbed
 	install -m 755 $(TMCD_PATH)/linux/remap_ide_disks $(TARGET_PATH)/etc/testbed
 	install -m 755 $(TMCD_PATH)/linux/get_edd_map.pl $(TARGET_PATH)/etc/testbed
