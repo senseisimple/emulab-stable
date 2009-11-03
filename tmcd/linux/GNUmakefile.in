@@ -89,6 +89,7 @@ frisbee-mfs-install:	destdircheck
 	$(INSTALL) -m 755 $(SRCDIR)/check_disklabel $(SYSETCDIR)/testbed
 	$(INSTALL) -m 755 $(SRCDIR)/linux_slicefix $(SYSETCDIR)/testbed
 	$(INSTALL) -m 755 $(SRCDIR)/extract_kernel_info $(SYSETCDIR)/testbed
+	$(INSTALL) -m 755 $(SRCDIR)/mount_bsd_slice $(SYSETCDIR)/testbed
 	$(INSTALL) -m 755 $(SRCDIR)/extract_initrd_info $(SYSETCDIR)/testbed
 	$(INSTALL) -m 755 $(SRCDIR)/extract_image_info $(SYSETCDIR)/testbed
 	$(INSTALL) -m 755 $(SRCDIR)/get_edd_map $(SYSETCDIR)/testbed
@@ -223,6 +224,7 @@ script-install:	dir-install $(SCRIPTS)
 	$(INSTALL) -m 755 $(SRCDIR)/extract_kernel_info $(BINDIR)
 	$(INSTALL) -m 755 $(SRCDIR)/extract_initrd_info $(BINDIR)
 	$(INSTALL) -m 755 $(SRCDIR)/extract_image_info $(BINDIR)
+	$(INSTALL) -m 755 $(SRCDIR)/mount_bsd_slice $(SYSETCDIR)/testbed
 	$(INSTALL) -m 755 $(SRCDIR)/get_edd_map $(BINDIR)/testbed
 	$(INSTALL) -m 755 -s ../findif $(BINDIR)/findif
 	$(INSTALL) -m 755 $(SRCDIR)/rc.linux $(BINDIR)/rc
