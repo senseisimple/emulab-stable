@@ -1109,6 +1109,7 @@ sub GetTicketAuxAux($$$$$$$$)
 	my $colocate       = $rspec->{'colocate'} ||
 	    $rspec->{'phys_nickname'};
 	my $exclusive      = $rspec->{'exclusive'};
+	my $subnode_of     = $rspec->{'subnode_of'};
 	$exclusive = 0
 	    if (!defined($exclusive));
 	
@@ -1119,7 +1120,11 @@ sub GetTicketAuxAux($$$$$$$$)
 	$rspec->{'component_manager_uuid'} = $ENV{'MYUUID'};
 
 	# Also update the virtexperiment table row.
-	$virtnode->fixed($node->node_id());
+	# Do not update subnodes; they are fixed to the parent,
+	# while the parent is fixed to an actual node.
+	if (!defined($subnode_of)) {
+	    $virtnode->fixed($node->node_id());
+	}
 
 	#
 	# Shared and virt nodes do not need to be allocated.
