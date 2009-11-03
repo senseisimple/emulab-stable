@@ -1724,10 +1724,12 @@ sub SliverWorkAux($$$$$$$)
 	}
 	$restorephys = 1;
 
-	system("$SNMPIT -r $pid $eid");
-	if ($?) {
-	    print STDERR "Could not tear down vlans\n";
-	    goto bad;
+	if (!$v2) {
+	    system("$SNMPIT -r $pid $eid");
+	    if ($?) {
+		print STDERR "Could not tear down vlans\n";
+		goto bad;
+	    }
 	}
     }
     else {
@@ -2066,19 +2068,28 @@ sub SliverWorkAux($$$$$$$)
     # We want to do this stuff only once, not for each node. 
     #
     # Must have the topofile for node boot. Might need locking on this.
-    if (system("$GENTOPOFILE $pid $eid")) {
-	print STDERR "$GENTOPOFILE failed\n";
-	goto bad;
+    #
+    if (!$v2) {
+	if (system("$GENTOPOFILE $pid $eid")) {
+	    print STDERR "$GENTOPOFILE failed\n";
+	    goto bad;
+	}
+	if (system("$EXPORTS_SETUP")) {
+	    print STDERR "$EXPORTS_SETUP failed\n";
+	    goto bad;
+	}
+	# The nodes will not boot locally unless there is a DNS record.
+	if (system("$NAMEDSETUP")) {
+	    print STDERR "$NAMEDSETUP failed\n";
+	    goto bad;
+	}
+	system("$SNMPIT -t $pid $eid");
+	if ($?) {
+	    $message = "Could not set up vlans";
+	    goto bad;
+	}
     }
-    if (system("$EXPORTS_SETUP")) {
-	print STDERR "$EXPORTS_SETUP failed\n";
-	goto bad;
-    }
-    # The nodes will not boot locally unless there is a DNS record.
-    if (system("$NAMEDSETUP")) {
-	print STDERR "$NAMEDSETUP failed\n";
-	goto bad;
-    }
+	
     # Set up plab nodes all at once. 
     if ($needplabslice && @plabnodes && !$impotent) {
 	my @node_ids = map { $_->node_id() } @plabnodes;
@@ -2088,15 +2099,6 @@ sub SliverWorkAux($$$$$$$)
 	    print STDERR "$VNODESETUP failed\n";
 	    goto bad;
 	}
-    }
-
-    #
-    # Run snmpit ...
-    #
-    system("$SNMPIT -t $pid $eid");
-    if ($?) {
-	$message = "Could not set up vlans";
-	goto bad;
     }
 
     # The Manifest.
@@ -2180,12 +2182,14 @@ sub SliverWorkAux($$$$$$$)
 		print STDERR "Could not restore backup state for $pid,$eid\n";
 	    }
 	}
-	system("$SNMPIT -t $pid $eid");
-	if ($?) {
-	    print STDERR "Could not restore vlans\n";
+	if (!$v2) {
+	    system("$SNMPIT -t $pid $eid");
+	    if ($?) {
+		print STDERR "Could not restore vlans\n";
+	    }
 	}
     }
-    else {
+    elsif (!$v2) {
 	system("$SNMPIT -r $pid $eid");
 	if ($?) {
 	    print STDERR "Could not tear down vlans\n";
@@ -2442,7 +2446,7 @@ sub StartSliver($)
 	}
     }
     
-    if (!$impotent && $sliver->Start() != 0) {
+    if (!$impotent && $sliver->Start($API_VERSION, 0) != 0) {
 	$slice->UnLock();
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not start sliver/aggregate");
@@ -3662,13 +3666,6 @@ sub CleanupDeadSlice($;$)
 		return -1;
 	    }
 	}
-	# These are not serious errors.
-	if (system("$EXPORTS_SETUP")) {
-	    print STDERR "$EXPORTS_SETUP failed\n";
-	}
-	if (system("$NAMEDSETUP")) {
-	    print STDERR "$NAMEDSETUP failed\n";
-	}
     }
 
     #
@@ -3746,6 +3743,16 @@ sub CleanupDeadSlice($;$)
 
     DBQueryWarn("delete from geni_manifests ".
 		"where slice_uuid='$slice_uuid'");
+
+    if (defined($experiment)) {
+	# These are not serious errors.
+	if (system("$EXPORTS_SETUP")) {
+	    print STDERR "$EXPORTS_SETUP failed\n";
+	}
+	if (system("$NAMEDSETUP")) {
+	    print STDERR "$NAMEDSETUP failed\n";
+	}
+    }
 
     return 0
 	if (!$purge);
