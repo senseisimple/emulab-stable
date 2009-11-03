@@ -2,11 +2,10 @@ package pgmap
 {
 	import com.google.maps.InfoWindowOptions;
 	import com.google.maps.LatLng;
+	import com.google.maps.LatLngBounds;
 	import com.google.maps.MapMouseEvent;
 	import com.google.maps.overlays.Marker;
 	import com.google.maps.overlays.MarkerOptions;
-	import com.google.maps.overlays.Polygon;
-	import com.google.maps.overlays.PolygonOptions;
 	import com.google.maps.overlays.Polyline;
 	import com.google.maps.overlays.PolylineOptions;
 	import com.google.maps.services.ClientGeocoder;
@@ -21,11 +20,14 @@ package pgmap
 	import flash.geom.Point;
 	
 	import mx.collections.ArrayCollection;
+	import mx.events.FlexEvent;
 	import mx.managers.PopUpManager;
+	
     	
 	public class ProtoGeniMapHandler
 	{
 		public var main : pgmap;
+		
 		
 		public function ProtoGeniMapHandler()
 		{
@@ -69,34 +71,41 @@ package pgmap
 		        var groupInfo:NodeGroupInfo = new NodeGroupInfo();
 		        groupInfo.Load(drawGroup, main);
 		        
-		        var geocoder:ClientGeocoder = new ClientGeocoder();
-		    	
-		    	geocoder.addEventListener(GeocodingEvent.GEOCODING_SUCCESS,
-				      function(event:GeocodingEvent):void {
-				      	var placemarks:Array = event.response.placemarks;
-				        if (placemarks.length > 0) {
-				        	try {
-				        		var p:Placemark = event.response.placemarks[0] as Placemark;
-				        		var fullAddress : String = p.address;
-				        		var splitAddress : Array = fullAddress.split(',');
-				        		if(splitAddress.length == 3)
-				        			groupInfo.city = splitAddress[0];
-				        		else 
-				        		if(splitAddress.length == 4)
-				        			groupInfo.city = splitAddress[1];
-				        		else
-				        			drawGroup.city = fullAddress;
-				        	} catch (err:Error) { }
-				        }
-				      });
-				        	
-				  geocoder.addEventListener(GeocodingEvent.GEOCODING_FAILURE,
-				        function(event:GeocodingEvent):void {
-				          main.console.appendText("Geocoding failed!\n");
-				        });
-	
-				  geocoder.reverseGeocode(new LatLng(g.latitude, g.longitude));
-		        
+		        if(drawGroup.city.length == 0)
+		        {
+			        var geocoder:ClientGeocoder = new ClientGeocoder();
+			    	geocoder.addEventListener(GeocodingEvent.GEOCODING_SUCCESS,
+					      function(event:GeocodingEvent):void {
+					      	var placemarks:Array = event.response.placemarks;
+					        if (placemarks.length > 0) {
+					        	try {
+					        		var p:Placemark = event.response.placemarks[0] as Placemark;
+					        		var fullAddress : String = p.address;
+					        		var splitAddress : Array = fullAddress.split(',');
+					        		if(splitAddress.length == 3)
+					        			groupInfo.city = splitAddress[0];
+					        		else 
+					        		if(splitAddress.length == 4)
+					        			groupInfo.city = splitAddress[1];
+					        		else
+					        			groupInfo.city = fullAddress;
+					        		drawGroup.city = groupInfo.city;
+					        	} catch (err:Error) { }
+					        }
+					      });
+					        	
+					  geocoder.addEventListener(GeocodingEvent.GEOCODING_FAILURE,
+					        function(event:GeocodingEvent):void {
+					        main.console.appendText("******************\n");
+					        main.console.appendText("Geocoding failed!\n");
+					        main.console.appendText(event.status + "\n"); // 500
+					        main.console.appendText(event.eventPhase + "\n"); //2
+					        });
+		
+					  geocoder.reverseGeocode(new LatLng(g.latitude, g.longitude));
+		        } else {
+		        	groupInfo.city = drawGroup.city;
+		        }
 		        m.addEventListener(MapMouseEvent.CLICK, function(e:Event):void {
 		            m.openInfoWindow(
 		            	new InfoWindowOptions({
@@ -128,11 +137,14 @@ package pgmap
 	    
 	    private function addNodeGroupCluster(nodeGroups:ArrayCollection):void {
 	    	var totalNodes:Number = 0;
+	    	var l:LatLngBounds = new LatLngBounds();
 	    	var upperLat:Number = nodeGroups[0].nodeGroup.latitude;
 	    	var lowerLat:Number = nodeGroups[0].nodeGroup.latitude;
 	    	var rightLong:Number = nodeGroups[0].nodeGroup.longitude;
 	    	var leftLong:Number = nodeGroups[0].nodeGroup.longitude;
+	    	var nodeGroupsOnly:ArrayCollection = new ArrayCollection();
 	    	for each(var o:Object in nodeGroups) {
+	    		// Check to see if the new group expends the cluster size
 	    		if(o.nodeGroup.latitude > upperLat)
 	    			upperLat = o.nodeGroup.latitude;
 	    		else if(o.nodeGroup.latitude < lowerLat)
@@ -143,38 +155,41 @@ package pgmap
 	    			leftLong = o.nodeGroup.longitude;
 
 	    		totalNodes += o.nodeGroup.collection.length;
+	    		nodeGroupsOnly.addItem(o.nodeGroup);
 	    		o.marker.visible = false;
 	    	}
 	    	
-	    	var polygon:Polygon = new Polygon([
-			    new LatLng(upperLat, leftLong),
-			    new LatLng(upperLat, rightLong),
-			    new LatLng(lowerLat, rightLong),
-			    new LatLng(lowerLat, leftLong),
-			    new LatLng(upperLat, leftLong)
-			    ], 
-			    new PolygonOptions({ 
-			    strokeStyle: new StrokeStyle({
-			        color: 0x0000ff,
-			        thickness: 2,
-			        alpha: 0.5}), 
-			    fillStyle: new FillStyle({
-			        color: 0x0000ff,
-			        alpha: 0.5})
-			}));
-			main.map.addOverlay(polygon); 
+	    	// Save the bounds of the cluster
+	    	var bounds:LatLngBounds = new LatLngBounds(new LatLng(upperLat, leftLong), new LatLng(lowerLat, rightLong));
 	    	
+	    	var clusterInfo:NodeGroupClusterInfo = new NodeGroupClusterInfo();
+	    	clusterInfo.addEventListener(FlexEvent.CREATION_COMPLETE,
+	    		function loadNodeGroup(evt:FlexEvent):void {
+	    			clusterInfo.Load(nodeGroupsOnly);
+		    		clusterInfo.setZoomButton(bounds);
+	    		});
+		    
+
 	    	var m:Marker = new Marker(
-		      	new LatLng((upperLat + lowerLat)/2, (rightLong + leftLong)/2),
+		      	bounds.getCenter(),
 		      	new MarkerOptions({
-		                  strokeStyle: new StrokeStyle({color: 0x092791}),
-		                  fillStyle: new FillStyle({color: 0xa0c8f1, alpha: 1}),
-		                  radius: 14,
-		                  hasShadow: true,
-		                  //tooltip: g.country,
-		                  label: totalNodes.toString()
+		      			  icon:new iconLabelSprite(totalNodes.toString()),
+		      			  iconAllignment:MarkerOptions.ALIGN_RIGHT,
+		      			  iconOffset:new Point(-2, -2),
+		                  hasShadow: true
 		      	}));
-		      	
+		    
+		    m.addEventListener(MapMouseEvent.CLICK, function(e:Event):void {
+		            m.openInfoWindow(
+		            	new InfoWindowOptions({
+		            		customContent:clusterInfo,
+		            		customoffset: new Point(0, 10),
+		            		width:150,
+		            		height:150,
+		            		drawDefaultFrame:true
+		            	}));
+		        });
+				  	
 	  		main.map.addOverlay(m);
 	    }
 	    
