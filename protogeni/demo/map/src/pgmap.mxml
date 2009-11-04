@@ -213,6 +213,11 @@
 	    	waitingIcon.visible = false;
 	    	chooseCMWindow.waitingIcon.visible = false;
 	    }
+	    
+	    public function resetZoom():void {
+	   		map.setZoom(4);
+	        map.panTo(new LatLng(38,-97));
+	    }
     ]]>
 </mx:Script>
 
@@ -237,20 +242,24 @@
 			toolTip="View the most recent RSpec"/>
 		<mx:VRule height="14"/>
 		<mx:ComboBox id="slicesCombobox" dataProvider="{slicesMenu}" labelFunction="getSliceLabel" change="sliceSelected(event)"></mx:ComboBox>
-		<mx:CheckBox label="Mine" id="onlyMyResourcesCheckbox" click="userResourcesOnly = onlyMyResourcesCheckbox.selected; pgHandler.map.drawMap()"/>
+		<mx:CheckBox label="Show Mine Only" id="onlyMyResourcesCheckbox" click="userResourcesOnly = onlyMyResourcesCheckbox.selected; pgHandler.map.drawMap()"/>
 		<mx:Spacer width="100%"/>
 		<mx:Label text="Initialized" id="progressLabel"  fontStyle="normal" fontWeight="bold"/>
 		<mx:SWFLoader id="waitingIcon" source="@Embed('../images/waiting.swf')" visible="false"/> 
 		<mx:Spacer width="100%"/>
 		<mx:Label  text="{pgHandler.CurrentUser.uid}"/>
-		<pgmap:ImageButton id="infoButton"
-			source="@Embed('../images/information.png')"
-			click="showAbout()"
-			toolTip="View more information" />
+		<pgmap:ImageButton id="resetZoomButton"
+			source="@Embed('../images/zoom.png')"
+			click="resetZoom();"
+			toolTip="Reset zoom" />
 		<pgmap:ImageButton id="fullscreenButton"
 			source="@Embed('../images/arrow_out.png')"
 			click="toggleFullScreen()"
 			toolTip="Toggle fullscreen" />
+		<pgmap:ImageButton id="infoButton"
+			source="@Embed('../images/information.png')"
+			click="showAbout()"
+			toolTip="View more information" />
 	</mx:ApplicationControlBar>
 
 	<maps:Map height="100%" width="100%" id="map" preinitialize="mappreinit()"

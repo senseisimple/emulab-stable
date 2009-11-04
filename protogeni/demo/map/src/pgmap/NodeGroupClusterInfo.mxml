@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml"
-	width="140" height="150"
- horizontalAlign="center" verticalGap="0">
+	width="170" height="160"
+ horizontalAlign="center" verticalGap="2">
 	
 	<mx:Script>
 		<![CDATA[
@@ -17,8 +17,13 @@
 
 			public function Load(cluster:ArrayCollection):void 
 			{
+				var nodeCount:int = 0;
 				for each(var ng:NodeGroup in cluster)
+				{
 					addNodeGroup(ng);
+					nodeCount += ng.collection.length;
+				}
+				clusterLabel.text = nodeCount + " Nodes in " + cluster.length + " Groups";
 			}	
 			
 			public function addNodeGroup(ng:NodeGroup):void {
@@ -55,7 +60,7 @@
 					        		else
 					        			city = fullAddress;
 					        		ng.city = city;
-					        		ngButton.label = city;
+					        		ngButton.label = city + " (" + ng.collection.length + ")";
 					        	} catch (err:Error) { }
 					        }
 					      });
@@ -67,31 +72,27 @@
 		
 					  geocoder.reverseGeocode(new LatLng(ng.latitude, ng.longitude));
 			 } else {
-		        	ngButton.label = ng.city;
+		        	ngButton.label = ng.city + " (" + ng.collection.length + ")";
 		        }
 				nodeGroupButtonsVbox.addChild(ngButton);
 			}
 			
 			public function setZoomButton(bounds:LatLngBounds):void {
-				if(zoomButton == null)
-				{
-					Alert.show("ERR");
-					return;
-				}
 				zoomButton.addEventListener(MouseEvent.CLICK,
 					function zoomin(evt:MouseEvent):void {
 						var map : Map = Common.Main().map;
 						var bzl : Number  = map.getBoundsZoomLevel(bounds);
 				        if(map.getZoom() != bzl)
 				          map.setZoom(bzl);
-			        	map.panTo( bounds.getCenter() ); 
+			        	map.panTo( bounds.getCenter() );
 	    			});
+	    		
 			}
 		]]>
 	</mx:Script>
-	<mx:Label text="Label"/>
-	<mx:VBox width="90%" height="100%" id="nodeGroupButtonsVbox">
+	<mx:Label text="Label" id="clusterLabel"/>
+	<mx:VBox width="170" height="114" id="nodeGroupButtonsVbox" verticalGap="2" horizontalGap="2" paddingBottom="2" paddingLeft="2" paddingRight="2" paddingTop="2" borderStyle="solid">
 	</mx:VBox>
-	<mx:Button label="Zoom" id="zoomButton"/>
+	<mx:Button label="Zoom" id="zoomButton" icon="@Embed('../../images/zoom_in.png')"/>
 
 </mx:VBox>

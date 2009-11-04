@@ -34,7 +34,11 @@ package pgmap
 		}
 		
 		private var markers:ArrayCollection;
-		private var nodeGroupClusters:ArrayCollection;
+		private var clusterMarkers:ArrayCollection;
+		private var linkLineOverlays:ArrayCollection;
+		private var linkLabelOverlays:ArrayCollection;
+
+		private var nodeGroupClusters:ArrayCollection;		
 		
 		private function addMarker(g:NodeGroup):void
 	    {
@@ -111,8 +115,8 @@ package pgmap
 		            	new InfoWindowOptions({
 		            		customContent:groupInfo,
 		            		customoffset: new Point(0, 10),
-		            		width:140,
-		            		height:150,
+		            		width:125,
+		            		height:160,
 		            		drawDefaultFrame:true
 		            	}));
 		        });
@@ -174,23 +178,25 @@ package pgmap
 		      	bounds.getCenter(),
 		      	new MarkerOptions({
 		      			  icon:new iconLabelSprite(totalNodes.toString()),
-		      			  iconAllignment:MarkerOptions.ALIGN_RIGHT,
-		      			  iconOffset:new Point(-2, -2),
+		      			  //iconAllignment:MarkerOptions.ALIGN_RIGHT,
+		      			  iconOffset:new Point(-20, -20),
 		                  hasShadow: true
 		      	}));
 		    
 		    m.addEventListener(MapMouseEvent.CLICK, function(e:Event):void {
-		            m.openInfoWindow(
+					m.openInfoWindow(
 		            	new InfoWindowOptions({
 		            		customContent:clusterInfo,
 		            		customoffset: new Point(0, 10),
-		            		width:150,
-		            		height:150,
+		            		width:180,
+		            		height:170,
 		            		drawDefaultFrame:true
 		            	}));
 		        });
-				  	
+
+
 	  		main.map.addOverlay(m);
+	  		clusterMarkers.addItem(m);
 	    }
 	    
 	    public function addLink(lg:LinkGroup):void {
@@ -209,6 +215,7 @@ package pgmap
 					}));
 	
 				main.map.addOverlay(polyline);
+				linkLineOverlays.addItem(polyline);
 				
 				// Add link marker
 				var ll:LatLng = new LatLng((drawGroup.latitude1 + drawGroup.latitude2)/2, (drawGroup.longitude1 + drawGroup.longitude2)/2);
@@ -220,6 +227,7 @@ package pgmap
 		        });
 		        
 		  		main.map.addOverlay(t);
+				linkLabelOverlays.addItem(t);
 	    	} else {
 	    		// Add line
 				var blankline:Polyline = new Polyline([
@@ -268,25 +276,9 @@ package pgmap
 	    	
 	    	main.setProgress("Drawing map",Common.waitColor);
 	    	
-	    	markers = new ArrayCollection();
-	    	for each(var g:NodeGroup in main.pgHandler.Nodes.collection) {
-	        	addMarker(g);
-	        }
-	        
-	        nodeGroupClusters = new ArrayCollection();
-	        var added:ArrayCollection = new ArrayCollection();
-	        for each(var o:Object in markers) {
-	        	if(!added.contains(o)) {
-	        		var overlapping:ArrayCollection = new ArrayCollection();
-		        	getOverlapping(o, overlapping);
-		        	if(overlapping.length > 0) {
-		        		added.addAll(overlapping);
-		        		nodeGroupClusters.addItem(overlapping);
-		        		addNodeGroupCluster(overlapping);
-		        	}
-	        	}
-	        }
-	        
+	    	// Draw links first
+	    	linkLabelOverlays = new ArrayCollection();
+	    	linkLineOverlays = new ArrayCollection();
 	        var drawSlice:Boolean = main.userResourcesOnly && main.selectedSlice != null && main.selectedSlice.status != null;
 	        if(drawSlice) {
 	        	for each(var drawGroup:LinkGroup in main.pgHandler.Links.collection) {
@@ -310,6 +302,52 @@ package pgmap
 		        	if(!l.IsSameSite()) {
 		        		addLink(l);
 		        	}
+		        }
+	        }
+	        
+	        // Draw markers
+	        markers = new ArrayCollection();
+	    	for each(var g:NodeGroup in main.pgHandler.Nodes.collection) {
+	        	addMarker(g);
+	        }
+	        
+	        // Combine overlapping markers
+	        clusterMarkers = new ArrayCollection();
+	        nodeGroupClusters = new ArrayCollection();
+	        var added:ArrayCollection = new ArrayCollection();
+	        for each(var o:Object in markers) {
+	        	if(!added.contains(o)) {
+	        		var overlapping:ArrayCollection = new ArrayCollection();
+		        	getOverlapping(o, overlapping);
+		        	if(overlapping.length > 0) {
+		        		added.addAll(overlapping);
+		        		nodeGroupClusters.addItem(overlapping);
+		        		addNodeGroupCluster(overlapping);
+		        	}
+	        	}
+	        }
+	        
+	        // Remove link items that are blocking markers
+	        for each(var linkLabel:TooltipOverlay in linkLabelOverlays)
+	        {
+	        	var removed:Boolean = false;;
+	        	 var d:DisplayObject = linkLabel.foreground;
+	        	for each(var clusterMarker:Marker in clusterMarkers) {
+	        		if(linkLabel.foreground.hitTestObject(clusterMarker.foreground)) {
+	        			main.map.removeOverlay(linkLabel);
+	        			removed = true;
+	        			break;
+	        		}
+		        }
+		        if(!removed)
+		        {
+		        	for each(var ngo:Object in markers) {
+		        		var nodegroupMarker:Marker = ngo.marker;
+		        		if(linkLabel.foreground.hitTestObject(nodegroupMarker.foreground)) {
+		        			main.map.removeOverlay(linkLabel);
+		        			break;
+		        		}
+			        }
 		        }
 	        }
 	        

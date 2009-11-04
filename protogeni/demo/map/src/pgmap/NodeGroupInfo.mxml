@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml"
 	width="140" height="150"
- horizontalAlign="center" verticalGap="0">
+ horizontalAlign="center" verticalGap="0" paddingBottom="0" paddingLeft="0" paddingRight="0" paddingTop="0">
 	
 	<mx:Script>
 		<![CDATA[
