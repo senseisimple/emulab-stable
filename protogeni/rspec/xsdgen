@@ -18,6 +18,19 @@ done
 
 for path in 0.1; do
   rm -f ${path}/*.xsd
+
+  ### Manifest
+  $TRANGCMD ${path}/manifest.rnc ${path}/manifest.xsd
+
+  mv ${path}/top.xsd ${path}/manifest-top.xsd
+  sed "s/top.xsd/manifest-top.xsd/" ${path}/common.xsd > ${path}/manifest-common.xsd
+  rm ${path}/common.xsd
+  sed "s/common.xsd/manifest-common.xsd/" ${path}/request.xsd > ${path}/manifest-request.xsd
+  rm ${path}/request.xsd
+  sed "s/request.xsd/manifest-request.xsd/" ${path}/manifest.xsd > ${path}/manifest.tmp
+  mv ${path}/manifest.tmp ${path}/manifest.xsd
+  ### End Manifest
+
   for schema in ad request; do
     $TRANGCMD ${path}/${schema}.rnc ${path}/${schema}.xsd
 
