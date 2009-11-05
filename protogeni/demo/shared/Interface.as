@@ -21,7 +21,8 @@ package
       virtualId = newVirtualId;
       name = newName;
       used = false;
-      role = CONTROL;
+      role = UNUSED;
+      bandwidth = 0;
     }
 
     public function clone() : Interface
@@ -29,6 +30,7 @@ package
       var result = new Interface(virtualId, name);
       result.used = used;
       result.role = role;
+      result.bandwidth = bandwidth;
       return result;
     }
 
@@ -36,8 +38,12 @@ package
     public var name : String;
     public var used : Boolean;
     public var role : int;
+    public var bandwidth : int;
 
     public static var CONTROL = 0;
     public static var EXPERIMENTAL = 1;
+    public static var UNUSED = 2;
+    public static var UNUSED_CONTROL = 3;
+    public static var UNUSED_EXPERIMENTAL = 4;
   }
 }

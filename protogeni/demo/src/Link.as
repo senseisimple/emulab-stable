@@ -31,8 +31,8 @@ package
       left.addLink(this);
       right = newRight;
       right.addLink(this);
-      leftInterface = "";
-      rightInterface = "";
+      leftInterface = null;
+      rightInterface = null;
       tunnelIp = 0;
       if (isTunnel())
       {
@@ -41,7 +41,9 @@ package
       else
       {
         leftInterface = left.allocateInterface();
+        leftInterfaceName = interfaceToName(left, leftInterface);
         rightInterface = right.allocateInterface();
+        rightInterfaceName = interfaceToName(right, rightInterface);
       }
 
       removeClick = newRemoveClick;
@@ -66,6 +68,20 @@ package
       left.removeLink(this);
       right.freeInterface(rightInterface);
       right.removeLink(this);
+    }
+
+    public function interfaceToName(node : Node, iface : Interface) : String
+    {
+      var result = "";
+      if (node.getManager().getVersion() == 0)
+      {
+        result = iface.name;
+      }
+      else
+      {
+        result = iface.virtualId;
+      }
+      return result;
     }
 
     public function renumber(number : int) : void
@@ -110,6 +126,10 @@ package
         {
           result.@virtual_id = "link" + String(number);
         }
+        if (! isTunnel())
+        {
+          result.appendChild(getBandwidthXml());
+        }
 
         if (version >= 3)
         {
@@ -137,8 +157,10 @@ package
           }
         }
 
-        result.appendChild(getInterfaceXml(left, leftInterface, 0, version));
-        result.appendChild(getInterfaceXml(right, rightInterface, 1, version));
+        result.appendChild(getInterfaceXml(left, leftInterfaceName, 0,
+                                           version));
+        result.appendChild(getInterfaceXml(right, rightInterfaceName, 1,
+                                           version));
       }
       return result;
     }
@@ -190,6 +212,13 @@ package
       return result;
     }
 
+    function getBandwidthXml() : XML
+    {
+      var bandwidth = Math.floor(Math.min(leftInterface.bandwidth,
+                                          rightInterface.bandwidth));
+      return XML("<bandwidth>" + bandwidth + "</bandwidth>");
+    }
+
     function ipToString(ip : int) : String
     {
       var first : int = ((ip >> 8) & 0xff);
@@ -225,9 +254,11 @@ package
 
     var number : int;
     var left : Node;
-    var leftInterface : String;
+    var leftInterface : Interface;
+    var leftInterfaceName : String;
     var right : Node;
-    var rightInterface : String;
+    var rightInterface : Interface;
+    var rightInterfaceName : String;
     var tunnelIp : int;
     var canvas : Shape;
     var removeClick : Function;

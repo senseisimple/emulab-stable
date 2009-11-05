@@ -285,6 +285,15 @@ package
                 var newInterface = new Interface("virt-"
                                                  + String(interfaceNumber),
                                                  interName);
+                var interRole = inter.attribute("role");
+                if (interRole == "control")
+                {
+                  newInterface.role = Interface.UNUSED_CONTROL;
+                }
+                else if (interRole == "experimental")
+                {
+                  newInterface.role = Interface.UNUSED_EXPERIMENTAL;
+                }
                 com.interfaces.push(newInterface);
                 ++interfaceNumber;
               }
@@ -333,6 +342,13 @@ package
       var linkName : QName = new QName(rspec.namespace(), "link");
       for each (var link in rspec.elements(linkName))
       {
+        var bandwidthName : QName = new QName(rspec.namespace(),
+                                              "bandwidth");
+        var bandwidth : int = 100000;
+        for each (var current in link.elements(bandwidthName))
+        {
+          bandwidth = int(current.text());
+        }
         var interElement : QName = new QName(rspec.namespace(),
                                              "interface_ref");
         if (version < 2)
@@ -364,7 +380,15 @@ package
             {
               if (interName == nodeInter.name)
               {
-                nodeInter.role = Interface.EXPERIMENTAL;
+                if (nodeInter.role == Interface.UNUSED_EXPERIMENTAL)
+                {
+                  nodeInter.role = Interface.EXPERIMENTAL;
+                }
+                else if (nodeInter.role == Interface.UNUSED_CONTROL)
+                {
+                  nodeInter.role = Interface.CONTROL;
+                }
+                nodeInter.bandwidth = bandwidth;
               }
             }
           }

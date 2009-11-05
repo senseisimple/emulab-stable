@@ -177,7 +177,7 @@ package
       if (code == 0)
       {
         user = response.value;
-        startSliceLookup();
+        startSliceDelete();
       }
       else
       {
@@ -217,8 +217,7 @@ package
       clip.loadText.text = "Deleting existing slice";
       op.reset(Geni.remove);
       op.addField("credential", credential.base);
-//      op.addField("uuid", sliceId);
-      op.addField("hrn", "urn:publicid:IDN+emulab.net+slice+"+sliceName);
+      op.addField("hrn", "urn:publicid:IDN+" + AUTHORITY + "+slice+"+sliceName);
       op.addField("type", "Slice");
       op.call(completeSliceDelete, failure);
       addSend();
@@ -243,7 +242,7 @@ package
       clip.loadText.text = "Creating new slice";
       op.reset(Geni.register);
       op.addField("credential", credential.base);
-      op.addField("hrn", "urn:publicid:IDN+emulab.net+slice+"+sliceName);
+      op.addField("hrn", "urn:publicid:IDN+" + AUTHORITY + "+slice+"+sliceName);
 //      op.addField("hrn", sliceName);
       op.addField("type", "Slice");
 //      op.addField("userbindings", new Array(user.uuid));
@@ -306,6 +305,8 @@ package
     var user : Object;
     var credential : Credential;
 
-    static var userName : String = "ricci";
+    static var userName : String = "duerig";
+    static var AUTHORITY : String = "emulab.net";
+//    static var AUTHORITY : String = "jonlab.geni.emulab.net";
   }
 }

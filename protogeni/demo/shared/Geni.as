@@ -21,6 +21,8 @@ package
     private static var ses : String = "ses";
     private static var ch : String = "ch";
 
+    private static var cmv2 : String = "cmv2";
+
     public static var sesUrl : String = "https://myboss.emulab.geni.emulab.net/protogeni/xmlrpc/";
 //"https://boss.emulab.net:443/protogeni/xmlrpc/";
 
@@ -44,8 +46,10 @@ package
     public static var sliverStatus : Array = new Array(cm, "SliverStatus");
     public static var sliverTicket : Array = new Array(cm, "SliverTicket");
 
+    public static var discoverResourcesv2 : Array = new Array(cmv2, "DiscoverResources");
+
     public static var map : Array = new Array(ses, "Map");
-    
+
     public static var listComponents : Array = new Array(ch, "ListComponents");
   }
 }

@@ -72,12 +72,14 @@ package
                              ".emulab.net",
                              "https://myboss.myelab.testbed.emulab.net:443/protogeni/xmlrpc",
                              updateList, 2),
+
         new ComponentManager("28a10955-aa00-11dd-ad1f-001143e453fe",
                              "Emulab",
                              ".emulab.net",
                              "https://boss.emulab.net:443/protogeni/xmlrpc",
 // Doesn't work ???                             "https://boss.emulab.net:443/dev/stoller/protogeni/xmlrpc",
                              updateList, 2),
+
 /*
         new ComponentManager("be300821-ecb7-11dd-a0f8-001143e43ff3",
                              "gtwelab",
@@ -85,6 +87,11 @@ package
                              "https://myboss.emulab.geni.emulab.net:443/protogeni/xmlrpc",
                              updateList, 2),
 */
+        new ComponentManager("27cd73fb-b908-11de-837a-0002b33f8548",
+                             "jonlab",
+                             ".emulab.net",
+                             "https://myboss.jonlab.geni.emulab.net:443/protogeni/xmlrpc",
+                             updateList, 2),
         new ComponentManager("b83b47be-e7f0-11dd-848b-0013468d3dc8",
                              "Kentucky",
                              ".uky.emulab.net",

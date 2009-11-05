@@ -16,13 +16,10 @@ package
 {
   class RequestReleaseTicket extends Request
   {
-    public function RequestReleaseTicket(newTicket : String,
-                                         newUrl : String,
-                                         newServer : String) : void
+    public function RequestReleaseTicket(newManager : ComponentManager) : void
     {
-      super(newServer);
-      ticket = newTicket;
-      url = newUrl;
+      super(newManager.getName());
+      manager = newManager;
     }
 
     override public function cleanup() : void
@@ -34,12 +31,22 @@ package
     {
       opName = "Release Ticket";
       op.reset(Geni.releaseTicket);
-      op.addField("ticket", ticket);
-      op.setUrl(url);
+      op.addField("credential", credential.slice);
+      op.addField("ticket", manager.getTicket());
+      op.setUrl(manager.getUrl());
       return op;
     }
 
-    var ticket : String;
-    var url : String;
+    override public function complete(code : Number, response : Object,
+                                      credential : Credential) : Request
+    {
+      if (code == 0)
+      {
+        manager.setTicket(null);
+      }
+      return null;
+    }
+
+    var manager : ComponentManager;
   }
 }

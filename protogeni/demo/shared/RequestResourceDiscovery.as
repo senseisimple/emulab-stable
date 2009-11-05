@@ -30,7 +30,13 @@ package
     override public function start(credential : Credential) : Operation
     {
       opName = "Discovering Resources";
-      op.reset(Geni.discoverResources);
+      var opType = Geni.discoverResources;
+      if (cm.getName() == "Wisconsin" || cm.getName() == "Kentucky"
+        || cm.getName() == "CMU")
+      {
+        opType = Geni.discoverResourcesv2;
+      }
+      op.reset(opType);
       op.addField("credential", credential.slice);
       op.setUrl(cm.getUrl());
       return op;

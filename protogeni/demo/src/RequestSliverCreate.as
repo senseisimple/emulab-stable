@@ -114,10 +114,7 @@ package
       var result : Request = null;
       if (manager.getTicket() != null)
       {
-        result = new RequestReleaseTicket(manager.getTicket(),
-                                          manager.getUrl(),
-                                          manager.getName());
-        manager.setTicket(null);
+        result = new RequestReleaseTicket(manager);
       }
       return result;
     }

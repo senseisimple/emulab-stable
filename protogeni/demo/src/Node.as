@@ -191,22 +191,15 @@ package
       return name + manager.getHostName();
     }
 
-    public function allocateInterface() : String
+    public function allocateInterface() : Interface
     {
-      var result = null;
+      var result : Interface = null;
       for each (var candidate in interfaces)
       {
         if (! candidate.used && candidate.role == Interface.EXPERIMENTAL)
         {
           candidate.used = true;
-          if (manager.getVersion() == 0)
-          {
-            result = candidate.name;
-          }
-          else
-          {
-            result = candidate.virtualId;
-          }
+          result = candidate;
           break;
         }
       }
@@ -216,17 +209,18 @@ package
                                          null);
         newInterface.used = true;
         newInterface.role = Interface.EXPERIMENTAL;
+        newInterface.bandwidth = 100000;
         interfaces.push(newInterface);
-        result = newInterface.virtualId;
+        result = newInterface;
       }
       return result;
     }
 
-    public function freeInterface(interName : String) : void
+    public function freeInterface(iface : Interface) : void
     {
       for each (var candidate in interfaces)
       {
-        if (interName == candidate.virtualId)
+        if (iface == candidate)
         {
           candidate.used = false;
           break;
@@ -338,6 +332,8 @@ package
         {
           str += "exclusive=\"1\"";
         }
+//        str += "tarfiles=\"/tmp http://valas.gtnoise.net/files/mux-client.tar.gz\" ";
+//        str += "startup_command=\"/tmp/client.py\" ";
         str += ">";
         if (component.isBgpMux)
         {
@@ -422,7 +418,7 @@ package
       }
       for each (var inter in interfaces)
       {
-        if (inter.used || inter.role == Interface.CONTROL)
+        if (inter.used || inter.role != Interface.EXPERIMENTAL)
         {
           result += "<font color=\"#770000\">";
         }

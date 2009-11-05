@@ -99,9 +99,7 @@ package
       {
         if (ticket != null && manager.getVersion() > 0)
         {
-          result = new RequestReleaseTicket(ticket, manager.getUrl(),
-                                            manager.getName());
-          manager.setTicket(null);
+          result = new RequestReleaseTicket(manager);
         }
         if (beginTunnel)
         {
