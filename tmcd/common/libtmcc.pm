@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -71,6 +71,7 @@ my $beproxy     = 0;
       "useudp"		=> 0,
       "beproxy"		=> 0,	# A unix domain path when true.
       "dounix"		=> 0,	# A unix domain path when true.
+      "beinetproxy"	=> 0,   # A string of the form "ipaddr:port"
       "server"		=> undef,
       "portnum"		=> undef,
       "version"		=> undef,
@@ -290,6 +291,10 @@ sub optionstring($%)
     if ($opthash{"dounix"}) {
 	$options .= " -l " . $opthash{"dounix"};
     }
+    if ($opthash{"beinetproxy"}) {
+	$options .= " -X " . $opthash{"beinetproxy"};
+	$beproxy  = 1;
+    }
     if (defined($opthash{"server"})) {
 	$options .= " -s " . $opthash{"server"};
     }
@@ -347,7 +352,7 @@ sub runtmcc ($;$$%)
     }
 
     #
-    # Special case. If the proxy option is given, exec and forget.
+    # Special case. If a proxy option is given, exec and forget.
     #
     if ($beproxy) {
 	exec($string);

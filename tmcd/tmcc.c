@@ -92,7 +92,9 @@ static int	getbossnode(char **, int *);
 static int	doudp(char *, int, struct in_addr, int);
 static int	dotcp(char *, int, struct in_addr);
 static int	dounix(char *, int, char *);
-static void	beproxy(char *, struct in_addr, char *);
+static void	beudproxy(char *, struct in_addr, char *);
+static void	beidproxy(struct in_addr, int, struct in_addr, char *);
+static void	beproxy(int, int, struct in_addr, char *);
 static int	dooutput(int, char *, int);
 static int	rewritecommand(char *, char *, char **);
 
@@ -107,7 +109,8 @@ char *usagestr =
  " -u		   Use UDP instead of TCP\n"
  " -l path	   Use named unix domain socket instead of TCP\n"
  " -t timeout	   Timeout waiting for the controller.\n"
- " -x path	   Be a tmcc proxy, using the named unix domain socket\n"
+ " -x path	   Be a unix domain proxy listening on the named socket\n"
+ " -X ip:port	   Be an inet domain proxy listening on the given IP:port\n"
  " -o logfile      Specify log file name for -x option\n"
  " -f datafile     Extra stuff to send to tmcd (tcp mode only)\n"
  " -i              Do not use SSL protocol\n"
@@ -161,12 +164,14 @@ main(int argc, char **argv)
 	char			*keyfile  = NULL;
 	char			*privkey  = NULL;
 	char			*proxypath= NULL;
+	struct in_addr		proxyaddr;
+	int			proxyport = 0;
 	char			*datafile = NULL;
 #ifdef _WIN32
         WSADATA wsaData;
 #endif
 
-	while ((ch = getopt(argc, argv, "v:s:p:un:t:k:x:l:do:if:")) != -1)
+	while ((ch = getopt(argc, argv, "v:s:p:un:t:k:x:X:l:do:if:")) != -1)
 		switch(ch) {
 		case 'd':
 			debug++;
@@ -196,6 +201,15 @@ main(int argc, char **argv)
 		case 'x':
 			proxypath = optarg;
 			break;
+		case 'X':
+		{
+			char *ap, *pp = optarg;
+			ap = strsep(&pp, ":");
+			if (!inet_aton(*ap ? ap : "127.0.0.1", &proxyaddr))
+				usage();
+			proxyport = pp ? atoi(pp) : TBSERVER_PORT+1;
+			break;
+		}
 		case 'l':
 			unixpath  = optarg;
 			break;
@@ -216,14 +230,26 @@ main(int argc, char **argv)
 
 	argv += optind;
 	argc -= optind;
-	if (!proxypath && (argc < 1 || argc > 5)) {
+	if (!(proxypath || proxyport) && (argc < 1 || argc > 5)) {
 		usage();
 	}
-	if (unixpath && proxypath)
+	if (unixpath && proxypath) {
+		fprintf(stderr,
+			"Cannot be both proxy server (-x) and client (-l)\n");
 		usage();
+	}
 
-	if (useudp && datafile)
+	if (proxypath && proxyport) {
+		fprintf(stderr,
+			"Cannot be both unix (-x) and inet (-X) domain proxy\n");
 		usage();
+	}
+
+	if (useudp && datafile) {
+		fprintf(stderr,
+			"Cannot send a file (-f) in UDP mode (-u)\n");
+		usage();
+	}
 
 	if (unixpath && (keyfile || bossnode)) {
 		fprintf(stderr,
@@ -261,7 +287,7 @@ main(int argc, char **argv)
 			numports    = 1;
 		}
 	}
-	
+
 	he = gethostbyname(bossnode);
 	if (he)
 		memcpy((char *)&serverip, he->h_addr, he->h_length);
@@ -273,7 +299,8 @@ main(int argc, char **argv)
 	/*
 	 * Handle built-in "bossinfo" command
 	 */
-	if (!proxypath && (strcmp(argv[0], "bossinfo") == 0)) {
+	if (!(proxypath || proxyport) &&
+	    argc > 0 && (strcmp(argv[0], "bossinfo") == 0)) {
 		printf("%s %s\n", bossnode, inet_ntoa(serverip));
 		exit(0);
 	}
@@ -328,7 +355,11 @@ main(int argc, char **argv)
 	 * In proxy mode ...
 	 */
 	if (proxypath) {
-		beproxy(proxypath, serverip, buf);
+		beudproxy(proxypath, serverip, buf);
+		exit(0);
+	}
+	if (proxyport != 0) {
+		beidproxy(proxyaddr, proxyport, serverip, buf);
 		exit(0);
 	}
 
@@ -749,17 +780,15 @@ dounix(char *data, int outfd, char *unixpath)
  * sensitive that way.
  */
 static void
-beproxy(char *localpath, struct in_addr serverip, char *partial)
+beudproxy(char *localpath, struct in_addr serverip, char *partial)
 {
 #if defined(_WIN32)
 	fprintf(stderr, "proxy mode not supported on this platform!\n");
 	exit(-1);
 #else
-	int			sock, newsock, cc;
-	struct sockaddr_un	sunaddr, client;
+	int			sock;
 	socklen_t		length;
-	char			command[MAXTMCDPACKET], buf[MAXTMCDPACKET];
-	char			*bp, *cp;
+	struct sockaddr_un	sunaddr;
 	
 	/* don't let a client kill us */
 	signal(SIGPIPE, SIG_IGN);
@@ -783,11 +812,85 @@ beproxy(char *localpath, struct in_addr serverip, char *partial)
 		exit(-1);
 	}
 	chmod(localpath, S_IRWXU|S_IRWXG|S_IRWXO);
+
 	if (listen(sock, 5) < 0) {
 		perror("listen on unix domain socket");
 		exit(-1);
 	}
 
+	beproxy(sock, -1, serverip, partial);
+#endif
+}
+
+static void
+beidproxy(struct in_addr ip, int port, struct in_addr serverip, char *partial)
+{
+#if defined(_WIN32)
+	fprintf(stderr, "proxy mode not supported on this platform!\n");
+	exit(-1);
+#else
+	int			tcpsock, udpsock;
+	socklen_t		length;
+	struct sockaddr_in	name;
+
+	/* don't let a client kill us */
+	signal(SIGPIPE, SIG_IGN);
+
+	/* get a TCP socket */
+	tcpsock = socket(AF_INET, SOCK_STREAM, 0);
+	if (tcpsock < 0) {
+		perror("creating TCP socket");
+		exit(-1);
+	}
+
+	name.sin_family = AF_INET;
+	name.sin_addr = ip;
+	name.sin_port = htons(port);
+	length = sizeof(name);
+	if (bind(tcpsock, (struct sockaddr *)&name, length) < 0) {
+		perror("binding TCP socket");
+		exit(-1);
+	}
+
+	if (listen(tcpsock, 5) < 0) {
+		perror("listen on TCP socket");
+		exit(-1);
+	}
+
+	/* and a UDP socket */
+	udpsock = socket(AF_INET, SOCK_DGRAM, 0);
+	if (udpsock < 0) {
+		perror("creating UDP socket");
+		exit(-1);
+	}
+
+	name.sin_family = AF_INET;
+	name.sin_addr = ip;
+	name.sin_port = htons(port);
+	length = sizeof(name);
+	if (bind(udpsock, (struct sockaddr *)&name, length) < 0) {
+		perror("binding UDP socket");
+		exit(-1);
+	}
+	beproxy(tcpsock, udpsock, serverip, partial);
+#endif
+}
+
+static int proxymode = 0;
+
+#if !defined(_WIN32)
+static void
+beproxy(int tcpsock, int udpsock, struct in_addr serverip, char *partial)
+{
+	int			newsock, cc;
+	struct sockaddr_in	client;
+	socklen_t		length;
+	char			command[MAXTMCDPACKET], buf[MAXTMCDPACKET];
+	char			*bp, *cp;
+	fd_set			rfds;
+	int			fdcount = 0;
+	
+	proxymode = 1;
 	if (logfile) {
 		int	fd;
 
@@ -813,46 +916,105 @@ beproxy(char *localpath, struct in_addr serverip, char *partial)
 			(void)close(fd);
 	}
 
+	FD_ZERO(&rfds);
+	if (tcpsock >= 0) {
+		FD_SET(tcpsock, &rfds);
+		fdcount = tcpsock;
+	}
+	if (udpsock >= 0) {
+		FD_SET(udpsock, &rfds);
+		if (udpsock > fdcount)
+			fdcount = udpsock;
+	}
+	fdcount++;
+
 	/*
-	 * Wait for TCP connections.
+	 * Wait for messages.
 	 */
 	while (1) {
 		int	rval;
 		volatile int useudp = 0;
+		fd_set	fds;
 		
-		length  = sizeof(client);
-		newsock = accept(sock, (struct sockaddr *)&client, &length);
-		if (newsock < 0) {
-			perror("accepting Unix domain connection");
+		fds = rfds;
+		rval = select(fdcount, &fds, NULL, NULL, NULL);
+		if (rval < 0) {
+			if (errno == EINTR)
+				continue;
+			perror("proxy: select failed");
+			exit(1);
+		}
+
+		/*
+		 * Yes, we only handle one request per loop, even if both
+		 * FDs were ready.  This is potentially unfair to UDP
+		 * clients but there really shouldn't be much UDP traffic.
+		 */
+		if (tcpsock >= 0 && FD_ISSET(tcpsock, &fds)) {
+			/*
+			 * Accept and read the message
+			 */
+			length  = sizeof(client);
+			newsock = accept(tcpsock, (struct sockaddr *)&client,
+					 &length);
+			if (newsock < 0) {
+				perror("proxy: accepting connection");
+				continue;
+			}
+			cc = read(newsock, buf, sizeof(buf) - 1);
+		} else if (udpsock >= 0 && FD_ISSET(udpsock, &fds)) {
+			/*
+			 * Read the message and create a reply socket
+			 */
+			length = sizeof(client);
+			cc = recvfrom(udpsock, buf, sizeof(buf) - 1, 0,
+				      (struct sockaddr *)&client, &length);
+			if (cc > 0) {
+				newsock = socket(AF_INET, SOCK_DGRAM, 0);
+				if (newsock < 0) {
+					perror("creating UDP reply socket");
+					continue;
+				}
+				if (connect(newsock,
+					    (struct sockaddr *)&client,
+					    length) < 0) {
+					perror("connecting UDP reply socket");
+					close(newsock);
+					continue;
+				}
+				useudp = 1;
+			} else
+				newsock = -1;
+		} else {
+			fprintf(stderr,
+				"proxy: select returned with no fd!\n");
+			sleep(5);
 			continue;
 		}
 
 		/*
-		 * Read in the command request.
+		 * Check read
 		 */
-		if ((cc = read(newsock, buf, sizeof(buf) - 1)) <= 0) {
+		if (cc <= 0) {
 			if (cc < 0)
-				perror("Reading Unix domain request");
-			fprintf(stderr, "Unix domain connection aborted\n");
-			close(newsock);
+				perror("proxy: reading request");
+			fprintf(stderr, "proxy: connection aborted\n");
+			if (newsock >= 0)
+				close(newsock);
 			continue;
 		}
 		buf[cc] = '\0';
 
 		/*
-		 * Do not allow PRIVKEY or VNODE options to be specified
+		 * Do not allow PRIVKEY or VNODEID options to be specified
 		 * by the proxy user. 
 		 */
 		strcpy(command, partial);
 		bp = cp = buf;
 		while ((bp = strsep(&cp, " ")) != NULL) {
 			if (strstr(bp, "PRIVKEY=") ||
-			    strstr(bp, "VNODE=")) {
-				if (debug)
-					fprintf(stderr,
-						"Ignoring option: %s\n", bp);
+			    strstr(bp, "VNODEID="))
 				continue;
-			}
 			if (strstr(bp, "USEUDP=1")) {
 				useudp = 1;
 				continue;
@@ -862,7 +1024,9 @@ beproxy(char *localpath, struct in_addr serverip, char *partial)
 		}
 
 		if (debug) {
-			fprintf(stderr, "%s\n", command);
+			fprintf(stderr, "%sREQ: %s\n",
+				udpsock < 0 ? "" : (useudp ? "UDP " : "TCP "),
+				command);
 			fflush(stderr);
 		}
 
@@ -874,7 +1038,8 @@ beproxy(char *localpath, struct in_addr serverip, char *partial)
 				fprintf(stderr,
 					"Server request timeout on: %s\n",
 					command);
-				close(newsock);
+				if (newsock >= 0)
+					close(newsock);
 				continue;
 			}
 			signal(SIGALRM, (sig_t)tooktoolong);
@@ -890,7 +1055,8 @@ beproxy(char *localpath, struct in_addr serverip, char *partial)
 			fprintf(stderr, "Request failed!\n");
 			fflush(stderr);
 		}
-		close(newsock);
+		if (newsock >= 0)
+			close(newsock);
 	}
 #endif
 }
@@ -904,7 +1070,9 @@ dooutput(int fd, char *buf, int len)
 	int		cc, count = len;
 
 	if (debug) {
-		write(fileno(stderr), buf, len);
+		if (proxymode)
+			fprintf(stderr, "REP: ");
+		fwrite(buf, 1, len, stderr);
 	}
 	
 	while (count) {
