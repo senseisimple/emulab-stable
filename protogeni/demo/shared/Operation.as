@@ -56,6 +56,11 @@ package
       url = newUrl + "/" + module;
     }
 
+    public function setExactUrl(newUrl : String) : void
+    {
+      url = newUrl;
+    }
+
     public function getUrl() : String
     {
       return url;
@@ -79,7 +84,7 @@ package
         {
           visitedSites[url] = true;
           var hostPattern : RegExp = /^(http(s?):\/\/([^\/]+))(\/.*)?$/;
-          var match = hostPattern.exec(url);
+          var match : Object = hostPattern.exec(url);
           if (match != null)
           {
             var host : String = match[1];
