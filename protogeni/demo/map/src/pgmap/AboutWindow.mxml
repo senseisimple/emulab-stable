@@ -9,7 +9,7 @@
 		]]>
 	</mx:Script>
 	
-	<mx:Label text="Displays resources from ProtoGENI"/>
+	<mx:Label text="Displays resources from ProtoGENI" fontSize="12"/>
 	<mx:HRule/>
 	<mx:Label text="Special thanks to" fontWeight="bold"/>
 	<mx:HBox width="100%" horizontalAlign="center">

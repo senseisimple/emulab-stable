@@ -23,12 +23,18 @@
 		}
 		
 		[Bindable]
+		public var virtualId:String;
+		
+		[Bindable]
 		public var node1:Node;
 		
 		[Bindable]
 		public var node2:Node;
 		
 		public var type:String;
+		
+		[Bindable]
+		public var bandwidth:Number;
 		
 		public var slice : Slice = null;
 

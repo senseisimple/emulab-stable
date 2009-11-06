@@ -24,9 +24,14 @@ public class TooltipOverlay extends OverlayBase {
   private var textField:TextField;
   private var dropShadow:Sprite;
   private var button:Sprite;
+  
+  private var borderColor:Object;
+  private var backgroundColor:Object;
 
-  public function TooltipOverlay(latLng:LatLng, label:String) {
+  public function TooltipOverlay(latLng:LatLng, label:String, edgeColor:Object, backColor:Object) {
     super();
+    this.borderColor = edgeColor;
+    this.backgroundColor = backColor;
     this.latLng = latLng;
     this.label = label;
     
@@ -46,11 +51,11 @@ public class TooltipOverlay extends OverlayBase {
     this.textField.text = this.label;
     this.textField.selectable = false;
     this.textField.border = true;
-    this.textField.borderColor = 0xFF00FF;
+    this.textField.borderColor = borderColor as uint;
     this.textField.background = true;
     this.textField.multiline = false;
     this.textField.autoSize = TextFieldAutoSize.CENTER;
-    this.textField.backgroundColor = 0xFFCFD1;
+    this.textField.backgroundColor = backgroundColor as uint;
     this.textField.mouseEnabled = false;
     this.textField.filters = [new DropShadowFilter()];
     

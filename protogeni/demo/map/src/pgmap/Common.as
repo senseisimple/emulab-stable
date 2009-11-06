@@ -16,6 +16,8 @@ package pgmap
 		public static var hideColor:Object = 0xCCCCCC;
 		public static var linkColor:Object = 0xFFCFD1;
 		public static var linkBorderColor:Object = 0xFF00FF;
+		public static var tunnelColor:uint = 0xFFAEAE;
+		public static var tunnelBorderColor:Object = 0xFF0000;
 		public static var nodeColor:Object = 0x092B9F;
 		public static var nodeBorderColor:Object = 0xD2E1F0;
 		
@@ -119,6 +121,26 @@ package pgmap
 			);
 			return linkButton;
 		}
+		
+		public static function getPointLinkButton(pl:PointLink):Button {
+			var linkButton:Button = new Button();
+			linkButton.label = pl.virtualId;
+			linkButton.setStyle("icon", Common.linkIcon);
+			linkButton.addEventListener(MouseEvent.CLICK,
+				function openLink(event:MouseEvent):void {
+					viewPointLink(pl);
+				}
+			);
+			return linkButton;
+		}
+		
+		public static function viewPointLink(pl:PointLink):void {
+	    	var plWindow:PointLinkAdvancedWindow = new PointLinkAdvancedWindow();
+	    	plWindow.main = Main();
+	    	PopUpManager.addPopUp(plWindow, Main(), false);
+       		PopUpManager.centerPopUp(plWindow);
+       		plWindow.loadPointLink(pl);
+	    }
 		
 		public static function viewLink(l:Link):void {
 			var lgWindow:LinkAdvancedWindow = new LinkAdvancedWindow();

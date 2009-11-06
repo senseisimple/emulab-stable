@@ -63,11 +63,13 @@
 							endNode = pl.node1;
 						
 						sliceLinksVbox.addChild(Common.getNodeButton(endNode));
-						//var pointLinkHbox:HBox = new HBox();
-						//var space:Spacer = new Spacer();
-						//space.width = 16;
-						//pointLinkHbox.addChild(space);
-						//sliceLinksVbox.addChild(pointLinkHbox);
+						
+						var pointLinkHbox:HBox = new HBox();
+						var space:Spacer = new Spacer();
+						space.width = 16;
+						pointLinkHbox.addChild(space);
+						pointLinkHbox.addChild(Common.getPointLinkButton(pl));
+						sliceLinksVbox.addChild(pointLinkHbox);
 					}
 				} else if(linkTabs.getChildren().length > 1)
 					linkTabs.removeChild(sliceLinksVbox);

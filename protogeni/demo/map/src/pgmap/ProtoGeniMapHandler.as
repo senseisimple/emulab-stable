@@ -209,7 +209,7 @@ package pgmap
 					new LatLng(drawGroup.latitude1, drawGroup.longitude1),
 					new LatLng(drawGroup.latitude2, drawGroup.longitude2)
 					], new PolylineOptions({ strokeStyle: new StrokeStyle({
-						color: 0xFF00FF,
+						color: Common.linkBorderColor,
 						thickness: 4,
 						alpha:1})
 					}));
@@ -220,10 +220,10 @@ package pgmap
 				// Add link marker
 				var ll:LatLng = new LatLng((drawGroup.latitude1 + drawGroup.latitude2)/2, (drawGroup.longitude1 + drawGroup.longitude2)/2);
 				
-				var t:TooltipOverlay = new TooltipOverlay(ll, Common.kbsToString(drawGroup.TotalBandwidth()));
+				var t:TooltipOverlay = new TooltipOverlay(ll, Common.kbsToString(drawGroup.TotalBandwidth()), Common.linkBorderColor, Common.linkColor);
 		  		t.addEventListener(MouseEvent.CLICK, function(e:Event):void {
 		            e.stopImmediatePropagation();
-		            main.pgHandler.map.viewLinkGroup(drawGroup)
+		            Common.viewLinkGroup(drawGroup)
 		        });
 		        
 		  		main.map.addOverlay(t);
@@ -250,19 +250,40 @@ package pgmap
 	    		return;
 	    	
     		// Add line
-    		var c:Object = 0x66FF00;
+    		var backColor:Object = Common.linkColor;
+    		var borderColor:Object = Common.linkBorderColor;
     		if(pl.type != "tunnel")
-    			c = 0xFF00FF;
+    		{
+    			backColor = Common.tunnelColor;
+    			borderColor = Common.tunnelBorderColor;
+    		}
+    		
+    		var firstll:LatLng = new LatLng(pl.node1.GetLatitude(), pl.node1.GetLongitude());
+    		var secondll:LatLng = new LatLng(pl.node2.GetLatitude(), pl.node2.GetLongitude());
+			
 			var polyline:Polyline = new Polyline([
-				new LatLng(pl.node1.GetLatitude(), pl.node1.GetLongitude()),
-				new LatLng(pl.node2.GetLatitude(), pl.node2.GetLongitude())
+				firstll,
+				secondll
 				], new PolylineOptions({ strokeStyle: new StrokeStyle({
-					color: c,
+					color: borderColor,
 					thickness: 4,
 					alpha:1})
 				}));
 
 			main.map.addOverlay(polyline);
+			linkLineOverlays.addItem(polyline);
+				
+			// Add point link marker
+			var ll:LatLng = new LatLng((firstll.lat() + secondll.lat())/2, (firstll.lng() + secondll.lng())/2);
+			
+			var t:TooltipOverlay = new TooltipOverlay(ll, Common.kbsToString(pl.bandwidth), borderColor, backColor);
+	  		t.addEventListener(MouseEvent.CLICK, function(e:Event):void {
+	            e.stopImmediatePropagation();
+	            Common.viewPointLink(pl)
+	        });
+	        
+	  		main.map.addOverlay(t);
+			linkLabelOverlays.addItem(t);
 	    }
 	    
 	    public function drawAll():void {
@@ -367,23 +388,6 @@ package pgmap
 	        		}
         		}
 	        }
-	    }
-	    
-	    public function viewNodeGroup(group:NodeGroup):void {
-	    	var ngWindow:NodeGroupAdvancedWindow = new NodeGroupAdvancedWindow();
-	    	ngWindow.main = main;
-	    	PopUpManager.addPopUp(ngWindow, main, false);
-       		PopUpManager.centerPopUp(ngWindow);
-       		ngWindow.loadGroup(group);
-	    }
-	    
-	    public function viewLinkGroup(group:LinkGroup):void {
-	    	var lgWindow:LinkGroupAdvancedWindow = new LinkGroupAdvancedWindow();
-	    	lgWindow.main = main;
-	    	PopUpManager.addPopUp(lgWindow, main, false);
-       		PopUpManager.centerPopUp(lgWindow);
-       		lgWindow.loadGroup(group);
-       		
 	    }
 	}
 }

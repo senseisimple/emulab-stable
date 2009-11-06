@@ -58,7 +58,7 @@
 			switch(status) {
 				case "ready":
 					switch(sliverStatus) {
-						case "ready": returnString += " (All Ready)";
+						case "ready": returnString += " (Ready)";
 							break;
 						case "notready": returnString += " (Sliver Not Ready)";
 							break;

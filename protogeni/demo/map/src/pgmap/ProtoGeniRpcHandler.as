@@ -45,6 +45,8 @@
 		
 		public var Rspec:XML = null;
 		
+		private var waiting:Boolean = false;
+		
 		[Bindable]
 		public var Components:Array = null;
 		
@@ -537,8 +539,11 @@
 	      				var link:PointLink = new PointLink();
 	      				link.node1 = main.pgHandler.Nodes.GetByName(nodeNames[0]);
 	      				link.node2 = main.pgHandler.Nodes.GetByName(nodeNames[1]);
-	      				link.type = component.@link_type;
+	      				link.type = component.link_type;
+	      				link.bandwidth = component.bandwidth;
+	      				link.virtualId = component.virtual_id;
 	      				link.slice = slice;
+	      				link.sliverRspec = component;
 	      				slice.Links.addItem(link);
 	      			}
 	      		}

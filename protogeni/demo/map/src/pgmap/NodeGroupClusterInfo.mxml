@@ -82,8 +82,8 @@
 					function zoomin(evt:MouseEvent):void {
 						var map : Map = Common.Main().map;
 						var bzl : Number  = map.getBoundsZoomLevel(bounds);
-				        if(map.getZoom() != bzl)
-				          map.setZoom(bzl);
+				        if(map.getZoom() != bzl-1)
+				          map.setZoom(bzl-1);
 			        	map.panTo( bounds.getCenter() );
 	    			});
 	    		
