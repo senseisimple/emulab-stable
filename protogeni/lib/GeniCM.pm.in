@@ -488,10 +488,10 @@ sub GetTicketAuxAux($$$$$$$$)
 	}
 	
 	#
-	# No more then 25 hours out ... Needs to be a sitevar?
+	# Do we need a policy limit?
 	#
 	my $diff = $when - time();
-	if ($diff < (60 * 15) || $diff > (3600 * 25)) {
+	if ($diff < (60 * 5) || $diff > (3600 * 24 * 100)) {
 	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 					"valid_until out of range");
 	}
@@ -1527,10 +1527,10 @@ sub SliverWorkAux($$$$$$$)
 					
 	}
 	#
-	# No more then 25 hours out ... Needs to be a sitevar?
+	# Do we need a policy limit?
 	#
 	my $diff = $when - time();
-	if ($diff < (60 * 15) || $diff > (3600 * 25)) {
+	if ($diff < (60 * 5) || $diff > (3600 * 24 * 100)) {
 	    $message = "valid_until out of range";
 	    goto bad;
 	}
@@ -2289,13 +2289,13 @@ sub RenewSliverAux($$)
 	goto bad;
     }
     #
-    # No more then 25 hours out ... Needs to be a sitevar?
+    # Do we need a policy limit?
     #
     my $diff = $when - time();
 
     print STDERR "RenewSliver: $expires, $when, $diff\n";
     
-    if ($diff < (60 * 5) || $diff > (3600 * 25)) {
+    if ($diff < (60 * 5) || $diff > (3600 * 24 * 100)) {
 	$message = "valid_until out of range";
 	goto bad;
     }
