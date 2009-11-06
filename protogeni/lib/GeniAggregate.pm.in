@@ -154,7 +154,7 @@ sub Create($$$$$$)
     my @insert_data = ();
 
     # Every aggregate gets a new unique index.
-    my $idx = TBGetUniqueIndex('next_aggregate', 1);
+    my $idx = TBGetUniqueIndex('next_sliver', 1);
 
     # Create a cert pair, which gives us a new uuid.
     my $urn = GeniHRN::Generate( "@OURDOMAIN@", "sliver", $idx );
