@@ -94,7 +94,9 @@ print "Got the ticket"
 #
 print "Releasing the ticket"
 params = {}
-params["ticket"] = ticket
+params["slice_urn"]   = myslice["urn"]
+params["credentials"] = (slicecred,)
+params["ticket"]      = ticket
 rval,response = do_method("cmv2", "ReleaseTicket", params)
 if rval:
     Fatal("Could not release the ticket")
