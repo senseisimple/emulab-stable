@@ -64,7 +64,14 @@ sub Lookup($$)
     my $query_result;
     my $idx;
 
-    if ($token =~ /^\d+$/) {
+    if (GeniHRN::IsValid($token)) {
+	return undef if !GeniHRN::Authoritative($token, "@OURDOMAIN@");
+
+	my ($authority, $type, $id) = GeniHRN::Parse($token);
+	return undef if $type ne "sliver";
+	$idx = $id;
+    }
+    elsif ($token =~ /^\d+$/) {
 	$idx = $token;
     }
     elsif ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
@@ -98,8 +105,15 @@ sub Lookup($$)
 
     my $rspec_string = $self->{'SLIVER'}->{'rspec_string'};
     if (defined($rspec_string) && $rspec_string ne "") {
-	$self->{'RSPEC'} = XMLin($rspec_string,
-				 ForceArray => ["node", "link"]);
+	my $rspec = 
+	    eval { XMLin($rspec_string, KeyAttr => [],
+			 ForceArray => ["node", "link", "interface",
+					"interface_ref", "linkendpoints"]) };
+	if ($@) {
+	    print STDERR "XMLin error reading rspec: $@\n";
+	    return undef;
+	}
+	$self->{'RSPEC'} = $rspec;
     }
 
     #
@@ -147,32 +161,26 @@ sub Stringify($)
 #
 sub Create($$$$$$$$$)
 {
-    my ($class, $slice, $owner, $uuid, $resource_uuid, $resource_type,
+    my ($class, $slice, $owner, $uuid,
+	$resource_uuid, $resource_type, $resource_id,
 	$hrn, $nickname, $rspec) = @_;
     my @insert_data = ();
-    my $certificate;
 
     # Every sliver gets a new unique index.
     my $idx = TBGetUniqueIndex('next_sliver', 1);
+    my $urn = GeniHRN::Generate("@OURDOMAIN@", "sliver", $idx);
 
-    # Create a cert pair, for this resource uuid.
-    if (defined($uuid) && $resource_type eq "Node") {
-	$certificate = GeniCertificate->Lookup($uuid);
-
-	if (defined($certificate) && $certificate->hrn() ne $hrn) {
-	    print STDERR "GeniSliver::Create: ".
-		"Already have a certificate for $hrn/$uuid\n";
-	    return undef;
-	}
+    # Sanity check.
+    my $certificate = GeniCertificate->Lookup($urn);
+    if (defined($certificate)) {
+	print STDERR "GeniSliver::Create: ".
+	    "Already have a certificate for $hrn/$urn\n";
+	return undef;
     }
-    $hrn =~ /.*([^.]+)$/;
-    my $urn = GeniHRN::Generate( "@OURDOMAIN@", "node", $1 );
-    $certificate = GeniCertificate->Create("sliver", $urn, $hrn, $TBOPS, $uuid)
-	if (!defined($certificate));
-	
+    $certificate = GeniCertificate->Create("sliver", $urn, $hrn, $TBOPS,$uuid);
     if (!defined($certificate)) {
 	print STDERR "GeniSliver::Create: ".
-	    "Could not generate new certificate and UUID for $hrn/$uuid\n";
+	    "Could not generate new certificate for $hrn/$urn\n";
 	return undef;
     }
     my $slice_uuid     = $slice->uuid();
@@ -187,6 +195,7 @@ sub Create($$$$$$$$$)
     push(@insert_data, "uuid='$uuid'");
     push(@insert_data, "resource_uuid='$resource_uuid'");
     push(@insert_data, "resource_type='$resource_type'");
+    push(@insert_data, "resource_id='$resource_id'");
     push(@insert_data, "creator_uuid='$owner_uuid'");
     push(@insert_data, "slice_uuid='$slice_uuid'");
 
@@ -228,6 +237,7 @@ sub creator_uuid($)	{ return field($_[0], "creator_uuid"); }
 sub created($)		{ return field($_[0], "created"); }
 sub credential_idx($)	{ return field($_[0], "credential_idx"); }
 sub resource_uuid($)	{ return field($_[0], "resource_uuid"); }
+sub resource_id($)	{ return field($_[0], "resource_id"); }
 sub resource_type($)	{ return field($_[0], "resource_type"); }
 sub component_uuid($)	{ return field($_[0], "component_uuid"); }
 sub aggregate_uuid($)	{ return field($_[0], "aggregate_uuid"); }
@@ -237,6 +247,14 @@ sub state($)		{ return field($_[0], "state"); }
 sub cert($)		{ return $_[0]->{'CERTIFICATE'}->cert(); }
 sub GetCertificate($)   { return $_[0]->{'CERTIFICATE'}; }
 sub rspec($)            { return $_[0]->{'RSPEC'}; }
+
+# Return the sliver URN. 
+sub sliver_urn($)
+{
+    my ($self)  = @_;
+
+    return GeniHRN::Generate("@OURDOMAIN@", "sliver", $self->idx());
+}
 
 #
 # Delete the sliver. The sliver should not be provisioned when this done.
@@ -268,6 +286,30 @@ sub Delete($$)
     delete($slivers{$idx});
     
     return 0;
+}
+
+#
+# Get the manifest for an aggregate. Returns the XML string.
+#
+sub GetManifest($$)
+{
+    my ($self, $asxml) = @_;
+
+    return undef
+	if (! ref($self));
+
+    my $manifest = $self->rspec();
+
+    return $manifest
+	if (!$asxml);
+    
+    my $xml =
+	eval { XMLout($manifest, "NoAttr" => 1, RootName => "manifest") };
+    if ($@) {
+	print STDERR "XMLout error on manifest: $@\n";
+	return undef;
+    }
+    return $xml;
 }
 
 #
@@ -534,15 +576,6 @@ use libdb qw(TBDB_ALLOCSTATE_RES_INIT_DIRTY TBDB_NODESTATE_SHUTDOWN
 	     TBResolveNextOSID TBDB_NODESTATE_ISUP TBDB_NODESTATE_TBFAILED);
 
 # Return the URN.
-sub urn($)
-{
-    my ($self)  = @_;
-    my ($node_id) = ($self->hrn() =~ /\.([-\w]*)$/);
-
-    return GeniHRN::Generate("@OURDOMAIN@", "node", $node_id);
-}
-
-# Return the URN.
 sub ErrorLog($)
 {
     my ($self)  = @_;
@@ -560,9 +593,17 @@ sub ErrorLog($)
     return $bootlog;
 }
 
+# Return the component URN. This is how a resource is resolved.
+sub component_urn($)
+{
+    my ($self)  = @_;
+
+    return GeniHRN::Generate("@OURDOMAIN@", "node", $self->resource_id())
+}
+
 sub Create($$$$$$)
 {
-    my ($class, $slice, $user, $resource_uuid, $sliver_uuid, $rspec) = @_;
+    my ($class, $slice, $user, $resource_uuid, $rspec) = @_;
     my $virtualization_type = $rspec->{'virtualization_type'};
 
     my $experiment = $slice->GetExperiment();
@@ -584,7 +625,7 @@ sub Create($$$$$$)
 
     #
     # An artifact of Emulab is that for shared/remote nodes, the physical
-    # node is already allocated, but not to the current experiment. An
+    # node is already allocated, but not to the current experiment.
     #
     if (! ($node->sharing_mode() ||
 	   ($node->isremotenode() && $node->isvirtnode()))) {
@@ -599,10 +640,13 @@ sub Create($$$$$$)
 	    return undef;
 	}
     }
-    my $hrn = "${PGENIDOMAIN}." . $node->node_id();
     my $nickname = $rspec->{'virtual_id'};
-    $sliver_uuid = $node->uuid();
-    
+    my $hrn;
+    my $sshdport;
+    my $hostname;
+    my $resource_id;
+    my $sliver_uuid;
+
     #
     # The resource UUID refers to the physical node, but the virtualization
     # type might require a vnode.
@@ -615,9 +659,28 @@ sub Create($$$$$$)
 	}
 	$hrn = "${PGENIDOMAIN}." . $vnode->node_id();
 	$sliver_uuid = $vnode->uuid();
+	$resource_id = $vnode->node_id();
+	$hostname = $vnode->node_id() . ".${OURDOMAIN}";
+	$sshdport = $vnode->sshdport();
     }
+    else {
+	$hrn = "${PGENIDOMAIN}." . $node->node_id();
+	$sliver_uuid = $node->uuid();
+	$resource_id = $node->node_id();
+	$hostname = $node->node_id() . ".${OURDOMAIN}";
+    }
+    my $component_urn = GeniHRN::Generate($OURDOMAIN, "node", $resource_id);
+
+    #
+    # Add this stuff to the rspec (which becomes the manifest).
+    #
+    $rspec->{'sliver_uuid'}   = $sliver_uuid;
+    $rspec->{'hostname'}      = $hostname;
+    $rspec->{'sshdport'}      = $sshdport if (defined($sshdport));
+    $rspec->{'component_urn'} = $component_urn;
+
     return GeniSliver->Create($slice, $user, $sliver_uuid, $resource_uuid,
-			      "Node", $hrn, $nickname, $rspec);
+			      "Node", $resource_id, $hrn, $nickname, $rspec);
 }
 
 #
@@ -1036,21 +1099,35 @@ use GeniCredential;
 use GeniCertificate;
 use GeniUtil;
 
+# Return the component URN. This is how a resource is resolved.
+# Return the component URN. This is how a resource is resolved.
+sub component_urn($)
+{
+    my ($self)  = @_;
+
+    return GeniHRN::Generate("@OURDOMAIN@", "interface", $self->resource_id())
+}
+
 sub Create()
 {
-    my ($class, $slice, $user,
-	$interface_uuid, $node, $linkname, $rspec) = @_;
+    my ($class, $slice, $user, $nodeid, $iface, $linkname, $rspec) = @_;
 
-    my $nickname = $node->node_id() . ".$linkname." .
-	$rspec->{'virtual_interface_id'};
-    my $hrn = "${PGENIDOMAIN}.$nickname";
+    # These are silly; uuids should go away for interfaces. 
+    my $interface_uuid = GeniUtil::NewUUID();
+    my $component_urn  = GeniHRN::GenerateInterface($OURDOMAIN,
+						    $nodeid, $iface);
+    my $nickname       = "$linkname.$nodeid.$iface";
+    my $hrn            = "${PGENIDOMAIN}.$nodeid.$iface";
+    my $resource_id    = "$nodeid//$iface";
 
-    # Ignore the interface uuid and create a new one.
-    # Temporary fix cause of shared interfaces on shared nodes.
-    $interface_uuid = GeniUtil::NewUUID();
+    #
+    # Add this stuff to the rspec (which becomes the manifest).
+    #
+    $rspec->{'sliver_uuid'}   = $interface_uuid;
+    $rspec->{'component_urn'} = $component_urn;
 
     return GeniSliver->Create($slice, $user, $interface_uuid,
-			      $node->uuid(), "Interface",
+			      $interface_uuid, "Interface", $resource_id,
 			      $hrn, $nickname, $rspec);
 }
 

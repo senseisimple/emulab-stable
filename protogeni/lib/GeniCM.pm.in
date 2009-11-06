@@ -1848,7 +1848,6 @@ sub SliverWorkAux($$$$$$$)
 	my $sliver = GeniSliver::Node->Create($slice,
 					      $owner,
 					      $resource_uuid,
-					      undef,
 					      $ref);
 	if (!defined($sliver)) {
 	    $message = "Could not create GeniSliver object for $virtual_id";
@@ -1857,25 +1856,8 @@ sub SliverWorkAux($$$$$$$)
 	$slivers{$sliver->uuid()} = $sliver;
 	$nodemap{$virtual_id} = $sliver;
 
-	#
-	# Find the actual node (might be a vnode) so that we can put
-	# the info into the manifest.
-	#
-	my $realnode = Node->Lookup($sliver->uuid());
-	if (!defined($realnode)) {
-	    print STDERR "Could not lookup node for $sliver\n";
-	    $message = "Internal Error finding mapped node for $virtual_id\n";
-	    goto bad;
-	}
-	my $sliver_urn = GeniHRN::Generate($OURDOMAIN, "sliver",
-					   $realnode->node_id());
-
-	# Manifest goes back to the user.
-	$ref->{'sliver_uuid'} = $sliver->uuid();
-	$ref->{'sliver_urn'}  = $sliver_urn;
-	$ref->{'component_hostname'} = $realnode->node_id() . ".${OURDOMAIN}";
-	$ref->{'sshdport'}    = $realnode->sshdport()
-	    if ($realnode->isvirtnode());
+	# For the manifest.
+	$ref->{'sliver_urn'} = $sliver->sliver_urn();
 
 	# Add to the aggregate.
 	if ($sliver->SetAggregate($aggregate) != 0) {
@@ -1957,6 +1939,7 @@ sub SliverWorkAux($$$$$$$)
 	    
 	    # Manifest goes back to the user.
 	    $linkref->{'sliver_uuid'} = $tunnel->uuid();
+	    $linkref->{'sliver_urn'}  = $tunnel->urn();
 
 	    # Add to the aggregate.
 	    if ($tunnel->SetAggregate($aggregate) != 0) {
@@ -1977,6 +1960,7 @@ sub SliverWorkAux($$$$$$$)
 
 	# Manifest goes back to the user.
 	$linkref->{'sliver_uuid'} = $linkaggregate->uuid();
+	$linkref->{'sliver_urn'}  = $linkaggregate->urn();
 
 	# Add to the aggregate.
 	if ($linkaggregate->SetAggregate($aggregate) != 0) {
@@ -2030,8 +2014,8 @@ sub SliverWorkAux($$$$$$$)
 	    }
 	    my $sliver = GeniSliver::Interface->Create($slice,
 						       $owner,
-						       undef,
-						       $nodeobject,
+						       $nodeobject->node_id(),
+						       $iface_name,
 						       $linkname,
 						       $ifaceref);
 	    if (!defined($sliver)) {
@@ -2040,7 +2024,7 @@ sub SliverWorkAux($$$$$$$)
 		goto bad;
 	    }
 	    # Manifest goes back to the user.
-	    $ifaceref->{'sliver_uuid'} = $sliver->uuid();
+	    $ifaceref->{'sliver_urn'}  = $sliver->sliver_urn();
 	    $ifaceref->{'MAC'} = $interface->mac()
 		if (defined($interface));
 	    

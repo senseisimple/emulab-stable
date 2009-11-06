@@ -114,12 +114,9 @@ sub Resolve($)
     return $credential
 	if (GeniResponse::IsResponse($credential));
 
-    # The URN encodes the type.
-    my ($auth,$type,$id) = GeniHRN::Parse($urn);
-    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				"Authority mismatch")
-	if ($auth ne $OURDOMAIN);
-    $type = lc($type);
+    my ($object, $type) = LookupURN($urn);
+    return $object
+	if (GeniResponse::IsResponse($object));
 
     #
     # This is a convenience for testing. If a local user and that
@@ -132,15 +129,11 @@ sub Resolve($)
     }
     
     if ($type eq "node") {
-	my $node = GeniCM::LookupNode($urn);
-	if (! defined($node)) {
-	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED,
-					undef, "Nothing here by that name");
-	}
+	my $node  = $object;
 	my $rspec = GeniCM::GetAdvertisement(0, $node->node_id());
 	if (! defined($rspec)) {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					"Could not start avail");
+					"Error getting advertisement");
 	}
 	# Return a blob.
 	my $blob = { "hrn"          => "${PGENIDOMAIN}." . $node->node_id(),
@@ -158,11 +151,8 @@ sub Resolve($)
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
     }
     if ($type eq "slice") {
-	my $slice = GeniSlice->Lookup($urn);
-	if (!defined($slice)) {
-	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED,
-					undef, "Nothing here by that name");
-	}
+	my $slice = $object;
+
 	#
 	# In this implementation, the caller must hold a valid slice
 	# credential for the slice being looked up. 
@@ -184,22 +174,19 @@ sub Resolve($)
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
     }
     if ($type eq "sliver") {
-	my $aggregate = GeniAggregate->Lookup($urn);
-	if (!defined($aggregate)) {
-	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED,
-					undef, "Nothing here by that name");
-	}
+	my $sliver = $object;
+
 	#
 	# In this implementation, the caller must hold a valid slice
 	# or sliver credential for the slice being looked up. 
 	#
 	if (! ($admin ||
-	       $aggregate->uuid() eq $credential->target_uuid() ||
-	       $aggregate->slice_uuid() eq $credential->target_uuid())) {
+	       $sliver->uuid() eq $credential->target_uuid() ||
+	       $sliver->slice_uuid() eq $credential->target_uuid())) {
 	    return GeniResponse->Create(GENIRESPONSE_FORBIDDEN);
 	}
-	my $manifest = $aggregate->GetManifest(1);
-	if (!defined($aggregate)) {
+	my $manifest = $sliver->GetManifest(1);
+	if (!defined($manifest)) {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR);
 	}
 	# Return a blob.
@@ -209,11 +196,8 @@ sub Resolve($)
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
     }
     if ($type eq "ticket") {
-	my $ticket = GeniTicket->Lookup($urn);
-	if (!defined($ticket)) {
-	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED,
-					undef, "Nothing here by that name");
-	}
+	my $ticket = $object;
+
 	#
 	# In this implementation, the caller must hold a valid slice
 	# or sliver credential to get the ticket.
@@ -572,6 +556,7 @@ sub RestartSliver($)
 sub SliverAction($$$$)
 {
     my ($action, $slice_urn, $sliver_urns, $credentials) = @_;
+    my $response;
     
     if (! (defined($credentials) &&
 	   (defined($slice_urn) || defined($sliver_urns)))) {
@@ -594,13 +579,6 @@ sub SliverAction($$$$)
 	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 				    "No slice or aggregate here");
     }
-    # Shutdown slices get nothing.
-    if ($slice->shutdown()) {
-	$slice->UnLock();
-	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
-				    "Slice has been shutdown");
-    }
-    
     if (defined($slice_urn)) {
 	if (! GeniHRN::IsValid($slice_urn)) {
 	    return
@@ -610,57 +588,106 @@ sub SliverAction($$$$)
 	    return GeniResponse->Create(GENIRESPONSE_FORBIDDEN(), undef,
 					"Credential does not match the URN");
 	}
-	if ($slice->Lock() != 0) {
-	    return GeniResponse->BusyResponse();
-	}
-	if ($aggregate->ComputeState()) {
-	    $slice->UnLock();
-	    print STDERR "Could not determine current state\n";
-	    return GeniResponse->Create(GENIRESPONSE_ERROR);
-	}
+    }
+    if ($slice->Lock() != 0) {
+	return GeniResponse->BusyResponse();
+    }
+    # Shutdown slices get nothing.
+    if ($slice->shutdown()) {
+	$slice->UnLock();
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+				    "Slice has been shutdown");
+    }
+    if ($aggregate->ComputeState()) {
+	$slice->UnLock();
+	print STDERR "Could not determine current state\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
+    }
+    my $CheckState = sub {
+	my ($object, $action) = @_;
+
 	if ($action eq "start") {
-	    if ($aggregate->state() ne "stopped") {
-		$slice->UnLock();
+	    if ($object->state() ne "stopped") {
 		return GeniResponse->Create(GENIRESPONSE_REFUSED, undef,
 					    "Sliver is not stopped (yet)");
 	    }
-	    if ($aggregate->Start($API_VERSION, 0) != 0) {
-		$slice->UnLock();
+	}
+	elsif ($action eq "stop") {
+	    if ($object->state() ne "started") {
+		return GeniResponse->Create(GENIRESPONSE_REFUSED, undef,
+					    "Sliver is not started (yet)");
+	    }
+	}
+	elsif ($action eq "restart") {
+	    if ($object->state() ne "started") {
+		return GeniResponse->Create(GENIRESPONSE_REFUSED, undef,
+					    "Sliver is not started (yet)");
+	    }
+	}
+	return 0;
+    };
+    my $PerformAction = sub {
+	my ($object, $action) = @_;
+
+	if ($action eq "start") {
+	    if ($object->Start($API_VERSION, 0) != 0) {
 		return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					    "Could not start sliver");
 	    }
 	}
 	elsif ($action eq "stop") {
-	    if ($aggregate->state() ne "started") {
-		$slice->UnLock();
-		return GeniResponse->Create(GENIRESPONSE_REFUSED, undef,
-					    "Sliver is not started (yet)");
-	    }
-	    if ($aggregate->Stop($API_VERSION) != 0) {
-		$slice->UnLock();
+	    if ($object->Stop($API_VERSION) != 0) {
 		return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					    "Could not stop sliver");
 	    }
 	}
 	elsif ($action eq "restart") {
-	    if ($aggregate->state() ne "started") {
-		$slice->UnLock();
-		return GeniResponse->Create(GENIRESPONSE_REFUSED, undef,
-					    "Sliver is not started (yet)");
-	    }
-	    if ($aggregate->Start($API_VERSION, 1) != 0) {
-		$slice->UnLock();
+	    if ($object->Start($API_VERSION, 1) != 0) {
 		return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					    "Could not restart sliver");
-	    }
+	    }	    
 	}
+	return 0;
+    };
+
+    if (defined($slice_urn)) {
+	$response = &$CheckState($aggregate, $action);
+	goto bad
+	    if (GeniResponse::IsResponse($response));
+	    
+	$response = &$PerformAction($aggregate, $action);
+	goto bad
+	    if (GeniResponse::IsResponse($response));
+
 	$slice->UnLock();
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS);
     }
     else {
+	my @slivers = ();
 
+	#
+	# Sanity check all arguments before doing anything.
+	#
+	foreach my $urn (@{ $sliver_urns }) {
+	    my $sliver = GeniSliver->Lookup($urn);
+	    
+	    $response = &$CheckState($sliver, $action);
+	    goto bad
+		if (GeniResponse::IsResponse($response));
+
+	    push(@slivers, $sliver);
+	}
+	foreach my $sliver (@slivers) {
+	    $response = &$PerformAction($sliver, $action);
+	    goto bad
+		if (GeniResponse::IsResponse($response));
+	}
+	$slice->UnLock();
+	return GeniResponse->Create(GENIRESPONSE_SUCCESS);
     }
-    return GeniResponse->Create(GENIRESPONSE_UNSUPPORTED);
+  bad:
+    $slice->UnLock();
+    return $response;
 }
 
 #
@@ -731,7 +758,8 @@ sub SliverStatus($)
 	next
 	    if ($sliver->resource_type() ne "Node");
 
-	my $urn    = $sliver->urn(); 
+	my $sliver_urn    = $sliver->sliver_urn();
+	my $component_urn = $sliver->component_urn();
 	my $state  = $sliver->state();
 	my $status = $sliver->status();
 	my $error  = "";
@@ -746,7 +774,8 @@ sub SliverStatus($)
 	    $blob->{'status'} = "notready"
 		if ($blob->{'status'} ne "failed");
 	}
-	$blob->{'details'}->{$urn} = {
+	$blob->{'details'}->{$sliver_urn} = {
+	    "component_urn" => $component_urn,
 	    "state"  => $state,
 	    "status" => $status,
 	    "error"  => $error,
@@ -1147,10 +1176,31 @@ sub BindToSlice($)
 sub ReleaseTicket($)
 {
     my ($argref) = @_;
+    my $slice_urn    = $argref->{'slice_urn'};
     my $ticketstr    = $argref->{'ticket'};
-
-    if (! (defined($ticketstr))) {
+    my $credentials  = $argref->{'credentials'};
+    
+    if (! (defined($credentials) &&
+	   defined($slice_urn) && defined($ticketstr))) {
 	return GeniResponse->MalformedArgsResponse("Missing arguments");
+    }
+    my $credential = CheckCredentials($credentials);
+    return $credential
+	if (GeniResponse::IsResponse($credential));
+
+    $credential->HasPrivilege( "pi" ) or
+	$credential->HasPrivilege( "bind" ) or
+	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
+				     "Insufficient privilege" );
+
+    my ($slice, $aggregate) = Credential2SliceAggregate($credential);
+    if (! (defined($slice))) {
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "No slice here");
+    }
+    if ($slice_urn ne $slice->urn()) {
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN(), undef,
+				    "Credential does not match the URN");
     }
     my $ticket = GeniTicket->CreateFromSignedTicket($ticketstr);
     if (!defined($ticket)) {
@@ -1158,18 +1208,19 @@ sub ReleaseTicket($)
 				    "Could not create GeniTicket object");
     }
     #
-    # Make sure the ticket was issued to the caller.
-    #
-    if ($ticket->owner_uuid() ne $ENV{'GENIUUID'}) {
-	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
-				    "This is not your ticket");
-    }
-    #
     # If the ticket is not stored, it is not a ticket that needs
     # to be released. It is a copy or a reissue. Needs more thought.
     #
     if (! $ticket->stored()) {
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS);
+    }
+    #
+    # And of course, the ticket has to be for the slice indicated
+    # by the provided credential.
+    #
+    if ($ticket->slice_uuid() ne $slice->uuid()) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "This ticket is for another slice");
     }
     if ($ticket->Lock() != 0) {
 	return GeniResponse->BusyResponse("ticket");
@@ -1224,8 +1275,7 @@ sub CheckCredentials($)
 				    "Could not create credential object");
     }
     #
-    # Make sure the credential was issued to the caller, but no special
-    # permission required to resolve component resources.
+    # Make sure the credential was issued to the caller.
     #
     if ($credential->owner_uuid() ne $ENV{'GENIUUID'}) {
 	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
@@ -1268,7 +1318,7 @@ sub LookupURN($)
 	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED,
 				    undef, "Nothing here by that name");
     }
-    return $object;
+    return ($object, $type);
 }
 
 #
