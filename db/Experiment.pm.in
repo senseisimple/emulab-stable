@@ -1510,6 +1510,21 @@ sub UserDir($)
 
     return $self->path();
 }
+# Long term storage.
+sub InfoDir($$)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+    my $idx = $self->idx();
+
+    return "$TB/expinfo/$pid/$eid/$idx";
+}
 
 # Event/Web key filenames.
 sub EventKeyPath($)
@@ -2685,13 +2700,13 @@ sub SaveLogFiles($)
     my $pid = $self->pid();
     my $eid = $self->eid();
     my $workdir = $self->WorkDir();
-    my $logdir  = TBExptLogDir($pid, $eid);
+    my $infodir = $self->InfoDir();
 
     # What the hell is this file! Very annoying.
     if (-e "$workdir/.rnd") {
 	mysystem("/bin/rm -f $workdir/.rnd");
     }
-    mysystem("/bin/cp -Rpf $workdir/ $logdir");
+    mysystem("/bin/cp -Rpf $workdir/ $infodir");
     return 0;
 }
 

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2008 University of Utah and the Flux Group.
+# Copyright (c) 2008-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -164,7 +164,7 @@ DBQueryFatal("update experiments set ".
 #
 my $workdir = $experiment->WorkDir();
 my $userdir = $experiment->UserDir();
-my $logdir  = TBExptLogDir($experiment->pid(), $experiment->eid());
+my $infodir = $experiment->InfoDir();
 
 if (system("$CHOWN $target_uid $workdir")) {
     fatal("Failed: '$CHOWN $target_user $workdir'");
@@ -172,8 +172,8 @@ if (system("$CHOWN $target_uid $workdir")) {
 if (system("$CHOWN $target_uid $userdir")) {
     fatal("Failed: '$CHOWN $target_user $userdir'");
 }
-if (system("$CHOWN $target_uid $logdir")) {
-    fatal("Failed: '$CHOWN $target_user $logdir'");
+if (system("$CHOWN $target_uid $infodir")) {
+    fatal("Failed: '$CHOWN $target_user $infodir'");
 }
 	     
 exit(0);

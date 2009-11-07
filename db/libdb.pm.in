@@ -174,7 +174,7 @@ use vars qw(@ISA @EXPORT);
 	 TBIsNodeImageable TBIsNodeVirtual TBControlNetIP TBPhysNodeID
 	 TBNodeUpdateAccountsByPid TBNodeUpdateAccountsByType
 	 TBNodeUpdateAccountsByUID
-	 TBSaveExpLogFiles TBExptWorkDir TBExptUserDir TBExptLogDir
+	 TBExptWorkDir TBExptUserDir
 	 TBIPtoNodeID TBNodeBootReset TBNodeStateWait
 	 TBExptSetSwapUID TBExptSetThumbNail
 	 TBPlabNodeUsername MarkPhysNodeDown
@@ -1890,24 +1890,6 @@ sub MarkPhysNodeDown($)
 }
 
 #
-# Return the working directory name for an experiment. This is where
-# the scripts work. The logs are copied over to the user's version of
-# the directory later.
-#
-sub TBExptLogDir($$)
-{
-    my($pid, $eid) = @_;
-
-    my $query_result =
-	DBQueryFatal("select idx from experiments ".
-		     "where pid='$pid' and eid='$eid'");
-
-    my ($idx) = $query_result->fetchrow_array;
-
-    return "$TB/expinfo/${pid}-${eid}.${idx}";
-}
-
-#
 # Return the IDX for a current experiment. 
 #
 # usage: TBExptIDX(char $pid, char *gid, int \$idx)
@@ -3257,25 +3239,6 @@ sub MapNodeOSID($$)
     my $n_osid = $o_row{'osid'};
 
     return $n_osid;
-}
-
-#
-# Save off the log files for an experiment to long term storage.
-#
-sub TBSaveExpLogFiles($$)
-{
-    my($pid, $eid) = @_;
-
-    my $workdir = TBExptWorkDir($pid, $eid);
-    my $logdir  = TBExptLogDir($pid, $eid);
-
-    # What the hell is this file! Very annoying.
-    if (-e "$workdir/.rnd") {
-	system("/bin/rm -f $workdir/.rnd");
-    }
-    system("/bin/cp -Rpf $workdir/ $logdir");
-
-    return 1;
 }
 
 #
