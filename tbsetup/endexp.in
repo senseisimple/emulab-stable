@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -157,6 +157,32 @@ if (! $experiment) {
 my $pid     = $experiment->pid();
 my $eid     = $experiment->eid();
 my $swapper = $experiment->GetSwapper();
+
+my $workdir = $experiment->WorkDir();
+my $userdir = $experiment->UserDir();
+my $infodir = $experiment->InfoDir();
+
+# Sanity check.
+if (! (-e $workdir && -e $userdir)) {
+    die("*** $0:\n".
+	"    Missing a critical directory!\n");
+}
+if (! -e $infodir) {
+    if (! -e "$TB/expinfo/$pid") {
+	die("*** $0:\n".
+	    "    $TB/expinfo/$pid has not been created yet!\n".
+	    "    Did you run 'fixexpinfo' like you were supposed to?\n");
+    }
+    #
+    # This is not going to happen unless a devel tree has been
+    # mixed with the main tree (or another devel tree). Try to
+    # recover, bail of not possible.
+    #
+    if (system("/bin/mkdir -m 777 -p $infodir")) {
+	die("*** $0:\n".
+	    "    $infodir was missing and cannot be created!\n");
+    }
+}
 
 #
 # See if this is a template instance; error if the -x option not provided,

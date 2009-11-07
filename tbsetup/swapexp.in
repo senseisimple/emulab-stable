@@ -305,6 +305,7 @@ if (! $experiment) {
 
 my $workdir = $experiment->WorkDir();
 my $userdir = $experiment->UserDir();
+my $infodir = $experiment->InfoDir();
 
 #
 # See if this is a template instance; error if the -x option not provided,
@@ -314,6 +315,28 @@ if (my $instance = Template::Instance->LookupByExptidx($experiment->idx())) {
     if ($inout ne "in" && !$template_mode) {
 	die("*** $0:\n".
 	    "    $pid/$eid is a template instance; use another command\n");
+    }
+}
+
+# Sanity check.
+if (! (-e $workdir && -e $userdir)) {
+    die("*** $0:\n".
+	"    Missing a critical directory! Stopping now ...\n");
+}
+if (! -e $infodir) {
+    if (! -e "$TB/expinfo/$pid") {
+	die("*** $0:\n".
+	    "    $TB/expinfo/$pid has not been created yet!\n".
+	    "    Did you run 'fixexpinfo' like you were supposed to?\n");
+    }
+    #
+    # This is not going to happen unless a devel tree has been
+    # mixed with the main tree (or another devel tree). Try to
+    # recover, bail of not possible.
+    #
+    if (system("/bin/mkdir -m 777 -p $infodir")) {
+	die("*** $0:\n".
+	    "    $infodir was missing and cannot be created!\n");
     }
 }
 

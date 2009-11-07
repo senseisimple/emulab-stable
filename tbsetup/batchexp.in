@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -203,6 +203,12 @@ usage()
     if (!defined($pid) || !defined($eid));
 usage()
     if (defined($tempnsfile) && defined($copyarg));
+
+if (! -e "$TB/expinfo/$pid") {
+    die("*** $0:\n".
+	"    $TB/expinfo/$pid has not been created yet!\n".
+	"    Did you run 'fixexpinfo' like you were supposed to?\n");
+}
 
 if (!defined($gid)) {
     $gid = $pid;

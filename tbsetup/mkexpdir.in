@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -74,6 +74,7 @@ my $expdir    = "$piddir/exp";
 my $eiddir    = "$expdir/$eid";
 my $eidlink   = "$projroot/$pid/exp/$eid";
 my $workdir   = TBExptWorkDir($pid, $eid);
+my $INFODIR   = "$TB/expinfo";
 
 #
 # Unix info for the group
@@ -151,6 +152,20 @@ if (! mkdir($workdir, 0775)) {
 }
 if (! chown($UID, $unix_gid, "$workdir")) {
     fatal("Could not chown $workdir to $UID/$unix_gid: $!");
+}
+
+#
+# Create the expinfo directory.
+#
+my $expinfo = "$INFODIR/$pid/$eid";
+
+if (! -e $expinfo) {
+    if (! mkdir($expinfo, 0777)) {
+	fatal("Could not create $expinfo: $!");
+    }
+    if (! chown($UID, $unix_gid, "$expinfo")) {
+	fatal("Could not chown $expinfo to $UID/$unix_gid: $!");
+    }
 }
 
 #

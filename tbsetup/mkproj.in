@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -424,6 +424,23 @@ if (! -e $workdir) {
     }
     if (! chown($uid, $gid, "$workdir")) {
 	fatal("Could not chown $workdir to $uid/$gid: $!");
+    }
+}
+
+#
+# Create experiment info (long term archive) directory.
+#
+my $infodir = "$TB/expinfo/$pid";
+
+if (! -e $infodir) {
+    if (! mkdir("$infodir", 0775)) {
+	fatal("Could not make directory $infodir: $!");
+    }
+    if (! chmod(0775, "$infodir")) {
+	fatal("Could not chmod directory $infodir: $!");
+    }
+    if (! chown($uid, $gid, "$infodir")) {
+	fatal("Could not chown $infodir to $uid/$gid: $!");
     }
 }
 
