@@ -197,3 +197,34 @@ while (my $dirent = readdir(DIR)) {
     }
 }
 closedir(DIR);
+
+#
+# Make sure all projet directories are made.
+#
+foreach my $pid (keys(%projects)) {
+    my $project = Project->Lookup($pid);
+    fatal("Could not find project record")
+	if (!defined($project));
+    
+    my $unix_uid = $project->GetLeader()->unix_uid();
+    my $unix_gid = $project->unix_gid();
+    my $piddir   = "$EXPINFO/$pid";
+
+    if (! -e $piddir) {
+	if ($impotent) {
+	    print STDERR "Would mkdir $piddir\n"
+		if ($verbose);
+	}
+	else {
+	    print STDERR "mkdir $piddir\n"
+		if ($debug);
+	    if (! mkdir($piddir, 0777)) {
+		fatal("Could not create $piddir: $!");
+	    }
+	    if (! chown($unix_uid, $unix_gid, "$piddir")) {
+		fatal("Could not chown $piddir to $UID/$unix_gid: $!");
+	    }
+	}
+    }
+}
+
