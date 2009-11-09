@@ -273,7 +273,7 @@ elsif ($opt{p}) {
 my %portMap = mapPortsToDevices(@ports);
 
 my @stats;
-foreach my $name (keys %portMap) {
+DEVICE: foreach my $name (keys %portMap) {
     my @ports = @{$portMap{$name}};
 
     #
@@ -304,7 +304,8 @@ foreach my $name (keys %portMap) {
 	};
 
 	# 'default' case
-	die "Unknown switch type ($type) for $name\n";
+	warn "WARNING: Unknown switch type ($type) for $name, skipping some ports\n";
+        last DEVICE;
     }
     my @results = $device->getFields(\@ports,\@oids);
 
