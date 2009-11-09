@@ -36,6 +36,8 @@ def Usage():
     -f file, --certificate=file         read SSL certificate from file
                                             [default: ~/.ssl/encrypted.pem]
     -h, --help                          show options and usage
+    -k keyfile, --keys=keyfile          read SSH keys from file            
+                                            [default: query from SA]
     -n name, --slicename=name           specify human-readable name of slice
                                             [default: mytestslice]
     -p file, --passphrase=file          read passphrase from file
@@ -52,6 +54,19 @@ for arg in sys.argv[:]:
     if arg == "-u" or ( len( arg ) >= 3 and "--update".find( arg ) == 0 ):
         sys.argv.remove( arg )
         update = True
+
+# Gah.  This case is even uglier, since we need to remove both the
+# option and its mandator parameter.  Don't bother addressing the
+# case where the user specifies -k more than once: they are being silly.
+keyfile = ""
+for i in range( len( sys.argv ) ):
+    if sys.argv[ i ] == "-k" or ( len( sys.argv[ i ] ) >= 3 and "--key".find( sys.argv[ i ] ) == 0 ):
+        if i + 1 >= len( sys.argv ):
+            Usage()
+            sys.exit( 1 )
+        keyfile = sys.argv[ i + 1 ]
+        sys.argv[ i : i + 2 ] = [];
+        break
 
 execfile( "test-common.py" )
 
@@ -84,11 +99,20 @@ print "Got my SA credential"
 #
 params = {}
 params["credential"] = mycredential
-rval,response = do_method("sa", "GetKeys", params)
-if rval:
-    Fatal("Could not get my keys")
-    pass
-mykeys = response["value"]
+if keyfile == "":
+    rval,response = do_method("sa", "GetKeys", params)
+    if rval:
+        Fatal("Could not get my keys")
+        pass
+    mykeys = response["value"]
+else:
+    mykeys = []
+    f = open( keyfile )
+    for keyline in f:
+        if re.match( r"\s*#", keyline ):
+            continue
+        mykeys.append( { 'type' : 'ssh', 'key' : keyline } )
+    f.close()
 if debug: print str(mykeys)
 
 #
