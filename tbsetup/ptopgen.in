@@ -1663,6 +1663,9 @@ sub print_node_flags
 	    print "  <trivial_bandwidth>$value</trivial_bandwidth>\n";
 	}
 	elsif ($name eq "subnode_of") {
+	    if ($genimode) {
+		$value = GeniHRN::Generate($OURDOMAIN, "node", $value);
+	    }
 	    print "  <subnode_of>$value</subnode_of>\n";
 	}
 	elsif ($name eq "unique" && ! $genimode) {
