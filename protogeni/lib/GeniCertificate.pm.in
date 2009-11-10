@@ -549,14 +549,22 @@ sub StoreCRL($$$)
 	return -1;
     }
     $expires =~ s/^nextupdate=//i;
+    my $issuer = `$OPENSSL crl -noout -issuer -in $filename`;
+    chomp($issuer);
+    if (! (defined($issuer) && ($issuer =~ /^issuer/i))) {
+	print STDERR "Could not get issuer from CRL\n";
+	return -1;
+    }
+    $issuer =~ s/^issuer=//i;
     my $safe_cert    = DBQuoteSpecial($string);
     my $safe_expires = DBQuoteSpecial($expires);
+    my $safe_issuer  = DBQuoteSpecial($issuer);
     my $dateconvert  = "DATE_SUB(STR_TO_DATE($safe_expires, ".
 	"'%b %e %T %Y'), INTERVAL 1 DAY)";
 
     DBQueryWarn("replace into geni_crls set ".
 		"  uuid='$uuid', created=now(), expires=$dateconvert, ".
-		"  cert=$safe_cert")
+		"  cert=$safe_cert, DN=$safe_issuer")
 	or return -1;
     unlink($filename);
     return 0;
