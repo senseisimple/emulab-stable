@@ -67,6 +67,9 @@ elsif ($authority->type() eq "sa") {
 	fatal("Could not delete users for $authority");
     }
 }
+elsif ($authority->type() eq "ses") {
+    # Nothing to do.
+}
 else {
     fatal("Do not know how to delete $authority");
 }
