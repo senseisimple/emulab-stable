@@ -353,7 +353,8 @@ sub lookup($$)
 
     my @cnodes = grep( $_->nodeName eq $name, $node->childNodes );
 
-    fatal( "invalid credential" )
+    fatal( "invalid credential (found " . scalar( @cnodes ) . " $name " .
+	   "nodes, expecting 1)" )
 	if scalar( @cnodes ) != 1;
 
     return $cnodes[ 0 ];
