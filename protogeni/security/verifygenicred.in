@@ -251,15 +251,15 @@ foreach my $credential ( keys( %credentials ) ) {
 	    }		
 	}
 
-	my $expiry = lookup( $node, "expiry" )->textContent;
-	my $parent_expiry = lookup( $parent, "expiry" )->textContent;
+	my $expiry = lookup( $node, "expires" )->textContent;
+	my $parent_expiry = lookup( $parent, "expires" )->textContent;
 	my $dateregexp = '^\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\d$';
 
 	fatal( "invalid delegation (malformed expiry)" )
 	    if $expiry !~ $dateregexp or $parent_expiry !~ $dateregexp;
 
 	fatal( "invalid delegation (expiry violation)" )
-	    if $expiry > $parent_expiry;
+	    if $expiry gt $parent_expiry;
     }
 }
 
