@@ -1,11 +1,12 @@
 #!/usr/bin/perl -wT
-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
+use strict;
 use English;
+use Getopt::Std;
 
 #
 # Back up the DB, rolling the base and update logs. The approach is to
@@ -20,7 +21,15 @@ use English;
 # made since backup.XXX was made). This should give you a DB that is the
 # same as backup.XXX+1. You can go back further, and just apply all the
 # subsequent update.XXX files. 
-# 
+#
+sub usage()
+{
+    print("Usage: backup [-o]\n");
+    exit(-1);
+}
+my $optlist = "do";
+my $debug   = 0;
+my $opsmode = 0;
 
 #
 # Configure variables
@@ -34,6 +43,7 @@ my $LOGDIR	= "$TB/log/mysql";
 my $HOTCOPY     = "/usr/local/bin/mysqlhotcopy";
 my $MYSQLDUMP   = "/usr/local/bin/mysqldump";
 my $SETSITEVAR  = "$TB/sbin/setsitevar";
+my $DBCONF      = "$TB/etc/mysqld.pwd";
 my $TAR         = "/usr/bin/tar";
 my $BASE	= "base";
 my $UPD		= "update";
@@ -41,6 +51,9 @@ my $SLOW	= "slowqueries";
 my $BACK	= "tbdb";
 my $extension;
 my $dohotcopy   = 0;
+my $dbname      = "mysql";
+my $dbuser      = "root";
+my $dbpass;
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
@@ -69,6 +82,23 @@ if ($UID != 0) {
 }
 
 #
+# Parse command arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"o"})) {
+    $opsmode = 1;
+}
+if ($opsmode && $dohotcopy) {
+    fatal("Cannot do hotcopy mode on ops");
+}
+
+#
 # Create a temporary name for a log file and untaint it.
 #
 #
@@ -89,15 +119,30 @@ if ($logname =~ /^([-\@\w.\/]+)$/) {
 open(STDERR, ">> $logname") or die("opening $logname for STDERR: $!");
 open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
 
-if (! chdir($BACKUPDIR)) {
-    fatal("Could not chdir to $BACKUPDIR: $!");
-}
+if ($opsmode) {
+    require libtbdb;
+    import libtbdb;
 
-#
-# Let people know the system will be sluggish.
-#
-system("$SETSITEVAR web/message '<font color=red>".
-       "Nightly backup in progress; system might be sluggish</font>'");
+    if (`cat $DBCONF` =~ /^([\w]*)$/) {
+	$dbpass = $1;
+    }
+    else {
+	fatal("Could not get mysql password from $DBCONF!");
+    }
+    if (TBDBConnect($dbname, $dbuser, $dbpass) < 0) {
+	fatal("Could not connect to ops database!");
+    }
+}
+else {
+    if (! chdir($BACKUPDIR)) {
+	fatal("Could not chdir to $BACKUPDIR: $!");
+    }
+    #
+    # Let people know the system will be sluggish.
+    #
+    system("$SETSITEVAR web/message '<font color=red>".
+	   "Nightly backup in progress; system might be sluggish</font>'");
+}
 
 #
 # Open up the index file to see what the current update file extension is.
@@ -138,7 +183,8 @@ my $basename  = "$BASE.$extension";
 my $updname   = "$UPD.$extension";
 my $slowname  = "$SLOW.$extension";
 
-print "Backup file name: $backname\n";
+print "Backup file name: $backname\n"
+    if (!$opsmode);
 print "Base file name:   $basename\n";
 print "Update file name: $updname\n";
 print "Slow file name:   $slowname\n";
@@ -157,7 +203,15 @@ if (-e "$LOGDIR/$SLOW") {
     }
 }
 
-if ($dohotcopy) {
+if ($opsmode) {
+    #
+    # This will reset the log files.
+    #
+    if (! DBQueryWarn("flush logs")) {
+	fatal("mysqladmin failed!");
+    }
+}
+elsif ($dohotcopy) {
     #
     # Do a hotcopy. This will reset the log files.
     #
@@ -226,7 +280,8 @@ if ($dohotcopy && -e "$BACKUPDIR/tbdb") {
 #SENDMAIL("stoller@flux.utah.edu",
 #	 "DB Backup Finished", "", undef, undef, ($logname));
 
-system("$SETSITEVAR web/message -");
+system("$SETSITEVAR web/message -")
+    if (!$opsmode);
 unlink("$logname");
 exit 0;
 
