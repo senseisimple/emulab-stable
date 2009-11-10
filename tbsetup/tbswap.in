@@ -197,7 +197,8 @@ my $experiment = Experiment->Lookup($pid, $eid);
 if (!defined($experiment)) {
     tbdie("Could not lookup experiment object!")
 }
-my $special = ($pid eq "testbed" || $pid eq "tbres" || $pid eq "emulab-ops");
+my $special = ($pid eq "testbed" || $pid eq "tbres" ||
+	       $pid eq "emulab-ops" || $pid eq "utahstud");
 
 #
 # Print starting message.
@@ -907,8 +908,7 @@ sub doSwapin($) {
 	#
 	my $exitcode;
 	my $cmd = "$wrapper";
-	if ($pid eq "testbed" || $pid eq "tbres" || $pid eq "emulab-ops" ||
-	    $this_user->stud() || $experiment->virtnode_count()) {
+	if ($special || $this_user->stud() || $experiment->virtnode_count()) {
 	    $cmd = "$mapper";
 	}
 	$cmd .= " -f"
