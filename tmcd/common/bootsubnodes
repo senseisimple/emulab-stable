@@ -161,10 +161,12 @@ foreach my $subnode (keys(%subnodelist)) {
 	    last SWITCH;
 	};
 	/^netfpga$/i && do {
-	    system("netfpgactl $subnode boot");
-	    if ($?) {
-                print STDERR "$subnode boot failed with $?\n";
-            }
+	    if (-x "$BINDIR/netfpgactl") {
+		system("$BINDIR/netfpgactl $subnode boot");
+		if ($?) {
+		    print STDERR "$subnode boot failed with $?\n";
+		}
+	    }
             last SWITCH;
 	};
 	print "Invalid subnode type: $type\n";
