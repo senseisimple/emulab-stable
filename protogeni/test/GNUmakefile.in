@@ -27,9 +27,11 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 FILES	 = $(wildcard *.py)
 FILES   += $(wildcard $(SRCDIR)/*.py)
 ALLFILES = $(notdir $(FILES))
+TARBALL  = $(INSTALL_WWWDIR)/downloads/protogeni-tests.tar.gz
 
 install:	install-mkdir \
-	$(addprefix $(INSTALL_TOPDIR)/opsdir/protogeni/test/, $(ALLFILES))
+	$(addprefix $(INSTALL_TOPDIR)/opsdir/protogeni/test/, $(ALLFILES)) \
+	$(TARBALL)
 
 control-install:
 
@@ -43,3 +45,7 @@ $(INSTALL_TOPDIR)/opsdir/protogeni/test/%: %
 	@echo "Installing $<"
 	$(INSTALL_PROGRAM) $(subst $$,\$$,$<) $(subst $$,\$$,$@) 
 
+$(TARBALL): $(ALLFILES)
+	-mkdir -p $(INSTALL_WWWDIR)/downloads
+	rm -f $(TARBALL)
+	tar czf $(TARBALL) -C $(SRCDIR) .
