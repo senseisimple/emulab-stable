@@ -84,7 +84,8 @@ elif len( args ) == 1:
 else:
     rspec = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
             " <node virtual_id=\"geni1\" "+\
-            "       virtualization_type=\"emulab-vnode\"> " +\
+            "       virtualization_type=\"emulab-vnode\" " +\
+            "       startup_command=\"/bin/ls > /tmp/foo\"> " +\
             " </node>" +\
             "</rspec>"    
 
@@ -213,14 +214,29 @@ if update:
         Fatal("Could not update sliver on CM")
         pass
     manifest = response["value"]
-    print "Updated the sliver on the CM. Starting the sliver ..."
+    print "Updated the sliver on the CM. Renewing the sliver ..."
     print str(manifest)
+
+#
+# Bump the expiration time.
+#
+valid_until = time.strftime("%Y%m%dT%H:%M:%S", time.gmtime(time.time() + 600));
+
+params = {}
+params["credential"]   = sliver
+params["valid_until"]  = valid_until
+rval,response = do_method("cm", "RenewSliver", params)
+if rval:
+    Fatal("Could not renew sliver")
+    pass
+print "Sliver has been renewed. Starting the sliver ..."
 
 #
 # Start the sliver.
 #
 params = {}
 params["credential"] = sliver
+params["manifest"]   = manifest
 params["impotent"]   = impotent
 rval,response = do_method("cm", "StartSliver", params)
 if rval:
