@@ -83,6 +83,7 @@ rspec = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
 params = {}
 params["credential"] = myslice
 params["rspec"]      = rspec
+params["impotent"]   = 0
 rval,response = do_method("cm", "GetTicket", params)
 if rval:
     Fatal("Could not get ticket")
@@ -132,8 +133,8 @@ ticketcopy = response["value"]
 
 print "Releasing the ticket now ..."
 params = {}
-params["ticket"] = ticketcopy
 params["credential"] = myslice
+params["ticket"]     = ticketcopy
 rval,response = do_method("cm", "ReleaseTicket", params)
 if rval:
     Fatal("Could not release ticket")
