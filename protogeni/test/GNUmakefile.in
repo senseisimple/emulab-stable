@@ -41,5 +41,5 @@ clean:
 
 $(INSTALL_TOPDIR)/opsdir/protogeni/test/%: %
 	@echo "Installing $<"
-	$(INSTALL_DATA) $(subst $$,\$$,$<) $(subst $$,\$$,$@) 
+	$(INSTALL_PROGRAM) $(subst $$,\$$,$<) $(subst $$,\$$,$@) 
 
