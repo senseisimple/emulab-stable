@@ -48,4 +48,4 @@ $(INSTALL_TOPDIR)/opsdir/protogeni/test/%: %
 $(TARBALL): $(ALLFILES)
 	-mkdir -p $(INSTALL_WWWDIR)/downloads
 	rm -f $(TARBALL)
-	tar czf $(TARBALL) -C $(SRCDIR) .
+	tar czf $(TARBALL) -C $(SRCDIR) $(ALLFILES)
