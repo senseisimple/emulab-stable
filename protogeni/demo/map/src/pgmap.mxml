@@ -59,7 +59,7 @@
 		
 	    //------------------------------------------
 	    // Variables needed
-	    private var chooseCMWindow:ChooseComponentManagerWindow;
+	    public var chooseCMWindow:ChooseComponentManagerWindow;
 	    
 	    private function preinit():void {
 	    	Security.allowDomain("*");
@@ -75,7 +75,7 @@
 	    	
 	    	main.setConole(console);
 
-			pgHandler = new ProtoGeniHandler(this);
+			pgHandler = new ProtoGeniHandler();
 			
 			chooseCMWindow = new ChooseComponentManagerWindow();
 	    	chooseCMWindow.main = this;	    	
@@ -95,13 +95,6 @@
         public function openConsole():void {
 	    	PopUpManager.addPopUp(console, this, false);
        		PopUpManager.centerPopUp(console);
-	    }
-	    
-	    private function viewRspec():void {
-	    	PopUpManager.addPopUp(rspecView, this, false);
-       		PopUpManager.centerPopUp(rspecView);
-       		rspecView.title = "Advertisement RSPEC from " + pgHandler.rpc.ComponentManagerURL;
-       		rspecView.loadXml(pgHandler.rpc.Rspec);
 	    }
             
         public function refresh():void {
@@ -198,10 +191,6 @@
 	    	if(color.length > 0) {
 	    		progressLabel.setStyle("color", color);
 	    	}
-	    	chooseCMWindow.progressLabel.text = message;
-	    	if(color.length > 0) {
-	    		chooseCMWindow.progressLabel.setStyle("color", color);
-	    	}
 	    }
 	    
 	    public function startWaiting():void {
@@ -236,10 +225,6 @@
 			source="@Embed('../images/application_xp_terminal.png')"
 			click="openConsole()" 
 			toolTip="View the console"/>
-		<pgmap:ImageButton id="rspecButton"
-			source="@Embed('../images/page_white_code.png')"
-			click="viewRspec()" 
-			toolTip="View the most recent RSpec"/>
 		<mx:VRule height="14"/>
 		<mx:ComboBox id="slicesCombobox" dataProvider="{slicesMenu}" labelFunction="getSliceLabel" change="sliceSelected(event)"></mx:ComboBox>
 		<mx:CheckBox label="Show Mine Only" id="onlyMyResourcesCheckbox" click="userResourcesOnly = onlyMyResourcesCheckbox.selected; pgHandler.map.drawMap()"/>
