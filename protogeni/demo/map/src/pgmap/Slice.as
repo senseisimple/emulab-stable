@@ -18,27 +18,28 @@
 	
 	public class Slice
 	{
+		public static var READY : String = "ready";
+	    public static var NOTREADY : String = "notready";
+	    public static var FAILED : String = "failed";
+	    
 		public var uuid : String = null;
 		public var hrn : String = null;
+		public var urn : String = null;
 		public var creator : User = null;
-		public var credential : String = null;
-		public var sliverCredential : String = null;
+		public var credential : String = "";
+		public var slivers : ArrayCollection = new ArrayCollection();
 		
-		public var status : String = null;
-		public var sliverStatus : String = null;
-		
-		public var Nodes : ArrayCollection = new ArrayCollection();
-		public var Links : ArrayCollection = new ArrayCollection();
-		
+		public var status : String = "";
+
 		public function Slice()
 		{
 		}
 		
 		public function ReadyIcon():Class {
 			switch(status) {
-				case "ready" : return Common.flagGreenIcon;
-				case "notready" : return Common.flagYellowIcon;
-				case "failed" : return Common.flagRedIcon;
+				case READY : return Common.flagGreenIcon;
+				case NOTREADY : return Common.flagYellowIcon;
+				case FAILED : return Common.flagRedIcon;
 				default : return null;
 			}
 		}
@@ -55,24 +56,63 @@
 			else
 				returnString = hrn;
 				
-			switch(status) {
-				case "ready":
-					switch(sliverStatus) {
-						case "ready": returnString += " (Ready)";
-							break;
-						case "notready": returnString += " (Sliver Not Ready)";
-							break;
-						case "failed": returnString += " (Sliver Failed)";
-							break;
-						default: returnString += " (Sliver N/A)";
-					}
-					break;
-				case "notready": returnString += " (Not Ready)";
-					break;
-				case "failed": returnString += " (N/A)";
-					break;
-				default: returnString += " (N/A)";
+			return returnString + " (" + status + ")";
+		}
+		
+		public function DetectStatus():String
+		{
+			if(slivers.length == 0)
+			{
+				status = "Empty";
+				return status;
 			}
+			var partialReady:Boolean = false;
+			var partialFailed:Boolean = false;
+			var partialNotready:Boolean = false;
+			var allReady:Boolean = true;
+			for each(var s:Sliver in slivers)
+			{
+				if(s.sliceStatus == Slice.READY)
+					partialReady = true;
+				else if(s.sliceStatus == Slice.FAILED)
+				{
+					partialFailed = true;
+					allReady = false;
+				} else if(s.sliceStatus == Slice.NOTREADY)
+				{
+					partialNotready = true;
+					allReady = false;
+				} else if(s.sliceStatus.length == 0)
+					allReady = false;
+			}
+			
+			var returnString:String = "";
+			
+			if(allReady)
+				returnString += "Ready";
+			else
+			{
+				if(partialReady || partialNotready || partialFailed)
+				{
+					returnString += "Partially "
+					if(partialReady)
+					{
+						returnString += "ready"
+						if(partialNotready || partialFailed)
+							returnString += ", ";
+					}
+					if(partialNotready)
+					{
+						returnString += "not ready";
+						if(partialFailed)
+							returnString += ", ";
+					}
+					if(partialFailed)
+						returnString += "failed"
+				} else
+					returnString = "N/A";
+			}
+			status = returnString;
 			return returnString;
 		}
 		
@@ -82,24 +122,16 @@
 				return -1;
 			}
 			
-			switch(status) {
-				case "ready":
-					switch(sliverStatus) {
-						case "ready": return 0;
-							break;
-						case "notready": return 1;
-							break;
-						case "failed": return 2;
-							break;
-						default: return 3;
-					}
-					break;
-				case "notready": return 4;
-					break;
-				case "failed": return 5;
-					break;
-				default: return 6;
-			}
+			if(status == "Ready")
+				return 0;
+			else if(status.search("Partially") > -1)
+				return 1;
+			else if(status == "N/A")
+				return 2;
+			else if(status == "Empty")
+				return 3;
+			else
+				return 4;
 		}
 	}
 }

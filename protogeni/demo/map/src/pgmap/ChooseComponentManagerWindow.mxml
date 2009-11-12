@@ -1,25 +1,63 @@
 <?xml version="1.0" encoding="utf-8"?>
 <mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" layout="vertical"
-	title="Choose Component Manager"
+	title="Component Managers"
 	showCloseButton="true"
-	borderAlpha=".9" borderColor="#D2E1F0" width="400"
+	borderAlpha=".9" borderColor="#D2E1F0" width="222"
 	defaultButton="{okButton}"
 	close="close()"
-	creationComplete="okButton.setFocus()" xmlns:ns1="pgmap.*">
+	creationComplete="okButton.setFocus()" xmlns:ns1="pgmap.*" height="288" verticalGap="2" paddingBottom="2" paddingLeft="2" paddingRight="2" paddingTop="2">
+	
+	<mx:Style>
+		.failedStyle {
+            color: red;
+            textRollOverColor: red;
+            textSelectedColor: red;
+            themeColor: red;
+        }
+        
+        .validStyle {
+            color: green;
+            textRollOverColor: green;
+            textSelectedColor: green;
+            themeColor: green;
+        }
+        
+        .unknownStyle {
+            color: grey;
+            textRollOverColor: grey;
+            textSelectedColor: grey;
+            themeColor: grey;
+        }
+        
+        .inprogressStyle {
+            color: #FF7F00;
+            textRollOverColor: #FF7F00;
+            textSelectedColor: #FF7F00;
+            themeColor: #FF7F00;
+        }
+
+
+	</mx:Style>
 	
 	<mx:Script>
 		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.containers.HBox;
+			import mx.controls.CheckBox;
 			import mx.controls.Alert;
 			import mx.events.CloseEvent;	
        		import mx.managers.PopUpManager;
+       		
+       		[Embed(source="../../images/flag_red.png")]
+			private var msgImage:Class; 
 
 			[Bindable]
 			public var main:pgmap;
-			
+
 			public function success():void {
-				main.pgHandler.rpc.ComponentManagerURL = listManagers.selectedItem.url;
-            	main.refresh();
-				close();
+				okButton.enabled = false;
+				main.refresh();
+				//close();
 			}
 			
 			public function close():void {
@@ -27,9 +65,9 @@
 			}
 			
 			public function open():void {
-				PopUpManager.addPopUp(this, main, true);
+				PopUpManager.addPopUp(this, main, false);
        			PopUpManager.centerPopUp(this);
-       			if(main.pgHandler.rpc.Components == null || main.pgHandler.rpc.Components.length == 0) {
+       			if(main.pgHandler.ComponentManagers.length == 0) {
        				startRefreshList();
        			} else
        				okButton.enabled = true;
@@ -44,22 +82,162 @@
 			}
 			
 			public function refreshList():void {
-				okButton.enabled = true;
+				var existingCms:ArrayCollection = new ArrayCollection();
+				
+				// Remove non-valid CMs
+				for(var i:int = 0; i < cmVbox.getChildren().length; i++)
+				{
+					var found:Boolean = false;
+					var checkboxCm:CheckBox = (cmVbox.getChildAt(i) as HBox).getChildAt(0) as CheckBox;
+					for each(var testCm:ComponentManager in main.pgHandler.ComponentManagers)
+					{
+						if(checkboxCm.label == testCm.Hrn)
+						{
+							found = true;
+							if(!existingCms.contains(testCm))
+								existingCms.addItem(testCm);
+							break;
+						}
+					}
+					if(!found)
+					{
+						cmVbox.removeChildAt(i);
+						i--;
+					}
+				}
+				
+				for each(var cm:ComponentManager in main.pgHandler.ComponentManagers )
+				{
+					if(!existingCms.contains(cm))
+						addCm(cm);
+				}
+			}
+			
+			public function ResetAll():void
+			{
+				for each(var cmHbox:HBox in cmVbox.getChildren() )
+				{
+					var cmCheckbox:CheckBox = cmHbox.getChildAt(0) as CheckBox;
+					for each(var cm:ComponentManager in main.pgHandler.ComponentManagers )
+					{
+						if(cm.Hrn == cmCheckbox.label)
+						{
+							updateCmHbox(cmHbox, cmCheckbox, cm);
+							break;
+						}
+					}
+				}
+			}
+			
+			public function BlankAll():void
+			{
+				for each(var cmHbox:HBox in cmVbox.getChildren() )
+				{
+					var cmCheckbox:CheckBox = cmHbox.getChildAt(0) as CheckBox;
+					cmCheckbox.styleName = "unknownStyle";
+					while(cmHbox.getChildren().length > 1)
+						cmHbox.removeChildAt(1);
+				}
+			}
+			
+			public function ResetStatus(cm:ComponentManager):void
+			{
+				for each(var cmHbox:HBox in cmVbox.getChildren() )
+				{
+					var cmCheckbox:CheckBox = cmHbox.getChildAt(0) as CheckBox;
+					if(cm.Hrn == cmCheckbox.label)
+					{
+						updateCmHbox(cmHbox, cmCheckbox, cm);
+						return;
+					}
+				}
+			}
+			
+			public function updateCmHbox(cmHbox:HBox, cmCheckbox:CheckBox, cm:ComponentManager):void
+			{
+				while(cmHbox.getChildren().length > 1)
+					cmHbox.removeChildAt(1);
+					
+				if(cm.Status == ComponentManager.FAILED)
+					cmCheckbox.styleName = "failedStyle";
+				else if(cm.Status == ComponentManager.UNKOWN)
+					cmCheckbox.styleName = "unknownStyle";
+				else if(cm.Status == ComponentManager.INPROGRESS)
+					cmCheckbox.styleName = "inprogressStyle";
+				else if(cm.Status == ComponentManager.VALID)
+				{
+					cmCheckbox.styleName = "validStyle";
+					var rspecButton:RspecButton = new RspecButton();
+					rspecButton.addEventListener(MouseEvent.CLICK,
+						function openRspec():void
+						{
+							PopUpManager.addPopUp(main.rspecView, main, false);
+				       		PopUpManager.centerPopUp(main.rspecView);
+				       		main.rspecView.title = "Advertisement RSPEC from " + cm.Hrn;
+				       		main.rspecView.loadXml(cm.Rspec);
+						});
+					cmHbox.addChild(rspecButton);
+				}
+				
+				if(cm.Message.length > 0)
+				{
+					var msgButton:ImageButton = new ImageButton();
+					msgButton.toolTip = "More information";
+					msgButton.source = new msgImage();
+					msgButton.addEventListener(MouseEvent.CLICK,
+						function openMsg():void
+						{
+							Alert.show(cm.Message);
+						});
+					cmHbox.addChild(msgButton);
+				}
+			}
+			
+			public function selectAll():void
+			{
+				for each(var cmHbox:HBox in cmVbox.getChildren() )
+				{
+					var cmCheckbox:CheckBox = cmHbox.getChildAt(0) as CheckBox;
+					cmCheckbox.selected = true;
+					//cmCheckbox.dispatchEvent(new MouseEvent(MouseEvent.CLICK, false, false));
+				}
+				for each(var cm:ComponentManager in main.pgHandler.ComponentManagers)
+					cm.Show = true;
+				okButton.enabled = cmVbox.getChildren().length > 0;
+			}
+			
+			public function addCm(cm:ComponentManager):void
+			{
+				var cmHbox:HBox = new HBox();
+				cmHbox.percentWidth = 100;
+				var cmCheckbox:CheckBox = new CheckBox();
+				cmCheckbox.selected = cm.Show;
+				cmCheckbox.label = cm.Hrn;
+				cmHbox.addChild(cmCheckbox);
+				updateCmHbox(cmHbox, cmCheckbox, cm);
+				cmCheckbox.addEventListener(MouseEvent.CLICK,
+					function allowApply():void {
+						okButton.enabled = true;
+						cm.Show = cmCheckbox.selected;
+					});
+				cmVbox.addChild(cmHbox);
 			}
 		]]>
 	</mx:Script>
-	
-	<mx:HBox width="100%" verticalAlign="middle">
-	<ns1:ImageButton id="refreshButton" source="@Embed('../images/arrow_refresh.png')" click="startRefreshList()"/>
-	<mx:ComboBox editable="false" width="100%" id="listManagers" dataProvider="{main.pgHandler.rpc.Components}" labelField="hrn"></mx:ComboBox>
-	<mx:CheckBox label="Compress when available" selected="{main.pgHandler.rpc.useCompression}" />
-	</mx:HBox>
+			
 	<mx:HBox width="100%" horizontalAlign="right">
+	<ns1:ImageButton id="refreshButton" source="@Embed('../images/arrow_refresh.png')" click="startRefreshList()"/>
+	<mx:Button label="Select All" click="selectAll();"/>
+	<mx:Spacer width="100%"/>
 	<mx:Label id="progressLabel"  fontStyle="normal" fontWeight="bold"/>
 	<mx:SWFLoader id="waitingIcon" source="@Embed('../../images/waiting.swf')" visible="false"/> 
+	</mx:HBox>
+	<mx:VBox width="100%" height="196" id="cmVbox" borderStyle="solid" verticalGap="2" paddingLeft="2" paddingBottom="2" paddingRight="2" paddingTop="2">
+	</mx:VBox>
+	<mx:HBox width="100%" horizontalAlign="right">
 	<mx:Spacer width="100%"/>
 	<mx:Button id="cancelButton" label="Cancel" icon="@Embed('../images/cross.png')" click="close();"/>
-	<mx:Button id="okButton" label="Go" icon="@Embed('../images/tick.png')" click="success();" enabled="false"/>
+	<mx:Button id="okButton" label="Apply" icon="@Embed('../images/tick.png')" click="success();" enabled="false"/>
 	</mx:HBox>
 	
 </mx:TitleWindow>

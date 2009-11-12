@@ -21,7 +21,6 @@ package pgmap
 	
 	import mx.collections.ArrayCollection;
 	import mx.events.FlexEvent;
-	import mx.managers.PopUpManager;
 	
     	
 	public class ProtoGeniMapHandler
@@ -40,21 +39,20 @@ package pgmap
 
 		private var nodeGroupClusters:ArrayCollection;		
 		
-		private function addMarker(g:NodeGroup):void
+		private function addNodeGroupMarker(g:PhysicalNodeGroup):void
 	    {
 	    	// Create the group to be drawn
-	    	var drawGroup:NodeGroup = new NodeGroup(g.latitude, g.longitude, g.country , main.pgHandler.Nodes);
-	    	drawGroup.owner = g.owner;
+	    	var drawGroup:PhysicalNodeGroup = new PhysicalNodeGroup(g.latitude, g.longitude, g.country, g.owner);
 	    	if(main.userResourcesOnly) {
-	    		for each(var n:Node in g.collection) {
-	    			if( n.slice != null &&
-	    			      ((main.selectedSlice == null || main.selectedSlice.status != null) ||
-	    			      (n.slice == main.selectedSlice)) )
+	    		for each(var n:PhysicalNode in g.collection) {
+	    			for each(var vn:VirtualNode in n.virtualNodes)
 	    			{
-	    				drawGroup.Add(n);
+	    				if(vn.sliver.slice == main.selectedSlice)
+	    				{
+	    					drawGroup.Add(n);
+	    					break;
+	    				}
 	    			}
-	    			
-	    			// Figure out links
 	    		}
 	    	} else {
 	    		drawGroup = g;
@@ -62,7 +60,7 @@ package pgmap
 	    	
 	    	if(drawGroup.collection.length > 0) {
 	    		var m:Marker = new Marker(
-			      	new LatLng(drawGroup.latitude, drawGroup.longitude),
+			      	new LatLng(g.latitude, g.longitude),
 			      	new MarkerOptions({
 			                  strokeStyle: new StrokeStyle({color: 0x092B9F}),
 			                  fillStyle: new FillStyle({color: 0xD2E1F0, alpha: 1}),
@@ -72,10 +70,10 @@ package pgmap
 			                  label: drawGroup.collection.length.toString()
 			      	}));
 	
-		        var groupInfo:NodeGroupInfo = new NodeGroupInfo();
+		        var groupInfo:PhysicalNodeGroupInfo = new PhysicalNodeGroupInfo();
 		        groupInfo.Load(drawGroup, main);
 		        
-		        if(drawGroup.city.length == 0)
+		        if(g.city.length == 0)
 		        {
 			        var geocoder:ClientGeocoder = new ClientGeocoder();
 			    	geocoder.addEventListener(GeocodingEvent.GEOCODING_SUCCESS,
@@ -93,7 +91,7 @@ package pgmap
 					        			groupInfo.city = splitAddress[1];
 					        		else
 					        			groupInfo.city = fullAddress;
-					        		drawGroup.city = groupInfo.city;
+					        		g.city = groupInfo.city;
 					        	} catch (err:Error) { }
 					        }
 					      });
@@ -108,7 +106,7 @@ package pgmap
 		
 					  geocoder.reverseGeocode(new LatLng(g.latitude, g.longitude));
 		        } else {
-		        	groupInfo.city = drawGroup.city;
+		        	groupInfo.city = g.city;
 		        }
 		        m.addEventListener(MapMouseEvent.CLICK, function(e:Event):void {
 		            m.openInfoWindow(
@@ -122,11 +120,11 @@ package pgmap
 		        });
 	
 		  		main.map.addOverlay(m);
-		  		markers.addItem({marker:m, nodeGroup:g});
+		  		markers.addItem({marker:m, nodeGroup:drawGroup});
 	    	} else {
 	    		// Draw an empty marker
 	    		var nonodes:Marker = new Marker(
-			      	new LatLng(drawGroup.latitude, drawGroup.longitude),
+			      	new LatLng(g.latitude, g.longitude),
 			      	new MarkerOptions({
 			                  strokeStyle: new StrokeStyle({color: 0x666666}),
 			                  fillStyle: new FillStyle({color: 0xCCCCCC, alpha: .8}),
@@ -166,7 +164,7 @@ package pgmap
 	    	// Save the bounds of the cluster
 	    	var bounds:LatLngBounds = new LatLngBounds(new LatLng(upperLat, leftLong), new LatLng(lowerLat, rightLong));
 	    	
-	    	var clusterInfo:NodeGroupClusterInfo = new NodeGroupClusterInfo();
+	    	var clusterInfo:PhysicalNodeGroupClusterInfo = new PhysicalNodeGroupClusterInfo();
 	    	clusterInfo.addEventListener(FlexEvent.CREATION_COMPLETE,
 	    		function loadNodeGroup(evt:FlexEvent):void {
 	    			clusterInfo.Load(nodeGroupsOnly);
@@ -199,9 +197,9 @@ package pgmap
 	  		clusterMarkers.addItem(m);
 	    }
 	    
-	    public function addLink(lg:LinkGroup):void {
+	    public function addPhysicalLink(lg:PhysicalLinkGroup):void {
 	    	// Create the group to be drawn
-	    	var drawGroup:LinkGroup = lg;
+	    	var drawGroup:PhysicalLinkGroup = lg;
 	    	
 	    	if(drawGroup.collection.length > 0 && !main.userResourcesOnly) {
 	    		// Add line
@@ -238,52 +236,63 @@ package pgmap
 						thickness: 3,
 						alpha:.8})
 					}));
-	
+
 				main.map.addOverlay(blankline);
 	    	}
 	    }
 	    
-	    public function addPointLink(pl:PointLink):void {
-	    	// Create the group to be drawn
-	    	if(pl.slice != main.selectedSlice ||
-	    		pl.node1.owner == pl.node2.owner )
-	    		return;
-	    	
+	    public function addVirtualLink(pl:VirtualLink):void {
     		// Add line
     		var backColor:Object = Common.linkColor;
     		var borderColor:Object = Common.linkBorderColor;
-    		if(pl.type != "tunnel")
+    		if(pl.type == "tunnel")
     		{
     			backColor = Common.tunnelColor;
     			borderColor = Common.tunnelBorderColor;
     		}
     		
-    		var firstll:LatLng = new LatLng(pl.node1.GetLatitude(), pl.node1.GetLongitude());
-    		var secondll:LatLng = new LatLng(pl.node2.GetLatitude(), pl.node2.GetLongitude());
-			
-			var polyline:Polyline = new Polyline([
-				firstll,
-				secondll
-				], new PolylineOptions({ strokeStyle: new StrokeStyle({
-					color: borderColor,
-					thickness: 4,
-					alpha:1})
-				}));
-
-			main.map.addOverlay(polyline);
-			linkLineOverlays.addItem(polyline);
+    		var current:int = 1;
+    		var node1:PhysicalNode = (pl.interfaces[0] as VirtualInterface).virtualNode.physicalNode;
+    		while(current < pl.interfaces.length)
+    		{
+    			var node2:PhysicalNode = (pl.interfaces[current] as VirtualInterface).virtualNode.physicalNode;
+				if(node1.owner == node2.owner)
+				{
+					node1 = node2;
+					current++;
+					continue;
+				}
+					
+    			var firstll:LatLng = new LatLng(node1.GetLatitude(), node1.GetLongitude());
+	    		var secondll:LatLng = new LatLng(node2.GetLatitude(), node2.GetLongitude());
 				
-			// Add point link marker
-			var ll:LatLng = new LatLng((firstll.lat() + secondll.lat())/2, (firstll.lng() + secondll.lng())/2);
-			
-			var t:TooltipOverlay = new TooltipOverlay(ll, Common.kbsToString(pl.bandwidth), borderColor, backColor);
-	  		t.addEventListener(MouseEvent.CLICK, function(e:Event):void {
-	            e.stopImmediatePropagation();
-	            Common.viewPointLink(pl)
-	        });
-	        
-	  		main.map.addOverlay(t);
-			linkLabelOverlays.addItem(t);
+				var polyline:Polyline = new Polyline([
+					firstll,
+					secondll
+					], new PolylineOptions({ strokeStyle: new StrokeStyle({
+						color: borderColor,
+						thickness: 4,
+						alpha:1})
+					}));
+	
+				main.map.addOverlay(polyline);
+				linkLineOverlays.addItem(polyline);
+					
+				// Add point link marker
+				var ll:LatLng = new LatLng((firstll.lat() + secondll.lat())/2, (firstll.lng() + secondll.lng())/2);
+				
+				var t:TooltipOverlay = new TooltipOverlay(ll, Common.kbsToString(pl.bandwidth), borderColor, backColor);
+		  		t.addEventListener(MouseEvent.CLICK, function(e:Event):void {
+		            e.stopImmediatePropagation();
+		            Common.viewPointLink(pl)
+		        });
+		        
+		  		main.map.addOverlay(t);
+				linkLabelOverlays.addItem(t);
+				
+				node1 = node2;
+				current++;
+    		}
 	    }
 	    
 	    public function drawAll():void {
@@ -292,47 +301,47 @@ package pgmap
 	    }
 	    
 	    public function drawMap():void {
-	    	main.map.closeInfoWindow();
-	    	main.map.clearOverlays();
-	    	
 	    	main.setProgress("Drawing map",Common.waitColor);
 	    	
-	    	// Draw links first
+	    	main.map.closeInfoWindow();
+	    	main.map.clearOverlays();
+
 	    	linkLabelOverlays = new ArrayCollection();
 	    	linkLineOverlays = new ArrayCollection();
-	        var drawSlice:Boolean = main.userResourcesOnly && main.selectedSlice != null && main.selectedSlice.status != null;
-	        if(drawSlice) {
-	        	for each(var drawGroup:LinkGroup in main.pgHandler.Links.collection) {
-	        		// Add line
-					var blankline:Polyline = new Polyline([
-						new LatLng(drawGroup.latitude1, drawGroup.longitude1),
-						new LatLng(drawGroup.latitude2, drawGroup.longitude2)
-						], new PolylineOptions({ strokeStyle: new StrokeStyle({
-							color: 0x666666,
-							thickness: 3,
-							alpha:.8})
-						}));
-		
-					main.map.addOverlay(blankline);
-	        	}
-	        	for each(var pl:PointLink in main.selectedSlice.Links) {
-		        	addPointLink(pl);
-		        }
-	        } else {
-	        	for each(var l:LinkGroup in main.pgHandler.Links.collection) {
-		        	if(!l.IsSameSite()) {
-		        		addLink(l);
-		        	}
-		        }
-	        }
-	        
-	        // Draw markers
 	        markers = new ArrayCollection();
-	    	for each(var g:NodeGroup in main.pgHandler.Nodes.collection) {
-	        	addMarker(g);
+	    	
+	    	// Draw physical components
+	    	for each(var cm:ComponentManager in main.pgHandler.ComponentManagers)
+	    	{
+	    		if(!cm.Show)
+	    			continue;
+	    		
+	    		// Links
+		        for each(var l:PhysicalLinkGroup in cm.Links.collection) {
+			        	if(!l.IsSameSite()) {
+			        		addPhysicalLink(l);
+			        	}
+			       }
+		        
+		        // Nodes
+		    	for each(var g:PhysicalNodeGroup in cm.Nodes.collection) {
+		        	addNodeGroupMarker(g);
+		        }
+	    	}
+	    	
+	    	if(main.userResourcesOnly && main.selectedSlice != null && main.selectedSlice.status != null) {
+	    		// Draw virtual links
+	    		for each(var sliver:Sliver in main.selectedSlice.slivers)
+	    		{
+	    			if(!sliver.componentManager.Show)
+	    				continue;
+	    			for each(var vl:VirtualLink in sliver.links) {
+			        	addVirtualLink(vl);
+			        }	    			
+	    		}
 	        }
-	        
-	        // Combine overlapping markers
+	    	
+	    	// Combine overlapping markers
 	        clusterMarkers = new ArrayCollection();
 	        nodeGroupClusters = new ArrayCollection();
 	        var added:ArrayCollection = new ArrayCollection();
@@ -351,7 +360,7 @@ package pgmap
 	        // Remove link items that are blocking markers
 	        for each(var linkLabel:TooltipOverlay in linkLabelOverlays)
 	        {
-	        	var removed:Boolean = false;;
+	        	var removed:Boolean = false;
 	        	 var d:DisplayObject = linkLabel.foreground;
 	        	for each(var clusterMarker:Marker in clusterMarkers) {
 	        		if(linkLabel.foreground.hitTestObject(clusterMarker.foreground)) {
@@ -371,7 +380,7 @@ package pgmap
 			        }
 		        }
 	        }
-	        
+
 	        main.setProgress("Done", Common.successColor);
 	    }
 	    

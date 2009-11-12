@@ -60,10 +60,11 @@ package pgmap
 	            return notAvailableIcon;
         }
         
-        public static function assignAvailabilityIcon(val:Node):Class {
-			if(val.slice != null)
-				return ownedIcon;
-            else if (val.available)
+        public static function assignAvailabilityIcon(val:PhysicalNode):Class {
+			//if(val.slice != null)
+			//	return ownedIcon;
+            //else
+            if (val.available)
                 return availableIcon;
             else
                 return notAvailableIcon;
@@ -98,7 +99,7 @@ package pgmap
 			return phrase.substring(0, upTo) + "..." +  phrase.substring(upTo + removeChars);
 		}
 		
-		public static function getNodeButton(n:Node):Button {
+		public static function getNodeButton(n:PhysicalNode):Button {
 			var nodeButton:Button = new Button();
 			nodeButton.label = n.name;
 			nodeButton.setStyle("icon", Common.assignAvailabilityIcon(n));
@@ -110,7 +111,7 @@ package pgmap
 			return nodeButton;
 		}
 		
-		public static function getLinkButton(ni:NodeInterface, nl:Link):Button {
+		public static function getLinkButton(ni:PhysicalNodeInterface, nl:PhysicalLink):Button {
 			var linkButton:Button = new Button();
 			linkButton.label = ni.id;
 			linkButton.setStyle("icon", Common.linkIcon);
@@ -122,7 +123,7 @@ package pgmap
 			return linkButton;
 		}
 		
-		public static function getPointLinkButton(pl:PointLink):Button {
+		public static function getPointLinkButton(pl:VirtualLink):Button {
 			var linkButton:Button = new Button();
 			linkButton.label = pl.virtualId;
 			linkButton.setStyle("icon", Common.linkIcon);
@@ -134,16 +135,16 @@ package pgmap
 			return linkButton;
 		}
 		
-		public static function viewPointLink(pl:PointLink):void {
-	    	var plWindow:PointLinkAdvancedWindow = new PointLinkAdvancedWindow();
+		public static function viewPointLink(pl:VirtualLink):void {
+	    	var plWindow:VirtualLinkAdvancedWindow = new VirtualLinkAdvancedWindow();
 	    	plWindow.main = Main();
 	    	PopUpManager.addPopUp(plWindow, Main(), false);
        		PopUpManager.centerPopUp(plWindow);
        		plWindow.loadPointLink(pl);
 	    }
 		
-		public static function viewLink(l:Link):void {
-			var lgWindow:LinkAdvancedWindow = new LinkAdvancedWindow();
+		public static function viewLink(l:PhysicalLink):void {
+			var lgWindow:PhysicalLinkAdvancedWindow = new PhysicalLinkAdvancedWindow();
 	    	lgWindow.main = Main();
 	    	PopUpManager.addPopUp(lgWindow, Main(), false);
        		PopUpManager.centerPopUp(lgWindow);
@@ -154,7 +155,7 @@ package pgmap
 			if(lc.length == 1)
 				viewLink(lc[0]);
 			else {
-				var lgWindow:LinkGroupAdvancedWindow = new LinkGroupAdvancedWindow();
+				var lgWindow:PhysicalLinkGroupAdvancedWindow = new PhysicalLinkGroupAdvancedWindow();
 		    	lgWindow.main = Main();
 		    	PopUpManager.addPopUp(lgWindow, Main(), false);
 	       		PopUpManager.centerPopUp(lgWindow);
@@ -162,24 +163,24 @@ package pgmap
 			}
 		}
 		
-		public static function viewLinkGroup(lg:LinkGroup):void {
-			var lgWindow:LinkGroupAdvancedWindow = new LinkGroupAdvancedWindow();
+		public static function viewLinkGroup(lg:PhysicalLinkGroup):void {
+			var lgWindow:PhysicalLinkGroupAdvancedWindow = new PhysicalLinkGroupAdvancedWindow();
 	    	lgWindow.main = Main();
 	    	PopUpManager.addPopUp(lgWindow, Main(), false);
        		PopUpManager.centerPopUp(lgWindow);
        		lgWindow.loadGroup(lg);
 		}
 		
-		public static function viewNode(n:Node):void {
-			var ngWindow:NodeAdvancedWindow = new NodeAdvancedWindow();
+		public static function viewNode(n:PhysicalNode):void {
+			var ngWindow:PhysicalNodeAdvancedWindow = new PhysicalNodeAdvancedWindow();
 	    	ngWindow.main = Main();
 	    	PopUpManager.addPopUp(ngWindow, Main(), false);
        		PopUpManager.centerPopUp(ngWindow);
        		ngWindow.loadNode(n);
 		}
 		
-		public static function viewNodeGroup(ng:NodeGroup):void {
-			var ngWindow:NodeGroupAdvancedWindow = new NodeGroupAdvancedWindow();
+		public static function viewNodeGroup(ng:PhysicalNodeGroup):void {
+			var ngWindow:PhysicalNodeGroupAdvancedWindow = new PhysicalNodeGroupAdvancedWindow();
 	    	ngWindow.main = Main();
 	    	PopUpManager.addPopUp(ngWindow, Main(), false);
        		PopUpManager.centerPopUp(ngWindow);
@@ -190,7 +191,7 @@ package pgmap
 			if(nc.length == 1)
 				viewNode(nc[0]);
 			else {
-				var ngWindow:NodeGroupAdvancedWindow = new NodeGroupAdvancedWindow();
+				var ngWindow:PhysicalNodeGroupAdvancedWindow = new PhysicalNodeGroupAdvancedWindow();
 		    	ngWindow.main = Main();
 		    	PopUpManager.addPopUp(ngWindow, Main(), false);
 	       		PopUpManager.centerPopUp(ngWindow);
