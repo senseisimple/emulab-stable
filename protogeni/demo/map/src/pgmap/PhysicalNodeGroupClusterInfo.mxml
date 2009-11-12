@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml"
+	width="170" height="160"
+ horizontalAlign="center" verticalGap="2">
+	
+	<mx:Script>
+		<![CDATA[
+			import mx.controls.Alert;
+			import com.google.maps.Map;
+			import com.google.maps.LatLngBounds;
+			import com.google.maps.LatLng;
+			import com.google.maps.services.Placemark;
+			import com.google.maps.services.ClientGeocoder;
+			import com.google.maps.services.GeocodingEvent;
+			import mx.collections.ArrayCollection;
+			import mx.controls.Button;
+
+			public function Load(cluster:ArrayCollection):void 
+			{
+				var nodeCount:int = 0;
+				for each(var ng:PhysicalNodeGroup in cluster)
+				{
+					addNodeGroup(ng);
+					nodeCount += ng.collection.length;
+				}
+				clusterLabel.text = nodeCount + " Nodes in " + cluster.length + " Groups";
+			}	
+			
+			public function addNodeGroup(ng:PhysicalNodeGroup):void {
+				var ngButton:Button = new Button();
+				ngButton.percentWidth = 100;
+				ngButton.label = ng.collection.length.toString() + " Nodes";
+				ngButton.addEventListener(MouseEvent.CLICK,
+					function openNodeGroup(evt:Event):void
+					{
+						if(ng.collection.length > 1)
+							Common.viewNodeGroup(ng);
+						else
+							Common.viewNode(ng.collection[0]);
+					});
+				
+				if(ng.city.length == 0)
+				{
+					var geocoder:ClientGeocoder = new ClientGeocoder();
+			    	
+			    	geocoder.addEventListener(GeocodingEvent.GEOCODING_SUCCESS,
+					      function(event:GeocodingEvent):void {
+					      	var placemarks:Array = event.response.placemarks;
+					      	var city:String = "";
+					        if (placemarks.length > 0) {
+					        	try {
+					        		var p:Placemark = event.response.placemarks[0] as Placemark;
+					        		var fullAddress : String = p.address;
+					        		var splitAddress : Array = fullAddress.split(',');
+					        		if(splitAddress.length == 3)
+					        			city = splitAddress[0];
+					        		else 
+					        		if(splitAddress.length == 4)
+					        			city = splitAddress[1];
+					        		else
+					        			city = fullAddress;
+					        		ng.city = city;
+					        		ngButton.label = city + " (" + ng.collection.length + ")";
+					        	} catch (err:Error) { }
+					        }
+					      });
+					        	
+					  geocoder.addEventListener(GeocodingEvent.GEOCODING_FAILURE,
+					        function(event:GeocodingEvent):void {
+					          //main.console.appendText("Geocoding failed!\n");
+					        });
+		
+					  geocoder.reverseGeocode(new LatLng(ng.latitude, ng.longitude));
+			 } else {
+		        	ngButton.label = ng.city + " (" + ng.collection.length + ")";
+		        }
+				nodeGroupButtonsVbox.addChild(ngButton);
+			}
+			
+			public function setZoomButton(bounds:LatLngBounds):void {
+				zoomButton.addEventListener(MouseEvent.CLICK,
+					function zoomin(evt:MouseEvent):void {
+						var map : Map = Common.Main().map;
+						var bzl : Number  = map.getBoundsZoomLevel(bounds);
+				        if(map.getZoom() != bzl-1)
+				          map.setZoom(bzl-1);
+			        	map.panTo( bounds.getCenter() );
+	    			});
+	    		
+			}
+		]]>
+	</mx:Script>
+	<mx:Label text="Label" id="clusterLabel"/>
+	<mx:VBox width="170" height="114" id="nodeGroupButtonsVbox" verticalGap="2" horizontalGap="2" paddingBottom="2" paddingLeft="2" paddingRight="2" paddingTop="2" borderStyle="solid">
+	</mx:VBox>
+	<mx:Button label="Zoom" id="zoomButton" icon="@Embed('../../images/zoom_in.png')"/>
+
+</mx:VBox>

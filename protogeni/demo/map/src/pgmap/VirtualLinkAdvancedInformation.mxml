@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml"
+	verticalGap="0" paddingTop="0" paddingRight="0" paddingLeft="0" paddingBottom="0" horizontalGap="0"
+	creationComplete="main = Common.Main()">
+
+	<mx:Script>
+		<![CDATA[
+			import mx.managers.PopUpManager;
+			import mx.controls.Spacer;
+			import mx.containers.HBox;
+			import mx.collections.ArrayCollection;
+			
+			[Bindable]
+			public var pointLink:VirtualLink = null;
+			
+			public var main:pgmap = null;
+			
+			public function load(pl:VirtualLink):void {
+				pointLink = pl;
+				txtBandwidth.text = Common.kbsToString(pl.bandwidth);
+				txtType.text = Common.firstToUpper(pointLink.type);
+				//interface1Button.setStyle("icon",Common.assignAvailabilityIcon(pl.node1));
+				//interface2Button.setStyle("icon",Common.assignAvailabilityIcon(pl.node2));
+			}
+			
+			public function viewRspec():void {
+				var rspecView:XmlWindow = new XmlWindow();
+				//rspecView.title = "Request RSPEC for " + pointLink.name;
+				PopUpManager.addPopUp(rspecView, main, false);
+       			PopUpManager.centerPopUp(rspecView);
+       			//rspecView.loadXml(pointLink.sliverRspec);
+			}
+		]]>
+	</mx:Script>
+
+	<mx:Grid width="100%" height="100%" verticalGap="2" horizontalGap="2">
+				<mx:GridRow width="100%">
+					<mx:GridItem rowSpan="2">
+						<mx:Button label="RSPEC" width="100%" height="100%" click="viewRspec()"/>
+					</mx:GridItem>
+					<mx:GridItem width="100%">
+						<mx:Label text="{pointLink.virtualId}" fontSize="17" fontWeight="bold"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%">
+					<mx:GridItem width="100%">
+						<mx:Label text="Bandwidth" fontWeight="bold"/>
+						<mx:Label id="txtBandwidth"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%">
+					<mx:GridItem>
+						<mx:VBox horizontalAlign="right" width="100%">
+							<mx:Label text="Type" fontWeight="bold"/>
+						</mx:VBox>
+					</mx:GridItem>
+					<mx:GridItem width="100%">
+							<mx:Label id="txtType" text="Type" fontWeight="bold"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%">
+					<mx:GridItem>
+						<mx:VBox horizontalAlign="right" width="100%">
+							<mx:Label text="Connects" fontWeight="bold"/>
+						</mx:VBox>
+					</mx:GridItem>
+					<mx:GridItem width="100%">
+						<mx:VBox width="100%">
+						</mx:VBox>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%">
+					<mx:GridItem>
+						<mx:VBox horizontalAlign="right" width="100%">
+							<mx:Label text="to" fontWeight="bold"/>
+						</mx:VBox>
+					</mx:GridItem>
+					<mx:GridItem width="100%">
+						<mx:VBox width="100%">
+						</mx:VBox>
+					</mx:GridItem>
+				</mx:GridRow>
+			</mx:Grid>
+</mx:VBox>
