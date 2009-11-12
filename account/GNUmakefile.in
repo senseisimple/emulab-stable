@@ -13,9 +13,9 @@ UNIFIED         = @UNIFIED_BOSS_AND_OPS@
 include $(OBJDIR)/Makeconf
 
 SBIN_STUFF	= tbacct addsfskey addpubkey mkusercert quotamail genpubkeys \
-		  newuser newproj mksyscert
+		  newuser newproj mksyscert spewcert
 LIBEXEC_STUFF	= webtbacct webaddsfskey webaddpubkey webmkusercert \
-		  webnewuser webnewproj
+		  webnewuser webnewproj webspewcert
 CTRLSBIN_STUFF  = adduserhook
 
 # These scripts installed setuid, with sudo. 

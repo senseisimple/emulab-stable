@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -16,7 +16,8 @@ $isadmin   = ISADMIN();
 #
 # Verify page arguments
 #
-$optargs = OptionalPageArguments("target_user", PAGEARG_USER);
+$optargs = OptionalPageArguments("target_user", PAGEARG_USER,
+				 "p12", PAGEARG_BOOLEAN);
 
 # Default to current user if not provided.
 if (!isset($target_user)) {
@@ -33,6 +34,24 @@ $target_idx = $target_user->uid_idx();
 if (!$isadmin && !$target_user->SameUser($this_user)) {
     USERERROR("You do not have permission to download SSL cert ".
 	      "for $user!", 1);
+}
+
+if ($p12) {
+    if ($fp = popen("$TBSUEXEC_PATH $target_uid nobody webspewcert", "r")) {
+	header("Content-Type: application/octet-stream;".
+	       "filename=\"emulab.p12\";");
+	header("Content-Disposition: inline; filename=\"emulab.p12\";");
+	header("Cache-Control: no-cache, must-revalidate");
+	header("Pragma: no-cache");
+#       header("Content-Type: application/x-x509-user-cert");
+	while (!feof($fp) && connection_status() == 0) {
+	    print(fread($fp, 1024));
+	    flush();
+	}
+	$retval = pclose($fp);
+	$fp = 0;
+    }
+    return;
 }
 
 $query_result =& $target_user->TableLookUp("user_sslcerts",

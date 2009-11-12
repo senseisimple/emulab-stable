@@ -40,10 +40,18 @@ PAGEHEADER("Generate SSL Certificate for user: $target_uid");
 if (isset($finished)) {
     $url = CreateURL("getsslcert", $target_user);
     
-    echo "Your new SSL certificate has been created. You can
+    echo "<blockquote>
+          Your new SSL certificate has been created. You can
           <a href='$url'>download</a> your 
           certificate and private key in PEM format, and then save
-          it to a file in your .ssl directory.\n";
+          it to a file in your .ssl directory.
+          <br>
+          <br>
+          You can also download it in <a href='$url&p12=1'><em>pkc12</em></a>
+          format for loading
+          into your web browser (if you do not know what this means, or why
+          you need to do this, then ignore this).
+          </blockquote>\n";
 	    
     PAGEFOOTER();
     return;
