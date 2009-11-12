@@ -30,19 +30,15 @@ if (!isset($target_user)) {
 $target_uid = $target_user->uid();
 
 #
-# Standard Testbed Header, now that we know what we want to say.
-#
-PAGEHEADER("Generate SSL Certificate for user: $target_uid");
-
-#
 # The conclusion.
 # 
 if (isset($finished)) {
+    PAGEHEADER("Download SSL Certificate for user: $target_uid");
+
     $url = CreateURL("getsslcert", $target_user);
     
     echo "<blockquote>
-          Your new SSL certificate has been created. You can
-          <a href='$url'>download</a> your 
+          <a href='$url'>Download</a> your 
           certificate and private key in PEM format, and then save
           it to a file in your .ssl directory.
           <br>
@@ -56,6 +52,11 @@ if (isset($finished)) {
     PAGEFOOTER();
     return;
 }
+
+#
+# Standard Testbed Header, now that we know what we want to say.
+#
+PAGEHEADER("Generate SSL Certificate for user: $target_uid");
 
 #
 # Only admin people can create SSL certs for another user.

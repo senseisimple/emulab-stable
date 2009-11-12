@@ -1075,6 +1075,12 @@ class User
 
 	return $this->Refresh();
     }
+    function HasEncryptedCert() {
+	$query_result = $this->TableLookUp("user_sslcerts",
+					   "cert,privkey",
+					   "encrypted=1 and revoked is null");
+	return mysql_num_rows($query_result);
+    }
 
     #
     # Return project access list for a user. This returns just pid,eid for
