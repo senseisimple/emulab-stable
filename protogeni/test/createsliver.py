@@ -229,20 +229,7 @@ rval,response = do_method("cm", "RenewSliver", params)
 if rval:
     Fatal("Could not renew sliver")
     pass
-print "Sliver has been renewed. Starting the sliver ..."
-
-#
-# Start the sliver.
-#
-params = {}
-params["credential"] = sliver
-params["manifest"]   = manifest
-params["impotent"]   = impotent
-rval,response = do_method("cm", "StartSliver", params)
-if rval:
-    Fatal("Could not start sliver")
-    pass
-print "Sliver has been started. Asking for a new manifest/ticket ..."
+print "Sliver has been renewed. Asking for a new manifest/ticket ..."
 
 #
 # Grab a sliver ticket just for the hell of it.
@@ -258,4 +245,5 @@ ticket = response["value"]
 print str(ticket);
 
 print ""
+print "Start this sliver with startsliver.py"
 print "Delete this sliver with deletesliver.py"
