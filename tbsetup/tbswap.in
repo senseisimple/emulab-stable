@@ -578,10 +578,12 @@ sub doSwapout($) {
 	}
     }
 	
-    if ($type >= CLEANUP) {
+    if ($type >= MODIFY) {
 	# XXX Do this before releasing the nodes. Needs more thought.
 	$experiment->DeleteInternalProgramAgents();
-	
+    }
+
+    if ($type >= CLEANUP) {
 	#
 	# Undo plab in elab specialness.
 	# No need to worry about VLANs here, as all the special abilities
