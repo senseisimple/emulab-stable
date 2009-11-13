@@ -110,11 +110,7 @@ sub Delete($)
 	if (! ref($self));
 
     my $uuid = $self->uuid();
-    
     my $idx  = $self->idx();
-    my $experiment = $self->GetExperiment();
-    $experiment->UnBindNonLocalUsers()
-	if (defined($experiment));
 
     DBQueryWarn("delete from geni_bindings where slice_uuid='$uuid'")
 	or return -1;
