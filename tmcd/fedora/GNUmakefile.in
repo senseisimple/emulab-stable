@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005, 2007, 2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -49,6 +49,7 @@ frisbee-mfs-install: baselinux-frisbee-mfs-install
 simple-install:	common-install script-install bin-install
 
 dir-install:
+	$(INSTALL) -m 755 -o root -g root -d $(SYSETCDIR)/init.d
 
 baselinux-%: dir-install
 	(cd ../linux; $(MAKE) DESTDIR=$(DESTDIR) $(subst baselinux-,,$@))
@@ -68,6 +69,7 @@ etc-install:	dir-install sysetc-remove sysetc-install
 
 sysetc-install:	ifcfgs dir-install
 	$(INSTALL) -m 644 $(SRCDIR)/ntp.conf $(SYSETCDIR)/ntp.conf
+	$(INSTALL) -m 755 $(SRCDIR)/ntpd $(SYSETCDIR)/init.d/ntpd
 	$(INSTALL) -m 644 $(SRCDIR)/ifcfg-eth99 $(SYSETCDIR)/sysconfig/network-scripts
 	$(INSTALL) -m 644 ifcfg-eth[0-9]* $(SYSETCDIR)/sysconfig/network-scripts
 

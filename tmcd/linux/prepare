@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007, 2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -23,7 +23,8 @@ my $LOGDIR      = "/var/log";
 my $RUNDIR      = "/var/run";
 my $HISTORY     = ".bash_history";
 my $MAILFILE    = "/var/spool/mail/root";
-my $NTPDRIFT    = "/etc/ntp/drift";
+my $NTPDRIFT1   = "/etc/ntp/drift";
+my $NTPDRIFT2   = "/var/lib/ntp/drift";
 my $SFSUSERS    = "/etc/sfs/sfs_users";
 my $SFSHOSTKEY  = "/etc/sfs/sfs_host_key";
 my $VARACCTDIR  = "/var/account";
@@ -240,10 +241,14 @@ if ( -f $IFTAB ) {
 # so set it to zero instead.  Not ideal, but at least the clock will
 # stabilize eventually this way.
 #
-print "Resetting drift in $NTPDRIFT ...\n";
-if (-f $NTPDRIFT) {
-    open(DRIFT, ">$NTPDRIFT") or
-	die("Could not open $NTPDRIFT: $!");
+print "Resetting NTP drift ...\n";
+my $driftfile = $NTPDRIFT1;
+if (! -f $driftfile) {
+    $driftfile = $NTPDRIFT2;
+}
+if (-f $driftfile) {
+    open(DRIFT, ">$driftfile") or
+	die("Could not open $driftfile: $!");
     print DRIFT "0\n";
     close(DRIFT);
 }
