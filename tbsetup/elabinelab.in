@@ -653,6 +653,10 @@ sub DumpDBGoo()
 			 "left join nodes as n on w.node_id1=n.node_id or ".
 			 "     w.node_id2=n.node_id ".
 			 "where w.type='Trunk'");
+
+	    # Clear any node reservations on the inside
+	    DBQueryFatal("update temp_${table} set ".
+			 " reserved_pid=null where reserved_pid is not null");
 	}
     
 	DBQueryWarn("select * from temp_$table ".
