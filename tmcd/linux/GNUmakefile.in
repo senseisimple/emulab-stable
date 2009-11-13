@@ -266,3 +266,12 @@ openvz-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/openvz/vzumount-elab.sh $(BINDIR)/
 	-ln -sf $(BINDIR)/vzumount-elab.sh /etc/vz/conf/vps.umount
 	$(INSTALL) -m 755 $(SRCDIR)/mkvnode.pl $(BINDIR)/mkvnode.pl
+
+xen-install:	dir-install
+	$(INSTALL) -m 755 $(SRCDIR)/libvnode.pm $(BINDIR)/
+	$(INSTALL) -m 755 $(SRCDIR)/xen/libvnode_xen.pm $(BINDIR)/
+	$(INSTALL) -m 755 $(SRCDIR)/vnodectl $(BINDIR)/
+	echo "xen" > $(ETCDIR)/genvmtype
+	$(INSTALL) -m 755 $(SRCDIR)/mkvnode.pl $(BINDIR)/mkvnode.pl
+	$(INSTALL) -m 755 $(SRCDIR)/xen/xend-config.sxp $(SYSETCDIR)/xen/
+	$(INSTALL) -m 755 xen/emulab-cnet $(SYSETCDIR)/xen/scripts/

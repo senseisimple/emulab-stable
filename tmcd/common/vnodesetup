@@ -866,7 +866,7 @@ sub hackwaitandexit()
     elsif ($fakevnode) {
 	$goofy = CONFDIR() . "/evproxy.pid";
     }
-    elsif ($dojail && -e "/vz") {
+    elsif ($dojail && (-e "/vz" || -e "/etc/xen")) {
 	$goofy = CONFDIR() . "/running";
     }
     else {

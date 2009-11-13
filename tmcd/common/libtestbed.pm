@@ -131,8 +131,10 @@ sub TBScriptLock($;$$$)
 	#
 	# A plain old serial lock.
 	#
+	my $tries = 0;
 	while (flock(LOCK, LOCK_EX|LOCK_NB) == 0) {
-	    print "Another $token is in progress. Waiting a moment ...\n";
+	    print "Another $token is in progress (${tries}s). Waiting ...\n"
+		if (($tries++ % 60) == 0);
 
 	    $waittime--;
 	    if ($waittime == 0) {

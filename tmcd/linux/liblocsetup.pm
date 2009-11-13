@@ -51,6 +51,7 @@ sub PLAB()	{ return libsetup::PLAB(); }
 sub LINUXJAILED()  { return libsetup::LINUXJAILED(); }
 sub GENVNODE()     { return libsetup::GENVNODE(); }
 sub GENVNODETYPE() { return libsetup::GENVNODETYPE(); }
+sub INXENVM()   { return libsetup::INXENVM(); }
 
 #
 # Various programs and things specific to Linux and that we want to export.
@@ -1862,8 +1863,14 @@ sub os_get_partition_info($$)
 sub os_nfsmount($$)
 {
     my ($remote,$local) = @_;
+    my $opts = "vers=2,udp";
 
-    if (system("/bin/mount -o vers=2,udp $remote $local")
+    # XXX doesn't work without this
+    if (INXENVM()) {
+	$opts .= ",rsize=1024,wsize=1024";
+    }
+
+    if (system("/bin/mount -o $opts $remote $local")
 	&& system("/bin/mount -o udp $remote $local")) {
 	return 1;
     }

@@ -37,6 +37,7 @@ use Exporter;
 	 TMROUTECONFIG TMLINKDELAY TMDELMAP TMTOPOMAP TMLTMAP TMLTPMAP
 	 TMGATEDCONFIG TMSYNCSERVER TMKEYHASH TMNODEID TMEVENTKEY 
 	 TMCREATOR TMSWAPPER TMFWCONFIG TMGENVNODECONFIG 
+	 INXENVM
        );
 
 # Must come after package declaration!
@@ -399,6 +400,11 @@ sub DELAYHOST()	{ if (-e ISDELAYNODEPATH()) { return 1; } else { return 0; } }
 # Is this node using SFS. Several scripts need to know this.
 #
 sub USESFS()	{ if (-e TMUSESFS()) { return 1; } else { return 0; } }
+
+#
+# XXX fernow hack so I can readily identify code that is special to Xen VMs
+#
+sub INXENVM()	{ return ($ingenvnode && GENVNODETYPE() eq "xen"); }
 
 #
 # Reset to a moderately clean state.

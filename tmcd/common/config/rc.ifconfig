@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004-2008 University of Utah and the Flux Group.
+# Copyright (c) 2004-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -182,8 +182,8 @@ sub doboot()
 	    # with a local interface. 
 	    push(@ifacemap, "$iface $inet $mac");
 	}
-	elsif ($ifconfig->{ISVIRT} 
-	       && (GENVNODE() && GENVNODETYPE() eq 'openvz')) {
+	elsif ($ifconfig->{ISVIRT}
+	       && (INXENVM() || (GENVNODE() && GENVNODETYPE() eq 'openvz'))) {
 	    #
 	    # Yes, these are veths, but we config them from the inside just
 	    # like for a phys node!
@@ -379,7 +379,8 @@ sub mygetifconfig($)
     for (my $tries = 0; $tries < $maxtries; $tries++) {
 	my $bad = 0;
 	foreach my $ifconfig (@ifacelist) {
-	    if ($ifconfig->{ISVIRT} &&
+	    if (!INXENVM() &&
+		$ifconfig->{ISVIRT} &&
 		$ifconfig->{ITYPE} eq "vlan" && $ifconfig->{VTAG} == 0) {
 		$bad++;
 	    }

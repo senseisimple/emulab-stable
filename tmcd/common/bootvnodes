@@ -55,6 +55,13 @@ sub bootvnode($$$);
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
 #
+# From rc.bootsetup:
+#
+# "-f"        first time boot, use vnode list from TMCC
+# "-f -h"     shutdown, vnodes that are running
+# "-f -c -h"  shutdown during reconfig, vnodes running but not in TMCC list
+# "-f -c -b"  reboot during reconfig
+#
 %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
