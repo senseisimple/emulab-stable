@@ -93,15 +93,6 @@ my $EXP_BASE_IFNUM = 0;
 
 my $debug = 0;
 
-my %if2mac = ();
-my %mac2if = ();
-my %ip2if = ();
-my %ip2mask = ();
-my %ip2net = ();
-my %ip2maskbits = ();
-my %bridges = ();
-my %if2br = ();
-
 # XXX needs lifting up
 my $JAILCTRLNET = "172.16.0.0";
 my $JAILCTRLNETMASK = "255.240.0.0";
@@ -276,7 +267,7 @@ sub vz_rootPreConfig {
     # but we can't rmmod the IMQ module to change the config, so no point.
     #
 
-    # Ug, pre-create a bunch of imq devices, since adding news ones
+    # Ug, pre-create a bunch of imq devices, since adding new ones
     # does not work right yet.
     mysystem("$MODPROBE imq numdevs=$MAXIMQ");
     mysystem("$MODPROBE ipt_IMQ");
@@ -379,9 +370,9 @@ sub vz_rootPreConfigNetwork {
 	if (exists($brs{$k}{PHYSDEV})) {
 	    # make sure this iface isn't already part of another bridge; if it
 	    # it is, remove it from there first and add to this bridge.
-	    if (exists($if2br{$brs{$k}{PHYSDEV}})) {
-		mysystem("$BRCTL delif " . $if2br{$brs{$k}{PHYSDEV}} . 
-			 " " .$brs{$k}{PHYSDEV});
+	    my $obr = findBridge($brs{$k}{PHYSDEV});
+	    if (defined($obr)) {
+		mysystem("$BRCTL delif " . $obr . " " .$brs{$k}{PHYSDEV});
 		# rebuild hashes
 		makeBridgeMaps();
 	    }
@@ -1334,6 +1325,7 @@ sub vz_vnodePostConfig {
 
 sub vz_setDebug($) {
     $debug = shift;
+    libvnode::setDebug($debug);
 }
 
 ##
@@ -1394,153 +1386,6 @@ sub editContainerConfigFile($$) {
     close(FD);
 
     return 0;
-}
-
-#
-# Find control net iface info.  Returns (iface,ip,mac) tuple.
-#
-sub findControlNet() {
-    my $ip = `cat $CTRLIPFILE`;
-    chomp($ip);
-    if ($ip =~ /^(\d+\.\d+\.\d+\.\d+)$/) {
-	$ip = $1;
-    }
-    else {
-	# can't/shouldn't really go on if this happens
-	die "could not find valid ip in $CTRLIPFILE!";
-    }
-
-    return ($ip2if{$ip},$ip,$ip2mask{$ip},$ip2maskbits{$ip},$ip2net{$ip},
-	    $if2mac{$ip2if{$ip}});
-}
-
-#
-# Grab iface, mac, IP info from /sys and /sbin/ip.
-#
-sub makeIfaceMaps() {
-    # clean out anything
-    %if2mac = ();
-    %mac2if = ();
-    %ip2if = ();
-    %ip2net = ();
-    %ip2mask = ();
-    %ip2maskbits = ();
-
-    my $devdir = '/sys/class/net';
-    opendir(SD,$devdir) 
-	or die "could not find $devdir!";
-    my @ifs = grep { /^[^\.]/ && -f "$devdir/$_/address" } readdir(SD);
-    closedir(SD);
-
-    foreach my $iface (@ifs) {
-	if ($iface =~ /^([\w\d\-_]+)$/) {
-	    $iface = $1;
-	}
-	else {
-	    next;
-	}
-
-	open(FD,"/sys/class/net/$iface/address") 
-	    or die "could not open /sys/class/net/$iface/address!";
-	my $mac = <FD>;
-	close(FD);
-	next if (!defined($mac) || $mac eq '');
-
-	$mac =~ s/://g;
-	chomp($mac);
-	$if2mac{$iface} = $mac;
-	$mac2if{$mac} = $iface;
-
-	# also find ip, ugh
-	my $pip = `ip addr show dev $iface | grep 'inet '`;
-	chomp($pip);
-	if ($pip =~ /^\s+inet\s+(\d+\.\d+\.\d+\.\d+)\/(\d+)/) {
-	    my $ip = $1;
-	    $ip2if{$ip} = $iface;
-	    my @ip = split(/\./,$ip);
-	    my $bits = int($2);
-	    my @netmask = (0,0,0,0);
-	    my ($idx,$counter) = (0,8);
-	    for (my $i = $bits; $i > 0; --$i) {
-		--$counter;
-		$netmask[$idx] += 2 ** $counter;
-		if ($counter == 0) {
-		    $counter = 8;
-		    ++$idx;
-		}
-	    }
-	    my @network = ($ip[0] & $netmask[0],$ip[1] & $netmask[1],
-			   $ip[2] & $netmask[2],$ip[3] & $netmask[3]);
-	    $ip2net{$ip} = join('.',@network);
-	    $ip2mask{$ip} = join('.',@netmask);
-	    $ip2maskbits{$ip} = $bits;
-	}
-    }
-
-    if (1 && $debug) {
-	print STDERR "makeIfaceMaps:\n";
-	print STDERR "if2mac:\n";
-	print STDERR Dumper(%if2mac) . "\n";
-	#print STDERR "mac2if:\n";
-	#print STDERR Dumper(%mac2if) . "\n";
-	print STDERR "ip2if:\n";
-	print STDERR Dumper(%ip2if) . "\n";
-	print STDERR "\n";
-    }
-
-    return 0;
-}
-
-sub makeBridgeMaps() {
-    # clean out anything...
-    %bridges = ();
-    %if2br = ();
-
-    my @lines = `brctl show`;
-    # always get rid of the first line -- it's the column header 
-    shift(@lines);
-    my $curbr = '';
-    foreach my $line (@lines) {
-	if ($line =~ /^([\w\d\-]+)\s+/) {
-	    $curbr = $1;
-	    $bridges{$curbr} = [];
-	}
-	if ($line =~ /^[^\s]+\s+[^\s]+\s+[^\s]+\s+([\w\d\-\.]+)$/ 
-	    || $line =~ /^\s+([\w\d\-\.]+)$/) {
-	    push @{$bridges{$curbr}}, $1;
-	    $if2br{$1} = $curbr;
-	}
-    }
-
-    if (1 && $debug) {
-	print STDERR "makeBridgeMaps:\n";
-	print STDERR "bridges:\n";
-	print STDERR Dumper(%bridges) . "\n";
-	print STDERR "if2br:\n";
-	print STDERR Dumper(%if2br) . "\n";
-	print STDERR "\n";
-    }
-
-    return 0;
-}
-
-sub findIface($) {
-    my $mac = shift;
-
-    $mac =~ s/://g;
-    return $mac2if{$mac}
-        if (exists($mac2if{$mac}));
-
-    return undef;
-}
-
-sub findMac($) {
-    my $iface = shift;
-
-    return $if2mac{$iface}
-        if (exists($if2mac{$iface}));
-
-    return undef;
 }
 
 sub vmexists($) {
