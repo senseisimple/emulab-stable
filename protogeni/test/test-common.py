@@ -94,6 +94,9 @@ for opt, arg in opts:
         SLICENAME = arg
     elif opt in ( "-m", "--cm" ):
         CMURI = arg
+        if CMURI[-2:] == "cm":
+            CMURI = CMURI[:-3]
+            pass
     elif opt in ( "-p", "--passphrase" ):
         PASSPHRASEFILE = arg
     elif opt in ( "-r", "--read-commands" ):
