@@ -460,10 +460,12 @@ sub handler ($) {
     $SIG{TERM} = 'IGNORE';
     $SIG{HUP}  = 'IGNORE';
 
+    my $str = "Killing";
     if ($signame eq 'USR1') {
 	$leaveme = 1;
+	$str = "Halting";
     }
-    MyFatal("Caught a SIG${signame}! Killing the container ...");
+    MyFatal("Caught a SIG${signame}! $str the container ...");
 }
 $SIG{INT}  = \&handler;
 $SIG{USR1} = \&handler;
@@ -620,4 +622,3 @@ sub safeLibOp($$$$;@) {
 
     return $ret;
 }
-
