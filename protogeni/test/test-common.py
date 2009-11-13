@@ -14,6 +14,9 @@
 
 from urlparse import urlsplit, urlunsplit
 from urllib import splitport
+import xmlrpclib
+from M2Crypto import X509
+import socket
 
 # Debugging output.
 debug           = 0
@@ -31,6 +34,8 @@ GLOBALCONF      = HOME + "/" + CONFIGFILE
 LOCALCONF       = CONFIGFILE
 EXTRACONF       = None
 SLICENAME       = "mytestslice"
+REQARGS         = None
+CMURI           = None
 
 selfcredentialfile = None
 slicecredentialfile = None
@@ -48,6 +53,9 @@ if "Usage" not in dir():
         if "ACCEPTSLICENAME" in globals():
             print """    -n name, --slicename=name           specify human-readable name of slice
                                             [default: mytestslice]"""
+            pass
+        print """    -m uri, --cm=uri           specify uri of component manager
+                                            [default: local]"""
         print """    -p file, --passphrase=file          read passphrase from file
                                             [default: ~/.ssl/password]
     -r file, --read-commands=file       specify additional configuration file
@@ -55,14 +63,17 @@ if "Usage" not in dir():
                                             [default: query from SA]"""
 
 try:
-    opts, args = getopt.getopt( sys.argv[ 1: ], "c:df:hn:p:r:s:",
-                                [ "credentials=", "debug", "certificate=",
-                                  "help", "passphrase=", "read-commands=",
-                                  "slicecredentials=", "slicename=" ] )
+    opts, REQARGS = getopt.getopt( sys.argv[ 1: ], "c:df:hn:p:r:s:m:",
+                                   [ "credentials=", "debug", "certificate=",
+                                     "help", "passphrase=", "read-commands=",
+                                     "slicecredentials=", "slicename=",
+                                     "cm="] )
 except getopt.GetoptError, err:
     print >> sys.stderr, str( err )
     Usage()
     sys.exit( 1 )
+
+args = REQARGS
 
 if "PROTOGENI_CERTIFICATE" in os.environ:
     CERTIFICATE = os.environ[ "PROTOGENI_CERTIFICATE" ]
@@ -81,6 +92,8 @@ for opt, arg in opts:
         sys.exit( 0 )
     elif opt in ( "-n", "--slicename" ):
         SLICENAME = arg
+    elif opt in ( "-m", "--cm" ):
+        CMURI = arg
     elif opt in ( "-p", "--passphrase" ):
         PASSPHRASEFILE = arg
     elif opt in ( "-r", "--read-commands" ):
@@ -103,6 +116,10 @@ if os.path.exists( LOCALCONF ):
 if EXTRACONF and os.path.exists( EXTRACONF ):
     execfile( EXTRACONF )
 
+HOSTNAME = socket.getfqdn(socket.gethostname())
+DOMAIN   = HOSTNAME[HOSTNAME.find('.')+1:]
+SLICEURN = "urn:publicid:IDN+" + DOMAIN + "+slice+" + SLICENAME
+
 def Fatal(message):
     print >> sys.stderr, message
     sys.exit(1)
@@ -116,18 +133,15 @@ def PassPhraseCB(v, prompt1='Enter passphrase:', prompt2='Verify passphrase:'):
 # Call the rpc server.
 #
 def do_method(module, method, params, URI=None, quiet=False):
-    if debug:
-        if module:
-            print module + " " + method + " " + str(params);
-        else:
-            print URI + " " + method + " " + str(params);
-        pass
-
     if not os.path.exists(CERTIFICATE):
         return Fatal("error: missing emulab certificate: %s\n" % CERTIFICATE)
     
     from M2Crypto.m2xmlrpclib import SSL_Transport
     from M2Crypto import SSL
+
+    if URI == None and CMURI and module == "cm":
+        URI = CMURI
+        pass
 
     if URI == None:
         if module in XMLRPC_SERVER:
@@ -146,12 +160,22 @@ def do_method(module, method, params, URI=None, quiet=False):
         pass
 
     scheme, netloc, path, query, fragment = urlsplit(URI)
+    if not scheme:
+        URI = "https://" + URI
+        pass
+    
+    scheme, netloc, path, query, fragment = urlsplit(URI)
     if scheme == "https":
         host,port = splitport(netloc)
         if not port:
             netloc = netloc + ":443"
             URI = urlunsplit((scheme, netloc, path, query, fragment));
             pass
+        pass
+
+    if debug:
+#        print URI + " " + method + " " + str(params);
+        print URI + " " + method
         pass
     
     ctx = SSL.Context("sslv23")
