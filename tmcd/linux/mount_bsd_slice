@@ -120,8 +120,10 @@ sub mount_ufs
 {
 	my ($device, $mtpt) = @_;
 
-	if (system("mount -t ufs -o ro,ufstype=44bsd $device $mtpt")) {
-		if (system("mount -t ufs -o ro,ufstype=ufs2 $device $mtpt")) {
+	if (system("mount -t ufs -o ro,ufstype=44bsd $device $mtpt " .
+			" 2> /dev/null")) {
+		if (system("mount -t ufs -o ro,ufstype=ufs2 $device $mtpt " .
+				"2> /dev/null")) {
 			return undef;
 		}
 	}
