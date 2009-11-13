@@ -299,7 +299,7 @@ sub GetAdvertisement($$)
     my ($available, $pc) = @_;
     my $xml = undef;
 
-    my $invocation = "$PTOPGEN -x -g -r -p GeniSlices";
+    my $invocation = "$PTOPGEN -x -g -r -a -p GeniSlices";
     $invocation .= " -a" unless $available;
     if (defined($pc)) {
 	$invocation .= " -1 $pc";
