@@ -73,7 +73,7 @@ else:
 # as a debugging aid, you can wildcard the uuid, and the CM will find
 # a free node and fill it in.
 #
-print "Asking for a ticket from the local CM"
+print "Asking for a ticket from the CM"
 
 rspec = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
         " <node virtual_id=\"geni1\" "+\

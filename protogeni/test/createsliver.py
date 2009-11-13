@@ -150,15 +150,12 @@ else:
     print "Got the slice credential"
     pass
 
-url = "https://myboss.myelab.testbed.emulab.net/protogeni/xmlrpc/cm"
-url = "https://boss.cmcl.cs.cmu.edu/protogeni/xmlrpc/cm"
-
 #
 # Get a ticket. We do not have a real resource discovery tool yet, so
 # as a debugging aid, you can wildcard the uuid, and the CM will find
 # a free node and fill it in.
 #
-print "Asking for a ticket from the local CM"
+print "Asking for a ticket from the CM"
 
 params = {}
 params["credential"] = myslice
