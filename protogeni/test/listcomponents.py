@@ -49,6 +49,9 @@ if debug: print str(response["value"])
 for manager in response["value"]:
     print manager["hrn"] + ": " + manager["url"]
 
+    # Skip the discover resources. Too much.
+    continue
+    
     #
     # manager for resource list.
     #
