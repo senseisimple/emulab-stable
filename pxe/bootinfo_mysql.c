@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2008 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2009 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -185,7 +185,7 @@ query_bootinfo_db(struct in_addr ipaddr, char *node_id, int version,
 	}
 	
 	if (!res) {
-		error("Query failed for host %s\n", ipstr);
+		error("Query failed for host %s\n", node_id ? node_id : ipstr);
 		/* XXX Wrong. Should fail so client can request again later */
 		return 0;
 	}
@@ -198,7 +198,8 @@ query_bootinfo_db(struct in_addr ipaddr, char *node_id, int version,
 	case 1:
 		break;
 	default:
-		error("%d entries for host %s\n", nrows, ipstr);
+		error("%d entries for host %s\n",
+		      nrows, node_id ? node_id : ipstr);
 		break;
 	}
 	row = mysql_fetch_row(res);
@@ -249,7 +250,8 @@ query_bootinfo_db(struct in_addr ipaddr, char *node_id, int version,
 			info->what.partition = TOINT(NEXT_BOOT_PARTITION);
 		}
 		else {
-			error("Invalid NEXT_BOOT entry for host %s\n", ipstr);
+			error("Invalid NEXT_BOOT entry for host %s\n",
+			      node_id ? node_id : ipstr);
 			rval = 1;
 		}
 		if (DEFINED(NEXT_BOOT_CMDLINE)) {
@@ -282,7 +284,8 @@ query_bootinfo_db(struct in_addr ipaddr, char *node_id, int version,
 			info->what.partition = TOINT(TEMP_BOOT_PARTITION);
 		}
 		else {
-			error("Invalid TEMP_BOOT entry for host %s\n", ipstr);
+			error("Invalid TEMP_BOOT entry for host %s\n",
+			      node_id ? node_id : ipstr);
 			rval = 1;
 		}
 		goto done;
@@ -307,7 +310,8 @@ query_bootinfo_db(struct in_addr ipaddr, char *node_id, int version,
 			info->what.partition = TOINT(DEF_BOOT_PARTITION);
 		}
 		else {
-			error("Invalid DEF_BOOT entry for host %s\n", ipstr);
+			error("Invalid DEF_BOOT entry for host %s\n",
+			      node_id ? node_id : ipstr);
 			rval = 1;
 		}
 		if (DEFINED(DEF_BOOT_CMDLINE)) {
@@ -324,7 +328,7 @@ query_bootinfo_db(struct in_addr ipaddr, char *node_id, int version,
 	 * If we get here, there is no bootinfo to give the client.
 	 * New PXE boot clients get PXEWAIT, but older ones get an error.
 	 */
-	error("No OSIDs set for host %s\n", ipstr);
+	error("No OSIDs set for host %s\n", node_id ? node_id : ipstr);
 	if (version >= 1) {
 		info->type = BIBOOTWHAT_TYPE_WAIT;
 		goto done;

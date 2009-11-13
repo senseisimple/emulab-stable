@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004, 2006, 2007 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2009 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -30,7 +30,9 @@
 #define MINEVENTTIME	10
 
 static int	bicache_init(void);
+#ifdef	EVENTSYS
 static int	bicache_needevent(struct in_addr ipaddr);
+#endif
 
 int
 bootinfo_init(void)
@@ -62,7 +64,9 @@ int
 bootinfo(struct in_addr ipaddr, char *node_id, struct boot_info *boot_info, 
 	 void *opaque, int no_event_send)
 {
+#ifdef	EVENTSYS
 	int		needevent = 0;
+#endif
 	int		err;
 	boot_what_t	*boot_whatp = (boot_what_t *) &boot_info->data;
 
@@ -153,6 +157,7 @@ bicache_init(void)
 	return 0;
 }
 
+#ifdef	EVENTSYS
 /*
  * This does both a check and an insert. The idea is that we store the
  * current time of the request, returning yes/no to the caller if the
@@ -207,4 +212,4 @@ bicache_needevent(struct in_addr ipaddr)
 	}
 	return rval;
 }
-
+#endif
