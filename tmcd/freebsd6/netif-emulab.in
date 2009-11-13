@@ -7,7 +7,7 @@
 #
 
 # PROVIDE: netif-emulab
-# REQUIRE: atm1 ipfilter mountcritlocal pccard serial sppp sysctl
+# REQUIRE: atm1 ipfilter mountcritlocal serial sppp sysctl
 # REQUIRE: adjkerntz hostname ipfs ipnat kldxref random
 # BEFORE: netif
 # KEYWORD: nojail
@@ -23,6 +23,18 @@ _cmdifn=
 # some emulab paths
 ELAB_LOGDIR=@CLIENT_VARDIR@/logs
 ELAB_BOOTDIR=@CLIENT_VARDIR@/boot
+
+# XXX accomodation for BSD-based frisbee MFS
+if [ ! -d "$ELAB_BOOTDIR" ]; then
+	if [ -r /etc/emulab/paths.sh ]; then
+		. /etc/emulab/paths.sh
+		ELAB_LOGDIR=$LOGDIR
+		ELAB_BOOTDIR=$BOOTDIR
+	else
+		ELAB_LOGDIR=/etc/testbed
+		ELAB_BOOTDIR=/etc/testbed
+	fi
+fi
 
 # this is a separate function so we can redirect all the output below
 cnet_dhcp()

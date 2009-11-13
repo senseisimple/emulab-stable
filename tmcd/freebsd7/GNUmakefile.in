@@ -96,8 +96,6 @@ etc-install:	dir-install sysetc-install
 sysetc-install:	dir-install netif-emulab
 	$(INSTALL) -m 444 $(SRCDIR)/rc.conf $(SYSETCDIR)/rc.conf
 	$(INSTALL) -m 444 $(SRCDIR)/sysctl.conf $(SYSETCDIR)/sysctl.conf
-	$(INSTALL) -m 755 $(SRCDIR)/dhclient-exit-hooks \
-			$(SYSETCDIR)/dhclient-exit-hooks
 	$(INSTALL) -m 555 ./netif-emulab $(SYSETCDIR)/rc.d/netif-emulab
 
 script-install:	dir-install
