@@ -56,11 +56,11 @@ tweakmbr() {
 	_CUR=1
 	;;
     12305790s)
-	_CUR=2   
+	_CUR=2
 	;;
     s)
         # special case: no part1 so probably no MBR at all, make sure we install
-	echo "Found no MBR on $_DSK, installing version $_NEW"   
+	echo "Found no MBR on $_DSK, installing version $_NEW"
 	_CUR=1000000
 	;;
     *)
@@ -211,7 +211,7 @@ loadone() {
     #
     if [ -x /dev/MAKEDEV -a ! -e /dev/$DISK ]; then
 	(cd /dev; ./MAKEDEV $DISK ${DISK}s2a ${DISK}s3a ${DISK}s4a)
-    fi 
+    fi
 
     if [ x"$ADDRESS" != x ]; then
 	isurl=`echo $ADDRESS | grep http -`
@@ -225,7 +225,7 @@ loadone() {
 		echo "Need to create or mount /images directory!"
 		return 1
 	    fi
-	    
+
 	    #
 	    # This needs a lot more work ...
 	    #
@@ -233,7 +233,7 @@ loadone() {
 	    imagefile="/images/$imagefile"
 	elif [ x"$ispath" != x ]; then
 	    ispath=1
-	    
+
 	    if [ ! -e $ADDRESS ]; then
 		echo "$ADDRESS does not exist!"
 		return 1
@@ -251,7 +251,7 @@ loadone() {
 	    isurl=0
 	    ispath=0
 	fi
-	    
+
 	#
 	# ZFILL==1: use frisbee
 	# ZFILL==2: separate disk-wipe pass (not yet implemented)
@@ -440,7 +440,7 @@ case $STATUS in
 			mount | grep "^/dev/$d" > /dev/null && continue
 			zapsuperblocks $d
 			echo "Invalidating MBR on $d"
-			dd if=/dev/zero of=/dev/$d bs=512 count=1
+			dd if=/dev/zero of=/dev/$d bs=512 count=16
 		done
 		;;
 esac

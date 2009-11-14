@@ -85,7 +85,7 @@ tweakmbr()
 		echo "WARNING: cannot find MBR version $new_mbr_ver, not installed"
 		return 255
 	fi
-	
+
 	echo "Installing MBR version $new_mbr_ver ..."
 	dd if=$MBR_PATH/mbr${new_mbr_ver}.dd of=$disk bs=512 count=1
 
@@ -115,7 +115,7 @@ find_disks() {
 zapsuperblocks()
 {
 	local disk=${1##*/}
-	
+
 	echo "Invalidating old potential superblocks on $disk"
 	partitions=`echo /sys/block/$disk/$disk* 2>/dev/null`
 	for part in $partitions; do
@@ -262,7 +262,7 @@ handle_loadinfo()
 		[hs]d[a-z])
 			;;
 		*)
-			DISK=`$BINDIR/freebsd_to_linux_disk $DISK 0` 
+			DISK=`$BINDIR/freebsd_to_linux_disk $DISK 0`
 			DISK=${DISK%% *}
 			;;
 	esac
@@ -345,7 +345,7 @@ get_loadinfo()
 	if [ $time -eq 0 ]; then
 		return 1
 	fi
-	
+
 	return 0
 }
 
@@ -409,7 +409,7 @@ case $STATUS in
 			mount | grep "^/dev/$d" > /dev/null && continue
 			zapsuperblocks /dev/$d
 			echo "Invalidating MBR on /dev/$d"
-			dd if=/dev/zero of=/dev/$d bs=512 count=1
+			dd if=/dev/zero of=/dev/$d bs=512 count=16
 	done
 		;;
 esac
