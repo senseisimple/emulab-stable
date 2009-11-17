@@ -403,7 +403,7 @@ function SPITFORM($node_type, $formfields, $attributes, $deletes, $errors)
     echo "<blockquote>
 	      <ol type=1 start=1>
 		 <li> To add more than one image, add the first image and 
-                      submit the form.  Than add the next, etc.</li>
+                      submit the form.  Then add the next, etc.</li>
               </ol>
               </blockquote>";
 }
