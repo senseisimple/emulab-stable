@@ -18,6 +18,9 @@ $isadmin   = ISADMIN();
 #
 $optargs = OptionalPageArguments("target_user", PAGEARG_USER,
 				 "p12", PAGEARG_BOOLEAN);
+if (!isset($p12)) {
+    $p12 = 0;
+}
 
 # Default to current user if not provided.
 if (!isset($target_user)) {
