@@ -711,6 +711,8 @@ if (! $DBlinkid) {
 if (!mysql_select_db($TBDBNAME)) {
     TBERROR("Could not select DB after connecting!", 1);
 }
+$DBlinkids = array();
+$DBlinkids[$TBDBNAME] = $DBlinkid;
 
 #
 # Connect to alternate DB.
@@ -718,6 +720,11 @@ if (!mysql_select_db($TBDBNAME)) {
 function DBConnect($dbname)
 {
     global $SCRIPT_NAME;
+    global $DBlinkids;
+
+    if (array_key_exists($dbname, $DBlinkids)) {
+	return $DBlinkids[$dbname];
+    }
 
     $linkid = mysql_connect("localhost", basename($SCRIPT_NAME), "none", 1);
     if ($linkid) {
@@ -725,6 +732,7 @@ function DBConnect($dbname)
 	    return null;
 	}
     }
+    $DBlinkids[$dbname] = $linkid;
     return $linkid;
 }
 
