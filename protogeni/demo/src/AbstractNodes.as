@@ -69,7 +69,7 @@ package
         component.isVirtual = true;
         component.isShared = isShared;
         nodes.addNode(component, currentManager, -1,
-                      event.stageX, event.stageY);
+                      event.stageX, event.stageY, true, null);
       }
     }
 

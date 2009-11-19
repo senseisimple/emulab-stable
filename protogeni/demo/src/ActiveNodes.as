@@ -78,16 +78,20 @@ package
     }
 
     public function addNode(component : Component, manager : ComponentManager,
-                            nodeIndex : int, x : int, y : int) : void
+                            nodeIndex : int, x : int, y : int,
+                            shouldDrag : Boolean, newSuperNode : String) : void
     {
       var newNode : Node = new Node(nodeLayer, component, manager,
-                                    nodeIndex, nodes.length,
+                                    nodeIndex, nodes.length, newSuperNode,
                                     beginDragEvent, beginAddLink);
       dragX = Node.CENTER_X;
       dragY = Node.CENTER_Y;
       newNode.move(x - dragX, y - dragY);
       nodes.push(newNode);
-      beginDrag(newNode);
+      if (shouldDrag)
+      {
+        beginDrag(newNode);
+      }
       newNode.getManager().setChanged();
     }
 
@@ -332,7 +336,9 @@ package
 
       for (i = 0; i < links.length; ++i)
       {
-        if (version >= 3 || links[i].isConnectedTo(cm))
+        if ((version >= 3 || links[i].isConnectedTo(cm))
+            && (cm == ComponentView.georgia
+                || ! links[i].isConnectedTo(ComponentView.georgia)))
         {
           var currentLink : XML = links[i].getXml(useTunnels, version);
           if (currentLink != null)

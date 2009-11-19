@@ -51,6 +51,13 @@ package
 '  <bgp_prefix address="168.62.16.0" netmask="21" /> ' +
 '</rspec> ';
 
+    public static var georgia
+      = new ComponentManager("f00",
+                             "Georgia Tech",
+                             ".ga.edu",
+                             "http://www.ga.edu/protogeni/xmlrpc",
+                             null, 3);
+
     public function ComponentView(newSelect : ComboBox,
                                   newList : List,
                                   newNodes : ActiveNodes) : void
@@ -65,6 +72,7 @@ package
       listStatus.alpha = 0.3;
       nodes = newNodes;
 
+      georgia.setUpdate(updateList);
       managers = new Array(
         new ComponentManager("", "", "", "", updateList, 2),
         new ComponentManager("e2a9e480-aa9f-11dd-9fcd-001143e43770",
@@ -77,7 +85,7 @@ package
                              "Emulab",
                              ".emulab.net",
                              "https://boss.emulab.net:443/protogeni/xmlrpc",
-// Doesn't work ???                             "https://boss.emulab.net:443/dev/stoller/protogeni/xmlrpc",
+//                             "https://boss.emulab.net/protogeni/stoller/xmlrpc",
                              updateList, 2),
 
 /*
@@ -97,24 +105,22 @@ package
                              ".uky.emulab.net",
                              "https://www.uky.emulab.net/protogeni/xmlrpc",
                              updateList, 2),
+/*
         new ComponentManager("f38e8571-f7af-11dd-ab88-00304868a4be",
                              "Wisconsin",
                              ".schooner.wail.wisc.edu",
                              "https://www.schooner.wail.wisc.edu/protogeni/xmlrpc",
                              updateList, 0),
+*/
         new ComponentManager("b14b4a9d-8e53-11de-be30-001ec9540a39", "CMU", ".cmcl.cs.cmu.edu",
                              "https://boss.cmcl.cs.cmu.edu/protogeni/xmlrpc",
                              updateList, 2),
-        new ComponentManager("a4539e9b-876a-11de-af17-00a0c9983803",
+        new ComponentManager("urn:publicid:IDN+uml.emulab.net+authority+cm",
                              "umlGENI",
                              ".uml.emulab.net",
                              "https://boss.uml.emulab.net/protogeni/xmlrpc",
                              updateList, 2),
-        new ComponentManager("f00",
-                             "Georgia Tech",
-                             ".ga.edu",
-                             "http://www.ga.edu/protogeni/xmlrpc",
-                             updateList, 3));
+        georgia);
       select.removeAll();
       select.selectedIndex = 0;
 
@@ -162,9 +168,23 @@ package
       if (! cm.isUsed(event.index))
       {
         var component = cm.getComponent(event.index);
+        var superNode = null;
+        var superNodeName = null;
+        if (component.superNode != -1 && ! cm.isUsed(component.superNode))
+        {
+          superNode = cm.getComponent(component.superNode);
+          superNodeName = superNode.name;
+        }
         nodes.addNode(component, cm, event.index,
-                      select.stage.mouseX, select.stage.mouseY);
+                      select.stage.mouseX, select.stage.mouseY, true,
+                      superNodeName);
         cm.addUsed(event.index);
+        if (superNode != null)
+        {
+          nodes.addNode(superNode, cm, component.superNode,
+                        400, 200, false, null);
+          cm.addUsed(component.superNode);
+        }
       }
       list.selectedIndices = cm.getUsed();
     }

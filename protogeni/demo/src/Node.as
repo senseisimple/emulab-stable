@@ -25,7 +25,8 @@ package
     public function Node(parent : DisplayObjectContainer,
                          newComponent : Component,
                          newManager : ComponentManager, newNodeIndex : int,
-                         newNumber : int, newMouseDownNode : Function,
+                         newNumber : int, newSuperNode : String,
+                         newMouseDownNode : Function,
                          newMouseDownLink : Function) : void
     {
       component = newComponent;
@@ -38,6 +39,7 @@ package
       interfaces = cloneInterfaces(newComponent);
       manager = newManager;
       nodeIndex = newNodeIndex;
+      superNode = newSuperNode;
       mouseDownNode = newMouseDownNode;
       mouseDownLink = newMouseDownLink;
 
@@ -332,8 +334,11 @@ package
         {
           str += "exclusive=\"1\"";
         }
-//        str += "tarfiles=\"/tmp http://valas.gtnoise.net/files/mux-client.tar.gz\" ";
-//        str += "startup_command=\"/tmp/client.py\" ";
+        if (isConnectedTo(ComponentView.georgia))
+        {
+          str += "tarfiles=\"/tmp http://valas.gtnoise.net/files/mux-client.tar.gz\" ";
+          str += "startup_command=\"/tmp/client.py\" ";
+        }
         str += ">";
         if (component.isBgpMux)
         {
@@ -364,6 +369,10 @@ package
           str += "<node_type type_name=\"" + nodeType
             + "\" type_slots=\"1\" /> ";
         }
+        if (superNode != null)
+        {
+          str += "<subnode_of>" + superNode + "</subnode_of> ";
+        }
         for each (var current in interfaces)
         {
           if (current.used)
@@ -381,6 +390,20 @@ package
         str += "<interface virtual_id=\"control\" />";
         str += " </node>";
         result = XML(str);
+      }
+      return result;
+    }
+
+    public function isConnectedTo(target : ComponentManager) : Boolean
+    {
+      var result = false;
+      for each (var link in links)
+      {
+        if (manager != target && link.isConnectedTo(target))
+        {
+          result = true;
+          break;
+        }
       }
       return result;
     }
@@ -490,6 +513,7 @@ package
     var interfaces : Array;
     var isVirtual : Boolean;
     var isShared : Boolean;
+    var superNode : String;
 
     static var virtType = "emulab-vnode";
 

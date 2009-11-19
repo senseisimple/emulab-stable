@@ -216,6 +216,11 @@ package
     {
       var bandwidth = Math.floor(Math.min(leftInterface.bandwidth,
                                           rightInterface.bandwidth));
+      if (left.getName().slice(0, 2) == "pg"
+          || right.getName().slice(0, 2) == "pg")
+      {
+        bandwidth = 1000000;
+      }
       return XML("<bandwidth>" + bandwidth + "</bandwidth>");
     }
 

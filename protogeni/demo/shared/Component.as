@@ -27,6 +27,7 @@ package
       interfaces = new Array();
       isVirtual = false;
       isShared = false;
+      superNode = -1;
 
       isBgpMux = false;
       upstreamAs = "";
@@ -38,6 +39,7 @@ package
     public var interfaces : Array;
     public var isVirtual : Boolean;
     public var isShared : Boolean;
+    public var superNode : int;
 
     public var isBgpMux : Boolean;
     public var upstreamAs : String;

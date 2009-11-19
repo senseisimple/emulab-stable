@@ -50,6 +50,11 @@ package
       state = LOADING;
     }
 
+    public function setUpdate(newUpdate : Function) : void
+    {
+      update = newUpdate;
+    }
+
     public function getBgpAddress() : String
     {
       return bgpAddress;
@@ -236,6 +241,7 @@ package
         if (str != null)
         {
           var uuidToNode = new Dictionary();
+          var subNodeOf = new Dictionary();
           var rspec : XML = XML(str);
           var nodeName : QName = new QName(rspec.namespace(), "node");
           var xmlNodes : Array = new Array();
@@ -268,6 +274,7 @@ package
                 com.managerId = xmlNodes[i].attribute("component_manager_uuid");
               }
               parseNodeTypes(xmlNodes[i], com);
+              parseSubNode(subNodeOf, xmlNodes[i], com.uuid);
               var interfaceName = new QName(rspec.namespace(), "interface");
               var interfaceList = xmlNodes[i].elements(interfaceName);
               var interfaceNumber = 0;
@@ -300,6 +307,7 @@ package
             }
           }
 
+          setSubNodes(subNodeOf);
           parseLinks(rspec, uuidToNode);
           parseBgpPrefixes(rspec);
         }
@@ -333,6 +341,29 @@ package
               com.upstreamAs = currentField.attribute("value");
             }
           }
+        }
+      }
+    }
+
+    private function parseSubNode(subNodeOf : Dictionary, node : XML,
+                                  uuid : String) : void
+    {
+      var subNodeName = new QName(node.namespace(), "subnode_of");
+      for each (var current in node.elements(subNodeName))
+      {
+        var text = current.text();
+        var parent = text.toString();
+        subNodeOf[uuid] = parent;
+      }
+    }
+
+    private function setSubNodes(subNodeOf : Dictionary) : void
+    {
+      for each (var current in components)
+      {
+        if (subNodeOf[current.uuid] != null)
+        {
+          current.superNode = findId(subNodeOf[current.uuid]);
         }
       }
     }

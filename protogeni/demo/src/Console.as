@@ -15,6 +15,7 @@
 package
 {
   import flash.display.DisplayObjectContainer;
+  import flash.display.StageDisplayState;
   import flash.events.MouseEvent;
   import flash.events.ErrorEvent;
   import flash.net.navigateToURL;
@@ -56,6 +57,7 @@ package
                                              arena.deleteButton,
                                              arena.embedButton,
                                              arena.rspecButton,
+                                             arena.fullScreenButton,
                                              clip.backButton,
                                              clip.copyButton),
                                    new Array(clickConsole,
@@ -65,6 +67,7 @@ package
                                              clickDeleteSlivers,
                                              clickEmbed,
                                              clickRspec,
+                                             clickFullScreen,
                                              clickBack,
                                              clickCopy));
 
@@ -232,6 +235,18 @@ package
                                                              currentManager),
                                                 Geni.sesUrl);
         pushRequest(request);
+      }
+    }
+
+    function clickFullScreen(event : MouseEvent) : void
+    {
+      if (arena.stage.displayState == StageDisplayState.FULL_SCREEN)
+      {
+        arena.stage.displayState = StageDisplayState.NORMAL;
+      }
+      else
+      {
+        arena.stage.displayState = StageDisplayState.FULL_SCREEN;
       }
     }
 
