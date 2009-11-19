@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-if (scalar(@ARGV) < 6)
+if (scalar(@ARGV) < 7)
 {
     print STDERR "Usage: master-virt.pl <proj> <exp> <\"type\" | \"name\">\n"
 	        ."    <typeName | nodeName> <runPath> <resultPath>\n"

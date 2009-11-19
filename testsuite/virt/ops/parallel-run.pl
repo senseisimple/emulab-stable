@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-if (scalar(@ARGV) != 5)
+if (scalar(@ARGV) != 6)
 {
     print STDERR "Usage: parallel-run.pl <run-path> <result-path> <proj>\n"
 	."    <exp> <pairCount> <unlimited | limited>\n";

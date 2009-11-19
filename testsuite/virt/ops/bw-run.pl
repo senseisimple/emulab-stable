@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-if (scalar(@ARGV) < 5)
+if (scalar(@ARGV) < 6)
 {
     print STDERR "Usage: bw-run.pl <run-path> <result-path> <proj> <exp> <pair-count> <bandwidth [...]>\n";
     print STDERR "The special string 'unlimited' removes bandwidth constraints\n";
