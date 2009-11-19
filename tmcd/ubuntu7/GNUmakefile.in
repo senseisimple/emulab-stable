@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007, 2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -61,8 +61,12 @@ common-sysetc-install:	dir-install
 
 sysetc-fixup:
 	rm -rf $(SYSETCDIR)/modules.conf $(SYSETCDIR)/cron.pend $(SYSETCDIR)/sysconfig $(SYSETCDIR)/init.d/ntpd
-	mv $(SYSETCDIR)/dhclient-enter-hooks $(SYSETCDIR)/dhcp3/
-	mv $(SYSETCDIR)/dhclient-exit-hooks $(SYSETCDIR)/dhcp3/
+	rm -f $(SYSETCDIR)/dhclient-enter-hooks \
+		$(SYSETCDIR)/dhclient-exit-hooks
+	$(INSTALL) -m 755 $(SRCDIR)/dhclient-exit-hooks \
+			$(SYSETCDIR)/dhcp3/dhclient-exit-hooks
+	$(INSTALL) -m 755 $(SRCDIR)/dhclient-enter-hooks \
+			$(SYSETCDIR)/dhcp3/dhclient-enter-hooks
 	rm -f $(RRCDIR)/rc.local $(SYSETCDIR)/rc.local
 	$(INSTALL) -m 755 $(SRCDIR)/rc.local $(SYSETCDIR)/rc.local
 	$(INSTALL) -m 755 $(SRCDIR)/interfaces $(SYSETCDIR)/network/interfaces

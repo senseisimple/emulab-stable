@@ -1,0 +1,87 @@
+#!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+. /etc/emulab/paths.sh
+
+echo "`date`: ${interface}: ${reason}" >>$LOGDIR/dhclient-exit.log 2>&1
+
+if [ x$reason != xREBOOT -a x$reason != xBOUND -a x$reason != xRENEW -a x$reason != xREBIND ]
+then
+    exit 0
+fi
+
+#
+# ElabinElab support
+#
+# The enter-hooks script should weed out outer boss calls, so there
+# should be nothing to do here.  However, just in case we smack em down
+# again here.
+#
+# XXX we will get here on Ubuntu (Debian?), as the exit status of the
+# enter hook is not checked (see dhclient-enter-hook).  At this point
+# we have a bogus resolv.conf file and we must fix it up.
+#
+if [ x"$new_domain_name_servers" = "x1.1.1.1" ]; then
+    echo -n "`date`: ${interface}: exit with bad name server..."
+    if [ -f /etc/resolv.conf.good ]; then
+	echo "replacing"
+	mv /etc/resolv.conf.good /etc/resolv.conf
+    else
+	echo "no good replacement, removing"
+	cp /dev/null /etc/resolv.conf
+    fi
+    exit_status=1
+    exit 1
+fi >>$LOGDIR/dhclient-exit.log 2>&1
+
+#
+# Remember our server IP, real hostname, router IP, etc.
+#
+echo $new_dhcp_server_identifier > $BOOTDIR/bossip
+echo $new_host_name > $BOOTDIR/realname
+echo $new_routers > $BOOTDIR/routerip
+echo $new_ip_address > $BOOTDIR/myip
+echo $new_subnet_mask > $BOOTDIR/mynetmask
+if [ -n "$interface" ]; then
+    echo $interface > $BOOTDIR/controlif
+fi
+
+#
+# If this is a newnode boot, boss (inner or outer) will have returned with
+# no hostname.  We don't need to record anything in this case, so skip it.
+#
+if [ x"$new_host_name" = x ]; then
+    exit 0
+fi
+
+#
+# We have observed problems where changing the speed/duplex of a link
+# leaves DNS a little wonky.  So we whack on it til it responds so that
+# the sethostname script won't fail.
+#
+if [ "$new_network_number" = "10.200.1.0" ]; then
+    for i in 0 1 2; do
+        if `$BINDIR/tmcc bossinfo >/dev/null 2>&1`; then
+	    break
+	fi
+        echo "`date`: ${interface}: waiting for DNS.." >>$LOGDIR/dhclient-exit.log 2>&1
+        sleep $i
+    done
+fi
+
+#
+# See if the Testbed configuration software wants to change the hostname.
+#
+$BINDIR/sethostname.dhclient >>$LOGDIR/dhclient.log 2>&1
+
+echo "`date`: ${interface}: ${reason}: done" >>$LOGDIR/dhclient-exit.log 2>&1
+
+#
+# The killing of dhclient and shutdown of other interfaces is handled
+# by the dhclient caller (sysconfig/network-scripts/ifcfg-eth99)
+#
+
+exit 0
