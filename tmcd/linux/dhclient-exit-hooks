@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 . /etc/emulab/paths.sh
@@ -20,18 +20,15 @@ fi
 # should be nothing to do here.  However, just in case we smack em down
 # again here.
 #
+# XXX not that if we do get here, we have probably generated a bogus
+# /etc/resolv.conf file.
+#
 if [ x"$new_domain_name_servers" = "x1.1.1.1" ]; then
+    echo "`date`: ${interface}: exit with bad name server, removing..."
+    cp /dev/null /etc/resolv.conf
     exit_status=1
     exit 1
-fi
-
-#
-# If this is a newnode boot, boss (inner or outer) will have returned with
-# no hostname.  We don't need to record anything in this case, so skip it.
-#
-if [ x"$new_host_name" = x ]; then
-    exit 0
-fi
+fi >>$LOGDIR/dhclient-exit.log 2>&1
 
 #
 # Remember our server IP, real hostname, router IP, etc.
@@ -43,6 +40,14 @@ echo $new_ip_address > $BOOTDIR/myip
 echo $new_subnet_mask > $BOOTDIR/mynetmask
 if [ -n "$interface" ]; then
     echo $interface > $BOOTDIR/controlif
+fi
+
+#
+# If this is a newnode boot, boss (inner or outer) will have returned with
+# no hostname.  We don't need to record anything in this case, so skip it.
+#
+if [ x"$new_host_name" = x ]; then
+    exit 0
 fi
 
 #
