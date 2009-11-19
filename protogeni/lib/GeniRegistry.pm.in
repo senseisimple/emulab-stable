@@ -397,8 +397,12 @@ sub Register($$$$)
 				 "type"       => $type,
 			         "gid"        => $cert,
 			         "info"       => $info });
-    return -1
-	if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS);
+
+    if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS) {
+	print STDERR "Could not register object: " .
+	    $response->output() . "\n";
+	return -1;
+    }
     
     return 0;
 }
