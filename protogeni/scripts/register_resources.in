@@ -52,6 +52,7 @@ require GeniDB;
 require GeniCertificate;
 require GeniComponent;
 require GeniRegistry;
+require GeniHRN;
 
 # List of nodes.
 my @nodes = ();
@@ -109,6 +110,9 @@ foreach my $node_id (@nodes) {
 	$certificate = GeniCertificate->Lookup($node->uuid());
 	if (!defined($certificate)) {
 	    $certificate = GeniCertificate->Create("Node",
+						   GeniHRN::Generate(
+						       $OURDOMAIN, "node",
+						       ${node_id} ),
 						   "${PGENIDOMAIN}.${node_id}",
 						   $TBOPS, $node->uuid(),
 						   $cmcertificate->URL());
