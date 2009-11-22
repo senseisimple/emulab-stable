@@ -101,6 +101,7 @@ package
       }
       catch (e : Error)
       {
+      	
         Main.getConsole().appendText("\n\nException on XMLRPC Call: "
                                      + e.toString() + "\n\n");
       }
@@ -135,6 +136,8 @@ package
     {
       server.removeEventListener(Event.COMPLETE, callSuccess);
       server.removeEventListener(ErrorEvent.ERROR, callFailure);
+      server.observeTimer.stop();
+      server.observeTimer = null;
     }
 
     private var module : String;

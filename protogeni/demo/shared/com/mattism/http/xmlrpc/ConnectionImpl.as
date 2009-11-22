@@ -17,6 +17,8 @@ package com.mattism.http.xmlrpc
   import flash.net.URLLoader;
   import flash.net.URLRequest;
   import flash.net.URLRequestMethod;
+    import flash.events.TimerEvent;
+    import flash.utils.Timer;
 
   import com.mattism.http.xmlrpc.Connection;
   import com.mattism.http.xmlrpc.MethodCall;
@@ -106,11 +108,32 @@ package com.mattism.http.xmlrpc
         request.url = this.getUrl();
 
         this._response.load(request);
+        observeTimeout(60);
       }
     }
+    
+    public var observeTimer:Timer;
+    private function observeTimeout(sec:Number):void
+    {
+        observeTimer = new Timer(sec * 1000, 1);
+        observeTimer.addEventListener(
+           TimerEvent.TIMER, timeoutError, false, 1, true);
+        observeTimer.start();
+    }
+    private function timeoutError(e:TimerEvent):void
+        {
+        	_fault = null;
+        	this._response.close();
+        	dispatchEvent(new ErrorEvent(ErrorEvent.ERROR, false, false, "Operation timed out after " + observeTimer.delay/1000 + " seconds"));
+        	//dispatchEvent(new IOErrorEvent(IOErrorEvent.IO_ERROR, false, false, 'request timeout'));
+        	observeTimer = null;
+        }
 
     private function _onLoad( evt:Event ):void
     {
+    	if (observeTimer) {
+                observeTimer.removeEventListener(TimerEvent.TIMER, timeoutError);
+            }
       var responseXML:XML = new XML(this._response.data);
       _fault = null;
       if (responseXML.fault.length() > 0)
