@@ -51,10 +51,7 @@
 		{
 			for each(var cm : ComponentManager in this.ComponentManagers)
 			{
-				 cm.Nodes.collection.removeAll();
-				 cm.Links.collection.removeAll();
-				 cm.Status = ComponentManager.UNKOWN;
-				 cm.Message = "";
+				 cm.clear();
 			}
 		}
 		
@@ -77,9 +74,11 @@
 		}
 		
 		public function getResourcesAndSlices():void {
-			clearComponents();
 			for each ( var cm:ComponentManager in ComponentManagers)
-				cm.Status = ComponentManager.INPROGRESS;
+			{
+				if(cm.Rspec == null)
+					cm.Status = ComponentManager.INPROGRESS;
+			}
 			main.chooseCMWindow.ResetAll();
 			rpc.startIndexedCall(rpc.startResourceLookup);
 		}

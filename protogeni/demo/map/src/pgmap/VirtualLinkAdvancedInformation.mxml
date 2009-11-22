@@ -19,16 +19,16 @@
 				pointLink = pl;
 				txtBandwidth.text = Common.kbsToString(pl.bandwidth);
 				txtType.text = Common.firstToUpper(pointLink.type);
-				//interface1Button.setStyle("icon",Common.assignAvailabilityIcon(pl.node1));
-				//interface2Button.setStyle("icon",Common.assignAvailabilityIcon(pl.node2));
+				interface1Button.setStyle("icon",Common.assignAvailabilityIcon((pl.interfaces[0] as VirtualInterface).virtualNode.physicalNode));
+				interface2Button.setStyle("icon",Common.assignAvailabilityIcon((pl.interfaces[1] as VirtualInterface).virtualNode.physicalNode));
 			}
 			
 			public function viewRspec():void {
 				var rspecView:XmlWindow = new XmlWindow();
-				//rspecView.title = "Request RSPEC for " + pointLink.name;
+				rspecView.title = "Request RSPEC for " + pointLink.virtualId;
 				PopUpManager.addPopUp(rspecView, main, false);
        			PopUpManager.centerPopUp(rspecView);
-       			//rspecView.loadXml(pointLink.sliverRspec);
+       			rspecView.loadXml(pointLink.rspec);
 			}
 		]]>
 	</mx:Script>
@@ -55,7 +55,7 @@
 						</mx:VBox>
 					</mx:GridItem>
 					<mx:GridItem width="100%">
-							<mx:Label id="txtType" text="Type" fontWeight="bold"/>
+							<mx:Label id="txtType" text="Type" fontWeight="normal"/>
 					</mx:GridItem>
 				</mx:GridRow>
 				<mx:GridRow width="100%">
@@ -66,6 +66,9 @@
 					</mx:GridItem>
 					<mx:GridItem width="100%">
 						<mx:VBox width="100%">
+						<mx:Button id="interface1Button"
+							label="{(pointLink.interfaces.getItemAt(0) as VirtualInterface).virtualNode.physicalNode.name}"
+							click="Common.viewNode((pointLink.interfaces.getItemAt(0) as VirtualInterface).virtualNode.physicalNode)" />
 						</mx:VBox>
 					</mx:GridItem>
 				</mx:GridRow>
@@ -76,6 +79,9 @@
 						</mx:VBox>
 					</mx:GridItem>
 					<mx:GridItem width="100%">
+						<mx:Button id="interface2Button"
+							label="{(pointLink.interfaces.getItemAt(1) as VirtualInterface).virtualNode.physicalNode.name}"
+							click="Common.viewNode((pointLink.interfaces.getItemAt(1) as VirtualInterface).virtualNode.physicalNode)" />
 						<mx:VBox width="100%">
 						</mx:VBox>
 					</mx:GridItem>

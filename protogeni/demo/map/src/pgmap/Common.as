@@ -61,13 +61,15 @@ package pgmap
         }
         
         public static function assignAvailabilityIcon(val:PhysicalNode):Class {
-			//if(val.slice != null)
-			//	return ownedIcon;
-            //else
-            if (val.available)
-                return availableIcon;
+			if(val.virtualNodes != null && val.virtualNodes.length > 0)
+				return ownedIcon;
             else
-                return notAvailableIcon;
+            {
+	            if (val.available)
+	                return availableIcon;
+	            else
+	                return notAvailableIcon;
+            }
         }
 		
 		public static function kbsToString(bandwidth:Number):String {
@@ -117,25 +119,25 @@ package pgmap
 			linkButton.setStyle("icon", Common.linkIcon);
 			linkButton.addEventListener(MouseEvent.CLICK,
 				function openLink(event:MouseEvent):void {
-					viewLink(nl);
+					viewPhysicalLink(nl);
 				}
 			);
 			return linkButton;
 		}
 		
-		public static function getPointLinkButton(pl:VirtualLink):Button {
+		public static function getVirtualLinkButton(pl:VirtualLink):Button {
 			var linkButton:Button = new Button();
 			linkButton.label = pl.virtualId;
 			linkButton.setStyle("icon", Common.linkIcon);
 			linkButton.addEventListener(MouseEvent.CLICK,
 				function openLink(event:MouseEvent):void {
-					viewPointLink(pl);
+					viewVirtualLink(pl);
 				}
 			);
 			return linkButton;
 		}
 		
-		public static function viewPointLink(pl:VirtualLink):void {
+		public static function viewVirtualLink(pl:VirtualLink):void {
 	    	var plWindow:VirtualLinkAdvancedWindow = new VirtualLinkAdvancedWindow();
 	    	plWindow.main = Main();
 	    	PopUpManager.addPopUp(plWindow, Main(), false);
@@ -143,7 +145,7 @@ package pgmap
        		plWindow.loadPointLink(pl);
 	    }
 		
-		public static function viewLink(l:PhysicalLink):void {
+		public static function viewPhysicalLink(l:PhysicalLink):void {
 			var lgWindow:PhysicalLinkAdvancedWindow = new PhysicalLinkAdvancedWindow();
 	    	lgWindow.main = Main();
 	    	PopUpManager.addPopUp(lgWindow, Main(), false);
@@ -151,9 +153,9 @@ package pgmap
        		lgWindow.loadLink(l);
 		}
 		
-		public static function viewLinkCollection(lc:ArrayCollection):void {
+		public static function viewPhysicalLinkCollection(lc:ArrayCollection):void {
 			if(lc.length == 1)
-				viewLink(lc[0]);
+				viewPhysicalLink(lc[0]);
 			else {
 				var lgWindow:PhysicalLinkGroupAdvancedWindow = new PhysicalLinkGroupAdvancedWindow();
 		    	lgWindow.main = Main();
@@ -163,7 +165,7 @@ package pgmap
 			}
 		}
 		
-		public static function viewLinkGroup(lg:PhysicalLinkGroup):void {
+		public static function viewPhysicalLinkGroup(lg:PhysicalLinkGroup):void {
 			var lgWindow:PhysicalLinkGroupAdvancedWindow = new PhysicalLinkGroupAdvancedWindow();
 	    	lgWindow.main = Main();
 	    	PopUpManager.addPopUp(lgWindow, Main(), false);

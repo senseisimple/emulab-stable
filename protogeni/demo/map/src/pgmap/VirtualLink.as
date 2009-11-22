@@ -27,6 +27,8 @@
 		public var virtualId:String;
 		
 		public var type:String;
+		
+		[Bindable]
 		public var interfaces:ArrayCollection = new ArrayCollection();
 		
 		[Bindable]

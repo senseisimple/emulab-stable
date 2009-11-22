@@ -221,7 +221,7 @@ package pgmap
 				var t:TooltipOverlay = new TooltipOverlay(ll, Common.kbsToString(drawGroup.TotalBandwidth()), Common.linkBorderColor, Common.linkColor);
 		  		t.addEventListener(MouseEvent.CLICK, function(e:Event):void {
 		            e.stopImmediatePropagation();
-		            Common.viewLinkGroup(drawGroup)
+		            Common.viewPhysicalLinkGroup(drawGroup)
 		        });
 		        
 		  		main.map.addOverlay(t);
@@ -251,15 +251,18 @@ package pgmap
     			borderColor = Common.tunnelBorderColor;
     		}
     		
-    		var current:int = 1;
-    		var node1:PhysicalNode = (pl.interfaces[0] as VirtualInterface).virtualNode.physicalNode;
-    		while(current < pl.interfaces.length)
+    		var current:int = 0;
+    		var node1:PhysicalNode = (pl.interfaces[pl.interfaces.length - 1] as VirtualInterface).virtualNode.physicalNode;
+    		while(current != pl.interfaces.length - 1)
     		{
     			var node2:PhysicalNode = (pl.interfaces[current] as VirtualInterface).virtualNode.physicalNode;
+    			
 				if(node1.owner == node2.owner)
 				{
 					node1 = node2;
 					current++;
+					if(current == pl.interfaces.length)
+    				current = 0;
 					continue;
 				}
 					
@@ -284,7 +287,7 @@ package pgmap
 				var t:TooltipOverlay = new TooltipOverlay(ll, Common.kbsToString(pl.bandwidth), borderColor, backColor);
 		  		t.addEventListener(MouseEvent.CLICK, function(e:Event):void {
 		            e.stopImmediatePropagation();
-		            Common.viewPointLink(pl)
+		            Common.viewVirtualLink(pl)
 		        });
 		        
 		  		main.map.addOverlay(t);
@@ -292,6 +295,8 @@ package pgmap
 				
 				node1 = node2;
 				current++;
+				if(current == pl.interfaces.length)
+    				current = 0;
     		}
 	    }
 	    

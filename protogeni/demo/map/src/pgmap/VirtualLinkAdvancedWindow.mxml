@@ -3,7 +3,7 @@
 	width="364" height="172" showCloseButton="true" layout="vertical"
 	borderAlpha=".9" borderColor="#D2E1F0"
 	resizable="true"
-	title="Point Link Information"
+	title="Virtaul Link Information"
 	close="PopUpManager.removePopUp(this)">
 	
 	<mx:Script>

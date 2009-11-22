@@ -64,6 +64,9 @@ package pgmap
 	    {
 	    	Nodes = new PhysicalNodeGroupCollection();
 			Links = new PhysicalLinkGroupCollection();
+			Rspec = null;
+			Status = ComponentManager.UNKOWN;
+			Message = "";
 	    }
 	    
 	    public function processRspec(afterCompletion : Function):void {

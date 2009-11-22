@@ -92,6 +92,7 @@
       					if(vi.id == vid)
       					{
       						virtualLink.interfaces.addItem(vi);
+      						vi.virtualLinks.addItem(virtualLink);
       						break;
       					}
       				}

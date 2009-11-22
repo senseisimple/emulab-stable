@@ -195,10 +195,16 @@
 	    
 	    public function startResourceLookup() : void
 	    {
+	    	while(currentIndex < main.pgHandler.ComponentManagers.length
+	    			&& (main.pgHandler.ComponentManagers[currentIndex] as ComponentManager).Rspec != null)
+	    	{
+	    		currentIndex++;
+	    	}
+	    	
 	    	if(currentIndex == main.pgHandler.ComponentManagers.length)
 	    	//if(currentIndex == 1)
 	    	{
-	    		//main.chooseCMWindow.refreshList();
+	    		main.chooseCMWindow.refreshList();
 	    		//main.pgHandler.map.drawMap();
 	    		//return;
 	    		
@@ -248,11 +254,14 @@
 
 	      if (code == 0)
 	      {
+	      	
       		var decodor:Base64Decoder = new Base64Decoder();
 	      	decodor.decode(response.value);
 	      	var bytes:ByteArray = decodor.toByteArray();
 	      	bytes.uncompress();
 	      	var decodedRspec:String = bytes.toString();
+	      	
+	      	//var decodedRspec:String = response.value;
 	        currentCm.Rspec = new XML(decodedRspec);
 	      	currentIndex++;
 	      	currentCm.processRspec(startResourceLookup);
@@ -348,6 +357,7 @@
 	      			userSlice.hrn = sliceHrn;
 	      			main.pgHandler.CurrentUser.slices.addItem(userSlice);
 	      		}
+	      		main.fillCombobox();
 	      		startIndexedCall(startSliceLookup);
 	      	}
 	      	else
@@ -408,15 +418,19 @@
 	    {
 	    	if(currentIndex == main.pgHandler.CurrentUser.slices.length)
 	    	{
-	    		/*
-	    		currentSlice = new Slice();
-	      		currentSlice.hrn = "gec6";
-	    		currentSlice.creator = main.pgHandler.CurrentUser;
-	    		currentSlice.status = "Ready";
-	    		var ba:ByteArray = new DelegatedCredentialXml() as ByteArray;
-		      	currentSlice.credential = ba.readUTFBytes(ba.length);
-		      	main.pgHandler.CurrentUser.slices.addItem(currentSlice);
-		      	totalCalls++;*/
+	    		//
+	    		if(main.pgHandler.CurrentUser.hrn.search("mstrum") > -1)
+	    		{
+		    		currentSlice = new Slice();
+		      		currentSlice.hrn = "gec6";
+		    		currentSlice.creator = main.pgHandler.CurrentUser;
+		    		currentSlice.status = "Ready";
+		    		var ba:ByteArray = new DelegatedCredentialXml() as ByteArray;
+			      	currentSlice.credential = ba.readUTFBytes(ba.length);
+			      	main.pgHandler.CurrentUser.slices.addItem(currentSlice);
+			      	totalCalls++;
+			     }
+		      	//
 		      	
 	    		for each(var s:Slice in main.pgHandler.CurrentUser.slices)
 	    		{

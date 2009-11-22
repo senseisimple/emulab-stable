@@ -53,10 +53,13 @@
 
 			[Bindable]
 			public var main:pgmap;
+			
+			public var first:Boolean = true;
 
 			public function success():void {
 				okButton.enabled = false;
-				main.refresh();
+				main.pgHandler.map.drawMap();
+				//main.pgHandler.getResourcesAndSlices();
 				//close();
 			}
 			
@@ -94,6 +97,11 @@
 						if(checkboxCm.label == testCm.Hrn)
 						{
 							found = true;
+							if(testCm.Rspec == null && checkboxCm.selected)
+							{
+								okButton.enabled = true;
+								testCm.Show = true;
+							}
 							if(!existingCms.contains(testCm))
 								existingCms.addItem(testCm);
 							break;
@@ -110,6 +118,12 @@
 				{
 					if(!existingCms.contains(cm))
 						addCm(cm);
+				}
+				if(first)
+				{
+					selectAll();
+					main.pgHandler.getResourcesAndSlices();
+					first = false;
 				}
 			}
 			

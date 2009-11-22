@@ -40,6 +40,7 @@
 		public var available:Boolean;
 		public var exclusive:Boolean;
 		
+		[Bindable]
 		public var subNodeOf : PhysicalNode = null;
 		public var subNodes : ArrayCollection = new ArrayCollection();
 		public var virtualNodes : ArrayCollection = new ArrayCollection();

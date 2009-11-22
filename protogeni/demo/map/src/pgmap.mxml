@@ -97,18 +97,6 @@
        		PopUpManager.centerPopUp(console);
 	    }
             
-        public function refresh():void {
-        	// Clear the map
-	    	map.clearOverlays();
-
-	    	// Get a fresh dataset
-	    	pgHandler.guarenteeCredential(pgHandler.getResourcesAndSlices);
-	    }
-	    
-	    private function viewInformation():void {
-	    	Alert.show("Current Google Maps API Key is\n"+map.key);
-	    }
-            
 	    //------------------------------------------
 	    // GUI
 	    private function toggleFullScreen():void {
@@ -139,6 +127,8 @@
 	    
 	    public function sliceSelected(evt:ListEvent):void {
 	    	selectedSlice = evt.currentTarget.selectedItem;
+	    	onlyMyResourcesCheckbox.selected = selectedSlice.hrn != null && selectedSlice.hrn.length > 0;
+	    	userResourcesOnly = onlyMyResourcesCheckbox.selected;
 	    	pgHandler.map.drawMap();
 	    }
 	    
@@ -215,7 +205,7 @@
 		<mx:VRule height="14"/>
 		<pgmap:ImageButton id="refreshButton"
 			source="@Embed('../images/arrow_refresh.png')"
-			click="refresh()"
+			click="pgHandler.clearComponents(); pgHandler.getResourcesAndSlices();"
 			toolTip="Reload data" />
 		<pgmap:ImageButton id="changeCMButton"
 			source="@Embed('../images/server_edit.png')"
