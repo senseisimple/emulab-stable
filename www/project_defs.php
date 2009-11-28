@@ -484,6 +484,28 @@ class Project
     }
 
     #
+    # Return an array of any users in the project who are admins.
+    #
+    function GetAdmins() {
+	$pid_idx = $this->pid_idx();
+	$query_result =
+	    DBQueryFatal("select distinct u.uid_idx from users as u".
+			 " left join group_membership as gm on u.uid=gm.uid".
+			 " where gm.pid_idx='$pid_idx' and u.admin=1");
+
+	while ($row = mysql_fetch_array($query_result)) {
+	    $uid_idx = $row["uid_idx"];
+
+	    if (! ($user = User::Lookup($uid_idx))) {
+		TBERROR("Project::GetAdmins: ".
+			"Could not load user $uid_idx!", 1);
+	    }
+	    $result[] = $user;
+	}
+	return $result;
+    }
+
+    #
     # List of subgroups for a project member (not including default group).
     #
     function GroupList($user) {

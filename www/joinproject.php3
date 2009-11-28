@@ -733,6 +733,22 @@ if (!$forwikionly) {
     }
 }
 
+#
+# If this is a new user, only allow the user creation to proceed if 
+# doing so would not add a non-admin (default for new users) to a 
+# project with admins.
+#
+if (!$returning && count($project->GetAdmins())) {
+    $errors["Joining Project"] =
+	"You cannot join project '$pid' due to security restrictions!"
+	. "  If you were told to join this project specifically, email"
+	. " either the project leader OR $TBMAILADDR_OPS.";
+    TBERROR("New user '".$formfields["joining_uid"]."' attempted to join project ".
+	    "'$pid'\n".
+	    "which would create a mix of admin and non-admin ".
+	    "users\n\n--- so the user creation was NOT allowed to occur!\n", 0);
+}
+
 # Done with sanity checks!
 if (count($errors)) {
     SPITFORM($formfields, $returning, $errors);
