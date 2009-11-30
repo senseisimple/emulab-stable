@@ -53,7 +53,7 @@ my %servernodes	    = ();
 my %singlectlnet    = ();
 my $template        = $DHCPD_TEMPLATE;
 my $outfile	    = "/tmp/dhcpd_makeconf.$$";
-my $OUT		    = *STDOUT; 
+my $OUT		    = *STDOUT;
 
 #
 # Parse command arguments. Once we return from getopts, all that should
@@ -97,7 +97,7 @@ if (defined($options{"t"})) {
 
 #
 # If we are going to actually install this file, must serialize to
-# avoid a trashed config file. 
+# avoid a trashed config file.
 #
 if ($install) {
     if ((my $locked = TBScriptLock("dhcpd.conf", 1)) != TBSCRIPTLOCK_OKAY()) {
@@ -108,7 +108,7 @@ if ($install) {
 
     #
     # Open temporary output file.
-    # 
+    #
     open(OF, ">$outfile") or
 	fatal("Could not open $outfile\n");
     $OUT = *OF;
@@ -137,7 +137,7 @@ while (my %row = $query_result->fetchhash()) {
 	my $pid = $row{"pid"};
 	my $eid = $row{"eid"};
 	my $tag = "${pid}:${eid}";
-	
+
 	$servernodes{$tag} = $row{"IP"};
 
 	#
@@ -214,7 +214,7 @@ while (<IF>) {
 			 ($row{"plab_boot"} == 1 &&
 			  defined($row{"plab_role"}) &&
 			  $row{"plab_role"} eq "node"))) {
-			
+
 			#
 			# XXX it is not yet completely clear what all we
 			# need to do, or not do, for plab nodes.
@@ -241,8 +241,24 @@ while (<IF>) {
 		    else {
 			$hostname =
 			    "${spaces}\toption host-name \"$node_id\";\n";
+
+			my $query_result =
+			    DBQueryWarn( "(select attrvalue from node_attributes where node_id = '$node_id' " .
+				           " and attrkey = 'tftp_server' ) union " .
+				           "(select attrvalue from node_type_attributes where type = '$nodetype' " .
+				           " and attrkey = 'tftp_server') limit 1" );
+
+			if (! $query_result) {
+			    fatal("Could not get tftp_server data from DB!");
+			}
+
+			if (my %row = $query_result->fetchhash()) {
+				my $tftp_server = $row{'attrvalue'};
+				$next_server = "${spaces}\tnext-server " .
+					$tftp_server . ";\n";
+			}
 		    }
-		    
+
 		    #
 		    # Handle alternate boot program filename if it exists.
 		    # Use mutable nodes.pxe_boot_path if it is defined.
@@ -266,10 +282,10 @@ while (<IF>) {
 			$nodetype->pxe_boot_path(\$nt_pxe_boot_path) == 0
                             or fatal("Could not get pxe_boot_path for ".
 				     "$node_id");
-						    
+
 			if (defined($nt_pxe_boot_path)) {
 			    my $fn = $nt_pxe_boot_path;
-			    
+
 			    # make sure it is pretty constrained
 			    if ($fn =~ /^\/tftpboot\// && $fn !~ /\.\./) {
 				$filename = "${spaces}\tfilename \"$fn\";\n";
@@ -331,10 +347,10 @@ exit(0);
 #
 sub fatal {
     my $msg = $_[0];
-    
+
     TBScriptUnlock()
 	if ($install);
-    
+
     die("*** $0:\n".
 	"    $msg\n");
 }
