@@ -1,0 +1,11 @@
+<rspec xmlns="http://www.protogeni.net/resources/rspec/0.1"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.protogeni.net/resources/rspec/0.1 http://www.protogeni.net/resources/rspec/0.1/request.xsd"
+       type="request" >
+  <node virtual_id="my-node"
+        virtualization_type="emulab-vnode"
+        exclusive="1">
+    <node_type type_name="pc" type_slots="1"/>
+    <interface virtual_id="control"/>
+  </node>
+</rspec>

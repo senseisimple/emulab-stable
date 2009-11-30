@@ -13,4 +13,74 @@
 -->
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" targetNamespace="http://www.protogeni.net/resources/rspec/0.1" xmlns:rspec="http://www.protogeni.net/resources/rspec/0.1">
   <xs:include schemaLocation="ad-common.xsd"/>
+  <!--
+    Reference to components managed by other component managers.
+    TODO: Merge ComponentInterfaceRefName into just component_id when
+    length restrictions on URNs end.
+  -->
+  <xs:element name="external_ref">
+    <xs:complexType>
+      <xs:attributeGroup ref="rspec:ComponentInterfaceRefName"/>
+      <xs:attribute name="component_manager_uuid"/>
+      <xs:attribute name="component_manager_urn"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:complexType name="ServiceContents">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element ref="rspec:login"/>
+      <xs:element ref="rspec:install"/>
+      <xs:element ref="rspec:execute"/>
+    </xs:choice>
+  </xs:complexType>
+  <xs:element name="login">
+    <xs:complexType>
+      <xs:attributeGroup ref="rspec:LoginServiceContents"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="install">
+    <xs:complexType>
+      <xs:attributeGroup ref="rspec:InstallServiceContents"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="execute">
+    <xs:complexType>
+      <xs:attributeGroup ref="rspec:ExecuteServiceContents"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:attributeGroup name="LoginServiceContents">
+    <xs:attribute name="authentication" use="required">
+      <xs:simpleType>
+        <xs:restriction base="xs:token">
+          <xs:enumeration value="ssh-keys"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="hostname" use="required"/>
+    <xs:attribute name="port" use="required"/>
+  </xs:attributeGroup>
+  <xs:attributeGroup name="InstallServiceContents">
+    <xs:attribute name="file_type" use="required">
+      <xs:simpleType>
+        <xs:restriction base="xs:token">
+          <xs:enumeration value="tar.gz"/>
+          <xs:enumeration value="tar.bz2"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+  </xs:attributeGroup>
+  <xs:attributeGroup name="ExecuteServiceContents">
+    <xs:attribute name="shell" use="required">
+      <xs:simpleType>
+        <xs:restriction base="xs:token">
+          <xs:enumeration value="sh"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+  </xs:attributeGroup>
+  <xs:element name="bgp_prefix">
+    <xs:complexType>
+      <xs:attribute name="address" use="required"/>
+      <xs:attribute name="netmask" use="required"/>
+    </xs:complexType>
+  </xs:element>
 </xs:schema>
