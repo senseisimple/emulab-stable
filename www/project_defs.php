@@ -488,6 +488,7 @@ class Project
     #
     function GetAdmins() {
 	$pid_idx = $this->pid_idx();
+	$result  = array();
 	$query_result =
 	    DBQueryFatal("select distinct u.uid_idx from users as u".
 			 " left join group_membership as gm on u.uid=gm.uid".
