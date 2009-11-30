@@ -6,6 +6,7 @@
 #
 #
 include_once("template_defs.php");
+include_once("geni_defs.php");
 
 # This class is really just a wrapper around the DB data ...
 #
@@ -99,6 +100,21 @@ class Experiment
 	$query_result =
 	    DBQueryWarn("select idx from experiments ".
 			"where pid='$safe_pid' and eid='$safe_eid'");
+
+	if (!$query_result || !mysql_num_rows($query_result)) {
+	    return null;
+	}
+	$row = mysql_fetch_array($query_result);
+	$idx = $row['idx'];
+
+	return Experiment::Lookup($idx); 
+    }
+    function LookupByUUID($uuid) {
+	$safe_uuid = addslashes($uuid);
+
+	$query_result =
+	    DBQueryWarn("select idx from experiments ".
+			"where eid_uuid='$safe_uuid'");
 
 	if (!$query_result || !mysql_num_rows($query_result)) {
 	    return null;
@@ -1063,46 +1079,36 @@ class Experiment
               </tr>\n";
 	}
 	if (!$short && ISADMIN() && $this->geniflags()) {
-	    $dbid = DBConnect("geni-cm");
 	    $slice_hrn = null;
 	    $user_hrn  = null;
-	    if ($dbid) {
-		$geni_result =
-		    DBQueryFatal("select hrn,creator_uuid from geni_slices ".
-				 "where uuid='$uuid'", $dbid);
-		if ($geni_result &&
-		    mysql_num_rows($geni_result)) {
-		    $genirow = mysql_fetch_array($geni_result);
-		    $creator_uuid = $genirow["creator_uuid"];
-		    $slice_hrn    = $genirow["hrn"];
 
-		    $geni_result =
-			DBQueryFatal("select hrn from geni_users ".
-				     "where uuid='$creator_uuid'", $dbid);
-		    if ($geni_result &&
-			mysql_num_rows($geni_result)) {
-			$genirow = mysql_fetch_array($geni_result);
-			$user_hrn = $genirow["hrn"];
-		    }
-		    else {
-			$user = User::LookupByUUID($creator_uuid);
-			if ($user) {
-			    $user_hrn = $user->uid();
-			}
-		    }
-		    if (! is_null($slice_hrn)) {
-			echo "<tr>
-                               <td>Geni Slice HRN: </td>
-                               <td class=\"left\">$slice_hrn</td>
-                              </tr>\n";
-		    }
-		    if (! is_null($user_hrn)) {
-			echo "<tr>
-                               <td>Geni User HRN: </td>
-                               <td class=\"left\">$user_hrn</td>
-                              </tr>\n";
+	    $slice = GeniSlice::Lookup("geni-cm", $uuid);
+	    if ($slice) {
+		$slice_hrn     = $slice->hrn();
+		$slice_creator = GeniUser::Lookup("geni-cm",
+						  $slice->creator_uuid());
+
+		if ($slice_creator) {
+		    $user_hrn = $slice_creator->hrn();
+		}
+		else {
+		    $user = User::LookupByUUID($slice->creator_uuid());
+		    if ($user) {
+			$user_hrn = $user->uid();
 		    }
 		}
+	    }
+	    if (! is_null($slice_hrn)) {
+		echo "<tr>
+                           <td>Geni Slice HRN: </td>
+                           <td class=\"left\">$slice_hrn</td>
+                      </tr>\n";
+	    }
+	    if (! is_null($user_hrn)) {
+		echo "<tr>
+                           <td>Geni User HRN: </td>
+                           <td class=\"left\">$user_hrn</td>
+                      </tr>\n";
 	    }
 	}
 	echo "</table>\n";

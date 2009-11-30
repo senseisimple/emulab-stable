@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2006-2008 University of Utah and the Flux Group.
+ * Copyright (c) 2006-2009 University of Utah and the Flux Group.
  * All rights reserved.
  */
 /*
@@ -497,3 +497,19 @@ function toggle_menu(e_list, e_arrow) {
     }
     return true;
 }
+
+function PopUpWindow(text)
+{
+    var newWinHeight = 400;
+    var newWinWidth  = 700;
+    var newWinTop    = (screen.height-newWinHeight)/2;
+    var newWinLeft   = (screen.width-newWinWidth)/2;
+    
+    var winProps = eval('"resizable=yes,menubar=no,toolbar=no,scrollbars=yes,top=" +newWinTop+ ",left=" +newWinLeft+ ",width=" +newWinWidth+ ",height=" +newWinHeight');
+
+    myWindow = window.open('', "XML", winProps);
+    myWindow.document.write('<html><head><title>XML</title></head>');
+    myWindow.document.write('<body><xmp>' + text + '</xmp></body></html>');
+    myWindow.document.close();
+}
+

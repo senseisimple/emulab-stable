@@ -295,6 +295,7 @@ function WRITESIDEBAR() {
     global $login_status, $login_user, $pid, $gid;
     global $TBBASE, $TBDOCBASE, $BASEPATH, $WIKISUPPORT, $MAILMANSUPPORT;
     global $BUGDBSUPPORT, $BUGDBURL, $CVSSUPPORT, $CHATSUPPORT, $TRACSUPPORT;
+    global $PROTOGENI;
     global $CHECKLOGIN_WIKINAME, $TBMAINSITE;
     global $THISHOMEBASE;
     global $EXPOSETEMPLATES;
@@ -743,6 +744,10 @@ function WRITESIDEBAR() {
 	}
 	NavMenuButtonNew("Approve Widearea User",
 			 "$TBBASE/approvewauser_form.php3");
+	if ($PROTOGENI) {
+	    NavMenuButton("ProtoGeni Slices",
+			  "$TBBASE/genislices.php");
+	}
     }
     if (0 && $login_user) {
 	NavMenuSection("Status", "Status");

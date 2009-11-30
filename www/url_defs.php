@@ -114,6 +114,7 @@ $url_mapping["cvswebwrap"]          = "cvsweb/cvswebwrap.php3";
 $url_mapping["profile"]             = "profile.php";
 $url_mapping["submitpub"]           = "submitpub.php";
 $url_mapping["showslice"]           = "showslice.php";
+$url_mapping["showmanifest"]        = "showmanifest.php";
 	     
 #
 # The caller will pass in a page id, and a list of things. If the thing
