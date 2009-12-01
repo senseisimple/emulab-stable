@@ -11,6 +11,7 @@
   <!--
     
     Common definitions for advertisements, requests, and tickets
+    Version 0.1
     
   -->
   <xs:element name="node" type="rspec:NodeContents"/>

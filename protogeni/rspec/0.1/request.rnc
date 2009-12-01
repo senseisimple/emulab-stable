@@ -6,6 +6,7 @@
 
 #
 # Prototype of a request RSpec, to be used by ProtoGENI
+# Version 0.1
 #
 
 default namespace = "http://www.protogeni.net/resources/rspec/0.1"

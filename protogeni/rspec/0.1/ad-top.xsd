@@ -12,6 +12,7 @@
     Definition of common data structures used for representing topologies -
     shared between vtop (virtual topology) and ptop (physical topology)
     formats.
+    Version 0.1
     
   -->
   <xs:element name="node_type">

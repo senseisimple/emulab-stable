@@ -40,4 +40,6 @@ for path in 0.1; do
     sed "s/common.xsd/${schema}-common.xsd/" ${path}/${schema}.xsd > ${path}/${schema}.tmp
     mv ${path}/${schema}.tmp ${path}/${schema}.xsd
   done
+
+  sudo scp ${path}/*.xsd ${path}/*.rnc ops.emulab.net:/usr/local/www.geni/data/trac/resources/rspec/${path}/
 done

@@ -11,6 +11,7 @@
   <!--
     
     Schema for a manifest RSpec, to be used by ProtoGENI
+    Version 0.1
     
   -->
 </xs:schema>

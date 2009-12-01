@@ -9,6 +9,7 @@
 <!--
   
   Prototype of an advertisement RSpec, to be used by ProtoGENI
+  Version 0.1
   
 -->
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" targetNamespace="http://www.protogeni.net/resources/rspec/0.1" xmlns:rspec="http://www.protogeni.net/resources/rspec/0.1">

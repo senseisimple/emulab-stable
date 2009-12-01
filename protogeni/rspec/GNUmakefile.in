@@ -11,23 +11,24 @@ SUBDIR		= protogeni/rspec
 
 include $(OBJDIR)/Makeconf
 
-SCHEMATA	= rspec-ad-common.xsd rspec-ad-top.xsd rspec-ad.xsd \
-		  rspec-request-common.xsd rspec-request-top.xsd \
-		  rspec-request.xsd
+SUBDIRS	= 0.1
 
-# No explicit dependencies here.  xsdgen must be run manually if necessary.
-all:
+# xsdgen must be run manually if necessary.
+all: all-subdirs
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-install: $(addprefix $(INSTALL_LIBDIR)/assign/, $(SCHEMATA))
+install: 
+	@$(MAKE) -C 0.1 install
 
 control-install:
 
-clean:
-	rm -f *.o core
+clean:		clean-subdirs
 
-$(INSTALL_LIBDIR)/assign/%: %
-	@echo "Installing $<"
-	-mkdir -p $(INSTALL_LIBDIR)/assign
-	$(INSTALL) $< $@
+# How to recursively descend into subdirectories to make general
+# targets such as `all'.
+%.MAKE:
+	@$(MAKE) -C $(dir $@) $(basename $(notdir $@))
+%-subdirs: $(addsuffix /%.MAKE,$(SUBDIRS)) ;
+
+.PHONY:	$(SUBDIRS) install

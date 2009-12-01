@@ -6,6 +6,7 @@
 
 #
 # Common definitions for advertisements, requests, and tickets
+# Version 0.1
 #
 
 include "top.rnc" 
