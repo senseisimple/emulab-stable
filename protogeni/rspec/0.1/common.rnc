@@ -23,6 +23,8 @@ NodeContents =
     # Each node may be the subnode of (physically located within) another.
     # In advertisements, this is the URN of the other component.
     # In requests, this is the virtual_id of the other sliver.
+    # TODO: To be consistent with the rest of the RSpec, we should have 
+    # an attribute called parent_node instead of a child text node
     element subnode_of { text }? &
 
     # Node type list
