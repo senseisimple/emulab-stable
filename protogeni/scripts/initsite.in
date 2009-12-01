@@ -117,7 +117,7 @@ if( $? == -1 ) {
     die( "could not inspect root certificate $TB/etc/emulab.pem" );
 } elsif( $? & 0x7F ) {
     die( "unexpected signal while inspecting root certificate" );
-} else if( $? ) {
+} elsif( $? ) {
     # grep returned non-zero exit code (indicating no matches): this is
     # an old certificate, so regenerate it.
     my $extfile = "/tmp/$$"; # not worth trying to be secure
