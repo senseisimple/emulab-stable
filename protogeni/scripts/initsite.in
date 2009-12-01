@@ -126,13 +126,23 @@ if( system( "$OPENSSL x509 -text -noout < $TB/etc/emulab.pem | " .
 	die( "refusing to overwrite $originalfile" );
     rename( "$TB/etc/emulab.pem", "$originalfile" ) or
 	die( "could not rename root certificate" );
+    # Save the new certificate to a temporary file: OpenSSL will reuse the
+    # plain text from the old certificate instead of the current version,
+    # so we regenerate the whole thing once we've finished to avoid
+    # horrible confusion.
     system( "$OPENSSL x509 -days 2000 -text -extfile $extfile " .
 	    "-signkey $TB/etc/emulab.key < $originalfile " .
-	    "> $TB/etc/emulab.pem" );
+	    "> $TB/etc/emulab.tmp" );
     # For some reason, OpenSSL can return non-zero even when the certificate
     # generation succeeded.  Check the output file instead.
-    -s "$TB/etc/emulab.pem" or
+    if( !( -s "$TB/etc/emulab.tmp" ) ) {
+	rename( "$originalfile", "$TB/etc/emulab.pem" );
 	die( "could not generate new root certificate" );	    
+    }
+
+    # Regenerate the certificate, so that the comments are up to date.
+    system( "$OPENSSL x509 -text < $TB/etc/emulab.tmp > $TB/etc/emulab.pem" );
+    unlink( "$TB/etc/emulab.tmp" );
 
     print "Root certificate updated.  You will need to send the new\n";
     print "certificate to the clearing house.\n";
