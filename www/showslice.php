@@ -83,6 +83,24 @@ else {
     }
 }
 
+if ($showtype != "sa") {
+    $saslice = GeniSlice::Lookup("sa", $slice->uuid());
+    if ($saslice) {
+	$saidx = $saslice->idx();
+	$url   = CreateURL("showslice", "slice_idx", $saidx, "showtype", "sa");
+
+	$rows[] = array("SA Slice" => "<a href='$url'>$saidx</a>");
+    }
+}
+if ($showtype != "cm") {
+    $cmslice = GeniSlice::Lookup("cm", $slice->uuid());
+    if ($cmslice) {
+	$cmidx = $cmslice->idx();
+	$url   = CreateURL("showslice", "slice_idx", $cmidx, "showtype", "cm");
+
+	$rows[] = array("CM Slice" => "<a href='$url'>$cmidx</a>");
+    }
+}
 
 list ($html, $button) = TableRender($table, $rows);
 echo $html;
@@ -90,7 +108,12 @@ echo $html;
 $clientslivers = ClientSliver::SliverList($slice);
 if ($clientslivers && count($clientslivers)) {
     $table = array('#id'	   => 'clientslivers',
-		   '#title'        => "Client Slivers");
+		   '#title'        => "Client Slivers",
+		   '#headings'     => array("idx"      => "ID",
+					    "urn"      => "URN",
+					    "manager"  => "Manager URN",
+					    "created"  => "Created",
+					    "manifest" => "Manifest"));
     $rows = array();
 
     foreach ($clientslivers as $clientsliver) {
@@ -107,6 +130,9 @@ if ($clientslivers && count($clientslivers)) {
 		"<a href='#' title='' ".
 		"onclick='PopUpWindow($manifest);'>".
 		"Manifest</a>";
+	}
+	else {
+	    $row["manifest"] = "Unknown";
 	}
 	$rows[] = $row;
     }
