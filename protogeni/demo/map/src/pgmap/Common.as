@@ -71,6 +71,13 @@ package pgmap
 	                return notAvailableIcon;
             }
         }
+        
+        public static function assignIconForComponentManager(val:ComponentManager):Class {
+			if(val.Status == ComponentManager.VALID)
+				return availableIcon;
+			else
+				return notAvailableIcon;
+        }
 		
 		public static function kbsToString(bandwidth:Number):String {
 			var bw:String = "";
@@ -99,6 +106,18 @@ package pgmap
 			var removeChars:int = phrase.length - size + 3;
 			var upTo:int = (phrase.length / 2) - (removeChars / 2);
 			return phrase.substring(0, upTo) + "..." +  phrase.substring(upTo + removeChars);
+		}
+		
+		public static function getComponentManagerButton(cm:ComponentManager):Button {
+			var cmButton:Button = new Button();
+			cmButton.label = cm.Hrn;
+			cmButton.setStyle("icon", Common.assignIconForComponentManager(cm));
+			cmButton.addEventListener(MouseEvent.CLICK,
+				function openComponentManager(event:MouseEvent):void {
+					viewComponentManager(cm);
+				}
+			);
+			return cmButton;
 		}
 		
 		public static function getNodeButton(n:PhysicalNode):Button {
@@ -171,6 +190,14 @@ package pgmap
 	    	PopUpManager.addPopUp(lgWindow, Main(), false);
        		PopUpManager.centerPopUp(lgWindow);
        		lgWindow.loadGroup(lg);
+		}
+		
+		public static function viewComponentManager(cm:ComponentManager):void {
+			var cmWindow:ComponentManagerAdvancedWindow = new ComponentManagerAdvancedWindow();
+	    	cmWindow.main = Main();
+	    	PopUpManager.addPopUp(cmWindow, Main(), false);
+       		PopUpManager.centerPopUp(cmWindow);
+       		cmWindow.loadCm(cm);
 		}
 		
 		public static function viewNode(n:PhysicalNode):void {

@@ -12,6 +12,7 @@ package pgmap
 	    public static var VALID : int = 2;
 	    public static var FAILED : int = 3;
 		
+		[Bindable]
 		public var Url : String = "";
 		
 		[Bindable]
@@ -173,7 +174,8 @@ package pgmap
 	        	n.urn = p.@component_uuid;
 	        	n.available = p.available == "true";
 	        	n.exclusive = p.exclusive == "true";
-	        	n.manager = p.@component_manager_uuid;
+	        	n.managerString = p.@component_manager_uuid;
+	        	n.manager = this;
 	        	
 	        	var parentName:String = p.subnode_of;
 	        	if(parentName.length > 0)
@@ -236,7 +238,8 @@ package pgmap
 		        		}
 		        		var l:PhysicalLink = new PhysicalLink(lg);
 		        		l.name = link.@component_name;
-		        		l.manager = link.@component_manager_uuid;
+		        		l.managerString = link.@component_manager_uuid;
+		        		l.manager = this;
 		        		l.urn = link.@component_uuid;
 		        		l.interface1 = ni1;
 		        		l.interface2 = ni2;

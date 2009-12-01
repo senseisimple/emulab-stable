@@ -29,7 +29,10 @@
 		public var name:String;
 		
 		[Bindable]
-		public var manager:String;
+		public var managerString:String;
+		
+		[Bindable]
+		public var manager:ComponentManager;
 		
 		[Bindable]
 		public var uuid:String;

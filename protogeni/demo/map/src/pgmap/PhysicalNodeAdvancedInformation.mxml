@@ -52,6 +52,51 @@
 				
 				loadPhysicalLinks();
 				loadSlices();
+				loadHierarchy();
+			}
+			
+			public function loadHierarchy():void
+			{
+				hierarchyVbox.removeAllChildren();
+				
+				// Manager
+				var managerHbox:HBox = new HBox();
+				var managerLabel:Label = new Label();
+				managerLabel.text = "Owned by";
+				managerHbox.addChild(managerLabel);
+				managerHbox.addChild(Common.getComponentManagerButton(node.manager));
+				hierarchyVbox.addChild(managerHbox);
+				
+				// Parent node info
+				var parentNodeHbox:HBox = new HBox();
+				var parentNodeLabel:Label = new Label();
+				parentNodeHbox.addChild(parentNodeLabel);
+				hierarchyVbox.addChild(parentNodeHbox);
+				if(node.subNodeOf != null)
+				{
+					parentNodeLabel.text = "Subnode of";
+					parentNodeHbox.addChild(Common.getNodeButton(node.subNodeOf));
+				}
+				else
+				{
+					parentNodeLabel.text = "No parent node";
+				}
+				
+				// Child node info
+				var subNodesLabel:Label = new Label();
+				hierarchyVbox.addChild(subNodesLabel);
+				if(node.subNodes.length > 0)
+				{
+					subNodesLabel.text = "Subnodes:";
+					for each(var subNode:PhysicalNode in node.subNodes)
+					{
+						hierarchyVbox.addChild(Common.getNodeButton(subNode));
+					}
+				}
+				else
+				{
+					subNodesLabel.text = "No subnodes";
+				}
 			}
 			
 			public function loadSlices():void {
@@ -164,7 +209,7 @@
 					<mx:GridItem>
 						
 					</mx:GridItem>
-					<mx:GridItem width="100%">
+					<mx:GridItem width="100%" id="quickInfoHbox">
 						<mx:Label text="Exclusive" fontWeight="bold"/>
 						<mx:Image id="imgExclusive"/>
 						<mx:VRule height="16"/>
@@ -180,14 +225,6 @@
 						<mx:Label text="{node.urn}"/>
 					</mx:GridItem>
 				</mx:GridRow>
-				<mx:GridRow width="100%">
-					<mx:GridItem>
-						<mx:Label text="Manager" fontWeight="bold"/>
-					</mx:GridItem>
-					<mx:GridItem width="100%">
-						<mx:Label text="{node.manager}"/>
-					</mx:GridItem>
-				</mx:GridRow>
 				<mx:GridRow width="100%" height="86">
 					<mx:GridItem>
 						<mx:Label text="Types" fontWeight="bold"/>
@@ -200,6 +237,15 @@
 								<mx:DataGridColumn headerText="Static" dataField="isStatic"/>
 							</mx:columns>
 						</mx:DataGrid>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%">
+					<mx:GridItem>
+					<mx:Label text="Hierarchy" fontWeight="bold"/>
+					</mx:GridItem>
+					<mx:GridItem width="100%">
+						<mx:VBox width="100%" height="100%" id="hierarchyVbox">
+						</mx:VBox>
 					</mx:GridItem>
 				</mx:GridRow>
 				<mx:GridRow width="100%" height="100%">

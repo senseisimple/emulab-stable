@@ -35,7 +35,10 @@
 		public var urn:String;
 		
 		[Bindable]
-		public var manager:String;
+		public var managerString:String;
+		
+		[Bindable]
+		public var manager:ComponentManager;
 		
 		public var available:Boolean;
 		public var exclusive:Boolean;

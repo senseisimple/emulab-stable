@@ -18,6 +18,8 @@
 			public function load(l:PhysicalLink):void {
 				link = l;
 				txtBandwidth.text = Common.kbsToString(l.bandwidth);
+				managerGridItem.removeAllChildren();
+				managerGridItem.addChild(Common.getComponentManagerButton(link.manager));
 				interface1Button.setStyle("icon",Common.assignAvailabilityIcon(l.interface1.owner));
 				interface2Button.setStyle("icon",Common.assignAvailabilityIcon(l.interface2.owner));
 			}
@@ -65,8 +67,7 @@
 					<mx:GridItem>
 						<mx:Label text="Manager" fontWeight="bold"/>
 					</mx:GridItem>
-					<mx:GridItem width="100%">
-						<mx:Label text="{link.manager}"/>
+					<mx:GridItem width="100%" id="managerGridItem">
 					</mx:GridItem>
 				</mx:GridRow>
 				<mx:GridRow width="100%">

@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ResizeWindow xmlns="pgmap.*" xmlns:mx="http://www.adobe.com/2006/mxml"
-	width="675" height="500" showCloseButton="true" layout="vertical"
+	width="422" height="118" showCloseButton="true" layout="vertical"
 	borderAlpha=".9" borderColor="#D2E1F0"
 	resizable="true"
-	title="Node Information"
+	title="Component Manager Information"
 	close="PopUpManager.removePopUp(this)">
 	
 	<mx:Script>
@@ -20,10 +20,10 @@
 			
 			public var main:pgmap;
 			
-			public function loadNode(n:PhysicalNode):void {
-				nodeInfo.load(n);
+			public function loadCm(cm:ComponentManager):void {
+				cmInfo.load(cm);
 			}
 		]]>
 	</mx:Script>
-	<PhysicalNodeAdvancedInformation height="100%" width="100%" verticalGap="0" paddingTop="0" paddingRight="0" paddingLeft="0" paddingBottom="0" horizontalGap="0" id="nodeInfo" />
+	<ComponentManagerAdvancedInformation height="100%" width="100%" verticalGap="0" paddingTop="0" paddingRight="0" paddingLeft="0" paddingBottom="0" horizontalGap="0" id="cmInfo" />
 </ResizeWindow>
