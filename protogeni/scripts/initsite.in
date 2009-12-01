@@ -111,8 +111,15 @@ if ($PGENIDOMAIN =~ /^unknown/i) {
 #
 # Check for (and update) an old (pre-URN) root certificate.
 #
-if( system( "$OPENSSL x509 -text -noout < $TB/etc/emulab.pem | " .
-	    "grep -q -i URI:urn:publicid:IDN" ) ) {
+system( "$OPENSSL x509 -text -noout < $TB/etc/emulab.pem | " .
+	"grep -q -i URI:urn:publicid:IDN" );
+if( $? == -1 ) {
+    die( "could not inspect root certificate $TB/etc/emulab.pem" );
+} elsif( $? & 0x7F ) {
+    die( "unexpected signal while inspecting root certificate" );
+} else if( $? ) {
+    # grep returned non-zero exit code (indicating no matches): this is
+    # an old certificate, so regenerate it.
     my $extfile = "/tmp/$$"; # not worth trying to be secure
     open( EXTFILE, "> $extfile" ) or die "can't open $extfile";
     print EXTFILE "subjectAltName=URI:urn:publicid:IDN+${OURDOMAIN}+authority+root\n";
