@@ -1079,35 +1079,15 @@ class Experiment
               </tr>\n";
 	}
 	if (!$short && ISADMIN() && $this->geniflags()) {
-	    $slice_hrn = null;
-	    $user_hrn  = null;
-
 	    $slice = GeniSlice::Lookup("geni-cm", $uuid);
 	    if ($slice) {
-		$slice_hrn     = $slice->hrn();
-		$slice_creator = GeniUser::Lookup("geni-cm",
-						  $slice->creator_uuid());
+		$slice_hrn = $slice->hrn();
+		$url = CreateURL("showslice", "slice_idx", $slice->idx(),
+				 "showtype", "cm");
 
-		if ($slice_creator) {
-		    $user_hrn = $slice_creator->hrn();
-		}
-		else {
-		    $user = User::LookupByUUID($slice->creator_uuid());
-		    if ($user) {
-			$user_hrn = $user->uid();
-		    }
-		}
-	    }
-	    if (! is_null($slice_hrn)) {
 		echo "<tr>
-                           <td>Geni Slice HRN: </td>
-                           <td class=\"left\">$slice_hrn</td>
-                      </tr>\n";
-	    }
-	    if (! is_null($user_hrn)) {
-		echo "<tr>
-                           <td>Geni User HRN: </td>
-                           <td class=\"left\">$user_hrn</td>
+                        <td>Geni Slice: </td>
+                        <td class=\"left\"><a href='$url'>$slice_hrn</a></td>
                       </tr>\n";
 	    }
 	}
