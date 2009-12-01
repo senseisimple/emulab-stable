@@ -1,0 +1,20 @@
+#
+# Support for sliver registration.
+#
+use strict;
+use GeniDB;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    DBSetDefault($dbhandle);
+
+    if (!DBSlotExists("geni_aggregates", "registered")) {
+	DBQueryFatal("alter table geni_aggregates add ".
+		     "`registered` datetime default NULL ".
+		     "after locked");
+    }
+    return 0;
+}
+1;
