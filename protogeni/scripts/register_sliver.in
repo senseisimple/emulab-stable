@@ -1,0 +1,103 @@
+#!/usr/bin/perl -w
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+
+#
+# Register slivers at their SAs
+# 
+sub usage()
+{
+    print "Usage: register_sliver [-d] [-u] slice_idx\n";
+    exit(1);
+}
+my $optlist    = "ndu";
+my $debug      = 1;
+my $impotent   = 0;
+my $unregister = 0;
+sub fatal($);
+
+#
+# Configure variables
+#
+my $TB		  = "@prefix@";
+my $TBOPS         = "@TBOPSEMAIL@";
+my $TBLOGS        = "@TBLOGSEMAIL@";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+#
+# Check args.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"n"})) {
+    $impotent = 1;
+}
+if (defined($options{"u"})) {
+    $unregister  = 1;
+}
+usage()
+    if (@ARGV != 1);
+
+use vars qw($GENI_DBNAME);
+$GENI_DBNAME = "geni-cm";
+
+# Now we can load the libraries after setting the proper DB.
+use lib '@prefix@/lib';
+use libtestbed;
+require GeniDB;
+require Genixmlrpc;
+require GeniCertificate;
+require GeniSlice;
+require GeniCM;
+
+my $slice = GeniSlice->Lookup($ARGV[0]);
+if (!defined($slice)) {
+    fatal("Could not find slice in the DB");
+}
+
+#
+# The RPC context for this script is as the SA
+#
+my $EMULAB_PEMFILE = "@prefix@/etc/genicm.pem";
+my $certificate  = GeniCertificate->LoadFromFile($EMULAB_PEMFILE);
+if (!defined($certificate)) {
+    fatal("Could not load certificate from $EMULAB_PEMFILE");
+}
+Genixmlrpc->SetContext(Genixmlrpc->Context($certificate));
+Genixmlrpc->SetTimeout(10);
+
+if ($slice->Lock() != 0) {
+    print STDERR "Could not lock slice $slice. Try again later.\n";
+    exit(0);
+}
+my $retval = ($unregister ?
+	      GeniCM::UnRegisterSliver($slice) :
+	      GeniCM::RegisterSliver($slice));
+$slice->UnLock();
+exit($retval);
+
+sub fatal($) {
+    my ($msg) = @_;
+
+    print STDERR "$msg\n";
+    exit(1);
+}
