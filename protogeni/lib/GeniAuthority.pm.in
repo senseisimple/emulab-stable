@@ -175,7 +175,8 @@ sub Create($$$$)
     # Delete from cache, since we use replace above. 
     delete($authorities{$certificate->uuid()});
 
-    return GeniAuthority->Lookup($certificate->URN());
+    return GeniAuthority->Lookup( defined( $certificate->urn() ) ?
+	$certificate->urn() : $certificate->uuid() );
 }
 # accessors
 sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'AUTHORITY'}->{$_[1]}); }
