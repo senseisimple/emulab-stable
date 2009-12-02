@@ -2630,7 +2630,7 @@ class experiment:
             "left join experiment_stats as s on s.exptidx=e.idx "
             "left join experiment_resources as r on r.idx=s.rsrcidx "
             "left join experiment_input_data as i on i.idx=r.input_data_idx "
-            "where pid=%s and eid=%s",
+            "where e.pid=%s and e.eid=%s",
             (argdict["proj"], argdict["exp"]))
 
         if len(dbres) == 0:
