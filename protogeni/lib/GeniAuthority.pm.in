@@ -77,6 +77,8 @@ sub Lookup($$)
 	$uuid = $token;
     }
     elsif ($token =~ /^P([\w]+)$/) {
+	# Only SAs are looked up this way.
+	# This will be flushed after URNs are fully pushed out.
 	return GeniAuthority->LookupByPrefix($1);
     }
     elsif ($token =~ /^[\w\.]*$/) {
@@ -164,10 +166,14 @@ sub Create($$$$)
 	return undef;
     }
 
-    # Insert into DB.
+    # Insert into DB. Use "replace" here since we reload the auth info
+    # periodically, and do not want to cause a race by deleting it. 
     return undef
 	if (!DBQueryWarn("replace into geni_authorities set " .
 			 join(",", @insert_data)));
+
+    # Delete from cache, since we use replace above. 
+    delete($authorities{$certificate->uuid()});
 
     return GeniAuthority->Lookup($certificate->URN());
 }
@@ -201,7 +207,7 @@ sub Delete($)
 		"where uuid='$uuid'")
 	or return -1;
 
-    # Delete fromcache. 
+    # Delete from cache. 
     delete($authorities{$uuid});
     return 0;
 }
@@ -246,7 +252,7 @@ sub CheckExisting($$$$)
 #
 sub CreateFromRegistry($$$)
 {
-    my ($class, $type, $uuid) = @_;
+    my ($class, $type, $name) = @_;
 
     my $clearinghouse = GeniRegistry::ClearingHouse->Create();
     return undef
@@ -254,7 +260,7 @@ sub CreateFromRegistry($$$)
 
     my $blob;
     return undef
-	if ($clearinghouse->Resolve($uuid, $type, \$blob) != 0);
+	if ($clearinghouse->Resolve($name, $type, \$blob) != 0);
 
     my $certificate = GeniCertificate->LoadFromString($blob->{'gid'});
     return undef
@@ -290,7 +296,9 @@ sub PrefixMatch($$)
 
 #
 # Find an authority by looking for the prefix. This will eventually go
-# away when we switch top chains.
+# away when we fully switch to URNs
+#
+# Note tha only SAs are looked up this way.
 #
 sub LookupByPrefix($$)
 {
@@ -310,7 +318,7 @@ sub LookupByPrefix($$)
     
     my $query_result =
 	DBQueryWarn("select uuid from geni_authorities ".
-		    "where uuid_prefix='$prefix'");
+		    "where uuid_prefix='$prefix' and type='sa'");
 
     return undef
 	if (! $query_result || !$query_result->numrows);
