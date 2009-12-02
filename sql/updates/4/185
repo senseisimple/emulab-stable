@@ -20,15 +20,17 @@ sub DoUpdate($$$)
 
     # Add the def_parentosid column so that OSes that can be subOSes will
     # always have a potential parent even if the user does not specify.
-    DBQueryFatal("ALTER TABLE os_info ADD COLUMN" . 
+    DBQueryFatal("ALTER TABLE os_info ADD COLUMN" .  
 		 " def_parentosid int(8) unsigned default NULL" . 
-		 " AFTER nextosid");
+		 " AFTER nextosid")
+	unless DBSlotExists( "os_info", "def_parentosid" );
 
     # Add a table that describes which (sub)osids can run on which osids.
     DBQueryFatal("CREATE TABLE os_submap (" . 
 		 "  osid int(8) unsigned NOT NULL default '0'," . 
 		 "  parent_osid int(8) unsigned NOT NULL default '0'," . 
-		 "  PRIMARY KEY (osid,parent_osid))");
+		 "  PRIMARY KEY (osid,parent_osid))")
+	unless DBTableExists( "os_submap" );
 
     # Add the parent_osname column since we currently have no handle for
     # virthosts in ns files, and we want to set both the subOS and parent
@@ -36,7 +38,8 @@ sub DoUpdate($$$)
     # handle virthosts explicitly defined in ns files.
     DBQueryFatal("ALTER TABLE virt_nodes ADD COLUMN" . 
 		 " parent_osname varchar(20) default NULL" . 
-		 " AFTER osname");
+		 " AFTER osname")
+	unless DBSlotExists( "virt_nodes", "parent_osname" );
 
     #
     # Add some database-fill stuff...
