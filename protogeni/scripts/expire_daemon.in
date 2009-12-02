@@ -23,7 +23,6 @@ sub usage()
 my $optlist   = "di";
 my $debug     = 0;
 my $idlecheck = 0;
-my $asch      = 0;
 
 #
 # Configure variables
@@ -34,9 +33,10 @@ my $TBLOGS        = "@TBLOGSEMAIL@";
 my $PGENIDOMAIN   = "@PROTOGENI_DOMAIN@";
 my $PGENISUPPORT  = @PROTOGENI_SUPPORT@;
 my $PGENICLRHOUSE = @PROTOGENI_CLEARINGHOUSE@;
-my $LOGFILE       = "$TB/log/geniexpire";
+my $LOGFILE       = "$TB/log/geniexpire.cm";
 my $IDLETIMES	  = "$TB/sbin/idletimes";
 my $EMULAB_PEMFILE = "$TB/etc/genicm.pem";
+my $REGISTER      = "$TB/sbin/protogeni/register_sliver";
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
@@ -77,8 +77,7 @@ if (defined($options{"i"})) {
 
 # Do this early so that we talk to the right DB.
 use vars qw($GENI_DBNAME);
-$GENI_DBNAME = ($asch ? "geni-ch" : "geni-cm");
-$LOGFILE    .= ($asch ? ".ch" : ".cm");
+$GENI_DBNAME = "geni-cm";
 
 # Load the Testbed support stuff.
 use lib "@prefix@/lib";
@@ -100,6 +99,8 @@ my $certificate = GeniCertificate->LoadFromFile($EMULAB_PEMFILE);
 if (!defined($certificate)) {
     fatal("Could not get uuid/urn from $EMULAB_PEMFILE\n");
 }
+Genixmlrpc->SetContext(Genixmlrpc->Context($certificate));
+Genixmlrpc->SetTimeout(10);
 $ENV{'MYUUID'} = $certificate->uuid();
 $ENV{'MYURN'} = "urn:publicid:IDN+@OURDOMAIN@+authority+cm";
 
@@ -260,6 +261,34 @@ sub ShutdownSlices()
 }
 
 #
+# Look for slices that need to be registered.
+#
+sub RegisterSlices()
+{
+    # Only toplevel aggregates. 
+    my $query_result =
+	GeniDB::DBQueryWarn("select idx from geni_aggregates ".
+			    "where type='Aggregate' and registered is null");
+
+    while (my ($idx) = $query_result->fetchrow_array()) {
+	my $aggregate = GeniAggregate->Lookup($idx);
+
+	if (!defined($aggregate)) {
+	    # aggregate is gone, lets not worry.
+	    next;
+	}
+	my $slice = $aggregate->GetSlice();
+	if (!defined($slice)) {
+	    # slice is gone, lets not worry.
+	    next;
+	}
+	# Run the register script. Ignore errors; we will retry again later.
+	print STDERR "Registering $slice ($aggregate)\n";
+	system("$REGISTER " . $slice->idx());
+    }
+}
+
+#
 # Setup a signal handler for newsyslog.
 #
 sub handler()
@@ -276,6 +305,7 @@ while (1) {
     ExpireTickets();
     ExpireSlices();
     ShutdownSlices();
+    RegisterSlices();
 
     # Be certain stale info is gone.
     Experiment->FlushAll();
