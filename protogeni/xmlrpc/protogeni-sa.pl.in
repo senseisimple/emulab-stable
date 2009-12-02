@@ -133,6 +133,8 @@ my $responder = Frontier::Responder->new( "methods" => {
     "GetKeys"	        => \&GeniSA::GetKeys,
     "BindToSlice"	=> \&GeniSA::BindToSlice,
     "Shutdown"          => \&GeniSA::Shutdown,
+    "RegisterSliver"    => \&GeniSA::RegisterSliver,
+    "UnRegisterSliver"  => \&GeniSA::UnRegisterSliver,
    },
 );
 
@@ -151,3 +153,22 @@ AddAuditInfo("cc", "protogeni-errors\@flux.utah.edu");
 LogEnd();
 
 print "Content-Type: text/xml \n\n" . $response;
+exit(0);
+
+#
+# Want to prevent bad exit.
+#
+END {
+    my $exitcode = $?;
+
+    if ($exitcode) {
+	LogEnd(0);
+
+	my $decoder = Frontier::RPC2->new();
+	print "Content-Type: text/xml \n\n";
+	print $decoder->encode_fault(-2, "XMLRPC Server Error");
+
+	# Since we converted to a normal error and sent the log message.
+	$? = 0;
+    }
+}

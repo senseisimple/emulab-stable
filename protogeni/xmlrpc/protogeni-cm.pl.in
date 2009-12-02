@@ -196,7 +196,7 @@ END {
 
 	my $decoder = Frontier::RPC2->new();
 	print "Content-Type: text/xml \n\n";
-	print $decoder->encode_fault(-1, "XMLRPC Server Error");
+	print $decoder->encode_fault(-2, "XMLRPC Server Error");
 
 	# Since we converted to a normal error and sent the log message.
 	$? = 0;

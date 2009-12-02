@@ -151,7 +151,7 @@ sub CallMethod($$$@)
 	return GeniResponse->new(GENIRESPONSE_RPCERROR, -1,
 				 "Must provide an rpc context");
     }
-    
+
     if (0) {
 	#
 	# This does not work. Not sure why, but need to figure it out
@@ -254,8 +254,8 @@ sub CallMethod($$$@)
     elsif ($goo->value()->is_fault() 
 	|| (ref($goo->value()) && UNIVERSAL::isa($goo->value(),"HASH") 
 	    && exists($goo->value()->{'faultCode'}))) {
-	$code   = $goo->value()->{"faultCode"}->value;
-	$value  = $code;
+	$code   = GENIRESPONSE_RPCERROR();
+	$value  = $goo->value()->{"faultCode"}->value;
 	$output = $goo->value()->{"faultString"}->value;
     }
     else {
@@ -264,9 +264,11 @@ sub CallMethod($$$@)
 	$output = $goo->value()->{'output'}->value;
     }
     if ($debug > 1 && $code) {
-	print STDERR "$code, $value, $output\n";
+	print STDERR "CallMethod: $method failed: $code";
+	print STDERR ", $output\n" if (defined($output) && $output ne "");
     }
     return GeniResponse->new($code, $value, $output);
+
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

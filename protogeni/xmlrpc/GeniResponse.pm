@@ -48,6 +48,27 @@ sub GENIRESPONSE_EXPIRED()        {15; }
 sub GENIRESPONSE_INPROGRESS()     {16; }
 sub GENIRESPONSE()		  { return $current_response; }
 
+my @GENIRESPONSE_STRINGS =
+    (
+     "Success",
+     "Bad Arguments",
+     "Error",
+     "Operation Forbidden",
+     "Bad Version",
+     "Server Error",
+     "Too Big",
+     "Operation Refused",
+     "Operation Times Out",
+     "Database Error",
+     "RPC Error",
+     "Unavailable",
+     "Search Failed",
+     "Operation Unsupported",
+     "Busy",
+     "Expired",
+     "In Progress",
+    );
+
 #
 # This is the (python-style) "structure" we want to return.
 #
@@ -58,6 +79,9 @@ sub GENIRESPONSE()		  { return $current_response; }
 #        self.output   = output          # Pithy output to print
 #        return
 #
+# For debugging, stash the method and arguments in case we want to
+# print things out.
+#
 sub new($$;$$)
 {
     my ($class, $code, $value, $output) = @_;
@@ -67,9 +91,9 @@ sub new($$;$$)
     $value = 0
 	if (!defined($value));
 
-    my $self = {"code"   => $code,
-		"value"  => $value,
-		"output" => $output};
+    my $self = {"code"      => $code,
+		"value"     => $value,
+		"output"    => $output};
     bless($self, $class);
     return $self;
 }
@@ -109,10 +133,29 @@ sub IsResponse($)
 sub IsError($)
 {
     my ($arg) = @_;
-    
+
+    if (ref($arg) eq "GeniResponse") {
+	return $arg->code() ne GENIRESPONSE_SUCCESS;
+    }
     return (ref($arg) eq "HASH" &&
 	    exists($arg->{'code'}) && exists($arg->{'value'}) &&
 	    $arg->{'code'} ne GENIRESPONSE_SUCCESS);
+}
+
+sub Dump($)
+{
+    my ($self) = @_;
+    
+    my $code   = $self->code();
+    my $value  = $self->value();
+    my $string = $GENIRESPONSE_STRINGS[$code] || "Unknown";
+    my $output;
+
+    $output = $self->output()
+	if (defined($self->output()) && $self->output() ne "");
+
+    return "code:$code ($string), value:$value" .
+	(defined($output) ? ", output:$output" : "");
 }
 
 #
@@ -122,10 +165,11 @@ sub Stringify($)
 {
     my ($self) = @_;
     
-    my $code  = $self->code();
-    my $value = $self->value();
+    my $code   = $self->code();
+    my $value  = $self->value();
+    my $string = $GENIRESPONSE_STRINGS[$code] || "Unknown";
 
-    return "[GeniResponse: code:$code, value:$value]";
+    return "[GeniResponse: code:$code ($string), value:$value]";
 }
 
 sub MalformedArgsResponse($;$)
