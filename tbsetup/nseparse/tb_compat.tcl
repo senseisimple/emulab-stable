@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -13,7 +13,7 @@ proc tb-set-ip-interface {src dst ip} {}
 proc tb-set-ip-link {src link ip} {}
 proc tb-set-ip-lan {src lan ip} {}
 proc tb-set-hardware {node type args} {}
-proc tb-set-node-os {node os} {}
+proc tb-set-node-os {node os {parentos 0}} {}
 proc tb-set-link-loss {src args} {}
 proc tb-set-lan-loss {lan rate} {}
 proc tb-set-node-rpms {node args} {}
