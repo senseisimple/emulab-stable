@@ -60,8 +60,12 @@ sub Lookup($$)
 	$query_result =
 	    DBQueryWarn("select uuid from geni_certificates ".
 			"where urn='$token'");
-	($uuid) = $query_result->fetchrow_array()
-	    if( $query_result && $query_result->numrows );
+
+	return undef
+	    if (! ($query_result && $query_result->numrows));
+	
+	($uuid) = $query_result->fetchrow_array();
+	
     }
     elsif ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
 	$uuid = $token;
