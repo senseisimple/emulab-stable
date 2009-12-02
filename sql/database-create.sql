@@ -2058,6 +2058,8 @@ CREATE TABLE `node_hostkeys` (
   `sshrsa_v1` mediumtext,
   `sshrsa_v2` mediumtext,
   `sshdsa_v2` mediumtext,
+  `tpmblob` mediumtext,
+  `tpmx509` mediumtext,
   `sfshostid` varchar(128) default NULL,
   PRIMARY KEY  (`node_id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;

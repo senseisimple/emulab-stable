@@ -23,7 +23,8 @@ SCRIPTS		= $(addprefix $(SRCDIR)/, \
 		    rc.syncserver rc.linkagent rc.mkelab rc.localize \
 		    rc.keys rc.trafgen rc.tarfiles rc.rpms rc.progagent \
 		    rc.startcmd rc.simulator rc.topomap rc.firewall \
-		    rc.tiptunnels rc.trace rc.motelog rc.fakejail)
+		    rc.tiptunnels rc.trace rc.motelog rc.fakejail \
+		    rc.tpmsetup)
 
 include $(OBJDIR)/Makeconf
 

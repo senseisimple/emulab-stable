@@ -34,6 +34,7 @@ use Exporter;
              TMCCCMD_PLABEVENTKEYS TMCCCMD_PORTREGISTER
 	     TMCCCMD_MOTELOG TMCCCMD_BOOTWHAT TMCCCMD_ROOTPSWD
 	     TMCCCMD_LTMAP TMCCCMD_LTPMAP TMCCCMD_TOPOMAP TMCCCMD_LOADINFO
+	     TMCCCMD_TPMBLOB TMCCCMD_TPMPUB 
 	     );
 
 # Must come after package declaration!
@@ -84,6 +85,7 @@ my $beproxy     = 0;
       "clrcache"        => 0,
       "noproxy"         => 0,
       "nossl"           => 0,
+      "usetpm"          => 0,
     );
 
 # The cache directory is named by the vnodeid. This avoids some confusion.
@@ -183,6 +185,8 @@ my %commandset =
       "topomap"	        => {TAG => "topomap"},
       "ltmap"	        => {TAG => "ltmap"},
       "ltpmap"	        => {TAG => "ltpmap"},
+      "tpmblob"      	=> {TAG => "tpmblob"},
+      "tpmpubkey"       => {TAG => "tpmpubkey"},
       "loadinfo"        => {TAG => "loadinfo"},
     );
 
@@ -247,6 +251,8 @@ sub TMCCCMD_ROOTPSWD()  { $commandset{"rootpswd"}->{TAG}; }
 sub TMCCCMD_TOPOMAP(){ $commandset{"topomap"}->{TAG}; }
 sub TMCCCMD_LTMAP()  { $commandset{"ltmap"}->{TAG}; }
 sub TMCCCMD_LTPMAP()  { $commandset{"ltpmap"}->{TAG}; }
+sub TMCCCMD_TPMBLOB()  { $commandset{"tpmblob"}->{TAG}; }
+sub TMCCCMD_TPMPUB()  { $commandset{"tpmpubkey"}->{TAG}; }
 sub TMCCCMD_LOADINFO()  { $commandset{"loadinfo"}->{TAG}; }
 
 #
@@ -283,6 +289,9 @@ sub optionstring($%)
     }
     if ($opthash{"nossl"}) {
 	$options .= " -i";
+    }
+    if ($opthash{"usetpm"}) {
+	$options .= " -T";
     }
     if ($opthash{"beproxy"}) {
 	$options .= " -x " . $opthash{"beproxy"};

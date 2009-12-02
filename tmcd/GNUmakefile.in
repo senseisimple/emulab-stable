@@ -35,6 +35,8 @@ CFLAGS	+= -DETCDIR='"$(INSTALL_ETCDIR)"'
 SSLFLAGS = -DWITHSSL 
 TMLIBS	+= -lssl -lcrypto
 SSLOBJ   = ssl.o
+TPMOBJ   = tpm.o
+NOTPM	 = notpm
 
 ifeq ($(SYSTEM),Linux)
 ifneq ($(LDSTATIC),)
@@ -104,9 +106,9 @@ ifeq ($(EVENTSYS),1)
 	ELVINFLAGS  = -lm -L/usr/local/lib -lpubsub 
 endif
 
-tmcd: tmcd.c ${TMCDLIBS} decls.h version.o $(SSLOBJ) $(BOOTINFO)
+tmcd: tmcd.c ${TMCDLIBS} decls.h version.o $(SSLOBJ) $(BOOTINFO) $(NOTPM)
 	$(CC) $(CFLAGS) $(SSLFLAGS) $(TMCDCFLAGS) -o tmcd $< \
-		version.o $(SSLOBJ) $(BOOTINFO) \
+		version.o $(SSLOBJ) $(TPMOBJ) $(BOOTINFO) \
 		$(LFLAGS) -L/usr/local/lib/mysql -lmysqlclient \
 		$(ELVINFLAGS) $(TMCDLDFLAGS) $(TMCDLIBS) $(TMLIBS) 
 
@@ -115,27 +117,29 @@ mod_tmcd.so: libtmcd.o
 		-L /usr/local/lib -lxml2 $(SSLOBJ) \
 		$(ELVINFLAGS) $(TMCDLDFLAGS) $(TMCDLIBS) $(TMLIBS) $<
 
-newtmcd: newtmcd.c libtmcd.o ${TMCDLIBS} decls.h version.o $(SSLOBJ) $(BOOTINFO)
+newtmcd: newtmcd.c libtmcd.o ${TMCDLIBS} decls.h version.o $(SSLOBJ) \
+	$(NOTPMOBJ) $(BOOTINFO)
 	$(CC) $(CFLAGS) $(SSLFLAGS) $(TMCDCFLAGS) -o tmcd $< \
-		libtmcd.o version.o $(SSLOBJ) $(BOOTINFO) \
+		libtmcd.o version.o $(SSLOBJ) $(TPMOBJ) $(BOOTINFO) \
 		$(LFLAGS) -L/usr/local/lib/mysql -lmysqlclient  -lxml2 \
 		$(ELVINFLAGS) $(TMCDLDFLAGS) $(TMCDLIBS) $(TMLIBS) 
 
 libtmcd.o: libtmcd.c ${TMCDLIBS} decls.h version.o $(SSLOBJ) $(BOOTINFO)
-	$(CC) $(CFLAGS) -I/usr/local/include/libxml2 $(SSLFLAGS) $(TMCDCFLAGS) -c -o libtmcd.o $<
+	$(CC) $(CFLAGS) -I/usr/local/include/libxml2 $(SSLFLAGS) \
+		$(TMCDCFLAGS) -c -o libtmcd.o $<
 
 libtmcd.so: libtmcd.o ${TMCDLIBS} decls.h $(BOOTINFO)
 	$(LD) -shared $^ -L/usr/local/lib/mysql -lxml2 -lmysqlclient \
 		$(TMCDLIBS) $(ELVINFLAGS) ../lib/libtb/libtb.a \
 		-o $@
 
-tmcc: tmcc.c decls.h $(SSLOBJ)
-	$(CC) $(CFLAGS) $(SSLFLAGS) $(LDSTATIC) -g -o tmcc $< $(SSLOBJ) \
-		$(LFLAGS) $(TMLIBS)
+tmcc: tmcc.c decls.h $(SSLOBJ) $(TPMOBJ) 
+	$(CC) $(CFLAGS) $(SSLFLAGS) $(LDSTATIC) -g -o tmcc \
+		$< $(SSLOBJ) $(TPMOBJ) $(LFLAGS) $(TMLIBS)
 
-tmcc-shared: tmcc.c decls.h $(SSLOBJ)
+tmcc-shared: tmcc.c decls.h $(SSLOBJ) $(TPMOBJ) 
 	$(CC) $(CFLAGS) $(SSLFLAGS) -g -o tmcc $< $(SSLOBJ) \
-		$(LFLAGS) $(TMLIBS)
+		$(TPMOBJ) $(LFLAGS) $(TMLIBS)
 
 tmcc-nossl-debug: tmcc.c decls.h
 	$(CC) $(CFLAGS) $(LDSTATIC) -g -o $@ $< $(LFLAGS) $(TMSLIBS)
@@ -147,6 +151,14 @@ dostype-debug: dostype.o
 	$(CC) $(CFLAGS) -g -o $@ dostype.o $(LFLAGS)
 
 ssl.o:	ssl.c ssl.h decls.h
+
+tpm.o:	tpm.c tpm.h
+	$(CC) -c $(CFLAGS) $(TESTBED_SRCDIR)/tmcd/tpm.c \
+		-I$(TESTBED_SRCDIR)/tmcd/
+
+notpm: tpm.c tpm.h
+	$(CC) -c $(CFLAGS) -DTPMOVERRIDE $(TESTBED_SRCDIR)/tmcd/tpm.c \
+		-I$(TESTBED_SRCDIR)/tmcd/
 
 version.c: tmcd.c
 	echo >$@ "char build_info[] = \"Built `date +%d-%b-%Y` by `id -nu`@`hostname | sed 's/\..*//'`:`pwd`\";"

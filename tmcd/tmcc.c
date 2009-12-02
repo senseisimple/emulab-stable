@@ -114,6 +114,7 @@ char *usagestr =
  " -o logfile      Specify log file name for -x option\n"
  " -f datafile     Extra stuff to send to tmcd (tcp mode only)\n"
  " -i              Do not use SSL protocol\n"
+ " -T              Use the TPM for SSL negotiation\n"
  "\n";
 
 void
@@ -171,7 +172,7 @@ main(int argc, char **argv)
         WSADATA wsaData;
 #endif
 
-	while ((ch = getopt(argc, argv, "v:s:p:un:t:k:x:X:l:do:if:")) != -1)
+	while ((ch = getopt(argc, argv, "v:s:p:un:t:k:x:X:l:do:if:T")) != -1)
 		switch(ch) {
 		case 'd':
 			debug++;
@@ -224,6 +225,9 @@ main(int argc, char **argv)
 			nousessl = 1;
 #endif
 			break;
+		case 'T':
+			usetpm = 1;
+			break;
 		default:
 			usage();
 		}
@@ -256,6 +260,17 @@ main(int argc, char **argv)
 			"You may not use the -k or -s with the -l option\n");
 		usage();
 	}
+	if (usetpm && nousessl) {
+		fprintf(stderr, "You cannot use -T and -i together\n");
+		usage();
+	}
+#ifndef	WITHSSL
+	if (usetpm) {
+		fprintf(stderr,
+		    "You used -T but compiled without WITHSSL.  Bailing!\n");
+		exit(1);
+	}
+#endif
 
 #ifndef _WIN32
 	if( (! unixpath) && (0==access("/etc/emulab/emulab-privkey", R_OK)) ) {

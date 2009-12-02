@@ -114,6 +114,7 @@ static int	checkprivkey(struct in_addr, char *);
 static void	tcpserver(int sock, int portnum);
 static void	udpserver(int sock, int portnum);
 static int      handle_request(int, struct sockaddr_in *, char *, int);
+static int      checkcerts(char*);
 static int	makesockets(int portnum, int *udpsockp, int *tcpsockp);
 int		client_writeback(int sock, void *buf, int len, int tcp);
 void		client_writeback_done(int sock, struct sockaddr_in *client);
@@ -279,6 +280,7 @@ COMMAND_PROTOTYPE(doportregister);
 COMMAND_PROTOTYPE(dobootwhat);
 COMMAND_PROTOTYPE(dotpmblob);
 COMMAND_PROTOTYPE(dotpmpubkey);
+COMMAND_PROTOTYPE(dotpmdummy);
 
 /*
  * The fullconfig slot determines what routines get called when pushing
@@ -300,6 +302,7 @@ COMMAND_PROTOTYPE(dotpmpubkey);
 #define F_ALLOCATED	0x08	/* node must be allocated to make call */
 #define F_REMNOSSL	0x10	/* remote nodes can request without SSL */
 #define F_REMREQSSL	0x20	/* remote nodes must connect with SSL */
+#define F_REQTPM	0x40	/* require TPM on client */
 
 struct command {
 	char	*cmdname;
@@ -377,6 +380,7 @@ struct command {
 	{ "bootwhat",	  FULLCONFIG_NONE, 0, dobootwhat },
 	{ "tpmblob",	  FULLCONFIG_ALL, 0, dotpmblob },
 	{ "tpmpubkey",	  FULLCONFIG_ALL, 0, dotpmpubkey },
+	{ "tpmdummy",	  FULLCONFIG_ALL, F_REQTPM, dotpmdummy },
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -1216,6 +1220,28 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	}
 
 	/*
+	 * Enforce TPM use with an iron fist!
+	 */
+	if ((command_array[i].flags & F_REQTPM)) {
+		if (!isssl) {
+			/* Should at least be TLS encrypted */
+			error("%s: %s: Invalid non-SSL/TPM request\n",
+			      reqp->nodeid, command_array[i].cmdname);
+			goto skipit;
+		}
+
+		/* 
+		 * Make sure they are using the TPM certificate that we have in
+		 * the database for this TLS sesion.
+		 */
+		if (checkcerts(reqp->nodeid)) {
+			error("%s: %s: TPM certificate mismatch\n",
+			      reqp->nodeid, command_array[i].cmdname);
+			goto skipit;
+		}
+	}
+
+	/*
 	 * Execute it.
 	 */
 	if ((command_array[i].flags & F_MAXLOG) != 0) {
@@ -1247,6 +1273,60 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 		     byteswritten);
 
 	return 0;
+}
+
+static int checkcerts(char *nid)
+{
+	MYSQL_RES	*res;
+	MYSQL_ROW	row;
+	int		nrows, ret;
+
+	X509		*local, *remote;
+
+	res = mydb_query("select tpmx509 "
+			"from node_hostkeys "
+			"where node_id='%s' ",
+			1, nid);
+
+	/* Treat errors as failure */
+	if (!res) {
+		error("Couldn't get tpmx509 from database for node %s\n", nid);
+		return 1;
+	}
+
+	nrows = mysql_num_rows(res);
+	if (!nrows) {
+		error("No tpmx509 in the database for node %s\n", nid);
+		mysql_free_result(res);
+		return 1;
+	}
+
+	row = mysql_fetch_row(res);
+
+	remote = tmcd_sslgetpeercert();
+	if (!remote) {
+		error("SSL_get_peer_certificate() returned NULL for node %s\n",
+		    nid);
+		mysql_free_result(res);
+		return 1;
+	}
+
+	local = tmcd_sslrowtocert(row[0], nid);
+	if (!local) {
+		error("Failure converting row to X509 for node %s\n",
+		    nid);
+		mysql_free_result(res);
+		X509_free(remote);
+		return 1;
+	}
+
+	ret = X509_cmp(local, remote);
+
+	mysql_free_result(res);
+	X509_free(local);
+	X509_free(remote);
+
+	return ret;
 }
 
 /*
@@ -7835,7 +7915,8 @@ COMMAND_PROTOTYPE(dotpmblob)
 	return 0;
 }
 
-COMMAND_PROTOTYPE(dotpmpubkey){
+COMMAND_PROTOTYPE(dotpmpubkey)
+{
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
 	int		nrows;
@@ -7845,13 +7926,13 @@ COMMAND_PROTOTYPE(dotpmpubkey){
 			"from node_hostkeys "
 			"where node_id='%s' ",
 			1, reqp->nodeid);
-	if (!res){
+	if (!res) {
 		error("gettpmpub: %s: DB error getting tpmx509\n",
 			reqp->nodeid);
 		return 1;
 	}
 	nrows = mysql_num_rows(res);
-	if (!nrows){
+	if (!nrows) {
 		error("%s: no tpmx509 in database for this node.\n",
 			reqp->nodeid);
 		mysql_free_result(res);
@@ -7867,3 +7948,14 @@ COMMAND_PROTOTYPE(dotpmpubkey){
 	return 0;
 }
 
+COMMAND_PROTOTYPE(dotpmdummy)
+{
+	char buf[MYBUFSIZE];
+
+	OUTPUT(buf, sizeof(buf),
+	    "You'd better be using the TPM, you twicky wabbit!\n");
+
+	client_writeback(sock, buf, strlen(buf), tcp);
+
+	return 0;
+}

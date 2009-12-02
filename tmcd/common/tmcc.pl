@@ -31,9 +31,10 @@ sub usage()
     print STDERR " -i   	Do not use SSL protocol\n";
     print STDERR " -c   	Clear tmcc cache first (must be root)\n";
     print STDERR " -D   	Force command to use a direct, UDP request\n";
+    print STDERR " -T   	Use TPM\n";
     exit(1);
 }
-my $optlist	= "ds:p:v:n:k:ul:t:x:X:o:bcDif:";
+my $optlist	= "ds:p:v:n:k:ul:t:x:X:o:bcDif:T";
 my $debug       = 0;
 my $CMD;
 my $ARGS;
@@ -91,6 +92,9 @@ sub ParseOptions()
     }
     if (defined($options{"i"})) {
         libtmcc::configtmcc("nossl", 1);
+    }
+    if (defined($options{"T"})) {
+        libtmcc::configtmcc("usetpm", 1);
     }
     if (defined($options{"c"})) {
 	if ($UID) {

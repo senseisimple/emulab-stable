@@ -27,10 +27,12 @@
 #include <string.h>
 #include <unistd.h>
 #include <netdb.h>
+#include <openssl/engine.h>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #include "decls.h"
 #include "ssl.h"
+#include "tpm.h"
 #ifndef STANDALONE
 #include "log.h"
 #include "config.h"
@@ -45,6 +47,8 @@
 #define EMULAB_CERTFILE		"emulab.pem"
 #define SERVER_CERTFILE		"server.pem"
 #define CLIENT_CERTFILE		"client.pem"
+#define TPM_CERTFILE		"tpm.cert"
+#define TPM_KEYFILE		"tpm.key"
 
 #ifdef linux
 #define EAUTH	EPERM
@@ -59,6 +63,11 @@ int	isssl;
  * Client side; optional use of SSL.
  */
 int	nousessl;
+
+/*
+ * Client side; use TPM for SSL
+ */
+int	usetpm;
 
 /*
  * On the client, we search a couple of dirs for the pem file.
@@ -100,7 +109,7 @@ tmcd_server_sslinit(void)
 	}
 
 	sprintf(buf, "%s/%s", ETCDIR, SERVER_CERTFILE);
-	
+
 	/*
 	 * Load our server key and certificate and then check it.
 	 */
@@ -163,14 +172,16 @@ tmcd_client_sslinit(void)
 	 */
 	cp = clientcertdirs;
 	while (*cp) {
-		sprintf(buf, "%s/%s", *cp, CLIENT_CERTFILE);
+		sprintf(buf, "%s/%s", *cp,
+		    (usetpm ? TPM_CERTFILE : CLIENT_CERTFILE));
 
 		if (access(buf, R_OK) == 0)
 			break;
 		cp++;
 	}
 	if (! *cp) {
-		error("Could not find a client certificate!\n");
+		error("Could not find a %s certificate!\n",
+		    (usetpm ? "TPM" : "client"));
 		return 1;
 	}
 
@@ -181,10 +192,31 @@ tmcd_client_sslinit(void)
 		tmcd_sslerror();
 		return 1;
 	}
-	
-	if (! SSL_CTX_use_PrivateKey_file(ctx, buf, SSL_FILETYPE_PEM)) {
-		tmcd_sslerror();
-		return 1;
+	if (usetpm) {
+		sprintf(buf, "%s/%s", *cp, TPM_KEYFILE);
+
+		if (tmcd_tpm_loadengine()) {
+			tmcd_sslerror();
+			return 1;
+		}
+		/*
+		 * Our key isn't in the same PEM as our cert
+		 * because our keyfile is a binary blob
+		 */
+		if (tmcd_tpm_getkey(buf)) {
+			tmcd_sslerror();
+			return 1;
+		}
+
+		if (SSL_CTX_use_PrivateKey(ctx, tpmk) != 1) {
+			tmcd_sslerror();
+			return 1;
+		}
+	} else {
+		if (! SSL_CTX_use_PrivateKey_file(ctx, buf, SSL_FILETYPE_PEM)) {
+			tmcd_sslerror();
+			return 1;
+		}
 	}
 	
 	if (SSL_CTX_check_private_key(ctx) != 1) {
@@ -381,7 +413,7 @@ tmcd_sslconnect(int sock, const struct sockaddr *name, socklen_t namelen)
 	 * a check?
 	 */
 	ipaddr = ((struct sockaddr_in *)name)->sin_addr;
-	
+
 	if (!(he = gethostbyname(cname))) {
 		error("Could not map %s: %s\n", cname, hstrerror(h_errno));
 		goto badauth;
@@ -535,7 +567,7 @@ tmcd_sslread(int sock, void *buf, size_t nbytes)
 	}
 
 	errno = 0;
-	if (isssl)
+	if (isssl)	/* Renegotiations? */
 		cc = SSL_read(ssl, buf, nbytes);
 	else
 		cc = read(sock, buf, nbytes);
@@ -566,6 +598,14 @@ tmcd_sslclose(int sock)
 			tmcd_sslprint("SSL_shutdown: ");
 			tmcd_sslerror();
 		}
+
+		/*
+		 * This is here for completeness only; the server cannot use
+		 * TPM right now or set 'usetpm' (we decided it was pointless
+		 * at the moment) and the tmcc never calls this function.
+		 */
+		if (usetpm)
+			tmcd_tpm_free();
 		SSL_free(ssl);
 		ssl = NULL;
 		ERR_clear_error();
@@ -573,6 +613,40 @@ tmcd_sslclose(int sock)
 	nosslbuflen = 0;
 	close(sock);
 	return 0;
+}
+
+/*
+ * Return the peer's cert.  Caller must free the returned X509 via X509_free().
+ */
+X509*
+tmcd_sslgetpeercert(void)
+{
+	return (SSL_get_peer_certificate(ssl));
+}
+
+/*
+ * Take a row from the database (like TPM public key) and turn it into an X509.
+ * Caller must free the returned X509 via X509_free().
+ */
+X509*
+tmcd_sslrowtocert(char *in, char *nid)
+{
+	BIO *b;
+	X509 *local;
+
+	if (in == NULL)
+		return NULL;
+
+	b = BIO_new_mem_buf(in, -1);
+	local = PEM_read_bio_X509(b, NULL, NULL, NULL);
+	BIO_free(b);
+
+	if (!local) {
+		error("Error reading PEM from bio for node %s\n", nid);
+		return NULL;
+	}
+
+	return local;
 }
 
 /*
