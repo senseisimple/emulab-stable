@@ -2150,6 +2150,7 @@ sub SliverWorkAux($$$$$$$)
     }
     $ticket->Redeem()
 	if (defined($ticket));
+    $aggregate->SetRegistered(0);
     $slice->UnLock();
     return GeniResponse->Create(GENIRESPONSE_SUCCESS, $manifest);
 
@@ -2293,7 +2294,7 @@ sub RenewSliverAux($$)
     #
     my $diff = $when - time();
 
-    print STDERR "RenewSliver: $expires, $when, $diff\n";
+#    print STDERR "RenewSliver: $expires, $when, $diff\n";
     
     if ($diff < (60 * 5) || $diff > (3600 * 24 * 100)) {
 	$message = "valid_until out of range";
@@ -3534,14 +3535,9 @@ sub CreateSliceFromCertificate($)
     my $certificate = $credential->target_cert();
     my $owner_uuid  = $credential->owner_uuid();
 
-    my $authority = GeniAuthority->LookupByPrefix($certificate->uuid());
-    if (!defined($authority)) {
-	$authority = CreateAuthorityFromRegistry($certificate->uuid());
-	if (!defined($authority)) {
-	    print STDERR "Could not create new authority record\n";
-	    return undef;
-	}
-    }
+    my $authority = CreateAuthorityFromRegistry($certificate);
+    return undef    
+	if (!defined($authority));
 
     #
     # The problem with HRNs is that people will tend to reuse them.
@@ -3591,14 +3587,9 @@ sub CreateUserFromCertificate($)
 	return $geniuser;
     }
 
-    my $authority = GeniAuthority->LookupByPrefix($certificate->uuid());
-    if (!defined($authority)) {
-	$authority = CreateAuthorityFromRegistry($certificate->uuid());
-	if (!defined($authority)) {
-	    print STDERR "Could not create new authority record\n";
-	    return undef;
-	}
-    }
+    my $authority = CreateAuthorityFromRegistry($certificate);
+    return undef    
+	if (!defined($authority));
 
     return GeniUser->Create($certificate, $authority);
 }
@@ -3608,29 +3599,107 @@ sub CreateUserFromCertificate($)
 #
 sub CreateAuthorityFromRegistry($)
 {
-    my ($uuid) = @_;
+    my ($certificate) = @_;
 
-    my ($prefix) = ($uuid =~ /^\w+\-\w+\-\w+\-\w+\-(\w+)$/);
-
-    my $clearinghouse = GeniRegistry::ClearingHouse->Create();
-    return undef
-	if (!defined($clearinghouse));
-
-    my $blob;
-    return undef
-	if ($clearinghouse->Resolve("P${prefix}", "SA", \$blob) != 0);
-
-    my $certificate = GeniCertificate->LoadFromString($blob->{'gid'});
-    return undef
-	if (!defined($certificate));
-
-    my $authority = GeniAuthority->Create($certificate,
-					  $blob->{'url'},
-					  $blob->{'type'});
-    $certificate->Delete()
-	if (!defined($authority));
-
+    # This prefix stuff will go away when fully converted to urns.
+    my ($prefix) = ($certificate->uuid() =~ /^\w+\-\w+\-\w+\-\w+\-(\w+)$/);
+    
+    my $authority = GeniAuthority->LookupByPrefix($certificate->uuid());
+    if (!defined($authority)) {
+	$authority = GeniAuthority->CreateFromRegistry("SA", "P${prefix}");
+	if (!defined($authority)) {
+	    print STDERR "Could not create authority from registry\n";
+	    return undef;
+	}
+    }
+    else {
+	#
+	# Check for an out of date record; the certificate has a urn
+	# but the local authority object does not.
+	#
+	if (defined($certificate->urn()) &&
+	    GeniHRN::IsValid($certificate->urn()) &&
+	    (!defined($authority->urn()) || $authority->urn() eq "")) {
+	    print STDERR "Reloading authority for prefix $prefix\n";
+	    $authority = GeniAuthority->CreateFromRegistry("SA", "P${prefix}");
+	    if (!defined($authority)) {
+		print STDERR "Could not recreate authority from registry\n";
+		return undef;
+	    }
+	    if (!defined($authority->urn()) || $authority->urn() eq "") {
+		print STDERR "Missing URN in authority $authority\n";
+		return undef;
+	    }
+	}
+    }
     return $authority;
+}
+
+#
+# Register/Unregister a local sliver at its slice authority.
+#
+sub RegisterSliver($)
+{
+    my ($slice) = @_;
+
+    return RegisterAux($slice, 0);
+}
+sub UnRegisterSliver($)
+{
+    my ($slice) = @_;
+
+    return RegisterAux($slice, 1);
+}
+sub RegisterAux($$)
+{
+    my ($slice, $unregister) = @_;
+
+    my $authority = $slice->SliceAuthority();
+    if (!defined($authority)) {
+	$authority =
+	    GeniAuthority->CreateFromRegistry("SA", $slice->sa_uuid());
+	if (!defined($authority)) {
+	    print STDERR "Could not find authority for $slice\n";
+	    return -1;
+	}
+    }
+    my $credential = GeniRegistry::Client->CreateCredential($authority);
+    if (!defined($authority)) {
+	print STDERR "Could not create a credential for $authority\n";
+	return -1;
+    }
+    my $registry = GeniRegistry::Client->Create($authority, undef,$credential);
+    if (!defined($registry)) {
+	print STDERR "Could not create a registry client for $authority\n";
+	return -1;
+    }
+    if ($unregister) {
+	$registry->UnRegisterSliver($slice->urn());
+    }
+    else {
+	my $aggregate = GeniAggregate->SliceAggregate($slice);
+	if (!defined($aggregate)) {
+	    print STDERR "Could not find aggregate for $slice\n";
+	    return -1;
+	}
+	my $creator = $aggregate->GetCreator();
+	if (!defined($creator)) {
+	    print STDERR "Could not find creator for $slice\n";
+	    return -1;
+	}
+	my $blob = {
+	    "urn"           => $aggregate->urn(),
+	    "creator_urn"   => $creator->urn(),
+	    "created"       => $slice->created(),
+	    "expires"       => $slice->expires(),
+	    "manifest"      => $aggregate->GetManifest(1),
+	};
+
+	if ($registry->RegisterSliver($slice->urn(), $blob) == 0) {
+	    $aggregate->SetRegistered(1);
+	}
+    }
+    return 0;
 }
 
 #
@@ -3669,6 +3738,11 @@ sub CleanupDeadSlice($;$)
 		return -1;
 	    }
 	}
+    }
+    my $topaggregate = GeniAggregate->SliceAggregate($slice);
+    if (defined($topaggregate) && $topaggregate->registered()) {
+	# Unregister the slice at the SA.
+	UnRegisterSliver($slice);
     }
 
     #

@@ -257,6 +257,174 @@ sub Stringify($)
 
 ##########################################################################
 #
+package GeniRegistry::ClientSliver;
+
+use GeniDB;
+use GeniSlice;
+use GeniHRN;
+use emutil qw(TBGetUniqueIndex);
+use English;
+use Data::Dumper;
+use overload ('""' => 'Stringify');
+
+#
+# Lookup.
+#
+sub Lookup($$)
+{
+    my ($class, $token) = @_;
+    my $query_result;
+    my $idx;
+
+    if( GeniHRN::IsValid( $token ) ) {
+	return undef if !GeniHRN::Authoritative($token, "@OURDOMAIN@");
+
+	my ($authority, $type, $id) = GeniHRN::Parse($token);
+	return undef if $type ne "sliver";
+	
+	$query_result = 
+	    DBQueryWarn("select idx from client_slivers ".
+			"where urn='$token'");
+	return undef
+	    if (! $query_result || !$query_result->numrows);
+
+	($idx) = $query_result->fetchrow_array();
+    }
+    elsif ($token =~ /^\d+$/) {
+	$idx = $token;
+    }
+    else {
+	return undef;
+    }
+
+    $query_result =
+	DBQueryWarn("select * from client_slivers where idx='$idx'");
+    return undef
+	if (!$query_result || !$query_result->numrows);
+
+    my $self         = {};
+    $self->{'SLIVER'} = $query_result->fetchrow_hashref();
+    bless($self, $class);
+
+    #
+    # Grab the slice, since we will probably want it.
+    #
+    my $slice = GeniSlice->Lookup($self->slice_idx());
+    if (!defined($slice)) {
+	print STDERR "Could not find slice for slice $idx\n";
+	return undef;
+    }
+    return $self;
+}
+# accessors
+sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'SLIVER'}->{$_[1]}); }
+sub idx($)		{ return field($_[0], "idx"); }
+sub urn($)		{ return field($_[0], "urn"); }
+sub manager_urn($)	{ return field($_[0], "manager_urn"); }
+sub slice_idx($)	{ return field($_[0], "slice_idx"); }
+sub creator_idx($)	{ return field($_[0], "creator_idx"); }
+sub created($)		{ return field($_[0], "created"); }
+sub expires($)		{ return field($_[0], "expires"); }
+sub manifest($)		{ return field($_[0], "manifest"); }
+sub LOCKED($)           { return $_[0]->{'LOCKED'}; }
+
+sub LookupByAuthority($$$)
+{
+    my ($class, $slice, $urn) = @_;
+    my $slice_idx = $slice->idx();
+    my $query_result;
+    my $idx;
+
+    if (GeniHRN::IsValid($urn)) {
+	my $safe_urn = DBQuoteSpecial($urn);
+
+	$query_result = 
+	    DBQueryWarn("select idx from client_slivers ".
+			"where manager_urn=$safe_urn and ".
+			"slice_idx='$slice_idx'");
+	return undef
+	    if (! $query_result || !$query_result->numrows);
+
+	($idx) = $query_result->fetchrow_array();
+    }
+    else {
+	return undef;
+    }
+    return GeniRegistry::ClientSliver->Lookup($idx);
+}
+
+#
+# Class function to create new Geni slice and return the object.
+#
+sub Create($$$$$)
+{
+    my ($class, $slice, $manager_urn, $user, $blob) = @_;
+    my @insert_data = ();
+
+    # Every one gets a new unique index.
+    my $idx = TBGetUniqueIndex('next_clientsliver', 1);
+    
+    my $slice_idx      = $slice->idx();
+    my $user_idx       = $user->idx();
+    my $safe_urn       = DBQuoteSpecial($blob->{'urn'});
+    my $safe_created   = DBQuoteSpecial($blob->{'created'});
+    my $safe_expires   = DBQuoteSpecial($blob->{'expires'});
+    my $safe_manager   = DBQuoteSpecial($manager_urn);
+
+    push(@insert_data, "idx='$idx'");
+    push(@insert_data, "slice_idx='$slice_idx'");
+    push(@insert_data, "creator_idx='$user_idx'");
+    push(@insert_data, "urn=$safe_urn");
+    push(@insert_data, "manager_urn=$safe_manager");
+    push(@insert_data, "created=$safe_created");
+    push(@insert_data, "expires=$safe_expires");
+
+    if (exists($blob->{'manifest'})) {
+	my $safe_manifest  = DBQuoteSpecial($blob->{'manifest'});
+	push(@insert_data, "manifest=$safe_manifest");
+    }
+
+    # Insert into DB.
+    return undef
+	if (! DBQueryWarn("insert into client_slivers set " .
+			  join(",", @insert_data)));
+
+    return GeniRegistry::ClientSliver->Lookup($idx);
+}
+
+#
+# Delete it.
+#
+sub Delete($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $idx  = $self->idx();
+
+    DBQueryWarn("delete from client_slivers where idx='$idx'")
+	or return -1;
+    
+    return 0;
+}
+
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+    
+    my $urn = $self->urn();
+    my $idx = $self->idx();
+
+    return "[ClientSliver: $idx, $urn]";
+}
+
+##########################################################################
+#
 package GeniRegistry::Client;
 
 use Genixmlrpc;
@@ -354,7 +522,13 @@ sub Resolve($$$$)
 				 "type"       => $type,
 				 $which       => $token });
     return -1
-	if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS);
+	if (!defined($response));
+
+    if ($response->IsError()) {
+	print STDERR "Resolve: " . $response->Dump() . "\n"
+	    if ($response->code() != GENIRESPONSE_SEARCHFAILED());
+	return -1;
+    }
     
     $$pref = $response->value();
     return 0;
@@ -398,12 +572,13 @@ sub Register($$$$)
 			         "gid"        => $cert,
 			         "info"       => $info });
 
-    if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS) {
-	print STDERR "Could not register object: " .
-	    $response->output() . "\n";
+    return -1
+	if (!defined($response));
+
+    if ($response->IsError()) {
+	print STDERR "Register: " . $response->Dump() . "\n";
 	return -1;
     }
-    
     return 0;
 }
 
@@ -448,8 +623,13 @@ sub Remove($$$)
 				 "type"       => $type,
 			         "uuid"       => $uuid });
     return -1
-	if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS);
-    
+	if (!defined($response));
+
+    if ($response->IsError()) {
+	print STDERR "Remove: " . $response->Dump() . "\n"
+	    if ($response->code() != GENIRESPONSE_SEARCHFAILED());
+	return -1;
+    }
     return 0;
 }
 
@@ -478,8 +658,12 @@ sub Shutdown($$$)
 				 "clear"      => $clear,
 			         "uuid"       => $uuid });
     return -1
-	if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS);
-    
+	if (!defined($response));
+
+    if ($response->IsError()) {
+	print STDERR "Shutdown: " . $response->Dump() . "\n";
+	return -1;
+    }
     return 0;
 }
 
@@ -499,9 +683,10 @@ sub ListComponents($$$)
     return -1
 	if (!defined($response));
 
-    return -1
-	if ($response->code() != GENIRESPONSE_SUCCESS);
-
+    if ($response->IsError()) {
+	print STDERR "ListComponents: " . $response->Dump() . "\n";
+	return -1;
+    }
     $$pref = $response->value();
     return 0;
 }
@@ -520,8 +705,59 @@ sub PostCRL($$)
 			       { "credential" => $self->credential(),
 			         "cert"       => $cert });
     return -1
-	if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS);
-    
+	if (!defined($response));
+
+    if ($response->IsError()) {
+	print STDERR "PostCRL: " . $response->Dump() . "\n";
+	return -1;
+    }
+    return 0;
+}
+
+#
+# Register a sliver at an SA
+#
+sub RegisterSliver($$$)
+{
+    my ($self, $slice_urn, $info) = @_;
+
+    my $response =
+	Genixmlrpc::CallMethod($self->authority(),
+			       $self->context(),
+			       "RegisterSliver",
+			       { "credential" => $self->credential(),
+			         "slice_urn"  => $slice_urn,
+			         "info"       => $info });
+    return -1
+	if (!defined($response));
+
+    if ($response->IsError()) {
+	print STDERR "RegisterSliver: " . $response->Dump() . "\n";
+	return -1;
+    }
+    return 0;
+}
+
+#
+# UnRegister a sliver at an SA
+#
+sub UnRegisterSliver($$)
+{
+    my ($self, $slice_urn) = @_;
+
+    my $response =
+	Genixmlrpc::CallMethod($self->authority(),
+			       $self->context(),
+			       "UnRegisterSliver",
+			       { "credential" => $self->credential(),
+			         "slice_urn"  => $slice_urn });
+    return -1
+	if (!defined($response));
+
+    if ($response->IsError()) {
+	print STDERR "UnRegisterSliver: " . $response->Dump() . "\n";
+	return -1;
+    }
     return 0;
 }
 

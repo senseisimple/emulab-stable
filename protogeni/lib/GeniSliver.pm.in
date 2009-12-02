@@ -235,6 +235,7 @@ sub nickname($)		{ return field($_[0], "nickname"); }
 sub slice_uuid($)	{ return field($_[0], "slice_uuid"); }
 sub creator_uuid($)	{ return field($_[0], "creator_uuid"); }
 sub created($)		{ return field($_[0], "created"); }
+sub registered($)	{ return field($_[0], "registered"); }
 sub credential_idx($)	{ return field($_[0], "credential_idx"); }
 sub resource_uuid($)	{ return field($_[0], "resource_uuid"); }
 sub resource_id($)	{ return field($_[0], "resource_id"); }
@@ -763,7 +764,6 @@ sub Provision($;$)
 	    return -1;
 	}
     }
-    $self->SetStatus("ready");
     return 0;
 }
 
@@ -1058,6 +1058,14 @@ sub ComputeStatus($$)
     return -1
 	if (! ref($self));
 
+    #
+    # If the sliver is "broken" then call it failed.
+    #
+    if ($self->status() eq "broken") {
+	$$pref = "failed";
+	return 0;
+    }
+
     my $uuid = $self->uuid();
     return -1
 	if (!defined($uuid));
@@ -1071,6 +1079,9 @@ sub ComputeStatus($$)
 	print STDERR "$node was already released from $self\n";
 	return -1;
     }
+    #
+    # Emulab does not return "unknown" ... we always know ...
+    #
     my $eventstate = $node->eventstate();
     if ($eventstate eq TBDB_NODESTATE_ISUP()) {
 	$status = "ready";
@@ -1078,8 +1089,11 @@ sub ComputeStatus($$)
     elsif ($eventstate eq TBDB_NODESTATE_TBFAILED()) {
 	$status = "failed";
     }
-    else {
+    elsif ($eventstate eq TBDB_NODESTATE_SHUTDOWN()) {
 	$status = "notready";
+    }
+    else {
+	$status = "changing";
     }
     $self->SetStatus($status);
     $$pref = $status;

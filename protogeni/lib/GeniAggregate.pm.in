@@ -24,6 +24,7 @@ use GeniSliver;
 use GeniSlice;
 use GeniRegistry;
 use GeniUtil;
+use GeniUser;
 use GeniHRN;
 use emutil;
 use Lan;
@@ -138,9 +139,10 @@ sub Stringify($)
     my ($self) = @_;
     
     my $uuid = $self->uuid();
+    my $hrn  = $self->hrn();
     my $idx  = $self->idx();
 
-    return "[GeniAggregate: $uuid, IDX: $idx]";
+    return "[GeniAggregate: $hrn, IDX: $idx]";
 }
 
 #
@@ -205,6 +207,7 @@ sub type($)		{ return field($_[0], "type"); }
 sub slice_uuid($)	{ return field($_[0], "slice_uuid"); }
 sub creator_uuid($)	{ return field($_[0], "creator_uuid"); }
 sub created($)		{ return field($_[0], "created"); }
+sub registered($)	{ return field($_[0], "registered"); }
 sub credential_idx($)	{ return field($_[0], "credential_idx"); }
 sub aggregate_idx($)	{ return field($_[0], "aggregate_idx"); }
 sub status($)		{ return field($_[0], "status"); }
@@ -510,6 +513,27 @@ sub SetState($$)
 }
 
 #
+# Set the registered datetime for the aggregate
+#
+sub SetRegistered($$)
+{
+    my ($self, $yesno) = @_;
+
+    return undef
+	if (! ref($self));
+
+    my $idx = $self->idx();
+    my $val = ($yesno ? "now()" : "NULL");
+    
+    return -1
+	if (!DBQueryWarn("update geni_aggregates set ".
+			 "  registered=$val ".
+			 "where idx='$idx'"));
+    
+    return 0;
+}
+
+#
 # Get the slice for the aggregate.
 #
 sub GetSlice($)
@@ -532,6 +556,23 @@ sub GetSlice($)
     }
     $self->{'SLICE'} = $slice;
     return $slice;
+}
+
+#
+# Get the creator for the aggregate.
+#
+sub GetCreator($)
+{
+    my ($self) = @_;
+
+    return undef
+	if (! ref($self));
+
+    if (!defined($self->creator_uuid())) {
+	print STDERR "No creator associated with $self\n";
+	return undef;
+    }
+    return GeniUser->Lookup($self->creator_uuid(), 1);
 }
 
 #
@@ -981,6 +1022,10 @@ sub ComputeState($)
     my $started = 0;
     my $stopped = 0;
     my $unknown = 0;
+    my $ready   = 0;
+    my $notready= 0;
+    my $failed  = 0;
+    my $changing= 0;
     my $count   = 0;
 
     return -1
@@ -1018,6 +1063,19 @@ sub ComputeState($)
 	else {
 	    $unknown++;
 	}
+	if ($status eq "ready") {
+	    $ready++;
+	}
+	elsif ($status eq "notready") {
+	    $notready++;
+	}
+	elsif ($status eq "failed" ||
+	       $status eq "broken") {
+	    $failed++;
+	}
+	elsif ($status eq "changing") {
+	    $changing++;
+	}
 	$count++;
     }
     if ($stopped == $count) {
@@ -1028,6 +1086,21 @@ sub ComputeState($)
     }
     else {
 	$self->SetState("mixed");
+    }
+    if ($ready == $count) {
+	$self->SetStatus("ready");
+    }
+    elsif ($notready == $count) {
+	$self->SetStatus("notready");
+    }
+    elsif ($changing == $count) {
+	$self->SetStatus("changing");
+    }
+    elsif ($failed) {
+	$self->SetStatus("failed");
+    }
+    else {
+	$self->SetStatus("mixed");
     }
     return 0;
 }

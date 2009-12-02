@@ -866,5 +866,161 @@ sub Shutdown($)
     return GeniResponse->Create(GENIRESPONSE_SUCCESS);
 }
 
+#
+# Register a sliver.
+#
+sub RegisterSliver($)
+{
+    my ($argref) = @_;
+    my $credstr  = $argref->{'credential'};
+    my $slice_urn= $argref->{'slice_urn'};
+    my $blob     = $argref->{'info'};
+
+    if (! (defined($blob) && defined($slice_urn) && defined($credstr))) {
+	return GeniResponse->MalformedArgsResponse("Missing Arguments");
+    }
+    if (!GeniHRN::IsValid($slice_urn)) {
+	return GeniResponse->MalformedArgsResponse("Bad URN");
+    }
+    my $credential = GeniCredential->CreateFromSigned($credstr);
+    if (!defined($credential)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not create GeniCredential object");
+    }
+
+    #
+    # Make sure the credential was issued to the caller.
+    #
+    if ($credential->owner_uuid() ne $ENV{'GENIUUID'}) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "This is not your credential!");
+    }
+    #
+    # And that the target of the credential is this registry.
+    #
+    my $authority = GeniAuthority->Lookup($ENV{'MYUUID'});
+    if (!defined($authority)) {
+	print STDERR "Could not find local authority object\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
+    }
+    if ($credential->target_uuid() ne $authority->uuid()) {
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN,
+				    undef, "This is not your registry!");
+    }
+
+    $credential->HasPrivilege( "authority" ) or
+	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
+				     "Insufficient privilege" );
+
+    my $slice = GeniSlice->Lookup($slice_urn);
+    if (!defined($slice)) {
+	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
+				    "No such slice here");
+    }
+    # The user is embedded in the blob.
+    if (!exists($blob->{'creator_urn'})) {
+	return GeniResponse->MalformedArgsResponse("Please tell me creator");
+    }
+    my $user = GeniUser->Lookup($blob->{'creator_urn'}, 1);
+    if (!defined($user)) {
+	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
+				    "No such user here");
+    }
+    if (!exists($blob->{'urn'})) {
+	return GeniResponse->MalformedArgsResponse("Please tell me the urn");
+    }
+    my $manager_urn = $credential->owner_cert()->urn();
+    if (!defined($manager_urn)) {
+	print STDERR "No URN in $credential\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
+    }
+        
+    #
+    # See if one already exists; overwrite it.
+    #
+    my $clientsliver =
+	GeniRegistry::ClientSliver->LookupByAuthority($slice, $manager_urn);
+    $clientsliver->Delete()
+	if (defined($clientsliver));
+    
+    $clientsliver =
+	GeniRegistry::ClientSliver->Create($slice, $manager_urn, $user, $blob);
+    if (!defined($clientsliver)) {
+	print STDERR "Could not register sliver for $slice_urn\n";
+	print STDERR Dumper($blob);
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
+    }
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS);
+}
+
+#
+# UnRegister a sliver.
+#
+sub UnRegisterSliver($)
+{
+    my ($argref) = @_;
+    my $credstr  = $argref->{'credential'};
+    my $slice_urn= $argref->{'slice_urn'};
+
+    if (! (defined($slice_urn) && defined($credstr))) {
+	return GeniResponse->MalformedArgsResponse("Missing Arguments");
+    }
+    if (!GeniHRN::IsValid($slice_urn)) {
+	return GeniResponse->MalformedArgsResponse("Bad URN");
+    }
+    my $credential = GeniCredential->CreateFromSigned($credstr);
+    if (!defined($credential)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not create GeniCredential object");
+    }
+
+    #
+    # Make sure the credential was issued to the caller.
+    #
+    if ($credential->owner_uuid() ne $ENV{'GENIUUID'}) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "This is not your credential!");
+    }
+    #
+    # And that the target of the credential is this registry.
+    #
+    my $authority = GeniAuthority->Lookup($ENV{'MYUUID'});
+    if (!defined($authority)) {
+	print STDERR "Could not find local authority object\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
+    }
+    if ($credential->target_uuid() ne $authority->uuid()) {
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN,
+				    undef, "This is not your registry!");
+    }
+
+    $credential->HasPrivilege( "authority" ) or
+	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
+				     "Insufficient privilege" );
+
+    my $slice = GeniSlice->Lookup($slice_urn);
+    if (!defined($slice)) {
+	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
+				    "No such slice here");
+    }
+
+    my $manager_urn = $credential->owner_cert()->urn();
+    if (!defined($manager_urn)) {
+	print STDERR "No URN in $credential\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
+    }
+        
+    #
+    # See if one already exists; overwrite it.
+    #
+    my $clientsliver =
+	GeniRegistry::ClientSliver->LookupByAuthority($slice, $manager_urn);
+
+    $clientsliver->Delete()
+	if (defined($clientsliver));
+    
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS);
+}
+
 # _Always_ make sure that this 1 is at the end of the file...
 1;

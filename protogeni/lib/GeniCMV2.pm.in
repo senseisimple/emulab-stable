@@ -479,7 +479,7 @@ sub DeleteSlice($)
     if ($slice->Lock() != 0) {
 	return GeniResponse->BusyResponse();
     }
-    if (GeniCM::CleanupDeadSlice($slice) != 0) {
+    if (GeniCM::CleanupDeadSlice($slice, 1) != 0) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not cleanup slice");
     }
@@ -670,6 +670,12 @@ sub SliverAction($$$$)
 	#
 	foreach my $urn (@{ $sliver_urns }) {
 	    my $sliver = GeniSliver->Lookup($urn);
+	    if (!defined($sliver)) {
+		$response = GeniResponse->Create(GENIRESPONSE_SEARCHFAILED,
+						 undef,
+						 "Nothing here by that name");
+		goto bad;
+	    }
 	    
 	    $response = &$CheckState($sliver, $action);
 	    goto bad
@@ -748,7 +754,7 @@ sub SliverStatus($)
 
     my $blob = {
 	"state"   => $aggregate->state(),
-	"status"  => "ready",
+	"status"  => $aggregate->status(),
 	"details" => {},
     };
     
@@ -760,19 +766,12 @@ sub SliverStatus($)
 
 	my $sliver_urn    = $sliver->sliver_urn();
 	my $component_urn = $sliver->component_urn();
-	my $state  = $sliver->state();
-	my $status = $sliver->status();
-	my $error  = "";
+	my $state         = $sliver->state();
+	my $status        = $sliver->status();
+	my $error         = "";
 
 	if ($status eq "failed") {
-	    $blob->{'status'} = "failed";
 	    $error = $sliver->ErrorLog();
-	}
-	elsif ($status eq "notready") {
-	    $status = "notready";
-	    # Set to notready unless something already failed. 
-	    $blob->{'status'} = "notready"
-		if ($blob->{'status'} ne "failed");
 	}
 	$blob->{'details'}->{$sliver_urn} = {
 	    "component_urn" => $component_urn,

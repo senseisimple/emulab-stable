@@ -206,6 +206,26 @@ sub Stringify($)
     return "[GeniUser: $hrn, IDX: $idx]";
 }
 
+# Return the URN.
+#
+# Return the URN. This is complicated by the fact that the DB does
+# not store the urn, but is in the certificate. Further, it might
+# be a slice from an SA not doing URNs yet, in which case set it to
+# the uuid and hope for the best.
+#
+sub urn($)
+{
+    my ($self) = @_;
+    my $urn = $self->GetCertificate()->urn();
+
+    return $urn
+	if (defined($urn) && $urn ne "");
+
+    my ($DOMAIN) = ($self->hrn() =~ /^([-\w]*)\..*$/);
+    
+    return GeniHRN::Generate($DOMAIN, "user", $self->uid());
+}
+
 #
 # Class method to check for an existing user that has the same
 # uid/email. Lets not allow this for now. Return the number of
@@ -652,6 +672,7 @@ use vars qw(@ISA);
 use English;
 use GeniDB;
 use GeniUser;
+use GeniHRN;
 use GeniCertificate;
 use overload ('""' => 'Stringify');
 
@@ -696,6 +717,14 @@ sub hrn($)		{ return "${PGENIDOMAIN}." . $_[0]->uid(); }
 # And this is in another structure.
 sub cert($)             { return $_[0]->{'CERT'}->cert(); }
 sub GetCertificate($)   { return $_[0]->{'CERT'}; }
+
+# Return the URN.
+sub urn($)
+{
+    my ($self) = @_;
+
+    return GeniHRN::Generate("@OURDOMAIN@", "user", $self->uid());
+}
 
 #
 # Register this local user at the ClearingHouse.

@@ -133,12 +133,21 @@ sub slicename($)
     return $slicename;
 }
 
-# Return the URN.
+#
+# Return the URN. This is complicated by the fact that the DB does
+# not store the urn, but is in the certificate. Further, it might
+# be a slice from an SA not doing URNs yet, in which case set it to
+# the uuid and hope for the best.
+#
 sub urn($)
 {
     my ($self) = @_;
+    my $urn = $self->GetCertificate()->urn();
 
-    return GeniHRN::Generate("@OURDOMAIN@", "slice", $self->slicename());
+    return $urn
+	if (defined($urn) && $urn ne "");
+
+    return $self->uuid();
 }
 
 #
@@ -329,6 +338,19 @@ sub GetExperiment($)
 	if (!ref($self));
 
     return Experiment->Lookup($self->uuid());
+}
+
+#
+# Return the slice authority for this slice.
+#
+sub SliceAuthority($)
+{
+    my ($self) = @_;
+
+    return undef
+	if (!ref($self));
+
+    return GeniAuthority->Lookup($self->sa_uuid());
 }
 
 #
