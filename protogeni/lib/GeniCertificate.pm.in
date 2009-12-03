@@ -237,6 +237,17 @@ sub Delete($)
 }
 
 #
+# Flush from our little cache.
+#
+sub Flush($)
+{
+    my ($self) = @_;
+
+    $self->GetCertificate()->Flush();
+    delete($certificates{$self->uuid()});
+}
+
+#
 # Load a certificate from a string. This creates an object, but does
 # not store it in the DB.
 #
