@@ -1299,7 +1299,7 @@ sub doSwapin($) {
     # the step has completed and 2) It's OK for the command to run in
     # parallel with os_setup (no DB dependencies, etc.)
     #
-    if ($type != MODIFY || $ELABINELAB) {
+    if ($type != MODIFY || ($ELABINELAB || !$MAINSITE || !$special)) {
 	print "Setting up VLANs.\n";
 	TBDebugTimeStamp("snmpit started");
 	if (system("snmpit -t $pid $eid")) {
