@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -23,7 +23,8 @@ $optargs = OptionalPageArguments("show_archived",   PAGEARG_BOOLEAN,
 				 "bodyfile",        PAGEARG_STRING,
 				 "body",            PAGEARG_ANYTHING,
 				 "msgid",           PAGEARG_STRING,
-				 "date",            PAGEARG_STRING);
+				 "date",            PAGEARG_STRING,
+				 "protogeni",       PAGEARG_BOOLEAN);
 
 #
 # If user is an admin, present edit options.
@@ -33,7 +34,24 @@ $this_user = CheckLogin($check_status);
 if (! isset($show_archived)) {
     $show_archived = 0;
 }
+if (! isset($protogeni) || !$protogeni) {
+    $protogeni = 0;
+}
+else {
+    $protogeni = 1;
+}
 $show_archived = ($show_archived ? 1 : 0);
+$db_table = "webnews";
+
+$view = NULL;
+if ($protogeni) {
+    $view['hide_banner']  = 1;
+    $view['hide_sidebar'] = 1;
+    $view['hide_title']   = 1;
+    $view['hide_versioninfo'] = 1;
+    $view['show_protogeni']   = 1;
+    $db_table = "webnews_protogeni";
+}
 
 if ($this_user) {
     $uid     = $this_user->uid();
@@ -47,37 +65,42 @@ if ($isadmin) {
     if (isset($delete_confirm)) {
 	$safeid = addslashes($delete_confirm);
 
-	DBQueryFatal("DELETE FROM webnews WHERE msgid='$safeid'");
+	DBQueryFatal("DELETE FROM $db_table WHERE msgid='$safeid'");
 
-	header("Location: news.php3?show_archived=$show_archived");
+	header("Location: news.php3?show_archived=$show_archived".
+	       "&protogeni=$protogeni");
 	return;
     }
     if (isset($archive)) {
 	$safeid = addslashes($archive);
 
-	DBQueryFatal("update webnews set archived=1,archived_date=now() ".
+	DBQueryFatal("update $db_table set archived=1,archived_date=now() ".
 		     "where msgid='$safeid'");
 
-	header("Location: news.php3?show_archived=$show_archived");
+	header("Location: news.php3?show_archived=$show_archived".
+	       "&protogeni=$protogeni");
 	return;
     }
     if (isset($restore)) {
 	$safeid = addslashes($restore);
 
-	DBQueryFatal("update webnews set archived=0,archived_date=NULL ".
+	DBQueryFatal("update $db_table set archived=0,archived_date=NULL ".
 		     "where msgid='$safeid'");
 
-	header("Location: news.php3?show_archived=$show_archived");
+	header("Location: news.php3?show_archived=$show_archived".
+	       "&protogeni=$protogeni");
 	return;
     }
 
-    PAGEHEADER("News",NULL,$RSS_HEADER_NEWS);
+    PAGEHEADER("News", $view,
+	       ($protogeni ? $RSS_HEADER_PGENINEWS : $RSS_HEADER_NEWS));
     
     if (isset($delete)) {
 	$delete = addslashes($delete);
 	echo "<center>";
 	echo "<h2>Are you sure you want to delete message #$delete?</h2>";
 	echo "<form action='news.php3' method='post'>\n";
+	echo "<input type='hidden' name=protogeni value='$protogeni'>";
 	echo "<button name='delete_confirm' value='$delete'>Yes</button>\n";
 	echo "&nbsp;&nbsp;";
 	echo "<button name='nothin'>No</button>\n";
@@ -124,7 +147,7 @@ if ($isadmin) {
 		USERERROR("No date!",1);
 	    }
 	    $date = addslashes($date);
-	    DBQueryFatal("UPDATE webnews SET ".
+	    DBQueryFatal("UPDATE $db_table SET ".
 			 "subject='$subject', ".
 			 "author='$author', ".
 			 "date='$date', ".
@@ -132,13 +155,13 @@ if ($isadmin) {
 			 "WHERE msgid='$msgid'");
 	    echo "<h3>Updated message with subject '$subject'.</h3><br />";
 	} else {	    
-	    DBQueryFatal("INSERT INTO webnews (subject, date, author, body) ".
+	    DBQueryFatal("INSERT INTO $db_table (subject, date, author,body) ".
 			 "VALUES ('$subject', NOW(), '$author', '$body')");
 	    echo "<h3>Posted message with subject '$subject'.</h3><br />";
 	}
 	flush();
 	sleep(1);
-	PAGEREPLACE("news.php3");
+	PAGEREPLACE("news.php3?protogeni=$protogeni");
 	PAGEFOOTER();
 	die("");
     }
@@ -147,7 +170,7 @@ if ($isadmin) {
 	$edit = addslashes($edit);
 	$query_result = 
 	    DBQueryFatal("SELECT subject, author, body, msgid, date ".
-			 "FROM webnews ".
+			 "FROM $db_table ".
 		         "WHERE msgid='$edit'" );
 
 	if (!mysql_num_rows($query_result)) {
@@ -177,6 +200,7 @@ if ($isadmin) {
 	if (isset($msgid)) {
 	    echo "<input type='hidden' name='msgid' value='$msgid' />";
 	}
+	echo "<input type='hidden' name=protogeni value='$protogeni'>";
 	
 	if (!isset($subject)) {
 	    $subject = "";
@@ -219,26 +243,28 @@ if ($isadmin) {
 	die("");
     } else {
 	echo "<form action='news.php3' method='post'>\n";
+	echo "<input type='hidden' name=protogeni value='$protogeni'>";
 	echo "<button name='addnew'>Add a new message</button>\n";
 	echo "</form>";
     }
 }
 else {
-    PAGEHEADER("News",NULL,$RSS_HEADER_NEWS);
+    PAGEHEADER("News", $view,
+	       ($protogeni ? $RSS_HEADER_PGENINEWS : $RSS_HEADER_NEWS));
 }
 
 ?>
 <table align=center class=stealth border=0>
 <tr><td class=stealth align=center><h1>News</h1></td></tr>
 <?php
-if ($TBMAINSITE && ! (isset($single) && $single)) {
+if ($TBMAINSITE && ! (isset($single) && $single) && !$protogeni) {
     echo "<tr><td class=stealth align=center>
                   <a href = 'doc/changelog.php3'>
                      (Changelog/Technical Details)</a></td></tr>\n";
 }
 if (!isset($single) || !$single) {
     echo "<tr><td class=stealth align=center>
-                  <a href = '$TBDOCBASE/news-rss.php3'>
+                  <a href = '$TBDOCBASE/news-rss.php3?protogeni=$protogeni'>
                   <img src='rss.png' width=27 height=14 border=0>
                   RSS Feed
                   </a></td></tr>";
@@ -251,10 +277,12 @@ $show_archive_clause = "archived=0";
 if ($isadmin) {
     if ($show_archived) {
 	$show_archive_clause = "1";
-	echo "<a href='news.php3?show_archived=0'>Hide Archived Messages</a>\n";
+	echo "<a href='news.php3?show_archived=0&protogeni=$protogeni'>".
+	    "Hide Archived Messages</a>\n";
     }
     else {
-	echo "<a href='news.php3?show_archived=1'>Show Archived Messages</a>\n";
+	echo "<a href='news.php3?show_archived=1&protogeni=$protogeni'>".
+	    "Show Archived Messages</a>\n";
     }
 }
 
@@ -273,7 +301,7 @@ $query_result=
 		 "archived, ".
 		 "DATE_FORMAT(archived_date,'%W, %M %e, %Y, %l:%i%p') as ".
 		 "  archived_date ".
-		 "FROM webnews ".
+		 "FROM $db_table ".
                  "WHERE " .
                  "$show_archive_clause " .
                  "AND " .
@@ -288,6 +316,7 @@ if (!mysql_num_rows($query_result)) {
 	echo "<form action='news.php3' method='post'>";
 	echo "<input type='hidden' name=show_archived value='$show_archived'>";
     }
+    echo "<input type='hidden' name=protogeni value='$protogeni'>";
 
     while ($row = mysql_fetch_array($query_result)) {
 	$subject = $row["subject"];

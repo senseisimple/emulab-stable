@@ -145,8 +145,11 @@ putenv("HTTP_SCRIPT=1");
 # to PAGEHEADER
 #
 $RSS_HEADER_NEWS = "<link rel=\"alternate\" type=\"application/rss+xml\" " .
-           "title=\"Emulab News\" href=\"$TBDOCBASE/news-rss.php3\" />";
+           "title=\"Emulab News\" href=\"$TBDOCBASE/news-rss.php3?protogeni=0\" />";
 
+$RSS_HEADER_PGENINEWS =
+   "<link rel=\"alternate\" type=\"application/rss+xml\" " .
+   "title=\"ProtoGeni News\" href=\"$TBDOCBASE/news-rss.php3?protogeni=1\"/>";
 
 #
 # Database constants and the like.

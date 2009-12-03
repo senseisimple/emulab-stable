@@ -1069,7 +1069,15 @@ function PAGEHEADER($title, $view = NULL, $extra_headers = NULL,
     PAGEBEGINNING( $title, $nobanner,
 		   $nocontent,
 		   $extra_headers );
-    if (!VIEWSET($view, 'hide_sidebar')) {
+    if (VIEWSET($view, 'show_protogeni')) {
+	echo "<table id=topcelltablefoo ".
+	    "cellspacing=0 cellpadding=0 border=0><tr>".
+	    "<td>".
+	    "<img border='0' alt='ProtoGENI' src='$BASEPATH/protogeni.png'>".
+	    "</td></tr></table>\n";
+	$contentname = "fullcontent";
+    }
+    elseif (!VIEWSET($view, 'hide_sidebar')) {
 	WRITESIDEBAR();
     }
     elseif (VIEWSET($view, 'menu')) {
@@ -1099,47 +1107,49 @@ function PAGEHEADER($title, $view = NULL, $extra_headers = NULL,
     echo "<div class='$contentname'>\n";
     echo "<!-- content body -->\n";
 
-    if ($login_user)
-	echo "<div id='contentheader'>";
-    else {
-	echo "<div class='contentbody'>";
-	echo "<div id='rightcontentheader'>";
-    }
-    echo "<div id='logintime'>";
-    echo "<span class='loggedin'>";
-    $now = date("D M d g:ia T");
-    if ($login_user) {
-	echo "<span class='uid'>$login_uid</span> Logged in.";
-    }
-    echo "</span>";
-    echo "<span class='timestamp'>$now</span>\n";
-    echo "</div>";
+    if (! VIEWSET($view, 'hide_title')) {
+	if ($login_user)
+	    echo "<div id='contentheader'>";
+	else {
+	    echo "<div class='contentbody'>";
+	    echo "<div id='rightcontentheader'>";
+	}
+	echo "<div id='logintime'>";
+	echo "<span class='loggedin'>";
+	$now = date("D M d g:ia T");
+	if ($login_user) {
+	    echo "<span class='uid'>$login_uid</span> Logged in.";
+	}
+	echo "</span>";
+	echo "<span class='timestamp'>$now</span>\n";
+	echo "</div>";
     
-    if ($login_user || VIEWSET($view, 'hide_versioninfo'))
-	$versioninfo = "";
-    else {
-	$major = "";
-	$minor = "";
-	$build = "";
-	TBGetVersionInfo($major, $minor, $build);
+	if ($login_user || VIEWSET($view, 'hide_versioninfo'))
+	    $versioninfo = "";
+	else {
+	    $major = "";
+	    $minor = "";
+	    $build = "";
+	    TBGetVersionInfo($major, $minor, $build);
 	
-	$versioninfo = "Vers: $major.$minor Build: $build";
-    }
-    echo "<div id='versioninfo'>$versioninfo</div>";
-    if ($notice) {
-	echo "<span class='headernotice'>$notice</span>";
-    }
+	    $versioninfo = "Vers: $major.$minor Build: $build";
+	}
+	echo "<div id='versioninfo'>$versioninfo</div>";
+	if ($notice) {
+	    echo "<span class='headernotice'>$notice</span>";
+	}
 
-    if ($login_user)
-	echo "<h2 class='contenttitle'>\n";
-    else
-	echo "<h2 class='rightcontenttitle'>\n";
-    echo "$title</h2>";
-    # Close off 'contentheader' (rightcontentheader);
-    echo "</div>\n";
-    if ($login_user) {
-	# And start the contentbody.
-	echo "<div id='fullcontentbody'>";
+	if ($login_user)
+	    echo "<h2 class='contenttitle'>\n";
+	else
+	    echo "<h2 class='rightcontenttitle'>\n";
+	echo "$title</h2>";
+        # Close off 'contentheader' (rightcontentheader);
+	echo "</div>\n";
+	if ($login_user) {
+        # And start the contentbody.
+	    echo "<div id='fullcontentbody'>";
+	}
     }
     echo "<!-- begin content -->";
     if (VIEWSET($view, 'show_topbar', "plab")) {
