@@ -123,7 +123,7 @@ sub Resolve($)
     # user is an admin person, then do whatever it says. This is
     # easier then trying to do this with credential privs.
     #
-    my $user = GeniUser->Lookup($credential->owner_uuid(), 1);
+    my $user = GeniCM::CreateUserFromCertificate($credential->owner_cert());
     if (defined($user) && $user->IsLocal() && $user->admin()) {
 	$admin = 1;
     }
@@ -384,13 +384,9 @@ sub DeleteSliver($)
     #
     # We need the user to sign the new ticket to. 
     #
-    my $user = GeniUser->Lookup($credential->owner_uuid(), 1);
+    my $user = GeniCM::CreateUserFromCertificate($credential->owner_cert());
     if (!defined($user)) {
-	$user = GeniCM::CreateUserFromCertificate($credential->owner_cert());
-	if (!defined($user)) {
-	    print STDERR "Could not create user from $credential\n";
-	    return GeniResponse->Create(GENIRESPONSE_ERROR);
-	}
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
     
     my $response = GeniCM::DeleteSliverAux($credential, $impotent, 1);
@@ -977,13 +973,9 @@ sub UpdateTicket($)
     #
     # We need the user to sign the new ticket to. 
     #
-    my $user = GeniUser->Lookup($credential->owner_uuid(), 1);
+    my $user = GeniCM::CreateUserFromCertificate($credential->owner_cert());
     if (!defined($user)) {
-	$user = GeniCM::CreateUserFromCertificate($credential->owner_cert());
-	if (!defined($user)) {
-	    print STDERR "Could not create user from $credential\n";
-	    return GeniResponse->Create(GENIRESPONSE_ERROR);
-	}
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
     return GeniCM::GetTicketAuxAux($slice, $user,
 				   $rspecstr, 1, $impotent, 1, 1, $ticket);
@@ -1044,13 +1036,9 @@ sub UpdateSliver($)
     #
     # Any user can update the sliver. The ticket is signed to that user.
     #
-    my $user = GeniUser->Lookup($credential->owner_uuid(), 1);
+    my $user = GeniCM::CreateUserFromCertificate($credential->owner_cert());
     if (!defined($user)) {
-	$user = GeniCM::CreateUserFromCertificate($credential->owner_cert());
-	if (!defined($user)) {
-	    print STDERR "Could not create user from $credential\n";
-	    return GeniResponse->Create(GENIRESPONSE_ERROR);
-	}
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
     return GeniCM::GetTicketAuxAux($slice, $user,
 				   $rspecstr, 1, $impotent, 1, 1, undef);
@@ -1139,13 +1127,9 @@ sub BindToSlice($)
     #
     # Find or create the user.
     #
-    my $user = GeniUser->Lookup($credential->owner_uuid());
+    my $user = GeniCM::CreateUserFromCertificate($credential->owner_cert());
     if (!defined($user)) {
-	$user = CreateUserFromCertificate($credential->owner_cert());
-	if (!defined($user)) {
-	    print STDERR "Could not create user from certificate\n";
-	    return GeniResponse->Create(GENIRESPONSE_ERROR);
-	}
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
     if (!$user->IsLocal() && defined($keys)) {
 	$user->Modify(undef, undef, $keys);
@@ -1298,7 +1282,7 @@ sub LookupURN($)
     my ($auth,$type,$id) = GeniHRN::Parse($urn);
     return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				"Authority mismatch")
-	if ($auth ne $OURDOMAIN);
+	if ($type ne "slice" && $auth ne $OURDOMAIN);
     $type = lc($type);
 
     if ($type eq "node") {

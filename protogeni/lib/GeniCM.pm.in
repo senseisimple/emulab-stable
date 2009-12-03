@@ -412,19 +412,14 @@ sub GetTicketAux($$$$$$$)
     #
     # Ditto the user.
     #
-    my $user = GeniUser->Lookup($user_uuid, 1);
+    my $user = CreateUserFromCertificate($credential->owner_cert());
     if (!defined($user)) {
 	if ($isupdate) {
 	    print STDERR "Could not locate $user_uuid for UpdateTicket\n";
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					"No user found for UpdateTicket");
 	}
-	$user = CreateUserFromCertificate($credential->owner_cert());
-	if (!defined($user)) {
-	    print STDERR "No user $user_uuid in the ClearingHouse\n";
-	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-			    "Could not get user info from ClearingHouse");
-	}
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
     return GetTicketAuxAux($slice, $user, $rspecstr,
 			   $isupdate, $impotent, $v2, $level, $ticket);
@@ -1442,14 +1437,9 @@ sub SliverWorkAux($$$$$$$)
     #
     # Create the user.
     #
-    my $owner = GeniUser->Lookup($owner_uuid);
+    my $owner = CreateUserFromCertificate($owner_cert);
     if (!defined($owner)) {
-	$owner = CreateUserFromCertificate($owner_cert);
-	if (!defined($owner)) {
-	    print STDERR "No user $owner_uuid in the ClearingHouse\n";
-	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					"No user record for $owner_uuid");
-	}
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
     if (!$owner->IsLocal() && defined($keys)) {
 	$owner->Modify(undef, undef, $keys);
@@ -2688,14 +2678,9 @@ sub SplitSliver($)
 	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
 				     "Insufficient privilege" );
 
-    my $user = GeniUser->Lookup($user_uuid);
+    my $user = CreateUserFromCertificate($credential->owner_cert());
     if (!defined($user)) {
-	$user = CreateUserFromCertificate($credential->owner_cert());
-	if (!defined($user)) {
-	    print STDERR "No user $user_uuid in the ClearingHouse\n";
-	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					"No user record for $user_uuid");
-	}
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
 
     my $aggregate = GeniAggregate->Lookup($sliver_uuid);
@@ -2771,13 +2756,9 @@ sub GetSliverAux($)
 	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
 				     "Insufficient privilege" );
 
-    my $user = GeniUser->Lookup($user_uuid);
+    my $user = CreateUserFromCertificate($credential->owner_cert());
     if (!defined($user)) {
-	$user = CreateUserFromCertificate($credential->owner_cert());
-	if (!defined($user)) {
-	    print STDERR "Could not create user from certificate\n";
-	    return GeniResponse->Create(GENIRESPONSE_ERROR);
-	}
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
 
     my $slice = GeniSlice->Lookup($slice_uuid);
@@ -2851,14 +2832,9 @@ sub BindToSlice($)
     #
     # Find or create the user.
     #
-    my $user = GeniUser->Lookup($user_uuid);
+    my $user = CreateUserFromCertificate($credential->owner_cert());
     if (!defined($user)) {
-	$user = CreateUserFromCertificate($credential->owner_cert());
-	if (!defined($user)) {
-	    print STDERR "Could not create user from certificate\n";
-	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					"Could not create/find user");
-	}
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
     if (!$user->IsLocal() && defined($keys)) {
 	$user->Modify(undef, undef, $keys);
@@ -3268,11 +3244,9 @@ sub SliverTicket($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
 
-    my $user = GeniUser->Lookup($user_uuid, 1);
+    my $user = CreateUserFromCertificate($credential->owner_cert());
     if (!defined($user)) {
-	print STDERR "Could not locate user $user_uuid\n";
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "No user found");
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
     my $aggregate = GeniAggregate->Lookup($sliver_uuid);
     if (!defined($aggregate)) {
@@ -3489,8 +3463,7 @@ sub ListTickets($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "This is not your credential!");
     }
-    my $user_uuid = $credential->owner_uuid();
-    my $user = GeniUser->Lookup($user_uuid, 1);
+    my $user = CreateUserFromCertificate($credential->owner_cert());
     if (!defined($user)) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "No such user found");
@@ -3591,7 +3564,34 @@ sub CreateUserFromCertificate($)
     return undef    
 	if (!defined($authority));
 
-    return GeniUser->Create($certificate, $authority);
+    $user = GeniUser->Lookup($certificate->uuid());
+    if (!defined($user)) {
+	$user = GeniUser->Create($certificate, $authority);
+	if (!defined($user)) {
+	    print STDERR "Could not create user from $certificate\n";
+	    return undef;
+	}
+	return $user;
+    }
+    #
+    # Ths point of this is to look for the case that a newer certificate
+    # with a URN should replace an older certificate. 
+    #
+    if (defined($certificate->urn()) &&
+	GeniHRN::IsValid($certificate->urn()) &&
+	! GeniHRN::IsValid($user->urn())) {
+	print STDERR "Reloading certificate for $user from $certificate\n";
+
+	$user->Flush();
+	$certificate->Store();
+	$user = GeniUser->Lookup($certificate->uuid());
+	
+	if (!defined($user)) {
+	    print STDERR "Could not reload user for $certificate\n";
+	    return undef;
+	}
+    }    
+    return $user;
 }
 
 #
