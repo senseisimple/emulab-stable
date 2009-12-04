@@ -10,7 +10,17 @@ sub DoUpdate($$$)
 
     DBSetDefault($dbhandle);
 
-    if (!DBSlotExists("geni_crls", "DN")) {
+    if (!DBTableExists("geni_crls")) {
+	DBQueryFatal("CREATE TABLE `geni_crls` ( ".
+		     " `uuid` varchar(40) NOT NULL default '', ".
+		     " `created` datetime default NULL, ".
+		     " `expires` datetime default NULL, ".
+		     " `cert` text, ".
+		     " `DN` text, ".
+		     " PRIMARY KEY  (`uuid`) ".
+		     ") ENGINE=MyISAM DEFAULT CHARSET=latin1");
+    }
+    elsif (!DBSlotExists("geni_crls", "DN")) {
 	DBQueryFatal("alter table geni_crls add `DN` text");
     }
     if (!DBSlotExists("ticket_history", "target_uuid")) {
