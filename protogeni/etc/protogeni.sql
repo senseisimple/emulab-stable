@@ -72,13 +72,15 @@ CREATE TABLE `geni_slivers` (
   `creator_uuid` varchar(40) NOT NULL default '',
   `resource_uuid` varchar(40) NOT NULL default '',
   `resource_type` varchar(40) NOT NULL default '',
+  `resource_id` varchar(64) NOT NULL default '',
   `created` datetime default NULL,
   `expires` datetime default NULL,
   `locked` datetime default NULL,
   `credential_idx` int(10) unsigned default NULL,
   `component_uuid` varchar(40) default NULL,
   `aggregate_uuid` varchar(40) default NULL,
-  `status` enum('created','ready','broken') NOT NULL default 'created',
+  `status` varchar(16) NOT NULL default 'created',
+  `state` varchar(16) NOT NULL default 'stopped',
   `rspec_string` text,
   PRIMARY KEY  (`idx`),
   UNIQUE KEY `uuid` (`uuid`),
@@ -97,10 +99,12 @@ CREATE TABLE `geni_aggregates` (
   `created` datetime default NULL,
   `expires` datetime default NULL,
   `locked` datetime default NULL,
+  `registered` datetime default NULL,
   `credential_idx` int(10) unsigned default NULL,
   `component_idx` int(10) unsigned NOT NULL default '0',
   `aggregate_idx` int(10) unsigned default NULL,
-  `status` enum('created','ready','broken') NOT NULL default 'created',
+  `status` varchar(16) NOT NULL default 'created',
+  `state` varchar(16) NOT NULL default 'stopped',
   PRIMARY KEY  (`idx`),
   UNIQUE KEY `uuid` (`uuid`),
   INDEX `slice_uuid` (`slice_uuid`)
@@ -277,5 +281,20 @@ CREATE TABLE `ticket_history` (
   PRIMARY KEY  (`idx`),
   UNIQUE KEY `uuid` (`uuid`),
   INDEX `slice_uuid` (`slice_uuid`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+DROP TABLE IF EXISTS `client_slivers`;
+CREATE TABLE `client_slivers` (
+  `idx` mediumint(8) unsigned NOT NULL default '0',
+  `urn` varchar(256) NOT NULL default '',
+  `slice_idx` mediumint(8) unsigned NOT NULL default '0',
+  `manager_urn` varchar(256) NOT NULL default '',
+  `creator_idx` mediumint(8) unsigned NOT NULL default '0',
+  `created` datetime default NULL,
+  `expires` datetime default NULL,
+  `locked` datetime default NULL,
+  `manifest` text,
+  PRIMARY KEY  (`idx`),
+  INDEX `slice_uuid` (`slice_idx`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
