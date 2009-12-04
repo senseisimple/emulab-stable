@@ -747,6 +747,8 @@ function WRITESIDEBAR() {
 	if ($PROTOGENI) {
 	    NavMenuButton("ProtoGeni Slices",
 			  "$TBBASE/genislices.php");
+	    NavMenuButton("ProtoGeni History",
+			  "$TBBASE/genihistory.php");
 	}
     }
     if (0 && $login_user) {
