@@ -105,6 +105,16 @@ GeniUtil::FlipToGeniUser();
 
 sub DoCM()
 {
+    #
+    # Need an RPC context for this to work.
+    #
+    my $certificate = GeniCertificate->LoadFromFile("$TB/etc/genicm.pem");
+    fatal("Could not load CM certificate")
+	if (!defined($certificate));
+    Genixmlrpc->SetContext(Genixmlrpc->Context($certificate));
+    $ENV{'MYUUID'} = $certificate->uuid();
+    $ENV{'MYURN'} = "urn:publicid:IDN+@OURDOMAIN@+authority+cm";
+
     if (GeniCM::CleanupDeadSlice($slice) != 0) {
 	fatal("Could not clean up slice $slice");
     }
@@ -126,6 +136,8 @@ sub DoSA()
     fatal("Could not load SA certificate")
 	if (!defined($certificate));
     Genixmlrpc->SetContext(Genixmlrpc->Context($certificate));
+    $ENV{'MYUUID'} = $certificate->uuid();
+    $ENV{'MYURN'} = "urn:publicid:IDN+@OURDOMAIN@+authority+sa";
     
     if ($slice->UnRegister()) {
 	print STDERR "Could not unregister $slice from clearinghouse!\n";

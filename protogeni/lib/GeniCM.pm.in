@@ -33,6 +33,7 @@ use GeniUser;
 use GeniRegistry;
 use GeniUtil;
 use GeniHRN;
+use GeniUsage;
 use libtestbed qw(SENDMAIL);
 use emutil;
 # Hate to import all this crap; need a utility library.
@@ -370,7 +371,6 @@ sub GetTicket($;$)
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					"Could not create GeniTicket object");
 	}
-	$ticket->SetSlice($credential->target_uuid());
     }
     return GetTicketAux($credential,
 			$rspecstr, $isupdate, $impotent, 0, 1, $ticket);
@@ -502,6 +502,9 @@ sub GetTicketAuxAux($$$$$$$$)
     #
     if (defined($ticket) && $ticket->stored() && $ticket->Lock() != 0) {
 	return GeniResponse->BusyResponse("ticket");
+    }
+    if (defined($ticket)) {
+	$ticket->SetSlice($slice);
     }
     
     #
@@ -1201,7 +1204,7 @@ sub GetTicketAuxAux($$$$$$$$)
 				 "Could not create GeniTicket object");
 	goto bad;
     }
-    $newticket->SetSlice($slice->uuid());
+    $newticket->SetSlice($slice);
     
     if ($newticket->Sign()) {
 	$response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
@@ -1409,7 +1412,7 @@ sub SliverWorkAux($$$$$$$)
 					"Already have an aggregate for slice");
 	}
     }
-    $ticket->SetSlice($slice_uuid)
+    $ticket->SetSlice($slice)
 	if (defined($ticket));
     
     if ($slice->Lock() != 0) {
@@ -2109,6 +2112,10 @@ sub SliverWorkAux($$$$$$$)
 		"  manifest=". DBQuoteSpecial($manifest) . ", " .
 		"  idx=NULL, slice_uuid='$slice_uuid', created=now()");
 
+    if (GeniUsage->NewManifest($aggregate, $rspec)) {
+	print STDERR "GeniUsage->NewManifest($aggregate) failed\n";
+    }
+
     #
     # The API states we return a credential to control the aggregate.
     #
@@ -2324,7 +2331,13 @@ sub ReleaseTicket($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not create GeniCredential object");
     }
-    $ticket->SetSlice($credential->target_uuid());
+    my $slice_uuid = $credential->target_uuid();
+    my $slice      = GeniSlice->Lookup($slice_uuid);
+    if (!defined($slice)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "No slice record for $slice_uuid");
+    }
+    $ticket->SetSlice($slice);
     
     #
     # Make sure the ticket was issued to the caller.

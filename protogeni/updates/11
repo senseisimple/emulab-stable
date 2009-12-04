@@ -1,0 +1,36 @@
+#
+# Tweaks to history code.
+#
+use strict;
+use GeniDB;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    DBSetDefault($dbhandle);
+
+    if (!DBSlotExists("geni_crls", "DN")) {
+	DBQueryFatal("alter table geni_crls add `DN` text");
+    }
+    if (!DBSlotExists("ticket_history", "target_uuid")) {
+	DBQueryFatal("alter table ticket_history drop target_uuid");
+    }
+    if (!DBSlotExists("ticket_history", "target_hrn")) {
+	DBQueryFatal("alter table ticket_history drop target_hrn");
+    }
+    if (!DBSlotExists("aggregate_history", "aggregate_uuid")) {
+	DBQueryFatal("alter table aggregate_history drop aggregate_uuid");
+    }
+    if (!DBTableExists("manifest_history")) {
+	DBQueryFatal("CREATE TABLE `manifest_history` ( ".
+		     " `idx` int(10) unsigned NOT NULL auto_increment, ".
+		     " `aggregate_uuid` varchar(40) NOT NULL default '', ".
+		     " `created` datetime default NULL, ".
+		     " `manifest` text, ".
+		     " PRIMARY KEY  (`idx`) ".
+		     ") ENGINE=MyISAM DEFAULT CHARSET=latin1");
+    }
+    return 0;
+}
+1;

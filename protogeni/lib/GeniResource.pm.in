@@ -492,7 +492,7 @@ sub GetTicket($$$$)
 	print STDERR $response->value() . "\n";
 	return -1;
     }
-    $newticket->SetSlice($slice->uuid());
+    $newticket->SetSlice($slice);
     if ($newticket->Store(TICKET_NOSTATS) != 0) {
 	print STDERR "*** Could not store $newticket\n";
 	return -1;

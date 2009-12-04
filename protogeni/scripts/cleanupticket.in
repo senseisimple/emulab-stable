@@ -25,6 +25,7 @@ my $optlist = "";
 my $TB		  = "@prefix@";
 my $TBOPS         = "@TBOPSEMAIL@";
 my $TBLOGS        = "@TBLOGSEMAIL@";
+my $EMULAB_PEMFILE = "$TB/etc/genicm.pem";
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
@@ -67,6 +68,16 @@ if (!$this_user->IsAdmin()) {
 
 # Connect to the proper DB.
 DBConnect(GENICM_DBNAME());
+
+#
+# So we know who/what we are acting as.
+#
+my $certificate = GeniCertificate->LoadFromFile($EMULAB_PEMFILE);
+if (!defined($certificate)) {
+    fatal("Could not get uuid/urn from $EMULAB_PEMFILE\n");
+}
+$ENV{'MYUUID'} = $certificate->uuid();
+$ENV{'MYURN'} = "urn:publicid:IDN+@OURDOMAIN@+authority+cm";
 
 my $ticket = GeniTicket->Lookup($token);
 if (!defined($ticket)) {

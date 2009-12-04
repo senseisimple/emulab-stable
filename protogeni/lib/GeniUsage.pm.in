@@ -187,16 +187,16 @@ sub NewTicket($$)
 
     my $ticket_idx     = $ticket->idx();
     my $ticket_uuid    = $ticket->uuid();
-    my $target_uuid    = $ticket->target_uuid();
-    my $target_hrn     = $ticket->target_hrn();
+    my $slice_uuid     = $ticket->slice_uuid();
+    my $slice_hrn      = $ticket->slice_hrn();
     my $owner_uuid     = $ticket->owner_uuid();
     my $owner_hrn      = $ticket->owner_hrn();
 
     # Now tack on other stuff we need.
     push(@insert_data, "idx='$ticket_idx'");
     push(@insert_data, "uuid='$ticket_uuid'");
-    push(@insert_data, "target_uuid=" . DBQuoteSpecial($target_uuid));
-    push(@insert_data, "target_hrn=" . DBQuoteSpecial($target_hrn));
+    push(@insert_data, "slice_uuid=" . DBQuoteSpecial($slice_uuid));
+    push(@insert_data, "slice_hrn=" . DBQuoteSpecial($slice_hrn));
     push(@insert_data, "owner_uuid=" . DBQuoteSpecial($owner_uuid));
     push(@insert_data, "owner_hrn=" . DBQuoteSpecial($owner_hrn));
     push(@insert_data, "created=now()");
@@ -300,3 +300,25 @@ sub ListTickets($$)
     @$pref = @result;
     return 0;
 }
+
+#
+# Create an entry in the manifest history table.
+#
+sub NewManifest($$$)
+{
+    my ($class, $aggregate, $manifest) = @_;
+    my @insert_data = ();
+
+    my $aggregate_uuid  = $aggregate->uuid();
+    my $manifest_string = XMLout($manifest, RootName => "manifest");
+    my $safe_manifest   = DBQuoteSpecial($manifest_string);
+
+    # Insert into DB.
+    if (!DBQueryWarn("insert into manifest_history set " .
+		     " idx=NULL, aggregate_uuid='$aggregate_uuid', ".
+		     " created=now(), manifest=$safe_manifest")) {
+	return -1;
+    }
+    return 0;
+}
+

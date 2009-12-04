@@ -154,7 +154,7 @@ sub Create($$$$)
     $self->{'seqno'}         = $seqno;
     $self->{'ticket_string'} = undef;
     $self->{'component'}     = undef;
-    $self->{'slice_uuid'}    = undef;
+    $self->{'slice'}         = undef;
     $self->{'stored'}        = 0;	# Stored to the DB.
     $self->{'LOCKED'}        = 0;
 
@@ -198,7 +198,10 @@ sub redeemed($   )	{ return field($_[0], "redeemed"); }
 sub component_uuid($)	{ return field($_[0], "component_uuid"); }
 sub component($)	{ return field($_[0], "component"); }
 sub stored($)		{ return field($_[0], "stored"); }
-sub slice_uuid($)	{ return field($_[0], "slice_uuid"); }
+sub slice($)            { return $_[0]->{'slice'}; }
+sub slice_uuid($)	{ return $_[0]->slice()->uuid(); }
+sub slice_hrn($)	{ return $_[0]->slice()->hrn(); }
+sub slice_urn($)	{ return $_[0]->slice()->urn(); }
 sub LOCKED($)           { return $_[0]->{'LOCKED'}; }
 
 
@@ -398,7 +401,7 @@ sub CreateFromSignedTicket($$;$$)
     $self->{'seqno'}         = $seqno;
     $self->{'expires'}       = $expires;
     $self->{'stored'}        = 0;
-    $self->{'slice_uuid'}    = undef;
+    $self->{'slice'}         = undef;
     $self->{'LOCKED'}        = 0;
     
     #
@@ -411,12 +414,24 @@ sub CreateFromSignedTicket($$;$$)
     if ($query_result && $query_result->numrows) {
 	my $row = $query_result->fetchrow_hashref();
 	$self->{'redeem_before'} = $row->{'redeem_before'};
-	$self->{'slice_uuid'}    = $row->{'slice_uuid'};
 	$self->{'idx'}    = $seqno;
 	$self->{'stored'} = 1;
+	#
+	# Older tickets might not have the slice set. The CM will
+	# set it later though.
+	#
+	if (defined($row->{'slice_uuid'})) {
+	    my $slice_uuid = $row->{'slice_uuid'};
+	    my $slice = GeniSlice->Lookup($slice_uuid);
+	    if (!defined($slice)) {
+		print STDERR
+		    "Could not locate slice for ticket from $slice_uuid\n";
+		return undef;
+	    }
+	    $self->{'slice'} = $slice;
+	}
     }
     bless($self, $class);
-
     return $self;
 }
 
@@ -519,9 +534,9 @@ sub UnLock($)
 
 sub SetSlice($$)
 {
-    my ($self, $slice_uuid) = @_;
+    my ($self, $slice) = @_;
     
-    $self->{'slice_uuid'} = $slice_uuid;
+    $self->{'slice'} = $slice;
     return 0;
 }
 

@@ -413,7 +413,7 @@ sub DeleteSliver($)
 	$response = GeniResponse->Create(GENIRESPONSE_ERROR);
 	goto bad;
     }
-    $ticket->SetSlice($slice->uuid());
+    $ticket->SetSlice($slice);
     
     if ($ticket->Sign()) {
 	$ticket->Delete();
