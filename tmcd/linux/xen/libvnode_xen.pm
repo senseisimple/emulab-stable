@@ -103,7 +103,7 @@ my $GLOBAL_CONF_LOCK = "xenconf";
 
 # default image to load on logical disks
 my %defaultImage = (
- 'name'    => "default-FC8-XEN",
+ 'name'    => "emulab-ops-emulab-ops-XEN-GUEST-F8-XXX",
  'kernel'  => "/boot/vmlinuz-2.6.18.8-xenU",
  'ramdisk' => "/boot/initrd-2.6.18.8-xenU.img"
 );
@@ -303,13 +303,6 @@ sub rootPreConfig($)
 	    TBScriptUnlock();
 	    return -1;
 	}
-
-	#
-	# Setup the default image now.
-	# XXX right now this is a hack where we just copy the dom0
-	# filesystem and clone (snapshot) that.
-	#
-	createRootDisk($defaultImage{'name'});
     }
 
     #
@@ -375,9 +368,10 @@ sub rootPostConfig($)
 # Create the basic context for the VM and give it a unique ID for identifying
 # "internal" state.
 #
-sub vnodeCreate($)
+sub vnodeCreate($$$)
 {
-    my ($vnode_id,$imagename,$reload_args_ref) = @_;
+    my ($vnode_id,$imagename,$raref) = @_;
+    my %image = %defaultImage;
 
     my $vmid;
     if ($vnode_id =~ /^\w+\d+\-(\d+)$/) {
@@ -387,18 +381,52 @@ sub vnodeCreate($)
 	fatal("xen_vnodeCreate: bad vnode_id $vnode_id!");
     }
 
+    my $lvname = $image{'name'};
+
     #
-    # XXX at the moment, no matter what you ask for, you get the default
-    # Xen Linux image.
+    # No image specified, use a default based on the dom0 OS.
     #
-    my $image;
-    if (1 || !defined($imagename) || $image eq '') {
-	$image = \%defaultImage;
+    if (!defined($imagename)) {
+	#
+	# Setup the default image now.
+	# XXX right now this is a hack where we just copy the dom0
+	# filesystem and clone (snapshot) that.
+	#
+	$imagename = $defaultImage{'name'};
+	createRootDisk($imagename);
+	$raref = { "IMAGETIME" => 0 };
     }
 
-    # Create the snapshot LVM
+    print STDERR "xen_vnodeCreate: loading image '$imagename'\n";
+    if (!defined($raref)) {
+	fatal("xen_vnodeCreate: cannot load image without loadinfo\n");
+    }
+
+    $lvname = createImageDisk($imagename, $raref);
+    if (!$lvname) {
+	fatal("xen_vnodeCreate: cannot create logical volume for $imagename");
+    }
+
+    #
+    # Since we may have (re)loaded a new image for this vnode, check
+    # and make sure the vnode snapshot disk is associated with the
+    # correct image.  Otherwise destroy the current vnode LVM so it
+    # will get correctly associated below.
+    #
+    if (findLVMLogicalVolume($vnode_id)) {
+	my $olvname = findLVMOrigin($vnode_id);
+	if ($olvname ne $lvname) {
+	    if (system("lvremove -f $VGNAME/$vnode_id")) {
+		fatal("xen_vnodeCreate: could not destroy old disk for $vnode_id");
+	    }
+	}
+    }
+
+    #
+    # Create the snapshot LVM.
+    #
     if (!findLVMLogicalVolume($vnode_id)) {
-	my $basedisk = lvmVolumePath($image->{'name'});
+	my $basedisk = lvmVolumePath($lvname);
 	if (system("lvcreate -s -L ${XEN_LDSIZE}G -n $vnode_id $basedisk")) {
 	    print STDERR "libvnode_xen: could not create disk for $vnode_id\n";
 	    return -1;
@@ -412,8 +440,8 @@ sub vnodeCreate($)
     # and write it out right before we boot.
     #
     my $vndisk = lvmVolumePath($vnode_id);
-    my $kernel = $image->{'kernel'};
-    my $ramdisk = $image->{'ramdisk'};
+    my $kernel = $image{'kernel'};
+    my $ramdisk = $image{'ramdisk'};
 
     $vninfo{$vmid}{'cffile'} = [];
     addConfig($vmid, "# xen configuration script for $vnode_id", 2);
@@ -423,6 +451,16 @@ sub vnodeCreate($)
     addConfig($vmid, "disk = ['phy:$vndisk,sda1,w']", 2);
     addConfig($vmid, "root = '/dev/sda1 ro'", 2);
     addConfig($vmid, "extra = '3 xencons=tty'", 2);
+
+    #
+    # Finish off the state transitions started by createImageDisk.
+    #
+    if (defined($imagename)) {
+	# Tell stated via tmcd
+	libvnode::setState("RELOADDONE");
+	sleep(4);
+	libvnode::setState("SHUTDOWN");
+    }
 
     return $vmid;
 }
@@ -722,7 +760,7 @@ sub vnodeDestroy($)
     if (domainExists($vnode_id)) {
 	mysystem("/usr/sbin/xm destroy $vnode_id");
 	# XXX hang out awhile waiting for domain to disappear
-	domainGone($vnode_id, 5);
+	domainGone($vnode_id, 15);
     }
 
     #
@@ -748,7 +786,7 @@ sub vnodeHalt($)
     }
     mysystem("/usr/sbin/xm shutdown $vnode_id");
     # XXX hang out awhile waiting for domain to disappear
-    domainGone($vnode_id, 5);
+    domainGone($vnode_id, 15);
 
     return 0;
 }
@@ -817,17 +855,98 @@ sub copyRoot($$)
 
 #
 # Create the root "disk" (logical volume)
-# XXX this is a temp hack til we support real images.
+# XXX this is a temp hack til all vnode creations have an explicit image.
 #
 sub createRootDisk($)
 {
     my ($lv) = @_;
     my $full_path = lvmVolumePath($lv);
     my $size = $XEN_LDSIZE;
+
+    #
+    # We only want to do this once.  Note that we wait up to 20 minutes since
+    # it can take a long time to copy the filesystem.  If we really cared, we
+    # could further trim what is copied; e.g., no share/doc.
+    #
+    if (TBScriptLock($GLOBAL_CONF_LOCK, 0, 1200) != TBSCRIPTLOCK_OKAY()) {
+	print STDERR "Could not get the xennetwork lock after a long time!\n";
+	return -1;
+    }
+
     system("/usr/sbin/lvcreate -n $lv -L ${size}G $VGNAME");
     system("echo y | mkfs -t ext3 $full_path");
     mysystem("e2label $full_path /");
     copyRoot(findRoot(), $full_path);
+
+    TBScriptUnlock();
+}
+
+#
+# Create a logical volume for the image if it doesn't already exist.
+# We include the time stamp in the volume name so that we detect and
+# automatically handle updated images.  Downloads an image as necessary.
+#
+# Returns the name of the logical volume, or zero on failure.
+#
+sub createImageDisk($$)
+{
+    my ($image,$raref) = @_;
+    my $tstamp = $raref->{'IMAGEMTIME'};
+
+    my $lvname = "$image.";
+    if (defined($tstamp)) {
+	$lvname .= $tstamp;
+    } else {
+	$lvname .= "0";
+    }
+
+    #
+    # We might be creating multiple vnodes with the same image, so grab
+    # the global lock for this image before doing anything.
+    #
+    my $imagelock = "xenimage.$lvname";
+    my $locked = TBScriptLock($imagelock, TBSCRIPTLOCK_GLOBALWAIT(), 1800);
+    if ($locked != TBSCRIPTLOCK_OKAY()) {
+	print STDERR "Could not get the $imagelock lock after a long time!\n";
+	return 0;
+    }
+
+    if (findLVMLogicalVolume($lvname)) {
+	if (!defined($tstamp)) {
+	    print STDERR
+		"libvnode_xen: WARNING: ",
+		"requested image $image has no timestamp and already exists; ",
+		"using existing (possibly outdated) version.\n";
+	}
+	TBScriptUnlock();
+	return $lvname;
+    }
+
+    # Tell stated we are getting ready for a reload
+    libvnode::setState("RELOADSETUP");
+
+    my $size = $XEN_LDSIZE;
+    if (system("/usr/sbin/lvcreate -n $lvname -L ${size}G $VGNAME")) {
+	print STDERR "libvnode_xen: could not create disk for $image\n";
+	TBScriptUnlock();
+	return 0;
+    }
+
+    # Tell stated via tmcd
+    libvnode::setState("RELOADING");
+
+    # Now we just download the file, then let create do its normal thing
+    my $imagepath = lvmVolumePath($lvname);
+    my $dret = libvnode::downloadImage($imagepath, 1, $raref);
+
+    #
+    # XXX note that we don't declare RELOADDONE here since we haven't
+    # actually created the vnode shadow disk yet.  That is the caller's
+    # responsibility.
+    #
+
+    TBScriptUnlock();
+    return $lvname;
 }
 
 sub replace_hack($)
@@ -1331,7 +1450,7 @@ sub createExpBridges($$)
     return 0;
 }
 
-sub destroyExpBridges($)
+sub destroyExpBridges($$)
 {
     my ($vnode_id,$linfo) = @_;
 
@@ -1587,6 +1706,22 @@ sub findLVMLogicalVolume($)
 	}
     }
     return 0;
+}
+
+#
+# Return the LVM that the indicated one is a snapshot of, or a null
+# string if none.
+#
+sub findLVMOrigin($)
+{
+    my ($lv) = @_;
+
+    foreach (`lvs --noheadings -o name,origin $VGNAME`) {
+	if (/^\s*${lv}\s+(\S+)\s*$/) {
+	    return $1;	
+	}
+    }
+    return "";
 }
 
 1
