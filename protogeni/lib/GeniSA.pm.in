@@ -754,7 +754,7 @@ sub GetKeys($)
 				    undef, "Who are you?");
     }
     my @keys;
-    if ($this_user->GetKeys(\@keys) != 0) {
+    if ($this_user->GetKeyBundle(\@keys) != 0) {
 	print STDERR "Could not get keys for $this_user\n";
 	return GeniResponse->Create(GENIRESPONSE_ERROR);	
     }

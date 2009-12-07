@@ -560,7 +560,7 @@ sub RedeemTicket($$)
     }
 
     my @keys;
-    if ($geniuser->GetKeys(\@keys) != 0) {
+    if ($geniuser->GetKeyBundle(\@keys) != 0) {
 	print STDERR "Could not get keys for $geniuser\n";
 	return -1;
     }

@@ -1711,11 +1711,11 @@ sub Create($$$$$$;$)
     push(@insert_data, "email=$safe_email");
     push(@insert_data, "uid_uuid=$safe_uuid");
 
-    if (!$islocal && defined($sshkeys)) {
+    if (defined($sshkeys)) {
 	foreach my $sshkey (@{ $sshkeys }) {
 	    my $safe_sshkey = DBQuoteSpecial($sshkey);
 
-	    DBQueryWarn("insert into user_pubkeys set ".
+	    DBQueryWarn("insert into nonlocal_user_pubkeys set ".
 			"  uid=$safe_uid, uid_idx='$idx', ".
 			"  idx=NULL, stamp=now(), pubkey=$safe_sshkey")
 		or return undef;
@@ -1725,7 +1725,7 @@ sub Create($$$$$$;$)
     # Insert into DB.
     if (!DBQueryWarn("insert into nonlocal_users set " .
 		     join(",", @insert_data))) {
-	DBQueryWarn("delete from user_pubkeys where uid_idx='$idx'")
+	DBQueryWarn("delete from nonlocal_user_pubkeys where uid_idx='$idx'")
 	    if (!$islocal);
 	return undef;
     }
@@ -1739,20 +1739,17 @@ sub ModifyKeys($$)
 {
     my ($self, $sshkeys) = @_;
 
-    return 0
-	if ($self->shadow());
-
     my $idx = $self->uid_idx();
     my $uid = $self->uid();
     
-    DBQueryWarn("delete from user_pubkeys where uid_idx='$idx'")
+    DBQueryWarn("delete from nonlocal_user_pubkeys where uid_idx='$idx'")
 	or return -1;
     
     if (defined($sshkeys)) {
 	foreach my $sshkey (@{ $sshkeys }) {
 	    my $safe_sshkey = DBQuoteSpecial($sshkey);
 
-	    DBQueryWarn("insert into user_pubkeys set ".
+	    DBQueryWarn("insert into nonlocal_user_pubkeys set ".
 			"  uid='$uid', uid_idx='$idx', ".
 			"  idx=NULL, stamp=now(), pubkey=$safe_sshkey")
 		or return -1;
@@ -1773,10 +1770,8 @@ sub Delete($)
 
     my $idx = $self->idx();
 
-    if (!$self->shadow()) {
-	DBQueryWarn("delete from user_pubkeys where uid_idx='$idx'")
-	    or return -1;
-    }
+    DBQueryWarn("delete from nonlocal_user_pubkeys where uid_idx='$idx'")
+	or return -1;
     DBQueryWarn("delete from nonlocal_user_bindings where uid_idx='$idx'")
 	or return -1;
     DBQueryWarn("delete from nonlocal_users where uid_idx='$idx'")

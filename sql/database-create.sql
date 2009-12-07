@@ -2326,6 +2326,22 @@ CREATE TABLE `nologins` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `nonlocal_user_pubkeys`
+--
+
+DROP TABLE IF EXISTS `nonlocal_user_pubkeys`;
+CREATE TABLE `nonlocal_user_pubkeys` (
+  `uid` varchar(8) NOT NULL default '',
+  `uid_idx` mediumint(8) unsigned NOT NULL default '0',
+  `idx` int(10) unsigned NOT NULL auto_increment,
+  `pubkey` text,
+  `stamp` datetime default NULL,
+  `comment` varchar(128) NOT NULL default '',
+  PRIMARY KEY  (`uid_idx`,`idx`),
+  KEY `uid` (`uid`,`idx`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `nonlocal_user_bindings`
 --
 

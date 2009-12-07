@@ -357,10 +357,12 @@ sub Modify($$$$)
     my $safe_name  = DBQuoteSpecial($name || $self->name());
     my $safe_email = DBQuoteSpecial($email || $self->email());
 
-    return -1
-	if (!DBQueryWarn("update geni_users set ".
-			 " name=$safe_name, email=$safe_email ".
-			 "where idx='$idx'"));
+    if (defined($name) || defined($email)) {
+	return -1
+	    if (!DBQueryWarn("update geni_users set ".
+			     " name=$safe_name, email=$safe_email ".
+			     "where idx='$idx'"));
+    }
 
     if (defined($keys)) {
 	return -1
@@ -441,9 +443,9 @@ sub GetSSHKeys($$)
 }
 
 #
-# Get the keys for a user.
+# Get the keys for a user. See the SA. 
 #
-sub GetKeys($$)
+sub GetKeyBundle($$)
 {
     my ($self, $pref) = @_;
     my @results = ();
@@ -508,27 +510,10 @@ sub BindToSlice($$)
     }
     else {
 	my @sshkeys = ();
-	$self->GetSSHKeys(\@sshkeys);
-	if (0) {
-	    $emulab_user->ModifyKeys(\@sshkeys);
-	}
-	elsif (!$emulab_user->shadow()) {
-	    my $idx = $emulab_user->idx();
-	    my $uid = $emulab_user->uid();
-	    
-	    emdb::DBQueryWarn("delete from user_pubkeys where uid_idx='$idx'")
-		or return -1;
-    
-	    if (@sshkeys) {
-		foreach my $sshkey (@sshkeys) {
-		    my $safe_sshkey = DBQuoteSpecial($sshkey);
-
-		    emdb::DBQueryWarn("insert into user_pubkeys set ".
-				      "  uid='$uid', uid_idx='$idx', ".
-				      "  idx=NULL, stamp=now(), ".
-				      "pubkey=$safe_sshkey")
-			or return -1;
-		}
+	if ($self->GetSSHKeys(\@sshkeys) == 0) {
+	    if ($emulab_user->ModifyKeys(\@sshkeys)) {
+		print STDERR "Could not update keys for user $self\n";
+		return -1;
 	    }
 	}
     }
@@ -707,13 +692,13 @@ sub Create($$)
     return $self;
 }
 
+sub emulab_user()       { return $_[0]->{'USER'}; }
 sub idx($)		{ return $_[0]->{'USER'}->uid_idx(); }
 sub uid($)		{ return $_[0]->{'USER'}->uid(); }
 sub uuid                { return $_[0]->{'USER'}->uuid(); }
 sub created($)		{ return $_[0]->{'USER'}->created(); }
 sub name($)		{ return $_[0]->{'USER'}->name(); }
 sub email($)		{ return $_[0]->{'USER'}->email(); }
-sub GetSSHKeys($$)      { return $_[0]->{'USER'}->GetSSHKeys($_[1]); }
 sub SSLPassPhrase($$$)  { return $_[0]->{'USER'}->SSLPassPhrase($_[1],$_[2]); }
 sub HomeDir($)          { return $_[0]->{'USER'}->HomeDir(); }
 sub admin($)		{ return $_[0]->{'USER'}->admin(); }
@@ -749,9 +734,11 @@ sub Register($)
 }
 
 #
-# Get the keys for a local user, which are just sshkeys
+# Get the key bundle for a local user, which are just sshkeys. 
+# This function is intended to be used only by the SA to get the
+# key bundle from the emulab ssh keys for the local user. 
 #
-sub GetKeys($$)
+sub GetKeyBundle($$)
 {
     my ($self, $pref) = @_;
     my @results = ();
@@ -761,7 +748,7 @@ sub GetKeys($$)
 
     my $uuid = $self->uuid();
     my @sshkeys    = ();
-    $self->GetSSHKeys(\@sshkeys);
+    $self->emulab_user()->GetSSHKeys(\@sshkeys);
     
     foreach my $sshkey (@sshkeys) {
 	push(@results, {"type" => 'ssh',
@@ -769,26 +756,6 @@ sub GetKeys($$)
     }
     @$pref = @results;
     return 0;
-}
-
-#
-# Override this for local users. For tmcd we need an entry in the
-# nonlocal tables (not in the mood to change tmcd yet) so that local
-# users get accounts in slivers that match their local identity. But
-# no need to duplicate the ssh keys. Needs more thought. 
-#
-sub CreateNonLocal($)
-{
-    my ($self) = @_;
-
-    return undef
-	if (! ref($self));
-
-    return User::NonLocal->Create($self->idx(),
-				  $self->uid(),
-				  $self->uuid(),
-				  $self->name(),
-				  $self->email(), undef);
 }
 
 #

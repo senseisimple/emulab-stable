@@ -1444,7 +1444,7 @@ sub SliverWorkAux($$$$$$$)
     if (!defined($owner)) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
-    if (!$owner->IsLocal() && defined($keys)) {
+    if (defined($keys)) {
 	$owner->Modify(undef, undef, $keys);
     }
 
@@ -2849,7 +2849,7 @@ sub BindToSlice($)
     if (!defined($user)) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
-    if (!$user->IsLocal() && defined($keys)) {
+    if (defined($keys)) {
 	$user->Modify(undef, undef, $keys);
     }
     if ($slice->Lock() != 0) {
