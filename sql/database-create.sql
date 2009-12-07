@@ -4075,6 +4075,23 @@ CREATE TABLE `webnews` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `webnews_protogeni`
+--
+
+DROP TABLE IF EXISTS `webnews_protogeni`;
+CREATE TABLE `webnews` (
+  `msgid` int(11) NOT NULL auto_increment,
+  `subject` tinytext,
+  `date` datetime default NULL,
+  `author` varchar(32) default NULL,
+  `body` text,
+  `archived` tinyint(1) NOT NULL default '0',
+  `archived_date` datetime default NULL,
+  PRIMARY KEY  (`msgid`),
+  KEY `date` (`date`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `widearea_accounts`
 --
 

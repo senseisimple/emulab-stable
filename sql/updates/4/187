@@ -1,0 +1,13 @@
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (!DBTableExists("webnews_protogeni")) {
+	DBQueryFatal("CREATE TABLE webnews_protogeni like webnews");
+    }
+    return 0;
+}
+1;
