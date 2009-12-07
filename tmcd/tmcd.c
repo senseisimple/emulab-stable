@@ -2388,7 +2388,11 @@ COMMAND_PROTOTYPE(doaccounts)
 		pubkeys_res = mydb_query("select idx,pubkey "
 					 " from user_pubkeys "
 					 "where uid_idx='%s'",
-					 2, row[17]);
+					 2,
+					 (didnonlocal ?
+					  "nonlocal_user_pubkeys" :
+					  "user_pubkeys"),
+					 row[17]);
 	
 		if (!pubkeys_res) {
 			error("ACCOUNTS: %s: DB Error getting keys\n", row[0]);
