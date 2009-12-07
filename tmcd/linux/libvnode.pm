@@ -372,23 +372,28 @@ sub findBridgeIfaces($) {
 # mechanism.  Caller provides an imagepath for frisbee, and a hash of args that
 # comes directly from loadinfo.
 #
-sub downloadImage($$) {
-    my ($imagepath,$reload_args_ref) = @_;
+sub downloadImage($$$) {
+    my ($imagepath,$todisk,$reload_args_ref) = @_;
 
     return -1 
 	if (!defined($imagepath) || !defined($reload_args_ref));
 
     my $addr = $reload_args_ref->{"ADDR"};
     my $FRISBEE = "/usr/local/etc/emulab/frisbee";
+    my $IMAGEUNZIP = "/usr/local/bin/imageunzip";
 
     if ($addr =~/^(\d+\.\d+\.\d+\.\d+):(\d+)$/) {
 	my $mcastaddr = $1;
 	my $mcastport = $2;
 
-	mysystem("$FRISBEE -m $mcastaddr -p $mcastport  $imagepath");
+	mysystem("$FRISBEE -m $mcastaddr -p $mcastport $imagepath");
     }
     elsif ($addr =~ /^http/) {
-	mysystem("wget -nv -N -P -O $imagepath '$addr'");
+	if ($todisk) {
+	    mysystem("wget -nv -N -P -O - '$addr' | $IMAGEUNZIP - $imagepath");
+	} else {
+	    mysystem("wget -nv -N -P -O $imagepath '$addr'");
+	}
     }
 
     return 0;

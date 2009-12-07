@@ -549,7 +549,7 @@ sub vz_vnodeCreate {
 
 	if (!$incache) {
 	    # Now we just download the file, then let create do its normal thing
-	    my $dret = libvnode::downloadImage($imagepath,$reload_args_ref);
+	    my $dret = libvnode::downloadImage($imagepath,0,$reload_args_ref);
 
 	    # reload has finished, file is written... so let's set its mtime
 	    utime(time(),$reload_args{"IMAGEMTIME"},$imagepath);
