@@ -301,7 +301,7 @@ else {
 	MyFatal("Failed to get status for $vnodeid: $err");
     }
     if ($ret ne VNODE_STATUS_STOPPED()) {
-	MyFatal("vnode $vnodeid not stopped, no booting!");
+	MyFatal("vnode $vnodeid not stopped, not booting!");
     }
     $rebooting = 1;
 }
@@ -460,12 +460,33 @@ sub handler ($) {
     $SIG{TERM} = 'IGNORE';
     $SIG{HUP}  = 'IGNORE';
 
-    my $str = "Killing";
+    my $str = "killed";
     if ($signame eq 'USR1') {
 	$leaveme = 1;
-	$str = "Halting";
+	$str = "halted";
     }
-    MyFatal("Caught a SIG${signame}! $str the container ...");
+
+    #
+    # XXX this is a woeful hack for vnodesetup.  At the end of rebootvnode,
+    # vnodesetup calls hackwaitandexit which essentially waits for a vnode
+    # to be well on the way back up before it returns.  This call was
+    # apparently added for the lighter-weight "reconfigure a vnode"
+    # (as opposed to reboot it) path, however it makes the semantics of
+    # reboot on a vnode different than that for a pnode, where reboot returns
+    # as soon as the node stops responding (i.e., when it goes down and not
+    # when it comes back up).  Why do I care?  Because Xen vnodes cannot
+    # always "reboot" under the current semantics in less than 30 seconds,
+    # which is the timeout in libreboot.
+    #
+    # So by touching the "running" file here we force hackwaitandexit to
+    # return when the vnode is shutdown in Xen (or OpenVZ), more closely
+    # matching the pnode semantics while leaving the BSD jail case (which
+    # doesn't use this code) alone.  This obviously needs to be revisited.
+    #
+    mysystem("touch $VNDIR/running")
+	if ($leaveme && -e "$VNDIR/running");
+
+    MyFatal("mkvnode ($PID) caught a SIG${signame}! container $str");
 }
 $SIG{INT}  = \&handler;
 $SIG{USR1} = \&handler;
