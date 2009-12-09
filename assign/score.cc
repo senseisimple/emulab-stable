@@ -4,7 +4,7 @@
  * All rights reserved.
  */
 
-static const char rcsid[] = "$Id: score.cc,v 1.68 2009-10-08 02:16:49 ricci Exp $";
+static const char rcsid[] = "$Id: score.cc,v 1.69 2009-12-09 22:53:44 ricci Exp $";
 
 #include "port.h"
 
@@ -753,6 +753,7 @@ void unscore_link_info(vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode, tb_vnod
 	} else {
 	  old_over_bw = 0;
 	}
+        SDEBUG(cerr << "  old trivial bandwidth over by " << old_over_bw << endl);
 
 	src_pnode->trivial_bw_used -= vlink->delay_info.bandwidth;
 
@@ -762,13 +763,15 @@ void unscore_link_info(vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode, tb_vnod
 	} else {
 	  new_over_bw = 0;
 	}
+        SDEBUG(cerr << "  new trivial bandwidth over by " << new_over_bw << endl);
 
 	if (old_over_bw) {
 	  // Count how many multiples of the maximum bandwidth we're at
-	  int num_violations = (int)(
-	      floor((double)(old_bw -1)/src_pnode->trivial_bw)
-	      - floor((double)(src_pnode->trivial_bw_used -1) /
-		src_pnode->trivial_bw));
+          int new_multiple = src_pnode->trivial_bw_used / src_pnode->trivial_bw;
+          int old_multiple = old_bw / src_pnode->trivial_bw;
+	  int num_violations = old_multiple - new_multiple;
+          SDEBUG(cerr << "  removing " << num_violations <<
+                 " violations for trivial bandwidth" << endl);
 	  violated -= num_violations;
 	  vinfo.bandwidth -= num_violations;
 	  double removed_bandwidth_percent = (old_over_bw - new_over_bw) * 1.0 /
@@ -1084,6 +1087,7 @@ void score_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode, tb_vnod
       } else {
 	old_over_bw = 0;
       }
+      SDEBUG(cerr << "  old trivial bandwidth over by " << old_over_bw << endl);
 
       dst_pnode->trivial_bw_used += vlink->delay_info.bandwidth;
 
@@ -1093,13 +1097,15 @@ void score_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode, tb_vnod
       } else {
 	new_over_bw = 0;
       }
+      SDEBUG(cerr << "  new trivial bandwidth over by " << new_over_bw << endl);
 	
       if (new_over_bw) {
 	// Count how many multiples of the maximum bandwidth we're at
-	int num_violations =
-	  (int)(floor((double)((src_pnode->trivial_bw_used -1)
-			       / src_pnode->trivial_bw))
-		- floor((double)((old_bw -1)/src_pnode->trivial_bw)));
+        int new_multiple = src_pnode->trivial_bw_used / src_pnode->trivial_bw;
+        int old_multiple = old_bw / src_pnode->trivial_bw;
+	int num_violations = new_multiple - old_multiple;
+        SDEBUG(cerr << "  adding " << num_violations <<
+               " violations for trivial bandwidth" << endl);
 	violated += num_violations;
 	vinfo.bandwidth += num_violations;
 
