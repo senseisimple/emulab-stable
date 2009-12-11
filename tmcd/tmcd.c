@@ -2386,7 +2386,7 @@ COMMAND_PROTOTYPE(doaccounts)
 		 * Need a list of keys for this user.
 		 */
 		pubkeys_res = mydb_query("select idx,pubkey "
-					 " from user_pubkeys "
+					 " from %s "
 					 "where uid_idx='%s'",
 					 2,
 					 (didnonlocal ?
