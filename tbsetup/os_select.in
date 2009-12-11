@@ -82,7 +82,7 @@ openlog("osselect", "pid", $TBLOG);
 %options = ();
 if (! getopts($optlist, \%options)) { usage(); }
 if (defined($options{"h"})) { usage(); }
-if (defined($options{"d"})) { $debug++; }
+if (defined($options{"d"})) { $debug=1; }
 if (defined($options{"1"})) { $oneshot=1; }
 if (defined($options{"t"})) { $tempmode=1; }
 if (defined($options{"c"})) { $clear=1; }
