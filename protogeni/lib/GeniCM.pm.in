@@ -588,6 +588,7 @@ sub GetTicketAuxAux($$$$$$$$)
     }
     # Turn off fixnode; we will control this on the commandline.
     $virtexperiment->allowfixnode(0);
+    $virtexperiment->multiplex_factor(3);
 
     # This is where nodes are parked until a ticket is redeemed.
     # This experiment no longer has to exist.
@@ -722,13 +723,22 @@ sub GetTicketAuxAux($$$$$$$$)
 	if (defined($virtualization_type)) {
 	    if ($virtualization_type eq "emulab-vnode") {
 		if (defined($virtualization_subtype)) {
+		    $pctype = "pcvm";
+		    
 		    if ($virtualization_subtype eq "emulab-jail") {
 			$osname = "FBSD-JAIL";
 		    }
 		    elsif ($virtualization_subtype eq "emulab-openvz") {
 			$osname = "OPENVZ-STD";
 		    }
-		    $pctype = "pcvm";
+		    elsif ($virtualization_subtype eq "emulab-spp") {
+			$osname = "SPPVM-FAKE";
+			$pctype = "sppvm";
+			# Lets force to shared node.
+			$ref->{'exclusive'} = $exclusive = 0;
+			# Kludge for libvtop.
+			$virtexperiment->multiplex_factor(1);
+		    }
 		}
 		else {
 		    goto raw;
@@ -894,6 +904,7 @@ sub GetTicketAuxAux($$$$$$$$)
 	my $interfaces = $linkref->{'linkendpoints'} ||
 	    $linkref->{'interface_ref'};
 	my $ifacenum   = 1;
+	my $trivial_ok = 0;
 
 	if (!defined($lanname)) {
 	    $response = GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
@@ -1000,7 +1011,7 @@ sub GetTicketAuxAux($$$$$$$$)
 					 {"vname"       => $lanname,
 					  "vnode"       => $node_nickname,
 					  "vport"       => $iface_vport,
-					  "trivial_ok"  => 1,
+					  "trivial_ok"  => $trivial_ok,
 					  "ip"          => $ip,
 					  "delay"       => 0.0,
 					  "bandwidth"   => $bandwidth, # kbps
@@ -1047,7 +1058,7 @@ sub GetTicketAuxAux($$$$$$$$)
 				 "Could not verify topo");
 	goto bad;
     }
-    system("$MAPPER -n -d -v -m 3 -u -o $tmpfile $pid $eid");
+    system("$MAPPER -n -d -v -u -o $tmpfile $pid $eid");
     if ($?) {
 	$response =
 	    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
@@ -1757,7 +1768,7 @@ sub SliverWorkAux($$$$$$$)
 	goto bad;
     }
     # Add -u for update mode, but not -f (fixnode). 
-    system("$MAPPER -d -v -u -m 3 $pid $eid");
+    system("$MAPPER -d -v -u $pid $eid");
     if ($?) {
 	print STDERR "Mapper failed!\n";
 	# Dump the vtop.
