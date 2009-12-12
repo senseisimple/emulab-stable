@@ -393,7 +393,12 @@ sub vnodeCreate($$$)
 	# filesystem and clone (snapshot) that.
 	#
 	$imagename = $defaultImage{'name'};
-	createRootDisk($imagename);
+	print STDERR "xen_vnodeCreate: no image specified, using default ('$imagename')\n";
+
+	my $vname = $imagename . ".0";
+	if (!findLVMLogicalVolume($vname)) {
+	    createRootDisk($vname);
+	}
 	$raref = { "IMAGETIME" => 0 };
     }
 
@@ -434,23 +439,48 @@ sub vnodeCreate($$$)
     }
 
     #
+    # XXX need a better way to determine this!
+    #
+    my $os;
+    if ($imagename =~ /BSD/) {
+	$os = "FreeBSD";
+	$image{'kernel'} = "/boot/freebsd8/kernel";
+	undef $image{'ramdisk'};
+    } else {
+	$os = "Linux";
+    }
+
+    #
     # Create the config file and fill in the disk/filesystem related info.
     # Since we don't want to leave a partial config file in the event of
     # a failure down the road, we just accumulate the config info in a string
     # and write it out right before we boot.
     #
+    # BSD stuff inspired by:
+    # http://wiki.freebsd.org/AdrianChadd/XenHackery
+    #
+    $vninfo{$vmid}{'cffile'} = [];
+
     my $vndisk = lvmVolumePath($vnode_id);
     my $kernel = $image{'kernel'};
     my $ramdisk = $image{'ramdisk'};
+    my $vdisk = "sda";	# yes, this is right for FBSD too
 
-    $vninfo{$vmid}{'cffile'} = [];
-    addConfig($vmid, "# xen configuration script for $vnode_id", 2);
+    addConfig($vmid, "# Xen configuration script for $os vnode $vnode_id", 2);
     addConfig($vmid, "name = '$vnode_id'", 2);
     addConfig($vmid, "kernel = '$kernel'", 2);
-    addConfig($vmid, "ramdisk = '$ramdisk'", 2);
-    addConfig($vmid, "disk = ['phy:$vndisk,sda1,w']", 2);
-    addConfig($vmid, "root = '/dev/sda1 ro'", 2);
-    addConfig($vmid, "extra = '3 xencons=tty'", 2);
+    addConfig($vmid, "ramdisk = '$ramdisk'", 2)
+	if (defined($ramdisk));
+    addConfig($vmid, "disk = ['phy:$vndisk,$vdisk,w']", 2);
+
+    if ($os eq "FreeBSD") {
+	addConfig($vmid, "extra = 'boot_verbose=1'", 2);
+	addConfig($vmid, "extra += ',vfs.root.mountfrom=ufs:/dev/da0a'", 2);
+	addConfig($vmid, "extra += ',kern.bootfile=/boot/kernel/kernel'", 2);
+    } else {
+	addConfig($vmid, "root = '/dev/$vdisk ro'", 2);
+	addConfig($vmid, "extra = '3 xencons=tty'", 2);
+    }
 
     #
     # Finish off the state transitions started by createImageDisk.
@@ -485,6 +515,14 @@ sub vnodePreConfig($$$){
 	    die("libvnode_xen: vnodePreConfig: no Xen config for $vnode_id!?");
 	}
 	$vninfo{$vmid}{'cffile'} = $aref;
+    }
+
+    #
+    # XXX can only do the rest for Linux vnodes
+    #
+    if ($vninfo{$vmid}{'cffile'}->[0] !~ /Linux/) {
+	print "libvnode_xen: vnodePreConfig: short-circuit non-Linux vnode\n";
+	return 0;
     }
 
     mkpath(["/mnt/xen/$vnode_id"]);
