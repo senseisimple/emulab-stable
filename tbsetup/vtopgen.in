@@ -18,13 +18,14 @@ sub usage ()
     print STDERR " -f   - Fix current resources during update mode\n";
     exit(1);
 }
-my $optlist  = "vufxo:p";
+my $optlist  = "vufxo:pr";
 my $verbose  = 0;
 my $fixmode  = 0;
 my $updating = 0;
 my $warnings = 0;
 my $preassign= 0;
 my $xml      = 0;
+my $rspec    = 0;
 my $output   = *STDOUT;
 my $retval   = 0;
 my $filename;
@@ -78,6 +79,9 @@ if (defined($options{"f"})) {
 if (defined($options{"x"})) {
     $xml = 1;
 }
+if (defined($options{"r"})) {
+    $rspec = 1;
+}
 if (defined($options{"p"})) {
     $preassign = 1;
 }
@@ -128,7 +132,10 @@ if ($preassign) {
     exit(0);
 }
 
-if ($xml) {
+if ($rspec && defined($vtop->rspec())) {
+    $retval = $vtop->PrintRspec($output);
+}
+elsif ($xml) {
     $retval = $vtop->PrintXML($output);
 }
 else {
