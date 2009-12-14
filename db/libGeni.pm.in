@@ -34,6 +34,7 @@ use Socket;
 use XML::Simple;
 use Data::Dumper;
 use File::Temp;
+use IO::File;
 
 sub Register($$)
 {
@@ -47,6 +48,17 @@ sub UnRegister($)
     my ($experiment) = @_;
 
     return GeniEmulab::UnRegisterExperiment($experiment);
+}
+
+#
+# Quickie solution.
+#
+sub RenewAllSlivers()
+{
+    #
+    # Hand this off ...
+    #
+    return GeniResource::RenewAll();
 }
 
 #
@@ -64,13 +76,20 @@ sub MapResources($$$)
 	or return -1;
 
     foreach my $ref (@{ $rspec->{'node'} }) {
-	my $node_urn = $ref->{'component_urn'};
+	my %copy = %{ $ref };
+	my $copy = \%copy;
+	
+	my $node_urn = $copy->{'component_urn'};
 	my ($auth,$type,$node_id) = GeniHRN::Parse($node_urn);
 	my $cm = GeniHRN::Generate($auth, "authority", "cm");
 
-	$ref->{'component_manager_uuid'} = $cm;
-	if ($node_id ne "*") {
-	    $ref->{'component_uuid'} = $node_urn;
+	$copy->{'component_manager_uuid'} = $cm;
+	if ($node_id eq "*") {
+	    # assign will use this, but its format is bogus. Kill it.
+	    delete($copy->{'component_urn'});
+	}
+	else {
+	    $copy->{'component_uuid'} = $node_urn;
 	}
 	$cm_urns{$cm} = $cm;
 
@@ -84,11 +103,12 @@ sub MapResources($$$)
 	#
 	if (!exists($fragments{$cm})) {
 	    $fragments{$cm} = {
+		'generated_by' => 'libvtop',
 		'type'  => 'request',
 		'xmlns' => 'http://www.protogeni.net/resources/rspec/0.1',
 		'node'  => [] };
 	}
-	push(@{ $fragments{$cm}->{'node'} }, $ref);
+	push(@{ $fragments{$cm}->{'node'} }, $copy);
 	$node_cms{$ref->{'virtual_id'}} = $cm;
 	$nodemap{$ref->{'virtual_id'}}  = $ref;
     }
@@ -149,57 +169,73 @@ sub MapResources($$$)
 		print STDERR "Could not get resource list for $resource\n";
 		return -1;
 	}
-	my $vtop = new File::Temp(TEMPLATE => 'XXXXX',
-				  UNLINK => 0,
-				  SUFFIX => '.vtop');
-	my $ptop = new File::Temp(TEMPLATE => 'XXXXX',
-				  UNLINK => 0,
-				  SUFFIX => '.ptop');
-	my $tmp  = File::Temp::mktemp("/tmp/XXXXX") . ".soln";
+	my $tmp  = File::Temp::mktemp("XXXXX");
+	my $soln = $tmp . ".soln";
+	my $log  = $tmp . ".log";
+	my $ptop = $tmp . ".ptop";
+	my $vtop = $tmp . ".vtop";
 
 	my $reqstring =
 	    eval { XMLout($fragment, "NoAttr" => 0, RootName => "rspec") };
 	if ($@) {
 	    print STDERR "XMLout error: $@\n";
+	    print STDERR Dumper($fragment);
 	    return -1;
 	}
 
-	print $vtop "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
-	print $vtop $reqstring;
-	print $ptop $advertisement;
+	my $vtopfh = new IO::File "> $vtop";
+	my $ptopfh = new IO::File "> $ptop";
+	if (! (defined($vtopfh) && defined($ptopfh))) {
+	    print STDERR "Could not create temporary files for ptop/vtop\n";
+	    return -1;
+	}
+	print $vtopfh "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+	print $vtopfh $reqstring;
+	print $ptopfh $advertisement;
+	$vtopfh->close();
+	$ptopfh->close();
 
-	system("$ASSIGN -uod -c .75 -q $ptop -w $vtop -W $tmp");
+	system("nice $ASSIGN -uod -c .75 ".
+	       "-q $ptop -w $vtop -W $soln > $log 2>&1");
+	
 	if ($?) {
 	    print STDERR "Could not map to physical resources on $resource\n";
+	    print STDERR Dumper($fragment);
 	    return -1;
 	}
 	my $solution =
-	    eval { XMLin($tmp, KeyAttr => [],
+	    eval { XMLin($soln, KeyAttr => [],
 			 ForceArray => ["node", "link", "interface",
 					"interface_ref", "linkendpoints"]) };
 	if ($@) {
-	    print STDERR "XMLin error: $@\n";
+	    print STDERR "XMLin error reading $soln: $@\n";
 	    return -1;
 	}
-	print STDERR Dumper($solution);
+#	print STDERR Dumper($solution);
 
 	foreach my $ref (@{ $solution->{'node'} }) {
 	    my $virtual_id = $ref->{'virtual_id'};
-	    my $node_urn   = $ref->{'component_uuid'};
+	    my $node_uuid  = $ref->{'component_uuid'};
 	    my $cm_urn     = $ref->{'component_manager_uuid'};
 	    my $noderef    = $nodemap{$virtual_id};
 
-	    $noderef->{'component_uuid'} = $node_urn;
+	    #
+	    # This writes the solution back into the original rspec. 
+	    #
+	    $noderef->{'component_uuid'} = $node_uuid;
+	    $noderef->{'component_urn'}  = $node_uuid;
+	    $noderef->{'component_manager_uuid'} = $cm_urn;
 
 	    if (exists($ref->{'interface'})) {
 		my $interfaces = $ref->{'interface'};
 
 		foreach my $ifaceref (@{ $interfaces }) {
 		    my $iface_id = $ifaceref->{'virtual_id'};
-		    my $compid   = $ifaceref->{'component_name'};
+		    my $compid   = $ifaceref->{'component_id'};
 
 		    foreach my $oref (@{ $noderef->{'interface'} }) {
 			if ($oref->{'virtual_id'} eq $iface_id) {
+			    # write the solution back into the original rspec. 
 			    $oref->{'component_id'} = $compid;
 			    last;
 			}
@@ -208,7 +244,7 @@ sub MapResources($$$)
 	    }
 	}
     }
-    print STDERR Dumper($rspec);
+#    print STDERR Dumper($rspec);
     return 0;
 }
 
@@ -221,6 +257,16 @@ sub GetTickets($$$$)
 	or return -1;
 
     foreach my $ref (@{ $rspec->{'node'} }) {
+	#
+	# Delete the fake lan nodes before sending off the request.
+	# They were needed for the mapping above, but the remote CM
+	# will barf on them.
+	#
+	if (0 && exists($ref->{'node_type'}) &&
+	    exists($ref->{'node_type'}->{'type_name'}) &&
+	    $ref->{'node_type'}->{'type_name'} eq "lan") {
+	    next;
+	}
 	my $node_urn = $ref->{'component_urn'};
 	my ($auth,$type,$node_id) = GeniHRN::Parse($node_urn);
 	my $cm = GeniHRN::Generate($auth, "authority", "cm");
@@ -233,7 +279,7 @@ sub GetTickets($$$$)
 	$ref->{'tarfiles'} = "/usr/local/etc/emulab ".
 	    "$TBDOCBASE/downloads/geniclient.tar";
     }
-    print STDERR Dumper($rspec);
+    #print STDERR Dumper($rspec);
 
     #
     # Get the resource objects.
@@ -257,40 +303,9 @@ sub GetTickets($$$$)
 
 	print STDERR "Asking for ticket from $resource\n";
 	if ($resource->GetTicket($user, $rspec, $impotent)) {
-		print STDERR "Could not GetTicket for $resource\n";
-		return -1;
-	}
-    }
-
-    #
-    # If we can get all of the tickets, lets create the physical nodes
-    # we need.
-    #
-    foreach my $cm (keys(%cm_urns)) {
-	my $resource = $cm_urns{$cm};
-	my $ticket   = $resource->Ticket();
-
-	if (!defined($ticket)) {
-	    print STDERR "No ticket defined for $resource\n";
+	    print STDERR "Could not GetTicket for $resource\n";
+	    print STDERR Dumper($rspec);
 	    return -1;
-	}
-	my $rspec = $ticket->rspec();
-	if (!defined($rspec)) {
-	    print STDERR "No rspec defined for $ticket on $resource\n";
-	    return -1;
-	}
-	foreach my $ref (@{ $rspec->{'node'} }) {
-	    my $node_urn = $ref->{'component_uuid'};
-	    my $cm_urn   = $ref->{'component_manager_uuid'};
-
-	    $ref->{'component_urn'} = $node_urn;
-
-	    print STDERR "Creating $node_urn for $resource\n";
-	    my $node = GeniEmulab::CreatePhysNode($node_urn);
-	    if (!defined($node)) {
-		print STDERR "  Could not create $node_urn!\n";
-		return -1;
-	    }
 	}
     }
     return 0;
@@ -367,6 +382,13 @@ sub MapNodes($)
 
 		$node->Update({'sshdport' => $sshdport});
 	    }
+	    #
+	    # This is how we get the client side to do cooked mode properly.
+	    #
+	    $ref->{'startup_command'} = "/usr/local/etc/emulab/rc.pgeni ".
+		"-s $BOSSNODE -u '$sliver_urn' boot";
+
+	    # Interface map for loop below.
 	    if (exists($ref->{'interface'})) {
 		foreach my $ifaceref (@{ $ref->{'interface'} }) {
 		    my $virtid = $ifaceref->{'virtual_id'};
