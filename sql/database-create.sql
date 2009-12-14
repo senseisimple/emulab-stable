@@ -4095,7 +4095,7 @@ CREATE TABLE `webnews` (
 --
 
 DROP TABLE IF EXISTS `webnews_protogeni`;
-CREATE TABLE `webnews` (
+CREATE TABLE `webnews_protogeni` (
   `msgid` int(11) NOT NULL auto_increment,
   `subject` tinytext,
   `date` datetime default NULL,
