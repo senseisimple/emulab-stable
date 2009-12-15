@@ -46,6 +46,8 @@
 		[Bindable]
 		public var pgHandler:ProtoGeniHandler;
 		
+		public var connectionHandler:ConnectionHandler;
+		
 		[Bindable]
 		public var slicesMenu : ArrayCollection;
 		
@@ -54,8 +56,6 @@
 		
 		[Bindable]
 		public var selectedSlice : Slice = null;
-		
-		public var main:Main;
 		
 	    //------------------------------------------
 	    // Variables needed
@@ -68,17 +68,19 @@
 	    
 	    // Start out by asking the user for the CM URL
 	    private function init():void {
-	    	
-	    	main = new Main();
 	    	console = new ConsoleWindow();
 	    	rspecView = new XmlWindow();
 	    	
-	    	main.setConole(console);
+	    	Main.setConole(console);
 
 			pgHandler = new ProtoGeniHandler();
 			
+			connectionHandler = new ConnectionHandler();
+			
 			chooseCMWindow = new ChooseComponentManagerWindow();
-	    	chooseCMWindow.main = this;	    	
+	    	chooseCMWindow.main = this;	    
+	    	
+	    	Security.allowDomain("localhost");	
 	    }
         
         public function showAbout():void {

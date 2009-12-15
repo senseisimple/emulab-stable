@@ -1,4 +1,4 @@
-/* GENIPUBLIC-COPYRIGHT
+﻿/* GENIPUBLIC-COPYRIGHT
  * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
  * All rights reserved.
  *
@@ -43,6 +43,11 @@ package
       wait = new SliceWait(clip.wait, clip.opText, console);
       abstract = new AbstractNodes(clip, nodes, managers);
     }
+	
+	public override function getComponent(urn:String, cm:String):String
+	{
+		return "READY for " + urn + " on " + cm + "!";
+	}
 
     override public function cleanup() : void
     {

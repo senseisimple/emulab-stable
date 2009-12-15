@@ -1,4 +1,4 @@
-/* GENIPUBLIC-COPYRIGHT
+﻿/* GENIPUBLIC-COPYRIGHT
  * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
  * All rights reserved.
  *
@@ -35,5 +35,10 @@ package
     {
       return null;
     }
+	
+	public function getComponent(urn:String, cm:String):String
+	{
+		return "The flash client is not ready to process messages.  Please make sure the slice is created.";
+	}
   }
 }

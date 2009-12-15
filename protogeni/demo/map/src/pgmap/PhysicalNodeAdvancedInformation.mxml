@@ -62,7 +62,7 @@
 				// Manager
 				var managerHbox:HBox = new HBox();
 				var managerLabel:Label = new Label();
-				managerLabel.text = "Owned by";
+				managerLabel.text = "Hosted on";
 				managerHbox.addChild(managerLabel);
 				managerHbox.addChild(Common.getComponentManagerButton(node.manager));
 				hierarchyVbox.addChild(managerHbox);
@@ -185,6 +185,10 @@
 	       			rspecView.loadXml(virtualNode.rspec);
 				}
 			}
+			
+			public function tryAdd():void {
+				main.connectionHandler.RequestNode(node.urn, node.manager.Hrn);
+			}
 		]]>
 	</mx:Script>
 
@@ -215,6 +219,7 @@
 						<mx:VRule height="16"/>
 						<mx:Label text="Availability" fontWeight="bold"/>
 						<mx:Image id="imgAvailable"/>
+						<mx:Button label="Add" click="tryAdd();"/>
 					</mx:GridItem>
 				</mx:GridRow>
 				<mx:GridRow width="100%">

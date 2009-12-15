@@ -4,25 +4,19 @@ package
 	
   public class Main
   {
-    public function getConsole() : LogRoot
+    public static function getConsole() : LogRoot
     {
       return log;
     }
 
-    public function setConole(newLog : LogRoot) : void
+    public static function setConole(newLog : LogRoot) : void
     {
       log = newLog;
     }
     
-    public function startTimer() : void
+    public static function startTimer() : void
     {
     	d = new Date();
-    }
-    
-    public function endTimer() : void
-    {
-    	var d2 : Date = new Date();
-    	Alert.show((d.valueOf() - d2.valueOf()).toString());
     }
 
     private static var log : LogRoot = null;

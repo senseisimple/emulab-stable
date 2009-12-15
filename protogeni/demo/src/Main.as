@@ -1,4 +1,4 @@
-/* GENIPUBLIC-COPYRIGHT
+﻿/* GENIPUBLIC-COPYRIGHT
  * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
  * All rights reserved.
  *
@@ -16,15 +16,20 @@ package
 {
   import flash.display.DisplayObjectContainer;
   import flash.text.TextField;
+  import flash.system.Security;
 
   public class Main
   {
     public static function init(newParent : DisplayObjectContainer)
     {
+	  //Security.allowDomain("localhost");
+	  
       parent = newParent;
 
       menu = new MenuSliceSelect();
       menu.init(parent);
+	  
+	  com = new ConnectionHandler();	
     }
 
     public static function changeState(newMenu : MenuState)
@@ -51,6 +56,7 @@ package
 
     static var parent : DisplayObjectContainer;
     static var menu : MenuState;
+	static var com : ConnectionHandler;
 
     static var text : String;
   }
