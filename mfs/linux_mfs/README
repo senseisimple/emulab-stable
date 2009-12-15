@@ -1,17 +1,21 @@
 This is the build tree for the Linux-based frisbee MFS.
 
-In order to actually build anything, you'll need a whole bunch of source
-tarballs.  They can be found in ops:/share/linux/mfs/source.  Just rsync
-or scp that whole tree on top of the 'source' subdirectory in this tree.
-
 This can probably only be compiled on a Linux machine.
 
-To build, run "make build-env" to build the cross-compiling uClibc
-toolchain.  Then run "make target" to compile all of the source for the
-initramfs.
+To build the toolchain for the Linux MFS, do this ($ARCH is either
+i386 or x86_64):
 
-Finally, run "make target-initramfs" to create a compressed cpio archive
-suitable to use as an initramfs.
+# cd testbed/mfs/linux_mfs
+# scp ops:/share/linux/mfs/source tarballs
+# tar xvjf tarballs/buildroot-20081211.tar.bz2
+# cp source/buildroot/buildroot.config.$ARCH buildroot/.config
+# cd buildroot
+# make oldconfig
+# make
+
+Once that's done, edit testbed/mfs/linux_mfs/Makefile and set the ARCH
+variable appropriately, then run 'make initramfs'.  If everything
+works, the boot/ directory will have the kernel and initramfs.
 
 The kernel is compiled but not installed anywhere.  You'll have to pull
 it out of the build tree for now.
