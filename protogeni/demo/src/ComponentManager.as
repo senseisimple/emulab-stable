@@ -320,7 +320,7 @@ package
           }
 
           setSubNodes(subNodeOf);
-          parseLinks(rspec, uuidToNode);
+          parseLinks(rspec);
           parseBgpPrefixes(rspec);
         }
         setState(NORMAL)
