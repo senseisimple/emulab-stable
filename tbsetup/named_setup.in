@@ -324,8 +324,9 @@ sub assemble_zonefile($) {
     open(MAPHEAD, "<$mapfilehead") || fatal("Couldn't open $mapfilehead\n");
     while (<MAPHEAD>) {
 	if ( /;\s*Serial\s+/i ) {
-	    my $serial = `date +%Y%H%M%S`;
-	    chop $serial;
+	    my $serial = `date +%s`;
+	    chomp($serial);
+	    $serial = $serial | 0x70000000;
 
 	    print MAP "\t\t\t$serial\t; Serial Number -- DO NOT EDIT\n";
 	}
