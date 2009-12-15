@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 
 # Get rid of a bunch of nasty built-in implicit rules,
@@ -97,7 +97,7 @@ vpath %     $(SRCDIR) $(MOSTLY_SRCDIRS)
 #
 # Rules to regen configure written files.
 #
-%: %.in
+%: %.in $(OBJDIR)/config.status
 	@echo "Regenerating $@"
 	cd $(OBJDIR) && CONFIG_FILES=$(SUBDIR)/$@ ./config.status
 
