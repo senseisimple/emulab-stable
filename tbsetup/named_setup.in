@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -324,7 +324,7 @@ sub assemble_zonefile($) {
     open(MAPHEAD, "<$mapfilehead") || fatal("Couldn't open $mapfilehead\n");
     while (<MAPHEAD>) {
 	if ( /;\s*Serial\s+/i ) {
-	    my $serial = `date +%s`;
+	    my $serial = `date +%Y%H%M%S`;
 	    chop $serial;
 
 	    print MAP "\t\t\t$serial\t; Serial Number -- DO NOT EDIT\n";
