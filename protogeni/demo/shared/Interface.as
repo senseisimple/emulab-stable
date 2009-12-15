@@ -40,10 +40,10 @@ package
     public var role : int;
     public var bandwidth : int;
 
-    public static var CONTROL = 0;
-    public static var EXPERIMENTAL = 1;
-    public static var UNUSED = 2;
-    public static var UNUSED_CONTROL = 3;
-    public static var UNUSED_EXPERIMENTAL = 4;
+    public static var CONTROL : int = 0;
+    public static var EXPERIMENTAL : int = 1;
+    public static var UNUSED : int = 2;
+    public static var UNUSED_CONTROL : int = 3;
+    public static var UNUSED_EXPERIMENTAL : int = 4;
   }
 }
