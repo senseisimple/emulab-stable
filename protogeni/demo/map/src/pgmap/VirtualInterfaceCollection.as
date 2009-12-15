@@ -16,6 +16,7 @@
 {
 	import mx.collections.ArrayCollection;
 	
+	// Collection of interfaces from a node in a sliver/slice
 	public class VirtualInterfaceCollection
 	{
 		public function VirtualInterfaceCollection()

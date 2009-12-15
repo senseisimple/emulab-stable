@@ -16,6 +16,7 @@
 {
 	import mx.collections.ArrayCollection;
 	
+	// Holds and handles all information regarding ProtoGENI
 	public class ProtoGeniHandler
 	{
 		public var main : pgmap;

@@ -16,6 +16,7 @@
 {
 	import mx.collections.ArrayCollection;
 	
+	// Physical link between nodes
 	public class PhysicalLink
 	{
 		public function PhysicalLink(own:PhysicalLinkGroup)

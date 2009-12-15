@@ -16,6 +16,7 @@
 {	
 	import mx.collections.ArrayCollection;
 	
+	// Group of physical links
 	public class PhysicalLinkGroup
 	{
 		public var latitude1:Number = -1;

@@ -22,11 +22,10 @@ package pgmap
 	import mx.collections.ArrayCollection;
 	import mx.events.FlexEvent;
 	
-    	
+    // Handles adding all the ProtoGENI info to the Google Map component
 	public class ProtoGeniMapHandler
 	{
 		public var main : pgmap;
-		
 		
 		public function ProtoGeniMapHandler()
 		{

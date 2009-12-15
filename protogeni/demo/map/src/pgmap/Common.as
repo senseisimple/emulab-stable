@@ -1,4 +1,23 @@
-package pgmap
+/* GENIPUBLIC-COPYRIGHT
+ * Copyright (c) 2009 University of Utah and the Flux Group.
+ * All rights reserved.
+ *
+ * Permission to use, copy, modify and distribute this software is hereby
+ * granted provided that (1) source code retains these copyright, permission,
+ * and disclaimer notices, and (2) redistributions including binaries
+ * reproduce the notices in supporting documentation.
+ *
+ * THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+ * CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+ * FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+ */
+ 
+ /* Common.as
+ 
+    Functions used all around the project
+*/
+ 
+ package pgmap
 {
 	import flash.events.MouseEvent;
 	
@@ -21,6 +40,7 @@ package pgmap
 		public static var nodeColor:Object = 0x092B9F;
 		public static var nodeBorderColor:Object = 0xD2E1F0;
 		
+		// Embedded images used around the application
 		[Bindable]
         [Embed(source="../../images/tick.png")]
         public static var availableIcon:Class;
@@ -53,6 +73,7 @@ package pgmap
         [Embed(source="../../images/error.png")]
         public static var errorIcon:Class;
         
+        // Gets an icon for a boolean value
         public static function assignIcon(val:Boolean):Class {
 			if (val)
 	            return availableIcon;
@@ -60,6 +81,7 @@ package pgmap
 	            return notAvailableIcon;
         }
         
+        // Gets the icon for the given node
         public static function assignAvailabilityIcon(val:PhysicalNode):Class {
 			if(val.virtualNodes != null && val.virtualNodes.length > 0)
 				return ownedIcon;
@@ -72,6 +94,7 @@ package pgmap
             }
         }
         
+        // Get's the CM icon
         public static function assignIconForComponentManager(val:ComponentManager):Class {
 			if(val.Status == ComponentManager.VALID)
 				return availableIcon;
@@ -79,6 +102,7 @@ package pgmap
 				return notAvailableIcon;
         }
 		
+		// Takes the given bandwidth and creates a human readable string
 		public static function kbsToString(bandwidth:Number):String {
 			var bw:String = "";
 			if(bandwidth < 1000) {
@@ -91,14 +115,17 @@ package pgmap
 			return bw;
 		}
 		
+		// Returns the main class
 		public static function Main():pgmap {
 			return mx.core.Application.application as pgmap;
 		}
 		
+		// Makes the first letter uppercase
 		public static function firstToUpper (phrase : String) : String {
 			return phrase.substring(1, 0).toUpperCase()+phrase.substring(1);
 		}
 		
+		// Shortens the given string to a length, taking out from the middle
 		public static function shortenString(phrase : String, size : int) : String {
 			if(phrase.length < size)
 				return phrase;
@@ -108,6 +135,7 @@ package pgmap
 			return phrase.substring(0, upTo) + "..." +  phrase.substring(upTo + removeChars);
 		}
 		
+		// Gets a button for the component manager
 		public static function getComponentManagerButton(cm:ComponentManager):Button {
 			var cmButton:Button = new Button();
 			cmButton.label = cm.Hrn;
@@ -120,6 +148,7 @@ package pgmap
 			return cmButton;
 		}
 		
+		// Gets a button for the physical node
 		public static function getNodeButton(n:PhysicalNode):Button {
 			var nodeButton:Button = new Button();
 			nodeButton.label = n.name;
@@ -132,6 +161,7 @@ package pgmap
 			return nodeButton;
 		}
 		
+		// Gets a button for a physical link
 		public static function getLinkButton(ni:PhysicalNodeInterface, nl:PhysicalLink):Button {
 			var linkButton:Button = new Button();
 			linkButton.label = ni.id;
@@ -144,6 +174,7 @@ package pgmap
 			return linkButton;
 		}
 		
+		// Gets a button for the virtual link
 		public static function getVirtualLinkButton(pl:VirtualLink):Button {
 			var linkButton:Button = new Button();
 			linkButton.label = pl.virtualId;
@@ -156,6 +187,7 @@ package pgmap
 			return linkButton;
 		}
 		
+		// Opens a virtual link window
 		public static function viewVirtualLink(pl:VirtualLink):void {
 	    	var plWindow:VirtualLinkAdvancedWindow = new VirtualLinkAdvancedWindow();
 	    	plWindow.main = Main();
@@ -164,6 +196,7 @@ package pgmap
        		plWindow.loadPointLink(pl);
 	    }
 		
+		// Opens a physical link window
 		public static function viewPhysicalLink(l:PhysicalLink):void {
 			var lgWindow:PhysicalLinkAdvancedWindow = new PhysicalLinkAdvancedWindow();
 	    	lgWindow.main = Main();
@@ -172,6 +205,7 @@ package pgmap
        		lgWindow.loadLink(l);
 		}
 		
+		// Opens a group of physical links
 		public static function viewPhysicalLinkCollection(lc:ArrayCollection):void {
 			if(lc.length == 1)
 				viewPhysicalLink(lc[0]);
@@ -184,6 +218,7 @@ package pgmap
 			}
 		}
 		
+		// Opens a group of physical links
 		public static function viewPhysicalLinkGroup(lg:PhysicalLinkGroup):void {
 			var lgWindow:PhysicalLinkGroupAdvancedWindow = new PhysicalLinkGroupAdvancedWindow();
 	    	lgWindow.main = Main();
@@ -192,6 +227,7 @@ package pgmap
        		lgWindow.loadGroup(lg);
 		}
 		
+		// Opens a component manager in a window
 		public static function viewComponentManager(cm:ComponentManager):void {
 			var cmWindow:ComponentManagerAdvancedWindow = new ComponentManagerAdvancedWindow();
 	    	cmWindow.main = Main();
@@ -200,6 +236,7 @@ package pgmap
        		cmWindow.loadCm(cm);
 		}
 		
+		// Opens a physical node in a window
 		public static function viewNode(n:PhysicalNode):void {
 			var ngWindow:PhysicalNodeAdvancedWindow = new PhysicalNodeAdvancedWindow();
 	    	ngWindow.main = Main();
@@ -208,6 +245,7 @@ package pgmap
        		ngWindow.loadNode(n);
 		}
 		
+		// Opens a group of physical nodes in a window
 		public static function viewNodeGroup(ng:PhysicalNodeGroup):void {
 			var ngWindow:PhysicalNodeGroupAdvancedWindow = new PhysicalNodeGroupAdvancedWindow();
 	    	ngWindow.main = Main();
@@ -216,6 +254,7 @@ package pgmap
        		ngWindow.loadGroup(ng);
 		}
 		
+		// Opens a group of physical nodes in a window
 		public static function viewNodeCollection(nc:ArrayCollection):void {
 			if(nc.length == 1)
 				viewNode(nc[0]);

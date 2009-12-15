@@ -16,6 +16,7 @@
 {
 	import mx.collections.ArrayCollection;
 	
+	// Physical node
 	public class PhysicalNode
 	{
 		public function PhysicalNode(own:PhysicalNodeGroup)

@@ -16,6 +16,7 @@
 {
 	import mx.collections.ArrayCollection;
 	
+	// Collection of all physical link groups
 	public class PhysicalLinkGroupCollection
 	{
 		public function PhysicalLinkGroupCollection()

@@ -16,6 +16,7 @@
 {
 	import mx.collections.ArrayCollection;
 	
+	// Interface on a virtual node
 	public class VirtualInterface
 	{
 		public function VirtualInterface(own:VirtualNode)

@@ -14,6 +14,7 @@
  
  package pgmap
 {	
+	// Holds the type of a node
 	public class NodeType
 	{
 		public function NodeType()

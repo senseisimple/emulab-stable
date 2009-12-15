@@ -16,6 +16,7 @@
 {
 	import mx.collections.ArrayCollection;
 	
+	// Node allocated into a sliver/slice which has a physical node underneath
 	public class VirtualNode
 	{
 		public function VirtualNode(owner:Sliver)
@@ -34,10 +35,8 @@
 		public var rspec:XML;
 		public var sliver:Sliver;
 		public var hostname:String;
-		//public var uuid:String;
-		//public var urn:String;
-		//public var status : String = "N/A";
 		
+		// Gets all connected physical nodes
 		public function GetNodes():ArrayCollection {
 			var ac:ArrayCollection = new ArrayCollection();
 			for each(var nodeInterface:VirtualInterface in interfaces) {
@@ -52,6 +51,7 @@
 			return ac;
 		}
 		
+		// Gets all virtual links connected to this node
 		public function GetLinks(n:PhysicalNode):ArrayCollection {
 			var ac:ArrayCollection = new ArrayCollection();
 			

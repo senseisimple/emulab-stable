@@ -1,3 +1,7 @@
+/**
+     http://flexdevtips.blogspot.com/2009/03/resizable-containers.html
+*/
+     
 package pgmap
 {
     import flash.display.DisplayObject;

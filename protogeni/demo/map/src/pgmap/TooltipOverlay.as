@@ -1,7 +1,12 @@
-/*
+/* ORIGINAL LICENSE
+
 * Licensed under the Apache License, Version 2.0 (the "License"):
 *    http://www.apache.org/licenses/LICENSE-2.0
+
+Code provided in the official examples for Google Maps API for Flash
+
 */
+
 package pgmap {
 
 import com.google.maps.LatLng;
@@ -18,6 +23,7 @@ import flash.text.TextField;
 import flash.text.TextFieldAutoSize;
 import flash.text.TextFormat;
 
+// Box with text to show as an overlay on Google Maps API for Flash
 public class TooltipOverlay extends OverlayBase {
   private var latLng:LatLng;
   private var label:String;

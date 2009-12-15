@@ -19,6 +19,7 @@
 	import mx.collections.SortField;
 	import mx.utils.ObjectUtil;
 	
+	// ProtoGENI user information
 	public class User
 	{
 		[Bindable]

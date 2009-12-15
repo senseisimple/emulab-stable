@@ -16,6 +16,7 @@
 {	
 	import mx.collections.ArrayCollection;
 	
+	// Group of physical nodes located in one area
 	public class PhysicalNodeGroup
 	{
 		public var latitude:Number = -1;

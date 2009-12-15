@@ -1,4 +1,4 @@
-﻿/* GENIPUBLIC-COPYRIGHT
+/* GENIPUBLIC-COPYRIGHT
  * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
  * All rights reserved.
  *
@@ -103,7 +103,7 @@ package
       {
       	
         Main.getConsole().appendText("\n\nException on XMLRPC Call: "
-                                    + e.toString() + "\n\n");
+                                     + e.toString() + "\n\n");
       }
     }
 
@@ -136,11 +136,8 @@ package
     {
       server.removeEventListener(Event.COMPLETE, callSuccess);
       server.removeEventListener(ErrorEvent.ERROR, callFailure);
-	  if(server.observeTimer != null)
-	  {
-      	server.observeTimer.stop();
-      	server.observeTimer = null;
-	  }
+      server.observeTimer.stop();
+      server.observeTimer = null;
     }
 
     private var module : String;

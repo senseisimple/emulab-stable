@@ -16,6 +16,7 @@
 {
 	import mx.collections.ArrayCollection;
 	
+	// Link as part of a sliver/slice connecting virtual nodes
 	public class VirtualLink
 	{
 		public function VirtualLink(owner:Sliver)

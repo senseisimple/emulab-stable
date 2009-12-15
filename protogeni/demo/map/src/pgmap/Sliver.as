@@ -18,6 +18,7 @@
 	
 	import mx.collections.ArrayCollection;
 	
+	// Sliver from a slice containing all resources from the CM
 	public class Sliver
 	{
 		public static var READY : String = "ready";

@@ -16,6 +16,7 @@
 {
 	import mx.collections.ArrayCollection;
 	
+	// Slice that a user created in ProtoGENI
 	public class Slice
 	{
 		public static var READY : String = "ready";
@@ -116,6 +117,7 @@
 			return returnString;
 		}
 		
+		// Used to push more important slices to the top of lists
 		public function CompareValue():int {
 			
 			if(hrn == null && uuid == null) {

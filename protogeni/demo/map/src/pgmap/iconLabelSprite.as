@@ -1,4 +1,8 @@
-package pgmap {
+/**
+ * Code taken from the official tutorials for Google Maps API for Flash
+ */
+ 
+ package pgmap {
 
 import flash.display.Sprite;
 import flash.text.TextField;
@@ -7,7 +11,7 @@ import flash.text.TextFieldAutoSize;
 /**
  * InfoWindowSprite is a sprite that contains sub sprites that function as tabs.
  */
-public class iconLabelSprite extends Sprite {
+	public class iconLabelSprite extends Sprite {
   [Embed('../../images/cloud.png')] private var CloudImg:Class;
   
   

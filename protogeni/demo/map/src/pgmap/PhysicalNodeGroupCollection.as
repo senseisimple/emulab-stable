@@ -16,6 +16,7 @@
 {
 	import mx.collections.ArrayCollection;
 	
+	// Collection of all physical node groups
 	public class PhysicalNodeGroupCollection
 	{
 		public function PhysicalNodeGroupCollection()

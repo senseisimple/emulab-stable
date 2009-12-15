@@ -20,16 +20,10 @@
 	import flash.utils.ByteArray;
 	
 	import mx.utils.Base64Decoder;
-    	
+    
+    // Handles all the XML-RPC calls
 	public class ProtoGeniRpcHandler
 	{
-	
-		[Embed(source="demo-rspec-full.xml",mimeType="application/octet-stream")]
-		public static const DemoSliceEmbeddedXml:Class;
-		
-		[Embed(source="delegatedcredential.xml",mimeType="application/octet-stream")]
-		public static const DelegatedCredentialXml:Class;
-	
 		public var op : Operation;
 		public var opName : String;
 		
@@ -418,20 +412,6 @@
 	    {
 	    	if(currentIndex == main.pgHandler.CurrentUser.slices.length)
 	    	{
-	    		//
-	    		if(main.pgHandler.CurrentUser.hrn.search("mstrum") > -1)
-	    		{
-		    		currentSlice = new Slice();
-		      		currentSlice.hrn = "gec6";
-		    		currentSlice.creator = main.pgHandler.CurrentUser;
-		    		currentSlice.status = "Ready";
-		    		var ba:ByteArray = new DelegatedCredentialXml() as ByteArray;
-			      	currentSlice.credential = ba.readUTFBytes(ba.length);
-			      	main.pgHandler.CurrentUser.slices.addItem(currentSlice);
-			      	totalCalls++;
-			     }
-		      	//
-		      	
 	    		for each(var s:Slice in main.pgHandler.CurrentUser.slices)
 	    		{
 	    			if(s.credential.length > 0)
