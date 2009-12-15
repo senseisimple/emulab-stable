@@ -47,6 +47,7 @@ sub REMOTE()	{ return libsetup::REMOTE(); }
 sub REMOTEDED()	{ return libsetup::REMOTEDED(); }
 sub MFS()	{ return libsetup::MFS(); }
 sub JAILED()	{ return libsetup::JAILED(); }
+sub INXENVM()   { return libsetup::INXENVM(); }
 
 #
 # Various programs and things specific to FreeBSD and that we want to export.
@@ -129,43 +130,45 @@ sub os_ifconfig_line($$$$$$$$;$$%)
     #
     # Need to check units on the speed. Just in case.
     #
-    if ($speed =~ /(\d*)([A-Za-z]*)/) {
-	if ($2 eq "Mbps") {
-	    $speed = $1;
+    if (!INXENVM()) {
+	if ($speed =~ /(\d*)([A-Za-z]*)/) {
+	    if ($2 eq "Mbps") {
+		$speed = $1;
+	    }
+	    elsif ($2 eq "Kbps") {
+		$speed = $1 / 1000;
+	    }
+	    else {
+		warn("*** Bad speed units $2 in ifconfig, default to 100Mbps\n");
+		$speed = 100;
+	    }
+	    if ($speed == 1000) {
+		$media = $IFC_1000MBS;
+	    }
+	    elsif ($speed == 100) {
+		$media = $IFC_100MBS;
+	    }
+	    elsif ($speed == 10) {
+		$media = $IFC_10MBS;
+	    }
+	    else {
+		warn("*** Bad Speed $speed in ifconfig, default to 100Mbps\n");
+		$speed = 100;
+		$media = $IFC_100MBS;
+	    }
 	}
-	elsif ($2 eq "Kbps") {
-	    $speed = $1 / 1000;
-	}
-	else {
-	    warn("*** Bad speed units $2 in ifconfig, default to 100Mbps\n");
-	    $speed = 100;
-	}
-	if ($speed == 1000) {
-	    $media = $IFC_1000MBS;
-	}
-	elsif ($speed == 100) {
-	    $media = $IFC_100MBS;
-	}
-	elsif ($speed == 10) {
-	    $media = $IFC_10MBS;
-	}
-	else {
-	    warn("*** Bad Speed $speed in ifconfig, default to 100Mbps\n");
-	    $speed = 100;
-	    $media = $IFC_100MBS;
-	}
-    }
 
-    if ($duplex eq "full") {
-	$mediaopt = $IFC_FDUPLEX;
-    }
-    elsif ($duplex eq "half") {
-	$mediaopt = $IFC_HDUPLEX;
-    }
-    else {
-	warn("*** Bad duplex $duplex in ifconfig, default to full\n");
-	$duplex = "full";
-	$mediaopt = $IFC_FDUPLEX;
+	if ($duplex eq "full") {
+	    $mediaopt = $IFC_FDUPLEX;
+	}
+	elsif ($duplex eq "half") {
+	    $mediaopt = $IFC_HDUPLEX;
+	}
+	else {
+	    warn("*** Bad duplex $duplex in ifconfig, default to full\n");
+	    $duplex = "full";
+	    $mediaopt = $IFC_FDUPLEX;
+	}
     }
 
     $uplines = "";

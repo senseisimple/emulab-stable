@@ -74,6 +74,12 @@ if (defined($options{"j"})) {
 if (@ARGV) {
     usage();
 }
+
+# XXX not yet
+if (INXENVM()) {
+    exit(0);
+}
+
 sub checkkernel($$);
 
 $FBSD_VERSION = `uname -v`;
