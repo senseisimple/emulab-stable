@@ -29,13 +29,13 @@ package
                                      newUrl : String,
                                      newUpdate : Function,
                                      newVersion : int,
-									 newHrn) : void
+									 newHrn : String = "") : void
     {
       id = newId;
       name = newName;
       hostName = newHostName;
       url = newUrl;
-	  hrn = 
+	  hrn = newHrn;
       ad = "";
       manifest = "";
       update = newUpdate;
