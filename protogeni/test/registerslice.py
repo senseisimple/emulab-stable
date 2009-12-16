@@ -25,8 +25,13 @@ import xmlrpclib
 from M2Crypto import X509
 
 ACCEPTSLICENAME=1
+OtherUser = None
 
 execfile( "test-common.py" )
+
+if len(REQARGS) == 1:
+    OtherUser = REQARGS[0]
+    pass
 
 #
 # Get a credential for myself, that allows me to do things at the SA.
@@ -72,29 +77,32 @@ myslice = response["value"]
 print "New slice created"
 if debug: print str(myslice)
 
-##
-## Lookup another user so we can bind them to the slice.
-##
-#params = {}
-#params["hrn"]       = "leebee"
-#params["credential"] = mycredential
-#params["type"]       = "User"
-#rval,response = do_method("sa", "Resolve", params)
-#if rval:
-#    Fatal("Could not resolve leebee")
-#    pass
-#leebee = response["value"]
-#print "Found leebee record at the SA, binding to slice ..."
 #
-##
-## And bind the user to the slice so that he can get his own cred.
-##
-#params = {}
-#params["uuid"]       = leebee["uuid"]
-#params["credential"] = myslice
-#rval,response = do_method("sa", "BindToSlice", params)
-#if rval:
-#    Fatal("Could not bind leebee to slice")
-#    pass
-#leebee = response["value"]
-#print "Bound leebee to slice at the SA"
+# Lookup another user so we can bind them to the slice.
+#
+if OtherUser:
+    params = {}
+    params["hrn"]       = OtherUser;
+    params["credential"] = mycredential
+    params["type"]       = "User"
+    rval,response = do_method("sa", "Resolve", params)
+    if rval:
+        Fatal("Could not resolve other user")
+        pass
+    user = response["value"]
+    print "Found other user record at the SA, binding to slice ..."
+    
+    #
+    # And bind the user to the slice so that he can get his own cred.
+    #
+    params = {}
+    params["uuid"]       = user["uuid"]
+    params["credential"] = myslice
+    rval,response = do_method("sa", "BindToSlice", params)
+    if rval:
+        Fatal("Could not bind other user to slice")
+        pass
+    binding = response["value"]
+    print "Bound other user to slice at the SA"
+    pass
+
