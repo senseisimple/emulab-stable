@@ -90,11 +90,13 @@ print "Asking for a ticket from the local CM"
 
 rspec = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
         " <node virtual_id=\"geni1\" "+\
-        "       virtualization_type=\"emulab-vnode\"> " +\
+        "       virtualization_type=\"emulab-vnode\" " +\
+        "       exclusive=\"1\"> " +\
         "   <interface virtual_id=\"virt0\"/> " +\
         " </node>" +\
         " <node virtual_id=\"geni2\" "+\
-        "       virtualization_type=\"emulab-vnode\"> " +\
+        "       virtualization_type=\"emulab-vnode\" " +\
+        "       exclusive=\"1\"> " +\
         "   <interface virtual_id=\"virt0\"/> " +\
         " </node>" +\
         " <link virtual_id=\"link0\"> " +\
