@@ -217,7 +217,8 @@ if update:
 #
 # Bump the expiration time.
 #
-valid_until = time.strftime("%Y%m%dT%H:%M:%S", time.gmtime(time.time() + 600));
+valid_until =
+  time.strftime("%Y%m%dT%H:%M:%S", time.gmtime(time.time() + 6000));
 
 params = {}
 params["credential"]   = sliver
