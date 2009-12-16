@@ -96,7 +96,10 @@ for opt, arg in opts:
         CMURI = arg
         if CMURI[-2:] == "cm":
             CMURI = CMURI[:-3]
+        elif CMURI[-4:] == "cmv2":
+            CMURI = CMURI[:-5]
             pass
+        pass
     elif opt in ( "-p", "--passphrase" ):
         PASSPHRASEFILE = arg
     elif opt in ( "-r", "--read-commands" ):
@@ -142,7 +145,7 @@ def do_method(module, method, params, URI=None, quiet=False):
     from M2Crypto.m2xmlrpclib import SSL_Transport
     from M2Crypto import SSL
 
-    if URI == None and CMURI and module == "cm":
+    if URI == None and CMURI and (module == "cm" or module == "cmv2"):
         URI = CMURI
         pass
 
