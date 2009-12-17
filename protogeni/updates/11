@@ -23,13 +23,13 @@ sub DoUpdate($$$)
     elsif (!DBSlotExists("geni_crls", "DN")) {
 	DBQueryFatal("alter table geni_crls add `DN` text");
     }
-    if (!DBSlotExists("ticket_history", "target_uuid")) {
+    if (DBSlotExists("ticket_history", "target_uuid")) {
 	DBQueryFatal("alter table ticket_history drop target_uuid");
     }
-    if (!DBSlotExists("ticket_history", "target_hrn")) {
+    if (DBSlotExists("ticket_history", "target_hrn")) {
 	DBQueryFatal("alter table ticket_history drop target_hrn");
     }
-    if (!DBSlotExists("aggregate_history", "aggregate_uuid")) {
+    if (DBSlotExists("aggregate_history", "aggregate_uuid")) {
 	DBQueryFatal("alter table aggregate_history drop aggregate_uuid");
     }
     if (!DBTableExists("manifest_history")) {
