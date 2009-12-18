@@ -62,7 +62,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)dinode.h	8.3 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/ufs/ufs/dinode.h,v 1.13.2.1 2005/01/31 23:27:01 imp Exp $
+ * $FreeBSD: src/sys/ufs/ufs/dinode.h,v 1.18.2.1.2.1 2009/10/25 01:10:29 kensmith Exp $
  */
 
 #ifndef _UFS_UFS_DINODE_H_
@@ -79,7 +79,7 @@
 /*
  * The Whiteout inode# is a dummy non-zero inode number which will
  * never be allocated to a real file.  It is used as a place holder
- * in the directory entry which has been tagged as a DT_W entry.
+ * in the directory entry which has been tagged as a DT_WHT entry.
  * See the comments about ROOTINO above.
  */
 #define	WINO	((ino_t)1)
@@ -129,7 +129,7 @@ struct ufs2_dinode {
 	u_int32_t	di_gid;		/*   8: File group. */
 	u_int32_t	di_blksize;	/*  12: Inode blocksize. */
 	u_int64_t	di_size;	/*  16: File byte count. */
-	u_int64_t	di_blocks;	/*  24: Bytes actually held. */
+	u_int64_t	di_blocks;	/*  24: Blocks actually held. */
 	ufs_time_t	di_atime;	/*  32: Last access time. */
 	ufs_time_t	di_mtime;	/*  40: Last modified time. */
 	ufs_time_t	di_ctime;	/*  48: Last inode change time. */
@@ -145,7 +145,8 @@ struct ufs2_dinode {
 	ufs2_daddr_t	di_extb[NXADDR];/*  96: External attributes block. */
 	ufs2_daddr_t	di_db[NDADDR];	/* 112: Direct disk blocks. */
 	ufs2_daddr_t	di_ib[NIADDR];	/* 208: Indirect disk blocks. */
-	int64_t		di_spare[3];	/* 232: Reserved; currently unused */
+	u_int64_t	di_modrev;	/* 232: i_modrev for NFSv4 */
+	int64_t		di_spare[2];	/* 240: Reserved; currently unused */
 };
 
 /*
@@ -183,7 +184,7 @@ struct ufs1_dinode {
 	int32_t		di_gen;		/* 108: Generation number. */
 	u_int32_t	di_uid;		/* 112: File owner. */
 	u_int32_t	di_gid;		/* 116: File group. */
-	int32_t		di_spare[2];	/* 120: Reserved; currently unused */
+	u_int64_t	di_modrev;	/* 120: i_modrev for NFSv4 */
 };
 #define	di_ogid		di_u.oldids[1]
 #define	di_ouid		di_u.oldids[0]
