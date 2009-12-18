@@ -65,7 +65,7 @@ if rval:
     Fatal("Could not get Sliver credential")
     pass
 slivercred = response["value"]
-print "Got the sliver credential, starting the sliver";
+print "Got the sliver credential, renewing the sliver";
 
 #
 # Bump the expiration time.
