@@ -241,11 +241,10 @@ if ($killit || $haltit) {
     exit(killvnode());
 }
 if ($rebootit) {
-    if (!$doplab && ! -e $pidfile) {
-	die("*** $0:\n".
-	    "    No pid for $vnodeid manager!\n");
+    if ($doplab || -e $pidfile) {
+	exit(rebootvnode());
     }
-    exit(rebootvnode());
+    # if vnode isn't already running, just try to (re)start it
 }
 
 #
