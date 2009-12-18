@@ -419,6 +419,7 @@ if ($dojail) {
 	# Parent waits for jail to fold on its own. If the jail is
 	# killed off though, will never return.
 	#
+	TBDebugTimeStamp("vnodesetup ($PID) waiting on vnode ($jailpid)");
 	if (waitpid($jailpid, 0) < 0) {
 	    #
 	    # Means that already waited. Must be forcing a reboot.
@@ -428,17 +429,19 @@ if ($dojail) {
 		goto REBOOT;
 	    }
 	}
+	my $jstat = $?;
+	TBDebugTimeStamp("vnodesetup ($jailpid) exiting with status $jstat");
 	undef($jailpid);
-	
+
 	if ($debug || $interactive) {
-	    if ($?) {
-		fatal("Jail startup exited with $?");
+	    if ($jstat) {
+		fatal("Jail startup exited with $jstat");
 	    }
 	    cleanup();
 	    exit(0);
 	}
 	$cleanupstate = "TBFAILED";
-	fatal("Jail exited unexpectedly!");
+	fatal("Jail exited unexpectedly with status $jstat!");
     }
     else {
 	my $options      = "";
@@ -458,7 +461,7 @@ if ($dojail) {
 	    }
 	    $options .= "-p $pid -h $vname.$eid.$pid.$DOMAINNAME";
 	}
-	TBDebugTimeStamp("vnodesetup calling $mkv");
+	TBDebugTimeStamp("vnodesetup ($PID) execing $mkv");
 	
 	exec("$mkv $options $vnodeid");
 	die("*** $0:\n".
@@ -642,6 +645,7 @@ sub rebootvnode() {
     }
 
     hackwaitandexit();
+    return 0;
 }
 
 #
@@ -871,13 +875,11 @@ sub hackwaitandexit()
     else {
 	$goofy = CONFDIR() . "/root/var/run/emulab-watchdog.pid";
     }
-    #print "hackwaitandexit: waiting for $goofy to appear\n";
 	
     while ($count--) {
 	sleep(1);
 	if (-e $goofy) {
-	    my (undef,undef,undef,undef,undef,undef,undef,undef,
-		undef,$mtime,$ctime,undef,undef) = stat($goofy);
+	    my ($mtime,$ctime) = (stat($goofy))[8,9];
 	    exit(0)
 		if ($mtime >= $now || $ctime >= $now);
 	}
