@@ -23,6 +23,7 @@ OPS_SCRIPTS     = 3.and.sh 1.mysql-client.sh 1.mysql-server.sh
 ifeq ($(ELVINCOMPAT),1)
 OPS_SCRIPTS    += 2.elvind.sh 3.elvin_gateway.sh
 endif
+TIP_SCRIPTS	=
 
 ifeq ($(SYSTEM),FreeBSD)
 FBSDVERSION   := $(shell uname -v | sed -e 's/FreeBSD \([0-9]\).*/FreeBSD\1/')
@@ -31,8 +32,11 @@ ifeq ($(FBSDVERSION),FreeBSD6)
 ifeq ($(WINSUPPORT),1)
 OPS_SCRIPTS += silly.sh
 endif
+# install without .sh
+TIP_SCRIPTS += capture
 else
 RC_SCRIPTS  += 1.named.sh
+TIP_SCRIPTS += capture.sh
 endif
 endif
 ifeq ($(PELABSUPPORT),1)
@@ -43,7 +47,7 @@ endif
 # Force dependencies to make sure configure regenerates if the .in file
 # is changed.
 # 
-all: $(RC_SCRIPTS) $(OPS_SCRIPTS)
+all: $(RC_SCRIPTS) $(OPS_SCRIPTS) capture.sh
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -53,6 +57,11 @@ $(INSTALL_RCDIR)/%: %
 	-mkdir -p $(INSTALL_RCDIR)
 	$(INSTALL_PROGRAM) $< $@
 
+# special case for capture.sh -> capture
+$(INSTALL_RCDIR)/capture: capture.sh
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_RCDIR)
+	$(INSTALL_PROGRAM) capture.sh $@
 
 install: $(addprefix $(INSTALL_RCDIR)/, $(RC_SCRIPTS))
 
@@ -61,3 +70,4 @@ control-install:	$(addprefix $(INSTALL_RCDIR)/, $(OPS_SCRIPTS))
 clrhouse-install:	$(INSTALL_RCDIR)/2.mysql-server.sh \
 			$(INSTALL_RCDIR)/1.mysql-client.sh
 
+tipserv-install:	$(addprefix $(INSTALL_RCDIR)/, $(TIP_SCRIPTS))
