@@ -500,6 +500,14 @@ sub SetExpiration($$)
     
     return -1
 	if (!$query_result);
+
+    # Has to be in the correct format.
+    $query_result =
+	DBQueryWarn("select expires from geni_slices where uuid='$uuid'");
+    return -1
+	if (!$query_result || !$query_result->numrows);
+    ($expires) = $query_result->fetchrow_array();
+    
     $self->{'SLICE'}->{'expires'} = $expires;
     return 0;
 }
