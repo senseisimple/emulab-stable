@@ -1,12 +1,12 @@
 The current traffic generation application is based on the TG traffic
 generator distributed by postel.org (http://www.postel.org/services.html).
-We have made modifications to interface it with our event system which
-is based on Elvin (http://elvin.dstc.edu.au/).
+We have made modifications to interface it with our event system.
 
-To build the trafgen application.
+The GNUmakefile should do everything necessary, but here is what happens
+when building the trafgen application.
 
-0. Note: you must first have installed and built the elvin library
-   and you must configure the testbed with --enable-events.
+0. Note: you must first have installed and built the pubsub library
+   for the event system.
 
 1. Download tg2.0:
 
