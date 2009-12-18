@@ -10,6 +10,17 @@
  * Prints out information about an image.
  */
 
+#ifdef WITH_HASH
+/*
+ * This enables a very specific command line option (-H) for printing out
+ * an MD5 hash for every chunk of an image.  I put this in just to get a
+ * sense of how common shared chunks between images are (i.e., could a
+ * frisbee server that serves multiple images take advantage of this to
+ * significant effect).
+ */
+#define WITH_HASHCMD
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
@@ -18,6 +29,10 @@
 #include <string.h>
 #include <zlib.h>
 #include <sys/stat.h>
+#ifdef WITH_HASHCMD
+#include <openssl/sha.h>
+#include <openssl/md5.h>
+#endif
 #include "imagehdr.h"
 
 static int detail = 0;
@@ -25,6 +40,7 @@ static int dumpmap = 0;
 static int ignorev1 = 0;
 static int infd = -1;
 static char *chkpointdev;
+static int dumphash = 0;
 
 static unsigned long long wasted;
 static uint32_t sectinuse;
@@ -35,6 +51,9 @@ static unsigned long long relocbytes;
 static void usage(void);
 static void dumpfile(char *name, int fd);
 static int dumpchunk(char *name, char *buf, int chunkno, int checkindex);
+#ifdef WITH_HASHCMD
+static void dumpchunkhash(char *name, char *buf, int chunkno, int checkindex);
+#endif
 
 #ifdef WITH_SHD
 void add_shdrange(u_int32_t start, u_int32_t size);
@@ -50,7 +69,7 @@ main(int argc, char **argv)
 	int ch, version = 0;
 	extern char build_info[];
 
-	while ((ch = getopt(argc, argv, "C:dimv")) != -1)
+	while ((ch = getopt(argc, argv, "C:dimvH")) != -1)
 		switch(ch) {
 		case 'd':
 			detail++;
@@ -67,6 +86,14 @@ main(int argc, char **argv)
 			break;
 		case 'v':
 			version++;
+			break;
+		case 'H':
+#ifdef WITH_HASHCMD
+			dumphash = 1;
+#else
+			fprintf(stderr,
+				"Not built with WITH_HASHCMD, -H ignored\n");
+#endif
 			break;
 		case 'h':
 		case '?':
@@ -91,6 +118,8 @@ main(int argc, char **argv)
 		if (!isstdin) {
 			if ((infd = open(argv[0], O_RDONLY, 0666)) < 0) {
 				perror(argv[0]);
+				argc--;
+				argv++;
 				continue;
 			}
 		} else
@@ -230,10 +259,11 @@ dumpfile(char *name, int fd)
 				}
 			}
 
-			printf("%s: %llu bytes, %lu chunks, version %d\n",
-			       name, (unsigned long long)filesize,
-			       (unsigned long)(filesize / CHUNKSIZE),
-			       hdr->magic - COMPRESSED_MAGIC_BASE + 1);
+			if (!dumphash)
+				printf("%s: %llu bytes, %lu chunks, version %d\n",
+				       name, (unsigned long long)filesize,
+				       (unsigned long)(filesize / CHUNKSIZE),
+				       hdr->magic - COMPRESSED_MAGIC_BASE + 1);
 		} else if (chunkno == 1 && !ignorev1) {
 			blockhdr_t *hdr = (blockhdr_t *)chunkbuf;
 
@@ -245,6 +275,11 @@ dumpfile(char *name, int fd)
 				checkindex = 0;
 		}
 
+#ifdef WITH_HASHCMD
+		if (dumphash)
+			dumpchunkhash(name, chunkbuf, chunkno, checkindex);
+		else
+#endif
 		if (dumpchunk(name, chunkbuf, chunkno, checkindex))
 			break;
 	}
@@ -263,6 +298,9 @@ dumpfile(char *name, int fd)
 	cbytes = (unsigned long long)(filesize - wasted);
 	dbytes = SECTOBYTES(sectinuse);
 	tbytes = SECTOBYTES(sectinuse + sectfree);
+
+	if (dumphash)
+		return;
 
 	if (detail > 0)
 		printf("\n");
@@ -312,6 +350,32 @@ dumpfile(char *name, int fd)
 		}
 	}
 }
+
+#ifdef WITH_HASHCMD
+static char *
+spewhash(unsigned char *h, int hlen)
+{
+	static char hbuf[16*2+1];
+	static const char hex[] = "0123456789abcdef";
+	int i;
+
+	for (i = 0; i < hlen; i++) {
+		hbuf[i*2] = hex[h[i] >> 4];
+		hbuf[i*2+1] = hex[h[i] & 0xf];
+	}
+	hbuf[i*2] = '\0';
+	return hbuf;
+}
+
+
+static void
+dumpchunkhash(char *name, char *buf, int chunkno, int checkindex)
+{
+	unsigned char hash[16];
+	MD5((unsigned char *)buf, CHUNKSIZE, hash);
+	printf("%s %s %d\n", spewhash(hash, 16), name, chunkno);
+}
+#endif
 
 static int
 dumpchunk(char *name, char *buf, int chunkno, int checkindex)
