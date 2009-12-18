@@ -24,7 +24,7 @@ SBIN_SCRIPTS	= vlandiff vlansync withadminprivs export_tables cvsupd.pl \
 		  grabswitchconfig backupswitches cvsinit checkquota \
 		  spewconlog opsdb_control newnode suchown archive_list \
                   wanodecheckin wanodecreate spewimage \
-                  anonsendmail epmodeset fixexpinfo
+                  anonsendmail epmodeset fixexpinfo node_traffic
 
 WEB_SBIN_SCRIPTS= webnewnode webdeletenode webspewconlog webarchive_list \
                   webwanodecheckin webspewimage
