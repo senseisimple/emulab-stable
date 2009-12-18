@@ -222,6 +222,17 @@ foreach my $node (@nodes) {
     next
 	if (!$nodeobj->isvirtnode());
 
+    # Special hack for SPP nodes. Need to generalize this.
+    if ($shared && $nodeobj->type eq "sppvm") {
+	if ($mode eq "teardown") {
+	    $nodeobj->SetEventState(TBDB_NODESTATE_SHUTDOWN());
+	}
+	else {
+	    $nodeobj->SetEventState(TBDB_NODESTATE_ISUP());
+	}
+	next;
+    }
+
     if (($plabonly || $jailonly) and 
         !(($plabonly && $plab) || ($jailonly && (($jailed || $remote) 
 						 && !($plab || $geninode))))) {

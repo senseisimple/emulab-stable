@@ -238,7 +238,7 @@ my %nodetoavailable;
 
 $result = DBQueryFatal("SELECT n.node_id, n.eventstate, n.role, n.uuid, " .
 		       "nt.isremotenode, " .
-		       "dedicated_wa_types.attrvalue, b.sharing_mode, " .
+		       "dedicated_wa_types.attrvalue, b.erole, " .
 		       "n.reserved_pid, b.eid " .
 		       "from nodes as n " .
 		       "left join reserved as b on n.node_id=b.node_id " .
@@ -251,7 +251,7 @@ $result = DBQueryFatal("SELECT n.node_id, n.eventstate, n.role, n.uuid, " .
 		       "  on nt.type=dedicated_wa_types.type " .
 		       "where nt.isvirtnode = 0 or nt.isvirtnode is null;");
 while (($node,$eventstate, $role, $uuid, $isremotenode,
-	$wa_attrvalue, $sharing_mode,
+	$wa_attrvalue, $erole,
 	$reserved_pid, $reserved_eid) = $result->fetchrow_array) {
     if (defined($uuid) && $uuid ne "")
     {
@@ -265,8 +265,8 @@ while (($node,$eventstate, $role, $uuid, $isremotenode,
 	    || $eventstate eq TBDB_NODESTATE_PXEWAIT
 	    || $eventstate eq TBDB_NODESTATE_POWEROFF
 	    || $eventstate eq TBDB_NODESTATE_ALWAYSUP);
-    my $isshared = (defined($sharing_mode)
-		    && $sharing_mode eq "shared_local"
+    my $isshared = (defined($erole)
+		    && $erole eq "sharedhost"
 		    && $useshared
 		    && $isup);
     my $isreserved = (defined($reserved_eid)
@@ -528,7 +528,7 @@ if (defined($exempt_eid)) {
 # In shared mode, allow allocated nodes whose sharing_mode is set.
 if ($useshared) {
     $free_condition = "($free_condition or ".
-	"(b.node_id is not null && b.sharing_mode='shared_local' && ".
+	"(b.node_id is not null && b.erole='sharedhost' && ".
 	" np.eventstate='" . TBDB_NODESTATE_ISUP . "'))";
 }
 

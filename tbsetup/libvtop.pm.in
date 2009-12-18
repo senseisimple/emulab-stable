@@ -1094,6 +1094,7 @@ sub LoadVirtLans($)
 	    if ($vlanmember->is_accesspoint());
 	$virtlan->_sharednodes(0);
 	$virtlan->_geninodes(0);
+	$virtlan->_needvlan(0);
 
 	if (defined($encap) &&
 	    ($encap eq "vtun" || $encap eq "gre" || $encap eq "egre")) {
@@ -1171,6 +1172,16 @@ sub LoadVirtLans($)
 
 	# Temporary, for generating rspecs.
 	push(@{ $vlanmember->virt_node()->_virtifaces() }, $vlanmember);
+
+	# Terrible.
+	$vlanmember->_reservebw(0);
+	$vlanmember->_needtrunk(0);
+	if ($vlanmember->virt_node()->type() eq "sppvm") {
+	    $vlanmember->_reservebw($bandwidth);
+	    $vlanmember->_needtrunk(1);
+	    $virtlan->_needvlan(1);
+	    $self->printdb("  Forcing $vlanmember to reserve shared bandwidth\n");
+	}
     }
     return 0;
 }
@@ -1767,14 +1778,16 @@ sub GenVirtLans($)
 
 	    if ($sharednodes) {
 		my $newencap;
-		
-		if ($sharednodes != $allnodes) {
+
+		if ($sharednodes != $allnodes || $vlan->_needvlan()) {
 		    #
 		    # Change the encap type to vlan since that is supported.
 		    #
 		    if ($nodesdo{"vlan"} == $allnodes) {
 			$newencap = "vlan";
 		    }
+		    # Force this on.
+		    $emulated   = 1;
 		}
 		else {
 		    if ($nodesdo{"veth-en"} == $allnodes) {
@@ -1784,11 +1797,15 @@ sub GenVirtLans($)
 		    elsif ($nodesdo{"veth-ne"} == $allnodes) {
 			$newencap = "veth-ne";
 		    }
+		    elsif ($nodesdo{"vlan"} == $allnodes) {
+			$newencap = "vlan";
+		    }
+		    # Force this on.
+		    $emulated   = 1;
 		}
 		if (defined($newencap)) {
-		    $emulated = 1;
 		    $encapval = $newencap;
-		    $vlan->_emulated(1);
+		    $vlan->_emulated($emulated);
 		    $vlan->_encapstyle($newencap);
 
 		    $self->printdb("Converting encapstyle to ".
@@ -3551,8 +3568,7 @@ sub AllocNodes($)
 	my $reservation = $pnode->Reservation();
 	if (!defined($reservation) ||
 	    (! $reservation->SameExperiment($self->experiment()) &&
-	     ! (defined($pnode->sharing_mode()) &&
-		$pnode->sharing_mode() eq "shared_local"))) {
+	     ! $pnode->erole() eq "sharedhost")) {
 	    tbinfo("$pnode is not in shared mode.\n");
 	    $rerun++;
 	}
@@ -4216,8 +4232,9 @@ sub InterpLinks($)
 		    # an underlying vlan. 
 		    # 
 		    #
-		    if (! ($virtnodeA->_onsharednode() &&
-			   $virtnodeB->_onsharednode())) {
+		    if ((!($virtnodeA->_onsharednode() &&
+			   $virtnodeB->_onsharednode())) ||
+			$virtlan->_needvlan()) {
 			my $lanid = "v" . "$lan" . $vlanid++;
 
 			$protovlan = ProtoLan->Create($experiment, $lanid,
@@ -4248,10 +4265,20 @@ sub InterpLinks($)
 		    #
 		    # We need to reserve the shared bandwidth.
 		    #
-		    if (exists($self->delaylinks()->{$plink})) {
-			my (undef,$bandwidth,undef,undef,
-			    undef,$rbandwidth,undef) =
-				@{$self->delaylinks()->{$plink}};
+		    if (exists($self->delaylinks()->{$plink}) ||
+			$member0->_reservebw() || $member1->_reservebw()) {
+			my ($bandwidth,$rbandwidth) = 0;
+			
+			if (exists($self->delaylinks()->{$plink})) {
+			    (undef,$bandwidth,undef,undef,
+			     undef,$rbandwidth,undef) =
+				 @{$self->delaylinks()->{$plink}};
+			}
+			else {
+			    $bandwidth  = $member0->_reservebw();
+			    $rbandwidth = $member1->_reservebw();
+			}
+
 			if ($virtnodeA->_onsharednode() &&
 			    !$self->impotent() && 
 			    $virtifaceA->ReserveSharedBandwidth($bandwidth)) {
@@ -4372,7 +4399,8 @@ sub InterpLinks($)
 		    my $protovlan;
 		    
 		    if (!$virtlan->_sharednodes() ||
-			$virtlan->_sharednodes() != $virtlan->memberlist()) {
+			$virtlan->_sharednodes() != $virtlan->memberlist() ||
+			$virtlan->_needvlan()) {
 			if (exists($protovlans{$lan})) {
 			    $protovlan = $protovlans{$lan};
 			}
@@ -4400,10 +4428,18 @@ sub InterpLinks($)
 		    #
 		    # We need to reserve the shared bandwidth.
 		    #
-		    if (exists($self->delaylinks()->{$plink})) {
-			my (undef,$bandwidth,undef,undef,
-			    undef,$rbandwidth,undef) =
-				@{$self->delaylinks()->{$plink}};
+		    if (exists($self->delaylinks()->{$plink}) ||
+			$member0->_reservebw()) {
+			my ($bandwidth,$rbandwidth) = 0;
+			
+			if (exists($self->delaylinks()->{$plink})) {
+			    (undef,$bandwidth,undef,undef,
+			     undef,$rbandwidth,undef) =
+				 @{$self->delaylinks()->{$plink}};
+			}
+			else {
+			    $bandwidth = $rbandwidth = $member0->_reservebw();
+			}
 			my $maxbw = max($bandwidth, $rbandwidth);
 			if ($virtnodeA->_onsharednode() &&
 			    !$self->impotent() && 
@@ -4774,10 +4810,9 @@ sub InitializePhysNode($$$)
 	# this experiment; just skip it since it was setup when its
 	# holding experiment swapped it in.
 	#
-	if (defined($pnode->sharing_mode()) &&
-	    $pnode->sharing_mode() eq "shared_local" &&
-	    !$pnode->isvirtnode()) {
-	    $self->printdb("InitPnode: Skipping shared_local node $pnode\n");
+	if (defined($pnode->sharing_mode()) && !$pnode->isvirtnode() &&
+	    $pnode->erole() eq "sharedhost") {
+	    $self->printdb("InitPnode: Skipping shared host $pnode\n");
 	    return 0;
 	}
     
@@ -5169,7 +5204,8 @@ sub NewVirtIface($$$$;$)
     # If the pnode is a shared host, we do not want to do this; the physical
     # interfaces are all set up the right way, do not mess it up. 
     #
-    if (defined($pport) && $isvdev && !$pnode->_sharedhost()) {
+    if (defined($pport) && $isvdev &&
+	(!$pnode->_sharedhost() || $member->_needtrunk())) {
 	my $speed = $self->interfacespeedmbps(physinterfacetype($pnode,$pport),
 					      "ethernet");
 	my $trunk = ($type eq "vlan" ? 1 : 0);

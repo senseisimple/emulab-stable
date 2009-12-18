@@ -41,6 +41,7 @@ use libdb qw(TBGetSiteVar EXPTSTATE_SWAPPED EXPTSTATE_ACTIVE TBOPSPID
 	     TBDB_NODESTATE_TBFAILED);
 use User;
 use Node;
+use Lan;
 use OSinfo;
 use Image;
 use Interface;
@@ -738,6 +739,7 @@ sub GetTicketAuxAux($$$$$$$$)
 			$ref->{'exclusive'} = $exclusive = 0;
 			# Kludge for libvtop.
 			$virtexperiment->multiplex_factor(1);
+			$virtexperiment->encap_style("vlan");
 		    }
 		}
 		else {
@@ -2094,6 +2096,34 @@ sub SliverWorkAux($$$$$$$)
 	if ($?) {
 	    $message = "Could not set up vlans";
 	    goto bad;
+	}
+	foreach my $linkref (@{$rspec->{'link'}}) {
+	    my $vname = $linkref->{"nickname"} || $linkref->{"virtual_id"};
+	    my $vlan;
+
+	    my $lan = Lan->Lookup($experiment, $vname, 1);
+	    if (!defined($lan)) {
+		print STDERR "No lan object for $vname\n";
+		next;
+	    }
+	    if ($lan->type() eq "vlan") {
+		$vlan = VLan->Lookup($experiment, $vname);
+	    }
+	    elsif (defined($lan->link())) {
+		$vlan = VLan->Lookup($lan->link());
+	    }
+
+	    if (!defined($vlan)) {
+		print STDERR "Could not find a vlan for $vname\n";
+		next;
+	    }
+	    my $tag;
+	    $vlan->GetTag(\$tag);
+	    if (!defined($tag)) {
+		print STDERR "No tag for $vlan\n";
+		next;
+	    }
+	    $linkref->{"vlantag"} = $tag;
 	}
     }
 	
@@ -3953,6 +3983,72 @@ sub CreateManifest($)
 
 sub CreateRspec($)
 {
+}
+
+#
+# Update the manifest with the new vlan tags. 
+#
+sub UpdateManifest($)
+{
+    my ($slice) = @_;
+
+    my $experiment = GeniExperiment($slice);
+    if (!defined($experiment)) {
+	print STDERR "No local experiment for $slice\n";
+	return -1;
+    }
+    my $aggregate = GeniAggregate->SliceAggregate($slice);
+    if (!defined($aggregate)) {
+	print STDERR "No aggregate for $slice\n";
+	return -1;
+    }
+    my $rspec = $aggregate->GetManifest(0);
+    if (!defined($rspec)) {
+	print STDERR "No manifest for $slice/$aggregate\n";
+	return -1;
+    }
+    my @vlanlist = ();
+    my %vlantags = ();
+    VLan->ExperimentVLans($experiment, \@vlanlist);
+    foreach my $vlan (@vlanlist) {
+	my $tag;
+	$vlan->GetTag(\$tag);
+	if (!defined($tag)) {
+	    print STDERR "UpdateManifest: No tag for $vlan\n";
+	}
+	$vlantags{$vlan->vname()} = $tag;
+    }
+    foreach my $linkref (@{$rspec->{'link'}}) {
+	my $vname = $linkref->{"nickname"} || $linkref->{"virtual_id"};
+	my $tag   = (exists($vlantags{$vname}) ? $vlantags{$vname} : undef);
+	if (!defined($tag)) {
+	    delete($linkref->{"vlantag"})
+		if (exists($linkref->{"vlantag"}));
+	}
+	else {
+	    $linkref->{"vlantag"} = $tag;
+	}
+	
+    }
+    my $manifest =
+	eval { XMLout($rspec, "NoAttr" => 1, RootName => "manifest") };
+    if ($@) {
+	print STDERR "Manifest: XMLout error: $@\n";
+	print STDERR Dumper($rspec);
+	return -1;
+    }
+    
+    #
+    # Move this elsewhere.
+    #
+    $manifest = DBQuoteSpecial($manifest);
+    my $slice_uuid = $slice->uuid();
+
+    DBQueryWarn("update geni_manifests set ".
+		"  manifest=$manifest ". 
+		"where slice_uuid='$slice_uuid'");
+
+    return 0;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

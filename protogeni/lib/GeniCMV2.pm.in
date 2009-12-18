@@ -655,6 +655,9 @@ sub SliverAction($$$$)
 	goto bad
 	    if (GeniResponse::IsResponse($response));
 
+	if ($action eq "start") {
+	    GeniCM::UpdateManifest($slice);
+	}
 	$slice->UnLock();
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS);
     }
