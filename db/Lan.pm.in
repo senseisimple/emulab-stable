@@ -51,9 +51,9 @@ my %LanTables = ("lans"           => ["lanid"],
 #
 # Lookup and create a class instance to return.
 #
-sub Lookup($$;$)
+sub Lookup($$;$$)
 {
-    my ($class, $arg1, $arg2) = @_;
+    my ($class, $arg1, $arg2, $linkokay) = @_;
     my $lanid;
     my $experiment;
 
@@ -81,10 +81,10 @@ sub Lookup($$;$)
     # Two args means lookup by exptidx,vname.
     #
     if (defined($arg2)) {
+	my $clause = (!defined($linkokay) ? "and link is null" : "");
 	my $result =
 	    DBQueryWarn("select lanid from lans ".
-			"where exptidx='$arg1' and vname='$arg2' and ".
-			"      link is null");
+			"where exptidx='$arg1' and vname='$arg2' $clause");
 
 	return undef
 	    if (! $result || !$result->numrows);
