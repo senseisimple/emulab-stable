@@ -2642,6 +2642,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tmcd/freebsd/supfile tmcd/freebsd/sethostname \
 	tmcd/linux/GNUmakefile tmcd/linux/supfile \
 	tmcd/linux/sethostname.dhclient \
+	tmcd/linux/xen/emulab-cnet \
 	tmcd/linux9/GNUmakefile tmcd/linux9/supfile \
 	tmcd/fedora/GNUmakefile tmcd/fedora/supfile \
         tmcd/linux-sg/GNUmakefile tmcd/ubuntu7/GNUmakefile \
