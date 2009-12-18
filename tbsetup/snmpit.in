@@ -164,7 +164,8 @@ if ($opt{q}) {
     $quiet = 1;
     if ($opt{m} || $opt{o} || $opt{t} || $opt{r} || $opt{X} || $opt{T} ||
 	  $opt{E} || $opt{U} || $opt{u} || $opt{d} || $opt{p} || $opt{e}) {
-	my $nulldev = open(">>/dev/null");
+	my $nulldev;
+        open($nulldev, ">>/dev/null");
 	select $nulldev; # supresses print foo(); without explicit fileglob
     }
 }
