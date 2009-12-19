@@ -13,6 +13,7 @@ DISTCLEAN_FILES = @DISTCLEAN_FILES@
 EVENTSYS	= @EVENTSYS@
 PELABSUPPORT	= @PELABSUPPORT@
 PGENISUPPORT    = @PROTOGENI_SUPPORT@
+ISMAINSITE	= @TBMAINSITE@
 SYSTEM	       := $(shell uname -s)
 
 include Makeconf
@@ -32,7 +33,10 @@ ifeq ($(STANDALONE_CLEARINGHOUSE),0)
 SUBDIRS = lib db assign www @optional_subdirs@ ipod security sensors \
 		pxe tbsetup account tmcd utils backend tip capture ipod vis \
 		sensors os xmlrpc install/newnode_sshkeys mote tools/whol \
-		tools/svn wiki bugdb collab tools/rmanage protogeni node_usage
+		tools/svn wiki bugdb collab protogeni node_usage
+ifeq ($(ISMAINSITE),1)
+SUBDIRS += tools/rmanage
+endif
 else
 SUBDIRS = db tbsetup account protogeni
 endif

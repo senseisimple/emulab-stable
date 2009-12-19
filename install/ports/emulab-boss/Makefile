@@ -1,13 +1,17 @@
 # New ports collection makefile for: emulab-boss
 # Date created:         28 January 2003
 # Whom:                 ricci@cs.utah.edu
+# Updated:              1 October 2009 jwalsh@atl.lmco.com
 
 # Need the major version number to figure out to do.
 OSMAJOR!= /usr/bin/uname -r | /usr/bin/sed -e 's/\..*//'
 OSMINOR!= /usr/bin/uname -r | /usr/bin/sed -e 's/[0-9][0-9]*\.\([0-9][0-9]*\).*/\1/'
 
 PORTNAME=	emulab-boss
-.if ${OSMAJOR} >= 6
+.if ${OSMAJOR} > 6
+PORTVERSION=	3.0
+.else
+.if ${OSMAJOR} == 6
 .if ${OSMINOR} >= 3
 PORTVERSION=	2.1
 .else
@@ -15,6 +19,7 @@ PORTVERSION=	2.0
 .endif
 .else
 PORTVERSION=	1.7
+.endif
 .endif
 CATEGORIES=	misc
 MASTER_SITES=	#none
@@ -50,6 +55,7 @@ MAINTAINER=	ricci@cs.utah.edu
 # Various ports need to agree on what version of apache. Make sure this
 # agrees with what is in the emulab-ops and emulab-php4 metaports.
 #
+.MAKEFLAGS+=	-DWITH_APACHE
 .MAKEFLAGS+=	APACHE_PORT=www/apache13-modssl
 
 #
@@ -62,7 +68,7 @@ MAINTAINER=	ricci@cs.utah.edu
 # XXX not really a build dependency, but needs to get installed before
 # any attempt to install mysql50-* ports
 #
-.if ${PORTVERSION} == "2.1"
+.if (${PORTVERSION} == "2.1" || ${PORTVERSION} == "3.0")
 BUILD_DEPENDS=	\
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Mysql.pm:${PORTSDIR}/misc/p5-DBD-mysql50-old
 .else
@@ -71,7 +77,7 @@ BUILD_DEPENDS=	\
 .endif
 
 LIB_DEPENDS= gd.4:${PORTSDIR}/graphics/gd \
-	lthread.[23]:${PORTSDIR}/devel/linuxthreads \
+	lthread.[23456]:${PORTSDIR}/devel/linuxthreads \
 	mhash.2:${PORTSDIR}/security/mhash \
 	mysqlclient.15:${PORTSDIR}/databases/mysql50-client \
 	snmp.4:${PORTSDIR}/net-mgmt/net-snmp4 \
@@ -112,19 +118,27 @@ RUN_DEPENDS=	\
 	xvcg:${PORTSDIR}/graphics/vcg \
 	${LOCALBASE}/libexec/tftpd:${PORTSDIR}/misc/emulab-tftp-hpa \
 	sudo:${PORTSDIR}/security/sudo \
-	dhcpd:${PORTSDIR}/net/isc-dhcp3-server \
 	wget:${PORTSDIR}/ftp/wget \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/XML/Parser:${PORTSDIR}/textproc/p5-XML-Parser \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/RPC/XML.pm:${PORTSDIR}/net/p5-RPC-XML \
 	${PYTHON_SITELIBDIR}/M2Crypto/ASN1.py:${PORTSDIR}/security/py-m2crypto \
-	${LOCALBASE}/include/boost:${PORTSDIR}/devel/boost \
+
 	gmake:${PORTSDIR}/devel/gmake \
 	kmetis:${PORTSDIR}/math/metis \
         curl:${PORTSDIR}/ftp/curl \
 	${PYTHON_SITELIBDIR}/MySQLdb/times.py:${PORTSDIR}/databases/py-MySQLdb \
 	mysqlhotcopy:${PORTSDIR}/databases/mysql50-scripts
 
-.if ${PORTVERSION} == "2.1"
+.if (${PORTVERSION} == "2.1" || ${PORTVERSION} == "3.0")
+.if ${PORTVERSION} == "3.0"
+RUN_DEPENDS+=	\
+	dhcpd:${PORTSDIR}/net/isc-dhcp30-server \
+	${LOCALBASE}/include/boost:${PORTSDIR}/devel/boost-all
+.else
+RUN_DEPENDS+=	\
+	dhcpd:${PORTSDIR}/net/isc-dhcp3-server \
+	${LOCALBASE}/include/boost:${PORTSDIR}/devel/boost
+.endif
 RUN_DEPENDS+=	\
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/XML/Parser.pm:${PORTSDIR}/textproc/p5-XML-Parser
 # not sure why this is just needed for 6.3
@@ -147,6 +161,12 @@ RUN_DEPENDS+= cvsup:${PORTSDIR}/net/cvsup-without-gui \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/DBI.pm:${PORTSDIR}/databases/p5-DBI-137 \
 	swig1.1:${PORTSDIR}/devel/swig11 \
 	${LOCALBASE}/sbin/named:${PORTSDIR}/dns/bind9
+.endif
+
+# this wasn't getting installed correctly
+.if ${OSMAJOR} >= 7
+RUN_DEPENDS+= \
+	${LOCALBASE}/libexec/apache/libphp4.so:${PORTSDIR}/misc/emulab-php4
 .endif
 
 USE_PERL5=	yes

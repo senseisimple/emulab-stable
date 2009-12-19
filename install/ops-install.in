@@ -111,7 +111,10 @@ else {
 my $OPS_PORT = "emulab-ops-1.4"; 
 my $FS_PORT = "emulab-fs-1.4";
 if ($FBSD_MAJOR > 4) {
-    if ($FBSD_MAJOR == 6 && $FBSD_MINOR > 2) {
+    if ($FBSD_MAJOR > 6) {
+	$OPS_PORT = "emulab-ops-3.0";
+	$FS_PORT = "emulab-fs-3.0";
+    } elsif ($FBSD_MAJOR == 6 && $FBSD_MINOR > 2) {
 	$OPS_PORT = "emulab-ops-2.1";
 	$FS_PORT = "emulab-fs-2.1";
     } else {
@@ -534,20 +537,22 @@ Phase "portfixup", "Fixing up packages", sub {
 };
 
 Phase "patches", "Applying patches", sub {
-    Phase "m2cryptopatch", "Patching m2crypto", sub {
-	my $patchfile = $M2CRYPTO_PATCH;
+    if ($FBSD_MAJOR < 7) {
+	Phase "m2cryptopatch", "Patching m2crypto", sub {
+	    my $patchfile = $M2CRYPTO_PATCH;
 
-	if (ExecQuiet("$PKG_INFO -I -x m2crypto | fgrep -q -s '0.17'") == 0) {
-	    $patchfile = "${patchfile}-0.17";
-	}
-	elsif (ExecQuiet("$PKG_INFO -I -x m2crypto | fgrep -q -s '0.13'") == 0) {
-	    $patchfile = "${patchfile}-0.13";
-	}
-	if (!ExecQuiet("$PATCH -C -f -l -R -p0 -i $patchfile")) {
-	    PhaseSkip("Patch already applied");
-	}
-	ExecQuietFatal("$PATCH -f -l -p0 -i $patchfile");
-    };
+	    if (ExecQuiet("$PKG_INFO -I -x m2crypto | fgrep -q -s '0.17'") == 0) {
+		$patchfile = "${patchfile}-0.17";
+	    }
+	    elsif (ExecQuiet("$PKG_INFO -I -x m2crypto | fgrep -q -s '0.13'") == 0) {
+		$patchfile = "${patchfile}-0.13";
+	    }
+	    if (!ExecQuiet("$PATCH -C -f -l -R -p0 -i $patchfile")) {
+		PhaseSkip("Patch already applied");
+	    }
+	    ExecQuietFatal("$PATCH -f -l -p0 -i $patchfile");
+	};
+    }
     if ($MAILMANSUPPORT) {
 	Phase "mailmanpatch", "Patching mailman", sub {
 	    my $patchfile = $MAILMAN_PATCH;
@@ -936,6 +941,10 @@ Phase "samba", "Setting up Samba", sub {
 Phase "ssh", "Allowing root ssh", sub {
     Phase "sshdconfig", "Permitting root login through ssh", sub {
 	DoneIfEdited($SSHD_CONFIG);
+	# modern versions of FBSD explicitly turn off proto 1 by default
+	if ($FBSD_MAJOR > 6) {
+	    ExecQuietFatal("sed -i.orig -e 's/Protocol/#Protocol/' $SSHD_CONFIG");
+	}
 	AppendToFileFatal($SSHD_CONFIG,
 			  "PermitRootLogin yes",
 			  "Protocol 2,1");

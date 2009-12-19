@@ -260,7 +260,9 @@ else {
 #
 my $BOSS_PORT = "emulab-boss-1.8";
 if ($FBSD_MAJOR > 4) {
-    if ($FBSD_MAJOR == 6 && $FBSD_MINOR > 2) {
+    if ($FBSD_MAJOR > 6) {
+	$BOSS_PORT = "emulab-boss-3.0";
+    } elsif ($FBSD_MAJOR == 6 && $FBSD_MINOR > 2) {
 	$BOSS_PORT = "emulab-boss-2.1";
     } else {
 	$BOSS_PORT = "emulab-boss-2.0";
@@ -484,7 +486,7 @@ Phase "ports", "Installing ports", sub {
 		ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
 	    };
 	    # XXX Ditto
-	    if ($FBSD_MAJOR == 6 && $FBSD_MINOR > 2) {
+	    if ($FBSD_MAJOR > 6 || ($FBSD_MAJOR == 6 && $FBSD_MINOR > 2)) {
 		Phase "p5-DBD-mysql50", "Installing old Perl Mysql package", sub {
 		    my $pname = `$PKG_INFO -E 'p5-DBD-mysql50-*' 2>/dev/null`;
 		    chomp($pname);
@@ -599,20 +601,22 @@ Phase "patches", "Applying patches", sub {
 	    ExecQuietFatal("$PATCH -f -p0 -i $STL_PATCH");
 	};
     }
-    Phase "m2cryptopatch", "Patching m2crypto", sub {
-	my $patchfile = $M2CRYPTO_PATCH;
+    if ($FBSD_MAJOR < 7) {
+	Phase "m2cryptopatch", "Patching m2crypto", sub {
+	    my $patchfile = $M2CRYPTO_PATCH;
 	
-	if (ExecQuiet("$PKG_INFO -I -x m2crypto | fgrep -q -s '0.17'") == 0) {
-	    $patchfile = "${patchfile}-0.17";
-	}
-	elsif (ExecQuiet("$PKG_INFO -I -x m2crypto | fgrep -q -s '0.13'") == 0) {
-	    $patchfile = "${patchfile}-0.13";
-	}
-	if (!ExecQuiet("$PATCH -C -f -l -R -p0 -i $patchfile")) {
-	    PhaseSkip("Patch already applied");
-	}
-	ExecQuietFatal("$PATCH -f -l -p0 -i $patchfile");
-    };
+	    if (ExecQuiet("$PKG_INFO -I -x m2crypto | fgrep -q -s '0.17'") == 0) {
+		$patchfile = "${patchfile}-0.17";
+	    }
+	    elsif (ExecQuiet("$PKG_INFO -I -x m2crypto | fgrep -q -s '0.13'") == 0) {
+		$patchfile = "${patchfile}-0.13";
+	    }
+	    if (!ExecQuiet("$PATCH -C -f -l -R -p0 -i $patchfile")) {
+		PhaseSkip("Patch already applied");
+	    }
+	    ExecQuietFatal("$PATCH -f -l -p0 -i $patchfile");
+	};
+    }
     Phase "Mysql.pm.patch", "Patching Mysql.pm", sub {
 	my $patchfile = $MYSQL_PM_PATCH;
 	$patchfile = `realpath $patchfile`;
@@ -1006,19 +1010,20 @@ Phase "NFSmounts", "Setting up NFS mounts", sub {
     };
     Phase "fstab", "Adding NFS mounts to $FSTAB", sub {
 	DoneIfEdited($FSTAB);
-	my @lines = ("$FSNODE:$USERROOT\t\t$USERROOT\tnfs\trw,nodev,nosuid\t0\t0",
-		     "$FSNODE:$PROJROOT\t\t$PROJROOT\tnfs\trw,nodev,nosuid\t0\t0",
-		     "$FSNODE:$GROUPROOT\t\t$GROUPROOT\tnfs\trw,nodev,nosuid\t0\t0",
-		     "$FSNODE:$SHAREROOT\t\t$SHAREROOT\tnfs\trw,nodev,nosuid\t0\t0");
+	my $nfsopt = "nosuid";
+	$nfsopt .= ",nodev"
+	    if ($FBSD_VERSION < 7);
+	my @lines = ("$FSNODE:$USERROOT\t\t$USERROOT\tnfs\trw,$nfsopt\t0\t0",
+		     "$FSNODE:$PROJROOT\t\t$PROJROOT\tnfs\trw,$nfsopt\t0\t0",
+		     "$FSNODE:$GROUPROOT\t\t$GROUPROOT\tnfs\trw,$nfsopt\t0\t0",
+		     "$FSNODE:$SHAREROOT\t\t$SHAREROOT\tnfs\trw,$nfsopt\t0\t0");
 	if ($SCRATCHDIR) {
 	    push(@lines,
-		 "$FSNODE:$SCRATCHROOT\t\t$SCRATCHROOT\tnfs\trw,nodev,nosuid\t0\t0");
+		 "$FSNODE:$SCRATCHROOT\t\t$SCRATCHROOT\tnfs\trw,$nfsopt\t0\t0");
 	}
 	push(@lines,
-	     "$USERNODE:/usr/testbed\t\t$OPSDIR_DIR\tnfs\trw,soft,".
-	     "-b,nodev,nosuid\t0\t0",
-	     "$USERNODE:/var\t\t$USERSVAR_DIR\tnfs\tro,soft,".
-	     "-b,nodev,nosuid\t0\t0");
+	     "$USERNODE:/usr/testbed\t\t$OPSDIR_DIR\tnfs\trw,soft,-b,$nfsopt\t0\t0",
+	     "$USERNODE:/var\t\t$USERSVAR_DIR\tnfs\tro,soft,-b,$nfsopt\t0\t0");
 	AppendToFileFatal($FSTAB, @lines);
     };
     Phase "mounts", "Mounting NFS filesystems", sub {
@@ -1209,7 +1214,13 @@ Phase "sslcerts", "Setting up SSL certificates", sub {
 	};
 	Phase "rc.d", "Installing Apache startup file", sub {
 	    DoneIfExists("$RCDIR/apache.sh");
-	    ExecQuietFatal("mv $RCDIR/apache.sh.sample $RCDIR/apache.sh");
+	    my $sfile
+	    if ($FBSD_MAJOR > 6) {
+		$sfile = "$RCDIR/apache";		
+	    } else {
+		$sfile = "$RCDIR/apache.sh.sample";
+	    }
+	    ExecQuietFatal("mv $sfile $RCDIR/apache.sh");
 	    if ($FBSD_MAJOR == 6) {
 		ExecQuietFatal("sed -i .orig ".
 			       "-e 's/^apache_enable/#apache_enable/' ".
