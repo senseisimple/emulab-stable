@@ -1,0 +1,50 @@
+#! /bin/sh
+
+if [ -z "$GIT_DIR" ] || ! [ -r "$GIT_DIR" ]; then
+	GIT_DIR=`git rev-parse --git-dir`
+	if [ -z "$GIT_DIR" ]; then
+		echo "GIT_DIR is not defined or is unreadable" 1>&2
+		exit 1
+	fi
+fi
+
+branch=$1
+
+if [ -z "$branch" ]; then
+	branch=`git branch | sed -n 's/^* //p'`
+fi
+
+remote=`git config branch.$branch.remote`
+remote_branch=`git config branch.$branch.merge`
+cvsdir=`git config branch.$branch.cvsdir`
+
+[ "$remote" = . ] && remote=''
+
+if [ -z "$remote" ]; then
+	echo "Branch \"$branch\" is not a remote tracking branch" 1>&2
+	exit 1
+elif [ -z "$cvsdir" ]; then
+	echo "Branch \"$branch\" has no cvsdir set" 1>&2
+	exit 1
+fi
+
+remote_branch_head=`git ls-remote $remote $remote_branch | cut -f1`
+
+git show $remote_branch_head 2>&1 | \
+	grep "fatal: bad object $remote_branch_head" > /dev/null
+rc=$?
+if [ $rc -eq 0 ]; then
+	echo "Your repository is not up-to-date" 1>&2
+	exit 1
+fi
+
+git cherry $remote_branch_head refs/heads/$branch | sed -n 's/^+ //p' | while read commit; do
+	# You can use git-cvsexportcommit here, but mine also handles
+	# the case of a patch already being applied.
+	git-cvsexportcommit.mod -w "$cvsdir" -c -u -p -v -v -v $commit
+	rc=$?
+	if [ $rc -ne 0 ]; then
+		echo "Failed to apply commit $commit. Fix it and retry." 1>&2
+		exit 1
+	fi
+done
