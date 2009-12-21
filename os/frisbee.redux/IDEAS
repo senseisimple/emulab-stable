@@ -20,11 +20,20 @@ Sources of info for the following include (from the testbed source repo):
    Disk:
    * 40GB -> 500-1000GB (12-25x increase in capacity)
    * ~50MB/sec -> ~100-150MB/sec (2-3x increase in throughput)
+   * 7200-10000 rpm -> 7200-15000 rpm (0-1.5x decrease in rotational delay)
+   SSDs:
+   * 64-256GB
+   * 100-250MB/sec
+   * near zero latency
    Net:
    * 100Mb/sec -> 1000Mb/sec (10x increase in BW)
 
    The bottlenecks and thus trade-offs have changed.  This drives the changes
    below that we have made to frisbee...blah, blah.
+
+   One example: drives have become faster due to increased density, but
+   heads/spindles don't move much faster.  Thus avoiding seeks becomes even
+   more important.
 
    Is disk imaging still relevant?  There has been an increasing shift toward
    virtualization, and with that, the use of virtual disks.  These disks can
