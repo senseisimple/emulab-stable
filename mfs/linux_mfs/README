@@ -35,4 +35,3 @@ BUGS
     good fix for.
   - There are some minor dependency issues in building some of the
     targets that cause other targets to be rebuilt unnecessarily.
-- Documentation sucks.
