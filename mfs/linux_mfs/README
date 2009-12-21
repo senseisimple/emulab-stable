@@ -30,12 +30,9 @@ BUGS
 ----
 - There are no docs (except this, and it sucks).
 - The build system needs some work:
-  - The kernel image isn't installed anywhere
   - There are occasional problems building the toolchain.  These are due
     to weird bugs in the gcc build process that I haven't figured out a
     good fix for.
   - There are some minor dependency issues in building some of the
     targets that cause other targets to be rebuilt unnecessarily.
 - Documentation sucks.
-- The hotplug scripts that work with mdev (busybox's stripped-down udev)
-  need to be cleaned up a bit.
