@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -44,6 +44,7 @@ my $TIMESTAMPS	 = "@TIMESTAMPS@";
 my $TBOPSEMAIL	 = "@TBOPSEMAIL@";
 my $TBWWWEMAIL	 = "@TBWWWEMAIL@";
 my $TBAUDITEMAIL = "@TBAUDITEMAIL@";
+my $UUIDGEN	 = "@UUIDGEN@";
 my $NOREPLY      = "no-reply\@@OURDOMAIN@";
 my $SCRIPTNAME	 = "Unknown";
 
@@ -781,7 +782,7 @@ sub TBScriptUnlock()
 #
 sub NewUUID()
 {
-    my $uuid = `/usr/bin/uuidgen`;
+    my $uuid = `$UUIDGEN`;
 
     if ($uuid =~ /^(\w{8}\-\w{4}\-\w{4}\-\w{4}\-\w{12})$/) {
 	return $1;

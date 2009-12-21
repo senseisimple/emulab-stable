@@ -219,6 +219,12 @@ NAMED_FORWARDERS="1.1.1.1 1.1.2.1"
 WINSUPPORT=0
 
 #
+# Enable an NS verification path using a clean version of NS.
+# There is no reason to disable this unless NS won't build on your ops node.
+#
+NSVERIFY=1
+
+#
 # Virtual node network configuration (if you don't want virtual nodes,
 # just leave this as is)
 #

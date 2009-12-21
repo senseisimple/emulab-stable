@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -8,10 +8,14 @@ SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ..
 SUBDIR		= tools
+ISMAINSITE	= @TBMAINSITE@
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS = teachswitch webcamapplet whol svn rmanage
+SUBDIRS = teachswitch webcamapplet whol svn
+ifeq ($(ISMAINSITE),1)
+SUBDIRS += rmanage
+endif
 
 ifneq ($(host_cpu),arm)
 SUBDIRS += pcapper

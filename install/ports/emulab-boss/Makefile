@@ -11,7 +11,7 @@ PORTNAME=	emulab-boss
 .if ${OSMAJOR} > 6
 PORTVERSION=	3.0
 .else
-.if ${OSMAJOR} == 6
+.if ${OSMAJOR} > 5
 .if ${OSMINOR} >= 3
 PORTVERSION=	2.1
 .else
@@ -77,7 +77,7 @@ BUILD_DEPENDS=	\
 .endif
 
 LIB_DEPENDS= gd.4:${PORTSDIR}/graphics/gd \
-	lthread.[23456]:${PORTSDIR}/devel/linuxthreads \
+	lthread.[236]:${PORTSDIR}/devel/linuxthreads \
 	mhash.2:${PORTSDIR}/security/mhash \
 	mysqlclient.15:${PORTSDIR}/databases/mysql50-client \
 	snmp.4:${PORTSDIR}/net-mgmt/net-snmp4 \

@@ -6,7 +6,10 @@ OSMAJOR!= /usr/bin/uname -r | /usr/bin/sed -e 's/\..*//'
 OSMINOR!= /usr/bin/uname -r | /usr/bin/sed -e 's/[0-9][0-9]*\.\([0-9][0-9]*\).*/\1/'
 
 PORTNAME=	emulab-fs
-.if ${OSMAJOR} >= 6
+.if ${OSMAJOR} > 6
+PORTVERSION=	3.0
+.else
+.if ${OSMAJOR} > 5
 .if ${OSMINOR} >= 3
 PORTVERSION=	2.1
 .else
@@ -14,6 +17,7 @@ PORTVERSION=	2.0
 .endif
 .else
 PORTVERSION=	1.4
+.endif
 .endif
 CATEGORIES=	misc
 MASTER_SITES=	#none
