@@ -1,0 +1,655 @@
+#!/usr/bin/perl -w
+#
+# gitmail - script to send mail for git commits
+# Robert Ricci <ricci@cs.utah.edu>
+# December 2009
+#
+# To set this script up: 
+# 1) Copy or link it to .git/hooks/post-receive in your repository. Make sure
+#    it's world-readable and executable.
+# 2) Set configuration options by editng the values of variables directly
+#    below
+#       OR
+#    Set the simple values with git options: run
+#       git config --add hooks.gitmail.<optname> value
+#       (for example:
+#           git config --add hooks.gitmail.alwaysmail ricci@cs.utah.edu
+# 3) Test it by running it with the -d and -t options, which will not send
+#    mail and will give you a chance to make sure everything looks right
+#
+# TODO:
+#    Users can add notifications for themselves
+#    Support branch deletion
+#    Support commits that remove revisions (ie. are not fast-forwards)
+#    Support tag creation/deletion/etc.
+#
+
+use strict;
+use POSIX 'setsid';
+use Getopt::Long;
+sub get_config($$);
+my $CONFIGBASE = "hooks.gitmail";
+
+######################################################################
+# Configuration Options
+# Options that use get_config can be set using 'git config' - if not
+# set, the second parameter is used as the default
+######################################################################
+
+#
+# If debugging is enabled, prints a lot of messages and doesn't actually send
+# mail.
+#
+my $debug = get_config("debug",undef);
+
+#
+# If set, just picks up the most recent commits instead of reading them from
+# stdin. Note that this one doesn't look in the git config; that wouldn't
+# make any sense.
+#
+my $testmode = undef;
+
+#
+# Command-line options - have to do this before setting other options, since
+# we want to be able to turn on debugging early
+#
+my %opt;
+if (!GetOptions(\%opt, 'd', 'h', 't') || @ARGV || $opt{h}) {
+    print STDERR "Usage: gitmail [-h|-d]\n";
+    print STDERR "  -h    this message\n";
+    print STDERR "  -d    enable debugging output and don't send mail\n";
+    print STDERR "  -t    test mode - operate on last 3 commits to master\n";
+}
+
+if ($opt{d}) { $debug    = 1; }
+if ($opt{t}) { $testmode = 1; }
+
+#
+# Name of this repository - set it to a string to get it included in the
+# mail subject line and the X-Git-Repo header
+#
+my $reponame = get_config("reponame",undef);
+
+#
+# Data structure mapping paths to email addresses. This should be a list of
+# pairs: the first element of the pair is interpreted as a regular expression,
+# and is matched against every filename in the commit. If it matches any of
+# them, mail is sent to the second element of the pair, which may be a string
+# or an array ref containing a list of strings.
+#
+# *NOTE* This are perl regexps, not shell globs! *NOTE*
+#
+my @mailpaths = (
+# Examples:
+#    [ '^protogeni/',            'ricci@cs.utah.edu'],
+#    [ 'snmpit',                ['ricci@flux.utah.edu',
+#                                'sklower@vangogh.cs.berkeley.edu'] ]
+);
+
+#
+# Data structure mapping branch names to email addresses. Works like the one
+# above, but matches on branch names instead. Note that if the branch matches,
+# email will be sent no matter what the path.
+# TODO: Possibly, this should override path matches, instead of being
+#       additive
+#
+my @mailbranches = (
+# Example
+#    [ '^ricci-', 'ricci+branch@flux.utah.edu' ]
+);
+
+#
+# Default mail address - if none of the more specific regular expressions
+# match, send to this address
+#
+my $defmail = get_config("defmail",undef);
+
+#
+# If set, *always* send mail to this address (even if one or more regexps
+# match). ($defmail will still be used if no regexps match)
+#
+my $alwaysmail = get_config("alwaysmail",undef);
+
+#
+# If set to true, detach and run in background - the push doesn't return until
+# the hook finishes, so doing this means the pusher doesn't have to wait for
+# us to finish
+# Note: Not well tested!
+#
+my $detach = get_config("detach",undef);
+
+#
+# If set to true, send a separate mail message for every single commit. If
+# false, pushes of multiple commits along a branch get included in the same
+# mail.
+#
+my $separate_mail = get_config("separate_mail",undef);
+
+######################################################################
+# Constants
+######################################################################
+
+#
+# Programs we use
+#
+my $GIT = "git";
+my $SENDMAIL = get_config("sendmail","sendmail");
+
+#
+# Magic 'hash' that indicates an empty or non-existant rev
+#
+my $EMPTYREV = "0"x40;
+
+#
+# Types of changes
+#
+my $CT_CREATE = "create";
+my $CT_UPDATE = "update";
+my $CT_DELETE = "delete";
+
+#
+# Tired of typing this and getting it wrong
+#
+my $STDERRNULL = " 2> /dev/null";
+
+######################################################################
+# Function Prototypes
+######################################################################
+sub change_type($$);
+sub rev_type($);
+sub revparse($);
+sub changed_files($$);
+sub get_mail_addresses($@);
+sub uniq(@);
+sub flatten_arrayref($);
+sub commit_mail($$$@);
+sub get_commits($$$);
+sub send_mail($$@);
+sub short_refname($);
+sub debug(@);
+sub rev_string($$);
+
+######################################################################
+# Main Body
+######################################################################
+
+debug("starting");
+
+my @reflines;
+if ($testmode) {
+    #
+    # Provide a simple way to grab some commits - the three most recent ones
+    #
+    @reflines = ('master~2 master refs/heads/master');
+} else {
+    #
+    # Get all of the references that are being pushed from stdin - we do this in
+    # one slurp so that we can detach below
+    #
+    @reflines = <STDIN>;
+    debug("finished reading stdin");
+}
+
+
+#
+# Detach?
+#
+if ($detach && !$debug) {
+    # Stolen from perlipc manpage
+    chdir '/'               or die "Can't chdir to /: $!";
+    open STDIN, '/dev/null' or die "Can't read /dev/null: $!";
+    open STDOUT, '>/dev/null'
+                            or die "Can't write to /dev/null: $!";
+    defined(my $pid = fork) or die "Can't fork: $!";
+    exit if $pid;
+    setsid                  or die "Can't start a new session: $!";
+    open STDERR, '>&STDOUT' or die "Can't dup stdout: $!";
+}
+
+#
+# Loop over all of the references we got on stdin
+#
+foreach my $refline (@reflines) {
+    chomp $refline;
+    debug("Read line '$refline'");
+
+    #
+    # Each line we get on stdin gives us an old revision, a new revision, and
+    # a reference (such as the branch name). It's our job to figure out what
+    # happened in the middle
+    #
+    my ($oldrev, $newrev, $refname) = split(/\s+/, $refline);
+
+    #
+    # Use rev-parse so that fancy symbolic names, etc. can be used
+    # Note: revparse can die if the name given is bogus
+    #
+    $oldrev = revparse($oldrev);
+    $newrev = revparse($newrev);
+
+    #
+    # Figure out what type of change occured (update, creation, deletion, etc.)
+    # and what type of objects (commit, tree, etc.) we got
+    #
+    my $ct = change_type($oldrev,$newrev);
+    my $old_type = rev_type($oldrev);
+    my $new_type = rev_type($newrev);
+
+    debug("Change type: $ct ($old_type,$new_type)");
+
+    #
+    # For now, only handle commits that update existing branches or make
+    # new ones
+    #
+    if ($new_type ne "commit") {
+        debug("Skipping non-commit");
+        next;
+    }
+
+    #
+    # Get a list of all of the files that changed
+    #
+    my @changed_files = changed_files($oldrev,$newrev);
+    debug("Changed files: ", join(",",@changed_files));
+
+    #
+    # Based on the list of files, figure out who to mail
+    #
+    my @mailaddrs = get_mail_addresses($refname,@changed_files);
+    debug("Mailing to: ", join(",",@mailaddrs));
+
+    #
+    # Send off the mail!
+    #
+    if (@mailaddrs) {
+        print "Sending email notification to ", join(",",@mailaddrs), "\n";
+        commit_mail($oldrev,$newrev,$refname,@mailaddrs);
+    }
+}
+
+debug("finishing");
+
+######################################################################
+# Functions
+######################################################################
+
+#
+# Does this change represent the creation, deletion, or update of an object?
+# Takes old and new revs
+#
+sub change_type($$) {
+    my ($oldrev, $newrev) = @_;
+        
+    #
+    # We can detect creates and deletes by looking for a special 'null'
+    # revision
+    #
+    if ($oldrev eq $EMPTYREV) {
+        return $CT_CREATE;
+    } elsif ($newrev eq $EMPTYREV) {
+        return $CT_DELETE;
+    } else {
+        return $CT_UPDATE;
+    }
+}
+
+#
+# Find out what type an object has
+#
+sub rev_type($) {
+    my ($rev) = @_;
+    my $rev_type = `git cat-file -t '$rev' $STDERRNULL`;
+    chomp $rev_type;
+    return $rev_type;
+}
+
+#
+# Parse (possibly) symbolic revision name into hash
+# Note: Dies if the revision name is bogus!
+#
+sub revparse($) {
+    my ($rev) = @_;
+    open(RP,"$GIT rev-parse $rev $STDERRNULL |");
+    my $parsedrev = <RP>;
+    my $okay = close(RP);
+    if (!$okay) {
+        die "gitmail: $rev is not a valid revision\n";
+    }
+    chomp $parsedrev;
+    return $parsedrev;
+}
+
+#
+# Given two revisions, return an list of the files that were changed between
+# them
+#
+sub changed_files($$) {
+    my ($oldrev,$newrev) = @_;
+
+    my $revstring = rev_string($oldrev,$newrev);
+    debug("running '$GIT diff-tree -r --name-only '$revstring''");
+    my @lines = `$GIT diff-tree -r --name-only '$revstring' $STDERRNULL`;
+    chomp @lines;
+    return @lines;
+}
+
+#
+# Given a refname and a list of filenames, return the set of email addresses
+# the report should be sent to
+#
+sub get_mail_addresses($@) {
+    my ($refname, @changedfiles) = @_;
+    my @addrs;
+    my $matched = 0;
+
+    #
+    # Note: we use flatten_arrayref so that either individual strings or array
+    # references containing lists of addresses can be used
+    #
+
+    #
+    # If there's an address we're always supposed to send to, include that now
+    #
+    if (defined($alwaysmail)) {
+        push @addrs, flatten_arrayref($alwaysmail);
+        debug("Used alwaysmail address $alwaysmail");
+    }
+
+    #
+    # Check to see if there's a particular address we're supposed to use for
+    # this ref
+    #
+    if ($refname =~ /^refs\/heads\/(.*)/) {
+        my $branchname = $1;
+        foreach my $entry (@mailbranches) {
+            my ($regexp, $addr) = @$entry;
+            if ($branchname =~ $regexp) {
+                push @addrs, flatten_arrayref($addr);
+                $matched = 1;
+                debug("Matched branch regexp /$regexp/, adding ",
+                        join(",",flatten_arrayref($addr)));
+            }
+        }
+    }
+
+    #
+    # Check every single file and add the addresses in - we'll weed out
+    # duplicates later
+    #
+    foreach my $file (@changedfiles) {
+        foreach my $entry (@mailpaths) {
+            my ($regexp, $addr) = @$entry;
+            if ($file =~ $regexp) {
+                push @addrs, flatten_arrayref($addr);
+                $matched = 1;
+                debug("Matched path regexp /$regexp/, adding ",
+                        join(",",flatten_arrayref($addr)));
+            }
+        }
+    }
+
+    #
+    # Fall back to default if no matches (note that an earlier match with an
+    # empty list of addresses will cause this case to not be triggered - this
+    # is intentional)
+    #
+    if (!$matched && defined($defmail)) {
+        @addrs = flatten_arrayref($defmail);
+        debug("Used default address $alwaysmail");
+    }
+    
+    #
+    # Pull out unique values to return
+    #
+    return uniq(@addrs);
+}
+
+#
+# Return only the unique elements of the supplied list. Input does not have
+# to be sorted, sort order of output is undefined.
+#
+sub uniq(@) {
+    my %uniq;
+    map { $uniq{$_} = 1 } @_;
+    return keys %uniq;
+}
+
+#
+# If the parameter is a scalar, just return a one-element array containing the
+# scalar. If it's a reference to an array, return the array referenced.
+#
+sub flatten_arrayref($) {
+    my ($ref) = @_;
+    if (ref($ref) eq "ARRAY") {
+        return @$ref;
+    } else {
+        return ($ref);
+    }
+}
+
+#
+# Send mail about a regular update commit
+#
+sub commit_mail($$$@) {
+    my ($oldrev,$newrev,$refname,@mailaddrs) = @_;
+
+    #
+    # What type of chage was this?
+    #
+    my $ct = change_type($oldrev,$newrev);
+
+    #
+    # Get all commits between these two revisions
+    #
+    my @revs = get_commits($oldrev,$newrev,$refname);
+
+    debug("commits are: ", join(" ",@revs));
+
+    #
+    # Construct the subject line. For now, we just say what repo (if defined)
+    # and what branch it happened on
+    #
+    my $subject = "git commit: ";
+    if (defined($reponame)) {
+        $subject .= "[$reponame] ";
+    }
+    $subject .= "branch " . short_refname($refname);
+
+    if ($ct eq $CT_UPDATE) {
+        $subject .= " updated";
+    } elsif ($ct eq $CT_CREATE) {
+        $subject .= " created";
+    } elsif ($ct eq $CT_DELETE) {
+        $subject .= " deleted";
+    }
+
+    my $actionstring = "Branch " . short_refname($refname) .
+                       " has been ${ct}d\n\n";
+    
+    my @fullbody;
+    foreach my $rev (@revs) {
+        #
+        # Just use regular git show command, with purty +/- summary at the
+        # bottom (formatted to be narrow enough for email)
+        #
+        debug("running '$GIT show --stat=72 '$rev''");
+        my @body = `$GIT show --stat=72 $rev`;
+
+        if ($separate_mail) {
+            # Send this message by itself
+            send_mail($subject,$actionstring . join("",@body),@mailaddrs);
+        } else {
+            push @fullbody,\@body;
+        }
+    }
+
+    #
+    # Send all the changes together in one message
+    #
+    if (!$separate_mail) {
+        send_mail($subject,
+            $actionstring . join("-"x72 . "\n", map { join "",@$_} @fullbody),
+            @mailaddrs);
+    }
+}
+
+#
+# Given two revisions, get a list of the commits that occured between them
+# TODO: Consider leaving out already-reachable commits like the contrib script
+#       does, or at least making it an option
+#
+sub get_commits($$$) {
+    my ($oldrev,$newrev,$refname) = @_;
+    my $ct = change_type($oldrev,$newrev);
+
+    #
+    # If this is an update, we can just ask git for the revisions between the
+    # two revisions we were given
+    #
+    if ($ct eq $CT_UPDATE) {
+        my $revstring = rev_string($oldrev,$newrev);
+
+        debug("running '$GIT rev-list --reverse --date-order '$revstring'");
+        my @revs = `$GIT rev-list --reverse --date-order '$revstring'`;
+        chomp @revs;
+        return @revs;
+
+    } elsif ($ct eq $CT_CREATE) {
+        #
+        # If it's a create, we have to be a bit more fancy: we look for all
+        # commits reachable from the new branch, but *not* reachable from any
+        # other branch (otherwise, we get all of the history back to the dawn
+        # of time). I stole this magic from the contrib post-receive-email hook
+        # from the git distro.
+        #
+
+        #
+        # Get the list of all other branch heads
+        #
+        my @other_branches = `$GIT for-each-ref --format='%(refname)' refs/heads/ | grep -F -v $refname`;
+        chomp @other_branches;
+
+        my $other_branches = join(" ",@other_branches);
+        debug("other branches are: '$other_branches'");
+
+        #
+        # Get a list of commits that are reachable from this branch, and no
+        # others.
+        #
+        debug("running '$GIT rev-parse --not $other_branches | $GIT rev-list --pretty --stdin $newrev'");
+        my @commits = `$GIT rev-parse --not $other_branches | $GIT rev-list --reverse --date-order --stdin $newrev`;
+
+        chomp @commits;
+        return @commits;
+    }
+
+    #
+    # The following magic is from the contrib post-receive hook, and it tries
+    # to avoid sending the same commit in mail twice, by excluding commits that
+    # are reachable from other branches
+    #
+    #my @other_branches = `$GIT for-each-ref --format='%(refname)' refs/heads/ | grep -F -v $refname`;
+    #chomp @other_branches;
+    #my $other_branches = join(" ",@other_branches);
+    #if ($debug) {
+    #    print "other_branches magic: '$other_branches'\n";
+    #}
+    #my $rev_parse = `$GIT rev-parse --not $other_branches`;
+    #if ($debug) {
+    #    print "rev_parse magic: \n" . $rev_parse;
+    #}
+    #my @commits = `$GIT rev-parse --not $other_branches | $GIT rev-list --pretty --stdin $revspec`;
+
+}
+
+#
+# Send out some mail (or not, if in debug mode)
+#
+sub send_mail($$@) {
+    my ($subject, $body, @to) = @_;
+
+    if ($debug) {
+           open(MAIL,">&STDERR");
+           print MAIL "\n\n";
+    } else {
+           # sendmail args:
+           # -oem causes errors in mail to be "mailed back"
+           # -odb deliver mail in background
+           # -t causes sendmail to look in the message for 'To:' 'Cc:' and
+           #    'Bcc:' lines
+           open(MAIL, "| $SENDMAIL -odb -oem -t");
+    }
+
+    print MAIL "To: " . join(", ",@to) . "\n";
+    print MAIL "Subject: $subject\n";
+
+    #
+    # Add an X-Git-Repo header to help people procmail
+    # TODO: Add branch too!
+    #
+    if (defined($reponame)) {
+        print MAIL "X-Git-Repo: $reponame\n";
+    }
+
+    #
+    # Marks end of headers
+    #
+    print MAIL "\n";
+
+    print MAIL $body;
+
+}
+
+#
+# Given a full refname, pull off the last part for pretty printing
+#
+sub short_refname($) {
+    my ($refname) = @_;
+    $refname =~ /([^\/]+)$/;
+    return $1;
+}
+
+#
+# Print only if in debug mode
+#
+sub debug(@) {
+    if ($debug) {
+        print STDERR "*** gitmail: ", @_, "\n";
+    }
+}
+
+#
+# Return either the config value associated with the repo or the second
+# argument, which supplies the default.
+#
+sub get_config($$) {
+    my ($var,$default) = @_;
+    my $value = `git config $CONFIGBASE.$var`;
+    chomp $value;
+    if ($value ne "") { 
+        debug("Got $value from git config for $var");
+        return $value;
+    } else {
+        debug("Using " , defined($default)?$default : "(undef)" , " for $var");
+        return $default;
+    }
+}
+
+#
+# Return an appropriate string to get a revision: if the ref was created or
+# deleted, this looks a little different
+#
+sub rev_string($$) {
+    my ($oldrev, $newrev) = @_;
+    my $ct = change_type($oldrev,$newrev);
+    if ($ct eq $CT_UPDATE) {
+        return "$oldrev..$newrev";
+    } elsif ($ct eq $CT_CREATE) {
+        return $newrev;
+    } elsif ($ct eq $CT_DELETE) {
+        return $oldrev;
+    } else {
+        # Shouldn't be able to get here
+        return undef;
+    }
+}
