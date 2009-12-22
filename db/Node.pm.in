@@ -740,6 +740,29 @@ sub GetEventState($$)
 }
 
 #
+# We do this cause we always want to go to the DB.
+#
+sub GetEventState($$)
+{
+    my ($self, $pstate) = @_;
+    my $node_id = $self->node_id();
+
+    my $query_result =
+	DBQueryWarn("select eventstate from nodes where node_id='$node_id'");
+    return -1
+	if (!$query_result || !$query_result->numrows);
+
+    my ($state) = $query_result->fetchrow_array();
+    $state = TBDB_NODESTATE_UNKNOWN
+	if (!defined($state));
+
+    $self->{'DBROW'} = $state
+	if (defined($self->{'DBROW'}));
+    $$pstate = $state;
+    return 0;
+}
+
+#
 # Equality test for two experiments.
 # Not strictly necessary in perl, but good form.
 #
