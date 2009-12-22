@@ -101,6 +101,16 @@ case "$1" in
 			@prefix@/sbin/protogeni/expire_daemon
 		fi
 
+		if [ -x @prefix@/sbin/protogeni/sa_daemon ]; then
+			echo -n " sa_daemon"
+			@prefix@/sbin/protogeni/sa_daemon
+		fi
+
+		if [ -x @prefix@/sbin/checknodes_daemon  ]; then
+			echo -n " checknodes_daemon"
+			@prefix@/sbin/checknodes_daemon
+		fi
+
 		#
 		# Could trigger experiment creation, so make sure everything
 		# else is setup first; i.e., run this last!
