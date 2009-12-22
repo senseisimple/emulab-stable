@@ -38,6 +38,9 @@ MAINTAINER=	ricci@cs.utah.edu
 # We must make sure PERL is built with this.
 #
 .MAKEFLAGS+=	ENABLE_SUIDPERL=yes
+.if ${PORTVERSION} == "3.0"
+.MAKEFLAGS+=	PERL_VERSION=5.10.0
+.endif
 
 #
 # For SWIG, so that it doesn't feel the need to suck in php and apache
@@ -122,7 +125,6 @@ RUN_DEPENDS=	\
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/XML/Parser:${PORTSDIR}/textproc/p5-XML-Parser \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/RPC/XML.pm:${PORTSDIR}/net/p5-RPC-XML \
 	${PYTHON_SITELIBDIR}/M2Crypto/ASN1.py:${PORTSDIR}/security/py-m2crypto \
-
 	gmake:${PORTSDIR}/devel/gmake \
 	kmetis:${PORTSDIR}/math/metis \
         curl:${PORTSDIR}/ftp/curl \
@@ -133,7 +135,7 @@ RUN_DEPENDS=	\
 .if ${PORTVERSION} == "3.0"
 RUN_DEPENDS+=	\
 	dhcpd:${PORTSDIR}/net/isc-dhcp30-server \
-	${LOCALBASE}/include/boost:${PORTSDIR}/devel/boost-all
+	${LOCALBASE}/include/boost:${PORTSDIR}/devel/boost
 .else
 RUN_DEPENDS+=	\
 	dhcpd:${PORTSDIR}/net/isc-dhcp3-server \
@@ -177,3 +179,10 @@ NO_BUILD=	yes
 do-install:	# empty
 
 .include <bsd.port.mk>
+
+vars:
+	@echo "PORTVERSION=$(PORTVERSION)"
+	@echo ".MAKEFLAGS=$(.MAKEFLAGS)"
+	@echo "BUILD_DEPENDS=$(BUILD_DEPENDS)"
+	@echo "LIB_DEPENDS=$(LIB_DEPENDS)"
+	@echo "RUN_DEPENDS=$(RUN_DEPENDS)"
