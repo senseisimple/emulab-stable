@@ -108,6 +108,14 @@ if ($experiment->state() eq EXPTSTATE_SWAPPED()) {
 my $pid = $experiment->pid();
 my $eid = $experiment->eid();
 
+#
+# We need the hwdown experiment below.
+#
+my $hwdown_experiment = Experiment->Lookup(NODEDEAD_PID(), NODEDEAD_EID());
+if (!defined($hwdown_experiment)) {
+    fatal("Cannot find the hwdown experiment.");
+}
+
 # Go to ground.
 if (! $debug) {
     if (TBBackGround($LOGFILE)) {
@@ -167,7 +175,7 @@ while (1) {
 	# push it into the hwcheckup experiment.
 	#
 	if ($node->MoveReservation($experiment)) {
-	    print STDERR "Could not move $node in $NODEILL_EID\n";
+	    print STDERR "Could not move $node to $experiment\n";
 	    next;
 	}
 	$node->InsertNodeLogEntry($elabman, TB_DEFAULT_NODELOGTYPE(),
@@ -196,6 +204,8 @@ while (1) {
 	push(@tmp, $node);
     }
     @nodelist = @tmp;
+
+    print "Checking nodes @nodelist\n";
 
     if (@nodelist) {
 	print "Running $GENTOPOFILE ...\n";
@@ -288,8 +298,11 @@ sub NodeIsDead($)
 {
     my ($node) = @_;
     
+    if ($node->MoveReservation($hwdown_experiment)) {
+	print STDERR "Could not move $node to $hwdown_experiment\n";
+	return;
+    }
     print STDERR "$node is fatally ill; moving to hwdown.\n";
-    $node->MarkAsDown();
     $node->InsertNodeLogEntry($elabman, TB_DEFAULT_NODELOGTYPE(),
 			      "Moved to hwdown by checknodes daemon");
 }
