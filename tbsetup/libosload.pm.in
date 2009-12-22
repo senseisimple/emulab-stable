@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Osload library. Basically the backend to the osload script, but also used
@@ -50,7 +50,7 @@ my $TBUISP	    = "$TB/bin/tbuisp";
 my %imageinfo       = ();	# Per imageid DB info.
 my $debug           = 0;
 my %children        = ();	# Child pids in when asyncmode=1
-my $remote_mult     = 10;       # Wait lots longer for remote nodes!
+my $remote_mult     = 5;        # Wait lots longer for remote nodes!
 
 sub osload ($$) {
     my ($args, $result) = @_;
