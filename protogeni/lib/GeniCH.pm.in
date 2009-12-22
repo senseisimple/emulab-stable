@@ -806,6 +806,7 @@ sub ListComponents($)
 	    
 	push(@results, { "gid" => $manager->cert(),
 			 "hrn" => $manager->hrn(),
+			 "urn" => $manager->urn(),
 		         "url" => $manager->url() });
     }
     return GeniResponse->Create(GENIRESPONSE_SUCCESS, \@results);

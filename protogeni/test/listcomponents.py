@@ -47,7 +47,7 @@ if debug: print str(response["value"])
 # Ask each manager for its list.
 #
 for manager in response["value"]:
-    print manager["hrn"] + ": " + manager["url"]
+    print manager["hrn"] + "[" + manager[ "urn" ] + "]: " + manager["url"]
 
     # Skip the discover resources. Too much.
     continue
