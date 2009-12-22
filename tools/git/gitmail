@@ -71,31 +71,29 @@ if ($opt{t}) { $testmode = 1; }
 my $reponame = get_config("reponame",undef);
 
 #
-# Data structure mapping paths to email addresses. This should be a list of
-# pairs: the first element of the pair is interpreted as a regular expression,
-# and is matched against every filename in the commit. If it matches any of
-# them, mail is sent to the second element of the pair, which may be a string
-# or an array ref containing a list of strings.
+# Data structure mapping branch names and path names to email address. Each
+# entry is a triple:
+#    Branch name
+#    File path
+#    Mail address
+# If *both* the branch and path match for a commit, mail will be sent to the
+# associated address. The branch and paths are interpreted as perl regexps,
+# with the special value 'undef' matching anything at all. Any of these may
+# be array references: for the branch and path fields, if *any* of the 
+# elements in the array match, the field is considered to match. For the email
+# address field, the mail will be sent to all addresses in the array.
 #
 # *NOTE* This are perl regexps, not shell globs! *NOTE*
 #
-my @mailpaths = (
-# Examples:
-#    [ '^protogeni/',            'ricci@cs.utah.edu'],
-#    [ 'snmpit',                ['ricci@flux.utah.edu',
-#                                'sklower@vangogh.cs.berkeley.edu'] ]
-);
-
-#
-# Data structure mapping branch names to email addresses. Works like the one
-# above, but matches on branch names instead. Note that if the branch matches,
-# email will be sent no matter what the path.
-# TODO: Possibly, this should override path matches, instead of being
-#       additive
-#
-my @mailbranches = (
-# Example
-#    [ '^ricci-', 'ricci+branch@flux.utah.edu' ]
+my @mailto = (
+  # Branch              # Path             # Send mail to
+# Examples
+# [ undef,              undef,             'cvs-testbed@flux.utah.edu' ],
+# [ undef,              'snmpit',         ['ricci@flux.utah.edu',
+#                                          'sklower@vangogh.cs.berkeley.edu']],
+# [ ['^ricci-',
+#    '^test-'],         'assign/',         'ricci+assign@flux.utah.edu'],
+# [ 'gitmail',          'tools/git',       'ricci+git@flux.utah.edu']
 );
 
 #
@@ -356,36 +354,76 @@ sub get_mail_addresses($@) {
     }
 
     #
-    # Check to see if there's a particular address we're supposed to use for
-    # this ref
+    # Find out if this is a branch, and of so, what it's name is. If it's not,
+    # set the branch name to be empty, so that only empty regexps will match
+    # it
     #
+    my $branchname = "";
     if ($refname =~ /^refs\/heads\/(.*)/) {
-        my $branchname = $1;
-        foreach my $entry (@mailbranches) {
-            my ($regexp, $addr) = @$entry;
-            if ($branchname =~ $regexp) {
-                push @addrs, flatten_arrayref($addr);
-                $matched = 1;
-                debug("Matched branch regexp /$regexp/, adding ",
-                        join(",",flatten_arrayref($addr)));
-            }
-        }
+       $branchname = $1;
     }
 
     #
-    # Check every single file and add the addresses in - we'll weed out
-    # duplicates later
+    # Loop through each entry, making sure both branch and path match
     #
-    foreach my $file (@changedfiles) {
-        foreach my $entry (@mailpaths) {
-            my ($regexp, $addr) = @$entry;
-            if ($file =~ $regexp) {
-                push @addrs, flatten_arrayref($addr);
-                $matched = 1;
-                debug("Matched path regexp /$regexp/, adding ",
-                        join(",",flatten_arrayref($addr)));
+    ENTRY: foreach my $entry (@mailto) {
+        my ($branches, $paths, $addresses) = @$entry;
+        my @branches = flatten_arrayref($branches);
+        my @paths = flatten_arrayref($paths);
+        my @addresses = flatten_arrayref($addresses);
+
+        #
+        # If the branch doesn't match, go on to the next entry
+        #
+        my $branch_matched = 0;
+        BRANCH: foreach my $branchRE (@branches) {
+            if (!defined($branchRE)) {
+                debug("Empty branch matched");
+                $branch_matched = 1;
+                last BRANCH;
+            } elsif ($branchname =~ $branchRE) {
+                debug("Matched branch regexp /$branchRE/");
+                $branch_matched = 1;
+                last BRANCH;
             }
         }
+
+        if (!$branch_matched) {
+            next ENTRY;
+        }
+
+        #
+        # If the path doesn't match, go on to the next entry
+        #
+        my $paths_matched = 0;
+        PATH: foreach my $regexp (@paths) {
+            if (!defined($regexp)) {
+                debug("  Empty path matched");
+                $paths_matched = 1;
+                last PATH;
+            }
+            # Have to check against every file in the changeset
+            foreach my $file (@changedfiles) {
+                if ($file =~ $regexp) {
+                    debug("  Matched path regexp /$regexp/");
+                    $paths_matched = 1;
+                    last PATH;
+                }
+            }
+        }
+
+        if (!$paths_matched) {
+            debug("  Path match failed");
+            next ENTRY;
+        }
+
+        #
+        # Great, made it through - we add all addresses, we'll weed out
+        # duplicates later
+        #
+        debug("  Adding adddresses ", join(",",@addresses));
+        $matched = 1;
+        push @addrs, @addresses;
     }
 
     #
