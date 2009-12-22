@@ -510,8 +510,8 @@ sub commit_mail($$$@) {
         # Just use regular git show command, with purty +/- summary at the
         # bottom (formatted to be narrow enough for email)
         #
-        debug("running '$GIT show --numstat '$rev''");
-        my @body = `$GIT show --numstat $rev`;
+        debug("running '$GIT show --numstat --shortstat '$rev''");
+        my @body = `$GIT show --numstat --shortstat $rev`;
 
         if ($separate_mail) {
             # Send this message by itself
