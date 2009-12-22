@@ -798,9 +798,6 @@ sub MoveReservation($$)
     return -1
 	if (! (ref($self) && ref($newexperiment)));
 
-    return -1
-	if (! $self->IsReserved());
-    
     my $node_id    = $self->node_id();
     my $newpid     = $newexperiment->pid();
     my $neweid     = $newexperiment->eid();
@@ -810,7 +807,7 @@ sub MoveReservation($$)
     my $oldidx     = 0;
     
     # Must remember old reservation when moving to new oldreserved.
-    if ($newpid eq OLDRESERVED_PID() && $neweid eq OLDRESERVED_EID()) {
+    if ($newpid eq OLDRESERVED_PID() && $neweid eq OLDRESERVED_EID()) {	
         #
 	# Cannot do an experiment Lookup cause reserved table may be locked.
 	# IsReserved() will load the reserved table entry only.
