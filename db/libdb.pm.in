@@ -30,6 +30,7 @@ use vars qw(@ISA @EXPORT);
 	 NODESTARTSTATUS_NOSTATUS PROJMEMBERTRUST_NONE PROJMEMBERTRUST_USER
 	 PROJMEMBERTRUST_ROOT PROJMEMBERTRUST_GROUPROOT
 	 PROJMEMBERTRUST_PROJROOT PROJMEMBERTRUST_LOCALROOT
+	 NODEILL_PID NODEILL_EID
 
 	 TBOPSPID EXPTLOGNAME
 	 PLABMOND_PID PLABMOND_EID PLABHOLDING_PID PLABHOLDING_EID
@@ -159,8 +160,7 @@ use vars qw(@ISA @EXPORT);
 	 TBDB_PHYSICAL_NODE_TABLES
 
 	 TBAdmin TBOpsGuy TBProjAccessCheck TBNodeAccessCheck 
-	 TBExptAccessCheck MarkNodeDown
-	 SetNodeBootStatus NodeidToExp 
+	 TBExptAccessCheck NodeidToExp 
 	 ExpState
 	 ExpNodes ExpNodeVnames ExpNodesOldReserved
 	 DBDateTime DefaultImageID 
@@ -284,6 +284,8 @@ sub NODEREPOSITIONING_EID()	{ "repositioning"; }
 sub NODEREPOSPENDING_EID()	{ "repositionpending"; }
 sub NODEDEAD_PID()		{ $TBOPSPID; }
 sub NODEDEAD_EID()		{ "hwdown"; }
+sub NODEILL_PID()		{ $TBOPSPID; }
+sub NODEILL_EID()		{ "hwcheckup"; }
 sub PLABMOND_PID()		{ $TBOPSPID; }
 sub PLABMOND_EID()		{ "plab-monitor"; }
 sub PLABTESTING_PID()		{ $TBOPSPID; }
@@ -1086,50 +1088,6 @@ sub ExpNodeVnames($$;$$)
 	}
     }
     return %nodes;
-}
-
-#
-# Mark a node as down. We schedule a next reservation for it so that it
-# remains in the users experiment through the termination so that there
-# are no permission errors (say, from snmpit).
-#
-# usage: MarkNodeDown(char *nodeid)
-#
-sub MarkNodeDown($)
-{
-    my($node) = $_[0];
-    my($pid, $eid);
-
-    $pid = NODEDEAD_PID;
-    $eid = NODEDEAD_EID;
-
-    my $exptidx;
-    if (!TBExptIDX($pid, $eid, \$exptidx)) {
-	print "*** WARNING: No such experiment $pid/$eid!\n";
-	return -1;
-    }
-
-    my $query_result =
-	DBQueryFatal("replace into next_reserve " .
-		     "(node_id, exptidx, pid, eid) " .
-		     "values ('$node', '$exptidx', '$pid', '$eid')");
-
-    if ($query_result->num_rows < 1) {
-	DBWarn("WARNING: Could not mark $node down");
-    }
-}
-
-#
-# Set the boot status for a node.
-#
-# usage: SetNodeBootStatus(char *status)
-#
-sub SetNodeBootStatus($$)
-{
-    my($node, $bstat) = @_;
-
-    DBQueryFatal("update nodes set bootstatus='$bstat' ".
-		 "where node_id='$node'");
 }
 
 #

@@ -1,0 +1,255 @@
+#!/usr/bin/perl -w
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+
+#
+# Attempt to determine if nodes are really messed up.
+#
+sub usage()
+{
+    print "Usage: checknodes_daemon [-d]\n";
+    exit(1);
+}
+my $optlist   = "d";
+my $debug     = 0;
+
+#
+# Configure variables
+#
+my $TB		  = "@prefix@";
+my $TBOPS         = "@TBOPSEMAIL@";
+my $TBLOGS        = "@TBLOGSEMAIL@";
+my $LOGFILE       = "$TB/log/checknodes.log";
+my $SUDO          = "/usr/local/bin/sudo";
+my $PROTOUSER     = "elabman";
+my $WAP           = "$TB/sbin/withadminprivs";
+my $BATCHEXP      = "$TB/bin/batchexp";
+my $NAMED_SETUP   = "$TB/sbin/named_setup";
+my $EXPORTS_SETUP = "$TB/sbin/exports_setup";
+my $GENTOPOFILE   = "$TB/libexec/gentopofile";
+my $NFREE         = "$TB/bin/nfree";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Protos
+sub fatal($);
+	  
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+if ($UID != 0) {
+    die("Must be root to run this script\n");
+}
+
+#
+# Check args early so we get the right DB.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
+use libdb;
+use libosload;
+use libtestbed;
+use Experiment;
+use Node;
+use User;
+
+my $NODEILL_PID = NODEILL_PID();
+my $NODEILL_EID = NODEILL_EID();
+
+#
+# We need this user for running below.
+#
+my $elabman = User->Lookup($PROTOUSER);
+if (!defined($elabman)) {
+    fatal("Could not lookup $PROTOUSER user. Exiting ...");
+}
+
+#
+# Grab the expeiment we use,
+#
+my $experiment = Experiment->Lookup($NODEILL_PID, $NODEILL_EID);
+if (!defined($experiment)) {
+    #
+    # Create if it does not exist.
+    #
+    system("$SUDO -u $PROTOUSER $WAP $BATCHEXP ".
+	   " -q -i -k -j -w -f -n -S 'System Experiment' ".
+	   " -L 'System Experiment' ".
+	   " -E 'Check failed nodes before moving to hwdown - DO NOT DELETE' ".
+	   " -p $NODEILL_PID -e $NODEILL_EID");
+    if ($?) {
+ 	fatal("Could not create experiment for $NODEILL_PID/$NODEILL_EID\n");
+    }
+    $experiment = Experiment->Lookup($NODEILL_PID, $NODEILL_EID);
+}
+if ($experiment->state() eq EXPTSTATE_SWAPPED()) {
+    $experiment->SetState(EXPTSTATE_ACTIVE());
+}
+my $pid = $experiment->pid();
+my $eid = $experiment->eid();
+
+# Go to ground.
+if (! $debug) {
+    if (TBBackGround($LOGFILE)) {
+	exit(0);
+    }
+}
+print "Check Nodes Daemon starting ... pid $$, at ".`date`;
+
+if ($elabman->FlipTo($experiment->unix_gid())) {
+    fatal("Could not flipto $elabman ($experiment)");
+}
+
+#
+# Setup a signal handler for newsyslog.
+#
+sub handler()
+{
+    ReOpenLog($LOGFILE);
+}
+$SIG{HUP} = \&handler
+    if (!$debug);
+
+while (1) {
+    print "Running at ".
+	POSIX::strftime("20%y-%m-%d %H:%M:%S", localtime()) . "\n";
+
+    $experiment->Flush();
+    Node->FlushAll();
+
+    my @nodelist = $experiment->NodeList();
+    goto loop
+	if (!@nodelist);
+
+    foreach my $node (@nodelist) {
+	if ($node->ClearBootAttributes()) {
+	    print STDERR "$node: Could not clear boot attributes.\n";
+	}
+    }
+
+    print "Running $GENTOPOFILE ...\n";
+    if (system("$GENTOPOFILE $pid $eid")) {
+	print STDERR "$GENTOPOFILE failed\n";
+	next;
+    }
+    print "Running $EXPORTS_SETUP ...\n";
+    if (system("$EXPORTS_SETUP")) {
+	print STDERR "$EXPORTS_SETUP failed\n";
+	next;
+    }
+    # The nodes will not boot locally unless there is a DNS record.
+    print "Running $NAMED_SETUP ...\n";
+    if (system("$NAMED_SETUP")) {
+	print STDERR "$NAMED_SETUP failed\n";
+	next;
+    }
+    my @nodenames       = map { $_->node_id() } @nodelist;
+    my %reload_args     = ();
+    my %reload_results  = ();
+
+    $reload_args{'debug'}     = $debug;
+    $reload_args{'waitmode'}  = 2; # XXX Wait till reboot after reload.
+    $reload_args{'nodelist'}  = [ @nodenames ];
+    print "Running osload on @nodenames\n";
+    my $failures = osload(\%reload_args, \%reload_results);
+    if ($failures) {
+	print STDERR "osload returned $failures failures\n";
+    }
+    my @informtbopsfatal = ();
+    my @informtbopswarn  = ();
+
+    foreach my $node (@nodelist) {
+	if ($reload_results{$node->node_id()}) {
+	    push(@informtbopsfatal, $node->node_id());
+
+	    print STDERR "$node is fatally ill; moving to hwdown.\n";
+	    $node->MarkAsDown();
+	    $node->InsertNodeLogEntry($elabman, TB_DEFAULT_NODELOGTYPE(),
+				      "Moved to hwdown by checknodes daemon");
+	}
+	else {
+	    push(@informtbopswarn, $node->node_id());
+
+	    print STDERR "$node appears to be okay; releasing.\n";
+	    $node->InsertNodeLogEntry($elabman, TB_DEFAULT_NODELOGTYPE(),
+				      "Released by checknodes daemon");
+	}
+    }
+    if (@informtbopsfatal) {
+	my $count = scalar(@informtbopsfatal);
+	SENDMAIL($TBOPS, "$count nodes are down",
+		 "Nodes:\n".
+		 "  " . join(" ", @informtbopsfatal) . "\n".
+		 "appear to be dead.\n\n".
+		 "The nodes have been taken out of the pool.\n");
+    }
+    if (@informtbopswarn) {
+	my $count = scalar(@informtbopswarn);
+
+	system("$NFREE $pid $eid @informtbopswarn");
+	if ($?) {
+	    fatal("Could not free nodes: @informtbopswarn");
+	}
+	else {
+	    SENDMAIL($TBOPS, "$count nodes appear to be okay",
+		     "Nodes:\n".
+		     "  " . join(" ", @informtbopswarn) . "\n".
+		     "have reloaded and rebooted okay.\n\n".
+		     "The nodes have been freed.\n");
+	}
+    }
+
+    print "Running $GENTOPOFILE ...\n";
+    if (system("$GENTOPOFILE $pid $eid")) {
+	print STDERR "$GENTOPOFILE failed\n";
+	next;
+    }
+    print "Running $EXPORTS_SETUP ...\n";
+    if (system("$EXPORTS_SETUP")) {
+	print STDERR "$EXPORTS_SETUP failed\n";
+	next;
+    }
+    # The nodes will not boot locally unless there is a DNS record.
+    print "Running $NAMED_SETUP ...\n";
+    if (system("$NAMED_SETUP")) {
+	print STDERR "$NAMED_SETUP failed\n";
+	next;
+    }
+  loop:
+    sleep(10);
+}
+exit(0);
+
+sub fatal($)
+{
+    my ($msg) = @_;
+
+    #
+    # Send a message to the testbed list. 
+    #
+    SENDMAIL($TBOPS,
+	     "Check Nodes Daemon died",
+	     $msg,
+	     $TBOPS);
+
+    die("*** $0:\n".
+	"    $msg\n");
+}

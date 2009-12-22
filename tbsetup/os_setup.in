@@ -612,7 +612,7 @@ if ($firewalled) {
 	# We assume that firewall node images are "standard" here,
 	# and whine to tbops.
 	#
-	MarkNodeDown($node);
+	Node::MarkAsDown($node);
 	TBSetNodeLogEntry($node, $user_uid, TB_DEFAULT_NODELOGTYPE(),
 			  "'Moved to hwdown by os_setup; ".
 			  "failed to boot image for osid " . $osmap{$node} .
@@ -913,7 +913,7 @@ if ($plabinelab) {
     foreach my $node (@plabnodes) {
 	if (exists($nodes{$node})) {
 	    tbnotice "Not waiting for emulated plab node $node";
-	    SetNodeBootStatus($node, NODEBOOTSTATUS_OKAY);
+	    Node::SetBootStatus($node, NODEBOOTSTATUS_OKAY);
 	    TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_READY());
 	    $nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_READY();
 	    TBSetNodeEventState($node, TBDB_NODESTATE_ISUP());
@@ -977,7 +977,7 @@ while ( @nodelist ) {
 	    goto tbfailed;
 	}
 	print "$node is alive and well\n";
-	SetNodeBootStatus($node, NODEBOOTSTATUS_OKAY);
+	Node::SetBootStatus($node, NODEBOOTSTATUS_OKAY);
 	TBSetNodeAllocState( $node, TBDB_ALLOCSTATE_RES_READY() );
 	$nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_READY();
 	next;
@@ -1013,7 +1013,7 @@ while ( @nodelist ) {
     tbwarn "$node may be down. This has been reported to testbed-ops.";
 
   tbfailed:
-    SetNodeBootStatus($node, NODEBOOTSTATUS_FAILED);
+    Node::SetBootStatus($node, NODEBOOTSTATUS_FAILED);
 
     if ($canfail{$node} && !($canceled || $noretry)) {
 	push(@informuser, $node);
@@ -1033,9 +1033,9 @@ while ( @nodelist ) {
     if (!exists($geninodes{$node}) &&
 	(! TBOsidToPid($osids{$node}, \$pidofosid) ||
 	 $pidofosid eq TBOPSPID())) {
-	MarkNodeDown($node);
+	Node::MarkAsIll($node);
 	TBSetNodeLogEntry($node, $user_uid, TB_DEFAULT_NODELOGTYPE(),
-			  "'Moved to hwdown by os_setup; ".
+			  "'Moved to hwcheckup by os_setup; ".
 			  "failed to boot image for osid " . $osmap{$node} .
 			  " in $pid/$eid'");
 	push(@informtbopsfatal, $node);
@@ -1075,8 +1075,7 @@ if ($count > 0) {
 	     "Nodes:\n".
 	     "  " . join(" ", @informtbopsfatal) . "\n".
 	     "in pid/eid $pid/$eid appear to be dead.\n\n".
-	     "The nodes have been taken out of the pool until this matter ".
-	     "is resolved.\n",
+	     "The nodes have been moved into hardware checkup.\n",
 	     $user_email_to);
 }
 $count = scalar(@informtbopswarn);
@@ -1241,13 +1240,13 @@ elsif (@vnodelist) {
 		
 		# Might have already been set above.
 		TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_READY);
-		SetNodeBootStatus($node, NODEBOOTSTATUS_OKAY);
+		Node::SetBootStatus($node, NODEBOOTSTATUS_OKAY);
 		next;
 	    }
 
 	  vtbfailed:
 	    TBDebugTimeStamp("Virtual node $node setup FAILED");
-	    SetNodeBootStatus($node, NODEBOOTSTATUS_FAILED);
+	    Node::SetBootStatus($node, NODEBOOTSTATUS_FAILED);
 	    TBSetNodeAllocState($node, TBDB_ALLOCSTATE_DOWN());
 
 	    #
@@ -1834,7 +1833,7 @@ sub os_setup_one($$$;$)
 		return 0;
 	    }
 	    print "$node is alive and well\n";
-	    SetNodeBootStatus($node, NODEBOOTSTATUS_OKAY);
+	    Node::SetBootStatus($node, NODEBOOTSTATUS_OKAY);
 	    TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_READY());
 	    $nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_READY();
 	} else {
@@ -1870,7 +1869,7 @@ sub os_setup_one($$$;$)
 	    return 0;
 	}
 	print "$node is alive and well\n";
-	SetNodeBootStatus($node, NODEBOOTSTATUS_OKAY);
+	Node::SetBootStatus($node, NODEBOOTSTATUS_OKAY);
 	TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_READY());
 	$nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_READY();
     }

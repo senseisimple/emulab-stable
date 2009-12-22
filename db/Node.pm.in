@@ -1260,6 +1260,29 @@ sub InsertNodeLogEntry($$$$)
 }
 
 #
+# Clear a bunch of stuff from the nodes tale entry so boot is clean.
+#
+sub ClearBootAttributes($)
+{
+    my ($self) = @_;
+    my $node_id = (ref($self) ? $self->node_id() : $self);
+    my $allocFreeState = TBDB_ALLOCSTATE_FREE_DIRTY();
+
+    DBQueryWarn("update nodes set startupcmd='',rpms='',deltas='', ".
+		"tarballs='',failureaction='fatal', routertype='none', ".
+		"def_boot_cmd_line='',next_boot_cmd_line='', ".
+		"temp_boot_osid=NULL,next_boot_osid=NULL, ".
+		"update_accounts=0,ipport_next=ipport_low,rtabid=0, ".
+		"sfshostid=NULL,allocstate='$allocFreeState',boot_errno=0, ".
+		"destination_x=NULL,destination_y=NULL, ".
+		"destination_orientation=NULL ".
+		"where node_id='$node_id'")
+	or return -1;
+
+    return 0;
+}
+
+#
 # Clear the experimental interfaces for a node.
 #
 sub ClearInterfaces($)
@@ -2008,6 +2031,82 @@ sub SetSchedReload($$;$)
 	if (! DBQueryWarn("replace into scheduled_reloads ".
 			  "(node_id, image_id, reload_type) values ".
 			  "('$node_id', '$imageid', '$type')"));
+
+    return 0;
+}
+
+#
+# Mark a node as down. We schedule a next reservation for it so that it
+# remains in the users experiment through the termination so that there
+# are no permission errors (say, from snmpit).
+#
+sub MarkAsDown($)
+{
+    my ($self) = @_;
+    my $nodeid = (ref($self) ? $self->node_id() : $self);
+
+    if (ClearBootAttributes($nodeid)) {
+	print STDERR "*** WARNING: Could not clear boot attributes: $self!\n";
+    }
+    my $pid = NODEDEAD_PID();
+    my $eid = NODEDEAD_EID();
+    my $experiment = Experiment->Lookup($pid, $eid);
+    if (!defined($experiment)) {
+	print STDERR "*** WARNING: No such experiment $pid/$eid!\n";
+	return -1;
+    }
+    my $exptidx = $experiment->idx();
+
+    my $query_result =
+	DBQueryWarn("replace into next_reserve " .
+		     "(node_id, exptidx, pid, eid) " .
+		     "values ('$nodeid', '$exptidx', '$pid', '$eid')");
+    if (!$query_result || !$query_result->num_rows) {
+	print STDERR "*** WARNING: Could not mark $self as down\n";
+	return -1;
+    }
+    return 0;
+}
+sub MarkAsIll($)
+{
+    my ($self) = @_;
+    my $nodeid = (ref($self) ? $self->node_id() : $self);
+
+    if (ClearBootAttributes($nodeid)) {
+	print STDERR "*** WARNING: Could not clear boot attributes: $self!\n";
+    }
+    my $pid = NODEILL_PID();
+    my $eid = NODEILL_EID();
+    my $experiment = Experiment->Lookup($pid, $eid);
+    if (!defined($experiment)) {
+	print STDERR "*** WARNING: No such experiment $pid/$eid!\n";
+	return -1;
+    }
+    my $exptidx = $experiment->idx();
+
+    my $query_result =
+	DBQueryWarn("replace into next_reserve " .
+		     "(node_id, exptidx, pid, eid) " .
+		     "values ('$nodeid', '$exptidx', '$pid', '$eid')");
+    if (!$query_result || !$query_result->num_rows) {
+	print STDERR "*** WARNING: Could not mark $self as ill\n";
+	return -1;
+    }
+    return 0;
+}
+
+#
+# Set the boot status for a node. We also update the fail stamp/count
+# as appropriate.
+#
+sub SetBootStatus($$)
+{
+    my ($self, $bstat) = @_;
+    my $nodeid = (ref($self) ? $self->node_id() : $self);
+
+    return -1
+	if (!DBQueryWarn("update nodes set bootstatus='$bstat'  ".
+			 "where node_id='$nodeid'"));
 
     return 0;
 }

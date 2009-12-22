@@ -461,12 +461,12 @@ sub nodereboot($$)
 				  TBDB_NODESTATE_ISUP))) {
 		if ($actual_state eq TBDB_NODESTATE_ISUP) {
 		    print STDOUT "reboot ($node): alive and well.\n";
-		    SetNodeBootStatus($node, NODEBOOTSTATUS_OKAY);
+		    Node::SetBootStatus($node, NODEBOOTSTATUS_OKAY);
 		    next;
 		}
 		tberror "$node reported a TBFAILED event.";
 	    }
-	    SetNodeBootStatus($node, NODEBOOTSTATUS_FAILED);
+	    Node::SetBootStatus($node, NODEBOOTSTATUS_FAILED);
 	    $result->{$node} = -1;
 	    $failed++;
 	}

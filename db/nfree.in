@@ -447,18 +447,8 @@ foreach my $node (@freed_nodes) {
 				      "Moved from hwdown; nfree");
 	}
     }
-
-    my $allocFreeState = TBDB_ALLOCSTATE_FREE_DIRTY();
-
-    DBQueryWarn("update nodes set startupcmd='',rpms='',deltas='', ".
-		"tarballs='',failureaction='fatal', routertype='none', ".
-		"def_boot_cmd_line='',next_boot_cmd_line='', ".
-		"temp_boot_osid=NULL,next_boot_osid=NULL, ".
-		"update_accounts=0,ipport_next=ipport_low,rtabid=0, ".
-		"sfshostid=NULL,allocstate='$allocFreeState',boot_errno=0, ".
-		"destination_x=NULL,destination_y=NULL, ".
-		"destination_orientation=NULL ".
-		"where node_id='$node_id'") || $error++;
+    $node->ClearBootAttributes() == 0
+	or $error++;
 
     #
     # If the node is a virtnode, force its state to SHUTDOWN. This is mostly
