@@ -4,7 +4,7 @@
 # Robert Ricci <ricci@cs.utah.edu>
 # December 2009
 #
-# To set this script up: 
+# To set this script up:
 # 1) Copy or link it to .git/hooks/post-receive in your repository. Make sure
 #    it's world-readable and executable.
 # 2) Set configuration options by editng the values of variables directly
@@ -79,7 +79,7 @@ my $reponame = get_config("reponame",undef);
 # If *both* the branch and path match for a commit, mail will be sent to the
 # associated address. The branch and paths are interpreted as perl regexps,
 # with the special value 'undef' matching anything at all. Any of these may
-# be array references: for the branch and path fields, if *any* of the 
+# be array references: for the branch and path fields, if *any* of the
 # elements in the array match, the field is considered to match. For the email
 # address field, the mail will be sent to all addresses in the array.
 #
@@ -277,7 +277,7 @@ debug("finishing");
 #
 sub change_type($$) {
     my ($oldrev, $newrev) = @_;
-        
+
     #
     # We can detect creates and deletes by looking for a special 'null'
     # revision
@@ -435,7 +435,7 @@ sub get_mail_addresses($@) {
         @addrs = flatten_arrayref($defmail);
         debug("Used default address $alwaysmail");
     }
-    
+
     #
     # Pull out unique values to return
     #
@@ -503,15 +503,15 @@ sub commit_mail($$$@) {
 
     my $actionstring = "Branch " . short_refname($refname) .
                        " has been ${ct}d\n\n";
-    
+
     my @fullbody;
     foreach my $rev (@revs) {
         #
         # Just use regular git show command, with purty +/- summary at the
         # bottom (formatted to be narrow enough for email)
         #
-        debug("running '$GIT show --stat=72 '$rev''");
-        my @body = `$GIT show --stat=72 $rev`;
+        debug("running '$GIT show --numstat '$rev''");
+        my @body = `$GIT show --numstat $rev`;
 
         if ($separate_mail) {
             # Send this message by itself
@@ -664,7 +664,7 @@ sub get_config($$) {
     my ($var,$default) = @_;
     my $value = `git config $CONFIGBASE.$var`;
     chomp $value;
-    if ($value ne "") { 
+    if ($value ne "") {
         debug("Got $value from git config for $var");
         return $value;
     } else {
