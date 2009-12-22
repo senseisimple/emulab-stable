@@ -819,17 +819,23 @@ sub MoveReservation($$)
 	$oldeid     = $self->{"RSRV"}->{'eid'};
 	$oldidx     = $self->{"RSRV"}->{'exptidx'};
     }
-    
-    DBQueryWarn("update reserved set " .
-		" vname='$node_id', ".
-		" exptidx=$newidx, ".
-		" pid='$newpid', ".
-		" eid='$neweid', ".
-		" old_exptidx=$oldidx, ".
-		" old_pid='$oldpid', ".
-		" old_eid='$oldeid' ".
-		"where node_id='$node_id'")
-	or return -1;
+    my $sets = "rsrv_time=now(), ".
+	" vname='$node_id', ".
+	" exptidx=$newidx, ".
+	" pid='$newpid', ".
+	" eid='$neweid', ".
+	" old_exptidx=$oldidx, ".
+	" old_pid='$oldpid', ".
+	" old_eid='$oldeid' ";
+
+    if ($self->IsReserved()) {
+	DBQueryWarn("update reserved set $sets where node_id='$node_id'")
+	    or return -1;
+    }
+    else {
+	DBQueryWarn("insert into reserved set $sets, node_id='$node_id'")
+	    or return -1;
+    }
 
     # Force this to reload.
     $self->{"RSRV"} = undef;
