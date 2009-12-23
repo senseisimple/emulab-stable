@@ -121,7 +121,13 @@ my $detach = get_config("detach",undef);
 # false, pushes of multiple commits along a branch get included in the same
 # mail.
 #
-my $separate_mail = get_config("separate_mail",undef);
+my $separate_mail = get_config("separatemail",undef);
+
+#
+# If set, these arguments will be passed *in addition* to the regular arguments
+# to 'git show' to produce descriptions of commits
+#
+my $showcommit_extra = get_config("showcommitextra",undef);
 
 ######################################################################
 # Constants
@@ -510,8 +516,13 @@ sub commit_mail($$$@) {
         # Just use regular git show command, with purty +/- summary at the
         # bottom (formatted to be narrow enough for email)
         #
-        debug("running '$GIT show --numstat --shortstat '$rev''");
-        my @body = `$GIT show --numstat --shortstat $rev`;
+        my $showcommand = "$GIT show --numstat --shortstat ";
+        if (defined($showcommit_extra)) {
+            $showcommand .= "$showcommit_extra ";
+        }
+        $showcommand .= "'$rev'";
+        debug("running '$showcommand'");
+        my @body = `$showcommand`;
 
         if ($separate_mail) {
             # Send this message by itself
