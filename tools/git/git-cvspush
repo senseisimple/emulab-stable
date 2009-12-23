@@ -29,22 +29,39 @@ elif [ -z "$cvsdir" ]; then
 fi
 
 remote_branch_head=`git ls-remote $remote $remote_branch | cut -f1`
+last_commit_file="$GIT_DIR/cvspush_lastcommit/$branch"
 
 git show $remote_branch_head 2>&1 | \
 	grep "fatal: bad object $remote_branch_head" > /dev/null
 rc=$?
 if [ $rc -eq 0 ]; then
 	echo "Your repository is not up-to-date" 1>&2
+	rm -f "$last_commit_file"
 	exit 1
+fi
+
+if ! mkdir -p "${last_commit_file%/*}"; then
+	echo "Failed to mkdir" 1>&2
+	exit 1
+fi
+
+if [ -f "$last_commit_file" ]; then
+	lastcommit=`cat "$last_commit_file"`
+	commits=`git-cherry $lastcommit refs/heads/$branch | sed -n 's/^+ //p' | wc -l`
+	if [ $commits -ge 0 ]; then
+		remote_branch_head=$lastcommit
+	fi
 fi
 
 git cherry $remote_branch_head refs/heads/$branch | sed -n 's/^+ //p' | while read commit; do
 	# You can use git-cvsexportcommit here, but mine also handles
-	# the case of a patch already being applied.
+	# the case of a patch already being applied.  It also enforces
+	# a large amount of context to be generated for each diff.
 	git-cvsexportcommit.mod -w "$cvsdir" -c -u -p -v -v -v $commit
 	rc=$?
 	if [ $rc -ne 0 ]; then
 		echo "Failed to apply commit $commit. Fix it and retry." 1>&2
 		exit 1
 	fi
+	echo $commit > "$last_commit_file"
 done

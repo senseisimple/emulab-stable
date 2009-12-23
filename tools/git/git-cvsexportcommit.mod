@@ -150,9 +150,9 @@ if ($opt_a) {
 close MSG;
 
 if ($parent eq $noparent) {
-    `git-diff-tree --binary -p --root $commit >.cvsexportcommit.diff`;# || die "Cannot diff";
+    `git-diff-tree --binary -p -U8 --root $commit >.cvsexportcommit.diff`;# || die "Cannot diff";
 } else {
-    `git-diff-tree --binary -p $parent $commit >.cvsexportcommit.diff`;# || die "Cannot diff";
+    `git-diff-tree --binary -p -U8 $parent $commit >.cvsexportcommit.diff`;# || die "Cannot diff";
 }
 
 ## apply non-binary changes
