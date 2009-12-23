@@ -733,7 +733,7 @@ sub GetEventState($$)
     $state = TBDB_NODESTATE_UNKNOWN
 	if (!defined($state));
 
-    $self->{'DBROW'} = $state
+    $self->{'DBROW'}->{'eventstate'} = $state
 	if (defined($self->{'DBROW'}));
     $$pstate = $state;
     return 0;
