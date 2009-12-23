@@ -28,6 +28,8 @@ use Image;
 use User;
 use OSinfo;
 use English;
+use event;
+use Data::Dumper;
 use File::stat;
 use IO::Handle;
 
@@ -562,13 +564,51 @@ sub osload ($$) {
     foreach my $node (@nodes) {
 	$retries{$node} = $MAXRETRIES;
     }
+
+    #
+    # Callback for our event handler. We use a "closure" so it can
+    # reference the list of nodes that we are currently waiting on.
+    #
+    my $eventnodes = undef;
+    my $handler = sub {
+	my ($handle, $notification, undef) = @_;
     
+	my $node_id = event_notification_get_objname($handle,$notification);
+	my $event   = event_notification_get_eventtype($handle,$notification);
+
+	return
+	    if (!defined($eventnodes));
+
+	print "osload: eventhandler: $node_id, $event\n"
+	    if ($debug);
+
+	if (exists($eventnodes->{$node_id})) {
+	    $eventnodes->{$node_id} = time();
+	}
+    };
+    my $evhandle = SetupEventHandler($handler);
+    if (!defined($evhandle)) {
+	tbnotice "Stopping because event registration failed!";
+	foreach my $node (@nodes) {
+	    $result->{$node} = -1;
+	    $failures++;
+	}
+	goto done;
+    }
+
     while (@nodes) {
 	my ($reboot_nodes, $noreboot_nodes)
 	    = GetNodesRequiringReboot(\%reload_info, @nodes);
 	if (@$reboot_nodes) {
 	    # Reboot them all.
-	    print "osload: Issuing reboot for @$reboot_nodes and then waiting ...\n";
+	    print "osload: ".
+		"Issuing reboot for @$reboot_nodes and then waiting ...\n";
+
+	    # Prime the event handler above.
+	    $eventnodes = {} if (!defined($eventnodes));
+	    foreach my $node (@$reboot_nodes) {
+		$eventnodes->{$node} = 0;
+	    }
 	    
 	    my %reboot_args     = ();
 	    my %reboot_failures = ();
@@ -602,7 +642,10 @@ sub osload ($$) {
 	my @failednodes = WaitTillReloadDone($startwait,
 					     $waitmode,
 					     \%reload_info, 
+					     $eventnodes,
+					     $evhandle,
 					     @nodes);
+				
 	@nodes=();
     
 	while (@failednodes) {
@@ -743,9 +786,10 @@ sub GetImageInfo($;$)
 }
 
 # Wait for a reload to finish by watching its state
-sub WaitTillReloadDone($$$@)
+sub WaitTillReloadDone($$$$$@)
 {
-    my ($startwait, $waitmode, $reload_info, @nodes) = @_;
+    my ($startwait, $waitmode,
+	$reload_info, $eventnodes, $evhandle, @nodes) = @_;
     my %done	= ();
     my $count   = @nodes;
     my @failed  = ();
@@ -772,8 +816,10 @@ sub WaitTillReloadDone($$$@)
 	# Wait first to make sure reboot is done, and so that we don't
 	# wait one more time after everyone is up.
 	sleep(5);
+	event_poll($evhandle);
 	foreach my $node (@nodes) {
 	    if (! $done{$node}) {
+		my $nodeobject = Node->Lookup($node);
 		my $maxwait;
 
 		#
@@ -788,8 +834,7 @@ sub WaitTillReloadDone($$$@)
 		# Else, if we have a remote node, we wait another multiplier.
 		#
 		if ($reload_info->{$node}{'zerofree'}) {
-		    my $nodeobject = Node->Lookup($node);
-		    my $disksize   = $nodeobject->disksize();
+		    my $disksize = $nodeobject->disksize();
 
 		    $disksize = 20
 			if (!$disksize);
@@ -834,15 +879,41 @@ sub WaitTillReloadDone($$$@)
 		    $done{$node} = 1;
 		    next;
 		}
+
+		#
+		# All of the eventstate stuff belongs in stated. Sheesh.
+		#
+		my $eventstate;
+		if ($nodeobject->GetEventState(\$eventstate)) {
+		    print STDERR "osload ($node): Could not get event state\n";
+		}
 	
 		# Soon we will have stated's timeouts take care of
 		# rebooting once or twice if we get stuck during
 		# reloading.
 		$waittime = time - $startwait;
-		if ($waittime > $maxwait) {
+		
+		if ($waittime > $maxwait ||
+		    (defined($eventstate) &&
+		     ($eventstate eq TBDB_NODESTATE_TBFAILED() ||
+		      $eventstate eq TBDB_NODESTATE_PXEFAILED())) ||
+		    ($minutes > 5 &&
+		     exists($eventnodes->{$node}) &&
+		     $eventnodes->{$node} == 0)) {
 		    my $t = (int ($waittime / 60));
 		    tbnotice "$node appears wedged; ".
 			"it has been $t minutes since it was rebooted.";
+
+		    if (defined($eventstate) &&
+			($eventstate eq TBDB_NODESTATE_TBFAILED() ||
+			 $eventstate eq TBDB_NODESTATE_PXEFAILED())) {
+			tbnotice("  $node looks stuck in $eventstate.");
+		    }
+		    elsif ($minutes > 5 &&
+			   exists($eventnodes->{$node}) &&
+			   $eventnodes->{$node} == 0) {
+			tbnotice("  $node failed to enter reloading state.");
+		    }
 		    TBNodeConsoleTail($node, *STDERR);
 
 		    $count--;
@@ -874,6 +945,7 @@ sub WaitTillReloadDone($$$@)
 					 (60*6),
 					 \$actual_state,
 					 (TBDB_NODESTATE_TBFAILED,
+					  TBDB_NODESTATE_PXEFAILED,
 					  TBDB_NODESTATE_ISUP))) {
 			$count--;
 			$done{$node} = $waitmode;
@@ -1290,6 +1362,42 @@ sub osload_setupswapinfo($$;@)
 	    }
 	}
     }
+}
+
+sub SetupEventHandler($)
+{
+    my ($handler) = @_;
+    
+    my $port = @BOSSEVENTPORT@;
+    my $URL  = "elvin://localhost:$port";
+    
+    # Connect to the event system, and subscribe the the events we want
+    my $EVhandle = event_register($URL, 0);
+    
+    if (!$EVhandle) {
+	print STDERR "*** event: Unable to register with event system\n";
+	return undef;
+    }
+
+    my $tuple = address_tuple_alloc();
+    if (!$tuple) {
+	print STDERR "*** event: Could not allocate an address tuple\n";
+	return undef;
+    }
+
+    # These are the states that indicate things are happening.
+    my @states = (TBDB_NODESTATE_RELOADSETUP(),
+		  TBDB_NODESTATE_RELOADING());
+
+    %$tuple = ( objtype   => TBDB_TBEVENT_NODESTATE(),
+		eventtype => join(",", @states),
+	      );
+    
+    if (!event_subscribe($EVhandle, $handler, $tuple)) {
+	print STDERR "*** event: Could not subscribe to events\n";
+	return undef;
+    }
+    return $EVhandle;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...
