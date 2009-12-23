@@ -54,15 +54,19 @@ my $testmode = undef;
 # we want to be able to turn on debugging early
 #
 my %opt;
-if (!GetOptions(\%opt, 'd', 'h', 't') || @ARGV || $opt{h}) {
+if (!GetOptions(\%opt, 'd', 'h', 't', 'T=s') || @ARGV || $opt{h}) {
     print STDERR "Usage: gitmail [-h|-d]\n";
     print STDERR "  -h    this message\n";
     print STDERR "  -d    enable debugging output and don't send mail\n";
     print STDERR "  -t    test mode - operate on last 3 commits to master\n";
+    print STDERR "  -T br Like '-t', but use branch 'br' instead of master\n";
+    exit 1;
 }
 
+my $testbranch = "master";
 if ($opt{d}) { $debug    = 1; }
 if ($opt{t}) { $testmode = 1; }
+if ($opt{T}) { $testmode = 1; $testbranch = $opt{T} }
 
 #
 # Name of this repository - set it to a string to get it included in the
@@ -184,7 +188,7 @@ if ($testmode) {
     #
     # Provide a simple way to grab some commits - the three most recent ones
     #
-    @reflines = ('master~2 master refs/heads/master');
+    @reflines = ("$testbranch~2 $testbranch refs/heads/$testbranch");
 } else {
     #
     # Get all of the references that are being pushed from stdin - we do this in
