@@ -54,6 +54,7 @@ my $testmode = undef;
 # we want to be able to turn on debugging early
 #
 my %opt;
+Getopt::Long::Configure("no_ignore_case");
 if (!GetOptions(\%opt, 'd', 'h', 't', 'T=s') || @ARGV || $opt{h}) {
     print STDERR "Usage: gitmail [-h|-d]\n";
     print STDERR "  -h    this message\n";
