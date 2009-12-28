@@ -37,6 +37,9 @@ MAINTAINER=	ricci@cs.utah.edu
 # We must make sure PERL is built with this.
 #
 .MAKEFLAGS+=	ENABLE_SUIDPERL=yes
+.if ${PORTVERSION} == "3.0"
+.MAKEFLAGS+=	PERL_VERSION=5.10.0 PERL_VER=5.10.0 PERL_ARCH=mach
+.endif
 
 #
 # For SWIG, so that it doesn't feel the need to suck in php and apache
@@ -71,7 +74,7 @@ MAINTAINER=	ricci@cs.utah.edu
 # XXX not really a build dependency, but needs to get installed before
 # any attempt to install mysql50-* ports
 #
-.if ${PORTVERSION} == "2.1"
+.if (${PORTVERSION} == "2.1" || ${PORTVERSION} == "3.0")
 BUILD_DEPENDS=	\
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Mysql.pm:${PORTSDIR}/misc/p5-DBD-mysql50-old
 .else
@@ -101,7 +104,7 @@ RUN_DEPENDS= gmake:${PORTSDIR}/devel/gmake \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/BSD/Resource.pm:${PORTSDIR}/devel/p5-BSD-Resource \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Time/HiRes.pm:${PORTSDIR}/devel/p5-Time-HiRes \
 	wget:${PORTSDIR}/ftp/wget \
-	${PYTHON_SITELIBDIR}/M2Crypto/ASN1.py:${PORTSDIR}/security/py-m2crypto
+	${PYTHON_PKGNAMEPREFIX}m2crypto>0:${PORTSDIR}/security/py-m2crypto
 
 .if defined(ELVIN_COMPAT)
 RUN_DEPENDS+= ${LOCALBASE}/libexec/elvind:${PORTSDIR}/misc/elvind
@@ -110,7 +113,7 @@ RUN_DEPENDS+= ${LOCALBASE}/libexec/elvind:${PORTSDIR}/misc/elvind
 .if ${OSMAJOR} >= 6
 RUN_DEPENDS+= \
 	${LOCALBASE}/etc/apache/ssl.crl:${PORTSDIR}/www/apache13-modssl \
-	${LOCALBASE}/libexec/apache/libauth_mysql.so:${PORTSDIR}/www/mod_auth_mysql \
+	mod_auth_mysql>1:${PORTSDIR}/www/mod_auth_mysql \
 	${LOCALBASE}/libexec/mysqld:${PORTSDIR}/databases/mysql50-server \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/DBI.pm:${PORTSDIR}/databases/p5-DBI \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/XML/Parser:${PORTSDIR}/textproc/p5-XML-Parser \
@@ -128,11 +131,9 @@ RUN_DEPENDS+= \
 RUN_DEPENDS+= smbd:${PORTSDIR}/net/samba3
 .endif
 
-.if ${PORTVERSION} == "2.1"
+.if (${PORTVERSION} == "2.1" || ${PORTVERSION} == "3.0")
 # not sure why this is just needed for 6.3
 RUN_DEPENDS+= ${X11BASE}/libdata/xorg/libraries:${PORTSDIR}/x11/xorg-libraries
-# not sure why we don't build this for 6.0-6.2...
-RUN_DEPENDS+= smbd:${PORTSDIR}/net/samba3
 .endif
 
 NO_BUILD=	yes
@@ -142,4 +143,3 @@ USE_PERL5=	yes
 do-install:	# empty
 
 .include <bsd.port.mk>
-

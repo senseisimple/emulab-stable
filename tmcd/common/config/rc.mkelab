@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004-2008 University of Utah and the Flux Group.
+# Copyright (c) 2004-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # XXX I hardwire IPs into generated /etc/rc.conf and /etc/rc.resolv.
@@ -342,6 +342,18 @@ sub doboot()
 	$emulabconfig{FS_PKG}       = "emulab-fs-2.1";
 	$emulabconfig{OPS_PKG}      = "emulab-ops-2.1";
 	$emulabconfig{BOSS_PKG}     = "emulab-boss-2.1";
+    }
+    elsif ($FBSD_VERSION == 7.2) {
+	if ($ELVIN_COMPAT) {
+	    $emulabconfig{FS_PKG_DIR} = "/share/freebsd/7.2/packages.elvincompat";
+	} else {
+	    $emulabconfig{FS_PKG_DIR} = "/share/freebsd/7.2/packages";
+	}
+	$emulabconfig{OPS_PKG_DIR}  = $emulabconfig{FS_PKG_DIR};
+	$emulabconfig{BOSS_PKG_DIR} = $emulabconfig{FS_PKG_DIR};
+	$emulabconfig{FS_PKG}       = "emulab-fs-3.0";
+	$emulabconfig{OPS_PKG}      = "emulab-ops-3.0";
+	$emulabconfig{BOSS_PKG}     = "emulab-boss-3.0";
     }
 
     # Figure out where /share is coming from (outer fs node). We need
@@ -1810,6 +1822,15 @@ sub CreateDefsFile($)
 		};
 		/^ELVIN_COMPAT$/ && do {
 		    print OUTDEFS "ELVIN_COMPAT=$ELVIN_COMPAT\n";
+		    last SWITCH;
+		};
+		/^NSVERIFY$/ && do {
+		    # XXX cannot build full ns on FBSD7 yet
+		    if ($FBSD_VERSION > 6) {
+			print OUTDEFS "NSVERIFY=0\n";
+		    } else {
+			print OUTDEFS "NSVERIFY=1\n";
+		    }
 		    last SWITCH;
 		};
 		

@@ -528,7 +528,7 @@ Phase "portfixup", "Fixing up packages", sub {
 	Phase "gcc30", "Looking for GCC 3.0 and installing", sub {
 	    if ($FBSD_MAJOR > 4 ||
 		!ExecQuiet("$PKG_INFO -x gcc30")) {
-		PhaseSkip("GCC 3.0 already installed");
+		PhaseSkip("GCC 3.0 or greater already installed");
 	    }
 	    my $pname = GetPackage("gcc30", $packagedir);
 	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
@@ -1251,9 +1251,9 @@ if ($CVSSUPPORT) {
 	};
 
 	Phase "cvsd.sh", "Installing cvsd.sh", sub {
-	    # FBSD 6.3 package should install this in place
-	    DoneIfExists("$RCDIR/cvsd")
-		if ($FBSD_MINOR > 2);
+	    # FBSD 6.3 and beyond should install this in place
+	    DoneIfExists("$RCDIR/cvsd");
+
 	    DoneIfExists("$RCDIR/cvsd.sh");
 	    ExecQuietFatal("mv $RCDIR/cvsd.sh.sample $RCDIR/cvsd.sh");
 	    ExecQuietFatal("$CHMOD a+x $RCDIR/cvsd.sh");

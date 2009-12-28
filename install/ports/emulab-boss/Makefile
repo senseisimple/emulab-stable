@@ -39,7 +39,7 @@ MAINTAINER=	ricci@cs.utah.edu
 #
 .MAKEFLAGS+=	ENABLE_SUIDPERL=yes
 .if ${PORTVERSION} == "3.0"
-.MAKEFLAGS+=	PERL_VERSION=5.10.0
+.MAKEFLAGS+=	PERL_VERSION=5.10.0 PERL_VER=5.10.0 PERL_ARCH=mach
 .endif
 
 #
@@ -101,7 +101,7 @@ LIB_DEPENDS+= pubsub.1:${PORTSDIR}/misc/emulab-pubsub
 
 RUN_DEPENDS=	\
 	${LOCALBASE}/etc/apache/ssl.crl:${PORTSDIR}/www/apache13-modssl \
-	${LOCALBASE}/libexec/apache/libauth_mysql.so:${PORTSDIR}/www/mod_auth_mysql \
+	mod_auth_mysql>1:${PORTSDIR}/www/mod_auth_mysql \
 	fping:${PORTSDIR}/net/fping \
 	rsync:${PORTSDIR}/net/rsync \
 	neato:${PORTSDIR}/graphics/graphviz \
@@ -124,7 +124,7 @@ RUN_DEPENDS=	\
 	wget:${PORTSDIR}/ftp/wget \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/XML/Parser:${PORTSDIR}/textproc/p5-XML-Parser \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/RPC/XML.pm:${PORTSDIR}/net/p5-RPC-XML \
-	${PYTHON_SITELIBDIR}/M2Crypto/ASN1.py:${PORTSDIR}/security/py-m2crypto \
+	${PYTHON_PKGNAMEPREFIX}m2crypto>0:${PORTSDIR}/security/py-m2crypto \
 	gmake:${PORTSDIR}/devel/gmake \
 	kmetis:${PORTSDIR}/math/metis \
         curl:${PORTSDIR}/ftp/curl \

@@ -561,7 +561,7 @@ Phase "portfixup", "Fixing up packages", sub {
 	my $pname = GetPackage("rsync", $packagedir);
 	ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
     };
-    if ($FBSD_MAJOR == 6) {
+    if ($FBSD_MAJOR >= 6) {
 	# Temporary for template stuff
 	Phase "Simple", "Looking for Simple XML Parser", sub {
 	    if (!ExecQuiet("$PKG_INFO -x p5-XML-Simple")) {
@@ -575,7 +575,12 @@ Phase "portfixup", "Fixing up packages", sub {
 		if (!ExecQuiet("$PKG_INFO -x subversion")) {
 		    PhaseSkip("subversion already installed");
 		}
-		my $pname = GetPackage("subversion-python", $packagedir);
+		my $pname;
+		if ($FBSD_MAJOR > 6) {
+		    $pname = GetPackage("py-subversion", $packagedir);
+		} else {
+		    $pname = GetPackage("subversion-python", $packagedir);
+		}
 		ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
 	    };
 	}
@@ -584,7 +589,7 @@ Phase "portfixup", "Fixing up packages", sub {
 	Phase "gcc30", "Looking for GCC 3.0 and installing", sub {
 	    if ($FBSD_MAJOR > 4 ||
 		!ExecQuiet("$PKG_INFO -x gcc30")) {
-		PhaseSkip("GCC 3.0 already installed");
+		PhaseSkip("GCC 3.0 or greater already installed");
 	    }
 	    my $pname = GetPackage("gcc30", $packagedir);
 	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
@@ -1214,7 +1219,7 @@ Phase "sslcerts", "Setting up SSL certificates", sub {
 	};
 	Phase "rc.d", "Installing Apache startup file", sub {
 	    DoneIfExists("$RCDIR/apache.sh");
-	    my $sfile
+	    my $sfile;
 	    if ($FBSD_MAJOR > 6) {
 		$sfile = "$RCDIR/apache";		
 	    } else {
