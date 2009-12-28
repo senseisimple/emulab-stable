@@ -290,7 +290,7 @@ while (1) {
 	next;
     }
   loop:
-    sleep(10);
+    sleep(60);
 }
 exit(0);
 
