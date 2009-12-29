@@ -20,8 +20,8 @@ do
 done
 
 # "register" the emulab ports
-echo "Patching $PORTSDIR/$PORTSSUBDIR/Makefile ..."
-patch -p0 $PORTSDIR/$PORTSSUBDIR/Makefile ports.patch
+echo "Patching $PORTSDIR/$PORTSUBDIR/Makefile ..."
+patch -p0 $PORTSDIR/$PORTSUBDIR/Makefile ports.patch
 
 ## recreate the index
 #echo "Recreating ports INDEX (this will take forever) ..."
