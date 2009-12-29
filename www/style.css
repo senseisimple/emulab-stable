@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003, 2005-2008 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2009 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -82,7 +82,7 @@ iframe.usageframe, iframe.transparentusageframe {
   padding: 0px;
   background-color: #444444;
   float: right;
-  overflow: hide;
+  overflow: hidden;
 }
 iframe.transparentusageframe, iframe.navbarusageframe {
   background-color: #444444;
@@ -150,7 +150,7 @@ div#usage table tr th.usagetitle {
 }
 div#usagefreenodes table tr th.usagetitle {
   font-size: 8pt;
-  border: solid 0px
+  border: solid 0px;
   padding-left: 1px;
   padding-right: 1px;
   padding-top: 0px; 
