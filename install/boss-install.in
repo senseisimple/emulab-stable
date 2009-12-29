@@ -1017,7 +1017,7 @@ Phase "NFSmounts", "Setting up NFS mounts", sub {
 	DoneIfEdited($FSTAB);
 	my $nfsopt = "nosuid";
 	$nfsopt .= ",nodev"
-	    if ($FBSD_VERSION < 7);
+	    if ($FBSD_MAJOR < 7);
 	my @lines = ("$FSNODE:$USERROOT\t\t$USERROOT\tnfs\trw,$nfsopt\t0\t0",
 		     "$FSNODE:$PROJROOT\t\t$PROJROOT\tnfs\trw,$nfsopt\t0\t0",
 		     "$FSNODE:$GROUPROOT\t\t$GROUPROOT\tnfs\trw,$nfsopt\t0\t0",

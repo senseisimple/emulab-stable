@@ -381,7 +381,7 @@ Phase "ports", "Installing ports", sub {
 	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
 	};
 	# XXX Ditto
-	if ($FBSD_MAJOR == 6 && $FBSD_MINOR > 2) {
+	if ($FBSD_MAJOR > 6 || ($FBSD_MAJOR == 6 && $FBSD_MINOR > 2)) {
 	    Phase "p5-DBD-mysql50", "Installing old Perl Mysql package", sub {
 		my $pname = `$PKG_INFO -E 'p5-DBD-mysql50-*' 2>/dev/null`;
 		chomp($pname);
@@ -582,6 +582,14 @@ Phase "rc.conf", "Adding testbed content to rc.conf", sub {
 
 Phase "hosts", "Adding boss/ops/fs IP addresses to $HOSTS", sub {
     DoneIfEdited($HOSTS);
+    # XXX get rid of any existing lines with boss/ops/fs
+    if ($ELABINELAB) {
+	my $dellist = "-e '/^${BOSSNODE_IP}/d' -e '/^${USERNODE_IP}/d'";
+	if (!$ISFS) {
+	    $dellist .= " -e '/^${FSNODE_IP}/d'";
+	}
+	ExecQuietFatal("sed -i.orig $dellist $HOSTS");
+    }
     my $hstr = "${BOSSNODE_IP}\t${BOSSNODE} boss" .
 	"\n${USERNODE_IP}\t@OPS_NAMES";
     if (!$ISFS) {
