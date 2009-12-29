@@ -105,6 +105,8 @@ my $ROOT_PRIVKEY    = "/root/.ssh/id_rsa";
 my $ROOT_PUBKEY     = "$ROOT_PRIVKEY.pub";
 my $ROOT_AUTHKEY    = "/root/.ssh/authorized_keys";
 
+my $CHECKUPUSER	    = "elabckup";
+
 my $APACHE_ETCDIR   = "/usr/local/etc/apache";
 my $SUDOERS         = "/usr/local/etc/sudoers";
 my $HTTPD_CONF      = "$APACHE_ETCDIR/httpd.conf";
@@ -1453,12 +1455,12 @@ Phase "firstuser", "Setting up initial user ($PROTOUSER)", sub {
     };
 };
 
-Phase "chkupuser", "Setting up checkup user (elabckup)", sub {
-    PhaseSkip("elabckup already created")
-	if (-d "$USERROOT/elabckup");
+Phase "chkupuser", "Setting up checkup user ($CHECKUPUSER)", sub {
+    PhaseSkip("$CHECKUPUSER already created")
+	if (-d "$USERROOT/$CHECKUPUSER");
     ExecQuietFatal("perl $TOP_OBJDIR/utils/firstuser -b ".
 		   (defined($password) ? " -p $password" : "").
-		   " -u elabckup -n 'Emulab Checkup User' ".
+		   " -u $CHECKUPUSER -n 'Emulab Checkup User' ".
 		   "-e '@TBTESTSUITEEMAIL@'");
 };
 Phase "wikidocs", "Installing wikidocs redirect", sub {
