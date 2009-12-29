@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -81,6 +81,10 @@ SWITCH: for ($action) {
 	last SWITCH;
     };
     /^cleanup$/i && do {
+	docleanup();
+	last SWITCH;
+    };
+    /^reset$/i && do {
 	docleanup();
 	last SWITCH;
     };
