@@ -771,6 +771,15 @@ sub DumpDBGoo()
 		"into outfile '$statedir/osidtoimageid'")
 	or die("*** $0:\n".
 	       "    Could not dump table osidtoimageid\n");
+	    
+    # Subosids.  Only take the mapping to parents for those children that
+    # are in the e-in-e pid or are in emulab-ops and are shared.
+    DBQueryWarn("select osm.* from os_submap as osm ".
+		"left join os_info as osi on osm.osid=osi.osid ".
+		"where osi.pid='$pid' or (osi.pid='$TBOPSPID' and osi.shared=1) ".
+		"into outfile '$statedir/os_submap'")
+	or die("*** $0:\n".
+	       "    Could not dump table os_submap\n");
 
     #
     # interfaces table. Need to tag the interfaces being used as the control
