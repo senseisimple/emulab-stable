@@ -135,9 +135,6 @@ if ($query_result->numrows) {
 my $parse = XMLin($xmlfile, ValueAttr => [ 'value' ],
 		  SuppressEmpty => undef,ForceArray => 1);
 
-#print Dumper($parse);
-#exit(0);
-
 # Pick up values from XML file.
 foreach my $key (keys(%defaults)) {
     my $default = $defaults{$key};
@@ -217,9 +214,11 @@ sub fieldCheckAndFill {
 	}
     }
 
-    print "fieldCheckAndFill:\n";
-    print Dumper($fillhash);
-    print "\n";
+    if ($debug) {
+	print "fieldCheckAndFill:\n";
+	print Dumper($fillhash);
+	print "\n";
+    }
 
     return 0;
 }
@@ -247,7 +246,6 @@ if (exists($parse->{'interface'})) {
 if (exists($parse->{'outlet'})) {
     # only look for one -- two does not make sense.
     my $ia = $parse->{'outlet'}->[0];
-    print Dumper($ia);
     fieldCheckAndFill($ia,\%outlet,\%outlets_fields);
     # the field names have been changed, so be careful when testing vs 
     # outputing an error msg
