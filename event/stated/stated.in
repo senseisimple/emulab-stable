@@ -1549,7 +1549,7 @@ sub info($) {
 
     # Print out log entries like this:
     # Sep 20 09:36:00 [238]: Reloading state from database
-    print strftime("%b %e %H:%M:%S", localtime) . " [$$]: $message\n";
+    print strftime("%b %e %H:%M:%S", localtime) . " [$$]: $message";
 }
 
 sub restart_wrap { $sigrestart=1; }
