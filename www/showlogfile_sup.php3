@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005-2008 University of Utah and the Flux Group.
+# Copyright (c) 2005-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require_once("Sajax.php");
@@ -127,14 +127,20 @@ function STARTLOG($object)
                   src='mungelog.js'>
           </script>\n";
     echo "<script type='text/javascript' language='javascript'>\n";
-
-    echo "SetupOutputArea('outputframe', true);\n"; 
-
+    echo "if (is_chrome == false && is_safari == false) {
+              SetupOutputArea('outputframe', true);
+          }\n";
     echo "</script><div>
          <iframe id='downloader' name='downloader'
                  class='downloader' src='$url'
                  onload='ml_handleReadyState(LOG_STATE_LOADED);'>
          </iframe></div>\n";
+    echo "<script type='text/javascript' language='javascript'>\n";
+    echo "if (is_chrome || is_safari) {
+	    HideFrame('outputframe');
+	    ShowDownLoader('downloader');
+         }\n";
+    echo "</script>";
 }
 
 # See if this request is to one of the above functions. Does not return

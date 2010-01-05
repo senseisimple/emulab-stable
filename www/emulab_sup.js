@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2006-2009 University of Utah and the Flux Group.
+ * Copyright (c) 2006-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 /*
@@ -10,12 +10,17 @@
 var user_agent = navigator.userAgent.toLowerCase();
 var is_safari   = false;
 var is_firefox  = false;
+var is_chrome   = false;
 
 if (user_agent.indexOf("safari") != -1) {
     is_safari = true;
 }
 if (user_agent.indexOf("firefox") != -1) {
     is_firefox = true;
+}
+if (user_agent.indexOf("chrome") != -1) {
+    is_chrome = true;
+    is_safari = false;
 }
 
 /* Clear the various 'loading' indicators. */
@@ -132,7 +137,8 @@ function SetupOutputArea(id, clean) {
 
     Iframe.style.border = "2px solid";
     Iframe.style.width  = "98%";
-    Iframe.height       = winheight;
+    Iframe.style.height = winheight + "px";
+    Iframe.height       = winheight + "px";
     Iframe.width        = "98%"; 
     Iframe.scrolling    = "auto";
     Iframe.frameBorder  = "1";
@@ -143,6 +149,8 @@ function HideFrame(id) {
     var IframeDoc = IframeDocument(id);
 
     Iframe.style.border = "0px none";
+    Iframe.style.width  = 0;
+    Iframe.style.height = 0;
     Iframe.frameBorder  = 0;
     Iframe.height       = 0;
     Iframe.width        = 0;
@@ -151,36 +159,12 @@ function HideFrame(id) {
 
 function ShowDownLoader(id) {
     var Iframe    = getObjbyName(id);
-    var IframeDoc = IframeDocument(id);
-
-    var winheight = 0;
-    var yoff = 0;
-
-    // This tells us the total height of the browser window.
-    if (window.innerHeight) // all except Explorer
-	winheight = window.innerHeight;
-    else if (document.documentElement &&
-	     document.documentElement.clientHeight)
-	// Explorer 6 Strict Mode
-	winheight = document.documentElement.clientHeight;
-    else if (document.body)
-	// other Explorers
-	winheight = document.body.clientHeight;
-
-    // Now get the Y offset of the outputframe.
-    yoff = Iframe.offsetTop;
-
-    if (winheight != 0) {
-	// Now calculate how much room is left and make the iframe
-	// big enough to use most of the rest of the window.
-	if (yoff != 0)
-	    winheight = winheight - (yoff + 175);
-	else
-	    winheight = winheight * 0.7;
-    }
+    var winheight = GetMaxHeight(id);
 
     Iframe.style.border = "2px solid";
-    Iframe.height       = winheight;
+    Iframe.style.width  = "98%";
+    Iframe.style.height = winheight + "px";
+    Iframe.height       = winheight + "px";
     Iframe.width        = "98%";
     Iframe.scrolling    = "auto";
     Iframe.frameBorder  = "1";

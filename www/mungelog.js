@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2006-2008 University of Utah and the Flux Group.
+ * Copyright (c) 2006-2008, 2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 var LOG_STATE_LOADING = 1;
@@ -174,6 +174,15 @@ function ml_getScrollHeight() {
  * @param state The state of the download.
  */
 function ml_handleReadyState(state) {
+    if (is_chrome || is_safari) {
+	if (state == LOG_STATE_LOADING) {
+	    clearInterval(upInterval);
+	}
+	else if (state == LOG_STATE_LOADED) {
+	    ml_loadFinished();
+        }
+	return;
+    }
     var Iframe = getObjbyName('outputframe');
     var idoc   = IframeDocument('outputframe');
     var oa     = idoc.getElementById('outputarea');
