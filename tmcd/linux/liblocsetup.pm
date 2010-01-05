@@ -130,10 +130,15 @@ sub os_account_cleanup()
     my %PDB;
     my %GDB;
 
-    dbmopen(%PDB, $PASSDB, undef) or
-	fatal("Cannot open $PASSDB: $!");
-    dbmopen(%GDB, $GROUPDB, undef) or
-	fatal("Cannot open $GROUPDB: $!");
+    my $gretval = dbmopen(%PDB, $PASSDB, undef);
+    my $gretval = dbmopen(%GDB, $GROUPDB, undef);
+
+    if ($pretval) {
+	die "Cannot open $PASSDB: $!";
+    }
+    elsif ($gretval) {
+	die "Cannot open $GROUPDB: $!";
+    }
 
     if ($debug) {
 	use Data::Dumper;
@@ -183,7 +188,8 @@ sub os_account_cleanup()
 
     # remove emulab groups first (save a bit of work):
     while (my ($group,$gid) = each(%GDB)) {
-	print "DEBUG: $group/$gid\n";
+	print "DEBUG: $group/$gid\n"
+	    if ($debug);
 	foreach my $file ("$SYSETCDIR/group","$SYSETCDIR/gshadow") {
 	    if (defined($lineHash{$file}->{$group})) {
 		# undef its line
