@@ -403,6 +403,12 @@ class PLCagent:
     def SiteDelete(self,id):
         return self.__server.DeleteSite(self.auth,id)
 
+    def SiteId(self,id):
+        retval = self.SiteInfo(id,['site_id'])
+        if retval and 'site_id' in retval:
+            return retval['site_id']
+        return None
+
     def __keygen(self):
         astr = "abcdefghijklmnopqrstuvwxyz"
         astr = astr + astr.upper() + '0123456789'
@@ -494,6 +500,12 @@ class PLCagent:
     def NodeDelete(self,id):
         return self.__server.DeleteNode(self.auth,id)
 
+    def NodeId(self,id):
+        retval = self.NodeInfo(id,['node_id'])
+        if retval and 'node_id' in retval:
+            return retval['node_id']
+        return None
+
     def NodeSetBootState(self,id,boot_state):
             self.__server.UpdateNode(self.auth,id,{ 'boot_state':boot_state })
             pass
@@ -581,6 +593,12 @@ class PLCagent:
 
     def PersonDelete(self,id):
         return self.__server.DeletePerson(self.auth,id)
+
+    def PersonId(self,id):
+        retval = self.PersonInfo(id,['person_id'])
+        if retval and 'person_id' in retval:
+            return retval['person_id']
+        return None
 
     pass # end of PLCagent class
 

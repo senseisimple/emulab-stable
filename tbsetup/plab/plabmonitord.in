@@ -358,7 +358,11 @@ sub updatenodepool($) {
             my $pnodename = $row[0];
 
 	    if (exists($ignore{$pnodename})) {
+		print "Ignoring $pnodename\n";
 		next;
+	    }
+	    else {
+		print "Did not ignore $pnodename\n";
 	    }
 
             if (!exists $poolpnodes->{$pnodename} ) {

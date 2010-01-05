@@ -11,11 +11,13 @@ sys.path.append("@prefix@/lib")
 import libplab
 from libtestbed import *
 
-usage = "\t%prog [-vd] [-p plcname] [-e pid/eid] [-s slicename]"
+usage = "\t%prog [-vdf] [-p plcname] [-e pid/eid] [-s slicename]"
 
 def main(args):
     me = args[0]
     parser = TBParser(usage)
+    parser.add_option("-f","--force",dest="force",action="store",
+                      help="Force slice renewal",default=None)
     parser.add_option("-p","--plc",dest="plc",action="store",
                       help="PLC name",default=None)
     parser.add_option("-e","--expt",dest="expt",action="store",
@@ -44,7 +46,7 @@ def main(args):
         pass
 
     plab = libplab.Plab()
-    plab.renew(opts.plc,pid,eid,opts.slicename)
+    plab.renew(opts.plc,pid,eid,opts.slicename,opts.force)
 
     return
 
