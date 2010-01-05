@@ -66,8 +66,8 @@ sub DoUpdate($$$)
 		 " ('*','RELOAD-PCVM','RELOADDONE','RESET, RELOADDONE')");
 
     DBQueryFatal("REPLACE INTO table_regex VALUES" . 
-		 " ('virt_nodes','parent_osname','text','redirect','" . 
-		 " os_info:osname',0,0,NULL)");
+		 " ('virt_nodes','parent_osname','text','redirect'," . 
+		 " 'os_info:osname',0,0,NULL)");
 
     return 0;
 }
