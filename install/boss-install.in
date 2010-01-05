@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003-2009 University of Utah and the Flux Group.
+# Copyright (c) 2003-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -778,7 +778,8 @@ Phase "syslog", "Setting up syslog", sub {
 	DoneIfEdited($NEWSYSLOG_CONF);
 	AppendToFileFatal($NEWSYSLOG_CONF,
 	    "$LOGDIR/tmcd.log               640  9     1000 *     Z",
-	    "$LOGDIR/stated.log             640  9     300  *     Z",
+	    "$LOGDIR/stated.log             640  9     1000 *     Z ".
+	        "/var/run/stated.pid 31",
 	    "$LOGDIR/osselect.log           640  9     300  *     Z",
 	    "$LOGDIR/power.log              640  7     300  *     Z",
 	    "$LOGDIR/frisbeed.log           640  7     300  *     Z",
