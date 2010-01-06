@@ -24,9 +24,9 @@ CATEGORIES=	misc
 MASTER_SITES=	#none
 DISTFILES=	#none
 EXTRACT_ONLY=	#none
-COMMENT=	"Meta-port for an emulab ops node"
+COMMENT=	"Meta-port for an Emulab ops node"
 
-MAINTAINER=	ricci@cs.utah.edu
+MAINTAINER=	testbed-ops@flux.utah.edu
 
 #
 # We set this so that the mysql server port doesn't do name resolution
@@ -103,11 +103,20 @@ RUN_DEPENDS= gmake:${PORTSDIR}/devel/gmake \
 	otclsh:${PORTSDIR}/lang/otcl \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/BSD/Resource.pm:${PORTSDIR}/devel/p5-BSD-Resource \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Time/HiRes.pm:${PORTSDIR}/devel/p5-Time-HiRes \
-	wget:${PORTSDIR}/ftp/wget \
-	${PYTHON_PKGNAMEPREFIX}m2crypto>0:${PORTSDIR}/security/py-m2crypto
+	wget:${PORTSDIR}/ftp/wget
 
 .if defined(ELVIN_COMPAT)
 RUN_DEPENDS+= ${LOCALBASE}/libexec/elvind:${PORTSDIR}/misc/elvind
+.endif
+
+.if ${PORTVERSION} == "3.0"
+# must handle patching of m2crypto when the port is built
+RUN_DEPENDS+=	\
+	${PYTHON_PKGNAMEPREFIX}m2crypto>0:${PORTSDIR}/misc/emulab-py-m2crypto
+.else
+# for older version we can patch the standard m2crypto once installed
+RUN_DEPENDS+=	\
+	${PYTHON_PKGNAMEPREFIX}m2crypto>0:${PORTSDIR}/security/py-m2crypto
 .endif
 
 .if ${OSMAJOR} >= 6

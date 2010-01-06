@@ -25,9 +25,9 @@ CATEGORIES=	misc
 MASTER_SITES=	#none
 DISTFILES=	#none
 EXTRACT_ONLY=	#none
-COMMENT=	"Meta-port for an emulab boss node"
+COMMENT=	"Meta-port for an Emulab boss node"
 
-MAINTAINER=	ricci@cs.utah.edu
+MAINTAINER=	testbed-ops@flux.utah.edu
 
 #
 # We set this so that the mysql server port doesn't do name resolution
@@ -124,28 +124,37 @@ RUN_DEPENDS=	\
 	wget:${PORTSDIR}/ftp/wget \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/XML/Parser:${PORTSDIR}/textproc/p5-XML-Parser \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/RPC/XML.pm:${PORTSDIR}/net/p5-RPC-XML \
-	${PYTHON_PKGNAMEPREFIX}m2crypto>0:${PORTSDIR}/security/py-m2crypto \
+	${LOCALBASE}/include/boost:${PORTSDIR}/devel/boost \
 	gmake:${PORTSDIR}/devel/gmake \
 	kmetis:${PORTSDIR}/math/metis \
         curl:${PORTSDIR}/ftp/curl \
 	${PYTHON_SITELIBDIR}/MySQLdb/times.py:${PORTSDIR}/databases/py-MySQLdb \
 	mysqlhotcopy:${PORTSDIR}/databases/mysql50-scripts
 
+.if ${PORTVERSION} == "3.0"
+# must handle patching of m2crypto when the port is built
+RUN_DEPENDS+=	\
+	${PYTHON_PKGNAMEPREFIX}m2crypto>0:${PORTSDIR}/misc/emulab-py-m2crypto
+.else
+# for older version we can patch the standard m2crypto once installed
+RUN_DEPENDS+=	\
+	${PYTHON_PKGNAMEPREFIX}m2crypto>0:${PORTSDIR}/security/py-m2crypto
+.endif
+
 .if (${PORTVERSION} == "2.1" || ${PORTVERSION} == "3.0")
 .if ${PORTVERSION} == "3.0"
 RUN_DEPENDS+=	\
-	dhcpd:${PORTSDIR}/net/isc-dhcp30-server \
-	${LOCALBASE}/include/boost:${PORTSDIR}/devel/boost
+	dhcpd:${PORTSDIR}/net/isc-dhcp30-server
 .else
 RUN_DEPENDS+=	\
-	dhcpd:${PORTSDIR}/net/isc-dhcp3-server \
-	${LOCALBASE}/include/boost:${PORTSDIR}/devel/boost
+	dhcpd:${PORTSDIR}/net/isc-dhcp3-server
 .endif
 RUN_DEPENDS+=	\
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/XML/Parser.pm:${PORTSDIR}/textproc/p5-XML-Parser
-# not sure why this is just needed for 6.3
+# not getting installed via dependencies?
 RUN_DEPENDS+=	\
-	${X11BASE}/libdata/xorg/libraries:${PORTSDIR}/x11/xorg-libraries
+	${X11BASE}/libdata/xorg/libraries:${PORTSDIR}/x11/xorg-libraries \
+	${LOCALBASE}/libexec/apache/libphp4.so:${PORTSDIR}/misc/emulab-php4
 .endif
 
 .if ${OSMAJOR} >= 6
@@ -163,12 +172,6 @@ RUN_DEPENDS+= cvsup:${PORTSDIR}/net/cvsup-without-gui \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/DBI.pm:${PORTSDIR}/databases/p5-DBI-137 \
 	swig1.1:${PORTSDIR}/devel/swig11 \
 	${LOCALBASE}/sbin/named:${PORTSDIR}/dns/bind9
-.endif
-
-# this wasn't getting installed correctly
-.if ${OSMAJOR} >= 7
-RUN_DEPENDS+= \
-	${LOCALBASE}/libexec/apache/libphp4.so:${PORTSDIR}/misc/emulab-php4
 .endif
 
 USE_PERL5=	yes
