@@ -513,6 +513,25 @@ sub SetExpiration($$)
 }
 
 #
+# Is slice expired?
+#
+sub IsExpired($)
+{
+    my ($self) = @_;
+
+    return 0
+	if (! ref($self));
+
+    my $slice_expires = $self->expires();
+    return 0
+	if (!defined($slice_expires));
+    
+    $slice_expires = str2time($slice_expires);
+
+    return (time() >= $slice_expires);
+}
+
+#
 # Set the shutdown field.
 #
 sub SetShutdown($$)

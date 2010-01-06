@@ -133,6 +133,7 @@ my $responder = Frontier::Responder->new( "methods" => {
     "GetKeys"	        => \&GeniSA::GetKeys,
     "BindToSlice"	=> \&GeniSA::BindToSlice,
     "Shutdown"          => \&GeniSA::Shutdown,
+    "RenewSlice"        => \&GeniSA::RenewSlice,
     "RegisterSliver"    => \&GeniSA::RegisterSliver,
     "UnRegisterSliver"  => \&GeniSA::UnRegisterSliver,
    },

@@ -805,13 +805,13 @@ sub Shutdown($)
 }
 
 #
-# Renew a sliver
+# Renew a slice
 #
-sub RenewSliver($)
+sub RenewSlice($)
 {
     my ($argref) = @_;
     my $slice_urn    = $argref->{'slice_urn'};
-    my $valid_until  = $argref->{'valid_until'};
+    my $valid_until  = $argref->{'valid_until'} || $argref->{'expiration'};
     my $credentials  = $argref->{'credentials'};
 
     if (! (defined($credentials) &&
@@ -889,6 +889,10 @@ sub GetTicket($)
 	    return GeniResponse->Create(GENIRESPONSE_REFUSED, undef,
 				    "Must release unredeemed ticket first");
 	}
+	if ($slice->IsExpired()) {
+	    return GeniResponse->Create(GENIRESPONSE_REFUSED, undef,
+					"Slice has expired");
+	}
     }
     else {
 	# Slice does not exist yet. 
@@ -943,6 +947,11 @@ sub UpdateTicket($)
 	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED(), undef,
 				    "Slice does not exist here");
     }
+    if ($slice->IsExpired()) {
+	return GeniResponse->Create(GENIRESPONSE_REFUSED, undef,
+				    "Slice has expired");
+    }
+    
     #
     # UpdateTicket applies only to slices that are not active. Must
     # use UpdateSliver() for an active sliver.
@@ -1034,6 +1043,11 @@ sub UpdateSliver($)
     if (defined($ticket)) {
 	return GeniResponse->Create(GENIRESPONSE_REFUSED, undef,
 				    "Must release unredeemed ticket first");
+    }
+
+    if ($slice->IsExpired()) {
+	return GeniResponse->Create(GENIRESPONSE_REFUSED, undef,
+				    "Slice has expired");
     }
 
     #

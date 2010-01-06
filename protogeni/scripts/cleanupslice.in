@@ -86,9 +86,6 @@ my $this_user = User->ThisUser();
 if (! defined($this_user)) {
     fatal("You ($UID) do not exist!");
 }
-if (!$this_user->IsAdmin()) {
-    fatal("You must be a testbed administrator to do this");
-}
 
 # Connect to the proper DB.
 DBConnect(($doch ? GENICH_DBNAME() :
@@ -98,7 +95,7 @@ my $slice = GeniSlice->Lookup($uuid);
 if (!defined($slice)) {
     fatal("No such slice for $uuid");
 }
-if ($slice->Lock() != 0) {
+if ($slice->Lock() && !$force) {
     fatal("Could not lock slice $slice");
 }
 GeniUtil::FlipToGeniUser();
@@ -129,6 +126,15 @@ sub DoCH()
 
 sub DoSA()
 {
+    #
+    # Not allowed to delete a slice that has not expired since that would
+    # make it impossible to control any existing slivers.
+    #
+    if (!$slice->IsExpired() && !$force) {
+	print STDERR "Slice has not expired; use -f option!\n";
+	exit(1);
+    }
+    
     #
     # Need an RPC context for this to work.
     #

@@ -110,6 +110,8 @@ sub Stringify($)
 # accessors
 sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'CERT'}->{$_[1]}); }
 sub uuid($)		{ return field($_[0], "uuid"); }
+# This will always be undefined, but we need the method.
+sub expires($)		{ return undef; }
 sub created($)		{ return field($_[0], "created"); }
 sub cert($)		{ return field($_[0], "cert"); }
 sub DN($)		{ return field($_[0], "DN"); }

@@ -153,7 +153,7 @@ my $responder = Frontier::Responder->new( "methods" => {
     "SliverTicket"      => \&GeniCM::SliverTicket,
     "ListTickets"       => \&GeniCM::ListTickets,
     "ListHistory"       => \&GeniCM::ListHistory,
-    "RenewSliver"	=> \&GeniCM::RenewSliver,
+    "RenewSlice"	=> \&GeniCM::RenewSlice,
    },
 );
 

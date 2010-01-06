@@ -185,6 +185,7 @@ sub idx($)		{ return field($_[0], "idx"); }
 sub uid($)		{ return field($_[0], "uid"); }
 sub hrn($)		{ return field($_[0], "hrn"); }
 sub uuid($)		{ return field($_[0], "uuid"); }
+sub expires($)		{ return field($_[0], "expires"); }
 sub status($)		{ return field($_[0], "status"); }
 sub created($)		{ return field($_[0], "created"); }
 sub archived($)		{ return field($_[0], "archived"); }

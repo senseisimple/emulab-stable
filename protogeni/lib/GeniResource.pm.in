@@ -414,15 +414,13 @@ sub GetTicket($$$$)
     #
     # Generate a slice credential for the user. 
     #
-    my $slice_credential = GeniCredential->Create($slice, $geniuser);
+    my $slice_credential =
+	GeniCredential->CreateSigned($slice,
+				     $geniuser,
+				     $GeniCredential::LOCALSA_FLAG);
     if (!defined($slice_credential)) {
 	print STDERR
 	    "*** Could not create a slice credential for $slice/$geniuser!\n";
-	return -1;
-    }
-    if ($slice_credential->Sign($GeniCredential::LOCALSA_FLAG) != 0) {
-	print STDERR
-	    "*** Could not sign slice credential $slice_credential!\n";
 	return -1;
     }
 
@@ -568,15 +566,13 @@ sub RedeemTicket($$)
     #
     # Generate a slice credential for the user. 
     #
-    my $slice_credential = GeniCredential->Create($slice, $geniuser);
+    my $slice_credential =
+	GeniCredential->CreateSigned($slice,
+				     $geniuser,
+				     $GeniCredential::LOCALSA_FLAG);
     if (!defined($slice_credential)) {
 	print STDERR
 	    "*** Could not create a slice credential for $slice/$geniuser!\n";
-	return -1;
-    }
-    if ($slice_credential->Sign($GeniCredential::LOCALSA_FLAG) != 0) {
-	print STDERR
-	    "*** Could not sign slice credential $slice_credential!\n";
 	return -1;
     }
 
@@ -805,16 +801,14 @@ sub Clear($$)
 	#
 	# Generate a slice credential for the user. 
 	#
-	my $slice_credential = GeniCredential->Create($slice, $geniuser);
+	my $slice_credential =
+	    GeniCredential->CreateSigned($slice,
+					 $geniuser,
+					 $GeniCredential::LOCALSA_FLAG);
 	if (!defined($slice_credential)) {
 	    print STDERR
 		"*** Could not create a slice credential for ".
 		"$slice/$geniuser!\n";
-	    return -1;
-	}
-	if ($slice_credential->Sign($GeniCredential::LOCALSA_FLAG) != 0) {
-	    print STDERR
-		"*** Could not sign slice credential $slice_credential!\n";
 	    return -1;
 	}
 	$response =
@@ -894,15 +888,13 @@ sub Purge($$)
     #
     # Generate a slice credential for the user. 
     #
-    my $slice_credential = GeniCredential->Create($slice, $geniuser);
+    my $slice_credential =
+	GeniCredential->CreateSigned($slice,
+				     $geniuser,
+				     $GeniCredential::LOCALSA_FLAG);
     if (!defined($slice_credential)) {
 	print STDERR
 	    "*** Could not create a slice credential for $slice/$geniuser!\n";
-	return -1;
-    }
-    if ($slice_credential->Sign($GeniCredential::LOCALSA_FLAG) != 0) {
-	print STDERR
-	    "*** Could not sign slice credential $slice_credential!\n";
 	return -1;
     }
 
@@ -1014,15 +1006,13 @@ sub StartSliver($$$)
     #
     # Generate a slice credential for the user. 
     #
-    my $slice_credential = GeniCredential->Create($slice, $geniuser);
+    my $slice_credential =
+	GeniCredential->CreateSigned($slice,
+				     $geniuser,
+				     $GeniCredential::LOCALSA_FLAG);
     if (!defined($slice_credential)) {
 	print STDERR
 	    "*** Could not create a slice credential for $slice/$geniuser!\n";
-	return -1;
-    }
-    if ($slice_credential->Sign($GeniCredential::LOCALSA_FLAG) != 0) {
-	print STDERR
-	    "*** Could not sign slice credential $slice_credential!\n";
 	return -1;
     }
     if (!defined(self->Manifest())) {
@@ -1105,21 +1095,6 @@ sub SliverStatus($$$$)
     }
 
     #
-    # Generate a slice credential for the user. 
-    #
-    my $slice_credential = GeniCredential->Create($slice, $geniuser);
-    if (!defined($slice_credential)) {
-	print STDERR
-	    "*** Could not create a slice credential for $slice/$geniuser!\n";
-	return -1;
-    }
-    if ($slice_credential->Sign($GeniCredential::LOCALSA_FLAG) != 0) {
-	print STDERR
-	    "*** Could not sign slice credential $slice_credential!\n";
-	return -1;
-    }
-
-    #
     # Do it. 
     #
     $response =
@@ -1183,15 +1158,13 @@ sub Discover($$$)
     #
     # Generate a slice credential for the user. 
     #
-    my $slice_credential = GeniCredential->Create($slice, $geniuser);
+    my $slice_credential =
+	GeniCredential->CreateSigned($slice,
+				     $geniuser,
+				     $GeniCredential::LOCALSA_FLAG);
     if (!defined($slice_credential)) {
 	print STDERR
 	    "*** Could not create a slice credential for $slice/$geniuser!\n";
-	return -1;
-    }
-    if ($slice_credential->Sign($GeniCredential::LOCALSA_FLAG) != 0) {
-	print STDERR
-	    "*** Could not sign slice credential $slice_credential!\n";
 	return -1;
     }
 

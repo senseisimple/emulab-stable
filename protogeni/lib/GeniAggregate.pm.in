@@ -559,6 +559,24 @@ sub GetSlice($)
 }
 
 #
+# The expiration time for an aggregate is when the slice expires.
+# The DB field is ignored.
+#
+sub expires($)
+{
+    my ($self) = @_;
+
+    return undef
+	if (! ref($self));
+
+    my $slice = $self->GetSlice();
+    return undef
+	if (!defined($slice));
+
+    return $slice->expires();
+}
+
+#
 # Get the creator for the aggregate.
 #
 sub GetCreator($)

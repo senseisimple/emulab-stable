@@ -468,6 +468,9 @@ sub GetTicketAuxAux($$$$$$$$)
     #
     # For now all tickets expire very quickly (minutes), but once the
     # ticket is redeemed, it will expire according to the rspec request.
+    # If nothing specified in the rspec, then it will expire when the
+    # slice record expires, which was given by the expiration time of the
+    # slice credential.
     #
     if (exists($rspec->{'valid_until'})) {
 	my $expires = $rspec->{'valid_until'};
@@ -487,15 +490,22 @@ sub GetTicketAuxAux($$$$$$$$)
 	# Do we need a policy limit?
 	#
 	my $diff = $when - time();
-	if ($diff < (60 * 5) || $diff > (3600 * 24 * 100)) {
+	if ($diff < (60 * 5) || $diff > (3600 * 24 * 90)) {
 	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 					"valid_until out of range");
 	}
-    }
-    else {
-	# Give it a reasonable default for later when the ticket is redeemed.
-	$rspec->{'valid_until'} =
-	    POSIX::strftime("20%y-%m-%dT%H:%M:%S", gmtime(time() + (3600*1)));
+
+	#
+	# Must be before the slice expires.
+	#
+	my $slice_expires = $slice->expires();
+	if (defined($slice_expires)) {
+	    $slice_expires = strptime($slice_expires);
+	    if ($expires > $slice_expires) {
+		return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "valid_until is past slice expiration");
+	    }
+	}
     }
 
     #
@@ -524,6 +534,14 @@ sub GetTicketAuxAux($$$$$$$$)
 	    if (defined($ticket) && $ticket->stored());
 	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
 				    "Slice has been shutdown");
+    }
+    # Ditto for expired.
+    if ($slice->IsExpired()) {
+	$slice->UnLock();
+	$ticket->UnLock()
+	    if (defined($ticket) && $ticket->stored());
+	return GeniResponse->Create(GENIRESPONSE_REFUSED, undef,
+				    "Slice has expired");
     }
 
     #
@@ -1449,6 +1467,14 @@ sub SliverWorkAux($$$$$$$)
 	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
 				    "Slice has been shutdown");
     }
+    # Ditto expired slices.
+    if ($slice->IsExpired()) {
+	$slice->UnLock();
+	$ticket->UnLock()
+	    if (defined($ticket));
+	return GeniResponse->Create(GENIRESPONSE_REFUSED, undef,
+				    "Slice has expired");
+    }
 
     #
     # Create the user.
@@ -1540,6 +1566,24 @@ sub SliverWorkAux($$$$$$$)
 	    $message = "valid_until out of range";
 	    goto bad;
 	}
+
+	#
+	# Must be before the slice expires.
+	#
+	my $slice_expires = $slice->expires();
+	if (defined($slice_expires)) {
+	    $slice_expires = strptime($slice_expires);
+	    if ($when > $slice_expires) {
+		$message = "valid_until is past slice expiration";
+		goto bad;
+	    }
+	}
+	#
+	# Seems odd, eh? This changes the slice expiration in the DB,
+	# which was originally the time in the slice credential. The slice
+	# cannot be extended beyond this point, except by going through
+	# the RenewSliver() call below.
+	#
 	if ($slice->SetExpiration($when) != 0) {
 	    $message = "Could not set expiration time";
 	    goto bad;
@@ -2250,13 +2294,13 @@ sub SliverWorkAux($$$$$$$)
 #
 # Renew a sliver
 #
-sub RenewSliver($)
+sub RenewSlice($)
 {
     my ($argref) = @_;
     my $credstr  = $argref->{'credential'};
-    my $expires  = $argref->{'valid_until'};
+    my $expires  = $argref->{'valid_until'} || $argref->{'expiration'};
 
-    if (! (defined($credstr) && defined($expires))) {
+    if (! (defined($credstr))) {
 	return GeniResponse->Create(GENIRESPONSE_BADARGS);
     }
     my $credential = GeniCredential->CreateFromSigned($credstr);
@@ -2277,23 +2321,16 @@ sub RenewSliver($)
 sub RenewSliverAux($$)
 {
     my ($credential, $expires) = @_;
-    my $target_uuid = $credential->target_uuid();
+    my $slice_uuid  = $credential->target_uuid();
     my $user_uuid   = $credential->owner_uuid(); 
     my $message     = "Error renewing aggregate";
-    my $slice_uuid;
+    my $when;
    
     $credential->HasPrivilege( "pi" ) or
 	$credential->HasPrivilege( "control" ) or
 	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
 				     "Insufficient privilege" );
 
-    my $aggregate = GeniAggregate->Lookup($target_uuid);
-    if (defined($aggregate)) {
-	$slice_uuid = $aggregate->slice_uuid();
-    }
-    else {
-	$slice_uuid = $target_uuid;
-    }
     my $slice = GeniSlice->Lookup($slice_uuid);
     if (!defined($slice)) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
@@ -2307,37 +2344,55 @@ sub RenewSliverAux($$)
 	$message = "Slice has been shutdown";
 	goto bad;
     }
-    my $experiment = GeniExperiment($slice);
-    if (!defined($experiment)) {
-	$message = "No local experiment for slice";
+
+    #
+    # Figure out new expiration time.
+    #
+    my $slice_expires = $credential->expires();
+    if (!defined($slice_expires)) {
+	$message = "No expiration time in credential";
+	goto bad;
+    }
+    # Convert slice expiration to a time.
+    my $slice_when = str2time($slice_expires);
+    if (!defined($slice_when)) {
+	$message = "Could not parse expiration in credential";
 	goto bad;
     }
 
     #
-    # Figure out new expiration time; this is the time at which we can
-    # idleswap the slice out. 
+    # If credential is providing the time, we are done. Otherwise have
+    # to sanity check it. 
     #
-    if (! ($expires =~ /^[-\w:.\/]+/)) {
-	$message = "Illegal valid_until in rspec";
-	goto bad;
-    }
-    # Convert to a localtime.
-    my $when = timegm(strptime($expires));
-    if (!defined($when)) {
-	$message = "Could not parse valid_until";
-	goto bad;
-    }
-    #
-    # Do we need a policy limit?
-    #
-    my $diff = $when - time();
+    if (defined($expires)) {
+	# Convert to a localtime.
+	$when = timegm(strptime($expires));
+	if (!defined($when)) {
+	    $message = "Could not parse expiration";
+	    goto bad;
+	}
+	#
+	# Do we need a policy limit?
+	#
+	my $diff = $when - time();
 
-#    print STDERR "RenewSliver: $expires, $when, $diff\n";
+	if ($diff < (60 * 5) || $diff > (3600 * 24 * 90)) {
+	    $message = "expiration out of range";
+	    goto bad;
+	}
+	if ($when > $slice_when) {
+	    $message = "Expiration is greater then slice expiration";
+	    goto bad;
+	}
+    }
+    else {
+	$when = $slice_when;
+    }
+    if ($when < time()) {
+	$message = "Expiration is in the past";
+	goto bad;
+    }
     
-    if ($diff < (60 * 5) || $diff > (3600 * 24 * 100)) {
-	$message = "valid_until out of range";
-	goto bad;
-    }
     if ($slice->SetExpiration($when) != 0) {
 	$message = "Could not set expiration time";
 	goto bad;
@@ -2701,75 +2756,7 @@ sub DeleteSlice($)
 #
 sub SplitSliver($)
 {
-    my ($argref) = @_;
-    my $cred        = $argref->{'credential'};
-    my $impotent    = $argref->{'impotent'};
-
-    $impotent = 0
-	if (!defined($impotent));
-
-    if (!defined($cred)) {
-	return GeniResponse->Create(GENIRESPONSE_BADARGS);
-    }
-    my $credential = GeniCredential->CreateFromSigned($cred);
-    if (!defined($credential)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "Could not create GeniCredential object");
-    }
-    my $sliver_uuid = $credential->target_uuid();
-    my $user_uuid   = $credential->owner_uuid();
-    
-    #
-    # Make sure the credential was issued to the caller.
-    #
-    if ($credential->owner_uuid() ne $ENV{'GENIUUID'}) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "This is not your credential!");
-    }
-    $credential->HasPrivilege( "pi" ) or
-	$credential->HasPrivilege( "instantiate" ) or
-	$credential->HasPrivilege( "control" ) or
-	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
-				     "Insufficient privilege" );
-
-    my $user = CreateUserFromCertificate($credential->owner_cert());
-    if (!defined($user)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR);
-    }
-
-    my $aggregate = GeniAggregate->Lookup($sliver_uuid);
-    if (!defined($aggregate)) {
-	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
-				    "No such aggregate $sliver_uuid");
-    }
-    my $slice = GeniSlice->Lookup($aggregate->slice_uuid());
-    if (!defined($slice)) {
-	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
-			    "No such slice on this component");
-    }
-    if ($slice->Lock() != 0) {
-	return GeniResponse->BusyResponse();
-    }
-    
-    my @sliver_list = ();
-    if ($aggregate->SliverList(\@sliver_list) != 0) {
-	$slice->UnLock();
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "Could not get slivers for $aggregate");
-    }
-    my @credentials = ();
-
-    foreach my $sliver (@sliver_list) {
-	my $credential = $sliver->NewCredential($user);
-	if (!defined($credential)) {
-	    $slice->UnLock();
-	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				"Could not create credential for $sliver");
-	}
-	push(@credentials, $credential->asString());
-    }
-    $slice->UnLock();
-    return GeniResponse->Create(GENIRESPONSE_SUCCESS, \@credentials);
+    return GeniResponse->Create(GENIRESPONSE_UNSUPPORTED);
 }
 
 #
@@ -3568,9 +3555,7 @@ sub CreateSliceFromCertificate($)
 
     #
     # The problem with HRNs is that people will tend to reuse them.
-    # So check to see if we have a slice with the hrn, and if so
-    # we need to check with the registry to see if its still active.
-    # Destroy it locally if not active.
+    # So check to see if we have a slice with the hrn.
     #
     my $slice = GeniSlice->Lookup($certificate->hrn());
     if (defined($slice)) {
@@ -3590,6 +3575,11 @@ sub CreateSliceFromCertificate($)
     $slice = GeniSlice->Create($certificate, $owner_uuid, $authority);
     return undef
 	if (!defined($slice));
+
+    # The slice expires when the credential expires. The slice must be
+    # renewed to extend it.
+    my $expires = $credential->expires();
+    $slice->SetExpiration($expires);
 
     return $slice;
 }

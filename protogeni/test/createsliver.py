@@ -215,21 +215,6 @@ if update:
     print str(manifest)
 
 #
-# Bump the expiration time.
-#
-valid_until =
-  time.strftime("%Y%m%dT%H:%M:%S", time.gmtime(time.time() + 6000));
-
-params = {}
-params["credential"]   = sliver
-params["valid_until"]  = valid_until
-rval,response = do_method("cm", "RenewSliver", params)
-if rval:
-    Fatal("Could not renew sliver")
-    pass
-print "Sliver has been renewed. Asking for a new manifest/ticket ..."
-
-#
 # Grab a sliver ticket just for the hell of it.
 #
 params = {}

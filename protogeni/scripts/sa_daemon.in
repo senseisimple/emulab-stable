@@ -1,0 +1,300 @@
+#!/usr/bin/perl -w
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+
+#
+# Look for things that need to be expired and resources released. This is
+# incredibly primitive at the moment.
+#
+sub usage()
+{
+    print "Usage: sa_daemon [-d] [-n]\n";
+    exit(1);
+}
+my $optlist   = "dn";
+my $debug     = 0;
+my $impotent  = 0;
+
+#
+# Configure variables
+#
+my $TB		  = "@prefix@";
+my $TBOPS         = "@TBOPSEMAIL@";
+my $TBLOGS        = "@TBLOGSEMAIL@";
+my $PGENIDOMAIN   = "@PROTOGENI_DOMAIN@";
+my $PGENISUPPORT  = @PROTOGENI_SUPPORT@;
+my $PGENICLRHOUSE = @PROTOGENI_CLEARINGHOUSE@;
+my $LOGFILE       = "$TB/log/sa_daemon.log";
+my $EMULAB_PEMFILE = "$TB/etc/genisa.pem";
+my $CLEANUPSLICE  = "$TB/sbin/cleanupslice";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Protos
+sub fatal($);
+	  
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+if ($UID != 0) {
+    fatal("Must be root to run this script\n");
+}
+
+#
+# Exit if not a protogeni site.
+#
+if (! $PGENISUPPORT) {
+    exit(0);
+}
+
+#
+# Check args early so we get the right DB.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"n"})) {
+    $impotent = 1;
+}
+
+# Do this early so that we talk to the right DB.
+use vars qw($GENI_DBNAME);
+$GENI_DBNAME = "geni";
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
+require GeniDB;
+require GeniUtil;
+require GeniSlice;
+require GeniCertificate;
+require GeniUser;
+use Experiment;
+use Node;
+use libtestbed;
+use POSIX qw(strftime);
+
+#
+# So we know who/what we are acting as.
+#
+my $certificate = GeniCertificate->LoadFromFile($EMULAB_PEMFILE);
+if (!defined($certificate)) {
+    fatal("Could not get uuid/urn from $EMULAB_PEMFILE\n");
+}
+Genixmlrpc->SetContext(Genixmlrpc->Context($certificate));
+Genixmlrpc->SetTimeout(10);
+$ENV{'MYUUID'} = $certificate->uuid();
+$ENV{'MYURN'} = "urn:publicid:IDN+@OURDOMAIN@+authority+sa";
+
+# Go to ground.
+if (! $debug) {
+    if (TBBackGround($LOGFILE)) {
+	exit(0);
+    }
+}
+GeniUtil::FlipToGeniUser();
+
+#
+# Keep track of who has been warned. Do not expire until 24 hours after
+# warning.
+#
+my %warned  = ();
+my %expires = ();
+my $hours   = 24;
+my $grace   = $hours * 3600;
+
+#
+# Send out warnings about 24 hours ahead of time. Do not delete until
+# at least 24 hours goes by, even if expired.
+#
+sub WarnSlices()
+{
+    my $query_result =
+	GeniDB::DBQueryWarn("select idx,expires,UNIX_TIMESTAMP(expires) ".
+			    "  from geni_slices ".
+			    "where shutdown is null");
+
+    while (my ($idx,$expires,$stamp) = $query_result->fetchrow_array()) {
+	if (exists($expires{$idx})) {
+	    if ($expires{$idx} == $stamp) {
+		# Already warned, skip.
+	    }
+	    else {
+		# Expiration changed, delete and catch in the next loop
+		print STDERR "Expiration changed for slice $idx to $expires\n";
+		delete($expires{$idx});
+		delete($warned{$idx});
+	    }
+	    next;
+	}
+	#
+	# If expiration is greater then 24 hours out, skip. 
+	#
+	if ($stamp > time() + $grace) {
+	    delete($expires{$idx});
+	    delete($warned{$idx});
+	    next;
+	}
+	my $slice = GeniSlice->Lookup($idx);
+
+	if (!defined($slice)) {
+	    # Slice is gone, lets not worry.
+	    next;
+	}
+	if ($slice->Lock() != 0) {
+	    print STDERR "Could not lock slice $slice.\n";
+	    goto skip;
+	}
+	if (! $slice->IsExpired()) {
+	    delete($warned{$idx});
+	    delete($expires{$idx});
+	    $slice->UnLock();
+	    goto skip;
+	}
+	my $geniuser  = GeniUser->Lookup($slice->creator_uuid(), 1);
+	my $emailaddr = $geniuser->email();
+	my $urn       = $slice->urn();
+	my $hrn       = $slice->hrn();
+	
+	if ($impotent) {
+	    print STDERR "Would send mail to $geniuser about $idx,$hrn\n";
+	    $warned{$idx}  = time();
+	    $expires{$idx} = $stamp;
+	    $slice->UnLock();
+	    goto skip;
+	}
+	print STDERR
+	    "Sending mail to $geniuser about expiring slice $idx,$hrn\n";
+	SENDMAIL($emailaddr, "Slice $urn expiring",
+		 "Slice $urn\n".
+		 "is going to expire in approximately 24 hours.\n".
+		 "Please renew it or let it expire if you not using it.\n",
+		 undef, "CC: $TBOPS");
+	
+	$warned{$idx}  = time();
+	$expires{$idx} = $stamp;
+	$slice->UnLock();
+	
+      skip:
+	$slice->Flush()
+	    if (defined($slice));
+    }
+}
+
+#
+# Look for slices that have expired.
+#
+sub ExpireSlices()
+{
+    my $query_result =
+	GeniDB::DBQueryWarn("select idx from geni_slices ".
+			    "where UNIX_TIMESTAMP(now()) > ".
+			    "      UNIX_TIMESTAMP(expires) and ".
+			    "      shutdown is null");
+
+    while (my ($idx) = $query_result->fetchrow_array()) {
+	my $slice = GeniSlice->Lookup($idx);
+
+	if (!defined($slice)) {
+	    # Slice is gone, lets not worry.
+	    next;
+	}
+	if ($slice->Lock() != 0) {
+	    print STDERR "Could not lock slice $slice.\n";
+	    goto skip;
+	}
+	if (! $slice->IsExpired()) {
+	    $slice->UnLock();
+	    delete($warned{"$idx"});
+	    delete($expires{"$idx"});
+	    goto skip;
+	}
+	# Do not delete anything that was not warned at least 24 hours ago.
+	if (!exists($warned{"$idx"}) ||
+	    $warned{"$idx"} > time() - $grace) {
+	    print STDERR "Skipping $slice cause it was not warned at least ".
+		"$hours hours ago\n" if ($debug > 1);
+	    $slice->UnLock();
+	    goto skip;
+	}
+	if ($impotent) {
+	    print STDERR "Would expire $slice\n";
+	    $slice->UnLock();
+	    goto skip;
+	}
+	my $geniuser  = GeniUser->Lookup($slice->creator_uuid(), 1);
+	my $emailaddr = $geniuser->email();
+	my $urn       = $slice->urn();
+	my $hrn       = $slice->hrn();
+	
+	print STDERR "Expiring $slice\n";
+	system("$CLEANUPSLICE -f -s $idx");
+	if (! $?) {
+	    $slice->UnLock();
+	    goto skip;
+	}
+	SENDMAIL($emailaddr, "Slice $urn has expired",
+		 "Slice $urn\n".
+		 "has been expired. Sorry :-(\n",
+		 undef, "CC: $TBOPS");
+	
+	delete($warned{"$idx"});
+	delete($expires{"$idx"});
+      skip:
+	$slice->Flush()
+	    if (defined($slice));
+    }
+}
+
+#
+# Setup a signal handler for newsyslog.
+#
+sub handler()
+{
+    ReOpenLog($LOGFILE);
+}
+$SIG{HUP} = \&handler
+    if (!$debug);
+
+while (1) {
+    print "Running at ".
+	POSIX::strftime("20%y-%m-%d %H:%M:%S", localtime()) . "\n";
+
+    WarnSlices();
+    ExpireSlices();
+
+    # Be certain stale info is gone.
+    GeniUtil::FlushCaches();
+
+    sleep(15);
+}
+exit(0);
+
+sub fatal($)
+{
+    my ($msg) = @_;
+
+    #
+    # Send a message to the testbed list. 
+    #
+    SENDMAIL($TBOPS,
+	     "ProtoGENI SA daemon died",
+	     $msg,
+	     $TBOPS);
+
+    die("*** $0:\n".
+	"    $msg\n");
+}

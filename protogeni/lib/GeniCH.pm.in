@@ -144,15 +144,14 @@ sub GetCredential($)
 	    print STDERR "Could not find local authority object\n";
 	    return GeniResponse->Create(GENIRESPONSE_ERROR);
 	}
-	my $credential = GeniCredential->Create($authority, $caller_authority);
-	if (!defined($credential)) {
-	    print STDERR "Could not create credential for $caller_authority\n";
-	    return GeniResponse->Create(GENIRESPONSE_ERROR);
-	}
-	if ($credential->Sign($GeniCredential::LOCALMA_FLAG)) {
-	    print STDERR "Could not sign credential for $caller_authority\n";
-	    return GeniResponse->Create(GENIRESPONSE_ERROR);
-	}
+
+	my $credential =
+	    GeniCredential->CreateSigned($authority,
+					 $caller_authority,
+					 $GeniCredential::LOCALMA_FLAG);
+	return GeniResponse->Create(GENIRESPONSE_ERROR)
+	    if (!defined($credential));
+
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS,
 				    $credential->asString());
     }

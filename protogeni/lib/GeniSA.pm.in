@@ -97,15 +97,13 @@ sub GetCredential($)
 	    print STDERR "Could not find local authority object for $ENV{'MYUUID'}\n";
 	    return GeniResponse->Create(GENIRESPONSE_ERROR);
 	}
-	my $credential = GeniCredential->Create($authority, $geniuser);
-	if (!defined($credential)) {
-	    print STDERR "Could not create credential from $geniuser\n";
-	    return GeniResponse->Create(GENIRESPONSE_ERROR);
-	}
-	if ($credential->Sign($GeniCredential::LOCALSA_FLAG)) {
-	    print STDERR "Could not sign credential for $geniuser\n";
-	    return GeniResponse->Create(GENIRESPONSE_ERROR);
-	}
+	my $credential =
+	    GeniCredential->CreateSigned($authority,
+					 $geniuser,
+					 $GeniCredential::LOCALSA_FLAG);
+	return GeniResponse->Create(GENIRESPONSE_ERROR)
+	    if (!defined($credential));
+
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS,
 				    $credential->asString());
     }
@@ -172,16 +170,13 @@ sub GetCredential($)
 	#
 	# Return a credential for the slice.
 	#
-	my $slice_credential = GeniCredential->Create($slice, $this_user);
-	if (!defined($slice_credential)) {
-	    print STDERR "Could not create new credential for $slice\n";
-	    return GeniResponse->Create(GENIRESPONSE_ERROR);
-	}
-	if ($slice_credential->Sign($GeniCredential::LOCALSA_FLAG)) {
-	    $slice_credential->Delete();
-	    print STDERR "Could not sign credential for $slice\n";
-	    return GeniResponse->Create(GENIRESPONSE_ERROR);
-	}
+	my $slice_credential =
+	    GeniCredential->CreateSigned($slice,
+					 $this_user,
+					 $GeniCredential::LOCALSA_FLAG);
+	return GeniResponse->Create(GENIRESPONSE_ERROR)
+	    if (!defined($slice_credential));
+
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS,
 				    $slice_credential->asString());
     }
@@ -417,6 +412,7 @@ sub Register($)
     
     if ( lc( $type ) eq "slice") {
 	my $userbindings = $argref->{'userbindings'};
+	my $expires = $argref->{'expiration'};
 	
 	if (! ($hrn =~ /^[-\w]+$/)) {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
@@ -444,6 +440,39 @@ sub Register($)
 		    return GeniResponse->Create(GENIRESPONSE_ERROR);
 		}
 	    }
+	}
+
+	#
+	# Figure out new expiration time; this is the time at which we can
+	# idleswap the slice out. 
+	#
+	if (defined($expires)) {
+	    my $message;
+		
+	    if (! ($expires =~ /^[-\w:.\/]+/)) {
+		$message = "Illegal valid_until in rspec";
+		goto bad;
+	    }
+	    # Convert to a localtime.
+	    my $when = timegm(strptime($expires));
+	    if (!defined($when)) {
+		$message = "Could not parse valid_until";
+		goto bad;
+	    }
+	    #
+	    # Do we need a policy limit?
+	    #
+	    my $diff = $when - time();
+
+	    if ($diff < (60 * 5) || $diff > (3600 * 24 * 30)) {
+		$message = "valid_until out of range";
+		goto bad;
+	    }
+	  bad:
+	    if (defined($message)) {
+		return GeniResponse->Create(GENIRESPONSE_ERROR, undef, $message);
+	    }
+	    $expires = $when;
 	}
 	
 	my $urn = GeniHRN::Generate( "@OURDOMAIN@", "slice", $hrn );
@@ -483,20 +512,20 @@ sub Register($)
 	    print STDERR "Could not create new slice object\n";
 	    return GeniResponse->Create(GENIRESPONSE_ERROR);
 	}
+	if (defined($expires) && $slice->SetExpiration($expires) != 0) {
+	    print STDERR "Could not set slice expiration to $expires\n";
+	    return GeniResponse->Create(GENIRESPONSE_ERROR);
+	}
 
 	#
 	# Return a credential for the slice.
 	#
-	my $slice_credential = GeniCredential->Create($slice, $this_user);
+	my $slice_credential =
+	    GeniCredential->CreateSigned($slice,
+					 $this_user,
+					 $GeniCredential::LOCALSA_FLAG);
 	if (!defined($slice_credential)) {
 	    $slice->Delete();
-	    print STDERR "Could not create new credential for $slice\n";
-	    return GeniResponse->Create(GENIRESPONSE_ERROR);
-	}
-	if ($slice_credential->Sign($GeniCredential::LOCALSA_FLAG)) {
-	    $slice_credential->Delete();
-	    $slice->Delete();
-	    print STDERR "Could not sign credential for $slice\n";
 	    return GeniResponse->Create(GENIRESPONSE_ERROR);
 	}
 
@@ -632,6 +661,15 @@ sub Remove($)
 	if (!defined($slice)) {
 	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
 					"No such slice");
+	}
+	#
+	# Not allowed to delete a slice that has not expired since
+	# that would make it impossible to control any existing
+	# slivers.
+	#
+	if (! $slice->IsExpired()) {
+	    return GeniResponse->Create(GENIRESPONSE_REFUSED, undef,
+					"Slice has not expired");
 	}
 
 	#
@@ -867,6 +905,80 @@ sub Shutdown($)
 				    "Error shutting down slice");
     }
     return GeniResponse->Create(GENIRESPONSE_SUCCESS);
+}
+
+#
+# Extend a slice expiration time.
+#
+sub RenewSlice($)
+{
+    my ($argref) = @_;
+    my $credstr = $argref->{'credential'};
+    my $expires = $argref->{'expiration'};
+    my $message = "Error renewing slice";
+
+    if (! (defined($credstr) && defined($expires))) {
+	return GeniResponse->Create(GENIRESPONSE_BADARGS);
+    }
+    my $credential = GeniCredential->CreateFromSigned($credstr);
+    if (!defined($credential)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not create GeniCredential object");
+    }
+
+    #
+    # Make sure the credential was issued to the caller.
+    #
+    if ($credential->owner_uuid() ne $ENV{'GENIUUID'}) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "This is not your credential!");
+    }
+    my $slice = GeniSlice->Lookup($credential->target_uuid());
+    if (!defined($slice)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Unknown slice for this credential");
+    }
+    
+    $credential->HasPrivilege( "pi" ) or
+	$credential->HasPrivilege( "bind" ) or
+	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
+				     "Insufficient privilege" );
+
+    #
+    # Figure out new expiration time; this is the time at which we can
+    # idleswap the slice out. 
+    #
+    if (! ($expires =~ /^[-\w:.\/]+/)) {
+	$message = "Illegal characters in expiration";
+	goto bad;
+    }
+    # Convert to a localtime.
+    my $when = timegm(strptime($expires));
+    if (!defined($when)) {
+	$message = "Could not parse expiration";
+	goto bad;
+    }
+    #
+    # Do we need a policy limit?
+    #
+    my $diff = $when - time();
+
+    if ($diff < (60 * 5) || $diff > (3600 * 24 * 30)) {
+	$message = "expiration out of range";
+	goto bad;
+    }
+    if ($when < time()) {
+	$message = "Expiration is in the past";
+	goto bad;
+    }
+    if ($slice->SetExpiration($when) != 0) {
+	$message = "Could not set expiration time";
+	goto bad;
+    }
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS);
+
+  bad:
+    return GeniResponse->Create(GENIRESPONSE_ERROR, undef, $message);
 }
 
 #

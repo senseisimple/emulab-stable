@@ -160,6 +160,7 @@ sub Create($$;$)
 # accessors
 sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'COMPONENT'}->{$_[1]}); }
 sub uuid($)		{ return field($_[0], "uuid"); }
+sub expires($)		{ return field($_[0], "expires"); }
 sub manager_uuid($)	{ return field($_[0], "manager_uuid"); }
 sub hrn($)		{ return field($_[0], "hrn"); }
 sub url($)		{ return field($_[0], "url"); }

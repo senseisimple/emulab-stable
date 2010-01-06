@@ -53,19 +53,7 @@ print "Found the slice, asking for a credential ..."
 # Get the slice credential.
 #
 slicecred = get_slice_credential( myslice, mycredential )
-print "Got the slice credential, asking for a sliver credential ..."
-
-#
-# Get the sliver credential.
-#
-params = {}
-params["credential"] = slicecred
-rval,response = do_method("cm", "GetSliver", params)
-if rval:
-    Fatal("Could not get Sliver credential")
-    pass
-slivercred = response["value"]
-print "Got the sliver credential, renewing the sliver";
+print "Got the slice credential, renewing the slice at the SA ..."
 
 #
 # Bump the expiration time.
@@ -73,10 +61,28 @@ print "Got the sliver credential, renewing the sliver";
 valid_until = time.strftime("%Y%m%dT%H:%M:%S",
                             time.gmtime(time.time() + (60 * int(minutes))))
 
+#
+# Renew the slice at the SA.
+#
 params = {}
-params["credential"]   = slivercred
-params["valid_until"]  = valid_until
-rval,response = do_method("cm", "RenewSliver", params)
+params["credential"] = slicecred
+params["expiration"] = valid_until
+rval,response = do_method("sa", "RenewSlice", params)
+if rval:
+    Fatal("Could not renew slice at the SA")
+    pass
+slivercred = response["value"]
+print "Renewed the slice, asking for slice credential again";
+
+#
+# Get the slice credential again so we have the new time in it.
+#
+slicecred = get_slice_credential( myslice, mycredential )
+print "Got the slice credential, renewing the sliver";
+
+params = {}
+params["credential"]   = slicecred
+rval,response = do_method("cm", "RenewSlice", params)
 if rval:
     Fatal("Could not renew sliver")
     pass

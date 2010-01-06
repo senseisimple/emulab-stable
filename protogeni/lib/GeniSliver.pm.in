@@ -469,6 +469,24 @@ sub GetSlice($)
 }
 
 #
+# The expiration time for a sliver is when the slice expires.
+# The DB field is ignored.
+#
+sub expires($)
+{
+    my ($self) = @_;
+
+    return undef
+	if (! ref($self));
+
+    my $slice = $self->GetSlice();
+    return undef
+	if (!defined($slice));
+
+    return $slice->expires();
+}
+
+#
 # Look up a list of slivers for a locally instantiated slice. 
 # Used by the CM.
 #
@@ -526,34 +544,6 @@ sub DependentSlivers($$)
     }
     @$pref = @result;
     return 0;
-}
-
-#
-# Create a signed credential for this sliver, issued to the provided user.
-# The credential will grant all permissions for now.
-#
-# Should we store these credentials in the DB, recording what we hand out?
-#
-sub NewCredential($$)
-{
-    my ($self, $owner) = @_;
-
-    return undef
-	if (! (ref($self) && ref($owner)));
-
-    my $credential = GeniCredential->Create($self, $owner);
-    if (!defined($credential)) {
-	print STDERR "Could not create credential for $self, $owner\n";
-	return undef;
-    }
-    if (defined($self->nickname())) {
-	$credential->AddExtension("nickname", $self->nickname());
-    }
-    if ($credential->Sign($self->GetCertificate()) != 0) {
-	print STDERR "Could not sign credential for $self, $owner\n";
-	return undef;
-    }
-    return $credential;
 }
 
 ############################################################################

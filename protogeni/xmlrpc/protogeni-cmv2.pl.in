@@ -142,7 +142,7 @@ my $responder = Frontier::Responder->new( "methods" => {
     "GetSliver"         => \&GeniCMV2::GetSliver,
     "Shutdown"          => \&GeniCMV2::Shutdown,
     "SliverStatus"      => \&GeniCMV2::SliverStatus,
-    "RenewSliver"       => \&GeniCMV2::RenewSliver,
+    "RenewSlice"        => \&GeniCMV2::RenewSlice,
     "GetTicket"         => \&GeniCMV2::GetTicket,
     "ReleaseTicket"     => \&GeniCMV2::ReleaseTicket,
     "UpdateTicket"      => \&GeniCMV2::UpdateTicket,
