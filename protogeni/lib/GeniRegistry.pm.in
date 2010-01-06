@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniRegistry;
@@ -145,7 +145,7 @@ sub Create($$$$;$)
 
     # Now tack on other stuff we need.
     push(@insert_data, "created=now()");
-    push(@insert_data, "expires=DATE_ADD(now(), INTERVAL 1 HOUR)");
+    push(@insert_data, "expires=DATE_ADD(now(), INTERVAL 6 HOUR)");
     push(@insert_data, "idx='$idx'");
     push(@insert_data, "sa_uuid='$sa_uuid'");
     push(@insert_data, "exptidx=$exptidx")
