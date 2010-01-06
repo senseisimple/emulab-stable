@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2009 University of Utah and the Flux Group.
+# Copyright (c) 2009-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -26,6 +26,7 @@ my $TB		  = "@prefix@";
 my $TBOPS         = "@TBOPSEMAIL@";
 my $TBLOGS        = "@TBLOGSEMAIL@";
 my $LOGFILE       = "$TB/log/checknodes.log";
+my $PIDFILE       = "/var/run/checknodes.pid";
 my $SUDO          = "/usr/local/bin/sudo";
 my $PROTOUSER     = "elabman";
 my $WAP           = "$TB/sbin/withadminprivs";
@@ -77,6 +78,19 @@ my $NODEILL_PID = NODEILL_PID();
 my $NODEILL_EID = NODEILL_EID();
 
 #
+# Check for existing pidfile and running daemon. Mostly cause
+# of devel tree versions.
+#
+if (-e $PIDFILE) {
+    my $opid = `cat $PIDFILE`;
+    chomp($opid);
+    if (kill(0, $opid)) {
+	fatal("Lockfile $PIDFILE exists, and process $opid is running");
+    }
+    unlink($PIDFILE);
+}
+
+#
 # We need this user for running below.
 #
 my $elabman = User->Lookup($PROTOUSER);
@@ -121,6 +135,11 @@ if (! $debug) {
     if (TBBackGround($LOGFILE)) {
 	exit(0);
     }
+}
+# This acts as a lockfile to prevent a devel version from running at
+# the same time as the real version or another devel version.
+if (system("echo '$PID' > $PIDFILE")) {
+    fatal("Could not create $PIDFILE!");
 }
 print "Check Nodes Daemon starting ... pid $$, at ".`date`;
 
@@ -331,3 +350,4 @@ sub fatal($)
     die("*** $0:\n".
 	"    $msg\n");
 }
+

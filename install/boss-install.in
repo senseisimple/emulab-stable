@@ -737,7 +737,6 @@ Phase "syslog", "Setting up syslog", sub {
 	    "!capserver", "*.*\t\t\t\t\t\t$LOGDIR/capserver.log",
 	    "!frisbeed",  "*.*\t\t\t\t\t\t$LOGDIR/frisbeed.log",
 	    "!pubsubd",    "*.*\t\t\t\t\t\t$LOGDIR/pubsubd.log",
-	    "!stated",    "*.*\t\t\t\t\t\t$LOGDIR/stated.log",
 	    "!osselect",  "*.*\t\t\t\t\t\t$LOGDIR/osselect.log",
 	    "!genlastlog","*.*\t\t\t\t\t\t$LOGDIR/genlastlog.log",
 	    "!sdcollectd","*.*\t\t\t\t\t\t$LOGDIR/sdcollectd.log",
@@ -780,6 +779,8 @@ Phase "syslog", "Setting up syslog", sub {
 	    "$LOGDIR/tmcd.log               640  9     1000 *     Z",
 	    "$LOGDIR/stated.log             640  9     1000 *     Z ".
 	        "/var/run/stated.pid 31",
+	    "$LOGDIR/checknodes.log         640  14    300  *     Z ".
+	        "/var/run/checknodes.pid",
 	    "$LOGDIR/osselect.log           640  9     300  *     Z",
 	    "$LOGDIR/power.log              640  7     300  *     Z",
 	    "$LOGDIR/frisbeed.log           640  7     300  *     Z",

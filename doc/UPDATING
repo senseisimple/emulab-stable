@@ -32,7 +32,11 @@ earliest time one of the steps needs to occur.
 20091228: After install:
 
 	  New daemon to better manage the transition of nodes into
-          hwdown after a failure. Start this daemon:
+          hwdown after a failure. In /etc/newsyslog.conf, add this line:
+
+         /usr/testbed/log/checknodes.log 640 14 300 * Z /var/run/checknodes.pid
+
+          Then start this daemon:
 
 	     boss> sudo /usr/testbed/sbin/checknodes_daemon
 
