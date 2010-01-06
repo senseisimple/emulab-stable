@@ -216,7 +216,7 @@ if update:
         Fatal("Could not update sliver on CM")
         pass
     manifest = response["value"]
-    print "Updated the sliver on the CM. Renewing the sliver ..."
+    print "Updated the sliver on the CM, asking for a ticket copy ..."
     print str(manifest)
 
 #
@@ -228,7 +228,7 @@ rval,response = do_method("cm", "SliverTicket", params)
 if rval:
     Fatal("Could not get sliver ticket/manifest")
     pass
-print "Got a new manifest/ticket"
+print "Got a new ticket"
 ticket = response["value"]
 print str(ticket);
 
