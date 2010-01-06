@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniCH;
@@ -805,7 +805,7 @@ sub ListComponents($)
 	    
 	push(@results, { "gid" => $manager->cert(),
 			 "hrn" => $manager->hrn(),
-			 "urn" => $manager->urn(),
+			 "urn" => $manager->urn() || "",
 		         "url" => $manager->url() });
     }
     return GeniResponse->Create(GENIRESPONSE_SUCCESS, \@results);
