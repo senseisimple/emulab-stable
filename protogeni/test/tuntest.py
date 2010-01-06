@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
 # All rights reserved.
 # 
 # Permission to use, copy, modify and distribute this software is hereby
@@ -176,6 +176,11 @@ params["credential"] = myslice
 params["rspec"]      = rspec1
 rval,response = do_method(None, "GetTicket", params, URI=url1)
 if rval:
+    if response and response["value"]:
+        print >> sys.stderr, ""
+        print >> sys.stderr, str(response["value"])
+        print >> sys.stderr, ""
+        pass
     Fatal("Could not get ticket")
     pass
 ticket1 = response["value"]
@@ -202,6 +207,11 @@ params["credential"] = myslice
 params["rspec"]      = rspec2
 rval,response = do_method(None, "GetTicket", params, URI=url2)
 if rval:
+    if response and response["value"]:
+        print >> sys.stderr, ""
+        print >> sys.stderr, str(response["value"])
+        print >> sys.stderr, ""
+        pass
     Fatal("Could not get ticket")
     pass
 ticket2 = response["value"]
