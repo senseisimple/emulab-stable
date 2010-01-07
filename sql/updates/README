@@ -22,3 +22,7 @@ git-speak:
 which will give you the hash of your latest commit. Then, tag the commit:
 
     boss> git tag v4.185 <hash>
+
+Now you can push your commit along with the tag(s) to the remote repo:
+
+    boss> git push --tags origin master
