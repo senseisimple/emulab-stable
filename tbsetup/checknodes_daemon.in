@@ -16,8 +16,9 @@ sub usage()
     print "Usage: checknodes_daemon [-d]\n";
     exit(1);
 }
-my $optlist   = "d";
+my $optlist   = "dn";
 my $debug     = 0;
+my $impotent  = 0;
 
 #
 # Configure variables
@@ -63,6 +64,9 @@ if (! getopts($optlist, \%options)) {
 }
 if (defined($options{"d"})) {
     $debug++;
+}
+if (defined($options{"n"})) {
+    $impotent = 1;
 }
 
 # Load the Testbed support stuff.
@@ -152,7 +156,11 @@ if ($elabman->FlipTo($experiment->unix_gid())) {
 #
 sub handler()
 {
+    my $SAVEEUID = $EUID;
+    
+    $EUID = 0;
     ReOpenLog($LOGFILE);
+    $EUID = $SAVEEUID;
 }
 $SIG{HUP} = \&handler
     if (!$debug);
@@ -183,6 +191,9 @@ while (1) {
 
     while (my ($nodeid,$eventstate,$stamp) = $query_result->fetchrow_array()) {
 	print "Node in unknown state: $nodeid,$eventstate,$stamp\n";
+
+	next
+	    if ($impotent);
 	
 	my $node = Node->Lookup($nodeid);
 	if (!defined($node)) {
@@ -208,6 +219,11 @@ while (1) {
     my @nodelist = $experiment->NodeList();
     goto loop
 	if (!@nodelist);
+
+    if ($impotent) {
+	print "Would check @nodelist\n";
+	goto loop;
+    }
 
     foreach my $node (@nodelist) {
 	if ($node->ClearBootAttributes()) {
@@ -309,7 +325,7 @@ while (1) {
 	next;
     }
   loop:
-    sleep(60);
+    sleep(($debug ? 10 : 60));
 }
 exit(0);
 
