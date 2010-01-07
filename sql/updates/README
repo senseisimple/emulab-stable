@@ -1,0 +1,24 @@
+This directory contains the update scripts that bring external sites up
+to the current revision level of the database. Each numbered script
+corresponds to a revision of sql/database-create.sql. In the past, these
+numbers were the actual CVS revision numbers; revision 4.185 of
+database-create.sql corresponds to script 4/185. This makes it very easy
+to track the changes in the revision history, and it serves as a
+revision level that is presented on the web page.
+
+With the switch to GIT, this is no longer possible, since a revision
+number in git is an SHA1 hash, and that hash is not known until the file
+is actually committed.
+
+The new approach will be to continue creating the scripts as before;
+simply create a new numbered file in the appropriate subdirectory.  Once
+the script is committed along with the changes to database-create.sql,
+the *commit* will be tagged with the name of the update script. In
+git-speak:
+
+    boss> git commit -a -m "Important changes to the schema"
+    boss> git log -n 1 database-create.sql
+
+which will give you the hash of your latest commit. Then, tag the commit:
+
+    boss> git tag v4.185 <hash>
