@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007, 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -93,6 +93,16 @@ if (count($suexec_output_array)) {
 
     for ($i = 0; $i < count($suexec_output_array); $i++) {
 	$listname = $suexec_output_array[$i];
+
+	#
+	# XXX Since the output array contains stderr as well as stdout,
+	# we might get warnings and other chaff.  Do some filtering of
+	# lines here.  This is the current DB table_regex regex for a
+	# mailman listname.
+	#
+	if (!preg_match("/^[-\w\.\+]+$/", $listname)) {
+	    continue;
+	}
 
 	echo "<tr>
                   <td><a href='mailto:$listname@${OURDOMAIN}'>$listname</a>
