@@ -1100,9 +1100,8 @@ sub GetTicketAuxAux($$$$$$$$)
     }
     system("$MAPPER -n -d -v -u -o $tmpfile $pid $eid");
     if ($?) {
-	$response =
-	    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				 "Could not map to resources");
+	my $logstuff = undef;
+	
 	unlink($tmpfile);
 	if ($isupdate) {
 	    $slice_experiment->RemovePhysicalState();
@@ -1123,10 +1122,13 @@ sub GetTicketAuxAux($$$$$$$$)
 	if (-e "assign.log") {
 	    print STDERR "----------------------------------------------\n";
 	    print STDERR "------------- Assign Error Log ---------------\n";
-	    my $log = `cat assign.log`;
-	    print STDERR $log . "\n";
+	    $logstuff = `cat assign.log`;
+	    print STDERR $logstuff . "\n";
 	    print STDERR "----------------------------------------------\n";
 	}	    
+	$response =
+	    GeniResponse->Create(GENIRESPONSE_ERROR, $logstuff,
+				 "Could not map to resources");
 	goto bad;
     }
     my $solution =
@@ -1406,6 +1408,7 @@ sub SliverWorkAux($$$$$$$)
     my ($credential, $object, $keys, $isupdate, $impotent, $v2, $level) = @_;
     my $didfwsetup  = 0;
     my $restorephys = 0;	# Flag to restore physical state
+    my $response;
     my $ticket;
     my $rspec;
 
@@ -1836,6 +1839,9 @@ sub SliverWorkAux($$$$$$$)
     # Add -u for update mode, but not -f (fixnode). 
     system("$MAPPER -d -v -u $pid $eid");
     if ($?) {
+	my $logstuff = undef;
+	$message = "Could not map to resources";
+	
 	print STDERR "Mapper failed!\n";
 	# Dump the vtop.
 	if (-e "$pid-$eid.vtop") {
@@ -1852,10 +1858,12 @@ sub SliverWorkAux($$$$$$$)
 	if (-e "assign.log") {
 	    print STDERR "----------------------------------------------\n";
 	    print STDERR "------------- Assign Error Log ---------------\n";
-	    my $log = `cat assign.log`;
-	    print STDERR $log . "\n";
+	    $logstuff = `cat assign.log`;
+	    print STDERR $logstuff . "\n";
 	    print STDERR "----------------------------------------------\n";
-	}	    
+	}
+	$response =
+	    GeniResponse->Create(GENIRESPONSE_ERROR, $logstuff, $message);
 	goto bad;
     }
 
@@ -2308,7 +2316,8 @@ sub SliverWorkAux($$$$$$$)
     $slice->UnLock();
     $ticket->UnLock()
 	if (defined($ticket));
-    return GeniResponse->Create(GENIRESPONSE_ERROR, undef, $message);
+    return $response ||
+	GeniResponse->Create(GENIRESPONSE_ERROR, undef, $message);
 }
 
 #
