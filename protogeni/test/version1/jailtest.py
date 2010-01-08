@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
 # All rights reserved.
 # 
 # Permission to use, copy, modify and distribute this software is hereby
@@ -22,32 +22,10 @@ import getopt
 import os
 import time
 import re
+import xmlrpclib
+from M2Crypto import X509
 
-ACCEPTSLICENAME=1
-
-debug    = 0
-impotent = 1
-
-execfile( "../test-common.py" )
-
-if len(REQARGS) > 1:
-    Usage()
-    sys.exit( 1 )
-elif len(REQARGS) == 1:
-    try:
-        rspecfile = open(REQARGS[0])
-        rspec = rspecfile.read()
-        rspecfile.close()
-    except IOError, e:
-        print >> sys.stderr, args[ 0 ] + ": " + e.strerror
-        sys.exit( 1 )
-else:
-    rspec = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
-            " <node virtual_id=\"geni1\" "+\
-            "       virtualization_type=\"emulab-vnode\" " +\
-            "       startup_command=\"/bin/ls > /tmp/foo\"> " +\
-            " </node>" +\
-            "</rspec>"    
+execfile( "test-common.py" )
 
 #
 # Get a credential for myself, that allows me to do things at the SA.
@@ -65,7 +43,7 @@ if rval:
     Fatal("Could not get my keys")
     pass
 mykeys = response["value"]
-if debug: print str(mykeys)
+#print str(mykeys);
 
 #
 # Lookup slice.
@@ -102,36 +80,68 @@ else:
     pass
 
 #
+# Get a ticket. We do not have a real resource discovery tool yet, so
+# as a debugging aid, you can wildcard the uuid, and the CM will find
+# a free node and fill it in.
+#
+node_uuid = "*";
+#node_uuid = "de9803c2-773e-102b-8eb4-001143e453fe";
+
+print "Asking for a ticket from the local CM ..."
+
+rspec = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
+        " <node virtual_id=\"geni1\" "+\
+        "       colocate=\"geni1\" "+\
+        "       virtualization_type=\"emulab-vnode\" " +\
+        "       virtualization_subtype=\"emulab-jail\"> " +\
+        " </node>" +\
+        " <node virtual_id=\"geni2\" "+\
+        "       colocate=\"geni1\" "+\
+        "       virtualization_type=\"emulab-vnode\" " +\
+        "       virtualization_subtype=\"emulab-jail\"> " +\
+        " </node>" +\
+        "</rspec>"
+params = {}
+params["credential"] = myslice
+params["rspec"]      = rspec
+rval,response = do_method("cm", "GetTicket", params)
+if rval:
+    if response and response["value"]:
+        print >> sys.stderr, ""
+        print >> sys.stderr, str(response["value"])
+        print >> sys.stderr, ""
+        pass
+    Fatal("Could not get ticket")
+    pass
+ticket = response["value"]
+print "Got a ticket from the CM. Redeeming the ticket ..."
+
+#
 # Create the sliver.
 #
-print "Creating the Sliver ..."
 params = {}
-params["credentials"] = (myslice,)
-params["slice_urn"]   = SLICEURN
-params["rspec"]       = rspec
-params["keys"]        = mykeys
-params["impotent"]    = impotent
-rval,response = do_method("cmv2", "CreateSliver", params)
+params["credential"] = myslice
+params["ticket"]   = ticket
+params["keys"]     = mykeys
+params["impotent"] = impotent
+rval,response = do_method("cm", "RedeemTicket", params)
 if rval:
-    Fatal("Could not create sliver")
+    Fatal("Could not redeem ticket")
     pass
 sliver,manifest = response["value"]
-print "Created the sliver"
+print "Created the sliver. Starting the sliver ..."
 print str(manifest)
 
 #
-# Renew the sliver, for kicks
+# Start the sliver.
 #
-valid_until = time.strftime("%Y%m%dT%H:%M:%S",time.gmtime(time.time() + 6000));
-
-print "Renewing the Sliver until " + valid_until
 params = {}
-params["slice_urn"]    = SLICEURN
-params["credentials"]  = (sliver,)
-params["valid_until"]  = valid_until
-rval,response = do_method("cmv2", "RenewSliver", params)
+params["credential"] = sliver
+params["impotent"]   = impotent
+rval,response = do_method("cm", "StartSliver", params)
 if rval:
-    Fatal("Could not renew sliver")
+    Fatal("Could not start sliver")
     pass
-print "Sliver has been renewed"
-
+print "Sliver has been started."
+print ""
+print "Delete this sliver with deletesliver.py"

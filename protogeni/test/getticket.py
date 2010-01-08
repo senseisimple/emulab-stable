@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2009 University of Utah and the Flux Group.
 # All rights reserved.
 # 
 # Permission to use, copy, modify and distribute this software is hereby
@@ -28,6 +28,25 @@ from M2Crypto import X509
 ACCEPTSLICENAME=1
 
 execfile( "test-common.py" )
+
+if len(REQARGS) > 1:
+    Usage()
+    sys.exit( 1 )
+elif len(REQARGS) == 1:
+    try:
+        rspecfile = open(REQARGS[0])
+        rspec = rspecfile.read()
+        rspecfile.close()
+    except IOError, e:
+        print >> sys.stderr, args[ 0 ] + ": " + e.strerror
+        sys.exit( 1 )
+else:
+    rspec = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
+            " <node virtual_id=\"geni1\" "+\
+            "       virtualization_type=\"emulab-vnode\"> " +\
+            " </node>" +\
+            "</rspec>"
+    pass
 
 #
 # Get a credential for myself, that allows me to do things at the SA.
@@ -73,76 +92,33 @@ else:
 # as a debugging aid, you can wildcard the uuid, and the CM will find
 # a free node and fill it in.
 #
-print "Asking for a ticket from the CM"
+print "Asking for a ticket from the local CM"
 
-rspec = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
-        " <node virtual_id=\"geni1\" "+\
-        "       virtualization_type=\"emulab-vnode\"> " +\
-        " </node>" +\
-        "</rspec>"
 params = {}
-params["credential"] = myslice
-params["rspec"]      = rspec
-params["impotent"]   = 0
-rval,response = do_method("cm", "GetTicket", params)
+params["slice_urn"]   = SLICEURN
+params["credentials"] = (myslice,)
+params["rspec"]       = rspec
+params["impotent"]    = 0
+rval,response = do_method("cmv2", "GetTicket", params)
 if rval:
-    if response and response["value"]:
-        print >> sys.stderr, ""
-        print >> sys.stderr, str(response["value"])
-        print >> sys.stderr, ""
-        pass
     Fatal("Could not get ticket")
     pass
 ticket = response["value"]
-print "Got a ticket from the CM. Delaying a moment ..."
-if debug: print str(ticket)
 #print str(ticket)
 
-time.sleep(2)
-
-print "Doing a ticket update ..."
+#
+# Update the ticket.
+#
+print "Got the ticket, doing a update on it. "
 params = {}
-params["credential"] = myslice
-params["ticket"]  = ticket
-params["rspec"]   = rspec
-rval,response = do_method("cm", "UpdateTicket", params)
+params["slice_urn"]   = SLICEURN
+params["ticket"]      = ticket
+params["credentials"] = (myslice,)
+params["rspec"]       = rspec
+params["impotent"]    = 0
+rval,response = do_method("cmv2", "UpdateTicket", params)
 if rval:
     Fatal("Could not update ticket")
     pass
 ticket = response["value"]
-print "Got an updated ticket from the CM. Delaying a moment ..."
-if debug: print str(ticket)
-#print str(ticket)
-
-time.sleep(2)
-
-print "Getting a list of all your tickets ..."
-params = {}
-params["credential"] = myslice
-rval,response = do_method("cm", "ListTickets", params)
-if rval:
-    Fatal("Could not get ticket list")
-    pass
-tickets = response["value"]
-print str(tickets);
-
-print "Asking for a copy of the ticket ..."
-params = {}
-params["credential"] = myslice
-params["uuid"]       = tickets[0]["uuid"]
-rval,response = do_method("cm", "GetTicket", params)
-if rval:
-    Fatal("Could not get ticket list")
-    pass
-ticketcopy = response["value"]
-
-print "Releasing the ticket now ..."
-params = {}
-params["credential"] = myslice
-params["ticket"]     = ticketcopy
-rval,response = do_method("cm", "ReleaseTicket", params)
-if rval:
-    Fatal("Could not release ticket")
-    pass
-print "Ticket has been released"
-
+print str(ticket)

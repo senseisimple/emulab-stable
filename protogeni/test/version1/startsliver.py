@@ -20,20 +20,23 @@ import sys
 import pwd
 import getopt
 import os
+import time
 import re
+import xmlrpclib
+from M2Crypto import X509
 
 ACCEPTSLICENAME=1
 
-execfile( "../test-common.py" )
+execfile( "test-common.py" )
 
 #
 # Get a credential for myself, that allows me to do things at the SA.
 #
 mycredential = get_self_credential()
-print "Got my SA credential. Looking for slice ..."
+print "Got my SA credential"
 
 #
-# Lookup slice.
+# Lookup slice
 #
 myslice = resolve_slice( SLICENAME, mycredential )
 print "Found the slice, asking for a credential ..."
@@ -48,24 +51,22 @@ print "Got the slice credential, asking for a sliver credential ..."
 # Get the sliver credential.
 #
 params = {}
-params["slice_urn"]   = SLICEURN
-params["credentials"] = (slicecred,)
-rval,response = do_method("cmv2", "GetSliver", params)
+params["credential"] = slicecred
+rval,response = do_method("cm", "GetSliver", params)
 if rval:
     Fatal("Could not get Sliver credential")
     pass
 slivercred = response["value"]
-print "Got the sliver credential, asking for sliver status";
+print "Got the sliver credential, starting the sliver";
 
 #
-# Get the sliver status
+# Start the sliver.
 #
 params = {}
-params["slice_urn"]   = SLICEURN
-params["credentials"] = (slivercred,)
-rval,response = do_method("cmv2", "SliverStatus", params)
+params["credential"] = slivercred
+rval,response = do_method("cm", "StartSliver", params)
 if rval:
-    Fatal("Could not get sliver status")
+    Fatal("Could not start sliver")
     pass
-print str(response["value"])
+print "Sliver has been started ..."
 

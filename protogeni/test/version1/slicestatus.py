@@ -21,6 +21,10 @@ import pwd
 import getopt
 import os
 import re
+import xmlrpclib
+from M2Crypto import X509
+
+ACCEPTSLICENAME=1
 
 execfile( "test-common.py" )
 
@@ -28,14 +32,28 @@ execfile( "test-common.py" )
 # Get a credential for myself, that allows me to do things at the SA.
 #
 mycredential = get_self_credential()
+print "Got my SA credential. Looking for slice ..."
 
 #
-# Ask manager for its list.
+# Lookup slice, delete before proceeding.
+#
+myslice = resolve_slice( SLICENAME, mycredential )
+print "Found the slice, asking for a credential ..."
+
+#
+# Get the slice credential.
+#
+slicecred = get_slice_credential( myslice, mycredential )
+print "Got the slice credential, asking for slice status ..."
+
+#
+# Get the slice status
 #
 params = {}
-params["credentials"] = (mycredential,)
-rval,response = do_method("cmv2", "DiscoverResources", params)
+params["credential"] = slicecred
+rval,response = do_method("cm", "SliceStatus", params)
 if rval:
-    Fatal("Could not get a list of resources")
+    Fatal("Could not get slice status")
     pass
-print response[ "value" ]
+print str(response["value"])
+

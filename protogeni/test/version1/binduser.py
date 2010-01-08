@@ -20,41 +20,40 @@ import sys
 import pwd
 import getopt
 import os
+import time
 import re
+import xmlrpclib
+from M2Crypto import X509
 
 ACCEPTSLICENAME=1
 
-execfile( "../test-common.py" )
+execfile( "test-common.py" )
 
 #
 # Get a credential for myself, that allows me to do things at the SA.
 #
 mycredential = get_self_credential()
-print "Got my SA credential. Looking for slice ..."
+print "Got self credential"
 
 #
-# Lookup slice, delete before proceeding.
+# Lookup slice.
 #
 myslice = resolve_slice( SLICENAME, mycredential )
-print "Found the slice, asking for a credential ..."
+print "Resolved slice " + SLICENAME
 
 #
 # Get the slice credential.
 #
-slicecred = get_slice_credential( myslice, mycredential )
-print "Got the slice credential"
+slicecredential = get_slice_credential( myslice, mycredential )
+print "Got slice credential"
 
 #
-# Delete the Slice
+# Bind to slice at the CM.
 #
-print "Deleting the slice"
 params = {}
-params["credentials"] = (slicecred,)
-params["slice_urn"]   = SLICEURN
-rval,response = do_method("cmv2", "DeleteSlice", params)
+params["credential"] = slicecredential
+rval,response = do_method("cm", "BindToSlice", params)
 if rval:
-    Fatal("Could not delete slice")
+    Fatal("Could not bind myself to slice")
     pass
-print "Slice has been deleted."
-
-
+print "Bound myself to slice"

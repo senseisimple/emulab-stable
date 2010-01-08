@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2009 University of Utah and the Flux Group.
 # All rights reserved.
 # 
 # Permission to use, copy, modify and distribute this software is hereby
@@ -22,60 +22,20 @@ import getopt
 import os
 import time
 import re
-import xmlrpclib
-from M2Crypto import X509
 
 ACCEPTSLICENAME=1
 
-def Usage():
-    print "usage: " + sys.argv[ 0 ] + " [option...] [resource-specification]"
-    print """Options:
-    -c file, --credentials=file         read self-credentials from file
-                                            [default: query from SA]
-    -d, --debug                         be verbose about XML methods invoked
-    -f file, --certificate=file         read SSL certificate from file
-                                            [default: ~/.ssl/encrypted.pem]
-    -h, --help                          show options and usage
-    -k keyfile, --keys=keyfile          read SSH keys from file            
-                                            [default: query from SA]
-    -n name, --slicename=name           specify human-readable name of slice
-                                            [default: mytestslice]
-    -p file, --passphrase=file          read passphrase from file
-                                            [default: ~/.ssl/password]
-    -r file, --read-commands=file       specify additional configuration file
-    -s file, --slicecredentials=file    read slice credentials from file
-                                            [default: query from SA]
-    -u, --update                        perform an update after creation"""
-
-update = False
-# We're supposed to make a temporary copy of a list to iterate over it
-# if we might also mutate it.  Silly Python.
-for arg in sys.argv[:]:
-    if arg == "-u" or ( len( arg ) >= 3 and "--update".find( arg ) == 0 ):
-        sys.argv.remove( arg )
-        update = True
-
-# Gah.  This case is even uglier, since we need to remove both the
-# option and its mandator parameter.  Don't bother addressing the
-# case where the user specifies -k more than once: they are being silly.
-keyfile = ""
-for i in range( len( sys.argv ) ):
-    if sys.argv[ i ] == "-k" or ( len( sys.argv[ i ] ) >= 3 and "--key".find( sys.argv[ i ] ) == 0 ):
-        if i + 1 >= len( sys.argv ):
-            Usage()
-            sys.exit( 1 )
-        keyfile = sys.argv[ i + 1 ]
-        sys.argv[ i : i + 2 ] = [];
-        break
+debug    = 0
+impotent = 1
 
 execfile( "test-common.py" )
 
-if len( args ) > 1:
+if len(REQARGS) > 1:
     Usage()
     sys.exit( 1 )
-elif len( args ) == 1:
+elif len(REQARGS) == 1:
     try:
-        rspecfile = open( args[ 0 ] )
+        rspecfile = open(REQARGS[0])
         rspec = rspecfile.read()
         rspecfile.close()
     except IOError, e:
@@ -100,20 +60,11 @@ print "Got my SA credential"
 #
 params = {}
 params["credential"] = mycredential
-if keyfile == "":
-    rval,response = do_method("sa", "GetKeys", params)
-    if rval:
-        Fatal("Could not get my keys")
-        pass
-    mykeys = response["value"]
-else:
-    mykeys = []
-    f = open( keyfile )
-    for keyline in f:
-        if re.match( r"\s*#", keyline ):
-            continue
-        mykeys.append( { 'type' : 'ssh', 'key' : keyline } )
-    f.close()
+rval,response = do_method("sa", "GetKeys", params)
+if rval:
+    Fatal("Could not get my keys")
+    pass
+mykeys = response["value"]
 if debug: print str(mykeys)
 
 #
@@ -151,87 +102,36 @@ else:
     pass
 
 #
-# Get a ticket. We do not have a real resource discovery tool yet, so
-# as a debugging aid, you can wildcard the uuid, and the CM will find
-# a free node and fill it in.
-#
-print "Asking for a ticket from the CM"
-
-params = {}
-params["credential"] = myslice
-params["rspec"]      = rspec
-rval,response = do_method("cm", "GetTicket", params)
-if rval:
-    if response and response["value"]:
-        print >> sys.stderr, ""
-        print >> sys.stderr, str(response["value"])
-        print >> sys.stderr, ""
-        pass
-    Fatal("Could not get ticket")
-    pass
-ticket = response["value"]
-print "Got a ticket from the CM. Redeeming the ticket ..."
-
-#
 # Create the sliver.
 #
+print "Creating the Sliver ..."
 params = {}
-params["credential"] = myslice
-params["ticket"]   = ticket
-params["keys"]     = mykeys
-params["impotent"] = impotent
-rval,response = do_method("cm", "RedeemTicket", params)
+params["credentials"] = (myslice,)
+params["slice_urn"]   = SLICEURN
+params["rspec"]       = rspec
+params["keys"]        = mykeys
+params["impotent"]    = impotent
+rval,response = do_method("cmv2", "CreateSliver", params)
 if rval:
-    Fatal("Could not redeem ticket")
+    Fatal("Could not create sliver")
     pass
 sliver,manifest = response["value"]
 print "Created the sliver"
 print str(manifest)
 
-if update:
-    #
-    # Get an updated ticket using the manifest. Normally the user would
-    # actually change the contents.
-    #
-    print "Updating the original ticket ..."
-    params = {}
-    params["credential"] = myslice
-    params["ticket"]     = ticket
-    params["rspec"]      = manifest
-    rval,response = do_method("cm", "UpdateTicket", params)
-    if rval:
-        Fatal("Could not update the ticket")
-        pass
-    newticket = response["value"]
-    print "Got an updated ticket from the CM. Updating the sliver ..."
-
-    #
-    # Update the sliver
-    #
-    params = {}
-    params["credential"] = sliver
-    params["ticket"]     = newticket
-    rval,response = do_method("cm", "UpdateSliver", params)
-    if rval:
-        Fatal("Could not update sliver on CM")
-        pass
-    manifest = response["value"]
-    print "Updated the sliver on the CM, asking for a ticket copy ..."
-    print str(manifest)
-
 #
-# Grab a sliver ticket just for the hell of it.
+# Renew the sliver, for kicks
 #
+valid_until = time.strftime("%Y%m%dT%H:%M:%S",time.gmtime(time.time() + 6000));
+
+print "Renewing the Sliver until " + valid_until
 params = {}
-params["credential"] = sliver
-rval,response = do_method("cm", "SliverTicket", params)
+params["slice_urn"]    = SLICEURN
+params["credentials"]  = (sliver,)
+params["valid_until"]  = valid_until
+rval,response = do_method("cmv2", "RenewSliver", params)
 if rval:
-    Fatal("Could not get sliver ticket/manifest")
+    Fatal("Could not renew sliver")
     pass
-print "Got a new ticket"
-ticket = response["value"]
-print str(ticket);
+print "Sliver has been renewed"
 
-print ""
-print "Start this sliver with startsliver.py"
-print "Delete this sliver with deletesliver.py"

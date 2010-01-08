@@ -23,8 +23,23 @@ import os
 import re
 
 ACCEPTSLICENAME=1
+URN = None
 
 execfile( "test-common.py" )
+
+if len(REQARGS) < 1:
+    print >> sys.stderr, "Must provide the action (start/stop/restart)"
+    sys.exit(1)
+else:
+    action = REQARGS[0]
+    if action != "start" and action != "stop" and action != "restart":
+        print >> sys.stderr, "Action must be one of start/stop/restart"
+        sys.exit(1)
+        pass
+    if len(REQARGS) == 2:
+        URN = REQARGS[1]
+        pass
+    pass
 
 #
 # Get a credential for myself, that allows me to do things at the SA.
@@ -45,24 +60,6 @@ slicecred = get_slice_credential( myslice, mycredential )
 print "Got the slice credential, asking for a sliver credential ..."
 
 #
-# Do a resolve to get the sliver urn.
-#
-print "Resolving the slice at the CM"
-params = {}
-params["credentials"] = (slicecred,)
-params["urn"]         = myslice["urn"]
-rval,response = do_method("cmv2", "Resolve", params)
-if rval:
-    Fatal("Could not resolve slice")
-    pass
-myslice = response["value"]
-print str(myslice)
-
-if not "sliver_urn" in myslice:
-    Fatal("No sliver exists for slice")
-    pass
-
-#
 # Get the sliver credential.
 #
 params = {}
@@ -73,20 +70,31 @@ if rval:
     Fatal("Could not get Sliver credential")
     pass
 slivercred = response["value"]
-print "Got the sliver credential, deleting the sliver";
+
+if action == "start":
+    method = "StartSliver"
+elif action == "stop":
+    method = "StopSliver"
+else:
+    method = "RestartSliver"
+    pass
 
 #
-# Delete the sliver.
+# Start the sliver.
 #
+print "Got the sliver credential, calling " + method + " on the sliver";
 params = {}
 params["credentials"] = (slivercred,)
-params["sliver_urn"]  = myslice["sliver_urn"]
-rval,response = do_method("cmv2", "DeleteSliver", params)
-if rval:
-    Fatal("Could not delete sliver")
+if URN:
+    params["component_urns"] = (URN,)
+else:
+    params["slice_urn"]   = SLICEURN
     pass
-print "Sliver has been deleted. Ticket for remaining time:"
-ticket = response["value"]
-print str(ticket);
+rval,response = do_method("cmv2", method, params)
+if rval:
+    Fatal("Could not start sliver")
+    pass
+print "Sliver has been " + action + "'ed."
+
 
 

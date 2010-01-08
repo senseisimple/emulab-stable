@@ -21,10 +21,12 @@ import pwd
 import getopt
 import os
 import re
+import xmlrpclib
+from M2Crypto import X509
 
 ACCEPTSLICENAME=1
 
-execfile( "../test-common.py" )
+execfile( "test-common.py" )
 
 #
 # Get a credential for myself, that allows me to do things at the SA.
@@ -45,30 +47,11 @@ slicecred = get_slice_credential( myslice, mycredential )
 print "Got the slice credential, asking for a sliver credential ..."
 
 #
-# Do a resolve to get the sliver urn.
-#
-print "Resolving the slice at the CM"
-params = {}
-params["credentials"] = (slicecred,)
-params["urn"]         = myslice["urn"]
-rval,response = do_method("cmv2", "Resolve", params)
-if rval:
-    Fatal("Could not resolve slice")
-    pass
-myslice = response["value"]
-print str(myslice)
-
-if not "sliver_urn" in myslice:
-    Fatal("No sliver exists for slice")
-    pass
-
-#
 # Get the sliver credential.
 #
 params = {}
-params["credentials"] = (slicecred,)
-params["slice_urn"]   = SLICEURN
-rval,response = do_method("cmv2", "GetSliver", params)
+params["credential"] = slicecred
+rval,response = do_method("cm", "GetSliver", params)
 if rval:
     Fatal("Could not get Sliver credential")
     pass
@@ -79,14 +62,11 @@ print "Got the sliver credential, deleting the sliver";
 # Delete the sliver.
 #
 params = {}
-params["credentials"] = (slivercred,)
-params["sliver_urn"]  = myslice["sliver_urn"]
-rval,response = do_method("cmv2", "DeleteSliver", params)
+params["credential"] = slivercred
+rval,response = do_method("cm", "DeleteSliver", params)
 if rval:
     Fatal("Could not delete sliver")
     pass
-print "Sliver has been deleted. Ticket for remaining time:"
-ticket = response["value"]
-print str(ticket);
+print "Sliver has been deleted."
 
 

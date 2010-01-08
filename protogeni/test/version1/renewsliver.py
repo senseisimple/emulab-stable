@@ -20,20 +20,31 @@ import sys
 import pwd
 import getopt
 import os
+import time
 import re
+import xmlrpclib
+from M2Crypto import X509
 
 ACCEPTSLICENAME=1
 
+minutes = 60
+
 execfile( "test-common.py" )
 
+if len(REQARGS) != 1:
+    print >> sys.stderr, "Must provide number of minutes to renew for"
+    sys.exit(1)
+else:
+    minutes = REQARGS[0]
+    pass
 #
 # Get a credential for myself, that allows me to do things at the SA.
 #
 mycredential = get_self_credential()
-print "Got my SA credential. Looking for slice ..."
+print "Got my SA credential"
 
 #
-# Lookup slice, delete before proceeding.
+# Lookup slice
 #
 myslice = resolve_slice( SLICENAME, mycredential )
 print "Found the slice, asking for a credential ..."
@@ -42,51 +53,39 @@ print "Found the slice, asking for a credential ..."
 # Get the slice credential.
 #
 slicecred = get_slice_credential( myslice, mycredential )
-print "Got the slice credential, asking for a sliver credential ..."
+print "Got the slice credential, renewing the slice at the SA ..."
 
 #
-# Do a resolve to get the sliver urn.
+# Bump the expiration time.
 #
-print "Resolving the slice at the CM"
-params = {}
-params["credentials"] = (slicecred,)
-params["urn"]         = myslice["urn"]
-rval,response = do_method("cmv2", "Resolve", params)
-if rval:
-    Fatal("Could not resolve slice")
-    pass
-myslice = response["value"]
-print str(myslice)
-
-if not "sliver_urn" in myslice:
-    Fatal("No sliver exists for slice")
-    pass
+valid_until = time.strftime("%Y%m%dT%H:%M:%S",
+                            time.gmtime(time.time() + (60 * int(minutes))))
 
 #
-# Get the sliver credential.
+# Renew the slice at the SA.
 #
 params = {}
-params["credentials"] = (slicecred,)
-params["slice_urn"]   = SLICEURN
-rval,response = do_method("cmv2", "GetSliver", params)
+params["credential"] = slicecred
+params["expiration"] = valid_until
+rval,response = do_method("sa", "RenewSlice", params)
 if rval:
-    Fatal("Could not get Sliver credential")
+    Fatal("Could not renew slice at the SA")
     pass
 slivercred = response["value"]
-print "Got the sliver credential, deleting the sliver";
+print "Renewed the slice, asking for slice credential again";
 
 #
-# Delete the sliver.
+# Get the slice credential again so we have the new time in it.
 #
+slicecred = get_slice_credential( myslice, mycredential )
+print "Got the slice credential, renewing the sliver";
+
 params = {}
-params["credentials"] = (slivercred,)
-params["sliver_urn"]  = myslice["sliver_urn"]
-rval,response = do_method("cmv2", "DeleteSliver", params)
+params["credential"]   = slicecred
+rval,response = do_method("cm", "RenewSlice", params)
 if rval:
-    Fatal("Could not delete sliver")
+    Fatal("Could not renew sliver")
     pass
-print "Sliver has been deleted. Ticket for remaining time:"
-ticket = response["value"]
-print str(ticket);
+print "Sliver has been renewed until " + valid_until
 
 

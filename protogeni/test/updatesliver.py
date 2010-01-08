@@ -28,7 +28,7 @@ ACCEPTSLICENAME=1
 debug    = 0
 impotent = 1
 
-execfile( "../test-common.py" )
+execfile( "test-common.py" )
 
 if len(REQARGS) > 1:
     Usage()

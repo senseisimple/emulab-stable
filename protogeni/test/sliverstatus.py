@@ -21,8 +21,6 @@ import pwd
 import getopt
 import os
 import re
-import xmlrpclib
-from M2Crypto import X509
 
 ACCEPTSLICENAME=1
 
@@ -50,8 +48,9 @@ print "Got the slice credential, asking for a sliver credential ..."
 # Get the sliver credential.
 #
 params = {}
-params["credential"] = slicecred
-rval,response = do_method("cm", "GetSliver", params)
+params["slice_urn"]   = SLICEURN
+params["credentials"] = (slicecred,)
+rval,response = do_method("cmv2", "GetSliver", params)
 if rval:
     Fatal("Could not get Sliver credential")
     pass
@@ -62,8 +61,9 @@ print "Got the sliver credential, asking for sliver status";
 # Get the sliver status
 #
 params = {}
-params["credential"] = slivercred
-rval,response = do_method("cm", "SliverStatus", params)
+params["slice_urn"]   = SLICEURN
+params["credentials"] = (slivercred,)
+rval,response = do_method("cmv2", "SliverStatus", params)
 if rval:
     Fatal("Could not get sliver status")
     pass

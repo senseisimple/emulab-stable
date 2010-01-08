@@ -23,23 +23,8 @@ import os
 import re
 
 ACCEPTSLICENAME=1
-URN = None
 
-execfile( "../test-common.py" )
-
-if len(REQARGS) < 1:
-    print >> sys.stderr, "Must provide the action (start/stop/restart)"
-    sys.exit(1)
-else:
-    action = REQARGS[0]
-    if action != "start" and action != "stop" and action != "restart":
-        print >> sys.stderr, "Action must be one of start/stop/restart"
-        sys.exit(1)
-        pass
-    if len(REQARGS) == 2:
-        URN = REQARGS[1]
-        pass
-    pass
+execfile( "test-common.py" )
 
 #
 # Get a credential for myself, that allows me to do things at the SA.
@@ -57,44 +42,19 @@ print "Found the slice, asking for a credential ..."
 # Get the slice credential.
 #
 slicecred = get_slice_credential( myslice, mycredential )
-print "Got the slice credential, asking for a sliver credential ..."
+print "Got the slice credential"
 
 #
-# Get the sliver credential.
+# Delete the Slice
 #
+print "Deleting the slice"
 params = {}
 params["credentials"] = (slicecred,)
 params["slice_urn"]   = SLICEURN
-rval,response = do_method("cmv2", "GetSliver", params)
+rval,response = do_method("cmv2", "DeleteSlice", params)
 if rval:
-    Fatal("Could not get Sliver credential")
+    Fatal("Could not delete slice")
     pass
-slivercred = response["value"]
-
-if action == "start":
-    method = "StartSliver"
-elif action == "stop":
-    method = "StopSliver"
-else:
-    method = "RestartSliver"
-    pass
-
-#
-# Start the sliver.
-#
-print "Got the sliver credential, calling " + method + " on the sliver";
-params = {}
-params["credentials"] = (slivercred,)
-if URN:
-    params["component_urns"] = (URN,)
-else:
-    params["slice_urn"]   = SLICEURN
-    pass
-rval,response = do_method("cmv2", method, params)
-if rval:
-    Fatal("Could not start sliver")
-    pass
-print "Sliver has been " + action + "'ed."
-
+print "Slice has been deleted."
 
 

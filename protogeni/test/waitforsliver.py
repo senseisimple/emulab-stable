@@ -25,7 +25,7 @@ import time
 
 ACCEPTSLICENAME=1
 
-execfile( "../test-common.py" )
+execfile( "test-common.py" )
 
 #
 # Get a credential for myself, that allows me to do things at the SA.

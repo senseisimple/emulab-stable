@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2009 University of Utah and the Flux Group.
+# Copyright (c) 2008-2009 University of Utah and the Flux Group.
 # All rights reserved.
 # 
 # Permission to use, copy, modify and distribute this software is hereby
@@ -20,36 +20,24 @@ import sys
 import pwd
 import getopt
 import os
-import time
 import re
+import xmlrpclib
+from M2Crypto import X509
 
-execfile("../test-common.py")
-
-URN = None
-
-if len(REQARGS) == 1:
-    URN = REQARGS[0]
-else:
-    print "You must supply a URN to resolve"
-    sys.exit(1)
-    pass
+execfile( "test-common.py" )
 
 #
 # Get a credential for myself, that allows me to do things at the SA.
 #
 mycredential = get_self_credential()
-print "Got my SA credential"
 
-
-print "Resolving at the local CM"
+#
+# Ask manager for its list.
+#
 params = {}
-params["credentials"] = (mycredential,)
-params["urn"]         = URN
-rval,response = do_method("cmv2", "Resolve", params)
+params["credential"] = mycredential
+rval,response = do_method("cm", "DiscoverResources", params)
 if rval:
-    Fatal("Could not resolve")
+    Fatal("Could not get a list of resources")
     pass
-value = response["value"]
-print str(value)
-
-
+print response[ "value" ]
