@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005-2009 University of Utah and the Flux Group.
+# Copyright (c) 2005-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package libvtop;
@@ -2680,7 +2680,7 @@ sub CreateVtop($)
 # getbandwidth(bw)
 # Returns the lowest ok bandwidth that is greater than or equal to
 # the one passed. Takes a virtual node, from which it grabs a type - only
-# consideres bandwidths on the node types the virtual node can be mapped to.
+# considers bandwidths on the node types the virtual node can be mapped to.
 # Very similar to requires_delay().
 #
 sub getbandwidth($$$$)
