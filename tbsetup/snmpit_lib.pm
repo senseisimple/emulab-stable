@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-LGPL
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -587,16 +587,24 @@ sub getInterfaceSettings ($) {
     }
 
     my $result =
-	DBQueryFatal("SELECT current_speed, duplex FROM interfaces " .
-		     "WHERE node_id='$node' and card=$port");
+	DBQueryFatal("SELECT i.current_speed,i.duplex,ic.capval ".
+		     "  FROM interfaces as i " .
+		     "left join interface_capabilities as ic on ".
+		     "     ic.type=i.interface_type and ".
+		     "     capkey='noportcontrol' ".
+		     "WHERE i.node_id='$node' and i.card=$port");
 
-    my @row = $result->fetchrow();
     # Sanity check - make sure the interface exists
-    if (!@row) {
+    if ($result->numrows() != 1) {
 	die "No such interface: $interface\n";
     }
+    my ($speed,$duplex,$noportcontrol) = $result->fetchrow_array();
 
-    return @row;
+    # If the port does not support portcontrol, ignore it.
+    if (defined($noportcontrol) && $noportcontrol) {
+	return ();
+    }
+    return ($speed,$duplex);
 }
 
 #
