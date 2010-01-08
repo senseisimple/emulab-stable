@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2002-2007 University of Utah and the Flux Group.
+# Copyright (c) 2002-2007, 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -30,8 +30,20 @@ $(INSTALL_APACHE_CONFIG)/%: %
 	$(INSTALL_DATA) $< $@
 
 
-install: httpd.conf
-	$(INSTALL_DATA) httpd.conf $(INSTALL_APACHE_CONFIG)/httpd.conf
+#
+# XXX hack, hack: need to fix the path to the auth_mysql_module
+# This could (should?) be done with configure, but apache port might
+# not be installed when we configure our software.
+#
+httpd.conf.fixed: httpd.conf
+	-@cp httpd.conf httpd.conf.fixed
+	@if [ -x /usr/local/libexec/apache/mod_auth_mysql.so ]; then \
+            sed -i "" -e '/^LoadModule auth_mysql/s/libauth/mod_auth/' httpd.conf.fixed; \
+	    echo "Updated httpd.conf"; \
+	fi
+
+install: httpd.conf.fixed
+	$(INSTALL_DATA) httpd.conf.fixed $(INSTALL_APACHE_CONFIG)/httpd.conf
 
 control-install: httpd.conf-ops
 	$(INSTALL_DATA) httpd.conf-ops $(INSTALL_APACHE_CONFIG)/httpd.conf

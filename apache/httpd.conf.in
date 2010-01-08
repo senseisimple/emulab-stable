@@ -243,9 +243,7 @@ LoadModule usertrack_module   libexec/apache/mod_usertrack.so
 LoadModule unique_id_module   libexec/apache/mod_unique_id.so
 LoadModule setenvif_module    libexec/apache/mod_setenvif.so
 LoadModule php4_module        libexec/apache/libphp4.so
-LoadModule auth_mysql_module  libexec/apache/mod_auth_mysql.so
-# use the following for older versions of mod_auth_mysql
-#LoadModule auth_mysql_module  libexec/apache/libauth_mysql.so
+LoadModule auth_mysql_module  libexec/apache/libauth_mysql.so
 <IfDefine SSL>
 LoadModule ssl_module         libexec/apache/libssl.so
 </IfDefine>
