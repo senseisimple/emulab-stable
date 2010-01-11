@@ -1,0 +1,64 @@
+#!/bin/sh
+
+# PROVIDE: apache
+# REQUIRE: DAEMON
+# BEFORE: LOGIN
+# KEYWORD: shutdown
+
+# if real apache startup file hasn't been moved, we do nothing
+if [ -f /usr/local/etc/rc.d/apache -o ! -f /usr/local/etc/rc.d/.apache.real ]
+then
+	return 0
+fi
+   
+ARGS=$*
+CFFILE=/usr/local/etc/apache/httpd.conf
+command=/usr/local/sbin/httpd
+pidfile=/var/run/httpd.pid
+
+. /etc/rc.subr
+
+#
+# It seems to be well documented that some combinations of apache and PHP
+# extensions result in immediate crash of the server.  There is also a
+# work around that involves "apachectl restart".  So if apache fails to
+# start up, we enact the hack.
+#
+case $1 in
+*start)
+	# (re)start it
+	/usr/local/etc/rc.d/.apache.real $ARGS
+
+	# give it time to crash
+	sleep 2
+
+	# still running? all done
+	rc_pid=$(check_pidfile $pidfile $command)
+	if [ -n "$rc_pid" ]; then
+		return 0
+	fi
+
+	# otherwise tweak the config file and start again
+	echo "Apache did not start; trying PHP restart hack..."
+	rm -f $CFFILE.orig
+	sed -i .orig -e '/^LoadModule php4_module/s/^/#/' -e '/^AddModule mod_php4.c/s/^/#/' $CFFILE || return 1
+	/usr/local/etc/rc.d/.apache.real $ARGS
+	sleep 2
+
+	# still not running? we have bigger problems
+	rc_pid=$(check_pidfile $pidfile $command)
+	if [ -z "$rc_pid" ]; then
+		mv $CFFILE.orig $CFFILE
+		return 1
+	fi
+
+	# otherwise restore config and use apachectl to restart
+	mv $CFFILE.orig $CFFILE
+	/usr/local/sbin/apachectl restart
+	;;
+*)
+	/usr/local/etc/rc.d/.apache.real $ARGS
+	;;
+esac
+
+return $?
