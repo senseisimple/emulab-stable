@@ -180,11 +180,13 @@ while (1) {
 	DBQueryWarn("select n.node_id,n.eventstate, ".
 	    "   FROM_UNIXTIME(n.state_timestamp) from nodes as n ".
 	    "left join reserved as r on r.node_id=n.node_id ".
+	    "left join node_types as t on t.type=n.type ".
 	    "where (n.eventstate!='". TBDB_NODESTATE_ISUP ."' and ".
 	    "       n.eventstate!='". TBDB_NODESTATE_PXEWAIT ."' and ".
 	    "       n.eventstate!='". TBDB_NODESTATE_ALWAYSUP ."' and ".
 	    "       n.eventstate!='". TBDB_NODESTATE_POWEROFF ."') and ".
             "       r.pid is null and n.role='testnode' and ".
+	    "       t.isvirtnode=0 and ".
             "       (UNIX_TIMESTAMP(now()) - n.state_timestamp) > 600");
     goto loop
 	if (!$query_result);
@@ -200,6 +202,14 @@ while (1) {
 	    print STDERR "Cannot find object for $nodeid\n";
 	    next;
 	}
+	#
+	# Skip nodes that are not imageable; we cannot load them
+	# to test them.
+	#
+	next
+	    if (!$node->imageable() ||
+		!defined($node->default_imageid()));
+	
 	#
 	# The node is not in any experiment, so we have to explicitly
 	# push it into the hwcheckup experiment.
