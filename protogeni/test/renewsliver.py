@@ -81,8 +81,9 @@ slicecred = get_slice_credential( myslice, mycredential )
 print "Got the slice credential, renewing the sliver";
 
 params = {}
-params["credential"]   = slicecred
-rval,response = do_method("cm", "RenewSlice", params)
+params["credentials"]  = (slicecred,)
+params["slice_urn"]    = SLICEURN
+rval,response = do_method("cmv2", "RenewSlice", params)
 if rval:
     Fatal("Could not renew sliver")
     pass

@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
 # All rights reserved.
 # 
 # Permission to use, copy, modify and distribute this software is hereby
@@ -118,20 +118,4 @@ if rval:
 sliver,manifest = response["value"]
 print "Created the sliver"
 print str(manifest)
-
-#
-# Renew the sliver, for kicks
-#
-valid_until = time.strftime("%Y%m%dT%H:%M:%S",time.gmtime(time.time() + 6000));
-
-print "Renewing the Sliver until " + valid_until
-params = {}
-params["slice_urn"]    = SLICEURN
-params["credentials"]  = (sliver,)
-params["valid_until"]  = valid_until
-rval,response = do_method("cmv2", "RenewSliver", params)
-if rval:
-    Fatal("Could not renew sliver")
-    pass
-print "Sliver has been renewed"
 
