@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
 # All rights reserved.
 # 
 # Permission to use, copy, modify and distribute this software is hereby
@@ -71,7 +71,6 @@ rval,response = do_method("sa", "RenewSlice", params)
 if rval:
     Fatal("Could not renew slice at the SA")
     pass
-slivercred = response["value"]
 print "Renewed the slice, asking for slice credential again";
 
 #
