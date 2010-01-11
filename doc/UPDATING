@@ -40,6 +40,12 @@ earliest time one of the steps needs to occur.
 
 	     boss> sudo /usr/testbed/sbin/checknodes_daemon
 
+	  Also install new rc.d files on boss.
+          Note that this is not done as part of toplevel install.
+
+	      cd /your/object/tree/obj/rc.d
+	      sudo gmake install
+
 20091103: After install:
 
 	  The structure of /usr/testbed/expinfo has changed. With the
