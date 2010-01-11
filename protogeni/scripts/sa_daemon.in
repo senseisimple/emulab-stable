@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -85,7 +85,7 @@ require GeniUser;
 use Experiment;
 use Node;
 use libtestbed;
-use POSIX qw(strftime);
+use POSIX qw(strftime ceil);
 
 #
 # So we know who/what we are acting as.
@@ -123,11 +123,13 @@ my $grace   = $hours * 3600;
 sub WarnSlices()
 {
     my $query_result =
-	GeniDB::DBQueryWarn("select idx,expires,UNIX_TIMESTAMP(expires) ".
+	GeniDB::DBQueryWarn("select idx,expires,UNIX_TIMESTAMP(expires), ".
+			    "   UNIX_TIMESTAMP(created) ".
 			    "  from geni_slices ".
 			    "where shutdown is null");
 
-    while (my ($idx,$expires,$stamp) = $query_result->fetchrow_array()) {
+    while (my ($idx,$expires,$stamp,$created) =
+	   $query_result->fetchrow_array()) {
 	if (exists($expires{$idx})) {
 	    if ($expires{$idx} == $stamp) {
 		# Already warned, skip.
@@ -158,32 +160,60 @@ sub WarnSlices()
 	    print STDERR "Could not lock slice $slice.\n";
 	    goto skip;
 	}
-	if (! $slice->IsExpired()) {
-	    delete($warned{$idx});
-	    delete($expires{$idx});
-	    $slice->UnLock();
-	    goto skip;
-	}
+
 	my $geniuser  = GeniUser->Lookup($slice->creator_uuid(), 1);
 	my $emailaddr = $geniuser->email();
 	my $urn       = $slice->urn();
 	my $hrn       = $slice->hrn();
+	my $diff      = $stamp - time();
+	my $unit;
+	if ($diff < 0) {
+	    $diff = 0;
+	    $unit = "minutes";
+	}
+	elsif ($diff < 60) {
+	    $diff = POSIX::ceil($diff / 60);
+	    $unit = "minutes";
+	}
+	else {
+	    $diff = POSIX::ceil($diff / 3600);
+	    $unit = "hours";
+	}
 	
 	if ($impotent) {
-	    print STDERR "Would send mail to $geniuser about $idx,$hrn\n";
+	    if ($stamp - $created < $grace) {
+		print STDERR
+		    "Short lived slice is going to expire: ".
+		    "$geniuser,$idx,$hrn,$diff $unit\n";
+	    }
+	    else {
+		print STDERR
+		    "Would send mail to $geniuser: $idx,$hrn,$diff $unit\n";
+	    }
 	    $warned{$idx}  = time();
 	    $expires{$idx} = $stamp;
 	    $slice->UnLock();
 	    goto skip;
 	}
-	print STDERR
-	    "Sending mail to $geniuser about expiring slice $idx,$hrn\n";
-	SENDMAIL($emailaddr, "Slice $urn expiring",
-		 "Slice $urn\n".
-		 "is going to expire in approximately 24 hours.\n".
-		 "Please renew it or let it expire if you not using it.\n",
-		 undef, "CC: $TBOPS");
-	
+	#
+	# If this is a short lived slice then do not bother to send
+	# email. Assume negative reenforcement will teach users what
+	# to do.
+	#
+	if ($stamp - $created < $grace) {
+	    print STDERR
+		"Short lived slice is going to expire: ".
+		"$geniuser,$idx,$hrn,$diff $unit\n";
+	}
+	else {
+	    print STDERR
+		"Sending mail to $geniuser about expiring slice $idx,$hrn\n";
+	    SENDMAIL($emailaddr, "Slice $urn expiring",
+		     "Slice $urn\n".
+		     "is going to expire in approximately $diff $unit.\n".
+		     "Please renew it or let it expire if you not using it.\n",
+		     undef, "CC: $TBOPS");
+	}
 	$warned{$idx}  = time();
 	$expires{$idx} = $stamp;
 	$slice->UnLock();
@@ -220,14 +250,6 @@ sub ExpireSlices()
 	    $slice->UnLock();
 	    delete($warned{"$idx"});
 	    delete($expires{"$idx"});
-	    goto skip;
-	}
-	# Do not delete anything that was not warned at least 24 hours ago.
-	if (!exists($warned{"$idx"}) ||
-	    $warned{"$idx"} > time() - $grace) {
-	    print STDERR "Skipping $slice cause it was not warned at least ".
-		"$hours hours ago\n" if ($debug > 1);
-	    $slice->UnLock();
 	    goto skip;
 	}
 	if ($impotent) {
