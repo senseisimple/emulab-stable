@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniCMV2;
@@ -814,8 +814,7 @@ sub RenewSlice($)
     my $valid_until  = $argref->{'valid_until'} || $argref->{'expiration'};
     my $credentials  = $argref->{'credentials'};
 
-    if (! (defined($credentials) &&
-	   defined($valid_until) && defined($slice_urn))) {
+    if (! (defined($credentials) && defined($slice_urn))) {
 	return GeniResponse->MalformedArgsResponse("Missing arguments");
     }
     if (! GeniHRN::IsValid($slice_urn)) {
