@@ -30,6 +30,7 @@ package
 
     public function reset(qualifiedMethod : Array) : void
     {
+      cleanup();
       if (qualifiedMethod != null)
       {
         module = qualifiedMethod[0];
@@ -48,12 +49,20 @@ package
 
     public function resetUrl() : void
     {
-      url = "https://" + XMLRPC_SERVER + SERVER_PATH + module;
+      url = "https://" + Geni.defaultHost + SERVER_PATH;
+      if (module != null)
+      {
+        url += module;
+      }
     }
 
     public function setUrl(newUrl : String) : void
     {
-      url = newUrl + "/" + module;
+      url = newUrl;
+      if (module != null)
+      {
+        url += "/" + module;
+      }
     }
 
     public function setExactUrl(newUrl : String) : void
@@ -101,7 +110,7 @@ package
       }
       catch (e : Error)
       {
-      	
+
         Main.getConsole().appendText("\n\nException on XMLRPC Call: "
                                      + e.toString() + "\n\n");
       }
@@ -119,7 +128,7 @@ package
 
     private function callSuccess(event : Event) : void
     {
-      cleanup();
+//      cleanup();
       success(Number(server.getResponse().code),
 //              server.getResponse().value.toString(),
 //              String(server.getResponse().output),
@@ -128,16 +137,21 @@ package
 
     private function callFailure(event : ErrorEvent) : void
     {
-      cleanup();
+//      cleanup();
       failure(event, server.getFault());
     }
 
     public function cleanup() : void
     {
-      server.removeEventListener(Event.COMPLETE, callSuccess);
-      server.removeEventListener(ErrorEvent.ERROR, callFailure);
-      server.observeTimer.stop();
-      server.observeTimer = null;
+      if (server != null)
+      {
+        server.removeEventListener(Event.COMPLETE, callSuccess);
+        server.removeEventListener(ErrorEvent.ERROR, callFailure);
+        server.observeTimer.stop();
+        server.observeTimer = null;
+        server.cleanup();
+        server = null;
+      }
     }
 
     private var module : String;
@@ -148,8 +162,6 @@ package
     private var success : Function;
     private var failure : Function;
 
-    private static var XMLRPC_SERVER : String = "boss.emulab.net:443";
-//    private static var XMLRPC_SERVER : String = "myboss.jonlab.geni.emulab.net:443";
     private static var SERVER_PATH : String = "/protogeni/xmlrpc/";
 
     private static var visitedSites : Dictionary = new Dictionary();

@@ -47,6 +47,7 @@ package
 
     override public function cleanup() : void
     {
+      op.cleanup();
       clip.removeEventListener(Event.ENTER_FRAME, enterFrame);
       clip.parent.removeChild(clip);
     }
@@ -217,7 +218,8 @@ package
       clip.loadText.text = "Deleting existing slice";
       op.reset(Geni.remove);
       op.addField("credential", credential.base);
-      op.addField("hrn", "urn:publicid:IDN+" + AUTHORITY + "+slice+"+sliceName);
+      op.addField("hrn", "urn:publicid:IDN+" + Geni.defaultAuthority
+                  + "+slice+"+sliceName);
       op.addField("type", "Slice");
       op.call(completeSliceDelete, failure);
       addSend();
@@ -242,7 +244,8 @@ package
       clip.loadText.text = "Creating new slice";
       op.reset(Geni.register);
       op.addField("credential", credential.base);
-      op.addField("hrn", "urn:publicid:IDN+" + AUTHORITY + "+slice+"+sliceName);
+      op.addField("hrn", "urn:publicid:IDN+" + Geni.defaultAuthority
+                  + "+slice+"+sliceName);
 //      op.addField("hrn", sliceName);
       op.addField("type", "Slice");
 //      op.addField("userbindings", new Array(user.uuid));
@@ -306,7 +309,5 @@ package
     var credential : Credential;
 
     static var userName : String = "duerig";
-    static var AUTHORITY : String = "emulab.net";
-//    static var AUTHORITY : String = "jonlab.geni.emulab.net";
   }
 }

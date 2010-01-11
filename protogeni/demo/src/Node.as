@@ -378,12 +378,12 @@ package
           if (current.used)
           {
             str += "<interface virtual_id=\"" + current.virtualId + "\" ";
-/*
+
             if (current.name != null)
             {
               str += "component_id=\"" + current.name + "\" ";
             }
-*/
+
             str += " />";
           }
         }

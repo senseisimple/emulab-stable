@@ -14,14 +14,12 @@
 
 package
 {
-  public class RequestResourceDiscovery extends Request
+  public class RequestListComponents extends Request
   {
-    public function RequestResourceDiscovery(newCm : ComponentManager,
-                                             newNext : Request) : void
+    public function RequestListComponents(newView : ComponentView) : void
     {
-      super(newCm.getName());
-      cm = newCm;
-      next = newNext;
+      super("Clearinghouse");
+      view = newView;
     }
 
     override public function cleanup() : void
@@ -31,35 +29,38 @@ package
 
     override public function start(credential : Credential) : Operation
     {
-      opName = "Discovering Resources";
-      var opType = Geni.discoverResources;
-      if (cm.getName() == "Wisconsin" || cm.getName() == "Kentucky"
-        || cm.getName() == "CMU")
-      {
-        opType = Geni.discoverResourcesv2;
-      }
+      opName = "Listing ComponentManagers";
+      var opType = Geni.listComponents;
       op.reset(opType);
       op.addField("credential", credential.slice);
-      op.setUrl(cm.getUrl());
+      op.setUrl(Geni.chUrl);
       return op;
     }
 
     override public function complete(code : Number, response : Object,
                                       credential : Credential) : Request
     {
-      var result : Request = next;
+      var result : Request = null;
       if (code == 0)
       {
-        cm.resourceSuccess(response.value);
+        var head : RequestResourceDiscovery = null;
+        for each (var input in response.value)
+        {
+          var current : ComponentManager
+            = new ComponentManager(input.urn, input.hrn, "REMOVEME",
+                                   input.url, null, 2);
+          view.addManager(current);
+          head = new RequestResourceDiscovery(current, head);
+        }
+        result = head;
       }
       else
       {
-        cm.resourceFailure();
+        Main.getConsole().appendText("ListComponents Failed\n");
       }
       return result;
     }
 
-    private var cm : ComponentManager;
-    private var next : Request;
+    private var view : ComponentView;
   }
 }

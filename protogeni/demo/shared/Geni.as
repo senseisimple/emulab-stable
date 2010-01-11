@@ -17,14 +17,21 @@ package
   public class Geni
   {
     private static var sa : String = "sa";
-    private static var cm : String = "cm";
+    private static var cm : String = null;
     private static var ses : String = "ses";
     private static var ch : String = "ch";
 
     private static var cmv2 : String = "cmv2";
 
+//    public static var defaultAuthority : String = "jonlab.testbed.emulab.net";
+    public static var defaultAuthority : String = "emulab.net";
+
+//    public static var defaultHost : String = "myboss.jonlab.testbed.emulab.net";
+    public static var defaultHost : String = "boss.emulab.net";
+
     public static var sesUrl : String = "https://myboss.emulab.geni.emulab.net/protogeni/xmlrpc/";
 //"https://boss.emulab.net:443/protogeni/xmlrpc/";
+    public static var chUrl : String = "https://boss.emulab.net/protogeni/xmlrpc/";
 
     public static var getCredential : Array = new Array(sa, "GetCredential");
     public static var getKeys : Array = new Array(sa, "GetKeys");

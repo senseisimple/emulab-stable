@@ -83,6 +83,7 @@ package
 
     public function discoverResources() : void
     {
+      pushRequest(new RequestListComponents(managers));
       forEachComponent(discoverSliver);
     }
 
@@ -102,7 +103,7 @@ package
         }
         else
         {
-          return new RequestResourceDiscovery(cm);
+          return new RequestResourceDiscovery(cm, null);
         }
       }
       else
@@ -346,18 +347,25 @@ package
 
     function complete(code : Number, response : Object) : void
     {
-      clip.text.appendText(Util.getResponse(queue.front().getOpName(),
-                                            queue.front().getUrl(),
-                                            queue.front().getResponseXml()));
-      clip.text.scrollV = clip.text.maxScrollV;
-      var next : Request = queue.front().complete(code, response, credential);
-      queue.front().cleanup();
-      queue.pop();
-      if (next != null)
+      try
       {
-        queue.push(next);
+        clip.text.appendText(Util.getResponse(queue.front().getOpName(),
+                                              queue.front().getUrl(),
+                                              queue.front().getResponseXml()));
+        clip.text.scrollV = clip.text.maxScrollV;
+        var next : Request = queue.front().complete(code, response, credential);
+        queue.front().cleanup();
+        queue.pop();
+        if (next != null)
+        {
+          queue.push(next);
+        }
+        start();
       }
-      start();
+      catch (e : Error)
+      {
+        clip.text.appendText("\n" + e.toString() + "\n\n" + e.getStackTrace());
+      }
     }
 
     public function isWorking() : Boolean

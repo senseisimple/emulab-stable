@@ -72,8 +72,8 @@ package
       listStatus.alpha = 0.3;
       nodes = newNodes;
 
-      georgia.setUpdate(updateList);
-      managers = new Array(
+/*
+    managers = new Array(
         new ComponentManager("", "", "", "", updateList, 2),
         new ComponentManager("e2a9e480-aa9f-11dd-9fcd-001143e43770",
                              "ProtoGENI",
@@ -88,13 +88,13 @@ package
 //                             "https://boss.emulab.net/protogeni/stoller/xmlrpc",
                              updateList, 2),
 
-/*
+
         new ComponentManager("be300821-ecb7-11dd-a0f8-001143e43ff3",
                              "gtwelab",
                              ".emulab.net",
                              "https://myboss.emulab.geni.emulab.net:443/protogeni/xmlrpc",
                              updateList, 2),
-*/
+
         new ComponentManager("27cd73fb-b908-11de-837a-0002b33f8548",
                              "jonlab",
                              ".emulab.net",
@@ -105,13 +105,13 @@ package
                              ".uky.emulab.net",
                              "https://www.uky.emulab.net/protogeni/xmlrpc",
                              updateList, 2),
-/*
+
         new ComponentManager("f38e8571-f7af-11dd-ab88-00304868a4be",
                              "Wisconsin",
                              ".schooner.wail.wisc.edu",
                              "https://www.schooner.wail.wisc.edu/protogeni/xmlrpc",
                              updateList, 0),
-*/
+
         new ComponentManager("b14b4a9d-8e53-11de-be30-001ec9540a39", "CMU", ".cmcl.cs.cmu.edu",
                              "https://boss.cmcl.cs.cmu.edu/protogeni/xmlrpc",
                              updateList, 2),
@@ -121,21 +121,35 @@ package
                              "https://boss.uml.emulab.net/protogeni/xmlrpc",
                              updateList, 2),
         georgia);
+*/
+      managers = new Array();
+
       select.removeAll();
       select.selectedIndex = 0;
 
+      addManager(new ComponentManager("", "", "", "", updateList, 2));
+      addManager(georgia);
+/*
       var i : int = 0;
       for (; i < managers.length; ++i)
       {
         select.addItem(new ListItem(managers[i].getName(), managers[i]));
       }
-
+*/
       managers[0].setState(ComponentManager.NORMAL);
 
       list.addEventListener(ListEvent.ITEM_CLICK, clickItem);
       list.addEventListener(Event.CHANGE, changeItem);
       select.addEventListener(Event.CHANGE, changeComponent);
 
+      updateList();
+    }
+
+    public function addManager(newManager : ComponentManager) : void
+    {
+      newManager.setUpdate(updateList);
+      managers.push(newManager);
+      select.addItem(new ListItem(newManager.getName(), ""));
       updateList();
     }
 
