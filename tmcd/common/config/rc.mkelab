@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004-2009 University of Utah and the Flux Group.
+# Copyright (c) 2004-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # XXX I hardwire IPs into generated /etc/rc.conf and /etc/rc.resolv.
@@ -104,6 +104,14 @@ my $fsname;
 # Cert stuff to give the inner emulab
 my $RPCCERT = "/usr/testbed/etc/outer_emulab.pem";
 #my $RPCPORT = 7778;
+
+#
+# Elab daemons to kill off before setting up boss/ops/fs.
+# Order matters: must kill event agents before evproxy and pubsubd.
+# XXX we leave slothd running for idleswap in case we hang.
+#
+my @DAEMONS = ("emulab-watchdog", "progagent", "linktest",
+	       "syncd", "evproxy", "pubsubd");
 
 # This gets turned on/off below
 my $WINSUPPORT = 0;
@@ -465,6 +473,18 @@ sub SetupFsNode()
     }
 
     #
+    # Kill off any Emulab daemons that might freak once we have removed
+    # Emulab accounts.  We have seen this happen with the program agent--
+    # it runs amok, filling up its logfile (that has been unlinked) and
+    # eventually /var, possibly before we can finish setting up.
+    #
+    foreach my $daemon (@DAEMONS) {
+	if (-e "/var/run/$daemon.pid") {
+	    system("kill `cat /var/run/$daemon.pid`");
+	}
+    }
+
+    #
     # Run the prepare script to clear out the current accounts and such.
     # From this point on will need to log in as root,
     #
@@ -821,6 +841,18 @@ sub SetupOpsNode($)
 	$inner_controlif = $ifacelist[0]->{IFACE};
 	$inner_ip        = $ifacelist[0]->{IPADDR};
 	$inner_netmask   = $ifacelist[0]->{IPMASK};
+    }
+
+    #
+    # Kill off any Emulab daemons that might freak once we have removed
+    # Emulab accounts.  We have seen this happen with the program agent--
+    # it runs amok, filling up its logfile (that has been unlinked) and
+    # eventually /var, possibly before we can finish setting up.
+    #
+    foreach my $daemon (@DAEMONS) {
+	if (-e "/var/run/$daemon.pid") {
+	    system("kill `cat /var/run/$daemon.pid`");
+	}
     }
 
     #
@@ -1207,6 +1239,18 @@ sub SetupBossNode()
 	$inner_controlif = $ifacelist[0]->{IFACE};
 	$inner_ip        = $ifacelist[0]->{IPADDR};
 	$inner_netmask   = $ifacelist[0]->{IPMASK};
+    }
+
+    #
+    # Kill off any Emulab daemons that might freak once we have removed
+    # Emulab accounts.  We have seen this happen with the program agent--
+    # it runs amok, filling up its logfile (that has been unlinked) and
+    # eventually /var, possibly before we can finish setting up.
+    #
+    foreach my $daemon (@DAEMONS) {
+	if (-e "/var/run/$daemon.pid") {
+	    system("kill `cat /var/run/$daemon.pid`");
+	}
     }
 
     #
