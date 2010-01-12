@@ -1,4 +1,4 @@
-/* GENIPUBLIC-COPYRIGHT
+﻿/* GENIPUBLIC-COPYRIGHT
  * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
  * All rights reserved.
  *
@@ -147,8 +147,6 @@ package
       {
         server.removeEventListener(Event.COMPLETE, callSuccess);
         server.removeEventListener(ErrorEvent.ERROR, callFailure);
-        server.observeTimer.stop();
-        server.observeTimer = null;
         server.cleanup();
         server = null;
       }

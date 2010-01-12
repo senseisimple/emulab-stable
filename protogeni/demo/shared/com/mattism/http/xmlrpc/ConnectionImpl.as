@@ -81,6 +81,11 @@ package com.mattism.http.xmlrpc
 //    this._response.removeEventListener(ProgressEvent.PROGRESS, progress);
       this._response.removeEventListener(SecurityErrorEvent.SECURITY_ERROR,
                                          securityError);
+		if(observeTimer != null)
+		{
+			observeTimer.stop();
+			observeTimer = null;
+		}
     }
 
     public function call(method : String) : void
