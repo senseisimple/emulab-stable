@@ -51,6 +51,9 @@ httpd.conf.fixed: httpd.conf
 	    echo "Updated httpd.conf"; \
 	fi
 
+install-dirs:
+	-mkdir -p $(INSTALL_TOPDIR)/www
+
 #
 # XXX another woeful hack.  There appears to be a well-documented problem
 # with Apache and PHP4, where loading PHP with certain extensions will cause
@@ -59,18 +62,21 @@ httpd.conf.fixed: httpd.conf
 # We install this script which accomodates that...ahem, "behavior."
 # Since we have only seen this on FBSD7, we only do it there.
 #
-script-install: apache-emulab
+# Note that we install apache-emulab as apache.sh to be consistant with
+# with what {boss,ops}-install expect.
+#
+install-scripts: apache-emulab
 ifeq ($(SCRIPT_HACK),1)
 	@if [ -f /usr/local/etc/rc.d/apache -a ! -f /usr/local/etc/rc.d/.apache.real ]; then \
 	    mv /usr/local/etc/rc.d/apache /usr/local/etc/rc.d/.apache.real; \
 	fi
-	$(INSTALL) -m 755 $(SRCDIR)/apache-emulab /usr/local/etc/rc.d/apache-emulab
+	$(INSTALL) -m 755 $(SRCDIR)/apache-emulab /usr/local/etc/rc.d/apache.sh
 
-install: script-install httpd.conf.fixed
+install: install-dirs install-scripts httpd.conf.fixed
 	$(INSTALL_DATA) httpd.conf.fixed $(INSTALL_APACHE_CONFIG)/httpd.conf
 endif
 
-control-install: script-install httpd.conf-ops
+control-install: install-dirs install-scripts httpd.conf-ops
 	$(INSTALL_DATA) httpd.conf-ops $(INSTALL_APACHE_CONFIG)/httpd.conf
 
 clean:
