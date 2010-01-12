@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
 # All rights reserved.
 # 
 # Permission to use, copy, modify and distribute this software is hereby
@@ -95,7 +95,7 @@ print "Resolving the slice at the CM"
 params = {}
 params["credentials"] = (slicecred,)
 params["urn"]         = myslice["urn"]
-rval,response = do_method("cmv2", "Resolve", params)
+rval,response = do_method("cm", "Resolve", params, version="2.0")
 if rval:
     Fatal("Could not get resolve slice")
     pass
@@ -108,7 +108,7 @@ print str(myslice)
 print "Asking for sliver credential"
 params = {}
 params["credentials"] = (slicecred,)
-rval,response = do_method("cmv2", "GetSliver", params)
+rval,response = do_method("cm", "GetSliver", params, version="2.0")
 if rval:
     Fatal("Could not get Sliver credential")
     pass
@@ -125,7 +125,7 @@ params = {}
 params["credentials"]  = (slivercred,)
 params["slice_urn"]    = SLICEURN
 params["valid_until"]  = valid_until
-rval,response = do_method("cmv2", "RenewSliver", params)
+rval,response = do_method("cm", "RenewSliver", params, version="2.0")
 if rval:
     Fatal("Could not renew sliver")
     pass
@@ -140,7 +140,7 @@ params["sliver_urn"]  = myslice["sliver_urn"]
 params["credentials"] = (slicecred,)
 params["rspec"]       = rspec
 params["impotent"]    = impotent
-rval,response = do_method("cmv2", "UpdateSliver", params)
+rval,response = do_method("cm", "UpdateSliver", params, version="2.0")
 if rval:
     Fatal("Could not update sliver")
     pass

@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2009 University of Utah and the Flux Group.
+# Copyright (c) 2009-2010 University of Utah and the Flux Group.
 # All rights reserved.
 # 
 # Permission to use, copy, modify and distribute this software is hereby
@@ -45,7 +45,7 @@ print "Resolving at the local CM"
 params = {}
 params["credentials"] = (mycredential,)
 params["urn"]         = URN
-rval,response = do_method("cmv2", "Resolve", params)
+rval,response = do_method("cm", "Resolve", params, version="2.0")
 if rval:
     Fatal("Could not resolve")
     pass

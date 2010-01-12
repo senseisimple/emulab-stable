@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
 # All rights reserved.
 # 
 # Permission to use, copy, modify and distribute this software is hereby
@@ -64,7 +64,7 @@ print "Resolving the slice at the CM"
 params = {}
 params["credentials"] = (slicecred,)
 params["urn"]         = myslice["urn"]
-rval,response = do_method("cmv2", "Resolve", params)
+rval,response = do_method("cm", "Resolve", params, version="2.0")
 if rval:
     Fatal("Could not resolve slice")
     pass
@@ -82,7 +82,7 @@ print "Asking for the ticket"
 params = {}
 params["credentials"] = (slicecred,)
 params["urn"]         = myslice["ticket_urn"]
-rval,response = do_method("cmv2", "Resolve", params)
+rval,response = do_method("cm", "Resolve", params, version="2.0")
 if rval:
     Fatal("Could not get the ticket")
     pass
@@ -97,7 +97,7 @@ params = {}
 params["slice_urn"]   = myslice["urn"]
 params["credentials"] = (slicecred,)
 params["ticket"]      = ticket
-rval,response = do_method("cmv2", "ReleaseTicket", params)
+rval,response = do_method("cm", "ReleaseTicket", params, version="2.0")
 if rval:
     Fatal("Could not release the ticket")
     pass

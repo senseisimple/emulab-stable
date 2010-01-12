@@ -111,7 +111,7 @@ params["slice_urn"]   = SLICEURN
 params["rspec"]       = rspec
 params["keys"]        = mykeys
 params["impotent"]    = impotent
-rval,response = do_method("cmv2", "CreateSliver", params)
+rval,response = do_method("cm", "CreateSliver", params, version="2.0")
 if rval:
     Fatal("Could not create sliver")
     pass

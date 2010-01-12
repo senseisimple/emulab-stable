@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
 # All rights reserved.
 # 
 # Permission to use, copy, modify and distribute this software is hereby
@@ -51,7 +51,7 @@ print "Resolving the slice at the CM"
 params = {}
 params["credentials"] = (slicecred,)
 params["urn"]         = myslice["urn"]
-rval,response = do_method("cmv2", "Resolve", params)
+rval,response = do_method("cm", "Resolve", params, version="2.0")
 if rval:
     Fatal("Could not resolve slice")
     pass
@@ -68,7 +68,7 @@ if not "sliver_urn" in myslice:
 params = {}
 params["credentials"] = (slicecred,)
 params["slice_urn"]   = SLICEURN
-rval,response = do_method("cmv2", "GetSliver", params)
+rval,response = do_method("cm", "GetSliver", params, version="2.0")
 if rval:
     Fatal("Could not get Sliver credential")
     pass
@@ -81,7 +81,7 @@ print "Got the sliver credential, deleting the sliver";
 params = {}
 params["credentials"] = (slivercred,)
 params["sliver_urn"]  = myslice["sliver_urn"]
-rval,response = do_method("cmv2", "DeleteSliver", params)
+rval,response = do_method("cm", "DeleteSliver", params, version="2.0")
 if rval:
     Fatal("Could not delete sliver")
     pass

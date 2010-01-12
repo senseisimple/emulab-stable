@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
 # All rights reserved.
 # 
 # Permission to use, copy, modify and distribute this software is hereby
@@ -34,7 +34,7 @@ mycredential = get_self_credential()
 #
 params = {}
 params["credentials"] = (mycredential,)
-rval,response = do_method("cmv2", "DiscoverResources", params)
+rval,response = do_method("cm", "DiscoverResources", params, version="2.0")
 if rval:
     Fatal("Could not get a list of resources")
     pass

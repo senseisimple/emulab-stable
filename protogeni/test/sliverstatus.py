@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
 # All rights reserved.
 # 
 # Permission to use, copy, modify and distribute this software is hereby
@@ -50,7 +50,7 @@ print "Got the slice credential, asking for a sliver credential ..."
 params = {}
 params["slice_urn"]   = SLICEURN
 params["credentials"] = (slicecred,)
-rval,response = do_method("cmv2", "GetSliver", params)
+rval,response = do_method("cm", "GetSliver", params, version="2.0")
 if rval:
     Fatal("Could not get Sliver credential")
     pass
@@ -63,7 +63,7 @@ print "Got the sliver credential, asking for sliver status";
 params = {}
 params["slice_urn"]   = SLICEURN
 params["credentials"] = (slivercred,)
-rval,response = do_method("cmv2", "SliverStatus", params)
+rval,response = do_method("cm", "SliverStatus", params, version="2.0")
 if rval:
     Fatal("Could not get sliver status")
     pass

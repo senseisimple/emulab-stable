@@ -1,6 +1,6 @@
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -21,7 +21,7 @@ SETUID_LIBX_SCRIPTS  =
 # configure if the .in file is changed.
 # 
 all:	protogeni-cm.pl protogeni-ch.pl protogeni-sa.pl protogeni-ses.pl \
-	Genixmlrpc.pm GeniResponse.pm protogeni-cmv2.pl
+	Genixmlrpc.pm GeniResponse.pm 
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -32,7 +32,6 @@ install-libs: $(INSTALL_LIBDIR)/Genixmlrpc.pm \
 
 install-scripts: $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-sa.pl \
 		$(INSTALL_DIR)/protogeni/xmlrpc/protogeni-cm.pl \
-		$(INSTALL_DIR)/protogeni/xmlrpc/protogeni-cmv2.pl \
 		$(INSTALL_DIR)/protogeni/xmlrpc/protogeni-ch.pl \
 		$(INSTALL_DIR)/protogeni/xmlrpc/protogeni-ses.pl
 	$(SUDO) chown root $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-sa.pl
@@ -41,8 +40,6 @@ install-scripts: $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-sa.pl \
 	$(SUDO) chmod u+s  $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-ch.pl
 	$(SUDO) chown root $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-cm.pl
 	$(SUDO) chmod u+s  $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-cm.pl
-	$(SUDO) chown root $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-cmv2.pl
-	$(SUDO) chmod u+s  $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-cmv2.pl
 	$(SUDO) chown root $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-ses.pl
 	$(SUDO) chmod u+s  $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-ses.pl
 

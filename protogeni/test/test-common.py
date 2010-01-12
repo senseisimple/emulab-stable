@@ -1,6 +1,6 @@
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
 # All rights reserved.
 # 
 # Permission to use, copy, modify and distribute this software is hereby
@@ -138,7 +138,7 @@ def PassPhraseCB(v, prompt1='Enter passphrase:', prompt2='Verify passphrase:'):
 #
 # Call the rpc server.
 #
-def do_method(module, method, params, URI=None, quiet=False):
+def do_method(module, method, params, URI=None, quiet=False, version=None):
     if not os.path.exists(CERTIFICATE):
         return Fatal("error: missing emulab certificate: %s\n" % CERTIFICATE)
     
@@ -163,6 +163,10 @@ def do_method(module, method, params, URI=None, quiet=False):
         URI = "https://" + addr + path + module
     elif module:
         URI = URI + "/" + module
+        pass
+
+    if version:
+        URI = URI + "/" + version
         pass
 
     scheme, netloc, path, query, fragment = urlsplit(URI)

@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
 # All rights reserved.
 # 
 # Permission to use, copy, modify and distribute this software is hereby
@@ -99,7 +99,7 @@ params["slice_urn"]   = SLICEURN
 params["credentials"] = (myslice,)
 params["rspec"]       = rspec
 params["impotent"]    = 0
-rval,response = do_method("cmv2", "GetTicket", params)
+rval,response = do_method("cm", "GetTicket", params, version="2.0")
 if rval:
     Fatal("Could not get ticket")
     pass
@@ -116,7 +116,7 @@ params["ticket"]      = ticket
 params["credentials"] = (myslice,)
 params["rspec"]       = rspec
 params["impotent"]    = 0
-rval,response = do_method("cmv2", "UpdateTicket", params)
+rval,response = do_method("cm", "UpdateTicket", params, version="2.0")
 if rval:
     Fatal("Could not update ticket")
     pass
