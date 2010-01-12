@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005-2009 University of Utah and the Flux Group.
+# Copyright (c) 2005-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package Interface;
@@ -141,6 +141,7 @@ sub type($)    { return field($_[0], 'interface_type'); }
 sub mask($)    { return field($_[0], 'mask'); }
 sub uuid($)    { return field($_[0], 'uuid'); }
 # Wires table
+sub wiredup($)     { return exists($_[0]->{'WIRES'}); }
 sub wire_type($)   { return $_[0]->{'WIRES'}->{'type'}; }
 sub switch_id($)   { return $_[0]->{'WIRES'}->{'node_id2'}; }
 sub switch_card($) { return $_[0]->{'WIRES'}->{'card2'}; }

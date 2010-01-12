@@ -4657,7 +4657,8 @@ sub InterpLinks($)
 		my $type  = $interface->type();
 		
 		next
-		    if ($interface->role() ne TBDB_IFACEROLE_EXPERIMENT());
+		    if ($interface->role() ne TBDB_IFACEROLE_EXPERIMENT() ||
+			!$interface->wiredup());
 
 		$protovlan->AddMember($pnodename, $iface);
 		
