@@ -27,7 +27,7 @@ package
 
     public function clone() : Interface
     {
-      var result = new Interface(virtualId, name);
+      var result : Interface = new Interface(virtualId, name);
       result.used = used;
       result.role = role;
       result.bandwidth = bandwidth;
