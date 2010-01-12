@@ -4653,12 +4653,13 @@ sub InterpLinks($)
 		return -1;
 	    }
 	    foreach my $interface (@interfaces) {
-		my $iface = $interface->iface();
-		my $type  = $interface->type();
-		
+		my $iface   = $interface->iface();
+		my $type    = $interface->type();
+		my $wiredup = $interface->wiredup();
+
 		next
 		    if ($interface->role() ne TBDB_IFACEROLE_EXPERIMENT() ||
-			!$interface->wiredup());
+			!$wiredup);
 
 		$protovlan->AddMember($pnodename, $iface);
 		
