@@ -40,6 +40,13 @@ package
 
       clip.stage.addEventListener(KeyboardEvent.KEY_UP, keyUp);
     }
+	
+	public function setSliceName(newSliceName:String):void
+	{
+		clip.sliceName.text = newSliceName;
+      	clip.sliceName.setSelection(0, clip.sliceName.length);
+      	clip.stage.focus = clip.sliceName;
+	}
 
     override public function cleanup() : void
     {

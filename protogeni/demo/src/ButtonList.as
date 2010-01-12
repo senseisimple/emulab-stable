@@ -25,6 +25,7 @@ package
       var i : int = 0;
       for (; i < buttons.length; ++i)
       {
+		buttons[i].gotoAndStop(NORMAL);
         buttons[i].addEventListener(MouseEvent.CLICK, functions[i]);
         buttons[i].addEventListener(MouseEvent.MOUSE_OVER, rollOver);
         buttons[i].addEventListener(MouseEvent.MOUSE_OUT, rollOut);

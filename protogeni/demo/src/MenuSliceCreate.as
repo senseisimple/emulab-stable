@@ -1,4 +1,4 @@
-/* GENIPUBLIC-COPYRIGHT
+﻿/* GENIPUBLIC-COPYRIGHT
  * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
  * All rights reserved.
  *
@@ -232,6 +232,12 @@ package
       {
         startSliceCreate();
       }
+	  else if(code == 7)
+	  {
+		  var newMenu = new MenuSliceSelect();
+		  Main.changeState(newMenu);
+		  newMenu.setSliceName(sliceName + " hasn't expired");
+	  }
       else
       {
         codeFailure();

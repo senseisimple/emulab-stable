@@ -172,6 +172,11 @@ package
       return uuidToNode[uuid];
     }
 
+    public function getIndexFromUuid(uuid : String) : int
+    {
+		return components.indexOf(uuidToNode[uuid]);
+    }
+
     public function getComponentCount() : int
     {
       return components.length;
