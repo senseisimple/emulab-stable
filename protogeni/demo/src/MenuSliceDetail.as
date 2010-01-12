@@ -46,7 +46,50 @@ package
 	
 	public override function getComponent(urn:String, cm:String):String
 	{
-		return "READY for " + urn + " on " + cm + "!";
+		var compm : ComponentManager = null;
+		var cms : Array = managers.getManagers();
+		
+		// Get CM
+		var length:int = cms.length;
+		for(var i:int = 0; i < length; i++)
+		{
+			if( cms[i].name == cm )
+			{
+				compm = ComponentManager(cms[i]);
+				break;
+			}
+		}
+		
+		// Get component
+		if(compm != null)
+		{
+			var index:int = compm.getIndexFromUuid(urn);
+			if(compm.isUsed(index))
+				return "Component is being used already";
+			var component = compm.getComponent(index);
+			var superNode = null;
+			var superNodeName = null;
+			if (component.superNode != -1)
+			{
+				if(compm.isUsed(component.superNode))
+					return "Component's supernode already in use";
+				superNode = compm.getComponent(component.superNode);
+				superNodeName = superNode.name;
+			}
+			nodes.addNode(component, compm, index,
+							  420, 220, true,
+							  superNodeName);
+        	compm.addUsed(index);
+			if (superNode != null)
+			{
+			  nodes.addNode(superNode, compm, component.superNode,
+							400, 200, false, null);
+			  compm.addUsed(component.superNode);
+			}
+		return "Successfully added " + urn + " on " + cm + "!";
+		} else {
+			return "Could not find component manager named " + cm;
+		}
 	}
 
     override public function cleanup() : void

@@ -35,7 +35,6 @@ package
       name = newName;
       hostName = newHostName;
       url = newUrl;
-	  hrn = newHrn;
       ad = "";
       manifest = "";
       update = newUpdate;
@@ -508,7 +507,6 @@ package
     private var name : String;
     private var hostName : String;
     private var url : String;
-    private var hrn : String;
     private var ad : String;
     private var manifest : String;
 

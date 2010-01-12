@@ -1,4 +1,4 @@
-/* GENIPUBLIC-COPYRIGHT
+﻿/* GENIPUBLIC-COPYRIGHT
  * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
  * All rights reserved.
  *
@@ -43,6 +43,12 @@ package
       op.setUrl(cm.getUrl());
       return op;
     }
+	
+	override public function fail() : Request
+	{
+		cm.resourceFailure();
+      	return next;
+	}
 
     override public function complete(code : Number, response : Object,
                                       credential : Credential) : Request
