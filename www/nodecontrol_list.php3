@@ -66,7 +66,9 @@ echo ".</b><br>\n";
 echo "<b>Map views: <a href='floormap.php3'>wireless</a>";
 if ($TBMAINSITE) {
     echo ", <a href='floormap.php3?feature=usrp'>
-              GNU USRP (software defined radio)</a>,
+              GNU USRP</a>,
+            <a href='floormap.php3?feature=usrp2'>
+              USRP2</a> (software defined radio),
             <a href='robotmap.php3'>robot</a>";
 }
 echo ".</b><br>\n";
