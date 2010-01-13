@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006-2009 University of Utah and the Flux Group.
+# Copyright (c) 2006-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -214,7 +214,6 @@ class User
 		SUEXECERROR(SUEXEC_ACTION_CONTINUE);
 	    }
 	    else {
-		# unlink($xmlname);
 		if (count($suexec_output_array)) {
 		    for ($i = 0; $i < count($suexec_output_array); $i++) {
 			$line = $suexec_output_array[$i];
@@ -229,6 +228,7 @@ class User
 		else
 		    $errors[] = "Transient error(4, $retval); please try again later.";
 	    }
+	    unlink($xmlname);
 	    return null;
 	}
 
