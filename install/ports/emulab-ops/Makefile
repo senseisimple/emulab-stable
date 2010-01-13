@@ -111,8 +111,10 @@ RUN_DEPENDS+= ${LOCALBASE}/libexec/elvind:${PORTSDIR}/misc/elvind
 
 .if ${PORTVERSION} == "3.0"
 # must handle patching of m2crypto when the port is built
+# also needs swig to install!
 RUN_DEPENDS+=	\
-	${PYTHON_PKGNAMEPREFIX}m2crypto>0:${PORTSDIR}/misc/emulab-py-m2crypto
+	${PYTHON_PKGNAMEPREFIX}m2crypto>0:${PORTSDIR}/misc/emulab-py-m2crypto \
+	swig:${PORTSDIR}/devel/swig13
 .else
 # for older version we can patch the standard m2crypto once installed
 RUN_DEPENDS+=	\
