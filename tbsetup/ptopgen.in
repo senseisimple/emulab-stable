@@ -1368,7 +1368,8 @@ if (! defined($component_name)) {
 #
 # Fake switch. Hardwired for now. 
 #
-my @wireless_protos = ("80211", "80211a", "80211b", "80211g", "flex900");
+my @wireless_protos = ("80211", "80211a", "80211b", "80211g", "flex900",
+		       "xcvr2450");
 my $fake_switch = "airswitch";
 
 my @fake_switch_types = map("*$_:*", @wireless_protos);

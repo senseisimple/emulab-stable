@@ -6058,7 +6058,7 @@ sub UpLoadInterfaceSettings($)
 	my $vlanname = $virtlan->vname();
 
 	next
-	    if (! ($protocol =~ /^(80211|flex900)/));
+	    if (! ($protocol =~ /^(80211|flex900|xcvr2450)/));
 
 	my @members = $virtlan->memberlist();
 	my $ssid    = "${vlanname}_${idx}";
