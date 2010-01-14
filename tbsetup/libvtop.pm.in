@@ -1955,8 +1955,8 @@ sub GenVirtLans($)
 	    }
 
 	    #
-	    # See if the link is really being shaped, or if the we just
-	    # need a delay node cause of tracing/monitoring.
+	    # See if the link is really being shaped, or if just need
+	    # a delay node cause of tracing/monitoring.
 	    #
 	    my $shaped = 0;
 
@@ -6106,7 +6106,7 @@ sub UpLoadInterfaceSettings($)
 	    #
 	    foreach my $setting ($self->virt_lan_member_settings()->Rows()) {
 		next
-		    if ($member ne $setting->member());
+		    if ("$member" ne $setting->member());
 
 		my $capkey = DBQuoteSpecial($setting->capkey());
 		my $capval = DBQuoteSpecial($setting->capval());
