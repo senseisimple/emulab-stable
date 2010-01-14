@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2009 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -152,6 +152,7 @@ static uint32_t nextsector;
 static uint32_t fmax, fmin, franges, amax, amin, aranges;
 static uint32_t adist[8]; /* <4k, <8k, <16k, <32k, <64k, <128k, <256k, >=256k */
 static int regmax, regmin;
+static uint32_t losect, hisect;
 
 static void
 dumpfile(char *name, int fd)
@@ -167,6 +168,8 @@ dumpfile(char *name, int fd)
 	nextsector = 0;
 	relocs = 0;
 	relocbytes = 0;
+	hisect = 0;
+	losect = ~0;
 
 	fmax = amax = 0;
 	fmin = amin = ~0;
@@ -312,6 +315,9 @@ dumpfile(char *name, int fd)
 	if (relocs)
 		printf("  %d relocations covering %llu bytes\n",
 		       relocs, relocbytes);
+	if (hisect != ~0)
+		printf("  covered sector range: [%u-%u]\n",
+		       losect, hisect);
 	printf("  %llu bytes of compressed data\n",
 	       cbytes);
 	printf("  %5.2fx compression of allocated data (%llu bytes)\n",
@@ -484,6 +490,10 @@ dumpchunk(char *name, char *buf, int chunkno, int checkindex)
 						(reg->start+reg->size);
 				}
 			}
+			if (hdr->firstsect < losect)
+				losect = hdr->firstsect;
+			if (hdr->lastsect > hisect)
+				hisect = hdr->lastsect;
 		} else
 			count = reg->start - nextsector;
 		if (count > 0) {
