@@ -521,7 +521,7 @@ sub GetTicketAuxAux($$$$$$$$)
 	my $slice_expires = $slice->expires();
 	if (defined($slice_expires)) {
 	    $slice_expires = strptime($slice_expires);
-	    if ($expires > $slice_expires) {
+	    if ($when > $slice_expires) {
 		return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 				    "valid_until is past slice expiration");
 	    }
