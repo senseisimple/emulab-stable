@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # TODO: Signal handlers for protecting db files.
@@ -2254,13 +2254,22 @@ sub whatsmynickname()
 
 #
 # Return the hostname or IP to use for a local event server.
-# Normally this is "localhost", but for virtual nodes which share an
-# event server via the physical host, it may be the IP of the physical host.
+# Defaults to "localhost" for most nodes or the physical host IP for Xen VMs.
+# The value can be overridden on a per-host basis via a local file.
 #
 sub getlocalevserver()
 {
     my $evserver = "localhost";
 
+    if (INXENVM()) {
+	#
+	# XXX gawdawful hack alert!
+	# Will only work with Utah naming convention.
+	#
+	if ($vnodeid =~ /^pcvm(\d+)-\d+$/) {
+	    $evserver = "pc$1";
+	}
+    }
     if (-e "$BOOTDIR/localevserver") {
 	$evserver = `cat $BOOTDIR/localevserver`;
 	chomp($evserver);

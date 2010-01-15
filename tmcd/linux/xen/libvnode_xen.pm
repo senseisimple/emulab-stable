@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Implements the libvnode API for Xen support in Emulab.
@@ -530,21 +530,29 @@ sub vnodePreConfig($$$){
     my $vnoderoot = "/mnt/xen/$vnode_id";
     mysystem("mount $dev $vnoderoot");
 
-    # This is essential for libsetup to recognize us as a "genvnode"
-    open(FD,">$vnoderoot/var/emulab/boot/vmname") 
-	or die "vnodePreConfig: could not open vmname for $vnode_id: $!";
-    print FD "$vnode_id\n";
-    close(FD);
+    # XXX this should no longer be needed, but just in case
+    if (! -e "$vnoderoot/var/emulab/boot/vmname" ) {
+	print STDERR
+	    "libvnode_xen: WARNING: vmname not set by dhclient-exit-hook\n";
+	open(FD,">$vnoderoot/var/emulab/boot/vmname") 
+	    or die "vnodePreConfig: could not open vmname for $vnode_id: $!";
+	print FD "$vnode_id\n";
+	close(FD);
+    }
 
     # Use the physical host pubsub daemon
     my (undef, $ctrlip) = findControlNet();
     if (!$ctrlip || $ctrlip !~ /^(\d+\.\d+\.\d+\.\d+)$/) {
 	die "vnodePreConfig: could not get control net IP for $vnode_id";
     }
-    open(FD,">$vnoderoot/var/emulab/boot/localevserver") 
-	or die "vnodePreConfig: could not open localevserver for $vnode_id: $!";
-    print FD "$ctrlip\n";
-    close(FD);
+
+    # Should be handled in libsetup.pm, but just in case
+    if (! -e "$vnoderoot/var/emulab/boot/localevserver" ) {
+	open(FD,">$vnoderoot/var/emulab/boot/localevserver") 
+	    or die "vnodePreConfig: could not open localevserver for $vnode_id: $!";
+	print FD "$ctrlip\n";
+	close(FD);
+    }
 
     my $ret = &$callback($vnoderoot);
 
