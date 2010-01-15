@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Osload library. Basically the backend to the osload script, but also used
@@ -805,14 +805,15 @@ sub WaitTillReloadDone($$$$$@)
 	}
     }
 
-    print STDERR "Waiting for @nodes to finish reloading\n".`date` if $debug;
+    print STDERR "Waiting for @nodes to finish reloading\n".`date`
+	if ($count && $debug);
 
     # Start a counter going, relative to the time we rebooted the first
     # node.
     my $waittime  = 0;
     my $minutes   = 0;
 
-    while ($count) {
+    while ($count > 0) {
 	# Wait first to make sure reboot is done, and so that we don't
 	# wait one more time after everyone is up.
 	sleep(5);
@@ -931,25 +932,23 @@ sub WaitTillReloadDone($$$$$@)
     }
 
     if ($waitmode > 1) {
-	$count = @nodes - @failed;
 	$startwait = time;
-	while ($count) {
-	    foreach my $node (@nodes) {
-		print STDERR "osload ($node): waiting for node to finish ".
-		    "booting\n";
-		if ($done{$node} < $waitmode) {
-		    my $actual_state;
+	foreach my $node (@nodes) {
+	    print STDERR
+		"osload ($node): waiting for node to finish booting\n";
+	    if ($done{$node} < $waitmode) {
+		my $actual_state;
 
-		    if (!TBNodeStateWait($node,
-					 $startwait,
-					 (60*6),
-					 \$actual_state,
-					 (TBDB_NODESTATE_TBFAILED,
-					  TBDB_NODESTATE_PXEFAILED,
-					  TBDB_NODESTATE_ISUP))) {
-			$count--;
-			$done{$node} = $waitmode;
-		    }
+		if (!TBNodeStateWait($node,
+				     $startwait,
+				     (60*6),
+				     \$actual_state,
+				     (TBDB_NODESTATE_TBFAILED,
+				      TBDB_NODESTATE_PXEFAILED,
+				      TBDB_NODESTATE_ISUP))) {
+		    $done{$node} = $waitmode;
+		} else {
+		    push(@failed, $node);
 		}
 	    }
 	}
