@@ -520,7 +520,7 @@ sub GetTicketAuxAux($$$$$$$$)
 	#
 	my $slice_expires = $slice->expires();
 	if (defined($slice_expires)) {
-	    $slice_expires = strptime($slice_expires);
+	    $slice_expires = str2time($slice_expires);
 	    if ($when > $slice_expires) {
 		return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 				    "valid_until is past slice expiration");
@@ -1595,7 +1595,7 @@ sub SliverWorkAux($$$$$$$)
 	#
 	my $slice_expires = $slice->expires();
 	if (defined($slice_expires)) {
-	    $slice_expires = strptime($slice_expires);
+	    $slice_expires = str2time($slice_expires);
 	    if ($when > $slice_expires) {
 		$message = "valid_until is past slice expiration";
 		goto bad;
