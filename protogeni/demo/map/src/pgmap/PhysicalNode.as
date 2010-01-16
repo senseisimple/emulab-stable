@@ -41,7 +41,10 @@
 		[Bindable]
 		public var manager:ComponentManager;
 		
+		[Bindable]
 		public var available:Boolean;
+		
+		[Bindable]
 		public var exclusive:Boolean;
 		
 		[Bindable]

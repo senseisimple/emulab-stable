@@ -219,7 +219,7 @@
 						<mx:VRule height="16"/>
 						<mx:Label text="Availability" fontWeight="bold"/>
 						<mx:Image id="imgAvailable"/>
-						<mx:Button label="Add" click="tryAdd();"/>
+						<mx:Button label="Add" click="tryAdd();" enabled="{node.available}"/>
 					</mx:GridItem>
 				</mx:GridRow>
 				<mx:GridRow width="100%">

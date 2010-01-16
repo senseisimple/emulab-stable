@@ -122,7 +122,7 @@
 	      {
 	      	main.pgHandler.CurrentUser.credential = String(response.value);
 	      	var cred:XML = new XML(response.value);
-	      	main.pgHandler.CurrentUser.uuid = cred.credential.owner_urn;
+	      	main.pgHandler.CurrentUser.urn = cred.credential.owner_urn;
 	        postCall();
 	      }
 	      else
@@ -195,7 +195,7 @@
 	    		currentIndex++;
 	    	}
 	    	
-	    	if(currentIndex == main.pgHandler.ComponentManagers.length)
+	    	if(currentIndex >= main.pgHandler.ComponentManagers.length)
 	    	//if(currentIndex == 1)
 	    	{
 	    		main.chooseCMWindow.refreshList();
@@ -257,8 +257,18 @@
 	      	
 	      	//var decodedRspec:String = response.value;
 	        currentCm.Rspec = new XML(decodedRspec);
-	      	currentIndex++;
-	      	currentCm.processRspec(startResourceLookup);
+		  	currentIndex++;
+		  	currentCm.processRspec(startResourceLookup);
+	      }
+	      else if(code == 1)
+	      {
+	      	main.setProgress("Done", Common.failColor);
+	    	main.stopWaiting();
+	    	currentCm.Message = "Malformed arguments";
+			currentCm.Status = ComponentManager.FAILED;
+			currentIndex++;
+			main.chooseCMWindow.ResetStatus(currentCm);
+			startResourceLookup();
 	      }
 	      else
 	      {
@@ -279,7 +289,7 @@
 	      op.reset(Geni.resolve);
 	      op.addField("credential", main.pgHandler.CurrentUser.credential);
 	      //op.addField("uuid", main.pgHandler.CurrentUser.uuid);
-	      op.addField("uuid", main.pgHandler.CurrentUser.uuid);
+	      op.addField("hrn", main.pgHandler.CurrentUser.urn);
 	      op.addField("type", "User");
 	      op.setUrl("https://boss.emulab.net:443/protogeni/xmlrpc");
 	      op.call(completeResolveUser, failure);
@@ -297,51 +307,6 @@
 	      	main.pgHandler.CurrentUser.uuid = response.value.uuid;
 	      	main.pgHandler.CurrentUser.email = response.value.email;
 	      	main.pgHandler.CurrentUser.name = response.value.name;
-	      	
-	      	/*/ HACK ----------------------------
-	      	currentCm = main.pgHandler.ComponentManagers[0];
-	      	var ba:ByteArray = new DemoSliceEmbeddedXml() as ByteArray;
-	      	var demoSlice : Slice = new Slice();
-	      	demoSlice.creator = main.pgHandler.CurrentUser;
-	      	demoSlice.hrn = "DEMO";
-	      	demoSlice.uuid = "DEMO";
-	      	demoSlice.urn = "DEMO";
-	      	demoSlice.status = Slice.READY;
-	      	main.pgHandler.CurrentUser.slices.addItem(demoSlice);
-
-			var demoSliver : Sliver = new Sliver(demoSlice);
-			demoSliver.componentManager = currentCm;
-			demoSliver.status = Sliver.READY;
-			demoSliver.rspec = new XML(ba.readUTFBytes(ba.length));
-			demoSliver.parseRspec();
-			demoSlice.slivers.addItem(demoSliver);
-			
-	      	main.pgHandler.map.drawAll();
-	      	return;
-	      	// END DEMO ---------------------------- /*/
-	      	
-	      	/* START DEMO
-	      	currentSlice = new Slice();
-	      	currentSlice.hrn = "gec6";
-	      	
-	      	var ba:ByteArray = new DelegatedCredentialXml() as ByteArray;
-	      	currentSlice.credential = ba.readUTFBytes(ba.length);
-	      	main.pgHandler.CurrentUser.slices.addItem(currentSlice);
-	      	currentCm = main.pgHandler.ComponentManagers[0];
-	      	startIndexedCall(startSliceStatus);
-	      	return;
-	    	
-			  //opName = "Acquiring " + (((main.pgHandler.CurrentUser.slices.length - currentIndex) * main.pgHandler.ComponentManagers.length) + (currentSecondaryIndex - main.pgHandler.ComponentManagers.length)) + " more sliver credential(s)";
-			  main.setProgress(opName, Common.waitColor);
-			  main.startWaiting();
-			  main.console.appendText(opName);
-			  op.reset(Geni.getSliver);
-			  op.addField("credential", currentSlice.credential);
-			  op.setExactUrl(currentCm.Url);
-			  op.call(completeGetSliver, failure);
-			  addSend();
-	      	return;
-	      	END DEMO */
 	      	
 	      	var sliceHrns:Array = response.value.slices;
 	      	if(sliceHrns != null && sliceHrns.length > 0) {
@@ -533,6 +498,10 @@
 	      	newSliver.sliceStatus = response.value.status;
 	      	currentSlice.slivers.addItem(newSliver);
 	      	nextTotalCalls++;
+	      }
+	      else if(code == 12)
+	      {
+	      	// NO SLICE FOUND HERE
 	      }
 	      else
 	      {
