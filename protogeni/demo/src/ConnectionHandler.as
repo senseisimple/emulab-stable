@@ -50,8 +50,8 @@ package
 		{
 			if(statusEvent.level == "error")
 			{
+			sender.send("protogeni-flashtomap", "updatestatus", "ah crap, the flash client has a connection status problem");
 			}
 		}
-
 	}
 }

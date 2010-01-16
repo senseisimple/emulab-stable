@@ -53,7 +53,7 @@ package
 		var length:int = cms.length;
 		for(var i:int = 0; i < length; i++)
 		{
-			if( cms[i].name == cm )
+			if( cms[i].getName() == cm )
 			{
 				compm = ComponentManager(cms[i]);
 				break;
@@ -63,7 +63,14 @@ package
 		// Get component
 		if(compm != null)
 		{
-			var index:int = compm.getIndexFromUuid(urn);
+			var index:int;
+			try
+			{
+				compm.getIndexFromUuid(urn);
+			} catch(e:Error)
+			{
+				return "Node not found, most likely because it isn't available.";
+			}
 			if(compm.isUsed(index))
 				return "Component is being used already";
 			var component = compm.getComponent(index);
@@ -76,15 +83,19 @@ package
 				superNode = compm.getComponent(component.superNode);
 				superNodeName = superNode.name;
 			}
+			var randomX:Number = Math.round(Math.random() * 601 + 180);
+			var randomY:Number = Math.round(Math.random() * 385 + 75);
 			nodes.addNode(component, compm, index,
-							  420, 220, true,
+							  randomX, randomY, false,
 							  superNodeName);
         	compm.addUsed(index);
 			if (superNode != null)
 			{
-			  nodes.addNode(superNode, compm, component.superNode,
-							400, 200, false, null);
-			  compm.addUsed(component.superNode);
+				randomX = Math.round(Math.random() * 601 + 180);
+				randomY = Math.round(Math.random() * 385 + 75);
+			  	nodes.addNode(superNode, compm, component.superNode,
+							randomX, randomY, false, null);
+			  	compm.addUsed(component.superNode);
 			}
 		return "Successfully added " + urn + " on " + cm + "!";
 		} else {
