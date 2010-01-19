@@ -242,8 +242,18 @@ int parse_top(tb_vgraph &vg, istream& input)
 	l->type = link_type;
 	put(vedge_pmap,e,l);
 
-	if ((sscanf(bw.c_str(),"%d",&(l->delay_info.bandwidth)) != 1) ||
-	    (sscanf(bwunder.c_str(),"%d",&(l->delay_info.bw_under)) != 1) ||
+        // Special flag: treat a bandwidth of '*' specially
+        if (!strcmp(bw.c_str(),"*")) {
+            l->delay_info.bandwidth = 0;
+            l->delay_info.adjust_to_native_bandwidth = true;
+        } else {
+            if (sscanf(bw.c_str(),"%d",&(l->delay_info.bandwidth)) != 1) {
+                top_error("Bad line line, bad bandwidth characteristics.");
+            }
+        }
+
+        // Scan in the rest of the delay_info structure
+	if ((sscanf(bwunder.c_str(),"%d",&(l->delay_info.bw_under)) != 1) ||
 	    (sscanf(bwover.c_str(),"%d",&(l->delay_info.bw_over)) != 1) ||
 	    (sscanf(bwweight.c_str(),"%lg",&(l->delay_info.bw_weight)) != 1) ||
 	    (sscanf(delay.c_str(),"%d",&(l->delay_info.delay)) != 1) ||
@@ -288,6 +298,13 @@ int parse_top(tb_vgraph &vg, istream& input)
 		      parsed_line[i] << ".");
 	  }
 	}
+
+        // Some sanity checks: this combination is illegal for now
+        if (l->delay_info.adjust_to_native_bandwidth && (l->allow_trivial ||
+                    l->emulated)) {
+            top_error("Auto-assigning bandwidth on trivial or emulated links"
+                      " not allowed!");
+        }
 	
 #ifdef PER_VNODE_TT
 	tb_vnode *vnode1 = get(vvertex_pmap,node1);

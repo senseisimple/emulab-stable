@@ -36,9 +36,21 @@ inline double loss_distance(double a,double b) {
 
 class tb_delay_info {
 public:
+  // TODO: Make a real constructor!
+  tb_delay_info() : bandwidth(0), delay(0), loss(0.0),
+    adjust_to_native_bandwidth(false) { ; } ;
+
+  // Note the adjust_to_native_bandwidth flag below
   int bandwidth;
   int delay;
   double loss;
+
+  // If true, we just use the native bandwidth of the interface that gets 
+  // picked; the bandwidth member gets updated on every assignment. This only
+  // makes sense on virtual links.
+  bool adjust_to_native_bandwidth;
+
+  // TODO: We don't actually use any of these; we should get 'em out of here.
   int bw_under,bw_over;
   int delay_under,delay_over;
   double loss_under,loss_over;
@@ -62,12 +74,14 @@ public:
   
   friend ostream &operator<<(ostream &o, const tb_delay_info& delay)
   {
-    o << "tb_delay_info: bw=" << delay.bandwidth << "+" <<
-      delay.bw_over << "-" << delay.bw_under << "/" << delay.bw_weight;
-    o << " delay=" << delay.delay << "+" << delay.delay_over <<
-      "-" << delay.delay_under << "/" << delay.delay_weight;
-    o << " loss=" << delay.loss << "+" << delay.loss_over << "-" <<
-      delay.loss_under << "/" << delay.loss_weight;
+    // Only print out the stuff that matters, not all of the pieces we don't
+    // use
+    o << "tb_delay_info: bw=" << delay.bandwidth;
+    if (delay.adjust_to_native_bandwidth) {
+        o << "(adjusted)";
+    }
+    o << " delay=" << delay.delay;
+    o << " loss=" << delay.loss;
     o << endl;
     return o;
   }
