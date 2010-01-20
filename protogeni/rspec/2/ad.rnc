@@ -1,0 +1,115 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Prototype of an advertisement RSpec, to be used by ProtoGENI
+# Version 2
+#
+
+default namespace = "http://www.protogeni.net/resources/rspec/2"
+
+include "common.rnc"
+
+NodeContents &=
+  # Component identifiers
+  attribute component_id { text } &
+  attribute component_manager_id { text } &
+  attribute component_name { text }? &
+
+  # Indicates whether the node is in sharing mode: exclusive is true if
+  # the component manager will agree to promise not to share it.
+  attribute exclusive { xsd:boolean } &
+
+  # Indicate whether or not this node is available - the idea is that a
+  # full dump of the static physical topology will not include this, but
+  # that we can later get updates that include only this attribute (and a
+  # URN)
+  element available { AvailableContents } &
+
+  # Marks this node as a stand-in for a large network rather than a
+  # single machine. This means that other CMs can make external
+  # references to this node without a corresponding external reference
+  # in this advertisement. It also means that it makes sense for
+  # multiple physical links to connect to the same interface.
+  element cloud { AnyExtension } &
+
+  # Lists services provided by the CM for this node.
+  element services { ServiceContents } &
+
+  # Node type. This includes both hardware and sliver type elements:
+  HardwareType* &
+  SliverType*
+
+AvailableContents =
+  AnyExtension &
+  # Indictates current availability
+  attribute now { xsd:boolean }
+
+LinkContents &=
+  # Component identifiers
+  attribute component_id { text } &
+  attribute component_manager_id { text } &
+  attribute component_name { text }?
+
+InterfaceContents &=
+  attribute component_id { text } &
+  attribute component_name { text }? &
+  element monitoring { MonitoringContents }? &
+  attribute role { "control" | "experimental" | "mixed" }? &
+  attribute public_ipv4 { text }?
+
+MonitoringContents &=
+  AnyExtension &
+  # True if user traffic moves through this interface and is available
+  # for monitoring.
+  attribute user_traffic { xsd:boolean }?
+
+InterfaceRefContents &=
+  attribute component_id { text }
+
+# Reference to components managed by other component managers.
+ExternalReferenceContents &=
+  AnyExtension &
+  attribute component_id { text } &
+  attribute component_manager_id { text }?
+
+ServiceContents &=
+  AnyExtension &
+  # Login services include ssh-services, serial consoles, etc.
+  element login { LoginServiceContents }* &
+
+  # Install services include download and extraction of a file at
+  # experiment startup.
+  element install { InstallServiceContents }* &
+
+  # Execute services include initialization scripts
+  element execute { ExecuteServiceContents }*
+
+LoginServiceContents &=
+  AnyExtension &
+  # Authentication mechanism
+  attribute authentication { "ssh-keys" } &
+  # Access mechanism
+  attribute hostname { text } &
+  attribute port { text }
+
+InstallServiceContents &=
+  AnyExtension &
+  # Type(s) of archives supported
+  attribute file_type { "tar.gz" | "tar.bz2" }
+
+ExecuteServiceContents &=
+  AnyExtension &
+  # Shell environment allowed
+  attribute shell { "sh" }
+
+RSpecContents &=
+  attribute type { "advertisement" } &
+  element external_ref {
+    ExternalReferenceContents
+  }*
+
+start = RSpec

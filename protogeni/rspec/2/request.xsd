@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  
+  EMULAB-COPYRIGHT
+  Copyright (c) 2008 University of Utah and the Flux Group.
+  All rights reserved.
+  
+-->
+<!--
+  
+  Prototype of a request RSpec, to be used by ProtoGENI
+  Version 2
+  
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" targetNamespace="http://www.protogeni.net/resources/rspec/2" xmlns:rspec="http://www.protogeni.net/resources/rspec/2">
+  <xs:include schemaLocation="request-common.xsd"/>
+  <!-- The ComponentName will only be available after an assignment -->
+  <!-- The LinkMapping will only be available after an assignment -->
+  <!-- The ComponentInterfaceDeclName will only be available after an assignment -->
+  <!-- The ComponentInterfaceRefName will only be available after an assignment -->
+  <!--
+    A request link is mapped to an arbitrary topology which represents
+    the virtual LAN/link which embodies it. Note that nodes do not
+    provide any additional information and can be derived from the
+    interface mapping.
+  -->
+  <xs:complexType name="ComponentHopContents">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:group ref="rspec:AnyExtension"/>
+      <xs:group ref="rspec:InterfaceMapping"/>
+    </xs:choice>
+    <xs:attributeGroup ref="rspec:AnyExtension"/>
+    <xs:attribute name="component_id" use="required"/>
+    <xs:attribute name="component_manager_id" use="required"/>
+  </xs:complexType>
+  <!--
+    Each interface represents a particular physical interface. If that
+    interface is one of the link end points, it is also mapped to that
+    virtual interface name.
+  -->
+  <xs:group name="InterfaceMapping">
+    <xs:sequence>
+      <xs:element name="interface_ref">
+        <xs:complexType>
+          <xs:group ref="rspec:AnyExtension"/>
+          <xs:attributeGroup ref="rspec:AnyExtension"/>
+          <xs:attribute name="component_id" use="required"/>
+          <xs:attribute name="component_manager_id" use="required"/>
+          <xs:attribute name="client_id"/>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:group>
+</xs:schema>

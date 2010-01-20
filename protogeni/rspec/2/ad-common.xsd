@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  
+  EMULAB-COPYRIGHT
+  Copyright (c) 2008-2009 University of Utah and the Flux Group.
+  All rights reserved.
+  
+-->
+<!--
+  
+  Common definitions for advertisements, requests, and tickets
+  Version 0.2
+  
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" targetNamespace="http://www.protogeni.net/resources/rspec/2" xmlns:rspec="http://www.protogeni.net/resources/rspec/2">
+  <xs:include schemaLocation="any-extension-schema.xsd"/>
+  <xs:element name="rspec" type="rspec:RSpecContents"/>
+  <xs:complexType name="RSpecContents">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:choice>
+        <xs:group ref="rspec:AnyExtension"/>
+        <xs:element ref="rspec:node"/>
+        <xs:element ref="rspec:link"/>
+      </xs:choice>
+      <xs:element ref="rspec:external_ref"/>
+    </xs:choice>
+    <xs:attributeGroup ref="rspec:AnyExtension"/>
+    <xs:attribute name="generated" type="xs:dateTime"/>
+    <xs:attribute name="generated_by"/>
+    <xs:attribute name="valid_until" type="xs:dateTime"/>
+    <xs:attribute name="type" use="required">
+      <xs:simpleType>
+        <xs:restriction base="xs:token">
+          <xs:enumeration value="advertisement"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+  </xs:complexType>
+  <xs:element name="external_ref" type="rspec:ExternalReferenceContents"/>
+  <xs:element name="node" type="rspec:NodeContents"/>
+  <xs:element name="link" type="rspec:LinkContents"/>
+  <xs:complexType name="NodeContents">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:choice>
+        <xs:group ref="rspec:AnyExtension"/>
+        <xs:element ref="rspec:relation"/>
+        <xs:element ref="rspec:location"/>
+        <xs:element ref="rspec:interface"/>
+      </xs:choice>
+      <xs:choice>
+        <xs:element ref="rspec:available"/>
+        <xs:element ref="rspec:cloud"/>
+        <xs:element ref="rspec:services"/>
+        <xs:element ref="rspec:hardware_type"/>
+        <xs:element ref="rspec:sliver_type"/>
+      </xs:choice>
+    </xs:choice>
+    <xs:attributeGroup ref="rspec:AnyExtension"/>
+    <xs:attribute name="component_id" use="required"/>
+    <xs:attribute name="component_manager_id" use="required"/>
+    <xs:attribute name="component_name"/>
+    <xs:attribute name="exclusive" use="required" type="xs:boolean"/>
+  </xs:complexType>
+  <xs:element name="relation" type="rspec:RelationContents"/>
+  <xs:element name="location" type="rspec:LocationContents"/>
+  <xs:element name="interface" type="rspec:InterfaceContents"/>
+  <xs:element name="available" type="rspec:AvailableContents"/>
+  <xs:element name="cloud">
+    <xs:complexType>
+      <xs:group ref="rspec:AnyExtension"/>
+      <xs:attributeGroup ref="rspec:AnyExtension"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="services" type="rspec:ServiceContents"/>
+  <xs:complexType name="RelationContents">
+    <xs:group ref="rspec:AnyExtension"/>
+    <xs:attributeGroup ref="rspec:AnyExtension"/>
+  </xs:complexType>
+  <xs:complexType name="LocationContents">
+    <xs:group ref="rspec:AnyExtension"/>
+    <xs:attributeGroup ref="rspec:AnyExtension"/>
+    <xs:attribute name="country" use="required"/>
+    <xs:attribute name="longitude"/>
+    <xs:attribute name="latitude"/>
+  </xs:complexType>
+  <xs:complexType name="InterfaceContents">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:group ref="rspec:AnyExtension"/>
+      <xs:element ref="rspec:monitoring"/>
+    </xs:choice>
+    <xs:attributeGroup ref="rspec:AnyExtension"/>
+    <xs:attribute name="component_id" use="required"/>
+    <xs:attribute name="component_name"/>
+    <xs:attribute name="role">
+      <xs:simpleType>
+        <xs:restriction base="xs:token">
+          <xs:enumeration value="control"/>
+          <xs:enumeration value="experimental"/>
+          <xs:enumeration value="mixed"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="public_ipv4"/>
+  </xs:complexType>
+  <xs:element name="monitoring" type="rspec:MonitoringContents"/>
+  <xs:complexType name="LinkContents">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:group ref="rspec:AnyExtension"/>
+      <xs:element ref="rspec:property"/>
+      <xs:element ref="rspec:link_type"/>
+      <xs:element ref="rspec:interface_ref"/>
+    </xs:choice>
+    <xs:attributeGroup ref="rspec:AnyExtension"/>
+    <xs:attribute name="component_id" use="required"/>
+    <xs:attribute name="component_manager_id" use="required"/>
+    <xs:attribute name="component_name"/>
+  </xs:complexType>
+  <xs:element name="property" type="rspec:LinkPropertyContents"/>
+  <xs:element name="interface_ref" type="rspec:InterfaceRefContents"/>
+  <xs:complexType name="InterfaceRefContents">
+    <xs:group ref="rspec:AnyExtension"/>
+    <xs:attributeGroup ref="rspec:AnyExtension"/>
+    <xs:attribute name="component_id" use="required"/>
+  </xs:complexType>
+  <!-- The unidirectional network properties of a link. -->
+  <xs:complexType name="LinkPropertyContents">
+    <xs:group ref="rspec:AnyExtension"/>
+    <xs:attributeGroup ref="rspec:AnyExtension"/>
+    <xs:attribute name="source_id" use="required"/>
+    <xs:attribute name="dest_id" use="required"/>
+    <xs:attribute name="capacity"/>
+    <xs:attribute name="latency"/>
+    <xs:attribute name="packet_loss"/>
+  </xs:complexType>
+  <xs:element name="link_type">
+    <xs:complexType>
+      <xs:group ref="rspec:AnyExtension"/>
+      <xs:attributeGroup ref="rspec:AnyExtension"/>
+      <xs:attribute name="name" use="required"/>
+      <xs:attribute name="class"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="link_class">
+    <xs:complexType>
+      <xs:group ref="rspec:AnyExtension"/>
+      <xs:attributeGroup ref="rspec:AnyExtension"/>
+      <xs:attribute name="name" use="required"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="sliver_type">
+    <xs:complexType>
+      <xs:group ref="rspec:AnyExtension"/>
+      <xs:attributeGroup ref="rspec:AnyExtension"/>
+      <xs:attribute name="name" use="required"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="hardware_type">
+    <xs:complexType>
+      <xs:group ref="rspec:AnyExtension"/>
+      <xs:attributeGroup ref="rspec:AnyExtension"/>
+      <xs:attribute name="name" use="required"/>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

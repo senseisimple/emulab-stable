@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  
+  EMULAB-COPYRIGHT
+  Copyright (c) 2008-2009 University of Utah and the Flux Group.
+  All rights reserved.
+  
+-->
+<!--
+  
+  Prototype of an advertisement RSpec, to be used by ProtoGENI
+  Version 2
+  
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" targetNamespace="http://www.protogeni.net/resources/rspec/2" xmlns:rspec="http://www.protogeni.net/resources/rspec/2">
+  <xs:include schemaLocation="ad-common.xsd"/>
+  <xs:complexType name="AvailableContents">
+    <xs:group ref="rspec:AnyExtension"/>
+    <xs:attributeGroup ref="rspec:AnyExtension"/>
+    <xs:attribute name="now" use="required" type="xs:boolean"/>
+  </xs:complexType>
+  <xs:complexType name="MonitoringContents">
+    <xs:group ref="rspec:AnyExtension"/>
+    <xs:attributeGroup ref="rspec:AnyExtension"/>
+    <xs:attribute name="user_traffic" type="xs:boolean"/>
+  </xs:complexType>
+  <!-- Reference to components managed by other component managers. -->
+  <xs:complexType name="ExternalReferenceContents">
+    <xs:group ref="rspec:AnyExtension"/>
+    <xs:attributeGroup ref="rspec:AnyExtension"/>
+    <xs:attribute name="component_id" use="required"/>
+    <xs:attribute name="component_manager_id"/>
+  </xs:complexType>
+  <xs:complexType name="ServiceContents">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:group ref="rspec:AnyExtension"/>
+      <xs:element ref="rspec:login"/>
+      <xs:element ref="rspec:install"/>
+      <xs:element ref="rspec:execute"/>
+    </xs:choice>
+    <xs:attributeGroup ref="rspec:AnyExtension"/>
+  </xs:complexType>
+  <xs:element name="login" type="rspec:LoginServiceContents"/>
+  <xs:element name="install" type="rspec:InstallServiceContents"/>
+  <xs:element name="execute" type="rspec:ExecuteServiceContents"/>
+  <xs:complexType name="LoginServiceContents">
+    <xs:group ref="rspec:AnyExtension"/>
+    <xs:attributeGroup ref="rspec:AnyExtension"/>
+    <xs:attribute name="authentication" use="required">
+      <xs:simpleType>
+        <xs:restriction base="xs:token">
+          <xs:enumeration value="ssh-keys"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="hostname" use="required"/>
+    <xs:attribute name="port" use="required"/>
+  </xs:complexType>
+  <xs:complexType name="InstallServiceContents">
+    <xs:group ref="rspec:AnyExtension"/>
+    <xs:attributeGroup ref="rspec:AnyExtension"/>
+    <xs:attribute name="file_type" use="required">
+      <xs:simpleType>
+        <xs:restriction base="xs:token">
+          <xs:enumeration value="tar.gz"/>
+          <xs:enumeration value="tar.bz2"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+  </xs:complexType>
+  <xs:complexType name="ExecuteServiceContents">
+    <xs:group ref="rspec:AnyExtension"/>
+    <xs:attributeGroup ref="rspec:AnyExtension"/>
+    <xs:attribute name="shell" use="required">
+      <xs:simpleType>
+        <xs:restriction base="xs:token">
+          <xs:enumeration value="sh"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+  </xs:complexType>
+</xs:schema>
