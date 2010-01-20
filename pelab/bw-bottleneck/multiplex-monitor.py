@@ -14,9 +14,10 @@ import select
 import re
 import traceback
 import errno
+import math
 from optparse import OptionParser
 sys.path.append("/usr/testbed/lib")
-from tbevent import EventClient, address_tuple, ADDRESSTUPLE_ALL
+#from tbevent import EventClient, address_tuple, ADDRESSTUPLE_ALL
 
 EVENT_FORWARD_PATH = 0
 EVENT_BACKWARD_PATH = 1
@@ -340,9 +341,10 @@ def read_initial_conditions():
   while line != '':
     # Don't worry about loss for now. Just discard the value.
     fields = line.strip().split(' ', 4)
+    delay = math.floor(float(fields[3]))
     if len(fields) == 5 and fields[0] == this_ip:
-      set_delay(fields[0], fields[1], str(int(fields[3])/2))
-#      set_link(fields[0], fields[1], 'delay=' + str(int(fields[3])/2))
+      set_delay(fields[0], fields[1], str(delay))
+#      set_link(fields[0], fields[1], 'delay=' + str(delay)
 #      set_link(fields[0], fields[1], 'bandwidth=' + fields[2])
       initial_connection_bandwidth[fields[1]] = int(fields[2])
     line = input.readline()

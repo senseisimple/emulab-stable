@@ -1,159 +1,27 @@
-----------------------------------------------------------------------
-Flexlab software release - Beta
-----------------------------------------------------------------------
-Disclaimer:
 
-This software is currently in beta. It still needs a lot of polishing, and is
-somewhat brittle in the face of PlanetLab node failure, which is frequent.
-----------------------------------------------------------------------
-Basic information:
+** iperf.ns - sample ns file 
 
-We suggest that you read the paper "The Flexlab Approach to Realistic
-Evaluation of Networked Systems", by Ricci, Duerig, et al. in the proc. of NSDI
-2007 for an explanation of how Flexlab works.
+** send-streams 
+   This program starts an iperf server, and initiates simultaneous iperf
+    client connections to host specified using -d for duration specified
+    by -t.
 
-You might see references to 'pelab' (PlanetLab + Emulab) in this software -
-this was the internal name for this project, and not all references to it have
-been purged.
+      usage: $0 [-h] [-m num] [-d ip -t time] [-w directory]
 
-----------------------------------------------------------------------
-What is supported:
+     -h        : this (help) message
+     -v        : verbose output
+     -m num    : become master node for synchronization purpose of num nodes
+     -d ip     : destination ip address or full name
+     -t time   : iperf duration in secs
+     -w dir    : working directory
 
-* Automatic creation of an experiment of any number of nodes
+   example: $0 -d 192.168.1.1 -t 30 -d 192.168.4.2 -t 45
 
-* Running experiments on the real PlanetLab or a 'fake' PlanetLab inside
-  of Emulab - or both in the same experiment
 
-* Automatic software installation, and running and instrumenting server
-  code
-
-* Automatic tcpdumps of your traffic on the Emulab and PlanetLab side
-
-* Automatic logfile gathering
-
-* Automatic collection of log files at the end of an experiment
-
-* Easy starting/restarting of stubs and monitors
-
-* Asking for specific PlanetLab nodes or sites
-
-* Setting initial conditions for nodes based on flexmon data
-
-----------------------------------------------------------------------
-What is not supported:
-
-* Running test clients (ie. 'iperf -c') for you (planned)
-
-* Instrumenting programs that use preemptive (ie. kernel-level) threads
-  (planned)
-
-----------------------------------------------------------------------
-Running an experiment with the auto-pelab scripts:
-
-Note: Depending in how you got the source, it will either be in a directory
-called 'pelab' made by untarring the tarball, or in the 'pelab' subdirectory
-of the testbed CVS repository.
-
-1) Build the flexlab software:
-    Swap in an experiment using the 'PLAB-DEVBOX' image. Note that this disk
-        image corresponds to PlanetLab v4.0, and that binaries built on it
-        will not run on v3.3 nodes, due to incompatible system libraries. Note
-        that if you already have a Flexlab experiment swapped in, you can use
-        the nodes in the Emulab side of it for this purpose.
-    Run 'make' in the root directory of the Flexlab source
-
-2) Create a tarball of the version of the Flexlab software (monitor, agent,
-   etc.) that you'd like to test:
-     From the root of your Flexlab source tree, run:
-         sh ./make-tarball /proj/<PID>/my-pelab.tar.gz
-     Of course, don't name it 'my-plab.tar.gz'! You can put this file in
-       a subdirectory if you want, but it must be somewhere in
-         /proj/<PID>/, where <PID> is the project ID of the project you're
-         going to run the experiment in (for example, 'tbres')
-
-     Put the path to your tarball in the pelab_tar variable in auto-pelab.ns 
-
-2) Read the user-settable options at the top of auto-pelab.ns and change them
-   to your preferences.
-   
-3) Use your modified auto-pelab.ns to create an experiment and swap it in
-
-4) Once it has swapped in, and you're ready to start an experiment, run the
-   'start-experiment' script from your source directory on ops. It takes as
-   arguments the pid and eid of your experiment.  It will:
-     Restart monitors and agents
-     Reset ALL link shaping to the defaults from the NS file
-     Set initial conditions for all paths from the flexmon database
-     Clean logfiles
-     Restart the user-specified servers on all 'elab-*' nodes
-
-   start-experiment has a few useful options for passing additional
-   arguments to the agents and monitors, e.g.
-	 start-experiment -s '-d' pid eid
-   would turn on debugging in the magents 
-	start-experiment -m '-d' pid eid
-   would do the same for the monitors (assuming it has a '-d' option).
-
-   Important: If you are using real planetlab nodes, instead of a 'fake' 
-   planetlab inside of Emulab, run start-experiment with '-p'.
-
-   Important: If you want to have the initial conditions for your paths set
-   to measured values, rather than 0ms 100Mbps (and you should...), give
-   start-experiment the '-i' flag
-
-   Important: Watch for errors from start-experiment - errors about 'no such
-   file or directory' when cleaning out logfiles are harmless, but other
-   errors can be important.
-
-4a) If you modify something in the flexlab (e.g., the agent) and need to
-   deploy it to the nodes, first recreate the tarball as in step 1,
-   and then
-	install-tarball pid eid
-   this triggers a program agent on all the nodes telling it to update
-   the tarballs and RPMs.  You will need to run start-experiment again
-   after this to restart agents/monitors.
-
-5) Log into the 'elab-*' node or nodes, and run your experiment (ie. one run
-   of iperf). Any programs that you run should be prefixed with
-   '/local/pelab/monitor/instrument.sh'. This shell script sets up environment
-   variables so that your program has all of its network calls instrumented.
-   All command line arguments are passed through to the program - ie:
-   /local/pelab/monitor/instrument.sh iperf -c elab-2
-
-6) When you're done with your experiment, run 'stop-experiment' on ops. It
-   will:
-    Stop the stubs, monitors, and iperf servers
-    Collect logfiles from all of the nodes in the experiment, including
-      stub/monitor logs, tcpdumps, delay agent logs, and so on
-    Run tcptrace on all tcpdump logs to produce xplot graphs
-    Put all of these things in a zip file for you in the experiment's log
-      directory - you will get a message like 'Created log hole archive:
-      EXP.5.zip. This file can be found in (/proj/PID/exp/EID/logs). A new
-      zipfile is kept for each experiment, and old ones are not automatically
-      deleted.
-
-7) If you want to look at the logs, unzip the .zip file somewhere, and see
-   the description of the files it contains below. If you want to look at logs
-   as the experiment runs, they are typically in /local/logs/ on the nodes.
-
-----------------------------------------------------------------------
-Important places:
-
-* The contents of the flexlab tarball are installed in /local/pelab on each
-  node
-
-* Logfiles from the monitors, agents, and the user-specified server program
-  can all be found in /local/logs on the node while the experiment runs. You
-  can tail the .out or .err files to see the stdout and stderr of these
-  processes
-
-* Inside the archive zip file you will find:
-  elab-*/ - Logifles from the emulator hosts
-  event-sched.log - Log of all events (including dummynet control events) sent
-      during the experiment
-  plab-*/ - Logfiles from the FAKE plabnetlab nodes
-  planet-*/ - Logifles from the REAL PlanetLab nodes, including tcpdump traces
-      of traffic to and from the PlanetLab nodes
-  tbsdelay*/ - Logs from the delay nodes, including tcpdump traces from the
-      emulab nodes
+** runiperfmesh
+   * to be run at node-startup 
+   * takes care of FC2/FC4 dependency of iperf
+   * currently starts all pair iperf for 10 secs
+   -- result files are stored in /local/logs/iperfmesh directory 
+      (you can use loghole to get them)
 

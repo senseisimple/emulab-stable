@@ -36,6 +36,8 @@ foreach my $mapping (@nodelist) {
 $command = "./query_iplane_client iplane.cs.washington.edu 1 iplane_pairwise.rb \""
            .join(" ", keys(%node_mapping))."\"";
 
+print $command."\n";
+
 @replylist = `$command`;
 
 print "$pid $eid\n";
