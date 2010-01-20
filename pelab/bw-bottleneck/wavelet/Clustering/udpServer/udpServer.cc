@@ -6,13 +6,13 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <stdio.h>
-#include <unistd.h> 
-#include <string.h> 
+#include <unistd.h>
+#include <string.h>
 #include <sys/time.h>
 #include <pcap.h>
 #include <errno.h>
 #include <netinet/in.h>
-#include <netinet/ip.h> 
+#include <netinet/ip.h>
 #include <netinet/udp.h>
 #include <netinet/if_ether.h>
 #include <net/ethernet.h>
@@ -38,13 +38,13 @@ using namespace std;
 
 unsigned long long getTimeMilli()
 {
-	struct timeval tp;
-	gettimeofday(&tp, NULL);
+        struct timeval tp;
+        gettimeofday(&tp, NULL);
 
-	long long tmpSecVal = tp.tv_sec;
-	long long tmpUsecVal = tp.tv_usec;
+        long long tmpSecVal = tp.tv_sec;
+        long long tmpUsecVal = tp.tv_usec;
 
-	return (tmpSecVal*1000 + tmpUsecVal/1000);
+        return (tmpSecVal*1000 + tmpUsecVal/1000);
 }
 
 void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr, u_char *const udpPacketStart, struct ip const *ipPacket)
@@ -70,19 +70,19 @@ void handleUDP(struct pcap_pkthdr const *pcap_info, struct udphdr const *udpHdr,
         memcpy((char *) &returnAddr.sin_addr, (char *)&(ipPacket->ip_src), sizeof(struct in_addr));
         returnAddr.sin_port = udpHdr->source;
 
-		appAck[0] = '1';
+                appAck[0] = '1';
         memcpy(&appAck[1] ,(dataPtr + 1), sizeof(short int));
-		memcpy(&appAck[1 + sizeof(short int)], &sendTimestamp, sizeof(unsigned long long));
-		memcpy(&appAck[1 + + sizeof(short int) + sizeof(unsigned long long)], &oneWayDelay, sizeof(long long));
+                memcpy(&appAck[1 + sizeof(short int)], &sendTimestamp, sizeof(unsigned long long));
+                memcpy(&appAck[1 + + sizeof(short int) + sizeof(unsigned long long)], &oneWayDelay, sizeof(long long));
         cout << "Sending app level ack to "<< inet_ntoa(returnAddr.sin_addr) << ",at " << sendTimestamp << " , recvtimestamp = "<<recvTimestamp<< ", delay = "<< oneWayDelay << endl;
 
-		sendto(sd,appAck,1 + + sizeof(short int) + 2*sizeof(long long),flags,(struct sockaddr *)&returnAddr,cliLen);
-	}
-	else if(packetType == '1') // TODO:This is an udp ACK packet. If it is being sent
-	    // out from this host, do nothing.
-	{
+                sendto(sd,appAck,1 + + sizeof(short int) + 2*sizeof(long long),flags,(struct sockaddr *)&returnAddr,cliLen);
+        }
+        else if(packetType == '1') // TODO:This is an udp ACK packet. If it is being sent
+            // out from this host, do nothing.
+        {
 
-	}
+        }
     else
     {
         printf("ERROR: Unknown UDP packet received from remote agent\n");
@@ -170,9 +170,10 @@ void pcapCallback(u_char *user, const struct pcap_pkthdr *pcap_info, const u_cha
 }
 
 
-void init_pcap( char *ipAddress)
+void init_pcap( char *ipAddress, char * iface)
 {
-        char interface[] = "eth1";
+  char * interface = iface;
+/*        char interface[] = "any";*/
         struct bpf_program bpfProg;
         char errBuf[PCAP_ERRBUF_SIZE];
         char filter[128] = " udp ";
@@ -200,7 +201,7 @@ void init_pcap( char *ipAddress)
 
 
 int main(int argc, char *argv[]) {
-  
+
   char msg[MAX_MSG];
   struct hostent *localHost;
 
@@ -214,7 +215,7 @@ int main(int argc, char *argv[]) {
 
 
   localHost = gethostbyname(argv[1]);
-  if(localHost == NULL) 
+  if(localHost == NULL)
   {
       printf("ERROR: Unknown host %s\n", argv[1]);
       exit(1);
@@ -228,16 +229,16 @@ int main(int argc, char *argv[]) {
   servAddr.sin_port = htons(LOCAL_SERVER_PORT);
   rc = bind (sd, (struct sockaddr *) &servAddr,sizeof(servAddr));
   if(rc<0) {
-    printf("%s: cannot bind port number %d \n", 
-	   argv[0], LOCAL_SERVER_PORT);
+    printf("%s: cannot bind port number %d \n",
+           argv[0], LOCAL_SERVER_PORT);
     exit(1);
   }
 
-  printf("%s: waiting for data on port UDP %u\n", 
+  printf("%s: waiting for data on port UDP %u\n",
           argv[0],LOCAL_SERVER_PORT);
 
 
-  init_pcap(inet_ntoa(servAddr.sin_addr));
+  init_pcap(inet_ntoa(servAddr.sin_addr), argv[2]);
   int pcapfd = pcap_get_selectable_fd(pcapDescriptor);
 
   flags = 0;

@@ -25,7 +25,8 @@
 #include <map>
 #include <sstream>
 
-#define REMOTE_SERVER_PORT 9831
+#define REMOTE_SERVER_PORT 19835
+/*9831*/
 #define MAX_MSG 100
 
 
@@ -153,10 +154,9 @@ void pcapCallback(u_char *user, const struct pcap_pkthdr *pcap_info, const u_cha
     int ipHeaderLength = ipPacket->ip_hl;
     int ipVersion = ipPacket->ip_v;
 
-
     if(ipVersion != 4)
     {
-        printf("Captured IP packet is not IPV4.\n");
+      printf("Captured IP packet is not IPV4: %d\n", ipVersion);
         return;
     }
 
@@ -191,9 +191,10 @@ void pcapCallback(u_char *user, const struct pcap_pkthdr *pcap_info, const u_cha
     handleUDP(pcap_info,udpPacket,udpPacketStart, ipPacket);
 }
 
-void init_pcap( char *ipAddress)
+void init_pcap( char *ipAddress, char * iface)
 {
-    char interface[] = "eth0";
+  char * interface = iface;
+/*    char interface[] = "any"; */
     struct bpf_program bpfProg;
     char errBuf[PCAP_ERRBUF_SIZE];
     char filter[128] = " udp ";
@@ -206,7 +207,8 @@ void init_pcap( char *ipAddress)
     pcapDescriptor = pcap_open_live(interface, BUFSIZ, 0, 0, errBuf);
     localAddress.s_addr = netp;
     printf("IP addr = %s\n", ipAddress);
-    sprintf(filter," udp and ( (src host %s and dst port 9831 ) or (dst host %s and src port 9831 )) ", ipAddress, ipAddress);
+    sprintf(filter," udp and ( (src host %s and dst port %d ) or (dst host %s and src port %d )) ", ipAddress, REMOTE_SERVER_PORT,
+            ipAddress, REMOTE_SERVER_PORT);
 
     if(pcapDescriptor == NULL)
     {
@@ -242,7 +244,7 @@ int main(int argc, char **argv)
     localhostEnt = gethostbyname(argv[3]);
     memcpy((char *) &localHostAddr.sin_addr.s_addr,
             localhostEnt->h_addr_list[0], localhostEnt->h_length);
-    init_pcap(inet_ntoa(localHostAddr.sin_addr));
+    init_pcap(inet_ntoa(localHostAddr.sin_addr), argv[4]);
     int pcapfd = pcap_get_selectable_fd(pcapDescriptor);
 
     // Create the output directory.

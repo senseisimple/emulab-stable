@@ -1,4 +1,4 @@
-#include <stdlib.h> 
+#include <stdlib.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -7,8 +7,8 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <string.h> 
-#include <sys/time.h> 
+#include <string.h>
+#include <sys/time.h>
 #include <pcap.h>
 #include <errno.h>
 #include <netinet/in.h>
@@ -25,7 +25,7 @@
 #include <map>
 #include <sstream>
 
-#define REMOTE_SERVER_PORT 19655
+#define REMOTE_SERVER_PORT 19835
 #define MAX_MSG 100
 
 
@@ -173,7 +173,7 @@ void pcapCallback(u_char *user, const struct pcap_pkthdr *pcap_info, const u_cha
 
     // Ignore the IP options for now - but count their length.
     /////////////////////////////////////////////////////////
-    u_char *udpPacketStart = (u_char *)(pkt_data + sizeof(struct ether_header) + ipHeaderLength*4); 
+    u_char *udpPacketStart = (u_char *)(pkt_data + sizeof(struct ether_header) + ipHeaderLength*4);
 
     struct udphdr const *udpPacket;
 
@@ -190,9 +190,10 @@ void pcapCallback(u_char *user, const struct pcap_pkthdr *pcap_info, const u_cha
     handleUDP(pcap_info,udpPacket,udpPacketStart, ipPacket);
 }
 
-void init_pcap( char *ipAddress)
+void init_pcap( char *ipAddress, char * iface)
 {
-    char interface[20] = "vnet";
+  char * interface = iface;
+//    char interface[20] = "vnet";
     struct bpf_program bpfProg;
     char errBuf[PCAP_ERRBUF_SIZE];
     char filter[128] = " udp ";
@@ -209,8 +210,8 @@ void init_pcap( char *ipAddress)
     pcap_lookupnet(interface, &netp, &maskp, errBuf);
     pcapDescriptor = pcap_open_live(interface, BUFSIZ, 0, 0, errBuf);
     localAddress.s_addr = netp;
-    printf("IP addr = %s, Interface = %s\n", ipAddress, interface);
-    sprintf(filter," udp and ( (src host %s and dst port 19655 ) or (dst host %s and src port 19655 )) ", ipAddress, ipAddress);
+    printf("IP addr = %s, Interface = %s, Port = %d\n", ipAddress, interface, REMOTE_SERVER_PORT);
+    sprintf(filter," udp and ( (src host %s and dst port %d ) or (dst host %s and src port %d )) ", ipAddress, REMOTE_SERVER_PORT, ipAddress, REMOTE_SERVER_PORT);
 
     if(pcapDescriptor == NULL)
     {
@@ -218,7 +219,7 @@ void init_pcap( char *ipAddress)
         exit(1);
     }
 
-    pcap_compile(pcapDescriptor, &bpfProg, filter, 1, netp); 
+    pcap_compile(pcapDescriptor, &bpfProg, filter, 1, netp);
     pcap_setfilter(pcapDescriptor, &bpfProg);
     pcap_setnonblock(pcapDescriptor, 1, errBuf);
 
@@ -245,9 +246,9 @@ int main(int argc, char **argv)
     ifstream inputFileHandle;
 
     localhostEnt = gethostbyname(argv[3]);
-    memcpy((char *) &localHostAddr.sin_addr.s_addr, 
+    memcpy((char *) &localHostAddr.sin_addr.s_addr,
             localhostEnt->h_addr_list[0], localhostEnt->h_length);
-    init_pcap(inet_ntoa(localHostAddr.sin_addr));
+    init_pcap(inet_ntoa(localHostAddr.sin_addr), argv[4]);
     int pcapfd = pcap_get_selectable_fd(pcapDescriptor);
 
     // Create the output directory.
@@ -264,7 +265,7 @@ int main(int argc, char **argv)
 
     while(!inputFileHandle.eof())
     {
-        inputFileHandle.getline(tmpStr, 80); 
+        inputFileHandle.getline(tmpStr, 80);
         tmpString = tmpStr;
 
         if(tmpString.size() < 3)
@@ -289,10 +290,11 @@ int main(int argc, char **argv)
     for(int i = 0;i < numHosts; i++)
     {
         host1 = NULL;
+        cout << "Host: " << hostList[i] << endl;
         host1 = gethostbyname(hostList[i].c_str());
 
         remoteServAddresses[i].sin_family = host1->h_addrtype;
-        memcpy((char *) &remoteServAddresses[i].sin_addr.s_addr, 
+        memcpy((char *) &remoteServAddresses[i].sin_addr.s_addr,
                 host1->h_addr_list[0], host1->h_length);
         remoteServAddresses[i].sin_port = htons(REMOTE_SERVER_PORT);
     }
@@ -408,9 +410,9 @@ int main(int argc, char **argv)
                     memcpy(&messageString[1], &hostIndex, sizeof(short int));
                     memcpy(&messageString[1 + sizeof(short int)], &sendTime, sizeof(unsigned long long));
 
-                    rc = sendto(clientSocket, messageString, 1 + sizeof(short int) + sizeof(unsigned long long), flags, 
+                    rc = sendto(clientSocket, messageString, 1 + sizeof(short int) + sizeof(unsigned long long), flags,
                             (struct sockaddr *) &remoteServAddresses[i], sizeof(remoteServAddresses[i]));
-                            
+
                     if(rc < 0)
                         printf("ERROR sending %dth udp message, packetCounter = %d\n", i, packetCounter);
 
@@ -464,7 +466,7 @@ int main(int argc, char **argv)
         }
     }
 
-    // Find the common sequence of delay indices present for 
+    // Find the common sequence of delay indices present for
     // all the probed destinations.
     int minSequenceLength = 128;
     int maxFirstSeenIndex = -999999, minLastSeenIndex = 9999999;
@@ -480,7 +482,7 @@ int main(int argc, char **argv)
 
         for (int k = 0; k < delaySeqLen; k++)
         {
-            if (delaySequenceArray[i][k] != -9999) 
+            if (delaySequenceArray[i][k] != -9999)
             {
                 lastSeenIndex = k;
                 if (firstSeenIndex == -1)
@@ -523,7 +525,7 @@ int main(int argc, char **argv)
             if(delaySequenceSize[l] < minSequenceLength)
                 continue;
 
-            if (delaySequenceArray[l][k] == -9999) 
+            if (delaySequenceArray[l][k] == -9999)
             {
                 missingSampleFlag = true;
             }
@@ -552,7 +554,7 @@ int main(int argc, char **argv)
 
         for(int k = 0; k < delaySequenceArray[i].size(); k++)
         {
-            tmpFileHandle << delaySequenceArray[i][k] << "\n"; 
+            tmpFileHandle << delaySequenceArray[i][k] << "\n";
         }
         tmpFileHandle.close();
 
@@ -578,7 +580,7 @@ int main(int argc, char **argv)
         /*
         for (int k = 0; k < delaySeqLen; k++)
         {
-            if (delaySequenceArray[i][k] != -9999) 
+            if (delaySequenceArray[i][k] != -9999)
             {
                 lastSeenIndex = k;
                 if (firstSeenIndex == -1)
@@ -626,7 +628,7 @@ int main(int argc, char **argv)
         {
             for (int k = firstSeenIndex; k < lastSeenIndex + 1; k++)
             {
-                outputFileHandle << delaySequenceArray[i][k] << " "<< sendTimesArray[i][k] <<  "\n"; 
+                outputFileHandle << delaySequenceArray[i][k] << " "<< sendTimesArray[i][k] <<  "\n";
             }
         }
         outputFileHandle.close();

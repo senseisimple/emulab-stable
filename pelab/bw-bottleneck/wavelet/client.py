@@ -47,7 +47,7 @@ inputFileHandle.close()
 
 
 numHosts = len(hostList)
-targetSleepTime = float ((1000.0/float(probeRate))/1000.0 ) - 0.001
+targetSleepTime = float ((1000.0/float(probeRate)) ) - 0.001
 
 clientSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 fcntl.fcntl(clientSocket, fcntl.F_SETFL, os.O_NONBLOCK)
@@ -72,24 +72,24 @@ for i in range(0, numHosts-1):
     #{
         secondHostAddr = (hostList[j] + ".flex-plab2.tbres.emulab.net", portNum) 
 
-        startTime = int(time.time()*1000)
+        startTime = int(time.time())
         lastSentTime = startTime
 
         endProbesFlag = 0
         readTimeoutFlag = 0
 
         # For each combination(pair), send a train of UDP packets.
-        while (( lastSentTime - startTime)/1000 < probeDuration) or \
+        while (( lastSentTime - startTime) < probeDuration) or \
               not(readTimeoutFlag):
         #{
 
         # Stop waiting for probe replies after a timeout - calculated from the
         # time the last probe was sent out.
-            if endProbesFlag and ( (time.time()*1000 - lastSentTime)/1000.0 > timeout):
+            if endProbesFlag and ( (time.time() - lastSentTime) > timeout):
                 readTimeoutFlag = 1
 
         # Stop sending probes after the given probe duration.
-            if not(endProbesFlag) and (lastSentTime - startTime)/1000.0 > probeDuration:
+            if not(endProbesFlag) and (lastSentTime - startTime) > probeDuration:
                 endProbesFlag = 1
 
             if endProbesFlag:
@@ -133,14 +133,14 @@ for i in range(0, numHosts-1):
                 if clientSocket in writeSet:
                 #{
                     # Send the probe packets.
-                    sendTime = int(time.time()*1000)
+                    sendTime = int(time.time())
                     messageString = "0 "
                     messageString = messageString + str(sendTime)
                     clientSocket.sendto(messageString, firstHostAddr)
                     packetTimeMaps[0][str(sendTime)] = packetCounter
                     delaySequenceArray[0].append(-9999)
 
-                    sendTime = int(time.time()*1000)
+                    sendTime = int(time.time())
                     messageString = "1 "
                     messageString = messageString + str(sendTime)
                     clientSocket.sendto(messageString, secondHostAddr)
@@ -148,15 +148,15 @@ for i in range(0, numHosts-1):
                     delaySequenceArray[1].append(-9999)
 
                     # Sleep for 99 msec for a 10Hz target probing rate.
-                    lastSentTime = time.time()*1000
+                    lastSentTime = time.time()
                     time.sleep(targetSleepTime) 
 
                     packetCounter += 1
                 #}
                 else:
                 #{
-                    if not(time.time()*1000 - lastSentTime > targetSleepTime*1000):
-                        time.sleep( float( ( targetSleepTime*1000 - (time.time()*1000 - lastSentTime) )/1000.0) )
+                    if not(time.time() - lastSentTime > targetSleepTime):
+                        time.sleep( float( ( targetSleepTime - (time.time() - lastSentTime) )) )
                 #}
             #}
         #}
