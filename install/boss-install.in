@@ -357,6 +357,13 @@ if ($UID != 0) {
     die "This script must be run as root.\n";
 }
 
+Phase "sperl", "Checking for setuid perl", sub {
+    if (ExecQuiet("$PKG_INFO -L -x perl-5 | fgrep -q -s sperl") == 0) {
+	PhaseSkip("Perl is okay");
+    }
+    PhaseFail("setuid perl is not set up properly. Read the wiki!");
+};
+
 Phase "usersgroups", "Creating users and groups", sub {
     Phase "tbadmin", "Creating tbadmin group", sub {
 	if (getgrnam("tbadmin")) {

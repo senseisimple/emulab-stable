@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003-2008 University of Utah and the Flux Group.
+# Copyright (c) 2003-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -291,6 +291,13 @@ if ($UID != 0) {
 #
 # The phases are fairly self-explanatory
 #
+Phase "sperl", "Checking for setuid perl", sub {
+    if (ExecQuiet("$PKG_INFO -L -x perl-5 | fgrep -q -s sperl") == 0) {
+	PhaseSkip("Perl is okay");
+    }
+    PhaseFail("setuid perl is not set up properly. Read the wiki!");
+};
+
 Phase "usersgroups", "Creating users and groups", sub {
     Phase "tbadmin", "Creating tbadmin group", sub {
 	if (getgrnam("tbadmin")) {
