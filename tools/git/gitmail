@@ -55,12 +55,14 @@ my $testmode = undef;
 #
 my %opt;
 Getopt::Long::Configure("no_ignore_case");
-if (!GetOptions(\%opt, 'd', 'h', 't', 'T=s') || @ARGV || $opt{h}) {
+if (!GetOptions(\%opt, 'd', 'h', 't', 'T=s', 'o=s@') || @ARGV || $opt{h}) {
     print STDERR "Usage: gitmail [-h|-d]\n";
-    print STDERR "  -h    this message\n";
-    print STDERR "  -d    enable debugging output and don't send mail\n";
-    print STDERR "  -t    test mode - operate on last 3 commits to master\n";
-    print STDERR "  -T br Like '-t', but use branch 'br' instead of master\n";
+    print STDERR "  -h     this message\n";
+    print STDERR "  -d     enable debugging output and don't send mail\n";
+    print STDERR "  -t     test mode - operate on last 3 commits to master\n";
+    print STDERR "  -T br  like '-t', but use branch 'br' instead of master\n";
+    print STDERR "  -o o=v give option o the value v (may be given multiple\n";
+    print STDERR "         times)\n";
     exit 1;
 }
 
@@ -89,6 +91,7 @@ my $reponame = get_config("reponame",undef);
 # address field, the mail will be sent to all addresses in the array.
 #
 # *NOTE* This are perl regexps, not shell globs! *NOTE*
+# *NOTE* This can also be read from a file - see below *NOTE*
 #
 my @mailto = (
   # Branch              # Path             # Send mail to
@@ -100,6 +103,16 @@ my @mailto = (
 #    '^test-'],         'assign/',         'ricci+assign@flux.utah.edu'],
 # [ 'gitmail',          'tools/git',       'ricci+git@flux.utah.edu']
 );
+
+#
+# If set, look in a file for the @mailto structure.  This file should be
+# executable perl code that returns an array following the same format as the
+# @mailto array below. For example, the file could contain:
+# ( [ undef, undef, 'me@example.com'] )
+#
+# *NOTE* If this is set, overrides the @mailto setting above *NOTE*
+#
+my $mailconfigfile = get_config("mailconfigfile",undef);
 
 #
 # Default mail address - if none of the more specific regular expressions
@@ -184,6 +197,44 @@ sub rev_string($$);
 
 debug("starting");
 
+#
+# Read from the mail config file, if requested. We do this before detaching
+# so that we can report an error if one occurs.
+#
+if ($mailconfigfile) {
+    #
+    # We open the file, read the contents, then eval them. If we didn't get any
+    # errors, the result becomes the new contents of the @mailto array
+    #
+    if (!open(MCF,"<$mailconfigfile")) {
+        warn "gitmail: Unable to open config file $mailconfigfile - $!\n";
+    } else {
+        my @mailcode = <MCF>;
+        close MCF;
+
+        #
+        # Have to turn array back into a single string before we can call
+        # eval on it. Put the result in a temp. variable so that we don't
+        # overwrite @mailto if there is an error
+        #
+        my @mailconfig = eval join("\n",@mailcode);
+
+        #
+        # If there were any errors in the eval, they will be found in the magic
+        # variable $@ - however, they will also have been printed to stderr, so
+        # don't print again
+        #
+        if ($@) {
+            warn "gitmail: Error in $mailconfigfile!\n";
+        } else {
+            @mailto = @mailconfig;
+        }
+    }
+}
+
+#
+# Get the actual references
+#
 my @reflines;
 if ($testmode) {
     #
@@ -198,7 +249,6 @@ if ($testmode) {
     @reflines = <STDIN>;
     debug("finished reading stdin");
 }
-
 
 #
 # Detach?
@@ -678,6 +728,20 @@ sub debug(@) {
 #
 sub get_config($$) {
     my ($var,$default) = @_;
+    
+    #
+    # Allow the user to override on command line
+    #
+    if ($opt{o}) {
+        foreach my $pair (@{$opt{o}}) {
+            my ($name,$value) = split /=/, $pair;
+            if ($name eq $var) {
+                debug("Using config value $value for $name from command line");
+                return $value;
+            }
+        }
+    }
+
     my $value = `git config $CONFIGBASE.$var`;
     chomp $value;
     if ($value ne "") {
