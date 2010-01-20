@@ -282,5 +282,35 @@
 	        myIndex += idx;
 	    }
 
+		public function getDotGraph():String {
+			var added:Dictionary = new Dictionary();
+			
+			var dot:String = "graph " + Common.getDotString(Hrn) + " {\n" +
+				"\toverlap=scale;\n";
+			for each(var currentNodeGroup:PhysicalNodeGroup in Nodes.collection) {
+				for each(var currentNode:PhysicalNode in currentNodeGroup.collection) {
+					// Give any special node characteristics
+					for each(var d:NodeType in currentNode.types) {
+						if(d.name == "switch")
+							dot += "\t" + Common.getDotString(currentNode.name) + " [shape=box, style=bold];\n";
+					}
+					// Add connections
+					for each(var connectedNode:PhysicalNode in currentNode.GetNodes()) {
+						if(added[connectedNode.urn] != null)
+							continue;
+						dot += "\t" + Common.getDotString(currentNode.name) + " -- " + Common.getDotString(connectedNode.name) + ";\n";
+					}
+					if(currentNode.subNodes != null && currentNode.subNodes.length > 0) {
+						for each(var subNode:PhysicalNode in currentNode.subNodes) {
+							dot += "\t" + Common.getDotString(currentNode.name) + " -- " + Common.getDotString(subNode.name) + ";\n";
+						}
+					}
+					added[currentNode.urn] = currentNode;
+				}
+			}
+			
+			return dot + "}";
+		}
+
 	}
 }

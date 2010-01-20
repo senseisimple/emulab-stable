@@ -191,6 +191,19 @@
 				       		main.rspecView.loadXml(cm.Rspec);
 						});
 					cmHbox.addChild(rspecButton);
+					
+					var dotButton:Button = new Button();
+					dotButton.label = ".";
+					dotButton.addEventListener(MouseEvent.CLICK,
+						function openDot():void
+						{
+							var cw:ConsoleWindow = new ConsoleWindow();
+							PopUpManager.addPopUp(cw, main, false);
+				       		PopUpManager.centerPopUp(cw);
+							cw.title = "dot format from " + cm.Hrn;
+							cw.txt.text = cm.getDotGraph();
+						});
+					cmHbox.addChild(dotButton);
 				}
 				
 				if(cm.Message.length > 0)

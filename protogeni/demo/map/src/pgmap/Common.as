@@ -125,6 +125,14 @@
 			return phrase.substring(1, 0).toUpperCase()+phrase.substring(1);
 		}
 		
+		public static function replaceString(original:String, find:String, replace:String):String {
+			return original.split(find).join(replace);
+		}
+		
+		public static function getDotString(name : String) : String {
+			return replaceString(replaceString(name, ".", ""), "-", "");
+		}
+		
 		// Shortens the given string to a length, taking out from the middle
 		public static function shortenString(phrase : String, size : int) : String {
 			if(phrase.length < size)
