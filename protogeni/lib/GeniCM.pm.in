@@ -2105,6 +2105,9 @@ sub SliverWorkAux($$$$$$$)
 	    $ifaceref->{'sliver_urn'}  = $sliver->sliver_urn();
 	    $ifaceref->{'MAC'} = $interface->mac()
 		if (defined($interface));
+	    $ifaceref->{'IP'} = $interface->IP()
+		if (defined($interface) &&
+		    defined($interface->IP()) && $interface->IP() ne "");
 	    
 	    if ($sliver->SetAggregate($linkaggregate) != 0) {
 		$message = "Could not add link sliver $sliver to $aggregate";
