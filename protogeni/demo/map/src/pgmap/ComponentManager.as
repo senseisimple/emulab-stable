@@ -40,6 +40,7 @@
 		
 		public var Nodes:PhysicalNodeGroupCollection = new PhysicalNodeGroupCollection();
 		public var Links:PhysicalLinkGroupCollection = new PhysicalLinkGroupCollection();
+		public var AllNodes:ArrayCollection = new ArrayCollection();
 		
 		[Bindable]
 		public var Status : int = UNKOWN;
@@ -80,6 +81,7 @@
 	    {
 	    	Nodes = new PhysicalNodeGroupCollection();
 			Links = new PhysicalLinkGroupCollection();
+			AllNodes = new ArrayCollection();
 			Rspec = null;
 			Status = ComponentManager.UNKOWN;
 			Message = "";
@@ -215,6 +217,7 @@
 	        	ng.Add(n);
 	        	nodeNameDictionary[n.urn] = n;
 	        	nodeNameDictionary[n.name] = n;
+	        	AllNodes.addItem(n);
 	        	
 	        	//main.console.appendText("done\n");
 	        }
@@ -285,27 +288,86 @@
 		public function getDotGraph():String {
 			var added:Dictionary = new Dictionary();
 			
+			// Start graph
 			var dot:String = "graph " + Common.getDotString(Hrn) + " {\n" +
 				"\toverlap=scale;\n";
-			for each(var currentNodeGroup:PhysicalNodeGroup in Nodes.collection) {
-				for each(var currentNode:PhysicalNode in currentNodeGroup.collection) {
-					// Give any special node characteristics
-					for each(var d:NodeType in currentNode.types) {
-						if(d.name == "switch")
-							dot += "\t" + Common.getDotString(currentNode.name) + " [shape=box, style=bold];\n";
-					}
-					// Add connections
-					for each(var connectedNode:PhysicalNode in currentNode.GetNodes()) {
-						if(added[connectedNode.urn] != null)
-							continue;
-						dot += "\t" + Common.getDotString(currentNode.name) + " -- " + Common.getDotString(connectedNode.name) + ";\n";
-					}
-					if(currentNode.subNodes != null && currentNode.subNodes.length > 0) {
-						for each(var subNode:PhysicalNode in currentNode.subNodes) {
-							dot += "\t" + Common.getDotString(currentNode.name) + " -- " + Common.getDotString(subNode.name) + ";\n";
+			
+			var nodesToAdd:ArrayCollection = new ArrayCollection(AllNodes.toArray());
+			var nodeGroups:ArrayCollection = new ArrayCollection();
+
+			// Add nodes and combine similar nodes together
+			for each(var currentNode:PhysicalNode in AllNodes) {
+				// Give nodes any special qualities, otherwise see if they need to be grouped
+				if(currentNode.IsSwitch())
+					dot += "\t" + Common.getDotString(currentNode.name) + " [shape=box, style=filled, color=blue, height=2, width=2];\n";
+				else if(currentNode.subNodeOf != null)
+					dot += "\t" + Common.getDotString(currentNode.name) + " [style=dotted, color=green];\n";
+				else if(currentNode.subNodes != null && currentNode.subNodes.length > 0)
+					dot += "\t" + Common.getDotString(currentNode.name) + " [style=filled, color=green];\n";
+				else {
+					
+					// Group simple nodes connected to same switches
+					var connectedSwitches:ArrayCollection = currentNode.ConnectedSwitches();
+					if(connectedSwitches.length > 0 && connectedSwitches.length == currentNode.GetNodes().length) {
+						// Go through all the groups already made
+						var addedNode:Boolean = false;
+						for each(var switchCombination:Object in nodeGroups) {
+							// See if all switches exist
+							if(connectedSwitches.length == switchCombination.switches.length) {
+								var found:Boolean = true;
+								for each(var connectedSwitch:Object in connectedSwitches) {
+									if(!switchCombination.switches.contains(connectedSwitch)) {
+										found = false;
+										break;
+									}
+								}
+								if(found) {
+									switchCombination.count++;
+									nodesToAdd.removeItemAt(nodesToAdd.getItemIndex(currentNode));
+									addedNode = true;
+									break;
+								}
+							}
+						}
+						if(!addedNode) {
+							var newGroup:Object = {switches: new ArrayCollection(connectedSwitches.toArray()), count: 1, name: Common.getDotString(currentNode.name), original: currentNode};
+							nodeGroups.addItem(newGroup);
+							nodesToAdd.removeItemAt(nodesToAdd.getItemIndex(currentNode));
 						}
 					}
-					added[currentNode.urn] = currentNode;
+				}
+			}
+			// Remove any groups with just 1 node
+			for(var i:int = nodeGroups.length-1; i > -1; --i) {
+				if(nodeGroups[i].count == 1) {
+					nodesToAdd.addItem(nodeGroups[i].original);
+					nodeGroups.removeItemAt(i);
+				}
+			}
+				
+			for each(currentNode in nodesToAdd) {
+				// Add connections
+				for each(var connectedNode:PhysicalNode in currentNode.GetNodes()) {
+					if(added[connectedNode.urn] != null || !nodesToAdd.contains(connectedNode))
+						continue;
+					if(connectedNode.IsSwitch() && currentNode.IsSwitch())
+						dot += "\t" + Common.getDotString(currentNode.name) + " -- " + Common.getDotString(connectedNode.name) + " [style=bold, color=blue];\n";
+					else
+						dot += "\t" + Common.getDotString(currentNode.name) + " -- " + Common.getDotString(connectedNode.name) + ";\n";
+				}
+				if(currentNode.subNodes != null && currentNode.subNodes.length > 0) {
+					for each(var subNode:PhysicalNode in currentNode.subNodes) {
+						dot += "\t" + Common.getDotString(currentNode.name) + " -- " + Common.getDotString(subNode.name) + " [style=dotted, len=0.2];\n";
+					}
+				}
+				added[currentNode.urn] = currentNode;
+			}
+			
+			// Build up node groups
+			for each(var nodeGroup:Object in nodeGroups) {
+				dot += "\t" + nodeGroup.name + " [style=filled, height="+.25*nodeGroup.count+", width="+.375*nodeGroup.count+", color=orange, label=\""+nodeGroup.count+" Nodes\"];\n";
+				for each(connectedNode in nodeGroup.switches) {
+					dot += "\t" + nodeGroup.name + " -- " + Common.getDotString(connectedNode.name) + " [style=bold, color=orange];\n";
 				}
 			}
 			

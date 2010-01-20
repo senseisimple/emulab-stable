@@ -59,6 +59,24 @@
 		public var interfaces:PhysicalNodeInterfaceCollection = new PhysicalNodeInterfaceCollection();
 		
 		public var rspec:XML;
+		
+		public function IsSwitch():Boolean {
+			for each(var d:NodeType in types) {
+				if(d.name == "switch")
+					return true;
+			}
+			return false;
+		}
+		
+		public function ConnectedSwitches():ArrayCollection {
+			var connectedNodes:ArrayCollection = GetNodes();
+			var connectedSwitches:ArrayCollection = new ArrayCollection();
+			for each(var connectedNode:PhysicalNode in connectedNodes) {
+				if(connectedNode.IsSwitch())
+					connectedSwitches.addItem(connectedNode);
+			}
+			return connectedSwitches;
+		}
 
 		public function GetLatitude():Number {
 			return owner.latitude;
