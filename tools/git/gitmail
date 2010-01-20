@@ -1,8 +1,8 @@
 #!/usr/bin/perl -w
 #
-# gitmail - script to send mail for git commits
-# Robert Ricci <ricci@cs.utah.edu>
-# December 2009
+# EMULAB-COPYRIGHT
+# Copyright (c) 2009-2010 University of Utah and the Flux Group.
+# All rights reserved.
 #
 # To set this script up:
 # 1) Copy or link it to .git/hooks/post-receive in your repository. Make sure
