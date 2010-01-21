@@ -134,7 +134,7 @@ function showsummary ($showby) {
     switch ($showby) {
         case "projects":
 	    $which = "pid";
-	    $table = "project_stats";
+	    $table = "project_stats_backup";
 	    $title = "Project Summary Stats (Epoch)";
 	    $link  = "showproject.php3?pid=";
 	    $wclause = "where pid!='$TBOPSPID'";
@@ -142,7 +142,7 @@ function showsummary ($showby) {
 	    break;
         case "users":
 	    $which = "uid";
-	    $table = "user_stats";
+	    $table = "user_stats_backup";
 	    $title = "User Summary Stats (Epoch)";
 	    $link  = "showuser.php3?user=";
 	    $wclause = "";
@@ -161,7 +161,7 @@ function showsummary ($showby) {
 			 "exptpreload_count+exptstart_count as expt_new, ".
 			 "exptswapmod_count as expt_swapmods, ".
 			 "u.usr_name, s.uid_idx ".
-			 "from user_stats as s ".
+			 "from $table as s ".
 			 "left join users as u on u.uid_idx=s.uid_idx ".
 			 "$wclause ".
 			 "order by $order");
@@ -443,8 +443,8 @@ function showrange ($showby, $range) {
 	DBQueryFatal("select s.exptidx,s.pid,u.uid,r.pnodes,r.vnodes, ".
 		     "   swapin_time,swapout_time,swapmod_time,byswapmod, ".
 		     "   e.eid_uuid,r.idx,r.lastidx,byswapin ".
-		     " from experiment_resources as r ".
-		     "left join experiment_stats as s on ".
+		     " from experiment_resources_backup as r ".
+		     "left join experiment_stats_backup as s on ".
 		     "     r.exptidx=s.exptidx ".
 		     "left join experiments as e on e.idx=s.exptidx ".
 		     "left join users as u on u.uid_idx=r.uid_idx ".
@@ -541,13 +541,13 @@ function showrange ($showby, $range) {
 	# current experiment.
 	#
 	if ($swapin_time == 0) {
-	    if ($debug)
+	    if (1)
 		echo "No swapin time: $exptidx, $rsrcidx<br>\n";
 	    continue;
 	}
 	if ($swapout_time == 0 && $swapmod_time == 0) {
 	    if (!isset($uuid)) {	    
-		if ($debug)
+		if (1)
 		    echo "No swapout/swapmod time: $exptidx, $rsrcidx<br>\n";
 		continue;
 	    }
