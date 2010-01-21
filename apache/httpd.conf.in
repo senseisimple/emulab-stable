@@ -371,6 +371,11 @@ ServerAdmin @TBOPSEMAIL_NOSLASH@
 #ServerName new.host.name
 
 #
+# Emulab likes a limited request size. 
+#
+LimitRequestBody 2097152
+
+#
 # DocumentRoot: The directory out of which you will serve your
 # documents. By default, all requests are taken from this directory, but
 # symbolic links and aliases may be used to point to other locations.
