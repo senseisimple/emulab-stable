@@ -301,12 +301,3 @@ void printRouteToSubnet(string sourceIp, string firstHopIp, string destSubnet,
 }
 
 //-----------------------------------------------------------------------------
-
-string intToString(int num)
-{
-    ostringstream stream;
-    stream << num;
-    return stream.str();
-}
-
-//-----------------------------------------------------------------------------

@@ -88,6 +88,11 @@ public:
     int getVertexCount(void) const;
     // What is the index of the source host?
     int getSource(void) const;
+    // Get the vector of first hops
+    std::vector<int> const & getAllFirstHops(void) const
+    {
+        return first_hop;
+    }
 private:
     // Use an adjacency_list graph instead of an adjacency_matrix
     // graph, based on the assumption that there will be many fewer
