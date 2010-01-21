@@ -1,7 +1,7 @@
 #!/usr/bin/perl 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -35,7 +35,7 @@ while (my ($idx,$action,$exptidx,$eid,$pid,$start,$stop) = $qr->fetchrow()) {
 	next;
     }
 
-    my $dir = "/usr/testbed/expinfo/$pid-$eid.$exptidx";
+    my $dir = "/usr/testbed/expinfo/$pid/$eid/$exptidx";
 
     my @res;
     foreach my $fn (<$dir/*.ptop>) {
