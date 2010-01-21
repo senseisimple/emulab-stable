@@ -1,0 +1,72 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use File::Basename;
+use File::Find;
+
+sub usage {
+    print STDERR "Usage: installwikidocs <sourcedir>\n";
+    exit(-1);
+}
+my $optlist     = "";
+my $TB          = "@prefix@";
+my $WIKIDOCS    = "$TB/www/wikidocs";
+my $HTMLINSTALL = "$TB/sbin/htmlinstall";
+
+# Protos
+sub FindCallBack();
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Turn off line buffering on output
+$| = 1;
+
+usage()
+    if (@ARGV != 1);
+
+my $sourcedir = $ARGV[0];
+
+if (! chdir($sourcedir)) {
+    die("Could not chdir to $sourcedir: $!\n");
+}
+if (!-e $WIKIDOCS) {
+    if (! mkdir("$WIKIDOCS", 0771)) {
+	die("Could not make directory $WIKIDOCS: $!\n");
+    }
+}
+
+system("rsync -a --delete $sourcedir/ $WIKIDOCS") == 0
+    or die("Could not rsync  $sourcedir/ to $WIKIDOCS");
+
+find({'wanted' => \&FindCallBack, 'untaint' => 1}, $sourcedir);
+
+unlink("$WIKIDOCS/robots.txt")
+    if (-e "$WIKIDOCS/robots.txt");
+unlink("$WIKIDOCS/.htaccess")
+    if (-e "$WIKIDOCS/.htaccess");
+
+exit(0);
+
+sub FindCallBack()
+{
+    my $name = $_;
+
+    return
+	if ($name eq "." || $name eq "..");
+
+    my $fullpath = "$File::Find::dir/$name";
+
+    my $tmp = `file -i $name`;
+    if ($tmp =~ /text\/plain/ ||
+	$tmp =~ /text\/html/) {
+	print "$name, $WIKIDOCS/$fullpath\n";
+    }
+}
+
