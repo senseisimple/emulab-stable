@@ -521,18 +521,9 @@ DocumentRoot "/usr/local/www/data"
 # Control access to UserDir directories.  The following is an example
 # for a site where these directories are restricted to read-only.
 #
-#<Directory /home/*/public_html>
-#    AllowOverride FileInfo AuthConfig Limit
-#    Options MultiViews Indexes SymLinksIfOwnerMatch IncludesNoExec
-#    <Limit GET POST OPTIONS PROPFIND>
-#        Order allow,deny
-#        Allow from all
-#    </Limit>
-#    <LimitExcept GET POST OPTIONS PROPFIND>
-#        Order deny,allow
-#        Deny from all
-#    </LimitExcept>
-#</Directory>
+<Directory /home/*/public_html>
+    php_admin_flag engine off
+</Directory>
 
 #
 # DirectoryIndex: Name of the file or files to use as a pre-written HTML
