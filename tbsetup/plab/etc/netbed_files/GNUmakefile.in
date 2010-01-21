@@ -11,7 +11,7 @@ SUBDIR		= tbsetup/plab/etc/netbed_files
 
 include $(OBJDIR)/Makeconf
 
-SBIN_STUFF      = installcron.sh thttpd.restart thttpd
+SBIN_STUFF      = installcron.sh thttpd.restart
 FILES_DIR	= $(INSTALL_ETCDIR)/plab/netbed_files
 SBIN_DIR	= $(FILES_DIR)/sbin
 LOG_DIR		= $(FILES_DIR)/log
