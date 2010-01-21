@@ -13,7 +13,7 @@ import xmlrpclib
 # Depending on where you've installed m2crypto, edit/remove the following
 # path addition...
 #
-sys.path.append("/home/johnsond/r/usr/local/lib/python2.5/site-packages")
+#sys.path.append("/home/johnsond/r/usr/local/lib/python2.5/site-packages")
 from M2Crypto.m2xmlrpclib import SSL_Transport
 from M2Crypto import SSL
 
@@ -167,7 +167,22 @@ def umount():
 # safety hatch
 mountopts = ''
 if nowrite:
-    mountopts = '-o ro'
+    mountopts = '-r'
+    pass
+
+# figure out what our partition names should look like
+(elab_part,plab_part) = (None,None)
+(ufs_opts,vfat_opts) = ('','')
+if sys.platform.startswith('linux'):
+    (elab_part,plab_part) = ('1','2')
+    (ufs_opts,vfat_opts) = ('-t ufs -o ufstype=ufs2','-t vfat')
+elif sys.platform.startswith('freebsd'):
+    (elab_part,plab_part) = ('s1a','s2')
+    (ufs_opts,vfat_opts) = ('','-t msdosfs')
+else:
+    print "Unsupported platform %s, exiting!" % sys.platform
+    sys.exit(99)
+    pass
 
 # Figure out what/where to mount the emulab device
 if not onlyplab:
@@ -187,8 +202,8 @@ if not onlyplab:
         # figure out if we need to mount using the slice or the device:
         if eslice:
             if os.path.exists(eslice):
-                retval = os.system('/sbin/mount %s %s %s' \
-                                   % (mountopts,eslice,emount))
+                retval = os.system('/sbin/mount %s %s %s %s' \
+                                   % (mountopts,ufs_opts,eslice,emount))
                 if not retval == 0:
                     raise RuntimeError("mount(%s,%s) failed: %d" \
                                        % (eslice,emount,retval >> 8))
@@ -198,15 +213,15 @@ if not onlyplab:
             pass
         elif device:
             if not device.find('/dev') == 0:
-                rdev = "%s%s%s" % ('/dev/',device,'s1a')
+                rdev = "%s%s%s" % ('/dev/',device,elab_part)
             else:
-                rdev = "%s%s" % (device,'s1a')
+                rdev = "%s%s" % (device,elab_part)
                 pass
             if devmap.has_key(rdev):
                 raise RuntimeError("Device %s already mounted!" % rdev)
             if os.path.exists(rdev):
-                retval = os.system('/sbin/mount %s %s %s' \
-                                   % (mountopts,rdev,emount))
+                retval = os.system('/sbin/mount %s %s %s %s' \
+                                   % (mountopts,ufs_opts,rdev,emount))
                 if not retval == 0:
                     raise RuntimeError("mount(%s,%s) failed: %d" \
                                        % (rdev,emount,retval >> 8))
@@ -238,8 +253,8 @@ if not onlyelab:
         # figure out if we need to mount using the slice or the device:
         if pslice:
             if os.path.exists(pslice):
-                retval = os.system('/sbin/mount -t msdosfs %s %s %s' \
-                                   % (mountopts,pslice,pmount))
+                retval = os.system('/sbin/mount %s %s %s %s' \
+                                   % (mountopts,vfat_opts,pslice,pmount))
                 if not retval == 0:
                     umount()
                     raise RuntimeError("mount(%s,%s) failed: %d" \
@@ -251,16 +266,16 @@ if not onlyelab:
             pass
         elif device:
             if not device.find('/dev') == 0:
-                rdev = "%s%s%s" % ('/dev/',device,'s2')
+                rdev = "%s%s%s" % ('/dev/',device,plab_part)
             else:
-                rdev = "%s%s" % (device,'s2')
+                rdev = "%s%s" % (device,plab_part)
                 pass
             if devmap.has_key(rdev):
                 umount()
                 raise RuntimeError("Device %s already mounted!" % rdev)
             if os.path.exists(rdev):
-                retval = os.system('/sbin/mount -t msdosfs %s %s %s' \
-                                   % (mountopts,rdev,pmount))
+                retval = os.system('/sbin/mount %s %s %s %s' \
+                                   % (mountopts,vfat_opts,rdev,pmount))
                 if not retval == 0:
                     umount()
                     raise RuntimeError("mount(%s,%s) failed: %d" \
