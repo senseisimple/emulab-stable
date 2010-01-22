@@ -225,7 +225,7 @@ if ($mailconfigfile) {
         # don't print again
         #
         if ($@) {
-            warn "gitmail: Error in $mailconfigfile!\n";
+            warn "gitmail: Error in $mailconfigfile: $@\n";
         } else {
             @mailto = @mailconfig;
         }
