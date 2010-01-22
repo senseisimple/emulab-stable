@@ -592,7 +592,8 @@ sub commit_mail($$$@) {
     #
     if (!$separate_mail) {
         send_mail($subject,
-            $actionstring . join("-"x72 . "\n", map { join "",@$_} @fullbody),
+            $actionstring . join("\n" . "-"x72 . "\n\n",
+                                 map { join "",@$_} @fullbody),
             @mailaddrs);
     }
 }
