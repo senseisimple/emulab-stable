@@ -85,10 +85,10 @@ evproxyplab.o: evproxyplab.cc
 	$(CPPC) $(CFLAGS)  -c $<
 
 evproxyplab-debug:    evproxyplab.o ../lib/libevent.a ../lib/event.h
-	$(CPPC) $(LDFLAGS) -static -o $@ evproxyplab.o $(LIBS)
+	$(CPPC) $(LDFLAGS) -o $@ evproxyplab.o $(LIBS)
 
 eventping-debug: eventping.o
-	$(CC) $(LDFLAGS) -static -o $@ eventping.o -pthread $(LIBS)
+	$(CC) $(LDFLAGS) -o $@ eventping.o -pthread $(LIBS)
 
 $(PROGRAMS):	../lib/libevent.a ../lib/event.h
 
