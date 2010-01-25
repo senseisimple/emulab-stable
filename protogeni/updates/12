@@ -1,0 +1,20 @@
+#
+# Add a disabled flag to authority, for ClearingHouse.
+#
+use strict;
+use GeniDB;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    DBSetDefault($dbhandle);
+
+    if (!DBSlotExists("geni_authorities", "disabled")) {
+	DBQueryFatal("alter table geni_authorities ".
+		     "  add `disabled` tinyint(1) NOT NULL default '0' ".
+		     "  after `type`");
+    }
+    return 0;
+}
+1;

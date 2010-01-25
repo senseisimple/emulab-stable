@@ -37,6 +37,7 @@ CREATE TABLE `geni_authorities` (
   `created` datetime default NULL,
   `expires` datetime default NULL,
   `type` enum('sa','ma','ch','cm','ses') NOT NULL default 'sa',
+  `disabled` tinyint(1) NOT NULL default '0',
   `url` tinytext,
   `urn` tinytext,
   PRIMARY KEY  (`uuid`),
