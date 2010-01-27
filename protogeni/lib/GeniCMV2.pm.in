@@ -575,7 +575,7 @@ sub SliverAction($$$$)
         # find out the component manager URN.
         my $cm_urn = GeniHRN::Generate($OURDOMAIN, "authority", "cm");
 
-        if ((!defined($slice)) && ($credential->target_urn() =~ "authority")) {
+        if ((!defined($slice)) && ($credential->target_urn() =~ "+authority+cm")) {
                 # administrative credentials are presented.
                 if ($cm_urn != $credential->target_urn() {
                         return GeniResponse->Create(GENIRESPONSE_FORBIDDEN(), undef,
