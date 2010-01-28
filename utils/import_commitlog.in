@@ -32,7 +32,7 @@ my $debug    = 0;
 #
 # Only root can run this script.
 #
-if (0 && $UID) {
+if ($UID) {
     die("*** $0:\n".
 	"    Only root can run this script\n");
 }
