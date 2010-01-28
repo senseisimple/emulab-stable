@@ -190,6 +190,8 @@ sub send_mail($$@);
 sub short_refname($);
 sub debug(@);
 sub rev_string($$);
+sub object_exists($$);
+sub filter_out_objects_in_repo($@);
 
 ######################################################################
 # Main Body
@@ -771,4 +773,33 @@ sub rev_string($$) {
         # Shouldn't be able to get here
         return undef;
     }
+}
+
+#
+# Returns 1 if the given object (identified by hash) exists in the given
+# repository (identified by path); 0 if it does not .
+#
+sub object_exists($$) {
+    my ($obj, $repo) = @_;
+
+    #
+    # 'cat-file -e' is like 'test -e', and don't be fooled by the name, it
+    # works on non-files too
+    #
+    debug("running $GIT --git-dir='$repo' cat-file -e $obj");
+    my $rv = system "$GIT --git-dir='$repo' cat-file -e $obj";
+    if ($rv) {
+        return 0;
+    } else {
+        return 1;
+    }
+}
+
+#
+# Return a list of all objects from the input list that do *not* exist in
+# the given repo
+#
+sub filter_out_objects_in_repo($@) {
+    my $repo = shift @_;
+    return grep { !object_exists($_,$repo)} @_;
 }
