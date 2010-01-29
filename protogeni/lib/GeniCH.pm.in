@@ -802,6 +802,8 @@ sub ListComponents($)
 	my $manager = GeniAuthority->Lookup($manager_uuid);
 	return GeniResponse->Create(GENIRESPONSE_DBERROR)
 	    if (!defined($manager));
+	next
+	    if ($manager->disabled());
 	    
 	push(@results, { "gid" => $manager->cert(),
 			 "hrn" => $manager->hrn(),

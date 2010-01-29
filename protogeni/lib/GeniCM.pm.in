@@ -2763,14 +2763,13 @@ sub DeleteSlice($)
 				     "Insufficient privilege" );
 
     #
-    # See if we have a record of this slice in the DB. If not, then we have
-    # to go to the ClearingHouse to find its record, so that we can find out
-    # who the SA for it is.
+    # See if we have a record of this slice in the DB. Might have been
+    # expired out already.
     #
     my $slice = GeniSlice->Lookup($slice_uuid);
     if (!defined($slice)) {
-	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
-			    "No such slice on this component: $slice_uuid");
+	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
+				    "No slice by that name");
     }
     if ($slice->Lock() != 0) {
 	return GeniResponse->BusyResponse();

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -130,7 +130,7 @@ sub os_account_cleanup()
     my %PDB;
     my %GDB;
 
-    my $gretval = dbmopen(%PDB, $PASSDB, undef);
+    my $pretval = dbmopen(%PDB, $PASSDB, undef);
     my $gretval = dbmopen(%GDB, $GROUPDB, undef);
 
     if ($pretval) {

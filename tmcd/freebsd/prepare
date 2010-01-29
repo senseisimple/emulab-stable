@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -235,6 +235,15 @@ if (-f $SFSHOSTKEY) {
 }
 system("rm -f /var/sfs/sockets/*.sock");
 
+# Clean out /var/tmp
+print "Cleaning up /var/tmp ....\n";
+system("rm -rf /var/tmp/*");
+if (! -d "/var/tmp/vi.recover") {
+    print "Recreating /var/tmp/vi.recover ...\n";
+    system("mkdir /var/tmp/vi.recover");
+    system("chown root:wheel /var/tmp/vi.recover");
+    system("chmod 1777 /var/tmp/vi.recover");
+}
 
 print "Clearing out directories in $VARDIR ...\n";
 foreach my $dir (@VARDIRS) {

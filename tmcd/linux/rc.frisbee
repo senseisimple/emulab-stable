@@ -59,7 +59,7 @@ tweakmbr()
 
 	size=`echo -e 'u\np\nq' | fdisk $disk 2> /dev/null| \
 		sed -n "s#^${disk}1 *. *[0-9]* *[0-9]* *\([0-9]*\).*\\$#\1#p"`
-	size=`expr $size '*' 2`
+	[ -n "$size" ] && size=`expr $size '*' 2`
 
 	case ${size}s in
 		6281352s)
