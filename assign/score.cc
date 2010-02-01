@@ -336,48 +336,71 @@ float find_link_resolutions(resolution_vector &resolutions, pvertex pv,
         ++dest_switch_it) {
       if (*source_switch_it == *dest_switch_it) continue;
       tb_link_info info(tb_link_info::LINK_INTERSWITCH);
-      // DELAY_INFO_BANDWIDTH: we probably know interface bandwidth by now
-      if (find_interswitch_path(*source_switch_it,*dest_switch_it,vlink->delay_info.bandwidth,
-            info.plinks, info.switches) != 0) {
-        bool first_link, second_link;
-        /*
-         * Check to see if either, or both, pnodes are actually the
-         * switches we are looking for
-         */
-        if ((pv == *source_switch_it) || (pv ==
-              *dest_switch_it)) {
-          first_link = false;
-        } else {
-          first_link = true;
-        }
-        if ((dest_pv == *source_switch_it) ||
-            (dest_pv == *dest_switch_it)) {
-          second_link = false;
-        } else {
-          second_link = true;
-        }
 
-        if (first_link) {
-          // Check only whether the source interface is fixed - this is the
-          // first link in a multi-hop path
-          if (!find_best_link(pv,*source_switch_it,vlink,first,true,false)) {
-              // No link to this switch
-              SDEBUG(cerr << "    interswitch failed - no first link"
-                  << endl;)
-                continue;
-            }
-        }
+      /*
+       * Check to see if either, or both, pnodes are actually the
+       * switches we are looking for
+       */
+      bool first_link, second_link;
+      if ((pv == *source_switch_it) || (pv ==
+            *dest_switch_it)) {
+        first_link = false;
+      } else {
+        first_link = true;
+      }
+      if ((dest_pv == *source_switch_it) ||
+          (dest_pv == *dest_switch_it)) {
+        second_link = false;
+      } else {
+        second_link = true;
+      }
 
-        if (second_link) {
-          // Check only whether the dest interface is fixed - this is the
-          // last link in a multi-hop path
-          if (!find_best_link(dest_pv,*dest_switch_it,vlink,second,false,true)) {
-            // No link to tshis switch
-            SDEBUG(cerr << "    interswitch failed - no second link" <<                                          endl;)
+      // Get link objects
+      if (first_link) {
+        // Check only whether the source interface is fixed - this is the
+        // first link in a multi-hop path
+        if (!find_best_link(pv,*source_switch_it,vlink,first,true,false)) {
+            // No link to this switch
+            SDEBUG(cerr << "    interswitch failed - no first link"
+                << endl;)
               continue;
           }
-        }
+      }
 
+      if (second_link) {
+        // Check only whether the dest interface is fixed - this is the
+        // last link in a multi-hop path
+        if (!find_best_link(dest_pv,*dest_switch_it,vlink,second,false,true)) {
+          // No link to tshis switch
+          SDEBUG(cerr << "    interswitch failed - no second link" <<                                          endl;)
+            continue;
+        }
+      }
+
+      // XXX: Can we hit this point with first or second not set?
+
+      // DELAY_INFO_BANDWIDTH: we probably know interface bandwidth by now
+      // For regular links, we just grab the vlink's bandwidth; for links
+      // where we're matching the link speed to the 'native' one for the
+      // interface, we have to look up interface speeds on both ends.
+      int bandwidth;
+      if (vlink->delay_info.adjust_to_native_bandwidth) {
+          // Grab the actual plink objects for both pedges
+          tb_plink *first_plink = get(pedge_pmap,first);
+          tb_plink *second_plink = get(pedge_pmap,second);
+          // We need the minimum bandwidth of both endpoints
+          bandwidth = min(first_plink->delay_info.bandwidth,
+                  second_plink->delay_info.bandwidth);
+          // XXX
+          cerr << "Using bandwidth " << bandwidth << endl;
+      } else {
+          bandwidth = vlink->delay_info.bandwidth;
+      }
+
+      // Find a path on the switch fabric between these two switches
+      if (find_interswitch_path(*source_switch_it,*dest_switch_it,bandwidth,
+            info.plinks, info.switches) != 0) {
+        // Okay, we found a real resolution!
         if (flipped) { // Order these need to go in depends on flipped bit
           if (second_link) {
             info.plinks.push_front(second);
@@ -1033,6 +1056,20 @@ void score_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode, tb_vnod
   tb_pnode *the_switch;
   
   // DELAY_INFO_BANDWIDTH: Probably set the vlink speed here
+
+  // If this link is to be adjusted to the native speed of the interface, go
+  // ahead and do that now - we use the minimum of the two endpoint interfaces
+  // Note! Not currently supported on trivial links! (it's illegal for
+  // adjust_to_native_bandwidth and trivial_ok to both be true)
+  if (vlink->delay_info.adjust_to_native_bandwidth &&
+      vlink->link_info.type_used != tb_link_info::LINK_TRIVIAL) {
+    tb_plink *front_plink = get(pedge_pmap, vlink->link_info.plinks.front());
+    tb_plink *back_plink = get(pedge_pmap, vlink->link_info.plinks.back());
+    vlink->delay_info.bandwidth =
+      min(front_plink->delay_info.bandwidth, back_plink->delay_info.bandwidth);
+      // XXX
+      cerr << "Picked bandwidth " << vlink->delay_info.bandwidth << endl;
+  }
   
   switch (vlink->link_info.type_used) {
   case tb_link_info::LINK_DIRECT:
