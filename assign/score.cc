@@ -1502,11 +1502,15 @@ bool find_best_link(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
 	}
       } else {
 	// For non-emulated links, we're just looking for links with few (0,
-	// actually) users, and enough bandwidth
+	// actually) users, and enough bandwidth (if we're adjusting the bw
+        // on the vlink to match what's on the interfaces selected, we don't
+        // even need to check bandwidth)
         // DELAY_INFO_BANDWIDTH: Modify this check to skip looking at the
         // bandwidth
 	if ((users < best_users) &&
-		(plink->delay_info.bandwidth >= vlink->delay_info.bandwidth)) {
+                (vlink->delay_info.adjust_to_native_bandwidth ||
+		 (plink->delay_info.bandwidth >= vlink->delay_info.bandwidth)
+                 )) {
 	  best_pedge = *pedge_it;
 	  best_distance = distance;
 	  found_best = true;
