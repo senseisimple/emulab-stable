@@ -147,6 +147,13 @@ my $separate_mail = get_config("separatemail",undef);
 #
 my $showcommit_extra = get_config("showcommitextra",undef);
 
+#
+# If set, check all commit objects to see if they exist in the repository
+# at the specified path.  If a commit object exists in this repository,
+# do not include its log in the email message.
+#
+my $exclude_repo = get_config("excluderepo",undef);
+
 ######################################################################
 # Constants
 ######################################################################
@@ -181,10 +188,11 @@ sub change_type($$);
 sub rev_type($);
 sub revparse($);
 sub changed_files($$);
+sub changed_files_single_revision($);
 sub get_mail_addresses($@);
 sub uniq(@);
 sub flatten_arrayref($);
-sub commit_mail($$$@);
+sub commit_mail($\@$@);
 sub get_commits($$$);
 sub send_mail($$@);
 sub short_refname($);
@@ -308,9 +316,20 @@ foreach my $refline (@reflines) {
     }
 
     #
-    # Get a list of all of the files that changed
+    # Get all commits between these two revisions
+    # and all files that changed
     #
-    my @changed_files = changed_files($oldrev,$newrev);
+    my @commits = get_commits($oldrev,$newrev,$refname);
+    debug("commits are: ", join(" ",@commits));
+
+    my @changed_files;
+    if (defined $exclude_repo) {
+	@commits = filter_out_objects_in_repo($exclude_repo, @commits);
+	next unless (@commits);
+        @changed_files = map { changed_files_single_revision($_) } @commits;
+    } else {
+    	@changed_files = changed_files($oldrev,$newrev);
+    }
     debug("Changed files: ", join(",",@changed_files));
 
     #
@@ -324,7 +343,7 @@ foreach my $refline (@reflines) {
     #
     if (@mailaddrs) {
         print "Sending email notification to ", join(",",@mailaddrs), "\n";
-        commit_mail($oldrev,$newrev,$refname,@mailaddrs);
+        commit_mail($ct,@commits,$refname,@mailaddrs);
     }
 }
 
@@ -381,7 +400,7 @@ sub revparse($) {
 }
 
 #
-# Given two revisions, return an list of the files that were changed between
+# Given two revisions, return a list of the files that were changed between
 # them
 #
 sub changed_files($$) {
@@ -390,6 +409,19 @@ sub changed_files($$) {
     my $revstring = rev_string($oldrev,$newrev);
     debug("running '$GIT diff-tree -r --name-only '$revstring''");
     my @lines = `$GIT diff-tree -r --name-only '$revstring' $STDERRNULL`;
+    chomp @lines;
+    return @lines;
+}
+
+#
+# Given one revision, return a list of the files that were changed between
+# it and its parents
+#
+sub changed_files_single_revision($) {
+    my ($rev) = @_;
+
+    debug("running '$GIT diff-tree -r --name-only '$rev''");
+    my @lines = `$GIT diff-tree -r --name-only '$rev' $STDERRNULL`;
     chomp @lines;
     return @lines;
 }
@@ -531,20 +563,8 @@ sub flatten_arrayref($) {
 #
 # Send mail about a regular update commit
 #
-sub commit_mail($$$@) {
-    my ($oldrev,$newrev,$refname,@mailaddrs) = @_;
-
-    #
-    # What type of chage was this?
-    #
-    my $ct = change_type($oldrev,$newrev);
-
-    #
-    # Get all commits between these two revisions
-    #
-    my @revs = get_commits($oldrev,$newrev,$refname);
-
-    debug("commits are: ", join(" ",@revs));
+sub commit_mail($\@$@) {
+    my ($ct,$commits,$refname,@mailaddrs) = @_;
 
     #
     # Construct the subject line. For now, we just say what repo (if defined)
@@ -568,7 +588,7 @@ sub commit_mail($$$@) {
                        " has been ${ct}d\n\n";
 
     my @fullbody;
-    foreach my $rev (@revs) {
+    foreach my $rev (@$commits) {
         #
         # Just use regular git show command, with purty +/- summary at the
         # bottom (formatted to be narrow enough for email)
@@ -731,7 +751,7 @@ sub debug(@) {
 #
 sub get_config($$) {
     my ($var,$default) = @_;
-    
+
     #
     # Allow the user to override on command line
     #
