@@ -151,6 +151,9 @@ my $showcommit_extra = get_config("showcommitextra",undef);
 # If set, check all commit objects to see if they exist in the repository
 # at the specified path.  If a commit object exists in this repository,
 # do not include its log in the email message.
+# Note: This should point at the .git directory - for a 'bare' repository,
+# this is just the path the repository. For a 'reglar' repository, this is the
+# .git/ directory *inside* the repositry.
 #
 my $exclude_repo = get_config("excluderepo",undef);
 
