@@ -178,6 +178,7 @@ my $EMPTYREV = "0"x40;
 my $CT_CREATE = "create";
 my $CT_UPDATE = "update";
 my $CT_DELETE = "delete";
+my $CT_FORCED_UPDATE = "force-update";
 
 #
 # Tired of typing this and getting it wrong
@@ -193,6 +194,7 @@ sub revparse($);
 sub changed_files($$);
 sub changed_files_single_revision($);
 sub get_mail_addresses($@);
+sub get_merge_base($$);
 sub uniq(@);
 sub flatten_arrayref($);
 sub commit_mail($\@$@);
@@ -326,9 +328,11 @@ foreach my $refline (@reflines) {
     debug("commits are: ", join(" ",@commits));
 
     my @changed_files;
-    if (defined $exclude_repo) {
-	@commits = filter_out_objects_in_repo($exclude_repo, @commits);
-	next unless (@commits);
+    if (defined $exclude_repo || $ct eq $CT_FORCED_UPDATE) {
+	if (defined $exclude_repo) {
+	    @commits = filter_out_objects_in_repo($exclude_repo, @commits);
+	    next unless (@commits);
+        }
         @changed_files = map { changed_files_single_revision($_) } @commits;
     } else {
     	@changed_files = changed_files($oldrev,$newrev);
@@ -372,7 +376,13 @@ sub change_type($$) {
     } elsif ($newrev eq $EMPTYREV) {
         return $CT_DELETE;
     } else {
-        return $CT_UPDATE;
+        my $merge_base = get_merge_base($oldrev,$newrev);
+	my $oldrev = revparse($oldrev);
+	if ($merge_base eq $oldrev) {
+            return $CT_UPDATE;
+	} else {
+            return $CT_FORCED_UPDATE;
+	}
     }
 }
 
@@ -581,6 +591,8 @@ sub commit_mail($\@$@) {
 
     if ($ct eq $CT_UPDATE) {
         $subject .= " updated";
+    } elsif ($ct eq $CT_FORCED_UPDATE) {
+        $subject .= " force-updated";
     } elsif ($ct eq $CT_CREATE) {
         $subject .= " created";
     } elsif ($ct eq $CT_DELETE) {
@@ -589,6 +601,10 @@ sub commit_mail($\@$@) {
 
     my $actionstring = "Branch " . short_refname($refname) .
                        " has been ${ct}d\n\n";
+
+    if ($ct eq $CT_FORCED_UPDATE) {
+        $actionstring .= "New and/or modified commits shown below\n\n";
+    }
 
     my @fullbody;
     foreach my $rev (@$commits) {
@@ -634,14 +650,23 @@ sub get_commits($$$) {
 
     #
     # If this is an update, we can just ask git for the revisions between the
-    # two revisions we were given
+    # two revisions we were given.  We call git-cherry for this information
+    # so that we can identify if a particular commit already exists in the
+    # repository with a different commit hash (for the rebase case).
     #
-    if ($ct eq $CT_UPDATE) {
-        my $revstring = rev_string($oldrev,$newrev);
-
-        debug("running '$GIT rev-list --reverse --date-order '$revstring'");
-        my @revs = `$GIT rev-list --reverse --date-order '$revstring'`;
-        chomp @revs;
+    if ($ct eq $CT_UPDATE || $ct eq $CT_FORCED_UPDATE) {
+        debug("running '$GIT cherry '$oldrev' '$newrev'");
+	# Only return revs prefixed with a '+' since commits prefixed with a
+	# '-' are already in the repository with a different commit hash.  We
+	# should have seen those already, so we don't want to see them here.
+	# Note that '+' commits may not be "new" per-se, but they are not the
+	# same as the existing commit with the same commit message due to
+	# rebasing.
+	my @revs;
+	for (`$GIT cherry '$oldrev' '$newrev'`) {
+		chomp;
+		unshift @revs, $1 if (/^\+\s+(.*)$/);
+	}
         return @revs;
 
     } elsif ($ct eq $CT_CREATE) {
@@ -796,6 +821,19 @@ sub rev_string($$) {
         # Shouldn't be able to get here
         return undef;
     }
+}
+
+#
+# Returns the merge base (i.e., common ancestor) of
+# the two supplied revisions.
+#
+sub get_merge_base($$)
+{
+	my ($rev_a, $rev_b) = @_;
+	my $mb = `git merge-base '$rev_a' '$rev_b'`;
+	chomp $mb;
+
+	return $mb
 }
 
 #
