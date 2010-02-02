@@ -244,7 +244,7 @@ int parse_top(tb_vgraph &vg, istream& input)
 
         // Special flag: treat a bandwidth of '*' specially
         if (!strcmp(bw.c_str(),"*")) {
-            l->delay_info.bandwidth = 0;
+            l->delay_info.bandwidth = -2; // Special flag
             l->delay_info.adjust_to_native_bandwidth = true;
         } else {
             if (sscanf(bw.c_str(),"%d",&(l->delay_info.bandwidth)) != 1) {
@@ -299,16 +299,9 @@ int parse_top(tb_vgraph &vg, istream& input)
 	  }
 	}
 
-        // Some sanity checks: this combination is illegal for now
-        if (l->delay_info.adjust_to_native_bandwidth && (l->allow_trivial ||
-                    l->emulated)) {
-            top_error("Auto-assigning bandwidth on trivial or emulated links"
-                      " not allowed!");
-        }
-	
-#ifdef PER_VNODE_TT
 	tb_vnode *vnode1 = get(vvertex_pmap,node1);
 	tb_vnode *vnode2 = get(vvertex_pmap,node2);
+#ifdef PER_VNODE_TT
 	if (l->emulated) {
 	    if (!l->allow_trivial) {
 		vnode1->total_bandwidth += l->delay_info.bandwidth;
@@ -321,6 +314,21 @@ int parse_top(tb_vgraph &vg, istream& input)
 	    vnode2->link_counts[link_type]++;
 	}
 #endif
+        
+        // Some sanity checks: this combination is illegal for now
+        if (l->delay_info.adjust_to_native_bandwidth && (l->allow_trivial ||
+                    l->emulated)) {
+            top_error("Auto-assigning bandwidth on trivial or emulated links"
+                      " not allowed!");
+        }
+        // Some sanity checks: this is also illegal, but would be easier to fix
+        // Also: nasty harcoding of "switch"
+        if (l->delay_info.adjust_to_native_bandwidth &&
+                (vnode1->type == "switch" || vnode2->type == "switch")) {
+            top_error("Auto-assigning bandwidth on links to switches"
+                      " not allowed!");
+        }
+	
       }
     } else if (command == string("make-vclass")) {
       if (parsed_line.size() < 4) {

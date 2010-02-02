@@ -377,23 +377,24 @@ float find_link_resolutions(resolution_vector &resolutions, pvertex pv,
         }
       }
 
-      // XXX: Can we hit this point with first or second not set?
-
-      // DELAY_INFO_BANDWIDTH: we probably know interface bandwidth by now
       // For regular links, we just grab the vlink's bandwidth; for links
       // where we're matching the link speed to the 'native' one for the
       // interface, we have to look up interface speeds on both ends.
       int bandwidth;
       if (vlink->delay_info.adjust_to_native_bandwidth) {
+          // Note: It shouldn't be possible to get here without first or second
+          // being set - the parser disallows links to switches from using
+          // auto-adjusting bandwidths.
+
           // Grab the actual plink objects for both pedges
           tb_plink *first_plink = get(pedge_pmap,first);
           tb_plink *second_plink = get(pedge_pmap,second);
-          // We need the minimum bandwidth of both endpoints
+          
+          // We use the minimum bandwidth of both endpoints
           bandwidth = min(first_plink->delay_info.bandwidth,
                   second_plink->delay_info.bandwidth);
-          // XXX
-          cerr << "Using bandwidth " << bandwidth << endl;
       } else {
+          // If not auto-adjusting, just use the specified bandwidth
           bandwidth = vlink->delay_info.bandwidth;
       }
 
@@ -515,8 +516,8 @@ void resolve_link(vvertex vv, pvertex pv, tb_vnode *vnode, tb_pnode *pnode,
          * doesn't usually get called for trivial links, and
          * letting them fall through into the 'normal' link code
          * below is disatrous!
-         * DELAY_INFO_BANDWIDTH: Can't get to this point, as we don't
-         * allow auto-picking link speed on trivial links
+         * Note: We can't get here when doing adjust_to_native_bandwidth,
+         * since it's illegal to allow trivial links when it's in use.
          */
         score_link_info(edge,pnode,dest_pnode,vnode,dest_vnode);
       } else {
@@ -699,8 +700,6 @@ void unscore_link_info(vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode, tb_vnod
   if (vlink->link_info.type_used == tb_link_info::LINK_DIRECT) {
     // DIRECT LINK
     SDEBUG(cerr << "   direct link" << endl);
-    // DELAY_INFO_BANDWIDTH: Have to make sure the bandwidth is not modified
-    // between the add() and this point
     src_pnode->nontrivial_bw_used -= vlink->delay_info.bandwidth;
     dst_pnode->nontrivial_bw_used -= vlink->delay_info.bandwidth;
 
@@ -710,7 +709,6 @@ void unscore_link_info(vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode, tb_vnod
   } else if (vlink->link_info.type_used == tb_link_info::LINK_INTERSWITCH) {
     // INTERSWITCH LINK
     SDEBUG(cerr << "  interswitch link" << endl);
-    // DELAY_INFO_BANDWIDTH: Same as above
     src_pnode->nontrivial_bw_used -= vlink->delay_info.bandwidth;
     dst_pnode->nontrivial_bw_used -= vlink->delay_info.bandwidth;
     
@@ -742,14 +740,12 @@ void unscore_link_info(vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode, tb_vnod
 	SSUB(SCORE_SWITCH);
       }
       // We count the bandwidth into and out of the switch
-      // DELAY_INFO_BANDWIDTH: Same as above
       the_switch->nontrivial_bw_used -= vlink->delay_info.bandwidth * 2;
     }
     vlink->link_info.switches.clear();
   } else if (vlink->link_info.type_used == tb_link_info::LINK_INTRASWITCH) {
     // INTRASWITCH LINK
     SDEBUG(cerr << "   intraswitch link" << endl);
-    // DELAY_INFO_BANDWIDTH: Same as above
     src_pnode->nontrivial_bw_used -= vlink->delay_info.bandwidth;
     dst_pnode->nontrivial_bw_used -= vlink->delay_info.bandwidth;
 
@@ -761,7 +757,6 @@ void unscore_link_info(vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode, tb_vnod
     tb_pnode *the_switch = get(pvertex_pmap,
 			       vlink->link_info.switches.front());
     // We count the bandwidth into and out of the switch
-    // DELAY_INFO_BANDWIDTH: Same as above
     the_switch->nontrivial_bw_used -= vlink->delay_info.bandwidth * 2;
     if (--the_switch->switch_used_links == 0) {
       SDEBUG(cerr << "  releasing switch" << endl);
@@ -787,7 +782,6 @@ void unscore_link_info(vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode, tb_vnod
 	}
         SDEBUG(cerr << "  old trivial bandwidth over by " << old_over_bw << endl);
 
-        // DELAY_INFO_BANDWIDTH: Same as above
 	src_pnode->trivial_bw_used -= vlink->delay_info.bandwidth;
 
 	int new_over_bw;
@@ -817,7 +811,11 @@ void unscore_link_info(vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode, tb_vnod
   }
 #endif
 
-  // DELAY_INFO_BANDWIDTH: Probably re-set vlink bandwidh here
+  // If auto-adjusting the vlink bandwidth, we set it to a sentinel value
+  // so that we can detect any problems next time we do a score_link_info()
+  if (vlink->delay_info.adjust_to_native_bandwidth) {
+      vlink->delay_info.bandwidth = -2;
+  }
 
 }
 
@@ -1055,33 +1053,30 @@ void score_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode, tb_vnod
   tb_vlink *vlink = get(vedge_pmap,ve);
   tb_pnode *the_switch;
   
-  // DELAY_INFO_BANDWIDTH: Probably set the vlink speed here
-
   // If this link is to be adjusted to the native speed of the interface, go
   // ahead and do that now - we use the minimum of the two endpoint interfaces
   // Note! Not currently supported on trivial links! (it's illegal for
   // adjust_to_native_bandwidth and trivial_ok to both be true)
   if (vlink->delay_info.adjust_to_native_bandwidth &&
       vlink->link_info.type_used != tb_link_info::LINK_TRIVIAL) {
+    // Check for special sentinel value to make sure we remembered to re-set
+    // the value before
+    assert(vlink->delay_info.bandwidth == -2);
     tb_plink *front_plink = get(pedge_pmap, vlink->link_info.plinks.front());
     tb_plink *back_plink = get(pedge_pmap, vlink->link_info.plinks.back());
     vlink->delay_info.bandwidth =
       min(front_plink->delay_info.bandwidth, back_plink->delay_info.bandwidth);
-      // XXX
-      cerr << "Picked bandwidth " << vlink->delay_info.bandwidth << endl;
   }
   
   switch (vlink->link_info.type_used) {
   case tb_link_info::LINK_DIRECT:
     SADD(SCORE_DIRECT_LINK);
-    // DELAY_INFO_BANDWIDTH: Modify the bandwidth *before* ths point
     src_pnode->nontrivial_bw_used += vlink->delay_info.bandwidth;
     dst_pnode->nontrivial_bw_used += vlink->delay_info.bandwidth;
     score_link(vlink->link_info.plinks.front(),ve,src_pnode,dst_pnode);
     break;
   case tb_link_info::LINK_INTRASWITCH:
     SADD(SCORE_INTRASWITCH_LINK);
-    // DELAY_INFO_BANDWIDTH: Same as above
     src_pnode->nontrivial_bw_used += vlink->delay_info.bandwidth;
     dst_pnode->nontrivial_bw_used += vlink->delay_info.bandwidth;
     score_link(vlink->link_info.plinks.front(),ve,src_pnode,dst_pnode);
@@ -1093,11 +1088,9 @@ void score_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode, tb_vnod
       SADD(SCORE_SWITCH);
     }
     // We count the bandwidth into and out of the switch
-    // DELAY_INFO_BANDWIDTH: Same as above
     the_switch->nontrivial_bw_used += vlink->delay_info.bandwidth * 2;
     break;
   case tb_link_info::LINK_INTERSWITCH:
-    // DELAY_INFO_BANDWIDTH: Same as above
     src_pnode->nontrivial_bw_used += vlink->delay_info.bandwidth;
     dst_pnode->nontrivial_bw_used += vlink->delay_info.bandwidth;
 #ifndef INTERSWITCH_LENGTH
@@ -1126,7 +1119,6 @@ void score_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode, tb_vnod
 	SADD(SCORE_SWITCH);
       }
       // We count the bandwidth into and out of the switch
-      // DELAY_INFO_BANDWIDTH: Same as above
       the_switch->nontrivial_bw_used += vlink->delay_info.bandwidth * 2;
     }
     break;
@@ -1146,7 +1138,6 @@ void score_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode, tb_vnod
       }
       SDEBUG(cerr << "  old trivial bandwidth over by " << old_over_bw << endl);
 
-      // DELAY_INFO_BANDWIDTH: Same as above
       dst_pnode->trivial_bw_used += vlink->delay_info.bandwidth;
 
       int new_over_bw;
@@ -1530,8 +1521,6 @@ bool find_best_link(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
 	if (plink->nonemulated > 0) {
 	    continue;
 	}
-        // DELAY_INFO_BANDWIDTH: Can't get here for now; we don't allow
-        // emulated links when matching bandwidth
 	if (available_bandwidth >= vlink->delay_info.bandwidth) {
 	  best_pedge = *pedge_it;
 	  found_best = true;
@@ -1542,8 +1531,6 @@ bool find_best_link(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
 	// actually) users, and enough bandwidth (if we're adjusting the bw
         // on the vlink to match what's on the interfaces selected, we don't
         // even need to check bandwidth)
-        // DELAY_INFO_BANDWIDTH: Modify this check to skip looking at the
-        // bandwidth
 	if ((users < best_users) &&
                 (vlink->delay_info.adjust_to_native_bandwidth ||
 		 (plink->delay_info.bandwidth >= vlink->delay_info.bandwidth)
@@ -1695,7 +1682,6 @@ void score_link(pedge pe,vedge ve,tb_pnode *src_pnode, tb_pnode *dst_pnode)
       old_over_bw = 0;
     }
 
-    // DELAY_INFO_BANDWIDTH: We should have modifed the bandwidth by this point
     plink->bw_used += vlink->delay_info.bandwidth;
 
     int new_over_bw;
@@ -1719,8 +1705,6 @@ void score_link(pedge pe,vedge ve,tb_pnode *src_pnode, tb_pnode *dst_pnode)
     }
 
 #ifdef PENALIZE_BANDWIDTH
-    // DELAY_INFO_BANDWIDTH: We should have modified the bandwidth by this
-    // point
     SADD(plink->penalty * (vlink->delay_info.bandwidth * 1.0) / (plink->delay_info.bandwidth));
 #endif
 
@@ -1835,21 +1819,18 @@ void unscore_link(pedge pe,vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode)
   // bandwidth check
   if (plink->is_type != tb_plink::PLINK_LAN) {
 #ifdef PENALIZE_BANDWIDTH
-    // DELAY_INFO_BANDWIDTH: Should have modified bandwidth by this point
     SSUB(plink->penalty * (vlink->delay_info.bandwidth * 1.0) / (plink->delay_info.bandwidth));
 #endif
 
     // Handle being over bandwidth
     int old_over_bw;
     int old_bw = plink->bw_used;
-    // DELAY_INFO_BANDWIDTH: Should have modified bandwidth by this point
     if (plink->bw_used > plink->delay_info.bandwidth) {
       old_over_bw = plink->bw_used - plink->delay_info.bandwidth;
     } else {
       old_over_bw = 0;
     }
 
-    // DELAY_INFO_BANDWIDTH: Should have modified bandwidth by this point
     plink->bw_used -= vlink->delay_info.bandwidth;
 
     int new_over_bw;
