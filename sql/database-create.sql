@@ -3133,6 +3133,7 @@ CREATE TABLE `sitevariables` (
   `value` text,
   `defaultvalue` text NOT NULL,
   `description` text,
+  `ns_include` tinyint(0) NOT NULL default 0,
   PRIMARY KEY  (`name`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 

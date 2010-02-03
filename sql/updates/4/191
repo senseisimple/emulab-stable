@@ -1,0 +1,15 @@
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    #
+    # Add a new column to the sitevariables table
+    #
+    DBQueryFatal("alter table sitevariables add column ns_include " .
+                 "tinyint(0) NOT NULL default 0");
+    return 0;
+}
+1;
