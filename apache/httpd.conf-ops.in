@@ -445,6 +445,17 @@ DocumentRoot "/usr/local/www/data"
 </IfModule>
 
 #
+# Per-proj/exp visualizations
+#
+AliasMatch ^/proj-vis/([a-zA-Z0-9-]+)/(.*) /q/proj/$1/public_html/proj-vis/$2
+AliasMatch ^/exp-vis/([a-zA-Z0-9-]+)/([a-zA-Z0-9-]+)/(.*) /q/proj/$1/public_html/exp-vis/$2/$3
+
+<Directory "/q/proj/*/public_html/">
+    Order allow,deny
+    Allow from all
+</Directory>
+
+#
 # Twiki-related entries
 #
 <Directory "/usr/local/www/data/twiki/bin">
