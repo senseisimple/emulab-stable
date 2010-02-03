@@ -1011,6 +1011,10 @@ sub GetTicketAuxAux($$$$$$$$)
 		next;
 	    }
 	    if (!exists($ifacemap{$node_nickname})) {
+		# Might be the other side. Skip for now; might bite later.
+		next
+		    if (!exists($namemap{$node_nickname}));
+
 		$response =
 		    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				 "$lanname: No such virtual_node_id: ".
