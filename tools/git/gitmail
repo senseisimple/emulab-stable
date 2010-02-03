@@ -147,6 +147,16 @@ my $separate_mail = get_config("separatemail",undef);
 #
 my $showcommit_extra = get_config("showcommitextra",undef);
 
+#
+# If set, check all commit objects to see if they exist in the repository
+# at the specified path.  If a commit object exists in this repository,
+# do not include its log in the email message.
+# Note: This should point at the .git directory - for a 'bare' repository,
+# this is just the path the repository. For a 'reglar' repository, this is the
+# .git/ directory *inside* the repositry.
+#
+my $exclude_repo = get_config("excluderepo",undef);
+
 ######################################################################
 # Constants
 ######################################################################
@@ -168,6 +178,7 @@ my $EMPTYREV = "0"x40;
 my $CT_CREATE = "create";
 my $CT_UPDATE = "update";
 my $CT_DELETE = "delete";
+my $CT_FORCED_UPDATE = "force-update";
 
 #
 # Tired of typing this and getting it wrong
@@ -181,15 +192,19 @@ sub change_type($$);
 sub rev_type($);
 sub revparse($);
 sub changed_files($$);
+sub changed_files_single_revision($);
 sub get_mail_addresses($@);
+sub get_merge_base($$);
 sub uniq(@);
 sub flatten_arrayref($);
-sub commit_mail($$$@);
+sub commit_mail($\@$@);
 sub get_commits($$$);
 sub send_mail($$@);
 sub short_refname($);
 sub debug(@);
 sub rev_string($$);
+sub object_exists($$);
+sub filter_out_objects_in_repo($@);
 
 ######################################################################
 # Main Body
@@ -306,9 +321,22 @@ foreach my $refline (@reflines) {
     }
 
     #
-    # Get a list of all of the files that changed
+    # Get all commits between these two revisions
+    # and all files that changed
     #
-    my @changed_files = changed_files($oldrev,$newrev);
+    my @commits = get_commits($oldrev,$newrev,$refname);
+    debug("commits are: ", join(" ",@commits));
+
+    my @changed_files;
+    if (defined $exclude_repo || $ct eq $CT_FORCED_UPDATE) {
+	if (defined $exclude_repo) {
+	    @commits = filter_out_objects_in_repo($exclude_repo, @commits);
+	    next unless (@commits);
+        }
+        @changed_files = map { changed_files_single_revision($_) } @commits;
+    } else {
+    	@changed_files = changed_files($oldrev,$newrev);
+    }
     debug("Changed files: ", join(",",@changed_files));
 
     #
@@ -322,7 +350,7 @@ foreach my $refline (@reflines) {
     #
     if (@mailaddrs) {
         print "Sending email notification to ", join(",",@mailaddrs), "\n";
-        commit_mail($oldrev,$newrev,$refname,@mailaddrs);
+        commit_mail($ct,@commits,$refname,@mailaddrs);
     }
 }
 
@@ -348,7 +376,13 @@ sub change_type($$) {
     } elsif ($newrev eq $EMPTYREV) {
         return $CT_DELETE;
     } else {
-        return $CT_UPDATE;
+        my $merge_base = get_merge_base($oldrev,$newrev);
+	my $oldrev = revparse($oldrev);
+	if ($merge_base eq $oldrev) {
+            return $CT_UPDATE;
+	} else {
+            return $CT_FORCED_UPDATE;
+	}
     }
 }
 
@@ -379,7 +413,7 @@ sub revparse($) {
 }
 
 #
-# Given two revisions, return an list of the files that were changed between
+# Given two revisions, return a list of the files that were changed between
 # them
 #
 sub changed_files($$) {
@@ -388,6 +422,19 @@ sub changed_files($$) {
     my $revstring = rev_string($oldrev,$newrev);
     debug("running '$GIT diff-tree -r --name-only '$revstring''");
     my @lines = `$GIT diff-tree -r --name-only '$revstring' $STDERRNULL`;
+    chomp @lines;
+    return @lines;
+}
+
+#
+# Given one revision, return a list of the files that were changed between
+# it and its parents
+#
+sub changed_files_single_revision($) {
+    my ($rev) = @_;
+
+    debug("running '$GIT diff-tree -r --name-only '$rev''");
+    my @lines = `$GIT diff-tree -r --name-only '$rev' $STDERRNULL`;
     chomp @lines;
     return @lines;
 }
@@ -529,20 +576,8 @@ sub flatten_arrayref($) {
 #
 # Send mail about a regular update commit
 #
-sub commit_mail($$$@) {
-    my ($oldrev,$newrev,$refname,@mailaddrs) = @_;
-
-    #
-    # What type of chage was this?
-    #
-    my $ct = change_type($oldrev,$newrev);
-
-    #
-    # Get all commits between these two revisions
-    #
-    my @revs = get_commits($oldrev,$newrev,$refname);
-
-    debug("commits are: ", join(" ",@revs));
+sub commit_mail($\@$@) {
+    my ($ct,$commits,$refname,@mailaddrs) = @_;
 
     #
     # Construct the subject line. For now, we just say what repo (if defined)
@@ -556,6 +591,8 @@ sub commit_mail($$$@) {
 
     if ($ct eq $CT_UPDATE) {
         $subject .= " updated";
+    } elsif ($ct eq $CT_FORCED_UPDATE) {
+        $subject .= " force-updated";
     } elsif ($ct eq $CT_CREATE) {
         $subject .= " created";
     } elsif ($ct eq $CT_DELETE) {
@@ -565,8 +602,12 @@ sub commit_mail($$$@) {
     my $actionstring = "Branch " . short_refname($refname) .
                        " has been ${ct}d\n\n";
 
+    if ($ct eq $CT_FORCED_UPDATE) {
+        $actionstring .= "New and/or modified commits shown below\n\n";
+    }
+
     my @fullbody;
-    foreach my $rev (@revs) {
+    foreach my $rev (@$commits) {
         #
         # Just use regular git show command, with purty +/- summary at the
         # bottom (formatted to be narrow enough for email)
@@ -609,14 +650,23 @@ sub get_commits($$$) {
 
     #
     # If this is an update, we can just ask git for the revisions between the
-    # two revisions we were given
+    # two revisions we were given.  We call git-cherry for this information
+    # so that we can identify if a particular commit already exists in the
+    # repository with a different commit hash (for the rebase case).
     #
-    if ($ct eq $CT_UPDATE) {
-        my $revstring = rev_string($oldrev,$newrev);
-
-        debug("running '$GIT rev-list --reverse --date-order '$revstring'");
-        my @revs = `$GIT rev-list --reverse --date-order '$revstring'`;
-        chomp @revs;
+    if ($ct eq $CT_UPDATE || $ct eq $CT_FORCED_UPDATE) {
+        debug("running '$GIT cherry '$oldrev' '$newrev'");
+	# Only return revs prefixed with a '+' since commits prefixed with a
+	# '-' are already in the repository with a different commit hash.  We
+	# should have seen those already, so we don't want to see them here.
+	# Note that '+' commits may not be "new" per-se, but they are not the
+	# same as the existing commit with the same commit message due to
+	# rebasing.
+	my @revs;
+	for (`$GIT cherry '$oldrev' '$newrev'`) {
+		chomp;
+		unshift @revs, $1 if (/^\+\s+(.*)$/);
+	}
         return @revs;
 
     } elsif ($ct eq $CT_CREATE) {
@@ -729,7 +779,7 @@ sub debug(@) {
 #
 sub get_config($$) {
     my ($var,$default) = @_;
-    
+
     #
     # Allow the user to override on command line
     #
@@ -771,4 +821,46 @@ sub rev_string($$) {
         # Shouldn't be able to get here
         return undef;
     }
+}
+
+#
+# Returns the merge base (i.e., common ancestor) of
+# the two supplied revisions.
+#
+sub get_merge_base($$)
+{
+	my ($rev_a, $rev_b) = @_;
+	my $mb = `git merge-base '$rev_a' '$rev_b'`;
+	chomp $mb;
+
+	return $mb
+}
+
+#
+# Returns 1 if the given object (identified by hash) exists in the given
+# repository (identified by path); 0 if it does not .
+#
+sub object_exists($$) {
+    my ($obj, $repo) = @_;
+
+    #
+    # 'cat-file -e' is like 'test -e', and don't be fooled by the name, it
+    # works on non-files too
+    #
+    debug("running $GIT --git-dir='$repo' cat-file -e $obj");
+    my $rv = system "$GIT --git-dir='$repo' cat-file -e $obj";
+    if ($rv) {
+        return 0;
+    } else {
+        return 1;
+    }
+}
+
+#
+# Return a list of all objects from the input list that do *not* exist in
+# the given repo
+#
+sub filter_out_objects_in_repo($@) {
+    my $repo = shift @_;
+    return grep { !object_exists($_,$repo)} @_;
 }
