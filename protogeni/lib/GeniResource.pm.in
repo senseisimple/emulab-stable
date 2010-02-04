@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniResource;
@@ -383,13 +383,10 @@ sub GetTicket($$$$)
     #
     Genixmlrpc->SetContext($context);
 
-    my $authority = GeniAuthority->Lookup($manager_urn);
+    my $authority = GeniAuthority->CreateFromRegistry("cm", $manager_urn);
     if (!defined($authority)) {
-	$authority = GeniAuthority->CreateFromRegistry("cm", $manager_urn);
-	if (!defined($authority)) {
-	    print STDERR "*** Could not find $manager_urn at ClearingHouse\n";
-	    return -1;
-	}
+	print STDERR "*** Could not find $manager_urn at ClearingHouse\n";
+	return -1;
     }
 
     #
@@ -529,13 +526,10 @@ sub RedeemTicket($$)
     #
     Genixmlrpc->SetContext($context);
 
-    my $authority = GeniAuthority->Lookup($manager_urn);
+    my $authority = GeniAuthority->CreateFromRegistry("cm", $manager_urn);
     if (!defined($authority)) {
-	$authority = GeniAuthority->CreateFromRegistry("cm", $manager_urn);
-	if (!defined($authority)) {
-	    print STDERR "*** Could not find $manager_urn at ClearingHouse\n";
-	    return -1;
-	}
+	print STDERR "*** Could not find $manager_urn at ClearingHouse\n";
+	return -1;
     }
 
     #
@@ -721,13 +715,10 @@ sub Clear($$)
     #
     Genixmlrpc->SetContext($context);
 
-    my $authority = GeniAuthority->Lookup($manager_urn);
+    my $authority = GeniAuthority->CreateFromRegistry("cm", $manager_urn);
     if (!defined($authority)) {
-	$authority = GeniAuthority->CreateFromRegistry("cm", $manager_urn);
-	if (!defined($authority)) {
-	    print STDERR "*** Could not find $manager_urn at ClearingHouse\n";
-	    return -1;
-	}
+	print STDERR "*** Could not find $manager_urn at ClearingHouse\n";
+	return -1;
     }
 
     #
@@ -857,13 +848,10 @@ sub Purge($$)
 	return -1;
     }
     my $manager_urn = $self->manager_urn();
-    my $authority   = GeniAuthority->Lookup($manager_urn);
+    my $authority = GeniAuthority->CreateFromRegistry("cm", $manager_urn);
     if (!defined($authority)) {
-	$authority = GeniAuthority->CreateFromRegistry("cm", $manager_urn);
-	if (!defined($authority)) {
-	    print STDERR "*** Could not find $manager_urn at ClearingHouse\n";
-	    return -1;
-	}
+	print STDERR "*** Could not find $manager_urn at ClearingHouse\n";
+	return -1;
     }
 
     #
@@ -975,13 +963,10 @@ sub StartSliver($$$)
 	return -1;
     }
     my $manager_urn = $self->manager_urn();
-    my $authority   = GeniAuthority->Lookup($manager_urn);
+    my $authority = GeniAuthority->CreateFromRegistry("cm", $manager_urn);
     if (!defined($authority)) {
-	$authority = GeniAuthority->CreateFromRegistry("cm", $manager_urn);
-	if (!defined($authority)) {
-	    print STDERR "*** Could not find $manager_urn at ClearingHouse\n";
-	    return -1;
-	}
+	print STDERR "*** Could not find $manager_urn at ClearingHouse\n";
+	return -1;
     }
 
     #
@@ -1066,13 +1051,10 @@ sub SliverStatus($$$$)
 	return -1;
     }
     my $manager_urn = $self->manager_urn();
-    my $authority   = GeniAuthority->Lookup($manager_urn);
+    my $authority = GeniAuthority->CreateFromRegistry("cm", $manager_urn);
     if (!defined($authority)) {
-	$authority = GeniAuthority->CreateFromRegistry("cm", $manager_urn);
-	if (!defined($authority)) {
-	    print STDERR "*** Could not find $manager_urn at ClearingHouse\n";
-	    return -1;
-	}
+	print STDERR "*** Could not find $manager_urn at ClearingHouse\n";
+	return -1;
     }
 
     #
@@ -1127,13 +1109,10 @@ sub Discover($$$)
 	return -1;
     }
     my $manager_urn = $self->manager_urn();
-    my $authority   = GeniAuthority->Lookup($manager_urn);
+    my $authority = GeniAuthority->CreateFromRegistry("cm", $manager_urn);
     if (!defined($authority)) {
-	$authority = GeniAuthority->CreateFromRegistry("cm", $manager_urn);
-	if (!defined($authority)) {
-	    print STDERR "*** Could not find $manager_urn at ClearingHouse\n";
-	    return -1;
-	}
+	print STDERR "*** Could not find $manager_urn at ClearingHouse\n";
+	return -1;
     }
 
     #
