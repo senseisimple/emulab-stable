@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2009 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -19,9 +19,6 @@
 #include <zlib.h>
 #include <sys/types.h>
 #include <sys/time.h>
-#ifndef linux
-#include <sys/disklabel.h>
-#endif
 #include "imagehdr.h"
 #include "queue.h"
 #ifndef NOTHREADS
@@ -1632,11 +1629,11 @@ fixmbr(int slice, int dtype)
 
 static struct blockreloc *reloctable;
 static int numrelocs;
-#ifndef linux
-static void reloc_bsdlabel(struct disklabel *label, int reloctype);
-#endif
 static void reloc_lilo(void *addr, int reloctype, uint32_t size);
 static void reloc_lilocksum(void *addr, uint32_t off, uint32_t size);
+
+#include "ffs/disklabel.h"	/* XXX doesn't belong here */
+static void reloc_bsdlabel(struct disklabel *label, int reloctype);
 
 static void
 getrelocinfo(const blockhdr_t *hdr)
@@ -1701,14 +1698,12 @@ applyrelocs(off_t offset, size_t size, void *buf)
 			switch (reloc->type) {
 			case RELOC_NONE:
 				break;
-#ifndef linux
 			case RELOC_FBSDDISKLABEL:
 			case RELOC_OBSDDISKLABEL:
 				assert(reloc->size >= sizeof(struct disklabel));
 				reloc_bsdlabel((struct disklabel *)((char *)buf+coff),
 					       reloc->type);
 				break;
-#endif
 			case RELOC_LILOSADDR:
 			case RELOC_LILOMAPSECT:
 				reloc_lilo((char *)buf+coff, reloc->type,
@@ -1734,7 +1729,6 @@ applyrelocs(off_t offset, size_t size, void *buf)
 	return nsize;
 }
 
-#ifndef linux
 static void
 reloc_bsdlabel(struct disklabel *label, int reloctype)
 {
@@ -1803,7 +1797,6 @@ reloc_bsdlabel(struct disklabel *label, int reloctype)
 	label->d_checksum = 0;
 	label->d_checksum = dkcksum(label);
 }
-#endif
 
 #include "extfs/lilo.h"
 
