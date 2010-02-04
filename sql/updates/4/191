@@ -8,8 +8,10 @@ sub DoUpdate($$$)
     #
     # Add a new column to the sitevariables table
     #
-    DBQueryFatal("alter table sitevariables add column ns_include " .
-                 "tinyint(0) NOT NULL default 0");
-    return 0;
+    if (!DBSlotExists("sitevariables", "ns_include")) {
+        DBQueryFatal("alter table sitevariables add column ns_include " .
+                     "tinyint(0) NOT NULL default 0");
+        return 0;
+    }
 }
 1;
