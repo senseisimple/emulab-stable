@@ -1229,11 +1229,10 @@ sub Create($$$$$$)
 	$linkrspec, $node1rspec, $node2rspec) = @_;
     my $clearinghouse;
 
-    my $linkname = GeniXML::GetText("./n:nickname | ".
-				    "./n:virtual_id", $linkrspec);
+    my $linkname = GeniXML::GetVirtualId($linkrspec);
     return undef
 	if (!defined($linkname));
-    my @interfaces = GeniXML::FindNodes("./n:interface_ref",
+    my @interfaces = GeniXML::FindNodes("n:interface_ref",
 					$linkrspec)->get_nodelist();
     
     my $experiment = Experiment->Lookup($slice->uuid());
@@ -1265,8 +1264,8 @@ sub Create($$$$$$)
     my $iface2ref = $interfaces[1];
 
     # These are the ips of the tunnel.
-    my $ip1      = GeniXML::GetText("./n:tunnel_ip", $iface1ref);
-    my $ip2      = GeniXML::GetText("./n:tunnel_ip", $iface2ref);
+    my $ip1      = GeniXML::GetText("tunnel_ip", $iface1ref);
+    my $ip2      = GeniXML::GetText("tunnel_ip", $iface2ref);
     my $ctrlip1;
     my $ctrlip2;
     my $iface1;

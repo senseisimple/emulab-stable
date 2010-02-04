@@ -789,7 +789,7 @@ sub Release($$)
     my @nodeids = ();
     my @nodes   = ();
 
-    foreach my $ref (GeniXML::FindNodes("./n:node",
+    foreach my $ref (GeniXML::FindNodes("n:node",
 					$self->rspec())->get_nodelist()) {
 	# Skip lan nodes; they are fake.
 	next
@@ -863,7 +863,7 @@ sub ReleaseHolding($$)
     my @nodeids = ();
     my @nodes   = ();
 
-    foreach my $ref (GeniXML::FindNodes("./n:node",
+    foreach my $ref (GeniXML::FindNodes("n:node",
 					$self->rspec())->get_nodelist()) {
 	# Skip lan nodes; they are fake.
 	next

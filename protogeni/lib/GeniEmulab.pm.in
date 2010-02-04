@@ -310,19 +310,19 @@ sub CreatePhysNode($)
 	if (!defined($rspec)) {
 	    goto bad;
 	}
-	foreach my $noderef (GeniXML::FindNodes("./n:node",
+	foreach my $noderef (GeniXML::FindNodes("n:node",
 						$rspec)->get_nodelist()) {
 	    next
 		if (GeniXML::GetNodeId($noderef) ne $node_urn);
 	    next
-		if (! defined(GeniXML::FindFirst("./n:interface", $noderef)));
+		if (! defined(GeniXML::FindFirst("n:interface", $noderef)));
 
 	    my $count = 0;
 	    
-	    foreach my $ref (GeniXML::FindNodes("./n:interface",
+	    foreach my $ref (GeniXML::FindNodes("n:interface",
 						$noderef)->get_nodelist()) {
-		my $component_id = GeniXML::GetText("./n:component_id", $ref);
-		my $role = GeniXML::GetText("./n:role", $ref);
+		my $component_id = GeniXML::GetText("component_id", $ref);
+		my $role = GeniXML::GetText("role", $ref);
 		if (! defined($role)) {
 		    $role = "expt";
 		}

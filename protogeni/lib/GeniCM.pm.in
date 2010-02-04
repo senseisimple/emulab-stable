@@ -489,10 +489,8 @@ sub GetTicketAuxAux($$$$$$$$)
     # slice record expires, which was given by the expiration time of the
     # slice credential.
     #
-    my $valid_until = GeniXML::FindFirst("./n:valid_until", $rspec);
-    if (defined($valid_until)) {
-	my $expires = $valid_until->textContent();
-
+    my $expires = GeniXML::GetText("valid_until", $rspec);
+    if (defined($expires)) {
 	if (! ($expires =~ /^[-\w:.\/]+/)) {
 	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 					"Illegal valid_until in rspec");
@@ -583,9 +581,9 @@ sub GetTicketAuxAux($$$$$$$$)
     #
     # Firewall hack; just a flag in the rspec for now.
     #
-    my $needsfirewall = GeniXML::FindFirst("./n:needsfirewall", $rspec);
-    if (defined($needsfirewall) && $needsfirewall->textContent()) {
-	if ($slice->SetFirewallFlag($needsfirewall->textContent()) != 0) {
+    my $needsfirewall = GeniXML::GetText("needsfirewall", $rspec);
+    if (defined($needsfirewall)) {
+	if ($slice->SetFirewallFlag($needsfirewall) != 0) {
 	    $response = GeniResponse->Create(GENIRESPONSE_ERROR);
 	    goto bad;
 	}
@@ -607,9 +605,8 @@ sub GetTicketAuxAux($$$$$$$$)
     # Mark the experiment locally as coming from the cooked interface.
     # This changes what tmcd returns to the local nodes.
     #
-    my $generated_by = GeniXML::FindFirst("./n:generated_by", $rspec);
-    if (defined($generated_by) &&
-	$generated_by->textContent() eq "libvtop") {
+    my $generated_by = GeniXML::GetText("generated_by", $rspec);
+    if ($generated_by eq "libvtop") {
 	$slice_experiment->Update({"geniflags" =>
 				       $Experiment::EXPT_GENIFLAGS_EXPT|
 				       $Experiment::EXPT_GENIFLAGS_COOKED});
@@ -680,7 +677,7 @@ sub GetTicketAuxAux($$$$$$$$)
 	    $oldrspec = $ticket->rspec();
 	}
 	
-	foreach my $ref (GeniXML::FindNodes("./n:node",
+	foreach my $ref (GeniXML::FindNodes("n:node",
 					    $oldrspec)->get_nodelist()) {
 	    # Let remote nodes pass through.
 	    next
@@ -690,10 +687,9 @@ sub GetTicketAuxAux($$$$$$$$)
 	    next
 		if (GeniXML::IsLanNode($ref));
 
-	    my $node_nickname = GeniXML::FindFirst("./n:virtual_id | " .
-						   "./n:nickname", $ref);
-	    my $colocate      = GeniXML::FindFirst("./n:colocate | " .
-						   "./n:phys_nickname", $ref);
+	    my $node_nickname = GeniXML::GetVirtualId($ref);
+	    my $colocate      = GeniXML::GetText("colocate", $ref) ||
+		                GeniXML::GetText("phys_nickname", $ref);
 	    my $resource_uuid = GeniXML::GetNodeId($ref);
 	    my $node = LookupNode($resource_uuid);
 	    if (!defined($node)) {
@@ -726,21 +722,19 @@ sub GetTicketAuxAux($$$$$$$$)
 
     print $rspec->toString();
 
-    foreach my $ref (GeniXML::FindNodes("./n:node", $rspec)->get_nodelist()) {
+    foreach my $ref (GeniXML::FindNodes("n:node", $rspec)->get_nodelist()) {
 	my $resource_uuid = GeniXML::GetNodeId($ref);
-	my $manager_uuid  = GeniXML::GetText("./n:component_manager_uuid",
-					     $ref);
-	my $node_nickname = GeniXML::GetText("./n:virtual_id | " .
-					     "./n:nickname", $ref);
-	my $colocate      = GeniXML::GetText("./n:colocate | " .
-					     "./n:phys_nickname", $ref);
-	my $subnode_of    = GeniXML::GetText("./n:subnode_of", $ref);
+	my $manager_uuid  = GeniXML::GetManagerId($ref);
+	my $node_nickname = GeniXML::GetVirtualId($ref);
+	my $colocate      = GeniXML::GetText("colocate", $ref) ||
+	                    GeniXML::GetText("phys_nickname", $ref);
+	my $subnode_of    = GeniXML::GetText("subnode_of", $ref);
 	my $virtualization_type
-                          = GeniXML::GetText("./n:virtualization_type", $ref);
+                          = GeniXML::GetText("virtualization_type", $ref);
 	my $virtualization_subtype
-                          = GeniXML::GetText("./n:virtualization_subtype",
+                          = GeniXML::GetText("virtualization_subtype",
 					     $ref);
-	my $exclusive     = GeniXML::GetText("./n:exclusive", $ref);
+	my $exclusive     = GeniXML::GetText("exclusive", $ref);
 	my $pctype;
 	my $osname;
 	my $node;
@@ -872,7 +866,7 @@ sub GetTicketAuxAux($$$$$$$$)
 			};
 
 	# Tarball and startup command.
-	my $startupcmd = GeniXML::GetText("./n:startup_command", $ref);
+	my $startupcmd = GeniXML::GetText("startup_command", $ref);
 	if (defined($startupcmd)) {
 	    if (! TBcheck_dbslot($startupcmd, "virt_nodes", "startupcmd",
 			 TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
@@ -883,7 +877,7 @@ sub GetTicketAuxAux($$$$$$$$)
 	    }
 	    $nodeblob->{'startupcmd'} = $startupcmd;
 	}
-	my $tarfiles = GeniXML::GetText("./n:tarfiles", $ref);
+	my $tarfiles = GeniXML::GetText("tarfiles", $ref);
 	if (defined($tarfiles)) {
 	    if (! TBcheck_dbslot($tarfiles, "virt_nodes", "tarfiles",
 			 TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
@@ -917,12 +911,12 @@ sub GetTicketAuxAux($$$$$$$$)
 	# in the link specifications. 
 	#
 	next
-	    if (!defined(GeniXML::FindFirst("./n:interface", $ref)));
+	    if (!defined(GeniXML::FindFirst("n:interface", $ref)));
 	
-	foreach my $linkref (GeniXML::FindNodes("./n:interface",
+	foreach my $linkref (GeniXML::FindNodes("n:interface",
 						$ref)->get_nodelist()) {
-	    my $component_id = GeniXML::GetText("./n:component_id", $linkref);
-	    my $virtual_id   = GeniXML::GetText("./n:virtual_id", $linkref);
+	    my $component_id = GeniXML::GetText("component_id", $linkref);
+	    my $virtual_id   = GeniXML::GetText("virtual_id", $linkref);
 
 	    if (!defined($virtual_id)) {
 		$response = GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
@@ -946,7 +940,7 @@ sub GetTicketAuxAux($$$$$$$$)
     }
 
     goto skiplinks
-	if (!defined(GeniXML::FindFirst("./n:link", $rspec)));
+	if (!defined(GeniXML::FindFirst("n:link", $rspec)));
     
     #
     # Now deal with links for wildcarded nodes. We need to fill in the
@@ -954,15 +948,12 @@ sub GetTicketAuxAux($$$$$$$$)
     #
     my $linknum = 1;
     
-    foreach my $linkref (GeniXML::FindNodes("./n:link",
+    foreach my $linkref (GeniXML::FindNodes("n:link",
 					    $rspec)->get_nodelist()) {
-	my $lanname    = GeniXML::GetText("./n:nickname | ".
-					  "./n:virtual_id", $linkref);
-	my $tunnel_type = GeniXML::FindFirst("./n:link_type", $linkref);
-	my $istunnel   = (defined($tunnel_type) &&
-			  $tunnel_type->textContent() eq "tunnel");
-	my @interfaces = GeniXML::FindNodes("./n:linkendpoints | ".
-					    "./n:interface_ref",
+	my $lanname    = GeniXML::GetVirtualId($linkref);
+	my $istunnel   = (GeniXML::GetText("link_type", $linkref) eq "tunnel");
+	my @interfaces = GeniXML::FindNodes("n:linkendpoints | ".
+					    "n:interface_ref",
 					    $linkref)->get_nodelist();
 	my $ifacenum   = 1;
 	my $trivial_ok = 0;
@@ -982,9 +973,9 @@ sub GetTicketAuxAux($$$$$$$$)
 	#
 	if (!$istunnel) {
 	    foreach my $ref (@interfaces) {
-		my $node_nickname = GeniXML::GetText("./n:virtual_node_id | ".
-						     "./n:node_nickname",
-						     $ref);
+		my $node_nickname =
+		    GeniXML::GetText("virtual_node_id", $ref) ||
+		    GeniXML::GetText("node_nickname", $ref);
 
 		if (exists($lannodes{$node_nickname})) {
 		    $lanname = $node_nickname;
@@ -997,10 +988,10 @@ sub GetTicketAuxAux($$$$$$$$)
 	}
 	
 	foreach my $ref (@interfaces) {
-	    my $node_nickname = GeniXML::GetText("./n:virtual_node_id | ".
-						 "./n:node_nickname", $ref);
-	    my $iface_id      = GeniXML::GetText("./n:virtual_interface_id | ".
-						 "./n:iface_name", $ref);
+	    my $node_nickname = GeniXML::GetText("virtual_node_id", $ref) ||
+		                GeniXML::GetText("node_nickname", $ref);
+	    my $iface_id = GeniXML::GetText("virtual_interface_id", $ref) ||
+		           GeniXML::GetText("iface_name", $ref);
 
 	    if (!defined($node_nickname)) {
 		$response =
@@ -1051,7 +1042,7 @@ sub GetTicketAuxAux($$$$$$$$)
 		goto bad;
 	    }
 	    my $iface_ref   = $ifacemap{$node_nickname}->{$iface_id}->{"rspec"};
-	    my $iface_name  = GeniXML::GetText("./n:component_id", $iface_ref);
+	    my $iface_name  = GeniXML::GetText("component_id", $iface_ref);
 	    if (!defined($iface_name)) {
 		$iface_name = "";
 	    }
@@ -1069,7 +1060,7 @@ sub GetTicketAuxAux($$$$$$$$)
 	    my $bandwidth = 100000;
 
 	    # Let user override.
-	    my $user_bandwidth = GeniXML::GetText("./n:bandwidth", $linkref);
+	    my $user_bandwidth = GeniXML::GetText("bandwidth", $linkref);
 	    if (defined($user_bandwidth)) {
 		$bandwidth = $user_bandwidth;
 	    }
@@ -1168,10 +1159,10 @@ sub GetTicketAuxAux($$$$$$$$)
     unlink($tmpfile);
     print $solution->toString();
 
-    foreach my $ref (GeniXML::FindNodes("./n:node",
+    foreach my $ref (GeniXML::FindNodes("n:node",
 					$solution)->get_nodelist()) {
-	my $virtual_id     = GeniXML::GetText("./n:virtual_id", $ref);
-	my $component_uuid = GeniXML::GetText("./n:component_uuid", $ref);
+	my $virtual_id     = GeniXML::GetVirtualId($ref);
+	my $component_uuid = GeniXML::GetNodeId($ref);
 	if (!exists($nodemap{$virtual_id})) {
 	    $response =
 		GeniResponse->Create(GENIRESPONSE_ERROR, undef,
@@ -1181,10 +1172,10 @@ sub GetTicketAuxAux($$$$$$$$)
 	my $rspec          = $nodemap{$virtual_id}->{'rspec'};
 	my $virtnode       = $nodemap{$virtual_id}->{'virtnode'};
 	my $node           = LookupNode($component_uuid);
-	my $colocate       = GeniXML::GetText("./n:colocate | ".
-					      "./n:phys_nickname", $rspec);
-	my $exclusive      = GeniXML::GetText("./n:exclusive", $rspec);
-	my $subnode_of     = GeniXML::GetText("./n:subnode_of", $rspec);
+	my $colocate       = GeniXML::GetText("colocate", $rspec) ||
+	                     GeniXML::GetText("phys_nickname", $rspec);
+	my $exclusive      = GeniXML::GetText("exclusive", $rspec);
+	my $subnode_of     = GeniXML::GetText("subnode_of", $rspec);
 	$exclusive = 0
 	    if (!defined($exclusive));
 	
@@ -1217,17 +1208,17 @@ sub GetTicketAuxAux($$$$$$$$)
 	$colomap{$colocate} = $node
 	    if (defined($colocate));
     }
-    foreach my $ref (GeniXML::FindNodes("./n:link",
+    foreach my $ref (GeniXML::FindNodes("n:link",
 					$solution)->get_nodelist()) {
-	my $nickname          = GeniXML::GetText("./n:virtual_id", $ref);
-	my $interfaces        = GeniXML::FindNodes("./n:interface_ref", $ref);
+	my $nickname          = GeniXML::GetVirtualId($ref);
+	my $interfaces        = GeniXML::FindNodes("n:interface_ref", $ref);
 
 	foreach my $iface_ref ($interfaces) {
-	    my $virtual_node_id   = GeniXML::GetText("./n:virtual_node_id",
+	    my $virtual_node_id   = GeniXML::GetText("virtual_node_id",
 						     $iface_ref);
-	    my $virtual_port_id   = GeniXML::GetText("./n:virtual_port_id",
+	    my $virtual_port_id   = GeniXML::GetText("virtual_port_id",
 						     $iface_ref);
-	    my $component_id      = GeniXML::GetText("./n:component_id",
+	    my $component_id      = GeniXML::GetText("component_id",
 						     $iface_ref);
 	    my $linkref     = $vportmap{"$virtual_node_id:$virtual_port_id"};
 
@@ -1598,7 +1589,7 @@ sub SliverWorkAux($$$$$$$)
     # Figure out new expiration time; this is the time at which we can
     # idleswap the slice out. 
     #
-    my $expires = GeniXML::GetText("./n:valid_until", $rspec);
+    my $expires = GeniXML::GetText("valid_until", $rspec);
     if (defined($expires)) {
 	if (! ($expires =~ /^[-\w:.\/]+/)) {
 	    $message = "Illegal valid_until in rspec";
@@ -1650,14 +1641,11 @@ sub SliverWorkAux($$$$$$$)
     #
     # Make sure all nodes requested are allocated. 
     #
-    foreach my $ref (GeniXML::FindNodes("./n:node",
+    foreach my $ref (GeniXML::FindNodes("n:node",
 					$rspec)->get_nodelist()) {
 	my $resource_uuid = GeniXML::GetNodeId($ref);
-	my $node_nickname = GeniXML::GetText("./n:virtual_id | ".
-					     "./n:nickname", $ref);
-	my $manager_uuid  = GeniXML::GetText("./n:component_manager_urn | ".
-					     "./n:component_manager_uuid",
-					     $ref);
+	my $node_nickname = GeniXML::GetVirtualId($ref);
+	my $manager_uuid  = GeniXML::GetManagerId($ref);
 	
 	# Let remote nodes pass through.
 	next
@@ -1732,10 +1720,9 @@ sub SliverWorkAux($$$$$$$)
 	my $sliver   = $nodemap{$nickname};
 	my $needfree = 1;
 	
-	foreach my $ref (GeniXML::FindNodes("./n:node",
+	foreach my $ref (GeniXML::FindNodes("n:node",
 					    $rspec)->get_nodelist()) {
-	    my $virtual_id = GeniXML::GetText("./n:virtual_id | ".
-					      "./n:nickname", $ref);
+	    my $virtual_id = GeniXML::GetVirtualId($ref);
 	    if ($nickname eq $virtual_id) {
 		$needfree = 0;
 		last;
@@ -1812,10 +1799,9 @@ sub SliverWorkAux($$$$$$$)
     foreach my $linkname (keys(%linkmap)) {
 	my $needfree = 1;
 	
-	foreach my $linkref (GeniXML::FindNodes("./n:link",
+	foreach my $linkref (GeniXML::FindNodes("n:link",
 						$rspec)->get_nodelist()) {
-	    my $nickname = GeniXML::GetText("./n:nickname | ".
-					    "./n:virtual_id", $linkref);
+	    my $nickname = GeniXML::GetVirtualId($linkref);
 
 	    if ($linkname eq $nickname) {
 		$needfree = 0;
@@ -1915,12 +1901,10 @@ sub SliverWorkAux($$$$$$$)
     my @plabnodes = ();
     my %ifacemap  = ();
     my %rspecmap  = ();
-    foreach my $ref (GeniXML::FindNodes("./n:node", $rspec)->get_nodelist()) {
+    foreach my $ref (GeniXML::FindNodes("n:node", $rspec)->get_nodelist()) {
 	my $resource_uuid = GeniXML::GetNodeId($ref);
-	my $virtual_id    = GeniXML::GetText("./n:virtual_id | ".
-					     "./n:nickname", $ref);
-	my $manager_uuid  = GeniXML::GetText("./n:component_manager_uuid",
-					     $ref);
+	my $virtual_id    = GeniXML::GetVirtualId($ref);
+	my $manager_uuid  = GeniXML::GetManagerId($ref);
 
 	$rspecmap{$virtual_id} = $ref;
 
@@ -1935,12 +1919,10 @@ sub SliverWorkAux($$$$$$$)
 	#
 	# For a map of the interfaces.
 	#
-	foreach my $linkref (GeniXML::FindNodes("./n:interface",
+	foreach my $linkref (GeniXML::FindNodes("n:interface",
 						$ref)->get_nodelist()) {
-	    my $component_id     = GeniXML::GetText("./n:component_id",
-						    $linkref);
-	    my $virtual_iface_id = GeniXML::GetText("./n:virtual_id",
-						    $linkref);
+	    my $component_id     = GeniXML::GetText("component_id", $linkref);
+	    my $virtual_iface_id = GeniXML::GetText("virtual_id", $linkref);
 
 	    $ifacemap{$virtual_id} = {}
 	        if (!exists($ifacemap{$virtual_id}));
@@ -1995,15 +1977,14 @@ sub SliverWorkAux($$$$$$$)
     # and then that aggregate goes into the aggregate for toplevel sliver.
     #
     goto skiplinks
-	if (!defined(GeniXML::FindFirst("./n:link", $rspec)));
+	if (!defined(GeniXML::FindFirst("n:link", $rspec)));
     
-    foreach my $linkref (GeniXML::FindNodes("./n:link",
+    foreach my $linkref (GeniXML::FindNodes("n:link",
 					    $rspec)->get_nodelist()) {
 	my @linkslivers  = ();
-	my $linkname     = GeniXML::GetText("./n:nickname | ".
-					    "./n:virtual_id", $linkref);
-	my @interfaces   = GeniXML::FindNodes("./n:linkendpoints | ".
-					      "./n:interface_ref",
+	my $linkname     = GeniXML::GetVirtualId($linkref);
+	my @interfaces   = GeniXML::FindNodes("n:linkendpoints | ".
+					      "n:interface_ref",
 					      $linkref)->get_nodelist();
 
 	if (! ($linkname =~ /^[-\w]*$/)) {
@@ -2018,13 +1999,13 @@ sub SliverWorkAux($$$$$$$)
 	#
 	# XXX Tunnels are a total kludge right now ...
 	#
-	if (GeniXML::GetText("./n:link_type", $linkref) eq "tunnel") {
+	if (GeniXML::GetText("link_type", $linkref) eq "tunnel") {
 
 	    my $iface1ref   = $interfaces[0];
 	    my $iface2ref   = $interfaces[1];
-	    my $node1_id    = GeniXML::GetText("./n:virtual_node_id",
+	    my $node1_id    = GeniXML::GetText("virtual_node_id",
 					       $iface1ref);
-	    my $node2_id    = GeniXML::GetText("./n:virtual_node_id",
+	    my $node2_id    = GeniXML::GetText("virtual_node_id",
 					       $iface2ref);
 	    my $node1sliver = $nodemap{$node1_id};
 	    my $node2sliver = $nodemap{$node2_id};
@@ -2087,9 +2068,9 @@ sub SliverWorkAux($$$$$$$)
 	}
 
 	foreach my $ifaceref (@interfaces) {
-	    my $iface_id   = GeniXML::GetText("./n:virtual_interface_id",
+	    my $iface_id   = GeniXML::GetText("virtual_interface_id",
 					      $ifaceref);
-	    my $node_id    = GeniXML::GetText("./n:virtual_node_id",
+	    my $node_id    = GeniXML::GetText("virtual_node_id",
 					      $ifaceref);
 
 	    #
@@ -2213,10 +2194,9 @@ sub SliverWorkAux($$$$$$$)
 	    $message = "Could not set up vlans";
 	    goto bad;
 	}
-	foreach my $linkref (GeniXML::FindNodes("./n:link",
+	foreach my $linkref (GeniXML::FindNodes("n:link",
 						$rspec->get_nodelist())) {
-	    my $vname = GeniXML::GetText("./n:nickname | ".
-					 "./n:virtual_id", $linkref);
+	    my $vname = GeniXML::GetVirtualId($linkref);
 	    my $vlan;
 
 	    my $lan = Lan->Lookup($experiment, $vname, 1);
@@ -4049,9 +4029,8 @@ sub UpdateManifest($)
 	}
 	$vlantags{$vlan->vname()} = $tag;
     }
-    foreach my $linkref (GeniXML::GetNodes("./n:link", $rspec)) {
-	my $vname = GeniXML::GetText("./n:nickname | ".
-				     "./n:virtual_id", $linkref);
+    foreach my $linkref (GeniXML::GetNodes("n:link", $rspec)) {
+	my $vname = GeniXML::GetVirtualId($linkref);
 	my $tag   = (exists($vlantags{$vname}) ? $vlantags{$vname} : undef);
 	if (!defined($tag)) {
 	    $linkref->removeChild("vlantag");

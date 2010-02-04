@@ -11,7 +11,7 @@ use Exporter;
 use vars qw(@ISA @EXPORT);
 
 @ISA = "Exporter";
-@EXPORT = qw(Parse ParseFile FindNodes FindFirst FindElement FindAttr IsLanNode IsLocalNode GetNodeId SetText GetText);
+@EXPORT = qw(Parse ParseFile FindNodes FindFirst FindElement FindAttr IsLanNode IsLocalNode GetNodeId GetVirtualId GetManagerId SetText GetText);
 
 use English;
 use XML::LibXML;
@@ -164,13 +164,23 @@ sub IsLocalNode($)
 sub GetNodeId($)
 {
     my ($node) = @_;
-    my $result = undef;
-    if (defined($node) && $node->localname() eq "node") {
-	$result = FindFirst("./n:component_uuid | " .
-			    "./n:component_urn | " .
-			    "./n:uuid", $node);
-    }
-    return $result;
+    return GetText("component_uuid", $node) ||
+	GetText("component_urn", $node) ||
+	GetText("uuid", $node);
+}
+
+sub GetVirtualId($)
+{
+    my ($node) = @_;
+    return GetText("virtual_id", $node) ||
+	GetText("nickname", $node);
+}
+
+sub GetManagerId($)
+{
+    my ($node) = @_;
+    return GetText("component_manager_uuid", $node) ||
+	GetText("component_manager_urn", $node);
 }
 
 # Takes an attribute/element name, *NOT AN XPATH* and a node and sets
@@ -182,12 +192,15 @@ sub SetText($$$)
 {
     my ($name, $node, $text) = @_;
     my $result = 0;
-    my $child = FindFirst("./n:".$name, $node);
+    my $child = FindFirst("@n:".$name, $node);
     if (defined($child)) {
 	if ($child->nodeType() == XML_ATTRIBUTE_NODE) {
 	    $child->setValue($text);
 	    $result = 1;
-	} else {
+	}
+    } else {
+	$child = FindFirst("n:".$name, $node);
+	if (defined($child)) {
 	    my @grand = $child->childNodes();
 	    if (scalar(@grand) == 1
 		&& $grand[0]->nodeType() == XML_TEXT_NODE) {
@@ -197,22 +210,24 @@ sub SetText($$$)
 		     && $child->nodeType() == XML_ELEMENT_NODE) {
 		$child->appendText($text);
 	    }
+	} elsif ($node->nodeType() == XML_ELEMENT_NODE) {
+	    $node->setAttribute($name, $text);
 	}
-    } elsif ($node->nodeType() == XML_ELEMENT_NODE) {
-	$node->setAttribute($name, $text);
     }
     return $result;
 }
 
-# Get the contents of a given xpath relative to a given node. Returns
-# undefined if not found.
+# Get the text contents of a child of a node with a particular
+# name. This can be either an attribute or an element.
 sub GetText($$)
 {
-    my ($path, $node) = @_;
+    my ($name, $node) = @_;
     my $result = undef;
-    my $child = FindFirst($path, $node);
+    my $child = FindFirst("@n:".$name, $node);
     if (defined($child)) {
 	$result = $child->textContent();
+    } else {
+	$child = FindFirst("n:".$name, $node);
     }
     return $result;
 }

@@ -356,7 +356,7 @@ sub GetTicket($$$$)
     #
     # Lets give it a reasonable default time.
     #
-    my $valid_until = GeniXML::FindFirst("./n:valid_until", $rspec);
+    my $valid_until = GeniXML::GetText("valid_until", $rspec);
     if (! defined($valid_until)) {
 	GeniXML::SetText("valid_until",
 			 POSIX::strftime("20%y-%m-%dT%H:%M:%S",
