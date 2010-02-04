@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2005, 2007, 2008 University of Utah and the Flux Group.
+# Copyright (c) 2003-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -59,12 +59,12 @@ if (!TBAdmin($>)) {
     die "Sorry, only admins can use this script\n";
 }
 
-my %opt = ();
-GetOptions(\%opt, 'v');
+my (@test_switches, @control_switches);
 my $debug = 0;
-if ($opt{v}) {
-    $debug = 1;
-}
+my %opt = ("v+" => \$debug,
+	   "E=s" => \@test_switches,
+	   "C=s" => \@control_switches);
+GetOptions(%opt);
 
 sub DEBUG {
     if ($debug) {
@@ -110,14 +110,27 @@ if ($ELABINELAB) {
 &SNMP::initMib();
 
 #
-# Yeah, it's slow, but we want to use all the test switches so that we don't
-# have to worry about missing something, and don't have to get the user to
-# guess which switch they're using
+# If explicit switches were listed, we use them as listed in the roles
+# specified with no checking.  The caller had better know what they are
+# doing!
 #
-my @test_switches = map {[$_,"experimental"]} getTestSwitches();
-if (!@test_switches) {
-    die "Error: No experimental net switches found in database - you need\n" .
-        "to add them before running this script\n";
+if (@test_switches > 0) {
+    if ($test_switches[0] eq "none") {
+	@test_switches = ();
+    } else {
+	@test_switches = map {[$_,"experimental"]} @test_switches;
+    }
+} else {
+    #
+    # Yeah, it's slow, but we want to use all the test switches so that we don't
+    # have to worry about missing something, and don't have to get the user to
+    # guess which switch they're using
+    #
+    @test_switches = map {[$_,"experimental"]} getTestSwitches();
+    if (!@test_switches) {
+	die "Error: No experimental net switches found in database - you need\n" .
+	    "to add them before running this script\n";
+    }
 }
 
 #
@@ -125,10 +138,18 @@ if (!@test_switches) {
 #
 my %trunks = getTrunkHash();
 
-my @control_switches = map {[$_,"control"]} getControlSwitches();
-if (!@control_switches) {
-    warn "Warning - No control switches found - you probably want to add them " .
-	"to the nodes table\n";
+if (@control_switches > 0) {
+    if ($control_switches[0] eq "none") {
+	@control_switches = ();
+    } else {
+	@control_switches = map {[$_,"control"]} @control_switches;
+    }
+} else {
+    @control_switches = map {[$_,"control"]} getControlSwitches();
+    if (!@control_switches) {
+	warn "Warning - No control switches found - you probably want to add them " .
+	    "to the nodes table\n";
+    }
 }
 
 my @switches = (@test_switches, @control_switches);
@@ -142,7 +163,7 @@ if ($debug) {
 }
 
 #
-# Loop through each switch indvidually
+# Loop through each switch individually
 #
 SWITCHLOOP:
 foreach my $switchref (@switches) {
