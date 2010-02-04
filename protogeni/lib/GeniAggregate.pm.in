@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniAggregate;
@@ -25,6 +25,7 @@ use GeniSlice;
 use GeniRegistry;
 use GeniUtil;
 use GeniUser;
+use GeniComponent;
 use GeniHRN;
 use emutil;
 use Lan;
@@ -1295,52 +1296,23 @@ sub Create($$$$$$)
 	}
     }
     else {
-	my $component = GeniComponent->Lookup($node1rspec->{'component_uuid'});
-	my $blob;
+	my $node_uuid = $node1rspec->{'component_uuid'};
+	my $component = GeniComponent->CreateFromRegistry($node_uuid);
 	
 	if (!defined($component)) {
-	    #
-	    # Need to ask the clearinghouse where this node comes from.
-	    #
-	    $clearinghouse = GeniRegistry::ClearingHouse->Create();
-	
-	    if ($clearinghouse->Resolve($node1rspec->{'component_uuid'},
-					"Component", \$blob) != 0) {
-		print STDERR "Could not lookup node at clearinghouse\n";
-		print STDERR Dumper($node1rspec);
-		goto bad;
-	    }
-	    my $certificate = GeniCertificate->LoadFromString($blob->{'gid'});
-	    goto bad
-		if (!defined($certificate));
-	
-	    $component = GeniComponent->CreateFromCertificate($certificate);
-	    if (!defined($component)) {
-		print STDERR "Could not create component from $certificate\n";
-		goto bad;
-	    }
-	}
-	my $credential = GeniRegistry::Client->CreateCredential($component);
-	if (!defined($credential)) {
-	    print STDERR "Could not create a credential for $component\n";
-	    goto bad;
-
-	}
-	my $registry = GeniRegistry::Client->Create($component, undef,
-						    $credential);
-	if (!defined($registry)) {
-	    print STDERR "Could not create a registry client for $component\n";
+	    print STDERR "Could not create component for $node_uuid\n";
 	    goto bad;
 	}
-	$registry->Resolve($node1rspec->{'component_uuid'}, "Node", \$blob);
-	$ctrlip1 = $blob->{'physctrl'}
-	    if (defined($blob) && exists($blob->{'physctrl'}));
-
-	if (!defined($ctrlip1)) {
-	    print STDERR "Could not get control IP for ".
-		"$node1rspec->{'component_uuid'} at $component\n";
+	my $blob = $component->Resolve();
+	if (!defined($blob)) {
+	    print STDERR "Could not Resolve $component\n";
 	    goto bad;
 	}
+	if (!exists($blob->{'physctrl'}) || !defined($blob->{'physctrl'})) {
+	    print STDERR "Could not get control IP for $component\n";
+	    goto bad;
+	}
+	$ctrlip1 = $blob->{'physctrl'};
     }
     if (defined($node2sliver)) {
 	my $node2 = Node->Lookup($node2sliver->resource_uuid());
@@ -1359,51 +1331,23 @@ sub Create($$$$$$)
 	}
     }
     else {
-	my $blob;
-	my $component = GeniComponent->Lookup($node2rspec->{'component_uuid'});
+	my $node_uuid = $node2rspec->{'component_uuid'};
+	my $component = GeniComponent->CreateFromRegistry($node_uuid);
+	
 	if (!defined($component)) {
-	    #
-	    # Need to ask the clearinghouse where this node comes from.
-	    #
-	    $clearinghouse = GeniRegistry::ClearingHouse->Create();
-	
-	    if ($clearinghouse->Resolve($node2rspec->{'component_uuid'},
-					"Component", \$blob) != 0) {
-		print STDERR "Could not lookup node at clearinghouse\n";
-		print STDERR Dumper($node2rspec);
-		goto bad;
-	    }
-	    my $certificate = GeniCertificate->LoadFromString($blob->{'gid'});
-	    goto bad
-		if (!defined($certificate));
-	
-	    $component = GeniComponent->CreateFromCertificate($certificate);
-	    if (!defined($component)) {
-		print STDERR "Could not create component from $certificate\n";
-		goto bad;
-	    }
-	}
-	my $credential = GeniRegistry::Client->CreateCredential($component);
-	if (!defined($credential)) {
-	    print STDERR "Could not create a credential for $component\n";
-	    goto bad;
-
-	}
-	my $registry = GeniRegistry::Client->Create($component, undef,
-						    $credential);
-	if (!defined($registry)) {
-	    print STDERR "Could not create a registry client for $component\n";
+	    print STDERR "Could not create component for $node_uuid\n";
 	    goto bad;
 	}
-	$registry->Resolve($node2rspec->{'component_uuid'}, "Node", \$blob);
-	$ctrlip2 = $blob->{'physctrl'}
-	    if (defined($blob) && exists($blob->{'physctrl'}));
-
-	if (!defined($ctrlip2)) {
-	    print STDERR "Could not get control IP for ".
-		"$node2rspec->{'component_uuid'} at $component\n";
+	my $blob = $component->Resolve();
+	if (!defined($blob)) {
+	    print STDERR "Could not Resolve $component\n";
 	    goto bad;
 	}
+	if (!exists($blob->{'physctrl'}) || !defined($blob->{'physctrl'})) {
+	    print STDERR "Could not get control IP for $component\n";
+	    goto bad;
+	}
+	$ctrlip2 = $blob->{'physctrl'};
     }
     # print STDERR "$ip1, $ip2, $ctrlip1, $ctrlip2\n";
 

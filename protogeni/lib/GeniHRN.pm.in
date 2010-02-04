@@ -1,13 +1,14 @@
 #!/usr/bin/perl -wT
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2009 University of Utah and the Flux Group.
+# Copyright (c) 2009-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniHRN;
 
 use strict;
 use Exporter;
+use Carp;
 use vars qw(@ISA @EXPORT);
 
 @ISA    = "Exporter";
@@ -52,6 +53,11 @@ sub Unescape($)
 sub IsValid($)
 {
     my ($hrn) = @_;
+
+    if (!defined($hrn)) {
+	carp("GeniHRN::IsValid: hrn is undefined");
+	return 0;
+    }
 
     # Reject %00 sequences (see RFC 3986, section 7.3).
     return undef if $hrn =~ /%00/;
@@ -146,6 +152,10 @@ sub Parse($)
 {
     my ($hrn) = @_;
 
+    if (!defined($hrn)) {
+	carp("GeniHRN::Parse: hrn is undefined");
+	return 0;
+    }
     return undef if !IsValid( $hrn );
 
     $hrn = Unescape( $hrn );
@@ -238,6 +248,10 @@ sub ParseInterface($)
 {
     my ($urn) = @_;
 
+    if (!defined($urn)) {
+	carp("GeniHRN::ParseInterface: urn is undefined");
+	return 0;
+    }
     my ($authority,$type,$id) = Parse( $urn );
 
     return undef if $type ne "interface";

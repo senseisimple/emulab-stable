@@ -133,6 +133,7 @@ else:
     print "Got the slice credential"
     pass
 
+
 #
 # Ask the clearinghouse for a list of component managers. 
 #
@@ -158,8 +159,53 @@ else:
     url1 = components[0]["url"]
     url2 = components[1]["url"]
 
-#url1 = "https://boss.emulab.net/protogeni/stoller/xmlrpc/cm"
-#url2 = "https://myboss.myelab.testbed.emulab.net/protogeni/xmlrpc/cm"
+url1 = "https://boss.emulab.net/protogeni/xmlrpc/cm"
+url2 = "https://myboss.myelab.testbed.emulab.net/protogeni/xmlrpc/cm"
+
+def DeleteSlivers():
+    #
+    # Delete the slivers.
+    #
+    print "Deleting sliver1 now"
+    params = {}
+    params["credentials"] = (myslice,)
+    params["slice_urn"]   = SLICEURN
+    rval,response = do_method(None, "DeleteSlice",
+                              params, URI=url1, version="2.0")
+    if rval:
+        Fatal("Could not delete sliver on CM1")
+        pass
+    print "Sliver1 has been deleted"
+    
+    print "Deleting sliver2 now"
+    params = {}
+    params["credentials"] = (myslice,)
+    params["slice_urn"]   = SLICEURN
+    rval,response = do_method(None, "DeleteSlice",
+                              params, URI=url2, version="2.0")
+    if rval:
+        Fatal("Could not delete sliver on CM2")
+        pass
+    print "Sliver2 has been deleted"
+    sys.exit(0);
+    pass
+
+if DELETE:
+    DeleteSlivers()
+    sys.exit(1)
+    pass
+
+#
+# Lookup my ssh keys.
+#
+params = {}
+params["credential"] = mycredential
+rval,response = do_method("sa", "GetKeys", params)
+if rval:
+    Fatal("Could not get my keys")
+    pass
+mykeys = response["value"]
+if debug: print str(mykeys)
 
 #
 # Get a ticket for a node on a CM.
@@ -172,9 +218,10 @@ rspec1 = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
 
 print "Asking for a ticket from CM1 ..."
 params = {}
-params["credential"] = myslice
-params["rspec"]      = rspec1
-rval,response = do_method(None, "GetTicket", params, URI=url1)
+params["slice_urn"]   = SLICEURN
+params["credentials"] = (myslice,)
+params["rspec"]       = rspec1
+rval,response = do_method(None, "GetTicket", params, URI=url1, version="2.0")
 if rval:
     if response and response["value"]:
         print >> sys.stderr, ""
@@ -203,9 +250,10 @@ rspec2 = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
         "</rspec>"
 
 params = {}
-params["credential"] = myslice
-params["rspec"]      = rspec2
-rval,response = do_method(None, "GetTicket", params, URI=url2)
+params["slice_urn"]   = SLICEURN
+params["credentials"] = (myslice,)
+params["rspec"]       = rspec2
+rval,response = do_method(None, "GetTicket", params, URI=url2, version="2.0")
 if rval:
     if response and response["value"]:
         print >> sys.stderr, ""
@@ -228,26 +276,34 @@ node2_rspec    = str(node_element.string);
 # Create the slivers.
 #
 params = {}
-params["credential"] = myslice
-params["ticket"]   = ticket1
-rval,response = do_method(None, "RedeemTicket", params, url1)
+params["credentials"] = (myslice,)
+params["ticket"]      = ticket1
+params["slice_urn"]   = SLICEURN
+params["keys"]        = mykeys
+rval,response = do_method(None, "RedeemTicket", params,
+                          URI=url1, version="2.0")
 if rval:
     Fatal("Could not redeem ticket on CM1")
     pass
 sliver1,manifest1 = response["value"]
 print "Created a sliver on CM1, redeeming ticket on CM2 ..."
 print str(manifest1);
+sliver1_urn = str(findElement("target_urn", sliver1).value)
 
 params = {}
-params["credential"] = myslice
-params["ticket"]   = ticket2
-rval,response = do_method(None, "RedeemTicket", params, url2)
+params["credentials"] = (myslice,)
+params["ticket"]      = ticket2
+params["slice_urn"]   = SLICEURN
+params["keys"]        = mykeys
+rval,response = do_method(None, "RedeemTicket", params,
+                          URI=url2, version="2.0")
 if rval:
     Fatal("Could not redeem ticket on CM2")
     pass
 sliver2,manifest2 = response["value"]
 print "Created a sliver on CM2"
 print str(manifest2)
+sliver2_urn = str(findElement("target_urn", sliver2).value)
 
 #
 # Now add the tunnel part since we have the uuids for the two nodes.
@@ -267,71 +323,78 @@ rspec = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +\
 
 #print str(rspec)
 
-print "Updating ticket on CM1 with tunnel stuff ..."
+print "Updating sliver on CM1 with tunnel stuff ..."
 params = {}
-params["credential"] = myslice
-params["ticket"]     = ticket1
-params["rspec"]      = rspec
-rval,response = do_method(None, "UpdateTicket", params, url1)
+params["credentials"] = (myslice,)
+params["sliver_urn"]  = sliver1_urn
+params["rspec"]       = rspec
+rval,response = do_method(None, "UpdateSliver", params,
+                          URI=url1, version="2.0")
 if rval:
-    Fatal("Could not update ticket on CM1")
+    Fatal("Could not update sliver on CM1")
     pass
 ticket1 = response["value"]
-print "Updated ticket on CM1. Updating ticket on CM2 with tunnel stuff ..."
+print "Updated sliver on CM1. Updating sliver on CM2 with tunnel stuff ..."
 
-#
-# And again for the second ticket.
-#
 params = {}
-params["credential"] = myslice
-params["ticket"]     = ticket2
-params["rspec"]      = rspec
-rval,response = do_method(None, "UpdateTicket", params, url2)
+params["credentials"] = (myslice,)
+params["sliver_urn"]  = sliver2_urn
+params["rspec"]       = rspec
+rval,response = do_method(None, "UpdateSliver", params,
+                          URI=url2, version="2.0")
 if rval:
-    Fatal("Could not update ticket on CM2")
+    Fatal("Could not update sliver on CM2")
     pass
 ticket2 = response["value"]
-print "Updated ticket on CM2. Updating sliver on CM1 with new ticket ..."
+print "Updated sliver on CM2. Redeeming new ticket on CM1 ..."
 
 #
 # Update the slivers with the new tickets, to create the tunnels
 #
 params = {}
-params["credential"] = sliver1
-params["ticket"]     = ticket1
-rval,response = do_method(None, "UpdateSliver", params, url1)
+params["credentials"] = (sliver1,)
+params["slice_urn"]   = SLICEURN
+params["ticket"]      = ticket1
+params["keys"]        = mykeys
+rval,response = do_method(None, "RedeemTicket", params,
+                          URI=url1, version="2.0")
 if rval:
-    Fatal("Could not update sliver on CM1")
+    Fatal("Could not redeem new ticket on CM1")
     pass
 manifest1 = response["value"]
-print "Updated sliver on CM1. Updating sliver on CM2 with new ticket ..."
+print "Redeemed new ticket CM1. Redeeming new ticket on CM2 ..."
 #print str(manifest1);
 
 params = {}
-params["credential"] = sliver2
-params["ticket"]     = ticket2
-rval,response = do_method(None, "UpdateSliver", params, url2)
+params["credentials"] = (sliver2,)
+params["slice_urn"]   = SLICEURN
+params["ticket"]      = ticket2
+params["keys"]        = mykeys
+rval,response = do_method(None, "RedeemTicket", params,
+                          URI=url2, version="2.0")
 if rval:
-    Fatal("Could not start sliver on CM2")
+    Fatal("Could not redeem new ticket on CM2")
     pass
 manifest2 = response["value"]
-print "Updated sliver on CM2. Starting sliver on CM1 ..."
+print "Redeemed new ticket on CM2. Starting sliver on CM1 ..."
 #print str(manifest1);
 
 #
 # Start the slivers.
 #
 params = {}
-params["credential"] = sliver1
-rval,response = do_method(None, "StartSliver", params, url1)
+params["credentials"] = (sliver1,)
+params["slice_urn"]   = SLICEURN
+rval,response = do_method(None, "StartSliver", params, URI=url1, version="2.0")
 if rval:
     Fatal("Could not start sliver on CM1")
     pass
 print "Started sliver on CM1. Starting sliver on CM2 ..."
 
 params = {}
-params["credential"] = sliver2
-rval,response = do_method(None, "StartSliver", params, url2)
+params["credentials"] = (sliver2,)
+params["slice_urn"]   = SLICEURN
+rval,response = do_method(None, "StartSliver", params, URI=url2, version="2.0")
 if rval:
     Fatal("Could not start sliver on CM2")
     pass
@@ -340,24 +403,4 @@ print "Slivers have been started, waiting for input to delete it"
 print "You should be able to log into the sliver after a little bit"
 sys.stdin.readline();
 
-#
-# Delete the slivers.
-#
-print "Deleting sliver1 now"
-params = {}
-params["credential"] = sliver1
-rval,response = do_method(None, "DeleteSliver", params, url1)
-if rval:
-    Fatal("Could not delete sliver on CM1")
-    pass
-print "Sliver1 has been deleted"
-
-print "Deleting sliver2 now"
-params = {}
-params["credential"] = sliver2
-rval,response = do_method(None, "DeleteSliver", params, url2)
-if rval:
-    Fatal("Could not delete sliver on CM2")
-    pass
-print "Sliver2 has been deleted"
-
+DeleteSlivers()

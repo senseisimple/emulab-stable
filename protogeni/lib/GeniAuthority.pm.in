@@ -20,6 +20,8 @@ use vars qw(@ISA @EXPORT);
 use GeniDB;
 use GeniRegistry;
 use GeniHRN;
+use Genixmlrpc;
+use GeniResponse;
 use emutil qw(TBGetUniqueIndex);
 use English;
 use overload ('""' => 'Stringify');
@@ -52,26 +54,11 @@ sub Lookup($$)
 	$query_result =
 	    DBQueryWarn("select uuid from geni_authorities ".
 			"where urn='$token'");
-	if( $query_result && $query_result->numrows ) {
-	    ($uuid) = $query_result->fetchrow_array();
-	} else {
-	    # Fallback for backward compatibility (hunt for an
-	    # authority in the database that was never registered with
-	    # a URN).  This is ugly and fragile and needs to go away
-	    # as soon as all authorities have re-registered with URNs.
-	    my ($auth,$t,$id) = GeniHRN::Parse($token);
-	    my $regexp = "/.[-[:alnum:]]+.${auth}";
-	    $regexp =~ s/\./\\\./g;
 
-	    $query_result =
-		DBQueryWarn("select uuid from geni_authorities ".
-			    "where url regexp '$regexp' and ".
-			    "      type='$id'");
-	    return undef
-		if (! $query_result || !$query_result->numrows);
+	return undef
+	    if (! $query_result || !$query_result->numrows);
 
-	    ($uuid) = $query_result->fetchrow_array();
-	}
+	($uuid) = $query_result->fetchrow_array();
     }
     elsif ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
 	$uuid = $token;
@@ -105,6 +92,7 @@ sub Lookup($$)
 
     my $self              = {};
     $self->{'AUTHORITY'}  = $query_result->fetchrow_hashref();
+    $self->{'version'}    = undef;
     bless($self, $class);
 
     #
@@ -188,6 +176,7 @@ sub url($)		{ return field($_[0], "url"); }
 sub hrn($)		{ return field($_[0], "hrn"); }
 sub type($)		{ return field($_[0], "type"); }
 sub disabled($)		{ return field($_[0], "disabled"); }
+sub version($)		{ return field($_[0], "version"); }
 sub cert($)		{ return $_[0]->{'CERT'}->cert(); }
 sub GetCertificate($)   { return $_[0]->{'CERT'}; }
 
@@ -257,6 +246,10 @@ sub CreateFromRegistry($$$)
 {
     my ($class, $type, $name) = @_;
 
+    my $authority = GeniAuthority->Lookup($name);
+    return $authority
+	if (defined($authority) && $authority->urn());
+
     my $clearinghouse = GeniRegistry::ClearingHouse->Create();
     return undef
 	if (!defined($clearinghouse));
@@ -269,13 +262,53 @@ sub CreateFromRegistry($$$)
     return undef
 	if (!defined($certificate));
 
-    my $authority = GeniAuthority->Create($certificate,
-					  $blob->{'url'},
-					  $blob->{'type'});
+    #
+    # At this point, we do not support non-urn sites. They must re-register.
+    #
+    my $urn = $certificate->urn();
+    if (!defined($urn)) {
+	print STDERR "GeniAuthority::CreateFromRegistry: ".
+	    "$certificate does not have a urn.\n";
+	$certificate->Delete();
+	return undef;
+    }
+
+    $authority = GeniAuthority->Create($certificate,
+				       $blob->{'url'},
+				       $blob->{'type'});
     $certificate->Delete()
 	if (!defined($authority));
 
     return $authority;
+}
+
+#
+# Get Version. Ask the Authority what version it is running. 
+#
+sub Version($)
+{
+    my ($self) = @_;
+
+    return $self->version()
+	if (defined($self->version()));
+
+    #
+    # The caller had to set up the xmlrpc context.
+    #
+    my $response =
+	Genixmlrpc::CallMethod($self->url(), undef, "GetVersion");
+    
+    if (!defined($response)) {
+	print STDERR "*** Internal error getting version for $self\n";
+	return undef;
+    }
+    if ($response->code() != GENIRESPONSE_SUCCESS) {
+	print STDERR "Could not get version for $self Error: ";
+	print STDERR "  " . $response->output() . "\n";
+	return undef;
+    }
+    $self->{'version'} = $response->value();
+    return $response->value();
 }
 
 #

@@ -1,0 +1,96 @@
+#!/usr/bin/perl -w
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+use Data::Dumper;
+
+#
+# Resolve a uuid or hrn at the clearinghouse or an SA.
+# 
+sub usage()
+{
+    print "Usage: resolvenode urn\n";
+    exit(1);
+}
+my $optlist = "";
+my $uuid;
+my $hrn;
+
+#
+# Configure variables
+#
+my $TB		  = "@prefix@";
+my $TBOPS         = "@TBOPSEMAIL@";
+my $TBLOGS        = "@TBLOGSEMAIL@";
+my $PGENIDOMAIN   = "@PROTOGENI_DOMAIN@";
+my $PGENISUPPORT  = @PROTOGENI_SUPPORT@;
+my $CMCERT	  = "$TB/etc/genicm.pem";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Protos
+sub fatal($);
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+# Now we can load the libraries after setting the proper DB.
+use lib '@prefix@/lib';
+use GeniDB;
+use GeniCertificate;
+use GeniAuthority;
+use GeniComponent;
+use Genixmlrpc;
+use Carp;
+
+$Carp::Verbose = 1;
+
+#
+# Check args.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+usage()
+    if (@ARGV != 1);
+my $token = $ARGV[0];
+
+#
+# Load the CM cert to act as caller context.
+#
+my $certificate = GeniCertificate->LoadFromFile($CMCERT);
+if (!defined($certificate)) {
+    fatal("Could not load certificate from $CMCERT\n");
+}
+Genixmlrpc->SetContext(Genixmlrpc->Context($certificate));
+
+my $component = GeniComponent->CreateFromRegistry($token);
+if (!defined($component)) {
+    fatal("Could not create component for $token");
+}
+my $blob = $component->Resolve();
+if (!defined($blob)) {
+    fatal("Could not Resolve $component");
+}
+print Dumper($blob);
+exit(0);
+
+sub fatal($)
+{
+    my ($msg) = @_;
+
+    print STDERR "*** $0:\n".
+	         "    $msg\n";
+    # exit value important.
+    exit(-1);
+}
