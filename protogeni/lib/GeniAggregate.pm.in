@@ -26,6 +26,7 @@ use GeniRegistry;
 use GeniUtil;
 use GeniUser;
 use GeniHRN;
+use GeniXML;
 use emutil;
 use Lan;
 use Data::Dumper;
@@ -646,29 +647,22 @@ sub GetManifest($$)
     }
     my ($xml) = $query_result->fetchrow_array();
 
-    my $manifest =
-	eval { XMLin($xml, KeyAttr => [],
-		     ForceArray => ["node", "link", "interface",
-				    "interface_ref", "linkendpoints"]) };
-    if ($@) {
-	print STDERR "XMLin error reading manifest: $@\n";
+    my $manifest = GeniXML::Parse($xml);
+    if (!defined($manifest)) {
 	return undef;
     }
+
     #
     # Update the manifest ticket to reflect the current expiration time.
     #
-    $manifest->{'valid_until'} =
-	POSIX::strftime("20%y-%m-%dT%H:%M:%S",
-			gmtime(str2time($slice->expires())));
+    my $valid_date = POSIX::strftime("20%y-%m-%dT%H:%M:%S",
+				     gmtime(str2time($slice->expires())));
+    GeniXML::SetText("valid_until", $manifest, $valid_date);
 
     return $manifest
 	if (!$asxml);
     
-    $xml = eval { XMLout($manifest, "NoAttr" => 1, RootName => "manifest") };
-    if ($@) {
-	print STDERR "XMLout error on manifest: $@\n";
-	return undef;
-    }
+    $xml = $manifest->toString();
     return $xml;
 }
 
@@ -1235,10 +1229,12 @@ sub Create($$$$$$)
 	$linkrspec, $node1rspec, $node2rspec) = @_;
     my $clearinghouse;
 
-    my $linkname = $linkrspec->{"nickname"} || $linkrspec->{"virtual_id"};
+    my $linkname = GeniXML::GetText("./n:nickname | ".
+				    "./n:virtual_id", $linkrspec);
     return undef
 	if (!defined($linkname));
-    my @interfaces = @{ $linkrspec->{'interface_ref'} };
+    my @interfaces = GeniXML::FindNodes("./n:interface_ref",
+					$linkrspec)->get_nodelist();
     
     my $experiment = Experiment->Lookup($slice->uuid());
     if (!defined($experiment)) {
@@ -1269,8 +1265,8 @@ sub Create($$$$$$)
     my $iface2ref = $interfaces[1];
 
     # These are the ips of the tunnel.
-    my $ip1      = $iface1ref->{'tunnel_ip'};
-    my $ip2      = $iface2ref->{'tunnel_ip'};
+    my $ip1      = GeniXML::GetText("./n:tunnel_ip", $iface1ref);
+    my $ip2      = GeniXML::GetText("./n:tunnel_ip", $iface2ref);
     my $ctrlip1;
     my $ctrlip2;
     my $iface1;
@@ -1295,7 +1291,8 @@ sub Create($$$$$$)
 	}
     }
     else {
-	my $component = GeniComponent->Lookup($node1rspec->{'component_uuid'});
+	my $component_name = GeniXML::GetNodeId($node1rspec);
+	my $component = GeniComponent->Lookup($component_name);
 	my $blob;
 	
 	if (!defined($component)) {
@@ -1304,10 +1301,10 @@ sub Create($$$$$$)
 	    #
 	    $clearinghouse = GeniRegistry::ClearingHouse->Create();
 	
-	    if ($clearinghouse->Resolve($node1rspec->{'component_uuid'},
+	    if ($clearinghouse->Resolve($component_name,
 					"Component", \$blob) != 0) {
 		print STDERR "Could not lookup node at clearinghouse\n";
-		print STDERR Dumper($node1rspec);
+		print STDERR $node1rspec->toString();
 		goto bad;
 	    }
 	    my $certificate = GeniCertificate->LoadFromString($blob->{'gid'});
@@ -1332,13 +1329,13 @@ sub Create($$$$$$)
 	    print STDERR "Could not create a registry client for $component\n";
 	    goto bad;
 	}
-	$registry->Resolve($node1rspec->{'component_uuid'}, "Node", \$blob);
+	$registry->Resolve($component_name, "Node", \$blob);
 	$ctrlip1 = $blob->{'physctrl'}
 	    if (defined($blob) && exists($blob->{'physctrl'}));
 
 	if (!defined($ctrlip1)) {
 	    print STDERR "Could not get control IP for ".
-		"$node1rspec->{'component_uuid'} at $component\n";
+		"$component_name at $component\n";
 	    goto bad;
 	}
     }
@@ -1360,17 +1357,18 @@ sub Create($$$$$$)
     }
     else {
 	my $blob;
-	my $component = GeniComponent->Lookup($node2rspec->{'component_uuid'});
+	my $component_name = GeniXML::GetNodeId($node2rspec);
+	my $component = GeniComponent->Lookup($component_name);
 	if (!defined($component)) {
 	    #
 	    # Need to ask the clearinghouse where this node comes from.
 	    #
 	    $clearinghouse = GeniRegistry::ClearingHouse->Create();
 	
-	    if ($clearinghouse->Resolve($node2rspec->{'component_uuid'},
+	    if ($clearinghouse->Resolve($component_name,
 					"Component", \$blob) != 0) {
 		print STDERR "Could not lookup node at clearinghouse\n";
-		print STDERR Dumper($node2rspec);
+		print STDERR $node2rspec->toString();
 		goto bad;
 	    }
 	    my $certificate = GeniCertificate->LoadFromString($blob->{'gid'});
@@ -1395,13 +1393,13 @@ sub Create($$$$$$)
 	    print STDERR "Could not create a registry client for $component\n";
 	    goto bad;
 	}
-	$registry->Resolve($node2rspec->{'component_uuid'}, "Node", \$blob);
+	$registry->Resolve($component_name, "Node", \$blob);
 	$ctrlip2 = $blob->{'physctrl'}
 	    if (defined($blob) && exists($blob->{'physctrl'}));
 
 	if (!defined($ctrlip2)) {
 	    print STDERR "Could not get control IP for ".
-		"$node2rspec->{'component_uuid'} at $component\n";
+		"$component_name at $component\n";
 	    goto bad;
 	}
     }

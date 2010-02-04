@@ -26,6 +26,7 @@ use GeniAuthority;
 use GeniComponent;
 use GeniUser;
 use GeniHRN;
+use GeniXML;
 use emutil qw(TBGetUniqueIndex);
 use User;
 use Project;
@@ -303,9 +304,7 @@ sub Manifest($)
 	return undef;
     }
     my ($manifest_string) = $query_result->fetchrow_array();
-    my $manifest = XMLin($manifest_string, KeyAttr => [],
-			 ForceArray => ["node", "link", "interface",
-					"interface_ref", "linkendpoints"]);
+    my $manifest = GeniXML::Parse($manifest_string);
 
     $self->{'MANIFEST'}    = $manifest;
     $self->{'MANIFESTSTR'} = $manifest_string;
@@ -321,13 +320,8 @@ sub UpdateManifest($$)
 	return -1;
     }
     my $manifest_idx = $self->manifest_idx();
-    my $manifest_string =
-	eval { XMLout($manifest, "NoAttr" => 1, RootName => "manifest") };
-    if ($@) {
-	print STDERR "UpdateManifest: XMLout error: $@\n";
-	print STDERR Dumper($manifest);
-	return -1;
-    }
+    my $manifest_string = $manifest->toString();
+
     my $query_result =
 	DBQueryWarn("update geni_manifests set ".
 		    "  manifest=". DBQuoteSpecial($manifest_string) . ", " .
@@ -362,13 +356,14 @@ sub GetTicket($$$$)
     #
     # Lets give it a reasonable default time.
     #
-    if (!exists($rspec->{'valid_until'})) {
-	$rspec->{'valid_until'} =
-	    POSIX::strftime("20%y-%m-%dT%H:%M:%S", gmtime(time() + (3600*6)));
+    my $valid_until = GeniXML::FindFirst("./n:valid_until", $rspec);
+    if (! defined($valid_until)) {
+	GeniXML::SetText("valid_until",
+			 POSIX::strftime("20%y-%m-%dT%H:%M:%S",
+					 gmtime(time() + (3600*6))));
     }
 
-    my $rspec_string = XMLout($rspec, "NoAttr" => 1);
-    $rspec_string =~ s/opt\>/rspec\>/g;
+    my $rspec_string = $rspec_nodes->toString();
 
     #
     # Load the SA cert to act as caller context.

@@ -31,6 +31,7 @@ use GeniSlice;
 use GeniSliver;
 use GeniUser;
 use GeniHRN;
+use GeniXML;
 use libtestbed;
 use User;
 use Node;
@@ -305,20 +306,26 @@ sub CreatePhysNode($)
 	}
     }
     elsif (exists($blob->{'rspec'})) {
-	my $rspec = XMLin($blob->{'rspec'}, KeyAttr => [],
-			  ForceArray => ["interface"]);
-	
-	foreach my $noderef (@{ $rspec->{'node'} }) {
+	my $rspec = GeniXML::Parse($blob->{'rspec'});
+	if (!defined($rspec)) {
+	    goto bad;
+	}
+	foreach my $noderef (GeniXML::FindNodes("./n:node",
+						$rspec)->get_nodelist()) {
 	    next
-		if ($noderef->{'component_uuid'} ne $node_urn);
+		if (GeniXML::GetNodeId($noderef) ne $node_urn);
 	    next
-		if (! exists($noderef->{'interface'}));
+		if (! defined(GeniXML::FindFirst("./n:interface", $noderef)));
 
 	    my $count = 0;
 	    
-	    foreach my $ref (@{ $noderef->{'interface'} }) {
-		my $component_id = $ref->{'component_id'};
-		my $role = (exists($ref->{'role'}) ? $ref->{'role'} : "expt");
+	    foreach my $ref (GeniXML::FindNodes("./n:interface",
+						$noderef)->get_nodelist()) {
+		my $component_id = GeniXML::GetText("./n:component_id", $ref);
+		my $role = GeniXML::GetText("./n:role", $ref);
+		if (! defined($role)) {
+		    $role = "expt";
+		}
 		my $MAC  = "00000000000" . $count;
 
 		my ($auth,$id,$iface) = GeniHRN::ParseInterface($component_id);

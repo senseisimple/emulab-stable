@@ -22,6 +22,7 @@ use GeniCertificate;
 use GeniAggregate;
 use GeniUsage;
 use GeniHRN;
+use GeniXML;
 use emutil;
 use Experiment;
 use OSinfo;
@@ -105,12 +106,8 @@ sub Lookup($$)
 
     my $rspec_string = $self->{'SLIVER'}->{'rspec_string'};
     if (defined($rspec_string) && $rspec_string ne "") {
-	my $rspec = 
-	    eval { XMLin($rspec_string, KeyAttr => [],
-			 ForceArray => ["node", "link", "interface",
-					"interface_ref", "linkendpoints"]) };
-	if ($@) {
-	    print STDERR "XMLin error reading rspec: $@\n";
+	my $rspec = GeniXML::Parse($rspec_string);
+	if (!defined($rspec)) {
 	    return undef;
 	}
 	$self->{'RSPEC'} = $rspec;
@@ -200,7 +197,7 @@ sub Create($$$$$$$$$)
     push(@insert_data, "slice_uuid='$slice_uuid'");
 
     if (defined($rspec)) {
-	my $rspec_string = XMLout($rspec, RootName => "rspec");
+	my $rspec_string = $rspec->toString();
 	my $safe_rspec   = DBQuoteSpecial($rspec_string);
 
 	push(@insert_data, "rspec_string=$safe_rspec");
@@ -304,12 +301,7 @@ sub GetManifest($$)
     return $manifest
 	if (!$asxml);
     
-    my $xml =
-	eval { XMLout($manifest, "NoAttr" => 1, RootName => "manifest") };
-    if ($@) {
-	print STDERR "XMLout error on manifest: $@\n";
-	return undef;
-    }
+    my $xml = $self->rspec()->toString();
     return $xml;
 }
 
@@ -594,8 +586,14 @@ sub component_urn($)
 
 sub Create($$$$$$)
 {
+    # $rspec is a LibXML element representing a single node.
     my ($class, $slice, $user, $resource_uuid, $rspec) = @_;
-    my $virtualization_type = $rspec->{'virtualization_type'};
+    my $virt_xml = GeniXML::FindFirst("./n:virtualization_type", $rspec);
+    if (!defined($virt_xml)) {
+	print STDERR "Node does not contain a virtualization_type\n";
+	return undef;
+    }
+    my $virtualization_type = $virt_xml->textContent();
 
     my $experiment = $slice->GetExperiment();
     if (!defined($experiment)) {
@@ -631,7 +629,12 @@ sub Create($$$$$$)
 	    return undef;
 	}
     }
-    my $nickname = $rspec->{'virtual_id'};
+    my $virtual_id_xml = GeniXML::FindFirst("./n:virtual_id", $rspec);
+    if (!defined($virtual_id_xml)) {
+	print STDERR "Node does not contain a virtual_id\n";
+	return undef;
+    }
+    my $nickname = $virtual_id_xml->textContent();
     my $hrn;
     my $sshdport;
     my $hostname;
@@ -665,10 +668,10 @@ sub Create($$$$$$)
     #
     # Add this stuff to the rspec (which becomes the manifest).
     #
-    $rspec->{'sliver_uuid'}   = $sliver_uuid;
-    $rspec->{'hostname'}      = $hostname;
-    $rspec->{'sshdport'}      = $sshdport if (defined($sshdport));
-    $rspec->{'component_urn'} = $component_urn;
+    $rspec->setAttribute("sliver_uuid", $sliver_uuid);
+    $rspec->setAttribute("hostname", $hostname);
+    $rspec->setAttribute("sshdport", $sshdport) if (defined($sshdport));
+    $rspec->setAttribute("component_urn", $component_urn);
 
     return GeniSliver->Create($slice, $user, $sliver_uuid, $resource_uuid,
 			      "Node", $resource_id, $hrn, $nickname, $rspec);
@@ -717,9 +720,11 @@ sub Provision($;$)
     my $pid = $experiment->pid();
     my $eid = $experiment->eid();
 
+    my $virt_type = GeniXML::FindFirst("./n:virtualization_type",
+				       $self->rspec());
     if (!$node->isremotenode() &&
-	exists($self->rspec()->{'virtualization_type'}) &&
-	$self->rspec()->{'virtualization_type'} eq "emulab-vnode") {
+	defined($virt_type) &&
+	$virt_type->textContent() eq "emulab-vnode") {
 	my $pnode = Node->Lookup($node->phys_nodeid());
 	if (!defined($pnode)) {
 	    print STDERR "Could not get pnode object for $node\n";
@@ -729,8 +734,10 @@ sub Provision($;$)
 	# Mark
 	$node->ModifyReservation({"genisliver_idx" => $self->idx()});
 
-	if (exists($self->rspec()->{'virtualization_subtype'})) {
-	    my $subtype = $self->rspec()->{'virtualization_subtype'};
+	my $virt_subtype_xml = GeniXML::FindFirst("./n:virtualization_subtype",
+						  $self->rspec());
+	if (defined($virt_subtype_xml)) {
+	    my $subtype = $virt_subtype_xml->textContent();
 	    
 	    if (!$pnode->sharing_mode()) {
 		$pnode->ModifyReservation({"genisliver_idx" => $self->idx()});
@@ -808,8 +815,11 @@ sub UnProvision($;$)
 	    }
 	}
 
+	my $virt_type = GeniXML::FindFirst("./n:virtualization_type",
+					   $self->rspec());
 	if (!$node->isremotenode() &&
-	    $self->rspec()->{'virtualization_type'} eq "emulab-vnode") {
+	    defined($virt_type) &&
+	    $virt_type->textContent() eq "emulab-vnode") {
 	    my $pnode_id = $node->phys_nodeid();
 	    my $pnode = Node->Lookup($pnode_id);
 	    if (!defined($pnode)) {
@@ -902,12 +912,15 @@ sub ProcessManifest($$)
 	#
 	# Find the corresponding node in the manifest.
 	#
-	foreach my $ref (@{$manifest->{'node'}}) {
-	    if ($ref->{'sliver_uuid'} eq $uuid) {
+	foreach my $ref (GeniXML::FindNodes("./n:node",
+					    $manifest)->get_nodelist()) {
+	    my $sliver_xml = GeniXML::FindFirst("./n:sliver_uuid", $ref);
+	    if (defined($sliver_xml) && $sliver_xml->textContent() eq $uuid) {
 		# startup command.
-		if (exists($ref->{'startup_command'})) {
-		    my $startupcmd = $ref->{'startup_command'};
-	    
+		my $startup = GeniXML::FindFirst("./n:startup_command", $ref);
+		if (defined($startup)) {
+		    my $startupcmd = $startup->textContent();
+
 		    if (! TBcheck_dbslot($startupcmd, "virt_nodes",
 					 "startupcmd",
 					 TBDB_CHECKDBSLOT_WARN|
@@ -1127,8 +1140,8 @@ sub Create()
     #
     # Add this stuff to the rspec (which becomes the manifest).
     #
-    $rspec->{'sliver_uuid'}   = $interface_uuid;
-    $rspec->{'component_urn'} = $component_urn;
+    GeniXML::SetText("sliver_uuid", $rspec, $interface_uuid);
+    GeniXML::SetText("component_urn", $rspec, $component_urn);
 
     return GeniSliver->Create($slice, $user, $interface_uuid,
 			      $interface_uuid, "Interface", $resource_id,
