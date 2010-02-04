@@ -1213,9 +1213,10 @@ sub GetTicketAuxAux($$$$$$$$)
     foreach my $ref (GeniXML::FindNodes("n:link",
 					$solution)->get_nodelist()) {
 	my $nickname          = GeniXML::GetVirtualId($ref);
-	my $interfaces        = GeniXML::FindNodes("n:interface_ref", $ref);
+	my @interfaces        = GeniXML::FindNodes("n:interface_ref",
+						   $ref)->get_nodelist();
 
-	foreach my $iface_ref ($interfaces) {
+	foreach my $iface_ref (@interfaces) {
 	    my $virtual_node_id   = GeniXML::GetText("virtual_node_id",
 						     $iface_ref);
 	    my $virtual_port_id   = GeniXML::GetText("virtual_port_id",
@@ -1944,7 +1945,7 @@ sub SliverWorkAux($$$$$$$)
 	}
 	my $sliver = GeniSliver::Node->Create($slice,
 					      $owner,
-					      $resource_uuid,
+					      $node->node_id(),
 					      $ref);
 	if (!defined($sliver)) {
 	    $message = "Could not create GeniSliver object for $virtual_id";
@@ -2107,6 +2108,9 @@ sub SliverWorkAux($$$$$$$)
 	    my $interface;
 
 	    if ($iface_name ne "lo0") {
+		my ($authority, $short_node, $short_iface) =
+		    GeniHRN::ParseInterface($iface_name);
+		$iface_name = $short_iface;
 		$interface = Interface->LookupByIface($nodeobject,$iface_name);
 		if (!defined($interface)) {
 		    $message = "No such interface ".
@@ -2129,7 +2133,7 @@ sub SliverWorkAux($$$$$$$)
 	    GeniXML::SetText("sliver_urn", $ifaceref, $sliver->sliver_urn());
 	    GeniXML::SetText("MAC", $ifaceref, $interface->mac())
 		if (defined($interface));
-	    $ifaceref->{'IP'} = $interface->IP()
+	    GeniXML::SetText("IP", $ifaceref, $interface->IP())
 		if (defined($interface) &&
 		    defined($interface->IP()) && $interface->IP() ne "");
 	    
@@ -2197,7 +2201,7 @@ sub SliverWorkAux($$$$$$$)
 	    goto bad;
 	}
 	foreach my $linkref (GeniXML::FindNodes("n:link",
-						$rspec->get_nodelist())) {
+						$rspec)->get_nodelist()) {
 	    my $vname = GeniXML::GetVirtualId($linkref);
 	    my $vlan;
 
