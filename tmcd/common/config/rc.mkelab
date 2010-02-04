@@ -237,7 +237,11 @@ sub doboot()
     $emulabconfig{"JAILIPBASE"} = "172.16.0.0";
     $emulabconfig{"JAILIPMASK"} = "255.240.0.0";
     $emulabconfig{"MFSTARBALL"} = "tftpboot-elabinelab.tar.gz";
-    $emulabconfig{"MFSVERSION"} = "62";
+    if ($FBSD_VERSION == 7.2) {
+	$emulabconfig{"MFSVERSION"} = "72";
+    } else {
+	$emulabconfig{"MFSVERSION"} = "62";
+    }
     $emulabconfig{"MFSCONSOLE"} = "sio";
     $emulabconfig{"WINSUPPORT"} = 0;
     $emulabconfig{"NOSETUP"}    = 0;
