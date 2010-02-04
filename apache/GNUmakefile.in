@@ -71,10 +71,10 @@ ifeq ($(SCRIPT_HACK),1)
 	    mv /usr/local/etc/rc.d/apache /usr/local/etc/rc.d/.apache.real; \
 	fi
 	$(INSTALL) -m 755 $(SRCDIR)/apache-emulab /usr/local/etc/rc.d/apache.sh
+endif
 
 install: install-dirs install-scripts httpd.conf.fixed
 	$(INSTALL_DATA) httpd.conf.fixed $(INSTALL_APACHE_CONFIG)/httpd.conf
-endif
 
 control-install: install-dirs install-scripts httpd.conf-ops
 	$(INSTALL_DATA) httpd.conf-ops $(INSTALL_APACHE_CONFIG)/httpd.conf
