@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -300,6 +300,11 @@ DEVICE: foreach my $name (keys %portMap) {
 	/nortel/ && do {
 	    require snmpit_nortel;
 	    $device = new snmpit_nortel($name);
+	    last;
+	};
+	/hp/ && do {
+	    require snmpit_hp;
+	    $device = new snmpit_hp($name);
 	    last;
 	};
 
