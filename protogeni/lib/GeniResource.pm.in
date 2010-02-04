@@ -358,12 +358,12 @@ sub GetTicket($$$$)
     #
     my $valid_until = GeniXML::GetText("valid_until", $rspec);
     if (! defined($valid_until)) {
-	GeniXML::SetText("valid_until",
+	GeniXML::SetText("valid_until", $rspec,
 			 POSIX::strftime("20%y-%m-%dT%H:%M:%S",
 					 gmtime(time() + (3600*6))));
     }
 
-    my $rspec_string = $rspec_nodes->toString();
+    my $rspec_string = $rspec->toString();
 
     #
     # Load the SA cert to act as caller context.

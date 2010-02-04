@@ -73,8 +73,6 @@ sub FindNodes($$)
 	} else {
 	    $path =~ s/\bn://g;
 	}
-	$path = $path . '[node()]';
-	print STDERR $path."\n";
 	$result = $xc->findnodes($path, $node);
     };
     if ($@) {
@@ -192,14 +190,17 @@ sub SetText($$$)
 {
     my ($name, $node, $text) = @_;
     my $result = 0;
-    my $child = FindFirst("@n:".$name, $node);
+    my $child = FindFirst('@n:'.$name, $node);
+    if (! defined($child)) {
+	$child = FindFirst('@'.$name, $node);
+    }
     if (defined($child)) {
 	if ($child->nodeType() == XML_ATTRIBUTE_NODE) {
 	    $child->setValue($text);
 	    $result = 1;
 	}
     } else {
-	$child = FindFirst("n:".$name, $node);
+	$child = FindFirst('n:'.$name, $node);
 	if (defined($child)) {
 	    my @grand = $child->childNodes();
 	    if (scalar(@grand) == 1
@@ -223,11 +224,14 @@ sub GetText($$)
 {
     my ($name, $node) = @_;
     my $result = undef;
-    my $child = FindFirst("@n:".$name, $node);
+    my $child = FindFirst('@n:'.$name, $node);
+    if (! defined($child)) {
+	$child = FindFirst('@'.$name, $node);
+    }
     if (defined($child)) {
 	$result = $child->textContent();
     } else {
-	$child = FindFirst("n:".$name, $node);
+	$child = FindFirst('n:'.$name, $node);
     }
     return $result;
 }

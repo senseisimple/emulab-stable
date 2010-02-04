@@ -629,7 +629,7 @@ sub Create($$$$$$)
 	}
     }
     my $nickname = GeniXML::GetVirtualId($rspec);
-    if (!defined($virtual_id_xml)) {
+    if (!defined($nickname)) {
 	print STDERR "Node does not contain a virtual_id\n";
 	return undef;
     }
@@ -720,6 +720,7 @@ sub Provision($;$)
 
     my $virt_type = GeniXML::GetText("virtualization_type", $self->rspec());
     if (!$node->isremotenode() &&
+	defined($virt_type) &&
 	$virt_type eq "emulab-vnode") {
 	my $pnode = Node->Lookup($node->phys_nodeid());
 	if (!defined($pnode)) {
@@ -812,6 +813,7 @@ sub UnProvision($;$)
 	my $virt_type = GeniXML::GetText("virtualization_type",
 					 $self->rspec());
 	if (!$node->isremotenode() &&
+	    defined($virt_type) &&
 	    $virt_type eq "emulab-vnode") {
 	    my $pnode_id = $node->phys_nodeid();
 	    my $pnode = Node->Lookup($pnode_id);
@@ -908,7 +910,7 @@ sub ProcessManifest($$)
 	foreach my $ref (GeniXML::FindNodes("n:node",
 					    $manifest)->get_nodelist()) {
 	    my $sliver_id = GeniXML::GetText("sliver_uuid", $ref);
-	    if ($sliver_id eq $uuid) {
+	    if (defined($sliver_id) && $sliver_id eq $uuid) {
 		# startup command.
 		my $startupcmd = GeniXML::GetText("startup_command", $ref);
 		if (defined($startupcmd)) {

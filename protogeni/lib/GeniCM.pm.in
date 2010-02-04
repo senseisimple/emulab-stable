@@ -606,7 +606,8 @@ sub GetTicketAuxAux($$$$$$$$)
     # This changes what tmcd returns to the local nodes.
     #
     my $generated_by = GeniXML::GetText("generated_by", $rspec);
-    if ($generated_by eq "libvtop") {
+    if (defined($generated_by) &&
+	$generated_by eq "libvtop") {
 	$slice_experiment->Update({"geniflags" =>
 				       $Experiment::EXPT_GENIFLAGS_EXPT|
 				       $Experiment::EXPT_GENIFLAGS_COOKED});
@@ -915,7 +916,6 @@ sub GetTicketAuxAux($$$$$$$$)
 	
 	foreach my $linkref (GeniXML::FindNodes("n:interface",
 						$ref)->get_nodelist()) {
-	    my $component_id = GeniXML::GetText("component_id", $linkref);
 	    my $virtual_id   = GeniXML::GetText("virtual_id", $linkref);
 
 	    if (!defined($virtual_id)) {
@@ -951,7 +951,8 @@ sub GetTicketAuxAux($$$$$$$$)
     foreach my $linkref (GeniXML::FindNodes("n:link",
 					    $rspec)->get_nodelist()) {
 	my $lanname    = GeniXML::GetVirtualId($linkref);
-	my $istunnel   = (GeniXML::GetText("link_type", $linkref) eq "tunnel");
+	my $link_type  = GeniXML::GetText("link_type", $linkref);
+	my $istunnel   = (defined($link_type) && $link_type eq "tunnel");
 	my @interfaces = GeniXML::FindNodes("n:linkendpoints | ".
 					    "n:interface_ref",
 					    $linkref)->get_nodelist();
@@ -1179,11 +1180,12 @@ sub GetTicketAuxAux($$$$$$$$)
 	$exclusive = 0
 	    if (!defined($exclusive));
 	
-	$rspec->{'component_urn'} = GeniHRN::Generate( $OURDOMAIN, "node",
-						       $node->node_id() );
-	$rspec->{'component_uuid'} = $component_uuid;
-	$rspec->{'component_manager_urn'} = $ENV{'MYURN'};
-	$rspec->{'component_manager_uuid'} = $ENV{'MYUUID'};
+	GeniXML::SetText("component_urn", $rspec,
+			 GeniHRN::Generate( $OURDOMAIN, "node",
+					    $node->node_id() ));
+	GeniXML::SetText("component_uuid", $rspec, $component_uuid);
+	GeniXML::SetText("component_manager_urn", $rspec, $ENV{'MYURN'});
+	GeniXML::SetText("component_manager_uuid", $rspec, $ENV{'MYUUID'});
 
 	# Also update the virtexperiment table row.
 	# Do not update subnodes; they are fixed to the parent,
