@@ -109,26 +109,23 @@ my $entry = $_;
 #
 # Reverse the rest of the entries, saving them up, month by month
 #
-my $this_month  = $STARTDATE;
 my $index       = 0;
-my @month_index = ($STARTDATE);
-my %month_data  = ($STARTDATE => []);
+my @month_index = ();
+my %month_data  = ();
 my $month;
 
 while (<INPUT>) {
     if ($_ =~
 	/^Date:\s*(\d\d\d\d\-\d\d)\-\d\d\s*\d\d:\d\d:\d\d\s*[+-]?\w\w\w\w$/) {
-	$month = $1;
+	$this_month = $1;
     }
     elsif ($_ =~ /^commit\s*[\w]*$/) {
+	if (! exists($month_data{$this_month})) {
+	    $month_data{$this_month} = [];
+	    $month_index[$index++]   = $this_month;
+	}
 	unshift(@{ $month_data{$this_month} }, $entry);
 	$entry = $_;
-	if ($month ne $this_month) {
-	    $this_month = $month;
-	    $index++;
-	    $month_index[$index] = $this_month;
-	    $month_data{$this_month} = [];
-	}
 	next;
     }
     $entry .= $_;
@@ -138,7 +135,7 @@ close(INPUT);
 #
 # Write out the list in one file (reverse order of course).
 # 
-for (my $i = $index; $i >= 0; $i--) {
+for (my $i = $index - 1; $i >= 0; $i--) {
     my @entries = @{ $month_data{$month_index[$i]} };
 
     foreach my $entry (@entries) {
@@ -159,7 +156,7 @@ unlink($tempname)
 #
 # Now write a bunch of per-month files.
 #
-for (my $i = 0; $i <= $index; $i++) {
+for (my $i = 0; $i < $index; $i++) {
     my @entries = @{ $month_data{$month_index[$i]} };
     my $month   = $month_index[$i];
     $month =~ s/\//-/g;
@@ -189,7 +186,7 @@ if (!open(OUTPUT, "> $tempname")) {
     fatal("Could not open $tempname for writing!");
 }
 
-for (my $i = $index; $i >= 0; $i--) {
+for (my $i = $index - 1; $i >= 0; $i--) {
     my $month   = $month_index[$i];
     $month =~ s/\//-/g;
     my $target  = "ChangeLog-" . $month . ".txt";
