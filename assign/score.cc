@@ -382,17 +382,40 @@ float find_link_resolutions(resolution_vector &resolutions, pvertex pv,
       // interface, we have to look up interface speeds on both ends.
       int bandwidth;
       if (vlink->delay_info.adjust_to_native_bandwidth) {
-          // Note: It shouldn't be possible to get here without first or second
-          // being set - the parser disallows links to switches from using
-          // auto-adjusting bandwidths.
+          // Grab the actual plink objects for both pedges - it's possible for
+          // one or both to be missing if we're linking directly to a switch
+          // (as with a LAN)
+          tb_plink *first_plink = NULL;
+          tb_plink *second_plink = NULL;
+          if (first_link) {
+              first_plink = get(pedge_pmap,first);
+          }
+          if (second_link) {
+              second_plink = get(pedge_pmap,second);
+          }
 
-          // Grab the actual plink objects for both pedges
-          tb_plink *first_plink = get(pedge_pmap,first);
-          tb_plink *second_plink = get(pedge_pmap,second);
-          
-          // We use the minimum bandwidth of both endpoints
-          bandwidth = min(first_plink->delay_info.bandwidth,
-                  second_plink->delay_info.bandwidth);
+          if (first_plink != NULL && second_plink != NULL) {
+              // If both endpoints are not switches, we use the minimum
+              // bandwidth
+              bandwidth = min(first_plink->delay_info.bandwidth,
+                      second_plink->delay_info.bandwidth);
+          } else if (first_plink == NULL) {
+              // If one end is a switch, use the bandwidth from the other
+              // end
+              bandwidth = second_plink->delay_info.bandwidth;
+          } else if (second_plink == NULL) {
+              bandwidth = first_plink->delay_info.bandwidth;
+          } else {
+              // Both endpoints are switches! (eg. this might be a link between
+              // two LANs): It is not at all clear what the right semantics
+              // for this would be, and unfortunately, we can't catch this
+              // earlier. So, exiting with an error is crappy, but it's
+              // unlikely to happen in our regular use, and it's the best we
+              // can do.
+              cerr << "*** Using bandwidth adjustment on virutal links " <<
+                      "between switches not allowed " << endl;
+              exit(EXIT_FATAL);
+          }
       } else {
           // If not auto-adjusting, just use the specified bandwidth
           bandwidth = vlink->delay_info.bandwidth;

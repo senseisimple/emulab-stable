@@ -321,13 +321,6 @@ int parse_top(tb_vgraph &vg, istream& input)
             top_error("Auto-assigning bandwidth on trivial or emulated links"
                       " not allowed!");
         }
-        // Some sanity checks: this is also illegal, but would be easier to fix
-        // Also: nasty harcoding of "switch"
-        if (l->delay_info.adjust_to_native_bandwidth &&
-                (vnode1->type == "switch" || vnode2->type == "switch")) {
-            top_error("Auto-assigning bandwidth on links to switches"
-                      " not allowed!");
-        }
 	
       }
     } else if (command == string("make-vclass")) {
