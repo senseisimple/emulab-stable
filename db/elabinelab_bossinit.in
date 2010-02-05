@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -10,6 +10,12 @@ use Getopt::Std;
 #
 # ElabInElab: This is run on the inner boss to construct a bunch stuff
 # from the db (groups, projects, users, etc).
+#
+# We also use this opportunity to munge node-related bootstrap state.
+# Right now we only load the standard BSD-based pxeboot and MFSes into
+# an elabinelab, but many of our node types now use the Linux-based tools
+# instead.  So for the moment, we tweak the DB to rewrite everything to use
+# the BSD tools.
 #
 sub usage()
 {
@@ -152,6 +158,54 @@ while (my ($uid,$admin) = $users_result->fetchrow_array()) {
 #
 mysystem("$TB/sbin/genelists -a");
 mysystem("$TB/sbin/exports_setup");
+
+#
+# Fixup pxeboot and MFS info.
+#
+# Right now we only load the standard BSD-based pxeboot and MFSes into
+# an elabinelab, but many of our node types use the Linux-based tools instead.
+# So for the moment, we tweak the DB to rewrite everything to use the BSD
+# tools.
+#
+# XXX this should go away if we once again settle on a single set of tools.
+#
+if (1) {
+    # first find the OSIDs for the "standard" MFSes
+    my $qr = DBQueryFatal("select osname,osid from os_info where osname in ".
+			  "  ('FREEBSD-MFS','FRISBEE-MFS','NEWNODE-MFS') ".
+			  " and pid='$TBOPSPID'");
+    my ($amfs,$dmfs,$nmfs,$nmfspath);
+    while (my ($name, $osid) = $qr->fetchrow_array()) {
+	if ($name eq "FREEBSD-MFS") {
+	    $amfs = $osid;
+	} elsif ($name eq "FRISBEE-MFS") {
+	    $dmfs = $osid;
+	} else {
+	    $nmfs = $osid;
+	    $nmfspath = "/tftpboot/freebsd.newnode"; # XXX hardwired
+	}
+    }
+
+    # make sure newnode MFS points to the correct place
+    DBQueryFatal("update os_info set path='$nmfspath' where osid=$nmfs");
+
+    # and find all the node types and update their attributes.
+    $qr = DBQueryFatal("select type from node_types where class='pc'");
+    while (my ($ntype) = $qr->fetchrow_array()) {
+	# XXX assumes that BSD version is the default in dhcpd.conf.template
+	DBQueryFatal("delete from node_type_attributes ".
+		     "  where attrkey='pxe_boot_path' and type='$ntype'");
+	DBQueryFatal("update node_type_attributes set attrvalue='$amfs' ".
+		     "  where attrkey='adminmfs_osid' and type='$ntype'");
+	DBQueryFatal("update node_type_attributes set attrvalue='$dmfs' ".
+		     "  where attrkey='diskloadmfs_osid' and type='$ntype'");
+    }
+
+    #
+    # Remake the dhcpd.conf file to reflect any pxeboot change.
+    #
+    mysystem("$TB/sbin/dhcpd_makeconf -ir");
+}
 
 #
 # Run a command string.

@@ -1542,11 +1542,25 @@ sub SetupBossNode()
     # Copy the inner ssl cert and root's public ssh keys to the mfs's
     # so that imported they will talk to the inner boss properly.
     # At Berkeley the frisbee mfs copies these to disk images,
-    # needing changes to slicefix , which always needs to be run now.
+    # needing changes to slicefix, which always needs to be run now.
     #
     MungeMfsRoot("frisbee");
     MungeMfsRoot("freebsd");
     MungeMfsRoot("freebsd.newnode");
+
+    #
+    # XXX at Utah, many of our node types use a Linux-based boot/setup path
+    # (pxeboot & MFSes) that we don't currently load into inner elabs.
+    # To compensate, we do some inner DB munging (in the elabinelab_boss
+    # script).  However, due to either a bug or a feature, when a node gets
+    # redirected from real boss to the inner boss by the outer dhcpd, the
+    # node continues to use the "filename" spec returned by the outer dhcpd.
+    # This may point to the Linux (actually grub) pxeboot which doesn't exist
+    # inside.  We take care of this here (where we are root) by creating a
+    # symlink.
+    #
+    mysystem("cd /tftpboot; rm -rf pxeboot_grub2pxe; ".
+	     "ln -s pxeboot.emu pxeboot_grub2pxe");
 
     #
     # Set up a bunch of DB stuff.  This part will eventually be optional,
