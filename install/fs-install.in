@@ -325,6 +325,12 @@ Phase "rc.conf", "Adding testbed content to rc.conf", sub {
 
 Phase "hosts", "Adding boss/ops/fs IP addresses to $HOSTS", sub {
     DoneIfEdited($HOSTS);
+    # XXX get rid of any existing lines with boss/ops/fs
+    if ($ELABINELAB) {
+	my $dellist = "-e '/^${BOSSNODE_IP}/d' -e '/^${USERNODE_IP}/d'";
+	$dellist .= " -e '/^${FSNODE_IP}/d'";
+	ExecQuietFatal("sed -i.orig $dellist $HOSTS");
+    }
     my $hstr = "${BOSSNODE_IP}\t${BOSSNODE} boss".
 	      "\n${USERNODE_IP}\t@OPS_NAMES".
 	      "\n${FSNODE_IP}\t${FSNODE} fs";
@@ -487,7 +493,13 @@ Phase "samba", "Setting up Samba", sub {
 Phase "ssh", "Allowing root ssh", sub {
     Phase "sshdconfig", "Permitting root login through ssh", sub {
 	DoneIfEdited($SSHD_CONFIG);
-	AppendToFileFatal($SSHD_CONFIG,"PermitRootLogin yes");
+	# modern versions of FBSD explicitly turn off proto 1 by default
+	if ($FBSD_MAJOR > 6) {
+	    ExecQuietFatal("sed -i.orig -e 's/Protocol/#Protocol/' $SSHD_CONFIG");
+	}
+	AppendToFileFatal($SSHD_CONFIG,
+			  "PermitRootLogin yes",
+			  "Protocol 2,1");
     };
     Phase "dotssh", "Making root's .ssh directory", sub {
 	DoneIfExists("/root/.ssh");
