@@ -203,8 +203,9 @@ if (1) {
 
     #
     # Remake the dhcpd.conf file to reflect any pxeboot change.
+    # XXX dhcpd is not running yet so don't need this.
     #
-    mysystem("$TB/sbin/dhcpd_makeconf -ir");
+    #mysystem("$TB/sbin/dhcpd_makeconf -ir");
 }
 
 #
