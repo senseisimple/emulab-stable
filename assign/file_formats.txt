@@ -98,8 +98,8 @@ top file: <line>*
 <desire> ::= <desire_type><desire_name>:<float>
 <desire_type> ::= | "?+" | "&*" | "*!"
 
-<link_line1> ::= link <link_name> <interface> <interface> <int> <float> <float>
-                 <link_flag>*
+<link_line1> ::= link <link_name> <interface> <interface> <int|'*'> <float>
+                 <float> <link_flag>*
 <link_line2> ::= link <link_name> <interface> <interface> <int> <float> <float> 
                  <link_type> <link_flag*>
 <link_flag> ::= nodelay | emulated | trivial_ok | fixsrciface:<string> |
@@ -124,7 +124,9 @@ Interpretation:
 <desire> - see <feature> in the ptop file
 <desire_type> - see <feature_type> in the ptop file
 <link_line1> and <link_line2> - see notes below for the difference between the
-    two line types. See <link_line> in the ptop file.
+    two line types. See <link_line> in the ptop file. The integer gives the
+    bandwidth for the link, but if the special value '*' is given, assign
+    simply uses the native bandwidth of the interfaces selected.
 <link_type> - when present, a valid mapping must put this virtual link on a
     physical link of the same type. For multi-hop link mappings (ie. those
     that traverse multiple switches), *all* links used must be of this type. I
