@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004-2009 University of Utah and the Flux Group.
+# Copyright (c) 2004-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -190,7 +190,8 @@ sub RemoteDoVlansFromTables($@)
 		print STDERR "could not set vlan tag for $vlan\n";
 		$errors++;
 	    }
-	    VLan->RecordVlanInsertion($vlan->GetExperiment(), $vlan->lanid());
+	    VLan->RecordVlanInsertion($vlan->GetExperiment(), $vlan->lanid(),
+				      $vlan->GetClass());
 	}
     }
     else {

@@ -60,11 +60,7 @@ sub runTest
     my $num = $_[2];
     startProgram($dest, "sh /local/bw-bottleneck-wavelet/multiplex-server.sh $serverPort /local/bw-bottleneck-wavelet", 0);
     sleep(2);
-<<<<<<< scan-multiplex.pl
-    startProgram($source, "sh /bw-bottleneck/multiplex-client.sh $serverPort /bw-bottleneck end-$dest $duration $source-to-$dest-run-$run-$num", 0);
-=======
     startProgram($source, "sh /local/bw-bottleneck-wavelet/multiplex-client.sh $serverPort /local/bw-bottleneck-wavelet node-$dest.$exp.$proj.emulab.net $duration $source-to-$dest-run-$run-$num", 0);
->>>>>>> 1.2
     sleep($duration * 11);
 
     stopProgram($dest);
@@ -77,22 +73,11 @@ $count = 0;
 
 srand($run);
 
-<<<<<<< scan-multiplex.pl
-#while (1)
-#{
-#    $i = int(rand($nodeCount));
-#    $j = int(rand($nodeCount));
-for ($i = 1; $i <= $nodeCount; ++$i)
-=======
 my %PairHash = ();
 my $iterLimit = $nodeCount*($nodeCount-1);
 
 while (1)
->>>>>>> 1.2
 {
-<<<<<<< scan-multiplex.pl
-    for ($j = 1; $j <= $nodeCount; ++$j)
-=======
     $i = int(rand($nodeCount)) + 1;
     $j = int(rand($nodeCount)) + 1;
 
@@ -102,16 +87,7 @@ while (1)
     }
 
     if ($i != $j)
->>>>>>> 1.2
     {
-<<<<<<< scan-multiplex.pl
-	if ($i != $j)
-	{
-	    runTest($i, $j, $count);
-	    ++$count;
-#	runTest($nodes[$i], $nodes[$j]);
-	}
-=======
         my $nodeString = $i . ":" . $j;
         if( not ( $PairHash{$nodeString} ) )
         {
@@ -125,7 +101,6 @@ while (1)
         {
             next;
         }
->>>>>>> 1.2
     }
 }
 #    sleep(600);

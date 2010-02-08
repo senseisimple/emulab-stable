@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2004-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -42,11 +42,12 @@ if ($UID) {
 #
 my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
-my $INPUTLOG    = "/usr/testbed/scratch/CVS/CVSROOT/commitlogs/testbed";
+my $GIT         = "/usr/local/bin/git";
+my $GITDIR      = "/z/GIT/emulab-devel.git";
 my $OUTPUTLOG   = "$TB/www/doc/ChangeLog.txt";
 my $MONTHROOT   = "$TB/www/doc/ChangeLog";
 my $HTMLFILE    = "$TB/www/doc/changelog-months.html";
-my $STARTDATE   = "2003/10";
+my $STARTDATE   = "2003-10";
 my $tempname    = "/tmp/import.$$";
 my @entries     = ();
 
@@ -79,8 +80,9 @@ if (defined($options{d})) {
     $debug = 1;
 }
 
-if (!open(INPUT, $INPUTLOG)) {
-    fatal("Could not open $INPUTLOG for reading!");
+if (!open(INPUT, "$GIT --git-dir=$GITDIR log ".
+	  "--pretty=medium --numstat --date=iso --reverse |")) {
+    fatal("Could not start $GIT log process!");
 }
 if (!open(OUTPUT, "> $tempname")) {
     fatal("Could not open $tempname for writing!");
@@ -90,10 +92,16 @@ if (!open(OUTPUT, "> $tempname")) {
 # Skip to approximate start date.
 # 
 while (<INPUT>) {
-    if ($_ =~ /^\w*\s*(\d\d\d\d\/\d\d)\/\d\d\s*\d\d:\d\d:\d\d\s*\w\w\w$/) {
+    if ($_ =~
+	/^Date:\s*(\d\d\d\d\-\d\d)\-\d\d\s*\d\d:\d\d:\d\d\s*[+-]?\w\w\w\w$/) {
         if ($1 eq $STARTDATE) {
 	    last;
 	}
+    }
+}
+while (<INPUT>) {
+    if ($_ =~ /^commit\s*[\w]*$/) {
+	last;
     }
 }
 my $entry = $_;
@@ -105,13 +113,18 @@ my $this_month  = $STARTDATE;
 my $index       = 0;
 my @month_index = ($STARTDATE);
 my %month_data  = ($STARTDATE => []);
+my $month;
 
 while (<INPUT>) {
-    if ($_ =~ /^\w*\s*(\d\d\d\d\/\d\d)\/\d\d\s*\d\d:\d\d:\d\d\s*\w\w\w$/) {
+    if ($_ =~
+	/^Date:\s*(\d\d\d\d\-\d\d)\-\d\d\s*\d\d:\d\d:\d\d\s*[+-]?\w\w\w\w$/) {
+	$month = $1;
+    }
+    elsif ($_ =~ /^commit\s*[\w]*$/) {
 	unshift(@{ $month_data{$this_month} }, $entry);
 	$entry = $_;
-	if ($1 ne $this_month) {
-	    $this_month = $1;
+	if ($month ne $this_month) {
+	    $this_month = $month;
 	    $index++;
 	    $month_index[$index] = $this_month;
 	    $month_data{$this_month} = [];

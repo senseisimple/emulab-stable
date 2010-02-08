@@ -313,6 +313,12 @@ if (! -e "$PROJROOT/$pid") {
     }
 }
 if ($SCRATCHROOT && ! -e "$SCRATCHROOT/$pid") {
+    if (! -e "$SCRATCHROOT") {
+        if (! mkdir("$SCRATCHROOT", 0770)) {
+            fatal("Could not make a directory $SCRATCHROOT: $!");
+        }
+    }
+
     if (! mkdir("$SCRATCHROOT/$pid", 0770)) {
 	fatal("Could not make directory $SCRATCHROOT/$pid: $!");
     }

@@ -16,7 +16,10 @@ PAGEHEADER("Emulab Software Distributions");
 ?>
 
 <ul>
-<li> <img src="/new.gif" alt="&lt;NEW&gt;">
+<li><img src="/new.gif" alt="&lt;NEW&gt;"> The latest version of the Emulab
+    software is available upon request from our <a href="http://users.emulab.net/trac/emulab/wiki/GitRepository">git repository</a>
+</li>
+<li>
     <a href="/downloads/emulab-080901.tar.gz">
     Emulab network testbed software</a>,
     Version 5.0, released September 1, 2008.

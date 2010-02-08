@@ -566,6 +566,28 @@ sub GenDefsFile($)
     }
     print TCL "\n";
 
+    print TCL "# Site variables\n";
+    $query_result = DBQueryFatal("select name,value,defaultvalue " .
+        " from sitevariables where ns_include=TRUE");
+    while (my ($name,$value,$defaultvalue) = $query_result->fetchrow_array()) {
+        # Use the default value if unset, or skip altogether if the default
+        # is just the empty string.
+        if (!defined($value)) {
+            if ($defaultvalue eq "") {
+                next;
+            } else {
+                $value = $defaultvalue;
+            }
+        }
+        # Escape special characters in the value (just braces)
+        $value =~ s/([{}])/\\$1/g;
+        # Note: braces in tcl act like single quotes in other scripting
+        # languages (eg. no interpolation occurs)
+	print TCL "set sitevariables($name) {$value}\n";
+    }
+    print TCL "\n";
+
+
     if (defined($pid)) {
 	print TCL "# OSIDs\n";
 	$query_result =

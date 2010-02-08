@@ -36,6 +36,7 @@ EXTRACONF       = None
 SLICENAME       = "mytestslice"
 REQARGS         = None
 CMURI           = None
+DELETE          = 0
 
 selfcredentialfile = None
 slicecredentialfile = None
@@ -67,7 +68,7 @@ try:
                                    [ "credentials=", "debug", "certificate=",
                                      "help", "passphrase=", "read-commands=",
                                      "slicecredentials=", "slicename=",
-                                     "cm="] )
+                                     "cm=", "delete"] )
 except getopt.GetoptError, err:
     print >> sys.stderr, str( err )
     Usage()
@@ -85,6 +86,8 @@ for opt, arg in opts:
         selfcredentialfile = arg
     elif opt in ( "-d", "--debug" ):
         debug = 1
+    elif opt in ( "--delete" ):
+        DELETE = 1
     elif opt in ( "-f", "--certificate" ):
         CERTIFICATE = arg
     elif opt in ( "-h", "--help" ):
