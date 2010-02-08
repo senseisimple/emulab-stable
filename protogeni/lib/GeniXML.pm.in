@@ -210,9 +210,11 @@ sub SetText($$$)
 	    } elsif (scalar(@grand) == 0
 		     && $child->nodeType() == XML_ELEMENT_NODE) {
 		$child->appendText($text);
+		$result = 1;
 	    }
 	} elsif ($node->nodeType() == XML_ELEMENT_NODE) {
 	    $node->setAttribute($name, $text);
+	    $result = 1;
 	}
     }
     return $result;
