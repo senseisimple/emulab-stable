@@ -336,47 +336,95 @@ float find_link_resolutions(resolution_vector &resolutions, pvertex pv,
         ++dest_switch_it) {
       if (*source_switch_it == *dest_switch_it) continue;
       tb_link_info info(tb_link_info::LINK_INTERSWITCH);
-      if (find_interswitch_path(*source_switch_it,*dest_switch_it,vlink->delay_info.bandwidth,
-            info.plinks, info.switches) != 0) {
-        bool first_link, second_link;
-        /*
-         * Check to see if either, or both, pnodes are actually the
-         * switches we are looking for
-         */
-        if ((pv == *source_switch_it) || (pv ==
-              *dest_switch_it)) {
-          first_link = false;
-        } else {
-          first_link = true;
-        }
-        if ((dest_pv == *source_switch_it) ||
-            (dest_pv == *dest_switch_it)) {
-          second_link = false;
-        } else {
-          second_link = true;
-        }
 
-        if (first_link) {
-          // Check only whether the source interface is fixed - this is the
-          // first link in a multi-hop path
-          if (!find_best_link(pv,*source_switch_it,vlink,first,true,false)) {
-              // No link to this switch
-              SDEBUG(cerr << "    interswitch failed - no first link"
-                  << endl;)
-                continue;
-            }
-        }
+      /*
+       * Check to see if either, or both, pnodes are actually the
+       * switches we are looking for
+       */
+      bool first_link, second_link;
+      if ((pv == *source_switch_it) || (pv ==
+            *dest_switch_it)) {
+        first_link = false;
+      } else {
+        first_link = true;
+      }
+      if ((dest_pv == *source_switch_it) ||
+          (dest_pv == *dest_switch_it)) {
+        second_link = false;
+      } else {
+        second_link = true;
+      }
 
-        if (second_link) {
-          // Check only whether the dest interface is fixed - this is the
-          // last link in a multi-hop path
-          if (!find_best_link(dest_pv,*dest_switch_it,vlink,second,false,true)) {
-            // No link to tshis switch
-            SDEBUG(cerr << "    interswitch failed - no second link" <<                                          endl;)
+      // Get link objects
+      if (first_link) {
+        // Check only whether the source interface is fixed - this is the
+        // first link in a multi-hop path
+        if (!find_best_link(pv,*source_switch_it,vlink,first,true,false)) {
+            // No link to this switch
+            SDEBUG(cerr << "    interswitch failed - no first link"
+                << endl;)
               continue;
           }
-        }
+      }
 
+      if (second_link) {
+        // Check only whether the dest interface is fixed - this is the
+        // last link in a multi-hop path
+        if (!find_best_link(dest_pv,*dest_switch_it,vlink,second,false,true)) {
+          // No link to tshis switch
+          SDEBUG(cerr << "    interswitch failed - no second link" <<                                          endl;)
+            continue;
+        }
+      }
+
+      // For regular links, we just grab the vlink's bandwidth; for links
+      // where we're matching the link speed to the 'native' one for the
+      // interface, we have to look up interface speeds on both ends.
+      int bandwidth;
+      if (vlink->delay_info.adjust_to_native_bandwidth) {
+          // Grab the actual plink objects for both pedges - it's possible for
+          // one or both to be missing if we're linking directly to a switch
+          // (as with a LAN)
+          tb_plink *first_plink = NULL;
+          tb_plink *second_plink = NULL;
+          if (first_link) {
+              first_plink = get(pedge_pmap,first);
+          }
+          if (second_link) {
+              second_plink = get(pedge_pmap,second);
+          }
+
+          if (first_plink != NULL && second_plink != NULL) {
+              // If both endpoints are not switches, we use the minimum
+              // bandwidth
+              bandwidth = min(first_plink->delay_info.bandwidth,
+                      second_plink->delay_info.bandwidth);
+          } else if (first_plink == NULL) {
+              // If one end is a switch, use the bandwidth from the other
+              // end
+              bandwidth = second_plink->delay_info.bandwidth;
+          } else if (second_plink == NULL) {
+              bandwidth = first_plink->delay_info.bandwidth;
+          } else {
+              // Both endpoints are switches! (eg. this might be a link between
+              // two LANs): It is not at all clear what the right semantics
+              // for this would be, and unfortunately, we can't catch this
+              // earlier. So, exiting with an error is crappy, but it's
+              // unlikely to happen in our regular use, and it's the best we
+              // can do.
+              cerr << "*** Using bandwidth adjustment on virutal links " <<
+                      "between switches not allowed " << endl;
+              exit(EXIT_FATAL);
+          }
+      } else {
+          // If not auto-adjusting, just use the specified bandwidth
+          bandwidth = vlink->delay_info.bandwidth;
+      }
+
+      // Find a path on the switch fabric between these two switches
+      if (find_interswitch_path(*source_switch_it,*dest_switch_it,bandwidth,
+            info.plinks, info.switches) != 0) {
+        // Okay, we found a real resolution!
         if (flipped) { // Order these need to go in depends on flipped bit
           if (second_link) {
             info.plinks.push_front(second);
@@ -491,6 +539,8 @@ void resolve_link(vvertex vv, pvertex pv, tb_vnode *vnode, tb_pnode *pnode,
          * doesn't usually get called for trivial links, and
          * letting them fall through into the 'normal' link code
          * below is disatrous!
+         * Note: We can't get here when doing adjust_to_native_bandwidth,
+         * since it's illegal to allow trivial links when it's in use.
          */
         score_link_info(edge,pnode,dest_pnode,vnode,dest_vnode);
       } else {
@@ -784,6 +834,12 @@ void unscore_link_info(vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode, tb_vnod
   }
 #endif
 
+  // If auto-adjusting the vlink bandwidth, we set it to a sentinel value
+  // so that we can detect any problems next time we do a score_link_info()
+  if (vlink->delay_info.adjust_to_native_bandwidth) {
+      vlink->delay_info.bandwidth = -2;
+  }
+
 }
 
 /*
@@ -1019,6 +1075,22 @@ void score_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode, tb_vnod
 {
   tb_vlink *vlink = get(vedge_pmap,ve);
   tb_pnode *the_switch;
+  
+  // If this link is to be adjusted to the native speed of the interface, go
+  // ahead and do that now - we use the minimum of the two endpoint interfaces
+  // Note! Not currently supported on trivial links! (it's illegal for
+  // adjust_to_native_bandwidth and trivial_ok to both be true)
+  if (vlink->delay_info.adjust_to_native_bandwidth &&
+      vlink->link_info.type_used != tb_link_info::LINK_TRIVIAL) {
+    // Check for special sentinel value to make sure we remembered to re-set
+    // the value before
+    assert(vlink->delay_info.bandwidth == -2);
+    tb_plink *front_plink = get(pedge_pmap, vlink->link_info.plinks.front());
+    tb_plink *back_plink = get(pedge_pmap, vlink->link_info.plinks.back());
+    vlink->delay_info.bandwidth =
+      min(front_plink->delay_info.bandwidth, back_plink->delay_info.bandwidth);
+  }
+  
   switch (vlink->link_info.type_used) {
   case tb_link_info::LINK_DIRECT:
     SADD(SCORE_DIRECT_LINK);
@@ -1479,9 +1551,13 @@ bool find_best_link(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
 	}
       } else {
 	// For non-emulated links, we're just looking for links with few (0,
-	// actually) users, and enough bandwidth
+	// actually) users, and enough bandwidth (if we're adjusting the bw
+        // on the vlink to match what's on the interfaces selected, we don't
+        // even need to check bandwidth)
 	if ((users < best_users) &&
-		(plink->delay_info.bandwidth >= vlink->delay_info.bandwidth)) {
+                (vlink->delay_info.adjust_to_native_bandwidth ||
+		 (plink->delay_info.bandwidth >= vlink->delay_info.bandwidth)
+                 )) {
 	  best_pedge = *pedge_it;
 	  best_distance = distance;
 	  found_best = true;

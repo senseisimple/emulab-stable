@@ -1928,6 +1928,13 @@ sub GenVirtLans($)
 	    my ($traced,$trace_endnode)   = @{$member0->_traceinfo()};
 	    my ($rtraced,$rtrace_endnode) = @{$member1->_traceinfo()};
 
+	    # Rob says not supported
+	    if (($trivial_ok || $emulated) &&
+		($bandwidth == 0 || $rbandwidth == 0)) {
+		tberror("Cannot mix trivial_ok|emulated with * bw\n");
+		$errors++;
+	    }
+
 	    #
 	    # Geni links and lans are dead simple right now. 
 	    #
@@ -2073,7 +2080,9 @@ sub GenVirtLans($)
 		    my $plink = "linksimple/$vname/$member0,$member1";
 
 		    $self->addlink("$plink $vname0 $vname1 ".
-				   max($top_bw,$top_rbw) . " 0 0 $protocol" .
+				   ($top_bw == 0 ? "*" :
+				    max($top_bw,$top_rbw)).
+				   " 0 0 $protocol" .
 				   ($emulated ? " emulated" : "") .
 				   ($trivial_ok ? " trivial_ok" : "") .
 				   " $fixall");
@@ -2098,11 +2107,13 @@ sub GenVirtLans($)
 		    $self->addnode("$delayname delay $delaydesire");
 		    
 		    $self->addlink("linksdelaysrc/$vname/$member0,$member1 ".
-				   "$vname0 $delayname $top_bw 0 0 ".
-				   "$protocol $fixsrc0");
+				   "$vname0 $delayname ".
+				   ($top_bw == 0 ? "*" : $top_bw) .
+				   " 0 0 $protocol $fixsrc0");
 		    $self->addlink("linksdelaydst/$vname/$member1,$member0 ".
-				   "$vname1 $delayname $top_bw 0 0 ".
-				   "$protocol $fixdst1");
+				   "$vname1 $delayname ".
+				   ($top_bw == 0 ? "*" : $top_bw) .
+				   " 0 0 $protocol $fixdst1");
 
 		    $self->printdb("Delay node $plink ($delayname) = " . 
 				   join(" ", @delayinfo) . "\n");
@@ -2124,16 +2135,18 @@ sub GenVirtLans($)
 	    }
 	    else {
 		my $plink = "linksimple/$vname/$member0,$member1";
-
-		my $spec = "$plink $vname0 $vname1";
+		my $spec  = "$plink $vname0 $vname1 ";
 
 		if ($emulated) {
-		    $spec .= " " . max($top_bw,$top_rbw) .
-			" 0 0 $protocol emulated";
+		    $spec .= max($top_bw,$top_rbw);
 		}
 		else {
-		    $spec .= " $top_bw 0 0 $protocol";
+		    # Let assign choose bw if top_bw is zero.
+		    $spec .= ($top_bw == 0 ? "*" : $top_bw);
 		}
+		$spec .= " 0 0 $protocol";
+		$spec .= " emulated" if ($emulated);
+		
 		if ($trivial_ok) {
 		    $spec .= " trivial_ok";
 		    #
@@ -2338,7 +2351,8 @@ sub GenVirtLans($)
 					 $rdelay,$rbw,$rbackfill,$rloss,0);
 
 			$self->addlink("$plink $vnodevname lan/$vname " .
-				       max($top_bw,$top_rbw) .
+				       ($top_bw == 0 ? "*" :
+					max($top_bw,$top_rbw)).
 				       " 0 0 $protocol" .
 				       ($emulated ? " emulated" : "") .
 				       ($trivial_ok ? " trivial_ok" : "") . 
@@ -2360,11 +2374,13 @@ sub GenVirtLans($)
 			$self->addnode("$delayname delay $delaydesire");
 			
 			$self->addlink("linkdelaysrc/$vname/$member " .
-				       "$vnodevname $delayname $top_bw 0 0 ".
-				       "$protocol $fixsrc0");
+				       "$vnodevname $delayname ".
+				       ($top_bw == 0 ? "*" : $top_bw) .
+				       " 0 0 $protocol $fixsrc0");
 			$self->addlink("linkdelaydst/$vname/$member " .
-				       "lan/$vname $delayname $top_bw 0 0 ".
-				       "$protocol");
+				       "lan/$vname $delayname ".
+				       ($top_bw == 0 ? "*" : $top_bw) .
+				       " 0 0 $protocol");
 
 			$self->printdb("Delay node $plink ($delayname) = " .
 				       join(" ", @delayinfo) . "\n");
@@ -2388,12 +2404,13 @@ sub GenVirtLans($)
 		}
 		else {
 		    my $plink = "linklan/$vname/$member";
+		    my $spec  = "$plink $vnodevname lan/$vname ";
 
-		    my $spec = "$plink $vnodevname lan/$vname $top_bw " .
-			"0 0 $protocol";
-		    if ($emulated) {
-			$spec .= " emulated";
-		    }
+		    # Let assign choose bw if top_bw is zero.
+		    $spec .= ($top_bw == 0 ? "*" : $top_bw);
+		    $spec .= " 0 0 $protocol";
+		    $spec .= " emulated" if ($emulated);
+
 		    if ($trivial_ok) {
 			$spec .= " trivial_ok";
 
@@ -2692,6 +2709,12 @@ sub getbandwidth($$$$)
     my $node_type = $virtnode->type();
     my $protocol  = protocolbasetype($virtlan->_protocol());
     my $linkbws   = $self->{'TYPELINKBW'};
+
+    #
+    # A target bandwidth of zero indicates that we want assign to choose.
+    #
+    return 0
+	if ($targetbw == 0);
 	
     foreach my $bw (keys(%{ $linkbws->{$node_type}{$protocol} })) {
 	if (($bw >= $targetbw) && ($bw < $best)) {
@@ -2738,6 +2761,13 @@ sub requires_delay($$$$)
     my $linkbws   = $self->{'TYPELINKBW'};
     my $node_class;
 
+    #
+    # A target bandwidth of zero indicates that we want assign to choose.
+    # Therefore, no delay is needed since assign picks the native bw.
+    #
+    return 0
+	if ($targetbw == 0);
+	
     if (!exists($linkbws->{$node_type}{$protocol})) {    
 	warn("requires_delay(): $virtnode - invalid type $node_type!\n");
 	return 0;
@@ -4200,7 +4230,7 @@ sub InterpLinks($)
 	    my ($nodeB,$portB) = undef;
 	    my $protolink;
 	    my $virtnodeB = $self->vnodes()->{$vnodeB};
-	
+
 	    #
 	    # If the link is delayed, its with endpoint delays, not a
 	    # delay node.
@@ -4211,7 +4241,7 @@ sub InterpLinks($)
 	    if (! $trivial) {
 		$nodeB  = $member1->_pnode();
 		$portB  = $member1->_pport();
-		
+
 		$self->printdb("LINK simple: $virtA,$virtB - ".
 			       "$nodeA:$portA,$nodeB:$portB\n");
 
@@ -4684,6 +4714,51 @@ sub InterpLinks($)
 			or return -1 if (!$self->impotent());
 		}
 	    }
+	}
+    }
+
+    #
+    # Check the portbw to make sure they are all set; if the user is
+    # letting assign pick the interfaces (zero bandwidth), then portbw
+    # is still zero, and it needs to be set to the default speed for
+    # that interface.
+    #
+    foreach my $virtlan (values(%{ $self->vlans() })) {
+	foreach my $member ($virtlan->memberlist()) {
+	    # Will this happen?
+	    next
+		if (!exists($self->solution_portmap()->{$member}));
+
+	    # XXX NSE checks I do not understand.
+	    next
+		if (! (exists($self->portbw()->{$member}) &&
+		       exists($self->solution_v2p()->{$member->vnode()})));
+
+	    # Skip anything that was turned into a vinterface; the
+	    # port speed will get set elsewhere.
+	    next
+		if (exists($self->solution_vifacemap()->{$member}));
+
+	    my $iface     = $self->solution_portmap()->{$member};
+	    my $pnodename = $self->solution_v2p()->{$member->vnode()};
+	    my $speed     = $self->portbw()->{$member};
+
+	    # Already set.
+	    next
+		if ($speed);
+
+	    my $interface = Interface->LookupByIface($pnodename, $iface);
+	    if (!defined($interface)) {
+		tberror("Could not lookup interface $pnodename:$iface\n");
+		return -1;
+	    }
+	    $speed =
+		$self->interfacespeedmbps($interface->type(), "ethernet");
+
+	    # portbw() is in bps.
+	    $self->portbw()->{$member} = $speed * 1000;
+
+	    $self->printdb("Setting portbw: $pnodename:$iface $speed\n");
 	}
     }
 
