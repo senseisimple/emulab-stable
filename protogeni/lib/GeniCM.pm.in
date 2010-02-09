@@ -1713,7 +1713,8 @@ sub SliverWorkAux($$$$$$$)
 	# Unincorporated nodes have no genisliver_idx.
 	my $restable = $node->ReservedTableEntry();
 	if (defined($restable) &&
-	    !defined($restable->{'genisliver_idx'})) {
+	    (!defined($restable->{'genisliver_idx'}) ||
+	     $restable->{'genisliver_idx'} == 0)) {
 	    $newnodes{$node->node_id()} = $node;
 	    next;
 	}
