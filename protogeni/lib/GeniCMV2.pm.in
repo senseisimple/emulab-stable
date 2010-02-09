@@ -1302,7 +1302,7 @@ sub LookupURN($)
     $type = lc($type);
 
     if ($type eq "node") {
-	$object = GeniCM::LookupNode($urn);
+	$object = GeniUtil::LookupNode($urn);
     }
     elsif ($type eq "slice") {
 	$object = GeniSlice->Lookup($urn);

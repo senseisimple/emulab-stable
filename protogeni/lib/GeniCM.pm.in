@@ -100,36 +100,6 @@ sub GetVersion()
     return GeniResponse->Create( GENIRESPONSE_SUCCESS, $API_VERSION );
 }
 
-# Look up a node by an identifier of unspecified type (perhaps a URN, an
-# (obsolete) UUID, or an old-style HRN.  Ultimately, all IDs should be
-# URNs and this mess will go away, but for now we try not to make
-# any assumptions, because of backward compatibility constraints.
-sub LookupNode($)
-{
-    my ($nodeid) = @_;
-
-    if( GeniHRN::IsValid( $nodeid ) ) {
-	# Looks like a URN.
-	my ($auth,$t,$id) = GeniHRN::Parse( $nodeid );
-
-	return undef if $auth ne $OURDOMAIN or $t ne "node";
-
-	return Node->Lookup( $id );
-    }
- 
-    #
-    # Looks like an old HRN, but we only want the last token for node lookup.
-    #
-    if ($nodeid =~ /\./) {
-	($nodeid) = ($nodeid =~ /\.([-\w]*)$/);
-
-	return Node->Lookup($nodeid);
-    }
-    
-    # Assume it's a UUID, and pass it on as is.
-    return Node->Lookup($nodeid);
-}
-
 #
 # Respond to a Resolve request. 
 #
@@ -188,10 +158,10 @@ sub Resolve($)
 	my $node;
 	
 	if (defined($uuid)) {
-	    $node= LookupNode($uuid);
+	    $node= GeniUtil::LookupNode($uuid);
 	}
 	else {
-	    $node= LookupNode($hrn);
+	    $node= GeniUtil::LookupNode($hrn);
 	}
 	if (! defined($node)) {
 	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED,
@@ -692,7 +662,7 @@ sub GetTicketAuxAux($$$$$$$$)
 	    my $colocate      = GeniXML::GetText("colocate", $ref) ||
 		                GeniXML::GetText("phys_nickname", $ref);
 	    my $resource_uuid = GeniXML::GetNodeId($ref);
-	    my $node = LookupNode($resource_uuid);
+	    my $node = GeniUtil::LookupNode($resource_uuid);
 	    if (!defined($node)) {
 		$response = GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 				 "Bad resource $resource_uuid in ticket");
@@ -828,7 +798,7 @@ sub GetTicketAuxAux($$$$$$$$)
 	    }
 	}
 	else {
-	    $node = LookupNode($resource_uuid);
+	    $node = GeniUtil::LookupNode($resource_uuid);
 
 	    if (!defined($node)) {
 		$response =
@@ -1176,7 +1146,7 @@ sub GetTicketAuxAux($$$$$$$$)
 	}
 	my $rspec          = $nodemap{$virtual_id}->{'rspec'};
 	my $virtnode       = $nodemap{$virtual_id}->{'virtnode'};
-	my $node           = LookupNode($component_uuid);
+	my $node           = GeniUtil::LookupNode($component_uuid);
 	my $colocate       = GeniXML::GetText("colocate", $rspec) ||
 	                     GeniXML::GetText("phys_nickname", $rspec);
 	my $exclusive      = GeniXML::GetText("exclusive", $rspec);
@@ -1668,7 +1638,7 @@ sub SliverWorkAux($$$$$$$)
 	    next;
 	}
 
-	my $node = LookupNode($resource_uuid);
+	my $node = GeniUtil::LookupNode($resource_uuid);
 	if (!defined($node)) {
 	    $message = "Bad resource_uuid $resource_uuid";
 	    goto bad;
@@ -1943,7 +1913,7 @@ sub SliverWorkAux($$$$$$$)
 	next
 	    if (grep {$_ eq $virtual_id} keys(%nodemap));
 	
-	my $node = LookupNode($resource_uuid);
+	my $node = GeniUtil::LookupNode($resource_uuid);
 	if (!defined($node)) {
 	    $message = "Unknown resource_uuid in ticket: $resource_uuid";
 	    goto bad;
@@ -1970,7 +1940,7 @@ sub SliverWorkAux($$$$$$$)
 
 	# See below; setup all plab nodes at once.
 	if ($node->isplabphysnode()) {
-	    my $vnode = LookupNode($sliver->uuid());
+	    my $vnode = GeniUtil::LookupNode($sliver->uuid());
 	    if (!defined($vnode)) {
 		print STDERR "Could not locate vnode $sliver\n";
 		goto bad;
@@ -2096,7 +2066,7 @@ sub SliverWorkAux($$$$$$$)
 		$message = "Link $linkname specifies a non-existent node";
 		goto bad;
 	    }
-	    my $nodeobject= LookupNode($nodesliver->resource_uuid());
+	    my $nodeobject= GeniUtil::LookupNode($nodesliver->resource_uuid());
 	    if (!defined($nodeobject)) {
 		$message = "Could not find node object for $nodesliver";
 		goto bad;
@@ -3270,7 +3240,7 @@ sub SliceStatus($)
 	    if ($sliver->resource_type() ne "Node");
 
 	my $node_uuid = $sliver->uuid();
-	my $node = LookupNode($node_uuid);
+	my $node = GeniUtil::LookupNode($node_uuid);
 	if (!defined($node)) {
 	    $slice->UnLock();
 	    print STDERR "Cannot find node by uuid $node_uuid\n";
@@ -3489,7 +3459,7 @@ sub SliverStatus($)
 	    if ($sliver->resource_type() ne "Node");
 
 	my $node_uuid = $sliver->uuid();
-	my $node = LookupNode($node_uuid);
+	my $node = GeniUtil::LookupNode($node_uuid);
 	if (!defined($node)) {
 	    $slice->UnLock();
 	    print STDERR "Cannot find node by uuid $node_uuid\n";

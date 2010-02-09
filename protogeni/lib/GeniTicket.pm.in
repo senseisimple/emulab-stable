@@ -62,6 +62,7 @@ BEGIN { use GeniUtil; GeniUtil::AddCache(\%tickets); }
 BEGIN { 
     if (! defined($main::GENI_ISCLRHOUSE)) {
 	require Experiment;
+	require Node;
     }
 }
 
@@ -807,7 +808,7 @@ sub Release($$)
 	}
 
 	# Virtual nodes not created until ticket redeemed.
-	my $node = Node->Lookup($resource_uuid);
+	my $node = GeniUtil::LookupNode($resource_uuid);
 	next
 	    if (!defined($node));
 
