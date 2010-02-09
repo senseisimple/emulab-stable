@@ -232,10 +232,11 @@ sub GetText($$)
     if (! defined($child)) {
 	$child = FindFirst('@'.$name, $node);
     }
+    if (! defined($child)) {
+	$child = FindFirst('n:'.$name, $node);
+    }
     if (defined($child)) {
 	$result = $child->textContent();
-    } else {
-	$child = FindFirst('n:'.$name, $node);
     }
     return $result;
 }
