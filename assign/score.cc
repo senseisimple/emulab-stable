@@ -279,6 +279,7 @@ float find_link_resolutions(resolution_vector &resolutions, pvertex pv,
       }
 
       if (first_link) {
+        SDEBUG(cerr << "    intraswitch: finding first link" << endl;)
         // Check only whether the source interface is fixed - this is the
         // first link in a multi-hop path
         if (!find_best_link(pv,*switch_it,vlink,first,true,false)) {
@@ -292,6 +293,7 @@ float find_link_resolutions(resolution_vector &resolutions, pvertex pv,
       if (second_link) {
         // Check only whether the dest interface is fixed - this is the
         // last link in a multi-hop path
+        SDEBUG(cerr << "    intraswitch: finding second link" << endl;)
         if (!find_best_link(dest_pv,*switch_it,vlink,second,false,true)) {
           // No link to this switch
           SDEBUG(cerr << "    intraswitch failed - no link second" <<
@@ -1486,15 +1488,16 @@ bool find_best_link(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
 
       // If the vlink has a fixed source interface, and it doesn't match
       // this plink, skip it
-      // XXX: Is this gonna break interswtich?
       if (vlink->fix_src_iface && check_src_iface) {
           if (plink->srciface != vlink->src_iface) {
-              SDEBUG(cerr << "find_best_link: Fix source: " << plink->srciface
-                      << " != " << vlink->src_iface << endl);
+              SDEBUG(cerr << "          find_best_link (" << vlink->name <<
+                      "): Fix source: " << plink->srciface << " != " <<
+                      vlink->src_iface << endl);
               continue;
           } else {
-              SDEBUG(cerr << "find_best_link: Fix source: " << plink->srciface
-                      << " == " << vlink->src_iface << endl);
+              SDEBUG(cerr << "          find_best_link (" << vlink->name <<
+                      "): Fix source: " << plink->srciface << " == " <<
+                      vlink->src_iface << endl);
           }
       }
 
@@ -1504,12 +1507,14 @@ bool find_best_link(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
       // of a plink! Shouldn't depend on this!
       if (vlink->fix_dst_iface && check_dst_iface) {
           if (plink->srciface != vlink->dst_iface) {
-              SDEBUG(cerr << "find_best_link: Fix dst: " << plink->srciface
-                      << " != " << vlink->dst_iface << endl);
+              SDEBUG(cerr << "          find_best_link (" << vlink->name <<
+                      "): Fix dst: " << plink->srciface << " != " <<
+                      vlink->dst_iface << endl);
               continue;
           } else {
-              SDEBUG(cerr << "find_best_link: Fix dst: " << plink->srciface
-                      << " == " << vlink->dst_iface << endl);
+              SDEBUG(cerr << "          find_best_link (" << vlink->name <<
+                      "): Fix dst: " << plink->srciface << " == " <<
+                      vlink->dst_iface << endl);
           }
       }
 
@@ -1562,18 +1567,25 @@ bool find_best_link(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
 	  best_distance = distance;
 	  found_best = true;
 	  best_users = plink->emulated+plink->nonemulated;
+          SDEBUG(cerr << "          find_best_link: picked " << plink->name <<
+                  " with " << best_users << " users" << endl;)
 	}
       }
     }
   }
 
   if ((!vlink->emulated) && found_best && (best_users > 0)) {
+      SDEBUG(cerr << "      find_best_link failing (first case) (" <<
+              vlink->emulated << "," << found_best << "," << best_users <<
+              ")" << endl;)
       return false;
   }
   if (found_best) {
     out_edge = best_pedge;
+    SDEBUG(cerr << "      find_best_link succeeding" << endl;)
     return true;
   } else {
+    SDEBUG(cerr << "      find_best_link failing (second case)" << endl;)
     return false;
   }
 }
