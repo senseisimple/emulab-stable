@@ -71,7 +71,7 @@ sub FindNodes($$)
 	my $xc = XML::LibXML::XPathContext->new();
 	$ns = $node->namespaceURI();
 	if (defined($ns)) {
-	    $xc->registerNs('n', $node->namespaceURI());
+	    $xc->registerNs('n', $ns);
 	} else {
 	    $path =~ s/\bn://g;
 	}
@@ -213,7 +213,12 @@ sub SetText($$$)
 		$result = 1;
 	    }
 	} elsif ($node->nodeType() == XML_ELEMENT_NODE) {
-	    $node->setAttribute($name, $text);
+	    my $ns = $node->namespaceURI();
+	    if (defined($ns)) {
+		$node->setAttributeNS($ns, "rs:$name", $text);
+	    } else {
+		$node->setAttribute($name, $text);
+	    }
 	    $result = 1;
 	}
     }
@@ -243,11 +248,17 @@ sub CreateDocument($$)
 {
     my ($ns, $name) = @_;
     my $doc = XML::LibXML::Document->createDocument("1.0", "UTF-8");
+    my $root = $doc->createElementNS($ns, "rs:$name");
+    $doc->setDocumentElement($root);
+    return $doc;
 }
 
 sub AddElement($$)
 {
     my ($name, $node) = @_;
+    my $ns = $node->namespaceURI();
+    my $child = $node->addNewChild($ns, "rs:$name");
+    return $child;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...
