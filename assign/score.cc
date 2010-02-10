@@ -293,7 +293,7 @@ float find_link_resolutions(resolution_vector &resolutions, pvertex pv,
       if (second_link) {
         // Check only whether the dest interface is fixed - this is the
         // last link in a multi-hop path
-        SDEBUG(cerr << "    intraswitch: finding second link" << endl;)
+        SDEBUG(cerr << "    intraswitch: finding second link (" <<  ")" << endl;)
         if (!find_best_link(dest_pv,*switch_it,vlink,second,false,true)) {
           // No link to this switch
           SDEBUG(cerr << "    intraswitch failed - no link second" <<
@@ -512,6 +512,7 @@ void resolve_link(vvertex vv, pvertex pv, tb_vnode *vnode, tb_pnode *pnode,
    */
   bool flipped = false;
   if (vlink->src != vv) {
+    SDEBUG(cerr << "  vlink is flipped" << endl);
     flipped = true;
   }
 
