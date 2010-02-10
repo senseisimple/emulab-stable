@@ -404,7 +404,20 @@ Simulator instproc run {} {
     var_import ::GLOBALS::optarray_order
     var_import ::GLOBALS::optarray_count
     var_import ::GLOBALS::dpdb
-    
+   
+#for oml begin
+    var_import ::TBCOMPAT::oml_use_control
+    if { $oml_use_control == 0 } {
+        set ::TBCOMPAT::nodelist [list]
+        foreach node [lsort [array names node_list]] {
+          lappend ::TBCOMPAT::nodelist $node
+        }
+        uplevel #0 { set omllan [$ns make-lan ${::TBCOMPAT::nodelist} 100Mb 0ms] }
+    }
+
+    begin_oml_code_generator
+#for oml end
+ 
     if {$ran == 1} {
 	perror "The Simulator 'run' statement can only be run once."
 	return
