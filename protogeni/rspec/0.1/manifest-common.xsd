@@ -57,6 +57,7 @@
         </xs:element>
       </xs:choice>
       <xs:choice>
+        <xs:element ref="rspec:component_manager"/>
         <xs:group ref="rspec:LinkMapping"/>
         <xs:choice>
           <xs:element ref="rspec:bandwidth"/>
@@ -79,6 +80,11 @@
     <xs:attributeGroup ref="rspec:VirtualName"/>
     <xs:attribute name="sliver_id" use="required"/>
   </xs:complexType>
+  <xs:element name="component_manager">
+    <xs:complexType>
+      <xs:attribute name="name" use="required"/>
+    </xs:complexType>
+  </xs:element>
   <xs:element name="bandwidth">
     <xs:annotation>
       <xs:documentation>Bandwidth of the link in kbps</xs:documentation>

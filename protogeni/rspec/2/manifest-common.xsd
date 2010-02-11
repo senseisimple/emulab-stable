@@ -85,13 +85,21 @@
         <xs:element ref="rspec:link_type"/>
         <xs:element name="interface_ref" type="rspec:InterfaceRefContents"/>
       </xs:choice>
-      <xs:element ref="rspec:component_hop"/>
+      <xs:choice>
+        <xs:element ref="rspec:component_manager"/>
+        <xs:element ref="rspec:component_hop"/>
+      </xs:choice>
     </xs:choice>
     <xs:attributeGroup ref="rspec:AnyExtension"/>
     <xs:attribute name="client_id" use="required"/>
     <xs:attribute name="sliver_id" use="required"/>
   </xs:complexType>
   <xs:element name="property" type="rspec:LinkPropertyContents"/>
+  <xs:element name="component_manager">
+    <xs:complexType>
+      <xs:attribute name="name" use="required"/>
+    </xs:complexType>
+  </xs:element>
   <xs:element name="component_hop" type="rspec:ComponentHopContents"/>
   <xs:complexType name="InterfaceRefContents">
     <xs:group ref="rspec:AnyExtension"/>
