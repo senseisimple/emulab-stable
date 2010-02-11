@@ -4010,11 +4010,11 @@ sub UpdateManifest($)
 	}
 	$vlantags{$vlan->vname()} = $tag;
     }
-    foreach my $linkref (GeniXML::GetNodes("n:link", $rspec)) {
+    foreach my $linkref (GeniXML::GetNodes("n:link", $rspec)->get_nodelist()) {
 	my $vname = GeniXML::GetVirtualId($linkref);
 	my $tag   = (exists($vlantags{$vname}) ? $vlantags{$vname} : undef);
 	if (!defined($tag)) {
-	    $linkref->removeChild("vlantag");
+	    GeniXML::RemoveChild("vlantag", $linkref);
 	}
 	else {
 	    GeniXML::SetText("vlantag", $linkref, $tag);

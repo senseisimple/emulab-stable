@@ -261,5 +261,17 @@ sub AddElement($$)
     return $child;
 }
 
+sub RemoveChild($$)
+{
+    my ($name, $node) = @_;
+    my $child = FindFirst('@n:'.$name, $node);
+    if (! defined($child)) {
+	$child = FindFirst('n:'.$name, $node);
+    }
+    if (defined($child)) {
+	$node->removeChild($child);
+    }
+}
+
 # _Always_ make sure that this 1 is at the end of the file...
 1;
