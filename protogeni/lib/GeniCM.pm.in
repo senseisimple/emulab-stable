@@ -926,6 +926,7 @@ sub GetTicketAuxAux($$$$$$$$)
 	my @interfaces = GeniXML::FindNodes("n:linkendpoints | ".
 					    "n:interface_ref",
 					    $linkref)->get_nodelist();
+	my %managers   = undef;
 	my $ifacenum   = 1;
 	my $trivial_ok = 0;
 
@@ -933,6 +934,23 @@ sub GetTicketAuxAux($$$$$$$$)
 	    $response = GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 				     "Must provide a virtual_id for links");
 	    goto bad;
+	}
+
+	#
+	# Look for managers list; optional for now. If not specified then
+	# we assume the link is for thie CM.
+	#
+	if (GeniXML::FindNodes("n:component_manager", $linkref)) {
+	    %managers = map { GeniXML::GetText("id", $_) => $_ } 
+	                      GeniXML::FindNodes("n:component_manager",
+						 $linkref)->get_nodelist();
+
+	    #
+	    # Initial check for the entire link. We check on a per interface
+	    # case below.
+	    #
+	    next
+		if (!exists($managers{$ENV{'MYURN'}}));
 	}
 
 	#
@@ -1931,6 +1949,7 @@ sub SliverWorkAux($$$$$$$)
 
 	# For the manifest.
 	GeniXML::SetText("sliver_urn", $ref, $sliver->sliver_urn());
+	GeniXML::SetText("component_urn", $ref, $sliver->component_urn());
 
 	# Add to the aggregate.
 	if ($sliver->SetAggregate($aggregate) != 0) {
@@ -1960,6 +1979,7 @@ sub SliverWorkAux($$$$$$$)
     foreach my $linkref (GeniXML::FindNodes("n:link",
 					    $rspec)->get_nodelist()) {
 	my @linkslivers  = ();
+	my %managers     = undef;
 	my $linkname     = GeniXML::GetVirtualId($linkref);
 	my @interfaces   = GeniXML::FindNodes("n:linkendpoints | ".
 					      "n:interface_ref",
@@ -1968,6 +1988,23 @@ sub SliverWorkAux($$$$$$$)
 	if (! ($linkname =~ /^[-\w]*$/)) {
 	    $message = "Bad name for link: $linkname";
 	    goto bad;
+	}
+
+	#
+	# Look for managers list; optional for now. If not specified then
+	# we assume the link is for thie CM.
+	#
+	if (GeniXML::FindNodes("n:component_manager", $linkref)) {
+	    %managers = map { GeniXML::GetText("id", $_) => $_ } 
+	                      GeniXML::FindNodes("n:component_manager",
+						 $linkref)->get_nodelist();
+
+	    #
+	    # Initial check for the entire link. We check on a per interface
+	    # case below.
+	    #
+	    next
+		if (!exists($managers{$ENV{'MYURN'}}));
 	}
 
 	# Do not worry about modifying a link that is setup. Later.
@@ -3917,6 +3954,7 @@ sub CleanupDeadSlice($;$)
 	return -1
 	    if ($?);
 	$experiment->Flush();
+	$slice->SetExperiment(undef);
     }
     
     if ($slice->Delete() != 0) {
@@ -3973,6 +4011,7 @@ sub GeniExperiment($)
 	$experiment = Experiment->Lookup($uuid);
 	$experiment->SetState(EXPTSTATE_SWAPPED());
 	$experiment->Update({"geniflags" => $Experiment::EXPT_GENIFLAGS_EXPT});
+	$slice->SetExperiment($experiment);
     }
     return $experiment;
 }
