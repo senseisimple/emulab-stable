@@ -1212,12 +1212,14 @@ sub GetTicketAuxAux($$$$$$$$)
 	    my $virtual_node_id   = GeniXML::GetText("virtual_node_id",
 						     $iface_ref);
 	    my $virtual_port_id   = GeniXML::GetText("virtual_interface_id",
+						     $iface_ref) ||
+				    GeniXML::GetText("virtual_port_id",
 						     $iface_ref);
 	    my $component_id      = GeniXML::GetText("component_id",
 						     $iface_ref);
 	    if (!defined($virtual_node_id) || !defined($virtual_port_id)) {
 		$response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-						 "Virtual port ID or virtual interface ID missing on interface");
+						 "Virtual node ID or virtual interface ID missing on interface");
 		goto bad;
 	    }
 	    my $linkref     = $vportmap{"$virtual_node_id:$virtual_port_id"};
