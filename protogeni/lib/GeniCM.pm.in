@@ -1979,7 +1979,7 @@ sub SliverWorkAux($$$$$$$)
     foreach my $linkref (GeniXML::FindNodes("n:link",
 					    $rspec)->get_nodelist()) {
 	my @linkslivers  = ();
-	my %managers     = undef;
+	my %managers     = ();
 	my $linkname     = GeniXML::GetVirtualId($linkref);
 	my @interfaces   = GeniXML::FindNodes("n:linkendpoints | ".
 					      "n:interface_ref",
