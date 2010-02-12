@@ -2127,9 +2127,11 @@ sub SliverWorkAux($$$$$$$)
 	    my $interface;
 
 	    if ($iface_name ne "lo0") {
-		my ($authority, $short_node, $short_iface) =
-		    GeniHRN::ParseInterface($iface_name);
-		$iface_name = $short_iface;
+		if (GeniHRN::IsValid($iface_name)) {
+		    my ($authority, $short_node, $short_iface) =
+			GeniHRN::ParseInterface($iface_name);
+		    $iface_name = $short_iface;
+		}
 		$interface = Interface->LookupByIface($nodeobject,$iface_name);
 		if (!defined($interface)) {
 		    $message = "No such interface ".
