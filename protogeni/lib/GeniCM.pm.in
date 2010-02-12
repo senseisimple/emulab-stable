@@ -1211,12 +1211,16 @@ sub GetTicketAuxAux($$$$$$$$)
 	foreach my $iface_ref (@interfaces) {
 	    my $virtual_node_id   = GeniXML::GetText("virtual_node_id",
 						     $iface_ref);
-	    my $virtual_port_id   = GeniXML::GetText("virtual_port_id",
+	    my $virtual_port_id   = GeniXML::GetText("virtual_interface_id",
 						     $iface_ref);
 	    my $component_id      = GeniXML::GetText("component_id",
 						     $iface_ref);
+	    if (!defined($virtual_node_id) || !defined($virtual_port_id)) {
+		$response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+						 "Virtual port ID or virtual interface ID missing on interface");
+		goto bad;
+	    }
 	    my $linkref     = $vportmap{"$virtual_node_id:$virtual_port_id"};
-
 	    $component_id = "lo0"
 		if (!defined($component_id));
 	    if (! GeniXML::SetText("component_id", $linkref, $component_id)) {
@@ -1267,7 +1271,7 @@ sub GetTicketAuxAux($$$$$$$$)
     #
     # Create a new ticket.
     #
-    my $newticket = GeniTicket->Create($authority, $user, $rspecstr);
+    my $newticket = GeniTicket->Create($authority, $user, $rspec->toString());
     if (!defined($newticket)) {
 	$response =
 	    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
@@ -1719,7 +1723,7 @@ sub SliverWorkAux($$$$$$$)
 	foreach my $ref (GeniXML::FindNodes("n:node",
 					    $rspec)->get_nodelist()) {
 	    my $virtual_id = GeniXML::GetVirtualId($ref);
-	    if ($nickname eq $virtual_id) {
+	    if (defined($virtual_id) && $nickname eq $virtual_id) {
 		$needfree = 0;
 		last;
 	    }
@@ -1799,7 +1803,7 @@ sub SliverWorkAux($$$$$$$)
 						$rspec)->get_nodelist()) {
 	    my $nickname = GeniXML::GetVirtualId($linkref);
 
-	    if ($linkname eq $nickname) {
+	    if (defined($nickname) && $linkname eq $nickname) {
 		$needfree = 0;
 		last;
 	    }
@@ -2014,7 +2018,8 @@ sub SliverWorkAux($$$$$$$)
 	#
 	# XXX Tunnels are a total kludge right now ...
 	#
-	if (GeniXML::GetText("link_type", $linkref) eq "tunnel") {
+	my $link_type = GeniXML::GetText("link_type", $linkref);
+	if (defined($link_type) && $link_type eq "tunnel") {
 
 	    my $iface1ref   = $interfaces[0];
 	    my $iface2ref   = $interfaces[1];
@@ -4051,7 +4056,10 @@ sub UpdateManifest($)
     }
     foreach my $linkref (GeniXML::FindNodes("n:link", $rspec)->get_nodelist()){
 	my $vname = GeniXML::GetVirtualId($linkref);
-	my $tag   = (exists($vlantags{$vname}) ? $vlantags{$vname} : undef);
+	my $tag = undef;
+	if (defined($vname) && exists($vlantags{$vname})) {
+	    $tag = $vlantags{$vname};
+	}
 	if (!defined($tag)) {
 	    GeniXML::RemoveChild("vlantag", $linkref);
 	}

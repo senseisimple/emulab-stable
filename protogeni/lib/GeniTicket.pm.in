@@ -803,7 +803,7 @@ sub Release($$)
 	my $resource_uuid = GeniXML::GetNodeId($ref);
 	if (!defined($resource_uuid)) {
 	    print STDERR "No resource id for node in ticket\n";
-	    print Dumper($ref);
+	    print $ref->toString();
 	    return -1;
 	}
 
@@ -878,7 +878,7 @@ sub ReleaseHolding($$)
 	my $resource_uuid = GeniXML::GetNodeId($ref);
 	if (!defined($resource_uuid)) {
 	    print STDERR "No resource id for node in ticket\n";
-	    print Dumper($ref);
+	    print $ref->toString();
 	    return -1;
 	}
 
