@@ -663,7 +663,7 @@ sub GetManifest($$)
     return $manifest
 	if (!$asxml);
     
-    $xml = $manifest->toString();
+    $xml = $manifest->toStringC14N();
     return $xml;
 }
 

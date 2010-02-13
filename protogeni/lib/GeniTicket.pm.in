@@ -578,7 +578,7 @@ sub rspecXML($)
     return undef
 	if (!defined($self->rspec()));
 
-    return $self->rspec()->toString();
+    return $self->rspec()->toStringC14N();
 }
 
 #
@@ -710,7 +710,7 @@ sub RunSigner($$)
     my $target_cert = $self->target_cert()->cert();
     my $owner_cert  = $self->owner_cert()->cert();
     my $ticket_uuid = $self->{'ticket_uuid'};
-    my $rspec_xml   = $self->rspec()->toString();
+    my $rspec_xml   = $self->rspec()->toStringC14N();
 
     # Convert to GMT.
     $expires = POSIX::strftime("20%y-%m-%dT%H:%M:%S",
@@ -803,7 +803,7 @@ sub Release($$)
 	my $resource_uuid = GeniXML::GetNodeId($ref);
 	if (!defined($resource_uuid)) {
 	    print STDERR "No resource id for node in ticket\n";
-	    print $ref->toString();
+	    print $ref->toStringC14N();
 	    return -1;
 	}
 
@@ -878,7 +878,7 @@ sub ReleaseHolding($$)
 	my $resource_uuid = GeniXML::GetNodeId($ref);
 	if (!defined($resource_uuid)) {
 	    print STDERR "No resource id for node in ticket\n";
-	    print $ref->toString();
+	    print $ref->toStringC14N();
 	    return -1;
 	}
 

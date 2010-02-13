@@ -36,7 +36,7 @@ sub Parse($)
         $doc = $parser->parse_string($xml);
     };
     if ($@) {
-	carp("Failed to parse xml string: $@\n");
+	carp("Failed to parse xml string: $@\nXML: $xml\n\n");
 	return undef;
     } else {
 	return $doc->documentElement();
@@ -52,7 +52,7 @@ sub ParseFile($)
         $doc = $parser->parse_file($file);
     };
     if ($@) {
-	carp("Failed to parse xml string: $@\n");
+	carp("Failed to parse xml string: $@");
 	return undef;
     } else {
 	return $doc->documentElement();
