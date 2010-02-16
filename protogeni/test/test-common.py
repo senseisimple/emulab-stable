@@ -125,7 +125,7 @@ if os.path.exists( LOCALCONF ):
 if EXTRACONF and os.path.exists( EXTRACONF ):
     execfile( EXTRACONF )
 
-HOSTNAME = socket.getfqdn(socket.gethostname())
+HOSTNAME = XMLRPC_SERVER[ "default" ]
 DOMAIN   = HOSTNAME[HOSTNAME.find('.')+1:]
 SLICEURN = "urn:publicid:IDN+" + DOMAIN + "+slice+" + SLICENAME
 
