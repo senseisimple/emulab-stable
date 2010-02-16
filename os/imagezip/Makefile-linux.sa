@@ -15,8 +15,8 @@ BINDIR=	/usr/local/bin
 #
 WITH_EXTFS	= 1
 WITH_FFS	= 1
-WITH_FAT	= 0
-WITH_NTFS	= 0
+WITH_FAT	= 1
+WITH_NTFS	= 1
 WITH_EXT4FS	= 0
 
 PTHREADCFLAGS	= -D_THREAD_SAFE -pthread
@@ -31,27 +31,27 @@ LIBS 		= -lz $(PTHREADLIBS)
 UNZIPCFLAGS	= $(CFLAGS) -Wall
 UNZIPLIBS	= $(LIBS)
 
-ifeq (WITH_EXTFS, 1)
+ifeq ($(WITH_EXTFS), 1)
 FSOBJS		+= extfs/extfs.o extfs/reloc_lilo.o
 CFLAGS		+= -DWITH_EXTFS -Iextfs
 endif
 
-ifeq (WITH_EXT4FS, 1)
+ifeq ($(WITH_EXT4FS), 1)
 FSOBJS		+= ext4fs/ext4fs.o ext4fs/reloc_lilo.o
 CFLAGS		+= -DWITH_EXT4FS -Iext4fs
 endif
 
-ifeq (WITH_FFS, 1)
+ifeq ($(WITH_FFS), 1)
 FSOBJS		+= ffs/ffs.o
 CFLAGS		+= -DWITH_FFS -Iffs
 endif
 
-ifeq (WITH_FAT, 1)
+ifeq ($(WITH_FAT), 1)
 FSOBJS		+= fat/fat_fat.o fat/fat_boot.o fat/fat_glue.o
 CFLAGS		+= -DWITH_FAT -Ifat
 endif
 
-ifeq (WITH_NTFS, 1)
+ifeq ($(WITH_NTFS), 1)
 FSOBJS		+= ntfs/ntfs_glue.o
 FSLIBS		+= ntfs/libntfs/libntfs.a
 CFLAGS		+= -DWITH_NTFS -DOLD_LIBNTFS -Intfs/libntfs/ntfsprogs-1.7.1.linux/include

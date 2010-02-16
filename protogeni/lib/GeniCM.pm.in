@@ -691,7 +691,7 @@ sub GetTicketAuxAux($$$$$$$$)
 	}
     }
 
-    print $rspec->toString();
+    print $rspec->toStringC14N();
 
     foreach my $ref (GeniXML::FindNodes("n:node", $rspec)->get_nodelist()) {
 	my $resource_uuid = GeniXML::GetNodeId($ref);
@@ -1150,7 +1150,7 @@ sub GetTicketAuxAux($$$$$$$$)
     }
 
     unlink($tmpfile);
-    print $solution->toString();
+    print $solution->toStringC14N();
 
     foreach my $ref (GeniXML::FindNodes("n:node",
 					$solution)->get_nodelist()) {
@@ -1211,12 +1211,18 @@ sub GetTicketAuxAux($$$$$$$$)
 	foreach my $iface_ref (@interfaces) {
 	    my $virtual_node_id   = GeniXML::GetText("virtual_node_id",
 						     $iface_ref);
-	    my $virtual_port_id   = GeniXML::GetText("virtual_port_id",
+	    my $virtual_port_id   = GeniXML::GetText("virtual_interface_id",
+						     $iface_ref) ||
+				    GeniXML::GetText("virtual_port_id",
 						     $iface_ref);
 	    my $component_id      = GeniXML::GetText("component_id",
 						     $iface_ref);
+	    if (!defined($virtual_node_id) || !defined($virtual_port_id)) {
+		$response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+						 "Virtual node ID or virtual interface ID missing on interface");
+		goto bad;
+	    }
 	    my $linkref     = $vportmap{"$virtual_node_id:$virtual_port_id"};
-
 	    $component_id = "lo0"
 		if (!defined($component_id));
 	    if (! GeniXML::SetText("component_id", $linkref, $component_id)) {
@@ -1233,7 +1239,7 @@ sub GetTicketAuxAux($$$$$$$$)
 	goto bad;
     }
 
-    print $rspec->toString();
+    print $rspec->toStringC14N();
 
     # Nalloc might fail if the node gets picked up by someone else.
     if (@nodeids && !$impotent) {
@@ -1267,7 +1273,8 @@ sub GetTicketAuxAux($$$$$$$$)
     #
     # Create a new ticket.
     #
-    my $newticket = GeniTicket->Create($authority, $user, $rspecstr);
+    my $newticket = GeniTicket->Create($authority, $user,
+				       $rspec->toStringC14N());
     if (!defined($newticket)) {
 	$response =
 	    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
@@ -1552,7 +1559,7 @@ sub SliverWorkAux($$$$$$$)
     my @freelinks= ();
     my $needplabslice = 0;
 
-    print $rspec->toString();
+    print $rspec->toStringC14N();
 
     #
     # Find current slivers and save.
@@ -1719,7 +1726,7 @@ sub SliverWorkAux($$$$$$$)
 	foreach my $ref (GeniXML::FindNodes("n:node",
 					    $rspec)->get_nodelist()) {
 	    my $virtual_id = GeniXML::GetVirtualId($ref);
-	    if ($nickname eq $virtual_id) {
+	    if (defined($virtual_id) && $nickname eq $virtual_id) {
 		$needfree = 0;
 		last;
 	    }
@@ -1799,7 +1806,7 @@ sub SliverWorkAux($$$$$$$)
 						$rspec)->get_nodelist()) {
 	    my $nickname = GeniXML::GetVirtualId($linkref);
 
-	    if ($linkname eq $nickname) {
+	    if (defined($nickname) && $linkname eq $nickname) {
 		$needfree = 0;
 		last;
 	    }
@@ -2014,7 +2021,8 @@ sub SliverWorkAux($$$$$$$)
 	#
 	# XXX Tunnels are a total kludge right now ...
 	#
-	if (GeniXML::GetText("link_type", $linkref) eq "tunnel") {
+	my $link_type = GeniXML::GetText("link_type", $linkref);
+	if (defined($link_type) && $link_type eq "tunnel") {
 
 	    my $iface1ref   = $interfaces[0];
 	    my $iface2ref   = $interfaces[1];
@@ -2120,9 +2128,11 @@ sub SliverWorkAux($$$$$$$)
 	    my $interface;
 
 	    if ($iface_name ne "lo0") {
-		my ($authority, $short_node, $short_iface) =
-		    GeniHRN::ParseInterface($iface_name);
-		$iface_name = $short_iface;
+		if (GeniHRN::IsValid($iface_name)) {
+		    my ($authority, $short_node, $short_iface) =
+			GeniHRN::ParseInterface($iface_name);
+		    $iface_name = $short_iface;
+		}
 		$interface = Interface->LookupByIface($nodeobject,$iface_name);
 		if (!defined($interface)) {
 		    $message = "No such interface ".
@@ -2255,7 +2265,7 @@ sub SliverWorkAux($$$$$$$)
     }
 
     # The Manifest.
-    my $manifest = $rspec->toString();
+    my $manifest = $rspec->toStringC14N();
 
     #
     # Move this elsewhere.
@@ -2601,7 +2611,7 @@ sub StartSliver($)
     }
 
     if (defined($manifest)) {
-	print $manifest->toString();
+	print $manifest->toStringC14N();
 	
 	#
 	# This is not signed, so have to be very careful about using
@@ -3391,7 +3401,7 @@ sub SliverTicket($)
 		     POSIX::strftime("20%y-%m-%dT%H:%M:%S",
 				     gmtime(str2time($slice->expires()))));
 
-    my $rspec_xml = $rspec->toString();
+    my $rspec_xml = $rspec->toStringC14N();
 
     #
     # Create a new ticket.
@@ -4051,7 +4061,10 @@ sub UpdateManifest($)
     }
     foreach my $linkref (GeniXML::FindNodes("n:link", $rspec)->get_nodelist()){
 	my $vname = GeniXML::GetVirtualId($linkref);
-	my $tag   = (exists($vlantags{$vname}) ? $vlantags{$vname} : undef);
+	my $tag = undef;
+	if (defined($vname) && exists($vlantags{$vname})) {
+	    $tag = $vlantags{$vname};
+	}
 	if (!defined($tag)) {
 	    GeniXML::RemoveChild("vlantag", $linkref);
 	}
@@ -4060,7 +4073,7 @@ sub UpdateManifest($)
 	}
 	
     }
-    my $manifest = $rspec->toString();
+    my $manifest = $rspec->toStringC14N();
     
     #
     # Move this elsewhere.

@@ -408,7 +408,7 @@ sub DeleteSliver($)
 	$response = GeniResponse->Create(GENIRESPONSE_ERROR);
 	goto bad;
     }
-    my $ticket = GeniTicket->Create($authority, $user, $manifest);
+    my $ticket = GeniTicket->Create($authority, $user, $manifest->toStringC14N());
     if (!defined($ticket)) {
 	print STDERR "Could not create new ticket for $slice\n";
 	$response = GeniResponse->Create(GENIRESPONSE_ERROR);

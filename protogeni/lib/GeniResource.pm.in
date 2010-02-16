@@ -320,7 +320,7 @@ sub UpdateManifest($$)
 	return -1;
     }
     my $manifest_idx = $self->manifest_idx();
-    my $manifest_string = $manifest->toString();
+    my $manifest_string = $manifest->toStringC14N();
 
     my $query_result =
 	DBQueryWarn("update geni_manifests set ".
@@ -363,7 +363,7 @@ sub GetTicket($$$$)
 					 gmtime(time() + (3600*6))));
     }
 
-    my $rspec_string = $rspec->toString();
+    my $rspec_string = $rspec->toStringC14N();
 
     #
     # Load the SA cert to act as caller context.
