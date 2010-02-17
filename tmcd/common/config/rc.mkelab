@@ -204,19 +204,6 @@ sub doboot()
     return 0
 	if (! @tmccresults);
 
-    #
-    # This is temporary until images are up to date.
-    #
-    if (0 && ! $skipit) {
-	print "*** Installing current software first ... \n";
-	
-	mysystem("cd /users/stoller/testbed/obj-real/tmcd/common; ".
-		 "gmake local-install");
-	exec($PROGRAM_NAME, ("-s"));
-	die("*** $0:\n".
-	    "    Could not re-exec script!\n");
-    }
-
     if (!$debug) {
 	print "Redirecting output to $LOGFILE\n";
 
@@ -230,6 +217,19 @@ sub doboot()
 	STDERR->autoflush(1);
     }
     
+    #
+    # See if we should do a full, from-scratch configuration.
+    # Defaults to a full-config for backward compat.
+    #
+    $emulabconfig{"LOADPACKAGES"} = 1
+	if (!defined($emulabconfig{"LOADPACKAGES"}));
+    $emulabconfig{"LOADMFS"} = 1
+	if (!defined($emulabconfig{"LOADMFS"}));
+    $emulabconfig{"BUILDSOURCE"} = 1
+	if (!defined($emulabconfig{"BUILDSOURCE"}));
+    $emulabconfig{"LOADDB"} = 1
+	if (!defined($emulabconfig{"LOADDB"}));
+
     #
     # XXX defaults for things that may or may not be passed in.
     # Will be overridden if values are actually passed in.
