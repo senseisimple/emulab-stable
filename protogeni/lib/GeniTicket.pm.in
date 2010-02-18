@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniTicket;
@@ -23,6 +23,7 @@ use GeniCertificate;
 use emutil qw(TBGetUniqueIndex);
 use GeniUtil;
 use GeniHRN;
+use GeniXML;
 use English;
 use XML::Simple;
 use XML::LibXML;
@@ -61,6 +62,7 @@ BEGIN { use GeniUtil; GeniUtil::AddCache(\%tickets); }
 BEGIN { 
     if (! defined($main::GENI_ISCLRHOUSE)) {
 	require Experiment;
+	require Node;
     }
 }
 
@@ -137,13 +139,24 @@ sub Lookup($$)
 #
 sub Create($$$$)
 {
+    # $rspec is an XML string.
     my ($class, $target, $owner, $rspec) = @_;
+
+    my $parser = XML::LibXML->new;
+    my $doc;
+    eval {
+	$doc = $parser->parse_string($rspec);
+    };
+    if ($@) {
+	print STDERR "Failed to parse ticket string: $@\n";
+	return undef;
+    }
 
     # Every Ticket gets a new unique index (sequence number).
     my $seqno = TBGetUniqueIndex('next_ticket', 1);
 
     my $self = {};
-    $self->{'rspec'}         = $rspec;
+    $self->{'rspec'}         = $doc->documentElement();
     $self->{'ticket_uuid'}   = undef;
     $self->{'owner_uuid'}    = $owner->uuid();
     $self->{'owner_hrn'}     = $owner->hrn();
@@ -282,21 +295,13 @@ sub CreateFromSignedTicket($$;$$)
     }
 
     # Dig out the rspec.
-    my ($rspec_node) = $doc->getElementsByTagName("rspec");
-    if (!defined($rspec_node)) {
+    my $rspec = GeniXML::FindFirst("//*[local-name()='rspec']",
+				   $doc->documentElement());
+    if (!defined($rspec)) {
 	print STDERR "Ticket is missing rspec node\n";
 	return undef;
     }
     
-    my $rspec =
-	eval { XMLin($rspec_node->toString(), KeyAttr => [],
-		     ForceArray => ["node", "link", "interface",
-				    "interface_ref", "linkendpoints"]) };
-    if ($@) {
-	print STDERR "XMLin error on ticket rspec: $@\n";
-	return undef;
-    }
-
     # Dig out the ticket uuid.
     my ($uuid_node) = $doc->getElementsByTagName("uuid");
     if (!defined($uuid_node)) {
@@ -573,14 +578,7 @@ sub rspecXML($)
     return undef
 	if (!defined($self->rspec()));
 
-    my $rspec_xml =
-	eval { XMLout($self->rspec(),
-		      "NoAttr" => 1, RootName => "rspec") };
-    if ($@) {
-	print STDERR "XMLout error on rspec: $@\n";
-	return undef;
-    }
-    return $rspec_xml;
+    return $self->rspec()->toStringC14N();
 }
 
 #
@@ -712,18 +710,7 @@ sub RunSigner($$)
     my $target_cert = $self->target_cert()->cert();
     my $owner_cert  = $self->owner_cert()->cert();
     my $ticket_uuid = $self->{'ticket_uuid'};
-    my $rspec_xml   = $self->rspec();
-
-    # Allow for the rspec to be in XML already.
-    if (ref($rspec_xml)) {
-	$rspec_xml =
-	    eval { XMLout($rspec_xml,
-			  "NoAttr" => 1, RootName => "rspec") };
-	if ($@) {
-	    print STDERR "XMLout error on ticket rspec: $@\n";
-	    return -1;
-	}
-    }
+    my $rspec_xml   = $self->rspec()->toStringC14N();
 
     # Convert to GMT.
     $expires = POSIX::strftime("20%y-%m-%dT%H:%M:%S",
@@ -803,29 +790,25 @@ sub Release($$)
     my @nodeids = ();
     my @nodes   = ();
 
-    foreach my $ref (@{$self->rspec()->{'node'}}) {
+    foreach my $ref (GeniXML::FindNodes("n:node",
+					$self->rspec())->get_nodelist()) {
 	# Skip lan nodes; they are fake.
 	next
-	    if (exists($ref->{'node_type'}) &&
-		exists($ref->{'node_type'}->{'type_name'}) &&
-		$ref->{'node_type'}->{'type_name'} eq "lan");
+	    if (GeniXML::IsLanNode($ref));
 	
 	# Skip remote nodes.
-	my $manager_uuid  = $ref->{'component_manager_uuid'};
 	next
-	    if (defined($manager_uuid) &&
-		!GeniHRN::Equal($manager_uuid, $ENV{'MYURN'}) &&
-		$manager_uuid ne $ENV{'MYUUID'});
+	    if (!GeniXML::IsLocalNode($ref));
 	
-	my $resource_uuid = $ref->{'component_uuid'} || $ref->{'uuid'};
+	my $resource_uuid = GeniXML::GetNodeId($ref);
 	if (!defined($resource_uuid)) {
 	    print STDERR "No resource id for node in ticket\n";
-	    print Dumper($ref);
+	    print $ref->toStringC14N();
 	    return -1;
 	}
 
 	# Virtual nodes not created until ticket redeemed.
-	my $node = Node->Lookup($resource_uuid);
+	my $node = GeniUtil::LookupNode($resource_uuid);
 	next
 	    if (!defined($node));
 
@@ -844,7 +827,8 @@ sub Release($$)
 	if ($reservation->SameExperiment($experiment)) {
 	    my $restable = $node->ReservedTableEntry();
 	    if (defined($restable) &&
-		!defined($restable->{'genisliver_idx'})) {
+		(!defined($restable->{'genisliver_idx'}) ||
+		 $restable->{'genisliver_idx'} == 0)) {
 		push(@nodeids, $node->node_id());
 		push(@nodes, $node);
 	    }
@@ -881,26 +865,23 @@ sub ReleaseHolding($$)
     my @nodeids = ();
     my @nodes   = ();
 
-    foreach my $ref (@{$self->rspec()->{'node'}}) {
+    foreach my $ref (GeniXML::FindNodes("n:node",
+					$self->rspec())->get_nodelist()) {
 	# Skip lan nodes; they are fake.
 	next
-	    if (exists($ref->{'node_type'}) &&
-		exists($ref->{'node_type'}->{'type_name'}) &&
-		$ref->{'node_type'}->{'type_name'} eq "lan");
+	    if (GeniXML::IsLanNode($ref));
 	
 	# Skip remote nodes.
-	my $manager_uuid  = $ref->{'component_manager_uuid'};
 	next
-	    if (defined($manager_uuid) &&
-		!GeniHRN::Equal($manager_uuid, $ENV{'MYURN'}) &&
-		$manager_uuid ne $ENV{'MYUUID'});
+	    if (!GeniXML::IsLocalNode($ref));
 	
-	my $resource_uuid = $ref->{'component_uuid'} || $ref->{'uuid'};
+	my $resource_uuid = GeniXML::GetNodeId($ref);
 	if (!defined($resource_uuid)) {
 	    print STDERR "No resource id for node in ticket\n";
-	    print Dumper($ref);
+	    print $ref->toStringC14N();
 	    return -1;
 	}
+
 	my $node = Node->Lookup($resource_uuid);
 	next
 	    if (!defined($node));

@@ -18,6 +18,7 @@ static const char rcsid[] = "$Id: parse_request_rspec.cc,v 1.16 2009-10-21 20:49
 
 #include <fstream>
 #include <sstream>
+#include <sys/time.h>
 
 #include "anneal.h"
 #include "vclass.h"

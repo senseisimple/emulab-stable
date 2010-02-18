@@ -34,6 +34,7 @@ my $TBROOT   = "@prefix@";
 my $TESTMODE = @TESTMODE@;
 my $TBLOGS   = "@TBLOGSEMAIL@";
 my $OPSDBSUPPORT= @OPSDBSUPPORT@;
+my $NSVERIFY = @NSVERIFY@;
 my $vtopgen  = "$TBROOT/bin/vtopgen";
 my $wrapper  = "$TBROOT/libexec/assign_wrapper";
 my $batchexp = "$TBROOT/bin/batchexp";
@@ -322,21 +323,25 @@ if ($OPSDBSUPPORT) {
 
 if (!$experiment->elabinelab()) {
     TBDebugTimeStamp("verify-ns started");
-    print "Verifying parse ...\n";
+    if ($NSVERIFY) {
+	print "Verifying parse ...\n";
     
-    if (system("verify-ns $pid $gid $eid $nsfile")) {
-	if (1) {
-	    SENDMAIL($TBLOGS,
-		     "NS Verify failure for $pid/$eid",
-		     "'verify-ns' failed for $pid/$eid\n".
-		     "\nIf it is not a user error nstb_compat.tcl is ".
-		     "probably out of date.\n");
+	if (system("verify-ns $pid $gid $eid $nsfile")) {
+	    if (1) {
+		SENDMAIL($TBLOGS,
+			 "NS Verify failure for $pid/$eid",
+			 "'verify-ns' failed for $pid/$eid\n".
+			 "\nIf it is not a user error nstb_compat.tcl is ".
+			 "probably out of date.\n");
+	    }
+	    else {
+		fatal({type => 'secondary', severity => SEV_SECONDARY,
+		       error => ['ns_verify_failed']},
+		      "verify-ns failed!");
+	    }
 	}
-	else {
-	    fatal({type => 'secondary', severity => SEV_SECONDARY,
-		   error => ['ns_verify_failed']},
-		  "verify-ns failed!");
-	}
+    } else {
+	print "NSVERIFY not configured, skipping ...\n";
     }
 }
 

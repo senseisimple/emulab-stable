@@ -105,6 +105,8 @@ my $ROOT_PRIVKEY    = "/root/.ssh/id_rsa";
 my $ROOT_PUBKEY     = "$ROOT_PRIVKEY.pub";
 my $ROOT_AUTHKEY    = "/root/.ssh/authorized_keys";
 
+my $CHECKUPUSER	    = "elabckup";
+
 my $APACHE_ETCDIR   = "/usr/local/etc/apache";
 my $SUDOERS         = "/usr/local/etc/sudoers";
 my $HTTPD_CONF      = "$APACHE_ETCDIR/httpd.conf";
@@ -158,6 +160,7 @@ my $TFTPD_PKG	  = "emulab-tftp-hpa-0.48";
 my $P5DBD_PKG	  = "p5-DBD-mysql50-3.0002";
 # XXX temporary until fix dependencies in emulab-boss package
 my $P5GD_PKG	  = "p5-GD-2.07";
+my $PYM2_PKG	  = "py25-m2crypto-0.19.1";
 
 #
 # Named pid file.
@@ -260,7 +263,9 @@ else {
 #
 my $BOSS_PORT = "emulab-boss-1.8";
 if ($FBSD_MAJOR > 4) {
-    if ($FBSD_MAJOR == 6 && $FBSD_MINOR > 2) {
+    if ($FBSD_MAJOR > 6) {
+	$BOSS_PORT = "emulab-boss-3.0";
+    } elsif ($FBSD_MAJOR == 6 && $FBSD_MINOR > 2) {
 	$BOSS_PORT = "emulab-boss-2.1";
     } else {
 	$BOSS_PORT = "emulab-boss-2.0";
@@ -484,7 +489,7 @@ Phase "ports", "Installing ports", sub {
 		ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
 	    };
 	    # XXX Ditto
-	    if ($FBSD_MAJOR == 6 && $FBSD_MINOR > 2) {
+	    if ($FBSD_MAJOR > 6 || ($FBSD_MAJOR == 6 && $FBSD_MINOR > 2)) {
 		Phase "p5-DBD-mysql50", "Installing old Perl Mysql package", sub {
 		    my $pname = `$PKG_INFO -E 'p5-DBD-mysql50-*' 2>/dev/null`;
 		    chomp($pname);
@@ -498,7 +503,7 @@ Phase "ports", "Installing ports", sub {
 			if ($pname);
 		    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $P5DBD_PKG");
 		};
-		# XXX cannot seem to get the dependency into emulab-boss pkg
+		# XXX cannot seem to get these dependencies into emulab-boss
 		Phase "p5-GD", "Installing GD graphics package", sub {
 		    my $pname = `$PKG_INFO -E 'p5-GD-*' 2>/dev/null`;
 		    chomp($pname);
@@ -512,7 +517,21 @@ Phase "ports", "Installing ports", sub {
 			if ($pname);
 		    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $P5GD_PKG");
 		};
-
+		if ($FBSD_MAJOR > 6) {
+		    Phase "py-m2crypto", "Installing python m2crypto package", sub {
+			my $pname = `$PKG_INFO -E 'py25-m2crypto-*' 2>/dev/null`;
+			chomp($pname);
+			if ($pname eq $PYM2_PKG) {
+			    PhaseSkip("py25-m2crypto already up to date");
+			}
+			if (!$packagedir) {
+			    PhaseSkip("No package directory provided");
+			}
+			ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_DEL -f $pname")
+			    if ($pname);
+			ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $PYM2_PKG");
+		    };
+		}
 	    }
 	}
 	else {
@@ -559,7 +578,7 @@ Phase "portfixup", "Fixing up packages", sub {
 	my $pname = GetPackage("rsync", $packagedir);
 	ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
     };
-    if ($FBSD_MAJOR == 6) {
+    if ($FBSD_MAJOR >= 6) {
 	# Temporary for template stuff
 	Phase "Simple", "Looking for Simple XML Parser", sub {
 	    if (!ExecQuiet("$PKG_INFO -x p5-XML-Simple")) {
@@ -573,7 +592,12 @@ Phase "portfixup", "Fixing up packages", sub {
 		if (!ExecQuiet("$PKG_INFO -x subversion")) {
 		    PhaseSkip("subversion already installed");
 		}
-		my $pname = GetPackage("subversion-python", $packagedir);
+		my $pname;
+		if ($FBSD_MAJOR > 6) {
+		    $pname = GetPackage("py-subversion", $packagedir);
+		} else {
+		    $pname = GetPackage("subversion-python", $packagedir);
+		}
 		ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
 	    };
 	}
@@ -582,7 +606,7 @@ Phase "portfixup", "Fixing up packages", sub {
 	Phase "gcc30", "Looking for GCC 3.0 and installing", sub {
 	    if ($FBSD_MAJOR > 4 ||
 		!ExecQuiet("$PKG_INFO -x gcc30")) {
-		PhaseSkip("GCC 3.0 already installed");
+		PhaseSkip("GCC 3.0 or greater already installed");
 	    }
 	    my $pname = GetPackage("gcc30", $packagedir);
 	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
@@ -599,20 +623,22 @@ Phase "patches", "Applying patches", sub {
 	    ExecQuietFatal("$PATCH -f -p0 -i $STL_PATCH");
 	};
     }
-    Phase "m2cryptopatch", "Patching m2crypto", sub {
-	my $patchfile = $M2CRYPTO_PATCH;
+    if ($FBSD_MAJOR < 7) {
+	Phase "m2cryptopatch", "Patching m2crypto", sub {
+	    my $patchfile = $M2CRYPTO_PATCH;
 	
-	if (ExecQuiet("$PKG_INFO -I -x m2crypto | fgrep -q -s '0.17'") == 0) {
-	    $patchfile = "${patchfile}-0.17";
-	}
-	elsif (ExecQuiet("$PKG_INFO -I -x m2crypto | fgrep -q -s '0.13'") == 0) {
-	    $patchfile = "${patchfile}-0.13";
-	}
-	if (!ExecQuiet("$PATCH -C -f -l -R -p0 -i $patchfile")) {
-	    PhaseSkip("Patch already applied");
-	}
-	ExecQuietFatal("$PATCH -f -l -p0 -i $patchfile");
-    };
+	    if (ExecQuiet("$PKG_INFO -I -x m2crypto | fgrep -q -s '0.17'") == 0) {
+		$patchfile = "${patchfile}-0.17";
+	    }
+	    elsif (ExecQuiet("$PKG_INFO -I -x m2crypto | fgrep -q -s '0.13'") == 0) {
+		$patchfile = "${patchfile}-0.13";
+	    }
+	    if (!ExecQuiet("$PATCH -C -f -l -R -p0 -i $patchfile")) {
+		PhaseSkip("Patch already applied");
+	    }
+	    ExecQuietFatal("$PATCH -f -l -p0 -i $patchfile");
+	};
+    }
     Phase "Mysql.pm.patch", "Patching Mysql.pm", sub {
 	my $patchfile = $MYSQL_PM_PATCH;
 	$patchfile = `realpath $patchfile`;
@@ -1006,19 +1032,20 @@ Phase "NFSmounts", "Setting up NFS mounts", sub {
     };
     Phase "fstab", "Adding NFS mounts to $FSTAB", sub {
 	DoneIfEdited($FSTAB);
-	my @lines = ("$FSNODE:$USERROOT\t\t$USERROOT\tnfs\trw,nodev,nosuid\t0\t0",
-		     "$FSNODE:$PROJROOT\t\t$PROJROOT\tnfs\trw,nodev,nosuid\t0\t0",
-		     "$FSNODE:$GROUPROOT\t\t$GROUPROOT\tnfs\trw,nodev,nosuid\t0\t0",
-		     "$FSNODE:$SHAREROOT\t\t$SHAREROOT\tnfs\trw,nodev,nosuid\t0\t0");
+	my $nfsopt = "nosuid";
+	$nfsopt .= ",nodev"
+	    if ($FBSD_MAJOR < 7);
+	my @lines = ("$FSNODE:$USERROOT\t\t$USERROOT\tnfs\trw,$nfsopt\t0\t0",
+		     "$FSNODE:$PROJROOT\t\t$PROJROOT\tnfs\trw,$nfsopt\t0\t0",
+		     "$FSNODE:$GROUPROOT\t\t$GROUPROOT\tnfs\trw,$nfsopt\t0\t0",
+		     "$FSNODE:$SHAREROOT\t\t$SHAREROOT\tnfs\trw,$nfsopt\t0\t0");
 	if ($SCRATCHDIR) {
 	    push(@lines,
-		 "$FSNODE:$SCRATCHROOT\t\t$SCRATCHROOT\tnfs\trw,nodev,nosuid\t0\t0");
+		 "$FSNODE:$SCRATCHROOT\t\t$SCRATCHROOT\tnfs\trw,$nfsopt\t0\t0");
 	}
 	push(@lines,
-	     "$USERNODE:/usr/testbed\t\t$OPSDIR_DIR\tnfs\trw,soft,".
-	     "-b,nodev,nosuid\t0\t0",
-	     "$USERNODE:/var\t\t$USERSVAR_DIR\tnfs\tro,soft,".
-	     "-b,nodev,nosuid\t0\t0");
+	     "$USERNODE:/usr/testbed\t\t$OPSDIR_DIR\tnfs\trw,soft,-b,$nfsopt\t0\t0",
+	     "$USERNODE:/var\t\t$USERSVAR_DIR\tnfs\tro,soft,-b,$nfsopt\t0\t0");
 	AppendToFileFatal($FSTAB, @lines);
     };
     Phase "mounts", "Mounting NFS filesystems", sub {
@@ -1209,7 +1236,13 @@ Phase "sslcerts", "Setting up SSL certificates", sub {
 	};
 	Phase "rc.d", "Installing Apache startup file", sub {
 	    DoneIfExists("$RCDIR/apache.sh");
-	    ExecQuietFatal("mv $RCDIR/apache.sh.sample $RCDIR/apache.sh");
+	    my $sfile;
+	    if ($FBSD_MAJOR > 6) {
+		$sfile = "$RCDIR/apache";		
+	    } else {
+		$sfile = "$RCDIR/apache.sh.sample";
+	    }
+	    ExecQuietFatal("mv $sfile $RCDIR/apache.sh");
 	    if ($FBSD_MAJOR == 6) {
 		ExecQuietFatal("sed -i .orig ".
 			       "-e 's/^apache_enable/#apache_enable/' ".
@@ -1437,12 +1470,12 @@ Phase "firstuser", "Setting up initial user ($PROTOUSER)", sub {
     };
 };
 
-Phase "chkupuser", "Setting up checkup user (elabckup)", sub {
-    PhaseSkip("elabckup already created")
-	if (-d "$USERROOT/elabckup");
+Phase "chkupuser", "Setting up checkup user ($CHECKUPUSER)", sub {
+    PhaseSkip("$CHECKUPUSER already created")
+	if (-d "$USERROOT/$CHECKUPUSER");
     ExecQuietFatal("perl $TOP_OBJDIR/utils/firstuser -b ".
 		   (defined($password) ? " -p $password" : "").
-		   " -u elabckup -n 'Emulab Checkup User' ".
+		   " -u $CHECKUPUSER -n 'Emulab Checkup User' ".
 		   "-e '@TBTESTSUITEEMAIL@'");
 };
 Phase "wikidocs", "Installing wikidocs redirect", sub {

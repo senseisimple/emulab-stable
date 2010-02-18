@@ -77,7 +77,7 @@ $TBLIBEXEC_DIR	= "$TBDIR"."libexec/";
 $TBSUEXEC_PATH  = "$TBLIBEXEC_DIR/suexec";
 $TBCHKPASS_PATH = "$TBLIBEXEC_DIR/checkpass";
 $TBCSLOGINS     = "$TBETC_DIR/cslogins";
-$UUIDGEN_PATH   = "/usr/bin/uuidgen";
+$UUIDGEN_PATH   = "@UUIDGEN@";
 
 #
 # Hardcoded check against $WWWHOST, to prevent anyone from accidentally setting

@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006, 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -537,6 +537,13 @@ proc new {class args} {
 # unit is given then bytes (b) is assumed.  It returns the bandwidth
 # in Kbps.
 proc parse_bw {bspec {islink 1}} {
+    #
+    # Special case; "*" means let assign pick the bandwidth. Make it zero.
+    #
+    if {"$bspec" == "*"} {
+	return 0
+    }
+
     # Default to bytes
     if {[scan $bspec "%f%s" bw unit] == 1} {
 	set unit b

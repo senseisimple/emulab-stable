@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2002-2007 University of Utah and the Flux Group.
+# Copyright (c) 2002-2007, 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -10,6 +10,15 @@ SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ..
 SUBDIR		= apache
+
+SYSTEM	       := $(shell uname -s)
+ifeq ($(SYSTEM),FreeBSD)
+FBSDREL	:= $(shell uname -r | sed -e 's/\([^-][^-]*\)-.*/\1/')
+FBSDMAJ := $(basename $(FBSDREL))
+ifeq ($(FBSDMAJ),7)
+SCRIPT_HACK	= 1
+endif
+endif
 
 include $(OBJDIR)/Makeconf
 
@@ -30,10 +39,44 @@ $(INSTALL_APACHE_CONFIG)/%: %
 	$(INSTALL_DATA) $< $@
 
 
-install: httpd.conf
-	$(INSTALL_DATA) httpd.conf $(INSTALL_APACHE_CONFIG)/httpd.conf
+#
+# XXX hack, hack: need to fix the path to the auth_mysql_module
+# This could (should?) be done with configure, but apache port might
+# not be installed when we configure our software.
+#
+httpd.conf.fixed: httpd.conf
+	-@cp httpd.conf httpd.conf.fixed
+	@if [ -x /usr/local/libexec/apache/mod_auth_mysql.so ]; then \
+            sed -i "" -e '/^LoadModule auth_mysql/s/libauth/mod_auth/' httpd.conf.fixed; \
+	    echo "Updated httpd.conf"; \
+	fi
 
-control-install: httpd.conf-ops
+install-dirs:
+	-mkdir -p $(INSTALL_TOPDIR)/www
+
+#
+# XXX another woeful hack.  There appears to be a well-documented problem
+# with Apache and PHP4, where loading PHP with certain extensions will cause
+# Apache to crash immediately.  However, if you start it without PHP and then
+# use apachectl to restart it *with* PHP, all is well.  Go figure...
+# We install this script which accomodates that...ahem, "behavior."
+# Since we have only seen this on FBSD7, we only do it there.
+#
+# Note that we install apache-emulab as apache.sh to be consistant with
+# with what {boss,ops}-install expect.
+#
+install-scripts: apache-emulab
+ifeq ($(SCRIPT_HACK),1)
+	@if [ -f /usr/local/etc/rc.d/apache -a ! -f /usr/local/etc/rc.d/.apache.real ]; then \
+	    mv /usr/local/etc/rc.d/apache /usr/local/etc/rc.d/.apache.real; \
+	fi
+	$(INSTALL) -m 755 $(SRCDIR)/apache-emulab /usr/local/etc/rc.d/apache.sh
+endif
+
+install: install-dirs install-scripts httpd.conf.fixed
+	$(INSTALL_DATA) httpd.conf.fixed $(INSTALL_APACHE_CONFIG)/httpd.conf
+
+control-install: install-dirs install-scripts httpd.conf-ops
 	$(INSTALL_DATA) httpd.conf-ops $(INSTALL_APACHE_CONFIG)/httpd.conf
 
 clean:

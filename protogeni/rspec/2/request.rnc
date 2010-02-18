@@ -38,6 +38,7 @@ NodeContents &=
 # The LinkMapping will only be available after an assignment
 LinkContents &=
   attribute client_id { text } &
+  element component_manager { attribute name { text } }* &
   element component_hop { ComponentHopContents }*
 
 # The ComponentInterfaceDeclName will only be available after an assignment

@@ -1,0 +1,18 @@
+--- M2Crypto/SSL/Connection.py.orig     2008-10-12 22:47:33.000000000 -0600
++++ M2Crypto/SSL/Connection.py  2010-01-06 11:41:47.000000000 -0700
+@@ -18,11 +18,14 @@
+ def _serverPostConnectionCheck(*args, **kw):
+     return 1
+ 
++def _clientPostConnectionCheck(*args, **kw):
++    return 1
++
+ class Connection:
+ 
+     """An SSL connection."""
+ 
+-    clientPostConnectionCheck = Checker.Checker()
++    clientPostConnectionCheck = _clientPostConnectionCheck
+     serverPostConnectionCheck = _serverPostConnectionCheck
+ 
+     m2_bio_free = m2.bio_free

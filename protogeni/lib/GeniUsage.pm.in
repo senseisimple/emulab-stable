@@ -68,7 +68,7 @@ sub NewSliver($$$$)
 	}
     }
     if (defined($sliver->rspec())) {
-	my $rspec_string = XMLout($sliver->rspec(), RootName => "rspec");
+	my $rspec_string = $sliver->rspec()->toStringC14N();
 	my $safe_rspec   = DBQuoteSpecial($rspec_string);
 
 	push(@insert_data, "rspec_string=$safe_rspec");
@@ -310,7 +310,7 @@ sub NewManifest($$$)
     my @insert_data = ();
 
     my $aggregate_uuid  = $aggregate->uuid();
-    my $manifest_string = XMLout($manifest, RootName => "manifest");
+    my $manifest_string = $manifest->toStringC14N();
     my $safe_manifest   = DBQuoteSpecial($manifest_string);
 
     # Insert into DB.

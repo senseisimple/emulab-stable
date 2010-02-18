@@ -25,6 +25,7 @@ NodeContents &=
 # The LinkMapping will only be available after an assignment
 LinkContents &=
   attribute link_type { text }? &
+  element component_manager { attribute name { text } }* &
   VirtualName &
   LinkMapping? &
   # Characteristics (bandwidth, latency, loss) which affect traffic.

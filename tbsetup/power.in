@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -31,7 +31,6 @@ use power_rpc27;
 use power_sgmote;
 use power_mail;
 use power_whol;
-use power_rmcp;
 use power_ilo;
 use snmpit_apc;
 use libtestbed;
@@ -350,6 +349,7 @@ foreach my $power_id (keys %outlets) {
 	    $errors++;
 	}
     } elsif ($type =~ /rmcp-(\w+)/) {
+	require power_rmcp;
 	if (rmcpctrl($1,$op,@nodes)) {
 	    print "Control of $nodestr failed.\n"; ++$exitval;
 	    ++$errors;
