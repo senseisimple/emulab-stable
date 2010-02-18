@@ -218,17 +218,32 @@ sub doboot()
     }
     
     #
-    # See if we should do a full, from-scratch configuration.
-    # Defaults to a full-config for backward compat.
+    # Elabinelab build options:
+    #
+    # 	LOADPACKAGES	download and install a standard set of packages,
+    #	               	otherwise assume they are already installed.
+    #   LOADMFS		download and install a tftpboot tarball,
+    #	               	otherwise assume it is already installed.
+    #   LOADELABSOURCE	download, build and install the Emulab source code,
+    #	               	otherwise assume it is already installed.
+    #	LOADDB		download and install Emulab DB state,
+    #			otherwise...this might not even be useful.
+    #	LOADUSERDIRS	download and install "user data" whatever we
+    #			decide that might be.
+    #
+    # Defaults to all *but* LOADUSERDIRS for backward compat.
     #
     $emulabconfig{"LOADPACKAGES"} = 1
 	if (!defined($emulabconfig{"LOADPACKAGES"}));
     $emulabconfig{"LOADMFS"} = 1
 	if (!defined($emulabconfig{"LOADMFS"}));
-    $emulabconfig{"BUILDSOURCE"} = 1
+    $emulabconfig{"LOADELABSOURCE"} = 1
 	if (!defined($emulabconfig{"BUILDSOURCE"}));
     $emulabconfig{"LOADDB"} = 1
 	if (!defined($emulabconfig{"LOADDB"}));
+    # XXX not yet
+    $emulabconfig{"LOADUSERDIRS"} = 0
+	if (!defined($emulabconfig{"LOADUSERDIRS"}));
 
     #
     # XXX defaults for things that may or may not be passed in.
