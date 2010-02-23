@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2010 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2008 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -583,29 +583,6 @@ event_notification_alloc(event_handle_t handle, address_tuple_t tuple)
     notification->pubsub_notification = pubsub_notification;
     notification->has_hmac = 0;
 
-    /*
-     * Event version number
-     */
-    if (!event_notification_set_version(handle, notification, "1.0")) {
-        ERROR("pubsub_notification_alloc failed to set version number\n");
-	event_notification_free(handle, notification);
-        return NULL;
-    }
-#ifdef ELVIN_COMPAT
-    if (!event_notification_set_elvincompat(handle, notification)) {
-        ERROR("pubsub_notification_alloc failed to set elvin compat\n");
-	event_notification_free(handle, notification);
-        return NULL;
-    }
-#endif
-#ifdef ELVIN_COMPAT0
-    notification->hashtable = elvin_hashtable_alloc(0, &handle->status);
-    if (notification->hashtable == NULL) {
-        ERROR("pubsub_notification_alloc failed to allocate hashtable\n");
-	event_notification_free(handle, notification);
-        return NULL;
-    }
-#endif
     if (tuple == NULL)
 	    return notification;
 
@@ -661,11 +638,6 @@ event_notification_free(event_handle_t handle,
 
     pubsub_notification_free(handle->server, notification->pubsub_notification,
 			     &handle->status);
-#ifdef ELVIN_COMPAT0
-    if (notification->hashtable) {
-        elvin_hashtable_free(notification->hashtable);
-    }
-#endif
     free(notification);
 
     return 1;
@@ -698,13 +670,10 @@ event_notification_clone(event_handle_t handle,
 	free(clone);
         return 0;
     }
-#ifdef ELVIN_COMPAT0
-    notification->hashtable = elvin_hashtable_clone(notification->hashtable,
-						    &handle->status);
-#endif
     clone->has_hmac = notification->has_hmac;
 
     return clone;
+
 }
 
 
@@ -941,6 +910,7 @@ event_notification_put_double(event_handle_t handle,
         pubsub_error_fprintf(stderr, &handle->status);
         return 0;
     }
+
     return 1;
 }
 
@@ -1517,13 +1487,14 @@ hmac_traverse(void *rock, char *name,
 	if (!strcmp(name, "__hmac__")) 
 		return 1;
 
+#ifdef ELVIN_COMPAT
 	/*
-	 * Never include this in hmac computation. See elvin_gateway and
-	 * the elvin compat code below. 
+	 * The elvin gateway sticks this flag in, but we need to ignore it
+	 * when doing hmac computation.
 	 */
 	if (!strcmp(name, "___elvin_ordered___"))
 		return 1;
-
+#endif
 	switch (type) {
 	case INT32_TYPE:
 		HMAC_Update(ctx,
@@ -1564,60 +1535,60 @@ hmac_traverse(void *rock, char *name,
 
 #ifdef ELVIN_COMPAT
 static int
-notify_order_traverse(void *arg, char *name,
-		      pubsub_type_t type, pubsub_value_t value,
-		      pubsub_error_t *error)
-{
-	pubsub_notification_t	*pubsub_notification =
-		(pubsub_notification_t *) arg;
-
-	switch (type) {
-	case STRING_TYPE:
-		pubsub_notification_add_string(pubsub_notification,
-					       name, value.pv_string, error);
-		break;
-	case INT32_TYPE:
-		pubsub_notification_add_int32(pubsub_notification,
-					      name, value.pv_int32, error);
-		break;
-	case INT64_TYPE:
-		pubsub_notification_add_int64(pubsub_notification,
-					      name, value.pv_int64, error);
-		break;
-	case REAL64_TYPE:
-		pubsub_notification_add_real64(pubsub_notification,
-					       name, value.pv_real64, error);
-		break;
-
-	case OPAQUE_TYPE:
-		pubsub_notification_add_opaque(pubsub_notification,
-					       name,
-					       (char *)(value.pv_opaque.data),
-					       value.pv_opaque.length,
-					       error);
-		break;
-		       
-	default:
-		break;
-	}
-	return 1;
-}
-
-static int
 hmac_fill_hash(void *rock, char *name,
 	       pubsub_type_t type, pubsub_value_t value,
 	       pubsub_error_t *status)
 {
 	struct elvin_hashtable	*table = (struct elvin_hashtable *) rock;
 
-	if (elvin_hashtable_add(table, name, value, type, status) == -1) {
-	    ERROR("hmac_fill_hash failure %s: ", name);
-	    pubsub_error_fprintf(stderr, status);
-	    return 0;
-	}
+	if (elvin_hashtable_add(table, name, value, type, status) == -1)
+		return 0;
+	
 	return 1;
 }
 #endif
+
+static int
+notification_hmac(pubsub_notification_t *notification, HMAC_CTX *ctx,
+		  pubsub_error_t *status)
+{
+	int retval = 0;
+#ifdef ELVIN_COMPAT
+	struct elvin_hashtable  *table;
+	int			elvin_ordered;
+
+	if (pubsub_notification_get_int32(notification,
+					  "___elvin_ordered___",
+					  &elvin_ordered, status) == 0) {
+		if (!pubsub_notification_traverse(notification, hmac_traverse,
+						  ctx, status)) {
+			return -1;
+		}
+		return 0;
+	}
+	if ((table = elvin_hashtable_alloc(0, status)) == NULL) {
+		return -1;
+	}
+	else if (!pubsub_notification_traverse(notification, hmac_fill_hash,
+					       table, status)) {
+		retval = -1;
+	}
+	else if (!elvin_hashtable_traverse(table, hmac_traverse,
+					   ctx, status)) {
+		retval = -1;
+	}
+
+	elvin_hashtable_free(table);
+	table = NULL;
+#else
+	if (!pubsub_notification_traverse(notification, hmac_traverse,
+					  ctx, status)) {
+		return -1;
+	}
+#endif
+	
+	return retval;
+}
 
 int
 event_notification_insert_hmac(event_handle_t handle,
@@ -1626,11 +1597,8 @@ event_notification_insert_hmac(event_handle_t handle,
 	HMAC_CTX	ctx;
 	unsigned char	mac[EVP_MAX_MD_SIZE];
 	int		i, len = EVP_MAX_MD_SIZE;
-#ifdef ELVIN_COMPAT
-	struct elvin_hashtable  *hashtable;
-	pubsub_notification_t   *notecopy;
-#endif
-	if (1)
+
+	if (0)
 	    INFO("event_notification_insert_hmac: %d %s\n",
 		 handle->keylen, handle->keydata);
 
@@ -1640,73 +1608,12 @@ event_notification_insert_hmac(event_handle_t handle,
 	}
 #ifdef  ELVIN_COMPAT
 	/*
-	 * The point of this is to convert the ordering of the pubsub
-	 * notification into elvin ordering according to its hash
-	 * function, and then create a new notification with that
-	 * order as returned by pubsub_traverse (which is linear). Then
-	 * insert the ___elvin_ordered___ flag. At the client:
-	 *
-	 * 1) With Elvin Compat: That the pubsub notification is in the
-         *     correct order to generate the hmac using pubsub traverse.
-	 *     Without ___elvin_ordered___, the client will convert the
-	 *     ordering to elvin hash order to generate the hmac.
-	 * 2) No Elvin Compat: The client always uses pubsub traverse, so
-	 *     it will get the correct hmac.
-	 *
-	 * This is backwards compatabile with clients linked with old
-	 * versions of the event library, and new versions of the event
-	 * library.
-	 *
-	 * XXX This impl is just a prototype. It would be much more efficient
-	 * to do this as items are added to the notification. Later.
+	 * Remove this so we recompute the elvin ordering above, since the
+	 * notification might have changed, and the exiting linear order
+	 * will no longer correspond to elvin ordering.
 	 */
-	notecopy = pubsub_notification_alloc(handle->server, &handle->status);
-	if (notecopy == NULL) {
-	    ERROR("event_notification_insert_hmac failed: notecopy alloc\n");
-	    return -1;
-	}
-	hashtable = elvin_hashtable_alloc(0, &handle->status);
-	if (hashtable == NULL) {
-	    ERROR("event_notification_insert_hmac failed: hashtable alloc\n");
-	    pubsub_notification_free(handle->server,
-				     notecopy, &handle->status);
-	    return -1;
-	}
-	
 	pubsub_notification_remove(notification->pubsub_notification,
 				   "___elvin_ordered___", &handle->status);
-
-	/*
-	 * Pubsub puts this in when ELVIN_COMPAT is on. But it it causes
-	 * a duplicate entry when trying to copy the notification. Seems
-	 * that Pubsub should not put this in, since it is not doing
-	 * anything else wrt ELVIN_COMPAT. Still pondering this.
-	 */
-	pubsub_notification_remove(notification->pubsub_notification,
-				   "___PUBSUB___", &handle->status);
-
-	if (!pubsub_notification_traverse(notification->pubsub_notification,
-					  hmac_fill_hash,
-					  hashtable, &handle->status)) {
-	    ERROR("event_notification_insert_hmac failed: hmac_fill_hash\n");
-	    pubsub_notification_free(handle->server,
-				     notecopy, &handle->status);
-	    elvin_hashtable_free(hashtable);
-	    return -1;
-	}
-	if (!elvin_hashtable_traverse(hashtable, notify_order_traverse,
-				      notecopy, &handle->status)) {
-	    ERROR("event_notification_insert_hmac failed: notify_traverse\n");
-	    pubsub_notification_free(handle->server,
-				     notecopy, &handle->status);
-	    elvin_hashtable_free(hashtable);
-	    return -1;
-	}
-	pubsub_notification_free(handle->server,
-				 notification->pubsub_notification,
-				 &handle->status);
-	notification->pubsub_notification = notecopy;
-	elvin_hashtable_free(hashtable);
 #endif	
 	memset(&ctx, 0, sizeof(ctx));
 #if (OPENSSL_VERSION_NUMBER < 0x0090703f)
@@ -1715,17 +1622,15 @@ event_notification_insert_hmac(event_handle_t handle,
 	HMAC_CTX_init(&ctx);
 	HMAC_Init_ex(&ctx, handle->keydata, handle->keylen, EVP_sha1(), NULL);
 #endif
-	if (!pubsub_notification_traverse(notification->pubsub_notification,
-					  hmac_traverse,
-					  &ctx, &handle->status)) {
-	    ERROR("event_notification_insert_hmac failed: hmac_traverse\n");
-	    HMAC_cleanup(&ctx);
-	    return 1;
+	if (notification_hmac(notification->pubsub_notification,
+			      &ctx, &handle->status) == -1) {
+		HMAC_cleanup(&ctx);
+		return 1;
 	}
 	HMAC_Final(&ctx, mac, &len);
 	HMAC_cleanup(&ctx);
 
-	if (1) {
+	if (0) {
 		unsigned char   *up;
 		
 		INFO("event_notification_insert_hmac: %d\n", len);
@@ -1745,15 +1650,6 @@ event_notification_insert_hmac(event_handle_t handle,
 		pubsub_error_fprintf(stderr, &handle->status);
 		return 1;
 	}
-#ifdef ELVIN_COMPAT
-	/*
-	 * Add a flag to indicate this notification is in "elvin order."
-	 * See above. 
-	 */
-	pubsub_notification_add_int32(notification->pubsub_notification,
-				      "___elvin_ordered___", 1,
-				      &handle->status);
-#endif
 	notification->has_hmac = 1;
     	return 0;
 }
@@ -1769,12 +1665,8 @@ event_notification_check_hmac(event_handle_t handle,
 	unsigned char	srcmac[EVP_MAX_MD_SIZE], mac[EVP_MAX_MD_SIZE];
 	char		*pmac;
 	int		i, srclen, len = EVP_MAX_MD_SIZE;
-	int		oldelvin, newelvin, elvin_ordered;
-#ifdef ELVIN_COMPAT
-	struct elvin_hashtable  *hashtable;
-#endif
 
-	if (1)
+	if (0)
 	    INFO("event_notification_check_hmac: %d %s\n",
 		 handle->keylen, handle->keydata);
 		
@@ -1790,7 +1682,7 @@ event_notification_check_hmac(event_handle_t handle,
 	assert(srclen <= EVP_MAX_MD_SIZE);
 	memcpy(srcmac, pmac, srclen);
 
-	if (1) {
+	if (0) {
 		unsigned char   *up;
 		
 		INFO("event_notification_check_hmac1: %d\n", srclen);
@@ -1801,39 +1693,6 @@ event_notification_check_hmac(event_handle_t handle,
 		fprintf(stderr, "\n");
 	}
 	
-	/*
-	 * Look to see if the notification is from an elvin compatabile
-	 * client. Its either old or new, but if the current client is
-	 * not compiled with ELVIN_COMPAT, then we can say something useful
-	 * instead of just dying with an hmac error.
-	 */
-	if (pubsub_notification_get_int32(notification->pubsub_notification,
-					  "___PUBSUB___",
-					  &oldelvin, &handle->status)) {
-	    oldelvin = 0;
-	}
-	if (event_notification_get_elvincompat(handle, notification,
-					       &newelvin)) {
-	    newelvin = 0;
-	}
-	else if (newelvin) {
-	    oldelvin = 1;
-	}
-	if (pubsub_notification_get_int32(notification->pubsub_notification,
-					  "___elvin_ordered___",
-					  &elvin_ordered, &handle->status)) {
-	    elvin_ordered = 0;
-	}
-#ifndef ELVIN_COMPAT
-	if (oldelvin && !elvin_ordered) {
-	    ERROR("Client says its old elvin compatabile, but not ordered!\n");
-	    return -1;
-	}
-	if (newelvin && !elvin_ordered) {
-	    ERROR("Client says its new elvin compatabile, but not ordered!\n");
-	    return -1;
-	}
-#endif
 	memset(&ctx, 0, sizeof(ctx));
 #if (OPENSSL_VERSION_NUMBER < 0x0090703f)
 	HMAC_Init(&ctx, handle->keydata, handle->keylen, EVP_sha1());
@@ -1841,42 +1700,17 @@ event_notification_check_hmac(event_handle_t handle,
 	HMAC_CTX_init(&ctx);
 	HMAC_Init_ex(&ctx, handle->keydata, handle->keylen, EVP_sha1(), NULL);
 #endif
-#ifdef ELVIN_COMPAT
-	if ((newelvin || oldelvin) && !elvin_ordered) {
-	    hashtable = elvin_hashtable_alloc(0, &handle->status);
-	    if (hashtable == NULL) {
-		HMAC_cleanup(&ctx);
-	        return -1;
-	    }
-	    if (!pubsub_notification_traverse(notification->pubsub_notification,
-					      hmac_fill_hash,
-					      hashtable, &handle->status)) {
-	        elvin_hashtable_free(hashtable);
+	
+	/* Compute the MAC */
+	if (notification_hmac(notification->pubsub_notification,
+			      &ctx, &handle->status) == -1) {
 		HMAC_cleanup(&ctx);
 		return -1;
-	    }
-	    if (!elvin_hashtable_traverse(hashtable, hmac_traverse,
-					  &ctx, &handle->status)) {
-
-	        elvin_hashtable_free(hashtable);
-		HMAC_cleanup(&ctx);
-		return -1;
-	    }
-	    elvin_hashtable_free(hashtable);
 	}
-	else
-#endif
-	if (!pubsub_notification_traverse(notification->pubsub_notification,
-					  hmac_traverse,
-					  &ctx, &handle->status)) {
-	    HMAC_cleanup(&ctx);
-	    return -1;
-	}
-
 	HMAC_Final(&ctx, mac, &len);
 	HMAC_cleanup(&ctx);
 
-	if (1) {
+	if (0) {
 		unsigned char   *up;
 		
 		INFO("event_notification_check_hmac2: %d\n", len);
