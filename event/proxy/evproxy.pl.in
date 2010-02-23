@@ -1,0 +1,147 @@
+#!/usr/bin/perl
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use Getopt::Std;
+use strict;
+
+sub usage()
+{
+    warn "Usage: $0 [-s remoteserver] [-p remoteport] [-l localport] pid/eid\n";
+    return 1;
+}
+my $optlist      = "s:p:l:h";
+my $remoteserver = "event-server";
+my $remoteport;
+my $localport;
+my $pideid;
+
+#
+# Configure variables
+#
+use lib '@prefix@/lib';
+use event;
+
+sub FromRemoteServer();
+sub FromLocalServer();
+sub RemoteCallBack($$$);
+sub LocalCallBack($$$);
+
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+usage ()
+    if (!@ARGV || defined($options{"h"}));
+
+$pideid       = shift(@ARGV);
+$remoteserver = $options{"s"} if (defined($options{"s"}));
+$remoteport   = $options{"p"} if (defined($options{"p"}));
+$localport    = $options{"l"} if (defined($options{"l"}));
+$remoteport   = (defined($remoteport) ? ":$remoteport" : "");
+$localport    = (defined($localport)  ? ":$localport"  : "");
+
+# Need these handles to be global, but will be different other either
+# side of the fork.
+my $remotehandle;
+my $localhandle;
+
+#
+# Do not even think about using the threaded model in perl.
+#
+my $pid = fork();
+if ($pid) {
+    FromRemoteServer();
+}
+else {
+    FromLocalServer();
+}
+exit(0);
+
+#
+# Get events from remote server and dispatch to local server.
+#
+sub FromRemoteServer()
+{
+    my $URL = "elvin://$remoteserver${remoteport}";
+
+    $remotehandle = event_register($URL,0);
+    if (!$remotehandle) {
+	die("Unable to register with remote event system\n");
+    }
+    my $tuple = address_tuple_alloc();
+    if (!$tuple) {
+	die("Could not allocate an address tuple\n");
+    }
+    if ($expt) {
+	%$tuple = ( host => "*", expt => $expt );
+    }
+    if (!event_subscribe($remotehandle, \&RemoteCallBack, $tuple)) {
+	die("Could not subscribe to events on $URL\n");
+    }
+
+    $localhandle = event_register("elvin://localhost${localport}", 0);
+    if (!$localhandle) {
+	die("Unable to register with local event system\n");
+    }
+    while (1) {
+	event_poll_blocking($remotehandle, 0);
+    }
+}
+
+#
+# Subscribe to scheduler events from the local server and push to remote.
+#
+sub FromLocalServer()
+{
+    my $URL = "elvin://$remoteserver${remoteport}";
+
+    $remotehandle = event_register($URL,0);
+    if (!$remotehandle) {
+	die("Unable to register with remote event system\n");
+    }
+
+    $localhandle = event_register("elvin://localhost${localport}", 0);
+    if (!$localhandle) {
+	die("Unable to register with local event system\n");
+    }
+    $tuple = address_tuple_alloc();
+    if (!$tuple) {
+	die("Could not allocate an address tuple\n");
+    }
+    %$tuple = ( "scheduler" => 1 );
+
+    if (!event_subscribe($localhandle, \&LocalCallBack, $tuple)) {
+	die("Could not subscribe to scheduler events on local node\n");
+    }
+
+    while (1) {
+	event_poll_blocking($localhandle, 0);
+    }
+}
+
+sub LocalCallBack($$$)
+{
+    my ($handle,$notification,$data) = @_;
+
+    my $time      = time();
+    my $expt      = event_notification_get_expt($handle, $notification);
+    my $objtype   = event_notification_get_objtype($handle, $notification);
+    my $objname   = event_notification_get_objname($handle, $notification);
+
+    print "Event: $time $expt $objtype $objname\n";
+}
+
+sub RemoteCallBack($$$)
+{
+    my ($handle,$notification,$data) = @_;
+
+    my $time      = time();
+    my $expt      = event_notification_get_expt($handle, $notification);
+    my $objtype   = event_notification_get_objtype($handle, $notification);
+    my $objname   = event_notification_get_objname($handle, $notification);
+
+    print "Event: $time $expt $objtype $objname\n";
+}
