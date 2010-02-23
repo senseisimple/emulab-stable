@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -40,7 +40,7 @@ my $logtemplate;
 # Get the config parameters so we can open up a log file in the proper
 # location. See below.
 #
-if (JAILED() || GENVNODE() || PLAB()) {
+if (JAILED() || GENVNODE() || PLAB() || SHADOW()) {
     $logtemplate = "$VARDIR/logs/runlog.XXXXXX";
 }
 else {

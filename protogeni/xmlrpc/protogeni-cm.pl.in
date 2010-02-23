@@ -33,7 +33,7 @@ BEGIN { $GENI_DBNAME = "geni-cm"; }
 # Configure variables
 my $EMULAB_PEMFILE = "@prefix@/etc/genicm.pem";
 my $MAINSITE 	   = @TBMAINSITE@;
-my $VERSION	   = "1.0";
+my $VERSION	   = "2.0";
 
 # Testbed libraries.
 use lib '@prefix@/lib';
