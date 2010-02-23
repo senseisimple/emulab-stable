@@ -1682,8 +1682,7 @@ event_notification_insert_hmac(event_handle_t handle,
 	 * that Pubsub should not put this in, since it is not doing
 	 * anything else wrt ELVIN_COMPAT. Still pondering this.
 	 */
-	pubsub_notification_remove(notification->pubsub_notification,
-				   "___PUBSUB___", &handle->status);
+	pubsub_notification_remove(notecopy, "___PUBSUB___", &handle->status);
 
 	if (!pubsub_notification_traverse(notification->pubsub_notification,
 					  hmac_fill_hash,
