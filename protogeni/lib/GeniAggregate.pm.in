@@ -663,7 +663,7 @@ sub GetManifest($$)
     return $manifest
 	if (!$asxml);
     
-    $xml = $manifest->toStringC14N();
+    $xml = GeniXML::Serialize($manifest);
     return $xml;
 }
 

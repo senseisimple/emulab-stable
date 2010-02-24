@@ -244,6 +244,17 @@ sub GetText($$)
     return $result;
 }
 
+# Converts the XML representation of a node to a UTF-8 string and
+# outputs it as a complete XML document.
+sub Serialize($)
+{
+    my ($node) = @_;
+    my $newnode = $node->cloneNode(1);
+    return $newnode->toString();
+}
+
+# Create a new XML document with a given namespace URI and document
+# element name.
 sub CreateDocument($$)
 {
     my ($ns, $name) = @_;
@@ -253,6 +264,8 @@ sub CreateDocument($$)
     return $doc;
 }
 
+# Add a new element to a node. The new element will have the given
+# name and be otherwise empty.
 sub AddElement($$)
 {
     my ($name, $node) = @_;
@@ -261,6 +274,8 @@ sub AddElement($$)
     return $child;
 }
 
+# Remove a node with a given name from a node. It will be removed
+# whether it is an attribute or an element. The name is not an xpath.
 sub RemoveChild($$)
 {
     my ($name, $node) = @_;
