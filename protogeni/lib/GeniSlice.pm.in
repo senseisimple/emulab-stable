@@ -95,8 +95,16 @@ sub Create($$$$;$$)
 
     return undef
 	if (!defined($slice));
+
+    $slice = GeniSlice->Lookup($slice->idx());
     
-    return GeniSlice->Lookup($slice->idx());
+    return undef
+	if (!defined($slice));
+
+    $slice->{'LOCKED'} = $$
+	if ($lock);
+
+    return $slice;
 }
 
 #
