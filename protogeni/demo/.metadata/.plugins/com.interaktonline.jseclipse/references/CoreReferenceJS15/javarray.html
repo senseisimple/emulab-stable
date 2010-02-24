@@ -1,0 +1,339 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html>
+  <head>
+    <meta content="HTML Tidy for Cygwin (vers 1st February 2003), see www.w3.org" name="generator">
+    <meta name="keywords" content="electronic commerce, ecommerce, ebusiness, e-business, e-commerce, enterprise software, net economy, Netscape, Sun Microsystems, DevEdge Archive, iPlanet, internet software">
+    <meta name="description" content="The DevEdge Archive, a strategic alliance formed by America Online and Sun Microsystems, Inc., is delivering iPlanet e-commerce software and enterprise solutions that enable companies to compete successfully in the Net Economy">
+    <meta http-equiv="Content-Type" content="text/html; charset=us-ascii">
+    <meta name="TEMPLATEBASE" content="Authored in FrameMaker. Converted to HTML in WebWorks Publisher 2000. manual wdt 1.5">
+    <meta name="LASTUPDATED" content="09/28/00 13:15:33">
+    <title>
+      Core JavaScript Reference 1.5:
+    </title>
+    <link rel="stylesheet" type="text/css" href="js15ref.css">
+  </head>
+  <body>
+    <table width="100%" border="0" cellspacing="4">
+      <tr>
+        <td valign="top">
+          <b><a class="sansserifPurple" href="java.html">Previous</a></b>&nbsp;&nbsp;&nbsp;&nbsp; <a href="contents.html"><b class="sansserifPurple">Contents</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="ix.html"><b class="sansserifPurple">Index</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="javclass.html"><b class="sansserifPurple">Next</b></a> &nbsp;&nbsp;&nbsp;&nbsp;
+        </td>
+      </tr>
+      <tr>
+        <td class="sansserifBlack" valign="top" align="right" bgcolor="#CCCCCC">
+          <b>Core JavaScript Reference 1.5</b>
+        </td>
+      </tr>
+    </table><br>
+     
+    <blockquote>
+      <br>
+      <br>
+      <br>
+      <br>
+       
+      <p>
+        <a name="1193137" id="1193137"></a> <a name="JavaArray" id="JavaArray"></a> <span class="sansserif"><b>JavaArray</b></span>
+      </p>
+      <p>
+        <a name="1193151" id="1193151"></a> <span class="sansserif">A wrapped Java array accessed from within JavaScript code is a member of the type <span class="mono">JavaArray</span>.<br></span>
+      </p><br>
+       
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193140" id="1193140"></a> <span class="sansserif"><i>Core object</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193142" id="1193142"></a> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193144" id="1193144"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193146" id="1193146"></a> <span class="sansserif">JavaScript 1.1, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193152" id="1193152"></a> <a name="Created by" id="Created by"></a> <span class="sansserif"><b>Created by</b></span><br>
+         <a name="1193153" id="1193153"></a> <span class="sansserif">Any Java method which returns an array. In addition, you can create a <span class="mono">JavaArray</span> with an arbitrary data type using the <span class="mono">newInstance</span> method of the <span class="mono">Array</span> class:</span>
+      </p>
+      <p>
+        <a name="1200452" id="1200452"></a> <span class="mono">public static Object newInstance(Class componentType,<br>
+         &nbsp;&nbsp;&nbsp;int length)<br>
+         &nbsp;&nbsp;&nbsp;throws NegativeArraySizeException</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193162" id="1193162"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1198224" id="1198224"></a> <span class="sansserif">The <span class="mono">JavaArray</span> object is an instance of a Java array that is created in or passed to JavaScript. <span class="mono">JavaArray</span> is a wrapper for the instance; all references to the array instance are made through the <span class="mono">JavaArray</span>.</span>
+      </p>
+      <p>
+        <a name="1200559" id="1200559"></a> <span class="sansserif">In JavaScript 1.4 and later, the <span class="mono">componentType</span> parameter is either a <span class="mono">JavaClass</span> object representing the type of the array or class object, such as one returned by <span class="mono">java.lang.Class.forName</span>. In JavaScript 1.3 and earlier, <span class="mono">componentType</span> must be a class object.</span>
+      </p>
+      <p>
+        <a name="1200750" id="1200750"></a> <span class="sansserif">Use zero-based indexes to access the elements in a <span class="mono">JavaArray</span> object, just as you do to access elements in an array in Java. For example:</span>
+      </p>
+      <p>
+        <a name="1200760" id="1200760"></a><span class="mono">var javaString = new java.lang.String("Hello world!");<br>
+         var byteArray = javaString.getBytes();<br>
+         byteArray[0] // returns 72<br>
+         byteArray[1] // returns 101</span>
+      </p>
+      <p>
+        <a name="1200981" id="1200981"></a> <span class="sansserif">Any Java data brought into JavaScript is converted to JavaScript data types. When the <span class="mono">JavaArray</span> is passed back to Java, the array is unwrapped and can be used by Java code. See the <a href="/devedge-srce/library/manuals/2000/javascript/1.5/guide/"><i>Core JavaScript Guide</i></a> for more information about data type conversions.</span>
+      </p>
+      <p>
+        <a name="1201008" id="1201008"></a> <span class="sansserif">In JavaScript 1.4 and later, the methods of <span class="mono">java.lang.Object</span> are inherited by <span class="mono">JavaArray</span>.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1200997" id="1200997"></a> <a name="Backward compatibility" id="Backward compatibility"></a> <span class="sansserif"><b>Backward compatibility</b></span>
+      </p>
+      <p>
+        <a name="1199085" id="1199085"></a> <span class="sansserif"><b>JavaScript 1.3 and earlier.</b></span> <a name="1199229" id="1199229"></a> <span class="sansserif">The methods of <span class="mono">java.lang.Object</span> are not inherited by <span class="mono">JavaArray</span>. In addition, the <span class="mono">toString</span> method is inherited from the <span class="mono">Object</span> object and returns the following value:</span>
+      </p>
+      <p>
+        <a name="1199499" id="1199499"></a> <span class="mono">[object JavaArray]</span>
+      </p>
+      <p>
+        <a name="1199826" id="1199826"></a> <span class="sansserif">You must specify a class object, such as one returned by <span class="mono">java.lang.Object.forName</span>, for the <span class="mono">componentType</span> parameter of <span class="mono">newInstance</span> when you use this method to create an array. You cannot use a <span class="mono">JavaClass</span> object for the <span class="mono">componentType</span> parameter.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1199292" id="1199292"></a> <a name="Property Summary&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;" id="Property Summarynbsp;nbsp;nbsp;nbsp;nbsp;nbsp;"></a> <span class="sansserif"><b>Property Summary&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</b></span><br>
+         <a name="1199333" id="1199333"></a> <span class="sansserif"><br></span>
+      </p><br>
+       
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr bgcolor="#CCCCCC" align="left" valign="top">
+          <th valign="top" align="left">
+            <a name="1199295" id="1199295"></a> 
+            <p class="alignleft">
+              <span class="sansserif"><b>Property</b></span>
+            </p>
+          </th>
+          <th valign="top" align="left">
+            <a name="1199297" id="1199297"></a> 
+            <p class="alignleft">
+              <span class="sansserif"><b>Description</b></span>
+            </p>
+          </th>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1199323" id="1199323"></a> <span class="mono"><a href="javarray.html#1198970">length</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1199325" id="1199325"></a> <span class="sansserif">The number of elements in the Java array represented by <span class="mono">JavaArray</span>.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1199230" id="1199230"></a> <a name="Method Summary" id="Method Summary"></a> <span class="sansserif"><b>Method Summary</b></span><br>
+         <a name="1199244" id="1199244"></a> <span class="sansserif"><br></span>
+      </p><br>
+       
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr bgcolor="#CCCCCC" align="left" valign="top">
+          <th valign="top" align="left">
+            <a name="1199233" id="1199233"></a> 
+            <p class="alignleft">
+              <span class="sansserif"><b>Method</b></span>
+            </p>
+          </th>
+          <th valign="top" align="left">
+            <a name="1199235" id="1199235"></a> 
+            <p class="alignleft">
+              <span class="sansserif"><b>Description</b></span>
+            </p>
+          </th>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1199241" id="1199241"></a> <span class="mono"><a href="javarray.html#1198884">toString</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1199243" id="1199243"></a> <span class="sansserif">In JavaScript 1.4, this method is overridden by the inherited method <span class="mono">java.lang.Object.toString</span>.</span>
+            </p>
+            <p>
+              <a name="1199619" id="1199619"></a> <span class="sansserif">In JavaScript 1.3 and earlier, this method returns a string identifying the object as a <span class="mono">JavaArray</span>.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <a name="1198826" id="1198826"></a> <span class="sansserif">In JavaScript 1.4 and later, <span class="mono">JavaArray</span> also inherits methods from the Java array superclass, <span class="mono">java.lang.Object</span>.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193209" id="1193209"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1198266" id="1198266"></a> <span class="sansserif"><b>Example 1.</b> Instantiating a <span class="mono">JavaArray</span> in JavaScript.</span>
+      </p>
+      <p>
+        <a name="1200128" id="1200128"></a> <span class="sansserif">In this example, the <span class="mono">JavaArray</span> <span class="mono">byteArray</span> is created by the <span class="mono">java.lang.String.getBytes</span> method, which returns an array.</span>
+      </p>
+      <p>
+        <a name="1200102" id="1200102"></a><span class="mono">var javaString = new java.lang.String("Hello world!");<br>
+         var byteArray = javaString.getBytes();</span>
+      </p>
+      <p>
+        <a name="1200089" id="1200089"></a> <span class="sansserif"><b>Example 2.</b> Instantiating a <span class="mono">JavaArray</span> in JavaScript with the <span class="mono">newInstance</span> method.</span>
+      </p>
+      <p>
+        <a name="1198267" id="1198267"></a> <span class="sansserif">In JavaScript 1.4, you can use a <span class="mono">JavaClass</span> object as the argument for the <span class="mono">newInstance</span> method which creates the array, as shown in the following code:</span>
+      </p>
+      <p>
+        <a name="1198268" id="1198268"></a><span class="mono">var dogs = java.lang.reflect.Array.newInstance(java.lang.String, 5)</span>
+      </p>
+      <p>
+        <a name="1198403" id="1198403"></a> <span class="sansserif">In JavaScript 1.1, use a class object returned by <span class="mono">java.lang.Class.forName</span> as the argument for the <span class="mono">newInstance</span> method, as shown in the following code:</span>
+      </p>
+      <p>
+        <a name="1198387" id="1198387"></a><span class="mono">var dataType = java.lang.Class.forName("java.lang.String")<br>
+         var dogs = java.lang.reflect.Array.newInstance(dataType, 5)</span>
+      </p>
+      <p>
+        <a name="1198970" id="1198970"></a> <a name="length" id="length"></a> <span class="sansserif"><b>length</b></span>
+      </p>
+      <p>
+        <a name="1198971" id="1198971"></a> <span class="sansserif">The number of elements in the Java array represented by the <span class="mono">JavaArray</span> object.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1198974" id="1198974"></a> <span class="sansserif"><i>Property of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1198979" id="1198979"></a> <span class="sansserif"><a href="javarray.html#1193137">JavaArray</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1198981" id="1198981"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1198983" id="1198983"></a> <span class="sansserif">JavaScript 1.1, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1198988" id="1198988"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1199785" id="1199785"></a> <span class="sansserif">Unlike <span class="mono">Array.length</span>, <span class="mono">JavaArray.length</span> is a read-only property. You cannot change the value of the <span class="mono">JavaArray.length</span> property because Java arrays have a fixed number of elements.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1199908" id="1199908"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1199909" id="1199909"></a> <span class="sansserif"><a href="array.html#1193439">Array.length</a></span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1198884" id="1198884"></a> <a name="toString" id="toString"></a> <span class="sansserif"><b>toString</b></span>
+      </p>
+      <p>
+        <a name="1198901" id="1198901"></a> <span class="sansserif">Returns a string representation of the JavaArray.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1198887" id="1198887"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1198892" id="1198892"></a> <span class="sansserif"><a href="javarray.html#1193137">JavaArray</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1198894" id="1198894"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1198896" id="1198896"></a> <span class="sansserif">JavaScript 1.1, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1198904" id="1198904"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1199692" id="1199692"></a> <span class="sansserif">None</span>
+      </p>
+      <p>
+        <br>
+         <a name="1199693" id="1199693"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1199694" id="1199694"></a> <span class="sansserif">Calls the method <span class="mono">java.lang.Object.toString</span>, which returns the value of the following expression:</span>
+      </p>
+      <p>
+        <a name="1199730" id="1199730"></a> <span class="mono">JavaArray.getClass().getName() + '@' +<br>
+         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;java.lang.Integer.toHexString(JavaArray.hashCode())</span>
+      </p>
+      <p>
+        <br>
+         <a name="1199705" id="1199705"></a> <a name="Backward compatibility" id="Backward compatibility"></a> <span class="sansserif"><b>Backward compatibility</b></span><br>
+      </p>
+      <p>
+        <a name="1199718" id="1199718"></a> <span class="sansserif"><b>JavaScript 1.3 and earlier.</b></span> <a name="1199719" id="1199719"></a> <span class="sansserif">The <span class="mono">toString</span> method is inherited from the <span class="mono">Object</span> object and returns the following value:</span>
+      </p>
+      <p>
+        <a name="1199720" id="1199720"></a> <span class="mono">[object JavaArray]</span>
+      </p>
+    </blockquote>
+    <blockquote>
+      <br>
+       <b><a class="sansserifPurple" href="java.html">Previous</a></b>&nbsp;&nbsp;&nbsp;&nbsp; <a href="contents.html"><b class="sansserifPurple">Contents</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="ix.html"><b class="sansserifPurple">Index</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="javclass.html"><b class="sansserifPurple">Next</b></a> &nbsp;&nbsp;&nbsp;&nbsp; 
+      <hr noshade="noshade" size="1">
+      <span class="sansserif">Copyright &copy; 2000 <a href="http://www.netscape.com">Netscape Communications Corp.</a> All rights reserved.</span>
+    </blockquote>
+    <p class="alignright">
+      <span class="sansserif">Last Updated <b>September 28, 2000</b></span>
+    </p>
+  </body>
+</html>

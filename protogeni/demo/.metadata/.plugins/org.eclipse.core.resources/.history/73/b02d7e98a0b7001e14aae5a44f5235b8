@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml"
+	verticalGap="0" paddingTop="0" paddingRight="0" paddingLeft="0" paddingBottom="0" horizontalGap="0" >
+
+	<mx:Script>
+		<![CDATA[
+			
+			[Bindable]
+			public var node:Node = null;
+			
+			public var load(n:Node):void {
+				node = n;
+				
+				imgAvailable.source = Common.assignAvailabilityIcon(n);
+				imgExclusive.source = Common.assignIcon(n.exclusive);
+				
+				linksEndpointVbox.removeAllChildren();
+				linksStartpointVbox.removeAllChildren();
+				
+				var endpointArray:ArrayCollection = new ArrayCollection();
+				var startpointArray:ArrayCollection = new ArrayCollection();
+				
+				for each(var i:NodeInterface in n.interfaces.collection) {
+					for each(var l:Link in i.links) {
+						var n:Node;
+						var iEnd:NodeInterface;
+						var iStart:NodeInterface;
+						if(l.interface1 == i) {
+							n = l.interface2.owner;
+							iEnd = l.interface2;
+							iStart = l.interface1;
+						} else {
+							n = l.interface1.owner;
+							iEnd = l.interface1;
+							iStart = l.interface2;
+						}
+						
+						// Build up endpoint
+						var nodeFound:Boolean = false;
+						for each(var na:Object in endpointArray) {
+							if(na.node == n) {
+								nodeFound = true;
+								na.links.addItem({i: iEnd, l: l});
+								break;
+							}
+						}
+						if(!nodeFound) {
+							var newLinks:ArrayCollection = new ArrayCollection();
+							newLinks.addItem({i: iEnd, l: l});
+							endpointArray.addItem({node: n, links: newLinks});
+						}
+						
+						// Build up startpoint
+						var interfaceFound:Boolean = false;
+						for each(var ia:Object in startpointArray) {
+							if(ia.link.i == iStart) {
+								interfaceFound = true;
+								if(!ia.nodes.contains(n))
+									ia.nodes.addItem(n);
+								break;
+							}
+						}
+						if(!interfaceFound) {
+							var newNodes:ArrayCollection = new ArrayCollection();
+							newNodes.addItem(n);
+							startpointArray.addItem({link: {i: iStart, l: l}, nodes: newNodes});
+						}
+						
+						// Build endpoint interface
+				for each(var nodeInfo:Object in endpointArray) {
+					linksEndpointVbox.addChild(Common.getNodeButton(nodeInfo.node));
+					
+					for each(var nodeLink:Object in nodeInfo.links) {
+						var linkHbox:HBox = new HBox();
+						var space:Spacer = new Spacer();
+						space.width = 16;
+						linkHbox.addChild(space);
+						linkHbox.addChild(Common.getLinkButton(nodeLink.i, nodeLink.l));
+						linksEndpointVbox.addChild(linkHbox);
+					}
+				}
+				
+				// Build startpoint interface
+				for each(var linkInfo:Object in startpointArray) {
+					linksStartpointVbox.addChild(Common.getLinkButton(linkInfo.link.i, linkInfo.link.l));
+					
+					for each(var node:Node in linkInfo.nodes) {
+						var linkHbox2:HBox = new HBox();
+						var space2:Spacer = new Spacer();
+						space2.width = 16;
+						linkHbox2.addChild(space2);
+						linkHbox2.addChild(Common.getNodeButton(node));
+						linksStartpointVbox.addChild(linkHbox2);
+					}
+				}
+			}
+			}
+		]]>
+	</mx:Script>
+			
+			
+
+	<mx:Grid width="100%" height="100%" verticalGap="2" horizontalGap="2">
+				<mx:GridRow width="100%">
+					<mx:GridItem rowSpan="2">
+						<mx:Button label="RSPEC" width="100%" height="100%" click="viewRspec()"/>
+					</mx:GridItem>
+					<mx:GridItem width="100%">
+						<mx:Label text="{node.name}" fontSize="17" fontWeight="bold"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%">
+					<mx:GridItem width="100%">
+						<mx:Label text="Exclusive" fontWeight="bold"/>
+						<mx:Image id="imgExclusive"/>
+						<mx:VRule height="16"/>
+						<mx:Label text="Availability" fontWeight="bold"/>
+						<mx:Image id="imgAvailable"/>
+						<mx:VRule height="16"/>
+						<mx:Label text="Status" fontWeight="bold"/>
+						<mx:Label text="{node.status}" fontWeight="normal"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%">
+					<mx:GridItem>
+						<mx:Label text="UUID" fontWeight="bold"/>
+					</mx:GridItem>
+					<mx:GridItem width="100%">
+						<mx:Label text="{node.uuid}"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%">
+					<mx:GridItem>
+						<mx:Label text="Manager" fontWeight="bold"/>
+					</mx:GridItem>
+					<mx:GridItem width="100%">
+						<mx:Label text="{node.manager}"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%" height="86">
+					<mx:GridItem>
+						<mx:Label text="Types" fontWeight="bold"/>
+					</mx:GridItem>
+					<mx:GridItem width="100%">
+						<mx:DataGrid width="100%" height="100%" id="gridTypes" dataProvider="{node.types}">
+							<mx:columns>
+								<mx:DataGridColumn headerText="Name" dataField="name"/>
+								<mx:DataGridColumn headerText="Slots" dataField="slots"/>
+								<mx:DataGridColumn headerText="Static" dataField="isStatic"/>
+							</mx:columns>
+						</mx:DataGrid>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%" height="100%">
+					<mx:GridItem>
+					<mx:VBox horizontalAlign="right">
+						<mx:Label text="Links to" fontWeight="bold"/>
+						<mx:HRule width="32"/>
+						<mx:Label text="View all" fontWeight="normal"/>
+						<mx:Button label="Links" click="viewLinks();" width="100%"/>
+						<mx:Button label="Nodes" click="viewNodes();" width="100%"/>
+					</mx:VBox>
+					</mx:GridItem>
+					<mx:GridItem width="100%">
+						<mx:TabNavigator width="100%" height="100%" paddingTop="2" paddingRight="2" paddingLeft="2" paddingBottom="2">
+								<mx:VBox label="Endpoint" width="100%" height="100%" id="linksEndpointVbox">
+								</mx:VBox>
+								<mx:VBox label="Startpoint" width="100%" height="100%" id="linksStartpointVbox">
+								</mx:VBox>
+							</mx:TabNavigator>
+					</mx:GridItem>
+				</mx:GridRow>
+			</mx:Grid>
+</mx:VBox>

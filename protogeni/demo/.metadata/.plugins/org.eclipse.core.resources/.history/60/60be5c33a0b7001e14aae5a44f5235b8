@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ResizeWindow xmlns="pgmap.*" xmlns:mx="http://www.adobe.com/2006/mxml"
+	width="900" height="400" showCloseButton="true" layout="vertical"
+	borderAlpha=".9" borderColor="#D2E1F0"
+	resizable="true"
+	title="Node Group Information"
+	close="PopUpManager.removePopUp(this)">
+	
+	<mx:Script>
+		<![CDATA[
+			import mx.controls.Spacer;
+			import mx.containers.HBox;
+			import mx.controls.Button;
+			import com.google.maps.View;
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.Label;
+			import mx.events.CloseEvent;
+			import mx.managers.PopUpManager;
+			
+			[Bindable]
+			public var nodes:ArrayCollection;
+			
+			[Bindable]
+			public var linkedNodes:ArrayCollection = new ArrayCollection();
+			
+			public var main:pgmap;
+			
+			public function loadCollection(group:ArrayCollection):void {
+				nodes = group;
+				
+				if(nodes.length > 1) {
+					listNodes.selectedIndex = 0;
+					title += " Group";
+				} else {
+					listNodes.visible = false;
+					listNodes.includeInLayout = false;
+					nodeInfoHolder.percentWidth = 100;
+					title = "Node Information";
+				}
+
+				loadNode(nodes[0]);
+			}
+			
+			public function loadGroup(group:NodeGroup):void {
+				if(group.city.length > 0)
+					title = group.city + " Node";
+				loadCollection(group.collection);
+			}
+			
+			public function loadNode(n:Node):void {
+				// ??
+			}
+				
+				// Build endpoint interface
+				for each(var nodeInfo:Object in endpointArray) {
+					linksEndpointVbox.addChild(Common.getNodeButton(nodeInfo.node));
+					
+					for each(var nodeLink:Object in nodeInfo.links) {
+						var linkHbox:HBox = new HBox();
+						var space:Spacer = new Spacer();
+						space.width = 16;
+						linkHbox.addChild(space);
+						linkHbox.addChild(Common.getLinkButton(nodeLink.i, nodeLink.l));
+						linksEndpointVbox.addChild(linkHbox);
+					}
+				}
+				
+				// Build startpoint interface
+				for each(var linkInfo:Object in startpointArray) {
+					linksStartpointVbox.addChild(Common.getLinkButton(linkInfo.link.i, linkInfo.link.l));
+					
+					for each(var node:Node in linkInfo.nodes) {
+						var linkHbox2:HBox = new HBox();
+						var space2:Spacer = new Spacer();
+						space2.width = 16;
+						linkHbox2.addChild(space2);
+						linkHbox2.addChild(Common.getNodeButton(node));
+						linksStartpointVbox.addChild(linkHbox2);
+					}
+				}
+			}
+			
+			public function viewLinks():void {
+				var lgWindow:LinkGroupAdvancedWindow = new LinkGroupAdvancedWindow();
+		    	lgWindow.main = main;
+		    	PopUpManager.addPopUp(lgWindow, main, false);
+	       		PopUpManager.centerPopUp(lgWindow);
+	       		
+	       		lgWindow.loadCollection(node.GetLinks());
+			}
+			
+			public function viewNodes():void {
+				var hgWindow:NodeGroupAdvancedWindow = new NodeGroupAdvancedWindow();
+		    	hgWindow.main = main;
+		    	PopUpManager.addPopUp(hgWindow, main, false);
+	       		PopUpManager.centerPopUp(hgWindow);
+	       		
+	       		hgWindow.loadCollection(node.GetNodes());
+			}
+			
+			public function viewRspec():void {
+				var rspecView:XmlWindow = new XmlWindow();
+				PopUpManager.addPopUp(rspecView, main, false);
+       			PopUpManager.centerPopUp(rspecView);
+       			rspecView.loadXml(node.rspec);
+			}
+
+            private function assignAvailableIcon(item:Object):Class {
+                return Common.assignAvailabilityIcon(item as Node);
+            }
+		]]>
+	</mx:Script>
+	<mx:HDividedBox width="100%" height="100%">
+		<mx:List width="25%" height="100%" id="listNodes"
+			dataProvider="{nodes}"
+			labelField="name" change="loadNode(event.target.selectedItem)"
+			iconFunction="assignAvailableIcon"></mx:List>
+		<NodeAdvancedInformation  height="100%" width="75%" verticalGap="0" paddingTop="0" paddingRight="0" paddingLeft="0" paddingBottom="0" horizontalGap="0" id="nodeInfoHolder"/>
+	</mx:HDividedBox>
+</ResizeWindow>
