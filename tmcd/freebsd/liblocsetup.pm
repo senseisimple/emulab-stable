@@ -1004,11 +1004,6 @@ sub os_find_freedisk($$)
     my ($minsize,$allparts) = @_;
     my %diskinfo = ();
 
-    # XXX backward compat with Linux libvnode version
-    if (!defined($minsize)) {
-	$minsize = 8 * 1000 * 1000;
-    }
-
     #
     # Use sysctl to locate disks.
     #
@@ -1021,7 +1016,7 @@ sub os_find_freedisk($$)
     #
     my %mounts;
     if (!open(FD, "/sbin/mount|")) {
-	print STDERR "findSpareDisks: cannot read mount info\n";
+	print STDERR "find_freedisk: cannot read mount info\n";
 	return %diskinfo;
     }
     while (<FD>) {
@@ -1045,7 +1040,7 @@ sub os_find_freedisk($$)
     # Count active swap partitions as mounted
     #
     if (!open(FD, "/usr/sbin/swapinfo|")) {
-	print STDERR "findSpareDisks: cannot read swap info\n";
+	print STDERR "find_freedisk: cannot read swap info\n";
 	return %diskinfo;
     }
     while (<FD>) {
@@ -1076,13 +1071,13 @@ sub os_find_freedisk($$)
 	#
 	my $dinfo = `diskinfo $disk 2>/dev/null`;
 	if ($?) {
-	    print STDERR "findSpareDisks: $disk: could not open\n";
+	    print STDERR "find_freedisk: $disk: could not open\n";
 	    next;
 	}
 	my ($dname,$dsecsize,$dbytes,$dsects) = split /\s+/, $dinfo;
 	if ($dname ne $disk ||
 	    !defined($dsecsize) || !defined($dbytes) || !defined($dsects)) {
-	    print STDERR "findSpareDisks: $disk: could not parse diskinfo\n";
+	    print STDERR "find_freedisk: $disk: could not parse diskinfo\n";
 	    next;
 	}
 	print STDERR "$disk: has $dsects $dsecsize byte sectors\n" if ($debug);
@@ -1091,7 +1086,7 @@ sub os_find_freedisk($$)
 	# See how it is partitioned.
 	#
 	if (!open(FD, "fdisk -s $disk 2>&1|")) {
-	    print STDERR "findSpareDisks: $disk: could not get partitions\n";
+	    print STDERR "find_freedisk: $disk: could not get partitions\n";
 	    next;
 	}
 	while (<FD>) {
@@ -1103,8 +1098,10 @@ sub os_find_freedisk($$)
 	    if (/invalid fdisk partition table found/ &&
 		!defined($mounts{$disk})) {
 		print STDERR "$disk: disk: size=$dbytes\n" if ($debug);
-		$diskinfo{$disk}{"size"} = $dbytes;
-		$diskinfo{$disk}{"type"} = 0;
+		if ($dbytes >= $minsize) {
+		    $diskinfo{$disk}{"size"} = $dbytes;
+		    $diskinfo{$disk}{"type"} = 0;
+		}
 		last;
 	    }
 
@@ -1123,8 +1120,10 @@ sub os_find_freedisk($$)
 		if ($type == 0) {
 		    $size *= $dsecsize;
 		    print STDERR "$disk$part: part: size=$size\n" if ($debug);
-		    $diskinfo{$disk}{$part}{"size"} = $size;
-		    $diskinfo{$disk}{$part}{"type"} = 0;
+		    if ($size >= $minsize) {
+			$diskinfo{$disk}{$part}{"size"} = $size;
+			$diskinfo{$disk}{$part}{"type"} = 0;
+		    }
 		} else {
 		    #
 		    # If type is non-zero but partition isn't mounted
@@ -1134,8 +1133,10 @@ sub os_find_freedisk($$)
 			$size *= $dsecsize;
 			print STDERR "$disk$part: part: size=$size, in use ($type) not mounted\n"
 			    if ($debug);
-			$diskinfo{$disk}{$part}{"size"} = $size;
-			$diskinfo{$disk}{$part}{"type"} = $type;
+			if ($size >= $minsize) {
+			    $diskinfo{$disk}{$part}{"size"} = $size;
+			    $diskinfo{$disk}{$part}{"type"} = $type;
+			}
 		    } else {
 			print STDERR "$disk$part: part: size=$size, in use ($type)\n"
 			    if ($debug);
