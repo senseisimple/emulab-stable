@@ -27,6 +27,7 @@ ddns-update-style               none;                   # req'd vers 3 directive
 #         to start a new MTFTP transfer
 # Code 5: Number of secondes a client must listen before trying to restart
 #         a MTFTP transfer
+# Code 128: IP address of Emulab bootinfo server
 option space PXE;
 option PXE.mtftp-ip code 1 = ip-address;
 option PXE.mtftp-cport code 2 = unsigned integer 16;
@@ -35,6 +36,7 @@ option PXE.mtftp-tmout code 4 = unsigned integer 8;
 option PXE.mtftp-delay code 5 = unsigned integer 8;
 option PXE.discovery-control code 6 = unsigned integer 8;
 option PXE.discovery-mcast-addr code 7 = ip-address;
+option PXE.emulab-bootinfo code 128 = ip-address;
 
 #
 # For PXE booting nodes we set the magic bits to tell the client that we are
