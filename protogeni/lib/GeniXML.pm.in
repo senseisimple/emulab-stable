@@ -215,7 +215,9 @@ sub SetText($$$)
 	} elsif ($node->nodeType() == XML_ELEMENT_NODE) {
 	    my $ns = $node->namespaceURI();
 	    if (defined($ns)) {
-		$node->setAttributeNS($ns, "rs:$name", $text);
+# TODO: Submit bug report for the library. This call is bugged.
+#		$node->setAttributeNS($ns, "rs:$name", $text);
+		$node->setAttribute($name, $text);
 	    } else {
 		$node->setAttribute($name, $text);
 	    }
