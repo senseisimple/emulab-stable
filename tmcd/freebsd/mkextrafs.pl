@@ -20,23 +20,26 @@ my $DOSTYPE = "$BINDIR/dostype";
 #
 sub usage()
 {
-    print("Usage: mkextrafs.pl [-fl] [-s slice] [-r disk] <mountpoint>\n");
+    print("Usage: mkextrafs.pl [-2fl] [-s slice] [-r disk] <mountpoint>\n");
     print("       [-r disk]  disk device to use (default: ad0)\n");
     print("       [-s slice] DOS partition to use or 0 for entire disk (default: 4)\n");
     print("       <mount>    where the new filesystem will be mounted\n");
     print("       -f         DANGEROUS! force creation of the filesystem\n");
     print("                   even if partition is in use\n");
+    print("       -2         hack: break DOS partition into two unequal (70/30)\n");
+    print("                   BSD partitions and mount the first\n");
     print("Usage: mkextrafs.pl -l [-f]\n");
     print("       -l  list available partitions\n");
     print("       -f  also list inactive partitions that have non-zero type\n");
     exit(-1);
 }
-my $optlist    = "fls:r:cn";
+my $optlist    = "2fls:r:cn";
 my $diskopt;
 my $checkit    = 0;
 my $forceit    = 0;
 my $noinit     = 0;
 my $showonly   = 0;
+my $twoparts   = 0;
 my $debug      = 0;
 
 #
@@ -91,6 +94,9 @@ if (defined($options{"n"})) {
 }
 if (defined($options{"l"})) {
     $showonly = 1;
+}
+if (defined($options{"2"})) {
+    $twoparts = 1;
 }
 
 if ($showonly) {
@@ -262,32 +268,64 @@ mysystem("disklabel -r $slicedev > $tmpfile");
 # In FreeBSD 4.x, we just add one.
 # In FreeBSD 5.x, we replace the 'a' partition which is created by default.
 #
+# In "two part" mode, break into two partitions 'e' (70%) and 'f' (30%)
+# and use the first.  This is primarily for elabinelab use, where we need
+# a smaller /share that is not on the same FS as /proj and /users.
+#
 open(DL, "+<$tmpfile") or
     die("*** $0:\n".
 	"    Could not edit temporary label in $tmpfile!\n");
 my @dl = <DL>;
 if (scalar(grep(/^  ${partition}: /, @dl)) != 0) {
     die("*** $0:\n".
-	"    Already an \'$partition\' partition?!\n");
+        "    Already an \'$partition\' partition?!\n");
 }
 seek(DL, 0, 0);
 truncate(DL, 0);
 
 my $done = 0;
+my $fsize = 0;
+my $foff = 0;
+my $bad = 0;
 foreach my $line (@dl) {
     # we assume that if the 'a' paritition exists, it is the correct one
-    my $pat = q(^  a: );
-    if (!$done && $line =~ /$pat/) {
-	$line =~ s/$pat/  e: /;
+    if (!$done && $line =~ /^\s+a:\s+(\d+)\s+(\d+)(.*)$/) {
+	my $size = $1;
+	my $off = $2;
+	my $rest = $3;
+	if ($twoparts) {
+	    my $esize = int($size / 16 * 0.7) * 16;
+	    $foff = $off + $esize;
+	    $fsize = $size - $esize;
+	    $line = "  e: $esize $off $rest";
+	} else {
+	    $line = "  e: $size $off $rest";
+	}
 	$done = 1;
     }
-    $pat = q(^  c: );
-    if (!$done && $line =~ /$pat/) {
-	print DL $line;
-	$line =~ s/$pat/  e: /;
+    # otherwise we use the 'c' partition as our model
+    if (!$done && $line =~ /^\s+c:\s+(\d+)\s+(\d+)(.*)$/) {
+        print DL $line;
+	my $size = $1;
+	my $off = $2;
+	my $rest = $3;
+	if ($twoparts) {
+	    my $esize = int($size / 16 * 0.7) * 16;
+	    $foff = $off + $esize;
+	    $fsize = $size - $esize;
+	    $line = "  e: $esize $off $rest";
+	} else {
+	    $line = "  e: $size $off $rest";
+	}
 	$done = 1;
+    }
+    if ($line =~ /^  f:/) {
+	$bad = 1;
     }
     print DL $line;
+}
+if (!$bad && $twoparts && $fsize > 0) {
+    print DL "  f: $fsize $foff unused 0 0\n";
 }
 close(DL);
 mysystem("disklabel -R -r $slicedev $tmpfile");
