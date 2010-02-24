@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008, 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -22,6 +22,7 @@ use Exporter;
 	 os_routing_add_manual os_routing_del_manual os_homedirdel
 	 os_groupdel os_getnfsmounts os_islocaldir
 	 os_fwconfig_line os_fwrouteconfig_line os_config_gre os_nfsmount
+	 os_find_freedisk
        );
 
 # Must come after package declaration!
@@ -981,4 +982,175 @@ sub os_nfsmount($$)
     return 0;
 }
 
+#
+# Find unused disk space on a machine.
+#
+# A spare disk or disk partition is one whose partition ID is zero and is
+# "inactive" (not mounted or in use as a swap partition).
+#
+# If $allparts is non-zero, then we also consider inactive partitions with
+# non-zero IDs.
+#
+# This function returns a hash of:
+#   device name (disk) => slice/part number => size (bytes);
+# note that a device name => size entry is filled IF the device has no
+# partitions.
+#
+# XXX assumes MBR and not GPT.  GPT-based disks might well appear available,
+# we should fix that!
+#
+sub os_find_freedisk($$)
+{
+    my ($minsize,$allparts) = @_;
+    my %diskinfo = ();
+
+    # XXX backward compat with Linux libvnode version
+    if (!defined($minsize)) {
+	$minsize = 8 * 1000 * 1000;
+    }
+
+    #
+    # Use sysctl to locate disks.
+    #
+    my @disks = split /\s+/, `sysctl -n kern.disks 2>/dev/null`;
+    return %diskinfo if ($?);
+    print STDERR "disks: ", join('/', @disks), "\n" if ($debug);
+
+    #
+    # Capture all mounted devices
+    #
+    my %mounts;
+    if (!open(FD, "/sbin/mount|")) {
+	print STDERR "findSpareDisks: cannot read mount info\n";
+	return %diskinfo;
+    }
+    while (<FD>) {
+	if (/^\/dev\/(\S+)/) {
+	    my $dev = $1;
+	    $mounts{$dev} = 1;
+	    # full <disk><slice><part> syntax, mark components as "mounted"
+	    if ($dev =~ /^(\D+\d+)(s\d+)([a-z])$/) {
+		$mounts{"$1$2"} = 2;
+		$mounts{$1} = 2;
+	    }
+	    # <disk><slice> syntax, ditto
+	    elsif ($dev =~ /^(\D+\d+)(s\d+)$/) {
+		$mounts{$1} = 2;
+	    }
+	}
+    }
+    close(FD);
+
+    #
+    # Count active swap partitions as mounted
+    #
+    if (!open(FD, "/usr/sbin/swapinfo|")) {
+	print STDERR "findSpareDisks: cannot read swap info\n";
+	return %diskinfo;
+    }
+    while (<FD>) {
+	if (/^\/dev\/(\S+)/) {
+	    my $dev = $1;
+	    $mounts{$dev} = 1;
+	    # full <disk><slice><part> syntax, mark components as "mounted"
+	    if ($dev =~ /^(\D+\d+)(s\d+)([a-z])$/) {
+		$mounts{"$1$2"} = 2;
+		$mounts{$1} = 2;
+	    }
+	    # <disk><slice> syntax, ditto
+	    elsif ($dev =~ /^(\D+\d+)(s\d+)$/) {
+		$mounts{$1} = 2;
+	    }
+	}
+    }
+    close(FD);
+
+    print STDERR "found mounts: ", join('/', sort keys %mounts), "\n" if ($debug);
+
+    #
+    # For each disk, find any unused space 
+    #
+    foreach my $disk (sort @disks) {
+	#
+	# Find size of disk
+	#
+	my $dinfo = `diskinfo $disk 2>/dev/null`;
+	if ($?) {
+	    print STDERR "findSpareDisks: $disk: could not open\n";
+	    next;
+	}
+	my ($dname,$dsecsize,$dbytes,$dsects) = split /\s+/, $dinfo;
+	if ($dname ne $disk ||
+	    !defined($dsecsize) || !defined($dbytes) || !defined($dsects)) {
+	    print STDERR "findSpareDisks: $disk: could not parse diskinfo\n";
+	    next;
+	}
+	print STDERR "$disk: has $dsects $dsecsize byte sectors\n" if ($debug);
+
+	#
+	# See how it is partitioned.
+	#
+	if (!open(FD, "fdisk -s $disk 2>&1|")) {
+	    print STDERR "findSpareDisks: $disk: could not get partitions\n";
+	    next;
+	}
+	while (<FD>) {
+	    #
+	    # No MBR should mean that the entire disk is unused.
+	    # But we make sure there are no mounts anywhere on the
+	    # disk just to be safe.
+	    #
+	    if (/invalid fdisk partition table found/ &&
+		!defined($mounts{$disk})) {
+		print STDERR "$disk: disk: size=$dbytes\n" if ($debug);
+		$diskinfo{$disk}{"size"} = $dbytes;
+		$diskinfo{$disk}{"type"} = 0;
+		last;
+	    }
+
+	    #
+	    # Otherwise fdisk output looks like:
+	    #
+	    #  /dev/da0: 30394 cyl 255 hd 63 sec
+	    #  Part        Start Size     Type Flags
+	    #  1:          63    12305790 0xa5 0x80
+	    #  ...
+	    #
+	    if (/^\s*([1-4]):\s+\d+\s+(\d+)\s+(0x\S\S)\s+/) {
+		my $part = "s$1";
+		my $size = $2;
+		my $type = hex($3);
+		if ($type == 0) {
+		    $size *= $dsecsize;
+		    print STDERR "$disk$part: part: size=$size\n" if ($debug);
+		    $diskinfo{$disk}{$part}{"size"} = $size;
+		    $diskinfo{$disk}{$part}{"type"} = 0;
+		} else {
+		    #
+		    # If type is non-zero but partition isn't mounted
+		    # and $allparts is non-zero, we return it.
+		    #
+		    if ($allparts && !exists($mounts{"$disk$part"})) {
+			$size *= $dsecsize;
+			print STDERR "$disk$part: part: size=$size, in use ($type) not mounted\n"
+			    if ($debug);
+			$diskinfo{$disk}{$part}{"size"} = $size;
+			$diskinfo{$disk}{$part}{"type"} = $type;
+		    } else {
+			print STDERR "$disk$part: part: size=$size, in use ($type)\n"
+			    if ($debug);
+		    }
+		}
+	    }
+
+	    #
+	    # XXX right now we are not going to drill down into disklabels
+	    # to look for unused space.
+	    #
+	}
+	close(FD);
+    }
+
+    return %diskinfo;
+}
 1;

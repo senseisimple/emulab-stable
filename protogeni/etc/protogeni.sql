@@ -197,6 +197,7 @@ CREATE TABLE `geni_resources` (
   `idx` mediumint(8) unsigned NOT NULL default '0',
   `manager_urn` tinytext,
   `created` datetime default NULL,
+  `expires` datetime default NULL,
   `updated` datetime default NULL,
   `slice_idx` mediumint(8) unsigned NOT NULL default '0',
   `credential_idx` mediumint(8) unsigned NOT NULL default '0',

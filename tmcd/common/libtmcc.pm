@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -85,6 +85,8 @@ my $beproxy     = 0;
       "clrcache"        => 0,
       "noproxy"         => 0,
       "nossl"           => 0,
+      "cachedir"        => undef,
+      "urn"             => undef,
       "usetpm"          => 0,
     );
 
@@ -267,6 +269,12 @@ sub configtmcc($$)
 	             "    Invalid libtmcc option: $opt/$val\n";
 	return -1;
     }
+    if ($opt eq "cachedir") {
+	$CACHEDIR = $val;
+    }
+    elsif ($opt eq "server") {
+	$ENV{'BOSSNAME'} = $val;
+    }
     $config{$opt} = $val;
 }
 
@@ -351,6 +359,11 @@ sub runtmcc ($;$$%)
     $options = optionstring("", %config);
     $options = optionstring($options, %optconfig)
 	if (%optconfig);
+
+    # Must be last option, before command
+    if (defined($config{"urn"})) {
+	$options .= " URN=" . $config{"urn"};
+    }
 
     if (!defined($args)) {
 	$args = "";

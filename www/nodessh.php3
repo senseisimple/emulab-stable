@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -31,7 +31,7 @@ $query_result =
     DBQueryFatal("select n.jailflag,n.jailip,n.sshdport, ".
 		 "       r.vname,r.pid,r.eid, ".
 		 "       t.isvirtnode,t.isremotenode,t.isplabdslice, ".
-		 "       t.issubnode,t.class ".
+		 "       t.issubnode,t.isfednode,t.class ".
 		 " from nodes as n ".
 		 "left join reserved as r on n.node_id=r.node_id ".
 		 "left join node_types as t on t.type=n.type ".
@@ -54,6 +54,7 @@ $isremote = $row["isremotenode"];
 $isplab   = $row["isplabdslice"];
 $issubnode= $row["issubnode"];
 $class    = $row["class"];
+$isfednode= $row["isfednode"];
 
 #
 # XXX hack to determine if target node is on a routable network
@@ -78,7 +79,7 @@ if ($isvirt) {
 	# Remote nodes run sshd on another port since they so not
 	# have per-jail IPs. Of course, might not even be jailed!
 	#
-	if ($jailflag || $isplab) {
+	if ($jailflag || $isplab || $isfednode) {
 	    echo "port: $sshdport\n";
 	}
     }

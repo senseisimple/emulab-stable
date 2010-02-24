@@ -518,6 +518,29 @@ sub Update($$)
     return Refresh($self);
 }
 
+#
+# Lookup a specific attribute in the type capabilities table. 
+#
+sub TypeCapability($$$)
+{
+    my ($self, $capkey, $pcapval) = @_;
+    
+    return -1
+	if (!ref($self));
+
+    my $itype = $self->interface_type();
+
+    my $query_result =
+	DBQueryWarn("select capval from interface_capabilities ".
+		    "where type='$itype' and capkey=$capkey");
+
+    return -1
+	if (!$query_result || !$query_result->numrows());
+    my ($capval) = $query_result->fetchrow_array();
+    $pcapval = $capval;
+    return 0;
+}
+
 ##############################################################################
 package Interface::VInterface;
 use libdb;
