@@ -1234,6 +1234,9 @@ sub GenVirtNodes($)
 	    if ($vnode->_isvirtnode()) {
 		$ref->{'virtualization_type'} = 'emulab-vnode';
 		$ref->{'virtualization_subtype'} = 'emulab-openvz';
+		if ($vnode->_sharedokay()) {
+		    $ref->{'exclusive'} = 0;
+		}
 	    }
 	    else {
 		$ref->{'virtualization_type'} = 'raw';

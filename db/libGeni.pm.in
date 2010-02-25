@@ -435,9 +435,12 @@ sub MapNodes($$)
 	    #
 	    # This is how we get the client side to do cooked mode properly.
 	    #
-	    $ref->{'startup_command'} =
-		"sudo /usr/local/etc/emulab/rc/rc.pgeni ".
-		"-s $BOSSNODE -k $eventkey,$keyhash -u '$sliver_urn' boot";
+	    my $cmd = "sudo /usr/local/etc/emulab/rc/rc.pgeni ".
+		"-s $BOSSNODE -k $eventkey,$keyhash -u '$sliver_urn'";
+	    $cmd .= " -j " . $node->node_id()
+		if ($node->isvirtnode());
+	    
+	    $ref->{'startup_command'} = "$cmd boot";
 
 	    # Interface map for loop below.
 	    if (exists($ref->{'interface'})) {
