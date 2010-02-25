@@ -392,6 +392,7 @@ sub UpdateManifest($$)
 	return -1;
     }
     my $manifest_idx = $self->manifest_idx();
+
     my $manifest_string =
 	eval { XMLout($manifest, "NoAttr" => 1, RootName => "manifest") };
     if ($@) {
@@ -399,6 +400,7 @@ sub UpdateManifest($$)
 	print STDERR Dumper($manifest);
 	return -1;
     }
+
     my $query_result =
 	DBQueryWarn("update geni_manifests set ".
 		    "  manifest=". DBQuoteSpecial($manifest_string) . ", " .
@@ -477,6 +479,7 @@ sub GetTicket($$$$)
 	print STDERR Dumper($rspec);
 	return -1;
     }
+
     $rspec_string =~ s/opt\>/rspec\>/g;
 
     #

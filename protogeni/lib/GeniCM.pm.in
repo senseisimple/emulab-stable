@@ -691,7 +691,7 @@ sub GetTicketAuxAux($$$$$$$$)
 	}
     }
 
-    print $rspec->toStringC14N();
+    print GeniXML::Serialize($rspec);
 
     foreach my $ref (GeniXML::FindNodes("n:node", $rspec)->get_nodelist()) {
 	my $resource_uuid = GeniXML::GetNodeId($ref);
@@ -1150,7 +1150,7 @@ sub GetTicketAuxAux($$$$$$$$)
     }
 
     unlink($tmpfile);
-    print $solution->toStringC14N();
+    print GeniXML::Serialize($solution);
 
     foreach my $ref (GeniXML::FindNodes("n:node",
 					$solution)->get_nodelist()) {
@@ -1239,7 +1239,7 @@ sub GetTicketAuxAux($$$$$$$$)
 	goto bad;
     }
 
-    print $rspec->toStringC14N();
+    print GeniXML::Serialize($rspec);
 
     # Nalloc might fail if the node gets picked up by someone else.
     if (@nodeids && !$impotent) {
@@ -1274,7 +1274,7 @@ sub GetTicketAuxAux($$$$$$$$)
     # Create a new ticket.
     #
     my $newticket = GeniTicket->Create($authority, $user,
-				       $rspec->toStringC14N());
+				       GeniXML::Serialize($rspec));
     if (!defined($newticket)) {
 	$response =
 	    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
@@ -1559,7 +1559,7 @@ sub SliverWorkAux($$$$$$$)
     my @freelinks= ();
     my $needplabslice = 0;
 
-    print $rspec->toStringC14N();
+    print GeniXML::Serialize($rspec);
 
     #
     # Find current slivers and save.
@@ -2265,7 +2265,7 @@ sub SliverWorkAux($$$$$$$)
     }
 
     # The Manifest.
-    my $manifest = $rspec->toStringC14N();
+    my $manifest = GeniXML::Serialize($rspec);
 
     #
     # Move this elsewhere.
@@ -2611,7 +2611,7 @@ sub StartSliver($)
     }
 
     if (defined($manifest)) {
-	print $manifest->toStringC14N();
+	print GeniXML::Serialize($manifest);
 	
 	#
 	# This is not signed, so have to be very careful about using
@@ -3401,7 +3401,7 @@ sub SliverTicket($)
 		     POSIX::strftime("20%y-%m-%dT%H:%M:%S",
 				     gmtime(str2time($slice->expires()))));
 
-    my $rspec_xml = $rspec->toStringC14N();
+    my $rspec_xml = GeniXML::Serialize($rspec);
 
     #
     # Create a new ticket.
@@ -4073,7 +4073,7 @@ sub UpdateManifest($)
 	}
 	
     }
-    my $manifest = $rspec->toStringC14N();
+    my $manifest = GeniXML::Serialize($rspec);
     
     #
     # Move this elsewhere.
