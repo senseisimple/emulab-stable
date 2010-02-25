@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2005, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2003-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -17,13 +17,15 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print STDERR "Usage: grantnodetype [-h] -p <pid> <type>\n";
+    print STDERR "Usage: grantnodetype [-h] [-r] -p <pid> <type>\n";
     print STDERR "	-h   This message\n";
+    print STDERR "	-r   Revoke access instead of grant\n";
     exit(-1);
 }
-my $optlist  = "hp:dn";
+my $optlist  = "hp:dnr";
 my $impotent = 0;
 my $debug    = 0;
+my $revoke   = 0;
 my %newtypes = ();
 my $pid;
 
@@ -76,6 +78,9 @@ if (defined($options{h})) {
 }
 if (defined($options{n})) {
     $impotent = 1;
+}
+if (defined($options{r})) {
+    $revoke = 1;
 }
 if (defined($options{d})) {
     $debug = 1;
@@ -163,7 +168,9 @@ while (my ($nodetype,$nodeclass) = $query_result->fetchrow_array()) {
 # Run the queries.
 # 
 foreach my $newtype (keys(%newtypes)) {
-    print STDERR "Granting permission to use type $newtype\n"
+    print STDERR
+	($revoke ? "Revoking" : "Granting") . " " .
+	"permission to use type $newtype\n"
 	if ($debug);
 
     #
@@ -186,11 +193,13 @@ foreach my $newtype (keys(%newtypes)) {
     #
     # Add generic rules that say the project is allowed to use "infinite"
     # number of nodes of each type. 
-    # 
+    #
+    my $count = ($revoke ? 0 : 999999);
+    
     DBQueryFatal("replace into group_policies ".
 		 "(pid_idx, gid_idx, pid, gid, policy, auxdata, count) ".
 		 "values ($pid_idx, $pid_idx, '$pid', '$pid', ".
-		 "        'type', '$newtype', 999999)")
+		 "        'type', '$newtype', $count)")
 	if (!$impotent);
 }
 
