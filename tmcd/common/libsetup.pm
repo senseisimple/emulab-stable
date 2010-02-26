@@ -1,4 +1,4 @@
-#!/usr/bin/perl -wT
+#!/usr/bin/perl -w
 
 #
 # EMULAB-COPYRIGHT
@@ -26,7 +26,8 @@ use Exporter;
 
 	 TBDebugTimeStamp TBDebugTimeStampsOn
 
-	 MFS REMOTE REMOTEDED CONTROL WINDOWS JAILED PLAB LOCALROOTFS IXP USESFS 
+	 MFS REMOTE REMOTEDED CONTROL WINDOWS JAILED PLAB LOCALROOTFS IXP
+	 USESFS SHADOW
 
 	 SIMTRAFGEN SIMHOST ISDELAYNODEPATH JAILHOST DELAYHOST STARGATE
 	 ISFW FAKEJAILED LINUXJAILED GENVNODE GENVNODETYPE GENVNODEHOST
@@ -119,6 +120,12 @@ my $inplab;
 my $inixp;
 
 #
+# Shadow mode. Run the client side against a remote tmcd.
+#
+my $shadow;
+my $SHADOWDIR = "$VARDIR/shadow";
+
+#
 # The role of this pnode
 #
 my $role;
@@ -132,6 +139,7 @@ BEGIN
     }
     require "/etc/emulab/paths.pm";
     import emulabpaths;
+    $SHADOWDIR = "$VARDIR/shadow";
 
     # Make sure these exist! They will not exist on a PLAB vserver initially.
     mkdir("$VARDIR", 0775);
@@ -141,11 +149,28 @@ BEGIN
     mkdir("$VARDIR/logs", 0775);
     mkdir("$VARDIR/boot", 0775);
     mkdir("$VARDIR/lock", 0775);
+    mkdir("$SHADOWDIR", 0775);
+    mkdir("$SHADOWDIR/db", 0755);
+    mkdir("$SHADOWDIR/logs", 0775);
+    mkdir("$SHADOWDIR/boot", 0775);
+    mkdir("$SHADOWDIR/lock", 0775);
 
+    #
+    # Shadow mode allows the client side to run against remote tmcd.
+    #
+    if (exists($ENV{'SHADOW'})) {
+	$shadow = $ENV{'SHADOW'};
+	my ($server,$urn) = split(',', $shadow);
+	
+	# The cache needs to go in a difference location.
+	libtmcc::configtmcc("cachedir", $SHADOWDIR);
+	libtmcc::configtmcc("server", $server);
+	libtmcc::configtmcc("urn", $urn);
+    }
     #
     # Determine if running inside a jail. This affects the paths below.
     #
-    if (-e "$BOOTDIR/jailname") {
+    elsif (-e "$BOOTDIR/jailname") {
 	open(VN, "$BOOTDIR/jailname");
 	my $vid = <VN>;
 	close(VN);
@@ -256,6 +281,8 @@ sub LOCALROOTFS() {
 # jailed node, the code that sets it up needs a different per-vnode path.
 #
 sub CONFDIR() {
+    return "$SHADOWDIR/boot"
+	if ($shadow);
     return $BOOTDIR
 	if ($injail || $inplab || $ingenvnode);
     return GENVNODEDIR() 
@@ -266,6 +293,8 @@ sub CONFDIR() {
 }
 # Cause of fakejails, we want log files in the right place.
 sub LOGDIR() {
+    return "$SHADOWDIR/logs"
+	if ($shadow);
     return $LOGDIR
 	if ($injail || $inplab || $ingenvnode);
     return GENVNODEDIR() 
@@ -395,6 +424,9 @@ sub SHAREDHOST()   { return ($role eq "sharedhost" ? 1 : 0); }
 
 # A delay host?  Either a delay node or a node using linkdelays
 sub DELAYHOST()	{ if (-e ISDELAYNODEPATH()) { return 1; } else { return 0; } }
+
+# A shadow?
+sub SHADOW()	   { return (defined($shadow) ? 1 : 0); }
 
 #
 # Is this node using SFS. Several scripts need to know this.
@@ -1809,6 +1841,60 @@ sub bootsetup()
 }
 
 #
+# Shadow mode setup. The server argument is the remote boss we talk to.
+#
+sub shadowsetup($$)
+{
+    my ($server, $urn) = @_;
+
+    $shadow = 1;
+
+    # This changes where tmcc is going to store the data.
+    libtmcc::configtmcc("cachedir", $SHADOWDIR);
+    libtmcc::configtmcc("server", $server);
+    libtmcc::configtmcc("urn", $urn);
+
+    # Tell children.
+    $ENV{'SHADOW'} = "$server,$urn";
+    $ENV{'URN'}    = $urn;
+
+    # Tell libtmcc to forget anything it knows.
+    tmccclrconfig();
+    
+    #
+    # Check allocation. Exit now if not allocated.
+    #
+    if (! check_status()) {
+	return undef;
+    } 
+    print STDOUT "  Allocated! $pid/$eid/$vname\n";
+
+    #
+    # Tell libtmcc to get the full config. 
+    #
+    tmccgetconfig();
+    
+    #
+    # Get the role of this node from tmcc which can be one of
+    # "node", "virthost", "delaynode" or "simhost".
+    # Mainly useful for simulation (nse) stuff
+    # Hopefully, this will come out of the tmcc cache and will not
+    # be expensive.
+    #
+    dorole();
+
+    #
+    # And the nodeid.
+    #
+    donodeid();
+
+    my $eiddir = "/proj/$pid/exp/$eid/tbdata";
+    os_mkdir($eiddir, "0777");
+
+    return ($pid, $eid, $vname);
+}
+
+#
 # This happens inside a jail. 
 #
 sub jailsetup()
@@ -2025,6 +2111,9 @@ sub getgenvnodeconfig($;$)
 		&& $2 =~ /^(\d+\.\d+\.\d+\.\d+),(\d+\.\d+\.\d+\.\d+)$/) {
 		$vconfig{"CTRLIP"} = $1;
 		$vconfig{"CTRLMASK"} = $2;
+	    }
+	    else {
+		$vconfig{$1} = $2;
 	    }
 	}
     }

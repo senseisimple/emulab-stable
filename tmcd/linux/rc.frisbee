@@ -441,7 +441,7 @@ rm -f /tmp/loadinfo.out
 if [ $reboot -eq 1 ]; then
     $BINDIR/tmcc state RELOADDONEV2
     echo "Waiting for server to reboot us ..."
-    if [ $isrem -eq 1 ]; then
+    if [ $IS_REMOTE -eq 1 ]; then
 	sleep 30
     else
 	sleep 240

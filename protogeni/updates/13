@@ -1,0 +1,19 @@
+#
+# Add a expires to geni_resources; when the sliver expires.
+#
+use strict;
+use GeniDB;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    DBSetDefault($dbhandle);
+
+    if (!DBSlotExists("geni_resources", "expires")) {
+	DBQueryFatal("alter table geni_resources ".
+		     "  add `expires` datetime default NULL after `created`");
+    }
+    return 0;
+}
+1;

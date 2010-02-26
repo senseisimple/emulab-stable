@@ -190,6 +190,7 @@ while (<IF>) {
 		    my $mac = $row{"MAC"};
 		    my $node_id;
 		    my $next_server = "";
+		    my $bootinfo_server = "";
 		    my $hostname = "";
 		    my $dns = "";
 		    my $booting = "";
@@ -243,10 +244,13 @@ while (<IF>) {
 			    "${spaces}\toption host-name \"$node_id\";\n";
 
 			my $query_result =
-			    DBQueryWarn( "(select attrvalue from node_attributes where node_id = '$node_id' " .
-				           " and attrkey = 'tftp_server' ) union " .
-				           "(select attrvalue from node_type_attributes where type = '$nodetype' " .
-				           " and attrkey = 'tftp_server') limit 1" );
+			    DBQueryWarn( "(select attrvalue from " .
+				   "node_attributes where node_id = '$node_id' " .
+			           " and attrkey = 'tftp_server' ) union " .
+			           "(select attrvalue from " .
+			           "node_type_attributes where type = " .
+			           "'$nodetype' " .
+				   " and attrkey = 'tftp_server') limit 1" );
 
 			if (! $query_result) {
 			    fatal("Could not get tftp_server data from DB!");
@@ -256,6 +260,25 @@ while (<IF>) {
 				my $tftp_server = $row{'attrvalue'};
 				$next_server = "${spaces}\tnext-server " .
 					$tftp_server . ";\n";
+			}
+
+			$query_result =
+			    DBQueryWarn( "(select attrvalue from " .
+				   "node_attributes where node_id = '$node_id' " .
+			           " and attrkey = 'bootinfo_server' ) union " .
+			           "(select attrvalue from " .
+			           "node_type_attributes where type = " .
+			           "'$nodetype' " .
+				   " and attrkey = 'bootinfo_server') limit 1" );
+
+			if (! $query_result) {
+			    fatal("Could not get bootinfo_server data from DB!");
+			}
+
+			if (my %row = $query_result->fetchhash()) {
+				$bootinfo_server = "${spaces}\toption " .
+				"PXE.emulab-bootinfo " .
+				$row{'attrvalue'} . ";\n";
 			}
 		    }
 
@@ -299,6 +322,7 @@ while (<IF>) {
 		    print $OUT "${spaces}host $ip {\n";
 		    print $OUT $filename;
 		    print $OUT $next_server;
+		    print $OUT $bootinfo_server;
 		    print $OUT $dns;
 		    print $OUT $booting;
 		    print $OUT "${spaces}\thardware ethernet $mac;\n";

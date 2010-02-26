@@ -16,9 +16,9 @@ FAKEROOT_BIN	=	fakeroot
 MODULES := busybox zlib linux dropbear testbed hdparm target_template sudo e2fsprogs openssl wget perl portmap file
 #MODULES := busybox zlib linux dropbear testbed hdparm target_template sudo e2fsprogs openssl wget portmap file
 INSTALL_MODULES := $(addsuffix -install,$(MODULES))
-EXTRACT_MODULES := $(addsuffix -extract,$(MODULES))
-PATCH_MODULES := $(addsuffix -patch,$(MODULES))
-CLEAN_MODULES := $(addsuffix -clean,$(MODULES))
+EXTRACT_MODULES := $(addsuffix -extract,$(MODULES) toolchain)
+PATCH_MODULES := $(addsuffix -patch,$(MODULES) toolchain)
+CLEAN_MODULES := $(addsuffix -clean,$(MODULES) toolchain)
 
 .PHONY: all clean install root-template-install devices \
 	root-base root-install $(MODULES) $(INSTALL_MODULES) \
@@ -37,7 +37,12 @@ clean:
 	rm -rf $(TARGET_BUILD_PATH)
 	rm -rf $(BOOT_PATH)
 
-$(MODULES):
+toolchain:
+	$(MAKE) -C $(SOURCE_PATH)/$@ all
+	$(MAKE) -C $(SOURCE_PATH)/zlib install-sysroot
+	$(MAKE) -C $(SOURCE_PATH)/openssl install
+
+$(MODULES): toolchain
 	$(MAKE) -C $(SOURCE_PATH)/$@ all
 
 $(CLEAN_MODULES):

@@ -3,7 +3,7 @@ include ../../variables.mk
 LINUX_VERSION		=	2.6.27.8
 LINUX_PATH		=	$(TARGET_BUILD_PATH)/linux-$(LINUX_VERSION)
 
-KERNEL_CONFIG	=	$(SOURCE_PATH)/linux/linux.config
+KERNEL_CONFIG	=	$(SOURCE_PATH)/linux/linux.config.$(MFS_ARCH)
 TARGET_MODULE_PATH =	$(TARGET_PATH)/lib/modules/$(LINUX_VERSION)
 
 MODULE_TARBALL_PATH = $(TOPDIR)/boot/modules-$(LINUX_VERSION).tar.gz

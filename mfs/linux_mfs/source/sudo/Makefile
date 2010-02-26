@@ -1,6 +1,6 @@
 include ../../variables.mk
 
-SUDO_VERSION	=	1.6.9p17
+SUDO_VERSION	=	1.6.9p21
 SUDO_PATH	=	$(TARGET_BUILD_PATH)/sudo-$(SUDO_VERSION)
 
 .PHONY: extract patch config \
