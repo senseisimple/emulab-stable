@@ -14,7 +14,7 @@ patch: $(WGET_PATH)/.patch-stamp
 
 config: $(WGET_PATH)/.config-stamp
 
-wget: $(WGET_PATH)/wget
+wget: $(WGET_PATH)/src/wget
 
 install: $(TARGET_PATH)/usr/bin/wget
 
