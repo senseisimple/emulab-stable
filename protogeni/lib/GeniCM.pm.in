@@ -2095,6 +2095,7 @@ sub SliverWorkAux($$$$$$$)
 					      $ifaceref);
 	    my $node_id    = GeniXML::GetText("virtual_node_id",
 					      $ifaceref);
+	    my ($vnode,$vinterface);
 
 	    #
 	    # Look for links that are really lans; one of the interfaces
@@ -2111,10 +2112,27 @@ sub SliverWorkAux($$$$$$$)
 		$message = "Link $linkname specifies a non-existent node";
 		goto bad;
 	    }
-	    my $nodeobject= GeniUtil::LookupNode($nodesliver->resource_uuid());
-	    if (!defined($nodeobject)) {
+	    my $node = GeniUtil::LookupNode($nodesliver->resource_id());
+	    if (!defined($node)) {
 		$message = "Could not find node object for $nodesliver";
 		goto bad;
+	    }
+	    #
+	    # Not quite sure how to deal with links into virtual containers
+	    # yet. For now, the link section will hold the physical info,
+	    # but we have to return the VMAC so the caller knows which
+	    # virtual interface inside the container.
+	    #
+	    if ($node->isvirtnode()) {
+		$vnode = $node;
+		$node  = GeniUtil::LookupNode($nodesliver->resource_uuid());
+		if (!defined($node)) {
+		    $message = "Could not find node object for $nodesliver";
+		    goto bad;
+		}
+		$vinterface =
+		    Interface::VInterface->LookupByVirtLan($experiment,
+				     $linkname, $node_id);
 	    }
 
 	    #
@@ -2133,16 +2151,15 @@ sub SliverWorkAux($$$$$$$)
 			GeniHRN::ParseInterface($iface_name);
 		    $iface_name = $short_iface;
 		}
-		$interface = Interface->LookupByIface($nodeobject,$iface_name);
+		$interface = Interface->LookupByIface($node, $iface_name);
 		if (!defined($interface)) {
-		    $message = "No such interface ".
-			"$iface_name on node $nodeobject";
+		    $message = "No such interface $iface_name on $node";
 		    goto bad;
 		}
 	    }
 	    my $sliver = GeniSliver::Interface->Create($slice,
 						       $owner,
-						       $nodeobject->node_id(),
+						       $node->node_id(),
 						       $iface_name,
 						       $linkname,
 						       $ifaceref);
@@ -2155,6 +2172,8 @@ sub SliverWorkAux($$$$$$$)
 	    GeniXML::SetText("sliver_urn", $ifaceref, $sliver->sliver_urn());
 	    GeniXML::SetText("MAC", $ifaceref, $interface->mac())
 		if (defined($interface));
+	    GeniXML::SetText("VMAC", $ifaceref, $vinterface->mac())
+		if (defined($vinterface));
 	    GeniXML::SetText("IP", $ifaceref, $interface->IP())
 		if (defined($interface) &&
 		    defined($interface->IP()) && $interface->IP() ne "");

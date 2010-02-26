@@ -553,7 +553,7 @@ my $nextfake = 0;
 #
 # Lookup by node_id,unit
 #
-sub Lookup($$$$)
+sub Lookup($$$)
 {
     my ($class, $nodeid, $unit) = @_;
 
@@ -592,6 +592,30 @@ sub bandwidth($)   { return field($_[0], 'bandwidth'); }
 
 # The virtual iface name is $type$unit
 sub viface($)     { return $_[0]->type() . $_[0]->unit(); }
+
+#
+# Lookup by the experiment/virtlan/vnode
+#
+sub LookupByVirtLan($$$$)
+{
+    my ($class, $experiment, $virtlan, $vnode) = @_;
+    my $exptidx = $experiment->idx();
+
+    $virtlan = DBQuoteSpecial($virtlan);
+    $vnode   = DBQuoteSpecial($vnode);
+
+    my $query_result =
+	DBQueryWarn("select node_id,unit from vinterfaces as vif ".
+		    "left join virt_lans as vl on vl.exptidx=vif.exptidx and ".
+		    "  vl.ip=vif.IP ".
+		    "where vif.exptidx='$exptidx' and ".
+		    "      vl.vname=$virtlan and vl.vnode=$vnode");
+    return undef
+	if (!defined($query_result) || !$query_result->numrows);
+
+    my ($node_id,$unit) = $query_result->fetchrow_array();
+    return Interface::VInterface->Lookup($node_id, $unit);
+}
     
 #
 # Create a new vinterface
@@ -680,6 +704,62 @@ sub ReserveSharedBandwidth($$)
 	
     $self->{'DBROW'}->{'bandwidth'} = $bandwidth;
     return 0;
+}
+
+#
+# Refresh instance by reloading from the DB.
+#
+sub Refresh($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $nodeid  = $self->node_id();
+    my $unit    = $self->unit();
+
+    my $query_result =
+	DBQueryWarn("select * from vinterfaces ".
+		    "where node_id='$nodeid' and unit='$unit'");
+    return undef
+	if (!$query_result || !$query_result->numrows);
+
+    $self->{"DBROW"} = $query_result->fetchrow_hashref();
+    
+    return 0;
+}
+
+#
+# Perform some updates ...
+#
+sub Update($$)
+{
+    my ($self, $argref) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $nodeid  = $self->node_id();
+    my $unit    = $self->unit();
+    my @sets    = ();
+
+    foreach my $key (keys(%{$argref})) {
+	my $val = $argref->{$key};
+
+	# Treat NULL special.
+	push (@sets, "${key}=" . ($val eq "NULL" ?
+				  "NULL" : DBQuoteSpecial($val)));
+    }
+
+    my $query = "update vinterfaces set " . join(",", @sets) .
+	" where node_id='$nodeid' and unit='$unit'";
+
+    return -1
+	if (! DBQueryWarn($query));
+
+    return Refresh($self);
 }
 
 # _Always_ make sure that this 1 is at the end of the file...
