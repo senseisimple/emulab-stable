@@ -5,5 +5,25 @@
 
 # Of course, it doesn't work like tcsh.  But
 # including tcsh is overkill and unnecessary.
+arguments=""
+command=""
 
-exec /bin/sh $@
+# csh stops parsing arguments as soon as it
+# encounters the 'c' option.  The remaining
+# command line is then executed. sh doesn't
+# work that way, so we need to handle that
+# case to make scp work.
+while [ $# -gt 0 ]; do
+	arg="$1"
+	shift
+	case $arg in
+		-c) command="$@"; break ;;
+	esac
+	arguments="$arguments $arg"
+done
+
+if [ -n "$command" ]; then
+	exec /bin/sh $arguments -c "$command"
+else
+	exec /bin/sh $arguments $@
+fi

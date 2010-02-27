@@ -796,6 +796,14 @@ sub GetTicketAuxAux($$$$$$$$)
 	    elsif ($isupdate && exists($namemap{$node_nickname})) {
 		$node = $namemap{$node_nickname};
 	    }
+	    # If the node still isn't bound and doesn't have a pctype,
+	    # use the user-specified one.
+	    if (! defined($node) && ! defined($pctype)) {
+		my $usertype = GeniXML::FindFirst("n:node_type", $ref);
+		if (defined($usertype)) {
+		    $pctype = GeniXML::GetText("type_name", $usertype);
+		}
+	    }
 	}
 	else {
 	    $node = GeniUtil::LookupNode($resource_uuid);
