@@ -1,4 +1,4 @@
-/* GENIPUBLIC-COPYRIGHT
+﻿/* GENIPUBLIC-COPYRIGHT
  * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
  * All rights reserved.
  *
@@ -164,12 +164,12 @@ package
         if (cm.getSliver() == null)
         {
           rspec = nodes.getXml(false, cm);
-          result = new RequestSliverCreate(cm, nodes, rspec);
+          result = new RequestSliverCreate(cm, nodes, rspec, arena.sliceName.text);
         }
         else if (cm.getVersion() >= 2)
         {
           rspec = nodes.getXml(true, cm);
-          result = new RequestSliverUpdate(cm, nodes, rspec, false);
+          result = new RequestSliverUpdate(cm, nodes, rspec, false, arena.sliceName.text);
         }
       }
       return result;
@@ -188,7 +188,7 @@ package
       var result : Request = null;
       if (nodes.existsState(cm, ActiveNodes.CREATED))
       {
-        result = new RequestSliverStart(cm, nodes);
+        result = new RequestSliverStart(cm, nodes, arena.sliceName.text);
       }
       return result;
     }
@@ -221,7 +221,7 @@ package
           || nodes.existsState(cm, ActiveNodes.CREATED)
           || nodes.existsState(cm, ActiveNodes.BOOTED))
       {
-        result = new RequestSliverDestroy(cm, nodes);
+        result = new RequestSliverDestroy(cm, nodes, arena.sliceName.text);
       }
       return result;
     }

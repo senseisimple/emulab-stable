@@ -287,7 +287,7 @@ package
       opName = "Looking up resources";
       clip.loadText.text = opName;
       op.reset(Geni.discoverResources);
-      op.addField("credential", credential.slice);
+      op.addField("credentials", new Array(credential.slice));
       op.addField("rspec", rspec);
       op.setUrl("https://myboss.myelab.testbed.emulab.net:443/protogeni/xmlrpc");
       op.call(completeResourceLookup, failure);
