@@ -56,6 +56,7 @@ script-install:
 	mkdir -p $(TARGET_PATH)/var/emulab/boot
 	mkdir -p $(TARGET_PATH)/var/emulab/db
 	ln -sf /etc/testbed $(TARGET_PATH)/usr/local/etc/emulab
+	install -m 755 $(TESTBEDOBJ_PATH)/tmcd/linux/sethostname.dhclient $(TARGET_PATH)/usr/share/udhcpc
 	install -m 755 $(TMCD_PATH)/linux/control_interface $(TARGET_PATH)/etc/testbed
 	install -m 755 $(TMCD_PATH)/linux/rc.frisbee $(TARGET_PATH)/etc/testbed
 	install -m 755 $(TMCD_PATH)/linux/rc.ipod $(TARGET_PATH)/etc/testbed
