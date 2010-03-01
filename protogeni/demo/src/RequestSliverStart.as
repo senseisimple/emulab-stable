@@ -1,4 +1,4 @@
-/* GENIPUBLIC-COPYRIGHT
+﻿/* GENIPUBLIC-COPYRIGHT
  * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
  * All rights reserved.
  *
@@ -17,11 +17,13 @@ package
   class RequestSliverStart extends Request
   {
     public function RequestSliverStart(newManager : ComponentManager,
-                                       newNodes : ActiveNodes) : void
+                                       newNodes : ActiveNodes,
+									   newSliceUrn) : void
     {
       super(newManager.getName());
       manager = newManager;
       nodes = newNodes;
+	  sliceUrn = newSliceUrn;
     }
 
     override public function cleanup() : void
@@ -34,8 +36,9 @@ package
       nodes.changeState(manager, ActiveNodes.CREATED, ActiveNodes.BOOTED);
       opName = "Booting Sliver";
       op.reset(Geni.startSliver);
-      op.addField("credential", manager.getSliver());
-      op.addField("impotent", Request.IMPOTENT);
+      op.addField("slice_urn", sliceUrn);
+      op.addField("credentials", new Array(manager.getSliver()));
+      //? op.addField("impotent", Request.IMPOTENT);
       op.setUrl(manager.getUrl());
       return op;
     }
@@ -56,5 +59,6 @@ package
 
     var manager : ComponentManager;
     var nodes : ActiveNodes;
+	var sliceUrn : String;
   }
 }

@@ -66,7 +66,7 @@ package
 			var index:int;
 			try
 			{
-				compm.getIndexFromUuid(urn);
+				index = compm.getIndexFromUuid(urn);
 			} catch(e:Error)
 			{
 				return "Node not found, most likely because it isn't available.";
@@ -78,8 +78,6 @@ package
 			var superNodeName = null;
 			if (component.superNode != -1)
 			{
-				if(compm.isUsed(component.superNode))
-					return "Component's supernode already in use";
 				superNode = compm.getComponent(component.superNode);
 				superNodeName = superNode.name;
 			}

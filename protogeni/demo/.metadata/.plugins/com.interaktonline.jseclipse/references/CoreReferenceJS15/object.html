@@ -1,0 +1,1131 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html>
+  <head>
+    <meta content="HTML Tidy for Cygwin (vers 1st February 2003), see www.w3.org" name="generator">
+    <meta name="keywords" content="electronic commerce, ecommerce, ebusiness, e-business, e-commerce, enterprise software, net economy, Netscape, Sun Microsystems, DevEdge Archive, iPlanet, internet software">
+    <meta name="description" content="The DevEdge Archive, a strategic alliance formed by America Online and Sun Microsystems, Inc., is delivering iPlanet e-commerce software and enterprise solutions that enable companies to compete successfully in the Net Economy">
+    <meta http-equiv="Content-Type" content="text/html; charset=us-ascii">
+    <meta name="TEMPLATEBASE" content="Authored in FrameMaker. Converted to HTML in WebWorks Publisher 2000. manual wdt 1.5">
+    <meta name="LASTUPDATED" content="09/28/00 13:15:49">
+    <title>
+      Core JavaScript Reference 1.5:
+    </title>
+    <link rel="stylesheet" type="text/css" href="js15ref.css">
+  </head>
+  <body>
+    <table width="100%" border="0" cellspacing="4">
+      <tr>
+        <td valign="top">
+          <b><a class="sansserifPurple" href="number.html">Previous</a></b>&nbsp;&nbsp;&nbsp;&nbsp; <a href="contents.html"><b class="sansserifPurple">Contents</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="ix.html"><b class="sansserifPurple">Index</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="packages.html"><b class="sansserifPurple">Next</b></a> &nbsp;&nbsp;&nbsp;&nbsp;
+        </td>
+      </tr>
+      <tr>
+        <td class="sansserifBlack" valign="top" align="right" bgcolor="#CCCCCC">
+          <b>Core JavaScript Reference 1.5</b>
+        </td>
+      </tr>
+    </table><br>
+     
+    <blockquote>
+      <br>
+      <br>
+      <br>
+      <br>
+       
+      <p>
+        <a name="1193136" id="1193136"></a> <a name="Object" id="Object"></a> <span class="sansserif"><b>Object</b></span>
+      </p>
+      <p>
+        <a name="1193137" id="1193137"></a> <span class="sansserif"><span class="mono">Object</span> is the primitive JavaScript object type. All JavaScript objects are descended from <span class="mono">Object</span>. That is, all JavaScript objects have the methods defined for <span class="mono">Object</span>.<br></span>
+      </p><br>
+       
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top" colspan="2" rowspan="1">
+            <p>
+              <a name="1193140" id="1193140"></a> <span class="sansserif"><i>Core object</i></span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193144" id="1193144"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193146" id="1193146"></a> <span class="sansserif">JavaScript 1.0: <span class="mono">toString</span> method.</span>
+            </p>
+            <p>
+              <a name="1195549" id="1195549"></a>
+            </p>
+            <p>
+              <a name="1195550" id="1195550"></a> <span class="sansserif">JavaScript 1.1, NES 2.0: added <span class="mono">eval</span> and <span class="mono">valueOf</span> methods; <span class="mono">constructor</span> property.</span>
+            </p>
+            <p>
+              <a name="1195551" id="1195551"></a>
+            </p>
+            <p>
+              <a name="1195552" id="1195552"></a> <span class="sansserif">JavaScript 1.2: deprecated <a href="object.html#1194118">eval</a> method.</span>
+            </p>
+            <p>
+              <a name="1193150" id="1193150"></a>
+            </p>
+            <p>
+              <a name="1195553" id="1195553"></a> <span class="sansserif">JavaScript 1.3: added <a href="object.html#1193320">toSource</a> method.</span>
+            </p>
+            <p>
+              <a name="1203643" id="1203643"></a>
+            </p>
+            <p>
+              <a name="1203640" id="1203640"></a> <span class="sansserif">JavaScript 1.4: removed <a href="object.html#1194118">eval</a> method.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1196451" id="1196451"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1196453" id="1196453"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193151" id="1193151"></a> <a name="Created by" id="Created by"></a> <span class="sansserif"><b>Created by</b></span><br>
+         <a name="1193152" id="1193152"></a> <span class="sansserif">The <span class="mono">Object</span> constructor:</span>
+      </p>
+      <p>
+        <a name="1193153" id="1193153"></a> <span class="mono">new Object()</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193154" id="1193154"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1193155" id="1193155"></a> <span class="sansserif">None</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193156" id="1193156"></a> <a name="Property Summary" id="Property Summary"></a> <span class="sansserif"><b>Property Summary</b></span><br>
+         <a name="1193176" id="1193176"></a> <span class="sansserif"><br></span>
+      </p><br>
+       
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr bgcolor="#CCCCCC" align="left" valign="top">
+          <th valign="top" align="left">
+            <a name="1193159" id="1193159"></a> 
+            <p class="alignleft">
+              <span class="sansserif"><b>Property</b></span>
+            </p>
+          </th>
+          <th valign="top" align="left">
+            <a name="1193161" id="1193161"></a> 
+            <p class="alignleft">
+              <span class="sansserif"><b>Description</b></span>
+            </p>
+          </th>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193166" id="1193166"></a> <span class="mono"><a href="object.html#1193229">constructor</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193168" id="1193168"></a> <span class="sansserif">Specifies the function that creates an object's prototype.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193173" id="1193173"></a> <span class="mono"><a href="object.html#1193255">prototype</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193175" id="1193175"></a> <span class="sansserif">Allows the addition of properties to all objects.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193177" id="1193177"></a> <a name="Method Summary" id="Method Summary"></a> <span class="sansserif"><b>Method Summary</b></span><br>
+         <a name="1193225" id="1193225"></a> <span class="sansserif"><br></span>
+      </p><br>
+       
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr bgcolor="#CCCCCC" align="left" valign="top">
+          <th valign="top" align="left">
+            <a name="1193180" id="1193180"></a> 
+            <p class="alignleft">
+              <span class="sansserif"><b>Method</b></span>
+            </p>
+          </th>
+          <th valign="top" align="left">
+            <a name="1193182" id="1193182"></a> 
+            <p class="alignleft">
+              <span class="sansserif"><b>Description</b></span>
+            </p>
+          </th>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193187" id="1193187"></a> <span class="mono"><a href="object.html#1194118">eval</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193189" id="1193189"></a> <span class="sansserif">Deprecated. Evaluates a string of JavaScript code in the context of the specified object.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193194" id="1193194"></a> <span class="mono"><a href="object.html#1193320">toSource</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193196" id="1193196"></a> <span class="sansserif">Returns an object literal representing the specified object; you can use this value to create a new object.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193201" id="1193201"></a> <span class="mono"><a href="object.html#1193350">toString</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193203" id="1193203"></a> <span class="sansserif">Returns a string representing the specified object.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193208" id="1193208"></a> <span class="mono"><a href="object.html#1193499">unwatch</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193210" id="1193210"></a> <span class="sansserif">Removes a watchpoint from a property of the object.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193215" id="1193215"></a> <span class="mono"><a href="object.html#1193540">valueOf</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193217" id="1193217"></a> <span class="sansserif">Returns the primitive value of the specified object.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193222" id="1193222"></a> <span class="mono"><a href="object.html#1193628">watch</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193224" id="1193224"></a> <span class="sansserif">Adds a watchpoint to a property of the object.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <a name="1193229" id="1193229"></a> <a name="constructor" id="constructor"></a> <span class="sansserif"><b>constructor</b></span>
+      </p>
+      <p>
+        <a name="1193230" id="1193230"></a> <span class="sansserif">Specifies the function that creates an object's prototype. Note that the value of this property is a reference to the function itself, not a string containing the function's name.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193233" id="1193233"></a> <span class="sansserif"><i>Property of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193238" id="1193238"></a> <span class="sansserif"><a href="object.html#1193136">Object</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193240" id="1193240"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193242" id="1193242"></a> <span class="sansserif">JavaScript 1.1, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1196460" id="1196460"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1196462" id="1196462"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193243" id="1193243"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1193244" id="1193244"></a> <span class="sansserif">All objects inherit a <span class="mono">constructor</span> property from their <span class="mono">prototype</span>:</span>
+      </p>
+      <p>
+        <a name="1193245" id="1193245"></a><span class="mono">o = new Object // or o = {} in JavaScript 1.2<br>
+         o.constructor == Object<br>
+         a = new Array // or a = [] in JavaScript 1.2<br>
+         a.constructor == Array<br>
+         n = new Number(3)<br>
+         n.constructor == Number</span>
+      </p>
+      <p>
+        <a name="1193246" id="1193246"></a> <span class="sansserif">Even though you cannot construct most HTML objects, you can do comparisons. For example,</span>
+      </p>
+      <p>
+        <a name="1193247" id="1193247"></a> <span class="mono">document.constructor == Document<br>
+         document.form3.constructor == Form</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193248" id="1193248"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1193249" id="1193249"></a> <span class="sansserif">The following example creates a prototype, <span class="mono">Tree</span>, and an object of that type, <span class="mono">theTree</span>. The example then displays the <span class="mono">constructor</span> property for the object <span class="mono">theTree</span>.</span>
+      </p>
+      <p>
+        <a name="1193250" id="1193250"></a> <span class="mono">function Tree(name) {<br>
+         &nbsp;&nbsp;&nbsp;this.name=name<br>
+         }<br>
+         theTree = new Tree("Redwood")<br>
+         document.writeln("&lt;B&gt;theTree.constructor is&lt;/B&gt; " +<br>
+         &nbsp;&nbsp;&nbsp;theTree.constructor + "&lt;P&gt;")</span>
+      </p>
+      <p>
+        <a name="1193251" id="1193251"></a> <span class="sansserif">This example displays the following output:</span>
+      </p>
+      <p>
+        <a name="1193252" id="1193252"></a> <span class="mono">theTree.constructor is function Tree(name) { this.name = name; }</span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1194118" id="1194118"></a> <a name="eval" id="eval"></a> <span class="sansserif"><b>eval</b></span>
+      </p>
+      <p>
+        <a name="1194131" id="1194131"></a> <span class="sansserif">Deprecated. Evaluates a string of JavaScript code in the context of an object.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1194121" id="1194121"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1194126" id="1194126"></a> <span class="sansserif"><a href="object.html#1193136">Object</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1194128" id="1194128"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1194130" id="1194130"></a> <span class="sansserif">JavaScript 1.1, NES 2.0</span>
+            </p>
+            <p>
+              <a name="1195556" id="1195556"></a>
+            </p>
+            <p>
+              <a name="1195557" id="1195557"></a> <span class="sansserif">JavaScript 1.2, NES 3.0: deprecated as method of objects; retained as top-level function.</span>
+            </p>
+            <p>
+              <a name="1203544" id="1203544"></a>
+            </p>
+            <p>
+              <a name="1203565" id="1203565"></a> <span class="sansserif">JavaScript 1.4: removed as method of objects.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1194132" id="1194132"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1194133" id="1194133"></a> <span class="mono">eval(<i>string</i>)</span>
+      </p>
+      <p>
+        <br>
+         <a name="1194134" id="1194134"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1194140" id="1194140"></a> <span class="sansserif"><br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <a name="1194137" id="1194137"></a> <span class="mono">string</span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1194139" id="1194139"></a> <span class="sansserif">Any string representing a JavaScript expression, statement, or sequence of statements. The expression can include variables and properties of existing objects.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1194141" id="1194141"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1194142" id="1194142"></a> <span class="sansserif">The <span class="mono">eval</span> method is no longer available as a method of <span class="mono">Object</span>. Use the top-level <a href="toplev.html#1063795">eval</a> function.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1202533" id="1202533"></a> <a name="Backward Compatibility" id="Backward Compatibility"></a> <span class="sansserif"><b>Backward Compatibility</b></span><br>
+      </p>
+      <p>
+        <a name="1203587" id="1203587"></a> <span class="sansserif"><b>JavaScript 1.2 and 1.3.</b></span> <a name="1203588" id="1203588"></a> <span class="sansserif"><span class="mono">eval</span> as a method of Object and every object derived from Object is deprecated (but still available).</span>
+      </p>
+      <p>
+        <a name="1202534" id="1202534"></a> <span class="sansserif"><b>JavaScript 1.1.</b></span> <a name="1202544" id="1202544"></a> <span class="sansserif"><span class="mono">eval</span> is a method of Object and every object derived from Object.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1194155" id="1194155"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1194159" id="1194159"></a> <span class="sansserif"><a href="toplev.html#1063795">eval</a></span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1193255" id="1193255"></a> <a name="prototype" id="prototype"></a> <span class="sansserif"><b>prototype</b></span>
+      </p>
+      <p>
+        <a name="1193256" id="1193256"></a> <span class="sansserif">Represents the prototype for this class. You can use the prototype to add properties or methods to all instances of a class. For more information, see <a href="function.html#1193426">Function.prototype</a>.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193262" id="1193262"></a> <span class="sansserif"><i>Property of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193267" id="1193267"></a> <span class="sansserif"><a href="object.html#1193136">Object</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193269" id="1193269"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193271" id="1193271"></a> <span class="sansserif">JavaScript 1.1</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1196486" id="1196486"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1196488" id="1196488"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1193320" id="1193320"></a> <a name="toSource" id="toSource"></a> <span class="sansserif"><b>toSource</b></span>
+      </p>
+      <p>
+        <a name="1193322" id="1193322"></a> <span class="sansserif">Returns a string representing the source code of the object.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193325" id="1193325"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193330" id="1193330"></a> <span class="sansserif"><a href="object.html#1193136">Object</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193332" id="1193332"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193334" id="1193334"></a> <span class="sansserif">JavaScript 1.3</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193335" id="1193335"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1193336" id="1193336"></a> <span class="mono">toSource()</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193337" id="1193337"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1193338" id="1193338"></a> <span class="sansserif">None</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193339" id="1193339"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1204221" id="1204221"></a> <span class="sansserif">The <span class="mono">toSource</span> method returns the following values:</span>
+      </p>
+      <ul>
+        <li class="nobullet">
+          <a name="1204304" id="1204304"></a>
+        </li>
+        <li>
+          <span class="sansserif">For the built-in <span class="mono">Object</span> object, <span class="mono">toSource</span> returns the following string indicating that the source code is not available:</span> 
+          <p>
+            <a name="1204317" id="1204317"></a> <span class="mono">&nbsp;&nbsp;&nbsp;function Object() {<br>
+             &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[native code]<br>
+             &nbsp;&nbsp;&nbsp;}</span>
+          </p>
+          <p>
+            <a name="1204308" id="1204308"></a>
+          </p>
+        </li>
+        <li>
+          <span class="sansserif">For instances of <span class="mono">Object</span>, <span class="mono">toSource</span> returns a string representing the source code.</span> 
+          <p>
+            <a name="1204331" id="1204331"></a>
+          </p>
+        </li>
+        <li>
+          For custom objects, <span class="mono">toSource</span> returns the JavaScript source that defines the object as a string.
+        </li>
+      </ul><a name="1204183" id="1204183"></a> <span class="sansserif">This method is usually called internally by JavaScript and not explicitly in code. You can call <span class="mono">toSource</span> while debugging to examine the contents of an object.</span> 
+      <p>
+        <br>
+         <a name="1193340" id="1193340"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1204772" id="1204772"></a> <span class="sansserif">The following code defines the <span class="mono">Dog</span> object type and creates <span class="mono">theDog,</span> an object of type <span class="mono">Dog</span>:</span>
+      </p>
+      <p>
+        <a name="1204688" id="1204688"></a> <span class="mono">function Dog(name,breed,color,sex) {<br>
+         &nbsp;&nbsp;&nbsp;this.name=name<br>
+         &nbsp;&nbsp;&nbsp;this.breed=breed<br>
+         &nbsp;&nbsp;&nbsp;this.color=color<br>
+         &nbsp;&nbsp;&nbsp;this.sex=sex<br>
+         }<br>
+         theDog = new Dog("Gabby","Lab","chocolate","girl")</span>
+      </p>
+      <p>
+        <a name="1204667" id="1204667"></a> <span class="sansserif">Calling the <span class="mono">toSource</span> method of <span class="mono">theDog</span> displays the JavaScript source that defines the object:</span>
+      </p>
+      <p>
+        <a name="1204789" id="1204789"></a> <span class="mono">theDog.toSource()<br>
+         //returns "{name:"Gabby", breed:"Lab", color:"chocolate", sex:"girl"}</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193343" id="1193343"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1193347" id="1193347"></a> <span class="sansserif"><a href="object.html#1193350">Object.toString</a></span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1193350" id="1193350"></a> <a name="toString" id="toString"></a> <span class="sansserif"><b>toString</b></span>
+      </p>
+      <p>
+        <a name="1193363" id="1193363"></a> <span class="sansserif">Returns a string representing the specified object.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193353" id="1193353"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193358" id="1193358"></a> <span class="sansserif"><a href="object.html#1193136">Object</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193360" id="1193360"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193362" id="1193362"></a> <span class="sansserif">JavaScript 1.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1196496" id="1196496"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1196498" id="1196498"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1203456" id="1203456"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1203457" id="1203457"></a> <span class="mono">toString()</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193421" id="1193421"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1193422" id="1193422"></a> <span class="sansserif">Every object has a <span class="mono">toString</span> method that is automatically called when it is to be represented as a text value or when an object is referred to in a string concatenation. For example, the following examples require <span class="mono">theDog</span> to be represented as a string:</span>
+      </p>
+      <p>
+        <a name="1193423" id="1193423"></a> <span class="mono">document.write(theDog)<br>
+         document.write("The dog is " + theDog)</span>
+      </p>
+      <p>
+        <a name="1200394" id="1200394"></a> <span class="sansserif">By default, the <span class="mono">toString</span> method is inherited by every object descended from <span class="mono">Object</span>. You can override this method for custom objects that you create. If you do not override <span class="mono">toString</span> in a custom object, <span class="mono">toString</span> returns <span class="mono">[object</span> <span class="mono"><i>type</i></span> <span class="mono">]</span>, where <span class="mono"><i>type</i></span> is the object type or the name of the constructor function that created the object.</span>
+      </p>
+      <p>
+        <a name="1203849" id="1203849"></a> <span class="sansserif">For example:</span>
+      </p>
+      <p>
+        <a name="1203854" id="1203854"></a> <span class="mono">var o = new Object()<br>
+         o.toString // returns [object Object]</span>
+      </p>
+      <p>
+        <a name="1193426" id="1193426"></a> <span class="sansserif"><b>Built-in toString methods.</b></span> <a name="1203699" id="1203699"></a> <span class="sansserif">Every built-in core JavaScript object overrides the <span class="mono">toString</span> method of <span class="mono">Object</span> to return an appropriate value. JavaScript calls this method whenever it needs to convert an object to a string.</span>
+      </p>
+      <p>
+        <a name="1193453" id="1193453"></a> <span class="sansserif"><b>Overriding the default toString method.</b></span> <a name="1193454" id="1193454"></a> <span class="sansserif">You can create a function to be called in place of the default <span class="mono">toString</span> method. The <span class="mono">toString</span> method takes no arguments and should return a string. The <span class="mono">toString</span> method you create can be any value you want, but it will be most useful if it carries information about the object.</span>
+      </p>
+      <p>
+        <a name="1193455" id="1193455"></a> <span class="sansserif">The following code defines the <span class="mono">Dog</span> object type and creates <span class="mono">theDog,</span> an object of type <span class="mono">Dog</span>:</span>
+      </p>
+      <p>
+        <a name="1193456" id="1193456"></a> <span class="mono">function Dog(name,breed,color,sex) {<br>
+         &nbsp;&nbsp;&nbsp;this.name=name<br>
+         &nbsp;&nbsp;&nbsp;this.breed=breed<br>
+         &nbsp;&nbsp;&nbsp;this.color=color<br>
+         &nbsp;&nbsp;&nbsp;this.sex=sex<br>
+         }</span>
+      </p>
+      <p>
+        <a name="1193457" id="1193457"></a> <span class="mono">theDog = new Dog("Gabby","Lab","chocolate","girl")</span>
+      </p>
+      <p>
+        <a name="1193458" id="1193458"></a> <span class="sansserif">If you call the <span class="mono">toString</span> method on this custom object, it returns the default value inherited from <span class="mono">Object</span>:</span>
+      </p>
+      <p>
+        <a name="1203749" id="1203749"></a> <span class="mono">theDog.toString() //returns [object Object]</span>
+      </p>
+      <p>
+        <a name="1203735" id="1203735"></a> <span class="sansserif">The following code creates <span class="mono">dogToString,</span> the function that will be used to override the default <span class="mono">toString</span> method. This function generates a string containing each property, of the form <span class="mono">"property = value;"</span>.</span>
+      </p>
+      <p>
+        <a name="1193459" id="1193459"></a> <span class="mono">function dogToString() {<br>
+         &nbsp;&nbsp;&nbsp;var ret = "Dog " + this.name + " is [\n"<br>
+         &nbsp;&nbsp;&nbsp;for (var prop in this)<br>
+         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ret += " " + prop + " is " + this[prop] + ";\n"<br>
+         &nbsp;&nbsp;&nbsp;return ret + "]"<br>
+         }</span>
+      </p>
+      <p>
+        <a name="1193460" id="1193460"></a> <span class="sansserif">The following code assigns the user-defined function to the object's <span class="mono">toString</span> method:</span>
+      </p>
+      <p>
+        <a name="1193461" id="1193461"></a> <span class="mono">Dog.prototype.toString = dogToString</span>
+      </p>
+      <p>
+        <a name="1193462" id="1193462"></a> <span class="sansserif">With the preceding code in place, any time <span class="mono">theDog</span> is used in a string context, JavaScript automatically calls the <span class="mono">dogToString</span> function, which returns the following string:</span>
+      </p>
+      <p>
+        <a name="1203804" id="1203804"></a> <span class="mono">Dog Gabby is [<br>
+         &nbsp;&nbsp;name is Gabby;<br>
+         &nbsp;&nbsp;breed is Lab;<br>
+         &nbsp;&nbsp;color is chocolate;<br>
+         &nbsp;&nbsp;sex is girl;<br>
+         ]</span>
+      </p>
+      <p>
+        <a name="1203805" id="1203805"></a> <span class="sansserif">An object's <span class="mono">toString</span> method is usually invoked by JavaScript, but you can invoke it yourself as follows:</span>
+      </p>
+      <p>
+        <a name="1193465" id="1193465"></a> <span class="mono">var dogString = theDog.toString()</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193466" id="1193466"></a> <a name="Backward Compatibility" id="Backward Compatibility"></a> <span class="sansserif"><b>Backward Compatibility</b></span><br>
+      </p>
+      <p>
+        <a name="1193467" id="1193467"></a> <span class="sansserif"><b>JavaScript 1.2.</b></span> <a name="1193468" id="1193468"></a> <span class="sansserif">The behavior of the <span class="mono">toString</span> method depends on whether you specify <span class="mono">LANGUAGE="JavaScript1.2"</span> in the <span class="mono">&lt;SCRIPT&gt;</span> tag:</span>
+      </p>
+      <ul>
+        <li class="nobullet">
+          <a name="1193469" id="1193469"></a>
+        </li>
+        <li>
+          <span class="sansserif">If you specify <span class="mono">LANGUAGE="JavaScript1.2"</span> in the <span class="mono">&lt;SCRIPT&gt;</span> tag, the <span class="mono">toString</span> method returns an object literal.</span> 
+          <p>
+            <a name="1193470" id="1193470"></a>
+          </p>
+        </li>
+        <li>
+          If you do not specify <span class="mono">LANGUAGE="JavaScript1.2"</span> in the <span class="mono">&lt;SCRIPT&gt;</span> tag, the <span class="mono">toString</span> method returns <span class="mono">[object</span> <span class="mono"><i>type</i></span> <span class="mono">]</span>, as with other JavaScript versions.
+        </li>
+      </ul><br>
+       <a name="1193471" id="1193471"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+       <a name="1193472" id="1193472"></a> <span class="sansserif"><b>Example 1: The location object.</b> The following example prints the string equivalent of the current location.</span> 
+      <p>
+        <a name="1193473" id="1193473"></a> <span class="mono">document.write("location.toString() is " + location.toString() + "&lt;BR&gt;")</span>
+      </p>
+      <p>
+        <a name="1193474" id="1193474"></a> <span class="sansserif">The output is as follows:</span>
+      </p>
+      <p>
+        <a name="1195036" id="1195036"></a> <span class="mono">location.toString() is file:///C|/TEMP/myprog.htmll</span>
+      </p>
+      <p>
+        <a name="1195040" id="1195040"></a> <span class="sansserif"><b>Example 2: Object with no string value.</b> Assume you have an <span class="mono">Image</span> object named <span class="mono">sealife</span> defined as follows:</span>
+      </p>
+      <p>
+        <a name="1193480" id="1193480"></a> <span class="mono">&lt;IMG NAME="sealife" SRC="images\seaotter.gif" ALIGN="left" VSPACE="10"&gt;</span>
+      </p>
+      <p>
+        <a name="1193484" id="1193484"></a> <span class="sansserif">Because the <span class="mono">Image</span> object itself has no special <span class="mono">toString</span> method, <span class="mono">sealife.toString()</span> returns the following:</span>
+      </p>
+      <p>
+        <a name="1193485" id="1193485"></a> <span class="mono">[object Image]</span>
+      </p>
+      <p>
+        <a name="1193486" id="1193486"></a> <span class="sansserif"><b>Example 3: The radix parameter.</b> The following example prints the string equivalents of the numbers 0 through 9 in decimal and binary.</span>
+      </p>
+      <p>
+        <a name="1193487" id="1193487"></a> <span class="mono">for (x = 0; x &lt; 10; x++) {<br>
+         &nbsp;&nbsp;&nbsp;document.write("Decimal: ", x.toString(10), " Binary: ",<br>
+         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;x.toString(2), "&lt;BR&gt;")<br>
+         }</span>
+      </p>
+      <p>
+        <a name="1193488" id="1193488"></a> <span class="sansserif">The preceding example produces the following output:</span>
+      </p>
+      <p>
+        <a name="1193489" id="1193489"></a> <span class="mono">Decimal: 0 Binary: 0<br>
+         Decimal: 1 Binary: 1<br>
+         Decimal: 2 Binary: 10<br>
+         Decimal: 3 Binary: 11<br>
+         Decimal: 4 Binary: 100<br>
+         Decimal: 5 Binary: 101<br>
+         Decimal: 6 Binary: 110<br>
+         Decimal: 7 Binary: 111<br>
+         Decimal: 8 Binary: 1000<br>
+         Decimal: 9 Binary: 1001</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193490" id="1193490"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1193497" id="1193497"></a> <span class="sansserif"><a href="object.html#1193320">Object.toSource</a>, <a href="object.html#1193540">Object.valueOf</a></span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1193499" id="1193499"></a> <a name="unwatch" id="unwatch"></a> <span class="sansserif"><b>unwatch</b></span>
+      </p>
+      <p>
+        <a name="1193516" id="1193516"></a> <span class="sansserif">Removes a watchpoint set with the <a href="object.html#1193628">watch</a> method.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193506" id="1193506"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193511" id="1193511"></a> <span class="sansserif"><a href="object.html#1193136">Object</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193513" id="1193513"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193515" id="1193515"></a> <span class="sansserif">JavaScript 1.2, NES 3.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193517" id="1193517"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1193518" id="1193518"></a> <span class="mono">unwatch(<i>prop</i>)</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193519" id="1193519"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1193525" id="1193525"></a> <span class="sansserif"><br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193522" id="1193522"></a> <span class="sansserif"><span class="mono">prop</span></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193524" id="1193524"></a> <span class="sansserif">The name of a property of the object.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193526" id="1193526"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1193527" id="1193527"></a> <span class="sansserif">The JavaScript debugger has functionality similar to that provided by this method, as well as other debugging options. For information on the debugger, see <i><a href="/devedge-srce/viewsource/2002/venkman/01/">Venkman, the new JavaScript Debugger for Netscape 7.x</a></i>.</span>
+      </p>
+      <p>
+        <a name="1200644" id="1200644"></a> <span class="sansserif">By default, this method is inherited by every object descended from <span class="mono">Object</span>.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193533" id="1193533"></a> <a name="Example" id="Example"></a> <span class="sansserif"><b>Example</b></span><br>
+         <a name="1193537" id="1193537"></a> <span class="sansserif">See <a href="object.html#1193628">watch</a>.</span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1193540" id="1193540"></a> <a name="valueOf" id="valueOf"></a> <span class="sansserif"><b>valueOf</b></span>
+      </p>
+      <p>
+        <a name="1193553" id="1193553"></a> <span class="sansserif">Returns the primitive value of the specified object.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193543" id="1193543"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193548" id="1193548"></a> <span class="sansserif"><a href="object.html#1193136">Object</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193550" id="1193550"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193552" id="1193552"></a> <span class="sansserif">JavaScript 1.1</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1196506" id="1196506"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1196508" id="1196508"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193554" id="1193554"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1193555" id="1193555"></a> <span class="mono">valueOf()</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193556" id="1193556"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1193557" id="1193557"></a> <span class="sansserif">None</span>
+      </p>
+      <p>
+        <br>
+         <a name="1200569" id="1200569"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1204828" id="1204828"></a> <span class="sansserif">JavaScript calls the <span class="mono">valueOf</span> method to convert an object to a primitive value. You rarely need to invoke the <span class="mono">valueOf</span> method yourself; JavaScript automatically invokes it when encountering an object where a primitive value is expected.</span>
+      </p>
+      <p>
+        <a name="1198170" id="1198170"></a> <span class="sansserif">By default, the <span class="mono">valueOf</span> method is inherited by every object descended from <span class="mono">Object</span>. Every built-in core object overrides this method to return an appropriate value. If an object has no primitive value, <span class="mono">valueOf</span> returns the object itself, which is displayed as:</span>
+      </p>
+      <p>
+        <a name="1198203" id="1198203"></a> <span class="mono">[object Object]</span>
+      </p>
+      <p>
+        <a name="1198132" id="1198132"></a> <span class="sansserif">You can use <span class="mono">valueOf</span> within your own code to convert a built-in object into a primitive value. When you create a custom object, you can override <a href="object.html#1193540">Object.valueOf</a> to call a custom method instead of the default <span class="mono">Object</span> method.</span>
+      </p>
+      <p>
+        <a name="1193605" id="1193605"></a> <span class="sansserif"><b>Overriding valueOf for custom objects.</b></span> <a name="1198049" id="1198049"></a> <span class="sansserif">You can create a function to be called in place of the default <span class="mono">valueOf</span> method. Your function must take no arguments.</span>
+      </p>
+      <p>
+        <a name="1193606" id="1193606"></a> <span class="sansserif">Suppose you have an object type <span class="mono">myNumberType</span> and you want to create a <span class="mono">valueOf</span> method for it. The following code assigns a user-defined function to the object's <span class="mono">valueOf</span> method:</span>
+      </p>
+      <p>
+        <a name="1193607" id="1193607"></a> <span class="mono">myNumberType.prototype.valueOf = new Function(functionText)</span>
+      </p>
+      <p>
+        <a name="1193608" id="1193608"></a> <span class="sansserif">With the preceding code in place, any time an object of type <span class="mono">myNumberType</span> is used in a context where it is to be represented as a primitive value, JavaScript automatically calls the function defined in the preceding code.</span>
+      </p>
+      <p>
+        <a name="1193609" id="1193609"></a> <span class="sansserif">An object's <span class="mono">valueOf</span> method is usually invoked by JavaScript, but you can invoke it yourself as follows:</span>
+      </p>
+      <p>
+        <a name="1193610" id="1193610"></a> <span class="mono">myNumber.valueOf()</span>
+      </p>
+      <p>
+        <a name="1193611" id="1193611"></a> <span class="sansserif"><b>
+         Note</b></span> <a name="1193615" id="1193615"></a> <span class="sansserif">Objects in string contexts convert via the <a href="object.html#1193350">toString</a> method, which is different from <span class="mono">String</span> objects converting to string primitives using <span class="mono">valueOf</span>. All string objects have a string conversion, if only <span class="mono">"[object</span> <span class="mono"><i>type</i></span> <span class="mono">]"</span>. But many objects do not convert to number, boolean, or function.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193619" id="1193619"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1193626" id="1193626"></a> <span class="sansserif"><a href="toplev.html#1064173">parseInt</a>, <a href="object.html#1193350">Object.toString</a></span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1193628" id="1193628"></a> <a name="watch" id="watch"></a> <span class="sansserif"><b>watch</b></span>
+      </p>
+      <p>
+        <a name="1193630" id="1193630"></a> <span class="sansserif">Watches for a property to be assigned a value and runs a function when that occurs.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193633" id="1193633"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193638" id="1193638"></a> <span class="sansserif"><a href="object.html#1193136">Object</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193640" id="1193640"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193642" id="1193642"></a> <span class="sansserif">JavaScript 1.2, NES 3.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193643" id="1193643"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1193644" id="1193644"></a> <span class="mono">watch(<i>prop</i>, <i>handler</i>)</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193645" id="1193645"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1193655" id="1193655"></a> <span class="sansserif"><span class="mono"><br></span></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193648" id="1193648"></a> <span class="sansserif"><span class="mono">prop</span></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193650" id="1193650"></a> <span class="sansserif">The name of a property of the object.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193652" id="1193652"></a> <span class="sansserif"><span class="mono">handler</span></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193654" id="1193654"></a> <span class="sansserif">A function to call.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193656" id="1193656"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1193657" id="1193657"></a> <span class="sansserif">Watches for assignment to a property named <span class="mono">prop</span> in this object, calling <span class="mono">handler(prop, oldval, newval)</span> whenever <span class="mono">prop</span> is set and storing the return value in that property. A watchpoint can filter (or nullify) the value assignment, by returning a modified <span class="mono">newval</span> (or <span class="mono">oldval</span>).</span>
+      </p>
+      <p>
+        <a name="1193658" id="1193658"></a> <span class="sansserif">If you delete a property for which a watchpoint has been set, that watchpoint does not disappear. If you later recreate the property, the watchpoint is still in effect.</span>
+      </p>
+      <p>
+        <a name="1200696" id="1200696"></a> <span class="sansserif">To remove a watchpoint, use the <a href="object.html#1193499">unwatch</a> method. By default, the <span class="mono">watch</span> method is inherited by every object descended from <span class="mono">Object</span>.</span>
+      </p>
+      <p>
+        <a name="1193663" id="1193663"></a> <span class="sansserif">The JavaScript debugger has functionality similar to that provided by this method, as well as other debugging options. For information on the debugger, see <i><a href="/devedge-srce/viewsource/2002/venkman/01/">Venkman, the new JavaScript Debugger for Netscape 7.x</a></i>.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193669" id="1193669"></a> <a name="Example" id="Example"></a> <span class="sansserif"><b>Example</b></span><br>
+         <a name="1193670" id="1193670"></a> <span class="mono">&lt;script language="JavaScript1.2"&gt;<br>
+         o = {p:1}<br>
+         o.watch("p",<br>
+         &nbsp;&nbsp;&nbsp;function (id,oldval,newval) {<br>
+         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;document.writeln("o." + id + " changed from "<br>
+         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+ oldval + " to " + newval)<br>
+         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return newval<br>
+         &nbsp;&nbsp;&nbsp;})</span>
+      </p>
+      <p>
+        <a name="1193671" id="1193671"></a> <span class="mono">o.p = 2<br>
+         o.p = 3<br>
+         delete o.p<br>
+         o.p = 4</span>
+      </p>
+      <p>
+        <a name="1193672" id="1193672"></a> <span class="mono">o.unwatch('p')<br>
+         o.p = 5</span>
+      </p>
+      <p>
+        <a name="1193673" id="1193673"></a> <span class="mono">&lt;/script&gt;</span>
+      </p>
+      <p>
+        <a name="1193674" id="1193674"></a> <span class="sansserif">This script displays the following:</span>
+      </p>
+      <p>
+        <a name="1193675" id="1193675"></a> <span class="sansserif">o.p changed from 1 to 2<br>
+         o.p changed from 2 to 3<br>
+         o.p changed from 3 to 4</span>
+      </p>
+    </blockquote>
+    <blockquote>
+      <br>
+       <b><a class="sansserifPurple" href="number.html">Previous</a></b>&nbsp;&nbsp;&nbsp;&nbsp; <a href="contents.html"><b class="sansserifPurple">Contents</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="ix.html"><b class="sansserifPurple">Index</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="packages.html"><b class="sansserifPurple">Next</b></a> &nbsp;&nbsp;&nbsp;&nbsp; 
+      <hr noshade="noshade" size="1">
+      <span class="sansserif">Copyright &copy; 2000 <a href="http://www.netscape.com">Netscape Communications Corp.</a> All rights reserved.</span>
+    </blockquote>
+    <p class="alignright">
+      <span class="sansserif">Last Updated <b>September 28, 2000</b></span>
+    </p>
+  </body>
+</html>

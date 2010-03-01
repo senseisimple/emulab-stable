@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml"
+	verticalGap="0" paddingTop="0" paddingRight="0" paddingLeft="0" paddingBottom="0" horizontalGap="0"
+	creationComplete="main = Common.Main()" xmlns:pgmap="pgmap.*">
+
+	<mx:Script>
+		<![CDATA[
+			import mx.controls.Button;
+			import mx.controls.Label;
+			import mx.controls.Alert;
+			import mx.controls.Spacer;
+			import mx.containers.HBox;
+			import mx.collections.ArrayCollection;
+			import mx.managers.PopUpManager;
+			
+			[Bindable]
+			public var cm:ComponentManager = null;
+			
+			public var main:pgmap = null;
+			
+			public function load(n:ComponentManager):void {
+				cm = n;
+				messageButton.visible = cm.Message.length > 0;
+				messageButton.includeInLayout = cm.Message.length > 0;
+				
+				
+			}
+			
+			public function viewRspec():void {
+				PopUpManager.addPopUp(main.rspecView, main, false);
+	       		PopUpManager.centerPopUp(main.rspecView);
+	       		main.rspecView.title = "Advertisement RSPEC from " + cm.Hrn;
+	       		main.rspecView.loadXml(cm.Rspec);
+			}
+			
+			public function viewMessage():void {
+				Alert.show(cm.Message);
+			}
+			
+			public function openDot():void
+			{
+				var cw:ConsoleWindow = new ConsoleWindow();
+				PopUpManager.addPopUp(cw, main, false);
+	       		PopUpManager.centerPopUp(cw);
+				cw.title = "dot format from " + cm.Hrn;
+				cw.txt.text = cm.getDotGraph();
+			}
+		]]>
+	</mx:Script>
+
+	<mx:Grid width="100%" height="100%" verticalGap="2" horizontalGap="2">
+				<mx:GridRow width="100%">
+					<mx:GridItem width="30">
+						
+					</mx:GridItem>
+					<mx:GridItem width="100%">
+						<mx:Label text="{cm.Hrn}" fontSize="17" fontWeight="bold" width="100%"/>
+						<pgmap:ImageButton id="rpsecButton"
+							source="@Embed('../images/page_white_code.png')"
+							click="viewRspec()"
+							toolTip="View Advertisement RSPEC" />
+						<pgmap:ImageButton id="dotButton"
+							source="@Embed('../images/chart_organisation.png')"
+							click="openDot()"
+							toolTip="View the DOT graph data" />
+						<pgmap:ImageButton id="messageButton"
+							source="@Embed('../images/flag_red.png')"
+							click="viewMessage()"
+							toolTip="View Message" />
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%">
+					<mx:GridItem>
+						<mx:Label text="URL" fontWeight="bold"/>
+					</mx:GridItem>
+					<mx:GridItem width="100%">
+						<mx:Label text="{cm.Url}"/>
+					</mx:GridItem>
+				</mx:GridRow>
+			</mx:Grid>
+</mx:VBox>

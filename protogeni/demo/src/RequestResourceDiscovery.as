@@ -39,7 +39,7 @@ package
         opType = Geni.discoverResourcesv2;
       }
       op.reset(opType);
-      op.addField("credential", credential.slice);
+      op.addField("credentials", new Array(credential.slice));
       op.setUrl(cm.getUrl());
       return op;
     }

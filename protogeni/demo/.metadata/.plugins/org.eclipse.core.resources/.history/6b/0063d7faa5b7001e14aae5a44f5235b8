@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml"
+	verticalGap="0" paddingTop="0" paddingRight="0" paddingLeft="0" paddingBottom="0" horizontalGap="0">
+
+	<mx:Script>
+		<![CDATA[
+			
+			[Bindable]
+			public var node:Node = null;
+			
+			public var load(n:Node):void {
+				
+			}
+		]]>
+	</mx:Script>
+
+	<mx:Grid width="100%" height="100%" verticalGap="2" horizontalGap="2">
+				<mx:GridRow width="100%">
+					<mx:GridItem rowSpan="2">
+						<mx:Button label="RSPEC" width="100%" height="100%" click="viewRspec()"/>
+					</mx:GridItem>
+					<mx:GridItem width="100%">
+						<mx:Label text="{node.name}" fontSize="17" fontWeight="bold"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%">
+					<mx:GridItem width="100%">
+						<mx:Label text="Exclusive" fontWeight="bold"/>
+						<mx:Image id="imgExclusive"/>
+						<mx:VRule height="16"/>
+						<mx:Label text="Availability" fontWeight="bold"/>
+						<mx:Image id="imgAvailable"/>
+						<mx:VRule height="16"/>
+						<mx:Label text="Status" fontWeight="bold"/>
+						<mx:Label text="{node.status}" fontWeight="normal"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%">
+					<mx:GridItem>
+						<mx:Label text="UUID" fontWeight="bold"/>
+					</mx:GridItem>
+					<mx:GridItem width="100%">
+						<mx:Label text="{node.uuid}"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%">
+					<mx:GridItem>
+						<mx:Label text="Manager" fontWeight="bold"/>
+					</mx:GridItem>
+					<mx:GridItem width="100%">
+						<mx:Label text="{node.manager}"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%" height="86">
+					<mx:GridItem>
+						<mx:Label text="Types" fontWeight="bold"/>
+					</mx:GridItem>
+					<mx:GridItem width="100%">
+						<mx:DataGrid width="100%" height="100%" id="gridTypes" dataProvider="{node.types}">
+							<mx:columns>
+								<mx:DataGridColumn headerText="Name" dataField="name"/>
+								<mx:DataGridColumn headerText="Slots" dataField="slots"/>
+								<mx:DataGridColumn headerText="Static" dataField="isStatic"/>
+							</mx:columns>
+						</mx:DataGrid>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%" height="100%">
+					<mx:GridItem>
+					<mx:VBox horizontalAlign="right">
+						<mx:Label text="Links to" fontWeight="bold"/>
+						<mx:HRule width="32"/>
+						<mx:Label text="View all" fontWeight="normal"/>
+						<mx:Button label="Links" click="viewLinks();" width="100%"/>
+						<mx:Button label="Nodes" click="viewNodes();" width="100%"/>
+					</mx:VBox>
+					</mx:GridItem>
+					<mx:GridItem width="100%">
+						<mx:TabNavigator width="100%" height="100%" paddingTop="2" paddingRight="2" paddingLeft="2" paddingBottom="2">
+								<mx:VBox label="Endpoint" width="100%" height="100%" id="linksEndpointVbox">
+								</mx:VBox>
+								<mx:VBox label="Startpoint" width="100%" height="100%" id="linksStartpointVbox">
+								</mx:VBox>
+							</mx:TabNavigator>
+					</mx:GridItem>
+				</mx:GridRow>
+			</mx:Grid>
+</mx:VBox>

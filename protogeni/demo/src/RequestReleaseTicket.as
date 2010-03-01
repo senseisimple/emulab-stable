@@ -1,4 +1,4 @@
-/* GENIPUBLIC-COPYRIGHT
+﻿/* GENIPUBLIC-COPYRIGHT
  * Copyright (c) 2009 University of Utah and the Flux Group.
  * All rights reserved.
  *
@@ -16,10 +16,12 @@ package
 {
   class RequestReleaseTicket extends Request
   {
-    public function RequestReleaseTicket(newManager : ComponentManager) : void
+    public function RequestReleaseTicket(newManager : ComponentManager,
+										 newSliceUrn) : void
     {
       super(newManager.getName());
       manager = newManager;
+	  sliceUrn = newSliceUrn;
     }
 
     override public function cleanup() : void
@@ -31,7 +33,8 @@ package
     {
       opName = "Release Ticket";
       op.reset(Geni.releaseTicket);
-      op.addField("credential", credential.slice);
+      op.addField("slice_urn", sliceUrn);
+      op.addField("credentials", new Array(credential.slice));
       op.addField("ticket", manager.getTicket());
       op.setUrl(manager.getUrl());
       return op;
@@ -48,5 +51,6 @@ package
     }
 
     var manager : ComponentManager;
+	var sliceUrn : String;
   }
 }

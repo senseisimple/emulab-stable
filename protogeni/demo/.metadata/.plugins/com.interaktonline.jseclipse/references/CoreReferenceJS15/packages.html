@@ -1,0 +1,420 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html>
+  <head>
+    <meta content="HTML Tidy for Cygwin (vers 1st February 2003), see www.w3.org" name="generator">
+    <meta name="keywords" content="electronic commerce, ecommerce, ebusiness, e-business, e-commerce, enterprise software, net economy, Netscape, Sun Microsystems, DevEdge Archive, iPlanet, internet software">
+    <meta name="description" content="The DevEdge Archive, a strategic alliance formed by America Online and Sun Microsystems, Inc., is delivering iPlanet e-commerce software and enterprise solutions that enable companies to compete successfully in the Net Economy">
+    <meta http-equiv="Content-Type" content="text/html; charset=us-ascii">
+    <meta name="TEMPLATEBASE" content="Authored in FrameMaker. Converted to HTML in WebWorks Publisher 2000. manual wdt 1.5">
+    <meta name="LASTUPDATED" content="09/28/00 13:15:52">
+    <title>
+      Core JavaScript Reference 1.5:
+    </title>
+    <link rel="stylesheet" type="text/css" href="js15ref.css">
+  </head>
+  <body>
+    <table width="100%" border="0" cellspacing="4">
+      <tr>
+        <td valign="top">
+          <b><a class="sansserifPurple" href="object.html">Previous</a></b>&nbsp;&nbsp;&nbsp;&nbsp; <a href="contents.html"><b class="sansserifPurple">Contents</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="ix.html"><b class="sansserifPurple">Index</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="regexp.html"><b class="sansserifPurple">Next</b></a> &nbsp;&nbsp;&nbsp;&nbsp;
+        </td>
+      </tr>
+      <tr>
+        <td class="sansserifBlack" valign="top" align="right" bgcolor="#CCCCCC">
+          <b>Core JavaScript Reference 1.5</b>
+        </td>
+      </tr>
+    </table><br>
+     
+    <blockquote>
+      <br>
+      <br>
+      <br>
+      <br>
+       
+      <p>
+        <a name="1193137" id="1193137"></a> <a name="Packages" id="Packages"></a> <span class="sansserif"><b>Packages</b></span>
+      </p>
+      <p>
+        <a name="1193151" id="1193151"></a> <span class="sansserif">A top-level object used to access Java classes from within JavaScript code.<br></span>
+      </p><br>
+       
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193140" id="1193140"></a> <span class="sansserif"><i>Core object</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193142" id="1193142"></a> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193144" id="1193144"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193146" id="1193146"></a> <span class="sansserif">JavaScript 1.1, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193152" id="1193152"></a> <a name="Created by" id="Created by"></a> <span class="sansserif"><b>Created by</b></span><br>
+         <a name="1193153" id="1193153"></a> <span class="sansserif">The <span class="mono">Packages</span> object is a top-level, predefined JavaScript object. You can automatically access it without using a constructor or calling a method.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193162" id="1193162"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1193168" id="1193168"></a> <span class="sansserif">The <span class="mono">Packages</span> object lets you access the public methods and fields of an arbitrary Java class from within JavaScript. The <span class="mono">java</span>, <span class="mono">netscape</span>, and <span class="mono">sun</span> properties represent the packages java.*, netscape.*, and sun.* respectively. Use standard Java dot notation to access the classes, methods, and fields in these packages. For example, you can access a constructor of the <span class="mono">Frame</span> class as follows:</span>
+      </p>
+      <p>
+        <a name="1195024" id="1195024"></a><span class="mono">var theFrame = new Packages.java.awt.Frame();</span>
+      </p>
+      <p>
+        <a name="1195010" id="1195010"></a> <span class="sansserif">For convenience, JavaScript provides the top-level <span class="mono">netscape</span>, <span class="mono">sun</span>, and <span class="mono">java</span> objects that are synonyms for the <span class="mono">Packages</span> properties with the same names. Consequently, you can access Java classes in these packages without the Packages keyword, as follows:</span>
+      </p>
+      <p>
+        <a name="1195072" id="1195072"></a><span class="mono">var theFrame = new java.awt.Frame();</span>
+      </p>
+      <p>
+        <a name="1195041" id="1195041"></a> <span class="sansserif">The <span class="mono">className</span> property represents the fully qualified path name of any other Java class that is available to JavaScript. You must use the <span class="mono">Packages</span> object to access classes outside the <span class="mono">netscape</span>, <span class="mono">sun</span>, and <span class="mono">java</span> packages.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193174" id="1193174"></a> <a name="Property Summary" id="Property Summary"></a> <span class="sansserif"><b>Property Summary</b></span><br>
+         <a name="1193187" id="1193187"></a> <span class="sansserif"><br></span>
+      </p><br>
+       
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr bgcolor="#CCCCCC" align="left" valign="top">
+          <th valign="top" align="left">
+            <a name="1193177" id="1193177"></a> 
+            <p class="alignleft">
+              <span class="sansserif"><b>Property</b></span>
+            </p>
+          </th>
+          <th valign="top" align="left">
+            <a name="1193179" id="1193179"></a> 
+            <p class="alignleft">
+              <span class="sansserif"><b>Description</b></span>
+            </p>
+          </th>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1194662" id="1194662"></a> <span class="mono"><a href="packages.html#1194741">className</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1194664" id="1194664"></a> <span class="sansserif">The fully qualified name of a Java class in a package other than netscape, java, or sun that is available to JavaScript.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1194642" id="1194642"></a> <span class="mono"><a href="packages.html#1194831">java</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1194644" id="1194644"></a> <span class="sansserif">Any class in the Java package java.*.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1194650" id="1194650"></a> <span class="mono"><a href="packages.html#1194854">netscape</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1194652" id="1194652"></a> <span class="sansserif">Any class in the Java package netscape.*.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193184" id="1193184"></a> <span class="mono"><a href="packages.html#1194880">sun</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193186" id="1193186"></a> <span class="sansserif">Any class in the Java package sun.*.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193209" id="1193209"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1194739" id="1194739"></a><span class="mono">The following JavaScript function creates a Java dialog box:</span>
+      </p>
+      <p>
+        <a name="1195233" id="1195233"></a> <span class="mono">function createWindow() {<br>
+         &nbsp;&nbsp;&nbsp;var theOwner = new Packages.java.awt.Frame();<br>
+         &nbsp;&nbsp;&nbsp;var theWindow = new Packages.java.awt.Dialog(theOwner);<br>
+         &nbsp;&nbsp;&nbsp;theWindow.setSize(350,200);<br>
+         &nbsp;&nbsp;&nbsp;theWindow.setTitle("Hello, World");<br>
+         &nbsp;&nbsp;&nbsp;theWindow.setVisible(true);<br>
+         }</span>
+      </p>
+      <p>
+        <a name="1195227" id="1195227"></a> <span class="sansserif">In the previous example, the function instantiates <span class="mono">theWindow</span> as a new <span class="mono">Packages</span> object. The <span class="mono">setSize</span>, <span class="mono">setTitle</span>, and <span class="mono">setVisible</span> methods are all available to JavaScript as public methods of <span class="mono">java.awt.Dialog</span>.</span>
+      </p>
+      <p>
+        <a name="1194741" id="1194741"></a> <a name="className" id="className"></a> <span class="sansserif"><b>className</b></span>
+      </p>
+      <p>
+        <a name="1195314" id="1195314"></a> <span class="sansserif">The fully qualified name of a Java class in a package other than <span class="mono">netscape</span>, <span class="mono">java</span>, or <span class="mono">sun</span> that is available to JavaScript.<br></span>
+      </p><br>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1194748" id="1194748"></a> <span class="sansserif"><i>Property of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1194753" id="1194753"></a> <span class="sansserif"><a href="packages.html#1193137">Packages</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1194755" id="1194755"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1194757" id="1194757"></a> <span class="sansserif">JavaScript 1.1, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1195384" id="1195384"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1195385" id="1195385"></a> <span class="mono">Packages.<i>className</i></span>
+      </p>
+      <p>
+        <a name="1197207" id="1197207"></a> <span class="sansserif">where <span class="mono"><i>classname</i></span> is the fully qualified name of a Java class.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1195394" id="1195394"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1195361" id="1195361"></a> <span class="sansserif">You must use the <span class="mono"><i>className</i></span> property of the <span class="mono">Packages</span> object to access classes outside the <span class="mono">netscape</span>, <span class="mono">sun</span>, and <span class="mono">java</span> packages.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1195349" id="1195349"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1195367" id="1195367"></a> <span class="sansserif">The following code accesses the constructor of the <span class="mono">CorbaObject</span> class in the <span class="mono">myCompany</span> package from JavaScript:</span>
+      </p>
+      <p>
+        <a name="1195368" id="1195368"></a><span class="mono">var theObject = new Packages.myCompany.CorbaObject()</span>
+      </p>
+      <p>
+        <a name="1195468" id="1195468"></a> <span class="sansserif">In the previous example, the value of the <span class="mono"><i>className</i></span> property is <span class="mono">myCompany.CorbaObject,</span> the fully qualified path name of the <span class="mono">CorbaObject</span> class.</span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1194831" id="1194831"></a> <a name="java" id="java"></a> <span class="sansserif"><b>java</b></span>
+      </p>
+      <p>
+        <a name="1194844" id="1194844"></a> <span class="sansserif">Any class in the Java package <span class="mono">java.*</span>.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1194834" id="1194834"></a> <span class="sansserif"><i>Property of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1194839" id="1194839"></a> <span class="sansserif"><a href="packages.html#1193137">Packages</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1194841" id="1194841"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1194843" id="1194843"></a> <span class="sansserif">JavaScript 1.1, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1195508" id="1195508"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1195509" id="1195509"></a> <span class="mono">Packages.java</span>
+      </p>
+      <p>
+        <br>
+         <a name="1195510" id="1195510"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1195511" id="1195511"></a> <span class="sansserif">Use the <span class="mono">java</span> property to access any class in the <span class="mono">java</span> package from within JavaScript. Note that the top-level object <span class="mono">java</span> is a synonym for <span class="mono">Packages.java</span>.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1195512" id="1195512"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1195562" id="1195562"></a><span class="mono">The following code accesses the constructor of the <span class="mono">java.awt.Frame</span> class:</span>
+      </p>
+      <p>
+        <a name="1195563" id="1195563"></a><span class="mono">var theOwner = new Packages.java.awt.Frame();</span>
+      </p>
+      <p>
+        <a name="1195595" id="1195595"></a> <span class="sansserif">You can simplify this code by using the top-level java object to access the constructor as follows:</span>
+      </p>
+      <p>
+        <a name="1195604" id="1195604"></a><span class="mono">var theOwner = new java.awt.Frame();</span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1194854" id="1194854"></a> <a name="netscape" id="netscape"></a> <span class="sansserif"><b>netscape</b></span>
+      </p>
+      <p>
+        <a name="1194867" id="1194867"></a> <span class="sansserif">Any class in the Java package <span class="mono">netscape.*</span>.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1194857" id="1194857"></a> <span class="sansserif"><i>Property of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1194862" id="1194862"></a> <span class="sansserif"><a href="packages.html#1193137">Packages</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1194864" id="1194864"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1194866" id="1194866"></a> <span class="sansserif">JavaScript 1.1, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1195616" id="1195616"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1195617" id="1195617"></a> <span class="mono">Packages.netscape</span>
+      </p>
+      <p>
+        <br>
+         <a name="1195618" id="1195618"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1195619" id="1195619"></a> <span class="sansserif">Use the <span class="mono">netscape</span> property to access any class in the <span class="mono">netscape</span> package from within JavaScript. Note that the top-level object <span class="mono">netscape</span> is a synonym for <span class="mono">Packages.netscape</span>.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1195620" id="1195620"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1195621" id="1195621"></a><span class="mono">See the example for <a href="packages.html#1194831">.</a><a href="packages.html#1194831">Packages.java</a></span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1194880" id="1194880"></a> <a name="sun" id="sun"></a> <span class="sansserif"><b>sun</b></span>
+      </p>
+      <p>
+        <a name="1194893" id="1194893"></a> <span class="sansserif">Any class in the Java package <span class="mono">sun.*</span>.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1194883" id="1194883"></a> <span class="sansserif"><i>Property of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1194888" id="1194888"></a> <span class="sansserif"><a href="packages.html#1193137">Packages</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1194890" id="1194890"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1194892" id="1194892"></a> <span class="sansserif">JavaScript 1.1, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1195658" id="1195658"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1195659" id="1195659"></a> <span class="mono">Packages.sun</span>
+      </p>
+      <p>
+        <br>
+         <a name="1195660" id="1195660"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1195661" id="1195661"></a> <span class="sansserif">Use the <span class="mono">sun</span> property to access any class in the <span class="mono">sun</span> package from within JavaScript. Note that the top-level object <span class="mono">sun</span> is a synonym for <span class="mono">Packages.sun</span>.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1195662" id="1195662"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1195669" id="1195669"></a><span class="mono">See the example for <a href="packages.html#1194831">Packages.java</a></span>
+      </p>
+    </blockquote>
+    <blockquote>
+      <br>
+       <b><a class="sansserifPurple" href="object.html">Previous</a></b>&nbsp;&nbsp;&nbsp;&nbsp; <a href="contents.html"><b class="sansserifPurple">Contents</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="ix.html"><b class="sansserifPurple">Index</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="regexp.html"><b class="sansserifPurple">Next</b></a> &nbsp;&nbsp;&nbsp;&nbsp; 
+      <hr noshade="noshade" size="1">
+      <span class="sansserif">Copyright &copy; 2000 <a href="http://www.netscape.com">Netscape Communications Corp.</a> All rights reserved.</span>
+    </blockquote>
+    <p class="alignright">
+      <span class="sansserif">Last Updated <b>September 28, 2000</b></span>
+    </p>
+  </body>
+</html>
