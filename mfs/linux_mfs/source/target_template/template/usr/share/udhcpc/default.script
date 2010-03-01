@@ -53,6 +53,14 @@ case "$1" in
 			echo adding dns $i
 			echo nameserver $i >> $RESOLV_CONF
 		done
+
+		if [ -n "$hostname" ]; then
+			hostname $hostname
+			if [ -x /usr/share/udhcpc/sethostname.dhclient ]; then
+				/usr/share/udhcpc/sethostname.dhclient
+			fi
+		fi
+
 		# XXX For now assume that this is the control net.
 		# The 'true' below should be changed to actually test
 		# whether this actually is the control net.

@@ -466,6 +466,9 @@ sub GetTicket($$$$)
     my $ticket;
     my $response;
 
+    # Always clear for caller.
+    $self->{'last_rpcerror'} = 0;
+
     my $slice = GeniSlice->Lookup($self->slice_idx());
     if (!defined($slice)) {
 	print STDERR "*** AddResources: No slice for $self\n";
@@ -629,6 +632,9 @@ sub RedeemTicket($$)
 {
     my ($self, $user) = @_;
     my $response;
+
+    # Always clear for caller.
+    $self->{'last_rpcerror'} = 0;
 
     my $slice = GeniSlice->Lookup($self->slice_idx());
     if (!defined($slice)) {
@@ -833,6 +839,9 @@ sub Clear($$)
     my ($self, $user) = @_;
     my $response;
 
+    # Always clear for caller.
+    $self->{'last_rpcerror'} = 0;
+
     my $slice = GeniSlice->Lookup($self->slice_idx());
     if (!defined($slice)) {
 	print STDERR "*** ClearResources: No slice for $self\n";
@@ -1030,6 +1039,9 @@ sub Purge($$)
     my ($self, $user) = @_;
     my $response;
 
+    # Always clear for caller.
+    $self->{'last_rpcerror'} = 0;
+
     my $slice = GeniSlice->Lookup($self->slice_idx());
     if (!defined($slice)) {
 	print STDERR "*** ClearResources: No slice for $self\n";
@@ -1154,6 +1166,9 @@ sub StartSliver($$$)
     my ($self, $user, $urn) = @_;
     my $response;
 
+    # Always clear for caller.
+    $self->{'last_rpcerror'} = 0;
+
     #
     # Load sliver credential if we have it.
     #
@@ -1258,6 +1273,9 @@ sub SliverStatus($$$$)
     my ($self, $user, $pref, $urn) = @_;
     my ($response);
 
+    # Always clear for caller.
+    $self->{'last_rpcerror'} = 0;
+
     #
     # Load sliver credential if we have it.
     #
@@ -1357,6 +1375,9 @@ sub Discover($$$)
 {
     my ($self, $user, $pref) = @_;
     my $response;
+
+    # Always clear for caller.
+    $self->{'last_rpcerror'} = 0;
 
     my $slice = GeniSlice->Lookup($self->slice_idx());
     if (!defined($slice)) {
@@ -1540,6 +1561,9 @@ sub RenewResources(@)
 	# No sliver, skip.
 	next
 	    if (! $resource->credential_idx());
+
+	# Always clear for caller.
+	$resource->{'last_rpcerror'} = 0;
 
 	my $slice = GeniSlice->Lookup($resource->slice_idx());
 	if (!defined($slice)) {

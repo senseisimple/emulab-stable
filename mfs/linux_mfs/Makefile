@@ -13,11 +13,12 @@ INITRAMFS	=	$(BOOT_PATH)/initramfs.gz
 #FAKEROOT_BIN	=	$(STAGING_DIR)/usr/bin/fakeroot
 FAKEROOT_BIN	=	fakeroot
 
-MODULES := busybox zlib linux dropbear testbed hdparm target_template sudo e2fsprogs openssl wget perl portmap file
+MODULES := busybox zlib linux dropbear testbed hdparm target_template sudo e2fsprogs openssl wget perl portmap file ethtool
 #MODULES := busybox zlib linux dropbear testbed hdparm target_template sudo e2fsprogs openssl wget portmap file
 INSTALL_MODULES := $(addsuffix -install,$(MODULES))
 EXTRACT_MODULES := $(addsuffix -extract,$(MODULES) toolchain)
 PATCH_MODULES := $(addsuffix -patch,$(MODULES) toolchain)
+CONFIG_MODULES := $(addsuffix -config,$(MODULES) toolchain)
 CLEAN_MODULES := $(addsuffix -clean,$(MODULES) toolchain)
 
 .PHONY: all clean install root-template-install devices \
@@ -53,6 +54,9 @@ $(EXTRACT_MODULES):
 
 $(PATCH_MODULES):
 	$(MAKE) -C $(SOURCE_PATH)/$(subst -patch,,$@) patch
+
+$(CONFIG_MODULES):
+	$(MAKE) -C $(SOURCE_PATH)/$(subst -config,,$@) config
 
 $(INSTALL_MODULES):
 	$(MAKE) -C $(SOURCE_PATH)/$(subst -install,,$@) install
