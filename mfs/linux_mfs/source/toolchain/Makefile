@@ -1,7 +1,6 @@
 include ../../variables.mk
 
 BUILDROOT_CONFIG	=	$(SOURCE_PATH)/buildroot/buildroot.config.$(MFS_ARCH)
-BUILDROOT_VERSION	=	20081211
 
 .PHONY: extract patch config toolchain
 .PHONY: all clean
@@ -36,8 +35,9 @@ $(BUILDROOT_PATH)/.patch-stamp: $(BUILDROOT_PATH)/.extract-stamp
 $(BUILDROOT_PATH)/.config-stamp: $(BUILDROOT_PATH)/.patch-stamp
 	cp $(BUILDROOT_CONFIG) $(BUILDROOT_PATH)/.config
 	$(MAKE) -C $(BUILDROOT_PATH) oldconfig
-	rmdir $(BUILDROOT_PATH)/dl || true
-	ln -s $(TARBALL_PATH) $(BUILDROOT_PATH)/dl
+	mkdir -p $(BUILDROOT_PATH)/output
+	rmdir $(BUILDROOT_PATH)/output/dl || true
+	ln -s $(TARBALL_PATH) $(BUILDROOT_PATH)/output/dl
 	PATH=$(STAGING_DIR)/usr/bin:$(PATH) $(MAKE) -C $(BUILDROOT_PATH) oldconfig
 	touch $@
 
