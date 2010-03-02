@@ -19,25 +19,25 @@ if [ ! -d "${patchdir}" ] ; then
     echo "Aborting.  '${patchdir}' is not a directory."
     exit 1
 fi
-    
-for i in `cd ${patchdir}; ls -d ${patchpattern} 2> /dev/null` ; do 
+
+for i in `cd ${patchdir}; ls -d ${patchpattern} 2> /dev/null` ; do
     case "$i" in
 	*.gz)
-	type="gzip"; uncomp="gunzip -dc"; ;; 
+	type="gzip"; uncomp="gunzip -dc"; ;;
 	*.bz)
-	type="bzip"; uncomp="bunzip -dc"; ;; 
+	type="bzip"; uncomp="bunzip -dc"; ;;
 	*.bz2)
-	type="bzip2"; uncomp="bunzip2 -dc"; ;; 
+	type="bzip2"; uncomp="bunzip2 -dc"; ;;
 	*.zip)
-	type="zip"; uncomp="unzip -d"; ;; 
+	type="zip"; uncomp="unzip -d"; ;;
 	*.Z)
-	type="compress"; uncomp="uncompress -c"; ;; 
+	type="compress"; uncomp="uncompress -c"; ;;
 	*)
-	type="plaintext"; uncomp="cat"; ;; 
+	type="plaintext"; uncomp="cat"; ;;
     esac
     echo ""
-    echo "Applying ${i} using ${type}: " 
-    ${uncomp} ${patchdir}/${i} | patch -p1 -E -d ${targetdir} 
+    echo "Applying ${i} using ${type}: "
+    ${uncomp} ${patchdir}/${i} | patch -p1 -E -d ${targetdir}
     if [ $? != 0 ] ; then
         echo "Patch failed!  Please fix $i!"
 	exit 1
@@ -51,4 +51,4 @@ if [ "`find $targetdir/ '(' -name '*.rej' -o -name '.*.rej' ')' -print`" ] ; the
 fi
 
 # Remove backup files
-find $targetdir/ '(' -name '*.orig' -o -name '.*.orig' ')' -exec rm -f {} \;
+find $targetdir/ -type f '(' -name '*.orig' -o -name '.*.orig' ')' -exec rm -f {} \;
