@@ -9,7 +9,8 @@ BUILDROOT_PATH		=	$(PWD)/buildroot-$(BUILDROOT_VERSION)
 FAKEROOT_ENVIRONMENT	=	$(PWD)/fs_fakeroot.env
 STAGING_DIR	=	$(PWD)/buildroot/build_$(MFS_ARCH)/staging_dir
 BOOT_PATH	=	$(PWD)/boot
-INITRAMFS	=	$(BOOT_PATH)/initramfs.gz
+INITRAMFS_COMPRESSION	=	lzma
+INITRAMFS	=	$(BOOT_PATH)/initramfs
 
 #FAKEROOT_BIN	=	$(STAGING_DIR)/usr/bin/fakeroot
 FAKEROOT_BIN	=	fakeroot
@@ -92,6 +93,6 @@ initramfs: install
 		-i $(FAKEROOT_ENVIRONMENT) \
 		$(SCRIPTS_PATH)/misc_fixup.sh $(TARGET_PATH)
 	$(FAKEROOT_BIN) -i $(FAKEROOT_ENVIRONMENT) \
-		$(SCRIPTS_PATH)/gen_initramfs.sh $(INITRAMFS_PATH) $(INITRAMFS)
+		$(SCRIPTS_PATH)/gen_initramfs.sh -c $(INITRAMFS_COMPRESSION) $(INITRAMFS_PATH) $(INITRAMFS)
 	rm -f $(FAKEROOT_ENVIRONMENT)
 	rm -rf $(INITRAMFS_PATH)
