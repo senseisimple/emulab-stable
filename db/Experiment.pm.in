@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005-2009 University of Utah and the Flux Group.
+# Copyright (c) 2005-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package Experiment;
@@ -324,6 +324,8 @@ sub security_level($)   { return field($_[0], 'security_level');}
 sub linktest_pid($)     { return field($_[0], 'linktest_pid');}
 sub linktest_level($)   { return field($_[0], 'linktest_level');}
 sub logfile($)          { return field($_[0], 'logfile');}
+sub eventkey($)         { return field($_[0], 'eventkey');}
+sub keyhash($)          { return field($_[0], 'keyhash');}
 sub paniced($)          { return field($_[0], 'paniced');}
 sub cpu_usage($)        { return field($_[0], 'cpu_usage');}
 sub encap_style($)      { return field($_[0], 'encap_style');}

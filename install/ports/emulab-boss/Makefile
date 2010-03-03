@@ -1,13 +1,17 @@
 # New ports collection makefile for: emulab-boss
 # Date created:         28 January 2003
 # Whom:                 ricci@cs.utah.edu
+# Updated:              1 October 2009 jwalsh@atl.lmco.com
 
 # Need the major version number to figure out to do.
 OSMAJOR!= /usr/bin/uname -r | /usr/bin/sed -e 's/\..*//'
 OSMINOR!= /usr/bin/uname -r | /usr/bin/sed -e 's/[0-9][0-9]*\.\([0-9][0-9]*\).*/\1/'
 
 PORTNAME=	emulab-boss
-.if ${OSMAJOR} >= 6
+.if ${OSMAJOR} > 6
+PORTVERSION=	3.0
+.else
+.if ${OSMAJOR} > 5
 .if ${OSMINOR} >= 3
 PORTVERSION=	2.1
 .else
@@ -16,13 +20,14 @@ PORTVERSION=	2.0
 .else
 PORTVERSION=	1.7
 .endif
+.endif
 CATEGORIES=	misc
 MASTER_SITES=	#none
 DISTFILES=	#none
 EXTRACT_ONLY=	#none
-COMMENT=	"Meta-port for an emulab boss node"
+COMMENT=	"Meta-port for an Emulab boss node"
 
-MAINTAINER=	ricci@cs.utah.edu
+MAINTAINER=	testbed-ops@flux.utah.edu
 
 #
 # We set this so that the mysql server port doesn't do name resolution
@@ -33,6 +38,9 @@ MAINTAINER=	ricci@cs.utah.edu
 # We must make sure PERL is built with this.
 #
 .MAKEFLAGS+=	ENABLE_SUIDPERL=yes
+.if ${PORTVERSION} == "3.0"
+.MAKEFLAGS+=	PERL_VERSION=5.10.0 PERL_VER=5.10.0 PERL_ARCH=mach
+.endif
 
 #
 # For SWIG, so that it doesn't feel the need to suck in php and apache
@@ -50,6 +58,7 @@ MAINTAINER=	ricci@cs.utah.edu
 # Various ports need to agree on what version of apache. Make sure this
 # agrees with what is in the emulab-ops and emulab-php4 metaports.
 #
+.MAKEFLAGS+=	-DWITH_APACHE
 .MAKEFLAGS+=	APACHE_PORT=www/apache13-modssl
 
 #
@@ -62,7 +71,7 @@ MAINTAINER=	ricci@cs.utah.edu
 # XXX not really a build dependency, but needs to get installed before
 # any attempt to install mysql50-* ports
 #
-.if ${PORTVERSION} == "2.1"
+.if (${PORTVERSION} == "2.1" || ${PORTVERSION} == "3.0")
 BUILD_DEPENDS=	\
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Mysql.pm:${PORTSDIR}/misc/p5-DBD-mysql50-old
 .else
@@ -71,7 +80,7 @@ BUILD_DEPENDS=	\
 .endif
 
 LIB_DEPENDS= gd.4:${PORTSDIR}/graphics/gd \
-	lthread.[23]:${PORTSDIR}/devel/linuxthreads \
+	lthread.[236]:${PORTSDIR}/devel/linuxthreads \
 	mhash.2:${PORTSDIR}/security/mhash \
 	mysqlclient.15:${PORTSDIR}/databases/mysql50-client \
 	snmp.4:${PORTSDIR}/net-mgmt/net-snmp4 \
@@ -92,7 +101,7 @@ LIB_DEPENDS+= pubsub.1:${PORTSDIR}/misc/emulab-pubsub
 
 RUN_DEPENDS=	\
 	${LOCALBASE}/etc/apache/ssl.crl:${PORTSDIR}/www/apache13-modssl \
-	${LOCALBASE}/libexec/apache/libauth_mysql.so:${PORTSDIR}/www/mod_auth_mysql \
+	mod_auth_mysql>1:${PORTSDIR}/www/mod_auth_mysql \
 	fping:${PORTSDIR}/net/fping \
 	rsync:${PORTSDIR}/net/rsync \
 	neato:${PORTSDIR}/graphics/graphviz \
@@ -112,11 +121,9 @@ RUN_DEPENDS=	\
 	xvcg:${PORTSDIR}/graphics/vcg \
 	${LOCALBASE}/libexec/tftpd:${PORTSDIR}/misc/emulab-tftp-hpa \
 	sudo:${PORTSDIR}/security/sudo \
-	dhcpd:${PORTSDIR}/net/isc-dhcp3-server \
 	wget:${PORTSDIR}/ftp/wget \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/XML/Parser:${PORTSDIR}/textproc/p5-XML-Parser \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/RPC/XML.pm:${PORTSDIR}/net/p5-RPC-XML \
-	${PYTHON_SITELIBDIR}/M2Crypto/ASN1.py:${PORTSDIR}/security/py-m2crypto \
 	${LOCALBASE}/include/boost:${PORTSDIR}/devel/boost \
 	gmake:${PORTSDIR}/devel/gmake \
 	kmetis:${PORTSDIR}/math/metis \
@@ -124,12 +131,30 @@ RUN_DEPENDS=	\
 	${PYTHON_SITELIBDIR}/MySQLdb/times.py:${PORTSDIR}/databases/py-MySQLdb \
 	mysqlhotcopy:${PORTSDIR}/databases/mysql50-scripts
 
-.if ${PORTVERSION} == "2.1"
+.if ${PORTVERSION} == "3.0"
+# must handle patching of m2crypto when the port is built
+RUN_DEPENDS+=	\
+	${PYTHON_PKGNAMEPREFIX}m2crypto>0:${PORTSDIR}/misc/emulab-py-m2crypto
+.else
+# for older version we can patch the standard m2crypto once installed
+RUN_DEPENDS+=	\
+	${PYTHON_PKGNAMEPREFIX}m2crypto>0:${PORTSDIR}/security/py-m2crypto
+.endif
+
+.if (${PORTVERSION} == "2.1" || ${PORTVERSION} == "3.0")
+.if ${PORTVERSION} == "3.0"
+RUN_DEPENDS+=	\
+	dhcpd:${PORTSDIR}/net/isc-dhcp30-server
+.else
+RUN_DEPENDS+=	\
+	dhcpd:${PORTSDIR}/net/isc-dhcp3-server
+.endif
 RUN_DEPENDS+=	\
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/XML/Parser.pm:${PORTSDIR}/textproc/p5-XML-Parser
-# not sure why this is just needed for 6.3
+# not getting installed via dependencies?
 RUN_DEPENDS+=	\
-	${X11BASE}/libdata/xorg/libraries:${PORTSDIR}/x11/xorg-libraries
+	${X11BASE}/libdata/xorg/libraries:${PORTSDIR}/x11/xorg-libraries \
+	${LOCALBASE}/libexec/apache/libphp4.so:${PORTSDIR}/misc/emulab-php4
 .endif
 
 .if ${OSMAJOR} >= 6
@@ -157,3 +182,10 @@ NO_BUILD=	yes
 do-install:	# empty
 
 .include <bsd.port.mk>
+
+vars:
+	@echo "PORTVERSION=$(PORTVERSION)"
+	@echo ".MAKEFLAGS=$(.MAKEFLAGS)"
+	@echo "BUILD_DEPENDS=$(BUILD_DEPENDS)"
+	@echo "LIB_DEPENDS=$(LIB_DEPENDS)"
+	@echo "RUN_DEPENDS=$(RUN_DEPENDS)"

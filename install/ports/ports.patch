@@ -1,15 +1,15 @@
 Index: Makefile
 ===================================================================
 RCS file: /share/freebsd/CVS/ports/misc/Makefile,v
-retrieving revision 1.866
-diff -u -r1.866 Makefile
---- Makefile	29 Oct 2007 23:47:35 -0000	1.866
-+++ Makefile	21 Aug 2008 20:47:38 -0000
-@@ -514,5 +514,22 @@
+retrieving revision 1.918
+diff -u -r1.918 Makefile
+--- Makefile    29 Jun 2009 12:04:10 -0000      1.918
++++ Makefile    7 Jan 2010 23:14:23 -0000
+@@ -561,5 +561,23 @@
      SUBDIR += ytree
      SUBDIR += zaptel
      SUBDIR += zoneinfo
-+# Emulab ports	
++# Emulab ports
 +    SUBDIR += elvind
 +    SUBDIR += emulab-boss
 +    SUBDIR += emulab-fs
@@ -26,5 +26,6 @@ diff -u -r1.866 Makefile
 +    SUBDIR += emulab-mailman
 +    SUBDIR += emulab-pubsub
 +    SUBDIR += emulab-pubsub-elvincompat
++    SUBDIR += emulab-py-m2crypto
  
  .include <bsd.port.subdir.mk>

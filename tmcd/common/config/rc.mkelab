@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004-2008 University of Utah and the Flux Group.
+# Copyright (c) 2004-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # XXX I hardwire IPs into generated /etc/rc.conf and /etc/rc.resolv.
@@ -104,6 +104,14 @@ my $fsname;
 # Cert stuff to give the inner emulab
 my $RPCCERT = "/usr/testbed/etc/outer_emulab.pem";
 #my $RPCPORT = 7778;
+
+#
+# Elab daemons to kill off before setting up boss/ops/fs.
+# Order matters: must kill event agents before evproxy and pubsubd.
+# XXX we leave slothd running for idleswap in case we hang.
+#
+my @DAEMONS = ("emulab-watchdog", "progagent", "linktest",
+	       "syncd", "evproxy", "pubsubd");
 
 # This gets turned on/off below
 my $WINSUPPORT = 0;
@@ -229,7 +237,11 @@ sub doboot()
     $emulabconfig{"JAILIPBASE"} = "172.16.0.0";
     $emulabconfig{"JAILIPMASK"} = "255.240.0.0";
     $emulabconfig{"MFSTARBALL"} = "tftpboot-elabinelab.tar.gz";
-    $emulabconfig{"MFSVERSION"} = "62";
+    if ($FBSD_VERSION == 7.2) {
+	$emulabconfig{"MFSVERSION"} = "72";
+    } else {
+	$emulabconfig{"MFSVERSION"} = "62";
+    }
     $emulabconfig{"MFSCONSOLE"} = "sio";
     $emulabconfig{"WINSUPPORT"} = 0;
     $emulabconfig{"NOSETUP"}    = 0;
@@ -343,6 +355,18 @@ sub doboot()
 	$emulabconfig{OPS_PKG}      = "emulab-ops-2.1";
 	$emulabconfig{BOSS_PKG}     = "emulab-boss-2.1";
     }
+    elsif ($FBSD_VERSION == 7.2) {
+	if ($ELVIN_COMPAT) {
+	    $emulabconfig{FS_PKG_DIR} = "/share/freebsd/7.2/packages.elvincompat";
+	} else {
+	    $emulabconfig{FS_PKG_DIR} = "/share/freebsd/7.2/packages";
+	}
+	$emulabconfig{OPS_PKG_DIR}  = $emulabconfig{FS_PKG_DIR};
+	$emulabconfig{BOSS_PKG_DIR} = $emulabconfig{FS_PKG_DIR};
+	$emulabconfig{FS_PKG}       = "emulab-fs-3.0";
+	$emulabconfig{OPS_PKG}      = "emulab-ops-3.0";
+	$emulabconfig{BOSS_PKG}     = "emulab-boss-3.0";
+    }
 
     # Figure out where /share is coming from (outer fs node). We need
     # that below.
@@ -450,6 +474,18 @@ sub SetupFsNode()
 	$inner_controlif = $ifacelist[0]->{IFACE};
 	$inner_ip        = $ifacelist[0]->{IPADDR};
 	$inner_netmask   = $ifacelist[0]->{IPMASK};
+    }
+
+    #
+    # Kill off any Emulab daemons that might freak once we have removed
+    # Emulab accounts.  We have seen this happen with the program agent--
+    # it runs amok, filling up its logfile (that has been unlinked) and
+    # eventually /var, possibly before we can finish setting up.
+    #
+    foreach my $daemon (@DAEMONS) {
+	if (-e "/var/run/$daemon.pid") {
+	    system("kill `cat /var/run/$daemon.pid`");
+	}
     }
 
     #
@@ -809,6 +845,18 @@ sub SetupOpsNode($)
 	$inner_controlif = $ifacelist[0]->{IFACE};
 	$inner_ip        = $ifacelist[0]->{IPADDR};
 	$inner_netmask   = $ifacelist[0]->{IPMASK};
+    }
+
+    #
+    # Kill off any Emulab daemons that might freak once we have removed
+    # Emulab accounts.  We have seen this happen with the program agent--
+    # it runs amok, filling up its logfile (that has been unlinked) and
+    # eventually /var, possibly before we can finish setting up.
+    #
+    foreach my $daemon (@DAEMONS) {
+	if (-e "/var/run/$daemon.pid") {
+	    system("kill `cat /var/run/$daemon.pid`");
+	}
     }
 
     #
@@ -1198,6 +1246,18 @@ sub SetupBossNode()
     }
 
     #
+    # Kill off any Emulab daemons that might freak once we have removed
+    # Emulab accounts.  We have seen this happen with the program agent--
+    # it runs amok, filling up its logfile (that has been unlinked) and
+    # eventually /var, possibly before we can finish setting up.
+    #
+    foreach my $daemon (@DAEMONS) {
+	if (-e "/var/run/$daemon.pid") {
+	    system("kill `cat /var/run/$daemon.pid`");
+	}
+    }
+
+    #
     # Run the prepare script to clear out the current accounts and such.
     # From this point on will need to log in as root,
     #
@@ -1482,11 +1542,25 @@ sub SetupBossNode()
     # Copy the inner ssl cert and root's public ssh keys to the mfs's
     # so that imported they will talk to the inner boss properly.
     # At Berkeley the frisbee mfs copies these to disk images,
-    # needing changes to slicefix , which always needs to be run now.
+    # needing changes to slicefix, which always needs to be run now.
     #
     MungeMfsRoot("frisbee");
     MungeMfsRoot("freebsd");
     MungeMfsRoot("freebsd.newnode");
+
+    #
+    # XXX at Utah, many of our node types use a Linux-based boot/setup path
+    # (pxeboot & MFSes) that we don't currently load into inner elabs.
+    # To compensate, we do some inner DB munging (in the elabinelab_boss
+    # script).  However, due to either a bug or a feature, when a node gets
+    # redirected from real boss to the inner boss by the outer dhcpd, the
+    # node continues to use the "filename" spec returned by the outer dhcpd.
+    # This may point to the Linux (actually grub) pxeboot which doesn't exist
+    # inside.  We take care of this here (where we are root) by creating a
+    # symlink.
+    #
+    mysystem("cd /tftpboot; rm -rf pxeboot_grub2pxe; ".
+	     "ln -s pxeboot.emu pxeboot_grub2pxe");
 
     #
     # Set up a bunch of DB stuff.  This part will eventually be optional,
@@ -1810,6 +1884,15 @@ sub CreateDefsFile($)
 		};
 		/^ELVIN_COMPAT$/ && do {
 		    print OUTDEFS "ELVIN_COMPAT=$ELVIN_COMPAT\n";
+		    last SWITCH;
+		};
+		/^NSVERIFY$/ && do {
+		    # XXX cannot build full ns on FBSD7 yet
+		    if ($FBSD_VERSION > 6) {
+			print OUTDEFS "NSVERIFY=0\n";
+		    } else {
+			print OUTDEFS "NSVERIFY=1\n";
+		    }
 		    last SWITCH;
 		};
 		

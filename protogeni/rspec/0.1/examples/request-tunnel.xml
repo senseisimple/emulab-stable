@@ -21,6 +21,8 @@
   </node>
   <link virtual_id="link0"
         link_type="tunnel">
+    <component_manager name="urn:publicid:IDN+emulab.net+authority+cm" />
+    <component_manager name="urn:publicid:IDN+uky.emulab.net+authority+cm" />
     <interface_ref virtual_node_id="pc10"
                    virtual_interface_id="control"
                    tunnel_ip="192.168.0.1" />

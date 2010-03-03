@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005-2009 University of Utah and the Flux Group.
+# Copyright (c) 2005-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package Node;
@@ -2456,6 +2456,26 @@ sub GetOsids($) {
     return ($self->{"DBROW"}{"def_boot_osid"},
 	    $self->{"DBROW"}{"temp_boot_osid"},
 	    $self->{"DBROW"}{"next_boot_osid"});
+}
+
+#
+# Look for a widearea node by its external node id.
+#
+sub LookupWideArea($$)
+{
+    my ($class, $external_node_id) = @_;
+    my $safe_id = DBQuoteSpecial($external_node_id);
+
+    my $query_result =
+	DBQueryWarn("select node_id from widearea_nodeinfo ".
+		    "where external_node_id=$safe_id");
+
+    return undef
+	if (!defined($query_result) || !$query_result->numrows);
+
+    my ($node_id) = $query_result->fetchrow_array();
+
+    return Node->Lookup($node_id);
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

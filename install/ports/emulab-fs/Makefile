@@ -6,7 +6,10 @@ OSMAJOR!= /usr/bin/uname -r | /usr/bin/sed -e 's/\..*//'
 OSMINOR!= /usr/bin/uname -r | /usr/bin/sed -e 's/[0-9][0-9]*\.\([0-9][0-9]*\).*/\1/'
 
 PORTNAME=	emulab-fs
-.if ${OSMAJOR} >= 6
+.if ${OSMAJOR} > 6
+PORTVERSION=	3.0
+.else
+.if ${OSMAJOR} > 5
 .if ${OSMINOR} >= 3
 PORTVERSION=	2.1
 .else
@@ -14,6 +17,7 @@ PORTVERSION=	2.0
 .endif
 .else
 PORTVERSION=	1.4
+.endif
 .endif
 CATEGORIES=	misc
 MASTER_SITES=	#none
@@ -32,6 +36,9 @@ MAINTAINER=	hibler@cs.utah.edu
 # We must make sure PERL is built with this.
 #
 .MAKEFLAGS+=	ENABLE_SUIDPERL=yes
+.if ${PORTVERSION} == "3.0"
+.MAKEFLAGS+=	PERL_VERSION=5.10.0 PERL_VER=5.10.0 PERL_ARCH=mach
+.endif
 
 #
 # This prevents any ports from trying to run interactively - some, ask silly
@@ -41,17 +48,8 @@ MAINTAINER=	hibler@cs.utah.edu
 
 RUN_DEPENDS= gmake:${PORTSDIR}/devel/gmake \
 	sudo:${PORTSDIR}/security/sudo \
-	rsync:${PORTSDIR}/net/rsync
-
-.if ${OSMAJOR} >= 6
-.else
-RUN_DEPENDS+= smbd:${PORTSDIR}/net/samba3
-.endif
-
-.if ${PORTVERSION} == "2.1"
-# not sure why we don't build this for 6.0-6.2...
-RUN_DEPENDS+= smbd:${PORTSDIR}/net/samba3
-.endif
+	rsync:${PORTSDIR}/net/rsync \
+	smbd:${PORTSDIR}/net/samba3
 
 NO_BUILD=	yes
 

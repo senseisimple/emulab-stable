@@ -20,6 +20,7 @@ use lib '@prefix@/lib';
 use English;
 use libdb;
 use libtestbed;
+use libtblog qw(tbdie);
 use snmpit_lib;
 use Lan;
 use libxmlrpc;
@@ -85,7 +86,6 @@ sub commonTail($$)
 	defined($response->{"output"}) && $response->{"output"} ne "") {
 	print $response->{"output"};
     }
-    print STDERR $response->{"output"};
     return $response;
 }
 
@@ -334,7 +334,8 @@ sub RemoteDoList(@)
     $arg->{"vlans"} = [ @vlans ];
 
     my $response = commonTail("list",$arg);
-    return 1
+    tbdie({cause => 'hardware'},
+          "elabinelab::vlansv2 returns '" . $response->{"code"} . "'\n")
 	if ($response->{"code"});
     my $xmlback = $response->{"output"};
     if (!defined($xmlback)) { return @list; }
@@ -346,6 +347,9 @@ sub RemoteDoList(@)
     #
     foreach my $vlres (split ',', $xmlback) {
 	my ($name, $num, $mems) = split '#', $vlres;
+	tbdie({cause => 'hardware'},
+	      "elabinelab::vlansv2 returned bogus info: '$xmlback'\n")
+	    if (!defined($num) || !defined($mems));
 	$Names{$num} = $name;
         @{$Members{$num}} = ();
 	foreach my $mem (split " ", $mems) {

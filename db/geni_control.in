@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2009 University of Utah and the Flux Group.
+# Copyright (c) 2009, 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -52,6 +52,7 @@ sub ClearAll();
 sub StartAll();
 sub WaitAll();
 sub PurgeAll();
+sub RenewAll();
 
 #
 # Turn off line buffering on output
@@ -82,7 +83,8 @@ my $pid    = shift;
 my $eid	   = shift;
 my $action = shift;
 
-if ($action =~ /^(alloc|free|clear|wait|purge|start|register|unregister)$/) {
+if ($action =~
+    /^(alloc|free|clear|wait|purge|start|register|unregister|renew)$/) {
     $action = $1;
 }
 else {
@@ -166,6 +168,10 @@ SWITCH: for ($action) {
 	PurgeAll();
 	last SWITCH;
     };
+    /^renew$/ && do {
+	RenewAll();
+	last SWITCH;
+    };
     fatal("Unknown action $action");
 }
 exit($exitval);
@@ -229,8 +235,10 @@ sub PurgeAll()
     foreach my $resource (@resources) {
 	$resource->Purge($this_user) == 0
 	    or fatal("Could not purge resources from $resource");
+	$resource->Delete() == 0
+	    or fatal("Could not delete $resource");
     }
-
+    UnRegister();
     return 0;
 }
 
@@ -244,6 +252,12 @@ sub WaitAll()
 {
     libGeni::WaitForSlivers($experiment, $this_user) == 0 or
 	fatal("Cannot wait on slivers!\n");
+}
+
+sub RenewAll()
+{
+    libGeni::RenewSlivers($experiment, 1) == 0 or
+	fatal("Cannot renew resources");
 }
 
 #

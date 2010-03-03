@@ -2640,7 +2640,7 @@ class experiment:
         result = dbres[0][0]
         
         return EmulabResponse(RESPONSE_SUCCESS,
-                              value=result,
+                              value=str(result),
                               output="ok")
 
     #

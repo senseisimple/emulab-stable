@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -40,7 +40,8 @@ use strict;
 
 use vars qw($SCRIPTNAME 
 	    $EMERG $ALRET $CRIT $ERR $WARNING $NOTICE $INFO $DEBUG
-	    %PRIORITY_MAP_TO_STR %PRIORITY_MAP_TO_NUM);
+	    %PRIORITY_MAP_TO_STR %PRIORITY_MAP_TO_NUM
+	    *SOUT *SERR);
 
 #
 # Duplicate STDOUT and STDERR to SOUT and SERR respectfully, since

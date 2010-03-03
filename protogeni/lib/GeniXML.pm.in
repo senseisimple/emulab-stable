@@ -11,10 +11,12 @@ use Exporter;
 use vars qw(@ISA @EXPORT);
 
 @ISA = "Exporter";
-@EXPORT = qw(Parse ParseFile FindNodes FindFirst FindElement FindAttr IsLanNode IsLocalNode GetNodeId GetVirtualId GetManagerId SetText GetText);
+@EXPORT = qw(Parse ParseFile FindNodes FindFirst FindElement FindAttr IsLanNode IsLocalNode GetNodeId GetVirtualId GetManagerId SetText GetText CreateDocument AddElement);
 
 use English;
 use XML::LibXML;
+use XML::LibXML::XPathContext;
+use XML::LibXML::NodeList;
 use GeniHRN;
 use Carp qw(cluck carp);
 
@@ -34,7 +36,7 @@ sub Parse($)
         $doc = $parser->parse_string($xml);
     };
     if ($@) {
-	carp("Failed to parse xml string: $@\n");
+	carp("Failed to parse xml string: $@\nXML: $xml\n\n");
 	return undef;
     } else {
 	return $doc->documentElement();
@@ -50,7 +52,7 @@ sub ParseFile($)
         $doc = $parser->parse_file($file);
     };
     if ($@) {
-	carp("Failed to parse xml string: $@\n");
+	carp("Failed to parse xml string: $@");
 	return undef;
     } else {
 	return $doc->documentElement();
@@ -69,7 +71,7 @@ sub FindNodes($$)
 	my $xc = XML::LibXML::XPathContext->new();
 	$ns = $node->namespaceURI();
 	if (defined($ns)) {
-	    $xc->registerNs('n', $node->namespaceURI());
+	    $xc->registerNs('n', $ns);
 	} else {
 	    $path =~ s/\bn://g;
 	}
@@ -126,9 +128,9 @@ sub IsLanNode($)
     my ($node) = @_;
     my $result = 0;
     if (defined($node) && $node->localname() eq "node") {
-	foreach my $lan (FindNodes("./n:node_type/n:type_name",
-				   $node)->get_nodelist()) {
-	    if ($lan->textContent() eq "lan") {
+	foreach my $lan (FindNodes("n:node_type", $node)->get_nodelist()) {
+	    my $typeName = GetText("type_name", $lan);
+	    if (defined($typeName) && $typeName eq "lan") {
 		$result = 1;
 		last;
 	    }
@@ -145,9 +147,7 @@ sub IsLocalNode($)
     my ($node) = @_;
     my $result = 0;
     if (defined($node) && $node->localname() eq "node") {
-	my $manager_uuid  = FindFirst("./n:component_manager_uuid | ".
-				      "./n:component_manager_urn",
-					       $node);
+	my $manager_uuid  = GetManagerId($node);
 	if (! defined($manager_uuid) ||
 	    GeniHRN::Equal($manager_uuid, $ENV{'MYURN'}) ||
 	    $manager_uuid eq $ENV{'MYUUID'}) {
@@ -213,7 +213,14 @@ sub SetText($$$)
 		$result = 1;
 	    }
 	} elsif ($node->nodeType() == XML_ELEMENT_NODE) {
-	    $node->setAttribute($name, $text);
+	    my $ns = $node->namespaceURI();
+	    if (defined($ns)) {
+# TODO: Submit bug report for the library. This call is bugged.
+#		$node->setAttributeNS($ns, "rs:$name", $text);
+		$node->setAttribute($name, $text);
+	    } else {
+		$node->setAttribute($name, $text);
+	    }
 	    $result = 1;
 	}
     }
@@ -230,12 +237,57 @@ sub GetText($$)
     if (! defined($child)) {
 	$child = FindFirst('@'.$name, $node);
     }
-    if (defined($child)) {
-	$result = $child->textContent();
-    } else {
+    if (! defined($child)) {
 	$child = FindFirst('n:'.$name, $node);
     }
+    if (defined($child)) {
+	$result = $child->textContent();
+    }
     return $result;
+}
+
+# Converts the XML representation of a node to a UTF-8 string and
+# outputs it as a complete XML document.
+sub Serialize($)
+{
+    my ($node) = @_;
+    my $newnode = $node->cloneNode(1);
+    return $newnode->toString();
+}
+
+# Create a new XML document with a given namespace URI and document
+# element name.
+sub CreateDocument($$)
+{
+    my ($ns, $name) = @_;
+    my $doc = XML::LibXML::Document->createDocument("1.0", "UTF-8");
+    my $root = $doc->createElementNS($ns, "rs:$name");
+    $doc->setDocumentElement($root);
+    return $doc;
+}
+
+# Add a new element to a node. The new element will have the given
+# name and be otherwise empty.
+sub AddElement($$)
+{
+    my ($name, $node) = @_;
+    my $ns = $node->namespaceURI();
+    my $child = $node->addNewChild($ns, "rs:$name");
+    return $child;
+}
+
+# Remove a node with a given name from a node. It will be removed
+# whether it is an attribute or an element. The name is not an xpath.
+sub RemoveChild($$)
+{
+    my ($name, $node) = @_;
+    my $child = FindFirst('@n:'.$name, $node);
+    if (! defined($child)) {
+	$child = FindFirst('n:'.$name, $node);
+    }
+    if (defined($child)) {
+	$node->removeChild($child);
+    }
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

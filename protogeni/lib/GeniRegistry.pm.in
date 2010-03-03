@@ -129,9 +129,9 @@ sub LOCKED($)           { return $_[0]->{'LOCKED'}; }
 #
 # Class function to create new Geni slice and return the object.
 #
-sub Create($$$$;$)
+sub Create($$$$;$$)
 {
-    my ($class, $certificate, $creator_uuid, $authority, $exptidx) = @_;
+    my ($class, $certificate, $creator_uuid, $authority, $exptidx, $lock) = @_;
     my @insert_data = ();
 
     # Every slice gets a new unique index.
@@ -150,6 +150,8 @@ sub Create($$$$;$)
     push(@insert_data, "sa_uuid='$sa_uuid'");
     push(@insert_data, "exptidx=$exptidx")
 	if (defined($exptidx));
+    push(@insert_data, "locked=now()")
+	if (defined($lock) && $lock);
     
     my $safe_hrn   = DBQuoteSpecial($certificate->hrn());
     my $safe_uuid  = DBQuoteSpecial($certificate->uuid());
@@ -405,6 +407,24 @@ sub Delete($)
     my $idx  = $self->idx();
 
     DBQueryWarn("delete from client_slivers where idx='$idx'")
+	or return -1;
+    
+    return 0;
+}
+
+#
+# Delete all for a slice.
+#
+sub SliceDelete($$)
+{
+    my ($self, $slice) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $slice_idx = $self->slice_idx();
+
+    DBQueryWarn("delete from client_slivers where slice_idx='$slice_idx'")
 	or return -1;
     
     return 0;

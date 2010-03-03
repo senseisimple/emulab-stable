@@ -281,10 +281,12 @@ sub Resolve($)
 	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
 					"No such component $lookup_token");
 	}
+	my $manager = $component->GetManager();
 
 	# Return a blob.
-	my $blob = { "gid"      => $component->cert(),
-		     "url"      => $component->url(),
+	my $blob = { "gid"         => $component->cert(),
+		     "url"         => $component->url(),
+		     "manager_gid" => $manager->cert(),
 		 };
     
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);

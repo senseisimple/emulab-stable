@@ -34,6 +34,7 @@ use GeniRegistry;
 use GeniUtil;
 use GeniCM;
 use GeniHRN;
+use GeniXML;
 use libtestbed qw(SENDMAIL);
 use emutil;
 # Hate to import all this crap; need a utility library.
@@ -407,7 +408,8 @@ sub DeleteSliver($)
 	$response = GeniResponse->Create(GENIRESPONSE_ERROR);
 	goto bad;
     }
-    my $ticket = GeniTicket->Create($authority, $user, $manifest);
+    my $ticket = GeniTicket->Create($authority, $user,
+				    GeniXML::Serialize($manifest));
     if (!defined($ticket)) {
 	print STDERR "Could not create new ticket for $slice\n";
 	$response = GeniResponse->Create(GENIRESPONSE_ERROR);
@@ -525,8 +527,10 @@ sub StartSliver($)
     my $slice_urn    = $argref->{'slice_urn'};
     my $sliver_urns  = $argref->{'component_urns'};
     my $credentials  = $argref->{'credentials'};
+    my $manifest     = $argref->{'manifest'};
     
-    return SliverAction("start", $slice_urn, $sliver_urns, $credentials);
+    return SliverAction("start",
+			$slice_urn, $sliver_urns, $credentials, $manifest);
 }
 
 sub StopSliver($)
@@ -536,7 +540,8 @@ sub StopSliver($)
     my $sliver_urns  = $argref->{'component_urns'};
     my $credentials  = $argref->{'credentials'};
 
-    return SliverAction("stop", $slice_urn, $sliver_urns, $credentials);
+    return SliverAction("stop",
+			$slice_urn, $sliver_urns, $credentials, undef);
 }
 
 sub RestartSliver($)
@@ -545,13 +550,15 @@ sub RestartSliver($)
     my $slice_urn    = $argref->{'slice_urn'};
     my $sliver_urns  = $argref->{'component_urns'};
     my $credentials  = $argref->{'credentials'};
+    my $manifest     = $argref->{'manifest'};
 
-    return SliverAction("restart", $slice_urn, $sliver_urns, $credentials);
+    return SliverAction("restart",
+			$slice_urn, $sliver_urns, $credentials, $manifest);
 }
 
-sub SliverAction($$$$)
+sub SliverAction($$$$$)
 {
-    my ($action, $slice_urn, $sliver_urns, $credentials) = @_;
+    my ($action, $slice_urn, $sliver_urns, $credentials, $manifest) = @_;
     my $response;
     
     if (! (defined($credentials) &&
@@ -567,6 +574,15 @@ sub SliverAction($$$$)
 	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
 				    "Insufficient privilege");
 
+    if (defined($manifest)) {
+	$manifest = GeniXML::Parse($manifest);
+	if (!defined($manifest)) {
+	    print STDERR "Error reading manifest\n";
+	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+					"Bad manifest");
+	}
+    }
+    
     #
     # For now, only allow top level aggregate or the slice
     #
@@ -666,6 +682,15 @@ sub SliverAction($$$$)
 	goto bad
 	    if (GeniResponse::IsResponse($response));
 	    
+	if ($action eq "start" && defined($manifest)) {
+	    if ($aggregate->ProcessManifest($manifest)) {
+		$response = GeniResponse->Create(GENIRESPONSE_ERROR,
+						 undef,
+						 "Error processing manifest");
+		goto bad;
+	    }
+	}
+	
 	$response = &$PerformAction($aggregate, $action);
 	goto bad
 	    if (GeniResponse::IsResponse($response));
@@ -698,6 +723,14 @@ sub SliverAction($$$$)
 	    push(@slivers, $sliver);
 	}
 	foreach my $sliver (@slivers) {
+	    if ($action eq "start" && defined($manifest)) {
+		if ($sliver->ProcessManifest($manifest)) {
+		    $response = GeniResponse->Create(GENIRESPONSE_ERROR,
+				     undef,
+				     "Error processing manifest for $sliver");
+		    goto bad;
+		}
+	    }
 	    $response = &$PerformAction($sliver, $action);
 	    goto bad
 		if (GeniResponse::IsResponse($response));
@@ -1317,7 +1350,7 @@ sub LookupURN($)
     $type = lc($type);
 
     if ($type eq "node") {
-	$object = GeniCM::LookupNode($urn);
+	$object = GeniUtil::LookupNode($urn);
     }
     elsif ($type eq "slice") {
 	$object = GeniSlice->Lookup($urn);

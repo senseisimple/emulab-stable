@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -29,6 +29,7 @@ my $force   = 0;
 my $TBROOT       = "@prefix@";
 my $OPSDBSUPPORT = @OPSDBSUPPORT@;
 my $dbcontrol    = "$TBROOT/sbin/opsdb_control";
+my $PGENISUPPORT = @PROTOGENI_SUPPORT@;
 
 # Untaint the path
 $ENV{'PATH'} = "/usr/bin:$TBROOT/libexec:$TBROOT/libexec/ns2ir" . 
@@ -47,6 +48,9 @@ use libdb;
 use libtestbed;
 use libtblog;
 use Experiment;
+if ($PGENISUPPORT) {
+    require libGeni;
+}
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -84,6 +88,11 @@ if (!$force && $state ne EXPTSTATE_TERMINATING) {
     tbdie("Experiment is in the wrong state: $state.\n");
 }
 
+if ($PGENISUPPORT) {
+    if (libGeni::UnRegister($experiment)) {
+	tbdie("Could not delete protogeni slice\n");
+    }
+}
 print "Clearing out virtual state.\n";
 $experiment->RemoveVirtualState() == 0 or $errors++;
 

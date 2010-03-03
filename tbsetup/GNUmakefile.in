@@ -11,11 +11,15 @@ SUBDIR		= tbsetup
 UNIFIED         = @UNIFIED_BOSS_AND_OPS@
 PLABSUPPORT     = @PLABSUPPORT@
 ISMAINSITE	= @TBMAINSITE@
+NSVERIFY	= @NSVERIFY@
 SYSTEM         := $(shell uname -s)
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS		= checkpass ns2ir nsverify nseparse checkup template_cvsroot
+SUBDIRS		= checkpass ns2ir nseparse checkup template_cvsroot
+ifeq ($(NSVERIFY),1)
+SUBDIRS		+= nsverify
+endif
 
 BIN_STUFF	= power snmpit tbend tbprerun tbreport \
 		  os_load endexp batchexp swapexp \
@@ -181,7 +185,9 @@ subdir-install:
 	@$(MAKE) -C checkpass install	
 	@$(MAKE) -C ns2ir install
 	@$(MAKE) -C template_cvsroot install
+ifeq ($(NSVERIFY),1)
 	@$(MAKE) -C nsverify install
+endif
 	@$(MAKE) -C nseparse install
 	$(PLAB_INSTALL)
 ifeq ($(IPASSIGN),Yes)
@@ -201,7 +207,9 @@ script-install:	$(addprefix $(INSTALL_BINDIR)/, $(BIN_STUFF)) \
 
 post-install: 
 	@$(MAKE) -C ns2ir post-install
+ifeq ($(NSVERIFY),1)
 	@$(MAKE) -C nsverify post-install
+endif
 	@$(MAKE) -C nseparse post-install
 	$(PLAB_POST_INSTALL)
 ifeq ($(IPASSIGN),Yes)
@@ -265,7 +273,9 @@ control-install:	$(addprefix $(INSTALL_SBINDIR)/, $(CTRLSBIN_STUFF)) \
 			$(addprefix $(INSTALL_BINDIR)/, $(CTRLBIN_STUFF)) \
 			$(addprefix $(INSTALL_LIBDIR)/, libtestbed.pm)
 	@$(MAKE) -C ns2ir control-install
+ifeq ($(NSVERIFY),1)
 	@$(MAKE) -C nsverify control-install
+endif
 	@$(MAKE) -C nseparse control-install
 
 #

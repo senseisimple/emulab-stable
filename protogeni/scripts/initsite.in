@@ -194,7 +194,7 @@ if (!$asch && ! -e "$TB/etc/.federated") {
 #
 my %packlist = ("libxml2>=2.6.26"       => "/usr/ports/textproc/libxml2",
 		"p5-Frontier-RPC"       => "/usr/ports/net/p5-Frontier-RPC",
-		"p5-XML-LibXML"         => "/usr/ports/textproc/p5-XML-LibXML",
+		"p5-XML-LibXML>=1.70"   => "/usr/ports/textproc/p5-XML-LibXML",
 		"xmlsec1"               => "/usr/ports/security/xmlsec1",
 		"p5-Crypt-SSLeay>=0.57" => "/usr/ports/security/p5-Crypt-SSLeay"
 		);
