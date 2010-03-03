@@ -3987,7 +3987,7 @@ sub CleanupDeadSlice($;$)
 	my $eid = $experiment->eid();
 	system("$PLABSLICE destroy $pid $eid");
     
-	system("$ENDEXPT -q $pid,$eid");
+	system("$ENDEXPT -N -q $pid,$eid");
 	return -1
 	    if ($?);
 	$experiment->Flush();
@@ -4037,7 +4037,7 @@ sub GeniExperiment($)
 	}
 
 	# Note the -h option; allows experiment with no NS file.
-	system("$CREATEEXPT -q -i -k -w ".
+	system("$CREATEEXPT -N -q -i -k -w ".
 	       "-S 'Geni Slice Experiment -- DO NOT SWAP OR TERMINATE' ".
 	       "-E 'Geni Slice Experiment -- DO NOT SWAP OR TERMINATE' ".
 	       "-L 'Geni Slice Experiment -- DO NOT SWAP OR TERMINATE' ".
