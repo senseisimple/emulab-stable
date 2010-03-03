@@ -417,9 +417,18 @@ sub doboot()
 #
 sub SetupFsNode()
 {
-    print "Setting up an Fs node ...\n";
-    $TBFS = "/q";
-    $TBDIR = "/q";
+    my $shareslice;
+    my $TBDIR = "/usr/testbed";
+    my $FSDIR = "";
+
+    my $fromscratch = $emulabconfig{"LOADELABSOURCE"};
+    my $installpkgs = $emulabconfig{"LOADPACKAGES"};
+
+    print "Setting up an Fs node";
+    if ($fromscratch) {
+	print " from scratch";
+    }
+    print " ...\n";
 
     #
     # XXX (hopefully) tmp hack for dealing with other FS OSes
@@ -430,16 +439,34 @@ sub SetupFsNode()
     }
 
     #
-    # Create a ${TBDIR} from the extra slice and put everything there.
-    # 
-    mysystem("mkdir ${TBFS}")
-	if (! -d "${TBFS}");
-    mysystem("$BINDIR/mkextrafs.pl -f ${TBFS}");
-    mysystem("mkdir ${TBDIR}/testbed");
-    mysystem("mkdir ${TBDIR}/testbed/src");
-    mysystem("mkdir ${TBDIR}/testbed/obj");
+    # Create filesystems for fs use.  We need:
+    #  * /usr/testbed		 => disk0s2e
+    # for a "from scratch" build and:
+    #  * /q (proj,users,scratch) => disk0s4e
+    #  * /share			 => disk0s4f
+    # for ops+fs and fs-only nodes.
+    #
+    if ($fromscratch) {
+	SetupTBDir($TBDIR, 1);
+    }
+    $FSDIR = "/q";
+    mysystem("mkdir $FSDIR")
+	if (! -d "$FSDIR");
+    mysystem("$BINDIR/mkextrafs.pl -f -2 $FSDIR");
 
-    GetEmulabSource("${TBDIR}/testbed/src");
+    #
+    # XXX mkextrafs does not create the second filesystem, it only creates
+    # the BSD partition.  So we need to determine the name of the disk
+    # device in use, and create a filesystem on that 'f' partition.
+    #
+    my $disk = `mount | grep '0s4e on $FSDIR'`;
+    if ($disk =~ /(\/dev\/\S+)s4e on/) {
+	$shareslice = "$1" . "s4f";
+	mysystem("newfs $shareslice");
+	# don't mount it yet, just remember
+    } else {
+	SetupFatal("Could not parse mount info to find extra partition");
+    }
 
     #
     # The mirror tree is copied to temp storage, and then copied into
@@ -447,7 +474,7 @@ sub SetupFsNode()
     #
     if ($domirror && -e "/proj/$pid/mirror") {
 	print "Copying over mirror tree from /proj/$pid/mirror\n";
-	mysystem("rsync -a --delete /proj/$pid/mirror ${TBDIR}", 3);
+	mysystem("rsync -a --delete /proj/$pid/mirror $TBDIR", 3);
     }
 
     #
@@ -518,46 +545,46 @@ sub SetupFsNode()
     #
     # And clear some other stuff.
     # 
-    mysystem("rm -rf /usr/testbed/lib");
-    mysystem("rm -rf /usr/testbed/bin");
+    mysystem("rm -rf $TBDIR/bin $TBDIR/lib");
     unlink("/etc/rc.conf.d/dhclient")
 	if (-e "/etc/rc.conf.d/dhclient");
     unlink("/etc/rc.d/netif-emulab")
 	if (-e "/etc/rc.d/netif-emulab");
 
-    goto skippkg
-	if ($NOSETUP);
-
-    # XXX fer now: if not set, derive from the OPS info
-    if (!$emulabconfig{FS_PKG_DIR} || !$emulabconfig{FS_PKG}) {
-	$emulabconfig{FS_PKG_DIR} = $emulabconfig{OPS_PKG_DIR};
-	($emulabconfig{FS_PKG} = $emulabconfig{OPS_PKG}) =~ s/ops/fs/;
-    }
-
     #
-    # Do this as a separate step because PKG_DIR might be an NFS path,
-    # but we must do the NFS unmounts before running ops-install. 
-    # 
-    if (!$emulabconfig{FS_PKG_DIR} || !$emulabconfig{FS_PKG}) {
-	SetupFatal("Could not get package info from Emulab!");
-    }
-    print "Installing the fs metaport.\n";
-
-    # Make sure /usr/ports is not a symlink to RO shared space
-    if (-l "/usr/ports") {
-	if (!unlink("/usr/ports")) {
-	    print "WARNING: /usr/ports is a symlink, port install may fail\n";
-	} else {
-	    mysystem("mkdir /usr/ports");
+    # Load up packages if necessary
+    #
+    if (!$NOSETUP && $installpkgs) {
+	# XXX fer now: if not set, derive from the OPS info
+	if (!$emulabconfig{FS_PKG_DIR} || !$emulabconfig{FS_PKG}) {
+	    $emulabconfig{FS_PKG_DIR} = $emulabconfig{OPS_PKG_DIR};
+	    ($emulabconfig{FS_PKG} = $emulabconfig{OPS_PKG}) =~ s/ops/fs/;
 	}
+
+	#
+	# Do this as a separate step because PKG_DIR might be an NFS path,
+	# but we must do the NFS unmounts before running ops-install. 
+	# 
+	if (!$emulabconfig{FS_PKG_DIR} || !$emulabconfig{FS_PKG}) {
+	    SetupFatal("Could not get package info from Emulab!");
+	}
+	print "Installing the fs metaport.\n";
+
+	# Make sure /usr/ports is not a symlink to RO shared space
+	if (-l "/usr/ports") {
+	    if (!unlink("/usr/ports")) {
+		print "WARNING: /usr/ports is a symlink, port install may fail\n";
+	    } else {
+		mysystem("mkdir /usr/ports");
+	    }
+	}
+
+	$ENV{"PKG_PATH"} = $emulabconfig{FS_PKG_DIR};
+	mysystem("pkg_add $emulabconfig{FS_PKG} >/tmp/perrs 2>&1");
     }
 
-    $ENV{"PKG_PATH"} = $emulabconfig{FS_PKG_DIR};
-    mysystem("pkg_add $emulabconfig{FS_PKG} >/tmp/perrs 2>&1");
-  skippkg:
-
     #
-    # Clean up a few things on the image and create symlinks into ${TBDIR} for
+    # Clean up a few things on the image and create symlinks into $FSDIR for
     # /proj, /users, /groups and /scratch. Also allows /share to be created/
     #
     print "Command: 'umount -A -t nfs'\n";
@@ -578,23 +605,24 @@ sub SetupFsNode()
     # This might not exist
     mysystem("cd /; mv -f groups groups.old")
 	if (-d "/groups");
-    mysystem("mkdir ${TBDIR}/users ${TBDIR}/proj ${TBDIR}/groups");
-    mysystem("ln -s ${TBDIR}/users /users");
-    mysystem("ln -s ${TBDIR}/proj /proj");
-    mysystem("ln -s ${TBDIR}/groups /groups");
+
+    mysystem("mkdir $FSDIR/users $FSDIR/proj $FSDIR/groups $FSDIR/share");
+    mysystem("ln -s $FSDIR/users /users");
+    mysystem("ln -s $FSDIR/proj /proj");
+    mysystem("ln -s $FSDIR/groups /groups");
+
+    #
+    # Setup /share.  The partition and filesystem were created above.
+    #
+    mysystem("mount $shareslice $FSDIR/share");
+    mysystem("echo \"$shareslice $FSDIR/share ufs rw 0 2\" >> /etc/fstab");
 
     if ($SCRATCHFS) {
 	mysystem("cd /; mv -f scratch scratch.old")
 	    if (-d "/scratch");
-	mysystem("mkdir ${TBDIR}/scratch");
-	mysystem("ln -s ${TBDIR}/scratch /scratch");
+	mysystem("mkdir $FSDIR/scratch");
+	mysystem("ln -s $FSDIR/scratch /scratch");
     }
-
-    #
-    # Setup a stub /share using slice 2 of the image.
-    #
-    mysystem("mkdir /share");
-    mysystem("$BINDIR/mkextrafs.pl -f -s 2 /share");
 
     #
     # Lets mount the package dir so that we can pass off some stuff to
@@ -681,7 +709,7 @@ sub SetupFsNode()
     #
     # Create a defs file. Note that this will move to boss at some point.
     #
-    CreateDefsFile("${TBDIR}/testbed/src/testbed/defs-elabinelab");
+    CreateDefsFile("$TBDIR/src/testbed/defs-elabinelab");
 
     goto skipsetup
 	if ($NOSETUP);
@@ -689,10 +717,10 @@ sub SetupFsNode()
     #
     # Configure an object tree. 
     #
-    mysystem("mkdir -p ${TBDIR}/testbed/obj/testbed");
-    mysystem("cd ${TBDIR}/testbed/obj/testbed; ".
-	     "   ../../src/testbed/configure ".
-	     "      --with-TBDEFS=../../src/testbed/defs-elabinelab ".
+    mysystem("mkdir -p $TBDIR/obj/testbed");
+    mysystem("cd $TBDIR/obj/testbed; ".
+	     "   $TBDIR/src/testbed/configure ".
+	     "      --with-TBDEFS=$TBDIR/src/testbed/defs-elabinelab ".
 	     ($WINSUPPORT ? "--enable-windows" : "--disable-windows"));
 
     #
@@ -710,13 +738,13 @@ sub SetupFsNode()
     #
     $ENV{"PKG_PATH"} = "/packages";
     my $pkg = "-P $emulabconfig{FS_PKG} -p /packages";
-    mysystem("cd ${TBDIR}/testbed/obj/testbed/install; ".
+    mysystem("cd $TBDIR/obj/testbed/install; ".
 	     "   perl fs-install $pkg -b");
 
     #
     # And install the fs side.
     #
-    mysystem("cd ${TBDIR}/testbed/obj/testbed; gmake fs-install");
+    mysystem("cd $TBDIR/obj/testbed; gmake fs-install");
 
     #
     # Ack! The prepare script above killed the pid file for mountd. This
@@ -770,15 +798,14 @@ sub SetupFsNode()
     return
 	if ($NOSETUP);
 
-    mysystem("cp -p ${TBDIR}/testbed/src/testbed/defs-elabinelab ".
-	     "      ${TBDIR}/testbed/src");
+    mysystem("cp -p $TBDIR/src/testbed/defs-elabinelab $TBDIR/src");
 
     #
     # Copy the mirror tree into place. Do not use rsync.
     #
-    if (0 && -e "${TBDIR}/mirror") {
+    if (0 && -e "$TBDIR/mirror") {
 	print "Copying mirror tree into place\n";
-	mysystem("cp -Rfp ${TBDIR}/mirror/ /");
+	mysystem("cp -Rfp $TBDIR/mirror/ /");
     }
 }
 
@@ -788,29 +815,50 @@ sub SetupFsNode()
 sub SetupOpsNode($)
 {
     my ($isfs) = @_;
+    my $shareslice;
+    my $TBDIR = "/usr/testbed";
+    my $FSDIR = "";
 
-    print "Setting up an " . ($isfs ? "Ops/Fs" : "Ops") . " node ...\n";
+    my $fromscratch = $emulabconfig{"LOADELABSOURCE"};
+    my $installpkgs = $emulabconfig{"LOADPACKAGES"};
 
-    if ($isfs) {
-	$TBFS = "/q";
-	$TBDIR = "/q";
-    } else {
-	$TBFS = "/usr/testbed";
-	$TBDIR = "/usr";
+    print "Setting up an " . ($isfs ? "Ops/Fs" : "Ops") . " node";
+    if ($fromscratch) {
+	print " from scratch";
     }
+    print " ...\n";
 
     #
-    # Create a ${TBFS} from the extra slice and put everything there.
-    # 
-    mysystem("mkdir ${TBFS}")
-	if (! -d "${TBFS}");
-    mysystem("$BINDIR/mkextrafs.pl -f ${TBFS}");
-    mysystem("mkdir ${TBDIR}/testbed")
-	if (! -d "${TBDIR}/testbed");
-    mysystem("mkdir ${TBDIR}/testbed/src");
-    mysystem("mkdir ${TBDIR}/testbed/obj");
+    # Create filesystems for fs use.  We need:
+    #  * /usr/testbed		 => disk0s2e
+    # for a "from scratch" build and:
+    #  * /q (proj,users,scratch) => disk0s4e
+    #  * /share			 => disk0s4f
+    # for ops+fs and fs-only nodes.
+    #
+    if ($fromscratch) {
+	SetupTBDir($TBDIR, 1);
+    }
+    if ($isfs) {
+	$FSDIR = "/q";
+	mysystem("mkdir $FSDIR")
+	    if (! -d "$FSDIR");
+	mysystem("$BINDIR/mkextrafs.pl -f -2 $FSDIR");
 
-    GetEmulabSource("${TBDIR}/testbed/src");
+	#
+	# XXX mkextrafs does not create the second filesystem, it only creates
+	# the BSD partition.  So we need to determine the name of the disk
+	# device in use, and create a filesystem on that 'f' partition.
+	#
+	my $disk = `mount | grep '0s4e on $FSDIR'`;
+	if ($disk =~ /(\/dev\/\S+)s4e on/) {
+	    $shareslice = "$1" . "s4f";
+	    mysystem("newfs $shareslice");
+	    # don't mount it yet, just remember
+	} else {
+	    SetupFatal("Could not parse mount info to find extra partition");
+	}
+    }
 
     #
     # The mirror tree is copied to temp storage, and then copied into
@@ -818,7 +866,7 @@ sub SetupOpsNode($)
     #
     if ($isfs && $domirror && -e "/proj/$pid/mirror") {
 	print "Copying over mirror tree from /proj/$pid/mirror\n";
-	mysystem("rsync -a --delete /proj/$pid/mirror ${TBDIR}", 3);
+	mysystem("rsync -a --delete /proj/$pid/mirror $TBDIR", 3);
     }
 
     #
@@ -889,52 +937,52 @@ sub SetupOpsNode($)
     #
     # And clear some other stuff.
     # 
-    mysystem("rm -rf /usr/testbed/lib");
-    mysystem("rm -rf /usr/testbed/bin");
+    mysystem("rm -rf $TBDIR/bin $TBDIR/lib");
     unlink("/etc/rc.conf.d/dhclient")
 	if (-e "/etc/rc.conf.d/dhclient");
     unlink("/etc/rc.d/netif-emulab")
 	if (-e "/etc/rc.d/netif-emulab");
 
-    goto skippkg
-	if ($NOSETUP);
-    
     #
-    # Do this as a separate step because PKG_DIR might be an NFS path,
-    # but we must do the NFS unmounts before running ops-install. 
-    # 
-    if (!$emulabconfig{OPS_PKG_DIR} || !$emulabconfig{OPS_PKG}) {
-	SetupFatal("Could not get package info from Emulab!");
-    }
-    print "Removing conflicting packages.\n";
-    mysystem("pkg_delete -r -x mysql-client")
-	if (-e "/usr/local/bin/mysql");
+    # Load up packages if necessary
+    #
+    if (!$NOSETUP && $installpkgs) {
+	#
+	# Do this as a separate step because PKG_DIR might be an NFS path,
+	# but we must do the NFS unmounts before running ops-install. 
+	# 
+	if (!$emulabconfig{OPS_PKG_DIR} || !$emulabconfig{OPS_PKG}) {
+	    SetupFatal("Could not get package info from Emulab!");
+	}
+	print "Removing conflicting packages.\n";
+	mysystem("pkg_delete -r -x mysql-client")
+	    if (-e "/usr/local/bin/mysql");
     
-    print "Installing the ops metaport.\n";
+	print "Installing the ops metaport.\n";
 
-    # Make sure /usr/ports is not a symlink to RO shared space
-    if (-l "/usr/ports") {
-	if (!unlink("/usr/ports")) {
-	    print "WARNING: /usr/ports is a symlink, port install may fail\n";
-	} else {
-	    mysystem("mkdir /usr/ports");
+	# Make sure /usr/ports is not a symlink to RO shared space
+	if (-l "/usr/ports") {
+	    if (!unlink("/usr/ports")) {
+		print "WARNING: /usr/ports is a symlink, port install may fail\n";
+	    } else {
+		mysystem("mkdir /usr/ports");
+	    }
+	}
+
+	$ENV{"PKG_PATH"} = $emulabconfig{OPS_PKG_DIR};
+	mysystem("pkg_add $emulabconfig{OPS_PKG} >/tmp/perrs 2>&1");
+
+	if ($isfs) {
+	    # XXX if not set, derive from the OPS info
+	    if (!$emulabconfig{FS_PKG_DIR} || !$emulabconfig{FS_PKG}) {
+		$emulabconfig{FS_PKG_DIR} = $emulabconfig{OPS_PKG_DIR};
+		($emulabconfig{FS_PKG} = $emulabconfig{OPS_PKG}) =~ s/ops/fs/;
+	    }
 	}
     }
 
-    $ENV{"PKG_PATH"} = $emulabconfig{OPS_PKG_DIR};
-    mysystem("pkg_add $emulabconfig{OPS_PKG} >/tmp/perrs 2>&1");
-
-    if ($isfs) {
-	# XXX if not set, derive from the OPS info
-	if (!$emulabconfig{FS_PKG_DIR} || !$emulabconfig{FS_PKG}) {
-	    $emulabconfig{FS_PKG_DIR} = $emulabconfig{OPS_PKG_DIR};
-	    ($emulabconfig{FS_PKG} = $emulabconfig{OPS_PKG}) =~ s/ops/fs/;
-	}
-    }
-  skippkg:
-
     #
-    # Clean up a few things on the image and create symlinks into ${TBDIR} for
+    # Clean up a few things on the image and create symlinks into $FSDIR for
     # /proj, /users, /groups and /scratch. Also allows /share to be created/
     #
     print "Command: 'umount -A -t nfs'\n";
@@ -955,29 +1003,26 @@ sub SetupOpsNode($)
     # This might not exist
     mysystem("cd /; mv -f groups groups.old")
 	if (-d "/groups");
+
+    mysystem("mkdir $FSDIR/users $FSDIR/proj $FSDIR/groups $FSDIR/share");
     if ($isfs) {
-	mysystem("mkdir ${TBDIR}/users ${TBDIR}/proj ${TBDIR}/groups");
-	mysystem("ln -s ${TBDIR}/users /users");
-	mysystem("ln -s ${TBDIR}/proj /proj");
-	mysystem("ln -s ${TBDIR}/groups /groups");
+	mysystem("ln -s $FSDIR/users /users");
+	mysystem("ln -s $FSDIR/proj /proj");
+	mysystem("ln -s $FSDIR/groups /groups");
 
 	#
-	# Setup a stub /share using slice 2 of the image.
+	# Setup /share.  The partition and filesystem were created above.
 	#
-	mysystem("mkdir /share");
-	mysystem("$BINDIR/mkextrafs.pl -f -s 2 /share");
-    } else {
-	mysystem("mkdir /users /proj /groups /share");
+	mysystem("mount $shareslice $FSDIR/share");
+	mysystem("echo \"$shareslice $FSDIR/share ufs rw 0 2\" >> /etc/fstab");
     }
 
     if ($SCRATCHFS) {
 	mysystem("cd /; mv -f scratch scratch.old")
 	    if (-d "/scratch");
+	mysystem("mkdir $FSDIR/scratch");
 	if ($isfs) {
-	    mysystem("mkdir ${TBDIR}/scratch");
-	    mysystem("ln -s ${TBDIR}/scratch /scratch");
-	} else {
-	    mysystem("mkdir /scratch");
+	    mysystem("ln -s $FSDIR/scratch /scratch");
 	}
     }
 
@@ -1035,7 +1080,7 @@ sub SetupOpsNode($)
     print RC "network_interfaces=\"$outer_controlif\"\n";
     print RC "ifconfig_${outer_controlif}=".
 	"\"inet $outer_ip netmask $outer_netmask\"\n";
-    
+
     if (! $SINGLE_CONTROLNET) {
 	print RC "network_interfaces=\"\$network_interfaces $inner_controlif\"\n";
 	print RC "ifconfig_${inner_controlif}=".
@@ -1069,7 +1114,7 @@ sub SetupOpsNode($)
     #
     # Create a defs file. Note that this will move to boss at some point.
     #
-    CreateDefsFile("${TBDIR}/testbed/src/testbed/defs-elabinelab");
+    CreateDefsFile("$TBDIR/src/testbed/defs-elabinelab");
 
     goto skipsetup
 	if ($NOSETUP);
@@ -1077,10 +1122,10 @@ sub SetupOpsNode($)
     #
     # Configure an object tree. 
     #
-    mysystem("mkdir -p ${TBDIR}/testbed/obj/testbed");
-    mysystem("cd ${TBDIR}/testbed/obj/testbed; ".
-	     "   ../../src/testbed/configure ".
-	     "      --with-TBDEFS=../../src/testbed/defs-elabinelab ".
+    mysystem("mkdir -p $TBDIR/obj/testbed");
+    mysystem("cd $TBDIR/obj/testbed; ".
+	     "   $TBDIR/src/testbed/configure ".
+	     "      --with-TBDEFS=$TBDIR/src/testbed/defs-elabinelab ".
 	     ($WINSUPPORT ? "--enable-windows" : "--disable-windows"));
 
     #
@@ -1089,14 +1134,14 @@ sub SetupOpsNode($)
     $ENV{"PKG_PATH"} = "/packages";
     my $pkg = "-P $emulabconfig{OPS_PKG} -p /packages " .
 	($isfs ? "-F $emulabconfig{FS_PKG}" : "");
-    mysystem("cd ${TBDIR}/testbed/obj/testbed/install; ".
+    mysystem("cd $TBDIR/obj/testbed/install; ".
 	     "   perl ops-install $pkg -b -w ElabInElab ");
 
     #
     # And install the ops side.
     #
     my $itarget = $isfs ? "opsfs-install" : "ops-install";
-    mysystem("cd ${TBDIR}/testbed/obj/testbed; gmake $itarget");
+    mysystem("cd $TBDIR/obj/testbed; gmake $itarget");
 
     #
     # Lets populate the mail lists with the creator of the experiment so
@@ -1164,20 +1209,11 @@ sub SetupOpsNode($)
 	if ($NOSETUP);
 
     #
-    # Remove source code from ops so that mere users do not get access to it.
-    # Something to do with licensing ...
-    #
-    mysystem("cp -p ${TBDIR}/testbed/src/testbed/defs-elabinelab ".
-	     "      ${TBDIR}/testbed/src");
-    mysystem("rm -rf ${TBDIR}/testbed/src/testbed");
-    mysystem("rm -rf ${TBDIR}/testbed/obj/testbed");
-
-    #
     # Copy the mirror tree into place. Do not use rsync.
     #
-    if (0 && -e "${TBDIR}/mirror") {
+    if (0 && -e "$TBDIR/mirror") {
 	print "Copying mirror tree into place\n";
-	mysystem("cp -Rfp ${TBDIR}/mirror/ /");
+	mysystem("cp -Rfp $TBDIR/mirror/ /");
     }
 }
 
@@ -2057,5 +2093,34 @@ sub GetEmulabSource($)
 		 "key=${keyhash}&elabinelab_source=1${cvstag}'");
 
 	mysystem("tar xzf /tmp/foo.tar.gz -C $destdir/testbed");
+    }
+}
+
+#
+# Create and optionally populate the main testbed directory.
+#
+SetupTBDir($$)
+{
+    my ($TBDIR, $getsource) = @_;
+
+    #
+    # If /usr/testbed already exists, we need to get rid of it.
+    # If it is a mount point, unmount it.  Otherwise, rename it.
+    #
+    if (-d "$TBDIR") {
+	if (system("umount $TBDIR") != 0) {
+	    # not a mounted FS or could not umount it, just move it
+	    mysystem("mv $TBDIR ${TBDIR}.tmp");
+	}
+    }
+    mysystem("mkdir $TBDIR")
+	if (! -d "$TBDIR");
+    mysystem("$BINDIR/mkextrafs.pl -s 2 -f $TBDIR");
+
+    # Download the source
+    if ($getsource) {
+	mysystem("mkdir $TBDIR/src");
+	mysystem("mkdir $TBDIR/obj");
+	GetEmulabSource("$TBDIR/src");
     }
 }
