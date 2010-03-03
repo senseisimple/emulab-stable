@@ -161,7 +161,7 @@ sub doboot()
             }
 
 	    my ($upline, $downline) =
-		os_ifconfig_line($iface, $inet, $mask,
+		&os_ifconfig_line($iface, $inet, $mask,
 				 $speed, $duplex, $aliases,
 				 $type, $lan, $settings,
 				 $ifrtabid, \%oscookie);
@@ -201,7 +201,7 @@ sub doboot()
 	    my $ifrtabid = undef;
 
 	    my ($upline, $downline) =
-		os_ifconfig_line($iface, $inet, $mask,
+		&os_ifconfig_line($iface, $inet, $mask,
 				 $speed, $duplex, $aliases,
 				 $type, $lan, $settings,
 				 $ifrtabid, \%oscookie);
