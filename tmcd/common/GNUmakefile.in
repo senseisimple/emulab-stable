@@ -130,7 +130,7 @@ pgeni-tarball:
 	($(MAKE) DESTDIR=/tmp/mk1 local-install)
 	tar cf $(TBROOT)/www/downloads/geniclient.tar \
                 -C /tmp/mk1/usr/local/etc/emulab \
-		libsetup.pm libtmcc.pm runstartup \
+		libsetup.pm libtmcc.pm runstartup watchdog \
 		$(addprefix rc/, $(PGENIFILES))
 	rm -rf /tmp/mk1
 
