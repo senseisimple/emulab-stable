@@ -1,8 +1,7 @@
 #!/usr/bin/perl -wT
-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008, 2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -25,6 +24,8 @@ use Exporter;
 	 os_find_freedisk
        );
 
+sub VERSION()	{ return 1.0; }
+
 # Must come after package declaration!
 use English;
 
@@ -32,6 +33,7 @@ use English;
 # Note this file has probably already been loaded by the caller.
 BEGIN
 {
+
     if (-e "/etc/emulab/paths.pm") {
 	require "/etc/emulab/paths.pm";
 	import emulabpaths;

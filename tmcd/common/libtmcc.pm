@@ -573,10 +573,12 @@ sub tmccgetconfig()
     my @tmccresults;
     my $cdir = CacheDir();
 
+    my $noproxy = $config{"noproxy"};
+
     #
     # Check for proxypath file, but do not override config option. 
     #
-    if (!$config{"dounix"} && -e $PROXYDEF) {
+    if (!$config{"dounix"} && !$noproxy && -e $PROXYDEF) {
 	#
 	# Suck out the path and untaint. 
 	# 
