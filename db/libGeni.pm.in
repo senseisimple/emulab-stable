@@ -29,6 +29,7 @@ use Experiment;
 use OSinfo;
 use GeniEmulab;
 use GeniResource;
+use GeniResponse;
 use English;
 use Socket;
 use XML::Simple;

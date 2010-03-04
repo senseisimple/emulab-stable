@@ -165,10 +165,11 @@ sub doboot()
 	print "Node is free\n";
 	return;
     }
+    my $optarg = (defined($vnodeid) ? "-j $vnodeid" : "");
 
     if (-x "$BINDIR/watchdog") {
         print("Starting testbed update watchdog\n");
-	system("$BINDIR/watchdog start");
+	system("$BINDIR/watchdog $optarg start");
 	if ($?) {
 	    fatal("Error running $BINDIR/watchdog");
 	}
@@ -186,7 +187,7 @@ sub doboot()
 	#
 	my $oldumask = umask(0227);
     
-	if (system("echo '$eventkey' > $file")) {
+	if (system("echo -n '$eventkey' > $file")) {
 	    fatal("Could not write $file");
 	}
 	umask($oldumask);
@@ -203,7 +204,7 @@ sub doboot()
 	#
 	my $oldumask = umask(0227);
     
-	if (system("echo '$keyhash' > $file")) {
+	if (system("echo -n '$keyhash' > $file")) {
 	    fatal("Could not write $file");
 	}
 	umask($oldumask);
@@ -226,10 +227,10 @@ sub doboot()
     }
     }
 
-    my $optarg = (defined($vnodeid) ? "-j $vnodeid" : "");
     my @bootscripts = ("rc.misc", "rc.topomap", 
 		       "rc.tarfiles", "rc.rpms",
-		       "rc.route", "rc.ifconfig", "rc.progagent");
+		       "rc.route", "rc.ifconfig", "rc.hostnames",
+		       "rc.progagent");
 
     foreach my $script (@bootscripts) {
 	next
