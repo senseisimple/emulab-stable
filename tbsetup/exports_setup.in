@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -104,6 +104,7 @@ $| = 1;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use Data::Dumper;
 
 my $PROJROOT  = PROJROOT();
 my $GROUPROOT = GROUPROOT();
@@ -211,15 +212,15 @@ my @mountpoints = fsinit();
 #
 # Note that we could do this per experiment rather than per node,
 # adding all nodes from an experiment to the sublists created.
-while (@row = $nodes_result->fetchrow_array) {
-    my $node_id = $row[0];
-    my $pid     = $row[1];
-    my $eid     = $row[2];
-    my $gid     = $row[3];
-    my $ip      = $row[4];
-    my $admin	= $row[5];
-    my $shared  = $row[6];
-    my $erole   = $row[7];
+while ($row = $nodes_result->fetchrow_hashref) {
+    my $node_id = $row->{'node_id'};
+    my $pid     = $row->{'pid'};
+    my $eid     = $row->{'eid'};
+    my $gid     = $row->{'gid'};
+    my $ip      = $row->{'IP'};
+    my $admin	= $row->{'admin'};
+    my $shared  = $row->{'sharing_mode'};
+    my $erole   = $row->{'erole'};
     my %fslist = ();
     my @dirlist = ();
     my @smbshares = ();
@@ -229,6 +230,7 @@ while (@row = $nodes_result->fetchrow_array) {
     if ((!defined($node_id)) || (!defined($pid)) || (!defined($eid)) ||
         (!defined($gid)) || (!defined($admin)) || (!defined($ip))) {
         print "WARNING: exports_setup: Skipping database row with undefined values\n";
+	print "         $node_id\n" if defined($node_id);
 	next;
     }
     
