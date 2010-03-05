@@ -288,8 +288,7 @@ sub MapResources($$$$)
 sub GetTickets($$$$)
 {
     my ($experiment, $impotent, $user, $rspec) = @_;
-    my %cm_urns  = ();
-    my %node_cms = ();
+    my %cm_urns   = ();
 
     Register($experiment, $user) == 0
 	or return -1;
@@ -310,7 +309,6 @@ sub GetTickets($$$$)
 	my $cm = GeniHRN::Generate($auth, "authority", "cm");
 
 	$cm_urns{$cm} = $cm;
-	$node_cms{$ref->{'virtual_id'}} = $cm;
 
 	#
 	# This is how we get the client side to do cooked mode properly.
@@ -335,19 +333,53 @@ sub GetTickets($$$$)
     }
 
     #
-    # Ask for tickets.
+    # Get Tickets in parallel.
     #
-    foreach my $cm (keys(%cm_urns)) {
-	my $resource = $cm_urns{$cm};
+    my @resources = values(%cm_urns);
+    my @results   = ();
+    my $coderef   = sub {
+	my ($resource) = @_;
 
 	print STDERR "Asking for ticket from $resource\n";
 	if ($resource->GetTicket($user, $rspec, $impotent)) {
-	    print STDERR "Could not GetTicket for $resource\n";
-	    print STDERR Dumper($rspec);
 	    return -1;
 	}
+	return 0;
+    };
+    if (ParRun(undef, \@results, $coderef, @resources)) {
+	print STDERR "*** GetTickets: Internal error getting tickets\n";
+	#
+	# Need to be careful here; some of the tickets might have been
+	# redeemed, and that happened in the child of a fork. Sync with
+	# the DB so the parent sees the current state.
+	#
+	map { $_->Refresh() } @resources;
+	return -1;
     }
-    return 0;
+    #
+    # Check the exit codes. Eventually return specific error info.
+    #
+    my $errors = 0;
+    my $count  = 0;
+    foreach my $result (@results) {
+	my $resource = $resources[$count];
+
+	#
+	# ParRun does a fork; so need to refresh the resource object
+	# to sync it to the DB.
+	#
+	if ($resource->Refresh()) {
+	    print STDERR "*** GetTickets: Error synchronizing $resource\n";
+	    $errors++;
+	}
+	elsif ($result != 0) {
+	    print STDERR "*** Error getting ticket for $resource\n";
+	    $errors++;
+	}
+	$count++;
+    }
+    print STDERR Dumper($rspec) if ($errors);
+    return $errors;
 }
 
 #
@@ -366,16 +398,53 @@ sub RedeemTickets($$$)
 	return 0;
     }
 
-    foreach my $resource (@resources) {
+    #
+    # Redeem Tickets in parallel.
+    #
+    my @results   = ();
+    my $coderef   = sub {
+	my ($resource) = @_;
+
 	print STDERR "Redeeming ticket for $resource\n";
 	if ($resource->RedeemTicket($user)) {
-	    print STDERR
-		"RedeemTicket: Could not redeem ticket for $resource\n";
 	    return -1;
 	}
+	return 0;
+    };
+    if (ParRun(undef, \@results, $coderef, @resources)) {
+	print STDERR "*** RedeemTickets: Internal error getting tickets\n";
+	#
+	# Need to be careful here; some of the tickets might have been
+	# redeemed, and that happened in the child of a fork. Sync with
+	# the DB so the parent sees the current state.
+	#
+	map { $_->Refresh() } @resources;
+	return -1;
     }
-
-    return 0;
+    #
+    # Check the exit codes. Eventually return specific error info.
+    #
+    my $errors = 0;
+    my $count  = 0;
+    foreach my $result (@results) {
+	my $resource = $resources[$count];
+	
+	#
+	# ParRun does a fork; so need to refresh the resource object
+	# to sync it to the DB.
+	#
+	if ($resource->Refresh()) {
+	    print STDERR "*** RedeemTicket: Error synchronizing $resource\n";
+	    $errors++;
+	}
+	elsif ($result != 0) {
+	    print STDERR "*** Error redeeming ticket for $resource\n";
+	    $errors++;
+	}
+	$count++;
+    }
+    print STDERR Dumper($rspec) if ($errors);
+    return $errors;
 }
 
 #
@@ -665,6 +734,11 @@ sub WaitForSlivers($$@)
 	print STDERR "Waiting ($$) for sliver $resource\n";
 
 	if ($resource->SliverStatus($user, \$ref) != 0) {
+	    # Tell the parent to keep trying.
+	    return 0
+		if ($resource->last_rpcerror() &&
+		    $resource->last_rpcerror() == GENIRESPONSE_BUSY());
+	    
 	    print STDERR "Error getting sliver status for $resource\n";
 	    # Tell the parent error.
 	    return -1;
@@ -719,6 +793,11 @@ sub WaitForSlivers($$@)
 	# Tell the parent not ready.
 	return 1;
     };
+    #
+    # We want to watch for failures.
+    #
+    my @failed = ();
+    
     while (@resources) {
 	my @results = ();
 	
@@ -735,39 +814,44 @@ sub WaitForSlivers($$@)
 	    if ($result > 0) {
 		push(@tmp, $resource);
 	    }
+	    elsif ($result < 0) {
+		push(@failed, $resource);
+	    }
 	}
 	@resources = @tmp;
 
 	#
 	# Check for cancelation. When canceled, go through and mark
-	# any nodes that have not been marked, as failed. This will
-	# stop the waiting up in os_setup.
+	# any nodes that have not been marked, as failed. 
 	#
-	if ($experiment->canceled()) {
-	    foreach my $resource (@resources) {	
-		my $manifest = $resource->Manifest();
-		next
-		    if (!defined($manifest));
-
-		foreach my $ref (@{ $manifest->{'node'} }) {
-		    my $vname      = $ref->{'virtual_id'};
-		    my $node       = $experiment->VnameToNode($vname);
-		    next
-			if (!defined($node));
-		    # State was changed in child process.
-		    $node->Refresh();
-
-		    if ($node->eventstate() ne TBDB_NODESTATE_ISUP &&
-			$node->eventstate() ne TBDB_NODESTATE_TBFAILED) {
-			$node->SetEventState(TBDB_NODESTATE_TBFAILED());
-		    }
-		}
-	    }
-	    return 0;
-	}
+	last
+	    if ($experiment->canceled());
 
 	sleep(10)
 	    if (@resources);
+    }
+    #
+    # If we get here, mark any nodes left over or failed, with TBFAILED.
+    # This will stop the waiting up in os_setup.
+    #
+    foreach my $resource (@resources, @failed) {	
+	my $manifest = $resource->Manifest();
+	next
+	    if (!defined($manifest));
+
+	foreach my $ref (@{ $manifest->{'node'} }) {
+	    my $vname      = $ref->{'virtual_id'};
+	    my $node       = $experiment->VnameToNode($vname);
+	    next
+		if (!defined($node));
+	    # State was changed in child process.
+	    $node->Refresh();
+
+	    if ($node->eventstate() ne TBDB_NODESTATE_ISUP &&
+		$node->eventstate() ne TBDB_NODESTATE_TBFAILED) {
+		$node->SetEventState(TBDB_NODESTATE_TBFAILED());
+	    }
+	}
     }
     return 0;
 }
@@ -814,8 +898,16 @@ sub DeleteAllSlivers($$)
     if (ParRun(undef, \@results, $coderef, @resources)) {
 	print STDERR
 	    "*** DeleteAllSlivers: Internal error deleting slivers.\n";
+	#
+	# Need to be careful here; some of the tickets might have been
+	# deleted, and that happened in the child of a fork. Sync with
+	# the DB so the parent sees the current state.
+	#
+	map { $_->Refresh() } @resources;
 	return -1;
     }
+    # Ditto, above.
+    map { $_->Refresh() } @resources;
     return 0;
 }
 
