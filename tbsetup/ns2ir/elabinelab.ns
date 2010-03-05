@@ -102,6 +102,10 @@ for {set i 1} {$i <= $maxpcs} {incr i} {
 	    namespace eval TBCOMPAT {
         	tb-fix-node [set $name] $elabinelab_fixnodes($name)
 	    }
+        } elseif {[info exists ::TBCOMPAT::elabinelab_hardware($name)]} {
+	    namespace eval TBCOMPAT {
+		tb-set-hardware [set $name] $elabinelab_hardware($name)
+	    }
 	} else {
 	    tb-set-hardware [set $name] pcslow
 	}
