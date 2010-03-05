@@ -248,10 +248,13 @@ package
     {
       opName = "Create";
       clip.loadText.text = "Creating new slice";
+	  
+	  sliceUrn = "urn:publicid:IDN+" + Geni.defaultAuthority
+                  + "+slice+"+sliceName;
+	  
       op.reset(Geni.register);
       op.addField("credential", credential.base);
-      op.addField("hrn", "urn:publicid:IDN+" + Geni.defaultAuthority
-                  + "+slice+"+sliceName);
+      op.addField("hrn", sliceUrn);
 //      op.addField("hrn", sliceName);
       op.addField("type", "Slice");
 //      op.addField("userbindings", new Array(user.uuid));
@@ -266,7 +269,7 @@ package
       {
         credential.slice = String(response.value);
 //        startResourceLookup();
-        var newMenu = new MenuSliceDetail(sliceName, sliceId, credential);
+        var newMenu = new MenuSliceDetail(sliceName, sliceId, credential, sliceUrn);
         Main.setText(clip.xmlText.text);
         Main.changeState(newMenu);
       }
@@ -309,6 +312,7 @@ package
     var clip : WaitingClip;
     var sliceName : String;
     var sliceId : String;
+	var sliceUrn : String;
     var op : Operation;
     var opName : String;
     var user : Object;

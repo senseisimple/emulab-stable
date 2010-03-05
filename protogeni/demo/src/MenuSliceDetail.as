@@ -21,10 +21,12 @@ package
   {
     public function MenuSliceDetail(newSliceName : String,
                                     newSliceId : String,
-                                    newCredential : Credential) : void
+                                    newCredential : Credential,
+									newSliceUrn : String) : void
     {
       sliceName = newSliceName;
       sliceId = newSliceId;
+	  sliceUrn = newSliceUrn;
       credential = newCredential;
     }
 
@@ -35,6 +37,7 @@ package
       parent.addChild(clip);
 
       clip.sliceName.text = sliceName;
+	  clip.sliceUrn.text = sliceUrn;
       nodes = new ActiveNodes(parent, clip.nodeList, clip.description);
       managers = new ComponentView(clip.cmSelect, clip.nodeList, nodes);
       console = new Console(parent, nodes, managers, clip,
@@ -118,6 +121,7 @@ package
 
     var sliceName : String;
     var sliceId : String;
+	var sliceUrn : String;
     var credential : Credential;
     var parent : DisplayObjectContainer;
     var clip : SliceDetailClip;

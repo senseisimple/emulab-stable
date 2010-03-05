@@ -164,12 +164,12 @@ package
         if (cm.getSliver() == null)
         {
           rspec = nodes.getXml(false, cm);
-          result = new RequestSliverCreate(cm, nodes, rspec, arena.sliceName.text);
+          result = new RequestSliverCreate(cm, nodes, rspec, arena.sliceUrn.text);
         }
         else if (cm.getVersion() >= 2)
         {
           rspec = nodes.getXml(true, cm);
-          result = new RequestSliverUpdate(cm, nodes, rspec, false, arena.sliceName.text);
+          result = new RequestSliverUpdate(cm, nodes, rspec, false, arena.sliceUrn.text);
         }
       }
       return result;
@@ -188,7 +188,7 @@ package
       var result : Request = null;
       if (nodes.existsState(cm, ActiveNodes.CREATED))
       {
-        result = new RequestSliverStart(cm, nodes, arena.sliceName.text);
+        result = new RequestSliverStart(cm, nodes, arena.sliceUrn.text);
       }
       return result;
     }
@@ -221,7 +221,7 @@ package
           || nodes.existsState(cm, ActiveNodes.CREATED)
           || nodes.existsState(cm, ActiveNodes.BOOTED))
       {
-        result = new RequestSliverDestroy(cm, nodes, arena.sliceName.text);
+        result = new RequestSliverDestroy(cm, nodes, arena.sliceUrn.text);
       }
       return result;
     }

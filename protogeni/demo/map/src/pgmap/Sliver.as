@@ -28,9 +28,11 @@
 		public var credential : Object = null;
 		public var componentManager : ComponentManager = null;
 		public var rspec : XML = null;
+		public var urn : String = null;
 		
+		public var state : String;
 		public var status : String;
-		public var sliceStatus : String;
+		public var error : String;
 		
 		public var nodes:ArrayCollection = new ArrayCollection();
 		public var links:ArrayCollection = new ArrayCollection();
@@ -61,7 +63,7 @@
       			var virtualNode:VirtualNode = new VirtualNode(this);
       			virtualNode.virtualId = nodeXml.virtual_id;
       			virtualNode.virtualizationType = nodeXml.virtualization_type;
-      			virtualNode.physicalNode = componentManager.Nodes.GetByUrn(nodeXml.component_urn);
+      			virtualNode.physicalNode = componentManager.Nodes.GetByUrn(nodeXml.@component_urn);
       			for each(var ix:XML in nodeXml.children()) {
 	        		if(ix.localName() == "interface") {
 	        			var virtualInterface:VirtualInterface = new VirtualInterface(virtualNode);
@@ -74,6 +76,7 @@
       			nodes.addItem(virtualNode);
       			nodesById[virtualNode.virtualId] = virtualNode;
       			virtualNode.physicalNode.virtualNodes.addItem(virtualNode);
+      			var i:int = 0;
       		}
       		
       		for each(var linkXml:XML in linksXml)

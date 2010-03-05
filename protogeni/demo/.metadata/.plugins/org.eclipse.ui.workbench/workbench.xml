@@ -30,17 +30,22 @@
 <presentation id="org.eclipse.ui.internal.presentations.r33.WorkbenchPresentationFactory_33">
 <part id="0"/>
 <part id="1"/>
+<part id="2"/>
 </presentation>
 </folder>
 </info>
 </editorArea>
-<editor activePart="true" focus="true" id="com.adobe.flexbuilder.editors.actionscript.ActionScriptEditor" name="ProtoGeniRpcHandler.as" partName="ProtoGeniRpcHandler.as" path="D:/FLUX/emulab-devel/protogeni/demo/map/src/pgmap/ProtoGeniRpcHandler.as" title="ProtoGeniRpcHandler.as" tooltip="map/src/pgmap/ProtoGeniRpcHandler.as" workbook="DefaultEditorWorkbook">
+<editor id="com.adobe.flexbuilder.editors.actionscript.ActionScriptEditor" name="ProtoGeniRpcHandler.as" partName="ProtoGeniRpcHandler.as" path="D:/FLUX/emulab-devel/protogeni/demo/map/src/pgmap/ProtoGeniRpcHandler.as" title="ProtoGeniRpcHandler.as" tooltip="map/src/pgmap/ProtoGeniRpcHandler.as" workbook="DefaultEditorWorkbook">
 <input factoryID="org.eclipse.ui.part.FileEditorInputFactory" path="/map/src/pgmap/ProtoGeniRpcHandler.as"/>
-<editorState selectionHPixel="0" selectionLength="0" selectionOffset="21178"/>
+<editorState selectionHPixel="0" selectionLength="0" selectionOffset="25613"/>
 </editor>
-<editor id="com.adobe.flexbuilder.editors.actionscript.ActionScriptEditor" name="Geni.as" partName="Geni.as" path="D:/Desktop/testbed/protogeni/demo/shared/Geni.as" title="Geni.as" tooltip="map/[source path] shared/Geni.as" workbook="DefaultEditorWorkbook">
-<input factoryID="org.eclipse.ui.part.FileEditorInputFactory" path="/map/[source path] shared/Geni.as"/>
-<editorState selectionHPixel="0" selectionLength="8" selectionOffset="1703"/>
+<editor id="com.adobe.flexbuilder.editors.actionscript.ActionScriptEditor" name="ProtoGeniMapHandler.as" partName="ProtoGeniMapHandler.as" path="D:/FLUX/emulab-devel/protogeni/demo/map/src/pgmap/ProtoGeniMapHandler.as" title="ProtoGeniMapHandler.as" tooltip="map/src/pgmap/ProtoGeniMapHandler.as" workbook="DefaultEditorWorkbook">
+<input factoryID="org.eclipse.ui.part.FileEditorInputFactory" path="/map/src/pgmap/ProtoGeniMapHandler.as"/>
+<editorState selectionHPixel="0" selectionLength="0" selectionOffset="8992"/>
+</editor>
+<editor activePart="true" focus="true" id="com.adobe.flexbuilder.editors.actionscript.ActionScriptEditor" name="Sliver.as" partName="Sliver.as" path="D:/FLUX/emulab-devel/protogeni/demo/map/src/pgmap/Sliver.as" title="Sliver.as" tooltip="map/src/pgmap/Sliver.as" workbook="DefaultEditorWorkbook">
+<input factoryID="org.eclipse.ui.part.FileEditorInputFactory" path="/map/src/pgmap/Sliver.as"/>
+<editorState selectionHPixel="0" selectionLength="0" selectionOffset="3617"/>
 </editor>
 </editors>
 <views>
@@ -62,7 +67,7 @@
 <element path="/map/src/pgmap"/>
 </expanded>
 <selection>
-<element path="/map/src/pgmap/ProtoGeniRpcHandler.as"/>
+<element path="/map/src/pgmap/ProtoGeniMapHandler.as"/>
 </selection>
 </viewState>
 </view>
@@ -256,33 +261,49 @@
 <view id="org.eclipse.debug.ui.BreakpointView"/>
 <view id="org.eclipse.debug.ui.ExpressionView"/>
 <fastViewBars/>
-<layout>&#x0A;<mainWindow>&#x0A;<info folder="true" part="org.eclipse.ui.internal.ViewStack@111e2b5">&#x0A;<folder activePageID="com.adobe.flexbuilder.navigator" appearance="2" expanded="2">&#x0A;<page content="com.adobe.flexbuilder.navigator" label="Flex Navigator "/>
-<presentation id="org.eclipse.ui.internal.presentations.r33.WorkbenchPresentationFactory_33">&#x0A;<part id="0"/>
+<layout>
+<mainWindow>
+<info folder="true" part="org.eclipse.ui.internal.ViewStack@111e2b5">
+<folder activePageID="com.adobe.flexbuilder.navigator" appearance="2" expanded="2">
+<page content="com.adobe.flexbuilder.navigator" label="Flex Navigator "/>
+<presentation id="org.eclipse.ui.internal.presentations.r33.WorkbenchPresentationFactory_33">
+<part id="0"/>
 </presentation>
 </folder>
 </info>
-<info folder="true" part="stickyFolderRight" ratio="0.75" ratioLeft="762" ratioRight="254" relationship="2" relative="org.eclipse.ui.internal.ViewStack@111e2b5">&#x0A;<folder appearance="2" expanded="2">&#x0A;<page content="org.eclipse.help.ui.HelpView" label="LabelNotFound"/>
+<info folder="true" part="stickyFolderRight" ratio="0.75" ratioLeft="762" ratioRight="254" relationship="2" relative="org.eclipse.ui.internal.ViewStack@111e2b5">
+<folder appearance="2" expanded="2">
+<page content="org.eclipse.help.ui.HelpView" label="LabelNotFound"/>
 <page content="org.eclipse.ui.internal.introview" label="LabelNotFound"/>
 <page content="org.eclipse.ui.cheatsheets.views.CheatSheetView" label="LabelNotFound"/>
 </folder>
 </info>
-<info folder="true" part="org.eclipse.debug.internal.ui.NavigatorFolderView" ratio="0.23395854" ratioLeft="237" ratioRight="776" relationship="2" relative="org.eclipse.ui.internal.ViewStack@111e2b5">&#x0A;<folder activePageID="org.eclipse.debug.ui.DebugView" appearance="2" expanded="2">&#x0A;<page content="org.eclipse.debug.ui.DebugView" label="Debug"/>
-<presentation id="org.eclipse.ui.internal.presentations.r33.WorkbenchPresentationFactory_33">&#x0A;<part id="0"/>
+<info folder="true" part="org.eclipse.debug.internal.ui.NavigatorFolderView" ratio="0.23395854" ratioLeft="237" ratioRight="776" relationship="2" relative="org.eclipse.ui.internal.ViewStack@111e2b5">
+<folder activePageID="org.eclipse.debug.ui.DebugView" appearance="2" expanded="2">
+<page content="org.eclipse.debug.ui.DebugView" label="Debug"/>
+<presentation id="org.eclipse.ui.internal.presentations.r33.WorkbenchPresentationFactory_33">
+<part id="0"/>
 </presentation>
 </folder>
 </info>
-<info folder="true" part="org.eclipse.debug.internal.ui.ConsoleFolderView" ratio="0.86698717" ratioLeft="541" ratioRight="83" relationship="4" relative="org.eclipse.debug.internal.ui.NavigatorFolderView">&#x0A;<folder activePageID="org.eclipse.ui.console.ConsoleView" appearance="2" expanded="2">&#x0A;<page content="org.eclipse.ui.console.ConsoleView" label="Console"/>
+<info folder="true" part="org.eclipse.debug.internal.ui.ConsoleFolderView" ratio="0.86858976" ratioLeft="542" ratioRight="82" relationship="4" relative="org.eclipse.debug.internal.ui.NavigatorFolderView">
+<folder activePageID="org.eclipse.ui.console.ConsoleView" appearance="2" expanded="2">
+<page content="org.eclipse.ui.console.ConsoleView" label="Console"/>
 <page content="org.eclipse.ui.views.ProblemView" label="Problems"/>
-<presentation id="org.eclipse.ui.internal.presentations.r33.WorkbenchPresentationFactory_33">&#x0A;<part id="0"/>
+<presentation id="org.eclipse.ui.internal.presentations.r33.WorkbenchPresentationFactory_33">
+<part id="0"/>
 <part id="1"/>
 </presentation>
 </folder>
 </info>
 <info part="org.eclipse.ui.editorss" ratio="0.66741073" ratioLeft="299" ratioRight="149" relationship="4" relative="org.eclipse.debug.internal.ui.NavigatorFolderView"/>
-<info folder="true" part="org.eclipse.debug.internal.ui.ToolsFolderView" ratio="0.22897801" ratioLeft="177" ratioRight="596" relationship="2" relative="org.eclipse.debug.internal.ui.NavigatorFolderView">&#x0A;<folder activePageID="org.eclipse.debug.ui.VariableView" appearance="2" expanded="2">&#x0A;<page content="org.eclipse.debug.ui.VariableView" label="Variables"/>
+<info folder="true" part="org.eclipse.debug.internal.ui.ToolsFolderView" ratio="0.22897801" ratioLeft="177" ratioRight="596" relationship="2" relative="org.eclipse.debug.internal.ui.NavigatorFolderView">
+<folder activePageID="org.eclipse.debug.ui.VariableView" appearance="2" expanded="2">
+<page content="org.eclipse.debug.ui.VariableView" label="Variables"/>
 <page content="org.eclipse.debug.ui.BreakpointView" label="Breakpoints"/>
 <page content="org.eclipse.debug.ui.ExpressionView" label="Expressions"/>
-<presentation id="org.eclipse.ui.internal.presentations.r33.WorkbenchPresentationFactory_33">&#x0A;<part id="0"/>
+<presentation id="org.eclipse.ui.internal.presentations.r33.WorkbenchPresentationFactory_33">
+<part id="0"/>
 <part id="1"/>
 <part id="2"/>
 </presentation>
@@ -296,90 +317,163 @@
 <navigationHistory>
 <editors>
 <editor factoryID="org.eclipse.ui.part.FileEditorInputFactory" id="com.adobe.flexbuilder.editors.actionscript.ActionScriptEditor" path="/map/src/pgmap/ProtoGeniRpcHandler.as"/>
-<editor factoryID="org.eclipse.ui.part.FileEditorInputFactory" id="com.adobe.flexbuilder.editors.actionscript.ActionScriptEditor" path="/map/src/pgmap/Common.as"/>
-<editor factoryID="org.eclipse.ui.part.FileEditorInputFactory" id="com.adobe.flexbuilder.editors.actionscript.ActionScriptEditor" path="/map/[source path] shared/Geni.as"/>
-<editor factoryID="org.eclipse.ui.part.FileEditorInputFactory" id="com.adobe.flexbuilder.editors.actionscript.ActionScriptEditor" path="/map/[source path] shared/Operation.as"/>
+<editor factoryID="org.eclipse.ui.part.FileEditorInputFactory" id="com.adobe.flexbuilder.editors.actionscript.ActionScriptEditor" path="/map/src/pgmap/Sliver.as"/>
+<editor factoryID="org.eclipse.ui.part.FileEditorInputFactory" id="com.adobe.flexbuilder.editors.actionscript.ActionScriptEditor" path="/map/[source path] shared/com/mattism/http/xmlrpc/ConnectionImpl.as"/>
+<editor factoryID="org.eclipse.ui.part.FileEditorInputFactory" id="com.adobe.flexbuilder.editors.actionscript.ActionScriptEditor" path="/map/src/pgmap/VirtualNode.as"/>
+<editor factoryID="org.eclipse.ui.part.FileEditorInputFactory" id="com.adobe.flexbuilder.editors.actionscript.ActionScriptEditor" path="/map/src/pgmap/Slice.as"/>
+<editor factoryID="org.eclipse.ui.part.FileEditorInputFactory" id="com.adobe.flexbuilder.editors.actionscript.ActionScriptEditor" path="/map/[source path] shared/com/mattism/http/xmlrpc/ParserImpl.as"/>
+<editor factoryID="org.eclipse.ui.part.FileEditorInputFactory" id="com.adobe.flexbuilder.editors.actionscript.ActionScriptEditor" path="/map/src/pgmap/User.as"/>
+<editor factoryID="org.eclipse.ui.part.FileEditorInputFactory" id="com.adobe.flexbuilder.editors.actionscript.ActionScriptEditor" path="/map/src/pgmap/ProtoGeniMapHandler.as"/>
 </editors>
+<item historyLabel="ConnectionImpl.as" index="2">
+<position info="not_deleted" x="5171" y="0"/>
+</item>
+<item historyLabel="Sliver.as" index="1">
+<position info="not_deleted" x="2692" y="68"/>
+</item>
+<item historyLabel="ProtoGeniRpcHandler.as" index="0">
+<position info="not_deleted" x="25548" y="0"/>
+</item>
+<item historyLabel="Sliver.as" index="1">
+<position info="not_deleted" x="2692" y="68"/>
+</item>
+<item historyLabel="VirtualNode.as" index="3">
+<position/>
+</item>
+<item historyLabel="Sliver.as" index="1">
+<position info="not_deleted" x="2692" y="0"/>
+</item>
+<item historyLabel="VirtualNode.as" index="3">
+<position info="not_deleted" x="867" y="0"/>
+</item>
+<item historyLabel="Sliver.as" index="1">
+<position info="not_deleted" x="2770" y="0"/>
+</item>
+<item historyLabel="ConnectionImpl.as" index="2">
+<position info="not_deleted" x="5171" y="0"/>
+</item>
+<item historyLabel="Slice.as" index="4">
+<position/>
+</item>
+<item historyLabel="Sliver.as" index="1">
+<position info="not_deleted" x="2770" y="0"/>
+</item>
+<item historyLabel="Sliver.as" index="1">
+<position info="not_deleted" x="2784" y="0"/>
+</item>
+<item historyLabel="Sliver.as" index="1">
+<position info="not_deleted" x="2713" y="12"/>
+</item>
+<item historyLabel="VirtualNode.as" index="3">
+<position/>
+</item>
+<item historyLabel="Sliver.as" index="1">
+<position info="not_deleted" x="2713" y="12"/>
+</item>
+<item historyLabel="Sliver.as" index="1">
+<position info="not_deleted" x="1944" y="61"/>
+</item>
+<item historyLabel="Sliver.as" index="1">
+<position info="not_deleted" x="2006" y="0"/>
+</item>
+<item historyLabel="Sliver.as" index="1">
+<position info="not_deleted" x="2059" y="0"/>
+</item>
+<item historyLabel="Sliver.as" index="1">
+<position info="not_deleted" x="2223" y="53"/>
+</item>
+<item historyLabel="ParserImpl.as" index="5">
+<position info="not_deleted" x="1167" y="0"/>
+</item>
+<item historyLabel="Sliver.as" index="1">
+<position info="not_deleted" x="2223" y="0"/>
+</item>
+<item historyLabel="ProtoGeniRpcHandler.as" index="0">
+<position info="not_deleted" x="25548" y="0"/>
+</item>
+<item historyLabel="ProtoGeniRpcHandler.as" index="0">
+<position info="not_deleted" x="25612" y="35"/>
+</item>
+<item historyLabel="ProtoGeniRpcHandler.as" index="0">
+<position info="not_deleted" x="25652" y="0"/>
+</item>
+<item historyLabel="ProtoGeniRpcHandler.as" index="0">
+<position info="not_deleted" x="25561" y="53"/>
+</item>
+<item historyLabel="Slice.as" index="4">
+<position/>
+</item>
+<item historyLabel="Sliver.as" index="1">
+<position info="not_deleted" x="1207" y="0"/>
+</item>
+<item historyLabel="Slice.as" index="4">
+<position/>
+</item>
+<item historyLabel="ProtoGeniRpcHandler.as" index="0">
+<position info="not_deleted" x="25561" y="53"/>
+</item>
+<item historyLabel="Slice.as" index="4">
+<position/>
+</item>
+<item historyLabel="ProtoGeniRpcHandler.as" index="0">
+<position info="not_deleted" x="25561" y="53"/>
+</item>
+<item historyLabel="Sliver.as" index="1">
+<position info="not_deleted" x="1207" y="0"/>
+</item>
+<item historyLabel="ProtoGeniRpcHandler.as" index="0">
+<position info="not_deleted" x="25561" y="53"/>
+</item>
+<item historyLabel="Slice.as" index="4">
+<position/>
+</item>
+<item historyLabel="ProtoGeniRpcHandler.as" index="0">
+<position info="not_deleted" x="20896" y="35"/>
+</item>
 <item historyLabel="ProtoGeniRpcHandler.as" index="0">
 <position/>
 </item>
-<item historyLabel="Common.as" index="1">
-<position/>
-</item>
 <item historyLabel="ProtoGeniRpcHandler.as" index="0">
 <position/>
 </item>
-<item historyLabel="Geni.as" index="2">
-<position info="not_deleted" x="1429" y="13"/>
-</item>
-<item historyLabel="ProtoGeniRpcHandler.as" index="0">
-<position info="not_deleted" x="4596" y="0"/>
-</item>
-<item historyLabel="Geni.as" index="2">
-<position info="not_deleted" x="1429" y="13"/>
+<item historyLabel="User.as" index="6">
+<position info="not_deleted" x="1476" y="21"/>
 </item>
 <item historyLabel="ProtoGeniRpcHandler.as" index="0">
 <position/>
 </item>
-<item historyLabel="Operation.as" index="3">
-<position info="not_deleted" x="1934" y="8"/>
-</item>
-<item historyLabel="Operation.as" index="3">
-<position info="not_deleted" x="1995" y="0"/>
-</item>
-<item historyLabel="Operation.as" index="3">
-<position info="not_deleted" x="4168" y="5"/>
+<item historyLabel="Slice.as" index="4">
+<position info="not_deleted" x="2074" y="0"/>
 </item>
 <item historyLabel="ProtoGeniRpcHandler.as" index="0">
-<position info="not_deleted" x="10499" y="0"/>
-</item>
-<item historyLabel="Geni.as" index="2">
-<position info="not_deleted" x="1573" y="7"/>
+<position info="not_deleted" x="26014" y="0"/>
 </item>
 <item historyLabel="ProtoGeniRpcHandler.as" index="0">
-<position info="not_deleted" x="14286" y="0"/>
-</item>
-<item historyLabel="Geni.as" index="2">
-<position info="not_deleted" x="1429" y="13"/>
-</item>
-<item historyLabel="Common.as" index="1">
-<position info="not_deleted" x="1406" y="0"/>
-</item>
-<item historyLabel="Geni.as" index="2">
-<position info="not_deleted" x="1429" y="13"/>
+<position info="not_deleted" x="27167" y="0"/>
 </item>
 <item historyLabel="ProtoGeniRpcHandler.as" index="0">
-<position info="not_deleted" x="16459" y="0"/>
-</item>
-<item historyLabel="Geni.as" index="2">
-<position info="not_deleted" x="2454" y="11"/>
+<position info="not_deleted" x="25496" y="0"/>
 </item>
 <item historyLabel="ProtoGeniRpcHandler.as" index="0">
-<position info="not_deleted" x="16459" y="0"/>
-</item>
-<item historyLabel="Geni.as" index="2">
-<position info="not_deleted" x="2451" y="0"/>
+<position info="not_deleted" x="25689" y="1"/>
 </item>
 <item historyLabel="ProtoGeniRpcHandler.as" index="0">
-<position info="not_deleted" x="14306" y="0"/>
+<position info="not_deleted" x="8759" y="0"/>
 </item>
-<item historyLabel="Geni.as" index="2">
-<position info="not_deleted" x="1429" y="13"/>
+<item historyLabel="ProtoGeniMapHandler.as" index="7">
+<position info="not_deleted" x="11767" y="0"/>
+</item>
+<item historyLabel="ProtoGeniMapHandler.as" index="7">
+<position info="not_deleted" x="8668" y="14"/>
+</item>
+<item historyLabel="ProtoGeniMapHandler.as" index="7">
+<position info="not_deleted" x="8992" y="118"/>
 </item>
 <item historyLabel="ProtoGeniRpcHandler.as" index="0">
-<position info="not_deleted" x="21178" y="0"/>
+<position info="not_deleted" x="25613" y="0"/>
 </item>
-<item historyLabel="Geni.as" index="2">
-<position info="not_deleted" x="1703" y="8"/>
-</item>
-<item historyLabel="ProtoGeniRpcHandler.as" index="0">
-<position info="not_deleted" x="21178" y="0"/>
-</item>
-<item historyLabel="Geni.as" index="2">
-<position info="not_deleted" x="1703" y="8"/>
-</item>
-<item active="true" historyLabel="ProtoGeniRpcHandler.as" index="0">
-<position info="not_deleted" x="21178" y="0"/>
+<item active="true" historyLabel="Sliver.as" index="1">
+<position info="not_deleted" x="1452" y="10"/>
 </item>
 </navigationHistory>
 <input factoryID="org.eclipse.ui.internal.model.ResourceFactory" path="/" type="8"/>
@@ -387,9 +481,6 @@
 <workbenchWindowAdvisor/>
 <actionBarAdvisor/>
 <trimLayout>
-<trimArea IMemento.internal.id="16384">
-<trimItem IMemento.internal.id="org.eclipse.ui.internal.ViewStack@1cbcf91"/>
-</trimArea>
 <trimArea IMemento.internal.id="128">
 <trimItem IMemento.internal.id="org.eclipse.ui.internal.WorkbenchWindow.topBar"/>
 </trimArea>
@@ -397,17 +488,39 @@
 <trimItem IMemento.internal.id="org.eclise.ui.internal.FastViewBar"/>
 <trimItem IMemento.internal.id="org.eclipse.jface.action.StatusLineManager"/>
 <trimItem IMemento.internal.id="org.eclipse.ui.internal.progress.ProgressRegion"/>
-<trimItem IMemento.internal.id="org.eclipse.ui.internal.ViewStack@10699ea"/>
-<trimItem IMemento.internal.id="outlineHolder"/>
 </trimArea>
 </trimLayout>
 </window>
 <mruList>
-<file factoryID="org.eclipse.ui.part.FileEditorInputFactory" id="com.adobe.flexbuilder.editors.actionscript.ActionScriptEditor" name="Operation.as" tooltip="map/[source path] shared/Operation.as">
-<persistable path="/map/[source path] shared/Operation.as"/>
+<file factoryID="org.eclipse.ui.part.FileEditorInputFactory" id="com.adobe.flexbuilder.editors.actionscript.ActionScriptEditor" name="Sliver.as" tooltip="map/src/pgmap/Sliver.as">
+<persistable path="/map/src/pgmap/Sliver.as"/>
+</file>
+<file factoryID="org.eclipse.ui.part.FileEditorInputFactory" id="com.adobe.flexbuilder.editors.actionscript.ActionScriptEditor" name="ProtoGeniMapHandler.as" tooltip="map/src/pgmap/ProtoGeniMapHandler.as">
+<persistable path="/map/src/pgmap/ProtoGeniMapHandler.as"/>
+</file>
+<file factoryID="org.eclipse.ui.part.FileEditorInputFactory" id="com.adobe.flexbuilder.editors.actionscript.ActionScriptEditor" name="User.as" tooltip="map/src/pgmap/User.as">
+<persistable path="/map/src/pgmap/User.as"/>
+</file>
+<file factoryID="org.eclipse.ui.part.FileEditorInputFactory" id="com.adobe.flexbuilder.editors.actionscript.ActionScriptEditor" name="Slice.as" tooltip="map/src/pgmap/Slice.as">
+<persistable path="/map/src/pgmap/Slice.as"/>
+</file>
+<file factoryID="org.eclipse.ui.part.FileEditorInputFactory" id="com.adobe.flexbuilder.editors.actionscript.ActionScriptEditor" name="VirtualNode.as" tooltip="map/src/pgmap/VirtualNode.as">
+<persistable path="/map/src/pgmap/VirtualNode.as"/>
+</file>
+<file factoryID="org.eclipse.ui.part.FileEditorInputFactory" id="com.adobe.flexbuilder.editors.actionscript.ActionScriptEditor" name="ConnectionImpl.as" tooltip="map/[source path] shared/com/mattism/http/xmlrpc/ConnectionImpl.as">
+<persistable path="/map/[source path] shared/com/mattism/http/xmlrpc/ConnectionImpl.as"/>
+</file>
+<file factoryID="org.eclipse.ui.part.FileEditorInputFactory" id="com.adobe.flexbuilder.editors.mxml.MXMLEditor" name="pgmap.mxml" tooltip="map/src/pgmap.mxml">
+<persistable path="/map/src/pgmap.mxml"/>
+</file>
+<file factoryID="org.eclipse.ui.part.FileEditorInputFactory" id="com.adobe.flexbuilder.editors.mxml.MXMLEditor" name="ComponentManagerAdvancedWindow.mxml" tooltip="map/src/pgmap/ComponentManagerAdvancedWindow.mxml">
+<persistable path="/map/src/pgmap/ComponentManagerAdvancedWindow.mxml"/>
 </file>
 <file factoryID="org.eclipse.ui.part.FileEditorInputFactory" id="com.adobe.flexbuilder.editors.actionscript.ActionScriptEditor" name="Geni.as" tooltip="map/[source path] shared/Geni.as">
 <persistable path="/map/[source path] shared/Geni.as"/>
+</file>
+<file factoryID="org.eclipse.ui.part.FileEditorInputFactory" id="com.adobe.flexbuilder.editors.actionscript.ActionScriptEditor" name="Operation.as" tooltip="map/[source path] shared/Operation.as">
+<persistable path="/map/[source path] shared/Operation.as"/>
 </file>
 <file factoryID="org.eclipse.ui.part.FileEditorInputFactory" id="com.adobe.flexbuilder.editors.actionscript.ActionScriptEditor" name="Common.as" tooltip="map/src/pgmap/Common.as">
 <persistable path="/map/src/pgmap/Common.as"/>
@@ -423,30 +536,6 @@
 </file>
 <file factoryID="org.eclipse.ui.part.FileEditorInputFactory" id="com.adobe.flexbuilder.editors.mxml.MXMLEditor" name="ComponentManagerAdvancedInformation.mxml" tooltip="map/src/pgmap/ComponentManagerAdvancedInformation.mxml">
 <persistable path="/map/src/pgmap/ComponentManagerAdvancedInformation.mxml"/>
-</file>
-<file factoryID="org.eclipse.ui.part.FileEditorInputFactory" id="com.adobe.flexbuilder.editors.mxml.MXMLEditor" name="ChooseComponentManagerWindow.mxml" tooltip="map/src/pgmap/ChooseComponentManagerWindow.mxml">
-<persistable path="/map/src/pgmap/ChooseComponentManagerWindow.mxml"/>
-</file>
-<file factoryID="org.eclipse.ui.part.FileEditorInputFactory" id="com.adobe.flexbuilder.editors.mxml.MXMLEditor" name="ComponentManagerAdvancedWindow.mxml" tooltip="map/src/pgmap/ComponentManagerAdvancedWindow.mxml">
-<persistable path="/map/src/pgmap/ComponentManagerAdvancedWindow.mxml"/>
-</file>
-<file factoryID="org.eclipse.ui.part.FileEditorInputFactory" id="org.eclipse.ui.systemExternalEditor" name="ComponentManager.as.bak" tooltip="map/src/pgmap/ComponentManager.as.bak">
-<persistable path="/map/src/pgmap/ComponentManager.as.bak"/>
-</file>
-<file factoryID="org.eclipse.ui.part.FileEditorInputFactory" id="com.adobe.flexbuilder.editors.actionscript.ActionScriptEditor" name="ComponentManager.as" tooltip="map/src/pgmap/ComponentManager.as">
-<persistable path="/map/src/pgmap/ComponentManager.as"/>
-</file>
-<file factoryID="org.eclipse.ui.part.FileEditorInputFactory" id="com.adobe.flexbuilder.editors.mxml.MXMLEditor" name="pgmap.mxml" tooltip="map/src/pgmap.mxml">
-<persistable path="/map/src/pgmap.mxml"/>
-</file>
-<file factoryID="org.eclipse.ui.part.FileEditorInputFactory" id="com.adobe.flexbuilder.editors.actionscript.ActionScriptEditor" name="ConnectionHandler.as" tooltip="map/src/pgmap/ConnectionHandler.as">
-<persistable path="/map/src/pgmap/ConnectionHandler.as"/>
-</file>
-<file factoryID="org.eclipse.ui.part.FileEditorInputFactory" id="com.adobe.flexbuilder.editors.actionscript.ActionScriptEditor" name="JavaMessage.as" tooltip="map/src/pgmap/JavaMessage.as">
-<persistable path="/map/src/pgmap/JavaMessage.as"/>
-</file>
-<file factoryID="org.eclipse.ui.part.FileEditorInputFactory" id="com.adobe.flexbuilder.editors.actionscript.ActionScriptEditor" name="PhysicalNode.as" tooltip="map/src/pgmap/PhysicalNode.as">
-<persistable path="/map/src/pgmap/PhysicalNode.as"/>
 </file>
 </mruList>
 </workbench>

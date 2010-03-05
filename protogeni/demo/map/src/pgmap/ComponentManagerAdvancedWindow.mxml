@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ResizeWindow xmlns="pgmap.*" xmlns:mx="http://www.adobe.com/2006/mxml"
-	width="422" height="118" showCloseButton="true" layout="vertical"
+	width="500" height="118" showCloseButton="true" layout="vertical"
 	borderAlpha=".9" borderColor="#D2E1F0"
 	resizable="true"
 	title="Component Manager Information"
