@@ -81,7 +81,6 @@ sub Lookup($$;$)
     $self->{'DBROW'}      = $query_result->fetchrow_hashref();
     $self->{'NEWTICKET'}  = undef;
     $self->{'manager_version'}    = undef;
-    $self->{'rspec_fragment'}     = undef;
     $self->{'last_rpcerror'}	  = 0;
     bless($self, $class);
 
@@ -265,7 +264,8 @@ sub Refresh($)
     return -1
 	if (!$query_result || !$query_result->numrows);
 
-    $self->{'DBROW'} = $query_result->fetchrow_hashref();
+    $self->{'DBROW'}     = $query_result->fetchrow_hashref();
+    $self->{'NEWTICKET'} = undef;
     return 0;
 }
 
@@ -1360,6 +1360,7 @@ sub SliverStatus($$$$)
 	$blob->{'details'} = $response->value()->{'detailsNew'};
     }
     elsif ($manager_version == 2.0) {
+	$blob->{'state'}   = $response->value()->{'state'};
 	$blob->{'details'} = $response->value()->{'details'};
     }
     $$pref = $blob
