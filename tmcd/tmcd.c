@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2009 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -1396,12 +1396,10 @@ COMMAND_PROTOTYPE(doifconfig)
 	char		buf[MYBUFSIZE], *ebufp = &buf[MYBUFSIZE];
 	int		nrows;
 	int		num_interfaces=0;
+	int		cookedgeninode = (reqp->geniflags & 0x2);
 
-	/*
-	 * Do nothing for cooked mode geni nodes; handled by remote config.
-	 */
-	if (reqp->geniflags & 0x2)
-		return 0;
+	if (cookedgeninode)
+		goto skipphys;
 
 	/* 
 	 * For Virtual Nodes, we return interfaces that belong to it.
@@ -1596,6 +1594,7 @@ COMMAND_PROTOTYPE(doifconfig)
 	if (vers < 10)
 		return 0;
 
+ skipphys:
 	/*
 	 * First, return config info for physical interfaces underlying
 	 * the virtual interfaces or delay interfaces. These are marked

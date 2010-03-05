@@ -1,0 +1,24 @@
+<rspec xmlns="http://protogeni.net/resources/rspec/0.1">
+ <node virtual_id="geni1" 
+       exclusive="0"
+       virtualization_type="emulab-vnode"
+       virtualization_subtype="emulab-openvz">
+   <interface virtual_id="virt0"/> 
+ </node>
+ <node virtual_id="geni2"
+       exclusive="0"
+       virtualization_type="emulab-vnode"
+       virtualization_subtype="emulab-openvz"> 
+   <interface virtual_id="virt0"/> 
+ </node>
+ <link virtual_id="link0"> 
+  <interface_ref 
+            virtual_interface_id="virt0" 
+            virtual_node_id="geni1" 
+            /> 
+  <interface_ref 
+            virtual_interface_id="virt0" 
+            virtual_node_id="geni2" 
+            /> 
+ </link> 
+</rspec>

@@ -205,12 +205,19 @@ else {
 # Use libaudit to capture any output from libraries and programs.
 # Send that to tbops so they can be fixed.
 #
-LogStart(0, undef, LIBAUDIT_LOGTBOPS());
+if ($MAINSITE) {
+    LogStart(0);
+    AddAuditInfo("to", "protogeni-errors\@flux.utah.edu")
+}
+else {
+    LogStart(0, undef, LIBAUDIT_LOGTBOPS());
+}
 
 # Add stuff for log message if sent.
 AddAuditInfo("message", $request);
 # CC errors to Utah for now.
-AddAuditInfo("cc", "protogeni-errors\@flux.utah.edu");
+AddAuditInfo("cc", "protogeni-errors\@flux.utah.edu")
+    if (!$MAINSITE);
 
 my $response = $responder->{'_decode'}->serve($request,
 					      $responder->{'methods'});
