@@ -278,23 +278,20 @@
 	        currentCm.Rspec = new XML(decodedRspec);
 		  	currentIndex++;
 		  	currentCm.processRspec(startResourceLookup);
-	      }
-	      else if(code == GENIRESPONSE_BADARGS)
-	      {
-	      	main.setProgress("Done", Common.failColor);
-	    	main.stopWaiting();
-	    	currentCm.Message = "Malformed arguments";
-			currentCm.Status = ComponentManager.FAILED;
-			currentIndex++;
-			main.chooseCMWindow.ResetStatus(currentCm);
-			startResourceLookup();
-	      }
-	      else
-	      {
-	        codeFailure();
-	        currentCm.Status = ComponentManager.FAILED;
-	        main.console.appendText(op.getResponseXml());
-			main.chooseCMWindow.ResetStatus(currentCm);
+	      } else {
+		      	main.setProgress("Done", Common.failColor);
+		    	main.stopWaiting();
+		    	switch(code) {
+		    		case GENIRESPONSE_BADARGS: currentCm.Message = "Malformed arguments";
+		    			break;
+		    		case GENIRESPONSE_ERROR: currentCm.Message = "Error";
+		    			break;
+		    		default: currentCm.Message = "Other error";
+		    	}
+				currentCm.Status = ComponentManager.FAILED;
+				currentIndex++;
+				main.chooseCMWindow.ResetStatus(currentCm);
+				startResourceLookup();
 	      }
 	    }
 	    
@@ -622,7 +619,8 @@
 	      addResponse();
 	      if (code == GENIRESPONSE_SUCCESS)
 	      {
-	      	//currentSliver.status = response.value.status;
+	      	currentSliver.status = response.value.status;
+	      	currentSliver.state = response.value.state;
 	      	nextTotalCalls++;
 	      }
 	      else
@@ -664,6 +662,7 @@
 
 	    	if(currentIndex >= main.pgHandler.CurrentUser.slices.length || totalCalls == 0)
 	    	{
+	    		main.fillCombobox();
 	    		main.pgHandler.map.drawAll();
 	    		return;
 	    	}

@@ -25,6 +25,7 @@
 	    public static var NOTREADY : String = "notready";
 	    public static var FAILED : String = "failed";
 	    public static var UNKNOWN : String = "unknown";
+	    public static var NA : String = "N/A";
 	    
 	    // State values
 	    public static var STARTED : String = "started";
@@ -37,16 +38,26 @@
 		public var creator : User = null;
 		public var credential : String = "";
 		public var slivers : ArrayCollection = new ArrayCollection();
-		
-		public var state : String = "";
-		public var status : String = "";
 
 		public function Slice()
 		{
 		}
 		
+		public function Status():String {
+			if(hrn == null) return null;
+			var status:String = NA;
+			for each(var sliver:Sliver in slivers) {
+				if(status == NA) status = sliver.status;
+				else {
+					if(sliver.status != status)
+						return "mixed";
+				}
+			}
+			return status;
+		}
+		
 		public function ReadyIcon():Class {
-			switch(status) {
+			switch(Status()) {
 				case READY : return Common.flagGreenIcon;
 				case NOTREADY : return Common.flagYellowIcon;
 				case FAILED : return Common.flagRedIcon;
@@ -66,7 +77,7 @@
 			else
 				returnString = hrn;
 				
-			return returnString + " (" + state + ", " + status + ")";
+			return returnString + " (" + Status() + ")";
 		}
 		
 		// Used to push more important slices to the top of lists
@@ -76,7 +87,7 @@
 				return -1;
 			}
 			
-			if(status == "ready")
+			if(Status() == "ready")
 				return 0;
 			else
 				return 1;

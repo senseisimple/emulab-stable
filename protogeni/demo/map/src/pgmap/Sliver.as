@@ -32,7 +32,6 @@
 		
 		public var state : String;
 		public var status : String;
-		public var error : String;
 		
 		public var nodes:ArrayCollection = new ArrayCollection();
 		public var links:ArrayCollection = new ArrayCollection();
@@ -61,13 +60,14 @@
       		for each(var nodeXml:XML in nodesXml)
       		{
       			var virtualNode:VirtualNode = new VirtualNode(this);
-      			virtualNode.virtualId = nodeXml.virtual_id;
-      			virtualNode.virtualizationType = nodeXml.virtualization_type;
+      			virtualNode.virtualId = nodeXml.@virtual_id;
+      			virtualNode.sliverUrn = nodeXml.@sliver_urn;
+      			virtualNode.virtualizationType = nodeXml.@virtualization_type;
       			virtualNode.physicalNode = componentManager.Nodes.GetByUrn(nodeXml.@component_urn);
       			for each(var ix:XML in nodeXml.children()) {
 	        		if(ix.localName() == "interface") {
 	        			var virtualInterface:VirtualInterface = new VirtualInterface(virtualNode);
-	      				virtualInterface.id = ix.virtual_id;
+	      				virtualInterface.id = ix.@virtual_id;
 	      				virtualNode.interfaces.addItem(virtualInterface);
       				}
 	        	}
@@ -82,14 +82,16 @@
       		for each(var linkXml:XML in linksXml)
       		{
       			var virtualLink:VirtualLink = new VirtualLink(this);
-      			virtualLink.virtualId = linkXml.virtual_id;
-      			virtualLink.bandwidth = linkXml.bandwidth;
-      			virtualLink.type = linkXml.link_type;
+      			virtualLink.virtualId = linkXml.@virtual_id;
+      			virtualLink.sliverUrn = linkXml.@sliver_urn;
+      			virtualLink.type = linkXml.@link_type;
       			
-      			for each(var viXml:XML in linkXml.interface_ref)
-      			{
-      				var vid:String = viXml.virtual_interface_id;
-      				var nid:String = viXml.virtual_node_id;
+      			for each(var viXml:XML in linkXml.children()) {
+      				if(viXml.localName() == "bandwidth")
+      					virtualLink.bandwidth = viXml.toString();
+	        		if(viXml.localName() == "interface_ref") {
+	        			var vid:String = viXml.@virtual_interface_id;
+      				var nid:String = viXml.@virtual_node_id;
       				var interfacedNode:VirtualNode = nodesById[nid];
       				for each(var vi:VirtualInterface in interfacedNode.interfaces)
       				{
@@ -100,7 +102,8 @@
       						break;
       					}
       				}
-      			}
+      				}
+	        	}
       			
       			virtualLink.rspec = linkXml.copy();
       			links.addItem(virtualLink);
