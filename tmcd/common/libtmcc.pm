@@ -39,6 +39,7 @@ use Exporter;
 
 # Must come after package declaration!
 use English;
+use Data::Dumper;
 
 #
 # Turn off line buffering on output
@@ -497,13 +498,19 @@ sub tmcc ($;$$%)
 sub tmccbossname()
 {
     my @tmccresults;
+    my $bossname;
 
-    if (runtmcc(TMCCCMD_BOSSINFO, undef, \@tmccresults) < 0 ||
+    if (exists($ENV{'BOSSNAME'})) {
+	$bossname = $ENV{'BOSSNAME'};
+    }
+    elsif (runtmcc(TMCCCMD_BOSSINFO, undef, \@tmccresults) < 0 ||
 	!scalar(@tmccresults)) {
 	warn("*** WARNING: Could not get bossinfo from tmcc!\n");
 	return undef;
     }
-    my ($bossname) = split(" ", $tmccresults[0]);
+    else {
+	($bossname) = split(" ", $tmccresults[0]);
+    }
 
     #
     # Taint check. Nice to do for the caller. Also strips any newline.
