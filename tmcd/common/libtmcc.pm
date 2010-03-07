@@ -39,6 +39,7 @@ use Exporter;
 
 # Must come after package declaration!
 use English;
+use Data::Dumper;
 
 #
 # Turn off line buffering on output
@@ -497,6 +498,9 @@ sub tmcc ($;$$%)
 sub tmccbossname()
 {
     my @tmccresults;
+
+    return $ENV{'BOSSNAME'}
+        if (exists($ENV{'BOSSNAME'}));
 
     if (runtmcc(TMCCCMD_BOSSINFO, undef, \@tmccresults) < 0 ||
 	!scalar(@tmccresults)) {
