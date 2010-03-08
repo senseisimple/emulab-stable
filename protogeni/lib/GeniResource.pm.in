@@ -80,8 +80,10 @@ sub Lookup($$;$)
     my $self              = {};
     $self->{'DBROW'}      = $query_result->fetchrow_hashref();
     $self->{'NEWTICKET'}  = undef;
-    $self->{'manager_version'}    = undef;
-    $self->{'last_rpcerror'}	  = 0;
+    $self->{'manager_version'} = undef;
+    $self->{'last_rpc_error'}  = 0;
+    $self->{'last_rpc_value'}  = undef;
+    $self->{'last_rpc_output'} = undef;
     bless($self, $class);
 
     return $self;
@@ -213,7 +215,9 @@ sub manifest_idx($)     { return field($_[0], "manifest_idx"); }
 sub ticket_idx($)       { return field($_[0], "ticket_idx"); }
 sub newticket_idx($)    { return field($_[0], "newticket_idx"); }
 sub manager_version($)  { return $_[0]->{'manager_version'}; }
-sub last_rpcerror($)    { return $_[0]->{'last_rpcerror'}; }
+sub last_rpc_error($)   { return $_[0]->{'last_rpc_error'}; }
+sub last_rpc_output($)  { return $_[0]->{'last_rpc_output'}; }
+sub last_rpc_value($)   { return $_[0]->{'last_rpc_value'}; }
 
 #
 # Delete a resource record from the DB.
@@ -467,7 +471,9 @@ sub GetTicket($$$$)
     my $response;
 
     # Always clear for caller.
-    $self->{'last_rpcerror'} = 0;
+    $self->{'last_rpc_error'} = 0;
+    $self->{'last_rpc_output'} = undef;
+    $self->{'last_rpc_value'}  = undef;
 
     my $slice = GeniSlice->Lookup($self->slice_idx());
     if (!defined($slice)) {
@@ -593,11 +599,13 @@ sub GetTicket($$$$)
 	Genixmlrpc::CallMethod($authority->url(), $usercontext,
 			       $method_name, $method_args);
     if (!defined($response)) {
-	$self->{'last_rpcerror'} = GENIRESPONSE_RPCERROR();
+	$self->{'last_rpc_error'} = GENIRESPONSE_RPCERROR();
 	print STDERR "*** Internal error getting/updating ticket for $self\n";
 	return -1;
     }
-    $self->{'last_rpcerror'} = $response->code();
+    $self->{'last_rpc_error'} = $response->code();
+    $self->{'last_rpc_output'} = $response->output();
+    $self->{'last_rpc_value'}  = $response->value();
     if ($response->code() != GENIRESPONSE_SUCCESS) {
 	if ($ticket) {
 	    print STDERR "Could not update ticket $ticket. Error: ";
@@ -634,7 +642,9 @@ sub RedeemTicket($$)
     my $response;
 
     # Always clear for caller.
-    $self->{'last_rpcerror'} = 0;
+    $self->{'last_rpc_error'} = 0;
+    $self->{'last_rpc_output'} = undef;
+    $self->{'last_rpc_value'}  = undef;
 
     my $slice = GeniSlice->Lookup($self->slice_idx());
     if (!defined($slice)) {
@@ -756,12 +766,14 @@ sub RedeemTicket($$)
 	Genixmlrpc::CallMethod($authority->url(), $usercontext,
 			       $method_name, $method_args);
     if (!defined($response)) {
-	$self->{'last_rpcerror'} = GENIRESPONSE_RPCERROR();
+	$self->{'last_rpc_error'} = GENIRESPONSE_RPCERROR();
 	print STDERR
 	    "*** Internal error redeeming/updating sliver for $self\n";
 	return -1;
     }
-    $self->{'last_rpcerror'} = $response->code();
+    $self->{'last_rpc_error'} = $response->code();
+    $self->{'last_rpc_output'} = $response->output();
+    $self->{'last_rpc_value'}  = $response->value();
     if ($response->code() != GENIRESPONSE_SUCCESS) {
 	if ($sliver_credential) {
 	    print STDERR "Could not update sliver $sliver_credential Error: ";
@@ -840,7 +852,9 @@ sub Clear($$)
     my $response;
 
     # Always clear for caller.
-    $self->{'last_rpcerror'} = 0;
+    $self->{'last_rpc_error'} = 0;
+    $self->{'last_rpc_output'} = undef;
+    $self->{'last_rpc_value'}  = undef;
 
     my $slice = GeniSlice->Lookup($self->slice_idx());
     if (!defined($slice)) {
@@ -951,11 +965,13 @@ sub Clear($$)
 	    Genixmlrpc::CallMethod($authority->url(), $usercontext,
 				   $method_name, $method_args);
 	if (!defined($response)) {
-	    $self->{'last_rpcerror'} = GENIRESPONSE_RPCERROR();
+	    $self->{'last_rpc_error'} = GENIRESPONSE_RPCERROR();
 	    print STDERR "*** Internal error deleting sliver for $self\n";
 	    return -1;
 	}
-	$self->{'last_rpcerror'} = $response->code();
+	$self->{'last_rpc_error'} = $response->code();
+	$self->{'last_rpc_output'} = $response->output();
+	$self->{'last_rpc_value'}  = $response->value();
 	if ($response->code() != GENIRESPONSE_SUCCESS &&
 	    $response->code() != GENIRESPONSE_SEARCHFAILED) {
 	    print STDERR "Could not delete sliver for $self. Error: ";
@@ -998,11 +1014,13 @@ sub Clear($$)
 	    Genixmlrpc::CallMethod($authority->url(), $usercontext,
 				   $method_name, $method_args);
 	if (!defined($response)) {
-	    $self->{'last_rpcerror'} = GENIRESPONSE_RPCERROR();
+	    $self->{'last_rpc_error'} = GENIRESPONSE_RPCERROR();
 	    print STDERR "*** Internal error releasing ticket for $self\n";
 	    return -1;
 	}
-	$self->{'last_rpcerror'} = $response->code();
+	$self->{'last_rpc_error'} = $response->code();
+	$self->{'last_rpc_output'} = $response->output();
+	$self->{'last_rpc_value'}  = $response->value();
 	if ($response->code() != GENIRESPONSE_SUCCESS &&
 	    $response->code() != GENIRESPONSE_SEARCHFAILED) {
 	    print STDERR "Could not release ticket for $self. Error: ";
@@ -1040,7 +1058,9 @@ sub Purge($$)
     my $response;
 
     # Always clear for caller.
-    $self->{'last_rpcerror'} = 0;
+    $self->{'last_rpc_error'} = 0;
+    $self->{'last_rpc_output'} = undef;
+    $self->{'last_rpc_value'}  = undef;
 
     my $slice = GeniSlice->Lookup($self->slice_idx());
     if (!defined($slice)) {
@@ -1134,11 +1154,13 @@ sub Purge($$)
 	Genixmlrpc::CallMethod($authority->url(), $usercontext,
 			       $method_name, $method_args);
     if (!defined($response)) {
-	$self->{'last_rpcerror'} = GENIRESPONSE_RPCERROR();
+	$self->{'last_rpc_error'} = GENIRESPONSE_RPCERROR();
 	print STDERR "*** Internal error deleting sliver for $self\n";
 	return -1;
     }
-    $self->{'last_rpcerror'} = $response->code();
+    $self->{'last_rpc_error'} = $response->code();
+    $self->{'last_rpc_output'} = $response->output();
+    $self->{'last_rpc_value'}  = $response->value();
     if ($response->code() != GENIRESPONSE_SUCCESS &&
 	$response->code() != GENIRESPONSE_SEARCHFAILED) {
 	print STDERR "Could not delete sliver for $self. Error: ";
@@ -1167,7 +1189,9 @@ sub StartSliver($$$)
     my $response;
 
     # Always clear for caller.
-    $self->{'last_rpcerror'} = 0;
+    $self->{'last_rpc_error'} = 0;
+    $self->{'last_rpc_output'} = undef;
+    $self->{'last_rpc_value'}  = undef;
 
     #
     # Load sliver credential if we have it.
@@ -1251,12 +1275,14 @@ sub StartSliver($$$)
 	Genixmlrpc::CallMethod($authority->url(), $usercontext,
 			       $method_name, $method_args);
     if (!defined($response)) {
-	$self->{'last_rpcerror'} = GENIRESPONSE_RPCERROR();
+	$self->{'last_rpc_error'} = GENIRESPONSE_RPCERROR();
 	print STDERR
 	    "*** Internal error starting sliver for $self\n";
 	return -1;
     }
-    $self->{'last_rpcerror'} = $response->code();
+    $self->{'last_rpc_error'} = $response->code();
+    $self->{'last_rpc_output'} = $response->output();
+    $self->{'last_rpc_value'}  = $response->value();
     if ($response->code() != GENIRESPONSE_SUCCESS) {
 	print STDERR "Could not start sliver $sliver_credential Error: ";
 	print STDERR "  " . $response->output() . "\n";
@@ -1274,7 +1300,9 @@ sub SliverStatus($$$$)
     my ($response);
 
     # Always clear for caller.
-    $self->{'last_rpcerror'} = 0;
+    $self->{'last_rpc_error'} = 0;
+    $self->{'last_rpc_output'} = undef;
+    $self->{'last_rpc_value'}  = undef;
 
     #
     # Load sliver credential if we have it.
@@ -1341,12 +1369,14 @@ sub SliverStatus($$$$)
 	Genixmlrpc::CallMethod($authority->url(), $usercontext,
 			       $method_name, $method_args);
     if (!defined($response)) {
-	$self->{'last_rpcerror'} = GENIRESPONSE_RPCERROR();
+	$self->{'last_rpc_error'} = GENIRESPONSE_RPCERROR();
 	print STDERR
 	    "*** Internal error getting sliver status for $self\n";
 	return -1;
     }
-    $self->{'last_rpcerror'} = $response->code();
+    $self->{'last_rpc_error'} = $response->code();
+    $self->{'last_rpc_output'} = $response->output();
+    $self->{'last_rpc_value'}  = $response->value();
     if ($response->code() != GENIRESPONSE_SUCCESS) {
 	print STDERR "Could not get sliver status $sliver_credential Error: ";
 	print STDERR "  " . $response->output() . "\n";
@@ -1378,7 +1408,9 @@ sub Discover($$$)
     my $response;
 
     # Always clear for caller.
-    $self->{'last_rpcerror'} = 0;
+    $self->{'last_rpc_error'} = 0;
+    $self->{'last_rpc_output'} = undef;
+    $self->{'last_rpc_value'}  = undef;
 
     my $slice = GeniSlice->Lookup($self->slice_idx());
     if (!defined($slice)) {
@@ -1441,12 +1473,14 @@ sub Discover($$$)
 	Genixmlrpc::CallMethod($authority->url(), $usercontext,
 			       $method_name, $method_args);
     if (!defined($response)) {
-	$self->{'last_rpcerror'} = GENIRESPONSE_RPCERROR();
+	$self->{'last_rpc_error'} = GENIRESPONSE_RPCERROR();
 	print STDERR
 	    "*** Internal error doing DiscoverResources for $self\n";
 	return -1;
     }
-    $self->{'last_rpcerror'} = $response->code();
+    $self->{'last_rpc_error'} = $response->code();
+    $self->{'last_rpc_output'} = $response->output();
+    $self->{'last_rpc_value'}  = $response->value();
     if ($response->code() != GENIRESPONSE_SUCCESS) {
 	print STDERR "Could not discover resources $slice_credential Error: ";
 	print STDERR "  " . $response->output() . "\n";
@@ -1564,7 +1598,9 @@ sub RenewResources(@)
 	    if (! $resource->credential_idx());
 
 	# Always clear for caller.
-	$resource->{'last_rpcerror'} = 0;
+	$resource->{'last_rpc_error'} = 0;
+	$resource->{'last_rpc_output'} = undef;
+	$resource->{'last_rpc_value'}  = undef;
 
 	my $slice = GeniSlice->Lookup($resource->slice_idx());
 	if (!defined($slice)) {
@@ -1623,12 +1659,14 @@ sub RenewResources(@)
 	    Genixmlrpc::CallMethod($authority->url(), $context,
 				   $method_name, $method_args);
 	if (!defined($response)) {
-	    $resource->{'last_rpcerror'} = GENIRESPONSE_RPCERROR();
+	    $resource->{'last_rpc_error'} = GENIRESPONSE_RPCERROR();
 	    print STDERR
 		"RenewAll: Internal error doing renew for $resource\n";
 	    next;
 	}
-	$resource->{'last_rpcerror'} = $response->code();
+	$resource->{'last_rpc_error'} = $response->code();
+	$resource->{'last_rpc_output'} = $response->output();
+	$resource->{'last_rpc_value'}  = $response->value();
 	if ($response->code() != GENIRESPONSE_SUCCESS) {
 	    print STDERR "RenewAll: Could not renew $slice_credential Error: ";
 	    print STDERR "  " . $response->output() . "\n";
