@@ -344,6 +344,16 @@ sub GetTickets($$$$)
 
 	print STDERR "Asking for ticket from $resource\n";
 	if ($resource->GetTicket($user, $rspec, $impotent)) {
+	    #
+	    # Print this here since we do not save this in the
+	    # DB, and the parent side of the fork will not have
+	    # the error message.
+	    #
+	    if ($resource->last_rpc_error() &&
+		defined($resource->last_rpc_value()) &&
+		$resource->last_rpc_value()) {
+		print STDERR $resource->last_rpc_value() . "\n";
+	    }
 	    return -1;
 	}
 	return 0;
@@ -635,8 +645,8 @@ sub StartSlivers($$)
 	    last
 		if (!$retval);
 	    return -1
-		if (!$resource->last_rpcerror() ||
-		    $resource->last_rpcerror() != GENIRESPONSE_BUSY());
+		if (!$resource->last_rpc_error() ||
+		    $resource->last_rpc_error() != GENIRESPONSE_BUSY());
 	    
 	    sleep(10);
 	}
@@ -738,8 +748,8 @@ sub WaitForSlivers($$@)
 	if ($resource->SliverStatus($user, \$ref) != 0) {
 	    # Tell the parent to keep trying.
 	    return 0
-		if ($resource->last_rpcerror() &&
-		    $resource->last_rpcerror() == GENIRESPONSE_BUSY());
+		if ($resource->last_rpc_error() &&
+		    $resource->last_rpc_error() == GENIRESPONSE_BUSY());
 	    
 	    print STDERR "Error getting sliver status for $resource\n";
 	    # Tell the parent error.
@@ -886,8 +896,8 @@ sub DeleteAllSlivers($$)
 	    last
 		if (!$retval);
 	    return -1
-		if (!$resource->last_rpcerror() ||
-		    $resource->last_rpcerror() != GENIRESPONSE_BUSY());
+		if (!$resource->last_rpc_error() ||
+		    $resource->last_rpc_error() != GENIRESPONSE_BUSY());
 	    
 	    sleep(10);
 	}
