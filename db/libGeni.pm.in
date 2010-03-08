@@ -208,6 +208,8 @@ sub MapResources($$$$)
 	if ($?) {
 	    print STDERR "Could not map to physical resources on $resource\n";
 	    print STDERR Dumper($fragment);
+	    my $logstuff = `cat $log`;
+	    print STDERR "\n" . $logstuff . "\n";
 	    return -1;
 	}
 	my $solution =

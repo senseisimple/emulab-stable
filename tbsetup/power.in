@@ -350,7 +350,7 @@ foreach my $power_id (keys %outlets) {
 	}
     } elsif ($type =~ /rmcp-(\w+)/) {
 	require power_rmcp;
-	if (rmcpctrl($1,$op,@nodes)) {
+	if (power_rmcp::rmcpctrl($1,$op,@nodes)) {
 	    print "Control of $nodestr failed.\n"; ++$exitval;
 	    ++$errors;
 	}
