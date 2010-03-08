@@ -856,8 +856,6 @@ sub ReleaseHolding($$)
 
     my $experiment = Experiment->Lookup("GeniSlices", "reservations");
     if (!defined($experiment)) {
-	#
-	print STDERR "Could not find Geni reservations experiment!";
 	return 0;
     }
     my $pid     = $experiment->pid();
