@@ -54,7 +54,7 @@ myslice = resolve_slice( SLICENAME, mycredential )
 print "Found the slice, asking for a credential ..."
 
 if admincredentialfile:
-  f = open( slicecredentialfile )
+  f = open( admincredentialfile )
   slivercred = f.read()
   f.close()
 else:
