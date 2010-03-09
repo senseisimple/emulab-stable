@@ -601,9 +601,16 @@ bool populate_link (DOMElement* elt, tb_vgraph &vg, map< pair<string,string>, pa
 	tb_vnode *src_vnode = get(vvertex_pmap,v_src_vertex);
 	tb_vnode *dst_vnode = get(vvertex_pmap,v_dst_vertex);
 
-	bool emulated = false;
-	if (str_virtualization_type.compare("raw") == 0 || str_virtualization_type.compare("") == 0)
-		emulated = true;
+        // If the virtualization type on the string is missing or "raw", then
+        // we leave the emulated flag off - we want the whole physical
+        // interface. If anything else, we assume that it's some kind of
+        // virtualized link and the emulated flag should be set.
+	bool emulated = true;
+	if (str_virtualization_type.compare("raw") == 0 ||
+                str_virtualization_type.compare("") == 0) {
+            emulated = false;
+            cerr << "Set emulated=false" << endl;
+        }
 		
 // 		bool allow_delayed = !hasChildTag (elt, "nodelay");
 		
