@@ -1234,6 +1234,9 @@ sub GenVirtNodes($)
 	    if ($vnode->_isvirtnode()) {
 		$ref->{'virtualization_type'} = 'emulab-vnode';
 		$ref->{'virtualization_subtype'} = 'emulab-openvz';
+		if ($vnode->_sharedokay()) {
+		    $ref->{'exclusive'} = 0;
+		}
 	    }
 	    else {
 		$ref->{'virtualization_type'} = 'raw';
@@ -1243,14 +1246,16 @@ sub GenVirtNodes($)
 	    if (@ifaces) {
 		my @refs = ();
 		foreach my $vlanmember (@ifaces) {
-		    my $iface = {'virtual_id'   => "$vlanmember"};
+		    my $virtlan = $vlanmember->virt_lan();
+		    my $iface   = {'virtual_id'   => "$vlanmember"};
 		    
 		    if ($vlanmember->fixed_iface() ne "") {
 			$iface->{'component_id'}  = $vlanmember->fixed_iface();
 		    }
 		    push(@refs, $iface);
 		}
-		$ref->{'interface'} = [ @refs ];
+		$ref->{'interface'} = [ @refs ]
+		    if (@refs);
 	    }
 	    if (!defined($self->rspec())) {
 		$self->{'RSPEC'} = {
@@ -1450,6 +1455,82 @@ sub GenVirtLans($)
     my $experiment = $self->experiment();
     my $pid    = $experiment->pid();
     my $eid    = $experiment->eid();
+
+    #
+    # It would be nice if "tunnels" could be handled as a case in the
+    # logic below, but there are too many special things about
+    # tunnels, primary being that they are assumed to be connected
+    # over the control interfaces of the nodes. There should really be
+    # no reason why we cannot build a tunnel on top of an experimental
+    # link since it is just another form of encapsulation. 
+    #
+    foreach my $vname (sort(keys(%{ $self->{'VLANS'} }))) {
+	my $vlan = $self->vlans()->{$vname};
+
+	next
+	    if (!$vlan->_tunnel());
+
+	my @members = $vlan->memberlist();
+	$self->printdb("$vname (tunnel): " . join(" ",@members) . "\n");
+
+	if (scalar(@members) != 2) {
+	    tberror("Too many members in tunnel $vname\n");
+	    return -1;
+	}
+
+	my ($member0,$member1) = @members;
+	my $virtnode0 = $member0->virt_node();
+	my $virtnode1 = $member1->virt_node();
+	my $vname0    = $virtnode0->vname();
+	my $vname1    = $virtnode1->vname();
+	my $ip0       = $member0->ip();
+	my $ip1       = $member1->ip();
+
+	$vlan->_geninodes(1)
+	    if ($virtnode0->_isgeninode() || $virtnode0->_isgeninode());
+	
+	my ($delay0,$bw0,$ebw0,$backfill0,$loss0,
+	    $rdelay0,$rbw0,$rebw0,$rbackfill0,$rloss0) =
+		@{$member0->_delayinfo()};
+	my ($delay1,$bw1,$ebw1,$backfill1,$loss1,
+	    $rdelay1,$rbw1,$rebw1,$rbackfill1,$rloss1) =
+		@{$member1->_delayinfo()};
+
+	my $bw = min($bw0,$rbw1);
+
+	#
+	# If the link has geninode members, need to extend the rspec.
+	#
+	# XXX We eventually want to support tunnels between a local
+	# cluster node and a protogeni node. Should be doable, but might
+	# be easier once assign can take a single rspec for the entire
+	# topology.
+	#
+	if ($vlan->_geninodes()) {
+	    my $ref = {
+		'virtual_id'    => $vname,
+		# The list references are so XML::Simple does not
+		# turn them into attributes. Need a better solution.
+		'bandwidth'     => [$bw],
+		'latency'       => [0],
+		'packet_loss'   => [0],
+#		'link_type'     => {"type_name" => "tunnel"},
+		'link_type'     => "tunnel",
+		'interface_ref' =>
+		    [ {'virtual_node_id' => $vname0,
+		       'virtual_interface_id' => "$member0",
+		       'tunnel_ip' => $ip0 },
+		      {'virtual_node_id' => $vname1,
+		       'virtual_interface_id' => "$member1",
+		       'tunnel_ip' => $ip1 },
+		      ],
+	    };
+	    if (!exists($self->rspec()->{'link'})) {
+		$self->rspec()->{'link'} = [];
+	    }
+	    push(@{ $self->rspec()->{'link'} }, $ref);
+	}
+    }
 
     my $errors	         = 0;
     my %osdoesveth       = ();
@@ -1946,7 +2027,8 @@ sub GenVirtLans($)
 		    'bandwidth'     => [$bw],
 		    'latency'       => [0],
 		    'packet_loss'   => [0],
-		    'link_type'     => {"type_name" => "ethernet"},
+#		    'link_type'     => {"type_name" => "ethernet"},
+		    'link_type'     => "ethernet",
 		    'interface_ref' =>
 			[ {'virtual_node_id' => $vname0,
 			   'virtual_interface_id' => "$member0" },
@@ -2224,7 +2306,8 @@ sub GenVirtLans($)
 			   # turn them into attributes. Need a better solution.
 			   'latency'       => [0],
 			   'packet_loss'   => [0],
-			   'link_type'     => {"type_name" => "ethernet"},
+#			   'link_type'     => {"type_name" => "ethernet"},
+			   'link_type'     => "ethernet",
 			   'bandwidth'     => [$bw],
 			   'interface_ref' =>
 			       [
@@ -2920,7 +3003,8 @@ sub MapResources($)
 	$self->printdb("Mapping geni resources ...\n");
 	
 	if (libGeni::MapResources($self->experiment(),
-				  $self->user(), $self->rspec())) {
+				  $self->user(), $self->rspec(),
+				  $self->verbose())) {
 	    tberror("Could not map Geni resources\n");
 	    return -1;
 	}
@@ -3204,6 +3288,11 @@ sub ReadRspecSolution($$)
 	foreach my $linkref (@{$ref->{'interface'}}) {
 	    my $component_id  = $linkref->{"component_id"};
 	    my $virtual_id    = $linkref->{"virtual_id"};
+	    my $virtlan       = $self->memberof()->{$virtual_id};
+
+	    # Skip tunnels until assign can handle multiple rspecs
+	    next
+		if ($virtlan->_tunnel());
 
 	    if (GeniHRN::IsValid($component_id)) {
 		my ($urn_authority,$urn_node,$urn_iface) =
@@ -3216,17 +3305,16 @@ sub ReadRspecSolution($$)
     $self->printdb("Links:\n");
     foreach my $ref (@{ $self->rspec()->{'link'} }) {
 	my $virtual_id = $ref->{"virtual_id"};
-	my $istunnel   = (exists($ref->{'link_type'}) &&
-			  $ref->{'link_type'} eq "tunnel");
-
-	next
-	    if ($istunnel);
-	    
-	my $virtlan = $self->vlans()->{$virtual_id};
+	my $virtlan    = $self->vlans()->{$virtual_id};
+	
 	if (!defined($virtlan)) {
 	    tberror("Could not find lan $virtual_id\n");
 	    return -1;
 	}
+	# Skip tunnels until assign can handle multiple rspecs
+	next
+	    if ($virtlan->_tunnel());
+	
 	my @ifacerefs = @{ $ref->{'interface_ref'} };
 
 	if (scalar(@ifacerefs) == 2) {
@@ -3635,7 +3723,7 @@ sub AllocNodes($)
     if (defined($self->rspec()) && !$self->impotent()) {
 	$self->printdb("Requesting geni tickets ...\n");
 	
-	if (libGeni::GetTickets($self->experiment(), $self->impotent,
+	if (libGeni::GetTickets($self->experiment(), $self->impotent(),
 				$self->user(), $self->rspec())) {
 	    tberror("Could not allocate Geni Tickets\n");
 	    return -1;
@@ -4805,7 +4893,7 @@ sub InitializePhysNodes($)
     # XXX This is here cause vnames were not set until now. Need to move.
     #
     if (defined($self->rspec()) && !$self->impotent()) {
-	if (libGeni::MapNodes($self->experiment())) {
+	if (libGeni::MapNodes($self->experiment(), $self->verbose())) {
 	    tberror("Could not map geni nodes to local nodes.\n");
 	    return -1;
 	}
@@ -5987,6 +6075,8 @@ sub UpLoadTunnels($)
 	
 	next
 	    if (! $virtlan->_tunnel());
+	next
+	    if ($virtlan->_geninodes());
 
 	my @members = $virtlan->memberlist();
 	if (@members != 2) {
@@ -6019,6 +6109,8 @@ sub UpLoadTunnels($)
     foreach my $virtlan (values(%{ $self->vlans() })) {
 	next
 	    if (! $virtlan->_tunnel());
+	next
+	    if ($virtlan->_geninodes());
 
 	my $server    = $lantotunnelserver{$virtlan};
 	my $ipport    = $rnodetotunnelport{$server};
@@ -6039,17 +6131,19 @@ sub UpLoadTunnels($)
 			  $self->solution_v2p()->{$virtnode1->vname()});
 	my $pnode0 = $self->pnodes()->{$pnodename0};
 	my $pnode1 = $self->pnodes()->{$pnodename1};
-	my ($peerip0,$peerip1);
     
 	#
 	# Need to map the server to the control net interface of the
 	# physical node.
 	#
-	if (! TBControlNetIP($pnodename0, \$peerip0)) {
+	my $peerip0 = Interface->LookupControl($pnode0);
+	my $peerip1 = Interface->LookupControl($pnode1);
+
+	if (!defined($peerip0)) {
 	    tberror("No Control Network IP for $pnodename0!\n");
 	    return -1;
 	}
-	if (! TBControlNetIP($pnodename1, \$peerip1)) {
+	if (!defined($peerip1)) {
 	    tberror("No Control Network IP for $pnodename1!\n");
 	    return -1;
 	}

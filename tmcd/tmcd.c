@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2009 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -68,6 +68,10 @@
 #define RUNASGROUP	"nobody"
 #define NTPSERVER       "ntp1"
 #define PROTOUSER	"elabman"
+#define PRIVKEY_LEN	128
+#define URN_LEN		128
+#define XSTRINGIFY(s)   STRINGIFY(s)
+#define STRINGIFY(s)	#s
 
 /* socket read/write timeouts in ms */
 #define READTIMO	3000
@@ -110,7 +114,6 @@ static char     dbname[DBNAME_SIZE];
 static struct in_addr myipaddr;
 static char	fshostid[HOSTID_SIZE];
 static int	nodeidtoexp(char *nodeid, char *pid, char *eid, char *gid);
-static int	checkprivkey(struct in_addr, char *);
 static void	tcpserver(int sock, int portnum);
 static void	udpserver(int sock, int portnum);
 static int      handle_request(int, struct sockaddr_in *, char *, int);
@@ -192,7 +195,8 @@ typedef struct {
 	char		sfshostid[TBDB_FLEN_SFSHOSTID];
 	char		testdb[TBDB_FLEN_TINYTEXT];
 	char		sharing_mode[TBDB_FLEN_TINYTEXT];
-	char            privkey[TBDB_FLEN_PRIVKEY+1];
+	char            privkey[PRIVKEY_LEN+1];
+	char            urn[URN_LEN+1];
 } tmcdreq_t;
 static int	iptonodeid(struct in_addr, tmcdreq_t *, char*);
 static int	checkdbredirect(tmcdreq_t *);
@@ -932,9 +936,10 @@ static int
 handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 {
 	struct sockaddr_in redirect_client;
-	int		   redirect = 0, havekey = 0;
+	int		   redirect = 0;
 	char		   buf[BUFSIZ], *bp, *cp;
-	char		   privkey[TBDB_FLEN_PRIVKEY];
+	char		   privkeybuf[PRIVKEY_LEN];
+	char		   *privkey = (char *) NULL;
 	int		   i, overbose = 0, err = 0;
 	int		   version = DEFAULT_VERSION;
 	tmcdreq_t	   tmcdreq, *reqp = &tmcdreq;
@@ -960,7 +965,11 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 		/*
 		 * Look for PRIVKEY. 
 		 */
-		if (sscanf(bp, "PRIVKEY=%64s", buf)) {
+		if (sscanf(bp, "PRIVKEY=%" XSTRINGIFY(PRIVKEY_LEN) "s", buf)) {
+			if (strlen(buf) < 16) {
+				info("tmcd client provided short privkey");
+				goto skipit;
+			}
 			for (i = 0; i < strlen(buf); i++){
 				if (! isxdigit(buf[i])) {
 					info("tmcd client provided invalid "
@@ -968,8 +977,8 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 					goto skipit;
 				}
 			}
-			havekey = 1;
-			strncpy(privkey, buf, sizeof(privkey));
+			strncpy(privkeybuf, buf, sizeof(privkeybuf));
+			privkey = privkeybuf;
 
 			if (debug) {
 				info("%s: PRIVKEY %s\n", reqp->nodeid, buf);
@@ -1016,8 +1025,6 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 		 * Look for VNODE. This is used for virtual nodes.
 		 * It indicates which of the virtual nodes (on the physical
 		 * node) is talking to us. Currently no perm checking.
-		 * Very temporary approach; should be done via a per-vnode
-		 * cert or a key.
 		 */
 		if (sscanf(bp, "VNODEID=%30s", buf)) {
 			for (i = 0; i < strlen(buf); i++){
@@ -1033,6 +1040,28 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 
 			if (debug) {
 				info("VNODEID %s\n", buf);
+			}
+			continue;
+		}
+
+		/*
+		 * Look for URN. 
+		 */
+		if (sscanf(bp, "URN=%" XSTRINGIFY(URN_LEN) "s", buf)) {
+			for (i = 0; i < strlen(buf); i++){
+				if (! (isalnum(buf[i]) ||
+				       buf[i] == '_' || buf[i] == '-' ||
+				       buf[i] == '.' || buf[i] == '/' ||
+				       buf[i] == ':' || buf[i] == '+')) {
+					info("tmcd client provided invalid "
+					     "characters in URN");
+					goto skipit;
+				}
+			}
+			strncpy(reqp->urn, buf, sizeof(reqp->urn));
+
+			if (debug) {
+				info("URN %s\n", buf);
 			}
 			continue;
 		}
@@ -1057,24 +1086,26 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	/*
 	 * Map the ip to a nodeid.
 	 */
-	if (havekey) {
-		if ((err = iptonodeid(client->sin_addr, reqp, privkey))) {
+	if ((err = iptonodeid(client->sin_addr, reqp, privkey))) {
+		if (privkey) {
 			error("No such node with wanode_key [%s]\n", privkey);
-			goto skipit;
 		}
-	}
-	else {
-		if ((err = iptonodeid(client->sin_addr, reqp, NULL))) {
-			if (reqp->isvnode) {
-				error("No such vnode %s associated with %s\n",
-				      reqp->vnodeid, inet_ntoa(client->sin_addr));
-			}
-			else {
-				error("No such node: %s\n",
-				      inet_ntoa(client->sin_addr));
-			}
-			goto skipit;
+		else if (reqp->urn[0]) {
+			if (reqp->isvnode)
+				error("No such vnode %s with urn %s\n",
+				      reqp->vnodeid, reqp->urn);
+			else
+				error("No such node with urn %s\n", reqp->urn);
 		}
+		else if (reqp->isvnode) {
+			error("No such vnode %s associated with %s\n",
+			      reqp->vnodeid, inet_ntoa(client->sin_addr));
+		}
+		else {
+			error("No such node: %s\n",
+			      inet_ntoa(client->sin_addr));
+		}
+		goto skipit;
 	}	
 
 	/*
@@ -1150,31 +1181,6 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	if (checkdbredirect(reqp)) {
 		/* Something went wrong */
 		goto skipit;
-	}
-
-	/*
-	 * Do private key check. (Non-plab) widearea nodes must report a
-	 * private key. It comes over ssl of course. At present we skip
-	 * this check for ron nodes.
-	 *
-	 * LBS: I took this test out cause its silly. Will kill the code at
-	 * some point.
-	 */
-	if (0 &&
-	    (!reqp->islocal && !(reqp->isplabdslice || reqp->isplabsvc))) {
-		if (!havekey) {
-			error("%s: No privkey sent!\n", reqp->nodeid);
-			/*
-			 * Skip. Okay, the problem is that the nodes out
-			 * there are not reporting the key!
-			goto skipit;
-			 */
-		}
-		else if (checkprivkey(client->sin_addr, privkey)) {
-			error("%s: privkey mismatch: %s!\n",
-			      reqp->nodeid, privkey);
-			goto skipit;
-		}
 	}
 
 	/*
@@ -1390,12 +1396,10 @@ COMMAND_PROTOTYPE(doifconfig)
 	char		buf[MYBUFSIZE], *ebufp = &buf[MYBUFSIZE];
 	int		nrows;
 	int		num_interfaces=0;
+	int		cookedgeninode = (reqp->geniflags & 0x2);
 
-	/*
-	 * Do nothing for cooked mode geni nodes; handled by remote config.
-	 */
-	if (reqp->geniflags & 0x2)
-		return 0;
+	if (cookedgeninode)
+		goto skipphys;
 
 	/* 
 	 * For Virtual Nodes, we return interfaces that belong to it.
@@ -1590,6 +1594,7 @@ COMMAND_PROTOTYPE(doifconfig)
 	if (vers < 10)
 		return 0;
 
+ skipphys:
 	/*
 	 * First, return config info for physical interfaces underlying
 	 * the virtual interfaces or delay interfaces. These are marked
@@ -4602,14 +4607,27 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp, char* nodekey)
 				 "   WHERE attrkey='dedicated_widearea' "
 				 "   GROUP BY type) AS dedicated_wa_types "
 				 "  ON n.type=dedicated_wa_types.type "
-				"WHERE n.node_id IN "
-                                        "(SELECT node_id FROM widearea_nodeinfo WHERE privkey='%s') "
+				 "WHERE n.node_id IN "
+				 "     (SELECT node_id FROM widearea_nodeinfo "
+				 "      WHERE privkey='%s') "
 				 "  AND nobootinfo_types.attrvalue IS NULL",
 				 34, nodekey);
-
 	}
-
 	else if (reqp->isvnode) {
+		char	clause[BUFSIZ];
+		
+		if (reqp->urn[0]) {
+			sprintf(clause,
+				"r.external_resource_id is not null and "
+				"r.external_resource_id='%s'",
+				reqp->urn);
+		}
+		else {
+			sprintf(clause,
+				"(i.IP='%s' and i.role='ctrl') or "
+				"nv.jailip='%s'",
+				inet_ntoa(ipaddr), inet_ntoa(ipaddr));
+		}
 		res = mydb_query("select vt.class,vt.type,np.node_id,"
 				 " nv.jailflag,r.pid,r.eid,r.vname, "
 				 " e.gid,e.testdb,nv.update_accounts, "
@@ -4642,13 +4660,23 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp, char* nodekey)
 				 " nk.node_id=nv.node_id "
 				 "left join users as u on "
 				 " u.uid_idx=e.swapper_idx "
-				 "where nv.node_id='%s' and "
-				 " ((i.IP='%s' and i.role='ctrl') or "
-				 "  nv.jailip='%s')",
-				 34, reqp->vnodeid,
-				 inet_ntoa(ipaddr), inet_ntoa(ipaddr));
+				 "where nv.node_id='%s' and (%s)",
+				 34, reqp->vnodeid, clause);
 	}
 	else {
+		char	clause[BUFSIZ];
+		
+		if (reqp->urn[0]) {
+			sprintf(clause,
+				"r.external_resource_id is not null and "
+				"r.external_resource_id='%s'",
+				reqp->urn);
+		}
+		else {
+			sprintf(clause,
+				"i.IP='%s' and i.role='ctrl'",
+				inet_ntoa(ipaddr));
+		}
 		res = mydb_query("select t.class,t.type,n.node_id,n.jailflag,"
 				 " r.pid,r.eid,r.vname,e.gid,e.testdb, "
 				 " n.update_accounts,n.role, "
@@ -4687,9 +4715,9 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp, char* nodekey)
 				 "   where attrkey='dedicated_widearea' "
 				 "   group by type) as dedicated_wa_types "
 				 "  on n.type=dedicated_wa_types.type "
-				 "where i.IP='%s' and i.role='ctrl' "
+				 "where (%s) "
 				 "  and nobootinfo_types.attrvalue is NULL",
-				 34, inet_ntoa(ipaddr));
+				 34, clause);
 	}
 
 	if (!res) {
@@ -4716,7 +4744,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp, char* nodekey)
 	strncpy(reqp->ptype,  row[15], sizeof(reqp->ptype));
 	strncpy(reqp->nodeid, row[2],  sizeof(reqp->nodeid));
 	if(nodekey != NULL) {
-		strncpy(reqp->privkey, nodekey, TBDB_FLEN_PRIVKEY); 
+		strncpy(reqp->privkey, nodekey, PRIVKEY_LEN); 
 	}
 	else {
 		strcpy(reqp->privkey, ""); 
@@ -4882,37 +4910,6 @@ checkdbredirect(tmcdreq_t *reqp)
 	return 0;
 }
 
-/*
- * Check private key. 
- */
-static int
-checkprivkey(struct in_addr ipaddr, char *privkey)
-{
-	MYSQL_RES	*res;
-	MYSQL_ROW	row;
-
-	res = mydb_query("select privkey from widearea_privkeys "
-			 "where IP='%s'",
-			 1, inet_ntoa(ipaddr));
-	
-	if (!res) {
-		error("checkprivkey: %s: DB Error getting privkey!\n",
-		      inet_ntoa(ipaddr));
-		return 1;
-	}
-
-	if (! (int)mysql_num_rows(res)) {
-		mysql_free_result(res);
-		return 1;
-	}
-	row = mysql_fetch_row(res);
-	mysql_free_result(res);
-	if (! row[0] || !row[0][0])
-		return 1;
-
-	return strcmp(privkey, row[0]);
-}
- 
 #ifdef EVENTSYS
 /*
  * Connect to the event system. It's not an error to call this function if
@@ -7819,7 +7816,7 @@ COMMAND_PROTOTYPE(dobootwhat)
 
 	if(strlen(reqp->privkey) > 1) { /* We have a private key, so prepare bootinfo for it. */
 		boot_info.opcode = BIOPCODE_BOOTWHAT_KEYED_REQUEST;
-		strncpy(boot_info.data, reqp->privkey, TBDB_FLEN_PRIVKEY);
+		strncpy(boot_info.data, reqp->privkey, PRIVKEY_LEN);
 	}
 
 	if (bootinfo(reqp->client, (reqp->isvnode) ? reqp->nodeid : NULL,

@@ -578,7 +578,7 @@ sub rspecXML($)
     return undef
 	if (!defined($self->rspec()));
 
-    return $self->rspec()->toStringC14N();
+    return GeniXML::Serialize($self->rspec());
 }
 
 #
@@ -710,7 +710,7 @@ sub RunSigner($$)
     my $target_cert = $self->target_cert()->cert();
     my $owner_cert  = $self->owner_cert()->cert();
     my $ticket_uuid = $self->{'ticket_uuid'};
-    my $rspec_xml   = $self->rspec()->toStringC14N();
+    my $rspec_xml   = GeniXML::Serialize($self->rspec());
 
     # Convert to GMT.
     $expires = POSIX::strftime("20%y-%m-%dT%H:%M:%S",
@@ -803,7 +803,7 @@ sub Release($$)
 	my $resource_uuid = GeniXML::GetNodeId($ref);
 	if (!defined($resource_uuid)) {
 	    print STDERR "No resource id for node in ticket\n";
-	    print $ref->toStringC14N();
+	    print GeniXML::Serialize($ref);
 	    return -1;
 	}
 
@@ -856,8 +856,6 @@ sub ReleaseHolding($$)
 
     my $experiment = Experiment->Lookup("GeniSlices", "reservations");
     if (!defined($experiment)) {
-	#
-	print STDERR "Could not find Geni reservations experiment!";
 	return 0;
     }
     my $pid     = $experiment->pid();
@@ -878,7 +876,7 @@ sub ReleaseHolding($$)
 	my $resource_uuid = GeniXML::GetNodeId($ref);
 	if (!defined($resource_uuid)) {
 	    print STDERR "No resource id for node in ticket\n";
-	    print $ref->toStringC14N();
+	    print GeniXML::Serialize($ref);
 	    return -1;
 	}
 

@@ -663,7 +663,7 @@ sub GetManifest($$)
     return $manifest
 	if (!$asxml);
     
-    $xml = $manifest->toStringC14N();
+    $xml = GeniXML::Serialize($manifest);
     return $xml;
 }
 
@@ -743,6 +743,13 @@ sub Start($$$)
 	    return -1;
 	}
 	if ($reservation->SameExperiment($experiment)) {
+	    #
+	    # Since this is an aggregate, some slivers may already be
+	    # in the started state. Skip those, unless doing a restart.
+	    #
+	    next
+		if ($sliver->state() eq "started" && !$restart);
+	    
 	    if ($node->isvirtnode()) {
 		$vnodes{$node->node_id} = $node;
 	    }
@@ -883,6 +890,13 @@ sub Stop($$)
 	    return -1;
 	}
 	if ($reservation->SameExperiment($experiment)) {
+	    #
+	    # Since this is an aggregate, some slivers may already be
+	    # in the stopped state. Skip those.
+	    #
+	    next
+		if ($sliver->state() eq "started");
+	    
 	    if ($node->isvirtnode()) {
 		$vnodes{$node->node_id} = $node;
 	    }

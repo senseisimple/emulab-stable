@@ -197,7 +197,7 @@ sub Create($$$$$$$$$)
     push(@insert_data, "slice_uuid='$slice_uuid'");
 
     if (defined($rspec)) {
-	my $rspec_string = $rspec->toStringC14N();
+	my $rspec_string = GeniXML::Serialize($rspec);
 	my $safe_rspec   = DBQuoteSpecial($rspec_string);
 
 	push(@insert_data, "rspec_string=$safe_rspec");
@@ -301,7 +301,7 @@ sub GetManifest($$)
     return $manifest
 	if (!$asxml);
     
-    my $xml = $self->rspec()->toStringC14N();
+    my $xml = GeniXML::Serialize($self->rspec());
     return $xml;
 }
 

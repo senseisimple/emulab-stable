@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use Getopt::Std;
@@ -15,10 +15,11 @@ use POSIX qw(strftime);
 #
 sub usage()
 {
-    print "Usage: watchdog [-dvn] [start | stop]\n";
+    print "Usage: watchdog [-dvn] [-j vnodeid] [start | stop]\n";
     exit(1);
 }
-my $optlist = "Fdvn";
+my $optlist = "Fdvnj:";
+my $vnodeid;
 
 #
 # Turn off line buffering on output
@@ -45,7 +46,7 @@ sub PLABSVC() {
 
 # Locals
 my $action	= "start";
-my $logname	= "$LOGDIR/emulab-watchdog.log";
+my $logname	= LOGDIR() . "/emulab-watchdog.log";
 my $pidfile	= "/var/run/emulab-watchdog.pid";
 my $rusagebin	= "$BINDIR/plabrusage";
 my $uptimebin	= "/usr/bin/uptime";
@@ -145,6 +146,13 @@ if (defined($options{"v"})) {
 if (defined($options{"n"})) {
     $noproxy = 1;
 }
+if (defined($options{'j'})) {
+    #
+    # This allows us to override what libsetup says, as for SHADOW().
+    #
+    $vnodeid = $options{'j'};
+    libsetup_setvnodeid($vnodeid);
+}
 if (defined($options{"F"})) {
     $fakeit = 1;
 }
@@ -222,9 +230,8 @@ if (JAILED() || GENVNODE() || PLAB()) {
     # but I duplicate it here to make it explicit.
     configtmcc("subnode", $vnodeid);
 
-    # This doesn't work yet, at least for jails since tmcd
-    # doesn't accept requests from them
-    #configtmcc("noproxy", $noproxy);
+    configtmcc("noproxy", 1)
+	if (SHADOW());
 }
 
 #

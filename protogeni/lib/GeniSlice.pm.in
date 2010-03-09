@@ -86,17 +86,25 @@ sub Lookup($$)
 #
 # Class function to create new Geni slice and return the object.
 #
-sub Create($$$$;$)
+sub Create($$$$;$$)
 {
-    my ($class, $certificate, $creator_uuid, $authority, $exptidx) = @_;
+    my ($class, $certificate, $creator_uuid, $authority, $exptidx, $lock) = @_;
 
     my $slice = GeniRegistry::GeniSlice->Create($certificate, $creator_uuid,
-						$authority, $exptidx);
+						$authority, $exptidx, $lock);
 
     return undef
 	if (!defined($slice));
+
+    $slice = GeniSlice->Lookup($slice->idx());
     
-    return GeniSlice->Lookup($slice->idx());
+    return undef
+	if (!defined($slice));
+
+    $slice->{'LOCKED'} = $$
+	if ($lock);
+
+    return $slice;
 }
 
 #
@@ -274,8 +282,9 @@ sub CreateFromLocal($$$)
 	    "Could not generate new certificate $experiment\n";
 	return undef;
     }
+    # Create the slice as locked.
     my $slice = GeniSlice->Create($certificate, $user->uuid(),
-				  $authority, $experiment->idx());
+				  $authority, $experiment->idx(), 1);
     $certificate->Delete()
 	if (!defined($slice));
 

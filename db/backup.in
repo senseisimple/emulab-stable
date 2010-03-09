@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -24,12 +24,13 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print("Usage: backup [-o]\n");
+    print("Usage: backup [-o] [-c -y]\n");
     exit(-1);
 }
-my $optlist = "do";
+my $optlist = "docy";
 my $debug   = 0;
 my $opsmode = 0;
+my $clean   = 0;
 
 #
 # Configure variables
@@ -49,6 +50,7 @@ my $BASE	= "base";
 my $UPD		= "update";
 my $SLOW	= "slowqueries";
 my $BACK	= "tbdb";
+my $BACKUPDAYS  = "30";
 my $extension;
 my $dohotcopy   = 0;
 my $dbname      = "mysql";
@@ -91,11 +93,42 @@ if (! getopts($optlist, \%options)) {
 if (defined($options{"d"})) {
     $debug = 1;
 }
+if (defined($options{"c"})) {
+    $clean++;
+}
+if (defined($options{"y"})) {
+    $clean++;
+}
 if (defined($options{"o"})) {
     $opsmode = 1;
 }
-if ($opsmode && $dohotcopy) {
-    fatal("Cannot do hotcopy mode on ops");
+if ($opsmode && ($dohotcopy || $clean)) {
+    fatal("Cannot do hotcopy or clean mode on ops");
+}
+
+if ($clean) {
+    if (! chdir($BACKUPDIR)) {
+	fatal("Could not chdir to $BACKUPDIR: $!");
+    }
+    my $doit = ($clean > 1 ? "-delete" : "");
+
+    print "These files will be removed in $BACKUPDIR\n";
+    if ($clean == 1) {
+	print "Add the -y option to actually remove.\n";
+    }
+    system("find . \\\( -name 'tbdb.*.gz' \\\) -mtime +${BACKUPDAYS} -print $doit");
+
+    if (! chdir($LOGDIR)) {
+	fatal("Could not chdir to $LOGDIR: $!");
+    }
+    print "These files will be removed in $LOGDIR\n";
+    if ($clean == 1) {
+	print "Add the -y option to actually remove.\n";
+    }
+    system("find . \\\( -name 'base.*.gz' -o -name 'update.*.gz' ".
+	   "         -o -name 'slowqueries.*.gz' \\\) ".
+	   "-mtime +${BACKUPDAYS} -print $doit");
+    exit(0);
 }
 
 #
@@ -243,11 +276,6 @@ else {
     }
 }
 
-# Should do this too, but right now I do it by hand ...
-if (0) {
-    system("find . \( -name 'tbdb.*.gz' \) -mtime +40 -print -delete");
-}
-
 if (! chdir($LOGDIR)) {
     fatal("Could not chdir to $LOGDIR: $!");
 }
@@ -262,13 +290,6 @@ if (-e "$updname" && system("nice gzip $updname")) {
 
 if (-e "$slowname" && system("nice gzip $slowname")) {
     fatal("gzip $slowname failed!");
-}
-
-# Should do this too, but right now I do it by hand ...
-if (0) {
-    system("find . \( -name 'base.*.gz' -o -name 'update.*.gz' ".
-	   "         -o -name 'slowqueries.*.gz' \) ".
-	   "-mtime +35 -print -delete");
 }
 
 # Do this now that the backup is complete.

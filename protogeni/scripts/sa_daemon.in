@@ -82,6 +82,7 @@ require GeniUtil;
 require GeniSlice;
 require GeniCertificate;
 require GeniUser;
+require libGeni;
 use Experiment;
 use Node;
 use libtestbed;
@@ -122,11 +123,16 @@ my $grace   = $hours * 3600;
 #
 sub WarnSlices()
 {
+    #
+    # This query purposely skips slices that are attached to cooked
+    # mode experiments; those that have a non-null exptidx of a local
+    # experiment.
+    #
     my $query_result =
 	GeniDB::DBQueryWarn("select idx,expires,UNIX_TIMESTAMP(expires), ".
 			    "   UNIX_TIMESTAMP(created) ".
 			    "  from geni_slices ".
-			    "where shutdown is null");
+			    "where shutdown is null and exptidx is null");
 
     while (my ($idx,$expires,$stamp,$created) =
 	   $query_result->fetchrow_array()) {
@@ -229,11 +235,16 @@ sub WarnSlices()
 #
 sub ExpireSlices()
 {
+    #
+    # This query purposely skips slices that are attached to cooked
+    # mode experiments; those that have a non-null exptidx of a local
+    # experiment.
+    #
     my $query_result =
 	GeniDB::DBQueryWarn("select idx from geni_slices ".
 			    "where UNIX_TIMESTAMP(now()) > ".
 			    "      UNIX_TIMESTAMP(expires) and ".
-			    "      shutdown is null");
+			    "      shutdown is null and exptidx is null");
 
     while (my ($idx) = $query_result->fetchrow_array()) {
 	my $slice = GeniSlice->Lookup($idx);
@@ -282,6 +293,79 @@ sub ExpireSlices()
 }
 
 #
+# Renew slices and slivers for local cooked mode experiments.
+#
+sub RenewSlices()
+{
+    my $query_result =
+	GeniDB::DBQueryWarn("select idx,UNIX_TIMESTAMP(expires), ".
+			    "  from geni_slices ".
+			    "where shutdown is null and exptidx is not null");
+
+    while (my ($idx,$stamp) = $query_result->fetchrow_array()) {
+	#
+	# Wait until within $hours of expiration.
+	#
+	if ($stamp > time() + $grace) {
+	    next;
+	}
+	my $slice = GeniSlice->Lookup($idx);
+
+	if (!defined($slice)) {
+	    # Slice is gone, lets not worry.
+	    next;
+	}
+	if ($slice->Lock() != 0) {
+	    print STDERR "Could not lock slice $slice.\n";
+	    goto skip;
+	}
+	#
+	# There should be an experiment.
+	#
+	my $experiment = $slice->GetExperiment();
+	if (!defined($experiment)) {
+	    print STDERR "No experiment for $slice.\n";
+	    $slice->UnLock();
+	    goto skip;
+	}
+	#
+	# And we want to take the lock to prevent it from changing.
+	#
+	if ($experiment->LockTables()) {
+	    print STDERR "Could not lock tables for $experiment\n";
+	    $slice->UnLock();
+	    goto skip;
+	}
+	if ($experiment->Lock(undef, 1)) {
+	    print STDERR "Could not lock $experiment\n";
+	    $slice->UnLock();
+	    goto skip;
+	}
+	if ($impotent) {
+	    print STDERR "Would renew $slice\n";
+	    $experiment->Unlock();
+	    $slice->UnLock();
+	    goto skip;
+	}
+	
+	if (libGeni::RenewSlivers($experiment)) {
+	    print STDERR "Could not renew $slice/$experiment\n";
+
+	    SENDMAIL($TBOPS,
+		     "SA daemon renew failure",
+		     "Could not renew $slice/$experiment\n",
+		     $TBOPS);
+	}
+	$experiment->Unlock();
+	$slice->UnLock();
+	
+      skip:
+	$slice->Flush()
+	    if (defined($slice));
+    }
+}
+
+#
 # Setup a signal handler for newsyslog.
 #
 sub handler()
@@ -297,6 +381,7 @@ while (1) {
 
     WarnSlices();
     ExpireSlices();
+#    RenewSlices();
 
     # Be certain stale info is gone.
     GeniUtil::FlushCaches();
