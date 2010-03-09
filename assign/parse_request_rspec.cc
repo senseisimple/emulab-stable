@@ -27,9 +27,9 @@ static const char rcsid[] = "$Id: parse_request_rspec.cc,v 1.16 2009-10-21 20:49
 #define ISSWITCH(n) (n->types.find("switch") != n->types.end())
 
 #ifdef TBROOT
-	#define SCHEMA_LOCATION TBROOT"/lib/assign/rspec-request.xsd"
+	#define SCHEMA_LOCATION TBROOT"/lib/assign/request.xsd"
 #else
-	#define SCHEMA_LOCATION "rspec-request.xsd"
+	#define SCHEMA_LOCATION "request.xsd"
 #endif
 /*
  * XXX: Do I have to release lists when done with them?
