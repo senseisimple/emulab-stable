@@ -41,6 +41,7 @@ DELETE          = 0
 selfcredentialfile = None
 slicecredentialfile = None
 admincredentialfile = None
+
 if "Usage" not in dir():
     def Usage():
         print "usage: " + sys.argv[ 0 ] + " [option...]"
