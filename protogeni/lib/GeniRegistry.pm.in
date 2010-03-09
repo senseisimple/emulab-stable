@@ -43,7 +43,7 @@ sub Lookup($$)
     my $idx;
 
     if( GeniHRN::IsValid( $token ) ) {
-	return undef if !GeniHRN::Authoritative( $token, "@OURDOMAIN@" );
+#	return undef if !GeniHRN::Authoritative( $token, "@OURDOMAIN@" );
 
 	my ($authority, $type, $id) = GeniHRN::Parse( $token );
 
