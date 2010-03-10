@@ -112,7 +112,7 @@ if ($PUBSUPPORT) {
 $vis_html = null;
 $whocares = null;
 if (CHECKURL("http://$USERNODE/proj-vis/$pid/", $whocares)) {
-  $vis_html = "<iframe src=\"http://$USERNODE/proj-vis/$pid/\" width=\"100%\" height=400 id=\"vis-iframe\"></iframe>";
+  $vis_html = "<iframe src=\"http://$USERNODE/proj-vis/$pid/\" width=\"100%\" height=600 id=\"vis-iframe\"></iframe>";
 }
 
 #

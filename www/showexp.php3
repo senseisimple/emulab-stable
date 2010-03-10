@@ -237,7 +237,7 @@ function Show($which, $arg1, $arg2)
     }
     elseif ($which == "uservis") {
 	ob_start();
-	$html .= "<iframe src=\"$USER_VIS_URL\" width=\"100%\" height=400 id=\"vis-iframe\"></iframe>";
+	$html .= "<iframe src=\"$USER_VIS_URL\" width=\"100%\" height=600 id=\"vis-iframe\"></iframe>";
 	ob_end_clean();
     }
     return $html;
