@@ -288,6 +288,7 @@ sub Lookup($$)
     if( GeniHRN::IsValid( $token ) ) {
 	$token = GeniHRN::Normalise( $token );
 
+	my ($authority, $type, $id) = GeniHRN::Parse($token);
 	return undef if $type ne "sliver";
 	
 	$query_result = 
