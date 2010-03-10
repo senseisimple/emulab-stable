@@ -355,6 +355,30 @@ sub LookupByAuthority($$$)
     return GeniRegistry::ClientSliver->Lookup($idx);
 }
 
+# Returns an array of client slivers belonging which belong to a
+# particular slice.
+sub LookupBySlice($$)
+{
+    my ($class, $slice) = @_;
+    my $slice_idx = $slice->idx();
+    my $query_result;
+    my @result = ();
+    $query_result =
+	DBQueryWarn("select idx from client_slivers ".
+		    "where slice_idx='$slice_idx'");
+    if ($query_result) {
+	while (my ($idx) = $query_result->fetchrow_array()) {
+	    my $sliver = GeniRegistry::ClientSliver->Lookup($idx);
+	    if (defined($sliver)) {
+		push(@result, $sliver);
+	    } else {
+		return undef;
+	    }
+	}
+    }
+    return @result;
+}
+
 #
 # Class function to create new Geni slice and return the object.
 #
