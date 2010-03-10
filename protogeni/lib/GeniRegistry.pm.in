@@ -34,7 +34,7 @@ use Data::Dumper;
 use overload ('""' => 'Stringify');
 
 #
-# Lookup by idx or uuid.
+# Lookup by URN, idx or uuid.
 #
 sub Lookup($$)
 {
@@ -286,9 +286,8 @@ sub Lookup($$)
     my $idx;
 
     if( GeniHRN::IsValid( $token ) ) {
-	return undef if !GeniHRN::Authoritative($token, "@OURDOMAIN@");
+	$token = GeniHRN::Normalise( $token );
 
-	my ($authority, $type, $id) = GeniHRN::Parse($token);
 	return undef if $type ne "sliver";
 	
 	$query_result = 
