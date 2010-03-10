@@ -328,10 +328,6 @@ sub Resolve($)
 	    return GeniResponse->BusyResponse("slice");
 	}
 	my @slivers = GeniRegistry::ClientSliver->LookupBySlice($slice);
-	if (! @slivers) {
-	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					"Failed to lookup sliver entries");
-	}
 	my @managers = ();
 	foreach my $sliver (@slivers) {
 	    push(@managers, $sliver->manager_urn());
