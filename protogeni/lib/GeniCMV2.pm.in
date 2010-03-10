@@ -587,20 +587,29 @@ sub SliverAction($$$$$)
     # For now, only allow top level aggregate or the slice
     #
     my ($slice, $aggregate) = Credential2SliceAggregate($credential);
-    # find out the component manager URN.
-    my $cm_urn = GeniHRN::Generate($OURDOMAIN, "authority", "cm");
 
-    if ( (!defined($slice)) && ($credential->target_urn() =~ /\+authority\+cm$/)) {        # administrative credentials are presented.
-        if ($cm_urn != $credential->target_urn()) {
+    if ( (!defined($slice)) && 
+          ($credential->target_urn() =~ /\+authority\+cm$/)) {
+          # administrative credentials are presented.
+          my $cm_urn = GeniHRN::Generate($OURDOMAIN, "authority", "cm");
+          if ($cm_urn != $credential->target_urn()) {
             return GeniResponse->Create(GENIRESPONSE_FORBIDDEN(), undef,
-    "Credential target does not match CM URN");
-        }
-      if(!defined($slice_urn)){
+                      "Credential target does not match CM URN");
+          }
+
+      if (!defined($slice_urn)) {
           return GeniResponse->MalformedArgsResponse("Missing arguments");
       }       
-  $slice = GeniSlice->Lookup($slice_urn);
-  $aggregate = GeniAggregate->SliceAggregate($slice);
+      $slice = GeniSlice->Lookup($slice_urn);
+      return GeniResponse->Create(GENIRESPONSE_ERROR, undef, 
+                "No Slice with urn $slice_urn here")
+          if (!defined($slice));
+      $aggregate = GeniAggregate->SliceAggregate($slice);
+      return GeniResponse->Create(GENIRESPONSE_ERROR, undef, 
+                      "No Aggregate here")
+          if (!defined($aggregate));
     } 
+
     if (! (defined($slice) && defined($aggregate))) {
 	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 				    "No slice or aggregate here");
