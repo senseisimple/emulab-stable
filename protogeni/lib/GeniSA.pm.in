@@ -327,14 +327,20 @@ sub Resolve($)
 	if ($slice->Lock() != 0) {
 	    return GeniResponse->BusyResponse("slice");
 	}
+	my @slivers = GeniRegistry::ClientSliver->LookupBySlice($slice);
+	my @managers = ();
+	foreach my $sliver (@slivers) {
+	    push(@managers, $sliver->manager_urn());
+	}
 	# Return a blob.
 	my $blob = { "hrn"          => $slice->hrn(),
 		     "uuid"         => $slice->uuid(),
 		     "creator_uuid" => $slice->creator_uuid(),
 		     "gid"          => $slice->cert(),
-		     "urn"          => GeniHRN::Generate( $OURDOMAIN,
-							  "slice",
-							  $slice->slicename() )
+		     "urn"          => GeniHRN::Generate($OURDOMAIN,
+							 "slice",
+							 $slice->slicename() ),
+		     "component_managers" => \@managers
 		 };
 	$slice->UnLock();
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);

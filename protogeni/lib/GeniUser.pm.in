@@ -57,7 +57,7 @@ sub mysystem($)
 }
 
 #
-# Lookup by idx, or uuid.
+# Lookup by URN, idx, or uuid.
 #
 sub Lookup($$;$)
 {
@@ -69,30 +69,40 @@ sub Lookup($$;$)
 	if (!defined($includelocal));
 
     if( GeniHRN::IsValid( $token ) ) {
-	return undef if !GeniHRN::Authoritative( $token, $OURDOMAIN );
-
+	$token = GeniHRN::Normalise( $token );
 	my ($authority, $type, $id) = GeniHRN::Parse( $token );
 
 	return undef if $type ne "user";
 
-	$query_result =
-	    DBQueryWarn("select idx from geni_users ".
-			"where hrn='${PGENIDOMAIN}.$id' and status='active'");
+	if( GeniHRN::Authoritative( $token, "@OURDOMAIN@" ) ) {
+	    # A local name, so look only for local users...
+	    $query_result =
+		DBQueryWarn("select idx from geni_users ".
+			    "where hrn='${PGENIDOMAIN}.$id' " .
+			    "and status='active'");
 
-	return undef
-	    if (!$query_result);
-
-	if (!$query_result->numrows) {
 	    return undef
-		if (!$includelocal);
+		if (!$query_result);
 
-	    #
-	    # Check Emulab users table. 
-	    #
-	    my $user = User->Lookup($id);
-	    return undef
-		if (!defined($user));
-	    return GeniUser->CreateFromLocal($user);
+	    if (!$query_result->numrows) {
+		return undef
+		    if (!$includelocal);
+
+		#
+		# Check Emulab users table. 
+		#
+		my $user = User->Lookup($id);
+		return undef
+		    if (!defined($user));
+		return GeniUser->CreateFromLocal($user);
+	    }
+	} else {
+	    # A foreign name: check against names in certificates.
+	    $query_result = DBQueryWarn(
+		"SELECT geni_users.idx FROM geni_users, geni_certificates " .
+		"WHERE geni_users.uuid = geni_certificates.uuid AND " .
+		"geni_certificates.urn = '$token';" );
+	    return undef unless $query_result and $query_result->numrows;
 	}
 	($idx) = $query_result->fetchrow_array();	
     }
