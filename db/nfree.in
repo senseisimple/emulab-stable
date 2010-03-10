@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -377,6 +377,7 @@ foreach my $node (@freed_nodes) {
     my $mustclean     = 1;
     my $estate        = $node->eventstate();
     my $isvirt        = $node->isvirtnode();
+    my $isgeni        = $node->isfednode();
     my $isdynamic     = $node->isdynamic();
     my $def_boot_osid = $node->def_boot_osid();
     my $imageable     = $node->imageable();
@@ -453,10 +454,11 @@ foreach my $node (@freed_nodes) {
     #
     # If the node is a virtnode, force its state to SHUTDOWN. This is mostly
     # to avoid silly stated warnings for nodes that do not have a physical
-    # representation most of the time!
+    # representation most of the time! Ditto for geninodes which are really
+    # just proxies for a remote physical nodes.
     #
     $node->SetEventState(TBDB_NODESTATE_SHUTDOWN)
-	if ($isvirt && $estate ne TBDB_NODESTATE_SHUTDOWN());
+	if (($isvirt || $isgeni) && $estate ne TBDB_NODESTATE_SHUTDOWN());
 
     # Clean out the SFS hostid. What about the other keys?
     DBQueryWarn("update node_hostkeys set ".
