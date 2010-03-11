@@ -40,6 +40,7 @@ DELETE          = 0
 
 selfcredentialfile = None
 slicecredentialfile = None
+admincredentialfile = None
 
 if "Usage" not in dir():
     def Usage():
@@ -61,14 +62,14 @@ if "Usage" not in dir():
                                             [default: ~/.ssl/password]
     -r file, --read-commands=file       specify additional configuration file
     -s file, --slicecredentials=file    read slice credentials from file
-                                            [default: query from SA]"""
+                                            [default: query from SA]
+    -a file, --admincredentials=file    read admin credentials from file"""
 
 try:
-    opts, REQARGS = getopt.getopt( sys.argv[ 1: ], "c:df:hn:p:r:s:m:",
+    opts, REQARGS = getopt.getopt( sys.argv[ 1: ], "c:df:hn:p:r:s:m:a:",
                                    [ "credentials=", "debug", "certificate=",
                                      "help", "passphrase=", "read-commands=",
-                                     "slicecredentials=", "slicename=",
-                                     "cm=", "delete"] )
+                                     "slicecredentials=","admincredentials",                                     "slicename=", "cm=", "delete"] )
 except getopt.GetoptError, err:
     print >> sys.stderr, str( err )
     Usage()
@@ -109,6 +110,8 @@ for opt, arg in opts:
         EXTRACONF = arg
     elif opt in ( "-s", "--slicecredentials" ):
         slicecredentialfile = arg
+    elif opt in ( "-a", "--admincredentials" ):
+        admincredentialfile = arg
 
 cert = X509.load_cert( CERTIFICATE )
 

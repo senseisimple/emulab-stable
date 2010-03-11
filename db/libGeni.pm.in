@@ -27,6 +27,7 @@ use NodeType;
 use Interface;
 use Experiment;
 use OSinfo;
+use Lan;
 use GeniEmulab;
 use GeniResource;
 use GeniResponse;
@@ -483,7 +484,8 @@ sub MapNodes($$)
 	return -1
 	    if (!defined($manifest));
 
-	print STDERR Dumper($manifest);
+	print STDERR Dumper($manifest)
+	    if ($verbose);
 	
 	foreach my $ref (@{ $manifest->{'node'} }) {
 	    my $sliver_urn = $ref->{'sliver_urn'};
@@ -552,12 +554,44 @@ sub MapNodes($$)
 	    next 
 		if (!exists($managers{$resource->manager_urn()}));
 
+	    if (exists($ref->{'vlantag'})) {
+		my $TAG = $ref->{'vlantag'};
+		
+		if (defined($TAG)) {
+		    if (!($TAG =~ /^[\w]*$/)) {
+			print STDERR "Bad vlantag '$TAG' for $linkname\n";
+			print STDERR Dumper($manifest);
+			return -1;
+		    }
+		    my $lan = Lan->Lookup($experiment, $linkname, 1);
+		    if (!defined($lan)) {
+			print STDERR "Could not find vlan for $linkname\n";
+			return -1;
+		    }
+		    #
+		    # XXX This seems backwards. If the lan is pointing
+		    # to another lan, then we really want to change that
+		    # one. 
+		    #
+		    if ($lan->type() eq "emulated" && defined($lan->link())) {
+			$lan = Lan->Lookup($lan->link());
+			if (!defined($lan)) {
+			    print STDERR 
+				"Could not find linked vlan for $linkname\n";
+			    return -1;
+			}
+		    }
+		    return -1
+			if ($lan->SetAttribute("vlantag", $TAG));
+		}
+	    }
+
 	    foreach my $ifaceref (@{ $interfaces }) {
 		my $vname    = $ifaceref->{'virtual_node_id'};
 		my $iface_id = $ifaceref->{'virtual_interface_id'};
 		my $MAC      = $ifaceref->{'MAC'};
 		my ($node, $compid) = @{ $ifacemap{$iface_id} };
-		my ($iface,$interface);
+		my $iface;
 
 		if (GeniHRN::IsValid($compid)) {
 		    (undef,undef,$iface) = GeniHRN::ParseInterface($compid);
@@ -571,14 +605,16 @@ sub MapNodes($$)
 		    print STDERR Dumper($manifest);
 		    return -1;
 		}
+		
 		#
-		# We do not need to do this for virtual nodes.
+		# XXX At this point, not sure if the interface is a
+		# vinterface or a real interface.
 		#
-		if ($node->isvirtnode()) {
-		    $interface =
-			Interface::VInterface->LookupByVirtLan($experiment,
-							       $linkname,
-							       $vname);
+		my $interface =
+		    Interface::VInterface->LookupByVirtLan($experiment,
+							   $linkname,
+							   $vname);
+		if (defined($interface)) {
 		    $MAC = $ifaceref->{'VMAC'};
 		}
 		else {
@@ -600,7 +636,7 @@ sub MapNodes($$)
 		    return -1;
 		}
 		if ($interface->Update({"mac" => "$MAC"})) {
-		    print STDERR "Could not update mac for $node,$iface\n";
+		    print STDERR "Could not update $node,$iface\n";
 		    print Dumper($manifest);
 		    return -1;
 		}
@@ -619,9 +655,9 @@ sub MapNodes($$)
 # Boot (Start) all of the slivers. This does the entire set, and blocks
 # till done.
 #
-sub StartSlivers($$)
+sub StartSlivers($$$$)
 {
-    my ($experiment, $user) = @_;
+    my ($experiment, $user, $restart, $verbose) = @_;
 
     #
     # Get the resource objects.
@@ -638,10 +674,11 @@ sub StartSlivers($$)
     my $coderef = sub {
 	my ($resource) = @_;
 
-	print STDERR "Starting ($$) sliver $resource\n";
-
 	while (1) {
-	    my $retval = $resource->StartSliver($user);
+	    print STDERR "Starting ($$) sliver $resource\n";
+	    my $retval = ($restart ?
+			  $resource->RestartSliver($user)  :
+			  $resource->StartSliver($user));
 	    last
 		if (!$retval);
 	    return -1
@@ -649,6 +686,23 @@ sub StartSlivers($$)
 		    $resource->last_rpc_error() != GENIRESPONSE_BUSY());
 	    
 	    sleep(10);
+	}
+	#
+	# Grab a new manifest;
+	#
+	if ($resource->ManagerVersion() == 2.0) {
+	    while (1) {
+		print STDERR "Getting ($$) new manifest for $resource\n";
+		my $retval = $resource->GetManifest($user);
+		last
+		    if (!$retval);
+		return -1
+		    if (!$resource->last_rpc_error() ||
+			$resource->last_rpc_error() != GENIRESPONSE_BUSY());
+	    
+		sleep(10);
+	    }
+
 	}
 	return 0;
     };
@@ -670,16 +724,27 @@ sub StartSlivers($$)
 	    $errors++;
 	}
 	else {
+	    #
+	    # ParRun does a fork; so need to refresh the resource object
+	    # to sync it to the DB.
+	    #
+	    if ($resource->Refresh()) {
+		print STDERR
+		    "*** StartSlivers: Error synchronizing $resource\n";
+		$errors++;
+	    }
 	    push(@tmp, $resource);
 	}
 	$count++;
     }
-    return WaitForSlivers($experiment, $user, @tmp);
+    MapNodes($experiment, $verbose);
+    
+    return WaitForSlivers($experiment, $user, $verbose, @tmp);
 }
 
-sub WaitForSlivers($$@)
+sub WaitForSlivers($$$@)
 {
-    my ($experiment, $user, @resources) = @_;
+    my ($experiment, $user, $verbose, @resources) = @_;
     my %nodemap = ();
 
     #
@@ -691,6 +756,8 @@ sub WaitForSlivers($$@)
     if (! @resources) {
 	return 0;
     }
+
+    print STDERR "Waiting for slivers ...\n";
 
     #
     # Build a map of the nodes. I made a real mess of this in Version 1.
@@ -743,7 +810,7 @@ sub WaitForSlivers($$@)
 	my $ref;
 	my $notready = 0;
 
-	print STDERR "Waiting ($$) for sliver $resource\n";
+	print STDERR "Getting ($$) sliver status for $resource\n";
 
 	if ($resource->SliverStatus($user, \$ref) != 0) {
 	    # Tell the parent to keep trying.
@@ -755,7 +822,8 @@ sub WaitForSlivers($$@)
 	    # Tell the parent error.
 	    return -1;
 	}
-	print STDERR Dumper($ref);
+	print STDERR Dumper($ref)
+	    if ($verbose);
 
 	foreach my $key (keys(%{ $ref->{'details'} })) {
 	    my $val  = $ref->{'details'}->{$key};
@@ -782,17 +850,11 @@ sub WaitForSlivers($$@)
 	    # State was changed in a another process.
 	    $node->Refresh();
 
-	    #
-	    # Only send on state change to avoid multiple events.
-	    #
-	    if ($status eq "ready" && !$node->IsUp()) {
-#		print STDERR "    Sending ISUP event.\n";
-#		$node->SetEventState(TBDB_NODESTATE_ISUP());
+	    if ($status eq "ready") {
+		# print statement would be repeated.
 	    }
-	    elsif ($status eq "failed" &&
-		   $node->eventstate() ne TBDB_NODESTATE_TBFAILED) {
-#		print STDERR "    Sending TBFAILED event.\n";
-#		$node->SetEventState(TBDB_NODESTATE_TBFAILED());
+	    elsif ($status eq "failed") {
+		# print statement would be repeated.
 	    }
 	    else {
 		$notready++;
@@ -839,7 +901,7 @@ sub WaitForSlivers($$@)
 	last
 	    if ($experiment->canceled());
 
-	sleep(10)
+	sleep(15)
 	    if (@resources);
     }
     #

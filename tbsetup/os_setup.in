@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -725,7 +725,7 @@ if (keys(%geninodes)) {
     if (! $geni_setup_pid) {
 	TBdbfork();	# So we get the event system fork too ...
 
-	if (libGeni::StartSlivers($experiment, $this_user)) {
+	if (libGeni::StartSlivers($experiment, $this_user, 0, $dbg)) {
 	    print STDERR "*** Could not start Geni slivers\n";
 	    exit(-1);
 	}
