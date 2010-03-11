@@ -2126,10 +2126,10 @@ sub SliverWorkAux($$$$$$$)
 		goto bad;
 	    }
 	    #
-	    # Not quite sure how to deal with links into virtual containers
-	    # yet. For now, the link section will hold the physical info,
+	    # Not quite sure how to deal with virtual interfaces yet.
+	    # For now, the link section will hold the physical info,
 	    # but we have to return the VMAC so the caller knows which
-	    # virtual interface inside the container.
+	    # virtual interface.
 	    #
 	    if ($node->isvirtnode()) {
 		$vnode = $node;
@@ -2142,7 +2142,11 @@ sub SliverWorkAux($$$$$$$)
 		    Interface::VInterface->LookupByVirtLan($experiment,
 				     $linkname, $node_id);
 	    }
-
+	    else {
+		$vinterface =
+		    Interface::VInterface->LookupByVirtLan($experiment,
+				     $linkname, $node_id);
+	    }
 	    #
 	    # The interface was set above.
 	    #
@@ -4085,6 +4089,16 @@ sub UpdateManifest($)
 	    print STDERR "UpdateManifest: No tag for $vlan\n";
 	}
 	$vlantags{$vlan->vname()} = $tag;
+
+	#
+	# Encapsulation vlan, so need to find the actual link name.
+	#
+	my $linklan;
+
+	if ($vlan->GetAttribute("link/lan", \$linklan) == 0 &&
+	    defined($linklan)) {
+	    $vlantags{$linklan} = $tag;
+	}
     }
     foreach my $linkref (GeniXML::FindNodes("n:link", $rspec)->get_nodelist()){
 	my $vname = GeniXML::GetVirtualId($linkref);
