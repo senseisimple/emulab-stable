@@ -35,12 +35,14 @@ package
                             newManagers : ComponentView,
                             newArena : SliceDetailClip,
                             newCredential : Credential,
-                            newText : String) : void
+                            newText : String,
+                            newSliceName : String) : void
     {
       nodes = newNodes;
       managers = newManagers;
       arena = newArena;
       credential = newCredential;
+      sliceUrn = Util.makeUrn(Geni.defaultAuthority, "slice", newSliceName);
 
       clip = new ConsoleClip();
       parent.addChild(clip);
@@ -164,12 +166,12 @@ package
         if (cm.getSliver() == null)
         {
           rspec = nodes.getXml(false, cm);
-          result = new RequestSliverCreate(cm, nodes, rspec, arena.sliceName.text);
+          result = new RequestSliverCreate(cm, nodes, rspec, sliceUrn);
         }
         else if (cm.getVersion() >= 2)
         {
           rspec = nodes.getXml(true, cm);
-          result = new RequestSliverUpdate(cm, nodes, rspec, false, arena.sliceName.text);
+          result = new RequestSliverUpdate(cm, nodes, rspec, false, sliceUrn);
         }
       }
       return result;
@@ -188,7 +190,7 @@ package
       var result : Request = null;
       if (nodes.existsState(cm, ActiveNodes.CREATED))
       {
-        result = new RequestSliverStart(cm, nodes, arena.sliceName.text);
+        result = new RequestSliverStart(cm, nodes, sliceUrn);
       }
       return result;
     }
@@ -221,7 +223,7 @@ package
           || nodes.existsState(cm, ActiveNodes.CREATED)
           || nodes.existsState(cm, ActiveNodes.BOOTED))
       {
-        result = new RequestSliverDestroy(cm, nodes, arena.sliceName.text);
+        result = new RequestSliverDestroy(cm, nodes, sliceUrn);
       }
       return result;
     }
@@ -384,5 +386,6 @@ package
     var working : Boolean;
 
     var credential : Credential;
+    var sliceUrn : String;
   }
 }

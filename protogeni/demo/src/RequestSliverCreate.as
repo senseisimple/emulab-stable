@@ -19,14 +19,14 @@ package
     public function RequestSliverCreate(newManager : ComponentManager,
                                         newNodes : ActiveNodes,
                                         newRspec : String,
-										newSliceUrn : String) : void
-										
+                                        newSliceUrn : String) : void
+
     {
       super(newManager.getName());
       manager = newManager;
       nodes = newNodes;
       rspec = newRspec;
-	  sliceUrn = newSliceUrn;
+      sliceUrn = newSliceUrn;
     }
 
     override public function cleanup() : void
@@ -36,6 +36,7 @@ package
 
     override public function start(credential : Credential) : Operation
     {
+/*
       if (manager.getTicket() == null)
       {
         nodes.changeState(manager, ActiveNodes.PLANNED, ActiveNodes.CREATED);
@@ -58,6 +59,15 @@ package
         op.addField("keys", credential.ssh);
         op.setUrl(manager.getUrl());
       }
+*/
+      nodes.changeState(manager, ActiveNodes.PLANNED, ActiveNodes.BOOTED);
+      opName = "Creating Sliver";
+      op.reset(Geni.createSliver);
+      op.addField("slice_urn", sliceUrn);
+      op.addField("rspec", rspec);
+      op.addField("keys", credential.ssh);
+      op.addField("credentials", new Array(credential.slice));
+      op.setUrl(manager.getUrl());
       return op;
     }
 
@@ -65,6 +75,7 @@ package
                                       credential : Credential) : Request
     {
       var result : Request = null;
+/*
       if (code == 0)
       {
         if (manager.getTicket() == null)
@@ -102,6 +113,17 @@ package
       else
       {
         result = releaseTicket();
+        nodes.revertState(manager);
+      }
+*/
+      if (code == 0)
+      {
+        manager.setSliver(response.value[0]);
+        manager.setManifest(response.value[1]);
+        nodes.commitState(manager);
+      }
+      else
+      {
         nodes.revertState(manager);
       }
       return result;

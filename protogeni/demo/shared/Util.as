@@ -56,5 +56,12 @@ package
           + "\n";
       }
     }
+
+    public static function makeUrn(authority : String,
+                                   type : String,
+                                   name : String) : String
+    {
+      return "urn:publicid:IDN+" + authority + "+" + type + "+" + name;
+    }
   }
 }

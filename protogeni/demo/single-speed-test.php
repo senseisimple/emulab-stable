@@ -2,40 +2,42 @@
 <head>
 <script type="text/JavaScript">
 <!--
-  function refresh(time)
+  function init(time)
   {
-    setTimeout("location.reload(true);", time);
+    setTimeout("refresh();", time);
   }
+
+  function refresh()
+  {
+    if (window.success === undefined) {
+      location.reload(true);
+    }
+  }
+
+  function loadSuccess()
+  {
+    window.success = 1;
+  }
+
 //   -->
 </script>
 </head>
-<body onload="javascript:refresh(10000);">
-<table>
-<tr>
-
+<body bgcolor="#cccccc" onload="javascript:init(10000);">
+<center>
 <?php
 
-$names = explode(",", $_GET["names"]);
-$cms = explode(",", $_GET["cms"]);
-$hosts = explode(",", $_GET["hostnames"]);
+$name = $_GET["name"];
+$cm = $_GET["cm"];
+$host = $_GET["hostname"];
 
 $width = 3;
 
-$i = 0;
-for (; $i < count($names); ++$i)
-{
-  $url = "http://" . $hosts[$i] . "/speed-test.swf";
-  if ($i != 0 && $i % $width == 0)
-  {
-    echo "</tr><tr>\n";
-  }
 ?>
 
-<td bgcolor="#ccccff" align="center">
 <h3>
 
 <?php
-  echo $names[$i];
+  echo $name;
 ?>
 
 </h3>
@@ -47,13 +49,13 @@ for (; $i < count($names); ++$i)
   <param name="allowFullScreen" value="false" />
   <param name="movie"
 <?php
-  echo "value=\"http://" . $hosts[$i] . "/speed-test.swf\"";
+  echo "value=\"http://" . $host . "/speed-test.swf\"";
 ?>
  />
   <param name="FlashVars"
 
 <?php
-  echo "value=\"url=http://" . $hosts[$i] . "\" ";
+  echo "value=\"url=http://" . $host . "\" ";
 ?>
 
   />
@@ -61,11 +63,11 @@ for (; $i < count($names); ++$i)
   <param name="bgcolor" value="#cccccc" />
   <embed
 <?php
-  echo "src=\"http://" . $hosts[$i] . "/speed-test.swf\"";
+  echo "src=\"http://" . $host . "/speed-test.swf\"";
 ?>
 
 <?php
-  echo "FlashVars=\"url=http://" . $hosts[$i] . "\" ";
+  echo "FlashVars=\"url=http://" . $host . "\" ";
 ?>
 
 quality="high" bgcolor="#cccccc"
@@ -75,14 +77,6 @@ quality="high" bgcolor="#cccccc"
          type="application/x-shockwave-flash"
          pluginspage="http://www.macromedia.com/go/getflashplayer" />
 </object>
-</td>
-
-<?php
-}
-
-?>
-
-</tr>
-</table>
+</center>
 </body>
 </html>

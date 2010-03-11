@@ -52,6 +52,7 @@ package
     public static var getSliver : Array = new Array(cm, "GetSliver");
     public static var sliverStatus : Array = new Array(cm, "SliverStatus");
     public static var sliverTicket : Array = new Array(cm, "SliverTicket");
+    public static var createSliver : Array = new Array(cm, "CreateSliver");
 
     public static var discoverResourcesv2 : Array = new Array(cmv2, "DiscoverResources");
 
