@@ -378,8 +378,6 @@ sub LookupBySlice($$)
 	    my $sliver = GeniRegistry::ClientSliver->Lookup($idx);
 	    if (defined($sliver)) {
 		push(@result, $sliver);
-	    } else {
-		return undef;
 	    }
 	}
     }
