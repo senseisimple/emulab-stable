@@ -667,14 +667,14 @@ sub Create($$$$$$)
 	$hrn = "${PGENIDOMAIN}." . $vnode->node_id();
 	$sliver_uuid = $vnode->uuid();
 	$resource_id = $vnode->node_id();
-	$hostname = $vnode->node_id() . ".${OURDOMAIN}";
+	$hostname = GeniUtil::FindHostname($vnode->node_id());
 	$sshdport = $vnode->sshdport();
     }
     else {
 	$hrn = "${PGENIDOMAIN}." . $node->node_id();
 	$sliver_uuid = $node->uuid();
 	$resource_id = $node->node_id();
-	$hostname = $node->node_id() . ".${OURDOMAIN}";
+	$hostname = GeniUtil::FindHostname($node->node_id());
     }
 
     #
