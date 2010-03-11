@@ -76,6 +76,7 @@ sub Lookup($$)
     my $query_result;
 
     if (GeniHRN::IsValid($token)) {
+	# We don't attempt to handle tickets for foreign authorities.
 	return undef if !GeniHRN::Authoritative($token, "@OURDOMAIN@");
 
 	my ($authority, $type, $id) = GeniHRN::Parse($token);

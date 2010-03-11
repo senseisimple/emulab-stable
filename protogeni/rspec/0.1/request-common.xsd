@@ -22,17 +22,7 @@
       <xs:group ref="rspec:NodeTypeList"/>
       <xs:element ref="rspec:interface"/>
     </xs:choice>
-    <xs:attribute name="virtualization_type">
-      <xs:simpleType>
-        <xs:restriction base="xs:token">
-          <xs:enumeration value="raw"/>
-          <xs:enumeration value="trellis-vserver"/>
-          <xs:enumeration value="planetlab-vserver"/>
-          <xs:enumeration value="emulab-vnode"/>
-          <xs:enumeration value="bgpmux"/>
-        </xs:restriction>
-      </xs:simpleType>
-    </xs:attribute>
+    <xs:attribute name="virtualization_type"/>
     <xs:attributeGroup ref="rspec:VirtualName"/>
     <xs:attributeGroup ref="rspec:ComponentName"/>
     <xs:attribute name="colocate"/>
@@ -65,16 +55,7 @@
         </xs:choice>
       </xs:choice>
     </xs:choice>
-    <xs:attribute name="virtualization_type">
-      <xs:simpleType>
-        <xs:restriction base="xs:token">
-          <xs:enumeration value="raw"/>
-          <xs:enumeration value="trellis-vserver"/>
-          <xs:enumeration value="planetlab-vserver"/>
-          <xs:enumeration value="emulab-vnode"/>
-        </xs:restriction>
-      </xs:simpleType>
-    </xs:attribute>
+    <xs:attribute name="virtualization_type"/>
     <xs:attribute name="link_type"/>
     <xs:attributeGroup ref="rspec:VirtualName"/>
   </xs:complexType>

@@ -31,17 +31,7 @@
         <xs:element ref="rspec:services"/>
       </xs:choice>
     </xs:choice>
-    <xs:attribute name="virtualization_type">
-      <xs:simpleType>
-        <xs:restriction base="xs:token">
-          <xs:enumeration value="raw"/>
-          <xs:enumeration value="trellis-vserver"/>
-          <xs:enumeration value="planetlab-vserver"/>
-          <xs:enumeration value="emulab-vnode"/>
-          <xs:enumeration value="bgpmux"/>
-        </xs:restriction>
-      </xs:simpleType>
-    </xs:attribute>
+    <xs:attribute name="virtualization_type"/>
     <xs:attributeGroup ref="rspec:ComponentName"/>
   </xs:complexType>
   <xs:element name="subnode_of" type="xs:string"/>
@@ -64,16 +54,7 @@
         <xs:element ref="rspec:packet_loss"/>
       </xs:choice>
     </xs:choice>
-    <xs:attribute name="virtualization_type">
-      <xs:simpleType>
-        <xs:restriction base="xs:token">
-          <xs:enumeration value="raw"/>
-          <xs:enumeration value="trellis-vserver"/>
-          <xs:enumeration value="planetlab-vserver"/>
-          <xs:enumeration value="emulab-vnode"/>
-        </xs:restriction>
-      </xs:simpleType>
-    </xs:attribute>
+    <xs:attribute name="virtualization_type"/>
     <xs:attributeGroup ref="rspec:ComponentName"/>
   </xs:complexType>
   <xs:element name="interface_ref">

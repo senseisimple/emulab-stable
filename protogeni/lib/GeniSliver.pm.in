@@ -57,7 +57,7 @@ my %slivers      = ();
 BEGIN { use GeniUtil; GeniUtil::AddCache(\%slivers); }
 
 #
-# Lookup by idx, or uuid.
+# Lookup by URN, idx, or uuid.
 #
 sub Lookup($$)
 {
@@ -66,11 +66,26 @@ sub Lookup($$)
     my $idx;
 
     if (GeniHRN::IsValid($token)) {
-	return undef if !GeniHRN::Authoritative($token, "@OURDOMAIN@");
-
 	my ($authority, $type, $id) = GeniHRN::Parse($token);
 	return undef if $type ne "sliver";
-	$idx = $id;
+
+	if( GeniHRN::Authoritative($token, "@OURDOMAIN@") ) {
+	    # Very simple: we put the index of our own slivers right
+	    # in the name.
+	    $idx = $id;
+	} else {
+	    # Look up the slivers's certificate.
+	    $token = GeniHRN::Normalise( $token );
+	    $query_result = DBQueryWarn(
+		"SELECT geni_slivers.idx FROM geni_slivers, " .
+		"geni_certificates WHERE geni_slivers.uuid = " .
+		"geni_certificates.uuid AND " .
+		"geni_certificates.urn='$token';" );
+
+	    return undef if (! $query_result || !$query_result->numrows);
+
+	    ($idx) = $query_result->fetchrow_array();
+	}
     }
     elsif ($token =~ /^\d+$/) {
 	$idx = $token;
