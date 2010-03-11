@@ -1078,42 +1078,68 @@ class Experiment
 	    echo " </td>
               </tr>\n";
 	}
-	if (!$short && ISADMIN()) {
+	if (!$short) {
 	    if ($this->geniflags()) {
 		$slice = GeniSlice::Lookup("geni-cm", $uuid);
 
 		if ($slice) {
 		    $slice_hrn = $slice->hrn();
-		    $url = CreateURL("showslice", "slice_idx", $slice->idx(),
-				     "showtype", "cm");
+		    if (ISADMIN()) {
+			$url = CreateURL("showslice", "slice_idx",
+					 $slice->idx(), "showtype", "cm");
 
-		    echo "<tr>
-                        <td>Geni Slice (CM): </td>
-                        <td class=\"left\"><a href='$url'>$slice_hrn</a></td>
-                      </tr>\n";
+			echo "<tr>
+                                <td>Geni Slice (CM): </td>
+                                <td class=\"left\">
+                                     <a href='$url'>$slice_hrn</a></td>
+                              </tr>\n";
+		    }
+		    else {
+			echo "<tr>
+                                <td>Geni Slice (CM): </td>
+                                <td class=\"left\">$slice_hrn</td>
+                              </tr>\n";
+		    }
 		}
 	    }
 	    else {
 		$slice = GeniSlice::LookupByExperiment("geni-sa", $this);
 		if ($slice) {
 		    $slice_hrn = $slice->hrn();
-		    $url = CreateURL("showslice", "slice_idx", $slice->idx(),
-				     "showtype", "sa");
-
-		    echo "<tr>
-                        <td>Geni Slice (SA): </td>
-                        <td class=\"left\"><a href='$url'>$slice_hrn</a></td>
-                      </tr>\n";
-
-		    $slice = GeniSlice::Lookup("geni-cm", $slice_hrn);
-		    if ($slice) {
-			$url = CreateURL("showslice", "slice_idx", $slice->idx(),
-					 "showtype", "cm");
+		    if (ISADMIN()) {
+			$url = CreateURL("showslice", "slice_idx",
+					 $slice->idx(), "showtype", "sa");
 
 			echo "<tr>
-                                <td>Geni Slice (CM): </td>
-                                <td class=\"left\"><a href='$url'>$slice_hrn</a></td>
+                                 <td>Geni Slice (SA): </td>
+                                 <td class=\"left\">
+                                      <a href='$url'>$slice_hrn</a></td>
                              </tr>\n";
+		    }
+		    else {
+			echo "<tr>
+                                <td>Geni Slice (SA): </td>
+                                <td class=\"left\">$slice_hrn</td>
+                              </tr>\n";
+		    }
+		    $slice = GeniSlice::Lookup("geni-cm", $slice_hrn);
+		    if ($slice) {
+			if (ISADMIN()) {
+			    $url = CreateURL("showslice", "slice_idx",
+					     $slice->idx(), "showtype", "cm");
+
+			    echo "<tr>
+                                     <td>Geni Slice (CM): </td>
+                                     <td class=\"left\">
+                                           <a href='$url'>$slice_hrn</a></td>
+                                  </tr>\n";
+			}
+			else {
+			    echo "<tr>
+                                    <td>Geni Slice (SA): </td>
+                                    <td class=\"left\">$slice_hrn</td>
+                                  </tr>\n";
+			}
 		    }
 		}
 	    }
