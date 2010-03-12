@@ -82,7 +82,6 @@ if (@ARGV) {
 }
 
 # More stuff we need below.
-my $TBDIR;
 my $domain;
 my ($pid,$eid,undef) = check_nickname();
 my $file    = TMCREATOR();
@@ -616,6 +615,7 @@ sub SetupFsNode()
     #
     mysystem("mount $shareslice $FSDIR/share");
     mysystem("echo \"$shareslice $FSDIR/share ufs rw 0 2\" >> /etc/fstab");
+    mysystem("ln -s $FSDIR/share /share");
 
     if ($SCRATCHFS) {
 	mysystem("cd /; mv -f scratch scratch.old")
@@ -821,6 +821,7 @@ sub SetupOpsNode($)
 
     my $fromscratch = $emulabconfig{"LOADELABSOURCE"};
     my $installpkgs = $emulabconfig{"LOADPACKAGES"};
+$installpkgs = 0;
 
     print "Setting up an " . ($isfs ? "Ops/Fs" : "Ops") . " node";
     if ($fromscratch) {
@@ -1015,6 +1016,7 @@ sub SetupOpsNode($)
 	#
 	mysystem("mount $shareslice $FSDIR/share");
 	mysystem("echo \"$shareslice $FSDIR/share ufs rw 0 2\" >> /etc/fstab");
+	mysystem("ln -s $FSDIR/share /share");
     }
 
     if ($SCRATCHFS) {
@@ -2099,7 +2101,7 @@ sub GetEmulabSource($)
 #
 # Create and optionally populate the main testbed directory.
 #
-SetupTBDir($$)
+sub SetupTBDir($$)
 {
     my ($TBDIR, $getsource) = @_;
 
@@ -2111,6 +2113,9 @@ SetupTBDir($$)
 	if (system("umount $TBDIR") != 0) {
 	    # not a mounted FS or could not umount it, just move it
 	    mysystem("mv $TBDIR ${TBDIR}.tmp");
+	} else {
+	    # was a mounted FS, need to remove it from fstab if present
+	    mysystem("sed -i '.orig' -E '\\;\[\[:space:\]\]$TBDIR\[\[:space:\]\];d' /etc/fstab");
 	}
     }
     mysystem("mkdir $TBDIR")
