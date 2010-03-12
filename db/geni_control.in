@@ -7,6 +7,7 @@
 use strict;
 use English;
 use Getopt::Std;
+use Data::Dumper;
 
 #
 # Exit status is important. Exit with -1 if an error, else the number
@@ -50,9 +51,14 @@ sub Register();
 sub UnRegister();
 sub ClearAll();
 sub StartAll();
+sub RestartAll();
+sub StopAll();
 sub WaitAll();
 sub PurgeAll();
 sub RenewAll();
+sub GetManifests();
+sub GetStatus();
+sub MapNodes();
 
 #
 # Turn off line buffering on output
@@ -84,7 +90,7 @@ my $eid	   = shift;
 my $action = shift;
 
 if ($action =~
-    /^(alloc|free|clear|wait|purge|start|register|unregister|renew)$/) {
+    /^(alloc|free|clear|wait|purge|start|restart|mapnodes|status|stop|register|unregister||manifests|renew)$/) {
     $action = $1;
 }
 else {
@@ -160,6 +166,14 @@ SWITCH: for ($action) {
 	StartAll();
 	last SWITCH;
     };
+    /^restart$/ && do {
+	RestartAll();
+	last SWITCH;
+    };
+    /^stop$/ && do {
+	StopAll();
+	last SWITCH;
+    };
     /^wait$/ && do {
 	WaitAll();
 	last SWITCH;
@@ -170,6 +184,18 @@ SWITCH: for ($action) {
     };
     /^renew$/ && do {
 	RenewAll();
+	last SWITCH;
+    };
+    /^manifests$/ && do {
+	GetManifests();
+	last SWITCH;
+    };
+    /^status$/ && do {
+	GetStatus();
+	last SWITCH;
+    };
+    /^mapnodes$/ && do {
+	MapNodes();
 	last SWITCH;
     };
     fatal("Unknown action $action");
@@ -244,25 +270,47 @@ sub PurgeAll()
 
 sub StartAll()
 {
-    libGeni::StartSlivers($experiment, $this_user) == 0 or
+    libGeni::StartSlivers($experiment, $this_user, 0, $debug) == 0 or
 	fatal("Cannot start slivers!\n");
+}
+
+sub RestartAll()
+{
+    libGeni::StartSlivers($experiment, $this_user, 1, $debug) == 0 or
+	fatal("Cannot restart slivers!\n");
+
+    return 0;
+}
+
+sub StopAll()
+{
+    my @resources = GeniResource->LookupAll($experiment);
+
+    foreach my $resource (@resources) {
+	$resource->StopSliver($this_user) == 0
+	    or fatal("Could not stop $resource");
+    }
+    return 0;
 }
 
 sub WaitAll()
 {
-    libGeni::WaitForSlivers($experiment, $this_user) == 0 or
+    libGeni::WaitForSlivers($experiment, $this_user, $debug) == 0 or
 	fatal("Cannot wait on slivers!\n");
 }
 
 sub RenewAll()
 {
-    libGeni::RenewSlivers($experiment, 1) == 0 or
+    libGeni::RenewSlivers($experiment, $debug) == 0 or
 	fatal("Cannot renew resources");
 }
 
-#
-# Register.
-#
+sub MapNodes()
+{
+    libGeni::MapNodes($experiment, $debug) == 0 or
+	fatal("Cannot Mapnodes");
+}
+
 sub Register()
 {
     libGeni::Register($experiment, $this_user) == 0 or
@@ -280,6 +328,42 @@ sub UnRegister()
 	or fatal("Cannot unregister with Protgeni!");
       
    return 0;
+}
+
+sub GetManifests()
+{
+    my @resources = GeniResource->LookupAll($experiment);
+
+    foreach my $resource (@resources) {
+	$resource->GetManifest($this_user) == 0
+	    or fatal("Could not get manifest for $resource");
+
+	my $manifest = $resource->Manifest();
+	if (!defined($manifest)) {
+	    print STDERR "No manifest for $resource\n";
+	    next;
+	}
+
+	print STDERR Dumper($manifest);
+    }
+
+    return 0;
+}
+
+sub GetStatus()
+{
+    my @resources = GeniResource->LookupAll($experiment);
+
+    foreach my $resource (@resources) {
+	my $ref;
+	
+	$resource->SliverStatus($this_user, \$ref) == 0
+	    or fatal("Could not get status for $resource");
+
+	print STDERR Dumper($ref);
+    }
+
+    return 0;
 }
 
 sub fatal($)

@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -50,6 +50,7 @@ my $CHATSUPPORT = @CHATSUPPORT@;
 my $MAILMANSUPPORT= @MAILMANSUPPORT@;
 my $THISHOMEBASE= "@THISHOMEBASE@";
 my $PROTOUSER   = 'elabman';
+my $ELABINELAB  = @ELABINELAB@;
 
 my $SAMBANODE	= "fs";  # DNS makes this do the right thing in E-in-E.
 my $SMBPASSWD	= "/usr/local/bin/smbpasswd";
@@ -349,6 +350,13 @@ sub AddUser()
 	if ($webonly) {
 	    return 0;
 	}
+	#
+	# Allow for users to be initialized to frozen in an inner Emulab.
+	#
+	if ($ELABINELAB && $status eq USERSTATUS_FROZEN) {
+	    print STDERR "Ignoring frozen user in elabinelab\n";
+	    return 0;
+	}
 	if ($wikionly) {
 	    $EUID = $UID;
 
@@ -395,14 +403,18 @@ sub AddUser()
 	    }
 	}
 
-	# shell escape.
-	$pswd =~ s/\$/\\\$/g;
-	$pswd =~ s/\*/\\\*/g;
+	#
+	# Leave the password "starred" on elabinelab; safer.
+	#
+	if (!$ELABINELAB) {
+	    # shell escape.
+	    $pswd =~ s/\$/\\\$/g;
+	    $pswd =~ s/\*/\\\*/g;
 
-	print "Initializing user $user password on $CONTROL.\n";
-	    
-	if (system("$SSH -host $CONTROL $CHPASS -p '$pswd' $user")) {
-	    fatal("Could not initialize password for user $user on $CONTROL!");
+	    print "Initializing user $user password on $CONTROL.\n";
+	    if (system("$SSH -host $CONTROL $CHPASS -p '$pswd' $user")) {
+		fatal("Could not initialize password for $user on $CONTROL!");
+	    }
 	}
 
 	#
@@ -620,8 +632,9 @@ sub UpdatePassword()
 
     #
     # Change on ops only if there is a real account there.
+    # For ELABINELAB, safer to leave the password "starred".
     #
-    if (! $wikionly) {
+    if (!$wikionly && !$ELABINELAB) {
 	#
 	# Grab from the DB to avoid taint checking sillyness.
 	#
@@ -927,6 +940,14 @@ sub ThawUser()
     }
     $sfsupdate = 1;
 
+    #
+    # This lets users start off as frozen in an ELABINELAB, and then
+    # get created later. Saves a lot of time.
+    #
+    if ($ELABINELAB &&
+	system("egrep -q -s '^${user}:' /etc/passwd")) {
+	return AddUser();
+    }
     return UpdateUser(0);
 }
 

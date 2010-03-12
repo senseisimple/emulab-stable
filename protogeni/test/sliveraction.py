@@ -53,23 +53,28 @@ print "Got my SA credential. Looking for slice ..."
 myslice = resolve_slice( SLICENAME, mycredential )
 print "Found the slice, asking for a credential ..."
 
-#
-# Get the slice credential.
-#
-slicecred = get_slice_credential( myslice, mycredential )
-print "Got the slice credential, asking for a sliver credential ..."
+if admincredentialfile:
+  f = open( admincredentialfile )
+  slivercred = f.read()
+  f.close()
+else:
+  #
+  # Get the slice credential.
+  #
+  slicecred = get_slice_credential( myslice, mycredential )
+  print "Got the slice credential, asking for a sliver credential ..."
 
-#
-# Get the sliver credential.
-#
-params = {}
-params["credentials"] = (slicecred,)
-params["slice_urn"]   = SLICEURN
-rval,response = do_method("cm", "GetSliver", params, version="2.0")
-if rval:
+  #
+  # Get the sliver credential.
+  #
+  params = {}
+  params["credentials"] = (slicecred,)
+  params["slice_urn"]   = SLICEURN
+  rval,response = do_method("cm", "GetSliver", params, version="2.0")
+  if rval:
     Fatal("Could not get Sliver credential")
     pass
-slivercred = response["value"]
+  slivercred = response["value"]
 
 if action == "start":
     method = "StartSliver"

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006-2009 University of Utah and the Flux Group.
+# Copyright (c) 2006-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -10,7 +10,7 @@ function GetDBLink($authority)
     if ($authority == "cm")
 	$authority = "geni-cm";
     
-    if ($authority == "sa")
+    if ($authority == "sa" || $authority == "geni-sa")
 	$authority = "geni";
     
     if ($authority == "ch")
@@ -138,6 +138,26 @@ class GeniSlice
 	    $result[] = $slice;
 	}
 	return $result;
+    }
+
+    function LookupByExperiment($authority, $experiment) {
+	$dblink     = GetDBLink($authority);
+	$exptidx    = $experiment->idx();
+
+	if (! $dblink) {
+	    return null;
+	}
+	$query_result =
+	    DBQueryFatal("select idx from geni_slices ".
+			 "where exptidx=$exptidx",
+			 $dblink);
+
+	if (! ($query_result && mysql_num_rows($query_result))) {
+	    return null;
+	}
+	$row = mysql_fetch_row($query_result);
+	$idx = $row[0];
+ 	return GeniSlice::Lookup($authority, $idx);
     }
 
     function GetManifest() {

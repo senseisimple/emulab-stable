@@ -2036,6 +2036,9 @@ sub GenVirtLans($)
 			   'virtual_interface_id' => "$member1" },
 			],
 		};
+		if ($emulated) {
+		    $ref->{'virtualization_type'} = $vlan->_encapstyle();
+		}
 		if (!exists($self->rspec()->{'link'})) {
 		    $self->rspec()->{'link'} = [];
 		}
@@ -2299,9 +2302,8 @@ sub GenVirtLans($)
 			$noderef->{'component_urn'} =
 			    GeniHRN::Generate($authority, "node", "*");
 		    }
-
-		    push(@{ $self->rspec()->{'link'} },
-			 { 'virtual_id'    => "$vname:$member",
+		    my $ref = {
+			   'virtual_id'    => "$vname:$member",
 			   # The list references are so XML::Simple does not
 			   # turn them into attributes. Need a better solution.
 			   'latency'       => [0],
@@ -2316,8 +2318,11 @@ sub GenVirtLans($)
 				{ 'virtual_node_id' => "lan-$vname",
 				  'virtual_interface_id' => "$member" }
 			       ]
-			       });
-		    
+			       };
+		    if ($emulated) {
+			$ref->{'virtualization_type'} = $vlan->_encapstyle();
+		    }
+		    push(@{ $self->rspec()->{'link'} }, $ref);
 		    push(@nrefs, { 'virtual_id' => "$member"});
 		}
 		$noderef->{'interface'} = \@nrefs;
