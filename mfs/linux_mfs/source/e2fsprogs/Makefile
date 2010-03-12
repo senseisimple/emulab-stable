@@ -115,8 +115,8 @@ $(TARGET_PATH)/sbin/e2fsck: $(E2FSPROGS_PATH)/e2fsck/e2fsck
 	install -m 755 $< \
 		$(TARGET_PATH)/sbin/e2fsck
 	$(STRIPCMD) --strip-unneeded $(TARGET_PATH)/sbin/e2fsck
-	ln -sf $@ $(dir $@)/fsck.ext2
-	ln -sf $@ $(dir $@)/fsck.ext3
+	ln -sf $(notdir $@) $(dir $@)/fsck.ext2
+	ln -sf $(notdir $@) $(dir $@)/fsck.ext3
 	touch -c $@
 
 $(TARGET_PATH)/sbin/tune2fs: $(E2FSPROGS_PATH)/misc/tune2fs

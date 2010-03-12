@@ -252,7 +252,6 @@ package
       op.addField("credential", credential.base);
       op.addField("hrn", Util.makeUrn(Geni.defaultAuthority, "slice",
                                       sliceName));
-//      op.addField("hrn", sliceName);
       op.addField("type", "Slice");
 //      op.addField("userbindings", new Array(user.uuid));
       op.call(completeSliceCreate, failure);
@@ -266,7 +265,9 @@ package
       {
         credential.slice = String(response.value);
 //        startResourceLookup();
-        var newMenu = new MenuSliceDetail(sliceName, sliceId, credential);
+        var newMenu = new MenuSliceDetail(sliceName, sliceId, credential,
+                                          Util.makeUrn(Geni.defaultAuthority,
+                                                       "slice", sliceName));
         Main.setText(clip.xmlText.text);
         Main.changeState(newMenu);
       }

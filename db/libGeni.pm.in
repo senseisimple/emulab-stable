@@ -29,6 +29,7 @@ use Experiment;
 use OSinfo;
 use GeniEmulab;
 use GeniResource;
+use GeniResponse;
 use English;
 use Socket;
 use XML::Simple;
@@ -475,7 +476,7 @@ sub MapNodes($$)
 		my $iface_id = $ifaceref->{'virtual_interface_id'};
 		my $MAC      = $ifaceref->{'MAC'};
 		my ($node, $compid) = @{ $ifacemap{$iface_id} };
-		my $iface;
+		my ($iface,$interface);
 
 		if (GeniHRN::IsValid($compid)) {
 		    (undef,undef,$iface) = GeniHRN::ParseInterface($compid);
@@ -489,9 +490,26 @@ sub MapNodes($$)
 		    print STDERR Dumper($manifest);
 		    return -1;
 		}
-		my $interface = Interface->LookupByIface($node,$iface);
+		#
+		# We do not need to do this for virtual nodes.
+		#
+		if ($node->isvirtnode()) {
+		    $interface =
+			Interface::VInterface->LookupByVirtLan($experiment,
+							       $linkname,
+							       $vname);
+		    $MAC = $ifaceref->{'VMAC'};
+		}
+		else {
+		    $interface = Interface->LookupByIface($node,$iface);
+		}
 		if (!defined($interface)) {
 		    print STDERR "Could not map iface for $node,$iface\n";
+		    print STDERR Dumper($manifest);
+		    return -1;
+		}
+		if (!defined($MAC)) {
+		    print STDERR "No mac (or vmac) for $node,$iface\n";
 		    print STDERR Dumper($manifest);
 		    return -1;
 		}
@@ -540,8 +558,18 @@ sub StartSlivers($$)
 	my ($resource) = @_;
 
 	print STDERR "Starting ($$) sliver $resource\n";
-	
-	return $resource->StartSliver($user);
+
+	while (1) {
+	    my $retval = $resource->StartSliver($user);
+	    last
+		if (!$retval);
+	    return -1
+		if (!$resource->last_rpcerror() ||
+		    $resource->last_rpcerror() != GENIRESPONSE_BUSY());
+	    
+	    sleep(10);
+	}
+	return 0;
     };
     if (ParRun(undef, \@results, $coderef, @resources)) {
 	print STDERR "*** StartSlivers: Internal error starting slivers.\n";
@@ -758,19 +786,36 @@ sub DeleteAllSlivers($$)
     if (! @resources) {
 	return 0;
     }
+    #
+    # Delete slivers in parallel.
+    # 
+    my @results = ();
+    my $coderef = sub {
+	my ($resource) = @_;
 
-    foreach my $resource (@resources) {
-	print STDERR "Deleting sliver for $resource\n";
-	if ($resource->Clear($user)) {
-	    print STDERR "DeleteSlivers: Could not clear $resource\n";
-	    return -1;
+	print STDERR "Deleting ($$) sliver for $resource\n";
+
+	while (1) {
+	    my $retval = $resource->Clear($user);
+	    last
+		if (!$retval);
+	    return -1
+		if (!$resource->last_rpcerror() ||
+		    $resource->last_rpcerror() != GENIRESPONSE_BUSY());
+	    
+	    sleep(10);
 	}
 	if ($resource->Delete()) {
 	    print STDERR "DeleteSlivers: Could not delete $resource\n";
 	    return -1;
 	}
+	return 0;
+    };
+    if (ParRun(undef, \@results, $coderef, @resources)) {
+	print STDERR
+	    "*** DeleteAllSlivers: Internal error deleting slivers.\n";
+	return -1;
     }
-
     return 0;
 }
 

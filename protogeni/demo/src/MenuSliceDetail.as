@@ -1,4 +1,4 @@
-﻿/* GENIPUBLIC-COPYRIGHT
+/* GENIPUBLIC-COPYRIGHT
  * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
  * All rights reserved.
  *
@@ -21,11 +21,13 @@ package
   {
     public function MenuSliceDetail(newSliceName : String,
                                     newSliceId : String,
-                                    newCredential : Credential) : void
+                                    newCredential : Credential,
+                                    newSliceUrn : String) : void
     {
       sliceName = newSliceName;
       sliceId = newSliceId;
       credential = newCredential;
+      sliceUrn = newSliceUrn;
     }
 
     override public function init(newParent : DisplayObjectContainer) : void
@@ -35,20 +37,21 @@ package
       parent.addChild(clip);
 
       clip.sliceName.text = sliceName;
+          clip.sliceUrn.text = sliceUrn;
       nodes = new ActiveNodes(parent, clip.nodeList, clip.description);
       managers = new ComponentView(clip.cmSelect, clip.nodeList, nodes);
       console = new Console(parent, nodes, managers, clip,
-                            credential, Main.getText(), sliceName);
+                            credential, Main.getText(), sliceUrn);
       console.discoverResources();
       wait = new SliceWait(clip.wait, clip.opText, console);
       abstract = new AbstractNodes(clip, nodes, managers);
     }
-
+        
         public override function getComponent(urn:String, cm:String):String
         {
                 var compm : ComponentManager = null;
                 var cms : Array = managers.getManagers();
-
+                
                 // Get CM
                 var length:int = cms.length;
                 for(var i:int = 0; i < length; i++)
@@ -59,7 +62,7 @@ package
                                 break;
                         }
                 }
-
+                
                 // Get component
                 if(compm != null)
                 {
@@ -118,6 +121,7 @@ package
 
     var sliceName : String;
     var sliceId : String;
+        var sliceUrn : String;
     var credential : Credential;
     var parent : DisplayObjectContainer;
     var clip : SliceDetailClip;

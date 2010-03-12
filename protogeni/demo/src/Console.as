@@ -36,13 +36,13 @@ package
                             newArena : SliceDetailClip,
                             newCredential : Credential,
                             newText : String,
-                            newSliceName : String) : void
+                            newSliceUrn : String) : void
     {
       nodes = newNodes;
       managers = newManagers;
       arena = newArena;
       credential = newCredential;
-      sliceUrn = Util.makeUrn(Geni.defaultAuthority, "slice", newSliceName);
+      sliceUrn = newSliceUrn;
 
       clip = new ConsoleClip();
       parent.addChild(clip);
