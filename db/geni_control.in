@@ -336,11 +336,13 @@ sub GetManifests()
 
     foreach my $resource (@resources) {
 	$resource->GetManifest($this_user) == 0
-	    or fatal("Could not clear resources from $resource");
+	    or fatal("Could not get manifest for $resource");
 
 	my $manifest = $resource->Manifest();
-	return -1
-	    if (!defined($manifest));
+	if (!defined($manifest)) {
+	    print STDERR "No manifest for $resource\n";
+	    next;
+	}
 
 	print STDERR Dumper($manifest);
     }
@@ -356,7 +358,7 @@ sub GetStatus()
 	my $ref;
 	
 	$resource->SliverStatus($this_user, \$ref) == 0
-	    or fatal("Could not clear resources from $resource");
+	    or fatal("Could not get status for $resource");
 
 	print STDERR Dumper($ref);
     }
