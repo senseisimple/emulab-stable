@@ -590,6 +590,7 @@ sub MapNodes($$)
 		my $vname    = $ifaceref->{'virtual_node_id'};
 		my $iface_id = $ifaceref->{'virtual_interface_id'};
 		my $MAC      = $ifaceref->{'MAC'};
+		my $VMAC     = $ifaceref->{'VMAC'};
 		my ($node, $compid) = @{ $ifacemap{$iface_id} };
 		my $iface;
 
@@ -605,21 +606,22 @@ sub MapNodes($$)
 		    print STDERR Dumper($manifest);
 		    return -1;
 		}
+		#
+		# If this is a virtual node, then we want to set the
+		# MACs of the underlying physical node. The vinterface
+		# (VMAC) will be handled below.
+		#
+		if ($node->isvirtnode()) {
+		    my $pnode = $node->GetPhysHost();
+		    if (!defined($pnode)) {
+			print STDERR "Could not physical node for $node\n";
+			print STDERR Dumper($manifest);
+			return -1;
+		    }
+		    $node = $pnode;
+		}
 		
-		#
-		# XXX At this point, not sure if the interface is a
-		# vinterface or a real interface.
-		#
-		my $interface =
-		    Interface::VInterface->LookupByVirtLan($experiment,
-							   $linkname,
-							   $vname);
-		if (defined($interface)) {
-		    $MAC = $ifaceref->{'VMAC'};
-		}
-		else {
-		    $interface = Interface->LookupByIface($node,$iface);
-		}
+		my $interface = Interface->LookupByIface($node,$iface);
 		if (!defined($interface)) {
 		    print STDERR "Could not map iface for $node,$iface\n";
 		    print STDERR Dumper($manifest);
@@ -639,6 +641,28 @@ sub MapNodes($$)
 		    print STDERR "Could not update $node,$iface\n";
 		    print Dumper($manifest);
 		    return -1;
+		}
+		if (defined($VMAC)) {
+		    my $vinterface =
+			Interface::VInterface->LookupByVirtLan($experiment,
+							       $linkname,
+							       $vname);
+		    if (!defined($vinterface)) {
+			print STDERR
+			    "Could not map vinterface for $linkname,$vname\n";
+			print STDERR Dumper($manifest);
+			return -1;
+		    }
+		    if (! ($VMAC =~ /^[\w]*$/)) {
+			print STDERR "Bad vmac '$VMAC' for $linkname,$vname\n";
+			print STDERR Dumper($manifest);
+			return -1;
+		    }
+		    if ($vinterface->Update({"mac" => "$VMAC"})) {
+			print STDERR "Could not update $linkname,$vname\n";
+			print Dumper($manifest);
+			return -1;
+		    }
 		}
 	    }
 	}
