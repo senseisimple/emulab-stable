@@ -11,7 +11,7 @@ use Exporter;
 use vars qw(@ISA @EXPORT);
 
 @ISA    = "Exporter";
-@EXPORT = qw(NewUUID GENI_PURGEFLAG);
+@EXPORT = qw(NewUUID GENI_PURGEFLAG FindHostname);
 
 use English;
 use Data::Dumper;
@@ -19,12 +19,14 @@ use XML::Simple;
 use GeniHRN;
 
 # Configure variables
-my $TB		   = "@prefix@";
-my $TBOPS          = "@TBOPSEMAIL@";
-my $OURDOMAIN      = "@OURDOMAIN@";
-my $UUIDGEN	   = "@UUIDGEN@";
-my $user	   = "geniuser";
-my $group          = "GeniSlices";
+my $TB		       = "@prefix@";
+my $TBOPS              = "@TBOPSEMAIL@";
+my $OURDOMAIN          = "@OURDOMAIN@";
+my $UUIDGEN	       = "@UUIDGEN@";
+my $ELABINELAB         = "@ELABINELAB@";
+my $OUTERBOSS_NODENAME = "@OUTERBOSS_NODENAME@";
+my $user	       = "geniuser";
+my $group              = "GeniSlices";
 
 sub GENI_PURGEFLAG()	{ return 1; }
 
@@ -115,6 +117,17 @@ sub LookupNode($)
     
     # Assume it's a UUID, and pass it on as is.
     return Node->Lookup($nodeid);
+}
+
+sub FindHostname($)
+{
+    my ($nodeid) = @_;
+    my $prefix = $OURDOMAIN;
+    if ($ELABINELAB == 1) {
+	$OUTERBOSS_NODENAME =~ /^[^.]+\.(.*)$/;
+	$prefix = $1;
+    }
+    return $nodeid . "." . $prefix;    
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

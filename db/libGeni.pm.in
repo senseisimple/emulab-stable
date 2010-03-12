@@ -27,8 +27,10 @@ use NodeType;
 use Interface;
 use Experiment;
 use OSinfo;
+use Lan;
 use GeniEmulab;
 use GeniResource;
+use GeniResponse;
 use English;
 use Socket;
 use XML::Simple;
@@ -207,6 +209,8 @@ sub MapResources($$$$)
 	if ($?) {
 	    print STDERR "Could not map to physical resources on $resource\n";
 	    print STDERR Dumper($fragment);
+	    my $logstuff = `cat $log`;
+	    print STDERR "\n" . $logstuff . "\n";
 	    return -1;
 	}
 	my $solution =
@@ -287,8 +291,7 @@ sub MapResources($$$$)
 sub GetTickets($$$$)
 {
     my ($experiment, $impotent, $user, $rspec) = @_;
-    my %cm_urns  = ();
-    my %node_cms = ();
+    my %cm_urns   = ();
 
     Register($experiment, $user) == 0
 	or return -1;
@@ -309,7 +312,6 @@ sub GetTickets($$$$)
 	my $cm = GeniHRN::Generate($auth, "authority", "cm");
 
 	$cm_urns{$cm} = $cm;
-	$node_cms{$ref->{'virtual_id'}} = $cm;
 
 	#
 	# This is how we get the client side to do cooked mode properly.
@@ -334,19 +336,63 @@ sub GetTickets($$$$)
     }
 
     #
-    # Ask for tickets.
+    # Get Tickets in parallel.
     #
-    foreach my $cm (keys(%cm_urns)) {
-	my $resource = $cm_urns{$cm};
+    my @resources = values(%cm_urns);
+    my @results   = ();
+    my $coderef   = sub {
+	my ($resource) = @_;
 
 	print STDERR "Asking for ticket from $resource\n";
 	if ($resource->GetTicket($user, $rspec, $impotent)) {
-	    print STDERR "Could not GetTicket for $resource\n";
-	    print STDERR Dumper($rspec);
+	    #
+	    # Print this here since we do not save this in the
+	    # DB, and the parent side of the fork will not have
+	    # the error message.
+	    #
+	    if ($resource->last_rpc_error() &&
+		defined($resource->last_rpc_value()) &&
+		$resource->last_rpc_value()) {
+		print STDERR $resource->last_rpc_value() . "\n";
+	    }
 	    return -1;
 	}
+	return 0;
+    };
+    if (ParRun(undef, \@results, $coderef, @resources)) {
+	print STDERR "*** GetTickets: Internal error getting tickets\n";
+	#
+	# Need to be careful here; some of the tickets might have been
+	# redeemed, and that happened in the child of a fork. Sync with
+	# the DB so the parent sees the current state.
+	#
+	map { $_->Refresh() } @resources;
+	return -1;
     }
-    return 0;
+    #
+    # Check the exit codes. Eventually return specific error info.
+    #
+    my $errors = 0;
+    my $count  = 0;
+    foreach my $result (@results) {
+	my $resource = $resources[$count];
+
+	#
+	# ParRun does a fork; so need to refresh the resource object
+	# to sync it to the DB.
+	#
+	if ($resource->Refresh()) {
+	    print STDERR "*** GetTickets: Error synchronizing $resource\n";
+	    $errors++;
+	}
+	elsif ($result != 0) {
+	    print STDERR "*** Error getting ticket for $resource\n";
+	    $errors++;
+	}
+	$count++;
+    }
+    print STDERR Dumper($rspec) if ($errors);
+    return $errors;
 }
 
 #
@@ -365,16 +411,53 @@ sub RedeemTickets($$$)
 	return 0;
     }
 
-    foreach my $resource (@resources) {
+    #
+    # Redeem Tickets in parallel.
+    #
+    my @results   = ();
+    my $coderef   = sub {
+	my ($resource) = @_;
+
 	print STDERR "Redeeming ticket for $resource\n";
 	if ($resource->RedeemTicket($user)) {
-	    print STDERR
-		"RedeemTicket: Could not redeem ticket for $resource\n";
 	    return -1;
 	}
+	return 0;
+    };
+    if (ParRun(undef, \@results, $coderef, @resources)) {
+	print STDERR "*** RedeemTickets: Internal error getting tickets\n";
+	#
+	# Need to be careful here; some of the tickets might have been
+	# redeemed, and that happened in the child of a fork. Sync with
+	# the DB so the parent sees the current state.
+	#
+	map { $_->Refresh() } @resources;
+	return -1;
     }
-
-    return 0;
+    #
+    # Check the exit codes. Eventually return specific error info.
+    #
+    my $errors = 0;
+    my $count  = 0;
+    foreach my $result (@results) {
+	my $resource = $resources[$count];
+	
+	#
+	# ParRun does a fork; so need to refresh the resource object
+	# to sync it to the DB.
+	#
+	if ($resource->Refresh()) {
+	    print STDERR "*** RedeemTicket: Error synchronizing $resource\n";
+	    $errors++;
+	}
+	elsif ($result != 0) {
+	    print STDERR "*** Error redeeming ticket for $resource\n";
+	    $errors++;
+	}
+	$count++;
+    }
+    print STDERR Dumper($rspec) if ($errors);
+    return $errors;
 }
 
 #
@@ -401,7 +484,8 @@ sub MapNodes($$)
 	return -1
 	    if (!defined($manifest));
 
-	print STDERR Dumper($manifest);
+	print STDERR Dumper($manifest)
+	    if ($verbose);
 	
 	foreach my $ref (@{ $manifest->{'node'} }) {
 	    my $sliver_urn = $ref->{'sliver_urn'};
@@ -470,12 +554,45 @@ sub MapNodes($$)
 	    next 
 		if (!exists($managers{$resource->manager_urn()}));
 
+	    if (exists($ref->{'vlantag'})) {
+		my $TAG = $ref->{'vlantag'};
+		
+		if (defined($TAG)) {
+		    if (!($TAG =~ /^[\w]*$/)) {
+			print STDERR "Bad vlantag '$TAG' for $linkname\n";
+			print STDERR Dumper($manifest);
+			return -1;
+		    }
+		    my $lan = Lan->Lookup($experiment, $linkname, 1);
+		    if (!defined($lan)) {
+			print STDERR "Could not find vlan for $linkname\n";
+			return -1;
+		    }
+		    #
+		    # XXX This seems backwards. If the lan is pointing
+		    # to another lan, then we really want to change that
+		    # one. 
+		    #
+		    if ($lan->type() eq "emulated" && defined($lan->link())) {
+			$lan = Lan->Lookup($lan->link());
+			if (!defined($lan)) {
+			    print STDERR 
+				"Could not find linked vlan for $linkname\n";
+			    return -1;
+			}
+		    }
+		    return -1
+			if ($lan->SetAttribute("vlantag", $TAG));
+		}
+	    }
+
 	    foreach my $ifaceref (@{ $interfaces }) {
 		my $vname    = $ifaceref->{'virtual_node_id'};
 		my $iface_id = $ifaceref->{'virtual_interface_id'};
 		my $MAC      = $ifaceref->{'MAC'};
+		my $VMAC     = $ifaceref->{'VMAC'};
 		my ($node, $compid) = @{ $ifacemap{$iface_id} };
-		my ($iface,$interface);
+		my $iface;
 
 		if (GeniHRN::IsValid($compid)) {
 		    (undef,undef,$iface) = GeniHRN::ParseInterface($compid);
@@ -490,18 +607,21 @@ sub MapNodes($$)
 		    return -1;
 		}
 		#
-		# We do not need to do this for virtual nodes.
+		# If this is a virtual node, then we want to set the
+		# MACs of the underlying physical node. The vinterface
+		# (VMAC) will be handled below.
 		#
 		if ($node->isvirtnode()) {
-		    $interface =
-			Interface::VInterface->LookupByVirtLan($experiment,
-							       $linkname,
-							       $vname);
-		    $MAC = $ifaceref->{'VMAC'};
+		    my $pnode = $node->GetPhysHost();
+		    if (!defined($pnode)) {
+			print STDERR "Could not physical node for $node\n";
+			print STDERR Dumper($manifest);
+			return -1;
+		    }
+		    $node = $pnode;
 		}
-		else {
-		    $interface = Interface->LookupByIface($node,$iface);
-		}
+		
+		my $interface = Interface->LookupByIface($node,$iface);
 		if (!defined($interface)) {
 		    print STDERR "Could not map iface for $node,$iface\n";
 		    print STDERR Dumper($manifest);
@@ -518,9 +638,31 @@ sub MapNodes($$)
 		    return -1;
 		}
 		if ($interface->Update({"mac" => "$MAC"})) {
-		    print STDERR "Could not update mac for $node,$iface\n";
+		    print STDERR "Could not update $node,$iface\n";
 		    print Dumper($manifest);
 		    return -1;
+		}
+		if (defined($VMAC)) {
+		    my $vinterface =
+			Interface::VInterface->LookupByVirtLan($experiment,
+							       $linkname,
+							       $vname);
+		    if (!defined($vinterface)) {
+			print STDERR
+			    "Could not map vinterface for $linkname,$vname\n";
+			print STDERR Dumper($manifest);
+			return -1;
+		    }
+		    if (! ($VMAC =~ /^[\w]*$/)) {
+			print STDERR "Bad vmac '$VMAC' for $linkname,$vname\n";
+			print STDERR Dumper($manifest);
+			return -1;
+		    }
+		    if ($vinterface->Update({"mac" => "$VMAC"})) {
+			print STDERR "Could not update $linkname,$vname\n";
+			print Dumper($manifest);
+			return -1;
+		    }
 		}
 	    }
 	}
@@ -537,9 +679,9 @@ sub MapNodes($$)
 # Boot (Start) all of the slivers. This does the entire set, and blocks
 # till done.
 #
-sub StartSlivers($$)
+sub StartSlivers($$$$)
 {
-    my ($experiment, $user) = @_;
+    my ($experiment, $user, $restart, $verbose) = @_;
 
     #
     # Get the resource objects.
@@ -556,17 +698,35 @@ sub StartSlivers($$)
     my $coderef = sub {
 	my ($resource) = @_;
 
-	print STDERR "Starting ($$) sliver $resource\n";
-
 	while (1) {
-	    my $retval = $resource->StartSliver($user);
+	    print STDERR "Starting ($$) sliver $resource\n";
+	    my $retval = ($restart ?
+			  $resource->RestartSliver($user)  :
+			  $resource->StartSliver($user));
 	    last
 		if (!$retval);
 	    return -1
-		if (!$resource->last_rpcerror() ||
-		    $resource->last_rpcerror() != GENIRESPONSE_BUSY());
+		if (!$resource->last_rpc_error() ||
+		    $resource->last_rpc_error() != GENIRESPONSE_BUSY());
 	    
 	    sleep(10);
+	}
+	#
+	# Grab a new manifest;
+	#
+	if ($resource->ManagerVersion() == 2.0) {
+	    while (1) {
+		print STDERR "Getting ($$) new manifest for $resource\n";
+		my $retval = $resource->GetManifest($user);
+		last
+		    if (!$retval);
+		return -1
+		    if (!$resource->last_rpc_error() ||
+			$resource->last_rpc_error() != GENIRESPONSE_BUSY());
+	    
+		sleep(10);
+	    }
+
 	}
 	return 0;
     };
@@ -588,16 +748,27 @@ sub StartSlivers($$)
 	    $errors++;
 	}
 	else {
+	    #
+	    # ParRun does a fork; so need to refresh the resource object
+	    # to sync it to the DB.
+	    #
+	    if ($resource->Refresh()) {
+		print STDERR
+		    "*** StartSlivers: Error synchronizing $resource\n";
+		$errors++;
+	    }
 	    push(@tmp, $resource);
 	}
 	$count++;
     }
-    return WaitForSlivers($experiment, $user, @tmp);
+    MapNodes($experiment, $verbose);
+    
+    return WaitForSlivers($experiment, $user, $verbose, @tmp);
 }
 
-sub WaitForSlivers($$@)
+sub WaitForSlivers($$$@)
 {
-    my ($experiment, $user, @resources) = @_;
+    my ($experiment, $user, $verbose, @resources) = @_;
     my %nodemap = ();
 
     #
@@ -609,6 +780,8 @@ sub WaitForSlivers($$@)
     if (! @resources) {
 	return 0;
     }
+
+    print STDERR "Waiting for slivers ...\n";
 
     #
     # Build a map of the nodes. I made a real mess of this in Version 1.
@@ -661,14 +834,20 @@ sub WaitForSlivers($$@)
 	my $ref;
 	my $notready = 0;
 
-	print STDERR "Waiting ($$) for sliver $resource\n";
+	print STDERR "Getting ($$) sliver status for $resource\n";
 
 	if ($resource->SliverStatus($user, \$ref) != 0) {
+	    # Tell the parent to keep trying.
+	    return 0
+		if ($resource->last_rpc_error() &&
+		    $resource->last_rpc_error() == GENIRESPONSE_BUSY());
+	    
 	    print STDERR "Error getting sliver status for $resource\n";
 	    # Tell the parent error.
 	    return -1;
 	}
-	print STDERR Dumper($ref);
+	print STDERR Dumper($ref)
+	    if ($verbose);
 
 	foreach my $key (keys(%{ $ref->{'details'} })) {
 	    my $val  = $ref->{'details'}->{$key};
@@ -695,17 +874,11 @@ sub WaitForSlivers($$@)
 	    # State was changed in a another process.
 	    $node->Refresh();
 
-	    #
-	    # Only send on state change to avoid multiple events.
-	    #
-	    if ($status eq "ready" && !$node->IsUp()) {
-#		print STDERR "    Sending ISUP event.\n";
-#		$node->SetEventState(TBDB_NODESTATE_ISUP());
+	    if ($status eq "ready") {
+		# print statement would be repeated.
 	    }
-	    elsif ($status eq "failed" &&
-		   $node->eventstate() ne TBDB_NODESTATE_TBFAILED) {
-#		print STDERR "    Sending TBFAILED event.\n";
-#		$node->SetEventState(TBDB_NODESTATE_TBFAILED());
+	    elsif ($status eq "failed") {
+		# print statement would be repeated.
 	    }
 	    else {
 		$notready++;
@@ -718,6 +891,11 @@ sub WaitForSlivers($$@)
 	# Tell the parent not ready.
 	return 1;
     };
+    #
+    # We want to watch for failures.
+    #
+    my @failed = ();
+    
     while (@resources) {
 	my @results = ();
 	
@@ -734,39 +912,44 @@ sub WaitForSlivers($$@)
 	    if ($result > 0) {
 		push(@tmp, $resource);
 	    }
+	    elsif ($result < 0) {
+		push(@failed, $resource);
+	    }
 	}
 	@resources = @tmp;
 
 	#
 	# Check for cancelation. When canceled, go through and mark
-	# any nodes that have not been marked, as failed. This will
-	# stop the waiting up in os_setup.
+	# any nodes that have not been marked, as failed. 
 	#
-	if ($experiment->canceled()) {
-	    foreach my $resource (@resources) {	
-		my $manifest = $resource->Manifest();
-		next
-		    if (!defined($manifest));
+	last
+	    if ($experiment->canceled());
 
-		foreach my $ref (@{ $manifest->{'node'} }) {
-		    my $vname      = $ref->{'virtual_id'};
-		    my $node       = $experiment->VnameToNode($vname);
-		    next
-			if (!defined($node));
-		    # State was changed in child process.
-		    $node->Refresh();
-
-		    if ($node->eventstate() ne TBDB_NODESTATE_ISUP &&
-			$node->eventstate() ne TBDB_NODESTATE_TBFAILED) {
-			$node->SetEventState(TBDB_NODESTATE_TBFAILED());
-		    }
-		}
-	    }
-	    return 0;
-	}
-
-	sleep(10)
+	sleep(15)
 	    if (@resources);
+    }
+    #
+    # If we get here, mark any nodes left over or failed, with TBFAILED.
+    # This will stop the waiting up in os_setup.
+    #
+    foreach my $resource (@resources, @failed) {	
+	my $manifest = $resource->Manifest();
+	next
+	    if (!defined($manifest));
+
+	foreach my $ref (@{ $manifest->{'node'} }) {
+	    my $vname      = $ref->{'virtual_id'};
+	    my $node       = $experiment->VnameToNode($vname);
+	    next
+		if (!defined($node));
+	    # State was changed in child process.
+	    $node->Refresh();
+
+	    if ($node->eventstate() ne TBDB_NODESTATE_ISUP &&
+		$node->eventstate() ne TBDB_NODESTATE_TBFAILED) {
+		$node->SetEventState(TBDB_NODESTATE_TBFAILED());
+	    }
+	}
     }
     return 0;
 }
@@ -799,8 +982,8 @@ sub DeleteAllSlivers($$)
 	    last
 		if (!$retval);
 	    return -1
-		if (!$resource->last_rpcerror() ||
-		    $resource->last_rpcerror() != GENIRESPONSE_BUSY());
+		if (!$resource->last_rpc_error() ||
+		    $resource->last_rpc_error() != GENIRESPONSE_BUSY());
 	    
 	    sleep(10);
 	}
@@ -813,8 +996,16 @@ sub DeleteAllSlivers($$)
     if (ParRun(undef, \@results, $coderef, @resources)) {
 	print STDERR
 	    "*** DeleteAllSlivers: Internal error deleting slivers.\n";
+	#
+	# Need to be careful here; some of the tickets might have been
+	# deleted, and that happened in the child of a fork. Sync with
+	# the DB so the parent sees the current state.
+	#
+	map { $_->Refresh() } @resources;
 	return -1;
     }
+    # Ditto, above.
+    map { $_->Refresh() } @resources;
     return 0;
 }
 

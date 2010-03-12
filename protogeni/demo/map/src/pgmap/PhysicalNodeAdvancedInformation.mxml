@@ -27,6 +27,12 @@
 				
 				imgAvailable.source = Common.assignAvailabilityIcon(n);
 				imgExclusive.source = Common.assignIcon(n.exclusive);
+				if(n.exclusive) imgExclusive.toolTip = "Exclusive";
+					else imgExclusive.toolTip = "Not exclusive";
+				if(n.virtualNodes != null && n.virtualNodes.length > 0) imgAvailable.toolTip = "Allocated";
+				else
+					if(n.available) imgAvailable.toolTip = "Available";
+					else imgAvailable.toolTip = "Not available";
 
 				physicalLinksVbox.removeAllChildren();
 				
@@ -220,7 +226,7 @@
 						<mx:Label text="Availability" fontWeight="bold"/>
 						<mx:Image id="imgAvailable"/>
 						<!--<mx:Button label="Add" click="tryAdd();" enabled="{node.available}"/>-->
-						<pgmap:ImageButton id="fullscreenButton" enabled="{node.available}"
+						<pgmap:ImageButton id="addButton" enabled="{node.available}"
 							source="@Embed('../images/bullet_add.png')"
 							click="tryAdd()"
 							toolTip="Add this node on the flash client" />

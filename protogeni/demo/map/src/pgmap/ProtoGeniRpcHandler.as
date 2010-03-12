@@ -278,23 +278,20 @@
 	        currentCm.Rspec = new XML(decodedRspec);
 		  	currentIndex++;
 		  	currentCm.processRspec(startResourceLookup);
-	      }
-	      else if(code == GENIRESPONSE_BADARGS)
-	      {
-	      	main.setProgress("Done", Common.failColor);
-	    	main.stopWaiting();
-	    	currentCm.Message = "Malformed arguments";
-			currentCm.Status = ComponentManager.FAILED;
-			currentIndex++;
-			main.chooseCMWindow.ResetStatus(currentCm);
-			startResourceLookup();
-	      }
-	      else
-	      {
-	        codeFailure();
-	        currentCm.Status = ComponentManager.FAILED;
-	        main.console.appendText(op.getResponseXml());
-			main.chooseCMWindow.ResetStatus(currentCm);
+	      } else {
+		      	main.setProgress("Done", Common.failColor);
+		    	main.stopWaiting();
+		    	switch(code) {
+		    		case GENIRESPONSE_BADARGS: currentCm.Message = "Malformed arguments";
+		    			break;
+		    		case GENIRESPONSE_ERROR: currentCm.Message = "Error";
+		    			break;
+		    		default: currentCm.Message = "Other error";
+		    	}
+				currentCm.Status = ComponentManager.FAILED;
+				currentIndex++;
+				main.chooseCMWindow.ResetStatus(currentCm);
+				startResourceLookup();
 	      }
 	    }
 	    
@@ -450,104 +447,6 @@
 	      	startSliceCredential();
 	    }
 	    
-	    /* DEPPRECIATED
-	    public function startSliceStatus() : void
-	    {
-	    	 while(currentIndex < main.pgHandler.CurrentUser.slices.length
-				  	&& (main.pgHandler.CurrentUser.slices[currentIndex] as Slice).credential.length == 0)
-		  	{
-			  	currentIndex++;
-			  	currentSecondaryIndex = 0;
-		  	}
-				  	
-	    	if(currentIndex >= main.pgHandler.CurrentUser.slices.length)
-	    	{
-	    		if(nextTotalCalls > 0)
-	    		{
-	    			totalCalls = nextTotalCalls;
-	    			startIndexedCall(startGetSliver);
-	    		}
-	    		else
-	    			main.pgHandler.map.drawAll();
-	    		return;
-	    	}
-
-	    	currentSlice = main.pgHandler.CurrentUser.slices[currentIndex] as Slice;
-	    	currentCm = main.pgHandler.ComponentManagers[currentSecondaryIndex] as ComponentManager;
-	    	
-	      opName = "Acquiring " + ((totalCalls * main.pgHandler.ComponentManagers.length) - (main.pgHandler.ComponentManagers.length * currentIndex + currentSecondaryIndex)) + " more slice status report(s)";
-	      main.setProgress(opName, Common.waitColor);
-	      main.startWaiting();
-	      main.console.appendText(opName);
-	      op.reset(Geni.sliceStatus);
-	      op.addField("credential", currentSlice.credential);
-	      op.setExactUrl(currentCm.Url);
-		  op.call(completeSliceStatus, failSliceStatus);
-	      addSend();
-	    }
-	    
-	    public function failSliceStatus(event : ErrorEvent, fault : MethodFault) : void
-	    {
-	    	main.setProgress("Done", Common.failColor);
-	    	main.stopWaiting();
-	    	outputFailure(event, fault);
-			currentSecondaryIndex++;
-			while(currentSecondaryIndex < main.pgHandler.ComponentManagers.length
-	    		&& (main.pgHandler.ComponentManagers[currentSecondaryIndex] as ComponentManager).Status != ComponentManager.VALID)
-	    		currentSecondaryIndex++;
-		  if(currentSecondaryIndex == main.pgHandler.ComponentManagers.length)
-		  {
-		  	  currentSlice.DetectStatus();
-			  currentIndex++;
-			  while(currentIndex < main.pgHandler.CurrentUser.slices.length
-			  	&& (main.pgHandler.CurrentUser.slices[currentIndex] as Slice).credential.length == 0)
-			  	currentIndex++;
-			  currentSecondaryIndex = 0;
-		  }
-		  startSliceStatus();
-	    }
-	    
-	    public function completeSliceStatus(code : Number, response : Object) : void
-	    {
-	    	main.setProgress("Done", Common.successColor);
-	    	main.stopWaiting();
-	      addResponse();
-	      if (code == GENIRESPONSE_SUCCESS)
-	      {
-	      	// Remember the sliver to try to get it and skip unneeded calls
-	      	var newSliver:Sliver = new Sliver(currentSlice);
-	      	newSliver.componentManager = currentCm;
-	      	newSliver.sliceStatus = response.value.status;
-	      	currentSlice.slivers.addItem(newSliver);
-	      	nextTotalCalls++;
-	      }
-	      else if(code == GENIRESPONSE_SEARCHFAILED)
-	      {
-	      	// NO SLICE FOUND HERE
-	      }
-	      else
-	      {
-	        //codeFailure();
-	        //main.pgHandler.map.drawAll();
-	      }
-	      
-	      currentSecondaryIndex++;
-	      while(currentSecondaryIndex < main.pgHandler.ComponentManagers.length
-	    		&& (main.pgHandler.ComponentManagers[currentSecondaryIndex] as ComponentManager).Status != ComponentManager.VALID)
-	    		currentSecondaryIndex++;
-		  if(currentSecondaryIndex == main.pgHandler.ComponentManagers.length)
-		  {
-		  	  currentSlice.DetectStatus();
-			  currentIndex++;
-			  while(currentIndex < main.pgHandler.CurrentUser.slices.length
-			  	&& (main.pgHandler.CurrentUser.slices[currentIndex] as Slice).credential.length == 0)
-			  	currentIndex++;
-			  currentSecondaryIndex = 0;
-		  }
-		  startSliceStatus();
-	    }
-	    */
-	    
 	    public function startGetSliver() : void
 	    {
 	    	while(currentIndex < main.pgHandler.CurrentUser.slices.length
@@ -570,7 +469,7 @@
 	    	}
 
 	    	currentSlice = main.pgHandler.CurrentUser.slices[currentIndex] as Slice;
-	    	currentSliver = currentSlice.slivers[currentSecondaryIndex] as Sliver;
+	    	currentCm = main.pgHandler.ComponentManagers[currentSecondaryIndex] as ComponentManager;
 	    	
 	      opName = "Acquiring " + ((totalCalls * main.pgHandler.ComponentManagers.length) - (main.pgHandler.ComponentManagers.length * currentIndex + currentSecondaryIndex)) + " more sliver credential(s)";
 	      main.setProgress(opName, Common.waitColor);
@@ -579,7 +478,7 @@
 	      op.reset(Geni.getSliver);
 	      op.addField("slice_urn", currentSlice.urn);
 	      op.addField("credentials", new Array(currentSlice.credential));
-	      op.setExactUrl(currentSliver.componentManager.Url);
+	      op.setExactUrl(currentCm.Url);
 		  op.call(completeGetSliver, failGetSliver);
 		  callsMade++;
 	      addSend();
@@ -596,8 +495,7 @@
 	    		currentSecondaryIndex++;
 		  if(currentSecondaryIndex == main.pgHandler.ComponentManagers.length)
 		  {
-		  	  currentSlice.DetectStatus();
-			  currentIndex++;
+		  	  currentIndex++;
 			  while(currentIndex < main.pgHandler.CurrentUser.slices.length
 			  	&& (main.pgHandler.CurrentUser.slices[currentIndex] as Slice).credential.length == 0)
 			  	currentIndex++;
@@ -615,8 +513,11 @@
 	      {
 	      	var newSliver:Sliver = new Sliver(currentSlice);
 	      	newSliver.componentManager = currentCm;
-	      	newSliver.sliceStatus = response.value.status;
+	      	//newSliver.sliceStatus = response.value.status;
+	      	//newSliver.status = response.value.status;
 	      	newSliver.credential = String(response.value);
+	      	var cred:XML = new XML(response.value);
+	      	newSliver.urn = cred.credential.target_urn;
 	      	currentSlice.slivers.addItem(newSliver);
 	      	nextTotalCalls++;
 	      }
@@ -636,7 +537,7 @@
 	    		currentSecondaryIndex++;
 		  if(currentSecondaryIndex == main.pgHandler.ComponentManagers.length)
 		  {
-		  	  currentSlice.DetectStatus();
+		  	  //currentSlice.DetectStatus();
 			  currentIndex++;
 			  while(currentIndex < main.pgHandler.CurrentUser.slices.length
 			  	&& (main.pgHandler.CurrentUser.slices[currentIndex] as Slice).credential.length == 0)
@@ -666,7 +567,7 @@
 	    		if(nextTotalCalls > 0)
 	    		{
 	    			totalCalls = nextTotalCalls;
-	    			startIndexedCall(startSliverTicket);
+	    			startIndexedCall(startResolveSliver);
 	    		}
 	    		else
 	    			main.pgHandler.map.drawAll();
@@ -681,7 +582,8 @@
 	      main.startWaiting();
 	      main.console.appendText(opName);
 	      op.reset(Geni.sliverStatus);
-	      op.addField("credential", currentSliver.credential);
+	      op.addField("slice_urn", currentSlice.urn);
+	      op.addField("credentials", new Array(currentSlice.credential));
 	      op.setExactUrl(currentSliver.componentManager.Url);
 		  op.call(completeSliverStatus, failSliverStatus);
 	      addSend();
@@ -718,6 +620,7 @@
 	      if (code == GENIRESPONSE_SUCCESS)
 	      {
 	      	currentSliver.status = response.value.status;
+	      	currentSliver.state = response.value.state;
 	      	nextTotalCalls++;
 	      }
 	      else
@@ -743,7 +646,7 @@
 			startSliverStatus();
 	    }
 	    
-	    public function startSliverTicket() : void
+	    public function startResolveSliver() : void
 	    {
 	    	while(currentIndex < main.pgHandler.CurrentUser.slices.length
 				  	&& ((main.pgHandler.CurrentUser.slices[currentIndex] as Slice).slivers.length == 0
@@ -759,6 +662,7 @@
 
 	    	if(currentIndex >= main.pgHandler.CurrentUser.slices.length || totalCalls == 0)
 	    	{
+	    		main.fillCombobox();
 	    		main.pgHandler.map.drawAll();
 	    		return;
 	    	}
@@ -766,18 +670,20 @@
 	    	currentSlice = main.pgHandler.CurrentUser.slices[currentIndex] as Slice;
 	    	currentSliver = currentSlice.slivers[currentSecondaryIndex] as Sliver;
 	    	
-	      opName = "Acquiring " + (totalCalls - callsMade) + " more sliver ticket(s)";
+	      opName = "Acquiring " + (totalCalls - callsMade) + " more sliver rspec(s)";
 	      main.setProgress(opName, Common.waitColor);
 	      main.startWaiting();
 	      main.console.appendText(opName);
-	      op.reset(Geni.sliverTicket);
-	      op.addField("credential", currentSliver.credential);
+	      op.reset(Geni.resolveResource);
+	      op.addField("urn", currentSliver.urn);
+	      op.addField("credentials", new Array(currentSliver.credential));
 	      op.setExactUrl(currentSliver.componentManager.Url);
-		  op.call(completeSliverTicket, failSliverTicket);
+		  op.call(completeResolveSliver, failResolveSliver);
 	      addSend();
+	      callsMade++;
 	    }
 	    
-	    public function failSliverTicket(event : ErrorEvent, fault : MethodFault) : void
+	    public function failResolveSliver(event : ErrorEvent, fault : MethodFault) : void
 	    {
 	    	main.setProgress("Done", Common.failColor);
 	    	main.stopWaiting();
@@ -797,17 +703,18 @@
 			  currentSecondaryIndex = 0;
 		  }
 	      	
-			startSliverTicket();
+			startResolveSliver();
 	    }
 	    
-	    public function completeSliverTicket(code : Number, response : Object) : void
+	    public function completeResolveSliver(code : Number, response : Object) : void
 	    {
 	    	main.setProgress("Done", Common.successColor);
 	    	main.stopWaiting();
 	      addResponse();
 	      if (code == GENIRESPONSE_SUCCESS)
 	      {
-	      	currentSliver.rspec = new XML(response.value).descendants("rspec")[0];
+	      	//currentSliver.rspec = new XML(response.value).descendants("rspec")[0];
+	      	currentSliver.rspec = new XML(response.value.manifest);
 	      	currentSliver.parseRspec();
 	      }
 	      else
@@ -815,6 +722,7 @@
 	        //codeFailure();
 	        //main.pgHandler.map.drawAll();
 	      }
+	      
 	      currentSecondaryIndex++;
 		    while(currentSecondaryIndex < currentSlice.slivers.length
 	    		&& (currentSlice.credential.length == 0
@@ -830,7 +738,7 @@
 			  currentSecondaryIndex = 0;
 		  }
 	      	
-			startSliverTicket();
+			startResolveSliver();
 	    }
 	}
 }

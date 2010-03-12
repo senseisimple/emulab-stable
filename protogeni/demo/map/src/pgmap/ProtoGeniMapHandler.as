@@ -333,7 +333,7 @@ package pgmap
 		        }
 	    	}
 	    	
-	    	if(main.userResourcesOnly && main.selectedSlice != null && main.selectedSlice.status != null) {
+	    	if(main.userResourcesOnly && main.selectedSlice != null && main.selectedSlice.Status() != null) {
 	    		// Draw virtual links
 	    		for each(var sliver:Sliver in main.selectedSlice.slivers)
 	    		{

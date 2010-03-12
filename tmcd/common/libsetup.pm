@@ -161,16 +161,33 @@ BEGIN
     if (exists($ENV{'SHADOW'})) {
 	$shadow = $ENV{'SHADOW'};
 	my ($server,$urn) = split(',', $shadow);
+	#
+	# Need to taint check these to avoid breakage later.
+	#
+	if ($server =~ /^([-\w\.]+)$/) {
+	    $server = $1;
+	}
+	else {
+	    die("Bad data in server: $server");
+	}
+	if ($urn =~ /^([-\w\+\:\.]*)$/) {
+	    $urn = $1;
+	}
+	else {
+	    die("Bad data in urn: $urn");
+	}
 	
 	# The cache needs to go in a difference location.
 	libtmcc::configtmcc("cachedir", $SHADOWDIR);
 	libtmcc::configtmcc("server", $server);
 	libtmcc::configtmcc("urn", $urn);
+	# No proxy.
+	libtmcc::configtmcc("noproxy", 1);
     }
     #
     # Determine if running inside a jail. This affects the paths below.
     #
-    elsif (-e "$BOOTDIR/jailname") {
+    if (-e "$BOOTDIR/jailname") {
 	open(VN, "$BOOTDIR/jailname");
 	my $vid = <VN>;
 	close(VN);
@@ -1853,6 +1870,9 @@ sub shadowsetup($$)
     libtmcc::configtmcc("cachedir", $SHADOWDIR);
     libtmcc::configtmcc("server", $server);
     libtmcc::configtmcc("urn", $urn);
+
+    # No proxy.
+    libtmcc::configtmcc("noproxy", 1);
 
     # Tell children.
     $ENV{'SHADOW'} = "$server,$urn";

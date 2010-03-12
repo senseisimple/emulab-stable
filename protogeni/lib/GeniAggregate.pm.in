@@ -61,7 +61,7 @@ my %aggregates     = ();
 BEGIN { use GeniUtil; GeniUtil::AddCache(\%aggregates); }
 
 #
-# Lookup by idx, or uuid.
+# Lookup by URN, idx, or uuid.
 #
 sub Lookup($$)
 {
@@ -70,11 +70,26 @@ sub Lookup($$)
     my $idx;
 
     if (GeniHRN::IsValid($token)) {
-	return undef if !GeniHRN::Authoritative($token, "@OURDOMAIN@");
-
 	my ($authority, $type, $id) = GeniHRN::Parse($token);
 	return undef if $type ne "sliver";
-	$idx = $id;
+
+	if( GeniHRN::Authoritative($token, "@OURDOMAIN@") ) {
+	    # Very simple: we put the index of our own aggregates right
+	    # in the name.
+	    $idx = $id;
+	} else {
+	    # Look up the aggregate's certificate.
+	    $token = GeniHRN::Normalise( $token );
+	    $query_result = DBQueryWarn(
+		"SELECT geni_aggregates.idx FROM geni_aggregates, " .
+		"geni_certificates WHERE geni_aggregates.uuid = " .
+		"geni_certificates.uuid AND " .
+		"geni_certificates.urn='$token';" );
+
+	    return undef if (! $query_result || !$query_result->numrows);
+
+	    ($idx) = $query_result->fetchrow_array();
+	}
     }
     elsif ($token =~ /^\d+$/) {
 	$idx = $token;
@@ -743,6 +758,13 @@ sub Start($$$)
 	    return -1;
 	}
 	if ($reservation->SameExperiment($experiment)) {
+	    #
+	    # Since this is an aggregate, some slivers may already be
+	    # in the started state. Skip those, unless doing a restart.
+	    #
+	    next
+		if ($sliver->state() eq "started" && !$restart);
+	    
 	    if ($node->isvirtnode()) {
 		$vnodes{$node->node_id} = $node;
 	    }
@@ -883,6 +905,13 @@ sub Stop($$)
 	    return -1;
 	}
 	if ($reservation->SameExperiment($experiment)) {
+	    #
+	    # Since this is an aggregate, some slivers may already be
+	    # in the stopped state. Skip those.
+	    #
+	    next
+		if ($sliver->state() eq "started");
+	    
 	    if ($node->isvirtnode()) {
 		$vnodes{$node->node_id} = $node;
 	    }

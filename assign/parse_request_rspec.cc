@@ -27,9 +27,9 @@ static const char rcsid[] = "$Id: parse_request_rspec.cc,v 1.16 2009-10-21 20:49
 #define ISSWITCH(n) (n->types.find("switch") != n->types.end())
 
 #ifdef TBROOT
-	#define SCHEMA_LOCATION TBROOT"/lib/assign/rspec-request.xsd"
+	#define SCHEMA_LOCATION TBROOT"/lib/assign/request.xsd"
 #else
-	#define SCHEMA_LOCATION "rspec-request.xsd"
+	#define SCHEMA_LOCATION "request.xsd"
 #endif
 /*
  * XXX: Do I have to release lists when done with them?
@@ -601,9 +601,16 @@ bool populate_link (DOMElement* elt, tb_vgraph &vg, map< pair<string,string>, pa
 	tb_vnode *src_vnode = get(vvertex_pmap,v_src_vertex);
 	tb_vnode *dst_vnode = get(vvertex_pmap,v_dst_vertex);
 
-	bool emulated = false;
-	if (str_virtualization_type.compare("raw") == 0 || str_virtualization_type.compare("") == 0)
-		emulated = true;
+        // If the virtualization type on the string is missing or "raw", then
+        // we leave the emulated flag off - we want the whole physical
+        // interface. If anything else, we assume that it's some kind of
+        // virtualized link and the emulated flag should be set.
+	bool emulated = true;
+	if (str_virtualization_type.compare("raw") == 0 ||
+                str_virtualization_type.compare("") == 0) {
+            emulated = false;
+            cerr << "Set emulated=false" << endl;
+        }
 		
 // 		bool allow_delayed = !hasChildTag (elt, "nodelay");
 		

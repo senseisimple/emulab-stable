@@ -27,9 +27,9 @@ static const char rcsid[] = "$Id: parse_advertisement_rspec.cc,v 1.7 2009-10-21 
 #define ISSWITCH(n) (n->types.find("switch") != n->types.end())
 
 #ifdef TBROOT
-	#define SCHEMA_LOCATION TBROOT"/lib/assign/rspec-ad.xsd"
+	#define SCHEMA_LOCATION TBROOT"/lib/assign/ad.xsd"
 #else
-	#define SCHEMA_LOCATION "rspec-ad.xsd"
+	#define SCHEMA_LOCATION "ad.xsd"
 #endif
 				 
 /*

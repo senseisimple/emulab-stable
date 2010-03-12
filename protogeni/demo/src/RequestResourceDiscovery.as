@@ -43,12 +43,12 @@ package
       op.setUrl(cm.getUrl());
       return op;
     }
-	
-	override public function fail() : Request
-	{
-		cm.resourceFailure();
-      	return next;
-	}
+
+        override public function fail() : Request
+        {
+                cm.resourceFailure();
+        return next;
+        }
 
     override public function complete(code : Number, response : Object,
                                       credential : Credential) : Request

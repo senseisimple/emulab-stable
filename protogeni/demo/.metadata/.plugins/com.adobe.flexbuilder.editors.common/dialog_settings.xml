@@ -8,8 +8,8 @@
 	<item key="com.adobe.flexbuilder.editors.common.last.apptype" value="true"/>
 	<section name="ADD_SDK_DIALOG_SECTION">
 		<item key="DIALOG_X_ORIGIN" value="144"/>
-		<item key="DIALOG_HEIGHT" value="195"/>
 		<item key="DIALOG_FONT_NAME" value="1|Segoe UI|9.0|0|WINDOWS|1|-12|0|0|0|400|0|0|0|1|0|0|0|0|Segoe UI"/>
+		<item key="DIALOG_HEIGHT" value="195"/>
 		<item key="DIALOG_Y_ORIGIN" value="147"/>
 		<item key="DIALOG_WIDTH" value="514"/>
 	</section>
@@ -21,11 +21,11 @@
 		<item key="sortColumnAscending" value="true"/>
 	</section>
 	<section name="com.adobe.flexbuilder.editors.common.ui.pi.PropertiesView">
-		<item key="TreeGridImpl.TopAttribute" value=""/>
 		<item key="TreeGridImpl.ColumnZeroWidth" value="180"/>
-		<item key="Style" value="true"/>
-		<item key="ViewOption" value="2"/>
+		<item key="TreeGridImpl.TopAttribute" value=""/>
 		<item key="AlphaTopIndex" value="121"/>
+		<item key="ViewOption" value="1"/>
+		<item key="Style" value="true"/>
 		<item key="AlphaCol1Width" value="78"/>
 		<item key="TreeGridImpl.ColumnOneWidth" value="78"/>
 		<item key="TreeGridImpl.TopCategory" value="Common"/>
