@@ -140,7 +140,8 @@ sub Resolve($)
 	my $blob = { "hrn"          => "${PGENIDOMAIN}." . $node->node_id(),
 		     "uuid"         => $node->uuid(),
 		     "role"	    => $node->role(),
-		     "hostname"     => $node->node_id() . ".${OURDOMAIN}",
+		     "hostname"     =>
+			 GeniUtil::FindHostname($node->node_id()),
 		     "physctrl"     => 
 			 Interface->LookupControl($node->phys_nodeid())->IP(),
 		     "urn"          => GeniHRN::Generate($OURDOMAIN,
