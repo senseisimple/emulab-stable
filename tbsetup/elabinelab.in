@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004-2009 University of Utah and the Flux Group.
+# Copyright (c) 2004-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # TODO: ntpinfo table.
@@ -706,6 +706,19 @@ sub DumpDBGoo()
 	    DBQueryFatal("update temp_${table} set ".
 			 " admin=1 ".
 			 "where uid='$creator_uid'");
+
+	    #
+	    # Save time; force all users to start out
+	    # frozen since most users in the project do not ever
+	    # actually log in. 
+	    #
+	    DBQueryFatal("update temp_${table} set ".
+			 " admin=0 ".
+			 "where uid!='$creator_uid'");
+	    
+	    DBQueryFatal("update temp_${table} set ".
+			 " status='" . USERSTATUS_FROZEN() . "' ".
+			 "where admin=0");
 	}
 
 	# Clean up ... these are created in the inner elab.
