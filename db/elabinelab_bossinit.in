@@ -111,19 +111,23 @@ mysystem("$TB/sbin/mkproj -s $pid");
 # groups are created (tbacct add does not do a setgroups).
 #
 my $users_result =
-    DBQueryFatal("select distinct u.uid,u.admin from group_membership as m ".
-		 "left join users as u on u.uid_idx=m.uid_idx ".
-		 "where u.status='" . USERSTATUS_ACTIVE() . "'");
-while (my ($uid,$admin) = $users_result->fetchrow_array()) {
+    DBQueryFatal("select distinct u.uid,u.admin,u.status ".
+		 "   from group_membership as m ".
+		 "left join users as u on u.uid_idx=m.uid_idx ");
+while (my ($uid,$admin,$status) = $users_result->fetchrow_array()) {
     next
 	if ($uid eq "elabman");
     
-    mysystem("$TB/sbin/tbacct -b add $uid");
     if ($admin) {
 	# Add admin users to group wheel for convenience.
 	DBQueryFatal("replace into unixgroup_membership ".
 		     "values ('$uid','wheel')");
     }
+    next
+	if ($status ne USERSTATUS_ACTIVE());
+    
+    mysystem("$TB/sbin/tbacct -b add $uid");
+    
     if ($admin) {
 	# Flip back to root for pw command.
 	$EUID = 0;
