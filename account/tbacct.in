@@ -924,7 +924,8 @@ sub FreezeUser()
 	fatal("$user is still active! Cannot freeze the account!")
 	    if (!$update);
 
-	$target_user->SetStatus(USERSTATUS_ACTIVE());
+	$target_user->SetStatus(USERSTATUS_FROZEN());
+	$status = USERSTATUS_FROZEN();
     }
     $sfsupdate = 1;
 
@@ -949,6 +950,7 @@ sub ThawUser()
 	fatal("$user is not active! Cannot thaw the account!")
 	    if (!$update);
 	$target_user->SetStatus(USERSTATUS_ACTIVE());
+	$status = USERSTATUS_ACTIVE();
     }
     $sfsupdate = 1;
 
