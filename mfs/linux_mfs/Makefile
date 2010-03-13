@@ -25,7 +25,7 @@ CLEAN_MODULES := $(addsuffix -clean,$(MODULES) toolchain)
 	root-base root-install $(MODULES) $(INSTALL_MODULES) \
 	$(CLEAN_MODULES) initramfs
 
-all: $(MODULES)
+all: $(MODULES) initramfs
 
 install: uclibc-install $(INSTALL_MODULES)
 	cp $(SCRIPTS_PATH)/remove_unneeded_modules.pl $(BOOT_PATH)
