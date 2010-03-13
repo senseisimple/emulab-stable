@@ -128,7 +128,7 @@ my $NOCOLLAB   = 0;
 my $SINGLE_CONTROLNET = 0;
 
 # Enable elvin compatibility
-my $ELVIN_COMPAT = 0;
+my $ELVIN_COMPAT = 1;
 
 # This will not change ...
 my $PHP4_PKG = "php4-extensions-1.0";
@@ -537,6 +537,16 @@ sub SetupFsNode()
     mysystem("$BINDIR/prepare -N");
 
     #
+    # XXX prepare is a destructive beast.  It will take out the ld hints
+    # file so ld.so won't have a search path.  Repair that now if it is gone
+    # since ops-install will want to start apps that need libraries from
+    # /usr/local/lib.
+    #
+    if (! -r "/var/run/ld-elf.so.hints") {
+	system("/etc/rc.d/ldconfig start");
+    }
+
+    #
     # Remove the outer testbed startup script.
     #
     mysystem("rm -f /usr/local/etc/rc.d/testbed.sh");
@@ -722,16 +732,6 @@ sub SetupFsNode()
 	     "   $TBDIR/src/testbed/configure ".
 	     "      --with-TBDEFS=$TBDIR/src/testbed/defs-elabinelab ".
 	     ($WINSUPPORT ? "--enable-windows" : "--disable-windows"));
-
-    #
-    # XXX prepare is a destructive beast.  It will take out the ld hints
-    # file so ld.so won't have a search path.  Repair that now if it is gone
-    # since fs-install will want to start apps that need libraries from
-    # /usr/local/lib.
-    #
-    if (! -r "/var/run/ld-elf.so.hints") {
-	system("/etc/rc.d/ldconfig start");
-    }
 
     #
     # Create the fs node.
@@ -931,6 +931,16 @@ $installpkgs = 0;
     mysystem("$BINDIR/prepare -N");
 
     #
+    # XXX prepare is a destructive beast.  It will take out the ld hints
+    # file so ld.so won't have a search path.  Repair that now if it is gone
+    # since fs-install will want to start apps that need libraries from
+    # /usr/local/lib.
+    #
+    if (! -r "/var/run/ld-elf.so.hints") {
+	system("/etc/rc.d/ldconfig start");
+    }
+
+    #
     # Remove the outer testbed startup script.
     #
     mysystem("rm -f /usr/local/etc/rc.d/testbed.sh");
@@ -1030,7 +1040,7 @@ $installpkgs = 0;
 
     #
     # Lets mount the package dir so that we can pass off some stuff to
-    # the install scripts;
+    # the install scripts.
     #
     if (! -d "/packages") {
 	mysystem("mkdir /packages");
@@ -1221,30 +1231,50 @@ $installpkgs = 0;
 
 sub SetupBossNode()
 {
+    $TBDIR = "/usr/testbed";
+
+    my $fromscratch = $emulabconfig{"LOADELABSOURCE"};
+    my $installpkgs = $emulabconfig{"LOADPACKAGES"};
+$installpkgs = 0;
+
     print "Setting up a Boss node ...\n";
-    $TBDIR = "/usr";
 
     #
-    # Create a ${TBDIR}/testbed from the extra slice and put everything there.
-    # 
-    mysystem("mkdir ${TBDIR}/testbed")
-	if (! -d "${TBDIR}/testbed");
-    mysystem("$BINDIR/mkextrafs.pl -f ${TBDIR}/testbed");
-    mysystem("mkdir ${TBDIR}/testbed/src");
-    mysystem("mkdir ${TBDIR}/testbed/obj");
+    # Create filesystems for testbed use.  We need:
+    #  * /usr/testbed	   => disk0s2e
+    # for a "from scratch" build and:
+    #  * /usr/testbed/data => disk0s4e
+    # for the boss node.
+    #
+    if ($fromscratch) {
+	SetupTBDir($TBDIR, 1);
+    }
+    mysystem("mkdir $TBDIR/data")
+	if (! -d "$TBDIR/data");
+    mysystem("$BINDIR/mkextrafs.pl -f $TBDIR/data");
 
-    GetEmulabSource("${TBDIR}/testbed/src");
+    #
+    # Place the big content dirs on data
+    #
+    mysystem("mkdir $TBDIR/data/images $TBDIR/data/log $TBDIR/data/mysql");
+    mysystem("ln -s $TBDIR/data/images $TBDIR/images");
+    mysystem("ln -s $TBDIR/data/log $TBDIR/log");
+    if (-d "/var/db/mysql") {
+	mysystem("cp -Rfp /var/db/mysql/ $TBDIR/data/mysql/");
+	mysystem("rmdir /var/db/mysql");
+    }
+    mysystem("ln -s $TBDIR/data/mysql /var/db/mysql");
 
     print "Copying over initial dbstate from /proj\n";
     my $expdir = "/proj/$pid/exp/$eid";
-    my $stuffdir = "${TBDIR}/testbed/stuff";
+    my $stuffdir = "$TBDIR/stuff";
     mysystem("mkdir $stuffdir");
     mysystem("cp -fp $expdir/dbstate.tar.gz  $stuffdir");
     mysystem("cp -fp $expdir/outer_db_schema $stuffdir");
 
     if (!$NOSETUP) {
 	print "Check for db schema mismatch before we go any further\n";
-	my $testbed_srcdir = "${TBDIR}/testbed/src/testbed";
+	my $testbed_srcdir = "$TBDIR/src/testbed";
 	my $schemadiff     = "$testbed_srcdir/utils/schemadiff";
 	my $master_schema  = "$testbed_srcdir/sql/database-create.sql";
 	my $outer_schema   = "$stuffdir/outer_db_schema";
@@ -1257,6 +1287,7 @@ sub SetupBossNode()
     #
     # Stash the IP of the outer emulab for tmcc (and script above).
     # We use an IP to avoid DNS issues (there will be a DNS running inside).
+    # Ditto for the current router. Need that for later (rc.inelab).
     # 
     mysystem("echo '${outer_bossip}' > $ETCDIR/outer_bossnode");
     mysystem("cp -p $BOOTDIR/routerip $ETCDIR/outer_router");
@@ -1316,7 +1347,17 @@ sub SetupBossNode()
     #
     print "Clearing out existing accounts and such\n";
     mysystem("$BINDIR/prepare -N");
-  
+
+    #
+    # XXX prepare is a destructive beast.  It will take out the ld hints
+    # file so ld.so won't have a search path.  Repair that now if it is gone
+    # since boss-install will want to start apps that need libraries from
+    # /usr/local/lib.
+    #
+    if (! -r "/var/run/ld-elf.so.hints") {
+	system("/etc/rc.d/ldconfig start");
+    }
+
     #
     # Remove the outer testbed startup script.
     #
@@ -1325,49 +1366,42 @@ sub SetupBossNode()
     #
     # And clear some other stuff.
     # 
-    mysystem("rm -rf /usr/testbed/lib");
-    mysystem("rm -rf /usr/testbed/bin");
+    mysystem("rm -rf $TBDIR/bin $TBDIR/lib");
     unlink("/etc/rc.conf.d/dhclient")
 	if (-e "/etc/rc.conf.d/dhclient");
     unlink("/etc/rc.d/netif-emulab")
 	if (-e "/etc/rc.d/netif-emulab");
 
     #
-    # Create a bigger /var/db/mysql (before installing mysql!)
+    # Load up packages if necessary
     #
-    mysystem("mkdir /var/db/mysql")
-	if (! -d "/var/db/mysql");
-    mysystem("$BINDIR/mkextrafs.pl -f -s 2 /var/db/mysql");
-
-    goto skippkg
-	if ($NOSETUP);
-
-    #
-    # Do this as a separate step cause we need the NFS mounts, but
-    # must do the unmounts before running ops-install. 
-    # 
-    if (!$emulabconfig{BOSS_PKG_DIR} || !$emulabconfig{BOSS_PKG}) {
-	SetupFatal("Could not get package info from Emulab!");
-    }
-    print "Removing conflicting packages.\n";
-    mysystem("pkg_delete -r -x mysql-client")
-	if (-e "/usr/local/bin/mysql");
-    
-    print "Installing the boss metaport.\n";
-
-    # Make sure /usr/ports is not a symlink to RO shared space
-    if (-l "/usr/ports") {
-	if (!unlink("/usr/ports")) {
-	    print "WARNING: /usr/ports is a symlink, port install may fail\n";
-	} else {
-	    mysystem("mkdir /usr/ports");
+    if (!$NOSETUP && $installpkgs) {
+	#
+	# Do this as a separate step because we need the NFS mounts, but
+	# must do the unmounts before running ops-install. 
+	# 
+	if (!$emulabconfig{BOSS_PKG_DIR} || !$emulabconfig{BOSS_PKG}) {
+	    SetupFatal("Could not get package info from Emulab!");
 	}
+	print "Removing conflicting packages.\n";
+	mysystem("pkg_delete -r -x mysql-client")
+	    if (-e "/usr/local/bin/mysql");
+    
+	print "Installing the boss metaport.\n";
+
+	# Make sure /usr/ports is not a symlink to RO shared space
+	if (-l "/usr/ports") {
+	    if (!unlink("/usr/ports")) {
+		print "WARNING: /usr/ports is a symlink, port install may fail\n";
+	    } else {
+		mysystem("mkdir /usr/ports");
+	    }
+	}
+
+	$ENV{"PKG_PATH"} = $emulabconfig{BOSS_PKG_DIR};
+	mysystem("pkg_add -f $emulabconfig{BOSS_PKG} >/tmp/perrs 2>&1");
     }
 
-    $ENV{"PKG_PATH"} = $emulabconfig{BOSS_PKG_DIR};
-    mysystem("pkg_add -f $emulabconfig{BOSS_PKG} >/tmp/perrs 2>&1");
-
-  skippkg:
     #
     # We no longer need anything from NFS, and we need to unmount everything
     # so we can mount new NFS filesystems in their proper places. 
@@ -1477,7 +1511,7 @@ sub SetupBossNode()
     #
     # Create a defs file. Note that this will move to boss at some point.
     #
-    CreateDefsFile("${TBDIR}/testbed/src/testbed/defs-elabinelab");
+    CreateDefsFile("$TBDIR/src/testbed/defs-elabinelab");
 
     if ($SINGLE_CONTROLNET) {
 	#
@@ -1485,7 +1519,7 @@ sub SetupBossNode()
 	# This precludes dynamic node addition 
 	# Might think about allowing back if the experiment is firewalled.
 	#
-	mysystem("cd ${TBDIR}/testbed/src/testbed/dhcpd ; ".
+	mysystem("cd $TBDIR/src/testbed/dhcpd ; ".
 		 " sed -E -i .orig -e " .
 		 "   's;range .DHCPD_DYNRANGE.;ignore unknown-clients;' ".
 		 "  dhcpd.conf.template.in");
@@ -1497,10 +1531,10 @@ sub SetupBossNode()
     #
     # Configure an object tree. 
     #
-    mysystem("mkdir -p ${TBDIR}/testbed/obj/testbed");
-    mysystem("cd ${TBDIR}/testbed/obj/testbed; ".
-	     "   ../../src/testbed/configure ".
-	     "      --with-TBDEFS=../../src/testbed/defs-elabinelab ".
+    mysystem("mkdir -p $TBDIR/obj/testbed");
+    mysystem("cd $TBDIR/obj/testbed; ".
+	     "   $TBDIR/src/testbed/configure ".
+	     "      --with-TBDEFS=$TBDIR/src/testbed/defs-elabinelab ".
 	     ($WINSUPPORT ? "--enable-windows" : "--disable-windows"));
 
     #
@@ -1508,7 +1542,7 @@ sub SetupBossNode()
     #
     $ENV{"PKG_PATH"} = "/packages";
     my $pkg = "-P $emulabconfig{BOSS_PKG} -p /packages";
-    mysystem("cd ${TBDIR}/testbed/obj/testbed/install; ".
+    mysystem("cd $TBDIR/obj/testbed/install; ".
 	     "   perl boss-install $pkg -b -w ElabInElab");
 
     #

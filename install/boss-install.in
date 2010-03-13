@@ -846,6 +846,8 @@ Phase "database", "Setting up database", sub {
 	if (!ExecQuiet("$MYSQLADMIN ping")) {
 	    PhaseSkip("mysqld already running");
 	}
+	# XXX make sure client startup was done (setting ldpath)
+	ExecQuietFatal("$RCDIR/1.mysql-client.sh start");
 	ExecQuietFatal("$RCDIR/2.mysql-server.sh start");
 	# Give mysqld some time to start, then make sure it did
 	sleep 5;
