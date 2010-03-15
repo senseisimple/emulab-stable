@@ -345,8 +345,17 @@ sub osload ($$) {
 	    # for the subset of slices that are written to disk...
 	    #
 	    # ...UNLESS, the new image requires a different version of the MBR
-	    # in which case we must invalidate all partitions except the ones we
-	    # are loading since the partition boundaries may have changed.
+	    # in which case we must invalidate all partitions except the ones
+	    # we are loading since the partition boundaries may have changed...
+	    #
+	    # ...OR, the prepare flag has been specified, which will tell the
+	    # client to invalidate all partition metadata on the disk so we
+	    # might as well mark the partition as "empty".  In particular,
+	    # this case is used by the reload_daemon when a node is between
+	    # experiments.  In this case we need to invalidate all but the
+	    # partition(s) we are loading to ensure that a user later on
+	    # doesn't accidentally get some left over partition OS when they
+	    # should have been loading a new instance.
 	    #
 	    my $startpart = $loadpart == 0 ? $MINPART : $loadpart;
 	    my $endpart   = $startpart + $loadlen;
@@ -357,11 +366,15 @@ sub osload ($$) {
 		
 		#
 		# Partition is outside the range affected by this image.
-		# Normally, we just leave it alone, unless a change of MBR
-		# is implied by the current image.
+		# Normally, we just leave it alone, except for the special
+		# cases above.
 		#
 		if ($i < $startpart || $i >= $endpart) {
-		    if (defined($rowref->{'mbr_version'})) {
+		    my $whackit = 0;
+
+		    if ($prepare) {
+			$whackit = 1;
+		    } elsif (defined($rowref->{'mbr_version'})) {
 			$dbresult =
 			    DBQueryWarn("select mbr_version ".
 					" from partitions as p,images as i ".
@@ -374,16 +387,18 @@ sub osload ($$) {
 				tbwarn("$node: Existing partition $i inconsistent".
 				       " with new image partitioning,".
 				       " invalidating existing partition");
-				$dbresult =
-				    DBQueryWarn("delete from partitions ".
-						"where node_id='$node' and ".
-						"partition='$i'");
-				if (!$dbresult) {
-				    tberror("$node: Could not update ".
-					    "partition table");
-				    goto failednode;
-				}
+				$whackit = 1;
 			    }
+			}
+		    }
+		    if ($whackit) {
+			$dbresult =
+			    DBQueryWarn("delete from partitions ".
+					"where node_id='$node' and ".
+					"partition='$i'");
+			if (!$dbresult) {
+			    tberror("$node: Could not update partition table");
+			    goto failednode;
 			}
 		    }
 		    next;
