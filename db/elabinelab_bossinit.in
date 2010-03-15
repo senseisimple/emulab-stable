@@ -153,7 +153,7 @@ while (my ($gid_idx) = $query_result->fetchrow_array()) {
 # Now do a setgroups.
 #
 $users_result->dataseek(0);
-while (my ($uid,$admin) = $users_result->fetchrow_array()) {
+while (my ($uid,$admin,$status) = $users_result->fetchrow_array()) {
     next
 	if ($uid eq "elabman");
     next
