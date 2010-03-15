@@ -3082,7 +3082,7 @@ CREATE TABLE `reserved` (
   `exptidx` int(11) NOT NULL default '0',
   `rsrv_time` timestamp NOT NULL default CURRENT_TIMESTAMP on update CURRENT_TIMESTAMP,
   `vname` varchar(32) default NULL,
-  `erole` enum('node','virthost','delaynode','simhost','sharedhost') NOT NULL default 'node',
+  `erole` enum('node','virthost','delaynode','simhost','sharedhost', 'subboss') NOT NULL default 'node',
   `simhost_violation` tinyint(3) unsigned NOT NULL default '0',
   `old_pid` varchar(12) NOT NULL default '',
   `old_eid` varchar(32) NOT NULL default '',
@@ -3192,6 +3192,18 @@ CREATE TABLE `state_triggers` (
   `state` varchar(20) NOT NULL default '',
   `trigger` tinytext NOT NULL,
   PRIMARY KEY  (`node_id`,`op_mode`,`state`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `subbosses`
+--
+
+DROP TABLE IF EXISTS `subbosses`;
+CREATE TABLE `subbosses` (
+  `node_id` varchar(32) NOT NULL default '',
+  `service` varchar(20) NOT NULL default '',
+  `subboss_id` varchar(20) NOT NULL default '',
+  PRIMARY KEY  (`node_id`,`service`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
