@@ -359,6 +359,8 @@ sub GetTickets($$$$)
 	}
 	return 0;
     };
+    print STDERR "Getting all tickets in parallel ...\n";
+    
     if (ParRun(undef, \@results, $coderef, @resources)) {
 	print STDERR "*** GetTickets: Internal error getting tickets\n";
 	#
@@ -424,6 +426,8 @@ sub RedeemTickets($$$)
 	}
 	return 0;
     };
+    print STDERR "Redeeming all tickets in parallel ...\n";
+
     if (ParRun(undef, \@results, $coderef, @resources)) {
 	print STDERR "*** RedeemTickets: Internal error getting tickets\n";
 	#
@@ -730,6 +734,8 @@ sub StartSlivers($$$$)
 	}
 	return 0;
     };
+    print STDERR "Starting all slivers in parallel ...\n";
+
     if (ParRun(undef, \@results, $coderef, @resources)) {
 	print STDERR "*** StartSlivers: Internal error starting slivers.\n";
 	return -1;
@@ -896,6 +902,8 @@ sub WaitForSlivers($$$@)
     #
     my @failed = ();
     
+    print STDERR "Waiting for all slivers in parallel ...\n";
+
     while (@resources) {
 	my @results = ();
 	
@@ -993,6 +1001,8 @@ sub DeleteAllSlivers($$)
 	}
 	return 0;
     };
+    print STDERR "Deleting all slivers in parallel ...\n";
+
     if (ParRun(undef, \@results, $coderef, @resources)) {
 	print STDERR
 	    "*** DeleteAllSlivers: Internal error deleting slivers.\n";
