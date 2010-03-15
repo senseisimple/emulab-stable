@@ -95,6 +95,10 @@ else {
 DBQueryFatal("update group_membership set pid_idx=1,gid_idx=1 ".
 	     "where pid='$TBOPSPID' and pid=gid");
 
+# Do not want to share the UUIDs with outer Emulab.
+DBQueryFatal("update users set uid_uuid=UUID()");
+DBQueryFatal("update nodes set uuid=UUID()");
+
 #
 # Shift to real user for these scripts.
 #
