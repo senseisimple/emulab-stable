@@ -156,6 +156,8 @@ $users_result->dataseek(0);
 while (my ($uid,$admin) = $users_result->fetchrow_array()) {
     next
 	if ($uid eq "elabman");
+    next
+	if ($status ne USERSTATUS_ACTIVE());
     
     mysystem("$TB/sbin/setgroups $uid");
 }
