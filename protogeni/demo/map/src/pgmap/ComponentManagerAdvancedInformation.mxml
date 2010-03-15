@@ -79,5 +79,12 @@
 						<mx:Label text="{cm.Url}"/>
 					</mx:GridItem>
 				</mx:GridRow>
+				<mx:GridRow width="100%">
+					<mx:GridItem>
+						<mx:Label text="Image" fontWeight="bold"/>
+					</mx:GridItem>
+					<mx:GridItem width="100%">
+					</mx:GridItem>
+				</mx:GridRow>
 			</mx:Grid>
 </mx:VBox>
