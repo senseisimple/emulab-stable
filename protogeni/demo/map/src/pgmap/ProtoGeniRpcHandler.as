@@ -174,6 +174,7 @@
 				var newCm:ComponentManager = new ComponentManager();
 				newCm.Hrn = obj.hrn;
 				newCm.Url = obj.url;
+				newCm.Urn = obj.urn;
 				main.pgHandler.ComponentManagers.addItem(newCm);
 				//break;
 			}
@@ -380,6 +381,11 @@
 	      	currentSlice.creator = main.pgHandler.CurrentUser;
 	      	currentSlice.hrn = response.value.hrn;
 	      	currentSlice.urn = response.value.urn;
+	      	for each(var sliverCm:String in response.value.component_managers) {
+	      		var newSliver:Sliver = new Sliver(currentSlice);
+		      	newSliver.componentManager = main.pgHandler.getCm(sliverCm);
+		      	currentSlice.slivers.addItem(newSliver);
+	      	}
 	      	currentIndex++;
 			
 			startSliceLookup();
@@ -400,8 +406,14 @@
 	    			if(s.credential.length > 0)
 	    				totalCalls++;
 	    		}
-	    		if(totalCalls > 0)
-	    			startIndexedCall(startGetSliver); // Was SliceStatus at V1
+	    		if(totalCalls > 0) {
+	    			totalCalls = 0;
+	    			for each(var slice:Slice in main.pgHandler.CurrentUser.slices)
+		    		{
+		    			totalCalls += slice.slivers.length;
+		    		}
+		    		startIndexedCall(startGetSliver); // Was SliceStatus at V1
+	    		}
 	    		else
 	    			main.pgHandler.map.drawAll();
 	    		return;
@@ -469,16 +481,16 @@
 	    	}
 
 	    	currentSlice = main.pgHandler.CurrentUser.slices[currentIndex] as Slice;
-	    	currentCm = main.pgHandler.ComponentManagers[currentSecondaryIndex] as ComponentManager;
+	    	currentSliver = currentSlice.slivers[currentSecondaryIndex] as Sliver;
 	    	
-	      opName = "Acquiring " + ((totalCalls * main.pgHandler.ComponentManagers.length) - (main.pgHandler.ComponentManagers.length * currentIndex + currentSecondaryIndex)) + " more sliver credential(s)";
+	      opName = "Acquiring " + (totalCalls - callsMade) + " more sliver credential(s)";
 	      main.setProgress(opName, Common.waitColor);
 	      main.startWaiting();
 	      main.console.appendText(opName);
 	      op.reset(Geni.getSliver);
 	      op.addField("slice_urn", currentSlice.urn);
 	      op.addField("credentials", new Array(currentSlice.credential));
-	      op.setExactUrl(currentCm.Url);
+	      op.setExactUrl(currentSliver.componentManager.Url);
 		  op.call(completeGetSliver, failGetSliver);
 		  callsMade++;
 	      addSend();
@@ -490,10 +502,10 @@
 	    	main.stopWaiting();
 	    	outputFailure(event, fault);
 			currentSecondaryIndex++;
-			while(currentSecondaryIndex < main.pgHandler.ComponentManagers.length
-	    		&& (main.pgHandler.ComponentManagers[currentSecondaryIndex] as ComponentManager).Status != ComponentManager.VALID)
+			while(currentSecondaryIndex < currentSlice.slivers.length
+	    		&& (currentSlice.slivers[currentSecondaryIndex] as Sliver).componentManager.Status != ComponentManager.VALID)
 	    		currentSecondaryIndex++;
-		  if(currentSecondaryIndex == main.pgHandler.ComponentManagers.length)
+		  if(currentSecondaryIndex == (main.pgHandler.CurrentUser.slices[currentIndex] as Slice).slivers.length)
 		  {
 		  	  currentIndex++;
 			  while(currentIndex < main.pgHandler.CurrentUser.slices.length
@@ -511,14 +523,9 @@
 	      addResponse();
 	      if (code == GENIRESPONSE_SUCCESS)
 	      {
-	      	var newSliver:Sliver = new Sliver(currentSlice);
-	      	newSliver.componentManager = currentCm;
-	      	//newSliver.sliceStatus = response.value.status;
-	      	//newSliver.status = response.value.status;
-	      	newSliver.credential = String(response.value);
+	      	currentSliver.credential = String(response.value);
 	      	var cred:XML = new XML(response.value);
-	      	newSliver.urn = cred.credential.target_urn;
-	      	currentSlice.slivers.addItem(newSliver);
+	      	currentSliver.urn = cred.credential.target_urn;
 	      	nextTotalCalls++;
 	      }
 	      else if(code == GENIRESPONSE_SEARCHFAILED)
@@ -532,10 +539,10 @@
 	      }
 	      
 		  currentSecondaryIndex++;
-	      while(currentSecondaryIndex < main.pgHandler.ComponentManagers.length
-	    		&& (main.pgHandler.ComponentManagers[currentSecondaryIndex] as ComponentManager).Status != ComponentManager.VALID)
+	      while(currentSecondaryIndex < currentSlice.slivers.length
+	    		&& (currentSlice.slivers[currentSecondaryIndex] as Sliver).componentManager.Status != ComponentManager.VALID)
 	    		currentSecondaryIndex++;
-		  if(currentSecondaryIndex == main.pgHandler.ComponentManagers.length)
+		  if(currentSecondaryIndex == (main.pgHandler.CurrentUser.slices[currentIndex] as Slice).slivers.length)
 		  {
 		  	  //currentSlice.DetectStatus();
 			  currentIndex++;

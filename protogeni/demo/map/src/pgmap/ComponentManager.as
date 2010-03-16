@@ -33,6 +33,8 @@
 		[Bindable]
 		public var Hrn : String = "";
 		
+		public var Urn : String = "";
+		
 		[Bindable]
 		public var Show : Boolean = false;
 		
