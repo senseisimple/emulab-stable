@@ -194,6 +194,8 @@ sub CreateDefsFile($);
 sub SetupSendMail($$);
 sub GetEmulabSource($);
 sub MungeMfsRoot($);
+sub SetupTBDir($);
+sub RecreateDir($$);
 
 #
 # Boot Action.
@@ -255,6 +257,7 @@ sub doboot()
 #
 $emulabconfig{"LOADPACKAGES"} = 0;
 $emulabconfig{"LOADMFS"} = 0;
+$emulabconfig{"LOADELABSOURCE"} = 0;
 
     #
     # XXX defaults for things that may or may not be passed in.
@@ -459,7 +462,7 @@ sub SetupFsNode()
     # for ops+fs and fs-only nodes.
     #
     if ($fromscratch) {
-	SetupTBDir($TBDIR, 1);
+	SetupTBDir($TBDIR);
     }
     $FSDIR = "/q";
     RecreateDir("$FSDIR", 1);
@@ -845,7 +848,7 @@ sub SetupOpsNode($)
     # for ops+fs and fs-only nodes.
     #
     if ($fromscratch) {
-	SetupTBDir($TBDIR, 1);
+	SetupTBDir($TBDIR);
     }
     if ($isfs) {
 	$FSDIR = "/q";
@@ -1252,7 +1255,7 @@ sub SetupBossNode()
     # for the boss node.
     #
     if ($fromscratch) {
-	SetupTBDir($TBDIR, 1);
+	SetupTBDir($TBDIR);
     }
     RecreateDir("$TBDIR/data", 1);
     mysystem("$BINDIR/mkextrafs.pl -f $TBDIR/data");
@@ -2129,9 +2132,10 @@ sub GetEmulabSource($)
     my ($destdir) = @_;
 
     #
-    # Remove any pre-existing installed src/obj trees
+    # Remove any pre-existing installed src tree
     #
-    RecreateDir("$destdir/testbed");
+    RecreateDir("$destdir", 1);
+    mysystem("mkdir $destdir/testbed");
 
     #
     # Look to see if the source code is already here (say, cause the user
@@ -2171,7 +2175,7 @@ sub SetupTBDir($)
 {
     my ($TBDIR) = @_;
 
-    RecreateDir($TBDIR);
+    RecreateDir($TBDIR, 1);
     mysystem("$BINDIR/mkextrafs.pl -s 2 -f $TBDIR");
     mysystem("mkdir $TBDIR/src $TBDIR/obj");
 }
