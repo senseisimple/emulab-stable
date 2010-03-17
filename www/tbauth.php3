@@ -980,6 +980,16 @@ function DOLOGIN_MAGIC($uid, $uid_idx, $email = null, $adminon = 0)
     # with the hash value and auth usr embedded.
 
     #
+    # Since we changed the domain of the cookies make sure that the cookies 
+    # from the old domain no longer exist.
+    #
+    setcookie($TBAUTHCOOKIE, '', 1, "/", $TBAUTHDOMAIN, $TBSECURECOOKIES);
+    setcookie($TBLOGINCOOKIE, '', 1, "/", $TBAUTHDOMAIN, 0);
+    setcookie($TBNAMECOOKIE, '', 1, "/", $TBAUTHDOMAIN, 0);
+    if ($email)
+      setcookie($TBEMAILCOOKIE, '', 1, "/", $TBAUTHDOMAIN, 0);
+
+    #
     # For the hashkey, we use a zero timeout so that the cookie is
     # a session cookie; killed when the browser is exited. Hopefully this
     # keeps the key from going to disk on the client machine. The cookie
