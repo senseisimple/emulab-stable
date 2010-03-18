@@ -1,0 +1,105 @@
+#!/usr/bin/perl -T
+
+use strict;
+use warnings;
+
+use POSIX qw(setuid setgid);
+use Cwd qw(realpath);
+
+use Data::Dumper;
+
+#print "\n\n";
+#print Dumper(\%ENV);
+
+my $FSDIR_PROJ = "@FSDIR_PROJ@";
+
+sub error($) {
+    print "Content-Type: text/plain\n";
+    print "Status: 404 Not Found\n\n";
+    print "$_[0]\n";
+    #die "$_[0]\n";
+    exit 1;
+}
+
+my $SCRIPT_URL = $ENV{SCRIPT_URL};
+
+my ($proj,$dir,$file);
+local $_ = $SCRIPT_URL;
+if (/^\/proj-vis\/([a-zA-Z0-9-]+)\/?(.*)$/) {
+    $proj = $1;
+    $dir = "/proj/$1/www/proj-vis";
+    $file = $2;
+} elsif (/^\/exp-vis\/([a-zA-Z0-9-]+)\/?([a-zA-Z0-9-]+)\/?(.*)$/) {
+    $proj = $1;
+    $dir = "/proj/$1/www/exp-vis/$2";
+    $file = $3;
+} else {
+    error("Malformed URL");
+}
+
+# Lookup up the gid from the project name and make that the
+# only group we have access to
+my ($name, undef, $gid) = getgrnam($proj);
+error("Invalid proj: $proj") if $proj ne $name;
+undef $!;
+$) = "$gid $gid";
+setgid($gid);
+die $! if $!;
+
+# Now drop privileges, using setuid to make sure the saved uid
+# is also changes, ie, so that the change is permanent.
+setuid($<) or die $!;
+
+# For security remove any ".." from the path and abort if we would
+# leave $dir
+my @dirs = split /\//, $file;
+my @res;
+foreach my $d (@dirs) {
+    if ($d eq '' || $d eq '.') {
+	# nothing to do
+    } elsif ($d eq '..') {
+	error("Malformed URL") if @res == 0;
+	pop @res;
+    } else {
+	push @res, $d;
+    }
+}
+
+$file = join ('/', @res);
+my $path = "$dir/$file";
+
+error("File Doesn't Exist: $path") unless -e $path;
+
+if (-d $path) {
+    my $orig_path = $path;
+    $path .= "/index.html" if -e "$path/index.html";
+    $path .= "/index.htm" if -e "$path/index.htm";
+    error("Can't index dir: $path") unless $path ne $orig_path;
+}
+
+# Make sure that the path, after resolving any symbolic links,
+# still resides is /proj/<pid>
+my $realpath = realpath $path;
+error("Invalid path: $realpath") unless $realpath =~ /^$FSDIR_PROJ\/$proj/;
+
+my %mime_map = 
+    qw(html text/html htm text/html
+       txt text/plain
+       png image/png
+       gif image/gif
+       jpg image/jpeg jpeg image/jpeg
+       zip application/zip);
+
+my ($ext) = $path =~ /\.([^.]+)$/;
+$ext = lc $ext;
+
+my $mime_type = $mime_map{$ext};
+
+print "Content-Type: $mime_type\n" if defined $mime_type;
+print "\n";
+
+$/ = undef;
+open F, "$path" or error "Can't open file: $path";
+print <F>;
+
+exit 0;

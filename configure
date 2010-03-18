@@ -2770,6 +2770,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	collab/cvstools/cvs.proxy collab/cvstools/cvs_ctrl \
 	collab/cvstools/cvsrepo_ctrl.proxy collab/cvstools/cvsrepo_ctrl \
 	collab/cvstools/webcvsrepo_ctrl \
+	collab/exp-vis/GNUmakefile collab/exp-vis/fetch-vis \
 	node_usage/GNUmakefile node_usage/mk-plots \
 	node_usage/analy node_usage/publish \
 	node_usage/analy2 node_usage/refresh \
