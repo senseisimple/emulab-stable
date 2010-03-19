@@ -1,4 +1,4 @@
-#!/usr/bin/perl -wT
+#!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2004-2010 University of Utah and the Flux Group.
@@ -576,12 +576,12 @@ sub DumpDBGoo()
     #
     # These tables are dumped by project ID.
     #
-    my @PROJTABLES = ("project_stats", "projects", "group_stats", "groups");
+    my @PROJTABLES = ("projects", "groups");
 
     #
-    # These tables are dumped by user ID (for the project).
+    # These tables are dumped by user ID (for the project members).
     #
-    my @USERTABLES = ("users", "user_pubkeys", "user_stats");
+    my @USERTABLES = ("users", "user_pubkeys");
 
     foreach my $table (@FULLTABLES) {
 	unlink("$statedir/$table");
@@ -673,6 +673,28 @@ sub DumpDBGoo()
 	    or die("*** $0:\n".
 		   "    Could not dump table $table\n");
     }
+    #
+    # Cleared versions of the project/group stats tables.
+    #
+    unlink("$statedir/project_stats");
+    DBQueryFatal("create temporary table temp_project_stats ".
+		 "like project_stats");
+    DBQueryFatal("insert into temp_project_stats (pid,pid_idx) ".
+		 "select pid,pid_idx from project_stats ".
+		 "where pid='$pid'");
+    DBQueryFatal("select * from temp_project_stats ".
+		 "into outfile '$statedir/project_stats'");
+
+    unlink("$statedir/group_stats");
+    DBQueryFatal("create temporary table temp_group_stats ".
+		 "like group_stats");
+    DBQueryFatal("insert into temp_group_stats ".
+		 "  (pid,pid_idx,gid,gid_idx,gid_uuid) ".
+		 "select pid,pid_idx,gid,gid_idx,gid_uuid ".
+		 "   from group_stats ".
+		 "where pid='$pid'");
+    DBQueryFatal("select * from temp_group_stats ".
+		 "into outfile '$statedir/group_stats'");
 
     #
     # Special case the group and user policy tables. Not sure what to
@@ -690,7 +712,7 @@ sub DumpDBGoo()
 	unlink("$statedir/$table");
 
 	DBQueryWarn("create temporary table temp_$table ".
-		    "select t.* from group_membership as gm ".
+		    "select distinct t.* from group_membership as gm ".
 		    "left join users as u on u.uid_idx=gm.uid_idx ".
 		    "left join $table as t on t.uid_idx=u.uid_idx ".
 		    "where (gm.pid='$pid' or ".
@@ -699,6 +721,11 @@ sub DumpDBGoo()
 		    " u.status='" . USERSTATUS_ACTIVE() . "'")
 	    or die("*** $0:\n".
 		   "    Could not create table temp_$table\n");
+
+	# Clean up ... these are created in the inner elab.
+	DBQueryFatal("delete from temp_${table} ".
+		     "where uid='elabman' or uid='elabckup' or ".
+		     "      uid='operator'");
 
 	if ($table eq "users") {
 	    my $creator_uid = $experiment->creator();
@@ -717,16 +744,23 @@ sub DumpDBGoo()
 			 "where uid!='$creator_uid'");
 	}
 
-	# Clean up ... these are created in the inner elab.
-	DBQueryFatal("delete from temp_${table} ".
-		     "where uid='elabman' or uid='elabckup' or ".
-		     "      uid='operator'");
-
 	DBQueryWarn("select * from temp_$table ".
 		    "into outfile '$statedir/$table'")
 	    or die("*** $0:\n".
 		   "    Could not dump table temp_$table\n");
     }
+    #
+    # We want a cleared stats table, so do it here.
+    #
+    DBQueryFatal("create temporary table temp_user_stats ".
+		 "like user_stats");
+    DBQueryFatal("insert into temp_user_stats ".
+		 "  (uid,uid_idx,uid_uuid) ".
+		 "select uid,uid_idx,uid_uuid from temp_users");
+    DBQueryWarn("select * from temp_user_stats ".
+		"into outfile '$statedir/user_stats'")
+	or die("*** $0:\n".
+	       "    Could not dump table temp_user_stats\n");
 
     # The group_membership is also special.
     DBQueryWarn("select gm.* from group_membership as gm ".
