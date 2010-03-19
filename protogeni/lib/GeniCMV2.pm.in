@@ -826,6 +826,10 @@ sub SliverStatus($)
 	my $status        = $sliver->status();
 	my $error         = "";
 
+	# New is the same as stopped. Separate state is handy.
+	$state = "stopped"
+	    if ($state eq "new");
+
 	if ($status eq "failed") {
 	    $error = $sliver->ErrorLog();
 	}

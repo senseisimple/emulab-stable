@@ -759,9 +759,14 @@ sub send_mail($$@) {
 # Given a full refname, pull off the last part for pretty printing
 #
 sub short_refname($) {
-    my ($refname) = @_;
-    $refname =~ /([^\/]+)$/;
-    return $1;
+    my ($ref) = @_;
+    my $refname = `git rev-parse --abbrev-ref $ref $STDERRNULL`;
+    chomp $refname;
+
+    # This shouldn't be necessary, but return the full ref if
+    # rev-parse doesn't return anything.
+    $refname = $ref if (!$refname);
+    return $refname;
 }
 
 #
