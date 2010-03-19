@@ -947,7 +947,7 @@ function DOLOGIN($token, $password, $adminmode = 0) {
 
 function DOLOGIN_MAGIC($uid, $uid_idx, $email = null, $adminon = 0)
 {
-    global $TBAUTHCOOKIE, $TBAUTHDOMAIN, $TBAUTHTIMEOUT;
+    global $TBAUTHCOOKIE, $TBAUTHDOMAIN, $TBAUTHTIMEOUT, $WWWHOST;
     global $TBNAMECOOKIE, $TBLOGINCOOKIE, $TBSECURECOOKIES, $TBEMAILCOOKIE;
     global $TBMAIL_OPS, $TBMAIL_AUDIT, $TBMAIL_WWW;
     global $WIKISUPPORT, $WIKICOOKIENAME;
@@ -980,6 +980,16 @@ function DOLOGIN_MAGIC($uid, $uid_idx, $email = null, $adminon = 0)
     # with the hash value and auth usr embedded.
 
     #
+    # Since we changed the domain of the cookies make sure that the cookies 
+    # from the old domain no longer exist.
+    #
+    setcookie($TBAUTHCOOKIE, '', 1, "/", $TBAUTHDOMAIN, $TBSECURECOOKIES);
+    setcookie($TBLOGINCOOKIE, '', 1, "/", $TBAUTHDOMAIN, 0);
+    setcookie($TBNAMECOOKIE, '', 1, "/", $TBAUTHDOMAIN, 0);
+    if ($email)
+      setcookie($TBEMAILCOOKIE, '', 1, "/", $TBAUTHDOMAIN, 0);
+
+    #
     # For the hashkey, we use a zero timeout so that the cookie is
     # a session cookie; killed when the browser is exited. Hopefully this
     # keeps the key from going to disk on the client machine. The cookie
@@ -987,7 +997,7 @@ function DOLOGIN_MAGIC($uid, $uid_idx, $email = null, $adminon = 0)
     # at the server so it will become invalid at some point.
     #
     setcookie($TBAUTHCOOKIE, $hashkey, 0, "/",
-	      $TBAUTHDOMAIN, $TBSECURECOOKIES);
+	      $WWWHOST, $TBSECURECOOKIES);
 
     #
     # Another cookie, to help in menu generation. See above in
@@ -996,14 +1006,14 @@ function DOLOGIN_MAGIC($uid, $uid_idx, $email = null, $adminon = 0)
     # All this does is change the menu options presented, imparting
     # no actual privs. 
     #
-    setcookie($TBLOGINCOOKIE, $crc, 0, "/", $TBAUTHDOMAIN, 0);
+    setcookie($TBLOGINCOOKIE, $crc, 0, "/", $WWWHOST, 0);
 
     #
     # We want to remember who the user was each time they load a page
     # NOTE: This cookie is integral to authorization, since we do not pass
     # around the UID anymore, but look for it in the cookie.
     #
-    setcookie($TBNAMECOOKIE, $uid_idx, 0, "/", $TBAUTHDOMAIN, 0);
+    setcookie($TBNAMECOOKIE, $uid_idx, 0, "/", $WWWHOST, 0);
 
     #
     # This is a long term cookie so we can remember who the user was, and
@@ -1011,7 +1021,7 @@ function DOLOGIN_MAGIC($uid, $uid_idx, $email = null, $adminon = 0)
     #
     if ($email) {
 	$timeout = $now + (60 * 60 * 24 * 365);
-	setcookie($TBEMAILCOOKIE, $email, $timeout, "/", $TBAUTHDOMAIN, 0);
+	setcookie($TBEMAILCOOKIE, $email, $timeout, "/", $WWWHOST, 0);
     }
 
     #
@@ -1082,7 +1092,7 @@ function VERIFYPASSWD($uid, $password) {
 #
 function DOLOGOUT($user) {
     global $CHECKLOGIN_STATUS, $CHECKLOGIN_USER;
-    global $TBAUTHCOOKIE, $TBLOGINCOOKIE, $TBAUTHDOMAIN;
+    global $TBAUTHCOOKIE, $TBLOGINCOOKIE, $TBAUTHDOMAIN, $WWWHOST;
     global $WIKISUPPORT, $WIKICOOKIENAME, $HTTP_COOKIE_VARS;
     global $BUGDBSUPPORT, $BUGDBCOOKIENAME, $TRACSUPPORT, $TRACCOOKIENAME;
 
@@ -1140,8 +1150,8 @@ function DOLOGOUT($user) {
     #
     $timeout = time() - 3600;
     
-    setcookie($TBAUTHCOOKIE, "", $timeout, "/", $TBAUTHDOMAIN, 0);
-    setcookie($TBLOGINCOOKIE, "", $timeout, "/", $TBAUTHDOMAIN, 0);
+    setcookie($TBAUTHCOOKIE, "", $timeout, "/", $WWWHOST, 0);
+    setcookie($TBLOGINCOOKIE, "", $timeout, "/", $WWWHOST, 0);
 
     if ($TRACSUPPORT) {
 	setcookie("trac_auth_emulab", "", $timeout, "/",
