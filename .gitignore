@@ -2,3 +2,4 @@ event/trafgen/tg2.0
 sensors/nfstrace/nfsdump2/Makefile
 sensors/nfstrace/nfsdump2/config.h
 sensors/nfstrace/nfsdump2/config.log
+.merge-build
