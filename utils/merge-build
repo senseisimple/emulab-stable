@@ -1,5 +1,7 @@
 #!/usr/bin/perl 
 
+use Cwd;
+
 use warnings;
 use strict;
 
@@ -40,6 +42,9 @@ sub usage() {
     exit(1);
 }
 
+#
+# Read config file
+#
 open F, ".merge-build" or die "Unable to open .merge-build\n";
 my $source_tree;
 my $merge_tree;
@@ -68,27 +73,53 @@ missing_key('merge-tree') unless defined $merge_tree;
 missing_key('branches') unless @branches;
 my $branch_str = join ' ', map {"origin/$_"} @branches;
 
-my $op = shift @ARGV || '';
+#
+# Figure out where we are
+#
+sub same_file($$) {
+    my ($dev0,$ino0) = stat $_[0];
+    my ($dev1,$ino1) = stat $_[1];
+    return defined $dev0 && defined $dev1 && $dev0 == $dev1 && $ino0 == $ino1;
+}
+sub where_am_i() {
+    my $cwd = cwd();
+    if (same_file($cwd,"$cwd/$source_tree/$merge_tree")) {
+	return 'merge';
+    } elsif (same_file($cwd,"$cwd/$merge_tree/$source_tree")) {
+	return 'source';
+    } else {
+	die "I don't know where I am! Check that source-tree and merge-tree are correct.\n";
+    }
+}
+sub cd_source() {
+    cd $source_tree if where_am_i() eq 'merge';
+    die unless where_am_i() eq 'source';
+}
+sub cd_merge() {
+    cd $merge_tree if where_am_i() eq 'source';
+    die unless where_am_i() eq 'merge';
+}
 
+#
+# Finally, do the work
+#
+my $op = shift @ARGV || '';
 if ($op eq 'prep') {
-    my $branch_str = join ' ', map {"origin/$_"} @branches;
-    die "Can't read source tree\n" unless -d $source_tree;
     die "Merge tree must not exist\n" if -e $merge_tree;
-    sys "git clone -sn -b master $source_tree $merge_tree";
-    cd $merge_tree;
-    my $base = merge_base $merge_branch, split / /, $branch_str;
+    sys "git clone -sn . $merge_tree";
+    cd_merge();
+    my $base = merge_base split / /, $branch_str;
     sys "git checkout -b $merge_branch $base";
-    sys "git branch -D master";
     sys "ln -s $source_tree/.merge-build";
 } elsif ($op eq 'reset') {
-    cd $merge_tree;
+    cd_merge();
     my $base = merge_base $merge_branch, split / /, $branch_str;
     sys "git reset --hard $base";
 } elsif ($op eq 'sync') {
-    cd $source_tree;
+    cd_source();
     my $stash_id = sysp "git stash create";
     chomp $stash_id;
-    cd $merge_tree;
+    cd_merge();
     sys "git fetch origin";
     sys "git reset --hard";
     sys "git merge $branch_str";

@@ -2572,7 +2572,7 @@ MERGE_BUILD_SANDBOX=
 if test -e "$srcdir/.merge-build"; then
    merge_sandbox=`grep source-tree "$srcdir/.merge-build" | cut -d' ' -f2`
    merge_tree=`grep merge-tree "$srcdir/.merge-build" | cut -d' ' -f2`
-   if test "$srcdir" -ef "$srcdir/$merge_tree"; then
+   if test "$srcdir" -ef "$srcdir/$merge_sandbox/$merge_tree"; then
       MERGE_BUILD=1
       MERGE_BUILD_SANDBOX=$srcdir/$merge_sandbox
       echo "#/bin/sh"   > sync
