@@ -823,7 +823,7 @@ if test -e "$srcdir/.merge-build"; then
       echo "#/bin/sh"   > sync
       echo              >> sync
       echo "cd \"$srcdir\"" >> sync
-      echo "\"$srcdir/utils/merge-build\" sync" >> sync
+      echo "utils/merge-build sync" >> sync
       chmod +x sync
       echo "Merge-build enabled"
    fi
