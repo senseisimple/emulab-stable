@@ -1,0 +1,101 @@
+#!/usr/bin/perl 
+
+use warnings;
+use strict;
+
+sub cd ($) {
+    print "cd $_[0]\n";
+    chdir $_[0] or die "Unable to cd to $_[0]\n";
+}
+
+sub sys (@) {
+    print join(' ', @_), "\n";
+    system @_;
+    die "ERROR: @_ failed\n" unless $? == 0;
+}
+
+sub sysp (@) {
+    my $cmd = join(' ', @_, '|');
+    print "$cmd\n";
+    open F, $cmd or die $!;
+    local $/ = undef;
+    my $output = <F>;
+    close F;
+    die "ERROR: $cmd faild\n" unless $? == 0;
+    return $output;
+}
+
+sub merge_base(@) {
+    my $res = shift @_;
+    while (@_) {
+	my $other = shift @_;
+	$res = sysp("git merge-base $res $other");
+	chomp $res;
+    }
+    return $res;
+}
+
+sub usage() {
+    print "usage: merge-build prep|reset|sync\n";
+    exit(1);
+}
+
+open F, ".merge-build" or die "Unable to open .merge-build\n";
+my $source_tree;
+my $merge_tree;
+my @branches;
+my $branches_str;
+my $merge_branch = "merge";
+while (<F>) {
+    s/#.+//;
+    next unless /\S/;
+    my ($key, $value) = /^\s*(\S+)\s+(.+?)\s*$/ or die "Bad Line\n";
+    if ($key eq 'source-tree') {
+	$source_tree = $value;
+    } elsif ($key eq 'merge-tree') {
+	$merge_tree = $value;
+    } elsif ($key eq 'branches') {
+	@branches = split /\s+/, $value;
+    } elsif ($key eq 'merge-branch') {
+	$merge_branch = $value;
+    } else {
+	die "Unknown key in .merge-build: $key\n";
+    }
+}
+sub missing_key($) {die "Missing key in .merge-build: $_[0]\n";}
+missing_key('source-tree') unless defined $source_tree;
+missing_key('merge-tree') unless defined $merge_tree;
+missing_key('branches') unless @branches;
+my $branch_str = join ' ', map {"origin/$_"} @branches;
+
+my $op = shift @ARGV || '';
+
+if ($op eq 'prep') {
+    my $branch_str = join ' ', map {"origin/$_"} @branches;
+    die "Can't read source tree\n" unless -d $source_tree;
+    die "Merge tree must not exist\n" if -e $merge_tree;
+    sys "git clone -sn -b master $source_tree $merge_tree";
+    cd $merge_tree;
+    my $base = merge_base $merge_branch, split / /, $branch_str;
+    sys "git checkout -b $merge_branch $base";
+    sys "git branch -D master";
+    sys "ln -s $source_tree/.merge-build";
+} elsif ($op eq 'reset') {
+    cd $merge_tree;
+    my $base = merge_base $merge_branch, split / /, $branch_str;
+    sys "git reset --hard $base";
+} elsif ($op eq 'sync') {
+    cd $source_tree;
+    my $stash_id = sysp "git stash create";
+    chomp $stash_id;
+    cd $merge_tree;
+    sys "git fetch origin";
+    sys "git reset --hard";
+    sys "git merge $branch_str";
+    sys "git stash apply $stash_id | grep -v '^#'"
+	if $stash_id;
+    sys "touch .merged";
+} else {
+    usage();
+}
+
