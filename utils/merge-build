@@ -1,5 +1,9 @@
 #!/usr/bin/perl 
 
+#
+# See http://users.emulab.net/trac/emulab/wiki/MergeBuild
+#
+
 use Cwd;
 
 use warnings;
