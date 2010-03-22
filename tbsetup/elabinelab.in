@@ -1473,7 +1473,7 @@ sub UpdateEmulab()
     }
     print "Telling inner boss ($bossnode) to incorporate new nodes: @nodes\n";
     system("$SSH -host $bossnode sudo -u $creator /usr/testbed/sbin/wap ".
-	   "     /usr/testbed/sbin/newnode @nodes");
+	   "     /usr/testbed/sbin/newnode -q -n @nodes");
     if ($?) {
 	print STDERR "*** $0:\n".
 	             "    Could not incorporate new nodes on inner boss\n";
