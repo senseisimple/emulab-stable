@@ -300,6 +300,9 @@ sub locked($)		{ return field($_[0], 'expt_locked'); }
 sub elabinelab($)	{ return field($_[0], 'elab_in_elab');}
 sub elabinelab_eid($)   { return field($_[0], 'elabinelab_eid');}
 sub elabinelab_exptidx($){return field($_[0], 'elabinelab_exptidx');}
+sub elabinelab_nosetup($){return field($_[0], 'elabinelab_nosetup');}
+sub elabinelab_singlenet($){return field($_[0], 'elabinelab_singlenet');}
+sub elabinelab_cvstag($){return field($_[0], 'elabinelab_cvstag');}
 sub lockdown($)		{ return field($_[0], 'lockdown'); }
 sub geniflags($)	{ return field($_[0], 'geniflags'); }
 sub created($)		{ return field($_[0], 'expt_created'); }
