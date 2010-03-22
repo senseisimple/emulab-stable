@@ -1144,6 +1144,7 @@ sub RemoveNodes()
     my $wap        = "$tbdir/sbin/withadminprivs";
     my $nodereboot = "$tbdir/bin/node_reboot";
     my $deletenode = "$tbdir/sbin/deletenode";
+    my $creator    = $experiment->creator();
     my @nodes	   = ();
     my $paniced    = 0;
 
@@ -1315,7 +1316,7 @@ sub RemoveNodes()
 			 "    Outer boss will use power cycle.\n";
 	}
 	print "Asking inner boss ($bossnode) to delete $node\n";
-	system("$SSH -host $bossnode sudo -u elabman ".
+	system("$SSH -host $bossnode sudo -u $creator ".
 	       "     $wap $deletenode -b -q -f $node");
 	if ($?) {
 	    #
