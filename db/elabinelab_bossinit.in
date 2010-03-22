@@ -115,17 +115,17 @@ mysystem("$TB/sbin/mkproj -s $pid");
 # groups are created (tbacct add does not do a setgroups).
 #
 my $users_result =
-    DBQueryFatal("select distinct u.uid,u.admin,u.status ".
+    DBQueryFatal("select distinct u.uid,u.uid_idx,u.admin,u.status ".
 		 "   from group_membership as m ".
 		 "left join users as u on u.uid_idx=m.uid_idx ");
-while (my ($uid,$admin,$status) = $users_result->fetchrow_array()) {
+while (my ($uid,$uid_idx,$admin,$status) = $users_result->fetchrow_array()) {
     next
 	if ($uid eq "elabman");
     
     if ($admin) {
 	# Add admin users to group wheel for convenience.
 	DBQueryFatal("replace into unixgroup_membership ".
-		     "values ('$uid','wheel')");
+		     "values ('$uid','$uid_idx','wheel')");
     }
     next
 	if ($status ne USERSTATUS_ACTIVE());

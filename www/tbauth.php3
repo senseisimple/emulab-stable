@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -1186,13 +1186,13 @@ function NOLOGINS() {
     return $CHECKLOGIN_NOLOGINS;
 }
 
-function LASTWEBLOGIN($uid) {
+function LASTWEBLOGIN($uid_idx) {
     global $TBDBNAME;
 
     $query_result =
         DBQueryFatal("select weblogin_last from users as u ".
 		     "left join user_stats as s on s.uid_idx=u.uid_idx ".
-		     "where u.uid='$uid'");
+		     "where u.uid_idx='$uid_idx'");
     
     if (mysql_num_rows($query_result)) {
 	$lastrow      = mysql_fetch_array($query_result);

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007, 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -20,7 +20,9 @@ $optargs = OptionalPageArguments("showby",	      PAGEARG_STRING,
 				 "target_user",	      PAGEARG_USER,
 				 "target_project",    PAGEARG_PROJECT,
 				 "exptidx",           PAGEARG_INTEGER,
-				 "records",           PAGEARG_INTEGER);
+				 "records",           PAGEARG_INTEGER,
+				 "verbose",           PAGEARG_BOOLEAN,
+				 "startwith",         PAGEARG_INTEGER);
 
 #
 # Standard Testbed Header
@@ -37,8 +39,11 @@ if (! isset($showby)) {
 	$showby = "user";
 }
 # Show just the last N records unless request is different.
-if (!isset($records)) {
-    $records = 100;
+if (!isset($records) || $records == 0) {
+    $records = 20;
+}
+if (!isset($startwith)) {
+    $startwith    = 0;
 }
 
 echo "<b>Show: <a class='static' href='showexpstats.php3'>
@@ -86,7 +91,7 @@ if ($showby == "user") {
     elseif (! $target_user->AccessCheck($this_user, $TB_USERINFO_READINFO)) {
 	USERERROR("You do not have permission to view ${user}'s stats!", 1);
     }
-    $wclause = "where t.uid='" . $target_user->uid() . "'";
+    $wclause = "where (t.uid_idx='" . $target_user->uid_idx() . "')";
 }
 elseif ($showby == "project") {
     if (!isset($target_project)) {
@@ -98,7 +103,7 @@ elseif ($showby == "project") {
 	USERERROR("You do not have permission to view stats for ".
 		  "project $pid!", 1);
     }
-    $wclause = "where s.pid='$pid'";
+    $wclause = "where (s.pid='$pid')";
 }
 elseif ($showby == "expt") {
     #
@@ -128,7 +133,7 @@ elseif ($showby == "expt") {
 	USERERROR("You do not have permission to view stats for ".
 		  "experiment $exptidx!", 1);
     }
-    $wclause = "where t.exptidx='$exptidx'";
+    $wclause = "where (t.exptidx='$exptidx')";
 
     echo "<center>";
     if ($experiment) {
@@ -148,31 +153,43 @@ elseif ($showby == "all") {
 	    USERERROR("You do not have permission to view stats for ".
 		      "project $pid!", 1);
 	}
-	$wclause = "where s.pid='$pid'";
+	$wclause = "where (s.pid='$pid')";
     }
     elseif (!$isadmin) {
         #
         # Get a project list for which the user has read permission.
         #
+	$orclause = "";
         $projlist = $this_user->ProjectAccessList($TB_PROJECT_READINFO);
 	if (! count($projlist)) {
 	    USERERROR("You do not have permission to view stats for any ".
 		      "project!", 1);
 	}
 	while (list($project, $grouplist) = each($projlist)) {
-	    $wclause .= "s.pid='$project' or ";
+	    $orclause .= "s.pid='$project' or ";
 	}
-	$wclause = "where $wclause 0";
+	$wclause = "where ($wclause 0)";
     }
 }
 else {
     USERERROR("Bad page arguments!", 1);
 }
 
+$startclause = ($startwith ? "t.idx<$startwith " : "");
+
+if (strlen($wclause)) {
+    if (strlen($startclause)) {
+	$wclause = "$wclause and $startclause";
+    }
+}
+else {
+    $wclause = $startclause;
+}
+
 $query_result =
     DBQueryFatal("select t.exptidx,s.pid,s.eid,t.action,t.exitcode,t.uid, ".
                  "       r.pnodes,t.idx as statno,t.start_time,t.end_time, ".
-		 "       s.archive_idx,r.archive_tag ".
+		 "       s.archive_idx,r.archive_tag,t.uid_idx ".
 		 "  from testbed_stats as t ".
 		 "left join experiment_stats as s on s.exptidx=t.exptidx ".
 		 "left join experiment_resources as r on r.idx=t.rsrcidx ".
@@ -208,10 +225,11 @@ echo " </tr>\n";
 
 while ($row = mysql_fetch_assoc($query_result)) {
     $idx     = $row["statno"];
-    $exptidx = $row["exptidx"];
+    $eidx    = $row["exptidx"];
     $pid     = $row["pid"];
     $eid     = $row["eid"];
     $uid     = $row["uid"];
+    $uid_idx = $row["uid_idx"];
     $start   = $row["start_time"];
     $end     = $row["end_time"];
     $action  = $row["action"];
@@ -219,6 +237,7 @@ while ($row = mysql_fetch_assoc($query_result)) {
     $pnodes  = $row["pnodes"];
     $archive_idx = $row["archive_idx"];
     $archive_tag = $row["archive_tag"];
+    $startwith   = $idx;
 
     if (!isset($end))
 	$end = "&nbsp";
@@ -230,7 +249,7 @@ while ($row = mysql_fetch_assoc($query_result)) {
 	if ($archive_idx && $archive_tag &&
 	    ($action == "swapout" || $action == "swapmod")) {
 	    echo "  <td align=center>
-                       <a href=beginexp_html.php3?copyid=$exptidx:$archive_tag>
+                       <a href=beginexp_html.php3?copyid=$eidx:$archive_tag>
                        <img border=0 alt=Run src=greenball.gif></a></td>";
 	}
 	else {
@@ -238,10 +257,10 @@ while ($row = mysql_fetch_assoc($query_result)) {
 	}
     }
     if ($verbose || $showby != "expt") {
-	echo "<td>$uid</td>
+	echo "<td>$uid ($uid_idx)</td>
               <td>$pid</td>
               <td>$eid</td>
-              <td><a href=showexpstats.php3?record=$exptidx>$exptidx</a></td>";
+              <td><a href=showexpstats.php3?record=$eidx>$eidx</a></td>";
     }
     echo "  <td>$start</td>
             <td>$end</td>\n";
@@ -258,8 +277,8 @@ while ($row = mysql_fetch_assoc($query_result)) {
 	    (strcmp($action, "swapout") == 0 ||
 	     strcmp($action, "swapmod") == 0)) {
 	    echo "<td>".
-		 "<a href='cvsweb/cvswebwrap.php3/$exptidx/history/".
-		          "$archive_tag/?exptidx=$exptidx'>$archive_tag</a>".
+		 "<a href='cvsweb/cvswebwrap.php3/$eidx/history/".
+		          "$archive_tag/?exptidx=$eidx'>$archive_tag</a>".
 		 "</td>\n";
 	}
 	else {
@@ -269,6 +288,25 @@ while ($row = mysql_fetch_assoc($query_result)) {
     echo "</tr>\n";
 }
 echo "</table>\n";
+
+if (1) {
+    $args  = "?showby=$showby&startwith=$startwith&records=$records";
+    if (isset($target_user)) {
+	$args .= "&user=" . $target_user->uid_idx();
+    }
+    if (isset($target_project)) {
+	$args .= "&project=" . $target_project->pid_idx();
+    }
+    if (isset($exptidx)) {
+	$args .= "&exptidx=$exptidx";
+    }
+    if ($verbose) {
+	$args .= "&verbose=$verbose";
+    }
+    echo "<center>".
+	"<a href='showstats.php3${args}'>".
+	"More Entries</a></center><br>\n";
+}
 
 #
 # Standard Testbed Footer

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -738,7 +738,7 @@ if (!$forwikionly) {
 # doing so would not add a non-admin (default for new users) to a 
 # project with admins.
 #
-if (!$returning && count($project->GetAdmins())) {
+if ($ISOLATEADMINS && !$returning && count($project->GetAdmins())) {
     $errors["Joining Project"] =
 	"You cannot join project '$pid' due to security restrictions!"
 	. "  If you were told to join this project specifically, email"

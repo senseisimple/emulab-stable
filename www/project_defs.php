@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2006-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # A cache of groups to avoid lookups. Indexed by pid_idx;
@@ -491,7 +491,8 @@ class Project
 	$result  = array();
 	$query_result =
 	    DBQueryFatal("select distinct u.uid_idx from users as u".
-			 " left join group_membership as gm on u.uid=gm.uid".
+			 " left join group_membership as gm on ".
+			 "      u.uid_idx=gm.uid_idx".
 			 " where gm.pid_idx='$pid_idx' and u.admin=1");
 
 	while ($row = mysql_fetch_array($query_result)) {

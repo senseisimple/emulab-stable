@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -84,6 +84,12 @@ void
 dbclose(void)
 {
 	mydb_disconnect();
+}
+
+unsigned long
+mydb_escape_string(char *to, const char *from, unsigned long length)
+{
+	return mysql_real_escape_string(&db, to, from, length);
 }
 
 MYSQL_RES *

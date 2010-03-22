@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006, 2007, 2008, 2009 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007, 2008, 2009, 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -465,7 +465,7 @@ function VerifyPageArguments($argspec, $required)
 		$yep = 1;
 
 		if (ValidateArgument(PAGEARG_PID, $pid)) {
-		    $object = Project::LookupByPid($pid);
+		    $object = Project::Lookup($pid);
 		}
 	    }
 	    break;

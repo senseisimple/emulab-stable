@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -19,6 +19,7 @@ sub checkGroup ($$);
 #
 use lib '@prefix@/lib';
 use libdb;
+use User;
 
 my $TB        = "@prefix@";
 my $SETGROUPS = "$TB/sbin/setgroups";
@@ -41,13 +42,19 @@ if (($UID != 0) && (!TBAdmin($UID))) {
 my %opt = ();
 getopts('rhpa',\%opt);
 
-my ($uid, @gid);
+my ($uid, $uid_idx, @gid);
 if ($opt{a} || $opt{r}) {
     if (@ARGV < 2) {
 	die "Not enough arguments - see '$0 -h' for help\n";
     }
     $uid = shift @ARGV;
     @gid = @ARGV;
+
+    my $target_user = User->Lookup($uid);
+    if (!defined($target_user)) {
+	die "No such active user $uid exists\n";
+    }
+    $uid_idx = $target_user->uid_idx();
 } else {
     if (@ARGV != 0) {
 	die "Too many arguments - see '$0 -h' for help\n";
@@ -74,12 +81,12 @@ if ($opt{p}) {
     #
     foreach my $gid (@gid) {
 	print "Adding user $uid to group $gid in the database\n";
-	if (checkGroup($uid,$gid)) {
+	if (checkGroup($uid_idx,$gid)) {
 	    warn "User $uid is already in group $gid, skipping ...\n";
 	    next;
 	} else {
-	    DBQueryFatal("INSERT INTO unixgroup_membership SET uid='$uid', " .
-	    			"gid='$gid'");
+	    DBQueryFatal("INSERT INTO unixgroup_membership SET ".
+			 "  uid='$uid', uid_idx='$uid_idx', gid='$gid'");
 	}
     }
 
@@ -94,12 +101,12 @@ if ($opt{p}) {
     #
     foreach my $gid (@gid) {
 	print "Removing $uid from group $gid in the database\n";
-	if (!checkGroup($uid,$gid)) {
+	if (!checkGroup($uid_idx,$gid)) {
 	    warn "User $uid is not in group $gid, skipping ...\n";
 	    next;
 	} else {
-	    DBQueryFatal("DELETE FROM unixgroup_membership WHERE uid='$uid' " .
-	    			"AND gid='$gid'");
+	    DBQueryFatal("DELETE FROM unixgroup_membership ".
+			 "WHERE uid_idx='$uid_idx' AND gid='$gid'");
 	}
     }
     
@@ -126,8 +133,9 @@ if ($opt{p}) {
 # if not.
 #
 sub checkGroup ($$) {
-    my ($uid,$gid) = @_;
+    my ($uid_idx,$gid) = @_;
+    
     my $result = DBQueryFatal("SELECT gid,uid FROM unixgroup_membership WHERE ".
-				"uid='$uid' AND gid='$gid'");
+				"uid_idx='$uid_idx' AND gid='$gid'");
     return ($result->num_rows() > 0);
 }

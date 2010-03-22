@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005, 2006, 2007, 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -290,11 +290,14 @@ while (list ($user, $value) = each ($projectchecks)) {
 
 reset($HTTP_POST_VARS);
 
+STARTBUSY("Approving Users");
+
 #
 # Okay, all sanity tests passed for all post vars. Now do the actual work.
 # 
 while (list ($header, $value) = each ($POST_VARS_COPY)) {
     #echo "$header: $value<br>\n";
+    flush();
 
     $approval_string = strstr($header, "\$\$approval-");
     if (! $approval_string) {
@@ -475,6 +478,7 @@ while (list ($header, $value) = each ($POST_VARS_COPY)) {
 	continue;
     }
 }
+CLEARBUSY();
 
 #
 # Standard Testbed Footer
