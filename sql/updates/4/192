@@ -11,7 +11,7 @@ sub DoUpdate($$$)
 		     " after uid");
 
 	# This unique key is no longer wanted cause of archived users.
-	DBQueryFatal("alter table users drop unique key `uid`");
+	DBQueryFatal("alter table users drop key `uid`");
 	DBQueryFatal("alter table users add key `uid` (`uid`)");
     }
     if (!DBSlotExists("uidnodelastlogin", "uid_idx")) {
