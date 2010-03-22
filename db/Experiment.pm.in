@@ -332,6 +332,8 @@ sub keyhash($)          { return field($_[0], 'keyhash');}
 sub paniced($)          { return field($_[0], 'paniced');}
 sub cpu_usage($)        { return field($_[0], 'cpu_usage');}
 sub encap_style($)      { return field($_[0], 'encap_style');}
+sub minimum_nodes($)    { return field($_[0], 'minimum_nodes');}
+sub maximum_nodes($)    { return field($_[0], 'maximum_nodes');}
 sub multiplex_factor($) { return field($_[0], 'multiplex_factor');}
 sub delay_capacity($)   { return field($_[0], 'delay_capacity');}
 sub virtnode_count($)   { return field($_[0], 'virtnode_count');}
