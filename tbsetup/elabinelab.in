@@ -49,14 +49,11 @@ my $CONTROL	= "@USERNODE@";
 my $DBNAME      = "@TBDBNAME@";
 my $TBOPSPID    = TBOPSPID();
 my $SSH		= "$TB/bin/sshtb";
+my $SCP		= "/usr/bin/scp";
 my $nodereboot  = "$TB/bin/node_reboot";
 my $makeconf    = "$TB/sbin/dhcpd_makeconf";
 my $nodewait    = "$TB/sbin/node_statewait";
 my $snmpit      = "$TB/bin/snmpit";
-
-# Locals
-my $elabinelab;
-my $elabinelab_eid;
 
 # Protos
 sub TearDownEmulab();
@@ -170,10 +167,11 @@ TBDebugTimeStampsOn();
 # Get elabinelab status to make sure, and to see if we need to fire off
 # an experiment inside once its setup.
 #
-if (! TBExptIsElabInElab($pid, $eid, \$elabinelab, \$elabinelab_eid)) {
-    die("*** $0:\n".
-	"    Could not get elabinelab status for experiment $pid/$eid\n");
-}
+my $elabinelab           = $experiment->elabinelab();
+my $elabinelab_eid       = $experiment->elabinelab_eid();
+my $elabinelab_nosetup   = $experiment->elabinelab_nosetup();
+my $elabinelab_singlenet = $experiment->elabinelab_singlenet();
+
 exit(0)
     if (!$elabinelab);
 
@@ -182,15 +180,6 @@ exit(0)
 #
 my $firewall;
 my $firewalled = TBExptFirewall($pid, $eid, \$firewall);
-
-#
-# XXX NOSETUP option needs more work ...
-#
-$query_result =
-    DBQueryFatal("select elabinelab_nosetup,elabinelab_singlenet ".
-		 "   from experiments ".
-		 "where pid='$pid' and eid='$eid'");
-my ($nosetup,$singlenet) = $query_result->fetchrow_array();
 
 #
 # Presetup; turn off firewall.
@@ -374,7 +363,7 @@ $UID  = $SAVEUID;
 $EUID = $UID;
 
 goto skipsetup
-    if ($nosetup);
+    if ($elabinelab_nosetup);
 
 #
 # Restart DHCPD, but first mark the nodes as being ready to boot inside
@@ -839,7 +828,7 @@ sub DumpDBGoo()
 	or die("*** $0:\n".
 	       "    Could not create temporary table temp_interfaces\n");
 
-    if (! $singlenet) {
+    if (! $elabinelab_singlenet) {
 	# First, mark the real control network as "other" to avoid it being
 	# thought of as the control network!.
 	DBQueryWarn("update temp_interfaces ".
@@ -885,7 +874,7 @@ sub DumpDBGoo()
 		"left join virt_nodes as v on v.vname=r.vname and ".
 		"     v.pid=r.pid and v.eid=r.eid ".
 		"left join wires as t on t.node_id1=r.node_id ".
-		($singlenet == 0 ? " and t.type='Node' " : " ") .
+		($elabinelab_singlenet == 0 ? " and t.type='Node' " : " ") .
 		"where r.pid='$pid' and r.eid='$eid' and ".
 		"      v.inner_elab_role in ('node','ops','fs','ops+fs') ")
 	or die("*** $0:\n".
@@ -903,7 +892,7 @@ sub DumpDBGoo()
 	or die("*** $0:\n".
 	       "    Could not ops node_id in temp_wires\n");
 
-    if (! $singlenet) {
+    if (! $elabinelab_singlenet) {
 	# But we need to take out the wires that are being used as the
 	# inner control network, or at least mark them as Control.
 	$query_result =
@@ -1363,9 +1352,11 @@ sub RemoveNodes()
 sub UpdateEmulab()
 {
     my $tbdir      = "/usr/testbed";
+    my $statedir   = "$workdir/elabinelab";
     my $wap        = "$tbdir/sbin/withadminprivs";
     my $nodereboot = "$tbdir/bin/node_reboot";
     my $nodewait   = "$tbdir/sbin/node_statewait";
+    my $creator    = $experiment->creator();
     my @nodes      = ();
     my $paniced    = 0;
 
@@ -1390,17 +1381,107 @@ sub UpdateEmulab()
     # Grab the list of nodes that have been added to the inner elab.
     #
     my $query_result =
-	DBQueryFatal("select node_id from reserved ".
-		     "where pid='$pid' and eid='$eid' and ".
-		     "      inner_elab_boot=0 and inner_elab_role='node'");
-    
-    while (my ($node) = $query_result->fetchrow_array()) {
-	push(@nodes, $node);	
-    }
+	DBQueryFatal("select r.node_id,n.type,i.IP from reserved as r ".
+		     "left join nodes as n on n.node_id=r.node_id ".
+		     "left join interfaces as i on i.node_id=r.node_id and ".
+		     "     i.role='" . TBDB_IFACEROLE_CONTROL() . "' ".
+		     "where r.pid='$pid' and r.eid='$eid' and ".
+		     "      r.inner_elab_boot=0 and r.inner_elab_role='node'");
     return 0
-	if (!@nodes);
+	if (!$query_result->numrows);
+
+    DBQueryFatal("create temporary table temp_new_nodes like new_nodes");
+    DBQueryFatal("create temporary table temp_new_interfaces ".
+		 " like new_interfaces");
+
+    my %idmap = ();
+    while (my ($node,$type,$ip) = $query_result->fetchrow_array()) {
+	my $result =
+	    DBQueryFatal("insert into temp_new_nodes set ".
+			 " new_node_id=NULL, node_id='$node', ".
+			 " type='$type', IP='$ip'");
+	
+	$idmap{$node} = $result->insertid;
+    }
+    @nodes = keys(%idmap);
+
+    $query_result =
+	DBQueryFatal("select r.node_id,i.ip,i.role,i.card,i.mac, ".
+		     "  i.interface_type,w.node_id2,w.card2,w.port2 ".
+		     " from reserved as r ".
+		     "left join interfaces as i on i.node_id=r.node_id ".
+		     "left join wires as w on w.node_id1=i.node_id and ".
+		     "     w.card1=i.card and w.port1=i.port ".
+		     "where r.pid='$pid' and r.eid='$eid' and ".
+		     "      r.inner_elab_boot=0 and r.inner_elab_role='node'");
+
+    while (my ($node,$ip,$role,$card,$mac,$type,$switch,
+	       $switch_card,$switch_port) = $query_result->fetchrow_array()) {
+	my $nid = $idmap{$node};
+
+	if (! $elabinelab_singlenet) {
+	    #
+	    # Mark the real control network as "other" to avoid it being
+	    # thought of as the control network.
+	    #
+	    if ($role eq TBDB_IFACEROLE_CONTROL()) {
+		$role = TBDB_IFACEROLE_OUTER_CONTROL();
+	    }
+	    # And mark the inner control network.
+	    if ($role eq TBDB_IFACEROLE_EXPERIMENT() &&
+		defined($ip) && $ip ne "") {
+		$role = TBDB_IFACEROLE_CONTROL();
+	    }
+	}
+	DBQueryFatal("insert into temp_new_interfaces set ".
+		     " new_node_id='$nid', role='$role', card='$card', ".
+		     " mac='$mac', interface_type='$type', ".
+		     " switch_id='$switch',switch_card='$switch_card', ".
+		     " switch_port='$switch_port'");
+    }
+    unlink("$statedir/new_nodes");
+    DBQueryFatal("select * from temp_new_nodes ".
+		 "into outfile '$statedir/new_nodes'");
+    unlink("$statedir/new_interfaces");
+    DBQueryFatal("select * from temp_new_interfaces ".
+		 "into outfile '$statedir/new_interfaces'");
+
+    return 0
+	if ($dbgooonly);
+    
+    # For SSH and SCP below
+    $UID = 0;
+
+    #
+    # Send the new_nodes and new_interfaces tables over to the
+    # inner elab.
+    #
+    print "Sending new DB tables to inner boss ($bossnode)\n";
+    system("$SCP $statedir/new_nodes $statedir/new_interfaces ".
+	   "    ${bossnode}:/tmp");
+    if ($?) {
+	print STDERR "*** $0:\n".
+	             "    Could not scp tables to inner boss\n";
+	return -1;
+    }
+    system("$SSH -host $bossnode mysqlimport -r tbdb ".
+	   "     /tmp/new_nodes /tmp/new_interfaces");
+    if ($?) {
+	print STDERR "*** $0:\n".
+	             "    Could not load tables on inner boss\n";
+	return -1;
+    }
+    print "Telling inner boss ($bossnode) to incorporate new nodes: @nodes\n";
+    system("$SSH -host $bossnode sudo -u $creator /usr/testbed/sbin/wap ".
+	   "     /usr/testbed/sbin/newnode -q -n @nodes");
+    if ($?) {
+	print STDERR "*** $0:\n".
+	             "    Could not incorporate new nodes on inner boss\n";
+	return -1;
+    }
 
     # Run as real user for the next few scripts, which are setuid.
+    $UID  = $SAVEUID;
     $EUID = $UID;
 
     #
