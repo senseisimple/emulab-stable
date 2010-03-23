@@ -1,4 +1,4 @@
-/* GENIPUBLIC-COPYRIGHT
+﻿/* GENIPUBLIC-COPYRIGHT
  * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
  * All rights reserved.
  *
@@ -18,12 +18,15 @@ package
   {
     public function RequestSliverCreate(newManager : ComponentManager,
                                         newNodes : ActiveNodes,
-                                        newRspec : String) : void
+                                        newRspec : String,
+                                        newSliceUrn : String) : void
+
     {
       super(newManager.getName());
       manager = newManager;
       nodes = newNodes;
       rspec = newRspec;
+      sliceUrn = newSliceUrn;
     }
 
     override public function cleanup() : void
@@ -33,26 +36,38 @@ package
 
     override public function start(credential : Credential) : Operation
     {
+/*
       if (manager.getTicket() == null)
       {
         nodes.changeState(manager, ActiveNodes.PLANNED, ActiveNodes.CREATED);
         opName = "Getting Ticket";
         op.reset(Geni.getTicket);
-        op.addField("credential", credential.slice);
+        op.addField("slice_urn", sliceUrn);
+        op.addField("credentials", new Array(credential.slice));
         op.addField("rspec", rspec);
-        op.addField("impotent", Request.IMPOTENT);
+        //? op.addField("impotent", Request.IMPOTENT);
         op.setUrl(manager.getUrl());
       }
       else
       {
         opName = "Redeeming Ticket";
         op.reset(Geni.redeemTicket);
-        op.addField("credential", credential.slice);
+        op.addField("slice_urn", sliceUrn);
+        op.addField("credentials", new Array(credential.slice));
         op.addField("ticket", manager.getTicket());
-        op.addField("impotent", Request.IMPOTENT);
+        //? op.addField("impotent", Request.IMPOTENT);
         op.addField("keys", credential.ssh);
         op.setUrl(manager.getUrl());
       }
+*/
+      nodes.changeState(manager, ActiveNodes.PLANNED, ActiveNodes.BOOTED);
+      opName = "Creating Sliver";
+      op.reset(Geni.createSliver);
+      op.addField("slice_urn", sliceUrn);
+      op.addField("rspec", rspec);
+      op.addField("keys", credential.ssh);
+      op.addField("credentials", new Array(credential.slice));
+      op.setUrl(manager.getUrl());
       return op;
     }
 
@@ -60,6 +75,7 @@ package
                                       credential : Credential) : Request
     {
       var result : Request = null;
+/*
       if (code == 0)
       {
         if (manager.getTicket() == null)
@@ -67,7 +83,7 @@ package
           var ticket : String = response.value;
           manager.setTicket(ticket);
 //          setSliverIds(ticket);
-          result = new RequestSliverCreate(manager, nodes, rspec);
+          result = new RequestSliverCreate(manager, nodes, rspec, sliceUrn);
         }
         else
         {
@@ -90,13 +106,24 @@ package
           {
             var newRspec = nodes.getXml(true, manager);
             result = new RequestSliverUpdate(manager, nodes, newRspec,
-                                             true);
+                                             true, sliceUrn);
           }
         }
       }
       else
       {
         result = releaseTicket();
+        nodes.revertState(manager);
+      }
+*/
+      if (code == 0)
+      {
+        manager.setSliver(response.value[0]);
+        manager.setManifest(response.value[1]);
+        nodes.commitState(manager);
+      }
+      else
+      {
         nodes.revertState(manager);
       }
       return result;
@@ -114,7 +141,7 @@ package
       var result : Request = null;
       if (manager.getTicket() != null)
       {
-        result = new RequestReleaseTicket(manager);
+        result = new RequestReleaseTicket(manager, sliceUrn);
       }
       return result;
     }
@@ -136,5 +163,6 @@ package
     var manager : ComponentManager;
     var nodes : ActiveNodes;
     var rspec : String;
+    var sliceUrn : String;
   }
 }

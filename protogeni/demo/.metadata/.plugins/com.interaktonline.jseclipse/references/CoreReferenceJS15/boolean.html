@@ -1,0 +1,661 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html>
+  <head>
+    <meta content="HTML Tidy for Cygwin (vers 1st February 2003), see www.w3.org" name="generator">
+    <meta name="keywords" content="electronic commerce, ecommerce, ebusiness, e-business, e-commerce, enterprise software, net economy, Netscape, Sun Microsystems, DevEdge Archive, iPlanet, internet software">
+    <meta name="description" content="The DevEdge Archive, a strategic alliance formed by America Online and Sun Microsystems, Inc., is delivering iPlanet e-commerce software and enterprise solutions that enable companies to compete successfully in the Net Economy">
+    <meta http-equiv="Content-Type" content="text/html; charset=us-ascii">
+    <meta name="TEMPLATEBASE" content="Authored in FrameMaker. Converted to HTML in WebWorks Publisher 2000. manual wdt 1.5">
+    <meta name="LASTUPDATED" content="09/28/00 13:15:13">
+    <title>
+      Core JavaScript Reference 1.5:
+    </title>
+    <link rel="stylesheet" type="text/css" href="js15ref.css">
+  </head>
+  <body>
+    <table width="100%" border="0" cellspacing="4">
+      <tr>
+        <td valign="top">
+          <b><a class="sanserifPurple" href="array.html">Previous</a></b>&nbsp;&nbsp;&nbsp;&nbsp; <a href="contents.html"><b class="sansserifPurple">Contents</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="ix.html"><b class="sansserifPurple">Index</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="date.html"><b class="sansserifPurple">Next</b></a> &nbsp;&nbsp;&nbsp;&nbsp;
+        </td>
+      </tr>
+      <tr>
+        <td class="sansserifBlack" valign="top" align="right" bgcolor="#CCCCCC">
+          <b>Core JavaScript Reference 1.5</b>
+        </td>
+      </tr>
+    </table><br>
+     
+    <blockquote>
+      <br>
+      <br>
+      <br>
+      <br>
+       
+      <p>
+        <a name="1193137" id="1193137"></a> <a name="Boolean" id="Boolean"></a> <span class="sansserif"><b>Boolean</b></span>
+      </p>
+      <p>
+        <a name="1193151" id="1193151"></a> <span class="sansserif">The <span class="mono">Boolean</span> object is an object wrapper for a boolean value.<br></span>
+      </p><br>
+       
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193140" id="1193140"></a> <span class="sansserif"><i>Core object</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193142" id="1193142"></a> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193144" id="1193144"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193146" id="1193146"></a> <span class="sansserif">JavaScript 1.1, NES 2.0</span>
+            </p>
+            <p>
+              <a name="1193627" id="1193627"></a>
+            </p>
+            <p>
+              <a name="1193150" id="1193150"></a> <span class="sansserif">JavaScript 1.3: added <a href="boolean.html#1193426">toSource</a> method</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193978" id="1193978"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193980" id="1193980"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193152" id="1193152"></a> <a name="Created by" id="Created by"></a> <span class="sansserif"><b>Created by</b></span><br>
+         <a name="1193153" id="1193153"></a> <span class="sansserif">The <span class="mono">Boolean</span> constructor:</span>
+      </p>
+      <p>
+        <a name="1193154" id="1193154"></a><span class="mono">new Boolean(<i>value</i>)</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193155" id="1193155"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1193161" id="1193161"></a> <span class="sansserif"><br></span>
+      </p><br>
+       
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <a name="1193158" id="1193158"></a> <span class="mono">value</span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193160" id="1193160"></a> <span class="sansserif">The initial value of the <span class="mono">Boolean</span> object. The value is converted to a <span class="mono">boolean</span> value, if necessary. If value is omitted or is 0, -0, null, false, <span class="mono">NaN</span>, undefined, or the empty string (<span class="mono">""</span>), the object has an initial value of false. All other values, including any object or the string <span class="mono">"false"</span>, create an object with an initial value of true.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193162" id="1193162"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1196612" id="1196612"></a> <span class="sansserif">Do not confuse the primitive Boolean values true and false with the true and false values of the Boolean object.</span>
+      </p>
+      <p>
+        <a name="1197972" id="1197972"></a> <span class="sansserif">Any object whose value is not <span class="mono">undefined</span> or <span class="mono">null</span>, including a Boolean object whose value is false, evaluates to true when passed to a conditional statement. For example, the condition in the following <span class="mono">if</span> statement evaluates to <span class="mono">true</span>:</span>
+      </p>
+      <p>
+        <a name="1196613" id="1196613"></a><span class="mono">x = new Boolean(false);<br>
+         if(x) //the condition is true</span>
+      </p>
+      <p>
+        <a name="1196614" id="1196614"></a> <span class="sansserif">This behavior does not apply to Boolean primitives. For example, the condition in the following <span class="mono">if</span> statement evaluates to <span class="mono">false</span>:</span>
+      </p>
+      <p>
+        <a name="1196615" id="1196615"></a><span class="mono">x = false;<br>
+         if(x) //the condition is false</span>
+      </p>
+      <p>
+        <a name="1193163" id="1193163"></a> <span class="sansserif">Do not use a <span class="mono">Boolean</span> object to convert a non-boolean value to a boolean value. Instead, use Boolean as a function to perform this task:</span>
+      </p>
+      <p>
+        <a name="1196744" id="1196744"></a><span class="mono">x = Boolean(expression) //preferred<br>
+         x = new Boolean(expression) //don't use</span>
+      </p>
+      <p>
+        <a name="1196721" id="1196721"></a> <span class="sansserif">If you specify any object, including a Boolean object whose value is false, as the initial value of a Boolean object, the new Boolean object has a value of true.</span>
+      </p>
+      <p>
+        <a name="1196240" id="1196240"></a> <span class="mono">myFalse=new Boolean(false) &nbsp;&nbsp;// initial value of false<br>
+         g=new Boolean(myFalse) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//initial value of true<br>
+         myString=new String("Hello") // string object<br>
+         s=new Boolean(myString) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//initial value of true</span>
+      </p>
+      <p>
+        <a name="1196210" id="1196210"></a> <span class="sansserif">Do not use a Boolean object in place of a Boolean primitive.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193171" id="1193171"></a> <a name="Backward Compatibility" id="Backward Compatibility"></a> <span class="sansserif"><b>Backward Compatibility</b></span>
+      </p>
+      <p>
+        <a name="1193172" id="1193172"></a> <span class="sansserif"><b>JavaScript 1.2 and earlier versions.</b></span> <a name="1193173" id="1193173"></a> <span class="sansserif">The <span class="mono">Boolean</span> object behaves as follows:</span>
+      </p>
+      <ul>
+        <li class="nobullet">
+          <a name="1198083" id="1198083"></a>
+        </li>
+        <li>
+          <span class="sansserif">When a <span class="mono">Boolean</span> object is used as the condition in a conditional test, JavaScript returns the value of the <span class="mono">Boolean</span> object. For example, a <span class="mono">Boolean</span> object whose value is false is treated as the primitive value false, and a <span class="mono">Boolean</span> object whose value is true is treated as the primitive value <span class="mono">true</span> in conditional tests. If the <span class="mono">Boolean</span> object is a <span class="mono">false</span> object, the conditional statement evaluates to <span class="mono">false</span>.</span> 
+          <p>
+            <a name="1197973" id="1197973"></a>
+          </p>
+        </li>
+        <li>
+          You can use a Boolean object in place of a Boolean primitive.
+        </li>
+      </ul><br>
+       <a name="1193174" id="1193174"></a> <a name="Property Summary" id="Property Summary"></a> <span class="sansserif"><b>Property Summary</b></span><br>
+       <a name="1193187" id="1193187"></a> <span class="sansserif"><br></span><br>
+       
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr bgcolor="#CCCCCC" align="left" valign="top">
+          <th valign="top" align="left">
+            <a name="1193177" id="1193177"></a> 
+            <p class="alignleft">
+              <span class="sansserif"><b>Property</b></span>
+            </p>
+          </th>
+          <th valign="top" align="left">
+            <a name="1193179" id="1193179"></a> 
+            <p class="alignleft">
+              <span class="sansserif"><b>Description</b></span>
+            </p>
+          </th>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1195491" id="1195491"></a> <span class="mono"><a href="boolean.html#1195419">constructor</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1195493" id="1195493"></a> <span class="sansserif">Specifies the function that creates an object's prototype.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193184" id="1193184"></a> <span class="mono"><a href="boolean.html#1193217">prototype</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193186" id="1193186"></a> <span class="sansserif">Defines a property that is shared by all Boolean objects.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193188" id="1193188"></a> <a name="Method Summary" id="Method Summary"></a> <span class="sansserif"><b>Method Summary</b></span><br>
+         <a name="1193208" id="1193208"></a> <span class="sansserif"><br></span>
+      </p><br>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr bgcolor="#CCCCCC" align="left" valign="top">
+          <th valign="top" align="left">
+            <a name="1193191" id="1193191"></a> 
+            <p class="alignleft">
+              <span class="sansserif"><b>Method</b></span>
+            </p>
+          </th>
+          <th valign="top" align="left">
+            <a name="1193193" id="1193193"></a> 
+            <p class="alignleft">
+              <span class="sansserif"><b>Description</b></span>
+            </p>
+          </th>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193198" id="1193198"></a> <span class="mono"><a href="boolean.html#1193426">toSource</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193200" id="1193200"></a> <span class="sansserif">Returns an object literal representing the specified Boolean object; you can use this value to create a new object. Overrides the <a href="object.html#1193320">Object.toSource</a> method.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193205" id="1193205"></a> <span class="mono"><a href="boolean.html#1193269">toString</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193207" id="1193207"></a> <span class="sansserif">Returns a string representing the specified object. Overrides the <a href="object.html#1193350">Object.toString</a> method.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1194814" id="1194814"></a> <span class="mono"><a href="boolean.html#1195085">valueOf</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1194816" id="1194816"></a> <span class="sansserif">Returns the primitive value of a Boolean object. Overrides the <a href="object.html#1193540">Object.valueOf</a> method.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <a name="1195376" id="1195376"></a> <span class="sansserif">In addition, this object inherits the <a href="object.html#1193628">watch</a> and <a href="object.html#1193499">unwatch</a> methods from <a href="object.html#1193136">Object</a>.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193209" id="1193209"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1193210" id="1193210"></a> <span class="sansserif">The following examples create <span class="mono">Boolean</span> objects with an initial value of false:</span>
+      </p>
+      <p>
+        <a name="1193211" id="1193211"></a> <span class="mono">bNoParam = new Boolean()<br>
+         bZero = new Boolean(0)<br>
+         bNull = new Boolean(null)<br>
+         bEmptyString = new Boolean("")<br>
+         bfalse = new Boolean(false)</span>
+      </p>
+      <p>
+        <a name="1193212" id="1193212"></a> <span class="sansserif">The following examples create <span class="mono">Boolean</span> objects with an initial value of true:</span>
+      </p>
+      <p>
+        <a name="1193213" id="1193213"></a> <span class="mono">btrue = new Boolean(true)<br>
+         btrueString = new Boolean("true")<br>
+         bfalseString = new Boolean("false")<br>
+         bSuLin = new Boolean("Su Lin")</span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1195419" id="1195419"></a> <a name="constructor" id="constructor"></a> <span class="sansserif"><b>constructor</b></span>
+      </p>
+      <p>
+        <a name="1195420" id="1195420"></a> <span class="sansserif">Specifies the function that creates an object's prototype. Note that the value of this property is a reference to the function itself, not a string containing the function's name.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1195423" id="1195423"></a> <span class="sansserif"><i>Property of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1195428" id="1195428"></a> <span class="sansserif"><a href="boolean.html#1193137">Boolean</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1195430" id="1195430"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1195432" id="1195432"></a> <span class="sansserif">JavaScript 1.1, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1195434" id="1195434"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1195436" id="1195436"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1195437" id="1195437"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1195441" id="1195441"></a> <span class="sansserif">See <a href="object.html#1193229">Object.constructor</a>.</span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1193217" id="1193217"></a> <a name="prototype" id="prototype"></a> <span class="sansserif"><b>prototype</b></span>
+      </p>
+      <p>
+        <a name="1193218" id="1193218"></a> <span class="sansserif">Represents the prototype for this class. You can use the prototype to add properties or methods to all instances of a class. For information on prototypes, see <a href="function.html#1193426">Function.prototype</a>.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193224" id="1193224"></a> <span class="sansserif"><i>Property of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193229" id="1193229"></a> <span class="sansserif"><a href="boolean.html#1193137">Boolean</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193231" id="1193231"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193233" id="1193233"></a> <span class="sansserif">JavaScript 1.1, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1194007" id="1194007"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1194009" id="1194009"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1193426" id="1193426"></a> <a name="toSource" id="toSource"></a> <span class="sansserif"><b>toSource</b></span>
+      </p>
+      <p>
+        <a name="1193428" id="1193428"></a> <span class="sansserif">Returns a string representing the source code of the object.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193431" id="1193431"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193436" id="1193436"></a> <span class="sansserif"><a href="boolean.html#1193137">Boolean</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193438" id="1193438"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193440" id="1193440"></a> <span class="sansserif">JavaScript 1.3</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193441" id="1193441"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1193442" id="1193442"></a> <span class="mono">toSource()</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193443" id="1193443"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1193444" id="1193444"></a> <span class="sansserif">None</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193445" id="1193445"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1196833" id="1196833"></a> <span class="sansserif">The <span class="mono">toSource</span> method returns the following values:</span>
+      </p>
+      <ul>
+        <li class="nobullet">
+          <a name="1196834" id="1196834"></a>
+        </li>
+        <li>
+          <span class="sansserif">For the built-in <span class="mono">Boolean</span> object, <span class="mono">toSource</span> returns the following string indicating that the source code is not available:</span> 
+          <p>
+            <a name="1196835" id="1196835"></a> <span class="mono">&nbsp;&nbsp;&nbsp;function Boolean() {<br>
+             &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[native code]<br>
+             &nbsp;&nbsp;&nbsp;}</span>
+          </p>
+          <p>
+            <a name="1196836" id="1196836"></a>
+          </p>
+        </li>
+        <li>
+          For instances of <span class="mono">Boolean</span>, <span class="mono">toSource</span> returns a string representing the source code.
+        </li>
+      </ul><a name="1196837" id="1196837"></a> <span class="sansserif">This method is usually called internally by JavaScript and not explicitly in code.</span> 
+      <p>
+        <br>
+         <a name="1193451" id="1193451"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1193455" id="1193455"></a> <span class="sansserif"><a href="object.html#1193320">Object.toSource</a></span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1193269" id="1193269"></a> <a name="toString" id="toString"></a> <span class="sansserif"><b>toString</b></span>
+      </p>
+      <p>
+        <a name="1193282" id="1193282"></a> <span class="sansserif">Returns a string representing the specified Boolean object.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193272" id="1193272"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193277" id="1193277"></a> <span class="sansserif"><a href="boolean.html#1193137">Boolean</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193279" id="1193279"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193281" id="1193281"></a> <span class="sansserif">JavaScript 1.1, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1194021" id="1194021"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1194023" id="1194023"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193283" id="1193283"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1193284" id="1193284"></a> <span class="mono">toString()</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193285" id="1193285"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1193286" id="1193286"></a> <span class="sansserif">None.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193287" id="1193287"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1196996" id="1196996"></a> <span class="sansserif">The <a href="boolean.html#1193137">Boolean</a> object overrides the <span class="mono">toString</span> method of the <a href="object.html#1193136">Object</a> object; it does not inherit <a href="object.html#1193350">Object.toString</a>. For <a href="boolean.html#1193137">Boolean</a> objects, the <span class="mono">toString</span> method returns a string representation of the object.</span>
+      </p>
+      <p>
+        <a name="1194618" id="1194618"></a> <span class="sansserif">JavaScript calls the <span class="mono">toString</span> method automatically when a Boolean is to be represented as a text value or when a Boolean is referred to in a string concatenation.</span>
+      </p>
+      <p>
+        <a name="1193293" id="1193293"></a> <span class="sansserif">For <a href="boolean.html#1193137">Boolean</a> objects and values, the built-in <span class="mono">toString</span> method returns the string <span class="mono">"true"</span> or <span class="mono">"false"</span> depending on the value of the boolean object. In the following code, <span class="mono">flag.toString</span> returns <span class="mono">"true"</span>.</span>
+      </p>
+      <p>
+        <a name="1193294" id="1193294"></a><span class="mono">var flag = new Boolean(true)<br>
+         var myVar=flag.toString()</span>
+      </p>
+      <p>
+        <br>
+         <a name="1194731" id="1194731"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1195082" id="1195082"></a> <span class="sansserif"><a href="object.html#1193350">Object.toString</a></span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1195085" id="1195085"></a> <a name="valueOf" id="valueOf"></a> <span class="sansserif"><b>valueOf</b></span>
+      </p>
+      <p>
+        <a name="1195102" id="1195102"></a> <span class="sansserif">Returns the primitive value of a Boolean object.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1195088" id="1195088"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1195093" id="1195093"></a> <span class="sansserif"><a href="boolean.html#1193137">Boolean</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1195095" id="1195095"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1195097" id="1195097"></a> <span class="sansserif">JavaScript 1.1</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1195099" id="1195099"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1195101" id="1195101"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1194668" id="1194668"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1194669" id="1194669"></a> <span class="mono">valueOf()</span>
+      </p>
+      <p>
+        <br>
+         <a name="1194670" id="1194670"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1194671" id="1194671"></a> <span class="sansserif">None</span>
+      </p>
+      <p>
+        <br>
+         <a name="1194742" id="1194742"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1194749" id="1194749"></a> <span class="sansserif">The <span class="mono">valueOf</span> method of <a href="boolean.html#1193137">Boolean</a> returns the primitive value of a Boolean object or literal Boolean as a Boolean data type.</span>
+      </p>
+      <p>
+        <a name="1194788" id="1194788"></a> <span class="sansserif">This method is usually called internally by JavaScript and not explicitly in code.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1194796" id="1194796"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1195413" id="1195413"></a><span class="mono">x = new Boolean();<br>
+         myVar=x.valueOf()&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//assigns false to myVar</span>
+      </p>
+      <p>
+        <br>
+         <a name="1195414" id="1195414"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1194706" id="1194706"></a> <span class="sansserif"><a href="object.html#1193540">Object.valueOf</a></span>
+      </p>
+    </blockquote>
+    <blockquote>
+      <br>
+       <b><a class="sanserifPurple" href="array.html">Previous</a></b>&nbsp;&nbsp;&nbsp;&nbsp; <a href="contents.html"><b class="sansserifPurple">Contents</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="ix.html"><b class="sansserifPurple">Index</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="date.html"><b class="sansserifPurple">Next</b></a> &nbsp;&nbsp;&nbsp;&nbsp; 
+      <hr noshade="noshade" size="1">
+      <span class="sansserif">Copyright &copy; 2000 <a href="http://www.netscape.com">Netscape Communications Corp.</a> All rights reserved.</span>
+    </blockquote>
+    <p class="alignright">
+      <span class="sansserif">Last Updated <b>May 19, 2003</b></span>
+    </p>
+  </body>
+</html>

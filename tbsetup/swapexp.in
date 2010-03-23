@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -600,7 +600,7 @@ else {
 
 	    ExitWithStatus(1,
 			"Cannot modify an active ElabInElab experiment (yet).")
-		if ($elabinelab && $estate ne EXPTSTATE_SWAPPED && !$isadmin);
+		if ($elabinelab && $estate ne EXPTSTATE_SWAPPED);
 
 	    if ($overquota) {
 		tbreport(SEV_ERROR, 'over_disk_quota', $CONTROL);

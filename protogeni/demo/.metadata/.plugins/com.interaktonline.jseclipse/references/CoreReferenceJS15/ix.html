@@ -1,0 +1,3286 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html>
+  <head>
+    <meta content="HTML Tidy for Cygwin (vers 1st February 2003), see www.w3.org" name="generator">
+    <meta name="keywords" content="electronic commerce, ecommerce, ebusiness, e-business, e-commerce, enterprise software, net economy, Netscape, Sun Microsystems, DevEdge Archive, iPlanet, internet software">
+    <meta name="description" content="The DevEdge Archive, a strategic alliance formed by America Online and Sun Microsystems, Inc., is delivering iPlanet e-commerce software and enterprise solutions that enable companies to compete successfully in the Net Economy">
+    <meta http-equiv="Content-Type" content="text/html; charset=us-ascii">
+    <meta name="TEMPLATEBASE" content="Authored in FrameMaker. Converted to HTML in WebWorks Publisher 2000. manual wdt 1.5">
+    <meta name="LASTUPDATED" content="09/28/00 13:16:31">
+    <title>
+      Core JavaScript Reference 1.5:
+    </title>
+    <link rel="stylesheet" type="text/css" href="js15ref.css">
+  </head>
+  <body>
+    <table width="100%" border="0" cellspacing="4">
+      <tr>
+        <td valign="top">
+          <b><a class="sansserifPurple" href="deprecat.html">Previous</a></b>&nbsp;&nbsp;&nbsp;&nbsp; <a href="contents.html"><b class="sansserifPurple">Contents</b></a>&nbsp;&nbsp;&nbsp;&nbsp;
+        </td>
+      </tr>
+      <tr>
+        <td valign="top" align="right" bgcolor="#CCCCCC">
+          <b class="sansserifBlack">Core JavaScript Reference 1.5</b>
+        </td>
+      </tr>
+    </table><br>
+     <br>
+     
+    <table border="0" cellpadding="4" cellspacing="0">
+      <tr>
+        <td class="sansserifBlack">
+          <b>&nbsp;</b>
+        </td>
+        <td>
+          <a href="#SYMBOLS">Symbols</a>
+        </td>
+        <td>
+          <a href="#A">A</a>
+        </td>
+        <td>
+          <a href="#B">B</a>
+        </td>
+        <td>
+          <a href="#C">C</a>
+        </td>
+        <td>
+          <a href="#D">D</a>
+        </td>
+        <td>
+          <a href="#E">E</a>
+        </td>
+        <td>
+          <a href="#F">F</a>
+        </td>
+        <td>
+          <a href="#G">G</a>
+        </td>
+        <td>
+          <a href="#H">H</a>
+        </td>
+        <td>
+          <a href="#I">I</a>
+        </td>
+        <td>
+          <a href="#J">J</a>
+        </td>
+        <td>
+          <a href="#K">K</a>
+        </td>
+        <td>
+          <a href="#L">L</a>
+        </td>
+        <td>
+          <a href="#M">M</a>
+        </td>
+        <td>
+          <a href="#N">N</a>
+        </td>
+        <td>
+          <a href="#O">O</a>
+        </td>
+        <td>
+          <a href="#P">P</a>
+        </td>
+        <td>
+          <a href="#Q">Q</a>
+        </td>
+        <td>
+          <a href="#R">R</a>
+        </td>
+        <td>
+          <a href="#S">S</a>
+        </td>
+        <td>
+          <a href="#T">T</a>
+        </td>
+        <td>
+          <a href="#U">U</a>
+        </td>
+        <td>
+          <a href="#V">V</a>
+        </td>
+        <td>
+          <a href="#W">W</a>
+        </td>
+        <td>
+          <a href="#X">X</a>
+        </td>
+        <td>
+          <a href="#Y">Y</a>
+        </td>
+        <td>
+          <a href="#Z">Z</a>
+        </td>
+        <td>
+          &nbsp;
+        </td>
+      </tr>
+    </table>
+    <blockquote>
+      <a name="573" id="573"></a> <a name="" id=""></a> <span class="sansserifBlack"><b>Index 
+      </b></span><br>
+      <br>
+      <br>
+      <br>
+       
+      <p>
+        <a name="IX_Symbols" id="IX_Symbols"></a> <a name="Symbols" id="Symbols"></a> <span class="sansserif"><b><!-- <GROUPTITLESIX> -->Symbols<!-- </GROUPTITLESIX> -->
+        </b></span>
+      </p><br>
+       
+      <dl>
+        <dd>
+          <a name="179084" id="179084"></a> <span class="sansserif">
+           - (bitwise NOT) operator <a href="ops.html#1042474">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179086" id="179086"></a> <span class="sansserif">
+           - (unary negation) operator <a href="ops.html#1042430">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179088" id="179088"></a> <span class="sansserif">
+           -- (decrement) operator <a href="ops.html#1042421">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179090" id="179090"></a> <span class="sansserif">
+           ! (logical NOT) operator <a href="ops.html#1062688">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179092" id="179092"></a> <span class="sansserif">
+           != (not equal) operator <a href="ops.html#1043882">1</a>, <a href="ops.html#1050908">2</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179095" id="179095"></a> <span class="sansserif">
+           !== (strict not equal) operator <a href="ops.html#1049529">1</a>, <a href="ops.html#1050908">2</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179098" id="179098"></a> <span class="sansserif">
+           % (modulus) operator <a href="ops.html#1042403">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179100" id="179100"></a> <span class="sansserif">
+           %= operator <a href="ops.html#1042309">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179102" id="179102"></a> <span class="sansserif">
+           &amp;&amp; (logical AND) operator <a href="ops.html#1062682">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179104" id="179104"></a> <span class="sansserif">
+           &amp; (bitwise AND) operator <a href="ops.html#1042453">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179106" id="179106"></a> <span class="sansserif">
+           &amp;= operator <a href="ops.html#1042325">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179108" id="179108"></a> <span class="sansserif">
+           ) <a href="lcjsobj.html#1194386">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179110" id="179110"></a> <span class="sansserif">
+           */ comment <a href="comment.html#1066617">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179112" id="179112"></a> <span class="sansserif">
+           *= operator <a href="ops.html#1042301">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179114" id="179114"></a> <span class="sansserif">
+           + (string concatenation) operator <a href="ops.html#1042582">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179116" id="179116"></a> <span class="sansserif">
+           ++ (increment) operator <a href="ops.html#1042412">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179118" id="179118"></a> <span class="sansserif">
+           += (string concatenation) operator <a href="ops.html#1042582">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179120" id="179120"></a> <span class="sansserif">
+           += operator <a href="ops.html#1042293">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179122" id="179122"></a> <span class="sansserif">
+           /* comment <a href="comment.html#1066617">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179124" id="179124"></a> <span class="sansserif">
+           // comment <a href="comment.html#1066617">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179126" id="179126"></a> <span class="sansserif">
+           /= operator <a href="ops.html#1042305">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179128" id="179128"></a> <span class="sansserif">
+           &lt; (less than) operator <a href="ops.html#1043900">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179130" id="179130"></a> <span class="sansserif">
+           &lt;&lt; (left shift) operator <a href="ops.html#1042481">1</a>, <a href="ops.html#1042518">2</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179133" id="179133"></a> <span class="sansserif">
+           &lt;&lt;= operator <a href="ops.html#1042313">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179135" id="179135"></a> <span class="sansserif">
+           &lt;= (less than or equal) operator <a href="ops.html#1043906">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179137" id="179137"></a> <span class="sansserif">
+           == (equal) operator <a href="ops.html#1043876">1</a>, <a href="ops.html#1050908">2</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179140" id="179140"></a> <span class="sansserif">
+           === (strict equal) operator <a href="ops.html#1049523">1</a>, <a href="ops.html#1050908">2</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179143" id="179143"></a> <span class="sansserif">
+           -= operator <a href="ops.html#1042297">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179145" id="179145"></a> <span class="sansserif">
+           &gt; (greater than) operator <a href="ops.html#1043888">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179147" id="179147"></a> <span class="sansserif">
+           &gt;= (greater than or equal) operator <a href="ops.html#1043894">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179149" id="179149"></a> <span class="sansserif">
+           &gt;&gt; (sign-propagating right shift) operator <a href="ops.html#1042487">1</a>, <a href="ops.html#1042522">2</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179152" id="179152"></a> <span class="sansserif">
+           &gt;&gt;= operator <a href="ops.html#1042317">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179154" id="179154"></a> <span class="sansserif">
+           &gt;&gt;&gt; (zero-fill right shift) operator <a href="ops.html#1042493">1</a>, <a href="ops.html#1042525">2</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179157" id="179157"></a> <span class="sansserif">
+           &gt;&gt;&gt;= operator <a href="ops.html#1042321">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179159" id="179159"></a> <span class="sansserif">
+           ?: (conditional) operator <a href="ops.html#1045406">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179161" id="179161"></a> <span class="sansserif">
+           ^ (bitwise XOR) operator <a href="ops.html#1042467">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179163" id="179163"></a> <span class="sansserif">
+           ^= operator <a href="ops.html#1042329">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179165" id="179165"></a> <span class="sansserif">
+           | (bitwise OR) operator <a href="ops.html#1042460">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179167" id="179167"></a> <span class="sansserif">
+           |= operator <a href="ops.html#1042333">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179169" id="179169"></a> <span class="sansserif">
+           || (logical OR) operator <a href="ops.html#1062685">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179171" id="179171"></a> <span class="sansserif">
+           (comma) operator <a href="ops.html#1045439">1</a> 
+          </span>
+        </dd>
+      </dl><br>
+       
+      <p>
+        <a name="IX_A" id="IX_A"></a> <a name="A" id="A"></a> <span class="sansserif"><b><!-- <GROUPTITLESIX> -->A <!-- </GROUPTITLESIX> -->
+        </b></span>
+      </p><br>
+       
+      <dl>
+        <dd>
+          <a name="179176" id="179176"></a> <span class="sansserif">
+           abs method <a href="math.html#1195395">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179178" id="179178"></a> <span class="sansserif">
+           acos method <a href="math.html#1195429">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179180" id="179180"></a> <span class="sansserif">
+           anchor method <a href="string.html#1196382">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179182" id="179182"></a> <span class="sansserif">
+           anchors 
+          </span> 
+          <dl>
+            <dd>
+              <a name="179183" id="179183"></a> <span class="sansserif">
+               creating <a href="string.html#1196396">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="179185" id="179185"></a> <span class="sansserif">
+           AND (&amp;&amp;) logical operator <a href="ops.html#1062682">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179187" id="179187"></a> <span class="sansserif">
+           AND (&amp;) bitwise operator <a href="ops.html#1042453">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179189" id="179189"></a> <span class="sansserif">
+           anonymous functions <a href="ops.html#1066344">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179191" id="179191"></a> <span class="sansserif">
+           apply method <a href="function.html#1194017">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179193" id="179193"></a> <span class="sansserif">
+           arguments array <a href="function.html#1193312">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179195" id="179195"></a> <span class="sansserif">
+           arithmetic operators <a href="ops.html#1042400">1</a> 
+          </span> 
+          <dl>
+            <dd>
+              <a name="179197" id="179197"></a> <span class="sansserif">
+               % (modulus) <a href="ops.html#1042403">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179199" id="179199"></a> <span class="sansserif">
+               -- (decrement) <a href="ops.html#1042421">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179201" id="179201"></a> <span class="sansserif">
+               - (unary negation) <a href="ops.html#1042430">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179203" id="179203"></a> <span class="sansserif">
+               ++ (increment) <a href="ops.html#1042412">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="179205" id="179205"></a> <span class="sansserif">
+           arity property <a href="function.html#1231596">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179207" id="179207"></a> <span class="sansserif">
+           Array object <a href="array.html#1193137">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179209" id="179209"></a> <span class="sansserif">
+           arrays 
+          </span> 
+          <dl>
+            <dd>
+              <a name="179210" id="179210"></a> <span class="sansserif">
+               Array object <a href="array.html#1193137">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179212" id="179212"></a> <span class="sansserif">
+               creating from strings <a href="string.html#1194454">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179214" id="179214"></a> <span class="sansserif">
+               deleting elements <a href="ops.html#1045837">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179216" id="179216"></a> <span class="sansserif">
+               dense <a href="array.html#1217769">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179218" id="179218"></a> <span class="sansserif">
+               increasing length of <a href="array.html#1193195">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179220" id="179220"></a> <span class="sansserif">
+               indexing <a href="array.html#1211907">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179222" id="179222"></a> <span class="sansserif">
+               initial length of <a href="array.html#1204388">1</a>, <a href="array.html#1193251">2</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179225" id="179225"></a> <span class="sansserif">
+               Java <a href="javarray.html#1193137">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179227" id="179227"></a> <span class="sansserif">
+               joining <a href="array.html#1195456">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179229" id="179229"></a> <span class="sansserif">
+               length of, determining <a href="array.html#1193439">1</a>, <a href="string.html#1193455">2</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179232" id="179232"></a> <span class="sansserif">
+               referring to elements <a href="array.html#1211907">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179234" id="179234"></a> <span class="sansserif">
+               sorting <a href="array.html#1196882">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="179236" id="179236"></a> <span class="sansserif">
+           asin method <a href="math.html#1195485">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179238" id="179238"></a> <span class="sansserif">
+           assignment operators <a href="ops.html#1042274">1</a> 
+          </span> 
+          <dl>
+            <dd>
+              <a name="179240" id="179240"></a> <span class="sansserif">
+               %= <a href="ops.html#1042309">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179242" id="179242"></a> <span class="sansserif">
+               &amp;= <a href="ops.html#1042325">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179244" id="179244"></a> <span class="sansserif">
+               *= <a href="ops.html#1042301">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179246" id="179246"></a> <span class="sansserif">
+               += <a href="ops.html#1042293">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179248" id="179248"></a> <span class="sansserif">
+               /= <a href="ops.html#1042305">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179250" id="179250"></a> <span class="sansserif">
+               &lt;&lt;= <a href="ops.html#1042313">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179252" id="179252"></a> <span class="sansserif">
+               -= <a href="ops.html#1042297">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179254" id="179254"></a> <span class="sansserif">
+               &gt;&gt;= <a href="ops.html#1042317">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179256" id="179256"></a> <span class="sansserif">
+               &gt;&gt;&gt;= <a href="ops.html#1042321">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179258" id="179258"></a> <span class="sansserif">
+               ^= <a href="ops.html#1042329">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179260" id="179260"></a> <span class="sansserif">
+               |= <a href="ops.html#1042333">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179262" id="179262"></a> <span class="sansserif">
+               conditional statements and <a href="stmt.html#1045282">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="179264" id="179264"></a> <span class="sansserif">
+           atan2 method <a href="math.html#1195597">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179266" id="179266"></a> <span class="sansserif">
+           atan method <a href="math.html#1195541">1</a> 
+          </span>
+        </dd>
+      </dl><br>
+       
+      <p>
+        <a name="IX_B" id="IX_B"></a> <a name="B" id="B"></a> <span class="sansserif"><b><!-- <GROUPTITLESIX> -->B <!-- </GROUPTITLESIX> -->
+        </b></span>
+      </p><br>
+       
+      <dl>
+        <dd>
+          <a name="179270" id="179270"></a> <span class="sansserif">
+           BIG HTML tag <a href="string.html#1196463">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179272" id="179272"></a> <span class="sansserif">
+           big method <a href="string.html#1196447">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179274" id="179274"></a> <span class="sansserif">
+           bitwise operators <a href="ops.html#1042437">1</a> 
+          </span> 
+          <dl>
+            <dd>
+              <a name="179276" id="179276"></a> <span class="sansserif">
+               &amp; (AND) <a href="ops.html#1042453">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179278" id="179278"></a> <span class="sansserif">
+               - (NOT) <a href="ops.html#1042474">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179280" id="179280"></a> <span class="sansserif">
+               &lt;&lt; (left shift) <a href="ops.html#1042481">1</a>, <a href="ops.html#1042518">2</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179283" id="179283"></a> <span class="sansserif">
+               &gt;&gt; (sign-propagating right shift) <a href="ops.html#1042487">1</a>, <a href="ops.html#1042522">2</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179286" id="179286"></a> <span class="sansserif">
+               &gt;&gt;&gt; (zero-fill right shift) <a href="ops.html#1042493">1</a>, <a href="ops.html#1042525">2</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179289" id="179289"></a> <span class="sansserif">
+               ^ (XOR) <a href="ops.html#1042467">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179291" id="179291"></a> <span class="sansserif">
+               | (OR) <a href="ops.html#1042460">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179293" id="179293"></a> <span class="sansserif">
+               logical <a href="ops.html#1042500">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179295" id="179295"></a> <span class="sansserif">
+               shift <a href="ops.html#1042512">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="179297" id="179297"></a> <span class="sansserif">
+           BLINK HTML tag <a href="string.html#1196511">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179299" id="179299"></a> <span class="sansserif">
+           blink method <a href="string.html#1196495">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179301" id="179301"></a> <span class="sansserif">
+           BOLD HTML tag <a href="string.html#1196562">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179303" id="179303"></a> <span class="sansserif">
+           bold method <a href="string.html#1196546">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179305" id="179305"></a> <span class="sansserif">
+           Boolean object <a href="boolean.html#1193137">1</a> 
+          </span> 
+          <dl>
+            <dd>
+              <a name="179307" id="179307"></a> <span class="sansserif">
+               conditional tests and <a href="boolean.html#1196612">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="179309" id="179309"></a> <span class="sansserif">
+           break statement <a href="stmt.html#1081298">1</a> 
+          </span>
+        </dd>
+      </dl><br>
+       
+      <p>
+        <a name="IX_C" id="IX_C"></a> <a name="C" id="C"></a> <span class="sansserif"><b><!-- <GROUPTITLESIX> -->C <!-- </GROUPTITLESIX> -->
+        </b></span>
+      </p><br>
+       
+      <dl>
+        <dd>
+          <a name="179313" id="179313"></a> <span class="sansserif">
+           callee property <a href="function.html#1196419">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179315" id="179315"></a> <span class="sansserif">
+           caller property <a href="function.html#1196447">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179317" id="179317"></a> <span class="sansserif">
+           call method <a href="function.html#1194243">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179319" id="179319"></a> <span class="sansserif">
+           call method (LiveConnect) <a href="lcjsobj.html#1193239">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179321" id="179321"></a> <span class="sansserif">
+           capturing parentheses 
+          </span> 
+          <dl>
+            <dd>
+              <a name="179322" id="179322"></a> <span class="sansserif">
+               parentheses 
+              </span> 
+              <dl>
+                <dd>
+                  <a name="179323" id="179323"></a> <span class="sansserif">
+                   capturing <a href="regexp.html#1193236">1</a> 
+                  </span>
+                </dd>
+              </dl>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="179325" id="179325"></a> <span class="sansserif">
+           ceil method <a href="math.html#1195654">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179327" id="179327"></a> <span class="sansserif">
+           charAt method <a href="string.html#1196596">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179329" id="179329"></a> <span class="sansserif">
+           charCodeAt method <a href="string.html#1196647">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179331" id="179331"></a> <span class="sansserif">
+           classes, accessing Java <a href="javclass.html#1193137">1</a>, <a href="packages.html#1193137">2</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179334" id="179334"></a> <span class="sansserif">
+           className property <a href="packages.html#1194741">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179336" id="179336"></a> <span class="sansserif">
+           comma () operator <a href="ops.html#1045439">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179338" id="179338"></a> <span class="sansserif">
+           comments <a href="comment.html#1066617">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179340" id="179340"></a> <span class="sansserif">
+           comment statement <a href="comment.html#1066617">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179342" id="179342"></a> <span class="sansserif">
+           comparison operators <a href="ops.html#1060974">1</a> 
+          </span> 
+          <dl>
+            <dd>
+              <a name="179344" id="179344"></a> <span class="sansserif">
+               != (not equal) <a href="ops.html#1043882">1</a>, <a href="ops.html#1050908">2</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179347" id="179347"></a> <span class="sansserif">
+               !== (strict not equal) <a href="ops.html#1049529">1</a>, <a href="ops.html#1050908">2</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179350" id="179350"></a> <span class="sansserif">
+               &lt; (less than) <a href="ops.html#1043900">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179352" id="179352"></a> <span class="sansserif">
+               &lt;= (less than or equal) <a href="ops.html#1043906">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179354" id="179354"></a> <span class="sansserif">
+               == (equal) <a href="ops.html#1043876">1</a>, <a href="ops.html#1050908">2</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179357" id="179357"></a> <span class="sansserif">
+               === (strict equal) <a href="ops.html#1049523">1</a>, <a href="ops.html#1050908">2</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179360" id="179360"></a> <span class="sansserif">
+               &gt; (greater than) <a href="ops.html#1043888">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179362" id="179362"></a> <span class="sansserif">
+               &gt;= (greater than or equal) <a href="ops.html#1043894">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="179364" id="179364"></a> <span class="sansserif">
+           concat method 
+          </span> 
+          <dl>
+            <dd>
+              <a name="179365" id="179365"></a> <span class="sansserif">
+               Array object <a href="array.html#1194827">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179367" id="179367"></a> <span class="sansserif">
+               String object <a href="string.html#1196678">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="179369" id="179369"></a> <span class="sansserif">
+           conditional (?:) operator <a href="ops.html#1045406">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179371" id="179371"></a> <span class="sansserif">
+           conditional tests 
+          </span> 
+          <dl>
+            <dd>
+              <a name="179372" id="179372"></a> <span class="sansserif">
+               assignment operators and <a href="stmt.html#1045282">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179374" id="179374"></a> <span class="sansserif">
+               Boolean objects and <a href="boolean.html#1196612">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="179376" id="179376"></a> <span class="sansserif">
+           constructor property 
+          </span> 
+          <dl>
+            <dd>
+              <a name="179377" id="179377"></a> <span class="sansserif">
+               Array object <a href="array.html#1206131">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179379" id="179379"></a> <span class="sansserif">
+               Boolean object <a href="boolean.html#1195419">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179381" id="179381"></a> <span class="sansserif">
+               Date object <a href="date.html#1209532">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179383" id="179383"></a> <span class="sansserif">
+               Function object <a href="function.html#1204601">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179385" id="179385"></a> <span class="sansserif">
+               Number object <a href="number.html#1196194">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179387" id="179387"></a> <span class="sansserif">
+               Object object <a href="object.html#1193229">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179389" id="179389"></a> <span class="sansserif">
+               RegExp object <a href="regexp.html#1213253">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179391" id="179391"></a> <span class="sansserif">
+               String object <a href="string.html#1214362">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="179393" id="179393"></a> <span class="sansserif">
+           containership 
+          </span> 
+          <dl>
+            <dd>
+              <a name="179394" id="179394"></a> <span class="sansserif">
+               specifying default object <a href="stmt.html#1004910">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179396" id="179396"></a> <span class="sansserif">
+               with statement and <a href="stmt.html#1004910">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="179398" id="179398"></a> <span class="sansserif">
+           continue statement <a href="stmt.html#1078923">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179400" id="179400"></a> <span class="sansserif">
+           conventions <a href="stmt.html#1004756">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179402" id="179402"></a> <span class="sansserif">
+           cos method <a href="math.html#1195695">1</a> 
+          </span>
+        </dd>
+      </dl><br>
+       
+      <p>
+        <a name="IX_D" id="IX_D"></a> <a name="D" id="D"></a> <span class="sansserif"><b><!-- <GROUPTITLESIX> -->D <!-- </GROUPTITLESIX> -->
+        </b></span>
+      </p><br>
+       
+      <dl>
+        <dd>
+          <a name="179406" id="179406"></a> <span class="sansserif">
+           Date object <a href="date.html#1193137">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179408" id="179408"></a> <span class="sansserif">
+           dates 
+          </span> 
+          <dl>
+            <dd>
+              <a name="179409" id="179409"></a> <span class="sansserif">
+               converting to string <a href="date.html#1194984">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179411" id="179411"></a> <span class="sansserif">
+               Date object <a href="date.html#1193137">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179413" id="179413"></a> <span class="sansserif">
+               day of week <a href="date.html#1193587">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179415" id="179415"></a> <span class="sansserif">
+               defining <a href="date.html#1193174">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179417" id="179417"></a> <span class="sansserif">
+               milliseconds since 1970 <a href="date.html#1195080">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179419" id="179419"></a> <span class="sansserif">
+               month <a href="date.html#1193758">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="179421" id="179421"></a> <span class="sansserif">
+           decodeURIComponent function <a href="toplev.html#1119005">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179423" id="179423"></a> <span class="sansserif">
+           decodeURI function <a href="toplev.html#1120957">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179425" id="179425"></a> <span class="sansserif">
+           decrement (--) operator <a href="ops.html#1042421">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179427" id="179427"></a> <span class="sansserif">
+           default objects, specifying <a href="stmt.html#1004910">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179429" id="179429"></a> <span class="sansserif">
+           delete operator <a href="ops.html#1045837">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179431" id="179431"></a> <span class="sansserif">
+           deleting 
+          </span> 
+          <dl>
+            <dd>
+              <a name="179432" id="179432"></a> <span class="sansserif">
+               array elements <a href="ops.html#1045837">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179434" id="179434"></a> <span class="sansserif">
+               objects <a href="ops.html#1045837">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179436" id="179436"></a> <span class="sansserif">
+               properties <a href="ops.html#1045837">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="179438" id="179438"></a> <span class="sansserif">
+           dense arrays <a href="array.html#1217769">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179440" id="179440"></a> <span class="sansserif">
+           directories, conventions used <a href="preface.html#1003380">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179442" id="179442"></a> <span class="sansserif">
+           do...while statement <a href="stmt.html#1037353">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179444" id="179444"></a> <span class="sansserif">
+           document conventions <a href="preface.html#1001745">1</a> 
+          </span>
+        </dd>
+      </dl><br>
+       
+      <p>
+        <a name="IX_E" id="IX_E"></a> <a name="E" id="E"></a> <span class="sansserif"><b><!-- <GROUPTITLESIX> -->E <!-- </GROUPTITLESIX> -->
+        </b></span>
+      </p><br>
+       
+      <dl>
+        <dd>
+          <a name="179448" id="179448"></a> <span class="sansserif">
+           encodeURIComponent function <a href="toplev.html#1115986">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179450" id="179450"></a> <span class="sansserif">
+           encodeURI function <a href="toplev.html#1118346">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179452" id="179452"></a> <span class="sansserif">
+           E property <a href="math.html#1193363">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179454" id="179454"></a> <span class="sansserif">
+           equals method (LiveConnect <a href="lcjsobj.html#1194386">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179456" id="179456"></a> <span class="sansserif">
+           Euler's constant <a href="math.html#1193381">1</a> 
+          </span> 
+          <dl>
+            <dd>
+              <a name="179458" id="179458"></a> <span class="sansserif">
+               raised to a power <a href="math.html#1196410">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="179460" id="179460"></a> <span class="sansserif">
+           eval function <a href="toplev.html#1063795">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179462" id="179462"></a> <span class="sansserif">
+           eval method 
+          </span> 
+          <dl>
+            <dd>
+              <a name="179463" id="179463"></a> <span class="sansserif">
+               LiveConnect <a href="lcjsobj.html#1193245">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179465" id="179465"></a> <span class="sansserif">
+               Object object <a href="object.html#1194118">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="179467" id="179467"></a> <span class="sansserif">
+           exceptions 
+          </span> 
+          <dl>
+            <dd>
+              <a name="179468" id="179468"></a> <span class="sansserif">
+               catching <a href="stmt.html#1051663">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179470" id="179470"></a> <span class="sansserif">
+               LiveConnect <a href="lcjsexc.html#1193143">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179472" id="179472"></a> <span class="sansserif">
+               throwing <a href="stmt.html#1052196">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179474" id="179474"></a> <span class="sansserif">
+               throw statement <a href="stmt.html#1052196">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179476" id="179476"></a> <span class="sansserif">
+               try...catch statement <a href="stmt.html#1051663">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="179478" id="179478"></a> <span class="sansserif">
+           exec method <a href="regexp.html#1194735">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179480" id="179480"></a> <span class="sansserif">
+           exp method <a href="math.html#1196408">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179482" id="179482"></a> <span class="sansserif">
+           export statement <a href="stmt.html#1016648">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179484" id="179484"></a> <span class="sansserif">
+           expressions that return no value <a href="ops.html#1042625">1</a> 
+          </span>
+        </dd>
+      </dl><br>
+       
+      <p>
+        <a name="IX_F" id="IX_F"></a> <a name="F" id="F"></a> <span class="sansserif"><b><!-- <GROUPTITLESIX> -->F <!-- </GROUPTITLESIX> -->
+        </b></span>
+      </p><br>
+       
+      <dl>
+        <dd>
+          <a name="179488" id="179488"></a> <span class="sansserif">
+           fixed method <a href="string.html#1196715">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179490" id="179490"></a> <span class="sansserif">
+           floating-point <a href="number.html#1207032">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179492" id="179492"></a> <span class="sansserif">
+           floor method <a href="math.html#1196455">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179494" id="179494"></a> <span class="sansserif">
+           fontcolor method <a href="string.html#1196753">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179496" id="179496"></a> <span class="sansserif">
+           fonts 
+          </span> 
+          <dl>
+            <dd>
+              <a name="179497" id="179497"></a> <span class="sansserif">
+               big <a href="string.html#1196463">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179499" id="179499"></a> <span class="sansserif">
+               blinking <a href="string.html#1196511">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179501" id="179501"></a> <span class="sansserif">
+               bold <a href="string.html#1196562">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="179503" id="179503"></a> <span class="sansserif">
+           fontsize method <a href="string.html#1196806">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179505" id="179505"></a> <span class="sansserif">
+           for...in statement <a href="stmt.html#1004815">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179507" id="179507"></a> <span class="sansserif">
+           for loops 
+          </span> 
+          <dl>
+            <dd>
+              <a name="179508" id="179508"></a> <span class="sansserif">
+               continuation of <a href="stmt.html#1078923">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179510" id="179510"></a> <span class="sansserif">
+               syntax of <a href="stmt.html#1004804">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179512" id="179512"></a> <span class="sansserif">
+               termination of <a href="stmt.html#1081298">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="179514" id="179514"></a> <span class="sansserif">
+           for statement <a href="stmt.html#1004804">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179516" id="179516"></a> <span class="sansserif">
+           fromCharCode method <a href="string.html#1225094">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179518" id="179518"></a> <span class="sansserif">
+           function expression <a href="ops.html#1066344">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179520" id="179520"></a> <span class="sansserif">
+           Function object <a href="function.html#1193137">1</a> 
+          </span> 
+          <dl>
+            <dd>
+              <a name="179522" id="179522"></a> <span class="sansserif">
+               specifying arguments for <a href="function.html#1205610">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179524" id="179524"></a> <span class="sansserif">
+               as variable value <a href="function.html#1224456">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="179526" id="179526"></a> <span class="sansserif">
+           function operator <a href="ops.html#1066344">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179528" id="179528"></a> <span class="sansserif">
+           functions 
+          </span> 
+          <dl>
+            <dd>
+              <a name="179529" id="179529"></a> <span class="sansserif">
+               arguments array <a href="function.html#1193312">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179531" id="179531"></a> <span class="sansserif">
+               callee property <a href="function.html#1196419">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179533" id="179533"></a> <span class="sansserif">
+               caller property <a href="function.html#1196447">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179535" id="179535"></a> <span class="sansserif">
+               declaring <a href="stmt.html#1004825">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179537" id="179537"></a> <span class="sansserif">
+               Function object <a href="function.html#1193161">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179539" id="179539"></a> <span class="sansserif">
+               length property <a href="function.html#1196484">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179541" id="179541"></a> <span class="sansserif">
+               list of <a href="toplev.html#1063525">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179543" id="179543"></a> <span class="sansserif">
+               nesting <a href="function.html#1225385">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179545" id="179545"></a> <span class="sansserif">
+               number of arguments <a href="string.html#1193455">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179547" id="179547"></a> <span class="sansserif">
+               return values of <a href="stmt.html#1004871">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179549" id="179549"></a> <span class="sansserif">
+               top-level <a href="toplev.html#1061890">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179551" id="179551"></a> <span class="sansserif">
+               as variable value <a href="function.html#1224456">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="179553" id="179553"></a> <span class="sansserif">
+           function statement <a href="stmt.html#1004825">1</a> 
+          </span>
+        </dd>
+      </dl><br>
+       
+      <p>
+        <a name="IX_G" id="IX_G"></a> <a name="G" id="G"></a> <span class="sansserif"><b><!-- <GROUPTITLESIX> -->G <!-- </GROUPTITLESIX> -->
+        </b></span>
+      </p><br>
+       
+      <dl>
+        <dd>
+          <a name="179557" id="179557"></a> <span class="sansserif">
+           getDate method <a href="date.html#1193537">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179559" id="179559"></a> <span class="sansserif">
+           getDay method <a href="date.html#1193573">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179561" id="179561"></a> <span class="sansserif">
+           getFullYear method <a href="date.html#1193607">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179563" id="179563"></a> <span class="sansserif">
+           getHours method <a href="date.html#1193644">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179565" id="179565"></a> <span class="sansserif">
+           getMember method (LiveConnect) <a href="lcjsobj.html#1193251">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179567" id="179567"></a> <span class="sansserif">
+           getMilliseconds method <a href="date.html#1193677">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179569" id="179569"></a> <span class="sansserif">
+           getMinutes method <a href="date.html#1193710">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179571" id="179571"></a> <span class="sansserif">
+           getMonth method <a href="date.html#1193744">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179573" id="179573"></a> <span class="sansserif">
+           getSeconds method <a href="date.html#1193778">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179575" id="179575"></a> <span class="sansserif">
+           getSlot method (LiveConnect) <a href="lcjsobj.html#1193257">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179577" id="179577"></a> <span class="sansserif">
+           getTime method <a href="date.html#1193811">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179579" id="179579"></a> <span class="sansserif">
+           getTimezoneOffset method <a href="date.html#1193844">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179581" id="179581"></a> <span class="sansserif">
+           getUTCDate method <a href="date.html#1219395">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179583" id="179583"></a> <span class="sansserif">
+           getUTCDay method <a href="date.html#1193904">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179585" id="179585"></a> <span class="sansserif">
+           getUTCFullYear method <a href="date.html#1193940">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179587" id="179587"></a> <span class="sansserif">
+           getUTCHours method <a href="date.html#1193973">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179589" id="179589"></a> <span class="sansserif">
+           getUTCMilliseconds method <a href="date.html#1194006">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179591" id="179591"></a> <span class="sansserif">
+           getUTCMinutes method <a href="date.html#1194039">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179593" id="179593"></a> <span class="sansserif">
+           getUTCMonth method <a href="date.html#1194072">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179595" id="179595"></a> <span class="sansserif">
+           getUTCSeconds method <a href="date.html#1194105">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179597" id="179597"></a> <span class="sansserif">
+           getWindow method (LiveConnect) <a href="lcjsobj.html#1193263">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179599" id="179599"></a> <span class="sansserif">
+           getWrappedException (LiveConnect) <a href="lcjsexc.html#1193796">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179601" id="179601"></a> <span class="sansserif">
+           getWrappedExceptionType (LiveConnect) <a href="lcjsexc.html#1194668">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179603" id="179603"></a> <span class="sansserif">
+           getYear method <a href="date.html#1194138">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179605" id="179605"></a> <span class="sansserif">
+           global object <a href="toplev.html#1061890">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179607" id="179607"></a> <span class="sansserif">
+           global property <a href="regexp.html#1194562">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179609" id="179609"></a> <span class="sansserif">
+           GMT time, defined, local time, defined <a href="date.html#1193198">1</a> 
+          </span>
+        </dd>
+      </dl><br>
+       
+      <p>
+        <a name="IX_H" id="IX_H"></a> <a name="H" id="H"></a> <span class="sansserif"><b><!-- <GROUPTITLESIX> -->H <!-- </GROUPTITLESIX> -->
+        </b></span>
+      </p><br>
+       
+      <dl>
+        <dd>
+          <a name="179613" id="179613"></a> <span class="sansserif">
+           HTML tags 
+          </span> 
+          <dl>
+            <dd>
+              <a name="179614" id="179614"></a> <span class="sansserif">
+               BIG <a href="string.html#1196463">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179616" id="179616"></a> <span class="sansserif">
+               BLINK <a href="string.html#1196511">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179618" id="179618"></a> <span class="sansserif">
+               BOLD <a href="string.html#1196562">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+      </dl><br>
+       
+      <p>
+        <a name="IX_I" id="IX_I"></a> <a name="I" id="I"></a> <span class="sansserif"><b><!-- <GROUPTITLESIX> -->I <!-- </GROUPTITLESIX> -->
+        </b></span>
+      </p><br>
+       
+      <dl>
+        <dd>
+          <a name="179622" id="179622"></a> <span class="sansserif">
+           IEEE 754 <a href="number.html#1207032">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179624" id="179624"></a> <span class="sansserif">
+           if...else statement <a href="stmt.html#1004833">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179626" id="179626"></a> <span class="sansserif">
+           ignoreCase property <a href="regexp.html#1193678">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179628" id="179628"></a> <span class="sansserif">
+           import statement <a href="stmt.html#1082618">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179630" id="179630"></a> <span class="sansserif">
+           increment (++) operator <a href="ops.html#1042412">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179632" id="179632"></a> <span class="sansserif">
+           indexOf method <a href="string.html#1196895">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179634" id="179634"></a> <span class="sansserif">
+           index property <a href="array.html#1193399">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179636" id="179636"></a> <span class="sansserif">
+           Infinity property <a href="toplev.html#1063963">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179638" id="179638"></a> <span class="sansserif">
+           in keyword <a href="stmt.html#1004815">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179640" id="179640"></a> <span class="sansserif">
+           in operator <a href="ops.html#1066286">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179642" id="179642"></a> <span class="sansserif">
+           input property 
+          </span> 
+          <dl>
+            <dd>
+              <a name="179643" id="179643"></a> <span class="sansserif">
+               Array object <a href="array.html#1193419">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="179645" id="179645"></a> <span class="sansserif">
+           instanceof operator <a href="ops.html#1055015">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179647" id="179647"></a> <span class="sansserif">
+           isFinite function <a href="toplev.html#1063988">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179649" id="179649"></a> <span class="sansserif">
+           isNaN function <a href="toplev.html#1064024">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179651" id="179651"></a> <span class="sansserif">
+           italics method <a href="string.html#1196955">1</a> 
+          </span>
+        </dd>
+      </dl><br>
+       
+      <p>
+        <a name="IX_J" id="IX_J"></a> <a name="J" id="J"></a> <span class="sansserif"><b><!-- <GROUPTITLESIX> -->J <!-- </GROUPTITLESIX> -->
+        </b></span>
+      </p><br>
+       
+      <dl>
+        <dd>
+          <a name="179655" id="179655"></a> <span class="sansserif">
+           JavaArray object <a href="javarray.html#1193137">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179657" id="179657"></a> <span class="sansserif">
+           JavaClass object <a href="javclass.html#1193137">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179659" id="179659"></a> <span class="sansserif">
+           java object <a href="java.html#1193137">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179661" id="179661"></a> <span class="sansserif">
+           JavaObject object <a href="javobj.html#1193137">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179663" id="179663"></a> <span class="sansserif">
+           JavaPackage object <a href="javpkg.html#1193137">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179665" id="179665"></a> <span class="sansserif">
+           java property <a href="packages.html#1194831">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179667" id="179667"></a> <span class="sansserif">
+           JavaScript 
+          </span> 
+          <dl>
+            <dd>
+              <a name="179668" id="179668"></a> <span class="sansserif">
+               background for using <a href="preface.html#1005135">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179670" id="179670"></a> <span class="sansserif">
+               reserved words <a href="keywords.html#1004016">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179672" id="179672"></a> <span class="sansserif">
+               versions and Navigator <a href="preface.html#1003515">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="179674" id="179674"></a> <span class="sansserif">
+           join method <a href="array.html#1195456">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179676" id="179676"></a> <span class="sansserif">
+           JSException class <a href="lcjsexc.html#1193143">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179678" id="179678"></a> <span class="sansserif">
+           JSException constructor (LiveConnect) <a href="lcjsexc.html#1193164">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179680" id="179680"></a> <span class="sansserif">
+           JSObject class <a href="lcjsobj.html#1193143">1</a> 
+          </span>
+        </dd>
+      </dl><br>
+       
+      <p>
+        <a name="IX_K" id="IX_K"></a> <a name="K" id="K"></a> <span class="sansserif"><b><!-- <GROUPTITLESIX> -->K <!-- </GROUPTITLESIX> -->
+        </b></span>
+      </p><br>
+       
+      <dl>
+        <dd>
+          <a name="179684" id="179684"></a> <span class="sansserif">
+           keywords <a href="keywords.html#1004016">1</a> 
+          </span>
+        </dd>
+      </dl><br>
+       
+      <p>
+        <a name="IX_L" id="IX_L"></a> <a name="L" id="L"></a> <span class="sansserif"><b><!-- <GROUPTITLESIX> -->L <!-- </GROUPTITLESIX> -->
+        </b></span>
+      </p><br>
+       
+      <dl>
+        <dd>
+          <a name="179688" id="179688"></a> <span class="sansserif">
+           label statement <a href="stmt.html#1018088">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179690" id="179690"></a> <span class="sansserif">
+           lastIndexOf method <a href="string.html#1197005">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179692" id="179692"></a> <span class="sansserif">
+           lastIndex property <a href="regexp.html#1193732">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179694" id="179694"></a> <span class="sansserif">
+           left shift (&lt;&lt;) operator <a href="ops.html#1042481">1</a>, <a href="ops.html#1042518">2</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179697" id="179697"></a> <span class="sansserif">
+           length property 
+          </span> 
+          <dl>
+            <dd>
+              <a name="179698" id="179698"></a> <span class="sansserif">
+               arguments array <a href="function.html#1196484">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179700" id="179700"></a> <span class="sansserif">
+               Array object <a href="array.html#1193439">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179702" id="179702"></a> <span class="sansserif">
+               Function object <a href="function.html#1216661">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179704" id="179704"></a> <span class="sansserif">
+               JavaArray object <a href="javarray.html#1198970">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179706" id="179706"></a> <span class="sansserif">
+               String object <a href="string.html#1193437">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="179708" id="179708"></a> <span class="sansserif">
+           link method <a href="string.html#1198070">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179710" id="179710"></a> <span class="sansserif">
+           links 
+          </span> 
+          <dl>
+            <dd>
+              <a name="179711" id="179711"></a> <span class="sansserif">
+               anchors for <a href="string.html#1196396">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179713" id="179713"></a> <span class="sansserif">
+               with no destination <a href="ops.html#1042625">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="179715" id="179715"></a> <span class="sansserif">
+           LiveConnect 
+          </span> 
+          <dl>
+            <dd>
+              <a name="179716" id="179716"></a> <span class="sansserif">
+               JavaArray object <a href="javarray.html#1193137">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179718" id="179718"></a> <span class="sansserif">
+               JavaClass object <a href="javclass.html#1193137">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179720" id="179720"></a> <span class="sansserif">
+               java object <a href="java.html#1193137">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179722" id="179722"></a> <span class="sansserif">
+               JavaObject object <a href="javobj.html#1193137">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179724" id="179724"></a> <span class="sansserif">
+               JavaPackage object <a href="javpkg.html#1193137">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179726" id="179726"></a> <span class="sansserif">
+               JSException class <a href="lcjsexc.html#1193143">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179728" id="179728"></a> <span class="sansserif">
+               JSObject class <a href="lcjsobj.html#1193143">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179730" id="179730"></a> <span class="sansserif">
+               netscape object <a href="netscape.html#1193137">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179732" id="179732"></a> <span class="sansserif">
+               Packages object <a href="packages.html#1193137">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179734" id="179734"></a> <span class="sansserif">
+               sun object <a href="sun.html#1193137">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="179736" id="179736"></a> <span class="sansserif">
+           LN10 property <a href="math.html#1193389">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179738" id="179738"></a> <span class="sansserif">
+           LN2 property <a href="math.html#1216604">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179740" id="179740"></a> <span class="sansserif">
+           LOG10E property <a href="math.html#1217093">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179742" id="179742"></a> <span class="sansserif">
+           LOG2E property <a href="math.html#1193465">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179744" id="179744"></a> <span class="sansserif">
+           logarithms 
+          </span> 
+          <dl>
+            <dd>
+              <a name="179745" id="179745"></a> <span class="sansserif">
+               base of natural <a href="math.html#1193381">1</a>, <a href="math.html#1196410">2</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179748" id="179748"></a> <span class="sansserif">
+               natural logarithm of 10 <a href="math.html#1193407">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="179750" id="179750"></a> <span class="sansserif">
+           logical operators <a href="ops.html#1044813">1</a> 
+          </span> 
+          <dl>
+            <dd>
+              <a name="179752" id="179752"></a> <span class="sansserif">
+               ! (NOT) <a href="ops.html#1062688">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179754" id="179754"></a> <span class="sansserif">
+               &amp;&amp; (AND) <a href="ops.html#1062682">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179756" id="179756"></a> <span class="sansserif">
+               || (OR) <a href="ops.html#1062685">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179758" id="179758"></a> <span class="sansserif">
+               short-circuit evaluation <a href="ops.html#1063763">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="179760" id="179760"></a> <span class="sansserif">
+           log method <a href="math.html#1196917">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179762" id="179762"></a> <span class="sansserif">
+           lookahead assertions <a href="preface.html#1004984">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179764" id="179764"></a> <span class="sansserif">
+           loops 
+          </span> 
+          <dl>
+            <dd>
+              <a name="179765" id="179765"></a> <span class="sansserif">
+               continuation of <a href="stmt.html#1078923">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179767" id="179767"></a> <span class="sansserif">
+               for <a href="stmt.html#1004804">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179769" id="179769"></a> <span class="sansserif">
+               termination of <a href="stmt.html#1081298">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179771" id="179771"></a> <span class="sansserif">
+               while <a href="stmt.html#1004896">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="179773" id="179773"></a> <span class="sansserif">
+           lowercase <a href="string.html#1193405">1</a>, <a href="string.html#1194779">2</a> 
+          </span>
+        </dd>
+      </dl><br>
+       
+      <p>
+        <a name="IX_M" id="IX_M"></a> <a name="M" id="M"></a> <span class="sansserif"><b><!-- <GROUPTITLESIX> -->M <!-- </GROUPTITLESIX> -->
+        </b></span>
+      </p><br>
+       
+      <dl>
+        <dd>
+          <a name="179778" id="179778"></a> <span class="sansserif">
+           match method <a href="string.html#1205239">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179780" id="179780"></a> <span class="sansserif">
+           Math object <a href="math.html#1193138">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179782" id="179782"></a> <span class="sansserif">
+           MAX_VALUE property <a href="number.html#1193249">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179784" id="179784"></a> <span class="sansserif">
+           max method <a href="math.html#1197362">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179786" id="179786"></a> <span class="sansserif">
+           methods, top-level <a href="toplev.html#1061890">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179788" id="179788"></a> <span class="sansserif">
+           MIN_VALUE property <a href="number.html#1193275">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179790" id="179790"></a> <span class="sansserif">
+           min method <a href="math.html#1197403">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179792" id="179792"></a> <span class="sansserif">
+           modulo function <a href="ops.html#1042408">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179794" id="179794"></a> <span class="sansserif">
+           modulus (%) operator <a href="ops.html#1042403">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179796" id="179796"></a> <span class="sansserif">
+           multiline property <a href="regexp.html#1193831">1</a> 
+          </span>
+        </dd>
+      </dl><br>
+       
+      <p>
+        <a name="IX_N" id="IX_N"></a> <a name="N" id="N"></a> <span class="sansserif"><b><!-- <GROUPTITLESIX> -->N <!-- </GROUPTITLESIX> -->
+        </b></span>
+      </p><br>
+       
+      <dl>
+        <dd>
+          <a name="179800" id="179800"></a> <span class="sansserif">
+           NaN property 
+          </span> 
+          <dl>
+            <dd>
+              <a name="179801" id="179801"></a> <span class="sansserif">
+               Number object <a href="number.html#1193302">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179803" id="179803"></a> <span class="sansserif">
+               top-level <a href="toplev.html#1064064">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="179805" id="179805"></a> <span class="sansserif">
+           natural logarithms 
+          </span> 
+          <dl>
+            <dd>
+              <a name="179806" id="179806"></a> <span class="sansserif">
+               base of <a href="math.html#1193381">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179808" id="179808"></a> <span class="sansserif">
+               e <a href="math.html#1193381">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179810" id="179810"></a> <span class="sansserif">
+               e raised to a power <a href="math.html#1196410">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179812" id="179812"></a> <span class="sansserif">
+               of 10 <a href="math.html#1193407">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="179814" id="179814"></a> <span class="sansserif">
+           Navigator, JavaScript versions supported <a href="preface.html#1003515">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179816" id="179816"></a> <span class="sansserif">
+           NEGATIVE_INFINITY property <a href="number.html#1193346">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179818" id="179818"></a> <span class="sansserif">
+           nesting functions <a href="function.html#1225385">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179820" id="179820"></a> <span class="sansserif">
+           netscape.javascript.JSException class <a href="lcjsexc.html#1193143">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179822" id="179822"></a> <span class="sansserif">
+           netscape.javascript.JSObject class <a href="lcjsobj.html#1193143">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179824" id="179824"></a> <span class="sansserif">
+           netscape object <a href="netscape.html#1193137">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179826" id="179826"></a> <span class="sansserif">
+           netscape property <a href="packages.html#1194854">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179828" id="179828"></a> <span class="sansserif">
+           new operator <a href="ops.html#1055898">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179830" id="179830"></a> <span class="sansserif">
+           non-capturing parentheses 
+          </span> 
+          <dl>
+            <dd>
+              <a name="179831" id="179831"></a> <span class="sansserif">
+               parentheses 
+              </span> 
+              <dl>
+                <dd>
+                  <a name="179832" id="179832"></a> <span class="sansserif">
+                   non-capturing <a href="regexp.html#1207798">1</a> 
+                  </span>
+                </dd>
+              </dl>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="179834" id="179834"></a> <span class="sansserif">
+           NOT (!) logical operator <a href="ops.html#1062688">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179836" id="179836"></a> <span class="sansserif">
+           NOT (-) bitwise operator <a href="ops.html#1042474">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179838" id="179838"></a> <span class="sansserif">
+           Number function <a href="toplev.html#1064092">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179840" id="179840"></a> <span class="sansserif">
+           Number object <a href="number.html#1193137">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179842" id="179842"></a> <span class="sansserif">
+           numbers 
+          </span> 
+          <dl>
+            <dd>
+              <a name="179843" id="179843"></a> <span class="sansserif">
+               greater of two <a href="math.html#1197380">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179845" id="179845"></a> <span class="sansserif">
+               identifying <a href="toplev.html#1064024">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179847" id="179847"></a> <span class="sansserif">
+               Number object <a href="number.html#1193137">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179849" id="179849"></a> <span class="sansserif">
+               obtaining integer <a href="math.html#1195672">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179851" id="179851"></a> <span class="sansserif">
+               parsing from strings <a href="toplev.html#1064132">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179853" id="179853"></a> <span class="sansserif">
+               square root <a href="math.html#1197843">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+      </dl><br>
+       
+      <p>
+        <a name="IX_O" id="IX_O"></a> <a name="O" id="O"></a> <span class="sansserif"><b><!-- <GROUPTITLESIX> -->O <!-- </GROUPTITLESIX> -->
+        </b></span>
+      </p><br>
+       
+      <dl>
+        <dd>
+          <a name="179857" id="179857"></a> <span class="sansserif">
+           Object object <a href="object.html#1193136">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179859" id="179859"></a> <span class="sansserif">
+           objects 
+          </span> 
+          <dl>
+            <dd>
+              <a name="179860" id="179860"></a> <span class="sansserif">
+               confirming object type for <a href="ops.html#1055015">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179862" id="179862"></a> <span class="sansserif">
+               confirming property type for <a href="ops.html#1066286">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179864" id="179864"></a> <span class="sansserif">
+               creating new types <a href="ops.html#1055898">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179866" id="179866"></a> <span class="sansserif">
+               deleting <a href="ops.html#1045837">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179868" id="179868"></a> <span class="sansserif">
+               establishing default <a href="stmt.html#1004910">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179870" id="179870"></a> <span class="sansserif">
+               getting list of properties for <a href="stmt.html#1004823">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179872" id="179872"></a> <span class="sansserif">
+               iterating properties <a href="stmt.html#1004815">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179874" id="179874"></a> <span class="sansserif">
+               Java, accessing <a href="javobj.html#1193137">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="179876" id="179876"></a> <span class="sansserif">
+           operators <a href="ops.html#1003191">1</a>, <a href="ops.html#1042635">2</a> 
+          </span> 
+          <dl>
+            <dd>
+              <a name="179879" id="179879"></a> <span class="sansserif">
+               arithmetic <a href="ops.html#1042400">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179881" id="179881"></a> <span class="sansserif">
+               assignment <a href="ops.html#1042274">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179883" id="179883"></a> <span class="sansserif">
+               bitwise <a href="ops.html#1042437">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179885" id="179885"></a> <span class="sansserif">
+               comparison <a href="ops.html#1060974">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179887" id="179887"></a> <span class="sansserif">
+               list of <a href="ops.html#1056212">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179889" id="179889"></a> <span class="sansserif">
+               logical <a href="ops.html#1044813">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179891" id="179891"></a> <span class="sansserif">
+               special <a href="ops.html#1042588">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179893" id="179893"></a> <span class="sansserif">
+               string <a href="ops.html#1042582">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="179895" id="179895"></a> <span class="sansserif">
+           OR (|) bitwise operator <a href="ops.html#1042460">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179897" id="179897"></a> <span class="sansserif">
+           OR (||) logical operator <a href="ops.html#1062685">1</a> 
+          </span>
+        </dd>
+      </dl><br>
+       
+      <p>
+        <a name="IX_P" id="IX_P"></a> <a name="P" id="P"></a> <span class="sansserif"><b><!-- <GROUPTITLESIX> -->P <!-- </GROUPTITLESIX> -->
+        </b></span>
+      </p><br>
+       
+      <dl>
+        <dd>
+          <a name="179901" id="179901"></a> <span class="sansserif">
+           packages, accessing Java <a href="javpkg.html#1193137">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179903" id="179903"></a> <span class="sansserif">
+           Packages object <a href="packages.html#1193137">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179905" id="179905"></a> <span class="sansserif">
+           parseFloat function <a href="toplev.html#1064132">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179907" id="179907"></a> <span class="sansserif">
+           parseInt function <a href="toplev.html#1064173">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179909" id="179909"></a> <span class="sansserif">
+           parse method <a href="date.html#1194184">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179911" id="179911"></a> <span class="sansserif">
+           PI property <a href="math.html#1193490">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179913" id="179913"></a> <span class="sansserif">
+           pop method <a href="array.html#1196003">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179915" id="179915"></a> <span class="sansserif">
+           POSITIVE_INFINITY property <a href="number.html#1193380">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179917" id="179917"></a> <span class="sansserif">
+           pow method <a href="math.html#1197651">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179919" id="179919"></a> <span class="sansserif">
+           properties 
+          </span> 
+          <dl>
+            <dd>
+              <a name="179920" id="179920"></a> <span class="sansserif">
+               confirming object type for <a href="ops.html#1066286">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179922" id="179922"></a> <span class="sansserif">
+               deleting <a href="ops.html#1045837">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179924" id="179924"></a> <span class="sansserif">
+               getting list of for an object <a href="stmt.html#1004823">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179926" id="179926"></a> <span class="sansserif">
+               iterating for an object <a href="stmt.html#1004815">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179928" id="179928"></a> <span class="sansserif">
+               top-level <a href="toplev.html#1061890">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="179930" id="179930"></a> <span class="sansserif">
+           prototype property 
+          </span> 
+          <dl>
+            <dd>
+              <a name="179931" id="179931"></a> <span class="sansserif">
+               Array object <a href="array.html#1205871">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179933" id="179933"></a> <span class="sansserif">
+               Boolean object <a href="boolean.html#1193217">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179935" id="179935"></a> <span class="sansserif">
+               Date object <a href="date.html#1197095">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179937" id="179937"></a> <span class="sansserif">
+               Function object <a href="function.html#1193426">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179939" id="179939"></a> <span class="sansserif">
+               Number object <a href="number.html#1193415">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179941" id="179941"></a> <span class="sansserif">
+               Object object <a href="object.html#1193255">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179943" id="179943"></a> <span class="sansserif">
+               RegExp object <a href="regexp.html#1200174">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="179945" id="179945"></a> <span class="sansserif">
+               String object <a href="string.html#1193463">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="179947" id="179947"></a> <span class="sansserif">
+           push method <a href="array.html#1196550">1</a> 
+          </span>
+        </dd>
+      </dl><br>
+       
+      <p>
+        <a name="IX_R" id="IX_R"></a> <a name="R" id="R"></a> <span class="sansserif"><b><!-- <GROUPTITLESIX> -->R <!-- </GROUPTITLESIX> -->
+        </b></span>
+      </p><br>
+       
+      <dl>
+        <dd>
+          <a name="179952" id="179952"></a> <span class="sansserif">
+           random method <a href="math.html#1197697">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179954" id="179954"></a> <span class="sansserif">
+           RegExp object <a href="regexp.html#1193136">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179956" id="179956"></a> <span class="sansserif">
+           regular expressions <a href="regexp.html#1193136">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179958" id="179958"></a> <span class="sansserif">
+           removeMember method (LiveConnect) <a href="lcjsobj.html#1193269">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179960" id="179960"></a> <span class="sansserif">
+           replace method <a href="string.html#1194258">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179962" id="179962"></a> <span class="sansserif">
+           reserved words <a href="keywords.html#1004016">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179964" id="179964"></a> <span class="sansserif">
+           return statement <a href="stmt.html#1004871">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179966" id="179966"></a> <span class="sansserif">
+           reverse method <a href="array.html#1193641">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179968" id="179968"></a> <span class="sansserif">
+           rounding <a href="number.html#1207032">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179970" id="179970"></a> <span class="sansserif">
+           round method <a href="math.html#1197725">1</a> 
+          </span>
+        </dd>
+      </dl><br>
+       
+      <p>
+        <a name="IX_S" id="IX_S"></a> <a name="S" id="S"></a> <span class="sansserif"><b><!-- <GROUPTITLESIX> -->S <!-- </GROUPTITLESIX> -->
+        </b></span>
+      </p><br>
+       
+      <dl>
+        <dd>
+          <a name="179974" id="179974"></a> <span class="sansserif">
+           search method <a href="string.html#1194332">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179976" id="179976"></a> <span class="sansserif">
+           selection lists 
+          </span> 
+          <dl>
+            <dd>
+              <a name="179977" id="179977"></a> <span class="sansserif">
+               number of options <a href="string.html#1193455">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="179979" id="179979"></a> <span class="sansserif">
+           setDate method <a href="date.html#1194228">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179981" id="179981"></a> <span class="sansserif">
+           setFullYear method <a href="date.html#1194264">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179983" id="179983"></a> <span class="sansserif">
+           setHours method <a href="date.html#1194314">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179985" id="179985"></a> <span class="sansserif">
+           setMember method (LiveConnect) <a href="lcjsobj.html#1193275">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179987" id="179987"></a> <span class="sansserif">
+           setMilliseconds method <a href="date.html#1194367">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179989" id="179989"></a> <span class="sansserif">
+           setMinutes method <a href="date.html#1194404">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179991" id="179991"></a> <span class="sansserif">
+           setMonth method <a href="date.html#1194453">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179993" id="179993"></a> <span class="sansserif">
+           setSeconds method <a href="date.html#1194498">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179995" id="179995"></a> <span class="sansserif">
+           setSlot method (LiveConnect) <a href="lcjsobj.html#1193281">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179997" id="179997"></a> <span class="sansserif">
+           setTime method <a href="date.html#1194543">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="179999" id="179999"></a> <span class="sansserif">
+           setUTCDate method <a href="date.html#1194580">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180001" id="180001"></a> <span class="sansserif">
+           setUTCFullYear method <a href="date.html#1194617">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180003" id="180003"></a> <span class="sansserif">
+           setUTCHours method <a href="date.html#1194663">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180005" id="180005"></a> <span class="sansserif">
+           setUTCMilliseconds method <a href="date.html#1194713">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180007" id="180007"></a> <span class="sansserif">
+           setUTCMinutes method <a href="date.html#1194750">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180009" id="180009"></a> <span class="sansserif">
+           setUTCMonth method <a href="date.html#1194796">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180011" id="180011"></a> <span class="sansserif">
+           setUTCSeconds method <a href="date.html#1194838">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180013" id="180013"></a> <span class="sansserif">
+           setYear method <a href="date.html#1194880">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180015" id="180015"></a> <span class="sansserif">
+           shift method <a href="array.html#1193677">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180017" id="180017"></a> <span class="sansserif">
+           short-circuit evaluation <a href="ops.html#1063763">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180019" id="180019"></a> <span class="sansserif">
+           sign-propagating right shift (&gt;&gt;) operator <a href="ops.html#1042487">1</a>, <a href="ops.html#1042522">2</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180022" id="180022"></a> <span class="sansserif">
+           sin method <a href="math.html#1197769">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180024" id="180024"></a> <span class="sansserif">
+           slice method <a href="array.html#1193713">1</a>, <a href="string.html#1194366">2</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180027" id="180027"></a> <span class="sansserif">
+           small method <a href="string.html#1194405">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180029" id="180029"></a> <span class="sansserif">
+           sort method <a href="array.html#1196882">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180031" id="180031"></a> <span class="sansserif">
+           source property <a href="regexp.html#1193875">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180033" id="180033"></a> <span class="sansserif">
+           special operators <a href="ops.html#1042588">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180035" id="180035"></a> <span class="sansserif">
+           splice method <a href="array.html#1193766">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180037" id="180037"></a> <span class="sansserif">
+           split method <a href="string.html#1194452">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180039" id="180039"></a> <span class="sansserif">
+           SQRT1_2 property <a href="math.html#1193515">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180041" id="180041"></a> <span class="sansserif">
+           SQRT2 property <a href="math.html#1193540">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180043" id="180043"></a> <span class="sansserif">
+           sqrt method <a href="math.html#1197825">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180045" id="180045"></a> <span class="sansserif">
+           square roots <a href="math.html#1197843">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180047" id="180047"></a> <span class="sansserif">
+           statements <a href="stmt.html#1007251">1</a>, <a href="stmt.html#1004918">2</a> 
+          </span> 
+          <dl>
+            <dd>
+              <a name="180050" id="180050"></a> <span class="sansserif">
+               syntax conventions <a href="stmt.html#1004756">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="180052" id="180052"></a> <span class="sansserif">
+           strike method <a href="string.html#1194525">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180054" id="180054"></a> <span class="sansserif">
+           String function <a href="toplev.html#1064506">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180056" id="180056"></a> <span class="sansserif">
+           String object <a href="string.html#1193137">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180058" id="180058"></a> <span class="sansserif">
+           string operators <a href="ops.html#1042582">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180060" id="180060"></a> <span class="sansserif">
+           strings 
+          </span> 
+          <dl>
+            <dd>
+              <a name="180061" id="180061"></a> <span class="sansserif">
+               blinking <a href="string.html#1196511">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180063" id="180063"></a> <span class="sansserif">
+               bold <a href="string.html#1196562">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180065" id="180065"></a> <span class="sansserif">
+               character position within <a href="string.html#1193249">1</a>, <a href="string.html#1196610">2</a>, <a href="string.html#1196897">3</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180069" id="180069"></a> <span class="sansserif">
+               concatenating <a href="ops.html#1042582">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180071" id="180071"></a> <span class="sansserif">
+               converting from date <a href="date.html#1194984">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180073" id="180073"></a> <span class="sansserif">
+               converting to floating point <a href="toplev.html#1064132">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180075" id="180075"></a> <span class="sansserif">
+               creating from arrays <a href="array.html#1195456">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180077" id="180077"></a> <span class="sansserif">
+               defining <a href="string.html#1193173">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180079" id="180079"></a> <span class="sansserif">
+               fontsize of <a href="string.html#1196463">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180081" id="180081"></a> <span class="sansserif">
+               length of <a href="string.html#1193455">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180083" id="180083"></a> <span class="sansserif">
+               lowercase <a href="string.html#1193405">1</a>, <a href="string.html#1194779">2</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180086" id="180086"></a> <span class="sansserif">
+               parsing <a href="toplev.html#1064132">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180088" id="180088"></a> <span class="sansserif">
+               splitting into arrays <a href="string.html#1194454">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180090" id="180090"></a> <span class="sansserif">
+               String object <a href="string.html#1193137">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="180092" id="180092"></a> <span class="sansserif">
+           sub method <a href="string.html#1194575">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180094" id="180094"></a> <span class="sansserif">
+           substring method <a href="string.html#1194665">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180096" id="180096"></a> <span class="sansserif">
+           substr method <a href="string.html#1194618">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180098" id="180098"></a> <span class="sansserif">
+           sun object <a href="sun.html#1193137">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180100" id="180100"></a> <span class="sansserif">
+           sun property <a href="packages.html#1194880">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180102" id="180102"></a> <span class="sansserif">
+           sup method <a href="string.html#1194721">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180104" id="180104"></a> <span class="sansserif">
+           switch statement <a href="stmt.html#1018610">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180106" id="180106"></a> <span class="sansserif">
+           syntax conventions <a href="stmt.html#1004756">1</a> 
+          </span>
+        </dd>
+      </dl><br>
+       
+      <p>
+        <a name="IX_T" id="IX_T"></a> <a name="T" id="T"></a> <span class="sansserif"><b><!-- <GROUPTITLESIX> -->T <!-- </GROUPTITLESIX> -->
+        </b></span>
+      </p><br>
+       
+      <dl>
+        <dd>
+          <a name="180110" id="180110"></a> <span class="sansserif">
+           tan method <a href="math.html#1194346">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180112" id="180112"></a> <span class="sansserif">
+           test method <a href="regexp.html#1194128">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180114" id="180114"></a> <span class="sansserif">
+           this keyword <a href="ops.html#1043482">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180116" id="180116"></a> <span class="sansserif">
+           throw statement <a href="stmt.html#1052196">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180118" id="180118"></a> <span class="sansserif">
+           times 
+          </span> 
+          <dl>
+            <dd>
+              <a name="180119" id="180119"></a> <span class="sansserif">
+               Date object <a href="date.html#1193137">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180121" id="180121"></a> <span class="sansserif">
+               defining <a href="date.html#1193174">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180123" id="180123"></a> <span class="sansserif">
+               minutes <a href="date.html#1193724">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="180125" id="180125"></a> <span class="sansserif">
+           toGMTString method <a href="date.html#1194931">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180127" id="180127"></a> <span class="sansserif">
+           toLocaleString method <a href="date.html#1194970">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180129" id="180129"></a> <span class="sansserif">
+           toLowerCase method <a href="string.html#1194765">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180131" id="180131"></a> <span class="sansserif">
+           top-level properties and functions <a href="toplev.html#1061890">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180133" id="180133"></a> <span class="sansserif">
+           toSource method 
+          </span> 
+          <dl>
+            <dd>
+              <a name="180134" id="180134"></a> <span class="sansserif">
+               Array object <a href="array.html#1193889">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180136" id="180136"></a> <span class="sansserif">
+               Boolean object <a href="boolean.html#1193426">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180138" id="180138"></a> <span class="sansserif">
+               Date object <a href="date.html#1195016">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180140" id="180140"></a> <span class="sansserif">
+               Function object <a href="function.html#1193583">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180142" id="180142"></a> <span class="sansserif">
+               Number object <a href="number.html#1201831">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180144" id="180144"></a> <span class="sansserif">
+               Object object <a href="object.html#1193320">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180146" id="180146"></a> <span class="sansserif">
+               RegExp object <a href="regexp.html#1194174">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180148" id="180148"></a> <span class="sansserif">
+               String object <a href="string.html#1194796">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="180150" id="180150"></a> <span class="sansserif">
+           toString method 
+          </span> 
+          <dl>
+            <dd>
+              <a name="180151" id="180151"></a> <span class="sansserif">
+               Array object <a href="array.html#1193921">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180153" id="180153"></a> <span class="sansserif">
+               Boolean object <a href="boolean.html#1193269">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180155" id="180155"></a> <span class="sansserif">
+               built-in <a href="object.html#1193426">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180157" id="180157"></a> <span class="sansserif">
+               Date object <a href="date.html#1206669">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180159" id="180159"></a> <span class="sansserif">
+               Function object <a href="function.html#1193615">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180161" id="180161"></a> <span class="sansserif">
+               JavaArray object <a href="javarray.html#1198884">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180163" id="180163"></a> <span class="sansserif">
+               LiveConnect <a href="lcjsobj.html#1193287">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180165" id="180165"></a> <span class="sansserif">
+               Number object <a href="number.html#1200968">1</a>, <a href="number.html#1200964">2</a>, <a href="number.html#1201389">3</a>, <a href="number.html#1193464">4</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180170" id="180170"></a> <span class="sansserif">
+               Object object <a href="object.html#1193350">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180172" id="180172"></a> <span class="sansserif">
+               RegExp object <a href="regexp.html#1199205">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180174" id="180174"></a> <span class="sansserif">
+               String object <a href="string.html#1210667">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180176" id="180176"></a> <span class="sansserif">
+               user-defined <a href="object.html#1193453">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="180178" id="180178"></a> <span class="sansserif">
+           toUpperCase method <a href="string.html#1194823">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180180" id="180180"></a> <span class="sansserif">
+           toUTCString method <a href="date.html#1195045">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180182" id="180182"></a> <span class="sansserif">
+           try...catch statement <a href="stmt.html#1051663">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180184" id="180184"></a> <span class="sansserif">
+           typeof operator <a href="ops.html#1042603">1</a> 
+          </span>
+        </dd>
+      </dl><br>
+       
+      <p>
+        <a name="IX_U" id="IX_U"></a> <a name="U" id="U"></a> <span class="sansserif"><b><!-- <GROUPTITLESIX> -->U <!-- </GROUPTITLESIX> -->
+        </b></span>
+      </p><br>
+       
+      <dl>
+        <dd>
+          <a name="180188" id="180188"></a> <span class="sansserif">
+           unary negation (-) operator <a href="ops.html#1042430">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180190" id="180190"></a> <span class="sansserif">
+           undefined property <a href="toplev.html#1094680">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180192" id="180192"></a> <span class="sansserif">
+           Unicode 
+          </span> 
+          <dl>
+            <dd>
+              <a name="180193" id="180193"></a> <span class="sansserif">
+               charCodeAt method <a href="string.html#1196647">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="180195" id="180195"></a> <span class="sansserif">
+           unnamed functions <a href="ops.html#1066344">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180197" id="180197"></a> <span class="sansserif">
+           unshift method <a href="array.html#1193964">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180199" id="180199"></a> <span class="sansserif">
+           unwatch method <a href="object.html#1193499">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180201" id="180201"></a> <span class="sansserif">
+           URLs 
+          </span> 
+          <dl>
+            <dd>
+              <a name="180202" id="180202"></a> <span class="sansserif">
+               conventions used <a href="preface.html#1003383">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="180204" id="180204"></a> <span class="sansserif">
+           UTC method <a href="date.html#1195078">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180206" id="180206"></a> <span class="sansserif">
+           UTC time, defined <a href="date.html#1193198">1</a> 
+          </span>
+        </dd>
+      </dl><br>
+       
+      <p>
+        <a name="IX_V" id="IX_V"></a> <a name="V" id="V"></a> <span class="sansserif"><b><!-- <GROUPTITLESIX> -->V <!-- </GROUPTITLESIX> -->
+        </b></span>
+      </p><br>
+       
+      <dl>
+        <dd>
+          <a name="180210" id="180210"></a> <span class="sansserif">
+           valueOf method 
+          </span> 
+          <dl>
+            <dd>
+              <a name="180211" id="180211"></a> <span class="sansserif">
+               Array object <a href="array.html#1202613">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180213" id="180213"></a> <span class="sansserif">
+               Boolean object <a href="boolean.html#1195085">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180215" id="180215"></a> <span class="sansserif">
+               Date object <a href="date.html#1206897">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180217" id="180217"></a> <span class="sansserif">
+               Function object <a href="function.html#1199980">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180219" id="180219"></a> <span class="sansserif">
+               Number object <a href="number.html#1195199">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180221" id="180221"></a> <span class="sansserif">
+               Object object <a href="object.html#1193540">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180223" id="180223"></a> <span class="sansserif">
+               String object <a href="string.html#1210732">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="180225" id="180225"></a> <span class="sansserif">
+           variables 
+          </span> 
+          <dl>
+            <dd>
+              <a name="180226" id="180226"></a> <span class="sansserif">
+               declaring <a href="stmt.html#1077887">1</a>, <a href="stmt.html#1066604">2</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180229" id="180229"></a> <span class="sansserif">
+               initializing <a href="stmt.html#1077887">1</a>, <a href="stmt.html#1066604">2</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180232" id="180232"></a> <span class="sansserif">
+               syntax for declaring <a href="stmt.html#1077887">1</a>, <a href="stmt.html#1066604">2</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="180235" id="180235"></a> <span class="sansserif">
+           var statement <a href="stmt.html#1077887">1</a>, <a href="stmt.html#1066604">2</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180238" id="180238"></a> <span class="sansserif">
+           versions of JavaScript <a href="preface.html#1003515">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180240" id="180240"></a> <span class="sansserif">
+           void operator <a href="ops.html#1042625">1</a> 
+          </span>
+        </dd>
+      </dl><br>
+       
+      <p>
+        <a name="IX_W" id="IX_W"></a> <a name="W" id="W"></a> <span class="sansserif"><b><!-- <GROUPTITLESIX> -->W <!-- </GROUPTITLESIX> -->
+        </b></span>
+      </p><br>
+       
+      <dl>
+        <dd>
+          <a name="180244" id="180244"></a> <span class="sansserif">
+           watch method <a href="object.html#1193628">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180246" id="180246"></a> <span class="sansserif">
+           while loops 
+          </span> 
+          <dl>
+            <dd>
+              <a name="180247" id="180247"></a> <span class="sansserif">
+               continuation of <a href="stmt.html#1078923">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180249" id="180249"></a> <span class="sansserif">
+               syntax of <a href="stmt.html#1004896">1</a> 
+              </span>
+            </dd>
+            <dd>
+              <a name="180251" id="180251"></a> <span class="sansserif">
+               termination of <a href="stmt.html#1081298">1</a> 
+              </span>
+            </dd>
+          </dl>
+        </dd>
+        <dd>
+          <a name="180253" id="180253"></a> <span class="sansserif">
+           while statement <a href="stmt.html#1004896">1</a> 
+          </span>
+        </dd>
+        <dd>
+          <a name="180255" id="180255"></a> <span class="sansserif">
+           with statement <a href="stmt.html#1004910">1</a> 
+          </span>
+        </dd>
+      </dl><br>
+       
+      <p>
+        <a name="IX_X" id="IX_X"></a> <a name="X" id="X"></a> <span class="sansserif"><b><!-- <GROUPTITLESIX> -->X <!-- </GROUPTITLESIX> -->
+        </b></span>
+      </p><br>
+       
+      <dl>
+        <dd>
+          <a name="180259" id="180259"></a> <span class="sansserif">
+           XOR (^) operator <a href="ops.html#1042467">1</a> 
+          </span>
+        </dd>
+      </dl><br>
+       
+      <p>
+        <a name="IX_Z" id="IX_Z"></a> <a name="Z" id="Z"></a> <span class="sansserif"><b><!-- <GROUPTITLESIX> -->Z <!-- </GROUPTITLESIX> -->
+        </b></span>
+      </p><br>
+       
+      <dl>
+        <dd>
+          <a name="180264" id="180264"></a> <span class="sansserif">
+           zero-fill right shift (&gt;&gt;&gt;) operator <a href="ops.html#1042493">1</a>, <a href="ops.html#1042525">2</a> 
+          </span>
+        </dd>
+      </dl>
+    </blockquote>
+    <blockquote>
+      <br>
+       <b><a class="sansserifPurple" href="deprecat.html">Previous</a></b>&nbsp;&nbsp;&nbsp;&nbsp; <a href="contents.html"><b class="sansserifPurple">Contents</b></a>&nbsp;&nbsp;&nbsp;&nbsp; 
+      <hr noshade="noshade" size="1">
+      <span class="sansserif">Copyright &copy; 2000 <a href="http://www.netscape.com">Netscape Communications Corp.</a> All rights reserved.</span>
+    </blockquote>
+    <p class="alignright">
+      <span class="sansserif">Last Updated <b>September 28, 2000</b></span>
+    </p>
+  </body>
+</html>

@@ -57,7 +57,7 @@ my %slivers      = ();
 BEGIN { use GeniUtil; GeniUtil::AddCache(\%slivers); }
 
 #
-# Lookup by idx, or uuid.
+# Lookup by URN, idx, or uuid.
 #
 sub Lookup($$)
 {
@@ -66,11 +66,26 @@ sub Lookup($$)
     my $idx;
 
     if (GeniHRN::IsValid($token)) {
-	return undef if !GeniHRN::Authoritative($token, "@OURDOMAIN@");
-
 	my ($authority, $type, $id) = GeniHRN::Parse($token);
 	return undef if $type ne "sliver";
-	$idx = $id;
+
+	if( GeniHRN::Authoritative($token, "@OURDOMAIN@") ) {
+	    # Very simple: we put the index of our own slivers right
+	    # in the name.
+	    $idx = $id;
+	} else {
+	    # Look up the slivers's certificate.
+	    $token = GeniHRN::Normalise( $token );
+	    $query_result = DBQueryWarn(
+		"SELECT geni_slivers.idx FROM geni_slivers, " .
+		"geni_certificates WHERE geni_slivers.uuid = " .
+		"geni_certificates.uuid AND " .
+		"geni_certificates.urn='$token';" );
+
+	    return undef if (! $query_result || !$query_result->numrows);
+
+	    ($idx) = $query_result->fetchrow_array();
+	}
     }
     elsif ($token =~ /^\d+$/) {
 	$idx = $token;
@@ -195,6 +210,8 @@ sub Create($$$$$$$$$)
     push(@insert_data, "resource_id='$resource_id'");
     push(@insert_data, "creator_uuid='$owner_uuid'");
     push(@insert_data, "slice_uuid='$slice_uuid'");
+    # Start out new slivers, as new.
+    push(@insert_data, "state='new'");
 
     if (defined($rspec)) {
 	my $rspec_string = GeniXML::Serialize($rspec);
@@ -556,7 +573,8 @@ use Experiment;
 use emutil;
 use XML::Simple;
 use libdb qw(TBDB_ALLOCSTATE_RES_INIT_DIRTY TBDB_NODESTATE_SHUTDOWN
-	     TBResolveNextOSID TBDB_NODESTATE_ISUP TBDB_NODESTATE_TBFAILED);
+	     TBResolveNextOSID TBDB_NODESTATE_ISUP TBDB_NODESTATE_TBFAILED
+	     TBDB_NODESTATE_PXEWAIT);
 
 # Error log for local physical node.
 sub ErrorLog($)
@@ -652,14 +670,15 @@ sub Create($$$$$$)
 	$hrn = "${PGENIDOMAIN}." . $vnode->node_id();
 	$sliver_uuid = $vnode->uuid();
 	$resource_id = $vnode->node_id();
-	$hostname = $vnode->node_id() . ".${OURDOMAIN}";
-	$sshdport = $vnode->sshdport();
+	$hostname = GeniUtil::FindHostname($vnode->node_id());
+	$sshdport = $vnode->sshdport()
+	    if (!defined($vnode->jailip()));
     }
     else {
 	$hrn = "${PGENIDOMAIN}." . $node->node_id();
 	$sliver_uuid = $node->uuid();
 	$resource_id = $node->node_id();
-	$hostname = $node->node_id() . ".${OURDOMAIN}";
+	$hostname = GeniUtil::FindHostname($node->node_id());
     }
 
     #
@@ -852,6 +871,14 @@ sub UnProvision($;$)
 		$node->ModifyReservation({"genisliver_idx" => 0});
 		goto skip;
 	    }
+	    #
+	    # Look to see if local physical node was stopped (powered off).
+	    #
+	    if (!$node->isvirtnode() &&
+		!$node->isremotenode() &&
+		$self->state() eq "stopped") {
+		system("$POWER on $node_id");
+	    }
 	    system("$NFREE -q $pid $eid $node_id");
 	}
 	if ($?) {
@@ -976,7 +1003,17 @@ sub Start($$$)
 	    }
 	}
 	else {
-	    system("$NODEREBOOT -s $node_id");
+	    #
+	    # Look to see if local physical node was stopped (powered off).
+	    #
+	    if (!$node->isvirtnode() &&
+		!$node->isremotenode() &&
+		$self->state() eq "stopped") {
+		system("$POWER on $node_id");
+	    }
+	    else {
+		system("$NODEREBOOT -s $node_id");
+	    }
 	}
 	return -1
 	    if ($?);
@@ -1083,7 +1120,8 @@ sub ComputeStatus($$)
     elsif ($eventstate eq TBDB_NODESTATE_TBFAILED()) {
 	$status = "failed";
     }
-    elsif ($eventstate eq TBDB_NODESTATE_SHUTDOWN()) {
+    elsif ($eventstate eq TBDB_NODESTATE_SHUTDOWN() ||
+	   $eventstate eq TBDB_NODESTATE_PXEWAIT()) {
 	$status = "notready";
     }
     else {

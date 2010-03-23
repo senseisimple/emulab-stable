@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2006, 2007, 2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2006, 2007, 2009, 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -230,6 +230,7 @@ if (isset($target_project)) {
 }
 else {
     STARTBUSY("User '$target_uid' is being removed!");
+    DOLOGOUT($target_user);
 }
 
 #

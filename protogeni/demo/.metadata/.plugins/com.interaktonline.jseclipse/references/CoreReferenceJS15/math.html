@@ -1,0 +1,3057 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html>
+  <head>
+    <meta content="HTML Tidy for Cygwin (vers 1st February 2003), see www.w3.org" name="generator">
+    <meta name="keywords" content="electronic commerce, ecommerce, ebusiness, e-business, e-commerce, enterprise software, net economy, Netscape, Sun Microsystems, DevEdge Archive, iPlanet, internet software">
+    <meta name="description" content="The DevEdge Archive, a strategic alliance formed by America Online and Sun Microsystems, Inc., is delivering iPlanet e-commerce software and enterprise solutions that enable companies to compete successfully in the Net Economy">
+    <meta http-equiv="Content-Type" content="text/html; charset=us-ascii">
+    <meta name="TEMPLATEBASE" content="Authored in FrameMaker. Converted to HTML in WebWorks Publisher 2000. manual wdt 1.5">
+    <meta name="LASTUPDATED" content="09/28/00 13:15:36">
+    <title>
+      Core JavaScript Reference 1.5:
+    </title>
+    <link rel="stylesheet" type="text/css" href="js15ref.css">
+  </head>
+  <body>
+    <table width="100%" border="0" cellspacing="4">
+      <tr>
+        <td valign="top">
+          <b><a class="sansserifPurple" href="javpkg.html">Previous</a></b>&nbsp;&nbsp;&nbsp;&nbsp; <a href="contents.html"><b class="sansserifPurple">Contents</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="ix.html"><b class="sansserifPurple">Index</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="netscape.html"><b class="sansserifPurple">Next</b></a> &nbsp;&nbsp;&nbsp;&nbsp;
+        </td>
+      </tr>
+      <tr>
+        <td class="sansserifBlack" valign="top" align="right" bgcolor="#CCCCCC">
+          <b>Core JavaScript Reference 1.5</b>
+        </td>
+      </tr>
+    </table><br>
+     
+    <blockquote>
+      <br>
+      <br>
+      <br>
+      <br>
+       
+      <p>
+        <a name="1193138" id="1193138"></a> <a name="Math" id="Math"></a> <span class="sansserif"><b>Math</b></span>
+      </p>
+      <p>
+        <a name="1193139" id="1193139"></a> <span class="sansserif">A built-in object that has properties and methods for mathematical constants and functions. For example, the <span class="mono">Math</span> object's <a href="math.html#1193490">PI</a> property has the value of pi.<br></span>
+      </p><br>
+       
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top" colspan="2" rowspan="1">
+            <p>
+              <a name="1193145" id="1193145"></a> <span class="sansserif"><i>Core object</i></span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193149" id="1193149"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193151" id="1193151"></a> <span class="sansserif">JavaScript 1.0, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1201615" id="1201615"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1201617" id="1201617"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193152" id="1193152"></a> <a name="Created by" id="Created by"></a> <span class="sansserif"><b>Created by</b></span><br>
+         <a name="1193156" id="1193156"></a> <span class="sansserif">The <a href="math.html#1193138">Math</a> object is a top-level, predefined JavaScript object. You can automatically access it without using a constructor or calling a method.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193157" id="1193157"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1193158" id="1193158"></a> <span class="sansserif">All properties and methods of <span class="mono">Math</span> are static. You refer to the constant PI as <span class="mono">Math.PI</span> and you call the sine function as <span class="mono">Math.sin(x)</span>, where <span class="mono">x</span> is the method's argument. Constants are defined with the full precision of real numbers in JavaScript.</span>
+      </p>
+      <p>
+        <a name="1193162" id="1193162"></a> <span class="sansserif">It is often convenient to use the <a href="stmt.html#1004910">with</a> statement when a section of code uses several <span class="mono">Math</span> constants and methods, so you don't have to type "Math" repeatedly. For example,</span>
+      </p>
+      <p>
+        <a name="1193163" id="1193163"></a> <span class="mono">with (Math) {<br>
+         &nbsp;&nbsp;&nbsp;a = PI * r*r<br>
+         &nbsp;&nbsp;&nbsp;y = r*sin(theta)<br>
+         &nbsp;&nbsp;&nbsp;x = r*cos(theta)<br>
+         }</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193164" id="1193164"></a> <a name="Property Summary" id="Property Summary"></a> <span class="sansserif"><b>Property Summary</b></span><br>
+         <a name="1193226" id="1193226"></a> <span class="sansserif"><br></span>
+      </p><br>
+       
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr bgcolor="#CCCCCC" align="left" valign="top">
+          <th valign="top" align="left">
+            <a name="1193167" id="1193167"></a> 
+            <p class="alignleft">
+              <span class="sansserif"><b>Property</b></span>
+            </p>
+          </th>
+          <th valign="top" align="left">
+            <a name="1193169" id="1193169"></a> 
+            <p class="alignleft">
+              <span class="sansserif"><b>Description</b></span>
+            </p>
+          </th>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193174" id="1193174"></a> <span class="mono"><a href="math.html#1193363">E</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193176" id="1193176"></a> <span class="sansserif">Euler's constant and the base of natural logarithms, approximately 2.718.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1216179" id="1216179"></a> <span class="mono"><a href="math.html#1216604">LN2</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1216181" id="1216181"></a> <span class="sansserif">Natural logarithm of 2, approximately 0.693.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193181" id="1193181"></a> <span class="mono"><a href="math.html#1193389">LN10</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193183" id="1193183"></a> <span class="sansserif">Natural logarithm of 10, approximately 2.302.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1216068" id="1216068"></a> <span class="mono"><a href="math.html#1193465">LOG2E</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1216070" id="1216070"></a> <span class="sansserif">Base 2 logarithm of E (approximately 1.442).</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193195" id="1193195"></a> <span class="mono"><a href="math.html#1217093">LOG10E</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193197" id="1193197"></a> <span class="sansserif">Base 10 logarithm of E (approximately 0.434).</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193209" id="1193209"></a> <span class="mono"><a href="math.html#1193490">PI</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193211" id="1193211"></a> <span class="sansserif">Ratio of the circumference of a circle to its diameter, approximately 3.14159.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193216" id="1193216"></a> <span class="mono"><a href="math.html#1193515">SQRT1_2</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193218" id="1193218"></a> <span class="sansserif">Square root of 1/2; equivalently, 1 over the square root of 2, approximately 0.707.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193223" id="1193223"></a> <span class="mono"><a href="math.html#1193540">SQRT2</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193225" id="1193225"></a> <span class="sansserif">Square root of 2, approximately 1.414.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193227" id="1193227"></a> <a name="Method Summary" id="Method Summary"></a> <span class="sansserif"><b>Method Summary</b></span><br>
+         <a name="1193359" id="1193359"></a> <span class="sansserif"><br></span>
+      </p><br>
+       
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr bgcolor="#CCCCCC" align="left" valign="top">
+          <th valign="top" align="left">
+            <a name="1193230" id="1193230"></a> 
+            <p class="alignleft">
+              <span class="sansserif"><b>Method</b></span>
+            </p>
+          </th>
+          <th valign="top" align="left">
+            <a name="1193232" id="1193232"></a> 
+            <p class="alignleft">
+              <span class="sansserif"><b>Description</b></span>
+            </p>
+          </th>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193237" id="1193237"></a> <span class="mono"><a href="math.html#1195395">abs</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193239" id="1193239"></a> <span class="sansserif">Returns the absolute value of a number.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193244" id="1193244"></a> <span class="mono"><a href="math.html#1195429">acos</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193246" id="1193246"></a> <span class="sansserif">Returns the arccosine (in radians) of a number.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193251" id="1193251"></a> <span class="mono"><a href="math.html#1195485">asin</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193253" id="1193253"></a> <span class="sansserif">Returns the arcsine (in radians) of a number.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193258" id="1193258"></a> <span class="mono"><a href="math.html#1195541">atan</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193260" id="1193260"></a> <span class="sansserif">Returns the arctangent (in radians) of a number.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193265" id="1193265"></a> <span class="mono"><a href="math.html#1195597">atan2</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193267" id="1193267"></a> <span class="sansserif">Returns the arctangent of the quotient of its arguments.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193272" id="1193272"></a> <span class="mono"><a href="math.html#1195654">ceil</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193274" id="1193274"></a> <span class="sansserif">Returns the smallest integer greater than or equal to a number.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193279" id="1193279"></a> <span class="mono"><a href="math.html#1195695">cos</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193281" id="1193281"></a> <span class="sansserif">Returns the cosine of a number.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193286" id="1193286"></a> <span class="mono"><a href="math.html#1196408">exp</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193288" id="1193288"></a> <span class="sansserif">Returns E<sup>number</sup>, where <span class="mono">number</span> is the argument, and E is Euler's constant, the base of the natural logarithms.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193293" id="1193293"></a> <span class="mono"><a href="math.html#1196455">floor</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193295" id="1193295"></a> <span class="sansserif">Returns the largest integer less than or equal to a number.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193300" id="1193300"></a> <span class="mono"><a href="math.html#1196917">log</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193302" id="1193302"></a> <span class="sansserif">Returns the natural logarithm (base E) of a number.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193307" id="1193307"></a> <span class="mono"><a href="math.html#1197362">max</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193309" id="1193309"></a> <span class="sansserif">Returns the greater of two numbers.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193314" id="1193314"></a> <span class="mono"><a href="math.html#1197403">min</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193316" id="1193316"></a> <span class="sansserif">Returns the lesser of two numbers.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193321" id="1193321"></a> <span class="mono"><a href="math.html#1197651">pow</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193323" id="1193323"></a> <span class="sansserif">Returns <span class="mono">base</span> to the <span class="mono">exponent</span> power, that is, <span class="mono">base</span> <sup>exponent</sup>.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193328" id="1193328"></a> <span class="mono"><a href="math.html#1197697">random</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193330" id="1193330"></a> <span class="sansserif">Returns a pseudo-random number between 0 and 1.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193335" id="1193335"></a> <span class="mono"><a href="math.html#1197725">round</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193337" id="1193337"></a> <span class="sansserif">Returns the value of a number rounded to the nearest integer.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193342" id="1193342"></a> <span class="mono"><a href="math.html#1197769">sin</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193344" id="1193344"></a> <span class="sansserif">Returns the sine of a number.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193349" id="1193349"></a> <span class="mono"><a href="math.html#1197825">sqrt</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193351" id="1193351"></a> <span class="sansserif">Returns the square root of a number.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193356" id="1193356"></a> <span class="mono"><a href="math.html#1194346">tan</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193358" id="1193358"></a> <span class="sansserif">Returns the tangent of a number.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <a name="1205814" id="1205814"></a> <span class="sansserif">In addition, this object inherits the <a href="object.html#1193628">watch</a> and <a href="object.html#1193499">unwatch</a> methods from <a href="object.html#1193136">Object</a>.</span>
+      </p>
+      <p>
+        <a name="1195395" id="1195395"></a> <a name="abs" id="abs"></a> <span class="sansserif"><b>abs</b></span>
+      </p>
+      <p>
+        <a name="1195412" id="1195412"></a> <span class="sansserif">Returns the absolute value of a number.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1195398" id="1195398"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1195403" id="1195403"></a> <span class="sansserif"><a href="math.html#1193138">Math</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top" colspan="2" rowspan="1">
+            <p>
+              <a name="1195405" id="1195405"></a> <span class="sansserif"><i>Static</i></span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1195409" id="1195409"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1195411" id="1195411"></a> <span class="sansserif">JavaScript 1.0, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1201648" id="1201648"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1201650" id="1201650"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1195413" id="1195413"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1195414" id="1195414"></a> <span class="mono">abs(<i>x</i>)</span>
+      </p>
+      <p>
+        <br>
+         <a name="1195415" id="1195415"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1195421" id="1195421"></a> <span class="sansserif"><br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <a name="1195418" id="1195418"></a> <span class="mono">x</span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1195420" id="1195420"></a> <span class="sansserif">A number</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1195422" id="1195422"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1195423" id="1195423"></a> <span class="sansserif">The following function returns the absolute value of the variable <span class="mono">x</span>:</span>
+      </p>
+      <p>
+        <a name="1195424" id="1195424"></a> <span class="mono">function getAbs(x) {<br>
+         &nbsp;&nbsp;&nbsp;return Math.abs(x)<br>
+         }</span>
+      </p>
+      <p>
+        <br>
+         <a name="1195425" id="1195425"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1195426" id="1195426"></a> <span class="sansserif">Because <span class="mono">abs</span> is a static method of <span class="mono">Math</span>, you always use it as <span class="mono">Math.abs()</span>, rather than as a method of a <span class="mono">Math</span> object you created.</span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1195429" id="1195429"></a> <a name="acos" id="acos"></a> <span class="sansserif"><b>acos</b></span>
+      </p>
+      <p>
+        <a name="1195446" id="1195446"></a> <span class="sansserif">Returns the arccosine (in radians) of a number.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1195432" id="1195432"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1195437" id="1195437"></a> <span class="sansserif"><a href="math.html#1193138">Math</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top" colspan="2" rowspan="1">
+            <p>
+              <a name="1195439" id="1195439"></a> <span class="sansserif"><i>Static</i></span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1195443" id="1195443"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1195445" id="1195445"></a> <span class="sansserif">JavaScript 1.0, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1201669" id="1201669"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1201671" id="1201671"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1195447" id="1195447"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1195448" id="1195448"></a> <span class="mono">acos(<i>x</i>)</span>
+      </p>
+      <p>
+        <br>
+         <a name="1195449" id="1195449"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1195455" id="1195455"></a> <span class="sansserif"><br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <a name="1195452" id="1195452"></a> <span class="mono">x</span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1195454" id="1195454"></a> <span class="sansserif">A number</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1195456" id="1195456"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1195457" id="1195457"></a> <span class="sansserif">The <span class="mono">acos</span> method returns a numeric value between 0 and pi radians. If the value of <span class="mono">number</span> is outside this range, it returns <span class="mono">NaN</span>.</span>
+      </p>
+      <p>
+        <a name="1195458" id="1195458"></a> <span class="sansserif">Because <span class="mono">acos</span> is a static method of <span class="mono">Math</span>, you always use it as <span class="mono">Math.acos()</span>, rather than as a method of a <span class="mono">Math</span> object you created.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1195459" id="1195459"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1195460" id="1195460"></a> <span class="sansserif">The following function returns the arccosine of the variable <span class="mono">x</span>:</span>
+      </p>
+      <p>
+        <a name="1195461" id="1195461"></a> <span class="mono">function getAcos(x) {<br>
+         &nbsp;&nbsp;&nbsp;return Math.acos(x)<br>
+         }</span>
+      </p>
+      <p>
+        <a name="1195462" id="1195462"></a> <span class="sansserif">If you pass -1 to <span class="mono">getAcos</span>, it returns 3.141592653589793; if you pass 2, it returns <span class="mono">NaN</span> because 2 is out of range.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1195463" id="1195463"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1195482" id="1195482"></a> <span class="sansserif"><a href="math.html#1195485">Math.asin</a>, <a href="math.html#1195541">Math.atan</a>, <a href="math.html#1195597">Math.atan2</a>, <a href="math.html#1195695">Math.cos</a>, <a href="math.html#1197769">Math.sin</a>, <a href="math.html#1194346">Math.tan</a></span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1195485" id="1195485"></a> <a name="asin" id="asin"></a> <span class="sansserif"><b>asin</b></span>
+      </p>
+      <p>
+        <a name="1195502" id="1195502"></a> <span class="sansserif">Returns the arcsine (in radians) of a number.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1195488" id="1195488"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1195493" id="1195493"></a> <span class="sansserif"><a href="math.html#1193138">Math</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top" colspan="2" rowspan="1">
+            <p>
+              <a name="1195495" id="1195495"></a> <span class="sansserif"><i>Static</i></span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1195499" id="1195499"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1195501" id="1195501"></a> <span class="sansserif">JavaScript 1.0, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1201682" id="1201682"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1201684" id="1201684"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1195503" id="1195503"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1195504" id="1195504"></a> <span class="mono">asin(<i>x</i>)</span>
+      </p>
+      <p>
+        <br>
+         <a name="1195505" id="1195505"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1195511" id="1195511"></a> <span class="sansserif"><br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <a name="1195508" id="1195508"></a> <span class="mono">x</span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1195510" id="1195510"></a> <span class="sansserif">A number</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1195512" id="1195512"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1195513" id="1195513"></a> <span class="sansserif">The <span class="mono">asin</span> method returns a numeric value between -pi/2 and pi/2 radians. If the value of <span class="mono">number</span> is outside this range, it returns <span class="mono">NaN</span>.</span>
+      </p>
+      <p>
+        <a name="1195514" id="1195514"></a> <span class="sansserif">Because <span class="mono">asin</span> is a static method of <span class="mono">Math</span>, you always use it as <span class="mono">Math.asin()</span>, rather than as a method of a <span class="mono">Math</span> object you created.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1195515" id="1195515"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1195516" id="1195516"></a> <span class="sansserif">The following function returns the arcsine of the variable <span class="mono">x</span>:</span>
+      </p>
+      <p>
+        <a name="1195517" id="1195517"></a> <span class="mono">function getAsin(x) {<br>
+         &nbsp;&nbsp;&nbsp;return Math.asin(x)<br>
+         }</span>
+      </p>
+      <p>
+        <a name="1195518" id="1195518"></a> <span class="sansserif">If you pass <span class="mono">getAsin</span> the value 1, it returns 1.570796326794897 (pi/2); if you pass it the value 2, it returns <span class="mono">NaN</span> because 2 is out of range.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1195519" id="1195519"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1195538" id="1195538"></a> <span class="sansserif"><a href="math.html#1195429">Math.acos</a>, <a href="math.html#1195541">Math.atan</a>, <a href="math.html#1195597">Math.atan2</a>, <a href="math.html#1195695">Math.cos</a>, <a href="math.html#1197769">Math.sin</a>, <a href="math.html#1194346">Math.tan</a></span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1195541" id="1195541"></a> <a name="atan" id="atan"></a> <span class="sansserif"><b>atan</b></span>
+      </p>
+      <p>
+        <a name="1195558" id="1195558"></a> <span class="sansserif">Returns the arctangent (in radians) of a number.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1195544" id="1195544"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1195549" id="1195549"></a> <span class="sansserif"><a href="math.html#1193138">Math</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top" colspan="2" rowspan="1">
+            <p>
+              <a name="1195551" id="1195551"></a> <span class="sansserif"><i>Static</i></span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1195555" id="1195555"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1195557" id="1195557"></a> <span class="sansserif">JavaScript 1.0, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1201695" id="1201695"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1201697" id="1201697"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1195559" id="1195559"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1195560" id="1195560"></a> <span class="mono">atan(<i>x</i>)</span>
+      </p>
+      <p>
+        <br>
+         <a name="1195561" id="1195561"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1195567" id="1195567"></a> <span class="sansserif"><br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <a name="1195564" id="1195564"></a> <span class="mono">x</span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1195566" id="1195566"></a> <span class="sansserif">A number</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1195568" id="1195568"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1195569" id="1195569"></a> <span class="sansserif">The <span class="mono">atan</span> method returns a numeric value between -pi/2 and pi/2 radians.</span>
+      </p>
+      <p>
+        <a name="1195570" id="1195570"></a> <span class="sansserif">Because <span class="mono">atan</span> is a static method of <span class="mono">Math</span>, you always use it as <span class="mono">Math.atan()</span>, rather than as a method of a <span class="mono">Math</span> object you created.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1195571" id="1195571"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1195572" id="1195572"></a> <span class="sansserif">The following function returns the arctangent of the variable <span class="mono">x</span>:</span>
+      </p>
+      <p>
+        <a name="1195573" id="1195573"></a> <span class="mono">function getAtan(x) {<br>
+         &nbsp;&nbsp;&nbsp;return Math.atan(x)<br>
+         }</span>
+      </p>
+      <p>
+        <a name="1195574" id="1195574"></a> <span class="sansserif">If you pass <span class="mono">getAtan</span> the value 1, it returns 0.7853981633974483; if you pass it the value .5, it returns 0.4636476090008061.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1195575" id="1195575"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1195594" id="1195594"></a> <span class="sansserif"><a href="math.html#1195429">Math.acos</a>, <a href="math.html#1195485">Math.asin</a>, <a href="math.html#1195597">Math.atan2</a>, <a href="math.html#1195695">Math.cos</a>, <a href="math.html#1197769">Math.sin</a>, <a href="math.html#1194346">Math.tan</a></span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1195597" id="1195597"></a> <a name="atan2" id="atan2"></a> <span class="sansserif"><b>atan2</b></span>
+      </p>
+      <p>
+        <a name="1195614" id="1195614"></a> <span class="sansserif">Returns the arctangent of the quotient of its arguments.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1195600" id="1195600"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1195605" id="1195605"></a> <span class="sansserif"><a href="math.html#1193138">Math</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top" colspan="2" rowspan="1">
+            <p>
+              <a name="1195607" id="1195607"></a> <span class="sansserif"><i>Static</i></span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1195611" id="1195611"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1195613" id="1195613"></a> <span class="sansserif">JavaScript 1.0, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1201757" id="1201757"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1201759" id="1201759"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1195615" id="1195615"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1195616" id="1195616"></a> <span class="mono">atan2(<i>y</i>, <i>x</i>)</span>
+      </p>
+      <p>
+        <br>
+         <a name="1195617" id="1195617"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1195623" id="1195623"></a> <span class="sansserif"><br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <a name="1195620" id="1195620"></a> <span class="mono">y, x</span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1195622" id="1195622"></a> <span class="sansserif">Number</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1195624" id="1195624"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1195625" id="1195625"></a> <span class="sansserif">The <span class="mono">atan2</span> method returns a numeric value between -pi and pi representing the angle theta of an (<span class="mono">x,y</span>) point. This is the counterclockwise angle, measured in radians, between the positive X axis, and the point (<span class="mono">x,y</span>). Note that the arguments to this function pass the y-coordinate first and the x-coordinate second.</span>
+      </p>
+      <p>
+        <a name="1195626" id="1195626"></a> <span class="sansserif"><span class="mono">atan2</span> is passed separate <span class="mono">x</span> and <span class="mono">y</span> arguments, and <span class="mono">atan</span> is passed the ratio of those two arguments.</span>
+      </p>
+      <p>
+        <a name="1195627" id="1195627"></a> <span class="sansserif">Because <span class="mono">atan2</span> is a static method of <span class="mono">Math</span>, you always use it as <span class="mono">Math.atan2()</span>, rather than as a method of a <span class="mono">Math</span> object you created.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1195628" id="1195628"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1195629" id="1195629"></a> <span class="sansserif">The following function returns the angle of the polar coordinate:</span>
+      </p>
+      <p>
+        <a name="1195630" id="1195630"></a> <span class="mono">function getAtan2(x,y) {<br>
+         &nbsp;&nbsp;&nbsp;return Math.atan2(x,y)<br>
+         }</span>
+      </p>
+      <p>
+        <a name="1195631" id="1195631"></a> <span class="sansserif">If you pass <span class="mono">getAtan2</span> the values (90,15), it returns 1.4056476493802699; if you pass it the values (15,90), it returns 0.16514867741462683.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1195632" id="1195632"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1195651" id="1195651"></a> <span class="sansserif"><a href="math.html#1195429">Math.acos</a>, <a href="math.html#1195485">Math.asin</a>, <a href="math.html#1195541">Math.atan</a>, <a href="math.html#1195695">Math.cos</a>, <a href="math.html#1197769">Math.sin</a>, <a href="math.html#1194346">Math.tan</a></span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1195654" id="1195654"></a> <a name="ceil" id="ceil"></a> <span class="sansserif"><b>ceil</b></span>
+      </p>
+      <p>
+        <a name="1195672" id="1195672"></a> <span class="sansserif">Returns the smallest integer greater than or equal to a number.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1195658" id="1195658"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1195663" id="1195663"></a> <span class="sansserif"><a href="math.html#1193138">Math</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top" colspan="2" rowspan="1">
+            <p>
+              <a name="1195665" id="1195665"></a> <span class="sansserif"><i>Static</i></span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1195669" id="1195669"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1195671" id="1195671"></a> <span class="sansserif">JavaScript 1.0, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1201809" id="1201809"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1201811" id="1201811"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1195673" id="1195673"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1195674" id="1195674"></a> <span class="mono">ceil(<i>x</i>)</span>
+      </p>
+      <p>
+        <br>
+         <a name="1195675" id="1195675"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1195681" id="1195681"></a> <span class="sansserif"><br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <a name="1195678" id="1195678"></a> <span class="mono">x</span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1195680" id="1195680"></a> <span class="sansserif">A number</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1195682" id="1195682"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1195683" id="1195683"></a> <span class="sansserif">Because <span class="mono">ceil</span> is a static method of <span class="mono">Math</span>, you always use it as <span class="mono">Math.ceil()</span>, rather than as a method of a <span class="mono">Math</span> object you created.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1195684" id="1195684"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1195685" id="1195685"></a> <span class="sansserif">The following function returns the ceil value of the variable <span class="mono">x</span>:</span>
+      </p>
+      <p>
+        <a name="1195686" id="1195686"></a> <span class="mono">function getCeil(x) {<br>
+         &nbsp;&nbsp;&nbsp;return Math.ceil(x)<br>
+         }</span>
+      </p>
+      <p>
+        <a name="1195687" id="1195687"></a> <span class="sansserif">If you pass 45.95 to <span class="mono">getCeil</span>, it returns 46; if you pass -45.95, it returns -45.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1195688" id="1195688"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1195692" id="1195692"></a> <span class="sansserif"><a href="math.html#1196455">Math.floor</a></span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1195695" id="1195695"></a> <a name="cos" id="cos"></a> <span class="sansserif"><b>cos</b></span>
+      </p>
+      <p>
+        <a name="1195713" id="1195713"></a> <span class="sansserif">Returns the cosine of a number.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1195699" id="1195699"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1195704" id="1195704"></a> <span class="sansserif"><a href="math.html#1193138">Math</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top" colspan="2" rowspan="1">
+            <p>
+              <a name="1195706" id="1195706"></a> <span class="sansserif"><i>Static</i></span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1195710" id="1195710"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1195712" id="1195712"></a> <span class="sansserif">JavaScript 1.0, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1201822" id="1201822"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1201824" id="1201824"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1195714" id="1195714"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1195715" id="1195715"></a> <span class="mono">cos(<i>x</i>)</span>
+      </p>
+      <p>
+        <br>
+         <a name="1195716" id="1195716"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1195722" id="1195722"></a> <span class="sansserif"><br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <a name="1195719" id="1195719"></a> <span class="mono">x</span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1195721" id="1195721"></a> <span class="sansserif">A number</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1195723" id="1195723"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1195724" id="1195724"></a> <span class="sansserif">The <span class="mono">cos</span> method returns a numeric value between -1 and 1, which represents the cosine of the angle.</span>
+      </p>
+      <p>
+        <a name="1195725" id="1195725"></a> <span class="sansserif">Because <span class="mono">cos</span> is a static method of <span class="mono">Math</span>, you always use it as <span class="mono">Math.cos()</span>, rather than as a method of a <span class="mono">Math</span> object you created.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1195726" id="1195726"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1195727" id="1195727"></a> <span class="sansserif">The following function returns the cosine of the variable <span class="mono">x</span>:</span>
+      </p>
+      <p>
+        <a name="1195728" id="1195728"></a> <span class="mono">function getCos(x) {<br>
+         &nbsp;&nbsp;&nbsp;return Math.cos(x)<br>
+         }</span>
+      </p>
+      <p>
+        <a name="1195729" id="1195729"></a> <span class="sansserif">If <span class="mono">x</span> equals 2*<span class="mono">Math.PI</span>, <span class="mono">getCos</span> returns 1; if <span class="mono">x</span> equals <span class="mono">Math.PI</span>, the <span class="mono">getCos</span> method returns -1.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1195730" id="1195730"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1195746" id="1195746"></a> <span class="sansserif"><a href="math.html#1195429">Math.acos</a>, <a href="math.html#1195485">Math.asin</a>, <a href="math.html#1195541">Math.atan</a>, <a href="math.html#1195597">Math.atan2</a>, <a href="math.html#1197769">Math.sin</a>, <a href="math.html#1194346">Math.tan</a></span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1193363" id="1193363"></a> <a name="E" id="E"></a> <span class="sansserif"><b>E</b></span>
+      </p>
+      <p>
+        <a name="1193381" id="1193381"></a> <span class="sansserif">Euler's constant and the base of natural logarithms, approximately 2.718.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193367" id="1193367"></a> <span class="sansserif"><i>Property of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193372" id="1193372"></a> <span class="sansserif"><a href="math.html#1193138">Math</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top" colspan="2" rowspan="1">
+            <p>
+              <a name="1193374" id="1193374"></a> <span class="sansserif"><i>Static, Read-only</i></span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193378" id="1193378"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193380" id="1193380"></a> <span class="sansserif">JavaScript 1.0, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1201892" id="1201892"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1201894" id="1201894"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1201530" id="1201530"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1201531" id="1201531"></a> <span class="sansserif">Because <span class="mono">E</span> is a static property of <span class="mono">Math</span>, you always use it as <span class="mono">Math.E</span>, rather than as a property of a <span class="mono">Math</span> object you created.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193382" id="1193382"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1193383" id="1193383"></a> <span class="sansserif">The following function returns Euler's constant:</span>
+      </p>
+      <p>
+        <a name="1193384" id="1193384"></a> <span class="mono">function getEuler() {<br>
+         &nbsp;&nbsp;&nbsp;return Math.E<br>
+         }</span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1196408" id="1196408"></a> <a name="exp" id="exp"></a> <span class="sansserif"><b>exp</b></span>
+      </p>
+      <p>
+        <a name="1196410" id="1196410"></a> <span class="sansserif">Returns E<sup>x</sup>, where <span class="mono">x</span> is the argument, and <span class="mono">E</span> is Euler's constant, the base of the natural logarithms.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1196413" id="1196413"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1196418" id="1196418"></a> <span class="sansserif"><a href="math.html#1193138">Math</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top" colspan="2" rowspan="1">
+            <p>
+              <a name="1196420" id="1196420"></a> <span class="sansserif"><i>Static</i></span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1196424" id="1196424"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1196426" id="1196426"></a> <span class="sansserif">JavaScript 1.0, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1201909" id="1201909"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1201911" id="1201911"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1196427" id="1196427"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1196428" id="1196428"></a> <span class="mono">exp(x)</span>
+      </p>
+      <p>
+        <br>
+         <a name="1196429" id="1196429"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1196435" id="1196435"></a> <span class="sansserif"><br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <a name="1196432" id="1196432"></a> <span class="mono">x</span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1196434" id="1196434"></a> <span class="sansserif">A number</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1196436" id="1196436"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1196437" id="1196437"></a> <span class="sansserif">Because <span class="mono">exp</span> is a static method of <span class="mono">Math</span>, you always use it as <span class="mono">Math.exp()</span>, rather than as a method of a <span class="mono">Math</span> object you created.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1196438" id="1196438"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1196439" id="1196439"></a> <span class="sansserif">The following function returns the exponential value of the variable <span class="mono">x</span>:</span>
+      </p>
+      <p>
+        <a name="1196440" id="1196440"></a> <span class="mono">function getExp(x) {<br>
+         &nbsp;&nbsp;&nbsp;return Math.exp(x)<br>
+         }</span>
+      </p>
+      <p>
+        <a name="1196441" id="1196441"></a> <span class="sansserif">If you pass <span class="mono">getExp</span> the value 1, it returns 2.718281828459045.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1196442" id="1196442"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1196452" id="1196452"></a> <span class="sansserif"><a href="math.html#1193363">Math.E</a>, <a href="math.html#1196917">Math.log</a>, <a href="math.html#1197651">Math.pow</a></span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1196455" id="1196455"></a> <a name="floor" id="floor"></a> <span class="sansserif"><b>floor</b></span>
+      </p>
+      <p>
+        <a name="1196472" id="1196472"></a> <span class="sansserif">Returns the largest integer less than or equal to a number.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1196458" id="1196458"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1196463" id="1196463"></a> <span class="sansserif"><a href="math.html#1193138">Math</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top" colspan="2" rowspan="1">
+            <p>
+              <a name="1196465" id="1196465"></a> <span class="sansserif"><i>Static</i></span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1196469" id="1196469"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1196471" id="1196471"></a> <span class="sansserif">JavaScript 1.0, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1201918" id="1201918"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1201920" id="1201920"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1196473" id="1196473"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1196474" id="1196474"></a> <span class="mono">floor(<i>x</i>)</span>
+      </p>
+      <p>
+        <br>
+         <a name="1196475" id="1196475"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1196481" id="1196481"></a> <span class="sansserif"><br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <a name="1196478" id="1196478"></a> <span class="mono">x</span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1196480" id="1196480"></a> <span class="sansserif">A number</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1196482" id="1196482"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1196483" id="1196483"></a> <span class="sansserif">Because <span class="mono">floor</span> is a static method of <span class="mono">Math</span>, you always use it as <span class="mono">Math.floor()</span>, rather than as a method of a <span class="mono">Math</span> object you created.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1196484" id="1196484"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1196485" id="1196485"></a> <span class="sansserif">The following function returns the floor value of the variable <span class="mono">x</span>:</span>
+      </p>
+      <p>
+        <a name="1196486" id="1196486"></a> <span class="mono">function getFloor(x) {<br>
+         &nbsp;&nbsp;&nbsp;return Math.floor(x)<br>
+         }</span>
+      </p>
+      <p>
+        <a name="1196487" id="1196487"></a> <span class="sansserif">If you pass 45.95 to <span class="mono">getFloor</span>, it returns 45; if you pass -45.95, it returns -46.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1196488" id="1196488"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1196492" id="1196492"></a> <span class="sansserif"><a href="math.html#1195654">Math.ceil</a></span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1216604" id="1216604"></a> <a name="LN2" id="LN2"></a> <span class="sansserif"><b>LN2</b></span>
+      </p>
+      <p>
+        <a name="1216625" id="1216625"></a> <span class="sansserif">The natural logarithm of 2, approximately 0.693.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1216607" id="1216607"></a> <span class="sansserif"><i>Property of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1216612" id="1216612"></a> <span class="sansserif"><a href="math.html#1193138">Math</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top" colspan="2" rowspan="1">
+            <p>
+              <a name="1216614" id="1216614"></a> <span class="sansserif"><i>Static, Read-only</i></span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1216618" id="1216618"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1216620" id="1216620"></a> <span class="sansserif">JavaScript 1.0, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1216622" id="1216622"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1216624" id="1216624"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1216626" id="1216626"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1216627" id="1216627"></a> <span class="sansserif">The following function returns the natural log of 2:</span>
+      </p>
+      <p>
+        <a name="1216628" id="1216628"></a> <span class="mono">function getNatLog2() {<br>
+         &nbsp;&nbsp;&nbsp;return Math.LN2<br>
+         }</span>
+      </p>
+      <p>
+        <br>
+         <a name="1216629" id="1216629"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1216630" id="1216630"></a> <span class="sansserif">Because <span class="mono">LN2</span> is a static property of <span class="mono">Math</span>, you always use it as <span class="mono">Math.LN2</span>, rather than as a property of a <span class="mono">Math</span> object you created.</span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1193389" id="1193389"></a> <a name="LN10" id="LN10"></a> <span class="sansserif"><b>LN10</b></span>
+      </p>
+      <p>
+        <a name="1193407" id="1193407"></a> <span class="sansserif">The natural logarithm of 10, approximately 2.302.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193393" id="1193393"></a> <span class="sansserif"><i>Property of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193398" id="1193398"></a> <span class="sansserif"><a href="math.html#1193138">Math</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top" colspan="2" rowspan="1">
+            <p>
+              <a name="1193400" id="1193400"></a> <span class="sansserif"><i>Static, Read-only</i></span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193404" id="1193404"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193406" id="1193406"></a> <span class="sansserif">JavaScript 1.0, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1201931" id="1201931"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1201933" id="1201933"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193408" id="1193408"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1193409" id="1193409"></a> <span class="sansserif">The following function returns the natural log of 10:</span>
+      </p>
+      <p>
+        <a name="1193410" id="1193410"></a> <span class="mono">function getNatLog10() {<br>
+         &nbsp;&nbsp;&nbsp;return Math.LN10<br>
+         }</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193411" id="1193411"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1193412" id="1193412"></a> <span class="sansserif">Because <span class="mono">LN10</span> is a static property of <span class="mono">Math</span>, you always use it as <span class="mono">Math.LN10</span>, rather than as a property of a <span class="mono">Math</span> object you created.</span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1196917" id="1196917"></a> <a name="log" id="log"></a> <span class="sansserif"><b>log</b></span>
+      </p>
+      <p>
+        <a name="1196934" id="1196934"></a> <span class="sansserif">Returns the natural logarithm (base <span class="mono">E</span>) of a number.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1196920" id="1196920"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1196925" id="1196925"></a> <span class="sansserif"><a href="math.html#1193138">Math</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top" colspan="2" rowspan="1">
+            <p>
+              <a name="1196927" id="1196927"></a> <span class="sansserif"><i>Static</i></span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1196931" id="1196931"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1196933" id="1196933"></a> <span class="sansserif">JavaScript 1.0, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1201993" id="1201993"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1201995" id="1201995"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1196935" id="1196935"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1196936" id="1196936"></a> <span class="mono">log(<i>x</i>)</span>
+      </p>
+      <p>
+        <br>
+         <a name="1196937" id="1196937"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1196943" id="1196943"></a> <span class="sansserif"><br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <a name="1196940" id="1196940"></a> <span class="mono">x</span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1196942" id="1196942"></a> <span class="sansserif">A number</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1196944" id="1196944"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1205911" id="1205911"></a> <span class="sansserif">If the value of <span class="mono">number</span> is negative, the return value is always <span class="mono">NaN</span>.</span>
+      </p>
+      <p>
+        <a name="1196946" id="1196946"></a> <span class="sansserif">Because <span class="mono">log</span> is a static method of <span class="mono">Math</span>, you always use it as <span class="mono">Math.log()</span>, rather than as a method of a <span class="mono">Math</span> object you created.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1196947" id="1196947"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1196948" id="1196948"></a> <span class="sansserif">The following function returns the natural log of the variable <span class="mono">x</span>:</span>
+      </p>
+      <p>
+        <a name="1196949" id="1196949"></a> <span class="mono">function getLog(x) {<br>
+         &nbsp;&nbsp;&nbsp;return Math.log(x)<br>
+         }</span>
+      </p>
+      <p>
+        <a name="1196950" id="1196950"></a> <span class="sansserif">If you pass <span class="mono">getLog</span> the value 10, it returns 2.302585092994046; if you pass it the value 0, it returns <span class="mono">-Infinity</span>; if you pass it the value -1, it returns <span class="mono">NaN</span> because -1 is out of range.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1196951" id="1196951"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1196958" id="1196958"></a> <span class="sansserif"><a href="math.html#1196408">Math.exp</a>, <a href="math.html#1197651">Math.pow</a></span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1193465" id="1193465"></a> <a name="LOG2E" id="LOG2E"></a> <span class="sansserif"><b>LOG2E</b></span>
+      </p>
+      <p>
+        <a name="1193482" id="1193482"></a> <span class="sansserif">The base 2 logarithm of E (approximately 1.442).<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193468" id="1193468"></a> <span class="sansserif"><i>Property of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193473" id="1193473"></a> <span class="sansserif"><a href="math.html#1193138">Math</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top" colspan="2" rowspan="1">
+            <p>
+              <a name="1193475" id="1193475"></a> <span class="sansserif"><i>Static, Read-only</i></span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193479" id="1193479"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193481" id="1193481"></a> <span class="sansserif">JavaScript 1.0, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1202007" id="1202007"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1202009" id="1202009"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193483" id="1193483"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1193484" id="1193484"></a> <span class="sansserif">The following function returns the base 2 logarithm of E:</span>
+      </p>
+      <p>
+        <a name="1193485" id="1193485"></a> <span class="mono">function getLog2e() {<br>
+         &nbsp;&nbsp;&nbsp;return Math.LOG2E<br>
+         }</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193486" id="1193486"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1193487" id="1193487"></a> <span class="sansserif">Because <span class="mono">LOG2E</span> is a static property of <span class="mono">Math</span>, you always use it as <span class="mono">Math.LOG2E</span>, rather than as a property of a <span class="mono">Math</span> object you created.</span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1217093" id="1217093"></a> <a name="LOG10E" id="LOG10E"></a> <span class="sansserif"><b>LOG10E</b></span>
+      </p>
+      <p>
+        <a name="1217114" id="1217114"></a> <span class="sansserif">The base 10 logarithm of E (approximately 0.434).<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1217096" id="1217096"></a> <span class="sansserif"><i>Property of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1217101" id="1217101"></a> <span class="sansserif"><a href="math.html#1193138">Math</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top" colspan="2" rowspan="1">
+            <p>
+              <a name="1217103" id="1217103"></a> <span class="sansserif"><i>Static, Read-only</i></span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1217107" id="1217107"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1217109" id="1217109"></a> <span class="sansserif">JavaScript 1.0, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1217111" id="1217111"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1217113" id="1217113"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1217115" id="1217115"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1217116" id="1217116"></a> <span class="sansserif">The following function returns the base 10 logarithm of <span class="mono">E</span>:</span>
+      </p>
+      <p>
+        <a name="1217117" id="1217117"></a> <span class="mono">function getLog10e() {<br>
+         &nbsp;&nbsp;&nbsp;return Math.LOG10E<br>
+         }</span>
+      </p>
+      <p>
+        <br>
+         <a name="1217118" id="1217118"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1217119" id="1217119"></a> <span class="sansserif">Because <span class="mono">LOG10E</span> is a static property of <span class="mono">Math</span>, you always use it as <span class="mono">Math.LOG10E</span>, rather than as a property of a <span class="mono">Math</span> object you created.</span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1197362" id="1197362"></a> <a name="max" id="max"></a> <span class="sansserif"><b>max</b></span>
+      </p>
+      <p>
+        <a name="1197380" id="1197380"></a> <span class="sansserif">Returns the larger of two numbers.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1197366" id="1197366"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1197371" id="1197371"></a> <span class="sansserif"><a href="math.html#1193138">Math</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top" colspan="2" rowspan="1">
+            <p>
+              <a name="1197373" id="1197373"></a> <span class="sansserif"><i>Static</i></span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1197377" id="1197377"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1197379" id="1197379"></a> <span class="sansserif">JavaScript 1.0, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1202016" id="1202016"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1202018" id="1202018"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1197381" id="1197381"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1197382" id="1197382"></a> <span class="mono">max(<i>x</i>,<i>y</i>)</span>
+      </p>
+      <p>
+        <br>
+         <a name="1197383" id="1197383"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1197389" id="1197389"></a> <span class="sansserif"><br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <a name="1197386" id="1197386"></a> <span class="mono">x, y</span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1197388" id="1197388"></a> <span class="sansserif">Numbers.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1197390" id="1197390"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1197391" id="1197391"></a> <span class="sansserif">Because <span class="mono">max</span> is a static method of <span class="mono">Math</span>, you always use it as <span class="mono">Math.max()</span>, rather than as a method of a <span class="mono">Math</span> object you created.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1197392" id="1197392"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1197393" id="1197393"></a> <span class="sansserif">The following function evaluates the variables <span class="mono">x</span> and <span class="mono">y</span>:</span>
+      </p>
+      <p>
+        <a name="1197394" id="1197394"></a> <span class="mono">function getMax(x,y) {<br>
+         &nbsp;&nbsp;&nbsp;return Math.max(x,y)<br>
+         }</span>
+      </p>
+      <p>
+        <a name="1197395" id="1197395"></a> <span class="sansserif">If you pass <span class="mono">getMax</span> the values 10 and 20, it returns 20; if you pass it the values -10 and -20, it returns -10.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1197396" id="1197396"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1197400" id="1197400"></a> <span class="sansserif"><a href="math.html#1197403">Math.min</a></span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1197403" id="1197403"></a> <a name="min" id="min"></a> <span class="sansserif"><b>min</b></span>
+      </p>
+      <p>
+        <a name="1197420" id="1197420"></a> <span class="sansserif">Returns the smaller of two numbers.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1197406" id="1197406"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1197411" id="1197411"></a> <span class="sansserif"><a href="math.html#1193138">Math</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top" colspan="2" rowspan="1">
+            <p>
+              <a name="1197413" id="1197413"></a> <span class="sansserif"><i>Static</i></span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1197417" id="1197417"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1197419" id="1197419"></a> <span class="sansserif">JavaScript 1.0, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1202118" id="1202118"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1202120" id="1202120"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1197421" id="1197421"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1197422" id="1197422"></a> <span class="mono">min(<i>x</i>,<i>y</i>)</span>
+      </p>
+      <p>
+        <br>
+         <a name="1197423" id="1197423"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1197429" id="1197429"></a> <span class="sansserif"><br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <a name="1197426" id="1197426"></a> <span class="mono">x, y</span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1197428" id="1197428"></a> <span class="sansserif">Numbers</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1197430" id="1197430"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1197431" id="1197431"></a> <span class="sansserif">Because <span class="mono">min</span> is a static method of <span class="mono">Math</span>, you always use it as <span class="mono">Math.min()</span>, rather than as a method of a <span class="mono">Math</span> object you created.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1197432" id="1197432"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1197433" id="1197433"></a> <span class="sansserif">The following function evaluates the variables <span class="mono">x</span> and <span class="mono">y</span>:</span>
+      </p>
+      <p>
+        <a name="1197434" id="1197434"></a> <span class="mono">function getMin(x,y) {<br>
+         &nbsp;&nbsp;&nbsp;return Math.min(x,y)<br>
+         }</span>
+      </p>
+      <p>
+        <a name="1197435" id="1197435"></a> <span class="sansserif">If you pass <span class="mono">getMin</span> the values 10 and 20, it returns 10; if you pass it the values -10 and -20, it returns -20.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1197436" id="1197436"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1197440" id="1197440"></a> <span class="sansserif"><a href="math.html#1197362">Math.max</a></span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1193490" id="1193490"></a> <a name="PI" id="PI"></a> <span class="sansserif"><b>PI</b></span>
+      </p>
+      <p>
+        <a name="1193491" id="1193491"></a> <span class="sansserif">The ratio of the circumference of a circle to its diameter, approximately 3.14159.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193494" id="1193494"></a> <span class="sansserif"><i>Property of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193499" id="1193499"></a> <span class="sansserif"><a href="math.html#1193138">Math</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top" colspan="2" rowspan="1">
+            <p>
+              <a name="1193501" id="1193501"></a> <span class="sansserif"><i>Static, Read-only</i></span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193505" id="1193505"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1199147" id="1199147"></a> <span class="sansserif">JavaScript 1.0, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1202151" id="1202151"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1202153" id="1202153"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193508" id="1193508"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1193509" id="1193509"></a> <span class="sansserif">The following function returns the value of pi:</span>
+      </p>
+      <p>
+        <a name="1193510" id="1193510"></a> <span class="mono">function getPi() {<br>
+         &nbsp;&nbsp;&nbsp;return Math.PI<br>
+         }</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193511" id="1193511"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1193512" id="1193512"></a> <span class="sansserif">Because <span class="mono">PI</span> is a static property of <span class="mono">Math</span>, you always use it as <span class="mono">Math.PI</span>, rather than as a property of a <span class="mono">Math</span> object you created.</span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1197651" id="1197651"></a> <a name="pow" id="pow"></a> <span class="sansserif"><b>pow</b></span>
+      </p>
+      <p>
+        <a name="1197668" id="1197668"></a> <span class="sansserif">Returns <span class="mono">base</span> to the <span class="mono">exponent</span> power, that is, <span class="mono">base</span><sup>exponent</sup>.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1197654" id="1197654"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1197659" id="1197659"></a> <span class="sansserif"><a href="math.html#1193138">Math</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top" colspan="2" rowspan="1">
+            <p>
+              <a name="1197661" id="1197661"></a> <span class="sansserif"><i>Static</i></span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1197665" id="1197665"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1197667" id="1197667"></a> <span class="sansserif">JavaScript 1.0, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1202180" id="1202180"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1202182" id="1202182"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1197669" id="1197669"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1197670" id="1197670"></a> <span class="mono">pow(<i>x</i>,<i>y</i>)</span>
+      </p>
+      <p>
+        <br>
+         <a name="1197671" id="1197671"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1197681" id="1197681"></a> <span class="sansserif"><br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <a name="1197674" id="1197674"></a> <span class="mono">base</span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1197676" id="1197676"></a> <span class="sansserif">The base number</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1197678" id="1197678"></a> <span class="mono">exponent</span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1197680" id="1197680"></a> <span class="sansserif">The exponent to which to raise <span class="mono">base</span></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1197682" id="1197682"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1197683" id="1197683"></a> <span class="sansserif">Because <span class="mono">pow</span> is a static method of <span class="mono">Math</span>, you always use it as <span class="mono">Math.pow()</span>, rather than as a method of a <span class="mono">Math</span> object you created.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1197684" id="1197684"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1197685" id="1197685"></a> <span class="mono">function raisePower(x,y) {<br>
+         &nbsp;&nbsp;&nbsp;return Math.pow(x,y)<br>
+         }</span>
+      </p>
+      <p>
+        <a name="1197686" id="1197686"></a> <span class="sansserif">If <span class="mono">x</span> is 7 and <span class="mono">y</span> is 2, <span class="mono">raisePower</span> returns 49 (7 to the power of 2).</span>
+      </p>
+      <p>
+        <br>
+         <a name="1197687" id="1197687"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1197694" id="1197694"></a> <span class="sansserif"><a href="math.html#1196408">Math.exp</a>, <a href="math.html#1196917">Math.log</a></span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1197697" id="1197697"></a> <a name="random" id="random"></a> <span class="sansserif"><b>random</b></span>
+      </p>
+      <p>
+        <a name="1197698" id="1197698"></a> <span class="sansserif">Returns a pseudo-random number between 0 and 1. The random number generator is seeded from the current time, as in Java.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1197701" id="1197701"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1197706" id="1197706"></a> <span class="sansserif"><a href="math.html#1193138">Math</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top" colspan="2" rowspan="1">
+            <p>
+              <a name="1197708" id="1197708"></a> <span class="sansserif"><i>Static</i></span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1197712" id="1197712"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1197714" id="1197714"></a> <span class="sansserif">JavaScript 1.0, NES 2.0: Unix only</span>
+            </p>
+            <p>
+              <a name="1199337" id="1199337"></a>
+            </p>
+            <p>
+              <a name="1199338" id="1199338"></a> <span class="sansserif">JavaScript 1.1, NES 2.0: all platforms</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1202205" id="1202205"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1202207" id="1202207"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1197715" id="1197715"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1197716" id="1197716"></a> <span class="mono">random()</span>
+      </p>
+      <p>
+        <br>
+         <a name="1197717" id="1197717"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1197718" id="1197718"></a> <span class="sansserif">None.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1197719" id="1197719"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1197720" id="1197720"></a> <span class="sansserif">Because <span class="mono">random</span> is a static method of <span class="mono">Math</span>, you always use it as <span class="mono">Math.random()</span>, rather than as a method of a <span class="mono">Math</span> object you created.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1197721" id="1197721"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1197722" id="1197722"></a> <span class="mono">//Returns a random number between 0 and 1<br>
+         function getRandom() {<br>
+         &nbsp;&nbsp;&nbsp;return Math.random()<br>
+         }</span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1197725" id="1197725"></a> <a name="round" id="round"></a> <span class="sansserif"><b>round</b></span>
+      </p>
+      <p>
+        <a name="1197742" id="1197742"></a> <span class="sansserif">Returns the value of a number rounded to the nearest integer.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1197728" id="1197728"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1197733" id="1197733"></a> <span class="sansserif"><a href="math.html#1193138">Math</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top" colspan="2" rowspan="1">
+            <p>
+              <a name="1197735" id="1197735"></a> <span class="sansserif"><i>Static</i></span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1197739" id="1197739"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1197741" id="1197741"></a> <span class="sansserif">JavaScript 1.0, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1202226" id="1202226"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1202228" id="1202228"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1197743" id="1197743"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1197744" id="1197744"></a> <span class="mono">round(<i>x</i>)</span>
+      </p>
+      <p>
+        <br>
+         <a name="1197745" id="1197745"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1197751" id="1197751"></a> <span class="sansserif"><br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <a name="1197748" id="1197748"></a> <span class="mono">x</span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1197750" id="1197750"></a> <span class="sansserif">A number</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1197752" id="1197752"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1197753" id="1197753"></a> <span class="sansserif">If the fractional portion of <span class="mono">number</span> is .5 or greater, the argument is rounded to the next higher integer. If the fractional portion of <span class="mono">number</span> is less than .5, the argument is rounded to the next lower integer.</span>
+      </p>
+      <p>
+        <a name="1197754" id="1197754"></a> <span class="sansserif">Because <span class="mono">round</span> is a static method of <span class="mono">Math</span>, you always use it as <span class="mono">Math.round()</span>, rather than as a method of a <span class="mono">Math</span> object you created.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1197755" id="1197755"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1198138" id="1198138"></a> <span class="mono">//Returns the value 20<br>
+         x=Math.round(20.49)</span>
+      </p>
+      <p>
+        <a name="1197757" id="1197757"></a> <span class="mono">//Returns the value 21<br>
+         x=Math.round(20.5)</span>
+      </p>
+      <p>
+        <a name="1197758" id="1197758"></a> <span class="mono">//Returns the value -20<br>
+         x=Math.round(-20.5)</span>
+      </p>
+      <p>
+        <a name="1197759" id="1197759"></a> <span class="mono">//Returns the value -21<br>
+         x=Math.round(-20.51)</span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1197769" id="1197769"></a> <a name="sin" id="sin"></a> <span class="sansserif"><b>sin</b></span>
+      </p>
+      <p>
+        <a name="1197786" id="1197786"></a> <span class="sansserif">Returns the sine of a number.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1197772" id="1197772"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1197777" id="1197777"></a> <span class="sansserif"><a href="math.html#1193138">Math</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top" colspan="2" rowspan="1">
+            <p>
+              <a name="1197779" id="1197779"></a> <span class="sansserif"><i>Static</i></span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1197783" id="1197783"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1197785" id="1197785"></a> <span class="sansserif">JavaScript 1.0, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1202243" id="1202243"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1202245" id="1202245"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1197787" id="1197787"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1197788" id="1197788"></a> <span class="mono">sin(<i>x</i>)</span>
+      </p>
+      <p>
+        <br>
+         <a name="1197789" id="1197789"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1197795" id="1197795"></a> <span class="sansserif"><br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <a name="1197792" id="1197792"></a> <span class="mono">x</span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1197794" id="1197794"></a> <span class="sansserif">A number</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1197796" id="1197796"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1197797" id="1197797"></a> <span class="sansserif">The <span class="mono">sin</span> method returns a numeric value between -1 and 1, which represents the sine of the argument.</span>
+      </p>
+      <p>
+        <a name="1197798" id="1197798"></a> <span class="sansserif">Because <span class="mono">sin</span> is a static method of <span class="mono">Math</span>, you always use it as <span class="mono">Math.sin()</span>, rather than as a method of a <span class="mono">Math</span> object you created.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1197799" id="1197799"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1197800" id="1197800"></a> <span class="sansserif">The following function returns the sine of the variable <span class="mono">x</span>:</span>
+      </p>
+      <p>
+        <a name="1197801" id="1197801"></a> <span class="mono">function getSine(x) {<br>
+         &nbsp;&nbsp;&nbsp;return Math.sin(x)<br>
+         }</span>
+      </p>
+      <p>
+        <a name="1197802" id="1197802"></a> <span class="sansserif">If you pass <span class="mono">getSine</span> the value <span class="mono">Math.PI/2</span>, it returns 1.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1197803" id="1197803"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1197819" id="1197819"></a> <span class="sansserif"><a href="math.html#1195429">Math.acos</a>, <a href="math.html#1195485">Math.asin</a>, <a href="math.html#1195541">Math.atan</a>, <a href="math.html#1195597">Math.atan2</a>, <a href="math.html#1195695">Math.cos</a>, <a href="math.html#1194346">Math.tan</a></span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1197825" id="1197825"></a> <a name="sqrt" id="sqrt"></a> <span class="sansserif"><b>sqrt</b></span>
+      </p>
+      <p>
+        <a name="1197843" id="1197843"></a> <span class="sansserif">Returns the square root of a number.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1197829" id="1197829"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1197834" id="1197834"></a> <span class="sansserif"><a href="math.html#1193138">Math</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top" colspan="2" rowspan="1">
+            <p>
+              <a name="1197836" id="1197836"></a> <span class="sansserif"><i>Static</i></span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1197840" id="1197840"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1197842" id="1197842"></a> <span class="sansserif">JavaScript 1.0, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1202260" id="1202260"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1202262" id="1202262"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1197844" id="1197844"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1197845" id="1197845"></a> <span class="mono">sqrt(<i>x</i>)</span>
+      </p>
+      <p>
+        <br>
+         <a name="1197846" id="1197846"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1197852" id="1197852"></a> <span class="sansserif"><br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <a name="1197849" id="1197849"></a> <span class="mono">x</span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1197851" id="1197851"></a> <span class="sansserif">A number</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1197853" id="1197853"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1197854" id="1197854"></a> <span class="sansserif">If the value of <span class="mono">number</span> is negative, <span class="mono">sqrt</span> returns <span class="mono">NaN</span>.</span>
+      </p>
+      <p>
+        <a name="1197855" id="1197855"></a> <span class="sansserif">Because <span class="mono">sqrt</span> is a static method of <span class="mono">Math</span>, you always use it as <span class="mono">Math.sqrt()</span>, rather than as a method of a <span class="mono">Math</span> object you created.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1197856" id="1197856"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1197857" id="1197857"></a> <span class="sansserif">The following function returns the square root of the variable <span class="mono">x</span>:</span>
+      </p>
+      <p>
+        <a name="1197858" id="1197858"></a> <span class="mono">function getRoot(x) {<br>
+         &nbsp;&nbsp;&nbsp;return Math.sqrt(x)<br>
+         }</span>
+      </p>
+      <p>
+        <a name="1197859" id="1197859"></a> <span class="sansserif">If you pass <span class="mono">getRoot</span> the value 9, it returns 3; if you pass it the value 2, it returns 1.414213562373095.</span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1193515" id="1193515"></a> <a name="SQRT1_2" id="SQRT1_2"></a> <span class="sansserif"><b>SQRT1_2</b></span>
+      </p>
+      <p>
+        <a name="1193516" id="1193516"></a> <span class="sansserif">The square root of 1/2; equivalently, 1 over the square root of 2, approximately 0.707.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193519" id="1193519"></a> <span class="sansserif"><i>Property of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193524" id="1193524"></a> <span class="sansserif"><a href="math.html#1193138">Math</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top" colspan="2" rowspan="1">
+            <p>
+              <a name="1193526" id="1193526"></a> <span class="sansserif"><i>Static, Read-only</i></span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193530" id="1193530"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193532" id="1193532"></a> <span class="sansserif">JavaScript 1.0, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1202273" id="1202273"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1202275" id="1202275"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193533" id="1193533"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1193534" id="1193534"></a> <span class="sansserif">The following function returns 1 over the square root of 2:</span>
+      </p>
+      <p>
+        <a name="1193535" id="1193535"></a> <span class="mono">function getRoot1_2() {<br>
+         &nbsp;&nbsp;&nbsp;return Math.SQRT1_2<br>
+         }</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193536" id="1193536"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1193537" id="1193537"></a> <span class="sansserif">Because <span class="mono">SQRT1_2</span> is a static property of <span class="mono">Math</span>, you always use it as <span class="mono">Math.SQRT1_2</span>, rather than as a property of a <span class="mono">Math</span> object you created.</span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1193540" id="1193540"></a> <a name="SQRT2" id="SQRT2"></a> <span class="sansserif"><b>SQRT2</b></span>
+      </p>
+      <p>
+        <a name="1193557" id="1193557"></a> <span class="sansserif">The square root of 2, approximately 1.414.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193543" id="1193543"></a> <span class="sansserif"><i>Property of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193548" id="1193548"></a> <span class="sansserif"><a href="math.html#1193138">Math</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top" colspan="2" rowspan="1">
+            <p>
+              <a name="1193550" id="1193550"></a> <span class="sansserif"><i>Static, Read-only</i></span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193554" id="1193554"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193556" id="1193556"></a> <span class="sansserif">JavaScript 1.0, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1202282" id="1202282"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1202284" id="1202284"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193558" id="1193558"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1193559" id="1193559"></a> <span class="sansserif">The following function returns the square root of 2:</span>
+      </p>
+      <p>
+        <a name="1193560" id="1193560"></a> <span class="mono">function getRoot2() {<br>
+         &nbsp;&nbsp;&nbsp;return Math.SQRT2<br>
+         }</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193561" id="1193561"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1193562" id="1193562"></a> <span class="sansserif">Because <span class="mono">SQRT2</span> is a static property of <span class="mono">Math</span>, you always use it as <span class="mono">Math.SQRT2</span>, rather than as a property of a <span class="mono">Math</span> object you created.</span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1194346" id="1194346"></a> <a name="tan" id="tan"></a> <span class="sansserif"><b>tan</b></span>
+      </p>
+      <p>
+        <a name="1194363" id="1194363"></a> <span class="sansserif">Returns the tangent of a number.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1194349" id="1194349"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1194354" id="1194354"></a> <span class="sansserif"><a href="math.html#1193138">Math</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top" colspan="2" rowspan="1">
+            <p>
+              <a name="1194356" id="1194356"></a> <span class="sansserif"><i>Static</i></span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1194360" id="1194360"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1194362" id="1194362"></a> <span class="sansserif">JavaScript 1.0, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1202291" id="1202291"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1202293" id="1202293"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1194364" id="1194364"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1194365" id="1194365"></a> <span class="mono">tan(<i>x</i>)</span>
+      </p>
+      <p>
+        <br>
+         <a name="1194366" id="1194366"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1194372" id="1194372"></a> <span class="sansserif"><br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <a name="1194369" id="1194369"></a> <span class="mono">x</span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1194371" id="1194371"></a> <span class="sansserif">A number</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1194373" id="1194373"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1194374" id="1194374"></a> <span class="sansserif">The <span class="mono">tan</span> method returns a numeric value that represents the tangent of the angle.</span>
+      </p>
+      <p>
+        <a name="1194375" id="1194375"></a> <span class="sansserif">Because <span class="mono">tan</span> is a static method of <span class="mono">Math</span>, you always use it as <span class="mono">Math.tan()</span>, rather than as a method of a <span class="mono">Math</span> object you created.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1194376" id="1194376"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1194377" id="1194377"></a> <span class="sansserif">The following function returns the tangent of the variable <span class="mono">x</span>:</span>
+      </p>
+      <p>
+        <a name="1194378" id="1194378"></a> <span class="mono">function getTan(x) {<br>
+         &nbsp;&nbsp;&nbsp;return Math.tan(x)<br>
+         }</span>
+      </p>
+      <p>
+        <br>
+         <a name="1194380" id="1194380"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1194396" id="1194396"></a> <span class="sansserif"><a href="math.html#1195429">Math.acos</a>, <a href="math.html#1195485">Math.asin</a>, <a href="math.html#1195541">Math.atan</a>, <a href="math.html#1195597">Math.atan2</a>, <a href="math.html#1195695">Math.cos</a>, <a href="math.html#1197769">Math.sin</a></span>
+      </p>
+    </blockquote>
+    <blockquote>
+      <br>
+       <b><a class="sansserifPurple" href="javpkg.html">Previous</a></b>&nbsp;&nbsp;&nbsp;&nbsp; <a href="contents.html"><b class="sansserifPurple">Contents</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="ix.html"><b class="sansserifPurple">Index</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="netscape.html"><b class="sansserifPurple">Next</b></a> &nbsp;&nbsp;&nbsp;&nbsp; 
+      <hr noshade="noshade" size="1">
+      <span class="sansserif">Copyright &copy; 2000 <a href="http://www.netscape.com">Netscape Communications Corp.</a> All rights reserved.</span>
+    </blockquote>
+    <p class="alignright">
+      <span class="sansserif">Last Updated <b>September 28, 2000</b></span>
+    </p>
+  </body>
+</html>

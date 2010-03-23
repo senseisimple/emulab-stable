@@ -1,0 +1,5 @@
+#Wed Oct 14 10:38:59 MDT 2009
+eclipse.preferences.version=1
+playerTrustFileCleaned30=true
+com.adobe.flexbuilder.project.flex_sdks=<?xml version\="1.0" encoding\="UTF-8"?>\r\n<sdks>\r\n<sdk defaultSDK\="true" location\="C\:/Program Files/Adobe/Flex Builder 3/sdks/3.4" name\="Flex 3.4"/>\r\n<sdk location\="C\:/Program Files/Adobe/Flex Builder 3/sdks/3.2.0" name\="Flex 3.2"/>\r\n<sdk location\="C\:/Program Files/Adobe/Flex Builder 3/sdks/2.0.1" name\="Flex 2.0.1 Hotfix 3"/>\r\n</sdks>\r\n
+flexBuilderVersion=3.0.214193

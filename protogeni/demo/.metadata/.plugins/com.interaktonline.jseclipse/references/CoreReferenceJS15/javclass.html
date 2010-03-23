@@ -1,0 +1,139 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html>
+  <head>
+    <meta content="HTML Tidy for Cygwin (vers 1st February 2003), see www.w3.org" name="generator">
+    <meta name="keywords" content="electronic commerce, ecommerce, ebusiness, e-business, e-commerce, enterprise software, net economy, Netscape, Sun Microsystems, DevEdge Archive, iPlanet, internet software">
+    <meta name="description" content="The DevEdge Archive, a strategic alliance formed by America Online and Sun Microsystems, Inc., is delivering iPlanet e-commerce software and enterprise solutions that enable companies to compete successfully in the Net Economy">
+    <meta http-equiv="Content-Type" content="text/html; charset=us-ascii">
+    <meta name="TEMPLATEBASE" content="Authored in FrameMaker. Converted to HTML in WebWorks Publisher 2000. manual wdt 1.5">
+    <meta name="LASTUPDATED" content="09/28/00 13:15:35">
+    <title>
+      Core JavaScript Reference 1.5:
+    </title>
+    <link rel="stylesheet" type="text/css" href="js15ref.css">
+  </head>
+  <body>
+    <table width="100%" border="0" cellspacing="4">
+      <tr>
+        <td valign="top">
+          <b><a class="sansserifPurple" href="javarray.html">Previous</a></b>&nbsp;&nbsp;&nbsp;&nbsp; <a href="contents.html"><b class="sansserifPurple">Contents</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="ix.html"><b class="sansserifPurple">Index</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="javobj.html"><b class="sansserifPurple">Next</b></a> &nbsp;&nbsp;&nbsp;&nbsp;
+        </td>
+      </tr>
+      <tr>
+        <td class="sansserifBlack" valign="top" align="right" bgcolor="#CCCCCC">
+          <b>Core JavaScript Reference 1.5</b>
+        </td>
+      </tr>
+    </table><br>
+     
+    <blockquote>
+      <br>
+      <br>
+      <br>
+      <br>
+       
+      <p>
+        <a name="1193137" id="1193137"></a> <a name="JavaClass" id="JavaClass"></a> <span class="sansserif"><b>JavaClass</b></span>
+      </p>
+      <p>
+        <a name="1198169" id="1198169"></a> <span class="sansserif">A JavaScript reference to a Java class.<br></span>
+      </p><br>
+       
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1198162" id="1198162"></a> <span class="sansserif"><i>Core object</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1198164" id="1198164"></a> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1198166" id="1198166"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1198168" id="1198168"></a> <span class="sansserif">JavaScript 1.1, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1198170" id="1198170"></a> <a name="Created by" id="Created by"></a> <span class="sansserif"><b>Created by</b></span><br>
+         <a name="1198171" id="1198171"></a> <span class="sansserif">A reference to the class name used with the <span class="mono">Packages</span> object:</span>
+      </p>
+      <p>
+        <a name="1198172" id="1198172"></a> <span class="mono">Packages.<i>JavaClass</i></span>
+      </p>
+      <p>
+        <a name="1198173" id="1198173"></a> <span class="sansserif">where <i>JavaClass</i> is the fully-specified name of the object's Java class. The LiveConnect <span class="mono">java</span>, <span class="mono">sun</span>, and <span class="mono">netscape</span> objects provide shortcuts for commonly used Java packages and also create <span class="mono">JavaClass</span> objects.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1198174" id="1198174"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1198262" id="1198262"></a> <span class="sansserif">A <span class="mono">JavaClass</span> object is a reference to one of the classes in a Java package, such as <span class="mono">netscape.javascript.JSObject</span>. A <span class="mono">JavaPackage</span> object is a reference to a Java package, such as <span class="mono">netscape.javascript</span>. In JavaScript, the <span class="mono">JavaPackage</span> and <span class="mono">JavaClass</span> hierarchy reflect the Java package and class hierarchy.</span>
+      </p>
+      <p>
+        <a name="1198379" id="1198379"></a> <span class="sansserif">You can pass a <span class="mono">JavaClass</span> object to a Java method which requires an argument of type <span class="mono">java.lang.Class</span>.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1198409" id="1198409"></a> <a name="Backward compatibility" id="Backward compatibility"></a> <span class="sansserif"><b>Backward compatibility</b></span>
+      </p>
+      <p>
+        <a name="1198420" id="1198420"></a> <span class="sansserif"><b>JavaScript 1.3 and earlier.</b></span> <a name="1198894" id="1198894"></a> <span class="sansserif">You must create a wrapper around an instance of <span class="mono">java.lang.Class</span> before you pass it as a parameter to a Java method-<span class="mono">JavaClass</span> objects are not automatically converted to instances of <span class="mono">java.lang.Class</span>.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1198422" id="1198422"></a> <a name="Property Summary" id="Property Summary"></a> <span class="sansserif"><b>Property Summary</b></span><br>
+         <a name="1198285" id="1198285"></a> <span class="sansserif">The properties of a <span class="mono">JavaClass</span> object are the static fields of the Java class.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1198220" id="1198220"></a> <a name="Method Summary" id="Method Summary"></a> <span class="sansserif"><b>Method Summary</b></span><br>
+         <a name="1198221" id="1198221"></a> <span class="sansserif">The methods of a <span class="mono">JavaClass</span> object are the static methods of the Java class.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1198180" id="1198180"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1198460" id="1198460"></a> <span class="sansserif"><b>Example 1.</b> In the following example, <span class="mono">x</span> is a <span class="mono">JavaClass</span> object referring to <span class="mono">java.awt.Font</span>. Because <span class="mono">BOLD</span> is a static field in the <span class="mono">Font</span> class, it is also a property of the <span class="mono">JavaClass</span> object.</span>
+      </p>
+      <p>
+        <a name="1198252" id="1198252"></a><span class="mono">x = java.awt.Font<br>
+         myFont = x("helv",x.BOLD,10) // creates a Font object</span>
+      </p>
+      <p>
+        <a name="1198351" id="1198351"></a> <span class="sansserif">The previous example omits the <span class="mono">Packages</span> keyword and uses the <span class="mono">java</span> synonym because the <span class="mono">Font</span> class is in the <span class="mono">java</span> package.</span>
+      </p>
+      <p>
+        <a name="1198507" id="1198507"></a> <span class="sansserif"><b>Example 2.</b> In the following example, the <span class="mono">JavaClass</span> object <span class="mono">java.lang.String</span> is passed as an argument to the <span class="mono">newInstance</span> method which creates an array:</span>
+      </p>
+      <p>
+        <a name="1198467" id="1198467"></a><span class="mono">var cars = java.lang.reflect.Array.newInstance(java.lang.String, 15)</span>
+      </p>
+      <p>
+        <br>
+         <a name="1198183" id="1198183"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1198196" id="1198196"></a> <span class="sansserif"><a href="javarray.html#1193137">JavaArray</a>, <a href="javobj.html#1193137">JavaObject</a>, <a href="javpkg.html#1193137">JavaPackage</a>, <a href="packages.html#1193137">Packages</a></span>
+      </p>
+    </blockquote>
+    <blockquote>
+      <br>
+       <b><a class="sansserifPurple" href="javarray.html">Previous</a></b>&nbsp;&nbsp;&nbsp;&nbsp; <a href="contents.html"><b class="sansserifPurple">Contents</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="ix.html"><b class="sansserifPurple">Index</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="javobj.html"><b class="sansserifPurple">Next</b></a> &nbsp;&nbsp;&nbsp;&nbsp; 
+      <hr noshade="noshade" size="1">
+      <span class="sansserif">Copyright &copy; 2000 <a href="http://www.netscape.com">Netscape Communications Corp.</a> All rights reserved.</span>
+    </blockquote>
+    <p class="alignright">
+      <span class="sansserif">Last Updated <b>September 28, 2000</b></span>
+    </p>
+  </body>
+</html>

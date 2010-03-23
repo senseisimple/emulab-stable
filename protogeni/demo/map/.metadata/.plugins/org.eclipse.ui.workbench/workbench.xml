@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <workbench version="2.0">
 <workbenchAdvisor/>
-<window height="728" maximized="true" width="1024" x="1034" y="-15">
+<window height="728" maximized="true" width="1024" x="0" y="0">
 <fastViewData fastViewLocation="1024"/>
 <perspectiveBar>
 <itemSize x="160"/>
@@ -29,8 +29,8 @@
 </folder>
 </info>
 </editorArea>
-<editor focus="true" id="com.adobe.flexbuilder.ui.StartPage" name="Web Browser" partName="Flex Start Page" title="Flex Start Page" tooltip="Flex Start Page" workbook="DefaultEditorWorkbook">
-<input factoryID="com.adobe.flexbuilder.editors.derived.ui.startpage.StartPageEditorInput" iconpath="bundleentry://37/icons/flexbuilder16.png" style="20" tooltip="Flex Start Page" url="file:/C:/Program Files/Adobe/Flex Builder 3/plugins/com.adobe.flexbuilder.ui_3.0.214193/welcome/welcome.html?firstLaunch=false"/>
+<editor activePart="true" focus="true" id="com.adobe.flexbuilder.ui.StartPage" name="Web Browser" partName="Flex Start Page" title="Flex Start Page" tooltip="file:/C:/Program Files/Adobe/Flex Builder 3/plugins/com.adobe.flexbuilder.ui_3.0.214193/welcome/welcome.html?firstLaunch=false" workbook="DefaultEditorWorkbook">
+<input factoryID="com.adobe.flexbuilder.editors.derived.ui.startpage.StartPageEditorInput" iconpath="bundleentry://37/icons/flexbuilder16.png" style="20" url="file:/C:/Program Files/Adobe/Flex Builder 3/plugins/com.adobe.flexbuilder.ui_3.0.214193/welcome/welcome.html?firstLaunch=false"/>
 </editor>
 </editors>
 <views>
@@ -60,7 +60,7 @@
 </viewState>
 </view>
 </views>
-<perspectives activePart="com.adobe.flexbuilder.navigator" activePerspective="com.adobe.flexbuilder.editors.mxml.ui.perspectives.development">
+<perspectives activePart="com.adobe.flexbuilder.ui.StartPage" activePerspective="com.adobe.flexbuilder.editors.mxml.ui.perspectives.development">
 <perspective editorAreaTrimState="2" editorAreaVisible="1" fixed="0" version="0.016">
 <descriptor class="com.adobe.flexbuilder.editors.mxml.ui.perspectives.DevelopmentPerspectiveFactory" id="com.adobe.flexbuilder.editors.mxml.ui.perspectives.development" label="Flex Development"/>
 <alwaysOnActionSet id="com.adobe.flexbuilder.dbwizard.actionSet"/>
@@ -153,9 +153,11 @@
 <workingSets/>
 <navigationHistory>
 <editors>
-<editor factoryID="com.adobe.flexbuilder.editors.derived.ui.startpage.StartPageEditorInput" iconpath="bundleentry://37/icons/flexbuilder16.png" id="com.adobe.flexbuilder.ui.StartPage" style="20" tooltip="Flex Start Page" url="file:/C:/Program Files/Adobe/Flex Builder 3/plugins/com.adobe.flexbuilder.ui_3.0.214193/welcome/welcome.html?firstLaunch=false"/>
+<editor factoryID="com.adobe.flexbuilder.editors.derived.ui.startpage.StartPageEditorInput" iconpath="bundleentry://37/icons/flexbuilder16.png" id="com.adobe.flexbuilder.ui.StartPage" style="20" url="file:/C:/Program Files/Adobe/Flex Builder 3/plugins/com.adobe.flexbuilder.ui_3.0.214193/welcome/welcome.html?firstLaunch=false"/>
+<editor factoryID="com.adobe.flexbuilder.editors.derived.ui.startpage.StartPageEditorInput" iconpath="bundleentry://37/icons/flexbuilder16.png" id="com.adobe.flexbuilder.ui.StartPage" style="20" url="file:/C:/Program Files/Adobe/Flex Builder 3/plugins/com.adobe.flexbuilder.ui_3.0.214193/welcome/welcome.html?firstLaunch=false"/>
 </editors>
-<item active="true" historyLabel="Flex Start Page" index="0"/>
+<item historyLabel="Flex Start Page" index="0"/>
+<item active="true" historyLabel="Flex Start Page" index="1"/>
 </navigationHistory>
 <input factoryID="org.eclipse.ui.internal.model.ResourceFactory" path="/" type="8"/>
 </page>

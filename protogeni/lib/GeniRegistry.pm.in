@@ -34,7 +34,7 @@ use Data::Dumper;
 use overload ('""' => 'Stringify');
 
 #
-# Lookup by idx or uuid.
+# Lookup by URN, idx or uuid.
 #
 sub Lookup($$)
 {
@@ -43,21 +43,28 @@ sub Lookup($$)
     my $idx;
 
     if( GeniHRN::IsValid( $token ) ) {
-#	return undef if !GeniHRN::Authoritative( $token, "@OURDOMAIN@" );
-
 	my ($authority, $type, $id) = GeniHRN::Parse( $token );
 
 	return undef if $type ne "slice";
 	
-	# Prefixing @PROTOGENI_DOMAIN@. is horribly ugly, but necessary
-	# at the moment to maintain database compatibility... this should
-	# probably go away.
-	$query_result =
-	    DBQueryWarn("select idx from geni_slices ".
-			"where hrn='@PROTOGENI_DOMAIN@.$id'");
+	if( GeniHRN::Authoritative( $token, "@OURDOMAIN@" ) ) {
+	    # Good: this is one of our slices, and we can confidently
+	    # transform the name for direct lookup.  This method is
+	    # very general, and will even resolve a URN to a (deprecated)
+	    # pre-URN slice.
+	    $query_result =
+		DBQueryWarn("select idx from geni_slices ".
+			    "where hrn='@PROTOGENI_DOMAIN@.$id'");
+	} else {
+	    # Somebody else's slice.  We'll have to look up the slice
+	    # by its certificate, which will work only for post-URN slices.
+	    $query_result = DBQueryWarn(
+		"SELECT geni_slices.idx FROM geni_slices, geni_certificates " .
+		"WHERE geni_slices.uuid = geni_certificates.uuid AND " .
+		"geni_certificates.urn='$token';" );
+	}
 
-	return undef
-	    if (! $query_result || !$query_result->numrows);
+	return undef if (! $query_result || !$query_result->numrows);
 
 	($idx) = $query_result->fetchrow_array();
     }
@@ -279,7 +286,7 @@ sub Lookup($$)
     my $idx;
 
     if( GeniHRN::IsValid( $token ) ) {
-	return undef if !GeniHRN::Authoritative($token, "@OURDOMAIN@");
+	$token = GeniHRN::Normalise( $token );
 
 	my ($authority, $type, $id) = GeniHRN::Parse($token);
 	return undef if $type ne "sliver";
@@ -353,6 +360,28 @@ sub LookupByAuthority($$$)
 	return undef;
     }
     return GeniRegistry::ClientSliver->Lookup($idx);
+}
+
+# Returns an array of client slivers belonging which belong to a
+# particular slice.
+sub LookupBySlice($$)
+{
+    my ($class, $slice) = @_;
+    my $slice_idx = $slice->idx();
+    my $query_result;
+    my @result = ();
+    $query_result =
+	DBQueryWarn("select idx from client_slivers ".
+		    "where slice_idx='$slice_idx'");
+    if ($query_result) {
+	while (my ($idx) = $query_result->fetchrow_array()) {
+	    my $sliver = GeniRegistry::ClientSliver->Lookup($idx);
+	    if (defined($sliver)) {
+		push(@result, $sliver);
+	    }
+	}
+    }
+    return @result;
 }
 
 #

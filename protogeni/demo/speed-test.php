@@ -1,5 +1,15 @@
 <html>
-<body>
+<head>
+<script type="text/JavaScript">
+<!--
+  function refresh(time)
+  {
+    setTimeout("location.reload(true);", time);
+  }
+//   -->
+</script>
+</head>
+<body onload="javascript:refresh(10000);">
 <table>
 <tr>
 
@@ -25,12 +35,6 @@ for (; $i < count($names); ++$i)
 <h3>
 
 <?php
-  echo $cms[$i];
-?>
-
---
-
-<?php
   echo $names[$i];
 ?>
 
@@ -38,34 +42,36 @@ for (; $i < count($names); ++$i)
 <object classid="clsid:d27cdb6e-ae6d-11cf-96b8-444553540000"
         codebase="http://download.macromedia.com/pub/shockwave/cabs/flash/swflash.cab#version=9,0,0,0"
         width="337" height="250" id="demo" align="middle">
-  <param name="allowScriptAccess" value="sameDomain" />
+  <param name="allowScriptAccess" value="always" />
+  <param name="allowNeworking" value="all" />
   <param name="allowFullScreen" value="false" />
   <param name="movie"
-
 <?php
-  echo "value=\"" . $url . "\"";
+  echo "value=\"http://" . $hosts[$i] . "/speed-test.swf\"";
 ?>
-
-  />
-  <paran name="hostname"
+ />
+  <param name="FlashVars"
 
 <?php
-  echo "value=\"" . $hosts[$i] . "\" ";
+  echo "value=\"url=http://" . $hosts[$i] . "\" ";
 ?>
 
   />
   <param name="quality" value="high" />
   <param name="bgcolor" value="#cccccc" />
   <embed
+<?php
+  echo "src=\"http://" . $hosts[$i] . "/speed-test.swf\"";
+?>
 
 <?php
-  echo "src=\"" . $url . "\" ";
-  echo "hostname=\"" . $hosts[$i] . "\" ";
+  echo "FlashVars=\"url=http://" . $hosts[$i] . "\" ";
 ?>
 
 quality="high" bgcolor="#cccccc"
          width="337" height="250" name="demo" align="middle"
-         allowScriptAccess="sameDomain" allowFullScreen="false"
+         allowScriptAccess="always" allowFullScreen="false"
+         allowNetworking="all"
          type="application/x-shockwave-flash"
          pluginspage="http://www.macromedia.com/go/getflashplayer" />
 </object>

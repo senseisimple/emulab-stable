@@ -47,11 +47,12 @@ package
     public static var deleteSliver : Array = new Array(cm, "DeleteSliver");
     public static var startSliver : Array = new Array(cm, "StartSliver");
     public static var updateSliver : Array = new Array(cm, "UpdateSliver");
-    public static var resolveNode : Array = new Array(cm, "Resolve");
+    public static var resolveResource : Array = new Array(cm, "Resolve");
     public static var sliceStatus : Array = new Array(cm, "SliceStatus");
     public static var getSliver : Array = new Array(cm, "GetSliver");
     public static var sliverStatus : Array = new Array(cm, "SliverStatus");
     public static var sliverTicket : Array = new Array(cm, "SliverTicket");
+    public static var createSliver : Array = new Array(cm, "CreateSliver");
 
     public static var discoverResourcesv2 : Array = new Array(cmv2, "DiscoverResources");
 

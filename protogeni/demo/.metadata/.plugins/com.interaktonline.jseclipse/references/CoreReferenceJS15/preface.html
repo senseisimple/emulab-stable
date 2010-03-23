@@ -1,0 +1,421 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html>
+  <head>
+    <meta content="HTML Tidy for Cygwin (vers 1st February 2003), see www.w3.org" name="generator">
+    <meta name="keywords" content="electronic commerce, ecommerce, ebusiness, e-business, e-commerce, enterprise software, net economy, Netscape, Sun Microsystems, DevEdge Archive, iPlanet, internet software">
+    <meta name="description" content="The DevEdge Archive, a strategic alliance formed by America Online and Sun Microsystems, Inc., is delivering iPlanet e-commerce software and enterprise solutions that enable companies to compete successfully in the Net Economy">
+    <meta http-equiv="Content-Type" content="text/html; charset=us-ascii">
+    <meta name="TEMPLATEBASE" content="Authored in FrameMaker. Converted to HTML in WebWorks Publisher 2000. manual wdt 1.5">
+    <meta name="LASTUPDATED" content="09/28/00 13:15:05">
+    <title>
+      Core JavaScript Reference 1.5: About this Book
+    </title>
+    <link rel="stylesheet" type="text/css" href="js15ref.css">
+  </head>
+  <body>
+    <table width="100%" border="0" cellspacing="4">
+      <tr>
+        <td valign="top">
+          <b><a class="sansserifPurple" href="contents.html">Previous</a></b>&nbsp;&nbsp;&nbsp;&nbsp; <a href="contents.html"><b class="sansserifPurple">Contents</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="ix.html"><b class="sansserifPurple">Index</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="partobj.html"><b class="sansserifPurple">Next</b></a> &nbsp;&nbsp;&nbsp;&nbsp;
+        </td>
+      </tr>
+      <tr>
+        <td class="sansserifBlack" valign="top" align="right" bgcolor="#CCCCCC">
+          <b>Core JavaScript Reference 1.5</b>
+        </td>
+      </tr>
+    </table><br>
+     
+    <blockquote>
+      <br>
+      <br>
+       <a name="1001665" id="1001665"></a> <a name="About this Book" id="About this Book"></a> <span class="sansserifBlack"><b>About this Book 
+      </b></span><br>
+      <br>
+      <br>
+       <a name="1003098" id="1003098"></a> <span class="sansserif">JavaScript is Netscape's cross-platform, object-based scripting language. This book is a reference manual for the core JavaScript language.</span> 
+      <p>
+        <a name="1001667" id="1001667"></a> <span class="sansserif">This preface contains the following sections:</span>
+      </p>
+      <ul>
+        <li class="nobullet">
+          <a name="1001671" id="1001671"></a>
+        </li>
+        <li>
+          <span class="sansserif"><a href="preface.html#1003152">New Features in this Release</a></span> 
+          <p>
+            <a name="1003167" id="1003167"></a>
+          </p>
+        </li>
+        <li>
+          <span class="sansserif"><a href="preface.html#1005135">What You Should Already Know</a></span> 
+          <p>
+            <a name="1003563" id="1003563"></a>
+          </p>
+        </li>
+        <li>
+          <span class="sansserif"><a href="preface.html#1003515">JavaScript Versions</a></span> 
+          <p>
+            <a name="1001675" id="1001675"></a>
+          </p>
+        </li>
+        <li>
+          <span class="sansserif"><a href="preface.html#1001692">Where to Find JavaScript Information</a></span> 
+          <p>
+            <a name="1001679" id="1001679"></a>
+          </p>
+        </li>
+        <li>
+          <a href="preface.html#1001745">Document Conventions</a>
+        </li>
+      </ul><br>
+      <br>
+       <a name="1003152" id="1003152"></a> <a name="New Features in this Release" id="New Features in this Release"></a> <span class="sansserif">New Features in this Release
+      </span> 
+      <hr size="2" noshade="noshade">
+      <br>
+       <a name="1004963" id="1004963"></a> <span class="sansserif">JavaScript version 1.5 provides the following new features and enhancements:</span> 
+      <ul>
+        <li class="nobullet">
+          <a name="1004964" id="1004964"></a>
+        </li>
+        <li>
+          <span class="sansserif"><b>Runtime errors.</b> Runtime errors are now reported as exceptions.</span> 
+          <p>
+            <a name="1004965" id="1004965"></a>
+          </p>
+        </li>
+        <li>
+          <span class="sansserif"><b>Number formatting enhancements.</b> Number formatting has been enhanced to include <span class="mono">Number.prototype.toExponential</span>, <span class="mono">Number.protoytpe.toFixed</span> and <span class="mono">Number.prototype.toPrecision</span> methods. See <a href="number.html#1200968">page&nbsp;127</a>, <a href="number.html#1200964">page&nbsp;128</a>, and <a href="number.html#1201389">page&nbsp;129</a>.</span> 
+          <p>
+            <a name="1004975" id="1004975"></a>
+          </p>
+        </li>
+        <li>
+          <span class="sansserif"><b>Regular expression enhancements:</b></span> 
+          <ul>
+            <li class="nobullet">
+              <a name="1004976" id="1004976"></a>
+            </li>
+            <li>
+              <span class="sansserif">Greedy quantifiers - <span class="mono">+</span>, <span class="mono">*</span>, <span class="mono">?</span> and <span class="mono">{}</span> - can now be followed by a <span class="mono">?</span> to force them to be non-greedy. See the entry for <span class="mono">?</span> on <a href="regexp.html#1193226">page&nbsp;148</a>. 
+              </span> 
+              <p>
+                <a name="1004980" id="1004980"></a>
+              </p>
+            </li>
+            <li>
+              <span class="sansserif">Non-capturing parentheses, <span class="mono">(?:x)</span> can be used instead of capturing parentheses<span class="mono">(x)</span>. When non-capturing parentheses are used, matched subexpressions are not available as back-references. See the entry for <span class="mono">(?:x)</span> on <a href="regexp.html#1207798">page&nbsp;148</a>. 
+              </span> 
+              <p>
+                <a name="1004984" id="1004984"></a>
+              </p>
+            </li>
+            <li>
+              <span class="sansserif"> <span class="mono">P</span>ositive and negative lookahead assertions are supported. Both assert a match depending on what follows the string being matched. See the entries for <span class="mono">(?=)</span> and <span class="mono">(?!)</span> on <a href="regexp.html#1207831">page&nbsp;148</a>. 
+              </span> 
+              <p>
+                <a name="1004988" id="1004988"></a>
+              </p>
+            </li>
+            <li>
+              The <span class="mono">m</span> flag has been added to specify that the regular expression should match over multiple lines. See <a href="regexp.html#1193159">page&nbsp;146</a>. 
+              </li>
+          </ul><a name="1004995" id="1004995"></a>
+        </li>
+        <li>
+          <span class="sansserif"><b>Conditional function declarations.</b> Functions can now be declared inside an <span class="mono"><b>if</b></span> clause. See <a href="stmt.html#1076846">page&nbsp;221</a>.</span> 
+          <p>
+            <a name="1005213" id="1005213"></a>
+          </p>
+        </li>
+        <li>
+          <span class="sansserif"><b>Function expressions.</b> Functions can now be declared inside an expression. See <a href="ops.html#1066344">page&nbsp;254</a>.</span> 
+          <p>
+            <a name="1004999" id="1004999"></a>
+          </p>
+        </li>
+        <li>
+          <span class="sansserif"><b>Multiple</b> <span class="mono"><b>catch</b></span> <b>clauses.</b> Multiple <span class="mono">catch</span> clauses in a <span class="mono">try...catch</span> statement are supported. See <a href="stmt.html#1079200">page&nbsp;231</a>.</span> 
+          <p>
+            <a name="1005131" id="1005131"></a>
+          </p>
+        </li>
+        <li>
+          <span class="sansserif"><b>Constants.</b> Readonly, named constants are supported. This feature is available only in the C implementation of JavaScript. See <a href="stmt.html#1077887">page&nbsp;215</a>.</span> 
+          <p>
+            <a name="1005132" id="1005132"></a>
+          </p>
+        </li>
+        <li>
+          <b>Getters and Setters.</b> JavaScript writers can now add getters and setters to their objects. This feature is available only in the C implementation of JavaScript. See Defining Getters and Setters in Chapter 7 of the <i>Core JavaScript Guide</i> for information about this feature.
+        </li>
+      </ul><br>
+      <br>
+       <a name="1005135" id="1005135"></a> <a name="What You Should Already Know" id="What You Should Already Know"></a> <span class="sansserif">What You Should Already Know
+      </span> 
+      <hr size="2" noshade="noshade">
+      <br>
+       <a name="1003432" id="1003432"></a> <span class="sansserif">This book assumes you have the following basic background:</span> 
+      <ul>
+        <li class="nobullet">
+          <a name="1003190" id="1003190"></a>
+        </li>
+        <li>
+          <span class="sansserif">A general understanding of the Internet and the World Wide Web (WWW).</span> 
+          <p>
+            <a name="1003191" id="1003191"></a>
+          </p>
+        </li>
+        <li>
+          Good working knowledge of HyperText Markup Language (HTML).
+        </li>
+      </ul><a name="1003192" id="1003192"></a> <span class="sansserif">Some programming experience with a language such as C or Visual Basic is useful, but not required.</span> 
+      <p>
+        <br>
+        <br>
+         <a name="1003515" id="1003515"></a> <a name="JavaScript Versions" id="JavaScript Versions"></a> <span class="sansserif">JavaScript Versions
+        </span>
+      </p>
+      <hr size="2" noshade="noshade">
+      <br>
+       <a name="1003516" id="1003516"></a> <span class="sansserif">Each version of Navigator supports a different version of JavaScript. To help you write scripts that are compatible with multiple versions of Navigator, this manual lists the JavaScript version in which each feature was implemented.</span> 
+      <p>
+        <a name="1003517" id="1003517"></a> <span class="sansserif">The following table lists the JavaScript version supported by different Navigator versions. Versions of Navigator prior to 2.0 do not support JavaScript.</span>
+      </p>
+      <p>
+        <a name="1003548" id="1003548"></a> <span class="sansserif"><br></span>
+      </p>
+      <p>
+        <span {font-family: (null)}"><b><a name="1003521" id="1003521"></a> <a name="JavaScript and Navigator versions" id="JavaScript and Navigator versions"></a></b></span>
+      </p>
+      <align>
+        <span {font-family: (null)}"><b class="sansserif">Table 1 &nbsp;&nbsp; JavaScript and Navigator versions
+        </b></span><br>
+        <br>
+         
+        <table>
+          <tr bgcolor="#CCCCCC" align="left" valign="top">
+            <th valign="top" align="left">
+              <a name="1003525" id="1003525"></a> 
+              <p class="alignleft">
+                <span class="sansserif"><b>JavaScript version</b></span>
+              </p>
+            </th>
+            <th valign="top" align="left">
+              <a name="1003527" id="1003527"></a> 
+              <p class="alignleft">
+                <span class="sansserif"><b>Navigator version</b></span>
+              </p>
+            </th>
+          </tr>
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1003529" id="1003529"></a> <span class="sansserif">JavaScript 1.0</span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1003531" id="1003531"></a> <span class="sansserif">Navigator 2.0</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1003533" id="1003533"></a> <span class="sansserif">JavaScript 1.1</span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1003535" id="1003535"></a> <span class="sansserif">Navigator 3.0</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1003537" id="1003537"></a> <span class="sansserif">JavaScript 1.2</span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1003539" id="1003539"></a> <span class="sansserif">Navigator 4.0-4.05</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1003541" id="1003541"></a> <span class="sansserif">JavaScript 1.3</span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1003543" id="1003543"></a> <span class="sansserif">Navigator 4.06-4.7x</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1003545" id="1003545"></a> <span class="sansserif">JavaScript 1.4</span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1003547" id="1003547"></a> <span class="sansserif">-</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1004825" id="1004825"></a> <span class="sansserif">JavaScript 1.5</span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1004827" id="1004827"></a> <span class="sansserif">Navigator 6.0</span>
+              </p>
+              <p>
+                <a name="1005148" id="1005148"></a> <span class="sansserif">Mozilla (open source browser)</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p>
+          <a name="1003588" id="1003588"></a> <span class="sansserif">Each version of the Netscape Enterprise Server also supports a different version of JavaScript. To help you write scripts that are compatible with multiple versions of the Enterprise Server, this manual uses an abbreviation to indicate the server version in which each feature was implemented.</span>
+        </p>
+        <p>
+          <a name="1003629" id="1003629"></a> <span class="sansserif"><br></span>
+        </p>
+        <p>
+          <span {font-family: (null)}"><b><a name="1003602" id="1003602"></a> <a name="JavaScript and Netscape Enterprise Server versions" id="JavaScript and Netscape Enterprise Server versions"></a></b></span>
+        </p>
+        <align>
+          <span {font-family: (null)}"><b class="sansserif">Table 2 &nbsp;&nbsp; JavaScript and Netscape Enterprise Server versions 
+          </b></span><br>
+          <br>
+           
+          <table>
+            <tr bgcolor="#CCCCCC" align="left" valign="top">
+              <th valign="top" align="left">
+                <a name="1003606" id="1003606"></a> 
+                <p class="alignleft">
+                  <span class="sansserif"><b>Abbreviation</b></span>
+                </p>
+              </th>
+              <th valign="top" align="left">
+                <a name="1003608" id="1003608"></a> 
+                <p class="alignleft">
+                  <span class="sansserif"><b>Enterpriser Server version</b></span>
+                </p>
+              </th>
+            </tr>
+            <tr>
+              <td valign="top">
+                <p>
+                  <a name="1003610" id="1003610"></a> <span class="sansserif">NES 2.0</span> &nbsp;
+                </p>
+              </td>
+              <td valign="top">
+                <p>
+                  <a name="1003612" id="1003612"></a> <span class="sansserif">Netscape Enterprise Server 2.0</span> &nbsp;
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td valign="top">
+                <p>
+                  <a name="1003614" id="1003614"></a> <span class="sansserif">NES 3.0</span> &nbsp;
+                </p>
+              </td>
+              <td valign="top">
+                <p>
+                  <a name="1003616" id="1003616"></a> <span class="sansserif">Netscape Enterprise Server 3.0</span> &nbsp;
+                </p>
+              </td>
+            </tr>
+          </table>
+          <p>
+            <br>
+            <br>
+             <a name="1001692" id="1001692"></a> <a name="Where to Find JavaScript Information" id="Where to Find JavaScript Information"></a> <span class="sansserif">Where to Find JavaScript Information 
+            </span>
+          </p>
+          <hr size="2" noshade="noshade">
+          <br>
+           <a name="1003206" id="1003206"></a> <span class="sansserif">The core JavaScript documentation includes the following books:</span> 
+          <ul>
+            <li class="nobullet">
+              <a name="1003212" id="1003212"></a>
+            </li>
+            <li>
+              The <a href="/devedge-srce/library/manuals/2000/javascript/1.5/guide/"><i>Core JavaScript Guide</i></a> provides information about the core JavaScript language and its objects. 
+              <p>
+                <a name="1003218" id="1003218"></a>
+              </p>
+            </li>
+            <li>
+              The <i>Core JavaScript Reference</i> (this book) provides reference material for the core JavaScript language.
+            </li>
+          </ul><a name="1003224" id="1003224"></a> 
+          <p>
+            <a name="1005157" id="1005157"></a><span class="sansserif">If you are new to JavaScript, start with the <a href="/devedge-srce/library/manuals/2000/javascript/1.5/guide/"><i>Core JavaScript Guide</i></a>. Once you have a firm grasp of the fundamentals, you can use the <i>Core JavaScript Reference</i> to get more details on individual objects and statements.</span>
+          </p><br>
+           <a name="1001745" id="1001745"></a> <a name="Document Conventions" id="Document Conventions"></a> <span class="sansserif">Document Conventions
+          </span> 
+          <hr size="2" noshade="noshade">
+          <br>
+           <a name="1003380" id="1003380"></a> <span class="sansserif">JavaScript applications run on many operating systems; the information in this book applies to all versions. File and directory paths are given in Windows format (with backslashes separating directory names). For Unix versions, the directory paths are the same, except that you use slashes instead of backslashes to separate directories.</span> 
+          <p>
+            <a name="1003383" id="1003383"></a><span class="sansserif">This book uses uniform resource locators (URLs) of the following form:</span>
+          </p>
+          <p>
+            <a name="1003384" id="1003384"></a> <span class="mono">http://<i>server.domain</i>/<i>path</i>/<i>file</i>.htmll</span>
+          </p>
+          <p>
+            <a name="1003385" id="1003385"></a><span class="sansserif">In these URLs, <i>server</i> represents the name of the server on which you run your application, such as <span class="mono">research1</span> or <span class="mono">www</span>; <i>domain</i> represents your Internet domain name, such as <span class="mono">netscape.com</span> or <span class="mono">uiuc.edu</span>; <i>path</i> represents the directory structure on the server; and <i>file</i><span class="mono">.htmll</span> represents an individual file name. In general, items in italics in URLs are placeholders and items in normal monospace font are literals. If your server has Secure Sockets Layer (SSL) enabled, you would use <span class="mono">https</span> instead of <span class="mono">http</span> in the URL.</span>
+          </p>
+          <p>
+            <a name="1003386" id="1003386"></a><span class="sansserif">This book uses the following font conventions:</span>
+          </p>
+          <ul>
+            <li class="nobullet">
+              <a name="1003387" id="1003387"></a>
+            </li>
+            <li>
+              <span class="mono">The monospace font</span> is used for sample code and code listings, API and language elements (such as method names and property names), file names, path names, directory names, HTML tags, and any text that must be typed on the screen. (<span class="mono"><i>Monospace italic font</i></span> is used for placeholders embedded in code.) 
+              <p>
+                <a name="1003388" id="1003388"></a>
+              </p>
+            </li>
+            <li>
+              <i>Italic type</i> is used for book titles, emphasis, variables and placeholders, and words used in the literal sense. 
+              <p>
+                <a name="1001798" id="1001798"></a>
+              </p>
+            </li>
+            <li>
+              <b>Boldface type</b> is used for glossary terms.
+            </li>
+          </ul>
+        </align>
+        <blockquote>
+          <br>
+           <b><a class="sansserifPurple" href="contents.html">Previous</a></b>&nbsp;&nbsp;&nbsp;&nbsp; <a href="contents.html"><b class="sansserifPurple">Contents</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="ix.html"><b class="sansserifPurple">Index</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="partobj.html"><b class="sansserifPurple">Next</b></a> &nbsp;&nbsp;&nbsp;&nbsp; 
+          <hr noshade="noshade" size="1">
+          <span class="sansserif">Copyright &#169; 2000 <a href="http://www.netscape.com">Netscape Communications Corp.</a> All rights reserved.</span>
+        </blockquote>
+        <p class="alignright">
+          Last Updated <b>September 28, 2000</b>
+        </p>
+        <table width="90%" border="1" cellpadding="5" cellspacing="0"></table>
+      </align>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0"></table>
+    </blockquote>
+  </body>
+</html>

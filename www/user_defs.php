@@ -696,7 +696,7 @@ class User
         #
         # Last Login info.
         #
-	if (($lastweblogin = LASTWEBLOGIN($uid)) == 0)
+	if (($lastweblogin = LASTWEBLOGIN($uid_idx)) == 0)
 	    $lastweblogin = "&nbsp;";
 	if (($lastuserslogininfo = TBUsersLastLogin($uid)) == 0)
 	    $lastuserslogin = "N/A";
@@ -841,7 +841,8 @@ class User
                     <td>UUID: </td>
                     <td class=left>$uuid</td>
                   </tr>\n";
-	    
+	}
+	if (ISADMIN() && $status != TBDB_USERSTATUS_ARCHIVED) {
 	    $cvswebflip = ($cvsweb ? 0 : 1);
 
 	    $toggle_url = CreateURL("toggle", $user,
