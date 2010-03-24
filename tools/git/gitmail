@@ -255,7 +255,7 @@ if ($testmode) {
     #
     # Provide a simple way to grab some commits - the three most recent ones
     #
-    @reflines = ("$testbranch~2 $testbranch refs/heads/$testbranch");
+    @reflines = ("$testbranch~2 $testbranch $testbranch");
 } else {
     #
     # Get all of the references that are being pushed from stdin - we do this in
@@ -584,10 +584,18 @@ sub commit_mail($\@$@) {
     # and what branch it happened on
     #
     my $subject = "git commit: ";
+    my $ref_type;
     if (defined($reponame)) {
         $subject .= "[$reponame] ";
     }
-    $subject .= "branch " . short_refname($refname);
+
+    if ($refname =~ m#refs/tags/#) {
+	    $ref_type = 'tag';
+    } elsif ($refname =~ m#refs/heads/#) {
+	    $ref_type = 'branch';
+    }
+
+    $subject .= $ref_type . ' ' . short_refname($refname);
 
     if ($ct eq $CT_UPDATE) {
         $subject .= " updated";
@@ -599,7 +607,7 @@ sub commit_mail($\@$@) {
         $subject .= " deleted";
     }
 
-    my $actionstring = "Branch " . short_refname($refname) .
+    my $actionstring = ucfirst($ref_type) . ' ' . short_refname($refname) .
                        " has been ${ct}d\n\n";
 
     if ($ct eq $CT_FORCED_UPDATE) {
@@ -670,6 +678,14 @@ sub get_commits($$$) {
         return @revs;
 
     } elsif ($ct eq $CT_CREATE) {
+
+	#
+	# For tags, just return the new revision.  This at least tells us
+	# where the tag points.
+	#
+	if ($refname =~ m#^refs/tags/#) {
+	    return ($newrev);
+	}
         #
         # If it's a create, we have to be a bit more fancy: we look for all
         # commits reachable from the new branch, but *not* reachable from any
@@ -759,9 +775,14 @@ sub send_mail($$@) {
 # Given a full refname, pull off the last part for pretty printing
 #
 sub short_refname($) {
-    my ($refname) = @_;
-    $refname =~ /([^\/]+)$/;
-    return $1;
+    my ($ref) = @_;
+    my $refname = `git rev-parse --abbrev-ref $ref $STDERRNULL`;
+    chomp $refname;
+
+    # This shouldn't be necessary, but return the full ref if
+    # rev-parse doesn't return anything.
+    $refname = $ref if (!$refname);
+    return $refname;
 }
 
 #

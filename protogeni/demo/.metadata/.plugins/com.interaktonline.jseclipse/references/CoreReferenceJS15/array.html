@@ -1,0 +1,2602 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html>
+  <head>
+    <meta content="HTML Tidy for Cygwin (vers 1st February 2003), see www.w3.org" name="generator">
+    <meta name="keywords" content="electronic commerce, ecommerce, ebusiness, e-business, e-commerce, enterprise software, net economy, Netscape, Sun Microsystems, DevEdge Archive, iPlanet, internet software">
+    <meta name="description" content="The DevEdge Archive, a strategic alliance formed by America Online and Sun Microsystems, Inc., is delivering iPlanet e-commerce software and enterprise solutions that enable companies to compete successfully in the Net Economy">
+    <meta http-equiv="Content-Type" content="text/html; charset=us-ascii">
+    <meta name="TEMPLATEBASE" content="Authored in FrameMaker. Converted to HTML in WebWorks Publisher 2000. manual wdt 1.5">
+    <meta name="LASTUPDATED" content="09/28/00 13:15:07">
+    <title>
+      Core JavaScript Reference 1.5:
+    </title>
+    <link rel="stylesheet" type="text/css" href="js15ref.css">
+  </head>
+  <body>
+    <table width="100%" border="0" cellspacing="4">
+      <tr>
+        <td valign="top">
+          <b><a class="sansserifPurple" href="objintro.html">Previous</a></b>&nbsp;&nbsp;&nbsp;&nbsp; <a href="contents.html"><b class="sansserifPurple">Contents</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="ix.html"><b class="sansserifPurple">Index</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="boolean.html"><b class="sansserifPurple">Next</b></a> &nbsp;&nbsp;&nbsp;&nbsp;
+        </td>
+      </tr>
+      <tr>
+        <td class="sansserifBlack" valign="top" align="right" bgcolor="#CCCCCC">
+          <b>Core JavaScript Reference 1.5</b>
+        </td>
+      </tr>
+    </table><br>
+     
+    <blockquote>
+      <br>
+      <br>
+      <br>
+      <br>
+       
+      <p>
+        <a name="1193137" id="1193137"></a> <a name="Array" id="Array"></a> <span class="sansserif"><b>Array</b></span>
+      </p>
+      <p>
+        <a name="1193151" id="1193151"></a> <span class="sansserif">Lets you work with arrays.<br></span>
+      </p><br>
+       
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top" colspan="2" rowspan="1">
+            <p>
+              <a name="1193140" id="1193140"></a> <span class="sansserif"><i>Core object</i></span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193144" id="1193144"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193146" id="1193146"></a> <span class="sansserif">JavaScript 1.1, NES 2.0</span>
+            </p>
+            <p>
+              <a name="1198127" id="1198127"></a>
+            </p>
+            <p>
+              <a name="1193150" id="1193150"></a> <span class="sansserif">JavaScript 1.3: added <a href="array.html#1193889">toSource</a> method; changed <a href="array.html#1193439">length</a> property; changed <a href="array.html#1196550">push</a> method</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1198268" id="1198268"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1198270" id="1198270"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193152" id="1193152"></a> <a name="Created by" id="Created by"></a> <span class="sansserif"><b>Created by</b></span><br>
+         <a name="1193153" id="1193153"></a> <span class="sansserif">The <span class="mono">Array</span> object constructor:</span>
+      </p>
+      <p>
+        <a name="1193154" id="1193154"></a><span class="mono">new Array(<i>arrayLength</i>)<br>
+         new Array(<i>element0</i>, <i>element1</i>, ..., <i>elementN</i>)</span>
+      </p>
+      <p>
+        <a name="1213845" id="1213845"></a> <span class="sansserif">An array literal:</span>
+      </p>
+      <p>
+        <a name="1213846" id="1213846"></a> <span class="mono">[<i>element0</i>, <i>element1</i>, ..., <i>elementN</i>]</span>
+      </p>
+      <p>
+        <a name="1213847" id="1213847"></a> <span class="sansserif"><i>JavaScript 1.2 when you specify</i> <span class="mono"><i>LANGUAGE="JavaScript1.2"</i></span> <i>in the</i> <span class="mono"><i>&lt;SCRIPT&gt;</i></span> <i>tag:</i></span>
+      </p>
+      <p>
+        <a name="1193156" id="1193156"></a><span class="mono">new Array(<i>element0</i>, <i>element1</i>, ..., <i>elementN</i>)</span>
+      </p>
+      <p>
+        <a name="1193157" id="1193157"></a> <span class="sansserif"><i>JavaScript 1.2 when you do not specify</i> <span class="mono"><i>LANGUAGE="JavaScript1.2"</i></span> <i>in the</i> <span class="mono"><i>&lt;SCRIPT&gt;</i></span> <i>tag:</i></span>
+      </p>
+      <p>
+        <a name="1193158" id="1193158"></a><span class="mono">new Array([<i>arrayLength</i>])<br>
+         new Array([<i>element0</i>[, <i>element1</i>[, ..., <i>elementN</i>]]])</span>
+      </p>
+      <p>
+        <a name="1193159" id="1193159"></a> <span class="sansserif"><i>JavaScript 1.1:</i></span>
+      </p>
+      <p>
+        <a name="1193160" id="1193160"></a><span class="mono">new Array([<i>arrayLength</i>])<br>
+         new Array([<i>element0</i>[, <i>element1</i>[, ..., <i>elementN</i>]]])</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193162" id="1193162"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1211883" id="1211883"></a> <span class="sansserif"><br></span>
+      </p><br>
+       
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <a name="1211876" id="1211876"></a> <span class="mono">arrayLength</span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1211878" id="1211878"></a> <span class="sansserif">The initial length of the array. You can access this value using the <span class="mono">length</span> property. If the value specified is not a number, an array of length 1 is created, with the first element having the specified value. The maximum length allowed for an array is 4,294,967,295.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1211880" id="1211880"></a> <span class="mono">element<i>N</i></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1211882" id="1211882"></a> <span class="sansserif">A list of values for the array's elements. When this form is specified, the array is initialized with the specified values as its elements, and the array's <span class="mono">length</span> property is set to the number of arguments.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1211884" id="1211884"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1211904" id="1211904"></a> <span class="sansserif">An array is an ordered set of values associated with a single variable name.</span>
+      </p>
+      <p>
+        <a name="1212668" id="1212668"></a> <span class="sansserif">The following example creates an <span class="mono">Array</span> object with an array literal; the <span class="mono">coffees</span> array contains three elements and a length of three:</span>
+      </p>
+      <p>
+        <a name="1212669" id="1212669"></a> <span class="mono">coffees = ["French Roast", "Columbian", "Kona"]</span>
+      </p>
+      <p>
+        <a name="1217769" id="1217769"></a> <span class="sansserif">You can construct a <i>dense</i> array of two or more elements starting with index 0 if you define initial values for all elements. A dense array is one in which each element has a value. The following code creates a dense array with three elements:</span>
+      </p>
+      <p>
+        <a name="1217770" id="1217770"></a> <span class="mono">myArray = new Array("Hello", myVar, 3.14159)</span>
+      </p>
+      <p>
+        <a name="1211905" id="1211905"></a> <span class="sansserif"><b>Indexing an array.</b></span> <a name="1211907" id="1211907"></a> <span class="sansserif">You index an array by its ordinal number. For example, assume you define the following array:</span>
+      </p>
+      <p>
+        <a name="1193177" id="1193177"></a> <span class="mono">myArray = new Array("Wind","Rain","Fire")</span>
+      </p>
+      <p>
+        <a name="1204385" id="1204385"></a> <span class="sansserif">You then refer to the first element of the array as <span class="mono">myArray[0]</span> and the second element of the array as <span class="mono">myArray[1]</span>.</span>
+      </p>
+      <p>
+        <a name="1204386" id="1204386"></a> <span class="sansserif"><b>Specifying a single parameter.</b></span> <a name="1204388" id="1204388"></a> <span class="sansserif">When you specify a single numeric parameter with the <span class="mono">Array</span> constructor, you specify the initial length of the array. The following code creates an array of five elements:</span>
+      </p>
+      <p>
+        <a name="1193182" id="1193182"></a> <span class="mono">billingMethod = new Array(5)</span>
+      </p>
+      <p>
+        <a name="1193183" id="1193183"></a> <span class="sansserif">The behavior of the <span class="mono">Array</span> constructor depends on whether the single parameter is a number.</span>
+      </p>
+      <ul>
+        <li class="nobullet">
+          <a name="1193185" id="1193185"></a>
+        </li>
+        <li>
+          <span class="sansserif">If the value specified is a number, the constructor converts the number to an unsigned, 32-bit integer and generates an array with the <span class="mono">length</span> property (size of the array) set to the integer. The array initially contains no elements, even though it might have a non-zero length.</span> 
+          <p>
+            <a name="1193186" id="1193186"></a>
+          </p>
+        </li>
+        <li>
+          If the value specified is not a number, an array of length 1 is created, with the first element having the specified value.
+        </li>
+      </ul><a name="1193188" id="1193188"></a> <span class="sansserif">The following code creates an array of length 25, then assigns values to the first three elements:</span> 
+      <p>
+        <a name="1193189" id="1193189"></a> <span class="mono">musicTypes = new Array(25)<br>
+         musicTypes[0] = "R&amp;B"<br>
+         musicTypes[1] = "Blues"<br>
+         musicTypes[2] = "Jazz"</span>
+      </p>
+      <p>
+        <a name="1193193" id="1193193"></a> <span class="sansserif"><b>Increasing the array length indirectly.</b></span> <a name="1193195" id="1193195"></a> <span class="sansserif">An array's length increases if you assign a value to an element higher than the current length of the array. The following code creates an array of length 0, then assigns a value to element 99. This changes the length of the array to 100.</span>
+      </p>
+      <p>
+        <a name="1204395" id="1204395"></a> <span class="mono">colors = new Array()<br>
+         colors[99] = "midnightblue"</span>
+      </p>
+      <p>
+        <a name="1204396" id="1204396"></a> <span class="sansserif"><b>Creating an array using the result of a match.</b></span> <a name="1204397" id="1204397"></a> <span class="sansserif">The result of a match between a regular expression and a string can create an array. This array has properties and elements that provide information about the match. An array is the return value of <a href="regexp.html#1194735">RegExp.exec</a>, <a href="string.html#1205239">String.match</a>, and <a href="string.html#1194258">String.replace</a>. To help explain these properties and elements, look at the following example and then refer to the table below:</span>
+      </p>
+      <p>
+        <a name="1193208" id="1193208"></a> <span class="mono">&lt;SCRIPT LANGUAGE="JavaScript1.2"&gt;<br>
+         //Match one d followed by one or more b's followed by one d<br>
+         //Remember matched b's and the following d<br>
+         //Ignore case</span>
+      </p>
+      <p>
+        <a name="1193209" id="1193209"></a> <span class="mono">myRe=/d(b+)(d)/i;<br>
+         myArray = myRe.exec("cdbBdbsbz");</span>
+      </p>
+      <p>
+        <a name="1193210" id="1193210"></a> <span class="mono">&lt;/SCRIPT&gt;</span>
+      </p>
+      <p>
+        <a name="1193211" id="1193211"></a> <span class="sansserif">The properties and elements returned from this match are as follows:</span>
+      </p>
+      <p>
+        <a name="1193243" id="1193243"></a> <span class="sansserif"><br></span>
+      </p><br>
+       
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr bgcolor="#CCCCCC" align="left" valign="top">
+          <th valign="top" align="left">
+            <a name="1193214" id="1193214"></a> 
+            <p class="alignleft">
+              <span class="sansserif"><b>Property/Element</b></span>
+            </p>
+          </th>
+          <th valign="top" align="left">
+            <a name="1193216" id="1193216"></a> 
+            <p class="alignleft">
+              <span class="sansserif"><b>Description</b></span>
+            </p>
+          </th>
+          <th valign="top" align="left">
+            <a name="1193218" id="1193218"></a> 
+            <p class="alignleft">
+              <span class="sansserif"><b>Example</b></span>
+            </p>
+          </th>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193220" id="1193220"></a> <span class="mono">input</span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193222" id="1193222"></a> <span class="sansserif">A read-only property that reflects the original string against which the regular expression was matched.</span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193224" id="1193224"></a> <span class="sansserif">cdbBdbsbz</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193226" id="1193226"></a> <span class="mono">index</span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193228" id="1193228"></a> <span class="sansserif">A read-only property that is the zero-based index of the match in the string.</span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193230" id="1193230"></a> <span class="sansserif">1</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193232" id="1193232"></a> <span class="mono">[0]</span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193234" id="1193234"></a> <span class="sansserif">A read-only element that specifies the last matched characters.</span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193236" id="1193236"></a> <span class="sansserif">dbBd</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193238" id="1193238"></a> <span class="mono">[1], ...[n]</span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193240" id="1193240"></a> <span class="sansserif">Read-only elements that specify the parenthesized substring matches, if included in the regular expression. The number of possible parenthesized substrings is unlimited.</span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193242" id="1193242"></a> <span class="sansserif">[1]=bB&nbsp;<br>
+               [2]=d</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193244" id="1193244"></a> <a name="Backward Compatibility" id="Backward Compatibility"></a> <span class="sansserif"><b>Backward Compatibility</b></span>
+      </p>
+      <p>
+        <a name="1193245" id="1193245"></a> <span class="sansserif"><b>JavaScript 1.2.</b></span> <a name="1193246" id="1193246"></a> <span class="sansserif">When you specify a single parameter with the <span class="mono">Array</span> constructor, the behavior depends on whether you specify <span class="mono">LANGUAGE="JavaScript1.2"</span> in the <span class="mono">&lt;SCRIPT&gt;</span> tag:</span>
+      </p>
+      <ul>
+        <li class="nobullet">
+          <a name="1193247" id="1193247"></a>
+        </li>
+        <li>
+          <span class="sansserif">If you specify <span class="mono">LANGUAGE="JavaScript1.2"</span> in the <span class="mono">&lt;SCRIPT&gt;</span> tag, a single-element array is returned. For example, <span class="mono">new Array(5)</span> creates a one-element array with the first element being 5. A constructor with a single parameter acts in the same way as a multiple parameter constructor. You cannot specify the <span class="mono">length</span> property of an <span class="mono">Array</span> using a constructor with one parameter.</span> 
+          <p>
+            <a name="1193248" id="1193248"></a>
+          </p>
+        </li>
+        <li>
+          If you do not specify <span class="mono">LANGUAGE="JavaScript1.2"</span> in the <span class="mono">&lt;SCRIPT&gt;</span> tag, you specify the initial length of the array as with other JavaScript versions.
+        </li>
+      </ul>
+      <p>
+        <a name="1193249" id="1193249"></a> <span class="sansserif"><b>JavaScript 1.1 and earlier.</b></span> <a name="1193251" id="1193251"></a> <span class="sansserif">When you specify a single parameter with the <span class="mono">Array</span> constructor, you specify the initial length of the array. The following code creates an array of five elements:</span>
+      </p>
+      <p>
+        <a name="1193252" id="1193252"></a> <span class="mono">billingMethod = new Array(5)</span>
+      </p>
+      <p>
+        <a name="1193253" id="1193253"></a> <span class="sansserif"><b>JavaScript 1.0.</b></span> <a name="1193254" id="1193254"></a> <span class="sansserif">You must index an array by its ordinal number; for example <span class="mono">myArray[0]</span>.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193255" id="1193255"></a> <a name="Property Summary&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;" id="Property Summarynbsp;nbsp;nbsp;nbsp;nbsp;nbsp;"></a> <span class="sansserif"><b>Property Summary&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</b></span><br>
+         <a name="1193289" id="1193289"></a> <span class="sansserif"><br></span>
+      </p><br>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr bgcolor="#CCCCCC" align="left" valign="top">
+          <th valign="top" align="left">
+            <a name="1193258" id="1193258"></a> 
+            <p class="alignleft">
+              <span class="sansserif"><b>Property</b></span>
+            </p>
+          </th>
+          <th valign="top" align="left">
+            <a name="1193260" id="1193260"></a> 
+            <p class="alignleft">
+              <span class="sansserif"><b>Description</b></span>
+            </p>
+          </th>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1206419" id="1206419"></a> <span class="mono"><a href="array.html#1206131">constructor</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1206421" id="1206421"></a> <span class="sansserif">Specifies the function that creates an object's prototype.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193265" id="1193265"></a> <span class="mono"><a href="array.html#1193399">index</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193267" id="1193267"></a> <span class="sansserif">For an array created by a regular expression match, the zero-based index of the match in the string.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193272" id="1193272"></a> <span class="mono"><a href="array.html#1193419">input</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193274" id="1193274"></a> <span class="sansserif">For an array created by a regular expression match, reflects the original string against which the regular expression was matched.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193279" id="1193279"></a> <span class="mono"><a href="array.html#1193439">length</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193281" id="1193281"></a> <span class="sansserif">Reflects the number of elements in an array.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1206003" id="1206003"></a> <span class="mono"><a href="array.html#1205871">prototype</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1206005" id="1206005"></a> <span class="sansserif">Allows the addition of properties to all objects.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193290" id="1193290"></a> <a name="Method Summary" id="Method Summary"></a> <span class="sansserif"><b>Method Summary</b></span><br>
+         <a name="1193380" id="1193380"></a> <span class="sansserif"><br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr bgcolor="#CCCCCC" align="left" valign="top">
+          <th valign="top" align="left">
+            <a name="1193293" id="1193293"></a> 
+            <p class="alignleft">
+              <span class="sansserif"><b>Method</b></span>
+            </p>
+          </th>
+          <th valign="top" align="left">
+            <a name="1193295" id="1193295"></a> 
+            <p class="alignleft">
+              <span class="sansserif"><b>Description</b></span>
+            </p>
+          </th>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193300" id="1193300"></a> <span class="mono"><a href="array.html#1194827">concat</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193302" id="1193302"></a> <span class="sansserif">Joins two arrays and returns a new array.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193307" id="1193307"></a> <span class="mono"><a href="array.html#1195456">join</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193309" id="1193309"></a> <span class="sansserif">Joins all elements of an array into a string.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193314" id="1193314"></a> <span class="mono"><a href="array.html#1196003">pop</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193316" id="1193316"></a> <span class="sansserif">Removes the last element from an array and returns that element.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193321" id="1193321"></a> <span class="mono"><a href="array.html#1196550">push</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193323" id="1193323"></a> <span class="sansserif">Adds one or more elements to the end of an array and returns the new length of the array.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193328" id="1193328"></a> <span class="mono"><a href="array.html#1193641">reverse</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193330" id="1193330"></a> <span class="sansserif">Transposes the elements of an array: the first array element becomes the last and the last becomes the first.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193335" id="1193335"></a> <span class="mono"><a href="array.html#1193677">shift</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193337" id="1193337"></a> <span class="sansserif">Removes the first element from an array and returns that element.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193342" id="1193342"></a> <span class="mono"><a href="array.html#1193713">slice</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193344" id="1193344"></a> <span class="sansserif">Extracts a section of an array and returns a new array.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193349" id="1193349"></a> <span class="mono"><a href="array.html#1193766">splice</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193351" id="1193351"></a> <span class="sansserif">Adds and/or removes elements from an array.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193356" id="1193356"></a> <span class="mono"><a href="array.html#1196882">sort</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193358" id="1193358"></a> <span class="sansserif">Sorts the elements of an array.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193363" id="1193363"></a> <span class="mono"><a href="array.html#1193889">toSource</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193365" id="1193365"></a> <span class="sansserif">Returns an array literal representing the specified array; you can use this value to create a new array. Overrides the <a href="object.html#1193320">Object.toSource</a> method.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193370" id="1193370"></a> <span class="mono"><a href="array.html#1193921">toString</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193372" id="1193372"></a> <span class="sansserif">Returns a string representing the array and its elements. Overrides the <a href="object.html#1193350">Object.toString</a> method.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193377" id="1193377"></a> <span class="mono"><a href="array.html#1193964">unshift</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193379" id="1193379"></a> <span class="sansserif">Adds one or more elements to the front of an array and returns the new length of the array.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1202673" id="1202673"></a> <span class="mono"><a href="array.html#1202613">valueOf</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1202675" id="1202675"></a> <span class="sansserif">Returns the primitive value of the array. Overrides the <a href="object.html#1193540">Object.valueOf</a> method.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <a name="1201266" id="1201266"></a> <span class="sansserif">In addition, this object inherits the <a href="object.html#1193628">watch</a> and <a href="object.html#1193499">unwatch</a> methods from <a href="object.html#1193136">Object</a>.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193381" id="1193381"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1193382" id="1193382"></a> <span class="sansserif"><b>Example 1.</b> The following example creates an array, <span class="mono">msgArray</span>, with a length of 0, then assigns values to <span class="mono">msgArray[0]</span> and <span class="mono">msgArray[99]</span>, changing the length of the array to 100.</span>
+      </p>
+      <p>
+        <a name="1193383" id="1193383"></a> <span class="mono">msgArray = new Array()<br>
+         msgArray[0] = "Hello"<br>
+         msgArray[99] = "world"<br>
+         // The following statement is true,<br>
+         // because defined msgArray[99] element.<br>
+         if (msgArray.length == 100)<br>
+         &nbsp;&nbsp;&nbsp;myVar="The length is 100."</span>
+      </p>
+      <p>
+        <a name="1193388" id="1193388"></a> <span class="sansserif"><b>Example 2: Two-dimensional array.</b> The following code creates a two-dimensional array and assigns the results to <span class="mono">myVar</span>.</span>
+      </p>
+      <p>
+        <a name="1193389" id="1193389"></a> <span class="mono">myVar="Multidimensional array test; "<br>
+         a = new Array(4)<br>
+         for (i=0; i &lt; 4; i++) {<br>
+         &nbsp;&nbsp;&nbsp;a[i] = new Array(4)<br>
+         &nbsp;&nbsp;&nbsp;for (j=0; j &lt; 4; j++) {<br>
+         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;a[i][j] = "["+i+","+j+"]"<br>
+         &nbsp;&nbsp;&nbsp;}<br>
+         }<br>
+         for (i=0; i &lt; 4; i++) {<br>
+         &nbsp;&nbsp;&nbsp;str = "Row "+i+":"<br>
+         &nbsp;&nbsp;&nbsp;for (j=0; j &lt; 4; j++) {<br>
+         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;str += a[i][j]<br>
+         &nbsp;&nbsp;&nbsp;}<br>
+         &nbsp;&nbsp;&nbsp;myVar += str +"; "<br>
+         }</span>
+      </p>
+      <p>
+        <a name="1193390" id="1193390"></a> <span class="sansserif">This example assigns the following string to <span class="mono">myVar</span> (line breaks are used here for readability):</span>
+      </p>
+      <p>
+        <a name="1193391" id="1193391"></a> <span class="mono">Multidimensional array test;<br>
+         Row 0:[0,0][0,1][0,2][0,3];<br>
+         Row 1:[1,0][1,1][1,2][1,3];<br>
+         Row 2:[2,0][2,1][2,2][2,3];<br>
+         Row 3:[3,0][3,1][3,2][3,3];</span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1194827" id="1194827"></a> <a name="concat" id="concat"></a> <span class="sansserif"><b>concat</b></span>
+      </p>
+      <p>
+        <a name="1194841" id="1194841"></a> <span class="sansserif">Joins two arrays and returns a new array.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1198289" id="1198289"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1198294" id="1198294"></a> <span class="sansserif"><a href="array.html#1193137">Array</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1198296" id="1198296"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1198298" id="1198298"></a> <span class="sansserif">JavaScript 1.2, NES 3.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1220471" id="1220471"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1220473" id="1220473"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1194842" id="1194842"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1194843" id="1194843"></a> <span class="mono">concat(<i>arrayName2</i>, <i>arrayName3</i>, ..., <i>arrayNameN</i>)</span>
+      </p>
+      <p>
+        <br>
+         <a name="1194844" id="1194844"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1194850" id="1194850"></a> <span class="sansserif"><br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <a name="1194847" id="1194847"></a> <span class="mono">arrayName2...<br>
+             arrayName<i>N</i></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1194849" id="1194849"></a> <span class="sansserif">Arrays to concatenate to this array.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1194851" id="1194851"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1194852" id="1194852"></a> <span class="sansserif"><span class="mono">concat</span> does not alter the original arrays, but returns a "one level deep" copy that contains copies of the same elements combined from the original arrays. Elements of the original arrays are copied into the new array as follows:</span>
+      </p>
+      <ul>
+        <li class="nobullet">
+          <a name="1194853" id="1194853"></a>
+        </li>
+        <li>
+          <span class="sansserif">Object references (and not the actual object): <span class="mono">concat</span> copies object references into the new array. Both the original and new array refer to the same object. If a referenced object changes, the changes are visible to both the new and original arrays.</span> 
+          <p>
+            <a name="1194860" id="1194860"></a>
+          </p>
+        </li>
+        <li>
+          Strings and numbers (not <a href="string.html#1193137">String</a> and <a href="number.html#1193137">Number</a> objects): <span class="mono">concat</span> copies strings and numbers into the new array. Changes to the string or number in one array does not affect the other arrays.
+        </li>
+      </ul><a name="1194861" id="1194861"></a> <span class="sansserif">If a new element is added to either array, the other array is not affected.</span> 
+      <p>
+        <a name="1212871" id="1212871"></a> <span class="sansserif">The following code concatenates two arrays:</span>
+      </p>
+      <p>
+        <a name="1212906" id="1212906"></a> <span class="mono">alpha=new Array("a","b","c")<br>
+         numeric=new Array(1,2,3)<br>
+         alphaNumeric=alpha.concat(numeric) // creates array ["a","b","c",1,2,3]</span>
+      </p>
+      <p>
+        <a name="1213112" id="1213112"></a> <span class="sansserif">The following code concatenates three arrays:</span>
+      </p>
+      <p>
+        <a name="1213022" id="1213022"></a> <span class="mono">num1=[1,2,3]<br>
+         num2=[4,5,6]<br>
+         num3=[7,8,9]<br>
+         nums=num1.concat(num2,num3) // creates array [1,2,3,4,5,6,7,8,9]</span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1206131" id="1206131"></a> <a name="constructor" id="constructor"></a> <span class="sansserif"><b>constructor</b></span>
+      </p>
+      <p>
+        <a name="1206132" id="1206132"></a> <span class="sansserif">Specifies the function that creates an object's prototype. Note that the value of this property is a reference to the function itself, not a string containing the function's name.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1206135" id="1206135"></a> <span class="sansserif"><i>Property of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1206140" id="1206140"></a> <span class="sansserif"><a href="array.html#1193137">Array</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1206142" id="1206142"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1206144" id="1206144"></a> <span class="sansserif">JavaScript 1.1, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1206146" id="1206146"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1206148" id="1206148"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1206149" id="1206149"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1206150" id="1206150"></a> <span class="sansserif">See <a href="object.html#1193229">Object.constructor</a>.</span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1193399" id="1193399"></a> <a name="index" id="index"></a> <span class="sansserif"><b>index</b></span>
+      </p>
+      <p>
+        <a name="1193401" id="1193401"></a> <span class="sansserif">For an array created by a regular expression match, the zero-based index of the match in the string.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193404" id="1193404"></a> <span class="sansserif"><i>Property of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193409" id="1193409"></a> <span class="sansserif"><a href="array.html#1193137">Array</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top" colspan="2" rowspan="1">
+            <p>
+              <a name="1193411" id="1193411"></a> <span class="sansserif"><i>Static</i></span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193415" id="1193415"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193417" id="1193417"></a> <span class="sansserif">JavaScript 1.2, NES 3.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1193419" id="1193419"></a> <a name="input" id="input"></a> <span class="sansserif"><b>input</b></span>
+      </p>
+      <p>
+        <a name="1197743" id="1197743"></a> <span class="sansserif">For an array created by a regular expression match, reflects the original string against which the regular expression was matched.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193424" id="1193424"></a> <span class="sansserif"><i>Property of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193429" id="1193429"></a> <span class="sansserif"><a href="array.html#1193137">Array</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top" colspan="2" rowspan="1">
+            <p>
+              <a name="1193431" id="1193431"></a> <span class="sansserif"><i>Static</i></span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193435" id="1193435"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193437" id="1193437"></a> <span class="sansserif">JavaScript 1.2, NES 3.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1195456" id="1195456"></a> <a name="join" id="join"></a> <span class="sansserif"><b>join</b></span>
+      </p>
+      <p>
+        <a name="1195470" id="1195470"></a> <span class="sansserif">Joins all elements of an array into a string.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1195460" id="1195460"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1195465" id="1195465"></a> <span class="sansserif"><a href="array.html#1193137">Array</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1195467" id="1195467"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1195469" id="1195469"></a> <span class="sansserif">JavaScript 1.1, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1198304" id="1198304"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1198306" id="1198306"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1195471" id="1195471"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1195472" id="1195472"></a> <span class="mono">join(<i>separator</i>)</span>
+      </p>
+      <p>
+        <br>
+         <a name="1195473" id="1195473"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1195479" id="1195479"></a> <span class="sansserif"><br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <a name="1195476" id="1195476"></a> <span class="mono">separator</span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1195478" id="1195478"></a> <span class="sansserif">Specifies a string to separate each element of the array. The separator is converted to a string if necessary. If omitted, the array elements are separated with a comma.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1195480" id="1195480"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1195481" id="1195481"></a> <span class="sansserif">The string conversions of all array elements are joined into one string.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1195482" id="1195482"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1195483" id="1195483"></a> <span class="sansserif">The following example creates an array, <span class="mono">a</span>, with three elements, then joins the array three times: using the default separator, then a comma and a space, and then a plus.</span>
+      </p>
+      <p>
+        <a name="1206975" id="1206975"></a><span class="mono">a = new Array("Wind","Rain","Fire")<br>
+         myVar1=a.join()&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// assigns "Wind,Rain,Fire" to myVar1<br>
+         myVar2=a.join(", ")&nbsp;&nbsp;// assigns "Wind, Rain, Fire" to myVar1<br>
+         myVar3=a.join(" + ")&nbsp;// assigns "Wind + Rain + Fire" to myVar1</span>
+      </p>
+      <p>
+        <br>
+         <a name="1195487" id="1195487"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1195491" id="1195491"></a> <span class="sansserif"><a href="array.html#1193641">Array.reverse</a></span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1193439" id="1193439"></a> <a name="length" id="length"></a> <span class="sansserif"><b>length</b></span>
+      </p>
+      <p>
+        <a name="1193454" id="1193454"></a> <span class="sansserif">An unsigned, 32-bit integer that specifies the number of elements in an array.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193443" id="1193443"></a> <span class="sansserif"><i>Property of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193448" id="1193448"></a> <span class="sansserif"><a href="array.html#1193137">Array</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193450" id="1193450"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193452" id="1193452"></a> <span class="sansserif">JavaScript 1.1, NES 2.0</span>
+            </p>
+            <p>
+              <a name="1198137" id="1198137"></a>
+            </p>
+            <p>
+              <a name="1193453" id="1193453"></a> <span class="sansserif">JavaScript 1.3: <span class="mono">length</span> is an unsigned, 32-bit integer with a value less than 2<sup>32</sup>.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1198337" id="1198337"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1198339" id="1198339"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193455" id="1193455"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1193456" id="1193456"></a> <span class="sansserif">The value of the <span class="mono">length</span> property is an integer with a positive sign and a value less than 2 to the 32 power (2<sup>32</sup>).</span>
+      </p>
+      <p>
+        <a name="1193457" id="1193457"></a> <span class="sansserif">You can set the <span class="mono">length</span> property to truncate an array at any time. When you extend an array by changing its <span class="mono">length</span> property, the number of actual elements does not increase; for example, if you set <span class="mono">length</span> to 3 when it is currently 2, the array still contains only 2 elements.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193458" id="1193458"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1213262" id="1213262"></a> <span class="sansserif">In the following example, the <span class="mono">getChoice</span> function uses the <span class="mono">length</span> property to iterate over every element in the <span class="mono">musicType</span> array. <span class="mono">musicType</span> is a select element on the <span class="mono">musicForm</span> form.</span>
+      </p>
+      <p>
+        <a name="1213264" id="1213264"></a> <span class="mono">function getChoice() {<br>
+         &nbsp;&nbsp;&nbsp;for (var i = 0; i &lt; document.musicForm.musicType.length; i++) {<br>
+         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (document.musicForm.musicType.options[i].selected == true) {<br>
+         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return document.musicForm.musicType.options[i].text<br>
+         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+         &nbsp;&nbsp;&nbsp;}<br>
+         }</span>
+      </p>
+      <p>
+        <a name="1193461" id="1193461"></a> <span class="sansserif">The following example shortens the array <span class="mono">statesUS</span> to a length of 50 if the current length is greater than 50.</span>
+      </p>
+      <p>
+        <a name="1193462" id="1193462"></a><span class="mono">if (statesUS.length &gt; 50) {<br>
+         &nbsp;&nbsp;&nbsp;statesUS.length=50<br>
+         }</span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1196003" id="1196003"></a> <a name="pop" id="pop"></a> <span class="sansserif"><b>pop</b></span>
+      </p>
+      <p>
+        <a name="1196005" id="1196005"></a> <span class="sansserif">Removes the last element from an array and returns that element. This method changes the length of the array.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1196008" id="1196008"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1196013" id="1196013"></a> <span class="sansserif"><a href="array.html#1193137">Array</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1196015" id="1196015"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1196017" id="1196017"></a> <span class="sansserif">JavaScript 1.2, NES 3.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1220475" id="1220475"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1220477" id="1220477"></a> <span class="sansserif">ECMA-262 Edition 3</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1196018" id="1196018"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1196019" id="1196019"></a> <span class="mono">pop()</span>
+      </p>
+      <p>
+        <br>
+         <a name="1196020" id="1196020"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1196021" id="1196021"></a> <span class="sansserif">None.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1196022" id="1196022"></a> <a name="Example" id="Example"></a> <span class="sansserif"><b>Example</b></span><br>
+         <a name="1196023" id="1196023"></a> <span class="sansserif">The following code creates the <span class="mono">myFish</span> array containing four elements, then removes its last element.</span>
+      </p>
+      <p>
+        <a name="1196024" id="1196024"></a> <span class="mono">myFish = ["angel", "clown", "mandarin", "surgeon"];<br>
+         popped = myFish.pop();</span>
+      </p>
+      <p>
+        <br>
+         <a name="1196027" id="1196027"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1196037" id="1196037"></a> <span class="sansserif"><a href="array.html#1196550">push</a>, <a href="array.html#1193677">shift</a>, <a href="array.html#1193964">unshift</a></span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1205871" id="1205871"></a> <a name="prototype" id="prototype"></a> <span class="sansserif"><b>prototype</b></span>
+      </p>
+      <p>
+        <a name="1205872" id="1205872"></a> <span class="sansserif">Represents the prototype for this class. You can use the prototype to add properties or methods to all instances of a class. For information on prototypes, see <a href="function.html#1193426">Function.prototype</a>.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1205878" id="1205878"></a> <span class="sansserif"><i>Property of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1205883" id="1205883"></a> <span class="sansserif"><a href="array.html#1193137">Array</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1205885" id="1205885"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1205887" id="1205887"></a> <span class="sansserif">JavaScript 1.1, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1205889" id="1205889"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1205891" id="1205891"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1196550" id="1196550"></a> <a name="push" id="push"></a> <span class="sansserif"><b>push</b></span>
+      </p>
+      <p>
+        <a name="1196552" id="1196552"></a> <span class="sansserif">Adds one or more elements to the end of an array and returns the new length of the array. This method changes the length of the array.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1196555" id="1196555"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1196560" id="1196560"></a> <span class="sansserif"><a href="array.html#1193137">Array</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1196562" id="1196562"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1196564" id="1196564"></a> <span class="sansserif">JavaScript 1.2, NES 3.0</span>
+            </p>
+            <p>
+              <a name="1208293" id="1208293"></a>
+            </p>
+            <p>
+              <a name="1208306" id="1208306"></a> <span class="sansserif">JavaScript 1.3: <span class="mono">push</span> returns the new length of the array rather than the last element added to the array.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1220493" id="1220493"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1220495" id="1220495"></a> <span class="sansserif">ECMA-262 Edition 3</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1196565" id="1196565"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1196566" id="1196566"></a> <span class="mono">push(<i>element1</i>, ..., <i>elementN</i>)</span>
+      </p>
+      <p>
+        <br>
+         <a name="1196567" id="1196567"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1196573" id="1196573"></a> <span class="sansserif"><span class="sansserifRed"><br></span></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <a name="1196570" id="1196570"></a> <span class="mono">element1, ...,<br>
+             element<i>N</i></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1196572" id="1196572"></a> <span class="sansserif">The elements to add to the end of the array.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1196574" id="1196574"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1196575" id="1196575"></a> <span class="sansserif">The behavior of the <span class="mono">push</span> method is analogous to the <span class="mono">push</span> function in Perl&nbsp;4. Note that this behavior is different in Perl&nbsp;5.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1196576" id="1196576"></a> <a name="Backward Compatibility" id="Backward Compatibility"></a> <span class="sansserif"><b>Backward Compatibility</b></span><br>
+      </p>
+      <p>
+        <a name="1196577" id="1196577"></a> <span class="sansserif"><b>JavaScript 1.2.</b></span> <a name="1196578" id="1196578"></a> <span class="sansserif">The <span class="mono">push</span> method returns the last element added to an array.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1196579" id="1196579"></a> <a name="Example" id="Example"></a> <span class="sansserif"><b>Example</b></span><br>
+         <a name="1207690" id="1207690"></a> <span class="sansserif">The following code creates the <span class="mono">myFish</span> array containing two elements, then adds two elements to it. After the code executes, <span class="mono">pushed</span> contains 4. (In JavaScript 1.2, <span class="mono">pushed</span> contains "lion" after the code executes.)</span>
+      </p>
+      <p>
+        <a name="1196581" id="1196581"></a> <span class="mono">myFish = ["angel", "clown"];<br>
+         pushed = myFish.push("drum", "lion");</span>
+      </p>
+      <p>
+        <br>
+         <a name="1196584" id="1196584"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1196594" id="1196594"></a> <span class="sansserif"><a href="array.html#1196003">pop</a>, <a href="array.html#1193677">shift</a>, <a href="array.html#1193964">unshift</a></span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1193641" id="1193641"></a> <a name="reverse" id="reverse"></a> <span class="sansserif"><b>reverse</b></span>
+      </p>
+      <p>
+        <a name="1193642" id="1193642"></a> <span class="sansserif">Transposes the elements of an array: the first array element becomes the last and the last becomes the first.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193645" id="1193645"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193650" id="1193650"></a> <span class="sansserif"><a href="array.html#1193137">Array</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193652" id="1193652"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193654" id="1193654"></a> <span class="sansserif">JavaScript 1.1, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1198396" id="1198396"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1198398" id="1198398"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193655" id="1193655"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1193656" id="1193656"></a> <span class="mono">reverse()</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193657" id="1193657"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1193658" id="1193658"></a> <span class="sansserif">None</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193659" id="1193659"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1193660" id="1193660"></a> <span class="sansserif">The <span class="mono">reverse</span> method transposes the elements of the calling array object.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193661" id="1193661"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1193662" id="1193662"></a> <span class="sansserif">The following example creates an array <span class="mono">myArray</span>, containing three elements, then reverses the array.</span>
+      </p>
+      <p>
+        <a name="1193663" id="1193663"></a> <span class="mono">myArray = new Array("one", "two", "three")<br>
+         myArray.reverse()</span>
+      </p>
+      <p>
+        <a name="1193664" id="1193664"></a> <span class="sansserif">This code changes <span class="mono">myArray</span> so that:</span>
+      </p>
+      <ul>
+        <li class="nobullet">
+          <a name="1193665" id="1193665"></a>
+        </li>
+        <li>
+          <span class="sansserif"><span class="mono">myArray[0]</span> is <span class="mono">"three"</span></span> 
+          <p>
+            <a name="1193666" id="1193666"></a>
+          </p>
+        </li>
+        <li>
+          <span class="sansserif"><span class="mono">myArray[1]</span> is <span class="mono">"two"</span></span> 
+          <p>
+            <a name="1193667" id="1193667"></a>
+          </p>
+        </li>
+        <li>
+          <span class="mono">myArray[2]</span> is <span class="mono">"one"</span>
+        </li>
+      </ul><br>
+       <a name="1193668" id="1193668"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+       <a name="1193675" id="1193675"></a> <span class="sansserif"><a href="array.html#1195456">Array.join</a>, <a href="array.html#1196882">Array.sort</a></span> 
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1193677" id="1193677"></a> <a name="shift" id="shift"></a> <span class="sansserif"><b>shift</b></span>
+      </p>
+      <p>
+        <a name="1193679" id="1193679"></a> <span class="sansserif">Removes the first element from an array and returns that element. This method changes the length of the array.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193682" id="1193682"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193687" id="1193687"></a> <span class="sansserif"><a href="array.html#1193137">Array</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193689" id="1193689"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193691" id="1193691"></a> <span class="sansserif">JavaScript 1.2, NES 3.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1220501" id="1220501"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1220503" id="1220503"></a> <span class="sansserif">ECMA-262 Edition 3</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193692" id="1193692"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1193693" id="1193693"></a> <span class="mono">shift()</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193694" id="1193694"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1193695" id="1193695"></a> <span class="sansserif">None.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193696" id="1193696"></a> <a name="Example" id="Example"></a> <span class="sansserif"><b>Example</b></span><br>
+         <a name="1193697" id="1193697"></a> <span class="sansserif">The following code displays the <span class="mono">myFish</span> array before and after removing its first element. It also displays the removed element:</span>
+      </p>
+      <p>
+        <a name="1193698" id="1193698"></a> <span class="mono">myFish = ["angel", "clown", "mandarin", "surgeon"];<br>
+         document.writeln("myFish before: " + myFish);<br>
+         shifted = myFish.shift();<br>
+         document.writeln("myFish after: " + myFish);<br>
+         document.writeln("Removed this element: " + shifted);</span>
+      </p>
+      <p>
+        <a name="1193699" id="1193699"></a> <span class="sansserif">This example displays the following:</span>
+      </p>
+      <p>
+        <a name="1193700" id="1193700"></a> <span class="mono">myFish before: ["angel", "clown", "mandarin", "surgeon"]<br>
+         myFish after: ["clown", "mandarin", "surgeon"]<br>
+         Removed this element: angel</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193701" id="1193701"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1193711" id="1193711"></a> <span class="sansserif"><a href="array.html#1196003">pop</a>, <a href="array.html#1196550">push</a>, <a href="array.html#1193964">unshift</a></span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1193713" id="1193713"></a> <a name="slice" id="slice"></a> <span class="sansserif"><b>slice</b></span>
+      </p>
+      <p>
+        <a name="1193727" id="1193727"></a> <span class="sansserif">Extracts a section of an array and returns a new array.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193717" id="1193717"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193722" id="1193722"></a> <span class="sansserif"><a href="array.html#1193137">Array</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193724" id="1193724"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193726" id="1193726"></a> <span class="sansserif">JavaScript 1.2, NES 3.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1220510" id="1220510"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1220512" id="1220512"></a> <span class="sansserif">ECMA-262 Edition 3</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193728" id="1193728"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1193729" id="1193729"></a> <span class="mono">slice(<i>begin</i>[,<i>end</i>])</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193730" id="1193730"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1193743" id="1193743"></a> <span class="sansserif"><br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <a name="1193733" id="1193733"></a> <span class="mono">begin</span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193735" id="1193735"></a> <span class="sansserif">Zero-based index at which to begin extraction.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193737" id="1193737"></a> <span class="mono">end</span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193739" id="1193739"></a> <span class="sansserif">Zero-based index at which to end extraction:</span>
+            </p>
+            <ul>
+              <li class="nobullet">
+                <a name="1193740" id="1193740"></a>
+              </li>
+              <li>
+                <span class="sansserif"><span class="mono">slice</span> extracts up to but not including <span class="mono">end</span>. <span class="mono">slice(1,4)</span> extracts the second element through the fourth element (elements indexed 1, 2, and 3).</span> 
+                <p>
+                  <a name="1193741" id="1193741"></a>
+                </p>
+              </li>
+              <li>
+                <span class="sansserif">As a negative index, <span class="mono">end</span> indicates an offset from the end of the sequence. <span class="mono">slice(2,-1)</span> extracts the third element through the second to last element in the sequence.</span> 
+                <p>
+                  <a name="1193742" id="1193742"></a>
+                </p>
+              </li>
+              <li>
+                If <span class="mono">end</span> is omitted, <span class="mono">slice</span> extracts to the end of the sequence.
+              </li>
+            </ul>&nbsp;
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193744" id="1193744"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1193745" id="1193745"></a> <span class="sansserif"><span class="mono">slice</span> does not alter the original array, but returns a new "one level deep" copy that contains copies of the elements sliced from the original array. Elements of the original array are copied into the new array as follows:</span>
+      </p>
+      <ul>
+        <li class="nobullet">
+          <a name="1193746" id="1193746"></a>
+        </li>
+        <li>
+          <span class="sansserif">For object references (and not the actual object), <span class="mono">slice</span> copies object references into the new array. Both the original and new array refer to the same object. If a referenced object changes, the changes are visible to both the new and original arrays.</span> 
+          <p>
+            <a name="1193753" id="1193753"></a>
+          </p>
+        </li>
+        <li>
+          For strings and numbers (not <a href="string.html#1193137">String</a> and <a href="number.html#1193137">Number</a> objects), <span class="mono">slice</span> copies strings and numbers into the new array. Changes to the string or number in one array does not affect the other array.
+        </li>
+      </ul><a name="1193754" id="1193754"></a> <span class="sansserif">If a new element is added to either array, the other array is not affected.</span> 
+      <p>
+        <br>
+         <a name="1193755" id="1193755"></a> <a name="Example" id="Example"></a> <span class="sansserif"><b>Example</b></span><br>
+         <a name="1193756" id="1193756"></a> <span class="sansserif">In the following example, <span class="mono">slice</span> creates a new array, <span class="mono">newCar</span>, from <span class="mono">myCar</span>. Both include a reference to the object <span class="mono">myHonda</span>. When the color of <span class="mono">myHonda</span> is changed to <span class="mono">purple</span>, both arrays reflect the change.</span>
+      </p>
+      <p>
+        <a name="1193757" id="1193757"></a> <span class="mono">&lt;SCRIPT LANGUAGE="JavaScript1.2"&gt;</span>
+      </p>
+      <p>
+        <a name="1193758" id="1193758"></a> <span class="mono">//Using slice, create newCar from myCar.<br>
+         myHonda = {color:"red",wheels:4,engine:{cylinders:4,size:2.2}}<br>
+         myCar = [myHonda, 2, "cherry condition", "purchased 1997"]<br>
+         newCar = myCar.slice(0,2)</span>
+      </p>
+      <p>
+        <a name="1193759" id="1193759"></a> <span class="mono">//Write the values of myCar, newCar, and the color of myHonda<br>
+         // referenced from both arrays.<br>
+         document.write("myCar = " + myCar + "&lt;BR&gt;")<br>
+         document.write("newCar = " + newCar + "&lt;BR&gt;")<br>
+         document.write("myCar[0].color = " + myCar[0].color + "&lt;BR&gt;")<br>
+         document.write("newCar[0].color = " + newCar[0].color + "&lt;BR&gt;&lt;BR&gt;")</span>
+      </p>
+      <p>
+        <a name="1193760" id="1193760"></a> <span class="mono">//Change the color of myHonda.<br>
+         myHonda.color = "purple"<br>
+         document.write("The new color of my Honda is " + myHonda.color + "&lt;BR&gt;&lt;BR&gt;")</span>
+      </p>
+      <p>
+        <a name="1193761" id="1193761"></a> <span class="mono">//Write the color of myHonda referenced from both arrays.<br>
+         document.write("myCar[0].color = " + myCar[0].color + "&lt;BR&gt;")<br>
+         document.write("newCar[0].color = " + newCar[0].color + "&lt;BR&gt;")</span>
+      </p>
+      <p>
+        <a name="1193762" id="1193762"></a> <span class="mono">&lt;/SCRIPT&gt;</span>
+      </p>
+      <p>
+        <a name="1193763" id="1193763"></a> <span class="sansserif">This script writes:</span>
+      </p>
+      <p>
+        <a name="1193764" id="1193764"></a> <span class="mono">myCar = [{color:"red", wheels:4, engine:{cylinders:4, size:2.2}}, 2,<br>
+         &nbsp;&nbsp;&nbsp;"cherry condition", "purchased 1997"]<br>
+         newCar = [{color:"red", wheels:4, engine:{cylinders:4, size:2.2}}, 2]<br>
+         myCar[0].color = red newCar[0].color = red<br>
+         The new color of my Honda is purple<br>
+         myCar[0].color = purple<br>
+         newCar[0].color = purple</span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1196882" id="1196882"></a> <a name="sort" id="sort"></a> <span class="sansserif"><b>sort</b></span>
+      </p>
+      <p>
+        <a name="1196896" id="1196896"></a> <span class="sansserif">Sorts the elements of an array.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1196886" id="1196886"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1196891" id="1196891"></a> <span class="sansserif"><a href="array.html#1193137">Array</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1196893" id="1196893"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1196895" id="1196895"></a> <span class="sansserif">JavaScript 1.1, NES 2.0</span>
+            </p>
+            <p>
+              <a name="1198173" id="1198173"></a>
+            </p>
+            <p>
+              <a name="1198174" id="1198174"></a> <span class="sansserif">JavaScript 1.2: modified behavior.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1198419" id="1198419"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1198421" id="1198421"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1196897" id="1196897"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1196898" id="1196898"></a> <span class="mono">sort(<i>compareFunction</i>)</span>
+      </p>
+      <p>
+        <br>
+         <a name="1196899" id="1196899"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1196905" id="1196905"></a> <span class="sansserif"><br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <a name="1196902" id="1196902"></a> <span class="mono">compareFunction</span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1196904" id="1196904"></a> <span class="sansserif">Specifies a function that defines the sort order. If omitted, the array is sorted lexicographically (in dictionary order) according to the string conversion of each element.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1196906" id="1196906"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1196907" id="1196907"></a> <span class="sansserif">If <span class="mono">compareFunction</span> is not supplied, elements are sorted by converting them to strings and comparing strings in lexicographic ("dictionary" or "telephone book," <i>not</i> numerical) order. For example, "80" comes before "9" in lexicographic order, but in a numeric sort 9 comes before 80.</span>
+      </p>
+      <p>
+        <a name="1196908" id="1196908"></a> <span class="sansserif">If <span class="mono">compareFunction</span> is supplied, the array elements are sorted according to the return value of the compare function. If a and b are two elements being compared, then:</span>
+      </p>
+      <ul>
+        <li class="nobullet">
+          <a name="1196909" id="1196909"></a>
+        </li>
+        <li>
+          <span class="sansserif">If <span class="mono">compareFunction(a, b)</span> is less than 0, sort <span class="mono">b</span> to a lower index than <span class="mono">a</span>.</span> 
+          <p>
+            <a name="1196910" id="1196910"></a>
+          </p>
+        </li>
+        <li>
+          <span class="sansserif">If <span class="mono">compareFunction(a, b)</span> returns 0, leave <span class="mono">a</span> and <span class="mono">b</span> unchanged with respect to each other, but sorted with respect to all different elements.</span> 
+          <p>
+            <a name="1196911" id="1196911"></a>
+          </p>
+        </li>
+        <li>
+          If <span class="mono">compareFunction(a, b)</span> is greater than 0, sort <span class="mono">b</span> to a higher index than <span class="mono">a</span>.
+        </li>
+      </ul><a name="1196912" id="1196912"></a> <span class="sansserif">So, the compare function has the following form:</span> 
+      <p>
+        <a name="1196913" id="1196913"></a> <span class="mono">function compare(a, b) {<br>
+         &nbsp;&nbsp;&nbsp;if (a is less than b by some ordering criterion)<br>
+         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return -1<br>
+         &nbsp;&nbsp;&nbsp;if (a is greater than b by the ordering criterion)<br>
+         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return 1<br>
+         &nbsp;&nbsp;&nbsp;// a must be equal to b<br>
+         &nbsp;&nbsp;&nbsp;return 0<br>
+         }</span>
+      </p>
+      <p>
+        <a name="1196914" id="1196914"></a> <span class="sansserif">To compare numbers instead of strings, the compare function can simply subtract b from a:</span>
+      </p>
+      <p>
+        <a name="1196915" id="1196915"></a> <span class="mono">function compareNumbers(a, b) {<br>
+         &nbsp;&nbsp;&nbsp;return a - b<br>
+         }</span>
+      </p>
+      <p>
+        <a name="1196916" id="1196916"></a> <span class="sansserif">JavaScript uses a stable sort: the index partial order of a and b does not change if a and b are equal. If a's index was less than b's before sorting, it will be after sorting, no matter how a and b move due to sorting.</span>
+      </p>
+      <p>
+        <a name="1196917" id="1196917"></a> <span class="sansserif">The behavior of the <span class="mono">sort</span> method changed between JavaScript&nbsp;1.1 and JavaScript&nbsp;1.2.</span>
+      </p>
+      <p>
+        <a name="1196918" id="1196918"></a> <span class="sansserif">In JavaScript&nbsp;1.1, on some platforms, the sort method does not work. This method works on all platforms for JavaScript&nbsp;1.2.</span>
+      </p>
+      <p>
+        <a name="1196919" id="1196919"></a> <span class="sansserif">In JavaScript 1.2, this method no longer converts undefined elements to null; instead it sorts them to the high end of the array. For example, assume you have this script:</span>
+      </p>
+      <p>
+        <a name="1196920" id="1196920"></a> <span class="mono">&lt;SCRIPT&gt;<br>
+         a = new Array();<br>
+         a[0] = "Ant";<br>
+         a[5] = "Zebra";</span>
+      </p>
+      <p>
+        <a name="1196921" id="1196921"></a> <span class="mono">function writeArray(x) {<br>
+         &nbsp;&nbsp;&nbsp;for (i = 0; i &lt; x.length; i++) {<br>
+         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;document.write(x[i]);<br>
+         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (i &lt; x.length-1) document.write(", ");<br>
+         &nbsp;&nbsp;&nbsp;}<br>
+         }</span>
+      </p>
+      <p>
+        <a name="1197382" id="1197382"></a> <span class="mono">writeArray(a);<br>
+         a.sort();<br>
+         document.write("&lt;BR&gt;&lt;BR&gt;");<br>
+         writeArray(a);<br>
+         &lt;/SCRIPT&gt;</span>
+      </p>
+      <p>
+        <a name="1197383" id="1197383"></a> <span class="sansserif">In JavaScript 1.1, JavaScript prints:</span>
+      </p>
+      <p>
+        <a name="1197384" id="1197384"></a> <span class="mono">ant, null, null, null, null, zebra<br>
+         ant, null, null, null, null, zebra</span>
+      </p>
+      <p>
+        <a name="1196925" id="1196925"></a> <span class="sansserif">In JavaScript 1.2, JavaScript prints:</span>
+      </p>
+      <p>
+        <a name="1196926" id="1196926"></a> <span class="mono">ant, undefined, undefined, undefined, undefined, zebra<br>
+         ant, zebra, undefined, undefined, undefined, undefined</span>
+      </p>
+      <p>
+        <br>
+         <a name="1196927" id="1196927"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1196928" id="1196928"></a> <span class="sansserif">The following example creates four arrays and displays the original array, then the sorted arrays. The numeric arrays are sorted without, then with, a compare function.</span>
+      </p>
+      <p>
+        <a name="1196929" id="1196929"></a> <span class="mono">&lt;SCRIPT&gt;<br>
+         stringArray = new Array("Blue","Humpback","Beluga")<br>
+         numericStringArray = new Array("80","9","700")<br>
+         numberArray = new Array(40,1,5,200)<br>
+         mixedNumericArray = new Array("80","9","700",40,1,5,200)</span>
+      </p>
+      <p>
+        <a name="1196930" id="1196930"></a> <span class="mono">function compareNumbers(a, b) {<br>
+         &nbsp;&nbsp;&nbsp;return a - b<br>
+         }</span>
+      </p>
+      <p>
+        <a name="1196931" id="1196931"></a> <span class="mono">document.write("&lt;B&gt;stringArray:&lt;/B&gt; " + stringArray.join() +"&lt;BR&gt;")<br>
+         document.write("&lt;B&gt;Sorted:&lt;/B&gt; " + stringArray.sort() +"&lt;P&gt;")</span>
+      </p>
+      <p>
+        <a name="1196932" id="1196932"></a> <span class="mono">document.write("&lt;B&gt;numberArray:&lt;/B&gt; " + numberArray.join() +"&lt;BR&gt;")<br>
+         document.write("&lt;B&gt;Sorted without a compare function:&lt;/B&gt; " + numberArray.sort() +"&lt;BR&gt;")<br>
+         document.write("&lt;B&gt;Sorted with compareNumbers:&lt;/B&gt; " + numberArray.sort(compareNumbers) +"&lt;P&gt;")</span>
+      </p>
+      <p>
+        <a name="1196933" id="1196933"></a> <span class="mono">document.write("&lt;B&gt;numericStringArray:&lt;/B&gt; " + numericStringArray.join() +"&lt;BR&gt;")<br>
+         document.write("&lt;B&gt;Sorted without a compare function:&lt;/B&gt; " + numericStringArray.sort() +"&lt;BR&gt;")<br>
+         document.write("&lt;B&gt;Sorted with compareNumbers:&lt;/B&gt; " + numericStringArray.sort(compareNumbers) +"&lt;P&gt;")</span>
+      </p>
+      <p>
+        <a name="1196934" id="1196934"></a> <span class="mono">document.write("&lt;B&gt;mixedNumericArray:&lt;/B&gt; " + mixedNumericArray.join() +"&lt;BR&gt;")<br>
+         document.write("&lt;B&gt;Sorted without a compare function:&lt;/B&gt; " + mixedNumericArray.sort() +"&lt;BR&gt;")<br>
+         document.write("&lt;B&gt;Sorted with compareNumbers:&lt;/B&gt; " + mixedNumericArray.sort(compareNumbers) +"&lt;BR&gt;")<br>
+         &lt;/SCRIPT&gt;</span>
+      </p>
+      <p>
+        <a name="1196935" id="1196935"></a> <span class="sansserif">This example produces the following output. As the output shows, when a compare function is used, numbers sort correctly whether they are numbers or numeric strings.</span>
+      </p>
+      <p>
+        <a name="1196936" id="1196936"></a> <span class="mono"><b>stringArray:</b> Blue,Humpback,Beluga<br>
+         <b>Sorted:</b> Beluga,Blue,Humpback</span>
+      </p>
+      <p>
+        <a name="1196937" id="1196937"></a> <span class="mono"><b>numberArray:</b> 40,1,5,200<br>
+         <b>Sorted without a compare function:</b> 1,200,40,5<br>
+         <b>Sorted with compareNumbers:</b> 1,5,40,200</span>
+      </p>
+      <p>
+        <a name="1196938" id="1196938"></a> <span class="mono"><b>numericStringArray:</b> 80,9,700<br>
+         <b>Sorted without a compare function:</b> 700,80,9<br>
+         <b>Sorted with compareNumbers:</b> 9,80,700</span>
+      </p>
+      <p>
+        <a name="1196939" id="1196939"></a> <span class="mono"><b>mixedNumericArray:</b> 80,9,700,40,1,5,200<br>
+         <b>Sorted without a compare function:</b> 1,200,40,5,700,80,9<br>
+         <b>Sorted with compareNumbers:</b> 1,5,9,40,80,200,700</span>
+      </p>
+      <p>
+        <br>
+         <a name="1196940" id="1196940"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1196947" id="1196947"></a> <span class="sansserif"><a href="array.html#1195456">Array.join</a>, <a href="array.html#1193641">Array.reverse</a></span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1193766" id="1193766"></a> <a name="splice" id="splice"></a> <span class="sansserif"><b>splice</b></span>
+      </p>
+      <p>
+        <a name="1193768" id="1193768"></a> <span class="sansserif">Changes the content of an array, adding new elements while removing old elements.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193771" id="1193771"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193776" id="1193776"></a> <span class="sansserif"><a href="array.html#1193137">Array</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193778" id="1193778"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193780" id="1193780"></a> <span class="sansserif">JavaScript 1.2, NES 3.0</span>
+            </p>
+            <p>
+              <a name="1218119" id="1218119"></a>
+            </p>
+            <p>
+              <a name="1218128" id="1218128"></a> <span class="sansserif">JavaScript 1.3: returns an array containing the removed elements.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1220518" id="1220518"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1220520" id="1220520"></a> <span class="sansserif">ECMA-262 Edition 3</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193781" id="1193781"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1193782" id="1193782"></a> <span class="mono">splice(<i>index</i>, <i>howMany</i>, [element1][, ..., <i>elementN</i>])</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193783" id="1193783"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1193797" id="1193797"></a> <span class="sansserif"><br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <a name="1193786" id="1193786"></a> <span class="mono">index</span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193788" id="1193788"></a> <span class="sansserif">Index at which to start changing the array.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193790" id="1193790"></a> <span class="mono">howMany</span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193792" id="1193792"></a> <span class="sansserif">An integer indicating the number of old array elements to remove. If <span class="mono">howMany</span> is 0, no elements are removed. In this case, you should specify at least one new element.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193794" id="1193794"></a> <span class="mono">element1, ...,<br>
+             element<i>N</i></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193796" id="1193796"></a> <span class="sansserif">The elements to add to the array. If you don't specify any elements, splice simply removes elements from the array.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193798" id="1193798"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1193799" id="1193799"></a> <span class="sansserif">If you specify a different number of elements to insert than the number you're removing, the array will have a different length at the end of the call.</span>
+      </p>
+      <p>
+        <a name="1193800" id="1193800"></a> <span class="sansserif">The <span class="mono">splice</span> method returns an array containing the removed elements. If only one element is removed, an array of one element is returned.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193801" id="1193801"></a> <a name="Backward Compatibility" id="Backward Compatibility"></a> <span class="sansserif"><b>Backward Compatibility</b></span><br>
+      </p>
+      <p>
+        <a name="1193802" id="1193802"></a> <span class="sansserif"><b>JavaScript 1.2.</b></span> <a name="1193803" id="1193803"></a> <span class="sansserif">The <span class="mono">splice</span> method returns the element removed, if only one element is removed (<span class="mono">howMany</span> parameter is 1); otherwise, the method returns an array containing the removed elements.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193804" id="1193804"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1193805" id="1193805"></a> <span class="sansserif">The following script illustrate the use of <span class="mono">splice</span>:</span>
+      </p>
+      <p>
+        <a name="1193806" id="1193806"></a> <span class="mono">&lt;SCRIPT LANGUAGE="JavaScript1.2"&gt;</span>
+      </p>
+      <p>
+        <a name="1193807" id="1193807"></a> <span class="mono">myFish = ["angel", "clown", "mandarin", "surgeon"];<br>
+         document.writeln("myFish: " + myFish + "&lt;BR&gt;");</span>
+      </p>
+      <p>
+        <a name="1193808" id="1193808"></a> <span class="mono">removed = myFish.splice(2, 0, "drum");<br>
+         document.writeln("After adding 1: " + myFish);<br>
+         document.writeln("removed is: " + removed + "&lt;BR&gt;");</span>
+      </p>
+      <p>
+        <a name="1193809" id="1193809"></a> <span class="mono">removed = myFish.splice(3, 1)<br>
+         document.writeln("After removing 1: " + myFish);<br>
+         document.writeln("removed is: " + removed + "&lt;BR&gt;");</span>
+      </p>
+      <p>
+        <a name="1193810" id="1193810"></a> <span class="mono">removed = myFish.splice(2, 1, "trumpet")<br>
+         document.writeln("After replacing 1: " + myFish);<br>
+         document.writeln("removed is: " + removed + "&lt;BR&gt;");</span>
+      </p>
+      <p>
+        <a name="1193811" id="1193811"></a> <span class="mono">removed = myFish.splice(0, 2, "parrot", "anemone", "blue")<br>
+         document.writeln("After replacing 2: " + myFish);<br>
+         document.writeln("removed is: " + removed);</span>
+      </p>
+      <p>
+        <a name="1193812" id="1193812"></a> <span class="mono">&lt;/SCRIPT&gt;</span>
+      </p>
+      <p>
+        <a name="1193813" id="1193813"></a> <span class="sansserif">This script displays:</span>
+      </p>
+      <p>
+        <a name="1193814" id="1193814"></a> <span class="mono">myFish: ["angel", "clown", "mandarin", "surgeon"]</span>
+      </p>
+      <p>
+        <a name="1193815" id="1193815"></a> <span class="mono">After adding 1: ["angel", "clown", "drum", "mandarin", "surgeon"]<br>
+         removed is: undefined</span>
+      </p>
+      <p>
+        <a name="1193816" id="1193816"></a> <span class="mono">After removing 1: ["angel", "clown", "drum", "surgeon"]<br>
+         removed is: mandarin</span>
+      </p>
+      <p>
+        <a name="1193817" id="1193817"></a> <span class="mono">After replacing 1: ["angel", "clown", "trumpet", "surgeon"]<br>
+         removed is: drum</span>
+      </p>
+      <p>
+        <a name="1193818" id="1193818"></a> <span class="mono">After replacing 2: ["parrot", "anemone", "blue", "trumpet", "surgeon"]<br>
+         removed is: ["angel", "clown"]</span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1193889" id="1193889"></a> <a name="toSource" id="toSource"></a> <span class="sansserif"><b>toSource</b></span>
+      </p>
+      <p>
+        <a name="1193891" id="1193891"></a> <span class="sansserif">Returns a string representing the source code of the array.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193894" id="1193894"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193899" id="1193899"></a> <span class="sansserif"><a href="array.html#1193137">Array</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193901" id="1193901"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193903" id="1193903"></a> <span class="sansserif">JavaScript 1.3</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193904" id="1193904"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1193905" id="1193905"></a> <span class="mono">toSource()</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193906" id="1193906"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1193907" id="1193907"></a> <span class="sansserif">None</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193908" id="1193908"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1213327" id="1213327"></a> <span class="sansserif">The <span class="mono">toSource</span> method returns the following values:</span>
+      </p>
+      <ul>
+        <li class="nobullet">
+          <a name="1213328" id="1213328"></a>
+        </li>
+        <li>
+          <span class="sansserif">For the built-in <span class="mono">Array</span> object, <span class="mono">toSource</span> returns the following string indicating that the source code is not available:</span> 
+          <p>
+            <a name="1213329" id="1213329"></a> <span class="mono">&nbsp;&nbsp;&nbsp;function Array() {<br>
+             &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[native code]<br>
+             &nbsp;&nbsp;&nbsp;}</span>
+          </p>
+          <p>
+            <a name="1213330" id="1213330"></a>
+          </p>
+        </li>
+        <li>
+          For instances of <span class="mono">Array</span>, <span class="mono">toSource</span> returns a string representing the source code.
+        </li>
+      </ul><a name="1213381" id="1213381"></a> <span class="sansserif">This method is usually called internally by JavaScript and not explicitly in code. You can call <span class="mono">toSource</span> while debugging to examine the contents of an array.</span> 
+      <p>
+        <br>
+         <a name="1206391" id="1206391"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1206392" id="1206392"></a> <span class="sansserif">To examine the source code of an array:</span>
+      </p>
+      <p>
+        <a name="1213533" id="1213533"></a> <span class="mono">alpha = new Array("a", "b", "c")<br>
+         alpha.toSource() //returns ["a", "b", "c"]</span>
+      </p>
+      <p>
+        <br>
+         <a name="1201796" id="1201796"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1193918" id="1193918"></a> <span class="sansserif"><a href="array.html#1193921">Array.toString</a></span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1193921" id="1193921"></a> <a name="toString" id="toString"></a> <span class="sansserif"><b>toString</b></span>
+      </p>
+      <p>
+        <a name="1193934" id="1193934"></a> <span class="sansserif">Returns a string representing the specified array and its elements.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193924" id="1193924"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193929" id="1193929"></a> <span class="sansserif"><a href="array.html#1193137">Array</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193931" id="1193931"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193933" id="1193933"></a> <span class="sansserif">JavaScript 1.1, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1198430" id="1198430"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1198432" id="1198432"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193935" id="1193935"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1193936" id="1193936"></a> <span class="mono">toString()</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193937" id="1193937"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1193938" id="1193938"></a> <span class="sansserif">None.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193939" id="1193939"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1193940" id="1193940"></a> <span class="sansserif">The <a href="array.html#1193137">Array</a> object overrides the <span class="mono">toString</span> method of <a href="object.html#1193136">Object</a>. For <a href="array.html#1193137">Array</a> objects, the <span class="mono">toString</span> method joins the array and returns one string containing each array element separated by commas. For example, the following code creates an array and uses <span class="mono">toString</span> to convert the array to a string.</span>
+      </p>
+      <p>
+        <a name="1193946" id="1193946"></a><span class="mono">var monthNames = new Array("Jan","Feb","Mar","Apr")<br>
+         myVar=monthNames.toString() // assigns "Jan,Feb,Mar,Apr" to myVar</span>
+      </p>
+      <p>
+        <a name="1202005" id="1202005"></a> <span class="sansserif">JavaScript calls the <span class="mono">toString</span> method automatically when an array is to be represented as a text value or when an array is referred to in a string concatenation.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193953" id="1193953"></a> <a name="Backward Compatibility" id="Backward Compatibility"></a> <span class="sansserif"><b>Backward Compatibility</b></span><br>
+      </p>
+      <p>
+        <a name="1193954" id="1193954"></a> <span class="sansserif"><b>JavaScript 1.2.</b></span> <a name="1219144" id="1219144"></a> <span class="sansserif">When you specify <span class="mono">LANGUAGE="JavaScript1.2"</span> in the &lt;SCRIPT&gt; tag, <span class="mono">toString</span> returns a string representing the source code of the array. This value is the same as the value returned by the <span class="mono">toSource</span> method in JavaScript 1.3 and later versions.</span>
+      </p>
+      <p>
+        <a name="1219145" id="1219145"></a> <span class="mono">&lt;SCRIPT LANGUAGE="JavaScript1.2"&gt;<br>
+         var monthNames = new Array("Jan","Feb","Mar","Apr")<br>
+         myVar=monthNames.toString() // assigns '["Jan", "Feb", "Mar", "Apr"]'<br>
+         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// to myVar<br>
+         &lt;/SCRIPT&gt;</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193958" id="1193958"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1193962" id="1193962"></a> <span class="sansserif"><a href="array.html#1193889">Array.toSource</a></span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1193964" id="1193964"></a> <a name="unshift" id="unshift"></a> <span class="sansserif"><b>unshift</b></span>
+      </p>
+      <p>
+        <a name="1193966" id="1193966"></a> <span class="sansserif">Adds one or more elements to the beginning of an array and returns the new length of the array.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193969" id="1193969"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193974" id="1193974"></a> <span class="sansserif"><a href="array.html#1193137">Array</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193976" id="1193976"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193978" id="1193978"></a> <span class="sansserif">JavaScript 1.2, NES 3.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1220539" id="1220539"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1220541" id="1220541"></a> <span class="sansserif">ECMA-262 Edition 3</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193979" id="1193979"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1193980" id="1193980"></a> <span class="mono">arrayName.unshift(<i>element1</i>,..., <i>elementN</i>)</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193981" id="1193981"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1193987" id="1193987"></a> <span class="sansserif"><span class="sansserifRed"><br></span></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <a name="1193984" id="1193984"></a> <span class="mono">element1,...,<br>
+             element<i>N</i></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193986" id="1193986"></a> <span class="sansserif">The elements to add to the front of the array.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193988" id="1193988"></a> <a name="Example" id="Example"></a> <span class="sansserif"><b>Example</b></span><br>
+         <a name="1193989" id="1193989"></a> <span class="sansserif">The following code displays the <span class="mono">myFish</span> array before and after adding elements to it.</span>
+      </p>
+      <p>
+        <a name="1193990" id="1193990"></a> <span class="mono">myFish = ["angel", "clown"];<br>
+         document.writeln("myFish before: " + myFish);<br>
+         unshifted = myFish.unshift("drum", "lion");<br>
+         document.writeln("myFish after: " + myFish);<br>
+         document.writeln("New length: " + unshifted);</span>
+      </p>
+      <p>
+        <a name="1193991" id="1193991"></a> <span class="sansserif">This example displays the following:</span>
+      </p>
+      <p>
+        <a name="1193992" id="1193992"></a> <span class="mono">myFish before: ["angel", "clown"]<br>
+         myFish after: ["drum", "lion", "angel", "clown"]<br>
+         New length: 4</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193993" id="1193993"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1194003" id="1194003"></a> <span class="sansserif"><a href="array.html#1196003">pop</a>, <a href="array.html#1196550">push</a>, <a href="array.html#1193677">shift</a></span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1202613" id="1202613"></a> <a name="valueOf" id="valueOf"></a> <span class="sansserif"><b>valueOf</b></span>
+      </p>
+      <p>
+        <a name="1202630" id="1202630"></a> <span class="sansserif">Returns the primitive value of an array.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1202616" id="1202616"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1202621" id="1202621"></a> <span class="sansserif"><a href="array.html#1193137">Array</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1202623" id="1202623"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1202625" id="1202625"></a> <span class="sansserif">JavaScript 1.1</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1202627" id="1202627"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1202629" id="1202629"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1202631" id="1202631"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1202632" id="1202632"></a> <span class="mono">valueOf()</span>
+      </p>
+      <p>
+        <br>
+         <a name="1202633" id="1202633"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1202634" id="1202634"></a> <span class="sansserif">None</span>
+      </p>
+      <p>
+        <br>
+         <a name="1202635" id="1202635"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1202794" id="1202794"></a> <span class="sansserif">The <a href="array.html#1193137">Array</a> object inherits the <span class="mono">valueOf</span> method of <a href="object.html#1193136">Object</a>. The <span class="mono">valueOf</span> method of <span class="mono">Array</span> returns the primitive value of an array or the primitive value of its elements as follows:</span>
+      </p>
+      <p>
+        <a name="1202822" id="1202822"></a> <span class="sansserif"><br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr bgcolor="#CCCCCC" align="left" valign="top">
+          <th valign="top" align="left">
+            <a name="1202826" id="1202826"></a> 
+            <p class="alignleft">
+              <span class="sansserif"><b>Object type of element</b></span>
+            </p>
+          </th>
+          <th valign="top" align="left">
+            <a name="1202828" id="1202828"></a> 
+            <p class="alignleft">
+              <span class="sansserif"><b>Data type of returned value</b></span>
+            </p>
+          </th>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1202830" id="1202830"></a> <span class="sansserif">Boolean</span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1202832" id="1202832"></a> <span class="sansserif">Boolean</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1202834" id="1202834"></a> <span class="sansserif">Number or Date</span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1202836" id="1202836"></a> <span class="sansserif">number</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1202838" id="1202838"></a> <span class="sansserif">All others</span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1202840" id="1202840"></a> <span class="sansserif">string</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <a name="1202884" id="1202884"></a> <span class="sansserif">This method is usually called internally by JavaScript and not explicitly in code.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1202906" id="1202906"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1202656" id="1202656"></a> <span class="sansserif"><a href="object.html#1193540">Object.valueOf</a></span>
+      </p>
+    </blockquote>
+    <blockquote>
+      <br>
+       <b><a class="sansserifPurple" href="objintro.html">Previous</a></b>&nbsp;&nbsp;&nbsp;&nbsp; <a href="contents.html"><b class="sansserifPurple">Contents</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="ix.html"><b class="sansserifPurple">Index</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="boolean.html"><b class="sansserifPurple">Next</b></a> &nbsp;&nbsp;&nbsp;&nbsp; 
+      <hr noshade="noshade" size="1">
+      <span class="sansserif">Copyright &copy; 2000 <a href="http://www.netscape.com">Netscape Communications Corp.</a> All rights reserved.</span>
+    </blockquote>
+    <p class="alignright">
+      <span class="sansserif">Last Updated <b>September 28, 2000</b></span>
+    </p>
+  </body>
+</html>

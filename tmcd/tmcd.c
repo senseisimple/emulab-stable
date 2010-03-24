@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2009 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -1396,12 +1396,10 @@ COMMAND_PROTOTYPE(doifconfig)
 	char		buf[MYBUFSIZE], *ebufp = &buf[MYBUFSIZE];
 	int		nrows;
 	int		num_interfaces=0;
+	int		cookedgeninode = (reqp->geniflags & 0x2);
 
-	/*
-	 * Do nothing for cooked mode geni nodes; handled by remote config.
-	 */
-	if (reqp->geniflags & 0x2)
-		return 0;
+	if (cookedgeninode)
+		goto skipphys;
 
 	/* 
 	 * For Virtual Nodes, we return interfaces that belong to it.
@@ -1596,6 +1594,7 @@ COMMAND_PROTOTYPE(doifconfig)
 	if (vers < 10)
 		return 0;
 
+ skipphys:
 	/*
 	 * First, return config info for physical interfaces underlying
 	 * the virtual interfaces or delay interfaces. These are marked
@@ -4598,10 +4597,10 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp, char* nodekey)
 				 "LEFT OUTER JOIN "
 				 "  (SELECT type,attrvalue "
 				 "    FROM node_type_attributes "
-				 "    WHERE attrkey='nobootinfo' "
+				 "    WHERE attrkey='notmcdinfo' "
 				 "      AND attrvalue='1' "
-				 "     GROUP BY type) AS nobootinfo_types "
-				 "  ON n.type=nobootinfo_types.type "
+				 "     GROUP BY type) AS notmcdinfo_types "
+				 "  ON n.type=notmcdinfo_types.type "
 				 "LEFT OUTER JOIN "
 				 "  (SELECT type,attrvalue "
 				 "   FROM node_type_attributes "
@@ -4611,7 +4610,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp, char* nodekey)
 				 "WHERE n.node_id IN "
 				 "     (SELECT node_id FROM widearea_nodeinfo "
 				 "      WHERE privkey='%s') "
-				 "  AND nobootinfo_types.attrvalue IS NULL",
+				 "  AND notmcdinfo_types.attrvalue IS NULL",
 				 34, nodekey);
 	}
 	else if (reqp->isvnode) {
@@ -4706,10 +4705,10 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp, char* nodekey)
 				 "left outer join "
 				 "  (select type,attrvalue "
 				 "    from node_type_attributes "
-				 "    where attrkey='nobootinfo' "
+				 "    where attrkey='notmcdinfo' "
 				 "      and attrvalue='1' "
-				 "     group by type) as nobootinfo_types "
-				 "  on n.type=nobootinfo_types.type "
+				 "     group by type) as notmcdinfo_types "
+				 "  on n.type=notmcdinfo_types.type "
 				 "left outer join "
 				 "  (select type,attrvalue "
 				 "   from node_type_attributes "
@@ -4717,7 +4716,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp, char* nodekey)
 				 "   group by type) as dedicated_wa_types "
 				 "  on n.type=dedicated_wa_types.type "
 				 "where (%s) "
-				 "  and nobootinfo_types.attrvalue is NULL",
+				 "  and notmcdinfo_types.attrvalue is NULL",
 				 34, clause);
 	}
 

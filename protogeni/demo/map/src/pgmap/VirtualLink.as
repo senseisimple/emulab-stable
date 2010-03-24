@@ -27,6 +27,9 @@
 		[Bindable]
 		public var virtualId:String;
 		
+		[Bindable]
+		public var sliverUrn:String;
+		
 		public var type:String;
 		
 		[Bindable]

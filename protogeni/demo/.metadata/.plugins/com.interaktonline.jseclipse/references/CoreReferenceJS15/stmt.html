@@ -1,0 +1,2446 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html>
+  <head>
+    <meta content="HTML Tidy for Cygwin (vers 1st February 2003), see www.w3.org" name="generator">
+    <meta name="keywords" content="electronic commerce, ecommerce, ebusiness, e-business, e-commerce, enterprise software, net economy, Netscape, Sun Microsystems, DevEdge Archive, iPlanet, internet software">
+    <meta name="description" content="The DevEdge Archive, a strategic alliance formed by America Online and Sun Microsystems, Inc., is delivering iPlanet e-commerce software and enterprise solutions that enable companies to compete successfully in the Net Economy">
+    <meta http-equiv="Content-Type" content="text/html; charset=us-ascii">
+    <meta name="TEMPLATEBASE" content="Authored in FrameMaker. Converted to HTML in WebWorks Publisher 2000. manual wdt 1.5">
+    <meta name="LASTUPDATED" content="09/28/00 13:16:14">
+    <title>
+      Core JavaScript Reference 1.5: 3 Statements
+    </title>
+    <link rel="stylesheet" type="text/css" href="js15ref.css">
+  </head>
+  <body>
+    <table width="100%" border="0" cellspacing="4">
+      <tr>
+        <td valign="top">
+          <b><a class="sansserifPurple" href="partlang.html">Previous</a></b>&nbsp;&nbsp;&nbsp;&nbsp; <a href="contents.html"><b class="sansserifPurple">Contents</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="ix.html"><b class="sansserifPurple">Index</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="comment.html"><b class="sansserifPurple">Next</b></a> &nbsp;&nbsp;&nbsp;&nbsp;
+        </td>
+      </tr>
+      <tr>
+        <td class="sansserifBlack" valign="top" align="right" bgcolor="#CCCCCC">
+          <b>Core JavaScript Reference 1.5</b>
+        </td>
+      </tr>
+    </table><br>
+     
+    <blockquote>
+      <br>
+      <br>
+       <a name="1005816" id="1005816"></a> <a name="" id=""></a><span class="sansserif666"><b>Chapter 3 
+       &nbsp;</b></span> <a name="1003191" id="1003191"></a> <a name="Statements" id="Statements"></a> <span class="sansserifBlack"><b>Chapter 3 Statements 
+      </b></span><br>
+      <br>
+      <br>
+       <a name="1007251" id="1007251"></a> <span class="sansserif">This chapter describes all JavaScript statements. JavaScript statements consist of keywords used with the appropriate syntax. A single statement may span multiple lines. Multiple statements may occur on a single line if each statement is separated by a semicolon.</span> 
+      <p>
+        <a name="1004756" id="1004756"></a> <span class="sansserif">Syntax conventions: All keywords in syntax statements are in bold. Words in italics represent user-defined names or statements. Any portions enclosed in square brackets, [ ], are optional. {statements} indicates a block of statements, which can consist of zero or more statements delimited by a curly braces { }.</span>
+      </p>
+      <p>
+        <a name="1042702" id="1042702"></a> <span class="sansserif">The following table lists statements available in JavaScript.</span>
+      </p>
+      <p>
+        <a name="1081296" id="1081296"></a> <span class="sansserif"><br></span>
+      </p>
+      <p>
+        <span {font-family: (null)}"><b><a name="1081167" id="1081167"></a> <a name="JavaScript statements. &nbsp;" id="JavaScript statements. #160;"></a></b></span>
+      </p>
+      <align>
+        <span {font-family: (null)}"><b class="sansserif">Table 3.1 &nbsp;&nbsp; JavaScript statements. &nbsp;
+        </b></span><br>
+        <br>
+         
+        <table>
+          <tr>
+            <td valign="top">
+              <a name="1081174" id="1081174"></a> <span class="mono"><a href="stmt.html#1081298">break</a></span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1081176" id="1081176"></a> <span class="sansserif">Terminates the current while or for loop and transfers program control to the statement following the terminated loop.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1081181" id="1081181"></a> <span class="mono"><a href="stmt.html#1077887">const</a></span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1081183" id="1081183"></a> <span class="sansserif">Declares a global constant, optionally initializing it to a value.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1081188" id="1081188"></a> <span class="mono"><a href="stmt.html#1078923">continue</a></span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1081190" id="1081190"></a> <span class="sansserif">Terminates execution of the block of statements in a while or for loop, and continues execution of the loop with the next iteration.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1081195" id="1081195"></a> <span class="mono"><a href="stmt.html#1037353">do...while</a></span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1081197" id="1081197"></a> <span class="sansserif">Executes the specified statements until the test condition evaluates to false. Statements execute at least once.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1081202" id="1081202"></a> <span class="mono"><a href="stmt.html#1016648">export</a></span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1081204" id="1081204"></a> <span class="sansserif">Allows a signed script to provide properties, functions, and objects to other signed or unsigned scripts.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1081209" id="1081209"></a> <span class="mono"><a href="stmt.html#1004804">for</a></span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1081211" id="1081211"></a> <span class="sansserif">Creates a loop that consists of three optional expressions, enclosed in parentheses and separated by semicolons, followed by a block of statements executed in the loop.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1081216" id="1081216"></a> <span class="mono"><a href="stmt.html#1004815">for...in</a></span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1081218" id="1081218"></a> <span class="sansserif">Iterates a specified variable over all the properties of an object. For each distinct property, JavaScript executes the specified statements.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1081223" id="1081223"></a> <span class="mono"><a href="stmt.html#1004825">function</a></span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1081225" id="1081225"></a> <span class="sansserif">Declares a function with the specified parameters. Acceptable parameters include strings, numbers, and objects.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1081230" id="1081230"></a> <span class="mono"><a href="stmt.html#1004833">if...else</a></span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1081232" id="1081232"></a> <span class="sansserif">Executes a set of statements if a specified condition is true. If the condition is false, another set of statements can be executed.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1081237" id="1081237"></a> <span class="mono"><a href="stmt.html#1082618">import</a></span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1081239" id="1081239"></a> <span class="sansserif">Allows a script to import properties, functions, and objects from a signed script that has exported the information.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1081244" id="1081244"></a> <span class="mono"><a href="stmt.html#1018088">label</a></span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1081246" id="1081246"></a> <span class="sansserif">Provides an identifier that can be used with break or continue to indicate where the program should continue execution.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1081251" id="1081251"></a> <span class="mono"><a href="stmt.html#1004871">return</a></span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1081253" id="1081253"></a> <span class="sansserif">Specifies the value to be returned by a function.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1081258" id="1081258"></a> <span class="mono"><a href="stmt.html#1018610">switch</a></span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1081260" id="1081260"></a> <span class="sansserif">Allows a program to evaluate an expression and attempt to match the expression's value to a case label.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1081265" id="1081265"></a> <span class="mono"><a href="stmt.html#1052196">throw</a></span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1081267" id="1081267"></a> <span class="sansserif">Throws a user-defined exception.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1081272" id="1081272"></a> <span class="mono"><a href="stmt.html#1051663">try...catch</a></span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1081274" id="1081274"></a> <span class="sansserif">Marks a block of statements to try, and specifies a response should an exception be thrown.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1081279" id="1081279"></a> <span class="mono"><a href="stmt.html#1066604">var</a></span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1081281" id="1081281"></a> <span class="sansserif">Declares a variable, optionally initializing it to a value.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1081286" id="1081286"></a> <span class="mono"><a href="stmt.html#1004896">while</a></span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1081288" id="1081288"></a> <span class="sansserif">Creates a loop that evaluates an expression, and if it is true, executes a block of statements. The loop then repeats, as long as the specified condition is true.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1081293" id="1081293"></a> <span class="mono"><a href="stmt.html#1004910">with</a></span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1081295" id="1081295"></a> <span class="sansserif">Establishes the default object for a set of statements.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p>
+          <br>
+          <br>
+           <a name="1081298" id="1081298"></a> <a name="break" id="break"></a> <span class="sansserif">break
+          </span>
+        </p>
+        <hr size="2" noshade="noshade">
+        <br>
+         <a name="1081299" id="1081299"></a> <span class="sansserif">Use the break statement to terminate a loop, <span class="mono">switch</span>, or label statement.</span> 
+        <p>
+          <a name="1050041" id="1050041"></a> <span class="sansserif">Terminates the current loop, <span class="mono">switch</span>, or label statement and transfers program control to the statement following the terminated loop.<br></span>
+        </p><br>
+         
+        <table width="90%" border="1" cellpadding="5" cellspacing="0">
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1050044" id="1050044"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1050046" id="1050046"></a> <span class="sansserif">JavaScript 1.0, NES 2.0</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1050093" id="1050093"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1050095" id="1050095"></a> <span class="sansserif">ECMA-262 (for the unlabeled version)<br>
+                 ECMA-262, Edition 3 (for the labeled version)</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p>
+          <br>
+           <a name="1073781" id="1073781"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+           <a name="1073782" id="1073782"></a> <span class="mono">break [<i>label</i>]</span>
+        </p>
+        <p>
+          <br>
+           <a name="1014318" id="1014318"></a> <a name="Parameter" id="Parameter"></a> <span class="sansserif"><b>Parameter</b></span><br>
+           <a name="1014324" id="1014324"></a> <span class="sansserif"><br></span>
+        </p><br>
+         
+        <table width="90%" border="1" cellpadding="5" cellspacing="0">
+          <tr>
+            <td valign="top">
+              <a name="1014321" id="1014321"></a> <span class="mono">label</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1014323" id="1014323"></a> <span class="sansserif">Identifier associated with the label of the statement.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p>
+          <br>
+           <a name="1010036" id="1010036"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+           <a name="1031807" id="1031807"></a> <span class="sansserif">The <span class="mono">break</span> statement includes an optional label that allows the program to break out of a labeled statement. The statements in a labeled statement can be of any type.</span>
+        </p>
+        <p>
+          <br>
+           <a name="1031799" id="1031799"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+           <a name="1010037" id="1010037"></a> <span class="sansserif">The following function has a <span class="mono">break</span> statement that terminates the <a href="stmt.html#1004896">while</a> loop when <span class="mono">e</span> is 3, and then returns the value 3 * <span class="mono">x</span>.</span>
+        </p>
+        <p>
+          <a name="1004786" id="1004786"></a> <span class="mono">function testBreak(x) {<br>
+           &nbsp;&nbsp;&nbsp;var i = 0;<br>
+           &nbsp;&nbsp;&nbsp;while (i &lt; 6) {<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (i == 3)<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;i++;<br>
+           &nbsp;&nbsp;&nbsp;}<br>
+           &nbsp;&nbsp;&nbsp;return i*x;<br>
+           }</span>
+        </p>
+        <p>
+          <br>
+           <a name="1014796" id="1014796"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+           <a name="1014820" id="1014820"></a> <span class="sansserif"><a href="stmt.html#1078923">continue</a>, <a href="stmt.html#1018088">label</a>, <a href="stmt.html#1018610">switch</a></span>
+        </p>
+        <p>
+          <br>
+          <br>
+           <a name="1077887" id="1077887"></a> <a name="const" id="const"></a> <span class="sansserif">const
+          </span>
+        </p>
+        <hr size="2" noshade="noshade">
+        <br>
+         <a name="1077897" id="1077897"></a> <span class="sansserif">Declares a readonly, named constant.<br></span><br>
+         
+        <table width="90%" border="1" cellpadding="5" cellspacing="0">
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1077890" id="1077890"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1077892" id="1077892"></a> <span class="sansserif">JavaScript 1.5, NES 6.0 (Netscape extension, C engine only),</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p>
+          <br>
+           <a name="1078082" id="1078082"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+           <a name="1078083" id="1078083"></a> <span class="mono">const <i>constname</i> [= <i>value</i>] [..., <i>constname</i> [= <i>value</i>] ]</span>
+        </p>
+        <p>
+          <br>
+           <a name="1078084" id="1078084"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+           <a name="1077910" id="1077910"></a> <span class="sansserif"><br></span>
+        </p><br>
+        <table width="90%" border="1" cellpadding="5" cellspacing="0">
+          <tr>
+            <td valign="top">
+              <a name="1077903" id="1077903"></a> <span class="mono">varname</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1077905" id="1077905"></a> <span class="sansserif">Constant name. It can be any legal identifier.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1077907" id="1077907"></a> <span class="mono">value</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1077909" id="1077909"></a> <span class="sansserif">Value of the constant and can be any legal expression.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p>
+          <br>
+           <a name="1077911" id="1077911"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+           <a name="1078332" id="1078332"></a> <span class="sansserif">Creates a constant that can be global or local to the function in which it is declared. Constants follow the same scope rules as variables.</span>
+        </p>
+        <p>
+          <a name="1080040" id="1080040"></a> <span class="sansserif">The value of a constant cannot change through re-assignment, and a constant cannot be re-declared.</span>
+        </p>
+        <p>
+          <a name="1078333" id="1078333"></a> <span class="sansserif">A constant cannot share the same name as a function or variable in the same scope.</span>
+        </p>
+        <p>
+          <br>
+           <a name="1078336" id="1078336"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+           <a name="1078620" id="1078620"></a> <span class="sansserif">The script:</span>
+        </p>
+        <p>
+          <a name="1078920" id="1078920"></a> <span class="mono">const a = 7;</span>
+        </p>
+        <p>
+          <a name="1079008" id="1079008"></a> <span class="mono">document.writeln("a is " + a + ".");</span>
+        </p>
+        <p>
+          <a name="1081885" id="1081885"></a> <span class="sansserif">produces the output:</span>
+        </p>
+        <p>
+          <a name="1079005" id="1079005"></a><span class="mono">a is 7.</span>
+        </p>
+        <p>
+          <br>
+          <br>
+           <a name="1078923" id="1078923"></a> <a name="continue" id="continue"></a> <span class="sansserif">continue
+          </span>
+        </p>
+        <hr size="2" noshade="noshade">
+        <br>
+         <a name="1073873" id="1073873"></a> <span class="sansserif">Restarts a <span class="mono">while</span>, <span class="mono">do-while</span>, <span class="mono">for</span>, or <span class="mono">label</span> statement.<br></span> 
+        <p>
+          <br>
+          <br>
+        </p>
+        <table width="90%" border="1" cellpadding="5" cellspacing="0">
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1032602" id="1032602"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1041739" id="1041739"></a> <span class="sansserif">JavaScript 1.0, NES 2.0</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1050120" id="1050120"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1050122" id="1050122"></a> <span class="sansserif">ECMA-262 (for the unlabeled version)<br>
+                 ECMA-262, Edition 3 (for the labeled version)</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p>
+          <br>
+           <a name="1032605" id="1032605"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+           <a name="1032606" id="1032606"></a> <span class="mono">continue [<i>label</i>]</span>
+        </p>
+        <p>
+          <br>
+           <a name="1015179" id="1015179"></a> <a name="Parameter" id="Parameter"></a> <span class="sansserif"><b>Parameter</b></span><br>
+           <a name="1015226" id="1015226"></a> <span class="sansserif"><br></span>
+        </p>
+        <p>
+          <br>
+          <br>
+        </p>
+        <table width="90%" border="1" cellpadding="5" cellspacing="0">
+          <tr>
+            <td valign="top">
+              <a name="1015306" id="1015306"></a> <span class="mono">label</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1015325" id="1015325"></a> <span class="sansserif">Identifier associated with the label of the statement.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p>
+          <br>
+           <a name="1004801" id="1004801"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+           <a name="1032853" id="1032853"></a> <span class="sansserif">In contrast to the <a href="stmt.html#1081298">break</a> statement, <span class="mono">continue</span> does not terminate the execution of the loop entirely: instead,</span>
+        </p>
+        <ul>
+          <li class="nobullet">
+            <a name="1032854" id="1032854"></a>
+          </li>
+          <li>
+            <span class="sansserif">In a <a href="stmt.html#1004896">while</a> loop, it jumps back to the <span class="mono">condition</span>.</span> 
+            <p>
+              <a name="1032855" id="1032855"></a>
+            </p>
+          </li>
+          <li>
+            In a <a href="stmt.html#1004804">for</a> loop, it jumps to the <span class="mono">update</span> expression.
+          </li>
+        </ul><a name="1032856" id="1032856"></a> <span class="sansserif">The <span class="mono">continue</span> statement can now include an optional label that allows the program to terminate execution of a labeled statement and continue to the specified labeled statement. This type of continue must be in a looping statement identified by the label used by <span class="mono">continue</span>.</span> 
+        <p>
+          <br>
+           <a name="1032840" id="1032840"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+           <a name="1004802" id="1004802"></a> <span class="sansserif"><b>Example 1.</b> The following example shows a <span class="mono">while</span> loop that has a <a href="stmt.html#1078923">continue</a> statement that executes when the value of <span class="mono">i</span> is 3. Thus, <span class="mono">n</span> takes on the values 1, 3, 7, and 12.</span>
+        </p>
+        <p>
+          <a name="1004803" id="1004803"></a><span class="mono">i = 0;<br>
+           n = 0;<br>
+           while (i &lt; 5) {<br>
+           &nbsp;&nbsp;&nbsp;i++;<br>
+           &nbsp;&nbsp;&nbsp;if (i == 3)<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;continue;<br>
+           &nbsp;&nbsp;&nbsp;n += i;<br>
+           }</span>
+        </p>
+        <p>
+          <a name="1015392" id="1015392"></a> <span class="sansserif"><b>Example 2.</b> In the following example, a statement labeled <span class="mono">checkiandj</span> contains a statement labeled <span class="mono">checkj</span>. If <span class="mono">continue</span> is encountered, the program continues at the top of the <span class="mono">checkj</span> statement. Each time <span class="mono">continue</span> is encountered, <span class="mono">checkj</span> reiterates until its condition returns false. When false is returned, the remainder of the <span class="mono">checkiandj</span> statement is completed. <span class="mono">checkiandj</span> reiterates until its condition returns false. When false is returned, the program continues at the statement following <span class="mono">checkiandj</span>.</span>
+        </p>
+        <p>
+          <a name="1015846" id="1015846"></a> <span class="sansserif">If <span class="mono">continue</span> had a label of <span class="mono">checkiandj</span>, the program would continue at the top of the <span class="mono">checkiandj</span> statement.</span>
+        </p>
+        <p>
+          <a name="1026373" id="1026373"></a> <span class="mono">checkiandj :<br>
+           while (i&lt;4) {<br>
+           &nbsp;&nbsp;&nbsp;document.write(i + "&lt;BR&gt;");<br>
+           &nbsp;&nbsp;&nbsp;i+=1;</span>
+        </p>
+        <p>
+          <a name="1027440" id="1027440"></a> <span class="mono">&nbsp;&nbsp;&nbsp;checkj :<br>
+           &nbsp;&nbsp;&nbsp;while (j&gt;4) {<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;document.write(j + "&lt;BR&gt;");<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;j-=1;<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if ((j%2)==0)<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;continue checkj;<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;document.write(j + " is odd.&lt;BR&gt;");<br>
+           &nbsp;&nbsp;&nbsp;}<br>
+           &nbsp;&nbsp;&nbsp;document.write("i = " + i + "&lt;br&gt;");<br>
+           &nbsp;&nbsp;&nbsp;document.write("j = " + j + "&lt;br&gt;");<br>
+           }</span>
+        </p>
+        <p>
+          <br>
+           <a name="1015924" id="1015924"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+           <a name="1015950" id="1015950"></a> <span class="sansserif"><span class="mono"><a href="stmt.html#1081298">break</a>, <a href="stmt.html#1018088">label</a></span></span>
+        </p>
+        <p>
+          <br>
+          <br>
+           <a name="1037353" id="1037353"></a> <a name="do...while" id="do...while"></a> <span class="sansserif">do...while
+          </span>
+        </p>
+        <hr size="2" noshade="noshade">
+        <br>
+         <a name="1057761" id="1057761"></a> <span class="sansserif">Executes the specified statements until the test condition evaluates to false. Statements execute at least once.<br></span> 
+        <p>
+          <br>
+          <br>
+        </p>
+        <table width="90%" border="1" cellpadding="5" cellspacing="0">
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1057764" id="1057764"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1057766" id="1057766"></a> <span class="sansserif">JavaScript 1.2, NES 3.0</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1082045" id="1082045"></a> <span class="sansserif">ECMA Version</span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1082047" id="1082047"></a> <span class="sansserif">ECMA 262, Edition 3</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p>
+          <br>
+           <a name="1016010" id="1016010"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+           <a name="1016011" id="1016011"></a> <span class="mono">do<br>
+           &nbsp;&nbsp;&nbsp;<i>statements<br></i>while (<i>condition</i>);</span>
+        </p>
+        <p>
+          <br>
+           <a name="1016014" id="1016014"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+           <a name="1016015" id="1016015"></a> <span class="sansserif"><br></span>
+        </p>
+        <p>
+          <br>
+          <br>
+        </p>
+        <table width="90%" border="1" cellpadding="5" cellspacing="0">
+          <tr>
+            <td valign="top">
+              <a name="1016274" id="1016274"></a> <span class="mono">statements</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1016322" id="1016322"></a> <span class="sansserif">Block of statements that is executed at least once and is re-executed each time the condition evaluates to true.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1016278" id="1016278"></a> <span class="mono">condition</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1016379" id="1016379"></a> <span class="sansserif">Evaluated after each pass through the loop. If <span class="mono">condition</span> evaluates to true, the statements in the preceding block are re-executed. When <span class="mono">condition</span> evaluates to false, control passes to the statement following <span class="mono">do while</span>.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p>
+          <br>
+           <a name="1058838" id="1058838"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+           <a name="1016021" id="1016021"></a> <span class="sansserif">In the following example, the <span class="mono">do</span> loop iterates at least once and reiterates until i is no longer less than 5.</span>
+        </p>
+        <p>
+          <a name="1016023" id="1016023"></a> <span class="mono">do {<br>
+           &nbsp;&nbsp;&nbsp;i+=1;<br>
+           &nbsp;&nbsp;&nbsp;document.write(i);<br>
+           } while (i&lt;5);</span>
+        </p>
+        <p>
+          <br>
+          <br>
+           <a name="1016648" id="1016648"></a> <a name="export" id="export"></a> <span class="sansserif">export
+          </span>
+        </p>
+        <hr size="2" noshade="noshade">
+        <br>
+         <a name="1082357" id="1082357"></a> <span class="sansserif">Allows a signed script to provide properties, functions, and objects to other signed or unsigned scripts.</span> 
+        <p>
+          <a name="1082415" id="1082415"></a> <span class="sansserif">This feature is not in ECMA 262, Edition 3.<br></span>
+        </p>
+        <p>
+          <br>
+          <br>
+        </p>
+        <table width="90%" border="1" cellpadding="5" cellspacing="0">
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1035840" id="1035840"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1035842" id="1035842"></a> <span class="sansserif">JavaScript 1.2, NES 3.0</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p>
+          <br>
+           <a name="1016651" id="1016651"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+           <a name="1016652" id="1016652"></a> <span class="mono">export name1, name2, ..., nameN<br>
+           export *</span>
+        </p>
+        <p>
+          <br>
+           <a name="1016655" id="1016655"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+           <a name="1016656" id="1016656"></a> <span class="sansserif"><br></span>
+        </p>
+        <p>
+          <br>
+          <br>
+        </p>
+        <table width="90%" border="1" cellpadding="5" cellspacing="0">
+          <tr>
+            <td valign="top">
+              <a name="1016852" id="1016852"></a> <span class="mono">nameN</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1016991" id="1016991"></a> <span class="sansserif">List of properties, functions, and objects to be exported.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1033601" id="1033601"></a> <span class="mono">*</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1033733" id="1033733"></a> <span class="sansserif">Exports all properties, functions, and objects from the script.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p>
+          <br>
+           <a name="1016658" id="1016658"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+           <a name="1016659" id="1016659"></a> <span class="sansserif">Typically, information in a signed script is available only to scripts signed by the same principals. By exporting properties, functions, or objects, a signed script makes this information available to any script (signed or unsigned). The receiving script uses the companion import statement to access the information.</span>
+        </p>
+        <p>
+          <br>
+           <a name="1016663" id="1016663"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+           <a name="1016630" id="1016630"></a> <span class="sansserif"><a href="stmt.html#1082618">import</a></span>
+        </p>
+        <p>
+          <br>
+          <br>
+           <a name="1004804" id="1004804"></a> <a name="for" id="for"></a> <span class="sansserif">for
+          </span>
+        </p>
+        <hr size="2" noshade="noshade">
+        <br>
+         <a name="1004805" id="1004805"></a> <span class="sansserif">Creates a loop that consists of three optional expressions, enclosed in parentheses and separated by semicolons, followed by a block of statements executed in the loop.<br></span> 
+        <p>
+          <br>
+          <br>
+        </p>
+        <table width="90%" border="1" cellpadding="5" cellspacing="0">
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1035896" id="1035896"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1041845" id="1041845"></a> <span class="sansserif">JavaScript 1.0, NES 2.0</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1050127" id="1050127"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1050129" id="1050129"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p>
+          <br>
+           <a name="1004806" id="1004806"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+           <a name="1004807" id="1004807"></a> <span class="mono">for ([initial-expression]; [condition]; [increment-expression]) {<br>
+           &nbsp;&nbsp;&nbsp;statements<br>
+           }</span>
+        </p>
+        <p>
+          <br>
+           <a name="1005639" id="1005639"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+           <a name="1004808" id="1004808"></a> <span class="sansserif"><br></span>
+        </p>
+        <p>
+          <br>
+          <br>
+        </p>
+        <table width="90%" border="1" cellpadding="5" cellspacing="0">
+          <tr>
+            <td valign="top">
+              <a name="1012272" id="1012272"></a> <span class="mono">initial-expression</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1012381" id="1012381"></a> <span class="sansserif">Statement or variable declaration. Typically used to initialize a counter variable. This expression may optionally declare new variables with the <span class="mono">var</span> keyword. These variables are local to the function, not to the loop.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1012276" id="1012276"></a> <span class="mono">condition</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1012418" id="1012418"></a> <span class="sansserif">Evaluated on each pass through the loop. If this condition evaluates to true, the statements in <span class="mono">statements</span> are performed. This conditional test is optional. If omitted, the condition always evaluates to true.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1012280" id="1012280"></a> <span class="mono">increment-expression</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1012459" id="1012459"></a> <span class="sansserif">Generally used to update or increment the counter variable.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1012284" id="1012284"></a> <span class="mono">statements</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1012492" id="1012492"></a> <span class="sansserif">Block of statements that are executed as long as condition evaluates to true. This can be a single statement or multiple statements. Although not required, it is good practice to indent these statements from the beginning of the <span class="mono">for</span> statement.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p>
+          <br>
+           <a name="1004812" id="1004812"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+           <a name="1004813" id="1004813"></a> <span class="sansserif">The following <span class="mono">for</span> statement starts by declaring the variable <span class="mono">i</span> and initializing it to 0. It checks that <span class="mono">i</span> is less than nine, performs the two succeeding statements, and increments <span class="mono">i</span> by 1 after each pass through the loop.</span>
+        </p>
+        <p>
+          <a name="1004814" id="1004814"></a> <span class="mono">for (var i = 0; i &lt; 9; i++) {<br>
+           &nbsp;&nbsp;&nbsp;n += i;<br>
+           &nbsp;&nbsp;&nbsp;myfunc(n);<br>
+           }</span>
+        </p>
+        <p>
+          <br>
+          <br>
+           <a name="1004815" id="1004815"></a> <a name="for...in" id="for...in"></a> <span class="sansserif">for...in
+          </span>
+        </p>
+        <hr size="2" noshade="noshade">
+        <br>
+         <a name="1004816" id="1004816"></a> <span class="sansserif">Iterates a specified variable over all the properties of an object. For each distinct property, JavaScript executes the specified statements.<br></span> 
+        <p>
+          <br>
+          <br>
+        </p>
+        <table width="90%" border="1" cellpadding="5" cellspacing="0">
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1035903" id="1035903"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1041898" id="1041898"></a> <span class="sansserif">JavaScript 1.0, NES 2.0</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1050148" id="1050148"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1050150" id="1050150"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p>
+          <br>
+           <a name="1004817" id="1004817"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+           <a name="1004818" id="1004818"></a> <span class="mono">for (<i>variable</i> in <i>object</i>) {<br>
+           &nbsp;&nbsp;&nbsp;<i>statements<br></i>}</span>
+        </p>
+        <p>
+          <br>
+           <a name="1005653" id="1005653"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+           <a name="1004819" id="1004819"></a> <span class="sansserif"><br></span>
+        </p>
+        <p>
+          <br>
+          <br>
+        </p>
+        <table width="90%" border="1" cellpadding="5" cellspacing="0">
+          <tr>
+            <td valign="top">
+              <a name="1012697" id="1012697"></a> <span class="mono">variable</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1012751" id="1012751"></a> <span class="sansserif">Variable to iterate over every property, optionally declared with the <span class="mono">var</span> keyword. This variable is local to the function, not to the loop.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1012701" id="1012701"></a> <span class="mono">object</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1012768" id="1012768"></a> <span class="sansserif">Object for which the properties are iterated.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1012705" id="1012705"></a> <span class="mono">statements</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1012792" id="1012792"></a> <span class="sansserif">Specifies the statements to execute for each property.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p>
+          <br>
+           <a name="1004822" id="1004822"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+           <a name="1004823" id="1004823"></a> <span class="sansserif">The following function takes as its argument an object and the object's name. It then iterates over all the object's properties and returns a string that lists the property names and their values.</span>
+        </p>
+        <p>
+          <a name="1004824" id="1004824"></a> <span class="mono">function show_props(obj, objName) {<br>
+           &nbsp;&nbsp;&nbsp;var result = "";<br>
+           &nbsp;&nbsp;&nbsp;for (var i in obj) {<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;result += objName + "." + i + " = " + obj[i] + "\n";<br>
+           &nbsp;&nbsp;&nbsp;}<br>
+           &nbsp;&nbsp;&nbsp;return result;<br>
+           }</span>
+        </p>
+        <p>
+          <br>
+          <br>
+           <a name="1004825" id="1004825"></a> <a name="function" id="function"></a> <span class="sansserif">function
+          </span>
+        </p>
+        <hr size="2" noshade="noshade">
+        <br>
+         <a name="1004826" id="1004826"></a> <span class="sansserif">Declares a function with the specified parameters. Acceptable parameters include strings, numbers, and objects.<br></span> 
+        <p>
+          <br>
+          <br>
+        </p>
+        <table width="90%" border="1" cellpadding="5" cellspacing="0">
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1035950" id="1035950"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1041939" id="1041939"></a> <span class="sansserif">JavaScript 1.0, NES 2.0</span>
+              </p>
+              <p>
+                <a name="1076881" id="1076881"></a>
+              </p>
+              <p>
+                <a name="1076898" id="1076898"></a> <span class="sansserif">JavaScript 1.5, NES 6.0: added conditional function declarations (Netscape extension).</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1050161" id="1050161"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1050163" id="1050163"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p>
+          <br>
+           <a name="1004829" id="1004829"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+           <a name="1004830" id="1004830"></a> <span class="mono">function <i>name</i>([<i>param</i>] [, <i>param</i>] [..., <i>param</i>]) {<br>
+           &nbsp;&nbsp;&nbsp;<i>statements<br></i>}</span>
+        </p>
+        <p>
+          <a name="1065583" id="1065583"></a> <span class="sansserif">You can also define functions using the <a href="function.html#1193137">Function</a> constructor and the <a href="ops.html#1066344">function</a> operator; see <a href="function.html#1193137">Function</a> and <a href="ops.html#1066344">function</a>.</span>
+        </p>
+        <p>
+          <br>
+           <a name="1007886" id="1007886"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+           <a name="1007887" id="1007887"></a> <span class="sansserif"><br></span>
+        </p>
+        <p>
+          <br>
+          <br>
+        </p>
+        <table width="90%" border="1" cellpadding="5" cellspacing="0">
+          <tr>
+            <td valign="top">
+              <a name="1012941" id="1012941"></a> <span class="mono">name</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1012965" id="1012965"></a> <span class="sansserif">The function name.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1012979" id="1012979"></a> <span class="mono">param</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1013010" id="1013010"></a> <span class="sansserif">The name of an argument to be passed to the function. A function can have up to 255 arguments.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1074665" id="1074665"></a> <span class="mono">statements</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1074667" id="1074667"></a> <span class="sansserif">The statements which comprise the body of the function.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p>
+          <br>
+           <a name="1008195" id="1008195"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+           <a name="1065101" id="1065101"></a> <span class="sansserif">To return a value, the function must have a <a href="stmt.html#1004871">return</a> statement that specifies the value to return.</span>
+        </p>
+        <p>
+          <a name="1071423" id="1071423"></a> <span class="sansserif">A function created with the <span class="mono">function</span> statement is a <span class="mono">Function</span> object and has all the properties, methods, and behavior of <span class="mono">Function</span> objects. See <a href="function.html#1193137">Function</a> for detailed information on functions.</span>
+        </p>
+        <p>
+          <a name="1076846" id="1076846"></a> <span class="sansserif">Netscape supports conditional function declarations, whereby a function can be declared based on the evaluation of a condition. If the condition evaluates to true, the function is declared. Otherwise it is not declared.</span>
+        </p>
+        <p>
+          <a name="1083248" id="1083248"></a> <span class="sansserif">A function can also be declared inside an expression. In this case the function is usually anonymous. See <a href="ops.html#1066344">page&nbsp;254</a>.</span>
+        </p>
+        <p>
+          <br>
+           <a name="1004831" id="1004831"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+           <a name="1004832" id="1004832"></a> <span class="sansserif">The following code declares a function that returns the total dollar amount of sales, when given the number of units sold of products a, b, and c.</span>
+        </p>
+        <p>
+          <a name="1079065" id="1079065"></a> <span class="mono">function calc_sales(units_a, units_b, units_c) {<br>
+           &nbsp;&nbsp;&nbsp;return units_a*79 + units_b*129 + units_c*699<br>
+           }</span>
+        </p>
+        <p>
+          <a name="1079066" id="1079066"></a> <span class="sansserif">In the following script, the one function is always declared. The zero function is declared because '<span class="mono">if(1)'</span> evaluates to true:</span>
+        </p>
+        <p>
+          <a name="1079067" id="1079067"></a> <span class="mono">&lt;SCRIPT language="JavaScript1.5"&gt;<br>
+           &lt;!--<br>
+           function one()<br>
+           &nbsp;&nbsp;&nbsp;document.writeln("This is one.");<br>
+           &nbsp;&nbsp;&nbsp;if (1)<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;function zero()<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;document.writeln("This is zero.");<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+           }<br>
+           &lt;/SCRIPT&gt;</span>
+        </p>
+        <p>
+          <a name="1077232" id="1077232"></a> <span class="sansserif">However, if the script is changed so that the condition becomes '<span class="mono">if (0)'</span>, function zero is not declared and cannot be invoked on the page.</span>
+        </p>
+        <p>
+          <br>
+           <a name="1065517" id="1065517"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+           <a name="1065521" id="1065521"></a> <span class="sansserif"><a href="function.html#1193137">Function</a>, <a href="ops.html#1066344">function</a></span>
+        </p>
+        <p>
+          <br>
+          <br>
+           <a name="1004833" id="1004833"></a> <a name="if...else" id="if...else"></a> <span class="sansserif">if...else
+          </span>
+        </p>
+        <hr size="2" noshade="noshade">
+        <br>
+         <a name="1004834" id="1004834"></a> <span class="sansserif">Executes a set of statements if a specified condition is true. If the condition is false, another set of statements can be executed.<br></span> 
+        <p>
+          <br>
+          <br>
+        </p>
+        <table width="90%" border="1" cellpadding="5" cellspacing="0">
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1035961" id="1035961"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1042000" id="1042000"></a> <span class="sansserif">JavaScript 1.0, NES 2.0</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1050188" id="1050188"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1050190" id="1050190"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p>
+          <br>
+           <a name="1004835" id="1004835"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+           <a name="1004836" id="1004836"></a> <span class="mono">if (<i>condition</i>) {<br>
+           &nbsp;&nbsp;&nbsp;<i>statements1<br></i>}<br>
+           [else {<br>
+           &nbsp;&nbsp;&nbsp;<i>statements2<br></i>}]</span>
+        </p>
+        <p>
+          <br>
+           <a name="1005661" id="1005661"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+           <a name="1004837" id="1004837"></a> <span class="sansserif"><br></span>
+        </p>
+        <p>
+          <br>
+          <br>
+        </p>
+        <table width="90%" border="1" cellpadding="5" cellspacing="0">
+          <tr>
+            <td valign="top">
+              <a name="1013106" id="1013106"></a> <span class="mono">condition</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1013171" id="1013171"></a> <span class="sansserif">Can be any JavaScript expression that evaluates to true or false. Parentheses are required around the condition. If condition evaluates to true, the statements in <span class="mono">statements1</span> are executed.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1013110" id="1013110"></a> <span class="mono">statements1,<br>
+               statements2</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1013215" id="1013215"></a> <span class="sansserif">Can be any JavaScript statements, including further nested <span class="mono">if</span> statements. Multiple statements must be enclosed in braces.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p>
+          <br>
+           <a name="1045292" id="1045292"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+           <a name="1045282" id="1045282"></a> <span class="sansserif">You should not use simple assignments in a conditional statement. For example, do not use the following code:</span>
+        </p>
+        <p>
+          <a name="1045283" id="1045283"></a> <span class="mono">if(x = y)<br>
+           {<br>
+           &nbsp;&nbsp;&nbsp;/* do the right thing */<br>
+           }</span>
+        </p>
+        <p>
+          <a name="1045284" id="1045284"></a> <span class="sansserif">If you need to use an assignment in a conditional statement, put additional parentheses around the assignment. For example, use <span class="mono">if( (x = y) )</span>.</span>
+        </p>
+        <p>
+          <br>
+           <a name="1004839" id="1004839"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+           <a name="1004840" id="1004840"></a> <span class="mono">if (cipher_char == from_char) {<br>
+           &nbsp;&nbsp;&nbsp;result = result + to_char<br>
+           &nbsp;&nbsp;&nbsp;x++}<br>
+           else<br>
+           &nbsp;&nbsp;&nbsp;result = result + clear_char</span>
+        </p>
+        <p>
+          <br>
+          <br>
+           <a name="1082618" id="1082618"></a> <a name="import" id="import"></a> <span class="sansserif">import
+          </span>
+        </p>
+        <hr size="2" noshade="noshade">
+        <br>
+         <a name="1082619" id="1082619"></a> <span class="sansserif">Allows a script to import properties, functions, and objects from a signed script that has exported the information.</span> 
+        <p>
+          <a name="1082631" id="1082631"></a> <span class="sansserif">This feature is not in ECMA 262, Edition 3.<br></span>
+        </p>
+        <p>
+          <br>
+          <br>
+        </p>
+        <table width="90%" border="1" cellpadding="5" cellspacing="0">
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1082622" id="1082622"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1082624" id="1082624"></a> <span class="sansserif">JavaScript 1.2, NES 3.0</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p>
+          <br>
+           <a name="1025746" id="1025746"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+           <a name="1025747" id="1025747"></a> <span class="mono">import <i>objectName</i>.<i>name1</i>, <i>objectName</i>.<i>name2</i>, ..., <i>objectName</i>.<i>nameN<br></i>import <i>objectName</i>.*</span>
+        </p>
+        <p>
+          <br>
+           <a name="1025749" id="1025749"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+           <a name="1017239" id="1017239"></a> <span class="sansserif"><br></span>
+        </p>
+        <p>
+          <br>
+          <br>
+        </p>
+        <table width="90%" border="1" cellpadding="5" cellspacing="0">
+          <tr>
+            <td valign="top">
+              <a name="1074720" id="1074720"></a> <span class="mono">objectName</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1074722" id="1074722"></a> <span class="sansserif">Name of the object that will receive the imported names.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1017550" id="1017550"></a> <span class="mono">name1,<br>
+               name2,<br>
+               nameN</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1017594" id="1017594"></a> <span class="sansserif">List of properties, functions, and objects to import from the export file.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1023774" id="1023774"></a> <span class="mono">*</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1023871" id="1023871"></a> <span class="sansserif">Imports all properties, functions, and objects from the export script.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p>
+          <br>
+           <a name="1017785" id="1017785"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+           <a name="1024031" id="1024031"></a> <span class="sansserif">The <span class="mono">objectName</span> parameter is the name of the object that will receive the imported names. For example, if <span class="mono">f</span> and <span class="mono">p</span> have been exported, and if <span class="mono">obj</span> is an object from the importing script, the following code makes <span class="mono">f</span> and <span class="mono">p</span> accessible in the importing script as properties of <span class="mono">obj</span>.</span>
+        </p>
+        <p>
+          <a name="1024117" id="1024117"></a> <span class="mono">import obj.f, obj.p</span>
+        </p>
+        <p>
+          <a name="1024008" id="1024008"></a> <span class="sansserif">Typically, information in a signed script is available only to scripts signed by the same principals. By exporting (using the <a href="stmt.html#1016648">export</a> statement) properties, functions, or objects, a signed script makes this information available to any script (signed or unsigned). The receiving script uses the <span class="mono">import</span> statement to access the information.</span>
+        </p>
+        <p>
+          <a name="1065402" id="1065402"></a> <span class="sansserif">The script must load the export script into a window, frame, or layer before it can import and use any exported properties, functions, and objects.</span>
+        </p>
+        <p>
+          <br>
+           <a name="1065403" id="1065403"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+           <a name="1065407" id="1065407"></a> <span class="sansserif"><a href="stmt.html#1016648">export</a></span>
+        </p>
+        <p>
+          <br>
+          <br>
+           <a name="1018088" id="1018088"></a> <a name="label" id="label"></a> <span class="sansserif">label
+          </span>
+        </p>
+        <hr size="2" noshade="noshade">
+        <br>
+         <a name="1073587" id="1073587"></a> <span class="sansserif">Provides a statement with an identifier that lets you refer to it using a <span class="mono">break</span> or <span class="mono">continue</span> statement.<br></span> 
+        <p>
+          <br>
+          <br>
+        </p>
+        <table width="90%" border="1" cellpadding="5" cellspacing="0">
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1073590" id="1073590"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1073592" id="1073592"></a> <span class="sansserif">JavaScript 1.2, NES 3.0</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1082759" id="1082759"></a> <span class="sansserif">ECMA version</span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1082761" id="1082761"></a> <span class="sansserif">ECMA 262, Edition 3</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p>
+          <a name="1073599" id="1073599"></a> <span class="sansserif">For example, you can use a label to identify a loop, and then use the <span class="mono">break</span> or <span class="mono">continue</span> statements to indicate whether a program should interrupt the loop or continue its execution.</span>
+        </p>
+        <p>
+          <br>
+           <a name="1073606" id="1073606"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+           <a name="1073607" id="1073607"></a> <span class="mono"><i>label</i> :<br>
+           &nbsp;&nbsp;&nbsp;<i>statement</i></span>
+        </p>
+        <p>
+          <br>
+           <a name="1018096" id="1018096"></a> <a name="Parameter" id="Parameter"></a> <span class="sansserif"><b>Parameter</b></span><br>
+           <a name="1018097" id="1018097"></a> <span class="sansserif"><br></span>
+        </p>
+        <p>
+          <br>
+          <br>
+        </p>
+        <table width="90%" border="1" cellpadding="5" cellspacing="0">
+          <tr>
+            <td valign="top">
+              <a name="1073119" id="1073119"></a> <span class="mono">label</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1073121" id="1073121"></a> <span class="sansserif">Any JavaScript identifier that is not a reserved word.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1018388" id="1018388"></a> <span class="mono">statement</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1018473" id="1018473"></a> <span class="sansserif">Statements. <span class="mono">break</span> can be used with any labeled statement, and <span class="mono">continue</span> can be used with looping labeled statements.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p>
+          <br>
+           <a name="1058871" id="1058871"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+           <a name="1018100" id="1018100"></a> <span class="sansserif">For an example of a label statement using <a href="stmt.html#1081298">break</a>, see <a href="stmt.html#1081298">break</a>. For an example of a label statement using <a href="stmt.html#1078923">continue</a>, see <a href="stmt.html#1078923">continue</a>.</span>
+        </p>
+        <p>
+          <br>
+           <a name="1018102" id="1018102"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+           <a name="1018103" id="1018103"></a> <span class="sansserif"><a href="stmt.html#1081298">break</a>, <a href="stmt.html#1078923">continue</a></span>
+        </p>
+        <p>
+          <br>
+          <br>
+           <a name="1004871" id="1004871"></a> <a name="return" id="return"></a> <span class="sansserif">return
+          </span>
+        </p>
+        <hr size="2" noshade="noshade">
+        <br>
+         <a name="1004872" id="1004872"></a> <span class="sansserif">Specifies the value to be returned by a function.<br></span> 
+        <p>
+          <br>
+          <br>
+        </p>
+        <table width="90%" border="1" cellpadding="5" cellspacing="0">
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1036059" id="1036059"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1042059" id="1042059"></a> <span class="sansserif">JavaScript 1.0, NES 2.0</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1050215" id="1050215"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1050217" id="1050217"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p>
+          <br>
+           <a name="1005200" id="1005200"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+           <a name="1041656" id="1041656"></a> <span class="mono">return <i>expression;</i></span>
+        </p>
+        <p>
+          <br>
+           <a name="1041657" id="1041657"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+           <a name="1041663" id="1041663"></a> <span class="sansserif"><br></span>
+        </p>
+        <p>
+          <br>
+          <br>
+        </p>
+        <table width="90%" border="1" cellpadding="5" cellspacing="0">
+          <tr>
+            <td valign="top">
+              <a name="1041660" id="1041660"></a> <span class="mono">expression</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1041662" id="1041662"></a> <span class="sansserif">The expression to return.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p>
+          <br>
+           <a name="1041616" id="1041616"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+           <a name="1005203" id="1005203"></a> <span class="sansserif">The following function returns the square of its argument, <span class="mono">x</span>, where <span class="mono">x</span> is a number.</span>
+        </p>
+        <p>
+          <a name="1004877" id="1004877"></a> <span class="mono">function square(x) {<br>
+           &nbsp;&nbsp;&nbsp;return x * x;<br>
+           }</span>
+        </p>
+        <p>
+          <br>
+          <br>
+           <a name="1018610" id="1018610"></a> <a name="switch" id="switch"></a> <span class="sansserif">switch
+          </span>
+        </p>
+        <hr size="2" noshade="noshade">
+        <br>
+         <a name="1045263" id="1045263"></a> <span class="sansserif">Allows a program to evaluate an expression and attempt to match the expression's value to a case label.<br></span> 
+        <p>
+          <br>
+          <br>
+        </p>
+        <table width="90%" border="1" cellpadding="5" cellspacing="0">
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1045266" id="1045266"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1045268" id="1045268"></a> <span class="sansserif">JavaScript 1.2, NES 3.0</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1082940" id="1082940"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1082942" id="1082942"></a> <span class="sansserif">ECMA-262, Edition 3</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p>
+          <br>
+           <a name="1045269" id="1045269"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+           <a name="1018623" id="1018623"></a> <span class="mono">switch (<i>expression</i>){<br>
+           &nbsp;&nbsp;&nbsp;case <i>label</i> :<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<i>statements</i>;<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br>
+           &nbsp;&nbsp;&nbsp;case <i>label</i> :<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<i>statements</i>;<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br>
+           &nbsp;&nbsp;&nbsp;...<br>
+           &nbsp;&nbsp;&nbsp;default : <i>statements</i>;<br>
+           }</span>
+        </p>
+        <p>
+          <br>
+           <a name="1018633" id="1018633"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+           <a name="1018634" id="1018634"></a> <span class="sansserif"><br></span>
+        </p>
+        <p>
+          <br>
+          <br>
+        </p>
+        <table width="90%" border="1" cellpadding="5" cellspacing="0">
+          <tr>
+            <td valign="top">
+              <a name="1018958" id="1018958"></a> <span class="mono">expression</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1019047" id="1019047"></a> <span class="sansserif">Value matched against label.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1018962" id="1018962"></a> <span class="mono">label</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1019068" id="1019068"></a> <span class="sansserif">Identifier used to match against expression.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1019070" id="1019070"></a> <span class="mono">statements</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1019089" id="1019089"></a> <span class="sansserif">Block of statements that is executed once if <span class="mono">expression</span> matches <span class="mono">label</span>.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p>
+          <br>
+           <a name="1018637" id="1018637"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+           <a name="1034614" id="1034614"></a> <span class="sansserif">If a match is found, the program executes the associated statement. If multiple cases match the provided value, the first case that matches is selected, even if the cases are not equal to each other.</span>
+        </p>
+        <p>
+          <a name="1034615" id="1034615"></a> <span class="sansserif">The program first looks for a label matching the value of expression and then executes the associated statement. If no matching label is found, the program looks for the optional <span class="mono">default</span> statement, and if found, executes the associated statement. If no <span class="mono">default</span> statement is found, the program continues execution at the statement following the end of <span class="mono">switch</span>.</span>
+        </p>
+        <p>
+          <a name="1034616" id="1034616"></a> <span class="sansserif">The optional <a href="stmt.html#1081298">break</a> statement associated with each case label ensures that the program breaks out of switch once the matched statement is executed and continues execution at the statement following switch. If <a href="stmt.html#1081298">break</a> is omitted, the program continues execution at the next statement in the <span class="mono">switch</span> statement.</span>
+        </p>
+        <p>
+          <br>
+           <a name="1070590" id="1070590"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+           <a name="1070591" id="1070591"></a> <span class="sansserif">In the following example, if <span class="mono">expression</span> evaluates to "Bananas", the program matches the value with case "Bananas" and executes the associated statement. When <a href="stmt.html#1081298">break</a> is encountered, the program breaks out of <span class="mono">switch</span> and executes the statement following <span class="mono">switch</span>. If <a href="stmt.html#1081298">break</a> were omitted, the statement for case "Cherries" would also be executed.</span>
+        </p>
+        <p>
+          <a name="1018642" id="1018642"></a> <span class="mono">switch (i) {<br>
+           &nbsp;&nbsp;&nbsp;case "Oranges" :<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;document.write("Oranges are $0.59 a pound.&lt;BR&gt;");<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br>
+           &nbsp;&nbsp;&nbsp;case "Apples" :<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;document.write("Apples are $0.32 a pound.&lt;BR&gt;");<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br>
+           &nbsp;&nbsp;&nbsp;case "Bananas" :<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;document.write("Bananas are $0.48 a pound.&lt;BR&gt;");<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br>
+           &nbsp;&nbsp;&nbsp;case "Cherries" :<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;document.write("Cherries are $3.00 a pound.&lt;BR&gt;");<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br>
+           &nbsp;&nbsp;&nbsp;default :<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;document.write("Sorry, we are out of " + i + ".&lt;BR&gt;");<br>
+           }<br>
+           document.write("Is there anything else you'd like?&lt;BR&gt;");</span>
+        </p>
+        <p>
+          <br>
+          <br>
+           <a name="1052196" id="1052196"></a> <a name="throw" id="throw"></a> <span class="sansserif">throw
+          </span>
+        </p>
+        <hr size="2" noshade="noshade">
+        <br>
+         <a name="1062366" id="1062366"></a> <span class="sansserif">Throws a user-defined exception.<br></span> 
+        <p>
+          <br>
+          <br>
+        </p>
+        <table width="90%" border="1" cellpadding="5" cellspacing="0">
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1052199" id="1052199"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1052201" id="1052201"></a> <span class="sansserif">JavaScript 1.4</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1082968" id="1082968"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1082970" id="1082970"></a> <span class="sansserif">ECMA-262, Edition 3</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p>
+          <br>
+           <a name="1052207" id="1052207"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+           <a name="1052208" id="1052208"></a> <span class="mono">throw <i>expression;</i></span>
+        </p>
+        <p>
+          <br>
+           <a name="1052209" id="1052209"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+           <a name="1052219" id="1052219"></a> <span class="sansserif"><br></span>
+        </p>
+        <p>
+          <br>
+          <br>
+        </p>
+        <table width="90%" border="1" cellpadding="5" cellspacing="0">
+          <tr>
+            <td valign="top">
+              <a name="1052212" id="1052212"></a> <span class="mono">expression</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1052214" id="1052214"></a> <span class="sansserif">The value to throw.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p>
+          <br>
+           <a name="1052220" id="1052220"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+           <a name="1052221" id="1052221"></a> <span class="sansserif">Use the <span class="mono">throw</span> statement to throw an exception. When you throw an exception, an expression specifies the value of the exception. The following code throws several exceptions.</span>
+        </p>
+        <p>
+          <a name="1058466" id="1058466"></a> <span class="mono">throw "Error2"; &nbsp;&nbsp;&nbsp;// generates an exception with a string value<br>
+           throw 42;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// generates an exception with the value 42<br>
+           throw true;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// generates an exception with the value true</span>
+        </p>
+        <p>
+          <br>
+           <a name="1052222" id="1052222"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+        </p>
+        <p>
+          <a name="1062282" id="1062282"></a> <span class="sansserif"><b>Example 1: Throw an object.</b></span> <a name="1068685" id="1068685"></a> <span class="sansserif">You can specify an object when you throw an exception. You can then reference the object's properties in the <span class="mono">catch</span> block. The following example creates an object <span class="mono">myUserException</span> of type <span class="mono">UserException</span> and uses it in a <span class="mono">throw</span> statement.</span>
+        </p>
+        <p>
+          <a name="1074257" id="1074257"></a> <span class="mono">function UserException (message) {<br>
+           &nbsp;&nbsp;&nbsp;this.message=message;<br>
+           &nbsp;&nbsp;&nbsp;this.name="UserException";<br>
+           }<br>
+           function getMonthName (mo) {<br>
+           &nbsp;&nbsp;&nbsp;mo=mo-1; // Adjust month number for array index (1=Jan, 12=Dec)<br>
+           &nbsp;&nbsp;&nbsp;var months=new Array("Jan","Feb","Mar","Apr","May","Jun","Jul",<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"Aug","Sep","Oct","Nov","Dec");<br>
+           &nbsp;&nbsp;&nbsp;if (months[mo] != null) {<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return months[mo];<br>
+           &nbsp;&nbsp;&nbsp;} else {<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;myUserException=new UserException("InvalidMonthNo");<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;throw myUserException;<br>
+           &nbsp;&nbsp;&nbsp;}<br>
+           }</span>
+        </p>
+        <p>
+          <a name="1074269" id="1074269"></a> <span class="mono">try {<br>
+           &nbsp;&nbsp;&nbsp;// statements to try;<br>
+           &nbsp;&nbsp;&nbsp;monthName=getMonthName(myMonth)<br>
+           }<br>
+           catch (e) {<br>
+           &nbsp;&nbsp;&nbsp;monthName="unknown";<br>
+           &nbsp;&nbsp;&nbsp;logMyErrors(e.message,e.name); // pass exception object to err handler<br>
+           }</span>
+        </p>
+        <p>
+          <a name="1074580" id="1074580"></a> <span class="sansserif"><b>Example 2: Throw an object.</b></span> <a name="1074581" id="1074581"></a> <span class="sansserif">The following example tests an input string for a U.S. zip code. If the zip code uses an invalid format, the <span class="mono">throw</span> statement throws an exception by creating an object of type <span class="mono">ZipCodeFormatException</span>.</span>
+        </p>
+        <p>
+          <a name="1063138" id="1063138"></a> <span class="mono">/*<br>
+           &nbsp;* Creates a ZipCode object.<br>
+           &nbsp;*<br>
+           &nbsp;* Accepted formats for a zip code are:<br>
+           &nbsp;*&nbsp;&nbsp;&nbsp;&nbsp;12345<br>
+           &nbsp;*&nbsp;&nbsp;&nbsp;&nbsp;12345-6789<br>
+           &nbsp;*&nbsp;&nbsp;&nbsp;&nbsp;123456789<br>
+           &nbsp;*&nbsp;&nbsp;&nbsp;&nbsp;12345 6789<br>
+           &nbsp;*<br>
+           &nbsp;* If the argument passed to the ZipCode constructor does not<br>
+           &nbsp;* conform to one of these patterns, an exception is thrown.<br>
+           &nbsp;*/</span>
+        </p>
+        <p>
+          <a name="1063862" id="1063862"></a> <span class="mono">function ZipCode(zip) {<br>
+           &nbsp;&nbsp;&nbsp;zip = new String(zip);<br>
+           &nbsp;&nbsp;&nbsp;pattern = /[0-9]{5}([- ]?[0-9]{4})?/;<br>
+           &nbsp;&nbsp;&nbsp;if (pattern.test(zip)) {<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// zip code value will be the first match in the string<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.value = zip.match(pattern)[0];<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.valueOf = function (){return this.value};<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.toString = function (){return String(this.value)};<br>
+           &nbsp;&nbsp;&nbsp;} else {<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;throw new ZipCodeFormatException(zip);<br>
+           &nbsp;&nbsp;&nbsp;}<br>
+           }</span>
+        </p>
+        <p>
+          <a name="1063167" id="1063167"></a> <span class="mono">function ZipCodeFormatException(value) {<br>
+           &nbsp;&nbsp;&nbsp;this.value = value;<br>
+           &nbsp;&nbsp;&nbsp;this.message =<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"does not conform to the expected format for a zip code";<br>
+           &nbsp;&nbsp;&nbsp;this.toString =<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;function (){return this.value + this.message};<br>
+           }</span>
+        </p>
+        <p>
+          <a name="1063173" id="1063173"></a> <span class="mono">/*<br>
+           &nbsp;* This could be in a script that validates address data<br>
+           &nbsp;* for US addresses.<br>
+           &nbsp;*/</span>
+        </p>
+        <p>
+          <a name="1063177" id="1063177"></a> <span class="mono">var ZIPCODE_INVALID = -1;<br>
+           var ZIPCODE_UNKNOWN_ERROR = -2;</span>
+        </p>
+        <p>
+          <a name="1067460" id="1067460"></a> <span class="mono">function verifyZipCode(z) {<br>
+           &nbsp;&nbsp;&nbsp;try {<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;z = new ZipCode(z);<br>
+           &nbsp;&nbsp;&nbsp;}<br>
+           &nbsp;&nbsp;&nbsp;catch (e) {<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (e instanceof ZipCodeFormatException) {<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return ZIPCODE_INVALID;<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;else {<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return ZIPCODE_UNKNOWN_ERROR;<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+           &nbsp;&nbsp;&nbsp;}<br>
+           &nbsp;&nbsp;&nbsp;return z;<br>
+           }</span>
+        </p>
+        <p>
+          <a name="1063191" id="1063191"></a> <span class="mono">a=verifyZipCode(95060);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// returns 95060<br>
+           b=verifyZipCode(9560;)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// returns -1<br>
+           c=verifyZipCode("a");&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// returns -1<br>
+           d=verifyZipCode("95060");&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // returns 95060<br>
+           e=verifyZipCode("95060 1234");&nbsp;&nbsp;// returns 95060 1234</span>
+        </p>
+        <p>
+          <a name="1068135" id="1068135"></a> <span class="sansserif"><b>Example 3: Rethrow an exception.</b></span> <a name="1068745" id="1068745"></a> <span class="sansserif">You can use <span class="mono">throw</span> to rethrow an exception after you catch it. The following example catches an exception with a numeric value and rethrows it if the value is over 50. The rethrown exception propagates up to the enclosing function or to the top level so that the user sees it.</span>
+        </p>
+        <p>
+          <a name="1072419" id="1072419"></a> <span class="mono">try {<br>
+           &nbsp;&nbsp;&nbsp;throw n // throws an exception with a numeric value<br>
+           }<br>
+           catch (e) {<br>
+           &nbsp;&nbsp;&nbsp;if (e &lt;= 50) {<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// statements to handle exceptions 1-50<br>
+           &nbsp;&nbsp;&nbsp;}<br>
+           &nbsp;&nbsp;&nbsp;else {<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// cannot handle this exception, so rethrow<br>
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;throw e<br>
+           &nbsp;&nbsp;&nbsp;}<br>
+           }</span>
+        </p>
+        <p>
+          <br>
+           <a name="1063065" id="1063065"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+           <a name="1063072" id="1063072"></a> <span class="sansserif"><a href="stmt.html#1051663">try...catch</a></span>
+        </p>
+        <p>
+          <br>
+          <br>
+           <a name="1051663" id="1051663"></a> <a name="try...catch" id="try...catch"></a> <span class="sansserif">try...catch
+          </span>
+        </p>
+        <hr size="2" noshade="noshade">
+        <br>
+         <a name="1051664" id="1051664"></a> <span class="sansserif">Marks a block of statements to try, and specifies a response should an exception be thrown.<br></span> 
+        <p>
+          <br>
+          <br>
+        </p>
+        <table width="90%" border="1" cellpadding="5" cellspacing="0">
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1051667" id="1051667"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1051669" id="1051669"></a> <span class="sansserif">JavaScript 1.4</span>
+              </p>
+              <p>
+                <a name="1079091" id="1079091"></a>
+              </p>
+              <p>
+                <a name="1079100" id="1079100"></a> <span class="sansserif">JavaScript 1.5, NES 6.0: added multiple catch clauses (Netscape extension).</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1083048" id="1083048"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1083050" id="1083050"></a> <span class="sansserif">ECMA-262, Edition 3</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p>
+          <br>
+           <a name="1051674" id="1051674"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+           <a name="1079795" id="1079795"></a> <span class="mono">try {<br>
+           &nbsp;&nbsp;&nbsp;<i>statements<br></i>}<br>
+           [catch (<i>exception_var</i> if <i>expression</i>)<br>
+           &nbsp;&nbsp;&nbsp;{<i>statements}] . . .<br></i>[catch (<i>exception_var</i>) {<i>statements</i>}]<br>
+           [finally {<i>statements</i>}]</span>
+        </p>
+        <p>
+          <br>
+           <a name="1052985" id="1052985"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+           <a name="1052995" id="1052995"></a> <span class="sansserif"><br></span>
+        </p>
+        <p>
+          <br>
+          <br>
+        </p>
+        <table width="90%" border="1" cellpadding="5" cellspacing="0">
+          <tr>
+            <td valign="top">
+              <a name="1054244" id="1054244"></a> <span class="mono">statements</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1054246" id="1054246"></a> <span class="sansserif">Block of statements that executes once. The statements can be declarative statements (such as <span class="mono">var</span>) or executable statements (such as <span class="mono">for</span>).</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1054959" id="1054959"></a> <span class="mono">catch</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1054961" id="1054961"></a> <span class="sansserif">A block of statements to be executed if an exception is thrown in the <span class="mono">try</span> block.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1054175" id="1054175"></a> <span class="mono">exception_var</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1054177" id="1054177"></a> <span class="sansserif">An identifier to hold an exception object.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1079840" id="1079840"></a> <span class="mono">expression</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1079842" id="1079842"></a> <span class="sansserif">A test expression.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1054260" id="1054260"></a> <span class="mono">finally</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1054262" id="1054262"></a> <span class="sansserif">A block of statements that is executed before the <span class="mono">try...catch</span> statement completes. This block of statements executes whether or not an exception was thrown or caught.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p>
+          <br>
+           <a name="1051687" id="1051687"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+           <a name="1074080" id="1074080"></a> <span class="sansserif">The <span class="mono">try...catch</span> statement consists of a <span class="mono">try</span> block, which contains one or more statements, and one or more <span class="mono">catch</span> blocks, containing statements that specify what to do if an exception is thrown in the <span class="mono">try</span> block. That is, you want the <span class="mono">try</span> block to succeed, and if it does not succeed, you want control to pass to the <span class="mono">catch</span> block. If any statement within the <span class="mono">try</span> block (or in a function called from within the <span class="mono">try</span> block) throws an exception, control immediately shifts to the <span class="mono">catch</span> block. If no exception is thrown in the <span class="mono">try</span> block succeed, the <span class="mono">catch</span> block is skipped. The <span class="mono">finally</span> block executes after the <span class="mono">try</span> and
+          <span class="mono">catch</span> blocks execute but before the statements following the <span class="mono">try...catch</span> statement.</span>
+        </p>
+        <p>
+          <a name="1074074" id="1074074"></a> <span class="sansserif">You can nest one or more <span class="mono">try...catch</span> statements. If an inner <span class="mono">try...catch</span> statement does not have a <span class="mono">catch</span> block, the enclosing <span class="mono">try...catch</span> statement's <span class="mono">catch</span> block is entered.</span>
+        </p>
+        <p>
+          <a name="1072457" id="1072457"></a> <span class="sansserif">You also use the <span class="mono">try...catch</span> statement to handle Java exceptions. See the <a href="/devedge-srce/library/manuals/2000/javascript/1.5/guide/"><i>Core JavaScript Guide</i></a> for information on Java exceptions.</span>
+        </p>
+        <p>
+          <a name="1055419" id="1055419"></a> <span class="sansserif"><b>Unconditional catch Block.</b></span> <a name="1061261" id="1061261"></a> <span class="sansserif">When a single, unconditional <span class="mono">catch</span> block is used, the <span class="mono">catch</span> block entered when any exception is thrown. For example, the following code throws an exception. When the exception occurs, control transfers to the <span class="mono">catch</span> block.</span>
+        </p>
+        <p>
+          <a name="1072487" id="1072487"></a> <span class="mono">try {<br>
+           &nbsp;&nbsp;&nbsp;throw "myException" // generates an exception<br>
+           }<br>
+           catch (e) {<br>
+           &nbsp;&nbsp;&nbsp;// statements to handle any exceptions<br>
+           &nbsp;&nbsp;&nbsp;logMyErrors(e) // pass exception object to error handler<br>
+           }</span>
+        </p>
+        <p>
+          <a name="1079200" id="1079200"></a> <span class="sansserif"><b>Conditional catch Blocks.</b></span> <a name="1079201" id="1079201"></a> <span class="sansserif">You can also use one or more conditional <span class="mono">catch</span> blocks to handle specific exceptions. In this case, the appropriate <span class="mono">catch</span> block is entered when the specified exception is thrown. In the following example, code in the <span class="mono">try</span> block can potentially throw three exceptions: TypeError, RangeError, and EvalError. When an exception occurs, control transfers to the appropriate <span class="mono">catch</span> block. If the exception is not one of the specified exceptions, control transfers to the unconditional <span class="mono">catch</span> block at the end. If you use an unconditional <span class="mono">catch</span> block with one or more conditional <span class="mono">catch</span> blocks, the unconditional <span class="mono">catch</span> block must be specified last.</span>
+        </p>
+        <p>
+          <a name="1079313" id="1079313"></a> <span class="mono">try {<br>
+           &nbsp;&nbsp;&nbsp;myroutine(); // may throw three exceptions<br>
+           }<br>
+           catch (e if e instanceof TypeError) {<br>
+           &nbsp;&nbsp;&nbsp;// statements to handle TypeError exceptions<br>
+           }</span>
+        </p>
+        <p>
+          <a name="1079361" id="1079361"></a> <span class="mono">catch (e if e instanceof RangeError) {<br>
+           &nbsp;&nbsp;&nbsp;// statements to handle RangeError exceptions<br>
+           }</span>
+        </p>
+        <p>
+          <a name="1079389" id="1079389"></a> <span class="mono">catch (e if e instanceof EvalError) {<br>
+           &nbsp;&nbsp;&nbsp;// statements to handle EvalError exceptions<br>
+           }</span>
+        </p>
+        <p>
+          <a name="1079287" id="1079287"></a> <span class="mono">catch (e){<br>
+           &nbsp;&nbsp;&nbsp;// statements to handle any unspecified exceptions<br>
+           &nbsp;&nbsp;&nbsp;logMyErrors(e) // pass exception object to error handler<br>
+           }</span>
+        </p>
+        <p>
+          <a name="1069118" id="1069118"></a> <span class="sansserif"><b>The exception Identifier.</b></span> <a name="1069119" id="1069119"></a> <span class="sansserif">When an exception is thrown in the <span class="mono">try</span> block, the <span class="mono">exception_var</span> holds the value specified by the <span class="mono">throw</span> statement; you can use this identifier to get information about the exception that was thrown. JavaScript creates this identifier when the <span class="mono">catch</span> block is entered; the identifier lasts only for the duration of the <span class="mono">catch</span> block; after the <span class="mono">catch</span> block finishes executing, the identifier is no longer available.</span>
+        </p>
+        <p>
+          <a name="1059960" id="1059960"></a> <span class="sansserif"><b>The finally Block.</b></span> <a name="1059961" id="1059961"></a> <span class="sansserif">The <span class="mono">finally</span> block contains statements to execute after the <span class="mono">try</span> and <span class="mono">catch</span> blocks execute but before the statements following the <span class="mono">try...catch</span> statement. The <span class="mono">finally</span> block executes whether or not an exception is thrown. If an exception is thrown, the statements in the <span class="mono">finally</span> block execute even if no <span class="mono">catch</span> block handles the exception.</span>
+        </p>
+        <p>
+          <a name="1067269" id="1067269"></a> <span class="sansserif">You can use the <span class="mono">finally</span> block to make your script fail gracefully when an exception occurs; for example, you may need to release a resource that your script has tied up. The following example opens a file and then executes statements that use the file (server-side JavaScript allows you to access files). If an exception is thrown while the file is open, the <span class="mono">finally</span> block closes the file before the script fails.</span>
+        </p>
+        <p>
+          <a name="1067374" id="1067374"></a> <span class="mono">openMyFile()<br>
+           try {<br>
+           &nbsp;&nbsp;&nbsp;// tie up a resource<br>
+           &nbsp;&nbsp;&nbsp;writeMyFile(theData)<br>
+           }<br>
+           finally {<br>
+           &nbsp;&nbsp;&nbsp;closeMyFile() // always close the resource<br>
+           }</span>
+        </p>
+        <p>
+          <br>
+           <a name="1051695" id="1051695"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+           <a name="1062996" id="1062996"></a> <span class="sansserif">See the examples for <a href="stmt.html#1052196">throw</a>.</span>
+        </p>
+        <p>
+          <br>
+           <a name="1066594" id="1066594"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+           <a name="1066601" id="1066601"></a> <span class="sansserif"><a href="stmt.html#1052196">throw</a></span>
+        </p>
+        <p>
+          <br>
+          <br>
+           <a name="1066604" id="1066604"></a> <a name="var" id="var"></a> <span class="sansserif">var
+          </span>
+        </p>
+        <hr size="2" noshade="noshade">
+        <br>
+         <a name="1004888" id="1004888"></a> <span class="sansserif">Declares a variable, optionally initializing it to a value.<br></span> 
+        <p>
+          <br>
+          <br>
+        </p>
+        <table width="90%" border="1" cellpadding="5" cellspacing="0">
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1036104" id="1036104"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1042237" id="1042237"></a> <span class="sansserif">JavaScript 1.0, NES 2.0</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1050221" id="1050221"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1050223" id="1050223"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p>
+          <br>
+           <a name="1004890" id="1004890"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+           <a name="1004891" id="1004891"></a> <span class="mono">var <i>varname</i> [= <i>value</i>] [..., <i>varname</i> [= <i>value</i>] ]</span>
+        </p>
+        <p>
+          <br>
+           <a name="1005669" id="1005669"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+           <a name="1004892" id="1004892"></a> <span class="sansserif"><br></span>
+        </p>
+        <p>
+          <br>
+          <br>
+        </p>
+        <table width="90%" border="1" cellpadding="5" cellspacing="0">
+          <tr>
+            <td valign="top">
+              <a name="1013488" id="1013488"></a> <span class="mono">varname</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1013533" id="1013533"></a> <span class="sansserif">Variable name. It can be any legal identifier.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1013492" id="1013492"></a> <span class="mono">value</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1013571" id="1013571"></a> <span class="sansserif">Initial value of the variable and can be any legal expression.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p>
+          <br>
+           <a name="1008317" id="1008317"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+           <a name="1035580" id="1035580"></a> <span class="sansserif">The scope of a variable is the current function or, for variables declared outside a function, the current application.</span>
+        </p>
+        <p>
+          <a name="1035539" id="1035539"></a> <span class="sansserif">Using <span class="mono">var</span> outside a function is optional but recommended; you can declare a variable by simply assigning it a value. However, it is good style to use <span class="mono">var</span>, and it is necessary in functions in the following situations:</span>
+        </p>
+        <ul>
+          <li class="nobullet">
+            <a name="1073223" id="1073223"></a>
+          </li>
+          <li>
+            <span class="sansserif">If a global variable of the same name exists.</span> 
+            <p>
+              <a name="1073227" id="1073227"></a>
+            </p>
+          </li>
+          <li>
+            If recursive or multiple functions use variables with the same name.
+          </li>
+        </ul><br>
+         <a name="1004894" id="1004894"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1004895" id="1004895"></a><span class="mono">var num_hits = 0, cust_no = 0</span> 
+        <p>
+          <br>
+          <br>
+           <a name="1004896" id="1004896"></a> <a name="while" id="while"></a> <span class="sansserif">while
+          </span>
+        </p>
+        <hr size="2" noshade="noshade">
+        <br>
+         <a name="1004897" id="1004897"></a> <span class="sansserif">Creates a loop that evaluates an expression, and if it is true, executes a block of statements. The loop then repeats, as long as the specified condition is true.<br></span> 
+        <p>
+          <br>
+          <br>
+        </p>
+        <table width="90%" border="1" cellpadding="5" cellspacing="0">
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1036115" id="1036115"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1042272" id="1042272"></a> <span class="sansserif">JavaScript 1.0, NES 2.0</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1050231" id="1050231"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1050233" id="1050233"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p>
+          <br>
+           <a name="1004898" id="1004898"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+           <a name="1004899" id="1004899"></a> <span class="mono">while (<i>condition</i>) {<br>
+           &nbsp;&nbsp;&nbsp;<i>statements<br></i>}</span>
+        </p>
+        <p>
+          <br>
+           <a name="1005673" id="1005673"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+           <a name="1011211" id="1011211"></a> <span class="sansserif"><br></span>
+        </p>
+        <p>
+          <br>
+          <br>
+        </p>
+        <table width="90%" border="1" cellpadding="5" cellspacing="0">
+          <tr>
+            <td valign="top">
+              <a name="1013633" id="1013633"></a> <span class="mono">condition</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1013672" id="1013672"></a> <span class="sansserif">Evaluated before each pass through the loop. If this condition evaluates to true, the statements in the succeeding block are performed. When <span class="mono">condition</span> evaluates to false, execution continues with the statement following <span class="mono">statements</span>.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1013637" id="1013637"></a> <span class="mono">statements</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1013701" id="1013701"></a> <span class="sansserif">Block of statements that are executed as long as the condition evaluates to true. Although not required, it is good practice to indent these statements from the beginning of the statement.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p>
+          <br>
+           <a name="1004902" id="1004902"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+           <a name="1004903" id="1004903"></a> <span class="sansserif">The following <span class="mono">while</span> loop iterates as long as <span class="mono">n</span> is less than three.</span>
+        </p>
+        <p>
+          <a name="1004904" id="1004904"></a><span class="mono">n = 0;<br>
+           x = 0;<br>
+           while(n &lt; 3) {<br>
+           &nbsp;&nbsp;&nbsp;n ++;<br>
+           &nbsp;&nbsp;&nbsp;x += n;<br>
+           }</span>
+        </p>
+        <p>
+          <a name="1004905" id="1004905"></a> <span class="sansserif">Each iteration, the loop increments <span class="mono">n</span> and adds it to <span class="mono">x</span>. Therefore, <span class="mono">x</span> and <span class="mono">n</span> take on the following values:</span>
+        </p>
+        <ul>
+          <li class="nobullet">
+            <a name="1004906" id="1004906"></a>
+          </li>
+          <li>
+            <span class="sansserif">After the first pass: n = 1 and x = 1</span> 
+            <p>
+              <a name="1004907" id="1004907"></a>
+            </p>
+          </li>
+          <li>
+            <span class="sansserif">After the second pass: n = 2 and x = 3</span> 
+            <p>
+              <a name="1004908" id="1004908"></a>
+            </p>
+          </li>
+          <li>
+            After the third pass: n = 3 and x = 6
+          </li>
+        </ul><a name="1004909" id="1004909"></a> <span class="sansserif">After completing the third pass, the condition <span class="mono">n &lt; 3</span> is no longer true, so the loop terminates.</span> 
+        <p>
+          <br>
+          <br>
+           <a name="1004910" id="1004910"></a> <a name="with" id="with"></a> <span class="sansserif">with
+          </span>
+        </p>
+        <hr size="2" noshade="noshade">
+        <br>
+         <a name="1004911" id="1004911"></a> <span class="sansserif">Establishes the default object for a set of statements.<br></span> 
+        <p>
+          <br>
+          <br>
+        </p>
+        <table width="90%" border="1" cellpadding="5" cellspacing="0">
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1036122" id="1036122"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1042277" id="1042277"></a> <span class="sansserif">JavaScript 1.0, NES 2.0</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1050240" id="1050240"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1050242" id="1050242"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p>
+          <br>
+           <a name="1004912" id="1004912"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+           <a name="1004913" id="1004913"></a> <span class="mono">with (<i>object</i>){<br>
+           &nbsp;&nbsp;&nbsp;<i>statements<br></i>}</span>
+        </p>
+        <p>
+          <br>
+           <a name="1005677" id="1005677"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+           <a name="1004914" id="1004914"></a> <span class="sansserif"><br></span>
+        </p>
+        <p>
+          <br>
+          <br>
+        </p>
+        <table width="90%" border="1" cellpadding="5" cellspacing="0">
+          <tr>
+            <td valign="top">
+              <a name="1013842" id="1013842"></a> <span class="mono">object</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1013969" id="1013969"></a> <span class="sansserif">Specifies the default object to use for the statements. The parentheses around object are required.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1013846" id="1013846"></a> <span class="mono">statements</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1013960" id="1013960"></a> <span class="sansserif">Any block of statements.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p>
+          <br>
+           <a name="1004916" id="1004916"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+           <a name="1083116" id="1083116"></a> <span class="sansserif">JavaScript looks up any unqualified names within the set of statements to determine if the names are properties of the default object. If an unqualified name matches a property, then the property is used in the statement; otherwise, a local or global variable is used.</span>
+        </p>
+        <p>
+          <a name="1083117" id="1083117"></a> <span class="sansserif">Note that using a <span class="mono">with</span> statement will significantly slow down your code. Do not use it when performance is critical.</span>
+        </p>
+        <p>
+          <br>
+           <a name="1083118" id="1083118"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+           <a name="1004917" id="1004917"></a> <span class="sansserif">The following <span class="mono">with</span> statement specifies that the <a href="math.html#1193138">Math</a> object is the default object. The statements following the <span class="mono">with</span> statement refer to the <a href="math.html#1193490">PI</a> property and the <a href="math.html#1195695">cos</a> and <a href="math.html#1197769">sin</a> methods, without specifying an object. JavaScript assumes the <a href="math.html#1193138">Math</a> object for these references.</span>
+        </p>
+        <p>
+          <a name="1004918" id="1004918"></a> <span class="mono">var a, x, y<br>
+           var r=10<br>
+           with (Math) {<br>
+           &nbsp;&nbsp;&nbsp;a = PI * r * r<br>
+           &nbsp;&nbsp;&nbsp;x = r * cos(PI)<br>
+           &nbsp;&nbsp;&nbsp;y = r * sin(PI/2)<br>
+           }</span>
+        </p>
+      </align>
+      <blockquote>
+        <br>
+         <b><a class="sansserifPurple" href="partlang.html">Previous</a></b>&nbsp;&nbsp;&nbsp;&nbsp; <a href="contents.html"><b class="sansserifPurple">Contents</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="ix.html"><b class="sansserifPurple">Index</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="comment.html"><b class="sansserifPurple">Next</b></a> &nbsp;&nbsp;&nbsp;&nbsp; 
+        <hr noshade="noshade" size="1">
+        <span class="sansserif">Copyright &#169; 2000 <a href="http://www.netscape.com">Netscape Communications Corp.</a> All rights reserved.</span>
+      </blockquote>
+      <p class="alignright">
+        Last Updated <b>September 28, 2000</b>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0"></table>
+    </blockquote>
+  </body>
+</html>

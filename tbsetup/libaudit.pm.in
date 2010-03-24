@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -372,7 +372,10 @@ sub SendAuditMail($)
 	    @FILES = ($logfile);
 
 	    if ($logonly) {
-		if ($logtbops) {
+		if (defined($AUDIT_INFO{'to'})) {
+		    $TO    = join(', ', @{ $AUDIT_INFO{'to'} });
+		}
+		elsif ($logtbops) {
 		    $TO    = $TBOPS;
 		}
 		else {
@@ -490,7 +493,8 @@ my %AUDIT_METAINFO =
       success_frag => 'string', # ex "T. Swapped In"
       failure_frag => 'string', # ie "Bla Failure"
       message      => 'string',
-      cc => 'list');            # Cc audit mail to these people
+      to           => 'list',   # Send audit mail to these people
+      cc           => 'list');  # Cc audit mail to these people
 
 #
 # AddAuditInfo($key, $value)

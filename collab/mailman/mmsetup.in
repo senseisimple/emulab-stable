@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2005-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -90,18 +90,18 @@ my $optarg = ($debug ? "-d" : "");
 # Initialize a mailman password for all users. 
 #
 my $query_result =
-    DBQueryFatal("select uid from users ".
+    DBQueryFatal("select uid,uid_uid from users ".
 		 "where mailman_password is NULL and status!='archived'");
 
-while (my ($uid) = $query_result->fetchrow_array()) {
-    print "Setting initial mailman password for $uid\n"
+while (my ($uid,$uid_idx) = $query_result->fetchrow_array()) {
+    print "Setting initial mailman password for $uid ($uid_idx)\n"
 	if ($debug);
 
     my $password = TBGenSecretKey();
     $password = substr($password, 0, 10);
 
     DBQueryFatal("update users set mailman_password='$password' ".
-		 "where uid='$uid'");
+		 "where uid_idx='$uid_idx'");
 }
 
 #
@@ -110,7 +110,7 @@ while (my ($uid) = $query_result->fetchrow_array()) {
 $query_result =
     DBQueryFatal("select distinct g.uid,u.usr_email ".
 		 "  from group_membership as g ".
-		 "left join users as u on u.uid=g.uid ".
+		 "left join users as u on u.uid_idx=g.uid_idx ".
 		 "where u.status='active' or u.status='frozen' ".
 #		 "  and (g.pid='testbed' or g.pid='emulab-ops' or ".
 #		 "       g.pid='tbres' or g.pid='utahstud')" .

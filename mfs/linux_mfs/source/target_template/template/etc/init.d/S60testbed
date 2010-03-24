@@ -20,20 +20,20 @@ start() {
 
 	case $mode in
 		admin)
-			script=$BINDIR/rc.mfs
+			script=$BINDIR/rc/rc.mfs
 			;;
 		newnode)
 			script=$BINDIR/newclient
 			;;
 		frisbee)
-			script=$BINDIR/rc.frisbee
+			script=$BINDIR/rc/rc.frisbee
 			;;
 		*)
 			echo "Invalid mode \"$mode\"" 1>&2
-			script=$BINDIR/rc.mfs
+			script=$BINDIR/rc/rc.mfs
 			;;
 	esac
-			
+
 
  	echo "Starting ${script##*/}..."
 	exec $script
@@ -44,7 +44,7 @@ stop() {
 }
 restart() {
 	:
-}	
+}
 
 case "$1" in
   start)

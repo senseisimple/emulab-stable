@@ -218,8 +218,8 @@ package
       clip.loadText.text = "Deleting existing slice";
       op.reset(Geni.remove);
       op.addField("credential", credential.base);
-      op.addField("hrn", "urn:publicid:IDN+" + Geni.defaultAuthority
-                  + "+slice+"+sliceName);
+      op.addField("hrn", Util.makeUrn(Geni.defaultAuthority, "slice",
+                                      sliceName));
       op.addField("type", "Slice");
       op.call(completeSliceDelete, failure);
       addSend();
@@ -232,12 +232,12 @@ package
       {
         startSliceCreate();
       }
-	  else if(code == 7)
-	  {
-		  var newMenu = new MenuSliceSelect();
-		  Main.changeState(newMenu);
-		  newMenu.setSliceName(sliceName + " hasn't expired");
-	  }
+          else if(code == 7)
+          {
+                  var newMenu = new MenuSliceSelect();
+                  Main.changeState(newMenu);
+                  newMenu.setSliceName(sliceName + " hasn't expired");
+          }
       else
       {
         codeFailure();
@@ -250,9 +250,8 @@ package
       clip.loadText.text = "Creating new slice";
       op.reset(Geni.register);
       op.addField("credential", credential.base);
-      op.addField("hrn", "urn:publicid:IDN+" + Geni.defaultAuthority
-                  + "+slice+"+sliceName);
-//      op.addField("hrn", sliceName);
+      op.addField("hrn", Util.makeUrn(Geni.defaultAuthority, "slice",
+                                      sliceName));
       op.addField("type", "Slice");
 //      op.addField("userbindings", new Array(user.uuid));
       op.call(completeSliceCreate, failure);
@@ -266,7 +265,9 @@ package
       {
         credential.slice = String(response.value);
 //        startResourceLookup();
-        var newMenu = new MenuSliceDetail(sliceName, sliceId, credential);
+        var newMenu = new MenuSliceDetail(sliceName, sliceId, credential,
+                                          Util.makeUrn(Geni.defaultAuthority,
+                                                       "slice", sliceName));
         Main.setText(clip.xmlText.text);
         Main.changeState(newMenu);
       }
@@ -287,7 +288,7 @@ package
       opName = "Looking up resources";
       clip.loadText.text = opName;
       op.reset(Geni.discoverResources);
-      op.addField("credential", credential.slice);
+      op.addField("credentials", new Array(credential.slice));
       op.addField("rspec", rspec);
       op.setUrl("https://myboss.myelab.testbed.emulab.net:443/protogeni/xmlrpc");
       op.call(completeResourceLookup, failure);

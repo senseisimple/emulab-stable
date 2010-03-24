@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -31,6 +31,7 @@ $userstatus = $target_user->status();
 $wikionly   = $target_user->wikionly();
 $target_idx = $target_user->uid_idx();
 $target_uid = $target_user->uid();
+$archived   = ($userstatus == TBDB_USERSTATUS_ARCHIVED);
 
 
 #
@@ -85,16 +86,18 @@ $tabledefs = array('#html' => TRUE);
 # Add all the menu stuff. Ick.
 ob_start();
 SUBPAGESTART();
-SUBMENUSTART("Options");
 
 #
 # Permission check not needed; if the user can view this page, they can
 # generally access these subpages, but if not, the subpage will still whine.
 #
-WRITESUBMENUBUTTON("Edit Profile",
-		   CreateURL("moduserinfo", $target_user));
+if (!$archived) {
+    SUBMENUSTART("Options");
 
-if (!$target_user->wikionly() &&
+    WRITESUBMENUBUTTON("Edit Profile",
+		       CreateURL("moduserinfo", $target_user));
+}
+if (!$archived && !$target_user->wikionly() &&
     ($isadmin || $target_user->SameUser($this_user))) {
     WRITESUBMENUBUTTON("Edit SSH Keys",
 		       CreateURL("showpubkeys", $target_user));
@@ -127,38 +130,42 @@ if (!$target_user->wikionly() &&
 }
 
 if ($isadmin) {
-   SUBMENUSECTION("Admin Options");
-    
-    if ($target_user->status() == TBDB_USERSTATUS_FROZEN) {
-	WRITESUBMENUBUTTON("Thaw User",
-			     CreateURL("freezeuser", $target_user,
-				       "action", "thaw"));
-    }
-    else {
-	WRITESUBMENUBUTTON("Freeze User",
-			     CreateURL("freezeuser", $target_user,
-				       "action", "freeze"));
-    }
-    WRITESUBMENUBUTTON("Delete User",
-			 CreateURL("deleteuser", $target_user));
+    SUBMENUSECTION("Admin Options");
 
-    WRITESUBMENUBUTTON("SU as User",
-			 CreateURL("suuser", $target_user));
+    if (!$archived) {
+	if ($target_user->status() == TBDB_USERSTATUS_FROZEN) {
+	    WRITESUBMENUBUTTON("Thaw User",
+			       CreateURL("freezeuser", $target_user,
+					 "action", "thaw"));
+	}
+	else {
+	    WRITESUBMENUBUTTON("Freeze User",
+			       CreateURL("freezeuser", $target_user,
+					 "action", "freeze"));
+	}
+	WRITESUBMENUBUTTON("Delete User",
+			   CreateURL("deleteuser", $target_user));
 
-    if ($target_user->status() == TBDB_USERSTATUS_UNAPPROVED) {
-	WRITESUBMENUBUTTON("Change UID",
-			     CreateURL("changeuid", $target_user));
-    }
+	WRITESUBMENUBUTTON("SU as User",
+			   CreateURL("suuser", $target_user));
 
-    if ($target_user->status() == TBDB_USERSTATUS_NEWUSER ||
-	$target_user->status() == TBDB_USERSTATUS_UNVERIFIED) {
-	WRITESUBMENUBUTTON("Resend Verification Key",
-			     CreateURL("resendkey", $target_user));
+	if ($target_user->status() == TBDB_USERSTATUS_UNAPPROVED) {
+	    WRITESUBMENUBUTTON("Change UID",
+			       CreateURL("changeuid", $target_user));
+	}
+
+	if ($target_user->status() == TBDB_USERSTATUS_NEWUSER ||
+	    $target_user->status() == TBDB_USERSTATUS_UNVERIFIED) {
+	    WRITESUBMENUBUTTON("Resend Verification Key",
+			       CreateURL("resendkey", $target_user));
+	}
+	else {
+	    WRITESUBMENUBUTTON("Send Test Email Message",
+			       CreateURL("sendtestmsg", $target_user));
+	}
     }
-    else {
-	WRITESUBMENUBUTTON("Send Test Email Message",
-			     CreateURL("sendtestmsg", $target_user));
-    }
+    WRITESUBMENUBUTTON("Experiment History",
+		       CreateURL("showstats", $target_user, "showby", "user"));
 }
 SUBMENUEND();
 $target_user->Show();
@@ -168,6 +175,14 @@ ob_end_clean();
 list ($html_profile, $button_profile) =
 	TableWrapUp($html_profile, FALSE, FALSE,
 		    "profile_table", "profile_button");
+
+if ($isadmin) {
+    $html_stats = $target_user->ShowStats();
+    $html_stats = "<center><h3>User Stats</h3></center>$html_stats";
+    list ($html_stats, $button_stats) =
+	TableWrapUp($html_stats, FALSE, FALSE,
+		    "stats_table", "stats_button");
+}
 
 #
 # Lets show Experiments.
@@ -285,19 +300,6 @@ if (mysql_num_rows($query_result)) {
 	TableWrapUp($html_groups, FALSE, FALSE,
 		    "groups_table", "groups_button");
     ob_end_clean();
-}
-
-if ($isadmin) {
-    $html_stats = $target_user->ShowStats();
-    $html_stats = "<center><h3>User Stats</h3></center>$html_stats";
-    list ($html_stats, $button_stats) =
-	TableWrapUp($html_stats, FALSE, FALSE,
-		    "stats_table", "stats_button");
-}
-
-if ($isadmin) {
-    echo "<a href='" . CreateURL("showstats", $target_user, "showby", "user") .
-	"'>Experiment History</a>";
 }
 
 if ($PUBSUPPORT) {

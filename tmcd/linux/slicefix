@@ -41,7 +41,7 @@ fi
 
 #
 # Handle pseudo arguments in the environment.
-#   
+#
 ACPI=${SLICEFIX_ACPI:-'unknown'}
 case $ACPI in
 0|no|NO)
@@ -149,9 +149,9 @@ dofreebsd() {
 	# Try mounting the filesystem as UFSv1 first,
 	# then try UFSv2 if that doesn't work.
 
-	mount -t $fstype -o $fsopts $rootdev /mnt || {
+	mount -t $fstype -o $fsopts $rootdev /mnt 2> /dev/null || {
 		fsopts=ro,ufstype=ufs2
-		mount -t $fstype -o $fsopts $rootdev /mnt || {
+		mount -t $fstype -o $fsopts $rootdev /mnt 2> /dev/null || {
 			echo "RO-mount of $rootdev failed"
 			return 1
 		}
@@ -297,20 +297,24 @@ dofreebsd() {
 	fi
 
 	if [ $changedisk -eq 1 ]; then
-	    echo "  updating /etc/fstab"
-	    cp -fp /mnt/etc/fstab /mnt/etc/fstab.orig
-	    sed -i -e "s;^/dev/[a-zA-Z][a-zA-Z]*[0-9][0-9]*s[0-9][0-9]*;/dev/${freebsd_disk}s${part};" /mnt/etc/fstab || {
-		echo "Failed to update /etc/fstab"
-		umount $rootdev
-		return 1
-	    }
-	    echo "  updating /etc/dumpdates"
-	    cp -fp /mnt/etc/dumpdates /mnt/etc/dumpdates.orig
-	    sed -i -e "s;^/dev/[a-zA-Z][a-zA-Z]*[0-9][0-9]*s[0-9][0-9]*;/dev/${freebsd_disk}s${part};" /mnt/etc/dumpdates || {
-		echo "Failed to update /etc/dumpdates"
-		umount $rootdev
-		return 1
-	    }
+	    if [ -f /mnt/etc/fstab ]; then
+	    	    echo "  updating /etc/fstab"
+		    cp -fp /mnt/etc/fstab /mnt/etc/fstab.orig
+		    sed -i -e "s;^/dev/[a-zA-Z][a-zA-Z]*[0-9][0-9]*s[0-9][0-9]*;/dev/${freebsd_disk}s${part};" /mnt/etc/fstab || {
+			echo "Failed to update /etc/fstab"
+			umount $rootdev
+			return 1
+		    }
+    	    fi
+	    if [ -f /mnt/etc/dumpdates ]; then
+		    echo "  updating /etc/dumpdates"
+		    cp -fp /mnt/etc/dumpdates /mnt/etc/dumpdates.orig
+		    sed -i -e "s;^/dev/[a-zA-Z][a-zA-Z]*[0-9][0-9]*s[0-9][0-9]*;/dev/${freebsd_disk}s${part};" /mnt/etc/dumpdates || {
+			echo "Failed to update /etc/dumpdates"
+			umount $rootdev
+			return 1
+		    }
+	    fi
 	fi
 
 	if [ $changeentropy -eq 1 ]; then

@@ -22,8 +22,10 @@
 				cm = n;
 				messageButton.visible = cm.Message.length > 0;
 				messageButton.includeInLayout = cm.Message.length > 0;
-				
-				
+				rpsecButton.visible = cm.Rspec != null;
+				rpsecButton.includeInLayout = cm.Rspec != null;
+				dotButton.visible = cm.Rspec != null;
+				dotButton.includeInLayout = cm.Rspec != null;
 			}
 			
 			public function viewRspec():void {
@@ -35,6 +37,15 @@
 			
 			public function viewMessage():void {
 				Alert.show(cm.Message);
+			}
+			
+			public function openDot():void
+			{
+				var cw:ConsoleWindow = new ConsoleWindow();
+				PopUpManager.addPopUp(cw, main, false);
+	       		PopUpManager.centerPopUp(cw);
+				cw.title = "dot format from " + cm.Hrn;
+				cw.txt.text = cm.getDotGraph();
 			}
 		]]>
 	</mx:Script>
@@ -50,6 +61,10 @@
 							source="@Embed('../images/page_white_code.png')"
 							click="viewRspec()"
 							toolTip="View Advertisement RSPEC" />
+						<pgmap:ImageButton id="dotButton"
+							source="@Embed('../images/chart_organisation.png')"
+							click="openDot()"
+							toolTip="View the DOT graph data" />
 						<pgmap:ImageButton id="messageButton"
 							source="@Embed('../images/flag_red.png')"
 							click="viewMessage()"

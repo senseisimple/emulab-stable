@@ -174,6 +174,11 @@ if ($ELABINELAB) {
     if (!defined($rval)) {
 	exit(-1);
     }
+    if ($sendevent && ($op eq "off" || $op eq "cycle")) {
+	foreach my $node (@nodelist) {
+	    TBSetNodeEventState($node, TBDB_NODESTATE_SHUTDOWN);
+	}
+    }
     exit($rval);
 }
 
@@ -350,7 +355,7 @@ foreach my $power_id (keys %outlets) {
 	}
     } elsif ($type =~ /rmcp-(\w+)/) {
 	require power_rmcp;
-	if (rmcpctrl($1,$op,@nodes)) {
+	if (power_rmcp::rmcpctrl($1,$op,@nodes)) {
 	    print "Control of $nodestr failed.\n"; ++$exitval;
 	    ++$errors;
 	}

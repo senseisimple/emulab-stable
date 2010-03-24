@@ -19,9 +19,18 @@
 	// Slice that a user created in ProtoGENI
 	public class Slice
 	{
+		// Status values
+	    public static var CHANGING : String = "changing";
 		public static var READY : String = "ready";
 	    public static var NOTREADY : String = "notready";
 	    public static var FAILED : String = "failed";
+	    public static var UNKNOWN : String = "unknown";
+	    public static var NA : String = "N/A";
+	    
+	    // State values
+	    public static var STARTED : String = "started";
+		public static var STOPPED : String = "stopped";
+	    public static var MIXED : String = "mixed";
 	    
 		public var uuid : String = null;
 		public var hrn : String = null;
@@ -29,15 +38,26 @@
 		public var creator : User = null;
 		public var credential : String = "";
 		public var slivers : ArrayCollection = new ArrayCollection();
-		
-		public var status : String = "";
 
 		public function Slice()
 		{
 		}
 		
+		public function Status():String {
+			if(hrn == null) return null;
+			var status:String = NA;
+			for each(var sliver:Sliver in slivers) {
+				if(status == NA) status = sliver.status;
+				else {
+					if(sliver.status != status)
+						return "mixed";
+				}
+			}
+			return status;
+		}
+		
 		public function ReadyIcon():Class {
-			switch(status) {
+			switch(Status()) {
 				case READY : return Common.flagGreenIcon;
 				case NOTREADY : return Common.flagYellowIcon;
 				case FAILED : return Common.flagRedIcon;
@@ -57,64 +77,7 @@
 			else
 				returnString = hrn;
 				
-			return returnString + " (" + status + ")";
-		}
-		
-		public function DetectStatus():String
-		{
-			if(slivers.length == 0)
-			{
-				status = "Empty";
-				return status;
-			}
-			var partialReady:Boolean = false;
-			var partialFailed:Boolean = false;
-			var partialNotready:Boolean = false;
-			var allReady:Boolean = true;
-			for each(var s:Sliver in slivers)
-			{
-				if(s.sliceStatus == Slice.READY)
-					partialReady = true;
-				else if(s.sliceStatus == Slice.FAILED)
-				{
-					partialFailed = true;
-					allReady = false;
-				} else if(s.sliceStatus == Slice.NOTREADY)
-				{
-					partialNotready = true;
-					allReady = false;
-				} else if(s.sliceStatus.length == 0)
-					allReady = false;
-			}
-			
-			var returnString:String = "";
-			
-			if(allReady)
-				returnString += "Ready";
-			else
-			{
-				if(partialReady || partialNotready || partialFailed)
-				{
-					returnString += "Partially "
-					if(partialReady)
-					{
-						returnString += "ready"
-						if(partialNotready || partialFailed)
-							returnString += ", ";
-					}
-					if(partialNotready)
-					{
-						returnString += "not ready";
-						if(partialFailed)
-							returnString += ", ";
-					}
-					if(partialFailed)
-						returnString += "failed"
-				} else
-					returnString = "N/A";
-			}
-			status = returnString;
-			return returnString;
+			return returnString + " (" + Status() + ")";
 		}
 		
 		// Used to push more important slices to the top of lists
@@ -124,16 +87,10 @@
 				return -1;
 			}
 			
-			if(status == "Ready")
+			if(Status() == "ready")
 				return 0;
-			else if(status.search("Partially") > -1)
-				return 1;
-			else if(status == "N/A")
-				return 2;
-			else if(status == "Empty")
-				return 3;
 			else
-				return 4;
+				return 1;
 		}
 	}
 }

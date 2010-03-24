@@ -55,10 +55,12 @@ script-install:
 	mkdir -p $(TARGET_PATH)/var/emulab/lock
 	mkdir -p $(TARGET_PATH)/var/emulab/boot
 	mkdir -p $(TARGET_PATH)/var/emulab/db
+	mkdir -p $(TARGET_PATH)/usr/share/udhcpc
 	ln -sf /etc/testbed $(TARGET_PATH)/usr/local/etc/emulab
+	install -m 755 $(TESTBEDOBJ_PATH)/tmcd/linux/sethostname.dhclient $(TARGET_PATH)/usr/share/udhcpc
 	install -m 755 $(TMCD_PATH)/linux/control_interface $(TARGET_PATH)/etc/testbed
-	install -m 755 $(TMCD_PATH)/linux/rc.frisbee $(TARGET_PATH)/etc/testbed
-	install -m 755 $(TMCD_PATH)/linux/rc.ipod $(TARGET_PATH)/etc/testbed
+	install -m 755 $(TMCD_PATH)/linux/rc.frisbee $(TARGET_PATH)/etc/testbed/rc
+	install -m 755 $(TMCD_PATH)/linux/rc.ipod $(TARGET_PATH)/etc/testbed/rc
 	install -m 755 $(TMCD_PATH)/linux/slicefix $(TARGET_PATH)/etc/testbed
 	install -m 755 $(TMCD_PATH)/linux/freebsd_to_linux_disk $(TARGET_PATH)/etc/testbed
 	install -m 755 $(TMCD_PATH)/linux/mount_bsd_slice $(TARGET_PATH)/etc/testbed
@@ -83,7 +85,7 @@ script-install:
 	ln -sf /usr/bin/tmcc $(TARGET_PATH)/etc/testbed/tmcc
 	install -m 755 $(TMCD_PATH)/common/config/librc.pm $(TARGET_PATH)/etc/testbed
 	install -m 755 $(TMCD_PATH)/common/config/rc.config $(TARGET_PATH)/etc/testbed/rc
-	install -m 755 $(TMCD_PATH)/linux/rc.mfs $(TARGET_PATH)/etc/testbed
+	install -m 755 $(TMCD_PATH)/linux/rc.mfs $(TARGET_PATH)/etc/testbed/rc
 	install -m 755 $(TMCD_PATH)/common/config/rc.misc $(TARGET_PATH)/etc/testbed/rc
 	install -m 755 $(TMCD_PATH)/common/config/rc.localize $(TARGET_PATH)/etc/testbed/rc
 	install -m 755 $(TMCD_PATH)/common/config/rc.mounts $(TARGET_PATH)/etc/testbed/rc

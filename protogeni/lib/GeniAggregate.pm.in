@@ -61,7 +61,7 @@ my %aggregates     = ();
 BEGIN { use GeniUtil; GeniUtil::AddCache(\%aggregates); }
 
 #
-# Lookup by idx, or uuid.
+# Lookup by URN, idx, or uuid.
 #
 sub Lookup($$)
 {
@@ -70,11 +70,26 @@ sub Lookup($$)
     my $idx;
 
     if (GeniHRN::IsValid($token)) {
-	return undef if !GeniHRN::Authoritative($token, "@OURDOMAIN@");
-
 	my ($authority, $type, $id) = GeniHRN::Parse($token);
 	return undef if $type ne "sliver";
-	$idx = $id;
+
+	if( GeniHRN::Authoritative($token, "@OURDOMAIN@") ) {
+	    # Very simple: we put the index of our own aggregates right
+	    # in the name.
+	    $idx = $id;
+	} else {
+	    # Look up the aggregate's certificate.
+	    $token = GeniHRN::Normalise( $token );
+	    $query_result = DBQueryWarn(
+		"SELECT geni_aggregates.idx FROM geni_aggregates, " .
+		"geni_certificates WHERE geni_aggregates.uuid = " .
+		"geni_certificates.uuid AND " .
+		"geni_certificates.urn='$token';" );
+
+	    return undef if (! $query_result || !$query_result->numrows);
+
+	    ($idx) = $query_result->fetchrow_array();
+	}
     }
     elsif ($token =~ /^\d+$/) {
 	$idx = $token;
@@ -183,6 +198,8 @@ sub Create($$$$$$)
     push(@insert_data, "creator_uuid='$owner_uuid'");
     push(@insert_data, "slice_uuid='$slice_uuid'");
     push(@insert_data, "type='$aggregate_type'");
+    # Start out new aggregates, as new.
+    push(@insert_data, "state='new'");
 
     # Insert into DB.
     if (!DBQueryWarn("insert into geni_aggregates set " .
@@ -725,8 +742,9 @@ sub Start($$$)
 	print STDERR "Could not get sliver list for $self\n";
 	return -1;
     }
-    my %pnodes = ();
-    my %vnodes = ();
+    my %reboots  = ();
+    my %vnodes   = ();
+    my %poweron  = ();
 
     foreach my $sliver (@slivers) {
 	next
@@ -743,14 +761,30 @@ sub Start($$$)
 	    return -1;
 	}
 	if ($reservation->SameExperiment($experiment)) {
+	    #
+	    # Since this is an aggregate, some slivers may already be
+	    # in the started state. Skip those, unless doing a restart.
+	    #
+	    next
+		if ($sliver->state() eq "started" && !$restart);
+	    
 	    if ($node->isvirtnode()) {
 		$vnodes{$node->node_id} = $node;
 	    }
 	    else {
-		# node_reboot is smart enough to know that if a pnode
-		# is rebooted it can ignore the vnodes on it, so do
-		# not optimize this here.
-		$pnodes{$node->node_id} = $node;
+		#
+		# Look to see if local physical node was stopped (powered off).
+		#
+		if (!$node->isremotenode() &&
+		    $sliver->state() eq "stopped") {
+		    $poweron{$node->node_id} = $node;
+		}
+		else {
+		    # node_reboot is smart enough to know that if a pnode
+		    # is rebooted it can ignore the vnodes on it, so do
+		    # not optimize this here.
+		    $reboots{$node->node_id} = $node;
+		}
 	    }
 	}
 	else {
@@ -765,7 +799,8 @@ sub Start($$$)
     #
     my %tmp = %vnodes;
     foreach my $vnode (values(%vnodes)) {
-	if (!exists($pnodes{$vnode->phys_nodeid()})) {
+	if (! (exists($reboots{$vnode->phys_nodeid()}) ||
+	       exists($poweron{$vnode->phys_nodeid()}))) {
 	    $tmp{$vnode->node_id()} = $vnode;
 	}
     }
@@ -809,10 +844,21 @@ sub Start($$$)
     }
 
     #
-    # Now reboot the physical nodes, then any leftover virtual nodes.
+    # First power on any physical nodes that had been stopped.
+    # Then reboot the physical nodes, then any leftover virtual nodes.
     #
-    if (keys(%pnodes)) {
-	my @node_ids = keys(%pnodes);
+    if (keys(%poweron)) {
+	my @node_ids = keys(%poweron);
+
+	#
+	# Should waiting be an option?
+	#
+	system("$POWER on @node_ids");
+	return -1
+	    if ($?);
+    }
+    if (keys(%reboots)) {
+	my @node_ids = keys(%reboots);
 
 	#
 	# Should waiting be an option?
@@ -879,10 +925,17 @@ sub Stop($$)
 	}
 	my $reservation = $node->Reservation();
 	if (!defined($reservation)) {
-	    print STDERR "$node no long belongs to $self\n";
+	    print STDERR "$node no longer belongs to $self\n";
 	    return -1;
 	}
 	if ($reservation->SameExperiment($experiment)) {
+	    #
+	    # Since this is an aggregate, some slivers may already be
+	    # in the stopped state. Skip those.
+	    #
+	    next
+		if ($sliver->state() eq "stopped");
+	    
 	    if ($node->isvirtnode()) {
 		$vnodes{$node->node_id} = $node;
 	    }
@@ -1070,7 +1123,7 @@ sub ComputeState($)
 	if ($state eq "started") {
 	    $started++;
 	}
-	elsif ($state eq "stopped") {
+	elsif ($state eq "stopped" || $state eq "new") {
 	    $stopped++;
 	}
 	else {

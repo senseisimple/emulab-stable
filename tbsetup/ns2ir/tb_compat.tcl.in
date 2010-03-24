@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006, 2008, 2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -1736,10 +1736,14 @@ proc tb-set-elabinelab-cvstag {cvstag} {
 
     set elabinelab_cvstag $cvstag
 }
-proc tb-elabinelab-singlenet {} {
+proc tb-elabinelab-singlenet {args} {
     var_import ::GLOBALS::elabinelab_singlenet
+    set onoff 1
 
-    set elabinelab_singlenet 1
+    if {$args != {}} {
+	set onoff [lindex $args 0]
+    }
+    set elabinelab_singlenet $onoff
 }
 
 #

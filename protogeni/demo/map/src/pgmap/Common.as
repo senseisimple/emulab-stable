@@ -70,6 +70,10 @@
         public static var flagYellowIcon:Class;
         
         [Bindable]
+        [Embed(source="../../images/flag_orange.png")]
+        public static var flagOrangeIcon:Class;
+        
+        [Bindable]
         [Embed(source="../../images/error.png")]
         public static var errorIcon:Class;
         

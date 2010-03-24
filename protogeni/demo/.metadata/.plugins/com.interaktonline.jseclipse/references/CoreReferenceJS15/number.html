@@ -1,0 +1,1624 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html>
+  <head>
+    <meta content="HTML Tidy for Cygwin (vers 1st February 2003), see www.w3.org" name="generator">
+    <meta name="keywords" content="electronic commerce, ecommerce, ebusiness, e-business, e-commerce, enterprise software, net economy, Netscape, Sun Microsystems, DevEdge Archive, iPlanet, internet software">
+    <meta name="description" content="The DevEdge Archive, a strategic alliance formed by America Online and Sun Microsystems, Inc., is delivering iPlanet e-commerce software and enterprise solutions that enable companies to compete successfully in the Net Economy">
+    <meta http-equiv="Content-Type" content="text/html; charset=us-ascii">
+    <meta name="TEMPLATEBASE" content="Authored in FrameMaker. Converted to HTML in WebWorks Publisher 2000. manual wdt 1.5">
+    <meta name="LASTUPDATED" content="09/28/00 13:15:44">
+    <title>
+      Core JavaScript Reference 1.5:
+    </title>
+    <link rel="stylesheet" type="text/css" href="js15ref.css">
+  </head>
+  <body>
+    <table width="100%" border="0" cellspacing="4">
+      <tr>
+        <td valign="top">
+          <b><a class="sansserifPurple" href="netscape.html">Previous</a></b>&nbsp;&nbsp;&nbsp;&nbsp; <a href="contents.html"><b class="sansserifPurple">Contents</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="ix.html"><b class="sansserifPurple">Index</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="object.html"><b class="sansserifPurple">Next</b></a> &nbsp;&nbsp;&nbsp;&nbsp;
+        </td>
+      </tr>
+      <tr>
+        <td class="sansserifBlack" valign="top" align="right" bgcolor="#CCCCCC">
+          <b>Core JavaScript Reference 1.5</b>
+        </td>
+      </tr>
+    </table><br>
+     
+    <blockquote>
+      <br>
+      <br>
+      <br>
+      <br>
+       
+      <p>
+        <a name="1193137" id="1193137"></a> <a name="Number" id="Number"></a> <span class="sansserif"><b>Number</b></span>
+      </p>
+      <p>
+        <a name="1198237" id="1198237"></a> <span class="sansserif">Lets you work with numeric values. The <span class="mono">Number</span> object is an object wrapper for primitive numeric values.<br></span>
+      </p><br>
+       
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top" colspan="2" rowspan="1">
+            <p>
+              <a name="1193141" id="1193141"></a> <span class="sansserif"><i>Core object</i></span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193145" id="1193145"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193147" id="1193147"></a> <span class="sansserif">JavaScript 1.1, NES 2.0</span>
+            </p>
+            <p>
+              <a name="1193819" id="1193819"></a>
+            </p>
+            <p>
+              <a name="1193820" id="1193820"></a> <span class="sansserif">JavaScript 1.2: modified behavior of <span class="mono">Number</span> constructor.</span>
+            </p>
+            <p>
+              <a name="1193151" id="1193151"></a>
+            </p>
+            <p>
+              <a name="1193821" id="1193821"></a> <span class="sansserif">JavaScript 1.3: added <a href="number.html#1201831">toSource</a> method.</span>
+            </p>
+            <p>
+              <a name="1199080" id="1199080"></a>
+            </p>
+            <p>
+              <a name="1199117" id="1199117"></a> <span class="sansserif">JavaScript 1.5, NES 6.0: added <span class="mono"><a href="number.html#1200968">toExponential</a>, <a href="number.html#1200964">toFixed</a>, and <a href="number.html#1201389">toPrecision</a></span> methods.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1194435" id="1194435"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1194437" id="1194437"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193152" id="1193152"></a> <a name="Created by" id="Created by"></a> <span class="sansserif"><b>Created by</b></span><br>
+         <a name="1193153" id="1193153"></a> <span class="sansserif">The <span class="mono">Number</span> constructor:</span>
+      </p>
+      <p>
+        <a name="1193154" id="1193154"></a><span class="mono">new Number(<i>value</i>)</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193155" id="1193155"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1193161" id="1193161"></a> <span class="sansserif"><br></span>
+      </p><br>
+       
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <a name="1193158" id="1193158"></a> <span class="mono">value</span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193160" id="1193160"></a> <span class="sansserif">The numeric value of the object being created.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193162" id="1193162"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1193163" id="1193163"></a> <span class="sansserif">The primary uses for the <span class="mono">Number</span> object are:</span>
+      </p>
+      <ul>
+        <li class="nobullet">
+          <a name="1193164" id="1193164"></a>
+        </li>
+        <li>
+          <span class="sansserif">To access its constant properties, which represent the largest and smallest representable numbers, positive and negative infinity, and the Not-a-Number value.</span> 
+          <p>
+            <a name="1193165" id="1193165"></a>
+          </p>
+        </li>
+        <li>
+          To create numeric objects that you can add properties to. Most likely, you will rarely need to create a <span class="mono">Number</span> object.
+        </li>
+      </ul><a name="1193166" id="1193166"></a> <span class="sansserif">The properties of <span class="mono">Number</span> are properties of the class itself, not of individual <span class="mono">Number</span> objects.</span> 
+      <p>
+        <a name="1193167" id="1193167"></a> <span class="sansserif">JavaScript 1.2: <span class="mono">Number(x)</span> now produces <span class="mono">NaN</span> rather than an error if <span class="mono">x</span> is a string that does not contain a well-formed numeric literal. For example,</span>
+      </p>
+      <p>
+        <a name="1193168" id="1193168"></a> <span class="mono">x=Number("three");</span>
+      </p>
+      <p>
+        <a name="1193169" id="1193169"></a> <span class="mono">document.write(x + "&lt;BR&gt;");</span>
+      </p>
+      <p>
+        <a name="1193170" id="1193170"></a> <span class="sansserif">prints <span class="mono">NaN</span></span>
+      </p>
+      <p>
+        <a name="1197979" id="1197979"></a> <span class="sansserif">You can convert any object to a number using the top-level <a href="toplev.html#1064092">Number</a> function.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193171" id="1193171"></a> <a name="Property Summary" id="Property Summary"></a> <span class="sansserif"><b>Property Summary</b></span><br>
+         <a name="1193219" id="1193219"></a> <span class="sansserif"><br></span>
+      </p><br>
+       
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr bgcolor="#CCCCCC" align="left" valign="top">
+          <th valign="top" align="left">
+            <a name="1193174" id="1193174"></a> 
+            <p class="alignleft">
+              <span class="sansserif"><b>Property</b></span>
+            </p>
+          </th>
+          <th valign="top" align="left">
+            <a name="1193176" id="1193176"></a> 
+            <p class="alignleft">
+              <span class="sansserif"><b>Description</b></span>
+            </p>
+          </th>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1196298" id="1196298"></a> <span class="mono"><a href="number.html#1196194">constructor</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1196300" id="1196300"></a> <span class="sansserif">Specifies the function that creates an object's prototype.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193181" id="1193181"></a> <span class="mono"><a href="number.html#1193249">MAX_VALUE</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193183" id="1193183"></a> <span class="sansserif">The largest representable number.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193188" id="1193188"></a> <span class="mono"><a href="number.html#1193275">MIN_VALUE</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193190" id="1193190"></a> <span class="sansserif">The smallest representable number.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193195" id="1193195"></a> <span class="mono"><a href="number.html#1193302">NaN</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193197" id="1193197"></a> <span class="sansserif">Special "not a number" value.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193202" id="1193202"></a> <span class="mono"><a href="number.html#1193346">NEGATIVE_INFINITY</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193204" id="1193204"></a> <span class="sansserif">Special value representing negative infinity; returned on overflow.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193209" id="1193209"></a> <span class="mono"><a href="number.html#1193380">POSITIVE_INFINITY</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193211" id="1193211"></a> <span class="sansserif">Special value representing infinity; returned on overflow.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193216" id="1193216"></a> <span class="mono"><a href="number.html#1193415">prototype</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193218" id="1193218"></a> <span class="sansserif">Allows the addition of properties to a <span class="mono">Number</span> object.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193220" id="1193220"></a> <a name="Method Summary" id="Method Summary"></a> <span class="sansserif"><b>Method Summary</b></span><br>
+         <a name="1193240" id="1193240"></a> <span class="sansserif"><br></span>
+      </p><br>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr bgcolor="#CCCCCC" align="left" valign="top">
+          <th valign="top" align="left">
+            <a name="1199932" id="1199932"></a> 
+            <p class="alignleft">
+              <span class="sansserif"><b>Method</b></span>
+            </p>
+          </th>
+          <th valign="top" align="left">
+            <a name="1199934" id="1199934"></a> 
+            <p class="alignleft">
+              <span class="sansserif"><b>Description</b></span>
+            </p>
+          </th>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1200949" id="1200949"></a> <span class="mono">toExponential</span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1200951" id="1200951"></a> <span class="sansserif">Returns a string representing the number in exponential notation.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1199936" id="1199936"></a> <span class="mono"><a href="number.html#1200964">toFixed</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1199938" id="1199938"></a> <span class="sansserif">Returns a string representing the number in fixed-point notation.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1201374" id="1201374"></a> <span class="mono">toPrecision</span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1201376" id="1201376"></a> <span class="sansserif">Returns a string representing the number to a specified precision in fixed-point notation.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1199947" id="1199947"></a> <span class="mono"><a href="number.html#1201831">toSource</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1199949" id="1199949"></a> <span class="sansserif">Returns an object literal representing the specified Number object; you can use this value to create a new object. Overrides the <a href="object.html#1193320">Object.toSource</a> method.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1199957" id="1199957"></a> <span class="mono"><a href="number.html#1193464">toString</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1199959" id="1199959"></a> <span class="sansserif">Returns a string representing the specified object. Overrides the <a href="object.html#1193350">Object.toString</a> method.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1199967" id="1199967"></a> <span class="mono"><a href="number.html#1195199">valueOf</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1199969" id="1199969"></a> <span class="sansserif">Returns the primitive value of the specified object. Overrides the <a href="object.html#1193540">Object.valueOf</a> method.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <a name="1196162" id="1196162"></a> <span class="sansserif">In addition, this object inherits the <a href="object.html#1193628">watch</a> and <a href="object.html#1193499">unwatch</a> methods from <a href="object.html#1193136">Object</a>.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193241" id="1193241"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1193242" id="1193242"></a> <span class="sansserif"><b>Example 1.</b> The following example uses the <span class="mono">Number</span> object's properties to assign values to several numeric variables:</span>
+      </p>
+      <p>
+        <a name="1193243" id="1193243"></a> <span class="mono">biggestNum = Number.MAX_VALUE;<br>
+         smallestNum = Number.MIN_VALUE;<br>
+         infiniteNum = Number.POSITIVE_INFINITY;<br>
+         negInfiniteNum = Number.NEGATIVE_INFINITY;<br>
+         notANum = Number.NaN;</span>
+      </p>
+      <p>
+        <a name="1193244" id="1193244"></a> <span class="sansserif"><b>Example 2.</b> The following example creates a <span class="mono">Number</span> object, <span class="mono">myNum</span>, then adds a <span class="mono">description</span> property to all <span class="mono">Number</span> objects. Then a value is assigned to the <span class="mono">myNum</span> object's <span class="mono">description</span> property.</span>
+      </p>
+      <p>
+        <a name="1193245" id="1193245"></a> <span class="mono">myNum = new Number(65);<br>
+         Number.prototype.description=null;<br>
+         myNum.description="wind speed";</span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1196194" id="1196194"></a> <a name="constructor" id="constructor"></a> <span class="sansserif"><b>constructor</b></span>
+      </p>
+      <p>
+        <a name="1196195" id="1196195"></a> <span class="sansserif">Specifies the function that creates an object's prototype. Note that the value of this property is a reference to the function itself, not a string containing the function's name.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1196198" id="1196198"></a> <span class="sansserif"><i>Property of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1196203" id="1196203"></a> <span class="sansserif"><a href="number.html#1193137">Number</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1196205" id="1196205"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1196207" id="1196207"></a> <span class="sansserif">JavaScript 1.1, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1196209" id="1196209"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1196211" id="1196211"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1196212" id="1196212"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1196216" id="1196216"></a> <span class="sansserif">See <a href="object.html#1193229">Object.constructor</a>.</span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1193249" id="1193249"></a> <a name="MAX_VALUE" id="MAX_VALUE"></a> <span class="sansserif"><b>MAX_VALUE</b></span>
+      </p>
+      <p>
+        <a name="1193266" id="1193266"></a> <span class="sansserif">The maximum numeric value representable in JavaScript.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193252" id="1193252"></a> <span class="sansserif"><i>Property of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193257" id="1193257"></a> <span class="sansserif"><a href="number.html#1193137">Number</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top" colspan="2" rowspan="1">
+            <p>
+              <a name="1193259" id="1193259"></a> <span class="sansserif"><i>Static, Read-only</i></span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193263" id="1193263"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193265" id="1193265"></a> <span class="sansserif">JavaScript 1.1, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1194452" id="1194452"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1194454" id="1194454"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193267" id="1193267"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1193268" id="1193268"></a> <span class="sansserif">The <span class="mono">MAX_VALUE</span> property has a value of approximately 1.79E+308. Values larger than <span class="mono">MAX_VALUE</span> are represented as <span class="mono">"Infinity"</span>.</span>
+      </p>
+      <p>
+        <a name="1193269" id="1193269"></a> <span class="sansserif">Because <span class="mono">MAX_VALUE</span> is a static property of <span class="mono">Number</span>, you always use it as <span class="mono">Number.MAX_VALUE</span>, rather than as a property of a <span class="mono">Number</span> object you created.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193270" id="1193270"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1193271" id="1193271"></a> <span class="sansserif">The following code multiplies two numeric values. If the result is less than or equal to <span class="mono">MAX_VALUE</span>, the <span class="mono">func1</span> function is called; otherwise, the <span class="mono">func2</span> function is called.</span>
+      </p>
+      <p>
+        <a name="1193272" id="1193272"></a><span class="mono">if (num1 * num2 &lt;= Number.MAX_VALUE)<br>
+         &nbsp;&nbsp;&nbsp;func1()<br>
+         else<br>
+         &nbsp;&nbsp;&nbsp;func2()</span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1193275" id="1193275"></a> <a name="MIN_VALUE" id="MIN_VALUE"></a> <span class="sansserif"><b>MIN_VALUE</b></span>
+      </p>
+      <p>
+        <a name="1193292" id="1193292"></a> <span class="sansserif">The smallest positive numeric value representable in JavaScript.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193278" id="1193278"></a> <span class="sansserif"><i>Property of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193283" id="1193283"></a> <span class="sansserif"><a href="number.html#1193137">Number</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top" colspan="2" rowspan="1">
+            <p>
+              <a name="1193285" id="1193285"></a> <span class="sansserif"><i>Static, Read-only</i></span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193289" id="1193289"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193291" id="1193291"></a> <span class="sansserif">JavaScript 1.1, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1194471" id="1194471"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1194473" id="1194473"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193293" id="1193293"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1196879" id="1196879"></a> <span class="sansserif">The <span class="mono">MIN_VALUE</span> property is the number closest to 0, not the most negative number, that JavaScript can represent.</span>
+      </p>
+      <p>
+        <a name="1196880" id="1196880"></a> <span class="sansserif"><span class="mono">MIN_VALUE</span> has a value of approximately 5e-324. Values smaller than <span class="mono">MIN_VALUE</span> ("underflow values") are converted to 0.</span>
+      </p>
+      <p>
+        <a name="1193296" id="1193296"></a> <span class="sansserif">Because <span class="mono">MIN_VALUE</span> is a static property of <span class="mono">Number</span>, you always use it as <span class="mono">Number.MIN_VALUE</span>, rather than as a property of a <span class="mono">Number</span> object you created.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193297" id="1193297"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1193298" id="1193298"></a> <span class="sansserif">The following code divides two numeric values. If the result is greater than or equal to <span class="mono">MIN_VALUE</span>, the <span class="mono">func1</span> function is called; otherwise, the <span class="mono">func2</span> function is called.</span>
+      </p>
+      <p>
+        <a name="1193299" id="1193299"></a><span class="mono">if (num1 / num2 &gt;= Number.MIN_VALUE)<br>
+         &nbsp;&nbsp;&nbsp;func1()<br>
+         else<br>
+         &nbsp;&nbsp;&nbsp;func2()</span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1193302" id="1193302"></a> <a name="NaN" id="NaN"></a> <span class="sansserif"><b>NaN</b></span>
+      </p>
+      <p>
+        <a name="1193303" id="1193303"></a> <span class="sansserif">A special value representing Not-A-Number. This value is represented as the unquoted literal NaN.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193306" id="1193306"></a> <span class="sansserif"><i>Property of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193311" id="1193311"></a> <span class="sansserif"><a href="number.html#1193137">Number</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193313" id="1193313"></a> <span class="sansserif"><i>Read-only</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193315" id="1193315"></a> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193317" id="1193317"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193319" id="1193319"></a> <span class="sansserif">JavaScript 1.1, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1194494" id="1194494"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1194496" id="1194496"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193320" id="1193320"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1193321" id="1193321"></a> <span class="sansserif">JavaScript prints the value <span class="mono">Number.NaN</span> as <span class="mono">NaN</span>.</span>
+      </p>
+      <p>
+        <a name="1193322" id="1193322"></a> <span class="sansserif"><span class="mono">NaN</span> is always unequal to any other number, including NaN itself; you cannot check for the not-a-number value by comparing to <span class="mono">Number.NaN</span>. Use the <b><a href="toplev.html#1064024">isNaN</a></b> function instead.</span>
+      </p>
+      <p>
+        <a name="1193326" id="1193326"></a> <span class="sansserif">You might use the <span class="mono">NaN</span> property to indicate an error condition for a function that should return a valid number.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193327" id="1193327"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1193328" id="1193328"></a> <span class="sansserif">In the following example, if <span class="mono">month</span> has a value greater than 12, it is assigned NaN, and a message is displayed indicating valid values.</span>
+      </p>
+      <p>
+        <a name="1193329" id="1193329"></a> <span class="mono">var month = 13<br>
+         if (month &lt; 1 || month &gt; 12) {<br>
+         &nbsp;&nbsp;&nbsp;month = Number.NaN<br>
+         &nbsp;&nbsp;&nbsp;alert("Month must be between 1 and 12.")<br>
+         }</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193330" id="1193330"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1193343" id="1193343"></a> <span class="sansserif"><a class="mono" href="toplev.html#1064064">NaN</a>, <a href="toplev.html#1064024">isNaN</a>, <a href="toplev.html#1064132">parseFloat</a>, <a href="toplev.html#1064173">parseInt</a></span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1193346" id="1193346"></a> <a name="NEGATIVE_INFINITY" id="NEGATIVE_INFINITY"></a> <span class="sansserif"><b>NEGATIVE_INFINITY</b></span>
+      </p>
+      <p>
+        <a name="1193347" id="1193347"></a> <span class="sansserif">A special numeric value representing negative infinity. This value is represented as the unquoted literal <span class="mono">"-Infinity"</span>.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193350" id="1193350"></a> <span class="sansserif"><i>Property of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193355" id="1193355"></a> <span class="sansserif"><a href="number.html#1193137">Number</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top" colspan="2" rowspan="1">
+            <p>
+              <a name="1193357" id="1193357"></a> <span class="sansserif"><i>Static, Read-only</i></span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193361" id="1193361"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193363" id="1193363"></a> <span class="sansserif">JavaScript 1.1, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1194499" id="1194499"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1194501" id="1194501"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193364" id="1193364"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1196964" id="1196964"></a> <span class="sansserif">This value behaves slightly differently than mathematical infinity:</span>
+      </p>
+      <ul>
+        <li class="nobullet">
+          <a name="1197134" id="1197134"></a>
+        </li>
+        <li>
+          <span class="sansserif">Any positive value, including <span class="mono">POSITIVE_INFINITY</span>, multiplied by <span class="mono">NEGATIVE_INFINITY</span> is <span class="mono">NEGATIVE_INFINITY</span>.</span> 
+          <p>
+            <a name="1197135" id="1197135"></a>
+          </p>
+        </li>
+        <li>
+          <span class="sansserif">Any negative value, including <span class="mono">NEGATIVE_INFINITY</span>, multiplied by <span class="mono">NEGATIVE_INFINITY</span> is <span class="mono">POSITIVE_INFINITY</span>.</span> 
+          <p>
+            <a name="1197109" id="1197109"></a>
+          </p>
+        </li>
+        <li>
+          <span class="sansserif">Zero multiplied by <span class="mono">NEGATIVE_INFINITY</span> is <span class="mono">NaN</span>.</span> 
+          <p>
+            <a name="1197304" id="1197304"></a>
+          </p>
+        </li>
+        <li>
+          <span class="sansserif"><span class="mono">NaN</span> multiplied by <span class="mono">NEGATIVE_INFINITY</span> is <span class="mono">NaN</span>.</span> 
+          <p>
+            <a name="1197305" id="1197305"></a>
+          </p>
+        </li>
+        <li>
+          <span class="sansserif"><span class="mono">NEGATIVE_INFINITY</span>, divided by any negative value except <span class="mono">NEGATIVE_INFINITY</span>, is <span class="mono">POSITIVE_INFINITY</span>.</span> 
+          <p>
+            <a name="1197467" id="1197467"></a>
+          </p>
+        </li>
+        <li>
+          <span class="sansserif"><span class="mono">NEGATIVE_INFINITY</span>, divided by any positive value except <span class="mono">POSITIVE_INFINITY</span>, is <span class="mono">NEGATIVE_INFINITY</span>.</span> 
+          <p>
+            <a name="1197441" id="1197441"></a>
+          </p>
+        </li>
+        <li>
+          <span class="sansserif"><span class="mono">NEGATIVE_INFINITY</span>, divided by either <span class="mono">NEGATIVE_INFINITY</span> or <span class="mono">POSITIVE_INFINITY</span>, is <span class="mono">NaN</span>.</span> 
+          <p>
+            <a name="1197517" id="1197517"></a>
+          </p>
+        </li>
+        <li>
+          Any number divided by <span class="mono">NEGATIVE_INFINITY</span> is Zero.
+        </li>
+      </ul><a name="1193366" id="1193366"></a> <span class="sansserif">Because <span class="mono">NEGATIVE_INFINITY</span> is a static property of <span class="mono">Number</span>, you always use it as <span class="mono">Number.NEGATIVE_INFINITY</span>, rather than as a property of a <span class="mono">Number</span> object you created.</span> 
+      <p>
+        <br>
+         <a name="1193367" id="1193367"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1193368" id="1193368"></a> <span class="sansserif">In the following example, the variable <span class="mono">smallNumber</span> is assigned a value that is smaller than the minimum value. When the <span class="mono">if</span> statement executes, <span class="mono">smallNumber</span> has the value <span class="mono">"-Infinity"</span>, so the <span class="mono">func1</span> function is called.</span>
+      </p>
+      <p>
+        <a name="1193369" id="1193369"></a> <span class="mono">var smallNumber = -Number.MAX_VALUE*10<br>
+         if (smallNumber == Number.NEGATIVE_INFINITY)<br>
+         &nbsp;&nbsp;&nbsp;func1()<br>
+         else<br>
+         &nbsp;&nbsp;&nbsp;func2()</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193370" id="1193370"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1193377" id="1193377"></a> <span class="sansserif"><a class="mono" href="toplev.html#1063963">Infinity</a>, <a class="mono" href="toplev.html#1063988">isFinite</a></span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1193380" id="1193380"></a> <a name="POSITIVE_INFINITY" id="POSITIVE_INFINITY"></a> <span class="sansserif"><b>POSITIVE_INFINITY</b></span>
+      </p>
+      <p>
+        <a name="1193381" id="1193381"></a> <span class="sansserif">A special numeric value representing infinity. This value is represented as the unquoted literal <span class="mono">"Infinity"</span>.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193384" id="1193384"></a> <span class="sansserif"><i>Property of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193389" id="1193389"></a> <span class="sansserif"><a href="number.html#1193137">Number</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top" colspan="2" rowspan="1">
+            <p>
+              <a name="1193391" id="1193391"></a> <span class="sansserif"><i>Static, Read-only</i></span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193395" id="1193395"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193397" id="1193397"></a> <span class="sansserif">JavaScript 1.1, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1194504" id="1194504"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1194506" id="1194506"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193398" id="1193398"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1197681" id="1197681"></a> <span class="sansserif">This value behaves slightly differently than mathematical infinity:</span>
+      </p>
+      <ul>
+        <li class="nobullet">
+          <a name="1197682" id="1197682"></a>
+        </li>
+        <li>
+          <span class="sansserif">Any positive value, including <span class="mono">POSITIVE_INFINITY</span>, multiplied by <span class="mono">POSITIVE_INFINITY</span> is <span class="mono">POSITIVE_INFINITY</span>.</span> 
+          <p>
+            <a name="1197683" id="1197683"></a>
+          </p>
+        </li>
+        <li>
+          <span class="sansserif">Any negative value, including <span class="mono">NEGATIVE_INFINITY</span>, multiplied by <span class="mono">POSITIVE_INFINITY</span> is <span class="mono">NEGATIVE_INFINITY</span>.</span> 
+          <p>
+            <a name="1197684" id="1197684"></a>
+          </p>
+        </li>
+        <li>
+          <span class="sansserif">Zero multiplied by <span class="mono">POSITIVE_INFINITY</span> is <span class="mono">NaN</span>.</span> 
+          <p>
+            <a name="1197685" id="1197685"></a>
+          </p>
+        </li>
+        <li>
+          <span class="sansserif"><span class="mono">NaN</span> multiplied by <span class="mono">POSITIVE_INFINITY</span> is <span class="mono">NaN</span>.</span> 
+          <p>
+            <a name="1197686" id="1197686"></a>
+          </p>
+        </li>
+        <li>
+          <span class="sansserif"><span class="mono">POSITIVE_INFINITY</span>, divided by any negative value except <span class="mono">NEGATIVE_INFINITY</span>, is <span class="mono">NEGATIVE_INFINITY</span>.</span> 
+          <p>
+            <a name="1197687" id="1197687"></a>
+          </p>
+        </li>
+        <li>
+          <span class="sansserif"><span class="mono">POSITIVE_INFINITY</span>, divided by any positive value except <span class="mono">POSITIVE_INFINITY</span>, is <span class="mono">POSITIVE_INFINITY</span>.</span> 
+          <p>
+            <a name="1197688" id="1197688"></a>
+          </p>
+        </li>
+        <li>
+          <span class="sansserif"><span class="mono">POSITIVE_INFINITY</span>, divided by either <span class="mono">NEGATIVE_INFINITY</span> or <span class="mono">POSITIVE_INFINITY</span>, is <span class="mono">NaN</span>.</span> 
+          <p>
+            <a name="1197689" id="1197689"></a>
+          </p>
+        </li>
+        <li>
+          Any number divided by <span class="mono">POSITIVE_INFINITY</span> is Zero.
+        </li>
+      </ul><a name="1193401" id="1193401"></a> <span class="sansserif">Because <span class="mono">POSITIVE_INFINITY</span> is a static property of <span class="mono">Number</span>, you always use it as <span class="mono">Number.POSITIVE_INFINITY</span>, rather than as a property of a <span class="mono">Number</span> object you created.</span> 
+      <p>
+        <br>
+         <a name="1193402" id="1193402"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1193403" id="1193403"></a> <span class="sansserif">In the following example, the variable <span class="mono">bigNumber</span> is assigned a value that is larger than the maximum value. When the <span class="mono">if</span> statement executes, <span class="mono">bigNumber</span> has the value <span class="mono">"Infinity"</span>, so the <span class="mono">func1</span> function is called.</span>
+      </p>
+      <p>
+        <a name="1206640" id="1206640"></a> <span class="mono">var bigNumber = Number.MAX_VALUE * 10<br>
+         if (bigNumber == Number.POSITIVE_INFINITY)<br>
+         &nbsp;&nbsp;&nbsp;func1()<br>
+         else<br>
+         &nbsp;&nbsp;&nbsp;func2()</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193405" id="1193405"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1193412" id="1193412"></a> <span class="sansserif"><a class="mono" href="toplev.html#1063963">Infinity</a>, <a class="mono" href="toplev.html#1063988">isFinite</a></span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1193415" id="1193415"></a> <a name="prototype" id="prototype"></a> <span class="sansserif"><b>prototype</b></span>
+      </p>
+      <p>
+        <a name="1193416" id="1193416"></a> <span class="sansserif">Represents the prototype for this class. You can use the prototype to add properties or methods to all instances of a class. For information on prototypes, see <a href="function.html#1193426">Function.prototype</a>.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193422" id="1193422"></a> <span class="sansserif"><i>Property of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193427" id="1193427"></a> <span class="sansserif"><a href="number.html#1193137">Number</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193429" id="1193429"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193431" id="1193431"></a> <span class="sansserif">JavaScript 1.1, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1194509" id="1194509"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1194511" id="1194511"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1200968" id="1200968"></a> <a name="toExponential" id="toExponential"></a> <span class="sansserif"><b>toExponential</b></span>
+      </p>
+      <p>
+        <a name="1200985" id="1200985"></a> <span class="sansserif">Returns a string representing the Number object in exponential notation.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1200971" id="1200971"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1200976" id="1200976"></a> <span class="sansserif"><a href="number.html#1193137">Number</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1200978" id="1200978"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1200980" id="1200980"></a> <span class="sansserif">JavaScript 1.5</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1200982" id="1200982"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1200984" id="1200984"></a> <span class="sansserif">ECMA-262, Edition 3</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1201115" id="1201115"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1201116" id="1201116"></a> <span class="mono">toExponential([<i>fractionDigits</i>])</span>
+      </p>
+      <p>
+        <br>
+         <a name="1201117" id="1201117"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1200994" id="1200994"></a> <span class="sansserif"><br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <a name="1200991" id="1200991"></a> <span class="mono">fractionDigits</span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1200993" id="1200993"></a> <span class="sansserif">An integer specifying the number of digits after the decimal point. Defaults to as many digits as necessary to specify the number.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1200995" id="1200995"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1200996" id="1200996"></a> <span class="sansserif">The <span class="mono">Number.prototype.toExponential</span> method returns a string representing a Number object in exponential notation with one digit before the decimal point, rounded to <span class="mono"><i>fractionDigits</i></span> digits after the decimal point. If the <span class="mono"><i>fractionDigits</i></span> argument is omitted, the number of digits after the decimal point defaults to the number of digits necessary to represent the value uniquely.</span>
+      </p>
+      <p>
+        <a name="1206809" id="1206809"></a> <span class="sansserif">If you use the <span class="mono">toExponential</span> method for a numeric literal and the numeric literal has no exponent and no decimal point, leave a space before the dot that precedes the method call to prevent the dot from being interpreted as a decimal point.</span>
+      </p>
+      <p>
+        <a name="1207377" id="1207377"></a> <span class="sansserif">If a number has more digits that requested by the <span class="mono"><i>fractionDigits</i></span> parameter, the number is rounded to the nearest number represented by <span class="mono"><i>fractionDigits</i></span> digits. See the discussion of rounding in the description of the <span class="mono">toFixed</span> method on <a href="number.html#1207032">page&nbsp;129</a>, which also applies to <span class="mono">toExponential</span>.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1206810" id="1206810"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1206339" id="1206339"></a> <span class="mono">var num=77.1234<br>
+         alert("num.toExponential() is " + num.toExponential()) //displays 7.71234e+1<br>
+         alert("num.toExponential(4) is " + num.toExponential(4)) //displays 7.7123e+1&nbsp;&nbsp;&nbsp;<br>
+         alert("num.toExponential(2) is " + num.toExponential(2)) //displays 7.71e+1<br>
+         alert("77.1234.toExponential() is " + 77.1234.toExponential())<br>
+         //displays 7.71234e+1<br>
+         alert("77 .toExponential() is " + 77 .toExponential()) //displays 7.7e+1</span>
+      </p>
+      <p>
+        <br>
+         <a name="1201287" id="1201287"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1201291" id="1201291"></a> <span class="sansserif"><a href="number.html#1200964">toFixed</a>, <a href="number.html#1201389">toPrecision</a>, <a href="number.html#1193464">toString</a></span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1200964" id="1200964"></a> <a name="toFixed" id="toFixed"></a> <span class="sansserif"><b>toFixed</b></span>
+      </p>
+      <p>
+        <a name="1200232" id="1200232"></a> <span class="sansserif">Returns a string representing the Number object in fixed-point notation.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1200218" id="1200218"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1200223" id="1200223"></a> <span class="sansserif"><a href="number.html#1193137">Number</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1200225" id="1200225"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1200227" id="1200227"></a> <span class="sansserif">JavaScript 1.5</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1200229" id="1200229"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1200231" id="1200231"></a> <span class="sansserif">ECMA-262, Edition 3</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1200233" id="1200233"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1200234" id="1200234"></a> <span class="mono">toFixed([<i>fractionDigits</i>])</span>
+      </p>
+      <p>
+        <br>
+         <a name="1200235" id="1200235"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1200241" id="1200241"></a> <span class="sansserif"><br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <a name="1200341" id="1200341"></a> <span class="mono">fractionDigits</span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1200343" id="1200343"></a> <span class="sansserif">An integer specifying the number of digits after the decimal point. Defaults to zero.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1200242" id="1200242"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1200525" id="1200525"></a> <span class="sansserif">The <span class="mono">Number.prototype.toFixed</span> method returns a string representing a Number object in fixed-point notation, rounded to the number of digits after the decimal point specified by <span class="mono"><i>fractionDigits</i></span>.</span>
+      </p>
+      <p>
+        <a name="1201067" id="1201067"></a> <span class="sansserif">The output of <span class="mono">toFixed</span> may be more precise than <span class="mono">toString</span> for some values, because <span class="mono">toString</span> outputs only enough significant digits to distinguish the number from adjacent number values.</span>
+      </p>
+      <p>
+        <a name="1207032" id="1207032"></a> <span class="sansserif">If a number has more digits that requested by the <span class="mono"><i>fractionDigits</i></span> parameter, the number is rounded to the nearest number represented by <span class="mono"><i>fractionDigits</i></span> digits. If the number is exactly halfway between two representable numbers, it is rounded away from zero (up if it is positive, down if it is negative). Thus:</span>
+      </p>
+      <dl>
+        <dd>
+          <dl>
+            <dt>
+              <a name="1207136" id="1207136"></a> <span class="sansserif">
+               <span class="mono">0.124.toFixed(2)</span> returns "0.12".
+              </span><br>
+            </dt>
+            <dt>
+              <a name="1207163" id="1207163"></a> <span class="sansserif">
+               <span class="mono">0.125.tofixed(2)</span> returns "0.13", because 0.125 is exactly halfway between 0.12 and 0.13.
+              </span><br>
+            </dt>
+            <dt>
+              <a name="1207201" id="1207201"></a> <span class="sansserif">0 <span class="mono">.126.tofixed(2)</span> returns "0.13".
+              </span><br>
+            </dt>
+          </dl>
+        </dd>
+      </dl><a name="1207214" id="1207214"></a> <span class="sansserif">Given this convention, one might expect <span class="mono">0.045.toFixed(2)</span> to return "0.05", but it returns "0.04". This is because of the way computers represent IEEE 754 floating-point numbers. The IEEE 754 standard uses binary fractions (fractions of 0's and 1's after the dot). Just as some numbers, such as 1/3, are not representable precisely as decimal fractions, other numbers, such as 0.045, are not precisely representable as binary fractions. The IEEE 754 standard dictates that 0.045 be approximated to 0.04499999999999999833466546306226518936455249786376953125, which is precisely representable as a binary fraction. This approximation is closer to 0.04 than to 0.05, so <span class="mono">0.045.toFixed(2)</span> returns "0.04".</span> 
+      <p>
+        <br>
+         <a name="1201068" id="1201068"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1200863" id="1200863"></a> <span class="mono">var num=10.1234<br>
+         alert("num.toFixed() is " + num.toFixed()) //displays 10<br>
+         alert("num.toFixed(4) is " + num.toFixed(4)) //displays 10.1234&nbsp;&nbsp;&nbsp; alert("num.toFixed(2) is " + num.toFixed(2)) //displays 10.12</span>
+      </p>
+      <p>
+        <br>
+         <a name="1201348" id="1201348"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1201355" id="1201355"></a> <span class="sansserif"><a href="number.html#1200968">toExponential</a>, <a href="number.html#1201389">toPrecision</a>, <a href="number.html#1193464">toString</a></span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1201389" id="1201389"></a> <a name="toPrecision" id="toPrecision"></a> <span class="sansserif"><b>toPrecision</b></span>
+      </p>
+      <p>
+        <a name="1201406" id="1201406"></a> <span class="sansserif">Returns a string representing the Number object to the specified precision.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1201392" id="1201392"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1201397" id="1201397"></a> <span class="sansserif"><a href="number.html#1193137">Number</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1201399" id="1201399"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1201401" id="1201401"></a> <span class="sansserif">JavaScript 1.5</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1201403" id="1201403"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1201405" id="1201405"></a> <span class="sansserif">ECMA-262, Edition 3</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1201407" id="1201407"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1201408" id="1201408"></a> <span class="mono">toPrecision([<i>precision</i>])</span>
+      </p>
+      <p>
+        <br>
+         <a name="1201409" id="1201409"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1201415" id="1201415"></a> <span class="sansserif"><br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <a name="1201412" id="1201412"></a> <span class="mono">precision</span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1201414" id="1201414"></a> <span class="sansserif">An integer specifying the number of digits after the decimal point.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1201416" id="1201416"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1201719" id="1201719"></a> <span class="sansserif">The <span class="mono">Number.prototype.toPrecision</span> method returns a string representing a Number object in fixed-point or exponential notation rounded to <span class="mono"><i>precision</i></span> significant digits.</span>
+      </p>
+      <p>
+        <a name="1206997" id="1206997"></a> <span class="sansserif">If you use the <span class="mono">toPrecision</span> method for a numeric literal and the numeric literal has no exponent and no decimal point, leave a space before the dot that precedes the method call to prevent the dot from being interpreted as a decimal point.</span>
+      </p>
+      <p>
+        <a name="1201723" id="1201723"></a> <span class="sansserif">If the <span class="mono"><i>precision</i></span> argument is omitted, behaves as <span class="mono">Number.prototype.toString</span>.</span>
+      </p>
+      <p>
+        <a name="1207425" id="1207425"></a> <span class="sansserif">If a number has more digits that requested by the <span class="mono"><i>precision</i></span> parameter, the number is rounded to the nearest number represented by <span class="mono"><i>precision</i></span> digits. See the discussion of rounding in the description of the <span class="mono">toFixed</span> method on <a href="number.html#1207032">page&nbsp;129</a>, which also applies to <span class="mono">toPrecision</span>.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1201927" id="1201927"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1202066" id="1202066"></a> <span class="mono">var num=5.123456<br>
+         alert("num.toPrecision() is " + num.toPrecision()) //displays 5.123456<br>
+         alert("num.toPrecision(4) is " + num.toPrecision(4)) //displays 5.123<br>
+         alert("num.toPrecision(2) is " + num.toPrecision(2)) //displays 5.1<br>
+         alert("num.toPrecision(2) is " + num.toPrecision(1)) //displays 5<br>
+         alert("num.toPrecision(2) is " + num.toPrecision(1)) //displays 5<br>
+         alert("1250 .toPrecision() is " + 1250 .toPrecision(2))<br>
+         //displays 1.3e+3<br>
+         alert("1250 .toPrecision(5) is " + 1250 .toPrecision(5))<br>
+         //displays 1250.0</span>
+      </p>
+      <p>
+        <br>
+         <a name="1202058" id="1202058"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1201828" id="1201828"></a> <span class="sansserif"><a href="number.html#1200968">toExponential</a>, <a href="number.html#1200964">toFixed</a>, <a href="number.html#1193464">toString</a></span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1201831" id="1201831"></a> <a name="toSource" id="toSource"></a> <span class="sansserif"><b>toSource</b></span>
+      </p>
+      <p>
+        <a name="1193436" id="1193436"></a> <span class="sansserif">Returns a string representing the source code of the object.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193439" id="1193439"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193444" id="1193444"></a> <span class="sansserif"><a href="number.html#1193137">Number</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193446" id="1193446"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193448" id="1193448"></a> <span class="sansserif">JavaScript 1.3</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193449" id="1193449"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1193450" id="1193450"></a> <span class="mono">toSource()</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193451" id="1193451"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1193452" id="1193452"></a> <span class="sansserif">None</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193453" id="1193453"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1198134" id="1198134"></a> <span class="sansserif">The <span class="mono">toSource</span> method returns the following values:</span>
+      </p>
+      <ul>
+        <li class="nobullet">
+          <a name="1198135" id="1198135"></a>
+        </li>
+        <li>
+          <span class="sansserif">For the built-in <span class="mono">Number</span> object, <span class="mono">toSource</span> returns the following string indicating that the source code is not available:</span> 
+          <p>
+            <a name="1198136" id="1198136"></a> <span class="mono">&nbsp;&nbsp;&nbsp;function Number() {<br>
+             &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[native code]<br>
+             &nbsp;&nbsp;&nbsp;}</span>
+          </p>
+          <p>
+            <a name="1198137" id="1198137"></a>
+          </p>
+        </li>
+        <li>
+          For instances of <span class="mono">Number</span>, <span class="mono">toSource</span> returns a string representing the source code.
+        </li>
+      </ul><a name="1198138" id="1198138"></a> <span class="sansserif">This method is usually called internally by JavaScript and not explicitly in code.</span> 
+      <p>
+        <br>
+         <a name="1193457" id="1193457"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1193461" id="1193461"></a> <span class="sansserif"><a href="object.html#1193320">Object.toSource</a></span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1193464" id="1193464"></a> <a name="toString" id="toString"></a> <span class="sansserif"><b>toString</b></span>
+      </p>
+      <p>
+        <a name="1193477" id="1193477"></a> <span class="sansserif">Returns a string representing the specified Number object.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193467" id="1193467"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193472" id="1193472"></a> <span class="sansserif"><a href="number.html#1193137">Number</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193474" id="1193474"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193476" id="1193476"></a> <span class="sansserif">JavaScript 1.1</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1194515" id="1194515"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1194517" id="1194517"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193478" id="1193478"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1193479" id="1193479"></a> <span class="mono">toString()<br>
+         toString([<i>radix</i>])</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193480" id="1193480"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1193486" id="1193486"></a> <span class="sansserif"><br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <a name="1193483" id="1193483"></a> <span class="mono">radix</span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193485" id="1193485"></a> <span class="sansserif">An integer between 2 and 36 specifying the base to use for representing numeric values.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193487" id="1193487"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1195154" id="1195154"></a> <span class="sansserif">The <a href="number.html#1193137">Number</a> object overrides the <span class="mono">toString</span> method of the <a href="object.html#1193136">Object</a> object; it does not inherit <a href="object.html#1193350">Object.toString</a>. For <a href="number.html#1193137">Number</a> objects, the <span class="mono">toString</span> method returns a string representation of the object.</span>
+      </p>
+      <p>
+        <a name="1195161" id="1195161"></a> <span class="sansserif">JavaScript calls the <span class="mono">toString</span> method automatically when a number is to be represented as a text value or when a number is referred to in a string concatenation.</span>
+      </p>
+      <p>
+        <a name="1207025" id="1207025"></a> <span class="sansserif">If you use the <span class="mono">toString</span> method for a numeric literal and the numeric literal has no exponent and no decimal point, leave a space before the dot that precedes the method call to prevent the dot from being interpreted as a decimal point.</span>
+      </p>
+      <p>
+        <a name="1200638" id="1200638"></a> <span class="sansserif">For <a href="number.html#1193137">Number</a> objects and values, the built-in <span class="mono">toString</span> method returns the string representing the value of the number.</span>
+      </p>
+      <p>
+        <a name="1193491" id="1193491"></a> <span class="mono">var howMany=10;<br>
+         alert("howMany.toString() is " + howMany.toString())<br>
+         alert("45 .toString() is " + 45 .toString())</span>
+      </p>
+      <p>
+        <br>
+         <a name="1201877" id="1201877"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1201887" id="1201887"></a> <span class="sansserif"><a href="number.html#1200968">toExponential</a>, <a href="number.html#1200964">toFixed</a>, <a href="number.html#1201389">toPrecision</a></span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1195199" id="1195199"></a> <a name="valueOf" id="valueOf"></a> <span class="sansserif"><b>valueOf</b></span>
+      </p>
+      <p>
+        <a name="1195216" id="1195216"></a> <span class="sansserif">Returns the primitive value of a Number object.<br></span>
+      </p>
+      <p>
+        <br>
+        <br>
+      </p>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1195202" id="1195202"></a> <span class="sansserif"><i>Method of</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1195207" id="1195207"></a> <span class="sansserif"><a href="number.html#1193137">Number</a></span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1195209" id="1195209"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1195211" id="1195211"></a> <span class="sansserif">JavaScript 1.1</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1195213" id="1195213"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1195215" id="1195215"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1195217" id="1195217"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+         <a name="1195218" id="1195218"></a> <span class="mono">valueOf()</span>
+      </p>
+      <p>
+        <br>
+         <a name="1195219" id="1195219"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+         <a name="1195220" id="1195220"></a> <span class="sansserif">None</span>
+      </p>
+      <p>
+        <br>
+         <a name="1195221" id="1195221"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1195228" id="1195228"></a> <span class="sansserif">The <span class="mono">valueOf</span> method of <a href="number.html#1193137">Number</a> returns the primitive value of a Number object as a number data type.</span>
+      </p>
+      <p>
+        <a name="1195235" id="1195235"></a> <span class="sansserif">This method is usually called internally by JavaScript and not explicitly in code.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1195236" id="1195236"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1195237" id="1195237"></a><span class="mono">x = new Number();<br>
+         alert(x.valueOf())&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//displays 0</span>
+      </p>
+      <p>
+        <br>
+         <a name="1195238" id="1195238"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1195242" id="1195242"></a> <span class="sansserif"><a href="object.html#1193540">Object.valueOf</a></span>
+      </p>
+    </blockquote>
+    <blockquote>
+      <br>
+       <b><a class="sansserifPurple" href="netscape.html">Previous</a></b>&nbsp;&nbsp;&nbsp;&nbsp; <a href="contents.html"><b class="sansserifPurple">Contents</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="ix.html"><b class="sansserifPurple">Index</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="object.html"><b class="sansserifPurple">Next</b></a> &nbsp;&nbsp;&nbsp;&nbsp; 
+      <hr noshade="noshade" size="1">
+      <span class="sansserif">Copyright &copy; 2000 <a href="http://www.netscape.com">Netscape Communications Corp.</a> All rights reserved.</span>
+    </blockquote>
+    <p class="alignright">
+      <span class="sansserif">Last Updated <b>September 28, 2000</b></span>
+    </p>
+  </body>
+</html>

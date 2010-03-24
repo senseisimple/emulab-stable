@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -13,7 +13,7 @@ include $(OBJDIR)/Makeconf
 
 SBIN_SCRIPTS		= jabbersetup addjabberuser deljabberuser \
 			  modjabberbuddies addjabberchat deljabberchat \
-			  setchatmembers chatsup.py
+			  setchatmembers
 LIBEXEC_SCRIPTS		= 
 CTRL_LIBEXEC_SCRIPTS	= 
 CTRL_LIB_FILES		= 
