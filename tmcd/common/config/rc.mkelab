@@ -225,41 +225,6 @@ sub doboot()
     }
     
     #
-    # Elabinelab build options:
-    #
-    # 	LOADPACKAGES	download and install a standard set of packages,
-    #	               	otherwise assume they are already installed.
-    #   LOADMFS		download and install a tftpboot tarball,
-    #	               	otherwise assume it is already installed.
-    #   LOADELABSOURCE	download, build and install the Emulab source code,
-    #	               	otherwise assume it is already installed.
-    #	LOADDB		download and install Emulab DB state,
-    #			otherwise...this might not even be useful.
-    #	LOADUSERDIRS	download and install "user data" whatever we
-    #			decide that might be.
-    #
-    # Defaults to all *but* LOADUSERDIRS for backward compat.
-    #
-    $emulabconfig{"LOADPACKAGES"} = 1
-	if (!defined($emulabconfig{"LOADPACKAGES"}));
-    $emulabconfig{"LOADMFS"} = 1
-	if (!defined($emulabconfig{"LOADMFS"}));
-    $emulabconfig{"LOADELABSOURCE"} = 1
-	if (!defined($emulabconfig{"BUILDSOURCE"}));
-    $emulabconfig{"LOADDB"} = 1
-	if (!defined($emulabconfig{"LOADDB"}));
-    # XXX not yet
-    $emulabconfig{"LOADUSERDIRS"} = 0
-	if (!defined($emulabconfig{"LOADUSERDIRS"}));
-
-#
-# XXX Mike's transitional vesion while I debug things
-#
-$emulabconfig{"LOADPACKAGES"} = 0;
-$emulabconfig{"LOADMFS"} = 0;
-$emulabconfig{"LOADELABSOURCE"} = 0;
-
-    #
     # XXX defaults for things that may or may not be passed in.
     # Will be overridden if values are actually passed in.
     #
@@ -281,6 +246,29 @@ $emulabconfig{"LOADELABSOURCE"} = 0;
     } else {
 	$emulabconfig{"ELVIN_COMPAT"} = 0;
     }
+
+    #
+    # Elabinelab build options:
+    #
+    # 	LOADPACKAGES	download and install a standard set of packages,
+    #	               	otherwise assume they are already installed.
+    #   LOADMFS		download and install a tftpboot tarball,
+    #	               	otherwise assume it is already installed.
+    #   LOADELABSOURCE	download, build and install the Emulab source code,
+    #	               	otherwise assume it is already installed.
+    #	LOADDB		download and install Emulab DB state,
+    #			otherwise...this might not even be useful.
+    #	LOADUSERDIRS	download and install "user data" whatever we
+    #			decide that might be.
+    #
+    # Defaults to all *but* LOADUSERDIRS for backward compat.
+    #
+    $emulabconfig{"LOADPACKAGES"} = 1;
+    $emulabconfig{"LOADMFS"} = 1;
+    $emulabconfig{"LOADELABSOURCE"} = 1;
+    $emulabconfig{"LOADDB"} = 1;
+    # XXX not yet
+    $emulabconfig{"LOADUSERDIRS"} = 0;
 
     #
     # Need outer control router IP in lots of places.
@@ -310,10 +298,18 @@ $emulabconfig{"LOADELABSOURCE"} = 0;
     }
 
     #
-    # XXX temporary backward compat til this get implemented
+    # XXX temporary backward compat til this gets implemented
     #
     $emulabconfig{"ROLE"} = "boss"
 	if ($emulabconfig{"ROLE"} eq "boss+router");
+
+
+#
+# XXX Mike's transitional vesion while I debug things
+#
+$emulabconfig{"LOADPACKAGES"} = 0;
+$emulabconfig{"LOADMFS"} = 0;
+$emulabconfig{"LOADELABSOURCE"} = 0;
 
     #
     # XXX To avoid NFS errors while copying goo from outer boss.
