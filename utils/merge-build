@@ -31,6 +31,17 @@ sub sysp (@) {
     return $output;
 }
 
+sub sys_filter ($&) {
+    my $cmd = "$_[0] |";
+    my $filter = $_[1];
+    print "$cmd\n";
+    open F, $cmd or die $!;
+    while (<F>) {
+	print if $filter->();
+    }
+    die "ERROR: $cmd faild\n" unless $? == 0;
+}
+
 sub merge_base(@) {
     my $res = shift @_;
     while (@_) {
@@ -127,7 +138,7 @@ if ($op eq 'prep') {
     sys "git fetch origin";
     sys "git reset --hard";
     sys "git merge $branch_str";
-    sys "git stash apply $stash_id | grep -v '^#'"
+    sys_filter "git stash apply $stash_id", sub {!/^\#/}
 	if $stash_id;
     sys "touch .merged";
 } else {
