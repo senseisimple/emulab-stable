@@ -5,6 +5,7 @@
 #
 
 use Cwd;
+use File::Temp qw(mktemp);
 
 use warnings;
 use strict;
@@ -14,15 +15,18 @@ sub cd ($) {
     chdir $_[0] or die "Unable to cd to $_[0]\n";
 }
 
-sub sys (@) {
-    print join(' ', @_), "\n";
+sub sysq (@) {
     system @_;
     die "ERROR: @_ failed\n" unless $? == 0;
 }
 
+sub sys (@) {
+    print join(' ', @_), "\n";
+    sysq @_;
+}
+
 sub sysp (@) {
     my $cmd = join(' ', @_, '|');
-    print "$cmd\n";
     open F, $cmd or die $!;
     local $/ = undef;
     my $output = <F>;
@@ -40,16 +44,6 @@ sub sys_filter ($&) {
 	print if $filter->();
     }
     die "ERROR: $cmd faild\n" unless $? == 0;
-}
-
-sub merge_base(@) {
-    my $res = shift @_;
-    while (@_) {
-	my $other = shift @_;
-	$res = sysp("git merge-base $res $other");
-	chomp $res;
-    }
-    return $res;
 }
 
 sub usage() {
@@ -116,6 +110,37 @@ sub cd_merge() {
 }
 
 #
+#
+#
+
+sub save_uncommited() {
+    cd_source();
+    print "Saving Uncommited Changes\n";
+    sysq "git update-index -q --refresh";
+    local $ENV{GIT_INDEX_FILE} = mktemp ".git/index.XXXXXX";
+    sysq "cp -p .git/index $ENV{GIT_INDEX_FILE}";
+    sysq "git add -A";
+    sysq "git reset -q .merge-build";
+    my $tree_id = sysp "git write-tree";
+    chomp $tree_id;
+    my $stash_id = sysp "echo Build stash | git commit-tree $tree_id -p HEAD";
+    chomp $stash_id;
+    unlink($ENV{GIT_INDEX_FILE});
+    return $stash_id;
+}
+
+sub merge_base(@) {
+    cd_merge();
+    my $res = shift @_;
+    while (@_) {
+	my $other = shift @_;
+	$res = sysp "git merge-base $res $other";
+	chomp $res;
+    }
+    return $res;
+}
+
+#
 # Finally, do the work
 #
 my $op = shift @ARGV || '';
@@ -129,19 +154,18 @@ if ($op eq 'prep') {
 } elsif ($op eq 'reset') {
     cd_merge();
     my $base = merge_base $merge_branch, split / /, $branch_str;
-    sys "git reset --hard $base";
+    sys "git reset -q --hard $base";
 } elsif ($op eq 'sync') {
     cd_source();
-    my $stash_id = sysp "git stash create";
-    chomp $stash_id;
+    my $stash_id = save_uncommited();
     cd_merge();
-    sys "git fetch origin";
-    sys "git reset --hard";
-    sys "git merge $branch_str";
-    sys_filter "git stash apply $stash_id", sub {!/^\#/}
-	if $stash_id;
+    sys "git fetch -q origin";
+    sys "git reset -q --hard";
+    sys "git merge -q $branch_str";
+    sys "git merge-recursive -- HEAD $stash_id";
     sys "touch .merged";
 } else {
     usage();
 }
+
 
