@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2007-2009 University of Utah and the Flux Group.
+# Copyright (c) 2007-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package OSinfo;
@@ -19,6 +19,7 @@ use libdb;
 use libtestbed;
 use Project;
 use User;
+use Image;
 use English;
 use Data::Dumper;
 use overload ('""' => 'Stringify');
@@ -434,6 +435,17 @@ sub ValidOpMode($$)
 }
 
 #
+# Is the osinfo "generic"
+#
+sub IsGeneric($)
+{
+    my ($self)  = @_;
+    my $version = $self->version();
+    
+    return ((defined($version) && $version ne "") ? 0 : 1);
+}
+
+#
 # Boot command like. The caller supplies the default in $pref.
 #
 sub OSBootCmd($$$)
@@ -616,6 +628,29 @@ sub RunsOnParent($$)
     }
 
     return 1;
+}
+
+#
+# Map an osinfo and node type to the actual image.
+#
+sub MapToImage($$)
+{
+    my ($self, $type) = @_;
+
+    if (ref($type)) {
+	$type = $type->type();
+    }
+    my $osid = $self->osid();
+
+    my $query_result =
+	DBQueryWarn("select imageid from osidtoimageid ".
+		    "where type='$type' and osid='$osid'");
+    return undef
+	if (!defined($query_result) || !$query_result->numrows);
+
+    my ($imageid) = $query_result->fetchrow_array();
+
+    return Image->Lookup($imageid);
 }
 
 # _Always_ make sure that this 1 is at the end of the file...
