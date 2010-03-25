@@ -49,6 +49,14 @@ my $aftOID = "dot1qPortAcceptableFrameTypes";
 my $createOID = "dot1qVlanStaticRowStatus";
 
 #
+# Openflow OIDs, only number format now.
+#
+my $ofOID = 'iso.org.dod.internet.private.enterprises.11.2.14.11.5.1.7.1.35';
+my $ofEnableOID     = $ofOID.'.1.1.2';
+my $ofControllerOID = $ofOID.'.1.1.3';
+my $ofListenerOID   = $ofOID.'.1.1.4';
+
+#
 # Ports can be passed around in three formats:
 # ifindex: positive integer corresponding to the interface index (eg. 42)
 # modport: dotted module.port format, following the physical reality of
@@ -1772,6 +1780,73 @@ sub unlock($) {
 	if ($lock_held == 1) { TBScriptUnlock();}
 	$lock_held = 0;
 }
+
+#
+# Enable Openflow
+#
+sub enableOpenflow($$) {
+    my $self = shift;
+    my $vlan = shift;
+    my $RetVal;
+    
+    $RetVal = $self->set([$ofEnableOID, $vlan, 1, "INTEGER"]);
+    if (!defined($RetVal)) {
+	warn "ERROR: Unable to enable Openflow on VLAN $vlan\n";
+	return 0;
+    }
+    return 1;
+}
+
+#
+# Disable Openflow
+#
+sub disableOpenflow($$) {
+    my $self = shift;
+    my $vlan = shift;
+    my $RetVal;
+    
+    $RetVal = $self->set([$ofEnableOID, $vlan, 2, "INTEGER"]);
+    if (!defined($RetVal)) {
+	warn "ERROR: Unable to disable Openflow on VLAN $vlan\n";
+	return 0;
+    }
+    return 1;
+}
+
+#
+# Set controller
+#
+sub setController($$$) {
+    my $self = shift;
+    my $vlan = shift;
+    my $controller = shift;
+    my $RetVal;
+    
+    $RetVal = $self->set([$ofControllerOID, $vlan, $controller, "OCTETSTR"]);
+    if (!defined($RetVal)) {
+	warn "ERROR: Unable to set controller on VLAN $vlan\n";
+	return 0;
+    }
+    return 1;
+}
+
+#
+# Set listener
+#
+sub setListener($$$) {
+    my $self = shift;
+    my $vlan = shift;
+    my $listener = shift;
+    my $RetVal;
+    
+    $RetVal = $self->set([$ofListenerOID, $vlan, $listener, "OCTETSTR"]);
+    if (!defined($RetVal)) {
+	warn "ERROR: Unable to set listener on VLAN $vlan\n";
+	return 0;
+    }
+    return 1;
+}
+
 
 # End with true
 1;

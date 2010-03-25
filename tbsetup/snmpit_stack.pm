@@ -1149,6 +1149,80 @@ sub reapCall($$) {
     return snmpit_jitdev::reapCall($proc);
 }
 
+sub enableOpenflow($$) {
+    my $self = shift;
+    my $vlan = shift;
+    
+    my $dev;
+    #
+    # TODO: check if this is Procurve stack
+    # if ($self->{STACKID} neq "Procurve") {
+    #warn "ERROR: Openflow is supported on Procurve stack only.\n";
+    #return 0;
+    # }
+    # TODO: get Procurve3 device
+    # $dev = $self->{DEVICES}{"procurve3"};
+    #
+    
+    return $dev->enableOpenflow($vlan);
+}
+
+sub disableOpenflow($$) {
+    my $self = shift;
+    my $vlan = shift;
+    
+    my $dev;
+    #
+    # TODO: check if this is Procurve stack
+    # if ($self->{STACKID} neq "Procurve") {
+    #warn "ERROR: Openflow is supported on Procurve stack only.\n";
+    #return 0;
+    # }
+    # TODO: get Procurve3 device
+    # $dev = $self->{DEVICES}{"procurve3"};
+    #
+    
+    return $dev->disableOpenflow($vlan);
+}
+
+sub setController($$$) {
+    my $self = shift;
+    my $vlan = shift;
+    my $controller = shift;
+    
+    my $dev;
+    #
+    # TODO: check if this is Procurve stack
+    # if ($self->{STACKID} neq "Procurve") {
+    #warn "ERROR: Openflow is supported on Procurve stack only.\n";
+    #return 0;
+    # }
+    # TODO: get Procurve3 device
+    # $dev = $self->{DEVICES}{"procurve3"};
+    #
+    
+    return $dev->setController($vlan, $controller);
+}
+
+sub setListener($$$) {
+    my $self = shift;
+    my $vlan = shift;
+    my $listener = shift;
+    
+    my $dev;
+    #
+    # TODO: check if this is Procurve stack
+    # if ($self->{STACKID} neq "Procurve") {
+    #warn "ERROR: Openflow is supported on Procurve stack only.\n";
+    #return 0;
+    # }
+    # TODO: get Procurve3 device
+    # $dev = $self->{DEVICES}{"procurve3"};
+    #
+    
+    return $dev->setListener($vlan, $listener);
+}
+
 
 package snmpit_jitdev;
 use Dumpvalue;

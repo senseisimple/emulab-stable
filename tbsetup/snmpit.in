@@ -2412,3 +2412,98 @@ sub doTrunkDisable($$) {
 	if (!$errors);
     return $errors;
 }
+
+#
+# doOpenflowEnable(stacks, vlan)
+# Enable Openflow on a VLAN
+# Procurve stack only
+#
+sub doOpenflowEnable($$) {
+    my $stacks = shift;
+    my $vlan = shift;
+    
+    #
+    # Sanity checking
+    #
+    if (@$stacks != 1) {
+	die "Enabling Openflow can process only one stack now\n" .
+	    "Stacks are " . join(",",@$stacks) . "\n";
+    }
+    
+    my $stack = $$stacks[0];
+    print "Enabling Openflow on VLAN $vlan ...\n"
+	if(!$quiet);
+    #
+    # TODO: check if Openflow has been enabled, now in HP stack code
+    #
+    if (!$stack->enableOpenflow($vlan)) {
+	return 1;
+    }
+    return 0;
+}
+
+#
+# doOpenflowDisable(stack, vlan)
+# Disable Openflow on a VLAN
+# Procurve stack only
+#
+sub doOpenflowDisable($$) {
+    my $stacks = shift;
+    my $vlan = shift;
+    
+    #
+    # Sanity checking
+    #
+    if (@$stacks != 1) {
+	die "Disabling Openflow can process only one stack now\n" .
+	    "Stacks are " . join(",",@$stacks) . "\n";
+    }
+    
+    my $stack = $$stacks[0];
+    print "Disabling Openflow on VLAN $vlan ...\n"
+	if(!$quiet);
+    #
+    # TODO: check if Openflow is enabled, now in HP stack code.
+    #
+    if (!$stack->disableOpenflow($vlan)) {
+	return 1;
+    }
+    
+    #
+    # TODO:clear controllers/listeners here. Now in HP stack code.
+    #
+    
+    return 0;
+}
+
+#
+# doSetController(stack, vlan, controller)
+# Set controller for an Openflow-enabled VLAN
+# Procurve stack only
+#
+sub doSetController($$$) {
+    my $stacks = shift;
+    my $vlan - shift;
+    my $controller = shift;
+    
+    #
+    # Sanity checking
+    #
+    if (@$stacks != 1) {
+	die "Set controller on a VLAN can process only one stack now\n" .
+	    "Stacks are " . join(",",@$stacks) . "\n";
+    }
+    
+    my $stack = $$stacks[0];
+    print "Set controller for VLAN $vlan ...\n"
+	if(!$quiet);
+    
+    #
+    # TODO: Check if Openflow is enabled. But in fact it doesn't matter. 
+    #
+    if (!$stack->setController($vlan, $controller)) {
+	    return 1;
+    }
+    
+    return 0;
+}
