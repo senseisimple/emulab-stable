@@ -150,9 +150,9 @@ def PassPhraseCB(v, prompt1='Enter passphrase:', prompt2='Verify passphrase:'):
             passphrase = open(PASSPHRASEFILE).readline()
             passphrase = passphrase.strip()
             return passphrase
-        except IOError as (errno, strerror):
+        except IOError, e:
             print 'Error reading passphrase file %s: %s' % (PASSPHRASEFILE,
-                                                            strerror)
+                                                            e.strerror)
     else:
         if debug:
             print 'passphrase file %s does not exist' % (PASSPHRASEFILE)
