@@ -22,7 +22,10 @@
         <xs:element ref="rspec:node"/>
         <xs:element ref="rspec:link"/>
       </xs:choice>
-      <xs:element ref="rspec:external_ref"/>
+      <xs:choice>
+        <xs:element ref="rspec:external_ref"/>
+        <xs:element ref="rspec:type_relation"/>
+      </xs:choice>
     </xs:choice>
     <xs:attributeGroup ref="rspec:AnyExtension"/>
     <xs:attribute name="generated" type="xs:dateTime"/>
@@ -37,6 +40,7 @@
     </xs:attribute>
   </xs:complexType>
   <xs:element name="external_ref" type="rspec:ExternalReferenceContents"/>
+  <xs:element name="type_relation" type="rspec:TypeRelationContents"/>
   <xs:element name="node" type="rspec:NodeContents"/>
   <xs:element name="link" type="rspec:LinkContents"/>
   <xs:complexType name="NodeContents">
@@ -52,7 +56,23 @@
         <xs:element ref="rspec:cloud"/>
         <xs:element ref="rspec:services"/>
         <xs:element ref="rspec:hardware_type"/>
-        <xs:element ref="rspec:sliver_type"/>
+        <xs:element name="sliver_type">
+          <xs:complexType>
+            <xs:choice minOccurs="0" maxOccurs="unbounded">
+              <xs:group ref="rspec:SliverTypeContents"/>
+              <xs:element name="disk_image">
+                <xs:complexType>
+                  <xs:complexContent>
+                    <xs:extension base="rspec:DiskImageContents">
+                      <xs:attribute name="default"/>
+                    </xs:extension>
+                  </xs:complexContent>
+                </xs:complexType>
+              </xs:element>
+            </xs:choice>
+            <xs:attributeGroup ref="rspec:SliverTypeContents"/>
+          </xs:complexType>
+        </xs:element>
       </xs:choice>
     </xs:choice>
     <xs:attributeGroup ref="rspec:AnyExtension"/>
@@ -147,18 +167,28 @@
       <xs:attribute name="name" use="required"/>
     </xs:complexType>
   </xs:element>
-  <xs:element name="sliver_type">
-    <xs:complexType>
+  <xs:group name="SliverType">
+    <xs:sequence>
+      <xs:element name="sliver_type">
+        <xs:complexType>
+          <xs:group ref="rspec:SliverTypeContents"/>
+          <xs:attributeGroup ref="rspec:SliverTypeContents"/>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:group>
+  <xs:group name="SliverTypeContents">
+    <xs:sequence>
       <xs:group ref="rspec:AnyExtension"/>
-      <xs:attributeGroup ref="rspec:AnyExtension"/>
-      <xs:attribute name="name" use="required"/>
-    </xs:complexType>
-  </xs:element>
-  <xs:element name="hardware_type">
-    <xs:complexType>
-      <xs:group ref="rspec:AnyExtension"/>
-      <xs:attributeGroup ref="rspec:AnyExtension"/>
-      <xs:attribute name="name" use="required"/>
-    </xs:complexType>
-  </xs:element>
+    </xs:sequence>
+  </xs:group>
+  <xs:attributeGroup name="SliverTypeContents">
+    <xs:attributeGroup ref="rspec:AnyExtension"/>
+    <xs:attribute name="name" use="required"/>
+  </xs:attributeGroup>
+  <xs:complexType name="HardwareTypeContents">
+    <xs:group ref="rspec:AnyExtension"/>
+    <xs:attributeGroup ref="rspec:AnyExtension"/>
+    <xs:attribute name="name" use="required"/>
+  </xs:complexType>
 </xs:schema>

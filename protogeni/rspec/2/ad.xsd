@@ -19,6 +19,13 @@
     <xs:attributeGroup ref="rspec:AnyExtension"/>
     <xs:attribute name="now" use="required" type="xs:boolean"/>
   </xs:complexType>
+  <xs:complexType name="DiskImageContents">
+    <xs:group ref="rspec:AnyExtension"/>
+    <xs:attributeGroup ref="rspec:AnyExtension"/>
+    <xs:attribute name="name" use="required"/>
+    <xs:attribute name="os"/>
+    <xs:attribute name="version"/>
+  </xs:complexType>
   <xs:complexType name="MonitoringContents">
     <xs:group ref="rspec:AnyExtension"/>
     <xs:attributeGroup ref="rspec:AnyExtension"/>
@@ -79,4 +86,20 @@
       </xs:simpleType>
     </xs:attribute>
   </xs:complexType>
+  <xs:complexType name="TypeRelationContents">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:group ref="rspec:AnyExtension"/>
+      <xs:element ref="rspec:hardware_type"/>
+      <xs:element name="sliver_type">
+        <xs:complexType>
+          <xs:group ref="rspec:SliverTypeContents"/>
+          <xs:attributeGroup ref="rspec:SliverTypeContents"/>
+        </xs:complexType>
+      </xs:element>
+      <xs:element ref="rspec:disk_image"/>
+    </xs:choice>
+    <xs:attributeGroup ref="rspec:AnyExtension"/>
+  </xs:complexType>
+  <xs:element name="hardware_type" type="rspec:HardwareTypeContents"/>
+  <xs:element name="disk_image" type="rspec:DiskImageContents"/>
 </xs:schema>

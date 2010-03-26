@@ -8,7 +8,7 @@
     <hardware_type name="pc600" />
     <hardware_type name="pc3000" />
     <sliver_type name="raw-pc" />
-    <disk_image name="RH9-STD" os="linux" version="Redhat-9" />
+    <disk_image name="RHL9-STD" os="linux" version="Redhat-9" />
   </type_relation>
   <type_relation>
     <hardware_type name="pc3000" />
@@ -22,9 +22,8 @@
       <login authentication="ssh-keys" hostname="pc175.emulab.net" port="22"/>
     </services>
     <sliver_type name="raw-pc">
-      <disk_image name="FBSD62-UNSTABLE" os="linux" version="FreeBSD-6.21"
-		  default="true">
-      </disk_image>
+      <disk_image name="FBSD62-UNSTABLE" os="linux" version="FreeBSD-6.21" />
+      <disk_image name="FBSD62-STD" default="true" />
     </sliver_type>
     <hardware_type name="pc3000" />
     <hardware_type name="pc" />
@@ -35,7 +34,9 @@
     <services>
       <login authentication="ssh-keys" hostname="pc176.emulab.net" port="22"/>
     </services>
-    <sliver_type name="raw-pc" />
+    <sliver_type name="raw-pc">
+      <disk_image name="FBSD62-STD" default="true" />
+    </sliver_type>
     <hardware_type name="pc3000" />
     <hardware_type name="pc" />
   </node>
@@ -45,7 +46,9 @@
     <services>
       <login authentication="ssh-keys" hostname="pc1.emulab.net" port="22"/>
     </services>
-    <sliver_type name="raw-pc" />
+    <sliver_type name="raw-pc">
+      <disk_image name="RHL9-STD" default="true" />
+    </sliver_type>
     <hardware_type name="pc600" />
     <hardware_type name="pc" />
   </node>

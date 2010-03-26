@@ -131,18 +131,16 @@
       <xs:attribute name="name" use="required"/>
     </xs:complexType>
   </xs:element>
-  <xs:element name="sliver_type">
-    <xs:complexType>
-      <xs:group ref="rspec:AnyExtension"/>
-      <xs:attributeGroup ref="rspec:AnyExtension"/>
-      <xs:attribute name="name" use="required"/>
-    </xs:complexType>
-  </xs:element>
-  <xs:element name="hardware_type">
-    <xs:complexType>
-      <xs:group ref="rspec:AnyExtension"/>
-      <xs:attributeGroup ref="rspec:AnyExtension"/>
-      <xs:attribute name="name" use="required"/>
-    </xs:complexType>
-  </xs:element>
+  <xs:element name="sliver_type" type="rspec:SliverTypeContents"/>
+  <xs:complexType name="SliverTypeContents">
+    <xs:group ref="rspec:AnyExtension"/>
+    <xs:attributeGroup ref="rspec:AnyExtension"/>
+    <xs:attribute name="name" use="required"/>
+  </xs:complexType>
+  <xs:element name="hardware_type" type="rspec:HardwareTypeContents"/>
+  <xs:complexType name="HardwareTypeContents">
+    <xs:group ref="rspec:AnyExtension"/>
+    <xs:attributeGroup ref="rspec:AnyExtension"/>
+    <xs:attribute name="name" use="required"/>
+  </xs:complexType>
 </xs:schema>
