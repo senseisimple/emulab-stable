@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rspec xmlns="http://www.protogeni.net/resources/rspec/2"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.protogeni.net/resources/rspec/2 http://www.protogeni.net/resources/rspec/2/ad.xsd"
+       type="advertisement">
+  <type_relation>
+    <hardware_type name="pc" />
+    <hardware_type name="pc600" />
+    <hardware_type name="pc3000" />
+    <sliver_type name="raw-pc" />
+    <disk_image name="RH9-STD" os="linux" version="Redhat-9" />
+  </type_relation>
+  <type_relation>
+    <hardware_type name="pc3000" />
+    <sliver_type name="raw-pc" />    
+    <disk_image name="FBSD62-STD" os="linux" version="FreeBSD-6.2" />
+  </type_relation>
+  <node component_id="urn:publicid:IDN+emulab.net+node+pc175"
+        component_manager_id="urn:publicid:IDN+emulab.net+authority+cm"
+        exclusive="true">
+    <services>
+      <login authentication="ssh-keys" hostname="pc175.emulab.net" port="22"/>
+    </services>
+    <sliver_type name="raw-pc">
+      <disk_image name="FBSD62-UNSTABLE" os="linux" version="FreeBSD-6.21"
+		  default="true">
+      </disk_image>
+    </sliver_type>
+    <hardware_type name="pc3000" />
+    <hardware_type name="pc" />
+  </node>
+  <node component_id="urn:publicid:IDN+emulab.net+node+pc176"
+        component_manager_id="urn:publicid:IDN+emulab.net+authority+cm"
+        exclusive="true">
+    <services>
+      <login authentication="ssh-keys" hostname="pc176.emulab.net" port="22"/>
+    </services>
+    <sliver_type name="raw-pc" />
+    <hardware_type name="pc3000" />
+    <hardware_type name="pc" />
+  </node>
+  <node component_id="urn:publicid:IDN+emulab.net+node+pc1"
+        component_manager_id="urn:publicid:IDN+emulab.net+authority+cm"
+        exclusive="true">
+    <services>
+      <login authentication="ssh-keys" hostname="pc1.emulab.net" port="22"/>
+    </services>
+    <sliver_type name="raw-pc" />
+    <hardware_type name="pc600" />
+    <hardware_type name="pc" />
+  </node>
+</rspec>

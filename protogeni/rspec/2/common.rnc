@@ -118,12 +118,14 @@ LinkClass = element link_class {
     attribute name { text }
 }
 
-SliverType = element sliver_type {
-    AnyExtension &
-    attribute name { text }
-}
+SliverType = element sliver_type { SliverTypeContents }
 
-HardwareType = element hardware_type {
+SliverTypeContents =
     AnyExtension &
     attribute name { text }
-}
+
+HardwareType = element hardware_type { HardwareTypeContents }
+
+HardwareTypeContents =
+    AnyExtension &
+    attribute name { text }

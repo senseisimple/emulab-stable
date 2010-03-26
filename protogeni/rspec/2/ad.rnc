@@ -36,17 +36,28 @@ NodeContents &=
   # multiple physical links to connect to the same interface.
   element cloud { AnyExtension } &
 
-  # Lists services provided by the CM for this node.
   element services { ServiceContents } &
 
   # Node type. This includes both hardware and sliver type elements:
   HardwareType* &
-  SliverType*
+  element sliver_type {
+    SliverTypeContents &
+    element disk_image {
+      DiskImageContents &
+      attribute default { text }?
+    }*
+  }*
 
 AvailableContents =
   AnyExtension &
   # Indictates current availability
   attribute now { xsd:boolean }
+
+DiskImageContents =
+  AnyExtension &
+  attribute name { text } &
+  attribute os { text }? &
+  attribute version { text }?
 
 LinkContents &=
   # Component identifiers
@@ -106,10 +117,19 @@ ExecuteServiceContents &=
   # Shell environment allowed
   attribute shell { "sh" }
 
+TypeRelationContents &=
+  AnyExtension &
+  element hardware_type { HardwareTypeContents }* &
+  element sliver_type { SliverTypeContents }* &
+  element disk_image { DiskImageContents }*
+
 RSpecContents &=
   attribute type { "advertisement" } &
   element external_ref {
     ExternalReferenceContents
+  }* &
+  element type_relation {
+    TypeRelationContents
   }*
 
 start = RSpec
