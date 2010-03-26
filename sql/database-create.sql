@@ -422,6 +422,21 @@ CREATE TABLE `deltas` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `elabinelab_attributes`
+--
+
+CREATE TABLE `elabinelab_attributes` (
+  `pid` varchar(12) NOT NULL default '',
+  `eid` varchar(32) NOT NULL default '',
+  `exptidx` int(11) NOT NULL default '0',
+  `role` enum('boss','router','ops','fs','node') NOT NULL default 'node',
+  `attrkey` varchar(32) NOT NULL default '',
+  `attrvalue` tinytext NOT NULL,
+  `order` smallint(5) unsigned NOT NULL default '0',
+  PRIMARY KEY  (`exptidx`,`role`,`attrkey`,`order`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `elabinelab_vlans`
 --
 

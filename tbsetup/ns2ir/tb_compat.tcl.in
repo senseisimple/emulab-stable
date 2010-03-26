@@ -132,7 +132,7 @@ namespace eval TBCOMPAT {
 
     # Elabinelab attribute stuff.
     variable elabinelab_attributes
-    array set elabinelab_attributes {}
+    set elabinelab_attributes {}
     variable EINEROLE  {^(boss|ops|fs|router)$}
     variable EINEKEY   {^(\w[-\w\.]+)$}
     variable EINEVALUE {^([-\w\s\.\,\/]+)$}
@@ -1760,8 +1760,14 @@ proc tb-elabinelab-singlenet {args} {
 #    tb-unset-elabinelab-attribute <role> <key>
 #
 proc tb-set-elabinelab-attribute {role key value {order 0}} {
+    var_import ::TBCOMPAT::EINEROLE;
+    var_import ::TBCOMPAT::EINEKEY;
+    var_import ::TBCOMPAT::EINEVALUE;
+    var_import ::TBCOMPAT::EINEORDER;
+    var_import ::TBCOMPAT::elabinelab_attributes;
+
     if {[regexp $EINEROLE $role] == 0} {
-	perror "\[tb-set-elabinelab-attribute] - $role is not a valid elabinelab role"
+	perror "\[tb-set-elabinelab-attribute] - \"$role\" is not a valid elabinelab role"
 	return
     }
     if {[regexp $EINEKEY $key] == 0} {
@@ -1773,13 +1779,29 @@ proc tb-set-elabinelab-attribute {role key value {order 0}} {
 	return
     }
     if {[regexp $EINEORDER $order] == 0} {
-	perror "\[tb-set-elabinelab-attribute] - $order is not a valid elabinelab order"
+	perror "\[tb-set-elabinelab-attribute] - \"$order\" is not a valid elabinelab order"
 	return
     }
-
+    lappend elabinelab_attributes "$role,$key,$value,$order"
 }
 
 proc tb-unset-elabinelab-attribute {role key} {
+    var_import ::TBCOMPAT::EINEROLE;
+    var_import ::TBCOMPAT::EINEKEY;
+    var_import ::TBCOMPAT::elabinelab_attributes;
+
+    if {[regexp $EINEROLE $role] == 0} {
+	perror "\[tb-unset-elabinelab-attribute] - \"$role\" is not a valid elabinelab role"
+	return
+    }
+    if {[regexp $EINEKEY $key] == 0} {
+	perror "\[tb-unset-elabinelab-attribute] - \"$key\" is not a valid elabinelab key"
+	return
+    }
+    while {[lsearch -glob $elabinelab_attributes "$role,$key,*"] > 0} {
+	set i [lsearch -glob $elabinelab_attributes "$role,$key,*"]
+	set elabinelab_attributes [lreplace $elabinelab_attributes $i $i]
+    }
 }
 
 #

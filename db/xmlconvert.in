@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -110,6 +110,9 @@ my %virtual_tables =
      "firewall_rules"		=> { rows  => undef, 
 				     tag   => "firewall_rules",
 				     row   => "firewall_rule"},
+     "elabinelab_attributes"	=> { rows  => undef, 
+				     tag   => "elabinelab_attributes",
+				     row   => "attribute"},
      "virt_tiptunnels"		=> { rows  => undef, 
 				     tag   => "tiptunnels",
 				     row   => "tiptunnel"},

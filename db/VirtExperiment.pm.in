@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2009 University of Utah and the Flux Group.
+# Copyright (c) 2009, 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package VirtExperiment;
@@ -69,6 +69,7 @@ my $debug	      = 0;
      "event_groups"		=> [ "group_name", "agent_name" ],
      "virt_firewalls"		=> [ "fwname", "type", "style" ],
      "firewall_rules"		=> [ "fwname", "ruleno", "rule" ],
+     "elabinelab_attributes"	=> [ "role", "attrkey", "order" ],
      "virt_tiptunnels"		=> [ "host", "vnode" ],
      "virt_parameters"          => [ "name", "value" ],
 );

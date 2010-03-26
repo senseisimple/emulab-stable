@@ -1,0 +1,27 @@
+#
+# Add the elabinelab_attributes table.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (!DBTableExists("elabinelab_attributes")) {
+	DBQueryFatal("CREATE TABLE `elabinelab_attributes` ( ".
+	             " `pid` varchar(12) NOT NULL default '', ".
+	             " `eid` varchar(32) NOT NULL default '', ".
+	             " `exptidx` int(11) NOT NULL default '0', ".
+		     " `role` enum('boss','router','ops','fs','node') NOT NULL default 'node', ".
+	             " `attrkey` varchar(32) NOT NULL default '', ".
+	             " `attrvalue` tinytext NOT NULL, ".
+	             " `order` smallint(5) unsigned NOT NULL default '0', ".
+	             "  PRIMARY KEY  (`exptidx`,`role`,`attrkey`,`order`) ".
+	             ") ENGINE=MyISAM DEFAULT CHARSET=latin1");
+    }
+    
+    # Initialize new table.
+    return 0;
+}
+1;
