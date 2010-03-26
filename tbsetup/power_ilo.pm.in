@@ -29,7 +29,7 @@ use IO::Pty;
 use POSIX qw(setsid);
 use POSIX ":sys_wait_h";
 
-my $debug = 1;
+my $debug = 0;
 # Always parallelize for now cause we are vulnerable to timeouts with 
 # unreachable nodes or weird iLO crap.
 my $parallelize = 1;
