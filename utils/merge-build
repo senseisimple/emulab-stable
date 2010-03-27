@@ -111,9 +111,9 @@ sub save_uncommited() {
     sysq "git add -A";
     sysq "git reset -q .merge-build";
     my $tree_id = sysp "git write-tree";
-    chomp $tree_id;
+    chop $tree_id;
     my $stash_id = sysp "echo Build stash | git commit-tree $tree_id -p HEAD";
-    chomp $stash_id;
+    chop $stash_id;
     unlink($ENV{GIT_INDEX_FILE});
     return $stash_id;
 }
@@ -124,7 +124,7 @@ sub merge_base(@) {
     while (@_) {
 	my $other = shift @_;
 	$res = sysp "git merge-base $res $other";
-	chomp $res;
+	chop $res;
     }
     return $res;
 }
