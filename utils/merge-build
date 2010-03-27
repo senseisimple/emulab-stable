@@ -35,17 +35,6 @@ sub sysp (@) {
     return $output;
 }
 
-sub sys_filter ($&) {
-    my $cmd = "$_[0] |";
-    my $filter = $_[1];
-    print "$cmd\n";
-    open F, $cmd or die $!;
-    while (<F>) {
-	print if $filter->();
-    }
-    die "ERROR: $cmd faild\n" unless $? == 0;
-}
-
 sub usage() {
     print "usage: merge-build prep|reset|sync\n";
     exit(1);
@@ -167,5 +156,3 @@ if ($op eq 'prep') {
 } else {
     usage();
 }
-
-
