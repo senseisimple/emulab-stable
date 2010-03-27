@@ -432,8 +432,8 @@ CREATE TABLE `elabinelab_attributes` (
   `role` enum('boss','router','ops','fs','node') NOT NULL default 'node',
   `attrkey` varchar(32) NOT NULL default '',
   `attrvalue` tinytext NOT NULL,
-  `order` smallint(5) unsigned NOT NULL default '0',
-  PRIMARY KEY  (`exptidx`,`role`,`attrkey`,`order`)
+  `ordering` smallint(5) unsigned NOT NULL default '0',
+  PRIMARY KEY  (`exptidx`,`role`,`attrkey`,`ordering`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --

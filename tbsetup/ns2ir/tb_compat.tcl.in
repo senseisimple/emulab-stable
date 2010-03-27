@@ -133,9 +133,9 @@ namespace eval TBCOMPAT {
     # Elabinelab attribute stuff.
     variable elabinelab_attributes
     set elabinelab_attributes {}
-    variable EINEROLE  {^(boss|ops|fs|router)$}
-    variable EINEKEY   {^(\w[-\w\.]+)$}
-    variable EINEVALUE {^([-\w\s\.\,\/]+)$}
+    variable EINEROLE  {^(boss|ops|fs|router|node)$}
+    variable EINEKEY   {^([-\w\.]+)$}
+    variable EINEVALUE {^([-\w\.\+\,\s\/]+)$}
     variable EINEORDER {^\d+$}
 
     # Mapping of "resource classes" and "reservation types" to bootstrap
@@ -1798,7 +1798,7 @@ proc tb-unset-elabinelab-attribute {role key} {
 	perror "\[tb-unset-elabinelab-attribute] - \"$key\" is not a valid elabinelab key"
 	return
     }
-    while {[lsearch -glob $elabinelab_attributes "$role,$key,*"] > 0} {
+    while {[lsearch -glob $elabinelab_attributes "$role,$key,*"] > -1} {
 	set i [lsearch -glob $elabinelab_attributes "$role,$key,*"]
 	set elabinelab_attributes [lreplace $elabinelab_attributes $i $i]
     }

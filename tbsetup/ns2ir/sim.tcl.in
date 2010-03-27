@@ -703,13 +703,8 @@ Simulator instproc run {} {
 
     if {$elab_in_elab} {
 	foreach attr $elabinelab_attributes {
-	    set fields [list "role" "attrkey" "attrvalue" "order"]
+	    set fields [list "role" "attrkey" "attrvalue" "ordering"]
 	    set values [split $attr ","]
-
-	    # XXX this shouldn't be needed
-	    lappend fields [list "pid" "eid"]
-	    lappend values [list $pid $eid]
-
 	    $self spitxml_data "elabinelab_attributes" $fields $values
 	}
     }

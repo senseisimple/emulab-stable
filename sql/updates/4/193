@@ -16,11 +16,25 @@ sub DoUpdate($$$)
 		     " `role` enum('boss','router','ops','fs','node') NOT NULL default 'node', ".
 	             " `attrkey` varchar(32) NOT NULL default '', ".
 	             " `attrvalue` tinytext NOT NULL, ".
-	             " `order` smallint(5) unsigned NOT NULL default '0', ".
-	             "  PRIMARY KEY  (`exptidx`,`role`,`attrkey`,`order`) ".
+	             " `ordering` smallint(5) unsigned NOT NULL default '0', ".
+	             "  PRIMARY KEY  (`exptidx`,`role`,`attrkey`,`ordering`) ".
 	             ") ENGINE=MyISAM DEFAULT CHARSET=latin1");
     }
     
+    # Fill in check fields
+    DBQueryFatal("REPLACE INTO table_regex VALUES".
+		 " ('elabinelab_attributes','role','text','regex',".
+		 " '^(boss|router|ops|fs|node)\$',0,0,NULL)");
+    DBQueryFatal("REPLACE INTO table_regex VALUES".
+		 " ('elabinelab_attributes','attrkey','text','regex',".
+		 " '^[-\\\\w\\\\.]+\$',1,32,NULL)");
+    DBQueryFatal("REPLACE INTO table_regex VALUES".
+		 " ('elabinelab_attributes','attrvalue','text','regex',".
+		 " '^[-\\\\w\\\\.\\\\+,\\\\s\\\\/]+\$',0,255,NULL)");
+    DBQueryFatal("REPLACE INTO table_regex VALUES".
+		 " ('elabinelab_attributes','ordering','int','redirect',".
+		 " 'default:tinyint',0,0,NULL)");
+
     # Initialize new table.
     return 0;
 }
