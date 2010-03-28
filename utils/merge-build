@@ -27,11 +27,13 @@ sub sys (@) {
 
 sub sysp (@) {
     my $cmd = join(' ', @_, '|');
+    #print "$cmd\n";
     open F, $cmd or die $!;
     local $/ = undef;
     my $output = <F>;
     close F;
     die "ERROR: $cmd faild\n" unless $? == 0;
+    chop $output;
     return $output;
 }
 
@@ -49,6 +51,8 @@ my $merge_tree;
 my @branches;
 my $branches_str;
 my $merge_branch = "merge";
+my $merge_base = "merge-base";
+my $auto_reset = 1;
 while (<F>) {
     s/#.+//;
     next unless /\S/;
@@ -61,6 +65,16 @@ while (<F>) {
 	@branches = split /\s+/, $value;
     } elsif ($key eq 'merge-branch') {
 	$merge_branch = $value;
+    } elsif ($key eq 'merge-base') {
+	$merge_base = $value;
+    } elsif ($key eq 'auto-reset') {
+	if ($value eq 'yes') { 
+	    $auto_reset = 1;
+	} elsif ($value eq 'no') {
+	    $auto_reset = 0;
+	} else {
+	    die "Expected \"yes\" or \"no\" for auto-reset value\n";
+	}
     } else {
 	die "Unknown key in .merge-build: $key\n";
     }
@@ -69,7 +83,8 @@ sub missing_key($) {die "Missing key in .merge-build: $_[0]\n";}
 missing_key('source-tree') unless defined $source_tree;
 missing_key('merge-tree') unless defined $merge_tree;
 missing_key('branches') unless @branches;
-my $branch_str = join ' ', map {"origin/$_"} @branches;
+@branches = map {"origin/$_"} @branches;
+my $branch_str = join ' ', @branches;
 
 #
 # Figure out where we are
@@ -111,9 +126,7 @@ sub save_uncommited() {
     sysq "git add -A";
     sysq "git reset -q .merge-build";
     my $tree_id = sysp "git write-tree";
-    chop $tree_id;
     my $stash_id = sysp "echo Build stash | git commit-tree $tree_id -p HEAD";
-    chop $stash_id;
     unlink($ENV{GIT_INDEX_FILE});
     return $stash_id;
 }
@@ -122,11 +135,58 @@ sub merge_base(@) {
     cd_merge();
     my $res = shift @_;
     while (@_) {
-	my $other = shift @_;
-	$res = sysp "git merge-base $res $other";
-	chop $res;
+        my $other = shift @_;
+        $res = sysp "git merge-base $res $other";
     }
     return $res;
+}
+
+sub init($) {
+    my ($cmd) = @_;
+    cd_merge();
+    my $base = merge_base @branches;
+    sys "git $cmd $base";
+    sys "git commit -q --allow-empty -m Marker";
+    sys "git tag -f merge-base";
+}
+
+sub notall { $_ || return 1 for @_; 0 }
+sub auto_reset() {
+    cd_merge();
+    my $merge_base = sysp "git rev-parse merge-base";
+    my $new_base = merge_base @branches;
+    open F, "git rev-list $branch_str ^$new_base |" or die $!;
+    my %source_commits;
+    while (<F>) {
+	chop;
+  	$source_commits{$_} = 1;
+    }
+    $source_commits{$merge_base} = 1;
+    close F or die $!;
+    cd_merge();
+    $/ = "\0";
+    open F, "git log --pretty=raw -z --first-parent --topo-order merge-base..HEAD | " or die $!;
+    my $reset_point;
+    my $last;
+    while (<F>) {
+	my ($commit) = /^commit (.+)$/m or die;
+	next if $source_commits{$commit};
+	my @parents = /^parent (.+)$/mg;
+	shift @parents;
+	next unless @parents;
+	$last = $commit;
+	$reset_point = $commit if notall map {$source_commits{$_}} @parents;
+    }
+    close F or die $!;
+    if ($reset_point) {
+	if ($reset_point eq $last) {
+	    print "Starting over\n"; 
+	    init("reset -q --hard");
+	} else {
+	    print "Need to reset to $reset_point^\n"; 
+	    sys "git reset -q --soft $reset_point^";
+	}
+    }
 }
 
 #
@@ -137,18 +197,22 @@ if ($op eq 'prep') {
     die "Merge tree must not exist\n" if -e $merge_tree;
     sys "git clone -sn . $merge_tree";
     cd_merge();
-    my $base = merge_base split / /, $branch_str;
-    sys "git checkout -b $merge_branch $base";
+    init("checkout -q -b $merge_branch");
     sys "ln -s $source_tree/.merge-build";
 } elsif ($op eq 'reset') {
     cd_merge();
-    my $base = merge_base $merge_branch, split / /, $branch_str;
-    sys "git reset -q --hard $base";
+    sys "git fetch -q origin";
+    init("reset -q --hard");
+} elsif ($op eq 'auto-reset') {
+    cd_merge();
+    sys "git fetch -q origin";
+    auto_reset();
 } elsif ($op eq 'sync') {
     cd_source();
     my $stash_id = save_uncommited();
     cd_merge();
     sys "git fetch -q origin";
+    auto_reset() if $auto_reset;
     sys "git reset -q --hard";
     sys "git merge -q $branch_str";
     sys "git merge-recursive -- HEAD $stash_id";
