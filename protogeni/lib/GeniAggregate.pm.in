@@ -51,6 +51,7 @@ my $VERIFYCRED	   = "$TB/sbin/verifygenicred";
 my $NODEREBOOT	   = "$TB/bin/node_reboot";
 my $VNODESETUP     = "$TB/sbin/vnode_setup";
 my $POWER          = "$TB/bin/power";
+my $OSLOAD         = "$TB/bin/os_load";
 my $SNMPIT         = "$TB/bin/snmpit";
 my $NAMEDSETUP     = "$TB/sbin/named_setup";
 my $EXPORTS_SETUP  = "$TB/sbin/exports_setup";
@@ -745,6 +746,7 @@ sub Start($$$)
     my %reboots  = ();
     my %vnodes   = ();
     my %poweron  = ();
+    my %reloads  = ();
 
     foreach my $sliver (@slivers) {
 	next
@@ -770,20 +772,87 @@ sub Start($$$)
 	    
 	    if ($node->isvirtnode()) {
 		$vnodes{$node->node_id} = $node;
+
+		# A virtnode on a shared physical node needs nothing else.
+		next
+		    if ($node->sharing_mode());
+
+		# But if non-shared, have to make sure that the phys node
+		# gets loaded.
+		my $physnodeid = $node->phys_nodeid();
+		next
+		    if (exists($poweron{$physnodeid}) ||
+			exists($reboots{$physnodeid}) ||
+			exists($reloads{$physnodeid}));
+		$node = Node->Lookup($physnodeid);
+		if (!defined($node)) {
+		    print STDERR "Could not lookup $physnodeid\n";
+		    return -1;
+		}
+	    }
+	    #
+	    # Look to see if local physical node was stopped (powered off).
+	    #
+	    if (!$node->isremotenode() &&
+		$sliver->state() eq "stopped") {
+		$poweron{$node->node_id} = $node;
+	    }
+	    else {
+		# node_reboot is smart enough to know that if a pnode
+		# is rebooted it can ignore the vnodes on it, so do
+		# not optimize this here.
+		$reboots{$node->node_id} = $node;
+	    }
+	    next
+		if (!$node->imageable());
+
+	    my $osinfo = OSinfo->Lookup($node->def_boot_osid());
+	    if (!defined($osinfo)) {
+		print STDERR "Could not get osinfo for $node\n";
+		return -1;
+	    }
+	    print STDERR "$node wants to boot $osinfo.\n";
+	    if ($osinfo->IsGeneric()) {
+		#
+		# Map generic OSID to the specific one.
+		#
+		my $tmp = $osinfo->ResolveNextOSID($experiment);
+		if (!defined($tmp)) {
+		    print STDERR "No next mapping for $osinfo on $node!\n";
+		    return -1;
+		}
+		print STDERR "  Mapping $osinfo on $node to $tmp\n";
+		$osinfo = $tmp;
+	    }
+	    #
+	    # Make sure this OSID is actually loaded on the machine.
+	    #
+	    my $isloaded = $node->IsOSLoaded($osinfo);
+	    if ($isloaded < 0) {
+		print STDERR
+		    "Error determining if $osinfo is loaded on $node\n";
+		return -1;
+	    }
+	    if (! $isloaded) {
+		print STDERR "  Setting up a reload for $node\n";
+		
+		my $image = $osinfo->MapToImage($node->type());
+		if (!defined($image)) {
+		    print STDERR "  No image for $osinfo on $node\n";
+		    return -1;
+		}
+		if (!exists($reloads{$image->imageid()})) {
+		    $reloads{$image->imageid()} = [ ];
+		} 
+		push(@{ $reloads{$image->imageid()} }, $node);
 	    }
 	    else {
 		#
-		# Look to see if local physical node was stopped (powered off).
+		# Make sure boot is set correctly.
 		#
-		if (!$node->isremotenode() &&
-		    $sliver->state() eq "stopped") {
-		    $poweron{$node->node_id} = $node;
-		}
-		else {
-		    # node_reboot is smart enough to know that if a pnode
-		    # is rebooted it can ignore the vnodes on it, so do
-		    # not optimize this here.
-		    $reboots{$node->node_id} = $node;
+		if ($node->OSSelect($osinfo, "def_boot_osid", 0)) {
+		    print STDERR "  Could not os_select $node to $osinfo\n";
+		    return -1;
 		}
 	    }
 	}
@@ -805,6 +874,21 @@ sub Start($$$)
 	}
     }
     %vnodes = %tmp;
+
+    #
+    # Setup the reloads. We do not reboot the nodes until below.
+    #
+    if (keys(%reloads)) {
+	foreach my $imageid (keys(%reloads)) {
+	    my @nodes = @{ $reloads{$imageid} };
+	    my @node_ids = map { $_->node_id() } @nodes;
+
+	    # No wait, no reboot. reload runs completely in the background.
+	    system("$OSLOAD -s -r -m $imageid @node_ids");
+	    return -1
+		if ($?);
+	}
+    }
 
     if ($version >= 2) {
 	if (system("$GENTOPOFILE $pid $eid")) {
@@ -836,7 +920,7 @@ sub Start($$$)
 		}
 	    }
 	}
-	system("$SNMPIT -t $pid $eid");
+	system("$SNMPIT -q -t $pid $eid");
 	if ($?) {
 	    print STDERR "$SNMPIT failed\n";
 	    return -1;
@@ -965,7 +1049,7 @@ sub Stop($$)
     %vnodes = %tmp;
 
     if ($version >= 2) {
-	system("$SNMPIT -r $pid $eid");
+	system("$SNMPIT -q -r $pid $eid");
 	if ($?) {
 	    print STDERR "$SNMPIT failed\n";
 	    return -1;

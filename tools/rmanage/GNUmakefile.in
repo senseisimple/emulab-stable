@@ -15,12 +15,31 @@ SYSTEM	       := $(shell $(TESTBED_SRCDIR)/utils/osstuff.sh -t)
 
 CFLAGS = -Wall  
 LDFLAGS = -lssl
-SWIG_INCS = -I/usr/local/lib/perl5/5.8.8/mach/CORE -I$(SRCDIR)
 
 # XXX lame, doesn't compile on freebsd4
 ifneq ($(SYSTEM),freebsd4)
 LIB_STUFF = rmcp.so rmcp.pm 
 SBIN_STUFF = rmanage
+endif
+
+SYSTEM = $(shell uname -s)
+
+SEDEXTARG = -E
+ifeq ($(SYSTEM),Linux)
+SEDEXTARG = -r
+endif
+
+PCOREDIR  = `perl -V | sed -n $(SEDEXTARG) -e 's/^[ \t]+(\/usr(\/local)?\/lib\/perl5\/5.+\/.+)$$/\1/p' | grep -v BSDPAN\$$`
+PCORE     = $(PCOREDIR)/CORE
+PCFLAGS = `perl -e 'use Config; print $$Config{ccflags} . " " . $$Config{ccdlflags};'`
+# remove PCFLAGS since newer swigs can't seem to handle the gcc options (or
+# maybe earlier perls didn't include them...)
+SWIG_INCS = -I$(PCORE) -I$(SRCDIR) #$(PCFLAGS)
+SWIG_GCC_INCS = -I$(PCORE) -I$(SRCDIR) $(PCFLAGS)
+
+MYSQL_LIBS = -L/usr/local/lib/mysql -lmysqlclient
+ifeq ($(SYSTEM),Linux)
+MYSQL_LIBS = `mysql_config --libs`
 endif
 
 all: $(SBIN_STUFF) $(LIB_STUFF)
@@ -32,14 +51,14 @@ rmcp.so: rmcp.o rmcp_wrap.o
 	ld -shared $^ -lssl -o rmcp.so
 
 swig-wrappers: rmcp.h rmcp.i
-	swig -perl5 -module rmcp -o rmcp_wrap.c $(SWIG_INCS) $(SRCDIR)/rmcp.i
+	swig -perl5 -module rmcp -o $(SRCDIR)/rmcp_wrap.c $(SWIG_INCS) $(SRCDIR)/rmcp.i
 
 rmcp_wrap.o: $(SRCDIR)/rmcp_wrap.c
-	$(CC) -fpic -c $(CFLAGS) $(SWIG_INCS) $(LDFLAGS) $(SRCDIR)/rmcp_wrap.c
+	$(CC) -fpic -c $(CFLAGS) $(SWIG_GCC_INCS) $(LDFLAGS) $(SRCDIR)/rmcp_wrap.c
 
 rmanage: GNUmakefile rmanage.o rmcp.o \
 		${OBJDIR}/lib/libtb/tbdb.o ${OBJDIR}/lib/libtb/log.o
-	$(CC) $(CFLAGS) $(LDFLAGS)  -L/usr/local/lib/mysql -lmysqlclient \
+	$(CC) $(CFLAGS) $(LDFLAGS) $(MYSQL_LIBS) \
 		rmanage.o rmcp.o ${OBJDIR}/lib/libtb/tbdb.o \
 		${OBJDIR}/lib/libtb/log.o -o rmanage
 		cp rmanage rmanage.debug
