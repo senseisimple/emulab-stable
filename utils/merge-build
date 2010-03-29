@@ -119,7 +119,7 @@ sub cd_merge() {
 
 sub save_uncommited() {
     cd_source();
-    print "Saving Uncommited Changes\n";
+    print "Saving Uncommited Changes ...\n";
     sysq "git update-index -q --refresh";
     local $ENV{GIT_INDEX_FILE} = mktemp ".git/index.XXXXXX";
     sysq "cp -p .git/index $ENV{GIT_INDEX_FILE}";
@@ -128,6 +128,10 @@ sub save_uncommited() {
     my $tree_id = sysp "git write-tree";
     my $stash_id = sysp "echo Build stash | git commit-tree $tree_id -p HEAD";
     unlink($ENV{GIT_INDEX_FILE});
+    sysq ": >> .git/logs/build-stash";
+    my $date = localtime();
+    sysq "git update-ref -m 'Uncommitted changes: $date' build-stash $stash_id";
+    print "... done, commit id $stash_id\n";
     return $stash_id;
 }
 
