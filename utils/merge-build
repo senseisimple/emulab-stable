@@ -126,11 +126,12 @@ sub save_uncommited() {
     sysq "git add -A";
     sysq "git reset -q .merge-build";
     my $tree_id = sysp "git write-tree";
-    my $stash_id = sysp "echo Build stash | git commit-tree $tree_id -p HEAD";
-    unlink($ENV{GIT_INDEX_FILE});
-    sysq ": >> .git/logs/build-stash";
     my $date = localtime();
-    sysq "git update-ref -m 'Uncommitted changes: $date' build-stash $stash_id";
+    my $msg = "Uncommitted changes: $date";
+    my $stash_id = sysp "echo '$msg' | git commit-tree $tree_id -p HEAD";
+    unlink($ENV{GIT_INDEX_FILE});
+    sysq ": >> .git/logs/build-stash"; # make sure the reflogs are kept.
+    sysq "git update-ref -m '$msg' build-stash $stash_id";
     print "... done, commit id $stash_id\n";
     return $stash_id;
 }
