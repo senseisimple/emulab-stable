@@ -1,30 +1,19 @@
-This is the build tree for the Linux-based frisbee MFS.
+This is the build tree for the Linux-based Frisbee/admin/newnode MFS.
 
 This can probably only be compiled on a Linux machine.
 
-To build the toolchain for the Linux MFS, do this ($ARCH is either
-i386 or x86_64):
-
-# cd testbed/mfs/linux_mfs
-# scp ops:/share/linux/mfs/source tarballs
-# tar xvjf tarballs/buildroot-20081211.tar.bz2
-# cp source/buildroot/buildroot.config.$ARCH buildroot/.config
-# cd buildroot
-# make oldconfig
-# make
-
-Once that's done, edit testbed/mfs/linux_mfs/Makefile and set the ARCH
-variable appropriately, then run 'make initramfs'.  If everything
-works, the boot/ directory will have the kernel and initramfs.
-
-The kernel is compiled but not installed anywhere.  You'll have to pull
-it out of the build tree for now.
-
-TODO
-----
-Lots of small things.  I've tested the tmcc and frisbee functionality of
-the image, but it's not really automated yet.  The necessary scripts are
-all there, but not yet tested.
+COMPILING
+---------
+- Install the fakeroot package (fakeroot.alioth.debian.org)
+- Edit the top-level Makefile and set the MFS_ARCH variable to i386 for
+  a 32-bit build or x86_64 for a 64-bit build.
+- Set TESTBED_PATH and TESTBEDOBJ_PATH in source/testbed/Makefile to
+  the location of your Emulab source tree and your build tree
+  respectively.
+- Download the source tarballs from ops via scp into a 'tarballs'
+  directory: 'scp ops:/share/linux/mfs/source tarballs'
+- Run 'make' (or 'make toolchain' for the compiler and 'make initramfs'
+  for the kernel and initramfs).
 
 BUGS
 ----

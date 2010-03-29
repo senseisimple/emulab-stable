@@ -19,18 +19,21 @@ use Getopt::Std;
 # allows users to do things on behalf of other users, and we want to track
 # that in the audit log.
 #
-# This script always does the right thing ...
+# Use -u for update mode, which skips the checks on current status,
+# and forces the target user into that state. Eventually, this should
+# be the default mode of operation (independent of web interface).
 #
 sub usage()
 {
-    print("Usage: tbacct [-f] [-b] ".
+    print("Usage: tbacct [-f] [-b] [-u] ".
 	  "<add|del|mod|passwd|wpasswd|email|freeze|thaw|verify> ".
 	  "<user> [args]\n");
     exit(-1);
 }
-my $optlist = "fb";
+my $optlist = "fbu";
 my $force   = 0;
 my $batch   = 0;
+my $update  = 0;
 
 #
 # Configure variables
@@ -80,6 +83,7 @@ my $ADDMMUSER   = "$TB/sbin/addmmuser";
 my $DELMMUSER   = "$TB/sbin/delmmuser";
 my $OPSDBCONTROL= "$TB/sbin/opsdb_control";
 my $ADDHOOK     = "$TB/sbin/adduserhook";
+my $SETGROUPS   = "$TB/sbin/setgroups";
 my $NOLOGIN	= "/sbin/nologin";
 my $SSH		= "$TB/bin/sshtb";
 my $SAVEUID	= $UID;
@@ -174,6 +178,9 @@ if (defined($options{"f"})) {
 }
 if (defined($options{"b"})) {
     $batch = 1;
+}
+if (defined($options{"u"})) {
+    $update = 1;
 }
 if (@ARGV < 2) {
     usage();
@@ -914,7 +921,11 @@ sub FreezeUser()
     # Check status.
     #
     if ($status ne USERSTATUS_FROZEN) {
-	fatal("$user is still active! Cannot freeze the account!");
+	fatal("$user is still active! Cannot freeze the account!")
+	    if (!$update);
+
+	$target_user->SetStatus(USERSTATUS_FROZEN());
+	$status = USERSTATUS_FROZEN();
     }
     $sfsupdate = 1;
 
@@ -936,7 +947,10 @@ sub ThawUser()
     # Check status.
     #
     if ($status ne USERSTATUS_ACTIVE) {
-	fatal("$user is not active! Cannot thaw the account!");
+	fatal("$user is not active! Cannot thaw the account!")
+	    if (!$update);
+	$target_user->SetStatus(USERSTATUS_ACTIVE());
+	$status = USERSTATUS_ACTIVE();
     }
     $sfsupdate = 1;
 
@@ -946,9 +960,25 @@ sub ThawUser()
     #
     if ($ELABINELAB &&
 	system("egrep -q -s '^${user}:' /etc/passwd")) {
-	return AddUser();
+	
+	AddUser() == 0
+	    or fatal("Cannot thaw $user");
+
+	system("$USERMOD -n $user -s /bin/tcsh");
     }
-    return UpdateUser(0);
+    else {
+	UpdateUser(0) == 0
+	    or fatal("Cannot thaw $user");
+    }
+
+    #
+    # Invoke as real user for auditing.
+    #
+    $EUID = $UID;
+    system("$SETGROUPS $user");
+    $EUID = 0;
+    
+    return 0;
 }
 
 #

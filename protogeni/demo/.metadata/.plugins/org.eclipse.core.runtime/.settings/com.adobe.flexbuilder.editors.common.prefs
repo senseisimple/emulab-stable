@@ -1,7 +1,0 @@
-#Sat Mar 06 19:24:23 KST 2010
-defaultCurrentLineColor=RGB {232, 242, 254}
-eclipse.preferences.version=1
-activeViewIDs3=org.eclipse.ui.views.ProblemView,com.adobe.flexbuilder.navigator,com.adobe.flexbuilder.editors.mxml.components.ComponentsView,com.adobe.flexbuilder.editors.mxml.states.StatesView,com.adobe.flexbuilder.editors.mxml.inspector.view.PropertiesView
-activeViewIDs2=org.eclipse.ui.console.ConsoleView,com.adobe.flexbuilder.navigator,org.eclipse.ui.views.ContentOutline
-autoViewIDs=com.adobe.flexbuilder.editors.mxml.states.StatesView\=design-mxml,com.adobe.flexbuilder.editors.mxml.inspector.view.PropertiesView\=design-mxml;design-css,com.adobe.flexbuilder.editors.mxml.components.ComponentsView\=design-mxml
-hyperlinkColor=RGB {0, 0, 255}
