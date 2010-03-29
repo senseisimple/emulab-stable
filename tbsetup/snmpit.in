@@ -159,7 +159,9 @@ END
 }
 
 
-my %opt = ();
+my @ofcontroller = ();
+my @oflistener = ();
+my %opt = ('of-controller' => \@ofcontroller, 'of-listener' => \@oflistener);
 Getopt::Long::Configure("no_ignore_case");
 GetOptions(\%opt,
     'a','c','d','e','b','B=s@','g','h','i=s@','l+','m=s@','M','n',
@@ -939,20 +941,20 @@ COMMAND: foreach my $command (@commands) {
 
 # TODO: get stack
 
-if ($opt{of-enable}) {
-    $exitval += doOpenflowEnable(); # stack, vlan
+if ($opt{'of-enable'}) {
+    $exitval += doOpenflowEnable($opt{'of-enable'}); # ADD: stack
 }
 
-if ($opt{of-disable}) {
-    $exitval += doOpenflowDisable(); # stack, vlan
+if ($opt{'of-disable'}) {
+    $exitval += doOpenflowDisable($opt{'of-disable'}); # ADD: stack
 }
 
-if ($opt{of-controller}) {
-    $exitval += doSetController(${of-controller}); # stack, vlan
+if ($opt{'of-controller'}) {
+    $exitval += doSetController($ofcontroller[0], $ofcontroller[1]); # ADD: stack
 }
 
-if ($opt{of-listener}) {
-    $exitval += doOpenflowListener($opt{of-listener}); # stack, vlan
+if ($opt{'of-listener'}) {
+    $exitval += doOpenflowListener($oflistener[0], $oflistener[1]); # ADD: stack
 }
 
 exit $exitval;
