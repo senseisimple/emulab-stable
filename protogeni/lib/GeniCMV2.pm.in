@@ -92,7 +92,14 @@ my $API_VERSION = 2;
 #
 sub GetVersion()
 {
-    return GeniResponse->Create( GENIRESPONSE_SUCCESS, $API_VERSION );
+    my $blob = {
+	"api" => $API_VERSION,
+	"level" => 1,
+	"input_rspec" => ( "0.1", 2 ),
+	"output_rspec" => "0.1"
+    };
+
+    return GeniResponse->Create( GENIRESPONSE_SUCCESS, $blob );
 }
 
 #
