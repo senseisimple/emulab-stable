@@ -1782,6 +1782,15 @@ proc tb-set-elabinelab-attribute {role key value {order 0}} {
 	perror "\[tb-set-elabinelab-attribute] - \"$order\" is not a valid elabinelab order"
 	return
     }
+
+    #
+    # If role/key/ordering exactly matches an existing value, replace it
+    # otherwise just add it.
+    #
+    set i [lsearch -glob $elabinelab_attributes "$role,$key,*,$order"]
+    if {$i > -1} {
+	set elabinelab_attributes [lreplace $elabinelab_attributes $i $i]
+    }
     lappend elabinelab_attributes "$role,$key,$value,$order"
 }
 
