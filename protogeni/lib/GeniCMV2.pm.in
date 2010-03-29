@@ -92,10 +92,11 @@ my $API_VERSION = 2;
 #
 sub GetVersion()
 {
+    my @input_rspec_versions = ( "0.1", "2" );
     my $blob = {
 	"api" => $API_VERSION,
 	"level" => 1,
-	"input_rspec" => ( "0.1", "2" ),
+	"input_rspec" => \@input_rspec_versions,
 	"output_rspec" => "0.1"
     };
 
