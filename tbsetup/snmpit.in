@@ -82,6 +82,10 @@ Usage: $0 [-h] [-v level] [-q] [-n] [-i device] [-S stack]
 	  [-d ports] [-e ports] [-a ports]
 	  [-p <10|100|1000> ports] [-u <half|full> ports]
 	  [-c]
+          [--of-disable vlan]
+          [--of-enable vlan]
+          [--of-controller vlan tcp:ip:port]
+          [--of-listener vlan ptcp:ip:port]
 General:
   -h          Display this help message
   -v <level>  Verbose mode
@@ -120,6 +124,14 @@ VLAN Control:
                         WITH EXTREME CAUTION **
   -F                Create all vlans in the given stack on the leader for
 		    use in leader->{ALLVLANSONLEADER} (Internal use only)
+  --of-enable <vlan>
+                    Enable Openflow on VLAN <vlan>
+  --of-disable <vlan>
+                    Disable Openflow on VLAN <vlan>
+  --of-controller <vlan> tcp:ip:port
+                    Set controller for Openflow-enabled VLAN <vlan>
+  --of-listener <vlan> ptcp:ip:port
+                    Set listener for Openflow-enabled VLAN <vlan>
 
 Port Control:
   -s                     List all ports, and show configuration information
@@ -153,7 +165,7 @@ GetOptions(\%opt,
     'a','c','d','e','b','B=s@','g','h','i=s@','l+','m=s@','M','n',
     'N=s@','o=s@','p=s','q','r','s', 'S=s@','t','E=s','T=s','u=s','U','v=s','w',
     'y=s','x=s','z=s','F','L=s','O', 'D', 'R', 'f', 'X', 'vlan_tag=i', 
-    'of-disable=s', 'of-enable=s', 'of-controller=s', 'of-listener=s');
+    'of-disable=s', 'of-enable=s', 'of-controller=s{2}', 'of-listener=s{2}');
 # Unused: f,j
 
 if ($opt{h}) {
