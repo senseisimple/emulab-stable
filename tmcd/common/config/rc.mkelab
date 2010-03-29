@@ -312,6 +312,17 @@ $emulabconfig{"LOADMFS"} = 0;
 $emulabconfig{"LOADELABSOURCE"} = 0;
 
     #
+    # XXX Copy in new mkextrafs if necessary
+    #
+    if (-e "/tmp/mkextrafs.pl") {
+	# only copy if newer
+	if (! -e "$BINDIR/mkextrafs.pl" ||
+	    (stat("/tmp/mkextrafs.pl"))[9] > (stat("$BINDIR/mkextrafs.pl"))[9]) {
+	    mysystem("cp /tmp/mkextrafs.pl $BINDIR/");
+	}
+    }
+
+    #
     # XXX To avoid NFS errors while copying goo from outer boss.
     # 
     system("sysctl vfs.nfs.eacces_retry_enable=1 >/dev/null 2>&1");    
