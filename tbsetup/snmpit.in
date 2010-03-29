@@ -50,6 +50,10 @@ sub doTrunkDisable($$);
 sub doRestorePortStatus($@);
 sub doSynchLeader($);
 sub CreateOneVlan($$@);
+sub doOpenflowEnable($$);
+sub doOpenflowDisable($$);
+sub doSetController($$$);
+sub doSetListener($$$);
 
 #
 # Defaults
@@ -148,7 +152,8 @@ Getopt::Long::Configure("no_ignore_case");
 GetOptions(\%opt,
     'a','c','d','e','b','B=s@','g','h','i=s@','l+','m=s@','M','n',
     'N=s@','o=s@','p=s','q','r','s', 'S=s@','t','E=s','T=s','u=s','U','v=s','w',
-    'y=s','x=s','z=s','F','L=s','O', 'D', 'R', 'f', 'X', 'vlan_tag=i');
+    'y=s','x=s','z=s','F','L=s','O', 'D', 'R', 'f', 'X', 'vlan_tag=i', 
+    'of-disable=s', 'of-enable=s', 'of-controller=s', 'of-listener=s');
 # Unused: f,j
 
 if ($opt{h}) {
@@ -914,6 +919,28 @@ COMMAND: foreach my $command (@commands) {
 	    last;
 	}; # /portstatus/ && do
     }
+}
+
+######################################################################
+# Openflow operations
+######################################################################
+
+# TODO: get stack
+
+if ($opt{of-enable}) {
+    $exitval += doOpenflowEnable(); # stack, vlan
+}
+
+if ($opt{of-disable}) {
+    $exitval += doOpenflowDisable(); # stack, vlan
+}
+
+if ($opt{of-controller}) {
+    $exitval += doSetController(${of-controller}); # stack, vlan
+}
+
+if ($opt{of-listener}) {
+    $exitval += doOpenflowListener($opt{of-listener}); # stack, vlan
 }
 
 exit $exitval;
@@ -2502,7 +2529,39 @@ sub doSetController($$$) {
     # TODO: Check if Openflow is enabled. But in fact it doesn't matter. 
     #
     if (!$stack->setController($vlan, $controller)) {
-	    return 1;
+	return 1;
+    }
+    
+    return 0;
+}
+
+#
+# doSetListener(stack, vlan, listener)
+# Set listener for an Openflow-enabled VLAN
+# Procurve stack only
+#
+sub doSetListener($$$) {
+    my $stacks = shift;
+    my $vlan - shift;
+    my $listener = shift;
+    
+    #
+    # Sanity checking
+    #
+    if (@$stacks != 1) {
+	die "Set listener on a VLAN can process only one stack now\n" .
+	    "Stacks are " . join(",",@$stacks) . "\n";
+    }
+    
+    my $stack = $$stacks[0];
+    print "Set listener for VLAN $vlan ...\n"
+	if(!$quiet);
+    
+    #
+    # TODO: Check if Openflow is enabled. But in fact it doesn't matter. 
+    #
+    if (!$stack->setListener($vlan, $listener)) {
+	return 1;
     }
     
     return 0;
