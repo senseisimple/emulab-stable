@@ -764,14 +764,6 @@ sub Provision($;$)
 	if ($node->ModifyReservation({"genisliver_idx" => $self->idx()})) {
 	    return -1;
 	}
-
-	#
-	# Terrible place to do this. 
-	#
-	if ($node->OSSelect("<DEFAULT>", "def_boot_osid", 0) != 0) {
-	    print STDERR "Could not os_select $node to default\n";
-	    return -1;
-	}
     }
     return 0;
 }
