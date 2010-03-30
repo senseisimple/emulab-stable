@@ -7,10 +7,11 @@
 use strict;
 use warnings;
 
-use POSIX qw(setuid setgid strftime);
+use POSIX qw(setuid setgid);
 use Cwd qw(realpath);
 use CGI;
 use CGI::Cookie;
+use HTTP::Date;
 
 #use Data::Dumper;
 
@@ -26,12 +27,6 @@ sub error($) {
     print "$_[0]\n";
     #die "$_[0]\n";
     exit 1;
-}
-
-sub http_date_str ($)
-{
-    my ($time) = @_;
-    strftime("%a, %d %b %Y %T GMT", gmtime($time));
 }
 
 my $SCRIPT_URL = $ENV{SCRIPT_URL};
@@ -177,11 +172,18 @@ open F, "$path" or error "Can't read file: $path";
 
 my ($dev,$ino,$mode,$nlink,undef,undef,$rdev,$size,
     $atime,$mtime,$ctime,$blksize,$blocks) = stat F;
-print "Content-Type: $mime_type\n" if defined $mime_type;
-print "Content-Length: ", $size, "\n";
-print "Last-Modified: ", http_date_str($mtime), "\n";
-print "\n";
 
-print <F>;
-
+my $if_mod_since = 0;
+$if_mod_since = str2time($ENV{HTTP_IF_MODIFIED_SINCE}) 
+    if defined $ENV{HTTP_IF_MODIFIED_SINCE};
+if ($if_mod_since > 0 && $if_mod_since <= $mtime) {
+    print "Status: 304 Not Modified\n\n";
+} else {
+    print "Content-Type: $mime_type\n" if defined $mime_type;
+    print "Content-Length: ", $size, "\n";
+    print "Last-Modified: ", time2str($mtime), "\n";
+    print "\n";
+    
+    print <F>;
+}
 exit 0;
