@@ -29,6 +29,7 @@ my $WINSUPPORT = @WINSUPPORT@;
 my $MAILMANSUPPORT = @MAILMANSUPPORT@;
 my $BUGDBSUPPORT = @BUGDBSUPPORT@;
 my $ARCHSUPPORT = @ARCHIVESUPPORT@;
+my $PGENISUPPORT = @PROTOGENI_SUPPORT@;
 my $OURDOMAIN  = '@OURDOMAIN@';
 my $EXPOSETEMPLATES = $ELABINELAB;
 
@@ -545,6 +546,19 @@ Phase "ports", "Installing ports", sub {
 		ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
 	    }
 	}
+	if ($PGENISUPPORT) {
+	    Phase "protogeni", "Installing protogeni packages", sub {
+		if ($FBSD_MAJOR > 6 || ($FBSD_MAJOR == 6 && $FBSD_MINOR > 2)) {
+		    if (!ExecQuiet("$PKG_INFO -x emulab-protogeni")) {
+			PhaseSkip("Protogeni package already installed");
+		    }
+		    my $pname = GetPackage("emulab-protogeni", $packagedir);
+		    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
+		} else {
+		    PhaseSkip("OS install too old for Protogeni");
+		}
+	    };
+	}
     };
     PhaseSkip("Package directory provided; not installing from sources")
 	if ($packagedir);
@@ -567,6 +581,8 @@ Phase "ports", "Installing ports", sub {
 	      "interactive. Run: \n" .
 	      "    cd $PORTSMISCDIR/emulab-boss && make install\n" .
 	      "    cd $PORTSMISCDIR/emulab-php4 && make install\n" .
+	      ($PGENISUPPORT ?
+	      "    cd $PORTSMISCDIR/emulab-protogeni && make install\n" : "") .
 	      "then re-run this script.");
 };
 
