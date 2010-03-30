@@ -1066,7 +1066,7 @@ function DOLOGIN_MAGIC($uid, $uid_idx, $email = null, $adminon = 0)
 
     # Proj-vis cookies
     setcookie("exp_vis_session", $opskey, 0, "/", $TBAUTHDOMAIN, 0);
-    exec("$TBLIBEXEC_DIR/write-vis-auth-boss");
+    exec("$TBLIBEXEC_DIR/write-vis-auth-boss > /dev/null 2>&1 &");
 
     return 0;
 }
@@ -1178,7 +1178,8 @@ function DOLOGOUT($user) {
     }
 
     #
-    exec("$TBLIBEXEC_DIR/write-vis-auth-boss");
+    setcookie("exp_vis_session", "", $timeout, "/", $TBAUTHDOMAIN, 0);
+    exec("$TBLIBEXEC_DIR/write-vis-auth-boss > /dev/null 2>&1 &");
 
     return 0;
 }
