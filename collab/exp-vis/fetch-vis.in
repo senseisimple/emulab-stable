@@ -1,19 +1,18 @@
 #!/usr/bin/perl -T
 
 #
-# XXX: Add support for returning file modification times in the head
-#      Also support HEAD requests
+#
 #
 
 use strict;
 use warnings;
 
-use POSIX qw(setuid setgid);
+use POSIX qw(setuid setgid strftime);
 use Cwd qw(realpath);
 use CGI;
 use CGI::Cookie;
 
-use Data::Dumper;
+#use Data::Dumper;
 
 #print "\n\n";
 #print STDERR Dumper(\%ENV);
@@ -27,6 +26,12 @@ sub error($) {
     print "$_[0]\n";
     #die "$_[0]\n";
     exit 1;
+}
+
+sub http_date_str ($)
+{
+    my ($time) = @_;
+    strftime("%a, %d %b %Y %T GMT", gmtime($time));
 }
 
 my $SCRIPT_URL = $ENV{SCRIPT_URL};
@@ -166,11 +171,17 @@ $ext = lc $ext;
 
 my $mime_type = $mime_map{$ext};
 
-print "Content-Type: $mime_type\n" if defined $mime_type;
-print "\n";
 
 $/ = undef;
 open F, "$path" or error "Can't read file: $path";
+
+my ($dev,$ino,$mode,$nlink,undef,undef,$rdev,$size,
+    $atime,$mtime,$ctime,$blksize,$blocks) = stat F;
+print "Content-Type: $mime_type\n" if defined $mime_type;
+print "Content-Length: ", $size, "\n";
+print "Last-Modified: ", http_date_str($mtime), "\n";
+print "\n";
+
 print <F>;
 
 exit 0;
