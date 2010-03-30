@@ -12,10 +12,10 @@ SUBDIR		= collab/exp-vis
 include $(OBJDIR)/Makeconf
 
 CGI_SCRIPTS = fetch-vis
-LIBEXEC_SCRIPTS = write-vis-auth-boss
-CTRL_LIBEXEC_SCRIPTS = write-vis-auth-ops
+LIBEXEC_SCRIPTS = write-vis-auth
+CTRL_LIBEXEC_SCRIPTS = write-vis-auth.proxy
 
-SETUID_LIBX_SCRIPTS = write-vis-auth-boss
+SETUID_LIBX_SCRIPTS = write-vis-auth
 
 #
 # Force dependencies on the scripts so that they will be rerun through
@@ -34,7 +34,7 @@ $(TBROOT)/opsdir/www/cgi-bin/fetch-vis: fetch-vis
 	-$(SUDO) mkdir -m 775 $(TBROOT)/opsdir/www/cgi-bin
 	$(SUDO) $(INSTALL) -o root -m 4775 $< $@
 
-$(INSTALL_DIR)/opsdir/libexec/write-vis-auth-ops: write-vis-auth-ops
+$(INSTALL_DIR)/opsdir/libexec/write-vis-auth.proxy: write-vis-auth.proxy
 	-mkdir -p $(INSTALL_DIR)/opsdir/libexec
 	$(INSTALL) $< $@
 

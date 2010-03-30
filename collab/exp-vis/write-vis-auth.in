@@ -69,7 +69,7 @@ $< = $>;
 my $db_result =
     DBQueryFatal("select opskey, uid from login");
 
-open O, "| ssh root\@$USERNODE $TB/libexec/write-vis-auth-ops" 
+open O, "| ssh root\@$USERNODE $TB/libexec/write-vis-auth.proxy" 
     or die "ssh to ops failed: $!\n";
 
 my $prev_opskey = '';
