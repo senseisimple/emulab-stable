@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-LGPL
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -584,7 +584,8 @@ COMMAND: foreach my $command (@commands) {
             # devices that don't explicitly have a port in the VLAN.)
             @vlans = getExperimentVlans($pid,$eid,@optvlanids);
             if (!@vlans) {
-                print "snmpit: $pid/$eid has no VLANs to create, skipping\n";
+                print "snmpit: $pid/$eid has no VLANs to create, skipping\n"
+		    if (!$quiet);
                 next COMMAND;
             }
             if ($supplied_switches) {
@@ -609,7 +610,8 @@ COMMAND: foreach my $command (@commands) {
 	    #
 	    @vlans = getExperimentVlans($pid,$eid,@optvlanids);
             if (!@vlans) {
-                print "snmpit: $pid/$eid has no VLANs, skipping\n";
+                print "snmpit: $pid/$eid has no VLANs, skipping\n"
+		    if (!$quiet);
                 next COMMAND;
             }
             @vlans = filterPlannedVlans(@vlans);

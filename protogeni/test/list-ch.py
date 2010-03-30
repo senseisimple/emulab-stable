@@ -26,29 +26,31 @@ from M2Crypto import X509
 
 execfile( "test-common.py" )
 
+TYPE = None
+
+if len(REQARGS) == 1:
+    TYPE = REQARGS[0]
+else:
+    print "You must supply a TYPE (users|slices|authorities) to list"
+    sys.exit(1)
+    pass
+
+# sanity check on TYPE
+if TYPE not in ["users", "slices", "authorities"]:
+    print "TYPE must be one of users|slices|authorities"
+    sys.exit(1)
+
 #
 # Get a credential for myself, that allows me to do things at the SA.
 #
 mycredential = get_self_credential()
 
 #
-# Ask the clearinghouse for a list of slices
-#
+# Ask the clearinghouse for a list of users|slices|authorities as specified
+# by TYPE
 params = {}
 params["credential"] = mycredential
-params["type"]       = "slices"
-rval,response = do_method("ch", "List", params)
-if rval:
-    Fatal("Could not get the list from the ClearingHouse")
-    pass
-print str(response["value"])
-
-#
-# Ask the clearinghouse for a list of authorities
-#
-params = {}
-params["credential"] = mycredential
-params["type"]       = "authorities"
+params["type"]       = TYPE
 rval,response = do_method("ch", "List", params)
 if rval:
     Fatal("Could not get the list from the ClearingHouse")

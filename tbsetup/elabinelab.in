@@ -277,17 +277,23 @@ $UID = 0;
 # This is temporary. I think I will switch this over to grabbing the latest
 # version from the web server.
 #
+# XXX ugh, copy over a newer mkextrafs.pl as well (one that supports -2).
+#
 my $mkelab = "$TB/etc/rc.mkelab";
 if (-e "$expdir/rc.mkelab") {
     $mkelab = "$expdir/rc.mkelab";
 }
-print "Copying $mkelab to ${bossnode}/${opsnode}";
+my $mkextrafs = "";
+if (-e "$TB/etc/mkextrafs.pl") {
+    $mkextrafs = "$TB/etc/mkextrafs.pl";
+}
+print "Copying $mkelab $mkextrafs to ${bossnode}/${opsnode}";
 print "/${fsnode}"
     if (defined($fsnode));
 print "\n";
-system("scp $mkelab ${bossnode}:/tmp");
-system("scp $mkelab ${opsnode}:/tmp");
-system("scp $mkelab ${fsnode}:/tmp")
+system("scp $mkelab $mkextrafs ${bossnode}:/tmp");
+system("scp $mkelab $mkextrafs ${opsnode}:/tmp");
+system("scp $mkelab $mkextrafs ${fsnode}:/tmp")
     if (defined($fsnode));
 
 if (defined($fsnode)) {

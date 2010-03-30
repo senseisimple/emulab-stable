@@ -130,6 +130,14 @@ namespace eval TBCOMPAT {
     variable elabinelab_source_tarfile ""
     variable elabinelab_tarfiles
 
+    # Elabinelab attribute stuff.
+    variable elabinelab_attributes
+    set elabinelab_attributes {}
+    variable EINEROLE  {^(boss|ops|fs|router|node)$}
+    variable EINEKEY   {^([-\w\.]+)$}
+    variable EINEVALUE {^([-\w\.\+\,\s\/]+)$}
+    variable EINEORDER {^\d+$}
+
     # Mapping of "resource classes" and "reservation types" to bootstrap
     # values, where a resource class is a symbolic string provided by the user
     # (e.g. Client, Server), and a reservation type is a resource name provided
@@ -1719,7 +1727,7 @@ proc tb-set-dpdb {onoff} {
     }
 }
 #
-# Change the default topography.
+# Change the default topology.
 #
 proc tb-elab-in-elab-topology {topo} {
     var_import ::GLOBALS::elabinelab_topo
@@ -1744,6 +1752,65 @@ proc tb-elabinelab-singlenet {args} {
 	set onoff [lindex $args 0]
     }
     set elabinelab_singlenet $onoff
+}
+
+#
+# Set/clear elabinelab attributes:
+#    tb-set-elabinelab-attribute <role> <key> <value> [<order>]
+#    tb-unset-elabinelab-attribute <role> <key>
+#
+proc tb-set-elabinelab-attribute {role key value {order 0}} {
+    var_import ::TBCOMPAT::EINEROLE;
+    var_import ::TBCOMPAT::EINEKEY;
+    var_import ::TBCOMPAT::EINEVALUE;
+    var_import ::TBCOMPAT::EINEORDER;
+    var_import ::TBCOMPAT::elabinelab_attributes;
+
+    if {[regexp $EINEROLE $role] == 0} {
+	perror "\[tb-set-elabinelab-attribute] - \"$role\" is not a valid elabinelab role"
+	return
+    }
+    if {[regexp $EINEKEY $key] == 0} {
+	perror "\[tb-set-elabinelab-attribute] - \"$key\" is not a valid elabinelab key"
+	return
+    }
+    if {[regexp $EINEVALUE $value] == 0} {
+	perror "\[tb-set-elabinelab-attribute] - \"$value\" is not a valid elabinelab value"
+	return
+    }
+    if {[regexp $EINEORDER $order] == 0} {
+	perror "\[tb-set-elabinelab-attribute] - \"$order\" is not a valid elabinelab order"
+	return
+    }
+
+    #
+    # If role/key/ordering exactly matches an existing value, replace it
+    # otherwise just add it.
+    #
+    set i [lsearch -glob $elabinelab_attributes "$role,$key,*,$order"]
+    if {$i > -1} {
+	set elabinelab_attributes [lreplace $elabinelab_attributes $i $i]
+    }
+    lappend elabinelab_attributes "$role,$key,$value,$order"
+}
+
+proc tb-unset-elabinelab-attribute {role key} {
+    var_import ::TBCOMPAT::EINEROLE;
+    var_import ::TBCOMPAT::EINEKEY;
+    var_import ::TBCOMPAT::elabinelab_attributes;
+
+    if {[regexp $EINEROLE $role] == 0} {
+	perror "\[tb-unset-elabinelab-attribute] - \"$role\" is not a valid elabinelab role"
+	return
+    }
+    if {[regexp $EINEKEY $key] == 0} {
+	perror "\[tb-unset-elabinelab-attribute] - \"$key\" is not a valid elabinelab key"
+	return
+    }
+    while {[lsearch -glob $elabinelab_attributes "$role,$key,*"] > -1} {
+	set i [lsearch -glob $elabinelab_attributes "$role,$key,*"]
+	set elabinelab_attributes [lreplace $elabinelab_attributes $i $i]
+    }
 }
 
 #
