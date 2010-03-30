@@ -6,7 +6,6 @@
 #
 use strict;
 use Getopt::Std;
-use File::Temp;
 
 #
 # Configure variables
@@ -85,3 +84,4 @@ die "ssh to ops failed with exit code $?\n" if $? != 0;
 unlink $logfile;
 
 exit(0);
+
