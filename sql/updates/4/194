@@ -1,0 +1,17 @@
+#
+# Fix a quoting error in 175.  If you want a '\' in the DB, you have to
+# use FOUR backslashes here.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    DBQueryFatal("replace into table_regex values ".
+		 " ('virt_nodes','sharing_mode','text','regex', ".
+		 "  '^[-\\\\w]+\$',1,32,NULL)");
+    return 0;
+}
+1;
