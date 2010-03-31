@@ -65,7 +65,7 @@ if ($EXPOSETEMPLATES) {
 $USER_VIS_URL = "http://$USERNODE/exp-vis/$pid/$eid/";
 $HAVE_USER_VIS = 0;
 $whocares = null;
-if (CHECKURL($USER_VIS_URL, $whocares)) {
+if ($EXP_VIS && CHECKURL($USER_VIS_URL, $whocares)) {
   $HAVE_USER_VIS = 1;
 }
 

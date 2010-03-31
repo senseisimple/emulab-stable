@@ -952,7 +952,7 @@ function DOLOGIN_MAGIC($uid, $uid_idx, $email = null, $adminon = 0)
     global $TBMAIL_OPS, $TBMAIL_AUDIT, $TBMAIL_WWW;
     global $WIKISUPPORT, $WIKICOOKIENAME;
     global $BUGDBSUPPORT, $BUGDBCOOKIENAME, $TRACSUPPORT, $TRACCOOKIENAME;
-    global $TBLIBEXEC_DIR;
+    global $TBLIBEXEC_DIR, $EXP_VIS;
     
     # Caller makes these checks too.
     if (!TBvalid_uid($uid)) {
@@ -1065,8 +1065,10 @@ function DOLOGIN_MAGIC($uid, $uid_idx, $email = null, $adminon = 0)
 		 "where uid_idx='$uid_idx'");
 
     # Proj-vis cookies
-    setcookie("exp_vis_session", $opskey, 0, "/", $TBAUTHDOMAIN, 0);
-    exec("$TBLIBEXEC_DIR/write-vis-auth > /dev/null 2>&1 &");
+    if ($EXP_VIS) {
+	setcookie("exp_vis_session", $opskey, 0, "/", $TBAUTHDOMAIN, 0);
+	exec("$TBLIBEXEC_DIR/write-vis-auth > /dev/null 2>&1 &");
+    }
 
     return 0;
 }
@@ -1101,7 +1103,7 @@ function DOLOGOUT($user) {
     global $TBAUTHCOOKIE, $TBLOGINCOOKIE, $TBAUTHDOMAIN, $WWWHOST;
     global $WIKISUPPORT, $WIKICOOKIENAME, $HTTP_COOKIE_VARS;
     global $BUGDBSUPPORT, $BUGDBCOOKIENAME, $TRACSUPPORT, $TRACCOOKIENAME;
-    global $TBLIBEXEC_DIR;
+    global $TBLIBEXEC_DIR, $EXP_VIS;
 
     if (! $CHECKLOGIN_USER)
 	return 1;
@@ -1178,8 +1180,10 @@ function DOLOGOUT($user) {
     }
 
     #
-    setcookie("exp_vis_session", "", $timeout, "/", $TBAUTHDOMAIN, 0);
-    exec("$TBLIBEXEC_DIR/write-vis-auth > /dev/null 2>&1 &");
+    if ($EXP_VIS) {
+	setcookie("exp_vis_session", "", $timeout, "/", $TBAUTHDOMAIN, 0);
+	exec("$TBLIBEXEC_DIR/write-vis-auth > /dev/null 2>&1 &");
+    }
 
     return 0;
 }
