@@ -24,6 +24,9 @@ import re
 
 execfile( "test-common.py" )
 
+available_key = "geni_available"
+compress_key = "geni_compress"
+
 #
 # Get a credential for myself, that allows me to do things at the SA.
 #
@@ -33,13 +36,17 @@ mycredential = get_self_credential()
 # Ask manager for its list.
 #
 options = {}
-options["geni_available"] = True
-options["geni_compress"] = True
+options[available_key] = True
+options[compress_key] = True
 params = {}
 params["credentials"] = [mycredential]
 params["options"] = options
 rval,response = do_method("cm", "ListResources", params, version="2.0")
 if rval:
     Fatal("Could not get a list of resources")
-    pass
-print response[ "value" ]
+elif compress_key in options and options[compress_key]:
+    # decompress the result
+    import zlib
+    print zlib.decompress(response["value"].data)
+else:
+    print response[ "value" ]
