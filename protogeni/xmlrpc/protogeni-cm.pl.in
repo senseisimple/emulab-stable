@@ -33,12 +33,14 @@ BEGIN { $GENI_DBNAME = "geni-cm"; }
 # Configure variables
 my $EMULAB_PEMFILE = "@prefix@/etc/genicm.pem";
 my $MAINSITE 	   = @TBMAINSITE@;
+my $GENI_AM_SUPPORT = "@GENI_AM_SUPPORT@";
 my $VERSION	   = "2.0";
 
 # Testbed libraries.
 use lib '@prefix@/lib';
 use GeniCM;
 use GeniCMV2;
+use GeniAM;
 use Genixmlrpc;
 use GeniResponse;
 use libaudit;
@@ -143,7 +145,12 @@ if (exists($ENV{'PATH_INFO'}) && $ENV{'PATH_INFO'} ne "") {
 #
 Genixmlrpc->SetContext(Genixmlrpc->Context($certificate));
 
-if ($VERSION eq "1.0") {
+if ($GENI_AM_SUPPORT) {
+    $responder = Frontier::Responder->new( "methods" => {
+	"GetVersion"        => \&GeniAM::GetVersion,
+    },);
+}
+elsif ($VERSION eq "1.0") {
     $responder = Frontier::Responder->new( "methods" => {
 	"GetVersion"        => \&GeniCM::GetVersion,
 	"Resolve"	    => \&GeniCM::Resolve,
