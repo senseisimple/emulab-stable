@@ -158,16 +158,13 @@ END
     return 1;
 }
 
-
-my @ofcontroller = ();
-my @oflistener = ();
-my %opt = ('of-controller' => \@ofcontroller, 'of-listener' => \@oflistener);
+my %opt = ();
 Getopt::Long::Configure("no_ignore_case");
 GetOptions(\%opt,
     'a','c','d','e','b','B=s@','g','h','i=s@','l+','m=s@','M','n',
     'N=s@','o=s@','p=s','q','r','s', 'S=s@','t','E=s','T=s','u=s','U','v=s','w',
     'y=s','x=s','z=s','F','L=s','O', 'D', 'R', 'f', 'X', 'vlan_tag=i', 
-    'of-disable=s', 'of-enable=s', 'of-controller=s{2}', 'of-listener=s{2}');
+    'of-disable=s', 'of-enable=s', 'of-controller=s', 'of-listener=s');
 # Unused: f,j
 
 if ($opt{h}) {
@@ -182,14 +179,15 @@ if ($opt{v}) {
 if ($opt{q}) {
     $quiet = 1;
     if ($opt{m} || $opt{o} || $opt{t} || $opt{r} || $opt{X} || $opt{T} ||
-	  $opt{E} || $opt{U} || $opt{u} || $opt{d} || $opt{p} || $opt{e}) {
+	  $opt{E} || $opt{U} || $opt{u} || $opt{d} || $opt{p} || $opt{e} ||
+	  $opt{'of-enable'} || $opt{'of-disable'} || $opt{'of-controller'} || $opt{'of-listener'}) {
 	my $nulldev;
         open($nulldev, ">>/dev/null");
 	select $nulldev; # supresses print foo(); without explicit fileglob
     }
 }
 
-#
+#if ($opt{F}) { push @commands, ["synchleader"]; }
 # Values that may have been passed on the command line
 #
 my $pid;
@@ -199,6 +197,7 @@ my @ports;
 my @optvlanids = ();
 my $equaltrunking = 0;
 my $this_user;
+my $ofconnstr; # Openflow connection string, for listener and controller 
 our $next_vlan_tag; # XXX see doMakeVlan for explanation
 
 #
@@ -264,6 +263,27 @@ if ($opt{t} || $opt{r} || $opt{D} || $opt{R} || $opt{X}) {
     # Set the @ports array so that we'll do proper permission checking on it
     #
     @ports = ($opt{T});
+} elsif ($opt{'of-controller'} || $opt{'of-listener'}) {
+    #
+    # Options that take the connection string
+    #
+    if (@ARGV < 0) {
+	tberror "Controller/listener connection string reqired!";
+	exit &usage;
+    } elsif (!$opt{i}) { # Openflow operations must have a target device
+	tberror "A device is reqired!";
+	exit &usage;
+    } else {
+	$ofconnstr = shift @ARGV;
+    }
+} elsif ($opt{'of-enable'} || $opt{'of-disable'}) {
+    #
+    # Options that need other options
+    #
+    if (!$opt{i}) { # Openflow operations must have a target device
+	tberror "A device is reqired!";
+	exit &usage;
+    } 
 } else {
     #
     # Everything else
@@ -307,6 +327,10 @@ if ($opt{a}) { push @commands, ["portcontrol","auto"]; }
 if ($opt{D}) { push @commands, ["expcnetcontrol", "disable"]; }
 if ($opt{R}) { push @commands, ["expcnetcontrol", "enable"]; }
 if ($opt{T}) { push @commands, ["trunkenable", $opt{T}]; }
+if ($opt{'of-enable'}) { push @commands, ["ofenable", $opt{'of-enable'}]; }
+if ($opt{'of-disable'}) { push @commands, ["ofdisable", $opt{'of-disable'}]; }
+if ($opt{'of-controller'}) { push @commands, ["ofcontroller", $opt{'of-controller'}]; }
+if ($opt{'of-listener'}) { push @commands, ["oflistener", $opt{'of-listener'}]; }
 
 #
 # Commands that can occur more than once
@@ -736,6 +760,11 @@ COMMAND: foreach my $command (@commands) {
             @args = %args;
             last;
         };
+	(/ofenable/ || /ofdisable/ || /ofcontroller/ || /oflistener/) && do {
+	    @devicenames = @supplied_switches;
+	    @vlans = @args;
+	    last;
+	};
     }
 
     debug("Device names: " . join(",",@devicenames) . "\n");
@@ -932,29 +961,23 @@ COMMAND: foreach my $command (@commands) {
 	    $exitval += doRestorePortStatus(\@stacks,@args);
 	    last;
 	}; # /portstatus/ && do
+	(/ofenable/) && do {
+	    $exitval += doOpenflowEnable(\@stacks,$vlans[0]);
+	    last;
+	}; # /ofenable/ && do
+	(/ofdisable/) && do {
+	    $exitval += doOpenflowDisable(\@stacks,$vlans[0]);
+	    last;
+	}; # /ofdisable/ && do
+	(/ofcontroller/) && do {
+	    $exitval += doSetController(\@stacks,$vlans[0],$ofconnstr);
+	    last;
+	}; # /ofcontroller/ && do
+	(/oflistener/) && do {
+	    $exitval += doSetListener(\@stacks,$vlans[0],$ofconnstr);
+	    last;
+	}; # /oflistener/ && do
     }
-}
-
-######################################################################
-# Openflow operations
-######################################################################
-
-# TODO: get stack
-
-if ($opt{'of-enable'}) {
-    $exitval += doOpenflowEnable($opt{'of-enable'}); # ADD: stack
-}
-
-if ($opt{'of-disable'}) {
-    $exitval += doOpenflowDisable($opt{'of-disable'}); # ADD: stack
-}
-
-if ($opt{'of-controller'}) {
-    $exitval += doSetController($ofcontroller[0], $ofcontroller[1]); # ADD: stack
-}
-
-if ($opt{'of-listener'}) {
-    $exitval += doOpenflowListener($oflistener[0], $oflistener[1]); # ADD: stack
 }
 
 exit $exitval;

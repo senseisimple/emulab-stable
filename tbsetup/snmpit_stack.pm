@@ -1154,6 +1154,34 @@ sub enableOpenflow($$) {
     my $vlan = shift;
     
     my $dev;
+    foreach my $devicename (keys %{$self->{DEVICES}})
+    {
+	my $device = $self->{DEVICES}{$devicename};
+	my @existant_vlans = ();
+	my %vlan_numbers = $device->findVlans(@vlan_ids);
+	foreach my $vlan_id (@vlan_ids) {
+
+	    #
+	    # Only remove ports from the VLAN if it exists on this
+	    # device. Do it in one pass for efficiency
+	    #
+	    if (defined $vlan_numbers{$vlan_id}) {
+		push @existant_vlans, $vlan_numbers{$vlan_id};
+	    }
+	}
+	next LOOP if (scalar(@existant_vlans) == 0);
+
+	print "Removing ports on $devicename from VLANS " . 
+	    join(",",@existant_vlans)."\n" if $self->{DEBUG};
+
+	$errors += $device->removePortsFromVlan(@existant_vlans);
+
+	#
+	# Since mixed stacks doesn't use VTP, delete the VLAN, too.
+	#
+	my $ok = $device->removeVlan(@existant_vlans);
+	if (!$ok) { $errors++; }
+    }
     #
     # TODO: check if this is Procurve stack
     # if ($self->{STACKID} neq "Procurve") {
