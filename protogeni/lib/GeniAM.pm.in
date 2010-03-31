@@ -38,5 +38,30 @@ sub GetVersion()
     return GeniResponse->Create( GENIRESPONSE_SUCCESS, $blob );
 }
 
+# List this aggregates resources. Invokes DiscoverResources.
+# Still need to handle the slice
+sub ListResources()
+{
+    my ($argref) = @_;
+    my $credentials = $argref->{'credentials'};
+    my $options = $argref->{'options'};
+
+    my $available = $options->{'geni_available'} || 0;
+    my $compress = $options->{'geni_compress'} || 0;
+    my $slice_urn = $options->{'geni_slice_urn'};
+
+    # If $slice_urn is defined, this turns into a Resolve call.  We
+    # need to resolve twice: once to get the sliver urn from the
+    # slice, then to get the resources associated with the sliver (a
+    # manifest rspec).
+
+    my $discover_args = {
+        'credentials' => $credentials,
+        'available' => $available,
+        'compress' => $compress
+    };
+    return GeniCMV2::DiscoverResources($discover_args);
+}
+
 # _Always_ make sure that this 1 is at the end of the file...
 1;
