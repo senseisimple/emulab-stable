@@ -2547,7 +2547,7 @@ sub doOpenflowDisable($$) {
 #
 sub doSetController($$$) {
     my $stacks = shift;
-    my $vlan - shift;
+    my $vlan = shift;
     my $controller = shift;
     
     #
@@ -2579,7 +2579,7 @@ sub doSetController($$$) {
 #
 sub doSetListener($$$) {
     my $stacks = shift;
-    my $vlan - shift;
+    my $vlan = shift;
     my $listener = shift;
     
     #
