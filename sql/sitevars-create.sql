@@ -77,6 +77,8 @@ INSERT INTO sitevariables VALUES ('general/joinproject/admincheck','1','0','When
 INSERT INTO sitevariables VALUES ('protogeni/allow_externalusers','1','1','When set, external users may allocate slivers on your testbed.',0);
 INSERT INTO sitevariables VALUES ('protogeni/max_externalnodes',NULL,'1024','When set, external users may allocate slivers on your testbed.',0);
 INSERT INTO sitevariables VALUES ('protogeni/cm_uuid','28a10955-aa00-11dd-ad1f-001143e453fe','','The UUID of the local Component Manager.',0);
+INSERT INTO sitevariables VALUES ('protogeni/max_ticket_lifetime','90','90','The maximum ticket lifetime. When set limits the lifetime of a ticket.',0);
+INSERT INTO sitevariables VALUES ('protogeni/max_components','-1','-1','Maximum number of components that can be allocated. -1 indicates any number of components can be allocated.',0);
 INSERT INTO sitevariables VALUES ('general/minpoolsize','3','1','The Minimum size of the shared pool',0);
 INSERT INTO sitevariables VALUES ('general/maxpoolsize','5','1','The maximum size of the shared pool',0);
 INSERT INTO sitevariables VALUES ('protogeni/sa_uuid','2b437faa-aa00-11dd-ad1f-001143e453fe','','The UUID of the local Slice Authority.',0);
