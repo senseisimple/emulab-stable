@@ -147,8 +147,13 @@ Genixmlrpc->SetContext(Genixmlrpc->Context($certificate));
 
 if ($GENI_AM_SUPPORT) {
     $responder = Frontier::Responder->new( "methods" => {
-	"GetVersion"        => \&GeniAM::GetVersion,
-	"ListResources"     => \&GeniAM::ListResources,
+	"GetVersion"    => \&GeniAM::GetVersion,
+	"ListResources" => \&GeniAM::ListResources,
+	"CreateSliver"  => \&GeniAM::CreateSliver,
+        "DeleteSliver"  => \&GeniAM::DeleteSliver,
+        "SliverStatus"  => \&GeniAM::SliverStatus,
+        "RenewSliver"   => \&GeniAM::RenewSliver,
+        "Shutdown"      => \&GeniAM::Shutdown,
     },);
 }
 elsif ($VERSION eq "1.0") {

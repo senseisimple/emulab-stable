@@ -39,7 +39,7 @@ sub GetVersion()
 }
 
 # List this aggregates resources. Invokes DiscoverResources.
-# Still need to handle the slice
+# XXX Still need to handle the slice urn code path.
 sub ListResources()
 {
     my ($argref) = @_;
@@ -61,6 +61,93 @@ sub ListResources()
         'compress' => $compress
     };
     return GeniCMV2::DiscoverResources($discover_args);
+}
+
+# Create a sliver by allocating and starting resources.
+sub CreateSliver()
+{
+    my ($argref)    = @_;
+    my $slice_urn   = $argref->{'slice_urn'};
+    my $credentials = $argref->{'credentials'};
+    my $rspec       = $argref->{'rspec'};
+
+    # Invoke CreateSliver
+    my $create_args = {
+        'slice_urn' => $slice_urn,
+        'rspec' => $rspec,
+        'credentials' => $credentials
+        # Omit keys, we expect them to be in the rspec
+    };
+
+    my $response = GeniCMV2::CreateSliver($create_args);
+    if (GeniResponse::IsError($response)) {
+        # The create failed, so return the response.
+        return $response
+    }
+
+    # The create succeeded so gather the response info
+    my ($sliver_credential, $manifest_rspec) = GeniResponse::value($response);
+    return GeniResponse->Create( GENIRESPONSE_SUCCESS, $manifest_rspec );
+}
+
+sub DeleteSliver()
+{
+    my ($argref)    = @_;
+    my $slice_urn   = $argref->{'slice_urn'};
+    my $credentials = $argref->{'credentials'};
+
+    # Invoke CreateSliver
+    my $stop_args = {
+        'slice_urn' => $slice_urn,
+        'credentials' => $credentials
+    };
+
+    my $response = GeniCMV2::StopSliver($stop_args);
+    # Ignore refused error, it means the sliver was not started yet.
+    # A better way to go might be to check the sliver state and only
+    # invoke stop sliver if the sliver is started.
+    if (GeniResponse::IsError($response)
+        && GeniResponse::code($response) != GENIRESPONSE_REFUSED()) {
+        # The stop failed, so return the response.
+        return $response
+    }
+
+    # The sliver is stopped, now delete it.
+    my $delete_args = {
+        'slice_urn' => $slice_urn,
+        'credentials' => $credentials
+    };
+    # XXX Open question: Call "DeleteSlice" or "DeleteSliver"?
+    $response = GeniCMV2::DeleteSlice($delete_args);
+    if (GeniResponse::IsError($response)) {
+        return $response
+    }
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS);
+}
+
+# Get the status of the sliver associated with the given slice. This
+# just passes on to the CM SliverStatus operation.
+sub SliverStatus()
+{
+    my ($argref) = @_;
+    my $slice_urn = $argref->{'slice_urn'};
+    my $credentials = $argref->{'credentials'};
+
+    my $status_args = {
+        'slice_urn' => $slice_urn,
+        'credentials' => $credentials,
+    };
+    return GeniCMV2::SliverStatus($status_args);
+}
+
+sub RenewSliver()
+{
+    return GeniResponse->Create( GENIRESPONSE_UNSUPPORTED );
+}
+
+sub Shutdown()
+{
+    return GeniResponse->Create( GENIRESPONSE_UNSUPPORTED );
 }
 
 # _Always_ make sure that this 1 is at the end of the file...
