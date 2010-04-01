@@ -2480,7 +2480,6 @@ sub doTrunkDisable($$) {
 #
 # doOpenflowEnable(stacks, vlan)
 # Enable Openflow on a VLAN
-# Procurve stack only
 #
 sub doOpenflowEnable($$) {
     my $stacks = shift;
@@ -2497,8 +2496,9 @@ sub doOpenflowEnable($$) {
     my $stack = $$stacks[0];
     print "Enabling Openflow on VLAN $vlan ...\n"
 	if(!$quiet);
+    
     #
-    # TODO: check if Openflow has been enabled, now in HP stack code
+    # TODO: check if Openflow is already enabled. (Maybe in device code?)
     #
     if (!$stack->enableOpenflow($vlan)) {
 	return 1;
@@ -2509,7 +2509,6 @@ sub doOpenflowEnable($$) {
 #
 # doOpenflowDisable(stack, vlan)
 # Disable Openflow on a VLAN
-# Procurve stack only
 #
 sub doOpenflowDisable($$) {
     my $stacks = shift;
@@ -2527,7 +2526,7 @@ sub doOpenflowDisable($$) {
     print "Disabling Openflow on VLAN $vlan ...\n"
 	if(!$quiet);
     #
-    # TODO: check if Openflow is enabled, now in HP stack code.
+    # TODO: check if Openflow is enabled. (in device code?)
     #
     if (!$stack->disableOpenflow($vlan)) {
 	return 1;
@@ -2543,7 +2542,6 @@ sub doOpenflowDisable($$) {
 #
 # doSetController(stack, vlan, controller)
 # Set controller for an Openflow-enabled VLAN
-# Procurve stack only
 #
 sub doSetController($$$) {
     my $stacks = shift;
@@ -2575,7 +2573,6 @@ sub doSetController($$$) {
 #
 # doSetListener(stack, vlan, listener)
 # Set listener for an Openflow-enabled VLAN
-# Procurve stack only
 #
 sub doSetListener($$$) {
     my $stacks = shift;

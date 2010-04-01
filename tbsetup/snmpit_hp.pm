@@ -1847,6 +1847,24 @@ sub setListener($$$) {
     return 1;
 }
 
+#
+# Check if Openflow is supported on this switch
+#
+sub isOpenflowSupported($) {
+    my $self = shift;
+    my $ret;
+
+    #
+    # Still don't know how to detect if Openflow is supported.
+    # the ofOID is a directory. Maybe walking from it?
+    #
+    $ret = $self->get1($ofOID, 1); # not really
+    if (defined($ret)) {
+	return 1;
+    } else {
+	return 0;
+    }
+}
 
 # End with true
 1;

@@ -2263,5 +2263,77 @@ sub unlock($) {
 	$lock_held = 0;
 }
 
+#
+# Enable Openflow
+#
+sub enableOpenflow($$) {
+    my $self = shift;
+    my $vlan = shift;
+    my $RetVal;
+    
+    #
+    # Cisco switch doesn't support Openflow yet.
+    #
+    warn "ERROR: Cisco swith doesn't support Openflow now";
+    return 0;
+}
+
+#
+# Disable Openflow
+#
+sub disableOpenflow($$) {
+    my $self = shift;
+    my $vlan = shift;
+    my $RetVal;
+    
+    #
+    # Cisco switch doesn't support Openflow yet.
+    #
+    warn "ERROR: Cisco swith doesn't support Openflow now";
+    return 0;
+}
+
+#
+# Set controller
+#
+sub setController($$$) {
+    my $self = shift;
+    my $vlan = shift;
+    my $controller = shift;
+    my $RetVal;
+    
+    #
+    # Cisco switch doesn't support Openflow yet.
+    #
+    warn "ERROR: Cisco swith doesn't support Openflow now";
+    return 0;
+}
+
+#
+# Set listener
+#
+sub setListener($$$) {
+    my $self = shift;
+    my $vlan = shift;
+    my $listener = shift;
+    my $RetVal;
+    
+    #
+    # Cisco switch doesn't support Openflow yet.
+    #
+    warn "ERROR: Cisco swith doesn't support Openflow now";
+    return 0;
+}
+
+#
+# Check if Openflow is supported on this switch
+#
+sub isOpenflowSupported($) {
+    #
+    # Cisco switch doesn't support Openflow yet.
+    #
+    return 0;
+}
+
 # End with true
 1;

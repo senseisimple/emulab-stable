@@ -1433,5 +1433,77 @@ sub debug($$;$) {
     }
 }
 
+#
+# Enable Openflow
+#
+sub enableOpenflow($$) {
+    my $self = shift;
+    my $vlan = shift;
+    my $RetVal;
+    
+    #
+    # Foundry switch doesn't support Openflow yet.
+    #
+    warn "ERROR: Foundry swith doesn't support Openflow now";
+    return 0;
+}
+
+#
+# Disable Openflow
+#
+sub disableOpenflow($$) {
+    my $self = shift;
+    my $vlan = shift;
+    my $RetVal;
+    
+    #
+    # Foundry switch doesn't support Openflow yet.
+    #
+    warn "ERROR: Foundry swith doesn't support Openflow now";
+    return 0;
+}
+
+#
+# Set controller
+#
+sub setController($$$) {
+    my $self = shift;
+    my $vlan = shift;
+    my $controller = shift;
+    my $RetVal;
+    
+    #
+    # Foundry switch doesn't support Openflow yet.
+    #
+    warn "ERROR: Foundry swith doesn't support Openflow now";
+    return 0;
+}
+
+#
+# Set listener
+#
+sub setListener($$$) {
+    my $self = shift;
+    my $vlan = shift;
+    my $listener = shift;
+    my $RetVal;
+    
+    #
+    # Foundry switch doesn't support Openflow yet.
+    #
+    warn "ERROR: Foundry swith doesn't support Openflow now";
+    return 0;
+}
+
+#
+# Check if Openflow is supported on this switch
+#
+sub isOpenflowSupported($) {
+    #
+    # Foundry switch doesn't support Openflow yet.
+    #
+    return 0;
+}
+
 # End with true
 1;
