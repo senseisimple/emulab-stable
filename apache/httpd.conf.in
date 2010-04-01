@@ -1340,6 +1340,9 @@ ScriptAlias /protogeni/xmlrpc/ch @prefix@/protogeni/xmlrpc/protogeni-ch.pl
 ScriptAlias /protogeni/xmlrpc/cm @prefix@/protogeni/xmlrpc/protogeni-cm.pl
 ScriptAlias /protogeni/xmlrpc/sa @prefix@/protogeni/xmlrpc/protogeni-sa.pl
 ScriptAlias /protogeni/xmlrpc/ses @prefix@/protogeni/xmlrpc/protogeni-ses.pl
+<IfDefine GENI_AM>
+ScriptAlias /protogeni/xmlrpc/am @prefix@/protogeni/xmlrpc/geni-am.pl
+</IfDefine>
 <Directory "@prefix@/www/protogeni">
 	SSLRequireSSL
 	Order deny,allow
