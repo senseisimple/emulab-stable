@@ -160,7 +160,6 @@ my $TFTPD_PKG	  = "emulab-tftp-hpa-0.48";
 # XXX temporary for perl DBD mysql access
 my $P5DBD_PKG	  = "p5-DBD-mysql50-3.0002";
 # XXX temporary until fix dependencies in emulab-boss package
-my $P5GD_PKG	  = "p5-GD-2.07";
 my $PYM2_PKG	  = "py25-m2crypto-0.19.1";
 
 #
@@ -503,20 +502,6 @@ Phase "ports", "Installing ports", sub {
 		    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_DEL -f $pname")
 			if ($pname);
 		    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $P5DBD_PKG");
-		};
-		# XXX cannot seem to get these dependencies into emulab-boss
-		Phase "p5-GD", "Installing GD graphics package", sub {
-		    my $pname = `$PKG_INFO -E 'p5-GD-*' 2>/dev/null`;
-		    chomp($pname);
-		    if ($pname eq $P5GD_PKG) {
-			PhaseSkip("p5-GD already up to date");
-		    }
-		    if (!$packagedir) {
-			PhaseSkip("No package directory provided");
-		    }
-		    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_DEL -f $pname")
-			if ($pname);
-		    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $P5GD_PKG");
 		};
 		if ($FBSD_MAJOR > 6) {
 		    Phase "py-m2crypto", "Installing python m2crypto package", sub {
