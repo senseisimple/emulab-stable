@@ -53,5 +53,10 @@ params["credentials"] = (slicecred,)
 rval,response = do_method("am", "SliverStatus", params)
 if rval:
     Fatal("Could not get sliver status")
-    pass
-print str(response["value"])
+
+#
+# Pretty print the result
+#
+import pprint
+pp = pprint.PrettyPrinter(indent=2)
+pp.pprint(response["value"])
