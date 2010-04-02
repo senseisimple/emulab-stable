@@ -125,10 +125,15 @@ foreach my $node ( @ARGV ) {
 # Figure out who called us. Only root, people with admin status
 # in the DB, or members of the right project can do this.
 #
-if ($UID && !TBAdmin($UID) &&
-    !TBNodeAccessCheck($UID, TB_NODEACCESS_MODIFYINFO, @nodes)) {
-    fatal("os_select: You do not have permission to modify ".
-	  "one or more of the nodes.\n");
+if ($UID && !TBAdmin($UID)) {
+    if ($list && !TBNodeAccessCheck($UID, TB_NODEACCESS_READINFO, @nodes)) {
+	fatal("os_select: You do not have permission to access ".
+	      "one or more of the nodes.\n");
+    }
+    if (!$list && !TBNodeAccessCheck($UID, TB_NODEACCESS_MODIFYINFO, @nodes)) {
+	fatal("os_select: You do not have permission to modify ".
+	      "one or more of the nodes.\n");
+    }
 }
 
 #
