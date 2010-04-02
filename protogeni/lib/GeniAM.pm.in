@@ -96,7 +96,7 @@ sub DeleteSliver()
     my $slice_urn   = $argref->{'slice_urn'};
     my $credentials = $argref->{'credentials'};
 
-    # Invoke CreateSliver
+    # Invoke StopSliver
     my $stop_args = {
         'slice_urn' => $slice_urn,
         'credentials' => $credentials
@@ -171,12 +171,30 @@ sub SliverStatus()
     }
     $status->{'geni_resources'} = \@children;
 
-    return GeniResponse->Create(GENIRESPONSE_SUCCESS, $status)
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS, $status);
 }
 
 sub RenewSliver()
 {
-    return GeniResponse->Create( GENIRESPONSE_UNSUPPORTED );
+    my ($argref)        = @_;
+    my $slice_urn       = $argref->{'slice_urn'};
+    my $credentials     = $argref->{'credentials'};
+    my $expiration_time = $argref->{'expiration_time'};
+
+    my $renew_args = {
+        'slice_urn' => $slice_urn,
+        'expiration' => $expiration_time,
+        'credentials' => $credentials
+    };
+    my $response = GeniCMV2::RenewSlice($renew_args);
+    if (GeniResponse::IsError($response)) {
+        return $response
+    }
+
+    # Well this is ugly. We want to return True, so we must encode it
+    # as an XMLRPC Boolean via an encoder.
+    my $coder = Frontier::RPC2->new();
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS, $coder->boolean(1));
 }
 
 sub Shutdown()
