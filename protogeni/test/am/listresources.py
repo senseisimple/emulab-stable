@@ -41,7 +41,7 @@ options[compress_key] = True
 params = {}
 params["credentials"] = [mycredential]
 params["options"] = options
-rval,response = do_method("cm", "ListResources", params, version="2.0")
+rval,response = do_method("am", "ListResources", params)
 if rval:
     Fatal("Could not get a list of resources")
 elif compress_key in options and options[compress_key]:

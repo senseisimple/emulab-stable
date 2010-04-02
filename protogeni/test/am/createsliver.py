@@ -109,7 +109,7 @@ params = {}
 params["credentials"] = (myslice,)
 params["slice_urn"]   = SLICEURN
 params["rspec"]       = rspec
-rval,response = do_method("cm", "CreateSliver", params, version="2.0")
+rval,response = do_method("am", "CreateSliver", params)
 if rval:
     Fatal("Could not create sliver")
     pass

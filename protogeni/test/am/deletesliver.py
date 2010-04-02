@@ -50,7 +50,7 @@ print "Got the slice credential, deleting the sliver..."
 params = {}
 params["slice_urn"]  = myslice["urn"]
 params["credentials"] = [slicecred]
-rval,response = do_method("cm", "DeleteSliver", params, version="2.0")
+rval,response = do_method("am", "DeleteSliver", params)
 print "Received response code %r" % (response["code"])
 if rval:
     Fatal("Could not delete sliver")

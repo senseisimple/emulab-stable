@@ -50,7 +50,7 @@ print "Got the slice credential, asking for a sliver credential ..."
 params = {}
 params["slice_urn"]   = SLICEURN
 params["credentials"] = (slicecred,)
-rval,response = do_method("cm", "SliverStatus", params, version="2.0")
+rval,response = do_method("am", "SliverStatus", params)
 if rval:
     Fatal("Could not get sliver status")
     pass
