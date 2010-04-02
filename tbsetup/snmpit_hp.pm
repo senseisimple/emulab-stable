@@ -55,6 +55,7 @@ my $ofOID = 'iso.org.dod.internet.private.enterprises.11.2.14.11.5.1.7.1.35';
 my $ofEnableOID     = $ofOID.'.1.1.2';
 my $ofControllerOID = $ofOID.'.1.1.3';
 my $ofListenerOID   = $ofOID.'.1.1.4';
+my $ofSupportOID    = $ofOID.'.2.1.0';
 
 #
 # Ports can be passed around in three formats:
@@ -1858,7 +1859,7 @@ sub isOpenflowSupported($) {
     # Still don't know how to detect if Openflow is supported.
     # the ofOID is a directory. Maybe walking from it?
     #
-    $ret = $self->get1($ofOID, 1); # not really
+    $ret = $self->get1($ofSupportOID, 1); # not really
     if (defined($ret)) {
 	return 1;
     } else {

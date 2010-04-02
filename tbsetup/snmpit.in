@@ -124,14 +124,18 @@ VLAN Control:
                         WITH EXTREME CAUTION **
   -F                Create all vlans in the given stack on the leader for
 		    use in leader->{ALLVLANSONLEADER} (Internal use only)
-  --of-enable <vlan>
-                    Enable Openflow on VLAN <vlan>
-  --of-disable <vlan>
-                    Disable Openflow on VLAN <vlan>
-  --of-controller <vlan> tcp:ip:port
-                    Set controller for Openflow-enabled VLAN <vlan>
-  --of-listener <vlan> ptcp:ip:port
-                    Set listener for Openflow-enabled VLAN <vlan>
+  --of-enable <name> <pid> <eid> 
+                    Enable Openflow on VLAN with the name <name> that is associated 
+		        with the given experiment 
+  --of-disable <name> <pid> <eid>
+                    Disable Openflow on VLAN with the name <name> that is associated 
+		        with the given experiment
+  --of-controller <name> <pid> <eid> tcp:ip:port
+                    Set controller for Openflow-enabled VLAN with the name <name> that is associated 
+		        with the given experiment
+  --of-listener <name> <pid> <eid> ptcp:ip:port
+                    Set listener for Openflow-enabled VLAN with the name <name> that is associated 
+		        with the given experiment
 
 Port Control:
   -s                     List all ports, and show configuration information
@@ -164,7 +168,7 @@ GetOptions(\%opt,
     'a','c','d','e','b','B=s@','g','h','i=s@','l+','m=s@','M','n',
     'N=s@','o=s@','p=s','q','r','s', 'S=s@','t','E=s','T=s','u=s','U','v=s','w',
     'y=s','x=s','z=s','F','L=s','O', 'D', 'R', 'f', 'X', 'vlan_tag=i', 
-    'of-disable=s', 'of-enable=s', 'of-controller=s', 'of-listener=s');
+    'of-disable=s@', 'of-enable=s@', 'of-controller=s@', 'of-listener=s@');
 # Unused: f,j
 
 if ($opt{h}) {
@@ -265,25 +269,41 @@ if ($opt{t} || $opt{r} || $opt{D} || $opt{R} || $opt{X}) {
     @ports = ($opt{T});
 } elsif ($opt{'of-controller'} || $opt{'of-listener'}) {
     #
-    # Options that take the connection string
+    # Options that take the pid eid and connection string
     #
+    if (@ARGV < 2) {
+	tberror "pid/eid reqired!";
+	exit &usage;
+    } else {
+	($pid, $eid) = (shift @ARGV, shift @ARGV);
+    }
     if (@ARGV < 0) {
 	tberror "Controller/listener connection string reqired!";
 	exit &usage;
-    } elsif (!$opt{i}) { # Openflow operations must have a target device
-	tberror "A device is reqired!";
-	exit &usage;
+    #} elsif (!$opt{i}) { # Openflow operations must have a target device
+	#tberror "A device is reqired!";
+	#exit &usage;
     } else {
 	$ofconnstr = shift @ARGV;
     }
 } elsif ($opt{'of-enable'} || $opt{'of-disable'}) {
     #
+    # Options that need pid eid
+    #
+    if (@ARGV < 1) {
+	tberror "pid/eid reqired!";
+	exit &usage;
+    } else {
+	($pid, $eid) = (shift @ARGV, shift @ARGV);
+    }
+    # comment the following because we should support VLAN acrossing multiple switches
+    #
     # Options that need other options
     #
-    if (!$opt{i}) { # Openflow operations must have a target device
-	tberror "A device is reqired!";
-	exit &usage;
-    } 
+    #if (!$opt{i}) { # Openflow operations must have a target device
+    #	tberror "A device is reqired!";
+    #	exit &usage;
+    #} 
 } else {
     #
     # Everything else
@@ -761,8 +781,23 @@ COMMAND: foreach my $command (@commands) {
             last;
         };
 	(/ofenable/ || /ofdisable/ || /ofcontroller/ || /oflistener/) && do {
-	    @devicenames = @supplied_switches;
 	    @vlans = @args;
+
+	    # Same to 'remove', we find stacks by VLAN 
+	    my ($vlan_name) = @args;
+            my ($vlanobj, $stack);
+            if ($supplied_switches) {
+                debug("Openflow operations: using supplied switches\n");
+                @devicenames = @supplied_switches;
+            } elsif (defined($experiment) &&
+                     defined($vlanobj = VLan->Lookup($experiment,$vlan_name)) &&
+                     defined($stack = $vlanobj->GetStack())) {
+                debug("Openflow operations: found stack $stack in database\n");
+                @devicenames = getSwitchesInStack($stack);
+            } else {
+                debug("Openflow operations: using test switches\n");
+                @devicenames = getTestSwitches();
+            }
 	    last;
 	};
     }
@@ -2484,26 +2519,20 @@ sub doTrunkDisable($$) {
 sub doOpenflowEnable($$) {
     my $stacks = shift;
     my $vlan = shift;
-    
+    my $errors = 0;
+
     #
-    # Sanity checking
+    # Enabling Openflow on each stack
     #
-    if (@$stacks != 1) {
-	die "Enabling Openflow can process only one stack now\n" .
-	    "Stacks are " . join(",",@$stacks) . "\n";
-    }
-    
-    my $stack = $$stacks[0];
     print "Enabling Openflow on VLAN $vlan ...\n"
-	if(!$quiet);
-    
-    #
-    # TODO: check if Openflow is already enabled. (Maybe in device code?)
-    #
-    if (!$stack->enableOpenflow($vlan)) {
-	return 1;
+	if (!$quiet);
+    foreach my $stack (@$stacks) {
+	if (!$stack->enableOpenflow($vlan)) {
+	    $errors++;
+	}	
     }
-    return 0;
+    
+    return $errors;
 }
 
 #
@@ -2513,30 +2542,24 @@ sub doOpenflowEnable($$) {
 sub doOpenflowDisable($$) {
     my $stacks = shift;
     my $vlan = shift;
-    
+    my $errors = 0;
+
     #
-    # Sanity checking
+    # Disabling Openflow on each stack
     #
-    if (@$stacks != 1) {
-	die "Disabling Openflow can process only one stack now\n" .
-	    "Stacks are " . join(",",@$stacks) . "\n";
-    }
-    
-    my $stack = $$stacks[0];
     print "Disabling Openflow on VLAN $vlan ...\n"
-	if(!$quiet);
-    #
-    # TODO: check if Openflow is enabled. (in device code?)
-    #
-    if (!$stack->disableOpenflow($vlan)) {
-	return 1;
+	if (!$quiet);
+    foreach my $stack (@$stacks) {
+	if (!$stack->disableOpenflow($vlan)) {
+	    $errors++;
+	}	
     }
-    
+             
     #
     # TODO:clear controllers/listeners here. Now in HP stack code.
     #
     
-    return 0;
+    return $errors;
 }
 
 #
@@ -2547,27 +2570,20 @@ sub doSetController($$$) {
     my $stacks = shift;
     my $vlan = shift;
     my $controller = shift;
-    
+    my $errors = 0;
+
     #
-    # Sanity checking
+    # Set controller on each stack
     #
-    if (@$stacks != 1) {
-	die "Set controller on a VLAN can process only one stack now\n" .
-	    "Stacks are " . join(",",@$stacks) . "\n";
-    }
-    
-    my $stack = $$stacks[0];
     print "Set controller for VLAN $vlan ...\n"
-	if(!$quiet);
-    
-    #
-    # TODO: Check if Openflow is enabled. But in fact it doesn't matter. 
-    #
-    if (!$stack->setController($vlan, $controller)) {
-	return 1;
+	if (!$quiet);
+    foreach my $stack (@$stacks) {
+	if (!$stack->setController($vlan, $controller)) {
+	    $errors++;
+	}	
     }
     
-    return 0;
+    return $errors;
 }
 
 #
@@ -2578,25 +2594,18 @@ sub doSetListener($$$) {
     my $stacks = shift;
     my $vlan = shift;
     my $listener = shift;
-    
+    my $errors = 0;
+
     #
-    # Sanity checking
+    # Set controller on each stack
     #
-    if (@$stacks != 1) {
-	die "Set listener on a VLAN can process only one stack now\n" .
-	    "Stacks are " . join(",",@$stacks) . "\n";
-    }
-    
-    my $stack = $$stacks[0];
     print "Set listener for VLAN $vlan ...\n"
-	if(!$quiet);
-    
-    #
-    # TODO: Check if Openflow is enabled. But in fact it doesn't matter. 
-    #
-    if (!$stack->setListener($vlan, $listener)) {
-	return 1;
+	if (!$quiet);
+    foreach my $stack (@$stacks) {
+	if (!$stack->setListener($vlan, $listener)) {
+	    $errors++;
+	}	
     }
     
-    return 0;
+    return $errors;
 }
