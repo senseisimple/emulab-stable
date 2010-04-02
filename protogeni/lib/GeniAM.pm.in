@@ -137,7 +137,41 @@ sub SliverStatus()
         'slice_urn' => $slice_urn,
         'credentials' => $credentials,
     };
-    return GeniCMV2::SliverStatus($status_args);
+    my $response = GeniCMV2::SliverStatus($status_args);
+    if (GeniResponse::IsError($response)) {
+        return $response
+    }
+    # $status is a hash ref
+    my $pgstatus = GeniResponse::value($response);
+    my $status = {};
+
+    # How do we determine the sliver URN? Is there one for the whole
+    # sliver, or just for each individual sliver?
+    $status->{'geni_urn'} = 'Unknown';
+
+    # Determine geni_status. XXX how to determine 'configuring'?
+    if ($pgstatus->{'status'} == 'ready') {
+        $status->{'geni_status'} = 'ready';
+    } elsif ($pgstatus->{'status'} == 'failed') {
+        $status->{'geni_status'} = 'failed';
+    } else {
+        $status->{'geni_status'} = 'unknown';
+    }
+
+    my $details = $pgstatus->{'details'};
+    my @children = ();
+    while ( my ($pgurn, $pgrstat) = each(%$details) ) {
+        my $child = {
+            'geni_urn' => $pgurn,
+            # XXX Need to massage status to one of the AM status values
+            'geni_status' => $pgrstat->{'status'},
+            'geni_error' => $pgrstat->{'error'},
+        };
+        push @children, $child;
+    }
+    $status->{'geni_resources'} = \@children;
+
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS, $status)
 }
 
 sub RenewSliver()
