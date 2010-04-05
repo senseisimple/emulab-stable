@@ -1,0 +1,33 @@
+# Your extension should have its own namespace to disambiguate it from
+# others. 
+
+default namespace = "http://www.protogeni.net/resources/credentials/extension"
+
+# This is meant to specify maximum sliver lifetime, 
+# that will be honored by the CM. It takes precedence over 
+# the default limit imposed by CM on all users.
+MaxLifeTime = element max_sliver_lifetime {xsd:integer}
+
+# It is meant to specify exception limits to resource allocation
+# at the granularity of node type.
+ComponentType = element component_type {
+		attribute type {string} &
+		attribute count {string}
+		}
+
+# It allows CM to limit the total number of components allocated
+# to a user within a slice.
+MaxComponents = element max_components {
+    attribute limit {xsd:integer} &
+		ComponentType*
+		}
+
+# policy exceptions enable CM to let specific users 
+# pass through certain policies.
+PolicyExceptions = element policy_exceptions {
+		element policy {string}*
+		}
+
+# All of the above are extensions specified in credential.
+start =	MaxLifeTime | MaxComponents | PolicyExceptions
+
