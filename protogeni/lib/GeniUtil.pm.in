@@ -11,7 +11,7 @@ use Exporter;
 use vars qw(@ISA @EXPORT);
 
 @ISA    = "Exporter";
-@EXPORT = qw(NewUUID GENI_PURGEFLAG FindHostname $EXTENSIONS_NS $EXTENSIONS_PREFIX);
+@EXPORT = qw(NewUUID GENI_PURGEFLAG FindHostname);
 
 use English;
 use Data::Dumper;
@@ -28,6 +28,7 @@ my $OUTERBOSS_NODENAME = "@OUTERBOSS_NODENAME@";
 my $user	       = "geniuser";
 my $group              = "GeniSlices";
 
+use vars qw($EXTENSIONS_NS $EXTENSIONS_PREFIX);
 #Extensions namespace URI.
 # TODO: pick the right NS URI, prefix and update here.
 $EXTENSIONS_NS = ""; 
