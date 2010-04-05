@@ -1,7 +1,7 @@
 # Your extension should have its own namespace to disambiguate it from
 # others. 
 
-default namespace = "http://www.protogeni.net/resources/credentials/extension"
+default namespace = "http://www.protogeni.net/resources/credential/ext/policy/1.0"
 
 # This is meant to specify maximum sliver lifetime, 
 # that will be honored by the CM. It takes precedence over 
