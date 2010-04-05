@@ -82,10 +82,10 @@ Usage: $0 [-h] [-v level] [-q] [-n] [-i device] [-S stack]
 	  [-d ports] [-e ports] [-a ports]
 	  [-p <10|100|1000> ports] [-u <half|full> ports]
 	  [-c]
-          [--of-disable vlan]
-          [--of-enable vlan]
-          [--of-controller vlan tcp:ip:port]
-          [--of-listener vlan ptcp:ip:port]
+          [--of-disable name pid eid]
+          [--of-enable name pid eid]
+          [--of-controller name pid eid tcp:ip:port]
+          [--of-listener name pid eid ptcp:ip:port]
 General:
   -h          Display this help message
   -v <level>  Verbose mode
@@ -168,7 +168,7 @@ GetOptions(\%opt,
     'a','c','d','e','b','B=s@','g','h','i=s@','l+','m=s@','M','n',
     'N=s@','o=s@','p=s','q','r','s', 'S=s@','t','E=s','T=s','u=s','U','v=s','w',
     'y=s','x=s','z=s','F','L=s','O', 'D', 'R', 'f', 'X', 'vlan_tag=i', 
-    'of-disable=s@', 'of-enable=s@', 'of-controller=s@', 'of-listener=s@');
+    'of-disable=s', 'of-enable=s', 'of-controller=s', 'of-listener=s');
 # Unused: f,j
 
 if ($opt{h}) {
@@ -784,13 +784,12 @@ COMMAND: foreach my $command (@commands) {
 	    @vlans = @args;
 
 	    # Same to 'remove', we find stacks by VLAN 
-	    my ($vlan_name) = @args;
-            my ($vlanobj, $stack);
+	    my ($vlanobj, $stack);
             if ($supplied_switches) {
                 debug("Openflow operations: using supplied switches\n");
                 @devicenames = @supplied_switches;
             } elsif (defined($experiment) &&
-                     defined($vlanobj = VLan->Lookup($experiment,$vlan_name)) &&
+                     defined($vlanobj = VLan->Lookup($experiment,$vlans[0])) &&
                      defined($stack = $vlanobj->GetStack())) {
                 debug("Openflow operations: found stack $stack in database\n");
                 @devicenames = getSwitchesInStack($stack);
@@ -2531,6 +2530,10 @@ sub doOpenflowEnable($$) {
 	    $errors++;
 	}	
     }
+
+    if (!$errors) {
+	print 'Done! \n' if (!$quiet);
+    }
     
     return $errors;
 }
@@ -2558,6 +2561,10 @@ sub doOpenflowDisable($$) {
     #
     # TODO:clear controllers/listeners here. Now in HP stack code.
     #
+
+    if (!$errors) {
+	print 'Done! \n' if (!$quiet);
+    }
     
     return $errors;
 }
@@ -2583,6 +2590,10 @@ sub doSetController($$$) {
 	}	
     }
     
+    if (!$errors) {
+	print 'Done! \n' if (!$quiet);
+    }
+
     return $errors;
 }
 
@@ -2606,6 +2617,10 @@ sub doSetListener($$$) {
 	    $errors++;
 	}	
     }
-    
+
+    if (!$errors) {
+	print 'Done! \n' if (!$quiet);
+    }
+
     return $errors;
 }

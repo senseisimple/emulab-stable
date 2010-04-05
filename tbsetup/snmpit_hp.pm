@@ -51,7 +51,8 @@ my $createOID = "dot1qVlanStaticRowStatus";
 #
 # Openflow OIDs, only number format now.
 #
-my $ofOID = 'iso.org.dod.internet.private.enterprises.11.2.14.11.5.1.7.1.35';
+#my $ofOID = 'iso.org.dod.internet.private.enterprises.11.2.14.11.5.1.7.1.35';
+my $ofOID = '1.3.6.1.4.1.11.2.14.11.5.1.7.1.35';
 my $ofEnableOID     = $ofOID.'.1.1.2';
 my $ofControllerOID = $ofOID.'.1.1.3';
 my $ofListenerOID   = $ofOID.'.1.1.4';
@@ -1854,12 +1855,8 @@ sub setListener($$$) {
 sub isOpenflowSupported($) {
     my $self = shift;
     my $ret;
-
-    #
-    # Still don't know how to detect if Openflow is supported.
-    # the ofOID is a directory. Maybe walking from it?
-    #
-    $ret = $self->get1($ofSupportOID, 1); # not really
+    
+    $ret = $self->get1($ofSupportOID, 0);
     if (defined($ret)) {
 	return 1;
     } else {
