@@ -108,6 +108,7 @@ my $EXPT_RESOURCESHOSED = 0;
 		   "event_groups",
 		   "virt_firewalls",
 		   "firewall_rules",
+		   "elabinelab_attributes",
 		   "virt_tiptunnels",
 		   "ipsubnets");
 

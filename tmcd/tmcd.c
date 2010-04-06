@@ -5995,7 +5995,7 @@ COMMAND_PROTOTYPE(dorusage)
                      timebuf);
 
             snprintf(buf, sizeof(buf), "%ld %ld\n", 
-                     now.tv_sec, now.tv_usec);
+                     (long)now.tv_sec, (long)now.tv_usec);
             plfd = open(pllogfname, O_WRONLY|O_APPEND|O_CREAT, 
                         S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
             if (plfd < 0) {
@@ -6526,6 +6526,7 @@ COMMAND_PROTOTYPE(doemulabconfig)
 	MYSQL_ROW	row;
 	char		buf[MYBUFSIZE];
 	char		*bufp = buf, *ebufp = &buf[sizeof(buf)];
+	char		myrole[32], rolebuf[256];
 	int		nrows;
 
 	/*
@@ -6584,6 +6585,7 @@ COMMAND_PROTOTYPE(doemulabconfig)
 
 		if (!strcmp(row[0], reqp->nodeid)) {
 			bufp += OUTPUT(bufp, ebufp - bufp, "ROLE=%s\n", row[1]);
+			strncpy(myrole, row[1], sizeof(myrole));
 			break;
 		}
 	}
@@ -6686,6 +6688,67 @@ COMMAND_PROTOTYPE(doemulabconfig)
 	 */
 	bufp += OUTPUT(bufp, ebufp - bufp, "SINGLE_CONTROLNET=%d\n",
 		       reqp->singlenet);
+
+	/*
+	 * Put out new attributes.  Eventually, most of the above
+	 * parameters should come from here.  Note that a node can have
+	 * multiple roles and we need to construct a query for that.
+	 */
+	rolebuf[0] = '\0';
+	if (strchr(myrole, '+')) {
+		int gotone = 0;
+		int len = sizeof(rolebuf) - 1;
+		if (len > 0 && strstr(myrole, "boss")) {
+			if (gotone)
+				strcat(rolebuf, " or ");
+			strncat(rolebuf, "role='boss'", len);
+			len -= 11;
+			gotone = 1;
+		}
+		if (len > 0 && strstr(myrole, "ops")) {
+			if (gotone)
+				strcat(rolebuf, " or ");
+			strncat(rolebuf, "role='ops'", len);
+			len -= 10;
+			gotone = 1;
+		}
+		if (len > 0 && strstr(myrole, "fs")) {
+			if (gotone)
+				strcat(rolebuf, " or ");
+			strncat(rolebuf, "role='fs'", len);
+			len -= 9;
+			gotone = 1;
+		}
+		if (len > 0 && strstr(myrole, "router")) {
+			if (gotone)
+				strcat(rolebuf, " or ");
+			strncat(rolebuf, "role='router'", len);
+			len -= 13;
+			gotone = 1;
+		}
+	} else {
+		snprintf(rolebuf, sizeof(rolebuf), "role='%s'", myrole);
+	}
+
+	/*
+	 * Get all the attributes for the node's role.
+	 * Note taht for backward compat, we don't worry if the attributes
+	 * table does not exist.
+	 */
+	res = mydb_query("select attrkey,attrvalue "
+			 "   from elabinelab_attributes "
+			 "where exptidx=%d and (%s) order by ordering",
+			 2, reqp->exptidx, rolebuf);
+	if (res) {
+		nrows = (int)mysql_num_rows(res);
+		while (bufp < ebufp && nrows--) {
+			row = mysql_fetch_row(res);
+			if (row[0] && row[0][0] && row[1])
+				bufp += OUTPUT(bufp, ebufp - bufp, "%s=\"%s\"\n",
+					       row[0], row[1]);
+		}
+		mysql_free_result(res);
+	}
 
 	client_writeback(sock, buf, strlen(buf), tcp);
 	return 0;
