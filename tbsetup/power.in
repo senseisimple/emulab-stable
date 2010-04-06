@@ -295,6 +295,7 @@ foreach my $power_id (keys %outlets) {
 
     if ($power_id eq "mail" || $power_id =~ /^whol-/ 
 	|| $power_id=~ /^rmcp-/
+	|| $power_id eq 'drac'
 	|| $power_id eq 'ilo' || $power_id eq 'ilo2') {
 	$type = $power_id;
 	$IP = "";
@@ -359,7 +360,7 @@ foreach my $power_id (keys %outlets) {
 	    print "Control of $nodestr failed.\n"; ++$exitval;
 	    ++$errors;
 	}
-    } elsif ($type eq 'ilo2' || $type eq 'ilo') {
+    } elsif ($type eq 'ilo2' || $type eq 'ilo' || $type eq 'drac') {
 	if (iloctrl($type,$op,@nodes)) {
 	    print "Control of $nodestr failed.\n"; ++$exitval;
             ++$errors;

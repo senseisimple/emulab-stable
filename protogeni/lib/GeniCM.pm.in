@@ -214,12 +214,12 @@ sub DiscoverResources($)
 	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
 				    "Invalid credentials for operation");
     }
-    return DiscoverResourcesAux($available, $compress);
+    return DiscoverResourcesAux($available, $compress, [$credential]);
 }
 # Helper function for V2.
-sub DiscoverResourcesAux($$)
+sub DiscoverResourcesAux($$$)
 {
-    my ($available, $compress) = @_;
+    my ($available, $compress, $credentials) = @_;
     my $user_uuid  = $ENV{'GENIUSER'};
 
     # Oh, for $*%(s sake.  Frontier::RPC2 insists on representing a
@@ -240,7 +240,20 @@ sub DiscoverResourcesAux($$)
 	# Cannot get the value, say no.
 	$allow_externalusers = 0;
     }
-    if (!$allow_externalusers) {
+
+    # Figure out if user has a credentials that exempts him
+    # from the following policy. If external users are blocked access
+    # and he presents a credential that exempts him from it, 
+    # then he should get access.
+    my $isExempted = 0;
+    foreach my $credential (@$credentials) {
+      if (1 == GeniXML::PolicyExists('allow_externalusers', $credential)) {
+        $isExempted = 1;
+        last;
+      }
+    }
+
+    if (!$allow_externalusers && !$isExempted) {
 	my $user = GeniUser->Lookup($user_uuid, 1);
 	# No record means the user is remote.
 	if (!defined($user) || !$user->IsLocal()) {
@@ -397,12 +410,12 @@ sub GetTicketAux($$$$$$$)
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
     return GetTicketAuxAux($slice, $user, $rspecstr,
-			   $isupdate, $impotent, $v2, $level, $ticket);
+			   $isupdate, $impotent, $v2, $level, $ticket, [$credential]);
 }
-sub GetTicketAuxAux($$$$$$$$)
+sub GetTicketAuxAux($$$$$$$$$)
 {
-    my ($slice, $user,
-	$rspecstr, $isupdate, $impotent, $v2, $level, $ticket) = @_;
+    my ($slice, $user, $rspecstr, 
+        $isupdate, $impotent, $v2, $level, $ticket, $credentials) = @_;
     my $response    = undef;
     my $restorevirt = 0;	# Flag to restore virtual state
     my $restorephys = 0;	# Flag to restore physical state
@@ -445,11 +458,24 @@ sub GetTicketAuxAux($$$$$$$$)
     #
     my $allow_externalusers = 0;
     if (!TBGetSiteVar('protogeni/allow_externalusers', \$allow_externalusers)){
-	# Cannot get the value, say no.
-	$allow_externalusers = 0;
+	    # Cannot get the value, say no.
+	    $allow_externalusers = 0;
     }
-    if (!$allow_externalusers && !$user->IsLocal()) {
-	return GeniResponse->Create(GENIRESPONSE_UNAVAILABLE, undef,
+
+    # Figure out if user has a credentials that exempts him
+    # from the following policy. If external users are blocked access
+    # and he presents a credential that exempts him from it, 
+    # then he should get access.
+    my $isExempted = 0;
+    foreach my $credential (@$credentials) {
+      if (1 == GeniXML::PolicyExists('allow_externalusers', $credential)) {
+        $isExempted = 1;
+        last;
+      }
+    }
+
+    if (!$allow_externalusers && !$isExempted && !$user->IsLocal()) {
+	    return GeniResponse->Create(GENIRESPONSE_UNAVAILABLE, undef,
 				    "External users temporarily denied");
     }
     
@@ -475,9 +501,26 @@ sub GetTicketAuxAux($$$$$$$$)
 	
 	#
 	# Do we need a policy limit?
-	#
+  # A sitevar controls the sliver lifetime.
+  #
+  my $max_sliver_lifetime = 0;
+  if (!TBGetSiteVar('protogeni/max_sliver_lifetime', \$max_sliver_lifetime)){
+	  # Cannot get the value, default it to 90 days.
+	  $max_sliver_lifetime = 90;
+  }
+
+  # Check if the user has a credential that lets him obtain slivers
+  # with extended sliver lifetime. If so allow him to get sliver.
+  foreach my $credential (@$credentials) {
+    my $nodes = GeniXML::FindNodesNS("//n:max_sliver_lifetime",
+        GeniXML::Parse($credential->{'extensions'}), $GeniUtil::EXTENSIONS_NS);
+    if (0 < $nodes->size) {
+      $max_sliver_lifetime = int($nodes->pop()->string_value);
+      last;
+    }
+  }
 	my $diff = $when - time();
-	if ($diff < (60 * 5) || $diff > (3600 * 24 * 90)) {
+	if ($diff < (60 * 5) || $diff > (3600 * 24 * $max_sliver_lifetime)) {
 	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 					"valid_until out of range");
 	}
@@ -2426,17 +2469,18 @@ sub RenewSlice($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "This is not your credential!");
     }
-    return RenewSliverAux($credential, $expires);
+    return RenewSliverAux([$credential], $expires);
 }
 
 sub RenewSliverAux($$)
 {
-    my ($credential, $expires) = @_;
+    my ($credentials, $expires) = @_;
+    my $credential = $credentials->[0];
     my $slice_uuid  = $credential->target_uuid();
     my $user_uuid   = $credential->owner_uuid(); 
     my $message     = "Error renewing aggregate";
     my $when;
-   
+    
     $credential->HasPrivilege( "pi" ) or
 	$credential->HasPrivilege( "control" ) or
 	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
@@ -2484,10 +2528,28 @@ sub RenewSliverAux($$)
 	}
 	#
 	# Do we need a policy limit?
-	#
+  # A sitevar controls the sliver lifetime.
+  #
+  my $max_sliver_lifetime = 0;
+  if (!TBGetSiteVar('protogeni/max_sliver_lifetime', \$max_sliver_lifetime)){
+	  # Cannot get the value, default it to 90 days.
+	  $max_sliver_lifetime = 90;
+  }
+
+  # Check if the user has a credential that lets him obtain slivers
+  # with extended sliver lifetime. If so allow him to get sliver.
+  foreach my $credential (@$credentials) {
+    my $nodes = GeniXML::FindNodesNS("//n:max_sliver_lifetime",
+        GeniXML::Parse($credential->{'extensions'}), $GeniUtil::EXTENSIONS_NS);
+    if (0 < $nodes->size) {
+      $max_sliver_lifetime = int($nodes->pop()->string_value);
+      last;
+    }
+  }
+
 	my $diff = $when - time();
 
-	if ($diff < (60 * 5) || $diff > (3600 * 24 * 90)) {
+	if ($diff < (60 * 5) || $diff > (3600 * 24 * $max_sliver_lifetime)) {
 	    $message = "expiration out of range";
 	    goto bad;
 	}

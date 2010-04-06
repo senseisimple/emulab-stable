@@ -17,7 +17,9 @@
 import getopt
 import os
 import re
+import socket
 import sys
+import xml.dom.minidom
 import xmlrpclib
 from M2Crypto import X509
 
@@ -40,6 +42,7 @@ def Usage():
     -s file, --slicecredentials=file    read slice credentials from file
                                             [default: query from SA]
 Commands:
+    copy <source> <dest>        copy local dir/file <source> to remote <dest>
     exec <command>              run <command> on slice nodes
     install <file>              extract tape archive <file> onto slice nodes
     list                        show IP addresses of node control interfaces"""
@@ -47,6 +50,7 @@ Commands:
 execfile( "test-common.py" )
 
 NOTREADY = "---notready---"
+RSYNC = "/usr/local/bin/rsync"
 SSH = "/usr/bin/ssh"
 
 #
@@ -55,7 +59,13 @@ SSH = "/usr/bin/ssh"
 commands = []
 while args:
     command = args.pop( 0 )
-    if command == "install":
+    if command == "copy":
+        if len( args ) < 2: Fatal( sys.argv[ 0 ] +
+                                ": command \"copy\" requires two parameters" )
+        source = args.pop( 0 )
+        dest = args.pop( 0 )
+        commands.append( ( command, source, dest ) )
+    elif command == "install":
         if not args: Fatal( sys.argv[ 0 ] + 
                             ": command \"install\" requires a parameter" )
         file = args.pop( 0 )
@@ -98,11 +108,11 @@ if debug: print str( response[ "value" ] )
 
 #
 # Ask each manager for its relevant nodes.  We talk to the component
-# managers in parallel, but ask about each of its nodes serially: this
+# managers in parallel, but send each of its requests serially: this
 # ought to allow a reasonable amount of concurrency without excessively
 # burdening any individual server.
 #
-params = { "credential" : slicecred }
+params = { "slice_urn" : slice[ "urn" ], "credentials" : [ slicecred ] }
 ( pr, pw ) = os.pipe()
 
 for cm in response[ "value" ]:
@@ -124,33 +134,48 @@ for cm in response[ "value" ]:
 
             print >> p, text
 
-        rval, response = do_method( None, "SliceStatus", params, cm[ "url" ], 
-                                    True )
+        try:
+            rval, response = do_method( None, "SliverStatus", params, \
+                                            cm[ "url" ], True )
+        except:
+            print >> sys.stderr, "Warning: could not obtain sliver status " + \
+                "from " + cm[ "url" ]
+            os._exit( 1 )
+
         if not rval:
             if response[ "value" ][ "status" ] == "ready":
-                # We have a list of node IDs: now iterate over them, and hunt
-                # through all the details looking for the control address for
-                # each one.
-                for node in response[ "value" ][ "details" ].keys():
-                    params[ "type" ] = "Node"
-                    params[ "uuid" ] = node
-                    rval, response = do_method( None, "Resolve", params,
-                                                cm[ "url" ] )
-                    if rval:
-                        print >> sys.stderr, "Could not resolve node " + \
-                            node
-                        os._exit( 1 )
-                    if "physctrl" in response[ "value" ]:
-                        Say( response[ "value" ][ "physctrl" ] )
-                    elif "interfaces" in response[ "value" ]:
-                        for interface in response[ "value" ][ "interfaces" ]:
-                            if interface[ "role" ] == "ctrl":
-                                Say( interface[ "IP" ] )
-                                break
-                    else:
-                        print >> sys.stderr, "No address available for " + \
-                            node
-                        os._exit( 1 )
+                # There is a sliver here for us.  Look up its name...
+                rval, response = do_method( None, "Resolve", 
+                                            { "urn" : slice[ "urn" ],
+                                              "credentials" : [ slicecred ] },
+                                            cm[ "url" ], True )
+                if rval:
+                    print >> sys.stderr, "Could not resolve slice " + \
+                        slice[ "urn" ]
+                    os._exit( 1 )
+
+                sliver = response[ "value" ][ "sliver_urn" ];
+
+                # Now we have the sliver name, and can resolve it to
+                # obtain the manifest.
+                rval, response = do_method( None, "Resolve", 
+                                            { "urn" : sliver,
+                                              "credentials" : [ slicecred ] },
+                                            cm[ "url" ], True )
+                if rval:
+                    print >> sys.stderr, "Could not resolve sliver " + sliver
+                    os._exit( 1 )
+
+                # Wade through the manifest, and look for all node elements,
+                # noting the host name of each one.
+                doc = xml.dom.minidom.parseString( response[ "value" ] \
+                                                       [ "manifest" ] )
+
+                for node in filter( lambda x: x.nodeName == "node",
+                                    doc.documentElement.childNodes ):
+                    if node.hasAttribute( "hostname" ):
+                        Say( socket.gethostbyname( node.getAttribute( \
+                                    "hostname" ) ) )
             else:
                 Say( NOTREADY )
 
@@ -189,7 +214,25 @@ for cm in response[ "value" ]:
 nodes.sort()
 
 for command in commands:
-    if command[ 0 ] == "exec":
+    if command[ 0 ] == "copy":
+        print "Copying \"" + command[ 1 ] + "\" to \"" + command[ 2 ] + "\"..."
+                
+        child = {}
+        for node in nodes:
+            pid = os.fork()
+            if pid:
+                child[ pid ] = node
+            else:
+                os.execl( RSYNC, "rsync", "-a", "-e",
+                          SSH + " -T -o 'BatchMode yes' " +
+                          "-o 'StrictHostKeyChecking no' " +
+                          "-o 'EscapeChar none'",
+                          command[ 1 ], node + ":" + command[ 2 ] )
+                os._exit( 1 )
+        for node in nodes:
+            ( pid, status ) = os.wait()
+            print "  (finished on node " + child[ pid ] + ")"
+    elif command[ 0 ] == "exec":
         print "Executing command \"" + command[ 1 ] + "\"..."
         for node in nodes:
             if not os.fork():

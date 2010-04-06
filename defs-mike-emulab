@@ -1,0 +1,15 @@
+#
+# This is the definitions file for Mike on Emulab.Net.
+#
+. defs-default
+
+TBOPSEMAIL=mike@flux.utah.edu
+TBLOGSEMAIL=mike@flux.utah.edu
+TBWWWEMAIL=mike@flux.utah.edu
+TBAPPROVALEMAIL=mike@flux.utah.edu
+TBLOGSEMAIL=mike@flux.utah.edu
+TBAUDITEMAIL=mike@flux.utah.edu
+TBSTATEDEMAIL=mike@flux.utah.edu
+TBTESTSUITEEMAIL=mike@flux.utah.edu
+WWW=www.emulab.net/dev/mike
+THISHOMEBASE=Mike.Emulab.Net

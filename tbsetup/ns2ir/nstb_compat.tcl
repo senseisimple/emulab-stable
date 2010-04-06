@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2006, 2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -80,6 +80,10 @@ proc tb-elab-in-elab-topology {topo} {}
 proc tb-set-inner-elab-eid {eid} {}
 proc tb-set-elabinelab-cvstag {cvstag} {}
 proc tb-elabinelab-singlenet {} {}
+proc tb-set-elabinelab-attribute {key val {order 0}} {}
+proc tb-unset-elabinelab-attribute {key} {}
+proc tb-set-elabinelab-role-attribute {role key val {order 0}} {}
+proc tb-unset-elabinelab-role-attribute {role key} {}
 proc tb-set-node-inner-elab-role {node role} {}
 proc tb-set-node-id {vnode myid} {}
 proc tb-set-link-est-bandwidth {srclink args} {}

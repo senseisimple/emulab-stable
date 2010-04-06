@@ -92,7 +92,15 @@ my $API_VERSION = 2;
 #
 sub GetVersion()
 {
-    return GeniResponse->Create( GENIRESPONSE_SUCCESS, $API_VERSION );
+    my @input_rspec_versions = ( "0.1", "2" );
+    my $blob = {
+	"api" => $API_VERSION,
+	"level" => 1,
+	"input_rspec" => \@input_rspec_versions,
+	"output_rspec" => "0.1"
+    };
+
+    return GeniResponse->Create( GENIRESPONSE_SUCCESS, $blob );
 }
 
 #
@@ -242,7 +250,14 @@ sub DiscoverResources($)
     return $credential
 	if (GeniResponse::IsResponse($credential));
 
-    return GeniCM::DiscoverResourcesAux($available, $compress);
+    my $credential_objects = [];
+    foreach my $credstr (@$credentials) {
+      my $cred = CheckCredential($credstr);
+      push(@$credential_objects, $cred) 
+        if(!GeniResponse::IsResponse($cred));
+    }
+    return GeniCM::DiscoverResourcesAux($available, $compress,
+        $credential_objects);
 }
 
 #
@@ -897,7 +912,13 @@ sub RenewSlice($)
 	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN(), undef,
 				    "Credential does not match the URN");
     }
-    return GeniCM::RenewSliverAux($credential, $valid_until);
+    my $credential_objects = [];
+    foreach my $credstr (@$credentials) {
+      my $cred = CheckCredential($credstr);
+      push(@$credential_objects, $cred) 
+        if(!GeniResponse::IsResponse($cred));
+    }
+    return GeniCM::RenewSliverAux($credential_objects, $valid_until);
 }
 
 #
@@ -1049,8 +1070,14 @@ sub UpdateTicket($)
     if (!defined($user)) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
+    my $credential_objects = [];
+    foreach my $credstr (@$credentials) {
+      my $cred = CheckCredential($credstr);
+      push(@$credential_objects, $cred) 
+        if(!GeniResponse::IsResponse($cred));
+    }
     return GeniCM::GetTicketAuxAux($slice, $user,
-				   $rspecstr, 1, $impotent, 1, 1, $ticket);
+				   $rspecstr, 1, $impotent, 1, 1, $ticket, $credential_objects);
 }
 
 #
@@ -1117,8 +1144,14 @@ sub UpdateSliver($)
     if (!defined($user)) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
+    my $credential_objects = [];
+    foreach my $credstr (@$credentials) {
+      my $cred = CheckCredential($credstr);
+      push(@$credential_objects, $cred) 
+        if(!GeniResponse::IsResponse($cred));
+    }
     return GeniCM::GetTicketAuxAux($slice, $user,
-				   $rspecstr, 1, $impotent, 1, 1, undef);
+				   $rspecstr, 1, $impotent, 1, 1, undef, $credential_objects);
 }
 
 #
@@ -1330,6 +1363,23 @@ sub CheckCredentials($)
 	    GeniResponse->MalformedArgsResponse("Wrong number of credentials");
     }
     my $credential = GeniCredential->CreateFromSigned($credentials[0]);
+    if (!defined($credential)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not create credential object");
+    }
+    #
+    # Make sure the credential was issued to the caller.
+    #
+    if ($credential->owner_uuid() ne $ENV{'GENIUUID'}) {
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+				    "This is not your credential");
+    }
+    return $credential;
+}
+
+sub CheckCredential($)
+{
+    my $credential = GeniCredential->CreateFromSigned($_[0]);
     if (!defined($credential)) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not create credential object");

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008, 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -102,7 +102,7 @@ $fields['version'] =
 	  '#size'	=> $TBDB_OSID_VERSLEN,
 	  '#maxlength'	=> $TBDB_OSID_VERSLEN,
 	  '#checkslot'  => 'os_info:version',
-	  '#required'   => TRUE);
+	  '#required'   => FALSE);
 
 #
 # Path to Multiboot image.

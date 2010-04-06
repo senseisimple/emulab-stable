@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -212,7 +212,7 @@ if (defined($options{"m"})) {
     usage()
 	if (defined($options{"i"}));
 
-    foreach my $imageid (split /,/, $options{"i"}) {
+    foreach my $imageid (split /,/, $options{"m"}) {
 
 	if ($imageid =~ /^([-\w\.\+]+)$/) {
 	    $imageid = $1;

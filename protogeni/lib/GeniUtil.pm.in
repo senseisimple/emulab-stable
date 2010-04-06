@@ -28,6 +28,12 @@ my $OUTERBOSS_NODENAME = "@OUTERBOSS_NODENAME@";
 my $user	       = "geniuser";
 my $group              = "GeniSlices";
 
+use vars qw($EXTENSIONS_NS $EXTENSIONS_PREFIX);
+#Extensions namespace URI.
+# TODO: pick the right NS URI, prefix and update here.
+$EXTENSIONS_NS = ""; 
+$EXTENSIONS_PREFIX = "";
+
 sub GENI_PURGEFLAG()	{ return 1; }
 
 #

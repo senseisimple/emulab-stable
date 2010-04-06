@@ -4389,7 +4389,7 @@ class elabinelab:
         #
         # Funnel up to node.console() routine
         # 
-        node_instance = node(readonly=self.readonly);
+        node_instance = node(self.server);
         
         return node_instance.console(version, argdict);
     
