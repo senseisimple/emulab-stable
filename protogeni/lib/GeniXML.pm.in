@@ -327,8 +327,11 @@ sub PolicyExists($$)
 
   return 0
     if (!ref($credential) or !defined($policy));
+  my $extensions_elem = GeniXML::Parse($credential->{'extensions'});
+  return 0
+    if (!defined($extensions_elem));
   my $policies = GeniXML::FindNodesNS("//n:policy_exceptions/*",
-          $credential->{'extensions'}, $GeniUtil::EXTENSIONS_NS);
+          $extensions_elem, $GeniUtil::EXTENSIONS_NS);
   foreach my $epolicy ($policies->get_nodelist) {
     if ($policy eq $epolicy->string_value) {
         $exists = 1;
