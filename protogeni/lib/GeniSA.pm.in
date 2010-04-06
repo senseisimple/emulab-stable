@@ -36,6 +36,8 @@ use Date::Parse;
 use POSIX qw(strftime);
 use Time::Local;
 
+use libdb qw(TBGetSiteVar);
+
 # Configure variables
 my $TB		   = "@prefix@";
 my $OURDOMAIN      = "@OURDOMAIN@";
