@@ -477,10 +477,18 @@ sub Register($)
 	    }
 	    #
 	    # Do we need a policy limit?
-	    #
+      # A sitevar controls the sliver lifetime.
+      #
+      my $max_sliver_lifetime = 0; 
+      if (!TBGetSiteVar('protogeni/max_sliver_lifetime', 
+            \$max_sliver_lifetime)) {
+          # Cannot get the value, default it to 90 days.
+          $max_sliver_lifetime = 90;
+      }
+
 	    my $diff = $when - time();
 
-	    if ($diff < (60 * 5) || $diff > (3600 * 24 * 90)) {
+	    if ($diff < (60 * 5) || $diff > (3600 * 24 * $max_sliver_lifetime)) {
 		$message = "valid_until out of range";
 		goto bad;
 	    }
@@ -943,10 +951,18 @@ sub RenewSlice($)
     }
     #
     # Do we need a policy limit?
+    # A sitevar controls the sliver lifetime.
     #
+    my $max_sliver_lifetime = 0; 
+    if (!TBGetSiteVar('protogeni/max_sliver_lifetime', 
+          \$max_sliver_lifetime)) {
+        # Cannot get the value, default it to 90 days.
+        $max_sliver_lifetime = 90;
+    }
+
     my $diff = $when - time();
 
-    if ($diff < (60 * 5) || $diff > (3600 * 24 * 90)) {
+    if ($diff < (60 * 5) || $diff > (3600 * 24 * $max_sliver_lifetime)) {
 	$message = "expiration out of range";
 	goto bad;
     }
