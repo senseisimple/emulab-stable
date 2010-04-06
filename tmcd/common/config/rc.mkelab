@@ -343,6 +343,18 @@ sub doboot()
 	    $line =~ /^(.*)=(.+)$/) {
 	    my $key = $1;
 	    my $val = $2;
+
+	    #
+	    # XXX backward compat
+	    #
+	    if ($key eq "WINSUPPORT") {
+		$key = "CONFIG_WINDOWS";
+	    } elsif ($key eq "NOSETUP") {
+		$key = "CONFIG_NOSETUP";
+	    } elsif ($key eq "SINGLE_CONTROLNET") {
+		$key = "CONFIG_SINGLECNET";
+	    }
+
 	    $emulabconfig{$key} = $val;
 
 	    #
