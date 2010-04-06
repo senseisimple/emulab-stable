@@ -513,7 +513,7 @@ sub GetTicketAuxAux($$$$$$$$$)
   # with extended sliver lifetime. If so allow him to get sliver.
   foreach my $credential (@$credentials) {
     my $nodes = GeniXML::FindNodesNS("//n:max_sliver_lifetime",
-        GeniXML::Parse($credential->{'extensions'}), $GeniUtil::EXTENSIONS_NS);
+        $credential->extensions(), $GeniUtil::EXTENSIONS_NS);
     if (0 < $nodes->size) {
       $max_sliver_lifetime = int($nodes->pop()->string_value);
       last;
@@ -2540,7 +2540,7 @@ sub RenewSliverAux($$)
   # with extended sliver lifetime. If so allow him to get sliver.
   foreach my $credential (@$credentials) {
     my $nodes = GeniXML::FindNodesNS("//n:max_sliver_lifetime",
-        GeniXML::Parse($credential->{'extensions'}), $GeniUtil::EXTENSIONS_NS);
+        $credential->extensions(), $GeniUtil::EXTENSIONS_NS);
     if (0 < $nodes->size) {
       $max_sliver_lifetime = int($nodes->pop()->string_value);
       last;
