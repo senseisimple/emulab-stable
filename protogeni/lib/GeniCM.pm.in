@@ -237,8 +237,8 @@ sub DiscoverResourcesAux($$$)
     #
     my $allow_externalusers = 0;
     if (!TBGetSiteVar('protogeni/allow_externalusers', \$allow_externalusers)){
-	# Cannot get the value, say no.
-	$allow_externalusers = 0;
+	      # Cannot get the value, say no.
+	      $allow_externalusers = 0;
     }
 
     # Figure out if user has a credentials that exempts him
@@ -247,7 +247,7 @@ sub DiscoverResourcesAux($$$)
     # then he should get access.
     my $isExempted = 0;
     foreach my $credential (@$credentials) {
-      if (1 == GeniXML::PolicyExists('allow_externalusers', $credential)) {
+        if (GeniXML::PolicyExists('allow_externalusers', $credential) == 1) {
         $isExempted = 1;
         last;
       }
@@ -505,19 +505,19 @@ sub GetTicketAuxAux($$$$$$$$$)
   #
   my $max_sliver_lifetime = 0;
   if (!TBGetSiteVar('protogeni/max_sliver_lifetime', \$max_sliver_lifetime)){
-	  # Cannot get the value, default it to 90 days.
-	  $max_sliver_lifetime = 90;
+	    # Cannot get the value, default it to 90 days.
+	    $max_sliver_lifetime = 90;
   }
 
   # Check if the user has a credential that lets him obtain slivers
   # with extended sliver lifetime. If so allow him to get sliver.
   foreach my $credential (@$credentials) {
-    my $nodes = GeniXML::FindNodesNS("//n:max_sliver_lifetime",
-        $credential->extensions(), $GeniUtil::EXTENSIONS_NS);
-    if (0 < $nodes->size) {
-      $max_sliver_lifetime = int($nodes->pop()->string_value);
-      last;
-    }
+      my $nodes = GeniXML::FindNodesNS("//n:max_sliver_lifetime",
+          $credential->extensions(), $GeniUtil::EXTENSIONS_NS);
+      if ($nodes->size > 0) {
+          $max_sliver_lifetime = int($nodes->pop()->string_value);
+          last;
+      }
   }
 	my $diff = $when - time();
 	if ($diff < (60 * 5) || $diff > (3600 * 24 * $max_sliver_lifetime)) {
@@ -1939,7 +1939,35 @@ sub SliverWorkAux($$$$$$$)
 	    GeniResponse->Create(GENIRESPONSE_ERROR, $logstuff, $message);
 	goto bad;
     }
+  
+    # Check to see if experiment is using more than what is limited by CM.
+    # protogeni/max_components sitevar controls number of nodes that can
+    # be allocated to an experiment.
 
+    my $max_components = 0;
+    if (!TBGetSiteVar('protogeni/max_components', \$max_components)) {
+	      # Cannot get the value, default it to -1. Which means there is no limit.
+	      $max_components = -1;
+    }
+
+    # Check if the user has a credential that lets him obtain slivers
+    # with extended sliver lifetime. If so allow him to get sliver.
+    foreach my $credential (@$credentials) {
+        my $nodes = GeniXML::FindNodesNS("//n:max_components",
+            $credential->extensions(), $GeniUtil::EXTENSIONS_NS);
+        if ($nodes->size > 0) {
+            $max_components = int($nodes->pop()->getAttribute("limit"));
+            last;
+        }
+    }
+
+    if ($max_components != -1 && $experiment->maximum_nodes() > $max_components) {
+        $message = "Experiment needs nodes(" . $experiment->maximum_nodes()
+            . ") that are more than the limit(" . $max_components 
+            . ") imposed by CM.";
+        print STDERR $message;
+        goto bad;
+    }
     #
     # Must do this after the mapper runs.
     #
@@ -2541,7 +2569,7 @@ sub RenewSliverAux($$)
   foreach my $credential (@$credentials) {
     my $nodes = GeniXML::FindNodesNS("//n:max_sliver_lifetime",
         $credential->extensions(), $GeniUtil::EXTENSIONS_NS);
-    if (0 < $nodes->size) {
+    if ($nodes->size > 0) {
       $max_sliver_lifetime = int($nodes->pop()->string_value);
       last;
     }
