@@ -1223,10 +1223,12 @@ sub GetTicketAuxAux($$$$$$$$$)
     }
 
     if ($max_components != -1 && $slice_experiment->maximum_nodes() > $max_components) {
-        $message = "Experiment needs nodes(" . $slice_experiment->maximum_nodes()
+        my $message = "Experiment needs nodes(" . $slice_experiment->maximum_nodes()
             . ") that are more than the limit(" . $max_components 
             . ") imposed by CM.";
         print STDERR $message;
+        $response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+                      $message);
         goto bad;
     }
 
