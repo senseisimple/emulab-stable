@@ -1,0 +1,7 @@
+%%SITE_PERL%%/RPC/Async.pm
+%%SITE_PERL%%/RPC/Async/Client.pm
+%%SITE_PERL%%/RPC/Async/Coderef.pm
+%%SITE_PERL%%/RPC/Async/Server.pm
+%%SITE_PERL%%/RPC/Async/URL.pm
+%%SITE_PERL%%/RPC/Async/Util.pm
+@dirrm %%SITE_PERL%%/RPC/Async
