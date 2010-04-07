@@ -14,13 +14,15 @@
 
 package
 {
-  public class RequestResourceDiscovery extends Request
+  public class RequestSliverResolve extends Request
   {
-    public function RequestResourceDiscovery(newCm : ComponentManager,
+    public function RequestSliverResolve(newCm : ComponentManager,
+									 newSliceUrn : String,
                                              newNext : Request) : void
     {
       super(newCm.getName());
       cm = newCm;
+	  sliceUrn = newSliceUrn;
       next = newNext;
     }
 
@@ -31,23 +33,17 @@ package
 
     override public function start(credential : Credential) : Operation
     {
-      opName = "Discovering Resources";
-      var opType = Geni.discoverResources;
-      if (cm.getName() == "Wisconsin" || cm.getName() == "Kentucky"
-        || cm.getName() == "CMU")
-      {
-        opType = Geni.discoverResourcesv2;
-      }
-      op.reset(opType);
-      op.addField("credentials", new Array(credential.slice));
-      op.setUrl(cm.getUrl());
-      return op;
+		opName = "Resolving sliver";
+		op.reset(Geni.resolveResource);
+	      op.addField("urn", cm.getSliverUrn());
+	      op.addField("credentials", new Array(cm.getSliver()));
+	      op.setExactUrl(cm.getUrl());
+		  return op;
     }
 
         override public function fail() : Request
         {
-        	cm.resourceFailure();
-        	return next;
+           return next;
         }
 
     override public function complete(code : Number, response : Object,
@@ -56,16 +52,25 @@ package
       var result : Request = next;
       if (code == 0)
       {
-        cm.resourceSuccess(response.value);
+		var rspec = new XML(response.value.manifest);
+		for each(var component:XML in rspec.children())
+		{
+			if(component.localName() == "node")
+			{
+				Main.getConsole().appendText("\nYOOOOOOOOOOOO " + component.@component_urn + " " + cm.getName() + "\n");
+				Main.getConsole().appendText("\n" + Main.menu.getComponent(component.@component_urn, cm.getName(), true) + "\n");
+			}
+		}
       }
       else
       {
-        cm.resourceFailure();
+        // No sliver
       }
       return result;
     }
 
     private var cm : ComponentManager;
-    public var next : Request;
+	private var sliceUrn : String;
+    private var next : Request;
   }
 }

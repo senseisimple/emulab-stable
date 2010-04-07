@@ -136,6 +136,16 @@ package
       return sliver;
     }
 
+    public function setSliverUrn(newSliverUrn : String) : void
+    {
+      sliverUrn = newSliverUrn;
+    }
+
+    public function getSliverUrn() : String
+    {
+      return sliverUrn;
+    }
+
     public function isUsed(nodeIndex : int) : Boolean
     {
       return used.indexOf(nodeIndex) != -1;
@@ -273,10 +283,12 @@ package
           var i : int = 0;
           for (; i < xmlNodes.length; ++i)
           {
-            if (version < 2 || isAvailable(xmlNodes[i]))
-            {
+            //if (version < 2 || isAvailable(xmlNodes[i]))
+            //{
               var com : Component = new Component();
               components.push(com);
+			  if(!isAvailable(xmlNodes[i]))
+			  	used.push(components.length-1);
               var uuid : String = xmlNodes[i].attribute("component_uuid");
               uuidToNode[uuid] = com;
               com.name = xmlNodes[i].attribute("component_name");
@@ -320,7 +332,7 @@ package
                 com.interfaces.push(newInterface);
                 ++interfaceNumber;
               }
-            }
+           // }
           }
 
           setSubNodes(subNodeOf);
@@ -516,6 +528,7 @@ package
     private var ticket : String;
     // Credential for the sliver
     private var sliver : String;
+    private var sliverUrn : String;
     private var state : int;
     private var update : Function;
 

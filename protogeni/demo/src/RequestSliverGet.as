@@ -14,13 +14,15 @@
 
 package
 {
-  public class RequestResourceDiscovery extends Request
+  public class RequestSliverGet extends Request
   {
-    public function RequestResourceDiscovery(newCm : ComponentManager,
+    public function RequestSliverGet(newCm : ComponentManager,
+									 newSliceUrn : String,
                                              newNext : Request) : void
     {
       super(newCm.getName());
       cm = newCm;
+	  sliceUrn = newSliceUrn;
       next = newNext;
     }
 
@@ -31,23 +33,17 @@ package
 
     override public function start(credential : Credential) : Operation
     {
-      opName = "Discovering Resources";
-      var opType = Geni.discoverResources;
-      if (cm.getName() == "Wisconsin" || cm.getName() == "Kentucky"
-        || cm.getName() == "CMU")
-      {
-        opType = Geni.discoverResourcesv2;
-      }
-      op.reset(opType);
-      op.addField("credentials", new Array(credential.slice));
-      op.setUrl(cm.getUrl());
-      return op;
+	  opName = "Getting sliver";
+	  op.reset(Geni.getSliver);
+	  op.addField("slice_urn", sliceUrn);
+	  op.addField("credentials", new Array(credential.slice));
+	  op.setExactUrl(cm.getUrl());
+	  return op;
     }
 
         override public function fail() : Request
         {
-        	cm.resourceFailure();
-        	return next;
+           return next;
         }
 
     override public function complete(code : Number, response : Object,
@@ -56,16 +52,21 @@ package
       var result : Request = next;
       if (code == 0)
       {
-        cm.resourceSuccess(response.value);
+		// Sliver exists
+        cm.setSliver(String(response.value));
+	    var cred:XML = new XML(response.value);
+	    cm.setSliverUrn(cred.credential.target_urn);
+		result = new RequestSliverResolve(cm, sliceUrn, null);
       }
       else
       {
-        cm.resourceFailure();
+        // No sliver
       }
       return result;
     }
 
     private var cm : ComponentManager;
-    public var next : Request;
+	private var sliceUrn : String;
+    private var next : Request;
   }
 }

@@ -1,4 +1,4 @@
-/* GENIPUBLIC-COPYRIGHT
+﻿/* GENIPUBLIC-COPYRIGHT
  * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
  * All rights reserved.
  *
@@ -43,6 +43,11 @@ package
       return opName + " (" + opServer + ")";
     }
 
+    public function getOpServer() : String
+    {
+      return opServer;
+    }
+
     public function getUrl() : String
     {
       return op.getUrl();
@@ -67,7 +72,5 @@ package
     protected var op : Operation;
     protected var opName : String;
     protected var opServer : String;
-
-    public static var IMPOTENT : int = 0;
   }
 }
