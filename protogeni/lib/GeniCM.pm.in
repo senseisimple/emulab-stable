@@ -1201,6 +1201,37 @@ sub GetTicketAuxAux($$$$$$$$$)
 	goto bad;
     }
 
+    # Check to see if experiment is using more than what is limited by CM.
+    # protogeni/max_components sitevar controls number of nodes that can
+    # be allocated to an experiment.
+
+    my $max_components = 0;
+    if (!TBGetSiteVar('protogeni/max_components', \$max_components)) {
+	      # Cannot get the value, default it to -1. Which means there is no limit.
+	      $max_components = -1;
+    }
+
+    # Check if the user has a credential that lets him obtain slivers
+    # with extended sliver lifetime. If so allow him to get sliver.
+    foreach my $credential (@$credentials) {
+        my $nodes = GeniXML::FindNodesNS("//n:max_components",
+            $credential->extensions(), $GeniUtil::EXTENSIONS_NS);
+        if ($nodes->size > 0) {
+            $max_components = int($nodes->pop()->getAttribute("limit"));
+            last;
+        }
+    }
+
+    if ($max_components != -1 && $slice_experiment->maximum_nodes() > $max_components) {
+        my $message = "Experiment needs nodes(" . $slice_experiment->maximum_nodes()
+            . ") that are more than the limit(" . $max_components 
+            . ") imposed by CM.";
+        print STDERR $message;
+        $response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+                      $message);
+        goto bad;
+    }
+
     unlink($tmpfile);
     print GeniXML::Serialize($solution);
 
@@ -1940,34 +1971,6 @@ sub SliverWorkAux($$$$$$$)
 	goto bad;
     }
   
-    # Check to see if experiment is using more than what is limited by CM.
-    # protogeni/max_components sitevar controls number of nodes that can
-    # be allocated to an experiment.
-
-    my $max_components = 0;
-    if (!TBGetSiteVar('protogeni/max_components', \$max_components)) {
-	      # Cannot get the value, default it to -1. Which means there is no limit.
-	      $max_components = -1;
-    }
-
-    # Check if the user has a credential that lets him obtain slivers
-    # with extended sliver lifetime. If so allow him to get sliver.
-    foreach my $credential (@$credentials) {
-        my $nodes = GeniXML::FindNodesNS("//n:max_components",
-            $credential->extensions(), $GeniUtil::EXTENSIONS_NS);
-        if ($nodes->size > 0) {
-            $max_components = int($nodes->pop()->getAttribute("limit"));
-            last;
-        }
-    }
-
-    if ($max_components != -1 && $experiment->maximum_nodes() > $max_components) {
-        $message = "Experiment needs nodes(" . $experiment->maximum_nodes()
-            . ") that are more than the limit(" . $max_components 
-            . ") imposed by CM.";
-        print STDERR $message;
-        goto bad;
-    }
     #
     # Must do this after the mapper runs.
     #
