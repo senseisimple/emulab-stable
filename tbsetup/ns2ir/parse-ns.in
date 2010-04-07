@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -671,21 +671,14 @@ sub GenDefsFile($)
     # ElabInElab stuff.
     # 
     my $maxnodes   = 0;
-    if (defined($pid)) {
-	my $elabinelab = 0;
-	my $elabinelab_eid;
-
-	TBExptIsElabInElab($pid, $eid, \$elabinelab, \$elabinelab_eid)
-	    or tbdie("Failed to get ElabInElab attributes!");
-
-	if ($elabinelab && defined($elabinelab_eid)) {
-	    if (! TBExptMinMaxNodes($pid, $elabinelab_eid, undef, \$maxnodes)) {
-		tbdie("Could not get max nodes from DB!");
-	    }
-	}
+    my $singlenet  = 1;
+    if (defined($experiment) && $experiment->elabinelab()) {
+	$maxnodes  = $experiment->maximum_nodes();
+	$singlenet = $experiment->elabinelab_singlenet();
     }
     # Be sure to initialize this to something ...
     print TCL "set elabinelab_maxpcs $maxnodes\n\n";
+    print TCL "set ::GLOBALS::elabinelab_singlenet $singlenet\n";
 
     #
     # For Templates.

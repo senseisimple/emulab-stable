@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2004-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -148,8 +148,6 @@ Firewall instproc child-of {pfw} {
 
 # updatedb DB
 Firewall instproc updatedb {DB} {
-    var_import ::GLOBALS::pid
-    var_import ::GLOBALS::eid
     $self instvar rules
     $self instvar sim
     $self instvar type

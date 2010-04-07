@@ -8,10 +8,14 @@ OSMINOR!= /usr/bin/uname -r | /usr/bin/sed -e 's/[0-9][0-9]*\.\([0-9][0-9]*\).*/
 
 PORTNAME=	emulab-clrhouse
 .if ${OSMAJOR} >= 6
+.if ${OSMAJOR} > 6
+PORTVERSION=	1.2
+.else
 .if ${OSMINOR} >= 3
 PORTVERSION=	1.1
 .else
 PORTVERSION=	1.0
+.endif
 .endif
 .endif
 CATEGORIES=	misc
@@ -31,6 +35,9 @@ MAINTAINER=	stoller@cs.utah.edu
 # We must make sure PERL is built with this.
 #
 .MAKEFLAGS+=	ENABLE_SUIDPERL=yes
+.if ${PORTVERSION} == "1.2"
+.MAKEFLAGS+=	PERL_VERSION=5.10.0 PERL_VER=5.10.0 PERL_ARCH=mach
+.endif
 
 #
 # For SWIG, so that it doesn't feel the need to suck in php and apache
@@ -66,7 +73,7 @@ LIB_DEPENDS= mhash.2:${PORTSDIR}/security/mhash \
 
 RUN_DEPENDS=	\
 	${LOCALBASE}/etc/apache/ssl.crl:${PORTSDIR}/www/apache13-modssl \
-	${LOCALBASE}/libexec/apache/libauth_mysql.so:${PORTSDIR}/www/mod_auth_mysql \
+	mod_auth_mysql>1:${PORTSDIR}/www/mod_auth_mysql \
 	${LOCALBASE}/libexec/apache/libphp4.so:${PORTSDIR}/misc/emulab-php4 \
 	rsync:${PORTSDIR}/net/rsync \
 	${LOCALBASE}/libexec/mysqld:${PORTSDIR}/databases/mysql50-server \
@@ -78,10 +85,19 @@ RUN_DEPENDS=	\
 	wget:${PORTSDIR}/ftp/wget \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/XML/Parser:${PORTSDIR}/textproc/p5-XML-Parser \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/RPC/XML.pm:${PORTSDIR}/net/p5-RPC-XML \
-	${PYTHON_SITELIBDIR}/M2Crypto/ASN1.py:${PORTSDIR}/security/py-m2crypto \
 	gmake:${PORTSDIR}/devel/gmake \
 	${PYTHON_SITELIBDIR}/MySQLdb/times.py:${PORTSDIR}/databases/py-MySQLdb \
 	mysqlhotcopy:${PORTSDIR}/databases/mysql50-scripts
+
+.if ${PORTVERSION} == "1.2"
+# must handle patching of m2crypto when the port is built
+RUN_DEPENDS+=	\
+	${PYTHON_PKGNAMEPREFIX}m2crypto>0:${PORTSDIR}/misc/emulab-py-m2crypto
+.else
+# for older version we can patch the standard m2crypto once installed
+RUN_DEPENDS+=	\
+	${PYTHON_PKGNAMEPREFIX}m2crypto>0:${PORTSDIR}/security/py-m2crypto
+.endif
 
 RUN_DEPENDS+= \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/DBI.pm:${PORTSDIR}/databases/p5-DBI \
@@ -91,9 +107,9 @@ RUN_DEPENDS+= \
 RUN_DEPENDS+= \
 	${LOCALBASE}/lib/libxml2.so:${PORTSDIR}/textproc/libxml2 \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/Frontier/Client.pm:${PORTSDIR}/net/p5-Frontier-RPC \
-	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}${PERL_ARCH}/XML/LibXML.pm:${PORTSDIR}/textproc/p5-XML-LibXML \
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/XML/LibXML.pm:${PORTSDIR}/textproc/p5-XML-LibXML \
 	xmlsec1:${PORTSDIR}/security/xmlsec1 \
-	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}${PERL_ARCH}/Crypt/SSLeay.pm:${PORTSDIR}/security/p5-Crypt-SSLeay
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Crypt/SSLeay.pm:${PORTSDIR}/security/p5-Crypt-SSLeay
 
 USE_PERL5=	yes
 USE_PYTHON=	yes

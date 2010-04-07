@@ -22,6 +22,7 @@ import xmlrpclib
 import signal
 import types
 import datetime
+import syslog
 
 # Configure variables
 TBDIR = "@prefix@"
@@ -144,12 +145,20 @@ class TimedOutError(EmulabError):
 def TimeoutHandler(signum, frame):
     raise TimedOutError, 'Timer Expired'
 
+def logit(debug, msg):
+    if debug:
+        print msg
+        pass
+    else:
+        syslog.syslog(syslog.LOG_INFO, msg);
+        pass
+    return
+
 #
 # Arguments to methods are passed as a Dictionary. This converts to a XML
 # "struct" which in Perl/PHP/Ruby would be a hash. So, a client written in
 # pretty much any language should be able to talk to this class.
 #
-
 #
 # A helper function for checking required arguments.
 #
@@ -176,14 +185,14 @@ def CheckRequiredArgs(argdict, arglist):
 #
 # Check user permission to access a project.
 #
-def CheckProjPermission(uid, pid):
+def CheckProjPermission(uid_idx, pid):
     if not re.match("^[-\w]*$", pid):
         return EmulabResponse(RESPONSE_BADARGS,
                               output="Illegal characters in project ID!")
 
     res = DBQueryFatal("SELECT trust FROM group_membership "
-                       "WHERE uid=%s and pid=%s and gid=%s and trust!='none'",
-                       (uid, pid, pid))
+                       "WHERE uid_idx=%s and pid=%s and gid=%s and trust!='none'",
+                       (uid_idx, pid, pid))
 
     if len(res) == 0:
         return EmulabResponse(RESPONSE_FORBIDDEN,
@@ -192,10 +201,10 @@ def CheckProjPermission(uid, pid):
     
     return None
 
-def GetProjects(uid):
+def GetProjects(uid_idx):
     res = DBQueryFatal("SELECT distinct pid FROM group_membership "
-                       "WHERE uid=%s",
-                       (uid,))
+                       "WHERE uid_idx=%s",
+                       (uid_idx,))
 
     return [x[0] for x in res]
 
@@ -203,7 +212,7 @@ def GetProjects(uid):
 #
 # Check user permission to access an experiment.
 # 
-def CheckExptPermission(uid, pid, eid):
+def CheckExptPermission(uid_idx, pid, eid):
     if not (re.match("^[-\w]*$", pid) and
             re.match("^[-\w]*$", eid)):
         return EmulabResponse(RESPONSE_BADARGS,
@@ -221,8 +230,8 @@ def CheckExptPermission(uid, pid, eid):
     gid = res[0][0]
     
     res = DBQueryFatal("SELECT trust FROM group_membership "
-                       "WHERE uid=%s and pid=%s and gid=%s",
-                       (uid, pid, gid))
+                       "WHERE uid_idx=%s and pid=%s and gid=%s",
+                       (uid_idx, pid, gid))
 
     if len(res) == 0:
         return EmulabResponse(RESPONSE_FORBIDDEN,
@@ -233,7 +242,7 @@ def CheckExptPermission(uid, pid, eid):
 #
 # Check user permission to access a node.
 # 
-def CheckNodePermission(uid, node):
+def CheckNodePermission(uid_idx, node):
     res = DBQueryFatal("SELECT e.pid,e.eid FROM reserved AS r "
                        "left join experiments as e on "
                        "     e.pid=r.pid and e.eid=r.eid "
@@ -244,19 +253,19 @@ def CheckNodePermission(uid, node):
         return EmulabResponse(RESPONSE_ERROR,
                               output="No such node: " + node)
 
-    return CheckExptPermission(uid, res[0][0], res[0][1])
+    return CheckExptPermission(uid_idx, res[0][0], res[0][1])
 
 #
 # Check if user is an admin person
 # 
-def CheckIsAdmin(uid):
+def CheckIsAdmin(uid_idx):
     res = DBQueryFatal("SELECT admin FROM users "
-                       "WHERE uid=%s",
-                       (uid,))
+                       "WHERE uid_idx=%s and status='active'",
+                       (uid_idx,))
     
     if len(res) == 0:
         return EmulabResponse(RESPONSE_ERROR,
-                              output="No such user: " + uid)
+                              output="No such user: " + uid_idx)
 
     return res[0][0];
 
@@ -292,25 +301,32 @@ def ExperimentIndex(pid, eid):
 # For example experiment.swapexp(...).
 #
 class EmulabServer:
-    def __init__(self, readonly=0, clientip=None):
+    def __init__(self, readonly=0, clientip=None, debug=0):
         self.readonly  = readonly;
         self.clientip  = clientip;
+        self.debug     = debug;
         self.instances = {};
         self.uid       = pwd.getpwuid(os.getuid())[0]
 
-        self.instances["experiment"] = experiment(readonly=self.readonly);
-        self.instances["template"]   = template(readonly=self.readonly);
+        res = DBQueryFatal("select uid_idx from users "
+                           "where uid=%s and status='active'",
+                           (self.uid,))
+        if len(res) == 0:
+            return
+        self.uid_idx = res[0][0]
+
+        self.instances["experiment"] = experiment(self);
+        self.instances["template"]   = template(self);
         if readonly:
             return
         
-        self.instances["emulab"]     = emulab(readonly=self.readonly);
-        self.instances["user"]       = user(readonly=self.readonly);
-        self.instances["fs"]         = fs(readonly=self.readonly);
-        self.instances["imageid"]    = imageid(readonly=self.readonly);
-        self.instances["osid"]       = osid(readonly=self.readonly);
-        self.instances["node"]       = node(readonly=self.readonly);
-        self.instances["elabinelab"] = elabinelab(clientip=self.clientip,
-                                                  readonly=self.readonly);
+        self.instances["emulab"]     = emulab(self);
+        self.instances["user"]       = user(self);
+        self.instances["fs"]         = fs(self);
+        self.instances["imageid"]    = imageid(self);
+        self.instances["osid"]       = osid(self);
+        self.instances["node"]       = node(self);
+        self.instances["elabinelab"] = elabinelab(self);
         return
 
     def __getattr__(self, name):
@@ -329,10 +345,13 @@ class EmulabServer:
 # whole.
 #
 class emulab:
-    def __init__(self, readonly=0):
-        self.readonly = readonly;
+    def __init__(self, server):
+        self.server   = server
+        self.readonly = server.readonly
+        self.uid      = server.uid
+        self.uid_idx  = server.uid_idx
+        self.debug    = server.debug
         self.VERSION  = VERSION
-        self.uid      = pwd.getpwuid(os.getuid())[0]
         return
 
     #
@@ -516,10 +535,13 @@ class emulab:
 # specific information.
 #
 class user:
-    def __init__(self, readonly=0):
-        self.readonly = readonly;
+    def __init__(self, server):
+        self.server   = server
+        self.readonly = server.readonly
+        self.uid      = server.uid
+        self.uid_idx  = server.uid_idx
+        self.debug    = server.debug
         self.VERSION  = VERSION
-        self.uid      = pwd.getpwuid(os.getuid())[0]
         return
 
     #
@@ -592,10 +614,10 @@ class user:
                                           + permission))
 
         res = DBQueryFatal("SELECT distinct pid,gid FROM group_membership "
-                           "WHERE uid=%s and "
+                           "WHERE uid_idx=%s and "
                            + trust_clause
                            + " ORDER BY pid",
-                           (self.uid,))
+                           (self.uid_idx,))
 
         result = {}
         for proj in res:
@@ -629,8 +651,8 @@ class user:
         except NoLoginsError, e:
             return EmulabResponse(RESPONSE_REFUSED, output=str(e))
 
-        res = DBQueryFatal("select mailman_password from users where uid=%s",
-                           (self.uid,))
+        res = DBQueryFatal("select mailman_password from users where uid_idx=%s",
+                           (self.uid_idx,))
 
         if len(res) == 0:
             return EmulabResponse(RESPONSE_ERROR,
@@ -647,10 +669,13 @@ class user:
 # NFS exports.
 #
 class fs:
-    def __init__(self, readonly=0):
-        self.readonly = readonly;
+    def __init__(self, server):
+        self.server   = server
+        self.readonly = server.readonly
+        self.uid      = server.uid
+        self.uid_idx  = server.uid_idx
+        self.debug    = server.debug
         self.VERSION  = VERSION
-        self.uid      = pwd.getpwuid(os.getuid())[0]
         return
 
     #
@@ -803,8 +828,8 @@ class fs:
 
         # ... add the project/group listings.
         projs = DBQueryFatal("SELECT distinct pid,gid FROM group_membership "
-                             "WHERE uid=%s and trust!='none' ORDER BY pid",
-                             (self.uid,))
+                             "WHERE uid_idx=%s and trust!='none' ORDER BY pid",
+                             (self.uid_idx,))
 
         for proj in projs:
             if proj[0] == proj[1]:
@@ -829,10 +854,13 @@ class fs:
 # This class implements the server side of the XMLRPC interface to image IDs.
 #
 class imageid:
-    def __init__(self, readonly=0):
-        self.readonly = readonly;
+    def __init__(self, server):
+        self.server   = server
+        self.readonly = server.readonly
+        self.uid      = server.uid
+        self.uid_idx  = server.uid_idx
+        self.debug    = server.debug
         self.VERSION  = VERSION
-        self.uid      = pwd.getpwuid(os.getuid())[0]
         return
 
     def getlist(self, version, argdict):
@@ -850,8 +878,8 @@ class imageid:
         res = DBQueryFatal(
             "SELECT distinct i.imagename,i.description FROM images as i "
             "left join group_membership as g on g.pid=i.pid "
-            "WHERE g.uid=%s or i.global",
-            (self.uid,))
+            "WHERE g.uid_idx=%s or i.global",
+            (self.uid_idx,))
 
         if len(res) == 0:
             return EmulabResponse(RESPONSE_ERROR,
@@ -878,10 +906,13 @@ class imageid:
 # This class implements the server side of the XMLRPC interface to OS IDs.
 #
 class osid:
-    def __init__(self, readonly=0):
-        self.readonly = readonly;
+    def __init__(self, server):
+        self.server   = server
+        self.readonly = server.readonly
+        self.uid      = server.uid
+        self.uid_idx  = server.uid_idx
+        self.debug    = server.debug
         self.VERSION  = VERSION
-        self.uid      = pwd.getpwuid(os.getuid())[0]
         return
 
     def getlist(self, version, argdict):
@@ -900,8 +931,8 @@ class osid:
                            "o.* FROM "
                            "os_info as o "
                            "left join group_membership as g on g.pid=o.pid "
-                           "where g.uid=%s or o.shared=1",
-                           (self.uid,),
+                           "where g.uid_idx=%s or o.shared=1",
+                           (self.uid_idx,),
                            True)
 
         if len(res) == 0:
@@ -941,9 +972,9 @@ class osid:
                            "o.* FROM "
                            "os_info as o "
                            "left join group_membership as g on g.pid=o.pid "
-                           "where (g.uid=%s or o.shared=1) and "
+                           "where (g.uid_idx=%s or o.shared=1) and "
                            "(o.osname=%s or o.osid=%s)",
-                           (self.uid, argdict["osid"], argdict["osid"]),
+                           (self.uid_idx, argdict["osid"], argdict["osid"]),
                            True)
 
         if len(res) == 0:
@@ -972,10 +1003,13 @@ class experiment:
     ##
     # Initialize the object.  Currently only sets the objects 'VERSION' value.
     #
-    def __init__(self, readonly=0):
-        self.readonly = readonly;
+    def __init__(self, server):
+        self.server   = server
+        self.readonly = server.readonly
+        self.uid      = server.uid
+        self.uid_idx  = server.uid_idx
+        self.debug    = server.debug
         self.VERSION  = VERSION
-        self.uid      = pwd.getpwuid(os.getuid())[0]
         return
 
     ##
@@ -1281,7 +1315,7 @@ class experiment:
         #
         # Check permission. This will check proj/exp for illegal chars.
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -1362,7 +1396,7 @@ class experiment:
         #
         # Check permission. This will check proj/exp for illegal chars.
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -1468,7 +1502,7 @@ class experiment:
         #
         # Check permission. This will check proj/exp for illegal chars.
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -1521,7 +1555,7 @@ class experiment:
         #
         # Check permission. This will check proj/exp for illegal chars.
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -1578,7 +1612,7 @@ class experiment:
         #
         # Check permission. This will check proj/exp for illegal chars.
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -1621,7 +1655,7 @@ class experiment:
         #
         # Check permission. This will check proj/exp for illegal chars.
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -1689,7 +1723,7 @@ class experiment:
         #
         # Check permission.
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -1749,7 +1783,7 @@ class experiment:
         #
         # Check permission.
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -1866,7 +1900,7 @@ class experiment:
         #
         # Check permission.
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -2114,7 +2148,7 @@ class experiment:
         #
         # Check permission. This will check proj/exp for illegal chars.
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -2172,7 +2206,7 @@ class experiment:
         #
         # Check permission. This will check proj/exp for illegal chars.
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -2235,7 +2269,7 @@ class experiment:
         #
         # Check permission. This will check proj/exp for illegal chars.
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -2293,7 +2327,7 @@ class experiment:
         #
         # Check permission. This will check proj/exp for illegal chars.
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -2364,7 +2398,7 @@ class experiment:
         #
         # Check permission.
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -2462,7 +2496,7 @@ class experiment:
         #
         # Check permission. 
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -2507,7 +2541,7 @@ class experiment:
         #
         # Check permission. 
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -2565,7 +2599,7 @@ class experiment:
         #
         # Check permission. This will check proj/exp for illegal chars.
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -2620,7 +2654,7 @@ class experiment:
         #
         # Check permission. This will check proj/exp for illegal chars.
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -2680,7 +2714,7 @@ class experiment:
         #
         # Check permission. 
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -2728,7 +2762,7 @@ class experiment:
         #
         # Check permission. 
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -2919,7 +2953,7 @@ class experiment:
         #
         # Check permission. 
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -3033,7 +3067,7 @@ class experiment:
         #
         # Check permission. 
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -3073,7 +3107,7 @@ class experiment:
         #
         # Check permission. 
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -3196,7 +3230,7 @@ class experiment:
         #
         # Check permission. 
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -3258,7 +3292,7 @@ class experiment:
         #
         # Check permission. 
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -3286,10 +3320,13 @@ class node:
     ##
     # Initialize the object.  Currently only sets the objects 'VERSION' value.
     #
-    def __init__(self, readonly=0):
-        self.readonly = readonly;
+    def __init__(self, server):
+        self.server   = server
+        self.readonly = server.readonly
+        self.uid      = server.uid
+        self.uid_idx  = server.uid_idx
+        self.debug    = server.debug
         self.VERSION  = VERSION
-        self.uid      = pwd.getpwuid(os.getuid())[0]
         return
 
     #
@@ -3325,7 +3362,7 @@ class node:
 
         pid_clause = ""
         if argdict.has_key("proj"):
-            permerror = CheckProjPermission(self.uid, argdict["proj"])
+            permerror = CheckProjPermission(self.uid_idx, argdict["proj"])
             if permerror:
                 return permerror
 
@@ -3399,7 +3436,7 @@ class node:
         pid_clause = ""
         pid_clause_list = ""
         if argdict.has_key("proj"):
-            permerror = CheckProjPermission(self.uid, argdict["proj"])
+            permerror = CheckProjPermission(self.uid_idx, argdict["proj"])
             if permerror:
                 return permerror
 
@@ -3408,7 +3445,7 @@ class node:
             pass
         else:
             pid_clause_list = ",".join([("'" + x + "'")
-                                        for x in GetProjects(self.uid)])
+                                        for x in GetProjects(self.uid_idx)])
             pid_clause = (" or p.pid in (" + pid_clause_list + ")")
             pass
 
@@ -3496,12 +3533,12 @@ class node:
         res = DBQuery("SELECT distinct nt.* FROM node_types as nt "
                       "left join nodetypeXpid_permissions as p "
                       "  on nt.type=p.type "
-                      "left join group_membership as m on m.uid=%s "
+                      "left join group_membership as m on m.uid_idx=%s "
                       "WHERE (p.pid is null or p.pid=m.pid) and "
                       " nt.isdynamic=0 and nt.class not in ("
                       " 'pcplabphys','switch','shark','power','misc')"
                       + type_test,
-                      (self.uid),
+                      (self.uid_idx),
                       asDict=True)
 
         if len(res) == 0:
@@ -3534,7 +3571,7 @@ class node:
             return EmulabResponse(RESPONSE_BADARGS,
                                   output="Improperly formed node value!")
 
-        if not CheckIsAdmin(self.uid):
+        if not CheckIsAdmin(self.uid_idx):
             # XXX Refactor the trust stuff
             res = DBQueryFatal("SELECT e.pid,e.gid FROM reserved AS r "
                                "left join experiments as e on "
@@ -3548,8 +3585,8 @@ class node:
                                       argdict["node"])
 
             trust = DBQueryFatal("SELECT trust FROM group_membership "
-                                 "WHERE uid=%s and pid=%s and gid=%s",
-                                 (self.uid, res[0][0], res[0][1]))
+                                 "WHERE uid_idx=%s and pid=%s and gid=%s",
+                                 (self.uid_idx, res[0][0], res[0][1]))
 
             if len(trust) == 0:
                 return EmulabResponse(
@@ -3641,8 +3678,8 @@ class node:
             pass
 
         trust = DBQueryFatal("SELECT trust FROM group_membership "
-                             "WHERE uid=%s and pid=%s and gid=%s",
-                             (self.uid, pid, gid))
+                             "WHERE uid_idx=%s and pid=%s and gid=%s",
+                             (self.uid_idx, pid, gid))
 
         if len(trust) == 0:
             return EmulabResponse(
@@ -3734,8 +3771,8 @@ class node:
                                   output="No such node: " + argdict["node"])
 
         trust = DBQueryFatal("SELECT trust FROM group_membership "
-                             "WHERE uid=%s and pid=%s and gid=%s",
-                             (self.uid, res[0][0], res[0][1]))
+                             "WHERE uid_idx=%s and pid=%s and gid=%s",
+                             (self.uid_idx, res[0][0], res[0][1]))
 
         if len(trust) == 0:
             return EmulabResponse(
@@ -4033,7 +4070,7 @@ class node:
         #
         # Check permission.
         #
-        permerror = CheckNodePermission(self.uid, argdict["node"])
+        permerror = CheckNodePermission(self.uid_idx, argdict["node"])
         if (permerror):
             return permerror
 
@@ -4145,7 +4182,7 @@ class node:
             return EmulabResponse(RESPONSE_BADARGS,
                                   output="Improperly formed node value!")
 
-        if not CheckIsAdmin(self.uid):
+        if not CheckIsAdmin(self.uid_idx):
             return EmulabResponse(RESPONSE_ERROR,
                                   output="No permission to access node: " +
                                   argdict["node"])
@@ -4209,11 +4246,14 @@ class elabinelab:
     ##
     # Initialize the object.  Currently only sets the objects 'VERSION' value.
     #
-    def __init__(self, clientip=None, readonly=0):
-        self.readonly = readonly;
-        self.clientip = clientip;
+    def __init__(self, server):
+        self.server   = server
+        self.readonly = server.readonly
+        self.uid      = server.uid
+        self.uid_idx  = server.uid_idx
+        self.debug    = server.debug
         self.VERSION  = VERSION
-        self.uid      = pwd.getpwuid(os.getuid())[0]
+        self.clientip = server.clientip;
         self.pid      = None;
         self.eid      = None;
         return
@@ -4349,7 +4389,7 @@ class elabinelab:
         #
         # Funnel up to node.console() routine
         # 
-        node_instance = node(readonly=self.readonly);
+        node_instance = node(self.server);
         
         return node_instance.console(version, argdict);
     
@@ -4749,10 +4789,13 @@ class template:
     ##
     # Initialize the object.  Currently only sets the objects 'VERSION' value.
     #
-    def __init__(self, readonly=0):
-        self.readonly = readonly;
+    def __init__(self, server):
+        self.server   = server
+        self.readonly = server.readonly
+        self.uid      = server.uid
+        self.uid_idx  = server.uid_idx
+        self.debug    = server.debug
         self.VERSION  = VERSION
-        self.uid      = pwd.getpwuid(os.getuid())[0]
         return
 
     def addprogevent(self, version, argdict):
@@ -4785,7 +4828,7 @@ class template:
         #
         # Check permission. This will check proj/exp for illegal chars.
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror

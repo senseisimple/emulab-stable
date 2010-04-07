@@ -713,14 +713,6 @@ if (grep($_, values(%plabvnodes))) {
 if (keys(%geninodes)) {
     TBDebugTimeStamp("Starting Geni setup.");
 
-    #
-    # Need to initialize the eventstate. Move this elsewhere?
-    #
-    foreach my $node (keys(%geninodes)) {
-	TBSetNodeEventState($node, TBDB_NODESTATE_SHUTDOWN())
-	    if (exists($nodes{$node}));
-    }
-
     $geni_setup_pid = fork();
     if (! $geni_setup_pid) {
 	TBdbfork();	# So we get the event system fork too ...

@@ -422,6 +422,21 @@ CREATE TABLE `deltas` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `elabinelab_attributes`
+--
+
+CREATE TABLE `elabinelab_attributes` (
+  `pid` varchar(12) NOT NULL default '',
+  `eid` varchar(32) NOT NULL default '',
+  `exptidx` int(11) NOT NULL default '0',
+  `role` enum('boss','router','ops','fs','node') NOT NULL default 'node',
+  `attrkey` varchar(32) NOT NULL default '',
+  `attrvalue` tinytext NOT NULL,
+  `ordering` smallint(5) unsigned NOT NULL default '0',
+  PRIMARY KEY  (`exptidx`,`role`,`attrkey`,`ordering`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `elabinelab_vlans`
 --
 
@@ -2310,6 +2325,7 @@ DROP TABLE IF EXISTS `nodeuidlastlogin`;
 CREATE TABLE `nodeuidlastlogin` (
   `node_id` varchar(32) NOT NULL default '',
   `uid` varchar(10) NOT NULL default '',
+  `uid_idx` mediumint(8) unsigned NOT NULL default '0',
   `date` date default NULL,
   `time` time default NULL,
   PRIMARY KEY  (`node_id`)
@@ -3350,6 +3366,7 @@ CREATE TABLE `traces` (
 DROP TABLE IF EXISTS `uidnodelastlogin`;
 CREATE TABLE `uidnodelastlogin` (
   `uid` varchar(10) NOT NULL default '',
+  `uid_idx` mediumint(8) unsigned NOT NULL default '0',
   `node_id` varchar(32) NOT NULL default '',
   `date` date default NULL,
   `time` time default NULL,
@@ -3363,6 +3380,7 @@ CREATE TABLE `uidnodelastlogin` (
 DROP TABLE IF EXISTS `unixgroup_membership`;
 CREATE TABLE `unixgroup_membership` (
   `uid` varchar(8) NOT NULL default '',
+  `uid_idx` mediumint(8) unsigned NOT NULL default '0',
   `gid` varchar(16) NOT NULL default '',
   PRIMARY KEY  (`uid`,`gid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
@@ -3374,6 +3392,7 @@ CREATE TABLE `unixgroup_membership` (
 DROP TABLE IF EXISTS `user_policies`;
 CREATE TABLE `user_policies` (
   `uid` varchar(8) NOT NULL default '',
+  `uid_idx` mediumint(8) unsigned NOT NULL default '0',
   `policy` varchar(32) NOT NULL default '',
   `auxdata` varchar(64) NOT NULL default '',
   `count` int(10) NOT NULL default '0',
@@ -3519,7 +3538,7 @@ CREATE TABLE `users` (
   `wikionly` tinyint(1) default '0',
   `mailman_password` tinytext,
   PRIMARY KEY  (`uid_idx`),
-  UNIQUE KEY `uid` (`uid`),
+  KEY `uid` (`uid`),
   KEY `unix_uid` (`unix_uid`),
   KEY `status` (`status`),
   KEY `uid_uuid` (`uid_uuid`)
@@ -3532,6 +3551,7 @@ CREATE TABLE `users` (
 DROP TABLE IF EXISTS `userslastlogin`;
 CREATE TABLE `userslastlogin` (
   `uid` varchar(10) NOT NULL default '',
+  `uid_idx` mediumint(8) unsigned NOT NULL default '0',
   `date` date default NULL,
   `time` time default NULL,
   PRIMARY KEY  (`uid`)

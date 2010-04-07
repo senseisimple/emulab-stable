@@ -174,6 +174,11 @@ if ($ELABINELAB) {
     if (!defined($rval)) {
 	exit(-1);
     }
+    if ($sendevent && ($op eq "off" || $op eq "cycle")) {
+	foreach my $node (@nodelist) {
+	    TBSetNodeEventState($node, TBDB_NODESTATE_SHUTDOWN);
+	}
+    }
     exit($rval);
 }
 
@@ -290,6 +295,7 @@ foreach my $power_id (keys %outlets) {
 
     if ($power_id eq "mail" || $power_id =~ /^whol-/ 
 	|| $power_id=~ /^rmcp-/
+	|| $power_id eq 'drac'
 	|| $power_id eq 'ilo' || $power_id eq 'ilo2') {
 	$type = $power_id;
 	$IP = "";
@@ -354,7 +360,7 @@ foreach my $power_id (keys %outlets) {
 	    print "Control of $nodestr failed.\n"; ++$exitval;
 	    ++$errors;
 	}
-    } elsif ($type eq 'ilo2' || $type eq 'ilo') {
+    } elsif ($type eq 'ilo2' || $type eq 'ilo' || $type eq 'drac') {
 	if (iloctrl($type,$op,@nodes)) {
 	    print "Control of $nodestr failed.\n"; ++$exitval;
             ++$errors;

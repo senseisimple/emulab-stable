@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2006, 2007, 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -147,16 +147,16 @@ sub read_schema($) {
 	# differs depending on whether or not we're in a create definition.
 	#
 	if (!$create_table) {
-	    if (/^\s*$/ || /^\s*#/ || /^--/ || /^INSERT INTO/) {
+	    if (/^\s*$/i || /^\s*#/i || /^--/i || /^INSERT INTO/i) {
 		# An insert statement, a comment, or a blank line. Do nothing.
 	    }
-	    elsif (/^\/\*.*\*\/[;]+$/) {
+	    elsif (/^\/\*.*\*\/[;]+$/i) {
 		# Also a comment
 	    }
-	    elsif (/^DROP TABLE /) {
+	    elsif (/^DROP TABLE /i) {
 		# mysql 5.0 add these now.
 	    }
-	    elsif (/^CREATE TABLE `?(\w+)`? \($/) {
+	    elsif (/^CREATE TABLE `?(\w+)`? \($/i) {
 		# Start of a new table definition
 		$create_table = 1;
 		$table_name = $1;
@@ -184,9 +184,9 @@ sub read_schema($) {
 	    # If we are in a table creation statement, we need to find out
 	    # what this line is trying to do...
 	    #
-	    if (/^\) TYPE\s*=\s*(\w+);/ ||
-		/^\) ENGINE\s*=\s*(\w+)\s*DEFAULT\s*CHARSET=(\w+);/ ||
-		/^\) ENGINE\s*=\s*(\w+)\s*AUTO_INCREMENT=\d*\s*DEFAULT\s*CHARSET=(\w+);/) {
+	    if (/^\) TYPE\s*=\s*(\w+);/i ||
+		/^\) ENGINE\s*=\s*(\w+)\s*DEFAULT\s*CHARSET=(\w+);/i ||
+		/^\) ENGINE\s*=\s*(\w+)\s*AUTO_INCREMENT=\d*\s*DEFAULT\s*CHARSET=(\w+);/i) {
 
 		# The end of the table definition
 		my $type = $1;
@@ -209,16 +209,16 @@ sub read_schema($) {
 	    # them someday for completeness. For now, we have check for them
 	    # so that we don't accidentally treat them as columns
 	    #
-	    elsif (/^\s*.*\s+FOREIGN KEY\s+/) {
+	    elsif (/^\s*.*\s+FOREIGN KEY\s+/i) {
 		die "Found a FOREIGN KEY line, which we don't handle yet\n";
-	    } elsif (/^\s*CHECK\s*\((.+)\),?$/) {
+	    } elsif (/^\s*CHECK\s*\((.+)\),?$/i) {
 		die "Found a CHECK line, which we don't handle yet\n";
-	    } elsif (/^\s*UNIQUE (INDEX)?\s+(\w+)?\s+\((.+[^,])\),?$/) {
+	    } elsif (/^\s*UNIQUE (INDEX)?\s+(\w+)?\s+\((.+[^,])\),?$/i) {
 		die "Found a UNIQUE (INDEX) line, which we don't handle yet\n";
-	    } elsif (/^\s*FULLTEXT (INDEX)?\s+(\w+)?\s+\((.+[^,])\),?$/) {
+	    } elsif (/^\s*FULLTEXT (INDEX)?\s+(\w+)?\s+\((.+[^,])\),?$/i) {
 		die "Found a FULLTEXT (INDEX) line, which we don't handle yet\n";
 
-	    } elsif (/^\s*PRIMARY KEY\s*\((.+)\),?$/) {
+	    } elsif (/^\s*PRIMARY KEY\s*\((.+)\),?$/i) {
 
 		# A primary key
 		my $key = $1;
@@ -229,7 +229,7 @@ sub read_schema($) {
 		debug("Putting primary key $key in table $table_name\n");
 		$tables{$table_name}{PRIMARY}{$key} = 1;
 
-	    } elsif (/^\s*(UNIQUE)?\s+(KEY|INDEX)\s+`?(\w+)?`?\s+\((.+[^,])\),?$/) {
+	    } elsif (/^\s*(UNIQUE)?\s+(KEY|INDEX)\s+`?(\w+)?`?\s+\((.+[^,])\),?$/i) {
 
 		# A key/index (synonmyms)
 		my ($name, $key) = ($2, $3);
@@ -245,7 +245,7 @@ sub read_schema($) {
 		    die "Found a key without a name: $key\n";
 		}
 
-	    } elsif (/^\s*`?(\w+)`?\s+(.+[^,\s]),?\s*$/) {
+	    } elsif (/^\s*`?(\w+)`?\s+(.+[^,\s]),?\s*$/i) {
 
 		# A column definition
 		my ($name, $definition) = ($1, $2);
@@ -445,7 +445,7 @@ sub compare_columns($$@) {
 		my $old_definition =
 		    $schema1->{$table}{COLUMNS}{$removed->[$j]};
 
-		if ($old_definition eq $new_definition) {
+		if (lc($old_definition) eq lc($new_definition)) {
 		    $diff++;
 
 		    #

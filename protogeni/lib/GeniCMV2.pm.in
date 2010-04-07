@@ -92,7 +92,15 @@ my $API_VERSION = 2;
 #
 sub GetVersion()
 {
-    return GeniResponse->Create( GENIRESPONSE_SUCCESS, $API_VERSION );
+    my @input_rspec_versions = ( "0.1", "2" );
+    my $blob = {
+	"api" => $API_VERSION,
+	"level" => 1,
+	"input_rspec" => \@input_rspec_versions,
+	"output_rspec" => "0.1"
+    };
+
+    return GeniResponse->Create( GENIRESPONSE_SUCCESS, $blob );
 }
 
 #
@@ -825,6 +833,10 @@ sub SliverStatus($)
 	my $state         = $sliver->state();
 	my $status        = $sliver->status();
 	my $error         = "";
+
+	# New is the same as stopped. Separate state is handy.
+	$state = "stopped"
+	    if ($state eq "new");
 
 	if ($status eq "failed") {
 	    $error = $sliver->ErrorLog();

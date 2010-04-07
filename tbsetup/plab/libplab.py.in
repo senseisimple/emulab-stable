@@ -1,7 +1,7 @@
 # -*- python -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2006-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006-2008, 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -2350,9 +2350,9 @@ class EmulabPlcObjTranslator:
         
         # grab basic user details
         if uid.find("@") > -1:
-            wherestr = "where u.usr_email=%s"
+            wherestr = "where u.usr_email=%s and u.status='active'"
         else:
-            wherestr = "where u.uid=%s"
+            wherestr = "where u.uid=%s and u.status='active'"
             pass
         qres = DBQueryFatal("select u.uid,u.usr_name,u.usr_email,u.usr_URL," \
                             "  u.usr_phone,u.usr_pswd,admin" \
@@ -2385,7 +2385,8 @@ class EmulabPlcObjTranslator:
                             " left join group_membership as gm"
                             "   on u.uid_idx=gm.uid_idx"
                             " left join projects as p on gm.pid=p.pid"
-                            " where u.uid=%s and gm.gid=gm.pid",(uid,))
+                            " where u.uid=%s and u.status='active'"
+                            "       and gm.gid=gm.pid",(uid,))
         roles = []
         pids = []
         max_trust = None

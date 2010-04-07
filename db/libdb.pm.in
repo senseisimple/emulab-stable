@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -655,6 +655,7 @@ sub TBDB_PHYSICAL_NODE_TABLES() {
 	'nodeuidlastlogin'	=> [ 'node_id' ],
 	'ntpinfo'		=> [ 'node_id' ],
 	'outlets'		=> [ 'node_id' ],
+	'outlets_remoteauth'	=> [ 'node_id' ],
 	'partitions'		=> [ 'node_id' ],
 	'plab_slice_nodes'	=> [ 'node_id' ],
 	'port_counters'		=> [ 'node_id' ],
@@ -2604,13 +2605,14 @@ sub TBNodeUpdateAccountsByUID($)
 {
     my ($uid) = @_;
 
-    DBQueryFatal("update users set usr_modified=now() where uid='$uid'");
+    DBQueryFatal("update users set usr_modified=now() ".
+		 "where uid='$uid' and status!='archived'");
 
     my $query_result =
 	DBQueryFatal("select p.pid,pcremote_ok from users as u ".
 		     "left join group_membership as g on ".
-		     "  u.uid_idx=g.uid_idx and g.pid=g.gid ".
-		     "left join projects as p on p.pid=g.pid ".
+		     "  u.uid_idx=g.uid_idx and g.pid_idx=g.gid_idx ".
+		     "left join projects as p on p.pid_idx=g.pid_idx ".
 		     "where u.uid='$uid' and u.status='active' and ".
 		     "      p.pid is not null");
 

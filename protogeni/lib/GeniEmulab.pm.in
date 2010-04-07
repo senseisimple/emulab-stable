@@ -255,10 +255,6 @@ sub CreatePhysNode($)
 	print STDERR "Invalid hrn '$hrn' in blob from CM for $node_urn\n";
 	goto bad;
     }
-    if (! ($IP =~ /^[-\w\.]*$/)) {
-	print STDERR "Invalid IP '$IP' in blob from CM for $node_urn\n";
-	goto bad;
-    }
     if (! ($uuid =~ /^[-\w\.]*$/)) {
 	print STDERR "Invalid uuid '$uuid' in blob from CM for $node_urn\n";
 	goto bad;
@@ -281,8 +277,21 @@ sub CreatePhysNode($)
     #
     if (exists($blob->{'interfaces'})) {
 	foreach my $ref (@{ $blob->{'interfaces'} }) {
-	    if ($ref->{'role'} eq TBDB_IFACEROLE_CONTROL() ||
-		$ref->{'role'} eq TBDB_IFACEROLE_EXPERIMENT()) {
+	    my $role = $ref->{'role'};
+	    
+	    if ($role eq "ctrl" || $role eq "control") {
+		$IP = $ref->{'IP'};
+
+		#
+		# This turns out to be a problem; if the node is actually
+		# on the local cluster (we treat all protogeni nodes same),
+		# we end up with two nodes in the interfaces table with the
+		# same IP; not allowed since stuff breaks (bootinfo, tmcd).
+		#
+		next;
+	    }
+	    if ($role eq TBDB_IFACEROLE_CONTROL() ||
+		$role eq TBDB_IFACEROLE_EXPERIMENT()) {
 		my $MAC = $ref->{'MAC'};
 		if (!defined($MAC) || !($MAC =~ /^[:\w]*$/)) {
 		    print STDERR "Bad mac in blob for $node_urn:\n";
@@ -337,6 +346,17 @@ sub CreatePhysNode($)
 		}
 		elsif ($role eq "ctrl" || $role eq "control") {
 		    $role = TBDB_IFACEROLE_CONTROL();
+
+		    my $ipv4 = GeniXML::GetText("public_ipv4", $ref);
+		    $IP = $ipv4;
+
+		    #
+		    # This turns out to be a problem; if the node is actually
+		    # on the local cluster (we treat all protogeni nodes same),
+		    # we end up with two nodes in the interfaces table with the
+		    # same IP; not allowed since stuff breaks (bootinfo, tmcd).
+		    #
+		    next;
 		}
 		else {
 		    print STDERR "Unknown role $role for $node_urn!\n";
@@ -370,10 +390,14 @@ sub CreatePhysNode($)
 	print STDERR "No interfaces in blob for $node_urn!\n";
 	goto bad;
     }
-    if (!defined($ctrliface)) {
+    if (!defined($IP)) {
 	print STDERR "No control interface in blob for $node_urn!\n";
 	goto bad;
     }		   
+    if (! ($IP =~ /^[-\w\.]*$/)) {
+	print STDERR "Invalid IP '$IP' in blob from CM for $node_urn\n";
+	goto bad;
+    }
     my $newnode = Node->Create($node_id, undef,
 			       {"role"      => "testnode",
 				"type"      => "pcfedphys",

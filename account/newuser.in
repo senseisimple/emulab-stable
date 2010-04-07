@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008, 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -243,7 +243,7 @@ foreach my $key (keys(%{ $xmlparse->{'attribute'} })) {
 #
 if (exists($newuser_args{'uid'})) {
     UserError("User already exists; pick another login name!")
-	if (User->LookupByUidAll($newuser_args{'uid'}));
+	if (User->Lookup($newuser_args{'uid'}));
     
     UserError("Reserved user name; pick another login name!")
 	if (getpwnam($newuser_args{'uid'}));
@@ -367,13 +367,13 @@ if (TBGetSiteVar("general/firstinit/state", \$firstinitstate)) {
     if ($firstinitstate eq "createproject") {
 	DBQueryFatal("update users set ".
 		     " admin=1,status='". $User::USERSTATUS_UNAPPROVED . "' " .
-		     "where uid='$new_uid'");
+		     "where uid_idx='$usr_idx'");
 
 	DBQueryFatal("insert into unixgroup_membership set ".
-		     "uid='$new_uid', gid='wheel'");
+		     "uid='$new_uid', uid_idx='$usr_idx', gid='wheel'");
     
 	DBQueryFatal("insert into unixgroup_membership set ".
-		     "uid='$new_uid', gid='$TBADMINGROUP'");
+		     "uid='$new_uid', uid_idx='$usr_idx', gid='$TBADMINGROUP'");
 	
 	# The web interface requires this line to be printed!
 	print "User $usr_uid/$usr_idx has been created\n";

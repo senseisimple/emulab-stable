@@ -29,6 +29,7 @@ my $WINSUPPORT = @WINSUPPORT@;
 my $MAILMANSUPPORT = @MAILMANSUPPORT@;
 my $BUGDBSUPPORT = @BUGDBSUPPORT@;
 my $ARCHSUPPORT = @ARCHIVESUPPORT@;
+my $PGENISUPPORT = @PROTOGENI_SUPPORT@;
 my $OURDOMAIN  = '@OURDOMAIN@';
 my $EXPOSETEMPLATES = $ELABINELAB;
 
@@ -159,7 +160,6 @@ my $TFTPD_PKG	  = "emulab-tftp-hpa-0.48";
 # XXX temporary for perl DBD mysql access
 my $P5DBD_PKG	  = "p5-DBD-mysql50-3.0002";
 # XXX temporary until fix dependencies in emulab-boss package
-my $P5GD_PKG	  = "p5-GD-2.07";
 my $PYM2_PKG	  = "py25-m2crypto-0.19.1";
 
 #
@@ -503,20 +503,6 @@ Phase "ports", "Installing ports", sub {
 			if ($pname);
 		    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $P5DBD_PKG");
 		};
-		# XXX cannot seem to get these dependencies into emulab-boss
-		Phase "p5-GD", "Installing GD graphics package", sub {
-		    my $pname = `$PKG_INFO -E 'p5-GD-*' 2>/dev/null`;
-		    chomp($pname);
-		    if ($pname eq $P5GD_PKG) {
-			PhaseSkip("p5-GD already up to date");
-		    }
-		    if (!$packagedir) {
-			PhaseSkip("No package directory provided");
-		    }
-		    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_DEL -f $pname")
-			if ($pname);
-		    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $P5GD_PKG");
-		};
 		if ($FBSD_MAJOR > 6) {
 		    Phase "py-m2crypto", "Installing python m2crypto package", sub {
 			my $pname = `$PKG_INFO -E 'py25-m2crypto-*' 2>/dev/null`;
@@ -545,6 +531,19 @@ Phase "ports", "Installing ports", sub {
 		ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
 	    }
 	}
+	if ($PGENISUPPORT) {
+	    Phase "protogeni", "Installing protogeni packages", sub {
+		if ($FBSD_MAJOR > 6 || ($FBSD_MAJOR == 6 && $FBSD_MINOR > 2)) {
+		    if (!ExecQuiet("$PKG_INFO -x emulab-protogeni")) {
+			PhaseSkip("Protogeni package already installed");
+		    }
+		    my $pname = GetPackage("emulab-protogeni", $packagedir);
+		    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
+		} else {
+		    PhaseSkip("OS install too old for Protogeni");
+		}
+	    };
+	}
     };
     PhaseSkip("Package directory provided; not installing from sources")
 	if ($packagedir);
@@ -567,6 +566,8 @@ Phase "ports", "Installing ports", sub {
 	      "interactive. Run: \n" .
 	      "    cd $PORTSMISCDIR/emulab-boss && make install\n" .
 	      "    cd $PORTSMISCDIR/emulab-php4 && make install\n" .
+	      ($PGENISUPPORT ?
+	      "    cd $PORTSMISCDIR/emulab-protogeni && make install\n" : "") .
 	      "then re-run this script.");
 };
 
@@ -846,6 +847,8 @@ Phase "database", "Setting up database", sub {
 	if (!ExecQuiet("$MYSQLADMIN ping")) {
 	    PhaseSkip("mysqld already running");
 	}
+	# XXX make sure client startup was done (setting ldpath)
+	ExecQuietFatal("$RCDIR/1.mysql-client.sh start");
 	ExecQuietFatal("$RCDIR/2.mysql-server.sh start");
 	# Give mysqld some time to start, then make sure it did
 	sleep 5;
