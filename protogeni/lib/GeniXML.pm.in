@@ -322,24 +322,24 @@ sub RemoveChild($$)
 # credential.
 sub PolicyExists($$)
 {
-  my ($policy, $credential) = @_;
-  my $exists = 0;
+    my ($policy, $credential) = @_;
+    my $exists = 0;
 
-  return 0
-    if (!ref($credential) or !defined($policy));
-  my $extensions_elem = $credential->extensions();
-  return 0
-    if (!defined($extensions_elem));
-  my $policies = GeniXML::FindNodesNS("//n:policy_exceptions/*",
+    return 0
+        if (!ref($credential) or !defined($policy));
+    my $extensions_elem = $credential->extensions();
+    return 0
+        if (!defined($extensions_elem));
+    my $policies = GeniXML::FindNodesNS("//n:policy_exceptions/*",
           $extensions_elem, $GeniUtil::EXTENSIONS_NS);
-  foreach my $epolicy ($policies->get_nodelist) {
-    if ($policy eq $epolicy->string_value) {
-        $exists = 1;
-         last;
-    }      
-  }       
+    foreach my $epolicy ($policies->get_nodelist) {
+        if ($policy eq $epolicy->string_value) {
+            $exists = 1;
+            last;
+        }      
+    }       
   
-  return $exists;
+    return $exists;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...
