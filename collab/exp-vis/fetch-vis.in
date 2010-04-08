@@ -184,6 +184,6 @@ if ($if_mod_since > 0 && $if_mod_since <= $mtime) {
     print "Last-Modified: ", time2str($mtime), "\n";
     print "\n";
     
-    print <F>;
+    print <F> unless $ENV{REQUEST_METHOD} eq 'HEAD';
 }
 exit 0;
