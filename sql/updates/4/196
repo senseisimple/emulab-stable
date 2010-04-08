@@ -1,0 +1,22 @@
+use strict;
+use libdb;
+
+#
+# Regular expressions added for images and os_info tables, to support
+# changes in how we dump/load descriptors during initial install.
+#
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    DBQueryFatal("replace into table_regex values ".
+		 " ('images','mbr_version','text','redirect', ".
+		 "  'default:int',0,0,NULL)");
+
+    DBQueryFatal("replace into table_regex values ".
+		 " ('os_info','pid','text','redirect',".
+		 "  'projects:pid',0,0,NULL)");
+    return 0;
+}
+1;
+

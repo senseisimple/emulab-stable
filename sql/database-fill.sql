@@ -848,6 +848,7 @@ REPLACE INTO table_regex VALUES ('images','version','text','redirect','os_info:v
 REPLACE INTO table_regex VALUES ('images','osfeatures','text','redirect','os_info:osfeatures',0,0,NULL);
 REPLACE INTO table_regex VALUES ('images','op_mode','text','redirect','os_info:op_mode',0,0,NULL);
 REPLACE INTO table_regex VALUES ('images','wholedisk','text','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','mbr_version','text','redirect','default:int',0,0,NULL);
 REPLACE INTO table_regex VALUES ('images','max_concurrent','text','redirect','default:int',0,0,NULL);
 REPLACE INTO table_regex VALUES ('images','reboot_waittime','text','redirect','default:int',0,0,NULL);
 
@@ -938,6 +939,7 @@ REPLACE INTO table_regex VALUES ('virt_node_motelog','pid','text','redirect','pr
 REPLACE INTO table_regex VALUES ('virt_node_motelog','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO `table_regex` VALUES ('virt_nodes','plab_plcnet','text','regex','^[\\w\\_\\d]+$',0,0,NULL);
 REPLACE INTO table_regex VALUES ('os_info','osid','text','regex','^[-\\w\\.+]+$',2,35,NULL);
+REPLACE INTO table_regex VALUES ('os_info','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('os_info','pid_idx','text','redirect','projects:pid_idx',0,0,NULL);
 REPLACE INTO table_regex VALUES ('os_info','osname','text','regex','^[-\\w\\.+]+$',2,20,NULL);
 REPLACE INTO table_regex VALUES ('os_info','description','text','redirect','default:fulltext',1,256,NULL);
