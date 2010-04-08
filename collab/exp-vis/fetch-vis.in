@@ -106,9 +106,9 @@ error("Invalid path: $realpath") unless $realpath =~ /^$FSDIR_PROJ\/$proj|^$FSDI
 # show anything, just let boss know that the url is valid.
 #
 if ($ENV{REMOTE_ADDR} eq "@BOSSNODE_IP@") {
-    print "Content-Type: text/plain\n";
-    print "\n";
-    print "I exist!";
+    print "Content-Type: text/plain\n\n";
+    print "I exist!\n";
+    exit(0);
 }
 
 #
