@@ -1,0 +1,18 @@
+use strict;
+use libdb;
+
+#
+# MLE stuff
+#
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (!DBSlotExists("virt_lans", "layer")) {
+	DBQueryFatal("alter table virt_lans add ".
+		     " `layer` tinyint(4) NOT NULL default '2'");
+    }
+    return 0;
+}
+1;
+
