@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -24,7 +24,8 @@ $isadmin   = ISADMIN();
 
 # List of valid toggles
 $toggles = array("adminon", "webfreeze", "cvsweb", "lockdown", "stud",
-		 "cvsrepo_public", "workbench", "hiderun", "widearearoot");
+		 "cvsrepo_public", "workbench", "hiderun", "widearearoot",
+		 "skipvlans");
 
 # list of valid values for each toggle
 $values  = array("adminon"        => array(0,1),
@@ -32,6 +33,7 @@ $values  = array("adminon"        => array(0,1),
 		 "cvsweb"         => array(0,1),
 		 "stud"           => array(0,1),
 		 "lockdown"       => array(0,1),
+		 "skipvlans"      => array(0,1),
 		 "cvsrepo_public" => array(0,1),
 		 "workbench"      => array(0,1),
 		 "widearearoot"   => array(0,1),
@@ -43,6 +45,7 @@ $optargs = array("adminon"        => array(),
 		 "cvsweb"         => array("user" => 1),
 		 "stud"           => array("user" => 1),
 		 "lockdown"       => array("pid" => 1, "eid" => 1),
+		 "skipvlans"      => array("pid" => 1, "eid" => 1),
 		 "cvsrepo_public" => array("pid" => 1),
 		 "workbench"      => array("pid" => 1),
 		 "widearearoot"   => array("user" => 1),
@@ -141,6 +144,17 @@ elseif ($type == "lockdown") {
     }
     $zapurl = CreateURL("showexp", $experiment);
     $experiment->SetLockDown($value);
+}
+elseif ($type == "skipvlans") {
+    # must be admin
+    if (! $isadmin) {
+	USERERROR("You do not have permission to toggle $type!", 1);
+    }
+    if (! ($experiment = Experiment::LookupByPidEid($pid, $eid))) {
+	PAGEARGERROR("Experiment $pid/$eid is not a valid experiment!");
+    }
+    $zapurl = CreateURL("showexp", $experiment);
+    $experiment->SetSkipVlans($value);
 }
 elseif ($type == "cvsrepo_public") {
     # Must validate the pid since we allow non-admins to do this.
