@@ -71,6 +71,7 @@ my %WAITTIMES    = ("Linux"	 => 120,
 # OP modes. Mirrored in the web interface. The value is a user-okay flag.
 my %OPMODES	 = ("NORMALv2"	 => 1,
 		    "NORMALv1"	 => 0,
+		    "PCVM" 	 => 0,
 		    "MINIMAL"	 => 1,
 		    "NORMAL"	 => 1,
 		    "ALWAYSUP"	 => 1 );
