@@ -15,14 +15,26 @@ sub cd ($) {
     chdir $_[0] or die "Unable to cd to $_[0]\n";
 }
 
-sub sysq (@) {
-    system @_;
-    die "ERROR: @_ failed\n" unless $? == 0;
+sub echo_command (@) {
+    print "@_\n";
 }
 
 sub sys (@) {
-    print join(' ', @_), "\n";
-    sysq @_;
+    my $ops = ref $_[0] ? shift : {};
+    echo_command @_ unless $ops->{quiet};
+    system @_;
+    my $failed = $? != 0;
+    my $ret = $? >> 8;
+    if ($failed && $ops->{ok_exit_code}) {
+	$failed = 0 if $ret == $ops->{ok_exit_code};
+    }
+    die "ERROR: @_ failed\n" if $failed;
+    return $ret;
+}
+
+sub sysq (@) {
+    my $ops = ref $_[0] ? shift : {};
+    sys {%$ops, 'quiet'=>1}, @_;
 }
 
 sub sysp (@) {
@@ -117,6 +129,30 @@ sub cd_merge() {
 #
 #
 
+#
+#
+#
+
+sub check_for_conflicts() {
+    my @files = split /\n/, sysp "git ls-files -u";
+    my %files;
+    foreach (@files) {
+	/\S+\s+\S+\s+\S+\s+(\S+)/ or die;
+	$files{$1} = 1;
+    }
+    my @ok;
+    my @unresolved;
+    foreach my $f (keys %files) {
+	local $/ = undef;
+	open F, $f or die $!;
+	local $_ = <F>;
+	if (/^={7}|^<{7}|^>{7}/m) {push @unresolved, $f}
+	else                      {push @ok, $f}
+    }
+    sys 'git', 'add', '--', @ok if @ok;
+    return @unresolved;
+}
+
 sub save_uncommited() {
     cd_source();
     print "Saving Uncommited Changes ...\n";
@@ -134,6 +170,22 @@ sub save_uncommited() {
     sysq "git update-ref -m '$msg' build-stash $stash_id";
     print "... done, commit id $stash_id\n";
     return $stash_id;
+}
+
+sub apply_uncommited($) {
+    my ($stash_id) = @_;
+    my $ret = sys({ok_exit_code=>1},
+                  "git merge-recursive -- HEAD $stash_id");
+    if ($ret == 1) {
+	sys "git rerere";
+	my @unresolved = check_for_conflicts();
+	if (@unresolved) {
+	    print "Fix conflicts in:\n";
+	    print '  ', join (' ', @unresolved), "\n";
+	    print "and run \"git rerere\"\n";
+	    exit 1;
+	}
+    }
 }
 
 sub merge_base(@) {
@@ -189,7 +241,7 @@ sub auto_reset() {
 	    init("reset -q --hard");
 	} else {
 	    print "Need to reset to $reset_point^\n"; 
-	    sys "git reset -q --soft $reset_point^";
+	    sys "git reset -q $reset_point^";
 	}
     }
 }
@@ -202,6 +254,7 @@ if ($op eq 'prep') {
     die "Merge tree must not exist\n" if -e $merge_tree;
     sys "git clone -sn . $merge_tree";
     cd_merge();
+    sys("git config rerere.enabled true");
     init("checkout -q -b $merge_branch");
     sys "ln -s $source_tree/.merge-build";
 } elsif ($op eq 'reset') {
@@ -219,8 +272,31 @@ if ($op eq 'prep') {
     sys "git fetch -q origin";
     auto_reset() if $auto_reset;
     sys "git reset -q --hard";
-    sys "git merge -q $branch_str";
-    sys "git merge-recursive -- HEAD $stash_id";
+    foreach (@branches) {
+	unlink ".git/MERGE_HEAD";
+	my $cmd = "git merge -q $_";
+	echo_command $cmd;
+	open F, "$cmd |" or die $!;
+	my $conflicts = 0;
+	while (<F>) {
+	    print;
+	    $conflicts = 1 if /fix conflicts and then commit the result/;
+	}
+	close F;
+	my $failed = $? != 0;
+	$failed = 0 if $conflicts && ($? & 127) == 0 && -e ".git/MERGE_HEAD";
+	die "ERROR: $cmd faild\n" if $failed;
+	if ($conflicts) {
+	    my @unresolved = check_for_conflicts();
+	    if (@unresolved) {
+		exit (1);
+	    } else {
+		print "All conflicts resolved with rerere, continuing.\n";
+		sys "git commit -q -F .git/MERGE_MSG";
+	    }
+	}
+    }
+    apply_uncommited($stash_id);
     sys "touch .merged";
 } else {
     usage();
