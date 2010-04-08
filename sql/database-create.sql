@@ -2497,6 +2497,7 @@ CREATE TABLE `os_info` (
   `max_concurrent` int(11) default NULL,
   `mfs` tinyint(4) NOT NULL default '0',
   `reboot_waittime` int(10) unsigned default NULL,
+  `protogeni_export` tinyint(1) NOT NULL default '0',
   PRIMARY KEY  (`osid`),
   UNIQUE KEY `pid` (`pid`,`osname`),
   KEY `OS` (`OS`),
