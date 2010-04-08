@@ -1,0 +1,211 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use strict;
+use Getopt::Std;
+use CGI;
+use Data::Dumper;
+
+#
+# Dump an EZ descriptor out.
+#
+sub usage()
+{
+    print("Usage: dumpimage [-d] [-i <imageid>] | [-o <osid>] \n");
+    exit(-1);
+}
+my $optlist = "di:o:";
+my $debug   = 0;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $TBAUDIT	= "@TBAUDITEMAIL@";
+my $TBGROUP_DIR	= "@GROUPSROOT_DIR@";
+my $TBPROJ_DIR	= "@PROJROOT_DIR@";
+
+#
+# Untaint the path
+#
+$ENV{'PATH'} = "$TB/bin:$TB/sbin:/bin:/usr/bin:/usr/bin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the Testbed support stuff.
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use User;
+use Project;
+use Image;
+use OSinfo;
+
+# Protos
+sub fatal($);
+sub DumpImage($);
+sub DumpOS($);
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (@ARGV) {
+    usage();
+}
+
+if (defined($options{"i"})) {
+    my $imageid = $options{"i"};
+    my $image = Image->Lookup($imageid);
+    if (!defined($image)) {
+	fatal("No such image: $imageid");
+    }
+    DumpImage($image);
+}
+elsif (defined($options{"o"})) {
+    my $osid = $options{"o"};
+    my $osinfo = OSinfo->Lookup($osid);
+    if (!defined($osinfo)) {
+	fatal("No such osid: $osid");
+    }
+    DumpOS($osinfo);
+}
+else {
+    fatal("Must supply an image or os ID");
+}
+
+sub DumpImage($)
+{
+    my ($image) = @_;
+    
+    # Array of string values to print. 
+    my %xmlfields = ();
+
+    $xmlfields{"imagename"}    = $image->imagename();
+    $xmlfields{"pid"}          = $image->pid();
+    $xmlfields{"gid"}          = $image->gid();
+    $xmlfields{"description"}  = $image->description();
+    $xmlfields{"loadpart"}     = $image->loadpart();
+    $xmlfields{"global"}       = $image->global();
+    $xmlfields{"shared"}       = $image->shared();
+    $xmlfields{"path"}         = $image->path();
+    #$xmlfields{"mbr_version"}  = $image->mbr_version();
+
+    sub MapOS($) {
+	my ($osid) = @_;
+	return "none"
+	    if (!defined($osid));
+	
+	my $osinfo = OSinfo->Lookup($osid);
+	if (!defined($osinfo)) {
+	    fatal("Could not find osid $osid");
+	}
+	return $osinfo->pid() . "," . $osinfo->osname();
+    }
+
+    if (!$image->ezid()) {
+	$xmlfields{"loadlength"}   = $image->loadlength();
+	$xmlfields{"part1_osid"}   = MapOS($image->part1_osid());
+	$xmlfields{"part2_osid"}   = MapOS($image->part2_osid());
+	$xmlfields{"part3_osid"}   = MapOS($image->part3_osid());
+	$xmlfields{"part4_osid"}   = MapOS($image->part4_osid());
+	$xmlfields{"default_osid"} = MapOS($image->default_osid());
+    }
+    else {
+	my $osinfo = OSinfo->Lookup($image->imageid());
+	if (!defined($osinfo)) {
+	    fatal("Could not find osid for $image");
+	}
+	$xmlfields{"OS"}              = $osinfo->OS();
+	$xmlfields{"version"}         = $osinfo->version();
+	$xmlfields{"op_mode"}         = $osinfo->op_mode();
+	$xmlfields{"osfeatures"}      = $osinfo->osfeatures();
+	$xmlfields{"reboot_waittime"} = $osinfo->reboot_waittime()
+	    if (defined($osinfo->reboot_waittime()));
+    }
+    print "<image>\n";
+    foreach my $key (keys(%xmlfields)) {
+	my $val = $xmlfields{$key};
+
+	print "  <attribute name=\"$key\">\n";
+	print "    <value>" . CGI::escapeHTML($val) . "</value>\n";
+	print "  </attribute>\n";
+    }
+    print "</image>\n";
+
+    return 0;
+}
+
+sub DumpOS($)
+{
+    my ($osinfo) = @_;
+    
+    # Array of string values to print. 
+    my %xmlfields = ();
+
+    $xmlfields{"description"}     = $osinfo->description();
+    $xmlfields{"osname"}          = $osinfo->osname();
+    $xmlfields{"pid"}             = $osinfo->pid();
+    $xmlfields{"OS"}              = $osinfo->OS();
+    $xmlfields{"version"}         = $osinfo->version();
+    $xmlfields{"path"}            = $osinfo->path()
+	if (defined($osinfo->path()));
+    $xmlfields{"magic"}           = $osinfo->magic()
+	if (defined($osinfo->magic()));
+    $xmlfields{"op_mode"}         = $osinfo->op_mode();
+    $xmlfields{"features"}        = $osinfo->osfeatures();
+    $xmlfields{"shared"}          = $osinfo->shared();
+    $xmlfields{"mustclean"}       = $osinfo->mustclean();
+    $xmlfields{"reboot_waittime"} = $osinfo->reboot_waittime()
+	if (defined($osinfo->reboot_waittime()));
+
+    if (defined($osinfo->nextosid()) && $osinfo->nextosid()) {
+	my $nextosinfo = OSinfo->Lookup($osinfo->nextosid());
+	if (!defined($nextosinfo)) {
+	    fatal("Could not look up nextosid for $osinfo");
+	}
+	$xmlfields{"nextosid"} =
+	    $nextosinfo->pid() . "," . $nextosinfo->osname();
+    }
+
+    print "<osid>\n";
+    foreach my $key (keys(%xmlfields)) {
+	my $val = $xmlfields{$key};
+
+	print "  <attribute name=\"$key\">\n";
+	print "    <value>" . CGI::escapeHTML($val) . "</value>\n";
+	print "  </attribute>\n";
+    }
+    print "</osid>\n";
+
+    return 0;
+}
+exit(0);
+
+sub fatal($)
+{
+    my ($mesg) = @_;
+
+    print STDERR "*** $0:\n".
+	         "    $mesg\n";
+    exit(-1);
+}
+
