@@ -1850,6 +1850,32 @@ sub setListener($$$) {
 }
 
 #
+# Get used listener ports
+#
+sub getUsedListenerPorts($$) {
+    my $self = shift;
+    my $ports = shift;
+
+    my $listener = [$ofListenerOID,0];
+
+    #
+    # Get all listeners and gather their ports
+    #
+    my ($varname, $vlan, $connstr);
+    $self->{SESS}->getnext($listener);
+    do {
+	($varname, $vlan, $connstr) = @{$listener};
+	$self->debug("listener: $varname $vlan $connstr \n");
+	if ($varname =~ /11.2.14.11.5.1.7.1.35.1.1.4/) {
+	    my ($proto, $port) = split(":", $connstr);
+	    $ports->{$port} = 1;
+	}
+	$self->{SESS}->getnext($listener);
+    } while ($varname =~ /11.2.14.11.5.1.7.1.35.1.1.4/);
+}
+
+
+#
 # Check if Openflow is supported on this switch
 #
 sub isOpenflowSupported($) {
