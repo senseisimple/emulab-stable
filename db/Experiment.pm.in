@@ -8,7 +8,7 @@ package Experiment;
 
 use strict;
 use Exporter;
-use vars qw(@ISA @EXPORT);
+use vars qw(@ISA @EXPORT $AUTOLOAD);
 
 @ISA    = "Exporter";
 @EXPORT = qw ( );
@@ -275,78 +275,38 @@ sub Lookup($$;$)
     
     return $self;
 }
-# accessors
-sub field($$)     { return ((! ref($_[0])) ? -1 : $_[0]->{'EXPT'}->{$_[1]}); }
-sub stats($$)     { return ((! ref($_[0])) ? -1 : $_[0]->{'STATS'}->{$_[1]});}
-sub resources($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'RSRC'}->{$_[1]}); }
+
+# To avoid writting out all the methods.
+sub AUTOLOAD {
+    my $self = shift;
+    my $type = ref($self) or die("$self is not an object\n");
+
+    my $name = $AUTOLOAD;
+    $name =~ s/.*://;   # strip fully-qualified portion
+
+    if (exists($self->{'EXPT'}->{$name})) {
+	return $self->{'EXPT'}->{$name};
+    }
+    elsif (exists($self->{'STATS'}->{$name})) {
+	return $self->{'STATS'}->{$name};
+    }
+    elsif (exists($self->{'RSRC'}->{$name})) {
+	return $self->{'RSRC'}->{$name};
+    }
+    print STDERR "$self: tried to access unknown slot $name\n";
+    return undef;
+}
 sub dbrow($$)     { return $_[0]->{'EXPT'}; }
 
-sub pid($)		{ return field($_[0], 'pid'); }
-sub gid($)		{ return field($_[0], 'gid'); }
-sub pid_idx($)		{ return field($_[0], 'pid_idx'); }
-sub gid_idx($)		{ return field($_[0], 'gid_idx'); }
-sub eid($)		{ return field($_[0], 'eid'); }
-sub idx($)		{ return field($_[0], 'idx'); }
-sub uuid($)		{ return field($_[0], 'eid_uuid'); }
-sub eid_uuid($)		{ return field($_[0], 'eid_uuid'); }
-sub description($)	{ return field($_[0], 'expt_name'); }
-sub path($)		{ return field($_[0], 'path'); }
-sub state($)		{ return field($_[0], 'state'); }
-sub batchstate($)	{ return field($_[0], 'batchstate'); }
-sub batchmode($)	{ return field($_[0], 'batchmode'); }
-sub rsrcidx($)		{ return stats($_[0], 'rsrcidx'); }
-sub lastrsrc($)		{ return stats($_[0], 'lastrsrc'); }
-sub creator($)		{ return field($_[0], 'expt_head_uid');}
-sub locked($)		{ return field($_[0], 'expt_locked'); }
-sub elabinelab($)	{ return field($_[0], 'elab_in_elab');}
-sub elabinelab_eid($)   { return field($_[0], 'elabinelab_eid');}
-sub elabinelab_exptidx($){return field($_[0], 'elabinelab_exptidx');}
-sub elabinelab_nosetup($){return field($_[0], 'elabinelab_nosetup');}
-sub elabinelab_singlenet($){return field($_[0], 'elabinelab_singlenet');}
-sub elabinelab_cvstag($){return field($_[0], 'elabinelab_cvstag');}
-sub lockdown($)		{ return field($_[0], 'lockdown'); }
-sub geniflags($)	{ return field($_[0], 'geniflags'); }
-sub created($)		{ return field($_[0], 'expt_created'); }
-sub swapper($)		{ return field($_[0], 'expt_swap_uid');}
-sub swappable($)	{ return field($_[0], 'swappable');}
-sub idleswap($)		{ return field($_[0], 'idleswap');}
-sub autoswap($)		{ return field($_[0], 'autoswap');}
-sub noswap_reason($)	{ return field($_[0], 'noswap_reason');}
-sub noidleswap_reason($){ return field($_[0], 'noidleswap_reason');}
-sub idleswap_timeout($) { return field($_[0], 'idleswap_timeout');}
-sub autoswap_timeout($) { return field($_[0], 'autoswap_timeout');}
-sub prerender_pid($)    { return field($_[0], 'prerender_pid');}
-sub dpdb($)		{ return field($_[0], 'dpdb');}
-sub dpdbname($)         { return field($_[0], 'dpdbname');}
-sub dpdbpassword($)     { return field($_[0], 'dpdbpassword');}
-sub instance_idx($)     { return field($_[0], 'instance_idx'); }
-sub creator_idx($)      { return field($_[0], 'creator_idx');}
-sub swapper_idx($)      { return field($_[0], 'swapper_idx');}
-sub use_ipassign($)     { return field($_[0], 'use_ipassign');}
-sub ipassign_args($)    { return field($_[0], 'ipassign_args');}
-sub security_level($)   { return field($_[0], 'security_level');}
-sub linktest_pid($)     { return field($_[0], 'linktest_pid');}
-sub linktest_level($)   { return field($_[0], 'linktest_level');}
-sub logfile($)          { return field($_[0], 'logfile');}
-sub eventkey($)         { return field($_[0], 'eventkey');}
-sub keyhash($)          { return field($_[0], 'keyhash');}
-sub paniced($)          { return field($_[0], 'paniced');}
-sub cpu_usage($)        { return field($_[0], 'cpu_usage');}
-sub encap_style($)      { return field($_[0], 'encap_style');}
-sub minimum_nodes($)    { return field($_[0], 'minimum_nodes');}
-sub maximum_nodes($)    { return field($_[0], 'maximum_nodes');}
-sub multiplex_factor($) { return field($_[0], 'multiplex_factor');}
-sub delay_capacity($)   { return field($_[0], 'delay_capacity');}
-sub virtnode_count($)   { return field($_[0], 'virtnode_count');}
-sub archive_idx($)	{ return stats($_[0], 'archive_idx'); }
-sub swapin_count($)	{ return stats($_[0], 'swapin_count'); }
-sub destroyed($)	{ return stats($_[0], 'destroyed'); }
-sub archive_tag($)	{ return resources($_[0], 'archive_tag'); }
-sub thumbnail($)	{ return resources($_[0], 'thumbnail'); }
-sub swapin_time($)	{ return resources($_[0], 'swapin_time'); }
-sub swapout_time($)	{ return resources($_[0], 'swapout_time'); }
-sub lastidx($)	        { return resources($_[0], 'lastidx'); }
-sub input_data_idx($)   { return resources($_[0], 'input_data_idx'); }
+# Break circular reference someplace to avoid exit errors.
+sub DESTROY {
+    my $self = shift;
+
+    $self->{"EXPT"}     = undef;
+    $self->{"STATS"}    = undef;
+    $self->{"RSRC"}     = undef;
+    $self->{'VIRTEXPT'} = undef;
+}
 
 #
 # For canceled, goto to the DB.
