@@ -1129,6 +1129,7 @@ CREATE TABLE `experiments` (
   `panic_date` datetime default NULL,
   `delay_capacity` tinyint(3) unsigned default NULL,
   `savedisk` tinyint(1) NOT NULL default '0',
+  `skipvlans` tinyint(1) NOT NULL default '0',
   `locpiper_pid` int(11) default '0',
   `locpiper_port` int(11) default '0',
   `instance_idx` int(10) unsigned NOT NULL default '0',
