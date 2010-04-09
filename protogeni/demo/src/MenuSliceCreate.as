@@ -264,18 +264,17 @@ package
       {
 		  credential.slice = String(response.value);
 		  credential.existing = true;
-		clip.xmlText.appendText("\ntest2222222222\n");
-		//clip.rspecText.appendText("\ntest2222222222\n");
-		//clip.text.appendText("\ntest2222222222\n");
-		  var newMenu = new MenuSliceDetail(sliceName, sliceId, credential,
+		  var newDetailMenu = new MenuSliceDetail(sliceName, sliceId, credential,
                                           Util.makeUrn(Geni.defaultAuthority,
                                                        "slice", sliceName));
         Main.setText(clip.xmlText.text);
-        Main.changeState(newMenu);
+        Main.changeState(newDetailMenu);
       }
 	  else if (code == 3)
 	  {
-		  // Not the user's slice
+		  var newSelectMenu = new MenuSliceSelect();
+        newSelectMenu.setSliceName("Access to '" + sliceName + "' is forbidden");
+        Main.changeState(newSelectMenu);
 	  }
       else
       {

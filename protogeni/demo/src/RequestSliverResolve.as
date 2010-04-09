@@ -53,14 +53,19 @@ package
       if (code == 0)
       {
 		var rspec = new XML(response.value.manifest);
+		var links : Array = new Array();
 		for each(var component:XML in rspec.children())
 		{
 			if(component.localName() == "node")
 			{
-				Main.getConsole().appendText("\nYOOOOOOOOOOOO " + component.@component_urn + " " + cm.getName() + "\n");
-				Main.getConsole().appendText("\n" + Main.menu.getComponent(component.@component_urn, cm.getName(), true) + "\n");
+				Main.getConsole().appendText("\nAdding node ... " + Main.menu.getComponent(component.@component_urn, cm.getName(), true) + "\n");
+			}
+			else if(component.localName() == "link")
+			{
+				links.push(component);
 			}
 		}
+		// TODO: Process links after nodes to make sure the nodes exist
       }
       else
       {

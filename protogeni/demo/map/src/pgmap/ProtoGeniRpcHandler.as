@@ -17,9 +17,14 @@
 	import com.mattism.http.xmlrpc.MethodFault;
 	
 	import flash.events.ErrorEvent;
+	import flash.net.URLRequest;
+	import flash.net.navigateToURL;
 	import flash.utils.ByteArray;
 	
+	import mx.controls.Alert;
+	import mx.events.CloseEvent;
 	import mx.utils.Base64Decoder;
+	import mx.managers.PopUpManager;
     
     // Handles all the XML-RPC calls
 	public class ProtoGeniRpcHandler
@@ -216,13 +221,10 @@
 	    	}
 	    	
 	    	if(currentIndex >= main.pgHandler.ComponentManagers.length)
-	    	//if(currentIndex == 1)
 	    	{
-	    		main.chooseCMWindow.refreshList();
-	    		//main.pgHandler.map.drawMap();
-	    		//return;
-	    		
+				main.chooseCMWindow.refreshList();
 	    		startResolveUser();
+
 	    		return;
 	    	}
 	    	
@@ -245,15 +247,14 @@
 	    	main.setProgress("Done", Common.failColor);
 	    	main.stopWaiting();
 	    	outputFailure(event, fault);
-	    	var msg:String = event.toString();
-	    	if(msg.search("#2048") > -1)
-	        	currentCm.Message = "Stream error, possibly due to server error.  Another possible error might be that you haven't added an exception for:\n" + currentCm.DiscoverResourcesUrl();
-			else if(msg.search("#2032") > -1)
-				currentCm.Message = "IO error, possibly due to the server being down";
-			else if(msg.search("timed"))
-				currentCm.Message = event.text;
-			else
-				currentCm.Message = msg;
+	    	currentCm.errorMessage = event.toString();
+	    	currentCm.errorDescription = "";
+	    	if(currentCm.errorMessage.search("#2048") > -1)
+	        	currentCm.errorDescription = "Stream error, possibly due to server error.  Another possible error might be that you haven't added an exception for:\n" + currentCm.DiscoverResourcesUrl();
+			else if(currentCm.errorMessage.search("#2032") > -1)
+				currentCm.errorDescription = "IO error, possibly due to the server being down";
+			else if(currentCm.errorMessage.search("timed"))
+				currentCm.errorDescription = event.text;
 			currentCm.Status = ComponentManager.FAILED;
 			currentIndex++;
 			main.chooseCMWindow.ResetStatus(currentCm);
@@ -283,11 +284,11 @@
 		      	main.setProgress("Done", Common.failColor);
 		    	main.stopWaiting();
 		    	switch(code) {
-		    		case GENIRESPONSE_BADARGS: currentCm.Message = "Malformed arguments";
+		    		case GENIRESPONSE_BADARGS: currentCm.errorDescription = "Malformed arguments";
 		    			break;
-		    		case GENIRESPONSE_ERROR: currentCm.Message = "Error";
+		    		case GENIRESPONSE_ERROR: currentCm.errorDescription = "Error";
 		    			break;
-		    		default: currentCm.Message = "Other error";
+		    		default: currentCm.errorDescription = "Other error";
 		    	}
 				currentCm.Status = ComponentManager.FAILED;
 				currentIndex++;

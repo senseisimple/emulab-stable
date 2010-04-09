@@ -186,6 +186,19 @@ package
 		return components.indexOf(uuidToNode[uuid]);
     }
 
+    public function getIndexFromName(name : String) : int
+    {
+	  var i : int = 0;
+      for (; i < components.length; ++i)
+      {
+        if (components[i].name == name)
+        {
+          return i;
+        }
+      }
+      return -1;
+    }
+
     public function getComponentCount() : int
     {
       return components.length;
