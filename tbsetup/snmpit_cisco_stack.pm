@@ -1135,7 +1135,7 @@ sub disableOpenflow($$) {
 # setController(self, vlan_id, controller);
 # return # of errors
 #
-sub setController($$$) {
+sub setOpenflowController($$$) {
     my $self = shift;
     my $vlan_id = shift;
     my $controller = shift;
@@ -1156,7 +1156,7 @@ sub setController($$$) {
 		print "Setting Openflow controller on $devicename for VLAN $vlan_id".
 		    "..." if $self->{DEBUG};
 
-		my $ok = $device->setController($vlan_number, $controller);
+		my $ok = $device->setOpenflowController($vlan_number, $controller);
 		if (!$ok) { $errors++; }
 		else {print "Done! \n" if $self->{DEBUG};}
 	    } else {
@@ -1182,7 +1182,7 @@ sub setController($$$) {
 # that sets the listener on switches automatically and returns
 # the listener connection string.
 #
-sub setListener($$$) {
+sub setOpenflowListener($$$) {
     my $self = shift;
     my $vlan_id = shift;
     my $listener = shift;
@@ -1203,7 +1203,7 @@ sub setListener($$$) {
 		print "Setting Openflow listener on $devicename for VLAN $vlan_id".
 		    "..." if $self->{DEBUG};
 
-		my $ok = $device->setListener($vlan_number, $listener);
+		my $ok = $device->setOpenflowListener($vlan_number, $listener);
 		if (!$ok) { $errors++; }
 		else {print "Done! \n" if $self->{DEBUG};}
 	    } else {

@@ -1466,7 +1466,7 @@ sub disableOpenflow($$) {
 #
 # Set controller
 #
-sub setController($$$) {
+sub setOpenflowController($$$) {
     my $self = shift;
     my $vlan = shift;
     my $controller = shift;
@@ -1482,7 +1482,7 @@ sub setController($$$) {
 #
 # Set listener
 #
-sub setListener($$$) {
+sub setOpenflowListener($$$) {
     my $self = shift;
     my $vlan = shift;
     my $listener = shift;
@@ -1493,6 +1493,13 @@ sub setListener($$$) {
     #
     warn "ERROR: Foundry swith doesn't support Openflow now";
     return 0;
+}
+
+#
+# Get used listener ports
+#
+sub getUsedOpenflowListenerPorts($$) {
+    warn "ERROR: Foundry swith doesn't support Openflow now\n";
 }
 
 #
