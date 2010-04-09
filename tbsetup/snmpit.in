@@ -52,14 +52,17 @@ sub doSynchLeader($);
 sub CreateOneVlan($$@);
 sub doOpenflowEnable($$);
 sub doOpenflowDisable($$);
-sub doSetController($$$);
-sub doSetListener($$$);
+sub doSetOpenflowController($$$);
+sub doSetOpenflowListener($$$);
+sub doEnableOpenflowListener($$);
 
 #
 # Defaults
 #
 my $debug = 0;
 my $quiet = 0;
+my $minOpenflowListenerPort = 5000;
+my $maxOpenflowListenerPort = 65535;
 
 ######################################################################
 # Step 1 - Process command-line arguments
@@ -85,7 +88,7 @@ Usage: $0 [-h] [-v level] [-q] [-n] [-i device] [-S stack]
           [--of-disable name pid eid]
           [--of-enable name pid eid]
           [--of-controller name pid eid tcp:ip:port]
-          [--of-listener name pid eid ptcp:ip:port]
+          [--of-listener name pid eid]
 General:
   -h          Display this help message
   -v <level>  Verbose mode
@@ -133,9 +136,10 @@ VLAN Control:
   --of-controller <name> <pid> <eid> tcp:ip:port
                     Set controller for Openflow-enabled VLAN with the name <name> that is associated 
 		        with the given experiment
-  --of-listener <name> <pid> <eid> ptcp:ip:port
-                    Set listener for Openflow-enabled VLAN with the name <name> that is associated 
-		        with the given experiment
+  --of-listener <name> <pid> <eid> 
+                    Enable listener for Openflow-enabled VLAN with the name <name> that is associated 
+		        with the given experiment, snmpit will print out the listener connection
+			string.
 
 Port Control:
   -s                     List all ports, and show configuration information
@@ -201,7 +205,7 @@ my @ports;
 my @optvlanids = ();
 my $equaltrunking = 0;
 my $this_user;
-my $ofconnstr; # Openflow connection string, for listener and controller 
+my $ofconnstr; # Openflow connection string, for controller 
 our $next_vlan_tag; # XXX see doMakeVlan for explanation
 
 #
@@ -267,7 +271,7 @@ if ($opt{t} || $opt{r} || $opt{D} || $opt{R} || $opt{X}) {
     # Set the @ports array so that we'll do proper permission checking on it
     #
     @ports = ($opt{T});
-} elsif ($opt{'of-controller'} || $opt{'of-listener'}) {
+} elsif ($opt{'of-controller'}) {
     #
     # Options that take the pid eid and connection string
     #
@@ -278,15 +282,12 @@ if ($opt{t} || $opt{r} || $opt{D} || $opt{R} || $opt{X}) {
 	($pid, $eid) = (shift @ARGV, shift @ARGV);
     }
     if (@ARGV < 0) {
-	tberror "Controller/listener connection string reqired!";
+	tberror "Controller connection string reqired!";
 	exit &usage;
-    #} elsif (!$opt{i}) { # Openflow operations must have a target device
-	#tberror "A device is reqired!";
-	#exit &usage;
     } else {
 	$ofconnstr = shift @ARGV;
     }
-} elsif ($opt{'of-enable'} || $opt{'of-disable'}) {
+} elsif ($opt{'of-enable'} || $opt{'of-disable'} || $opt{'of-listener'}) {
     #
     # Options that need pid eid
     #
@@ -295,15 +296,7 @@ if ($opt{t} || $opt{r} || $opt{D} || $opt{R} || $opt{X}) {
 	exit &usage;
     } else {
 	($pid, $eid) = (shift @ARGV, shift @ARGV);
-    }
-    # comment the following because we should support VLAN acrossing multiple switches
-    #
-    # Options that need other options
-    #
-    #if (!$opt{i}) { # Openflow operations must have a target device
-    #	tberror "A device is reqired!";
-    #	exit &usage;
-    #} 
+    }    
 } else {
     #
     # Everything else
@@ -1004,11 +997,12 @@ COMMAND: foreach my $command (@commands) {
 	    last;
 	}; # /ofdisable/ && do
 	(/ofcontroller/) && do {
-	    $exitval += doSetController(\@stacks,$vlans[0],$ofconnstr);
+	    $exitval += doSetOpenflowController(\@stacks,$vlans[0],$ofconnstr);
 	    last;
 	}; # /ofcontroller/ && do
 	(/oflistener/) && do {
-	    $exitval += doSetListener(\@stacks,$vlans[0],$ofconnstr);
+	    #$exitval += doSetOpenflowListener(\@stacks,$vlans[0],$ofconnstr);
+	    $exitval += doEnableOpenflowListener(\@stacks,$vlan[0]);
 	    last;
 	}; # /oflistener/ && do
     }
@@ -2570,10 +2564,10 @@ sub doOpenflowDisable($$) {
 }
 
 #
-# doSetController(stack, vlan, controller)
+# doSetOpenflowController(stack, vlan, controller)
 # Set controller for an Openflow-enabled VLAN
 #
-sub doSetController($$$) {
+sub doSetOpenflowController($$$) {
     my $stacks = shift;
     my $vlan = shift;
     my $controller = shift;
@@ -2585,7 +2579,7 @@ sub doSetController($$$) {
     print "Set controller for VLAN $vlan ...\n"
 	if (!$quiet);
     foreach my $stack (@$stacks) {
-	if (!$stack->setController($vlan, $controller)) {
+	if (!$stack->setOpenflowController($vlan, $controller)) {
 	    $errors++;
 	}	
     }
@@ -2598,10 +2592,10 @@ sub doSetController($$$) {
 }
 
 #
-# doSetListener(stack, vlan, listener)
+# doSetOpenflowListener(stack, vlan, listener)
 # Set listener for an Openflow-enabled VLAN
 #
-sub doSetListener($$$) {
+sub doSetOpenflowListener($$$) {
     my $stacks = shift;
     my $vlan = shift;
     my $listener = shift;
@@ -2613,7 +2607,7 @@ sub doSetListener($$$) {
     print "Set listener for VLAN $vlan ...\n"
 	if (!$quiet);
     foreach my $stack (@$stacks) {
-	if (!$stack->setListener($vlan, $listener)) {
+	if (!$stack->setOpenflowListener($vlan, $listener)) {
 	    $errors++;
 	}	
     }
@@ -2623,4 +2617,41 @@ sub doSetListener($$$) {
     }
 
     return $errors;
+}
+
+#
+# doEnableOpenflowListener(stacks, vlan)
+# enable openflow listener on the given VLAN
+# this function prints out the connection string of the listener
+#
+sub doEnableOpenflowListener($$) {
+    my $stacks = shift;
+    my $vlan = shift;
+
+    my %ports = ();
+    my $port = $minOpenflowListenerPort;
+
+    #
+    # get used ports
+    #
+    foreach my $stack (@$stacks) {
+	$stack->getUsedOpenflowListenerPorts(\%ports);
+    }
+
+    # get the available port
+    while (defined($ports->{$port}) && $port <= $maxOpenflowListenerPort) {
+	$port++;
+    }
+    
+    if ($port > $maxOpenflowListenerPort) {
+	print "ERROR: No port available for Openflow listener on VLAN $vlan. \n";
+	return 1;
+    } else {
+	#
+	# set listener
+	#
+	my $listenerConnStr = "ptcp:".$port;
+	print "Openflow listener connection string for VLAN $vlan is $listenerConnStr \n";
+	return doSetOpenflowListener($stacks, $vlan, $listenerConnStr);
+    }
 }

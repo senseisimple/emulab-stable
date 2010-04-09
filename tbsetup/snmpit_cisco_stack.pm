@@ -1219,5 +1219,20 @@ sub setOpenflowListener($$$) {
     return $errors;
 }
 
+
+#
+# Get used Openflow listener ports
+#
+sub getUsedOpenflowListenerPorts($$) {
+    my $self = shift;
+    my $ports = shift;
+
+    foreach my $devicename (keys %{$self->{DEVICES}})
+    {
+	my $device = $self->{DEVICES}{$devicename};
+	$device->getUsedOpenflowListenerPorts($ports);
+    }
+}
+
 # End with true
 1;
