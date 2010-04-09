@@ -578,6 +578,16 @@ sub ResolveNextOSID($;$)
 }
 
 #
+# Set the nextosid.
+#
+sub SetNextOS($$)
+{
+    my ($self, $nextosinfo) = @_;
+
+    return $self->Update({"nextosid" => $nextosinfo->osid()});
+}
+
+#
 # Check if a particular feature is supported.
 #
 sub FeatureSupported($$)
