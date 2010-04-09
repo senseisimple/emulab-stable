@@ -57,6 +57,7 @@ my $ofEnableOID     = $ofOID.'.1.1.2';
 my $ofControllerOID = $ofOID.'.1.1.3';
 my $ofListenerOID   = $ofOID.'.1.1.4';
 my $ofSupportOID    = $ofOID.'.2.1.0';
+my $ofListenerVarNameMarker = '11.2.14.11.5.1.7.1.35.1.1.4';
 
 #
 # Ports can be passed around in three formats:
@@ -1818,7 +1819,7 @@ sub disableOpenflow($$) {
 #
 # Set controller
 #
-sub setController($$$) {
+sub setOpenflowController($$$) {
     my $self = shift;
     my $vlan = shift;
     my $controller = shift;
@@ -1835,7 +1836,7 @@ sub setController($$$) {
 #
 # Set listener
 #
-sub setListener($$$) {
+sub setOpenflowListener($$$) {
     my $self = shift;
     my $vlan = shift;
     my $listener = shift;
@@ -1852,7 +1853,7 @@ sub setListener($$$) {
 #
 # Get used listener ports
 #
-sub getUsedListenerPorts($$) {
+sub getUsedOpenflowListenerPorts($$) {
     my $self = shift;
     my $ports = shift;
 
@@ -1866,12 +1867,12 @@ sub getUsedListenerPorts($$) {
     do {
 	($varname, $vlan, $connstr) = @{$listener};
 	$self->debug("listener: $varname $vlan $connstr \n");
-	if ($varname =~ /11.2.14.11.5.1.7.1.35.1.1.4/) {
+	if ($varname =~ /$ofListenerVarNameMarker/) {
 	    my ($proto, $port) = split(":", $connstr);
 	    $ports->{$port} = 1;
 	}
 	$self->{SESS}->getnext($listener);
-    } while ($varname =~ /11.2.14.11.5.1.7.1.35.1.1.4/);
+    } while ($varname =~ /$ofListenerVarNameMarker/);
 }
 
 
