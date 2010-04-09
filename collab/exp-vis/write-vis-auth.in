@@ -13,6 +13,7 @@ use Getopt::Std;
 my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $USERNODE    = "@USERNODE@";
+my $SSH         = "$TB/bin/sshtb -l root -host $USERNODE";
 
 my $background = 0;
 
@@ -45,6 +46,7 @@ $SIG{__DIE__} = sub {
     open STDERR, ">&OLDERR";
     SENDMAIL($TBOPS, "write-vis-auth failed", $_, undef, undef, $logfile);
     unlink $logfile;
+    TBScriptUnlock();
     print STDERR "write-vis-auth failed, see testbed-ops mail\n";
     exit(1);
 };
@@ -68,7 +70,7 @@ $< = $>;
 my $db_result =
     DBQueryFatal("select opskey, uid from login");
 
-open O, "| ssh root\@$USERNODE $TB/libexec/write-vis-auth.proxy" 
+open O, "| $SSH $TB/libexec/write-vis-auth.proxy" 
     or die "ssh to ops failed: $!\n";
 
 my $prev_opskey = '';
@@ -82,6 +84,7 @@ die "ssh to ops failed: $!\n" if $!;
 die "ssh to ops failed with exit code $?\n" if $? != 0;
 
 unlink $logfile;
+TBScriptUnlock();
 
 exit(0);
 
