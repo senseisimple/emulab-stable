@@ -106,8 +106,9 @@ sub DumpImage($)
     $xmlfields{"loadpart"}     = $image->loadpart();
     $xmlfields{"global"}       = $image->global();
     $xmlfields{"shared"}       = $image->shared();
-    $xmlfields{"path"}         = $image->path();
-    #$xmlfields{"mbr_version"}  = $image->mbr_version();
+    $xmlfields{"path"}         = $image->path()
+    	if (defined($image->path()) && $image->path() ne "");
+    $xmlfields{"mbr_version"}  = $image->mbr_version();
 
     sub MapOS($) {
 	my ($osid) = @_;
@@ -135,9 +136,11 @@ sub DumpImage($)
 	    fatal("Could not find osid for $image");
 	}
 	$xmlfields{"OS"}              = $osinfo->OS();
-	$xmlfields{"version"}         = $osinfo->version();
+	$xmlfields{"version"}         = $osinfo->version()
+	    if (defined($osinfo->version()) && $osinfo->version() ne "");
 	$xmlfields{"op_mode"}         = $osinfo->op_mode();
-	$xmlfields{"osfeatures"}      = $osinfo->osfeatures();
+	$xmlfields{"osfeatures"}      = $osinfo->osfeatures()
+	    if (defined($osinfo->osfeatures()) && $osinfo->osfeatures() ne "");
 	$xmlfields{"reboot_waittime"} = $osinfo->reboot_waittime()
 	    if (defined($osinfo->reboot_waittime()));
     }
@@ -165,13 +168,15 @@ sub DumpOS($)
     $xmlfields{"osname"}          = $osinfo->osname();
     $xmlfields{"pid"}             = $osinfo->pid();
     $xmlfields{"OS"}              = $osinfo->OS();
-    $xmlfields{"version"}         = $osinfo->version();
+    $xmlfields{"version"}         = $osinfo->version()
+    	if (defined($osinfo->version()) && $osinfo->version() ne "");
     $xmlfields{"path"}            = $osinfo->path()
-	if (defined($osinfo->path()));
+	if (defined($osinfo->path()) && $osinfo->path() ne "");
     $xmlfields{"magic"}           = $osinfo->magic()
 	if (defined($osinfo->magic()));
     $xmlfields{"op_mode"}         = $osinfo->op_mode();
-    $xmlfields{"features"}        = $osinfo->osfeatures();
+    $xmlfields{"features"}        = $osinfo->osfeatures()
+	if (defined($osinfo->osfeatures()) && $osinfo->osfeatures() ne "");
     $xmlfields{"shared"}          = $osinfo->shared();
     $xmlfields{"mustclean"}       = $osinfo->mustclean();
     $xmlfields{"reboot_waittime"} = $osinfo->reboot_waittime()
