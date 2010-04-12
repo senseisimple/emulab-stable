@@ -1,0 +1,560 @@
+<descriptors>
+<mapping name="RHL-STD">
+    <value>FC6-STD</value>
+</mapping>
+<mapping name="FBSD-STD">
+    <value>FBSD62-STD</value>
+</mapping>
+<osid>
+  <attribute name="features">
+    <value>ping,ssh,ipod,isup</value>
+  </attribute>
+  <attribute name="version">
+    <value>6.2</value>
+  </attribute>
+  <attribute name="path">
+    <value>boss:/tftpboot/frisbee</value>
+  </attribute>
+  <attribute name="reboot_waittime">
+    <value>150</value>
+  </attribute>
+  <attribute name="description">
+    <value>Frisbee (FreeBSD) in an MFS</value>
+  </attribute>
+  <attribute name="mustclean">
+    <value>0</value>
+  </attribute>
+  <attribute name="shared">
+    <value>1</value>
+  </attribute>
+  <attribute name="op_mode">
+    <value>RELOAD</value>
+  </attribute>
+  <attribute name="pid">
+    <value>emulab-ops</value>
+  </attribute>
+  <attribute name="osname">
+    <value>FRISBEE-MFS</value>
+  </attribute>
+  <attribute name="OS">
+    <value>FreeBSD</value>
+  </attribute>
+</osid>
+<osid>
+  <attribute name="features">
+    <value>ping,ssh,ipod,isup</value>
+  </attribute>
+  <attribute name="version">
+    <value>4.X</value>
+  </attribute>
+  <attribute name="reboot_waittime">
+    <value>150</value>
+  </attribute>
+  <attribute name="description">
+    <value>FreeBSD on the Operations Node</value>
+  </attribute>
+  <attribute name="mustclean">
+    <value>0</value>
+  </attribute>
+  <attribute name="op_mode">
+    <value>OPSNODEBSD</value>
+  </attribute>
+  <attribute name="shared">
+    <value>1</value>
+  </attribute>
+  <attribute name="pid">
+    <value>emulab-ops</value>
+  </attribute>
+  <attribute name="osname">
+    <value>OPSNODE-BSD</value>
+  </attribute>
+  <attribute name="OS">
+    <value>FreeBSD</value>
+  </attribute>
+</osid>
+<osid>
+  <attribute name="magic">
+    <value>FreeBSD</value>
+  </attribute>
+  <attribute name="features">
+    <value>ping,ssh,ipod,isup,veths,veth-ne,veth-en,mlinks,vlans</value>
+  </attribute>
+  <attribute name="reboot_waittime">
+    <value>150</value>
+  </attribute>
+  <attribute name="description">
+    <value>IPFW Firewall</value>
+  </attribute>
+  <attribute name="mustclean">
+    <value>1</value>
+  </attribute>
+  <attribute name="op_mode">
+    <value>NORMAL</value>
+  </attribute>
+  <attribute name="shared">
+    <value>1</value>
+  </attribute>
+  <attribute name="pid">
+    <value>emulab-ops</value>
+  </attribute>
+  <attribute name="osname">
+    <value>FW-IPFW</value>
+  </attribute>
+  <attribute name="OS">
+    <value>FreeBSD</value>
+  </attribute>
+  <attribute name="nextosid">
+    <value>emulab-ops,FBSD410-STD</value>
+  </attribute>
+</osid>
+<osid>
+  <attribute name="magic">
+    <value>FreeBSD</value>
+  </attribute>
+  <attribute name="features">
+    <value>ping,ssh,ipod,isup,veths,veth-ne,veth-en,mlinks,vlans</value>
+  </attribute>
+  <attribute name="reboot_waittime">
+    <value>150</value>
+  </attribute>
+  <attribute name="description">
+    <value>IPFW2 Firewall</value>
+  </attribute>
+  <attribute name="mustclean">
+    <value>1</value>
+  </attribute>
+  <attribute name="op_mode">
+    <value>NORMAL</value>
+  </attribute>
+  <attribute name="shared">
+    <value>1</value>
+  </attribute>
+  <attribute name="pid">
+    <value>emulab-ops</value>
+  </attribute>
+  <attribute name="osname">
+    <value>FW-IPFW2</value>
+  </attribute>
+  <attribute name="OS">
+    <value>FreeBSD</value>
+  </attribute>
+  <attribute name="nextosid">
+    <value>emulab-ops,FBSD410-STD</value>
+  </attribute>
+</osid>
+<osid>
+  <attribute name="magic">
+    <value></value>
+  </attribute>
+  <attribute name="version">
+    <value>0.00</value>
+  </attribute>
+  <attribute name="reboot_waittime">
+    <value>60</value>
+  </attribute>
+  <attribute name="description">
+    <value>Stub descriptor for power controllers of any kind</value>
+  </attribute>
+  <attribute name="mustclean">
+    <value>1</value>
+  </attribute>
+  <attribute name="op_mode">
+    <value>ALWAYSUP</value>
+  </attribute>
+  <attribute name="shared">
+    <value>0</value>
+  </attribute>
+  <attribute name="pid">
+    <value>emulab-ops</value>
+  </attribute>
+  <attribute name="osname">
+    <value>POWER-CONTROLLER</value>
+  </attribute>
+  <attribute name="OS">
+    <value>Other</value>
+  </attribute>
+</osid>
+<osid>
+  <attribute name="magic">
+    <value>FreeBSD</value>
+  </attribute>
+  <attribute name="features">
+    <value>ping,ssh,ipod,isup,veths,veth-ne,veth-en,mlinks,linktest,linkdelays,vlans</value>
+  </attribute>
+  <attribute name="reboot_waittime">
+    <value>150</value>
+  </attribute>
+  <attribute name="description">
+    <value>Any Version of FreeBSD</value>
+  </attribute>
+  <attribute name="mustclean">
+    <value>1</value>
+  </attribute>
+  <attribute name="op_mode">
+    <value>NORMAL</value>
+  </attribute>
+  <attribute name="shared">
+    <value>1</value>
+  </attribute>
+  <attribute name="pid">
+    <value>emulab-ops</value>
+  </attribute>
+  <attribute name="osname">
+    <value>FBSD-STD</value>
+  </attribute>
+  <attribute name="OS">
+    <value>FreeBSD</value>
+  </attribute>
+</osid>
+<osid>
+  <attribute name="features">
+    <value>ping,ssh,ipod,isup</value>
+  </attribute>
+  <attribute name="version">
+    <value>6.2</value>
+  </attribute>
+  <attribute name="path">
+    <value>boss:/tftpboot/freebsd.newnode</value>
+  </attribute>
+  <attribute name="reboot_waittime">
+    <value>150</value>
+  </attribute>
+  <attribute name="description">
+    <value>NewNode (FreeBSD) in an MFS</value>
+  </attribute>
+  <attribute name="mustclean">
+    <value>0</value>
+  </attribute>
+  <attribute name="shared">
+    <value>1</value>
+  </attribute>
+  <attribute name="op_mode">
+    <value>PXEFBSD</value>
+  </attribute>
+  <attribute name="pid">
+    <value>emulab-ops</value>
+  </attribute>
+  <attribute name="osname">
+    <value>NEWNODE-MFS</value>
+  </attribute>
+  <attribute name="OS">
+    <value>FreeBSD</value>
+  </attribute>
+</osid>
+<osid>
+  <attribute name="magic">
+    <value></value>
+  </attribute>
+  <attribute name="features">
+    <value>ping,ssh,isup,linktest</value>
+  </attribute>
+  <attribute name="version">
+    <value>4.X</value>
+  </attribute>
+  <attribute name="reboot_waittime">
+    <value>90</value>
+  </attribute>
+  <attribute name="description">
+    <value>Generic OSID for jailed nodes</value>
+  </attribute>
+  <attribute name="mustclean">
+    <value>0</value>
+  </attribute>
+  <attribute name="shared">
+    <value>1</value>
+  </attribute>
+  <attribute name="op_mode">
+    <value>PCVM</value>
+  </attribute>
+  <attribute name="pid">
+    <value>emulab-ops</value>
+  </attribute>
+  <attribute name="osname">
+    <value>FBSD-JAIL</value>
+  </attribute>
+  <attribute name="OS">
+    <value>FreeBSD</value>
+  </attribute>
+  <attribute name="nextosid">
+    <value>emulab-ops,FBSD-STD</value>
+  </attribute>
+</osid>
+<osid>
+  <attribute name="magic">
+    <value>Linux</value>
+  </attribute>
+  <attribute name="features">
+    <value>ping,ssh,ipod,isup,linktest,linkdelays,vlans</value>
+  </attribute>
+  <attribute name="reboot_waittime">
+    <value>150</value>
+  </attribute>
+  <attribute name="description">
+    <value>Any of RedHat Linux</value>
+  </attribute>
+  <attribute name="mustclean">
+    <value>1</value>
+  </attribute>
+  <attribute name="op_mode">
+    <value>NORMAL</value>
+  </attribute>
+  <attribute name="shared">
+    <value>1</value>
+  </attribute>
+  <attribute name="pid">
+    <value>emulab-ops</value>
+  </attribute>
+  <attribute name="osname">
+    <value>RHL-STD</value>
+  </attribute>
+  <attribute name="OS">
+    <value>Linux</value>
+  </attribute>
+</osid>
+<osid>
+  <attribute name="features">
+    <value>ping,ssh,ipod,isup</value>
+  </attribute>
+  <attribute name="version">
+    <value>6.2</value>
+  </attribute>
+  <attribute name="path">
+    <value>boss:/tftpboot/freebsd</value>
+  </attribute>
+  <attribute name="reboot_waittime">
+    <value>150</value>
+  </attribute>
+  <attribute name="description">
+    <value>FreeBSD in an MFS</value>
+  </attribute>
+  <attribute name="mustclean">
+    <value>0</value>
+  </attribute>
+  <attribute name="shared">
+    <value>1</value>
+  </attribute>
+  <attribute name="op_mode">
+    <value>PXEFBSD</value>
+  </attribute>
+  <attribute name="pid">
+    <value>emulab-ops</value>
+  </attribute>
+  <attribute name="osname">
+    <value>FREEBSD-MFS</value>
+  </attribute>
+  <attribute name="OS">
+    <value>FreeBSD</value>
+  </attribute>
+</osid>
+<image>
+  <attribute name="global">
+    <value>1</value>
+  </attribute>
+  <attribute name="part1_osid">
+    <value>emulab-ops,FBSD62-STD</value>
+  </attribute>
+  <attribute name="default_osid">
+    <value>emulab-ops,FC6-STD</value>
+  </attribute>
+  <attribute name="part4_osid">
+    <value>none</value>
+  </attribute>
+  <attribute name="path">
+    <value>/usr/testbed/images/FBSD62+FC6-STD.ndz</value>
+  </attribute>
+  <attribute name="loadpart">
+    <value>0</value>
+  </attribute>
+  <attribute name="description">
+    <value>FreeBSD 6.2 and Fedora Core 6 combo image</value>
+  </attribute>
+  <attribute name="part3_osid">
+    <value>none</value>
+  </attribute>
+  <attribute name="shared">
+    <value>0</value>
+  </attribute>
+  <attribute name="imagename">
+    <value>FBSD62+FC6-STD</value>
+  </attribute>
+  <attribute name="pid">
+    <value>emulab-ops</value>
+  </attribute>
+  <attribute name="loadlength">
+    <value>4</value>
+  </attribute>
+  <attribute name="part2_osid">
+    <value>emulab-ops,FC6-STD</value>
+  </attribute>
+  <attribute name="gid">
+    <value>emulab-ops</value>
+  </attribute>
+</image>
+<image>
+  <attribute name="global">
+    <value>1</value>
+  </attribute>
+  <attribute name="version">
+    <value>6.2</value>
+  </attribute>
+  <attribute name="osfeatures">
+    <value>ping,ssh,ipod,isup,mlinks,linktest,linkdelays</value>
+  </attribute>
+  <attribute name="path">
+    <value>/usr/testbed/images/FBSD62-STD.ndz</value>
+  </attribute>
+  <attribute name="reboot_waittime">
+    <value>120</value>
+  </attribute>
+  <attribute name="loadpart">
+    <value>1</value>
+  </attribute>
+  <attribute name="description">
+    <value>FreeBSD 6.2 pre-release</value>
+  </attribute>
+  <attribute name="op_mode">
+    <value>NORMALv2</value>
+  </attribute>
+  <attribute name="shared">
+    <value>0</value>
+  </attribute>
+  <attribute name="imagename">
+    <value>FBSD62-STD</value>
+  </attribute>
+  <attribute name="pid">
+    <value>emulab-ops</value>
+  </attribute>
+  <attribute name="OS">
+    <value>FreeBSD</value>
+  </attribute>
+  <attribute name="gid">
+    <value>emulab-ops</value>
+  </attribute>
+</image>
+<image>
+  <attribute name="global">
+    <value>1</value>
+  </attribute>
+  <attribute name="part1_osid">
+    <value>emulab-ops,FBSD410-IPFW2</value>
+  </attribute>
+  <attribute name="default_osid">
+    <value>emulab-ops,FBSD410-IPFW2</value>
+  </attribute>
+  <attribute name="part4_osid">
+    <value>none</value>
+  </attribute>
+  <attribute name="path">
+    <value>/usr/testbed/images/FBSD410-IPFW2.ndz</value>
+  </attribute>
+  <attribute name="loadpart">
+    <value>1</value>
+  </attribute>
+  <attribute name="description">
+    <value>FreeBSD 4.10 with built-in IPFW2 support</value>
+  </attribute>
+  <attribute name="part3_osid">
+    <value>none</value>
+  </attribute>
+  <attribute name="shared">
+    <value>0</value>
+  </attribute>
+  <attribute name="imagename">
+    <value>FBSD410-IPFW2</value>
+  </attribute>
+  <attribute name="pid">
+    <value>emulab-ops</value>
+  </attribute>
+  <attribute name="loadlength">
+    <value>1</value>
+  </attribute>
+  <attribute name="part2_osid">
+    <value>none</value>
+  </attribute>
+  <attribute name="gid">
+    <value>emulab-ops</value>
+  </attribute>
+</image>
+<image>
+  <attribute name="global">
+    <value>1</value>
+  </attribute>
+  <attribute name="version">
+    <value>6</value>
+  </attribute>
+  <attribute name="osfeatures">
+    <value>ping,ssh,ipod,isup,linktest</value>
+  </attribute>
+  <attribute name="path">
+    <value>/usr/testbed/images/FC6-STD.ndz</value>
+  </attribute>
+  <attribute name="reboot_waittime">
+    <value>120</value>
+  </attribute>
+  <attribute name="loadpart">
+    <value>2</value>
+  </attribute>
+  <attribute name="description">
+    <value>Emulab Standard Fedora Core 6 image.</value>
+  </attribute>
+  <attribute name="op_mode">
+    <value>NORMALv2</value>
+  </attribute>
+  <attribute name="shared">
+    <value>0</value>
+  </attribute>
+  <attribute name="imagename">
+    <value>FC6-STD</value>
+  </attribute>
+  <attribute name="pid">
+    <value>emulab-ops</value>
+  </attribute>
+  <attribute name="OS">
+    <value>Fedora</value>
+  </attribute>
+  <attribute name="gid">
+    <value>emulab-ops</value>
+  </attribute>
+</image>
+<image>
+  <attribute name="global">
+    <value>1</value>
+  </attribute>
+  <attribute name="version">
+    <value>4.10</value>
+  </attribute>
+  <attribute name="osfeatures">
+    <value>ping,ssh,ipod,isup,veths,veth-ne,veth-en,mlinks,linktest,linkdelays,vlans</value>
+  </attribute>
+  <attribute name="path">
+    <value>/usr/testbed/images/FBSD410-STD.ndz</value>
+  </attribute>
+  <attribute name="reboot_waittime">
+    <value>150</value>
+  </attribute>
+  <attribute name="loadpart">
+    <value>1</value>
+  </attribute>
+  <attribute name="description">
+    <value>Testbed version of FreeBSD 4.10</value>
+  </attribute>
+  <attribute name="op_mode">
+    <value>NORMALv2</value>
+  </attribute>
+  <attribute name="shared">
+    <value>0</value>
+  </attribute>
+  <attribute name="imagename">
+    <value>FBSD410-STD</value>
+  </attribute>
+  <attribute name="pid">
+    <value>emulab-ops</value>
+  </attribute>
+  <attribute name="OS">
+    <value>FreeBSD</value>
+  </attribute>
+  <attribute name="gid">
+    <value>emulab-ops</value>
+  </attribute>
+</image>
+</descriptors>

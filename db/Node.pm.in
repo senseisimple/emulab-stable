@@ -2478,5 +2478,32 @@ sub LookupWideArea($$)
     return Node->Lookup($node_id);
 }
 
+#
+# Return the partition that an OSID is loaded on. 
+#
+sub IsOSLoaded($$)
+{
+    my ($self, $osinfo) = @_;
+
+    if (!ref($osinfo)) {
+	my $tmp = OSinfo->Lookup($osinfo);
+	if (!defined($tmp)) {
+	    print STDERR "Cannot lookup osinfo for $osinfo\n";
+	    return -1;
+	}
+	$osinfo = $tmp;
+    }
+    my $osid   = $osinfo->osid();
+    my $nodeid = $self->node_id();
+
+    my $query_result =
+	DBQueryWarn("select osid from partitions as p ".
+		    "where p.node_id='$nodeid' and p.osid='$osid'");
+    return -1
+	if (!$query_result);
+
+    return $query_result->numrows;
+}
+
 # _Always_ make sure that this 1 is at the end of the file...
 1;

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2007, 2008 University of Utah and the Flux Group.
+# Copyright (c) 2007-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package Image;
@@ -139,6 +139,7 @@ sub ezid($)             { return field($_[0], "ezid"); }
 sub shared($)           { return field($_[0], "shared"); }
 sub global($)           { return field($_[0], "global"); }
 sub updated($)          { return field($_[0], "updated"); }
+sub mbr_version($)      { return field($_[0], "mbr_version"); }
 sub access_key($)       { return field($_[0], "access_key"); }
 
 #

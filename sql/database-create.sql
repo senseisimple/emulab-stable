@@ -422,6 +422,21 @@ CREATE TABLE `deltas` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `elabinelab_attributes`
+--
+
+CREATE TABLE `elabinelab_attributes` (
+  `pid` varchar(12) NOT NULL default '',
+  `eid` varchar(32) NOT NULL default '',
+  `exptidx` int(11) NOT NULL default '0',
+  `role` enum('boss','router','ops','fs','node') NOT NULL default 'node',
+  `attrkey` varchar(32) NOT NULL default '',
+  `attrvalue` tinytext NOT NULL,
+  `ordering` smallint(5) unsigned NOT NULL default '0',
+  PRIMARY KEY  (`exptidx`,`role`,`attrkey`,`ordering`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `elabinelab_vlans`
 --
 
@@ -1114,6 +1129,7 @@ CREATE TABLE `experiments` (
   `panic_date` datetime default NULL,
   `delay_capacity` tinyint(3) unsigned default NULL,
   `savedisk` tinyint(1) NOT NULL default '0',
+  `skipvlans` tinyint(1) NOT NULL default '0',
   `locpiper_pid` int(11) default '0',
   `locpiper_port` int(11) default '0',
   `instance_idx` int(10) unsigned NOT NULL default '0',
@@ -2481,6 +2497,7 @@ CREATE TABLE `os_info` (
   `max_concurrent` int(11) default NULL,
   `mfs` tinyint(4) NOT NULL default '0',
   `reboot_waittime` int(10) unsigned default NULL,
+  `protogeni_export` tinyint(1) NOT NULL default '0',
   PRIMARY KEY  (`osid`),
   UNIQUE KEY `pid` (`pid`,`osname`),
   KEY `OS` (`OS`),
@@ -3768,6 +3785,7 @@ CREATE TABLE `virt_lans` (
   `trace_endnode` tinyint(1) NOT NULL default '0',
   `trace_db` tinyint(1) NOT NULL default '0',
   `fixed_iface` varchar(128) default '',
+  `layer` tinyint(4) NOT NULL default '2',
   PRIMARY KEY  (`exptidx`,`vname`,`vnode`,`vport`),
   UNIQUE KEY `vport` (`pid`,`eid`,`vname`,`vnode`,`vport`),
   KEY `pid` (`pid`,`eid`,`vname`),

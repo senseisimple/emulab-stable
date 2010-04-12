@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -132,10 +132,10 @@ process_nodes($db_result);
 # Get the list of currently-reserved nodes so that we can make CNAMEs for them
 #
 $db_result =
-    DBQueryFatal("select node_id,pid,eid,vname from reserved");
+    DBQueryFatal("select node_id,pid,eid,vname,inner_elab_role from reserved");
 
 my %cnames;
-while (my ($node_id,$pid,$eid,$vname) = $db_result->fetchrow_array()) {
+while (my ($node_id,$pid,$eid,$vname,$erole) = $db_result->fetchrow_array()) {
 
     #
     # Handle some rare cases where a node can get reserved without a vname -
@@ -144,8 +144,15 @@ while (my ($node_id,$pid,$eid,$vname) = $db_result->fetchrow_array()) {
     if (!defined($vname)) {
 	$vname = $node_id;
     }
-
     push @{$cnames{$node_id}}, "$vname.$eid.$pid";
+
+    #
+    # Special case for inner elab boss; add CNAME for www.
+    #
+    if (defined($erole) &&
+        ($erole eq "boss" || $erole eq "boss+router")) {
+        push @{$cnames{$node_id}}, "www.$eid.$pid";
+    }
 }
 
 
