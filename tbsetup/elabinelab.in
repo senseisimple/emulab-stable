@@ -14,6 +14,7 @@ use Getopt::Std;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use libtblog;
 use Experiment;
 use User;
 use Lan;
@@ -29,7 +30,7 @@ sub usage()
  
     exit(-1);
 }
-my $optlist  = "dgkfur";
+my $optlist  = "dgkfurP";
 my $debug    = 1;
 my $verbose  = 0;
 my $killmode = 0;
@@ -37,6 +38,10 @@ my $fwboot   = 0;
 my $dbgooonly= 0;
 my $update   = 0;
 my $remove   = 0;
+
+# XXX experimental speed hacks
+my $inparallel = 1;
+my $restartnodes = 1;
 
 sub DumpDBGoo();
 
@@ -51,6 +56,7 @@ my $TBOPSPID    = TBOPSPID();
 my $SSH		= "$TB/bin/sshtb";
 my $SCP		= "/usr/bin/scp";
 my $nodereboot  = "$TB/bin/node_reboot";
+my $noderestart	= "$TB/sbin/bootinfosend -R";
 my $makeconf    = "$TB/sbin/dhcpd_makeconf";
 my $nodewait    = "$TB/sbin/node_statewait";
 my $snmpit      = "$TB/bin/snmpit";
@@ -116,6 +122,9 @@ if (defined($options{"u"})) {
 }
 if (defined($options{"r"})) {
     $remove = 1;
+}
+if (defined($options{"P"})) {
+    $inparallel = 1;
 }
 if (! @ARGV) {
     usage();
@@ -278,6 +287,7 @@ $UID = 0;
 # version from the web server.
 #
 # XXX ugh, copy over a newer mkextrafs.pl as well (one that supports -2).
+# XXX ughII, we only copy over a FreeBSD version, this will break a Linux boss.
 #
 my $mkelab = "$TB/etc/rc.mkelab";
 if (-e "$expdir/rc.mkelab") {
@@ -386,37 +396,94 @@ if ($?) {
 	"    Failed to reconfig/restart DHCPD.\n");
 }
 
-if (defined($fsnode)) {
-    # Reboot fs and wait for it to come back.
-    print "Rebooting fsnode ($fsnode).\n";
-    TBDebugTimeStamp("Rebooting fsnode");
-    system("$nodereboot -w $fsnode");
+if ($inparallel) {
+    my $nodes = "$bossnode $opsnode";
+    $nodes .= " $fsnode"
+	if (defined($fsnode));
+    print "Rebooting servers ($nodes).\n";
+    TBDebugTimeStamp("Rebooting servers");
+    system("$nodereboot -w $nodes");
     if ($?) {
 	die("*** $0:\n".
-	    "    Error rebooting the fsnode ($fsnode)!\n");
+	    "    Error rebooting the servers ($nodes)!\n");
     }
-}
-# Reboot ops and wait for it to come back.
-print "Rebooting opsnode ($opsnode).\n";
-TBDebugTimeStamp("Rebooting opsnode");
-system("$nodereboot -w $opsnode");
-if ($?) {
-    die("*** $0:\n".
-	"    Error rebooting the opsnode ($opsnode)!\n");
-}
-# Reboot boss and wait for it to come back.
-print "Rebooting bossnode ($bossnode).\n";
-TBDebugTimeStamp("Rebooting bossnode");
-system("$nodereboot -w $bossnode");
-if ($?) {
-    die("*** $0:\n".
-	"    Error rebooting the bossnode ($bossnode)!\n");
+} else {
+    if (defined($fsnode)) {
+	# Reboot fs and wait for it to come back.
+	print "Rebooting fsnode ($fsnode).\n";
+	TBDebugTimeStamp("Rebooting fsnode");
+	system("$nodereboot -w $fsnode");
+	if ($?) {
+	    die("*** $0:\n".
+		"    Error rebooting the fsnode ($fsnode)!\n");
+	}
+    }
+    # Reboot ops and wait for it to come back.
+    print "Rebooting opsnode ($opsnode).\n";
+    TBDebugTimeStamp("Rebooting opsnode");
+    system("$nodereboot -w $opsnode");
+    if ($?) {
+	die("*** $0:\n".
+	    "    Error rebooting the opsnode ($opsnode)!\n");
+    }
+    # Reboot boss and wait for it to come back.
+    print "Rebooting bossnode ($bossnode).\n";
+    TBDebugTimeStamp("Rebooting bossnode");
+    system("$nodereboot -w $bossnode");
+    if ($?) {
+	die("*** $0:\n".
+	    "    Error rebooting the bossnode ($bossnode)!\n");
+    }
 }
 $EUID = 0;
 
 # Reboot the experimental nodes. They will come up inside the inner elab.
 # DO NOT WAIT! They are not going to report ISUP from this point on. 
 if (@expnodes) {
+    #
+    # First we try the magic pxeboot restart.
+    # The nodes should still be in PXEWAIT, so we send them a restart
+    # to make them re-DHCP.  This should get them quickly reparented to
+    # the inner boss.
+    #
+    # If this doesn't work, we fall back on rebooting the nodes.
+    #
+    if ($restartnodes) {
+	TBDebugTimeStamp("Redirecting experimental nodes to inner boss");
+	my $stat = 0;
+	# Run as real user again.
+	$EUID = $UID;
+	foreach my $node (@expnodes) {
+	    $stat = system("$noderestart $node");
+	    last if ($stat);
+	}
+	$EUID = 0;
+	if ($stat) {
+	    tbwarn("Node restart failed ($stat), falling back to reboot.");
+	    goto rebootnodes;
+	}
+
+	#
+	# Ssh into inner boss and use a utility script to determine
+	# when the nodes have reported in and are in PXEWAIT (part of the
+	# inner elab). Note the short timeout, since this operation should
+	# be virtually instantaneous.
+	#
+	print "Waiting for nodes to restart and join the inner emulab.\n";
+	TBDebugTimeStamp("Waiting for inner nodes to restart");
+	$UID  = 0;
+	$stat = system("$SSH -host $bossnode ".
+		       "/usr/testbed/sbin/node_statewait -t 15 -a");
+	$UID  = $SAVEUID;
+	if ($stat) {
+	    tbwarn("Error ($stat) waiting for nodes to restart, falling back to reboot.");
+	    goto rebootnodes;
+	}
+
+	goto restartworked;
+    }
+
+rebootnodes:
     print "Rebooting inner experimental nodes.\n";
     TBDebugTimeStamp("Rebooting experimental nodes");
     # Run as real user again.
@@ -445,6 +512,7 @@ if (@expnodes) {
     }
     $UID  = $SAVEUID;
 
+restartworked:
     #
     # To avoid confusion later (with swapmod, which wants them to be ISUP),
     # and so the web interface does not show the nodes as down, set the 
@@ -652,6 +720,16 @@ sub DumpDBGoo()
 	    # Clear any node reservations on the inside
 	    DBQueryFatal("update temp_${table} set ".
 			 " reserved_pid=null where reserved_pid is not null");
+
+	    # Put the inner nodes into "limbo" so they DTRT when restarted
+	    if ($restartnodes) {
+		DBQueryFatal("update temp_${table} set".
+			     "  op_mode='PXEKERNEL',next_op_mode='',".
+			     "  eventstate='". TBDB_NODESTATE_PXELIMBO . "',".
+			     "  temp_boot_osid=NULL,next_boot_osid=NULL,".
+			     "  osid=NULL".
+			     " where role='testnode'");
+	    }
 	}
     
 	DBQueryWarn("select * from temp_$table ".

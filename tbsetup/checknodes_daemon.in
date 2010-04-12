@@ -183,6 +183,7 @@ while (1) {
 	    "left join node_types as t on t.type=n.type ".
 	    "where (n.eventstate!='". TBDB_NODESTATE_ISUP ."' and ".
 	    "       n.eventstate!='". TBDB_NODESTATE_PXEWAIT ."' and ".
+	    "       n.eventstate!='". TBDB_NODESTATE_PXELIMBO ."' and ".
 	    "       n.eventstate!='". TBDB_NODESTATE_ALWAYSUP ."' and ".
 	    "       n.eventstate!='". TBDB_NODESTATE_POWEROFF ."') and ".
             "       r.pid is null and n.role='testnode' and ".
