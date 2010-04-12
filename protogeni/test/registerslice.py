@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
 # All rights reserved.
 # 
 # Permission to use, copy, modify and distribute this software is hereby
@@ -74,7 +74,7 @@ if rval:
     print str(response)
     pass
 myslice = response["value"]
-print "New slice created"
+print "New slice created: " + SLICEURN
 if debug: print str(myslice)
 
 #

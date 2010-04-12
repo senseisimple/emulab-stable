@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006, 2007, 2009 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007, 2009, 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -100,7 +100,7 @@ class OSinfo
 
 	# Add these. Maybe caller should do this?
 	$args["osname"]  = $osname;
-	$args["project"] = $project->pid_idx();
+	$args["pid"]     = $project->pid();
 
 	fwrite($fp, "<osid>\n");
 	foreach ($args as $name => $value) {
