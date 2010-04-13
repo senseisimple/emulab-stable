@@ -164,6 +164,17 @@ if ($isadmin) {
 	      '#label'       => 'Global?',
 	      '#checkslot'   => 'os_info:shared',
 	      '#description' => 'available to all projects');
+
+    #
+    # MFS?
+    #
+    $fields['mfs'] =
+	array('#type'        => 'checkbox',
+	      '#return_value'=> 1,
+	      '#label'       => 'MFS?',
+	      '#checkslot'   => 'os_info:mfs',
+	      '#description' => 'this OS is an MFS');
+
     #
     # Mustclean?
     #
@@ -236,6 +247,7 @@ if (!isset($submit)) {
     $defaults["path"]           = "";
     $defaults["magic"]          = "";
     $defaults["shared"]         = 0;
+    $defaults["mfs"]            = 0;
     $defaults["mustclean"]      = 0;
     $defaults["path"]           = "";
     $defaults["op_mode"]             = TBDB_DEFAULT_OSID_OPMODE;

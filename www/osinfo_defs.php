@@ -291,6 +291,7 @@ class OSinfo
 	$reboot_waittime= $this->reboot_waittime();
 	$uuid           = $this->uuid();
 	$ezid           = $this->ezid();
+	$mfs            = $this->mfs();
 
 	if (! ($creator_user = User::Lookup($creator))) {
 	    TBERROR("Error getting object for user $creator", 1);
@@ -419,6 +420,12 @@ class OSinfo
                         <td class=left>
                             <a href='showimageid.php3?imageid=$osid'>
                                             $os_osname</a></td>
+                      </tr>\n";
+	}
+	if ($mfs) {
+		echo "<tr>
+                        <td>MFS: </td>
+                        <td class=left>Yes</td>
                       </tr>\n";
 	}
 
