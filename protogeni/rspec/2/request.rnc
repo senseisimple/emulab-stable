@@ -33,7 +33,25 @@ NodeContents &=
   # of hardware type may be specified and the sliver type must be
   # specified.
   HardwareType? &
-  SliverType
+  element sliver_type {
+    SliverTypeContents &
+    element disk_image { DiskImageContents }
+  }
+
+ServiceContents &=
+  AnyExtension &
+  element install { InstallServiceContents }* &
+  element execute { ExecuteServiceContents }*
+
+InstallServiceContents &=
+  AnyExtension &
+  attribute url { text } &
+  attribute install_path { text }
+
+ExecuteServiceContents &=
+  AnyExtension &
+  attribute shell { text } &
+  attribute command { text }
 
 # The LinkMapping will only be available after an assignment
 LinkContents &=

@@ -19,13 +19,6 @@
     <xs:attributeGroup ref="rspec:AnyExtension"/>
     <xs:attribute name="now" use="required" type="xs:boolean"/>
   </xs:complexType>
-  <xs:complexType name="DiskImageContents">
-    <xs:group ref="rspec:AnyExtension"/>
-    <xs:attributeGroup ref="rspec:AnyExtension"/>
-    <xs:attribute name="name" use="required"/>
-    <xs:attribute name="os"/>
-    <xs:attribute name="version"/>
-  </xs:complexType>
   <xs:complexType name="MonitoringContents">
     <xs:group ref="rspec:AnyExtension"/>
     <xs:attributeGroup ref="rspec:AnyExtension"/>
@@ -37,31 +30,6 @@
     <xs:attributeGroup ref="rspec:AnyExtension"/>
     <xs:attribute name="component_id" use="required"/>
     <xs:attribute name="component_manager_id"/>
-  </xs:complexType>
-  <xs:complexType name="ServiceContents">
-    <xs:choice minOccurs="0" maxOccurs="unbounded">
-      <xs:group ref="rspec:AnyExtension"/>
-      <xs:element ref="rspec:login"/>
-      <xs:element ref="rspec:install"/>
-      <xs:element ref="rspec:execute"/>
-    </xs:choice>
-    <xs:attributeGroup ref="rspec:AnyExtension"/>
-  </xs:complexType>
-  <xs:element name="login" type="rspec:LoginServiceContents"/>
-  <xs:element name="install" type="rspec:InstallServiceContents"/>
-  <xs:element name="execute" type="rspec:ExecuteServiceContents"/>
-  <xs:complexType name="LoginServiceContents">
-    <xs:group ref="rspec:AnyExtension"/>
-    <xs:attributeGroup ref="rspec:AnyExtension"/>
-    <xs:attribute name="authentication" use="required">
-      <xs:simpleType>
-        <xs:restriction base="xs:token">
-          <xs:enumeration value="ssh-keys"/>
-        </xs:restriction>
-      </xs:simpleType>
-    </xs:attribute>
-    <xs:attribute name="hostname" use="required"/>
-    <xs:attribute name="port" use="required"/>
   </xs:complexType>
   <xs:complexType name="InstallServiceContents">
     <xs:group ref="rspec:AnyExtension"/>
