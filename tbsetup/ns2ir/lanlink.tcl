@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006, 2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -213,6 +213,9 @@ LanLink instproc init {s nodes bw d type} {
 
     # XXX Allow user to set the accesspoint.
     $self set accesspoint {}
+
+    # Optional layer
+    $self set layer {}
 
     # A simulated lanlink unless we find otherwise
     $self set simulated 1
@@ -716,6 +719,7 @@ Link instproc updatedb {DB} {
     $self instvar protocol
     $self instvar mustdelay
     $self instvar fixed_iface
+    $self instvar layer
 
     $sim spitxml_data "virt_lan_lans" [list "vname"] [list $self]
 
@@ -802,6 +806,11 @@ Link instproc updatedb {DB} {
 	    lappend fields "fixed_iface"
 	}
 
+	# Set the layer
+	if { $layer != {} } {
+	    lappend fields "layer"
+	}
+
 	set values [list $self $nodeportraw $netmask $delay($nodeport) $rdelay($nodeport) $bandwidth($nodeport) $rbandwidth($nodeport) $backfill($nodeport) $rbackfill($nodeport)  $loss($nodeport) $rloss($nodeport) $cost($nodeport) $widearea $emulated $uselinkdelay $nobwshaping $encap $limit_  $maxthresh_ $thresh_ $q_weight_ $linterm_ ${queue-in-bytes_}  $bytes_ $mean_pktsize_ $wait_ $setbit_ $droptail_ $red_ $gentle_ $trivial_ok $protocol $node $port $ip $mustdelay]
 
 	if { [info exists ebandwidth($nodeport)] } {
@@ -825,6 +834,10 @@ Link instproc updatedb {DB} {
 	# fixing ifaces
 	if {$fixed_iface($nodeport) != 0} {
 	    lappend values $fixed_iface($nodeport)
+	}
+	# Set the layer
+	if { $layer != {} } {
+	    lappend values $layer
 	}
 
 	$sim spitxml_data "virt_lans" $fields $values
