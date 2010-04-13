@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2009 University of Utah and the Flux Group.
+# Copyright (c) 2009, 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -145,6 +145,8 @@ if (!defined($image)) {
 }
 
 while (1) {
+    my $disabled;
+    
     # Use a long period; we do not want the pool to change too fast.
     if (!$startup) {
 	$startup++;
@@ -152,8 +154,12 @@ while (1) {
     else {
 	sleep(120);
     }
-
     print "Pool Daemon running at ".`date`;
+
+    if (! TBGetSiteVar("web/nologins", \$disabled) || $disabled) {
+	print "  Skipping this loop cause of nologins\n";
+	next;
+    }
 
     Node->FlushAll();
     $experiment->Refresh() == 0
