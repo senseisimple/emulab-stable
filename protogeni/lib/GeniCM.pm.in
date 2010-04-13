@@ -178,7 +178,8 @@ sub Resolve($)
 	my $blob = { "hrn"          => "${PGENIDOMAIN}." . $node->node_id(),
 		     "uuid"         => $node->uuid(),
 		     "role"	    => $node->role(),
-		     "hostname"     => $node->node_id() . ".${OURDOMAIN}",
+		     "hostname"     =>
+			 GeniUtil::FindHostname($node->node_id()),
 		     "physctrl"     => 
 			 Interface->LookupControl( $node->phys_nodeid() )->IP(),
 		     "urn"          => GeniHRN::Generate( $OURDOMAIN,
@@ -691,7 +692,7 @@ sub GetTicketAuxAux($$$$$$$$)
 	}
     }
 
-    print $rspec->toStringC14N();
+    print GeniXML::Serialize($rspec);
 
     foreach my $ref (GeniXML::FindNodes("n:node", $rspec)->get_nodelist()) {
 	my $resource_uuid = GeniXML::GetNodeId($ref);
@@ -795,6 +796,14 @@ sub GetTicketAuxAux($$$$$$$$)
 	    }
 	    elsif ($isupdate && exists($namemap{$node_nickname})) {
 		$node = $namemap{$node_nickname};
+	    }
+	    # If the node still isn't bound and doesn't have a pctype,
+	    # use the user-specified one.
+	    if (! defined($node) && ! defined($pctype)) {
+		my $usertype = GeniXML::FindFirst("n:node_type", $ref);
+		if (defined($usertype)) {
+		    $pctype = GeniXML::GetText("type_name", $usertype);
+		}
 	    }
 	}
 	else {
@@ -1150,7 +1159,7 @@ sub GetTicketAuxAux($$$$$$$$)
     }
 
     unlink($tmpfile);
-    print $solution->toStringC14N();
+    print GeniXML::Serialize($solution);
 
     foreach my $ref (GeniXML::FindNodes("n:node",
 					$solution)->get_nodelist()) {
@@ -1239,7 +1248,7 @@ sub GetTicketAuxAux($$$$$$$$)
 	goto bad;
     }
 
-    print $rspec->toStringC14N();
+    print GeniXML::Serialize($rspec);
 
     # Nalloc might fail if the node gets picked up by someone else.
     if (@nodeids && !$impotent) {
@@ -1274,7 +1283,7 @@ sub GetTicketAuxAux($$$$$$$$)
     # Create a new ticket.
     #
     my $newticket = GeniTicket->Create($authority, $user,
-				       $rspec->toStringC14N());
+				       GeniXML::Serialize($rspec));
     if (!defined($newticket)) {
 	$response =
 	    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
@@ -1559,7 +1568,7 @@ sub SliverWorkAux($$$$$$$)
     my @freelinks= ();
     my $needplabslice = 0;
 
-    print $rspec->toStringC14N();
+    print GeniXML::Serialize($rspec);
 
     #
     # Find current slivers and save.
@@ -2095,6 +2104,7 @@ sub SliverWorkAux($$$$$$$)
 					      $ifaceref);
 	    my $node_id    = GeniXML::GetText("virtual_node_id",
 					      $ifaceref);
+	    my ($vnode,$vinterface);
 
 	    #
 	    # Look for links that are really lans; one of the interfaces
@@ -2111,12 +2121,33 @@ sub SliverWorkAux($$$$$$$)
 		$message = "Link $linkname specifies a non-existent node";
 		goto bad;
 	    }
-	    my $nodeobject= GeniUtil::LookupNode($nodesliver->resource_uuid());
-	    if (!defined($nodeobject)) {
+	    my $node = GeniUtil::LookupNode($nodesliver->resource_id());
+	    if (!defined($node)) {
 		$message = "Could not find node object for $nodesliver";
 		goto bad;
 	    }
-
+	    #
+	    # Not quite sure how to deal with virtual interfaces yet.
+	    # For now, the link section will hold the physical info,
+	    # but we have to return the VMAC so the caller knows which
+	    # virtual interface.
+	    #
+	    if ($node->isvirtnode()) {
+		$vnode = $node;
+		$node  = GeniUtil::LookupNode($nodesliver->resource_uuid());
+		if (!defined($node)) {
+		    $message = "Could not find node object for $nodesliver";
+		    goto bad;
+		}
+		$vinterface =
+		    Interface::VInterface->LookupByVirtLan($experiment,
+				     $linkname, $node_id);
+	    }
+	    else {
+		$vinterface =
+		    Interface::VInterface->LookupByVirtLan($experiment,
+				     $linkname, $node_id);
+	    }
 	    #
 	    # The interface was set above.
 	    #
@@ -2133,16 +2164,15 @@ sub SliverWorkAux($$$$$$$)
 			GeniHRN::ParseInterface($iface_name);
 		    $iface_name = $short_iface;
 		}
-		$interface = Interface->LookupByIface($nodeobject,$iface_name);
+		$interface = Interface->LookupByIface($node, $iface_name);
 		if (!defined($interface)) {
-		    $message = "No such interface ".
-			"$iface_name on node $nodeobject";
+		    $message = "No such interface $iface_name on $node";
 		    goto bad;
 		}
 	    }
 	    my $sliver = GeniSliver::Interface->Create($slice,
 						       $owner,
-						       $nodeobject->node_id(),
+						       $node->node_id(),
 						       $iface_name,
 						       $linkname,
 						       $ifaceref);
@@ -2155,6 +2185,8 @@ sub SliverWorkAux($$$$$$$)
 	    GeniXML::SetText("sliver_urn", $ifaceref, $sliver->sliver_urn());
 	    GeniXML::SetText("MAC", $ifaceref, $interface->mac())
 		if (defined($interface));
+	    GeniXML::SetText("VMAC", $ifaceref, $vinterface->mac())
+		if (defined($vinterface));
 	    GeniXML::SetText("IP", $ifaceref, $interface->IP())
 		if (defined($interface) &&
 		    defined($interface->IP()) && $interface->IP() ne "");
@@ -2265,7 +2297,7 @@ sub SliverWorkAux($$$$$$$)
     }
 
     # The Manifest.
-    my $manifest = $rspec->toStringC14N();
+    my $manifest = GeniXML::Serialize($rspec);
 
     #
     # Move this elsewhere.
@@ -2611,7 +2643,7 @@ sub StartSliver($)
     }
 
     if (defined($manifest)) {
-	print $manifest->toStringC14N();
+	print GeniXML::Serialize($manifest);
 	
 	#
 	# This is not signed, so have to be very careful about using
@@ -3401,7 +3433,7 @@ sub SliverTicket($)
 		     POSIX::strftime("20%y-%m-%dT%H:%M:%S",
 				     gmtime(str2time($slice->expires()))));
 
-    my $rspec_xml = $rspec->toStringC14N();
+    my $rspec_xml = GeniXML::Serialize($rspec);
 
     #
     # Create a new ticket.
@@ -3960,7 +3992,7 @@ sub CleanupDeadSlice($;$)
 	my $eid = $experiment->eid();
 	system("$PLABSLICE destroy $pid $eid");
     
-	system("$ENDEXPT -q $pid,$eid");
+	system("$ENDEXPT -N -q $pid,$eid");
 	return -1
 	    if ($?);
 	$experiment->Flush();
@@ -4010,7 +4042,7 @@ sub GeniExperiment($)
 	}
 
 	# Note the -h option; allows experiment with no NS file.
-	system("$CREATEEXPT -q -i -k -w ".
+	system("$CREATEEXPT -N -q -i -k -w ".
 	       "-S 'Geni Slice Experiment -- DO NOT SWAP OR TERMINATE' ".
 	       "-E 'Geni Slice Experiment -- DO NOT SWAP OR TERMINATE' ".
 	       "-L 'Geni Slice Experiment -- DO NOT SWAP OR TERMINATE' ".
@@ -4058,6 +4090,16 @@ sub UpdateManifest($)
 	    print STDERR "UpdateManifest: No tag for $vlan\n";
 	}
 	$vlantags{$vlan->vname()} = $tag;
+
+	#
+	# Encapsulation vlan, so need to find the actual link name.
+	#
+	my $linklan;
+
+	if ($vlan->GetAttribute("link/lan", \$linklan) == 0 &&
+	    defined($linklan)) {
+	    $vlantags{$linklan} = $tag;
+	}
     }
     foreach my $linkref (GeniXML::FindNodes("n:link", $rspec)->get_nodelist()){
 	my $vname = GeniXML::GetVirtualId($linkref);
@@ -4073,7 +4115,7 @@ sub UpdateManifest($)
 	}
 	
     }
-    my $manifest = $rspec->toStringC14N();
+    my $manifest = GeniXML::Serialize($rspec);
     
     #
     # Move this elsewhere.

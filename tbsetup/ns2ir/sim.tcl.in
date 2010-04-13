@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -398,6 +398,7 @@ Simulator instproc run {} {
     var_import ::GLOBALS::elabinelab_eid
     var_import ::GLOBALS::elabinelab_cvstag
     var_import ::GLOBALS::elabinelab_singlenet
+    var_import ::TBCOMPAT::elabinelab_attributes
     var_import ::GLOBALS::security_level
     var_import ::GLOBALS::explicit_firewall
     var_import ::GLOBALS::sourcefile_list
@@ -698,6 +699,14 @@ Simulator instproc run {} {
 	
     foreach sourcefile $sourcefile_list {
 	$self spitxml_data "external_sourcefiles" [list "pathname" ] [list $sourcefile ]
+    }
+
+    if {$elab_in_elab} {
+	foreach attr $elabinelab_attributes {
+	    set fields [list "role" "attrkey" "attrvalue" "ordering"]
+	    set values [split $attr ","]
+	    $self spitxml_data "elabinelab_attributes" $fields $values
+	}
     }
 
     $self spitxml_finish

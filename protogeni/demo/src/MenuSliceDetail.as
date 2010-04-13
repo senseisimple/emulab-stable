@@ -1,4 +1,4 @@
-﻿/* GENIPUBLIC-COPYRIGHT
+/* GENIPUBLIC-COPYRIGHT
  * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
  * All rights reserved.
  *
@@ -21,11 +21,13 @@ package
   {
     public function MenuSliceDetail(newSliceName : String,
                                     newSliceId : String,
-                                    newCredential : Credential) : void
+                                    newCredential : Credential,
+                                    newSliceUrn : String) : void
     {
       sliceName = newSliceName;
       sliceId = newSliceId;
       credential = newCredential;
+      sliceUrn = newSliceUrn;
     }
 
     override public function init(newParent : DisplayObjectContainer) : void
@@ -35,73 +37,72 @@ package
       parent.addChild(clip);
 
       clip.sliceName.text = sliceName;
+          clip.sliceUrn.text = sliceUrn;
       nodes = new ActiveNodes(parent, clip.nodeList, clip.description);
       managers = new ComponentView(clip.cmSelect, clip.nodeList, nodes);
       console = new Console(parent, nodes, managers, clip,
-                            credential, Main.getText());
+                            credential, Main.getText(), sliceUrn);
       console.discoverResources();
       wait = new SliceWait(clip.wait, clip.opText, console);
       abstract = new AbstractNodes(clip, nodes, managers);
     }
-	
-	public override function getComponent(urn:String, cm:String):String
-	{
-		var compm : ComponentManager = null;
-		var cms : Array = managers.getManagers();
-		
-		// Get CM
-		var length:int = cms.length;
-		for(var i:int = 0; i < length; i++)
-		{
-			if( cms[i].getName() == cm )
-			{
-				compm = ComponentManager(cms[i]);
-				break;
-			}
-		}
-		
-		// Get component
-		if(compm != null)
-		{
-			var index:int;
-			try
-			{
-				compm.getIndexFromUuid(urn);
-			} catch(e:Error)
-			{
-				return "Node not found, most likely because it isn't available.";
-			}
-			if(compm.isUsed(index))
-				return "Component is being used already";
-			var component = compm.getComponent(index);
-			var superNode = null;
-			var superNodeName = null;
-			if (component.superNode != -1)
-			{
-				if(compm.isUsed(component.superNode))
-					return "Component's supernode already in use";
-				superNode = compm.getComponent(component.superNode);
-				superNodeName = superNode.name;
-			}
-			var randomX:Number = Math.round(Math.random() * 601 + 180);
-			var randomY:Number = Math.round(Math.random() * 385 + 75);
-			nodes.addNode(component, compm, index,
-							  randomX, randomY, false,
-							  superNodeName);
-        	compm.addUsed(index);
-			if (superNode != null)
-			{
-				randomX = Math.round(Math.random() * 601 + 180);
-				randomY = Math.round(Math.random() * 385 + 75);
-			  	nodes.addNode(superNode, compm, component.superNode,
-							randomX, randomY, false, null);
-			  	compm.addUsed(component.superNode);
-			}
-		return "Successfully added " + urn + " on " + cm + "!";
-		} else {
-			return "Could not find component manager named " + cm;
-		}
-	}
+        
+        public override function getComponent(urn:String, cm:String):String
+        {
+                var compm : ComponentManager = null;
+                var cms : Array = managers.getManagers();
+                
+                // Get CM
+                var length:int = cms.length;
+                for(var i:int = 0; i < length; i++)
+                {
+                        if( cms[i].getName() == cm )
+                        {
+                                compm = ComponentManager(cms[i]);
+                                break;
+                        }
+                }
+                
+                // Get component
+                if(compm != null)
+                {
+                        var index:int;
+                        try
+                        {
+                                index = compm.getIndexFromUuid(urn);
+                        } catch(e:Error)
+                        {
+                                return "Node not found, most likely because it isn't available.";
+                        }
+                        if(compm.isUsed(index))
+                                return "Component is being used already";
+                        var component = compm.getComponent(index);
+                        var superNode = null;
+                        var superNodeName = null;
+                        if (component.superNode != -1)
+                        {
+                                superNode = compm.getComponent(component.superNode);
+                                superNodeName = superNode.name;
+                        }
+                        var randomX:Number = Math.round(Math.random() * 601 + 180);
+                        var randomY:Number = Math.round(Math.random() * 385 + 75);
+                        nodes.addNode(component, compm, index,
+                                                          randomX, randomY, false,
+                                                          superNodeName);
+                compm.addUsed(index);
+                        if (superNode != null)
+                        {
+                                randomX = Math.round(Math.random() * 601 + 180);
+                                randomY = Math.round(Math.random() * 385 + 75);
+                                nodes.addNode(superNode, compm, component.superNode,
+                                                        randomX, randomY, false, null);
+                                compm.addUsed(component.superNode);
+                        }
+                return "Successfully added " + urn + " on " + cm + "!";
+                } else {
+                        return "Could not find component manager named " + cm;
+                }
+        }
 
     override public function cleanup() : void
     {
@@ -120,6 +121,7 @@ package
 
     var sliceName : String;
     var sliceId : String;
+        var sliceUrn : String;
     var credential : Credential;
     var parent : DisplayObjectContainer;
     var clip : SliceDetailClip;

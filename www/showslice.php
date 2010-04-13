@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -55,6 +55,9 @@ $rows[] = array("hrn"      => $slice->hrn());
 $rows[] = array("uuid"     => $slice->uuid());
 $rows[] = array("created"  => $slice->created());
 $rows[] = array("expires"  => $slice->expires());
+if ($slice->locked()) {
+    $rows[] = array("locked"  => $slice->locked());
+}
 if (($manifest = $slice->GetManifest())) {
     $json = new Services_JSON();
     $manifest = $json->encode($manifest);

@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -308,7 +308,7 @@ elsif ($swapop eq "update" || $swapop eq "modify") {
 	#
 	# Clean up the mess, leaving the experiment in the SWAPPED state,
 	#
-	if ($noswapout) {
+	if ($noswapout || $elabinelab) {
 	    print STDERR "Leaving experiment swapped in as directed.\n";
 	}
 	else {
@@ -364,7 +364,7 @@ elsif ($swapop eq "update" || $swapop eq "modify") {
 	    # exit status indicated by $updatehosed.
 	    # 
 	    if (!$CanRecover) {
-		if ($noswapout) {
+		if ($noswapout || $elabinelab) {
 		    print STDERR
 			"No Recovery, but leaving experiment swapped in.\n";
 		}
@@ -1299,7 +1299,8 @@ sub doSwapin($) {
     # the step has completed and 2) It's OK for the command to run in
     # parallel with os_setup (no DB dependencies, etc.)
     #
-    if ($type != MODIFY || ($ELABINELAB || !$MAINSITE || !$special)) {
+    if (!$experiments->skipvlans() &&
+	($type != MODIFY || ($ELABINELAB || !$MAINSITE || !$special))) {
 	print "Setting up VLANs.\n";
 	TBDebugTimeStamp("snmpit started");
 	if (system("snmpit -t $pid $eid")) {

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005-2009 University of Utah and the Flux Group.
+# Copyright (c) 2005-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package Node;
@@ -1191,6 +1191,7 @@ sub issimnode($)      { return NodeTypeInfo($_[0])->issimnode(); }
 sub isgeninode($)     { return NodeTypeInfo($_[0])->isgeninode(); }
 sub isfednode($)      { return NodeTypeInfo($_[0])->isfednode(); }
 sub isdedicatedremote($) { return NodeTypeInfo($_[0])->isdedicatedremote(); }
+sub isswitch($)       { return NodeTypeInfo($_[0])->isswitch(); }
 
 #
 # And these are the less common attributes, but still common enough to
@@ -2456,6 +2457,53 @@ sub GetOsids($) {
     return ($self->{"DBROW"}{"def_boot_osid"},
 	    $self->{"DBROW"}{"temp_boot_osid"},
 	    $self->{"DBROW"}{"next_boot_osid"});
+}
+
+#
+# Look for a widearea node by its external node id.
+#
+sub LookupWideArea($$)
+{
+    my ($class, $external_node_id) = @_;
+    my $safe_id = DBQuoteSpecial($external_node_id);
+
+    my $query_result =
+	DBQueryWarn("select node_id from widearea_nodeinfo ".
+		    "where external_node_id=$safe_id");
+
+    return undef
+	if (!defined($query_result) || !$query_result->numrows);
+
+    my ($node_id) = $query_result->fetchrow_array();
+
+    return Node->Lookup($node_id);
+}
+
+#
+# Return the partition that an OSID is loaded on. 
+#
+sub IsOSLoaded($$)
+{
+    my ($self, $osinfo) = @_;
+
+    if (!ref($osinfo)) {
+	my $tmp = OSinfo->Lookup($osinfo);
+	if (!defined($tmp)) {
+	    print STDERR "Cannot lookup osinfo for $osinfo\n";
+	    return -1;
+	}
+	$osinfo = $tmp;
+    }
+    my $osid   = $osinfo->osid();
+    my $nodeid = $self->node_id();
+
+    my $query_result =
+	DBQueryWarn("select osid from partitions as p ".
+		    "where p.node_id='$nodeid' and p.osid='$osid'");
+    return -1
+	if (!$query_result);
+
+    return $query_result->numrows;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

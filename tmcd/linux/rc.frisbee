@@ -383,8 +383,8 @@ if [ -x /usr/sbin/ntpdate ]; then
 fi
 
 # Enable IPoD
-if [ -r $BINDIR/rc.ipod ]; then
-	. $BINDIR/rc.ipod
+if [ -r $BINDIR/rc/rc.ipod ]; then
+	. $BINDIR/rc/rc.ipod
 fi
 
 # Try to map disks to BIOS drive numbers via EDD
@@ -441,7 +441,7 @@ rm -f /tmp/loadinfo.out
 if [ $reboot -eq 1 ]; then
     $BINDIR/tmcc state RELOADDONEV2
     echo "Waiting for server to reboot us ..."
-    if [ $isrem -eq 1 ]; then
+    if [ $IS_REMOTE -eq 1 ]; then
 	sleep 30
     else
 	sleep 240

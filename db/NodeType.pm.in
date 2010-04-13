@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005-2009 University of Utah and the Flux Group.
+# Copyright (c) 2005-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package NodeType;
@@ -82,6 +82,7 @@ sub isplabphysnode($) { return field($_[0], 'isplabphysnode'); }
 sub issimnode($)      { return field($_[0], 'issimnode'); }
 sub isgeninode($)     { return field($_[0], 'isgeninode'); }
 sub isfednode($)      { return field($_[0], 'isfednode'); }
+sub isswitch($)       { return field($_[0], 'isswitch'); }
 
 #
 # Force a reload of the data.

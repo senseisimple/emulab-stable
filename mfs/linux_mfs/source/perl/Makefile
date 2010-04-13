@@ -4,13 +4,13 @@ PERL_VERSION	=	5.8.8
 PERL_PATH	=	$(TARGET_BUILD_PATH)/perl-$(PERL_VERSION)
 
 PERL_MODULES	=	Digest Errno Fcntl File IO PerlIO POSIX \
-			Socket Sys Time XS Getopt \
+			Socket Sys Time XS Getopt Data \
 			DynaLoader \
 			Carp Config Cwd English Env Errno Exporter \
 			FileHandle Shell Switch UNIVERSAL XSLoader \
 			attributes attrs base bytes charnames constant \
 			fields if integer less lib locale open sigtrap \
-			sort strict subs utf8 vars warnings
+			sort strict subs utf8 vars warnings overload
 
 
 .PHONY: extract patch config \

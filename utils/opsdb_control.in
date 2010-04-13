@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007, 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -811,17 +811,18 @@ sub Initialize()
     # Initialize a mailman password for all users, just in case not set.
     #
     my $query_result =
-	DBQueryFatal("select uid from users where mailman_password is NULL");
+	DBQueryFatal("select uid,uid_idx from users ".
+		     "where mailman_password is NULL");
 
-    while (my ($uid) = $query_result->fetchrow_array()) {
-	print "Setting initial mailman password for $uid\n"
+    while (my ($uid,$uid_idx) = $query_result->fetchrow_array()) {
+	print "Setting initial mailman password for $uid ($uid_idx)\n"
 	    if ($debug);
 
 	my $password = TBGenSecretKey();
 	$password = substr($password, 0, 10);
 
 	DBQueryFatal("update users set mailman_password='$password' ".
-		     "where uid='$uid'");
+		     "where uid_idx='$uid_idx'");
     }
 
     #
@@ -846,7 +847,7 @@ sub Initialize()
     #
     my $projects_result =
 	DBQueryFatal("select g.pid,g.gid from groups as g ".
-		     "left join projects as p on p.pid=g.pid ".
+		     "left join projects as p on p.pid_idx=g.pid_idx ".
 		     "where p.approved=1 ".
 #		     "and (p.pid='testbed' or p.pid='emulab-ops' or ".
 #		     "     p.pid='tbres' or p.pid='utahstud') ".

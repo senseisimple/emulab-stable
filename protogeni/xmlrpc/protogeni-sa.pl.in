@@ -30,6 +30,7 @@ use vars qw($GENI_DBNAME);
 BEGIN { $GENI_DBNAME = "geni"; }
 
 # Configure variables
+my $TBOPS          = "@TBOPSEMAIL@";
 my $EMULAB_PEMFILE = "@prefix@/etc/genisa.pem";
 my $MAINSITE 	   = @TBMAINSITE@;
 my $VERSION	   = "1.0";
@@ -40,6 +41,7 @@ use GeniSA;
 use Genixmlrpc;
 use GeniResponse;
 use libaudit;
+use libtestbed;
 
 # Geniuser.
 my $user  = "geniuser";
@@ -65,6 +67,25 @@ if (!defined($certificate)) {
 	"    Could not get uuid from $EMULAB_PEMFILE\n");
 }
 $ENV{'MYUUID'} = $certificate->uuid();
+
+#
+# Make sure the client presented a valid certificate that apache says
+# is okay.
+#
+# THIS HAS TO BE HERE! Why? Cause recent security patches disable SSL
+# renegotiation, which is needed when a subdir turns on ssl client
+# verification (as httpd.conf used to). Now, we set it to "optional",
+# which avoids the renegotiation problem, but we have to make that
+# this interface is always invoked by a client supplying a verifiable
+# certificate. 
+#
+if (! (exists($ENV{'SSL_CLIENT_VERIFY'}) &&
+       $ENV{'SSL_CLIENT_VERIFY'} eq "SUCCESS")) {
+    my $decoder = Frontier::RPC2->new();
+    print "Content-Type: text/xml \n\n";
+    print $decoder->encode_fault(-1, "Invalid or missing certificate");
+    exit(0);
+}
 
 #
 # In the prototype, we accept certificate signed by trusted roots
@@ -142,7 +163,6 @@ my $responder = Frontier::Responder->new( "methods" => {
     "Resolve"           => \&GeniSA::Resolve,
     "Register"          => \&GeniSA::Register,
     "Remove"            => \&GeniSA::Remove,
-    "DiscoverResources" => \&GeniSA::DiscoverResources,
     "GetKeys"	        => \&GeniSA::GetKeys,
     "BindToSlice"	=> \&GeniSA::BindToSlice,
     "Shutdown"          => \&GeniSA::Shutdown,

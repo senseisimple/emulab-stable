@@ -90,7 +90,7 @@ if not "ticket_urn" in myslice:
 #
 # Get the ticket with another call to resolve.
 #
-print "Asking for the ticket"
+print "Asking for a copy of the ticket"
 params = {}
 params["credentials"] = (slicecred,)
 params["urn"]         = myslice["ticket_urn"]

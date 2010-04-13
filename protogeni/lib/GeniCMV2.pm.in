@@ -92,7 +92,15 @@ my $API_VERSION = 2;
 #
 sub GetVersion()
 {
-    return GeniResponse->Create( GENIRESPONSE_SUCCESS, $API_VERSION );
+    my @input_rspec_versions = ( "0.1", "2" );
+    my $blob = {
+	"api" => $API_VERSION,
+	"level" => 1,
+	"input_rspec" => \@input_rspec_versions,
+	"output_rspec" => "0.1"
+    };
+
+    return GeniResponse->Create( GENIRESPONSE_SUCCESS, $blob );
 }
 
 #
@@ -140,7 +148,8 @@ sub Resolve($)
 	my $blob = { "hrn"          => "${PGENIDOMAIN}." . $node->node_id(),
 		     "uuid"         => $node->uuid(),
 		     "role"	    => $node->role(),
-		     "hostname"     => $node->node_id() . ".${OURDOMAIN}",
+		     "hostname"     =>
+			 GeniUtil::FindHostname($node->node_id()),
 		     "physctrl"     => 
 			 Interface->LookupControl($node->phys_nodeid())->IP(),
 		     "urn"          => GeniHRN::Generate($OURDOMAIN,
@@ -408,7 +417,8 @@ sub DeleteSliver($)
 	$response = GeniResponse->Create(GENIRESPONSE_ERROR);
 	goto bad;
     }
-    my $ticket = GeniTicket->Create($authority, $user, $manifest->toStringC14N());
+    my $ticket = GeniTicket->Create($authority, $user,
+				    GeniXML::Serialize($manifest));
     if (!defined($ticket)) {
 	print STDERR "Could not create new ticket for $slice\n";
 	$response = GeniResponse->Create(GENIRESPONSE_ERROR);
@@ -586,6 +596,29 @@ sub SliverAction($$$$$)
     # For now, only allow top level aggregate or the slice
     #
     my ($slice, $aggregate) = Credential2SliceAggregate($credential);
+
+    if ( (!defined($slice)) && 
+          ($credential->target_urn() =~ /\+authority\+cm$/)) {
+          # administrative credentials are presented.
+          my $cm_urn = GeniHRN::Generate($OURDOMAIN, "authority", "cm");
+          if ($cm_urn != $credential->target_urn()) {
+            return GeniResponse->Create(GENIRESPONSE_FORBIDDEN(), undef,
+                      "Credential target does not match CM URN");
+          }
+
+      if (!defined($slice_urn)) {
+          return GeniResponse->MalformedArgsResponse("Missing arguments");
+      }       
+      $slice = GeniSlice->Lookup($slice_urn);
+      return GeniResponse->Create(GENIRESPONSE_ERROR, undef, 
+                "No Slice with urn $slice_urn here")
+          if (!defined($slice));
+      $aggregate = GeniAggregate->SliceAggregate($slice);
+      return GeniResponse->Create(GENIRESPONSE_ERROR, undef, 
+                      "No Aggregate here")
+          if (!defined($aggregate));
+    } 
+
     if (! (defined($slice) && defined($aggregate))) {
 	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 				    "No slice or aggregate here");
@@ -679,7 +712,7 @@ sub SliverAction($$$$$)
 	goto bad
 	    if (GeniResponse::IsResponse($response));
 
-	if ($action eq "start") {
+	if ($action eq "start" || $action eq "restart") {
 	    GeniCM::UpdateManifest($slice);
 	}
 	$slice->UnLock();
@@ -800,6 +833,10 @@ sub SliverStatus($)
 	my $state         = $sliver->state();
 	my $status        = $sliver->status();
 	my $error         = "";
+
+	# New is the same as stopped. Separate state is handy.
+	$state = "stopped"
+	    if ($state eq "new");
 
 	if ($status eq "failed") {
 	    $error = $sliver->ErrorLog();

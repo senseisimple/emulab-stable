@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008, 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -134,7 +134,7 @@ function showsummary ($showby) {
     switch ($showby) {
         case "projects":
 	    $which = "pid";
-	    $table = "project_stats_backup";
+	    $table = "project_stats";
 	    $title = "Project Summary Stats (Epoch)";
 	    $link  = "showproject.php3?pid=";
 	    $wclause = "where pid!='$TBOPSPID'";
@@ -142,7 +142,7 @@ function showsummary ($showby) {
 	    break;
         case "users":
 	    $which = "uid";
-	    $table = "user_stats_backup";
+	    $table = "user_stats";
 	    $title = "User Summary Stats (Epoch)";
 	    $link  = "showuser.php3?user=";
 	    $wclause = "";
@@ -160,7 +160,7 @@ function showsummary ($showby) {
 			 "exptswapin_count+exptstart_count as expt_swapins, ".
 			 "exptpreload_count+exptstart_count as expt_new, ".
 			 "exptswapmod_count as expt_swapmods, ".
-			 "u.usr_name, s.uid_idx ".
+			 "u.usr_name, s.uid_idx, u.status ".
 			 "from $table as s ".
 			 "left join users as u on u.uid_idx=s.uid_idx ".
 			 "$wclause ".
@@ -262,11 +262,17 @@ function showsummary ($showby) {
 
 	echo "<tr>";
 	if ($showby == "users") {
-	    # A current or a deleted user?
+	    # A current, archived, or a deleted user?
 	    $usr_name = $row["usr_name"];
 	    
 	    if (isset($usr_name)) {
-		echo "<td><A href='$link${heading}'>$heading</A></td>";
+		$status   = $row["status"];
+		$extra    = "";
+
+		if ($status == TBDB_USERSTATUS_ARCHIVED) {
+		    $extra = "(a)";
+		}
+		echo "<td><A href='$link${idx}'>$heading $extra</A></td>";
 	    }
 	    else {
 		echo "<td>$heading</td>";
@@ -369,8 +375,8 @@ function showrange ($showby, $range) {
     # Get current set of experiments so we can mark them as current.
     #
     $query_result =
-	DBQueryFatal("select e.pid,e.eid,u.uid,r.pnodes,r.vnodes, ".
-		     "    r.swapin_time,r.idx ".
+	DBQueryFatal("select e.pid,e.eid,u.uid,u.uid_idx,r.pnodes,r.vnodes, ".
+		     "    r.swapin_time,r.idx,u.status ".
 		     "  from experiments as e ".
 		     "left join experiment_stats as s on s.exptidx=e.idx ".
 		     "left join experiment_resources as r on ".
@@ -384,6 +390,7 @@ function showrange ($showby, $range) {
 	$pid         = $row["pid"];
 	$eid         = $row["eid"];
 	$uid         = $row["uid"];
+	$uid_idx     = $row["uid_idx"];
 	$swapin_time = $row["swapin_time"];
 	$swapseconds = 0;
 	$pnodes      = $row["pnodes"];
@@ -417,34 +424,38 @@ function showrange ($showby, $range) {
 				       'swapmods' => 0,
 				       'swapins'  => 0);
 	}
-	if (!isset($uid_summary[$uid])) {
-	    $uid_summary[$uid] = array('pnodes'   => 0,
-				       'vnodes'   => 0,
-				       'pseconds' => 0,
-				       'eseconds' => 0,
-				       'current'  => 1,
-				       'preloaded'=> 0,
-				       'started'  => 0,
-				       'swapmods' => 0,
-				       'swapins'  => 0);
+	if (!isset($uid_summary[$uid_idx])) {
+	    $status = $row["status"];
+	    $uid_summary[$uid_idx] = array('pnodes'   => 0,
+					   'vnodes'   => 0,
+					   'pseconds' => 0,
+					   'eseconds' => 0,
+					   'current'  => 1,
+					   'preloaded'=> 0,
+					   'started'  => 0,
+					   'swapmods' => 0,
+					   'swapins'  => 0,
+					   'status'   => $status,
+					   'uid'      => $uid);
 	}
 	$experiments[$rsrcidx]          = $rsrcidx;
 	$pid_summary[$pid]["vnodes"]   += $vnodes;
 	$pid_summary[$pid]["pnodes"]   += $pnodes;
 	$pid_summary[$pid]["pseconds"] += $pnodes * $swapseconds;
 	$pid_summary[$pid]["eseconds"] += $swapseconds;
-	$uid_summary[$uid]["vnodes"]   += $vnodes;
-	$uid_summary[$uid]["pnodes"]   += $pnodes;
-	$uid_summary[$uid]["pseconds"] += $pnodes * $swapseconds;
-	$uid_summary[$uid]["eseconds"] += $swapseconds;
+	$uid_summary[$uid_idx]["vnodes"]   += $vnodes;
+	$uid_summary[$uid_idx]["pnodes"]   += $pnodes;
+	$uid_summary[$uid_idx]["pseconds"] += $pnodes * $swapseconds;
+	$uid_summary[$uid_idx]["eseconds"] += $swapseconds;
     }
 
     $query_result =
-	DBQueryFatal("select s.exptidx,s.pid,u.uid,r.pnodes,r.vnodes, ".
+	DBQueryFatal("select s.exptidx,s.pid,r.pnodes,r.vnodes, ".
 		     "   swapin_time,swapout_time,swapmod_time,byswapmod, ".
-		     "   e.eid_uuid,r.idx,r.lastidx,byswapin ".
-		     " from experiment_resources_backup as r ".
-		     "left join experiment_stats_backup as s on ".
+		     "   e.eid_uuid,r.idx,r.lastidx,byswapin,u.status, ".
+		     "   s.creator as uid,s.creator_idx as uid_idx ".
+		     " from experiment_resources as r ".
+		     "left join experiment_stats as s on ".
 		     "     r.exptidx=s.exptidx ".
 		     "left join experiments as e on e.idx=s.exptidx ".
 		     "left join users as u on u.uid_idx=r.uid_idx ".
@@ -460,6 +471,7 @@ function showrange ($showby, $range) {
 	$exptidx      = $row["exptidx"];
 	$pid          = $row["pid"];
 	$uid          = $row["uid"];
+	$uid_idx      = $row["uid_idx"];
 	$pnodes       = $row["pnodes"];
 	$vnodes       = $row["vnodes"];
 	$swapin_time  = $row["swapin_time"];
@@ -492,35 +504,39 @@ function showrange ($showby, $range) {
 				       'swapmods' => 0,
 				       'swapins'  => 0);
 	}
-	if (!isset($uid_summary[$uid])) {
-	    $uid_summary[$uid] = array('pnodes'   => 0,
-				       'vnodes'   => 0,
-				       'pseconds' => 0,
-				       'eseconds' => 0,
-				       'current'  => 0,
-				       'preloaded'=> 0,
-				       'started'  => 0,
-				       'swapmods' => 0,
-				       'swapins'  => 0);
+	if (!isset($uid_summary[$uid_idx])) {
+	    $status = $row["status"];
+
+	    $uid_summary[$uid_idx] = array('pnodes'   => 0,
+					   'vnodes'   => 0,
+					   'pseconds' => 0,
+					   'eseconds' => 0,
+					   'current'  => 0,
+					   'preloaded'=> 0,
+					   'started'  => 0,
+					   'swapmods' => 0,
+					   'swapins'  => 0,
+					   'status'   => $status,
+					   'uid'      => $uid);
 	}
 
 	if (!$lastidx) {
 	    if ($swapin_time) {
 		$pid_summary[$pid]["started"]++;
-		$uid_summary[$uid]["started"]++;
+		$uid_summary[$uid_idx]["started"]++;
 	    }
 	    else {
 		$pid_summary[$pid]["preloaded"]++;
-		$uid_summary[$uid]["preloaded"]++;
+		$uid_summary[$uid_idx]["preloaded"]++;
 	    }
 	}
 	if ($byswapin) {
 	    $pid_summary[$pid]["swapins"]++;
-	    $uid_summary[$uid]["swapins"]++;
+	    $uid_summary[$uid_idx]["swapins"]++;
 	}
 	if ($byswapmod) {
 	    $pid_summary[$pid]["swapmods"]++;
-	    $uid_summary[$uid]["swapmods"]++;
+	    $uid_summary[$uid_idx]["swapmods"]++;
 	    if (!($pnodes || $vnodes))
 		$inactive_swapmods++;
 	}
@@ -583,10 +599,10 @@ function showrange ($showby, $range) {
 	$pid_summary[$pid]["pnodes"]   += $pnodes;
 	$pid_summary[$pid]["pseconds"] += $pnodes * $swapseconds;
 	$pid_summary[$pid]["eseconds"] += $swapseconds;
-	$uid_summary[$uid]["vnodes"]   += $vnodes;
-	$uid_summary[$uid]["pnodes"]   += $pnodes;
-	$uid_summary[$uid]["pseconds"] += $pnodes * $swapseconds;
-	$uid_summary[$uid]["eseconds"] += $swapseconds;
+	$uid_summary[$uid_idx]["vnodes"]   += $vnodes;
+	$uid_summary[$uid_idx]["pnodes"]   += $pnodes;
+	$uid_summary[$uid_idx]["pseconds"] += $pnodes * $swapseconds;
+	$uid_summary[$uid_idx]["eseconds"] += $swapseconds;
     }
 
     switch ($showby) {
@@ -718,9 +734,29 @@ function showrange ($showby, $range) {
 	else
 	    $current = "";
 
-	echo "<tr>
-                <td><A href='$link${heading}'>$heading $current</A></td>
-                <td>$pnodes</td>
+	echo "<tr>";
+
+	if ($showby == "users") {
+	    # A current, archived, or a deleted user?
+	    $status  = $value["status"];
+	    $heading = $value["uid"];
+	    
+	    if (isset($status)) {
+		$extra    = "";
+
+		if ($status == TBDB_USERSTATUS_ARCHIVED) {
+		    $extra = "(a)";
+		}
+		echo "<td><A href='$link${key}'>$heading $extra</A></td>";
+	    }
+	    else {
+		echo "<td>$heading</td>";
+	    }
+	}
+	else {
+	    echo "<td><A href='$link${heading}'>$heading $current</A></td>";
+	}
+        echo "  <td>$pnodes</td>
                 <td>$pdays</td>
                 <td>$edays</td>
                 <td>$starts</td>

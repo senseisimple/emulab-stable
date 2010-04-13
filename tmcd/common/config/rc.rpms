@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2004-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -112,7 +112,7 @@ sub doboot()
     # Note: Windows also uses the -t option since root does not have access
     # to NFS mounted FSes.
     # 
-    my $installoption = ((REMOTE() || WINDOWS()) ? "-t" : "-c");
+    my $installoption = ((REMOTE() || SHADOW() || WINDOWS()) ? "-t" : "-c");
 
     foreach my $rpm (@rpms) {
 	if ($rpm =~ /RPM=(.+)/) {

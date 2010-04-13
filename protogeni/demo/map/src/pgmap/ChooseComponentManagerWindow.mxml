@@ -48,9 +48,6 @@
 			import mx.events.CloseEvent;	
        		import mx.managers.PopUpManager;
        		
-       		[Embed(source="../../images/flag_red.png")]
-			private var msgImage:Class; 
-
 			[Bindable]
 			public var main:pgmap;
 			
@@ -59,8 +56,6 @@
 			public function success():void {
 				okButton.enabled = false;
 				main.pgHandler.map.drawMap();
-				//main.pgHandler.getResourcesAndSlices();
-				//close();
 			}
 			
 			public function close():void {
@@ -136,7 +131,7 @@
 					{
 						if(cm.Hrn == cmCheckbox.label)
 						{
-							updateCmHbox(cmHbox, cmCheckbox, cm);
+							updateCmHbox(cmHbox, cm);
 							break;
 						}
 					}
@@ -148,9 +143,9 @@
 				for each(var cmHbox:HBox in cmVbox.getChildren() )
 				{
 					var cmCheckbox:CheckBox = cmHbox.getChildAt(0) as CheckBox;
+					var cmInfo:ImageButton = cmHbox.getChildAt(1) as ImageButton;
 					cmCheckbox.styleName = "unknownStyle";
-					while(cmHbox.getChildren().length > 1)
-						cmHbox.removeChildAt(1);
+					cmInfo.source = Common.flagOrangeIcon;
 				}
 			}
 			
@@ -161,62 +156,37 @@
 					var cmCheckbox:CheckBox = cmHbox.getChildAt(0) as CheckBox;
 					if(cm.Hrn == cmCheckbox.label)
 					{
-						updateCmHbox(cmHbox, cmCheckbox, cm);
+						updateCmHbox(cmHbox, cm);
 						return;
 					}
 				}
 			}
 			
-			public function updateCmHbox(cmHbox:HBox, cmCheckbox:CheckBox, cm:ComponentManager):void
+			public function updateCmHbox(cmHbox:HBox, cm:ComponentManager):void
 			{
-				while(cmHbox.getChildren().length > 1)
-					cmHbox.removeChildAt(1);
-					
-				if(cm.Status == ComponentManager.FAILED)
+				var cmCheckbox:CheckBox = cmHbox.getChildAt(0) as CheckBox;
+				var cmInfo:ImageButton = cmHbox.getChildAt(1) as ImageButton;
+				
+				if(cm.Status == ComponentManager.FAILED) {
 					cmCheckbox.styleName = "failedStyle";
-				else if(cm.Status == ComponentManager.UNKOWN)
+					cmInfo.source = Common.flagRedIcon;
+					cmInfo.toolTip = cm.Message;
+				}
+				else if(cm.Status == ComponentManager.UNKOWN) {
 					cmCheckbox.styleName = "unknownStyle";
-				else if(cm.Status == ComponentManager.INPROGRESS)
+					cmInfo.source = Common.flagOrangeIcon;
+					cmInfo.toolTip = "Unknown status";
+				}
+				else if(cm.Status == ComponentManager.INPROGRESS) {
 					cmCheckbox.styleName = "inprogressStyle";
+					cmInfo.source = Common.flagOrangeIcon;
+					cmInfo.toolTip = "In progress...";
+				}
 				else if(cm.Status == ComponentManager.VALID)
 				{
 					cmCheckbox.styleName = "validStyle";
-					var rspecButton:RspecButton = new RspecButton();
-					rspecButton.addEventListener(MouseEvent.CLICK,
-						function openRspec():void
-						{
-							PopUpManager.addPopUp(main.rspecView, main, false);
-				       		PopUpManager.centerPopUp(main.rspecView);
-				       		main.rspecView.title = "Advertisement RSPEC from " + cm.Hrn;
-				       		main.rspecView.loadXml(cm.Rspec);
-						});
-					cmHbox.addChild(rspecButton);
-					
-					var dotButton:Button = new Button();
-					dotButton.label = ".";
-					dotButton.addEventListener(MouseEvent.CLICK,
-						function openDot():void
-						{
-							var cw:ConsoleWindow = new ConsoleWindow();
-							PopUpManager.addPopUp(cw, main, false);
-				       		PopUpManager.centerPopUp(cw);
-							cw.title = "dot format from " + cm.Hrn;
-							cw.txt.text = cm.getDotGraph();
-						});
-					cmHbox.addChild(dotButton);
-				}
-				
-				if(cm.Message.length > 0)
-				{
-					var msgButton:ImageButton = new ImageButton();
-					msgButton.toolTip = "More information";
-					msgButton.source = new msgImage();
-					msgButton.addEventListener(MouseEvent.CLICK,
-						function openMsg():void
-						{
-							Alert.show(cm.Message);
-						});
-					cmHbox.addChild(msgButton);
+					cmInfo.source = Common.flagGreenIcon;
+					cmInfo.toolTip = "Valid";
 				}
 			}
 			
@@ -241,11 +211,20 @@
 				cmCheckbox.selected = cm.Show;
 				cmCheckbox.label = cm.Hrn;
 				cmHbox.addChild(cmCheckbox);
-				updateCmHbox(cmHbox, cmCheckbox, cm);
+				
+				var cmInfo:ImageButton = new ImageButton();
+				cmHbox.addChild(cmInfo);
+				
+				updateCmHbox(cmHbox, cm);
 				cmCheckbox.addEventListener(MouseEvent.CLICK,
 					function allowApply():void {
 						okButton.enabled = true;
 						cm.Show = cmCheckbox.selected;
+					});
+				
+				cmInfo.addEventListener(MouseEvent.CLICK,
+					function openCm():void {
+						Common.viewComponentManager(cm);
 					});
 				cmVbox.addChild(cmHbox);
 			}

@@ -18,8 +18,7 @@ LinkSpec = element link { LinkContents }
 NodeContents =
     # Each node has exactly one virtualization technology, which we simply
     # enumerate here
-    attribute virtualization_type { "raw" | "trellis-vserver" |
-      "planetlab-vserver" | "emulab-vnode" | "bgpmux" }? &
+    attribute virtualization_type { text }? &
 
     # Each node may be the subnode of (physically located within) another.
     # In advertisements, this is the URN of the other component.
@@ -42,8 +41,7 @@ NodeContents =
   LinkContents =
     # Each link has exactly one virtualization technology, which we simply
     # enumerate here
-    attribute virtualization_type { "raw" | "trellis-vserver" |
-      "planetlab-vserver" | "emulab-vnode" }? &
+    attribute virtualization_type { text }? &
     # Link types
     LinkType+ &
     # The interfaces which this link spans.

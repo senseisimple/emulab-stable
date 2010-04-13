@@ -29,6 +29,7 @@
 		
 		public var virtualId:String;
 		public var virtualizationType:String;
+		public var sliverUrn:String;
 		
 		[Bindable]
 		public var interfaces:ArrayCollection = new ArrayCollection();

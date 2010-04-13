@@ -422,6 +422,21 @@ CREATE TABLE `deltas` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `elabinelab_attributes`
+--
+
+CREATE TABLE `elabinelab_attributes` (
+  `pid` varchar(12) NOT NULL default '',
+  `eid` varchar(32) NOT NULL default '',
+  `exptidx` int(11) NOT NULL default '0',
+  `role` enum('boss','router','ops','fs','node') NOT NULL default 'node',
+  `attrkey` varchar(32) NOT NULL default '',
+  `attrvalue` tinytext NOT NULL,
+  `ordering` smallint(5) unsigned NOT NULL default '0',
+  PRIMARY KEY  (`exptidx`,`role`,`attrkey`,`ordering`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `elabinelab_vlans`
 --
 
@@ -1114,6 +1129,7 @@ CREATE TABLE `experiments` (
   `panic_date` datetime default NULL,
   `delay_capacity` tinyint(3) unsigned default NULL,
   `savedisk` tinyint(1) NOT NULL default '0',
+  `skipvlans` tinyint(1) NOT NULL default '0',
   `locpiper_pid` int(11) default '0',
   `locpiper_port` int(11) default '0',
   `instance_idx` int(10) unsigned NOT NULL default '0',
@@ -2168,6 +2184,7 @@ CREATE TABLE `node_types` (
   `issimnode` tinyint(4) NOT NULL default '0',
   `isgeninode` tinyint(4) NOT NULL default '0',
   `isfednode` tinyint(4) NOT NULL default '0',
+  `isswitch` tinyint(4) NOT NULL default '0',
   PRIMARY KEY  (`type`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
@@ -2310,6 +2327,7 @@ DROP TABLE IF EXISTS `nodeuidlastlogin`;
 CREATE TABLE `nodeuidlastlogin` (
   `node_id` varchar(32) NOT NULL default '',
   `uid` varchar(10) NOT NULL default '',
+  `uid_idx` mediumint(8) unsigned NOT NULL default '0',
   `date` date default NULL,
   `time` time default NULL,
   PRIMARY KEY  (`node_id`)
@@ -2480,6 +2498,7 @@ CREATE TABLE `os_info` (
   `max_concurrent` int(11) default NULL,
   `mfs` tinyint(4) NOT NULL default '0',
   `reboot_waittime` int(10) unsigned default NULL,
+  `protogeni_export` tinyint(1) NOT NULL default '0',
   PRIMARY KEY  (`osid`),
   UNIQUE KEY `pid` (`pid`,`osname`),
   KEY `OS` (`OS`),
@@ -3064,7 +3083,7 @@ CREATE TABLE `reserved` (
   `exptidx` int(11) NOT NULL default '0',
   `rsrv_time` timestamp NOT NULL default CURRENT_TIMESTAMP on update CURRENT_TIMESTAMP,
   `vname` varchar(32) default NULL,
-  `erole` enum('node','virthost','delaynode','simhost','sharedhost') NOT NULL default 'node',
+  `erole` enum('node','virthost','delaynode','simhost','sharedhost', 'subboss') NOT NULL default 'node',
   `simhost_violation` tinyint(3) unsigned NOT NULL default '0',
   `old_pid` varchar(12) NOT NULL default '',
   `old_eid` varchar(32) NOT NULL default '',
@@ -3174,6 +3193,18 @@ CREATE TABLE `state_triggers` (
   `state` varchar(20) NOT NULL default '',
   `trigger` tinytext NOT NULL,
   PRIMARY KEY  (`node_id`,`op_mode`,`state`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `subbosses`
+--
+
+DROP TABLE IF EXISTS `subbosses`;
+CREATE TABLE `subbosses` (
+  `node_id` varchar(32) NOT NULL default '',
+  `service` varchar(20) NOT NULL default '',
+  `subboss_id` varchar(20) NOT NULL default '',
+  PRIMARY KEY  (`node_id`,`service`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
@@ -3350,6 +3381,7 @@ CREATE TABLE `traces` (
 DROP TABLE IF EXISTS `uidnodelastlogin`;
 CREATE TABLE `uidnodelastlogin` (
   `uid` varchar(10) NOT NULL default '',
+  `uid_idx` mediumint(8) unsigned NOT NULL default '0',
   `node_id` varchar(32) NOT NULL default '',
   `date` date default NULL,
   `time` time default NULL,
@@ -3363,6 +3395,7 @@ CREATE TABLE `uidnodelastlogin` (
 DROP TABLE IF EXISTS `unixgroup_membership`;
 CREATE TABLE `unixgroup_membership` (
   `uid` varchar(8) NOT NULL default '',
+  `uid_idx` mediumint(8) unsigned NOT NULL default '0',
   `gid` varchar(16) NOT NULL default '',
   PRIMARY KEY  (`uid`,`gid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
@@ -3374,6 +3407,7 @@ CREATE TABLE `unixgroup_membership` (
 DROP TABLE IF EXISTS `user_policies`;
 CREATE TABLE `user_policies` (
   `uid` varchar(8) NOT NULL default '',
+  `uid_idx` mediumint(8) unsigned NOT NULL default '0',
   `policy` varchar(32) NOT NULL default '',
   `auxdata` varchar(64) NOT NULL default '',
   `count` int(10) NOT NULL default '0',
@@ -3519,7 +3553,7 @@ CREATE TABLE `users` (
   `wikionly` tinyint(1) default '0',
   `mailman_password` tinytext,
   PRIMARY KEY  (`uid_idx`),
-  UNIQUE KEY `uid` (`uid`),
+  KEY `uid` (`uid`),
   KEY `unix_uid` (`unix_uid`),
   KEY `status` (`status`),
   KEY `uid_uuid` (`uid_uuid`)
@@ -3532,6 +3566,7 @@ CREATE TABLE `users` (
 DROP TABLE IF EXISTS `userslastlogin`;
 CREATE TABLE `userslastlogin` (
   `uid` varchar(10) NOT NULL default '',
+  `uid_idx` mediumint(8) unsigned NOT NULL default '0',
   `date` date default NULL,
   `time` time default NULL,
   PRIMARY KEY  (`uid`)
@@ -3763,6 +3798,7 @@ CREATE TABLE `virt_lans` (
   `trace_endnode` tinyint(1) NOT NULL default '0',
   `trace_db` tinyint(1) NOT NULL default '0',
   `fixed_iface` varchar(128) default '',
+  `layer` tinyint(4) NOT NULL default '2',
   PRIMARY KEY  (`exptidx`,`vname`,`vnode`,`vport`),
   UNIQUE KEY `vport` (`pid`,`eid`,`vname`,`vnode`,`vport`),
   KEY `pid` (`pid`,`eid`,`vname`),

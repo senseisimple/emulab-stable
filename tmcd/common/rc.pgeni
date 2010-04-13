@@ -1,0 +1,272 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# This script is run directly from boot. It should NOT be run after
+# that since some stuff is not setup to properly restart yet. For
+# general reconfig or update, use rc.config instead.
+#
+sub usage()
+{
+    print "Usage: " . scriptname() .
+	" -s server -u urn [-j vnodeid] boot|shutdown|reconfig|reset\n";
+    exit(1);
+}
+my $optlist = "s:j:u:k:";
+my $vnodeid;
+my $server;
+my $action;
+my $eventkey;
+my $keyhash;
+my $urn;
+
+# Turn off line buffering on output
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+# Only root.
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use libtmcc;
+use librc;
+use libtestbed;
+
+# Script specific goo.
+my $RCDIR	= "$BINDIR/rc";
+my $LOGFILE	= "$LOGDIR/pgeniboot.debug";
+
+# Protos.
+sub doboot();
+sub doshutdown();
+sub doreconfig();
+sub docleanup();
+sub BootFatal($$);
+
+# Parse command line.
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{'s'})) {
+    $server = $options{'s'};
+}
+if (defined($options{'k'})) {
+    ($eventkey,$keyhash) = split(',', $options{'k'});
+}
+if (defined($options{'u'})) {
+    $urn = $options{'u'};
+}
+if (defined($options{'j'})) {
+    $vnodeid = $options{'j'};
+    libsetup_setvnodeid($vnodeid);
+}
+# Allow default above.
+if (@ARGV) {
+    $action = $ARGV[0];
+}
+usage()
+    if (! (defined($server) && defined($urn) && defined($action)));
+
+# For tmcc client.
+$ENV{'BOSSNAME'} = $server;
+
+#
+# We want to save all of the output off
+#
+open(STDOUT, ">> $LOGFILE") or
+    die("opening $LOGFILE for STDOUT: $!");
+open(STDERR, ">> $LOGFILE") or
+    die("opening $LOGFILE for STDERR: $!");
+
+# Execute the action.
+SWITCH: for ($action) {
+    /^boot$/i && do {
+	doboot();
+	last SWITCH;
+    };
+    /^shutdown$/i && do {
+	doshutdown();
+	last SWITCH;
+    };
+    /^reconfig$/i && do {
+	doreconfig();
+	last SWITCH;
+    };
+    /^reset$/i && do {
+	docleanup();
+	last SWITCH;
+    };
+    fatal("Invalid action: $action\n");
+}
+#
+# Send the console log to the server.
+#
+if (-e $LOGFILE && -s $LOGFILE &&
+    tmcc(TMCCCMD_BOOTLOG, "", undef,
+	 ("datafile" => $LOGFILE, "timeout" => 5)) < 0) {
+    print "Error sending TBFAILED to Emulab Control!\n";
+}
+exit(0);
+
+#
+# This version of fatal sends the console log to tmcd, and then generates
+# a TBFAILED state transition. 
+#
+sub BootFatal($$)
+{
+    my ($code, $msg) = @_;
+    
+    print "$msg\n";
+
+    #
+    # Send the console log to the server.
+    #
+    if (-e $LOGFILE && -s $LOGFILE &&
+	tmcc(TMCCCMD_BOOTLOG, "", undef,
+	     ("datafile" => $LOGFILE, "timeout" => 5)) < 0) {
+	print "Error sending TBFAILED to Emulab Control!\n";
+    }
+    
+    # XXX "--" ensures that code < 0 is not interpreted as a tmcc cmdline arg
+    if (tmcc(TMCCCMD_BOOTERRNO, "-- $code", undef, %TMCCTIMEOUT) < 0) {
+	print "Error sending boot errno to Emulab Control!\n";
+    }
+    
+    if (tmcc(TMCCCMD_STATE, "TBFAILED", undef, %TMCCTIMEOUT) < 0) {
+	print "Error sending TBFAILED to Emulab Control!\n";
+    }
+    exit($code);
+}
+
+#
+# Boot Action.
+#
+sub doboot()
+{
+    print("Checking Testbed reservation status on $server\n");
+    my ($pid, $eid, $vname) = libsetup::shadowsetup($server, $urn);
+
+    if (!defined($pid)) {
+	print "Node is free\n";
+	return;
+    }
+    my $optarg = (defined($vnodeid) ? "-j $vnodeid" : "");
+
+    if (-x "$BINDIR/watchdog") {
+        print("Starting testbed update watchdog\n");
+	system("$BINDIR/watchdog $optarg start");
+	if ($?) {
+	    fatal("Error running $BINDIR/watchdog");
+	}
+    }
+
+    if (defined($eventkey)) {
+	#
+	# tmcd will not give us key info without ssl connection.
+	# Do it here until that is fixed.
+	#
+	my $file = "$VARDIR/shadow/boot/eventkey";
+	
+	#
+	# Write a file so the node knows the key.
+	#
+	my $oldumask = umask(0227);
+    
+	if (system("echo -n '$eventkey' > $file")) {
+	    fatal("Could not write $file");
+	}
+	umask($oldumask);
+    }
+    if (defined($keyhash)) {
+	#
+	# tmcd will not give us key info without ssl connection.
+	# Do it here until that is fixed.
+	#
+	my $file = "$VARDIR/shadow/boot/keyhash";
+	
+	#
+	# Write a file so the node knows the key.
+	#
+	my $oldumask = umask(0227);
+    
+	if (system("echo -n '$keyhash' > $file")) {
+	    fatal("Could not write $file");
+	}
+	umask($oldumask);
+    }
+
+    if (0) {
+    my $evproxy = "$BINDIR/evproxy";
+    if (-x $evproxy) {
+	my ($domain)    = ($server =~ /^[^\.]+\.(.*)$/);
+	my $eventserver = "event-server.${domain}";
+
+	print("Starting event proxy daemon\n");
+	system("$evproxy -s $eventserver -e $pid/$eid");
+	if ($?) {
+	    fatal("Error running $evproxy");
+	}
+    }
+    else {
+	print("$evproxy does not exist!\n");
+    }
+    }
+
+    my @bootscripts = ("rc.misc", "rc.topomap", 
+		       "rc.tarfiles", "rc.rpms",
+		       "rc.route", "rc.ifconfig", "rc.hostnames",
+		       "rc.progagent");
+
+    foreach my $script (@bootscripts) {
+	next
+	    if (!-x "$BINDIR/rc/$script");
+
+	print "Running $BINDIR/rc/$script $optarg\n";
+	
+	system("$BINDIR/rc/$script $optarg boot");
+	if ($?) {
+	    BootFatal(-1, "Failed running $BINDIR/rc/$script");
+	}
+    }
+
+    print("Informing Emulab Control that we are up and running\n");
+    if (tmcc(TMCCCMD_STATE, "ISUP") < 0) {
+	fatal("Error sending ISUP to Emulab Control!");
+    }
+}
+
+#
+# Shutdown Action.
+#
+sub doshutdown()
+{
+}
+
+#
+# Node Reconfig Action (without rebooting).
+#
+sub doreconfig()
+{
+}
+
+#
+# Node cleanup action (node is reset to completely clean state).
+#
+sub docleanup()
+{
+}

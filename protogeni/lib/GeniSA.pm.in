@@ -159,14 +159,19 @@ sub GetCredential($)
     #
     if ($type eq "Slice") {
 	my $slice = GeniSlice->Lookup( defined( $urn ) ? $urn : $uuid );
+
 	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
 				    "No such Slice")
 	    if (!defined($slice));
-	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
-				    "Not your slice!")
-	    if ($slice->creator_uuid() ne $this_user->uuid() &&
-		!$slice->IsBound($this_user));
-	
+	if ($slice->Lock() != 0) {
+	    return GeniResponse->BusyResponse("slice");
+	}
+	if ($slice->creator_uuid() ne $this_user->uuid() &&
+	    !$slice->IsBound($this_user)) {
+	    $slice->UnLock();
+	    return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+					"Not your slice!");
+	}
 	#
 	# Return a credential for the slice.
 	#
@@ -174,9 +179,11 @@ sub GetCredential($)
 	    GeniCredential->CreateSigned($slice,
 					 $this_user,
 					 $GeniCredential::LOCALSA_FLAG);
-	return GeniResponse->Create(GENIRESPONSE_ERROR)
-	    if (!defined($slice_credential));
-
+	if (!defined($slice_credential)) {
+	    $slice->UnLock();
+	    return GeniResponse->Create(GENIRESPONSE_ERROR);
+	}
+	$slice->UnLock();
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS,
 				    $slice_credential->asString());
     }
@@ -317,16 +324,25 @@ sub Resolve($)
 	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
 					"No such slice registered here");
 	}
-
+	if ($slice->Lock() != 0) {
+	    return GeniResponse->BusyResponse("slice");
+	}
+	my @slivers = GeniRegistry::ClientSliver->LookupBySlice($slice);
+	my @managers = ();
+	foreach my $sliver (@slivers) {
+	    push(@managers, $sliver->manager_urn());
+	}
 	# Return a blob.
 	my $blob = { "hrn"          => $slice->hrn(),
 		     "uuid"         => $slice->uuid(),
 		     "creator_uuid" => $slice->creator_uuid(),
 		     "gid"          => $slice->cert(),
-		     "urn"          => GeniHRN::Generate( $OURDOMAIN,
-							  "slice",
-							  $slice->slicename() )
+		     "urn"          => GeniHRN::Generate($OURDOMAIN,
+							 "slice",
+							 $slice->slicename() ),
+		     "component_managers" => \@managers
 		 };
+	$slice->UnLock();
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
     }
     
@@ -504,16 +520,19 @@ sub Register($)
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					"$hrn or $uuid already registered");
 	}
+	# Slice is created as locked.
 	my $slice = GeniSlice->Create($certificate,
 				      $credential->owner_uuid(),
-				      $authority);
+				      $authority, undef, 1);
 	if (!defined($slice)) {
 	    $certificate->Delete();
 	    print STDERR "Could not create new slice object\n";
 	    return GeniResponse->Create(GENIRESPONSE_ERROR);
 	}
+	
 	if (defined($expires) && $slice->SetExpiration($expires) != 0) {
 	    print STDERR "Could not set slice expiration to $expires\n";
+	    $slice->Delete();
 	    return GeniResponse->Create(GENIRESPONSE_ERROR);
 	}
 
@@ -530,16 +549,6 @@ sub Register($)
 	}
 
 	#
-	# Add the bindings locally before registration.
-	# 
-	if (0 && defined($userbindings)) {
-	    foreach my $binding_uuid (@{ $userbindings }) {
-		my $binding_user = GeniUser->Lookup($binding_uuid, 1);
-		$slice->BindUser($binding_user);
-	    }
-	}
-
-	#
 	# Register new slice at the clearinghouse.
 	#
 	if ($slice->Register() != 0) {
@@ -549,7 +558,7 @@ sub Register($)
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 			"Could not register new slice at clearinghouse");
 	}
-
+	$slice->UnLock();
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS,
 				    $slice_credential->asString());
     }
@@ -662,21 +671,37 @@ sub Remove($)
 	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
 					"No such slice");
 	}
+	if ($slice->Lock() != 0) {
+	    return GeniResponse->BusyResponse("slice");
+	}
+	#
+	# Not allowed to delete a cooked mode slice via this interface.
+	#
+	if ($slice->exptidx()) {
+	    $slice->UnLock();
+	    return GeniResponse->Create(GENIRESPONSE_REFUSED, undef,
+					"Cooked mode Slice");
+	}
+	
 	#
 	# Not allowed to delete a slice that has not expired since
 	# that would make it impossible to control any existing
 	# slivers.
 	#
 	if (! $slice->IsExpired()) {
+	    $slice->UnLock();
 	    return GeniResponse->Create(GENIRESPONSE_REFUSED, undef,
 					"Slice has not expired");
 	}
-
+	# Needs to move.
+	GeniRegistry::ClientSliver->SliceDelete($slice);
+	
 	#
 	# Remove from the clearing house.
 	#
 	if ($slice->UnRegister()) {
 	    print STDERR "Could not delete $slice from clearinghouse!\n";
+	    $slice->UnLock();
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					(defined($uuid)?$uuid:$hrn)
 					. " could not be unregistered");
@@ -691,60 +716,6 @@ sub Remove($)
     }
     
     return GeniResponse->Create(GENIRESPONSE_UNSUPPORTED);
-}
-
-#
-# Discover resources for one of our slices. Just return the list of
-# components that the clearinghouse gives us. Ug.
-#
-sub DiscoverResources($)
-{
-    my ($argref) = @_;
-    my $cred  = $argref->{'credential'};
-    my $rspec = $argref->{'rspec'};
-
-    if (! defined($cred)) {
-	return GeniResponse->MalformedArgsResponse();
-    }
-    if (! (defined($rspec) && ($rspec =~ /^[-\w]+$/))) {
-	GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
-			     "Improper rspec");	
-    }
-    my $credential = GeniCredential->CreateFromSigned($cred);
-    if (!defined($credential)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "Could not create GeniCredential object");
-    }
-
-    #
-    # Make sure the credential was issued to the caller.
-    #
-    if ($credential->owner_uuid() ne $ENV{'GENIUUID'}) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "This is not your credential!");
-    }
-
-    my $slice = GeniSlice->Lookup($credential->target_uuid());
-    if (!defined($slice)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "Unknown slice for this credential");
-    }
-
-    $credential->HasPrivilege( "authority" ) or
-	$credential->HasPrivilege( "resolve" ) or
-	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
-				     "Insufficient privilege" );
-
-    #
-    # Ask clearing house for a list of components.
-    #
-    my @components;
-    if ($slice->DiscoverResources(\@components)) {
-	print STDERR "Could not DiscoverResources for $slice\n";
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-			    "Could not discover resources at clearinghouse");
-    }
-    return GeniResponse->Create(GENIRESPONSE_SUCCESS, 0);
 }
 
 #
@@ -856,10 +827,15 @@ sub BindToSlice($)
 	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED,
 				    undef, "No such user here");
     }
+    if ($slice->Lock() != 0) {
+	return GeniResponse->BusyResponse("slice");
+    }
     if ($slice->BindUser($target_user) != 0) {
 	print STDERR "Could not bind $target_user to $slice\n";
+	$slice->UnLock();
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
+    $slice->UnLock();
     return GeniResponse->Create(GENIRESPONSE_SUCCESS);
 }
 
@@ -938,12 +914,25 @@ sub RenewSlice($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Unknown slice for this credential");
     }
+    #
+    # Not allowed to renew a cooked mode slice via this interface.
+    #
+    if ($slice->exptidx()) {
+	return GeniResponse->Create(GENIRESPONSE_REFUSED, undef,
+				    "Cooked mode Slice");
+    }
     
     $credential->HasPrivilege( "pi" ) or
 	$credential->HasPrivilege( "bind" ) or
 	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
 				     "Insufficient privilege" );
 
+    my $this_user = GeniUser->Lookup($credential->owner_uuid(), 1);
+    if (!defined($this_user)) {
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN,
+				    undef, "Who are you?");
+    }
+    
     #
     # Figure out new expiration time; this is the time at which we can
     # idleswap the slice out. 
@@ -971,12 +960,29 @@ sub RenewSlice($)
 	$message = "Expiration is in the past";
 	goto bad;
     }
+    if ($slice->Lock() != 0) {
+	return GeniResponse->BusyResponse("slice");
+    }
     if ($slice->SetExpiration($when) != 0) {
 	$message = "Could not set expiration time";
+	$slice->UnLock();
 	goto bad;
     }
-    return GeniResponse->Create(GENIRESPONSE_SUCCESS);
-
+    #
+    # Return a credential for the slice.
+    #
+    my $slice_credential =
+	GeniCredential->CreateSigned($slice,
+				     $this_user,
+				     $GeniCredential::LOCALSA_FLAG);
+    if (!defined($slice_credential)) {
+	$slice->UnLock();
+	$message = "Could not create new slice credential";
+	goto bad;
+    }
+    $slice->UnLock();
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS,
+				$slice_credential->asString());
   bad:
     return GeniResponse->Create(GENIRESPONSE_ERROR, undef, $message);
 }
@@ -1049,7 +1055,9 @@ sub RegisterSliver($)
 	print STDERR "No URN in $credential\n";
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
-        
+    if ($slice->Lock() != 0) {
+	return GeniResponse->BusyResponse("slice");
+    }
     #
     # See if one already exists; overwrite it.
     #
@@ -1063,8 +1071,10 @@ sub RegisterSliver($)
     if (!defined($clientsliver)) {
 	print STDERR "Could not register sliver for $slice_urn\n";
 	print STDERR Dumper($blob);
+	$slice->UnLock();
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
+    $slice->UnLock();
     return GeniResponse->Create(GENIRESPONSE_SUCCESS);
 }
 
@@ -1124,7 +1134,9 @@ sub UnRegisterSliver($)
 	print STDERR "No URN in $credential\n";
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
-        
+    if ($slice->Lock() != 0) {
+	return GeniResponse->BusyResponse("slice");
+    }
     #
     # See if one already exists; overwrite it.
     #
@@ -1134,6 +1146,7 @@ sub UnRegisterSliver($)
     $clientsliver->Delete()
 	if (defined($clientsliver));
     
+    $slice->UnLock();
     return GeniResponse->Create(GENIRESPONSE_SUCCESS);
 }
 

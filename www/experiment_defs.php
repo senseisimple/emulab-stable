@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006-2009 University of Utah and the Flux Group.
+# Copyright (c) 2006-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -307,6 +307,7 @@ class Experiment
     function locked()       { return $this->field('expt_locked'); }
     function elabinelab()   { return $this->field('elab_in_elab');}
     function lockdown()     { return $this->field('lockdown'); }
+    function skipvlans()    { return $this->field('skipvlans'); }
     function created()      { return $this->field('expt_created'); }
     function swapper()      { return $this->field('expt_swap_uid');}
     function swappable()    { return $this->field('swappable');}
@@ -434,6 +435,20 @@ class Experiment
 
 	$query_result =
 	    DBQueryFatal("update experiments set lockdown='$mode' ".
+			 "where idx='$idx'");
+
+	return 0;
+    }
+
+    #
+    # Flip lockdown bit.
+    #
+    function SetSkipVlans($mode) {
+	$idx      = $this->idx();
+	$mode     = ($mode ? 1 : 0);
+
+	$query_result =
+	    DBQueryFatal("update experiments set skipvlans='$mode' ".
 			 "where idx='$idx'");
 
 	return 0;
@@ -707,6 +722,7 @@ class Experiment
 	$mnet_cores  = $exprow["modelnet_cores"];
 	$mnet_edges  = $exprow["modelnet_edges"];
 	$lockdown    = $exprow["lockdown"];
+	$skipvlans   = $exprow["skipvlans"];
 	$exptidx     = $exprow["idx"];
 	$archive_idx = $exprow["archive_idx"];
 	$dpdb        = $exprow["dpdb"];
@@ -1005,6 +1021,17 @@ class Experiment
 		"&type=lockdown&value=$lockflip>Toggle</a>)
                    </td>
               </tr>\n";
+
+	    if (ISADMIN()) {
+		$thisflip = ($skipvlans ? 0 : 1);
+		$flipval  = ($skipvlans ? "Yes" : "No");
+		echo "<tr>
+                       <td>Skip Vlans:</td>
+                       <td>$flipval (<a href=toggle.php?pid=$pid&eid=$eid".
+		           "&type=skipvlans&value=$thisflip>Toggle</a>)
+                       </td>
+                      </tr>\n";
+	    }
 	}
 
 	if ($batchmode) {
@@ -1078,17 +1105,70 @@ class Experiment
 	    echo " </td>
               </tr>\n";
 	}
-	if (!$short && ISADMIN() && $this->geniflags()) {
-	    $slice = GeniSlice::Lookup("geni-cm", $uuid);
-	    if ($slice) {
-		$slice_hrn = $slice->hrn();
-		$url = CreateURL("showslice", "slice_idx", $slice->idx(),
-				 "showtype", "cm");
+	if (!$short) {
+	    if ($this->geniflags()) {
+		$slice = GeniSlice::Lookup("geni-cm", $uuid);
 
-		echo "<tr>
-                        <td>Geni Slice: </td>
-                        <td class=\"left\"><a href='$url'>$slice_hrn</a></td>
-                      </tr>\n";
+		if ($slice) {
+		    $slice_hrn = $slice->hrn();
+		    if (ISADMIN()) {
+			$url = CreateURL("showslice", "slice_idx",
+					 $slice->idx(), "showtype", "cm");
+
+			echo "<tr>
+                                <td>Geni Slice (CM): </td>
+                                <td class=\"left\">
+                                     <a href='$url'>$slice_hrn</a></td>
+                              </tr>\n";
+		    }
+		    else {
+			echo "<tr>
+                                <td>Geni Slice (CM): </td>
+                                <td class=\"left\">$slice_hrn</td>
+                              </tr>\n";
+		    }
+		}
+	    }
+	    else {
+		$slice = GeniSlice::LookupByExperiment("geni-sa", $this);
+		if ($slice) {
+		    $slice_hrn = $slice->hrn();
+		    if (ISADMIN()) {
+			$url = CreateURL("showslice", "slice_idx",
+					 $slice->idx(), "showtype", "sa");
+
+			echo "<tr>
+                                 <td>Geni Slice (SA): </td>
+                                 <td class=\"left\">
+                                      <a href='$url'>$slice_hrn</a></td>
+                             </tr>\n";
+		    }
+		    else {
+			echo "<tr>
+                                <td>Geni Slice (SA): </td>
+                                <td class=\"left\">$slice_hrn</td>
+                              </tr>\n";
+		    }
+		    $slice = GeniSlice::Lookup("geni-cm", $slice_hrn);
+		    if ($slice) {
+			if (ISADMIN()) {
+			    $url = CreateURL("showslice", "slice_idx",
+					     $slice->idx(), "showtype", "cm");
+
+			    echo "<tr>
+                                     <td>Geni Slice (CM): </td>
+                                     <td class=\"left\">
+                                           <a href='$url'>$slice_hrn</a></td>
+                                  </tr>\n";
+			}
+			else {
+			    echo "<tr>
+                                    <td>Geni Slice (SA): </td>
+                                    <td class=\"left\">$slice_hrn</td>
+                                  </tr>\n";
+			}
+		    }
+		}
 	    }
 	}
 	echo "</table>\n";

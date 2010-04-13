@@ -86,17 +86,25 @@ sub Lookup($$)
 #
 # Class function to create new Geni slice and return the object.
 #
-sub Create($$$$;$)
+sub Create($$$$;$$)
 {
-    my ($class, $certificate, $creator_uuid, $authority, $exptidx) = @_;
+    my ($class, $certificate, $creator_uuid, $authority, $exptidx, $lock) = @_;
 
     my $slice = GeniRegistry::GeniSlice->Create($certificate, $creator_uuid,
-						$authority, $exptidx);
+						$authority, $exptidx, $lock);
 
     return undef
 	if (!defined($slice));
+
+    $slice = GeniSlice->Lookup($slice->idx());
     
-    return GeniSlice->Lookup($slice->idx());
+    return undef
+	if (!defined($slice));
+
+    $slice->{'LOCKED'} = $$
+	if ($lock);
+
+    return $slice;
 }
 
 #
@@ -259,23 +267,25 @@ sub CreateFromLocal($$$)
     }
 
     #
-    # XXX Form hrn from the domain. 
+    # This mirrors the code in GeniSA.pm
     #
-    my $hrn = "${PGENIDOMAIN}.slices." . $experiment->idx(); 
-    my $urn = GeniHRN::Generate( "@OURDOMAIN@", "slice", 
-				 "slices." . $experiment->idx() );
+    my $hrn = "CE" . $experiment->idx();
+    my $urn = GeniHRN::Generate("@OURDOMAIN@", "slice", $hrn);
+    $hrn = "${PGENIDOMAIN}.${hrn}";
 
     #
     # Generate a certificate.
     #
-    $certificate = GeniCertificate->Create("slice", $urn, $hrn, $user->email());
+    $certificate = GeniCertificate->Create("slice", $urn, $hrn,
+					   $user->email());
     if (!defined($certificate)) {
 	print STDERR "GeniSlice::CreateFromLocal: ".
 	    "Could not generate new certificate $experiment\n";
 	return undef;
     }
+    # Create the slice as locked.
     my $slice = GeniSlice->Create($certificate, $user->uuid(),
-				  $authority, $experiment->idx());
+				  $authority, $experiment->idx(), 1);
     $certificate->Delete()
 	if (!defined($slice));
 

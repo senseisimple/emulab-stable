@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -39,6 +39,7 @@ use Exporter;
 
 # Must come after package declaration!
 use English;
+use Data::Dumper;
 
 #
 # Turn off line buffering on output
@@ -85,6 +86,8 @@ my $beproxy     = 0;
       "clrcache"        => 0,
       "noproxy"         => 0,
       "nossl"           => 0,
+      "cachedir"        => undef,
+      "urn"             => undef,
       "usetpm"          => 0,
     );
 
@@ -267,6 +270,12 @@ sub configtmcc($$)
 	             "    Invalid libtmcc option: $opt/$val\n";
 	return -1;
     }
+    if ($opt eq "cachedir") {
+	$CACHEDIR = $val;
+    }
+    elsif ($opt eq "server") {
+	$ENV{'BOSSNAME'} = $val;
+    }
     $config{$opt} = $val;
 }
 
@@ -351,6 +360,11 @@ sub runtmcc ($;$$%)
     $options = optionstring("", %config);
     $options = optionstring($options, %optconfig)
 	if (%optconfig);
+
+    # Must be last option, before command
+    if (defined($config{"urn"})) {
+	$options .= " URN=" . $config{"urn"};
+    }
 
     if (!defined($args)) {
 	$args = "";
@@ -484,13 +498,19 @@ sub tmcc ($;$$%)
 sub tmccbossname()
 {
     my @tmccresults;
+    my $bossname;
 
-    if (runtmcc(TMCCCMD_BOSSINFO, undef, \@tmccresults) < 0 ||
+    if (exists($ENV{'BOSSNAME'})) {
+	$bossname = $ENV{'BOSSNAME'};
+    }
+    elsif (runtmcc(TMCCCMD_BOSSINFO, undef, \@tmccresults) < 0 ||
 	!scalar(@tmccresults)) {
 	warn("*** WARNING: Could not get bossinfo from tmcc!\n");
 	return undef;
     }
-    my ($bossname) = split(" ", $tmccresults[0]);
+    else {
+	($bossname) = split(" ", $tmccresults[0]);
+    }
 
     #
     # Taint check. Nice to do for the caller. Also strips any newline.
@@ -560,10 +580,12 @@ sub tmccgetconfig()
     my @tmccresults;
     my $cdir = CacheDir();
 
+    my $noproxy = $config{"noproxy"};
+
     #
     # Check for proxypath file, but do not override config option. 
     #
-    if (!$config{"dounix"} && -e $PROXYDEF) {
+    if (!$config{"dounix"} && !$noproxy && -e $PROXYDEF) {
 	#
 	# Suck out the path and untaint. 
 	# 

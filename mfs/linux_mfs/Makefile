@@ -13,18 +13,19 @@ INITRAMFS	=	$(BOOT_PATH)/initramfs.gz
 #FAKEROOT_BIN	=	$(STAGING_DIR)/usr/bin/fakeroot
 FAKEROOT_BIN	=	fakeroot
 
-MODULES := busybox zlib linux dropbear testbed hdparm target_template sudo e2fsprogs openssl wget perl portmap file
+MODULES := busybox zlib linux dropbear testbed hdparm target_template sudo e2fsprogs openssl wget perl portmap file ethtool
 #MODULES := busybox zlib linux dropbear testbed hdparm target_template sudo e2fsprogs openssl wget portmap file
 INSTALL_MODULES := $(addsuffix -install,$(MODULES))
-EXTRACT_MODULES := $(addsuffix -extract,$(MODULES))
-PATCH_MODULES := $(addsuffix -patch,$(MODULES))
-CLEAN_MODULES := $(addsuffix -clean,$(MODULES))
+EXTRACT_MODULES := $(addsuffix -extract,$(MODULES) toolchain)
+PATCH_MODULES := $(addsuffix -patch,$(MODULES) toolchain)
+CONFIG_MODULES := $(addsuffix -config,$(MODULES) toolchain)
+CLEAN_MODULES := $(addsuffix -clean,$(MODULES) toolchain)
 
 .PHONY: all clean install root-template-install devices \
 	root-base root-install $(MODULES) $(INSTALL_MODULES) \
 	$(CLEAN_MODULES) initramfs
 
-all: $(MODULES)
+all: $(MODULES) initramfs
 
 install: uclibc-install $(INSTALL_MODULES)
 	cp $(SCRIPTS_PATH)/remove_unneeded_modules.pl $(BOOT_PATH)
@@ -37,7 +38,12 @@ clean:
 	rm -rf $(TARGET_BUILD_PATH)
 	rm -rf $(BOOT_PATH)
 
-$(MODULES):
+toolchain:
+	$(MAKE) -C $(SOURCE_PATH)/$@ all
+	$(MAKE) -C $(SOURCE_PATH)/zlib install-sysroot
+	$(MAKE) -C $(SOURCE_PATH)/openssl install
+
+$(MODULES): toolchain
 	$(MAKE) -C $(SOURCE_PATH)/$@ all
 
 $(CLEAN_MODULES):
@@ -48,6 +54,9 @@ $(EXTRACT_MODULES):
 
 $(PATCH_MODULES):
 	$(MAKE) -C $(SOURCE_PATH)/$(subst -patch,,$@) patch
+
+$(CONFIG_MODULES):
+	$(MAKE) -C $(SOURCE_PATH)/$(subst -config,,$@) config
 
 $(INSTALL_MODULES):
 	$(MAKE) -C $(SOURCE_PATH)/$(subst -install,,$@) install

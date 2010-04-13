@@ -290,7 +290,11 @@
 			
 			// Start graph
 			var dot:String = "graph " + Common.getDotString(Hrn) + " {\n" +
-				"\toverlap=scale;\n";
+				"\toverlap=scale;\n" + 
+				"\tsize=\"10,10\";\n" +
+				"\tfontsize=20;\n" +
+				"\tnode [fontsize=300];\n" +
+				"\tedge [style=bold];\n";
 			
 			var nodesToAdd:ArrayCollection = new ArrayCollection(AllNodes.toArray());
 			var nodeGroups:ArrayCollection = new ArrayCollection();
@@ -299,11 +303,11 @@
 			for each(var currentNode:PhysicalNode in AllNodes) {
 				// Give nodes any special qualities, otherwise see if they need to be grouped
 				if(currentNode.IsSwitch())
-					dot += "\t" + Common.getDotString(currentNode.name) + " [shape=box, style=filled, color=blue, height=2, width=2];\n";
+					dot += "\t" + Common.getDotString(currentNode.name) + " [shape=box3d, style=filled, color=deepskyblue3, height=20, width=30];\n";
 				else if(currentNode.subNodeOf != null)
-					dot += "\t" + Common.getDotString(currentNode.name) + " [style=dotted, color=green];\n";
+					dot += "\t" + Common.getDotString(currentNode.name) + " [style=dotted, color=palegreen];\n";
 				else if(currentNode.subNodes != null && currentNode.subNodes.length > 0)
-					dot += "\t" + Common.getDotString(currentNode.name) + " [style=filled, color=green];\n";
+					dot += "\t" + Common.getDotString(currentNode.name) + " [style=filled, color=palegreen];\n";
 				else {
 					
 					// Group simple nodes connected to same switches
@@ -351,13 +355,13 @@
 					if(added[connectedNode.urn] != null || !nodesToAdd.contains(connectedNode))
 						continue;
 					if(connectedNode.IsSwitch() && currentNode.IsSwitch())
-						dot += "\t" + Common.getDotString(currentNode.name) + " -- " + Common.getDotString(connectedNode.name) + " [style=bold, color=blue];\n";
+						dot += "\t" + Common.getDotString(currentNode.name) + " -- " + Common.getDotString(connectedNode.name) + " [style=bold, color=deepskyblue3, penwidth=60, len=0.2, weight=6, width=10, height=10];\n";
 					else
-						dot += "\t" + Common.getDotString(currentNode.name) + " -- " + Common.getDotString(connectedNode.name) + ";\n";
+						dot += "\t" + Common.getDotString(currentNode.name) + " -- " + Common.getDotString(connectedNode.name) + " [penwidth=8, len=0.3, weight=.8];\n";
 				}
 				if(currentNode.subNodes != null && currentNode.subNodes.length > 0) {
 					for each(var subNode:PhysicalNode in currentNode.subNodes) {
-						dot += "\t" + Common.getDotString(currentNode.name) + " -- " + Common.getDotString(subNode.name) + " [style=dotted, len=0.2];\n";
+						dot += "\t" + Common.getDotString(currentNode.name) + " -- " + Common.getDotString(subNode.name) + " [style=dotted, len=0.1, weight=5, penwidth=2, color=palegreen1];\n";
 					}
 				}
 				added[currentNode.urn] = currentNode;
@@ -365,9 +369,9 @@
 			
 			// Build up node groups
 			for each(var nodeGroup:Object in nodeGroups) {
-				dot += "\t" + nodeGroup.name + " [style=filled, height="+.25*nodeGroup.count+", width="+.375*nodeGroup.count+", color=orange, label=\""+nodeGroup.count+" Nodes\"];\n";
+				dot += "\t" + nodeGroup.name + " [style=filled, height="+.25*nodeGroup.count+", width="+.375*nodeGroup.count+", color=limegreen, label=\""+nodeGroup.count+" Nodes\"];\n";
 				for each(connectedNode in nodeGroup.switches) {
-					dot += "\t" + nodeGroup.name + " -- " + Common.getDotString(connectedNode.name) + " [style=bold, color=orange];\n";
+					dot += "\t" + nodeGroup.name + " -- " + Common.getDotString(connectedNode.name) + " [style=bold, color=limegreen, penwidth=26, len=0.35, weight=2];\n";
 				}
 			}
 			

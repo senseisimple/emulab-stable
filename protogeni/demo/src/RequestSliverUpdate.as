@@ -1,4 +1,4 @@
-/* GENIPUBLIC-COPYRIGHT
+﻿/* GENIPUBLIC-COPYRIGHT
  * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
  * All rights reserved.
  *
@@ -19,7 +19,8 @@ package
     public function RequestSliverUpdate(newManager : ComponentManager,
                                         newNodes : ActiveNodes,
                                         newRspec : String,
-                                        newBeginTunnel : Boolean) : void
+                                        newBeginTunnel : Boolean,
+										newSliceUrn : String) : void
     {
       super(newManager.getName());
       manager = newManager;
@@ -27,6 +28,7 @@ package
       rspec = newRspec;
       beginTunnel = newBeginTunnel;
       ticket = null;
+	  sliceUrn = newSliceUrn;
     }
 
     override public function cleanup() : void
@@ -44,10 +46,11 @@ package
         }
         opName = "Updating Sliver";
         op.reset(Geni.updateSliver);
-        op.addField("credential", manager.getSliver());
+        op.addField("slice_urn", sliceUrn);
+        op.addField("credentials", new Array(manager.getSliver()));
         op.addField("rspec", rspec);
         op.addField("keys", credential.ssh);
-        op.addField("impotent", Request.IMPOTENT);
+        //? op.addField("impotent", Request.IMPOTENT);
       }
       else if (ticket == null)
       {
@@ -57,7 +60,8 @@ package
         }
         opName = "Updating Ticket";
         op.reset(Geni.updateTicket);
-        op.addField("credential", credential.slice);
+        op.addField("slice_urn", sliceUrn);
+        op.addField("credentials", new Array(credential.slice));
         op.addField("ticket", manager.getTicket());
         op.addField("rspec", rspec);
       }
@@ -65,7 +69,8 @@ package
       {
         opName = "Updating Sliver";
         op.reset(Geni.updateSliver);
-        op.addField("credential", manager.getSliver());
+        op.addField("slice_urn", sliceUrn);
+        op.addField("credentials", new Array(manager.getSliver()));
         op.addField("ticket", ticket);
       }
       op.setUrl(manager.getUrl());
@@ -84,7 +89,7 @@ package
         }
         else if (ticket == null)
         {
-          var r = new RequestSliverUpdate(manager, nodes, rspec, beginTunnel);
+          var r = new RequestSliverUpdate(manager, nodes, rspec, beginTunnel, sliceUrn);
           r.setTicket(response.value);
           result = r;
         }
@@ -99,7 +104,7 @@ package
       {
         if (ticket != null && manager.getVersion() > 0)
         {
-          result = new RequestReleaseTicket(manager);
+          result = new RequestReleaseTicket(manager, sliceUrn);
         }
         if (beginTunnel)
         {
@@ -124,5 +129,6 @@ package
     var rspec : String;
     var beginTunnel : Boolean;
     var ticket : String;
+	var sliceUrn : String;
   }
 }

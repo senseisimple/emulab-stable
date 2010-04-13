@@ -27,6 +27,7 @@ package
   import flash.net.URLLoader;
   import flash.net.URLRequestHeader;
   import flash.utils.getTimer;
+  import flash.external.ExternalInterface;
 
   public class Main
   {
@@ -34,14 +35,19 @@ package
                          newStatusText : TextField,
                          newThroughput : TextField) : void
     {
+      ExternalInterface.call("loadSuccess");
       parent.addEventListener(Event.ENTER_FRAME, enterFrame);
       back = newBack;
       statusText = newStatusText;
       throughput = newThroughput;
 
-      var myUrl = parent.stage.loaderInfo.loaderURL;
-      var urlIndex = myUrl.lastIndexOf("/");
-      url = myUrl.substring(0, urlIndex) + "/download.jpg";
+      var myUrl = parent.stage.loaderInfo.parameters["url"];
+//      var myUrl = parent.stage.loaderInfo.loaderURL;
+//      var urlIndex = myUrl.lastIndexOf("/");
+//      url = myUrl.substring(0, urlIndex) + "/speed-test.swf";
+      url = myUrl + "/speed-test.swf";
+
+      statusText.text = url;
 
       sizeX = parent.stage.stageWidth;
       sizeY = parent.stage.stageHeight;

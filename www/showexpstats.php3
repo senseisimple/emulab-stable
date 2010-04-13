@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -16,6 +16,7 @@ include("defs.php3");
 #
 $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
+$uid_idx   = $this_user->uid_idx();
 $isadmin   = ISADMIN();
 
 #
@@ -35,7 +36,7 @@ PAGEHEADER("Show Experiment Information");
 if (isset($record)) {
     $wclause = "";
     if (! $isadmin) {
-	$wclause = "and s.creator='$uid'";
+	$wclause = "and s.creator_idx='$uid_idx'";
     }
     $query_result =
 	DBQueryFatal("select s.*,'foo',r.* from experiment_stats as s ".
@@ -51,7 +52,7 @@ if (isset($record)) {
 else {
     $wclause = "";
     if (! $isadmin) {
-	$wclause = "where s.creator='$uid'";
+	$wclause = "where s.creator_idx='$uid_idx'";
     }
     $query_result =
 	DBQueryFatal("select s.*,'foo',r.* from experiment_stats as s ".

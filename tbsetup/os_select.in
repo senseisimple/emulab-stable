@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -18,12 +18,13 @@ Usage: os_select [-h] [-d] [-c] [-1 | -t] [<osid>] <node> [<node> ...]
  -1    Apply change to one-time boot field
  -t    Apply change to temporary boot field
  -b    Reset to default boot osid. Do not provide an osid.
+ -l    Show the current settings.
  osid  OS identifier for the selected OS (see web interface for listing)
  node  Node identifiers (ie pcXX)
 EOF
     exit(-1);
 }
-my $optlist = "hdc1tb";
+my $optlist = "hdc1tbl";
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -68,6 +69,7 @@ my $oneshot	= 0; # apply change to next_boot_osid.
 my $tempmode	= 0; # apply change to temp_boot_osid.
 my $clear       = 0; # Clear the selected boot (def,temp,next).
 my $default     = 0; # Reset back to default osid.
+my $list	= 0; # Just list the current settings.
 my @nodes       = ();
 my $osid;
 my $osinfo;
@@ -87,9 +89,10 @@ if (defined($options{"1"})) { $oneshot=1; }
 if (defined($options{"t"})) { $tempmode=1; }
 if (defined($options{"c"})) { $clear=1; }
 if (defined($options{"b"})) { $default=1; }
+if (defined($options{"l"})) { $list=1; }
 
 # In clearmode, there is no OSID. Just a list of nodes.
-if (! ($clear || $default)) {
+if (! ($clear || $list || $default)) {
     usage()
 	if (@ARGV < 2);
     $osid = shift();
@@ -122,16 +125,21 @@ foreach my $node ( @ARGV ) {
 # Figure out who called us. Only root, people with admin status
 # in the DB, or members of the right project can do this.
 #
-if ($UID && !TBAdmin($UID) &&
-    !TBNodeAccessCheck($UID, TB_NODEACCESS_MODIFYINFO, @nodes)) {
-    fatal("os_select: You do not have permission to modify ".
-	  "one or more of the nodes.\n");
+if ($UID && !TBAdmin($UID)) {
+    if ($list && !TBNodeAccessCheck($UID, TB_NODEACCESS_READINFO, @nodes)) {
+	fatal("os_select: You do not have permission to access ".
+	      "one or more of the nodes.\n");
+    }
+    if (!$list && !TBNodeAccessCheck($UID, TB_NODEACCESS_MODIFYINFO, @nodes)) {
+	fatal("os_select: You do not have permission to modify ".
+	      "one or more of the nodes.\n");
+    }
 }
 
 #
 # Grab the info for the OSID. 
 #
-if (! ($clear || $default)) {
+if (! ($clear || $list || $default)) {
     $osinfo = OSinfo->Lookup($osid);
     fatal("Improper DB entry for OSID: $osid")
 	if (!defined($osinfo));
@@ -142,6 +150,30 @@ elsif ($default) {
 
 foreach my $node (@nodes) {
     my $nodeobject = Node->Lookup($node);
+
+    # In list mode, show all the IDs
+    if ($list) {
+	my $tb = $nodeobject->temp_boot_osid();
+	my $nb = $nodeobject->next_boot_osid();
+	my $db = $nodeobject->def_boot_osid();
+	print "$node: ";
+	if ($tb) {
+	    $info = OSinfo->Lookup($tb);
+	    print "temp=$info";
+	    print ", ";
+	}
+	if ($nb) {
+	    $info = OSinfo->Lookup($nb);
+	    print "next=$info";
+	    print ", ";
+	}
+	if ($db) {
+	    $info = OSinfo->Lookup($db);
+	    print "default=$info";
+	}
+	print "\n";
+	next;
+    }
 
     # The field to change in the DB. 
     my $field  = "def_boot_osid";

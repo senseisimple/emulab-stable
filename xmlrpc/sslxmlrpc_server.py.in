@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 #
-# Copyright (c) 2005-2008 University of Utah and the Flux Group.
+# Copyright (c) 2005-2008, 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 import sys
@@ -197,7 +197,8 @@ class MyServer(SSL.ForkingSSLServer, SimpleXMLRPCDispatcher):
             from emulabserver import EmulabServer
             
             self.emulabserver = EmulabServer(readonly=0,
-                                             clientip=client_address[0])
+                                             clientip=client_address[0],
+                                             debug=self.debug)
             pass
         return
     
@@ -223,7 +224,8 @@ class MyServer(SSL.ForkingSSLServer, SimpleXMLRPCDispatcher):
     def getuserid(self, uuid):
         userQuery = DBQueryFatal("select uid,uid_idx,unix_uid,status "
                                  "  from users "
-                                 "where uid_uuid=%s or uid=%s",
+                                 "where (uid_uuid=%s or uid=%s) and "
+                                 "       status='active'",
                                  (uuid, uuid))
         
         if len(userQuery) == 0:

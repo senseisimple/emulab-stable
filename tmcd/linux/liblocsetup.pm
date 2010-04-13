@@ -24,6 +24,8 @@ use Exporter;
 	 os_get_disks os_get_disk_size os_get_partition_info os_nfsmount
        );
 
+sub VERSION()	{ return 1.0; }
+
 # Must come after package declaration!
 use English;
 use Fcntl;

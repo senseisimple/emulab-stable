@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004-2008 University of Utah and the Flux Group.
+# Copyright (c) 2004-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -15,6 +15,7 @@ sub usage()
 }
 my $optlist = "j:";
 my $action  = "boot";
+my $vnodeid;
 
 # Turn off line buffering on output
 $| = 1;
@@ -54,7 +55,7 @@ if (! getopts($optlist, \%options)) {
     usage();
 }
 if (defined($options{'j'})) {
-    my $vnodeid = $options{'j'};
+    $vnodeid = $options{'j'};
     libsetup_setvnodeid($vnodeid);
 }
 # Allow default above.
@@ -173,12 +174,16 @@ sub dotopomap()
 	    }
 	}
     }
+    my $optarg = (defined($vnodeid) ? "-n $vnodeid" : "");
+    my $urnarg = (exists($ENV{'URN'}) ? "URN=" . $ENV{'URN'} : "");
     
     if (! -e $tempmap) {
 	#
 	# Try using tmcc. It returns compressed data so do it directly.
 	#
-	system(TMCCBIN() . " topomap > $tempmap");
+	print "foo $optarg $urnarg\n";
+	
+	system(TMCCBIN() . " $optarg $urnarg topomap > $tempmap");
 	#
 	# tmcc does not really return useful error codes.
 	#
@@ -191,7 +196,7 @@ sub dotopomap()
 	#
 	# Try using tmcc. It returns compressed data so do it directly.
 	#
-	system(TMCCBIN() . " ltmap > $templt");
+	system(TMCCBIN() . " $optarg $urnarg ltmap > $templt");
 	#
 	# tmcc does not really return useful error codes.
 	#
@@ -204,7 +209,7 @@ sub dotopomap()
 	#
 	# Try using tmcc. It returns compressed data so do it directly.
 	#
-	system(TMCCBIN() . " ltpmap > $templtp");
+	system(TMCCBIN() . " $optarg $urnarg ltpmap > $templtp");
 	#
 	# tmcc does not really return useful error codes.
 	#

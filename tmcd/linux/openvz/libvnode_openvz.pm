@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Implements the libvnode API for OpenVZ support in Emulab.
@@ -79,6 +79,7 @@ my $BRCTL = "/usr/sbin/brctl";
 my $IPTABLES = "/sbin/iptables";
 my $MODPROBE = "/sbin/modprobe";
 my $RMMOD = "/sbin/rmmod";
+my $VLANCONFIG = "/sbin/vconfig";
 
 my $VZRC   = "/etc/init.d/vz";
 my $MKEXTRAFS = "/usr/local/etc/emulab/mkextrafs.pl";
@@ -244,6 +245,10 @@ sub vz_rootPreConfig {
     # For tunnels
     mysystem("$MODPROBE ip_gre");
 
+    # For VLANs
+    mysystem("$MODPROBE 8021q");
+    system("$VLANCONFIG set_name_type VLAN_PLUS_VID_NO_PAD");
+
     # we need this stuff for traffic shaping -- only root context can
     # modprobe, for now.
     mysystem("$MODPROBE sch_plr");
@@ -322,7 +327,20 @@ sub vz_rootPreConfigNetwork {
 	foreach my $ifc (@{$node_ifs->{$node}}) {
 	    next if (!$ifc->{ISVIRT});
 
-	    if ($ifc->{PMAC} eq "none") {
+	    if ($ifc->{ITYPE} eq "vlan") {
+		my $iface = $ifc->{IFACE};
+		my $vtag  = $ifc->{VTAG};
+		my $vdev  = "vlan${vtag}";
+		
+		system("$VLANCONFIG add $iface $vtag");
+		system("$IFCONFIG $vdev up");
+
+		my $brname = "pbr$vdev";
+		$brs{$brname}{ENCAP} = 1;
+		$brs{$brname}{SHORT} = 0;
+		$brs{$brname}{PHYSDEV} = $vdev;
+	    }
+	    elsif ($ifc->{PMAC} eq "none") {
 		my $brname = "br" . $ifc->{VTAG};
 		# if no PMAC, we don't need encap on the bridge
 		$brs{$brname}{ENCAP} = 0;
@@ -1154,7 +1172,13 @@ sub vz_vnodePreConfigExpNetwork {
 	#
 	my $veth = "veth$vmid.$ifc->{ID}";
 	my $br;
-	if ($ifc->{PMAC} eq "none") {
+	
+	if ($ifc->{ITYPE} eq "vlan") {
+	    my $vtag  = $ifc->{VTAG};
+	    my $vdev  = "vlan${vtag}";
+	    $br = "pbr$vdev";
+	}
+	elsif ($ifc->{PMAC} eq "none") {
 	    $br = "br" . $ifc->{VTAG};
 	}
 	else {

@@ -1,4 +1,8 @@
 event/trafgen/tg2.0
+event/linktest/iperf/iperf-2.0.2
+event/linktest/rude/rude-0.70
 sensors/nfstrace/nfsdump2/Makefile
 sensors/nfstrace/nfsdump2/config.h
 sensors/nfstrace/nfsdump2/config.log
+protogeni/demo/.metadata
+protogeni/demo/map/.metadata

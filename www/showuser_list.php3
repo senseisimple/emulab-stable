@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -74,25 +74,25 @@ elseif (! strcmp($showtype, "all")) {
     $showtag = "";
 }
 elseif (! strcmp($showtype, "loggedin")) {
-    $clause  = "left join login as l on u.uid=l.uid ";
+    $clause  = "left join login as l on u.uid_idx=l.uid_idx ";
     $where   = "where l.timeout>=unix_timestamp()";
     $showtag = "logged in";
 }
 elseif (! strcmp($showtype, "recent")) {
-    $clause  = "left join login as l on u.uid=l.uid ";
+    $clause  = "left join login as l on u.uid_idx=l.uid_idx ";
     $where   = "where l.timeout is null or l.timeout<unix_timestamp() ".
 	       "having webidle=1 ";
     $showtag = "recently logged in (yesterday)";
     $dorecent= 1;
 }
 elseif (! strcmp($showtype, "widearea")) {
-    $clause  = "left join widearea_accounts as w on u.uid=w.uid ";
+    $clause  = "left join widearea_accounts as w on u.uid_idx=w.uid_idx ";
     $where   = "where w.node_id is not NULL";
     $showtag = "widearea";
 }
 elseif (! strcmp($showtype, "homeless")) {
     $clause  = "left join group_membership as m on u.uid_idx=m.uid_idx ";
-    $clause .= "left join widearea_accounts as w on u.uid=w.uid ";
+    $clause .= "left join widearea_accounts as w on u.uid_idx=w.uid_idx ";
     $where   = "where (m.uid is null and w.node_id is NULL) ";
     $showtag = "homeless";
 }
@@ -127,7 +127,7 @@ $query_result =
 		 "FROM users as u ".
 		 "$clause ".
 		 "left join userslastlogin as ull on u.uid=ull.uid ".
-		 "left join user_stats as ll on u.unix_uid=ll.uid_idx ".
+		 "left join user_stats as ll on u.uid_idx=ll.uid_idx ".
 		 "$where ".
 		 "order by u.uid");
 

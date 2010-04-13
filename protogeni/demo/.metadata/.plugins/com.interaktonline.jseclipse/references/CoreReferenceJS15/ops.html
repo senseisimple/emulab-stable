@@ -1,0 +1,3105 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html>
+  <head>
+    <meta content="HTML Tidy for Cygwin (vers 1st February 2003), see www.w3.org" name="generator">
+    <meta name="keywords" content="electronic commerce, ecommerce, ebusiness, e-business, e-commerce, enterprise software, net economy, Netscape, Sun Microsystems, DevEdge Archive, iPlanet, internet software">
+    <meta name="description" content="The DevEdge Archive, a strategic alliance formed by America Online and Sun Microsystems, Inc., is delivering iPlanet e-commerce software and enterprise solutions that enable companies to compete successfully in the Net Economy">
+    <meta http-equiv="Content-Type" content="text/html; charset=us-ascii">
+    <meta name="TEMPLATEBASE" content="Authored in FrameMaker. Converted to HTML in WebWorks Publisher 2000. manual wdt 1.5">
+    <meta name="LASTUPDATED" content="09/28/00 13:16:21">
+    <title>
+      Core JavaScript Reference 1.5: 5 Operators
+    </title>
+    <link rel="stylesheet" type="text/css" href="js15ref.css">
+  </head>
+  <body>
+    <table width="100%" border="0" cellspacing="4">
+      <tr>
+        <td valign="top">
+          <b><a class="sansserifPurple" href="comment.html">Previous</a></b>&nbsp;&nbsp;&nbsp;&nbsp; <a href="contents.html"><b class="sansserifPurple">Contents</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="ix.html"><b class="sansserifPurple">Index</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="partjava.html"><b class="sansserifPurple">Next</b></a> &nbsp;&nbsp;&nbsp;&nbsp;
+        </td>
+      </tr>
+      <tr>
+        <td class="sansserifBlack" valign="top" align="right" bgcolor="#CCCCCC">
+          <b>Core JavaScript Reference 1.5</b>
+        </td>
+      </tr>
+    </table><br>
+     
+    <blockquote>
+      <br>
+      <br>
+       <a name="1005816" id="1005816"></a> <a name="" id=""></a><span class="sansserif666"><b>Chapter 5 
+       &nbsp;</b></span> <a name="1003191" id="1003191"></a> <a name="Operators" id="Operators"></a> <span class="sansserifBlack"><b>Chapter 5 Operators 
+      </b></span><br>
+      <br>
+      <br>
+       <a name="1056211" id="1056211"></a> <span class="sansserif">JavaScript has assignment, comparison, arithmetic, bitwise, logical, string, and special operators. This chapter describes the operators and contains information about operator precedence.</span> 
+      <p>
+        <a name="1056212" id="1056212"></a> <span class="sansserif">The following table summarizes the JavaScript operators.</span>
+      </p>
+      <p>
+        <a name="1056548" id="1056548"></a> <span class="sansserif"><br></span>
+      </p>
+      <p>
+        <span class="sansserif"><b><a name="1065828" id="1065828"></a> <a name="JavaScript operators. &nbsp;" id="JavaScript operators. #160;"></a></b></span>
+      </p>
+      <align>
+        <span class="sansserif"><b class="sansserif">Table 5.1 &nbsp;&nbsp; JavaScript operators. &nbsp;
+        </b></span><br>
+        <br>
+         
+        <table>
+          <tr bgcolor="#CCCCCC" align="left" valign="top">
+            <th valign="top" align="left">
+              <a name="1065834" id="1065834"></a> 
+              <p class="alignleft">
+                <span class="sansserif"><b>Operator category</b></span>
+              </p>
+            </th>
+            <th valign="top" align="left">
+              <a name="1065836" id="1065836"></a> 
+              <p class="alignleft">
+                <span class="sansserif"><b>Operator</b></span>
+              </p>
+            </th>
+            <th valign="top" align="left">
+              <a name="1065838" id="1065838"></a> 
+              <p class="alignleft">
+                <span class="sansserif"><b>Description</b></span>
+              </p>
+            </th>
+          </tr>
+          <tr>
+            <td valign="top" colspan="1" rowspan="7">
+              <p>
+                <a name="1065842" id="1065842"></a> <span class="sansserif"><a href="ops.html#1042400">Arithmetic Operators</a></span>
+              </p>
+            </td>
+            <td valign="top">
+              <a name="1065845" id="1065845"></a> <span class="mono">+</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1065847" id="1065847"></a> <span class="sansserif">(Addition) Adds 2 numbers.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1065851" id="1065851"></a> <span class="mono">++</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1065853" id="1065853"></a> <span class="sansserif">(Increment) Adds one to a variable representing a number (returning either the new or old value of the variable).</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1065857" id="1065857"></a> <span class="mono">-</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1065859" id="1065859"></a> <span class="sansserif">(Unary negation, subtraction) As a unary operator, negates the value of its argument. As a binary operator, subtracts 2 numbers.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1065863" id="1065863"></a> <span class="mono">--</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1065865" id="1065865"></a> <span class="sansserif">(Decrement) Subtracts one from a variable representing a number (returning either the new or old value of the variable).</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1065869" id="1065869"></a> <span class="mono">*</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1065871" id="1065871"></a> <span class="sansserif">(Multiplication) Multiplies 2 numbers.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1065875" id="1065875"></a> <span class="mono">/</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1065877" id="1065877"></a> <span class="sansserif">(Division) Divides 2 numbers.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1065881" id="1065881"></a> <span class="mono">%</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1065883" id="1065883"></a> <span class="sansserif">(Modulus) Computes the integer remainder of dividing 2 numbers.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top" colspan="1" rowspan="2">
+              <p>
+                <a name="1065888" id="1065888"></a> <span class="sansserif"><a href="ops.html#1042582">String Operators</a></span>
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1065890" id="1065890"></a> <span class="sansserif">+</span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1065892" id="1065892"></a> <span class="sansserif">(String addition) Concatenates 2 strings.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1065896" id="1065896"></a> <span class="sansserif">+=</span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1065898" id="1065898"></a> <span class="sansserif">Concatenates 2 strings and assigns the result to the first operand.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top" colspan="1" rowspan="3">
+              <p>
+                <a name="1065902" id="1065902"></a> <span class="sansserif"><a href="ops.html#1044813">Logical Operators</a></span>
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1065905" id="1065905"></a> <span class="sansserif">&amp;&amp;</span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1065907" id="1065907"></a> <span class="sansserif">(Logical AND) Returns the first operand if it can be converted to false; otherwise, returns the second operand. Thus, when used with Boolean values, &amp;&amp; returns true if both operands are true; otherwise, returns false.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1065911" id="1065911"></a> <span class="sansserif">||</span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1065913" id="1065913"></a> <span class="sansserif">(Logical OR) Returns the first operand if it can be converted to true; otherwise, returns the second operand. Thus, when used with Boolean values, || returns true if either operand is true; if both are false, returns false.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1065917" id="1065917"></a> <span class="sansserif">!</span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1065919" id="1065919"></a> <span class="sansserif">(Logical NOT) Returns false if its single operand can be converted to true; otherwise, returns true.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top" colspan="1" rowspan="7">
+              <p>
+                <a name="1065923" id="1065923"></a> <span class="sansserif"><a href="ops.html#1042437">Bitwise Operators</a></span>
+              </p>
+            </td>
+            <td valign="top">
+              <a name="1065926" id="1065926"></a> <span class="mono">&amp;</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1065928" id="1065928"></a> <span class="sansserif">(Bitwise AND) Returns a one in each bit position if bits of both operands are ones.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1065932" id="1065932"></a> <span class="mono">^</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1065934" id="1065934"></a> <span class="sansserif">(Bitwise XOR) Returns a one in a bit position if bits of one but not both operands are one.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1065938" id="1065938"></a> <span class="mono">|</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1065940" id="1065940"></a> <span class="sansserif">(Bitwise OR) Returns a one in a bit if bits of either operand is one.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1065944" id="1065944"></a> <span class="mono">~</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1065946" id="1065946"></a> <span class="sansserif">(Bitwise NOT) Flips the bits of its operand.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1065950" id="1065950"></a> <span class="mono">&lt;&lt;</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1065952" id="1065952"></a> <span class="sansserif">(Left shift) Shifts its first operand in binary representation the number of bits to the left specified in the second operand, shifting in zeros from the right.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1065956" id="1065956"></a> <span class="mono">&gt;&gt;</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1065958" id="1065958"></a> <span class="sansserif">(Sign-propagating right shift) Shifts the first operand in binary representation the number of bits to the right specified in the second operand, discarding bits shifted off.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1065962" id="1065962"></a> <span class="mono">&gt;&gt;&gt;</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1065964" id="1065964"></a> <span class="sansserif">(Zero-fill right shift) Shifts the first operand in binary representation the number of bits to the right specified in the second operand, discarding bits shifted off, and shifting in zeros from the left.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top" colspan="1" rowspan="12">
+              <p>
+                <a name="1065968" id="1065968"></a> <span class="sansserif"><a href="ops.html#1042274">Assignment Operators</a></span>
+              </p>
+            </td>
+            <td valign="top">
+              <a name="1065971" id="1065971"></a> <span class="mono">=</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1065973" id="1065973"></a> <span class="sansserif">Assigns the value of the second operand to the first operand.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1065977" id="1065977"></a> <span class="mono">+=</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1065979" id="1065979"></a> <span class="sansserif">Adds 2 numbers and assigns the result to the first.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1065983" id="1065983"></a> <span class="mono">-=</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1065985" id="1065985"></a> <span class="sansserif">Subtracts 2 numbers and assigns the result to the first.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1065989" id="1065989"></a> <span class="mono">*=</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1065991" id="1065991"></a> <span class="sansserif">Multiplies 2 numbers and assigns the result to the first.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1065995" id="1065995"></a> <span class="mono">/=</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1065997" id="1065997"></a> <span class="sansserif">Divides 2 numbers and assigns the result to the first.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1066001" id="1066001"></a> <span class="mono">%=</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1066003" id="1066003"></a> <span class="sansserif">Computes the modulus of 2 numbers and assigns the result to the first.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1066007" id="1066007"></a> <span class="mono">&amp;=</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1066009" id="1066009"></a> <span class="sansserif">Performs a bitwise AND and assigns the result to the first operand.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1066013" id="1066013"></a> <span class="mono">^=</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1066015" id="1066015"></a> <span class="sansserif">Performs a bitwise XOR and assigns the result to the first operand.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1066019" id="1066019"></a> <span class="mono">|=</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1066021" id="1066021"></a> <span class="sansserif">Performs a bitwise OR and assigns the result to the first operand.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1066025" id="1066025"></a> <span class="mono">&lt;&lt;=</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1066027" id="1066027"></a> <span class="sansserif">Performs a left shift and assigns the result to the first operand.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1066031" id="1066031"></a> <span class="mono">&gt;&gt;=</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1066033" id="1066033"></a> <span class="sansserif">Performs a sign-propagating right shift and assigns the result to the first operand.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1066037" id="1066037"></a> <span class="mono">&gt;&gt;&gt;=</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1066039" id="1066039"></a> <span class="sansserif">Performs a zero-fill right shift and assigns the result to the first operand.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top" colspan="1" rowspan="8">
+              <p>
+                <a name="1066043" id="1066043"></a> <span class="sansserif"><a href="ops.html#1060974">Comparison Operators</a></span>
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1066046" id="1066046"></a> <span class="sansserif">==</span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1066048" id="1066048"></a> <span class="sansserif">Returns true if the operands are equal.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1066052" id="1066052"></a> <span class="sansserif">!=</span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1066054" id="1066054"></a> <span class="sansserif">Returns true if the operands are not equal.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1066058" id="1066058"></a> <span class="sansserif">===</span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1066060" id="1066060"></a> <span class="sansserif">Returns true if the operands are equal and of the same type.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1066064" id="1066064"></a> <span class="sansserif">!==</span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1066066" id="1066066"></a> <span class="sansserif">Returns true if the operands are not equal and/or not of the same type.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1066070" id="1066070"></a> <span class="sansserif">&gt;</span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1066072" id="1066072"></a> <span class="sansserif">Returns true if the left operand is greater than the right operand.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1066076" id="1066076"></a> <span class="sansserif">&gt;=</span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1066078" id="1066078"></a> <span class="sansserif">Returns true if the left operand is greater than or equal to the right operand.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1066082" id="1066082"></a> <span class="sansserif">&lt;</span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1066084" id="1066084"></a> <span class="sansserif">Returns true if the left operand is less than the right operand.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1066088" id="1066088"></a> <span class="sansserif">&lt;=</span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1066090" id="1066090"></a> <span class="sansserif">Returns true if the left operand is less than or equal to the right operand.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top" colspan="1" rowspan="10">
+              <p>
+                <a name="1066094" id="1066094"></a> <span class="sansserif"><a href="ops.html#1042588">Special Operators</a></span>
+              </p>
+            </td>
+            <td valign="top">
+              <a name="1066097" id="1066097"></a> <span class="mono">?:</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1066099" id="1066099"></a> <span class="sansserif">Performs a simple <span class="mono">"if...then...else".</span></span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1066103" id="1066103"></a> <span class="mono">,</span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1066105" id="1066105"></a> <span class="sansserif">Evaluates two expressions and returns the result of the second expression.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1066112" id="1066112"></a> <span class="mono"><a href="ops.html#1045837">delete</a></span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1066114" id="1066114"></a> <span class="sansserif">Deletes an object, an object's property, or an element at a specified index in an array.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1066180" id="1066180"></a> <span class="mono"><a href="ops.html#1066344">function</a></span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1066182" id="1066182"></a> <span class="sansserif">Defines an anonymous function.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1066121" id="1066121"></a> <span class="mono"><a href="ops.html#1066286">in</a></span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1066123" id="1066123"></a> <span class="sansserif">Returns true if the specified property is in the specified object.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1066130" id="1066130"></a> <span class="mono"><a href="ops.html#1055015">instanceof</a></span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1066132" id="1066132"></a> <span class="sansserif">Returns true if the specified object is of the specified object type.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1066139" id="1066139"></a> <span class="mono"><a href="ops.html#1055898">new</a></span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1066141" id="1066141"></a> <span class="sansserif">Creates an instance of a user-defined object type or of one of the built-in object types.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1066148" id="1066148"></a> <span class="mono"><a href="ops.html#1043482">this</a></span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1066150" id="1066150"></a> <span class="sansserif">Keyword that you can use to refer to the current object.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1066157" id="1066157"></a> <span class="mono"><a href="ops.html#1042603">typeof</a></span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1066159" id="1066159"></a> <span class="sansserif">Returns a string indicating the type of the unevaluated operand.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <a name="1066166" id="1066166"></a> <span class="mono"><a href="ops.html#1042625">void</a></span> 
+              <p>
+                &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1066168" id="1066168"></a> <span class="sansserif">Specifies an expression to be evaluated without returning a value.</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p>
+          <br>
+          <br>
+           <a name="1042274" id="1042274"></a> <a name="Assignment Operators" id="Assignment Operators"></a> <span class="sansserif">Assignment Operators
+          </span>
+        </p>
+        <hr size="2" noshade="noshade">
+        <br>
+         <a name="1042277" id="1042277"></a> <span class="sansserif">An assignment operator assigns a value to its left operand based on the value of its right operand.<br></span><br>
+         
+        <table width="90%" border="1" cellpadding="5" cellspacing="0">
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1043621" id="1043621"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1043623" id="1043623"></a> <span class="sansserif">JavaScript 1.0</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td valign="top">
+              <p>
+                <a name="1053113" id="1053113"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+              </p>
+            </td>
+            <td valign="top">
+              <p>
+                <a name="1053115" id="1053115"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p>
+          <a name="1043593" id="1043593"></a> <span class="sansserif">The basic assignment operator is equal (=), which assigns the value of its right operand to its left operand. That is, x = y assigns the value of y to x. The other assignment operators are usually shorthand for standard operations, as shown in the following table.</span>
+        </p>
+        <p>
+          <a name="1052965" id="1052965"></a> <span class="sansserif"><br></span>
+        </p>
+        <p>
+          <span class="sansserif"><b><a name="1042285" id="1042285"></a> <a name="Assignment operators" id="Assignment operators"></a></b></span>
+        </p>
+        <align>
+          <span class="sansserif"><b class="sansserif">Table 5.2 &nbsp;&nbsp; Assignment operators
+          </b></span><br>
+          <br>
+           
+          <table>
+            <tr bgcolor="#CCCCCC" align="left" valign="top">
+              <th valign="top" align="left">
+                <a name="1042289" id="1042289"></a> 
+                <p class="alignleft">
+                  <span class="sansserif"><b>Shorthand operator</b></span>
+                </p>
+              </th>
+              <th valign="top" align="left">
+                <a name="1042291" id="1042291"></a> 
+                <p class="alignleft">
+                  <span class="sansserif"><b>Meaning</b></span>
+                </p>
+              </th>
+            </tr>
+            <tr>
+              <td valign="top">
+                <a name="1042293" id="1042293"></a> <span class="mono">x += y</span> 
+                <p>
+                  &nbsp;
+                </p>
+              </td>
+              <td valign="top">
+                <a name="1042295" id="1042295"></a> <span class="mono">x = x + y</span> 
+                <p>
+                  &nbsp;
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td valign="top">
+                <a name="1042297" id="1042297"></a> <span class="mono">x -= y</span> 
+                <p>
+                  &nbsp;
+                </p>
+              </td>
+              <td valign="top">
+                <a name="1042299" id="1042299"></a> <span class="mono">x = x - y</span> 
+                <p>
+                  &nbsp;
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td valign="top">
+                <a name="1042301" id="1042301"></a> <span class="mono">x *= y</span> 
+                <p>
+                  &nbsp;
+                </p>
+              </td>
+              <td valign="top">
+                <a name="1042303" id="1042303"></a> <span class="mono">x = x * y</span> 
+                <p>
+                  &nbsp;
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td valign="top">
+                <a name="1042305" id="1042305"></a> <span class="mono">x /= y</span> 
+                <p>
+                  &nbsp;
+                </p>
+              </td>
+              <td valign="top">
+                <a name="1042307" id="1042307"></a> <span class="mono">x = x / y</span> 
+                <p>
+                  &nbsp;
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td valign="top">
+                <a name="1042309" id="1042309"></a> <span class="mono">x %= y</span> 
+                <p>
+                  &nbsp;
+                </p>
+              </td>
+              <td valign="top">
+                <a name="1042311" id="1042311"></a> <span class="mono">x = x % y</span> 
+                <p>
+                  &nbsp;
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td valign="top">
+                <a name="1042313" id="1042313"></a> <span class="mono">x &lt;&lt;= y</span> 
+                <p>
+                  &nbsp;
+                </p>
+              </td>
+              <td valign="top">
+                <a name="1042315" id="1042315"></a> <span class="mono">x = x &lt;&lt; y</span> 
+                <p>
+                  &nbsp;
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td valign="top">
+                <a name="1042317" id="1042317"></a> <span class="mono">x &gt;&gt;= y</span> 
+                <p>
+                  &nbsp;
+                </p>
+              </td>
+              <td valign="top">
+                <a name="1042319" id="1042319"></a> <span class="mono">x = x &gt;&gt; y</span> 
+                <p>
+                  &nbsp;
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td valign="top">
+                <a name="1042321" id="1042321"></a> <span class="mono">x &gt;&gt;&gt;= y</span> 
+                <p>
+                  &nbsp;
+                </p>
+              </td>
+              <td valign="top">
+                <a name="1042323" id="1042323"></a> <span class="mono">x = x &gt;&gt;&gt; y</span> 
+                <p>
+                  &nbsp;
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td valign="top">
+                <a name="1042325" id="1042325"></a> <span class="mono">x &amp;= y</span> 
+                <p>
+                  &nbsp;
+                </p>
+              </td>
+              <td valign="top">
+                <a name="1042327" id="1042327"></a> <span class="mono">x = x &amp; y</span> 
+                <p>
+                  &nbsp;
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td valign="top">
+                <a name="1042329" id="1042329"></a> <span class="mono">x ^= y</span> 
+                <p>
+                  &nbsp;
+                </p>
+              </td>
+              <td valign="top">
+                <a name="1042331" id="1042331"></a> <span class="mono">x = x ^ y</span> 
+                <p>
+                  &nbsp;
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td valign="top">
+                <a name="1042333" id="1042333"></a> <span class="mono">x |= y</span> 
+                <p>
+                  &nbsp;
+                </p>
+              </td>
+              <td valign="top">
+                <a name="1042335" id="1042335"></a> <span class="mono">x = x | y</span> 
+                <p>
+                  &nbsp;
+                </p>
+              </td>
+            </tr>
+          </table>
+          <p>
+            <a name="1042338" id="1042338"></a><span class="sansserif">In unusual situations, the assignment operator is not identical to the Meaning expression in <a href="ops.html#1042285">Table 5.2</a>. When the left operand of an assignment operator itself contains an assignment operator, the left operand is evaluated only once. For example:</span>
+          </p>
+          <p>
+            <a name="1061038" id="1061038"></a> <span class="mono">a[i++] += 5 //i is evaluated only once<br>
+             a[i++] = a[i++] + 5 //i is evaluated twice</span>
+          </p>
+          <p>
+            <br>
+            <br>
+             <a name="1060974" id="1060974"></a> <a name="Comparison Operators" id="Comparison Operators"></a> <span class="sansserif">Comparison Operators
+            </span>
+          </p>
+          <hr size="2" noshade="noshade">
+          <br>
+           <a name="1043854" id="1043854"></a> <span class="sansserif">A comparison operator compares its operands and returns a logical value based on whether the comparison is true.<br></span><br>
+           
+          <table width="90%" border="1" cellpadding="5" cellspacing="0">
+            <tr>
+              <td valign="top">
+                <p>
+                  <a name="1049975" id="1049975"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+                </p>
+              </td>
+              <td valign="top">
+                <p>
+                  <a name="1049977" id="1049977"></a> <span class="sansserif">JavaScript 1.0</span>
+                </p>
+                <p>
+                  <a name="1052922" id="1052922"></a>
+                </p>
+                <p>
+                  <a name="1050900" id="1050900"></a> <span class="sansserif">JavaScript 1.3: Added the <span class="mono">===</span> and <span class="mono">!==</span> operators.</span>
+                </p>
+                <p>
+                  <a name="1054717" id="1054717"></a>
+                </p>
+                <p>
+                  <a name="1054718" id="1054718"></a> <span class="sansserif">JavaScript 1.4: Deprecated <span class="mono">==</span> for comparison of two <span class="mono">JSObject</span> objects. Use the <a href="lcjsobj.html#1194386">JSObject.equals</a> method.</span> &nbsp;
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td valign="top">
+                <p>
+                  <a name="1053122" id="1053122"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+                </p>
+              </td>
+              <td valign="top">
+                <p>
+                  <a name="1053124" id="1053124"></a> <span class="sansserif">ECMA-262 includes all comparison operators except === and !==.<br>
+                   ECMA-262 Edition 3 adds === and !==.</span> &nbsp;
+                </p>
+              </td>
+            </tr>
+          </table>
+          <p>
+            <a name="1050162" id="1050162"></a><span class="sansserif">The operands can be numerical or string values. Strings are compared based on standard lexicographical ordering, using Unicode values.</span>
+          </p>
+          <p>
+            <a name="1049688" id="1049688"></a><span class="sansserif">A Boolean value is returned as the result of the comparison.</span>
+          </p>
+          <ul>
+            <li class="nobullet">
+              <a name="1050116" id="1050116"></a>
+            </li>
+            <li>
+              <span class="sansserif">Two strings are equal when they have the same sequence of characters, same length, and same characters in corresponding positions.</span> 
+              <p>
+                <a name="1050117" id="1050117"></a>
+              </p>
+            </li>
+            <li>
+              <span class="sansserif">Two numbers are equal when they are numerically equal (have the same number value). NaN is not equal to anything, including NaN. Positive and negative zeros are equal.</span> 
+              <p>
+                <a name="1050118" id="1050118"></a>
+              </p>
+            </li>
+            <li>
+              <span class="sansserif">Two objects are equal if they refer to the same Object.</span> 
+              <p>
+                <a name="1050119" id="1050119"></a>
+              </p>
+            </li>
+            <li>
+              <span class="sansserif">Two Boolean operands are equal if they are both <span class="mono">true</span> or <span class="mono">false</span>.</span> 
+              <p>
+                <a name="1050647" id="1050647"></a>
+              </p>
+            </li>
+            <li>
+              Null and Undefined types are == (but not ===).
+            </li>
+          </ul><a name="1047460" id="1047460"></a> <span class="sansserif">The following table describes the comparison operators.</span> 
+          <p>
+            <a name="1052977" id="1052977"></a> <span class="sansserif"><br></span>
+          </p>
+          <p>
+            <span class="sansserif"><b><a name="1043861" id="1043861"></a> <a name="Comparison operators" id="Comparison operators"></a></b></span>
+          </p>
+          <align>
+            <span class="sansserif"><b class="sansserif">Table 5.3 &nbsp;&nbsp; Comparison operators
+            </b></span><br>
+            <br>
+             
+            <table>
+              <tr bgcolor="#CCCCCC" align="left" valign="top">
+                <th valign="top" align="left">
+                  <a name="1043867" id="1043867"></a> 
+                  <p class="alignleft">
+                    <span class="sansserif"><b>Operator</b></span>
+                  </p>
+                </th>
+                <th valign="top" align="left">
+                  <a name="1043869" id="1043869"></a> 
+                  <p class="alignleft">
+                    <span class="sansserif"><b>Description</b></span>
+                  </p>
+                </th>
+                <th valign="top" align="left">
+                  <a name="1043874" id="1043874"></a> 
+                  <p class="alignleft">
+                    <span class="sansserif"><b>Examples returning true<a href="#1050189"><sup>1</sup></a></b></span>
+                  </p>
+                </th>
+              </tr>
+              <tr>
+                <td valign="top">
+                  <p>
+                    <a name="1043876" id="1043876"></a> <span class="sansserif">Equal (<span class="mono">==</span>)</span> &nbsp;
+                  </p>
+                </td>
+                <td valign="top">
+                  <p>
+                    <a name="1043878" id="1043878"></a> <span class="sansserif">Returns true if the operands are equal. If the two operands are not of the same type, JavaScript attempts to convert the operands to an appropriate type for the comparison.</span> &nbsp;
+                  </p>
+                </td>
+                <td valign="top">
+                  <a name="1043880" id="1043880"></a> <span class="mono">3 == var1<br>
+                   "3" == var1<br>
+                   3 == '3'</span> 
+                  <p>
+                    &nbsp;
+                  </p>
+                </td>
+              </tr>
+              <tr>
+                <td valign="top">
+                  <p>
+                    <a name="1043882" id="1043882"></a> <span class="sansserif">Not equal (<span class="mono">!=</span>)</span> &nbsp;
+                  </p>
+                </td>
+                <td valign="top">
+                  <p>
+                    <a name="1043884" id="1043884"></a> <span class="sansserif">Returns true if the operands are not equal. If the two operands are not of the same type, JavaScript attempts to convert the operands to an appropriate type for the comparison.</span> &nbsp;
+                  </p>
+                </td>
+                <td valign="top">
+                  <a name="1043886" id="1043886"></a> <span class="mono">var1 != 4<br>
+                   var1 != "3"</span> 
+                  <p>
+                    &nbsp;
+                  </p>
+                </td>
+              </tr>
+              <tr>
+                <td valign="top">
+                  <p>
+                    <a name="1049523" id="1049523"></a> <span class="sansserif">Strict equal (<span class="mono">===</span>)</span> &nbsp;
+                  </p>
+                </td>
+                <td valign="top">
+                  <p>
+                    <a name="1049525" id="1049525"></a> <span class="sansserif">Returns true if the operands are equal and of the same type.</span> &nbsp;
+                  </p>
+                </td>
+                <td valign="top">
+                  <a name="1049527" id="1049527"></a> <span class="mono">3 === var1</span> 
+                  <p>
+                    &nbsp;
+                  </p>
+                </td>
+              </tr>
+              <tr>
+                <td valign="top">
+                  <p>
+                    <a name="1049529" id="1049529"></a> <span class="sansserif">Strict not equal (<span class="mono">!==</span>)</span> &nbsp;
+                  </p>
+                </td>
+                <td valign="top">
+                  <p>
+                    <a name="1049531" id="1049531"></a> <span class="sansserif">Returns true if the operands are not equal and/or not of the same type.</span> &nbsp;
+                  </p>
+                </td>
+                <td valign="top">
+                  <a name="1049533" id="1049533"></a> <span class="mono">var1 !== "3"<br>
+                   3 !== '3'</span> 
+                  <p>
+                    &nbsp;
+                  </p>
+                </td>
+              </tr>
+              <tr>
+                <td valign="top">
+                  <p>
+                    <a name="1043888" id="1043888"></a> <span class="sansserif">Greater than (<span class="mono">&gt;</span>)</span> &nbsp;
+                  </p>
+                </td>
+                <td valign="top">
+                  <p>
+                    <a name="1043890" id="1043890"></a> <span class="sansserif">Returns true if the left operand is greater than the right operand.</span> &nbsp;
+                  </p>
+                </td>
+                <td valign="top">
+                  <a name="1043892" id="1043892"></a> <span class="mono">var2 &gt; var1</span> 
+                  <p>
+                    &nbsp;
+                  </p>
+                </td>
+              </tr>
+              <tr>
+                <td valign="top">
+                  <p>
+                    <a name="1043894" id="1043894"></a> <span class="sansserif">Greater than or equal (<span class="mono">&gt;=</span>)</span> &nbsp;
+                  </p>
+                </td>
+                <td valign="top">
+                  <p>
+                    <a name="1043896" id="1043896"></a> <span class="sansserif">Returns true if the left operand is greater than or equal to the right operand.</span> &nbsp;
+                  </p>
+                </td>
+                <td valign="top">
+                  <a name="1043898" id="1043898"></a> <span class="mono">var2 &gt;= var1<br>
+                   var1 &gt;= 3</span> 
+                  <p>
+                    &nbsp;
+                  </p>
+                </td>
+              </tr>
+              <tr>
+                <td valign="top">
+                  <p>
+                    <a name="1043900" id="1043900"></a> <span class="sansserif">Less than (<span class="mono">&lt;</span>)</span> &nbsp;
+                  </p>
+                </td>
+                <td valign="top">
+                  <p>
+                    <a name="1043902" id="1043902"></a> <span class="sansserif">Returns true if the left operand is less than the right operand.</span> &nbsp;
+                  </p>
+                </td>
+                <td valign="top">
+                  <a name="1043904" id="1043904"></a> <span class="mono">var1 &lt; var2</span> 
+                  <p>
+                    &nbsp;
+                  </p>
+                </td>
+              </tr>
+              <tr>
+                <td valign="top">
+                  <p>
+                    <a name="1043906" id="1043906"></a> <span class="sansserif">Less than or equal (<span class="mono">&lt;=</span>)</span> &nbsp;
+                  </p>
+                </td>
+                <td valign="top">
+                  <p>
+                    <a name="1043908" id="1043908"></a> <span class="sansserif">Returns true if the left operand is less than or equal to the right operand.</span> &nbsp;
+                  </p>
+                </td>
+                <td valign="top">
+                  <a name="1043910" id="1043910"></a> <span class="mono">var1 &lt;= var2<br>
+                   var2 &lt;= 5</span> 
+                  <p>
+                    &nbsp;
+                  </p>
+                </td>
+              </tr>
+            </table>
+            <table>
+              <tr>
+                <td>
+                  <a href="#1043874"><sup>1</sup></a> <a name="1050189" id="1050189"></a> <span class="sansserif">These examples assume that <span class="mono">var1</span> has been assigned the value 3 and <span class="mono">var2</span> has been assigned the value 4.</span>
+                </td>
+              </tr>
+            </table>
+            <p>
+              <br>
+               <a name="1050908" id="1050908"></a> <a name="Using the Equality Operators" id="Using the Equality Operators"></a> <span class="sansserif">Using the Equality Operators
+              </span><br>
+              <br>
+               <a name="1050207" id="1050207"></a><span class="sansserif">The standard equality operators (== and !=) compare two operands without regard to their type. The strict equality operators (=== and !==) perform equality comparisons on operands of the same type. Use strict equality operators if the operands must be of a specific type as well as value or if the exact type of the operands is important. Otherwise, use the standard equality operators, which allow you to compare the identity of two operands even if they are not of the same type.</span>
+            </p>
+            <p>
+              <a name="1051096" id="1051096"></a><span class="sansserif">When type conversion is needed, JavaScript converts <span class="mono">String</span>, <span class="mono">Number</span>, <span class="mono">Boolean</span>, or <span class="mono">Object</span> operands as follows.</span>
+            </p>
+            <ul>
+              <li class="nobullet">
+                <a name="1051097" id="1051097"></a>
+              </li>
+              <li>
+                When comparing a number and a string, the string is converted to a number value. JavaScript attempts to convert the string numeric literal to a <span class="mono">Number</span> type value. First, a mathematical value is derived from the string numeric literal. Next, this value is rounded to nearest <span class="mono">Number</span> type value. 
+                <p>
+                  <a name="1051098" id="1051098"></a>
+                </p>
+              </li>
+              <li>
+                If one of the operands is <span class="mono">Boolean</span>, the Boolean operand is converted to 1 if it is <span class="mono">true</span> and +0 if it is <span class="mono">false</span>. 
+                <p>
+                  <a name="1051099" id="1051099"></a>
+                </p>
+              </li>
+              <li>
+                If an object is compared with a number or string, JavaScript attempts to return the default value for the object. Operators attempt to convert the object to a primitive value, a <span class="mono">String</span> or <span class="mono">Number</span> value, using the <span class="mono">valueOf</span> and <span class="mono">toString</span> methods of the objects. If this attempt to convert the object fails, a runtime error is generated.
+              </li>
+            </ul><a name="1065532" id="1065532"></a><span class="sansserif">You cannot use the standard equality operator (<span class="mono">==</span>) to compare instances of <span class="mono">JSObject</span>. Use the <a href="lcjsobj.html#1194386">JSObject.equals</a> method for such comparisons.</span> 
+            <p>
+              <br>
+               <a name="1050474" id="1050474"></a> <a name="Backward Compatibility" id="Backward Compatibility"></a> <span class="sansserif"><b>Backward Compatibility</b></span><br>
+               <a name="1051242" id="1051242"></a><span class="sansserif">The behavior of the standard equality operators (== and !=) depends on the JavaScript version.</span>
+            </p>
+            <p>
+              <a name="1056739" id="1056739"></a> <span class="sansserif"><b>JavaScript 1.3 and earlier versions.</b></span> <a name="1056788" id="1056788"></a><span class="sansserif">You can use either the standard equality operator (<span class="mono">==</span>) or <a href="lcjsobj.html#1194386">JSObject.equals</a> to compare instances of <span class="mono">JSObject</span>.</span>
+            </p>
+            <p>
+              <a name="1050483" id="1050483"></a> <span class="sansserif"><b>JavaScript 1.2.</b></span> <a name="1051334" id="1051334"></a><span class="sansserif">The standard equality operators (== and !=) do not perform a type conversion before the comparison is made. The strict equality operators (=== and !==) are unavailable.</span>
+            </p>
+            <p>
+              <a name="1050705" id="1050705"></a> <span class="sansserif"><b>JavaScript 1.1 and earlier versions.</b></span> <a name="1051338" id="1051338"></a><span class="sansserif">The standard equality operators (== and !=) perform a type conversion before the comparison is made. The strict equality operators (=== and !==) are unavailable.</span>
+            </p>
+            <p>
+              <br>
+              <br>
+               <a name="1042400" id="1042400"></a> <a name="Arithmetic Operators" id="Arithmetic Operators"></a> <span class="sansserif">Arithmetic Operators
+              </span>
+            </p>
+            <hr size="2" noshade="noshade">
+            <br>
+             <a name="1042401" id="1042401"></a> <span class="sansserif">Arithmetic operators take numerical values (either literals or variables) as their operands and return a single numerical value. The standard arithmetic operators are addition (+), subtraction (-), multiplication (*), and division (/).<br></span><br>
+             
+            <table width="90%" border="1" cellpadding="5" cellspacing="0">
+              <tr>
+                <td valign="top">
+                  <p>
+                    <a name="1061137" id="1061137"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+                  </p>
+                </td>
+                <td valign="top">
+                  <p>
+                    <a name="1061139" id="1061139"></a> <span class="sansserif">JavaScript 1.0</span> &nbsp;
+                  </p>
+                </td>
+              </tr>
+              <tr>
+                <td valign="top">
+                  <p>
+                    <a name="1061141" id="1061141"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+                  </p>
+                </td>
+                <td valign="top">
+                  <p>
+                    <a name="1061143" id="1061143"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+                  </p>
+                </td>
+              </tr>
+            </table>
+            <p>
+              <a name="1061129" id="1061129"></a> <span class="sansserif">These operators work as they do in most other programming languages, except the / operator returns a floating-point division in JavaScript, not a truncated division as it does in languages such as C or Java. For example:</span>
+            </p>
+            <p>
+              <a name="1061117" id="1061117"></a> <span class="mono">1/2 //returns 0.5 in JavaScript<br>
+               1/2 //returns 0 in Java</span>
+            </p>
+            <p>
+              <br>
+               <a name="1042403" id="1042403"></a> <a name="% (Modulus)" id="% (Modulus)"></a> <span class="sansserif">% (Modulus)
+              </span><br>
+              <br>
+               <a name="1042406" id="1042406"></a><span class="sansserif">The modulus operator is used as follows:</span>
+            </p>
+            <p>
+              <a name="1042407" id="1042407"></a> <span class="mono"><i>var1</i> % <i>var2</i></span>
+            </p>
+            <p>
+              <a name="1042408" id="1042408"></a><span class="sansserif">The modulus operator returns the first operand modulo the second operand, that is, <span class="mono">var1</span> modulo <span class="mono">var2</span>, in the preceding statement, where <span class="mono">var1</span> and <span class="mono">var2</span> are variables. The modulo function is the integer remainder of dividing <span class="mono">var1</span> by <span class="mono">var2</span>. For example, 12 % 5 returns 2.</span>
+            </p>
+            <p>
+              <br>
+               <a name="1042412" id="1042412"></a> <a name="++ (Increment)" id="++ (Increment)"></a> <span class="sansserif">++ (Increment)
+              </span><br>
+              <br>
+               <a name="1042415" id="1042415"></a><span class="sansserif">The increment operator is used as follows:</span>
+            </p>
+            <p>
+              <a name="1042416" id="1042416"></a> <span class="sansserif"><i>var</i> <span class="mono">++</span> or <span class="mono">++</span><i>var</i></span>
+            </p>
+            <p>
+              <a name="1042417" id="1042417"></a><span class="sansserif">This operator increments (adds one to) its operand and returns a value. If used postfix, with operator after operand (for example, x++), then it returns the value before incrementing. If used prefix with operator before operand (for example, ++x), then it returns the value after incrementing.</span>
+            </p>
+            <p>
+              <a name="1042419" id="1042419"></a><span class="sansserif">For example, if x is three, then the statement <span class="mono">y&nbsp;=&nbsp;x++</span> sets <span class="mono">y</span> to 3 and increments <span class="mono">x</span> to 4. If <span class="mono">x</span> is 3, then the statement <span class="mono">y&nbsp;=&nbsp;++x</span> increments <span class="mono">x</span> to 4 and sets <span class="mono">y</span> to 4.</span>
+            </p>
+            <p>
+              <br>
+               <a name="1042421" id="1042421"></a> <a name="-- (Decrement)" id="-- (Decrement)"></a> <span class="sansserif">-- (Decrement)
+              </span><br>
+              <br>
+               <a name="1042424" id="1042424"></a><span class="sansserif">The decrement operator is used as follows:</span>
+            </p>
+            <p>
+              <a name="1042425" id="1042425"></a> <span class="sansserif"><i>var</i> <span class="mono">--</span> or <span class="mono">--</span><i>var</i></span>
+            </p>
+            <p>
+              <a name="1042426" id="1042426"></a><span class="sansserif">This operator decrements (subtracts one from) its operand and returns a value. If used postfix (for example, x--), then it returns the value before decrementing. If used prefix (for example, --x), then it returns the value after decrementing.</span>
+            </p>
+            <p>
+              <a name="1042428" id="1042428"></a><span class="sansserif">For example, if x is three, then the statement <span class="mono">y&nbsp;=&nbsp;x--</span> sets <span class="mono">y</span> to 3 and decrements <span class="mono">x</span> to 2. If <span class="mono">x</span> is 3, then the statement <span class="mono">y&nbsp;=&nbsp;--x</span> decrements <span class="mono">x</span> to 2 and sets <span class="mono">y</span> to 2.</span>
+            </p>
+            <p>
+              <br>
+               <a name="1042430" id="1042430"></a> <a name="- (Unary Negation)" id="- (Unary Negation)"></a> <span class="sansserif">- (Unary Negation)
+              </span><br>
+              <br>
+               <a name="1042433" id="1042433"></a><span class="sansserif">The unary negation operator precedes its operand and negates it. For example, <span class="mono">y&nbsp;=&nbsp;-x</span> negates the value of <span class="mono">x</span> and assigns that to <span class="mono">y</span>; that is, if <span class="mono">x</span> were 3, <span class="mono">y</span> would get the value -3 and <span class="mono">x</span> would retain the value 3.</span>
+            </p>
+            <p>
+              <br>
+              <br>
+               <a name="1042437" id="1042437"></a> <a name="Bitwise Operators" id="Bitwise Operators"></a> <span class="sansserif">Bitwise Operators
+              </span>
+            </p>
+            <hr size="2" noshade="noshade">
+            <br>
+             <a name="1042438" id="1042438"></a> <span class="sansserif">Bitwise operators treat their operands as a set of 32 bits (zeros and ones), rather than as decimal, hexadecimal, or octal numbers. For example, the decimal number nine has a binary representation of 1001. Bitwise operators perform their operations on such binary representations, but they return standard JavaScript numerical values.</span> 
+            <p>
+              <a name="1042498" id="1042498"></a><span class="sansserif">The following table summarizes JavaScript's bitwise operators:</span>
+            </p>
+            <p>
+              <a name="1052986" id="1052986"></a> <span class="sansserif"><br></span>
+            </p>
+            <p>
+              <span class="sansserif"><b><a name="1042441" id="1042441"></a> <a name="Bitwise operators" id="Bitwise operators"></a></b></span>
+            </p>
+            <align>
+              <span class="sansserif"><b class="sansserif">Table 5.4 &nbsp;&nbsp; Bitwise operators
+              </b></span><br>
+              <br>
+               
+              <table>
+                <tr bgcolor="#CCCCCC" align="left" valign="top">
+                  <th valign="top" align="left">
+                    <a name="1042447" id="1042447"></a> 
+                    <p class="alignleft">
+                      <span class="sansserif"><b>Operator</b></span>
+                    </p>
+                  </th>
+                  <th valign="top" align="left">
+                    <a name="1042449" id="1042449"></a> 
+                    <p class="alignleft">
+                      <span class="sansserif"><b>Usage</b></span>
+                    </p>
+                  </th>
+                  <th valign="top" align="left">
+                    <a name="1042451" id="1042451"></a> 
+                    <p class="alignleft">
+                      <span class="sansserif"><b>Description</b></span>
+                    </p>
+                  </th>
+                </tr>
+                <tr>
+                  <td valign="top">
+                    <p>
+                      <a name="1042453" id="1042453"></a> <span class="sansserif">Bitwise AND</span> &nbsp;
+                    </p>
+                  </td>
+                  <td valign="top">
+                    <a name="1042456" id="1042456"></a> <span class="mono">a &amp; b</span> 
+                    <p>
+                      &nbsp;
+                    </p>
+                  </td>
+                  <td valign="top">
+                    <p>
+                      <a name="1061174" id="1061174"></a> <span class="sansserif">Returns a one in each bit position for which the corresponding bits of both operands are ones.</span> &nbsp;
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <td valign="top">
+                    <p>
+                      <a name="1042460" id="1042460"></a> <span class="sansserif">Bitwise OR</span> &nbsp;
+                    </p>
+                  </td>
+                  <td valign="top">
+                    <a name="1042463" id="1042463"></a> <span class="mono">a | b</span> 
+                    <p>
+                      &nbsp;
+                    </p>
+                  </td>
+                  <td valign="top">
+                    <p>
+                      <a name="1061188" id="1061188"></a> <span class="sansserif">Returns a one in each bit position for which the corresponding bits of either or both operands are ones.</span> &nbsp;
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <td valign="top">
+                    <p>
+                      <a name="1042467" id="1042467"></a> <span class="sansserif">Bitwise XOR</span> &nbsp;
+                    </p>
+                  </td>
+                  <td valign="top">
+                    <a name="1042470" id="1042470"></a> <span class="mono">a ^ b</span> 
+                    <p>
+                      &nbsp;
+                    </p>
+                  </td>
+                  <td valign="top">
+                    <p>
+                      <a name="1061194" id="1061194"></a> <span class="sansserif">Returns a one in each bit position for which the corresponding bits of either but not both operands are ones.</span> &nbsp;
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <td valign="top">
+                    <p>
+                      <a name="1042474" id="1042474"></a> <span class="sansserif">Bitwise NOT</span> &nbsp;
+                    </p>
+                  </td>
+                  <td valign="top">
+                    <a name="1042477" id="1042477"></a> <span class="mono">~ a</span> 
+                    <p>
+                      &nbsp;
+                    </p>
+                  </td>
+                  <td valign="top">
+                    <p>
+                      <a name="1042479" id="1042479"></a> <span class="sansserif">Inverts the bits of its operand.</span> &nbsp;
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <td valign="top">
+                    <p>
+                      <a name="1042481" id="1042481"></a> <span class="sansserif">Left shift</span> &nbsp;
+                    </p>
+                  </td>
+                  <td valign="top">
+                    <a name="1042483" id="1042483"></a> <span class="mono">a &lt;&lt; b</span> 
+                    <p>
+                      &nbsp;
+                    </p>
+                  </td>
+                  <td valign="top">
+                    <p>
+                      <a name="1042485" id="1042485"></a> <span class="sansserif">Shifts <span class="mono">a</span> in binary representation <span class="mono">b</span> bits to left, shifting in zeros from the right.</span> &nbsp;
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <td valign="top">
+                    <p>
+                      <a name="1042487" id="1042487"></a> <span class="sansserif">Sign-propagating right shift</span> &nbsp;
+                    </p>
+                  </td>
+                  <td valign="top">
+                    <a name="1042489" id="1042489"></a> <span class="mono">a &gt;&gt; b</span> 
+                    <p>
+                      &nbsp;
+                    </p>
+                  </td>
+                  <td valign="top">
+                    <p>
+                      <a name="1042491" id="1042491"></a> <span class="sansserif">Shifts <span class="mono">a</span> in binary representation <span class="mono">b</span> bits to right, discarding bits shifted off.</span> &nbsp;
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <td valign="top">
+                    <p>
+                      <a name="1042493" id="1042493"></a> <span class="sansserif">Zero-fill right shift</span> &nbsp;
+                    </p>
+                  </td>
+                  <td valign="top">
+                    <a name="1042495" id="1042495"></a> <span class="mono">a &gt;&gt;&gt; b</span> 
+                    <p>
+                      &nbsp;
+                    </p>
+                  </td>
+                  <td valign="top">
+                    <p>
+                      <a name="1042497" id="1042497"></a> <span class="sansserif">Shifts <span class="mono">a</span> in binary representation <span class="mono">b</span> bits to the right, discarding bits shifted off, and shifting in zeros from the left.</span> &nbsp;
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              <p>
+                <br>
+                 <a name="1042500" id="1042500"></a> <a name="Bitwise Logical Operators&lt;BR&gt; &lt;P&gt; &lt;TABLE WIDTH=" border="1" cellpadding="5" cellspacing="0" id="Bitwise Logical Operatorslt;BRgt; lt;Pgt; lt;TABLE WIDTH="></a>
+              </p><br>
+              <table>
+                <tr>
+                  <td valign="top">
+                    <p>
+                      <a name="1044145" id="1044145"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+                    </p>
+                  </td>
+                  <td valign="top">
+                    <p>
+                      <a name="1044147" id="1044147"></a> <span class="sansserif">JavaScript 1.0</span> &nbsp;
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <td valign="top">
+                    <p>
+                      <a name="1053136" id="1053136"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+                    </p>
+                  </td>
+                  <td valign="top">
+                    <p>
+                      <a name="1053138" id="1053138"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              <p>
+                "&gt; <span class="sansserif">Bitwise Logical Operators<br></span>
+              </p>
+              <p>
+                <br>
+                <br>
+              </p>
+              <table width="90%" border="1" cellpadding="5" cellspacing="0">
+                <tr>
+                  <td valign="top">
+                    <p>
+                      <a name="1044145" id="1044145"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+                    </p>
+                  </td>
+                  <td valign="top">
+                    <p>
+                      <a name="1044147" id="1044147"></a> <span class="sansserif">JavaScript 1.0</span> &nbsp;
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <td valign="top">
+                    <p>
+                      <a name="1053136" id="1053136"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+                    </p>
+                  </td>
+                  <td valign="top">
+                    <p>
+                      <a name="1053138" id="1053138"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              <p>
+                
+                <br>
+                <br>
+                 <a name="1042503" id="1042503"></a> <span class="sansserif">Conceptually, the bitwise logical operators work as follows:</span>
+              </p>
+              <ul>
+                <li class="nobullet">
+                  <a name="1042504" id="1042504"></a>
+                </li>
+                <li>
+                  <span class="sansserif">The operands are converted to thirty-two-bit integers and expressed by a series of bits (zeros and ones).</span> 
+                  <p>
+                    <a name="1042505" id="1042505"></a>
+                  </p>
+                </li>
+                <li>
+                  <span class="sansserif">Each bit in the first operand is paired with the corresponding bit in the second operand: first bit to first bit, second bit to second bit, and so on.</span> 
+                  <p>
+                    <a name="1042506" id="1042506"></a>
+                  </p>
+                </li>
+                <li>
+                  The operator is applied to each pair of bits, and the result is constructed bitwise.
+                </li>
+              </ul><a name="1042507" id="1042507"></a><span class="sansserif">For example, the binary representation of nine is 1001, and the binary representation of fifteen is 1111. So, when the bitwise operators are applied to these values, the results are as follows:</span> 
+              <ul>
+                <li class="nobullet">
+                  <a name="1042508" id="1042508"></a>
+                </li>
+                <li>
+                  <span class="sansserif">15 &amp; 9 yields 9 (1111 &amp; 1001 = 1001)</span> 
+                  <p>
+                    <a name="1042509" id="1042509"></a>
+                  </p>
+                </li>
+                <li>
+                  <span class="sansserif">15 | 9 yields 15 (1111 | 1001 = 1111)</span> 
+                  <p>
+                    <a name="1042510" id="1042510"></a>
+                  </p>
+                </li>
+                <li>
+                  15 ^ 9 yields 6 (1111 ^ 1001 = 0110)
+                </li>
+              </ul>
+              <p>
+                <br>
+                 <a name="1042512" id="1042512"></a> <a name="Bitwise Shift Operators&lt;BR&gt; &lt;P&gt; &lt;TABLE WIDTH=" border="1" cellpadding="5" cellspacing="0" id="Bitwise Shift Operatorslt;BRgt; lt;Pgt; lt;TABLE WIDTH="></a>
+              </p>
+              <p>
+                <br>
+                <br>
+              </p>
+              <table>
+                <tr>
+                  <td valign="top">
+                    <p>
+                      <a name="1044173" id="1044173"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+                    </p>
+                  </td>
+                  <td valign="top">
+                    <p>
+                      <a name="1044175" id="1044175"></a> <span class="sansserif">JavaScript 1.0</span> &nbsp;
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <td valign="top">
+                    <p>
+                      <a name="1053141" id="1053141"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+                    </p>
+                  </td>
+                  <td valign="top">
+                    <p>
+                      <a name="1053143" id="1053143"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              <p>
+                "&gt; <span class="sansserif">Bitwise Shift Operators<br></span>
+              </p>
+              <p>
+                <br>
+                <br>
+              </p>
+              <table width="90%" border="1" cellpadding="5" cellspacing="0">
+                <tr>
+                  <td valign="top">
+                    <p>
+                      <a name="1044173" id="1044173"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+                    </p>
+                  </td>
+                  <td valign="top">
+                    <p>
+                      <a name="1044175" id="1044175"></a> <span class="sansserif">JavaScript 1.0</span> &nbsp;
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <td valign="top">
+                    <p>
+                      <a name="1053141" id="1053141"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+                    </p>
+                  </td>
+                  <td valign="top">
+                    <p>
+                      <a name="1053143" id="1053143"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              <p>
+                <span class="sansserif">
+                </span><br>
+                <br>
+                 <a name="1042515" id="1042515"></a> <span class="sansserif">The bitwise shift operators take two operands: the first is a quantity to be shifted, and the second specifies the number of bit positions by which the first operand is to be shifted. The direction of the shift operation is controlled by the operator used.</span>
+              </p>
+              <p>
+                <a name="1042516" id="1042516"></a> <span class="sansserif">Shift operators convert their operands to thirty-two-bit integers and return a result of the same type as the left operator.</span>
+              </p>
+              <p>
+                <br>
+              </p>
+              <p>
+                <a name="1042518" id="1042518"></a> <a name="&lt;&lt; (Left Shift)" id="lt;lt; (Left Shift)"></a> <span class="sansserif"><b>&lt;&lt; (Left Shift)
+                </b></span><br>
+                <br>
+                 <a name="1042519" id="1042519"></a> <span class="sansserif">This operator shifts the first operand the specified number of bits to the left. Excess bits shifted off to the left are discarded. Zero bits are shifted in from the right.</span>
+              </p>
+              <p>
+                <a name="1042520" id="1042520"></a> <span class="sansserif">For example, <span class="mono">9&lt;&lt;2</span> yields thirty-six, because 1001 shifted two bits to the left becomes 100100, which is thirty-six.</span>
+              </p>
+              <p>
+                <br>
+              </p>
+              <p>
+                <a name="1042522" id="1042522"></a> <a name="&gt;&gt; (Sign-Propagating Right Shift)" id="gt;gt; (Sign-Propagating Right Shift)"></a> <span class="sansserif"><b>&gt;&gt; (Sign-Propagating Right Shift) 
+                </b></span><br>
+                <br>
+                 <a name="1042523" id="1042523"></a> <span class="sansserif">This operator shifts the first operand the specified number of bits to the right. Excess bits shifted off to the right are discarded. Copies of the leftmost bit are shifted in from the left.</span>
+              </p>
+              <p>
+                <a name="1042524" id="1042524"></a> <span class="sansserif">For example, 9&gt;&gt;2 yields two, because 1001 shifted two bits to the right becomes 10, which is two. Likewise, -9&gt;&gt;2 yields -3, because the sign is preserved.</span>
+              </p>
+              <p>
+                <br>
+              </p>
+              <p>
+                <a name="1042525" id="1042525"></a> <a name="&gt;&gt;&gt; (Zero-Fill Right Shift)" id="gt;gt;gt; (Zero-Fill Right Shift)"></a> <span class="sansserif"><b>&gt;&gt;&gt; (Zero-Fill Right Shift) 
+                </b></span><br>
+                <br>
+                 <a name="1042526" id="1042526"></a> <span class="sansserif">This operator shifts the first operand the specified number of bits to the right. Excess bits shifted off to the right are discarded. Zero bits are shifted in from the left.</span>
+              </p>
+              <p>
+                <a name="1044809" id="1044809"></a> <span class="sansserif">For example, 19&gt;&gt;&gt;2 yields four, because 10011 shifted two bits to the right becomes 100, which is four. For non-negative numbers, zero-fill right shift and sign-propagating right shift yield the same result.</span>
+              </p>
+              <p>
+                <br>
+                <br>
+                 <a name="1044813" id="1044813"></a> <a name="Logical Operators" id="Logical Operators"></a> <span class="sansserif">Logical Operators
+                </span>
+              </p>
+              <hr size="2" noshade="noshade">
+              <br>
+               <a name="1044814" id="1044814"></a> <span class="sansserif">Logical operators are typically used with Boolean (logical) values; when they are, they return a Boolean value. However, the &amp;&amp; and || operators actually return the value of one of the specified operands, so if these operators are used with non-Boolean values, they may return a non-Boolean value.<br></span> 
+              <p>
+                <br>
+                <br>
+              </p>
+              <table width="90%" border="1" cellpadding="5" cellspacing="0">
+                <tr>
+                  <td valign="top">
+                    <p>
+                      <a name="1062502" id="1062502"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+                    </p>
+                  </td>
+                  <td valign="top">
+                    <p>
+                      <a name="1062504" id="1062504"></a> <span class="sansserif">JavaScript 1.0</span> &nbsp;
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <td valign="top">
+                    <p>
+                      <a name="1062506" id="1062506"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+                    </p>
+                  </td>
+                  <td valign="top">
+                    <p>
+                      <a name="1062508" id="1062508"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              <p>
+                <a name="1062736" id="1062736"></a> <span class="sansserif">The logical operators are described in the following table.</span>
+              </p>
+              <p>
+                <a name="1062159" id="1062159"></a> <span class="sansserif"><br></span>
+              </p>
+              <p>
+                <span class="sansserif"><b><a name="1062127" id="1062127"></a> <a name="Logical operators" id="Logical operators"></a></b></span>
+              </p>
+              <align>
+                <span class="sansserif"><b class="sansserif">Table 5.5 &nbsp;&nbsp; Logical operators
+                </b></span><br>
+                <br>
+                 
+                <table>
+                  <tr bgcolor="#CCCCCC" align="left" valign="top">
+                    <th valign="top" align="left">
+                      <a name="1062133" id="1062133"></a> 
+                      <p class="alignleft">
+                        <span class="sansserif"><b>Operator</b></span>
+                      </p>
+                    </th>
+                    <th valign="top" align="left">
+                      <a name="1062135" id="1062135"></a> 
+                      <p class="alignleft">
+                        <span class="sansserif"><b>Usage</b></span>
+                      </p>
+                    </th>
+                    <th valign="top" align="left">
+                      <a name="1062137" id="1062137"></a> 
+                      <p class="alignleft">
+                        <span class="sansserif"><b>Description</b></span>
+                      </p>
+                    </th>
+                  </tr>
+                  <tr>
+                    <td valign="top">
+                      <p>
+                        <a name="1062682" id="1062682"></a> <span class="sansserif">&amp;&amp;</span> &nbsp;
+                      </p>
+                    </td>
+                    <td valign="top">
+                      <a name="1062142" id="1062142"></a> <span class="mono"><i>expr1</i> &amp;&amp; <i>expr2</i></span> 
+                      <p>
+                        &nbsp;
+                      </p>
+                    </td>
+                    <td valign="top">
+                      <p>
+                        <a name="1062144" id="1062144"></a> <span class="sansserif">(Logical AND) Returns <span class="mono">expr1</span> if it can be converted to false; otherwise, returns <span class="mono">expr2</span>. Thus, when used with Boolean values, &amp;&amp; returns true if both operands are true; otherwise, returns false.</span> &nbsp;
+                      </p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td valign="top">
+                      <p>
+                        <a name="1062685" id="1062685"></a> <span class="sansserif">||</span> &nbsp;
+                      </p>
+                    </td>
+                    <td valign="top">
+                      <a name="1062149" id="1062149"></a> <span class="mono"><i>expr1</i> || <i>expr2</i></span> 
+                      <p>
+                        &nbsp;
+                      </p>
+                    </td>
+                    <td valign="top">
+                      <p>
+                        <a name="1062151" id="1062151"></a> <span class="sansserif">(Logical OR) Returns <span class="mono">expr1</span> if it can be converted to true; otherwise, returns <span class="mono">expr2</span>. Thus, when used with Boolean values, || returns true if either operand is true; if both are false, returns false.</span> &nbsp;
+                      </p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td valign="top">
+                      <p>
+                        <a name="1062688" id="1062688"></a> <span class="sansserif">!</span> &nbsp;
+                      </p>
+                    </td>
+                    <td valign="top">
+                      <a name="1062156" id="1062156"></a> <span class="mono">!<i>expr</i></span> 
+                      <p>
+                        &nbsp;
+                      </p>
+                    </td>
+                    <td valign="top">
+                      <p>
+                        <a name="1062302" id="1062302"></a> <span class="sansserif">(Logical NOT) Returns false if its single operand can be converted to true; otherwise, returns true.</span> &nbsp;
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+                <p>
+                  <a name="1046630" id="1046630"></a> <span class="sansserif">Examples of expressions that can be converted to false are those that evaluate to null, 0, the empty string (""), or undefined.</span>
+                </p>
+                <p>
+                  <a name="1064668" id="1064668"></a> <span class="sansserif">Even though the &amp;&amp; and || operators can be used with operands that are not Boolean values, they can still be considered Boolean operators since their return values can always be converted to Boolean values.</span>
+                </p>
+                <p>
+                  <a name="1063763" id="1063763"></a> <span class="sansserif"><b>Short-Circuit Evaluation.</b></span> <a name="1063764" id="1063764"></a> <span class="sansserif">As logical expressions are evaluated left to right, they are tested for possible "short-circuit" evaluation using the following rules:</span>
+                </p>
+                <ul>
+                  <li class="nobullet">
+                    <a name="1063765" id="1063765"></a>
+                  </li>
+                  <li>
+                    <span class="mono">false</span> &amp;&amp; <i>anything</i> is short-circuit evaluated to false. 
+                    <p>
+                      <a name="1063766" id="1063766"></a>
+                    </p>
+                  </li>
+                  <li>
+                    <span class="mono">true</span> || <i>anything</i> is short-circuit evaluated to true.
+                  </li>
+                </ul><a name="1063767" id="1063767"></a> <span class="sansserif">The rules of logic guarantee that these evaluations are always correct. Note that the <i>anything</i> part of the above expressions is not evaluated, so any side effects of doing so do not take effect.</span> 
+                <p>
+                  <br>
+                   <a name="1064378" id="1064378"></a> <a name="Backward Compatibility" id="Backward Compatibility"></a> <span class="sansserif"><b>Backward Compatibility</b></span><br>
+                </p>
+                <p>
+                  <a name="1064380" id="1064380"></a> <span class="sansserif"><b>JavaScript 1.0 and 1.1.</b></span> <a name="1064381" id="1064381"></a> <span class="sansserif">The &amp;&amp; and || operators behave as follows:</span>
+                </p>
+                <p>
+                  <a name="1064539" id="1064539"></a> <span class="sansserif"><br></span>
+                </p>
+                <p>
+                  <br>
+                  <br>
+                </p>
+                <table width="90%" border="1" cellpadding="5" cellspacing="0">
+                  <tr bgcolor="#CCCCCC" align="left" valign="top">
+                    <th valign="top" align="left">
+                      <a name="1064549" id="1064549"></a> 
+                      <p class="alignleft">
+                        <span class="sansserif"><b>Operator</b></span>
+                      </p>
+                    </th>
+                    <th valign="top" align="left">
+                      <a name="1064551" id="1064551"></a> 
+                      <p class="alignleft">
+                        <span class="sansserif"><b>Behavior</b></span>
+                      </p>
+                    </th>
+                  </tr>
+                  <tr>
+                    <td valign="top">
+                      <p>
+                        <a name="1064553" id="1064553"></a> <span class="sansserif">&amp;&amp;</span> &nbsp;
+                      </p>
+                    </td>
+                    <td valign="top">
+                      <p>
+                        <a name="1064555" id="1064555"></a> <span class="sansserif">If the first operand (<span class="mono">expr1</span>) can be converted to false, the &amp;&amp; operator returns false rather than the value of <span class="mono">expr1</span>.</span> &nbsp;
+                      </p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td valign="top">
+                      <p>
+                        <a name="1064557" id="1064557"></a> <span class="sansserif">||</span> &nbsp;
+                      </p>
+                    </td>
+                    <td valign="top">
+                      <p>
+                        <a name="1064559" id="1064559"></a> <span class="sansserif">If the first operand (<span class="mono">expr1</span>) can be converted to true, the || operator returns true rather than the value of <span class="mono">expr1</span>.</span> &nbsp;
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+                <p>
+                  <br>
+                   <a name="1062892" id="1062892"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+                   <a name="1062851" id="1062851"></a> <span class="sansserif">The following code shows examples of the &amp;&amp; (logical AND) operator.</span>
+                </p>
+                <p>
+                  <a name="1062974" id="1062974"></a> <span class="mono">a1=true &amp;&amp; true &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// t &amp;&amp; t returns true<br>
+                   a2=true &amp;&amp; false &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// t &amp;&amp; f returns false<br>
+                   a3=false &amp;&amp; true &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// f &amp;&amp; t returns false<br>
+                   a4=false &amp;&amp; (3 == 4) &nbsp;// f &amp;&amp; f returns false<br>
+                   a5="Cat" &amp;&amp; "Dog" &nbsp;&nbsp;&nbsp;&nbsp;// t &amp;&amp; t returns Dog<br>
+                   a6=false &amp;&amp; "Cat" &nbsp;&nbsp;&nbsp;&nbsp;// f &amp;&amp; t returns false<br>
+                   a7="Cat" &amp;&amp; false &nbsp;&nbsp;&nbsp;&nbsp;// t &amp;&amp; f returns false</span>
+                </p>
+                <p>
+                  <a name="1064276" id="1064276"></a> <span class="sansserif">The following code shows examples of the || (logical OR) operator.</span>
+                </p>
+                <p>
+                  <a name="1063089" id="1063089"></a> <span class="mono">o1=true || true &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// t || t returns true<br>
+                   o2=false || true &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// f || t returns true<br>
+                   o3=true || false &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// t || f returns true<br>
+                   o4=false || (3 == 4) &nbsp;// f || f returns false<br>
+                   o5="Cat" || "Dog" &nbsp;&nbsp;&nbsp;&nbsp;// t || t returns Cat<br>
+                   o6=false || "Cat" &nbsp;&nbsp;&nbsp;&nbsp;// f || t returns Cat<br>
+                   o7="Cat" || false &nbsp;&nbsp;&nbsp;&nbsp;// t || f returns Cat</span>
+                </p>
+                <p>
+                  <a name="1064352" id="1064352"></a> <span class="sansserif">The following code shows examples of the ! (logical NOT) operator.</span>
+                </p>
+                <p>
+                  <a name="1063511" id="1063511"></a> <span class="mono">n1=!true &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// !t returns false<br>
+                   n2=!false &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// !f returns true<br>
+                   n3=!"Cat" &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// !t returns false</span>
+                </p>
+                <p>
+                  <br>
+                  <br>
+                   <a name="1042582" id="1042582"></a> <a name="String Operators" id="String Operators"></a> <span class="sansserif">String Operators
+                  </span>
+                </p>
+                <hr size="2" noshade="noshade">
+                <br>
+                 <a name="1042585" id="1042585"></a><span class="sansserif">In addition to the comparison operators, which can be used on string values, the concatenation operator (+) concatenates two string values together, returning another string that is the union of the two operand strings. For example, <span class="mono">"my&nbsp;"&nbsp;+&nbsp;"string"</span> returns the string <span class="mono">"my&nbsp;string"</span>.<br></span> 
+                <p>
+                  <br>
+                  <br>
+                </p>
+                <table width="90%" border="1" cellpadding="5" cellspacing="0">
+                  <tr>
+                    <td valign="top">
+                      <p>
+                        <a name="1044292" id="1044292"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+                      </p>
+                    </td>
+                    <td valign="top">
+                      <p>
+                        <a name="1044294" id="1044294"></a> <span class="sansserif">JavaScript 1.0</span> &nbsp;
+                      </p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td valign="top">
+                      <p>
+                        <a name="1053151" id="1053151"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+                      </p>
+                    </td>
+                    <td valign="top">
+                      <p>
+                        <a name="1053153" id="1053153"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+                <p>
+                  <a name="1042586" id="1042586"></a> <span class="sansserif">The shorthand assignment operator += can also be used to concatenate strings. For example, if the variable <span class="mono">mystring</span> has the value "alpha," then the expression <span class="mono">mystring&nbsp;+=&nbsp;"bet"</span> evaluates to "alphabet" and assigns this value to <span class="mono">mystring</span>.</span>
+                </p>
+                <p>
+                  <br>
+                  <br>
+                   <a name="1042588" id="1042588"></a> <a name="Special Operators" id="Special Operators"></a> <span class="sansserif">Special Operators
+                  </span>
+                </p>
+                <hr size="2" noshade="noshade">
+                <br>
+                 
+                <p>
+                  <br>
+                   <a name="1045406" id="1045406"></a> <a name="?: (Conditional operator)" id="?: (Conditional operator)"></a> <span class="sansserif">?: (Conditional operator)
+                  </span><br>
+                  <br>
+                   <a name="1045435" id="1045435"></a> <span class="sansserif">The conditional operator is the only JavaScript operator that takes three operands. This operator is frequently used as a shortcut for the <span class="mono">if</span> statement.<br></span>
+                </p>
+                <p>
+                  <br>
+                  <br>
+                </p>
+                <table width="90%" border="1" cellpadding="5" cellspacing="0">
+                  <tr>
+                    <td valign="top">
+                      <p>
+                        <a name="1045527" id="1045527"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+                      </p>
+                    </td>
+                    <td valign="top">
+                      <p>
+                        <a name="1045529" id="1045529"></a> <span class="sansserif">JavaScript 1.0</span> &nbsp;
+                      </p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td valign="top">
+                      <p>
+                        <a name="1053163" id="1053163"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+                      </p>
+                    </td>
+                    <td valign="top">
+                      <p>
+                        <a name="1053165" id="1053165"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+                <p>
+                  <br>
+                   <a name="1045531" id="1045531"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+                   <a name="1045532" id="1045532"></a> <span class="mono"><i>condition</i> ? <i>expr1</i> : <i>expr2</i></span>
+                </p>
+                <p>
+                  <br>
+                   <a name="1045622" id="1045622"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+                   <a name="1045660" id="1045660"></a> <span class="sansserif"><br></span>
+                </p>
+                <p>
+                  <br>
+                  <br>
+                </p>
+                <table width="90%" border="1" cellpadding="5" cellspacing="0">
+                  <tr>
+                    <td valign="top">
+                      <a name="1045647" id="1045647"></a> <span class="mono">condition</span> 
+                      <p>
+                        &nbsp;
+                      </p>
+                    </td>
+                    <td valign="top">
+                      <p>
+                        <a name="1045649" id="1045649"></a> <span class="sansserif">An expression that evaluates to <span class="mono">true</span> or <span class="mono">false</span>.</span> &nbsp;
+                      </p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td valign="top">
+                      <a name="1045651" id="1045651"></a> <span class="mono">expr1, expr2</span> 
+                      <p>
+                        &nbsp;
+                      </p>
+                    </td>
+                    <td valign="top">
+                      <p>
+                        <a name="1045653" id="1045653"></a> <span class="sansserif">Expressions with values of any type.</span> &nbsp;
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+                <p>
+                  <br>
+                   <a name="1045625" id="1045625"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+                   <a name="1045627" id="1045627"></a> <span class="sansserif">If <span class="mono">condition</span> is <span class="mono">true</span>, the operator returns the value of <span class="mono">expr1</span>; otherwise, it returns the value of <span class="mono">expr2</span>. For example, to display a different message based on the value of the <span class="mono">isMember</span> variable, you could use this statement:</span>
+                </p>
+                <p>
+                  <a name="1045562" id="1045562"></a> <span class="mono">document.write ("The fee is " + (isMember ? "$2.00" : "$10.00"))</span>
+                </p>
+                <p>
+                  <br>
+                   <a name="1045439" id="1045439"></a> <a name=", (Comma operator)" id=", (Comma operator)"></a> <span class="sansserif">, (Comma operator)
+                  </span><br>
+                  <br>
+                   <a name="1045584" id="1045584"></a> <span class="sansserif">The comma operator evaluates both of its operands and returns the value of the second operand.<br></span>
+                </p>
+                <p>
+                  <br>
+                  <br>
+                </p>
+                <table width="90%" border="1" cellpadding="5" cellspacing="0">
+                  <tr>
+                    <td valign="top">
+                      <p>
+                        <a name="1045590" id="1045590"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+                      </p>
+                    </td>
+                    <td valign="top">
+                      <p>
+                        <a name="1045592" id="1045592"></a> <span class="sansserif">JavaScript 1.0</span> &nbsp;
+                      </p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td valign="top">
+                      <p>
+                        <a name="1053176" id="1053176"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+                      </p>
+                    </td>
+                    <td valign="top">
+                      <p>
+                        <a name="1053178" id="1053178"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+                <p>
+                  <br>
+                   <a name="1045710" id="1045710"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+                   <a name="1045677" id="1045677"></a> <span class="mono"><i>expr1</i>, <i>expr2</i></span>
+                </p>
+                <p>
+                  <br>
+                   <a name="1045678" id="1045678"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+                   <a name="1045688" id="1045688"></a> <span class="sansserif"><br></span>
+                </p>
+                <p>
+                  <br>
+                  <br>
+                </p>
+                <table width="90%" border="1" cellpadding="5" cellspacing="0">
+                  <tr>
+                    <td valign="top">
+                      <a name="1045685" id="1045685"></a> <span class="mono">expr1, expr2</span> 
+                      <p>
+                        &nbsp;
+                      </p>
+                    </td>
+                    <td valign="top">
+                      <p>
+                        <a name="1045687" id="1045687"></a> <span class="sansserif">Any expressions.</span> &nbsp;
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+                <p>
+                  <br>
+                   <a name="1045689" id="1045689"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+                   <a name="1045832" id="1045832"></a> <span class="sansserif">You can use the comma operator when you want to include multiple expressions in a location that requires a single expression. The most common usage of this operator is to supply multiple parameters in a <a href="stmt.html#1004804">for</a> loop.</span>
+                </p>
+                <p>
+                  <a name="1045942" id="1045942"></a> <span class="sansserif">For example, if <span class="mono">a</span> is a 2-dimensional array with 10 elements on a side, the following code uses the comma operator to increment two variables at once. The code prints the values of the diagonal elements in the array:</span>
+                </p>
+                <p>
+                  <a name="1045865" id="1045865"></a> <span class="mono">for (var i=0, j=9; i &lt;= 9; i++, j--)<br>
+                   &nbsp;&nbsp;&nbsp;document.writeln("a["+i+","+j+"]= " + a[i,j])</span>
+                </p>
+                <p>
+                  <br>
+                   <a name="1045837" id="1045837"></a> <a name="delete" id="delete"></a> <span class="sansserif">delete
+                  </span><br>
+                  <br>
+                   <a name="1045953" id="1045953"></a> <span class="sansserif">The delete operator deletes an object, an object's property, or an element at a specified index in an array.<br></span>
+                </p>
+                <p>
+                  <br>
+                  <br>
+                </p>
+                <table width="90%" border="1" cellpadding="5" cellspacing="0">
+                  <tr>
+                    <td valign="top">
+                      <p>
+                        <a name="1045981" id="1045981"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+                      </p>
+                    </td>
+                    <td valign="top">
+                      <p>
+                        <a name="1045983" id="1045983"></a> <span class="sansserif">JavaScript 1.2, NES 3.0</span> &nbsp;
+                      </p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td valign="top">
+                      <p>
+                        <a name="1053185" id="1053185"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+                      </p>
+                    </td>
+                    <td valign="top">
+                      <p>
+                        <a name="1053187" id="1053187"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+                <p>
+                  <br>
+                   <a name="1045954" id="1045954"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+                   <a name="1045955" id="1045955"></a> <span class="mono">delete <i>objectName<br></i>delete <i>objectName</i>.<i>property<br></i>delete <i>objectName</i>[<i>index</i>]<br>
+                   delete <i>property</i> // legal only within a with statement</span>
+                </p>
+                <p>
+                  <br>
+                   <a name="1045956" id="1045956"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+                   <a name="1045957" id="1045957"></a> <span class="sansserif"><br></span>
+                </p>
+                <p>
+                  <br>
+                  <br>
+                </p>
+                <table width="90%" border="1" cellpadding="5" cellspacing="0">
+                  <tr>
+                    <td valign="top">
+                      <a name="1046151" id="1046151"></a> <span class="mono">objectName</span> 
+                      <p>
+                        &nbsp;
+                      </p>
+                    </td>
+                    <td valign="top">
+                      <p>
+                        <a name="1046153" id="1046153"></a> <span class="sansserif">The name of an object.</span> &nbsp;
+                      </p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td valign="top">
+                      <a name="1046099" id="1046099"></a> <span class="mono">property</span> 
+                      <p>
+                        &nbsp;
+                      </p>
+                    </td>
+                    <td valign="top">
+                      <p>
+                        <a name="1046121" id="1046121"></a> <span class="sansserif">The property to delete.</span> &nbsp;
+                      </p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td valign="top">
+                      <a name="1046103" id="1046103"></a> <span class="mono">index</span> 
+                      <p>
+                        &nbsp;
+                      </p>
+                    </td>
+                    <td valign="top">
+                      <p>
+                        <a name="1046105" id="1046105"></a> <span class="sansserif">An integer representing the array index to delete.</span> &nbsp;
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+                <p>
+                  <br>
+                   <a name="1045959" id="1045959"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+                   <a name="1060217" id="1060217"></a> <span class="sansserif">The fourth form is legal only within a <span class="mono">with</span> statement, to delete a property from an object.</span>
+                </p>
+                <p>
+                  <a name="1060218" id="1060218"></a> <span class="sansserif">You can use the <span class="mono">delete</span> operator to delete variables declared implicitly but not those declared with the <span class="mono">var</span> statement.</span>
+                </p>
+                <p>
+                  <a name="1053086" id="1053086"></a> <span class="sansserif">If the <span class="mono">delete</span> operator succeeds, it sets the property or element to <span class="mono">undefined. The delete</span> operator returns true if the operation is possible; it returns false if the operation is not possible.</span>
+                </p>
+                <p>
+                  <a name="1060171" id="1060171"></a> <span class="mono">x=42<br>
+                   var y= 43<br>
+                   myobj=new Number()<br>
+                   myobj.h=4 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// create property h<br>
+                   delete x &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// returns true (can delete if declared implicitly)<br>
+                   delete y &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// returns false (cannot delete if declared with var)<br>
+                   delete Math.PI // returns false (cannot delete predefined properties)<br>
+                   delete myobj.h // returns true (can delete user-defined properties)<br>
+                   delete myobj &nbsp;&nbsp;// returns true (can delete objects)</span>
+                </p>
+                <p>
+                  <a name="1057588" id="1057588"></a> <span class="sansserif"><b>Deleting array elements.</b></span> <a name="1057706" id="1057706"></a> <span class="sansserif">When you delete an array element, the array length is not affected. For example, if you delete a[3], a[4] is still a[4] and a[3] is undefined.</span>
+                </p>
+                <p>
+                  <a name="1057142" id="1057142"></a> <span class="sansserif">When the <span class="mono">delete</span> operator removes an array element, that element is no longer in the array. In the following example, trees[3] is removed with <span class="mono">delete</span>.</span>
+                </p>
+                <p>
+                  <a name="1057079" id="1057079"></a> <span class="mono">trees=new Array("redwood","bay","cedar","oak","maple")<br>
+                   delete trees[3]<br>
+                   if (3 in trees) {<br>
+                   &nbsp;&nbsp;&nbsp;// this does not get executed<br>
+                   }</span>
+                </p>
+                <p>
+                  <a name="1057175" id="1057175"></a> <span class="sansserif">If you want an array element to exist but have an undefined value, use the <span class="mono">undefined</span> keyword instead of the <span class="mono">delete</span> operator. In the following example, trees[3] is assigned the value undefined, but the array element still exists:</span>
+                </p>
+                <p>
+                  <a name="1066282" id="1066282"></a> <span class="mono">trees=new Array("redwood","bay","cedar","oak","maple")<br>
+                   trees[3]=undefined<br>
+                   if (3 in trees) {<br>
+                   &nbsp;&nbsp;&nbsp;// this gets executed<br>
+                   }</span>
+                </p>
+                <p>
+                  <br>
+                   <a name="1066344" id="1066344"></a> <a name="function" id="function"></a> <span class="sansserif">function
+                  </span><br>
+                  <br>
+                   <a name="1066351" id="1066351"></a> <span class="sansserif">The <span class="mono">function</span> operator defines an anonymous function inside an expression.<br></span>
+                </p>
+                <p>
+                  <br>
+                  <br>
+                </p>
+                <table width="90%" border="1" cellpadding="5" cellspacing="0">
+                  <tr>
+                    <td valign="top">
+                      <p>
+                        <a name="1066348" id="1066348"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+                      </p>
+                    </td>
+                    <td valign="top">
+                      <p>
+                        <a name="1066350" id="1066350"></a> <span class="sansserif">JavaScript 1.5</span> &nbsp;
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+                <p>
+                  <br>
+                   <a name="1066602" id="1066602"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+                   <a name="1066603" id="1066603"></a> <span class="mono">{var | const} <i>variableName</i> = function(<i>parameters</i>) {<i>functionBody</i>};</span>
+                </p>
+                <p>
+                  <br>
+                   <a name="1066365" id="1066365"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+                   <a name="1066366" id="1066366"></a> <span class="sansserif">The following examples shows how the <span class="mono">function</span> operator is used.</span>
+                </p>
+                <p>
+                  <a name="1066846" id="1066846"></a> <span class="sansserif">This example declares an unnamed function inside an expression. It sets x to a function that returns the square of its argument:</span>
+                </p>
+                <p>
+                  <a name="1066788" id="1066788"></a> <span class="mono">var x = function(y) {return y*y};</span>
+                </p>
+                <p>
+                  <a name="1066789" id="1066789"></a> <span class="sansserif">The next example declares array a as an array of three functions:</span>
+                </p>
+                <p>
+                  <a name="1066790" id="1066790"></a> <span class="mono">var a = [function(y) {return y}, function y {return y*y}, function (y) [return y*y*y}];</span>
+                </p>
+                <p>
+                  <a name="1066854" id="1066854"></a> <span class="sansserif">For this array, a[0](5) returns 5, a[1](5) returns 25, and a[2](5) returns 125.</span>
+                </p>
+                <p>
+                  <br>
+                   <a name="1066286" id="1066286"></a> <a name="in" id="in"></a> <span class="sansserif">in
+                  </span><br>
+                  <br>
+                   <a name="1057972" id="1057972"></a> <span class="sansserif">The <span class="mono">in</span> operator returns true if the specified property is in the specified object.<br></span>
+                </p>
+                <p>
+                  <br>
+                  <br>
+                </p>
+                <table width="90%" border="1" cellpadding="5" cellspacing="0">
+                  <tr>
+                    <td valign="top">
+                      <p>
+                        <a name="1057975" id="1057975"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+                      </p>
+                    </td>
+                    <td valign="top">
+                      <p>
+                        <a name="1057977" id="1057977"></a> <span class="sansserif">JavaScript 1.4</span> &nbsp;
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+                <p>
+                  <br>
+                   <a name="1057777" id="1057777"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+                   <a name="1058100" id="1058100"></a> <span class="mono"><i>propNameOrNumber</i> in <i>objectName</i></span>
+                </p>
+                <p>
+                  <br>
+                   <a name="1063847" id="1063847"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+                   <a name="1058111" id="1058111"></a> <span class="sansserif"><br></span>
+                </p>
+                <p>
+                  <br>
+                  <br>
+                </p>
+                <table width="90%" border="1" cellpadding="5" cellspacing="0">
+                  <tr>
+                    <td valign="top">
+                      <a name="1058104" id="1058104"></a> <span class="mono">propNameOrNumber</span> 
+                      <p>
+                        &nbsp;
+                      </p>
+                    </td>
+                    <td valign="top">
+                      <p>
+                        <a name="1058106" id="1058106"></a> <span class="sansserif">A string or numeric expression representing a property name or array index.</span> &nbsp;
+                      </p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td valign="top">
+                      <a name="1058108" id="1058108"></a> <span class="mono">objectName</span> 
+                      <p>
+                        &nbsp;
+                      </p>
+                    </td>
+                    <td valign="top">
+                      <p>
+                        <a name="1058110" id="1058110"></a> <span class="sansserif">Name of an object.</span> &nbsp;
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+                <p>
+                  <br>
+                   <a name="1057794" id="1057794"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+                   <a name="1057795" id="1057795"></a> <span class="sansserif">The following examples show some uses of the <span class="mono">in</span> operator.</span>
+                </p>
+                <p>
+                  <a name="1059684" id="1059684"></a> <span class="mono">// Arrays<br>
+                   trees=new Array("redwood","bay","cedar","oak","maple")<br>
+                   0 in trees&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// returns true<br>
+                   3 in trees&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// returns true<br>
+                   6 in trees&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// returns false<br>
+                   "bay" in trees&nbsp;&nbsp;&nbsp;&nbsp;// returns false (you must specify the index number,<br>
+                   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// not the value at that index)<br>
+                   "length" in trees // returns true (length is an Array property)</span>
+                </p>
+                <p>
+                  <a name="1058280" id="1058280"></a> <span class="mono">// Predefined objects<br>
+                   "PI" in Math&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// returns true<br>
+                   myString=new String("coral")<br>
+                   "length" in myString&nbsp;&nbsp;// returns true</span>
+                </p>
+                <p>
+                  <a name="1058651" id="1058651"></a> <span class="mono">// Custom objects<br>
+                   mycar = {make:"Honda",model:"Accord",year:1998}<br>
+                   "make" in mycar&nbsp;&nbsp;// returns true<br>
+                   "model" in mycar // returns true</span>
+                </p>
+                <p>
+                  <a name="1060766" id="1060766"></a> <span class="sansserif">You must specify an object on the right side of the <span class="mono">in</span> operator. For example, you can specify a string created with the <span class="mono">String</span> constructor, but you cannot specify a string literal.</span>
+                </p>
+                <p>
+                  <a name="1059351" id="1059351"></a> <span class="mono">color1=new String("green")<br>
+                   "length" in color1 // returns true<br>
+                   color2="coral"<br>
+                   "length" in color2 // generates an error (color is not a String object)</span>
+                </p>
+                <p>
+                  <a name="1057859" id="1057859"></a> <span class="sansserif"><b>Using in with deleted or undefined properties.</b></span> <a name="1058840" id="1058840"></a> <span class="sansserif">If you delete a property with the <span class="mono">delete</span> operator, the <span class="mono">in</span> operator returns false for that property.</span>
+                </p>
+                <p>
+                  <a name="1058898" id="1058898"></a> <span class="mono">mycar = {make:"Honda",model:"Accord",year:1998}<br>
+                   delete mycar.make<br>
+                   "make" in mycar&nbsp;&nbsp;// returns false</span>
+                </p>
+                <p>
+                  <a name="1059022" id="1059022"></a> <span class="mono">trees=new Array("redwood","bay","cedar","oak","maple")<br>
+                   delete trees[3]<br>
+                   3 in trees // returns false</span>
+                </p>
+                <p>
+                  <a name="1058849" id="1058849"></a> <span class="sansserif">If you set a property to undefined but do not delete it, the <span class="mono">in</span> operator returns true for that property.</span>
+                </p>
+                <p>
+                  <a name="1058968" id="1058968"></a> <span class="mono">mycar = {make:"Honda",model:"Accord",year:1998}<br>
+                   mycar.make=undefined<br>
+                   "make" in mycar&nbsp;&nbsp;// returns true</span>
+                </p>
+                <p>
+                  <a name="1059029" id="1059029"></a> <span class="mono">trees=new Array("redwood","bay","cedar","oak","maple")<br>
+                   trees[3]=undefined<br>
+                   3 in trees // returns true</span>
+                </p>
+                <p>
+                  <a name="1058828" id="1058828"></a> <span class="sansserif">For additional information about using the <span class="mono">in</span> operator with deleted array elements, see <a href="ops.html#1045837">delete</a>.</span>
+                </p>
+                <p>
+                  <br>
+                   <a name="1055015" id="1055015"></a> <a name="instanceof" id="instanceof"></a> <span class="sansserif">instanceof
+                  </span><br>
+                  <br>
+                   <a name="1055016" id="1055016"></a> <span class="sansserif">The <span class="mono">instanceof</span> operator returns true if the specified object is of the specified object type.<br></span>
+                </p>
+                <p>
+                  <br>
+                  <br>
+                </p>
+                <table width="90%" border="1" cellpadding="5" cellspacing="0">
+                  <tr>
+                    <td valign="top">
+                      <p>
+                        <a name="1055019" id="1055019"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+                      </p>
+                    </td>
+                    <td valign="top">
+                      <p>
+                        <a name="1055021" id="1055021"></a> <span class="sansserif">JavaScript 1.4</span> &nbsp;
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+                <p>
+                  <br>
+                   <a name="1055026" id="1055026"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+                   <a name="1055027" id="1055027"></a> <span class="mono"><i>objectName</i> instanceof <i>objectType</i></span>
+                </p>
+                <p>
+                  <br>
+                   <a name="1063854" id="1063854"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+                   <a name="1055042" id="1055042"></a> <span class="sansserif"><br></span>
+                </p>
+                <p>
+                  <br>
+                  <br>
+                </p>
+                <table width="90%" border="1" cellpadding="5" cellspacing="0">
+                  <tr>
+                    <td valign="top">
+                      <a name="1055031" id="1055031"></a> <span class="mono">objectName</span> 
+                      <p>
+                        &nbsp;
+                      </p>
+                    </td>
+                    <td valign="top">
+                      <p>
+                        <a name="1055033" id="1055033"></a> <span class="sansserif">Name of the object to compare to <span class="mono">objectType</span>.</span> &nbsp;
+                      </p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td valign="top">
+                      <a name="1055035" id="1055035"></a> <span class="mono">objectType</span> 
+                      <p>
+                        &nbsp;
+                      </p>
+                    </td>
+                    <td valign="top">
+                      <p>
+                        <a name="1055037" id="1055037"></a> <span class="sansserif">Object type.</span> &nbsp;
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+                <p>
+                  <br>
+                   <a name="1055043" id="1055043"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+                   <a name="1056719" id="1056719"></a> <span class="sansserif">Use <span class="mono">instanceof</span> when you need to confirm the type of an object at runtime. For example, when catching exceptions, you can branch to different exception-handling code depending on the type of exception thrown.</span>
+                </p>
+                <p>
+                  <a name="1060829" id="1060829"></a> <span class="sansserif">You must specify an object on the right side of the <span class="mono">instanceof</span> operator. For example, you can specify a string created with the <span class="mono">String</span> constructor, but you cannot specify a string literal.</span>
+                </p>
+                <p>
+                  <a name="1059398" id="1059398"></a> <span class="mono">color1=new String("green")<br>
+                   color1 instanceof String // returns true<br>
+                   color2="coral"<br>
+                   color2 instanceof String // returns false (color is not a String object)</span>
+                </p>
+                <p>
+                  <br>
+                   <a name="1055745" id="1055745"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+                   <a name="1060675" id="1060675"></a> <span class="sansserif">See also the examples for <a href="stmt.html#1052196">throw</a>.</span>
+                </p>
+                <p>
+                  <a name="1055746" id="1055746"></a> <span class="sansserif"><b>Example 1.</b> The following code uses <span class="mono">instanceof</span> to determine whether <span class="mono">theDay</span> is a <span class="mono">Date</span> object. Because <span class="mono">theDay</span> is a <span class="mono">Date</span> object, the statements in the <span class="mono">if</span> statement execute.</span>
+                </p>
+                <p>
+                  <a name="1055772" id="1055772"></a> <span class="mono">theDay=new Date(1995, 12, 17)<br>
+                   if (theDay instanceof Date) {<br>
+                   &nbsp;&nbsp;&nbsp;// statements to execute<br>
+                   }</span>
+                </p>
+                <p>
+                  <a name="1059878" id="1059878"></a> <span class="sansserif"><b>Example 2.</b> The following code uses <span class="mono">instanceof</span> to demonstrate that <span class="mono">String</span> and <span class="mono">Date</span> objects are also of type <span class="mono">Object</span> (they are derived from <span class="mono">Object</span>).</span>
+                </p>
+                <p>
+                  <a name="1060023" id="1060023"></a> <span class="mono">myString=new String()<br>
+                   myDate=new Date()</span>
+                </p>
+                <p>
+                  <a name="1060026" id="1060026"></a> <span class="mono">myString instanceof String // returns true<br>
+                   myString instanceof Object // returns true<br>
+                   myString instanceof Date&nbsp;&nbsp;&nbsp;// returns false</span>
+                </p>
+                <p>
+                  <a name="1060030" id="1060030"></a> <span class="mono">myDate instanceof Date&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// returns true<br>
+                   myDate instanceof Object&nbsp;&nbsp;&nbsp;// returns true<br>
+                   myDate instanceof String&nbsp;&nbsp;&nbsp;// returns false</span>
+                </p>
+                <p>
+                  <a name="1060939" id="1060939"></a> <span class="sansserif"><b>Example 3.</b> The following code creates an object type <span class="mono">Car</span> and an instance of that object type, <span class="mono">mycar</span>. The <span class="mono">instanceof</span> operator demonstrates that the <span class="mono">mycar</span> object is of type <span class="mono">Car</span> and of type <span class="mono">Object</span>.</span>
+                </p>
+                <p>
+                  <a name="1060940" id="1060940"></a> <span class="mono">function Car(make, model, year) {<br>
+                   &nbsp;&nbsp;&nbsp;this.make = make<br>
+                   &nbsp;&nbsp;&nbsp;this.model = model<br>
+                   &nbsp;&nbsp;&nbsp;this.year = year<br>
+                   }<br>
+                   mycar = new Car("Honda", "Accord", 1998)<br>
+                   a=mycar instanceof Car // returns true<br>
+                   b=mycar instanceof Object // returns true</span>
+                </p>
+                <p>
+                  <br>
+                   <a name="1055898" id="1055898"></a> <a name="new" id="new"></a> <span class="sansserif">new
+                  </span><br>
+                  <br>
+                   <a name="1053310" id="1053310"></a> <span class="sansserif">The new operator creates an instance of a user-defined object type or of one of the built-in object types that has a constructor function.<br></span>
+                </p>
+                <p>
+                  <br>
+                  <br>
+                </p>
+                <table width="90%" border="1" cellpadding="5" cellspacing="0">
+                  <tr>
+                    <td valign="top">
+                      <p>
+                        <a name="1053313" id="1053313"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+                      </p>
+                    </td>
+                    <td valign="top">
+                      <p>
+                        <a name="1053315" id="1053315"></a> <span class="sansserif">JavaScript 1.0</span> &nbsp;
+                      </p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td valign="top">
+                      <p>
+                        <a name="1053317" id="1053317"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+                      </p>
+                    </td>
+                    <td valign="top">
+                      <p>
+                        <a name="1053319" id="1053319"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+                <p>
+                  <br>
+                   <a name="1043115" id="1043115"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+                   <a name="1043116" id="1043116"></a> <span class="mono"><i>objectName</i> = new <i>objectType</i> (<i>param1</i> [,<i>param2</i>] ...[,<i>paramN</i>])</span>
+                </p>
+                <p>
+                  <br>
+                   <a name="1063862" id="1063862"></a> <a name="Parameters" id="Parameters"></a> <span class="sansserif"><b>Parameters</b></span><br>
+                   <a name="1043131" id="1043131"></a> <span class="sansserif"><br></span>
+                </p>
+                <p>
+                  <br>
+                  <br>
+                </p>
+                <table width="90%" border="1" cellpadding="5" cellspacing="0">
+                  <tr>
+                    <td valign="top">
+                      <a name="1043120" id="1043120"></a> <span class="mono">objectName</span> 
+                      <p>
+                        &nbsp;
+                      </p>
+                    </td>
+                    <td valign="top">
+                      <p>
+                        <a name="1043122" id="1043122"></a> <span class="sansserif">Name of the new object instance.</span> &nbsp;
+                      </p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td valign="top">
+                      <a name="1043124" id="1043124"></a> <span class="mono">objectType</span> 
+                      <p>
+                        &nbsp;
+                      </p>
+                    </td>
+                    <td valign="top">
+                      <p>
+                        <a name="1043126" id="1043126"></a> <span class="sansserif">Object type. It must be a function that defines an object type.</span> &nbsp;
+                      </p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td valign="top">
+                      <a name="1043128" id="1043128"></a> <span class="mono">param1...paramN</span> 
+                      <p>
+                        &nbsp;
+                      </p>
+                    </td>
+                    <td valign="top">
+                      <p>
+                        <a name="1043130" id="1043130"></a> <span class="sansserif">Property values for the object. These properties are parameters defined for the <span class="mono">objectType</span> function.</span> &nbsp;
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+                <p>
+                  <br>
+                   <a name="1043132" id="1043132"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+                   <a name="1043133" id="1043133"></a> <span class="sansserif">Creating a user-defined object type requires two steps:</span>
+                </p>
+                <ol type="1">
+                  <li class="nobullet">
+                    <a name="1043134" id="1043134"></a>
+                  </li>
+                  <li value="1">
+                    <span class="sansserif">Define the object type by writing a function.</span> 
+                    <p>
+                      <a name="1043135" id="1043135"></a>
+                    </p>
+                  </li>
+                  <li value="2">
+                    Create an instance of the object with <span class="mono">new</span>.
+                  </li>
+                </ol><a name="1043136" id="1043136"></a><span class="sansserif">To define an object type, create a function for the object type that specifies its name, properties, and methods. An object can have a property that is itself another object. See the examples below.</span> 
+                <p>
+                  <a name="1043137" id="1043137"></a> <span class="sansserif">You can always add a property to a previously defined object. For example, the statement <span class="mono">car1.color&nbsp;=&nbsp;"black"</span> adds a property <span class="mono">color</span> to <span class="mono">car1</span>, and assigns it a value of <span class="mono">"black"</span>. However, this does not affect any other objects. To add the new property to all objects of the same type, you must add the property to the definition of the <span class="mono">car</span> object type.</span>
+                </p>
+                <p>
+                  <a name="1043138" id="1043138"></a> <span class="sansserif">You can add a property to a previously defined object type by using the <a href="function.html#1193426">Function.prototype</a> property. This defines a property that is shared by all objects created with that function, rather than by just one instance of the object type. The following code adds a <span class="mono">color</span> property to all objects of type <span class="mono">car</span>, and then assigns a value to the <span class="mono">color</span> property of the object <span class="mono">car1</span>. For more information, see <a href="function.html#1193426">prototype</a></span>
+                </p>
+                <p>
+                  <a name="1043145" id="1043145"></a> <span class="mono">Car.prototype.color=null<br>
+                   car1.color="black"<br>
+                   birthday.description="The day you were born"</span>
+                </p>
+                <p>
+                  <br>
+                   <a name="1043146" id="1043146"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+                   <a name="1043147" id="1043147"></a> <span class="sansserif"><b>Example 1: Object type and object instance.</b> Suppose you want to create an object type for cars. You want this type of object to be called <span class="mono">car</span>, and you want it to have properties for make, model, and year. To do this, you would write the following function:</span>
+                </p>
+                <p>
+                  <a name="1043148" id="1043148"></a> <span class="mono">function car(make, model, year) {<br>
+                   &nbsp;&nbsp;&nbsp;this.make = make<br>
+                   &nbsp;&nbsp;&nbsp;this.model = model<br>
+                   &nbsp;&nbsp;&nbsp;this.year = year<br>
+                   }</span>
+                </p>
+                <p>
+                  <a name="1043149" id="1043149"></a> <span class="sansserif">Now you can create an object called <span class="mono">mycar</span> as follows:</span>
+                </p>
+                <p>
+                  <a name="1043150" id="1043150"></a> <span class="mono">mycar = new car("Eagle", "Talon TSi", 1993)</span>
+                </p>
+                <p>
+                  <a name="1043151" id="1043151"></a> <span class="sansserif">This statement creates <span class="mono">mycar</span> and assigns it the specified values for its properties. Then the value of <span class="mono">mycar.make</span> is the string <span class="mono">"Eagle"</span>, <span class="mono">mycar.year</span> is the integer <span class="mono">1993</span>, and so on.</span>
+                </p>
+                <p>
+                  <a name="1043152" id="1043152"></a> <span class="sansserif">You can create any number of <span class="mono">car</span> objects by calls to <span class="mono">new</span>. For example,</span>
+                </p>
+                <p>
+                  <a name="1043153" id="1043153"></a> <span class="mono">kenscar = new car("Nissan", "300ZX", 1992)</span>
+                </p>
+                <p>
+                  <a name="1043154" id="1043154"></a> <span class="sansserif"><b>Example 2: Object property that is itself another object.</b> Suppose you define an object called <span class="mono">person</span> as follows:</span>
+                </p>
+                <p>
+                  <a name="1043155" id="1043155"></a> <span class="mono">function person(name, age, sex) {<br>
+                   &nbsp;&nbsp;&nbsp;this.name = name<br>
+                   &nbsp;&nbsp;&nbsp;this.age = age<br>
+                   &nbsp;&nbsp;&nbsp;this.sex = sex<br>
+                   }</span>
+                </p>
+                <p>
+                  <a name="1043156" id="1043156"></a> <span class="sansserif">And then instantiate two new <span class="mono">person</span> objects as follows:</span>
+                </p>
+                <p>
+                  <a name="1043157" id="1043157"></a> <span class="mono">rand = new person("Rand McNally", 33, "M")<br>
+                   ken = new person("Ken Jones", 39, "M")</span>
+                </p>
+                <p>
+                  <a name="1043158" id="1043158"></a> <span class="sansserif">Then you can rewrite the definition of <span class="mono">car</span> to include an owner property that takes a <span class="mono">person</span> object, as follows:</span>
+                </p>
+                <p>
+                  <a name="1043159" id="1043159"></a> <span class="mono">function car(make, model, year, owner) {<br>
+                   &nbsp;&nbsp;&nbsp;this.make = make;<br>
+                   &nbsp;&nbsp;&nbsp;this.model = model;<br>
+                   &nbsp;&nbsp;&nbsp;this.year = year;<br>
+                   &nbsp;&nbsp;&nbsp;this.owner = owner;<br>
+                   }</span>
+                </p>
+                <p>
+                  <a name="1043160" id="1043160"></a> <span class="sansserif">To instantiate the new objects, you then use the following:</span>
+                </p>
+                <p>
+                  <a name="1043161" id="1043161"></a> <span class="mono">car1 = new car("Eagle", "Talon TSi", 1993, rand);<br>
+                   car2 = new car("Nissan", "300ZX", 1992, ken)</span>
+                </p>
+                <p>
+                  <a name="1043162" id="1043162"></a> <span class="sansserif">Instead of passing a literal string or integer value when creating the new objects, the above statements pass the objects <span class="mono">rand</span> and <span class="mono">ken</span> as the parameters for the owners. To find out the name of the owner of <span class="mono">car2</span>, you can access the following property:</span>
+                </p>
+                <p>
+                  <a name="1043163" id="1043163"></a> <span class="mono">car2.owner.name</span>
+                </p>
+                <p>
+                  <br>
+                   <a name="1043482" id="1043482"></a> <a name="this" id="this"></a> <span class="sansserif">this
+                  </span><br>
+                  <br>
+                   <a name="1043483" id="1043483"></a> <span class="sansserif">The this keyword refers to the current object. In general, in a method <span class="mono">this</span> refers to the calling object.<br></span>
+                </p>
+                <p>
+                  <br>
+                  <br>
+                </p>
+                <table width="90%" border="1" cellpadding="5" cellspacing="0">
+                  <tr>
+                    <td valign="top">
+                      <p>
+                        <a name="1043486" id="1043486"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+                      </p>
+                    </td>
+                    <td valign="top">
+                      <p>
+                        <a name="1043488" id="1043488"></a> <span class="sansserif">JavaScript 1.0</span> &nbsp;
+                      </p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td valign="top">
+                      <p>
+                        <a name="1053208" id="1053208"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+                      </p>
+                    </td>
+                    <td valign="top">
+                      <p>
+                        <a name="1053210" id="1053210"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+                <p>
+                  <br>
+                   <a name="1043489" id="1043489"></a> <a name="Syntax" id="Syntax"></a> <span class="sansserif"><b>Syntax</b></span><br>
+                   <a name="1043490" id="1043490"></a> <span class="mono"><span class="mono">this</span>[.<i>propertyName</i>]</span>
+                </p>
+                <p>
+                  <br>
+                   <a name="1043491" id="1043491"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+                   <a name="1043492" id="1043492"></a> <span class="sansserif">Suppose a function called <span class="mono">validate</span> validates an object's value property, given the object and the high and low values:</span>
+                </p>
+                <p>
+                  <a name="1043493" id="1043493"></a> <span class="mono">function validate(obj, lowval, hival) {<br>
+                   &nbsp;&nbsp;&nbsp;if ((obj.value &lt; lowval) || (obj.value &gt; hival))<br>
+                   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;alert("Invalid Value!")<br>
+                   }</span>
+                </p>
+                <p>
+                  <a name="1051377" id="1051377"></a> <span class="sansserif">You could call <span class="mono">validate</span> in each form element's <span class="mono">onChange</span> event handler, using <span class="mono">this</span> to pass it the form element, as in the following example:</span>
+                </p>
+                <p>
+                  <a name="1043498" id="1043498"></a> <span class="mono">&lt;B&gt;Enter a number between 18 and 99:&lt;/B&gt;<br>
+                   &lt;INPUT TYPE = "text" NAME = "age" SIZE = 3<br>
+                   &nbsp;&nbsp;&nbsp;onChange="validate(this, 18, 99)"&gt;</span>
+                </p>
+                <p>
+                  <br>
+                   <a name="1042603" id="1042603"></a> <a name="typeof" id="typeof"></a> <span class="sansserif">typeof
+                  </span><br>
+                  <br>
+                   <a name="1042606" id="1042606"></a> <span class="sansserif">The <span class="mono">typeof</span> operator is used in either of the following ways:</span>
+                </p>
+                <p>
+                  <a name="1042607" id="1042607"></a> <span class="mono">1. typeof <i>operand<br></i>2. typeof (<i>operand</i>)</span>
+                </p>
+                <p>
+                  <a name="1042608" id="1042608"></a> <span class="sansserif">The <span class="mono">typeof</span> operator returns a string indicating the type of the unevaluated operand. <span class="mono">operand</span> is the string, variable, keyword, or object for which the type is to be returned. The parentheses are optional.<br></span>
+                </p>
+                <p>
+                  <br>
+                  <br>
+                </p>
+                <table width="90%" border="1" cellpadding="5" cellspacing="0">
+                  <tr>
+                    <td valign="top">
+                      <p>
+                        <a name="1044321" id="1044321"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+                      </p>
+                    </td>
+                    <td valign="top">
+                      <p>
+                        <a name="1044323" id="1044323"></a> <span class="sansserif">JavaScript 1.1</span> &nbsp;
+                      </p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td valign="top">
+                      <p>
+                        <a name="1053217" id="1053217"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+                      </p>
+                    </td>
+                    <td valign="top">
+                      <p>
+                        <a name="1053219" id="1053219"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+                <p>
+                  <a name="1042609" id="1042609"></a> <span class="sansserif">Suppose you define the following variables:</span>
+                </p>
+                <p>
+                  <a name="1042610" id="1042610"></a> <span class="mono">var myFun = new Function("5+2")<br>
+                   var shape="round"<br>
+                   var size=1<br>
+                   var today=new Date()</span>
+                </p>
+                <p>
+                  <a name="1042611" id="1042611"></a> <span class="sansserif">The <span class="mono">typeof</span> operator returns the following results for these variables:</span>
+                </p>
+                <p>
+                  <a name="1042612" id="1042612"></a> <span class="mono">typeof myFun is object<br>
+                   typeof shape is string<br>
+                   typeof size is number<br>
+                   typeof today is object<br>
+                   typeof dontExist is undefined</span>
+                </p>
+                <p>
+                  <a name="1042613" id="1042613"></a> <span class="sansserif">For the keywords <span class="mono">true</span> and <span class="mono">null</span>, the <span class="mono">typeof</span> operator returns the following results:</span>
+                </p>
+                <p>
+                  <a name="1042614" id="1042614"></a> <span class="mono">typeof true is boolean<br>
+                   typeof null is object</span>
+                </p>
+                <p>
+                  <a name="1042615" id="1042615"></a> <span class="sansserif">For a number or string, the <span class="mono">typeof</span> operator returns the following results:</span>
+                </p>
+                <p>
+                  <a name="1042616" id="1042616"></a> <span class="mono">typeof 62 is number<br>
+                   typeof 'Hello world' is string</span>
+                </p>
+                <p>
+                  <a name="1042617" id="1042617"></a> <span class="sansserif">For property values, the <span class="mono">typeof</span> operator returns the type of value the property contains:</span>
+                </p>
+                <p>
+                  <a name="1042618" id="1042618"></a> <span class="mono">typeof document.lastModified is string<br>
+                   typeof window.length is number<br>
+                   typeof Math.LN2 is number</span>
+                </p>
+                <p>
+                  <a name="1042619" id="1042619"></a> <span class="sansserif">For methods and functions, the <span class="mono">typeof</span> operator returns results as follows:</span>
+                </p>
+                <p>
+                  <a name="1042620" id="1042620"></a> <span class="mono">typeof blur is function<br>
+                   typeof eval is function<br>
+                   typeof parseInt is function<br>
+                   typeof shape.split is function</span>
+                </p>
+                <p>
+                  <a name="1042621" id="1042621"></a> <span class="sansserif">For predefined objects, the <span class="mono">typeof</span> operator returns results as follows:</span>
+                </p>
+                <p>
+                  <a name="1042622" id="1042622"></a> <span class="mono">typeof Date is function<br>
+                   typeof Function is function<br>
+                   typeof Math is function<br>
+                   typeof Option is function<br>
+                   typeof String is function</span>
+                </p>
+                <p>
+                  <br>
+                   <a name="1042625" id="1042625"></a> <a name="void" id="void"></a> <span class="sansserif">void
+                  </span><br>
+                  <br>
+                   <a name="1042628" id="1042628"></a> <span class="sansserif">The void operator is used in either of the following ways:</span>
+                </p>
+                <p>
+                  <a name="1042629" id="1042629"></a> <span class="mono">1. void (<i>expression</i>)<br>
+                   2. void <i>expression</i></span>
+                </p>
+                <p>
+                  <a name="1042630" id="1042630"></a> <span class="sansserif">The void operator specifies an expression to be evaluated without returning a value. <span class="mono">expression</span> is a JavaScript expression to evaluate. The parentheses surrounding the expression are optional, but it is good style to use them.<br></span>
+                </p>
+                <p>
+                  <br>
+                  <br>
+                </p>
+                <table width="90%" border="1" cellpadding="5" cellspacing="0">
+                  <tr>
+                    <td valign="top">
+                      <p>
+                        <a name="1044347" id="1044347"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+                      </p>
+                    </td>
+                    <td valign="top">
+                      <p>
+                        <a name="1044349" id="1044349"></a> <span class="sansserif">JavaScript 1.1</span> &nbsp;
+                      </p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td valign="top">
+                      <p>
+                        <a name="1053222" id="1053222"></a> <span class="sansserif"><i>ECMA version</i></span> &nbsp;
+                      </p>
+                    </td>
+                    <td valign="top">
+                      <p>
+                        <a name="1053224" id="1053224"></a> <span class="sansserif">ECMA-262</span> &nbsp;
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+                <p>
+                  <a name="1042631" id="1042631"></a> <span class="sansserif">You can use the <span class="mono">void</span> operator to specify an expression as a hypertext link. The expression is evaluated but is not loaded in place of the current document.</span>
+                </p>
+                <p>
+                  <a name="1042632" id="1042632"></a> <span class="sansserif">The following code creates a hypertext link that does nothing when the user clicks it. When the user clicks the link, <span class="mono">void(0)</span> evaluates to 0, but that has no effect in JavaScript.</span>
+                </p>
+                <p>
+                  <a name="1042633" id="1042633"></a> <span class="mono">&lt;A HREF="javascript:void(0)"&gt;Click here to do nothing&lt;/A&gt;</span>
+                </p>
+                <p>
+                  <a name="1042634" id="1042634"></a> <span class="sansserif">The following code creates a hypertext link that submits a form when the user clicks it.</span>
+                </p>
+                <p>
+                  <a name="1042635" id="1042635"></a> <span class="mono">&lt;A HREF="javascript:void(document.form.submit())"&gt;<br>
+                   Click here to submit&lt;/A&gt;</span>
+                </p>
+              </align>
+              <blockquote>
+                <br>
+                 <b><a class="sansserifPurple" href="comment.html">Previous</a></b>&nbsp;&nbsp;&nbsp;&nbsp; <a href="contents.html"><b class="sansserifPurple">Contents</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="ix.html"><b class="sansserifPurple">Index</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="partjava.html"><b class="sansserifPurple">Next</b></a> &nbsp;&nbsp;&nbsp;&nbsp; 
+                <hr noshade="noshade" size="1">
+                <span class="sansserif">Copyright &#169; 2000 <a href="http://www.netscape.com">Netscape Communications Corp.</a> All rights reserved.</span>
+              </blockquote>
+              <p class="alignright">
+                Last Updated <b>September 28, 2000</b><br>
+              </p>
+              <table width="90%" border="1" cellpadding="5" cellspacing="0"></table>
+            </align>
+            <table width="90%" border="1" cellpadding="5" cellspacing="0"></table>
+          </align>
+          <table width="90%" border="1" cellpadding="5" cellspacing="0"></table>
+        </align>
+        <table width="90%" border="1" cellpadding="5" cellspacing="0"></table>
+      </align>
+      <table width="90%" border="1" cellpadding="5" cellspacing="0"></table>
+    </blockquote>
+  </body>
+</html>

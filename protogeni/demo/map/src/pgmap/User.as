@@ -47,7 +47,6 @@
 			var ac : ArrayCollection = new ArrayCollection();
 			ac.addItem(new Slice());
 			for each(var s:Slice in slices) {
-				s.DetectStatus();
 				ac.addItem(s);
 			}
 			

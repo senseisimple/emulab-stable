@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -102,6 +102,7 @@ local-script-install:	common-script-install
 	$(INSTALL) -m 755 $(SRCDIR)/rc.canaryd $(RCDIR)/rc.canaryd
 	$(INSTALL) -m 755 $(SRCDIR)/rc.linktest $(RCDIR)/rc.linktest
 	$(INSTALL) -m 755 $(SRCDIR)/rc.inelab $(RCDIR)/rc.inelab
+	$(INSTALL) -m 755 $(SRCDIR)/rc.pgeni $(RCDIR)/rc.pgeni
 	# Symlink this cause we invoke it from boss, and its too much
 	# of a hassle to worry about right now.
 	rm -f $(ETCDIR)/update
@@ -119,6 +120,19 @@ control-script-install:	dir-install bossnode
 	$(INSTALL) -m 755 $(SRCDIR)/rc.ctrlnode $(RCDIR)/rc.ctrlnode
 	$(INSTALL) -m 755 $(SRCDIR)/config/librc.pm $(BINDIR)/librc.pm
 	$(INSTALL) bossnode $(ETCDIR)/bossnode
+
+PGENIFILES = rc.ifconfig rc.topomap rc.progagent rc.pgeni \
+		rc.tarfiles rc.rpms
+
+pgeni-tarball:
+	-rm -f $(TBROOT)/www/downloads/geniclient.tar
+	rm -rf /tmp/mk1
+	($(MAKE) DESTDIR=/tmp/mk1 local-install)
+	tar cf $(TBROOT)/www/downloads/geniclient.tar \
+                -C /tmp/mk1/usr/local/etc/emulab \
+		libsetup.pm libtmcc.pm runstartup watchdog \
+		$(addprefix rc/, $(PGENIFILES))
+	rm -rf /tmp/mk1
 
 bossnode:	GNUmakefile
 	echo >$@ "$(BOSSNODE)"
