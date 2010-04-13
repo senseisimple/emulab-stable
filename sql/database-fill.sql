@@ -948,6 +948,7 @@ REPLACE INTO table_regex VALUES ('os_info','version','text','regex','^[-\\w\\.]*
 REPLACE INTO table_regex VALUES ('os_info','path','text','regex','^[-\\w\\.\\/:]*$',1,256,NULL);
 REPLACE INTO table_regex VALUES ('os_info','magic','text','redirect','default:tinytext',0,256,NULL);
 REPLACE INTO table_regex VALUES ('os_info','shared','int','redirect','default:tinyint',0,1,NULL);
+REPLACE INTO table_regex VALUES ('os_info','mfs','int','redirect','default:tinyint',0,1,NULL);
 REPLACE INTO table_regex VALUES ('os_info','mustclean','int','redirect','default:tinyint',0,1,NULL);
 REPLACE INTO table_regex VALUES ('os_info','osfeatures','text','regex','^[-\\w,]*$',1,128,NULL);
 REPLACE INTO table_regex VALUES ('os_info','op_mode','text','regex','^[-\\w]*$',1,20,NULL);
