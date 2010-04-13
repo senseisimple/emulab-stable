@@ -15,15 +15,17 @@ use strict;
 #
 sub usage()
 {
-    print STDERR "Usage: dump-descriptors [-v vers] filename\n";
+    print STDERR "Usage: dump-descriptors [-v vers] [-m] filename\n";
+    print STDERR "  -m      dump just the MFS descriptors.\n";
     print STDERR "  -v 1    first generation STD images (FBSD410, RHL90)\n";
     print STDERR "  -v 2    second generation STD images (FBSD62, FC6)\n";
     print STDERR "Default version is 1.\n";
     exit(-1);
 }
 
-my $optlist = "v:";
+my $optlist = "v:m";
 my $version = 1;
+my $mfsonly = 0;
 
 #
 # These are the images/osids we dump out. We of course get the embedded osids.
@@ -109,7 +111,11 @@ if (defined($options{"v"})) {
     }
     $version = $vers;
 }
-
+if (defined($options{"m"})) {
+    $mfsonly    = 1;
+    %mappings   = ();
+    %imagenames = ();
+}
 usage()
     if (@ARGV != 1);
 my $filename = $ARGV[0];
@@ -189,6 +195,8 @@ foreach my $osid (keys(%osinfos)) {
 
     next
 	if ($osinfo->ezid());
+    next
+	if ($mfsonly && !$osinfo->mfs());
 
     system("$DUMPDESC -o $osid >> $filename") == 0
 	or fatal("Could not dump $osinfo");

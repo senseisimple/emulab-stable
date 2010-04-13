@@ -62,6 +62,7 @@ proc tb-set-encapsulate {onoff} {}
 proc tb-set-vlink-emulation {style} {}
 proc tb-set-sim-os {os} {}
 proc tb-set-jail-os {os} {}
+proc tb-set-link-layer {link layer} {}
 proc tb-set-delay-os {os} {}
 proc tb-set-delay-capacity {cap} {}
 proc tb-use-ipassign {onoff} {}
