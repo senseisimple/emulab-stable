@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Testbed Makefile
@@ -67,11 +67,14 @@ boss-install:	install-schemacheck install-sitevarscheck install-dbfillcheck \
 		install-setbuildinfo
 	@echo "Boss node installed!"
 
-#
-# Same target, with the install-schemacheck dependency omitted
-# 
+# Same target, with the checks omitted
 boss-install-force:	install-subdirs install-mkdirs install-setbuildinfo
 	@echo "Boss node installed!"
+
+# Skip only the schema checks, but do the other checks.
+boss-install-noschemacheck: install-sitevarscheck install-dbfillcheck \
+		install-genischemacheck install-subdirs install-mkdirs \
+		install-setbuildinfo
 
 clrhouse-install:	install-subdirs install-mkdirs
 	@echo "CleaingHouse code installed!"
