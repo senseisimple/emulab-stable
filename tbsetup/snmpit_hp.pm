@@ -1870,8 +1870,18 @@ sub getUsedOpenflowListenerPorts($$) {
 	if ($varname =~ /$ofListenerVarNameMarker/) {
 	    my ($proto, $port) = split(":", $connstr);
 	    $ports->{$port} = 1;
-	}
-	$self->{SESS}->getnext($listener);
+	    
+	    #
+	    # the SNMP session with MIB gives varname with strings not numbers, but
+	    # the string names can't be used to get the next entry in table! So we
+	    # have to use the numbered OID. To get the next entry, we must
+	    # append the current instance ID, which is the last section of the dotted
+	    # varname, to the numbered OID.
+	    #
+	    my $lastdot = rindex($varname, '.');
+	    $listener->[0] = $ofListenerOID.".".substr($varname, $lastdot+1);
+	    $self->{SESS}->getnext($listener);
+	}	
     } while ($varname =~ /$ofListenerVarNameMarker/);
 }
 

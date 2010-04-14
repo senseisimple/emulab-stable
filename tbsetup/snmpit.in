@@ -2509,6 +2509,8 @@ sub doTrunkDisable($$) {
 #
 # Openflow lock and functions
 # 
+use libtestbed;
+
 my $of_lock_held = 0;
 
 sub oflock() {
@@ -2646,7 +2648,7 @@ sub doEnableOpenflowListener($$) {
     my $stacks = shift;
     my $vlan = shift;
 
-    my %ports = ();
+    my %usedports = ();
     my $port = $minOpenflowListenerPort;
     my $errors = 0;
 
@@ -2659,11 +2661,11 @@ sub doEnableOpenflowListener($$) {
     #
     oflock();
     foreach my $stack (@$stacks) {
-        $stack->getUsedOpenflowListenerPorts(\%ports);
+        $stack->getUsedOpenflowListenerPorts(\%usedports);
     }
 
     # get the available port
-    while (defined($ports{$port}) && $port <= $maxOpenflowListenerPort) {
+    while (defined($usedports{$port}) && $port <= $maxOpenflowListenerPort) {
 	$port++;
     }
     
