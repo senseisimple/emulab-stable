@@ -2511,8 +2511,7 @@ sub doTrunkDisable($$) {
 # 
 my $of_lock_held = 0;
 
-sub oflock($) {
-    my $self = shift;
+sub oflock() {
     my $token = "of_snmpit";
     my $old_umask = umask(0);
     die if (TBScriptLock($token,0,1800) != TBSCRIPTLOCK_OKAY());
@@ -2520,7 +2519,7 @@ sub oflock($) {
     $of_lock_held = 1;
 }
 
-sub ofunlock($) {
+sub ofunlock() {
 	if ($of_lock_held) { TBScriptUnlock(); $of_lock_held = 0;}
 }
 
