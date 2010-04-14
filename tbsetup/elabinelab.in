@@ -39,7 +39,14 @@ my $dbgooonly= 0;
 my $update   = 0;
 my $remove   = 0;
 
-# XXX experimental speed hacks
+#
+# XXX experimental speed hacks.
+#     $inparallel    reboots all server in parallel (rather than serially)
+#		     after setup
+#     $restartnodes  uses a new bootinfo RESTART command to quickly move
+#		     inner nodes from control of outer boss to inner boss
+#		     avoiding all node reboots
+#
 my $inparallel = 1;
 my $restartnodes = 1;
 

@@ -379,12 +379,21 @@ sub doboot()
 	if ($emulabconfig{"ROLE"} eq "boss+router");
 
     #
-    # XXX temporary: adjust package info.
+    # XXX not-so-temporary: adjust package info.
     #
-    # The defaults are in sitevars passed via emulabconfig,
-    # but they are almost always wrong...
+    # There are defaults in sitevars passed via emulabconfig,
+    # but they are almost always wrong...  So we ALWAYS override them
+    # here; packages are just too intimately tied to the OS version.
     #
-    if ($FBSD_VERSION == 5.4) {    
+    if ($FBSD_VERSION == 4.10) {
+	$emulabconfig{FS_PKG_DIR}   = "/share/freebsd/4.10/packages";
+	$emulabconfig{OPS_PKG_DIR}  = "/share/freebsd/4.10/packages";
+	$emulabconfig{BOSS_PKG_DIR} = "/share/freebsd/4.10/packages";
+	$emulabconfig{FS_PKG}       = "emulab-fs-1.4";
+	$emulabconfig{OPS_PKG}      = "emulab-ops-1.4";
+	$emulabconfig{BOSS_PKG}     = "emulab-boss-1.4";
+    }
+    elsif ($FBSD_VERSION == 5.4) {    
 	$emulabconfig{FS_PKG_DIR}   = "/share/freebsd/5.4/packages";
 	$emulabconfig{OPS_PKG_DIR}  = "/share/freebsd/5.4/packages";
 	$emulabconfig{BOSS_PKG_DIR} = "/share/freebsd/5.4/packages";
