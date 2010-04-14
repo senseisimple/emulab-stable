@@ -1002,7 +1002,7 @@ COMMAND: foreach my $command (@commands) {
 	}; # /ofcontroller/ && do
 	(/oflistener/) && do {
 	    #$exitval += doSetOpenflowListener(\@stacks,$vlans[0],$ofconnstr);
-	    $exitval += doEnableOpenflowListener(\@stacks,$vlan[0]);
+	    $exitval += doEnableOpenflowListener(\@stacks,$vlans[0]);
 	    last;
 	}; # /oflistener/ && do
     }
@@ -2663,7 +2663,7 @@ sub doEnableOpenflowListener($$) {
     }
 
     # get the available port
-    while (defined($ports->{$port}) && $port <= $maxOpenflowListenerPort) {
+    while (defined($ports{$port}) && $port <= $maxOpenflowListenerPort) {
 	$port++;
     }
     
