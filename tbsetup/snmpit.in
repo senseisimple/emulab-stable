@@ -2505,6 +2505,25 @@ sub doTrunkDisable($$) {
     return $errors;
 }
 
+
+#
+# Openflow lock and functions
+# 
+my $of_lock_held = 0;
+
+sub oflock($) {
+    my $self = shift;
+    my $token = "of_snmpit";
+    my $old_umask = umask(0);
+    die if (TBScriptLock($token,0,1800) != TBSCRIPTLOCK_OKAY());
+    umask($old_umask);
+    $of_lock_held = 1;
+}
+
+sub ofunlock($) {
+	if ($of_lock_held) { TBScriptUnlock(); $of_lock_held = 0;}
+}
+
 #
 # doOpenflowEnable(stacks, vlan)
 # Enable Openflow on a VLAN
@@ -2630,12 +2649,18 @@ sub doEnableOpenflowListener($$) {
 
     my %ports = ();
     my $port = $minOpenflowListenerPort;
+    my $errors = 0;
 
     #
     # get used ports
     #
+    # Here a big lock is better than many small locks, it avoids dead locks
+    # because multiple small locks have to be held one by one, which
+    # brings the risk of dead lock.
+    #
+    oflock();
     foreach my $stack (@$stacks) {
-	$stack->getUsedOpenflowListenerPorts(\%ports);
+        $stack->getUsedOpenflowListenerPorts(\%ports);
     }
 
     # get the available port
@@ -2645,13 +2670,17 @@ sub doEnableOpenflowListener($$) {
     
     if ($port > $maxOpenflowListenerPort) {
 	print "ERROR: No port available for Openflow listener on VLAN $vlan. \n";
-	return 1;
+	$errors++;
     } else {
 	#
 	# set listener
 	#
 	my $listenerConnStr = "ptcp:".$port;
 	print "Openflow listener connection string for VLAN $vlan is $listenerConnStr \n";
-	return doSetOpenflowListener($stacks, $vlan, $listenerConnStr);
+	$errors += doSetOpenflowListener($stacks, $vlan, $listenerConnStr);
     }
+
+    ofunlock();
+
+    return $errors;
 }

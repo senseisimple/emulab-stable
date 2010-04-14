@@ -1282,10 +1282,6 @@ sub setOpenflowController($$$) {
 # setListener(self, vlan_id, listener);
 # return # of errors
 #
-# This function might be replaced by an enableListener(self, vlan_id)
-# function that sets the listener on switches automatically and 
-# returns the connection string.
-#
 sub setOpenflowListener($$$) {
     my $self = shift;
     my $vlan_id = shift;
@@ -1336,6 +1332,7 @@ sub getUsedOpenflowListenerPorts($$) {
 	$device->getUsedOpenflowListenerPorts($ports);
     }
 }
+
 
 package snmpit_jitdev;
 use Dumpvalue;
