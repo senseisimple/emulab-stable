@@ -95,6 +95,8 @@ sub FindNodesNS($$$)
 {
     my ($path, $node, $nsURI) = @_;
     my $result = undef;
+    return XML::LibXML::NodeList->new()
+        if (!defined($node));
     eval { 
   my $xc = XML::LibXML::XPathContext->new();
   if (defined($nsURI)) {
