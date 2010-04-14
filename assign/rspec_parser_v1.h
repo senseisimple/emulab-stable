@@ -19,18 +19,35 @@
 #include <string>
 #include <xercesc/dom/DOM.hpp>
 
+struct node_interface_v1 : node_interface
+{
+	std::string componentName;
+};
+
 class rspec_parser_v1 : public rspec_parser 
 {
 	// Functions specific to rspec version 1 should be declared here. 
 	// Most of the functions needed to parse rspecs in general should 
 	// already have been inherited from rspec parser
 	private:
-		
+		std::string find_urn(const xercesc::DOMElement* element, 
+												 std::string const& prefix, bool&);
 
 	public:
-		std::string find_urn(const xercesc::DOMElement* element, 
-							 std::string const& prefix);
+		
+		rspec_parser_v1 (int type) { this->rspecType = type; }
+		
+		std::string readPhysicalId (const xercesc::DOMElement*, bool&);
+		std::string readVirtualId (const xercesc::DOMElement*, bool&);
+		std::string readComponentManagerId (const xercesc::DOMElement*, bool&);
+		
+		int readInterfacesOnNode (const xercesc::DOMElement* node, bool& allUnique);
+		std::vector<struct link_interface> readLinkInterface
+									(const xercesc::DOMElement* link, int& ifaceCount);
+		struct link_interface getIface (const xercesc::DOMElement*);
 
+		void dummyFun ();
+		
 };
 
 #endif

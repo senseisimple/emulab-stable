@@ -215,12 +215,12 @@ int parse_fds_vnode_xml (const DOMElement *tag, node_fd_set *fd_set)
 interface_spec parse_interface_rspec_xml(const DOMElement *tag) 
 {
 	interface_spec rv =
-		{	
-			string(XStr(tag->getAttribute(XStr("virtual_node_id").x())).c()),
-			string(XStr(tag->getAttribute(XStr("virtual_interface_id").x())).c()),
-                        string(XStr(find_urn(tag, "component_node"))),
-			string(XStr(tag->getAttribute(XStr("component_interface_id").x())).c())		
-		};
+	{	
+		string(XStr(tag->getAttribute(XStr("virtual_node_id").x())).c()),
+		string(XStr(tag->getAttribute(XStr("virtual_interface_id").x())).c()),
+		string(XStr(find_urn(tag, "component_node"))),
+		string(XStr(tag->getAttribute(XStr("component_interface_id").x())).c())
+	};
     return rv;
 }
 

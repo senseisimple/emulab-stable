@@ -15,15 +15,19 @@
 
 #include <list>
 #include <map>
+#include <set>
 #include <string>
 #include <utility>
+#include <vector>
 #include <xercesc/dom/DOM.hpp>
 
+#define RSPEC_TYPE_ADVT 0
+#define RSPEC_TYPE_REQ 1
 
 struct node_type 
 {
 	std::string typeName;
-	int typeCount;
+	int typeSlots;
 	bool isStatic;
 };
 
@@ -36,48 +40,67 @@ struct link_characteristics
 
 struct link_interface
 {
-	std::string srcNode;
-	std::string srcIface;
-	std::string dstNode;
-	std::string dstIface;
+	std::string virtualNodeId;
+	std::string virtualIfaceId;
+	std::string physicalNodeId;
+	std::string physicalIfaceId;
+};
+
+struct node_interface
+{
+	std::string componentId;
+	std::string clientId;
 };
 
 class rspec_parser
 {
 	private:
-		std::map<std::string, std::string> interfacesSeen;
-	
+			
 	protected:
-		bool getAttribute (const xercesc::DOMElement*, const std::string,
-						          std::string&);
+		int rspecType; 
+		std::set< std::pair<std::string, std::string> >ifacesSeen;
+		std::string getAttribute (const xercesc::DOMElement*, const std::string,
+															bool&);
+		bool hasAttribute (const xercesc::DOMElement*, const std::string);
 		struct link_interface getIface (const xercesc::DOMElement*);
 		
 	public:
 		
-		const int LINK_BANDWIDTH = 0;
-		const int LINK_LATENCY = 1;
-		const int LINK_PACKET_LOSS = 2;
+		rspec_parser () { }
+		rspec_parser(int type) { this->rspecType = type; }
 		
 		// Common functions
-		virtual std::string readComponentId (const xercesc::DOMElement*, bool&);
-		virtual std::string readVirtualid (const xercesc::DOMElement*, bool&);
+		virtual std::string readPhysicalId (const xercesc::DOMElement*, bool&);
+		virtual std::string readVirtualId (const xercesc::DOMElement*, bool&);
 		virtual std::string readComponentManagerId (const xercesc::DOMElement*,
 				                                    bool&);
 		
+		// Reads subnode tag
+		virtual std::string readSubnodeOf (const xercesc::DOMElement*, bool&);
+		
 		// Functions for nodes
-		virtual std::list<std::string> 
-				readLocation(const xercesc::DOMElement*, int&);
+		virtual std::vector<std::string> readLocation(const xercesc::DOMElement*,
+																									int&);
 		virtual std::list<struct node_type> 
 				readNodeTypes (const xercesc::DOMElement*, int&);
-		virtual std::string readIfaceDecl (const xercesc::DOMElement*);
-		
 		
 		// Functions for links
 		virtual struct link_characteristics 
-				readLinkCharacteristics (const xercesc::DOMElement*, int&);
+				readLinkCharacteristics (const xercesc::DOMElement*, 
+																 int defaultBandwidth, 
+								 								 int unlimitedBandwidth,
+																 int&);
+				
+		virtual std::vector< struct link_interface >
+				readLinkInterface (const xercesc::DOMElement*, int&);
 		
-		virtual struct link_interface 
-				readInterface (const xercesc::DOMElement*);
+		// Reads all the interfaces on a node
+		// Returns the number of interfaces found. 
+		// This only populates the internal data structures of the object.
+		// Ideally, this ought to be done automatically, but in the current setup,
+		// there doesn't seem to be a clean way of making it happen.
+		virtual int readInterfacesOnNode (const xercesc::DOMElement*, bool&);
+		virtual void dummyFun();
 };
 
 

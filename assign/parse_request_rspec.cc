@@ -40,7 +40,7 @@ static const char rcsid[] = "$Id: parse_request_rspec.cc,v 1.16 2009-10-21 20:49
  */
 extern name_pvertex_map pname2vertex;
 
-/* ------------------- Have to include the vnode data structures as well -------------------- */
+/* --- Have to include the vnode data structures as well --- */
 extern name_vvertex_map vname2vertex;
 extern name_name_map fixed_nodes;
 extern name_name_map node_hints;
@@ -48,15 +48,13 @@ extern name_count_map vtypes;
 extern name_list_map vclasses;
 extern vvertex_vector virtual_nodes;
 extern name_vclass_map vclass_map;
-/* ---------------------------------- end of vtop stuff ----------------------------------- */
+/* --- end of vtop stuff --- */
 
 DOMElement* request_root = NULL;
 DOMDocument* doc = NULL;
 
-/*
- * TODO: This should be moved out of parse_top.cc, where it currently
- * resides.
- */
+int rspec_version = -1;
+
 int bind_ptop_subnodes(tb_pgraph &pg);
 int bind_vtop_subnodes(tb_vgraph &vg);
 
@@ -64,13 +62,19 @@ int bind_vtop_subnodes(tb_vgraph &vg);
  * These are not meant to be used outside of this file, so they are only
  * declared in here
  */
-bool populate_nodes_rspec(DOMElement *root, tb_vgraph &vg, map< pair<string, string>, pair<string, string> >* fixed_interfaces);
-bool populate_links_rspec(DOMElement *root, tb_vgraph &vg, map< pair<string, string>, pair<string, string> >* fixed_interfaces);
+bool populate_nodes_rspec(DOMElement *root, 
+						  tb_vgraph &vg, 
+		                  map< pair<string, string>,
+		                       pair<string, string> >* fixed_interfaces);
+bool populate_links_rspec(DOMElement *root, tb_vgraph &vg, 
+						  map< pair<string, string>, 
+							   pair<string, string> >* fixed_interfaces);
 bool populate_vclasses_rspec (DOMElement *root, tb_vgraph &vg);
-
 string generate_virtual_node_id (string virtual_id);
 string generate_virtual_interface_id(string node_name, int interface_number);
-DOMElement* appendChildTagWithData (DOMElement* parent, const char*tag_name, const char* child_value);
+DOMElement* appendChildTagWithData (DOMElement* parent, 
+									const char*tag_name, 
+		                            const char* child_value);
 
 bool hasComponentSpec (DOMElement* element);
 
@@ -97,6 +101,12 @@ int parse_vtop_rspec(tb_vgraph &vg, char *filename) {
     /*
      * Must validate against the ptop schema
      */
+	/* This is a problem
+	 * We can only know the schema location if we know the rspec version
+	 * But we only know the rspec version after it has been validated
+	 * And we can only validate it if we know the schema location.
+	 * Whoops!
+	 */
     parser -> setExternalSchemaLocation
 			("http://www.protogeni.net/resources/rspec/0.1 " SCHEMA_LOCATION);
     
@@ -558,8 +568,7 @@ bool populate_link (DOMElement* elt, tb_vgraph &vg, map< pair<string,string>, pa
 				
 			DOMElement* src_interface_ref = 
 					           doc->createElement(XStr("interface_ref").x());
-			src_interface_ref->setAttribute(
-											XStr("virtual_interface_id").x(),
+			src_interface_ref->setAttribute(XStr("virtual_interface_id").x(),
 					                           virtual_interface_id.x());
 			src_interface_ref->setAttribute(XStr("virtual_node_id").x(),
 											virtual_node_id.x());

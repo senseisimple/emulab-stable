@@ -165,7 +165,7 @@ int rspec_parser_v1::readInterfacesOnNode (const DOMElement* node,
 			nodeId = this->readVirtualId (node, hasAttr);
 			ifaceId = XStr(iface->getAttribute(XStr("virtual_id").x())).c();
 		}
-		//cout << "(" << nodeId << "," << ifaceId << ")" << endl;
+		cout << "(" << nodeId << "," << ifaceId << ")" << endl;
 		allUnique &= ((this->ifacesSeen).insert
 				(pair<string, string>(nodeId, ifaceId))).second;
 	}

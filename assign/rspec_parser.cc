@@ -11,141 +11,220 @@
 # ifdef WITH_XML
 
 #include "rspec_parser.h"
+#include "xmlhelpers.h"
 
 #include <string>
+#include <vector>
 #include "xstr.h"
 #include <xercesc/dom/DOM.hpp>
 
-// Returns true if the attribute exists and it's value is a non-empty string
+// Returns the attribute value and an out paramter if the attribute exists
 string rspec_parser :: getAttribute(const DOMElement* tag, 
-									const string attrName,
-									bool& hasAttr)
+																		const string attrName,
+																		bool& hasAttr)
 {
-	XMLCh* attr = XStr(attrName.c_str()).x();
-	attrValue = XStr(tag->getAttribute(attr)).c();
-	hasAttr = tag->hasAttribute(attrName) && attrValue != "";
-	return attrValue;
+	hasAttr = tag->hasAttribute(XStr(attrName.c_str()).x());
+	if (hasAttr)
+		return XStr(tag->getAttribute(XStr(attrName.c_str()).x())).c();
+	return "";
 }
 
-struct link_interface rspec_parser :: getIface (DOMElement* tag)
+bool rspec_parser :: hasAttribute(const DOMElement* tag, const string attrName)
 {
+	return (tag->hasAttribute(XStr(attrName).x()));
+}
+
+string rspec_parser :: readSubnodeOf (const DOMElement* tag, bool& isSubnode)
+{
+	isSubnode = hasChildTag(tag, "subnode_of");
+	string rv = "";
+	if (isSubnode)
+		rv = XStr(getChildValue(tag, "subnode_of")).c();
+	return rv;
+}
+
+struct link_interface rspec_parser :: getIface (const DOMElement* tag)
+{
+	bool exists;
 	struct link_interface rv = 
 	{
 		string(XStr(tag->getAttribute(XStr("virtual_node_id").x())).c()),
 		string(XStr(tag->getAttribute(XStr("virtual_interface_id").x())).c()),
-		string(XStr(find_urn(tag, "component_node"))),
+		string(XStr(tag->getAttribute(XStr("component_node_uuid").x())).c()),
 		string(XStr(tag->getAttribute(XStr("component_interface_id").x())).c())
 	};
 	return rv;
 }
 
-// Returns true if the attribute exists and its value is a non-empty string
-string rspec_parser :: readComponentId (const DOMElement* tag, 
-			     							 bool& hasComponentId)
+// Returns the component_id. Sets an out parameter to true if an ID is present
+string rspec_parser :: readPhysicalId (const DOMElement* tag, 
+																				bool& hasComponentId)
 {
 	return (this->getAttribute(tag, "component_id", hasComponentId));
 }
 
-// Returns true if the attribute exists and its value is a non-empty string
-string rspec_parser :: readVirtualId (const DOMElement* tag, bool& hasVirtualId)
+// Returns the client_id Sets an out parameter to true if an ID is present
+string rspec_parser :: readVirtualId (const DOMElement* tag, bool& hasClientId)
 {
-	return (this->getAttribute(tag, "virtual_id", hasVirtualId));
+	return (this->getAttribute(tag, "client_id", hasClientId));
 }
 
-// Returns true if the attribute exists and its value is a non-empty string
+// Returns the CMID and sets an out parameter to true if an ID is present
 string rspec_parser :: readComponentManagerId (const DOMElement* tag, 
 		                                          bool& cmId)
 {
 	return (this->getAttribute(tag, "component_manager_id", cmId));
 }
 
+// 
+
 // Returns true if the latitude and longitude tags are present
 // Absence of the country tag will be caught by the schema validator
-list<string> rspec_parser :: readLocation (DOMElement* tag, int& rvLength)
+vector<string> rspec_parser :: readLocation (const DOMElement* tag,
+																						 int& rvLength)
 {
-	XMLCh* country_attr = XStr("country").x();
-	XMLCh* latitude_attr = XStr("latitude").x();
-	XMLCh* longitude_attr = XStr("longitude").x();
+	bool hasCountry, hasLatitude, hasLongitude;
 	
-	country = string(XStr(tag->getAttribute(country_attr).c());
-	latitude = string(Xstr(tag->getAttribute(latitude_attr)).c());
-	longitude = string(XStr(tag->getAttribute(longitude_attr)).c());
+	string country = this->getAttribute(tag, "country", hasCountry);
+	string latitude = this->getAttribute(tag, "latitude", hasLatitude);
+	string longitude = this->getAttribute(tag, "longitude", hasLongitude);
+		
+	rvLength = (hasLatitude && hasLongitude) ? 3 : 1;
 	
-	rvLength = ((country == "" ? 0 : 1)
-			     + (latitude == "" ? 0 : 1)
-			     + (longitude == "" ? 0 : 1));	
-	
-	return (list<string> (country, latitude, longitude));
+	vector<string> rv;
+	rv.push_back(country);
+	rv.push_back(latitude);
+	rv.push_back(longitude);
+	return rv;
 }
 
 // Returns a list of node_type elements
 // The out parameter contains the number of elements found
-list< struct node_type > rspec_parser :: readNodeTypes (DOMElement* node,
-						                           int& typeCount)
+list<struct node_type> rspec_parser::readNodeTypes (const DOMElement* node,
+																											int& typeCount)
 {
 	DOMNodeList* nodeTypes = node->getElementsByTagName(XStr("node_type").x());
-	list< node_type > types;
-	for (int i = 0; i < types->getLength(); i++) 
+	list<struct node_type> types;
+	for (int i = 0; i < nodeTypes->getLength(); i++) 
 	{
-		DOMElement *tag = dynamic_cast<DOMElement*>(types->item(i));
+		DOMElement *tag = dynamic_cast<DOMElement*>(nodeTypes->item(i));
 		
 		string typeName = XStr(tag->getAttribute(XStr("type_name").x())).c();
 		
 		int typeSlots;
 		string slot = XStr(tag->getAttribute(XStr("type_slots").x())).c();
-		if (slotString.compare("unlimited") == 0)
+		if (slot.compare("unlimited") == 0)
 			typeSlots = 1000;
 		else 
-			typeSlots = slotString.i();
+			typeSlots = atoi(slot.c_str());
 			
-		bool isStatic = tag->hasAttribute("static");
-		node_type type (typeName, typeSlots, isStatic);
+		bool isStatic = tag->hasAttribute(XStr("static").x());
+		struct node_type type = {typeName, typeSlots, isStatic};
 		types.push_back(type);
 	}
-	typeCount = types->getLength();
+	typeCount = nodeTypes->getLength();
 	return types;
+}
+
+int rspec_parser::readInterfacesOnNode (const DOMElement* node, bool& allUnique)
+{
+	DOMNodeList* ifaces = node->getElementsByTagName(XStr("interface").x());
+	allUnique = true;
+	for (int i = 0; i < ifaces->getLength(); i++)
+	{
+		DOMElement* iface = dynamic_cast<DOMElement*>(ifaces->item(i));
+		bool hasAttr;
+		string nodeId = "";
+		string ifaceId = "";
+		if (this->rspecType == RSPEC_TYPE_ADVT)
+		{
+			nodeId = this->readPhysicalId (node, hasAttr);
+			ifaceId = XStr(iface->getAttribute(XStr("component_id").x())).c();
+		}
+		else //(this->rspecType == RSPEC_TYPE_REQ)
+		{
+			nodeId = this->readVirtualId (node, hasAttr);
+			ifaceId = XStr(iface->getAttribute(XStr("client_id").x())).c();
+		}
+		allUnique &= ((this->ifacesSeen).insert
+														(pair<string, string>(nodeId, ifaceId))).second;
+	}
+	return (ifaces->getLength());
 }
 
 // Returns a link_characteristics element
 struct link_characteristics rspec_parser :: readLinkCharacteristics 
 		                                      (const DOMElement* link,
+																					 int defaultBandwidth,
+																					 int unlimitedBandwidth,
 		                                       int& count)
 {
 	bool hasBandwidth, hasLatency, hasPacketLoss;
-    string strBw = this->getAttribute(link, "bandwidth", hasBandwidth&);
-	string strLat = this->getAttribute(link, "latency", hasLatency&);
-	string strLoss = this->getAttribute(link, "packet_loss", hasPacketLoss&);
+	string strBw = this->getAttribute(link, "bandwidth", hasBandwidth);
+	string strLat = this->getAttribute(link, "latency", hasLatency);
+	string strLoss = this->getAttribute(link, "packet_loss", hasPacketLoss);
 	
-	int bandwidth, latency, packetLoss;
-	if (!hasLatency)
-		bandwidth = DEFAULT_BANDWIDTH;
+	int bandwidth = 0, latency = 0;
+	float packetLoss = 0.0;
+	if (!hasBandwidth)
+		bandwidth = defaultBandwidth;
 	else if(strBw == "unlimited")
 		// This is the bandwidth used to simulate an unlimited value
 		// We don't expect it to change, so it's constant here
-		bandwidth = UNLIMITED_BANDWIDTH;
+		bandwidth = unlimitedBandwidth;
 	else
-		bandwidth = strBw.i();
+		bandwidth = atoi(strBw.c_str());
 	
-	latency = (hasLatency ? strLat.i() : 0);
-	packetLoss = (hasPacketLoss ? strLoss.d() : 0);
+	latency = hasLatency ? atoi(strLat.c_str()) : 0 ;
+	packetLoss = hasPacketLoss ? atof(strLoss.c_str()) : 0.0;
 	
-	return (link_characteristics(bandwidth, latency, packetLoss));
+	struct link_characteristics rv = {bandwidth, latency, packetLoss};
+	return rv;
 }
 
-struct list<link_interface> rspec_parser :: readLinkInterface
+vector<struct link_interface> rspec_parser :: readLinkInterface
 							(const DOMElement* link, int& ifaceCount)
 {
 	DOMNodeList* ifaceRefs =
 			         link->getElementsByTagName(XStr("interface_ref").x());
-	ifaceCount = ifaceRefs->getLength()
+	ifaceCount = ifaceRefs->getLength();
 	
-	if (ifaceCount > 2)
-		return NULL;
-
-	srcIface = this->getIface (ifaceRefs->item(0));
-	dstIface = this->getIface (ifaceRefs->item(1));
+	if (ifaceCount != 2) {
+		ifaceCount = -1;
+		return vector<link_interface>();
+	}
 	
-	return list<link_interface>(srcIface, dstIface)
+	struct link_interface srcIface 
+							= this->getIface(dynamic_cast<DOMElement*>(ifaceRefs->item(0)));
+	struct link_interface dstIface
+							= this->getIface(dynamic_cast<DOMElement*>(ifaceRefs->item(1)));
+	
+	pair<string, string> srcNodeIface;
+	pair<string, string> dstNodeIface;
+	if (this->rspecType == RSPEC_TYPE_ADVT)
+	{
+		srcNodeIface = make_pair(srcIface.physicalNodeId, srcIface.physicalIfaceId);
+		dstNodeIface = make_pair(dstIface.physicalNodeId, dstIface.physicalIfaceId);
+	}
+	else // (this->rspecType == RSPEC_TYPE_REQ)
+	{
+		srcNodeIface = make_pair(srcIface.virtualNodeId, srcIface.virtualIfaceId);
+		dstNodeIface = make_pair(dstIface.virtualNodeId, dstIface.virtualIfaceId);
+	}
+	
+	vector<struct link_interface> rv;
+	// Check if the node-interface pair has been seen before.
+	// If it hasn't, it is an error
+	if ((this->ifacesSeen).find(srcNodeIface) == (this->ifacesSeen).end()
+					|| (this->ifacesSeen).find(dstNodeIface) == (this->ifacesSeen).end())
+	{
+		ifaceCount = -1;
+		return rv;
+	}
+	
+	rv.push_back(srcIface);
+	rv.push_back(dstIface);
+	return rv;
 }
 
 #endif
