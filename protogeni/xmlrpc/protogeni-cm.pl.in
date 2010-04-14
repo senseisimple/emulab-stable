@@ -80,6 +80,25 @@ $ENV{'MYUUID'} = $certificate->uuid();
 $ENV{'MYURN'} = "urn:publicid:IDN+@OURDOMAIN@+authority+cm";
 
 #
+# Make sure the client presented a valid certificate that apache says
+# is okay.
+#
+# THIS HAS TO BE HERE! Why? Cause recent security patches disable SSL
+# renegotiation, which is needed when a subdir turns on ssl client
+# verification (as httpd.conf used to). Now, we set it to "optional",
+# which avoids the renegotiation problem, but we have to make that
+# this interface is always invoked by a client supplying a verifiable
+# certificate. 
+#
+if (! (exists($ENV{'SSL_CLIENT_VERIFY'}) &&
+       $ENV{'SSL_CLIENT_VERIFY'} eq "SUCCESS")) {
+    my $decoder = Frontier::RPC2->new();
+    print "Content-Type: text/xml \n\n";
+    print $decoder->encode_fault(-1, "Invalid or missing certificate");
+    exit(0);
+}
+
+#
 # In the prototype, we accept certificate signed by trusted roots
 # (CA certs we have locally cached). This script runs as "geniuser"
 # so that there is an emulab user context, or many of the scripts we

@@ -1308,26 +1308,6 @@ sub TBOSMaxConcurrent ($)
 }
 
 #
-# Returns the reboot waittime.
-#
-# usage: TBOSIDRebootWaittime(char *osid)
-#        returns >= 1 if there is a waittime
-#        returns undef if there is no waittime
-#        returns 0 if not valid.
-#
-sub TBOSIDRebootWaittime ($)
-{
-    my ($osid) = @_;
-
-    require OSinfo;
-
-    my $osinfo = OSinfo->Lookup($osid);
-    return 0
-	if (!defined($osinfo));
-    return $osinfo->reboot_waittime();
-}
-
-#
 # Returns the number of nodes that are supposedly booting an OS. A list of
 # nodes that should be excluded from this count can be given.
 #

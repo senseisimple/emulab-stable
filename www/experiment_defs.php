@@ -307,6 +307,7 @@ class Experiment
     function locked()       { return $this->field('expt_locked'); }
     function elabinelab()   { return $this->field('elab_in_elab');}
     function lockdown()     { return $this->field('lockdown'); }
+    function skipvlans()    { return $this->field('skipvlans'); }
     function created()      { return $this->field('expt_created'); }
     function swapper()      { return $this->field('expt_swap_uid');}
     function swappable()    { return $this->field('swappable');}
@@ -434,6 +435,20 @@ class Experiment
 
 	$query_result =
 	    DBQueryFatal("update experiments set lockdown='$mode' ".
+			 "where idx='$idx'");
+
+	return 0;
+    }
+
+    #
+    # Flip lockdown bit.
+    #
+    function SetSkipVlans($mode) {
+	$idx      = $this->idx();
+	$mode     = ($mode ? 1 : 0);
+
+	$query_result =
+	    DBQueryFatal("update experiments set skipvlans='$mode' ".
 			 "where idx='$idx'");
 
 	return 0;
@@ -707,6 +722,7 @@ class Experiment
 	$mnet_cores  = $exprow["modelnet_cores"];
 	$mnet_edges  = $exprow["modelnet_edges"];
 	$lockdown    = $exprow["lockdown"];
+	$skipvlans   = $exprow["skipvlans"];
 	$exptidx     = $exprow["idx"];
 	$archive_idx = $exprow["archive_idx"];
 	$dpdb        = $exprow["dpdb"];
@@ -1005,6 +1021,17 @@ class Experiment
 		"&type=lockdown&value=$lockflip>Toggle</a>)
                    </td>
               </tr>\n";
+
+	    if (ISADMIN()) {
+		$thisflip = ($skipvlans ? 0 : 1);
+		$flipval  = ($skipvlans ? "Yes" : "No");
+		echo "<tr>
+                       <td>Skip Vlans:</td>
+                       <td>$flipval (<a href=toggle.php?pid=$pid&eid=$eid".
+		           "&type=skipvlans&value=$thisflip>Toggle</a>)
+                       </td>
+                      </tr>\n";
+	    }
 	}
 
 	if ($batchmode) {

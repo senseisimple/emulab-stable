@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -18,8 +18,9 @@ sub usage()
     print("Usage: newimageid [-v] <xmlfile>\n");
     exit(-1);
 }
-my $optlist = "dv";
+my $optlist = "dvf";
 my $debug   = 0;
+my $force   = 0;
 my $verify  = 0;	# Check data and return status only. 
 
 #
@@ -67,6 +68,9 @@ if (! getopts($optlist, \%options)) {
 }
 if (defined($options{"d"})) {
     $debug = 1;
+}
+if (defined($options{"f"})) {
+    $force = 1;
 }
 if (defined($options{"v"})) {
     $verify = 1;
@@ -487,7 +491,7 @@ foreach $key (@mtype_keys) {
     }
 }
 UserError("Node Types: Must select at least one node type")
-    if ($node_types_selected == 0);
+    if ($node_types_selected == 0 && !$force);
 
 #
 # We perform a further check for non-admins.  When a node to snapshot

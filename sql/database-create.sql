@@ -1129,6 +1129,7 @@ CREATE TABLE `experiments` (
   `panic_date` datetime default NULL,
   `delay_capacity` tinyint(3) unsigned default NULL,
   `savedisk` tinyint(1) NOT NULL default '0',
+  `skipvlans` tinyint(1) NOT NULL default '0',
   `locpiper_pid` int(11) default '0',
   `locpiper_port` int(11) default '0',
   `instance_idx` int(10) unsigned NOT NULL default '0',
@@ -2183,6 +2184,7 @@ CREATE TABLE `node_types` (
   `issimnode` tinyint(4) NOT NULL default '0',
   `isgeninode` tinyint(4) NOT NULL default '0',
   `isfednode` tinyint(4) NOT NULL default '0',
+  `isswitch` tinyint(4) NOT NULL default '0',
   PRIMARY KEY  (`type`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
@@ -2496,6 +2498,7 @@ CREATE TABLE `os_info` (
   `max_concurrent` int(11) default NULL,
   `mfs` tinyint(4) NOT NULL default '0',
   `reboot_waittime` int(10) unsigned default NULL,
+  `protogeni_export` tinyint(1) NOT NULL default '0',
   PRIMARY KEY  (`osid`),
   UNIQUE KEY `pid` (`pid`,`osname`),
   KEY `OS` (`OS`),
@@ -3080,7 +3083,7 @@ CREATE TABLE `reserved` (
   `exptidx` int(11) NOT NULL default '0',
   `rsrv_time` timestamp NOT NULL default CURRENT_TIMESTAMP on update CURRENT_TIMESTAMP,
   `vname` varchar(32) default NULL,
-  `erole` enum('node','virthost','delaynode','simhost','sharedhost') NOT NULL default 'node',
+  `erole` enum('node','virthost','delaynode','simhost','sharedhost', 'subboss') NOT NULL default 'node',
   `simhost_violation` tinyint(3) unsigned NOT NULL default '0',
   `old_pid` varchar(12) NOT NULL default '',
   `old_eid` varchar(32) NOT NULL default '',
@@ -3190,6 +3193,18 @@ CREATE TABLE `state_triggers` (
   `state` varchar(20) NOT NULL default '',
   `trigger` tinytext NOT NULL,
   PRIMARY KEY  (`node_id`,`op_mode`,`state`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `subbosses`
+--
+
+DROP TABLE IF EXISTS `subbosses`;
+CREATE TABLE `subbosses` (
+  `node_id` varchar(32) NOT NULL default '',
+  `service` varchar(20) NOT NULL default '',
+  `subboss_id` varchar(20) NOT NULL default '',
+  PRIMARY KEY  (`node_id`,`service`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
@@ -3783,6 +3798,7 @@ CREATE TABLE `virt_lans` (
   `trace_endnode` tinyint(1) NOT NULL default '0',
   `trace_db` tinyint(1) NOT NULL default '0',
   `fixed_iface` varchar(128) default '',
+  `layer` tinyint(4) NOT NULL default '2',
   PRIMARY KEY  (`exptidx`,`vname`,`vnode`,`vport`),
   UNIQUE KEY `vport` (`pid`,`eid`,`vname`,`vnode`,`vport`),
   KEY `pid` (`pid`,`eid`,`vname`),

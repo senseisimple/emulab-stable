@@ -1191,6 +1191,7 @@ sub issimnode($)      { return NodeTypeInfo($_[0])->issimnode(); }
 sub isgeninode($)     { return NodeTypeInfo($_[0])->isgeninode(); }
 sub isfednode($)      { return NodeTypeInfo($_[0])->isfednode(); }
 sub isdedicatedremote($) { return NodeTypeInfo($_[0])->isdedicatedremote(); }
+sub isswitch($)       { return NodeTypeInfo($_[0])->isswitch(); }
 
 #
 # And these are the less common attributes, but still common enough to

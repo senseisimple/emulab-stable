@@ -1,0 +1,21 @@
+use strict;
+use libdb;
+
+#
+# Add a skipvlans toggle so that an experiment can be swapped in
+# but without vlan creation. This is exclusively a debugging feature.
+#
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (!DBSlotExists("experiments", "skipvlans")) {
+	DBQueryFatal("alter table experiments add ".
+		     " `skipvlans` tinyint(1) NOT NULL default '0' ".
+		     " after savedisk");
+
+    }
+    return 0;
+}
+1;
+
