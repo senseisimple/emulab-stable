@@ -37,6 +37,7 @@ INSERT INTO sitevariables VALUES ('watchdog/isalive/vnode',NULL,'10','Interval i
 INSERT INTO sitevariables VALUES ('watchdog/isalive/plab',NULL,'10','Interval in minutes between planetlab node status reports (0==never report)',0);
 INSERT INTO sitevariables VALUES ('watchdog/isalive/wa',NULL,'1','Interval in minutes between widearea node status reports (0==never report)',0);
 INSERT INTO sitevariables VALUES ('watchdog/isalive/dead_time','10','120','Time, in minutes, after which to consider a node dead if it has not checked in via tha watchdog',0);
+INSERT INTO sitevariables VALUES ('watchdog/dhcpdconf',NULL,'5','Time in minutes between DHCPD configuration updates (0==never update)',0);
 INSERT INTO sitevariables VALUES ('plab/setup/vnode_batch_size',NULL,'40','Number of plab nodes to setup simultaneously',0);
 INSERT INTO sitevariables VALUES ('plab/setup/vnode_wait_time','300','960','Number of seconds to wait for a plab node to setup',0);
 INSERT INTO sitevariables VALUES ('watchdog/rusage','30','300','Interval in _seconds_ between node resource usage reports (0==never report)',0);
@@ -60,7 +61,7 @@ INSERT INTO sitevariables VALUES ('elabinelab/boss_pkg_dir',NULL,'','Path from w
 INSERT INTO sitevariables VALUES ('elabinelab/ops_pkg',NULL,'','Name of ops node install package (DEPRECATED)',0);
 INSERT INTO sitevariables VALUES ('elabinelab/ops_pkg_dir',NULL,'','Path from which to fetch ops packages (DEPRECATED)',0);
 INSERT INTO sitevariables VALUES ('elabinelab/windows','1','0','Turn on Windows support in inner Emulab',0);
-INSERT INTO `sitevariables` VALUES ('elabinelab/singlenet',NULL,0,'Default control net config. 0==use inner cnet, 1==use real cnet',1);
+INSERT INTO `sitevariables` VALUES ('elabinelab/singlenet',NULL,'0','Default control net config. 0==use inner cnet, 1==use real cnet',1);
 INSERT INTO `sitevariables` VALUES ('elabinelab/boss_osid',NULL,'','Default (emulab-ops) OSID to boot on boss node. Empty string means use node_type default OSID',1);
 INSERT INTO `sitevariables` VALUES ('elabinelab/ops_osid',NULL,'','Default (emulab-ops) OSID to boot on ops node. Empty string means use node_type default OSID',1);
 INSERT INTO `sitevariables` VALUES ('elabinelab/fs_osid',NULL,'','Default (emulab-ops) OSID to boot on fs node. Empty string means use node_type default OSID',1);

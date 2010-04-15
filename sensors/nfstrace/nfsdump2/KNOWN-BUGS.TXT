@@ -1,4 +1,0 @@
-
-Prior to 9/9/2003:
-
-	- the size in the setattr call had its bytes reversed.

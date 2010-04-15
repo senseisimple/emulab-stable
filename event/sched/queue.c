@@ -146,6 +146,9 @@ sched_event_dequeue(sched_event_t *event, int wait)
 
     assert(initialized);
 
+// XXX
+// info("queue.c: sched_event_dequeue() called\n");
+// XXX
     if (event == NULL) {
         error("invalid event pointer\n");
         return 0;
@@ -173,6 +176,7 @@ sched_event_dequeue(sched_event_t *event, int wait)
      * woken up early if a new event comes in, so must recheck each
      * time. This allows newer events to sneak in, obviously.
      */
+// info("queue.c: sched_event_dequeue(): Waiting for an event\n");
     while (1) {
 	    struct timespec      fireme;
 	    int			 err;

@@ -391,6 +391,7 @@ Simulator instproc run {} {
     var_import ::GLOBALS::delay_capacity
     var_import ::TBCOMPAT::objtypes
     var_import ::TBCOMPAT::eventtypes
+    var_import ::TBCOMPAT::triggertypes
     var_import ::GLOBALS::modelnet_cores
     var_import ::GLOBALS::modelnet_edges
     var_import ::GLOBALS::elab_in_elab
@@ -673,11 +674,18 @@ Simulator instproc run {} {
     }
 
     foreach event $event_list {
-	set fields [list "time" "vnode" "vname" "objecttype" "eventtype" "arguments" "atstring" ]
-	set values [list [lindex $event 0] [lindex $event 1] [lindex $event 2] $objtypes([lindex $event 3]) $eventtypes([lindex $event 4]) [lindex $event 5] [lindex $event 6]]
-	if {[llength $event] > 7} {
+	if {[string equal [lindex $event 0] "swapout"]} {
+               set event [lreplace $event 0 0 0]
+	       set triggertype "SWAPOUT"
+	} else {
+	       set triggertype "TIMER"
+	}
+	set fields [list "time" "vnode" "vname" "objecttype" "eventtype" "arguments" "atstring" "triggertype" ]
+	set values [list [lindex $event 0] [lindex $event 1] [lindex $event 2] $objtypes([lindex $event 3]) $eventtypes([lindex $event 4]) [lindex $event 5] [lindex $event 6] $triggertypes($triggertype)]
+	if {[llength $event] > 8} {
+
 	    lappend fields "parent"
-	    lappend values [lindex $event 7]
+	    lappend values [lindex $event 8]
 	}
 	$self spitxml_data "eventlist" $fields $values
     }
@@ -741,6 +749,7 @@ Simulator instproc attach-agent {node agent} {
 Simulator instproc agentinit {agent} {
     var_import ::TBCOMPAT::objtypes
     var_import ::TBCOMPAT::eventtypes
+    var_import ::TBCOMPAT::triggertypes
 
     if {[$agent info class Application/Traffic/CBR]} {
 	$self spitxml_data "eventlist" [list "time" "vnode" "vname" "objecttype" "eventtype" "arguments" "atstring" "parent" ] [list "0" [$agent get_node] $agent $objtypes(TRAFGEN) $eventtypes(MODIFY) [$agent get_params] "" "__ns_sequence"]
@@ -799,12 +808,18 @@ Simulator instproc at {time eventstring} {
 	return
     }
 
-    set ptime [::GLOBALS::reltime-to-secs $time]
-    if {$ptime == -1} {
-	perror "Invalid time spec: $time"
-	return
+    if {[string equal $time "swapout"]} {
+# "swapout" will be preserved as the time until we're at a point
+# where we can shunt it into a code path where it changes the
+# trigger type.
+    } else {
+       set ptime [::GLOBALS::reltime-to-secs $time]
+       if {$ptime == -1} {
+               perror "Invalid time spec: $time"
+               return
+       }
+       set time $ptime
     }
-    set time $ptime
 
     $self instvar event_list
     $self instvar event_count

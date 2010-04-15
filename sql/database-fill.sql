@@ -567,6 +567,8 @@ REPLACE INTO table_regex VALUES ('eventlist','objecttype','int','redirect','defa
 REPLACE INTO table_regex VALUES ('eventlist','eventtype','int','redirect','default:tinyint',0,0,NULL);
 REPLACE INTO table_regex VALUES ('eventlist','arguments','text','redirect','default:text',0,1024,NULL);
 REPLACE INTO table_regex VALUES ('eventlist','atstring','text','redirect','default:text',0,1024,NULL);
+REPLACE INTO table_regex VALUES ('eventlist','triggertype','int','redirect','default:tinyint',0,0,NULL);
+
 REPLACE INTO table_regex VALUES ('experiments','eid','text','regex','^[a-zA-Z0-9][-a-zA-Z0-9]+$',2,19,'Must ensure not too long for the database. PID is 12, and the max is 32, so the user is not allowed to specify an EID more than 19, since other parts of the system may concatenate them together with a hyphen');
 REPLACE INTO table_regex VALUES ('experiments','eid_idx','text','regex','^[\\d]+$',1,12,NULL);
 REPLACE INTO table_regex VALUES ('experiments','multiplex_factor','int','redirect','default:tinyint',0,0,NULL);
@@ -976,6 +978,7 @@ REPLACE INTO table_regex VALUES ('default','tinytext_utf8','text','regex','^(?:[
 REPLACE INTO table_regex VALUES ('default','text_utf8','text','regex','^(?:[\\x20-\\x7E]|[\\xC2-\\xDF][\\x80-\\xBF]|\\xE0[\\xA0-\\xBF][\\x80-\\xBF]|[\\xE1-\\xEC\\xEE\\xEF][\\x80-\\xBF]{2}|\\xED[\\x80-\\x9F][\\x80-\\xBF])*$',0,65535,'adopted from http://www.w3.org/International/questions/qa-forms-utf-8.en.php');
 REPLACE INTO table_regex VALUES ('default','fulltext_utf8','text','regex','^(?:[\\x09\\x0A\\x0D\\x20-\\x7E]|[\\xC2-\\xDF][\\x80-\\xBF]|\\xE0[\\xA0-\\xBF][\\x80-\\xBF]|[\\xE1-\\xEC\\xEE\\xEF][\\x80-\\xBF]{2}|\\xED[\\x80-\\x9F][\\x80-\\xBF])*$',0,65535,'adopted from http://www.w3.org/International/questions/qa-forms-utf-8.en.php');
 
+
 --
 -- Dumping data for table `testsuite_preentables`
 --
@@ -1065,3 +1068,5 @@ REPLACE INTO `emulab_pubs_month_map` VALUES (23,10.5,'Oct-Nov');
 REPLACE INTO `emulab_pubs_month_map` VALUES (24,11.5,'Nov-Dec');
 REPLACE INTO `emulab_pubs_month_map` VALUES (25,12.5,'Dec-Jan');
 
+REPLACE INTO event_triggertypes VALUES(0,'TIMER');
+REPLACE INTO event_triggertypes VALUES(2,'SWAPOUT');

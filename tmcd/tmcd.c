@@ -6030,7 +6030,7 @@ COMMAND_PROTOTYPE(dodoginfo)
 	char		buf[MYBUFSIZE], *bp;
 	int		nrows, *iv;
 	int		iv_interval, iv_isalive, iv_ntpdrift, iv_cvsup;
-	int		iv_rusage, iv_hkeys;
+	int		iv_rusage, iv_hkeys, iv_dhcpdconf;
 
 	/*
 	 * XXX sitevar fetching should be a library function
@@ -6059,6 +6059,8 @@ COMMAND_PROTOTYPE(dodoginfo)
 			iv = &iv_rusage;
 		} else if (strcmp(row[0], "watchdog/hostkeys") == 0) {
 			iv = &iv_hkeys;
+		} else if (strcmp(row[0], "watchdog/dhcpdconf") == 0) {
+			iv = &iv_dhcpdconf;
 		} else if (strcmp(row[0], "watchdog/isalive/local") == 0) {
 			if (reqp->islocal && !reqp->isvnode)
 				iv = &iv_isalive;
@@ -6116,9 +6118,9 @@ COMMAND_PROTOTYPE(dodoginfo)
 	bp = buf;
 	bp += OUTPUT(bp, sizeof(buf),
 		     "INTERVAL=%d ISALIVE=%d NTPDRIFT=%d CVSUP=%d "
-		     "RUSAGE=%d HOSTKEYS=%d",
+		     "RUSAGE=%d HOSTKEYS=%d DHCPDCONF=%d",
 		     iv_interval, iv_isalive, iv_ntpdrift, iv_cvsup,
-		     iv_rusage, iv_hkeys);
+		     iv_rusage, iv_hkeys, iv_dhcpdconf);
 	if (vers >= 29) {
 	        int rootpswdinterval = 0;
 #ifdef DYNAMICROOTPASSWORDS

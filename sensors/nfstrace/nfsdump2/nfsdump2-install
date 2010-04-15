@@ -1,0 +1,58 @@
+#!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Download, unpack, and patch the nfsdump2 package.
+# Comes from: http://www.eecs.harvard.edu/sos/software/nfsdump-v1.01-031204.tgz
+#
+srcurl="http://www.eecs.harvard.edu/sos/software"
+tarball="nfsdump-v1.01-031204.tgz"
+
+if [ -x /usr/bin/fetch ]; then
+    fetch=/usr/bin/fetch
+elif [ -x /usr/bin/wget ]; then
+    fetch=/usr/bin/wget
+else
+    echo "ERROR: nfsdump2-install: need either 'fetch' or 'wget' installed"
+    exit 1
+fi
+
+if [ -n "$1" ]; then srcdir=$1; else srcdir=$PWD ; fi
+if [ -n "$2" ]; then tarball=$2; fi
+if [ -n "$3" ]; then host=$3; else host=www.emulab.net ; fi
+dir=$PWD
+
+if [ ! -d $dir/nfsdump2 ]; then
+    if [ ! -f "$tarball" ]; then
+      cd $dir
+      echo "Downloading nfsdump2 source from $host to $dir ..."
+      $fetch http://$host/$tarball
+      if [ $? -ne 0 ]; then
+           echo "Failed..."
+           echo "Downloading nfsdump2 source from $srcurl to $dir ..."
+           $fetch $srcurl/$tarball || {
+	       echo "ERROR: nfsdump2-install: $fetch failed"
+	       exit 1
+	   }
+      fi
+    fi
+    echo "Unpacking/patching nfsdump2 source ..."
+    tar xzof $tarball nfsdump2 || {
+        echo "ERROR: nfsdump-install: tar failed"
+	exit 1
+    }
+    patch -p0 < $srcdir/nfsdump2.patch || {
+        echo "ERROR: nfsdump2-install: patch failed"
+	exit 1
+    }
+    # XXX link in the local additions
+    for f in `ls $srcdir/files/*`; do
+        ln -sf $f nfsdump2/
+    done
+    rm -f nfsdump2/*.orig
+fi
+exit 0

@@ -12,10 +12,11 @@
 package libtestbed;
 use Exporter;
 @ISA    = "Exporter";
-@EXPORT = qw( TB_BOSSNODE TB_EVENTSERVER
-	      TBScriptLock TBScriptUnlock 
+@EXPORT = qw( SENDMAIL TB_BOSSNODE TB_EVENTSERVER
+	      TBScriptLock TBScriptUnlock
 	      TBSCRIPTLOCK_OKAY TBSCRIPTLOCK_TIMEDOUT
 	      TBSCRIPTLOCK_IGNORE TBSCRIPTLOCK_FAILED TBSCRIPTLOCK_GLOBALWAIT
+	      TBTimeStamp TBTimeStampWithDate
 	    );
 
 # Must come after package declaration!
@@ -40,6 +41,91 @@ BEGIN
 
 # Need this.
 use libtmcc;
+
+sub SENDMAILWith($$$$;$$@);
+
+sub SENDMAIL($$$;$$@)
+{
+    my($To, $Subject, $Message, $From, $Headers, @Files) = @_;
+    SENDMAILWith("/usr/sbin/sendmail -t", $To, $Subject, $Message, $From, $Headers, @Files);
+}
+
+sub SENDMAILWith($$$$;$$@)
+{
+    my($Command, $To, $Subject, $Message, $From, $Headers, @Files) = @_;
+    my $tag = uc($MAILTAG);
+
+    #
+    # Untaint the path locally. Note that using a "local" fails on older perl!
+    #
+    my $SAVE_PATH = $ENV{'PATH'};
+    $ENV{'PATH'} = "/bin:/usr/bin";
+    delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+    if (! open(MAIL, "| $Command")) {
+	print STDERR "SENDMAIL: Could not start sendmail: $!\n";
+	goto bad;
+    }
+
+    #
+    # Sendmail will figure this out if not given.
+    #
+    if (defined($From) && $From) {
+	print MAIL "From: $From\n";
+    }
+    if (defined($Headers) && length($Headers) > 0) {
+	print MAIL "$Headers\n";
+    }
+    print MAIL "X-NetBed: $SCRIPTNAME\n";
+    if (defined($To)) {
+	print MAIL "To: $To\n";
+    }
+    print MAIL "Subject: $tag: $Subject\n";
+    print MAIL "\n";
+    print MAIL "$Message\n";
+    print MAIL "\n";
+
+    if (@Files) {
+	foreach my $file ( @Files ) {
+	    if (defined($file) && open(IN, "$file")) {
+		print MAIL "\n--------- $file --------\n";
+
+		while (<IN>) {
+		    print MAIL "$_";
+		}
+		close(IN);
+	    }
+	}
+    }
+
+    print MAIL "\n";
+    if (! close(MAIL)) {
+	print STDERR "SENDMAIL: Could not finish sendmail: $!\n";
+	goto bad;
+    }
+    $ENV{'PATH'} = $SAVE_PATH;
+    return 1;
+
+  bad:
+    $ENV{'PATH'} = $SAVE_PATH;
+    return 0;
+}
+#
+# Return a timestamp. We don't care about day/date/year. Just the time mam.
+#
+# TBTimeStamp()
+#
+sub TBTimeStamp()
+{
+    my ($seconds, $microseconds) = gettimeofday();
+
+    return POSIX::strftime("%H:%M:%S", localtime($seconds)) . ":$microseconds";
+}
+
+sub TBTimeStampWithDate()
+{
+    return POSIX::strftime("%m/%d/20%y %H:%M:%S", localtime());
+}
 
 #
 # Return name of the bossnode.
@@ -93,7 +179,7 @@ sub TBSCRIPTLOCK_IGNORE()	{ 2;  }
 sub TBSCRIPTLOCK_FAILED()	{ -1; }
 sub TBSCRIPTLOCK_GLOBALWAIT()	{ 1; }
 
-# 
+#
 # There are two kinds of serialization.
 #
 #   * Usual Kind: Each party just waits for a chance to go.
@@ -158,17 +244,17 @@ sub TBScriptLock($;$$$)
     #
     # If we don't get it the first time, we wait for:
     # 1) The lock to become free, in which case we do our thing
-    # 2) The time on the lock to change, in which case we wait for that 
+    # 2) The time on the lock to change, in which case we wait for that
     #    process to finish, and then we are done since there is no
     #    reason to duplicate what the just finished process did.
     #
     if (flock(LOCK, LOCK_EX|LOCK_NB) == 0) {
 	my $oldlocktime = (stat(LOCK))[9];
 	my $gotlock = 0;
-	
+
 	while (1) {
 	    print "Another $token in progress. Waiting a moment ...\n";
-	    
+
 	    if (flock(LOCK, LOCK_EX|LOCK_NB) != 0) {
 		# OK, got the lock
 		$gotlock = 1;
@@ -179,7 +265,7 @@ sub TBScriptLock($;$$$)
 		$oldlocktime = $locktime;
 		last;
 	    }
-	    
+
 	    $waittime--;
 	    if ($waittime <= 0) {
 		print STDERR "Could not get the lock after a long time!\n";
@@ -209,7 +295,7 @@ sub TBScriptLock($;$$$)
 			"a long time!\n";
 		    return TBSCRIPTLOCK_TIMEDOUT();
 		}
-		sleep(1); 
+		sleep(1);
 	    }
 	}
     }
@@ -218,7 +304,7 @@ sub TBScriptLock($;$$$)
     #
     my $now = time;
     utime $now, $now, $lockname;
-    
+
     if (defined($lockhandle_ref)) {
 	$$lockhandle_ref = *LOCK;
     }

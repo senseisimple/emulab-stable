@@ -10,7 +10,7 @@ sub DoUpdate($$$)
     my ($dbhandle, $dbname, $version) = @_;
 
     if (!DBTableExists("subbosses")) {
-	DBQueryFatal( "CREATE TABLE 'subbosses' (" .
+	DBQueryFatal( "CREATE TABLE subbosses (" .
 		     "  'node_id' varchar(32) NOT NULL default ''," .
 		     "  'service' varchar(20) NOT NULL default ''," .
 		     "  'subboss_id' varchar(20) NOT NULL default ''," .
