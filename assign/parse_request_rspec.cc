@@ -89,16 +89,21 @@ int parse_vtop_rspec(tb_vgraph &vg, char *filename) {
     /*
      * Enable some of the features we'll be using: validation, namespaces, etc.
      */
-		/* XXX: The schema to validate against is specificed in the xml document
-		* This could lead to security problems. There are some ways around it,
-		* but they aren't exactly elegant. But we do need to take care of it at 
-		* some point 
-		 */		
     parser->setValidationScheme(XercesDOMParser::Val_Always);
     parser->setDoNamespaces(true);
     parser->setDoSchema(true);
     parser->setValidationSchemaFullChecking(true);
         
+    /*
+     * Must validate against the ptop schema
+     */
+    parser -> setExternalSchemaLocation ("http://www.protogeni.net/resources/rspec/0.1 " SCHEMA_LOCATION);
+    
+    /*
+     * Just use a custom error handler - must admin it's not clear to me why
+     * we are supposed to use a SAX error handler for this, but this is what
+     * the docs say....
+     */    
     ParseErrorHandler* errHandler = new ParseErrorHandler();
     parser->setErrorHandler(errHandler);
     
@@ -112,9 +117,7 @@ int parse_vtop_rspec(tb_vgraph &vg, char *filename) {
      * If there are any errors, do not go any further
      */
     if (errHandler->sawError()) {
-        cerr << "There were " << parser -> getErrorCount () 
-							<< " errors in your file." 
-						 << "Please correct the errors and try again." << endl;
+        cerr << "There were " << parser -> getErrorCount () << " errors in your file. Please correct the errors and try again." << endl;
         exit(EXIT_FATAL);
     }
     else {
@@ -133,35 +136,39 @@ int parse_vtop_rspec(tb_vgraph &vg, char *filename) {
 			exit (EXIT_FATAL);
 		}
         
-			// XXX: Not sure what to do with the datetimes, they are strings for now
-			XStr generated (request_root->getAttribute(XStr("generated").x()));
-			XStr valid_until(request_root->getAttribute(XStr("valid_until").x()));
+        // XXX: Not sure what to do with the datetimes, so they are strings for now
+        XStr generated (request_root->getAttribute(XStr("generated").x()));
+        XStr valid_until(request_root->getAttribute(XStr("valid_until").x()));
         
-			map< pair<string, string>, pair<string, string> > fixed_interfaces;
+		map< pair<string, string>, pair<string, string> > fixed_interfaces;
 				//map< pair<string, string>, pair<string, string> >();
 				
-			/*
-			* These three calls do the real work of populating the assign data
-			* structures
-			*/
-			XMLDEBUG("starting node population" << endl);
-			if (!populate_nodes_rspec(request_root,vg, &fixed_interfaces)) {
-				cerr << "Error reading nodes from virtual topology " << filename << endl;
-				exit(EXIT_FATAL);
-			}
-			XMLDEBUG("finishing node population" << endl);
+        /*
+        * These three calls do the real work of populating the assign data
+        * structures
+        */
+        // clock_t startNode = clock();
+        XMLDEBUG("starting node population" << endl);
+        if (!populate_nodes_rspec(request_root,vg, &fixed_interfaces)) {
+			cerr << "Error reading nodes from virtual topology " << filename << endl;
+			exit(EXIT_FATAL);
+        }
+        XMLDEBUG("finishing node population" << endl);
+        // //cerr << "Time taken : " << (clock() - startNode) / CLOCKS_PER_SEC << endl;
 
-			XMLDEBUG("starting link population" << endl);
-			if (!populate_links_rspec(request_root,vg, &fixed_interfaces)) {
-		cerr << "Error reading links from virtual topology " << filename << endl;
-		exit(EXIT_FATAL);
-			}
-			XMLDEBUG("finishing link population" << endl);
-			
-			/* TODO: We need to do something about policies at some point. */
+		// clock_t startLink = clock();
+        XMLDEBUG("starting link population" << endl);
+        if (!populate_links_rspec(request_root,vg, &fixed_interfaces)) {
+			cerr << "Error reading links from virtual topology " << filename << endl;
+			exit(EXIT_FATAL);
+        }
+        XMLDEBUG("finishing link population" << endl);
+		// //cerr << "Time taken : " << (clock() - startLink) / CLOCKS_PER_SEC << endl;
+        
+        /* TODO: We need to do something about policies at some point. */
 		//populate_policies(root);
-			
-			cerr << "RSpec parsing finished" << endl; 
+        
+        cerr << "RSpec parsing finished" << endl; 
     }
     
     /*

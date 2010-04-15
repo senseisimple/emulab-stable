@@ -86,16 +86,21 @@ int parse_ptop_rspec(tb_pgraph &pg, tb_sgraph &sg, char *filename) {
     /*
      * Enable some of the features we'll be using: validation, namespaces, etc.
      */
-		/* XXX: The schema to validate against is specificed in the xml document
-		 * This could lead to security problems. There are some ways around it,
-		 * but they aren't exactly elegant. But we do need to take care of it at 
-		 * some point 
-		 */
     parser->setValidationScheme(XercesDOMParser::Val_Always);
     parser->setDoNamespaces(true);
     parser->setDoSchema(true);
     parser->setValidationSchemaFullChecking(true);
     
+    /*
+     * Must validate against the ptop schema
+     */
+	parser -> setExternalSchemaLocation ("http://www.protogeni.net/resources/rspec/0.1 " SCHEMA_LOCATION);
+    
+    /*
+     * Just use a custom error handler - must admin it's not clear to me why
+     * we are supposed to use a SAX error handler for this, but this is what
+     * the docs say....
+     */    
     ParseErrorHandler* errHandler = new ParseErrorHandler();
     parser->setErrorHandler(errHandler);
     
@@ -126,8 +131,8 @@ int parse_ptop_rspec(tb_pgraph &pg, tb_sgraph &sg, char *filename) {
         XStr type (advertisement_root->getAttribute(XStr("type").x()));
         if (strcmp(type.c(), "advertisement") == 0)
         	is_physical = true;
-				else if (strcmp(type.c(), "request") == 0)
-					is_physical = false;
+		else if (strcmp(type.c(), "request") == 0)
+			is_physical = false;
         
         // XXX: Not sure what to do with the datetimes, so they are strings for now
         XStr generated (advertisement_root->getAttribute(XStr("generated").x()));
@@ -137,21 +142,23 @@ int parse_ptop_rspec(tb_pgraph &pg, tb_sgraph &sg, char *filename) {
         * These three calls do the real work of populating the assign data
         * structures
         */
+        // clock_t startNode = clock();
         XMLDEBUG("starting node population" << endl);
         if (!populate_nodes_rspec(advertisement_root,pg,sg,unavailable)) {
-        	cerr << "Error reading nodes from physical topology " 
-							<< filename << endl;
-        	exit(EXIT_FATAL);
+        cerr << "Error reading nodes from physical topology " << filename << endl;
+        exit(EXIT_FATAL);
         }
         XMLDEBUG("finishing node population" << endl);
+        // //cerr << "Time taken : " << (clock() - startNode) / CLOCKS_PER_SEC << endl;
 
+		// clock_t startLink = clock();
         XMLDEBUG("starting link population" << endl);
         if (!populate_links_rspec(advertisement_root,pg,sg,unavailable)) {
-        	cerr << "Error reading links from physical topology " 
-							<< filename << endl;
-        	exit(EXIT_FATAL);
+        cerr << "Error reading links from physical topology " << filename << endl;
+        exit(EXIT_FATAL);
         }
         XMLDEBUG("finishing link population" << endl);
+		// //cerr << "Time taken : " << (clock() - startLink) / CLOCKS_PER_SEC << endl;
         
         // TODO: We need to do something about these policies
 		//populate_policies(root);
