@@ -577,6 +577,17 @@ CREATE TABLE `event_objecttypes` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `event_triggertypes`
+--
+
+DROP TABLE IF EXISTS `event_triggertypes`;
+CREATE TABLE `event_triggertypes` (
+  `idx` smallint(5) unsigned NOT NULL,
+  `type` tinytext NOT NULL,
+  PRIMARY KEY (`idx`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `eventlist`
 --
 
@@ -591,6 +602,7 @@ CREATE TABLE `eventlist` (
   `vname` varchar(64) NOT NULL default '',
   `objecttype` smallint(5) unsigned NOT NULL default '0',
   `eventtype` smallint(5) unsigned NOT NULL default '0',
+  `triggertype` smallint(5) unsigned NOT NULL default '0',
   `isgroup` tinyint(1) unsigned default '0',
   `arguments` text,
   `atstring` text,
