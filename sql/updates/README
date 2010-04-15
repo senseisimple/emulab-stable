@@ -26,3 +26,10 @@ which will give you the hash of your latest commit. Then, tag the commit:
 Now you can push your commit along with the tag(s) to the remote repo:
 
     boss> git push --tags origin master
+
+NOTE: if you have to fix an update script for any reason, you will need to
+update and re-push the relevant tag to point to the new commit with the fixed
+version of the script.  That can be done as follows:
+
+    boss> git tag -f v4.185 <new hash>
+    boss> git push origin tags/v4.185

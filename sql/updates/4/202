@@ -1,0 +1,58 @@
+#
+# Add sitevariables to control global operation and defaults for elabinelab.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    DBQueryFatal("INSERT INTO `sitevariables` VALUES ".
+		 "('elabinelab/singlenet',NULL,0,'Default control net config. 0==use inner cnet, 1==use real cnet',1)")
+	if (!TBSiteVarExists("elabinelab/singlenet"));
+
+    #
+    # XXX need to think about a default for these.  The problem is
+    # that at this point, they have no images registered and we don't
+    # even know what images they have!  The elabinelab.ns script will
+    # complain and default to FBSD63-STD if these site vars are not set,
+    # so that seems as good at anything.
+    #
+    DBQueryFatal("INSERT INTO `sitevariables` VALUES ".
+		 "('elabinelab/boss_osid',NULL,'','Default (emulab-ops) OSID to boot on boss node. Empty string means use node_type default OSID',1)")
+	if (!TBSiteVarExists("elabinelab/boss_osid"));
+    DBQueryFatal("INSERT INTO `sitevariables` VALUES ".
+		 "('elabinelab/ops_osid',NULL,'','Default (emulab-ops) OSID to boot on ops node. Empty string means use node_type default OSID',1)")
+	if (!TBSiteVarExists("elabinelab/ops_osid"));
+    DBQueryFatal("INSERT INTO `sitevariables` VALUES ".
+		 "('elabinelab/fs_osid',NULL,'','Default (emulab-ops) OSID to boot on fs node. Empty string means use node_type default OSID',1)")
+	if (!TBSiteVarExists("elabinelab/fs_osid"));
+
+    #
+    # XXX the {boss,ops}_pkg* variables are deprecated since packages are
+    # just too tightly linked with the OS version and we deal with this in
+    # rc.mkelab.  Not quite sure how to handle the deprecation correctly
+    # however.  So lets try:
+    #   For new installs, we create them with empty values
+    #   (done by sitevars-create.sql).
+    #   For old installs (updates), we leave them alone.
+    # The net effect here is that we do nothing for these vars except to
+    # change the description.
+    #
+    DBQueryFatal("update sitevariables set description=".
+		 "'Name of boss node install package (DEPRECATED)'".
+		 " where name='elabinelab/boss_pkg'");
+    DBQueryFatal("update sitevariables set description=".
+		 "'Path from which to fetch boss packages (DEPRECATED)'".
+		 " where name='elabinelab/boss_pkg_dir'");
+    DBQueryFatal("update sitevariables set description=".
+		 "'Name of ops node install package (DEPRECATED)'".
+		 " where name='elabinelab/ops_pkg'");
+    DBQueryFatal("update sitevariables set description=".
+		 "'Path from which to fetch ops packages (DEPRECATED)'".
+		 " where name='elabinelab/ops_pkg_dir'");
+
+    return 0;
+}
+1;

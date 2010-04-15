@@ -425,6 +425,7 @@ REPLACE INTO state_transitions VALUES ('NORMALv1','ISUP','PXEBOOTING','KernelCha
 REPLACE INTO state_transitions VALUES ('NODEALLOC','FREE_CLEAN','RES_INIT_CLEAN','Reserve');
 REPLACE INTO state_transitions VALUES ('PXEKERNEL','PXEWAIT','PXEBOOTING','Retry');
 REPLACE INTO state_transitions VALUES ('PXEKERNEL','PXEBOOTING','PXEWAIT','Free');
+REPLACE INTO state_transitions VALUES ('PXEKERNEL','PXELIMBO','PXEBOOTING','Bootinfo-Restart');
 REPLACE INTO state_transitions VALUES ('BATCHSTATE','ACTIVATING','SWAPPED','NonBatch');
 REPLACE INTO state_transitions VALUES ('NORMAL','ISUP','SHUTDOWN','Reboot');
 REPLACE INTO state_transitions VALUES ('NORMAL','REBOOTING','SHUTDOWN','Reboot');

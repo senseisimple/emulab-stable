@@ -83,6 +83,7 @@ my %vnode2pnode = ();
 my %pnodevcount = ();
 my %plabvnodes  = ();
 my %geninodes   = ();
+my %einenodes	= ();
 my %osids       = ();
 my %osmap       = ();
 my %canfail     = ();
@@ -226,7 +227,8 @@ if (TBExptPlabInElabPLC($pid, $eid, \$plcnode)) {
 # Get the set of nodes, as well as the nodes table information for them.
 #
 my $db_result =
-    DBQueryFatal("select n.*,l.pid,r.vname,r.sharing_mode from reserved as r ".
+    DBQueryFatal("select n.*,l.pid,r.vname,r.sharing_mode,r.inner_elab_role ".
+		 "from reserved as r ".
 		 "left join nodes as n on n.node_id=r.node_id ".
 		 "left join last_reservation as l on n.node_id=l.node_id ".
 		 "where r.pid='$pid' and r.eid='$eid'");
@@ -249,6 +251,8 @@ while (my %row = $db_result->fetchhash()) {
     my $virtnode  = $typeinfo->isvirtnode();
     my $sharednode = defined($row{'sharing_mode'}) 
 	&& $row{'sharing_mode'} eq 'using_shared_local';
+    my $iseinenode= $elabinelab && defined($row{'inner_elab_role'})
+	&& $row{'inner_elab_role'} eq 'node';
     my $isremote  = $typeinfo->isremotenode();
     my $isgeninode= $typeinfo->isfednode();
     my $imageable = $typeinfo->imageable();
@@ -288,6 +292,11 @@ while (my %row = $db_result->fetchhash()) {
 	if (! $jailnode && ! $plabnode && !$isremote) {
 	    next;
 	}
+    }
+    elsif ($iseinenode) {
+	print "Will skip reload/reboot of inner elab node $node.\n";
+	$einenodes{$node} = 1;
+	next;
     }
     elsif ($subnode && !$imageable) {
 	print "Will skip subnode $node ISUP wait.\n";
@@ -495,6 +504,19 @@ while (my %row = $db_result->fetchhash()) {
     print STDERR "$node - $osmap{$node} - $canfail{$node}\n"
 	if $dbg;
 }
+
+#
+# XXX Inner elab nodes should never report in to us.
+# If they do, make sure they wind up in PXEWAIT.
+#
+if (keys(%einenodes)) {
+    DBQueryFatal("update nodes set ".
+		 "  def_boot_osid=NULL,".
+		 "  next_boot_osid=NULL,".
+		 "  temp_boot_osid=NULL ".
+		 "where node_id in (".
+		 join(",", map("'$_'", keys %einenodes)). ")");
+}    
 
 @all_nodes = (keys %nodes, keys %vnodes);
 
