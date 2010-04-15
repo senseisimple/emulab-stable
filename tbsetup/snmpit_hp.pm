@@ -57,7 +57,7 @@ my $ofEnableOID     = $ofOID.'.1.1.2';
 my $ofControllerOID = $ofOID.'.1.1.3';
 my $ofListenerOID   = $ofOID.'.1.1.4';
 my $ofSupportOID    = $ofOID.'.2.1.0';
-my $ofListenerVarNameMarker = '11.2.14.11.5.1.7.1.35.1.1.4';
+my $ofListenerVarNameMarker = '35.1.1.4';
 
 #
 # Ports can be passed around in three formats:
@@ -1853,9 +1853,9 @@ sub setOpenflowListener($$$) {
 #
 # Get used listener ports
 #
-sub getUsedOpenflowListenerPorts($$) {
+sub getUsedOpenflowListenerPorts($) {
     my $self = shift;
-    my $ports = shift;
+    my %ports = ();
 
     my $listener = [$ofListenerOID,0];
 
@@ -1869,7 +1869,7 @@ sub getUsedOpenflowListenerPorts($$) {
 	$self->debug("listener: $varname $vlan $connstr \n");
 	if ($varname =~ /$ofListenerVarNameMarker/) {
 	    my ($proto, $port) = split(":", $connstr);
-	    $ports->{$port} = 1;
+	    $ports{$port} = 1;
 	    
 	    #
 	    # the SNMP session with MIB gives varname with strings not numbers, but
@@ -1883,6 +1883,8 @@ sub getUsedOpenflowListenerPorts($$) {
 	    $self->{SESS}->getnext($listener);
 	}	
     } while ($varname =~ /$ofListenerVarNameMarker/);
+
+    return %ports;
 }
 
 

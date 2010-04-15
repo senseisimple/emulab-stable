@@ -128,18 +128,20 @@ VLAN Control:
   -F                Create all vlans in the given stack on the leader for
 		    use in leader->{ALLVLANSONLEADER} (Internal use only)
   --of-enable <name> <pid> <eid> 
-                    Enable Openflow on VLAN with the name <name> that is associated 
-		        with the given experiment 
+                    Enable Openflow on VLAN with the name <name> that is 
+		        associated with the given experiment 
   --of-disable <name> <pid> <eid>
-                    Disable Openflow on VLAN with the name <name> that is associated 
-		        with the given experiment
+                    Disable Openflow on VLAN with the name <name> that is 
+		        associated with the given experiment
   --of-controller <name> <pid> <eid> tcp:ip:port
-                    Set controller for Openflow-enabled VLAN with the name <name> that is associated 
-		        with the given experiment
+                    Set controller for Openflow-enabled VLAN with the 
+		        name <name> that is associated with the given 
+			experiment
   --of-listener <name> <pid> <eid> 
-                    Enable listener for Openflow-enabled VLAN with the name <name> that is associated 
-		        with the given experiment, snmpit will print out the listener connection
-			string.
+                    Enable listener for Openflow-enabled VLAN with the 
+		        name <name> that is associated with the given 
+			experiment, snmpit will print out the listener 
+			connection string
 
 Port Control:
   -s                     List all ports, and show configuration information
@@ -188,7 +190,8 @@ if ($opt{q}) {
     $quiet = 1;
     if ($opt{m} || $opt{o} || $opt{t} || $opt{r} || $opt{X} || $opt{T} ||
 	  $opt{E} || $opt{U} || $opt{u} || $opt{d} || $opt{p} || $opt{e} ||
-	  $opt{'of-enable'} || $opt{'of-disable'} || $opt{'of-controller'} || $opt{'of-listener'}) {
+	  $opt{'of-enable'} || $opt{'of-disable'} || $opt{'of-controller'} || 
+	  $opt{'of-listener'}) {
 	my $nulldev;
         open($nulldev, ">>/dev/null");
 	select $nulldev; # supresses print foo(); without explicit fileglob
@@ -840,7 +843,8 @@ COMMAND: foreach my $command (@commands) {
 	SWITCH: for ($stack_type) {
 	    (/cisco/ || /catalyst/) && do {
 		require snmpit_cisco_stack;
-		$stack = new snmpit_cisco_stack($stack_id,$debug,$single_domain, 						@{$stacks{$stack_id}});
+		$stack = new snmpit_cisco_stack($stack_id,$debug,$single_domain,
+ 						@{$stacks{$stack_id}});
 		last;
 	    }; # /cisco/
 	    /intel/ && do {
@@ -1001,7 +1005,6 @@ COMMAND: foreach my $command (@commands) {
 	    last;
 	}; # /ofcontroller/ && do
 	(/oflistener/) && do {
-	    #$exitval += doSetOpenflowListener(\@stacks,$vlans[0],$ofconnstr);
 	    $exitval += doEnableOpenflowListener(\@stacks,$vlans[0]);
 	    last;
 	}; # /oflistener/ && do
@@ -2540,13 +2543,11 @@ sub doOpenflowEnable($$) {
     print "Enabling Openflow on VLAN $vlan ...\n"
 	if (!$quiet);
     foreach my $stack (@$stacks) {
-	if (!$stack->enableOpenflow($vlan)) {
-	    $errors++;
-	}	
+	$errors += $stack->enableOpenflow($vlan);	
     }
 
     if (!$errors) {
-	print 'Done! \n' if (!$quiet);
+	print "Done! \n" if (!$quiet);
     }
     
     return $errors;
@@ -2567,9 +2568,7 @@ sub doOpenflowDisable($$) {
     print "Disabling Openflow on VLAN $vlan ...\n"
 	if (!$quiet);
     foreach my $stack (@$stacks) {
-	if (!$stack->disableOpenflow($vlan)) {
-	    $errors++;
-	}	
+	$errors += $stack->disableOpenflow($vlan);	
     }
              
     #
@@ -2577,7 +2576,7 @@ sub doOpenflowDisable($$) {
     #
 
     if (!$errors) {
-	print 'Done! \n' if (!$quiet);
+	print "Done! \n" if (!$quiet);
     }
     
     return $errors;
@@ -2599,13 +2598,11 @@ sub doSetOpenflowController($$$) {
     print "Set controller for VLAN $vlan ...\n"
 	if (!$quiet);
     foreach my $stack (@$stacks) {
-	if (!$stack->setOpenflowController($vlan, $controller)) {
-	    $errors++;
-	}	
+        $errors += $stack->setOpenflowController($vlan, $controller);	
     }
     
     if (!$errors) {
-	print 'Done! \n' if (!$quiet);
+	print "Done! \n" if (!$quiet);
     }
 
     return $errors;
@@ -2627,13 +2624,11 @@ sub doSetOpenflowListener($$$) {
     print "Set listener for VLAN $vlan ...\n"
 	if (!$quiet);
     foreach my $stack (@$stacks) {
-	if (!$stack->setOpenflowListener($vlan, $listener)) {
-	    $errors++;
-	}	
+	$errors += $stack->setOpenflowListener($vlan, $listener);	
     }
 
     if (!$errors) {
-	print 'Done! \n' if (!$quiet);
+	print "Done! \n" if (!$quiet);
     }
 
     return $errors;
@@ -2661,7 +2656,8 @@ sub doEnableOpenflowListener($$) {
     #
     oflock();
     foreach my $stack (@$stacks) {
-        $stack->getUsedOpenflowListenerPorts(\%usedports);
+        my %tmports = $stack->getUsedOpenflowListenerPorts($vlan);
+	@usedports{ keys %tmports } = values %tmports;
     }
 
     # get the available port

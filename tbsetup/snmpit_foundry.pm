@@ -1498,8 +1498,13 @@ sub setOpenflowListener($$$) {
 #
 # Get used listener ports
 #
-sub getUsedOpenflowListenerPorts($$) {
+sub getUsedOpenflowListenerPorts($) {
+    my $self = shift;
+    my %ports = ();
+
     warn "ERROR: Foundry swith doesn't support Openflow now\n";
+
+    return %ports;
 }
 
 #

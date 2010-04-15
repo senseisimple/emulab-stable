@@ -405,15 +405,37 @@ sub setOpenflowListener($$$) {
 #
 # Get used Openflow listener ports
 #
+# getUsedOpenflowListenerPorts(self, vlan_id)
+#
 sub getUsedOpenflowListenerPorts($$) {
     my $self = shift;
-    my $ports = shift;
+    my $vlan_id = shift;
+    my %ports = ();
 
     foreach my $devicename (keys %{$self->{DEVICES}})
     {
 	my $device = $self->{DEVICES}{$devicename};
-	$device->getUsedOpenflowListenerPorts($ports);
+	my $vlan_number = $device->findVlan($vlan_id, 2);
+	if (!$vlan_number) {
+	    #
+	    # Not sure if this is an error or not.
+	    # It might be possible that not all devices in a stack have the given VLAN.
+	    #
+	    print "$device has no VLAN $vlan_id, ignore it. \n" if $self->{DEBUG};
+	} else {
+	    if ($device->isOpenflowSupported()) {		
+		my %tmports = $device->getUsedOpenflowListenerPorts();
+		@ports{ keys %tmports } = values %tmports;		
+	    } else {
+		#
+		# YES this be an error because the VLAN is on it.
+		#
+		warn "ERROR: Openflow is not supported on $devicename \n";
+	    }
+	}	
     }
+
+    return %ports;
 }
 
 # End with true
