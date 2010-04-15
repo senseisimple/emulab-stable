@@ -60,7 +60,7 @@ INSERT INTO sitevariables VALUES ('elabinelab/boss_pkg_dir',NULL,'','Path from w
 INSERT INTO sitevariables VALUES ('elabinelab/ops_pkg',NULL,'','Name of ops node install package (DEPRECATED)',0);
 INSERT INTO sitevariables VALUES ('elabinelab/ops_pkg_dir',NULL,'','Path from which to fetch ops packages (DEPRECATED)',0);
 INSERT INTO sitevariables VALUES ('elabinelab/windows','1','0','Turn on Windows support in inner Emulab',0);
-INSERT INTO `sitevariables` VALUES ('elabinelab/singlenet',NULL,0,'Default control net config. 0==use inner cnet, 1==use real cnet',1);
+INSERT INTO `sitevariables` VALUES ('elabinelab/singlenet',NULL,'0','Default control net config. 0==use inner cnet, 1==use real cnet',1);
 INSERT INTO `sitevariables` VALUES ('elabinelab/boss_osid',NULL,'','Default (emulab-ops) OSID to boot on boss node. Empty string means use node_type default OSID',1);
 INSERT INTO `sitevariables` VALUES ('elabinelab/ops_osid',NULL,'','Default (emulab-ops) OSID to boot on ops node. Empty string means use node_type default OSID',1);
 INSERT INTO `sitevariables` VALUES ('elabinelab/fs_osid',NULL,'','Default (emulab-ops) OSID to boot on fs node. Empty string means use node_type default OSID',1);

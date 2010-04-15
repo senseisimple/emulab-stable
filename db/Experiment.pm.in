@@ -297,6 +297,7 @@ sub AUTOLOAD {
     return undef;
 }
 sub dbrow($$)     { return $_[0]->{'EXPT'}; }
+sub locked($)     { return $_[0]->expt_locked(); }
 
 # Break circular reference someplace to avoid exit errors.
 sub DESTROY {
