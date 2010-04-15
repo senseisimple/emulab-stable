@@ -3083,7 +3083,7 @@ CREATE TABLE `reserved` (
   `exptidx` int(11) NOT NULL default '0',
   `rsrv_time` timestamp NOT NULL default CURRENT_TIMESTAMP on update CURRENT_TIMESTAMP,
   `vname` varchar(32) default NULL,
-  `erole` enum('node','virthost','delaynode','simhost','sharedhost', 'subboss') NOT NULL default 'node',
+  `erole` enum('node','virthost','delaynode','simhost','sharedhost','subboss') NOT NULL default 'node',
   `simhost_violation` tinyint(3) unsigned NOT NULL default '0',
   `old_pid` varchar(12) NOT NULL default '',
   `old_eid` varchar(32) NOT NULL default '',
