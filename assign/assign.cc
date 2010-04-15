@@ -441,8 +441,9 @@ void print_help() {
   cout << "  -t <float>   - Start the temperature at <float> instead of melting."
       << endl;
   cout << "  -u           - Print a summary of the solution." << endl;
-  cout << "  -c <float>   - Use the 'connected' pnode finding algorithm " <<
-      "<float>*100%" << endl << "                of the time." << endl;
+  cout << "  -c <float>   - Use the 'connected' pnode finding algorithm ";
+	cout <<                   "<float>*100%" << endl;
+	cout << "                 of the time." << endl;
   cout << "  -n           - Don't anneal - just do the prechecks." << endl;
 
   cout << "  -x <file>    - Specify a text ptop file" << endl;
@@ -457,8 +458,9 @@ void print_help() {
 //   cout << "  -q <file>   - Specify a rspec ptop file" << endl;
 //   cout << "  -w <file>   - Specify a rspec vtop file" << endl;
   cout << "  -W <file>    - Specify the output rspec file" << endl;
-	cout << "  -f <T>[/<T>] - Specify the ptop and vtop file formats ";
-	cout << "(text|xml|rspec-<ver>)" << endl;
+	cout << "  -f <T>[/<T>] - Specify the ptop/vtop file formats " << endl;
+	cout << "                 T should be one of (text|xml|rspec-<rspec ver. number>)" << endl;;
+	cout << "                 Specifying only one T is equivalent to -f T/T"<<endl;
 #endif
   cout << "  -F           - Apply additional checking to fixed nodes" << endl;
   cout << "  -D           - Dump configuration options" << endl;
@@ -924,57 +926,17 @@ int main(int argc,char **argv) {
       dump_config = true;
       break;
     case 'x':
-/*#ifdef WITH_XML
-      ptop_xml_input = false;
-#endif*/
       if (strcmp(optarg, "") == 0) {
       	print_help();
 	  }
 	  ptopFilename = optarg;
       break;
-/*#ifdef WITH_XML      
-    case 'X':
-      ptop_xml_input = true;
-      if (strcmp(optarg, "") == 0) {
-      	print_help();
-	  }
-	  ptopFilename = optarg;
-    break;
-#endif*/
     case 'y':
-/*#ifdef WITH_XML
-      vtop_xml_input = false;
-#endif*/
       if (strcmp(optarg, "") == 0) {
       	print_help();
 	  }
 	  vtopFilename = optarg;
     break;
-// #ifdef WITH_XML
-//     case 'Y':
-//       vtop_xml_input = true;
-//       if (strcmp(optarg, "") == 0) {
-//       	print_help();
-// 	  }
-// 	  vtopFilename = optarg;
-//     break;
-// #endif
-// #ifdef WITH_XML
-// 	case 'q':
-// 	  ptop_rspec_input = true;
-// 	  if (strcmp(optarg, "") == 0) {
-// 	  	print_help();
-// 	  }
-// 	  ptopFilename = optarg;
-//     break;
-// 
-// 	case 'w':
-// 	  vtop_rspec_input = true;
-// 	  if (strcmp(optarg, "") == 0) {
-// 	  	print_help();
-// 	  }
-// 	  vtopFilename = optarg;
-//     break;
 #ifdef WITH_XML
 	case 'W':
 	  if (strcmp(optarg, "") == 0) {
@@ -1001,18 +963,23 @@ int main(int argc,char **argv) {
 		else if (strstr(ptopFileFormat, "rspec") != NULL) {
 			ptop_rspec_input = true;
 		}
-		else {
+		else if (strstr(ptopFileFormat, "xml") != NULL){
 			ptop_xml_input = true;
+		}
+		else {
+			print_help();
 		}
 #endif
 		
 		if (vtopFileFormat == NULL)
 		{
+			cout << "NULL" << endl;
 			vtop_xml_input = ptop_xml_input;
 			vtop_rspec_input = ptop_rspec_input;
 		}
 		else 
 		{
+			cout << "vtopFileFormat: " << vtopFileFormat << endl;
 			if (strcmp(vtopFileFormat, "text") == 0) {
 				vtop_xml_input = false;
 			}
@@ -1020,8 +987,11 @@ int main(int argc,char **argv) {
 			else if (strstr(vtopFileFormat, "rspec") != NULL) {
 				vtop_rspec_input = true;
 			}
-			else {
+			else if (strstr(vtopFileFormat, "xml") != NULL){
 				vtop_xml_input = true;
+			}
+			else {
+				print_help();
 			}
 #endif
 		}
