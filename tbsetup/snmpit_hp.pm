@@ -57,6 +57,9 @@ my $ofEnableOID     = $ofOID.'.1.1.2';
 my $ofControllerOID = $ofOID.'.1.1.3';
 my $ofListenerOID   = $ofOID.'.1.1.4';
 my $ofSupportOID    = $ofOID.'.2.1.0';
+
+# This string is enough now, but the Openflow OID may change in future. 
+# The maintainers should keep in mind of this ID. 
 my $ofListenerVarNameMarker = '35.1.1.4';
 
 #
