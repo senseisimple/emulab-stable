@@ -135,6 +135,6 @@ else
 fs-install install:
 endif
 
-clean:	clean.nfsdump
+clean:
 	cd nfsdump2 && $(MAKE) clean
 	rm -f *.o core nfsdump nfstrace.init
