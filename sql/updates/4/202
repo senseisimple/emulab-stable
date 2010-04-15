@@ -9,7 +9,7 @@ sub DoUpdate($$$)
     my ($dbhandle, $dbname, $version) = @_;
 
     DBQueryFatal("INSERT INTO `sitevariables` VALUES ".
-		 "('elabinelab/singlenet',NULL,0,'Default control net config. 0==use inner cnet, 1==use real cnet',1)")
+		 "('elabinelab/singlenet',NULL,'0','Default control net config. 0==use inner cnet, 1==use real cnet',1)")
 	if (!TBSiteVarExists("elabinelab/singlenet"));
 
     #
