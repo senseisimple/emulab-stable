@@ -81,26 +81,4 @@ sub SetRemote($$)
     $self->{'IS_REMOTE'} = $isremote;
 }
 
-package libptop::ptype;
-
-sub Create($$)
-{
-    my ($class, $name) = @_;
-    my $self = {};
-    $self->{'NAME'} = $name;
-    $self->{'OSIDS'} = ();
-
-    bless($self, $class);
-    return $self;
-}
-
-sub name($) { return $_[0]->{'NAME'}; }
-sub osids($) { return $_[0]->{'OSIDS'}; }
-
-sub AddOs($$)
-{
-    my ($self, $name) = @_;
-    push($self->{'OSIDS'}, $name);
-}
-
 1;

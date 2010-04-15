@@ -21,6 +21,7 @@ my $PGENISUPPORT = @PROTOGENI_SUPPORT@;
 
 $NO_GENI = "0";
 $V_0_1 = "0.1";
+$V_0_2 = "0.2";
 $V_2 = "2";
 
 if ($PGENISUPPORT) {
@@ -210,7 +211,9 @@ if (defined($options{"1"})) {
 
 usage()
     if ($prune && !defined($exempt_eid)
-	|| ($genimode ne $NO_GENI && $genimode ne $V_0_1
+	|| ($genimode ne $NO_GENI
+	    && $genimode ne $V_0_1
+	    && $genimode ne $V_0_2
 	    && $genimode ne $V_2));
 
 $fake_inet_switch = "internet";
@@ -315,6 +318,7 @@ while (my ($class,$type,$isvirt) = $result->fetchrow_array) {
     $map->{'TYPEINFO'} = $typeinfo;
     $map->{'FEATURES'} = [];
     $map->{'AUXTYPES'} = {};
+    $map->{'OSLIST'} = [];
     $typemap{$type} = $map;
 
     # Default is permission to use all types,classes. 
@@ -401,7 +405,7 @@ if (defined($pid)) {
 # 1) To avoid an explosion in the number of features for nodes
 # 2) To avoid information leaks, allowing projects to see each other's images
 # 
-my $osidquery = "select distinct o.osid, oi.type from os_info as o " .
+my $osidquery = "select distinct o.osid, oi.type, o.osname, o.pid, o.OS, o.version, o.description from os_info as o " .
 	"left join osidtoimageid as oi on o.osid = oi.osid " .
 	"left join images as i on oi.imageid = i.imageid ".
 	"where i.global = 1";
@@ -431,11 +435,25 @@ $subosidquery .= ")";
 my %node_type_osids;
 my %osid_node_types;
 my %osid_subosids;
+my %osid_name;
+my %osid_pid;
+my %osid_os;
+my %osid_version;
+my %osid_description;
 my %node_countries;
 my %node_latitudes;
 my %node_longitudes;
 $result = DBQueryFatal($osidquery);
-while (my ($osid,$type) = $result->fetchrow()) {
+while (my ($osid,$type,$osname,$ospid,$osos,
+	   $osversion,$osdescription) = $result->fetchrow()) {
+    if ($typemap{$type}) {
+	push(@{ $typemap{$type}->{'OSLIST'} }, $osid);
+	$osid_name{$osid} = $osname;
+	$osid_pid{$osid} = $ospid;
+	$osid_os{$osid} = $osos;
+	$osid_version{$osid} = $osversion;
+	$osid_description{$osid} = $osdescription;
+    }
     if ($node_type_osids{$type}) {
 	push @{$node_type_osids{$type}}, $osid;
     } else {
@@ -976,7 +994,8 @@ foreach $node (keys(%nodes)) {
 
     my @parse_features = split(" ", join(" ", @features));
     print_node($node, \@types, \@parse_features, \@flags, $uuid,
-	       $nodetointerface{$node}, $country, $latitude, $longitude);
+	       $nodetointerface{$node}, $country, $latitude, $longitude,
+	       $type);
 }
 
 my @inet_protos = ("ipv4");
@@ -989,7 +1008,7 @@ if (($widearea && ! defined($component_name)) || $genimode ne $NO_GENI) {
     #
     my @types = map("*$_:*", @inet_protos);
     print_node($fake_inet_switch, \@types, [], [], undef, [], undef, undef,
-        undef);
+        undef, undef);
 }
 
 #
@@ -1130,7 +1149,8 @@ if ($widearea && ! defined($component_name)) {
         }
 
 	print_node($physnode, \@types, \@features, \@flags, $uuid,
-		   $nodetointerface{$physnode},$country,$latitude,$longitude);
+		   $nodetointerface{$physnode},$country,$latitude,$longitude,
+		   undef);
 
         #
         # Print out a link to the 'internet'.
@@ -1418,7 +1438,7 @@ my @wireless_protos = ("80211", "80211a", "80211b", "80211g", "flex900",
 my @fake_switch_types = map("*$_:*", @wireless_protos);
 if (! defined($component_name)) {
   print_node($fake_air_switch, \@fake_switch_types, [], [], undef,
-	     [], undef, undef, undef);
+	     [], undef, undef, undef, undef);
 
   foreach my $interface (keys(%interfacetypes)) {
       my ($node,$card,$port) = split(":", $interface);
@@ -1539,6 +1559,9 @@ sub print_header {
 	    if ($genimode eq $V_0_1) {
 		$ns = "http://www.protogeni.net/resources/rspec/0.1";
 		$url = "http://www.protogeni.net/resources/rspec/0.1/ad.xsd";
+	    } elsif ($genimode eq $V_0_2) {
+		$ns = "http://www.protogeni.net/resources/rspec/0.2";
+		$url = "http://www.protogeni.net/resources/rspec/0.2/ad.xsd";
 	    } elsif ($genimode eq $V_2) {
 		$ns = "http://www.protogeni.net/resources/rspec/2";
 		$url = "http://www.protogeni.net/resources/rspec/2/ad.xsd";
@@ -1581,7 +1604,7 @@ sub print_switch
     }
     # XXX
     print_node($name, ["switch:1", "*lan:*"], [], [], $uuid, $interfaces,
-        $country, $latitude, $longitude);
+        $country, $latitude, $longitude, undef);
 }
 
 sub print_node
@@ -1595,6 +1618,7 @@ sub print_node
     my $country = shift(@_);
     my $lat = shift(@_);
     my $long = shift(@_);
+    my $mainType = shift(@_);
     if (! defined($lat) || ! defined($long)) {
 	$lat = $default_lat;
 	$long = $default_long;
@@ -1614,14 +1638,14 @@ sub print_node
 	    $exclusive = "false";
 	}
 	print "<node ";
-	if ($genimode eq $V_0_1) {
+	if ($genimode eq $V_0_1 || $genimode eq $V_0_2) {
 	    print "component_manager_uuid=\"$cmurn\" ";
 	} elsif ($genimode eq $V_2) {
 	    print "component_manager_id=\"$cmurn\" ";
 	}
 	print "component_name=\"$name\" ";
 	my $urn = GeniHRN::Generate($OURDOMAIN, "node", $name);
-	if ($genimode eq $V_0_1) {
+	if ($genimode eq $V_0_1 || $genimode eq $V_0_2) {
 	    print " component_uuid=\"$urn\" ";
 	} elsif ($genimode eq $V_2) {
 	    print " component_id=\"$urn\" ";
@@ -1630,6 +1654,9 @@ sub print_node
 	    print " exclusive=\"$exclusive\" ";
 	}
 	print ">\n";
+	if (defined($mainType) && $genimode eq $V_0_2) {
+	    print_osids($mainType);
+	}
 	print_node_types(@$types);
 	my $avail = "false";
 	if ($nodetoavailable{$name}
@@ -1637,14 +1664,14 @@ sub print_node
 	    || $name eq $fake_air_switch) {
 	    $avail = "true";
 	}
-	if ($genimode eq $V_0_1)
+	if ($genimode eq $V_0_1 || $genimode eq $V_0_2)
 	{
 	    print "  <available>$avail</available>\n";
 	} elsif ($genimode eq $V_2)
 	{
 	    print "  <available now=\"$avail\" />\n";
 	}
-	if ($genimode eq $V_0_1) {
+	if ($genimode eq $V_0_1 || $genimode eq $V_0_2) {
 	    print "  <exclusive>$exclusive</exclusive>\n";
 	}
 	if ($name eq $fake_inet_switch)
@@ -1677,6 +1704,25 @@ sub print_node
     }
 }
 
+# Print osids
+sub print_osids
+{
+    my ($type) = @_;
+    my @osids = @{ $typemap{$type}->{'OSLIST'} };
+    my $default = $typemap{$type}->{'OSID'};
+    foreach $os (@osids) {
+	print "<disk_image ";
+	print "name=\"" . $osid_name{$os} . "\" ";
+	print "os=\"" . $osid_os{$os} . "\" ";
+	print "version=\"" . $osid_version{$os} . "\" ";
+	print "description=\"" . $osid_description{$os} . "\" ";
+	if ($os eq $default) {
+	    print "default=\"true\" ";
+	}
+	print "/>\n";
+    }
+}
+
 # The order print_node_types(), print_node_features(),
 # print_node_flags() must always be observed lest we break the schema.
 sub print_node_types
@@ -1689,7 +1735,7 @@ sub print_node_types
 	    $name = substr($name, 1);
 	    $is_static = 1;
 	}
-	if ($genimode eq $V_0_1) {
+	if ($genimode eq $V_0_1 || $genimode eq $V_0_2) {
 	    print "  <node_type \n";
 	    print "    type_name=\"$name\"\n";
 	    if ($count eq "*") {
@@ -1882,14 +1928,14 @@ sub print_named_link_xml
     if ($genimode ne $NO_GENI) {
 	print "<link ";
 	my $cmurn = GeniHRN::Generate($OURDOMAIN, "authority", "sa");
-	if ($genimode eq $V_0_1) {
+	if ($genimode eq $V_0_1 || $genimode eq $V_0_2) {
 	    print "component_manager_uuid=\"$cmurn\" ";
 	} elsif ($genimode eq $V_2) {
 	    print "component_manager_id=\"$cmurn\" ";
 	}
 	print "component_name=\"$name\" ";
 	my $urn = GeniHRN::Generate($OURDOMAIN, "link", $name);
-	if ($genimode eq $V_0_1) {
+	if ($genimode eq $V_0_1 || $genimode eq $V_0_2) {
 	    print "component_uuid=\"$urn\" ";
 	} elsif ($genimode eq $V_2) {
 	    print "component_id=\"$urn\" ";
@@ -1906,7 +1952,7 @@ sub print_named_link_xml
 	print_interface_contents($dest, $dest_if);
 	print "  </interface></destination_interface>\n";
     }
-    if ($genimode eq $NO_GENI || $genimode eq $V_0_1)
+    if ($genimode eq $NO_GENI || $genimode eq $V_0_1 || $genimode eq $V_0_2)
     {
 	print "  <bandwidth>$bw</bandwidth>\n";
 	print "  <latency>$delay</latency>\n";
@@ -1922,7 +1968,7 @@ sub print_named_link_xml
 	if ($genimode eq $NO_GENI) {
 	    print "  <link_type><type_name>" . $_[$i]
 		. "</type_name></link_type>\n";
-	} elsif ($genimode eq $V_0_1) {
+	} elsif ($genimode eq $V_0_1 || $genimode eq $V_0_2) {
 	    print "  <link_type type_name=\"" . $_[$i] . "\" />\n";
 	} elsif ($genimode eq $V_2) {
 	    print "  <link_type name=\"" . $_[$i] . "\" />\n";
@@ -1939,7 +1985,7 @@ sub print_interface
     my $nodeUrn = GeniHRN::Generate($OURDOMAIN, "node", $node);
     my $interfaceUrn = GeniHRN::GenerateInterface($OURDOMAIN, $node,
 						  $interface);
-    if ($genimode eq $V_0_1) {
+    if ($genimode eq $V_0_1 || $genimode eq $V_0_2) {
 	print "component_node_uuid=\"$nodeUrn\" ";
 	print "component_interface_id=\"" . $interfaceUrn . "\"";
     } elsif ($genimode eq $V_2) {

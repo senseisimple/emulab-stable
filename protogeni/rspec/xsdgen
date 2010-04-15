@@ -2,12 +2,12 @@
 
 TRANGCMD="java -jar ${TRANG:-/usr/local/share/java/classes/trang.jar}"
 
-for path in 0.1 2; do
+for path in 0.1 0.2 2; do
   rm -f ${path}/{ad-common,ad,any-extension,manifest-common,manifest-request,manifest,request-common,request,ad-top,manifest-top,request-top}.xsd
 
   ### Manifest
   $TRANGCMD ${path}/manifest.rnc ${path}/manifest.xsd
-  if [ ${path} = 0.1 ]; then
+  if [ ${path} = 0.1 ] || [ ${path} = 0.2 ]; then
     mv ${path}/top.xsd ${path}/manifest-top.xsd
     sed "s/top.xsd/manifest-top.xsd/" ${path}/common.xsd > ${path}/manifest-common.xsd
   else
@@ -23,7 +23,7 @@ for path in 0.1 2; do
   for schema in ad request; do
     $TRANGCMD ${path}/${schema}.rnc ${path}/${schema}.xsd
 
-    if [ ${path} = 0.1 ]; then
+    if [ ${path} = 0.1 ] || [ ${path} = 0.2 ]; then
       mv ${path}/top.xsd ${path}/${schema}-top.xsd
       sed "s/top.xsd/${schema}-top.xsd/" ${path}/common.xsd > ${path}/${schema}-common.xsd
     else
@@ -31,7 +31,7 @@ for path in 0.1 2; do
     fi
     rm ${path}/common.xsd
     sed "s/common.xsd/${schema}-common.xsd/" ${path}/${schema}.xsd > ${path}/${schema}.tmp
-    if [ ${path} = 0.1 ]; then
+    if [ ${path} = 0.1 ] || [ ${path} = 0.2 ]; then
       mv ${path}/${schema}.tmp ${path}/${schema}.xsd
     else
       sed "s/any-extension.xsd/any-extension-schema.xsd/" ${path}/${schema}.tmp > ${path}/${schema}.xsd
