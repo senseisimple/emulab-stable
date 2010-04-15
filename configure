@@ -2600,6 +2600,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	sensors/and/GNUmakefile sensors/and/and-emulab.conf \
 	sensors/powermon/GNUmakefile sensors/powermon/powermon \
 	sensors/nfstrace/GNUmakefile sensors/nfstrace/nfstrace.init \
+	sensors/nfstrace/nfsdump2/GNUmakefile \
 	account/GNUmakefile account/tbacct \
 	account/addpubkey account/addsfskey account/genpubkeys \
 	account/quotamail account/mkusercert account/newproj account/newuser \

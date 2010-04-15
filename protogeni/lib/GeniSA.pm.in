@@ -937,6 +937,12 @@ sub RenewSlice($)
 	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
 				     "Insufficient privilege" );
 
+    my $this_user = GeniUser->Lookup($credential->owner_uuid(), 1);
+    if (!defined($this_user)) {
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN,
+				    undef, "Who are you?");
+    }
+    
     #
     # Figure out new expiration time; this is the time at which we can
     # idleswap the slice out. 
@@ -980,9 +986,21 @@ sub RenewSlice($)
 	$slice->UnLock();
 	goto bad;
     }
+    #
+    # Return a credential for the slice.
+    #
+    my $slice_credential =
+	GeniCredential->CreateSigned($slice,
+				     $this_user,
+				     $GeniCredential::LOCALSA_FLAG);
+    if (!defined($slice_credential)) {
+	$slice->UnLock();
+	$message = "Could not create new slice credential";
+	goto bad;
+    }
     $slice->UnLock();
-    return GeniResponse->Create(GENIRESPONSE_SUCCESS);
-
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS,
+				$slice_credential->asString());
   bad:
     return GeniResponse->Create(GENIRESPONSE_ERROR, undef, $message);
 }

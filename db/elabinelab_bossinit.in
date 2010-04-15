@@ -111,7 +111,7 @@ mysystem("$TB/sbin/mkproj -s $pid");
 
 #
 # Get the list of users and admin status. Admin users get a real shell
-# on boss. Create the users, and not that we have to do this before the
+# on boss. Create the users, and note that we have to do this before the
 # groups are created (tbacct add does not do a setgroups).
 #
 my $users_result =
@@ -153,7 +153,7 @@ while (my ($gid_idx) = $query_result->fetchrow_array()) {
 # Now do a setgroups.
 #
 $users_result->dataseek(0);
-while (my ($uid,$admin,$status) = $users_result->fetchrow_array()) {
+while (my ($uid,$uid_idx,$admin,$status) = $users_result->fetchrow_array()) {
     next
 	if ($uid eq "elabman");
     next
@@ -177,7 +177,20 @@ mysystem("$TB/sbin/exports_setup");
 # So for the moment, we tweak the DB to rewrite everything to use the BSD
 # tools.
 #
-# XXX this should go away if we once again settle on a single set of tools.
+# Note that re-writing the pxe_boot_path doesn't have any effect for elabs
+# NOT using the SINGLE_CONTROLNET setting.  This is because as long as
+# outer (real) boss responds first, the filename it returns is what gets
+# used.  We could rewrite pxe_boot_path in the real boss DB for nodes
+# that are in an elabinelab, but then we could lose custom per-node settings
+# for that field.  To fix that, we could introduce a temporary field for
+# holding any custom value, but I don't want to go there...
+#
+# Anyway, the way we work around the non-SINGLE_CONTROLNET problem is to
+# find all the custom pxe_boot_path values (in nodes or node_type_attributes)
+# and "create" them on the inner boss by symlinking them to the standard
+# pxeboot.  SWEET!
+#
+# XXX this should go away if/when we settle on a single set of tools.
 #
 if (1) {
     # first find the OSIDs for the "standard" MFSes
@@ -199,6 +212,21 @@ if (1) {
     # make sure newnode MFS points to the correct place
     DBQueryFatal("update os_info set path='$nmfspath' where osid=$nmfs");
 
+    # collect up non-standard PXE boot paths, first from node_type_attributes..
+    my @bogoboots = ();
+    $qr = DBQueryFatal("select attrvalue from node_type_attributes ".
+		       "where attrkey='pxe_boot_path' and attrvalue!='' ".
+		       "group by attrvalue");
+    while (my ($path) = $qr->fetchrow_array()) {
+	push @bogoboots, $path;
+    }
+    # ..and then from nodes
+    $qr = DBQueryFatal("select pxe_boot_path from nodes ".
+		       "where pxe_boot_path is not NULL and role='testnode'");
+    while (my ($path) = $qr->fetchrow_array()) {
+	push @bogoboots, $path;
+    }
+
     # and find all the node types and update their attributes.
     $qr = DBQueryFatal("select type from node_types where class='pc'");
     while (my ($ntype) = $qr->fetchrow_array()) {
@@ -210,6 +238,29 @@ if (1) {
 	DBQueryFatal("update node_type_attributes set attrvalue='$dmfs' ".
 		     "  where attrkey='diskloadmfs_osid' and type='$ntype'");
     }
+
+    # fixup any nodes table entries with non-standard pxe_boot_path's
+    DBQueryFatal("update nodes set pxe_boot_path=NULL ".
+		 "  where pxe_boot_path is not NULL");
+
+    #
+    # Now symlink all the alternate boots to pxeboot.emu
+    # XXX we assume everything is at the top level of /tftpboot right now.
+    #
+    $EUID = 0;
+    foreach my $boot (@bogoboots) {
+	if ($boot =~ /^\/tftpboot\/([^\/]+)$/) {
+	    $boot = $1;
+	    if (! -e "/tftpboot/$boot") {
+		if (system("ln -s pxeboot.emu /tftpboot/$boot")) {
+		    print STDERR
+			"*** could not symlink non-standard boot '$boot';",
+			" some inner nodes will not boot properly!\n";
+		}
+	    }
+	}
+    }
+    $EUID = $UID;
 
     #
     # Remake the dhcpd.conf file to reflect any pxeboot change.

@@ -1,0 +1,57 @@
+use strict;
+use libdb;
+
+#
+# MLE stuff
+#
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    #
+    # There is some stuff about switches that is currently implicit.
+    # Lets make it explicit.
+    #
+    if (!DBSlotExists("node_types", "isswitch")) {
+	DBQueryFatal("alter table node_types add ".
+		     " `isswitch` tinyint(4) not null default 0");
+    }
+    #
+    # It appears that node_type entries do not exist for some
+    # switch types. Create them and warn the user.
+    #
+    my $query_result =
+	DBQueryFatal("select distinct n.type from nodes as n ".
+		     "left join node_types as t on t.type=n.type ".
+		     "where role='testswitch' and class is null");
+    while (my ($type) = $query_result->fetchrow_array()) {
+	print STDERR "Missing node_types entry for switch type $type; ".
+	    "making it now\n";
+	DBQueryFatal("insert into node_types set ".
+		     " type='$type',class='switch',isswitch=1");
+    }
+    
+    # Existing switches get marked.
+    DBQueryFatal("update node_types as t left join nodes as n on ".
+		 " t.type=n.type ".
+		 "set t.isswitch='1' ".
+		 "where n.role='testswitch'");
+    DBQueryFatal("update node_types set isswitch=1 where class='switch'");
+
+    # All existing switches forward packets at layer 2.
+    DBQueryFatal("insert ignore into node_type_attributes ".
+		 "  (type,attrkey,attrvalue,attrtype) ".
+		 "select distinct type, ".
+		 "    'forwarding_protocols','ethernet','string' ".
+		 "from node_types where isswitch=1");
+
+    # Add another missing regex entry for os_info table.
+    DBQueryFatal("replace into table_regex values ".
+		 "  ('os_info','mfs','int','redirect',".
+		 "   'default:tinyint',0,1,NULL)");
+
+    return 0;
+}
+1;
+
+

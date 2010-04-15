@@ -1954,3 +1954,20 @@ proc tb-fix-interface {vnode lanlink iface} {
 
     $lanlink set_fixed_iface $vnode $iface
 }
+
+#
+# Set the layer.
+#
+proc tb-set-link-layer {link mylayer} {
+    if {[$link info class] != "Link"} {
+	perror "\[tb-set-link-layer] $link is not a link."
+	return
+    }
+    if {$mylayer != 1} {
+	perror "\[tb-set-link-layer] Only layer 1 is allowed."
+	return
+    }
+    $link instvar layer
+    $link set layer $mylayer
+}
+

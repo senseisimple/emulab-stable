@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -9,8 +9,10 @@ include("imageid_defs.php");
 
 #
 # Anyone can access this info, its a PUBLIC PAGE!
+# Get current user if there is one.
 #
-$reqargs = RequiredPageArguments("node_type", PAGEARG_STRING);
+$this_user = CheckLogin($check_status);
+$reqargs   = RequiredPageArguments("node_type", PAGEARG_STRING);
 
 # Sanitize.
 if (!preg_match("/^[-\w]+$/", $node_type)) {
@@ -29,24 +31,35 @@ $query_result =
 if (! mysql_num_rows($query_result) != 0) {
     USERERROR("No such node_type $node_type!", 1);
 }
-$noderow = mysql_fetch_assoc($query_result);
+$noderow = mysql_fetch_array($query_result);
 
-echo "<font size=+2>".
-     "Node Type <b>$node_type</b>".
-     "</font>\n";
+if ($this_user && ISADMIN()) {
+    SUBPAGESTART();
+    SUBMENUSTART("More Options");
+    WRITESUBMENUBUTTON("Edit this type",
+		       "editnodetype.php3?node_type=$node_type");
+    WRITESUBMENUBUTTON("Create a PC type",
+		       "editnodetype.php3?new_type=1&node_class=pc");
+    WRITESUBMENUBUTTON("Create a Switch type",
+		       "editnodetype.php3?new_type=1&node_class=switch");
+    SUBMENUEND();
+    SUBPAGEEND();
+}
 
 echo "<table border=2 cellpadding=0 cellspacing=2
              align=center>\n";
 
 # Stuff from the node types table.
-$class		= $noderow["class"];
-$isvirtnode	= $noderow["isvirtnode"];
-$isremotenode	= $noderow["isremotenode"];
-
-# Grab the attributes for the type.
-$query_result = DBQueryFatal("select * from node_type_attributes ".
-			     "where type='$node_type' ".
-			     "order by attrkey");
+$class	 = $noderow["class"];
+$options = array("isvirtnode",
+		 "isdynamic",
+		 "isjailed",
+		 "isremotenode",
+		 "issubnode",
+		 "isplabdslice",
+		 "isgeninode",
+		 "isfednode",
+		 "isswitch");
 
 echo "<tr>
       <td>Type:</td>
@@ -58,46 +71,51 @@ echo "<tr>
       <td class=left>$class</td>
           </tr>\n";
 
-if ($isremotenode) {
-    echo "<tr>
-          <td>Remote:</td>
-          <td class=left>Yes</td>
-              </tr>\n";
-}
+foreach ($options as $option) {
+    $value = $noderow[$option];
 
-if ($isvirtnode) {
-    echo "<tr>
-          <td>Virtual:</td>
-          <td class=left>Yes</td>
+    if ($value) {
+	echo "<tr>
+               <td>$option:</td>
+               <td class=left>Yes</td>
               </tr>\n";
+    }
 }
 
 #
 # And now all of the attributes ...
 #
-while ($row = mysql_fetch_array($query_result)) {
-    $key      = $row["attrkey"];
-    $val      = $row["attrvalue"];
-    $attrtype = $row["attrtype"];
+# Grab the attributes for the type.
+$query_result = DBQueryFatal("select * from node_type_attributes ".
+			     "where type='$node_type' ".
+			     "order by attrkey");
+if (mysql_num_rows($query_result)) {
+    echo "<tr></tr>\n";
 
-    if ($key == "default_osid" ||
-	$key == "jail_osid" ||
-	$key == "delay_osid") {
-	if ($osinfo = OSinfo::Lookup($val)) {
-	    $val = $osinfo->osname();
+    while ($row = mysql_fetch_array($query_result)) {
+	$key      = $row["attrkey"];
+	$val      = $row["attrvalue"];
+	$attrtype = $row["attrtype"];
+	
+	if ($key == "default_osid" ||
+	    $key == "jail_osid" ||
+	    $key == "delay_osid") {
+	    if ($osinfo = OSinfo::Lookup($val)) {
+		$val = $osinfo->osname();
+	    }
 	}
-    }
-    elseif ($key == "default_imageid") {
-	if ($image = Image::Lookup($val)) {
-	    $val = $image->imagename();
+	elseif ($key == "default_imageid") {
+	    if ($image = Image::Lookup($val)) {
+		$val = $image->imagename();
+	    }
 	}
+	echo "<tr>\n";
+	echo "<td>$key:</td>\n";
+	echo "<td class=left>$val</td>\n";
+	echo "</tr>\n";
     }
-    echo "<tr>\n";
-    echo "<td>$key:</td>\n";
-    echo "<td class=left>$val</td>\n";
-    echo "</tr>\n";
+    echo "</table>\n";
 }
-echo "</table>\n";
 
 #
 # Suck out info for all the nodes of this type. We are going to show

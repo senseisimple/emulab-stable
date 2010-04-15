@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2008 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2010 University of Utah and the Flux Group.
  * All rights reserved.
  *
  * Derived from boot/bootwhat.h in the OSKit.
@@ -101,6 +101,7 @@ typedef struct boot_what {
 #define BIBOOTWHAT_TYPE_REBOOT	5	/* Reboot */
 #define BIBOOTWHAT_TYPE_AUTO	6	/* Do a bootinfo query */
 #define BIBOOTWHAT_TYPE_MFS	7	/* Boot an MFS from server:/path */
+#define BIBOOTWHAT_TYPE_RESTART	8	/* Restart ourselves without reset */
 
 /* Flags */
 #define BIBOOTWHAT_FLAGS_CMDLINE	0x01	/* Kernel to boot */ 
