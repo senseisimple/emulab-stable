@@ -95,11 +95,6 @@ int parse_vtop_rspec(tb_vgraph &vg, char *filename) {
     parser->setValidationSchemaFullChecking(true);
         
     /*
-     * Must validate against the ptop schema
-     */
-    parser -> setExternalSchemaLocation ("http://www.protogeni.net/resources/rspec/0.1 " SCHEMA_LOCATION);
-    
-    /*
      * Just use a custom error handler - must admin it's not clear to me why
      * we are supposed to use a SAX error handler for this, but this is what
      * the docs say....
