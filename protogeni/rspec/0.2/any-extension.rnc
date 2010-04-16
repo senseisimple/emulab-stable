@@ -1,6 +1,0 @@
-default namespace rs = "http://www.protogeni.net/resources/rspec/0.2"
-
-AnyExtension =
-    attribute * - rs:* { text }* &
-    element * - rs:* { text }* &
-    element * - rs:* { AnyExtension }*

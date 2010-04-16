@@ -6,6 +6,7 @@
 
 #
 # Schema for a manifest RSpec, to be used by ProtoGENI
+# Version 0.2
 #
 
 include "request.rnc"

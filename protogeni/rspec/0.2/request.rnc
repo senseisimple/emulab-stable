@@ -15,39 +15,35 @@ include "common.rnc"
 
 # The ComponentName will only be available after an assignment
 NodeContents &=
-  # Client-specified identifier
-  attribute client_id { text } &
-  # Component used to create the sliver
-  attribute component_id { text } &
-  attribute component_manager_id { text } &
-  attribute component_name { text }? &
-
-  # Indicates whether the user is requesting this node exclusively
-  attribute exclusive { xsd:boolean }? &
-
-  # Indicates an equivalence class to determine which other slivers
-  # should be created on the same physical node.
+  VirtualName &
+  ComponentName? &
+  element disk_image { DiskImageContents }? &
   attribute colocate { text }? &
-
-  # The type of node this sliver should be bound to. At most one kind
-  # of hardware type may be specified and the software type must be
-  # specified.
-  HardwareType? &
-  SoftwareType
+  # TODO: Remove and replace with something more exensible
+  attribute virtualization_subtype { text }? &
+  attribute exclusive { text }?
 
 # The LinkMapping will only be available after an assignment
 LinkContents &=
-  attribute client_id { text } &
-  element component_hop { ComponentHopContents }*
+  attribute link_type { text }? &
+  element component_manager { attribute name { text } }* &
+  VirtualName &
+  LinkMapping? &
+  # Characteristics (bandwidth, latency, loss) which affect traffic.
+  LinkCharacteristics?
 
 # The ComponentInterfaceDeclName will only be available after an assignment
-InterfaceContents &=
-  attribute component_id { text }? &
-  attribute client_id { text }
+InterfaceDecl &=
+  ComponentInterfaceDeclName? &
+  VirtualName
 
 # The ComponentInterfaceRefName will only be available after an assignment
-InterfaceRefContents &=
-  attribute client_id { text }
+InterfaceRef &=
+  attribute tunnel_ip { text }? &
+  # A number in the range [0, 32] denoting subnet
+  attribute tunnel_netmask { text }? &
+  attribute virtual_node_id { text } &
+  attribute virtual_interface_id { text }
 
 RSpecContents &=
   attribute type { "request" }
@@ -56,22 +52,22 @@ RSpecContents &=
 # the virtual LAN/link which embodies it. Note that nodes do not
 # provide any additional information and can be derived from the
 # interface mapping.
-ComponentHopContents &=
-  AnyExtension &
-  # Component ID of the link
-  attribute component_id { text } &
-  attribute component_manager_id { text } &
-  InterfaceMapping*
+LinkMapping =
+  element component_hop { ComponentName, InterfaceMapping* }+
+
+VirtualInterfaceRefName =
+  (attribute virtual_node_id { text } &
+   attribute virtual_interface_id { text })
 
 # Each interface represents a particular physical interface. If that
 # interface is one of the link end points, it is also mapped to that
 # virtual interface name.
 InterfaceMapping = element interface_ref {
-  AnyExtension &
-  # Component ID of the interface
-  attribute component_id { text } &
-  attribute component_manager_id { text } &
-  attribute client_id { text }?
+  ComponentInterfaceRefName &
+  VirtualInterfaceRefName?
+#  (attribute virtual_node_id { text } &
+#   attribute virtual_interface_id { text })?
+#  VirtualName ?
 }
 
 start = RSpec
