@@ -2730,6 +2730,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	cdrom/groklilo/GNUmakefile \
 	flash/GNUmakefile \
 	dhcpd/dhcpd.conf.template dhcpd/GNUmakefile \
+	dhcpd/dhcpd.conf.subboss.template \
 	install/GNUmakefile \
 	install/ops-install install/boss-install install/fs-install \
 	install/load-descriptors install/dump-descriptors \
