@@ -435,7 +435,15 @@ sub GenDefsFile($)
 	print TCL "set eventtypes($type) $idx\n";
     }
     print TCL "\n";
-    
+
+    print TCL "# Event Trigger Types\n";
+    $query_result =
+      DBQueryFatal("select idx,type from event_triggertypes");
+    while (my ($idx,$type) = $query_result->fetchrow_array()) {
+      print TCL "set triggertypes($type) $idx\n";
+    }
+    print TCL "\n";
+ 
     print TCL "# Node Types and Classes\n";
     my @alltypes = NodeType->AllTypes();
     foreach my $typeinfo (@alltypes) {

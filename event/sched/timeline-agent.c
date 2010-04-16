@@ -233,10 +233,12 @@ int sequence_agent_handle_complete(event_handle_t handle,
 				ag = seq_se->agent.m[0];
 			else
 				ag = seq_se->agent.s;
+//info("Am I failing here?\n");
 			event_notification_get_int32(handle,
 						     seq_se->notification,
 						     "TOKEN",
 						     &token);
+//info("End question\n");
 		}
 		
 		if ((ag == NULL) || (ag != agent) || (ctoken != token)) {

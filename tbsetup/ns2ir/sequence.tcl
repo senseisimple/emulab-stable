@@ -77,7 +77,13 @@ EventSequence instproc updatedb {DB} {
     $self instvar error_seq
     
     foreach event $event_list {
-	$sim spitxml_data "eventlist" [list "vnode" "vname" "objecttype" "eventtype" "arguments" "atstring" "parent"] [list [lindex $event 0] [lindex $event 1] $objtypes([lindex $event 2]) $eventtypes([lindex $event 3]) [lindex $event 4] [lindex $event 5] $self ]
+	if {[string equal [lindex $event 0] "swapout"]} {
+		set event [lreplace $event 0 0 0]
+		set triggertype "SWAPOUT"
+	} else {
+		set triggertype "TIMER"
+	}
+	$sim spitxml_data "eventlist" [list "vnode" "vname" "objecttype" "eventtype" "triggertype" "arguments" "atstring" "parent"] [list [lindex $event 0] [lindex $event 1] $objtypes([lindex $event 2]) $eventtypes([lindex $event 3]) $triggertypes($triggertype) [lindex $event 4] [lindex $event 5] $self ]
     }
 
     $sim spitxml_data "virt_agents" [list "vnode" "vname" "objecttype" ] \

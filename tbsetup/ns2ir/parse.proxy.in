@@ -43,6 +43,7 @@ my $TESTMODE = @TESTMODE@;
 my $parser   = "$TB/lib/ns2ir/parse.tcl";
 my $vlib     = "$TB/lib/nsverify";
 my $vparser  = "$TB/libexec/nsverify/nstbparse";
+my $debug    = 0;
 
 # Locals
 my $tempdir  = "/tmp/parse-$$";
@@ -174,7 +175,8 @@ if (! $pid) {
 	$nsfile = $tempdir . "/" . $nsfile;
     }
 
-    exec("nice -15 $parser @ARGV $nsfile");
+#    exec("nice -15 $parser @ARGV $nsfile");
+    exec("nice -15 $parser @ARGV $nsfile|tee $tempdir/output.txt");
     die("Could not exec the parser!\n");
 }
 
@@ -195,13 +197,18 @@ if (($exit_status & 0xff) == SIGKILL) {
 	     undef, undef, ($nsfile));
     
     print STDERR "$msg\n";
-    if (-d $tempdir) {
-	system("/bin/rm -r $tempdir");
+    unless($debug) {
+      if (-d $tempdir) {
+        system("/bin/rm -r $tempdir");
+      }
     }
     exit(15);
 }
-if (-d $tempdir) {
-    system("/bin/rm -r $tempdir");
+unless($debug) {
+     if (-d $tempdir) {
+          system("/bin/rm -r $tempdir");
+     }
 }
+
 exit($exit_status >> 8);
 

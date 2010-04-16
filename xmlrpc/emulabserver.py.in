@@ -3117,20 +3117,22 @@ class experiment:
         #
         result = []
 
-	res = DBQuery("select ex.idx,ex.time,ex.vname,"
-                      " ot.type,et.type,ex.arguments,ex.parent "
-                      "from eventlist as ex "
-                      "left join event_eventtypes as et on "
+	res = DBQuery("SELECT ex.idx,ex.time,ex.vname,"
+                      "ot.type,et.type,ex.arguments,ex.parent,etr.type "
+                      "FROM eventlist AS ex "
+                      "LEFT JOIN event_triggertypes AS etr ON "
+                      "ex.triggertype=etr.idx "
+                      "LEFT JOIN event_eventtypes AS et ON "
                       " ex.eventtype=et.idx "
-                      "left join event_objecttypes as ot on "
+                      "LEFT JOIN event_objecttypes AS ot ON "
                       " ex.objecttype=ot.idx "
-                      "where ex.pid=%s and ex.eid=%s and ot.type!='TIME' "
-                      "order by ex.time,ex.idx ASC",
+                      "WHERE ex.pid=%s AND ex.eid=%s AND ot.type!='TIME' "
+                      "ORDER BY ex.time,ex.idx ASC",
                       (argdict["proj"], argdict["exp"]))
 
         for event in res:
             result.append((str(event[0]), str(event[1]), event[2],
-                           event[3], event[4], event[5], event[6]));
+                           event[3], event[4], event[5], event[6], event[7]));
             pass
         
         res = DBQuery("select n.phys_nodeid,i.IP from reserved as r "
@@ -3193,7 +3195,7 @@ class experiment:
                            "",
                            "__ns_teardown"))
             pass
-        
+
         return EmulabResponse(RESPONSE_SUCCESS, value=result)
 
     def event_time_start(self, version, argdict):

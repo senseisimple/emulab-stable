@@ -127,7 +127,11 @@ $EXPDIR  = PROJROOT() . "/$pid/exp/$eid";
 # Deal with stop and replay.
 #
 if ($action eq "stop" || $action eq "replay") {
-    if (-e $PIDFILE) {   
+    if (-e $PIDFILE) {
+	# Send any swapout events and wait, at most three seconds, for them to
+	# complete.
+	system("$TB/bin/tevc -w -t 3 -e ${pid}/${eid} now __ns_swapout run");
+
 	# Send any teardown events and wait, at most five seconds, for them to
 	# complete.
 	system("$TB/bin/tevc -w -t 5 -e ${pid}/${eid} now __ns_teardown run");

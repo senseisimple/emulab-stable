@@ -86,7 +86,7 @@ extern int AddGroup(event_handle_t handle, char *groupname, char *agentname);
 
 extern int AddEvent(event_handle_t handle, address_tuple_t tuple,
 		    char *exidx, char *ftime, char *objname, char *exargs,
-		    char *objtype, char *evttype, char *parent);
+		    char *objtype, char *evttype, char *parent, char *triggertype);
 
 extern int AddRobot(event_handle_t handle,
 		    struct agent *agent,

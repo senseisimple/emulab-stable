@@ -1,0 +1,75 @@
+#
+# dhcpd.conf.template - From the emulab software distribution
+#
+# This file is used with dhcpd_makeconf to generate an actual dhpd.conf file
+# from the database.
+#
+# Make sure to change all subnets (don't forget the mask!), the DHCP and DNS
+# servers' IP addresses, the router's IP, and see the comment about nodetypes
+# below.
+#
+server-identifier               %%subboss_ip;
+server-name                     "%%subboss_ip";
+
+# Config these too?
+option  root-path		"/tftpboot";
+filename 			"/tftpboot/pxeboot.emu";
+
+#default-lease-time              36000;                  # 10 hours
+#max-lease-time                  36000;                  # 10 hours
+ddns-update-style               none;                   # req'd vers 3 directive
+
+# Define the PXE option space
+# Code 1: Multicast IP address of bootfile
+# Code 2: UDP port that client should monitor for MTFTP responses
+# Code 3: UDP port that MTFTP servers are using to listen for MTFTP requests
+# Code 4: Number of secondes a client must listen for activity before trying
+#         to start a new MTFTP transfer
+# Code 5: Number of secondes a client must listen before trying to restart
+#         a MTFTP transfer
+# Code 128: IP address of Emulab bootinfo server
+option space PXE;
+option PXE.mtftp-ip code 1 = ip-address;
+option PXE.mtftp-cport code 2 = unsigned integer 16;
+option PXE.mtftp-sport code 3 = unsigned integer 16;
+option PXE.mtftp-tmout code 4 = unsigned integer 8;
+option PXE.mtftp-delay code 5 = unsigned integer 8;
+option PXE.discovery-control code 6 = unsigned integer 8;
+option PXE.discovery-mcast-addr code 7 = ip-address;
+option PXE.emulab-bootinfo code 128 = ip-address;
+
+#
+# For PXE booting nodes we set the magic bits to tell the client that we are
+# PXE-saavy so they don't wait around for 12 seconds or so waiting for a
+# better response.
+#
+# If, for some reason, this doesn't work for you, just comment out the
+# entire PXE class block.  It will work without it, it will just take longer.
+#
+class "PXE" {
+	match if substring (option vendor-class-identifier, 0, 9) = "PXEClient";
+	option vendor-class-identifier "PXEClient";
+	vendor-option-space PXE;
+
+	# bit 3 = If set, and a boot file name is present in the initial
+	# DHCP or ProxyDHCP offer packet, download the boot file (do not
+	# prompt/menu/discover).
+	option PXE.discovery-control 8;
+	option PXE.emulab-bootinfo @BOSSNODE_IP@;
+}
+
+shared-network emulab {
+ 
+ subnet @CONTROL_NETWORK@ netmask @CONTROL_NETMASK@ {
+	option subnet-mask		@CONTROL_NETMASK@;
+	option routers                  @CONTROL_ROUTER_IP@;
+	option domain-name-servers      @BOSSNODE_IP@;
+	option domain-name              "@OURDOMAIN@";
+
+	# testbed PCs
+	group {
+		%%nodes
+	}
+
+ }
+}
