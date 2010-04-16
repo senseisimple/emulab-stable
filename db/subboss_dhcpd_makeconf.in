@@ -39,7 +39,8 @@ $| = 1;
 
 use lib "@prefix@/lib";
 use libtestbed;
-use libsetup;
+use libsetup 'gendhcpdconf';
+use liblocsetup 'os_gendhcpdconf';
 use libtmcc;
 
 # Parse command arguments. Once we return from getopts, all that should

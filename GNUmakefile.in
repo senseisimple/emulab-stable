@@ -200,6 +200,12 @@ endif
 	@$(MAKE) -C sensors client-install
 	@$(MAKE) -C tmcd client-install
 
+subboss: client
+	@$(MAKE) -C utils subboss
+
+subboss-install: subboss client-install
+	@$(MAKE) -C utils subboss-install
+
 TARBALLDESTDIR = /var/tmp/emulab-client
 
 client-tarball:

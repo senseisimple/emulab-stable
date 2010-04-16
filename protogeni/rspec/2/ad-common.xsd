@@ -22,7 +22,10 @@
         <xs:element ref="rspec:node"/>
         <xs:element ref="rspec:link"/>
       </xs:choice>
-      <xs:element ref="rspec:external_ref"/>
+      <xs:choice>
+        <xs:element ref="rspec:external_ref"/>
+        <xs:element ref="rspec:type_relation"/>
+      </xs:choice>
     </xs:choice>
     <xs:attributeGroup ref="rspec:AnyExtension"/>
     <xs:attribute name="generated" type="xs:dateTime"/>
@@ -37,6 +40,7 @@
     </xs:attribute>
   </xs:complexType>
   <xs:element name="external_ref" type="rspec:ExternalReferenceContents"/>
+  <xs:element name="type_relation" type="rspec:TypeRelationContents"/>
   <xs:element name="node" type="rspec:NodeContents"/>
   <xs:element name="link" type="rspec:LinkContents"/>
   <xs:complexType name="NodeContents">
@@ -45,14 +49,30 @@
         <xs:group ref="rspec:AnyExtension"/>
         <xs:element ref="rspec:relation"/>
         <xs:element ref="rspec:location"/>
+        <xs:element ref="rspec:services"/>
         <xs:element ref="rspec:interface"/>
       </xs:choice>
       <xs:choice>
         <xs:element ref="rspec:available"/>
         <xs:element ref="rspec:cloud"/>
-        <xs:element ref="rspec:services"/>
         <xs:element ref="rspec:hardware_type"/>
-        <xs:element ref="rspec:sliver_type"/>
+        <xs:element name="sliver_type">
+          <xs:complexType>
+            <xs:choice minOccurs="0" maxOccurs="unbounded">
+              <xs:group ref="rspec:SliverTypeContents"/>
+              <xs:element name="disk_image">
+                <xs:complexType>
+                  <xs:complexContent>
+                    <xs:extension base="rspec:DiskImageContents">
+                      <xs:attribute name="default"/>
+                    </xs:extension>
+                  </xs:complexContent>
+                </xs:complexType>
+              </xs:element>
+            </xs:choice>
+            <xs:attributeGroup ref="rspec:SliverTypeContents"/>
+          </xs:complexType>
+        </xs:element>
       </xs:choice>
     </xs:choice>
     <xs:attributeGroup ref="rspec:AnyExtension"/>
@@ -63,6 +83,7 @@
   </xs:complexType>
   <xs:element name="relation" type="rspec:RelationContents"/>
   <xs:element name="location" type="rspec:LocationContents"/>
+  <xs:element name="services" type="rspec:ServiceContents"/>
   <xs:element name="interface" type="rspec:InterfaceContents"/>
   <xs:element name="available" type="rspec:AvailableContents"/>
   <xs:element name="cloud">
@@ -71,10 +92,40 @@
       <xs:attributeGroup ref="rspec:AnyExtension"/>
     </xs:complexType>
   </xs:element>
-  <xs:element name="services" type="rspec:ServiceContents"/>
+  <xs:complexType name="ServiceContents">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:choice>
+        <xs:group ref="rspec:AnyExtension"/>
+        <xs:element ref="rspec:login"/>
+      </xs:choice>
+      <xs:choice>
+        <xs:element ref="rspec:install"/>
+        <xs:element ref="rspec:execute"/>
+      </xs:choice>
+    </xs:choice>
+    <xs:attributeGroup ref="rspec:AnyExtension"/>
+  </xs:complexType>
+  <xs:element name="login" type="rspec:LoginServiceContents"/>
+  <xs:element name="install" type="rspec:InstallServiceContents"/>
+  <xs:element name="execute" type="rspec:ExecuteServiceContents"/>
+  <xs:complexType name="LoginServiceContents">
+    <xs:group ref="rspec:AnyExtension"/>
+    <xs:attributeGroup ref="rspec:AnyExtension"/>
+    <xs:attribute name="authentication" use="required">
+      <xs:simpleType>
+        <xs:restriction base="xs:token">
+          <xs:enumeration value="ssh-keys"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="hostname"/>
+    <xs:attribute name="port"/>
+  </xs:complexType>
   <xs:complexType name="RelationContents">
     <xs:group ref="rspec:AnyExtension"/>
     <xs:attributeGroup ref="rspec:AnyExtension"/>
+    <xs:attribute name="type" use="required"/>
+    <xs:attribute name="component_id" use="required"/>
   </xs:complexType>
   <xs:complexType name="LocationContents">
     <xs:group ref="rspec:AnyExtension"/>
@@ -147,18 +198,36 @@
       <xs:attribute name="name" use="required"/>
     </xs:complexType>
   </xs:element>
-  <xs:element name="sliver_type">
-    <xs:complexType>
+  <xs:group name="SliverType">
+    <xs:sequence>
+      <xs:element name="sliver_type">
+        <xs:complexType>
+          <xs:group ref="rspec:SliverTypeContents"/>
+          <xs:attributeGroup ref="rspec:SliverTypeContents"/>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:group>
+  <xs:group name="SliverTypeContents">
+    <xs:sequence>
       <xs:group ref="rspec:AnyExtension"/>
-      <xs:attributeGroup ref="rspec:AnyExtension"/>
-      <xs:attribute name="name" use="required"/>
-    </xs:complexType>
-  </xs:element>
-  <xs:element name="hardware_type">
-    <xs:complexType>
-      <xs:group ref="rspec:AnyExtension"/>
-      <xs:attributeGroup ref="rspec:AnyExtension"/>
-      <xs:attribute name="name" use="required"/>
-    </xs:complexType>
-  </xs:element>
+    </xs:sequence>
+  </xs:group>
+  <xs:attributeGroup name="SliverTypeContents">
+    <xs:attributeGroup ref="rspec:AnyExtension"/>
+    <xs:attribute name="name" use="required"/>
+  </xs:attributeGroup>
+  <xs:complexType name="HardwareTypeContents">
+    <xs:group ref="rspec:AnyExtension"/>
+    <xs:attributeGroup ref="rspec:AnyExtension"/>
+    <xs:attribute name="name" use="required"/>
+  </xs:complexType>
+  <xs:complexType name="DiskImageContents">
+    <xs:group ref="rspec:AnyExtension"/>
+    <xs:attributeGroup ref="rspec:AnyExtension"/>
+    <xs:attribute name="name" use="required"/>
+    <xs:attribute name="os"/>
+    <xs:attribute name="version"/>
+    <xs:attribute name="description"/>
+  </xs:complexType>
 </xs:schema>

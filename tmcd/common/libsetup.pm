@@ -22,7 +22,7 @@ use Exporter;
 	 ixpsetup libsetup_refresh gettopomap getfwconfig gettiptunnelconfig
 	 gettraceconfig genhostsfile getmotelogconfig calcroutes fakejailsetup
 	 getlocalevserver genvnodesetup getgenvnodeconfig stashgenvnodeconfig
-         getlinkdelayconfig getloadinfo getbootwhat getdhcpdconf
+         getlinkdelayconfig getloadinfo getbootwhat gendhcpdconf
 
 	 TBDebugTimeStamp TBDebugTimeStampsOn
 
@@ -46,6 +46,7 @@ use English;
 
 # The tmcc library.
 use libtmcc;
+use librc;
 
 #
 # This is the VERSION. We send it through to tmcd so it knows what version
@@ -1031,13 +1032,15 @@ sub gendhcpdconf($$)
 	my $tmpfile =  "/tmp/gendhcpdconf.$$";
 	my @tmccresults;
 	my @nodes;
+        # don't cache this stuff, can't get stale dhcpd info!
+        my %opthash = ( 'nocache' => 1 );
 
 	return 0 if (!SUBBOSS());
 
-	if (tmcc(TMCCCMD_DHCPDCONF, undef, \@tmccresults) == 0
+	if (tmcc(TMCCCMD_DHCPDCONF, undef, \@tmccresults, %opthash) == 0
 		&& scalar(@tmccresults)) {
-	} else {
-		fatal("No dhcpd configuration data returned by tmcd\n");
+	#} else {
+	#	fatal("No dhcpd configuration data returned by tmcd\n");
 	}
 
 	for (@tmccresults) {
@@ -1675,43 +1678,6 @@ sub getloadinfo($)
     my %opthash = ( 'nocache' => 1 );
 
     if (tmcc(TMCCCMD_LOADINFO, undef, \@tmccresults, %opthash) < 0) {
-	warn("*** WARNING: Could not get loadinfo from server!\n");
-	return -1;
-    }
-
-    # accept any key/val pair with basic formatting
-    foreach my $res (@tmccresults) {
-	chomp($res);
-	my @kvs = split(/\s+/,$res);
-	my %resh = ();
-	foreach my $kv (@kvs) {
-	    my @kvpair = split(/=/,$kv);
-	    if (scalar(@kvpair) != 2) {
-		warn("*** WARNING: malformed key-val pair in loadinfo: $kv\n");
-	    }
-	    else {
-		$resh{$kvpair[0]} = $kvpair[1];
-	    }
-	}
-	push @retval, \%resh;
-    }
-
-    @$rptr = @retval;
-    return 0;
-}
-
-#
-# Get dhcpd configuration.
-#
-sub getdhcpdconf($)
-{
-    my ($rptr)  = @_;
-    my @retval = ();
-    my @tmccresults = ();
-    # don't cache this stuff, can't get stale dhcpd info!
-    my %opthash = ( 'nocache' => 1 );
-
-    if (tmcc(TMCCCMD_DHCPDCONF, undef, \@tmccresults, %opthash) < 0) {
 	warn("*** WARNING: Could not get loadinfo from server!\n");
 	return -1;
     }

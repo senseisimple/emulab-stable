@@ -16,13 +16,14 @@ use Exporter;
 	      TBScriptLock TBScriptUnlock
 	      TBSCRIPTLOCK_OKAY TBSCRIPTLOCK_TIMEDOUT
 	      TBSCRIPTLOCK_IGNORE TBSCRIPTLOCK_FAILED TBSCRIPTLOCK_GLOBALWAIT
-	      TBTimeStamp TBTimeStampWithDate
+	      TBTimeStamp TBTimeStampWithDate TBBackGround ReOpenLog
 	    );
 
 # Must come after package declaration!
 use English;
 # For locking below
 use Fcntl ':flock';
+use IO::Handle;
 
 #
 # Turn off line buffering on output
@@ -110,6 +111,71 @@ sub SENDMAILWith($$$$;$$@)
     $ENV{'PATH'} = $SAVE_PATH;
     return 0;
 }
+
+#
+# Put ourselves into the background, directing output to the log file.
+# The caller provides the logfile name, which should have been created
+# with mktemp, just to be safe. Returns the usual return of fork.
+#
+# usage int TBBackGround(char *filename).
+#
+sub TBBackGround($)
+{
+    my ($logname) = @_;
+
+    my $mypid = fork();
+    if ($mypid) {
+	return $mypid;
+    }
+    select(undef, undef, undef, 0.2);
+
+    #
+    # We have to disconnect from the caller by redirecting both STDIN and
+    # STDOUT away from the pipe. Otherwise the caller (the web server) will
+    # continue to wait even though the parent has exited.
+    #
+    open(STDIN, "< /dev/null") or
+	die("opening /dev/null for STDIN: $!");
+
+    ReOpenLog($logname);
+
+    #
+    # Create a new session to ensure we are clear of any process group
+    #
+    POSIX::setsid() or
+	die("setsid failed: $!");
+
+    return 0;
+}
+
+#
+# As for newsyslog. Call this on signal. newsyslog will have renamed the
+# the original file already.
+#
+sub ReOpenLog($)
+{
+    my ($logname) = @_;
+
+    # Note different taint check (allow /).
+    if ($logname =~ /^([-\@\w.\/]+)$/) {
+	$logname = $1;
+    }
+    else {
+	die "Bad data in logfile name: $logname";
+    }
+
+    open(STDERR, ">> $logname") or die("opening $logname for STDERR: $!");
+    open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
+
+    #
+    # Turn off line buffering on output
+    #
+    STDOUT->autoflush(1);
+    STDERR->autoflush(1);
+
+    return 0;
+}
+
 #
 # Return a timestamp. We don't care about day/date/year. Just the time mam.
 #

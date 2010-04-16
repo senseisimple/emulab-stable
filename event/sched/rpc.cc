@@ -181,6 +181,7 @@ RPC_invoke(char *method,
 	int retval = 0;
 	va_list args;
 
+	ULXR_COUT << "Beginning call to " << method << "\n";
 	RPC_connect(&rcp);
 
 	va_start(args, tag);
@@ -214,6 +215,7 @@ RPC_invoke(char *method,
 	
 	RPC_disconnect(&rcp);
 
+	ULXR_COUT << "Finished with call to " << method << "\n";
 	return retval;
 }
 
@@ -228,6 +230,7 @@ RPC_invoke(char *pid, char *eid, char *method, emulab::EmulabResponse *er)
 	assert(method != NULL);
 	assert(er != NULL);
 	
+	ULXR_COUT << "Beginning call to " << method << "\n";
 	RPC_connect(&rcp);
 	
 	try
@@ -261,6 +264,7 @@ RPC_invoke(char *pid, char *eid, char *method, emulab::EmulabResponse *er)
 	}
 
 	RPC_disconnect(&rcp);
+	ULXR_COUT << "Finished with call to " << method << "\n";
 
 	return retval;
 }
@@ -591,7 +595,7 @@ RPC_agentlist(event_handle_t handle, char *pid, char *eid)
 		ipaddr = (char *) tmp.getString().c_str();
 		tmp = agent.getItem(4);
 		type = (char *) tmp.getString().c_str();
-		
+		info("D: adding agent %s\n", vname);
 		if (AddAgent(handle, vname, vnode, nodeid, ipaddr, type) < 0) {
 			return -1;
 		}
@@ -618,8 +622,10 @@ RPC_grouplist(event_handle_t handle, char *pid, char *eid)
 		
 		tmp = group.getItem(0);
 		groupname = (char *) tmp.getString().c_str();
+		info("D: \tIn GroupList() parsed name %s\n", groupname);
 		tmp = group.getItem(1);
 		agentname = (char *) tmp.getString().c_str();
+		info("D: \tIn GroupList() parsed agent %s\n", agentname);
 		
 		if (AddGroup(handle, groupname, agentname) != 0) {
 			return -1;
@@ -631,18 +637,28 @@ RPC_grouplist(event_handle_t handle, char *pid, char *eid)
 int
 RPC_eventlist(char *pid, char *eid,
 	      event_handle_t handle, address_tuple_t tuple)
-{
+{ /* This function requests all the static events from boss using an RPC call, packing them into its
+   * own data structures. */
 	emulab::EmulabResponse er;
 	int i, foo = RPC_invoke(pid, eid, "experiment.event_eventlist", &er);
-	
+
+// XXX
+//	info("rpc.cc:RPC_eventlist(): Just called RPC_invoke()\n");
+// XXX	
 	if (foo)
 		return foo;
 
+// XXX
+//	info("rpc.cc:RPC_eventlist(): calling getValue()\n");
+// XXX	
 	ulxr::Array events = (ulxr::Array)er.getValue();
 	
+// XXX
+//	info("rpc.cc:RPC_eventlist(): Interating over invoke results\n");
+// XXX	
 	for (i = 0; i < events.size(); i++) {
 		char *exidx, *extime, *objname, *objtype, *evttype, *exargs;
-		char *parent;
+		char *parent, *triggertype;
 		ulxr::RpcString tmp;
 		ulxr::Array event = (ulxr::Array)events.getItem(i);
 		
@@ -660,10 +676,14 @@ RPC_eventlist(char *pid, char *eid,
 		exargs = (char *) tmp.getString().c_str();
 		tmp = event.getItem(6);
 		parent = (char *) tmp.getString().c_str();
-		
+		tmp = event.getItem(7);
+		triggertype = (char *) tmp.getString().c_str();
+// XXX
+//	info("rpc.cc:RPC_eventlist(): Adding an event\n");
+// XXX 		
 		if (AddEvent(handle, tuple, exidx,
 			     extime, objname, exargs, objtype, evttype,
-			     parent) < 0) {
+			     parent, triggertype) < 0) {
 			return -1;
 		}
 	}
