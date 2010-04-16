@@ -1824,6 +1824,7 @@ CREATE TABLE `login` (
   `hashhash` varchar(64) NOT NULL default '',
   `timeout` varchar(10) NOT NULL default '',
   `adminon` tinyint(1) NOT NULL default '0',
+  `opskey` varchar(64) NOT NULL,
   PRIMARY KEY  (`uid_idx`,`hashkey`),
   UNIQUE KEY `hashhash` (`uid_idx`,`hashhash`),
   UNIQUE KEY `uidkey` (`uid`,`hashkey`)
