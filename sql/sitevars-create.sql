@@ -56,10 +56,10 @@ INSERT INTO sitevariables VALUES ('robotlab/opentime','08:00','07:00','Time the 
 INSERT INTO sitevariables VALUES ('robotlab/closetime',NULL,'18:00','Time the Robot lab closes down for the night.',0);
 INSERT INTO sitevariables VALUES ('robotlab/open','1','0','Turn the Robot Lab on/off for weekends and holidays. Overrides the open/close times.',0);
 INSERT INTO sitevariables VALUES ('swap/admission_control_debug',NULL,'0','Turn on/off admission control debugging (lots of output!)',0);
-INSERT INTO sitevariables VALUES ('elabinelab/boss_pkg',NULL,'','Name of boss node install package (DEPRECATED)',0);
-INSERT INTO sitevariables VALUES ('elabinelab/boss_pkg_dir',NULL,'','Path from which to fetch boss packages (DEPRECATED)',0);
-INSERT INTO sitevariables VALUES ('elabinelab/ops_pkg',NULL,'','Name of ops node install package (DEPRECATED)',0);
-INSERT INTO sitevariables VALUES ('elabinelab/ops_pkg_dir',NULL,'','Path from which to fetch ops packages (DEPRECATED)',0);
+INSERT INTO sitevariables VALUES ('elabinelab/boss_pkg',NULL,'emulab-boss-1.8','Name of boss node install package (DEPRECATED)',0);
+INSERT INTO sitevariables VALUES ('elabinelab/boss_pkg_dir',NULL,'/share/freebsd/packages/FreeBSD-4.10-20041102','Path from which to fetch boss packages (DEPRECATED)',0);
+INSERT INTO sitevariables VALUES ('elabinelab/ops_pkg',NULL,'emulab-ops-1.4','Name of ops node install package (DEPRECATED)',0);
+INSERT INTO sitevariables VALUES ('elabinelab/ops_pkg_dir',NULL,'/share/freebsd/packages/FreeBSD-4.10-20041102','Path from which to fetch ops packages (DEPRECATED)',0);
 INSERT INTO sitevariables VALUES ('elabinelab/windows','1','0','Turn on Windows support in inner Emulab',0);
 INSERT INTO `sitevariables` VALUES ('elabinelab/singlenet',NULL,'0','Default control net config. 0==use inner cnet, 1==use real cnet',1);
 INSERT INTO `sitevariables` VALUES ('elabinelab/boss_osid',NULL,'','Default (emulab-ops) OSID to boot on boss node. Empty string means use node_type default OSID',1);
