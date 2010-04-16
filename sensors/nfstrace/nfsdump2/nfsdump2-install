@@ -49,9 +49,20 @@ if [ ! -d $dir/nfsdump2 ]; then
         echo "ERROR: nfsdump2-install: patch failed"
 	exit 1
     }
+    #
     # XXX link in the local additions
+    # Note hack to deal with relative paths...argh!
+    #
+    pre=""
+    case $srcdir in
+    /*)
+	;;
+    *)
+        pre="../"
+	;;
+    esac
     for f in `ls $srcdir/files/*`; do
-        ln -sf $f nfsdump2/
+        ln -sf $pre$f nfsdump2/
     done
     rm -f nfsdump2/*.orig
 fi

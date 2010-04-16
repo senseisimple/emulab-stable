@@ -298,6 +298,7 @@ sub AUTOLOAD {
 }
 sub dbrow($$)     { return $_[0]->{'EXPT'}; }
 sub locked($)     { return $_[0]->expt_locked(); }
+sub elabinelab($) { return $_[0]->elab_in_elab(); }
 sub description($){ return $_[0]->expt_name(); }
 sub creator($)    { return $_[0]->expt_head_uid(); }
 sub created($)	  { return $_[0]->expt_created(); }
