@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2009 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -853,7 +853,7 @@ int main(int argc,char **argv) {
 	char* delims = "/";
 	char* flags = "s:v:l:t:rpPTdH:oguc:nx:y:W:FDf:";
 #else
-	char* flags = "s:v:l:t:rpPTdH:oguc:nx:y:FD"
+	char* flags = "s:v:l:t:rpPTdH:oguc:nx:y:FD";
 #endif	
 	
   while ((ch = getopt(argc,argv,flags)) != -1) {
