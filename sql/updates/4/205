@@ -1,0 +1,18 @@
+#
+# exp-vis
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+    if (!DBSlotExists("login", "opskey")) {
+        DBQueryFatal("ALTER TABLE login ADD COLUMN ".
+                     " `opskey` varchar(64) NOT NULL ".
+                     " after adminon");
+    }
+    return 0;
+}
+1;
+
