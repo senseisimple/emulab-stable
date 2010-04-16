@@ -50,3 +50,12 @@ for path in ext/gre-tunnel/1; do
     fi
   done
 done
+
+cd ../security
+
+for path in ext/policy/1; do
+  if [ -e ${path}/policy.rnc ]; then
+    $TRANGCMD ${path}/policy.rnc ${path}/policy.xsd
+    sudo scp ${path}/policy.xsd ${path}/policy.rnc ops.emulab.net:/usr/local/www.geni/data/trac/resources/credential/${path}/
+  fi
+done

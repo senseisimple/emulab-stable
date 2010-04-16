@@ -31,10 +31,10 @@ my $group              = "GeniSlices";
 use vars qw($EXTENSIONS_NS $XSI_NS $EXTENSIONS_PREFIX $EXTENSIONS_SCHEMA_LOCATION);
 #Extensions namespace URI.
 # TODO: pick the right NS URI, prefix and update here.
-$EXTENSIONS_NS = "http://www.protogeni.net/resources/credential/ext/policy/1.0"; 
+$EXTENSIONS_NS = "http://www.protogeni.net/resources/credential/ext/policy/1";
 $XSI_NS = "http://www.w3.org/2001/XMLSchema-instance";
 $EXTENSIONS_PREFIX = "policyExt";
-$EXTENSIONS_SCHEMA_LOCATION = "file:///home/srikanth/schema/policy.xsd"; 
+$EXTENSIONS_SCHEMA_LOCATION = "http://www.protogeni.net/resources/credential/ext/policy/1/policy.xsd"; 
 
 sub GENI_PURGEFLAG()	{ return 1; }
 
