@@ -148,7 +148,7 @@ REPLACE INTO exported_tables VALUES ('table_regex');
 REPLACE INTO exported_tables VALUES ('testsuite_preentables');
 REPLACE INTO exported_tables VALUES ('webdb_table_permissions');
 REPLACE INTO exported_tables VALUES ('emulab_pubs_month_map');
-
+REPLACE INTO exported_tables VALUES ('event_triggertypes');
 
 --
 -- Dumping data for table `foreign_keys`
@@ -1068,5 +1068,5 @@ REPLACE INTO `emulab_pubs_month_map` VALUES (23,10.5,'Oct-Nov');
 REPLACE INTO `emulab_pubs_month_map` VALUES (24,11.5,'Nov-Dec');
 REPLACE INTO `emulab_pubs_month_map` VALUES (25,12.5,'Dec-Jan');
 
-REPLACE INTO event_triggertypes VALUES(0,'TIMER');
-REPLACE INTO event_triggertypes VALUES(2,'SWAPOUT');
+REPLACE INTO `event_triggertypes`  VALUES (0,'TIMER');
+REPLACE INTO `event_triggertypes`  VALUES (2,'SWAPOUT');

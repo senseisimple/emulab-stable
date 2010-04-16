@@ -429,16 +429,16 @@ void print_help() {
   cout << "  -v <viz>    - Produce graphviz files with given prefix." <<
     endl;
 #endif
-  cout << "  -r           - Don't allow trivial links." << endl;
-  cout << "  -p           - Disable pclasses." << endl;
-  cout << "  -d           - Enable dynamic pclasses." << endl;
+  cout << "  -r          - Don't allow trivial links." << endl;
+  cout << "  -p          - Disable pclasses." << endl;
+  cout << "  -d          - Enable dynamic pclasses." << endl;
 #ifdef PER_VNODE_TT
-  cout << "  -P           - Prune unusable pclasses." << endl;
+  cout << "  -P          - Prune unusable pclasses." << endl;
 #endif
-  cout << "  -T           - Doing some scoring self-testing." << endl;
-  cout << "  -H <float>   - Try <float> times harder." << endl;
-  cout << "  -o           - Allow overloaded pnodes to be considered." << endl;
-  cout << "  -t <float>   - Start the temperature at <float> instead of melting."
+  cout << "  -T          - Doing some scoring self-testing." << endl;
+  cout << "  -H <float>  - Try <float> times harder." << endl;
+  cout << "  -o          - Allow overloaded pnodes to be considered." << endl;
+  cout << "  -t <float>  - Start the temperature at <float> instead of melting."
       << endl;
   cout << "  -u           - Print a summary of the solution." << endl;
   cout << "  -c <float>   - Use the 'connected' pnode finding algorithm ";
@@ -447,24 +447,16 @@ void print_help() {
   cout << "  -n           - Don't anneal - just do the prechecks." << endl;
 
   cout << "  -x <file>    - Specify a text ptop file" << endl;
-// #ifdef WITH_XML
-//   cout << "  -X <file>   - Specify a XML ptop file" << endl;
-// #endif
   cout << "  -y <file>    - Specify a text top file" << endl;
-// #ifdef WITH_XML
-//   cout << "  -Y <file>   - Specify a XML vtop file" << endl;
-// #endif
 #ifdef WITH_XML
-//   cout << "  -q <file>   - Specify a rspec ptop file" << endl;
-//   cout << "  -w <file>   - Specify a rspec vtop file" << endl;
   cout << "  -W <file>    - Specify the output rspec file" << endl;
 	cout << "  -f <T>[/<T>] - Specify the ptop/vtop file formats " << endl;
 	cout << "                 T should be one of (text|xml|rspec-<rspec ver. number>)" << endl;;
 	cout << "                 Specifying only one T is equivalent to -f T/T"<<endl;
 #endif
-  cout << "  -F           - Apply additional checking to fixed nodes" << endl;
-  cout << "  -D           - Dump configuration options" << endl;
-  cout << "  cparams      - You probably don't want to touch these!" << endl;
+  cout << "  -F          - Apply additional checking to fixed nodes" << endl;
+  cout << "  -D          - Dump configuration options" << endl;
+  cout << "  cparams     - You probably don't want to touch these!" << endl;
   cout << "                If you must, see config.h in the source for a list"
        << endl;
   exit(EXIT_FATAL);
@@ -854,12 +846,17 @@ int main(int argc,char **argv) {
   char* ptopFilename = "";
   char* vtopFilename = "";
   char* vtopOutputFilename = 0;
-	
-	const char* delims = "/";
-	char* ptopFileFormat = "";
-	char* vtopFileFormat = "";
 
-  while ((ch = getopt(argc,argv,"s:v:l:t:rpPTdH:oguc:nx:y:W:FDf:")) != -1) {
+#ifdef WITH_XML
+	char* ptopFileFormat;
+	char* vtopFileFormat;
+	char* delims = "/";
+	char* flags = "s:v:l:t:rpPTdH:oguc:nx:y:W:FDf:";
+#else
+	char* flags = "s:v:l:t:rpPTdH:oguc:nx:y:FD"
+#endif	
+	
+  while ((ch = getopt(argc,argv,flags)) != -1) {
     switch (ch) {
     case 's':
       if (sscanf(optarg,"%d",&seed) != 1) {
@@ -926,29 +923,29 @@ int main(int argc,char **argv) {
       dump_config = true;
       break;
     case 'x':
+#ifdef WITH_XML
+      ptop_xml_input = false;
+#endif
       if (strcmp(optarg, "") == 0) {
       	print_help();
 	  }
 	  ptopFilename = optarg;
       break;
-    case 'y':
+    
+		case 'y':
+#ifdef WITH_XML
+      vtop_xml_input = false;
+#endif
       if (strcmp(optarg, "") == 0) {
       	print_help();
 	  }
 	  vtopFilename = optarg;
     break;
-#ifdef WITH_XML
-	case 'W':
-	  if (strcmp(optarg, "") == 0) {
-	  	print_help();
-	  }
-	  vtopOutputFilename = optarg;
-    break;
-#endif
-        case 'F':
+	  case 'F':
           check_fixed_nodes = true;
     break;
 
+#ifdef WITH_XML
 	case 'f':
 		if (strcmp(optarg, "") == 0) {
 			print_help();
@@ -959,7 +956,6 @@ int main(int argc,char **argv) {
 		if (strcmp(ptopFileFormat, "text") == 0) {
 			ptop_xml_input = false;
 		}
-#ifdef WITH_XML
 		else if (strstr(ptopFileFormat, "rspec") != NULL) {
 			ptop_rspec_input = true;
 		}
@@ -969,21 +965,17 @@ int main(int argc,char **argv) {
 		else {
 			print_help();
 		}
-#endif
 		
 		if (vtopFileFormat == NULL)
 		{
-			cout << "NULL" << endl;
 			vtop_xml_input = ptop_xml_input;
 			vtop_rspec_input = ptop_rspec_input;
 		}
 		else 
 		{
-			cout << "vtopFileFormat: " << vtopFileFormat << endl;
 			if (strcmp(vtopFileFormat, "text") == 0) {
 				vtop_xml_input = false;
 			}
-#ifdef WITH_XML
 			else if (strstr(vtopFileFormat, "rspec") != NULL) {
 				vtop_rspec_input = true;
 			}
@@ -993,10 +985,10 @@ int main(int argc,char **argv) {
 			else {
 				print_help();
 			}
-#endif
 		}
 		
 		break;
+#endif
 		
 	default:
       print_help();

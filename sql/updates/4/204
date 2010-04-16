@@ -24,10 +24,12 @@ sub DoUpdate($$$)
 		     " PRIMARY KEY (`idx`)" .
 		     ") ENGINE=MyISAM DEFAULT CHARSET=latin1;");
     }
-    DBQueryFatal("REPLACE INTO event_triggertypes VALUES" . 
+    DBQueryFatal("REPLACE INTO event_triggertypes VALUES " . 
 		 "(0,'TIMER')");
-    DBQueryFatal("REPLACE INTO event_triggertypes VALUES" . 
+    DBQueryFatal("REPLACE INTO event_triggertypes VALUES " . 
 		 "(2,'SWAPOUT')");
+    DBQueryFatal("REPLACE INTO exported_tables VALUES ".
+		 "('event_triggertypes')");
 
     return 0;
 }
