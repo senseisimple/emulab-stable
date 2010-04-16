@@ -241,7 +241,7 @@ sub auto_reset() {
 	    init("reset -q --hard");
 	} else {
 	    print "Need to reset to $reset_point^\n"; 
-	    sys "git reset -q $reset_point^";
+	    sys "git reset -q --hard $reset_point^";
 	}
     }
 }
