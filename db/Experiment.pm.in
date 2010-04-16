@@ -3141,7 +3141,7 @@ sub RemovePhysicalState($)
 
 	# Interfaces table is special. Also cleaned in nfree.
 	DBQueryWarn("update interfaces set IP='',IPaliases=NULL,mask=NULL,".
-		    "       rtabid='0',vnode_id=NULL " .
+		    "       rtabid='0',vnode_id=NULL,current_speed='0' " .
 		    "where ($clause) and ".
 		    "       role='" . TBDB_IFACEROLE_EXPERIMENT() . "' ")
 	    or $errors++;
