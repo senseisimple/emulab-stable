@@ -103,7 +103,7 @@ my %funcs = (
     hkeys   => \&sendhkeys,
     batt    => \&sendbatt,
     rootpswd=> \&setrootpswd,
-    dhcpdconf=> \&gendhcpdconf,
+    dhcpdconf=> \&dhcpdconf,
 );
 
 my %immediate = (
@@ -131,7 +131,7 @@ sub sendbatt($);
 sub setrootpswd($);
 sub logmsg($;$);
 sub saysomething($);
-sub gendhcpdconf();
+sub dhcpdconf($);
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -992,15 +992,15 @@ resched:
 	if ($iv{rootpswd});
 }
 
-sub gendhcpdconf($)
+sub dhcpdconf($)
 {
     my ($curtime) = @_;
 
     if ($fakeit) {
 	my $delta = $curtime - $faketimes{dhcpdconf};
 	$faketimes{dhcpdconf} = $curtime;
-	logmsg("gendhcpdconf at +$delta\n");
-	qinsert($curtime + $iv{dhcpdconf}, \&gendhcpdconf) if ($iv{dhcpdconf});
+	logmsg("dhcpdconf at +$delta\n");
+	qinsert($curtime + $iv{dhcpdconf}, \&dhcpdconf) if ($iv{dhcpdconf});
 	return;
     }
 
@@ -1016,7 +1016,7 @@ resched:
     # Since the tmcc call and update can take awhile, we update curtime
     #
     $curtime = time();
-    qinsert($curtime + $iv{dhcpdconf}, \&gendhcpdconf)
+    qinsert($curtime + $iv{dhcpdconf}, \&dhcpdconf)
 	if ($iv{dhcpdconf});
 }
 
