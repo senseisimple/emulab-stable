@@ -2646,6 +2646,8 @@ sub doEnableOpenflowListener($$) {
     my %usedports = ();
     my $port = $minOpenflowListenerPort;
     my $errors = 0;
+    my $set_ok = 0;
+    my $listenerConnStr;
 
     #
     # get used ports
@@ -2672,9 +2674,15 @@ sub doEnableOpenflowListener($$) {
 	#
 	# set listener
 	#
-	my $listenerConnStr = "ptcp:".$port;
-	print "Openflow listener connection string for VLAN $vlan is $listenerConnStr \n";
-	$errors += doSetOpenflowListener($stacks, $vlan, $listenerConnStr);
+	$listenerConnStr = "ptcp:".$port;
+        my $err = doSetOpenflowListener($stacks, $vlan, $listenerConnStr);
+        if ($err == 0 && $set_ok == 0) {
+            $set_ok = 1;
+        }
+    }
+
+    if ($set_ok) {
+        print "Openflow listener connection string for VLAN $vlan is $listenerConnStr \n";
     }
 
     ofunlock();

@@ -1872,7 +1872,9 @@ sub getUsedOpenflowListenerPorts($) {
 	$self->debug("listener: $varname $vlan $connstr \n");
 	if ($varname =~ /$ofListenerVarNameMarker/) {
 	    my ($proto, $port) = split(":", $connstr);
-	    $ports{$port} = 1;
+	    if (defined($port)){
+                $ports{$port} = 1;
+            }
 	    
 	    #
 	    # the SNMP session with MIB gives varname with strings not numbers, but
