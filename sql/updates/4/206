@@ -1,0 +1,19 @@
+#
+# This file intentionally does nothing. Leave it be.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    # updating the sitevar name and description to make it
+    # more meaningful.
+    DBQueryFatal("update sitevariables set name = " .
+      "'protogeni/max_sliver_lifetime', description = " .
+      "'The maximum sliver lifetime. When set limits the lifetime of a " .
+      "sliver.' where name = 'protogeni/max_ticket_lifetime'");
+    return 0;
+}
+1;
