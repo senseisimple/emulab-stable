@@ -28,13 +28,13 @@ my $OUTERBOSS_NODENAME = "@OUTERBOSS_NODENAME@";
 my $user	       = "geniuser";
 my $group              = "GeniSlices";
 
-use vars qw($EXTENSIONS_NS $XSI_NS $EXTENSIONS_PREFIX $EXTENSIONS_SCHEMA_LOCATION);
+use vars qw($EXTENSIONS_NS $XSI_NS $EXTENSIONS_PREFIX $EXTENSIONS_SCHEMA_LOCATION $CREDENTIAL_SCHEMA_LOCATION);
 #Extensions namespace URI.
-# TODO: pick the right NS URI, prefix and update here.
 $EXTENSIONS_NS = "http://www.protogeni.net/resources/credential/ext/policy/1";
 $XSI_NS = "http://www.w3.org/2001/XMLSchema-instance";
 $EXTENSIONS_PREFIX = "policyExt";
 $EXTENSIONS_SCHEMA_LOCATION = "http://www.protogeni.net/resources/credential/ext/policy/1/policy.xsd"; 
+$CREDENTIAL_SCHEMA_LOCATION = "http://www.protogeni.net/resources/credential/credential.xsd";
 
 sub GENI_PURGEFLAG()	{ return 1; }
 

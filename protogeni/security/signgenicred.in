@@ -222,7 +222,7 @@ if ($root->nodeName eq "credential") {
     my $newroot       = XML::LibXML::Element->new('signed-credential');
     $newroot->setNamespace($GeniUtil::XSI_NS, "xsi", 0);
     $newroot->setAttributeNS($GeniUtil::XSI_NS, "noNamespaceSchemaLocation"
-                           , $SCHEMA);
+                           , $GeniUtil::CREDENTIAL_SCHEMA_LOCATION);
     $newroot->setAttributeNS($GeniUtil::XSI_NS, "schemaLocation"
                            , $GeniUtil::EXTENSIONS_NS . " " 
                            . $GeniUtil::EXTENSIONS_SCHEMA_LOCATION);
