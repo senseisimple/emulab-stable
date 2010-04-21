@@ -16,12 +16,14 @@ use Frontier::Responder;
 use Frontier::RPC2;
 use Data::Dumper;
 use POSIX;
+use Crypt::X509;
+use Crypt::OpenSSL::X509;
 
 # Yack. apache does not close fds before the exec, and if this dies
 # we are left with a giant mess.
 BEGIN {
     no warnings;
-    for (my $i = 3; $i < 2048; $i++) {
+    for (my $i = 3; $i < 1024; $i++) {
       POSIX:close($i);
     }
 }
@@ -80,6 +82,19 @@ $ENV{'MYUUID'} = $certificate->uuid();
 $ENV{'MYURN'} = "urn:publicid:IDN+@OURDOMAIN@+authority+cm";
 
 #
+# Helper function to return a properly formated XML error.
+#
+sub XMLError($$)
+{
+    my ($code, $string) = @_;
+
+    my $decoder = Frontier::RPC2->new();
+    print "Content-Type: text/xml \n\n";
+    print $decoder->encode_fault($code, $string);
+    exit(0);
+}
+
+#
 # Make sure the client presented a valid certificate that apache says
 # is okay.
 #
@@ -92,10 +107,7 @@ $ENV{'MYURN'} = "urn:publicid:IDN+@OURDOMAIN@+authority+cm";
 #
 if (! (exists($ENV{'SSL_CLIENT_VERIFY'}) &&
        $ENV{'SSL_CLIENT_VERIFY'} eq "SUCCESS")) {
-    my $decoder = Frontier::RPC2->new();
-    print "Content-Type: text/xml \n\n";
-    print $decoder->encode_fault(-1, "Invalid or missing certificate");
-    exit(0);
+    XMLError(-1, "Invalid or missing certificate");
 }
 
 #
@@ -131,11 +143,34 @@ if (exists($ENV{'SSL_CLIENT_S_DN_CN'}) &&
     $ENV{'GENIUUID'} = $ENV{'SSL_CLIENT_S_DN_CN'};
 }
 else {
-    my $decoder = Frontier::RPC2->new();
-    print "Content-Type: text/xml \n\n";
-    print $decoder->encode_fault(-1, "Invalid certificate; no UUID");
-    exit(0);
+    XMLError(-1, "Invalid certificate; no UUID");
 }
+
+#
+# The CERT data from apache holds the URN of the caller. 
+#
+if (exists($ENV{'SSL_CLIENT_CERT'})) {
+    my $x509 = eval {
+	Crypt::OpenSSL::X509->new_from_string($ENV{'SSL_CLIENT_CERT'}); };
+    if ($@) {
+	XMLError(-1, "Invalid certificate: $@");
+    }
+    my $cert = $x509->as_string(Crypt::OpenSSL::X509::FORMAT_ASN1);
+    XMLError(-1, "Could not convert certificate to ASN1")
+	if (!defined($cert) || $cert eq '');
+    my $decoded = Crypt::X509->new( cert => $cert );
+    if ($decoded->error) {
+	XMLError(-1, "Error decoding certificate:" . $decoded->error);
+    }
+    foreach my $tmp (@{ $decoded->SubjectAltName }) {
+	if ($tmp =~ /^uniformResourceIdentifier=(.*)$/) {
+	    $ENV{'GENIURN'} = $1;
+	}
+    }
+}
+XMLError(-1, "Invalid authentication certificate; no URN. Please regenerate.")
+    if (!exists($ENV{'GENIURN'}));
+
 #
 # Reaching into the Frontier code so I can debug this crap.
 #
