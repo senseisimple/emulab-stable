@@ -172,7 +172,7 @@ use vars qw(@ISA @EXPORT);
 	 TBOSLoadMaxOkay TBImageLoadMaxOkay TBImageID 
 	 TBdbfork VnameToNodeid 
 	 TBIsNodeRemote 
-	 TBIsNodeImageable TBIsNodeVirtual TBControlNetIP TBPhysNodeID
+	 TBIsNodeVirtual TBControlNetIP TBPhysNodeID
 	 TBNodeUpdateAccountsByPid TBNodeUpdateAccountsByType
 	 TBNodeUpdateAccountsByUID
 	 TBExptWorkDir TBExptUserDir
@@ -1692,33 +1692,6 @@ sub TBGetNodeAllocState($$)
 	$$state = TBDB_ALLOCSTATE_UNKNOWN;
     }
     return 1;
-}
-
-#
-# Is a node imageable?
-#
-# usage TBIsNodeImageable(char *node)
-#        Returns 1 if yes.
-#        Returns 0 if no.
-#
-sub TBIsNodeImageable($)
-{
-    my ($nodeid) = @_;
-
-    my $node = Node->Lookup($nodeid);
-
-    return 0
-	if (!defined($node));
-
-    my $imageable;
-    
-    return 0
-	if ($node->NodeTypeAttribute("imageable", \$imageable) != 0);
-
-    $imageable = 0
-	if (!defined($imageable));
-
-    return $imageable;
 }
 
 #
