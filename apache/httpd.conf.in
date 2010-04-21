@@ -1328,8 +1328,8 @@ CustomLog @prefix@/log/apache_ssl_request_log \
 SSLCACertificateFile @prefix@/etc/genica.bundle
 # Another bundle of CRLs.
 SSLCARevocationFile @prefix@/etc/genicrl.bundle
-# Default this to none so that regular web server requests pass.
-SSLVerifyClient none
+# Must use optional to avoid renegotiation, which is broken.
+SSLVerifyClient optional
 
 # Reject the unencrypted certs that all users get. 
 <Location />
@@ -1344,18 +1344,16 @@ ScriptAlias /protogeni/xmlrpc/ses @prefix@/protogeni/xmlrpc/protogeni-ses.pl
 	SSLRequireSSL
 	Order deny,allow
 	allow from all
-	SSLVerifyClient require
 	SSLVerifyDepth  5
 </Directory>
 <Directory "@prefix@/protogeni/">
 	SSLRequireSSL
 	Order deny,allow
 	allow from all
-	SSLOptions +StdEnvVars
+	SSLOptions +StdEnvVars +ExportCertData
 	Options +ExecCGI +FollowSymLinks
 	SetHandler cgi-script
 	SetEnv USER "nobody"
-	SSLVerifyClient require
 	SSLVerifyDepth  5
 </Directory>
 </IfDefine>
