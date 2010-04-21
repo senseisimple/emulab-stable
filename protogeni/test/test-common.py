@@ -298,7 +298,7 @@ def get_slice_credential( slice, selfcredential ):
     if "urn" in slice:
         params["urn"]       = slice["urn"]
     else:
-        params["uuid"]       = slice["uuid"]
+        params["uuid"]      = slice["uuid"]
     rval,response = do_method("sa", "GetCredential", params)
     if rval:
         Fatal("Could not get Slice credential")
