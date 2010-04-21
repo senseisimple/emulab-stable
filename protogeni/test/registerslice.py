@@ -96,7 +96,7 @@ if OtherUser:
     # And bind the user to the slice so that he can get his own cred.
     #
     params = {}
-    params["uuid"]       = user["uuid"]
+    params["urn"]        = user["urn"]
     params["credential"] = myslice
     rval,response = do_method("sa", "BindToSlice", params)
     if rval:
