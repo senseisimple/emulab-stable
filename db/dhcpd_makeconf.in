@@ -41,7 +41,7 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 # Turn off line buffering on output
 $| = 1;
 
-use lib "/usr/testbed/lib";
+use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use NodeType;
