@@ -192,6 +192,26 @@ if ($debug) {
     print STDERR Dumper($value);
 }
 
+#----------------------------------------------------------------------
+# Morph the ProtoGENI response (a hash with three keys; a
+# GeniResponse) into a GENI AM response (a single value or a fault if
+# there is an error).
+#
+# $response is an XML RPC response, which is a three element hash. The
+# value element is the GeniResponse hash.
+#----------------------------------------------------------------------
+my $decoder = Frontier::RPC2->new();
+my $object  = $decoder->decode($response);
+my $geni_response = $object->{'value'}[0];
+if (GeniResponse::IsError($geni_response)) {
+    # An error result gets mapped to an XML RPC fault
+    $response = $decoder->encode_fault(GeniResponse::code($geni_response),
+                                       GeniResponse::output($geni_response));
+} else {
+    # A successful result means return the value
+    $response = $decoder->encode_response(GeniResponse::value($geni_response));
+}
+
 #
 # Terminate the log capture so that we can print the response to STDOUT
 # for the web server.
