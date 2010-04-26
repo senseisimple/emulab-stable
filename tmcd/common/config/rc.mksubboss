@@ -1,0 +1,154 @@
+#! /usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use English;
+use strict;
+
+sub mysystem($;$);
+sub RecreateDir($$);
+sub SetupFatal($);
+
+# Turn off line buffering on output
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+# Only root.
+if ($EUID != 0) {
+    die("*** $0:\n".
+        "    Must be root to run this script!\n");
+}
+
+use libsetup;
+use libtmcc;
+use librc;
+
+my $TBDIR = "/usr/testbed";
+
+my ($bossname, $outer_bossip) = tmccbossinfo();
+
+sub doboot()
+{
+    my $EXTRAFS = "/z";
+    my $TFTPBOOT_DIR = "$EXTRAFS/tftpboot";
+    my $stuffdir = "$EXTRAFS/tmp";
+    my $MFSTARBALL = "tftpboot-subboss.tar.gz";
+
+    goto skipsetup if (!SUBBOSS());
+
+    print "Stopping tftpd (if running)";
+    # This needs to be system(), not mysystem since we don't
+    # care if it fails.
+    system("/usr/local/etc/rc.d/tftpd-hpa.sh stop");
+    RecreateDir($EXTRAFS,1);
+    mysystem("$BINDIR/mkextrafs.pl -f $EXTRAFS");
+    mysystem("mkdir -p $TFTPBOOT_DIR $stuffdir");
+    mysystem("ln -sf $TFTPBOOT_DIR /tftpboot");
+
+    print "Copying over tftpboot tar file from web server and unpacking\n";
+
+    #mysystem("wget -q -O $stuffdir/tftpboot.tar.gz ".
+    #		 "http://$bossname/downloads/$MFSTARBALL");
+
+    mysystem("fetch -q -o $stuffdir/tftpboot.tar.gz ".
+		 "http://$bossname/downloads/$MFSTARBALL");
+
+    mysystem("tar xzf $stuffdir/tftpboot.tar.gz -C /tftpboot");
+    # FIXME clean up stuffdir?
+
+    print "Restarting tftpd";
+    mysystem("/usr/local/etc/rc.d/tftpd-hpa.sh start");
+
+skipsetup:
+
+    mysystem("rm -f $BINDIR/rc/rc.mksubboss");
+}
+
+
+#
+# Run a command string.
+#
+sub mysystem($;$)
+{
+    my ($command, $retrycount) = @_;
+
+    $retrycount = 1
+	if (!defined($retrycount));
+
+    while ($retrycount--) {
+	print "Command: '$command'\n";
+	print "Started at:  " . libsetup::TBTimeStamp() . "\n";
+
+	system($command);
+	last
+	    if ($? == 0 || $retrycount == 0);
+
+	sleep(1);
+    }
+    if ($?) {
+	SetupFatal("Command failed: $? - $command");
+    }
+    print "Finished at: " . libsetup::TBTimeStamp() . "\n";
+}
+
+#
+# Very paranoid routine to "remove" and optionally recreate a directory.
+#
+# If the directory exists and is a mount point, we umount it and
+# fixup /etc/fstab so it doesn't get remounted.
+#
+# If we could not unmount it or it isn't a mount point, we just move
+# the directory out of the way.
+#
+# If it exists but is not a directory, we move it out of the way.
+#
+sub RecreateDir($$)
+{
+    my ($dir,$docreate) = @_;
+
+    #
+    # If path is a directory and already exists, we need to get rid of it.
+    # If it is a mount point, unmount it.  Otherwise, rename it.
+    #
+    if (-d "$dir") {
+	if (system("umount $dir") == 0) {
+	    # was a mounted FS, need to remove it from fstab if present
+	    mysystem("sed -i '.orig' -E '\\;\[\[:space:\]\]$TBDIR\[\[:space:\]\];d' /etc/fstab");
+	}
+	# remove it if it is empty
+	rmdir("$dir");
+    }
+
+    #
+    # At this point, if the target still exists (directory or not)
+    # we have to move it out of the way.  If that fails, we die.
+    #
+    if (-e "$dir") {
+	mysystem("mv $dir $dir.old.$$");
+    }
+
+    #
+    # Finally, make the directory
+    #
+    if ($docreate) {
+	mysystem("mkdir -p $dir");
+    }
+}
+
+#
+# Print error and exit.
+#
+sub SetupFatal($)
+{
+    my ($msg) = @_;
+
+    die("*** $0:\n".
+	"    $msg\n");
+}
+
+doboot();

@@ -1,0 +1,99 @@
+#!/usr/bin/perl -w
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use lib '@prefix@/lib';
+
+use GeniCredential;
+use GeniCertificate;
+use GeniAuthority;
+use GeniHRN;
+use GeniResponse;
+use GeniUser;
+use GeniUtil;
+
+sub CreateAdminCredential
+{
+	open(FILE, shift);
+    my $owner_cred = "";
+	my $target_cm_urn = shift;
+    while(<FILE>){
+        $owner_cred .= $_;
+    }
+    close FILE;
+
+	#
+        # Must be an emulab user who is talking to us.
+        # If any of the URN specified is invalid do no accept.
+        if (!GeniHRN::IsValid($target_cm_urn)) {
+            return GeniResponse->MalformedArgsResponse();
+        }
+
+
+	 my $authority = GeniAuthority->Lookup($target_cm_urn);
+        if (!defined($authority)) {
+            print STDERR "Could not find local authority object for $target_cm_urn\n";
+            return GeniResponse->Create(GENIRESPONSE_ERROR);
+        }
+
+        my $signer = $GeniCredential::LOCALCM_FLAG;
+        my $owner_cred_obj = GeniCredential->CreateFromSigned($owner_cred);
+        my $credential = Create($authority,$owner_cred_obj);
+        return GeniResponse->Create(GENIRESPONSE_ERROR)
+            if (!defined($credential));
+        my $policy_excep = XML::LibXML::Element->new( "policy_exceptions" );
+        $policy_excep->setNamespace($GeniUtil::EXTENSIONS_NS, $GeniUtil::EXTENSIONS_PREFIX);
+        my $policy = XML::LibXML::Element->new( "policy" );
+        $policy->appendText("allow_externalusers");
+        $policy->setNamespace($GeniUtil::EXTENSIONS_NS, $GeniUtil::EXTENSIONS_PREFIX);
+        $policy_excep->appendChild($policy);
+
+        $credential->AddExtension($policy_excep);
+        if ($credential->Sign($signer) != 0) {
+            $credential->Delete();
+            print STDERR "Could not sign credential for $authority, $owner_cred\n";
+            return GeniResponse->Create(GENIRESPONSE_ERROR);
+        }   
+
+        return GeniResponse->Create(GENIRESPONSE_SUCCESS,
+                                    $credential->asString());
+
+}
+
+
+sub Create($$$)
+{
+    my ($target, $ownercred) = @_;
+
+    return undef
+	if (! (ref($target) && ref($ownercred)));
+
+    my $self = {};
+    $self->{'uuid'}          = undef;
+    $self->{'valid_until'}   = $target->expires();
+    $self->{'target_uuid'}   = $target->uuid();
+    $self->{'owner_uuid'}    = $ownercred->owner_uuid();
+    # Convenience stuff.
+    $self->{'target_cert'}   = $target->GetCertificate();
+    $self->{'owner_cert'}    = $ownercred->owner_cert();
+    $self->{'string'}        = undef;
+    $self->{'capabilities'}  = undef;
+    $self->{'extensions'}    = undef;
+    $self->{'idx'}	     = undef;	# Only set when stored to DB.
+    bless($self, "GeniCredential");
+
+    return $self;
+}
+
+my $numArgs = $#ARGV + 1;
+if($numArgs !=2) {
+	print "Usage: ./genallow_extcred.pl <user-cred-file> <cm-urn>\n\n";
+}else{
+my $val =  CreateAdminCredential @ARGV; 
+print STDERR $val->{"code"};
+print STDERR $val->{"value"};
+print $val->{"output"};
+}

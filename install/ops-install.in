@@ -763,13 +763,16 @@ Phase "NFSmounts", "Setting up NFS mounts", sub {
     };
     Phase "fstab", "Adding NFS mounts to $FSTAB", sub {
 	DoneIfEdited($FSTAB);
-	my @lines = ("$FSNODE:$USERROOT\t\t$USERROOT\tnfs\trw,nodev,nosuid\t0\t0",
-		     "$FSNODE:$PROJROOT\t\t$PROJROOT\tnfs\trw,nodev,nosuid\t0\t0",
-		     "$FSNODE:$GROUPROOT\t\t$GROUPROOT\tnfs\trw,nodev,nosuid\t0\t0",
-		     "$FSNODE:$SHAREROOT\t\t$SHAREROOT\tnfs\trw,nodev,nosuid\t0\t0");
+	my $nfsopt = "nosuid";
+	$nfsopt .= ",nodev"
+	    if ($FBSD_MAJOR < 7);
+	my @lines = ("$FSNODE:$USERROOT\t\t$USERROOT\tnfs\trw,$nfsopt\t0\t0",
+		     "$FSNODE:$PROJROOT\t\t$PROJROOT\tnfs\trw,$nfsopt\t0\t0",
+		     "$FSNODE:$GROUPROOT\t\t$GROUPROOT\tnfs\trw,$nfsopt\t0\t0",
+		     "$FSNODE:$SHAREROOT\t\t$SHAREROOT\tnfs\trw,$nfsopt\t0\t0");
 	if ($SCRATCHDIR) {
 	    push(@lines,
-		 "$FSNODE:$SCRATCHROOT\t\t$SCRATCHROOT\tnfs\trw,nodev,nosuid\t0\t0");
+		 "$FSNODE:$SCRATCHROOT\t\t$SCRATCHROOT\tnfs\trw,$nfsopt\t0\t0");
 	}
 
 	AppendToFileFatal($FSTAB, @lines);

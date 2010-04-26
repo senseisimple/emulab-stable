@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# Copyright (c) 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -15,69 +15,62 @@ include "common.rnc"
 
 NodeContents &=
   # Component identifiers
-  attribute component_id { text } &
-  attribute component_manager_id { text } &
-  attribute component_name { text }? &
-
-  # Indicates whether the node is in sharing mode: exclusive is true if
-  # the component manager will agree to promise not to share it.
-  attribute exclusive { xsd:boolean } &
+  ComponentName &
+  # Information about the physical location of the node.
+  Location? &
 
   # Indicate whether or not this node is available - the idea is that a
   # full dump of the static physical topology will not include this, but
   # that we can later get updates that include only this attribute (and a
-  # URN)
-  element available { AvailableContents } &
+  # UUID) Just binary for now - probably will include more things, such
+  # as a number of "free slots", later
+  element available { xsd:boolean } &
+
+  # Indicates whether the node is in sharing mode: exclusive is true if
+  # the component manager will agree to promise not to share it.
+  element exclusive { xsd:boolean } &
 
   # Marks this node as a stand-in for a large network rather than a
   # single machine. This means that other CMs can make external
   # references to this node without a corresponding external reference
   # in this advertisement. It also means that it makes sense for
   # multiple physical links to connect to the same interface.
-  element cloud { AnyExtension } &
+  element cloud { empty } &
+
+  element disk_image {
+    DiskImageContents &
+    # Defaults to false
+    attribute default { text }?
+  }* &
 
   # Lists services provided by the CM for this node.
-  element services { ServiceContents } &
-
-  # Node type. This includes both hardware and software elements:
-  HardwareType* &
-  SoftwareType*
-
-AvailableContents =
-  AnyExtension &
-  # Indictates current availability
-  attribute now { xsd:boolean }
+  element services { ServiceContents }
 
 LinkContents &=
   # Component identifiers
-  attribute component_id { text } &
-  attribute component_manager_id { text } &
-  attribute component_name { text }?
+  ComponentName &
+  # Characteristics (bandwidth, latency, loss) which affect traffic.
+  LinkCharacteristics?
 
-InterfaceContents &=
-  attribute component_id { text } &
-  attribute component_name { text }? &
-  element monitoring { MonitoringContents }? &
-  attribute role { "control" | "experimental" | "mixed" }? &
+InterfaceDecl &=
+  ComponentInterfaceDeclName &
+  element monitoring { attribute user_traffic { text }? }? &
+  attribute role { "control" | "experimental" }? &
   attribute public_ipv4 { text }?
 
-MonitoringContents &=
-  AnyExtension &
-  # True if user traffic moves through this interface and is available
-  # for monitoring.
-  attribute user_traffic { xsd:boolean }?
-
-InterfaceRefContents &=
-  attribute component_id { text }
+InterfaceRef &=
+  ComponentInterfaceRefName
 
 # Reference to components managed by other component managers.
-ExternalReferenceContents &=
-  AnyExtension &
-  attribute component_id { text } &
-  attribute component_manager_id { text }?
+# TODO: Merge ComponentInterfaceRefName into just component_id when
+# length restrictions on URNs end.
+ExternalReference = element external_ref {
+  ComponentInterfaceRefName &
+  attribute component_manager_uuid { text }? &
+  attribute component_manager_urn { text }?
+}
 
 ServiceContents &=
-  AnyExtension &
   # Login services include ssh-services, serial consoles, etc.
   element login { LoginServiceContents }* &
 
@@ -89,7 +82,6 @@ ServiceContents &=
   element execute { ExecuteServiceContents }*
 
 LoginServiceContents &=
-  AnyExtension &
   # Authentication mechanism
   attribute authentication { "ssh-keys" } &
   # Access mechanism
@@ -97,19 +89,21 @@ LoginServiceContents &=
   attribute port { text }
 
 InstallServiceContents &=
-  AnyExtension &
   # Type(s) of archives supported
   attribute file_type { "tar.gz" | "tar.bz2" }
 
 ExecuteServiceContents &=
-  AnyExtension &
   # Shell environment allowed
   attribute shell { "sh" }
 
 RSpecContents &=
   attribute type { "advertisement" } &
-  element external_ref {
-    ExternalReferenceContents
-  }*
+  ExternalReference* &
+  BgpPrefix*
+
+BgpPrefix = element bgp_prefix {
+  attribute address { text } &
+  attribute netmask { text }
+}
 
 start = RSpec

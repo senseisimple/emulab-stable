@@ -1,0 +1,22 @@
+#
+# Add a URN field to the certificate table.
+#
+use strict;
+use GeniDB;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    DBSetDefault($dbhandle);
+
+    DBQueryFatal("ALTER TABLE `geni_authorities` " .
+		 "add unique key `urn` (`urn`(256))");
+
+    DBQueryFatal("ALTER TABLE `geni_slices` " .
+    		 "ADD COLUMN `creator_urn` tinytext after creator_uuid")
+        unless DBSlotExists("geni_slices", "creator_urn");
+    
+    return 0;
+}
+1;

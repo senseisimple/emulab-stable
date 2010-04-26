@@ -11,7 +11,7 @@ UNIFIED         = @UNIFIED_BOSS_AND_OPS@
 
 include $(OBJDIR)/Makeconf
 
-BIN_SCRIPTS	= nalloc nfree nodeip readycount 
+BIN_SCRIPTS	= nalloc nfree nodeip readycount subboss_dhcpd_makeconf
 SBIN_SCRIPTS	= avail inuse showgraph if2port backup webcontrol node_status \
                   genelists genelists.proxy dhcpd_makeconf nodelog unixgroups \
 		  dbcheck interswitch dbboot grabron stategraph newwanode \
@@ -72,6 +72,7 @@ boss-install: $(addprefix $(INSTALL_BINDIR)/, $(BIN_SCRIPTS)) \
         $(addprefix $(INSTALL_DIR)/opsdir/lib/, $(USERLIBS))
 
 post-install: 
+	chown root $(INSTALL_BINDIR)/subboss_dhcpd_makeconf
 	chown root $(INSTALL_SBINDIR)/genelists
 	chmod u+s $(INSTALL_SBINDIR)/genelists
 	chown root $(INSTALL_SBINDIR)/dhcpd_makeconf

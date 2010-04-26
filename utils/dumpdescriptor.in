@@ -178,6 +178,7 @@ sub DumpOS($)
     $xmlfields{"features"}        = $osinfo->osfeatures()
 	if (defined($osinfo->osfeatures()) && $osinfo->osfeatures() ne "");
     $xmlfields{"shared"}          = $osinfo->shared();
+    $xmlfields{"mfs"}             = $osinfo->mfs() if ($osinfo->mfs());
     $xmlfields{"mustclean"}       = $osinfo->mustclean();
     $xmlfields{"reboot_waittime"} = $osinfo->reboot_waittime()
 	if (defined($osinfo->reboot_waittime()));

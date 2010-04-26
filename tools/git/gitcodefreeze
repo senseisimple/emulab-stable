@@ -1,0 +1,364 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2009-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+# To set this script up:
+# 1) Copy or link it to .git/hooks/pre-receive in your repository. Make sure
+#    it's world-readable and executable.
+# 2) Set configuration options by editng the values of variables directly
+#    below
+#       OR
+#    Set the simple values with git options: run
+#       git config --add hooks.gitmail.<optname> value
+#       (for example:
+#           git config --add hooks.gitmail.alwaysmail ricci@cs.utah.edu
+# 3) Test it by running it with the -d and -t options, which will not send
+#    mail and will give you a chance to make sure everything looks right
+#
+
+use strict;
+use Getopt::Long;
+sub get_config($$);
+my $CONFIGBASE = "hooks.codefreeze";
+my $GIT = 'git';
+my $MAGIC_BUG_FIX_STRING = 'BUG FIX:';
+
+######################################################################
+# Configuration Options
+# Options that use get_config can be set using 'git config' - if not
+# set, the second parameter is used as the default
+######################################################################
+
+#
+# If debugging is enabled, prints a lot of messages and doesn't actually send
+# mail.
+#
+my $debug = get_config("$CONFIGBASE.debug",undef);
+
+#
+# If set, just picks up the most recent commits instead of reading them from
+# stdin. Note that this one doesn't look in the git config; that wouldn't
+# make any sense.
+#
+my $testmode = undef;
+
+#
+# Command-line options - have to do this before setting other options, since
+# we want to be able to turn on debugging early
+#
+my %opt;
+Getopt::Long::Configure("no_ignore_case");
+if (!GetOptions(\%opt, 'd', 'h', 't', 'T=s', 'o=s@') || @ARGV || $opt{h}) {
+    print STDERR "Usage: gitmail [-h|-d]\n";
+    print STDERR "  -h     this message\n";
+    print STDERR "  -d     enable debugging output and don't send mail\n";
+    print STDERR "  -t     test mode - operate on last 3 commits to master\n";
+    print STDERR "  -T br  like '-t', but use branch 'br' instead of master\n";
+    print STDERR "  -o o=v give option o the value v (may be given multiple\n";
+    print STDERR "         times)\n";
+    exit 1;
+}
+
+my $testbranch = "master";
+if ($opt{d}) { $debug    = 1; }
+if ($opt{t}) { $testmode = 1; }
+if ($opt{T}) { $testmode = 1; $testbranch = $opt{T} }
+
+######################################################################
+# Constants
+######################################################################
+
+#
+# Magic 'hash' that indicates an empty or non-existant rev
+#
+my $EMPTYREV = "0"x40;
+
+#
+# Types of changes
+#
+my $CT_CREATE = "create";
+my $CT_UPDATE = "update";
+my $CT_DELETE = "delete";
+my $CT_FORCED_UPDATE = "force-update";
+
+#
+# Tired of typing this and getting it wrong
+#
+my $STDERRNULL = " 2> /dev/null";
+
+######################################################################
+# Function Prototypes
+######################################################################
+sub change_type($$);
+sub rev_type($);
+sub revparse($);
+sub short_refname($);
+sub debug(@);
+sub rev_string($$);
+
+######################################################################
+# Main Body
+######################################################################
+
+debug("starting");
+
+#
+# Get the actual references
+#
+my @reflines;
+if ($testmode) {
+    #
+    # Provide a simple way to grab some commits - the three most recent ones
+    #
+    @reflines = ("$testbranch~2 $testbranch refs/heads/$testbranch");
+} else {
+    #
+    # Get all of the references that are being pushed from stdin - we do this in
+    # one slurp so that we can detach below
+    #
+    @reflines = <STDIN>;
+    debug("finished reading stdin");
+}
+
+my @bad_commits;
+#
+# Loop over all of the references we got on stdin
+#
+foreach my $refline (@reflines) {
+    my $ref_type;
+    chomp $refline;
+    debug("Read line '$refline'");
+
+    #
+    # Each line we get on stdin gives us an old revision, a new revision, and
+    # a reference (such as the branch name). It's our job to figure out what
+    # happened in the middle
+    #
+    my ($oldrev, $newrev, $refname) = split(/\s+/, $refline);
+
+    if ($refname =~ m#refs/tags/#) {
+	    $ref_type = 'tag';
+    } elsif ($refname =~ m#refs/heads/#) {
+	    $ref_type = 'branch';
+    }
+
+    # Skip if not a branch, or if branch isn't supposed to be frozen
+    next if ($ref_type ne 'branch');
+    my $short_ref = short_refname($refname);
+    if (get_config("branch.$short_ref.codefreeze", 'false') ne 'true') {
+	    next;
+    }
+
+    #
+    # Use rev-parse so that fancy symbolic names, etc. can be used
+    # Note: revparse can die if the name given is bogus
+    #
+    $oldrev = revparse($oldrev);
+    $newrev = revparse($newrev);
+
+    #
+    # Figure out what type of change occured (update, creation, deletion, etc.)
+    # and what type of objects (commit, tree, etc.) we got
+    #
+    my $ct = change_type($oldrev,$newrev);
+    my $old_type = rev_type($oldrev);
+    my $new_type = rev_type($newrev);
+
+    debug("Change type: $ct ($old_type,$new_type)");
+
+    #
+    # For now, only handle commits that update existing branches or make
+    # new ones
+    #
+    if ($new_type ne "commit") {
+        debug("Skipping non-commit");
+        next;
+	# FIXME should we return something?
+    }
+
+    # Make sure all commits (except merges) have magic
+    # bugfix string.
+    open GIT, "$GIT log --pretty='%H %P -- %s' $oldrev..$newrev|" or die
+    	"Couldn't run 'git log': $!\n";
+    while (<GIT>) {
+	    chomp;
+	    /^([A-Za-z0-9]+)\s+([A-Za-z0-9\s]+)\s+--\s+(.*)$/;
+	    my ($commit, $tmp, $subject) = ($1, $2, $3);
+	    my @parents = split /\s+/, $tmp;
+
+	    if ($subject !~ /^$MAGIC_BUG_FIX_STRING/ && @parents <= 1) {
+	    	    push @bad_commits, "$commit  $refname  $subject";
+	    }
+    }
+    close GIT;
+}
+
+if (@bad_commits) {
+    print STDERR "Error: your push has been rejected because the following commits do not have " .
+	"\'$MAGIC_BUG_FIX_STRING\' at the start of the subject line:\n\n";
+    print STDERR "$_\n" for @bad_commits;
+
+    print STDERR "\nPlease fix them and try pushing again.\n";
+
+    exit(1);
+}
+
+debug("finishing");
+
+######################################################################
+# Functions
+######################################################################
+
+#
+# Does this change represent the creation, deletion, or update of an object?
+# Takes old and new revs
+#
+sub change_type($$) {
+    my ($oldrev, $newrev) = @_;
+
+    #
+    # We can detect creates and deletes by looking for a special 'null'
+    # revision
+    #
+    if ($oldrev eq $EMPTYREV) {
+        return $CT_CREATE;
+    } elsif ($newrev eq $EMPTYREV) {
+        return $CT_DELETE;
+    } else {
+        my $merge_base = get_merge_base($oldrev,$newrev);
+	my $oldrev = revparse($oldrev);
+	if ($merge_base eq $oldrev) {
+            return $CT_UPDATE;
+	} else {
+            return $CT_FORCED_UPDATE;
+	}
+    }
+}
+
+#
+# Find out what type an object has
+#
+sub rev_type($) {
+    my ($rev) = @_;
+    my $rev_type = `git cat-file -t '$rev' $STDERRNULL`;
+    chomp $rev_type;
+    return $rev_type;
+}
+
+#
+# Parse (possibly) symbolic revision name into hash
+# Note: Dies if the revision name is bogus!
+#
+sub revparse($) {
+    my ($rev) = @_;
+    open(RP,"$GIT rev-parse $rev $STDERRNULL |");
+    my $parsedrev = <RP>;
+    my $okay = close(RP);
+    if (!$okay) {
+        die "gitmail: $rev is not a valid revision\n";
+    }
+    chomp $parsedrev;
+    return $parsedrev;
+}
+
+#
+# Given two revisions, return a list of the files that were changed between
+# them
+#
+#
+# Return only the unique elements of the supplied list. Input does not have
+# to be sorted, sort order of output is undefined.
+#
+sub uniq(@) {
+    my %uniq;
+    map { $uniq{$_} = 1 } @_;
+    return keys %uniq;
+}
+
+#
+# Given a full refname, pull off the last part for pretty printing
+#
+sub short_refname($) {
+    my ($ref) = @_;
+    my $refname = `git rev-parse --abbrev-ref $ref $STDERRNULL`;
+    chomp $refname;
+
+    # This shouldn't be necessary, but return the full ref if
+    # rev-parse doesn't return anything.
+    $refname = $ref if (!$refname);
+    return $refname;
+}
+
+#
+# Print only if in debug mode
+#
+sub debug(@) {
+    if ($debug) {
+        print STDERR "*** gitmail: ", @_, "\n";
+    }
+}
+
+#
+# Return either the config value associated with the repo or the second
+# argument, which supplies the default.
+#
+sub get_config($$) {
+    my ($var,$default) = @_;
+
+    #
+    # Allow the user to override on command line
+    #
+    if ($opt{o}) {
+        foreach my $pair (@{$opt{o}}) {
+            my ($name,$value) = split /=/, $pair;
+            if ($name eq $var) {
+                debug("Using config value $value for $name from command line");
+                return $value;
+            }
+        }
+    }
+
+    my $value = `git config $var`;
+    chomp $value;
+    if ($value ne "") {
+        debug("Got $value from git config for $var");
+        return $value;
+    } else {
+        debug("Using " , defined($default)?$default : "(undef)" , " for $var");
+        return $default;
+    }
+}
+
+#
+# Return an appropriate string to get a revision: if the ref was created or
+# deleted, this looks a little different
+#
+sub rev_string($$) {
+    my ($oldrev, $newrev) = @_;
+    my $ct = change_type($oldrev,$newrev);
+    if ($ct eq $CT_UPDATE) {
+        return "$oldrev..$newrev";
+    } elsif ($ct eq $CT_CREATE) {
+        return $newrev;
+    } elsif ($ct eq $CT_DELETE) {
+        return $oldrev;
+    } else {
+        # Shouldn't be able to get here
+        return undef;
+    }
+}
+
+#
+# Returns the merge base (i.e., common ancestor) of
+# the two supplied revisions.
+#
+sub get_merge_base($$)
+{
+	my ($rev_a, $rev_b) = @_;
+	my $mb = `git merge-base '$rev_a' '$rev_b'`;
+	chomp $mb;
+
+	return $mb
+}

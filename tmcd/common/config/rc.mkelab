@@ -135,7 +135,7 @@ my $WINSUPPORT = 1;
 # Whether installation of all collab tools should be disabled.
 # XXX here for compat; replaced by emulabconfig option.
 #
-my $NOCOLLAB   = 0;
+my $NOCOLLAB   = 1;
 
 #
 # Enable elvin compatibility.
@@ -379,12 +379,21 @@ sub doboot()
 	if ($emulabconfig{"ROLE"} eq "boss+router");
 
     #
-    # XXX temporary: adjust package info.
+    # XXX not-so-temporary: adjust package info.
     #
-    # The defaults are in sitevars passed via emulabconfig,
-    # but they are almost always wrong...
+    # There are defaults in sitevars passed via emulabconfig,
+    # but they are almost always wrong...  So we ALWAYS override them
+    # here; packages are just too intimately tied to the OS version.
     #
-    if ($FBSD_VERSION == 5.4) {    
+    if ($FBSD_VERSION == 4.10) {
+	$emulabconfig{FS_PKG_DIR}   = "/share/freebsd/4.10/packages";
+	$emulabconfig{OPS_PKG_DIR}  = "/share/freebsd/4.10/packages";
+	$emulabconfig{BOSS_PKG_DIR} = "/share/freebsd/4.10/packages";
+	$emulabconfig{FS_PKG}       = "emulab-fs-1.4";
+	$emulabconfig{OPS_PKG}      = "emulab-ops-1.4";
+	$emulabconfig{BOSS_PKG}     = "emulab-boss-1.4";
+    }
+    elsif ($FBSD_VERSION == 5.4) {    
 	$emulabconfig{FS_PKG_DIR}   = "/share/freebsd/5.4/packages";
 	$emulabconfig{OPS_PKG_DIR}  = "/share/freebsd/5.4/packages";
 	$emulabconfig{BOSS_PKG_DIR} = "/share/freebsd/5.4/packages";
@@ -1480,6 +1489,8 @@ sub SetupBossNode()
 	print "Removing conflicting packages.\n";
 	mysystem("pkg_delete -r -x mysql-client")
 	    if (-e "/usr/local/bin/mysql");
+	mysystem("pkg_delete -x net-snmp")
+	    if (-e "/usr/local/include/net-snmp");
     
 	print "Installing the boss metaport.\n";
 	RecreateDir("/usr/ports", 1);
@@ -1544,15 +1555,17 @@ sub SetupBossNode()
     print RC "linux_enable=\"YES\"\n";
     print RC "accounting_enable=\"YES\"\n";
 
-#    print RC "rpcbind_enable=\"YES\"\n";
-#    print RC "mountd_enable=\"YES\"\n";
-#    print RC "nfs_server_enable=\"YES\"\n";
-#    print RC "nfs_server_flags=\"-u -t -n 8\"\n";
     print RC "nfs_client_enable=\"YES\"\n";
+
+    #
+    # Disable TSO.  It causes horrific xmit throughput with divert sockets.
+    # See: http://www.freebsd.org/cgi/query-pr.cgi?pr=121257
+    #
+    my $tso = "-tso";
 
     print RC "network_interfaces=\"$outer_controlif\"\n";
     print RC "ifconfig_${outer_controlif}=".
-	"\"inet $outer_ip netmask $outer_netmask\"\n";
+	"\"inet $outer_ip netmask $outer_netmask $tso\"\n";
 
     if (! $emulabconfig{"CONFIG_SINGLECNET"}) {
 	print RC "network_interfaces=\"\$network_interfaces $inner_controlif\"\n";
@@ -1636,6 +1649,13 @@ sub SetupBossNode()
     }
 
     #
+    # INNER OPS DEPENDENCY: boss-install eventually wants to NFS mount
+    # the filesystems on ops/fs, so at this point the ops/fs filesystems
+    # should be populated and exported.  We do as much as possible before
+    # this point, to maximize potential parallel setup of boss and ops.
+    #
+
+    #
     # Create the boss node. This will also install the software.
     #
     $ENV{"PKG_PATH"} = "/packages";
@@ -1663,86 +1683,11 @@ sub SetupBossNode()
 	    if (-e "/usr/local/sbin/rndc");
     }
 
-    if ($emulabconfig{"LOAD_MFS"}) {
-	#
-	# Unpack the tftpboot directory. It would be nice if this was part
-	# of boss install too. 
-	#
-	print "Copying over tftpboot tar file from web server and unpacking\n";
-	mysystem("wget -q -O $stuffdir/tftpboot.tar.gz ".
-		 "http://${bossname}/downloads/".
-		 $emulabconfig{"MFSTARBALL"});
-
-	mysystem("tar xzf $stuffdir/tftpboot.tar.gz -C /tftpboot");
-
-	#
-	# Its the generic stuff; must localize.
-	#
-	my $fv = $emulabconfig{"MFSVERSION"};
-	if (! -e "/tftpboot/freebsd${fv}") {
-	    $fv = "47";
-	}
-	my $pdir = ".";
-	if (-d "/tftpboot/pxeboot${fv}") {
-	    $pdir = "pxeboot${fv}";
-	}
-	my $cons = $emulabconfig{"MFSCONSOLE"};
-	if (! -e "/tftpboot/$pdir/pxeboot.emu-${cons}") {
-	    $cons = "sio";
-	}
-
-	mysystem("cd /tftpboot; mv $pdir/pxeboot.emu-${cons} pxeboot.emu");
-	print "Using ${cons} version of pxeboot...\n";
-
-	mysystem("cd /tftpboot; mv freebsd${fv} freebsd");
-	print "Using freebsd${fv} version of admin MFS...\n";
-
-	mysystem("cd /tftpboot; mv frisbee${fv} frisbee");
-	print "Using frisbee${fv} version of disk load MFS...\n";
-
-	#
-	# Have recently added a 6.2 based newnode MFS
-	#
-	if (! -e "/tftpboot/freebsd.newnode") {
-	    $fv = $emulabconfig{"MFSVERSION"};
-	    if (! -e "/tftpboot/freebsd${fv}.newnode") {
-		$fv = "47";
-	    }
-	    mysystem("cd /tftpboot; mv freebsd${fv}.newnode freebsd.newnode");
-	    print "Using freebsd${fv}.newnode version of newnode MFS...\n";
-	}
-
-	#
-	# XXX at Utah, many of our node types use a Linux-based boot/setup path
-	# (pxeboot & MFSes) that we don't currently load into inner elabs.
-	# To compensate, we do some inner DB munging (in the elabinelab_boss
-	# script).  However, due to either a bug or a feature, when a node gets
-	# redirected from real boss to the inner boss by the outer dhcpd, the
-	# node continues to use the "filename" spec returned by the outer
-	# dhcpd.  This may point to the Linux (actually grub) pxeboot which
-	# doesn't exist inside.  We take care of this here (where we are root)
-	# by creating a symlink.
-	#
-	mysystem("cd /tftpboot; rm -rf pxeboot_grub2pxe; ".
-		 "ln -s pxeboot.emu pxeboot_grub2pxe");
-    }
-
     #
-    # Copy the inner SSL cert and root's public ssh keys to the MFSes
-    # so that they will talk to the inner boss properly.
-    # At Berkeley the frisbee MFS copies these to disk images,
-    # needing changes to slicefix, which always needs to be run now.
+    # Setup up MFSes in /tftpboot.  Must be done after boss-install as
+    # it needs the inner .pem files.
     #
-    MungeMfsRoot("frisbee");
-    MungeMfsRoot("freebsd");
-    MungeMfsRoot("freebsd.newnode");
-
-    #
-    # Finally, create the compressed versions of the MFS files
-    #
-    mysystem("cd /tftpboot/frisbee/boot; ./prepare; ".
-	     "cd /tftpboot/freebsd/boot; ./prepare; ".
-	     "cd /tftpboot/freebsd.newnode/boot; ./prepare");
+    SetupMFS($stuffdir);
 
     #
     # Copy the creators ssl certificate into place. This allows the
@@ -1799,8 +1744,25 @@ sub SetupBossNode()
     #
     # Hmm, need to run this at startup though.
     #
-    mysystem("echo '/usr/local/etc/emulab/rc/rc.inelab' ".
-	     "   >> /etc/rc.local");
+    # XXX we used to append this to /etc/rc.local but that file is
+    # executed before many critical services (such as sshd!) have been
+    # started.  So we need to push this as late as possible, which we do
+    # with a glorious file naming hack.  This late start is important for
+    # the inner boss node because the outer boss elabinelab script SSHs into
+    # the inner boss to invoke node_statewait after it has been informed that
+    # the inner boss is up.  We can't have the inner boss reporting in before
+    # it has even started sshd!
+    #
+    my $rcfile;
+    if (-d "/usr/local/etc/rc.d") {
+	$rcfile = "/usr/local/etc/rc.d/zzz-inelab.sh";
+	mysystem("echo '#!/bin/sh' > $rcfile");
+	mysystem("echo '# Auto generated by rc.mkelab' >> $rcfile");
+	chmod(0755, $rcfile);
+    } else {
+	$rcfile = "/etc/rc.local";
+    }
+    mysystem("echo '/usr/local/etc/emulab/rc/rc.inelab' >> $rcfile");
 }
 
 #
@@ -2102,6 +2064,78 @@ sub CreateDefsFile($)
     close(OUTDEFS);
     mysystem("cat /tmp/defs-elabinelab");
     mysystem("mv -f /tmp/defs-elabinelab $defsfile");
+}
+
+sub SetupMFS($)
+{
+    my ($stuffdir) = @_;
+
+    if ($emulabconfig{"LOAD_MFS"}) {
+	#
+	# Unpack the tftpboot directory. It would be nice if this was part
+	# of boss install too. 
+	#
+	print "Copying over tftpboot tar file from web server and unpacking\n";
+	mysystem("wget -q -O $stuffdir/tftpboot.tar.gz ".
+		 "http://$bossname/downloads/".
+		 $emulabconfig{"MFSTARBALL"});
+
+	mysystem("tar xzf $stuffdir/tftpboot.tar.gz -C /tftpboot");
+
+	#
+	# Its the generic stuff; must localize.
+	#
+	my $fv = $emulabconfig{"MFSVERSION"};
+	if (! -e "/tftpboot/freebsd${fv}") {
+	    $fv = "47";
+	}
+	my $pdir = ".";
+	if (-d "/tftpboot/pxeboot${fv}") {
+	    $pdir = "pxeboot${fv}";
+	}
+	my $cons = $emulabconfig{"MFSCONSOLE"};
+	if (! -e "/tftpboot/$pdir/pxeboot.emu-${cons}") {
+	    $cons = "sio";
+	}
+
+	mysystem("cd /tftpboot; mv $pdir/pxeboot.emu-${cons} pxeboot.emu");
+	print "Using ${cons} version of pxeboot...\n";
+
+	mysystem("cd /tftpboot; mv freebsd${fv} freebsd");
+	print "Using freebsd${fv} version of admin MFS...\n";
+
+	mysystem("cd /tftpboot; mv frisbee${fv} frisbee");
+	print "Using frisbee${fv} version of disk load MFS...\n";
+
+	#
+	# Older tarballs didn't have FBSD-specific versions of newnode MFS.
+	#
+	if (! -e "/tftpboot/freebsd.newnode") {
+	    $fv = $emulabconfig{"MFSVERSION"};
+	    if (! -e "/tftpboot/freebsd${fv}.newnode") {
+		$fv = "47";
+	    }
+	    mysystem("cd /tftpboot; mv freebsd${fv}.newnode freebsd.newnode");
+	    print "Using freebsd${fv}.newnode version of newnode MFS...\n";
+	}
+    }
+
+    #
+    # Copy the inner SSL cert and root's public ssh keys to the MFSes
+    # so that they will talk to the inner boss properly.
+    # At Berkeley the frisbee MFS copies these to disk images,
+    # needing changes to slicefix, which always needs to be run now.
+    #
+    MungeMfsRoot("frisbee");
+    MungeMfsRoot("freebsd");
+    MungeMfsRoot("freebsd.newnode");
+
+    #
+    # Finally, create the compressed versions of the MFS files
+    #
+    mysystem("cd /tftpboot/frisbee/boot; ./prepare; ".
+	     "cd /tftpboot/freebsd/boot; ./prepare; ".
+	     "cd /tftpboot/freebsd.newnode/boot; ./prepare");
 }
 
 sub MungeMfsRoot($)

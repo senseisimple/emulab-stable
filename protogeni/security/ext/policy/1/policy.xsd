@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Your extension should have its own namespace to disambiguate it from
+  others. 
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" targetNamespace="http://www.protogeni.net/resources/credential/ext/policy/1.0" xmlns:policy="http://www.protogeni.net/resources/credential/ext/policy/1.0">
+  <!--
+    This is meant to specify maximum sliver lifetime, 
+    that will be honored by the CM. It takes precedence over 
+    the default limit imposed by CM on all users.
+  -->
+  <xs:element name="max_sliver_lifetime" type="xs:integer"/>
+  <!--
+    It is meant to specify exception limits to resource allocation
+    at the granularity of node type.
+  -->
+  <xs:element name="component_type">
+    <xs:complexType>
+      <xs:attribute name="type" use="required" type="xs:string"/>
+      <xs:attribute name="count" use="required" type="xs:string"/>
+    </xs:complexType>
+  </xs:element>
+  <!--
+    It allows CM to limit the total number of components allocated
+    to a user within a slice.
+  -->
+  <xs:element name="max_components">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element minOccurs="0" maxOccurs="unbounded" ref="policy:component_type"/>
+      </xs:sequence>
+      <xs:attribute name="limit" use="required" type="xs:integer"/>
+    </xs:complexType>
+  </xs:element>
+  <!--
+    policy exceptions enable CM to let specific users 
+    pass through certain policies.
+  -->
+  <xs:element name="policy_exceptions">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element minOccurs="0" maxOccurs="unbounded" ref="policy:policy"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="policy" type="xs:string"/>
+  <!-- All of the above are extensions specified in credential. -->
+</xs:schema>

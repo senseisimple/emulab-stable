@@ -1328,8 +1328,15 @@ CustomLog @prefix@/log/apache_ssl_request_log \
 SSLCACertificateFile @prefix@/etc/genica.bundle
 # Another bundle of CRLs.
 SSLCARevocationFile @prefix@/etc/genicrl.bundle
-# Default this to none so that regular web server requests pass.
-SSLVerifyClient none
+#
+# THIS HAS TO BE optional! Why? Cause recent security patches disables SSL
+# renegotiation, which is needed when a subdir turns on ssl client
+# verification (as we used to). Now, we set it to "optional",
+# which avoids the renegotiation problem. The backend scripts MUST
+# check their environment to ensure they are always invoked by a client
+# supplying a verifiable certificate. 
+#
+SSLVerifyClient optional
 
 # Reject the unencrypted certs that all users get. 
 <Location />
@@ -1347,18 +1354,16 @@ ScriptAlias /protogeni/xmlrpc/am @prefix@/protogeni/xmlrpc/geni-am.pl
 	SSLRequireSSL
 	Order deny,allow
 	allow from all
-	SSLVerifyClient require
 	SSLVerifyDepth  5
 </Directory>
 <Directory "@prefix@/protogeni/">
 	SSLRequireSSL
 	Order deny,allow
 	allow from all
-	SSLOptions +StdEnvVars
+	SSLOptions +StdEnvVars +ExportCertData
 	Options +ExecCGI +FollowSymLinks
 	SetHandler cgi-script
 	SetEnv USER "nobody"
-	SSLVerifyClient require
 	SSLVerifyDepth  5
 </Directory>
 </IfDefine>

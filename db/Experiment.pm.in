@@ -297,6 +297,12 @@ sub AUTOLOAD {
     return undef;
 }
 sub dbrow($$)     { return $_[0]->{'EXPT'}; }
+sub locked($)     { return $_[0]->expt_locked(); }
+sub elabinelab($) { return $_[0]->elab_in_elab(); }
+sub description($){ return $_[0]->expt_name(); }
+sub creator($)    { return $_[0]->expt_head_uid(); }
+sub created($)	  { return $_[0]->expt_created(); }
+sub swapper($)	  { return $_[0]->expt_swap_uid(); }
 
 # Break circular reference someplace to avoid exit errors.
 sub DESTROY {
@@ -3136,7 +3142,7 @@ sub RemovePhysicalState($)
 
 	# Interfaces table is special. Also cleaned in nfree.
 	DBQueryWarn("update interfaces set IP='',IPaliases=NULL,mask=NULL,".
-		    "       rtabid='0',vnode_id=NULL " .
+		    "       rtabid='0',vnode_id=NULL,current_speed='0' " .
 		    "where ($clause) and ".
 		    "       role='" . TBDB_IFACEROLE_EXPERIMENT() . "' ")
 	    or $errors++;

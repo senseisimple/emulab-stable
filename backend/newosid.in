@@ -139,6 +139,7 @@ my %xmlfields =
      "magic",		=> ["magic",		$SLOT_OPTIONAL,	   ""],
      "op_mode",		=> ["op_mode",		$SLOT_REQUIRED],
      "features",	=> ["osfeatures",	$SLOT_OPTIONAL,	   ""],
+     "mfs",		=> ["mfs",		$SLOT_ADMINONLY,   0],
      "shared",		=> ["shared",		$SLOT_ADMINONLY,   0],
      "mustclean",	=> ["mustclean",	$SLOT_ADMINONLY,   1],
      "nextosid",	=> ["nextosid",		$SLOT_ADMINONLY],

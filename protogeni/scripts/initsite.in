@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -38,7 +38,6 @@ my $NEWUSER	  = "$TB/sbin/newuser";
 my $NEWPROJ	  = "$TB/sbin/newproj";
 my $MKPROJ	  = "$TB/sbin/mkproj";
 my $TBACCT	  = "$TB/sbin/tbacct";
-my $MKCERTS	  = "$TB/sbin/protogeni/createcerts";
 my $ADDAUTHORITY  = "$TB/sbin/protogeni/addauthority";
 my $GETCACERTS    = "$TB/sbin/protogeni/getcacerts";
 my $POSTCRL       = "$TB/sbin/protogeni/postcrl";
@@ -192,12 +191,15 @@ if (!$asch && ! -e "$TB/etc/.federated") {
 #
 # Packages.
 #
-my %packlist = ("libxml2>=2.6.26"       => "/usr/ports/textproc/libxml2",
-		"p5-Frontier-RPC"       => "/usr/ports/net/p5-Frontier-RPC",
-		"p5-XML-LibXML>=1.70"   => "/usr/ports/textproc/p5-XML-LibXML",
-		"xmlsec1"               => "/usr/ports/security/xmlsec1",
-		"p5-Crypt-SSLeay>=0.57" => "/usr/ports/security/p5-Crypt-SSLeay"
-		);
+my %packlist =
+    ("libxml2>=2.6.26"       => "/usr/ports/textproc/libxml2",
+     "p5-Frontier-RPC"       => "/usr/ports/net/p5-Frontier-RPC",
+     "p5-XML-LibXML>=1.70"   => "/usr/ports/textproc/p5-XML-LibXML",
+     "xmlsec1"               => "/usr/ports/security/xmlsec1",
+     "p5-Crypt-SSLeay>=0.57" => "/usr/ports/security/p5-Crypt-SSLeay",
+     "p5-Crypt-OpenSSL-X509" => "/usr/ports/security/p5-Crypt-OpenSSL-X509",
+     "p5-Crypt-X509"         => "/usr/ports/security/p5-Crypt-X509"
+     );
 my $needpkgs = 0;
 
 foreach my $pkgname (sort(keys(%packlist))) {

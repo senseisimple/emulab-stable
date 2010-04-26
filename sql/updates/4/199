@@ -1,0 +1,27 @@
+#
+# Create the subbosses table so that we can determine which subboss provides
+# a particular service to a node.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (!DBTableExists("subbosses")) {
+	DBQueryFatal( "CREATE TABLE subbosses (" .
+		     "  `node_id` varchar(32) NOT NULL default ''," .
+		     "  `service` varchar(20) NOT NULL default ''," .
+		     "  `subboss_id` varchar(20) NOT NULL default ''," .
+		     "  PRIMARY KEY  (`node_id`,`service`)" .
+		     ") ENGINE=MyISAM DEFAULT CHARSET=latin1;");
+    }
+    DBQueryFatal("alter table reserved change erole erole " .
+		 "  enum('node','virthost','delaynode','simhost', " .
+		 "  'sharedhost', 'subboss') NOT NULL default 'node'");
+    
+    return 0;
+}
+1;
+

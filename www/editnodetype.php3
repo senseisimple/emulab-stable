@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -31,6 +31,8 @@ $optargs = OptionalPageArguments("submit",     PAGEARG_STRING,
 				 "new_type",   PAGEARG_STRING,
 				 # Optional if new_type, required if not.
 				 "node_type",  PAGEARG_STRING,
+				 # Optional if new_type
+				 "node_class", PAGEARG_STRING,
 
 				 # Attribute creation and deletion.
 				 "deletes",    PAGEARG_ARRAY,
@@ -39,6 +41,7 @@ $optargs = OptionalPageArguments("submit",     PAGEARG_STRING,
 				 "newattribute_name",  PAGEARG_STRING,
 				 "newattribute_value", PAGEARG_ANYTHING);
 if (!isset($node_type)) { $node_type = ""; }
+if (!isset($node_class)) { $node_class = "pc"; }
 if (!isset($attributes)) { $attributes = array(); }
 if (!isset($deletes)) { $deletes = array(); }
 
@@ -59,6 +62,13 @@ if ($freebsd_mfs == null || $default_image == null ||
 }
 
 # This belongs elsewhere!
+$initial_switch_attributes = array(
+    array("attrkey" => "imageable", "attrvalue" => "0",
+	  "attrtype" => "boolean"),
+    array("attrkey" => "rebootable", "attrvalue" => "0",
+	  "attrtype" => "boolean"),
+    );
+
 $initial_attributes = array(
     array("attrkey" => "adminmfs_osid", "attrvalue" => $freebsd_mfs->osid(),
 	  "attrtype" => "integer"),
@@ -141,13 +151,6 @@ function SPITFORM($node_type, $formfields, $attributes, $deletes, $errors)
     #
     if (! isset($new_type)) {
 	PAGEHEADER("Edit Node Type");
-
-	echo "<font size=+2>Node Type <b>".
-              "<a href='shownodetype.php3?node_type=$node_type'>$node_type
-                 </a></b>\n".
-	       "</font>\n";
-
-	echo "<br><br>\n";
     }
     else {
 	PAGEHEADER("Create Node Type");
@@ -303,6 +306,16 @@ function SPITFORM($node_type, $formfields, $attributes, $deletes, $errors)
              </td>
           </tr>\n";
 
+    echo "<tr>
+             <td colspan=2>isswitch:</td>
+             <td class=left>
+                 <input type=text
+                        name=\"formfields[isswitch]\"
+                        value=\"" . $formfields["isswitch"] . "\"
+	                size=2>
+             </td>
+          </tr>\n";
+
     #
     # Now do attributes.
     #
@@ -412,11 +425,14 @@ if (isset($new_type)) {
     #
     # Starting a new node type - give some reasonable defaults
     #
-    $defaults = array("class" => "pc", "isvirtnode" => 0,
+    $defaults = array("class" => $node_class, "isvirtnode" => 0,
 		      "isremotenode" => 0, "issubnode" => 0,
 		      "isplabdslice" => 0, "isjailed" => 0, "isdynamic" => 0,
-		      "issimnode" => 0, "isgeninode" => 0, "isfednode" => 0);
-
+		      "issimnode" => 0, "isgeninode" => 0, "isfednode" => 0,
+                      "isswitch" => ($node_class == "switch" ? 1 : 0));
+    if ($node_class == "switch") {
+        $initial_attributes = $initial_switch_attributes;
+    }
     $default_attributes = array();
     $attribute_types = array();
     $attribute_deletes = array();
@@ -624,6 +640,11 @@ if (isset($formfields["isgeninode"]) && $formfields["isgeninode"] != "") {
 # isfednode
 if (isset($formfields["isfednode"]) && $formfields["isfednode"] != "") {
     $args["isfednode"] = $formfields["isfednode"];
+}
+
+# isswitch
+if (isset($formfields["isswitch"]) && $formfields["isswitch"] != "") {
+    $args["isswitch"] = $formfields["isswitch"];
 }
 
 # Existing attributes.

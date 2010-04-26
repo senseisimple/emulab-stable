@@ -1299,7 +1299,7 @@ sub doSwapin($) {
     # the step has completed and 2) It's OK for the command to run in
     # parallel with os_setup (no DB dependencies, etc.)
     #
-    if (!$experiments->skipvlans() &&
+    if (!$experiment->skipvlans() &&
 	($type != MODIFY || ($ELABINELAB || !$MAINSITE || !$special))) {
 	print "Setting up VLANs.\n";
 	TBDebugTimeStamp("snmpit started");
@@ -1423,12 +1423,17 @@ sub doSwapin($) {
     #
     # Do linktest if user requested it at swapin.
     #
+    # We don't run linktest on elabinelabs since there may be no network
+    # (i.e., in the "single control network" case) and inner nodes are
+    # going to be sitting in PXEWAIT.
+    #
     my $query_result =
 	DBQueryFatal("select linktest_level,linktest_pid from experiments ".
 		     "where pid='$pid' and eid='$eid'");
     my ($linktest_level,$linktest_pid) = $query_result->fetchrow_array();
 
-    if ($linktest_level && ($type == REAL || $type == MODIFY)) {
+    if (!$elabinelab && $linktest_level &&
+	($type == REAL || $type == MODIFY)) {
 	if ($linktest_pid) {
 	    tbwarn "Linktest is already running! $linktest_pid";
 	}

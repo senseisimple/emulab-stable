@@ -28,6 +28,7 @@ use emutil qw(TBGetUniqueIndex);
 use English;
 use overload ('""' => 'Stringify');
 use XML::Simple;
+use Date::Parse;
 
 # Configure variables
 my $TB		   = "@prefix@";
@@ -177,6 +178,22 @@ sub url($)		{ return field($_[0], "url"); }
 sub cert($)		{ return $_[0]->{'CERT'}->cert(); }
 sub GetCertificate($)   { return $_[0]->{'CERT'}; }
 sub GetManager($)       { return $_[0]->{'MANAGER'}; }
+
+#
+# Expired?
+#
+sub IsExpired($)
+{
+    my ($self)  = @_;
+    my $expires = $self->expires();
+
+    return 1
+	if (!defined($expires) || $expires eq "");
+    
+    my $when = strptime($expires);
+
+    return ($when < time());
+}
 
 #
 # Return the URN. This is complicated by the fact that the DB does not

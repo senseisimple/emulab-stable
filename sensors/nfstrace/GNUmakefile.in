@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007, 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # This is the Emulab specific makefile.
@@ -32,22 +32,9 @@ PW=/usr/sbin/pw
 NFSTRACE_HOME=/var/nfstrace
 NFSTRACE_DBDIR=/var/db/nfstrace
 
-$(SRCDIR)/nfsdump2/config.status:
-	cd $(SRCDIR)/nfsdump2 && ./configure
-
-make.nfsdump:
-	cd $(SRCDIR)/nfsdump2/ && ./config.status
-	cd $(SRCDIR)/nfsdump2 && $(MAKE)
-
-clean.nfsdump: $(SRCDIR)/nfsdump2/config.status
-	cd $(SRCDIR)/nfsdump2/ && ./config.status
-	cd $(SRCDIR)/nfsdump2 && $(MAKE) clean
-	cd $(SRCDIR)/nfsdump2 && rm -f config.status config.cache
-
-$(SRCDIR)/nfsdump2/nfsdump: $(SRCDIR)/nfsdump2/config.status make.nfsdump
-
-nfsdump: $(SRCDIR)/nfsdump2/nfsdump
-	cp $(SRCDIR)/nfsdump2/nfsdump .
+nfsdump:
+	cd nfsdump2 && $(MAKE)
+	cp nfsdump2/nfsdump2/nfsdump nfsdump
 
 client client-install control-install:
 
@@ -148,5 +135,6 @@ else
 fs-install install:
 endif
 
-clean:	clean.nfsdump
+clean:
+	cd nfsdump2 && $(MAKE) clean
 	rm -f *.o core nfsdump nfstrace.init
