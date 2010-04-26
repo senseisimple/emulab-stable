@@ -29,7 +29,7 @@ sub error($) {
     exit 1;
 }
 
-my $SCRIPT_URL = $ENV{SCRIPT_URL};
+my $SCRIPT_URL = $ENV{REQUEST_URI};
 
 # Parse URL
 my ($proj,$group,$exp,$dir,$file);

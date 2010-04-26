@@ -75,6 +75,7 @@ open O, "| $SSH $TB/libexec/write-vis-auth.proxy"
 
 my $prev_opskey = '';
 while (my ($opskey,$uid) = $db_result->fetchrow_array) {
+    $opskey = "00000000000000000000000000000000" if $opskey eq '';
     print O "$opskey $uid\n";
 }
 
