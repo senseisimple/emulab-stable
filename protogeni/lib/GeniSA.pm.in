@@ -19,6 +19,7 @@ use vars qw(@ISA @EXPORT);
 
 # Must come after package declaration!
 use lib '@prefix@/lib';
+use libtestbed;
 use GeniDB;
 use User;
 use Genixmlrpc;
@@ -40,6 +41,7 @@ use libdb qw(TBGetSiteVar);
 
 # Configure variables
 my $TB		   = "@prefix@";
+my $TBOPS          = "@TBOPSEMAIL@";
 my $OURDOMAIN      = "@OURDOMAIN@";
 my $PGENIDOMAIN    = "@PROTOGENI_DOMAIN@";
 my $SLICESHUTDOWN  = "$TB/sbin/protogeni/shutdownslice";
@@ -67,7 +69,7 @@ sub GetCredential($)
     # and $type automatically deduced from the URN.
     my ($argref) = @_;
     my $uuid = $argref->{'uuid'};
-    my $urn = $argref->{'urn'};
+    my $urn  = $argref->{'urn'};
     my $cred = $argref->{'credential'};
     my $type = $argref->{'type'};
     
@@ -76,27 +78,19 @@ sub GetCredential($)
     # to do other things.
     #
     if (!defined($cred)) {
-	#
-	# Must be an emulab user who is talking to us.
-	#
-	if (! ($ENV{'GENIUUID'} =~ /^[-\w]*$/)) {
-	    return GeniResponse->MalformedArgsResponse();
-	}
-	
-	my $geniuser = GeniUser->Lookup($ENV{'GENIUUID'}, 1);
+	my $geniuser = GeniUser->Lookup($ENV{'GENIURN'}, 1);
 	if (!defined($geniuser)) {
 	    return GeniResponse->Create(GENIRESPONSE_FORBIDDEN,
 					undef, "Who are you?");
 	}
+
 	#
 	# This credential is for access to this SA.
 	#
-	# FIXME We need to update this to use authority and user URNs,
-	# not UUIDs.  But that will require more thought to avoid
-	# breaking stuff.
-	my $authority = GeniAuthority->Lookup($ENV{'MYUUID'});
+	my $authority = GeniAuthority->Lookup($ENV{'MYURN'});
 	if (!defined($authority)) {
-	    print STDERR "Could not find local authority object for $ENV{'MYUUID'}\n";
+	    print STDERR
+		"Could not find local authority object for $ENV{'MYURN'}\n";
 	    return GeniResponse->Create(GENIRESPONSE_ERROR);
 	}
 	my $credential =
@@ -118,38 +112,21 @@ sub GetCredential($)
     return GeniResponse->MalformedArgsResponse()
 	if( defined( $urn ) && !GeniHRN::IsValid( $urn ) );
 
-    my $credential = GeniCredential->CreateFromSigned($cred);
-    if (!defined($credential)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "Could not create GeniCredential object");
-    }
-
-    #
-    # Make sure the credential was issued to the caller.
-    #
-    if ($credential->owner_uuid() ne $ENV{'GENIUUID'}) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "This is not your credential!");
-    }
-    #
-    # And that the target of the credential is this registry.
-    #
-    my $authority = GeniAuthority->Lookup($ENV{'MYUUID'});
+    my $authority = GeniAuthority->Lookup($ENV{'MYURN'});
     if (!defined($authority)) {
 	print STDERR "Could not find local authority object\n";
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
-    if ($credential->target_uuid() ne $authority->uuid()) {
-	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN,
-				    undef, "This is not your registry!");
-    }
-
+    my $credential = CheckCredential($cred, $authority);
+    return $credential
+	if (GeniResponse::IsResponse($credential));
+   
     $credential->HasPrivilege( "authority" ) or
 	$credential->HasPrivilege( "resolve" ) or
 	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
 				     "Insufficient privilege" );
 
-    my $this_user = GeniUser->Lookup($credential->owner_uuid(), 1);
+    my $this_user = GeniUser->Lookup($ENV{'GENIURN'}, 1);
     if (!defined($this_user)) {
 	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN,
 				    undef, "Who are you?");
@@ -201,54 +178,51 @@ sub Resolve($)
     my ($argref) = @_;
     my $uuid = $argref->{'uuid'};
     my $hrn  = $argref->{'hrn'};
+    my $urn  = $argref->{'urn'};
     my $cred = $argref->{'credential'};
     my $type = $argref->{'type'};
 
-    # Allow lookup by uuid or hrn.
-    if (! (defined($uuid) || defined($hrn))) {
+    if (! (defined($uuid) || defined($hrn) || defined($urn))) {
 	return GeniResponse->MalformedArgsResponse();
     }
-    if (defined($uuid) && !($uuid =~ /^[-\w]*$/)) {
+    # URN always takes precedence and all items should now have URNs
+    # in their certificates.
+    if (defined($urn)) {
+	return GeniResponse->MalformedArgsResponse()
+	    if (!GeniHRN::IsValid($urn));
+	$hrn = $uuid = undef;
+    }
+    elsif (defined($hrn) && GeniHRN::IsValid($hrn)) {
+	$urn = $hrn;
+	$hrn = $uuid = undef;
+    }
+    elsif (defined($uuid) && !($uuid =~ /^[-\w]*$/)) {
 	return GeniResponse->MalformedArgsResponse();
     }
-    if (defined($hrn) && !($hrn =~ /^[-\w\.]*$/) &&
-	!GeniHRN::IsValid( $hrn ) ) {
+    elsif (defined($hrn) && !($hrn =~ /^[-\w\.]*$/)) {
 	return GeniResponse->MalformedArgsResponse();
     }
-    if (! (defined($type) && ($type =~ /^(SA|MA|Component|Slice|User)$/i))) {
-	return GeniResponse->MalformedArgsResponse();
+    #
+    # Deprecated (pre-URN) HRN.
+    # XXX Form hrn from the uid and domain. This is backwards.
+    #
+    if (defined($hrn) && !($hrn =~ /\./)) {
+	$hrn = "${PGENIDOMAIN}.${hrn}";
     }
     $type = lc($type);
     if (! defined($cred)) {
 	return GeniResponse->MalformedArgsResponse();
     }
     
-    my $credential = GeniCredential->CreateFromSigned($cred);
-    if (!defined($credential)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "Could not create GeniCredential object");
-    }
-
-    #
-    # Make sure the credential was issued to the caller.
-    #
-    if ($credential->owner_uuid() ne $ENV{'GENIUUID'}) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "This is not your credential!");
-    }
-    #
-    # And that the target of the credential is this registry.
-    #
-    my $authority = GeniAuthority->Lookup($ENV{'MYUUID'});
+    my $authority = GeniAuthority->Lookup($ENV{'MYURN'});
     if (!defined($authority)) {
 	print STDERR "Could not find local authority object\n";
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
-    if ($credential->target_uuid() ne $authority->uuid()) {
-	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN,
-				    undef, "This is not your registry!");
-    }
-
+    my $credential = CheckCredential($cred, $authority);
+    return $credential
+	if (GeniResponse::IsResponse($credential));
+   
     $credential->HasPrivilege( "authority" ) or
 	$credential->HasPrivilege( "resolve" ) or
 	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
@@ -259,33 +233,18 @@ sub Resolve($)
     # allows anyone with a credential for this registry to lookup anyone
     # else. Good feature of the Geni API.
     #
-    my $this_user = GeniUser->Lookup($credential->owner_uuid(), 1);
+    my $this_user = GeniUser->Lookup($ENV{'GENIURN'}, 1);
     if (!defined($this_user)) {
-	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN,
-				    undef, "Who are you?");
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+				    "Who are you? No local record");
     }
+    my $lookup_token = $urn || $hrn || $uuid;
     
     if ($type eq "user") {
-	my $geniuser;
-	
-	if (defined($uuid)) {
-	    $geniuser = GeniUser->Lookup($uuid, 1);
-	}
-	elsif( GeniHRN::IsValid( $hrn ) ) {
-	    $geniuser = GeniUser->Lookup($hrn, 1);
-	} else {
-	    #
-	    # Deprecated (pre-URN) HRN.
-	    # XXX Form hrn from the uid and domain. This is backwards.
-	    #
-	    if (! ($hrn =~ /\./)) {
-		$hrn = "${PGENIDOMAIN}.${hrn}";
-	    }
-	    $geniuser = GeniUser->Lookup($hrn, 1);
-	}
+	my $geniuser = GeniUser->Lookup($lookup_token, 1);
 	if (!defined($geniuser)) {
-	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED,
-					undef, "No one here by that name");
+	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
+					"No one here by that name");
 	}
 
 	my @slices = GeniSlice->LookupByCreator( $geniuser );
@@ -295,6 +254,7 @@ sub Resolve($)
 	# Return a blob.
 	my $blob = { "uid"      => $geniuser->uid(),
 		     "hrn"      => $geniuser->hrn(),
+		     "urn"      => $geniuser->urn(),
 		     "uuid"     => $geniuser->uuid(),
 		     "email"    => $geniuser->email(),
 		     "gid"      => $geniuser->cert(),
@@ -305,23 +265,7 @@ sub Resolve($)
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
     }
     if ($type eq "slice") {
-	my $slice;
-	
-	if (defined($uuid)) {
-	    $slice = GeniSlice->Lookup($uuid);
-	}
-	elsif( GeniHRN::IsValid( $hrn ) ) {
-	    $slice = GeniSlice->Lookup($hrn);
-	} else {
-	    #
-	    # Deprecated (pre-URN) HRN.
-	    # XXX Form hrn from the uid and domain. This is backwards.
-	    #
-	    if (! ($hrn =~ /\./)) {
-		$hrn = "${PGENIDOMAIN}.${hrn}";
-	    }
-	    $slice = GeniSlice->Lookup($hrn);
-	}
+	my $slice = GeniSlice->Lookup($lookup_token);
 	if (!defined($slice)) {
 	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
 					"No such slice registered here");
@@ -336,12 +280,14 @@ sub Resolve($)
 	}
 	# Return a blob.
 	my $blob = { "hrn"          => $slice->hrn(),
+		     "urn"          => $slice->urn(),
 		     "uuid"         => $slice->uuid(),
 		     "creator_uuid" => $slice->creator_uuid(),
+		     "creator_urn"  => $slice->creator_urn(),
 		     "gid"          => $slice->cert(),
 		     "urn"          => GeniHRN::Generate($OURDOMAIN,
 							 "slice",
-							 $slice->slicename() ),
+							 $slice->slicename()),
 		     "component_managers" => \@managers
 		 };
 	$slice->UnLock();
@@ -365,53 +311,54 @@ sub Register($)
     my $cred  = $argref->{'credential'};
     my $type  = $argref->{'type'};
     my $hrn   = $argref->{'hrn'};
+    my $urn   = $argref->{'urn'};
 
-    if (! defined($hrn)) {
+    if (! ((defined($hrn) || defined($urn)) && defined($cred))) {
+	return GeniResponse->MalformedArgsResponse();
+    }
+    if (defined($urn)) {
+	return GeniResponse->MalformedArgsResponse()
+	    if (!GeniHRN::IsValid($urn));
+	$hrn = undef;
+    }
+    elsif (defined($hrn) && GeniHRN::IsValid($hrn)) {
+	$urn = $hrn;
+	$hrn = undef;
+    }
+    elsif (defined($hrn) && !($hrn =~ /^[-\w\.]*$/)) {
+	return GeniResponse->MalformedArgsResponse();
+    }
+    elsif (! ($hrn =~ /^[-\w]+$/)) {
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "hrn: Single token only please");
+    }
+    if (defined($urn)) {
+	my ($auth,$t,$id) = GeniHRN::Parse($urn);
+
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				     "Authority mismatch")
+	    if ($auth ne $OURDOMAIN);
+
+	#
+	# The user can supply a URN, but only the type and id
+	# really matter. The URN is ignored below.
+	#
+	$type = $t;
+	$hrn  = $id;
+    }
+    elsif (!defined($type)) {
 	return GeniResponse->MalformedArgsResponse();
     }
 
-    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				"Invalid URN")
-	if( !GeniHRN::IsValid( $hrn ) && $hrn !~ /^[-\w\.]*$/);
-
-    if( GeniHRN::IsValid( $hrn ) ) {
-	my ($auth,$t,$id) = GeniHRN::Parse( $hrn );
-
-	return GeniResponse->Create( GENIRESPONSE_ERROR, undef,
-				     "Authority mismatch" )
-	    if( $auth ne $OURDOMAIN );
-	
-	$type = $t;
-
-	$hrn = $id;
-    }
-
-    my $credential = GeniCredential->CreateFromSigned($cred);
-    if (!defined($credential)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "Could not create GeniCredential object");
-    }
-
-    #
-    # Make sure the credential was issued to the caller.
-    #
-    if ($credential->owner_uuid() ne $ENV{'GENIUUID'}) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "This is not your credential!");
-    }
-    #
-    # And that the target of the credential is this registry.
-    #
-    my $authority = GeniAuthority->Lookup($ENV{'MYUUID'});
+    my $authority = GeniAuthority->Lookup($ENV{'MYURN'});
     if (!defined($authority)) {
 	print STDERR "Could not find local authority object\n";
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
-    if ($credential->target_uuid() ne $authority->uuid()) {
-	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN,
-				    undef, "This is not your registry!");
-    }
-
+    my $credential = CheckCredential($cred, $authority);
+    return $credential
+	if (GeniResponse::IsResponse($credential));
+   
     $credential->HasPrivilege( "authority" ) or
 	$credential->HasPrivilege( "refresh" ) or
 	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
@@ -422,20 +369,14 @@ sub Register($)
     # allows anyone with a credential for this registry to lookup anyone
     # else. Good feature of the Geni API.
     #
-    my $this_user = GeniUser->Lookup($credential->owner_uuid(), 1);
+    my $this_user = GeniUser->Lookup($ENV{'GENIURN'}, 1);
     if (!defined($this_user)) {
-	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN,
-				    undef, "Who are you?");
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+				    "Who are you? No local record");
     }
     
     if ( lc( $type ) eq "slice") {
-	my $userbindings = $argref->{'userbindings'};
 	my $expires = $argref->{'expiration'};
-	
-	if (! ($hrn =~ /^[-\w]+$/)) {
-	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					"hrn: Single token only please");
-	}
 
 	#
 	# Make sure the user creating the slice is registered at the
@@ -443,21 +384,8 @@ sub Register($)
 	#
 	if ($this_user->Register() != 0) {
 	    print STDERR "Could not register $this_user at clearinghouse\n";
-	    return GeniResponse->Create(GENIRESPONSE_ERROR);
-	}
-	if (0 && defined($userbindings)) {
-	    foreach my $binding_uuid (@{ $userbindings }) {
-		my $binding_user = GeniUser->Lookup($binding_uuid, 1);
-		if (!defined($binding_user)) {
-		    print STDERR "No user $binding_uuid to bind to slice\n";
-		    return GeniResponse->Create(GENIRESPONSE_ERROR);
-		}
-		if ($binding_user->Register() != 0) {
-		    print STDERR
-			"Could not register $binding_user at clearinghouse\n";
-		    return GeniResponse->Create(GENIRESPONSE_ERROR);
-		}
-	    }
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				"Could not register at clearinghouse");
 	}
 
 	#
@@ -502,6 +430,7 @@ sub Register($)
 	}
 	
 	my $urn = GeniHRN::Generate( "@OURDOMAIN@", "slice", $hrn );
+	
 	#
 	# When using this interface, the HRN does not correspond to an
 	# existing experiment in a project. It is just a token to call
@@ -512,6 +441,15 @@ sub Register($)
 	my $hrn = "${PGENIDOMAIN}.${hrn}";
 
 	#
+	# Make sure slice is unique. Locking?
+	#
+	my $tempslice = GeniSlice->Lookup($hrn) || GeniSlice->Lookup($urn);
+	if ($tempslice) {
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					"$urn already a registered slice");
+	}
+	    
+	#
 	# Generate a certificate (and uuid) for this new slice.
 	#
 	my $certificate = GeniCertificate->Create("slice", $urn, $hrn,
@@ -520,20 +458,10 @@ sub Register($)
 	    print STDERR "Could not create new certificate for slice\n";
 	    return GeniResponse->Create(GENIRESPONSE_ERROR);
 	}
-	my $uuid = $certificate->uuid();
 	
-	#
-	# Make sure slice hrn and uuid are unique. Locking?
-	#
-	if (GeniSlice->CheckExisting($hrn, $uuid)) {
-	    $certificate->Delete();
-	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					"$hrn or $uuid already registered");
-	}
 	# Slice is created as locked.
 	my $slice = GeniSlice->Create($certificate,
-				      $credential->owner_uuid(),
-				      $authority, undef, 1);
+				      $this_user, $authority, undef, 1);
 	if (!defined($slice)) {
 	    $certificate->Delete();
 	    print STDERR "Could not create new slice object\n";
@@ -586,97 +514,78 @@ sub Remove($)
     my ($argref) = @_;
     my $uuid = $argref->{'uuid'};
     my $hrn  = $argref->{'hrn'};
+    my $urn  = $argref->{'urn'};
     my $cred = $argref->{'credential'};
     my $type = lc( $argref->{'type'} );
 
-    if( defined( $hrn ) && GeniHRN::IsValid( $hrn ) ) {
-	# this is pretty ugly, but since this section will have to be
-	# cleaned up eventually to remove support for deprecated HRNs,
-	# it will do for now.
-	my ($auth,$t,$id) = GeniHRN::Parse( $hrn );
-
-	return GeniResponse->Create( GENIRESPONSE_ERROR, undef,
-				     "Authority mismatch" )
-	    if( $auth ne $OURDOMAIN );
-
-	$type = lc( $t );
-	
-	$hrn = $id;
-    }
-
-    if (! (defined($uuid) || defined($hrn))) {
+    if (! ((defined($hrn) || defined($urn) || defined($uuid)) &&
+	   defined($cred))) {
 	return GeniResponse->MalformedArgsResponse();
     }
-    if (defined($uuid) && !($uuid =~ /^[-\w]*$/)) {
+    if (defined($urn)) {
+	return GeniResponse->MalformedArgsResponse()
+	    if (!GeniHRN::IsValid($urn));
+	$hrn = $uuid = undef;
+    }
+    elsif (defined($hrn) && GeniHRN::IsValid($hrn)) {
+	$urn = $hrn;
+	$hrn = $uuid = undef;
+    }
+    elsif (defined($uuid) && GeniHRN::IsValid($uuid)) {
+	$urn = $uuid;
+	$hrn = $uuid = undef;
+    }
+    elsif (defined($hrn) && !($hrn =~ /^[-\w\.]*$/)) {
 	return GeniResponse->MalformedArgsResponse();
     }
-    if (defined($hrn) && !($hrn =~ /^[-\w\.]*$/)) {
+    elsif (defined($uuid) && !($uuid =~ /^[-\w]*$/)) {
 	return GeniResponse->MalformedArgsResponse();
-    }
-    if (! (defined($type) && ($type =~ /^(sa|ma|component|slice|user)$/))) {
-	return GeniResponse->MalformedArgsResponse();
-    }
-    if (! defined($cred)) {
-	return GeniResponse->MalformedArgsResponse();
-    }
-    
-    my $credential = GeniCredential->CreateFromSigned($cred);
-    if (!defined($credential)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "Could not create GeniCredential object");
-    }
-
-    #
-    # Make sure the credential was issued to the caller.
-    #
-    if ($credential->owner_uuid() ne $ENV{'GENIUUID'}) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "This is not your credential!");
     }
     #
-    # And that the target of the credential is this registry.
+    # Deprecated (pre-URN) HRN.
+    # XXX Form hrn from the uid and domain. This is backwards.
     #
-    my $authority = GeniAuthority->Lookup($ENV{'MYUUID'});
+    if (defined($hrn) && !($hrn =~ /\./)) {
+	$hrn = "${PGENIDOMAIN}.${hrn}";
+    }
+    if (defined($urn)) {
+	my ($auth,$t,$id) = GeniHRN::Parse($urn);
+
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				     "Authority mismatch")
+	    if ($auth ne $OURDOMAIN);
+
+	#
+	# If the user supplies a URN, we get the type from it.
+	#
+	$type = $t;
+    }
+    elsif (!defined($type)) {
+	return GeniResponse->MalformedArgsResponse();
+    }
+
+    my $authority = GeniAuthority->Lookup($ENV{'MYURN'});
     if (!defined($authority)) {
 	print STDERR "Could not find local authority object\n";
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
-    if ($credential->target_uuid() ne $authority->uuid()) {
-	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN,
-				    undef, "This is not your registry!");
-    }
-
+    my $credential = CheckCredential($cred, $authority);
+    return $credential
+	if (GeniResponse::IsResponse($credential));
+   
     $credential->HasPrivilege( "authority" ) or
 	$credential->HasPrivilege( "refresh" ) or
 	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
 				     "Insufficient privilege" );
 
-    #
-    # We need to enforce Emulab permissions here, since the credential
-    # allows anyone with a credential for this registry to lookup anyone
-    # else. Good feature of the Geni API.
-    #
-    my $this_user = GeniUser->Lookup($credential->owner_uuid(), 1);
+    my $this_user = GeniUser->Lookup($ENV{'GENIURN'}, 1);
     if (!defined($this_user)) {
-	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN,
-				    undef, "Who are you?");
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+				    "Who are you? No local record");
     }
     
     if ($type eq "slice") {
-	my $slice;
-	
-	if (defined($uuid)) {
-	    $slice = GeniSlice->Lookup($uuid);
-	}
-	else {
-	    #
-	    # XXX Form hrn from the uid and domain. This is backwards.
-	    #
-	    if (! ($hrn =~ /\./)) {
-		$hrn = "${PGENIDOMAIN}.${hrn}";
-	    }
-	    $slice = GeniSlice->Lookup($hrn);
-	}
+	my $slice = GeniSlice->Lookup($uuid || $urn || $hrn);
 	if (!defined($slice)) {
 	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
 					"No such slice");
@@ -713,14 +622,12 @@ sub Remove($)
 	    print STDERR "Could not delete $slice from clearinghouse!\n";
 	    $slice->UnLock();
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					(defined($uuid)?$uuid:$hrn)
-					. " could not be unregistered");
+					"Slice could not be unregistered");
 	}
 	if ($slice->Delete()) {
 	    print STDERR "Could not delete $slice from SA!\n";
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					(defined($uuid)?$uuid:$hrn)
-					. " could not be unregistered");
+					"Slice could not be deleted");
 	}
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS);
     }
@@ -739,41 +646,25 @@ sub GetKeys($)
     if (! defined($cred)) {
 	return GeniResponse->MalformedArgsResponse();
     }
-    my $credential = GeniCredential->CreateFromSigned($cred);
-    if (!defined($credential)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "Could not create GeniCredential object");
-    }
 
-    #
-    # Make sure the credential was issued to the caller.
-    #
-    if ($credential->owner_uuid() ne $ENV{'GENIUUID'}) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "This is not your credential!");
-    }
-    #
-    # And that the target of the credential is this registry.
-    #
-    my $authority = GeniAuthority->Lookup($ENV{'MYUUID'});
+    my $authority = GeniAuthority->Lookup($ENV{'MYURN'});
     if (!defined($authority)) {
 	print STDERR "Could not find local authority object\n";
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
-    if ($credential->target_uuid() ne $authority->uuid()) {
-	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN,
-				    undef, "This is not your registry!");
-    }
-
+    my $credential = CheckCredential($cred, $authority);
+    return $credential
+	if (GeniResponse::IsResponse($credential));
+   
     $credential->HasPrivilege( "authority" ) or
 	$credential->HasPrivilege( "resolve" ) or
 	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
 				     "Insufficient privilege" );
 
-    my $this_user = GeniUser->Lookup($credential->owner_uuid(), 1);
+    my $this_user = GeniUser->Lookup($ENV{'GENIURN'}, 1);
     if (!defined($this_user)) {
-	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN,
-				    undef, "Who are you?");
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+				    "Who are you? No local record");
     }
     my @keys;
     if ($this_user->GetKeyBundle(\@keys) != 0) {
@@ -793,49 +684,50 @@ sub BindToSlice($)
     my ($argref) = @_;
     my $cred  = $argref->{'credential'};
     my $uuid  = $argref->{'uuid'};
+    my $urn   = $argref->{'urn'};
+    my $which = $uuid || $urn;
 
-    if (!defined($uuid) || !defined($cred)) {
+    if (! ((defined($uuid) || defined($urn)) && defined($cred))) {
 	return GeniResponse->MalformedArgsResponse();
     }
-    if (!($uuid =~ /^[-\w]*$/)) {
-	return GeniResponse->MalformedArgsResponse();
-    }
-    my $credential = GeniCredential->CreateFromSigned($cred);
-    if (!defined($credential)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "Could not create GeniCredential object");
-    }
+    return GeniResponse->MalformedArgsResponse()
+	if (defined($uuid) && $uuid !~ /^[-\w]*$/);
+    return GeniResponse->MalformedArgsResponse()
+	if (defined($urn) && !GeniHRN::IsValid($urn));
 
-    #
-    # Make sure the credential was issued to the caller.
-    #
-    if ($credential->owner_uuid() ne $ENV{'GENIUUID'}) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "This is not your credential!");
+    my $authority = GeniAuthority->Lookup($ENV{'MYURN'});
+    if (!defined($authority)) {
+	print STDERR "Could not find local authority object\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
-    my $this_user = GeniUser->Lookup($credential->owner_uuid(), 1);
-    if (!defined($this_user)) {
-	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN,
-				    undef, "Who are you?");
-    }
-    my $slice = GeniSlice->Lookup($credential->target_uuid());
-    if (!defined($slice)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "Unknown slice for this credential");
-    }
-    
+    my $credential = CheckCredential($cred, $authority);
+    return $credential
+	if (GeniResponse::IsResponse($credential));
+   
     $credential->HasPrivilege( "pi" ) or
 	$credential->HasPrivilege( "bind" ) or
 	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
 				     "Insufficient privilege" );
+    
+    my $this_user = GeniUser->Lookup($ENV{'GENIURN'}, 1);
+    if (!defined($this_user)) {
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+				    "Who are you? No local record");
+    }
 
+    my $slice = GeniSlice->Lookup($credential->target_urn());
+    if (!defined($slice)) {
+	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
+				    "Unknown slice for this credential");
+    }
+    
     #
     # Locate the target user; must exist locally.
     #
-    my $target_user = GeniUser->Lookup($uuid, 1);
+    my $target_user = GeniUser->Lookup($which, 1);
     if (!defined($target_user)) {
 	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED,
-				    undef, "No such user here");
+				    undef, "No such user $which here");
     }
     if ($slice->Lock() != 0) {
 	return GeniResponse->BusyResponse("slice");
@@ -861,29 +753,21 @@ sub Shutdown($)
     if (!defined($cred)) {
 	return GeniResponse->MalformedArgsResponse();
     }
-    my $credential = GeniCredential->CreateFromSigned($cred);
-    if (!defined($credential)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "Could not create GeniCredential object");
-    }
+    my $credential = CheckCredential($cred);
+    return $credential
+	if (GeniResponse::IsResponse($credential));
 
-    #
-    # Make sure the credential was issued to the caller.
-    #
-    if ($credential->owner_uuid() ne $ENV{'GENIUUID'}) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "This is not your credential!");
-    }
-    my $slice_uuid = $credential->target_uuid();
-    my $slice = GeniSlice->Lookup($slice_uuid);
-    if (!defined($slice)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "Unknown slice for this credential");
-    }
     $credential->HasPrivilege( "pi" ) or
 	$credential->HasPrivilege( "control" ) or
 	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
 				     "Insufficient privilege" );
+
+    my $slice = GeniSlice->Lookup($credential->target_urn());
+    if (!defined($slice)) {
+	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
+				    "Unknown slice for this credential");
+    }
+    my $slice_uuid = $slice->uuid();
     system("$SLICESHUTDOWN $slice_uuid");
     if ($?) {
 	print STDERR "Could not shutdown $slice!\n";
@@ -906,22 +790,19 @@ sub RenewSlice($)
     if (! (defined($credstr) && defined($expires))) {
 	return GeniResponse->Create(GENIRESPONSE_BADARGS);
     }
-    my $credential = GeniCredential->CreateFromSigned($credstr);
-    if (!defined($credential)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "Could not create GeniCredential object");
-    }
 
-    #
-    # Make sure the credential was issued to the caller.
-    #
-    if ($credential->owner_uuid() ne $ENV{'GENIUUID'}) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "This is not your credential!");
-    }
-    my $slice = GeniSlice->Lookup($credential->target_uuid());
+    my $credential = CheckCredential($credstr);
+    return $credential
+	if (GeniResponse::IsResponse($credential));
+   
+    $credential->HasPrivilege( "pi" ) or
+	$credential->HasPrivilege( "bind" ) or
+	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
+				     "Insufficient privilege" );
+
+    my $slice = GeniSlice->Lookup($credential->target_urn());
     if (!defined($slice)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
 				    "Unknown slice for this credential");
     }
     #
@@ -932,15 +813,10 @@ sub RenewSlice($)
 				    "Cooked mode Slice");
     }
     
-    $credential->HasPrivilege( "pi" ) or
-	$credential->HasPrivilege( "bind" ) or
-	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
-				     "Insufficient privilege" );
-
-    my $this_user = GeniUser->Lookup($credential->owner_uuid(), 1);
+    my $this_user = GeniUser->Lookup($ENV{"GENIURN"}, 1);
     if (!defined($this_user)) {
-	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN,
-				    undef, "Who are you?");
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+				    "Who are you? No local record");
     }
     
     #
@@ -1021,32 +897,16 @@ sub RegisterSliver($)
     if (!GeniHRN::IsValid($slice_urn)) {
 	return GeniResponse->MalformedArgsResponse("Bad URN");
     }
-    my $credential = GeniCredential->CreateFromSigned($credstr);
-    if (!defined($credential)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "Could not create GeniCredential object");
-    }
 
-    #
-    # Make sure the credential was issued to the caller.
-    #
-    if ($credential->owner_uuid() ne $ENV{'GENIUUID'}) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "This is not your credential!");
-    }
-    #
-    # And that the target of the credential is this registry.
-    #
-    my $authority = GeniAuthority->Lookup($ENV{'MYUUID'});
+    my $authority = GeniAuthority->Lookup($ENV{'MYURN'});
     if (!defined($authority)) {
 	print STDERR "Could not find local authority object\n";
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
-    if ($credential->target_uuid() ne $authority->uuid()) {
-	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN,
-				    undef, "This is not your registry!");
-    }
-
+    my $credential = CheckCredential($credstr, $authority);
+    return $credential
+	if (GeniResponse::IsResponse($credential));
+   
     $credential->HasPrivilege( "authority" ) or
 	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
 				     "Insufficient privilege" );
@@ -1111,32 +971,15 @@ sub UnRegisterSliver($)
     if (!GeniHRN::IsValid($slice_urn)) {
 	return GeniResponse->MalformedArgsResponse("Bad URN");
     }
-    my $credential = GeniCredential->CreateFromSigned($credstr);
-    if (!defined($credential)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "Could not create GeniCredential object");
-    }
-
-    #
-    # Make sure the credential was issued to the caller.
-    #
-    if ($credential->owner_uuid() ne $ENV{'GENIUUID'}) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "This is not your credential!");
-    }
-    #
-    # And that the target of the credential is this registry.
-    #
-    my $authority = GeniAuthority->Lookup($ENV{'MYUUID'});
+    my $authority = GeniAuthority->Lookup($ENV{'MYURN'});
     if (!defined($authority)) {
 	print STDERR "Could not find local authority object\n";
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
-    if ($credential->target_uuid() ne $authority->uuid()) {
-	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN,
-				    undef, "This is not your registry!");
-    }
-
+    my $credential = CheckCredential($credstr, $authority);
+    return $credential
+	if (GeniResponse::IsResponse($credential));
+   
     $credential->HasPrivilege( "authority" ) or
 	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
 				     "Insufficient privilege" );
@@ -1166,6 +1009,46 @@ sub UnRegisterSliver($)
     
     $slice->UnLock();
     return GeniResponse->Create(GENIRESPONSE_SUCCESS);
+}
+
+#
+# Initial credential check.
+#
+sub CheckCredential($;$)
+{
+    my ($credstring, $authority) = @_;
+
+    my $credential = GeniCredential->CreateFromSigned($credstring);
+    if (!defined($credential)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not create credential object");
+    }
+    #
+    # Well formed credentials must now have URNs.
+    #
+    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				"Malformed credentials; missing URNs")
+	if (! (defined($credential->owner_urn()) &&
+	       defined($credential->target_urn()) &&
+	       GeniHRN::IsValid($credential->owner_urn()) &&
+	       GeniHRN::IsValid($credential->target_urn())));
+	
+    #
+    # Make sure the credential was issued to the caller.
+    #
+    if ($credential->owner_urn() ne $ENV{'GENIURN'}) {
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+				    "This is not your credential");
+    }
+    #
+    # If an authority is provided, the target must match the authority.
+    #
+    return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+				"This credential is for another authority!")
+	if (defined($authority) &&
+	    $credential->target_urn() ne $authority->urn());
+	
+    return $credential;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

@@ -167,7 +167,7 @@ sub Resolve($)
 	# In this implementation, the caller must hold a valid slice
 	# credential for the slice being looked up. 
 	#
-	if (! ($admin || $slice->uuid() eq $credential->target_uuid())) {
+	if (! ($admin || $slice->urn() eq $credential->target_urn())) {
 	    return GeniResponse->Create(GENIRESPONSE_FORBIDDEN());
 	}
 	# Return a blob.
@@ -191,7 +191,7 @@ sub Resolve($)
 	# or sliver credential for the slice being looked up. 
 	#
 	if (! ($admin ||
-	       $sliver->uuid() eq $credential->target_uuid() ||
+	       $sliver->urn() eq $credential->target_urn() ||
 	       $sliver->slice_uuid() eq $credential->target_uuid())) {
 	    return GeniResponse->Create(GENIRESPONSE_FORBIDDEN);
 	}
@@ -212,18 +212,18 @@ sub Resolve($)
 	# In this implementation, the caller must hold a valid slice
 	# or sliver credential to get the ticket.
 	#
-	my $slice = GeniSlice->Lookup($ticket->slice_uuid());
+	my $slice = GeniSlice->Lookup($ticket->slice_urn());
 	if (!defined($slice)) {
 	    print STDERR "Could not find slice for $ticket\n";
 	    return GeniResponse->Create(GENIRESPONSE_ERROR);
 	}
-	if (! ($admin || $slice->uuid() eq $credential->target_uuid())) {
+	if (! ($admin || $slice->urn() eq $credential->target_urn())) {
 	    #
 	    # See if its the sliver credential. 
 	    #
 	    my $aggregate = GeniAggregate->SliceAggregate($slice);
 	    if (!defined($aggregate) ||
-		$aggregate->uuid() ne $credential->target_uuid()) {
+		$aggregate->urn() ne $credential->target_urn()) {
 		return GeniResponse->Create(GENIRESPONSE_FORBIDDEN());
 	    }
 	}
@@ -318,7 +318,7 @@ sub CreateSliver($)
 	# up by the daemon. This is mostly cause I am reaching into
 	# the V1 code, and its messy.
 	#
-	my $slice = GeniSlice->Lookup($credential->target_uuid());
+	my $slice = GeniSlice->Lookup($credential->target_urn());
 	if ($slice->Lock() != 0) {
 	    print STDERR "CreateSliver: Could not lock $slice before delete\n";
 	    return $response;
@@ -330,7 +330,7 @@ sub CreateSliver($)
     #
     # Leave the slice intact on error, so we can go look at it. 
     #
-    $slice = GeniSlice->Lookup($credential->target_uuid());
+    $slice = GeniSlice->Lookup($credential->target_urn());
     if (!defined($slice)) {
 	print STDERR "CreateSliver: Could not find slice for $credential\n";
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
@@ -394,7 +394,7 @@ sub DeleteSliver($)
     #
     my $authority = GeniCertificate->LoadFromFile($EMULAB_PEMFILE);
     if (!defined($authority)) {
-	print STDERR " Could not get uuid from $EMULAB_PEMFILE\n";
+	print STDERR " Could not load $EMULAB_PEMFILE\n";
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
 	
     }
@@ -1050,7 +1050,7 @@ sub UpdateTicket($)
     #
     # Make sure the ticket was issued to the caller.
     #
-    if ($ticket->owner_uuid() ne $ENV{'GENIUUID'}) {
+    if ($ticket->owner_urn() ne $ENV{'GENIURN'}) {
 	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
 				    "This is not your ticket");
     }
@@ -1058,7 +1058,7 @@ sub UpdateTicket($)
 	return GeniResponse->Create(GENIRESPONSE_REFUSED(), undef,
 				    "Not an active ticket");
     }
-    if ($ticket->slice_uuid() ne $slice->uuid()) {
+    if ($ticket->slice_urn() ne $slice->urn()) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "This ticket is for another slice");
     }
@@ -1182,7 +1182,7 @@ sub RedeemTicket($)
     #
     # Make sure the ticket was issued to the caller.
     #
-    if ($ticket->owner_uuid() ne $ENV{'GENIUUID'}) {
+    if ($ticket->owner_urn() ne $ENV{'GENIURN'}) {
 	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
 				    "This is not your ticket");
     }
@@ -1311,7 +1311,7 @@ sub ReleaseTicket($)
     # And of course, the ticket has to be for the slice indicated
     # by the provided credential.
     #
-    if ($ticket->slice_uuid() ne $slice->uuid()) {
+    if ($ticket->slice_urn() ne $slice->urn()) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "This ticket is for another slice");
     }
@@ -1368,9 +1368,19 @@ sub CheckCredentials($)
 				    "Could not create credential object");
     }
     #
+    # Well formed credentials must now have URNs.
+    #
+    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				"Malformed credentials; missing URNs")
+	if (! (defined($credential->owner_urn()) &&
+	       defined($credential->target_urn()) &&
+	       GeniHRN::IsValid($credential->owner_urn()) &&
+	       GeniHRN::IsValid($credential->target_urn())));
+	
+    #
     # Make sure the credential was issued to the caller.
     #
-    if ($credential->owner_uuid() ne $ENV{'GENIUUID'}) {
+    if ($credential->owner_urn() ne $ENV{'GENIURN'}) {
 	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
 				    "This is not your credential");
     }
@@ -1385,9 +1395,19 @@ sub CheckCredential($)
 				    "Could not create credential object");
     }
     #
+    # Well formed credentials must now have URNs.
+    #
+    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				"Malformed credentials; missing URNs")
+	if (! (defined($credential->owner_urn()) &&
+	       defined($credential->target_urn()) &&
+	       GeniHRN::IsValid($credential->owner_urn()) &&
+	       GeniHRN::IsValid($credential->target_urn())));
+	
+    #
     # Make sure the credential was issued to the caller.
     #
-    if ($credential->owner_uuid() ne $ENV{'GENIUUID'}) {
+    if ($credential->owner_urn() ne $ENV{'GENIURN'}) {
 	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
 				    "This is not your credential");
     }
