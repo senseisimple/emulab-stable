@@ -154,7 +154,8 @@ if (exists($ENV{'SSL_CLIENT_CERT'})) {
 	XMLError(-1, "Error decoding certificate:" . $decoded->error);
     }
     foreach my $tmp (@{ $decoded->SubjectAltName }) {
-	if ($tmp =~ /^uniformResourceIdentifier=(.*)$/) {
+	if ($tmp =~ /^uniformResourceIdentifier=(.*)$/ ||
+	    $tmp =~ /^(urn:.*)$/) {
 	    $ENV{'GENIURN'} = $1;
 	}
     }

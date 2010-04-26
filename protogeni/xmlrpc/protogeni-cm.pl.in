@@ -163,7 +163,8 @@ if (exists($ENV{'SSL_CLIENT_CERT'})) {
 	XMLError(-1, "Error decoding certificate:" . $decoded->error);
     }
     foreach my $tmp (@{ $decoded->SubjectAltName }) {
-	if ($tmp =~ /^uniformResourceIdentifier=(.*)$/) {
+	if ($tmp =~ /^uniformResourceIdentifier=(.*)$/ ||
+	    $tmp =~ /^(urn:.*)$/) {
 	    $ENV{'GENIURN'} = $1;
 	}
     }
@@ -249,10 +250,7 @@ elsif ($VERSION eq "2.0") {
     },);
 }
 else {
-    my $decoder = Frontier::RPC2->new();
-    print "Content-Type: text/xml \n\n";
-    print $decoder->encode_fault(-3, "Invalid API Version");
-    exit(0);
+    XMLError(-3, "Invalid API Version");
 }
 
 #
@@ -278,14 +276,6 @@ my $response = $responder->{'_decode'}->serve($request,
 
 # Add stuff for log message if sent.
 AddAuditInfo("message", $response . "\n\n" . $request);
-
-# When debugging on, generate some output so email is sent.
-if ($debug) {
-    my $decoder = Frontier::RPC2->new();
-    my $object  = $decoder->decode($response);
-    my $value   = $object->{'value'};
-    print STDERR Dumper($value);
-}
 
 #
 # Terminate the log capture so that we can print the response to STDOUT
