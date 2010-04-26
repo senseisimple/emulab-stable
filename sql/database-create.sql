@@ -3829,7 +3829,7 @@ CREATE TABLE `virt_node_desires` (
   `eid` varchar(32) NOT NULL default '',
   `exptidx` int(11) NOT NULL default '0',
   `vname` varchar(32) NOT NULL default '',
-  `desire` varchar(30) NOT NULL default '',
+  `desire` varchar(64) NOT NULL default '',
   `weight` float default NULL,
   PRIMARY KEY  (`exptidx`,`vname`,`desire`),
   UNIQUE KEY `pideid` (`pid`,`eid`,`vname`,`desire`)

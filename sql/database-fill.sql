@@ -687,7 +687,7 @@ REPLACE INTO table_regex VALUES ('virt_lans','layer','int','redirect','default:t
 REPLACE INTO table_regex VALUES ('virt_node_desires','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_node_desires','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_node_desires','vname','text','redirect','virt_nodes:vname',0,0,NULL);
-REPLACE INTO table_regex VALUES ('virt_node_desires','desire','text','regex','^[\\?\\*]?[\\+\\!\\&]?[-\\w?+]+$',1,30,NULL);
+REPLACE INTO table_regex VALUES ('virt_node_desires','desire','text','regex','^[\\?\\*]?[\\+\\!\\&]?[-\\w?+]+$',1,64,NULL);
 REPLACE INTO table_regex VALUES ('virt_node_desires','weight','int','redirect','default:float',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','eid','text','redirect','experiments:eid',0,0,NULL);
