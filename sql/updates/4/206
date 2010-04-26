@@ -18,7 +18,7 @@ sub DoUpdate($$$)
           "of a sliver.' where name = 'protogeni/max_ticket_lifetime'");
     }
     else {
-        DBQueryFatal("INSERT INTO `sitevariables` VALUES " . 
+        DBQueryFatal("REPLACE INTO `sitevariables` VALUES " . 
           "('protogeni/max_sliver_lifetime', '90', '90', " . 
           "'The maximum sliver lifetime. When set limits the lifetime " . 
           "of a sliver.',0)");
