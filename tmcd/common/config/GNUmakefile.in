@@ -45,3 +45,6 @@ install:
 script-install:
 	$(INSTALL_PROGRAM) $(SRCDIR)/librc.pm $(BINDIR)/librc.pm
 	$(INSTALL_PROGRAM) $(SCRIPTS) $(BINDIR)/rc
+
+subboss-script-install: script-install
+	$(INSTALL_PROGRAM) $(SRCDIR)/rc.mksubboss $(BINDIR)/rc

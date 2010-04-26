@@ -1,0 +1,39 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/sbin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+my $excludes = '/usr/local/etc/subboss_tftpboot_sync.excludes';
+
+sub sync_tftpboot($)
+{
+	my ($node_id) = @_;
+	my $rsync_opts = '-r -l';
+	if ( -r $excludes ) {
+		$rsync_opts .= " --exclude-from=$excludes";
+	}
+	system("rsync $rsync_opts /tftpboot $node_id:/tftpboot");
+}
+
+my $query_result =
+	DBQueryWarn("select n.node_id from nodes as n left join reserved as r on " .
+		    "n.node_id = r.node_id left join subbosses as s on " .
+		    "n.node_id = s.subboss_id where r.erole = 'subboss' and " .
+	            "s.service = 'tftp' and n.eventstate = 'ISUP'");
+if (! $query_result) {
+    fatal("Could not subboss data from DB!");
+}
+
+while (my %row = $query_result->fetchhash()) {
+	sync_tftpboot($row{"node_id"});
+}
