@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -113,6 +113,7 @@ require exitonwarn;
 use libdb;
 use libtblog;
 use Experiment;
+use Node;
 use NodeType;
 use Lan;
 
@@ -121,7 +122,6 @@ tblog_stop_capture('stdout');
 my $TRACK_INTERSWITCH_BANDWIDTH = "@TRACK_INTERSWITCH_BANDWIDTH@";
 
 my %switches	  = ();
-my %used_switches = ();
 my %permissions   = ();
 my %typemap       = ();
 my %auxtypemap    = ();
@@ -138,6 +138,8 @@ my $pid;
 my $exempt_eid;
 my $switchtouse;
 my $experiment;
+
+sub fatal($);
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -1203,6 +1205,7 @@ while (($type,$capkey,$capval) = $result->fetchrow_array) {
 # Read interface switches
 $result = DBQueryFatal("SELECT node_id1, iface, node_id2 FROM wires AS w " .
 	"LEFT JOIN interfaces as i ON w.node_id1=i.node_id AND w.card1=i.card");
+
 while (($node,$iface,$switch) = $result->fetchrow_array) {
     if ($node && $iface) {
 	$interfaceswitches{"$node:$iface"} = $switch;
@@ -1276,11 +1279,34 @@ while (($node1,$card1,$port1,$node2,$card2,$port2) =
 	(defined($nodes{$node2}) || defined($switches{$node2})) &&
 	! defined($component_name)) {
 
-        
-        # Types for this link - for the time being, we assume that all
-        # links are Ethernet, though this will certaily change later.
-        my $basetype = "ethernet";
+	#
+	# When it is a node,switch link, the switch always used to be
+	# node2, but now switches are explicitly tagged. But we also
+	# have a node,node links and switch,switch links (trunks).
+	#
+	my $node1obj = Node->Lookup($node1);
+	if (!defined($node1obj)) {
+	    fatal("Could not lookup $node1");
+	}
+	my $node2obj = Node->Lookup($node2);
+	if (!defined($node2obj)) {
+	    fatal("Could not lookup $node2");
+	}
+	my $switchobj = ($node2obj->isswitch() ? $node2obj :
+			 ($node1obj->isswitch() ? $node1obj : undef));
 
+	# This comes from the switch info, unless its a direct link
+	# between two nodes; use ethernet in this case.
+	my $basetype;
+
+	if (!defined($switchobj)) {
+	    $basetype = "ethernet";
+	}
+	elsif ($switchobj->NodeTypeAttribute("forwarding_protocols",
+					     \$basetype) ||
+	       !defined($basetype) || $basetype eq "") {
+	    fatal("No forwarding_protocols set for $switchobj (type)");
+	}
 	$iface1 = get_iface($node1,$card1,$port1);
 	$iface2 = get_iface($node2,$card2,$port2);
 	$iface1bw = get_ifacebw($node1,$card1,$port1,$basetype);
@@ -1288,13 +1314,24 @@ while (($node1,$card1,$port1,$node2,$card2,$port2) =
 
         my @types = ($basetype);
 
-	next
-	    if (! exists($interfacecardports{"$node1:$iface1"}));
-	
-	# XXX - This is a bad, bad hack - we  use our knowledge that in the
-	# wires table links to the switch always come as node2.
-	# Chris has something better on the way (storing the speed on the
-	# switch side), so this is just a temp. hack.
+	#
+	# The pc side of any link must have an interfaces table,
+	# or else we just skip it. Typically, the switch side does
+	# not have entry, unless its a trunk like and we want it to
+	# go into the ptop file. 
+	#
+	if (!$node1obj->isswitch()) {
+	    next
+		if (! exists($interfacecardports{"$node1:$iface1"}));
+	}
+	if (!$node2obj->isswitch()) {
+	    next
+		if (! exists($interfacecardports{"$node2:$iface2"}));
+	}
+
+	#
+	# Determine the (maximum) supported bandwidth for the link.
+	#
 	if (!defined($switches{$node1}) && defined($switches{$node2})) {
 	    $bw = $iface1bw;
 	} else {
@@ -1304,13 +1341,7 @@ while (($node1,$card1,$port1,$node2,$card2,$port2) =
 		$bw = $iface2bw;
 	    }
 	}
-	if (defined($switches{$node2})) {
-	    $used_switches{$node2} = 1;
-	}
-	if (defined($switches{$node1})) {
-	    $used_switches{$node1} = 1;
-	}
-	if (defined($switches{$node1}) && defined($switches{$node2})) {
+	if ($node1obj->isswitch() && $node2obj->isswitch()) {
 	    # interswitch link
 	    if (defined($interconnects{"$node1:$node2"})) {
 		$interconnects{"$node1:$node2"} += $bw;
@@ -1318,17 +1349,20 @@ while (($node1,$card1,$port1,$node2,$card2,$port2) =
 		$interconnects{"$node1:$node2"} = new Math::BigInt $bw;
 	    }
 	} else {
+	    #
             # Node-to-switch link
-	    # !!! - Here we use our knowledge that in the wires table links
-	    # to the switch always come as node2.
+	    #
+	    # We used to hardwire in the knowledge that the switch is
+	    # always node2 in the wires table. Now, we actually mark
+	    # switches as being switches.
+	    #
+            # Come up with some other types for this link. The idea is
+            # that it allows people to ask for links to specific
+            # switches, specific interface types, etc.
+	    #
+	    push(@types, $basetype . "-" . $switchobj->node_id())
+		if (defined($switchobj));
 
-            # Come up with some other types for this link. The idea is that
-            # it allows people to ask for links to specific switches, specific
-            # interface types, etc.
-            my $switch = get_ifaceswitch($node1,$iface1);
-            if ($switch) {
-                push @types, "$basetype-$switch";
-            }
             if ($interfacetypes{"$node1:$card1:$port1"}) {
                 push @types, "$basetype-" .
                     $interfacetypes{"$node1:$card1:$port1"};
@@ -1336,7 +1370,6 @@ while (($node1,$card1,$port1,$node2,$card2,$port2) =
             push @types, "$basetype-$bw";
 
 	    if ($sharing_mode{$node1}) {
-
 		$bw =
 		    $interfacestate{"$node1:$iface1"}->{'remaining_bandwidth'};
 		next
@@ -2034,4 +2067,13 @@ sub print_type_relation
 {
     my $type = shift(@_);
     my $osids = @_;
+}
+
+sub fatal($)
+{
+    my ($mesg) = @_;
+
+    print STDERR "*** $0:\n".
+	         "    $mesg\n";
+    exit(-1);
 }
