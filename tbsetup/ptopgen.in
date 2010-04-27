@@ -1744,8 +1744,10 @@ sub print_osids
     my @osids = @{ $typemap{$type}->{'OSLIST'} };
     my $default = $typemap{$type}->{'OSID'};
     foreach $os (@osids) {
+	my $urn = GeniHRN::Generate($OURDOMAIN, "image",
+				    $osid_pid{$os} . "//" . $osid_name{$os});
 	print "<disk_image ";
-	print "name=\"" . $osid_name{$os} . "\" ";
+	print "name=\"" . $urn . "\" ";
 	print "os=\"" . $osid_os{$os} . "\" ";
 	print "version=\"" . $osid_version{$os} . "\" ";
 	print "description=\"" . $osid_description{$os} . "\" ";
