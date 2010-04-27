@@ -1008,7 +1008,7 @@ sub dhcpdconf($)
     # Generate the dhcp configuration
     #
     system("$BINDIR/subboss_dhcpd_makeconf -r") == 0
-    	or die("Could not generate dhcpd.conf");
+    	or warn("Could not generate dhcpd.conf");
 
 resched:
     #
