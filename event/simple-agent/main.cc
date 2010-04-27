@@ -9,8 +9,11 @@
 #include <list>
 #include <vector>
 #include <iostream>
+#include <iomanip>
 #include <sstream>
 #include <fstream>
+
+#include <sys/time.h>
 
 using namespace std;
 
@@ -67,6 +70,7 @@ void readArgs(int argc, char * argv[])
     {
     case 'd':
       g::debug = true;
+      pubsub_debug = 1;
       break;
     case 's':
       server = optarg;
@@ -169,10 +173,13 @@ void callback(event_handle_t handle,
   char name[EVENT_BUFFER_SIZE];
   char type[EVENT_BUFFER_SIZE];
   char args[EVENT_BUFFER_SIZE];
-  time_t basicTime = time(NULL);
-  struct tm * structTime = gmtime(&basicTime);
-  char timestamp[1024];
-  strftime(timestamp, 1024, "%Y-%m-%dT%H:%M:%S", structTime);
+  struct timeval basicTime;
+  gettimeofday(&basicTime, NULL);
+  double floatTime = basicTime.tv_sec + basicTime.tv_usec/1000000.0;
+  ostringstream timeStream;
+  timeStream << setprecision(3) << setiosflags(ios::fixed | ios::showpoint);
+  timeStream << floatTime;
+  string timestamp = timeStream.str();
 
   if (event_notification_get_string(handle, notification, "OBJNAME", name, EVENT_BUFFER_SIZE) == 0)
   {
@@ -197,6 +204,5 @@ void callback(event_handle_t handle,
   int sequence = 0;
   line >> sequence;
 
-  cerr << timestamp << " name=" << name << " type=" << type
-       << " sequence=" << sequence << endl;
+  cout << "RECEIVE: " << name << " " << sequence << " " << timestamp << endl;
 }
