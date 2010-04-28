@@ -18,30 +18,6 @@ Note that some instructions may have steps that need to occur at a few
 different points in the install process - these are marked with the
 earliest time one of the steps needs to occur.
 
-20100428: After Install
-
-	  The new, optional, experiment visulazition support requires
-          that /usr/local/etc/apache/httpd.conf on ops be updated.
-          The normal boss-install will not update this file.
-
-	  First make sure that there are no local changes to the
-	  file. Than do one of the following:
-
-	  1) Bring your _ops_ testbed tree uptodate than, from your
-             _ops_ testbed obj tree:
-	      sudo mv /usr/local/etc/apache/httpd.conf \
-                 /usr/local/etc/apache/httpd.conf.bk
-	      cd apache
-	      make control-install
-	   
-	  2) Or, from the boss testbed obj tree:
-	      sudo ssh root@ops mv /usr/local/etc/apache/httpd.conf \
-		   /usr/local/etc/apache/httpd.conf.bk
-	      cd apache
-	      make httpd.conf-ops mv 
-	      sudo scp httpd.conf-ops \
-                   root@ops:/usr/local/etc/apache/httpd.conf
-
 20100108: After install:
 
 	  Change to how stated does it logging. In /etc/newsyslog.conf,

@@ -445,20 +445,6 @@ DocumentRoot "/usr/local/www/data"
 </IfModule>
 
 #
-# Per-proj/exp visualizations
-#
-ScriptAlias /proj-vis  /usr/testbed/www/cgi-bin/fetch-vis
-ScriptAlias /group-vis /usr/testbed/www/cgi-bin/fetch-vis
-ScriptAlias /exp-vis   /usr/testbed/www/cgi-bin/fetch-vis
-
-<Directory "/usr/testbed/www/cgi-bin">
-    AllowOverride None
-    Options None
-    Order allow,deny
-    Allow from all
-</Directory>
-
-#
 # Twiki-related entries
 #
 <Directory "/usr/local/www/data/twiki/bin">
