@@ -12,21 +12,31 @@ SUBDIR		= collab/exp-vis
 include $(OBJDIR)/Makeconf
 
 CGI_SCRIPTS = fetch-vis
+LIBEXEC_SCRIPTS = write-vis-auth-boss
+CTRL_LIBEXEC_SCRIPTS = write-vis-auth-ops
+
+SETUID_LIBX_SCRIPTS = write-vis-auth-boss
 
 #
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
-all:	$(CGI_SCRIPTS)
+all:	$(CGI_SCRIPTS) $(LIBEXEC_SCRIPTS) $(CTRL_LIBEXEC_SCRIPTS) 
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 install: \
-	$(addprefix $(TBROOT)/opsdir/www/cgi-bin/, $(CGI_SCRIPTS))
+	$(addprefix $(INSTALL_LIBEXECDIR)/, $(LIBEXEC_SCRIPTS)) \
+	$(addprefix $(TBROOT)/opsdir/www/cgi-bin/, $(CGI_SCRIPTS)) \
+	$(addprefix $(INSTALL_DIR)/opsdir/libexec/, $(CTRL_LIBEXEC_SCRIPTS))
 
 $(TBROOT)/opsdir/www/cgi-bin/fetch-vis: fetch-vis
 	-$(SUDO) mkdir -m 775 $(TBROOT)/opsdir/www/cgi-bin
 	$(SUDO) $(INSTALL) -o root -m 4775 $< $@
+
+$(INSTALL_DIR)/opsdir/libexec/write-vis-auth-ops: write-vis-auth-ops
+	-mkdir -p $(INSTALL_DIR)/opsdir/libexec
+	$(INSTALL) $< $@
 
 post-install:
 

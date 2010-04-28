@@ -1,0 +1,51 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+
+#
+# ... 
+#
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $USERNODE    = "@USERNODE@";
+
+#
+# Load the Testbed support stuff. 
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Turn off line buffering on output
+$| = 1; 
+
+# become root, needed for ssh
+$< = $>;
+
+my $db_result =
+    DBQueryFatal("select opskey, uid from login");
+
+open O, "| ssh root\@$USERNODE $TB/libexec/write-vis-auth-ops";
+
+my $prev_opskey = '';
+while (my ($opskey,$uid) = $db_result->fetchrow_array) {
+    print O "$opskey $uid\n";
+}
+
+close O;
+
+exit(0);
