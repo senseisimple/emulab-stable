@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003-2007 University of Utah and the Flux Group.
+# Copyright (c) 2003-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -17,15 +17,20 @@ use POSIX qw(strftime);
 $| = 1;
 
 #
-# Magic string that shows up in files we've already edited 
+# Magic string that shows up in files already edited 
 #
-my $MAGIC_STRING = "testbed installation process";
+my $MAGIC_TESTBED_VERSION = "5.0";
+my $MAGIC_TESTBED_START   = "Added by Emulab - Version: ";
+my $MAGIC_TESTBED_END     = "End of Emulab added section";
 
-my $MAGIC_TESTBED_START = "The follwing lines were added by the $MAGIC_STRING";
-my $MAGIC_TESTBED_END = "End of testbed-added configuration";
+sub MAGIC_TESTBED_START { $MAGIC_TESTBED_START . $MAGIC_TESTBED_VERSION; }
+sub MAGIC_TESTBED_END   { $MAGIC_TESTBED_END; }
 
-sub MAGIC_TESTBED_START { $MAGIC_TESTBED_START; }
-sub MAGIC_TESTBED_END { $MAGIC_TESTBED_END; }
+# When used in update mode, printing is a little different.
+my $updatemode = 0;
+
+# Used by update-install to bump the version number.
+sub SET_TESTBED_VERSION($)  { $updatemode = $MAGIC_TESTBED_VERSION = $_[0]; }
 
 #
 # Some programs we may call
@@ -71,7 +76,7 @@ sub Phase($$$) {
     my $isSubPhase = ($depth > 1);
 
     my $descrstring = "| " x ($depth -1) . $descr;
-    if ($firstSubPhase) {
+    if ($firstSubPhase && !$updatemode) {
 	print "\n";
     }
     printf "%-50s", $descrstring;
@@ -164,7 +169,7 @@ sub Phase($$$) {
     # If we decided that we need to die, do that now
     #
     if ($die) {
-	print "\n\n##### Installation failed in phase $name. The error was:\n";
+	print "\n##### Installation failed in phase $name. The error was:\n";
 	print "$message\n";
 	PrintPhaseTrace();
 	PrintLastOutput();
@@ -246,8 +251,9 @@ sub DoneIfDoesntExist($) {
 sub DoneIfEdited($) {
     my ($filename) = @_;
     if (!$filename) { PhaseFail("Bad filename passed to DoneIfEdited"); }
+    my $magic_string = MAGIC_TESTBED_START();
     open(FH,$filename) or return;
-    if (grep /$MAGIC_STRING/, <FH>) {
+    if (grep /$magic_string/, <FH>) {
         close(FH);
 	PhaseSkip("File has already been edited");
     }
@@ -317,9 +323,9 @@ sub AppendToFile($@) {
     open(FH,">>$filename") or return "Unable to open $filename for ".
 	"writing: $!";
 
-    print FH "# $MAGIC_TESTBED_START\n";
+    print FH "# " . MAGIC_TESTBED_START() . "\n";
     print FH map "$_\n", @lines;
-    print FH "# $MAGIC_TESTBED_END\n";
+    print FH "# " . MAGIC_TESTBED_END() . "\n";
 
     close(FH);
 
