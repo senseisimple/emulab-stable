@@ -1,0 +1,189 @@
+#!/usr/bin/perl -T
+
+#
+#
+#
+
+use strict;
+use warnings;
+
+use POSIX qw(setuid setgid);
+use Cwd qw(realpath);
+use CGI;
+use CGI::Cookie;
+use HTTP::Date;
+
+#use Data::Dumper;
+
+#print "\n\n";
+#print STDERR Dumper(\%ENV);
+
+my $FSDIR_PROJ = "@FSDIR_PROJ@";
+my $FSDIR_GROUPS = "@FSDIR_GROUPS@";
+
+sub error($) {
+    print "Content-Type: text/plain\n";
+    print "Status: 404 Not Found\n\n";
+    print "$_[0]\n";
+    #die "$_[0]\n";
+    exit 1;
+}
+
+my $SCRIPT_URL = $ENV{REQUEST_URI};
+
+# Parse URL
+my ($proj,$group,$exp,$dir,$file);
+local $_ = $SCRIPT_URL;
+if (/^\/proj-vis\/([a-zA-Z0-9-]+)\/?(.*)$/) {
+    $proj = $1;
+    $group = $1;
+    $file = $2;
+} elsif (/^\/group-vis\/([a-zA-Z0-9-]+)\/?([a-zA-Z0-9-]+)\/?(.*)$/) {
+    $proj = $1;
+    $group = $2;
+    $file = $3;
+} elsif (/^\/exp-vis\/([a-zA-Z0-9-]+)\/?([a-zA-Z0-9-]+)\/?(.*)$/) {
+    $proj = $1;
+    $exp = $2;
+    $file = $3;
+} else {
+    error("Malformed URL");
+}
+if (defined $exp) {
+    my $exp_dir = "/proj/$proj/exp/$exp";
+    local $_ = realpath $exp_dir;
+    if (/^$FSDIR_PROJ\/$proj\//) {
+	$group = $proj;
+    } elsif (/^$FSDIR_GROUPS\/$proj\/(.+?)\//) {
+	$group = $1;
+    }
+    $dir = "/groups/$proj/$group/www/exp-vis/$exp";
+} else {
+    $dir = "/groups/$proj/$group/www/group-vis";
+}
+
+# Lookup up the Unix GID for the proj and the group
+my (undef,undef,undef,undef,undef,$gid) = stat("/proj/$proj") or die;
+my ($gid_name,undef,undef,$gid_members) = getgrgid($gid);
+die "Error: Bad proj GID: $gid_name != $proj" unless $gid_name eq $proj;
+my (undef,undef,undef,undef,undef,$gid2) = stat("/groups/$proj/$group") or die;
+my ($gid2_name,undef,undef,$gid2_members) = getgrgid($gid2);
+
+# For security remove any ".." from the path and abort if we would
+# leave $dir
+my @dirs = split /\//, $file;
+my @res;
+foreach my $d (@dirs) {
+    if ($d eq '' || $d eq '.') {
+	# nothing to do
+    } elsif ($d eq '..') {
+	error("Malformed URL") if @res == 0;
+	pop @res;
+    } else {
+	push @res, $d;
+    }
+}
+
+# Create the path
+$file = join ('/', @res);
+my $path = "$dir/$file";
+if (-d $path) {
+    my $orig_path = $path;
+    $path .= "/index.html" if -e "$path/index.html";
+    $path .= "/index.htm" if -e "$path/index.htm";
+    error("Can't index dir: $path") unless $path ne $orig_path;
+}
+
+error("File Doesn't Exist: $path") unless -e $path;
+
+# Make sure that the path, after resolving any symbolic links,
+# still resides is /proj/<proj> or /groups/<proj>/<group>
+my $realpath = realpath $path;
+error("Invalid path: $realpath") unless $realpath =~ /^$FSDIR_PROJ\/$proj|^$FSDIR_GROUPS\/$proj\/$group/;
+
+#
+# Special rule for boss.  Since we are bypassing authorization, don't
+# show anything, just let boss know that the url is valid.
+#
+if ($ENV{REMOTE_ADDR} eq "@BOSSNODE_IP@") {
+    print "Content-Type: text/plain\n\n";
+    print "I exist!\n";
+    exit(0);
+}
+
+#
+# Get session cookie and make sure user is logged in and authorized to
+# view.
+#
+my %cookies = raw_fetch CGI::Cookie;
+
+my $session_key = $cookies{exp_vis_session};
+error("Not logged in.") unless defined $session_key;
+
+my $user;
+open F, "/var/run/exp-vis.auth" or die;
+foreach (<F>) {
+    chop;
+    my ($key, $u) = split / /;
+    if ($key eq $session_key) {
+	$user = $u;
+	last;
+    }
+}
+
+error("Login Timed Out.") unless defined $user;
+    
+my (undef, undef, $uid, $user_gid) = getpwnam($user);
+die if $user_gid == 0;
+error("You do not have permission to view $proj files") 
+    unless $gid == $user_gid || grep {$_ eq $user} split /\s+/, $gid_members;
+error("You do not have permission to view $proj/$group files") 
+    unless $gid2 == $user_gid || grep {$_ eq $user} split /\s+/, $gid2_members;
+
+# OK, Now we are sure the user has permission to view this file.
+
+# Now become a member of the GID for the proj and group and clear out
+# any other GIDs
+undef $!;
+setgid($gid);
+$) = "$gid $gid $gid2";
+die $! if $!;
+
+# Now drop privileges, using setuid to make sure the saved uid
+# is also changes, ie, so that the change is permanent.
+setuid($<) or die $!;
+
+my %mime_map = 
+    qw(html text/html htm text/html
+       txt text/plain
+       png image/png
+       gif image/gif
+       jpg image/jpeg jpeg image/jpeg
+       zip application/zip);
+
+my ($ext) = $path =~ /\.([^.]+)$/;
+$ext = lc $ext;
+
+my $mime_type = $mime_map{$ext};
+
+
+$/ = undef;
+open F, "$path" or error "Can't read file: $path";
+
+my ($dev,$ino,$mode,$nlink,undef,undef,$rdev,$size,
+    $atime,$mtime,$ctime,$blksize,$blocks) = stat F;
+
+my $if_mod_since = 0;
+$if_mod_since = str2time($ENV{HTTP_IF_MODIFIED_SINCE}) 
+    if defined $ENV{HTTP_IF_MODIFIED_SINCE};
+if ($if_mod_since > 0 && $if_mod_since <= $mtime) {
+    print "Status: 304 Not Modified\n\n";
+} else {
+    print "Content-Type: $mime_type\n" if defined $mime_type;
+    print "Content-Length: ", $size, "\n";
+    print "Last-Modified: ", time2str($mtime), "\n";
+    print "\n";
+    
+    print <F> unless $ENV{REQUEST_METHOD} eq 'HEAD';
+}
+exit 0;

@@ -36,12 +36,18 @@ NodeContents &=
   # multiple physical links to connect to the same interface.
   element cloud { AnyExtension } &
 
-  # Lists services provided by the CM for this node.
-  element services { ServiceContents } &
-
   # Node type. This includes both hardware and sliver type elements:
   HardwareType* &
-  SliverType*
+  element sliver_type {
+    SliverTypeContents &
+    element disk_image {
+      DiskImageContents &
+      attribute default { text }?
+    }*
+  }*
+
+RelationContents &=
+  attribute component_id { text }
 
 AvailableContents =
   AnyExtension &
@@ -77,24 +83,12 @@ ExternalReferenceContents &=
   attribute component_manager_id { text }?
 
 ServiceContents &=
-  AnyExtension &
-  # Login services include ssh-services, serial consoles, etc.
-  element login { LoginServiceContents }* &
-
   # Install services include download and extraction of a file at
   # experiment startup.
   element install { InstallServiceContents }* &
 
   # Execute services include initialization scripts
   element execute { ExecuteServiceContents }*
-
-LoginServiceContents &=
-  AnyExtension &
-  # Authentication mechanism
-  attribute authentication { "ssh-keys" } &
-  # Access mechanism
-  attribute hostname { text } &
-  attribute port { text }
 
 InstallServiceContents &=
   AnyExtension &
@@ -106,10 +100,19 @@ ExecuteServiceContents &=
   # Shell environment allowed
   attribute shell { "sh" }
 
+TypeRelationContents &=
+  AnyExtension &
+  element hardware_type { HardwareTypeContents }* &
+  element sliver_type { SliverTypeContents }* &
+  element disk_image { DiskImageContents }*
+
 RSpecContents &=
   attribute type { "advertisement" } &
   element external_ref {
     ExternalReferenceContents
+  }* &
+  element type_relation {
+    TypeRelationContents
   }*
 
 start = RSpec

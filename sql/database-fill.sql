@@ -148,7 +148,7 @@ REPLACE INTO exported_tables VALUES ('table_regex');
 REPLACE INTO exported_tables VALUES ('testsuite_preentables');
 REPLACE INTO exported_tables VALUES ('webdb_table_permissions');
 REPLACE INTO exported_tables VALUES ('emulab_pubs_month_map');
-
+REPLACE INTO exported_tables VALUES ('event_triggertypes');
 
 --
 -- Dumping data for table `foreign_keys`
@@ -425,6 +425,7 @@ REPLACE INTO state_transitions VALUES ('NORMALv1','ISUP','PXEBOOTING','KernelCha
 REPLACE INTO state_transitions VALUES ('NODEALLOC','FREE_CLEAN','RES_INIT_CLEAN','Reserve');
 REPLACE INTO state_transitions VALUES ('PXEKERNEL','PXEWAIT','PXEBOOTING','Retry');
 REPLACE INTO state_transitions VALUES ('PXEKERNEL','PXEBOOTING','PXEWAIT','Free');
+REPLACE INTO state_transitions VALUES ('PXEKERNEL','PXELIMBO','PXEBOOTING','Bootinfo-Restart');
 REPLACE INTO state_transitions VALUES ('BATCHSTATE','ACTIVATING','SWAPPED','NonBatch');
 REPLACE INTO state_transitions VALUES ('NORMAL','ISUP','SHUTDOWN','Reboot');
 REPLACE INTO state_transitions VALUES ('NORMAL','REBOOTING','SHUTDOWN','Reboot');
@@ -566,6 +567,8 @@ REPLACE INTO table_regex VALUES ('eventlist','objecttype','int','redirect','defa
 REPLACE INTO table_regex VALUES ('eventlist','eventtype','int','redirect','default:tinyint',0,0,NULL);
 REPLACE INTO table_regex VALUES ('eventlist','arguments','text','redirect','default:text',0,1024,NULL);
 REPLACE INTO table_regex VALUES ('eventlist','atstring','text','redirect','default:text',0,1024,NULL);
+REPLACE INTO table_regex VALUES ('eventlist','triggertype','int','redirect','default:tinyint',0,0,NULL);
+
 REPLACE INTO table_regex VALUES ('experiments','eid','text','regex','^[a-zA-Z0-9][-a-zA-Z0-9]+$',2,19,'Must ensure not too long for the database. PID is 12, and the max is 32, so the user is not allowed to specify an EID more than 19, since other parts of the system may concatenate them together with a hyphen');
 REPLACE INTO table_regex VALUES ('experiments','eid_idx','text','regex','^[\\d]+$',1,12,NULL);
 REPLACE INTO table_regex VALUES ('experiments','multiplex_factor','int','redirect','default:tinyint',0,0,NULL);
@@ -680,11 +683,11 @@ REPLACE INTO table_regex VALUES ('virt_lans','trace_db','int','redirect','defaul
 REPLACE INTO table_regex VALUES ('virt_lans','fixed_iface','text','redirect','default:tinytext',0,128,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','modbase','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','compat','int','redirect','default:boolean',0,0,NULL);
-
+REPLACE INTO table_regex VALUES ('virt_lans','layer','int','redirect','default:tinyint',1,2,NULL);
 REPLACE INTO table_regex VALUES ('virt_node_desires','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_node_desires','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_node_desires','vname','text','redirect','virt_nodes:vname',0,0,NULL);
-REPLACE INTO table_regex VALUES ('virt_node_desires','desire','text','regex','^[\\?\\*]?[\\+\\!\\&]?[-\\w?+]+$',1,30,NULL);
+REPLACE INTO table_regex VALUES ('virt_node_desires','desire','text','regex','^[\\?\\*]?[\\+\\!\\&]?[-\\w?+]+$',1,64,NULL);
 REPLACE INTO table_regex VALUES ('virt_node_desires','weight','int','redirect','default:float',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','eid','text','redirect','experiments:eid',0,0,NULL);
@@ -848,6 +851,7 @@ REPLACE INTO table_regex VALUES ('images','version','text','redirect','os_info:v
 REPLACE INTO table_regex VALUES ('images','osfeatures','text','redirect','os_info:osfeatures',0,0,NULL);
 REPLACE INTO table_regex VALUES ('images','op_mode','text','redirect','os_info:op_mode',0,0,NULL);
 REPLACE INTO table_regex VALUES ('images','wholedisk','text','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','mbr_version','text','redirect','default:int',0,0,NULL);
 REPLACE INTO table_regex VALUES ('images','max_concurrent','text','redirect','default:int',0,0,NULL);
 REPLACE INTO table_regex VALUES ('images','reboot_waittime','text','redirect','default:int',0,0,NULL);
 
@@ -938,6 +942,7 @@ REPLACE INTO table_regex VALUES ('virt_node_motelog','pid','text','redirect','pr
 REPLACE INTO table_regex VALUES ('virt_node_motelog','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO `table_regex` VALUES ('virt_nodes','plab_plcnet','text','regex','^[\\w\\_\\d]+$',0,0,NULL);
 REPLACE INTO table_regex VALUES ('os_info','osid','text','regex','^[-\\w\\.+]+$',2,35,NULL);
+REPLACE INTO table_regex VALUES ('os_info','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('os_info','pid_idx','text','redirect','projects:pid_idx',0,0,NULL);
 REPLACE INTO table_regex VALUES ('os_info','osname','text','regex','^[-\\w\\.+]+$',2,20,NULL);
 REPLACE INTO table_regex VALUES ('os_info','description','text','redirect','default:fulltext',1,256,NULL);
@@ -946,6 +951,7 @@ REPLACE INTO table_regex VALUES ('os_info','version','text','regex','^[-\\w\\.]*
 REPLACE INTO table_regex VALUES ('os_info','path','text','regex','^[-\\w\\.\\/:]*$',1,256,NULL);
 REPLACE INTO table_regex VALUES ('os_info','magic','text','redirect','default:tinytext',0,256,NULL);
 REPLACE INTO table_regex VALUES ('os_info','shared','int','redirect','default:tinyint',0,1,NULL);
+REPLACE INTO table_regex VALUES ('os_info','mfs','int','redirect','default:tinyint',0,1,NULL);
 REPLACE INTO table_regex VALUES ('os_info','mustclean','int','redirect','default:tinyint',0,1,NULL);
 REPLACE INTO table_regex VALUES ('os_info','osfeatures','text','regex','^[-\\w,]*$',1,128,NULL);
 REPLACE INTO table_regex VALUES ('os_info','op_mode','text','regex','^[-\\w]*$',1,20,NULL);
@@ -971,6 +977,7 @@ REPLACE INTO table_regex VALUES ('elabinelab_attributes','ordering','int','redir
 REPLACE INTO table_regex VALUES ('default','tinytext_utf8','text','regex','^(?:[\\x20-\\x7E]|[\\xC2-\\xDF][\\x80-\\xBF]|\\xE0[\\xA0-\\xBF][\\x80-\\xBF]|[\\xE1-\\xEC\\xEE\\xEF][\\x80-\\xBF]{2}|\\xED[\\x80-\\x9F][\\x80-\\xBF])*$',0,256,'adopted from http://www.w3.org/International/questions/qa-forms-utf-8.en.php');
 REPLACE INTO table_regex VALUES ('default','text_utf8','text','regex','^(?:[\\x20-\\x7E]|[\\xC2-\\xDF][\\x80-\\xBF]|\\xE0[\\xA0-\\xBF][\\x80-\\xBF]|[\\xE1-\\xEC\\xEE\\xEF][\\x80-\\xBF]{2}|\\xED[\\x80-\\x9F][\\x80-\\xBF])*$',0,65535,'adopted from http://www.w3.org/International/questions/qa-forms-utf-8.en.php');
 REPLACE INTO table_regex VALUES ('default','fulltext_utf8','text','regex','^(?:[\\x09\\x0A\\x0D\\x20-\\x7E]|[\\xC2-\\xDF][\\x80-\\xBF]|\\xE0[\\xA0-\\xBF][\\x80-\\xBF]|[\\xE1-\\xEC\\xEE\\xEF][\\x80-\\xBF]{2}|\\xED[\\x80-\\x9F][\\x80-\\xBF])*$',0,65535,'adopted from http://www.w3.org/International/questions/qa-forms-utf-8.en.php');
+
 
 --
 -- Dumping data for table `testsuite_preentables`
@@ -1061,3 +1068,5 @@ REPLACE INTO `emulab_pubs_month_map` VALUES (23,10.5,'Oct-Nov');
 REPLACE INTO `emulab_pubs_month_map` VALUES (24,11.5,'Nov-Dec');
 REPLACE INTO `emulab_pubs_month_map` VALUES (25,12.5,'Dec-Jan');
 
+REPLACE INTO `event_triggertypes`  VALUES (0,'TIMER');
+REPLACE INTO `event_triggertypes`  VALUES (2,'SWAPOUT');

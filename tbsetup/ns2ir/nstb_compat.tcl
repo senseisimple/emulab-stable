@@ -62,6 +62,7 @@ proc tb-set-encapsulate {onoff} {}
 proc tb-set-vlink-emulation {style} {}
 proc tb-set-sim-os {os} {}
 proc tb-set-jail-os {os} {}
+proc tb-set-link-layer {link layer} {}
 proc tb-set-delay-os {os} {}
 proc tb-set-delay-capacity {cap} {}
 proc tb-use-ipassign {onoff} {}
@@ -79,7 +80,7 @@ proc tb-elab-in-elab {onoff} {}
 proc tb-elab-in-elab-topology {topo} {}
 proc tb-set-inner-elab-eid {eid} {}
 proc tb-set-elabinelab-cvstag {cvstag} {}
-proc tb-elabinelab-singlenet {} {}
+proc tb-elabinelab-singlenet {{onoff 1}} {}
 proc tb-set-elabinelab-attribute {key val {order 0}} {}
 proc tb-unset-elabinelab-attribute {key} {}
 proc tb-set-elabinelab-role-attribute {role key val {order 0}} {}

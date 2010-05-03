@@ -1,0 +1,50 @@
+#! /bin/sh
+
+version_file=VERSION
+
+# Use git tools to get the head of the current branch
+# if they're available
+head=`git rev-parse HEAD 2>/dev/null`
+
+if [ -z "$head" ]; then
+	if [ -f .git/HEAD ]; then
+		echo "Extracting HEAD with git tools failed" 1>&2
+		echo "Trying to parse metadata manually" 1>&2
+		# Hmm, no git tools or they failed.  Try
+		# extracting the rev by hand.
+
+		# .git/HEAD can contain either a symbolic ref or a
+		# sha1 hash (if on a detached head), so we need to
+		# handle both cases.
+		head=`cat .git/HEAD`
+		case $head in ref:*)
+			# The ref can be unpacked or packed, so we need
+			# to check both places.
+			ref=${head#ref: }
+			if [ -f .git/$ref ]; then
+				head=`cat .git/$ref`
+			elif [ -f .git/packed-refs ]; then
+				head=`sed -n 's#^\([a-f0-9]*\) '$ref'$#\1#p' \
+					.git/packed-refs`
+			else
+				echo "Symbolic ref \"$ref\" not found" 1>&2
+				exit 1
+			fi
+			;;
+		esac
+	elif [ -f $version_file ]; then
+		# This is only used for exported tarballs
+		head=`sed -n 's#^Version: $Format:\([a-f0-9]*\) .*\$.*$#\1#p' \
+			$version_file`
+	else
+		exit 1
+	fi
+fi
+
+# Sanity check of head; should look like SHA1 hash
+if ! echo $head | grep -E '^[a-f0-9]{40}$' > /dev/null 2>&1; then
+	echo "Head \"$head\" does not look like a SHA1 hash" 1>&2
+	exit 1
+fi
+
+echo $head

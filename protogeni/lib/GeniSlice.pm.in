@@ -18,6 +18,7 @@ use GeniAuthority;
 use GeniCredential;
 use GeniCertificate;
 use GeniAggregate;
+use GeniUser;
 use GeniHRN;
 use English;
 use Date::Parse;
@@ -88,9 +89,9 @@ sub Lookup($$)
 #
 sub Create($$$$;$$)
 {
-    my ($class, $certificate, $creator_uuid, $authority, $exptidx, $lock) = @_;
+    my ($class, $certificate, $creator, $authority, $exptidx, $lock) = @_;
 
-    my $slice = GeniRegistry::GeniSlice->Create($certificate, $creator_uuid,
+    my $slice = GeniRegistry::GeniSlice->Create($certificate, $creator,
 						$authority, $exptidx, $lock);
 
     return undef
@@ -245,7 +246,7 @@ sub UnLock($)
 #
 sub CreateFromLocal($$$)
 {
-    my ($class, $experiment, $user) = @_;
+    my ($class, $experiment, $geniuser) = @_;
 
     #
     # So we know who/what we are acting as.
@@ -277,14 +278,14 @@ sub CreateFromLocal($$$)
     # Generate a certificate.
     #
     $certificate = GeniCertificate->Create("slice", $urn, $hrn,
-					   $user->email());
+					   $geniuser->email());
     if (!defined($certificate)) {
 	print STDERR "GeniSlice::CreateFromLocal: ".
 	    "Could not generate new certificate $experiment\n";
 	return undef;
     }
     # Create the slice as locked.
-    my $slice = GeniSlice->Create($certificate, $user->uuid(),
+    my $slice = GeniSlice->Create($certificate, $geniuser,
 				  $authority, $experiment->idx(), 1);
     $certificate->Delete()
 	if (!defined($slice));
@@ -306,8 +307,12 @@ sub Register($)
     return -1
 	if (!defined($clearinghouse));
 
-    return $clearinghouse->RegisterSlice($self->creator_uuid(),
-					 $self->cert(), {});
+    my $creator = GeniUser->Lookup($self->creator_uuid(), 1);
+    if (!defined($creator)) {
+	print STDERR "Could not find creator for $self\n";
+	return -1;
+    }
+    return $clearinghouse->RegisterSlice($creator->urn(), $self->cert(), {});
 }
 
 #
@@ -324,7 +329,7 @@ sub UnRegister($)
     return -1
 	if (!defined($clearinghouse));
 
-    return $clearinghouse->RemoveSlice($self->uuid());
+    return $clearinghouse->RemoveSlice($self->urn());
 }
 
 #

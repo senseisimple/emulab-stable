@@ -1,0 +1,104 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use Fcntl ':flock';
+
+#
+# dhcpd_makeconf - helper script to create dhcpd.conf files from the database.
+# The template file should look like an ordinary dhcpd.conf file, but have
+# the string %%nodetype=<type> where you want entries for a set of nodes
+# filled out. See the template file in the dhcp directory for an example.
+#
+sub usage {
+    print "Usage: $0 [-h] [-r]\n";
+    print "-h	Show this message\n";
+    print "-r 	Restart DHCPD after config file regeneration\n";
+    exit(1);
+}
+my $optlist = "h:r";
+my $install = 0;
+my $vnames  = 0;
+my $restart = 0;
+
+#
+# Configure variables
+#
+my $TBOPS       = "@TBOPSEMAIL@";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/sbin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Turn off line buffering on output
+$| = 1;
+
+use lib "@prefix@/lib";
+use libtestbed;
+use libsetup 'gendhcpdconf';
+use liblocsetup 'os_gendhcpdconf';
+use libtmcc;
+
+# Parse command arguments. Once we return from getopts, all that should
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"r"})) {
+	$restart = 1;
+}
+if (defined($options{"h"})) {
+    usage();
+}
+
+#
+# If we are going to actually install this file, must serialize to
+# avoid a trashed config file.
+#
+if ((my $locked = TBScriptLock("dhcpd.conf", 1)) != TBSCRIPTLOCK_OKAY()) {
+	exit(0) if ($locked == TBSCRIPTLOCK_IGNORE);
+	fatal("Could not get the lock after a long time!\n");
+}
+
+#
+# Generate the dhcp configuration
+#
+liblocsetup::os_gendhcpdconf();
+
+if ($restart) {
+	$dpid = `cat /var/run/dhcpd.pid`;
+	chomp($dpid);
+
+	# untaint
+	if ($dpid =~ /^([\d]+)$/) {
+		$dpid = $1;
+	}
+	else {
+		fatal("Bad pid for DHCPD: $dpid");
+	}
+	if (kill('TERM', $dpid) == 0) {
+		fatal("Could not kill(TERM) process $dpid (dhcpd): $!");
+	}
+}
+TBScriptUnlock();
+exit(0);
+
+#
+# Die.
+#
+sub fatal {
+    my $msg = $_[0];
+
+    TBScriptUnlock()
+	if ($install);
+
+    die("*** $0:\n".
+	"    $msg\n");
+}
+

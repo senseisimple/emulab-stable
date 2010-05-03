@@ -41,15 +41,14 @@ if TYPE not in ["SA", "CM", "Component", "Slice", "User"]:
     sys.exit(1)
 
 #
-# Get special credentials from the command line, that allows me to do things at the CH.
+# Get special credentials from the command line, that allows me to do things
+# at the CH. 
 #
 if not selfcredentialfile:
     print "Please specify special credentials with -c option."
     sys.exit(1)
 
-
 mycredential = get_self_credential()
-
 
 print "Resolving at the CH"
 params = {}

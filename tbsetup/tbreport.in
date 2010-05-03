@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -245,7 +245,7 @@ if ($showmap && $state eq EXPTSTATE_ACTIVE) {
     foreach $v (sort keys(%v2pmap)) {
 	my $p = $v2pmap{$v}->{PNODE};
 	my $t = $v2pmap{$v}->{TYPE};
-	my $o = $v2pmap{$v}->{OSID};
+	my $o = $v2pmap{$v}->{OSID} ? $v2pmap{$v}->{OSID} : "<NONE>";
 	my $m = $v2pmap{$v}->{VVP};
 	printf "%-15s %-12s %-15s %s", $v, $t, $o, $p;
 	if ($m ne $p) {

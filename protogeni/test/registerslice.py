@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
 # All rights reserved.
 # 
 # Permission to use, copy, modify and distribute this software is hereby
@@ -74,7 +74,7 @@ if rval:
     print str(response)
     pass
 myslice = response["value"]
-print "New slice created"
+print "New slice created: " + SLICEURN
 if debug: print str(myslice)
 
 #
@@ -96,7 +96,7 @@ if OtherUser:
     # And bind the user to the slice so that he can get his own cred.
     #
     params = {}
-    params["uuid"]       = user["uuid"]
+    params["urn"]        = user["urn"]
     params["credential"] = myslice
     rval,response = do_method("sa", "BindToSlice", params)
     if rval:

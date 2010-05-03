@@ -86,6 +86,7 @@ require libGeni;
 use Experiment;
 use Node;
 use libtestbed;
+use emutil;
 use POSIX qw(strftime ceil);
 
 #
@@ -376,6 +377,9 @@ $SIG{HUP} = \&handler
     if (!$debug);
 
 while (1) {
+    next
+	if (NoLogins());
+
     print "Running at ".
 	POSIX::strftime("20%y-%m-%d %H:%M:%S", localtime()) . "\n";
 
@@ -386,7 +390,7 @@ while (1) {
     # Be certain stale info is gone.
     GeniUtil::FlushCaches();
 
-    sleep(15);
+    sleep(60);
 }
 exit(0);
 

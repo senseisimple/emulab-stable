@@ -1,0 +1,37 @@
+#
+# CMULab Patches
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (!DBSlotExists("eventlist", "triggertype")) {
+	DBQueryFatal("ALTER TABLE eventlist ADD COLUMN ".
+		     " `triggertype` smallint(5) unsigned NOT NULL ".
+		     " default '0' after eventtype");
+    }
+    DBQueryFatal("REPLACE INTO table_regex VALUES" . 
+		 " ('eventlist', 'triggertype', 'int', 'redirect',
+		 'default:tinyint', 0,0,NULL)");
+
+    if (!DBTableExists("event_triggertypes")) {
+	DBQueryFatal("CREATE TABLE `event_triggertypes` (" .
+		     " `idx` smallint(5) unsigned NOT NULL," .
+		     " `type` tinytext NOT NULL," .
+		     " PRIMARY KEY (`idx`)" .
+		     ") ENGINE=MyISAM DEFAULT CHARSET=latin1;");
+    }
+    DBQueryFatal("REPLACE INTO event_triggertypes VALUES " . 
+		 "(0,'TIMER')");
+    DBQueryFatal("REPLACE INTO event_triggertypes VALUES " . 
+		 "(2,'SWAPOUT')");
+    DBQueryFatal("REPLACE INTO exported_tables VALUES ".
+		 "('event_triggertypes')");
+
+    return 0;
+}
+1;
+

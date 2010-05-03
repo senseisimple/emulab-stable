@@ -37,6 +37,7 @@ INSERT INTO sitevariables VALUES ('watchdog/isalive/vnode',NULL,'10','Interval i
 INSERT INTO sitevariables VALUES ('watchdog/isalive/plab',NULL,'10','Interval in minutes between planetlab node status reports (0==never report)',0);
 INSERT INTO sitevariables VALUES ('watchdog/isalive/wa',NULL,'1','Interval in minutes between widearea node status reports (0==never report)',0);
 INSERT INTO sitevariables VALUES ('watchdog/isalive/dead_time','10','120','Time, in minutes, after which to consider a node dead if it has not checked in via tha watchdog',0);
+INSERT INTO sitevariables VALUES ('watchdog/dhcpdconf',NULL,'5','Time in minutes between DHCPD configuration updates (0==never update)',0);
 INSERT INTO sitevariables VALUES ('plab/setup/vnode_batch_size',NULL,'40','Number of plab nodes to setup simultaneously',0);
 INSERT INTO sitevariables VALUES ('plab/setup/vnode_wait_time','300','960','Number of seconds to wait for a plab node to setup',0);
 INSERT INTO sitevariables VALUES ('watchdog/rusage','30','300','Interval in _seconds_ between node resource usage reports (0==never report)',0);
@@ -55,11 +56,15 @@ INSERT INTO sitevariables VALUES ('robotlab/opentime','08:00','07:00','Time the 
 INSERT INTO sitevariables VALUES ('robotlab/closetime',NULL,'18:00','Time the Robot lab closes down for the night.',0);
 INSERT INTO sitevariables VALUES ('robotlab/open','1','0','Turn the Robot Lab on/off for weekends and holidays. Overrides the open/close times.',0);
 INSERT INTO sitevariables VALUES ('swap/admission_control_debug',NULL,'0','Turn on/off admission control debugging (lots of output!)',0);
-INSERT INTO sitevariables VALUES ('elabinelab/boss_pkg','emulab-boss-1.8','emulab-boss-1.8','Name of boss node install package',0);
-INSERT INTO sitevariables VALUES ('elabinelab/boss_pkg_dir','/share/freebsd/packages/FreeBSD-4.10-20041102','/share/freebsd/packages/FreeBSD-4.10-20041102','Path from which to fetch boss packages',0);
-INSERT INTO sitevariables VALUES ('elabinelab/ops_pkg','emulab-ops-1.4','emulab-ops-1.4','Name of ops node install package',0);
-INSERT INTO sitevariables VALUES ('elabinelab/ops_pkg_dir','/share/freebsd/packages/FreeBSD-4.10-20041102','/share/freebsd/packages/FreeBSD-4.10-20041102','Path from which to fetch ops packages',0);
+INSERT INTO sitevariables VALUES ('elabinelab/boss_pkg',NULL,'emulab-boss-1.8','Name of boss node install package (DEPRECATED)',0);
+INSERT INTO sitevariables VALUES ('elabinelab/boss_pkg_dir',NULL,'/share/freebsd/packages/FreeBSD-4.10-20041102','Path from which to fetch boss packages (DEPRECATED)',0);
+INSERT INTO sitevariables VALUES ('elabinelab/ops_pkg',NULL,'emulab-ops-1.4','Name of ops node install package (DEPRECATED)',0);
+INSERT INTO sitevariables VALUES ('elabinelab/ops_pkg_dir',NULL,'/share/freebsd/packages/FreeBSD-4.10-20041102','Path from which to fetch ops packages (DEPRECATED)',0);
 INSERT INTO sitevariables VALUES ('elabinelab/windows','1','0','Turn on Windows support in inner Emulab',0);
+INSERT INTO `sitevariables` VALUES ('elabinelab/singlenet',NULL,'0','Default control net config. 0==use inner cnet, 1==use real cnet',1);
+INSERT INTO `sitevariables` VALUES ('elabinelab/boss_osid',NULL,'','Default (emulab-ops) OSID to boot on boss node. Empty string means use node_type default OSID',1);
+INSERT INTO `sitevariables` VALUES ('elabinelab/ops_osid',NULL,'','Default (emulab-ops) OSID to boot on ops node. Empty string means use node_type default OSID',1);
+INSERT INTO `sitevariables` VALUES ('elabinelab/fs_osid',NULL,'','Default (emulab-ops) OSID to boot on fs node. Empty string means use node_type default OSID',1);
 INSERT INTO sitevariables VALUES ('general/firstinit/state',NULL,'Ready','Indicates that a new emulab is not setup yet. Moves through several states.',0);
 INSERT INTO sitevariables VALUES ('general/firstinit/pid',NULL,'testbed','The Project Name of the first project.',0);
 INSERT INTO sitevariables VALUES ('general/version/minor','168','','Source code minor revision number',0);
@@ -77,7 +82,7 @@ INSERT INTO sitevariables VALUES ('general/joinproject/admincheck','1','0','When
 INSERT INTO sitevariables VALUES ('protogeni/allow_externalusers','1','1','When set, external users may allocate slivers on your testbed.',0);
 INSERT INTO sitevariables VALUES ('protogeni/max_externalnodes',NULL,'1024','When set, external users may allocate slivers on your testbed.',0);
 INSERT INTO sitevariables VALUES ('protogeni/cm_uuid','28a10955-aa00-11dd-ad1f-001143e453fe','','The UUID of the local Component Manager.',0);
-INSERT INTO sitevariables VALUES ('protogeni/max_ticket_lifetime','90','90','The maximum ticket lifetime. When set limits the lifetime of a ticket.',0);
+INSERT INTO sitevariables VALUES ('protogeni/max_sliver_lifetime','90','90','The maximum sliver lifetime. When set limits the lifetime of a sliver.',0);
 INSERT INTO sitevariables VALUES ('protogeni/max_components','-1','-1','Maximum number of components that can be allocated. -1 indicates any number of components can be allocated.',0);
 INSERT INTO sitevariables VALUES ('general/minpoolsize','3','1','The Minimum size of the shared pool',0);
 INSERT INTO sitevariables VALUES ('general/maxpoolsize','5','1','The maximum size of the shared pool',0);

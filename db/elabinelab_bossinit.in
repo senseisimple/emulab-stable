@@ -247,6 +247,7 @@ if (1) {
     # Now symlink all the alternate boots to pxeboot.emu
     # XXX we assume everything is at the top level of /tftpboot right now.
     #
+    $EUID = 0;
     foreach my $boot (@bogoboots) {
 	if ($boot =~ /^\/tftpboot\/([^\/]+)$/) {
 	    $boot = $1;
@@ -259,6 +260,7 @@ if (1) {
 	    }
 	}
     }
+    $EUID = $UID;
 
     #
     # Remake the dhcpd.conf file to reflect any pxeboot change.

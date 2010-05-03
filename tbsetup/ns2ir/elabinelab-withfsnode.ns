@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004-2008 University of Utah and the Flux Group.
+# Copyright (c) 2004-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -150,6 +150,10 @@ if {[info exists ::TBCOMPAT::elabinelab_nodeos("boss")]} {
     namespace eval TBCOMPAT {
         tb-set-node-os $myboss $elabinelab_nodeos("boss")
     }
+} elseif {[info exists ::TBCOMPAT::sitevariables(elabinelab/boss_osid)]} {
+    namespace eval TBCOMPAT {
+	tb-set-node-os $myboss $sitevariables(elabinelab/boss_osid)
+    }
 } else {
     tb-set-node-os $myboss FBSD63-STD
 }
@@ -158,14 +162,22 @@ if {[info exists ::TBCOMPAT::elabinelab_nodeos("ops")]} {
     namespace eval TBCOMPAT {
         tb-set-node-os $myops $elabinelab_nodeos("ops")
     }
+} elseif {[info exists ::TBCOMPAT::sitevariables(elabinelab/ops_osid)]} {
+    namespace eval TBCOMPAT {
+	tb-set-node-os $myops $sitevariables(elabinelab/ops_osid)
+    }
 } else {
-    tb-set-node-os $myops  FBSD63-STD
+    tb-set-node-os $myops FBSD63-STD
 }
 
 if {[info exists ::TBCOMPAT::elabinelab_nodeos("fs")]} {
     namespace eval TBCOMPAT {
         tb-set-node-os $myfs $elabinelab_nodeos("fs")
     }
+} elseif {[info exists ::TBCOMPAT::sitevariables(elabinelab/fs_osid)]} {
+    namespace eval TBCOMPAT {
+	tb-set-node-os $myfs $sitevariables(elabinelab/fs_osid)
+    }
 } else {
-    tb-set-node-os $myfs  FBSD63-STD
+    tb-set-node-os $myfs FBSD63-STD
 }

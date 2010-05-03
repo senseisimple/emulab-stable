@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -132,13 +132,14 @@ my %xmlfields =
     # XML Field Name        DB slot name         Flags             Default
     ("description"	=> ["description",	$SLOT_REQUIRED],
      "osname"		=> ["osname"	,	$SLOT_REQUIRED],
-     "project"		=> ["pid_idx",		$SLOT_REQUIRED],
+     "pid"		=> ["pid",		$SLOT_REQUIRED],
      "OS"		=> ["OS",		$SLOT_REQUIRED],
      "version"		=> ["version",		$SLOT_OPTIONAL,	   ""],
      "path"		=> ["path",		$SLOT_OPTIONAL,	   "NULL"],
      "magic",		=> ["magic",		$SLOT_OPTIONAL,	   ""],
      "op_mode",		=> ["op_mode",		$SLOT_REQUIRED],
      "features",	=> ["osfeatures",	$SLOT_OPTIONAL,	   ""],
+     "mfs",		=> ["mfs",		$SLOT_ADMINONLY,   0],
      "shared",		=> ["shared",		$SLOT_ADMINONLY,   0],
      "mustclean",	=> ["mustclean",	$SLOT_ADMINONLY,   1],
      "nextosid",	=> ["nextosid",		$SLOT_ADMINONLY],
@@ -257,12 +258,32 @@ foreach $key (keys(%{ $xmlparse->{'attribute'} })) {
 	$errors{$key} = "Administrators only"
 	    if (! $this_user->IsAdmin());
     }
+
+    #
+    # Special case nextosid so it can be in pid,osname format. 
+    #
+    if ($dbslot eq "nextosid" && $value =~ /^.+,.+$/) {
+	my ($pid,$osname) = ($value =~ /^(.*),(.*)$/);
 	
-    # Now check that the value is legal.
-    if (! TBcheck_dbslot($value, "os_info",
-			 $dbslot, TBDB_CHECKDBSLOT_ERROR)) {
-	$errors{$key} = TBFieldErrorString();
-	next;
+	# Now check that the value is legal.
+	if (! TBcheck_dbslot($pid, "projects",
+			     "pid", TBDB_CHECKDBSLOT_ERROR)) {
+	    $errors{$key} = TBFieldErrorString();
+	    next;
+	}
+	if (! TBcheck_dbslot($osname, "os_info",
+			     "osname", TBDB_CHECKDBSLOT_ERROR)) {
+	    $errors{$key} = TBFieldErrorString();
+	    next;
+	}
+    }
+    else {
+	# Now check that the value is legal.
+	if (! TBcheck_dbslot($value, "os_info",
+			     $dbslot, TBDB_CHECKDBSLOT_ERROR)) {
+	    $errors{$key} = TBFieldErrorString();
+	    next;
+	}
     }
 
     $newosid_args{$key} = $value;
@@ -273,9 +294,9 @@ UserError()
 #
 # Now do special checks.
 #
-my $project = Project->Lookup($newosid_args{"project"});
+my $project = Project->Lookup($newosid_args{"pid"});
 if (!defined($project)) {
-    UserError("Project: No such project ($project)");
+    UserError("Project: No such project");
 }
 if (!$project->AccessCheck($this_user, TB_PROJECT_MAKEOSID())) {
     UserError("Project: Not enough permission");
@@ -297,6 +318,8 @@ if (exists($newosid_args{"nextosid"})) {
     if (!defined($nextos)) {
 	UserError("Nextosid: Does not exist");
     }
+    # Might be in pid,osname format.
+    $newosid_args{"nextosid"} = $nextos->osid();
 }
 
 # Mere users have to supply a version, but admin people do not.

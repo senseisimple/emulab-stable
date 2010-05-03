@@ -1,5 +1,4 @@
 #!/usr/bin/perl -wT
-
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2000-2010 University of Utah and the Flux Group.
@@ -55,8 +54,10 @@ use libArchive;
 use Template;
 use NodeType;
 use Experiment;
+use Image;
 use OSinfo;
 use User;
+use Node;
 if ($PGENISUPPORT) {
     require libGeni;
 }
@@ -64,7 +65,6 @@ if ($PGENISUPPORT) {
 TBDebugTimeStampsOn();
 
 my $vnode_setup = "$TB/sbin/vnode_setup";
-my $osselect    = "$TB/bin/os_select";
 my $nodereboot  = "$TB/bin/node_reboot";
 my $elab_setup  = "$TB/sbin/elabinelab";
 my $dbg		= 0;
@@ -74,6 +74,7 @@ my $failedvnodes= 0;
 my $failedplab  = 0;
 my $failedgeni  = 0;
 my $canceled    = 0;
+my %nodeobjs    = ();
 my %nodes       = ();
 my %vnodes      = ();
 my %sharednodes = ();
@@ -82,6 +83,7 @@ my %vnode2pnode = ();
 my %pnodevcount = ();
 my %plabvnodes  = ();
 my %geninodes   = ();
+my %einenodes	= ();
 my %osids       = ();
 my %osmap       = ();
 my %canfail     = ();
@@ -225,7 +227,8 @@ if (TBExptPlabInElabPLC($pid, $eid, \$plcnode)) {
 # Get the set of nodes, as well as the nodes table information for them.
 #
 my $db_result =
-    DBQueryFatal("select n.*,l.pid,r.vname,r.sharing_mode from reserved as r ".
+    DBQueryFatal("select n.*,l.pid,r.vname,r.sharing_mode,r.inner_elab_role ".
+		 "from reserved as r ".
 		 "left join nodes as n on n.node_id=r.node_id ".
 		 "left join last_reservation as l on n.node_id=l.node_id ".
 		 "where r.pid='$pid' and r.eid='$eid'");
@@ -248,6 +251,8 @@ while (my %row = $db_result->fetchhash()) {
     my $virtnode  = $typeinfo->isvirtnode();
     my $sharednode = defined($row{'sharing_mode'}) 
 	&& $row{'sharing_mode'} eq 'using_shared_local';
+    my $iseinenode= $elabinelab && defined($row{'inner_elab_role'})
+	&& $row{'inner_elab_role'} eq 'node';
     my $isremote  = $typeinfo->isremotenode();
     my $isgeninode= $typeinfo->isfednode();
     my $imageable = $typeinfo->imageable();
@@ -255,6 +260,12 @@ while (my %row = $db_result->fetchhash()) {
     my $bios_wait = $typeinfo->bios_waittime();
     my $bootpath  = 0;
     my $osinfo    = undef;
+
+    my $nodeobj = Node->Lookup($node);
+    if (!defined($nodeobj)) {
+	die_noretry("Cannot lookup object for $node!");
+    }
+    $nodeobjs{$node} = $nodeobj;
 
     if ($isgeninode) {
 	#
@@ -282,12 +293,17 @@ while (my %row = $db_result->fetchhash()) {
 	    next;
 	}
     }
+    elsif ($iseinenode) {
+	print "Will skip reload/reboot of inner elab node $node.\n";
+	$einenodes{$node} = 1;
+	next;
+    }
     elsif ($subnode && !$imageable) {
 	print "Will skip subnode $node ISUP wait.\n";
     }
     else {
 	my $nodeAllocState;
-	TBGetNodeAllocState( $node, \$nodeAllocState );
+	$nodeobj->GetAllocState(\$nodeAllocState);
 	$nodes{$node}  = $node;
 	$nodeAllocStates{$node} = $nodeAllocState;
 	if ($nodeAllocState eq TBDB_ALLOCSTATE_RES_RECONFIG()) {
@@ -412,95 +428,35 @@ while (my %row = $db_result->fetchhash()) {
 	if (! $osinfo) {
 	    die_noretry("$node has no bootpath and no def_boot_osid set!");
 	}
-
 	#
 	# If there is an actual path, its an OSKit kernel not an image.
 	#
 	if (! defined($osinfo->path()) || $osinfo->path() eq "") {
+	    my $nextosinfo;
+	    
 	    #
 	    # Not an OSKit kernel.
+	    #
+	    if ($osinfo->IsGeneric()) {
+		#
+		# Map generic OSID to the specific one.
+		#
+		$nextosinfo = $osinfo->ResolveNextOSID($experiment);
+		if (!defined($nextosinfo)) {
+		    die_noretry("No next mapping for $osinfo on $node!\n");
+		}
+		print "Mapping $osinfo on $node to $nextosinfo\n";
+		$osinfo = $nextosinfo;
+	    }
+	    #
 	    # Make sure this OSID is actually loaded on the machine.
 	    #
-	    my $p_result =
-		DBQueryFatal("select * from partitions ".
-			     "where node_id='$node' and osid='$osid'".
-			     "order by partition");
-
-	    #
-	    # If not loaded, then see if the user was looking for the generic
-	    # name of the OS that is loaded.
-	    #
-	    if ($p_result->numrows == 0) {
-		#
-		# Check to see if a non specific version specified.
-		#
-		if (!defined($osinfo->version()) || $osinfo->version() eq "") {
-		    #
-		    # A non-specific version. There needs to be a way to
-		    # map it to another osid.
-		    #
-		    if (! defined($osinfo->nextosid())) {
-			die_noretry("No mapping for $osinfo ($node)!");
-		    }
-
-		    my $nextosid = TBResolveNextOSID($osid, $pid, $eid);
-		    if (!defined($nextosid)) {
-			die_noretry("No mapping for $osinfo ($node)!");
-		    }
-		    $nextosinfo = OSinfo->Lookup($nextosid);
-
-		    die_noretry("Could not map $osid to its object!")
-			if (!defined($nextosinfo));
-		
-		    #
-		    # See if the nextosid is already on the disk. If not,
-		    # it needs to be loaded.
-		    #
-		    my $o_result =
-			DBQueryFatal("select osid from partitions as p ".
-				     "where p.node_id='$node' and ".
-				     "      p.osid='$nextosid'");
-
-		    if (! $o_result->numrows) {
-			#
-			# User wants a specific version of an OS, but its not
-			# loaded on the machine.
-			#
-			print "Mapping $osinfo on $node to $nextosinfo ".
-			    "and setting up a reload.\n";
-
-			SetupReload($node, $nextosinfo, $type);
-			$osids{$node} = $nextosid;
-			$osmap{$node} = $nextosinfo;
-		    }
-		    else {
-			#
-			# Already loaded.
-			#
-			print "Mapping $osinfo on $node to $nextosinfo.\n";
-
-			if ($dolastload &&
-			    defined($row{'pid'}) && $row{'pid'} ne $pid) {
-			    SetupReload($node, $nextosinfo, $type);
-			}
-			else {
-			    system("$osselect $nextosid $node") and
-				die_noretry("Could not set boot OS to ".
-					    "$nextosid for $node");
-			}
-			$osids{$node} = $nextosid;
-			$osmap{$node} = $nextosinfo;
-		    }
-		}
-		else {
-		    #
-		    # User wants a specific version of an OS, but its not
-		    # loaded on the machine.
-		    #
-		    SetupReload($node, $osinfo, $type);
-		}
+	    my $isloaded = $nodeobj->IsOSLoaded($osinfo);
+	    if ($isloaded < 0) {
+		die_noretry("Error determining if $osinfo ".
+			    "is loaded on $node\n");
 	    }
-	    else {
+	    if ($isloaded) {
 		#
 		# OSID is loaded, but might need to be cleaned.
 		#
@@ -508,7 +464,26 @@ while (my %row = $db_result->fetchhash()) {
 		    defined($row{'pid'}) && $row{'pid'} ne $pid) {
 		    SetupReload($node, $osinfo, $type);
 		}
+		elsif ($nextosinfo) {
+		    #
+		    # Seems like a bad place for this; if the OS was
+		    # mapped to something else that is already on the
+		    # disk, need to reset def_boot_osid.
+		    #
+		    if ($nodeobj->OSSelect($osinfo, "def_boot_osid", 0)) {
+			die_noretry("Could not set boot OS to ".
+				    "$osinfo for $node");
+		    }
+		}
 	    }
+	    else {
+		#
+		# OS not loaded.
+		#
+		SetupReload($node, $osinfo, $type);
+	    }
+	    $osmap{$node} = $osinfo;
+	    $osids{$node} = $osinfo->osid();
 	}
     }
 
@@ -523,12 +498,25 @@ while (my %row = $db_result->fetchhash()) {
     #
     $osid = $osids{$node};
     if (!exists($reboot_waittime{$osid})) {
-	$reboot_waittime{$osid} = TBOSIDRebootWaittime($osid);
+	$reboot_waittime{$osid} = $osmap{$node}->reboot_waittime();
     }
 
     print STDERR "$node - $osmap{$node} - $canfail{$node}\n"
 	if $dbg;
 }
+
+#
+# XXX Inner elab nodes should never report in to us.
+# If they do, make sure they wind up in PXEWAIT.
+#
+if (keys(%einenodes)) {
+    DBQueryFatal("update nodes set ".
+		 "  def_boot_osid=NULL,".
+		 "  next_boot_osid=NULL,".
+		 "  temp_boot_osid=NULL ".
+		 "where node_id in (".
+		 join(",", map("'$_'", keys %einenodes)). ")");
+}    
 
 @all_nodes = (keys %nodes, keys %vnodes);
 
@@ -545,18 +533,15 @@ while (my %row = $db_result->fetchhash()) {
 # Collect some info about vnodes.
 #
 foreach my $vnode (keys(%vnodes)) {
-    my $jailed = $vnodes{$vnode};
-    my $pnode;
+    my $nodeobj = $nodeobjs{$vnode};
+    my $jailed  = $vnodes{$vnode};
 
 #    print "$vnode, $jailed\n";
 
     if (! $jailed) {
 	next;
     }
-
-    if (! TBPhysNodeID($vnode, \$pnode)) {
-	die_noretry("Cannot determine phys_nodeid for $vnode!");
-    }
+    my $pnode = $nodeobj->phys_nodeid();
 
 #    print "$vnode, $jailed, $pnode\n";
 
@@ -569,16 +554,11 @@ foreach my $vnode (keys(%vnodes)) {
 	if (!defined($pnodevcount{$pnode}));
     $pnodevcount{$pnode}++;
     $vnode2pnode{$vnode} = $pnode;
-
-    if (!exists($nodes{$pnode})) {
-	#
-	# Typical on remote nodes; we do not allocate the underlying
-	# phys node to the experiment.
-	#
-	next;
+    my $pnodeobj = Node->Lookup($pnode);
+    if (!defined($pnodeobj)) {
+	die_noretry("Cannot lookup object for $pnode!");
     }
-
-    # Nothing else to do for local jail nodes at this time ...
+    $nodeobjs{$pnode} = $pnodeobj;
 }
 
 #
@@ -600,6 +580,7 @@ foreach my $vnode (keys(%vnodes)) {
 #
 if ($firewalled) {
     my $node = $firewall;
+    my $nodeobj = $nodeobjs{$node};
 
     TBDebugTimeStamp("rebooting/reloading firewall");
     if (!FirewallSetup($node)) {
@@ -612,8 +593,8 @@ if ($firewalled) {
 	# We assume that firewall node images are "standard" here,
 	# and whine to tbops.
 	#
-	Node::MarkAsDown($node);
-	TBSetNodeLogEntry($node, $user_uid, TB_DEFAULT_NODELOGTYPE(),
+	$nodeobj->MarkAsDown();
+	$nodeobj->InsertNodeLogEntry($this_user, TB_DEFAULT_NODELOGTYPE(),
 			  "'Moved to hwdown by os_setup; ".
 			  "failed to boot image for osid " . $osmap{$node} .
 			  " in $pid/$eid'");
@@ -634,7 +615,7 @@ if ($firewalled) {
     # Check for cancelation.  Firewall setup may have taken awhile.
     #
     if (!$canceled) {
-	TBGetCancelFlag($pid, $eid, \$canceled);
+	$canceled = $experiment->canceled();
 	if ($canceled) {
 	    tbnotice({cause => 'canceled', severity => SEV_IMMEDIATE,
 		      error => ['cancel_flag']},
@@ -676,7 +657,7 @@ if ($plabinelab) {
     # Check for cancelation.  PLC setup may have taken awhile.
     #
     if (!$canceled) {
-	TBGetCancelFlag($pid, $eid, \$canceled);
+	$canceled = $experiment->canceled();
 	if ($canceled) {
 	    tbnotice({cause => 'canceled', severity => SEV_IMMEDIATE,
 		      error => ['cancel_flag']},
@@ -744,6 +725,8 @@ if (!$TESTMODE) {
 	my %nodeflags = ();
 
 	foreach my $node (@nodelist) {
+	    my $nodeobj = $nodeobjs{$node};
+	    
 	    #
 	    # vnodes only get rebooted if this is a modify and we need to
 	    # reload them (otherwise they will get rebooted because of presence
@@ -751,7 +734,7 @@ if (!$TESTMODE) {
 	    #
 	    if (defined($vnodes{$node})) {
 		my $vstate;
-		TBGetNodeAllocState($node,\$vstate);
+		$nodeobj->GetAllocState(\$vstate);
 		if ($vstate eq TBDB_ALLOCSTATE_RES_INIT_CLEAN()) {
 		    $nodeflags{$node}{'noreboot'} = 1;
 		}
@@ -767,7 +750,7 @@ if (!$TESTMODE) {
 		$nodeflags{$node}{'nowait'} = 1;
 	    }
 
-	    TBSetNodeAllocState( $node, TBDB_ALLOCSTATE_RES_RELOAD() );
+	    $nodeobj->SetAllocState(TBDB_ALLOCSTATE_RES_RELOAD());
 	    $nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_RELOAD();
 	    # No point in reboot/reconfig obviously, since node will reboot!
 	    delete $reboots{$node};
@@ -795,11 +778,13 @@ if (!$TESTMODE) {
     # 
     if (keys(%reboots)) {
 	foreach my $node (keys(%reboots)) {
+	    my $nodeobj = $nodeobjs{$node};
+
 	    if ($nodeAllocStates{$node} eq TBDB_ALLOCSTATE_RES_INIT_CLEAN()) {
-		TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_REBOOT_CLEAN());
+		$nodeobj->SetAllocState(TBDB_ALLOCSTATE_RES_REBOOT_CLEAN());
 		$nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_REBOOT_CLEAN();
 	    } else {
-		TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_REBOOT_DIRTY());
+		$nodeobj->SetAllocState(TBDB_ALLOCSTATE_RES_REBOOT_DIRTY());
 		$nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_REBOOT_DIRTY();
 	    }
 	    # See below, needed for vnode_setup.
@@ -888,7 +873,7 @@ if (!$TESTMODE) {
 	    add_failed_node_reload($node);
 	    delete($nodes{$node});
 
-	    TBSetNodeAllocState($node, TBDB_ALLOCSTATE_DOWN());
+	    $nodeobjs{$node}->SetAllocState(TBDB_ALLOCSTATE_DOWN());
 	    $nodeAllocStates{$node} = TBDB_ALLOCSTATE_DOWN();
 	}
     }
@@ -905,10 +890,10 @@ if ($plabinelab) {
     foreach my $node (@plabnodes) {
 	if (exists($nodes{$node})) {
 	    tbnotice "Not waiting for emulated plab node $node";
-	    Node::SetBootStatus($node, NODEBOOTSTATUS_OKAY);
-	    TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_READY());
+	    $nodeobjs{$node}->SetBootStatus(NODEBOOTSTATUS_OKAY);
+	    $nodeobjs{$node}->SetAllocState(TBDB_ALLOCSTATE_RES_READY());
 	    $nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_READY();
-	    TBSetNodeEventState($node, TBDB_NODESTATE_ISUP());
+	    $nodeobjs{$node}->SetEventState(TBDB_NODESTATE_ISUP());
 	    delete($nodes{$node});
 	}
     }
@@ -949,8 +934,9 @@ my @informtbopsfatal = ();
 
 TBDebugTimeStamp("Local node waiting started");
 while ( @nodelist ) {
-    my $node   = shift(@nodelist);
-    my $wstart = $waitstart{$node};
+    my $node    = shift(@nodelist);
+    my $nodeobj = $nodeobjs{$node};
+    my $wstart  = $waitstart{$node};
     my $actual_state;
     my $waittime = (60 * 7);	# The default.
 
@@ -969,8 +955,8 @@ while ( @nodelist ) {
 	    goto tbfailed;
 	}
 	print "$node is alive and well\n";
-	Node::SetBootStatus($node, NODEBOOTSTATUS_OKAY);
-	TBSetNodeAllocState( $node, TBDB_ALLOCSTATE_RES_READY() );
+	$nodeobj->SetBootStatus(NODEBOOTSTATUS_OKAY);
+	$nodeobj->SetAllocState(TBDB_ALLOCSTATE_RES_READY());
 	$nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_READY();
 	next;
     }
@@ -980,8 +966,7 @@ while ( @nodelist ) {
     # swap was canceled.
     #
     if (!$canceled) {
-	TBGetCancelFlag($pid, $eid, \$canceled);
-
+	$canceled = $experiment->canceled();
 	if ($canceled) {
 	    tbnotice({cause => 'canceled', severity => SEV_IMMEDIATE,
 		      error => ['cancel_flag']},
@@ -1005,7 +990,7 @@ while ( @nodelist ) {
     tbwarn "$node may be down. This has been reported to testbed-ops.";
 
   tbfailed:
-    Node::SetBootStatus($node, NODEBOOTSTATUS_FAILED);
+    $nodeobj->SetBootStatus(NODEBOOTSTATUS_FAILED);
 
     if ($canfail{$node} && !($canceled || $noretry)) {
 	push(@informuser, $node);
@@ -1021,12 +1006,11 @@ while ( @nodelist ) {
     # and allow it to be returned to the pool (caller, tbswap will end
     # doing the nfree on nodes with a DOWN allocstate).
     #
-    my $pidofosid;
+    my $pidofosid = $osmap{$node}->pid();
     if (!exists($geninodes{$node}) &&
-	(! TBOsidToPid($osids{$node}, \$pidofosid) ||
-	 $pidofosid eq TBOPSPID())) {
-	Node::MarkAsIll($node);
-	TBSetNodeLogEntry($node, $user_uid, TB_DEFAULT_NODELOGTYPE(),
+	(! defined($pidofosid) || $pidofosid eq TBOPSPID())) {
+	$nodeobj->MarkAsIll();
+	$nodeobj->InsertNodeLogEntry($this_user, TB_DEFAULT_NODELOGTYPE(),
 			  "'Moved to hwcheckup by os_setup; ".
 			  "failed to boot image for osid " . $osmap{$node} .
 			  " in $pid/$eid'");
@@ -1034,7 +1018,7 @@ while ( @nodelist ) {
     } else {
 	push(@informtbopswarn, $node);
     }
-    TBSetNodeAllocState( $node, TBDB_ALLOCSTATE_DOWN() );
+    $nodeobj->SetAllocState(TBDB_ALLOCSTATE_DOWN());
     $nodeAllocStates{$node} = TBDB_ALLOCSTATE_DOWN();
 
     $failed++;
@@ -1119,7 +1103,7 @@ foreach my $vnode (@vnodelist) {
 	if (!exists($rebooted{$pnode}) && !exists($reconfigs{$pnode}));
 
     if ($nodeAllocStates{$pnode} eq TBDB_ALLOCSTATE_RES_READY()) {
-	TBSetNodeAllocState($vnode, TBDB_ALLOCSTATE_RES_READY());
+	$nodeobjs{$vnode}->SetAllocState(TBDB_ALLOCSTATE_RES_READY());
 	$nodeAllocStates{$vnode} = TBDB_ALLOCSTATE_RES_READY();
     }
 }
@@ -1179,10 +1163,12 @@ elsif (@vnodelist) {
     @vnodelist = sort(@vnodelist);
 
     while ( @vnodelist ) {
-	my $node   = shift(@vnodelist);
-	my $pnode  = $vnode2pnode{$node};
-	my $islocal= exists($nodes{$pnode});
-	my $wstart = $waitstart{$node};
+	my $node    = shift(@vnodelist);
+	my $nodeobj = $nodeobjs{$node};
+	my $pnode   = $vnode2pnode{$node};
+	my $pnodeobj= $nodeobjs{$pnode};
+	my $islocal = exists($nodes{$pnode});
+	my $wstart  = $waitstart{$node};
 	my $curallocstate;
 	my $actual_state;
 	my $maxwait;
@@ -1211,7 +1197,7 @@ elsif (@vnodelist) {
 	    $maxwait = $reboot_time + 60 * $pnodevcount{$pnode};
 	}
 
-	TBGetNodeAllocState($node, \$curallocstate);
+	$nodeobj->GetAllocState(\$curallocstate);
 
 	#
 	# See if vnode_setup already determined the node was dead.
@@ -1231,15 +1217,15 @@ elsif (@vnodelist) {
 		TBDebugTimeStamp("Virtual node $node setup ISUP");
 		
 		# Might have already been set above.
-		TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_READY);
-		Node::SetBootStatus($node, NODEBOOTSTATUS_OKAY);
+		$nodeobj->SetAllocState(TBDB_ALLOCSTATE_RES_READY);
+		$nodeobj->SetBootStatus(NODEBOOTSTATUS_OKAY);
 		next;
 	    }
 
 	  vtbfailed:
 	    TBDebugTimeStamp("Virtual node $node setup FAILED");
-	    Node::SetBootStatus($node, NODEBOOTSTATUS_FAILED);
-	    TBSetNodeAllocState($node, TBDB_ALLOCSTATE_DOWN());
+	    $nodeobj->SetBootStatus(NODEBOOTSTATUS_FAILED);
+	    $nodeobj->SetAllocState(TBDB_ALLOCSTATE_DOWN());
 
 	    #
 	    # If a local node, lets retry since jail setup appears to be
@@ -1266,8 +1252,8 @@ elsif (@vnodelist) {
 	    #
 	    # XXX Need to deal with the same pnode being used twice.
 	    #
-	    MarkPhysNodeDown($pnode);
-	    TBSetNodeLogEntry($pnode, $user_uid, TB_DEFAULT_NODELOGTYPE(),
+	    $pnodeobj->MarkAsDown();
+	    $pnodeobj->InsertNodeLogEntry($this_user, TB_DEFAULT_NODELOGTYPE(),
 			      "'Moved to hwdown; ".
 			      "$node ($pid/$eid) failed to setup'");
 	}
@@ -1298,7 +1284,7 @@ elsif (@vnodelist) {
     if (@retry_list) {
 	# Check cancel first.
 	if (!$canceled) {
-	    TBGetCancelFlag($pid, $eid, \$canceled);
+	    $canceled = $experiment->canceled();
 	
 	    if ($canceled) {
 		tbnotice({cause => 'canceled', severity => SEV_IMMEDIATE,
@@ -1308,7 +1294,7 @@ elsif (@vnodelist) {
 	    else {
 		# Mark each node so that vnode_setup will retry.
 		foreach my $node (@retry_list) {
-		    TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_INIT_DIRTY());
+		    $nodeobjs{$node}->SetAllocState(TBDB_ALLOCSTATE_RES_INIT_DIRTY());
 		}
 		@vnodelist  = @retry_list;
 		@retry_list  = ();
@@ -1658,23 +1644,6 @@ TBDebugTimeStamp("os_setup finished");
 exit($exit_code);
 
 #
-# Map an OSID to an image for a node type.
-#
-sub TBMapOSIDtoImageID($$)
-{
-    my ($osid, $type) = @_;
-
-    my $query_result =
-	DBQueryFatal("select imageid from osidtoimageid ".
-		     "where type='$type' and osid='$osid'");
-
-    if ($query_result->numrows == 0) {
-	return 0;
-    }
-    return Image->Lookup($query_result->fetchrow_array());
-}
-
-#
 # Setup a reload of a node if we can find an image.
 # This goo constructs a hashed array of lists.
 #
@@ -1694,7 +1663,7 @@ sub SetupReload($$$)
 	$type = "pcvm";
     }
 
-    if ((my $image = TBMapOSIDtoImageID($osinfo->osid(), $type))) {
+    if ((my $image = $osinfo->MapToImage($type))) {
 	# XXX firewall is treated special
 	if ($firewalled && ($node eq $firewall)) {
 	    $firewallimage = $image;
@@ -1774,6 +1743,7 @@ sub FirewallSetup($)
 sub os_setup_one($$$;$)
 {
     my ($node,$image,$msgstr,$reboot_waittime) = @_;
+    my $nodeobj = $nodeobjs{$node};
 
     #
     # XXX this is probably not entirely right.
@@ -1789,7 +1759,7 @@ sub os_setup_one($$$;$)
 	delete $reboots{$node};
 	delete $reconfigs{$node};
 
-	TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_RELOAD());
+	$nodeobj->SetAllocState(TBDB_ALLOCSTATE_RES_RELOAD());
 	$nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_RELOAD();
 
 	my @nodelist        = ($node);
@@ -1825,8 +1795,8 @@ sub os_setup_one($$$;$)
 		return 0;
 	    }
 	    print "$node is alive and well\n";
-	    Node::SetBootStatus($node, NODEBOOTSTATUS_OKAY);
-	    TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_READY());
+	    $nodeobj->SetBootStatus(NODEBOOTSTATUS_OKAY);
+	    $nodeobj->SetAllocState(TBDB_ALLOCSTATE_RES_READY());
 	    $nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_READY();
 	} else {
 	    tbwarn "$msgstr $node reload timed-out";
@@ -1841,10 +1811,10 @@ sub os_setup_one($$$;$)
 	delete $reboots{$node};
 
 	if ($nodeAllocStates{$node} eq TBDB_ALLOCSTATE_RES_INIT_CLEAN()) {
-	    TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_REBOOT_CLEAN());
+	    $nodeobj->SetAllocState(TBDB_ALLOCSTATE_RES_REBOOT_CLEAN());
 	    $nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_REBOOT_CLEAN();
 	} else {
-	    TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_REBOOT_DIRTY());
+	    $nodeobj->SetAllocState(TBDB_ALLOCSTATE_RES_REBOOT_DIRTY());
 	    $nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_REBOOT_DIRTY();
 	}
 
@@ -1861,8 +1831,8 @@ sub os_setup_one($$$;$)
 	    return 0;
 	}
 	print "$node is alive and well\n";
-	Node::SetBootStatus($node, NODEBOOTSTATUS_OKAY);
-	TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_READY());
+	$nodeobj->SetBootStatus(NODEBOOTSTATUS_OKAY);
+	$nodeobj->SetAllocState(TBDB_ALLOCSTATE_RES_READY());
 	$nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_READY();
     }
 

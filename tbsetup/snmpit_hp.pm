@@ -49,6 +49,20 @@ my $aftOID = "dot1qPortAcceptableFrameTypes";
 my $createOID = "dot1qVlanStaticRowStatus";
 
 #
+# Openflow OIDs, only number format now.
+#
+#my $ofOID = 'iso.org.dod.internet.private.enterprises.11.2.14.11.5.1.7.1.35';
+my $ofOID = '1.3.6.1.4.1.11.2.14.11.5.1.7.1.35';
+my $ofEnableOID     = $ofOID.'.1.1.2';
+my $ofControllerOID = $ofOID.'.1.1.3';
+my $ofListenerOID   = $ofOID.'.1.1.4';
+my $ofSupportOID    = $ofOID.'.2.1.0';
+
+# This string is enough now, but the Openflow OID may change in future. 
+# The maintainers should keep in mind of this ID. 
+my $ofListenerVarNameMarker = '35.1.1.4';
+
+#
 # Ports can be passed around in three formats:
 # ifindex: positive integer corresponding to the interface index (eg. 42)
 # modport: dotted module.port format, following the physical reality of
@@ -1771,6 +1785,127 @@ sub lock($) {
 sub unlock($) {
 	if ($lock_held == 1) { TBScriptUnlock();}
 	$lock_held = 0;
+}
+
+#
+# Enable Openflow
+#
+sub enableOpenflow($$) {
+    my $self = shift;
+    my $vlan = shift;
+    my $RetVal;
+    
+    $RetVal = $self->set([$ofEnableOID, $vlan, 1, "INTEGER"]);
+    if (!defined($RetVal)) {
+	warn "ERROR: Unable to enable Openflow on VLAN $vlan\n";
+	return 0;
+    }
+    return 1;
+}
+
+#
+# Disable Openflow
+#
+sub disableOpenflow($$) {
+    my $self = shift;
+    my $vlan = shift;
+    my $RetVal;
+    
+    $RetVal = $self->set([$ofEnableOID, $vlan, 2, "INTEGER"]);
+    if (!defined($RetVal)) {
+	warn "ERROR: Unable to disable Openflow on VLAN $vlan\n";
+	return 0;
+    }
+    return 1;
+}
+
+#
+# Set controller
+#
+sub setOpenflowController($$$) {
+    my $self = shift;
+    my $vlan = shift;
+    my $controller = shift;
+    my $RetVal;
+    
+    $RetVal = $self->set([$ofControllerOID, $vlan, $controller, "OCTETSTR"]);
+    if (!defined($RetVal)) {
+	warn "ERROR: Unable to set controller on VLAN $vlan\n";
+	return 0;
+    }
+    return 1;
+}
+
+#
+# Set listener
+#
+sub setOpenflowListener($$$) {
+    my $self = shift;
+    my $vlan = shift;
+    my $listener = shift;
+    my $RetVal;
+    
+    $RetVal = $self->set([$ofListenerOID, $vlan, $listener, "OCTETSTR"]);
+    if (!defined($RetVal)) {
+	warn "ERROR: Unable to set listener on VLAN $vlan\n";
+	return 0;
+    }
+    return 1;
+}
+
+#
+# Get used listener ports
+#
+sub getUsedOpenflowListenerPorts($) {
+    my $self = shift;
+    my %ports = ();
+
+    my $listener = [$ofListenerOID,0];
+
+    #
+    # Get all listeners and gather their ports
+    #
+    my ($varname, $vlan, $connstr);
+    $self->{SESS}->getnext($listener);
+    do {
+	($varname, $vlan, $connstr) = @{$listener};
+	$self->debug("listener: $varname $vlan $connstr \n");
+	if ($varname =~ /$ofListenerVarNameMarker/) {
+	    my ($proto, $port) = split(":", $connstr);
+	    if (defined($port)){
+                $ports{$port} = 1;
+            }
+	    
+	    #
+	    # the SNMP session with MIB gives varname with strings not numbers, but
+	    # the string names can't be used to get the next entry in table! So we
+	    # have to use the numbered OID. To get the next entry, we must
+	    # append the current instance ID, which is the last section of the dotted
+	    # varname, to the numbered OID.
+	    #
+	    my $lastdot = rindex($varname, '.');
+	    $listener->[0] = $ofListenerOID.".".substr($varname, $lastdot+1);
+	    $self->{SESS}->getnext($listener);
+	}	
+    } while ($varname =~ /$ofListenerVarNameMarker/);
+
+    return %ports;
+}
+
+
+#
+# Check if Openflow is supported on this switch
+#
+sub isOpenflowSupported($) {
+    my $self = shift;
+    my $ret;
+    
+    $ret = $self->get1($ofSupportOID, 0);
+    if (defined($ret)) {
+	return 1;
+    } else {
+	return 0;
+    }
 }
 
 # End with true

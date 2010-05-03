@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -334,15 +334,10 @@ if (! strcmp($showtype, "summary")) {
               <td align=center>$allfree</td>
               <td align=center>$alltotal</td>
               </tr>\n";
-
-    if ($isadmin) {
-	# Give admins the option to create a new type
-	echo "<tr></tr>\n";
-	echo "<th colspan=3 align=center>
-                <a href=editnodetype.php3?new_type=1>Create a new type</a>
-              </th>\n";
-    }
     echo "</table>\n";
+
+    echo "<center><a href=shownodetype_list.php>Node Type List</a></center>";
+
     if ($allunknown > 0) {
 	    echo "<br><font size=-1><b>*</b> - Some nodes ($allunknown) are ".
 		    "free, but currently in an unallocatable state.</font>";

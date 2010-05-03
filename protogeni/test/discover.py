@@ -24,6 +24,16 @@ import re
 
 execfile( "test-common.py" )
 
+if len(REQARGS) > 1:
+    Usage()
+    sys.exit( 1 )
+elif len(REQARGS) == 1:
+    CMURI = REQARGS[0]
+    if CMURI[-2:] == "cm":
+        CMURI = CMURI[:-3]
+        pass
+pass
+
 #
 # Get a credential for myself, that allows me to do things at the SA.
 #

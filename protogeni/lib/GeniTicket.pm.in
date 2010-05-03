@@ -161,9 +161,11 @@ sub Create($$$$)
     $self->{'ticket_uuid'}   = undef;
     $self->{'owner_uuid'}    = $owner->uuid();
     $self->{'owner_hrn'}     = $owner->hrn();
+    $self->{'owner_urn'}     = $owner->urn();
     $self->{'owner_cert'}    = $owner->GetCertificate();
     $self->{'target_uuid'}   = $target->uuid();
     $self->{'target_hrn'}    = $target->hrn();
+    $self->{'target_urn'}    = $target->urn();
     $self->{'target_cert'}   = $target->GetCertificate();
     $self->{'seqno'}         = $seqno;
     $self->{'ticket_string'} = undef;
@@ -199,6 +201,8 @@ sub target_uuid($)	{ return field($_[0], "target_uuid"); }
 sub owner_uuid($)	{ return field($_[0], "owner_uuid"); }
 sub target_hrn($)	{ return field($_[0], "target_hrn"); }
 sub owner_hrn($)	{ return field($_[0], "owner_hrn"); }
+sub target_urn($)	{ return field($_[0], "target_urn"); }
+sub owner_urn($)	{ return field($_[0], "owner_urn"); }
 sub target_cert($)	{ return field($_[0], "target_cert"); }
 sub owner_cert($)	{ return field($_[0], "owner_cert"); }
 sub uuid($)		{ return field($_[0], "ticket_uuid"); }
@@ -399,6 +403,8 @@ sub CreateFromSignedTicket($$;$$)
     $self->{'owner_uuid'}    = $owner_certificate->uuid();
     $self->{'target_hrn'}    = $target_certificate->hrn();
     $self->{'owner_hrn'}     = $owner_certificate->hrn();
+    $self->{'target_urn'}    = $target_certificate->urn();
+    $self->{'owner_urn'}     = $owner_certificate->urn();
     $self->{'target_cert'}   = $target_certificate;
     $self->{'owner_cert'}    = $owner_certificate;
     $self->{'ticket_string'} = $ticket_string;
