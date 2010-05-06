@@ -109,6 +109,12 @@ if ($PUBSUPPORT) {
     }
 }
 
+$vis_html = null;
+$whocares = null;
+if ($EXP_VIS && CHECKURL("http://$USERNODE/proj-vis/$pid/", $whocares)) {
+  $vis_html = "<iframe src=\"http://$USERNODE/proj-vis/$pid/\" width=\"100%\" height=600 id=\"vis-iframe\"></iframe>";
+}
+
 #
 # Show number of PCS
 #
@@ -200,6 +206,12 @@ if ($papers_html) {
 	      "id=\"li_papers\" onclick=\"Show('papers');\">".
               "Publications</a></li>\n";
 }
+if ($vis_html) {
+    echo "<li>
+          <a href=\"#G\" class=topnavbar onfocus=\"this.hideFocus=true;\" ".
+	      "id=\"li_vis\" onclick=\"Show('vis');\">".
+              "Visualization</a></li>\n";
+}
 echo "</ul>\n";
 echo "</div>\n";
 echo "<div align=center id=topnavbarbottom>&nbsp</div>\n";
@@ -222,6 +234,9 @@ if ($isadmin && $stats_html) {
 }
 if ($papers_html) {
      echo "<div class=invisible id=\"div_papers\">$papers_html</div>";
+}
+if ($vis_html) {
+     echo "<div class=invisible id=\"div_vis\">$vis_html</div>";
 }
 SUBPAGEEND();
 

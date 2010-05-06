@@ -385,12 +385,14 @@ sub sendisalive($)
 	#
 	logmsg("isalive: succeeded after $retry{isalive} retries\n")
 	    if ($retry{isalive});
-	if ($updatefailed ||
-	    $tmccresults[0] =~ /^UPDATE=1$/) {
-	    logmsg("isalive: running an account update\n");
-	    system("$BINDIR/update -i -l");
-	    $updatefailed = $?;
-	    logmsg("isalive: update done\n");
+	if (!SUBBOSS()) {
+	   if ($updatefailed ||
+		$tmccresults[0] =~ /^UPDATE=1$/) {
+		logmsg("isalive: running an account update\n");
+	        system("$BINDIR/update -i -l");
+	        $updatefailed = $?;
+	        logmsg("isalive: update done\n");
+	    }
 	}
     }
 
@@ -765,8 +767,8 @@ sub sendrusage($)
 	#
 	# Failed, schedule a retry using a backoff.
 	# XXX: removed so that we know when a plab node is back ASAP.
-        #      Just log the failure and reschedule at the normal time.
-        #
+	#      Just log the failure and reschedule at the normal time.
+	#
 
 	#
 	# Failed miserably, just whine and reschedule at the normal time.
@@ -779,12 +781,14 @@ sub sendrusage($)
 	#
 	logmsg("rusage: succeeded after $retry{rusage} retries\n")
 	    if ($retry{rusage});
-	if ($updatefailed ||
-	    $tmccresults[0] =~ /^UPDATE=1$/) {
-	    logmsg("rusage: running an account update\n");
-	    system("$BINDIR/update -i -l");
-	    $updatefailed = $?;
-	    logmsg("rusage: update done\n");
+	if (!SUBBOSS()) {
+	    if ($updatefailed ||
+		$tmccresults[0] =~ /^UPDATE=1$/) {
+	        logmsg("rusage: running an account update\n");
+	        system("$BINDIR/update -i -l");
+	        $updatefailed = $?;
+	        logmsg("rusage: update done\n");
+	    }
 	}
     }
 
@@ -1008,7 +1012,7 @@ sub dhcpdconf($)
     # Generate the dhcp configuration
     #
     system("$BINDIR/subboss_dhcpd_makeconf -r") == 0
-    	or die("Could not generate dhcpd.conf");
+    	or warn("Could not generate dhcpd.conf");
 
 resched:
     #
