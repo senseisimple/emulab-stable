@@ -308,9 +308,13 @@ sub CreateSliver($)
     return $rspec
 	if (GeniResponse::IsResponse($rspec));
 
+    # Make sure that the next phase sees all changes.
+    Experiment->FlushAll();
+    Node->FlushAll();
+
     my $response = GeniCM::SliverWorkAux($credential,
 					 $rspec, $keys, 0, $impotent, 1, 0);
-    
+
     if (GeniResponse::IsError($response)) {
 	#
 	# We have to make sure there is nothing left over since there
@@ -347,6 +351,10 @@ sub CreateSliver($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Internal Error");
     }
+    # Make sure that the next phase sees all changes.
+    Experiment->FlushAll();
+    Node->FlushAll();
+
     if ($aggregate->Start($API_VERSION, 0) != 0) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not start sliver");
