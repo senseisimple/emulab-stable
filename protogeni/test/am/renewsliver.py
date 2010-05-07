@@ -82,8 +82,12 @@ print "Got the slice credential, renewing the sliver";
 params = {}
 params["credentials"]  = (slicecred,)
 params["slice_urn"]    = SLICEURN
-rval,response = do_method("am", "RenewSliver", params)
-if rval:
-    Fatal("Could not renew sliver")
-    pass
-print "Sliver has been renewed until " + valid_until
+try:
+    response = do_method("am", "RenewSliver", params,
+                         response_handler=geni_am_response_handler)
+    if response:
+        print "Sliver has been renewed until " + valid_until
+    else:
+        print "Renewal request denied by aggregate."
+except xmlrpclib.Fault, e:
+    Fatal("Could not renew sliver: %s" % (str(e)))

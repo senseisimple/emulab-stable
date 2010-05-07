@@ -50,9 +50,11 @@ print "Got the slice credential, deleting the sliver..."
 params = {}
 params["slice_urn"]  = myslice["urn"]
 params["credentials"] = [slicecred]
-rval,response = do_method("am", "DeleteSliver", params)
-print "Received response code %r" % (response["code"])
-if rval:
-    Fatal("Could not delete sliver")
-print "Sliver %s has been deleted." % (SLICENAME)
-print "value = %s" % (response["value"])
+
+try:
+    response = do_method("am", "DeleteSliver", params,
+                         response_handler=geni_am_response_handler)
+    print "Sliver %s has been deleted." % (SLICENAME)
+    print "value = %s" % (response)
+except xmlrpclib.Fault, e:
+    Fatal("Could not delete sliver: %s" % (str(e)))

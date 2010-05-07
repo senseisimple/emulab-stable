@@ -52,5 +52,5 @@ try:
     else:
         print response
 except xmlrpclib.Fault, e:
-    Fatal("Could not get a list of resources: %s" % str(e))
+    Fatal("Could not get a list of resources: %s" % (str(e)))
 
