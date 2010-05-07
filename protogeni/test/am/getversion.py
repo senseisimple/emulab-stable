@@ -46,4 +46,4 @@ try:
                          response_handler=geni_am_response_handler)
     print response
 except xmlrpclib.Fault, e:
-    Fatal("Could not obtain the API version: %s", str(e))
+    Fatal("Could not obtain the API version: %s" % str(e))
