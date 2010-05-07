@@ -41,12 +41,16 @@ options[compress_key] = True
 params = {}
 params["credentials"] = [mycredential]
 params["options"] = options
-rval,response = do_method("am", "ListResources", params)
-if rval:
-    Fatal("Could not get a list of resources")
-elif compress_key in options and options[compress_key]:
-    # decompress the result
-    import zlib
-    print zlib.decompress(response["value"].data)
-else:
-    print response[ "value" ]
+
+try:
+    response = do_method("am", "ListResources", params,
+                         response_handler=geni_am_response_handler)
+    if compress_key in options and options[compress_key]:
+        # decompress the result
+        import zlib
+        print zlib.decompress(response.data)
+    else:
+        print response
+except xmlrpclib.Fault, e:
+    Fatal("Could not get a list of resources: %s", str(e))
+

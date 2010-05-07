@@ -160,10 +160,19 @@ def PassPhraseCB(v, prompt1='Enter passphrase:', prompt2='Verify passphrase:'):
     from M2Crypto.util import passphrase_callback
     return passphrase_callback(v, prompt1, prompt2)
 
+def geni_am_response_handler(method, method_args):
+    """Handles the GENI AM responses, which are different from the
+    ProtoGENI responses. ProtoGENI always returns a dict with three
+    keys (code, value, and output. GENI AM operations return the
+    value, or an XML RPC Fault if there was a problem.
+    """
+    return apply(method, method_args)
+
 #
 # Call the rpc server.
 #
-def do_method(module, method, params, URI=None, quiet=False, version=None):
+def do_method(module, method, params, URI=None, quiet=False, version=None,
+              response_handler=None):
     if not os.path.exists(CERTIFICATE):
         return Fatal("error: missing emulab certificate: %s\n" % CERTIFICATE)
     
@@ -224,6 +233,11 @@ def do_method(module, method, params, URI=None, quiet=False, version=None):
     # Get a pointer to the function we want to invoke.
     meth      = getattr(server, method)
     meth_args = [ params ]
+
+    if response_handler:
+        # If a response handler was passed, use it and return the result.
+        # This is the case when running the GENI AM.
+        return response_handler(meth, meth_args)
 
     #
     # Make the call. 
