@@ -1003,7 +1003,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 	my @interfaces = GeniXML::FindNodes("n:linkendpoints | ".
 					    "n:interface_ref",
 					    $linkref)->get_nodelist();
-	my %managers   = undef;
+	my %managers   = ();
 	my $ifacenum   = 1;
 	my $trivial_ok = 0;
 
