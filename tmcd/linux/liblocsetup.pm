@@ -133,15 +133,10 @@ sub os_account_cleanup()
     my %PDB;
     my %GDB;
 
-    my $pretval = dbmopen(%PDB, $PASSDB, undef);
-    my $gretval = dbmopen(%GDB, $GROUPDB, undef);
-
-    if ($pretval) {
+    dbmopen(%PDB, $PASSDB, 0660) or
 	die "Cannot open $PASSDB: $!";
-    }
-    elsif ($gretval) {
+    dbmopen(%GDB, $GROUPDB, 0660) or
 	die "Cannot open $GROUPDB: $!";
-    }
 
     if ($debug) {
 	use Data::Dumper;
