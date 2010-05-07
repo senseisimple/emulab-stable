@@ -18,6 +18,24 @@ Note that some instructions may have steps that need to occur at a few
 different points in the install process - these are marked with the
 earliest time one of the steps needs to occur.
 
+20100507: After install
+
+	  Minor change to apache.conf, so you need to install that and
+          restart apache.
+
+		boss> cd /your/obj/tree/apache
+		boss> gmake
+
+          To be safe, you should backup your existing config file, and
+          then install the new one.
+
+		boss> cp /usr/local/etc/apache/httpd.conf ~/httpd.conf
+		boss> sudo gmake install
+
+	  And restart apache if its currently running.
+
+		boss> sudo /usr/local/etc/rc.d/apache.sh restart
+
 20100108: After install:
 
 	  Change to how stated does it logging. In /etc/newsyslog.conf,
