@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -9,6 +9,7 @@
 */
 
 #include "hmcd.h"
+#include <paths.h>
 
 #ifndef LOG_TESTBED
 #define LOG_TESTBED	LOG_DAEMON
@@ -17,6 +18,7 @@
 void AcceptClient(int, int*);
 void CollectData(int, HMONENT*);
 int EmitData(int, HMONENT*);
+char *Pidname;
 
 void lerror(const char* msgstr) {
   if (msgstr) {
@@ -37,6 +39,8 @@ void siginthandler(int signum) {
     lerror("Couldn't remove UNIX socket");
     exit(1);
   }
+  if (Pidname)
+    (void) unlink(Pidname);
   lnotice("Daemon exiting.");
   exit(0);
 }
@@ -119,6 +123,18 @@ int main(int argc, char **argv) {
   if (daemon(0, 0) < 0) {
     lerror("Couldn't become daemon");
     exit(1);
+  }
+  if (!getuid()) {
+    FILE	*fp;
+    char    mybuf[BUFSIZ];
+	    
+    sprintf(mybuf, "%s/hmcd.pid", _PATH_VARRUN);
+    fp = fopen(mybuf, "w");
+    if (fp != NULL) {
+      fprintf(fp, "%d\n", getpid());
+      (void) fclose(fp);
+      Pidname = strdup(mybuf);
+    }
   }
 
   lnotice("Daemon started successfully");
