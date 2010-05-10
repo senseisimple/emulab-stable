@@ -1,0 +1,65 @@
+#
+# Note that all actions *MUST* be idempotent; if this script is run
+# again, it should always do the right thing, not break if something
+# was already done. See boss-install for lots of example of how to use
+# libinstall to help with this.
+#
+use strict;
+use libinstall;
+
+my $APACHECONF = "/usr/local/etc/apache/httpd.conf";
+
+sub InstallUpdate($$)
+{
+    my ($version, $phase) = @_;
+
+    #
+    # If something should run in the pre-install phase.
+    #
+    if ($phase eq "pre") {
+	Phase "p5-Crypt-X509", "Checking for port p5-Crypt-X509", sub {
+	    DoneIfPackageInstalled("p5-Crypt-X509");
+	    ExecQuietFatal("cd $PORTSDIR/security/p5-Crypt-X509; ".
+			   "make -DBATCH install");
+	};
+    
+	Phase "p5-Crypt-OpenSSL-X509",
+	      "Checking for port p5-Crypt-OpenSSL-X509", sub {
+	    DoneIfPackageInstalled("p5-Crypt-OpenSSL-X509");
+	    ExecQuietFatal("cd $PORTSDIR/security/p5-Crypt-OpenSSL-X509; ".
+			   "make -DBATCH install");
+	};
+    }
+    
+    #
+    # If something should run in the post-install phase.
+    #
+    if ($phase eq "post") {
+	if ($PGENISUPPORT) {
+	    Phase "httpd.conf", "Updating apache config file", sub {
+		#
+		# This might be a rare case.
+		#
+		DoneIfIdentical("$TOP_OBJDIR/apache/httpd.conf", $APACHECONF);
+
+		#
+		# Check to see if SSLVerifyClient has been set to optional
+		#
+		PhaseSkip("Already updated")
+		    if `grep '^SSLVerifyClient optional' $APACHECONF`;
+
+		BackUpFileFatal($APACHECONF);
+		# For impotent mode. 
+		DiffFiles("$TOP_OBJDIR/apache/httpd.conf", $APACHECONF);
+		ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/apache install");
+	    };
+	    Phase "httpd", "Restarting apache", sub {
+		DoneIfDoesntExist("$VARRUN/httpd.pid");
+		ExecQuietFatal("$RCDIR/apache.sh restart");
+	    };
+	}
+    }
+    
+    return 0;
+}
+1;

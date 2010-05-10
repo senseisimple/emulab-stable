@@ -1,0 +1,167 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+
+#
+# Update DB.
+#
+sub usage()
+{
+    print STDERR "Usage: update-testbed [-v] [-f]\n";
+    exit(-1);
+}
+my $optlist = "idsvf";
+my $debug   = 0;
+my $force   = 0;
+my $verify  = 0;
+my $install = 0;
+my $forceopt= "";
+
+#
+# Configure variables
+#
+my $TB	         = "@prefix@";
+my $TBOPS        = "@TBOPSEMAIL@";
+my $DBNAME       = "@TBDBNAME@";
+my $SRCDIR       = "@top_srcdir@";
+my $SQLUPDATEDIR = "$SRCDIR/sql/updates";
+my $UPDATEDIR    = "$SRCDIR/install/updates";
+my $DBUPDATE     = "$TB/sbin/dbupdate";
+my $INSTALLUPDATE= "$TB/sbin/update-install";
+my $tempfile     = "/var/tmp/update.$$";
+
+# Protos
+sub Fatal($);
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# We want to force this to run from the build tree to avoid any
+# problems with the install tree not being in a consistent state.
+#
+BEGIN
+{
+    eval "require emdbi";
+    if ($@) {
+	if (-e "../Makeconf") {
+	    # Prior to first install or running from object dir.
+	    unshift(@INC, "../db");
+	    unshift(@INC, "@top_srcdir@/install");
+	    unshift(@INC, "@top_srcdir@/tbsetup");
+	    unshift(@INC, "../tbsetup");
+	}
+	require emdbi;
+    }
+}
+use emdbi;
+use libtestbed;
+
+#
+# Parse command arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"f"})) {
+    $force = 1;
+    $forceopt = "-f";
+}
+if (defined($options{"i"})) {
+    $install = 1;
+}
+if (defined($options{"v"})) {
+    $verify = 1;
+}
+
+#
+# Must be root if actually doing this.
+#
+if (!$verify && $UID) {
+    Fatal("This script must be run as root! Maybe use sudo?")
+}
+
+if (! (-e "../db/dbupdate" && -e "./update-install")) {
+    Fatal("Cannot find dbupdate script! Running from the object dir?");
+}
+
+my @INCDIRS = ("-I.", "-I../tbsetup", "-I../db",
+	       "-I${SRCDIR}/tbsetup", "-I${SRCDIR}/install");
+
+#
+# In verify mode, just run the update scripts in verify.
+#
+if ($verify) {
+    my $exitval = 0;
+    
+    print "Checking for DB updates ...\n";
+    system("perl @INCDIRS ../db/dbupdate -q -v -p $SQLUPDATEDIR $DBNAME");
+    $exitval++
+	if ($?);
+    
+    print "Checking for install updates ...\n";
+    system("perl @INCDIRS ./update-install -q -v -p $UPDATEDIR");
+    $exitval++
+	if ($?);
+
+    exit(0)
+	if (!$exitval);
+
+    print "*** You have update scripts that have not been run.\n";
+    print "    As a safety measure, you will not be able to install until\n";
+    print "    this is resolved. Typically, you can resolve this by:\n\n";
+    print "        boss> cd /your/object/dir\n";
+    print "        boss> gmake update-testbed\n\n";
+    exit($exitval);
+}
+
+print "Running DB updates ...\n";
+system("perl @INCDIRS ../db/dbupdate -q -p $SQLUPDATEDIR $DBNAME");
+exit(1)
+    if ($?);
+    
+print "Running pre-install updates ...\n";
+system("perl @INCDIRS ./update-install $forceopt -q -a pre -p $UPDATEDIR");
+exit(1)
+    if ($?);
+
+if ($install) {
+    print "Installing testbed software ... this will take a while!\n";
+    print "Output saved to $tempfile\n";
+    
+    system("cd ..; gmake boss-install-noupdatecheck >$tempfile 2>&1");
+    if ($?) {
+	exit(1);
+    }
+}
+
+print "Running post-install updates ...\n";
+system("perl @INCDIRS ./update-install $forceopt -q -a post -p $UPDATEDIR");
+exit(1)
+    if ($?);
+
+exit(0);
+
+sub Fatal($)
+{
+    my ($msg) = @_;
+
+    die("*** $0:\n".
+	"    $msg\n");
+}

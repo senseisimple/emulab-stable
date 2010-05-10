@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -12,7 +12,8 @@ SUBDIR		= install
 include $(OBJDIR)/Makeconf
 
 ifeq ($(STANDALONE_CLEARINGHOUSE),0)
-TARGETS	= boss-install ops-install fs-install dump-descriptors load-descriptors
+TARGETS	= libinstall.pm boss-install ops-install fs-install dump-descriptors \
+	load-descriptors update-install update-testbed
 else
 TARGETS = clrhouse-install
 endif
@@ -25,7 +26,10 @@ all: $(TARGETS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-install: $(INSTALL_LIBDIR)/libinstall.pm
+install: $(INSTALL_LIBDIR)/libinstall.pm \
+	$(INSTALL_SBINDIR)/update-install \
+	$(INSTALL_SBINDIR)/update-testbed
 
 clean: 
-	rm -f boss-install ops-install fs-install
+	rm -f boss-install ops-install fs-install update-install
+	rm -f update-testbed
