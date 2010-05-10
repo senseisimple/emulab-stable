@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2009 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -553,7 +553,7 @@ ul.navmenu li.newgroup {
   float: right;
   display: inline;
   margin-right: 10px;
-  line-height: 30px; /* Match the height of the header so the text is */
+  line-height: 15px; /* Match the height of the header so the text is */
 		     /* vertically centered. */
 }
 #logintime {
