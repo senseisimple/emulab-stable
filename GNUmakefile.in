@@ -203,8 +203,24 @@ endif
 subboss: client
 	@$(MAKE) -C utils subboss
 
-subboss-install: subboss client-install
+subboss-install: subboss
+ifeq ($(EVENTSYS),1)
+	@$(MAKE) -C event client-install
+endif
+	@$(MAKE) -C os client-install
+ifneq ($(SYSTEM),CYGWIN_NT-5.1)
+	@$(MAKE) -C capture client-install
+	@$(MAKE) -C tip client-install
+	@$(MAKE) -C tools client-install
+endif
+	@$(MAKE) -C sensors client-install
 	@$(MAKE) -C utils subboss-install
+	@$(MAKE) -C db subboss-install
+	@$(MAKE) -C tmcd subboss-install
+	@$(MAKE) -C rc.d subboss-install
+	# Hack: this should probably be done by a subboss-install
+	# script, but there isn't a huge need for that yet
+	@rm -f $(INSTALL_RCDIR)/isc-dhcpd
 
 TARBALLDESTDIR = /var/tmp/emulab-client
 

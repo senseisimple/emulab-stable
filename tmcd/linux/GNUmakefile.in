@@ -52,6 +52,10 @@ destdircheck:
 	    false; \
 	fi
 
+subboss-install:	subboss-common-install etc-install \
+			sup-install script-install bin-install
+	@echo "Remember to install the PEM files if necessary"
+
 install client-install:	common-install etc-install \
 			sup-install script-install bin-install vserver-install
 	@echo "Remember to install the PEM files if necessary"
@@ -149,6 +153,9 @@ dir-install:
 common-install:	dir-install
 	(cd ../common; $(MAKE) DESTDIR=$(DESTDIR) local-install)
 
+subboss-common-install:	dir-install
+	(cd ../common; $(MAKE) DESTDIR=$(DESTDIR) subboss-local-install)
+
 sup-install:	dir-install supfile
 	$(INSTALL) -m 755 ./supfile $(ETCDIR)/supfile
 	$(INSTALL) -m 750 -o root -g root -d $(DESTDIR)/root/.cvsup
@@ -215,7 +222,7 @@ script-install:	dir-install $(SCRIPTS)
 	$(INSTALL) -m 755 $(SRCDIR)/chipset.awk $(BINDIR)/chipset.awk
 	$(INSTALL) -m 755 $(SRCDIR)/cpuspeed.awk $(BINDIR)/cpuspeed.awk
 	$(INSTALL) -m 755 $(SRCDIR)/rc.mfs $(BINDIR)/rc/rc.mfs
-	$(INSTALL) -m 755 $(SRCDIR)/control_interface $(BINDIR)/testbed
+	$(INSTALL) -m 755 $(SRCDIR)/control_interface $(BINDIR)/control_interface
 	$(INSTALL) -m 755 $(SRCDIR)/rc.frisbee $(BINDIR)/rc/rc.frisbee
 	$(INSTALL) -m 755 $(SRCDIR)/slicefix $(BINDIR)/slicefix
 	$(INSTALL) -m 755 $(SRCDIR)/freebsd_to_linux_disk $(BINDIR)/freebsd_to_linux_disk
@@ -224,8 +231,8 @@ script-install:	dir-install $(SCRIPTS)
 	$(INSTALL) -m 755 $(SRCDIR)/extract_kernel_info $(BINDIR)
 	$(INSTALL) -m 755 $(SRCDIR)/extract_initrd_info $(BINDIR)
 	$(INSTALL) -m 755 $(SRCDIR)/extract_image_info $(BINDIR)
-	$(INSTALL) -m 755 $(SRCDIR)/mount_bsd_slice $(SYSETCDIR)/testbed
-	$(INSTALL) -m 755 $(SRCDIR)/get_edd_map $(BINDIR)/testbed
+	$(INSTALL) -m 755 $(SRCDIR)/mount_bsd_slice $(BINDIR)
+	$(INSTALL) -m 755 $(SRCDIR)/get_edd_map $(BINDIR)
 	$(INSTALL) -m 755 -s ../findif $(BINDIR)/findif
 	$(INSTALL) -m 755 $(SRCDIR)/rc.linux $(BINDIR)/rc
 

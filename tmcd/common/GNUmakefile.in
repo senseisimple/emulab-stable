@@ -42,7 +42,7 @@ install client-install:
 local-install:		path-install local-script-install symlinks
 remote-install:		path-install remote-script-install
 control-install:	path-install control-script-install
-subboss-install:	subboss-script-install
+subboss-local-install:	path-install subboss-local-script-install symlinks
 
 other-install:
 	(cd ../../os; $(MAKE) DESTDIR=$(DESTDIR) client-install)
@@ -85,7 +85,23 @@ common-script-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/startcmddone $(BINDIR)/startcmddone
 	(cd config; $(MAKE) DESTDIR=$(DESTDIR) script-install)
 
-subboss-script-install:	dir-install
+subboss-common-script-install:	dir-install
+	$(INSTALL) -m 755 $(SRCDIR)/libsetup.pm $(BINDIR)/libsetup.pm
+	$(INSTALL) -m 755 $(SRCDIR)/libtmcc.pm $(BINDIR)/libtmcc.pm
+	$(INSTALL) -m 755 $(SRCDIR)/libtestbed.pm $(BINDIR)/libtestbed.pm
+	$(INSTALL) -m 755 $(SRCDIR)/tmcc.pl $(BINDIR)/tmcc
+	$(INSTALL) -m 755 $(SRCDIR)/logboot $(BINDIR)/logboot
+	$(INSTALL) -m 755 $(SRCDIR)/watchdog $(BINDIR)/watchdog
+	$(INSTALL) -m 755 $(SRCDIR)/ntpstart $(BINDIR)/ntpstart
+	$(INSTALL) -m 755 $(SRCDIR)/runstartup $(BINDIR)/runstartup
+	$(INSTALL) -m 755 $(SRCDIR)/runcvsup.sh $(BINDIR)/runcvsup.sh
+	$(INSTALL) -m 755 $(SRCDIR)/update $(BINDIR)/update
+	$(INSTALL) -m 755 $(SRCDIR)/ifsetup $(BINDIR)/ifsetup
+	$(INSTALL) -m 755 $(SRCDIR)/ifdynconfig $(BINDIR)/ifdynconfig
+	$(INSTALL) -m 755 $(SRCDIR)/vnodesetup $(BINDIR)/vnodesetup
+	$(INSTALL) -m 755 $(SRCDIR)/bootsubnodes $(BINDIR)/bootsubnodes
+	$(INSTALL) -m 755 $(SRCDIR)/bootvnodes $(BINDIR)/bootvnodes
+	$(INSTALL) -m 755 $(SRCDIR)/startcmddone $(BINDIR)/startcmddone
 	(cd config; $(MAKE) DESTDIR=$(DESTDIR) subboss-script-install)
 
 symlinks:	dir-install
@@ -99,6 +115,20 @@ symlinks:	dir-install
 	ln -s $(CLIENT_BINDIR) $(TBLIBDIR)
 
 local-script-install:	common-script-install
+	$(INSTALL) -m 755 $(SRCDIR)/sendevent $(BINDIR)/sendevent
+	$(INSTALL) -m 755 $(SRCDIR)/rc.testbed $(RCDIR)/rc.testbed
+	$(INSTALL) -m 755 $(SRCDIR)/rc.bootsetup $(RCDIR)/rc.bootsetup
+	$(INSTALL) -m 755 $(SRCDIR)/rc.slothd $(RCDIR)/rc.slothd
+	$(INSTALL) -m 755 $(SRCDIR)/rc.canaryd $(RCDIR)/rc.canaryd
+	$(INSTALL) -m 755 $(SRCDIR)/rc.linktest $(RCDIR)/rc.linktest
+	$(INSTALL) -m 755 $(SRCDIR)/rc.inelab $(RCDIR)/rc.inelab
+	$(INSTALL) -m 755 $(SRCDIR)/rc.pgeni $(RCDIR)/rc.pgeni
+	# Symlink this cause we invoke it from boss, and its too much
+	# of a hassle to worry about right now.
+	rm -f $(ETCDIR)/update
+	-ln -s $(CLIENT_BINDIR)/update $(ETCDIR)/update
+
+subboss-local-script-install:	subboss-common-script-install
 	$(INSTALL) -m 755 $(SRCDIR)/sendevent $(BINDIR)/sendevent
 	$(INSTALL) -m 755 $(SRCDIR)/rc.testbed $(RCDIR)/rc.testbed
 	$(INSTALL) -m 755 $(SRCDIR)/rc.bootsetup $(RCDIR)/rc.bootsetup

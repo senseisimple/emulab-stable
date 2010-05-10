@@ -12,6 +12,9 @@ SUBDIR		= collab
 include $(OBJDIR)/Makeconf
 
 SUBDIRS	= mailman cvstools jabber trac
+ifeq ($(EXP_VIS_SUPPORT),1)
+SUBDIRS += exp-vis
+endif
 
 all:	all-subdirs
 
@@ -31,6 +34,9 @@ post-install:
 	@$(MAKE) -C cvstools post-install
 	@$(MAKE) -C jabber post-install
 	@$(MAKE) -C trac post-install
+ifeq ($(EXP_VIS_SUPPORT),1)
+	@$(MAKE) -C exp-vis post-install
+endif
 
 # How to recursively descend into subdirectories to make general
 # targets such as `all'.
