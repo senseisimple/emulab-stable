@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2005-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -52,7 +52,6 @@ my $TBOPSPID= TBOPSPID;
 my $HOME= USERROOT() . "/elabckup";
 
 sub fatal($);
-sub daemonize();
 sub misconfig($$);
 sub IsNodeFree($);
 sub UpdateCheckupState($$$$$);
@@ -89,33 +88,49 @@ if (defined($options{"d"})) {
     $debug = $options{"d"};
 }
 
-# Go to ground.
-if (! $debug) {
-    daemonize();
+#
+# We need this user for running below.
+#
+my $elabckup = User->Lookup("elabckup");
+if (!defined($elabckup)) {
+    fatal("Could not lookup 'elabckup' user. Exiting ...");
 }
-
-print "Checkup daemon starting... pid $$, at ".`date`;
-
-# Need the unix uid for the backup user.
-my $user = User->Lookup('elabckup');
-fatal("Could not get object for backup user")
-    if (!defined($user));
-my $ev_uid   = $user->unix_uid();
-
-# and need the unix gid for the group.
+# and the project.
 my $project = Project->Lookup($TBOPSPID);
 fatal("Could not get object for $TBOPSPID project")
     if (!defined($project));
-my $unix_gid = $project->unix_gid();
 
-print "Experiment head: $ev_uid\n"
-    if ($debug);
+if (CheckDaemonRunning("checkup_daemon")) {
+    fatal("Not starting another checkup daemon!");
+}
+# Go to ground.
+if (! $debug) {
+    if (TBBackGround($logfile)) {
+	exit(0);
+    }
+}
+if (MarkDaemonRunning("checkup_daemon")) {
+    fatal("Could not mark daemon as running!");
+}
+#
+# Setup a signal handler for newsyslog.
+#
+sub handler()
+{
+    my $SAVEEUID = $EUID;
+    
+    $EUID = 0;
+    ReOpenLog($logfile);
+    $EUID = $SAVEEUID;
+}
+$SIG{HUP} = \&handler
+    if (!$debug);
 
-# Switch to the elabckup user.
-$GID = $unix_gid;
-$EGID = "$unix_gid";
-$EUID = $UID = $ev_uid;
+print "Checkup daemon starting... pid $$, at ".`date`;
 
+if ($elabckup->FlipTo($project->unix_gid())) {
+    fatal("Could not flipto $elabckup");
+}
 my $iter = 0;
 
 MAINLOOP: while(1) {
@@ -367,6 +382,7 @@ MAINLOOP: while(1) {
 
     $iter += 1;
 }
+MarkDaemonStopped("checkup_daemon");
 
 sub IsNodeFree($)
 {
@@ -423,36 +439,10 @@ sub misconfig($$)
     DBQueryWarn("delete from checkups where type='$ctype'");
 }
 
-#
-# Become a daemon.
-# 
-sub daemonize()
-{
-    my $mypid = fork();
-    if ($mypid) {
-	exit(0);
-    }
-
-    #
-    # We have to disconnect from the caller by redirecting both STDIN and
-    # STDOUT away from the pipe. Otherwise the caller will continue to wait
-    # even though the parent has exited. 
-    #
-    open(STDIN, "< /dev/null") or
-	die("opening /dev/null for STDIN: $!");
-
-    #
-    # Open the batch log and start writing to it. 
-    #
-    open(STDERR, ">> $logfile") or die("opening $logfile for STDERR: $!");
-    open(STDOUT, ">> $logfile") or die("opening $logfile for STDOUT: $!");
-
-    return 0;
-}
-
 sub fatal($) {
     my($mesg) = $_[0];
 
+    MarkDaemonStopped("checkup_daemon");
     die("*** $0:\n".
 	"    $mesg\n");
 }

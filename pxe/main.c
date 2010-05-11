@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004, 2006, 2007 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -9,6 +9,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <stdio.h>
+#include <sys/param.h>
 #include <paths.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -32,6 +33,7 @@
 static void	log_bootwhat(struct in_addr ipaddr, boot_what_t *bootinfo);
 static void	onhup(int sig);
 static char	*progname;
+static char     pidfile[MAXPATHLEN];
 int		debug = 0;
 
 void
@@ -46,6 +48,12 @@ usage()
 	exit(-1);
 }
 
+static void
+cleanup()
+{
+	unlink(pidfile);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -53,7 +61,6 @@ main(int argc, char **argv)
 	struct sockaddr_in	name, client;
 	boot_info_t		boot_info;
 	int		        port = BOOTWHAT_DSTPORT;
-	char			buf[BUFSIZ];
 	FILE			*fp;
 	extern char		build_info[];
 
@@ -92,11 +99,12 @@ main(int argc, char **argv)
 	}
 	info("%s\n", build_info);
 
+	signal(SIGTERM, cleanup);
 	/*
 	 * Write out a pidfile.
 	 */
-	sprintf(buf, "%s/bootinfo.pid", _PATH_VARRUN);
-	fp = fopen(buf, "w");
+	sprintf(pidfile, "%s/bootinfo.pid", _PATH_VARRUN);
+	fp = fopen(pidfile, "w");
 	if (fp != NULL) {
 		fprintf(fp, "%d\n", getpid());
 		(void) fclose(fp);

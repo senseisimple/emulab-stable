@@ -66,7 +66,6 @@ my $PWD        = "/bin/pwd";
 my $PW         = "/usr/sbin/pw";
 my $PATCH      = "/usr/bin/patch";
 my $SSH_KEYGEN = "/usr/bin/ssh-keygen";
-my $PKG_INFO   = "/usr/sbin/pkg_info";
 my $PKG_ADD    = "/usr/sbin/pkg_add";
 my $PKG_DEL    = "/usr/sbin/pkg_delete";
 my $TOUCH      = "/usr/bin/touch";
@@ -86,8 +85,6 @@ my $MYSQLSHOW  = "/usr/local/bin/mysqlshow";
 my $MYSQLDUMP  = "/usr/local/bin/mysqldump";
 my $MYSQLINSTALL = "/usr/local/bin/mysql_install_db";
 my $MYSQLDBDIR = "/var/db/mysql";
-
-my $GMAKE      = "/usr/local/bin/gmake";
 
 #
 # Some files we edit/create
@@ -170,17 +167,13 @@ my $NAMED_PIDFILE = "/var/run/named.pid";
 #
 # Some directories we care about
 #
-my $LOGDIR        = "$PREFIX/log";
 my $MYSQL_LOGDIR  = "$LOGDIR/mysql";
-my $RCDIR         = "/usr/local/etc/rc.d";
 my $USERSVAR_DIR  = "$PREFIX/usersvar";
 my $OPSDIR_DIR    = "$PREFIX/opsdir";
-my $PORTSDIR      = "/usr/ports";
 my $PORTSMISCDIR  = "$PORTSDIR/misc";
 my $MIBPATH       = "/usr/local/share/snmp/mibs";
 my $TFTP_DIR      = "$PREFIX/tftpboot";
 my $TFTP_PROJ_DIR = "$TFTP_DIR/proj";
-my $VARRUN        = "/var/run";
 my $ETCSSH	  = "/etc/ssh";
 
 #
