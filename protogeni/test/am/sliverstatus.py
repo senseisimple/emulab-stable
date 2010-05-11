@@ -50,13 +50,14 @@ print "Got the slice credential, asking for a sliver credential ..."
 params = {}
 params["slice_urn"]   = SLICEURN
 params["credentials"] = (slicecred,)
-rval,response = do_method("am", "SliverStatus", params)
-if rval:
-    Fatal("Could not get sliver status")
-
-#
-# Pretty print the result
-#
-import pprint
-pp = pprint.PrettyPrinter(indent=2)
-pp.pprint(response["value"])
+try:
+    response = do_method("am", "SliverStatus", params,
+                         response_handler=geni_am_response_handler)
+    #
+    # Pretty print the result
+    #
+    import pprint
+    pp = pprint.PrettyPrinter(indent=2)
+    pp.pprint(response)
+except xmlrpclib.Fault, e:
+    Fatal("Could not get sliver status: %s" % (str(e)))

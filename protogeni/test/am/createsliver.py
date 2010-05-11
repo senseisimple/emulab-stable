@@ -109,11 +109,11 @@ params = {}
 params["credentials"] = (myslice,)
 params["slice_urn"]   = SLICEURN
 params["rspec"]       = rspec
-rval,response = do_method("am", "CreateSliver", params)
-if rval:
-    Fatal("Could not create sliver")
-    pass
-manifest = response["value"]
-print "Created the sliver"
-print str(manifest)
 
+try:
+    response = do_method("am", "CreateSliver", params,
+                         response_handler=geni_am_response_handler)
+    print "Created the sliver"
+    print str(response)
+except xmlrpclib.Fault, e:
+    Fatal("Could not create sliver: %s" % (str(e)))
