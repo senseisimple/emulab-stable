@@ -245,8 +245,7 @@ if (! -e "$TB/www/protogeni") {
 $crosstext = <<'CROSSEND';
 <?xml version="1.0"?>
 <cross-domain-policy>
-    <allow-access-from domain="boss.emulab.net" />
-    <allow-access-from domain="users.emulab.net" />
+    <allow-access-from domain="*.emulab.net" />
     <allow-access-from domain="*.protogeni.net" />
 </cross-domain-policy>
 CROSSEND
