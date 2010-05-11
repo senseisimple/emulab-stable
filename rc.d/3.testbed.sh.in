@@ -4,11 +4,6 @@
 #
 case "$1" in
 	start)
-		if [ -x @prefix@/sbin/cvsupd.pl -a -x /usr/local/sbin/cvsupd -a -d @prefix@/sup ]; then
-			echo -n " cvsupd"
-			@prefix@/sbin/cvsupd.pl
-		fi
-
 		if [ -x @prefix@/sbin/dbboot ]; then
 		        # Delay a moment so that mysqld has started!
 		        sleep 2
@@ -31,19 +26,9 @@ case "$1" in
 			@prefix@/sbin/capserver
 		fi
 
-		if [ -x @prefix@/etc/capture.rc -a -d /var/log/tiplogs ]; then
-			echo -n " capture"
-			@prefix@/etc/capture.rc
-		fi
-
 		if [ -x @prefix@/sbin/lastlog_daemon  ]; then
 			echo -n " lastlogd"
 			@prefix@/sbin/lastlog_daemon
-		fi
-
-		if [ -x @prefix@/sbin/hmcd  ]; then
-			echo -n " hmcd"
-			@prefix@/sbin/hmcd
 		fi
 
 		if [ -x @prefix@/sbin/sdcollectd  ]; then
@@ -62,18 +47,13 @@ case "$1" in
 		fi
 
 		if [ -x @prefix@/sbin/sslxmlrpc_server.py ]; then
-			echo -n " sslxmlrpc"
+			echo -n " sslxmlrpc_server"
 			@prefix@/sbin/sslxmlrpc_server.py
 		fi
 
 		if [ -x @prefix@/sbin/reload_daemon  ]; then
 			echo -n " reloadd"
 			@prefix@/sbin/reload_daemon
-		fi
-
-		if [ -x @prefix@/sbin/repos_daemon  ]; then
-			echo -n " reposd"
-			@prefix@/sbin/repos_daemon
 		fi
 
 		if [ -x @prefix@/sbin/checkup_daemon  ]; then
@@ -84,11 +64,6 @@ case "$1" in
 		if [ -x @prefix@/sbin/pool_daemon  ]; then
 			echo -n " poold"
 			@prefix@/sbin/pool_daemon
-		fi
-
-		if [ -x @prefix@/sbin/robomonitord  ]; then
-			echo -n " robomonitord"
-			@prefix@/sbin/robomonitord
 		fi
 
 		if [ -x @prefix@/sbin/mysqld_watchdog  ]; then
@@ -127,13 +102,56 @@ case "$1" in
 		fi
 		;;
 	stop)
-		# Only a few of our daemons keep enough state to require an
-		# explicit kill
-		if [ -r /var/run/stated.pid ]; then
-			kill `cat /var/run/stated.pid`
+		if [ -r /var/run/bootinfo.pid ]; then
+			kill `cat /var/run/bootinfo.pid`
 		fi
 		if [ -r /var/run/tmcd.pid ]; then
 			kill `cat /var/run/tmcd.pid`
+		fi
+		if [ -r /var/run/capserver.pid ]; then
+			kill `cat /var/run/capserver.pid`
+		fi
+		if [ -r /var/run/lastlog_daemon.pid ]; then
+			kill `cat /var/run/lastlog_daemon.pid`
+		fi
+		if [ -r /var/run/sdcollectd.pid ]; then
+			kill `cat /var/run/sdcollectd.pid`
+		fi
+		if [ -r /var/run/stated.pid ]; then
+			kill `cat /var/run/stated.pid`
+		fi
+		if [ -r /var/run/testbed-inetd.pid ]; then
+			kill `cat /var/run/testbed-inetd.pid`
+		fi
+		if [ -r /var/run/sslxmlrpc_server.pid ]; then
+			kill `cat /var/run/sslxmlrpc_server.pid`
+		fi
+		if [ -r /var/run/reload_daemon.pid ]; then
+			kill `cat /var/run/reload_daemon.pid`
+		fi
+		if [ -r /var/run/checkup_daemon.pid ]; then
+			kill `cat /var/run/checkup_daemon.pid`
+		fi
+		if [ -r /var/run/checkup_daemon.pid ]; then
+			kill `cat /var/run/checkup_daemon.pid`
+		fi
+		if [ -r /var/run/pool_daemon.pid ]; then
+			kill `cat /var/run/pool_daemon.pid`
+		fi
+		if [ -r /var/run/mysqld_watchdog.pid ]; then
+			kill `cat /var/run/mysqld_watchdog.pid`
+		fi
+		if [ -r /var/run/expire_daemon.pid ]; then
+			kill `cat /var/run/expire_daemon.pid`
+		fi
+		if [ -r /var/run/sa_daemon.pid ]; then
+			kill `cat /var/run/sa_daemon.pid`
+		fi
+		if [ -r /var/run/checknodes.pid ]; then
+			kill `cat /var/run/checknodes.pid`
+		fi
+		if [ -r /var/run/batch_daemon_wrapper.pid ]; then
+			kill `cat /var/run/batch_daemon_wrapper.pid`
 		fi
 
 		;;

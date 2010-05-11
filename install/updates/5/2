@@ -1,0 +1,46 @@
+#
+# Note that all actions *MUST* be idempotent; if this script is run
+# again, it should always do the right thing, not break if something
+# was already done. See boss-install for lots of example of how to use
+# libinstall to help with this.
+#
+use strict;
+use libinstall;
+
+my $NEWSYSLOG_CONF  = "/etc/newsyslog.conf";
+my $TESTBED_STARTUP = "/usr/local/etc/rc.d/3.testbed.sh";
+
+sub InstallUpdate($$)
+{
+    my ($version, $phase) = @_;
+
+    #
+    # If something should run in the pre-install phase.
+    #
+    if ($phase eq "pre") {
+	Phase "newsyslog", "Updating $NEWSYSLOG_CONF", sub {
+	    DoneIfEdited($NEWSYSLOG_CONF);
+	    BackUpFileFatal($NEWSYSLOG_CONF);
+	    AppendToFileFatal($NEWSYSLOG_CONF,
+			      "$LOGDIR/checknodes.log 640 14 300 ".
+			      "* Z /var/run/checknodes.pid");
+	};
+	Phase "startupfile", "Updating testbed startup file", sub {
+	    DoneIfIdentical("$TOP_OBJDIR/rc.d/3.testbed.sh", $TESTBED_STARTUP);
+	    DiffFiles("$TOP_OBJDIR/rc.d/3.testbed.sh", $TESTBED_STARTUP);
+	    ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/rc.d install");
+	};
+    }
+    
+    #
+    # If something should run in the post-install phase.
+    #
+    if ($phase eq "post") {
+	Phase "checknodes_daemon", "Starting up checknodes daemon", sub {
+	    # Testbed not running.
+	    DoneIfDoesntExist("$VARRUN/stated.pid");
+	};
+    }
+    return 0;
+}
+1;

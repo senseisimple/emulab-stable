@@ -39,7 +39,7 @@ my @DEADFILES	= ("rc.agents", "rc.delayagent", "rc.delta", "rc.healthd",
 		   "rc.injail", "rc.ipod", "rc.mfs", "rc.progagent",
 		   "rc.setup", "rc.slothd", "rc.testbed",
 		   "batchcmddone", "bootsetup", "install-tarfile",
-		   "jailsetup", "update_delays", "rc/rc.linux",
+		   "jailsetup", "update_delays",
 		   "sethostname" # replaced by sethostname.dhclient on linux
 		   );
 

@@ -175,8 +175,10 @@ if (! $pid) {
 	$nsfile = $tempdir . "/" . $nsfile;
     }
 
-#    exec("nice -15 $parser @ARGV $nsfile");
-    exec("nice -15 $parser @ARGV $nsfile|tee $tempdir/output.txt");
+    # Piping the output through "|tee" changes the exit status of this
+    # script so only use for debugging
+    exec("nice -15 $parser @ARGV $nsfile");
+    # exec("nice -15 $parser @ARGV $nsfile|tee $tempdir/output.txt");
     die("Could not exec the parser!\n");
 }
 

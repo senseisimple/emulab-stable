@@ -110,6 +110,7 @@ int		debug = 0;
 static int	verbose = 0;
 static int	insecure = 0;
 static int	byteswritten = 0;
+static char	pidfile[MAXPATHLEN];
 static char     dbname[DBNAME_SIZE];
 static struct in_addr myipaddr;
 static char	fshostid[HOSTID_SIZE];
@@ -412,6 +413,7 @@ cleanup()
 	signal(SIGHUP, SIG_IGN);
 	killme = 1;
 	killpg(0, SIGHUP);
+	unlink(pidfile);
 }
 
 static void
@@ -573,8 +575,8 @@ main(int argc, char **argv)
 	 * Stash the pid away.
 	 */
 	mypid = getpid();
-	sprintf(buf, "%s/tmcd.pid", _PATH_VARRUN);
-	fp = fopen(buf, "w");
+	sprintf(pidfile, "%s/tmcd.pid", _PATH_VARRUN);
+	fp = fopen(pidfile, "w");
 	if (fp != NULL) {
 		fprintf(fp, "%d\n", mypid);
 		(void) fclose(fp);

@@ -1,0 +1,40 @@
+#
+# Note that all actions *MUST* be idempotent; if this script is run
+# again, it should always do the right thing, not break if something
+# was already done. See boss-install for lots of example of how to use
+# libinstall to help with this.
+#
+use strict;
+use libinstall;
+
+my $NEWSYSLOG_CONF  = "/etc/newsyslog.conf";
+
+sub InstallUpdate($$)
+{
+    my ($version, $phase) = @_;
+
+    #
+    # If something should run in the pre-install phase.
+    #
+    if ($phase eq "pre") {
+	Phase "newsyslog", "Updating $NEWSYSLOG_CONF", sub {
+	    DoneIfEdited($NEWSYSLOG_CONF);
+	    BackUpFileFatal($NEWSYSLOG_CONF);
+	    AppendToFileFatal($NEWSYSLOG_CONF,
+			      "$LOGDIR/reloadlog   640  9  1000 *  Z ".
+			      "/var/run/reload_daemon.pid",
+			      "$LOGDIR/checkuplog  640  9  1000 *  Z ".
+			      "/var/run/checkup_daemon.pid",
+			      "$LOGDIR/poollog     640  9  1000 *  Z ".
+			      "/var/run/pool_daemon.pid");
+	};
+    }
+    
+    #
+    # If something should run in the post-install phase.
+    #
+    if ($phase eq "post") {
+    }
+    return 0;
+}
+1;

@@ -50,6 +50,9 @@ destdircheck:
 install client-install:	bincheck basefbsd-install etc-install \
 			sup-install script-install bin-install
 
+subboss-install:	bincheck basefbsd-subboss-install etc-install \
+			sup-install script-install bin-install
+
 simple-install:	script-install bin-install
 
 bincheck:
@@ -79,6 +82,12 @@ dir-install:
 
 basefbsd-install: dir-install
 	(cd ../freebsd5; $(MAKE) all install)
+	rm -rf $(SYSETCDIR)/rc.conf.d
+	rm -f $(DESTDIR)/usr/local/etc/dhclient*
+	ln -s /etc/dhclient* $(DESTDIR)/usr/local/etc/
+
+basefbsd-subboss-install: dir-install
+	(cd ../freebsd5; $(MAKE) all subboss-install)
 	rm -rf $(SYSETCDIR)/rc.conf.d
 	rm -f $(DESTDIR)/usr/local/etc/dhclient*
 	ln -s /etc/dhclient* $(DESTDIR)/usr/local/etc/
