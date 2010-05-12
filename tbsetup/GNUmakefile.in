@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -70,7 +70,7 @@ WEB_BIN_SCRIPTS = webnscheck webendexp webtbreport webbatchexp \
 		  webtemplate_delete webtemplate_revise
 
 LIBEXEC_STUFF	= wanlinksolve wanlinkinfo os_setup mkexpdir console_setup \
-		  assign_wrapper assign_wrapper2 \
+		  assign_wrapper assign_wrapper2 os_setup_new \
 		  assign_prepass ptopgen \
 		  spewlogfile staticroutes routecalc wanassign \
 		  switchmac \
@@ -85,7 +85,7 @@ LIB_STUFF       = libtbsetup.pm exitonwarn.pm libtestbed.pm snmpit_intel.pm \
 		  libaudit.pm libreboot.pm libosload.pm libtestbed.py \
 		  libadminmfs.pm libtblog.pm libtblog_simple.pm libArchive.pm \
 		  power_mail.pm power_whol.pm Template.pm power_rmcp.pm \
-		  power_ilo.pm libvtop.pm libptop.pm
+		  power_ilo.pm libvtop.pm libptop.pm libossetup.pm
 
 # These scripts installed setuid, with sudo. 
 SETUID_BIN_SCRIPTS   = node_reboot eventsys_control tarfiles_setup savelogs \
