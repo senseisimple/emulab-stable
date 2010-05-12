@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -20,13 +20,16 @@ use File::Basename;
 # $checkwait	time between progress checks (must be int div of $idlewait)
 # $reportwait	time between progress reports (must be multiple of $checkwait)
 #
-# $maximagesize	max size in bytes of an image
+# $maximagesize	max size in bytes of an image.  This should really be in the
+#		DB (per-testbed, per-project, per-user, per-something), and
+#		not hardwired here.  In the meantime, we set this big and let
+#		disk quotas do the dirty work of limiting size.
 #
 my $maxwait      = (72 * 60);
 my $idlewait     = ( 8 * 60);
 my $reportwait   = ( 2 * 60);
 my $checkwait    = 15;
-my $maximagesize = (6 * 1024**3); # 6GB
+my $maximagesize = (20 * 1024**3); # 20GB
 
 #
 # Create a disk image.
