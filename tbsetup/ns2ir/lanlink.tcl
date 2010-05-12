@@ -269,6 +269,11 @@ LanLink instproc init {s nodes bw d type} {
     $self instvar iscloud
     $self set iscloud 0
 
+    $self instvar ofenabled
+    $self instvar ofcontroller
+    #$self instvar oflistener   # this is not needed
+    $self set ofenabled 0
+
     foreach node $nodes {
 	set nodepair [list $node [$node add_lanlink $self]]
 	set bandwidth($nodepair) $bw
@@ -290,6 +295,16 @@ LanLink instproc init {s nodes bw d type} {
 	Queue lq$lq $self $type $node
 	set linkq($nodepair) lq$lq
     }
+}
+
+#
+# Enable Openflow on lan and set controller
+#
+Lan instproc enable_openflow {ofcontrollerstr} {
+    $self instvar ofenabled
+    $self instvar ofcontroller
+    set ofenable 1
+    set ofcontroller $ofcontrollerstr
 }
 
 #
@@ -863,6 +878,8 @@ Lan instproc updatedb {DB} {
     $self instvar member_settings
     $self instvar mustdelay
     $self instvar fixed_iface
+    $self instvar ofenabled
+    $self instvar ofcontroller
 
     if {$modelnet_cores > 0 || $modelnet_edges > 0} {
 	perror "Lans are not allowed when using modelnet; just duplex links."
@@ -990,6 +1007,22 @@ Lan instproc updatedb {DB} {
         if {$fixed_iface($nodeport) != 0} {
             lappend values $fixed_iface($nodeport)
         }
+
+	# openflow
+	#
+	# table: virt_lans
+	# columns: ofenabled = 0/1
+	#          ofcontroller = ""/"controller connection string"
+	#
+	lappend fields "ofenabled"
+	lappend fields "ofcontroller"
+	
+	lappend values $ofenabled
+	if {$ofenabled == 1} {
+	    lappend values $ofcontroller
+	} else {
+	    lappend values ""
+	}
 
 	$sim spitxml_data "virt_lans" $fields $values
 
