@@ -64,6 +64,11 @@ sub Lookup($$)
     elsif ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
 	$uuid = $token;
     }
+    elsif ($token =~ /^P([\w]+)$/) {
+	# Only SAs are looked up this way.
+	# This will be flushed after URNs are fully pushed out.
+	return GeniAuthority->LookupByPrefix($1);
+    }
     elsif ($token =~ /^[\w\.]*$/) {
 	$query_result =
 	    DBQueryWarn("select uuid from geni_authorities ".
@@ -370,6 +375,40 @@ sub ListAll($$)
     }
     @$pref = @result;
     return 0;
+}
+
+#
+# Find an authority by looking for the prefix. This will eventually go
+# away when we fully switch to URNs
+#
+# Note tha only SAs are looked up this way.
+#
+sub LookupByPrefix($$)
+{
+    my ($class, $uuid) = @_;
+    my $prefix;
+    
+    if ($uuid =~ /^\w+\-\w+\-\w+\-\w+\-(\w+)$/) {
+	$prefix = $1;
+    }
+    elsif ($uuid =~ /^(\w+)$/) {
+	$prefix = $1;
+    }
+    else {
+	print STDERR "Could not parse uuid for prefix\n";
+	return undef;
+    }
+    
+    my $query_result =
+	DBQueryWarn("select uuid from geni_authorities ".
+		    "where uuid_prefix='$prefix' and type='sa'");
+
+    return undef
+	if (! $query_result || !$query_result->numrows);
+
+    ($uuid) = $query_result->fetchrow_array();
+
+    return GeniAuthority->Lookup($uuid);
 }
 
 # _Always_ make sure that this 1 is at the end of the file...
