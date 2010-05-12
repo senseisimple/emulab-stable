@@ -1229,6 +1229,9 @@ sub control_iface($;$) {
 sub rebootable($;$) {
     return NodeTypeInfo($_[0])->rebootable($_[1]);
 }
+sub bios_waittime($;$) {
+    return NodeTypeInfo($_[0])->bios_waittime($_[1]);
+}
 
 #
 # Perform some updates ...
