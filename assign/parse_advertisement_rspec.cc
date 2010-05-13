@@ -64,7 +64,7 @@ DOMElement* advt_root = NULL;
 int bind_ptop_subnodes(tb_pgraph &pg);
 int bind_vtop_subnodes(tb_vgraph &vg);
 
-rspec_parser* rspecParser;
+static rspec_parser* rspecParser;
 
 /*
  * These are not meant to be used outside of this file, so they are only
@@ -101,8 +101,8 @@ int parse_ptop_rspec(tb_pgraph &pg, tb_sgraph &sg, char *filename) {
     /*
      * Must validate against the ptop schema
      */
-		domParser -> setExternalSchemaLocation
-			("http://www.protogeni.net/resources/rspec/0.1 " SCHEMA_LOCATION);
+/*		domParser -> setExternalSchemaLocation
+			("http://www.protogeni.net/resources/rspec/0.1 " SCHEMA_LOCATION);*/
     
     /*
      * Just use a custom error handler - must admin it's not clear to me why
@@ -158,8 +158,8 @@ int parse_ptop_rspec(tb_pgraph &pg, tb_sgraph &sg, char *filename) {
         	exit(EXIT_FATAL);
         }
         XMLDEBUG("finishing node population" << endl);
-        cerr << "Dummy fun: ";
-				rspecParser->dummyFun();
+//         cerr << "Dummy fun: ";
+// 				rspecParser->dummyFun();
 				XMLDEBUG("starting link population" << endl);
         if (!populate_links_rspec(advt_root,pg,sg,unavailable)) {
         	cerr << "Error reading links from physical topology "
@@ -213,40 +213,26 @@ bool populate_nodes_rspec(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
 		
 		if (!hasComponentId || !hasCMId)
 		{
-			cerr << " It " << componentId << " in hasComponentId " << endl;
 			is_ok = false;
 			continue;
 		}
-		/*
-		component_spec componentSpec = parse_component_spec(elt);
-		string str_component_manager_uuid =
-				                string(componentSpec.component_manager_uuid);
-		string str_component_name = string(componentSpec.component_name);
-		string str_component_uuid = string(componentSpec.component_uuid);
-		*/
-
-// 		if (str_component_manager_uuid == "")
+				
+		bool hasAvailable;
+		string available = rspecParser->readAvailable(elt, hasAvailable);
+// 		XStr available (getChildValue(elt, "available"));
+// 		if (strcmp(available, "false") == 0)
 // 		{
-// 			is_ok = false;
-// 			continue;
+// 		    unavailable.insert(componentId);
+// 		    continue;
 // 		}
-		
-		XStr available (getChildValue(elt, "available"));
-		if (strcmp(available, "false") == 0)
+		if (available == "false")
 		{
-		    unavailable.insert(componentId);
-		    continue;
+			unavailable.insert(componentId);
+			continue;
 		}
-		
 		++availableCount;
 		
-// 		if (str_component_uuid == "")
-// 		{
-// 			is_ok = false;
-// 			continue;
-// 		}
-// 		else
-// 		{
+		// Maintain a list of componentId's seen so far to ensure no duplicates
 		insert_ret = advertisement_elements->insert(
 								pair<string, DOMElement*>(componentId, elt));
 		if (insert_ret.second == false)
@@ -254,21 +240,10 @@ bool populate_nodes_rspec(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
 			cerr << componentId << " already exists" << endl;
 			is_ok = false;
 		}
-// 		}
 
-		XStr virtualization_type
-				        (elt->getAttribute(XStr("virtualization_type").x()));
-		
+		// XXX: This should not have to be called manually
 		bool allUnique;
 		rspecParser->readInterfacesOnNode(elt, allUnique);
-// 		DOMNodeList *interfaces =
-// 				            elt->getElementsByTagName(XStr("interface").x());
-// 		string *str_component_interface_names = 
-// 				                        new string [interfaces->getLength()];
-// 		for (int index = 0; index < interfaces->getLength(); ++index)
-// 			str_component_interface_names[index] = string(
-// 					XStr((dynamic_cast<DOMElement*>(interfaces->item(index)))
-// 					           ->getAttribute(XStr("component_id").x())).c());
 
 		/* Deal with the location tag */
 		int locationDataCount;
@@ -284,21 +259,6 @@ bool populate_nodes_rspec(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
 			longitude = locationData[2];
 		}
 		
-// 		string country = string("");
-// 		string latitude = string ("");
-// 		string longitude = string("");
-// 		if (hasChildTag(elt, "location"))
-// 		{
-// 			country = string(
-// 							XStr(elt->getAttribute (XStr("country").x())).c());
-// 			if (elt->hasAttribute (XStr("latitude").x()))
-// 				latitude = string
-// 						   (XStr(elt->getAttribute(XStr("latitude").x())).c());
-// 			if (elt->hasAttribute (XStr("longitude").x()))
-// 				longitude = string
-// 						  (XStr(elt->getAttribute(XStr("longitude").x())).c());
-// 		}
-
 		pvertex pv;
 
 		tb_pnode *p;
@@ -316,10 +276,10 @@ bool populate_nodes_rspec(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
 		pname2vertex[componentId.c_str()] = pv;
 		
 		int typeCount;
-		list<struct node_type> types = rspecParser->readNodeTypes(elt, typeCount);
-		for (int i = 0; i < typeCount; i++, types.pop_front())
+		vector<struct node_type> types = rspecParser->readNodeTypes(elt, typeCount);
+		for (int i = 0; i < typeCount; i++)
 		{
-			node_type type = types.front();
+			node_type type = types[i];
 			const char* typeName = type.typeName.c_str();
 			int typeSlots = type.typeSlots;
 			bool isStatic = type.isStatic;
@@ -355,106 +315,26 @@ bool populate_nodes_rspec(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
 			p->type_list.push_back(p->types[typeName]);
 		}
 		
-// 		/*
-// 		* Add on types
-// 		*/
-// 		int type_slots = 0;
-// 		bool no_type = false;
-// 		tb_vclass *vclass;
-// 		const char* str_type_name;
-// 		// XXX: This a ghastly hack. Find a way around it ASAP.
-// 		string s_type_name = string("");
-// 		DOMNodeList *types = elt->getElementsByTagName(XStr("node_type").x());
-// 		for (int i = 0; i < types->getLength(); i++) 
-// 		{
-// 			DOMElement *typetag = dynamic_cast<DOMElement*>(types->item(i));
-// // 			XStr type_name(getChildValue(typetag, "type_name"));
-// 			XStr type_name(typetag->getAttribute(XStr("type_name").x()));
-// 			
-// 			/*
-// 			* Check to see if it's a static type
-// 			*/
-// 			bool is_static = false;
-// 			if (typetag->hasAttribute(XStr("static").x()))
-// 				is_static = true;
-// 			
-// 			/*
-// 			* ... and how many slots it has
-// 			* XXX: Need a real 'unlimited' value!
-// 			*/
-// 			int type_slots;
-// 			XStr type_slot_string
-// 					           (typetag->getAttribute(XStr("type_slots").x()));
-// 			if (strcmp(type_slot_string.c(), "unlimited") == 0) {
-// 				type_slots = 1000;
-// 			} 
-// 			else {
-// 				type_slots = type_slot_string.i();
-// 			}
-// 			
-// 			/*
-// 			* Make a tb_ptype structure for this guy - or just add this node to
-// 			* it if it already exists
-// 			* XXX: This should not be "manual"!
-// 			*/
-// 			str_type_name = type_name.c();
-// 			s_type_name = string (str_type_name);
-// 			if (ptypes.find(str_type_name) == ptypes.end()) {
-// 				ptypes[str_type_name] = new tb_ptype(str_type_name);
-// 			}
-// 			ptypes[str_type_name]->add_slots(type_slots);
-// 			tb_ptype *ptype = ptypes[str_type_name];
-// 			
-// 			/*
-// 			* For the moment, we treat switches specially - when we get the
-// 			* "forwarding" code working correctly, this special treatment
-// 			* will go away.
-// 			* TODO: This should not be in the parser, it should be somewhere
-// 			* else!
-// 			*/
-// 			if (type_name == "switch") {
-// 				p->is_switch = true;
-// 				p->types["switch"] = new tb_pnode::type_record(1,false,ptype);
-// 				svertex sv = add_vertex(sg);
-// 				tb_switch *s = new tb_switch();
-// 				put(svertex_pmap,sv,s);
-// 				s->mate = pv;
-// 				p->sgraph_switch = sv;
-// 				p->switches.insert(pv);
-// 			} 
-// 			else {
-// 				p->types[str_type_name] = 
-// 					new tb_pnode::type_record(type_slots,is_static,ptype);
-// 			}
-// 			p->type_list.push_back(p->types[str_type_name]);
+		bool hasExclusive;
+		string exclusive = rspecParser->readExclusive(elt, hasExclusive);
+// 		if( hasChildTag( elt, "exclusive" ) ) {
+// 		    XStr exclusive( getChildValue( elt, "exclusive" ) );
+// 		    fstring feature( "shared" );
+// 
+// 		    if( !strcmp( exclusive, "false" ) )
+// 					p->features.push_front( 
+// 							tb_node_featuredesire( feature, 
+// 								1.0, true, featuredesire::FD_TYPE_NORMAL) );
 // 		}
-
-		if( hasChildTag( elt, "exclusive" ) ) {
-		    XStr exclusive( getChildValue( elt, "exclusive" ) );
-		    fstring feature( "shared" );
-
-		    if( !strcmp( exclusive, "false" ) )
-			p->features.push_front( 
-							tb_node_featuredesire( feature, 
-								1.0, true, featuredesire::FD_TYPE_NORMAL) );
+		
+		if (hasExclusive) {
+			fstring feature ("shared");
+			if (exclusive != "false") {
+				p->features.push_front(tb_node_featuredesire(feature, 1.0, true,
+																							featuredesire::FD_TYPE_NORMAL));
+			}
 		}
 
-	   /*
-		* Parse out the features
-		* TODO: I am pretty sure that we don't have features in Protogeni.
-		*/
-		//parse_fds_xml(elt,&(p->features));
-		
-		/*
-		* Finally, pull out any special node flags
-		*/
-// 		int trivial_bw = 0;
-// 		if (hasChildTag(elt,"trivial_bw")) {
-// 			trivial_bw = XStr(getChildValue(elt,"trivial_bw")).i();
-// 			////XMLDEBUG("  Trivial bandwidth: " << trivial_bw << endl);
-// 		}
-// 		p->trivial_bw = trivial_bw;
-		
 		// Add the component_manager_uuid as a feature.
 		// We need to do this to handle external references
 		(p->features).push_front(
@@ -477,13 +357,7 @@ bool populate_nodes_rspec(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
 				// an actual pnode later
 		    	p->subnode_of_name = XStr(subnodeOf.c_str()).f();
 				}
-			//XMLDEBUG("  Subnode of: " << subnode_of_name << endl);
 		}
-// 		
-// 		if (hasChildTag(elt,"unique")) {
-// 			p->unique = true;
-// 			////XMLDEBUG("  Unique" << endl);
-// 		}
 	
 		/*
 		* XXX: Is this really necessary?
@@ -526,25 +400,23 @@ bool populate_links_rspec(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
 			DOMNode *link = links->item(i);
 			DOMElement *elt = dynamic_cast<DOMElement*>(link);
         
-/*        interface_spec *pathSrcs;
-        interface_spec *pathDsts;*/
-		
-			component_spec linkComponentSpec = parse_component_spec(
-																			dynamic_cast<DOMElement*>(link));
-			string str_component_manager_uuid = 
-															linkComponentSpec.component_manager_uuid;
-			string str_component_uuid = linkComponentSpec.component_uuid;
-			string str_component_name = linkComponentSpec.component_name;
-			string str_sliver_uuid = linkComponentSpec.sliver_uuid;
-			if (str_component_uuid == "" || str_component_manager_uuid == "")
+			bool hasComponentId;
+			bool hasCMId;
+			string componentId = rspecParser->readPhysicalId(elt, hasComponentId);
+			string cmId = rspecParser->readComponentManagerId(elt, hasCMId);
+			
+			if (!hasComponentId || !hasCMId) {
+				cerr << "All elements must have a component_uuid/component_urn "
+						 << "and a component_manager_uuid/component_manager_urn" << endl;
 				is_ok = false;
+			}
 			else
 			{
 				insert_ret = advertisement_elements->insert(
-									pair<string, DOMElement*>(str_component_uuid, elt));
+									pair<string, DOMElement*>(componentId, elt));
 				if (insert_ret.second == false)
 				{
-					cerr << str_component_uuid << " already exists" << endl;
+					cerr << componentId << " already exists" << endl;
 					is_ok = false;
 				}
 			}
@@ -557,48 +429,41 @@ bool populate_links_rspec(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
 			vector<struct link_interface> interfaces 
 					= rspecParser->readLinkInterface(elt, ifaceCount);
 			
-// 			DOMNodeList *interfaces = elt->getElementsByTagName(
-// 																							XStr("interface_ref").x());
-			/* NOTE: In a request, we assume that each link has only two interfaces
-			* Although the order is immaterial, assign expects a source first 
-			* and a destination second and we assume the same
-			*/
-			if (ifaceCount != 2)
+			// Error handling
+			switch (ifaceCount)
 			{
-// 				cerr << "Incorrect number of interfaces found on link " 
-// 						<< str_component_uuid << ". Expected 2 (found " 
-// 						<< ifaceCount << ")" << endl;
-				is_ok = false;
-				continue;
-			}
+				case RSPEC_ERROR_BAD_IFACE_COUNT:
+					cerr << "Incorrect number of interfaces found on link " 
+							<< componentId << ". Expected 2 (found " 
+							<< ifaceCount << ")" << endl;
+					is_ok = false;
+					continue;
 				
+				case RSPEC_ERROR_UNSEEN_NODEIFACE_SRC:
+					cerr << "Unseen node-interface pair on the source interface ref"
+							<< endl;
+					is_ok = false;
+					continue;
+						
+				case RSPEC_ERROR_UNSEEN_NODEIFACE_DST:
+					cerr << "Unseen node-interface pair on the destination interface ref"
+							<< endl;
+					is_ok = false;
+					continue;
+			}
+			
+			/* NOTE: In a request, we assume that each link has only two interfaces
+			 * Although the order is immaterial, assign expects a source first 
+			 * and a destination second and we assume the same
+			 */	
 			string src_node = interfaces[0].physicalNodeId;
 			string src_iface = interfaces[0].physicalIfaceId;
 			string dst_node = interfaces[1].physicalNodeId;
 			string dst_iface = interfaces[1].physicalIfaceId;
 
-			
-// 			if (interfaces->getLength() != 2)
-// 			{
-// 				cerr << "Incorrect number of interfaces found on link " 
-// 					<< str_component_uuid << ". Expected 2 (found " 
-// 					<< interfaces->getLength() << ")" << endl;
-// 				is_ok = false;
-// 				continue;
-// 			}
-// 			interface_spec source = parse_interface_rspec_xml(
-// 								dynamic_cast<DOMElement*>(interfaces->item(0)));
-// 			interface_spec dest = 				parse_interface_rspec_xml(
-// 											dynamic_cast<DOMElement*>(interfaces->item(1)));
-// 	
-// 			src_node = source.component_node_id;
-// 			src_iface = source.component_interface_id;
-// 			dst_node = dest.component_node_id;
-// 			dst_iface = dest.component_interface_id;
-// 			
 			if (src_node == "" || src_iface == "")
 			{
-				cerr << "Physical link " << str_component_uuid 
+				cerr << "Physical link " << componentId 
 						<< " must have a component id and component interface id "
 						<< " specified for the source node" << endl;
 				is_ok = false;
@@ -606,7 +471,7 @@ bool populate_links_rspec(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
 			}
 			if (dst_node == "" || dst_iface == "")
 			{
-				cerr << "Physical link " << str_component_uuid 
+				cerr << "Physical link " << componentId 
 						<< " must have a component id and component interface id"
 						<< " specified for the destination node" << endl;
 				is_ok = false;
@@ -619,28 +484,16 @@ bool populate_links_rspec(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
 					//ignore the link
 					continue;
 	
-					/*
-					* Get standard link characteristics
-					*/
-					XStr bandwidth(getChildValue(elt,"bandwidth"));
-					XStr latency(getChildValue(elt,"latency"));
-					XStr packet_loss(getChildValue(elt,"packet_loss"));
-					
-					/*
-					* Check to make sure the referenced nodes actually exist
-					*/
-			if (pname2vertex.find(src_node.c_str()) == pname2vertex.end()) {
-				cerr << "Bad link, non-existent source node " 
-					<< src_node << endl;
-				is_ok = false;
-				continue;
-			}
-			if (pname2vertex.find(dst_node.c_str()) == pname2vertex.end()) {
-				cerr << "Bad link, non-existent destination node " 
-					<< dst_node << endl;
-				is_ok = false;
-				continue;
-			}
+			/*
+			* Get standard link characteristics
+			*/
+			int count;
+			link_characteristics characteristics
+					= rspecParser->readLinkCharacteristics (elt, count);
+			
+			int bandwidth = characteristics.bandwidth;
+			int latency = characteristics.latency;
+			double packetLoss = characteristics.packetLoss;
 			
 			/*
 			* Find the nodes in the existing data structures
@@ -654,10 +507,9 @@ bool populate_links_rspec(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
 			* Start getting link types - we know there is at least one, and we
 			* need it for the constructor
 			*/
-			DOMNodeList *types = elt->getElementsByTagName(XStr ("link_type").x());
-			DOMElement *first_type_tag = dynamic_cast<DOMElement*>(types->item(0));
-			XStr first_type (first_type_tag->getAttribute(XStr("type_name").x()));
-			const char* str_first_type = first_type.c();
+			int typeCount;
+			vector<link_type> types = rspecParser->readLinkTypes(elt, typeCount);
+			const char* str_first_type = types[0].typeName.c_str();
 							
 			/*
 			* Create the actual link object
@@ -667,14 +519,14 @@ bool populate_links_rspec(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
 			// XXX: Don't want to use (null) src and dest macs, but would break
 			// other stuff if I remove them... bummer!
 			tb_plink *phys_link =
-				new tb_plink(str_component_uuid.c_str(), 
+				new tb_plink(componentId.c_str(), 
 							tb_plink::PLINK_NORMAL, str_first_type,
 									"(null)", "(null)", 
 										src_iface.c_str(), dst_iface.c_str());
 			
-			phys_link->delay_info.bandwidth = bandwidth.i();
-			phys_link->delay_info.delay = latency.i();
-			phys_link->delay_info.loss = packet_loss.d();
+			phys_link->delay_info.bandwidth = bandwidth;
+			phys_link->delay_info.delay = latency;
+			phys_link->delay_info.loss = packetLoss;
 		
 			// XXX: Should not be manual
 			put(pedge_pmap, phys_edge, phys_link);
@@ -698,11 +550,9 @@ bool populate_links_rspec(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
 			/*
 			* Add in the rest of the link types we found
 			*/
-			for (int i = 1; i < types->getLength(); i++) 
+			for (int i = 1; i < typeCount; i++) 
 			{
-				DOMElement *link_type = dynamic_cast<DOMElement*>(types->item(i));
-				const char *str_type_name = XStr(link_type->getAttribute(
-																XStr("type_name").x())).c();
+				const char *str_type_name = types[i].typeName.c_str();
 				////XMLDEBUG("  Link has type " << type_name << endl);
 				// XXX: Should not be manual
 				phys_link->types.insert(str_type_name);
@@ -724,17 +574,17 @@ bool populate_links_rspec(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
 			else if (ISSWITCH(src_pnode) && ! ISSWITCH(dst_pnode)) 
 			{
 				dst_pnode->switches.insert(src_vertex);
-				#ifdef PER_VNODE_TT
-					dst_pnode->total_bandwidth += bandwidth.i();
-				#endif
+#ifdef PER_VNODE_TT
+				dst_pnode->total_bandwidth += bandwidth;
+#endif
 			}
 				
 			else if (ISSWITCH(dst_pnode) && ! ISSWITCH(src_pnode)) 
 			{
 				src_pnode->switches.insert(dst_vertex);
-				#ifdef PER_VNODE_TT
-					src_pnode->total_bandwidth += bandwidth.i();
-				#endif
+#ifdef PER_VNODE_TT
+				src_pnode->total_bandwidth += bandwidth;
+#endif
 			}
 
     }

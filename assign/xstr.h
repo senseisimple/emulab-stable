@@ -7,7 +7,7 @@
 #ifndef __XSTR_H
 #define __XSTR_H
 
-
+#include <cstdio>
 #include <string>
 using namespace std;
 #include <xercesc/util/XMLString.hpp>

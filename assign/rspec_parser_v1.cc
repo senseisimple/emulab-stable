@@ -76,7 +76,7 @@ vector<struct link_interface> rspec_parser_v1::readLinkInterface
 	ifaceCount = ifaceRefs->getLength();
 		
 	if (ifaceCount != 2) {
-		ifaceCount = -1;
+		ifaceCount = RSPEC_ERROR_BAD_IFACE_COUNT;
 		return vector<link_interface>();
 	}
 	
@@ -85,10 +85,10 @@ vector<struct link_interface> rspec_parser_v1::readLinkInterface
 	struct link_interface dstIface
 			= this->getIface(dynamic_cast<DOMElement*>(ifaceRefs->item(1)));
 	
-	cerr << "(" << srcIface.physicalNodeId << "," 
-			<< srcIface.physicalIfaceId << ")" << endl;
-	cerr << "(" << dstIface.physicalNodeId << "," 
-			<< dstIface.physicalIfaceId << ")" << endl;
+// 	cerr << "(" << srcIface.physicalNodeId << "," 
+// 			<< srcIface.physicalIfaceId << ")" << endl;
+// 	cerr << "(" << dstIface.physicalNodeId << "," 
+// 			<< dstIface.physicalIfaceId << ")" << endl;
 	
 	pair<string, string> srcNodeIface;
 	pair<string, string> dstNodeIface;
@@ -108,20 +108,16 @@ vector<struct link_interface> rspec_parser_v1::readLinkInterface
 	// If it hasn't, it is an error
 	if ((this->ifacesSeen).find(srcNodeIface) == ifacesSeen.end())
 	{
-// 		cout << "Could not find src (" << srcIface.physicalNodeId << ","
-// 				<< srcIface.physicalIfaceId << ")" << endl;
 		cout << "Could not find " << srcNodeIface.first 
 				<< " " << srcNodeIface.second << endl;
-		ifaceCount = -1;
+		ifaceCount = RSPEC_ERROR_UNSEEN_NODEIFACE_SRC;
 		return rv;
 	}
 	if ((this->ifacesSeen).find(dstNodeIface) == ifacesSeen.end())
 	{
-// 		cout << "Could not find dst (" << dstIface.physicalNodeId << ","
-// 					<< dstIface.physicalIfaceId << ")" << endl;
 		cout << "Could not find " << dstNodeIface.first 
 				<< " " << dstNodeIface.second << endl;
-		ifaceCount = -1;
+		ifaceCount = RSPEC_ERROR_UNSEEN_NODEIFACE_DST;
 		return rv;
 	}
 	
@@ -143,11 +139,13 @@ struct link_interface rspec_parser_v1::getIface (const DOMElement* tag)
 	return rv;
 }
 
-int rspec_parser_v1::readInterfacesOnNode (const DOMElement* node, 
-																					 bool& allUnique)
+map< pair<string, string>, pair<string, string> >
+					rspec_parser_v1::readInterfacesOnNode (const DOMElement* node, 
+																								 bool& allUnique)
 {
 	bool exists;
 	DOMNodeList* ifaces = node->getElementsByTagName(XStr("interface").x());
+	map< pair<string, string>, pair<string, string> > fixedInterfaces;
 	allUnique = true;
 	for (int i = 0; i < ifaces->getLength(); i++)
 	{
@@ -164,12 +162,21 @@ int rspec_parser_v1::readInterfacesOnNode (const DOMElement* node,
 		{
 			nodeId = this->readVirtualId (node, hasAttr);
 			ifaceId = XStr(iface->getAttribute(XStr("virtual_id").x())).c();
+            if (iface->hasAttribute(XStr("component_id").x()))
+            {
+              bool hasComponentId;
+              string componentNodeId = this->readPhysicalId (node, hasComponentId);
+              string componentIfaceId = this->getAttribute(iface, "component_id");
+              fixedInterfaces.insert (make_pair 
+										(make_pair(nodeId,ifaceId),
+					 					 make_pair(componentNodeId,componentIfaceId)));
+            }
 		}
-		cout << "(" << nodeId << "," << ifaceId << ")" << endl;
+		//cout << "(" << nodeId << "," << ifaceId << ")" << endl;
 		allUnique &= ((this->ifacesSeen).insert
 				(pair<string, string>(nodeId, ifaceId))).second;
 	}
-	return (ifaces->getLength());
+	return fixedInterfaces;
 }
 
 void rspec_parser_v1 :: dummyFun ()

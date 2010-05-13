@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2008 University of Utah and the Flux Group.
+ * Copyright (c) 2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -35,13 +35,15 @@ class rspec_parser_v1 : public rspec_parser
 
 	public:
 		
-		rspec_parser_v1 (int type) { this->rspecType = type; }
+		rspec_parser_v1 (int type) : rspec_parser(type) { ; }
 		
 		std::string readPhysicalId (const xercesc::DOMElement*, bool&);
 		std::string readVirtualId (const xercesc::DOMElement*, bool&);
 		std::string readComponentManagerId (const xercesc::DOMElement*, bool&);
 		
-		int readInterfacesOnNode (const xercesc::DOMElement* node, bool& allUnique);
+		std::map< std::pair<std::string, std::string>, 
+							std::pair<std::string, std::string> > 
+								readInterfacesOnNode (const xercesc::DOMElement*, bool&);
 		std::vector<struct link_interface> readLinkInterface
 									(const xercesc::DOMElement* link, int& ifaceCount);
 		struct link_interface getIface (const xercesc::DOMElement*);
