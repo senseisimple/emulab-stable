@@ -188,6 +188,53 @@ sub Create($$$;$$$)
     # Need the newly minted ID
     my $lanid = $query_result->insertid();
     my $lan   = Lan->Lookup($lanid);
+    
+    # Add openflow arrtibutes:
+    #
+    # Still not sure if it is the right place to add such
+    # attributes. Will take a look at where other attributes
+    # are added.
+    #
+    $query_result =
+	DBQueryWarn("select ofenabled, ofcontroller from virt_lans ".
+		    "where exptidx=$exptidx and vname='$vname'");
+    return undef
+	if (!$query_result);	
+    my($ofenabled, $ofcontroller) = $query_result->fetchrow_array()
+	if ($query_result->numrows);  
+	
+    my $safe_val = DBQuoteSpecial($ofenabled);
+    $query_result =
+	DBQueryWarn("insert into lan_attributes set ".
+		    "  lanid=$lanid, ".
+		    "  attrkey='ofenabled', ".
+		    "  attrvalue=$safe_val, ".
+		    "  attrtype='integer'"));
+    return undef
+	if (!defined($query_result));	  
+	
+    $safe_val = DBQuoteSpecial($ofcontroller);
+    $query_result =
+	DBQueryWarn("insert into lan_attributes set ".
+		    "  lanid=$lanid, ".
+		    "  attrkey='ofcontroller', ".
+		    "  attrvalue=$safe_val, ".
+		    "  attrtype='string'"));
+    return undef
+	if (!defined($query_result));
+	
+    $safe_val = DBQuoteSpecial("");
+    $query_result =
+	DBQueryWarn("insert into lan_attributes set ".
+		    "  lanid=$lanid, ".
+		    "  attrkey='oflistener', ".
+		    "  attrvalue=$safe_val, ".
+		    "  attrtype='string'"));
+    return undef
+	if (!defined($query_result));
+	
+    # An extra refresh for loading the openflow attributes.
+    $lan->Refresh();
 
     print "Created lan: $lan\n"
 	if ($debug && $lan);
