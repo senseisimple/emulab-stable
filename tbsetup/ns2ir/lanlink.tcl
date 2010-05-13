@@ -298,9 +298,9 @@ LanLink instproc init {s nodes bw d type} {
 }
 
 #
-# Enable Openflow on lan and set controller
+# Enable Openflow on lan/link and set controller
 #
-Lan instproc enable_openflow {ofcontrollerstr} {
+LanLink instproc enable_openflow {ofcontrollerstr} {
     $self instvar ofenabled
     $self instvar ofcontroller
     set ofenable 1
@@ -731,6 +731,8 @@ Link instproc updatedb {DB} {
     $self instvar protocol
     $self instvar mustdelay
     $self instvar fixed_iface
+    $self instvar ofenabled
+    $self instvar ofcontroller
 
     $sim spitxml_data "virt_lan_lans" [list "vname"] [list $self]
 
@@ -840,6 +842,22 @@ Link instproc updatedb {DB} {
 	# fixing ifaces
 	if {$fixed_iface($nodeport) != 0} {
 	    lappend values $fixed_iface($nodeport)
+	}
+	
+	# openflow
+	#
+	# table: virt_lans
+	# columns: ofenabled = 0/1
+	#          ofcontroller = ""/"controller connection string"
+	#
+	lappend fields "ofenabled"
+	lappend fields "ofcontroller"
+	
+	lappend values $ofenabled
+	if {$ofenabled == 1} {
+	    lappend values $ofcontroller
+	} else {
+	    lappend values ""
 	}
 
 	$sim spitxml_data "virt_lans" $fields $values
