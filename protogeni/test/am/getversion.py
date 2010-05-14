@@ -42,7 +42,7 @@ else:
     authority = "am"
 
 try:
-    response = do_method(authority, "GetVersion", {},
+    response = do_method(authority, "GetVersion", [],
                          response_handler=geni_am_response_handler)
     print response
 except xmlrpclib.Fault, e:

@@ -237,7 +237,7 @@ def do_method(module, method, params, URI=None, quiet=False, version=None,
     if response_handler:
         # If a response handler was passed, use it and return the result.
         # This is the case when running the GENI AM.
-        return response_handler(meth, meth_args)
+        return response_handler(meth, params)
 
     #
     # Make the call. 

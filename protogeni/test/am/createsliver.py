@@ -105,10 +105,7 @@ else:
 # Create the sliver.
 #
 print "Creating the Sliver ..."
-params = {}
-params["credentials"] = (myslice,)
-params["slice_urn"]   = SLICEURN
-params["rspec"]       = rspec
+params = [[myslice], SLICEURN, rspec]
 
 try:
     response = do_method("am", "CreateSliver", params,

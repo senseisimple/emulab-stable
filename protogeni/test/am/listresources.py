@@ -38,9 +38,7 @@ mycredential = get_self_credential()
 options = {}
 options[available_key] = True
 options[compress_key] = True
-params = {}
-params["credentials"] = [mycredential]
-params["options"] = options
+params = [[mycredential], options]
 
 try:
     response = do_method("am", "ListResources", params,

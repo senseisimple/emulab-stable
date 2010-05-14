@@ -47,9 +47,8 @@ print "Got the slice credential, asking for a sliver credential ..."
 #
 # Get the sliver status
 #
-params = {}
-params["slice_urn"]   = SLICEURN
-params["credentials"] = (slicecred,)
+params = [[slicecred], SLICEURN]
+
 try:
     response = do_method("am", "SliverStatus", params,
                          response_handler=geni_am_response_handler)
