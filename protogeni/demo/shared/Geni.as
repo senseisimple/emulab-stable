@@ -23,10 +23,10 @@ package
 
     private static var cmv2 : String = "cmv2";
 
-//    public static var defaultAuthority : String = "jonlab.testbed.emulab.net";
+//    public static var defaultAuthority : String = "myelab.testbed.emulab.net";
     public static var defaultAuthority : String = "emulab.net";
 
-//    public static var defaultHost : String = "myboss.jonlab.testbed.emulab.net";
+//    public static var defaultHost : String = "myboss.myelab.testbed.emulab.net:446";
     public static var defaultHost : String = "boss.emulab.net";
 
     public static var sesUrl : String = "https://myboss.emulab.geni.emulab.net/protogeni/xmlrpc/";
