@@ -594,6 +594,13 @@ namespace eval GLOBALS {
 	while { $vname != {} } {
 
 	    foreach event $event_list($vname) {
+               if {[string equal [lindex $event 0] "swapout"]} {
+                       set event [lreplace $event 0 0 0]
+                       set triggertype "SWAPOUT"
+               } else {
+                       set triggertype "TIMER"
+                }
+               set fields [list "time" "vnode" "vname" "objecttype" "eventtype" "arguments" "atstring" "triggertype" ]
 
 		real_set time [lindex $event 0]
 		real_set otype [lindex $event 1]
@@ -628,7 +635,7 @@ namespace eval GLOBALS {
 			real_set virt_agents_list($agt) {}
 		    }
 		}
-		$sim spitxml_data "eventlist" [list "time" "vnode" "vname" "objecttype" "eventtype" "arguments" "atstring" ] [list $time $pnode [$vname set objname] $otype $etype $args $atstring]
+		$sim spitxml_data "eventlist" [list "time" "vnode" "vname" "objecttype" "eventtype" "triggertype" "arguments" "atstring" ] [list $time $pnode [$vname set objname] $otype $etype $triggertype $args $atstring]
 	    }
 
 	    real_set vname [array nextelement event_list $searchid]

@@ -210,6 +210,8 @@ sub Create($$$$$$$$$)
     push(@insert_data, "resource_id='$resource_id'");
     push(@insert_data, "creator_uuid='$owner_uuid'");
     push(@insert_data, "slice_uuid='$slice_uuid'");
+    # Start out new slivers, as new.
+    push(@insert_data, "state='new'");
 
     if (defined($rspec)) {
 	my $rspec_string = GeniXML::Serialize($rspec);
@@ -571,7 +573,8 @@ use Experiment;
 use emutil;
 use XML::Simple;
 use libdb qw(TBDB_ALLOCSTATE_RES_INIT_DIRTY TBDB_NODESTATE_SHUTDOWN
-	     TBResolveNextOSID TBDB_NODESTATE_ISUP TBDB_NODESTATE_TBFAILED);
+	     TBResolveNextOSID TBDB_NODESTATE_ISUP TBDB_NODESTATE_TBFAILED
+	     TBDB_NODESTATE_PXEWAIT);
 
 # Error log for local physical node.
 sub ErrorLog($)
@@ -668,7 +671,8 @@ sub Create($$$$$$)
 	$sliver_uuid = $vnode->uuid();
 	$resource_id = $vnode->node_id();
 	$hostname = GeniUtil::FindHostname($vnode->node_id());
-	$sshdport = $vnode->sshdport();
+	$sshdport = $vnode->sshdport()
+	    if (!defined($vnode->jailip()));
     }
     else {
 	$hrn = "${PGENIDOMAIN}." . $node->node_id();
@@ -758,14 +762,6 @@ sub Provision($;$)
 	# we need to mark for tmcd.
 	#
 	if ($node->ModifyReservation({"genisliver_idx" => $self->idx()})) {
-	    return -1;
-	}
-
-	#
-	# Terrible place to do this. 
-	#
-	if ($node->OSSelect("<DEFAULT>", "def_boot_osid", 0) != 0) {
-	    print STDERR "Could not os_select $node to default\n";
 	    return -1;
 	}
     }
@@ -866,6 +862,14 @@ sub UnProvision($;$)
 		# Unincorporate the node. Bogus, needs fixing.
 		$node->ModifyReservation({"genisliver_idx" => 0});
 		goto skip;
+	    }
+	    #
+	    # Look to see if local physical node was stopped (powered off).
+	    #
+	    if (!$node->isvirtnode() &&
+		!$node->isremotenode() &&
+		$self->state() eq "stopped") {
+		system("$POWER on $node_id");
 	    }
 	    system("$NFREE -q $pid $eid $node_id");
 	}
@@ -991,7 +995,17 @@ sub Start($$$)
 	    }
 	}
 	else {
-	    system("$NODEREBOOT -s $node_id");
+	    #
+	    # Look to see if local physical node was stopped (powered off).
+	    #
+	    if (!$node->isvirtnode() &&
+		!$node->isremotenode() &&
+		$self->state() eq "stopped") {
+		system("$POWER on $node_id");
+	    }
+	    else {
+		system("$NODEREBOOT -s $node_id");
+	    }
 	}
 	return -1
 	    if ($?);
@@ -1098,7 +1112,8 @@ sub ComputeStatus($$)
     elsif ($eventstate eq TBDB_NODESTATE_TBFAILED()) {
 	$status = "failed";
     }
-    elsif ($eventstate eq TBDB_NODESTATE_SHUTDOWN()) {
+    elsif ($eventstate eq TBDB_NODESTATE_SHUTDOWN() ||
+	   $eventstate eq TBDB_NODESTATE_PXEWAIT()) {
 	$status = "notready";
     }
     else {

@@ -9,8 +9,8 @@
 # TMCC library. Provides an interface to the TMCD via a config file
 # or directly to it via TCP
 #
-# TODO: Proxy path in a jail. 
-# 
+# TODO: Proxy path in a jail.
+#
 package libtmcc;
 use Exporter;
 @ISA    = "Exporter";
@@ -34,7 +34,7 @@ use Exporter;
              TMCCCMD_PLABEVENTKEYS TMCCCMD_PORTREGISTER
 	     TMCCCMD_MOTELOG TMCCCMD_BOOTWHAT TMCCCMD_ROOTPSWD
 	     TMCCCMD_LTMAP TMCCCMD_LTPMAP TMCCCMD_TOPOMAP TMCCCMD_LOADINFO
-	     TMCCCMD_TPMBLOB TMCCCMD_TPMPUB 
+	     TMCCCMD_TPMBLOB TMCCCMD_TPMPUB TMCCCMD_DHCPDCONF
 	     );
 
 # Must come after package declaration!
@@ -66,7 +66,7 @@ my $beproxy     = 0;
 
 #
 # Configuration. The importer of this library should set these values
-# accordingly. 
+# accordingly.
 #
 %config =
     ( "debug"		=> 0,
@@ -191,6 +191,7 @@ my %commandset =
       "tpmblob"      	=> {TAG => "tpmblob"},
       "tpmpubkey"       => {TAG => "tpmpubkey"},
       "loadinfo"        => {TAG => "loadinfo"},
+      "dhcpdconf"       => {TAG => "dhcpdconf"},
     );
 
 #
@@ -257,10 +258,11 @@ sub TMCCCMD_LTPMAP()  { $commandset{"ltpmap"}->{TAG}; }
 sub TMCCCMD_TPMBLOB()  { $commandset{"tpmblob"}->{TAG}; }
 sub TMCCCMD_TPMPUB()  { $commandset{"tpmpubkey"}->{TAG}; }
 sub TMCCCMD_LOADINFO()  { $commandset{"loadinfo"}->{TAG}; }
+sub TMCCCMD_DHCPDCONF()  { $commandset{"dhcpdconf"}->{TAG}; }
 
 #
 # Caller uses this routine to set configuration of this library
-# 
+#
 sub configtmcc($$)
 {
     my ($opt, $val) = @_;
@@ -350,7 +352,7 @@ sub optionstring($%)
 # If a "results" argument (pass by reference) has been provided, then
 # take the results of tmcc, and store a list of strings into it.
 # If an options hash is passed, use that to extend the global config options.
-# 
+#
 sub runtmcc ($;$$%)
 {
     my ($cmd, $args, $results, %optconfig) = @_;
@@ -434,7 +436,7 @@ sub tmcc ($;$$%)
     }
 
     #
-    # See if this is a cmd we can get from the local config stash. 
+    # See if this is a cmd we can get from the local config stash.
     #
     if (!$nocache && (!defined($args) || $args eq "")) {
 	foreach my $key (keys(%commandset)) {
@@ -453,7 +455,7 @@ sub tmcc ($;$$%)
 		    #
 		    print STDERR "Fetching locally from $filename\n"
 			if ($debug);
-		
+
 		    while (<TD>) {
 			next
 			    if ($_ =~ /^\*\*\* $tag$/);
@@ -475,8 +477,8 @@ sub tmcc ($;$$%)
     #
     if (!$config{"dounix"} && !$noproxy && -e $PROXYDEF) {
 	#
-	# Suck out the path and untaint. 
-	# 
+	# Suck out the path and untaint.
+	#
 	open(PP, "$BOOTDIR/proxypath");
 	my $ppath = <PP>;
 	close(PP);
@@ -565,7 +567,7 @@ sub tmccbossinfo()
 sub tmccclrconfig()
 {
     my $dir = CacheDir();
-	
+
     if (-d $dir) {
 	system("rm -rf $dir");
     }
@@ -583,12 +585,12 @@ sub tmccgetconfig()
     my $noproxy = $config{"noproxy"};
 
     #
-    # Check for proxypath file, but do not override config option. 
+    # Check for proxypath file, but do not override config option.
     #
     if (!$config{"dounix"} && !$noproxy && -e $PROXYDEF) {
 	#
-	# Suck out the path and untaint. 
-	# 
+	# Suck out the path and untaint.
+	#
 	open(PP, "$BOOTDIR/proxypath");
 	my $ppath = <PP>;
 	close(PP);
@@ -606,7 +608,7 @@ sub tmccgetconfig()
 	warn("*** WARNING: Could not mkdir $cdir: $!\n");
 	return -1;
     }
-   
+
     # XXX  Can't "use libsetup" in libtmcc to reference the WINDOWS() function.
     my $arg = (-e "$ETCDIR/iscygwin") ? "windows" : undef;
     if (runtmcc("fullconfig", $arg, \@tmccresults) < 0 ||
@@ -619,7 +621,7 @@ sub tmccgetconfig()
     while ($str = shift(@tmccresults)) {
 	if ($str =~ /^\*\*\* ([-\w]*)$/) {
 	    my $param = $1;
-	    
+
 	    if (open(TD, "> $cdir/$param")) {
 		#
 		# Set the permission on the file first if necessary
@@ -637,7 +639,7 @@ sub tmccgetconfig()
 		}
 		while (@tmccresults) {
 		    $str = shift(@tmccresults);
-		    
+
 		    last
 			if ($str =~ /^\*\*\* $param$/);
 		    print TD $str;

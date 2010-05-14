@@ -1,3 +1,4 @@
+VERSION export-subst
 # Files that already had DOS-style line endings and those
 # that require them should be added to the list below.
 delay/linux/iptables_mods/iptables-1.3.6-imq.diff -crlf

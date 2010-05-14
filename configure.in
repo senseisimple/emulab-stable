@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 AC_PREREQ(2.13)
@@ -217,6 +217,7 @@ AC_SUBST(STANDALONE_CLEARINGHOUSE)
 AC_SUBST(GMAP_API_KEY)
 AC_SUBST(NODE_USAGE_SUPPORT)
 AC_SUBST(NOSTACKMIB)
+AC_SUBST(EXP_VIS_SUPPORT)
 
 #
 # Offer both versions of the email addresses that have the @ escaped
@@ -302,6 +303,7 @@ PROTOGENI_CLEARINGHOUSE=0
 PROTOGENI_DOMAIN="unknown"
 STANDALONE_CLEARINGHOUSE=0
 NODE_USAGE_SUPPORT=0
+EXP_VIS_SUPPORT=0
 NOSTACKMIB=0
 
 #
@@ -846,6 +848,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	sensors/and/GNUmakefile sensors/and/and-emulab.conf \
 	sensors/powermon/GNUmakefile sensors/powermon/powermon \
 	sensors/nfstrace/GNUmakefile sensors/nfstrace/nfstrace.init \
+	sensors/nfstrace/nfsdump2/GNUmakefile \
 	account/GNUmakefile account/tbacct \
 	account/addpubkey account/addsfskey account/genpubkeys \
 	account/quotamail account/mkusercert account/newproj account/newuser \
@@ -975,6 +978,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	cdrom/groklilo/GNUmakefile \
 	flash/GNUmakefile \
 	dhcpd/dhcpd.conf.template dhcpd/GNUmakefile \
+	dhcpd/dhcpd.conf.subboss.template \
 	install/GNUmakefile \
 	install/ops-install install/boss-install install/fs-install \
 	install/load-descriptors install/dump-descriptors \
@@ -1015,6 +1019,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	collab/cvstools/cvs.proxy collab/cvstools/cvs_ctrl \
 	collab/cvstools/cvsrepo_ctrl.proxy collab/cvstools/cvsrepo_ctrl \
 	collab/cvstools/webcvsrepo_ctrl \
+	collab/exp-vis/GNUmakefile collab/exp-vis/fetch-vis \
 	node_usage/GNUmakefile node_usage/mk-plots \
 	node_usage/analy node_usage/publish \
 	node_usage/analy2 node_usage/refresh \

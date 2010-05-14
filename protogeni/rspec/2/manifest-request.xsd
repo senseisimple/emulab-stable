@@ -15,6 +15,18 @@
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" targetNamespace="http://www.protogeni.net/resources/rspec/2" xmlns:rspec="http://www.protogeni.net/resources/rspec/2">
   <xs:include schemaLocation="manifest-common.xsd"/>
   <!-- The ComponentName will only be available after an assignment -->
+  <xs:complexType name="InstallServiceContents">
+    <xs:group ref="rspec:AnyExtension"/>
+    <xs:attributeGroup ref="rspec:AnyExtension"/>
+    <xs:attribute name="url" use="required"/>
+    <xs:attribute name="install_path" use="required"/>
+  </xs:complexType>
+  <xs:complexType name="ExecuteServiceContents">
+    <xs:group ref="rspec:AnyExtension"/>
+    <xs:attributeGroup ref="rspec:AnyExtension"/>
+    <xs:attribute name="shell" use="required"/>
+    <xs:attribute name="command" use="required"/>
+  </xs:complexType>
   <!-- The LinkMapping will only be available after an assignment -->
   <!-- The ComponentInterfaceDeclName will only be available after an assignment -->
   <!-- The ComponentInterfaceRefName will only be available after an assignment -->

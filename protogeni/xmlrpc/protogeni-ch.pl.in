@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -15,6 +15,8 @@ use English;
 use Frontier::Responder;
 use Data::Dumper;
 use POSIX;
+use Crypt::X509;
+use Crypt::OpenSSL::X509;
 
 # Yack. apache does not close fds before the exec, and if this dies
 # we are left with a giant mess.
@@ -26,11 +28,15 @@ BEGIN {
 }
 
 # Do this early so that we talk to the right DB.
-use vars qw($GENI_DBNAME $GENI_ISCLRHOUSE);
+use vars qw($GENI_DBNAME $GENI_ISCLRHOUSE $GENI_CHPEMFILE);
 BEGIN { $GENI_DBNAME = "geni-ch"; $GENI_ISCLRHOUSE = 1; }
 
 # Configure variables
-my $EMULAB_PEMFILE = "@prefix@/etc/genich.pem";
+my $ETCDIR         = "@prefix@/etc";
+my $EMULAB_PEMFILE = ((-s "$ETCDIR/genich-local.pem") ?
+		      "$ETCDIR/genich-local.pem" : "$ETCDIR/genich.pem");
+# See GeniCredential; a helpful debugging aid.
+$GENI_CHPEMFILE = $EMULAB_PEMFILE;
 
 # Testbed libraries.
 use lib '@prefix@/lib';
@@ -63,6 +69,40 @@ if (!defined($certificate)) {
 	"    Could not get uuid from $EMULAB_PEMFILE\n");
 }
 $ENV{'MYUUID'} = $certificate->uuid();
+# The URN could also come from the certificate, and that might be preferable
+# in some ways (if anybody is doing something silly like authenticating
+# with somebody else's certificate).  But that would require everybody to
+# upgrade to URNs in their certificates, so we can't assume it yet.
+$ENV{'MYURN'} = "urn:publicid:IDN+@OURDOMAIN@+authority+ch";
+
+#
+# Helper function to return a properly formated XML error.
+#
+sub XMLError($$)
+{
+    my ($code, $string) = @_;
+
+    my $decoder = Frontier::RPC2->new();
+    print "Content-Type: text/xml \n\n";
+    print $decoder->encode_fault($code, $string);
+    exit(0);
+}
+
+#
+# Make sure the client presented a valid certificate that apache says
+# is okay.
+#
+# THIS HAS TO BE HERE! Why? Cause recent security patches disable SSL
+# renegotiation, which is needed when a subdir turns on ssl client
+# verification (as httpd.conf used to). Now, we set it to "optional",
+# which avoids the renegotiation problem, but we have to make that
+# this interface is always invoked by a client supplying a verifiable
+# certificate. 
+#
+if (! (exists($ENV{'SSL_CLIENT_VERIFY'}) &&
+       $ENV{'SSL_CLIENT_VERIFY'} eq "SUCCESS")) {
+    XMLError(-1, "Invalid or missing certificate");
+}
 
 #
 # In the prototype, we accept certificate signed by trusted roots
@@ -97,11 +137,35 @@ if (exists($ENV{'SSL_CLIENT_S_DN_CN'}) &&
     $ENV{'GENIUUID'} = $ENV{'SSL_CLIENT_S_DN_CN'};
 }
 else {
-    my $decoder = Frontier::RPC2->new();
-    print "Content-Type: text/xml \n\n";
-    print $decoder->encode_fault(-1, "Invalid certificate; no UUID");
-    exit(0);
+    XMLError(-1, "Invalid certificate; no UUID");
 }
+
+#
+# The CERT data from apache holds the URN of the caller. 
+#
+if (exists($ENV{'SSL_CLIENT_CERT'})) {
+    my $x509 = eval {
+	Crypt::OpenSSL::X509->new_from_string($ENV{'SSL_CLIENT_CERT'}); };
+    if ($@) {
+	XMLError(-1, "Invalid certificate: $@");
+    }
+    my $cert = $x509->as_string(Crypt::OpenSSL::X509::FORMAT_ASN1);
+    XMLError(-1, "Could not convert certificate to ASN1")
+	if (!defined($cert) || $cert eq '');
+    my $decoded = Crypt::X509->new( cert => $cert );
+    if ($decoded->error) {
+	XMLError(-1, "Error decoding certificate:" . $decoded->error);
+    }
+    foreach my $tmp (@{ $decoded->SubjectAltName }) {
+	if ($tmp =~ /^uniformResourceIdentifier=(.*)$/ ||
+	    $tmp =~ /^(urn:.*)$/) {
+	    $ENV{'GENIURN'} = $1;
+	}
+    }
+}
+XMLError(-1, "Invalid authentication certificate; no URN. Please regenerate.")
+    if (!exists($ENV{'GENIURN'}));
+
 #
 # Reaching into the Frontier code so I can debug this crap.
 #

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -161,20 +161,20 @@ foreach my $pid (keys(%wikipids)) {
 # Now the users.
 # 
 $query_result =
-    DBQueryFatal("select distinct g.uid,u.usr_name,u.usr_email,u.wikiname ".
+    DBQueryFatal("select distinct g.uid,u.uid_idx,u.usr_name,u.usr_email,u.wikiname ".
 		 "  from group_membership as g ".
-		 "left join users as u on u.uid=g.uid ".
+		 "left join users as u on u.uid_idx=g.uid_idx ".
 		 "where u.status='active' ".
 #		 "  and (g.pid='testbed' or g.pid='emulab-ops' or ".
 #		 "       g.pid='tbres' or g.pid='utahstud')" .
 		 "order by u.admin");
 
-my %wikiuids   = ();	# Indexed by user uid, gives wikiname.
-my %emailaddrs = ();	# Indexed by user uid, gives user email address.
+my %wikiuids   = ();	# Indexed by user uid_idx, gives wikiname.
+my %emailaddrs = ();	# Indexed by user uid_idx, gives user email address.
 # Clear this for next loop.
 %wikinames = ();
 
-while (my ($uid,$name,$email,$wikiname) = $query_result->fetchrow_array()) {
+while (my ($uid,$idx,$name,$email,$wikiname) = $query_result->fetchrow_array()) {
     $emailaddrs{$uid} = $email;
 
     if (!defined($wikiname) || $wikiname eq "") {
@@ -221,23 +221,23 @@ while (my ($uid,$name,$email,$wikiname) = $query_result->fetchrow_array()) {
 	}
     }
     $wikinames{$wikiname} = $uid;
-    $wikiuids{$uid}       = $wikiname;
-    $emailaddrs{$uid}     = $email;
+    $wikiuids{$idx}       = [$uid, $wikiname];
+    $emailaddrs{$idx}     = $email;
 }
 
 #
 # Now we are going to loop over the names, insert them into the DB, and
 # then call addwikiuser to actually do the work over on ops.
 #
-foreach my $uid (keys(%wikiuids)) {
-    my $wikiname = $wikiuids{$uid};
+foreach my $idx (keys(%wikiuids)) {
+    my ($uid, $wikiname) = @{ $wikiuids{$idx} };
 
     print "Creating Wiki for home page $uid ($wikiname)\n"
 	if ($debug);
     
     if (!$impotent) {
 	DBQueryFatal("update users set wikiname='$wikiname' ".
-		     "where uid='$uid'");
+		     "where uid_idx='$idx'");
 
 	system("$ADDWIKIUSER $uid") == 0
 	    or fatal("Could not add wiki account for $uid ($wikiname)");

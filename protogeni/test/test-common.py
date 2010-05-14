@@ -137,9 +137,28 @@ def Fatal(message):
     sys.exit(1)
 
 def PassPhraseCB(v, prompt1='Enter passphrase:', prompt2='Verify passphrase:'):
-    passphrase = open(PASSPHRASEFILE).readline()
-    passphrase = passphrase.strip()
-    return passphrase
+    """Acquire the encrypted certificate passphrase by reading a file
+    or prompting the user.
+
+    This is an M2Crypto callback. If the passphrase file exists and is
+    readable, use it. If the passphrase file does not exist or is not
+    readable, delegate to the standard M2Crypto passphrase
+    callback. Return the passphrase.
+    """
+    if os.path.exists(PASSPHRASEFILE):
+        try:
+            passphrase = open(PASSPHRASEFILE).readline()
+            passphrase = passphrase.strip()
+            return passphrase
+        except IOError, e:
+            print 'Error reading passphrase file %s: %s' % (PASSPHRASEFILE,
+                                                            e.strerror)
+    else:
+        if debug:
+            print 'passphrase file %s does not exist' % (PASSPHRASEFILE)
+    # Prompt user if PASSPHRASEFILE does not exist or could not be read.
+    from M2Crypto.util import passphrase_callback
+    return passphrase_callback(v, prompt1, prompt2)
 
 #
 # Call the rpc server.
@@ -279,7 +298,7 @@ def get_slice_credential( slice, selfcredential ):
     if "urn" in slice:
         params["urn"]       = slice["urn"]
     else:
-        params["uuid"]       = slice["uuid"]
+        params["uuid"]      = slice["uuid"]
     rval,response = do_method("sa", "GetCredential", params)
     if rval:
         Fatal("Could not get Slice credential")

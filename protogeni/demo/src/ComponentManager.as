@@ -1,4 +1,4 @@
-﻿/* GENIPUBLIC-COPYRIGHT
+/* GENIPUBLIC-COPYRIGHT
  * Copyright (c) 2009 University of Utah and the Flux Group.
  * All rights reserved.
  *
@@ -134,6 +134,16 @@ package
     public function getSliver() : String
     {
       return sliver;
+    }
+
+    public function setSliverUrn(newSliverUrn : String) : void
+    {
+      sliverUrn = newSliverUrn;
+    }
+
+    public function getSliverUrn() : String
+    {
+      return sliverUrn;
     }
 
     public function isUsed(nodeIndex : int) : Boolean
@@ -283,6 +293,7 @@ package
     private var ticket : String;
     // Credential for the sliver
     private var sliver : String;
+    private var sliverUrn : String;
     private var state : int;
     private var update : Function;
 

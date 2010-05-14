@@ -1,0 +1,70 @@
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (!DBSlotExists("nodeuidlastlogin", "uid_idx")) {
+	DBQueryFatal("alter table nodeuidlastlogin add ".
+		     " `uid_idx` mediumint(8) unsigned NOT NULL default '0' ".
+		     " after uid");
+
+	# This unique key is no longer wanted cause of archived users.
+	DBQueryFatal("alter table users drop key `uid`");
+	DBQueryFatal("alter table users add key `uid` (`uid`)");
+    }
+    if (!DBSlotExists("uidnodelastlogin", "uid_idx")) {
+	DBQueryFatal("alter table uidnodelastlogin add ".
+		     " `uid_idx` mediumint(8) unsigned NOT NULL default '0' ".
+		     " after uid");
+    }
+    if (!DBSlotExists("userslastlogin", "uid_idx")) {
+	DBQueryFatal("alter table userslastlogin add ".
+		     " `uid_idx` mediumint(8) unsigned NOT NULL default '0' ".
+		     " after uid");
+    }
+    if (!DBSlotExists("user_policies", "uid_idx")) {
+	DBQueryFatal("alter table user_policies add ".
+		     " `uid_idx` mediumint(8) unsigned NOT NULL default '0' ".
+		     " after uid");
+    }
+    if (!DBSlotExists("unixgroup_membership", "uid_idx")) {
+	DBQueryFatal("alter table unixgroup_membership add ".
+		     " `uid_idx` mediumint(8) unsigned NOT NULL default '0' ".
+		     " after uid");
+    }
+    DBQueryFatal("update nodeuidlastlogin as n left join users as u on ".
+		 "  n.uid=u.uid ".
+		 "set n.uid_idx=u.uid_idx ".
+		 "where u.status!='archived'");
+    DBQueryFatal("delete from nodeuidlastlogin where uid_idx=0");
+
+    DBQueryFatal("update uidnodelastlogin as n left join users as u on ".
+		 "  n.uid=u.uid ".
+		 "set n.uid_idx=u.uid_idx ".
+		 "where u.status!='archived'");
+    DBQueryFatal("delete from uidnodelastlogin where uid_idx=0");
+    
+    DBQueryFatal("update userslastlogin as n left join users as u on ".
+		 "  n.uid=u.uid ".
+		 "set n.uid_idx=u.uid_idx ".
+		 "where u.status!='archived'");
+    DBQueryFatal("delete from userslastlogin where uid_idx=0");
+
+    DBQueryFatal("update user_policies as n left join users as u on ".
+		 "  n.uid=u.uid ".
+		 "set n.uid_idx=u.uid_idx ".
+		 "where u.status!='archived'");
+    DBQueryFatal("delete from user_policies where uid_idx=0");
+
+    DBQueryFatal("update unixgroup_membership as n left join users as u on ".
+		 "  n.uid=u.uid ".
+		 "set n.uid_idx=u.uid_idx ".
+		 "where u.status!='archived'");
+    DBQueryFatal("delete from unixgroup_membership where uid_idx=0");
+
+    return 0;
+}
+1;
+

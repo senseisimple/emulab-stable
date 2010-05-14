@@ -1,0 +1,91 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use Getopt::Std;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $USERNODE    = "@USERNODE@";
+my $SSH         = "$TB/bin/sshtb -l root -host $USERNODE";
+
+my $background = 0;
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Turn off line buffering on output
+$| = 1; 
+
+#
+# Capture stdout and stderr to a file so if we die we can mail the output to 
+# testbed-ops
+#
+
+# XXX: Don't hardcode
+my $logfile = "/tmp/write-vis-auth.$$";
+
+use vars qw(*OLDOUT *OLDERR);
+open OLDOUT, ">&STDOUT" or die "Can't dup STDOUT $!";
+open OLDERR, ">&STDERR" or die "Can't dup STDERR $!";
+open STDOUT, ">$logfile" or die "Can't open $logfile: $!";
+open STDERR, ">&STDOUT"  or die "Can't dup STDERR $!";
+
+$SIG{__DIE__} = sub {
+    return unless defined $^S; # In Parser
+    return if $^S;             # In Eval Block
+    local $_ = $_[0];
+    open STDOUT, ">&OLDOUT";
+    open STDERR, ">&OLDERR";
+    SENDMAIL($TBOPS, "write-vis-auth failed", $_, undef, undef, $logfile);
+    unlink $logfile;
+    TBScriptUnlock();
+    print STDERR "write-vis-auth failed, see testbed-ops mail\n";
+    exit(1);
+};
+
+#
+# Load the Testbed support stuff. 
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+if ((my $locked = TBScriptLock("write-vis-auth", 1)) != TBSCRIPTLOCK_OKAY()) {
+    exit(0)
+	if ($locked == TBSCRIPTLOCK_IGNORE);
+    die("Could not get the lock after a long time!\n");
+}
+
+# become root, needed for ssh
+$< = $>;
+
+my $db_result =
+    DBQueryFatal("select opskey, uid from login");
+
+open O, "| $SSH $TB/libexec/write-vis-auth.proxy" 
+    or die "ssh to ops failed: $!\n";
+
+my $prev_opskey = '';
+while (my ($opskey,$uid) = $db_result->fetchrow_array) {
+    $opskey = "00000000000000000000000000000000" if $opskey eq '';
+    print O "$opskey $uid\n";
+}
+
+close O;
+
+die "ssh to ops failed: $!\n" if $!;
+die "ssh to ops failed with exit code $?\n" if $? != 0;
+
+unlink $logfile;
+TBScriptUnlock();
+
+exit(0);
+

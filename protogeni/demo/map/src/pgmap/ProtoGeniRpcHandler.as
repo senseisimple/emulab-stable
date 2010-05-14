@@ -19,6 +19,7 @@
 	import flash.events.ErrorEvent;
 	import flash.utils.ByteArray;
 	
+	import mx.controls.Alert;
 	import mx.utils.Base64Decoder;
     
     // Handles all the XML-RPC calls
@@ -54,6 +55,30 @@
 		{
 			op = new Operation(null);
 			opName = null;
+		}
+		
+		public function GeniresponseToString(value:int):String
+		{
+			switch(value) {
+				case GENIRESPONSE_SUCCESS : return "Success";
+	    		case GENIRESPONSE_BADARGS: return "Malformed arguments";
+	    		case GENIRESPONSE_ERROR: return "General Error";
+				case GENIRESPONSE_FORBIDDEN : return "Forbidden";
+				case GENIRESPONSE_BADVERSION : return "Bad version";
+				case GENIRESPONSE_SERVERERROR : return "Server error";
+				case GENIRESPONSE_TOOBIG : return "Too big";
+				case GENIRESPONSE_REFUSED : return "Refused";
+				case GENIRESPONSE_TIMEDOUT : return "Timed out";
+				case GENIRESPONSE_DBERROR : return "Database error";
+				case GENIRESPONSE_RPCERROR : return "RPC error";
+				case GENIRESPONSE_UNAVAILABLE : return "Unavailable";
+				case GENIRESPONSE_SEARCHFAILED : return "Search failed";
+				case GENIRESPONSE_UNSUPPORTED : return "Unsupported";
+				case GENIRESPONSE_BUSY : return "Busy";
+				case GENIRESPONSE_EXPIRED : return "Expired";
+				case GENIRESPONSE_INPROGRESS : return "In progress";
+	    		default: return "Other";
+	    	}
 		}
 	    
 	    public function postCall() : void {
@@ -110,6 +135,13 @@
 	//      clip.xmlText.scrollV = clip.xmlText.maxScrollV;
 	    }
 	    
+	    public function addGeniresponse(code:int):void
+	    {
+	      main.console.appendText("\n-----\n");
+	      main.console.appendText("GENI RESPONSE: " + this.GeniresponseToString(code) + "\n");
+	      main.console.appendText("-----\n\n");
+	    }
+	    
 	    public function addResponse() : void
 	    {
 	      main.console.appendText("\n-----------------------------------------\n");
@@ -127,9 +159,23 @@
 	      main.startWaiting();
 	      main.console.appendText(opName);
 	      op.reset(Geni.getCredential);
-		  op.call(completeCredential, failure);
+		  op.call(completeCredential, failCredential);
 	      addSend();
 	    }
+		
+		public function failCredential(event : ErrorEvent, fault : MethodFault) : void
+		{
+			main.openConsole();
+			main.setProgress("Operation failed!", Common.failColor);
+			main.stopWaiting();
+			outputFailure(event, fault);
+
+			var msg:String = event.toString();
+			if(msg.search("#2048") > -1)
+				Alert.show("Check to make sure you have added a security exception for: " + op.getUrl(), "Security Exception");
+			else if(msg.search("#2032") > -1)
+				Alert.show("Check to make sure your SSL certificate has been added to your browser.","SSL Certificate");
+		}
 	    
 		public function completeCredential(code : Number, response : Object) : void
 	    {
@@ -137,6 +183,7 @@
 	    	main.stopWaiting();
 	    	main.console.appendText("Acquiring credential complete...\n");
 	      addResponse();
+	      addGeniresponse(code);
 	      if (code == GENIRESPONSE_SUCCESS)
 	      {
 	      	main.pgHandler.CurrentUser.credential = String(response.value);
@@ -167,6 +214,7 @@
 	    	main.setProgress("Done", Common.successColor);
 	    	main.stopWaiting();
 	    	main.console.appendText("List Components complete...\n");
+	      addGeniresponse(code);
 	      if (code == GENIRESPONSE_SUCCESS)
 	      {
 			for each(var obj:Object in response.value)
@@ -174,6 +222,7 @@
 				var newCm:ComponentManager = new ComponentManager();
 				newCm.Hrn = obj.hrn;
 				newCm.Url = obj.url;
+				newCm.Urn = obj.urn;
 				main.pgHandler.ComponentManagers.addItem(newCm);
 				//break;
 			}
@@ -215,13 +264,10 @@
 	    	}
 	    	
 	    	if(currentIndex >= main.pgHandler.ComponentManagers.length)
-	    	//if(currentIndex == 1)
 	    	{
-	    		main.chooseCMWindow.refreshList();
-	    		//main.pgHandler.map.drawMap();
-	    		//return;
-	    		
+				main.chooseCMWindow.refreshList();
 	    		startResolveUser();
+
 	    		return;
 	    	}
 	    	
@@ -244,15 +290,14 @@
 	    	main.setProgress("Done", Common.failColor);
 	    	main.stopWaiting();
 	    	outputFailure(event, fault);
-	    	var msg:String = event.toString();
-	    	if(msg.search("#2048") > -1)
-	        	currentCm.Message = "Stream error, possibly due to server error.  Another possible error might be that you haven't added an exception for:\n" + currentCm.DiscoverResourcesUrl();
-			else if(msg.search("#2032") > -1)
-				currentCm.Message = "IO error, possibly due to the server being down";
-			else if(msg.search("timed"))
-				currentCm.Message = event.text;
-			else
-				currentCm.Message = msg;
+	    	currentCm.errorMessage = event.toString();
+	    	currentCm.errorDescription = "";
+	    	if(currentCm.errorMessage.search("#2048") > -1)
+	        	currentCm.errorDescription = "Stream error, possibly due to server error.  Another possible error might be that you haven't added an exception for:\n" + currentCm.DiscoverResourcesUrl();
+			else if(currentCm.errorMessage.search("#2032") > -1)
+				currentCm.errorDescription = "IO error, possibly due to the server being down";
+			else if(currentCm.errorMessage.search("timed"))
+				currentCm.errorDescription = event.text;
 			currentCm.Status = ComponentManager.FAILED;
 			currentIndex++;
 			main.chooseCMWindow.ResetStatus(currentCm);
@@ -264,10 +309,10 @@
 	    	main.setProgress("Done", Common.successColor);
 	    	main.stopWaiting();
 	    	main.console.appendText("Resource lookup complete...\n");
+	      addGeniresponse(code);
 
 	      if (code == GENIRESPONSE_SUCCESS)
 	      {
-	      	
       		var decodor:Base64Decoder = new Base64Decoder();
 	      	decodor.decode(response.value);
 	      	var bytes:ByteArray = decodor.toByteArray();
@@ -281,13 +326,8 @@
 	      } else {
 		      	main.setProgress("Done", Common.failColor);
 		    	main.stopWaiting();
-		    	switch(code) {
-		    		case GENIRESPONSE_BADARGS: currentCm.Message = "Malformed arguments";
-		    			break;
-		    		case GENIRESPONSE_ERROR: currentCm.Message = "Error";
-		    			break;
-		    		default: currentCm.Message = "Other error";
-		    	}
+		    	currentCm.errorMessage = response.output;
+	    		currentCm.errorDescription = GeniresponseToString(code) + ": " + currentCm.errorMessage;
 				currentCm.Status = ComponentManager.FAILED;
 				currentIndex++;
 				main.chooseCMWindow.ResetStatus(currentCm);
@@ -304,7 +344,6 @@
 	      main.console.appendText(opName + "...\n");
 	      op.reset(Geni.resolve);
 	      op.addField("credential", main.pgHandler.CurrentUser.credential);
-	      //op.addField("uuid", main.pgHandler.CurrentUser.uuid);
 	      op.addField("hrn", main.pgHandler.CurrentUser.urn);
 	      op.addField("type", "User");
 	      op.setUrl("https://boss.emulab.net:443/protogeni/xmlrpc");
@@ -316,6 +355,7 @@
 	    	main.setProgress("Done", Common.successColor);
 	    	main.stopWaiting();
 	    	main.console.appendText("Resolve user complete...\n");
+	    	addGeniresponse(code);
 	      if (code == GENIRESPONSE_SUCCESS)
 	      {
 	      	main.pgHandler.CurrentUser.uid = response.value.uid;
@@ -374,12 +414,18 @@
 	    	main.setProgress("Done", Common.successColor);
 	    	main.stopWaiting();
 	      addResponse();
+	    	addGeniresponse(code);
 	      if (code == GENIRESPONSE_SUCCESS)
 	      {
 	      	currentSlice.uuid = response.value.uuid;
 	      	currentSlice.creator = main.pgHandler.CurrentUser;
 	      	currentSlice.hrn = response.value.hrn;
 	      	currentSlice.urn = response.value.urn;
+	      	for each(var sliverCm:String in response.value.component_managers) {
+	      		var newSliver:Sliver = new Sliver(currentSlice);
+		      	newSliver.componentManager = main.pgHandler.getCm(sliverCm);
+		      	currentSlice.slivers.addItem(newSliver);
+	      	}
 	      	currentIndex++;
 			
 			startSliceLookup();
@@ -400,8 +446,14 @@
 	    			if(s.credential.length > 0)
 	    				totalCalls++;
 	    		}
-	    		if(totalCalls > 0)
-	    			startIndexedCall(startGetSliver); // Was SliceStatus at V1
+	    		if(totalCalls > 0) {
+	    			totalCalls = 0;
+	    			for each(var slice:Slice in main.pgHandler.CurrentUser.slices)
+		    		{
+		    			totalCalls += slice.slivers.length;
+		    		}
+		    		startIndexedCall(startGetSliver); // Was SliceStatus at V1
+	    		}
 	    		else
 	    			main.pgHandler.map.drawAll();
 	    		return;
@@ -434,6 +486,7 @@
 	    	main.setProgress("Done", Common.successColor);
 	    	main.stopWaiting();
 	      addResponse();
+	    	addGeniresponse(code);
 	      if (code == GENIRESPONSE_SUCCESS)
 	      {
 	      	currentSlice.credential = String(response.value);
@@ -469,16 +522,16 @@
 	    	}
 
 	    	currentSlice = main.pgHandler.CurrentUser.slices[currentIndex] as Slice;
-	    	currentCm = main.pgHandler.ComponentManagers[currentSecondaryIndex] as ComponentManager;
+	    	currentSliver = currentSlice.slivers[currentSecondaryIndex] as Sliver;
 	    	
-	      opName = "Acquiring " + ((totalCalls * main.pgHandler.ComponentManagers.length) - (main.pgHandler.ComponentManagers.length * currentIndex + currentSecondaryIndex)) + " more sliver credential(s)";
+	      opName = "Acquiring " + (totalCalls - callsMade) + " more sliver credential(s)";
 	      main.setProgress(opName, Common.waitColor);
 	      main.startWaiting();
 	      main.console.appendText(opName);
 	      op.reset(Geni.getSliver);
 	      op.addField("slice_urn", currentSlice.urn);
 	      op.addField("credentials", new Array(currentSlice.credential));
-	      op.setExactUrl(currentCm.Url);
+	      op.setExactUrl(currentSliver.componentManager.Url);
 		  op.call(completeGetSliver, failGetSliver);
 		  callsMade++;
 	      addSend();
@@ -490,10 +543,10 @@
 	    	main.stopWaiting();
 	    	outputFailure(event, fault);
 			currentSecondaryIndex++;
-			while(currentSecondaryIndex < main.pgHandler.ComponentManagers.length
-	    		&& (main.pgHandler.ComponentManagers[currentSecondaryIndex] as ComponentManager).Status != ComponentManager.VALID)
+			while(currentSecondaryIndex < currentSlice.slivers.length
+	    		&& (currentSlice.slivers[currentSecondaryIndex] as Sliver).componentManager.Status != ComponentManager.VALID)
 	    		currentSecondaryIndex++;
-		  if(currentSecondaryIndex == main.pgHandler.ComponentManagers.length)
+		  if(currentSecondaryIndex == (main.pgHandler.CurrentUser.slices[currentIndex] as Slice).slivers.length)
 		  {
 		  	  currentIndex++;
 			  while(currentIndex < main.pgHandler.CurrentUser.slices.length
@@ -509,16 +562,12 @@
 	    	main.setProgress("Done", Common.successColor);
 	    	main.stopWaiting();
 	      addResponse();
+	    	addGeniresponse(code);
 	      if (code == GENIRESPONSE_SUCCESS)
 	      {
-	      	var newSliver:Sliver = new Sliver(currentSlice);
-	      	newSliver.componentManager = currentCm;
-	      	//newSliver.sliceStatus = response.value.status;
-	      	//newSliver.status = response.value.status;
-	      	newSliver.credential = String(response.value);
+	      	currentSliver.credential = String(response.value);
 	      	var cred:XML = new XML(response.value);
-	      	newSliver.urn = cred.credential.target_urn;
-	      	currentSlice.slivers.addItem(newSliver);
+	      	currentSliver.urn = cred.credential.target_urn;
 	      	nextTotalCalls++;
 	      }
 	      else if(code == GENIRESPONSE_SEARCHFAILED)
@@ -532,10 +581,10 @@
 	      }
 	      
 		  currentSecondaryIndex++;
-	      while(currentSecondaryIndex < main.pgHandler.ComponentManagers.length
-	    		&& (main.pgHandler.ComponentManagers[currentSecondaryIndex] as ComponentManager).Status != ComponentManager.VALID)
+	      while(currentSecondaryIndex < currentSlice.slivers.length
+	    		&& (currentSlice.slivers[currentSecondaryIndex] as Sliver).componentManager.Status != ComponentManager.VALID)
 	    		currentSecondaryIndex++;
-		  if(currentSecondaryIndex == main.pgHandler.ComponentManagers.length)
+		  if(currentSecondaryIndex == (main.pgHandler.CurrentUser.slices[currentIndex] as Slice).slivers.length)
 		  {
 		  	  //currentSlice.DetectStatus();
 			  currentIndex++;
@@ -617,6 +666,7 @@
 	    	main.setProgress("Done", Common.successColor);
 	    	main.stopWaiting();
 	      addResponse();
+	    	addGeniresponse(code);
 	      if (code == GENIRESPONSE_SUCCESS)
 	      {
 	      	currentSliver.status = response.value.status;

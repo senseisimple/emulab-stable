@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2008 University of Utah and the Flux Group.
+# Copyright (c) 2008, 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -19,18 +19,20 @@ sub usage()
     print STDOUT "-r	     Show only traffic received by each node\n";
     print STDOUT "-s	     Show only traffic sent by each node\n";
     print STDOUT "-i seconds Show stats over a <seconds>-period interval\n";
+    print STDOUT "-E	     Aggregate by experiment\n";
 #    print STDOUT "-C	     Show control net traffic\n";
     exit(-1);
 }
 
 sub gather($$);
 
-my $optlist  = "Ci:ars";
+my $optlist  = "CEi:ars";
 my $debug = 0;
 my $interval = 0;
 my $doall = 0;
 my $send = 1;
 my $recv = 1;
+my $byexpt = 0;
 
 # XXX only does control net right now
 my $controlnet = 1;
@@ -95,6 +97,9 @@ if (defined($options{"i"})) {
 	die("Bogus interval $interval\n");
     }
 }
+if (defined($options{"E"})) {
+    $byexpt = 1;
+}
 if (defined($options{"C"})) {
     $controlnet = 1;
 }
@@ -141,6 +146,8 @@ if ($interval > 0) {
 my %after = ();
 gather(\%pcs, \%after);
 
+my %expcounts = ();
+
 # weed out bad boys
 my @list = ();
 foreach my $node (keys %pcs) {
@@ -164,21 +171,56 @@ foreach my $node (keys %pcs) {
     }
     $pcs{$node}{'total'} = $total;
     push(@list, $node);
+
+    if ($byexpt) {
+	my $cb = $before{$node}{'totals'};
+	my $ca = $after{$node}{'totals'};
+	my $exp = $pcs{$node}{'exp'};
+	if (!exists($expcounts{$exp})) {
+	    $expcounts{$exp} = [ 0, 0, 0, 0 ];
+	}
+	$expcounts{$exp}->[0] += ($ca->[0] - $cb->[0]);
+	$expcounts{$exp}->[1] += ($ca->[1] - $cb->[1]);
+	$expcounts{$exp}->[2] += ($ca->[2] - $cb->[2]);
+	$expcounts{$exp}->[3] += ($ca->[3] - $cb->[3]);
+    }
 }
-@list = sort sortem @list;
 
-printf("%12s %25s %12s %12s %12s %12s\n",
-       "Node", "Experiment", "Tot Pkts", "Unicast", "Non-Uni", "Tot Bytes");
-foreach my $node (@list) {
-    my $cb = $before{$node}{'totals'};
-    my $ca = $after{$node}{'totals'};
-    my $exp = $pcs{$node}{'exp'};
-    my $s = $pcs{$node}{'state'};
+if ($byexpt) {
+    printf("%25s %12s %12s %12s %12s\n",
+	   "Experiment", "Tot Pkts", "Unicast", "Non-Uni", "Tot Bytes");
+    foreach my $exp (sort esortem keys %expcounts) {
+	printf("%25s %12d %12d %12d %12d\n",
+	       $exp, $expcounts{$exp}->[3],
+	       $expcounts{$exp}->[1],
+	       $expcounts{$exp}->[2],
+	       $expcounts{$exp}->[0]);
+    }
+} else {
+    @list = sort sortem @list;
 
-    printf("%12s %25s %12d %12d %12d %12d\n",
-	   $node, $exp,
-	   $ca->[3]-$cb->[3], $ca->[1]-$cb->[1],
-	   $ca->[2]-$cb->[2], $ca->[0]-$cb->[0]);
+    printf("%12s %25s %12s %12s %12s %12s\n",
+	   "Node", "Experiment", "Tot Pkts", "Unicast", "Non-Uni", "Tot Bytes");
+    foreach my $node (@list) {
+	my $cb = $before{$node}{'totals'};
+	my $ca = $after{$node}{'totals'};
+	my $exp = $pcs{$node}{'exp'};
+	my $s = $pcs{$node}{'state'};
+
+	printf("%12s %25s %12d %12d %12d %12d\n",
+	       $node, $exp,
+	       $ca->[3]-$cb->[3], $ca->[1]-$cb->[1],
+	       $ca->[2]-$cb->[2], $ca->[0]-$cb->[0]);
+    }
+}
+
+sub esortem($$)
+{
+    my ($a, $b) = @_;
+
+    my $atot = $expcounts{$a}->[3];
+    my $btot = $expcounts{$b}->[3];
+    return $btot <=> $atot;
 }
 
 sub sortem($$)

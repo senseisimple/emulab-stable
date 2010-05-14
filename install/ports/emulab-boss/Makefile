@@ -110,7 +110,6 @@ RUN_DEPENDS=	\
 	anytopnm:${PORTSDIR}/graphics/netpbm \
 	tclsh8.4:${PORTSDIR}/lang/tcl84 \
 	otclsh:${PORTSDIR}/lang/otcl \
-	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/GD.pm:${PORTSDIR}/misc/p5-GD-old \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/SNMP.pm:${PORTSDIR}/net-mgmt/p5-SNMP \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/SNMP_Session.pm:${PORTSDIR}/net-mgmt/p5-SNMP_Session \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/BSD/Resource.pm:${PORTSDIR}/devel/p5-BSD-Resource \
@@ -150,11 +149,20 @@ RUN_DEPENDS+=	\
 	dhcpd:${PORTSDIR}/net/isc-dhcp3-server
 .endif
 RUN_DEPENDS+=	\
-	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/XML/Parser.pm:${PORTSDIR}/textproc/p5-XML-Parser
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/XML/Parser.pm:${PORTSDIR}/textproc/p5-XML-Parser \
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/RPC/Async.pm:${PORTSDIR}/misc/p5-RPC-Async \
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/Privileges/Drop.pm:${PORTSDIR}/misc/p5-Privileges-Drop \
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/IO/EventMux.pm:${PORTSDIR}/misc/p5-IO-EventMux \
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/IO/EventMux/Socket/MsgHdr.pm:${PORTSDIR}/misc/p5-IO-EventMux-Socket-MsgHdr
 # not getting installed via dependencies?
 RUN_DEPENDS+=	\
 	${X11BASE}/libdata/xorg/libraries:${PORTSDIR}/x11/xorg-libraries \
-	${LOCALBASE}/libexec/apache/libphp4.so:${PORTSDIR}/misc/emulab-php4
+	${LOCALBASE}/libexec/apache/libphp4.so:${PORTSDIR}/misc/emulab-php4 \
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/GD.pm:${PORTSDIR}/graphics/p5-GD
+.else
+# for old versions there used to be a problem with newer GD + older perl 
+RUN_DEPENDS+=	\
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/GD.pm:${PORTSDIR}/misc/p5-GD-old
 .endif
 
 .if ${OSMAJOR} >= 6

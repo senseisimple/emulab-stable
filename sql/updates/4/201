@@ -1,0 +1,16 @@
+#
+# Add a PXEKERNEL state to support fast transition of nodes from outer
+# Emulab to inner Emulabs.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    DBQueryFatal("REPLACE INTO state_transitions VALUES ".
+		 " ('PXEKERNEL','PXELIMBO','PXEBOOTING','Bootinfo-Restart')");
+    return 0;
+}
+1;

@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006, 2008, 2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -103,6 +103,7 @@ namespace eval TBCOMPAT {
     # A mapping of event objects and types.
     variable objtypes
     variable eventtypes
+    variable triggertypes
 
     # Existing (reserved nodes).
     variable reserved_list
@@ -129,6 +130,14 @@ namespace eval TBCOMPAT {
     variable elabinelab_nodeos
     variable elabinelab_source_tarfile ""
     variable elabinelab_tarfiles
+
+    # Elabinelab attribute stuff.
+    variable elabinelab_attributes
+    set elabinelab_attributes {}
+    variable EINEROLE  {^(all|boss|ops|fs|router|node)$}
+    variable EINEKEY   {^([-\w\.]+)$}
+    variable EINEVALUE {^([-\w\.\+\,\s\/]+)$}
+    variable EINEORDER {^\d+$}
 
     # Mapping of "resource classes" and "reservation types" to bootstrap
     # values, where a resource class is a symbolic string provided by the user
@@ -1719,7 +1728,7 @@ proc tb-set-dpdb {onoff} {
     }
 }
 #
-# Change the default topography.
+# Change the default topology.
 #
 proc tb-elab-in-elab-topology {topo} {
     var_import ::GLOBALS::elabinelab_topo
@@ -1736,10 +1745,99 @@ proc tb-set-elabinelab-cvstag {cvstag} {
 
     set elabinelab_cvstag $cvstag
 }
-proc tb-elabinelab-singlenet {} {
+proc tb-elabinelab-singlenet {args} {
     var_import ::GLOBALS::elabinelab_singlenet
+    set onoff 1
 
-    set elabinelab_singlenet 1
+    if {$args != {}} {
+	set onoff [lindex $args 0]
+    }
+    set elabinelab_singlenet $onoff
+}
+
+#
+# Set/clear elabinelab attributes:
+#    tb-set-elabinelab-attribute <key> <value> [<order>]
+#    tb-unset-elabinelab-attribute <key>
+#    tb-set-elabinelab-role-attribute <role> <key> <value> [<order>]
+#    tb-unset-elabinelab-role-attribute <role> <key>
+#
+proc tb-set-elabinelab-attribute {key value {order 0}} {
+    tb-set-elabinelab-role-attribute "all" $key $value $order
+}
+
+proc tb-unset-elabinelab-attribute {key} {
+    tb-unset-elabinelab-role-attribute "all" $key
+}
+
+proc tb-set-elabinelab-role-attribute {role key value {order 0}} {
+    var_import ::TBCOMPAT::EINEROLE;
+    var_import ::TBCOMPAT::EINEKEY;
+    var_import ::TBCOMPAT::EINEVALUE;
+    var_import ::TBCOMPAT::EINEORDER;
+    var_import ::TBCOMPAT::elabinelab_attributes;
+
+    if {[regexp $EINEROLE $role] == 0} {
+	perror "\[tb-set-elabinelab-attribute] - \"$role\" is not a valid elabinelab role"
+	return
+    }
+    if {[regexp $EINEKEY $key] == 0} {
+	perror "\[tb-set-elabinelab-attribute] - \"$key\" is not a valid elabinelab key"
+	return
+    }
+    if {[regexp $EINEVALUE $value] == 0} {
+	perror "\[tb-set-elabinelab-attribute] - \"$value\" is not a valid elabinelab value"
+	return
+    }
+    if {[regexp $EINEORDER $order] == 0} {
+	perror "\[tb-set-elabinelab-attribute] - \"$order\" is not a valid elabinelab order"
+	return
+    }
+
+    if {$role == "all"} {
+	set roles {"boss" "ops" "fs" "router" "node"}
+    } else {
+	set roles $role
+    }
+
+    foreach r $roles {
+	#
+	# If role/key/ordering exactly matches an existing value,
+	# replace it to preserve uniqueness, otherwise just add it.
+	#
+	set i [lsearch -glob $elabinelab_attributes "$r,$key,*,$order"]
+	if {$i > -1} {
+	    set elabinelab_attributes [lreplace $elabinelab_attributes $i $i]
+	}
+	lappend elabinelab_attributes "$r,$key,$value,$order"
+    }
+}
+
+proc tb-unset-elabinelab-role-attribute {role key} {
+    var_import ::TBCOMPAT::EINEROLE;
+    var_import ::TBCOMPAT::EINEKEY;
+    var_import ::TBCOMPAT::elabinelab_attributes;
+
+    if {[regexp $EINEROLE $role] == 0} {
+	perror "\[tb-unset-elabinelab-attribute] - \"$role\" is not a valid elabinelab role"
+	return
+    }
+    if {[regexp $EINEKEY $key] == 0} {
+	perror "\[tb-unset-elabinelab-attribute] - \"$key\" is not a valid elabinelab key"
+	return
+    }
+    if {$role == "all"} {
+	set roles {"boss" "ops" "fs" "router" "node"}
+    } else {
+	set roles $role
+    }
+
+    foreach r $roles {
+	while {[lsearch -glob $elabinelab_attributes "$r,$key,*"] > -1} {
+	    set i [lsearch -glob $elabinelab_attributes "$r,$key,*"]
+	    set elabinelab_attributes [lreplace $elabinelab_attributes $i $i]
+	}
+    }
 }
 
 #
@@ -1857,3 +1955,20 @@ proc tb-fix-interface {vnode lanlink iface} {
 
     $lanlink set_fixed_iface $vnode $iface
 }
+
+#
+# Set the layer.
+#
+proc tb-set-link-layer {link mylayer} {
+    if {[$link info class] != "Link"} {
+	perror "\[tb-set-link-layer] $link is not a link."
+	return
+    }
+    if {$mylayer != 1} {
+	perror "\[tb-set-link-layer] Only layer 1 is allowed."
+	return
+    }
+    $link instvar layer
+    $link set layer $mylayer
+}
+

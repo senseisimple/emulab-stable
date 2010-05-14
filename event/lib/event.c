@@ -1487,14 +1487,13 @@ hmac_traverse(void *rock, char *name,
 	if (!strcmp(name, "__hmac__")) 
 		return 1;
 
-#ifdef ELVIN_COMPAT
 	/*
 	 * The elvin gateway sticks this flag in, but we need to ignore it
 	 * when doing hmac computation.
 	 */
 	if (!strcmp(name, "___elvin_ordered___"))
 		return 1;
-#endif
+
 	switch (type) {
 	case INT32_TYPE:
 		HMAC_Update(ctx,

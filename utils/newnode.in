@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003-2008 University of Utah and the Flux Group.
+# Copyright (c) 2003-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -85,14 +85,21 @@ if (!TBAdmin()) {
 sub usage() {
     die "Usage: $0 [-f] <node_id> ...\n";
 }
+my $noreboot = 0;
+my $quiet    = 0;
 my $force_unconnected_interfaces = 0;
 my %options = ();
-if (! getopts("f", \%options)) {
+if (! getopts("fnq", \%options)) {
     usage();
 }
-
 if ($options{f}) {
     $force_unconnected_interfaces = 1;
+}
+if ($options{'n'}) {
+    $noreboot = 1;
+}
+if ($options{'q'}) {
+    $quiet = 1;
 }
 
 #
@@ -561,16 +568,19 @@ if ($exports_rv) {
 #
 # Start rebooting nodes
 #
-print "Rebooting nodes...\n";
-foreach my $IP (@reboot_IPs) {
-    print "Rebooting $IP\n";
-    system "$newnode_reboot $IP\n";
+if (!$noreboot) {
+    print "Rebooting nodes...\n";
+    foreach my $IP (@reboot_IPs) {
+	print "Rebooting $IP\n";
+	system "$newnode_reboot $IP\n";
+    }
 }
-
-print "\n\n";
-print "Finished - when you are satisifed that the nodes are working\n";
-print "correctly, use nfree on boss to free them from the emulab-ops/hwdown\n";
-print "experiment.\n";
+if (!$quiet) {
+    print "\n\n";
+    print "Finished - when you are satisifed that the nodes are working\n";
+    print "correctly, use nfree on boss to free them from the emulab-ops/hwdown\n";
+    print "experiment.\n";
+}
 
 #
 # TODO -

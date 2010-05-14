@@ -46,8 +46,8 @@ package
 
         override public function fail() : Request
         {
-                cm.resourceFailure();
-        return next;
+        	cm.resourceFailure();
+        	return next;
         }
 
     override public function complete(code : Number, response : Object,
@@ -66,6 +66,6 @@ package
     }
 
     private var cm : ComponentManager;
-    private var next : Request;
+    public var next : Request;
   }
 }

@@ -2,12 +2,13 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2008 University of Utah and the Flux Group.
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
 #
 # Handle iLO or iLO 2 remote power control.
+# Also handle DRAC since its so similar.
 # Node must have an interface such that role='other' and
 # interface_type='ilo2' or 'ilo'.
 #
@@ -22,6 +23,7 @@ use Exporter;
 
 use lib "@prefix@/lib";
 use libdb;
+use emutil;
 
 use IO::Pty;
 use POSIX qw(setsid);
@@ -67,7 +69,7 @@ sub iloctrl($$@) {
 			       " where node_id='$n' and role='other'" . 
 			       "   and interface_type='$type'");
 	if (!defined($res) || !$res || $res->num_rows() == 0) {
-	    warn "No $type interface for $n; cannot find iLO IP!\n";
+	    warn "No $type interface for $n; cannot find $type IP!\n";
 	    ++$exitval;
 	    next;
 	}
@@ -83,47 +85,48 @@ sub iloctrl($$@) {
 	}
 	my ($krole,$kuid,$kkey) = $res->fetchrow();
 
-	$ilo_nodeinfo{$n} = [ $IP,$krole,$kuid,$kkey ];
+	$ilo_nodeinfo{$n} = [ $n,$IP,$krole,$kuid,$kkey ];
     }
 
-    my %kids = ();
     my $timeout = 30;
-
-    for my $n (keys(%ilo_nodeinfo)) {
-	my ($IP,$krole,$kuid,$kkey) = @{$ilo_nodeinfo{$n}};
-
-	if ($parallelize) {
-	    if (my $pid = fork()) {
-		$kids{$pid} = 1;
+    if ($parallelize) {
+	my $coderef = sub {
+	    my ($n,$IP,$krole,$kuid,$kkey) = @{ $_[0] };
+	    
+	    my $tret;
+	    eval {
+		$tret = iloexec($n,$type,$cmd,$IP,$krole,$kuid,$kkey,$timeout);
+	    };
+	    if ($@) {
+		print "$@";
+		return -1;
 	    }
-	    else {
-		my $tret;
-		eval {
-		    $tret = iloexec($n,$type,$cmd,$IP,$krole,$kuid,$kkey,
-				    $timeout);
-		};
-		if ($@) {
-		    print "$@";
-		    exit -1;
-		}
-	    }
+	    return 0;
+	};
+	my @results = ();
+	my @ilos    = values(%ilo_nodeinfo);
+	
+	if (ParRun(undef, \@results, $coderef, @ilos)) {
+	    print STDERR "*** power_ilo: Internal error in ParRun()!\n";
+	    return -1;
 	}
-	else {
+	#
+	# Check the exit codes. 
+	#
+	foreach my $result (@results) {
+	    ++$exitval
+		if ($result != 0);
+	}
+    }
+    else {
+	for my $key (keys(%ilo_nodeinfo)) {
+	    my ($n,$IP,$krole,$kuid,$kkey) = @{$ilo_nodeinfo{$key}};
+
 	    if (iloexec($n,$type,$cmd,$IP,$krole,$kuid,$kkey,$timeout)) {
 		++$exitval;
 	    }
 	}
     }
-
-    # grab child exit vals
-    if ($parallelize) {
-	while (wait() > 0) {
-	    if ($?) {
-		++$exitval;
-	    }
-	}
-    }
-
     return $exitval;
 }
 
@@ -147,24 +150,28 @@ sub iloexec($$$$$$$;$) {
 
     my $power_cmd;
     if ($cmd eq 'cycle') {
-	$power_cmd = 'power reset';
+	$power_cmd = ($type eq "drac" ?
+		      'racadm serveraction powercycle' : 'power reset');
     }
     elsif ($cmd eq 'reset') {
-	$power_cmd = 'power warm';
+	$power_cmd = ($type eq "drac" ?
+		      'racadm serveraction hardreset' : 'power warm');
     }
     elsif ($cmd eq 'on') {
-	$power_cmd = 'power on';
+	$power_cmd = ($type eq "drac" ?
+		      'racadm serveraction powerup' : 'power on');
     }
     elsif ($cmd eq 'off') {
-	$power_cmd = 'power off';
+	$power_cmd = ($type eq "drac" ?
+		      'racadm serveraction powerdown' : 'power off');
     }
     else {
 	warn "Bad iLO power command $cmd";
 	return -11;
     }
 
-    if ($type ne 'ilo' && $type ne 'ilo2') {
-	warn "Unsupported iLO type $type!";
+    if ($type ne 'ilo' && $type ne 'ilo2' && $type ne "drac") {
+	warn "Unsupported iLO/DRAC type $type!";
 	return -7;
     }
 
@@ -175,7 +182,13 @@ sub iloexec($$$$$$$;$) {
 	if ($key ne '') {
 	    $ssh_cmd .= " -i '$key'";
 	}
-	@expect_seq = (['hpiLO-> ',$power_cmd],['hpiLO-> ','exit']);
+	if ($type eq "drac") {
+	    @expect_seq = (['\$ ',  $power_cmd],
+			   ['\$ ',  'exit']);
+	}
+	else {
+	    @expect_seq = (['hpiLO-> ',$power_cmd],['hpiLO-> ','exit']);
+	}
     }
     elsif ($key_role eq 'ssh-passwd') {
 	$ssh_cmd .= " -o PubkeyAuthentication=no";
@@ -184,8 +197,15 @@ sub iloexec($$$$$$$;$) {
 	    warn "iLO key_role ssh-passwd specified, but no passwd!";
 	    return -13;
 	}
-	@expect_seq = (['password: ',$key],['hpiLO-> ',$power_cmd],
-		       ['hpiLO-> ','exit']);
+	if ($type eq "drac") {
+	    @expect_seq = (['password: ', $key],
+			   ['\$ ',        $power_cmd],
+			   ['\$ ',        'exit']);
+	}
+	else {
+	    @expect_seq = (['password: ',$key],['hpiLO-> ',$power_cmd],
+			   ['hpiLO-> ','exit']);
+	}
     }
     else {
 	warn "Unsupported key_role $key_role!";

@@ -1,4 +1,4 @@
-/* GENIPUBLIC-COPYRIGHT
+﻿/* GENIPUBLIC-COPYRIGHT
  * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
  * All rights reserved.
  *
@@ -43,16 +43,26 @@ package
       var result : Request = null;
       if (code == 0)
       {
-        var head : RequestResourceDiscovery = null;
-        for each (var input in response.value)
+        var headDiscovery : RequestResourceDiscovery = null;
+		var tailDiscovery : RequestResourceDiscovery = null;
+        var headSliver : RequestSliverGet = null;
+		var cm:ComponentManager;
+		
+		// Create the CMs
+		for each (var input in response.value)
         {
           var current : ComponentManager
             = new ComponentManager(input.urn, input.hrn, "REMOVEME",
                                    input.url, null, 2);
           view.addManager(current);
-          head = new RequestResourceDiscovery(current, head);
+		  headDiscovery = new RequestResourceDiscovery(current, headDiscovery);
+		  if(tailDiscovery == null)
+		  	tailDiscovery = headDiscovery;
+		  if(credential.existing)
+		  	headSliver = new RequestSliverGet(current, (Main.menu as MenuSliceDetail).sliceUrn, headSliver);
         }
-        result = head;
+		tailDiscovery.next = headSliver;
+        result = headDiscovery;
       }
       else
       {

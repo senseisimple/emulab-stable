@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Testbed Makefile
@@ -33,7 +33,7 @@ ifeq ($(STANDALONE_CLEARINGHOUSE),0)
 SUBDIRS = lib db assign www @optional_subdirs@ ipod security sensors \
 		pxe tbsetup account tmcd utils backend tip capture ipod vis \
 		sensors os xmlrpc install/newnode_sshkeys mote tools/whol \
-		tools/svn wiki bugdb collab protogeni node_usage
+		tools/svn wiki bugdb collab protogeni node_usage install
 ifeq ($(ISMAINSITE),1)
 SUBDIRS += tools/rmanage
 endif
@@ -67,11 +67,14 @@ boss-install:	install-schemacheck install-sitevarscheck install-dbfillcheck \
 		install-setbuildinfo
 	@echo "Boss node installed!"
 
-#
-# Same target, with the install-schemacheck dependency omitted
-# 
+# Same target, with the checks omitted
 boss-install-force:	install-subdirs install-mkdirs install-setbuildinfo
 	@echo "Boss node installed!"
+
+# Skip only the schema checks, but do the other checks.
+boss-install-noschemacheck: install-sitevarscheck install-dbfillcheck \
+		install-genischemacheck install-subdirs install-mkdirs \
+		install-setbuildinfo
 
 clrhouse-install:	install-subdirs install-mkdirs
 	@echo "CleaingHouse code installed!"
@@ -196,6 +199,12 @@ ifneq ($(SYSTEM),CYGWIN_NT-5.1)
 endif
 	@$(MAKE) -C sensors client-install
 	@$(MAKE) -C tmcd client-install
+
+subboss: client
+	@$(MAKE) -C utils subboss
+
+subboss-install: subboss client-install
+	@$(MAKE) -C utils subboss-install
 
 TARBALLDESTDIR = /var/tmp/emulab-client
 

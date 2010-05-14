@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -435,7 +435,15 @@ sub GenDefsFile($)
 	print TCL "set eventtypes($type) $idx\n";
     }
     print TCL "\n";
-    
+
+    print TCL "# Event Trigger Types\n";
+    $query_result =
+      DBQueryFatal("select idx,type from event_triggertypes");
+    while (my ($idx,$type) = $query_result->fetchrow_array()) {
+      print TCL "set triggertypes($type) $idx\n";
+    }
+    print TCL "\n";
+ 
     print TCL "# Node Types and Classes\n";
     my @alltypes = NodeType->AllTypes();
     foreach my $typeinfo (@alltypes) {
@@ -567,6 +575,7 @@ sub GenDefsFile($)
     print TCL "\n";
 
     print TCL "# Site variables\n";
+    my %sitevars = ();
     $query_result = DBQueryFatal("select name,value,defaultvalue " .
         " from sitevariables where ns_include=TRUE");
     while (my ($name,$value,$defaultvalue) = $query_result->fetchrow_array()) {
@@ -584,9 +593,29 @@ sub GenDefsFile($)
         # Note: braces in tcl act like single quotes in other scripting
         # languages (eg. no interpolation occurs)
 	print TCL "set sitevariables($name) {$value}\n";
+	$sitevars{$name} = $value;
     }
     print TCL "\n";
 
+    #
+    # XXX Backward compat: we must ensure that certain sitevars exist in
+    # the NS defs file as NS parser assumes they do.  If they don't exist,
+    # we create them with the "traditional" values.
+    #
+    my %defvalues = (
+	"elabinelab/singlenet" => 0,
+	"elabinelab/boss_osid" => "FBSD63-STD",
+	"elabinelab/ops_osid"  => "FBSD63-STD",
+	"elabinelab/fs_osid"   => "FBSD63-STD"
+    );
+    while (my ($var, $def) = each(%defvalues)) {
+	if (!exists($sitevars{$var})) {
+	    print "*** WARNING: sitevar $var does not exist or has no value, ",
+	          "defaulting to $def\n";
+	    print TCL "set sitevariables($var) $def\n";
+	    $sitevars{$var} = $def;
+	}
+    }
 
     if (defined($pid)) {
 	print TCL "# OSIDs\n";
@@ -668,23 +697,60 @@ sub GenDefsFile($)
     }
 
     #
-    # ElabInElab stuff.
+    # Defaults for ElabInElab settings.
+    # System-wide defaults that come from sitevariables integrated above.
+    # However, for compatibility, we want existing experiments to retain
+    # their current settings for some of these, unless explicitly overridden
+    # via NS commands.  So here we initialize elabinelab variables based on
+    # existing values, so that the sitevar values won't get used later.
+    # These values can still be overridden by explicit settings in the NS file.
     # 
-    my $maxnodes   = 0;
-    if (defined($pid)) {
-	my $elabinelab = 0;
-	my $elabinelab_eid;
-
-	TBExptIsElabInElab($pid, $eid, \$elabinelab, \$elabinelab_eid)
-	    or tbdie("Failed to get ElabInElab attributes!");
-
-	if ($elabinelab && defined($elabinelab_eid)) {
-	    if (! TBExptMinMaxNodes($pid, $elabinelab_eid, undef, \$maxnodes)) {
-		tbdie("Could not get max nodes from DB!");
+    if (defined($experiment) && $experiment->elabinelab()) {
+	# dig out existing OSIDs for the boss/ops/fs nodes
+	$query_result =
+	    DBQueryFatal("select inner_elab_role,osname from virt_nodes ".
+			 " where inner_elab_role!='node' and ".
+			 " pid='$pid' and eid='$eid'");
+	while (my ($role,$os) = $query_result->fetchrow_array()) {
+	    if ($role =~ /^boss/) {
+		print TCL "set ::TBCOMPAT::elabinelab_nodeos('boss') $os\n";
+		next;
+	    }
+	    if ($role =~ /^ops/) {
+		print TCL "set ::TBCOMPAT::elabinelab_nodeos('ops') $os\n";
+		if ($role eq "ops+fs") {
+		    print TCL "set ::TBCOMPAT::elabinelab_nodeos('fs') $os\n";
+		}
+		next;
+	    }
+	    if ($role =~ /^fs/) {
+		print TCL "set ::TBCOMPAT::elabinelab_nodeos('fs') $os\n";
+		next;
 	    }
 	}
     }
-    # Be sure to initialize this to something ...
+
+    #
+    # XXX elabinelab_singlenet must always have a value.
+    # This really isn't the place to do this, but I don't want to
+    # mess with the TCL code...
+    #
+    my $singlenet = $sitevars{"elabinelab/singlenet"};
+    if (defined($experiment) && $experiment->elabinelab()) {
+	$singlenet = $experiment->elabinelab_singlenet();
+    }
+    print TCL "set ::GLOBALS::elabinelab_singlenet $singlenet\n";
+
+    #
+    # Another ElabinElab setting.
+    # This looks much like the compat hack above, but is for a completely
+    # different reason.  If an inner-elab has an inner-experiment, the
+    # NS file is re-parsed to pick up additional info.
+    #
+    my $maxnodes = 0;
+    if (defined($experiment) && $experiment->elabinelab()) {
+	$maxnodes = $experiment->maximum_nodes();
+    }
     print TCL "set elabinelab_maxpcs $maxnodes\n\n";
 
     #

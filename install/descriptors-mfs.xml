@@ -1,0 +1,151 @@
+<descriptors>
+<osid>
+  <attribute name="mfs">
+    <value>1</value>
+  </attribute>
+  <attribute name="features">
+    <value>ping,ssh,ipod,isup</value>
+  </attribute>
+  <attribute name="version">
+    <value>6.2</value>
+  </attribute>
+  <attribute name="path">
+    <value>boss:/tftpboot/frisbee</value>
+  </attribute>
+  <attribute name="reboot_waittime">
+    <value>150</value>
+  </attribute>
+  <attribute name="description">
+    <value>Frisbee (FreeBSD) in an MFS</value>
+  </attribute>
+  <attribute name="mustclean">
+    <value>0</value>
+  </attribute>
+  <attribute name="shared">
+    <value>1</value>
+  </attribute>
+  <attribute name="op_mode">
+    <value>RELOAD</value>
+  </attribute>
+  <attribute name="pid">
+    <value>emulab-ops</value>
+  </attribute>
+  <attribute name="osname">
+    <value>FRISBEE-MFS</value>
+  </attribute>
+  <attribute name="OS">
+    <value>FreeBSD</value>
+  </attribute>
+</osid>
+<osid>
+  <attribute name="mfs">
+    <value>1</value>
+  </attribute>
+  <attribute name="features">
+    <value>ping,ssh,ipod,isup</value>
+  </attribute>
+  <attribute name="version">
+    <value>4.X</value>
+  </attribute>
+  <attribute name="reboot_waittime">
+    <value>150</value>
+  </attribute>
+  <attribute name="description">
+    <value>FreeBSD on the Operations Node</value>
+  </attribute>
+  <attribute name="mustclean">
+    <value>0</value>
+  </attribute>
+  <attribute name="op_mode">
+    <value>OPSNODEBSD</value>
+  </attribute>
+  <attribute name="shared">
+    <value>1</value>
+  </attribute>
+  <attribute name="pid">
+    <value>emulab-ops</value>
+  </attribute>
+  <attribute name="osname">
+    <value>OPSNODE-BSD</value>
+  </attribute>
+  <attribute name="OS">
+    <value>FreeBSD</value>
+  </attribute>
+</osid>
+<osid>
+  <attribute name="mfs">
+    <value>1</value>
+  </attribute>
+  <attribute name="features">
+    <value>ping,ssh,ipod,isup</value>
+  </attribute>
+  <attribute name="version">
+    <value>6.2</value>
+  </attribute>
+  <attribute name="path">
+    <value>boss:/tftpboot/freebsd.newnode</value>
+  </attribute>
+  <attribute name="reboot_waittime">
+    <value>150</value>
+  </attribute>
+  <attribute name="description">
+    <value>NewNode (FreeBSD) in an MFS</value>
+  </attribute>
+  <attribute name="mustclean">
+    <value>0</value>
+  </attribute>
+  <attribute name="shared">
+    <value>1</value>
+  </attribute>
+  <attribute name="op_mode">
+    <value>PXEFBSD</value>
+  </attribute>
+  <attribute name="pid">
+    <value>emulab-ops</value>
+  </attribute>
+  <attribute name="osname">
+    <value>NEWNODE-MFS</value>
+  </attribute>
+  <attribute name="OS">
+    <value>FreeBSD</value>
+  </attribute>
+</osid>
+<osid>
+  <attribute name="mfs">
+    <value>1</value>
+  </attribute>
+  <attribute name="features">
+    <value>ping,ssh,ipod,isup</value>
+  </attribute>
+  <attribute name="version">
+    <value>6.2</value>
+  </attribute>
+  <attribute name="path">
+    <value>boss:/tftpboot/freebsd</value>
+  </attribute>
+  <attribute name="reboot_waittime">
+    <value>150</value>
+  </attribute>
+  <attribute name="description">
+    <value>FreeBSD in an MFS</value>
+  </attribute>
+  <attribute name="mustclean">
+    <value>0</value>
+  </attribute>
+  <attribute name="shared">
+    <value>1</value>
+  </attribute>
+  <attribute name="op_mode">
+    <value>PXEFBSD</value>
+  </attribute>
+  <attribute name="pid">
+    <value>emulab-ops</value>
+  </attribute>
+  <attribute name="osname">
+    <value>FREEBSD-MFS</value>
+  </attribute>
+  <attribute name="OS">
+    <value>FreeBSD</value>
+  </attribute>
+</osid>
+</descriptors>

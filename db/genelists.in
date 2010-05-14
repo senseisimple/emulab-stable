@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use Fcntl ':flock';
@@ -300,7 +300,7 @@ sub ActiveUsers()
     if (! ($query_result =
 	   DBQuery("SELECT DISTINCT u.usr_email from experiments as e ".
 		   "left join group_membership as p ".
-		   "     on e.pid=p.pid and p.pid=p.gid ".
+		   "     on e.pid_idx=p.pid_idx and p.pid_idx=p.gid_idx ".
 		   "left join users as u on u.uid_idx=p.uid_idx ".
 		   "where u.status='active' and ".
 		   "      e.state='active' ".
@@ -352,7 +352,7 @@ sub RecentProjects()
     if (! ($query_result =
 	   DBQuery("select distinct u.usr_email from project_stats as s ".
 		   "left join group_membership as g on ".
-		   "  g.pid=s.pid and g.gid=g.pid ".
+		   "  g.pid_idx=s.pid_idx and g.gid_idx=g.pid_idx ".
 		   "left join users as u on u.uid_idx=g.uid_idx ".
 		   "where u.status='active' and ".
 		   "      ((UNIX_TIMESTAMP(now()) - ".
@@ -379,9 +379,9 @@ sub RecentProjectLeaders()
     if (! ($query_result =
 	   DBQuery("select distinct u.usr_email from project_stats as s ".
 		   "left join group_membership as g on ".
-		   "  g.pid=s.pid and g.gid=g.pid ".
+		   "  g.pid_idx=s.pid_idx and g.gid_idx=g.pid_idx ".
 		   "left join users as u on u.uid_idx=g.uid_idx ".
-                   "left join projects as p on u.uid=p.head_uid ".
+                   "left join projects as p on u.uid_idx=p.head_idx ".
 		   "where u.status='active' and ".
 		   "      ((UNIX_TIMESTAMP(now()) - ".
 		   "       UNIX_TIMESTAMP(s.last_activity)) <= $limit) ".
@@ -424,7 +424,7 @@ sub WideAreaPeople()
 {
     my $query_result =
 	DBQueryFatal("SELECT DISTINCT u.usr_email from projects as p ".
-		     "left join group_membership as m on m.pid=p.pid ".
+		     "left join group_membership as m on m.pid_idx=p.pid_idx ".
 		     "left join users as u on u.uid_idx=m.uid_idx ".
 		     "where p.approved!=0 and p.pcremote_ok is not null ".
 		     "      and m.trust!='none' and u.status='active' ".
@@ -465,7 +465,7 @@ sub ProjectLists($$)
 		     ($MAILMANSUPPORT ?
 		      ", u.uid ,u.usr_name, u.mailman_password " : "") .
 		     " from group_membership as p ".
-		     "left join users as u on u.uid=p.uid ".
+		     "left join users as u on u.uid_idx=p.uid_idx ".
 		     "where p.pid='$pid' and p.gid='$gid' and ".
 		     " p.trust!='none' and u.status='active' ".
 		     "order by u.usr_email");

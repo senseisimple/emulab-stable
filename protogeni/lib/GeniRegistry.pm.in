@@ -123,6 +123,7 @@ sub idx($)		{ return field($_[0], "idx"); }
 sub hrn($)		{ return field($_[0], "hrn"); }
 sub uuid($)		{ return field($_[0], "uuid"); }
 sub creator_uuid($)	{ return field($_[0], "creator_uuid"); }
+sub creator_urn($)	{ return field($_[0], "creator_urn"); }
 sub created($)		{ return field($_[0], "created"); }
 sub shutdown($)		{ return field($_[0], "shutdown"); }
 sub expires($)		{ return field($_[0], "expires"); }
@@ -138,7 +139,7 @@ sub LOCKED($)           { return $_[0]->{'LOCKED'}; }
 #
 sub Create($$$$;$$)
 {
-    my ($class, $certificate, $creator_uuid, $authority, $exptidx, $lock) = @_;
+    my ($class, $certificate, $creator, $authority, $exptidx, $lock) = @_;
     my @insert_data = ();
 
     # Every slice gets a new unique index.
@@ -162,10 +163,12 @@ sub Create($$$$;$$)
     
     my $safe_hrn   = DBQuoteSpecial($certificate->hrn());
     my $safe_uuid  = DBQuoteSpecial($certificate->uuid());
-    my $safe_cuuid = DBQuoteSpecial($creator_uuid);
+    my $safe_cuuid = DBQuoteSpecial($creator->uuid());
+    my $safe_curn  = DBQuoteSpecial($creator->urn());
     push(@insert_data, "hrn=$safe_hrn");
     push(@insert_data, "uuid=$safe_uuid");
     push(@insert_data, "creator_uuid=$safe_cuuid");
+    push(@insert_data, "creator_urn=$safe_curn");
 
     if ($certificate->Store() != 0) {
 	print STDERR "Could not store certificate for new slice.\n";
@@ -202,24 +205,20 @@ sub Delete($)
 }
 
 #
-# Class method to check for an existing user that has the same
-# uid/email. Lets not allow this for now. Return the number of
-# users that match or -1 if an error. 
+# Return the URN. This is complicated by the fact that the DB does
+# not store the urn, but is in the certificate. Further, it might
+# be a slice from an SA not doing URNs yet, in which case set it to
+# the uuid and hope for the best.
 #
-sub CheckExisting($$$)
+sub urn($)
 {
-    my ($class, $hrn, $uuid) = @_;
+    my ($self) = @_;
+    my $urn = $self->GetCertificate()->urn();
 
-    my $safe_hrn  = DBQuoteSpecial($hrn);
-    my $safe_uuid = DBQuoteSpecial($uuid);
+    return $urn
+	if (defined($urn) && $urn ne "");
 
-    my $query_result =
-	DBQueryFatal("select idx from geni_slices ".
-		     "where hrn=$safe_hrn or uuid=$safe_uuid");
-    return -1
-	if (!defined($query_result));
-
-    return $query_result->numrows;
+    return $self->uuid();
 }
 
 #
@@ -560,6 +559,9 @@ sub Resolve($$$$)
     if ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
 	$which = "uuid";
     }
+    elsif (GeniHRN::IsValid($token)) {
+	$which = "urn";
+    }
     else {
 	$which = "hrn";
     }
@@ -588,9 +590,9 @@ sub Resolve($$$$)
 #
 sub LookupUser($$$)
 {
-    my ($self, $uuid, $pref) = @_;
+    my ($self, $urn, $pref) = @_;
 
-    return $self->Resolve($uuid, "User", $pref);
+    return $self->Resolve($urn, "User", $pref);
 }
 
 #
@@ -598,9 +600,9 @@ sub LookupUser($$$)
 #
 sub LookupSlice($$$)
 {
-    my ($self, $uuid, $pref) = @_;
+    my ($self, $urn, $pref) = @_;
 
-    return $self->Resolve($uuid, "Slice", $pref);
+    return $self->Resolve($urn, "Slice", $pref);
 }
 
 #
@@ -649,9 +651,9 @@ sub RegisterUser($$$$$)
 #
 sub RegisterSlice($$$$)
 {
-    my ($self, $creator_uuid, $cert, $bindings) = @_;
+    my ($self, $creator_urn, $cert, $bindings) = @_;
 
-    my $info = { "creator_uuid"  => $creator_uuid,
+    my $info = { "creator_urn"   => $creator_urn,
 	         "userbindings"  => $bindings };
 
     return $self->Register("Slice", $cert, $info);
@@ -662,7 +664,7 @@ sub RegisterSlice($$$$)
 #
 sub Remove($$$)
 {
-    my ($self, $type, $uuid) = @_;
+    my ($self, $type, $urn) = @_;
 
     my $response =
 	Genixmlrpc::CallMethod($self->authority(),
@@ -670,7 +672,7 @@ sub Remove($$$)
 			       "Remove",
 			       { "credential" => $self->credential(),
 				 "type"       => $type,
-			         "uuid"       => $uuid });
+			         "urn"        => $urn });
     return -1
 	if (!defined($response));
 
@@ -687,9 +689,9 @@ sub Remove($$$)
 #
 sub RemoveSlice($$)
 {
-    my ($self, $uuid) = @_;
+    my ($self, $urn) = @_;
 
-    return $self->Remove("Slice", $uuid);
+    return $self->Remove("Slice", $urn);
 }
 
 #
@@ -826,8 +828,7 @@ sub Create($;$$)
 {
     my ($class, $context, $credential) = @_;
     
-    my $EMULAB_PEMFILE1 = "@prefix@/etc/genima.pem";
-    my $EMULAB_PEMFILE2 = "@prefix@/etc/genich.pem";
+    my $EMULAB_PEMFILE1 = "@prefix@/etc/genich.pem";
     my $url;
 
     if (!defined($credential)) {
@@ -835,9 +836,6 @@ sub Create($;$$)
 
 	if (-e $EMULAB_PEMFILE1) {
 	    $pemfile = $EMULAB_PEMFILE1
-	}
-	elsif (-e $EMULAB_PEMFILE2) {
-	    $pemfile = $EMULAB_PEMFILE2;
 	}
 	else {
 	    print STDERR "Cannot find the pem file for the clearinghouse!\n";
@@ -880,26 +878,28 @@ sub Create($;$$)
 #
 # Get a credential from the clearinghouse, as for bootstrapping.
 #
-sub GetCredential($;$)
+sub GetCredential($;$$)
 {
-    my ($class, $context) = @_;
+    my ($class, $context, $certfile) = @_;
 
     $context = Genixmlrpc->GetContext()
 	if (!defined($context));
 
-    my $EMULAB_PEMFILE = "@prefix@/etc/genich.pem";
-    if (!defined($EMULAB_PEMFILE)) {
-	print STDERR "$EMULAB_PEMFILE needed to talk to the clearinghouse\n";
-	return undef;
+    if (!defined($certfile)) {
+	$certfile = "@prefix@/etc/genich.pem";
+	if (! -e $certfile) {
+	    print STDERR "$certfile does not exist!\n";
+	    return undef;
+	}
     }
-    my $certificate = GeniCertificate->LoadFromFile($EMULAB_PEMFILE);
+    my $certificate = GeniCertificate->LoadFromFile($certfile);
     if (!defined($certificate)) {
-	print STDERR "Could not load CH certificate from $EMULAB_PEMFILE\n";
+	print STDERR "Could not load CH certificate from $certfile\n";
 	return undef;
     }
     my $url = $certificate->URL();
     if (!defined($url)) {
-	print STDERR "No URI extension in $EMULAB_PEMFILE\n";
+	print STDERR "No URI extension in $certificate\n";
 	return undef;
     }
     my $response =
@@ -907,9 +907,13 @@ sub GetCredential($;$)
 			       {"gid" => $context->certificate()->cert()});
 	
     return undef
-	if (!defined($response) ||
-	    $response->code() != GENIRESPONSE_SUCCESS());
-
+	if (!defined($response));
+    
+    if ($response->IsError()) {
+	print STDERR "GeniRegistry::ClearingHouse->GetCredential: " .
+	    $response->Dump() . "\n";
+	return undef;
+    }
     return GeniCredential->CreateFromSigned($response->value(), 1);
 }
 

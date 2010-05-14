@@ -19,12 +19,10 @@
 #
 # TODO:
 #    Users can add notifications for themselves
-#    Support branch deletion
-#    Support commits that remove revisions (ie. are not fast-forwards)
-#    Support tag creation/deletion/etc.
 #
 
 use strict;
+use IPC::Open2;
 use POSIX 'setsid';
 use Getopt::Long;
 sub get_config($$);
@@ -178,7 +176,8 @@ my $EMPTYREV = "0"x40;
 my $CT_CREATE = "create";
 my $CT_UPDATE = "update";
 my $CT_DELETE = "delete";
-my $CT_FORCED_UPDATE = "force-update";
+my $CT_REWIND = "rewind";
+my $CT_REBASE = "rebase";
 
 #
 # Tired of typing this and getting it wrong
@@ -188,11 +187,11 @@ my $STDERRNULL = " 2> /dev/null";
 ######################################################################
 # Function Prototypes
 ######################################################################
-sub change_type($$);
+sub change_type($$$);
+sub ref_type($);
 sub rev_type($);
 sub revparse($);
-sub changed_files($$);
-sub changed_files_single_revision($);
+sub changed_files(@);
 sub get_mail_addresses($@);
 sub get_merge_base($$);
 sub uniq(@);
@@ -202,7 +201,6 @@ sub get_commits($$$);
 sub send_mail($$@);
 sub short_refname($);
 sub debug(@);
-sub rev_string($$);
 sub object_exists($$);
 sub filter_out_objects_in_repo($@);
 
@@ -252,10 +250,17 @@ if ($mailconfigfile) {
 #
 my @reflines;
 if ($testmode) {
+    my $fullref = `git rev-parse --symbolic-full-name $testbranch`;
+    if (!$fullref) {
+	    exit(1);
+    }
+    my $newrev = `git rev-parse $fullref $STDERRNULL`;
+    chomp $newrev;
+
     #
     # Provide a simple way to grab some commits - the three most recent ones
     #
-    @reflines = ("$testbranch~2 $testbranch refs/heads/$testbranch");
+    @reflines = ("$newrev~2 $newrev $fullref");
 } else {
     #
     # Get all of the references that are being pushed from stdin - we do this in
@@ -284,6 +289,9 @@ if ($detach && !$debug) {
 # Loop over all of the references we got on stdin
 #
 foreach my $refline (@reflines) {
+    my @commits;
+    my @changed_files;
+
     chomp $refline;
     debug("Read line '$refline'");
 
@@ -293,6 +301,7 @@ foreach my $refline (@reflines) {
     # happened in the middle
     #
     my ($oldrev, $newrev, $refname) = split(/\s+/, $refline);
+    my $ref_type = ref_type($refname);
 
     #
     # Use rev-parse so that fancy symbolic names, etc. can be used
@@ -305,38 +314,57 @@ foreach my $refline (@reflines) {
     # Figure out what type of change occured (update, creation, deletion, etc.)
     # and what type of objects (commit, tree, etc.) we got
     #
-    my $ct = change_type($oldrev,$newrev);
+    my $ct = change_type($oldrev,$newrev,$ref_type);
     my $old_type = rev_type($oldrev);
     my $new_type = rev_type($newrev);
 
     debug("Change type: $ct ($old_type,$new_type)");
 
     #
-    # For now, only handle commits that update existing branches or make
-    # new ones
+    # For now, only handle commit objects.  Tag objects require extra work.
     #
-    if ($new_type ne "commit") {
+    if ($new_type && $new_type ne "commit") {
         debug("Skipping non-commit");
         next;
     }
 
     #
-    # Get all commits between these two revisions
-    # and all files that changed
+    # Figure out which commits we're interested in based on reference type
+    # and change type.
     #
-    my @commits = get_commits($oldrev,$newrev,$refname);
+    if ($ref_type eq 'tag') {
+	if ($ct eq $CT_DELETE) {
+	    # We want to know where the tag used to point before deletion
+	    push @commits, $oldrev;
+	} else {
+	    # Tags only have delete, create, and update.  Rewind and rebase
+	    # don't make sense in tag context.
+	    #
+	    # We only care about the new value of the tag here.
+	    push @commits, $newrev;
+	}
+    } elsif ($ref_type eq 'branch') {
+	if ($ct eq $CT_DELETE) {
+	    # We want to know where the branch used to point before deletion
+	    push @commits, $oldrev;
+	} elsif ($ct eq $CT_REWIND) {
+	    # There's no new history to show, but we still want to see where
+	    # the branch now points.
+	    push @commits, $newrev;
+	} else {
+	    @commits = get_commits($oldrev,$newrev,$refname);
+	    # We only want to see *new* commits, which means that commits already
+	    # in the main repository need to be excluded too.
+	    if (defined $exclude_repo) {
+		@commits = filter_out_objects_in_repo($exclude_repo, @commits);
+	    }
+	}
+    }
+
+    next unless (@commits);
     debug("commits are: ", join(" ",@commits));
 
-    my @changed_files;
-    if (defined $exclude_repo || $ct eq $CT_FORCED_UPDATE) {
-	if (defined $exclude_repo) {
-	    @commits = filter_out_objects_in_repo($exclude_repo, @commits);
-	    next unless (@commits);
-        }
-        @changed_files = map { changed_files_single_revision($_) } @commits;
-    } else {
-    	@changed_files = changed_files($oldrev,$newrev);
-    }
+    @changed_files = changed_files(@commits);
     debug("Changed files: ", join(",",@changed_files));
 
     #
@@ -364,8 +392,8 @@ debug("finishing");
 # Does this change represent the creation, deletion, or update of an object?
 # Takes old and new revs
 #
-sub change_type($$) {
-    my ($oldrev, $newrev) = @_;
+sub change_type($$$) {
+    my ($oldrev, $newrev, $ref_type) = @_;
 
     #
     # We can detect creates and deletes by looking for a special 'null'
@@ -375,13 +403,18 @@ sub change_type($$) {
         return $CT_CREATE;
     } elsif ($newrev eq $EMPTYREV) {
         return $CT_DELETE;
+    } elsif ($ref_type eq 'tag') {
+	    return $CT_UPDATE;
     } else {
-        my $merge_base = get_merge_base($oldrev,$newrev);
+	my $merge_base = get_merge_base($oldrev,$newrev);
 	my $oldrev = revparse($oldrev);
+	my $newrev = revparse($newrev);
 	if ($merge_base eq $oldrev) {
-            return $CT_UPDATE;
+	    return $CT_UPDATE;
+	} elsif ($merge_base eq $newrev) {
+	    return $CT_REWIND;
 	} else {
-            return $CT_FORCED_UPDATE;
+	    return $CT_REBASE;
 	}
     }
 }
@@ -394,6 +427,20 @@ sub rev_type($) {
     my $rev_type = `git cat-file -t '$rev' $STDERRNULL`;
     chomp $rev_type;
     return $rev_type;
+}
+
+#
+# Find out what type of reference this is
+#
+sub ref_type($) {
+    my ($ref) = @_;
+    my $type;
+    if ($ref =~ m#^refs/heads/#) {
+	    $type = 'branch';
+    } elsif ($ref =~ m#^refs/tags/#) {
+	    $type = 'tag';
+    }
+    return $type;
 }
 
 #
@@ -413,30 +460,31 @@ sub revparse($) {
 }
 
 #
-# Given two revisions, return a list of the files that were changed between
-# them
+# Given a list of commit object hashes, return the list of files changed by
+# all commits.
 #
-sub changed_files($$) {
-    my ($oldrev,$newrev) = @_;
+sub changed_files(@) {
+    my %files;
 
-    my $revstring = rev_string($oldrev,$newrev);
-    debug("running '$GIT diff-tree -r --name-only '$revstring''");
-    my @lines = `$GIT diff-tree -r --name-only '$revstring' $STDERRNULL`;
-    chomp @lines;
-    return @lines;
-}
+    debug("running '$GIT diff-tree --stdin -r --name-only --no-commit-id' on '@_'");
+    my $pid = open2(\*OUT, \*IN, "$GIT diff-tree --stdin -r --name-only --no-commit-id");
 
-#
-# Given one revision, return a list of the files that were changed between
-# it and its parents
-#
-sub changed_files_single_revision($) {
-    my ($rev) = @_;
+    print IN "$_\n" for (@_);
+    close(IN);
 
-    debug("running '$GIT diff-tree -r --name-only '$rev''");
-    my @lines = `$GIT diff-tree -r --name-only '$rev' $STDERRNULL`;
-    chomp @lines;
-    return @lines;
+    while (<OUT>) {
+	    chomp;
+	    $files{$_} = 1;
+    }
+    close(OUT);
+
+    waitpid($pid, 0);
+    my $rc = $? >> 8;
+    if ($rc) {
+	    die "'git diff-tree' exited with return code $rc\n";
+    }
+
+    return keys(%files);
 }
 
 #
@@ -581,30 +629,44 @@ sub commit_mail($\@$@) {
 
     #
     # Construct the subject line. For now, we just say what repo (if defined)
-    # and what branch it happened on
+    # and what branch/tag it happened on
     #
     my $subject = "git commit: ";
+    my $ref_type;
     if (defined($reponame)) {
         $subject .= "[$reponame] ";
     }
-    $subject .= "branch " . short_refname($refname);
 
+    $ref_type = ref_type($refname);
+
+    $subject .= $ref_type . ' ' . short_refname($refname);
+
+    my $what_happened;
     if ($ct eq $CT_UPDATE) {
-        $subject .= " updated";
-    } elsif ($ct eq $CT_FORCED_UPDATE) {
-        $subject .= " force-updated";
+        $what_happened .= 'updated';
+    } elsif ($ct eq $CT_REWIND) {
+        $what_happened .= 'rewound';
+    } elsif ($ct eq $CT_REBASE) {
+        $what_happened .= 'rebased';
     } elsif ($ct eq $CT_CREATE) {
-        $subject .= " created";
+        $what_happened .= 'created';
     } elsif ($ct eq $CT_DELETE) {
-        $subject .= " deleted";
+        $what_happened .= 'deleted';
     }
 
-    my $actionstring = "Branch " . short_refname($refname) .
-                       " has been ${ct}d\n\n";
+    $subject .= ' ' . $what_happened;
+    my $actionstring = ucfirst($ref_type) . ' ' . short_refname($refname) .
+                       " has been $what_happened";
 
-    if ($ct eq $CT_FORCED_UPDATE) {
-        $actionstring .= "New and/or modified commits shown below\n\n";
+    if ($ct eq $CT_REBASE) {
+        $actionstring .= ".  The following commits are new or have been modified:";
+    } elsif ($ct eq $CT_REWIND) {
+        $actionstring .= "  to point to the following commit:";
+    } elsif ($ct eq $CT_DELETE) {
+	$actionstring .= ".  It previously pointed to the following commit:";
     }
+
+    $actionstring .= "\n\n";
 
     my @fullbody;
     foreach my $rev (@$commits) {
@@ -646,29 +708,46 @@ sub commit_mail($\@$@) {
 #
 sub get_commits($$$) {
     my ($oldrev,$newrev,$refname) = @_;
-    my $ct = change_type($oldrev,$newrev);
+    my $ct = change_type($oldrev,$newrev, ref_type($refname));
 
     #
     # If this is an update, we can just ask git for the revisions between the
-    # two revisions we were given.  We call git-cherry for this information
-    # so that we can identify if a particular commit already exists in the
-    # repository with a different commit hash (for the rebase case).
+    # two revisions we were given.
     #
-    if ($ct eq $CT_UPDATE || $ct eq $CT_FORCED_UPDATE) {
+    if ($ct eq $CT_UPDATE) {
+	my $revstring = "$oldrev..$newrev";
+
+	debug("running '$GIT rev-list --reverse --date-order '$revstring'");
+	my @revs = `$GIT rev-list --reverse --date-order '$revstring'`;
+	chomp @revs;
+        return @revs;
+    } elsif ($ct eq $CT_REBASE) {
         debug("running '$GIT cherry '$oldrev' '$newrev'");
 	# Only return revs prefixed with a '+' since commits prefixed with a
-	# '-' are already in the repository with a different commit hash.  We
-	# should have seen those already, so we don't want to see them here.
-	# Note that '+' commits may not be "new" per-se, but they are not the
-	# same as the existing commit with the same commit message due to
-	# rebasing.
+	# '-' are already in the repository with a different commit hash.
+	#
+	# The '-' commits are the same as their non-rebased counterparts, except
+	# their ancestry is different.  For the email messages, we don't care
+	# about these since we should have seen the original commits already.
+	#
+	# The '+' commits are either new or are rebased commits whose *content*
+	# has changed.  We definitely want to see these.  Note that this only
+	# applies to the content of the commit, not the commit message.
 	my @revs;
+	my @all_revs;
 	for (`$GIT cherry '$oldrev' '$newrev'`) {
+		debug($_);
 		chomp;
-		unshift @revs, $1 if (/^\+\s+(.*)$/);
+		@_ = split /\s+/, $_;
+		unshift @revs, $_[1] if ($_[0] eq '+');
+		unshift @all_revs, $_[1];
 	}
-        return @revs;
 
+	# If cherry finds that all of the commits are already present,
+	# report 'em all anyway.  We still need to know that the rebase
+	# happened, and reporting just the head doesn't make any sense.
+	@revs = @all_revs if (!@revs);
+        return @revs;
     } elsif ($ct eq $CT_CREATE) {
         #
         # If it's a create, we have to be a bit more fancy: we look for all
@@ -693,6 +772,12 @@ sub get_commits($$$) {
         #
         debug("running '$GIT rev-parse --not $other_branches | $GIT rev-list --pretty --stdin $newrev'");
         my @commits = `$GIT rev-parse --not $other_branches | $GIT rev-list --reverse --date-order --stdin $newrev`;
+
+        # We always want to be notified when a branch is created, so if there are no commits reachable
+        # from only this branch just report on the head of the branch.
+        push @commits, $newrev if (!@commits);
+
+        debug("commits are @commits");
 
         chomp @commits;
         return @commits;
@@ -759,9 +844,22 @@ sub send_mail($$@) {
 # Given a full refname, pull off the last part for pretty printing
 #
 sub short_refname($) {
-    my ($refname) = @_;
-    $refname =~ /([^\/]+)$/;
-    return $1;
+    my ($ref) = @_;
+    my $refname = `git rev-parse --abbrev-ref $ref $STDERRNULL`;
+    chomp $refname;
+
+    # Fall back to full name if rev-parse fails for some reason
+    $refname = $ref if (!$refname);
+    debug("got short refname \"$refname\"");
+
+
+    # If the ref didn't get shortened, it may be because it was deleted.  Just
+    # chop off 'refs/heads' or 'refs/tags' and return the rest.
+    if ($refname =~ m#^refs/(?:heads|tags)/(.*)#) {
+	    $refname = $1;
+    }
+
+    return $refname;
 }
 
 #
@@ -801,25 +899,6 @@ sub get_config($$) {
     } else {
         debug("Using " , defined($default)?$default : "(undef)" , " for $var");
         return $default;
-    }
-}
-
-#
-# Return an appropriate string to get a revision: if the ref was created or
-# deleted, this looks a little different
-#
-sub rev_string($$) {
-    my ($oldrev, $newrev) = @_;
-    my $ct = change_type($oldrev,$newrev);
-    if ($ct eq $CT_UPDATE) {
-        return "$oldrev..$newrev";
-    } elsif ($ct eq $CT_CREATE) {
-        return $newrev;
-    } elsif ($ct eq $CT_DELETE) {
-        return $oldrev;
-    } else {
-        # Shouldn't be able to get here
-        return undef;
     }
 }
 
