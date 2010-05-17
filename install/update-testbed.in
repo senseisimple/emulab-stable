@@ -176,6 +176,7 @@ sub Restart()
 	    print "*** Could not restart testbed daemons.\n";
 	    exit(1);
 	}
+	print "\n";
     }
     if ($nologins) {
 	print "Turning on the web interface and allowing swaps\n";

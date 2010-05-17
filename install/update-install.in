@@ -284,6 +284,7 @@ elsif ($check) {
 }
 elsif ($impotent) {
     print "Running (impotent mode) pre-install updates  ...\n";
+    print "More detailed into saved to $logfile\n";
     RunUpdates("pre");
     print "Running (impotent mode) post-install updates  ...\n";
     RunUpdates("post");
