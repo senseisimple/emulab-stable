@@ -13,10 +13,10 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print STDERR "Usage: update-install [-v] [-s] [-f] [<version>]\n";
+    print STDERR "Usage: update-install [-v | -n] [-s] [-f] [<version>]\n";
     exit(-1);
 }
-my $optlist = "dsfvp:qa:ci";
+my $optlist = "dsfvp:qa:cin";
 my $debug   = 0;
 my $force   = 0;
 my $single  = 0;
@@ -86,7 +86,7 @@ if (defined($options{"d"})) {
 if (defined($options{"c"})) {
     $check = 1;
 }
-if (defined($options{"i"})) {
+if (defined($options{"i"}) || defined($options{"n"})) {
     $impotent = 1;
 }
 if (defined($options{"f"})) {
@@ -120,6 +120,21 @@ if ($UID && !($impotent || $check || $verify)) {
     Fatal("This script must be run as root! Maybe use sudo?")
 }
 
+#
+# This is a utility routine that callee scripts can use to set a DB
+# flag to indicate that a reboot is require.
+#
+sub MarkForReboot($)
+{
+    my ($version) = @_;
+
+    print "*** $version says reboot is (will be) required!\n";
+    
+    emdbi::DBQueryFatal("replace into version_info set ".
+			"  value='1', name='needreboot'");
+    return 0;
+}
+
 if ($impotent) {
     open(LOGFP, "> $logfile")
 	or Fatal("Could not open $logfile");
@@ -140,6 +155,8 @@ if (!defined($version)) {
 
 	DBQueryFatal("insert into version_info ".
 		     "values ('install', '$version')");
+	DBQueryFatal("insert into version_info ".
+		     "values ('needreboot', '0')");
     }
     else {
 	($version) = $query_result->fetchrow_array();
@@ -148,6 +165,9 @@ if (!defined($version)) {
 if (! ($version =~ /^[\d\.]+$/)) {
     Fatal("'$version' does not look like a reasonable starting version.");
 }
+# Start off with reboots not needed. 
+DBQueryFatal("replace into version_info ".
+	     "values ('needreboot', '0')");
 
 #
 # Split apart the version number. Assumed to be in dotted notation.

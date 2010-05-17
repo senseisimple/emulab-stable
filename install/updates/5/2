@@ -27,6 +27,7 @@ sub InstallUpdate($$)
 	};
 	Phase "startupfile", "Updating testbed startup file", sub {
 	    DoneIfIdentical("$TOP_OBJDIR/rc.d/3.testbed.sh", $TESTBED_STARTUP);
+	    main::MarkForReboot($version);
 	    DiffFiles("$TOP_OBJDIR/rc.d/3.testbed.sh", $TESTBED_STARTUP);
 	    ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/rc.d install");
 	};
@@ -38,7 +39,13 @@ sub InstallUpdate($$)
     if ($phase eq "post") {
 	Phase "checknodes_daemon", "Starting up checknodes daemon", sub {
 	    # Testbed not running.
-	    DoneIfDoesntExist("$VARRUN/stated.pid");
+	    if (! -e "$VARRUN/stated.pid") {
+		PhaseSkip("Testbed not running");
+	    }
+	    if (ExecQuiet("$TBROOT/sbin/checknodes_daemon")) {
+		PhaseSucceed("checknodes_daemon started");
+	    }
+	    PhaseFail("Could not start checknodes_daemon");
 	};
     }
     return 0;

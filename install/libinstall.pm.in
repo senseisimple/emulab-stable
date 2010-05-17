@@ -108,8 +108,10 @@ sub Phase($$$) {
     my $isSubPhase = ($depth > 1);
 
     my $descrstring = "| " x ($depth -1) . $descr;
-    if ($firstSubPhase && !$updatemode) {
+    if ($firstSubPhase) {
 	print "\n";
+	printf $logfp "\n"
+	    if ($impotent);
     }
     printf "%-50s", $descrstring;
     printf $logfp "%-50s", $descrstring
@@ -576,6 +578,31 @@ sub HUPDaemon($) {
     my ($name) = @_;
 
     SignalDaemon($name, 'HUP');
+}
+
+#
+# Restart a daemon if running. Do not start if not running.
+#
+sub RestartDaemon($) {
+    my ($name) = @_;
+
+    my $pidfile = "$VARRUN/${name}.pid";
+
+    if (! -e "$VARRUN/stated.pid") {
+	PhaseSkip("Testbed not running");
+    }
+    if (!-e $pidfile) {
+	PhaseSkip("$name not running");
+    }
+    if ($impotent) {
+	PhaseWouldHave("restart $name");
+	return 1;
+    }
+    SignalDaemon($name, 'TERM');
+    if (ExecQuiet("$TBROOT/sbin/$name")) {
+	PhaseSucceed("$name started");
+    }
+    PhaseFail("Could not start $name");
 }
 
 #

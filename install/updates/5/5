@@ -20,13 +20,28 @@ sub InstallUpdate($$)
 	Phase "newsyslog", "Updating $NEWSYSLOG_CONF", sub {
 	    DoneIfEdited($NEWSYSLOG_CONF);
 	    BackUpFileFatal($NEWSYSLOG_CONF);
+
+	    # Kill any old lines; they were hand jobs.
+	    ExecQuietFatal("sed -i .orig -e '/reloadlog/d' $NEWSYSLOG_CONF");
+	    ExecQuietFatal("sed -i .orig -e '/checkuplog/d' $NEWSYSLOG_CONF");
+	    ExecQuietFatal("sed -i .orig -e '/poollog/d' $NEWSYSLOG_CONF");
+	    ExecQuietFatal("sed -i .orig -e '/expire_dae/d' $NEWSYSLOG_CONF");
+	    ExecQuietFatal("sed -i .orig -e '/sa_daemon/d' $NEWSYSLOG_CONF");
+	    
+	    #
+	    # The ProtoGeni entries are okay; they might not be running.
+	    #
 	    AppendToFileFatal($NEWSYSLOG_CONF,
 			      "$LOGDIR/reloadlog   640  9  1000 *  Z ".
 			      "/var/run/reload_daemon.pid",
 			      "$LOGDIR/checkuplog  640  9  1000 *  Z ".
 			      "/var/run/checkup_daemon.pid",
 			      "$LOGDIR/poollog     640  9  1000 *  Z ".
-			      "/var/run/pool_daemon.pid");
+			      "/var/run/pool_daemon.pid",
+			      "$LOGDIR/expire_daemon.log  640  9  1000 *  Z ".
+			      "/var/run/expire_daemon.pid",
+			      "$LOGDIR/sa_daemon.log      640  9  1000 *  Z ".
+			      "/var/run/sa_daemon.pid");
 	};
     }
     
@@ -34,6 +49,24 @@ sub InstallUpdate($$)
     # If something should run in the post-install phase.
     #
     if ($phase eq "post") {
+	Phase "daemons", "Restarting daemons", sub {
+	    Phase "reload_daemon", "Restarting reload_daemon", sub {
+		RestartDaemon("reload_daemon");
+	    };
+	    Phase "checkup_daemon", "Restarting checkup_daemon", sub {
+		RestartDaemon("checkup_daemon");
+	    };
+	    Phase "pool_daemon", "Restarting pool_daemon", sub {
+		RestartDaemon("pool_daemon");
+	    };
+	    Phase "expire_daemon", "Restarting expire_daemon", sub {
+		RestartDaemon("expire_daemon");
+	    };
+	    Phase "sa_daemon", "Restarting sa_daemon", sub {
+		RestartDaemon("sa_daemon");
+	    };
+	    PhaseSucceed("Daemons Restarted");
+	};
     }
     return 0;
 }
