@@ -385,8 +385,13 @@ sub BackUpFileFatal($)
 
     PhaseFail("$filename does not exist")
 	if (! -e $filename);
-    PhaseFail("$filename already exists")
-	if (-e $backup);
+
+    if (-e $backup) {
+	sleep(1);
+	$backup = $filename . "-" . time();
+	PhaseFail("$backup already exists")
+	    if (-e $backup);
+    }
 
     ExecQuietFatal("/bin/cp -p $filename $backup")
 	if (!$impotent);
