@@ -82,16 +82,10 @@ my $NODEILL_PID = NODEILL_PID();
 my $NODEILL_EID = NODEILL_EID();
 
 #
-# Check for existing pidfile and running daemon. Mostly cause
-# of devel tree versions.
+# Only one please.
 #
-if (-e $PIDFILE) {
-    my $opid = `cat $PIDFILE`;
-    chomp($opid);
-    if (kill(0, $opid)) {
-	fatal("Lockfile $PIDFILE exists, and process $opid is running");
-    }
-    unlink($PIDFILE);
+if (CheckDaemonRunning("checknodes_daemon")) {
+    fatal("Not starting another checknodes daemon!");
 }
 
 #
@@ -140,10 +134,8 @@ if (! $debug) {
 	exit(0);
     }
 }
-# This acts as a lockfile to prevent a devel version from running at
-# the same time as the real version or another devel version.
-if (system("echo '$PID' > $PIDFILE")) {
-    fatal("Could not create $PIDFILE!");
+if (MarkDaemonRunning("checknodes_daemon")) {
+    fatal("Could not mark daemon as running!");
 }
 print "Check Nodes Daemon starting ... pid $$, at ".`date`;
 
@@ -338,6 +330,7 @@ while (1) {
   loop:
     sleep(($debug ? 10 : 60));
 }
+MarkDaemonStopped("checknodes_daemon");
 exit(0);
 
 sub NodeIsDead($)
@@ -373,6 +366,8 @@ sub fatal($)
 	     "Check Nodes Daemon died",
 	     $msg,
 	     $TBOPS);
+
+    MarkDaemonStopped("checknodes_daemon");
 
     die("*** $0:\n".
 	"    $msg\n");
