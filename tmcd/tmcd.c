@@ -287,6 +287,7 @@ COMMAND_PROTOTYPE(dotpmblob);
 COMMAND_PROTOTYPE(dotpmpubkey);
 COMMAND_PROTOTYPE(dotpmdummy);
 COMMAND_PROTOTYPE(dodhcpdconf);
+COMMAND_PROTOTYPE(dosecurestate);
 
 /*
  * The fullconfig slot determines what routines get called when pushing
@@ -388,6 +389,7 @@ struct command {
 	{ "tpmpubkey",	  FULLCONFIG_ALL, 0, dotpmpubkey },
 	{ "tpmdummy",	  FULLCONFIG_ALL, F_REQTPM, dotpmdummy },
 	{ "dhcpdconf",	  FULLCONFIG_ALL, 0, dodhcpdconf },
+	{ "securestate",  FULLCONFIG_NONE, F_REQTPM, dosecurestate},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -4260,6 +4262,95 @@ COMMAND_PROTOTYPE(dostate)
 
 	/* Leave this logging on all the time for now. */
 	info("%s: STATE: %s\n", reqp->nodeid, newstate);
+	return 0;
+
+}
+
+/*
+ * Report that the node has entered a new state - secure version: the report
+ * includes a TPM quote that will be checked against the database.
+ * If this check fails, we report a SECVIOLATION event instead, and tell the
+ * client so.
+ * TODO: Should probably reduce code duplication from dostate()
+ */
+COMMAND_PROTOTYPE(dosecurestate)
+{
+	char 		newstate[128];	/* More then we will ever need */
+        char            quote[1024];    /* TODO: Big enough? */
+        int             quote_passed;
+        char            result[16];
+
+#ifdef EVENTSYS
+	address_tuple_t tuple;
+#endif
+
+	/*
+	 * Dig out state that the node is reporting and the quote
+	 */
+	if (sscanf(rdata, "%128s %1024s", newstate, quote) != 1 ||
+	    strlen(newstate) == sizeof(newstate) || strlen(quote) == sizeof(quote)) {
+		error("DOSECURESTATE: %s: Bad arguments\n", reqp->nodeid);
+		return 1;
+	}
+
+        /*
+         * Parse and check the quote
+         */
+        // TODO: Fill in!
+        // For now, just pretend the quote passed
+        quote_passed = 1;
+
+#ifdef EVENTSYS
+	/*
+	 * Send the state out via an event
+	 */
+	/* XXX: Maybe we don't need to alloc a new tuple every time through */
+	tuple = address_tuple_alloc();
+	if (tuple == NULL) {
+		error("dostate: Unable to allocate address tuple!\n");
+		return 1;
+	}
+
+        // XXX: We probably need to indicate that we securely verified the
+        // state, right?
+	tuple->host      = BOSSNODE;
+	tuple->objtype   = "TBNODESTATE";
+	tuple->objname	 = reqp->nodeid;
+
+        // The state we report depends on whether we the quote check passed or
+        // not.
+        if (quote_passed) {
+            tuple->eventtype = newstate;
+        } else {
+            tuple->eventtype = "SECVIOLATION";
+        }
+
+	if (myevent_send(tuple)) {
+		error("dostate: Error sending event\n");
+		return 1;
+	}
+
+	address_tuple_free(tuple);
+#endif /* EVENTSYS */
+
+        /*
+         * Let the client know whether the quote checks out or not. Note that
+         * we do this *after* sending the event so that a malicious client
+         * can't stall or prevent the event notification by trying to hold up
+         * the TCP connection.
+         * Probably a slightly simpler way to do this, but want to stick with
+         * the common idioms in this file.
+         */
+        if (quote_passed) {
+            OUTPUT(result, sizeof(result), "OK");
+        } else { 
+            OUTPUT(result, sizeof(result), "FAILED");
+        }
+	client_writeback(sock, result, strlen(result), tcp);
+
+
+	/* Leave this logging on all the time for now. */
+	info("%s: SECURESTATE: %s\n", reqp->nodeid, newstate);
 	return 0;
 
 }
