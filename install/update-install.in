@@ -128,7 +128,8 @@ sub MarkForReboot($)
 {
     my ($version) = @_;
 
-    print "*** $version says reboot is (will be) required!\n";
+    print "*** $version says reboot is (will be) required!\n"
+	if ($impotent);
     
     emdbi::DBQueryFatal("replace into version_info set ".
 			"  value='1', name='needreboot'");
