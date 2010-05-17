@@ -10,7 +10,7 @@ use POSIX qw(setsid);
 use File::Basename;
 
 #
-# Tuneables:
+# Image Creation Tuneables.
 #
 # $maxwait	max wall clock time to allow, progress or not
 #		Empirically we have observed about 1.6MB/sec on a pc850
@@ -29,7 +29,7 @@ my $maxwait      = (72 * 60);
 my $idlewait     = ( 8 * 60);
 my $reportwait   = ( 2 * 60);
 my $checkwait    = 15;
-my $maximagesize = (20 * 1024**3); # 20GB
+my $maximagesize = (6 * 1024**3); # 20GB
 
 #
 # Create a disk image.
@@ -153,6 +153,26 @@ if (defined($options{"p"})) {
 	    "    Bad data in $imagepid.\n");
     }
 }
+
+#
+# Reset default values from site variables if they exist.
+#
+my $tmp;
+if (TBGetSiteVar("images/create/maxwait", \$tmp)) {
+    $maxwait = $tmp * 60;
+}
+if (TBGetSiteVar("images/create/idlewait", \$tmp)) {
+    $idlewait = $tmp * 60;
+}
+if (TBGetSiteVar("images/create/maxsize", \$tmp)) {
+    $maximagesize = $tmp * 1024**3;
+}
+$idlewait = $maxwait
+    if ($maxwait < $idlewait);
+$reportwait = $idlewait
+    if ($idlewait < $reportwait);
+$checkwait = $reportwait
+    if ($reportwait < $checkwait);
 
 #
 # Verify user and get his DB uid and other info for later.

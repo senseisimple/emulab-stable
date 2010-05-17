@@ -1,4 +1,9 @@
 #!/usr/bin/perl
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
 package TestBed::TestSuite;
 use SemiModern::Perl;
 use TestBed::TestSuite::Experiment;

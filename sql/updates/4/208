@@ -1,0 +1,28 @@
+#
+# Add sitevariables to control image creation limits.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    DBQueryFatal("INSERT INTO sitevariables VALUES ".
+		 "('images/create/maxwait',NULL,'72',".
+		 "'Max time (minutes) to allow for saving an image',0)")
+	if (!TBSiteVarExists("images/create/maxwait"));
+
+    DBQueryFatal("INSERT INTO sitevariables VALUES ".
+		 "('images/create/idlewait',NULL,'8',".
+		 "'Max time (minutes) to allow between periods of progress (image file getting larger) when saving an image (should be <= maxwait)',0)")
+	if (!TBSiteVarExists("images/create/idlewait"));
+
+    DBQueryFatal("INSERT INTO sitevariables VALUES ".
+		 "('images/create/maxsize',NULL,'6',".
+		 "'Max size (GB) of a created image',0)")
+	if (!TBSiteVarExists("images/create/maxsize"));
+
+    return 0;
+}
+1;

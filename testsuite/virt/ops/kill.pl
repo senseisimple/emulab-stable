@@ -1,3 +1,8 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
 if (scalar(@ARGV) != 3)
 {
     print STDERR "Usage: kill.pl <proj> <exp> <pairCount>\n";
