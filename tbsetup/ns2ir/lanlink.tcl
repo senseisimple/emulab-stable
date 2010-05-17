@@ -303,7 +303,7 @@ LanLink instproc init {s nodes bw d type} {
 LanLink instproc enable_openflow {ofcontrollerstr} {
     $self instvar ofenabled
     $self instvar ofcontroller
-    set ofenable 1
+    set ofenabled 1
     set ofcontroller $ofcontrollerstr
 }
 
