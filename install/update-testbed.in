@@ -64,11 +64,13 @@ $| = 1;
 BEGIN
 {
     if (-e "../Makeconf") {
+	my $objdir = `/bin/pwd`;
+	chomp($objdir);
 	# Prior to first install or running from object dir.
-	unshift(@INC, "../db");
-	unshift(@INC, "@top_srcdir@/install");
-	unshift(@INC, "@top_srcdir@/tbsetup");
-	unshift(@INC, "../tbsetup");
+	unshift(@INC, "$objdir/../db");
+	unshift(@INC, "$objdir/@top_srcdir@/install");
+	unshift(@INC, "$objdir/@top_srcdir@/tbsetup");
+	unshift(@INC, "$objdir/../tbsetup");
     }
 }
 use emdb;
@@ -112,8 +114,16 @@ if (! (-e "../db/dbupdate" && -e "./update-install")) {
     Fatal("Cannot find dbupdate script! Running from the object dir?");
 }
 
-my @INCDIRS = ("-I.", "-I../tbsetup", "-I../db",
-	       "-I${SRCDIR}/tbsetup", "-I${SRCDIR}/install");
+my $objdir = `/bin/pwd`;
+chomp($objdir);
+
+my @INCDIRS = ("-I${objdir}", "-I${objdir}/../tbsetup",
+	       "-I${objdir}/../db", 
+	       "-I${objdir}/${SRCDIR}/tbsetup",
+	       "-I${objdir}/${SRCDIR}/install",
+	       # To catch a few extra things that do not normally change.
+	       "-I@prefix@/lib"
+	       );
 
 #
 # Dump the testbed version numbers in all modes.

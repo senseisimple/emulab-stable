@@ -42,10 +42,12 @@ sub InstallUpdate($$)
 	    if (! -e "$VARRUN/stated.pid") {
 		PhaseSkip("Testbed not running");
 	    }
-	    if (ExecQuiet("$TBROOT/sbin/checknodes_daemon")) {
-		PhaseSucceed("checknodes_daemon started");
+	    # Old version of daemon still running.
+	    if (-e "$VARRUN/checknodes.pid" &&
+		ExecQuiet("pgrep -f checknodes_daemon")) {
+		SignalDaemon("checknodes", "TERM");
 	    }
-	    PhaseFail("Could not start checknodes_daemon");
+	    RestartDaemon("checknodes_daemon");
 	};
     }
     return 0;
