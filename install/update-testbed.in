@@ -286,7 +286,7 @@ if ($install) {
     print "Installing testbed software ... this will take a while!\n";
     print "Output saved to $tempfile\n";
     
-    system("cd ..; gmake boss-install-noupdatecheck >$tempfile 2>&1");
+    system("(cd ..; gmake; gmake boss-install-noupdatecheck) >$tempfile 2>&1");
     if ($?) {
 	exit(1);
     }

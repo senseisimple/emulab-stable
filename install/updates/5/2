@@ -47,6 +47,7 @@ sub InstallUpdate($$)
 	    if (-e "$VARRUN/checknodes.pid" &&
 		! ExecQuiet("pgrep -f checknodes_daemon")) {
 		SignalDaemon("checknodes", "TERM");
+		ExecQuiet("/bin/rm -f $VARRUN/checknodes.pid");
 	    };
 	    RestartDaemon("checknodes_daemon");
 	};
