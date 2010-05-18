@@ -604,6 +604,7 @@ sub RestartDaemon($) {
 	return 1;
     }
     SignalDaemon($name, 'TERM');
+    sleep(1);
     if (ExecQuiet("$TBROOT/sbin/$name")) {
 	PhaseSucceed("$name started");
     }
