@@ -41,6 +41,9 @@
 #include "event.h"
 #endif
 
+/* XXX: Not sure this is okay! */
+#include "tpm.h"
+
 /*
  * XXX This needs to be localized!
  */
@@ -288,6 +291,7 @@ COMMAND_PROTOTYPE(dotpmpubkey);
 COMMAND_PROTOTYPE(dotpmdummy);
 COMMAND_PROTOTYPE(dodhcpdconf);
 COMMAND_PROTOTYPE(dosecurestate);
+COMMAND_PROTOTYPE(doquoteprep);
 
 /*
  * The fullconfig slot determines what routines get called when pushing
@@ -390,6 +394,8 @@ struct command {
 	{ "tpmdummy",	  FULLCONFIG_ALL, F_REQTPM, dotpmdummy },
 	{ "dhcpdconf",	  FULLCONFIG_ALL, 0, dodhcpdconf },
 	{ "securestate",  FULLCONFIG_NONE, F_REQTPM, dosecurestate},
+	{ "securestate",  FULLCONFIG_NONE, F_REMREQSSL, dosecurestate},
+	{ "quoteprep",    FULLCONFIG_NONE, F_REMREQSSL, doquoteprep},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -4353,6 +4359,155 @@ COMMAND_PROTOTYPE(dosecurestate)
 	info("%s: SECURESTATE: %s\n", reqp->nodeid, newstate);
 	return 0;
 
+}
+
+/*
+ * Prepare for a TPM quote: give the client the encrypted identity key,
+ * a nonce to use in the quote, and the set of PCRs that need to be included in
+ * the quote. This saves some state (the nonce) that will be checked again in
+ * dosecurestate().
+ */
+COMMAND_PROTOTYPE(doquoteprep)
+{
+	char            newstate[128];	/* More then we will ever need */
+        TPM_NONCE       nonce;
+        char            nonce_hex[2*TPM_NONCE_BYTES + 1];
+        int             i;
+
+        // XXX: is MYBUFSIZE big enough?
+	char		buf[MYBUFSIZE];
+	char		*bufp = buf;
+	char		*bufe = &buf[MYBUFSIZE];
+
+	MYSQL_RES	*res;
+	MYSQL_ROW	row;
+	int		nrows;
+        unsigned long   *nlen;
+
+	/*
+	 * Dig out state that the node is reporting - we need this so that we
+         * can tell it what PCRs to include
+	 */
+	if (sscanf(rdata, "%128s", newstate) != 1 ||
+	    strlen(newstate) == sizeof(newstate)) {
+		error("DOQUOTEPREP: %s: Bad arguments\n", reqp->nodeid);
+		return 1;
+	}
+
+
+        /*
+         * Get the set of PCRs that have to be quoted to move into this state.
+         */
+	res = mydb_query("select q.pcr from nodes as n "
+			"left join tpm_quote_values as q "
+                        "on n.op_mode = q.op_mode "
+			"where n.node_id='%s' and q.state ='%s'",
+			1, reqp->nodeid,newstate);
+	if (!res){
+		error("quoteprep: %s: DB error getting pcr list\n",
+			reqp->nodeid);
+		return 1;
+	}
+
+	nrows = mysql_num_rows(res);
+
+	if (!nrows){
+		error("%s: no TPM quote values in database for state %s\n",
+			reqp->nodeid,newstate);
+		mysql_free_result(res);
+		return 1;
+	}
+
+	bufp += OUTPUT(bufp, bufe - bufp, "PCR=");
+
+        for (i = 0; i < nrows; i++) {
+            row = mysql_fetch_row(res);
+            // XXX: Is this already passed to us as a string?
+            bufp += OUTPUT(bufp, bufe - bufp,"%s",row[0]);
+            if (i < (nrows - 1)) {
+                    bufp += OUTPUT(bufp, bufe - bufp, ",");
+            }
+        }
+
+        bufp += OUTPUT(bufp, bufe - bufp, " ");
+        mysql_free_result(res);
+
+        /*
+         * Grab the (encrypted) identity key for the node - noone else will be
+         * able to decrypt it, so we don't have to be too paranoid about who
+         * we give it to.
+         */
+	res = mydb_query("select tpmidentity "
+			"from node_hostkeys "
+			"where node_id='%s' ",
+			1, reqp->nodeid);
+
+	if (!res){
+		error("quoteprep: %s: DB error getting tpmidentity\n",
+			reqp->nodeid);
+		return 1;
+	}
+
+	nrows = mysql_num_rows(res);
+
+	if (!nrows){
+		error("%s: no tpmidentity in database for this node.\n",
+			reqp->nodeid);
+		mysql_free_result(res);
+		return 1;
+	}
+
+	row = mysql_fetch_row(res);
+	nlen = mysql_fetch_lengths(res);
+	if (!nlen || !nlen[0]){
+		error("%s: invalid identity length.\n",
+			reqp->nodeid);
+		mysql_free_result(res);
+		return 1;
+	}
+
+	bufp += OUTPUT(bufp, bufe - bufp, "IDENTITY=");
+        for (i = 0;i < nlen[0];++i)
+                bufp += OUTPUT(bufp, bufe - bufp,
+                        "%.02x", (0xff & ((char)*(row[0]+i))));
+
+        bufp += OUTPUT(bufp, bufe - bufp, " ");
+	mysql_free_result(res);
+        
+        /*
+         * Generate a cryptographic nonce - we have to keep track of this to
+         * prevent replay attacks.
+         */
+        if (!tmcd_tpm_generate_nonce(nonce)) {
+            error("DOQUOTEPREP: %s: Failed to generate nonce\n", reqp->nodeid);
+            return 1;
+        }
+
+        // Make a hex representation of the nonce
+        for (i = 0; i < TPM_NONCE_BYTES; i++) {
+            sprintf(nonce_hex + (i*2),"%.02x",nonce[i]);
+        }
+        nonce_hex[TPM_NONCE_BYTES] = '\0';
+        // XXX
+        info("NONCE: %s", nonce_hex);
+
+        // Store the nonce in the database. It expires in one minute, and we
+        // overwrite any existing nonces for this node/state combo
+	mydb_update("replace into nonces "
+		    " (node_id, purpose, nonce, expires) "
+		    " values ('%s', 'state-%s','%s', UNIX_TIMESTAMP()+60)",
+		    reqp->nodeid,newstate,nonce_hex);
+
+	bufp += OUTPUT(bufp, bufe - bufp, "NONCE=%s",nonce_hex);
+
+	bufp += OUTPUT(bufp, bufe - bufp, "\n");
+
+        /*
+         * Return to the client
+         */
+	client_writeback(sock, buf, bufp - buf, tcp);
+
+        return 0;
 }
 
 /*

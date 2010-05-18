@@ -11,6 +11,12 @@
 #define error		printf
 #endif /* STANDALONE */
 
+#include <sys/time.h>
+#include <unistd.h>
+#include <strings.h>
+
+static unsigned int nonce_counter = 0;
+
 /*
  * XXX: Teach me how to do this properly . . .  This is so boss can build ssl.o
  * 	properly without installing trousers headers
@@ -123,4 +129,55 @@ tmcd_tpm_free(void)
 	error("Oops!  Want TPM but we're compiled without TPM support\n");
 	return 1;
 #endif /* TPM */
+}
+
+int
+tmcd_tpm_generate_nonce(unsigned char *nonce)
+{
+    struct timeval time;
+    pid_t pid;
+
+    int byte_count = 0;
+    bzero(nonce,TPM_NONCE_BYTES);
+    
+    /* Nonce must be 160 bits long, and we must be quite sure that we will
+     * never use the same one twice.  We put three things into the nonce to
+     * make it unique:
+     * 1) Timestamp to the best accuracy we can get
+     * 2) The PID of the current process, to avoid someone asking two 
+     *    different tmcds for nonces at thte same time
+     * 3) A local counter, in case someone can ask for nonces faster than our
+     *    clock resolution
+     */
+
+    // timestamp
+    if (gettimeofday(&time,NULL)) {
+        return -1;
+    }
+
+    if (sizeof(time) + byte_count > TPM_NONCE_BYTES) {
+        return -1;
+    }
+    bcopy(&time, nonce, sizeof(time));
+    byte_count += sizeof(time);
+
+    // pid
+    pid = getpid();
+    if (sizeof(pid) + byte_count > TPM_NONCE_BYTES) {
+        return -1;
+    }
+    bcopy(&pid, nonce + byte_count, sizeof(pid));
+    byte_count += sizeof(pid);
+
+    // counter
+    if (sizeof(nonce_counter) + byte_count > TPM_NONCE_BYTES) {
+        return -1;
+    }
+    bcopy(&nonce_counter, nonce + byte_count, sizeof(nonce_counter));
+    byte_count += sizeof(nonce_counter);
+
+    // TODO: Maybe hash to avoid giving away info on state on boss?
+
+    return 0;
+
 }
