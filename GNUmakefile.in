@@ -328,16 +328,28 @@ flashboot-install: destdircheck flashboot
 # A check to see if this is a 'real' install. Kinda hacky, but as far as I can
 # tell, you can't put ifeq()'s inside of targets
 #
-LIBUPDATEDIRS = -I../install -I../db -I../tbsetup
-
 ifeq ($(TBROOT),/usr/testbed)
 UPDATETESTBED= @cd $(OBJDIR)/install && perl update-testbed
 else
 UPDATETESTBED= @echo "Skipping update check, since prefix isn't /usr/testbed"
 endif
-update-testbed:
+ifeq ($(ISMAINSITE),1)
+update-testbed: update-testbed-nostop
+else
+update-testbed:	update-testbed-install
+endif
+
+update-testbed-install:
 	@echo "Updating the testbed ..."
 	$(UPDATETESTBED) -i -s
+
+update-testbed-noinstall:
+	@echo "Updating the testbed ..."
+	$(UPDATETESTBED)
+
+update-testbed-nostop:
+	@echo "Updating the testbed ..."
+	$(UPDATETESTBED) -i
 
 update-testbed-force:
 	@echo "Updating the testbed in force mode ..."
@@ -424,7 +436,8 @@ elabinelab:
 
 .PHONY: post-install install-mkdirs clrhouse-install install \
 	boss-install-noupdatecheck boss-install-noschemacheck \
-	boss-install-force
+	boss-install-force update-testbed update-testbed-install \
+	update-testbed-noinstall update-testbed-nostop
 
 # Get rid of a bunch of nasty built-in implicit rules.
 .SUFFIXES:
