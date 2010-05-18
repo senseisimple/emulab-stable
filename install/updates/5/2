@@ -21,9 +21,10 @@ sub InstallUpdate($$)
 	Phase "newsyslog", "Updating $NEWSYSLOG_CONF", sub {
 	    DoneIfEdited($NEWSYSLOG_CONF);
 	    BackUpFileFatal($NEWSYSLOG_CONF);
+	    ExecQuietFatal("sed -i .orig -e '/checknodes/d' $NEWSYSLOG_CONF");
 	    AppendToFileFatal($NEWSYSLOG_CONF,
 			      "$LOGDIR/checknodes.log 640 14 300 ".
-			      "* Z /var/run/checknodes.pid");
+			      "* Z /var/run/checknodes_daemon.pid");
 	};
 	Phase "startupfile", "Updating testbed startup file", sub {
 	    DoneIfIdentical("$TOP_OBJDIR/rc.d/3.testbed.sh", $TESTBED_STARTUP);
@@ -44,9 +45,9 @@ sub InstallUpdate($$)
 	    }
 	    # Old version of daemon still running.
 	    if (-e "$VARRUN/checknodes.pid" &&
-		ExecQuiet("pgrep -f checknodes_daemon")) {
+		! ExecQuiet("pgrep -f checknodes_daemon")) {
 		SignalDaemon("checknodes", "TERM");
-	    }
+	    };
 	    RestartDaemon("checknodes_daemon");
 	};
     }
