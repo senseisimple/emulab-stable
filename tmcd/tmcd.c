@@ -4478,7 +4478,7 @@ COMMAND_PROTOTYPE(doquoteprep)
          * Generate a cryptographic nonce - we have to keep track of this to
          * prevent replay attacks.
          */
-        if (!tmcd_tpm_generate_nonce(nonce)) {
+        if (tmcd_tpm_generate_nonce(nonce)) {
             error("DOQUOTEPREP: %s: Failed to generate nonce\n", reqp->nodeid);
             return 1;
         }
@@ -4487,9 +4487,9 @@ COMMAND_PROTOTYPE(doquoteprep)
         for (i = 0; i < TPM_NONCE_BYTES; i++) {
             sprintf(nonce_hex + (i*2),"%.02x",nonce[i]);
         }
-        nonce_hex[TPM_NONCE_BYTES] = '\0';
+        nonce_hex[TPM_NONCE_BYTES*2] = '\0';
         // XXX
-        info("NONCE: %s", nonce_hex);
+        info("NONCE: %s\n", nonce_hex);
 
         // Store the nonce in the database. It expires in one minute, and we
         // overwrite any existing nonces for this node/state combo
