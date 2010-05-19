@@ -79,7 +79,7 @@ print "Renewed the slice, asking for slice credential again";
 slicecred = get_slice_credential( myslice, mycredential )
 print "Got the slice credential, renewing the sliver";
 
-params = [[slicecred], SLICEURN]
+params = [SLICEURN, [slicecred]]
 print "WARNING: No expiration time passed!"
 try:
     response = do_method("am", "RenewSliver", params,

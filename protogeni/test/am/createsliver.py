@@ -105,7 +105,7 @@ else:
 # Create the sliver.
 #
 print "Creating the Sliver ..."
-params = [[myslice], SLICEURN, rspec]
+params = [SLICEURN, [myslice], rspec]
 
 try:
     response = do_method("am", "CreateSliver", params,

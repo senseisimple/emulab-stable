@@ -67,7 +67,7 @@ sub ListResources()
 # Create a sliver by allocating and starting resources.
 sub CreateSliver()
 {
-    my ($credentials, $slice_urn, $rspec) = @_;
+    my ($slice_urn, $credentials, $rspec) = @_;
 
     # Invoke CreateSliver
     my $create_args = {
@@ -91,7 +91,7 @@ sub CreateSliver()
 
 sub DeleteSliver()
 {
-    my ($credentials, $slice_urn) = @_;
+    my ($slice_urn, $credentials) = @_;
 
     # Invoke StopSliver
     my $stop_args = {
@@ -126,7 +126,7 @@ sub DeleteSliver()
 # just passes on to the CM SliverStatus operation.
 sub SliverStatus()
 {
-    my ($credentials, $slice_urn) = @_;
+    my ($slice_urn, $credentials) = @_;
 
     my $status_args = {
         'slice_urn' => $slice_urn,
@@ -171,7 +171,7 @@ sub SliverStatus()
 
 sub RenewSliver()
 {
-    my ($credentials, $slice_urn, $expiration_time) = @_;
+    my ($slice_urn, $credentials, $expiration_time) = @_;
 
     my $renew_args = {
         'slice_urn' => $slice_urn,
@@ -191,6 +191,8 @@ sub RenewSliver()
 
 sub Shutdown()
 {
+    my ($slice_urn, $credentials) = @_;
+
     return GeniResponse->Create( GENIRESPONSE_UNSUPPORTED );
 }
 

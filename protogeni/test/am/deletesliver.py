@@ -47,7 +47,7 @@ print "Got the slice credential, deleting the sliver..."
 #
 # Delete the sliver.
 #
-params = [[slicecred], myslice["urn"]]
+params = [myslice["urn"], [slicecred]]
 
 try:
     response = do_method("am", "DeleteSliver", params,
