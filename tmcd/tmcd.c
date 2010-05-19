@@ -73,6 +73,11 @@
 #define XSTRINGIFY(s)   STRINGIFY(s)
 #define STRINGIFY(s)	#s
 
+/* XXX backward compat */
+#ifndef TBCOREDIR
+#define	TBCOREDIR	TBROOT "/tmp"
+#endif
+
 /* socket read/write timeouts in ms */
 #define READTIMO	3000
 #define WRITETIMO	3000
@@ -497,7 +502,11 @@ main(int argc, char **argv)
 		loginit(0, 0);
 	else {
 		/* Become a daemon */
-		daemon(0, 0);
+		if (chdir(TBCOREDIR)) {
+			daemon(0, 0);
+		} else {
+			daemon(1, 0);
+		}
 		loginit(1, "tmcd");
 	}
 	info("daemon starting (version %d)\n", CURRENT_VERSION);
@@ -4476,7 +4485,8 @@ mydb_query(char *query, int ncols, ...)
 
 	va_start(ap, ncols);
 	n = vsnprintf(querybuf, sizeof(querybuf), query, ap);
-	if (n > sizeof(querybuf)) {
+	va_end(ap);
+	if (n >= sizeof(querybuf)) {
 		error("query too long for buffer\n");
 		return (MYSQL_RES *) 0;
 	}
@@ -4532,7 +4542,8 @@ mydb_update(char *query, ...)
 
 	va_start(ap, query);
 	n = vsnprintf(querybuf, sizeof(querybuf), query, ap);
-	if (n > sizeof(querybuf)) {
+	va_end(ap);
+	if (n >= sizeof(querybuf)) {
 		error("query too long for buffer\n");
 		return 1;
 	}
@@ -4768,7 +4779,14 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp, char* nodekey)
 	if (row[4] && row[5]) {
 		strncpy(reqp->pid, row[4], sizeof(reqp->pid));
 		strncpy(reqp->eid, row[5], sizeof(reqp->eid));
-		reqp->exptidx = atoi(row[25]);
+		if (row[25])
+			reqp->exptidx = atoi(row[25]);
+		else {
+			error("iptonodeid: %s: in non-existent experiment %s/%s!\n",
+			      inet_ntoa(ipaddr), reqp->pid, reqp->eid);
+			mysql_free_result(res);
+			return 1;
+		}
 		reqp->allocated = 1;
 
 		if (row[6])
