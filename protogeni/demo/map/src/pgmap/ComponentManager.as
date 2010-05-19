@@ -77,7 +77,7 @@
 	    private var myAfter:Function;
 	    private var myIndex:int;
 	    private var myState:int = NODE_PARSE;
-	    private var locations:XMLList;
+	    private var nodes:XMLList;
 	    private var links:XMLList;
 	    private var interfaceDictionary:Dictionary;
 	    private var nodeNameDictionary:Dictionary;
@@ -104,15 +104,15 @@
 	    public function processRspec(afterCompletion : Function):void {
 	    	main.setProgress("Parsing " + Hrn + " RSPEC", Common.waitColor);
 	    	main.startWaiting();
-	    	
-	    	namespace rsync01namespace = "http://www.protogeni.net/resources/rspec/0.1"; 
-	        use namespace rsync01namespace; 
+
+			var nodeName : QName = new QName(Rspec.namespace(), "node");
+			nodes = Rspec.elements(nodeName);
+			nodeName = new QName(Rspec.namespace(), "link");
+			links = Rspec.elements(nodeName);
 
 	    	myAfter = afterCompletion;
 	    	myIndex = 0;
 	    	myState = NODE_PARSE;
-	    	locations = Rspec.node.location;
-	    	links = Rspec.link;
 	    	interfaceDictionary = new Dictionary();
 	    	nodeNameDictionary = new Dictionary();
 	    	subnodeList = new ArrayCollection();
@@ -158,14 +158,11 @@
 	    }
 	    
 	    private function parseNextNode():void {
-	    	namespace rsync01namespace = "http://www.protogeni.net/resources/rspec/0.1"; 
-	        use namespace rsync01namespace; 
-	        
 	        var idx:int;
 	        for(idx = 0; idx < MAX_WORK; idx++) {
 	        	var fullIdx:int = myIndex + idx;
 	        	//main.console.appendText("idx:" + idx.toString() + " full:" + fullIdx.toString());
-	        	if(fullIdx == locations.length()) {
+	        	if(fullIdx == nodes.length()) {
 	        		
 	        		// Assign subnodes
 	        		for each(var obj:Object in subnodeList)
@@ -182,36 +179,45 @@
 	        	}
 	        	//main.console.appendText("parsing...");
 	        	//main.console.appendText(fullIdx.toString());
-	        	var location:XML = locations[fullIdx];
-	        	
-	        	var lat:Number = Number(location.@latitude);
-	        	var lng:Number = Number(location.@longitude);
-	        	if(lat == 0 && lng == 0)
-	        	{
-	        		lat = 39.017625;
-	        		lng = 125.763899;
-	        	}
-	        	
-	        	var ng:PhysicalNodeGroup = Nodes.GetByLocation(lat,lng);
-	        	if(ng == null) {
-	        		var cnt:String = location.@country;
-	        		ng = new PhysicalNodeGroup(lat, lng, cnt, Nodes);
-	        		Nodes.Add(ng);
-	        	}
-	        	
-	        	var n:PhysicalNode = new PhysicalNode(ng);
-	        	var p:XML = location.parent();
-	        	n.name = p.@component_name;
-	        	n.urn = p.@component_uuid;
-	        	n.available = p.available == "true";
-	        	n.exclusive = p.exclusive == "true";
-	        	n.managerString = p.@component_manager_uuid;
-	        	n.manager = this;
-	        	
-	        	var parentName:String = p.subnode_of;
-	        	if(parentName.length > 0)
-	        		subnodeList.addItem({subNode:n, parentName:parentName});
-	        	
+
+				var p:XML = nodes[fullIdx];
+				
+				// Get location info
+				var nodeName : QName = new QName(Rspec.namespace(), "location");
+				var temps:XMLList = p.elements(nodeName);
+				var temp:XML = temps[0];
+				var lat:Number = 39.017625;
+				var lng:Number = 125.763899;
+				if(temps.length() > 0)
+				{
+					if(Number(temp.@latitude) != 0 && Number(temp.@longitude) != 0)
+					{
+						lat = Number(temp.@latitude);
+						lng = Number(temp.@longitude);
+					}
+				}
+
+				var ng:PhysicalNodeGroup = Nodes.GetByLocation(lat,lng);
+				
+				if(ng == null) {
+					var cnt:String = "";
+					if(temp != null)
+						cnt = temp.@country;
+					ng = new PhysicalNodeGroup(lat, lng, cnt, Nodes);
+					Nodes.Add(ng);
+				}
+
+				var n:PhysicalNode = new PhysicalNode(ng);
+				n.name = p.@component_name;
+				n.urn = p.@component_uuid;
+				n.available = p.available == "true";
+				n.exclusive = p.exclusive == "true";
+				n.managerString = p.@component_manager_uuid;
+				n.manager = this;
+				var parentName:String = p.subnode_of;
+				if(parentName.length > 0)
+					subnodeList.addItem({subNode:n, parentName:parentName});
+
 	        	for each(var ix:XML in p.children()) {
 	        		if(ix.localName() == "interface") {
 	        			var i:PhysicalNodeInterface = new PhysicalNodeInterface(n);
@@ -226,7 +232,7 @@
 	        			n.types.addItem(t);
 	        		}
 	        	}
-	        	
+				
 	        	n.rspec = p.copy();
 	        	ng.Add(n);
 	        	nodeNameDictionary[n.urn] = n;
@@ -239,9 +245,6 @@
 	    }
 	    
 	    private function parseNextLink():void {
-	    	namespace rsync01namespace = "http://www.protogeni.net/resources/rspec/0.1"; 
-	        use namespace rsync01namespace; 
-	        
 	        var idx:int;
 	        for(idx = 0; idx < MAX_WORK; idx++) {
 	        	var fullIdx:int = myIndex + idx;
@@ -254,12 +257,13 @@
 	        	//main.console.appendText("parsing...");
 	        	var link:XML = links[fullIdx];
 	        	
-	        	var interfaces:XMLList = link.interface_ref;
-	        	var interface1:String = interfaces[0].@component_interface_id
+				var nodeName : QName = new QName(Rspec.namespace(), "interface_ref");
+				var temps:XMLList = link.elements(nodeName);
+	        	var interface1:String = temps[0].@component_interface_id
 	        	//var ni1:NodeInterface = Nodes.GetInterfaceByID(interface1);
 	        	var ni1:PhysicalNodeInterface = interfaceDictionary[interface1];
 	        	if(ni1 != null) {
-	        		var interface2:String = interfaces[1].@component_interface_id;
+	        		var interface2:String = temps[1].@component_interface_id;
 		        	//var ni2:NodeInterface = Nodes.GetInterfaceByID(interface2);
 	        		var ni2:PhysicalNodeInterface = interfaceDictionary[interface2];
 		        	if(ni2 != null) {
@@ -275,9 +279,17 @@
 		        		l.urn = link.@component_uuid;
 		        		l.interface1 = ni1;
 		        		l.interface2 = ni2;
-		        		l.bandwidth = link.bandwidth;
-		        		l.latency = link.latency;
-		        		l.packetLoss = link.packet_loss;
+						
+						for each(var ix:XML in link.children()) {
+							if(ix.localName() == "bandwidth") {
+								l.bandwidth = Number(ix);
+							} else if(ix.localName() == "latency") {
+								l.latency = Number(ix);
+							} else if(ix.localName() == "packet_loss") {
+								l.packetLoss = Number(ix);
+							}
+						}
+						
 		        		l.rspec = link.copy();
 		        		
 		        		for each(var tx:XML in link.link_type) {
