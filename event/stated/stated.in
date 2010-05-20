@@ -823,6 +823,17 @@ sub stateTransition($$) {
 		handleCommand($node,$TBPOWERCYCLE);
 		next;
 	    };
+	    (/^$TBPOWEROFF$/) && do {
+		handleCommand($node,$TBPOWEROFF);
+		next;
+	    };
+            (/^EMAILNOTIFY$/) && do {
+		SENDMAIL($REALTBOPS,
+			 "STATED: $node entered state $newstate",
+			 "$node entered state $mode/$newstate from " .
+                         "$mode/$oldstate",
+			 "Stated Daemon <".$TBOPS.">");
+            };
 	    /^RELOADOLDMFS$/ && do {
 		my $frisbee_osid = TBNodeDiskloadOSID($node);
 		my $frisbee_name = DBQuerySingleFatal("select osname from os_info where osid=$frisbee_osid");
