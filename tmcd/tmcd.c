@@ -4226,6 +4226,8 @@ COMMAND_PROTOTYPE(donseconfigs)
 COMMAND_PROTOTYPE(dostate)
 {
 	char 		newstate[128];	/* More then we will ever need */
+	MYSQL_RES	*res;
+	int		nrows;
 #ifdef EVENTSYS
 	address_tuple_t tuple;
 #endif
@@ -4242,6 +4244,38 @@ COMMAND_PROTOTYPE(dostate)
 		error("DOSTATE: %s: Bad arguments\n", reqp->nodeid);
 		return 1;
 	}
+
+
+        /*
+         * Check to make sure that this is not a state that must be reported
+         * by the securestate mechanism - we can tell because there are one
+         * or more PCR values required in the tpm_quote_values table for
+         * the state.
+         */
+	res = mydb_query("select q.pcr from nodes as n "
+			"left join tpm_quote_values as q "
+                        "on n.op_mode = q.op_mode "
+			"where n.node_id='%s' and q.state ='%s'",
+			1, reqp->nodeid,newstate);
+	if (!res){
+		error("state: %s: DB error check for pcr list\n",
+			reqp->nodeid);
+		return 1;
+	}
+
+	nrows = mysql_num_rows(res);
+
+        mysql_free_result(res);
+
+	if (nrows){
+            error("state: %s: tried to go into secure state %s using "
+                    "insecure state command\n",reqp->nodeid,newstate);
+            return 1;
+            // XXX Probably should send a SECVIOLATION state and/or send
+            // mail, but this needs more thought before making it the
+            // default action.
+        }
+
 #ifdef EVENTSYS
 	/*
 	 * Send the state out via an event
