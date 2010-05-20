@@ -2750,8 +2750,8 @@ sub doEnableOpenflowListener($$) {
     # update the vlan object with the new listener string
     # other openflow functions may also need this, especially doOpenflowEnable/doOpenflowDisable
     #
-    my $vlan = VLan->Lookup($vlan);
-    $vlan->SetAttribute('oflistener', $listenerConnStr, 'string');
+    my $vlaninst = VLan->Lookup($vlan);
+    $vlaninst->SetAttribute('oflistener', $listenerConnStr, 'string');
 
     return $errors;
 }
