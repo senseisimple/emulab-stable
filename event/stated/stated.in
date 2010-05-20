@@ -1052,6 +1052,11 @@ sub handleCtrlEvent($$) {
 		/^$TBTIMEOUTNOTIFY/ && do {
 		    notify("Node $node has timed out in state $mode/$state\n");
 		    last; };
+                /^STATE:([-\w\/]+)$/ && do {
+                    my $newstate = $1;
+                    # Force the node into a new state
+                    stateTransition($node,$newstate);
+                    last; };
 		notify("$node: Unknown Timeout Action: $action\n");
 	    }
 	    next;
