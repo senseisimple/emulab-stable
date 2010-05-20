@@ -8210,16 +8210,15 @@ COMMAND_PROTOTYPE(dotpmblob)
 			"where node_id='%s' ",
 			1, reqp->nodeid);
 
-	if (!res){
+	if (!res) {
 		error("gettpmblob: %s: DB error getting tpmblob\n",
-			reqp->nodeid);
+		      reqp->nodeid);
 		return 1;
 	}
 
 	nrows = mysql_num_rows(res);
-
-	if (!nrows){
-		error("%s: no tpmblob in database for this node.\n",
+	if (!nrows) {
+		error("%s: no node_hostkeys info in the database!\n",
 			reqp->nodeid);
 		mysql_free_result(res);
 		return 1;
@@ -8227,23 +8226,25 @@ COMMAND_PROTOTYPE(dotpmblob)
 
 	row = mysql_fetch_row(res);
 	nlen = mysql_fetch_lengths(res);
-	if (!nlen || !nlen[0]){
-		error("%s: invalid blob length.\n",
-			reqp->nodeid);
+	if (!nlen || !nlen[0]) {
 		mysql_free_result(res);
+#if 0 /* not an error yet */
+		error("%s: no TPM blob.\n", reqp->nodeid);
 		return 1;
+#endif
+		return 0;
 	}
 
 	bufp += OUTPUT(bufp, bufe - bufp,
-		(hex ? "BLOBHEX=" : "BLOB="));
-	if (hex){
+		       (hex ? "BLOBHEX=" : "BLOB="));
+	if (hex) {
 		for (i = 0;i < nlen[0];++i)
 			bufp += OUTPUT(bufp, bufe - bufp,
-				"%.02x", (0xff & ((char)*(row[0]+i))));
-	} else{
+				       "%.02x", (0xff & ((char)*(row[0]+i))));
+	} else {
 		for (i = 0;i < nlen[0];++i)
 			bufp += OUTPUT(bufp, bufe - bufp,
-				"%c", (char)*(row[0]+i));
+				       "%c", (char)*(row[0]+i));
 	}
 	bufp += OUTPUT(bufp, bufe - bufp, "\n");
 
@@ -8271,13 +8272,22 @@ COMMAND_PROTOTYPE(dotpmpubkey)
 	}
 	nrows = mysql_num_rows(res);
 	if (!nrows) {
-		error("%s: no tpmx509 in database for this node.\n",
+		error("%s: no node_hostkeys info in the database!\n",
 			reqp->nodeid);
 		mysql_free_result(res);
 		return 1;
 	}
 
 	row = mysql_fetch_row(res);
+	if (!row || !row[0]) {
+		mysql_free_result(res);
+#if 0 /* not an error yet */
+		error("%s: no x509 cert.\n", reqp->nodeid);
+		return 1;
+#endif
+		return 0;
+	}
+
 	OUTPUT(buf, sizeof(buf), "TPMPUB=%s\n", row[0]);
 
 	client_writeback(sock, buf, strlen(buf), tcp);
