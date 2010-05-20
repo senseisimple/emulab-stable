@@ -194,8 +194,8 @@ sub Lookup($$;$$)
     $self->{"ATTRS"} = {};
     $self->{"EXPT"}  = $experiment;
 
-    if (!Lan->InitOpenflowAttributes($arg1, $arg2, $lanid))
-	return undef;
+    return undef
+    	if (!Lan->InitOpenflowAttributes($arg1, $arg2, $lanid));
 
     #
     # Grab the attributes for this lan now.
