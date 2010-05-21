@@ -4448,7 +4448,8 @@ COMMAND_PROTOTYPE(dosecurestate)
 	res = mydb_query("select q.pcr,q.value from nodes as n "
 			"left join tpm_quote_values as q "
                         "on n.op_mode = q.op_mode "
-			"where n.node_id='%s' and q.state ='%s'",
+			"where n.node_id='%s' and q.state ='%s' "
+                        "order by q.pcr",
 			1, reqp->nodeid,newstate);
 	if (!res){
 		error("SECURESTATE: %s: DB error getting pcr list\n",
@@ -4637,7 +4638,8 @@ COMMAND_PROTOTYPE(doquoteprep)
 	res = mydb_query("select q.pcr from nodes as n "
 			"left join tpm_quote_values as q "
                         "on n.op_mode = q.op_mode "
-			"where n.node_id='%s' and q.state ='%s'",
+			"where n.node_id='%s' and q.state ='%s' "
+                        "order by q.pcr",
 			1, reqp->nodeid,newstate);
 	if (!res){
 		error("quoteprep: %s: DB error getting pcr list\n",
