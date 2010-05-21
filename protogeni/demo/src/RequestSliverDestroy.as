@@ -18,12 +18,12 @@ package
   {
     public function RequestSliverDestroy(newManager : ComponentManager,
                                          newNodes : ActiveNodes,
-										 newSliceUrn : String) : void
+                                                                                 newSliceUrn : String) : void
     {
       super(newManager.getName());
       manager = newManager;
       nodes = newNodes;
-	  sliceUrn = newSliceUrn;
+          sliceUrn = newSliceUrn;
     }
 
     override public function cleanup() : void
@@ -37,8 +37,8 @@ package
       // exists and perform a no-op if it doesn't.
       nodes.changeState(manager, ActiveNodes.CREATED, ActiveNodes.PLANNED);
       nodes.changeState(manager, ActiveNodes.BOOTED, ActiveNodes.PLANNED);
-      opName = "Deleting Sliver";
-      op.reset(Geni.deleteSliver);
+      opName = "Deleting Slice ";
+      op.reset(Geni.deleteSlice);
       op.addField("slice_urn", sliceUrn);
       op.addField("credentials", new Array(manager.getSliver()));
       //? op.addField("impotent", Request.IMPOTENT);
@@ -64,6 +64,6 @@ package
 
     var manager : ComponentManager;
     var nodes : ActiveNodes;
-	var sliceUrn : String;
+        var sliceUrn : String;
   }
 }

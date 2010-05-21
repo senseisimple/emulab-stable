@@ -44,7 +44,7 @@ package
     public static var updateTicket : Array = new Array(cm, "UpdateTicket");
     public static var redeemTicket : Array = new Array(cm, "RedeemTicket");
     public static var releaseTicket : Array = new Array(cm, "ReleaseTicket");
-    public static var deleteSliver : Array = new Array(cm, "DeleteSliver");
+    public static var deleteSlice : Array = new Array(cm, "DeleteSlice");
     public static var startSliver : Array = new Array(cm, "StartSliver");
     public static var updateSliver : Array = new Array(cm, "UpdateSliver");
     public static var resolveResource : Array = new Array(cm, "Resolve");

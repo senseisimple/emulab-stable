@@ -21,7 +21,9 @@ package
 
     public static var NORMAL = 0;
     public static var LOADING = 1;
-    public static var FAILED = 2;
+    public static var SECURITY_FAILURE = 2;
+    public static var IO_FAILURE = 3;
+    public static var INTERNAL_FAILURE = 4;
 
     public function ComponentManager(newId : String,
                                      newName : String,
@@ -248,9 +250,9 @@ package
       return result;
     }
 
-    public function resourceFailure() : void
+    public function resourceFailure(newState : int) : void
     {
-      setState(FAILED);
+      setState(newState);
       update();
     }
 
@@ -275,7 +277,7 @@ package
         {
           text.appendText("\n" + e.toString() + "\n");
         }
-        setState(FAILED);
+        setState(INTERNAL_FAILURE);
       }
       update();
     }

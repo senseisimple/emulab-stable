@@ -332,7 +332,8 @@ package
     private function setVersion() : void
     {
       if (ns == null
-          || ns.uri == "http://www.protogeni.net/resources/rspec/0.1")
+          || ns.uri == "http://www.protogeni.net/resources/rspec/0.1"
+          || ns.uri == "http://www.protogeni.net/resources/rspec/0.2")
       {
         version = 1;
       }

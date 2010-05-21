@@ -14,15 +14,17 @@
 
 package
 {
+  import flash.events.ErrorEvent;
+
   public class RequestSliverResolve extends Request
   {
     public function RequestSliverResolve(newCm : ComponentManager,
-									 newSliceUrn : String,
+                                                                         newSliceUrn : String,
                                              newNext : Request) : void
     {
       super(newCm.getName());
       cm = newCm;
-	  sliceUrn = newSliceUrn;
+          sliceUrn = newSliceUrn;
       next = newNext;
     }
 
@@ -33,15 +35,15 @@ package
 
     override public function start(credential : Credential) : Operation
     {
-		opName = "Resolving sliver";
-		op.reset(Geni.resolveResource);
-	      op.addField("urn", cm.getSliverUrn());
-	      op.addField("credentials", new Array(cm.getSliver()));
-	      op.setExactUrl(cm.getUrl());
-		  return op;
+                opName = "Resolving sliver";
+                op.reset(Geni.resolveResource);
+              op.addField("urn", cm.getSliverUrn());
+              op.addField("credentials", new Array(cm.getSliver()));
+              op.setExactUrl(cm.getUrl());
+                  return op;
     }
 
-        override public function fail() : Request
+        override public function fail(event : ErrorEvent) : Request
         {
            return next;
         }
@@ -52,20 +54,20 @@ package
       var result : Request = next;
       if (code == 0)
       {
-		var rspec = new XML(response.value.manifest);
-		var links : Array = new Array();
-		for each(var component:XML in rspec.children())
-		{
-			if(component.localName() == "node")
-			{
-				Main.getConsole().appendText("\nAdding node ... " + Main.menu.getComponent(component.@component_urn, cm.getName(), true) + "\n");
-			}
-			else if(component.localName() == "link")
-			{
-				links.push(component);
-			}
-		}
-		// TODO: Process links after nodes to make sure the nodes exist
+                var rspec = new XML(response.value.manifest);
+                var links : Array = new Array();
+                for each(var component:XML in rspec.children())
+                {
+                        if(component.localName() == "node")
+                        {
+                                Main.getConsole().appendText("\nAdding node ... " + Main.menu.getComponent(component.@component_urn, cm.getName(), true) + "\n");
+                        }
+                        else if(component.localName() == "link")
+                        {
+                                links.push(component);
+                        }
+                }
+                // TODO: Process links after nodes to make sure the nodes exist
       }
       else
       {
@@ -75,7 +77,7 @@ package
     }
 
     private var cm : ComponentManager;
-	private var sliceUrn : String;
+        private var sliceUrn : String;
     private var next : Request;
   }
 }
