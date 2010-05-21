@@ -62,7 +62,7 @@ sub InitOpenflowAttributes($$$)
     # Add openflow arrtibutes:
     my $query_result =
 	DBQueryWarn("select ofenabled, ofcontroller from virt_lans ".
-		    "where exptidx=$exptidx and vname='$vname'");
+		    "where exptidx='$exptidx' and vname='$vname'");
     return 0
 	if (!$query_result);	
     ($ofenabled, $ofcontroller) = $query_result->fetchrow_array()
@@ -77,7 +77,7 @@ sub InitOpenflowAttributes($$$)
     # Process 'ofenabled':
     $query_result =
 	DBQueryWarn("select attrvalue from lan_attributes ".
-		    "where lanid=$lanid and attrkey='ofenabled'");
+		    "where lanid='$lanid' and attrkey='ofenabled'");
     return 0
 	if (!$query_result);
     if (!$query_result->numrows)
@@ -85,7 +85,7 @@ sub InitOpenflowAttributes($$$)
 	$safe_val = DBQuoteSpecial($ofenabled);
 	$query_result =
 	    DBQueryWarn("replace into lan_attributes set ".
-			"  lanid=$lanid, ".
+			"  lanid='$lanid', ".
 			"  attrkey='ofenabled', ".
 			"  attrvalue=$safe_val, ".
 			"  attrtype='integer'");
@@ -96,7 +96,7 @@ sub InitOpenflowAttributes($$$)
     # Process 'ofcontroller':
     $query_result =
 	DBQueryWarn("select attrvalue from lan_attributes ".
-		    "where lanid=$lanid and attrkey='ofcontroller'");
+		    "where lanid='$lanid' and attrkey='ofcontroller'");
     return 0
 	if (!$query_result);
     if (!$query_result->numrows)
@@ -104,7 +104,7 @@ sub InitOpenflowAttributes($$$)
 	$safe_val = DBQuoteSpecial($ofcontroller);
 	$query_result =
 	    DBQueryWarn("replace into lan_attributes set ".
-			"  lanid=$lanid, ".
+			"  lanid='$lanid', ".
 			"  attrkey='ofcontroller', ".
 			"  attrvalue=$safe_val, ".
 			"  attrtype='string'");
@@ -115,7 +115,7 @@ sub InitOpenflowAttributes($$$)
     # Process 'oflistener':
     $query_result =
 	DBQueryWarn("select attrvalue from lan_attributes ".
-		    "where lanid=$lanid and attrkey='oflistener'");
+		    "where lanid='$lanid' and attrkey='oflistener'");
     return 0
 	if (!$query_result);
     if (!$query_result->numrows)
@@ -123,7 +123,7 @@ sub InitOpenflowAttributes($$$)
 	$safe_val = DBQuoteSpecial("");
 	$query_result =
 	    DBQueryWarn("replace into lan_attributes set ".
-			"  lanid=$lanid, ".
+			"  lanid='$lanid', ".
 			"  attrkey='oflistener', ".
 			"  attrvalue=$safe_val, ".
 			"  attrtype='string'");
@@ -195,7 +195,7 @@ sub Lookup($$;$$)
     $self->{"EXPT"}  = $experiment;
 
     return undef
-    	if (!Lan->InitOpenflowAttributes($arg1, $arg2, $lanid));
+    	if (!Lan->InitOpenflowAttributes($self->{'LAN'}->{'exptidx'}, $self->{'LAN'}->{'vname'}, $lanid));
 
     #
     # Grab the attributes for this lan now.
