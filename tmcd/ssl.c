@@ -320,19 +320,16 @@ tmcd_sslaccept(int sock, struct sockaddr *addr, socklen_t *addrlen, int ms)
 	if (! (ssl = SSL_new(ctx))) {
 		tmcd_sslerror();
 		err = EIO;
-		printf("mark 1\n");
 		goto badauth;
 	}
 	if (! SSL_set_fd(ssl, newsock)) {
 		tmcd_sslerror();
 		err = EIO;
-		printf("mark 1\n");
 		goto badauth;
 	}
 	if (SSL_accept(ssl) <= 0) {
 		tmcd_sslerror();
 		err = EAUTH;
-		printf("mark 1\n");
 		goto badauth;
 	}
 	
