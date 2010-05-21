@@ -7,6 +7,7 @@
 use strict;
 use English;
 use Getopt::Std;
+use Data::Dumper;
 
 #
 # Update DB.
@@ -57,16 +58,21 @@ BEGIN
 {
     eval "require emdbi";
     if ($@) {
-	unshift(@INC, "@prefix@/lib");
+	if (-e "../Makeconf") {
+	    # Prior to first install or running from object dir.
+	    unshift(@INC, "../db");
+	    unshift(@INC, "@top_srcdir@/install");
+	    unshift(@INC, "@top_srcdir@/tbsetup");
+	    unshift(@INC, "../tbsetup");
+	}
+	else {
+	    unshift(@INC, "@prefix@/lib");
+	}
     }
 }
 use emdb;
 use libtestbed;
 use libinstall;
-
-# Need this below.
-my $objdir = `/bin/pwd`;
-chomp($objdir);
 
 #
 # Parse command arguments.

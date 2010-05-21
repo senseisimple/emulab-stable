@@ -23,4 +23,25 @@ int tmcd_tpm_free(void);
 typedef unsigned char TPM_NONCE[TPM_NONCE_BYTES];
 int tmcd_tpm_generate_nonce(unsigned char*);
 
+/*
+ * Quote verifying stuff
+ */
+struct signed_pcomp {
+	unsigned char fixed[8];
+	/* Hash of PCR composite */
+	unsigned char comphash[20];
+	TPM_NONCE nonce;
+};
+
+/* Help for navigating around a PCR composite - they are variable length
+ * depending on how many PCRs you request in the quote */
+#define	PCOMP_PCRMASK_LEN	0
+#define	PCOMP_PCRMASK		2
+#define	PCOMP_PCRBLOB_LEN	4
+#define	PCOMP_PCRBLOB		8
+
+#define	PCOMP_PCR_LEN		20
+#define	PCOMP_PCRMASK_BITS	16
+
+
 #endif		

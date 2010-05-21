@@ -76,6 +76,11 @@
 #define XSTRINGIFY(s)   STRINGIFY(s)
 #define STRINGIFY(s)	#s
 
+/* XXX backward compat */
+#ifndef TBCOREDIR
+#define	TBCOREDIR	TBROOT "/tmp"
+#endif
+
 /* socket read/write timeouts in ms */
 #define READTIMO	3000
 #define WRITETIMO	3000
@@ -204,6 +209,7 @@ typedef struct {
 } tmcdreq_t;
 static int	iptonodeid(struct in_addr, tmcdreq_t *, char*);
 static int	checkdbredirect(tmcdreq_t *);
+static int	verify_quote(char *, ssize_t, char *, ssize_t, TPM_NONCE);
 
 #ifdef EVENTSYS
 int			myevent_send(address_tuple_t address);
@@ -393,7 +399,6 @@ struct command {
 	{ "tpmpubkey",	  FULLCONFIG_ALL, 0, dotpmpubkey },
 	{ "tpmdummy",	  FULLCONFIG_ALL, F_REQTPM, dotpmdummy },
 	{ "dhcpdconf",	  FULLCONFIG_ALL, 0, dodhcpdconf },
-	{ "securestate",  FULLCONFIG_NONE, F_REQTPM, dosecurestate},
 	{ "securestate",  FULLCONFIG_NONE, F_REMREQSSL, dosecurestate},
 	{ "quoteprep",    FULLCONFIG_NONE, F_REMREQSSL, doquoteprep},
 };
@@ -505,7 +510,11 @@ main(int argc, char **argv)
 		loginit(0, 0);
 	else {
 		/* Become a daemon */
-		daemon(0, 0);
+		if (chdir(TBCOREDIR)) {
+			daemon(0, 0);
+		} else {
+			daemon(1, 0);
+		}
 		loginit(1, "tmcd");
 	}
 	info("daemon starting (version %d)\n", CURRENT_VERSION);
@@ -1345,6 +1354,124 @@ static int checkcerts(char *nid)
 	X509_free(remote);
 
 	return ret;
+}
+
+/*
+ * Verify that a quote is what we expect it to be.  We need SHA1 hashing to do
+ * this so we require SSL.
+ *
+ * XXX: Are quotes failing to verify tmcd errors?
+ */
+static int verify_quote(char *quote, ssize_t quotelen, char *pcomp,
+    ssize_t pcomplen, TPM_NONCE nonce)
+{
+#ifdef	WITHSSL
+	struct signed_pcomp sp;
+
+	unsigned short pcrmlen;
+	unsigned short wantpcrs;
+	/* XXX: The pcr mask is supposedly variable length but really 2 bytes
+	 * in practice */
+	unsigned short pcrm;
+	uint32_t pcrlen;
+	int i, c, pcrtot = 0;
+	unsigned char *pcr, *idkey;
+	unsigned char hash[20];
+
+	if (!quote) {
+		error("NULL quote to %s\n", __FUNCTION__);
+		return 0;
+	}
+	if (!pcomp) {
+		error("NULL pcomp to %s\n", __FUNCTION__);
+		return 0;
+	}
+	if (!nonce) {
+		error("NULL nonce to %s\n", __FUNCTION__);
+		return 0;
+	}
+
+	pcrmlen = ntohs(pcomp[PCOMP_PCRMASK_LEN]);
+	pcrlen = ntohl(pcomp[PCOMP_PCRBLOB_LEN]);
+	/* Some sanity - 28 bytes is the smallest quote size possible on our
+	 * TPMs.
+	 * XXX: We do not deal with variable length pcr masks yet (it is
+	 * probably useless unless you want to quote the dynamic pcrs). */
+	i = pcrmlen + pcrlen + sizeof(short) + sizeof(uint32_t);
+	if (pcrmlen != 2 || i != pcomplen || pcomplen < 28) {
+		error("Corrupt quote blob; unexpected quote size\n");
+		error("pcr mask len: %d, pcomplen: %d, calculated len: %d\n",
+		    pcrmlen, pcomplen, i);
+		return 0;
+	}
+	pcrm = pcomp[PCOMP_PCRMASK];
+	for (i = 0; i < PCOMP_PCRMASK_BITS; i++)
+		if (pcrm & (1 << i))
+			pcrtot++;
+
+	if (pcrlen != pcrtot * PCOMP_PCR_LEN) {
+		error("Corrupt quote blob; pcrlen %d, should be: %d\n", pcrlen,
+		    pcrtot * PCOMP_PCR_LEN);
+		return 0;
+	}
+
+	/* Check that it includes the PCRs we want */
+	// TODO: Get wantpcr from some state
+	//wantpcrs = ?
+	if ((pcrm & wantpcrs) != wantpcrs) {
+		error("Missing required PCRs; wantpcr: %x pcrmask: %x\n",
+		    wantpcrs, pcrm);
+		return 0;
+	}
+
+	/* Make sure that the PCRs are what we expect them to be.  Dig up
+	 * required PCRs */
+	for (i = 0, c = 0; i < PCOMP_PCRMASK_BITS; i++) {
+		if (pcrm & (1 << i)) {
+			// TODO: Get required PCR values from state
+			//pcr = ?
+			if (memcmp(&pcomp[PCOMP_PCRBLOB + PCOMP_PCR_LEN * c++],
+			    pcr, PCOMP_PCR_LEN))
+				error("PCR %d doesn't match\n", i);
+				return 0;
+		}
+	}
+
+	/* SHA1 pcomp and stuff it into struct _signed_comp */
+	sp.fixed[0] = 1; sp.fixed[1] = 1;
+	sp.fixed[2] = 0; sp.fixed[3] = 0;
+	sp.fixed[4] = 'Q'; sp.fixed[5] = 'U';
+	sp.fixed[6] = 'O'; sp.fixed[7] = 'T';
+
+	if (tmcd_quote_hash(&pcomp, pcomplen, &sp.comphash)) {
+		error("Error hashing pcr composite\n");
+		return 0;
+	}
+
+	memcpy(&sp.nonce, nonce, TPM_NONCE_BYTES);
+
+	/* SHA1 _signed_comp */
+	if (tmcd_quote_hash(&sp, sizeof(sp), hash)) {
+		error("Error hashing signed pcomp\n");
+		return 0;
+	}
+
+	/* Verify that quote is indeed a signature of the SHA1 of
+	 * _signed_comp */
+	// TODO: We also need it's identity key to verify the signature
+	// idkey = ?
+	if (!tmcd_quote_verifysig(hash, quote, quotelen, idkey)) {
+		error("Signature check failed\n");
+		return 0;
+	}
+
+	/* They survived the gauntlet! */
+	return 1;
+
+#else
+	error("Can't verify quotes without SSL\n");
+	return 0;
+#endif
 }
 
 /*
@@ -4316,9 +4443,12 @@ COMMAND_PROTOTYPE(dostate)
 COMMAND_PROTOTYPE(dosecurestate)
 {
 	char 		newstate[128];	/* More then we will ever need */
-        char            quote[1024];    /* TODO: Big enough? */
+        char            quote[512];
+        char            pcomp[256];
+	ssize_t		pcomplen, quotelen;
         int             quote_passed;
         char            result[16];
+	TPM_NONCE	nonce;
 
 #ifdef EVENTSYS
 	address_tuple_t tuple;
@@ -4327,18 +4457,21 @@ COMMAND_PROTOTYPE(dosecurestate)
 	/*
 	 * Dig out state that the node is reporting and the quote
 	 */
-	if (sscanf(rdata, "%128s %1024s", newstate, quote) != 1 ||
-	    strlen(newstate) == sizeof(newstate) || strlen(quote) == sizeof(quote)) {
+	if (sscanf(rdata, "%128s %512s %256s", newstate, quote, pcomp) != 2 ||
+	    strlen(newstate) == sizeof(newstate) ||
+	    strlen(quote) == sizeof(quote) || strlen(pcomp) == sizeof(pcomp)) {
 		error("DOSECURESTATE: %s: Bad arguments\n", reqp->nodeid);
 		return 1;
 	}
 
         /*
          * Parse and check the quote
+         *
+	 * quote and pcomp both come from the client's TPM - they are both
+	 * returned from the quote operation.  We must dig up our nonce again.
          */
-        // TODO: Fill in!
-        // For now, just pretend the quote passed
-        quote_passed = 1;
+	// Convert quote and pcomp to binary
+        quote_passed = verify_quote(quote, quotelen, pcomp, pcomplen, nonce);
 
 #ifdef EVENTSYS
 	/*
@@ -4756,7 +4889,8 @@ mydb_query(char *query, int ncols, ...)
 
 	va_start(ap, ncols);
 	n = vsnprintf(querybuf, sizeof(querybuf), query, ap);
-	if (n > sizeof(querybuf)) {
+	va_end(ap);
+	if (n >= sizeof(querybuf)) {
 		error("query too long for buffer\n");
 		return (MYSQL_RES *) 0;
 	}
@@ -4812,7 +4946,8 @@ mydb_update(char *query, ...)
 
 	va_start(ap, query);
 	n = vsnprintf(querybuf, sizeof(querybuf), query, ap);
-	if (n > sizeof(querybuf)) {
+	va_end(ap);
+	if (n >= sizeof(querybuf)) {
 		error("query too long for buffer\n");
 		return 1;
 	}
@@ -5048,7 +5183,14 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp, char* nodekey)
 	if (row[4] && row[5]) {
 		strncpy(reqp->pid, row[4], sizeof(reqp->pid));
 		strncpy(reqp->eid, row[5], sizeof(reqp->eid));
-		reqp->exptidx = atoi(row[25]);
+		if (row[25])
+			reqp->exptidx = atoi(row[25]);
+		else {
+			error("iptonodeid: %s: in non-existent experiment %s/%s!\n",
+			      inet_ntoa(ipaddr), reqp->pid, reqp->eid);
+			mysql_free_result(res);
+			return 1;
+		}
 		reqp->allocated = 1;
 
 		if (row[6])
@@ -8472,16 +8614,15 @@ COMMAND_PROTOTYPE(dotpmblob)
 			"where node_id='%s' ",
 			1, reqp->nodeid);
 
-	if (!res){
+	if (!res) {
 		error("gettpmblob: %s: DB error getting tpmblob\n",
-			reqp->nodeid);
+		      reqp->nodeid);
 		return 1;
 	}
 
 	nrows = mysql_num_rows(res);
-
-	if (!nrows){
-		error("%s: no tpmblob in database for this node.\n",
+	if (!nrows) {
+		error("%s: no node_hostkeys info in the database!\n",
 			reqp->nodeid);
 		mysql_free_result(res);
 		return 1;
@@ -8489,23 +8630,25 @@ COMMAND_PROTOTYPE(dotpmblob)
 
 	row = mysql_fetch_row(res);
 	nlen = mysql_fetch_lengths(res);
-	if (!nlen || !nlen[0]){
-		error("%s: invalid blob length.\n",
-			reqp->nodeid);
+	if (!nlen || !nlen[0]) {
 		mysql_free_result(res);
+#if 0 /* not an error yet */
+		error("%s: no TPM blob.\n", reqp->nodeid);
 		return 1;
+#endif
+		return 0;
 	}
 
 	bufp += OUTPUT(bufp, bufe - bufp,
-		(hex ? "BLOBHEX=" : "BLOB="));
-	if (hex){
+		       (hex ? "BLOBHEX=" : "BLOB="));
+	if (hex) {
 		for (i = 0;i < nlen[0];++i)
 			bufp += OUTPUT(bufp, bufe - bufp,
-				"%.02x", (0xff & ((char)*(row[0]+i))));
-	} else{
+				       "%.02x", (0xff & ((char)*(row[0]+i))));
+	} else {
 		for (i = 0;i < nlen[0];++i)
 			bufp += OUTPUT(bufp, bufe - bufp,
-				"%c", (char)*(row[0]+i));
+				       "%c", (char)*(row[0]+i));
 	}
 	bufp += OUTPUT(bufp, bufe - bufp, "\n");
 
@@ -8533,13 +8676,22 @@ COMMAND_PROTOTYPE(dotpmpubkey)
 	}
 	nrows = mysql_num_rows(res);
 	if (!nrows) {
-		error("%s: no tpmx509 in database for this node.\n",
+		error("%s: no node_hostkeys info in the database!\n",
 			reqp->nodeid);
 		mysql_free_result(res);
 		return 1;
 	}
 
 	row = mysql_fetch_row(res);
+	if (!row || !row[0]) {
+		mysql_free_result(res);
+#if 0 /* not an error yet */
+		error("%s: no x509 cert.\n", reqp->nodeid);
+		return 1;
+#endif
+		return 0;
+	}
+
 	OUTPUT(buf, sizeof(buf), "TPMPUB=%s\n", row[0]);
 
 	client_writeback(sock, buf, strlen(buf), tcp);

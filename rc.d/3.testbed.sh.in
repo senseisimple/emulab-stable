@@ -132,9 +132,6 @@ case "$1" in
 		if [ -r /var/run/checkup_daemon.pid ]; then
 			kill `cat /var/run/checkup_daemon.pid`
 		fi
-		if [ -r /var/run/checkup_daemon.pid ]; then
-			kill `cat /var/run/checkup_daemon.pid`
-		fi
 		if [ -r /var/run/pool_daemon.pid ]; then
 			kill `cat /var/run/pool_daemon.pid`
 		fi
@@ -149,6 +146,9 @@ case "$1" in
 		fi
 		if [ -r /var/run/checknodes.pid ]; then
 			kill `cat /var/run/checknodes.pid`
+		fi
+		if [ -r /var/run/checknodes_daemon.pid ]; then
+			kill `cat /var/run/checknodes_daemon.pid`
 		fi
 		if [ -r /var/run/batch_daemon_wrapper.pid ]; then
 			kill `cat /var/run/batch_daemon_wrapper.pid`

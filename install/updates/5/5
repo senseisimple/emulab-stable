@@ -51,19 +51,46 @@ sub InstallUpdate($$)
     if ($phase eq "post") {
 	Phase "daemons", "Restarting daemons", sub {
 	    Phase "reload_daemon", "Restarting reload_daemon", sub {
+		# Old version of daemon still running.
+		if (! -e "$VARRUN/reload_daemon.pid" &&
+		    !ExecQuiet("pgrep -f reload_daemon")) {
+		    ExecQuietFatal("pkill -f reload_daemon");
+		}
 		RestartDaemon("reload_daemon");
 	    };
 	    Phase "checkup_daemon", "Restarting checkup_daemon", sub {
+		# Old version of daemon still running.
+		if (! -e "$VARRUN/checkup_daemon.pid" &&
+		    !ExecQuiet("pgrep -f checkup_daemon")) {
+		    ExecQuietFatal("pkill -f checkup_daemon");
+		}
 		RestartDaemon("checkup_daemon");
 	    };
 	    Phase "pool_daemon", "Restarting pool_daemon", sub {
+		# Old version of daemon still running.
+		if (! -e "$VARRUN/pool_daemon.pid" &&
+		    !ExecQuiet("pgrep -f pool_daemon")) {
+		    ExecQuietFatal("pkill -f pool_daemon");
+		}
 		RestartDaemon("pool_daemon");
 	    };
 	    Phase "expire_daemon", "Restarting expire_daemon", sub {
-		RestartDaemon("expire_daemon");
+		# Old version of daemon still running.
+		if (! -e "$VARRUN/expire_daemon.pid" &&
+		    !ExecQuiet("pgrep -f expire_daemon")) {
+		    ExecQuietFatal("pkill -f expire_daemon");
+		}
+		RestartDaemon("expire_daemon",
+			      "$TBROOT/sbin/protogeni/expire_daemon");
 	    };
 	    Phase "sa_daemon", "Restarting sa_daemon", sub {
-		RestartDaemon("sa_daemon");
+		# Old version of daemon still running.
+		if (! -e "$VARRUN/sa_daemon.pid" &&
+		    !ExecQuiet("pgrep -f sa_daemon")) {
+		    ExecQuietFatal("pkill -f sa_daemon");
+		}
+		RestartDaemon("sa_daemon",
+			      "$TBROOT/sbin/protogeni/sa_daemon");
 	    };
 	    PhaseSucceed("Daemons Restarted");
 	};

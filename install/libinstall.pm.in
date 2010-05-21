@@ -588,8 +588,8 @@ sub HUPDaemon($) {
 #
 # Restart a daemon if running. Do not start if not running.
 #
-sub RestartDaemon($) {
-    my ($name) = @_;
+sub RestartDaemon($;$) {
+    my ($name, $path) = @_;
 
     my $pidfile = "$VARRUN/${name}.pid";
 
@@ -604,7 +604,10 @@ sub RestartDaemon($) {
 	return 1;
     }
     SignalDaemon($name, 'TERM');
-    if (ExecQuiet("$TBROOT/sbin/$name")) {
+    sleep(1);
+    $path = "$TBROOT/sbin/$name"
+	if (!defined($path));
+    if (ExecQuiet($path) == 0) {
 	PhaseSucceed("$name started");
     }
     PhaseFail("Could not start $name");

@@ -28,7 +28,9 @@
 #include <unistd.h>
 #include <netdb.h>
 #include <openssl/engine.h>
+#include <openssl/rsa.h>
 #include <openssl/ssl.h>
+#include <openssl/sha.h>
 #include <openssl/err.h>
 #include "decls.h"
 #include "ssl.h"
@@ -142,8 +144,10 @@ tmcd_server_sslinit(void)
 	/*
 	 * Make it so the client must provide authentication.
 	 */
-	SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER |
-			   SSL_VERIFY_FAIL_IF_NO_PEER_CERT, 0);
+	/*SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER |
+			   SSL_VERIFY_FAIL_IF_NO_PEER_CERT, 0);*/
+	/* Disable required client auth for our experiment... */
+	SSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, 0);
 
 	/*
 	 * No session caching! Useless and eats up memory.
@@ -650,6 +654,35 @@ tmcd_sslrowtocert(char *in, char *nid)
 	}
 
 	return local;
+}
+
+/*
+ * SHA1 hashes src of length len and stores the result at dst.  dst must be at
+ * least 20 bytes long.
+ */
+int
+tmcd_quote_hash(void *src, size_t len, void *dst)
+{
+	if (SHA1(src, len, dst) == NULL)
+		return 1;
+	return 0;
+}
+
+/*
+ * Verifies that buffer sig of length siglen is indeed the buffer final
+ * encrypted with the private key to pubkey (or checks the signature of buffer
+ * sig).
+ *
+ * Returns 1 if the signature verified, 0 if it failed
+ */
+int
+tmcd_quote_verifysig(void *final, void *sig, size_t siglen, void *pubkey)
+{
+	RSA *rsa;
+	// TODO: Turn pubkey into an rsa key - will rob libtpm functions for
+	// this
+
+	return RSA_verify(NID_sha1, final, 20, sig, siglen, rsa);
 }
 
 /*

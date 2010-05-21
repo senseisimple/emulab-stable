@@ -161,9 +161,15 @@ while (1) {
     my @informtbopsfatal = ();
     my @informtbopswarn  = ();
     my @tmp = ();
+    my $disabled;
 
     print "Running at ".
 	POSIX::strftime("20%y-%m-%d %H:%M:%S", localtime()) . "\n";
+
+    if (! TBGetSiteVar("web/nologins", \$disabled) || $disabled) {
+	print "  Skipping this loop cause of nologins\n";
+	goto loop;
+    }
 
     #
     # Look for nodes in a wierd state. Lets test them.
