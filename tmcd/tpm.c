@@ -14,6 +14,8 @@
 #include <sys/time.h>
 #include <unistd.h>
 #include <strings.h>
+#include <string.h>
+#include <netinet/in.h>
 
 static unsigned int nonce_counter = 0;
 
@@ -30,6 +32,10 @@ static unsigned int nonce_counter = 0;
 #endif	/* TPM */
 
 #include "tpm.h"
+
+#ifdef WITHSSL
+#include "ssl.h"
+#endif
 
 EVP_PKEY *tpmk;
 
