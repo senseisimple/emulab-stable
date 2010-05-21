@@ -4332,6 +4332,16 @@ COMMAND_PROTOTYPE(dosecurestate)
         char            result[16];
 	TPM_NONCE	nonce;
 
+	MYSQL_RES	*res;
+	MYSQL_ROW	row;
+	int		nrows;
+        unsigned long   *nlen;
+
+        int             i,j;
+
+        unsigned short  wantpcrs;
+        TPM_PCR         *pcrs;
+
 #ifdef EVENTSYS
 	address_tuple_t tuple;
 #endif
@@ -4347,6 +4357,111 @@ COMMAND_PROTOTYPE(dosecurestate)
 	}
 
         /*
+         * Pull the nonce out, verify the exipration date, and clear it so that
+         * it can't be used again.
+         * XXX: Quote state
+         */
+	res = mydb_query("select nonce, (expires >= UNIX_TIMESTAMP), "
+			"from nonces "
+			"where node_id='%s' and purpose='state-%s'",
+			1, reqp->nodeid,newstate);
+	if (!res){
+		error("securestate: %s: DB error getting nonce\n",
+			reqp->nodeid);
+		return 1;
+	}
+
+	nrows = mysql_num_rows(res);
+
+	if (!nrows){
+		error("%s: no nonce in database for this node.\n",
+			reqp->nodeid);
+		mysql_free_result(res);
+                // XXX: return error to client
+		return 1;
+	}
+
+        // Delete from the database so that it can't be used again
+	mydb_update("delete from nonces where node_id='%s' and "
+                "purpose='state-%s' ", reqp->nodeid,newstate);
+
+
+        row = mysql_fetch_row(res);
+	nlen = mysql_fetch_lengths(res);
+        // XXX: Check to make sure the expire check is working
+        if (!row[1]) {
+            error("SECUREQUOTE: %s: Nonce is expired\n");
+            mysql_free_result(res);
+            // XXX: return error to client
+            return 1;
+        }
+
+        // Have to covert the hex representation in the database back into
+        // simple binary
+        if (nlen[0] != TPM_NONCE_BYTES * 2) {
+            error("SECUREQUOTE: %s: Nonce length is incorrect (%d)",
+                    reqp->nodeid, nlen[0]);
+        }
+        for (i = 0; i < TPM_NONCE_BYTES; i++) {
+            if (scanf(row[0] + (i*2),"%2x",nonce[i]) != 1) {
+                error("SECUREQUOTE: %s: Error parsing nonce\n", reqp->nodeid);
+                mysql_free_result(res);
+                // XXX: return error to client
+                return 1;
+            }
+        }
+
+        mysql_free_result(res);
+
+        /*
+         * Make a list of the PCR values we need to have verified
+         */
+	res = mydb_query("select q.pcr,q.value from nodes as n "
+			"left join tpm_quote_values as q "
+                        "on n.op_mode = q.op_mode "
+			"where n.node_id='%s' and q.state ='%s'",
+			1, reqp->nodeid,newstate);
+	if (!res){
+		error("quoteprep: %s: DB error getting pcr list\n",
+			reqp->nodeid);
+		return 1;
+	}
+
+	nrows = mysql_num_rows(res);
+
+	if (!nrows){
+		error("%s: no TPM quote values in database for state %s\n",
+			reqp->nodeid,newstate);
+		mysql_free_result(res);
+		return 1;
+	}
+
+        wantpcrs = 0;
+        pcrs = malloc(nrows*sizeof(TPM_PCR));
+        for (i = 0; i < nrows; i++) {
+            int pcr;
+
+            row = mysql_fetch_row(res);
+            // XXX: Check for nonsensical values for the pcr index
+            // XXX: Check for nlen...
+            // XXX: Check for proper PCR size
+            pcr = atoi(row[0]);
+            wantpcrs |= (1 << pcr);
+            for (j = 0; j < TPM_PCR_BYTES; j++) {
+                if (scanf(row[1] + (j*2),"%2x",pcrs[j][i]) != 1) {
+                    error("SECUREQUOTE: %s: Error parsing PCR\n", reqp->nodeid);
+                    free(pcrs);
+                    mysql_free_result(res);
+                    // XXX: return error to client
+                    return 1;
+                }
+            }
+
+        }
+
+        mysql_free_result(res);
+
+        /*
          * Parse and check the quote
          *
 	 * quote and pcomp both come from the client's TPM - they are both
@@ -4354,7 +4469,9 @@ COMMAND_PROTOTYPE(dosecurestate)
          */
 	// Convert quote and pcomp to binary
         quote_passed = tmcd_tpm_verify_quote(quote, quotelen, pcomp, pcomplen,
-                nonce);
+                nonce, wantpcrs, pcrs);
+
+        free(pcrs);
 
 #ifdef EVENTSYS
 	/*

@@ -189,19 +189,20 @@ tmcd_tpm_generate_nonce(unsigned char *nonce)
  * Returns 1 if the quote is valid, 0 otherwise.
  */
 int tmcd_tpm_verify_quote(char *quote, ssize_t quotelen, char *pcomp,
-    ssize_t pcomplen, TPM_NONCE nonce)
+    ssize_t pcomplen, TPM_NONCE nonce, unsigned short wantpcrs,
+    TPM_PCR *pcrs
+    )
 {
 #ifdef	WITHSSL
 	struct signed_pcomp sp;
 
 	unsigned short pcrmlen;
-	unsigned short wantpcrs;
 	/* XXX: The pcr mask is supposedly variable length but really 2 bytes
 	 * in practice */
 	unsigned short pcrm;
 	uint32_t pcrlen;
 	int i, c, pcrtot = 0;
-	unsigned char *pcr, *idkey;
+	unsigned char *idkey;
 	unsigned char hash[20];
 
 	if (!quote) {
@@ -256,10 +257,12 @@ int tmcd_tpm_verify_quote(char *quote, ssize_t quotelen, char *pcomp,
 		if (pcrm & (1 << i)) {
 			// TODO: Get required PCR values from state
 			//pcr = ?
-			if (memcmp(&pcomp[PCOMP_PCRBLOB + PCOMP_PCR_LEN * c++],
-			    pcr, PCOMP_PCR_LEN))
+			if (memcmp(&pcomp[PCOMP_PCRBLOB + PCOMP_PCR_LEN * c],
+			    pcrs[c], PCOMP_PCR_LEN)) {
 				error("PCR %d doesn't match\n", i);
 				return 0;
+                        }
+                        c++;
 		}
 	}
 
