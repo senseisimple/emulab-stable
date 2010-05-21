@@ -332,7 +332,7 @@ sub LoadFromFile($$)
 	} elsif( $line =~ /^\s+Authority Information Access:\s*$/ ) {
 	    $accessinfo = 1;
 	} elsif( $altname ) {
-	    m'^\s*URI:([-!#$%()*+,./0-9:;=?@A-Z_a-z~]+)\s*$' and $alturi = $1
+	    m'^\s*URI:(urn:publicid:[-!#$%()*+,./0-9:;=?@A-Z_a-z~]+)\s*$' and $alturi = $1
 		foreach split( /, /, $line );
 	    $altname = 0;
 	} elsif( $accessinfo ) {
