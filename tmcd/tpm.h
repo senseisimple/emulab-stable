@@ -20,7 +20,7 @@ int tmcd_tpm_free(void);
  * Nonce-related functions
  */
 #define TPM_NONCE_BYTES 0x14 // 160 bits
-#define TPM_PCR_BYTES 0x15 // 160 bits
+#define TPM_PCR_BYTES 0x14 // 160 bits
 typedef unsigned char TPM_NONCE[TPM_NONCE_BYTES];
 typedef unsigned char TPM_PCR[TPM_PCR_BYTES];
 int tmcd_tpm_generate_nonce(unsigned char*);

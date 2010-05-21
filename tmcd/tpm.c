@@ -190,8 +190,7 @@ tmcd_tpm_generate_nonce(unsigned char *nonce)
  */
 int tmcd_tpm_verify_quote(char *quote, ssize_t quotelen, char *pcomp,
     ssize_t pcomplen, TPM_NONCE nonce, unsigned short wantpcrs,
-    TPM_PCR *pcrs, unsigned char *idkey
-    )
+    TPM_PCR *pcrs, unsigned char *idkey)
 {
 #ifdef	WITHSSL
 	struct signed_pcomp sp;
