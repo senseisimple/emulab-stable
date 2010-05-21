@@ -3763,6 +3763,8 @@ CREATE TABLE `virt_lans` (
   `trace_endnode` tinyint(1) NOT NULL default '0',
   `trace_db` tinyint(1) NOT NULL default '0',
   `fixed_iface` varchar(128) default '',
+  `ofenabled` tinyint(1) default '0',
+  `ofcontroller` tinytext,
   PRIMARY KEY  (`exptidx`,`vname`,`vnode`,`vport`),
   UNIQUE KEY `vport` (`pid`,`eid`,`vname`,`vnode`,`vport`),
   KEY `pid` (`pid`,`eid`,`vname`),
