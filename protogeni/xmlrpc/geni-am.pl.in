@@ -141,9 +141,14 @@ if (exists($ENV{'SSL_CLIENT_S_DN_CN'}) &&
     $ENV{'GENIUSER'} = $ENV{'SSL_CLIENT_S_DN_CN'};
     $ENV{'GENIUUID'} = $ENV{'SSL_CLIENT_S_DN_CN'};
 }
-else {
-    XMLError(-1, "Invalid certificate; no UUID");
-}
+# Ignore the lack of UUID, they are going away.
+#else {
+#    XMLError(-1, "Invalid certificate; no UUID");
+#}
+
+# Furthermore, disable UUID checks in GeniCredential
+use GeniCredential;
+$GeniCredential::CHECK_UUID = 0;
 
 #
 # The CERT data from apache holds the URN of the caller. 
@@ -162,8 +167,8 @@ if (exists($ENV{'SSL_CLIENT_CERT'})) {
 	XMLError(-1, "Error decoding certificate:" . $decoded->error);
     }
     foreach my $tmp (@{ $decoded->SubjectAltName }) {
-	if ($tmp =~ /^uniformResourceIdentifier=(.*)$/ ||
-	    $tmp =~ /^(urn:.*)$/) {
+	if ($tmp =~ /^uniformResourceIdentifier=(urn:publicid:.*)$/ ||
+	    $tmp =~ /^(urn:publicid:.*)$/) {
 	    $ENV{'GENIURN'} = $1;
 	}
     }
