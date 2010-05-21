@@ -190,7 +190,7 @@ tmcd_tpm_generate_nonce(unsigned char *nonce)
  */
 int tmcd_tpm_verify_quote(char *quote, ssize_t quotelen, char *pcomp,
     ssize_t pcomplen, TPM_NONCE nonce, unsigned short wantpcrs,
-    TPM_PCR *pcrs
+    TPM_PCR *pcrs, unsigned char *idkey
     )
 {
 #ifdef	WITHSSL
@@ -202,7 +202,6 @@ int tmcd_tpm_verify_quote(char *quote, ssize_t quotelen, char *pcomp,
 	unsigned short pcrm;
 	uint32_t pcrlen;
 	int i, c, pcrtot = 0;
-	unsigned char *idkey;
 	unsigned char hash[20];
 
 	if (!quote) {
@@ -243,8 +242,6 @@ int tmcd_tpm_verify_quote(char *quote, ssize_t quotelen, char *pcomp,
 	}
 
 	/* Check that it includes the PCRs we want */
-	// TODO: Get wantpcr from some state
-	//wantpcrs = ?
 	if ((pcrm & wantpcrs) != wantpcrs) {
 		error("Missing required PCRs; wantpcr: %x pcrmask: %x\n",
 		    wantpcrs, pcrm);
@@ -255,8 +252,6 @@ int tmcd_tpm_verify_quote(char *quote, ssize_t quotelen, char *pcomp,
 	 * required PCRs */
 	for (i = 0, c = 0; i < PCOMP_PCRMASK_BITS; i++) {
 		if (pcrm & (1 << i)) {
-			// TODO: Get required PCR values from state
-			//pcr = ?
 			if (memcmp(&pcomp[PCOMP_PCRBLOB + PCOMP_PCR_LEN * c],
 			    pcrs[c], PCOMP_PCR_LEN)) {
 				error("PCR %d doesn't match\n", i);
@@ -287,8 +282,6 @@ int tmcd_tpm_verify_quote(char *quote, ssize_t quotelen, char *pcomp,
 
 	/* Verify that quote is indeed a signature of the SHA1 of
 	 * _signed_comp */
-	// TODO: We also need it's identity key to verify the signature
-	// idkey = ?
 	if (!tmcd_quote_verifysig(hash, quote, quotelen, idkey)) {
 		error("Signature check failed\n");
 		return 0;

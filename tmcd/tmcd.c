@@ -4327,6 +4327,8 @@ COMMAND_PROTOTYPE(dosecurestate)
 	char 		newstate[128];	/* More then we will ever need */
         char            quote[512];
         char            pcomp[256];
+        unsigned char   quote_bin[256];
+        unsigned char   pcomp_bin[128];
 	ssize_t		pcomplen, quotelen;
         int             quote_passed;
         char            result[16];
@@ -4352,21 +4354,48 @@ COMMAND_PROTOTYPE(dosecurestate)
 	if (sscanf(rdata, "%128s %512s %256s", newstate, quote, pcomp) != 2 ||
 	    strlen(newstate) == sizeof(newstate) ||
 	    strlen(quote) == sizeof(quote) || strlen(pcomp) == sizeof(pcomp)) {
-		error("DOSECURESTATE: %s: Bad arguments\n", reqp->nodeid);
+		error("SECURESTATE: %s: Bad arguments\n", reqp->nodeid);
 		return 1;
 	}
+        
+        // Have to covert the hex representations of quote and pcomp into
+        // simple binary
+        if ((strlen(quote) % 2) != 0) {
+            error("SECURESTATE: %s: Malformed quote: odd length\n");
+            return 1;
+        }
+        quotelen = strlen(quote)/2;
+        for (i = 0; i < quotelen; i++) {
+            if (scanf(quote+(i*2),"%2x",quote_bin[i]) != 1) {
+                error("SECURESTATE: %s: Error parsing quote\n", reqp->nodeid);
+                // XXX: return error to client
+                return 1;
+            }
+        }
+
+        if ((strlen(pcomp) % 2) != 0) {
+            error("SECURESTATE: %s: Malformed pcomp: odd length\n");
+            return 1;
+        }
+        pcomplen = strlen(pcomp)/2;
+        for (i = 0; i < pcomplen; i++) {
+            if (scanf(pcomp+(i*2),"%2x",pcomp_bin[i]) != 1) {
+                error("SECURESTATE: %s: Error parsing pcomp\n", reqp->nodeid);
+                // XXX: return error to client
+                return 1;
+            }
+        }
 
         /*
          * Pull the nonce out, verify the exipration date, and clear it so that
          * it can't be used again.
-         * XXX: Quote state
          */
-	res = mydb_query("select nonce, (expires >= UNIX_TIMESTAMP), "
+	res = mydb_query("select nonce, (expires >= UNIX_TIMESTAMP()), "
 			"from nonces "
 			"where node_id='%s' and purpose='state-%s'",
 			1, reqp->nodeid,newstate);
 	if (!res){
-		error("securestate: %s: DB error getting nonce\n",
+		error("SECURESTATE: %s: DB error getting nonce\n",
 			reqp->nodeid);
 		return 1;
 	}
@@ -4389,8 +4418,8 @@ COMMAND_PROTOTYPE(dosecurestate)
         row = mysql_fetch_row(res);
 	nlen = mysql_fetch_lengths(res);
         // XXX: Check to make sure the expire check is working
-        if (!row[1]) {
-            error("SECUREQUOTE: %s: Nonce is expired\n");
+        if (strcmp(row[1],"1") != 0) {
+            error("SECURESTATE: %s: Nonce is expired\n");
             mysql_free_result(res);
             // XXX: return error to client
             return 1;
@@ -4399,12 +4428,12 @@ COMMAND_PROTOTYPE(dosecurestate)
         // Have to covert the hex representation in the database back into
         // simple binary
         if (nlen[0] != TPM_NONCE_BYTES * 2) {
-            error("SECUREQUOTE: %s: Nonce length is incorrect (%d)",
+            error("SECURESTATE: %s: Nonce length is incorrect (%d)",
                     reqp->nodeid, nlen[0]);
         }
         for (i = 0; i < TPM_NONCE_BYTES; i++) {
             if (scanf(row[0] + (i*2),"%2x",nonce[i]) != 1) {
-                error("SECUREQUOTE: %s: Error parsing nonce\n", reqp->nodeid);
+                error("SECURESTATE: %s: Error parsing nonce\n", reqp->nodeid);
                 mysql_free_result(res);
                 // XXX: return error to client
                 return 1;
@@ -4422,7 +4451,7 @@ COMMAND_PROTOTYPE(dosecurestate)
 			"where n.node_id='%s' and q.state ='%s'",
 			1, reqp->nodeid,newstate);
 	if (!res){
-		error("quoteprep: %s: DB error getting pcr list\n",
+		error("SECURESTATE: %s: DB error getting pcr list\n",
 			reqp->nodeid);
 		return 1;
 	}
@@ -4449,7 +4478,7 @@ COMMAND_PROTOTYPE(dosecurestate)
             wantpcrs |= (1 << pcr);
             for (j = 0; j < TPM_PCR_BYTES; j++) {
                 if (scanf(row[1] + (j*2),"%2x",pcrs[j][i]) != 1) {
-                    error("SECUREQUOTE: %s: Error parsing PCR\n", reqp->nodeid);
+                    error("SECURESTATE: %s: Error parsing PCR\n", reqp->nodeid);
                     free(pcrs);
                     mysql_free_result(res);
                     // XXX: return error to client
@@ -4462,15 +4491,54 @@ COMMAND_PROTOTYPE(dosecurestate)
         mysql_free_result(res);
 
         /*
+         * Get the identity key for vertification purposes
+         */
+	res = mydb_query("select tpmidentity "
+			"from node_hostkeys "
+			"where node_id='%s' ",
+			1, reqp->nodeid);
+
+	if (!res){
+		error("quoteprep: %s: DB error getting tpmidentity\n",
+			reqp->nodeid);
+                free(pcrs);
+		return 1;
+	}
+
+	nrows = mysql_num_rows(res);
+
+	if (!nrows){
+		error("%s: no tpmidentity in database for this node.\n",
+			reqp->nodeid);
+                free(pcrs);
+		mysql_free_result(res);
+		return 1;
+	}
+
+	row = mysql_fetch_row(res);
+	nlen = mysql_fetch_lengths(res);
+	if (!nlen || !nlen[0]){
+		error("%s: invalid identity length.\n",
+			reqp->nodeid);
+                free(pcrs);
+		mysql_free_result(res);
+		return 1;
+	}
+
+        // NOTE: Do *not* free the mysql result until *after* the call to
+        // verify, as we're passing the identiy key directly from the SQL
+        // result.
+
+        /*
          * Parse and check the quote
          *
 	 * quote and pcomp both come from the client's TPM - they are both
 	 * returned from the quote operation.  We must dig up our nonce again.
          */
-	// Convert quote and pcomp to binary
-        quote_passed = tmcd_tpm_verify_quote(quote, quotelen, pcomp, pcomplen,
-                nonce, wantpcrs, pcrs);
+        quote_passed = tmcd_tpm_verify_quote(quote_bin, quotelen, pcomp_bin,
+                pcomplen, nonce, wantpcrs, pcrs, row[0]);
 
+	mysql_free_result(res);
         free(pcrs);
 
 #ifdef EVENTSYS
@@ -4484,8 +4552,9 @@ COMMAND_PROTOTYPE(dosecurestate)
 		return 1;
 	}
 
-        // XXX: We probably need to indicate that we securely verified the
-        // state, right?
+        // TODO: It might be nice to mark in the event that it was verified
+        // securely, but the connection to the event server is secure, and
+        // we'll refuse the insecure state command for secure states.
 	tuple->host      = BOSSNODE;
 	tuple->objtype   = "TBNODESTATE";
 	tuple->objname	 = reqp->nodeid;

@@ -46,6 +46,6 @@ struct signed_pcomp {
 #define	PCOMP_PCRMASK_BITS	16
 
 int tmcd_tpm_verify_quote(char *, ssize_t, char *, ssize_t, TPM_NONCE,
-        unsigned short, TPM_PCR*);
+        unsigned short, TPM_PCR*, unsigned char*);
 
 #endif		
