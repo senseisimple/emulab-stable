@@ -294,3 +294,97 @@ int tmcd_tpm_verify_quote(char *quote, ssize_t quotelen, char *pcomp,
 	return 0;
 #endif
 }
+
+/*
+ * Key extracting functions
+ *
+ * I use these to verify quotes.  We must extract the identity key from the key
+ * blob.  I took these from libtpm.
+ *
+ * XXX: I'll minimize these functions later.
+ */
+#define LOAD32(buffer,offset)         ( ntohl(*(uint32_t *)&buffer[offset]) )
+#define LOAD16(buffer,offset)         ( ntohs(*(uint16_t *)&buffer[offset]) )
+#define TPM_U16_SIZE                   2
+#define TPM_U32_SIZE                   4
+
+int tpm_extract_key(unsigned char *keybuff, struct keydata * k)
+{
+	int offset;
+	int pubkeylen;
+
+	/* fill in  keydata structure */
+	offset = 0;
+	memcpy(k->version, keybuff + offset, sizeof(k->version));
+	offset += 4;
+	k->keyusage = LOAD16(keybuff, offset);
+	offset += TPM_U16_SIZE;
+	k->keyflags = LOAD32(keybuff, offset);
+	offset += TPM_U32_SIZE;
+	k->authdatausage = keybuff[offset];
+	offset += 1;
+	pubkeylen = tpm_extract_pubkey(keybuff + offset, &(k->pub), 1);
+	offset += pubkeylen;
+	k->privkeylen = LOAD32(keybuff, offset);
+	offset += TPM_U32_SIZE;
+	if (k->privkeylen > 0 && k->privkeylen <= 1024)
+		memcpy(k->encprivkey, keybuff + offset, k->privkeylen);
+	offset += k->privkeylen;
+	return offset;
+}
+
+static int tpm_extract_pubkey(unsigned char *keybuff, struct pubkeydata *k,
+    int pcrpresent)
+{
+	uint32_t parmsize;
+	uint32_t pcrisize;
+
+	int offset;
+
+	offset = 0;
+	k->algorithm = LOAD32(keybuff, offset);
+	offset += TPM_U32_SIZE;
+	k->encscheme = LOAD16(keybuff, offset);
+	offset += TPM_U16_SIZE;
+	k->sigscheme = LOAD16(keybuff, offset);
+	offset += TPM_U16_SIZE;
+	parmsize = LOAD32(keybuff, offset);
+	offset += TPM_U32_SIZE;
+	if (k->algorithm == 0x00000001 && parmsize > 0) {	/* RSA */
+		k->keybitlen = LOAD32(keybuff, offset);
+		offset += TPM_U32_SIZE;
+		k->numprimes = LOAD32(keybuff, offset);
+		offset += TPM_U32_SIZE;
+		k->expsize = LOAD32(keybuff, offset);
+		offset += TPM_U32_SIZE;
+	} else {
+		offset += parmsize;
+	}
+	if (k->expsize == 3) {
+		k->exponent[0] = *(keybuff + offset + 0);
+		k->exponent[1] = *(keybuff + offset + 1);
+		k->exponent[2] = *(keybuff + offset + 2);
+		offset += k->expsize;
+	} else if (k->expsize != 0)
+		offset += k->expsize;
+	else {
+		k->exponent[0] = 0x01;
+		k->exponent[1] = 0x00;
+		k->exponent[2] = 0x01;
+		k->expsize = 3;
+	}
+	if (pcrpresent) {
+		pcrisize = LOAD32(keybuff, offset);
+		offset += TPM_U32_SIZE;
+		if (pcrisize > 0 && pcrisize <= 256)
+			memcpy(k->pcrinfo, keybuff + offset, pcrisize);
+		offset += pcrisize;
+		k->pcrinfolen = pcrisize;
+	}
+	k->keylength = LOAD32(keybuff, offset);
+	offset += TPM_U32_SIZE;
+	if (k->keylength > 0 && k->keylength <= 256)
+		memcpy(k->modulus, keybuff + offset, k->keylength);
+	offset += k->keylength;
+	return offset;
+}
