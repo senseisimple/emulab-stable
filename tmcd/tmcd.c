@@ -4357,7 +4357,7 @@ COMMAND_PROTOTYPE(dosecurestate)
 		error("SECURESTATE: %s: Bad arguments\n", reqp->nodeid);
 		return 1;
 	}
-        
+
         // Have to covert the hex representations of quote and pcomp into
         // simple binary
         if ((strlen(quote) % 2) != 0) {
@@ -4365,8 +4365,9 @@ COMMAND_PROTOTYPE(dosecurestate)
             return 1;
         }
         quotelen = strlen(quote)/2;
+        printf("quotelen is %d\n",quotelen);
         for (i = 0; i < quotelen; i++) {
-            if (scanf(quote+(i*2),"%2x",quote_bin[i]) != 1) {
+            if (sscanf(quote+(i*2),"%2x",&(quote_bin[i])) != 1) {
                 error("SECURESTATE: %s: Error parsing quote\n", reqp->nodeid);
                 // XXX: return error to client
                 return 1;
@@ -4379,7 +4380,7 @@ COMMAND_PROTOTYPE(dosecurestate)
         }
         pcomplen = strlen(pcomp)/2;
         for (i = 0; i < pcomplen; i++) {
-            if (scanf(pcomp+(i*2),"%2x",pcomp_bin[i]) != 1) {
+            if (sscanf(pcomp+(i*2),"%2x",&(pcomp_bin[i])) != 1) {
                 error("SECURESTATE: %s: Error parsing pcomp\n", reqp->nodeid);
                 // XXX: return error to client
                 return 1;
@@ -4390,10 +4391,10 @@ COMMAND_PROTOTYPE(dosecurestate)
          * Pull the nonce out, verify the exipration date, and clear it so that
          * it can't be used again.
          */
-	res = mydb_query("select nonce, (expires >= UNIX_TIMESTAMP()), "
+	res = mydb_query("select nonce, (expires >= UNIX_TIMESTAMP()) "
 			"from nonces "
 			"where node_id='%s' and purpose='state-%s'",
-			1, reqp->nodeid,newstate);
+			2, reqp->nodeid,newstate);
 	if (!res){
 		error("SECURESTATE: %s: DB error getting nonce\n",
 			reqp->nodeid);
@@ -4432,7 +4433,7 @@ COMMAND_PROTOTYPE(dosecurestate)
                     reqp->nodeid, nlen[0]);
         }
         for (i = 0; i < TPM_NONCE_BYTES; i++) {
-            if (scanf(row[0] + (i*2),"%2x",nonce[i]) != 1) {
+            if (sscanf(row[0] + (i*2),"%2x",&(nonce[i])) != 1) {
                 error("SECURESTATE: %s: Error parsing nonce\n", reqp->nodeid);
                 mysql_free_result(res);
                 // XXX: return error to client
@@ -4448,8 +4449,9 @@ COMMAND_PROTOTYPE(dosecurestate)
 	res = mydb_query("select q.pcr,q.value from nodes as n "
 			"left join tpm_quote_values as q "
                         "on n.op_mode = q.op_mode "
-			"where n.node_id='%s' and q.state ='%s'",
-			1, reqp->nodeid,newstate);
+			"where n.node_id='%s' and q.state ='%s' "
+                        "order by q.pcr",
+			2, reqp->nodeid,newstate);
 	if (!res){
 		error("SECURESTATE: %s: DB error getting pcr list\n",
 			reqp->nodeid);
@@ -4477,7 +4479,7 @@ COMMAND_PROTOTYPE(dosecurestate)
             pcr = atoi(row[0]);
             wantpcrs |= (1 << pcr);
             for (j = 0; j < TPM_PCR_BYTES; j++) {
-                if (scanf(row[1] + (j*2),"%2x",pcrs[i][j]) != 1) {
+                if (sscanf(row[1] + (j*2),"%2x",&(pcrs[i][j])) != 1) {
                     error("SECURESTATE: %s: Error parsing PCR\n", reqp->nodeid);
                     free(pcrs);
                     mysql_free_result(res);
@@ -4637,7 +4639,8 @@ COMMAND_PROTOTYPE(doquoteprep)
 	res = mydb_query("select q.pcr from nodes as n "
 			"left join tpm_quote_values as q "
                         "on n.op_mode = q.op_mode "
-			"where n.node_id='%s' and q.state ='%s'",
+			"where n.node_id='%s' and q.state ='%s' "
+                        "order by q.pcr",
 			1, reqp->nodeid,newstate);
 	if (!res){
 		error("quoteprep: %s: DB error getting pcr list\n",
