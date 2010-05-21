@@ -17,6 +17,8 @@ int		tmcd_sslwrite(int sock, const void *buf, size_t nbytes);
 int		tmcd_sslread(int sock, void *buf, size_t nbytes);
 int		tmcd_sslclose(int sock);
 int		tmcd_sslverify_client(char *, char *, char *, int);
+int		tmcd_quote_hash(void *, size_t, void *);
+int		tmcd_quote_verifysig(void *, void *, size_t, void *);
 X509*		tmcd_sslgetpeercert(void);
 X509*		tmcd_sslrowtocert(char*, char*);
 int		isssl;
