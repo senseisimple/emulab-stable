@@ -209,7 +209,6 @@ typedef struct {
 } tmcdreq_t;
 static int	iptonodeid(struct in_addr, tmcdreq_t *, char*);
 static int	checkdbredirect(tmcdreq_t *);
-static int	verify_quote(char *, ssize_t, char *, ssize_t, TPM_NONCE);
 
 #ifdef EVENTSYS
 int			myevent_send(address_tuple_t address);
@@ -1356,123 +1355,6 @@ static int checkcerts(char *nid)
 	return ret;
 }
 
-/*
- * Verify that a quote is what we expect it to be.  We need SHA1 hashing to do
- * this so we require SSL.
- *
- * XXX: Are quotes failing to verify tmcd errors?
- */
-static int verify_quote(char *quote, ssize_t quotelen, char *pcomp,
-    ssize_t pcomplen, TPM_NONCE nonce)
-{
-#ifdef	WITHSSL
-	struct signed_pcomp sp;
-
-	unsigned short pcrmlen;
-	unsigned short wantpcrs;
-	/* XXX: The pcr mask is supposedly variable length but really 2 bytes
-	 * in practice */
-	unsigned short pcrm;
-	uint32_t pcrlen;
-	int i, c, pcrtot = 0;
-	unsigned char *pcr, *idkey;
-	unsigned char hash[20];
-
-	if (!quote) {
-		error("NULL quote to %s\n", __FUNCTION__);
-		return 0;
-	}
-	if (!pcomp) {
-		error("NULL pcomp to %s\n", __FUNCTION__);
-		return 0;
-	}
-	if (!nonce) {
-		error("NULL nonce to %s\n", __FUNCTION__);
-		return 0;
-	}
-
-	pcrmlen = ntohs(pcomp[PCOMP_PCRMASK_LEN]);
-	pcrlen = ntohl(pcomp[PCOMP_PCRBLOB_LEN]);
-	/* Some sanity - 28 bytes is the smallest quote size possible on our
-	 * TPMs.
-	 * XXX: We do not deal with variable length pcr masks yet (it is
-	 * probably useless unless you want to quote the dynamic pcrs). */
-	i = pcrmlen + pcrlen + sizeof(short) + sizeof(uint32_t);
-	if (pcrmlen != 2 || i != pcomplen || pcomplen < 28) {
-		error("Corrupt quote blob; unexpected quote size\n");
-		error("pcr mask len: %d, pcomplen: %d, calculated len: %d\n",
-		    pcrmlen, pcomplen, i);
-		return 0;
-	}
-	pcrm = pcomp[PCOMP_PCRMASK];
-	for (i = 0; i < PCOMP_PCRMASK_BITS; i++)
-		if (pcrm & (1 << i))
-			pcrtot++;
-
-	if (pcrlen != pcrtot * PCOMP_PCR_LEN) {
-		error("Corrupt quote blob; pcrlen %d, should be: %d\n", pcrlen,
-		    pcrtot * PCOMP_PCR_LEN);
-		return 0;
-	}
-
-	/* Check that it includes the PCRs we want */
-	// TODO: Get wantpcr from some state
-	//wantpcrs = ?
-	if ((pcrm & wantpcrs) != wantpcrs) {
-		error("Missing required PCRs; wantpcr: %x pcrmask: %x\n",
-		    wantpcrs, pcrm);
-		return 0;
-	}
-
-	/* Make sure that the PCRs are what we expect them to be.  Dig up
-	 * required PCRs */
-	for (i = 0, c = 0; i < PCOMP_PCRMASK_BITS; i++) {
-		if (pcrm & (1 << i)) {
-			// TODO: Get required PCR values from state
-			//pcr = ?
-			if (memcmp(&pcomp[PCOMP_PCRBLOB + PCOMP_PCR_LEN * c++],
-			    pcr, PCOMP_PCR_LEN))
-				error("PCR %d doesn't match\n", i);
-				return 0;
-		}
-	}
-
-	/* SHA1 pcomp and stuff it into struct _signed_comp */
-	sp.fixed[0] = 1; sp.fixed[1] = 1;
-	sp.fixed[2] = 0; sp.fixed[3] = 0;
-	sp.fixed[4] = 'Q'; sp.fixed[5] = 'U';
-	sp.fixed[6] = 'O'; sp.fixed[7] = 'T';
-
-	if (tmcd_quote_hash(&pcomp, pcomplen, &sp.comphash)) {
-		error("Error hashing pcr composite\n");
-		return 0;
-	}
-
-	memcpy(&sp.nonce, nonce, TPM_NONCE_BYTES);
-
-	/* SHA1 _signed_comp */
-	if (tmcd_quote_hash(&sp, sizeof(sp), hash)) {
-		error("Error hashing signed pcomp\n");
-		return 0;
-	}
-
-	/* Verify that quote is indeed a signature of the SHA1 of
-	 * _signed_comp */
-	// TODO: We also need it's identity key to verify the signature
-	// idkey = ?
-	if (!tmcd_quote_verifysig(hash, quote, quotelen, idkey)) {
-		error("Signature check failed\n");
-		return 0;
-	}
-
-	/* They survived the gauntlet! */
-	return 1;
-
-#else
-	error("Can't verify quotes without SSL\n");
-	return 0;
-#endif
-}
 
 /*
  * Accept notification of reboot.
@@ -4471,7 +4353,8 @@ COMMAND_PROTOTYPE(dosecurestate)
 	 * returned from the quote operation.  We must dig up our nonce again.
          */
 	// Convert quote and pcomp to binary
-        quote_passed = verify_quote(quote, quotelen, pcomp, pcomplen, nonce);
+        quote_passed = tmcd_tpm_verify_quote(quote, quotelen, pcomp, pcomplen,
+                nonce);
 
 #ifdef EVENTSYS
 	/*
