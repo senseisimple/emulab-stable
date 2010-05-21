@@ -393,7 +393,6 @@ struct command {
 	{ "tpmpubkey",	  FULLCONFIG_ALL, 0, dotpmpubkey },
 	{ "tpmdummy",	  FULLCONFIG_ALL, F_REQTPM, dotpmdummy },
 	{ "dhcpdconf",	  FULLCONFIG_ALL, 0, dodhcpdconf },
-	{ "securestate",  FULLCONFIG_NONE, F_REQTPM, dosecurestate},
 	{ "securestate",  FULLCONFIG_NONE, F_REMREQSSL, dosecurestate},
 	{ "quoteprep",    FULLCONFIG_NONE, F_REMREQSSL, doquoteprep},
 };
