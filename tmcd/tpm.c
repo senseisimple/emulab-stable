@@ -190,8 +190,7 @@ tmcd_tpm_generate_nonce(unsigned char *nonce)
  */
 int tmcd_tpm_verify_quote(char *quote, ssize_t quotelen, char *pcomp,
     ssize_t pcomplen, TPM_NONCE nonce, unsigned short wantpcrs,
-    TPM_PCR *pcrs
-    )
+    TPM_PCR *pcrs)
 {
 #ifdef	WITHSSL
 	struct signed_pcomp sp;
@@ -255,8 +254,6 @@ int tmcd_tpm_verify_quote(char *quote, ssize_t quotelen, char *pcomp,
 	 * required PCRs */
 	for (i = 0, c = 0; i < PCOMP_PCRMASK_BITS; i++) {
 		if (pcrm & (1 << i)) {
-			// TODO: Get required PCR values from state
-			//pcr = ?
 			if (memcmp(&pcomp[PCOMP_PCRBLOB + PCOMP_PCR_LEN * c],
 			    pcrs[c], PCOMP_PCR_LEN)) {
 				error("PCR %d doesn't match\n", i);

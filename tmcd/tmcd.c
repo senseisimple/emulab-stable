@@ -4349,7 +4349,7 @@ COMMAND_PROTOTYPE(dosecurestate)
 	/*
 	 * Dig out state that the node is reporting and the quote
 	 */
-	if (sscanf(rdata, "%128s %512s %256s", newstate, quote, pcomp) != 2 ||
+	if (sscanf(rdata, "%128s %512s %256s", newstate, quote, pcomp) != 3 ||
 	    strlen(newstate) == sizeof(newstate) ||
 	    strlen(quote) == sizeof(quote) || strlen(pcomp) == sizeof(pcomp)) {
 		error("DOSECURESTATE: %s: Bad arguments\n", reqp->nodeid);
@@ -4448,7 +4448,7 @@ COMMAND_PROTOTYPE(dosecurestate)
             pcr = atoi(row[0]);
             wantpcrs |= (1 << pcr);
             for (j = 0; j < TPM_PCR_BYTES; j++) {
-                if (scanf(row[1] + (j*2),"%2x",pcrs[j][i]) != 1) {
+                if (scanf(row[1] + (j*2),"%2x",pcrs[i][j]) != 1) {
                     error("SECUREQUOTE: %s: Error parsing PCR\n", reqp->nodeid);
                     free(pcrs);
                     mysql_free_result(res);
