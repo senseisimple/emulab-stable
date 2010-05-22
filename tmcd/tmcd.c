@@ -3212,7 +3212,7 @@ COMMAND_PROTOTYPE(dostartstat)
 	/*
 	 * Dig out the exit status
 	 */
-	if (! sscanf(rdata, "%d", &exitstatus)) {
+	if (rdata == NULL || !sscanf(rdata, "%d", &exitstatus)) {
 		error("STARTSTAT: %s: Invalid status: %s\n",
 		      reqp->nodeid, rdata);
 		return 1;
@@ -3672,7 +3672,7 @@ COMMAND_PROTOTYPE(dosfshostid)
 	 * the buffer.
 	 */
 	sprintf(buf, "%%%ds", (int)sizeof(nodehostid));
-	if (sscanf(rdata, buf, nodehostid) != 1) {
+	if (rdata == NULL || sscanf(rdata, buf, nodehostid) != 1) {
 		error("dosfshostid: No hostid reported!\n");
 		return 1;
 	}
@@ -4248,7 +4248,7 @@ COMMAND_PROTOTYPE(dostate)
 	/*
 	 * Dig out state that the node is reporting
 	 */
-	if (sscanf(rdata, "%128s", newstate) != 1 ||
+	if (rdata == NULL || sscanf(rdata, "%128s", newstate) != 1 ||
 	    strlen(newstate) == sizeof(newstate)) {
 		error("DOSTATE: %s: Bad arguments\n", reqp->nodeid);
 		return 1;
@@ -4351,7 +4351,8 @@ COMMAND_PROTOTYPE(dosecurestate)
 	/*
 	 * Dig out state that the node is reporting and the quote
 	 */
-	if (sscanf(rdata, "%128s %512s %256s", newstate, quote, pcomp) != 3 ||
+	if (rdata == NULL ||
+	    sscanf(rdata, "%128s %512s %256s", newstate, quote, pcomp) != 3 ||
 	    strlen(newstate) == sizeof(newstate) ||
 	    strlen(quote) == sizeof(quote) || strlen(pcomp) == sizeof(pcomp)) {
 		error("SECURESTATE: %s: Bad arguments\n", reqp->nodeid);
@@ -5765,7 +5766,7 @@ COMMAND_PROTOTYPE(dontpdrift)
 	 * Node can be free?
 	 */
 
-	if (sscanf(rdata, "%f", &drift) != 1) {
+	if (rdata == NULL || sscanf(rdata, "%f", &drift) != 1) {
 		error("NTPDRIFT: %s: Bad argument\n", reqp->nodeid);
 		return 1;
 	}
@@ -6439,7 +6440,7 @@ COMMAND_PROTOTYPE(dorusage)
         char            pllogfname[MAXPATHLEN];
         char            timebuf[10];
 
-	if (sscanf(rdata, "LA1=%f LA5=%f LA15=%f DUSED=%f",
+	if (rdata == NULL || sscanf(rdata, "LA1=%f LA5=%f LA15=%f DUSED=%f",
 		   &la1, &la5, &la15, &dused) != 4) {
 		strncpy(buf, rdata, 64);
 		error("RUSAGE: %s: Bad arguments: %s...\n", reqp->nodeid, buf);
@@ -6644,7 +6645,7 @@ COMMAND_PROTOTYPE(dohostinfo)
 	char		*bp, buf[MYBUFSIZE];
 
 	bp = rdata;
-	if (sscanf(bp, "CDVERSION=%31[a-zA-Z0-9-]", buf) == 1) {
+	if (bp == NULL || sscanf(bp, "CDVERSION=%31[a-zA-Z0-9-]", buf) == 1) {
 		if (verbose)
 			info("HOSTINFO CDVERSION=%s\n", buf);
 		if (mydb_update("update nodes set cd_version='%s' "
@@ -7432,7 +7433,7 @@ COMMAND_PROTOTYPE(dotmcctest)
 	/*
 	 * Always allow the test that doesn't tie up a server thread
 	 */
-	if (strncmp(rdata, "noreply", strlen("noreply")) == 0)
+	if (rdata == NULL || strncmp(rdata, "noreply", strlen("noreply")) == 0)
 		return 0;
 
 	/*
@@ -7679,7 +7680,7 @@ COMMAND_PROTOTYPE(dobooterrno)
 	/*
 	 * Dig out errno that the node is reporting
 	 */
-	if (sscanf(rdata, "%d", &myerrno) != 1) {
+	if (rdata == NULL || sscanf(rdata, "%d", &myerrno) != 1) {
 		error("DOBOOTERRNO: %s: Bad arguments\n", reqp->nodeid);
 		return 1;
 	}
@@ -7710,7 +7711,8 @@ COMMAND_PROTOTYPE(dobattery)
 	/*
 	 * Dig out the capacity and voltage, then
 	 */
-	if ((sscanf(rdata,
+	if (rdata == NULL ||
+	    (sscanf(rdata,
 		    "CAPACITY=%f VOLTAGE=%f",
 		    &capacity,
 		    &voltage) != 2) ||
@@ -8099,7 +8101,8 @@ COMMAND_PROTOTYPE(doelvindport)
 	char		buf[MYBUFSIZE];
 	unsigned int	elvport = 0;
 
-	if (sscanf(rdata, "%u",
+	if (rdata == NULL ||
+	    sscanf(rdata, "%u",
 		   &elvport) != 1) {
 		strncpy(buf, rdata, 64);
 		error("ELVIND_PORT: %s: Bad arguments: %s...\n", reqp->nodeid,
@@ -8285,6 +8288,11 @@ COMMAND_PROTOTYPE(doportregister)
 	 * Need to be careful about not overflowing the buffer.
 	 */
 	sprintf(buf, "%%%ds %%d", (int)sizeof(service));
+	if (rdata == NULL) {
+		error("%s: Bad arguments - %s...\n", __FUNCTION__,
+		    reqp->nodeid);
+		return 1;
+	}
 	rc = sscanf(rdata, buf, service, &port);
 
 	if (rc == 0) {
