@@ -314,31 +314,6 @@ int tmcd_tpm_verify_quote(char *quote, ssize_t quotelen, char *pcomp,
 #define TPM_U16_SIZE                   2
 #define TPM_U32_SIZE                   4
 
-int tpm_extract_key(unsigned char *keybuff, struct keydata * k)
-{
-	int offset;
-	int pubkeylen;
-
-	/* fill in  keydata structure */
-	offset = 0;
-	memcpy(k->version, keybuff + offset, sizeof(k->version));
-	offset += 4;
-	k->keyusage = LOAD16(keybuff, offset);
-	offset += TPM_U16_SIZE;
-	k->keyflags = LOAD32(keybuff, offset);
-	offset += TPM_U32_SIZE;
-	k->authdatausage = keybuff[offset];
-	offset += 1;
-	pubkeylen = tpm_extract_pubkey(keybuff + offset, &(k->pub), 1);
-	offset += pubkeylen;
-	k->privkeylen = LOAD32(keybuff, offset);
-	offset += TPM_U32_SIZE;
-	if (k->privkeylen > 0 && k->privkeylen <= 1024)
-		memcpy(k->encprivkey, keybuff + offset, k->privkeylen);
-	offset += k->privkeylen;
-	return offset;
-}
-
 static int tpm_extract_pubkey(unsigned char *keybuff, struct pubkeydata *k,
     int pcrpresent)
 {
@@ -392,5 +367,30 @@ static int tpm_extract_pubkey(unsigned char *keybuff, struct pubkeydata *k,
 	if (k->keylength > 0 && k->keylength <= 256)
 		memcpy(k->modulus, keybuff + offset, k->keylength);
 	offset += k->keylength;
+	return offset;
+}
+
+int tpm_extract_key(unsigned char *keybuff, struct keydata * k)
+{
+	int offset;
+	int pubkeylen;
+
+	/* fill in  keydata structure */
+	offset = 0;
+	memcpy(k->version, keybuff + offset, sizeof(k->version));
+	offset += 4;
+	k->keyusage = LOAD16(keybuff, offset);
+	offset += TPM_U16_SIZE;
+	k->keyflags = LOAD32(keybuff, offset);
+	offset += TPM_U32_SIZE;
+	k->authdatausage = keybuff[offset];
+	offset += 1;
+	pubkeylen = tpm_extract_pubkey(keybuff + offset, &(k->pub), 1);
+	offset += pubkeylen;
+	k->privkeylen = LOAD32(keybuff, offset);
+	offset += TPM_U32_SIZE;
+	if (k->privkeylen > 0 && k->privkeylen <= 1024)
+		memcpy(k->encprivkey, keybuff + offset, k->privkeylen);
+	offset += k->privkeylen;
 	return offset;
 }
