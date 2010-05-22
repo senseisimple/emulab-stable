@@ -4626,12 +4626,11 @@ COMMAND_PROTOTYPE(doquoteprep)
 	 * Dig out state that the node is reporting - we need this so that we
          * can tell it what PCRs to include
 	 */
-	if (sscanf(rdata, "%128s", newstate) != 1 ||
+	if (rdata == NULL || sscanf(rdata, "%128s", newstate) != 1 ||
 	    strlen(newstate) == sizeof(newstate)) {
 		error("DOQUOTEPREP: %s: Bad arguments\n", reqp->nodeid);
 		return 1;
 	}
-
 
         /*
          * Get the set of PCRs that have to be quoted to move into this state.
