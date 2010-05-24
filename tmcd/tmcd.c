@@ -114,6 +114,10 @@ CHECKMASK(char *arg)
 #define HOSTID_SIZE	(32+64)
 #define DEFAULT_DBNAME	TBDBNAME
 
+/* For secure disk loading */
+#define SECURELOAD_OPMODE "SECURELOAD"
+#define SECURELOAD_STATE  "RELOADSETUP"
+
 int		debug = 0;
 static int	verbose = 0;
 static int	insecure = 0;
@@ -4774,7 +4778,7 @@ COMMAND_PROTOTYPE(doimagekey) {
          * probably not a good idea, but the right way to get it isn't clear
          */
         res = mydb_query("select op_mode, eventstate from nodes where "
-                "node_id='%s'",1,requp->nodeid);
+                "node_id='%s'",1,reqp->nodeid);
 
 	if (!res) {
 		error("IMAGEKEY: %s: DB Error getting event state\n",
@@ -4798,7 +4802,7 @@ COMMAND_PROTOTYPE(doimagekey) {
         }
 
         if (strncmp(row[0],SECURELOAD_OPMODE,nlen[0]) ||
-            strncmp(row[1],SECURELOAD_MODE,nlen[1])) {
+            strncmp(row[1],SECURELOAD_STATE,nlen[1])) {
 		error("IMAGEKEY: %s: Node is in the wrong state\n",
                         reqp->nodeid);
 		mysql_free_result(res);
