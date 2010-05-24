@@ -297,6 +297,7 @@ COMMAND_PROTOTYPE(dotpmdummy);
 COMMAND_PROTOTYPE(dodhcpdconf);
 COMMAND_PROTOTYPE(dosecurestate);
 COMMAND_PROTOTYPE(doquoteprep);
+COMMAND_PROTOTYPE(doimagekey);
 
 /*
  * The fullconfig slot determines what routines get called when pushing
@@ -400,6 +401,7 @@ struct command {
 	{ "dhcpdconf",	  FULLCONFIG_ALL, 0, dodhcpdconf },
 	{ "securestate",  FULLCONFIG_NONE, F_REMREQSSL, dosecurestate},
 	{ "quoteprep",    FULLCONFIG_NONE, F_REMREQSSL, doquoteprep},
+	{ "imagekey",     FULLCONFIG_NONE, F_REQTPM, doimagekey},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -4746,6 +4748,103 @@ COMMAND_PROTOTYPE(doquoteprep)
          */
 	client_writeback(sock, buf, bufp - buf, tcp);
 
+        return 0;
+}
+
+/*
+ * Get the decryption key for the image a node is suposed to be loading
+ */
+COMMAND_PROTOTYPE(doimagekey) {
+	char		buf[MYBUFSIZE];
+	char		*bufp = buf;
+	char		*bufe = &buf[MYBUFSIZE];
+
+	MYSQL_RES	*res;
+	MYSQL_ROW	row;
+	int		nrows;
+        unsigned long   *nlen;
+
+        /* No arguments - we don't allow the client to ask for a specific image
+         * key, just the one for the image they are supposed to be loading
+         * according to the database
+         */
+        
+        /*
+         * Make sure that this node is in the right state - hardcoding it is
+         * probably not a good idea, but the right way to get it isn't clear
+         */
+        res = mydb_query("select op_mode, eventstate from nodes where "
+                "node_id='%s'",1,requp->nodeid);
+
+	if (!res) {
+		error("IMAGEKEY: %s: DB Error getting event state\n",
+                        reqp->nodeid);
+		return 1;
+	}
+	if ((nrows = (int)mysql_num_rows(res)) != 1) {
+		error("IMAGEKEY: %s: DB Error getting event state\n",
+                        reqp->nodeid);
+		mysql_free_result(res);
+		return 1;
+	}
+
+	row = mysql_fetch_row(res);
+	nlen = mysql_fetch_lengths(res);
+	if (!nlen) {
+		error("IMAGEKEY: %s: DB Error getting event state\n",
+                        reqp->nodeid);
+		mysql_free_result(res);
+                return 1;
+        }
+
+        if (strncmp(row[0],SECURELOAD_OPMODE,nlen[0]) ||
+            strncmp(row[1],SECURELOAD_MODE,nlen[1])) {
+		error("IMAGEKEY: %s: Node is in the wrong state\n",
+                        reqp->nodeid);
+		mysql_free_result(res);
+                return 1;
+        }
+        mysql_free_result(res);
+
+        /*
+         * Grab and return the key itself
+         */
+	res = mydb_query("select decryption_key from current_reloads as r "
+			 "left join images as i on i.imageid = r.image_id "
+			 "where node_id='%s' order by r.idx",
+			 1, reqp->nodeid);
+	if (!res) {
+		error("IMAGEKEY: %s: DB Error getting key\n", reqp->nodeid);
+		return 1;
+	}
+	if ((nrows = (int)mysql_num_rows(res)) == 0) {
+		info("IMAGEKEY: %s: No current reload for this node\n",
+                        reqp->nodeid);
+		mysql_free_result(res);
+		return 0;
+	}
+
+        // Note: if there is more than one reload, we are only grabbing the
+        // 'most recent' due to the 'order by' clause
+	row = mysql_fetch_row(res);
+	nlen = mysql_fetch_lengths(res);
+
+	if (!nlen || !nlen[0]){
+		error("IMAGEKEY: %s: invalid key length\n",
+			reqp->nodeid);
+		mysql_free_result(res);
+		return 1;
+	}
+        
+        // Print out the KEY= even if the key is empty - this will just
+        // help the client realize there isn't one (as opposed to there being
+        // some error)
+	bufp += OUTPUT(bufp, bufe - bufp, "KEY=");
+        if (row[0] != NULL && nlen[0] > 0) {
+            bufp += OUTPUT(bufp, bufe - bufp, "%s",row[0]);
+        }
+	bufp += OUTPUT(bufp, bufe - bufp, "\n");
+        mysql_free_result(res);
         return 0;
 }
 
