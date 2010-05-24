@@ -92,6 +92,7 @@ static char		nosslbuf[MAXTMCDPACKET];
 static int		nosslbuflen, nosslbufidx;
 static void		tmcd_sslerror();
 static void		tmcd_sslprint(const char *fmt, ...);
+static RSA *		 convpubkey(struct pubkeydata *);
 
 /*
  * Init our SSL context. This is done once, in the parent.
@@ -675,11 +676,45 @@ tmcd_quote_hash(void *src, size_t len, void *dst)
 int
 tmcd_quote_verifysig(void *final, void *sig, size_t siglen, void *pubkey)
 {
+	struct keydata k;
 	RSA *rsa;
-	// TODO: Turn pubkey into an rsa key - will rob libtpm functions for
-	// this
+
+	if (!pubkey) {
+		error("NULL pubkey to %s\n", __FUNCTION__);
+		return 0;
+	}
+
+	/* Cannot fail */
+	tpm_extract_key((char *)pubkey, &k);
+	rsa = convpubkey(&k.pub);
+	if (!rsa) {
+		error("Error extracting and converting key\n");
+		return 0;
+	}
 
 	return RSA_verify(NID_sha1, final, 20, sig, siglen, rsa);
+}
+
+static RSA *
+convpubkey(struct pubkeydata *k)
+{
+	RSA *rsa;
+	BIGNUM *mod;
+	BIGNUM *exp;
+
+	/* create the necessary structures */
+	rsa = RSA_new();
+	mod = BN_new();
+	exp = BN_new();
+	if (rsa == NULL || mod == NULL || exp == NULL)
+		return NULL;
+	/* convert the raw public key values to BIGNUMS */
+	BN_bin2bn(k->modulus, k->keylength, mod);
+	BN_bin2bn(k->exponent, k->expsize, exp);
+	/* set up the RSA public key structure */
+	rsa->n = mod;
+	rsa->e = exp;
+	return rsa;
 }
 
 /*

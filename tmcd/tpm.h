@@ -35,6 +35,31 @@ struct signed_pcomp {
 	TPM_NONCE nonce;
 };
 
+struct pubkeydata {
+	uint32_t algorithm;
+	uint16_t encscheme;
+	uint16_t sigscheme;
+	uint32_t keybitlen;
+	uint32_t numprimes;
+	uint32_t expsize;
+	unsigned char exponent[3];
+	uint32_t keylength;
+	unsigned char modulus[256];
+	uint32_t pcrinfolen;
+	unsigned char pcrinfo[256];
+};
+
+struct keydata {
+	unsigned char version[4];
+	uint16_t keyusage;
+	uint32_t keyflags;
+	unsigned char authdatausage;
+	struct pubkeydata pub;
+	uint32_t privkeylen;
+	unsigned char encprivkey[1024];
+};
+
+
 /* Help for navigating around a PCR composite - they are variable length
  * depending on how many PCRs you request in the quote */
 #define	PCOMP_PCRMASK_LEN	0
@@ -47,5 +72,6 @@ struct signed_pcomp {
 
 int tmcd_tpm_verify_quote(char *, ssize_t, char *, ssize_t, TPM_NONCE,
         unsigned short, TPM_PCR*, unsigned char*);
+int tpm_extract_key(unsigned char *, struct keydata *);
 
 #endif		
