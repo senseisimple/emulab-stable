@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -199,7 +199,10 @@ if ($cmd eq "gc" && defined($pid)) {
 		     "       and pid='$pid' and eid='$eid'");
     
     while (my ($vname,$ip) = $nodes_result->fetchrow_array) {
-	print NT_WRITER "$vname:$ip\n";
+	# not all devices have an IP address on the control net
+	if ($ip) {
+	    print NT_WRITER "$vname:$ip\n";
+	}
     }
 }
 

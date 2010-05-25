@@ -52,6 +52,7 @@ static void
 cleanup()
 {
 	unlink(pidfile);
+	exit(0);
 }
 
 int

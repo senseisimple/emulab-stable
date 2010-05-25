@@ -13,7 +13,7 @@ include $(OBJDIR)/Makeconf
 
 ifeq ($(STANDALONE_CLEARINGHOUSE),0)
 TARGETS	= libinstall.pm boss-install ops-install fs-install dump-descriptors \
-	load-descriptors update-install update-testbed
+	load-descriptors update-install update-testbed testbed-version
 else
 TARGETS = clrhouse-install
 endif
@@ -28,7 +28,8 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 
 install: $(INSTALL_LIBDIR)/libinstall.pm \
 	$(INSTALL_SBINDIR)/update-install \
-	$(INSTALL_SBINDIR)/update-testbed
+	$(INSTALL_SBINDIR)/update-testbed \
+	$(INSTALL_SBINDIR)/testbed-version
 
 clean: 
 	rm -f boss-install ops-install fs-install update-install

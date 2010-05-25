@@ -52,7 +52,9 @@ if (mysql_num_rows($query_result)) {
 					    "isdyn"        => "IsDyn",
 					    "isfed"        => "IsFed",
 					    "issw"         => "IsSwch",
-					    "isjail"       => "IsJail"));
+					    "isjail"       => "IsJail",
+					    "issub"        => "IsSub"
+					    ));
     $rows = array();
     
     while ($row = mysql_fetch_array($query_result)) {
@@ -66,7 +68,9 @@ if (mysql_num_rows($query_result)) {
 			  "isdyn"        => $row["isdynamic"],
 			  "isfed"        => $row["isfednode"],
 			  "issw"         => $row["isswitch"],
-			  "isjail"       => $row["isjailed"]);
+			  "isjail"       => $row["isjailed"],
+			  "issub"        => $row["issubnode"],
+			  );
 
 	$rows[]  = $tablerow;
     }

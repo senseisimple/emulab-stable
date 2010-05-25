@@ -21,6 +21,7 @@ sub InstallUpdate($$)
     if ($phase eq "pre") {
 	Phase "startupfile", "Updating testbed startup file", sub {
 	    DoneIfIdentical("$TOP_OBJDIR/rc.d/3.testbed.sh", $TESTBED_STARTUP);
+	    main::MarkForReboot($version);
 	    DiffFiles("$TOP_OBJDIR/rc.d/3.testbed.sh", $TESTBED_STARTUP);
 	    ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/rc.d install");
 	};

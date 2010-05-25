@@ -62,8 +62,8 @@ endif
 #
 # For installation on boss node
 # 
-boss-install:	install-schemacheck install-sitevarscheck install-dbfillcheck \
-		install-genischemacheck install-subdirs install-mkdirs \
+boss-install:	install-checks \
+		install-subdirs install-mkdirs \
 		install-setbuildinfo
 	@echo "Boss node installed!"
 
@@ -72,9 +72,23 @@ boss-install-force:	install-subdirs install-mkdirs install-setbuildinfo
 	@echo "Boss node installed!"
 
 # Skip only the schema checks, but do the other checks.
-boss-install-noschemacheck: install-sitevarscheck install-dbfillcheck \
+boss-install-noschemacheck: install-updatecheck \
+		install-sitevarscheck install-dbfillcheck \
 		install-genischemacheck install-subdirs install-mkdirs \
 		install-setbuildinfo
+
+# Skip the update check. 
+boss-install-noupdatecheck: install-schemacheck \
+		install-sitevarscheck install-dbfillcheck \
+		install-genischemacheck install-subdirs install-mkdirs \
+		install-setbuildinfo
+
+# Only the checks:
+install-checks: install-updatecheck \
+		install-schemacheck \
+		install-sitevarscheck \
+		install-dbfillcheck install-genischemacheck
+	@echo "Installation checks completed!"
 
 clrhouse-install:	install-subdirs install-mkdirs
 	@echo "CleaingHouse code installed!"
@@ -315,6 +329,42 @@ flashboot-install: destdircheck flashboot
 # tell, you can't put ifeq()'s inside of targets
 #
 ifeq ($(TBROOT),/usr/testbed)
+UPDATETESTBED= @cd $(OBJDIR)/install && perl update-testbed
+else
+UPDATETESTBED= @echo "Skipping update check, since prefix isn't /usr/testbed"
+endif
+ifeq ($(ISMAINSITE),1)
+update-testbed: update-testbed-nostop
+else
+update-testbed:	update-testbed-install
+endif
+
+update-testbed-install:
+	@echo "Updating the testbed ..."
+	$(UPDATETESTBED) -i -s
+
+update-testbed-noinstall:
+	@echo "Updating the testbed ..."
+	$(UPDATETESTBED)
+
+update-testbed-nostop:
+	@echo "Updating the testbed ..."
+	$(UPDATETESTBED) -i
+
+update-testbed-force:
+	@echo "Updating the testbed in force mode ..."
+	$(UPDATETESTBED) -f
+
+ifeq ($(TBROOT),/usr/testbed)
+UPDATECHECK= @cd $(OBJDIR)/install && perl update-testbed -v
+else
+UPDATECHECK= @echo "Skipping update checks, since prefix isn't /usr/testbed"
+endif
+install-updatecheck:
+	@echo "Checking to see if updates need to be run"
+	$(UPDATECHECK)
+
+ifeq ($(TBROOT),/usr/testbed)
 SCHEMACHECK= cd $(OBJDIR)/db && perl schemacheck
 else
 SCHEMACHECK= @echo "Skipping schema check, since prefix isn't /usr/testbed"
@@ -384,7 +434,10 @@ elabinelab:
 # By default, make any target by descending into subdirectories.
 %: %-subdirs ;
 
-.PHONY: post-install install-mkdirs clrhouse-install install
+.PHONY: post-install install-mkdirs clrhouse-install install \
+	boss-install-noupdatecheck boss-install-noschemacheck \
+	boss-install-force update-testbed update-testbed-install \
+	update-testbed-noinstall update-testbed-nostop
 
 # Get rid of a bunch of nasty built-in implicit rules.
 .SUFFIXES:

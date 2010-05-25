@@ -7,6 +7,7 @@
 use strict;
 use English;
 use Getopt::Std;
+use Data::Dumper;
 
 #
 # Update DB.
@@ -16,12 +17,17 @@ sub usage()
     print STDERR "Usage: update-testbed [-v] [-f]\n";
     exit(-1);
 }
-my $optlist = "idsvf";
-my $debug   = 0;
-my $force   = 0;
-my $verify  = 0;
-my $install = 0;
-my $forceopt= "";
+my $optlist   = "idsvfn";
+my $debug     = 0;
+my $force     = 0;
+my $verify    = 0;
+my $install   = 0;
+my $stopbed   = 0;
+my $stopped   = 0;
+my $nologins  = 0;
+my $committed = 0;
+my $impotent  = 0;
+my $forceopt  = "";
 
 #
 # Configure variables
@@ -34,10 +40,13 @@ my $SQLUPDATEDIR = "$SRCDIR/sql/updates";
 my $UPDATEDIR    = "$SRCDIR/install/updates";
 my $DBUPDATE     = "$TB/sbin/dbupdate";
 my $INSTALLUPDATE= "$TB/sbin/update-install";
+my $SETSITEVAR   = "$TB/sbin/setsitevar";
+my $STARTUP      = "/usr/local/etc/rc.d/3.testbed.sh";
 my $tempfile     = "/var/tmp/update.$$";
 
 # Protos
 sub Fatal($);
+sub CheckForReboot();
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
@@ -54,19 +63,17 @@ $| = 1;
 #
 BEGIN
 {
-    eval "require emdbi";
-    if ($@) {
-	if (-e "../Makeconf") {
-	    # Prior to first install or running from object dir.
-	    unshift(@INC, "../db");
-	    unshift(@INC, "@top_srcdir@/install");
-	    unshift(@INC, "@top_srcdir@/tbsetup");
-	    unshift(@INC, "../tbsetup");
-	}
-	require emdbi;
+    if (-e "../Makeconf") {
+	my $objdir = `/bin/pwd`;
+	chomp($objdir);
+	# Prior to first install or running from object dir.
+	unshift(@INC, "$objdir/../db");
+	unshift(@INC, "$objdir/@top_srcdir@/install");
+	unshift(@INC, "$objdir/@top_srcdir@/tbsetup");
+	unshift(@INC, "$objdir/../tbsetup");
     }
 }
-use emdbi;
+use emdb;
 use libtestbed;
 
 #
@@ -89,11 +96,17 @@ if (defined($options{"i"})) {
 if (defined($options{"v"})) {
     $verify = 1;
 }
+if (defined($options{"s"})) {
+    $stopbed = 1;
+}
+if (defined($options{"n"})) {
+    $impotent = 1;
+}
 
 #
 # Must be root if actually doing this.
 #
-if (!$verify && $UID) {
+if (!($verify || $impotent) && $UID) {
     Fatal("This script must be run as root! Maybe use sudo?")
 }
 
@@ -101,8 +114,34 @@ if (! (-e "../db/dbupdate" && -e "./update-install")) {
     Fatal("Cannot find dbupdate script! Running from the object dir?");
 }
 
-my @INCDIRS = ("-I.", "-I../tbsetup", "-I../db",
-	       "-I${SRCDIR}/tbsetup", "-I${SRCDIR}/install");
+my $objdir = `/bin/pwd`;
+chomp($objdir);
+
+my @INCDIRS = ("-I${objdir}", "-I${objdir}/../tbsetup",
+	       "-I${objdir}/../db", 
+	       "-I${objdir}/${SRCDIR}/tbsetup",
+	       "-I${objdir}/${SRCDIR}/install",
+	       # To catch a few extra things that do not normally change.
+	       "-I@prefix@/lib"
+	       );
+
+#
+# Dump the testbed version numbers in all modes.
+#
+print "Testbed version info:\n";
+system("perl @INCDIRS ./testbed-version");
+
+#
+# Impotent mode, just runs the install scripts. 
+#
+if ($impotent) {
+    system("perl @INCDIRS ./update-install -n -p $UPDATEDIR");
+    if ($?) {
+	exit(1);
+    }
+    CheckForReboot();
+    exit(0);
+}
 
 #
 # In verify mode, just run the update scripts in verify.
@@ -131,6 +170,108 @@ if ($verify) {
     exit($exitval);
 }
 
+#
+# Cleanup handler when stopping the testbed.
+#
+sub Restart()
+{
+    if ($committed) {
+	print "*** Update has progressed too far; you must renable by hand\n";
+	return;
+    }
+    if ($stopped) {
+	print "Starting up testbed daemons.\n";
+	system("$STARTUP start");
+	if ($?) {
+	    print "*** Could not restart testbed daemons.\n";
+	    exit(1);
+	}
+	print "\n";
+    }
+    if ($nologins) {
+	print "Turning on the web interface and allowing swaps\n";
+	if (system("$SETSITEVAR web/nologins -") ||
+	    system("$SETSITEVAR web/message -")) {
+	    print "*** Could not renable the web interface and swapping!\n";
+	    exit(1);
+	}
+    }
+}
+
+sub Handler()
+{
+    Restart();
+    exit(1);
+}
+
+if ($stopbed) {
+    $SIG{INT} = \&Handler;
+    
+    #
+    # Stop the testbed before doing the update.
+    #
+    print "** Putting the testbed to sleep before updating ...\n";
+    print "-> Turning off the web interface and disallowing swaps.\n";
+
+    my $msg = "Testbed software update in progress; back in a little while";
+    $msg =~ s|\&|&amp;|g;
+    $msg =~ s|\<|&lt;|g;
+    system("$SETSITEVAR","web/message", $msg);
+    if ($?) {
+	Fatal("Could not update web message");
+    }
+    system("$SETSITEVAR web/nologins 1");
+    if ($?) {
+	Fatal("Could not disable web logins and experiment swaps");
+    }
+    $nologins = 1;
+    
+    print "-> Waiting a few seconds for testbed to quiet down ...\n";
+    sleep(5);
+    print "-> Looking for experiments still in transition.\n";
+
+    #
+    # Look for any experiments in transition, and wait for them to stop.
+    # This could take an arbitrarily long time of course, but its the only
+    # safe way to do it. Don't worry about any experiments that are older
+    # then 24 hours though; they are likely stuck and not going anywhere.
+    #
+    while (1) {
+	my $query_result =
+	    emdb::DBQueryWarn("select pid,eid,idx,state,expt_locked ".
+			"   from experiments ".
+			"where expt_locked is not null and ".
+			"      DATE_SUB(NOW(),INTERVAL 1 DAY) <= expt_locked");
+	if (!$query_result) {
+	    Fatal("Error getting info from the DB. Stopping.");
+	}
+	last
+	    if (!$query_result->numrows());
+
+	print "-> Experiments still in transition:\n";
+	while (my ($pid,$eid,$idx,$state,$expt_locked) =
+	       $query_result->query_result()) {
+
+	    print "  $pid,$eid,$idx -- $state, $expt_locked\n";
+	}
+	print "-> Waiting 30 seconds before trying again. ^C is okay\n\n";
+	sleep(30);
+    }
+    print "** Testbed is quiet; stopping testbed daemons ... \n";
+    system("$STARTUP stop >/dev/null 2>&1");
+    if ($?) {
+	Fatal("Could not stop testbed daemons. Stopping.");
+    }
+    $stopped = 1;
+    print "** Testbed is stopped. Proceeding to update\n";
+
+    #
+    # No going back; we do not want to re-enable the testbed if things fail
+    # from this point on.
+    #
+    $committed = 1;
+}
+
 print "Running DB updates ...\n";
 system("perl @INCDIRS ../db/dbupdate -q -p $SQLUPDATEDIR $DBNAME");
 exit(1)
@@ -145,7 +286,7 @@ if ($install) {
     print "Installing testbed software ... this will take a while!\n";
     print "Output saved to $tempfile\n";
     
-    system("cd ..; gmake boss-install-noupdatecheck >$tempfile 2>&1");
+    system("(cd ..; gmake; gmake boss-install-noupdatecheck) >$tempfile 2>&1");
     if ($?) {
 	exit(1);
     }
@@ -156,12 +297,48 @@ system("perl @INCDIRS ./update-install $forceopt -q -a post -p $UPDATEDIR");
 exit(1)
     if ($?);
 
+if (CheckForReboot()) {
+    exit(0);
+}
+# So we can turn the testbed back on.
+elsif ($stopbed) {
+    $committed = 0;
+    Restart();
+}
 exit(0);
 
 sub Fatal($)
 {
     my ($msg) = @_;
 
+    Restart();
     die("*** $0:\n".
 	"    $msg\n");
+}
+
+#
+# See if a reboot is needed. Typically not, but sometimes it might.
+#
+sub CheckForReboot()
+{
+    my $reboot_query =
+	emdb::DBQueryWarn("select value from version_info ".
+			  "where name='needreboot'");
+    if ($reboot_query->numrows) {
+	my ($needreboot) = $reboot_query->fetchrow_array();
+	if ($needreboot) {
+	    print "********************************************************\n";
+	    print "*\n";
+	    if ($impotent) {
+		print "* THESE UPDATES WILL REQUIRE BOSS REBOOT!\n";
+	    }
+	    else {
+		print "* YOU MUST NOW REBOOT BOSS!\n";
+	    }
+	    print "*\n";
+	    print "********************************************************\n";
+	    return 1;
+	}
+    }
+    return 0;
 }
