@@ -29,7 +29,7 @@ sub usage()
     exit(-1);
 }
 my $optlist  = "id";
-my $debug    = 0;
+my $debug    = 1;
 my $impotent = 0;
 
 #
@@ -261,7 +261,7 @@ foreach my $node (@nodelist) {
     # dynamic in how the modules are loaded/defined, perhaps specified on
     # a per-type basis in the DB.
     #
-    my $object = $MyStruct->TypeCache($node);
+    my $object = $MyStruct->TypeLookup($node);
     if (!defined($object)) {
 	$object = $MyStruct->NewType($type);
 	if (!defined($object)) {
@@ -309,8 +309,12 @@ while (1) {
     # Go through and ask each one for volunteers. 
     #
     foreach my $object (@{ $objects }) {
+	print "Asking $object for volunteers\n"
+	    if ($debug);
 	my @list = $object->Volunteers();
-	last
+	print "$object returns volunteers: @list\n"
+	    if ($debug && @list);
+	next
 	    if (! @list);
 	@nodes = (@nodes, @list);
 	push(@volunteers, [$object, \@list]);
@@ -368,6 +372,7 @@ while (1) {
     }
 
     # And wait. 
+    print STDERR "Waiting for nodes ...\n";
     $MyStruct->WaitForNodes(@nodes);
 
     #

@@ -8,10 +8,16 @@ package libossetup;
 
 use strict;
 use Exporter;
-use vars qw(@ISA @EXPORT $AUTOLOAD $NOSTATE $RELOAD $RECONFIG $REBOOT);
+use vars qw(@EXPORT $AUTOLOAD
+	    $NOSTATE $RELOAD $RECONFIG $REBOOT
+	    $RELOAD_FAILED $RECONFIG_FAILED $REBOOT_FAILED $SETUP_FAILED
+	    $SETUP_OKAY);
+use base qw( Exporter );
 
-@ISA    = "Exporter";
-@EXPORT = qw (die_noretry $NOSTATE $RELOAD $RECONFIG $REBOOT);
+@EXPORT = qw(&die_noretry
+	     $NOSTATE $RELOAD $RECONFIG $REBOOT
+	     $RELOAD_FAILED $RECONFIG_FAILED $REBOOT_FAILED $SETUP_FAILED
+	     $SETUP_OKAY);
 
 use libdb;
 use libtestbed;
@@ -28,11 +34,18 @@ my $TBOPS       = "@TBOPSEMAIL@";
 my $NODEREBOOT  = "$TB/bin/node_reboot";
 my $VNODESETUP  = "$TB/sbin/vnode_setup";
 
-# Flags
+# Setup Operation Flags
 $NOSTATE    = 0x00;
-$RELOAD  = 0x01;
+$RELOAD     = 0x01;
 $RECONFIG   = 0x02;
 $REBOOT     = 0x04;
+
+# Setup Result Flags
+$SETUP_OKAY      = 0x00;
+$RELOAD_FAILED   = 0x01;
+$RECONFIG_FAILED = 0x02;
+$REBOOT_FAILED   = 0x04;
+$SETUP_FAILED    = 0x08;
 
 #
 # Used to die with a -1 return code, to indicate to caller (tbswap)
@@ -78,6 +91,7 @@ sub New($$$@)
 
 	# Init some per-node stuff.
 	$node->_rebooted(0);
+	$node->_vnodecount(0);
     }
 
     bless($self, $class);
@@ -399,10 +413,11 @@ sub SetOS($$)
 		#
 		$self->SetupReload($node, $osinfo);
 	    }
-	    # Remember this for later. 
-	    $node->_bootosinfo($osinfo);
 	}
     }
+    # Remember this for later. 
+    $node->_bootosinfo($osinfo);
+    
     print STDERR "$node_id - $osinfo\n"
 	if ($self->debug());
 }
@@ -410,6 +425,9 @@ sub SetOS($$)
 #
 # Take a list of nodes and fire off the required reloads/reboots/reconfigs
 # in parallel, then wait for finish.
+#
+# This is called in a child (fork) so all state has to be communicated via
+# the DB, back to the parent. See the WaitForNodes() function. 
 #
 sub LightUpNodes($@)
 {
@@ -449,13 +467,10 @@ sub LightUpNodes($@)
 	}
 	print STDERR "$node_id will be $action\n"
 	    if ($self->debug());
-
-	# Mark this nodes as being rebooted for later phases.
-	$node->_rebooted(1);
     }
 
     # XXX Caller wants a list. 
-    return ()
+    return 0
 	if ($self->impotent());
     
     #
@@ -643,6 +658,8 @@ sub WaitForNodes($@)
     #
     foreach my $node (@nodelist) {
 	my $node_id = $node->node_id();
+	my $typehandler = $node->_typehandler();
+	
 	next
 	    if (! ($node->allocstate() eq TBDB_ALLOCSTATE_DOWN() ||
 		   $node->allocstate() eq TBDB_ALLOCSTATE_DEAD()));
@@ -654,9 +671,8 @@ sub WaitForNodes($@)
 
 	tbnotice("Not waiting for $node_id since reload/reboot failed!\n");
 	delete($nodes{$node_id});
-	$self->IncrFailCount();
-	$self->add_failed_node_reload($node_id);
-	$node->_bootstatus(TBDB_NODESTATE_UNKNOWN);
+	$node->_setupstatus($RELOAD_FAILED);
+	$typehandler->WaitDone($node);
     }
 
     #
@@ -706,7 +722,7 @@ sub WaitForNodes($@)
 	    }
 	    if ($node->GetEventState(\$state)) {
 		print STDERR "*** Error getting event state for $node_id.\n";
-		$node->_bootstatus(TBDB_NODESTATE_UNKNOWN);
+		$node->_setupstatus($SETUP_FAILED);
 	      node_error:
 		delete($nodes{$node_id});
 		$typehandler->WaitDone($node);
@@ -714,7 +730,7 @@ sub WaitForNodes($@)
 	    }
 	    if (grep {$_ eq $state} @waitstates) {
 		print "$node_id has reported state $state\n";
-		$node->_bootstatus($state);
+		$node->_setupstatus($SETUP_OKAY);
 	      node_done:
 		delete($nodes{$node_id});
 		$typehandler->WaitDone($node);
@@ -728,13 +744,13 @@ sub WaitForNodes($@)
 		    tbnotice("*** Giving up on $node_id ($state) - ".
 			     "it's been $minutes minute(s).\n");
 
-		    $node->_bootstatus($state);
+		    $node->_setupstatus($SETUP_FAILED);
 		    delete($nodes{$node_id});
 		    $typehandler->WaitDone($node);
 		}
 		else {
 		    if ($typehandler->Retry($node) != 0) {
-			$node->_bootstatus($state);
+			$node->_setupstatus($SETUP_OKAY);
 			delete($nodes{$node_id});
 			$typehandler->WaitDone($node);
 		    }
@@ -762,6 +778,13 @@ sub WaitForNodes($@)
 sub NewType($$)
 {
     my ($self, $type) = @_;
+
+    #
+    # These special cases will eventually be encoded in the DB.
+    #
+    $type = "protogeni"
+	if ($type eq "pcfedphys" || $type eq "pcfed");
+
     my $packname = "libossetup_${type}";
     my $newtype  = eval { $packname->New($self); };
     # Not loaded?
@@ -779,15 +802,24 @@ sub NewType($$)
 #
 # Return the cached type object.
 #
-sub TypeCache($$)
+sub TypeLookup($$)
 {
     my ($self, $node) = @_;
 
-    return $self->{'TYPECACHE'}->{$node->type()}
-        if (exists($self->{'TYPECACHE'}->{$node->type()}));
+    my $type  = $node->type();
+    my $class = $node->class();
 
-    return $self->{'TYPECACHE'}->{$node->class()}
-        if (exists($self->{'TYPECACHE'}->{$node->class()}));
+    #
+    # These special cases will eventually be encoded in the DB.
+    #
+    $type = "protogeni"
+	if ($type eq "pcfedphys" || $type eq "pcfed");
+
+    return $self->{'TYPECACHE'}->{$type}
+        if (exists($self->{'TYPECACHE'}->{$type}));
+
+    return $self->{'TYPECACHE'}->{$class}
+        if (exists($self->{'TYPECACHE'}->{$class}));
 
     return undef;
 }
@@ -796,8 +828,7 @@ sub TypeCache($$)
 # Wrapper class for the type/class specific packages below.
 #
 package libossetup_handler;
-use vars qw(@ISA);
-@ISA = qw(libossetup);
+use base qw(libossetup);
 
 use libdb;
 use libtestbed;
@@ -806,6 +837,7 @@ use libtblog;
 use Node;
 use English;
 use Data::Dumper;
+use overload ('""' => 'Stringify');
 
 sub New($$$)
 {
@@ -903,6 +935,8 @@ sub WaitForNode($$)
 sub WaitDone($@)
 {
     my ($self, @nodelist) = @_;
+    my $parent     = $self->parent();
+    my $experiment = $parent->experiment();
 
     foreach my $node (@nodelist) {
 	my $node_id = $node->node_id();
@@ -916,14 +950,25 @@ sub WaitDone($@)
     return 0;
 }
 
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+    
+    my $type = $self->type();
+
+    return "[$type]";
+}
+
 #####################################################################
 #
 # Generic handler for local cluster nodes that do not require much
 # special handling.
 #
 package libossetup_pc;
-use vars qw(@ISA);
-@ISA = qw(libossetup_handler);
+use base qw(libossetup_handler);
 
 use libdb;
 use libtestbed;
@@ -932,6 +977,7 @@ use libtblog;
 use Node;
 use English;
 use Data::Dumper;
+use overload ('""' => 'Stringify');
 
 #
 # A constructor for an object to handle all nodes of this type.
@@ -989,7 +1035,7 @@ sub AddNode($$)
     }
     $node->_retrycount(1);
     $node->_maxwait($waittime);
-    $node->_bootstatus(TBDB_NODESTATE_UNKNOWN);
+    $node->_setupstatus($libossetup::SETUP_OKAY);
 
     return 0;
 }
@@ -1014,17 +1060,22 @@ sub WaitDone($@)
     # Then per node processing.
     #
     foreach my $node (@nodelist) {
-	my $node_id    = $node->node_id();
-	my $bootstatus = $node->_bootstatus();
+	my $node_id     = $node->node_id();
+	my $setupstatus = $node->_setupstatus();
+	my $eventstate  = $node->eventstate();
 
-	if ($bootstatus eq TBDB_NODESTATE_ISUP()) {
+	if ($eventstate eq TBDB_NODESTATE_ISUP()) {
 	    print "$node_id is alive and well\n";
 	    $node->SetBootStatus(NODEBOOTSTATUS_OKAY);
 	    $node->SetAllocState(TBDB_ALLOCSTATE_RES_READY());
+	    # Set this so we know a successful reboot was done.
+	    # Important for VMs that depend on this node.
+	    $node->_rebooted(1)
+		if ($node->_setupoperation() != $libossetup::NOSTATE);
 	    next;
 	}
 	# Fall through on failure.	
-	if ($bootstatus eq TBDB_NODESTATE_TBFAILED()) {
+	if ($eventstate eq TBDB_NODESTATE_TBFAILED()) {
 	    tbwarn("$node_id reported a TBFAILED event\n");
 	}
 	else {
@@ -1032,7 +1083,10 @@ sub WaitDone($@)
 	}
 	$node->SetBootStatus(NODEBOOTSTATUS_FAILED);
 
-	if ($node->_canfail() &&
+	#
+	# Reload failures are terminal.
+	#
+	if ($node->_canfail() && $setupstatus != $libossetup::RELOAD_FAILED &&
 	    !($experiment->canceled() || $parent->noretry())) {
 
 	    $parent->add_failed_node_inform_user($node_id);
@@ -1065,7 +1119,12 @@ sub WaitDone($@)
 	$node->SetAllocState(TBDB_ALLOCSTATE_DOWN());
 	$self->IncrFailCount();
 	$parent->IncrFailCount();
-	$parent->add_failed_node_fatal($node_id);
+	if ($setupstatus == $libossetup::RELOAD_FAILED) {
+	    $parent->add_failed_node_reload($node_id);
+	}
+	else {
+	    $parent->add_failed_node_fatal($node_id);
+	}
     }
     return 0;
 }
@@ -1090,15 +1149,16 @@ sub Retry($$)
 # stuff.
 #
 package libossetup_virtnode;
-use vars qw(@ISA);
-@ISA = qw(libossetup_handler);
+use base qw(libossetup_handler);
 
 use libdb;
 use libtestbed;
 use libossetup;
+use libtblog;
 use Node;
 use English;
 use Data::Dumper;
+use overload ('""' => 'Stringify');
 
 #
 # A constructor for an object to handle all nodes of this type.
@@ -1172,7 +1232,7 @@ sub AddNode($$)
 
 	osload(\%reload_args, $reload_failures);
 
-	# Reset this. 
+	# Reset this. Updated in Volunteers() below. 
 	$node->_setupoperation($libossetup::NOSTATE);
     }
     return 0;
@@ -1188,14 +1248,17 @@ sub LightUpNodes($@)
     my $experiment = $parent->experiment();
     my $pid        = $experiment->pid();
     my $eid        = $experiment->eid();
+    my @nodeids    = map { $_->node_id() } @nodelist;
 
     tbnotice("Setting up virtual testbed nodes ...\n");
     TBDebugTimeStamp("vnode_setup starting");
-    system("$VNODESETUP -j $pid $eid @nodelist");
+    system("$VNODESETUP -j $pid $eid @nodeids");
     my $exitval = $?;
     TBDebugTimeStamp("vnode_setup done");
 
     if ($exitval) {
+	# This is very unusual.
+	$parent->noretry(1);
 	return -1;
     }
     return 0;
@@ -1213,7 +1276,7 @@ sub Volunteers($)
     # Look for nodes that we can do on this pass. Some nodes have
     # dependencies.
     #
-    foreach my $node ($self->nodelist()) {
+    foreach my $node ($self->todolist()) {
 	my $node_id     = $node->node_id();
 	my $pnode       = $node->_pnode();
 	my $pnode_id    = $pnode->node_id();
@@ -1242,7 +1305,7 @@ sub Volunteers($)
 	# dependency, and we can do it now. Otherwise, we have to
 	# wait to a later pass, after the physnode.
 	#
-	if (SameExperiment($reservation, $parent->experiment())) {
+	if ($reservation->SameExperiment($parent->experiment())) {
 	    #
 	    # If the node was rebooted, then we can determine if
 	    # the vnode is dead, or worth waiting for.
@@ -1271,7 +1334,7 @@ sub Volunteers($)
 		    # Something went wrong with the physnode reboot, so the
 		    # virtnodes are DOA.
 		    #
-		    $node->_bootstatus(TBDB_NODESTATE_UNKNOWN);
+		    $node->_setupstatus($libossetup::SETUP_OKAY);
 		    $typehandler->WaitDone($node);
 		    next;
 		}
@@ -1298,6 +1361,7 @@ sub Volunteers($)
 		else {
 		    print "Skipping $node_id this time around\n"
 			if ($parent->debug());
+		    next;
 		}
 	    }
 	}
@@ -1323,7 +1387,7 @@ sub Volunteers($)
 	else {
 	    $node->_maxwait($reboot_time + (40 * $pnode->_vnodecount()));
 	}
-	$node->_bootstatus(TBDB_NODESTATE_UNKNOWN);
+	$node->_seteupstatus($libossetup::SETUP_OKAY);
     }
     return @nodelist;
 }
@@ -1353,13 +1417,18 @@ sub WaitDone($@)
     my @failed     = ();
     
     #
+    # Must call the generic WaitDone handler too.
+    #
+    $self->SUPER::WaitDone(@nodelist);
+
+    #
     # See who booted okay; save failures for next loop.
     #
     foreach my $node (@nodelist) {
-	my $node_id    = $node->node_id();
-	my $bootstatus = $node->_bootstatus();
+	my $node_id     = $node->node_id();
+	my $eventstate  = $node->eventstate();
 
-	if ($bootstatus eq TBDB_NODESTATE_ISUP()) {
+	if ($eventstate eq TBDB_NODESTATE_ISUP()) {
 	    print "$node_id is alive and well\n";
 	    $node->SetBootStatus(NODEBOOTSTATUS_OKAY);
 	    $node->SetAllocState(TBDB_ALLOCSTATE_RES_READY());
@@ -1370,10 +1439,12 @@ sub WaitDone($@)
 	push(@failed, $node);
     }
     foreach my $node (@failed) {
-	my $node_id = $node->node_id();
+	my $node_id     = $node->node_id();
+	my $eventstate  = $node->eventstate();
+	my $setupstatus = $node->_setupstatus();
 
 	# Fall through on failure.	
-	if ($node->_bootstatus() eq TBDB_NODESTATE_TBFAILED()) {
+	if ($eventstate eq TBDB_NODESTATE_TBFAILED()) {
 	    tbwarn("$node_id reported a TBFAILED event\n");
 	}
 	else {
@@ -1399,21 +1470,22 @@ sub WaitDone($@)
 # Local virtual nodes. 
 #
 package libossetup_pcvm;
-use vars qw(@ISA);
-@ISA = qw(libossetup_virtnode);
+use base qw(libossetup_virtnode);
 
 use libdb;
 use libtestbed;
 use libossetup;
+use libtblog;
 use Node;
 use English;
 use Data::Dumper;
+use overload ('""' => 'Stringify');
 
 #
 # A constructor for an object to handle all nodes of this type.
 #
-sub New($$$) {
-    my ($class, $type, $parent) = @_;
+sub New($$) {
+    my ($class, $parent) = @_;
 
     my $self = $class->SUPER::New("pcvm", $parent);
     bless($self, $class);
@@ -1432,42 +1504,103 @@ sub AddNode($$)
 # This is a catchall for subnodes that do not have a type handler.
 #
 package libossetup_subnode;
-use vars qw(@ISA);
-@ISA = qw(libossetup_handler);
+use base qw(libossetup_handler);
 
 use libdb;
 use libtestbed;
 use libossetup;
+use libtblog;
 use Node;
 use English;
 use Data::Dumper;
+use overload ('""' => 'Stringify');
 
 #####################################################################
 #
-# Virtualized protogeni nodes.
-# 
-package libossetup_pcfed;
-use vars qw(@ISA);
-@ISA = qw(libossetup_handler);
-
-use libdb;
-use libtestbed;
-use libossetup;
-use Node;
-use English;
-use Data::Dumper;
-
-#####################################################################
+# All protogeni nodes.
 #
-# Physical protogeni nodes.
-# 
-package libossetup_pcfedphys;
-use vars qw(@ISA);
-@ISA = qw(libossetup_handler);
+package libossetup_protogeni;
+use base qw(libossetup_handler);
 
 use libdb;
 use libtestbed;
 use libossetup;
+use libtblog;
+use libGeni;
 use Node;
 use English;
 use Data::Dumper;
+use overload ('""' => 'Stringify');
+
+sub New($$) {
+    my ($class, $parent) = @_;
+
+    my $self = $class->SUPER::New("protogeni", $parent);
+    bless($self, $class);
+    return $self;
+}
+
+sub AddNode($$)
+{
+    my ($self, $node) = @_;
+
+    $self->SUPER::AddNode($node);
+
+    #
+    # Set up the retry count and the waittime.
+    #
+    my $waittime = (60 * 7);	# The default.
+    my $osinfo   = $node->_bootosinfo();
+
+    # Compute actual waittime.
+    if (defined($node->bios_waittime()) &&
+	defined($osinfo->reboot_waittime())) {
+	$waittime = ($node->bios_waittime() +
+		     $osinfo->reboot_waittime()) * 2;
+    }
+    $node->_retrycount(0);
+    $node->_maxwait($waittime);
+    $node->_setupstatus($libossetup::SETUP_OKAY);
+    return 0;
+}
+
+#
+# Protogeni are special.
+#
+# The problem with the current approach, is that this can happen in
+# parallel with all of os_setup; there are no dependencies. 
+#
+sub LightUpNodes($@)
+{
+    my ($self, @nodelist)  = @_;
+    my $parent     = $self->parent();
+    my $experiment = $parent->experiment();
+    my $pid        = $experiment->pid();
+    my $eid        = $experiment->eid();
+
+    TBDebugTimeStamp("Starting Geni setup.");
+    if (libGeni::StartSlivers($experiment,
+			      $parent->user(), 0, $parent->debug())) {
+	print STDERR "*** Could not start Geni slivers\n";
+	return 1;
+    }
+    TBDebugTimeStamp("Geni slivers have been started.");
+    return 0;
+}
+
+#
+# Nodes have signaled.
+#
+sub WaitDone($@)
+{
+    my ($self, @nodelist) = @_;
+    my $parent     = $self->parent();
+    my $experiment = $parent->experiment();
+
+    #
+    # I think this will work; just use the virtnode waitdone function.
+    #
+    return libossetup_virtnode::WaitDone($self, @nodelist);
+}
+
+1;
