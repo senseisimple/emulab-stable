@@ -7972,7 +7972,7 @@ COMMAND_PROTOTYPE(dodhcpdconf)
 		}
 
 		if (inner_elab_boot) {
-			res2 = mydb_query("select elabinelab_singlenet from experiments "
+			res2 = mydb_query("select elabinelab_singlenet from experiments where "
 					  "eid = '%s' and pid = '%s'", 1, row[5], row[6]);
 
 			if (!res2) {
