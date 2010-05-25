@@ -625,6 +625,14 @@ sub stateTransition($$) {
 	!$valid{$mode}{$oldstate}{$newstate}) {
 	notify("Invalid transition for node $node from $mode/$oldstate " .
 	       "to $newstate\n");
+        # XXX: Bad hack for TPM booting paper: this ought to be in the
+        # database, not harcoded here for a specific op_mode
+        # Let specifc op_modes drive nodes into particular states on invalid
+        # transitions
+        if ($mode eq TBDB_NODEOPMODE_SECURELOAD) {
+            $newstate = TBDB_NODESTATE_SECVIOLATION;
+            notify("Moving $node to $newstate because it's in $mode\n");
+        }
     }
 
     my $now = time();
