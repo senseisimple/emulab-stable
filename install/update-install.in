@@ -1,0 +1,292 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+
+#
+# Update DB.
+#
+sub usage()
+{
+    print STDERR "Usage: update-install [-v] [-s] [-f] [<version>]\n";
+    exit(-1);
+}
+my $optlist = "dsfvp:qa:ci";
+my $debug   = 0;
+my $force   = 0;
+my $single  = 0;
+my $verify  = 0;
+my $quiet   = 0;
+my $check   = 0;
+my $impotent= 0;
+my $path    = ".";
+my $phase;
+my $version;
+my $verify_count = 0;
+my $logfp;
+
+#
+# Configure variables
+#
+my $TB	      = "@prefix@";
+my $TBOPS     = "@TBOPSEMAIL@";
+my $logfile   = "/var/tmp/install.$$";
+
+# Protos
+sub Fatal($);
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Do not modify the include path if it was specified when invoked.
+# This allows update to run from the build tree.
+#
+BEGIN
+{
+    eval "require emdbi";
+    if ($@) {
+	unshift(@INC, "@prefix@/lib");
+    }
+}
+use emdb;
+use libtestbed;
+use libinstall;
+
+# Need this below.
+my $objdir = `/bin/pwd`;
+chomp($objdir);
+
+#
+# Parse command arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"a"})) {
+    $phase = $options{"a"};
+    Fatal("Phase (-a) must be either 'pre' or 'post'")
+	if (! ($phase eq "pre" || $phase eq "post"));
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"c"})) {
+    $check = 1;
+}
+if (defined($options{"i"})) {
+    $impotent = 1;
+}
+if (defined($options{"f"})) {
+    $force = 1;
+}
+if (defined($options{"v"})) {
+    $verify = 1;
+}
+if (defined($options{"q"})) {
+    $quiet = 1;
+}
+if (defined($options{"p"})) {
+    $path = $options{"p"};
+}
+if (defined($options{"s"})) {
+    $single = 1;
+    if (@ARGV != 1) {
+	Fatal("Must provide a version argument when using -s option");
+    }
+}
+if (@ARGV > 1) {
+    usage();
+}
+$version = shift()
+    if (@ARGV);
+
+#
+# Must be root if actually doing this.
+#
+if ($UID && !($impotent || $check || $verify)) {
+    Fatal("This script must be run as root! Maybe use sudo?")
+}
+
+if ($impotent) {
+    open(LOGFP, "> $logfile")
+	or Fatal("Could not open $logfile");
+    $logfp = *LOGFP;
+
+    SET_IMPOTENT_MODE($logfp);
+}
+
+#
+# If no version number provided, then grab it from the DB.
+#
+if (!defined($version)) {
+    my $query_result =
+	DBQueryFatal("select value from version_info ".
+		     "where name='install'");
+    if (!$query_result || !$query_result->numrows) {
+	$version = "5.0";
+
+	DBQueryFatal("insert into version_info ".
+		     "values ('install', '$version')");
+    }
+    else {
+	($version) = $query_result->fetchrow_array();
+    }
+}
+if (! ($version =~ /^[\d\.]+$/)) {
+    Fatal("'$version' does not look like a reasonable starting version.");
+}
+
+#
+# Split apart the version number. Assumed to be in dotted notation.
+#
+my @dots  = split(/\./, "$version");
+my $start = pop(@dots);
+
+#
+# If no dots, then assume the current directory. 
+#
+if (@dots) {
+    my $dir = join("/", @dots);
+    $path = "$path/$dir";
+}
+unshift(@INC, "$path");
+
+my @files;
+
+if ($single) {
+    Fatal("Update file $start does not exist")
+	if (! -e "$path/$start");
+    # Just the one file.
+    @files = ($start);
+}
+else {
+    #
+    # Open up the current directory. We want all numbered files.
+    #
+    opendir(DIR, $path) or
+	Fatal("Could not opendir the current directory");
+    @files  = grep { /^\d*$/ } readdir(DIR);
+    closedir(DIR);
+}
+
+#
+# Sort them since we we want to start at the right file, and proceed
+# in order.
+#
+@files = sort {$a <=> $b} @files;
+
+#
+# Now process each file starting at the start version.
+#
+sub RunUpdates($)
+{
+    my ($phase) = @_;
+    
+    foreach my $file (@files) {
+	next
+	    if (!$force && !$single && $file <= $start);
+	next
+	    if ($single && $file != $start);
+
+	my $fullpath = join("/", @dots) . "/$file";
+	my $revision = join(".", @dots);
+	$revision .= (@dots ? "." : "") . $file;
+
+	if ($verify) {
+	    print "Need install update $fullpath\n";
+	    $verify_count++;
+	    next;
+	}
+
+	if ($check) {
+	    print "Syntax checking update $fullpath\n";
+	}
+	elsif ($impotent) {
+	    print "*** Processing (impotent mode) update $fullpath\n";
+	}
+	else {
+	    print "*** Processing update $fullpath\n";
+	}
+
+	# Undefine this to make sure we get a new version each file.
+	undef &InstallUpdate;
+
+	# This just loads the file.
+	my $return = do $file;
+	if (!defined($return)) {
+	    Fatal("  could not parse $fullpath: $@") if $@;
+	    Fatal("  could not do $fullpath: $!")    if $!;
+	}
+	next
+	    if ($check);
+	
+	SET_TESTBED_VERSION($revision);
+    
+	# Then we run it.
+	if (InstallUpdate($revision, $phase, $impotent) != 0) {
+	    Fatal("  returned non-zero; aborting.\n");
+	}
+	# Mark that we have done it. 
+	DBQueryFatal("update version_info set value='$revision' ".
+		     "where name='install'")
+	    if (!$single && !$force && !$impotent && $phase eq "post");
+    }
+}
+
+if ($verify) {
+    RunUpdates("pre");
+    
+    exit($verify_count)
+	if (!$verify_count || $quiet);
+
+    print "*** You have install update scripts that have not been run.\n";
+    print "    As a safety measure, you will not be able to install until\n";
+    print "    this is resolved.\n";
+    exit($verify_count);
+}
+elsif ($check) {
+    print "Syntax checking updates ...\n";
+    RunUpdates("pre");
+    exit(0);
+}
+elsif ($impotent) {
+    print "Running (impotent mode) pre-install updates  ...\n";
+    RunUpdates("pre");
+    print "Running (impotent mode) post-install updates  ...\n";
+    RunUpdates("post");
+    exit(0);
+}
+
+#
+# When no phase is specifed, run both phases.
+#
+if (!defined($phase)) {
+    print "Running pre-install updates ...\n";
+    RunUpdates("pre");
+    print "Running post-install updates ...\n";
+    RunUpdates("post");
+    exit(0);
+}
+RunUpdates($phase);
+exit(0);
+
+sub Fatal($)
+{
+    my ($msg) = @_;
+
+    die("*** $0:\n".
+	"    $msg\n");
+}

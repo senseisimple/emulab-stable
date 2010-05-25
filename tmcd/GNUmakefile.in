@@ -174,8 +174,7 @@ control-install: tmcc
 	@$(MAKE) -C freebsd control-install
 
 subboss-install: client
-	@$(MAKE) -C $(MDSUBDIR) install
-	@$(MAKE) -C common subboss-install
+	@$(MAKE) -C $(MDSUBDIR) subboss-install
 
 client-install: client
 	@$(MAKE) -C $(MDSUBDIR) install

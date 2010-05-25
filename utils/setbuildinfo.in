@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Set the version and build info into the DB, at a toplevel install.
@@ -14,7 +14,7 @@ use POSIX qw(strftime);
 # Configure variables
 #
 my $DBNAME    = '@TBDBNAME@';
-my $DBMIGRATE = "@top_srcdir@/sql/database-migrate.txt";
+my $SRCDIR    = "@top_srcdir@";
 
 #
 # We use the bare Mysql module instead of the testbed libdb, so that this
@@ -47,6 +47,33 @@ my $query_result =
 if (!$query_result) {
     die("*** $0:\n".
 	"    Unable to set sitevar 'general/version/build' to $buildinfo\n");
+}
+
+$query_result =
+    $dbh->query("replace into version_info set ".
+		"   name='buildinfo', value=$buildinfo");
+if (!$query_result) {
+    die("*** $0:\n".
+	"    Unable to set version_info 'buildinfo' to $buildinfo\n");
+}
+
+#
+# Also store the Git hash into the DB so we can inspect it.
+#
+my $hash = `cd $SRCDIR; tools/git/current_branch_head`;
+if ($?) {
+    die("*** $0:\n".
+	"    Unable to get commit hash for source tree\n");
+}
+chomp($hash);
+$hash = $dbh->quote($hash);
+
+$query_result =
+    $dbh->query("replace into version_info set ".
+		"   name='commithash', value=$hash");
+if (!$query_result) {
+    die("*** $0:\n".
+	"    Unable to set version_info 'commithash' to $hash\n");
 }
 
 exit(0);

@@ -82,15 +82,9 @@ my $diff = (system("$sitevarsdiff $db_sitevars $master_sitevars") >> 8);
 unlink($db_sitevars);
 
 if ($diff) {
-
-    print << "EOSTR";
-
-The sitevariables from $master_sitevars differs from
-the running database. As a safety measure, you will not be able to install
-until this is resolved. Please see the SQL statements above. 
-
-EOSTR
-
+    print "*** Your sitevariables are out of date with $master_sitevars.\n";
+    print "    As a safety measure, you will not be able to install until\n";
+    print "    this is resolved.\n";
     exit(1);
 } else {
     exit(0);

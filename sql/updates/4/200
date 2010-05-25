@@ -45,6 +45,10 @@ sub DoUpdate($$$)
 		 "    'forwarding_protocols','ethernet','string' ".
 		 "from node_types where isswitch=1");
 
+    DBQueryFatal("replace into table_regex values ".
+		 "  ('node_types','isswitch','text','redirect',".
+		 "   'default:boolean',0,0,NULL)");
+
     # Add another missing regex entry for os_info table.
     DBQueryFatal("replace into table_regex values ".
 		 "  ('os_info','mfs','int','redirect',".

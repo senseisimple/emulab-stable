@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2009 University of Utah and the Flux Group.
+# Copyright (c) 2009-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -13,16 +13,20 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print STDERR "Usage: dbupdate [-s | -f] <dbname> [<version>]\n";
+    print STDERR "Usage: dbupdate [-v] [-s] [-f] <dbname> [<version>]\n";
     exit(-1);
 }
-my $optlist = "dsf";
+my $optlist = "dsfvp:q";
 my $debug   = 0;
 my $force   = 0;
 my $single  = 0;
+my $verify  = 0;
+my $quiet   = 0;
+my $path;
 my $dbname;
 my $version;
 my $dbnumber = 0;	# XXX Core emulab code is very rigid.
+my $verify_count = 0;
 
 #
 # Configure variables
@@ -30,6 +34,7 @@ my $dbnumber = 0;	# XXX Core emulab code is very rigid.
 my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $DEFDBNAME	= "@TBDBNAME@";
+my $testbed_srcdir = "@top_srcdir@";
 
 # Protos
 sub Fatal($);
@@ -44,10 +49,23 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 #
 $| = 1; 
 
-# Load the Testbed support stuff.
-use lib "@prefix@/lib";
+#
+# Do not modify the include path if it was specified when invoked.
+# This allows update to run from the build tree.
+#
+BEGIN
+{
+    eval "require emdbi";
+    if ($@) {
+	unshift(@INC, "@prefix@/lib");
+    }
+}
 use emdbi;
 use libtestbed;
+
+# Need this below.
+my $objdir = `/bin/pwd`;
+chomp($objdir);
 
 #
 # Parse command arguments.
@@ -61,6 +79,17 @@ if (defined($options{"d"})) {
 }
 if (defined($options{"f"})) {
     $force = 1;
+}
+if (defined($options{"q"})) {
+    $quiet = 1;
+}
+if (defined($options{"v"})) {
+    $verify = 1;
+}
+if (defined($options{"p"})) {
+    $path = $options{"p"};
+    chdir($path) or
+	Fatal("$path does not exist");
 }
 if (defined($options{"s"})) {
     $single = 1;
@@ -172,6 +201,12 @@ foreach my $file (@files) {
     my $revision = join(".", @dots);
     $revision .= (@dots ? "." : "") . $file;
 
+    if ($verify) {
+	print "Need DB update $fullpath\n";
+	$verify_count++;
+	next;
+    }
+
     print "Processing update $fullpath\n";
 
     # Undefine this to make sure we get a new version each file.
@@ -193,7 +228,18 @@ foreach my $file (@files) {
 			 "where name='dbrev'")
 	if (!$single && !$force);
 }
+if ($verify) {
+    exit($verify_count)
+	if (!$verify_count || $quiet);
 
+    my $updatedir = "$testbed_srcdir/sql/updates";
+    $updatedir =~ s/^\.\.\///;
+
+    print "*** Your have DB update scripts that have not been run.\n";
+    print "    As a safety measure, you will not be able to install until\n";
+    print "    this is resolved.\n";
+    exit($verify_count);
+}
 exit(0);
 
 sub Fatal($)
@@ -203,3 +249,4 @@ sub Fatal($)
     die("*** $0:\n".
 	"    $msg\n");
 }
+
