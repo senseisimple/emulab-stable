@@ -407,7 +407,7 @@ if (defined($pid)) {
 # 1) To avoid an explosion in the number of features for nodes
 # 2) To avoid information leaks, allowing projects to see each other's images
 # 
-my $osidquery = "select distinct o.osid, oi.type, o.osname, o.pid, o.OS, o.version, o.description from os_info as o " .
+my $osidquery = "select distinct o.osid, oi.type, o.osname, o.pid, o.OS, o.version, o.description,o.protogeni_export from os_info as o " .
 	"left join osidtoimageid as oi on o.osid = oi.osid " .
 	"left join images as i on oi.imageid = i.imageid ".
 	"where i.global = 1";
@@ -447,14 +447,18 @@ my %node_latitudes;
 my %node_longitudes;
 $result = DBQueryFatal($osidquery);
 while (my ($osid,$type,$osname,$ospid,$osos,
-	   $osversion,$osdescription) = $result->fetchrow()) {
+	   $osversion,$osdescription,$geni) = $result->fetchrow()) {
     if ($typemap{$type}) {
-	push(@{ $typemap{$type}->{'OSLIST'} }, $osid);
-	$osid_name{$osid} = $osname;
-	$osid_pid{$osid} = $ospid;
-	$osid_os{$osid} = $osos;
-	$osid_version{$osid} = $osversion;
-	$osid_description{$osid} = $osdescription;
+	my $default = $typemap{$type}->{'OSID'};
+	if ($geni eq 1 ||
+	    (defined($default) && $default eq $osid)) {
+	    push(@{ $typemap{$type}->{'OSLIST'} }, $osid);
+	    $osid_name{$osid} = $osname;
+	    $osid_pid{$osid} = $ospid;
+	    $osid_os{$osid} = $osos;
+	    $osid_version{$osid} = $osversion;
+	    $osid_description{$osid} = $osdescription;
+	}
     }
     if ($node_type_osids{$type}) {
 	push @{$node_type_osids{$type}}, $osid;
