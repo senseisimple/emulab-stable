@@ -42,7 +42,6 @@ my $CVSSUPPORT  = @CVSSUPPORT@;
 my $BUGDBSUPPORT= @BUGDBSUPPORT@;
 my $WIKISUPPORT = @WIKISUPPORT@;
 my $QUOTA_FSLIST= '@FS_WITH_QUOTAS@';
-my $LOGDIR      = "$PREFIX/log";
 my $ETCDIR      = "$PREFIX/etc";
 my $LIBDIR      = "$PREFIX/lib";
 my $SCRATCHDIR =  '@FSDIR_SCRATCH@';
@@ -183,13 +182,11 @@ my $PW         = "/usr/sbin/pw";
 my $PATCH      = "/usr/bin/patch";
 my $NEWALIASES = "/usr/bin/newaliases";
 my $SH         = "/bin/sh";
-my $PKG_INFO   = "/usr/sbin/pkg_info";
 my $PKG_ADD    = "/usr/sbin/pkg_add";
 my $PKG_DEL    = "/usr/sbin/pkg_delete";
 my $PWD        = "/bin/pwd";
 my $CP         = "/bin/cp";
 my $MV         = "/bin/mv";
-my $GMAKE      = "/usr/local/bin/gmake";
 my $ENV        = "/usr/bin/env";
 my $MOUNT      = "/sbin/mount";
 my $TAR	       = "/usr/bin/tar";
@@ -234,12 +231,9 @@ my $MYSQL_LOGDIR    = "$LOGDIR/mysql";
 #
 my $LIST_DIR      = "/etc/mail/lists";
 my $TIPLOG_DIR    = "/var/log/tiplogs";
-my $PORTSDIR      = "/usr/ports";
 my $PORTSMISCDIR  = "$PORTSDIR/misc";
 my $SRCDIR        = '@srcdir@';
 my $TOP_SRCDIR    = "@top_srcdir@";
-my $RCDIR         = "/usr/local/etc/rc.d";
-my $VARRUN        = "/var/run";
 
 #
 # And some lists that we use
@@ -840,16 +834,16 @@ Phase "syslog", "Setting up syslog", sub {
 	    # Find the cron line, after which we place our auth.info line
 	    #
 	    if ($line =~ /^cron/) {
-		print SC "# " . MAGIC_TESTBED_START . "\n";
+		print SC "# " . MAGIC_TESTBED_START() . "\n";
 		print SC "auth.info\t\t\t\t\t/var/log/logins\n";
-		print SC "# " . MAGIC_TESTBED_END . "\n";
+		print SC "# " . MAGIC_TESTBED_END() . "\n";
 	    }
 	}
 
 	#
 	# Put a few more lines at the end
 	#
-	print SC "# " . MAGIC_TESTBED_START . "\n";
+	print SC "# " . MAGIC_TESTBED_START() . "\n";
 	print SC "!capture\n";
 	print SC "*.*\t\t\t\t\t\t/var/log/tiplogs/capture.log\n";
 	print SC "!mountd\n";
@@ -858,7 +852,7 @@ Phase "syslog", "Setting up syslog", sub {
 	print SC "*.*\t\t\t\t\t\t${LOGDIR}/pubsubd.log\n";
 	print SC "!elvin_gateway\n";
 	print SC "*.*\t\t\t\t\t\t${LOGDIR}/elvin_gateway.log\n";
-	print SC "# " . MAGIC_TESTBED_END . "\n";
+	print SC "# " . MAGIC_TESTBED_END() . "\n";
 	close SC;
     };
 

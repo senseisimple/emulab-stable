@@ -1,3 +1,8 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
 my $pairs = $ARGV[0];
 
 my $count = $pairs * 2;

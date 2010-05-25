@@ -1685,26 +1685,6 @@ sub SetupReload($$$)
 }
 
 #
-# Fork a process to exec a command. Return the pid to wait on.
-#
-sub ForkCmd($) {
-    my ($cmd) = @_;
-    my($mypid);
-
-    $mypid = fork();
-    if ($mypid) {
-	return $mypid;
-    }
-
-    if ($dbg) {
-	print STDERR "Forking command: $cmd\n";
-    }
-
-    system($cmd);
-    exit($? >> 8);
-}
-
-#
 # Setup the firewall node before anything else.
 #
 sub FirewallSetup($)

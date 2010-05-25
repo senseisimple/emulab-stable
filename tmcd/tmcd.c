@@ -73,6 +73,11 @@
 #define XSTRINGIFY(s)   STRINGIFY(s)
 #define STRINGIFY(s)	#s
 
+/* XXX backward compat */
+#ifndef TBCOREDIR
+#define	TBCOREDIR	TBROOT "/tmp"
+#endif
+
 /* socket read/write timeouts in ms */
 #define READTIMO	3000
 #define WRITETIMO	3000
@@ -110,6 +115,7 @@ int		debug = 0;
 static int	verbose = 0;
 static int	insecure = 0;
 static int	byteswritten = 0;
+static char	pidfile[MAXPATHLEN];
 static char     dbname[DBNAME_SIZE];
 static struct in_addr myipaddr;
 static char	fshostid[HOSTID_SIZE];
@@ -412,6 +418,7 @@ cleanup()
 	signal(SIGHUP, SIG_IGN);
 	killme = 1;
 	killpg(0, SIGHUP);
+	unlink(pidfile);
 }
 
 static void
@@ -495,7 +502,11 @@ main(int argc, char **argv)
 		loginit(0, 0);
 	else {
 		/* Become a daemon */
-		daemon(0, 0);
+		if (chdir(TBCOREDIR)) {
+			daemon(0, 0);
+		} else {
+			daemon(1, 0);
+		}
 		loginit(1, "tmcd");
 	}
 	info("daemon starting (version %d)\n", CURRENT_VERSION);
@@ -573,8 +584,8 @@ main(int argc, char **argv)
 	 * Stash the pid away.
 	 */
 	mypid = getpid();
-	sprintf(buf, "%s/tmcd.pid", _PATH_VARRUN);
-	fp = fopen(buf, "w");
+	sprintf(pidfile, "%s/tmcd.pid", _PATH_VARRUN);
+	fp = fopen(pidfile, "w");
 	if (fp != NULL) {
 		fprintf(fp, "%d\n", mypid);
 		(void) fclose(fp);
@@ -4474,7 +4485,8 @@ mydb_query(char *query, int ncols, ...)
 
 	va_start(ap, ncols);
 	n = vsnprintf(querybuf, sizeof(querybuf), query, ap);
-	if (n > sizeof(querybuf)) {
+	va_end(ap);
+	if (n >= sizeof(querybuf)) {
 		error("query too long for buffer\n");
 		return (MYSQL_RES *) 0;
 	}
@@ -4530,7 +4542,8 @@ mydb_update(char *query, ...)
 
 	va_start(ap, query);
 	n = vsnprintf(querybuf, sizeof(querybuf), query, ap);
-	if (n > sizeof(querybuf)) {
+	va_end(ap);
+	if (n >= sizeof(querybuf)) {
 		error("query too long for buffer\n");
 		return 1;
 	}
@@ -4766,7 +4779,14 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp, char* nodekey)
 	if (row[4] && row[5]) {
 		strncpy(reqp->pid, row[4], sizeof(reqp->pid));
 		strncpy(reqp->eid, row[5], sizeof(reqp->eid));
-		reqp->exptidx = atoi(row[25]);
+		if (row[25])
+			reqp->exptidx = atoi(row[25]);
+		else {
+			error("iptonodeid: %s: in non-existent experiment %s/%s!\n",
+			      inet_ntoa(ipaddr), reqp->pid, reqp->eid);
+			mysql_free_result(res);
+			return 1;
+		}
 		reqp->allocated = 1;
 
 		if (row[6])
@@ -7952,7 +7972,7 @@ COMMAND_PROTOTYPE(dodhcpdconf)
 		}
 
 		if (inner_elab_boot) {
-			res2 = mydb_query("select elabinelab_singlenet from experiments "
+			res2 = mydb_query("select elabinelab_singlenet from experiments where "
 					  "eid = '%s' and pid = '%s'", 1, row[5], row[6]);
 
 			if (!res2) {
@@ -8190,16 +8210,15 @@ COMMAND_PROTOTYPE(dotpmblob)
 			"where node_id='%s' ",
 			1, reqp->nodeid);
 
-	if (!res){
+	if (!res) {
 		error("gettpmblob: %s: DB error getting tpmblob\n",
-			reqp->nodeid);
+		      reqp->nodeid);
 		return 1;
 	}
 
 	nrows = mysql_num_rows(res);
-
-	if (!nrows){
-		error("%s: no tpmblob in database for this node.\n",
+	if (!nrows) {
+		error("%s: no node_hostkeys info in the database!\n",
 			reqp->nodeid);
 		mysql_free_result(res);
 		return 1;
@@ -8207,23 +8226,25 @@ COMMAND_PROTOTYPE(dotpmblob)
 
 	row = mysql_fetch_row(res);
 	nlen = mysql_fetch_lengths(res);
-	if (!nlen || !nlen[0]){
-		error("%s: invalid blob length.\n",
-			reqp->nodeid);
+	if (!nlen || !nlen[0]) {
 		mysql_free_result(res);
+#if 0 /* not an error yet */
+		error("%s: no TPM blob.\n", reqp->nodeid);
 		return 1;
+#endif
+		return 0;
 	}
 
 	bufp += OUTPUT(bufp, bufe - bufp,
-		(hex ? "BLOBHEX=" : "BLOB="));
-	if (hex){
+		       (hex ? "BLOBHEX=" : "BLOB="));
+	if (hex) {
 		for (i = 0;i < nlen[0];++i)
 			bufp += OUTPUT(bufp, bufe - bufp,
-				"%.02x", (0xff & ((char)*(row[0]+i))));
-	} else{
+				       "%.02x", (0xff & ((char)*(row[0]+i))));
+	} else {
 		for (i = 0;i < nlen[0];++i)
 			bufp += OUTPUT(bufp, bufe - bufp,
-				"%c", (char)*(row[0]+i));
+				       "%c", (char)*(row[0]+i));
 	}
 	bufp += OUTPUT(bufp, bufe - bufp, "\n");
 
@@ -8251,13 +8272,22 @@ COMMAND_PROTOTYPE(dotpmpubkey)
 	}
 	nrows = mysql_num_rows(res);
 	if (!nrows) {
-		error("%s: no tpmx509 in database for this node.\n",
+		error("%s: no node_hostkeys info in the database!\n",
 			reqp->nodeid);
 		mysql_free_result(res);
 		return 1;
 	}
 
 	row = mysql_fetch_row(res);
+	if (!row || !row[0]) {
+		mysql_free_result(res);
+#if 0 /* not an error yet */
+		error("%s: no x509 cert.\n", reqp->nodeid);
+		return 1;
+#endif
+		return 0;
+	}
+
 	OUTPUT(buf, sizeof(buf), "TPMPUB=%s\n", row[0]);
 
 	client_writeback(sock, buf, strlen(buf), tcp);

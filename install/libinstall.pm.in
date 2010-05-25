@@ -1,15 +1,34 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003-2007 University of Utah and the Flux Group.
+# Copyright (c) 2003-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 #
-# A simple library for use in the installation scripts, to make them seem a
-# little more legitimate, instead of the quick hacks they are.
+# A simple library for use in the installation scripts, to make them
+# seem a little more legitimate, instead of the quick hacks they are.
 #
 use POSIX qw(strftime);
+use Exporter;
+use vars qw(@EXPORT $TOP_OBJDIR
+	    $TBROOT $LOGDIR $MAINSITE $PGENISUPPORT $GMAKE $PKG_INFO
+	    $PORTSDIR $VARRUN $RCDIR);
+
+@EXPORT = qw($TOP_OBJDIR
+	     $TBROOT $LOGDIR $MAINSITE $PGENISUPPORT $GMAKE $PKG_INFO
+	     $PORTSDIR $VARRUN $RCDIR);
+
+# Configure variables
+
+$TBROOT        = "@prefix@";
+$LOGDIR        = "$TBROOT/log";
+$MAINSITE      = @TBMAINSITE@;
+$PGENISUPPORT  = @PROTOGENI_SUPPORT@;
+$GMAKE         = "/usr/local/bin/gmake";
+$PKG_INFO      = "/usr/sbin/pkg_info";
+$PORTSDIR      = "/usr/ports";
+$VARRUN        = "/var/run";
+$RCDIR         = "/usr/local/etc/rc.d";
 
 #
 # Make sure that output gets printed right away
@@ -17,20 +36,38 @@ use POSIX qw(strftime);
 $| = 1;
 
 #
-# Magic string that shows up in files we've already edited 
+# Magic string that shows up in files already edited 
 #
-my $MAGIC_STRING = "testbed installation process";
+my $MAGIC_TESTBED_VERSION = "5.0";
+my $MAGIC_TESTBED_START   = "Added by Emulab - Version: ";
+my $MAGIC_TESTBED_END     = "End of Emulab added section";
 
-my $MAGIC_TESTBED_START = "The follwing lines were added by the $MAGIC_STRING";
-my $MAGIC_TESTBED_END = "End of testbed-added configuration";
+sub MAGIC_TESTBED_START { $MAGIC_TESTBED_START . $MAGIC_TESTBED_VERSION; }
+sub MAGIC_TESTBED_END   { $MAGIC_TESTBED_END; }
 
-sub MAGIC_TESTBED_START { $MAGIC_TESTBED_START; }
-sub MAGIC_TESTBED_END { $MAGIC_TESTBED_END; }
+# When used in update mode, printing is a little different.
+my $updatemode = 0;
+
+# Used by update-install to bump the version number.
+sub SET_TESTBED_VERSION($)  { $updatemode = $MAGIC_TESTBED_VERSION = $_[0]; }
+
+# Set by update-install.
+my $impotent   = 0;
+my $logfp;
+sub SET_IMPOTENT_MODE($)	    { $impotent = 1; $logfp = $_[0]; };
 
 #
 # Some programs we may call
 #
 my $FETCH = "/usr/bin/fetch";
+
+#
+# Figure out which directory we live in, so that some stages can do thing
+# relative to it.
+#
+$TOP_OBJDIR = `/usr/bin/dirname $0`;
+chomp $TOP_OBJDIR;
+$TOP_OBJDIR = "$TOP_OBJDIR/..";
 
 #
 # Let's pretend perl's exception mechanism has a sane name for the function
@@ -39,7 +76,7 @@ my $FETCH = "/usr/bin/fetch";
 sub throw(@) {
     die @_,"\n";
 }
- 
+
 #
 # Start a new installation phase
 #
@@ -73,14 +110,19 @@ sub Phase($$$) {
     my $descrstring = "| " x ($depth -1) . $descr;
     if ($firstSubPhase) {
 	print "\n";
+	printf $logfp "\n"
+	    if ($impotent);
     }
     printf "%-50s", $descrstring;
+    printf $logfp "%-50s", $descrstring
+	if ($impotent);
 
     #
     # Clear these, as we don't want to see the outputs of previous phases
     #
     @libinstall::lastExecOutput = ();
     $libinstall::lastCommand = undef;
+    @libinstall::loglines = ();
 
     #
     # Cool! TWO levels of Perl Hell just for me!
@@ -105,6 +147,8 @@ sub Phase($$$) {
     SWITCH: for ($@) {
 	(/^skip$/) && do {
 	    print "[ Skipped ($libinstall::reason) ]\n";
+	    print $logfp "[ Skipped ($libinstall::reason) ]\n"
+		if ($impotent && defined($logfp));
 	    $$parentSkipped++;
 	    $libinstall::phaseResults{$name} = $_;
 	    last SWITCH;
@@ -133,10 +177,24 @@ sub Phase($$$) {
 	    
 	    if ($hasSubPhase && $skipped && ($nonSkipped == 0)) {
 		print "[ Skipped   ] ($stamp)\n";
+		print $logfp "[ Skipped   ]\n"
+		    if ($impotent && defined($logfp));
 		$libinstall::phaseResults{$name} = "skip";
 		$$parentSkipped++;
 	    } else {
-		print "[ Succeeded ] ($stamp)\n";
+		if ($impotent) {
+		    if (defined($logfp)) {
+			print $logfp "[ $libinstall::reason ]\n";
+		    
+			print $logfp 
+			    "> " . join("\n> ", @libinstall::loglines) . "\n"
+			    if (@libinstall::loglines);
+		    }
+		    print "[ $libinstall::reason ]\n";
+		}
+		else {
+		    print "[ Succeeded ] ($stamp)\n";
+		}
 		$$parentNonSkipped++;
 		$libinstall::phaseResults{$name} = "succeed";
 	    }
@@ -164,7 +222,7 @@ sub Phase($$$) {
     # If we decided that we need to die, do that now
     #
     if ($die) {
-	print "\n\n##### Installation failed in phase $name. The error was:\n";
+	print "\n##### Installation failed in phase $name. The error was:\n";
 	print "$message\n";
 	PrintPhaseTrace();
 	PrintLastOutput();
@@ -217,6 +275,38 @@ sub PhaseWasSkipped($) {
 }
 
 #
+# For impotent mode.
+#
+sub PhaseWouldHave($) {
+    ($libinstall::reason) = (@_);
+    throw "succeed";
+}
+
+#
+# Also for impotent mode; detailed logging.
+#
+sub PhaseLog(@) {
+    (@libinstall::loglines) = (@_);
+}
+
+#
+# Also for impotent mode; log differences to a file.
+#
+sub DiffFiles($$) {
+    my ($src,$dst) = @_;
+
+    return
+	if (!$impotent);
+
+    if (! -e $dst) {
+	my $stuff = `cat $src`;
+	PhaseLog(split('\n', $stuff));
+    }
+    my $diff = `diff $src $dst`;
+    PhaseLog(split('\n', $diff));
+}
+    
+#
 # Check to see if the phase is already done, as evidenced by the existance of
 # a file
 #
@@ -246,8 +336,9 @@ sub DoneIfDoesntExist($) {
 sub DoneIfEdited($) {
     my ($filename) = @_;
     if (!$filename) { PhaseFail("Bad filename passed to DoneIfEdited"); }
+    my $magic_string = MAGIC_TESTBED_START();
     open(FH,$filename) or return;
-    if (grep /$MAGIC_STRING/, <FH>) {
+    if (grep /$magic_string/, <FH>) {
         close(FH);
 	PhaseSkip("File has already been edited");
     }
@@ -266,9 +357,44 @@ sub DoneIfIdentical($$) {
     if (!-e $filename1 || !-e $filename2) {
 	return;
     }
-    if (!ExecQuiet("cmp -s $filename1 $filename2")) {
+    system("cmp -s $filename1 $filename2");
+    if (! $?) {
 	PhaseSkip("Files $filename1 and $filename2 are identical");
     }
+}
+
+#
+# Done if package installed.
+#
+sub DoneIfPackageInstalled($) {
+    my ($pname) = @_;
+    my $foo = `$PKG_INFO -x $pname`;
+    if (! $?) {
+	PhaseSkip("already installed");
+    }
+}
+
+#
+# Backup a file or fail.
+#
+sub BackUpFileFatal($)
+{
+    my ($filename) = @_;
+    my $suffix     = time();
+    my $backup     = $filename . "-" . $suffix;
+
+    PhaseFail("$filename does not exist")
+	if (! -e $filename);
+
+    if (-e $backup) {
+	sleep(1);
+	$backup = $filename . "-" . time();
+	PhaseFail("$backup already exists")
+	    if (-e $backup);
+    }
+
+    ExecQuietFatal("/bin/cp -p $filename $backup")
+	if (!$impotent);
 }
 
 #
@@ -311,15 +437,21 @@ sub DoneIfMounted($)
 #
 sub AppendToFile($@) {
     my ($filename, @lines) = @_;
+
+    if ($impotent) {
+	PhaseLog(@lines);
+	PhaseWouldHave("append to $filename");
+	return undef;
+    }
     if (!-e $filename) {
 	return "File $filename does not exist";
     }
     open(FH,">>$filename") or return "Unable to open $filename for ".
 	"writing: $!";
 
-    print FH "# $MAGIC_TESTBED_START\n";
+    print FH "# " . MAGIC_TESTBED_START() . "\n";
     print FH map "$_\n", @lines;
-    print FH "# $MAGIC_TESTBED_END\n";
+    print FH "# " . MAGIC_TESTBED_END() . "\n";
 
     close(FH);
 
@@ -343,6 +475,12 @@ sub AppendToFileFatal($@) {
 #
 sub CreateFile($;@) {
     my ($filename,@lines) = @_;
+
+    if ($impotent) {
+	PhaseLog(@lines);
+	PhaseWouldHave("create $filename");
+	return undef;
+    }
     if (-e $filename) {
 	return "File $filename already exists";
     }
@@ -379,6 +517,12 @@ sub ExecQuiet(@) {
     # Use a pipe read, so that we save away the output
     #
     my $commandstr = join(" ",@_);
+
+    if ($impotent) {
+	PhaseWouldHave("exec($commandstr)");
+        return 0;
+    }
+    
     my @output = ();
     open(PIPE,"$commandstr 2>&1 |") or return -1;
     while (<PIPE>) {
@@ -409,14 +553,14 @@ sub ExecQuietFatal(@) {
 }
 
 #
-# HUP a daemon, if it's PID file exists. If we can't kill it, we assume that
+# Signal a daemon, if it's PID file exists. If we can't kill it, we assume that
 # it's because it wasn't running, and skip the phase. Fails if it has trouble
 # reading the pid file.
 # Takes the name of the daemon as an argument, and assumes
 # that the pid file is /var/run/$name.pid
 #
-sub HUPDaemon($) {
-    my ($name) = @_;
+sub SignalDaemon($$) {
+    my ($name,$sig) = @_;
     my $pidfile = "/var/run/$name.pid";
     PhaseSkip("$name is not running") unless (-e $pidfile);
     open(PID,$pidfile) or PhaseFail("Unable to open pidfile $pidfile");
@@ -425,9 +569,48 @@ sub HUPDaemon($) {
     close PID;
 
     PhaseFail("Bad pid ($pid) in $pidfile\n") unless ($pid =~ /^\d+$/);
-    if (!kill 1, $pid) {
-	PhaseSkip("$name does not seem to be running");
+
+    if ($impotent) {
+	PhaseWouldHave("signal($sig) $name");
+	return;
     }
+    if (!kill($sig, $pid)) {
+	PhaseSkip("$name is not running");
+    }
+}
+
+sub HUPDaemon($) {
+    my ($name) = @_;
+
+    SignalDaemon($name, 'HUP');
+}
+
+#
+# Restart a daemon if running. Do not start if not running.
+#
+sub RestartDaemon($;$) {
+    my ($name, $path) = @_;
+
+    my $pidfile = "$VARRUN/${name}.pid";
+
+    if (! -e "$VARRUN/stated.pid") {
+	PhaseSkip("Testbed not running");
+    }
+    if (!-e $pidfile) {
+	PhaseSkip("$name not running");
+    }
+    if ($impotent) {
+	PhaseWouldHave("restart $name");
+	return 1;
+    }
+    SignalDaemon($name, 'TERM');
+    sleep(1);
+    $path = "$TBROOT/sbin/$name"
+	if (!defined($path));
+    if (ExecQuiet($path) == 0) {
+	PhaseSucceed("$name started");
+    }
+    PhaseFail("Could not start $name");
 }
 
 #
@@ -436,6 +619,12 @@ sub HUPDaemon($) {
 #
 sub FetchFile($$) {
     my ($URL, $localname) = @_;
+
+    if ($impotent) {
+	PhaseLog("$URL --> $filename");
+	PhaseWouldHave("fetch $URL");
+	return 1;
+    }
     if (ExecQuiet("$FETCH -o $localname $URL")) {
 	return 0;
     } else {

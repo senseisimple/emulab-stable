@@ -15,6 +15,7 @@
 from urlparse import urlsplit, urlunsplit
 from urllib import splitport
 import xmlrpclib
+import M2Crypto
 from M2Crypto import X509
 import socket
 
@@ -250,6 +251,14 @@ def do_method(module, method, params, URI=None, quiet=False, version=None,
         return (-1, None)
     except xmlrpclib.ProtocolError, e:
         if not quiet: print >> sys.stderr, e.errmsg
+        return (-1, None)
+    except M2Crypto.SSL.Checker.WrongHost, e:
+        if not quiet:
+            print >> sys.stderr, "Warning: certificate host name mismatch."
+            print >> sys.stderr, "Please consult:"
+            print >> sys.stderr, "    http://www.protogeni.net/trac/protogeni/wiki/HostNameMismatch"            
+            print >> sys.stderr, "for recommended solutions."
+            print >> sys.stderr, e
         return (-1, None)
 
     #
