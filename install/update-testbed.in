@@ -167,6 +167,8 @@ if ($verify) {
     print "    this is resolved. Typically, you can resolve this by:\n\n";
     print "        boss> cd /your/object/dir\n";
     print "        boss> gmake update-testbed\n\n";
+    print "    More information is available at:\n";
+    print "       https://users.emulab.net/trac/emulab/wiki/install/update-testbed-v2\n\n";
     exit($exitval);
 }
 
