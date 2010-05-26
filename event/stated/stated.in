@@ -140,6 +140,9 @@ my $TB_OSID_MBKERNEL  = TB_OSID_MBKERNEL;
 # Special PXEBOOT state machine that all local nodes use.
 my $PXEKERNEL	 = "PXEKERNEL";
 
+# Even special-er SECURELOAD state machine that local nodes may use.
+my $SECURELOAD	 = "SECURELOAD";
+
 # Protos.
 sub debug(@);
 sub fatal($);
@@ -723,6 +726,19 @@ sub stateTransition($$) {
 		    info("$node: Forcing mode transition into $PXEKERNEL!\n");
 		    opModeTransition($node, $PXEKERNEL, 1);
 		    $mode=$PXEKERNEL;
+		}
+		next;
+	    };
+	    /^SECURELOAD$/ && do {
+		#
+		# Force machine into the SECURELOAD op_mode.
+		# Currently triggered only by receipt of GPXEBOOTING state.
+		#
+		debug("Running $SECURELOAD trigger\n");
+		if ($mode ne $SECURELOAD) {
+		    info("$node: Forcing mode transition into $SECURELOAD!\n");
+		    opModeTransition($node, $SECURELOAD, 1);
+		    $mode=$SECURELOAD;
 		}
 		next;
 	    };
