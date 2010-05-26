@@ -1212,7 +1212,7 @@ function PAGEFOOTER($view = NULL) {
                 </ul>
                 <!-- begin copyright -->
                 <span class='copyright'>
-                <a href='$TBDOCBASE/docwrapper.php3?docname=copyright.html'>
+                <a href=$TBDOCBASE/copyright.php>
                     Copyright &copy; 2000-$year The University of Utah</a>
                 </span>\n";
     }
