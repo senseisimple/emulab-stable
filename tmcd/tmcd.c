@@ -4315,6 +4315,39 @@ COMMAND_PROTOTYPE(dostate)
 
 }
 
+/* There are probably classic functions available to do this but I couldn't
+ * find one that will convert two bytes of ACII to one byte.  sscanf writes a
+ * full int and atoi gives us an int too
+ */
+static unsigned char hextochar(char *in)
+{
+	unsigned char lh, rh;
+
+	lh = in[0];
+	if (lh >= '0' && lh <= '9')
+		lh = lh - '0';
+	else if (lh >= 'A' && lh <= 'F')
+		lh = lh - 'A' + 10;
+	else if (lh >= 'a' && lh <= 'f')
+		lh = lh - 'a' + 10;
+
+	rh = in[1];
+	if (rh >= '0' && rh <= '9')
+		rh = rh - '0';
+	else if (rh >= 'A' && rh <= 'F')
+		rh = rh - 'A' + 10;
+	else if (rh >= 'a' && rh <= 'f')
+		rh = rh - 'a' + 10;
+
+	return (lh << 4) | rh;
+}
+
+static int ishex(char in)
+{
+	return ((in >= 'a' && in <= 'f') || (in >= 'A' && in <= 'F') ||
+	    (in >= '0' && in <= '9'));
+}
+
 /*
  * Report that the node has entered a new state - secure version: the report
  * includes a TPM quote that will be checked against the database.
@@ -4325,7 +4358,7 @@ COMMAND_PROTOTYPE(dostate)
 COMMAND_PROTOTYPE(dosecurestate)
 {
 	char 		newstate[128];	/* More then we will ever need */
-        char            quote[512];
+        char            quote[1024];
         char            pcomp[256];
         unsigned char   quote_bin[256];
         unsigned char   pcomp_bin[128];
@@ -4352,9 +4385,9 @@ COMMAND_PROTOTYPE(dosecurestate)
 	 * Dig out state that the node is reporting and the quote
 	 */
 	if (rdata == NULL ||
-	    sscanf(rdata, "%128s %512s %256s", newstate, quote, pcomp) != 3 ||
-	    strlen(newstate) == sizeof(newstate) ||
-	    strlen(quote) == sizeof(quote) || strlen(pcomp) == sizeof(pcomp)) {
+	    sscanf(rdata, "%127s %1023s %255s", newstate, quote, pcomp) != 3 ||
+	    strlen(newstate) + 1 == sizeof(newstate) || strlen(quote) + 1 ==
+	    sizeof(quote) || strlen(pcomp) + 1 == sizeof(pcomp)) {
 		error("SECURESTATE: %s: Bad arguments\n", reqp->nodeid);
 		return 1;
 	}
@@ -4368,11 +4401,12 @@ COMMAND_PROTOTYPE(dosecurestate)
         quotelen = strlen(quote)/2;
         printf("quotelen is %d\n",quotelen);
         for (i = 0; i < quotelen; i++) {
-            if (sscanf(quote+(i*2),"%2x",&(quote_bin[i])) != 1) {
-                error("SECURESTATE: %s: Error parsing quote\n", reqp->nodeid);
-                // XXX: return error to client
-                return 1;
-            }
+		if (!ishex(quote[i * 2]) || !ishex(quote[i * 2 + 1])) {
+			error("Error parsing quote\n");
+			// XXX: Send error to client
+			return 1;
+		}
+		quote_bin[i] = hextochar(&quote[i * 2]);
         }
 
         if ((strlen(pcomp) % 2) != 0) {
@@ -4381,11 +4415,12 @@ COMMAND_PROTOTYPE(dosecurestate)
         }
         pcomplen = strlen(pcomp)/2;
         for (i = 0; i < pcomplen; i++) {
-            if (sscanf(pcomp+(i*2),"%2x",&(pcomp_bin[i])) != 1) {
-                error("SECURESTATE: %s: Error parsing pcomp\n", reqp->nodeid);
-                // XXX: return error to client
-                return 1;
-            }
+		if (!ishex(pcomp[i * 2]) || !ishex(pcomp[i * 2 + 1])) {
+			error("Error parsing pcomp\n");
+			// XXX: Send error to client
+			return 1;
+		}
+		pcomp_bin[i] = hextochar(&pcomp[i * 2]);
         }
 
         /*
